@@ -1,3 +1,5 @@
+import { bytesToHex as nobleBytesToHex, hexToBytes as nobleHexToBytes } from '@noble/hashes/utils';
+
 /** Ensure hex string has 0x prefix */
 export function ensure0x(hex: string): string {
   return hex.startsWith('0x') ? hex : `0x${hex}`;
@@ -13,19 +15,15 @@ export function padHex64(hex: string): string {
   return `0x${stripHex(hex).padStart(64, '0')}`;
 }
 
-/** Convert a hex string (with or without 0x prefix) to a Uint8Array. */
+/**
+ * Convert a hex string (with or without 0x prefix) to a Uint8Array.
+ * Throws on invalid hex (non-hex characters, odd length).
+ */
 export function hexToBytes(hex: string): Uint8Array {
-  const clean = stripHex(hex);
-  const bytes = new Uint8Array(clean.length / 2);
-  for (let i = 0; i < bytes.length; i++) {
-    bytes[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16);
-  }
-  return bytes;
+  return nobleHexToBytes(stripHex(hex));
 }
 
 /** Convert a Uint8Array to a hex string (no 0x prefix). */
 export function bytesToHex(bytes: Uint8Array): string {
-  return Array.from(bytes)
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
+  return nobleBytesToHex(bytes);
 }

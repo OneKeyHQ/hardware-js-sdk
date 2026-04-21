@@ -27,6 +27,8 @@ function createMockConnector(): IConnector & {
       }
     },
 
+    connectionType: 'usb' as const,
+
     searchDevices: jest.fn().mockResolvedValue([
       {
         connectId: 'dev-1',

@@ -157,16 +157,17 @@ export class LedgerAdapter implements IHardwareWallet {
   // satisfy the IHardwareWallet interface with sensible defaults.
 
   get activeTransport(): TransportType | null {
-    return 'hid';
+    // Ledger all-current-models use USB-HID for wired connection.
+    return this.connector.connectionType === 'ble' ? 'ble' : 'hid';
   }
 
   getAvailableTransports(): TransportType[] {
-    return ['hid'];
+    return this.activeTransport ? [this.activeTransport] : [];
   }
 
   async switchTransport(_type: TransportType): Promise<void> {
-    // Transport is fixed at connector creation time.
-    // To switch transport, create a new LedgerAdapter with a different connector.
+    // Ledger binds a single connector (transport) at construction time.
+    // To use a different transport, create a new adapter with a different connector.
   }
 
   // ---------------------------------------------------------------------------

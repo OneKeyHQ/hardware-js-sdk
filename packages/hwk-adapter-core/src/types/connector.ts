@@ -1,4 +1,4 @@
-import type { DeviceCapabilities, DeviceInfo, VendorType } from './device';
+import type { ConnectionType, DeviceCapabilities, DeviceInfo, VendorType } from './device';
 import type { UiResponseEvent } from '../events/ui-request';
 
 // =====================================================================
@@ -55,6 +55,9 @@ export interface ConnectorEventMap {
 }
 
 export interface IConnector {
+  /** Physical connection type this connector uses. Fixed at construction. */
+  readonly connectionType: ConnectionType;
+
   searchDevices(): Promise<ConnectorDevice[]>;
   connect(deviceId?: string): Promise<ConnectorSession>;
   disconnect(sessionId: string): Promise<void>;
@@ -119,7 +122,11 @@ export interface IHardwareBridge {
  * Use this anywhere the actual hardware lives behind a process / context boundary
  * (Electron main, extension background, native module, worker, iframe).
  */
-export function createBridgedConnector(vendor: VendorType, bridge: IHardwareBridge): IConnector {
+export function createBridgedConnector(
+  vendor: VendorType,
+  connectionType: ConnectionType,
+  bridge: IHardwareBridge
+): IConnector {
   // Map from typed IConnector handlers to the bridge handler so we can
   // unregister them correctly via off().
   const handlerMap = new Map<
@@ -128,6 +135,7 @@ export function createBridgedConnector(vendor: VendorType, bridge: IHardwareBrid
   >();
 
   return {
+    connectionType,
     searchDevices: () => bridge.searchDevices({ vendor }),
     connect: deviceId => bridge.connect({ vendor, deviceId }),
     disconnect: sessionId => bridge.disconnect({ vendor, sessionId }),

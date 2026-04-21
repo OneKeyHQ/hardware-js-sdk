@@ -136,7 +136,7 @@ export class LedgerConnectorBase implements IConnector {
 
   private readonly _createTransport: TransportFactory;
 
-  private readonly _connectionType: ConnectionType;
+  public readonly connectionType: ConnectionType;
 
   // ---------------------------------------------------------------------------
   // ConnectId <-> DMK path mapping
@@ -201,7 +201,7 @@ export class LedgerConnectorBase implements IConnector {
     }
   ) {
     this._createTransport = createTransport;
-    this._connectionType = options?.connectionType ?? 'usb';
+    this.connectionType = options?.connectionType ?? 'usb';
     this._providedDmk = options?.dmk;
     this._importLedgerKit = options?.importLedgerKit ?? defaultLedgerKitImporter;
     if (this._providedDmk) {
@@ -287,7 +287,7 @@ export class LedgerConnectorBase implements IConnector {
       if (descriptors.length === 0) {
         throw new Error(
           `No Ledger device found. Make sure the device is connected${
-            this._connectionType === 'ble' ? ' nearby with Bluetooth enabled' : ' via USB'
+            this.connectionType === 'ble' ? ' nearby with Bluetooth enabled' : ' via USB'
           } and unlocked.`
         );
       }
@@ -307,7 +307,7 @@ export class LedgerConnectorBase implements IConnector {
           firmwareVersion: 'unknown',
           deviceId: path,
           connectId: externalConnectId,
-          connectionType: this._connectionType,
+          connectionType: this.connectionType,
           capabilities: { persistentDeviceIdentity: false },
         },
       };
@@ -337,7 +337,7 @@ export class LedgerConnectorBase implements IConnector {
         if (descriptors.length === 0) {
           throw new Error(
             `No Ledger device found after retry. Make sure the device is connected${
-              this._connectionType === 'ble' ? ' nearby with Bluetooth enabled' : ' via USB'
+              this.connectionType === 'ble' ? ' nearby with Bluetooth enabled' : ' via USB'
             } and unlocked.`
           );
         }

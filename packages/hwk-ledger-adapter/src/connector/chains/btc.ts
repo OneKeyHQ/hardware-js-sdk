@@ -118,7 +118,7 @@ export async function btcSignTransaction(
   ctx: ConnectorContext,
   sessionId: string,
   params: BtcSignTransactionCallParams
-): Promise<{ signedPsbt: string }> {
+): Promise<{ signatures: string[]; serializedTx: string }> {
   if (!params.psbt) {
     throw Object.assign(
       new Error('Ledger requires PSBT format for BTC transaction signing. Provide params.psbt.'),
@@ -143,10 +143,9 @@ export async function btcSignTransaction(
 
     const wallet = new DefaultWallet(path, template);
 
-    // signTransaction: signs the PSBT and returns the fully extracted raw tx hex
     const signedTxHex = await btcSigner.signTransaction(wallet, params.psbt);
 
-    return { signedPsbt: stripHex(signedTxHex) };
+    return { signatures: [], serializedTx: stripHex(signedTxHex) };
   } catch (err) {
     ctx.invalidateSession(sessionId);
     throw ctx.wrapError(err);
