@@ -540,9 +540,12 @@ export class LedgerAdapter implements IHardwareWallet {
       '[LedgerAdapter] getChainFingerprint permission ok, calling _deriveAddressForFingerprint'
     );
     try {
-      const address = await this._deriveAddressForFingerprint(connectId, chain);
-      debugLog('[LedgerAdapter] getChainFingerprint address:', address?.substring(0, 20));
-      return success(deriveDeviceFingerprint(address));
+      const raw = await this._deriveAddressForFingerprint(connectId, chain);
+      debugLog('[LedgerAdapter] getChainFingerprint raw:', raw?.substring(0, 20));
+      // BTC raw is already the BIP32 master fingerprint (8 hex) — use as-is
+      // so the caller can reuse it for BIP380 descriptors / PSBT signing.
+      // Other chains: FNV-hash the derived address for an opaque seed identifier.
+      return success(chain === 'btc' ? raw : deriveDeviceFingerprint(raw));
     } catch (err) {
       debugError(
         '[LedgerAdapter] getChainFingerprint error in _deriveAddressForFingerprint:',
@@ -565,8 +568,10 @@ export class LedgerAdapter implements IHardwareWallet {
     if (!deviceId) return { success: true };
 
     try {
-      const address = await this._deriveAddressWithSession(sessionId, chain);
-      const fingerprint = deriveDeviceFingerprint(address);
+      const raw = await this._deriveAddressWithSession(sessionId, chain);
+      // Match getChainFingerprint's format: BTC uses raw master fingerprint,
+      // other chains use the FNV-derived identifier.
+      const fingerprint = chain === 'btc' ? raw : deriveDeviceFingerprint(raw);
       if (fingerprint === deviceId) {
         return { success: true };
       }
@@ -602,11 +607,12 @@ export class LedgerAdapter implements IHardwareWallet {
     }
 
     if (chain === 'btc') {
-      const result = (await this.connectorCall(connectId, 'btcGetPublicKey', {
-        path,
-        showOnDevice: false,
-      })) as { xpub: string };
-      return result.xpub;
+      // BTC fingerprint = BIP32 master fingerprint (8 hex). Dedicated device
+      // call; reusable as the xfp in BIP380 descriptors and PSBT signing.
+      const result = (await this.connectorCall(connectId, 'btcGetMasterFingerprint', {})) as {
+        masterFingerprint: string;
+      };
+      return result.masterFingerprint;
     }
 
     if (chain === 'sol') {
@@ -648,11 +654,12 @@ export class LedgerAdapter implements IHardwareWallet {
     }
 
     if (chain === 'btc') {
-      const result = (await this.connector.call(sessionId, 'btcGetPublicKey', {
-        path,
-        showOnDevice: false,
-      })) as { xpub: string };
-      return result.xpub;
+      // Mirrors _deriveAddressForFingerprint: BTC returns the BIP32 master
+      // fingerprint directly, so verification also compares it verbatim.
+      const result = (await this.connector.call(sessionId, 'btcGetMasterFingerprint', {})) as {
+        masterFingerprint: string;
+      };
+      return result.masterFingerprint;
     }
 
     if (chain === 'sol') {
