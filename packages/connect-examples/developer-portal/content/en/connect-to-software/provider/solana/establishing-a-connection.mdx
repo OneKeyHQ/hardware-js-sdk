@@ -4,7 +4,7 @@ title: Establishing a Connection
 
 # Establishing a Connection
 
-Once an application has [detected the provider](../detecting-the-provider), it can then request to connect to OneKey. This connection request will prompt the user for permission to share their public key, indicating that they are willing to interact further. Users must approve a connection request before the app can make additional requests such as [signing a message](../signing-a-message) or [sending a transaction](../sending-a-transaction).
+Once an application has [detected the provider](/en/connect-to-software/provider/solana/detecting-the-provider), it can then request to connect to OneKey. This connection request will prompt the user for permission to share their public key, indicating that they are willing to interact further. Users must approve a connection request before the app can make additional requests such as [signing a message](/en/connect-to-software/provider/solana/signing-a-message) or [sending a transaction](/en/connect-to-software/provider/solana/sending-a-transaction).
 
 Once permission is established for the first time, the web application's domain will be whitelisted for future connection requests. After a connection is established, it is possible to terminate the connection from both the application and the user side.
 
@@ -40,7 +40,7 @@ try {
 
 
 
-The `connect()` call will return a [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global\_Objects/Promise) that resolves when the user accepts the connection request, and reject (throw when awaited) when the user declines the request or closes the pop-up. See [Errors](../signing-a-message.md#errors) for a breakdown of error messages OneKey may emit.
+The `connect()` call will return a [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global\_Objects/Promise) that resolves when the user accepts the connection request, and reject (throw when awaited) when the user declines the request or closes the pop-up. See [Errors](/en/connect-to-software/provider/solana/signing-a-message#errors) for a breakdown of error messages OneKey may emit.
 
 When the user accepts the request to connect, the provider will also emit a `connect` event.
 

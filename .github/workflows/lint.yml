@@ -40,3 +40,6 @@ jobs:
           yarn bootstrap
           yarn build
           yarn lint
+
+      - name: Run Unit Tests
+        run: yarn test

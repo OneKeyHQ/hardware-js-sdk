@@ -18,6 +18,7 @@ export * from './events';
 export * from './types';
 export { whitelist, whitelistExtension } from './data/config';
 export { executeCallback, cleanupCallback };
+export { preloadSessionCache } from './device/Device';
 
 const HardwareSdk = ({
   init,

@@ -4,8 +4,13 @@ const ByteBuffer = require('bytebuffer');
 const { decode } = require('../src/serialization/protobuf/decode');
 const { decode: decodeProtocol } = require('../src/serialization/protocol/decode');
 
-// eslint-disable-next-line import/no-unresolved
-const messages = require('../messages.json');
+// Reuse the messages.json already committed alongside @onekeyfe/hd-core
+// (runtime data for DataManager). hd-transport's own messages.json is
+// generated locally via `./scripts/protobuf-build.sh` and gitignored —
+// pointing the test at core's committed copy avoids a ~300KB duplicate
+// while keeping the two in sync naturally (they are regenerated together
+// from the same firmware .proto source).
+const messages = require('../../core/src/data/messages/messages.json');
 
 const fixtures = [
   {

@@ -6,7 +6,7 @@ title: iOS：通过蓝牙连接（原生）
 
 > **注意：**
 > 演示：原生 iOS 示例（WKWebView + CoreBluetooth）→ [native-ios-example](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/native-ios-example)
-> 本页基于《[底层传输插件](../../concepts/low-level-plugin)》与消息协议，建议先阅读接口与 64 字节帧格式。
+> 本页基于《[底层传输插件](/zh/hardware-sdk/concepts/low-level-plugin)》与消息协议，建议先阅读接口与 64 字节帧格式。
 
 
 本页面展示如何通过底层适配器在原生 iOS 宿主中集成 `@onekeyfe/hd-common-connect-sdk`。JavaScript 包在 WKWebView 中运行；传输调用被转发到原生 CoreBluetooth 并桥接回 JS。
@@ -275,5 +275,5 @@ bridge.register(handlerName: "closeUIWindow") { _, callback in
 
 ## 参考
 
-- 消息协议（64 字节帧）：[见底层传输插件](../../concepts/low-level-plugin#消息协议包含在底层传输中)
-- 底层传输插件契约：[底层传输插件](../../concepts/low-level-plugin)
+- 消息协议（64 字节帧）：[见底层传输插件](/zh/hardware-sdk/concepts/low-level-plugin#消息协议包含在底层传输中)
+- 底层传输插件契约：[底层传输插件](/zh/hardware-sdk/concepts/low-level-plugin)

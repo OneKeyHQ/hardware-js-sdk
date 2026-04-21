@@ -2,17 +2,17 @@
  * SDK Factory — creates and initializes the hardware SDK instance
  * for CLI usage with the appropriate transport.
  *
- * CRITICAL: Must register UI event handlers for PIN, Passphrase, and Button
- * confirmation. Without these, the SDK will hang waiting for responses.
- *
- * Reference: packages/core/src/core/index.ts (event registration pattern)
+ * Passphrase flow aligns with app-monorepo CLI:
+ *   - Standard wallet: --use-empty-passphrase, auto-respond
+ *   - Hidden wallet: interactive 1/2/3 selection (standard / pinentry / on-device)
+ *   - Session caching: passphraseState + sessionId stored in OS keychain,
+ *     preloaded via preloadSessionCache on next invocation
  */
 
-// @ts-ignore - hd-common-connect-sdk may not have type declarations
+import { execFile, execFileSync } from 'node:child_process';
+import * as readline from 'node:readline';
 import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
 import { DEVICE, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
-import { UsbPlugin } from '@onekeyfe/hd-transport-usb';
-import * as readline from 'readline';
 
 import type { ConnectSettings } from '@onekeyfe/hd-core';
 
@@ -23,133 +23,221 @@ export interface SDKOptions {
 }
 
 /**
- * Prompt user for input in the terminal (hidden for PIN).
- * Falls back to empty string in non-TTY (piped) mode.
+ * Current per-invocation CLI options. Event handlers read from this object
+ * so that invoking createSDK() with different opts never results in stale
+ * closure captures — the SDK is a singleton, but opts can change per call.
  */
-function promptUser(question: string, hidden = false): Promise<string> {
+let currentOpts: SDKOptions = {};
+
+/**
+ * Promise-singleton that resolves to the initialised SDK. Set on first call,
+ * reused by all subsequent (and concurrent) callers.
+ *
+ * Using a Promise instead of a boolean flag eliminates the race where two
+ * concurrent createSDK() calls could both pass the "initialised?" check
+ * before the flag was set, then both run init() — each call replaces the
+ * internal Core/Connector at the hd-core layer and leaks USB handles.
+ *
+ * Mirrors app-monorepo's apps/cli/src/commands/device/hardware-sdk.ts
+ * (sdkReadyPromise). Cleared by disposeSDK() so REPL/test harnesses can
+ * re-init cleanly after an explicit tear-down.
+ */
+let sdkReadyPromise: Promise<typeof HardwareSDK> | null = null;
+
+// ---------------------------------------------------------------------------
+// Pinentry — secure passphrase input via native OS dialog
+// ---------------------------------------------------------------------------
+
+const PINENTRY_PROGRAMS = ['pinentry-mac', 'pinentry', 'pinentry-gnome3', 'pinentry-qt'];
+
+function findPinentry(): string | null {
+  for (const prog of PINENTRY_PROGRAMS) {
+    try {
+      const result = execFileSync('which', [prog], {
+        encoding: 'utf-8',
+        timeout: 2000,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      if (result.trim()) return prog;
+    } catch {
+      // not found
+    }
+  }
+  return null;
+}
+
+function promptPassphraseViaPinentry(): Promise<{
+  value: string;
+  passphraseOnDevice: boolean;
+}> {
+  return new Promise((resolve, reject) => {
+    const pinentryBin = findPinentry();
+    if (!pinentryBin) {
+      process.stderr.write('[onekey-hw] No pinentry found, falling back to on-device entry.\n');
+      resolve({ value: '', passphraseOnDevice: true });
+      return;
+    }
+
+    const commands = [
+      'SETDESC OneKey Hardware Wallet',
+      'SETPROMPT Enter passphrase',
+      'GETPIN',
+      'BYE',
+    ].join('\n');
+
+    const child = execFile(
+      pinentryBin,
+      [],
+      { timeout: 120_000, encoding: 'utf-8' },
+      (error, stdout) => {
+        if (error) {
+          if (error.killed || (stdout && stdout.includes('ERR 83886179'))) {
+            process.stderr.write(
+              '[onekey-hw] Passphrase entry cancelled, falling back to on-device.\n'
+            );
+            resolve({ value: '', passphraseOnDevice: true });
+            return;
+          }
+          reject(error);
+          return;
+        }
+
+        const dataLine = stdout.split('\n').find(l => l.startsWith('D '));
+        if (dataLine) {
+          resolve({ value: dataLine.slice(2), passphraseOnDevice: false });
+          return;
+        }
+
+        if (stdout.includes('ERR 83886179') || stdout.includes('Operation cancelled')) {
+          process.stderr.write(
+            '[onekey-hw] Passphrase entry cancelled, falling back to on-device.\n'
+          );
+          resolve({ value: '', passphraseOnDevice: true });
+          return;
+        }
+
+        // Empty passphrase — on-device
+        resolve({ value: '', passphraseOnDevice: true });
+      }
+    );
+
+    child.stdin?.write(commands);
+    child.stdin?.end();
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Interactive prompts
+// ---------------------------------------------------------------------------
+
+/**
+ * Prompt user to select wallet type (aligns with app-monorepo flow):
+ *   1. Standard wallet (no passphrase)
+ *   2. Hidden wallet — enter passphrase via pinentry (secure OS dialog)
+ *   3. Hidden wallet — enter passphrase on device screen
+ */
+function resolvePassphraseByChoice(
+  choice: '1' | '2' | '3'
+): Promise<{ value: string; passphraseOnDevice: boolean }> {
+  if (choice === '1') return Promise.resolve({ value: '', passphraseOnDevice: false });
+  if (choice === '2') return promptPassphraseViaPinentry();
+  return Promise.resolve({ value: '', passphraseOnDevice: true });
+}
+
+function promptPassphraseMode(): Promise<{
+  value: string;
+  passphraseOnDevice: boolean;
+}> {
   if (!process.stdin.isTTY) {
-    // Non-interactive mode: return empty (agent should handle via uiResponse)
-    return Promise.resolve('');
+    return Promise.resolve({ value: '', passphraseOnDevice: true });
   }
 
   return new Promise(resolve => {
     const rl = readline.createInterface({
       input: process.stdin,
-      output: process.stderr, // Use stderr so JSON stdout stays clean
+      output: process.stderr,
+      terminal: true,
     });
 
-    if (hidden) {
-      // Mute output for PIN entry
-      process.stderr.write(question);
-      const { stdin } = process;
-      const wasRaw = stdin.isRaw;
-      if (stdin.setRawMode) stdin.setRawMode(true);
+    const prompt = () => {
+      process.stderr.write(
+        [
+          '[onekey-hw] Select wallet type:',
+          '  1. Standard wallet (no passphrase)',
+          '  2. Hidden wallet — enter passphrase on this computer (pinentry)',
+          '  3. Hidden wallet — enter passphrase on device screen',
+          '',
+        ].join('\n')
+      );
 
-      let input = '';
-      const onData = (char: Buffer) => {
-        const c = char.toString('utf8');
-        if (c === '\n' || c === '\r' || c === '\u0004') {
-          if (stdin.setRawMode) stdin.setRawMode(wasRaw ?? false);
-          stdin.removeListener('data', onData);
-          process.stderr.write('\n');
+      rl.question('Enter selection [1/2/3]: ', answer => {
+        const n = answer.trim() as '1' | '2' | '3';
+        if (n === '1' || n === '2' || n === '3') {
           rl.close();
-          resolve(input);
-        } else if (c === '\u0003') {
-          // Ctrl+C
-          process.exit(1);
-        } else if (c === '\u007F' || c === '\b') {
-          // Backspace
-          input = input.slice(0, -1);
-        } else {
-          input += c;
-          process.stderr.write('*');
+          resolvePassphraseByChoice(n).then(resolve);
+          return;
         }
-      };
-      stdin.on('data', onData);
-    } else {
-      rl.question(question, answer => {
-        rl.close();
-        resolve(answer);
+        process.stderr.write('Invalid selection. Enter 1, 2, or 3.\n');
+        prompt();
       });
-    }
+    };
+    prompt();
   });
 }
 
-/**
- * Register UI event handlers for interactive device operations.
- *
- * The SDK emits events when the device needs user interaction:
- * - PIN entry (entered on device screen for Touch/Pro, or via matrix for Classic)
- * - Passphrase input (for hidden wallets)
- * - Button confirmation (user must physically press on device)
- *
- * Reference: packages/core/src/core/index.ts lines 315-330, 1021-1098
- */
-function registerEventHandlers(sdk: typeof HardwareSDK, opts: SDKOptions): void {
-  sdk.on(UI_EVENT, (message: any) => {
-    // PIN Request
-    // For Touch/Pro devices, PIN is entered on-device (device screen shows numpad).
-    // For Classic devices, PIN uses a matrix mapping.
-    // In CLI context, we auto-acknowledge since PIN entry happens on-device.
-    if (message.type === UI_REQUEST.REQUEST_PIN) {
-      const pinType = message.payload?.type;
+// ---------------------------------------------------------------------------
+// Event handlers
+// ---------------------------------------------------------------------------
 
-      if (pinType === 'ButtonRequest_PinEntry' || pinType === 'ButtonRequest_AttachPin') {
-        // PIN is entered directly on device screen (Touch/Pro)
-        process.stderr.write('[onekey-hw] Please enter PIN on your device screen...\n');
-        // No uiResponse needed — device handles PIN input internally
-      } else {
-        // Classic devices: PIN entry via matrix
-        // In CLI mode, prompt user or let agent handle
-        process.stderr.write('[onekey-hw] PIN required. Please enter PIN on your device.\n');
-        promptUser('PIN (on-device numpad mapping): ', true).then(pin => {
-          sdk.uiResponse({
-            type: UI_RESPONSE.RECEIVE_PIN,
-            payload: pin,
-          });
-        });
-      }
+function registerEventHandlers(sdk: typeof HardwareSDK): void {
+  sdk.on(UI_EVENT, (message: any) => {
+    // PIN Request — always on-device for CLI security (no terminal echo).
+    // The sentinel '@@ONEKEY_INPUT_PIN_IN_DEVICE' makes DeviceCommands send
+    // `BixinPinInputOnDevice` so the device switches to on-device PIN entry.
+    // Sending an empty string would be treated as a wrong (empty) PIN and
+    // would consume a PIN retry on Classic/1S/Mini/Pure.
+    // Touch/Pro never emit PinMatrixRequest — they handle PIN on touchscreen
+    // before this code path runs, so the sentinel is harmless there.
+    if (message.type === UI_REQUEST.REQUEST_PIN) {
+      process.stderr.write('[onekey-hw] Please enter PIN on your device screen...\n');
+      sdk.uiResponse({
+        type: UI_RESPONSE.RECEIVE_PIN,
+        payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
+      });
     }
 
     // Passphrase Request
-    // User must provide passphrase for hidden wallet access.
-    // Passphrase can be entered on-device (Touch/Pro) or via host.
     if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
-      if (opts.useEmptyPassphrase) {
-        // Standard wallet (no passphrase)
+      // 1. Explicit --use-empty-passphrase: auto-respond
+      if (currentOpts.useEmptyPassphrase) {
         sdk.uiResponse({
           type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-          payload: {
-            value: '',
-            passphraseOnDevice: false,
-            save: false,
-          },
+          payload: { value: '', passphraseOnDevice: false, save: false },
         });
-      } else {
-        process.stderr.write('[onekey-hw] Passphrase required for hidden wallet.\n');
-        promptUser('Enter passphrase (or press Enter for on-device entry): ').then(passphrase => {
-          if (passphrase === '') {
-            // Enter on device
-            sdk.uiResponse({
-              type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-              payload: {
-                value: '',
-                passphraseOnDevice: true,
-                save: false,
-              },
-            });
-          } else {
-            sdk.uiResponse({
-              type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-              payload: {
-                value: passphrase,
-                passphraseOnDevice: false,
-                save: false,
-              },
-            });
-          }
-        });
+        return;
       }
+
+      // 2. Interactive: 1/2/3 selection
+      promptPassphraseMode()
+        .then(result => {
+          sdk.uiResponse({
+            type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+            payload: {
+              value: result.value,
+              passphraseOnDevice: result.passphraseOnDevice,
+              save: false,
+            },
+          });
+        })
+        .catch(() => {
+          process.stderr.write(
+            '[onekey-hw] Passphrase prompt failed, falling back to on-device.\n'
+          );
+          sdk.uiResponse({
+            type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+            payload: { value: '', passphraseOnDevice: true, save: false },
+          });
+        });
     }
 
     // Passphrase On Device
@@ -158,42 +246,73 @@ function registerEventHandlers(sdk: typeof HardwareSDK, opts: SDKOptions): void 
     }
 
     // Button Confirmation
-    // User must physically press confirm/reject on the device.
     if (message.type === UI_REQUEST.REQUEST_BUTTON) {
       process.stderr.write('[onekey-hw] Please confirm the action on your device...\n');
     }
   });
 
-  // Device connection events — only show when device has a known name
   sdk.on(DEVICE.CONNECT, (device: any) => {
     const name = device?.label || device?.name;
-    if (name) {
-      process.stderr.write(`[onekey-hw] Device connected: ${name}\n`);
-    }
+    if (name) process.stderr.write(`[onekey-hw] Device connected: ${name}\n`);
   });
 
   sdk.on(DEVICE.DISCONNECT, (device: any) => {
     const name = device?.label || device?.name;
-    if (name) {
-      process.stderr.write(`[onekey-hw] Device disconnected: ${name}\n`);
-    }
+    if (name) process.stderr.write(`[onekey-hw] Device disconnected: ${name}\n`);
   });
 }
 
-export async function createSDK(opts: SDKOptions) {
+// ---------------------------------------------------------------------------
+// SDK Factory
+// ---------------------------------------------------------------------------
+
+async function initSDK(): Promise<typeof HardwareSDK> {
   const settings: Partial<ConnectSettings> = {
     debug: false,
     fetchConfig: true,
+    env: 'node-usb',
   };
+  await HardwareSDK.init(settings);
 
-  // Direct USB via libusb — works on macOS, Linux, Windows
-  settings.env = 'lowlevel';
-  const plugin = UsbPlugin;
-
-  await HardwareSDK.init(settings, undefined, plugin);
-
-  // Register event handlers AFTER init
-  registerEventHandlers(HardwareSDK, opts);
+  // Defensive: strip any stale listeners (e.g. left over from a previous
+  // dispose/init cycle in a long-running process) before wiring ours.
+  // Mirrors app-monorepo's cleanupHardwareSDKInstance() which removes
+  // listeners for ALL events at once.
+  // @ts-expect-error CoreApi types require an event name; passing none
+  // removes listeners for ALL events (Node.js EventEmitter semantics).
+  HardwareSDK.removeAllListeners();
+  registerEventHandlers(HardwareSDK);
 
   return HardwareSDK;
+}
+
+export async function createSDK(opts: SDKOptions): Promise<typeof HardwareSDK> {
+  // Always refresh opts — event handlers read from the module-level ref,
+  // so subsequent createSDK() calls pick up new opts without re-registering.
+  currentOpts = opts;
+
+  if (!sdkReadyPromise) {
+    sdkReadyPromise = initSDK();
+  }
+  return sdkReadyPromise;
+}
+
+/**
+ * Release the SDK and clear the singleton. Must be called before the CLI
+ * process exits — the USB transport holds open handles (event listeners,
+ * polling timers) that otherwise keep Node.js alive for ~26s.
+ *
+ * Safe to call multiple times (no-op after the first successful call).
+ */
+export async function disposeSDK(): Promise<void> {
+  if (!sdkReadyPromise) return;
+  try {
+    const sdk = await sdkReadyPromise;
+    sdk.dispose();
+  } catch {
+    // ignore errors during cleanup
+  } finally {
+    sdkReadyPromise = null;
+    currentOpts = {};
+  }
 }

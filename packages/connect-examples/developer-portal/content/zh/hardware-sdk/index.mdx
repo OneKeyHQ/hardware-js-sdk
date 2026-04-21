@@ -6,7 +6,9 @@ import { ExternalLink, Play, Monitor } from 'lucide-react'
 
 # 简介
 
-面向开发者的 OneKey 硬件钱包集成文档，适用于 Web 和原生应用。本指南涵盖 SDK 安装、初始化、设备发现、UI 提示处理，以及首次签名调用。
+面向开发者的 OneKey 硬件钱包集成文档，适用于 Web 和原生应用。
+
+本页是**入门层** —— 帮你选对 SDK 包并装上。端到端流程（搜设备 → 事件 → PIN/passphrase → 首次签名）和参数、事件、错误处理的完整说明，请看 [Core API Guide](/zh/hardware-sdk/core-api-guide)。
 
 ## 选择传输协议
 
@@ -122,123 +124,15 @@ await HardwareSDK.init({
 });
 ```
 
-## 绑定事件
+## 下一步
 
-设置设备连接和 UI 提示的事件监听器：
+`HardwareSDK.init(...)` 完成之后，剩下的流程 —— 设备发现、事件绑定、PIN/passphrase 处理、签名 —— 都在 [Core API Guide](/zh/hardware-sdk/core-api-guide) 里端到端讲清楚了：
 
-```ts
-import { UI_EVENT, UI_REQUEST, DEVICE } from '@onekeyfe/hd-core';
-
-HardwareSDK.on(UI_EVENT, async (message) => {
-  switch (message.type) {
-    case UI_REQUEST.REQUEST_PIN:
-      // 处理 PIN 输入（见下文）
-      break;
-    case UI_REQUEST.REQUEST_PASSPHRASE:
-      // 处理密码短语输入（见下文）
-      break;
-  }
-});
-
-HardwareSDK.on(DEVICE.CONNECT, (payload) => console.log('已连接:', payload));
-HardwareSDK.on(DEVICE.DISCONNECT, (payload) => console.log('已断开:', payload));
-```
-
-## 发现设备
-
-### WebUSB 授权（浏览器）
-
-```ts
-import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
-
-// 触发浏览器设备选择器
-await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
-```
-
-### 搜索设备
-
-```ts
-const result = await HardwareSDK.searchDevices();
-if (!result.success) throw new Error(result.payload.error);
-
-const devices = result.payload;
-// [{ connectId, deviceId?, name, deviceType, ... }]
-```
-
-### 获取设备特征
-
-从 `connectId` 解析 `device_id`（BLE 连接必需）：
-
-```ts
-const features = await HardwareSDK.getFeatures(connectId);
-if (!features.success) throw new Error(features.payload.error);
-
-const deviceId = features.payload.device_id;
-```
-
-> **重要：** `connectId` 可长期缓存（设备重置不影响）；`device_id` 在设备重置/恢复后会变化，需要重新 `getFeatures` 刷新。
-
-## 处理 PIN 输入
-
-当执行受保护的调用且设备已锁定时，处理 `REQUEST_PIN`：
-
-```ts
-import { UI_RESPONSE } from '@onekeyfe/hd-core';
-
-// 方式 1：在设备上输入（推荐）
-await HardwareSDK.uiResponse({
-  type: UI_RESPONSE.RECEIVE_PIN,
-  payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE'
-});
-
-// 方式 2：软件盲输 PIN（Pro/Touch 不支持）
-await HardwareSDK.uiResponse({
-  type: UI_RESPONSE.RECEIVE_PIN,
-  payload: userInputPin  // 例如 '1234'
-});
-```
-
-> **注意：** OneKey Pro 和 Touch 设备仅支持设备端 PIN 输入。
-
-## 处理密码短语
-
-访问隐藏钱包时，处理 `REQUEST_PASSPHRASE`：
-
-```ts
-// 方式 1：在设备上输入（最安全）
-await HardwareSDK.uiResponse({
-  type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-  payload: { passphraseOnDevice: true, value: '' }
-});
-
-// 方式 2：软件输入，可选会话缓存
-await HardwareSDK.uiResponse({
-  type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-  payload: { value: userPassphrase, passphraseOnDevice: false, save: true }
-});
-```
-
-强制使用标准钱包（跳过密码短语），在任意方法调用中添加 `useEmptyPassphrase: true`。
-
-## 首次签名调用
-
-示例：签名 EVM 消息（EIP-191 personal_sign）：
-
-```ts
-const message = 'Hello OneKey';
-const messageHex = Buffer.from(message).toString('hex');
-
-const res = await HardwareSDK.evmSignMessage(connectId, deviceId, {
-  path: "m/44'/60'/0'",
-  messageHex,
-  chainId: 1,
-});
-
-if (!res.success) throw new Error(res.payload.error);
-
-console.log('地址:', res.payload.address);
-console.log('签名:', res.payload.signature);
-```
+- 标准生命周期（`init → search → getFeatures → subscribe → call + uiResponse → cleanup`）：[Core API Guide → 标准生命周期](/zh/hardware-sdk/core-api-guide#standard-lifecycle)
+- 所有方法都接受的调用参数：[通用参数](/zh/hardware-sdk/core-api-guide#common-params)
+- 标识符参考（`connectId` / `deviceId` / `passphraseState` / …）：[Identifiers](/zh/hardware-sdk/concepts/identifiers)
+- PIN 输入流程：[PIN 码](/zh/hardware-sdk/concepts/pin)
+- Passphrase / 隐藏钱包流程：[Passphrase](/zh/hardware-sdk/concepts/passphrase)
 
 import { DeviceCompatibilityTable } from '../../../components/DeviceCompatibilityTable'
 
@@ -265,16 +159,11 @@ import { DeviceCompatibilityTable } from '../../../components/DeviceCompatibilit
 
 - 更新日志：[releases](https://github.com/OneKeyHQ/hardware-js-sdk/releases)
 
-## API 参考
+## 延伸阅读
 
-- 各链 API：[硬件 SDK 核心 API 指南](/zh/hardware-sdk/core-api-guide)
-- 事件和 UI 响应：[事件配置](/zh/hardware-sdk/core-api-guide#events-ui)
-- 如何解锁设备：[PIN 码](/zh/hardware-sdk/concepts/pin)
-- 需要密码短语支持？[什么是 Passphrase](/zh/hardware-sdk/concepts/passphrase)
-
-## 概念和进阶主题
-
-- 消息协议（用于调试底层传输）：[低层传输插件](/zh/hardware-sdk/concepts/low-level-plugin#message-protocol)
+- 底层传输与消息协议（调试 / 自定义适配器场景）：[底层传输插件](/zh/hardware-sdk/concepts/low-level-plugin)
+- 从老的 `hd-web-sdk` 方案迁移：[迁移指引](/zh/hardware-sdk/legacy-guides)
+- AI Agent 集成 OneKey skills：[AI Agent 集成](/zh/hardware-sdk/agent-integration)
 
 ## 支持
 
