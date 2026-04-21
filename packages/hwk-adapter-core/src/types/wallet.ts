@@ -1,3 +1,4 @@
+import type { DEVICE } from '../events/device';
 import type { Response } from './response';
 import type { DeviceInfo, TransportType } from './device';
 import type { IEvmMethods } from './chain-evm';
@@ -7,10 +8,8 @@ import type { ITronMethods } from './chain-tron';
 import type { QrDisplayData, QrResponseData } from './qr';
 import type { ChainForFingerprint } from './fingerprint';
 import type { ActiveJobInfo, Interruptibility } from '../utils/DeviceJobQueue';
-import type { UiResponseEvent } from '../events/ui-request';
-import { DEVICE } from '../events/device';
-import { UI_REQUEST } from '../events/ui-request';
-import { SDK } from '../events/sdk';
+import type { UI_REQUEST, UiResponseEvent } from '../events/ui-request';
+import type { SDK } from '../events/sdk';
 
 export type ChainCapability = 'evm' | 'btc' | 'sol' | 'tron';
 

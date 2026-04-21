@@ -1,4 +1,3 @@
-
 import { SignerEth } from '../signer/SignerEth';
 
 function createMockSdkSigner() {

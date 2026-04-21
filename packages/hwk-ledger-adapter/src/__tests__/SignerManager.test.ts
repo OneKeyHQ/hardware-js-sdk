@@ -1,4 +1,3 @@
-
 import { SignerManager } from '../signer/SignerManager';
 
 import type { DeviceManagementKit } from '@ledgerhq/device-management-kit';

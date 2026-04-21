@@ -1,4 +1,3 @@
-
 import { DeviceJobQueue } from '../index';
 
 describe('DeviceJobQueue', () => {

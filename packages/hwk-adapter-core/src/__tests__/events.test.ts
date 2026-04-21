@@ -1,4 +1,3 @@
-
 import { DEVICE, DEVICE_EVENT, SDK, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '../index';
 
 describe('event constants', () => {

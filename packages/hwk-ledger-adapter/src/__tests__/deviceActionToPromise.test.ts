@@ -1,4 +1,3 @@
-
 import { deviceActionToPromise } from '../signer/deviceActionToPromise';
 
 function createMockAction<T>(

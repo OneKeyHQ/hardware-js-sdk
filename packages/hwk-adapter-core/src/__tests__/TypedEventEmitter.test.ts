@@ -1,4 +1,3 @@
-
 import { TypedEventEmitter } from '../index';
 
 type TestEventMap = {

@@ -1,4 +1,3 @@
-
 import { HardwareErrorCode } from '../index';
 
 /**
