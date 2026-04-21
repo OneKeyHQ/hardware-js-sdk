@@ -1,4 +1,5 @@
-import { HardwareErrorCode, bytesToHex, hexToBytes, stripHex } from '@onekeyfe/hwk-adapter-core';
+import { HardwareErrorCode, stripHex } from '@onekeyfe/hwk-adapter-core';
+import { Psbt } from 'bitcoinjs-lib';
 
 import { collapseSignerInteraction, normalizePath } from './utils';
 import { SignerBtc } from '../../signer/SignerBtc';
@@ -30,8 +31,6 @@ export interface BtcSignTransactionCallParams {
   coin: string;
   /** Account-level derivation path for wallet template determination (e.g. "84'/0'/0'"). */
   path?: string;
-  /** Per-input full derivation paths (e.g. ["m/86'/0'/0'/0/0"]) for PSBT enrichment. */
-  inputDerivations?: Array<{ path: string }>;
 }
 
 export interface BtcSignPsbtCallParams {
@@ -44,53 +43,6 @@ export interface BtcSignMessageCallParams {
   path: string;
   message: string;
   coin?: string;
-}
-
-// ---------------------------------------------------------------------------
-// PSBT binary helpers
-// ---------------------------------------------------------------------------
-
-/** Read a compact-size (varint) from `data` at `pos`. Returns [value, bytesConsumed]. */
-function readCompactSize(data: Uint8Array, pos: number): [number, number] {
-  const first = data[pos];
-  if (first < 0xfd) return [first, 1];
-  if (first === 0xfd) return [data[pos + 1] | (data[pos + 2] << 8), 3];
-  // 0xfe/0xff cases omitted -- PSBTs won't have keys/values > 64KB
-  return [0, 1];
-}
-
-/** Write a compact-size varint to `out` array. */
-function writeCompactSize(out: number[], val: number): void {
-  if (val < 0xfd) {
-    out.push(val);
-  } else {
-    out.push(0xfd, val & 0xff, (val >>> 8) & 0xff);
-  }
-}
-
-/** Read one PSBT key-value pair. Returns raw bytes, end position, key type, and value. */
-function readKeyValue(
-  data: Uint8Array,
-  pos: number
-): { bytes: Uint8Array; end: number; keyType: number; value: Uint8Array | null } {
-  const start = pos;
-  const [keyLen, keyLenSize] = readCompactSize(data, pos);
-  pos += keyLenSize;
-  const keyType = data[pos]; // first byte of key is the type
-  pos += keyLen;
-  const [valLen, valLenSize] = readCompactSize(data, pos);
-  pos += valLenSize;
-  const value = data.slice(pos, pos + valLen);
-  pos += valLen;
-  return { bytes: data.slice(start, pos), end: pos, keyType, value };
-}
-
-/** Write a PSBT key-value pair to `out` array. */
-function writeKv(out: number[], key: Uint8Array, value: Uint8Array): void {
-  writeCompactSize(out, key.length);
-  key.forEach(b => out.push(b));
-  writeCompactSize(out, value.length);
-  value.forEach(b => out.push(b));
 }
 
 // ---------------------------------------------------------------------------
@@ -187,15 +139,8 @@ export async function btcSignTransaction(
 
     const wallet = new DefaultWallet(path, template);
 
-    // Enrich PSBT with Taproot fields if needed (Ledger BTC App requires
-    // tapInternalKey + tapBip32Derivation for Taproot inputs).
-    let psbtToSign = params.psbt;
-    if (purpose === '86' && params.inputDerivations?.length) {
-      psbtToSign = await _enrichTaprootPsbt(btcSigner, psbtToSign, params.inputDerivations);
-    }
-
     // signTransaction: signs the PSBT and returns the fully extracted raw tx hex
-    const signedTxHex = await btcSigner.signTransaction(wallet, psbtToSign);
+    const signedTxHex = await btcSigner.signTransaction(wallet, params.psbt);
 
     return { signedPsbt: stripHex(signedTxHex) };
   } catch (err) {
@@ -329,159 +274,25 @@ function _applySignaturesToPsbt(
     tapleafHash?: Uint8Array;
   }>
 ): string {
-  const raw = hexToBytes(psbtHex);
-  const result: number[] = [];
-  let pos = 0;
-
-  for (let i = 0; i < 5; i++) result.push(raw[pos++]);
-
-  while (pos < raw.length && raw[pos] !== 0x00) {
-    const { bytes: kv, end } = readKeyValue(raw, pos);
-    kv.forEach(b => result.push(b));
-    pos = end;
-  }
-  result.push(raw[pos++]);
-
-  const sigsByInput = new Map<number, typeof signatures>();
+  const psbt = Psbt.fromHex(psbtHex);
   for (const sig of signatures) {
-    if (!sigsByInput.has(sig.inputIndex)) sigsByInput.set(sig.inputIndex, []);
-    sigsByInput.get(sig.inputIndex)!.push(sig);
-  }
-
-  for (let inputIdx = 0; pos < raw.length; inputIdx++) {
-    while (pos < raw.length && raw[pos] !== 0x00) {
-      const { bytes: kv, end } = readKeyValue(raw, pos);
-      kv.forEach(b => result.push(b));
-      pos = end;
+    if (sig.tapleafHash && sig.tapleafHash.length > 0) {
+      psbt.updateInput(sig.inputIndex, {
+        tapScriptSig: [
+          {
+            pubkey: sig.pubkey.length === 32 ? sig.pubkey : sig.pubkey.subarray(0, 32),
+            leafHash: sig.tapleafHash,
+            signature: sig.signature,
+          },
+        ],
+      });
+    } else if (sig.pubkey.length === 32) {
+      psbt.updateInput(sig.inputIndex, { tapKeySig: sig.signature });
+    } else {
+      psbt.updateInput(sig.inputIndex, {
+        partialSig: [{ pubkey: sig.pubkey, signature: sig.signature }],
+      });
     }
-
-    const inputSigs = sigsByInput.get(inputIdx) || [];
-    for (const sig of inputSigs) {
-      if (sig.tapleafHash && sig.tapleafHash.length > 0) {
-        const key = new Uint8Array(1 + 32 + 32);
-        key[0] = 0x14;
-        key.set(sig.pubkey.subarray(0, 32), 1);
-        key.set(sig.tapleafHash, 33);
-        writeKv(result, key, new Uint8Array(sig.signature));
-      } else if (sig.pubkey.length === 32) {
-        writeKv(result, new Uint8Array([0x13]), new Uint8Array(sig.signature));
-      } else {
-        const key = new Uint8Array(1 + sig.pubkey.length);
-        key[0] = 0x02;
-        key.set(sig.pubkey, 1);
-        writeKv(result, key, new Uint8Array(sig.signature));
-      }
-    }
-
-    result.push(raw[pos++]);
   }
-
-  while (pos < raw.length) {
-    result.push(raw[pos++]);
-  }
-
-  return bytesToHex(new Uint8Array(result));
-}
-
-// ---------------------------------------------------------------------------
-// Internal -- Taproot PSBT enrichment
-// ---------------------------------------------------------------------------
-
-/**
- * Enrich a PSBT hex with Taproot-specific fields that the Ledger BTC App requires.
- * For each Taproot input: adds tapInternalKey and tapBip32Derivation.
- */
-async function _enrichTaprootPsbt(
-  btcSigner: InstanceType<typeof SignerBtc>,
-  psbtHex: string,
-  inputDerivations: Array<{ path: string }>
-): Promise<string> {
-  // Get master fingerprint from device
-  const masterFp = await btcSigner.getMasterFingerprint({ skipOpenApp: true });
-  const fpBytes = masterFp.length === 4 ? masterFp : new Uint8Array([0, 0, 0, 0]);
-
-  // Parse PSBT binary
-  const raw = hexToBytes(psbtHex);
-  const result: number[] = [];
-  let pos = 0;
-
-  // Copy magic (5 bytes: "psbt\xff")
-  for (let i = 0; i < 5; i++) result.push(raw[pos++]);
-
-  // Copy global key-value pairs until separator (0x00)
-  while (pos < raw.length && raw[pos] !== 0x00) {
-    const { bytes: kv, end } = readKeyValue(raw, pos);
-    kv.forEach(b => result.push(b));
-    pos = end;
-  }
-  result.push(raw[pos++]); // global separator
-
-  // Process each input map
-  for (let inputIdx = 0; pos < raw.length; inputIdx++) {
-    const inputKvs: Uint8Array[] = [];
-    let witnessUtxoScript: Uint8Array | null = null;
-
-    // Read all existing key-value pairs for this input
-    while (pos < raw.length && raw[pos] !== 0x00) {
-      const { bytes: kv, end, keyType, value } = readKeyValue(raw, pos);
-      inputKvs.push(kv);
-      // PSBT_IN_WITNESS_UTXO = 0x01
-      if (keyType === 0x01 && value) {
-        // value = amount(8) + scriptPubKey(varint + data)
-        const scriptStart = 8; // skip amount
-        const scriptLen = value[scriptStart];
-        witnessUtxoScript = value.slice(scriptStart + 1, scriptStart + 1 + scriptLen);
-      }
-      pos = end;
-    }
-
-    // Write existing pairs
-    inputKvs.forEach(kv => kv.forEach(b => result.push(b)));
-
-    // If Taproot input (OP_1 0x20 <32-byte-key>) and we have derivation info
-    if (
-      witnessUtxoScript &&
-      witnessUtxoScript.length === 34 &&
-      witnessUtxoScript[0] === 0x51 && // OP_1
-      witnessUtxoScript[1] === 0x20 && // PUSH 32
-      inputDerivations[inputIdx]
-    ) {
-      const xOnlyKey = witnessUtxoScript.slice(2, 34);
-      const fullPath = inputDerivations[inputIdx].path;
-
-      // PSBT_IN_TAP_INTERNAL_KEY (0x17): key=0x17, value=32-byte xonly key
-      writeKv(result, new Uint8Array([0x17]), xOnlyKey);
-
-      // PSBT_IN_TAP_BIP32_DERIVATION (0x16): key=0x16+xOnlyKey, value=numLeafHashes+fingerprint+path
-      const pathComponents = fullPath.replace(/^m\//, '').split('/');
-      const pathBuf = new Uint8Array(1 + 4 + pathComponents.length * 4); // leafHashes(1) + fp(4) + path
-      pathBuf[0] = 0x00; // 0 leaf hashes
-      pathBuf.set(fpBytes, 1);
-      for (let i = 0; i < pathComponents.length; i++) {
-        const comp = pathComponents[i];
-        const hardened = comp.endsWith("'");
-        let val = parseInt(hardened ? comp.slice(0, -1) : comp, 10);
-        if (hardened) val += 0x80000000;
-        // little-endian 4 bytes
-        const off = 5 + i * 4;
-        pathBuf[off] = val & 0xff;
-        pathBuf[off + 1] = (val >>> 8) & 0xff;
-        pathBuf[off + 2] = (val >>> 16) & 0xff;
-        pathBuf[off + 3] = (val >>> 24) & 0xff;
-      }
-      const tapBipKey = new Uint8Array(1 + 32);
-      tapBipKey[0] = 0x16;
-      tapBipKey.set(xOnlyKey, 1);
-      writeKv(result, tapBipKey, pathBuf);
-    }
-
-    result.push(raw[pos++]); // input separator
-  }
-
-  // Copy remaining output maps as-is
-  while (pos < raw.length) {
-    result.push(raw[pos++]);
-  }
-
-  return bytesToHex(new Uint8Array(result));
+  return psbt.toHex();
 }

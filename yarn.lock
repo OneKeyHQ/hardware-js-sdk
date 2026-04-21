@@ -10972,6 +10972,14 @@ bip174@^2.1.1:
   resolved "https://registry.yarnpkg.com/bip174/-/bip174-2.1.1.tgz#ef3e968cf76de234a546962bcf572cc150982f9f"
   integrity sha512-mdFV5+/v0XyNYXjBS6CQPLo9ekCx4gtKZFnJm5PMto7Fs9hTTDpkkzOB7/FtluRI6JbUUAu+snTYfJRgHLZbZQ==
 
+bip174@^3.0.0:
+  version "3.0.0"
+  resolved "https://registry.yarnpkg.com/bip174/-/bip174-3.0.0.tgz#fbf60cc7a6e39dde17afdda0cf1a27e5508ae075"
+  integrity sha512-N3vz3rqikLEu0d6yQL8GTrSkpYb35NQKWMR7Hlza0lOj6ZOlvQ3Xr7N9Y+JPebaCVoEUHdBeBSuLxcHr71r+Lw==
+  dependencies:
+    uint8array-tools "^0.0.9"
+    varuint-bitcoin "^2.0.0"
+
 bip32@3.1.0:
   version "3.1.0"
   resolved "https://registry.yarnpkg.com/bip32/-/bip32-3.1.0.tgz#ce90e020d0e6b41e891a0122ff053efabcce1ccc"
@@ -11005,6 +11013,19 @@ bitcoinjs-lib@^6.1.5:
     bs58check "^3.0.1"
     typeforce "^1.11.3"
     varuint-bitcoin "^1.1.2"
+
+"bitcoinjs-lib@npm:@onekeyfe/bitcoinjs-lib@7.0.1":
+  version "7.0.1"
+  resolved "https://registry.yarnpkg.com/@onekeyfe/bitcoinjs-lib/-/bitcoinjs-lib-7.0.1.tgz#1da541071c694d2a714e81cab20d8f36692464ad"
+  integrity sha512-3IzjaDDNfsdMXnvWhwmeIqBSvwAvD7Vq6U67er9n3RlhdL0ChpAFYQK5/p8tpokBeJfzjD9M43DIoyVaaCQrWA==
+  dependencies:
+    "@noble/hashes" "^1.2.0"
+    bech32 "^2.0.0"
+    bip174 "^3.0.0"
+    bs58check "^4.0.0"
+    uint8array-tools "^0.0.9"
+    valibot "^0.38.0"
+    varuint-bitcoin "^2.0.0"
 
 bl@^4.1.0:
   version "4.1.0"
@@ -11320,6 +11341,14 @@ bs58check@^3.0.1:
   dependencies:
     "@noble/hashes" "^1.2.0"
     bs58 "^5.0.0"
+
+bs58check@^4.0.0:
+  version "4.0.0"
+  resolved "https://registry.yarnpkg.com/bs58check/-/bs58check-4.0.0.tgz#46cda52a5713b7542dcb78ec2efdf78f5bf1d23c"
+  integrity sha512-FsGDOnFg9aVI9erdriULkd/JjEWONV/lQE5aYziB5PoBsXRind56lh8doIZIc9X4HoxT5x4bLjMWN1/NB8Zp5g==
+  dependencies:
+    "@noble/hashes" "^1.2.0"
+    bs58 "^6.0.0"
 
 bser@2.1.1:
   version "2.1.1"
@@ -26039,6 +26068,16 @@ uid-number@0.0.6:
   resolved "https://registry.yarnpkg.com/uid-number/-/uid-number-0.0.6.tgz#0ea10e8035e8eb5b8e4449f06da1c730663baa81"
   integrity sha1-DqEOgDXo61uOREnwbaHHMGY7qoE=
 
+uint8array-tools@^0.0.8:
+  version "0.0.8"
+  resolved "https://registry.yarnpkg.com/uint8array-tools/-/uint8array-tools-0.0.8.tgz#712bab001f8347bd782f45bc47c76ffff32d1e0b"
+  integrity sha512-xS6+s8e0Xbx++5/0L+yyexukU7pz//Yg6IHg3BKhXotg1JcYtgxVcUctQ0HxLByiJzpAkNFawz1Nz5Xadzo82g==
+
+uint8array-tools@^0.0.9:
+  version "0.0.9"
+  resolved "https://registry.yarnpkg.com/uint8array-tools/-/uint8array-tools-0.0.9.tgz#e29e6d05f3472273db1b0e370ac1d91e4a0a4e6f"
+  integrity sha512-9vqDWmoSXOoi+K14zNaf6LBV51Q8MayF0/IiQs3GlygIKUYtog603e6virExkjjFosfJUBI4LhbQK1iq8IG11A==
+
 umask@^1.1.0:
   version "1.1.0"
   resolved "https://registry.yarnpkg.com/umask/-/umask-1.1.0.tgz#f29cebf01df517912bb58ff9c4e50fde8e33320d"
@@ -26463,6 +26502,11 @@ v8-to-istanbul@^9.0.1:
     "@types/istanbul-lib-coverage" "^2.0.1"
     convert-source-map "^1.6.0"
 
+valibot@^0.38.0:
+  version "0.38.0"
+  resolved "https://registry.yarnpkg.com/valibot/-/valibot-0.38.0.tgz#2d035d2a5bd36e8ea8b48b56d44552ace1a7616f"
+  integrity sha512-RCJa0fetnzp+h+KN9BdgYOgtsMAG9bfoJ9JSjIhFHobKWVWyzM3jjaeNTdpFK9tQtf3q1sguXeERJ/LcmdFE7w==
+
 valid-url@~1.0.9:
   version "1.0.9"
   resolved "https://registry.yarnpkg.com/valid-url/-/valid-url-1.0.9.tgz#1c14479b40f1397a75782f115e4086447433a200"
@@ -26494,6 +26538,13 @@ varuint-bitcoin@^1.1.2:
   integrity sha512-4EVb+w4rx+YfVM32HQX42AbbT7/1f5zwAYhIujKXKk8NQK+JfRVl3pqT3hjNn/L+RstigmGGKVwHA/P0wgITZw==
   dependencies:
     safe-buffer "^5.1.1"
+
+varuint-bitcoin@^2.0.0:
+  version "2.0.0"
+  resolved "https://registry.yarnpkg.com/varuint-bitcoin/-/varuint-bitcoin-2.0.0.tgz#59a53845a87ad18c42f184a3d325074465341523"
+  integrity sha512-6QZbU/rHO2ZQYpWFDALCDSRsXbAs1VOEmXAxtbtjLtKuMJ/FQ8YbhfxlaiKv5nklci0M6lZtlZyxo9Q+qNnyog==
+  dependencies:
+    uint8array-tools "^0.0.8"
 
 vary@^1.1.2, vary@~1.1.2:
   version "1.1.2"
