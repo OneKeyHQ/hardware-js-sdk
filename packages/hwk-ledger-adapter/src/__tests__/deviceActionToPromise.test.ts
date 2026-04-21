@@ -1,4 +1,3 @@
-import { describe, expect, it, vi } from 'vitest';
 
 import { deviceActionToPromise } from '../signer/deviceActionToPromise';
 
@@ -38,7 +37,7 @@ describe('deviceActionToPromise', () => {
   });
 
   it('should call onInteraction for pending states with interaction', async () => {
-    const onInteraction = vi.fn();
+    const onInteraction = jest.fn();
     const action = createMockAction([
       { status: 'pending', intermediateValue: { requiredUserInteraction: 'unlock-device' } },
       { status: 'completed', output: 'done' },
@@ -48,7 +47,7 @@ describe('deviceActionToPromise', () => {
   });
 
   it('should NOT call onInteraction for "none" interaction', async () => {
-    const onInteraction = vi.fn();
+    const onInteraction = jest.fn();
     const action = createMockAction([
       { status: 'pending', intermediateValue: { requiredUserInteraction: 'none' } },
       { status: 'completed', output: 'done' },

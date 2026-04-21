@@ -1,4 +1,3 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HardwareErrorCode, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hwk-adapter-core';
 
 import { LedgerAdapter } from '../adapter/LedgerAdapter';
@@ -28,7 +27,7 @@ function createMockConnector(): IConnector & {
       }
     },
 
-    searchDevices: vi.fn().mockResolvedValue([
+    searchDevices: jest.fn().mockResolvedValue([
       {
         connectId: 'dev-1',
         deviceId: 'dev-1',
@@ -37,7 +36,7 @@ function createMockConnector(): IConnector & {
       } as ConnectorDevice,
     ]),
 
-    connect: vi.fn().mockResolvedValue({
+    connect: jest.fn().mockResolvedValue({
       sessionId: 'session-abc',
       deviceInfo: {
         vendor: 'ledger',
@@ -49,26 +48,26 @@ function createMockConnector(): IConnector & {
       },
     } as ConnectorSession),
 
-    disconnect: vi.fn().mockResolvedValue(undefined),
+    disconnect: jest.fn().mockResolvedValue(undefined),
 
-    call: vi.fn().mockResolvedValue({}),
+    call: jest.fn().mockResolvedValue({}),
 
-    cancel: vi.fn().mockResolvedValue(undefined),
+    cancel: jest.fn().mockResolvedValue(undefined),
 
-    uiResponse: vi.fn(),
+    uiResponse: jest.fn(),
 
-    on: vi.fn().mockImplementation((event: string, handler: (...args: unknown[]) => void) => {
+    on: jest.fn().mockImplementation((event: string, handler: (...args: unknown[]) => void) => {
       if (!handlers.has(event)) {
         handlers.set(event, new Set());
       }
       handlers.get(event)!.add(handler);
     }),
 
-    off: vi.fn().mockImplementation((event: string, handler: (...args: unknown[]) => void) => {
+    off: jest.fn().mockImplementation((event: string, handler: (...args: unknown[]) => void) => {
       handlers.get(event)?.delete(handler);
     }),
 
-    reset: vi.fn(),
+    reset: jest.fn(),
   };
 
   return connector;
@@ -79,7 +78,7 @@ describe('LedgerAdapter', () => {
   let connector: ReturnType<typeof createMockConnector>;
 
   beforeEach(async () => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
     connector = createMockConnector();
     adapter = new LedgerAdapter(connector);
   });
@@ -332,14 +331,14 @@ describe('LedgerAdapter', () => {
 
   describe('setUiHandler', () => {
     it('should store the UI handler', () => {
-      const handler = { onPinRequest: vi.fn() };
+      const handler = { onPinRequest: jest.fn() };
       expect(() => adapter.setUiHandler(handler)).not.toThrow();
     });
   });
 
   describe('event listeners', () => {
     it('should register and invoke listeners with on()', () => {
-      const listener = vi.fn();
+      const listener = jest.fn();
       adapter.on('device-connect', listener);
       (adapter as any).emitter.emit('device-connect', {
         type: 'device-connect',
@@ -356,7 +355,7 @@ describe('LedgerAdapter', () => {
     });
 
     it('should remove listeners with off()', () => {
-      const listener = vi.fn();
+      const listener = jest.fn();
       adapter.on('device-connect', listener);
       adapter.off('device-connect', listener);
       (adapter as any).emitter.emit('device-connect', {
@@ -471,7 +470,7 @@ describe('LedgerAdapter', () => {
       });
       connector.call.mockResolvedValueOnce({ address: '0xSELECTED' });
 
-      const selectListener = vi.fn();
+      const selectListener = jest.fn();
       selectingAdapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, (event: any) => {
         selectListener(event);
         selectingAdapter.uiResponse({
@@ -557,7 +556,7 @@ describe('LedgerAdapter', () => {
 
   describe('event forwarding from connector', () => {
     it('should forward device-connect events', () => {
-      const listener = vi.fn();
+      const listener = jest.fn();
       adapter.on('device-connect', listener);
 
       connector._emit('device-connect', {
@@ -582,7 +581,7 @@ describe('LedgerAdapter', () => {
     });
 
     it('should forward device-disconnect events', () => {
-      const listener = vi.fn();
+      const listener = jest.fn();
       adapter.on('device-disconnect', listener);
 
       connector._emit('device-disconnect', { connectId: 'dev-1' });

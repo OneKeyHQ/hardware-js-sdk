@@ -1,4 +1,3 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hwk-adapter-core';
 
 import { LedgerAdapter } from '../adapter/LedgerAdapter';
@@ -9,7 +8,7 @@ function createMockConnector(): IConnector {
   const handlers = new Map<string, Set<(...args: unknown[]) => void>>();
 
   return {
-    searchDevices: vi.fn().mockResolvedValue([
+    searchDevices: jest.fn().mockResolvedValue([
       {
         connectId: 'dev-1',
         deviceId: 'dev-1',
@@ -18,7 +17,7 @@ function createMockConnector(): IConnector {
       } as ConnectorDevice,
     ]),
 
-    connect: vi.fn().mockResolvedValue({
+    connect: jest.fn().mockResolvedValue({
       sessionId: 'session-abc',
       deviceInfo: {
         vendor: 'ledger',
@@ -30,22 +29,22 @@ function createMockConnector(): IConnector {
       },
     } as ConnectorSession),
 
-    disconnect: vi.fn().mockResolvedValue(undefined),
-    call: vi.fn().mockResolvedValue({}),
-    cancel: vi.fn().mockResolvedValue(undefined),
+    disconnect: jest.fn().mockResolvedValue(undefined),
+    call: jest.fn().mockResolvedValue({}),
+    cancel: jest.fn().mockResolvedValue(undefined),
 
-    uiResponse: vi.fn(),
+    uiResponse: jest.fn(),
 
-    on: vi.fn().mockImplementation((event: string, handler: (...args: unknown[]) => void) => {
+    on: jest.fn().mockImplementation((event: string, handler: (...args: unknown[]) => void) => {
       if (!handlers.has(event)) handlers.set(event, new Set());
       handlers.get(event)!.add(handler);
     }),
 
-    off: vi.fn().mockImplementation((event: string, handler: (...args: unknown[]) => void) => {
+    off: jest.fn().mockImplementation((event: string, handler: (...args: unknown[]) => void) => {
       handlers.get(event)?.delete(handler);
     }),
 
-    reset: vi.fn(),
+    reset: jest.fn(),
   };
 }
 
@@ -54,7 +53,7 @@ describe('LedgerAdapter Integration', () => {
   let adapter: LedgerAdapter;
 
   beforeEach(async () => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
     connector = createMockConnector();
     adapter = new LedgerAdapter(connector);
   });
@@ -72,7 +71,7 @@ describe('LedgerAdapter Integration', () => {
     await adapter.connectDevice('dev-1');
 
     // Mock evmGetAddress response
-    (connector.call as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    (connector.call as ReturnType<typeof jest.fn>).mockResolvedValueOnce({
       address: '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18',
       publicKey: '0xpk',
     });
@@ -86,7 +85,7 @@ describe('LedgerAdapter Integration', () => {
     }
 
     // Mock evmSignTransaction response
-    (connector.call as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    (connector.call as ReturnType<typeof jest.fn>).mockResolvedValueOnce({
       v: '0x1c',
       r: '0xaabb',
       s: '0xccdd',
@@ -106,13 +105,13 @@ describe('LedgerAdapter Integration', () => {
 
   it('should emit ui-request-device-connect event when device is locked', async () => {
     // Mock connector.call to throw a locked error on both initial call and retry
-    (connector.call as ReturnType<typeof vi.fn>)
+    (connector.call as ReturnType<typeof jest.fn>)
       .mockRejectedValueOnce(Object.assign(new Error('locked'), { errorCode: '5515' }))
       .mockRejectedValueOnce(Object.assign(new Error('locked'), { errorCode: '5515' }));
 
     await adapter.connectDevice('dev-1');
 
-    const unlockListener = vi.fn();
+    const unlockListener = jest.fn();
     adapter.on(UI_REQUEST.REQUEST_DEVICE_CONNECT, (event: any) => {
       unlockListener(event);
       // Confirm the prompt so the adapter retries (and gets the second locked error)

@@ -1,4 +1,3 @@
-import { describe, expect, it, vi } from 'vitest';
 
 import { TypedEventEmitter } from '../index';
 
@@ -10,7 +9,7 @@ type TestEventMap = {
 describe('TypedEventEmitter', () => {
   it('should call listeners when event is emitted', () => {
     const emitter = new TypedEventEmitter<TestEventMap>();
-    const listener = vi.fn();
+    const listener = jest.fn();
 
     emitter.on('test', listener);
     emitter.emit('test', { type: 'test', value: 42 });
@@ -20,8 +19,8 @@ describe('TypedEventEmitter', () => {
 
   it('should support multiple listeners for the same event', () => {
     const emitter = new TypedEventEmitter<TestEventMap>();
-    const listener1 = vi.fn();
-    const listener2 = vi.fn();
+    const listener1 = jest.fn();
+    const listener2 = jest.fn();
 
     emitter.on('test', listener1);
     emitter.on('test', listener2);
@@ -33,7 +32,7 @@ describe('TypedEventEmitter', () => {
 
   it('should not call removed listeners', () => {
     const emitter = new TypedEventEmitter<TestEventMap>();
-    const listener = vi.fn();
+    const listener = jest.fn();
 
     emitter.on('test', listener);
     emitter.off('test', listener);
@@ -49,7 +48,7 @@ describe('TypedEventEmitter', () => {
 
   it('should clean up event key when last listener is removed', () => {
     const emitter = new TypedEventEmitter<TestEventMap>();
-    const listener = vi.fn();
+    const listener = jest.fn();
 
     emitter.on('test', listener);
     emitter.off('test', listener);
@@ -58,7 +57,7 @@ describe('TypedEventEmitter', () => {
 
   it('should not add the same listener twice', () => {
     const emitter = new TypedEventEmitter<TestEventMap>();
-    const listener = vi.fn();
+    const listener = jest.fn();
 
     emitter.on('test', listener);
     emitter.on('test', listener);
@@ -69,8 +68,8 @@ describe('TypedEventEmitter', () => {
 
   it('should isolate events by name', () => {
     const emitter = new TypedEventEmitter<TestEventMap>();
-    const testListener = vi.fn();
-    const otherListener = vi.fn();
+    const testListener = jest.fn();
+    const otherListener = jest.fn();
 
     emitter.on('test', testListener);
     emitter.on('other', otherListener);
@@ -82,8 +81,8 @@ describe('TypedEventEmitter', () => {
 
   it('should remove all listeners', () => {
     const emitter = new TypedEventEmitter<TestEventMap>();
-    const listener1 = vi.fn();
-    const listener2 = vi.fn();
+    const listener1 = jest.fn();
+    const listener2 = jest.fn();
 
     emitter.on('test', listener1);
     emitter.on('other', listener2);

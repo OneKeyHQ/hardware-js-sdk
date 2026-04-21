@@ -1,4 +1,3 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   CloseAppCommand,
   CommandResultFactory,
@@ -10,12 +9,12 @@ import { AppManager } from '../app/AppManager';
 
 function createMockDmk() {
   return {
-    startDiscovering: vi.fn(),
-    stopDiscovering: vi.fn(),
-    listenToAvailableDevices: vi.fn(),
-    connect: vi.fn(),
-    disconnect: vi.fn(),
-    sendCommand: vi.fn(),
+    startDiscovering: jest.fn(),
+    stopDiscovering: jest.fn(),
+    listenToAvailableDevices: jest.fn(),
+    connect: jest.fn(),
+    disconnect: jest.fn(),
+    sendCommand: jest.fn(),
   };
 }
 

@@ -1,4 +1,3 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SignerManager } from '../signer/SignerManager';
 
@@ -11,8 +10,8 @@ describe('SignerManager', () => {
 
   beforeEach(() => {
     mockDmk = {} as DeviceManagementKit;
-    mockSignerBuilder = vi.fn().mockReturnValue({
-      build: vi.fn().mockReturnValue({ getAddress: vi.fn() }),
+    mockSignerBuilder = jest.fn().mockReturnValue({
+      build: jest.fn().mockReturnValue({ getAddress: jest.fn() }),
     });
     manager = new SignerManager(mockDmk, mockSignerBuilder);
   });

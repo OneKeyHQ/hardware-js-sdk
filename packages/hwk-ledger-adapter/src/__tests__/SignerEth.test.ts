@@ -1,4 +1,3 @@
-import { describe, expect, it, vi } from 'vitest';
 
 import { SignerEth } from '../signer/SignerEth';
 
@@ -15,10 +14,10 @@ function createMockSdkSigner() {
   }
 
   return {
-    getAddress: vi.fn().mockReturnValue(mockAction({ address: '0xABC', publicKey: '0xPK' })),
-    signTransaction: vi.fn().mockReturnValue(mockAction({ r: '0xr', s: '0xs', v: 27 })),
-    signMessage: vi.fn().mockReturnValue(mockAction({ r: '0xr', s: '0xs', v: 28 })),
-    signTypedData: vi.fn().mockReturnValue(mockAction({ r: '0xr', s: '0xs', v: 28 })),
+    getAddress: jest.fn().mockReturnValue(mockAction({ address: '0xABC', publicKey: '0xPK' })),
+    signTransaction: jest.fn().mockReturnValue(mockAction({ r: '0xr', s: '0xs', v: 27 })),
+    signMessage: jest.fn().mockReturnValue(mockAction({ r: '0xr', s: '0xs', v: 28 })),
+    signTypedData: jest.fn().mockReturnValue(mockAction({ r: '0xr', s: '0xs', v: 28 })),
   };
 }
 
@@ -60,7 +59,7 @@ describe('SignerEth', () => {
   });
 
   it('should forward interaction callbacks', async () => {
-    const onInteraction = vi.fn();
+    const onInteraction = jest.fn();
     const sdk = createMockSdkSigner();
     sdk.getAddress.mockReturnValue({
       observable: {

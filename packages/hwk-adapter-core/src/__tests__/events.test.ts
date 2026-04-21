@@ -1,4 +1,3 @@
-import { describe, expect, it } from 'vitest';
 
 import { DEVICE, DEVICE_EVENT, SDK, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '../index';
 

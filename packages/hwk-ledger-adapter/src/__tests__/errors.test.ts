@@ -1,4 +1,3 @@
-import { describe, expect, it } from 'vitest';
 import { HardwareErrorCode } from '@onekeyfe/hwk-adapter-core';
 
 import {

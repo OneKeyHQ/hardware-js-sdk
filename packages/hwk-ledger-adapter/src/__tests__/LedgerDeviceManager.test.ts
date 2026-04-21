@@ -1,4 +1,3 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { type DeviceManagementKit, DeviceModelId } from '@ledgerhq/device-management-kit';
 
 import { LedgerDeviceManager } from '../device/LedgerDeviceManager';
@@ -13,7 +12,7 @@ function createMockDmk(): DeviceManagementKit & {
   let listObserver: any = null;
 
   return {
-    startDiscovering: vi.fn().mockReturnValue({
+    startDiscovering: jest.fn().mockReturnValue({
       subscribe: (obs: any) => {
         deviceObserver = obs;
         return {
@@ -23,8 +22,8 @@ function createMockDmk(): DeviceManagementKit & {
         };
       },
     }),
-    stopDiscovering: vi.fn(),
-    listenToAvailableDevices: vi.fn().mockReturnValue({
+    stopDiscovering: jest.fn(),
+    listenToAvailableDevices: jest.fn().mockReturnValue({
       subscribe: (obs: any) => {
         listObserver = obs;
         return {
@@ -34,13 +33,13 @@ function createMockDmk(): DeviceManagementKit & {
         };
       },
     }),
-    connect: vi.fn().mockResolvedValue('session-abc'),
-    disconnect: vi.fn().mockResolvedValue(undefined),
-    sendCommand: vi.fn().mockResolvedValue({}),
-    sendApdu: vi
+    connect: jest.fn().mockResolvedValue('session-abc'),
+    disconnect: jest.fn().mockResolvedValue(undefined),
+    sendCommand: jest.fn().mockResolvedValue({}),
+    sendApdu: jest
       .fn()
       .mockResolvedValue({ statusCode: new Uint8Array([0x90, 0x00]), data: new Uint8Array() }),
-    close: vi.fn(),
+    close: jest.fn(),
     _emitDevice: (d: DmkDiscoveredDevice) => deviceObserver?.next(d),
     _emitList: (d: DmkDiscoveredDevice[]) => listObserver?.next(d),
   };
@@ -133,7 +132,7 @@ describe('LedgerDeviceManager', () => {
 
   describe('listen', () => {
     it('should emit device-connected for new devices', () => {
-      const onChange = vi.fn();
+      const onChange = jest.fn();
       manager.listen(onChange);
       dmk._emitList([DEVICE_1]);
       expect(onChange).toHaveBeenCalledWith({
@@ -143,7 +142,7 @@ describe('LedgerDeviceManager', () => {
     });
 
     it('should emit device-disconnected when device removed', () => {
-      const onChange = vi.fn();
+      const onChange = jest.fn();
       manager.listen(onChange);
       dmk._emitList([DEVICE_1]);
       onChange.mockClear();
