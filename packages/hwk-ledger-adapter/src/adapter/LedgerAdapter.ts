@@ -536,22 +536,15 @@ export class LedgerAdapter implements IHardwareWallet {
       this._sessions.size
     );
     await this._ensureDevicePermission(connectId, deviceId);
-    debugLog(
-      '[LedgerAdapter] getChainFingerprint permission ok, calling _deriveAddressForFingerprint'
-    );
+    debugLog('[LedgerAdapter] getChainFingerprint permission ok, computing fingerprint');
     try {
-      const raw = await this._deriveAddressForFingerprint(connectId, chain);
-      debugLog('[LedgerAdapter] getChainFingerprint raw:', raw?.substring(0, 20));
-      // BTC raw is already the BIP32 master fingerprint (8 hex) — use as-is
-      // so the caller can reuse it for BIP380 descriptors / PSBT signing.
-      // Other chains: FNV-hash the derived address for an opaque seed identifier.
-      return success(chain === 'btc' ? raw : deriveDeviceFingerprint(raw));
-    } catch (err) {
-      debugError(
-        '[LedgerAdapter] getChainFingerprint error in _deriveAddressForFingerprint:',
-        chain,
-        err
+      const fingerprint = await this._computeChainFingerprint(chain, (method, params) =>
+        this.connectorCall(connectId, method, params)
       );
+      debugLog('[LedgerAdapter] getChainFingerprint result:', fingerprint?.substring(0, 20));
+      return success(fingerprint);
+    } catch (err) {
+      debugError('[LedgerAdapter] getChainFingerprint error:', chain, err);
       return this.errorToFailure(err);
     }
   }
@@ -568,10 +561,9 @@ export class LedgerAdapter implements IHardwareWallet {
     if (!deviceId) return { success: true };
 
     try {
-      const raw = await this._deriveAddressWithSession(sessionId, chain);
-      // Match getChainFingerprint's format: BTC uses raw master fingerprint,
-      // other chains use the FNV-derived identifier.
-      const fingerprint = chain === 'btc' ? raw : deriveDeviceFingerprint(raw);
+      const fingerprint = await this._computeChainFingerprint(chain, (method, params) =>
+        this.connector.call(sessionId, method, params)
+      );
       if (fingerprint === deviceId) {
         return { success: true };
       }
@@ -589,96 +581,57 @@ export class LedgerAdapter implements IHardwareWallet {
   }
 
   /**
-   * Derive an address at the fixed testnet path for fingerprint generation.
-   * Uses connectorCall (goes through ensureConnected). For public API use.
+   * Compute the chain fingerprint via a caller-supplied call strategy.
+   *
+   * Chains with a native device-side identity primitive (BTC → BIP32 master
+   * fingerprint) short-circuit at the top and return it verbatim, so the value
+   * stays reusable for higher-level use (BIP380 descriptors, PSBT signing).
+   *
+   * All other chains derive a fixed-path address and run it through
+   * `deriveDeviceFingerprint` to produce an opaque seed identifier.
+   *
+   * The two callers (`getChainFingerprint` / `_verifyDeviceFingerprintWithSession`)
+   * differ only in the underlying call mechanism, which is injected as `callMethod`
+   * to avoid queue deadlocks when running inside `connectorCall`.
    */
-  private async _deriveAddressForFingerprint(
-    connectId: string,
-    chain: ChainForFingerprint
+  private async _computeChainFingerprint(
+    chain: ChainForFingerprint,
+    callMethod: (method: string, params: unknown) => Promise<unknown>
   ): Promise<string> {
-    const path = CHAIN_FINGERPRINT_PATHS[chain];
-
-    if (chain === 'evm') {
-      const result = (await this.connectorCall(connectId, 'evmGetAddress', {
-        path,
-        showOnDevice: false,
-      })) as { address: string };
-      return result.address;
-    }
-
+    // BTC: dedicated device call returns the BIP32 master fingerprint already
+    // in the canonical 8-hex form — no further hashing.
     if (chain === 'btc') {
-      // BTC fingerprint = BIP32 master fingerprint (8 hex). Dedicated device
-      // call; reusable as the xfp in BIP380 descriptors and PSBT signing.
-      const result = (await this.connectorCall(connectId, 'btcGetMasterFingerprint', {})) as {
+      const result = (await callMethod('btcGetMasterFingerprint', {})) as {
         masterFingerprint: string;
       };
       return result.masterFingerprint;
     }
 
-    if (chain === 'sol') {
-      const result = (await this.connectorCall(connectId, 'solGetAddress', {
-        path,
-        showOnDevice: false,
-      })) as { address: string };
-      return result.address;
-    }
-
-    if (chain === 'tron') {
-      const result = (await this.connectorCall(connectId, 'tronGetAddress', {
-        path,
-        showOnDevice: false,
-      })) as { address: string };
-      return result.address;
-    }
-
-    throw new Error(`Unsupported chain for fingerprint: ${chain as string}`);
-  }
-
-  /**
-   * Derive an address using an existing sessionId directly.
-   * Does NOT go through connectorCall — safe to call inside connectorCall
-   * without causing queue deadlock.
-   */
-  private async _deriveAddressWithSession(
-    sessionId: string,
-    chain: ChainForFingerprint
-  ): Promise<string> {
     const path = CHAIN_FINGERPRINT_PATHS[chain];
-
+    let address: string;
     if (chain === 'evm') {
-      const result = (await this.connector.call(sessionId, 'evmGetAddress', {
-        path,
-        showOnDevice: false,
-      })) as { address: string };
-      return result.address;
+      address = (
+        (await callMethod('evmGetAddress', { path, showOnDevice: false })) as {
+          address: string;
+        }
+      ).address;
+    } else if (chain === 'sol') {
+      address = (
+        (await callMethod('solGetAddress', { path, showOnDevice: false })) as {
+          address: string;
+        }
+      ).address;
+    } else if (chain === 'tron') {
+      address = (
+        (await callMethod('tronGetAddress', { path, showOnDevice: false })) as {
+          address: string;
+        }
+      ).address;
+    } else {
+      throw new Error(`Unsupported chain for fingerprint: ${chain as string}`);
     }
 
-    if (chain === 'btc') {
-      // Mirrors _deriveAddressForFingerprint: BTC returns the BIP32 master
-      // fingerprint directly, so verification also compares it verbatim.
-      const result = (await this.connector.call(sessionId, 'btcGetMasterFingerprint', {})) as {
-        masterFingerprint: string;
-      };
-      return result.masterFingerprint;
-    }
-
-    if (chain === 'sol') {
-      const result = (await this.connector.call(sessionId, 'solGetAddress', {
-        path,
-        showOnDevice: false,
-      })) as { address: string };
-      return result.address;
-    }
-
-    if (chain === 'tron') {
-      const result = (await this.connector.call(sessionId, 'tronGetAddress', {
-        path,
-        showOnDevice: false,
-      })) as { address: string };
-      return result.address;
-    }
-
-    throw new Error(`Unsupported chain for fingerprint: ${chain as string}`);
+    return deriveDeviceFingerprint(address);
   }
 
   // ---------------------------------------------------------------------------
