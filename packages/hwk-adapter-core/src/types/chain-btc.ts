@@ -76,10 +76,10 @@ export interface BtcRefTransaction {
 }
 
 export interface BtcSignedTx {
-  signatures: string[];
   serializedTx: string;
+  /** Present when the wallet returns per-input sigs separately (e.g. Trezor). */
+  signatures?: string[];
   txid?: string;
-  signedPsbt?: string;
 }
 
 export interface BtcSignPsbtParams {

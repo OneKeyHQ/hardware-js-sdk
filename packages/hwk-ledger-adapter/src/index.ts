@@ -30,3 +30,6 @@ export type {
 
 // Errors
 export { isDeviceLockedError, mapLedgerError } from './errors';
+
+// Debug logging (opt-in)
+export { setDebugEnabled, isDebugEnabled } from './utils/debugLog';

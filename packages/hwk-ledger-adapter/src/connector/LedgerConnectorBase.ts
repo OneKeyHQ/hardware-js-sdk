@@ -96,6 +96,8 @@ async function defaultLedgerKitImporter(pkg: string): Promise<any> {
       return import('@ledgerhq/device-signer-kit-bitcoin');
     case '@ledgerhq/device-signer-kit-solana':
       return import('@ledgerhq/device-signer-kit-solana');
+    case '@ledgerhq/context-module':
+      return import('@ledgerhq/context-module');
     default:
       throw new Error(`Unknown Ledger kit package: ${pkg}`);
   }
