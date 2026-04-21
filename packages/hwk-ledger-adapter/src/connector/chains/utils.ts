@@ -18,9 +18,7 @@ export function normalizePath(path: string): string {
  * per the public ConnectorUiEvent type contract. Leaking raw DMK strings
  * out of the SDK would break consumers that switch on EConnectorInteraction.
  */
-export function collapseSignerInteraction(
-  interaction: string,
-): EConnectorInteraction {
+export function collapseSignerInteraction(interaction: string): EConnectorInteraction {
   switch (interaction) {
     case 'confirm-open-app':
       return EConnectorInteraction.ConfirmOpenApp;
