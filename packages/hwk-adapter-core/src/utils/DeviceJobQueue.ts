@@ -52,6 +52,9 @@ export class DeviceJobQueue {
 
   private readonly _deps: DeviceJobQueueDeps | null;
 
+  /** Incremented on clear() so stale queued jobs can detect invalidation. */
+  private _generation = 0;
+
   constructor(deps?: DeviceJobQueueDeps) {
     this._deps = deps ?? null;
   }
@@ -116,10 +119,14 @@ export class DeviceJobQueue {
 
     const ac = new AbortController();
     const prev = this._queues.get(deviceId) ?? Promise.resolve();
+    const gen = this._generation;
 
     const next = prev
       .catch(() => {})
       .then(async () => {
+        if (this._generation !== gen) {
+          throw new Error('Job cancelled: queue was cleared');
+        }
         this._active.set(deviceId, {
           options: { interruptibility, label: options.label },
           abortController: ac,
@@ -171,6 +178,7 @@ export class DeviceJobQueue {
   }
 
   clear(): void {
+    this._generation++;
     for (const active of this._active.values()) {
       active.abortController.abort(new Error('Queue cleared'));
     }
