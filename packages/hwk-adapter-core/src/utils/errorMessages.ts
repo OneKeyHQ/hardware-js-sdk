@@ -31,15 +31,15 @@ export function enrichErrorMessage(code: HardwareErrorCode, originalMessage: str
     case HardwareErrorCode.OperationTimeout:
       return `${originalMessage}. The operation timed out. Please try again.`;
     case HardwareErrorCode.EvmBlindSigningRequired:
-      return 'Please enable Blind signing on your Ledger: open the Ethereum app → Settings → Blind signing → Enabled, then try again.';
+      return 'Ledger: Blind signing not enabled in Ethereum app.';
     case HardwareErrorCode.EvmClearSignPluginMissing:
-      return 'Required Ledger plugin is not installed. Please install the matching plugin on Ledger Live, then try again.';
+      return 'Ledger: Required plugin not installed (install via Ledger Live).';
     case HardwareErrorCode.EvmDataTooLarge:
-      return 'Transaction data is too large for your Ledger device. Try a simpler transaction or use a Ledger with more memory.';
+      return 'Ledger: Transaction data too large for device memory.';
     case HardwareErrorCode.EvmTxTypeNotSupported:
-      return 'Transaction type is not supported by your Ledger Ethereum app. Please update the app to the latest version.';
+      return 'Ledger: Transaction type not supported by current Ethereum app.';
     case HardwareErrorCode.AppTooOld:
-      return 'Your Ledger app is out of date. Please update it via Ledger Live.';
+      return 'Ledger: App out of date (update via Ledger Live).';
     default:
       return originalMessage;
   }
