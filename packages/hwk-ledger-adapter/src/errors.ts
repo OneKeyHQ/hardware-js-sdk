@@ -1,5 +1,30 @@
 import { HardwareErrorCode, enrichErrorMessage } from '@onekeyfe/hwk-adapter-core';
 
+import type { Failure } from '@onekeyfe/hwk-adapter-core';
+
+/**
+ * Ledger-specific Failure: adds `appName` for "the currently-open app" — a
+ * Ledger hardware concept not shared with other vendors, so it lives here
+ * rather than in core's generic Failure.
+ */
+export type LedgerFailure = Omit<Failure, 'payload'> & {
+  payload: Failure['payload'] & { appName?: string };
+};
+
+/**
+ * Structurally compatible with `Failure`; writes `appName` only when provided,
+ * so `'appName' in payload` is a reliable "has info" signal for consumers.
+ */
+export function ledgerFailure(
+  code: HardwareErrorCode,
+  error: string,
+  appName?: string
+): LedgerFailure {
+  const payload: LedgerFailure['payload'] = { error, code };
+  if (appName !== undefined) payload.appName = appName;
+  return { success: false, payload };
+}
+
 /**
  * DMK locked device status codes:
  *   0x5515 (21781) — primary locked response

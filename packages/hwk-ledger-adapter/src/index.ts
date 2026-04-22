@@ -29,7 +29,8 @@ export type {
 } from './types';
 
 // Errors
-export { isDeviceLockedError, mapLedgerError } from './errors';
+export { isDeviceLockedError, ledgerFailure, mapLedgerError } from './errors';
+export type { LedgerFailure } from './errors';
 
 // Debug logging (opt-in)
 export { setDebugEnabled, isDebugEnabled } from './utils/debugLog';

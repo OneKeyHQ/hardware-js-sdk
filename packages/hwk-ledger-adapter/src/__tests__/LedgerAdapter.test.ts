@@ -271,6 +271,203 @@ describe('LedgerAdapter', () => {
     });
   });
 
+  describe('BTC methods', () => {
+    it('btcGetAddress forwards params and returns address', async () => {
+      connector.call.mockResolvedValueOnce({ address: 'bc1qxyz', path: "m/84'/0'/0'" });
+
+      await adapter.connectDevice('dev-1');
+      const result = await adapter.btcGetAddress('dev-1', '', {
+        path: "m/84'/0'/0'",
+        coin: 'btc',
+        showOnDevice: false,
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.payload.address).toBe('bc1qxyz');
+      }
+      expect(connector.call).toHaveBeenCalledWith(
+        'session-abc',
+        'btcGetAddress',
+        expect.objectContaining({ path: "m/84'/0'/0'", showOnDevice: false })
+      );
+    });
+
+    it('btcGetPublicKey forwards params and returns xpub', async () => {
+      connector.call.mockResolvedValueOnce({ xpub: 'xpub6Abc', path: "m/84'/0'/0'" });
+
+      await adapter.connectDevice('dev-1');
+      const result = await adapter.btcGetPublicKey('dev-1', '', {
+        path: "m/84'/0'/0'",
+        coin: 'btc',
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.payload.xpub).toBe('xpub6Abc');
+      }
+      expect(connector.call).toHaveBeenCalledWith(
+        'session-abc',
+        'btcGetPublicKey',
+        expect.objectContaining({ path: "m/84'/0'/0'" })
+      );
+    });
+
+    it('btcSignTransaction forwards PSBT and returns serialized tx', async () => {
+      connector.call.mockResolvedValueOnce({ serializedTx: 'aabbcc' });
+
+      await adapter.connectDevice('dev-1');
+      const result = await adapter.btcSignTransaction('dev-1', '', {
+        path: "m/84'/0'/0'",
+        coin: 'btc',
+        psbt: '70736274ff0100',
+        inputs: [],
+        outputs: [],
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.payload.serializedTx).toBe('aabbcc');
+      }
+      expect(connector.call).toHaveBeenCalledWith(
+        'session-abc',
+        'btcSignTransaction',
+        expect.objectContaining({ psbt: '70736274ff0100' })
+      );
+    });
+
+    it('btcSignPsbt forwards PSBT and returns signed PSBT', async () => {
+      connector.call.mockResolvedValueOnce({ signedPsbt: '70736274ff01signed' });
+
+      await adapter.connectDevice('dev-1');
+      const result = await adapter.btcSignPsbt('dev-1', '', {
+        path: "m/86'/0'/0'",
+        coin: 'btc',
+        psbt: '70736274ff0100',
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.payload.signedPsbt).toBe('70736274ff01signed');
+      }
+      expect(connector.call).toHaveBeenCalledWith(
+        'session-abc',
+        'btcSignPsbt',
+        expect.objectContaining({ psbt: '70736274ff0100' })
+      );
+    });
+
+    it('btcSignMessage forwards params and returns signature (address optional)', async () => {
+      connector.call.mockResolvedValueOnce({ signature: '1fabcd' });
+
+      await adapter.connectDevice('dev-1');
+      const result = await adapter.btcSignMessage('dev-1', '', {
+        path: "m/84'/0'/0'/0/0",
+        coin: 'btc',
+        messageHex: '0x48656c6c6f',
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.payload.signature).toBe('1fabcd');
+        // address is optional — Ledger DMK does not return it
+        expect(result.payload.address).toBeUndefined();
+      }
+      expect(connector.call).toHaveBeenCalledWith(
+        'session-abc',
+        'btcSignMessage',
+        expect.any(Object)
+      );
+    });
+
+    it('btcGetMasterFingerprint forwards to connector with no params', async () => {
+      connector.call.mockResolvedValueOnce({ masterFingerprint: 'deadbeef' });
+
+      await adapter.connectDevice('dev-1');
+      const result = await adapter.btcGetMasterFingerprint('dev-1', '');
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.payload.masterFingerprint).toBe('deadbeef');
+      }
+      expect(connector.call).toHaveBeenCalledWith(
+        'session-abc',
+        'btcGetMasterFingerprint',
+        expect.any(Object)
+      );
+    });
+  });
+
+  describe('Tron methods', () => {
+    it('tronGetAddress forwards params and returns address + publicKey', async () => {
+      connector.call.mockResolvedValueOnce({
+        address: 'TRonAddr1',
+        publicKey: '04pk',
+        path: "m/44'/195'/0'/0/0",
+      });
+
+      await adapter.connectDevice('dev-1');
+      const result = await adapter.tronGetAddress('dev-1', '', {
+        path: "m/44'/195'/0'/0/0",
+        showOnDevice: false,
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.payload.address).toBe('TRonAddr1');
+      }
+      expect(connector.call).toHaveBeenCalledWith(
+        'session-abc',
+        'tronGetAddress',
+        expect.objectContaining({ path: "m/44'/195'/0'/0/0" })
+      );
+    });
+
+    it('tronSignTransaction forwards rawTxHex (+ optional tokenSignatures) and returns signature', async () => {
+      connector.call.mockResolvedValueOnce({ signature: 'trxSig1' });
+
+      await adapter.connectDevice('dev-1');
+      const result = await adapter.tronSignTransaction('dev-1', '', {
+        path: "m/44'/195'/0'/0/0",
+        rawTxHex: '0adeadbeef',
+        tokenSignatures: ['tokenmeta1'],
+      } as any);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.payload.signature).toBe('trxSig1');
+      }
+      expect(connector.call).toHaveBeenCalledWith(
+        'session-abc',
+        'tronSignTransaction',
+        expect.objectContaining({
+          rawTxHex: '0adeadbeef',
+          tokenSignatures: ['tokenmeta1'],
+        })
+      );
+    });
+
+    it('tronSignMessage forwards messageHex and returns signature', async () => {
+      connector.call.mockResolvedValueOnce({ signature: 'trxMsgSig' });
+
+      await adapter.connectDevice('dev-1');
+      const result = await adapter.tronSignMessage('dev-1', '', {
+        path: "m/44'/195'/0'/0/0",
+        messageHex: '0x48656c6c6f',
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.payload.signature).toBe('trxMsgSig');
+      }
+      expect(connector.call).toHaveBeenCalledWith(
+        'session-abc',
+        'tronSignMessage',
+        expect.objectContaining({ messageHex: '0x48656c6c6f' })
+      );
+    });
+  });
+
   describe('cancel', () => {
     it('should delegate to connector.cancel', async () => {
       await adapter.connectDevice('dev-1');

@@ -38,7 +38,7 @@ export type UiRequestEvent =
   | { type: typeof UI_REQUEST.REQUEST_SELECT_DEVICE; payload: { devices: DeviceInfo[] } }
   | {
       type: typeof UI_REQUEST.REQUEST_DEVICE_CONNECT;
-      payload: { message: string; retryCount: number; maxRetries: number };
+      payload: { message: string };
     }
   | {
       type: typeof UI_REQUEST.REQUEST_PREEMPTION;
@@ -106,7 +106,7 @@ export interface HardwareEventMap {
   };
   [UI_REQUEST.REQUEST_DEVICE_CONNECT]: {
     type: typeof UI_REQUEST.REQUEST_DEVICE_CONNECT;
-    payload: { message: string; retryCount: number; maxRetries: number };
+    payload: { message: string };
   };
   [UI_REQUEST.REQUEST_PREEMPTION]: {
     type: typeof UI_REQUEST.REQUEST_PREEMPTION;

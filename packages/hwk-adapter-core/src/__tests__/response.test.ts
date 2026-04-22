@@ -28,6 +28,12 @@ describe('response helpers', () => {
       expect(result.payload.code).toBe(3);
       expect(result.payload.error).toBe('User cancelled the operation');
     });
+
+    it('should keep Failure payload vendor-agnostic (no appName / Ledger fields)', () => {
+      const result = failure(HardwareErrorCode.DeviceNotFound, 'msg');
+      expect('appName' in result.payload).toBe(false);
+      expect(Object.keys(result.payload).sort()).toEqual(['code', 'error']);
+    });
   });
 
   describe('Response<T> type narrowing', () => {

@@ -15,6 +15,7 @@ import {
   isDeviceDisconnectedError,
   isDeviceLockedError,
   isTimeoutError,
+  ledgerFailure,
   mapLedgerError,
 } from '../errors';
 import { debugError, debugLog } from '../utils/debugLog';
@@ -683,7 +684,7 @@ export class LedgerAdapter implements IHardwareWallet {
   // If `signal` is provided, an abort cancels the pending UI request so the
   // registry slot is released and a stale RECEIVE_DEVICE_CONNECT won't land in
   // a future request.
-  private async _waitForDeviceConnect(attempt: number, signal?: AbortSignal): Promise<void> {
+  private async _waitForDeviceConnect(signal?: AbortSignal): Promise<void> {
     if (signal?.aborted) {
       LedgerAdapter._throwIfAborted(signal);
     }
@@ -692,8 +693,6 @@ export class LedgerAdapter implements IHardwareWallet {
       type: UI_REQUEST.REQUEST_DEVICE_CONNECT,
       payload: {
         message: 'Please connect and unlock your Ledger device',
-        retryCount: attempt,
-        maxRetries: LedgerAdapter.MAX_DEVICE_RETRY,
       },
     });
 
@@ -760,7 +759,7 @@ export class LedgerAdapter implements IHardwareWallet {
 
       // No device found — prompt user (except on last attempt)
       if (attempt < LedgerAdapter.MAX_DEVICE_RETRY - 1) {
-        await this._waitForDeviceConnect(attempt + 1);
+        await this._waitForDeviceConnect();
       }
     }
 
@@ -950,7 +949,7 @@ export class LedgerAdapter implements IHardwareWallet {
         return this._retryWithFreshConnection(resolvedConnectId, method, params, signal, err);
       }
       if (isDeviceLockedError(err)) {
-        await this._waitForDeviceConnect(0, signal);
+        await this._waitForDeviceConnect(signal);
         LedgerAdapter._throwIfAborted(signal);
         return LedgerAdapter._abortable(signal, this.connector.call(sessionId, method, params));
       }
@@ -1032,7 +1031,7 @@ export class LedgerAdapter implements IHardwareWallet {
       typeof (err as { code: unknown }).code === 'number'
     ) {
       const e = err as { code: number; message?: string; appName?: string };
-      return failure(e.code, e.message ?? 'Unknown error', e.appName);
+      return ledgerFailure(e.code, e.message ?? 'Unknown error', e.appName);
     }
 
     const mapped = mapLedgerError(err);
@@ -1040,7 +1039,7 @@ export class LedgerAdapter implements IHardwareWallet {
     // DeviceLocked is handled by connectorCall retry logic (_waitForDeviceConnect).
     // Do NOT emit UI events here — it would show UI and return error simultaneously.
 
-    return failure(mapped.code, mapped.message, mapped.appName);
+    return ledgerFailure(mapped.code, mapped.message, mapped.appName);
   }
 
   // ---------------------------------------------------------------------------

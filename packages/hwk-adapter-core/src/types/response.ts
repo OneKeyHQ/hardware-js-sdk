@@ -10,7 +10,6 @@ export interface Failure {
   payload: {
     error: string;
     code: HardwareErrorCode;
-    appName?: string;
   };
 }
 
@@ -20,6 +19,6 @@ export function success<T>(payload: T): Success<T> {
   return { success: true, payload };
 }
 
-export function failure(code: HardwareErrorCode, error: string, appName?: string): Failure {
-  return { success: false, payload: { error, code, appName } };
+export function failure(code: HardwareErrorCode, error: string): Failure {
+  return { success: false, payload: { error, code } };
 }

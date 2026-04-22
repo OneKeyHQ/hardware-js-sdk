@@ -9,7 +9,6 @@ describe('event constants', () => {
     expect(DEVICE.CONNECT).toBe('device-connect');
     expect(DEVICE.DISCONNECT).toBe('device-disconnect');
     expect(DEVICE.CHANGED).toBe('device-changed');
-    expect(DEVICE.FEATURES).toBe('features');
   });
 
   it('should export UI_EVENT string', () => {

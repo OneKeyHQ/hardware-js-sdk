@@ -6,6 +6,7 @@ import {
   isTimeoutError,
   isUserRejectedError,
   isWrongAppError,
+  ledgerFailure,
   mapLedgerError,
 } from '../errors';
 
@@ -222,5 +223,29 @@ describe('mapLedgerError', () => {
     // 6982 is in locked set
     const result = mapLedgerError({ statusCode: '6982' });
     expect(result.code).toBe(HardwareErrorCode.DeviceLocked);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ledgerFailure
+// ---------------------------------------------------------------------------
+
+describe('ledgerFailure', () => {
+  it('includes appName in payload when provided', () => {
+    const r = ledgerFailure(HardwareErrorCode.WrongApp, 'wrong app', 'Bitcoin');
+    expect(r.success).toBe(false);
+    expect(r.payload.code).toBe(HardwareErrorCode.WrongApp);
+    expect(r.payload.error).toBe('wrong app');
+    expect(r.payload.appName).toBe('Bitcoin');
+  });
+
+  it('omits appName key when not provided', () => {
+    const r = ledgerFailure(HardwareErrorCode.DeviceLocked, 'locked');
+    expect('appName' in r.payload).toBe(false);
+  });
+
+  it('omits appName key when explicitly passed undefined', () => {
+    const r = ledgerFailure(HardwareErrorCode.DeviceLocked, 'locked', undefined);
+    expect('appName' in r.payload).toBe(false);
   });
 });
