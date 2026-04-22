@@ -32,8 +32,7 @@ export class DmkTransport extends Transport {
     });
 
     // Legacy format: data + statusCode (2 bytes) concatenated
-    const data = response.data as Uint8Array;
-    const statusCode = response.statusCode as Uint8Array;
+    const { data, statusCode } = response;
     const result = Buffer.alloc(data.length + 2);
     if (data.length > 0) {
       result.set(data, 0);

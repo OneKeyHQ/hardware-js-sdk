@@ -1,10 +1,14 @@
 {
   "rules": {
-    "no-bitwise": "off",
-    "default-case": "off",
-    "no-promise-executor-return": "off",
+    "@typescript-eslint/no-non-null-assertion": "off",
     "@typescript-eslint/require-await": "off",
-    "import/no-unresolved": ["error", { "ignore": ["^vitest"] }]
+    "@typescript-eslint/unbound-method": "off",
+    "default-case": "off",
+    "default-param-last": "off",
+    "no-promise-executor-return": "off",
+    "no-return-await": "off",
+    "no-void": "off",
+    "import/no-unresolved": ["error", { "ignore": ["^@ledgerhq/"] }]
   },
   "ignorePatterns": ["tsup.config.ts"]
 }

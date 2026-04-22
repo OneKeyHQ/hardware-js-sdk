@@ -13,12 +13,10 @@ describe('LedgerBleConnector', () => {
 
   describe('_resolveConnectId', () => {
     // _resolveConnectId is protected; tests reach it via an `as any` cast.
-    function resolve(
-      connector: LedgerBleConnector,
-      descriptor: DeviceDescriptor
-    ): string {
-      return (connector as unknown as { _resolveConnectId(d: DeviceDescriptor): string })
-        ._resolveConnectId(descriptor);
+    function resolve(connector: LedgerBleConnector, descriptor: DeviceDescriptor): string {
+      return (
+        connector as unknown as { _resolveConnectId(d: DeviceDescriptor): string }
+      )._resolveConnectId(descriptor);
     }
 
     it('extracts 4-hex suffix from device name and uppercases it', () => {
