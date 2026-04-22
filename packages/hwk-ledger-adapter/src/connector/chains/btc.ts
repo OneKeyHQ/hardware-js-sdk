@@ -89,7 +89,7 @@ export async function btcGetAddress(
     const { DefaultWallet, DefaultDescriptorTemplate } = await ctx.importLedgerKit(
       '@ledgerhq/device-signer-kit-bitcoin'
     );
-    const purpose = path.split('/')[0]?.replaceAll("'", '');
+    const purpose = path.split('/')[0]?.replace(/'/g, '');
     const template = _purposeToTemplate(purpose, DefaultDescriptorTemplate);
     const wallet = new DefaultWallet(path, template);
 
@@ -160,7 +160,7 @@ export async function btcSignTransaction(
 
     // Determine wallet template from the account-level derivation path
     const path = normalizePath(params.path || "84'/0'/0'");
-    const purpose = path.split('/')[0]?.replaceAll("'", '');
+    const purpose = path.split('/')[0]?.replace(/'/g, '');
     const template = _purposeToTemplate(purpose, DefaultDescriptorTemplate);
 
     const wallet = new DefaultWallet(path, template);
@@ -195,7 +195,7 @@ export async function btcSignPsbt(
     );
 
     const path = normalizePath(params.path || "84'/0'/0'");
-    const purpose = path.split('/')[0]?.replaceAll("'", '');
+    const purpose = path.split('/')[0]?.replace(/'/g, '');
     const template = _purposeToTemplate(purpose, DefaultDescriptorTemplate);
 
     const wallet = new DefaultWallet(path, template);
