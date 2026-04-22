@@ -1,13 +1,7 @@
-import { LedgerConnectorBase } from '@onekeyfe/hwk-ledger-adapter';
+import { LedgerConnectorBase, extractBleHexId } from '@onekeyfe/hwk-ledger-adapter';
 
 import type { DeviceDescriptor } from '@onekeyfe/hwk-adapter-core';
 import type { DeviceManagementKit } from '@ledgerhq/device-management-kit';
-
-function extractBleHexId(name?: string): string | undefined {
-  if (!name) return undefined;
-  const match = name.match(/\b([0-9A-Fa-f]{4})$/);
-  return match ? match[1].toUpperCase() : undefined;
-}
 
 export interface LedgerBleConnectorOptions {
   dmk?: DeviceManagementKit;

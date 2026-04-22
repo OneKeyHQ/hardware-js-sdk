@@ -34,3 +34,6 @@ export type { LedgerFailure } from './errors';
 
 // Debug logging (opt-in)
 export { setDebugEnabled, isDebugEnabled } from './utils/debugLog';
+
+// BLE utilities (shared by connector packages)
+export { extractBleHexId } from './utils/bleIdentity';
