@@ -1,22 +1,11 @@
 import { DeviceActionStatus } from '@ledgerhq/device-management-kit';
 
+import { debugLog } from '../utils/debugLog';
+
 import type { DeviceAction, DeviceActionState } from '../types';
 
 /** Default timeout for non-interactive operations (e.g. getAddress without showOnDevice). */
 const DEFAULT_TIMEOUT_MS = 30_000;
-
-/**
- * Debug logging for DMK observable state transitions.
- * Off by default; flip manually when debugging device flows locally.
- */
-const DEBUG_DMK_OBSERVABLE = false;
-
-function debugLog(...args: unknown[]): void {
-  if (DEBUG_DMK_OBSERVABLE) {
-    // eslint-disable-next-line no-console
-    console.debug(...args);
-  }
-}
 
 /**
  * Convert a DMK DeviceAction (Observable-based) into a Promise.
@@ -91,8 +80,9 @@ export function deviceActionToPromise<T>(
     debugLog('[DMK-Observable] subscribing to action.observable...');
     sub = action.observable.subscribe({
       next: (state: DeviceActionState<T>) => {
-        // Device is alive — reset timeout
-        resetTimer();
+        // Drop late emissions post-cancel; otherwise resetTimer re-arms an unclearable timer.
+        if (settled) return;
+        resetTimer(); // device is alive → reset timeout
 
         // Track last DMK step so caller can disambiguate failure contexts
         // (e.g. 0x6a80 during blindSignTransactionFallback = Blind signing disabled)
@@ -109,7 +99,6 @@ export function deviceActionToPromise<T>(
             hasError: state.status === DeviceActionStatus.Error,
           })
         );
-        if (settled) return;
         if (state.status === DeviceActionStatus.Completed) {
           settled = true;
           if (timer) clearTimeout(timer);

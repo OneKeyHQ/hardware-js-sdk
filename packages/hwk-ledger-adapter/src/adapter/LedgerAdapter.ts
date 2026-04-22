@@ -637,11 +637,12 @@ export class LedgerAdapter implements IHardwareWallet {
     const path = CHAIN_FINGERPRINT_PATHS[chain];
     let address: string;
     if (chain === 'evm') {
+      // Lowercase per deriveDeviceFingerprint's canonical-form contract.
       address = (
         (await callMethod('evmGetAddress', { path, showOnDevice: false })) as {
           address: string;
         }
-      ).address;
+      ).address.toLowerCase();
     } else if (chain === 'sol') {
       address = (
         (await callMethod('solGetAddress', { path, showOnDevice: false })) as {

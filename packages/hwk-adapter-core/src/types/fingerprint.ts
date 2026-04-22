@@ -29,11 +29,10 @@ export const CHAIN_FINGERPRINT_PATHS: Record<ChainForFingerprint, string> = {
 export type ChainForFingerprint = 'evm' | 'btc' | 'sol' | 'tron';
 
 /**
- * Hash an address string into a 16-character hex fingerprint.
- *
- * Uses the first 16 hex chars (64 bits) of SHA-256 — sufficient for
- * device identity matching. Not used for security decisions.
+ * 16-char SHA-256 fingerprint for device-identity verification.
+ * Callers must canonicalize input (e.g. EVM address → lowercase) —
+ * encoding variations otherwise cause false DeviceMismatch.
  */
-export function deriveDeviceFingerprint(address: string): string {
-  return bytesToHex(sha256(utf8ToBytes(address))).slice(0, 16);
+export function deriveDeviceFingerprint(value: string): string {
+  return bytesToHex(sha256(utf8ToBytes(value))).slice(0, 16);
 }

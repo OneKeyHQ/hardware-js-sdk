@@ -635,7 +635,14 @@ export class LedgerConnectorBase implements IConnector {
       _tag: src._tag,
       errorCode: src.errorCode,
       _lastStep: src._lastStep,
-      originalError: err,
+    });
+    // Non-enumerable: DMK errors can carry APDU payloads / signing
+    // intermediates that shouldn't leak into JSON.stringify / log transports.
+    Object.defineProperty(error, 'originalError', {
+      value: err,
+      configurable: true,
+      enumerable: false,
+      writable: true,
     });
     return error;
   }

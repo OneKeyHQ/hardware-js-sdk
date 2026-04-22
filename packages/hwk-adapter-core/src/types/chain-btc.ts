@@ -101,7 +101,8 @@ export interface BtcSignMsgParams {
 
 export interface BtcSignature {
   signature: string;
-  address: string;
+  /** Optional — not all adapters return it (e.g. Ledger DMK). Derive via btcGetAddress if needed. */
+  address?: string;
 }
 
 export interface IBtcMethods {

@@ -20,6 +20,11 @@ export interface TronSignTransactionCallParams {
   path: string;
   /** Protobuf-encoded raw transaction hex (no 0x prefix) */
   rawTxHex: string;
+  /**
+   * TRC token metadata for Ledger clear-signing. Omit → TRC-20 transfers
+   * fall back to blind-signing (user sees only raw bytes on-device).
+   */
+  tokenSignatures?: string[];
 }
 
 export interface TronSignMessageCallParams {
@@ -74,7 +79,11 @@ export async function tronSignTransaction(
       type: EConnectorInteraction.ConfirmOnDevice,
       payload: { sessionId: sid },
     });
-    const signature = await trx.signTransaction(path, params.rawTxHex, []);
+    const signature = await trx.signTransaction(
+      path,
+      params.rawTxHex,
+      params.tokenSignatures ?? []
+    );
     ctx.emit('ui-event', {
       type: EConnectorInteraction.InteractionComplete,
       payload: { sessionId: sid },

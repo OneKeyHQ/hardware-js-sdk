@@ -13,12 +13,11 @@ type SignerEthBuilderFn = (args: {
 }) => { build(): ISdkSignerEth } | Promise<{ build(): ISdkSignerEth }>;
 
 /**
- * Manages per-sessionId SignerEth instances.
- * Creates on demand, caches for reuse, invalidates on session change.
+ * Per-sessionId SignerEth factory. Builds fresh on every call — DMK signers
+ * hold DeviceAction state that isn't safe to reuse, so `invalidate` /
+ * `clearAll` are kept as no-op lifecycle hooks for callers.
  */
 export class SignerManager {
-  private readonly _cache = new Map<string, SignerEth>();
-
   private readonly _dmk: DeviceManagementKit;
 
   private readonly _builderFn: SignerEthBuilderFn;
@@ -29,27 +28,16 @@ export class SignerManager {
   }
 
   async getOrCreate(sessionId: string): Promise<SignerEth> {
-    const hadCached = this._cache.has(sessionId);
-    // Always create a fresh signer — DMK signers may maintain internal DeviceAction
-    // state that can prevent subsequent operations if reused.
-    this._cache.delete(sessionId);
-
-    debugLog('[DMK] SignerManager.getOrCreate:', { sessionId, hadCached, creating: true });
+    debugLog('[DMK] SignerManager.getOrCreate:', { sessionId });
     const builder = await this._builderFn({ dmk: this._dmk, sessionId });
-    const sdkSigner = builder.build();
-    debugLog('[DMK] SignerManager: new signer built');
-    const signer = new SignerEth(sdkSigner);
-    this._cache.set(sessionId, signer);
-    return signer;
+    return new SignerEth(builder.build());
   }
 
-  invalidate(sessionId: string): void {
-    this._cache.delete(sessionId);
-  }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars, class-methods-use-this
+  invalidate(_sessionId: string): void {}
 
-  clearAll(): void {
-    this._cache.clear();
-  }
+  // eslint-disable-next-line class-methods-use-this
+  clearAll(): void {}
 
   private static _defaultBuilder(): SignerEthBuilderFn {
     return args => {

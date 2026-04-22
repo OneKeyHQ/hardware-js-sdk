@@ -46,7 +46,7 @@ describe('SignerEth', () => {
   it('should signMessage', async () => {
     const sdk = createMockSdkSigner();
     const signer = new SignerEth(sdk);
-    const result = await signer.signMessage("44'/60'/0'/0/0", 'Hello');
+    const result = await signer.signMessage("44'/60'/0'/0/0", '0x48656c6c6f');
     expect(result).toEqual({ r: '0xr', s: '0xs', v: 28 });
   });
 

@@ -1,3 +1,5 @@
+import { hexToBytes } from '@onekeyfe/hwk-adapter-core';
+
 import { deviceActionToPromise } from './deviceActionToPromise';
 import { debugError, debugLog } from '../utils/debugLog';
 
@@ -12,12 +14,7 @@ type BtcMessageOptions = Parameters<ISdkSignerBtc['signMessage']>[2];
 
 /** Decode hex string (with or without 0x prefix) to UTF-8 text. */
 function hexToUtf8(hex: string): string {
-  const h = hex.startsWith('0x') ? hex.slice(2) : hex;
-  const bytes = new Uint8Array(h.length / 2);
-  for (let i = 0; i < bytes.length; i++) {
-    bytes[i] = parseInt(h.substring(i * 2, i * 2 + 2), 16);
-  }
-  return new TextDecoder().decode(bytes);
+  return new TextDecoder().decode(hexToBytes(hex));
 }
 
 /** Timeout for user-interactive operations (sign, verify). */

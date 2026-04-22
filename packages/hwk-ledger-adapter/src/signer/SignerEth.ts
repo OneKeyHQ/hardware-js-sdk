@@ -1,18 +1,10 @@
+import { hexToBytes } from '@onekeyfe/hwk-adapter-core';
+
 import { deviceActionToPromise } from './deviceActionToPromise';
 import { debugLog } from '../utils/debugLog';
 
 import type { SignerEth as ISdkSignerEth, TypedData } from '@ledgerhq/device-signer-kit-ethereum';
 import type { SignerEvmAddress, SignerEvmSignature } from '../types';
-
-/** Convert hex string (with or without 0x) to Uint8Array. */
-function hexToBytes(hex: string): Uint8Array {
-  const h = hex.startsWith('0x') ? hex.slice(2) : hex;
-  const bytes = new Uint8Array(h.length / 2);
-  for (let i = 0; i < bytes.length; i++) {
-    bytes[i] = parseInt(h.substring(i * 2, i * 2 + 2), 16);
-  }
-  return bytes;
-}
 
 /** Timeout for user-interactive operations (verify address, sign). */
 const INTERACTIVE_TIMEOUT_MS = 5 * 60_000;

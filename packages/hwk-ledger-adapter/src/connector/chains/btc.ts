@@ -46,6 +46,34 @@ export interface BtcSignMessageCallParams {
 }
 
 // ---------------------------------------------------------------------------
+// Internal -- BIP-44 purpose → Ledger wallet template
+// ---------------------------------------------------------------------------
+
+/**
+ * BIP-44 purpose → Ledger descriptor template. Throws on unknown —
+ * silent NATIVE_SEGWIT fallback would yield wrong addresses for
+ * multisig (m/48') / legacy BIP-45 accounts. DDT is injected because
+ * it comes from a runtime `importLedgerKit`.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function _purposeToTemplate(purpose: string | undefined, DDT: any): any {
+  switch (purpose) {
+    case '44':
+      return DDT.LEGACY;
+    case '49':
+      return DDT.NESTED_SEGWIT;
+    case '84':
+      return DDT.NATIVE_SEGWIT;
+    case '86':
+      return DDT.TAPROOT;
+    default:
+      throw Object.assign(new Error(`Unsupported BTC purpose: m/${purpose ?? '<undefined>'}'`), {
+        code: HardwareErrorCode.InvalidParams,
+      });
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Handlers
 // ---------------------------------------------------------------------------
 
@@ -62,10 +90,7 @@ export async function btcGetAddress(
       '@ledgerhq/device-signer-kit-bitcoin'
     );
     const purpose = path.split('/')[0]?.replaceAll("'", '');
-    let template = DefaultDescriptorTemplate.NATIVE_SEGWIT;
-    if (purpose === '44') template = DefaultDescriptorTemplate.LEGACY;
-    else if (purpose === '49') template = DefaultDescriptorTemplate.NESTED_SEGWIT;
-    else if (purpose === '86') template = DefaultDescriptorTemplate.TAPROOT;
+    const template = _purposeToTemplate(purpose, DefaultDescriptorTemplate);
     const wallet = new DefaultWallet(path, template);
 
     debugLog('[LedgerConnector] btcGetAddress params:', {
@@ -136,10 +161,7 @@ export async function btcSignTransaction(
     // Determine wallet template from the account-level derivation path
     const path = normalizePath(params.path || "84'/0'/0'");
     const purpose = path.split('/')[0]?.replaceAll("'", '');
-    let template = DefaultDescriptorTemplate.NATIVE_SEGWIT;
-    if (purpose === '44') template = DefaultDescriptorTemplate.LEGACY;
-    else if (purpose === '49') template = DefaultDescriptorTemplate.NESTED_SEGWIT;
-    else if (purpose === '86') template = DefaultDescriptorTemplate.TAPROOT;
+    const template = _purposeToTemplate(purpose, DefaultDescriptorTemplate);
 
     const wallet = new DefaultWallet(path, template);
 
@@ -174,10 +196,7 @@ export async function btcSignPsbt(
 
     const path = normalizePath(params.path || "84'/0'/0'");
     const purpose = path.split('/')[0]?.replaceAll("'", '');
-    let template = DefaultDescriptorTemplate.NATIVE_SEGWIT;
-    if (purpose === '44') template = DefaultDescriptorTemplate.LEGACY;
-    else if (purpose === '49') template = DefaultDescriptorTemplate.NESTED_SEGWIT;
-    else if (purpose === '86') template = DefaultDescriptorTemplate.TAPROOT;
+    const template = _purposeToTemplate(purpose, DefaultDescriptorTemplate);
 
     const wallet = new DefaultWallet(path, template);
 
@@ -202,7 +221,7 @@ export async function btcSignMessage(
   ctx: ConnectorContext,
   sessionId: string,
   params: BtcSignMessageCallParams
-): Promise<{ signature: string; address: string }> {
+): Promise<{ signature: string; address?: string }> {
   const btcSigner = await _createBtcSigner(ctx, sessionId);
   const path = normalizePath(params.path);
 
@@ -210,13 +229,12 @@ export async function btcSignMessage(
     // signMessage returns { r: HexaString, s: HexaString, v: number }
     const result = await btcSigner.signMessage(path, params.message);
 
-    // BIP-137: signature = v(1) + r(32) + s(32)
-    // Return as hex string (same as OneKey SDK), ProviderApiBtc converts to base64
+    // BIP-137: signature = v(1) + r(32) + s(32); returned as hex (OneKey SDK style).
     const vHex = result.v.toString(16).padStart(2, '0');
     const rHex = stripHex(result.r).padStart(64, '0');
     const sHex = stripHex(result.s).padStart(64, '0');
 
-    return { signature: `${vHex}${rHex}${sHex}`, address: '' };
+    return { signature: `${vHex}${rHex}${sHex}` };
   } catch (err) {
     ctx.invalidateSession(sessionId);
     throw ctx.wrapError(err);
@@ -280,7 +298,32 @@ async function _createBtcSigner(ctx: ConnectorContext, sessionId: string): Promi
 // Internal -- Apply partial signatures to PSBT
 // ---------------------------------------------------------------------------
 
-function _applySignaturesToPsbt(
+type PsbtInput = Psbt['data']['inputs'][number];
+
+function _isTaprootInput(input: PsbtInput): boolean {
+  if (
+    input.tapInternalKey ||
+    input.tapKeySig ||
+    input.tapLeafScript ||
+    input.tapMerkleRoot ||
+    input.tapBip32Derivation ||
+    input.tapScriptSig
+  )
+    return true;
+  // P2TR scriptPubKey: OP_1 (0x51) + PUSH32 (0x20) + <32B x-only>
+  const script = input.witnessUtxo?.script;
+  return !!(script && script.length === 34 && script[0] === 0x51 && script[1] === 0x20);
+}
+
+function _isScriptPathInput(input: PsbtInput): boolean {
+  return !!(input.tapLeafScript && input.tapLeafScript.length > 0);
+}
+
+/**
+ * Dispatch DMK-returned signatures to the correct PSBT field using the
+ * input's scriptPubKey as authoritative signal; throws on shape violations.
+ */
+export function _applySignaturesToPsbt(
   psbtHex: string,
   signatures: Array<{
     inputIndex: number;
@@ -291,19 +334,45 @@ function _applySignaturesToPsbt(
 ): string {
   const psbt = Psbt.fromHex(psbtHex);
   for (const sig of signatures) {
-    if (sig.tapleafHash && sig.tapleafHash.length > 0) {
+    const input = psbt.data.inputs[sig.inputIndex];
+    if (!input) {
+      throw new Error(`_applySignaturesToPsbt: no PSBT input at index ${sig.inputIndex}`);
+    }
+    const taproot = _isTaprootInput(input);
+    const scriptPath = taproot && _isScriptPathInput(input);
+    const hasLeafHash = !!(sig.tapleafHash && sig.tapleafHash.length > 0);
+
+    if (scriptPath) {
+      if (sig.pubkey.length !== 32)
+        throw new Error(
+          `input ${sig.inputIndex}: taproot script-path pubkey must be 32B, got ${sig.pubkey.length}`
+        );
+      if (!hasLeafHash)
+        throw new Error(
+          `input ${sig.inputIndex}: taproot script-path signature missing tapleafHash`
+        );
       psbt.updateInput(sig.inputIndex, {
         tapScriptSig: [
-          {
-            pubkey: sig.pubkey.length === 32 ? sig.pubkey : sig.pubkey.subarray(0, 32),
-            leafHash: sig.tapleafHash,
-            signature: sig.signature,
-          },
+          { pubkey: sig.pubkey, leafHash: sig.tapleafHash!, signature: sig.signature },
         ],
       });
-    } else if (sig.pubkey.length === 32) {
+    } else if (taproot) {
+      if (sig.pubkey.length !== 32)
+        throw new Error(
+          `input ${sig.inputIndex}: taproot key-path pubkey must be 32B, got ${sig.pubkey.length}`
+        );
+      if (hasLeafHash)
+        throw new Error(
+          `input ${sig.inputIndex}: taproot key-path signature must not carry tapleafHash`
+        );
       psbt.updateInput(sig.inputIndex, { tapKeySig: sig.signature });
     } else {
+      if (sig.pubkey.length !== 33 && sig.pubkey.length !== 65)
+        throw new Error(
+          `input ${sig.inputIndex}: ECDSA pubkey must be 33B or 65B, got ${sig.pubkey.length}`
+        );
+      if (hasLeafHash)
+        throw new Error(`input ${sig.inputIndex}: ECDSA signature must not carry tapleafHash`);
       psbt.updateInput(sig.inputIndex, {
         partialSig: [{ pubkey: sig.pubkey, signature: sig.signature }],
       });
