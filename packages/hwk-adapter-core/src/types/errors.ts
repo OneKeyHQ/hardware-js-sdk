@@ -44,4 +44,22 @@ export enum HardwareErrorCode {
   EvmTxTypeNotSupported = 7004,
   /** 0x911c Command code not supported — app predates current SDK */
   AppTooOld = 7005,
+
+  // --- Solana ---
+  /** 0x6808 Blind signing disabled for this instruction. */
+  SolanaBlindSigningRequired = 7101,
+
+  // --- Tron ---
+  /** 0x6a8d Custom Contracts setting disabled (blocks TRC-20 etc.). */
+  TronCustomContractRequired = 7201,
+  /** 0x6a8b Transactions Data setting disabled. */
+  TronDataSigningRequired = 7202,
+  /** 0x6a8c Sign by Hash setting disabled (hash-signing fallback). */
+  TronSignByHashRequired = 7203,
+
+  // --- BTC ---
+  /** 0xb008 Wallet policy HMAC mismatch or not registered. */
+  BtcWalletPolicyHmacMismatch = 7301,
+  /** 0xb007 Aborted due to unexpected state (malformed PSBT / missing UTXO). */
+  BtcUnexpectedState = 7302,
 }

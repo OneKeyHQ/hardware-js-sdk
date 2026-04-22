@@ -68,24 +68,32 @@ describe('DeviceJobQueue', () => {
     const started: string[] = [];
 
     // Step 1: Enqueue Job A (long-running) for device "d1"
-    const jobAPromise = queue.enqueue('d1', async (signal) => {
-      started.push('A');
-      await new Promise<void>((resolve, reject) => {
-        const timer = setTimeout(() => resolve(), 200);
-        signal.addEventListener('abort', () => {
-          clearTimeout(timer);
-          reject(signal.reason);
+    const jobAPromise = queue.enqueue(
+      'd1',
+      async signal => {
+        started.push('A');
+        await new Promise<void>((resolve, reject) => {
+          const timer = setTimeout(() => resolve(), 200);
+          signal.addEventListener('abort', () => {
+            clearTimeout(timer);
+            reject(signal.reason);
+          });
         });
-      });
-      return 'A';
-    }, { interruptibility: 'none', label: 'Job A' });
+        return 'A';
+      },
+      { interruptibility: 'none', label: 'Job A' }
+    );
 
     // Step 2: Enqueue Job B for device "d1" — chains behind A
-    const jobBPromise = queue.enqueue('d1', async () => {
-      started.push('B');
-      await new Promise(r => setTimeout(r, 100));
-      return 'B';
-    }, { interruptibility: 'none', label: 'Job B' });
+    const jobBPromise = queue.enqueue(
+      'd1',
+      async () => {
+        started.push('B');
+        await new Promise(r => setTimeout(r, 100));
+        return 'B';
+      },
+      { interruptibility: 'none', label: 'Job B' }
+    );
 
     // Step 3: Wait for A to start running, then clear()
     await new Promise(r => setTimeout(r, 50));
@@ -94,11 +102,15 @@ describe('DeviceJobQueue', () => {
     queue.clear();
 
     // Step 4: Enqueue Job C on fresh chain
-    const jobCPromise = queue.enqueue('d1', async () => {
-      started.push('C');
-      await new Promise(r => setTimeout(r, 100));
-      return 'C';
-    }, { interruptibility: 'none', label: 'Job C' });
+    const jobCPromise = queue.enqueue(
+      'd1',
+      async () => {
+        started.push('C');
+        await new Promise(r => setTimeout(r, 100));
+        return 'C';
+      },
+      { interruptibility: 'none', label: 'Job C' }
+    );
 
     const results = await Promise.allSettled([jobAPromise, jobBPromise, jobCPromise]);
 

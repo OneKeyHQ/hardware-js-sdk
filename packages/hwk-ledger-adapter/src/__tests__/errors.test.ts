@@ -224,6 +224,58 @@ describe('mapLedgerError', () => {
     const result = mapLedgerError({ statusCode: '6982' });
     expect(result.code).toBe(HardwareErrorCode.DeviceLocked);
   });
+
+  it('should map Solana 0x6808 to SolanaBlindSigningRequired', () => {
+    const result = mapLedgerError({ errorCode: '6808' });
+    expect(result.code).toBe(HardwareErrorCode.SolanaBlindSigningRequired);
+    expect(result.message).toContain('Blind signing');
+  });
+
+  it('should map Tron 0x6a8d (hex) to TronCustomContractRequired', () => {
+    const result = mapLedgerError({ errorCode: '6a8d' });
+    expect(result.code).toBe(HardwareErrorCode.TronCustomContractRequired);
+    expect(result.message).toContain('Custom Contracts');
+  });
+
+  it('should map Tron 0x6a8d (numeric statusCode) to TronCustomContractRequired', () => {
+    const result = mapLedgerError({ statusCode: 0x6a8d });
+    expect(result.code).toBe(HardwareErrorCode.TronCustomContractRequired);
+  });
+
+  it('should map Tron 0x6a8b to TronDataSigningRequired', () => {
+    const result = mapLedgerError({ errorCode: '6a8b' });
+    expect(result.code).toBe(HardwareErrorCode.TronDataSigningRequired);
+  });
+
+  it('should map Tron 0x6a8c to TronSignByHashRequired', () => {
+    const result = mapLedgerError({ errorCode: '6a8c' });
+    expect(result.code).toBe(HardwareErrorCode.TronSignByHashRequired);
+  });
+
+  it('should map BTC 0xb008 to BtcWalletPolicyHmacMismatch', () => {
+    const result = mapLedgerError({ errorCode: 'b008' });
+    expect(result.code).toBe(HardwareErrorCode.BtcWalletPolicyHmacMismatch);
+    expect(result.message).toContain('Wallet policy');
+  });
+
+  it('should map BTC 0xb007 to BtcUnexpectedState', () => {
+    const result = mapLedgerError({ errorCode: 'b007' });
+    expect(result.code).toBe(HardwareErrorCode.BtcUnexpectedState);
+  });
+
+  it('should unwrap chain-specific APDU from nested originalError', () => {
+    const result = mapLedgerError({
+      _tag: 'SomeWrapper',
+      message: 'wrapped',
+      originalError: { errorCode: '6808' },
+    });
+    expect(result.code).toBe(HardwareErrorCode.SolanaBlindSigningRequired);
+  });
+
+  it('should prefer user-rejected over chain-specific code', () => {
+    const result = mapLedgerError({ statusCode: '6985', errorCode: '6a8d' });
+    expect(result.code).toBe(HardwareErrorCode.UserRejected);
+  });
 });
 
 // ---------------------------------------------------------------------------

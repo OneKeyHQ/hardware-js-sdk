@@ -78,6 +78,71 @@ function getEthAppErrorCode(err: unknown): string | null {
 }
 
 /**
+ * Extract an APDU status word in lowercase hex. Handles DMK's hex-string
+ * `errorCode`, legacy TransportStatusError's numeric `statusCode`, and
+ * recurses through `originalError` for wrapped errors.
+ */
+function extractApduHex(err: unknown): string | null {
+  if (!err || typeof err !== 'object') return null;
+  const e = err as Record<string, unknown>;
+  if (typeof e.errorCode === 'string' && /^[0-9a-f]+$/i.test(e.errorCode)) {
+    return e.errorCode.toLowerCase();
+  }
+  if (typeof e.statusCode === 'number' && Number.isFinite(e.statusCode)) {
+    return e.statusCode.toString(16).padStart(4, '0');
+  }
+  if (typeof e.statusCode === 'string' && /^[0-9a-f]+$/i.test(e.statusCode)) {
+    return e.statusCode.toLowerCase();
+  }
+  if (e.originalError != null) {
+    const nested = extractApduHex(e.originalError);
+    if (nested) return nested;
+  }
+  if (e.error != null && typeof e._tag === 'string') {
+    const nested = extractApduHex(e.error);
+    if (nested) return nested;
+  }
+  return null;
+}
+
+/** Solana APDU → code. 0x6808 arrives as a plain DeviceExchangeError,
+ *  not wrapped in SolanaAppCommandError, so match by code only. */
+function mapSolanaAppError(hex: string): HardwareErrorCode | null {
+  switch (hex) {
+    case '6808':
+      return HardwareErrorCode.SolanaBlindSigningRequired;
+    default:
+      return null;
+  }
+}
+
+/** Tron APDU → code. Source: app-tron/src/app_errors.h (E_MISSING_SETTING_*). */
+function mapTronAppError(hex: string): HardwareErrorCode | null {
+  switch (hex) {
+    case '6a8d':
+      return HardwareErrorCode.TronCustomContractRequired;
+    case '6a8b':
+      return HardwareErrorCode.TronDataSigningRequired;
+    case '6a8c':
+      return HardwareErrorCode.TronSignByHashRequired;
+    default:
+      return null;
+  }
+}
+
+/** BTC APDU → code. 0xb000 range is disjoint from other apps' 0x6xxx. */
+function mapBtcAppError(hex: string): HardwareErrorCode | null {
+  switch (hex) {
+    case 'b008':
+      return HardwareErrorCode.BtcWalletPolicyHmacMismatch;
+    case 'b007':
+      return HardwareErrorCode.BtcUnexpectedState;
+    default:
+      return null;
+  }
+}
+
+/**
  * Map a Ledger Ethereum App APDU status word to a HardwareErrorCode.
  * `lastStep` (attached by `deviceActionToPromise`) is used only to refine
  * ambiguous codes like 0x6a80.
@@ -246,8 +311,15 @@ export function mapLedgerError(err: unknown): {
       err && typeof err === 'object'
         ? ((err as Record<string, unknown>)._lastStep as string | undefined)
         : undefined;
-    const mapped = ethCode ? mapEthAppError(ethCode, lastStep) : null;
-    code = mapped ?? HardwareErrorCode.UnknownError;
+    const ethMapped = ethCode ? mapEthAppError(ethCode, lastStep) : null;
+
+    // Solana / Tron / BTC APDU codes — disjoint from EVM's table, single-pass lookup.
+    const apduHex = ethMapped ? null : extractApduHex(err);
+    const chainMapped = apduHex
+      ? mapSolanaAppError(apduHex) ?? mapTronAppError(apduHex) ?? mapBtcAppError(apduHex)
+      : null;
+
+    code = ethMapped ?? chainMapped ?? HardwareErrorCode.UnknownError;
   }
 
   const appName =

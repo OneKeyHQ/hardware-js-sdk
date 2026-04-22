@@ -40,6 +40,18 @@ export function enrichErrorMessage(code: HardwareErrorCode, originalMessage: str
       return 'Ledger: Transaction type not supported by current Ethereum app.';
     case HardwareErrorCode.AppTooOld:
       return 'Ledger: App out of date (update via Ledger Live).';
+    case HardwareErrorCode.SolanaBlindSigningRequired:
+      return 'Blind signing disabled in the Solana app.';
+    case HardwareErrorCode.TronCustomContractRequired:
+      return 'Custom Contracts setting disabled in the Tron app.';
+    case HardwareErrorCode.TronDataSigningRequired:
+      return 'Transactions Data setting disabled in the Tron app.';
+    case HardwareErrorCode.TronSignByHashRequired:
+      return 'Sign by Hash setting disabled in the Tron app.';
+    case HardwareErrorCode.BtcWalletPolicyHmacMismatch:
+      return 'Wallet policy not registered or HMAC mismatch.';
+    case HardwareErrorCode.BtcUnexpectedState:
+      return 'Signing aborted due to unexpected device state.';
     default:
       return originalMessage;
   }
