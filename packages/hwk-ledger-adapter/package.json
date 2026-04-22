@@ -51,8 +51,7 @@
     "@ledgerhq/hw-app-trx": "^6.34.1",
     "@ledgerhq/hw-transport": "^6.34.1",
     "@onekeyfe/hwk-adapter-core": "1.1.26-alpha.103",
-    "bitcoinjs-lib": "npm:@onekeyfe/bitcoinjs-lib@7.0.1",
-    "rxjs": "^7.8.1"
+    "bitcoinjs-lib": "npm:@onekeyfe/bitcoinjs-lib@7.0.1"
   },
   "devDependencies": {
     "rimraf": "^5.0.0",
