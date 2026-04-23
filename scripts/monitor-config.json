@@ -14,7 +14,11 @@
       "hd-transport-http",
       "hd-transport-react-native",
       "hd-web-sdk",
-      "hd-transport-electron"
+      "hd-transport-electron",
+      "hwk-adapter-core",
+      "hwk-ledger-adapter",
+      "hwk-ledger-connector-ble",
+      "hwk-ledger-connector-webhid"
     ],
     "specialProjects": {
       "hd-web-sdk": ["dist", "build"]

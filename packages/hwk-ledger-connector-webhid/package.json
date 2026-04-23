@@ -1,0 +1,60 @@
+{
+  "name": "@onekeyfe/hwk-ledger-connector-webhid",
+  "version": "1.1.26-alpha.8",
+  "description": "IConnector implementation for Ledger hardware wallets via WebHID (DMK)",
+  "author": "OneKey",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rimraf dist",
+    "test": "jest"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OneKeyHQ/hardware-js-sdk.git",
+    "directory": "packages/hwk-ledger-connector-webhid"
+  },
+  "keywords": [
+    "ledger",
+    "webhid",
+    "hardware-wallet",
+    "onekey",
+    "connector"
+  ],
+  "dependencies": {
+    "@ledgerhq/device-management-kit": "^1.1.0",
+    "@ledgerhq/device-signer-kit-bitcoin": "^1.0.0",
+    "@ledgerhq/device-signer-kit-ethereum": "^1.9.0",
+    "@ledgerhq/device-signer-kit-solana": "^1.7.0",
+    "@ledgerhq/device-transport-kit-web-hid": "^1.0.0",
+    "@onekeyfe/hwk-adapter-core": "1.1.26-alpha.8",
+    "@onekeyfe/hwk-ledger-adapter": "1.1.26-alpha.8"
+  },
+  "devDependencies": {
+    "rimraf": "^5.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0"
+  }
+}
