@@ -26,7 +26,8 @@
     "get-address": "node dist/cli.js get-address",
     "ping": "node dist/cli.js ping",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "test": "jest"
   },
   "dependencies": {
     "@onekeyfe/hd-common-connect-sdk": "1.1.26-alpha.8",

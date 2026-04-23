@@ -9,12 +9,14 @@
  *     preloaded via preloadSessionCache on next invocation
  */
 
-import { execFile, execFileSync } from 'node:child_process';
 import * as readline from 'node:readline';
 import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
 import { DEVICE, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 
+import { promptPassphraseViaPinentry } from './pinentry';
+
 import type { ConnectSettings } from '@onekeyfe/hd-core';
+import type { PinentryResult } from './pinentry';
 
 export interface SDKOptions {
   connectId?: string;
@@ -45,88 +47,6 @@ let currentOpts: SDKOptions = {};
 let sdkReadyPromise: Promise<typeof HardwareSDK> | null = null;
 
 // ---------------------------------------------------------------------------
-// Pinentry — secure passphrase input via native OS dialog
-// ---------------------------------------------------------------------------
-
-const PINENTRY_PROGRAMS = ['pinentry-mac', 'pinentry', 'pinentry-gnome3', 'pinentry-qt'];
-
-function findPinentry(): string | null {
-  for (const prog of PINENTRY_PROGRAMS) {
-    try {
-      const result = execFileSync('which', [prog], {
-        encoding: 'utf-8',
-        timeout: 2000,
-        stdio: ['pipe', 'pipe', 'pipe'],
-      });
-      if (result.trim()) return prog;
-    } catch {
-      // not found
-    }
-  }
-  return null;
-}
-
-function promptPassphraseViaPinentry(): Promise<{
-  value: string;
-  passphraseOnDevice: boolean;
-}> {
-  return new Promise((resolve, reject) => {
-    const pinentryBin = findPinentry();
-    if (!pinentryBin) {
-      process.stderr.write('[onekey-hw] No pinentry found, falling back to on-device entry.\n');
-      resolve({ value: '', passphraseOnDevice: true });
-      return;
-    }
-
-    const commands = [
-      'SETDESC OneKey Hardware Wallet',
-      'SETPROMPT Enter passphrase',
-      'GETPIN',
-      'BYE',
-    ].join('\n');
-
-    const child = execFile(
-      pinentryBin,
-      [],
-      { timeout: 120_000, encoding: 'utf-8' },
-      (error, stdout) => {
-        if (error) {
-          if (error.killed || (stdout && stdout.includes('ERR 83886179'))) {
-            process.stderr.write(
-              '[onekey-hw] Passphrase entry cancelled, falling back to on-device.\n'
-            );
-            resolve({ value: '', passphraseOnDevice: true });
-            return;
-          }
-          reject(error);
-          return;
-        }
-
-        const dataLine = stdout.split('\n').find(l => l.startsWith('D '));
-        if (dataLine) {
-          resolve({ value: dataLine.slice(2), passphraseOnDevice: false });
-          return;
-        }
-
-        if (stdout.includes('ERR 83886179') || stdout.includes('Operation cancelled')) {
-          process.stderr.write(
-            '[onekey-hw] Passphrase entry cancelled, falling back to on-device.\n'
-          );
-          resolve({ value: '', passphraseOnDevice: true });
-          return;
-        }
-
-        // Empty passphrase — on-device
-        resolve({ value: '', passphraseOnDevice: true });
-      }
-    );
-
-    child.stdin?.write(commands);
-    child.stdin?.end();
-  });
-}
-
-// ---------------------------------------------------------------------------
 // Interactive prompts
 // ---------------------------------------------------------------------------
 
@@ -138,16 +58,13 @@ function promptPassphraseViaPinentry(): Promise<{
  */
 function resolvePassphraseByChoice(
   choice: '1' | '2' | '3'
-): Promise<{ value: string; passphraseOnDevice: boolean }> {
+): Promise<PinentryResult> {
   if (choice === '1') return Promise.resolve({ value: '', passphraseOnDevice: false });
   if (choice === '2') return promptPassphraseViaPinentry();
   return Promise.resolve({ value: '', passphraseOnDevice: true });
 }
 
-function promptPassphraseMode(): Promise<{
-  value: string;
-  passphraseOnDevice: boolean;
-}> {
+function promptPassphraseMode(): Promise<PinentryResult> {
   if (!process.stdin.isTTY) {
     return Promise.resolve({ value: '', passphraseOnDevice: true });
   }
