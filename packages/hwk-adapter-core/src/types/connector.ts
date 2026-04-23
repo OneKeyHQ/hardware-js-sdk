@@ -127,12 +127,12 @@ export function createBridgedConnector(
   connectionType: ConnectionType,
   bridge: IHardwareBridge
 ): IConnector {
-  // Map from typed IConnector handlers to the bridge handler so we can
-  // unregister them correctly via off().
-  const handlerMap = new Map<
-    (data: ConnectorEventMap[ConnectorEventType]) => void,
-    (event: { type: ConnectorEventType; data: unknown }) => void
-  >();
+  // Keyed by (event, handler). A flat handler-only map would collide when the
+  // same function is registered for multiple events — second .on() would
+  // overwrite the first bridge handler reference, leaking it permanently.
+  type UserHandler = (data: ConnectorEventMap[ConnectorEventType]) => void;
+  type BridgeHandler = (event: { type: ConnectorEventType; data: unknown }) => void;
+  const handlerMap = new Map<ConnectorEventType, Map<UserHandler, BridgeHandler>>();
 
   return {
     connectionType,
@@ -143,25 +143,26 @@ export function createBridgedConnector(
     cancel: sessionId => bridge.cancel({ vendor, sessionId }),
     uiResponse: response => bridge.uiResponse({ vendor, response }),
     on: (event, handler) => {
-      const bridgeHandler = (e: { type: ConnectorEventType; data: unknown }) => {
+      const bridgeHandler: BridgeHandler = e => {
         if (e.type === event) {
           handler(e.data as ConnectorEventMap[typeof event]);
         }
       };
-      handlerMap.set(
-        handler as (data: ConnectorEventMap[ConnectorEventType]) => void,
-        bridgeHandler
-      );
+      let inner = handlerMap.get(event);
+      if (!inner) {
+        inner = new Map();
+        handlerMap.set(event, inner);
+      }
+      inner.set(handler as UserHandler, bridgeHandler);
       bridge.onEvent({ vendor }, bridgeHandler);
     },
-    off: (_event, handler) => {
-      const bridgeHandler = handlerMap.get(
-        handler as (data: ConnectorEventMap[ConnectorEventType]) => void
-      );
-      if (bridgeHandler) {
-        bridge.offEvent({ vendor }, bridgeHandler);
-        handlerMap.delete(handler as (data: ConnectorEventMap[ConnectorEventType]) => void);
-      }
+    off: (event, handler) => {
+      const inner = handlerMap.get(event);
+      const bridgeHandler = inner?.get(handler as UserHandler);
+      if (!bridgeHandler || !inner) return;
+      bridge.offEvent({ vendor }, bridgeHandler);
+      inner.delete(handler as UserHandler);
+      if (inner.size === 0) handlerMap.delete(event);
     },
     reset: () => bridge.reset({ vendor }),
   };

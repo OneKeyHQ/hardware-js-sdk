@@ -6,38 +6,20 @@ import { AppManager } from '../../app/AppManager';
 import type { ConnectorContext } from './types';
 
 /**
- * Status codes that are known to come from a specific chain's app.
- * If we see one of these, the correct app IS open — don't try to switch.
- * Keyed by app name for extensibility.
+ * Wrong-app detection for legacy SDKs. Wraps isWrongAppError so callers don't
+ * depend on the shared function directly.
+ *
+ * Prior versions also treated "any 4-hex code not in a per-app allowlist" as
+ * wrong-app, to catch cases where the message format hid the real status.
+ * That was too aggressive: legacy hw-app-* throws TransportStatusError with a
+ * numeric `statusCode` that isWrongAppError already handles via hasStatusCode,
+ * so the regex path was dead weight for real errors and only fired on
+ * unanticipated message shapes (random hex in logs, new firmware SWs) —
+ * producing spurious app close→reopen cycles. `appName` is kept on the
+ * signature for future per-app extension points.
  */
-const KNOWN_APP_CODES: Record<string, Set<number>> = {
-  Tron: new Set([
-    0x6985, // user denied
-    0x5515, // device locked
-    0x6a8a, // invalid BIP32 path
-    0x6a8b,
-    0x6a8c,
-    0x6a8d, // app-specific data errors
-    0x6a80, // invalid data
-    0x6b00, // wrong parameter
-    0x6700, // wrong length
-  ]),
-};
-
-/**
- * Check if an error from a legacy SDK indicates the wrong app is open.
- * Uses the shared isWrongAppError() for common codes (0x6e00, 0x6d00, 0x6a83),
- * plus per-app exclusion of known status codes.
- */
-export function isLegacyWrongAppError(err: unknown, appName: string): boolean {
-  if (isWrongAppError(err)) return true;
-  const msg = err instanceof Error ? err.message : '';
-  const match = msg.match(/0x([0-9a-fA-F]{4})/);
-  if (!match) return false;
-  const sw = parseInt(match[1], 16);
-  const knownCodes = KNOWN_APP_CODES[appName];
-  if (knownCodes?.has(sw)) return false;
-  return true;
+export function isLegacyWrongAppError(err: unknown, _appName: string): boolean {
+  return isWrongAppError(err);
 }
 
 /**

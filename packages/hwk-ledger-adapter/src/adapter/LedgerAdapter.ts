@@ -988,7 +988,10 @@ export class LedgerAdapter implements IHardwareWallet {
    * If not granted, calls onDevicePermission so the consumer can request access.
    */
   private async _ensureDevicePermission(connectId?: string, deviceId?: string): Promise<void> {
-    const transportType: TransportType = 'hid';
+    // Single source of truth with activeTransport — BLE users need the BLE
+    // branch of checkDevicePermission / onDevicePermission (bluetooth toggle,
+    // Android location permission), not the HID one.
+    const transportType: TransportType = this.activeTransport ?? 'hid';
     let granted = false;
     let context: Record<string, unknown> | undefined;
 

@@ -487,11 +487,68 @@ describe('LedgerAdapter', () => {
     it('should return hid', () => {
       expect(adapter.activeTransport).toBe('hid');
     });
+
+    it('should return ble when connector.connectionType is ble', () => {
+      const bleConnector = createMockConnector();
+      (bleConnector as unknown as { connectionType: string }).connectionType = 'ble';
+      const bleAdapter = new LedgerAdapter(bleConnector);
+      expect(bleAdapter.activeTransport).toBe('ble');
+    });
   });
 
   describe('getAvailableTransports', () => {
     it('should return hid', () => {
       expect(adapter.getAvailableTransports()).toEqual(['hid']);
+    });
+
+    it('should return ble for a ble connector', () => {
+      const bleConnector = createMockConnector();
+      (bleConnector as unknown as { connectionType: string }).connectionType = 'ble';
+      const bleAdapter = new LedgerAdapter(bleConnector);
+      expect(bleAdapter.getAvailableTransports()).toEqual(['ble']);
+    });
+  });
+
+  describe('_ensureDevicePermission transport propagation', () => {
+    it('passes transportType=ble to UI handler when connector is BLE', async () => {
+      const bleConnector = createMockConnector();
+      (bleConnector as unknown as { connectionType: string }).connectionType = 'ble';
+      const bleAdapter = new LedgerAdapter(bleConnector);
+      const checkDevicePermission = jest.fn().mockResolvedValue({ granted: false });
+      const onDevicePermission = jest.fn().mockResolvedValue(undefined);
+      bleAdapter.setUiHandler({
+        onPinRequest: jest.fn(),
+        checkDevicePermission,
+        onDevicePermission,
+      } as unknown as Parameters<typeof bleAdapter.setUiHandler>[0]);
+
+      await bleAdapter.searchDevices();
+
+      expect(checkDevicePermission).toHaveBeenCalledWith(
+        expect.objectContaining({ transportType: 'ble' })
+      );
+      expect(onDevicePermission).toHaveBeenCalledWith(
+        expect.objectContaining({ transportType: 'ble' })
+      );
+    });
+
+    it('passes transportType=hid to UI handler when connector is USB', async () => {
+      const checkDevicePermission = jest.fn().mockResolvedValue({ granted: false });
+      const onDevicePermission = jest.fn().mockResolvedValue(undefined);
+      adapter.setUiHandler({
+        onPinRequest: jest.fn(),
+        checkDevicePermission,
+        onDevicePermission,
+      } as unknown as Parameters<typeof adapter.setUiHandler>[0]);
+
+      await adapter.searchDevices();
+
+      expect(checkDevicePermission).toHaveBeenCalledWith(
+        expect.objectContaining({ transportType: 'hid' })
+      );
+      expect(onDevicePermission).toHaveBeenCalledWith(
+        expect.objectContaining({ transportType: 'hid' })
+      );
     });
   });
 
