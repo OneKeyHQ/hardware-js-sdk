@@ -25,7 +25,7 @@ describe('response helpers', () => {
       const result = failure(HardwareErrorCode.UserRejected, 'User cancelled the operation');
 
       expect(result.success).toBe(false);
-      expect(result.payload.code).toBe(3);
+      expect(result.payload.code).toBe(HardwareErrorCode.UserRejected);
       expect(result.payload.error).toBe('User cancelled the operation');
     });
 
@@ -54,7 +54,7 @@ describe('response helpers', () => {
       );
 
       if (!result.success) {
-        expect(result.payload.code).toBe(0);
+        expect(result.payload.code).toBe(HardwareErrorCode.UnknownError);
         expect(result.payload.error).toBe('Something went wrong');
       } else {
         expect.unreachable('Should be a failure response');
