@@ -1,9 +1,6 @@
 import { createBridgedConnector } from '../types/connector';
 
-import type {
-  ConnectorEventType,
-  IHardwareBridge,
-} from '../types/connector';
+import type { ConnectorEventType, IHardwareBridge } from '../types/connector';
 
 function createMockBridge(): IHardwareBridge & {
   _emit: (event: { type: ConnectorEventType; data: unknown }) => void;

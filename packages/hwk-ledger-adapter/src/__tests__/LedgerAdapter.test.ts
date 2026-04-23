@@ -83,6 +83,14 @@ describe('LedgerAdapter', () => {
     jest.clearAllMocks();
     connector = createMockConnector();
     adapter = new LedgerAdapter(connector);
+    // Auto-reply granted=true for permission requests so tests that don't
+    // explicitly exercise the permission flow proceed normally.
+    adapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, () => {
+      adapter.uiResponse({
+        type: UI_RESPONSE.RECEIVE_DEVICE_PERMISSION,
+        payload: { granted: true },
+      });
+    });
   });
 
   it('should have vendor set to "ledger"', () => {
@@ -510,58 +518,69 @@ describe('LedgerAdapter', () => {
   });
 
   describe('_ensureDevicePermission transport propagation', () => {
-    it('passes transportType=ble to UI handler when connector is BLE', async () => {
+    it('emits REQUEST_DEVICE_PERMISSION with transportType=ble for a BLE connector', async () => {
       const bleConnector = createMockConnector();
       (bleConnector as unknown as { connectionType: string }).connectionType = 'ble';
       const bleAdapter = new LedgerAdapter(bleConnector);
-      const checkDevicePermission = jest.fn().mockResolvedValue({ granted: false });
-      const onDevicePermission = jest.fn().mockResolvedValue(undefined);
-      bleAdapter.setUiHandler({
-        onPinRequest: jest.fn(),
-        checkDevicePermission,
-        onDevicePermission,
-      } as unknown as Parameters<typeof bleAdapter.setUiHandler>[0]);
+      const listener = jest.fn();
+      bleAdapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, listener);
+      bleAdapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, () => {
+        bleAdapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_DEVICE_PERMISSION,
+          payload: { granted: true },
+        });
+      });
 
       await bleAdapter.searchDevices();
 
-      expect(checkDevicePermission).toHaveBeenCalledWith(
-        expect.objectContaining({ transportType: 'ble' })
-      );
-      expect(onDevicePermission).toHaveBeenCalledWith(
-        expect.objectContaining({ transportType: 'ble' })
+      expect(listener).toHaveBeenCalledWith(
+        expect.objectContaining({
+          payload: expect.objectContaining({ transportType: 'ble' }),
+        })
       );
     });
 
-    it('passes transportType=hid to UI handler when connector is USB', async () => {
-      const checkDevicePermission = jest.fn().mockResolvedValue({ granted: false });
-      const onDevicePermission = jest.fn().mockResolvedValue(undefined);
-      adapter.setUiHandler({
-        onPinRequest: jest.fn(),
-        checkDevicePermission,
-        onDevicePermission,
-      } as unknown as Parameters<typeof adapter.setUiHandler>[0]);
+    it('emits REQUEST_DEVICE_PERMISSION with transportType=hid for a USB connector', async () => {
+      const listener = jest.fn();
+      adapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, listener);
+      adapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, () => {
+        adapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_DEVICE_PERMISSION,
+          payload: { granted: true },
+        });
+      });
 
       await adapter.searchDevices();
 
-      expect(checkDevicePermission).toHaveBeenCalledWith(
-        expect.objectContaining({ transportType: 'hid' })
+      expect(listener).toHaveBeenCalledWith(
+        expect.objectContaining({
+          payload: expect.objectContaining({ transportType: 'hid' }),
+        })
       );
-      expect(onDevicePermission).toHaveBeenCalledWith(
-        expect.objectContaining({ transportType: 'hid' })
+    });
+
+    it('throws DevicePermissionDenied when the consumer replies granted=false', async () => {
+      // Drop the default granted=true listener installed in beforeEach so
+      // this test gets a clean event slot.
+      (adapter as unknown as { emitter: { removeAllListeners(e: string): void } }).emitter.removeAllListeners(
+        UI_REQUEST.REQUEST_DEVICE_PERMISSION
       );
+      adapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, () => {
+        adapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_DEVICE_PERMISSION,
+          payload: { granted: false },
+        });
+      });
+
+      await expect(adapter.searchDevices()).rejects.toMatchObject({
+        code: HardwareErrorCode.DevicePermissionDenied,
+      });
     });
   });
 
   describe('switchTransport', () => {
     it('should be a no-op (transport is fixed at connector creation)', async () => {
       await expect(adapter.switchTransport('ble')).resolves.toBeUndefined();
-    });
-  });
-
-  describe('setUiHandler', () => {
-    it('should store the UI handler', () => {
-      const handler = { onPinRequest: jest.fn() };
-      expect(() => adapter.setUiHandler(handler)).not.toThrow();
     });
   });
 

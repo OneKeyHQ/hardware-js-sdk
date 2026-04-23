@@ -5,7 +5,7 @@ import type { IEvmMethods } from './chain-evm';
 import type { IBtcMethods } from './chain-btc';
 import type { ISolMethods } from './chain-sol';
 import type { ITronMethods } from './chain-tron';
-import type { QrDisplayData, QrResponseData } from './qr';
+import type { QrDisplayData } from './qr';
 import type { ChainForFingerprint } from './fingerprint';
 import type { ActiveJobInfo, Interruptibility } from '../utils/DeviceJobQueue';
 import type { UI_REQUEST, UiResponseEvent } from '../events/ui-request';
@@ -34,7 +34,10 @@ export type UiRequestEvent =
       payload: { device: DeviceInfo; data: QrDisplayData };
     }
   | { type: typeof UI_REQUEST.REQUEST_QR_SCAN; payload: { device: DeviceInfo } }
-  | { type: typeof UI_REQUEST.REQUEST_DEVICE_PERMISSION; payload: Record<string, never> }
+  | {
+      type: typeof UI_REQUEST.REQUEST_DEVICE_PERMISSION;
+      payload: { transportType: TransportType; connectId?: string; deviceId?: string };
+    }
   | { type: typeof UI_REQUEST.REQUEST_SELECT_DEVICE; payload: { devices: DeviceInfo[] } }
   | {
       type: typeof UI_REQUEST.REQUEST_DEVICE_CONNECT;
@@ -98,7 +101,7 @@ export interface HardwareEventMap {
   };
   [UI_REQUEST.REQUEST_DEVICE_PERMISSION]: {
     type: typeof UI_REQUEST.REQUEST_DEVICE_PERMISSION;
-    payload: Record<string, never>;
+    payload: { transportType: TransportType; connectId?: string; deviceId?: string };
   };
   [UI_REQUEST.REQUEST_SELECT_DEVICE]: {
     type: typeof UI_REQUEST.REQUEST_SELECT_DEVICE;
@@ -132,50 +135,6 @@ export interface HardwareEventMap {
     payload: { connectId: string };
   };
   [SDK.DEVICE_RECOVERED]: { type: typeof SDK.DEVICE_RECOVERED; payload: { connectId: string } };
-}
-
-/**
- * Same-process callbacks for prompts and OS-level permission.
- * Cross-process flows use events + `uiResponse` + `UiRequestRegistry` instead.
- */
-export interface IUiHandler {
-  onPinRequest(device: DeviceInfo): Promise<string>;
-  onPassphraseRequest(device: DeviceInfo): Promise<string | PassphraseResponse>;
-  onQrDisplay(device: DeviceInfo, data: QrDisplayData): Promise<QrResponseData>;
-
-  /**
-   * Check if device access permission is already granted.
-   * Returns { granted, context? }.
-   * - granted: true → skip onDevicePermission
-   * - granted: false → adapter calls onDevicePermission with the context
-   * - context: consumer-defined data passed through to onDevicePermission
-   *
-   * When connectId/deviceId are undefined (searchDevices), check environment-level
-   * permissions (USB: any paired device exists; BLE: bluetooth on + location permission).
-   * When connectId/deviceId are provided (business methods), check device-level
-   * permissions (USB: target device authorized; BLE: bluetooth on + device connected).
-   */
-  checkDevicePermission?(params: {
-    transportType: TransportType;
-    connectId?: string;
-    deviceId?: string;
-  }): Promise<{
-    granted: boolean;
-    context?: Record<string, unknown>;
-  }>;
-
-  /**
-   * Request device access permission from the user.
-   * Only called when checkDevicePermission returns granted: false (or is not set).
-   *
-   * The handler decides what to do based on transportType + context:
-   * - usb/hid: open pairing page or call requestWebUSBDevice
-   * - ble: enable bluetooth, request location permission, start scanning
-   */
-  onDevicePermission(params: {
-    transportType: TransportType;
-    context?: Record<string, unknown>;
-  }): Promise<void>;
 }
 
 export interface IHardwareWallet<TConfig = unknown>
@@ -219,9 +178,6 @@ export interface IHardwareWallet<TConfig = unknown>
     deviceId: string,
     chain: ChainForFingerprint
   ): Promise<Response<string>>;
-
-  // UI handler (request-response)
-  setUiHandler(handler: Partial<IUiHandler>): void;
 
   // Events (notifications only: connect, disconnect, button, interaction)
   on<K extends keyof HardwareEventMap>(

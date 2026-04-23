@@ -48,7 +48,6 @@ import type {
   HardwareEventMap,
   IConnector,
   IHardwareWallet,
-  IUiHandler,
   Interruptibility,
   ProgressCallback,
   Response,
@@ -105,7 +104,7 @@ function formatDeviceMismatchError(expected: string, actual: string): string {
  * - Translates IHardwareWallet method calls to connector.call() invocations
  * - Maps connector results/errors to our Response<T> format with enriched error messages
  * - Translates connector events to HardwareEventMap events
- * - Integrates with IUiHandler for permission flows
+ * - Emits `REQUEST_DEVICE_PERMISSION` for OS-level permission checks
  */
 export class LedgerAdapter implements IHardwareWallet {
   readonly vendor = 'ledger' as const;
@@ -113,8 +112,6 @@ export class LedgerAdapter implements IHardwareWallet {
   private readonly connector: IConnector;
 
   private readonly emitter = new TypedEventEmitter<HardwareEventMap>();
-
-  private _uiHandler: Partial<IUiHandler> | null = null;
 
   private readonly _handleSelectDevice: boolean;
 
@@ -172,14 +169,6 @@ export class LedgerAdapter implements IHardwareWallet {
   }
 
   // ---------------------------------------------------------------------------
-  // UI handler
-  // ---------------------------------------------------------------------------
-
-  setUiHandler(handler: Partial<IUiHandler>): void {
-    this._uiHandler = handler;
-  }
-
-  // ---------------------------------------------------------------------------
   // Lifecycle
   // ---------------------------------------------------------------------------
 
@@ -206,7 +195,6 @@ export class LedgerAdapter implements IHardwareWallet {
     this._jobQueue.clear();
     this.unregisterEventListeners();
     this.connector.reset();
-    this._uiHandler = null;
     this._discoveredDevices.clear();
     this._sessions.clear();
     this.emitter.removeAllListeners();
@@ -982,39 +970,39 @@ export class LedgerAdapter implements IHardwareWallet {
   }
 
   /**
-   * Ensure device permission before proceeding.
-   * - No connectId (searchDevices): check environment-level permission
-   * - With connectId (business methods): check device-level permission
-   * If not granted, calls onDevicePermission so the consumer can request access.
+   * Ensure OS-level device permission (Bluetooth / USB) before proceeding.
+   *
+   * Emits `REQUEST_DEVICE_PERMISSION` and awaits the consumer's
+   * `RECEIVE_DEVICE_PERMISSION` reply (60s budget covers "probe → system
+   * prompt → user tap" plus a generous margin). If the consumer never wires
+   * a handler or never replies, the wait times out and the operation fails
+   * fast so scanners/callers don't hang silently.
+   *
+   * - No connectId (searchDevices): environment-level permission
+   * - With connectId (business methods): device-level permission
    */
   private async _ensureDevicePermission(connectId?: string, deviceId?: string): Promise<void> {
-    // Single source of truth with activeTransport — BLE users need the BLE
-    // branch of checkDevicePermission / onDevicePermission (bluetooth toggle,
-    // Android location permission), not the HID one.
     const transportType: TransportType = this.activeTransport ?? 'hid';
-    let granted = false;
-    let context: Record<string, unknown> | undefined;
 
-    if (this._uiHandler?.checkDevicePermission) {
-      try {
-        const result = await this._uiHandler.checkDevicePermission({
-          transportType,
-          connectId,
-          deviceId,
-        });
-        granted = result.granted;
-        context = result.context;
-      } catch {
-        granted = false;
-      }
-    }
+    // Register the wait before emitting — a synchronous listener that replies
+    // immediately (e.g. in tests or a same-process consumer) would otherwise
+    // resolve before any pending entry exists and the response would drop.
+    const waitPromise = this._uiRegistry.wait<{ granted: boolean }>(
+      UI_REQUEST.REQUEST_DEVICE_PERMISSION,
+      { timeoutMs: 60_000 }
+    );
+
+    this.emitter.emit(UI_REQUEST.REQUEST_DEVICE_PERMISSION, {
+      type: UI_REQUEST.REQUEST_DEVICE_PERMISSION,
+      payload: { transportType, connectId, deviceId },
+    });
+
+    const { granted } = await waitPromise;
 
     if (!granted) {
-      try {
-        await this._uiHandler?.onDevicePermission?.({ transportType, context });
-      } catch {
-        // UI handler cancelled or failed
-      }
+      throw Object.assign(new Error('Device permission denied'), {
+        code: HardwareErrorCode.DevicePermissionDenied,
+      });
     }
   }
 

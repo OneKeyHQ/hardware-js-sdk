@@ -32,6 +32,11 @@ export enum HardwareErrorCode {
   BridgeNotFound = 5550,
   TransportNotAvailable = 5551,
 
+  // OS-level permission (Bluetooth / USB / etc.) — denied, blocked, unavailable,
+  // or dismissed. Consumers surface a single "please grant permission" toast
+  // and let the user retry manually.
+  DevicePermissionDenied = 5570,
+
   // --- EVM (Ledger Ethereum App) APDU-specific errors ---
   /** 0x6a80 Invalid data — observed on blindSignTransactionFallback when the
    *  user has not enabled Blind signing on the device. */

@@ -3,6 +3,7 @@ import Trx from '@ledgerhq/hw-app-trx';
 
 import { normalizePath } from './utils';
 import { withLegacyAppRetry } from './legacyAppRetry';
+import { AppManager } from '../../app/AppManager';
 import { DmkTransport } from '../../transport/DmkTransport';
 
 import type { ConnectorContext } from './types';
@@ -43,6 +44,7 @@ export async function tronGetAddress(
   params: TronGetAddressCallParams
 ): Promise<{ address: string; publicKey: string; path: string }> {
   const path = normalizePath(params.path);
+  await _ensureTronAppOpen(ctx, sessionId);
   return withLegacyAppRetry(ctx, sessionId, 'Tron', async sid => {
     const trx = await _createTrx(ctx, sid);
     if (params.showOnDevice) {
@@ -73,6 +75,7 @@ export async function tronSignTransaction(
   }
 
   const path = normalizePath(params.path);
+  await _ensureTronAppOpen(ctx, sessionId);
   return withLegacyAppRetry(ctx, sessionId, 'Tron', async sid => {
     const trx = await _createTrx(ctx, sid);
     ctx.emit('ui-event', {
@@ -98,6 +101,7 @@ export async function tronSignMessage(
   params: TronSignMessageCallParams
 ): Promise<{ signature: string }> {
   const path = normalizePath(params.path);
+  await _ensureTronAppOpen(ctx, sessionId);
   return withLegacyAppRetry(ctx, sessionId, 'Tron', async sid => {
     const trx = await _createTrx(ctx, sid);
     ctx.emit('ui-event', {
@@ -120,4 +124,37 @@ export async function tronSignMessage(
 async function _createTrx(ctx: ConnectorContext, sessionId: string): Promise<Trx> {
   const dmk = await ctx.getOrCreateDmk();
   return new Trx(new DmkTransport(dmk, sessionId));
+}
+
+/**
+ * Proactively switch to the Tron app before sending a TRX APDU.
+ *
+ * Official DMK Signer kits (SignerEth / SignerBtc / SignerSol) get this for
+ * free via DMK's DeviceAction pipeline — it calls `getDeviceStatus` + emits
+ * `confirm-open-app` before sending any chain command. TRON can't use that
+ * pipeline yet because `@ledgerhq/device-signer-kit-tron` doesn't exist; we
+ * bridge `@ledgerhq/hw-app-trx` straight to `DmkTransport.exchange`, which
+ * bypasses the pre-flight check.
+ *
+ * Without this, a TRX APDU fired while e.g. the Ethereum app is still open
+ * gets answered by Ethereum (same CLA/INS, different data layout) with an
+ * app-specific SW like 0x6A15. That SW is not in `WRONG_APP_CODES`, so
+ * `withLegacyAppRetry` never triggers the auto-switch path and the user
+ * sees "UNKNOWN_ERROR (0x6a15)".
+ *
+ * Remove this once Ledger ships `device-signer-kit-tron` and we can route
+ * TRON through the same SignerManager DeviceAction flow as the other chains.
+ */
+async function _ensureTronAppOpen(
+  ctx: ConnectorContext,
+  sessionId: string
+): Promise<void> {
+  const dmk = await ctx.getOrCreateDmk();
+  const appManager = new AppManager(dmk);
+  await appManager.ensureAppOpen(sessionId, 'Tron', () => {
+    ctx.emit('ui-event', {
+      type: EConnectorInteraction.ConfirmOpenApp,
+      payload: { sessionId },
+    });
+  });
 }

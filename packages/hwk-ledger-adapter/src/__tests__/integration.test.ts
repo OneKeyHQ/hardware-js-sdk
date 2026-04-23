@@ -57,6 +57,12 @@ describe('LedgerAdapter Integration', () => {
     jest.clearAllMocks();
     connector = createMockConnector();
     adapter = new LedgerAdapter(connector);
+    adapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, () => {
+      adapter.uiResponse({
+        type: UI_RESPONSE.RECEIVE_DEVICE_PERMISSION,
+        payload: { granted: true },
+      });
+    });
   });
 
   afterEach(async () => {

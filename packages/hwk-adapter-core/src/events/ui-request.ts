@@ -27,6 +27,7 @@ export const UI_RESPONSE = {
   RECEIVE_QR_RESPONSE: 'receive-qr-response',
   RECEIVE_SELECT_DEVICE: 'receive-select-device',
   RECEIVE_DEVICE_CONNECT: 'receive-device-connect',
+  RECEIVE_DEVICE_PERMISSION: 'receive-device-permission',
   RECEIVE_PREEMPTION: 'receive-preemption',
   CANCEL: 'cancel',
 } as const;
@@ -62,6 +63,10 @@ export type UiResponseEvent =
   | {
       type: typeof UI_RESPONSE.RECEIVE_DEVICE_CONNECT;
       payload: { confirmed: boolean };
+    }
+  | {
+      type: typeof UI_RESPONSE.RECEIVE_DEVICE_PERMISSION;
+      payload: { granted: boolean };
     }
   | {
       type: typeof UI_RESPONSE.RECEIVE_PREEMPTION;
