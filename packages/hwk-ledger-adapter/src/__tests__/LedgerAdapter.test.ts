@@ -562,9 +562,9 @@ describe('LedgerAdapter', () => {
     it('throws DevicePermissionDenied when the consumer replies granted=false', async () => {
       // Drop the default granted=true listener installed in beforeEach so
       // this test gets a clean event slot.
-      (adapter as unknown as { emitter: { removeAllListeners(e: string): void } }).emitter.removeAllListeners(
-        UI_REQUEST.REQUEST_DEVICE_PERMISSION
-      );
+      (
+        adapter as unknown as { emitter: { removeAllListeners(e: string): void } }
+      ).emitter.removeAllListeners(UI_REQUEST.REQUEST_DEVICE_PERMISSION);
       adapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, () => {
         adapter.uiResponse({
           type: UI_RESPONSE.RECEIVE_DEVICE_PERMISSION,

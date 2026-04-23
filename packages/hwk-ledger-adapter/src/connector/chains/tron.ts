@@ -145,10 +145,7 @@ async function _createTrx(ctx: ConnectorContext, sessionId: string): Promise<Trx
  * Remove this once Ledger ships `device-signer-kit-tron` and we can route
  * TRON through the same SignerManager DeviceAction flow as the other chains.
  */
-async function _ensureTronAppOpen(
-  ctx: ConnectorContext,
-  sessionId: string
-): Promise<void> {
+async function _ensureTronAppOpen(ctx: ConnectorContext, sessionId: string): Promise<void> {
   const dmk = await ctx.getOrCreateDmk();
   const appManager = new AppManager(dmk);
   await appManager.ensureAppOpen(sessionId, 'Tron', () => {
