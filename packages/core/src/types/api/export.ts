@@ -179,6 +179,7 @@ export type { DnxTxKey, DnxSignTransactionParams, DnxSignature } from './dnxSign
 export type { TonAddress, TonGetAddressParams } from './tonGetAddress';
 export type { TonSignMessageParams } from './tonSignMessage';
 export type { TonSignProofParams } from './tonSignProof';
+export type { TonSignDataParams } from './tonSignData';
 
 export type { ScdoAddress, ScdoGetAddressParams } from './scdoGetAddress';
 export type { ScdoSignMessageParams } from './scdoSignMessage';
