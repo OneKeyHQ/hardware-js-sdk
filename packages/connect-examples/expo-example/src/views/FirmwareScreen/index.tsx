@@ -763,10 +763,15 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
 
             <PanelView title={intl.formatMessage({ id: 'title__device_firmware_update' })}>
               <XStack flexWrap="wrap" gap="$2">
-                {deviceTypeLowerCase === EDeviceType.Pro && (
+                {(deviceTypeLowerCase === EDeviceType.Pro ||
+                  deviceTypeLowerCase === EDeviceType.Pro2) && (
                   <FirmwareMultipleFiles
                     deviceType={deviceTypeLowerCase}
-                    title={intl.formatMessage({ id: 'label__device_update_firmware_v3' })}
+                    title={
+                      deviceTypeLowerCase === EDeviceType.Pro2
+                        ? 'Firmware Update V3 (Pro2 Proto V0)'
+                        : intl.formatMessage({ id: 'label__device_update_firmware_v3' })
+                    }
                     onUpdate={firmwareUpdateV3}
                   />
                 )}
@@ -823,7 +828,7 @@ export default function FirmwareScreen() {
   return (
     <PageView>
       <Stack padding="$2">
-        <DeviceList ref={deviceListInstanceRef} disableSaveDevice />
+        <DeviceList ref={deviceListInstanceRef} />
         <FirmwareUpdate
           onDisconnectDevice={() => setSelectedDevice(undefined)}
           onReconnectDevice={() => {
