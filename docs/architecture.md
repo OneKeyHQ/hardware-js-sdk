@@ -32,6 +32,10 @@ SDK接口层 (@onekeyfe/core)
 - **`@onekeyfe/hd-web-sdk`** - Web平台SDK
 - **`@onekeyfe/hd-ble-sdk`** - 移动端BLE SDK
 
+### CLI / Agent Entry
+- **`@onekeyfe/hardware-cli`** - 基于 Node USB 的本地 CLI，适合终端脚本和 AI Agent 直接连接设备
+- 运行模型、会话缓存与常见约束见 [`packages/hd-cli/README.md`](../packages/hd-cli/README.md)
+
 ### 示例应用
 - **`@onekeyfe/connect-examples`** - 集成示例
   - `expo-example` - Web集成示例
