@@ -1,31 +1,33 @@
 /**
- * Centralised debug logger for the Ledger adapter.
+ * SDK-internal logger sink.
  *
- * Off by default. Toggle programmatically via `setDebugEnabled(true)`.
+ * Off by default. The host app injects a sink via `setLogger(fn)` so debug
+ * output flows into the host's logging pipeline (e.g. defaultLogger).
+ *
+ * Cross-process note: this module holds a per-runtime singleton. In MV3
+ * extensions where the SDK runs split between the service worker (adapter)
+ * and an offscreen document (connector), each process must call
+ * `setLogger(...)` independently — they don't share state.
  */
 
-let enabled = false;
+export type LogLevel = 'debug' | 'error';
+export type Logger = (level: LogLevel, ...args: unknown[]) => void;
 
-/** Enable or disable debug logging at runtime. */
-export function setDebugEnabled(value: boolean): void {
-  enabled = value;
-}
+let logger: Logger | null = null;
 
-/** Returns the current debug-enabled state. */
-export function isDebugEnabled(): boolean {
-  return enabled;
+/**
+ * Inject a logger sink. Pass `null` to silence the SDK.
+ * Each process / runtime needs its own call (module state is not shared
+ * across MV3 SW ↔ offscreen).
+ */
+export function setLogger(fn: Logger | null): void {
+  logger = fn;
 }
 
 export function debugLog(...args: unknown[]): void {
-  if (enabled) {
-    // eslint-disable-next-line no-console
-    console.debug(...args);
-  }
+  logger?.('debug', ...args);
 }
 
 export function debugError(...args: unknown[]): void {
-  if (enabled) {
-    // eslint-disable-next-line no-console
-    console.error(...args);
-  }
+  logger?.('error', ...args);
 }

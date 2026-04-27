@@ -32,8 +32,9 @@ export type {
 export { isDeviceLockedError, ledgerFailure, mapLedgerError } from './errors';
 export type { LedgerFailure } from './errors';
 
-// Debug logging (opt-in)
-export { setDebugEnabled, isDebugEnabled } from './utils/debugLog';
+// Debug logging (opt-in via host-injected sink)
+export { setLogger } from './utils/debugLog';
+export type { LogLevel, Logger } from './utils/debugLog';
 
 // BLE utilities (shared by connector packages)
 export { extractBleHexId } from './utils/bleIdentity';
