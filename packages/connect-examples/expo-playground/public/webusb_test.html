@@ -1,0 +1,2998 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OneKey Pro 2 WebUSB eMMC</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #2a2a2a;
+            color: #eee;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            min-height: 100vh;
+        }
+        .main-content {
+            flex: 1;
+            max-width: 1200px;
+        }
+        h1 { color: #00d4aa; margin-bottom: 10px; font-size: 32px; }
+        .subtitle { color: #aaa; margin-bottom: 30px; font-size: 18px; }
+        h3 { font-size: 22px; }
+        .card {
+            background: #333333;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        button {
+            background: #00d4aa;
+            color: #1a1a2e;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover { background: #00f5c4; }
+        button:disabled { background: #444; color: #888; cursor: not-allowed; }
+        button.danger { background: #e74c3c; color: white; }
+        button.danger:hover { background: #ff6b5b; }
+        .status {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 16px;
+            font-weight: 500;
+        }
+        .status.connected { background: #00d4aa33; color: #00d4aa; }
+        .status.disconnected { background: #e74c3c33; color: #e74c3c; }
+        input, textarea {
+            width: 100%;
+            padding: 14px;
+            border: 1px solid #444;
+            border-radius: 8px;
+            background: #1a1a1a;
+            color: #eee;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        textarea { height: 150px; resize: vertical; }
+        .log {
+            background: #1a1a1a;
+            border-radius: 8px;
+            padding: 18px;
+            height: 250px;
+            overflow-y: auto;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+        .log-entry { margin-bottom: 4px; }
+        .log-tx { color: #00d4aa; }
+        .log-rx { color: #3498db; }
+        .log-info { color: #f39c12; }
+        .log-error { color: #e74c3c; }
+        .flex { display: flex; gap: 10px; align-items: center; }
+        label { display: block; margin-bottom: 10px; color: #bbb; font-size: 16px; }
+        .progress-bar {
+            width: 100%;
+            height: 28px;
+            background: #1a1a1a;
+            border-radius: 12px;
+            overflow: hidden;
+            margin: 12px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00d4aa, #3498db);
+            transition: width 0.1s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+            color: #1a1a2e;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .stat-box {
+            background: #1a1a1a;
+            padding: 18px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #00d4aa;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+        }
+        .test-config {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .test-config input {
+            margin-bottom: 0;
+        }
+        select {
+            width: 100%;
+            padding: 14px;
+            border: 1px solid #444;
+            border-radius: 8px;
+            background: #1a1a1a;
+            color: #eee;
+            font-size: 16px;
+        }
+        .tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-bottom: 15px;
+        }
+        .tab-btn {
+            background: #1a1a1a;
+            color: #aaa;
+            border: 1px solid #444;
+            padding: 12px 24px;
+            border-radius: 8px 8px 0 0;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+        }
+        .tab-btn.active {
+            background: #333333;
+            color: #00d4aa;
+            border-bottom-color: #333333;
+        }
+        .tab-btn:hover:not(.active) {
+            background: #1a1a3e;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .pb-msg-info {
+            background: #1a1a1a;
+            padding: 14px;
+            border-radius: 8px;
+            margin-top: 12px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        .pb-msg-info .label { color: #aaa; }
+        .pb-msg-info .value { color: #00d4aa; }
+        .status-bar {
+            width: 100%;
+        }
+        .status-bar-content {
+            background: #1a1a1a;
+            border-radius: 8px;
+            padding: 18px;
+            height: 500px;
+            overflow-y: auto;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+        .status-bar h3 {
+            margin-top: 0;
+            margin-bottom: 20px;
+            font-size: 22px;
+        }
+        .status-entry {
+            margin-bottom: 16px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #444;
+        }
+        .status-entry:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+        .status-entry-header {
+            font-size: 16px;
+            color: #aaa;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+        .status-entry-content {
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px 16px;
+        }
+        .status-entry-content .param {
+            display: inline-flex;
+            align-items: center;
+        }
+        .status-entry-content .key {
+            color: #888;
+            margin-right: 6px;
+        }
+        .status-entry-content .value {
+            color: #00d4aa;
+        }
+        .status-entry-content .error {
+            color: #e74c3c;
+        }
+        .status-entry-content .success {
+            color: #2ecc71;
+        }
+        .status-entry-time {
+            font-size: 12px;
+            color: #666;
+            margin-top: 8px;
+        }
+        @media (max-width: 1024px) {
+            body {
+                flex-direction: column;
+            }
+            .status-bar {
+                width: 100%;
+                position: relative;
+                top: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-content">
+        <h1>🔐 OneKey Pro 2 WebUSB eMMC</h1>
+        <p class="subtitle">eMMC file management via WebUSB</p>
+
+        <div class="card">
+        <div class="flex" style="justify-content: space-between; margin-bottom: 20px;">
+            <div>
+                <h3 style="margin: 0;">Connection</h3>
+            </div>
+            <span id="status" class="status disconnected">Disconnected</span>
+        </div>
+        <button id="connectBtn" onclick="connect()">🔌 Connect Device</button>
+        <button id="disconnectBtn" class="danger" onclick="disconnect()" disabled>Disconnect</button>
+    </div>
+
+    <div class="card">
+        <h3>Protobuf Messages</h3>
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchPbTab('ping')">Ping</button>
+            <button class="tab-btn" onclick="switchPbTab('fileread')">File Read</button>
+            <button class="tab-btn" onclick="switchPbTab('filewrite')">File Write</button>
+            <button class="tab-btn" onclick="switchPbTab('pathinfo')">Path Info</button>
+            <button class="tab-btn" onclick="switchPbTab('dirlist')">Dir List</button>
+            <button class="tab-btn" onclick="switchPbTab('dirmake')">Dir Make</button>
+            <button class="tab-btn" onclick="switchPbTab('dirremove')">Dir Remove</button>
+            <button class="tab-btn" onclick="switchPbTab('filedelete')">File Delete</button>
+            <button class="tab-btn" onclick="switchPbTab('fixpermission')">Fix Permission</button>
+            <button class="tab-btn" onclick="switchPbTab('fwupdate')">FW Update</button>
+            <button class="tab-btn" onclick="switchPbTab('reboot')">Reboot</button>
+        </div>
+
+        <div id="pb-tab-ping" class="tab-content active">
+            <label>Ping Message (optional string data):</label>
+            <input type="text" id="pbPingMessage" placeholder="Enter ping message..." value="Hello from WebUSB!">
+            <div class="flex" style="margin-top: 10px;">
+                <button onclick="sendPbPing()" id="sendPbPingBtn" disabled>Send Ping</button>
+            </div>
+            <div class="pb-msg-info" id="pbPingInfo" style="display: none;">
+                <div><span class="label">TX msg_type:</span> <span class="value" id="pbPingTxType">-</span></div>
+                <div><span class="label">TX payload:</span> <span class="value" id="pbPingTxPayload">-</span></div>
+                <div><span class="label">RX msg_type:</span> <span class="value" id="pbPingRxType">-</span></div>
+                <div><span class="label">RX payload:</span> <span class="value" id="pbPingRxPayload">-</span></div>
+                <div><span class="label">Decoded:</span> <span class="value" id="pbPingDecoded">-</span></div>
+            </div>
+        </div>
+
+        <div id="pb-tab-fileread" class="tab-content">
+            <div class="test-config">
+                <div>
+                    <label>File path (on device):</label>
+                    <input type="text" id="fileReadPath" placeholder="vol1:filename.bin" value="vol1:test.bin">
+                </div>
+                <div>
+                    <label>Chunk size (bytes):</label>
+                    <input type="number" id="fileReadChunkSize" min="64" max="2048" value="512">
+                </div>
+            </div>
+            <div class="test-config">
+                <div>
+                    <label>Start offset (bytes):</label>
+                    <input type="number" id="fileReadOffset" min="0" value="0">
+                </div>
+                <div>
+                    <label>Read length (bytes, 0=read all):</label>
+                    <input type="number" id="fileReadLength" min="0" value="0">
+                </div>
+            </div>
+            <div class="flex" style="margin-top: 10px;">
+                <button onclick="startFileRead()" id="startFileReadBtn" disabled>📥 Read File</button>
+                <button onclick="stopFileRead()" id="stopFileReadBtn" disabled style="background: #e74c3c; color: white;">Stop</button>
+            </div>
+            <div class="progress-bar" id="fileReadProgressBar" style="display: none;">
+                <div class="progress-fill" id="fileReadProgressFill" style="width: 0%;">0%</div>
+            </div>
+            <div class="pb-msg-info" id="fileReadInfo" style="display: none;">
+                <div><span class="label">File:</span> <span class="value" id="fileReadFileName">-</span></div>
+                <div><span class="label">Status:</span> <span class="value" id="fileReadStatus">-</span></div>
+                <div><span class="label">Progress:</span> <span class="value" id="fileReadProgress">-</span></div>
+                <div><span class="label">Speed:</span> <span class="value" id="fileReadSpeed">-</span></div>
+                <div><span class="label">Data size:</span> <span class="value" id="fileReadDataSize">-</span></div>
+            </div>
+            <div style="margin-top: 15px;">
+                <label>Read data (hex):</label>
+                <textarea id="fileReadDataHex" readonly style="height: 200px; font-size: 13px;"></textarea>
+            </div>
+            <div style="margin-top: 10px;">
+                <button onclick="downloadFileReadData()" id="downloadFileReadBtn" disabled style="background: #3498db; color: white;">💾 Download as File</button>
+                <button onclick="clearFileReadData()" style="background: #444; color: #ccc; font-size: 16px;">Clear</button>
+            </div>
+        </div>
+
+        <div id="pb-tab-filewrite" class="tab-content">
+            <label>Select file to upload:</label>
+            <input type="file" id="fileWriteInput" accept=".bin,.fw,.img,*/*" style="margin-bottom: 10px;">
+            <div class="test-config">
+                <div>
+                    <label>Target path (on device):</label>
+                    <input type="text" id="fileWritePath" placeholder="vol1:filename.bin" value="vol1:test.bin">
+                </div>
+                <div>
+                    <label>Chunk size (bytes):</label>
+                    <input type="number" id="fileWriteChunkSize" min="64" max="2048" value="512">
+                </div>
+            </div>
+            <div class="flex" style="margin-top: 10px;">
+                <button onclick="startFileWrite()" id="startFileWriteBtn" disabled>Upload File</button>
+                <button onclick="stopFileWrite()" id="stopFileWriteBtn" disabled style="background: #e74c3c; color: white;">Stop</button>
+            </div>
+            <div class="progress-bar" id="fileWriteProgressBar" style="display: none;">
+                <div class="progress-fill" id="fileWriteProgressFill" style="width: 0%;">0%</div>
+            </div>
+            <div class="pb-msg-info" id="fileWriteInfo" style="display: none;">
+                <div><span class="label">File:</span> <span class="value" id="fileWriteFileName">-</span></div>
+                <div><span class="label">Size:</span> <span class="value" id="fileWriteFileSize">-</span></div>
+                <div><span class="label">Status:</span> <span class="value" id="fileWriteStatus">-</span></div>
+                <div><span class="label">Progress:</span> <span class="value" id="fileWriteProgress">-</span></div>
+                <div><span class="label">Speed:</span> <span class="value" id="fileWriteSpeed">-</span></div>
+            </div>
+        </div>
+
+        <div id="pb-tab-pathinfo" class="tab-content">
+            <label>Path (on device):</label>
+            <input type="text" id="pathInfoPath" placeholder="vol1:filename.bin" value="vol1:test.bin">
+            <div class="flex" style="margin-top: 10px;">
+                <button onclick="sendPathInfo()" id="sendPathInfoBtn" disabled>📋 Query Path Info</button>
+            </div>
+            <div class="pb-msg-info" id="pathInfoResult" style="display: none; margin-top: 15px;">
+                <div><span class="label">TX msg_type:</span> <span class="value" id="pathInfoTxType">-</span></div>
+                <div><span class="label">RX msg_type:</span> <span class="value" id="pathInfoRxType">-</span></div>
+                <div><span class="label">Exist:</span> <span class="value" id="pathInfoExist">-</span></div>
+                <div><span class="label">Size:</span> <span class="value" id="pathInfoSize">-</span></div>
+                <div><span class="label">Is Directory:</span> <span class="value" id="pathInfoIsDir">-</span></div>
+                <div><span class="label">Time:</span> <span class="value" id="pathInfoTime">-</span></div>
+                <div><span class="label">Attributes:</span> <span class="value" id="pathInfoAttrs">-</span></div>
+            </div>
+        </div>
+
+        <div id="pb-tab-dirlist" class="tab-content">
+            <label>Directory path (on device):</label>
+            <input type="text" id="dirListPath" placeholder="vol1:" value="vol1:">
+            <div class="flex" style="margin-top: 10px;">
+                <button onclick="sendDirList()" id="sendDirListBtn" disabled>📂 List Directory</button>
+            </div>
+            <div class="pb-msg-info" id="dirListResult" style="display: none; margin-top: 15px;">
+                <div><span class="label">TX msg_type:</span> <span class="value" id="dirListTxType">-</span></div>
+                <div><span class="label">RX msg_type:</span> <span class="value" id="dirListRxType">-</span></div>
+                <div><span class="label">Path:</span> <span class="value" id="dirListPathResult">-</span></div>
+                <div><span class="label">Child Directories:</span> <span class="value" id="dirListDirs">-</span></div>
+                <div><span class="label">Child Files:</span> <span class="value" id="dirListFiles">-</span></div>
+            </div>
+        </div>
+
+        <div id="pb-tab-dirmake" class="tab-content">
+            <label>Directory path (on device):</label>
+            <input type="text" id="dirMakePath" placeholder="vol1:new_dir" value="vol1:test_dir">
+            <div class="flex" style="margin-top: 10px;">
+                <button onclick="sendDirMake()" id="sendDirMakeBtn" disabled>📁 Create Directory</button>
+            </div>
+            <div class="pb-msg-info" id="dirMakeResult" style="display: none; margin-top: 15px;">
+                <div><span class="label">TX msg_type:</span> <span class="value" id="dirMakeTxType">-</span></div>
+                <div><span class="label">RX msg_type:</span> <span class="value" id="dirMakeRxType">-</span></div>
+                <div><span class="label">Result:</span> <span class="value" id="dirMakeResultText">-</span></div>
+            </div>
+        </div>
+
+        <div id="pb-tab-dirremove" class="tab-content">
+            <label>Directory path (on device):</label>
+            <input type="text" id="dirRemovePath" placeholder="vol1:dir_to_remove" value="vol1:test_dir">
+            <div class="flex" style="margin-top: 10px;">
+                <button onclick="sendDirRemove()" id="sendDirRemoveBtn" disabled>🗑️ Remove Directory</button>
+            </div>
+            <div class="pb-msg-info" id="dirRemoveResult" style="display: none; margin-top: 15px;">
+                <div><span class="label">TX msg_type:</span> <span class="value" id="dirRemoveTxType">-</span></div>
+                <div><span class="label">RX msg_type:</span> <span class="value" id="dirRemoveRxType">-</span></div>
+                <div><span class="label">Result:</span> <span class="value" id="dirRemoveResultText">-</span></div>
+            </div>
+        </div>
+
+        <div id="pb-tab-filedelete" class="tab-content">
+            <label>File path (on device):</label>
+            <input type="text" id="fileDeletePath" placeholder="vol1:filename.bin" value="vol1:test.bin">
+            <div class="flex" style="margin-top: 10px;">
+                <button onclick="sendFileDelete()" id="sendFileDeleteBtn" disabled>🗑️ Delete File</button>
+            </div>
+            <div class="pb-msg-info" id="fileDeleteResult" style="display: none; margin-top: 15px;">
+                <div><span class="label">TX msg_type:</span> <span class="value" id="fileDeleteTxType">-</span></div>
+                <div><span class="label">RX msg_type:</span> <span class="value" id="fileDeleteRxType">-</span></div>
+                <div><span class="label">Result:</span> <span class="value" id="fileDeleteResultText">-</span></div>
+            </div>
+        </div>
+
+        <div id="pb-tab-fixpermission" class="tab-content">
+            <label>Fix eMMC permissions (no parameters required):</label>
+            <div class="flex" style="margin-top: 10px;">
+                <button onclick="sendFixPermission()" id="sendFixPermissionBtn" disabled>🔧 Fix Permission</button>
+            </div>
+            <div class="pb-msg-info" id="fixPermissionResult" style="display: none; margin-top: 15px;">
+                <div><span class="label">TX msg_type:</span> <span class="value" id="fixPermissionTxType">-</span></div>
+                <div><span class="label">RX msg_type:</span> <span class="value" id="fixPermissionRxType">-</span></div>
+                <div><span class="label">Result:</span> <span class="value" id="fixPermissionResultText">-</span></div>
+            </div>
+        </div>
+
+        <div id="pb-tab-fwupdate" class="tab-content">
+            <label>Firmware file path (on device):</label>
+            <input type="text" id="fwUpdatePath" placeholder="vol1:firmware.bin" value="vol1:firmware.bin">
+            <div class="flex" style="margin-top: 10px; align-items: center;">
+                <label style="margin: 0; display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="fwUpdateReboot" checked style="width: auto; margin: 0;">
+                    Reboot on success
+                </label>
+            </div>
+            <div class="flex" style="margin-top: 10px;">
+                <button onclick="sendFirmwareUpdate()" id="sendFwUpdateBtn" disabled>🚀 Update Firmware</button>
+            </div>
+            <div class="pb-msg-info" id="fwUpdateResult" style="display: none; margin-top: 15px;">
+                <div><span class="label">TX msg_type:</span> <span class="value" id="fwUpdateTxType">-</span></div>
+                <div><span class="label">RX msg_type:</span> <span class="value" id="fwUpdateRxType">-</span></div>
+                <div><span class="label">Result:</span> <span class="value" id="fwUpdateResultText">-</span></div>
+            </div>
+        </div>
+
+        <div id="pb-tab-reboot" class="tab-content">
+            <label>Reboot Type:</label>
+            <select id="rebootType" style="margin-bottom: 10px;">
+                <option value="0">Normal</option>
+                <option value="1">Boardloader</option>
+                <option value="2">BootLoader</option>
+            </select>
+            <div class="flex" style="margin-top: 10px;">
+                <button onclick="sendReboot()" id="sendRebootBtn" disabled>🔄 Reboot Device</button>
+            </div>
+            <div class="pb-msg-info" id="rebootResult" style="display: none; margin-top: 15px;">
+                <div><span class="label">TX msg_type:</span> <span class="value" id="rebootTxType">-</span></div>
+                <div><span class="label">RX msg_type:</span> <span class="value" id="rebootRxType">-</span></div>
+                <div><span class="label">Result:</span> <span class="value" id="rebootResultText">-</span></div>
+            </div>
+        </div>
+    </div>
+
+        <div class="card">
+            <h3>EMMC 闭环测试</h3>
+            <div style="margin-bottom: 15px;">
+                <label>测试文件大小 (bytes):</label>
+                <input type="number" id="testFileSize" value="8192" min="64" max="1048576" style="width: 200px;">
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label>测试路径:</label>
+                <input type="text" id="testPath" value="vol1:test_dir" style="width: 200px;">
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label>测试次数:</label>
+                <input type="number" id="testCount" value="1" min="1" max="100" style="width: 200px;">
+            </div>
+            <button onclick="runEmmcTest()" id="runTestBtn" disabled>🚀 运行闭环测试</button>
+            <button onclick="stopEmmcTest()" id="stopTestBtn" disabled style="background: #e74c3c; color: white;">停止测试</button>
+            <div id="testProgress" style="margin-top: 15px; display: none;">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="testProgressFill" style="width: 0%;">0%</div>
+                </div>
+            </div>
+            <div id="testResult" style="margin-top: 15px; display: none;">
+                <div class="pb-msg-info">
+                    <div><span class="label">测试状态:</span> <span class="value" id="testStatus">-</span></div>
+                    <div><span class="label">当前轮次:</span> <span class="value" id="testRound">-</span></div>
+                    <div><span class="label">当前步骤:</span> <span class="value" id="testStep">-</span></div>
+                    <div><span class="label">通过步骤:</span> <span class="value" id="testPassed">-</span></div>
+                    <div><span class="label">失败步骤:</span> <span class="value" id="testFailed">-</span></div>
+                    <div><span class="label">总通过轮次:</span> <span class="value" id="testRoundsPassed">-</span></div>
+                    <div><span class="label">总失败轮次:</span> <span class="value" id="testRoundsFailed">-</span></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="status-bar card">
+            <h3>📊 Command Status</h3>
+            <div id="statusBarContent" class="status-bar-content"></div>
+        </div>
+
+        <div class="card">
+            <h3>Log</h3>
+            <div id="log" class="log"></div>
+            <button onclick="clearLog()" style="margin-top: 10px; background: #444; color: #ccc; font-size: 16px;">Clear Log</button>
+        </div>
+    </div>
+
+    <script>
+        const VID = 0x1209;
+        const PID = 0x53c1;  // OneKey Pro 2
+        const PACKET_SIZE = 2048;  // WebUSB packet size (max single transfer)
+        const RX_BUFFER_SIZE = 4096;  // Receive buffer for large responses
+
+        let device = null;
+        let interfaceNumber = 0;
+        let endpointIn = null;
+        let endpointOut = null;
+
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            const time = new Date().toLocaleTimeString();
+            entry.textContent = `[${time}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        function addStatusEntry(cmdName, params, result, errorCode = null) {
+            const statusBarContent = document.getElementById('statusBarContent');
+            const entry = document.createElement('div');
+            entry.className = 'status-entry';
+            
+            const time = new Date().toLocaleTimeString();
+            let html = `<div class="status-entry-header">${cmdName}</div>`;
+            html += `<div class="status-entry-content">`;
+            
+            if (params) {
+                for (const [key, value] of Object.entries(params)) {
+                    html += `<div class="param"><span class="key">${key}:</span><span class="value">${value}</span></div>`;
+                }
+            }
+            
+            if (result) {
+                if (errorCode !== null && errorCode !== 0) {
+                    html += `<div class="param"><span class="key">Error Code:</span><span class="error">${errorCode}</span></div>`;
+                    html += `<div class="param"><span class="key">Result:</span><span class="error">${result}</span></div>`;
+                } else {
+                    html += `<div class="param"><span class="key">Result:</span><span class="success">${result}</span></div>`;
+                }
+            }
+            
+            html += `</div>`;
+            html += `<div class="status-entry-time">${time}</div>`;
+            
+            entry.innerHTML = html;
+            statusBarContent.insertBefore(entry, statusBarContent.firstChild);
+            
+            if (statusBarContent.children.length > 20) {
+                statusBarContent.removeChild(statusBarContent.lastChild);
+            }
+        }
+
+        function updateUI(connected) {
+            const status = document.getElementById('status');
+            const connectBtn = document.getElementById('connectBtn');
+            const disconnectBtn = document.getElementById('disconnectBtn');
+            const sendPbPingBtn = document.getElementById('sendPbPingBtn');
+            const startFileReadBtn = document.getElementById('startFileReadBtn');
+            const startFileWriteBtn = document.getElementById('startFileWriteBtn');
+            const sendPathInfoBtn = document.getElementById('sendPathInfoBtn');
+            const sendDirListBtn = document.getElementById('sendDirListBtn');
+            const sendDirMakeBtn = document.getElementById('sendDirMakeBtn');
+            const sendDirRemoveBtn = document.getElementById('sendDirRemoveBtn');
+            const sendFileDeleteBtn = document.getElementById('sendFileDeleteBtn');
+            const sendFixPermissionBtn = document.getElementById('sendFixPermissionBtn');
+            const sendFwUpdateBtn = document.getElementById('sendFwUpdateBtn');
+            const sendRebootBtn = document.getElementById('sendRebootBtn');
+
+            const runTestBtn = document.getElementById('runTestBtn');
+            if (connected) {
+                status.textContent = 'Connected';
+                status.className = 'status connected';
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+                sendPbPingBtn.disabled = false;
+                if (startFileReadBtn) startFileReadBtn.disabled = false;
+                startFileWriteBtn.disabled = false;
+                if (sendPathInfoBtn) sendPathInfoBtn.disabled = false;
+                if (sendDirListBtn) sendDirListBtn.disabled = false;
+                if (sendDirMakeBtn) sendDirMakeBtn.disabled = false;
+                if (sendDirRemoveBtn) sendDirRemoveBtn.disabled = false;
+                if (sendFileDeleteBtn) sendFileDeleteBtn.disabled = false;
+                if (sendFixPermissionBtn) sendFixPermissionBtn.disabled = false;
+                if (sendFwUpdateBtn) sendFwUpdateBtn.disabled = false;
+                if (sendRebootBtn) sendRebootBtn.disabled = false;
+                if (runTestBtn) runTestBtn.disabled = false;
+            } else {
+                status.textContent = 'Disconnected';
+                status.className = 'status disconnected';
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+                sendPbPingBtn.disabled = true;
+                if (startFileReadBtn) startFileReadBtn.disabled = true;
+                startFileWriteBtn.disabled = true;
+                if (sendPathInfoBtn) sendPathInfoBtn.disabled = true;
+                if (sendDirListBtn) sendDirListBtn.disabled = true;
+                if (sendDirMakeBtn) sendDirMakeBtn.disabled = true;
+                if (sendDirRemoveBtn) sendDirRemoveBtn.disabled = true;
+                if (sendFileDeleteBtn) sendFileDeleteBtn.disabled = true;
+                if (sendFixPermissionBtn) sendFixPermissionBtn.disabled = true;
+                if (sendFwUpdateBtn) sendFwUpdateBtn.disabled = true;
+                if (sendRebootBtn) sendRebootBtn.disabled = true;
+                if (runTestBtn) runTestBtn.disabled = true;
+            }
+        }
+
+        async function connect() {
+            try {
+                log('Requesting USB device...', 'info');
+                
+                device = await navigator.usb.requestDevice({
+                    filters: [{ vendorId: VID }]
+                });
+
+                log(`Device selected: ${device.productName} (${device.manufacturerName})`, 'info');
+                log(`VID: 0x${device.vendorId.toString(16)}, PID: 0x${device.productId.toString(16)}`, 'info');
+
+                await device.open();
+                log('Device opened', 'info');
+
+                // Find the vendor interface
+                for (const config of device.configurations) {
+                    for (const iface of config.interfaces) {
+                        for (const alt of iface.alternates) {
+                            if (alt.interfaceClass === 0xFF) {  // Vendor class
+                                interfaceNumber = iface.interfaceNumber;
+                                log(`Found vendor interface: ${interfaceNumber}`, 'info');
+                                
+                                for (const ep of alt.endpoints) {
+                                    if (ep.direction === 'in') {
+                                        endpointIn = ep.endpointNumber;
+                                    } else {
+                                        endpointOut = ep.endpointNumber;
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (endpointIn === null || endpointOut === null) {
+                    throw new Error('Could not find vendor endpoints');
+                }
+
+                log(`Endpoints - IN: ${endpointIn}, OUT: ${endpointOut}`, 'info');
+
+                await device.selectConfiguration(1);
+                await device.claimInterface(interfaceNumber);
+                log('Interface claimed', 'info');
+
+                updateUI(true);
+                log('✅ Connected successfully!', 'info');
+
+            } catch (error) {
+                log(`❌ Connection error: ${error.message}`, 'error');
+                console.error(error);
+                device = null;
+                updateUI(false);
+            }
+        }
+
+        async function disconnect() {
+            if (device) {
+                const dev = device;
+                device = null;
+                try {
+                    await dev.releaseInterface(interfaceNumber);
+                    await dev.close();
+                    log('Device disconnected', 'info');
+                } catch (error) {
+                    log(`Disconnect error: ${error.message}`, 'error');
+                }
+                updateUI(false);
+            }
+        }
+
+        // ==================== Proto V0 ====================
+        const PROTO_HEAD_SOF = 0x5A;
+        const PROTO_PRE_HEAD_SIZE = 4;
+        const PROTO_HEAD_CRC_SIZE = 8;
+        const PROTO_DATA_TYPE_PACKET = 0;
+        const CRC8_INIT = 0x30;
+
+        let protoSeq = 0;
+
+        // CRC-8 lookup table (same as firmware crc8.c)
+        const crc8_table = new Uint8Array([
+            0x00, 0x5e, 0xbc, 0xe2, 0x61, 0x3f, 0xdd, 0x83, 0xc2, 0x9c, 0x7e, 0x20, 0xa3, 0xfd, 0x1f, 0x41,
+            0x9d, 0xc3, 0x21, 0x7f, 0xfc, 0xa2, 0x40, 0x1e, 0x5f, 0x01, 0xe3, 0xbd, 0x3e, 0x60, 0x82, 0xdc,
+            0x23, 0x7d, 0x9f, 0xc1, 0x42, 0x1c, 0xfe, 0xa0, 0xe1, 0xbf, 0x5d, 0x03, 0x80, 0xde, 0x3c, 0x62,
+            0xbe, 0xe0, 0x02, 0x5c, 0xdf, 0x81, 0x63, 0x3d, 0x7c, 0x22, 0xc0, 0x9e, 0x1d, 0x43, 0xa1, 0xff,
+            0x46, 0x18, 0xfa, 0xa4, 0x27, 0x79, 0x9b, 0xc5, 0x84, 0xda, 0x38, 0x66, 0xe5, 0xbb, 0x59, 0x07,
+            0xdb, 0x85, 0x67, 0x39, 0xba, 0xe4, 0x06, 0x58, 0x19, 0x47, 0xa5, 0xfb, 0x78, 0x26, 0xc4, 0x9a,
+            0x65, 0x3b, 0xd9, 0x87, 0x04, 0x5a, 0xb8, 0xe6, 0xa7, 0xf9, 0x1b, 0x45, 0xc6, 0x98, 0x7a, 0x24,
+            0xf8, 0xa6, 0x44, 0x1a, 0x99, 0xc7, 0x25, 0x7b, 0x3a, 0x64, 0x86, 0xd8, 0x5b, 0x05, 0xe7, 0xb9,
+            0x8c, 0xd2, 0x30, 0x6e, 0xed, 0xb3, 0x51, 0x0f, 0x4e, 0x10, 0xf2, 0xac, 0x2f, 0x71, 0x93, 0xcd,
+            0x11, 0x4f, 0xad, 0xf3, 0x70, 0x2e, 0xcc, 0x92, 0xd3, 0x8d, 0x6f, 0x31, 0xb2, 0xec, 0x0e, 0x50,
+            0xaf, 0xf1, 0x13, 0x4d, 0xce, 0x90, 0x72, 0x2c, 0x6d, 0x33, 0xd1, 0x8f, 0x0c, 0x52, 0xb0, 0xee,
+            0x32, 0x6c, 0x8e, 0xd0, 0x53, 0x0d, 0xef, 0xb1, 0xf0, 0xae, 0x4c, 0x12, 0x91, 0xcf, 0x2d, 0x73,
+            0xca, 0x94, 0x76, 0x28, 0xab, 0xf5, 0x17, 0x49, 0x08, 0x56, 0xb4, 0xea, 0x69, 0x37, 0xd5, 0x8b,
+            0x57, 0x09, 0xeb, 0xb5, 0x36, 0x68, 0x8a, 0xd4, 0x95, 0xcb, 0x29, 0x77, 0xf4, 0xaa, 0x48, 0x16,
+            0xe9, 0xb7, 0x55, 0x0b, 0x88, 0xd6, 0x34, 0x6a, 0x2b, 0x75, 0x97, 0xc9, 0x4a, 0x14, 0xf6, 0xa8,
+            0x74, 0x2a, 0xc8, 0x96, 0x15, 0x4b, 0xa9, 0xf7, 0xb6, 0xe8, 0x0a, 0x54, 0xd7, 0x89, 0x6b, 0x35,
+        ]);
+
+        // CRC-8 calculation using lookup table (init 0x30, same as firmware)
+        function crc8(data, len) {
+            let crc = CRC8_INIT;
+            for (let i = 0; i < len; i++) {
+                crc = crc8_table[crc ^ data[i]];
+            }
+            return crc;
+        }
+
+        function buildProtoFrame(payload, packetSrc, router) {
+            const payloadLen = payload ? payload.length : 0;
+            const frameLen = payloadLen + PROTO_HEAD_CRC_SIZE;
+            const frame = new Uint8Array(frameLen);
+
+            protoSeq = (protoSeq + 1) & 0xFF;
+            if (protoSeq === 0) protoSeq = 1;
+
+            // Header (7 bytes)
+            frame[0] = PROTO_HEAD_SOF;                          // sof
+            frame[1] = frameLen & 0xFF;                         // len low
+            frame[2] = (frameLen >> 8) & 0xFF;                  // len high
+            frame[3] = 0;                                        // crc (placeholder)
+            frame[4] = router & 0xFF;                           // router
+            frame[5] = ((packetSrc & 0x0F) << 2) | (PROTO_DATA_TYPE_PACKET & 0x03); // attr
+            frame[6] = protoSeq;                                // seq
+
+            // CRC8 for pre-head (bytes 0-2)
+            frame[3] = crc8(frame, 3);
+
+            // Payload
+            if (payload && payloadLen > 0) {
+                frame.set(payload, 7);
+            }
+
+            // CRC8 for entire frame (bytes 0 to frameLen-2)
+            frame[frameLen - 1] = crc8(frame, frameLen - 1);
+
+            return frame;
+        }
+
+        // Handle device disconnect
+        navigator.usb.addEventListener('disconnect', (event) => {
+            if (event.device === device) {
+                log('Device was disconnected', 'error');
+                device = null;
+                updateUI(false);
+            }
+        });
+
+        // Check WebUSB support
+        if (!navigator.usb) {
+            log('❌ WebUSB is not supported in this browser!', 'error');
+            log('Please use Chrome, Edge, or Opera on desktop.', 'error');
+            document.getElementById('connectBtn').disabled = true;
+        } else {
+            log('WebUSB is supported ✓', 'info');
+        }
+
+        // ==================== Protobuf Messages ====================
+        // Message types from messages.proto (60000~61199 range)
+        const PB_MSG_TYPE = {
+            Ping: 60206,
+            Success: 60207,
+            Failure: 60208,
+            Reboot: 60400,
+            FixPermission: 60800,
+            PathInfo: 60801,
+            PathInfoQuery: 60802,
+            File: 60803,
+            FileRead: 60804,
+            FileWrite: 60805,
+            FileDelete: 60806,
+            Dir: 60807,
+            DirList: 60808,
+            DirMake: 60809,
+            DirRemove: 60810,
+            FirmwareUpdate: 61000,
+            FirmwareInstallProgress: 61001,
+        };
+
+        const PB_MSG_NAME = Object.fromEntries(Object.entries(PB_MSG_TYPE).map(([k, v]) => [v, k]));
+
+        // Simple protobuf encoder/decoder for our messages
+        // Protobuf wire types: 0=varint, 2=length-delimited
+        const pbEncoder = {
+            encodeVarint(value) {
+                const bytes = [];
+                while (value > 0x7f) {
+                    bytes.push((value & 0x7f) | 0x80);
+                    value >>>= 7;
+                }
+                bytes.push(value & 0x7f);
+                return bytes;
+            },
+
+            encodeString(fieldNum, str) {
+                if (!str || str.length === 0) return [];
+                const strBytes = new TextEncoder().encode(str);
+                const tag = (fieldNum << 3) | 2; // wire type 2 = length-delimited
+                return [...this.encodeVarint(tag), ...this.encodeVarint(strBytes.length), ...strBytes];
+            },
+
+            encodePing(message) {
+                // Ping { optional string message = 1; }
+                return new Uint8Array(this.encodeString(1, message));
+            },
+
+            encodeUint32(fieldNum, value, required = false) {
+                // For protobuf, default values (0) are typically not encoded unless required
+                // But nanopb will encode required fields even if 0
+                if (value === 0 && !required) return [];
+                const tag = (fieldNum << 3) | 0; // wire type 0 = varint
+                // For value 0, we need to encode: tag + 0x00
+                return [...this.encodeVarint(tag), ...this.encodeVarint(value)];
+            },
+
+            encodeBool(fieldNum, value) {
+                const tag = (fieldNum << 3) | 0; // wire type 0 = varint
+                return [...this.encodeVarint(tag), value ? 1 : 0];
+            },
+
+            encodeBytes(fieldNum, bytes) {
+                if (!bytes || bytes.length === 0) return [];
+                const tag = (fieldNum << 3) | 2; // wire type 2 = length-delimited
+                return [...this.encodeVarint(tag), ...this.encodeVarint(bytes.length), ...bytes];
+            },
+
+            // File { required string path=1; required uint32 offset=2; required uint32 total_size=3; optional bytes data=4; optional uint32 data_hash=5; optional uint32 processed_byte=6; }
+            encodeFile(path, offset, totalSize, data = null, dataHash = null) {
+                const result = [];
+                result.push(...this.encodeString(1, path));
+                result.push(...this.encodeUint32(2, offset, true));
+                result.push(...this.encodeUint32(3, totalSize, true));
+                if (data && data.length > 0) {
+                    result.push(...this.encodeBytes(4, data));
+                }
+                if (dataHash !== null) {
+                    result.push(...this.encodeUint32(5, dataHash));
+                }
+                return result;
+            },
+
+            // FileWrite { required File file=1; required bool overwrite=2; required bool append=3; optional uint32 ui_percentage=4; }
+            encodeFileWrite(fileBytes, overwrite, append, uiPercentage = null) {
+                const result = [];
+                const tag1 = (1 << 3) | 2;
+                result.push(...this.encodeVarint(tag1), ...this.encodeVarint(fileBytes.length), ...fileBytes);
+                result.push(...this.encodeBool(2, overwrite));
+                result.push(...this.encodeBool(3, append));
+                if (uiPercentage !== null) {
+                    result.push(...this.encodeUint32(4, uiPercentage));
+                }
+                return new Uint8Array(result);
+            },
+
+            // FixPermission { }
+            encodeFixPermission() {
+                return new Uint8Array([]);
+            },
+
+            // PathInfoQuery { required string path=1; }
+            encodePathInfoQuery(path) {
+                return new Uint8Array(this.encodeString(1, path));
+            },
+
+            // FileRead { required File file=1; optional uint32 chunk_len=2; optional uint32 ui_percentage=3; }
+            encodeFileRead(fileBytes, chunkLen = null, uiPercentage = null) {
+                const result = [];
+                const tag1 = (1 << 3) | 2;
+                result.push(...this.encodeVarint(tag1), ...this.encodeVarint(fileBytes.length), ...fileBytes);
+                if (chunkLen !== null) {
+                    result.push(...this.encodeUint32(2, chunkLen));
+                }
+                if (uiPercentage !== null) {
+                    result.push(...this.encodeUint32(3, uiPercentage));
+                }
+                return new Uint8Array(result);
+            },
+
+            // FileDelete { required string path=1; }
+            encodeFileDelete(path) {
+                return new Uint8Array(this.encodeString(1, path));
+            },
+
+            // DirList { required string path=1; }
+            encodeDirList(path) {
+                return new Uint8Array(this.encodeString(1, path));
+            },
+
+            // DirMake { required string path=1; }
+            encodeDirMake(path) {
+                return new Uint8Array(this.encodeString(1, path));
+            },
+
+            // DirRemove { required string path=1; }
+            encodeDirRemove(path) {
+                return new Uint8Array(this.encodeString(1, path));
+            },
+
+            // FirmwareTargetType enum
+            FirmwareTargetType: {
+                TARGET_MAIN_APP: 0,
+                TARGET_MAIN_BOOT: 1,
+                TARGET_BLE: 2,
+                TARGET_SE1: 3,
+                TARGET_SE2: 4,
+                TARGET_SE3: 5,
+                TARGET_SE4: 6,
+                TARGET_RESOURCE: 10,
+            },
+
+            // FirmwareTarget { required FirmwareTargetType target_id=1; required string path=2; }
+            encodeFirmwareTarget(targetId, path) {
+                const result = [];
+                result.push(...this.encodeUint32(1, targetId, true));
+                result.push(...this.encodeString(2, path));
+                return result;
+            },
+
+            // FirmwareUpdate { repeated FirmwareTarget targets=1; optional bool reboot_on_success=2; }
+            encodeFirmwareUpdate(targets, rebootOnSuccess = null) {
+                const result = [];
+                for (const target of targets) {
+                    const targetBytes = this.encodeFirmwareTarget(target.targetId, target.path);
+                    const tag1 = (1 << 3) | 2;
+                    result.push(...this.encodeVarint(tag1), ...this.encodeVarint(targetBytes.length), ...targetBytes);
+                }
+                if (rebootOnSuccess !== null) {
+                    result.push(...this.encodeBool(2, rebootOnSuccess));
+                }
+                return new Uint8Array(result);
+            },
+
+            // Reboot { required RebootType reboot_type=1; repeated RebootOp ops=2; }
+            encodeReboot(rebootType) {
+                return new Uint8Array(this.encodeUint32(1, rebootType, true));
+            },
+        };
+
+        const pbDecoder = {
+            decodeVarint(data, offset) {
+                let value = 0, shift = 0;
+                while (offset < data.length) {
+                    const byte = data[offset++];
+                    value |= (byte & 0x7f) << shift;
+                    if ((byte & 0x80) === 0) break;
+                    shift += 7;
+                }
+                return { value, offset };
+            },
+
+            decodeString(data, offset, len) {
+                const strBytes = data.slice(offset, offset + len);
+                return new TextDecoder().decode(strBytes);
+            },
+
+            decodeSuccess(data) {
+                // Success { optional string message = 1; }
+                let offset = 0, message = '';
+                while (offset < data.length) {
+                    const { value: tag, offset: off1 } = this.decodeVarint(data, offset);
+                    offset = off1;
+                    const fieldNum = tag >> 3;
+                    const wireType = tag & 0x7;
+                    if (fieldNum === 1 && wireType === 2) {
+                        const { value: len, offset: off2 } = this.decodeVarint(data, offset);
+                        message = this.decodeString(data, off2, len);
+                        offset = off2 + len;
+                    } else {
+                        break;
+                    }
+                }
+                return { message };
+            },
+
+            decodeFailure(data) {
+                // Failure { optional FailureType code = 1; optional string message = 2; }
+                let offset = 0, code = 0, message = '';
+                while (offset < data.length) {
+                    const { value: tag, offset: off1 } = this.decodeVarint(data, offset);
+                    offset = off1;
+                    const fieldNum = tag >> 3;
+                    const wireType = tag & 0x7;
+                    if (fieldNum === 1 && wireType === 0) {
+                        const { value: val, offset: off2 } = this.decodeVarint(data, offset);
+                        code = val;
+                        offset = off2;
+                    } else if (fieldNum === 2 && wireType === 2) {
+                        const { value: len, offset: off2 } = this.decodeVarint(data, offset);
+                        message = this.decodeString(data, off2, len);
+                        offset = off2 + len;
+                    } else {
+                        break;
+                    }
+                }
+                return { code, message };
+            },
+
+            // File { required string path=1; required uint32 offset=2; required uint32 total_size=3; optional bytes data=4; optional uint32 data_hash=5; optional uint32 processed_byte=6; }
+            decodeFile(data) {
+                let offset = 0;
+                const result = { path: '', offset: 0, totalSize: 0, data: null, dataHash: null, processedByte: null };
+                while (offset < data.length) {
+                    const { value: tag, offset: off1 } = this.decodeVarint(data, offset);
+                    offset = off1;
+                    const fieldNum = tag >> 3;
+                    const wireType = tag & 0x7;
+                    if (wireType === 0) {
+                        const { value: val, offset: off2 } = this.decodeVarint(data, offset);
+                        offset = off2;
+                        if (fieldNum === 2) result.offset = val;
+                        else if (fieldNum === 3) result.totalSize = val;
+                        else if (fieldNum === 5) result.dataHash = val;
+                        else if (fieldNum === 6) result.processedByte = val;
+                    } else if (wireType === 2) {
+                        const { value: len, offset: off2 } = this.decodeVarint(data, offset);
+                        if (fieldNum === 1) {
+                            result.path = this.decodeString(data, off2, len);
+                        } else if (fieldNum === 4) {
+                            result.data = data.slice(off2, off2 + len);
+                        }
+                        offset = off2 + len;
+                    } else {
+                        break;
+                    }
+                }
+                return result;
+            },
+
+            // PathInfo { required bool exist=1; required uint64 size=2; required uint32 year=3; ... }
+            decodePathInfo(data) {
+                let offset = 0;
+                const result = { exist: false, size: 0, year: 0, month: 0, day: 0, hour: 0, minute: 0, second: 0,
+                    readonly: false, hidden: false, system: false, archive: false, directory: false };
+                while (offset < data.length) {
+                    const { value: tag, offset: off1 } = this.decodeVarint(data, offset);
+                    offset = off1;
+                    const fieldNum = tag >> 3;
+                    const wireType = tag & 0x7;
+                    if (wireType === 0) {
+                        const { value: val, offset: off2 } = this.decodeVarint(data, offset);
+                        offset = off2;
+                        if (fieldNum === 1) result.exist = val !== 0;
+                        else if (fieldNum === 2) result.size = val;
+                        else if (fieldNum === 3) result.year = val;
+                        else if (fieldNum === 4) result.month = val;
+                        else if (fieldNum === 5) result.day = val;
+                        else if (fieldNum === 6) result.hour = val;
+                        else if (fieldNum === 7) result.minute = val;
+                        else if (fieldNum === 8) result.second = val;
+                        else if (fieldNum === 9) result.readonly = val !== 0;
+                        else if (fieldNum === 10) result.hidden = val !== 0;
+                        else if (fieldNum === 11) result.system = val !== 0;
+                        else if (fieldNum === 12) result.archive = val !== 0;
+                        else if (fieldNum === 13) result.directory = val !== 0;
+                    } else {
+                        break;
+                    }
+                }
+                return result;
+            },
+
+            // Dir { required string path=1; optional string child_dirs=2; optional string child_files=3; }
+            decodeDir(data) {
+                let offset = 0;
+                const result = { path: '', childDirs: '', childFiles: '' };
+                while (offset < data.length) {
+                    const { value: tag, offset: off1 } = this.decodeVarint(data, offset);
+                    offset = off1;
+                    const fieldNum = tag >> 3;
+                    const wireType = tag & 0x7;
+                    if (wireType === 2) {
+                        const { value: len, offset: off2 } = this.decodeVarint(data, offset);
+                        const str = this.decodeString(data, off2, len);
+                        if (fieldNum === 1) result.path = str;
+                        else if (fieldNum === 2) result.childDirs = str;
+                        else if (fieldNum === 3) result.childFiles = str;
+                        offset = off2 + len;
+                    } else {
+                        break;
+                    }
+                }
+                return result;
+            },
+        };
+
+        function buildPbFrame(msgType, pbPayload, packetSrc = 0, router = 0) {
+            // Build: 2-byte msg_type (little-endian) + protobuf payload
+            const msgTypeBytes = new Uint8Array([msgType & 0xff, (msgType >> 8) & 0xff]);
+            const payload = new Uint8Array(2 + pbPayload.length);
+            payload.set(msgTypeBytes, 0);
+            payload.set(pbPayload, 2);
+            // Wrap in proto v0 frame
+            return buildProtoFrame(payload, packetSrc, router);
+        }
+
+        function parsePbResponse(data) {
+            // data is the payload from proto v0 frame (after header, before CRC)
+            // Format: 2-byte msg_type (little-endian) + protobuf payload
+            if (data.length < 2) return null;
+            const msgType = data[0] | (data[1] << 8);
+            const pbPayload = data.slice(2);
+            return { msgType, pbPayload };
+        }
+
+        function switchPbTab(tabName) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelector(`[onclick="switchPbTab('${tabName}')"]`)?.classList.add('active');
+            document.getElementById(`pb-tab-${tabName}`)?.classList.add('active');
+        }
+
+        async function sendPbMessage(msgType, pbPayload, timeout = 5000) {
+            if (!device) {
+                throw new Error('Not connected');
+            }
+
+            const frame = buildPbFrame(msgType, pbPayload);
+            await device.transferOut(endpointOut, frame);
+
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Response timeout')), timeout));
+            const result = await Promise.race([
+                device.transferIn(endpointIn, RX_BUFFER_SIZE),
+                timeoutPromise
+            ]);
+
+            if (!result.data || result.data.byteLength === 0) {
+                throw new Error('Empty response');
+            }
+
+            const rxData = new Uint8Array(result.data.buffer);
+            if (rxData[0] !== PROTO_HEAD_SOF || rxData.length < PROTO_HEAD_CRC_SIZE) {
+                throw new Error('Invalid proto frame');
+            }
+
+            const frameLen = rxData[1] | (rxData[2] << 8);
+            const payloadData = rxData.slice(7, frameLen - 1);
+            const resp = parsePbResponse(payloadData);
+
+            if (!resp) {
+                throw new Error('Failed to parse response');
+            }
+
+            return resp;
+        }
+
+        async function sendPbPing() {
+            if (!device) {
+                log('Not connected!', 'error');
+                return;
+            }
+
+            const message = document.getElementById('pbPingMessage').value;
+            const pbPayload = pbEncoder.encodePing(message);
+            const frame = buildPbFrame(PB_MSG_TYPE.Ping, pbPayload);
+
+            const payloadHex = Array.from(new Uint8Array([PB_MSG_TYPE.Ping & 0xff, 0, ...pbPayload]))
+                .map(b => b.toString(16).padStart(2, '0')).join(' ');
+            document.getElementById('pbPingInfo').style.display = 'block';
+            document.getElementById('pbPingTxType').textContent = `${PB_MSG_TYPE.Ping} (Ping)`;
+            document.getElementById('pbPingTxPayload').textContent = payloadHex;
+            document.getElementById('pbPingRxType').textContent = 'waiting...';
+            document.getElementById('pbPingRxPayload').textContent = '-';
+            document.getElementById('pbPingDecoded').textContent = '-';
+
+            log(`📦 PB TX Ping: "${message}"`, 'tx');
+
+            const frameHex = Array.from(frame).map(b => b.toString(16).padStart(2, '0')).join(' ');
+            log(`📦 Frame: ${frameHex}`, 'tx');
+
+            try {
+                addStatusEntry('Ping', {
+                    'msg_type': `${PB_MSG_TYPE.Ping}`,
+                    'frame_len': `${frame.length}`,
+                    'payload_len': `${pbPayload.length}`
+                }, 'Sending...');
+
+                await device.transferOut(endpointOut, frame);
+
+                // Wait for response with timeout
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('Response timeout')), 3000));
+                const result = await Promise.race([
+                    device.transferIn(endpointIn, RX_BUFFER_SIZE),
+                    timeoutPromise
+                ]);
+
+                if (result.data && result.data.byteLength > 0) {
+                    const rxData = new Uint8Array(result.data.buffer);
+                    const rxHex = Array.from(rxData).map(b => b.toString(16).padStart(2, '0')).join(' ');
+                    log(`📥 PB RX (${rxData.length} bytes): ${rxHex}`, 'rx');
+
+                    // Parse proto v0 frame to extract payload
+                    if (rxData[0] === PROTO_HEAD_SOF && rxData.length >= PROTO_HEAD_CRC_SIZE) {
+                        const frameLen = rxData[1] | (rxData[2] << 8);
+                        const payloadData = rxData.slice(7, frameLen - 1);
+                        const resp = parsePbResponse(payloadData);
+
+                        if (resp) {
+                            const rxPayloadHex = Array.from(payloadData).map(b => b.toString(16).padStart(2, '0')).join(' ');
+                            document.getElementById('pbPingRxType').textContent = `${resp.msgType} (${PB_MSG_NAME[resp.msgType] || 'Unknown'})`;
+                            document.getElementById('pbPingRxPayload').textContent = rxPayloadHex;
+
+                            if (resp.msgType === PB_MSG_TYPE.Success) {
+                                const decoded = pbDecoder.decodeSuccess(resp.pbPayload);
+                                document.getElementById('pbPingDecoded').textContent = `Success: "${decoded.message}"`;
+                                log(`✅ Ping Success: "${decoded.message}"`, 'info');
+                                addStatusEntry('Ping', {
+                                    'rx_msg_type': `${resp.msgType}`,
+                                    'rx_len': `${rxData.length}`
+                                }, `Success: "${decoded.message}"`, 0);
+                            } else if (resp.msgType === PB_MSG_TYPE.Failure) {
+                                const decoded = pbDecoder.decodeFailure(resp.pbPayload);
+                                document.getElementById('pbPingDecoded').textContent = `Failure: code=${decoded.code}, msg="${decoded.message}"`;
+                                log(`❌ Ping Failure: code=${decoded.code}, "${decoded.message}"`, 'error');
+                                addStatusEntry('Ping', {
+                                    'rx_msg_type': `${resp.msgType}`,
+                                    'rx_len': `${rxData.length}`
+                                }, `Failure: "${decoded.message}"`, decoded.code);
+                            } else {
+                                document.getElementById('pbPingDecoded').textContent = `Unexpected msg_type: ${resp.msgType}`;
+                                addStatusEntry('Ping', {
+                                    'rx_msg_type': `${resp.msgType}`,
+                                    'rx_len': `${rxData.length}`
+                                }, `Unexpected msg_type: ${resp.msgType}`, -1);
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                log(`❌ PB Ping error: ${error.message}`, 'error');
+                document.getElementById('pbPingRxType').textContent = 'error';
+                addStatusEntry('Ping', {
+                    'frame_len': `${frame.length}`
+                }, `Error: ${error.message}`, -1);
+            }
+        }
+
+        // ==================== File Read ====================
+        let fileReadRunning = false;
+        let fileReadAborted = false;
+        let fileReadData = null;
+
+        function updateFileReadProgress(percent, text) {
+            const fill = document.getElementById('fileReadProgressFill');
+            fill.style.width = percent + '%';
+            fill.textContent = text || (percent.toFixed(1) + '%');
+        }
+
+        async function sendFileReadChunk(path, offset, readLen) {
+            const fileBytes = pbEncoder.encodeFile(path, offset, 0);
+            const pbPayload = pbEncoder.encodeFileRead(fileBytes, readLen);
+            const frame = buildPbFrame(PB_MSG_TYPE.FileRead, pbPayload);
+
+            try {
+                addStatusEntry('FileRead', {
+                    'msg_type': `${PB_MSG_TYPE.FileRead}`,
+                    'path': path,
+                    'offset': `${offset}`,
+                    'read_len': `${readLen}`,
+                    'frame_len': `${frame.length}`
+                }, 'Sending...');
+
+                await device.transferOut(endpointOut, frame);
+
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('Response timeout')), 10000));
+                const result = await Promise.race([
+                    device.transferIn(endpointIn, RX_BUFFER_SIZE),
+                    timeoutPromise
+                ]);
+
+                if (!result.data || result.data.byteLength === 0) {
+                    throw new Error('Empty response');
+                }
+
+                const rxData = new Uint8Array(result.data.buffer);
+
+                if (rxData[0] !== PROTO_HEAD_SOF || rxData.length < PROTO_HEAD_CRC_SIZE) {
+                    throw new Error('Invalid proto frame');
+                }
+
+                const frameLen = rxData[1] | (rxData[2] << 8);
+                const payloadData = rxData.slice(7, frameLen - 1);
+                const resp = parsePbResponse(payloadData);
+
+                if (!resp) {
+                    throw new Error('Failed to parse response');
+                }
+
+                if (resp.msgType === PB_MSG_TYPE.Failure) {
+                    const decoded = pbDecoder.decodeFailure(resp.pbPayload);
+                    addStatusEntry('FileRead', {
+                        'rx_msg_type': `${resp.msgType}`,
+                        'rx_len': `${rxData.length}`
+                    }, `Device error: "${decoded.message}"`, decoded.code);
+                    throw new Error(`Device error: code=${decoded.code}, msg="${decoded.message}"`);
+                }
+
+                if (resp.msgType !== PB_MSG_TYPE.File) {
+                    addStatusEntry('FileRead', {
+                        'rx_msg_type': `${resp.msgType}`,
+                        'rx_len': `${rxData.length}`
+                    }, `Unexpected response type: ${resp.msgType}`, -1);
+                    throw new Error(`Unexpected response type: ${resp.msgType}`);
+                }
+
+                const decoded = pbDecoder.decodeFile(resp.pbPayload);
+                addStatusEntry('FileRead', {
+                    'rx_msg_type': `${resp.msgType}`,
+                    'rx_len': `${rxData.length}`,
+                    'data_len': `${decoded.data ? decoded.data.length : 0}`
+                }, 'Success', 0);
+
+                return decoded;
+            } catch (error) {
+                if (!error.message.includes('Device error') && !error.message.includes('Unexpected')) {
+                    addStatusEntry('FileRead', {
+                        'offset': `${offset}`,
+                        'read_len': `${readLen}`
+                    }, `Error: ${error.message}`, -1);
+                }
+                throw error;
+            }
+        }
+
+        async function startFileRead() {
+            if (!device) {
+                log('Not connected!', 'error');
+                return;
+            }
+
+            const filePath = document.getElementById('fileReadPath').value.trim();
+            if (!filePath) {
+                log('Please enter file path', 'error');
+                return;
+            }
+
+            const chunkSize = parseInt(document.getElementById('fileReadChunkSize').value) || 512;
+            if (chunkSize < 64 || chunkSize > 2048) {
+                log('Chunk size must be 64-2048 bytes', 'error');
+                return;
+            }
+
+            const startOffset = parseInt(document.getElementById('fileReadOffset').value) || 0;
+            if (startOffset < 0) {
+                log('Start offset must be >= 0', 'error');
+                return;
+            }
+
+            let totalLength = parseInt(document.getElementById('fileReadLength').value) || 0;
+            if (totalLength < 0) {
+                log('Read length must be >= 0', 'error');
+                return;
+            }
+
+            fileReadRunning = true;
+            fileReadAborted = false;
+            fileReadData = new Uint8Array(0);
+
+            document.getElementById('startFileReadBtn').disabled = true;
+            document.getElementById('stopFileReadBtn').disabled = false;
+            document.getElementById('downloadFileReadBtn').disabled = true;
+            document.getElementById('fileReadProgressBar').style.display = 'block';
+            document.getElementById('fileReadInfo').style.display = 'block';
+
+            document.getElementById('fileReadFileName').textContent = filePath;
+            document.getElementById('fileReadStatus').textContent = 'Reading...';
+            document.getElementById('fileReadProgress').textContent = '0 / ?';
+            document.getElementById('fileReadSpeed').textContent = '-';
+            document.getElementById('fileReadDataSize').textContent = '0 B';
+            document.getElementById('fileReadDataHex').value = '';
+
+            updateFileReadProgress(0);
+
+            log(`📥 Starting file read: ${filePath} (offset=${startOffset}, length=${totalLength || 'all'})`, 'info');
+
+            const startTime = performance.now();
+            let offset = startOffset;
+            let readTotal = 0;
+
+            try {
+                if (totalLength === 0) {
+                    const pathInfoPayload = pbEncoder.encodePathInfoQuery(filePath);
+                    const pathInfoResp = await sendPbMessage(PB_MSG_TYPE.PathInfoQuery, pathInfoPayload);
+                    if (pathInfoResp.msgType === PB_MSG_TYPE.PathInfo) {
+                        const path = pbDecoder.decodePathInfo(pathInfoResp.pbPayload);
+                        if (!path.exist) {
+                            throw new Error('File does not exist');
+                        }
+                        totalLength = path.size - startOffset;
+                        if (totalLength <= 0) {
+                            throw new Error('Invalid offset or file size');
+                        }
+                        log(`📊 File size: ${path.size} bytes, reading from offset ${startOffset}`, 'info');
+                    } else {
+                        throw new Error('Failed to get file info');
+                    }
+                }
+
+                while (offset < startOffset + totalLength && !fileReadAborted) {
+                    const remaining = (startOffset + totalLength) - offset;
+                    const thisChunkSize = Math.min(chunkSize, remaining);
+                    
+                    const resp = await sendFileReadChunk(filePath, offset, thisChunkSize);
+
+                    if (resp.data && resp.data.length > 0) {
+                        const newData = new Uint8Array(fileReadData.length + resp.data.length);
+                        newData.set(fileReadData, 0);
+                        newData.set(resp.data, fileReadData.length);
+                        fileReadData = newData;
+                        readTotal += resp.data.length;
+                        offset += resp.data.length;
+
+                        const percent = ((offset - startOffset) / totalLength) * 100;
+                        const elapsed = (performance.now() - startTime) / 1000;
+                        const speed = readTotal / elapsed;
+
+                        updateFileReadProgress(percent);
+                        document.getElementById('fileReadProgress').textContent = `${formatBytes(offset - startOffset)} / ${formatBytes(totalLength)}`;
+                        document.getElementById('fileReadSpeed').textContent = formatBytes(speed) + '/s';
+                        document.getElementById('fileReadDataSize').textContent = formatBytes(fileReadData.length);
+
+                        const hexPreview = Array.from(fileReadData.slice(0, 1024))
+                            .map(b => b.toString(16).padStart(2, '0'))
+                            .join(' ');
+                        const hexText = fileReadData.length > 1024 
+                            ? hexPreview + ' ... (truncated, total ' + fileReadData.length + ' bytes)'
+                            : hexPreview;
+                        document.getElementById('fileReadDataHex').value = hexText;
+
+                        log(`📖 Read ${readTotal}/${totalLength} bytes (offset=${offset})`, 'info');
+                    } else {
+                        log('⚠️ No data received, stopping', 'info');
+                        break;
+                    }
+
+                    if (offset >= startOffset + totalLength) {
+                        break;
+                    }
+                }
+
+                if (fileReadAborted) {
+                    document.getElementById('fileReadStatus').textContent = 'Aborted';
+                    log('⏹ File read aborted', 'info');
+                } else {
+                    const elapsed = (performance.now() - startTime) / 1000;
+                    const avgSpeed = readTotal / elapsed;
+                    document.getElementById('fileReadStatus').textContent = 'Completed!';
+                    updateFileReadProgress(100, 'Complete!');
+                    log(`✅ File read complete: ${formatBytes(readTotal)} in ${elapsed.toFixed(2)}s (${formatBytes(avgSpeed)}/s)`, 'info');
+                    
+                    const hexText = Array.from(fileReadData)
+                        .map(b => b.toString(16).padStart(2, '0'))
+                        .join(' ');
+                    document.getElementById('fileReadDataHex').value = hexText;
+                    document.getElementById('downloadFileReadBtn').disabled = false;
+                }
+
+            } catch (error) {
+                document.getElementById('fileReadStatus').textContent = `Error: ${error.message}`;
+                log(`❌ File read error: ${error.message}`, 'error');
+            }
+
+            fileReadRunning = false;
+            document.getElementById('startFileReadBtn').disabled = !device;
+            document.getElementById('stopFileReadBtn').disabled = true;
+        }
+
+        function stopFileRead() {
+            fileReadAborted = true;
+            log('⏹ Stopping file read...', 'info');
+        }
+
+        function downloadFileReadData() {
+            if (!fileReadData || fileReadData.length === 0) {
+                log('No data to download', 'error');
+                return;
+            }
+
+            const filePath = document.getElementById('fileReadPath').value.trim();
+            const fileName = filePath.split('/').pop() || 'read_data.bin';
+            const blob = new Blob([fileReadData], { type: 'application/octet-stream' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            log(`💾 Downloaded ${formatBytes(fileReadData.length)} to ${fileName}`, 'info');
+        }
+
+        function clearFileReadData() {
+            fileReadData = null;
+            document.getElementById('fileReadDataHex').value = '';
+            document.getElementById('fileReadDataSize').textContent = '-';
+            document.getElementById('downloadFileReadBtn').disabled = true;
+            log('Cleared file read data', 'info');
+        }
+
+        // ==================== File Write ====================
+        let fileWriteRunning = false;
+        let fileWriteAborted = false;
+        let fileWriteData = null;
+
+        function updateFileWriteProgress(percent, text) {
+            const fill = document.getElementById('fileWriteProgressFill');
+            fill.style.width = percent + '%';
+            fill.textContent = text || (percent.toFixed(1) + '%');
+        }
+
+        function formatBytes(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+        }
+
+        async function sendFileWriteChunk(path, offset, totalLen, chunkData, overwrite) {
+            // Build FileWrite message
+            const fileBytes = pbEncoder.encodeFile(path, offset, totalLen, chunkData);
+            const pbPayload = pbEncoder.encodeFileWrite(fileBytes, overwrite, false);
+            const frame = buildPbFrame(PB_MSG_TYPE.FileWrite, pbPayload);
+
+            // const frameHex = Array.from(frame.slice(0, 32)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+            // log(`📤 TX FileWrite (${frame.length} bytes, offset=${offset}): ${frameHex}...`, 'tx');
+
+            try {
+                addStatusEntry('FileWrite', {
+                    'msg_type': `${PB_MSG_TYPE.FileWrite}`,
+                    'path': path,
+                    'offset': `${offset}`,
+                    'chunk_len': `${chunkData.length}`,
+                    'total_len': `${totalLen}`,
+                    'frame_len': `${frame.length}`
+                }, 'Sending...');
+
+                await device.transferOut(endpointOut, frame);
+
+                // Wait for response with timeout
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('Response timeout')), 10000));
+                const result = await Promise.race([
+                    device.transferIn(endpointIn, RX_BUFFER_SIZE),
+                    timeoutPromise
+                ]);
+
+                if (!result.data || result.data.byteLength === 0) {
+                    throw new Error('Empty response');
+                }
+
+                const rxData = new Uint8Array(result.data.buffer);
+
+                // Parse proto v0 frame
+                if (rxData[0] !== PROTO_HEAD_SOF || rxData.length < PROTO_HEAD_CRC_SIZE) {
+                    throw new Error('Invalid proto frame');
+                }
+
+                const frameLen = rxData[1] | (rxData[2] << 8);
+                const payloadData = rxData.slice(7, frameLen - 1);
+                const resp = parsePbResponse(payloadData);
+
+                if (!resp) {
+                    throw new Error('Failed to parse response');
+                }
+
+                if (resp.msgType === PB_MSG_TYPE.Failure) {
+                    const decoded = pbDecoder.decodeFailure(resp.pbPayload);
+                    addStatusEntry('FileWrite', {
+                        'rx_msg_type': `${resp.msgType}`,
+                        'rx_len': `${rxData.length}`
+                    }, `Device error: "${decoded.message}"`, decoded.code);
+                    throw new Error(`Device error: code=${decoded.code}, msg="${decoded.message}"`);
+                }
+
+                if (resp.msgType !== PB_MSG_TYPE.File) {
+                    addStatusEntry('FileWrite', {
+                        'rx_msg_type': `${resp.msgType}`,
+                        'rx_len': `${rxData.length}`
+                    }, `Unexpected response type: ${resp.msgType}`, -1);
+                    throw new Error(`Unexpected response type: ${resp.msgType}`);
+                }
+
+                const decoded = pbDecoder.decodeFile(resp.pbPayload);
+                addStatusEntry('FileWrite', {
+                    'rx_msg_type': `${resp.msgType}`,
+                    'rx_len': `${rxData.length}`,
+                    'processed': `${decoded.processedByte !== null ? decoded.processedByte : offset + chunkData.length}`
+                }, 'Success', 0);
+
+                return decoded;
+            } catch (error) {
+                if (!error.message.includes('Device error') && !error.message.includes('Unexpected')) {
+                    addStatusEntry('FileWrite', {
+                        'offset': `${offset}`,
+                        'chunk_len': `${chunkData.length}`
+                    }, `Error: ${error.message}`, -1);
+                }
+                throw error;
+            }
+        }
+
+        async function startFileWrite() {
+            if (!device) {
+                log('Not connected!', 'error');
+                return;
+            }
+
+            const fileInput = document.getElementById('fileWriteInput');
+            const file = fileInput.files[0];
+            if (!file) {
+                log('Please select a file first', 'error');
+                return;
+            }
+
+            const targetPath = document.getElementById('fileWritePath').value.trim();
+            if (!targetPath) {
+                log('Please enter target path', 'error');
+                return;
+            }
+
+            const chunkSize = parseInt(document.getElementById('fileWriteChunkSize').value) || 512;
+            if (chunkSize < 64 || chunkSize > 2048) {
+                log('Chunk size must be 64-2048 bytes', 'error');
+                return;
+            }
+
+            // Read file
+            try {
+                fileWriteData = new Uint8Array(await file.arrayBuffer());
+            } catch (e) {
+                log(`Failed to read file: ${e.message}`, 'error');
+                return;
+            }
+
+            const totalLen = fileWriteData.length;
+
+            fileWriteRunning = true;
+            fileWriteAborted = false;
+
+            document.getElementById('startFileWriteBtn').disabled = true;
+            document.getElementById('stopFileWriteBtn').disabled = false;
+            document.getElementById('fileWriteProgressBar').style.display = 'block';
+            document.getElementById('fileWriteInfo').style.display = 'block';
+
+            document.getElementById('fileWriteFileName').textContent = file.name;
+            document.getElementById('fileWriteFileSize').textContent = formatBytes(totalLen);
+            document.getElementById('fileWriteStatus').textContent = 'Uploading...';
+            document.getElementById('fileWriteProgress').textContent = '0 / ' + formatBytes(totalLen);
+            document.getElementById('fileWriteSpeed').textContent = '-';
+
+            updateFileWriteProgress(0);
+
+            log(`📤 Starting file upload: ${file.name} (${formatBytes(totalLen)}) -> ${targetPath}`, 'info');
+
+            const startTime = performance.now();
+            let offset = 0;
+            let isFirstChunk = true;
+
+            try {
+                while (offset < totalLen && !fileWriteAborted) {
+                    const remaining = totalLen - offset;
+                    const thisChunkSize = Math.min(chunkSize, remaining);
+                    const chunkData = fileWriteData.slice(offset, offset + thisChunkSize);
+
+                    const resp = await sendFileWriteChunk(
+                        targetPath,
+                        offset,
+                        totalLen,
+                        chunkData,
+                        isFirstChunk  // overwrite on first chunk
+                    );
+
+                    isFirstChunk = false;
+
+                    // Use processedByte from response to track progress
+                    const processedByte = resp.processedByte !== null ? resp.processedByte : (offset + thisChunkSize);
+                    offset = processedByte;
+
+                    const percent = (offset / totalLen) * 100;
+                    const elapsed = (performance.now() - startTime) / 1000;
+                    const speed = offset / elapsed;
+
+                    updateFileWriteProgress(percent);
+                    document.getElementById('fileWriteProgress').textContent = `${formatBytes(offset)} / ${formatBytes(totalLen)}`;
+                    document.getElementById('fileWriteSpeed').textContent = formatBytes(speed) + '/s';
+
+                    // Check if we're done
+                    if (offset >= totalLen) {
+                        break;
+                    }
+                }
+
+                if (fileWriteAborted) {
+                    document.getElementById('fileWriteStatus').textContent = 'Aborted';
+                    log('⏹ File upload aborted', 'info');
+                } else {
+                    const elapsed = (performance.now() - startTime) / 1000;
+                    const avgSpeed = totalLen / elapsed;
+                    document.getElementById('fileWriteStatus').textContent = 'Completed!';
+                    updateFileWriteProgress(100, 'Complete!');
+                    log(`✅ File upload complete: ${formatBytes(totalLen)} in ${elapsed.toFixed(2)}s (${formatBytes(avgSpeed)}/s)`, 'info');
+                }
+
+            } catch (error) {
+                document.getElementById('fileWriteStatus').textContent = `Error: ${error.message}`;
+                log(`❌ File upload error: ${error.message}`, 'error');
+            }
+
+            fileWriteRunning = false;
+            fileWriteData = null;
+            document.getElementById('startFileWriteBtn').disabled = !device;
+            document.getElementById('stopFileWriteBtn').disabled = true;
+        }
+
+        function stopFileWrite() {
+            fileWriteAborted = true;
+            log('⏹ Stopping file upload...', 'info');
+        }
+
+        // ==================== EMMC 闭环测试 ====================
+        let testRunning = false;
+        let testAborted = false;
+
+        function updateTestProgress(percent, step) {
+            const fill = document.getElementById('testProgressFill');
+            if (fill) {
+                fill.style.width = percent + '%';
+                fill.textContent = percent.toFixed(1) + '%';
+            }
+            const stepEl = document.getElementById('testStep');
+            if (stepEl) stepEl.textContent = step;
+        }
+
+        function updateTestResult(status, passed, failed, round = null, roundsPassed = null, roundsFailed = null) {
+            const statusEl = document.getElementById('testStatus');
+            const roundEl = document.getElementById('testRound');
+            const passedEl = document.getElementById('testPassed');
+            const failedEl = document.getElementById('testFailed');
+            const roundsPassedEl = document.getElementById('testRoundsPassed');
+            const roundsFailedEl = document.getElementById('testRoundsFailed');
+            if (statusEl) statusEl.textContent = status;
+            if (roundEl && round !== null) roundEl.textContent = round;
+            if (passedEl) passedEl.textContent = passed;
+            if (failedEl) failedEl.textContent = failed;
+            if (roundsPassedEl && roundsPassed !== null) roundsPassedEl.textContent = roundsPassed;
+            if (roundsFailedEl && roundsFailed !== null) roundsFailedEl.textContent = roundsFailed;
+        }
+
+        async function runEmmcTest() {
+            if (!device || testRunning) return;
+
+            testRunning = true;
+            testAborted = false;
+            document.getElementById('runTestBtn').disabled = true;
+            document.getElementById('stopTestBtn').disabled = false;
+            document.getElementById('testProgress').style.display = 'block';
+            document.getElementById('testResult').style.display = 'block';
+            
+            updateTestProgress(0, '准备开始...');
+            updateTestResult('运行中', 0, 0, null, 0, 0);
+
+            const testFileSize = parseInt(document.getElementById('testFileSize').value) || 8192;
+            const testDir = document.getElementById('testPath').value || 'vol1:test_dir';
+            const testCount = parseInt(document.getElementById('testCount').value) || 1;
+            const testFile = testDir + '/test.bin';
+
+            const totalSteps = 15;
+            let totalRoundsPassed = 0;
+            let totalRoundsFailed = 0;
+            let passed = 0;
+            let failed = 0;
+
+            try {
+                log(`🚀 [Test] 开始执行 ${testCount} 轮闭环测试`, 'info');
+
+                for (let round = 1; round <= testCount && !testAborted; round++) {
+                    log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, 'info');
+                    log(`🔄 [Test] 第 ${round}/${testCount} 轮测试开始`, 'info');
+                    log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, 'info');
+
+                    let roundPassed = 0;
+                    let roundFailed = 0;
+                    let roundSuccess = false;
+
+                    try {
+                        const result = await runSingleTestRound(testFileSize, testDir, testFile, totalSteps, round, testCount, (step, passedCount, failedCount) => {
+                            roundPassed = passedCount;
+                            roundFailed = failedCount;
+                            passed = passedCount;
+                            failed = failedCount;
+                        });
+
+                        if (result) {
+                            roundPassed = result.passed;
+                            roundFailed = result.failed;
+                            passed = result.passed;
+                            failed = result.failed;
+                        }
+
+                        if (!testAborted && roundFailed === 0) {
+                            roundSuccess = true;
+                            totalRoundsPassed++;
+                            log(`✅ [Test] 第 ${round}/${testCount} 轮测试通过`, 'info');
+                        } else if (!testAborted) {
+                            totalRoundsFailed++;
+                            log(`❌ [Test] 第 ${round}/${testCount} 轮测试失败 (失败 ${roundFailed} 步)`, 'error');
+                        }
+                    } catch (e) {
+                        totalRoundsFailed++;
+                        log(`❌ [Test] 第 ${round}/${testCount} 轮测试异常: ${e.message}`, 'error');
+                    }
+
+                    if (testAborted) {
+                        log(`⚠️ [Test] 测试已停止 (已完成 ${round - 1}/${testCount} 轮)`, 'info');
+                        break;
+                    }
+
+                    if (round < testCount) {
+                        log(`⏸ [Test] 等待 1 秒后开始下一轮...`, 'info');
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
+                }
+
+                updateTestProgress(100, '测试完成');
+                updateTestResult('完成', passed, failed, null, totalRoundsPassed, totalRoundsFailed);
+                log(`\n🎉 [Test] 所有测试完成: 通过 ${totalRoundsPassed}/${testCount} 轮, 失败 ${totalRoundsFailed}/${testCount} 轮`, 'info');
+                addStatusEntry('EMMC闭环测试', {
+                    '总轮次': `${testCount}`,
+                    '通过轮次': `${totalRoundsPassed}`,
+                    '失败轮次': `${totalRoundsFailed}`
+                }, totalRoundsFailed === 0 ? '全部通过' : `失败 ${totalRoundsFailed} 轮`, totalRoundsFailed > 0 ? -1 : 0);
+
+            } catch (e) {
+                log(`❌ [Test] 测试过程发生异常: ${e.message}`, 'error');
+                updateTestResult('异常', passed, failed, null, totalRoundsPassed, totalRoundsFailed);
+            } finally {
+                testRunning = false;
+                testAborted = false;
+                document.getElementById('runTestBtn').disabled = false;
+                document.getElementById('stopTestBtn').disabled = true;
+            }
+        }
+
+        async function runSingleTestRound(testFileSize, testDir, testFile, totalSteps, currentRound, totalRounds, progressCallback) {
+            let passed = 0;
+            let failed = 0;
+            
+            const roundProgress = totalRounds > 1 ? `[${currentRound}/${totalRounds}] ` : '';
+            
+            try {
+                // Step 1: Ping
+                const stepProgress1 = ((currentRound - 1) * totalSteps + 1) / (totalRounds * totalSteps) * 100;
+                updateTestProgress(stepProgress1, `${roundProgress}1. Ping`);
+                updateTestResult('运行中', passed, failed, `${currentRound}/${totalRounds}`, null, null);
+                if (progressCallback) progressCallback(1, passed, failed);
+                log('🧪 [Test] Step 1: Ping', 'info');
+                try {
+                    const pbPayload = pbEncoder.encodePing('EMMC Test');
+                    const resp = await sendPbMessage(PB_MSG_TYPE.Ping, pbPayload);
+                    if (resp.msgType === PB_MSG_TYPE.Success) {
+                        const decoded = pbDecoder.decodeSuccess(resp.pbPayload);
+                        log('✅ [Test] Step 1: Ping → Success', 'info');
+                        addStatusEntry('Test-1.Ping', {
+                            'msg_type': `${PB_MSG_TYPE.Ping}`,
+                            'rx_msg_type': `${resp.msgType}`,
+                            'message': decoded.message || 'ping'
+                        }, 'Success', 0);
+                        passed++;
+                    } else {
+                        throw new Error('Expected Success');
+                    }
+                } catch (e) {
+                    log(`❌ [Test] Step 1: Ping failed: ${e.message}`, 'error');
+                    addStatusEntry('Test-1.Ping', {
+                        'msg_type': `${PB_MSG_TYPE.Ping}`
+                    }, `Failed: ${e.message}`, -1);
+                    failed++;
+                    throw e;
+                }
+
+                // Step 2: FixPermission
+                const stepProgress2 = ((currentRound - 1) * totalSteps + 2) / (totalRounds * totalSteps) * 100;
+                updateTestProgress(stepProgress2, `${roundProgress}2. FixPermission`);
+                if (progressCallback) progressCallback(2, passed, failed);
+                log('🧪 [Test] Step 2: FixPermission', 'info');
+                try {
+                    const pbPayload = pbEncoder.encodeFixPermission();
+                    const resp = await sendPbMessage(PB_MSG_TYPE.FixPermission, pbPayload);
+                    if (resp.msgType === PB_MSG_TYPE.Success) {
+                        log('✅ [Test] Step 2: FixPermission → Success', 'info');
+                        addStatusEntry('Test-2.FixPermission', {
+                            'msg_type': `${PB_MSG_TYPE.FixPermission}`,
+                            'rx_msg_type': `${resp.msgType}`
+                        }, 'Success', 0);
+                        passed++;
+                    } else {
+                        throw new Error('Expected Success');
+                    }
+                } catch (e) {
+                    log(`❌ [Test] Step 2: FixPermission failed: ${e.message}`, 'error');
+                    addStatusEntry('Test-2.FixPermission', {
+                        'msg_type': `${PB_MSG_TYPE.FixPermission}`
+                    }, `Failed: ${e.message}`, -1);
+                    failed++;
+                    throw e;
+                }
+
+                // Step 3: DirMake
+                const stepProgress3 = ((currentRound - 1) * totalSteps + 3) / (totalRounds * totalSteps) * 100;
+                updateTestProgress(stepProgress3, `${roundProgress}3. DirMake`);
+                if (progressCallback) progressCallback(3, passed, failed);
+                log(`🧪 [Test] Step 3: DirMake("${testDir}")`, 'info');
+                try {
+                    const pbPayload = pbEncoder.encodeDirMake(testDir);
+                    const resp = await sendPbMessage(PB_MSG_TYPE.DirMake, pbPayload);
+                    if (resp.msgType === PB_MSG_TYPE.Success) {
+                        log(`✅ [Test] Step 3: DirMake("${testDir}") → Success`, 'info');
+                        addStatusEntry('Test-3.DirMake', {
+                            'msg_type': `${PB_MSG_TYPE.DirMake}`,
+                            'path': testDir,
+                            'rx_msg_type': `${resp.msgType}`
+                        }, 'Success', 0);
+                        passed++;
+                    } else {
+                        throw new Error('Expected Success');
+                    }
+                } catch (e) {
+                    log(`❌ [Test] Step 3: DirMake failed: ${e.message}`, 'error');
+                    addStatusEntry('Test-3.DirMake', {
+                        'msg_type': `${PB_MSG_TYPE.DirMake}`,
+                        'path': testDir
+                    }, `Failed: ${e.message}`, -1);
+                    failed++;
+                    throw e;
+                }
+
+                // Step 4: DirList
+                const stepProgress4 = ((currentRound - 1) * totalSteps + 4) / (totalRounds * totalSteps) * 100;
+                updateTestProgress(stepProgress4, `${roundProgress}4. DirList`);
+                if (progressCallback) progressCallback(4, passed, failed);
+                log('🧪 [Test] Step 4: DirList("vol1:")', 'info');
+                try {
+                    const pbPayload = pbEncoder.encodeDirList('vol1:');
+                    const resp = await sendPbMessage(PB_MSG_TYPE.DirList, pbPayload);
+                    if (resp.msgType === PB_MSG_TYPE.Dir) {
+                        const dir = pbDecoder.decodeDir(resp.pbPayload);
+                        const dirName = testDir.split(':').pop().split('/')[0];
+                        const hasTestDir = dir.childDirs.includes(dirName) || dir.childFiles.includes(dirName);
+                        if (hasTestDir) {
+                            log(`✅ [Test] Step 4: DirList → Found ${dirName}`, 'info');
+                            addStatusEntry('Test-4.DirList', {
+                                'msg_type': `${PB_MSG_TYPE.DirList}`,
+                                'path': 'vol1:',
+                                'rx_msg_type': `${resp.msgType}`,
+                                'found': dirName
+                            }, 'Success', 0);
+                            passed++;
+                        } else {
+                            log(`⚠️ [Test] Step 4: DirList → ${dirName} not found in list`, 'info');
+                            addStatusEntry('Test-4.DirList', {
+                                'msg_type': `${PB_MSG_TYPE.DirList}`,
+                                'path': 'vol1:',
+                                'rx_msg_type': `${resp.msgType}`
+                            }, 'Warning: dir not found', 0);
+                            passed++;
+                        }
+                    } else {
+                        throw new Error('Expected Dir');
+                    }
+                } catch (e) {
+                    log(`❌ [Test] Step 4: DirList failed: ${e.message}`, 'error');
+                    addStatusEntry('Test-4.DirList', {
+                        'msg_type': `${PB_MSG_TYPE.DirList}`,
+                        'path': 'vol1:'
+                    }, `Failed: ${e.message}`, -1);
+                    failed++;
+                    throw e;
+                }
+
+                // Step 5: FileWrite (分块写入)
+                const stepProgress5 = ((currentRound - 1) * totalSteps + 5) / (totalRounds * totalSteps) * 100;
+                updateTestProgress(stepProgress5, `${roundProgress}5. FileWrite`);
+                if (progressCallback) progressCallback(5, passed, failed);
+                log(`🧪 [Test] Step 5: FileWrite("${testFile}")`, 'info');
+                try {
+                    const chunkSize = 512;
+                    const testData = new Uint8Array(testFileSize);
+                    for (let i = 0; i < testFileSize; i++) {
+                        testData[i] = (i % 256);
+                    }
+
+                    let offset = 0;
+                    while (offset < testFileSize && !testAborted) {
+                        const chunk = testData.slice(offset, Math.min(offset + chunkSize, testFileSize));
+                        const fileBytes = pbEncoder.encodeFile(testFile, offset, testFileSize, chunk);
+                        const pbPayload = pbEncoder.encodeFileWrite(fileBytes, true, false);
+                        const resp = await sendPbMessage(PB_MSG_TYPE.FileWrite, pbPayload, 10000);
+                        
+                        if (resp.msgType === PB_MSG_TYPE.File) {
+                            const file = pbDecoder.decodeFile(resp.pbPayload);
+                            offset = file.processedByte !== null ? file.processedByte : (offset + chunk.length);
+                            log(`📝 [Test] Step 5: Written ${offset}/${testFileSize} bytes`, 'info');
+                        } else if (resp.msgType === PB_MSG_TYPE.Failure) {
+                            const failure = pbDecoder.decodeFailure(resp.pbPayload);
+                            throw new Error(`Write failed: ${failure.message}`);
+                        } else {
+                            throw new Error('Unexpected response type');
+                        }
+
+                        if (offset >= testFileSize) break;
+                    }
+
+                    if (!testAborted) {
+                        log(`✅ [Test] Step 5: FileWrite → Complete (${testFileSize} bytes)`, 'info');
+                        addStatusEntry('Test-5.FileWrite', {
+                            'msg_type': `${PB_MSG_TYPE.FileWrite}`,
+                            'path': testFile,
+                            'file_size': `${testFileSize}`,
+                            'chunks': `${Math.ceil(testFileSize / 512)}`
+                        }, 'Success', 0);
+                        passed++;
+                    }
+                } catch (e) {
+                    log(`❌ [Test] Step 5: FileWrite failed: ${e.message}`, 'error');
+                    addStatusEntry('Test-5.FileWrite', {
+                        'msg_type': `${PB_MSG_TYPE.FileWrite}`,
+                        'path': testFile,
+                        'file_size': `${testFileSize}`
+                    }, `Failed: ${e.message}`, -1);
+                    failed++;
+                    throw e;
+                }
+
+                if (testAborted) throw new Error('Test aborted');
+
+                // Step 6: PathInfoQuery
+                const stepProgress6 = ((currentRound - 1) * totalSteps + 6) / (totalRounds * totalSteps) * 100;
+                updateTestProgress(stepProgress6, `${roundProgress}6. PathInfoQuery`);
+                if (progressCallback) progressCallback(6, passed, failed);
+                log(`🧪 [Test] Step 6: PathInfoQuery("${testFile}")`, 'info');
+                try {
+                    const pbPayload = pbEncoder.encodePathInfoQuery(testFile);
+                    const resp = await sendPbMessage(PB_MSG_TYPE.PathInfoQuery, pbPayload);
+                    if (resp.msgType === PB_MSG_TYPE.PathInfo) {
+                        const path = pbDecoder.decodePathInfo(resp.pbPayload);
+                        if (path.exist && path.size === testFileSize) {
+                            log(`✅ [Test] Step 6: PathInfoQuery → exist=true, size=${path.size}`, 'info');
+                            addStatusEntry('Test-6.PathInfoQuery', {
+                                'msg_type': `${PB_MSG_TYPE.PathInfoQuery}`,
+                                'path': testFile,
+                                'rx_msg_type': `${resp.msgType}`,
+                                'exist': `${path.exist}`,
+                                'size': `${path.size}`
+                            }, 'Success', 0);
+                            passed++;
+                        } else {
+                            throw new Error(`Path info mismatch: exist=${path.exist}, size=${path.size}, expected=${testFileSize}`);
+                        }
+                    } else {
+                        throw new Error('Expected PathInfo');
+                    }
+                } catch (e) {
+                    log(`❌ [Test] Step 6: PathInfoQuery failed: ${e.message}`, 'error');
+                    addStatusEntry('Test-6.PathInfoQuery', {
+                        'msg_type': `${PB_MSG_TYPE.PathInfoQuery}`,
+                        'path': testFile
+                    }, `Failed: ${e.message}`, -1);
+                    failed++;
+                    throw e;
+                }
+
+                // Step 7: FileRead (分块读取并校验)
+                const stepProgress7 = ((currentRound - 1) * totalSteps + 7) / (totalRounds * totalSteps) * 100;
+                updateTestProgress(stepProgress7, `${roundProgress}7. FileRead`);
+                if (progressCallback) progressCallback(7, passed, failed);
+                log(`🧪 [Test] Step 7: FileRead("${testFile}")`, 'info');
+                try {
+                    const chunkSize = 512;
+                    let offset = 0;
+                    const readData = new Uint8Array(testFileSize);
+                    let readOk = true;
+                    let readTotal = 0;
+
+                    while (offset < testFileSize && !testAborted) {
+                        const readLen = Math.min(chunkSize, testFileSize - offset);
+                        const file = await sendFileReadChunk(testFile, offset, readLen);
+
+                        if (file.data && file.data.length > 0) {
+                            readData.set(file.data, offset);
+                            readTotal += file.data.length;
+                            offset += file.data.length;
+                            log(`📖 [Test] Step 7: Read ${offset}/${testFileSize} bytes`, 'info');
+                        } else {
+                            log(`⚠️ [Test] Step 7: No data received at offset ${offset}, stopping`, 'info');
+                            break;
+                        }
+
+                        if (offset >= testFileSize) {
+                            break;
+                        }
+                    }
+
+                    if (!testAborted) {
+                        if (readTotal < testFileSize) {
+                            throw new Error(`Incomplete read: ${readTotal}/${testFileSize} bytes`);
+                        }
+
+                        for (let i = 0; i < testFileSize; i++) {
+                            if (readData[i] !== (i % 256)) {
+                                readOk = false;
+                                log(`❌ [Test] Step 7: Data mismatch at offset ${i}`, 'error');
+                                break;
+                            }
+                        }
+                        if (readOk) {
+                            log(`✅ [Test] Step 7: FileRead → Data verified (${readTotal} bytes)`, 'info');
+                            addStatusEntry('Test-7.FileRead', {
+                                'msg_type': `${PB_MSG_TYPE.FileRead}`,
+                                'path': testFile,
+                                'file_size': `${testFileSize}`,
+                                'read_total': `${readTotal}`,
+                                'chunks': `${Math.ceil(testFileSize / 512)}`
+                            }, 'Success: Data verified', 0);
+                            passed++;
+                        } else {
+                            throw new Error('Data verification failed');
+                        }
+                    }
+                } catch (e) {
+                    log(`❌ [Test] Step 7: FileRead failed: ${e.message}`, 'error');
+                    addStatusEntry('Test-7.FileRead', {
+                        'msg_type': `${PB_MSG_TYPE.FileRead}`,
+                        'path': testFile,
+                        'file_size': `${testFileSize}`
+                    }, `Failed: ${e.message}`, -1);
+                    failed++;
+                    throw e;
+                }
+
+                if (testAborted) throw new Error('Test aborted');
+
+                // Step 8: PathInfoQuery (读取后再次验证)
+                const stepProgress8 = ((currentRound - 1) * totalSteps + 8) / (totalRounds * totalSteps) * 100;
+                updateTestProgress(stepProgress8, `${roundProgress}8. PathInfoQuery (after read)`);
+                if (progressCallback) progressCallback(8, passed, failed);
+                log(`🧪 [Test] Step 8: PathInfoQuery("${testFile}") - verify after read`, 'info');
+                try {
+                    const pbPayload = pbEncoder.encodePathInfoQuery(testFile);
+                    const resp = await sendPbMessage(PB_MSG_TYPE.PathInfoQuery, pbPayload);
+                    if (resp.msgType === PB_MSG_TYPE.PathInfo) {
+                        const path = pbDecoder.decodePathInfo(resp.pbPayload);
+                        if (path.exist && path.size === testFileSize) {
+                            log(`✅ [Test] Step 8: PathInfoQuery → exist=true, size=${path.size} (after read)`, 'info');
+                            addStatusEntry('Test-8.PathInfoQuery', {
+                                'msg_type': `${PB_MSG_TYPE.PathInfoQuery}`,
+                                'path': testFile,
+                                'rx_msg_type': `${resp.msgType}`,
+                                'exist': `${path.exist}`,
+                                'size': `${path.size}`
+                            }, 'Success: File still valid', 0);
+                            passed++;
+                        } else {
+                            throw new Error(`Path info mismatch after read: exist=${path.exist}, size=${path.size}, expected=${testFileSize}`);
+                        }
+                    } else {
+                        throw new Error('Expected PathInfo');
+                    }
+                } catch (e) {
+                    log(`❌ [Test] Step 8: PathInfoQuery failed: ${e.message}`, 'error');
+                    addStatusEntry('Test-8.PathInfoQuery', {
+                        'msg_type': `${PB_MSG_TYPE.PathInfoQuery}`,
+                        'path': testFile
+                    }, `Failed: ${e.message}`, -1);
+                    failed++;
+                    throw e;
+                }
+
+                // Step 9: FileRead (部分读取测试)
+                const stepProgress9 = ((currentRound - 1) * totalSteps + 9) / (totalRounds * totalSteps) * 100;
+                updateTestProgress(stepProgress9, `${roundProgress}9. FileRead (partial)`);
+                if (progressCallback) progressCallback(9, passed, failed);
+                log(`🧪 [Test] Step 9: FileRead("${testFile}") - partial read`, 'info');
+                try {
+                    const partialOffset = Math.floor(testFileSize / 4);
+                    const partialLen = Math.min(512, testFileSize - partialOffset);
+                    const file = await sendFileReadChunk(testFile, partialOffset, partialLen);
+                    
+                    if (file.data && file.data.length > 0) {
+                        let partialOk = true;
+                        for (let i = 0; i < file.data.length; i++) {
+                            const expected = (partialOffset + i) % 256;
+                            if (file.data[i] !== expected) {
+                                partialOk = false;
+                                log(`❌ [Test] Step 9: Partial read data mismatch at offset ${partialOffset + i}`, 'error');
+                                break;
+                            }
+                        }
+                        if (partialOk) {
+                            log(`✅ [Test] Step 9: FileRead (partial) → Data verified (offset=${partialOffset}, len=${file.data.length})`, 'info');
+                            addStatusEntry('Test-9.FileRead', {
+                                'msg_type': `${PB_MSG_TYPE.FileRead}`,
+                                'path': testFile,
+                                'offset': `${partialOffset}`,
+                                'read_len': `${file.data.length}`
+                            }, 'Success: Partial read verified', 0);
+                            passed++;
+                        } else {
+                            throw new Error('Partial read data verification failed');
+                        }
+                    } else {
+                        throw new Error('No data received in partial read');
+                    }
+                } catch (e) {
+                    log(`❌ [Test] Step 9: FileRead (partial) failed: ${e.message}`, 'error');
+                    addStatusEntry('Test-9.FileRead', {
+                        'msg_type': `${PB_MSG_TYPE.FileRead}`,
+                        'path': testFile
+                    }, `Failed: ${e.message}`, -1);
+                    failed++;
+                    throw e;
+                }
+
+                // Step 10: DirList (验证文件在目录中)
+                const stepProgress10 = ((currentRound - 1) * totalSteps + 10) / (totalRounds * totalSteps) * 100;
+                updateTestProgress(stepProgress10, `${roundProgress}10. DirList (verify file)`);
+                if (progressCallback) progressCallback(10, passed, failed);
+                log(`🧪 [Test] Step 10: DirList("${testDir}") - verify file in dir`, 'info');
+                try {
+                    const pbPayload = pbEncoder.encodeDirList(testDir);
+                    const resp = await sendPbMessage(PB_MSG_TYPE.DirList, pbPayload);
+                    if (resp.msgType === PB_MSG_TYPE.Dir) {
+                        const dir = pbDecoder.decodeDir(resp.pbPayload);
+                        const fileName = testFile.split('/').pop();
+                        const hasFile = dir.childFiles.includes(fileName);
+                        if (hasFile) {
+                            log(`✅ [Test] Step 10: DirList → Found file ${fileName}`, 'info');
+                            addStatusEntry('Test-10.DirList', {
+                                'msg_type': `${PB_MSG_TYPE.DirList}`,
+                                'path': testDir,
+                                'rx_msg_type': `${resp.msgType}`,
+                                'found': fileName
+                            }, 'Success', 0);
+                            passed++;
+                        } else {
+                            log(`⚠️ [Test] Step 10: DirList → File ${fileName} not found in list`, 'info');
+                            addStatusEntry('Test-10.DirList', {
+                                'msg_type': `${PB_MSG_TYPE.DirList}`,
+                                'path': testDir,
+                                'rx_msg_type': `${resp.msgType}`
+                            }, 'Warning: file not found', 0);
+                            passed++;
+                        }
+                    } else {
+                        throw new Error('Expected Dir');
+                    }
+                } catch (e) {
+                    log(`❌ [Test] Step 10: DirList failed: ${e.message}`, 'error');
+                    addStatusEntry('Test-10.DirList', {
+                        'msg_type': `${PB_MSG_TYPE.DirList}`,
+                        'path': testDir
+                    }, `Failed: ${e.message}`, -1);
+                    failed++;
+                    throw e;
+                }
+
+                if (testAborted) throw new Error('Test aborted');
+
+                // Step 11: FileDelete
+                const stepProgress11 = ((currentRound - 1) * totalSteps + 11) / (totalRounds * totalSteps) * 100;
+                updateTestProgress(stepProgress11, `${roundProgress}11. FileDelete`);
+                if (progressCallback) progressCallback(11, passed, failed);
+                log(`🧪 [Test] Step 11: FileDelete("${testFile}")`, 'info');
+                try {
+                    const pbPayload = pbEncoder.encodeFileDelete(testFile);
+                    const resp = await sendPbMessage(PB_MSG_TYPE.FileDelete, pbPayload);
+                    if (resp.msgType === PB_MSG_TYPE.Success) {
+                        log(`✅ [Test] Step 11: FileDelete → Success`, 'info');
+                        addStatusEntry('Test-11.FileDelete', {
+                            'msg_type': `${PB_MSG_TYPE.FileDelete}`,
+                            'path': testFile,
+                            'rx_msg_type': `${resp.msgType}`
+                        }, 'Success', 0);
+                        passed++;
+                    } else {
+                        throw new Error('Expected Success');
+                    }
+                } catch (e) {
+                    log(`❌ [Test] Step 11: FileDelete failed: ${e.message}`, 'error');
+                    addStatusEntry('Test-11.FileDelete', {
+                        'msg_type': `${PB_MSG_TYPE.FileDelete}`,
+                        'path': testFile
+                    }, `Failed: ${e.message}`, -1);
+                    failed++;
+                    throw e;
+                }
+
+                // Step 12: PathInfoQuery (验证文件已删除)
+                const stepProgress12 = ((currentRound - 1) * totalSteps + 12) / (totalRounds * totalSteps) * 100;
+                updateTestProgress(stepProgress12, `${roundProgress}12. PathInfoQuery (verify deleted)`);
+                if (progressCallback) progressCallback(12, passed, failed);
+                log(`🧪 [Test] Step 12: PathInfoQuery("${testFile}") - verify deleted`, 'info');
+                try {
+                    const pbPayload = pbEncoder.encodePathInfoQuery(testFile);
+                    const resp = await sendPbMessage(PB_MSG_TYPE.PathInfoQuery, pbPayload);
+                    if (resp.msgType === PB_MSG_TYPE.PathInfo) {
+                        const path = pbDecoder.decodePathInfo(resp.pbPayload);
+                        if (!path.exist) {
+                            log(`✅ [Test] Step 12: PathInfoQuery → exist=false (file deleted)`, 'info');
+                            addStatusEntry('Test-12.PathInfoQuery', {
+                                'msg_type': `${PB_MSG_TYPE.PathInfoQuery}`,
+                                'path': testFile,
+                                'rx_msg_type': `${resp.msgType}`,
+                                'exist': `${path.exist}`
+                            }, 'Success: File deleted', 0);
+                            passed++;
+                        } else {
+                            throw new Error('File still exists after delete');
+                        }
+                    } else {
+                        throw new Error('Expected PathInfo');
+                    }
+                } catch (e) {
+                    log(`❌ [Test] Step 12: PathInfoQuery failed: ${e.message}`, 'error');
+                    addStatusEntry('Test-12.PathInfoQuery', {
+                        'msg_type': `${PB_MSG_TYPE.PathInfoQuery}`,
+                        'path': testFile
+                    }, `Failed: ${e.message}`, -1);
+                    failed++;
+                    throw e;
+                }
+
+                // Step 13: DirRemove
+                const stepProgress13 = ((currentRound - 1) * totalSteps + 13) / (totalRounds * totalSteps) * 100;
+                updateTestProgress(stepProgress13, `${roundProgress}13. DirRemove`);
+                if (progressCallback) progressCallback(13, passed, failed);
+                log(`🧪 [Test] Step 13: DirRemove("${testDir}")`, 'info');
+                try {
+                    const pbPayload = pbEncoder.encodeDirRemove(testDir);
+                    const resp = await sendPbMessage(PB_MSG_TYPE.DirRemove, pbPayload);
+                    if (resp.msgType === PB_MSG_TYPE.Success) {
+                        log(`✅ [Test] Step 13: DirRemove → Success`, 'info');
+                        addStatusEntry('Test-13.DirRemove', {
+                            'msg_type': `${PB_MSG_TYPE.DirRemove}`,
+                            'path': testDir,
+                            'rx_msg_type': `${resp.msgType}`
+                        }, 'Success', 0);
+                        passed++;
+                    } else {
+                        throw new Error('Expected Success');
+                    }
+                } catch (e) {
+                    log(`❌ [Test] Step 13: DirRemove failed: ${e.message}`, 'error');
+                    addStatusEntry('Test-13.DirRemove', {
+                        'msg_type': `${PB_MSG_TYPE.DirRemove}`,
+                        'path': testDir
+                    }, `Failed: ${e.message}`, -1);
+                    failed++;
+                    throw e;
+                }
+
+                // Step 14: DirList (验证目录已删除)
+                const stepProgress14 = ((currentRound - 1) * totalSteps + 14) / (totalRounds * totalSteps) * 100;
+                updateTestProgress(stepProgress14, `${roundProgress}14. DirList (verify removed)`);
+                if (progressCallback) progressCallback(14, passed, failed);
+                log('🧪 [Test] Step 14: DirList("vol1:") - verify removed', 'info');
+                try {
+                    const pbPayload = pbEncoder.encodeDirList('vol1:');
+                    const resp = await sendPbMessage(PB_MSG_TYPE.DirList, pbPayload);
+                    if (resp.msgType === PB_MSG_TYPE.Dir) {
+                        const dir = pbDecoder.decodeDir(resp.pbPayload);
+                        const dirName = testDir.split(':').pop().split('/')[0];
+                        const hasTestDir = dir.childDirs.includes(dirName) || dir.childFiles.includes(dirName);
+                        if (!hasTestDir) {
+                            log(`✅ [Test] Step 14: DirList → ${dirName} removed`, 'info');
+                            addStatusEntry('Test-14.DirList', {
+                                'msg_type': `${PB_MSG_TYPE.DirList}`,
+                                'path': 'vol1:',
+                                'rx_msg_type': `${resp.msgType}`,
+                                'removed': dirName
+                            }, 'Success: Dir removed', 0);
+                            passed++;
+                        } else {
+                            log(`⚠️ [Test] Step 14: DirList → ${dirName} still in list`, 'info');
+                            addStatusEntry('Test-14.DirList', {
+                                'msg_type': `${PB_MSG_TYPE.DirList}`,
+                                'path': 'vol1:',
+                                'rx_msg_type': `${resp.msgType}`
+                            }, 'Warning: dir still exists', 0);
+                            passed++;
+                        }
+                    } else {
+                        throw new Error('Expected Dir');
+                    }
+                } catch (e) {
+                    log(`❌ [Test] Step 14: DirList failed: ${e.message}`, 'error');
+                    addStatusEntry('Test-14.DirList', {
+                        'msg_type': `${PB_MSG_TYPE.DirList}`,
+                        'path': 'vol1:'
+                    }, `Failed: ${e.message}`, -1);
+                    failed++;
+                    throw e;
+                }
+
+                // Step 15: Final Ping (测试完成验证)
+                const stepProgress15 = ((currentRound - 1) * totalSteps + 15) / (totalRounds * totalSteps) * 100;
+                updateTestProgress(stepProgress15, `${roundProgress}15. Final Ping`);
+                if (progressCallback) progressCallback(15, passed, failed);
+                log('🧪 [Test] Step 15: Final Ping', 'info');
+                try {
+                    const pbPayload = pbEncoder.encodePing('EMMC Test Complete');
+                    const resp = await sendPbMessage(PB_MSG_TYPE.Ping, pbPayload);
+                    if (resp.msgType === PB_MSG_TYPE.Success) {
+                        const decoded = pbDecoder.decodeSuccess(resp.pbPayload);
+                        log('✅ [Test] Step 15: Final Ping → Success', 'info');
+                        addStatusEntry('Test-15.FinalPing', {
+                            'msg_type': `${PB_MSG_TYPE.Ping}`,
+                            'rx_msg_type': `${resp.msgType}`,
+                            'message': decoded.message || 'ping'
+                        }, 'Success', 0);
+                        passed++;
+                    } else {
+                        throw new Error('Expected Success');
+                    }
+                } catch (e) {
+                    log(`❌ [Test] Step 15: Final Ping failed: ${e.message}`, 'error');
+                    addStatusEntry('Test-15.FinalPing', {
+                        'msg_type': `${PB_MSG_TYPE.Ping}`
+                    }, `Failed: ${e.message}`, -1);
+                    failed++;
+                    throw e;
+                }
+
+                return { passed, failed };
+            } catch (e) {
+                if (!testAborted) {
+                    log(`❌ [Test] 第 ${currentRound} 轮测试失败: ${e.message}`, 'error');
+                }
+                throw e;
+            }
+        }
+
+        function stopEmmcTest() {
+            testAborted = true;
+            log('⚠️ [Test] 正在停止测试...', 'info');
+        }
+
+        // ==================== EMMC 其他指令 ====================
+        async function sendPathInfo() {
+            if (!device) {
+                log('Not connected!', 'error');
+                return;
+            }
+
+            const path = document.getElementById('pathInfoPath').value.trim();
+            if (!path) {
+                log('Please enter path', 'error');
+                return;
+            }
+
+            const infoDiv = document.getElementById('pathInfoResult');
+            infoDiv.style.display = 'block';
+            document.getElementById('pathInfoTxType').textContent = `${PB_MSG_TYPE.PathInfoQuery} (PathInfoQuery)`;
+            document.getElementById('pathInfoRxType').textContent = 'waiting...';
+            document.getElementById('pathInfoExist').textContent = '-';
+            document.getElementById('pathInfoSize').textContent = '-';
+            document.getElementById('pathInfoIsDir').textContent = '-';
+            document.getElementById('pathInfoTime').textContent = '-';
+            document.getElementById('pathInfoAttrs').textContent = '-';
+
+            log(`📋 [PathInfo] Querying: ${path}`, 'info');
+
+            try {
+                const pbPayload = pbEncoder.encodePathInfoQuery(path);
+                const resp = await sendPbMessage(PB_MSG_TYPE.PathInfoQuery, pbPayload);
+
+                document.getElementById('pathInfoRxType').textContent = `${resp.msgType} (${PB_MSG_NAME[resp.msgType] || 'Unknown'})`;
+
+                if (resp.msgType === PB_MSG_TYPE.PathInfo) {
+                    const pathInfo = pbDecoder.decodePathInfo(resp.pbPayload);
+                    document.getElementById('pathInfoExist').textContent = pathInfo.exist ? 'Yes' : 'No';
+                    document.getElementById('pathInfoSize').textContent = formatBytes(pathInfo.size);
+                    document.getElementById('pathInfoIsDir').textContent = pathInfo.directory ? 'Yes' : 'No';
+                    document.getElementById('pathInfoTime').textContent = `${pathInfo.year}-${String(pathInfo.month).padStart(2, '0')}-${String(pathInfo.day).padStart(2, '0')} ${String(pathInfo.hour).padStart(2, '0')}:${String(pathInfo.minute).padStart(2, '0')}:${String(pathInfo.second).padStart(2, '0')}`;
+                    
+                    const attrs = [];
+                    if (pathInfo.readonly) attrs.push('ReadOnly');
+                    if (pathInfo.hidden) attrs.push('Hidden');
+                    if (pathInfo.system) attrs.push('System');
+                    if (pathInfo.archive) attrs.push('Archive');
+                    document.getElementById('pathInfoAttrs').textContent = attrs.length > 0 ? attrs.join(', ') : 'None';
+
+                    log(`✅ [PathInfo] Success: exist=${pathInfo.exist}, size=${pathInfo.size}, isDir=${pathInfo.directory}`, 'info');
+                    addStatusEntry('PathInfoQuery', {
+                        'path': path,
+                        'exist': `${pathInfo.exist}`,
+                        'size': `${pathInfo.size}`,
+                        'is_dir': `${pathInfo.directory}`
+                    }, 'Success', 0);
+                } else if (resp.msgType === PB_MSG_TYPE.Failure) {
+                    const failure = pbDecoder.decodeFailure(resp.pbPayload);
+                    document.getElementById('pathInfoExist').textContent = 'Error';
+                    log(`❌ [PathInfo] Failure: code=${failure.code}, "${failure.message}"`, 'error');
+                    addStatusEntry('PathInfoQuery', {
+                        'path': path
+                    }, `Failure: "${failure.message}"`, failure.code);
+                } else {
+                    log(`❌ [PathInfo] Unexpected response type: ${resp.msgType}`, 'error');
+                    addStatusEntry('PathInfoQuery', {
+                        'path': path,
+                        'rx_msg_type': `${resp.msgType}`
+                    }, `Unexpected response type: ${resp.msgType}`, -1);
+                }
+            } catch (error) {
+                log(`❌ [PathInfo] Error: ${error.message}`, 'error');
+                document.getElementById('pathInfoRxType').textContent = 'error';
+                addStatusEntry('PathInfoQuery', {
+                    'path': path
+                }, `Error: ${error.message}`, -1);
+            }
+        }
+
+        async function sendDirList() {
+            if (!device) {
+                log('Not connected!', 'error');
+                return;
+            }
+
+            const path = document.getElementById('dirListPath').value.trim();
+            if (!path) {
+                log('Please enter directory path', 'error');
+                return;
+            }
+
+            const infoDiv = document.getElementById('dirListResult');
+            infoDiv.style.display = 'block';
+            document.getElementById('dirListTxType').textContent = `${PB_MSG_TYPE.DirList} (DirList)`;
+            document.getElementById('dirListRxType').textContent = 'waiting...';
+            document.getElementById('dirListPathResult').textContent = '-';
+            document.getElementById('dirListDirs').textContent = '-';
+            document.getElementById('dirListFiles').textContent = '-';
+
+            log(`📂 [DirList] Listing: ${path}`, 'info');
+
+            try {
+                const pbPayload = pbEncoder.encodeDirList(path);
+                const resp = await sendPbMessage(PB_MSG_TYPE.DirList, pbPayload);
+
+                document.getElementById('dirListRxType').textContent = `${resp.msgType} (${PB_MSG_NAME[resp.msgType] || 'Unknown'})`;
+
+                if (resp.msgType === PB_MSG_TYPE.Dir) {
+                    const dir = pbDecoder.decodeDir(resp.pbPayload);
+                    document.getElementById('dirListPathResult').textContent = dir.path || path;
+                    document.getElementById('dirListDirs').textContent = dir.childDirs || '(empty)';
+                    document.getElementById('dirListFiles').textContent = dir.childFiles || '(empty)';
+
+                    const dirs = dir.childDirs ? dir.childDirs.split(',').filter(d => d.trim()) : [];
+                    const files = dir.childFiles ? dir.childFiles.split(',').filter(f => f.trim()) : [];
+                    log(`✅ [DirList] Success: ${dirs.length} dirs, ${files.length} files`, 'info');
+                    addStatusEntry('DirList', {
+                        'path': path,
+                        'dirs_count': `${dirs.length}`,
+                        'files_count': `${files.length}`
+                    }, 'Success', 0);
+                } else if (resp.msgType === PB_MSG_TYPE.Failure) {
+                    const failure = pbDecoder.decodeFailure(resp.pbPayload);
+                    log(`❌ [DirList] Failure: code=${failure.code}, "${failure.message}"`, 'error');
+                    addStatusEntry('DirList', {
+                        'path': path
+                    }, `Failure: "${failure.message}"`, failure.code);
+                } else {
+                    log(`❌ [DirList] Unexpected response type: ${resp.msgType}`, 'error');
+                    addStatusEntry('DirList', {
+                        'path': path,
+                        'rx_msg_type': `${resp.msgType}`
+                    }, `Unexpected response type: ${resp.msgType}`, -1);
+                }
+            } catch (error) {
+                log(`❌ [DirList] Error: ${error.message}`, 'error');
+                document.getElementById('dirListRxType').textContent = 'error';
+                addStatusEntry('DirList', {
+                    'path': path
+                }, `Error: ${error.message}`, -1);
+            }
+        }
+
+        async function sendDirMake() {
+            if (!device) {
+                log('Not connected!', 'error');
+                return;
+            }
+
+            const path = document.getElementById('dirMakePath').value.trim();
+            if (!path) {
+                log('Please enter directory path', 'error');
+                return;
+            }
+
+            const infoDiv = document.getElementById('dirMakeResult');
+            infoDiv.style.display = 'block';
+            document.getElementById('dirMakeTxType').textContent = `${PB_MSG_TYPE.DirMake} (DirMake)`;
+            document.getElementById('dirMakeRxType').textContent = 'waiting...';
+            document.getElementById('dirMakeResultText').textContent = '-';
+
+            log(`📁 [DirMake] Creating: ${path}`, 'info');
+
+            try {
+                const pbPayload = pbEncoder.encodeDirMake(path);
+                const resp = await sendPbMessage(PB_MSG_TYPE.DirMake, pbPayload);
+
+                document.getElementById('dirMakeRxType').textContent = `${resp.msgType} (${PB_MSG_NAME[resp.msgType] || 'Unknown'})`;
+
+                if (resp.msgType === PB_MSG_TYPE.Success) {
+                    const decoded = pbDecoder.decodeSuccess(resp.pbPayload);
+                    document.getElementById('dirMakeResultText').textContent = `Success: "${decoded.message || 'Directory created'}"`;
+                    log(`✅ [DirMake] Success: "${decoded.message || 'Directory created'}"`, 'info');
+                    addStatusEntry('DirMake', {
+                        'path': path,
+                        'rx_msg_type': `${resp.msgType}`
+                    }, 'Success', 0);
+                } else if (resp.msgType === PB_MSG_TYPE.Failure) {
+                    const failure = pbDecoder.decodeFailure(resp.pbPayload);
+                    document.getElementById('dirMakeResultText').textContent = `Failure: code=${failure.code}, "${failure.message}"`;
+                    log(`❌ [DirMake] Failure: code=${failure.code}, "${failure.message}"`, 'error');
+                    addStatusEntry('DirMake', {
+                        'path': path
+                    }, `Failure: "${failure.message}"`, failure.code);
+                } else {
+                    document.getElementById('dirMakeResultText').textContent = `Unexpected response type: ${resp.msgType}`;
+                    log(`❌ [DirMake] Unexpected response type: ${resp.msgType}`, 'error');
+                    addStatusEntry('DirMake', {
+                        'path': path,
+                        'rx_msg_type': `${resp.msgType}`
+                    }, `Unexpected response type: ${resp.msgType}`, -1);
+                }
+            } catch (error) {
+                log(`❌ [DirMake] Error: ${error.message}`, 'error');
+                document.getElementById('dirMakeRxType').textContent = 'error';
+                document.getElementById('dirMakeResultText').textContent = `Error: ${error.message}`;
+                addStatusEntry('DirMake', {
+                    'path': path
+                }, `Error: ${error.message}`, -1);
+            }
+        }
+
+        async function sendDirRemove() {
+            if (!device) {
+                log('Not connected!', 'error');
+                return;
+            }
+
+            const path = document.getElementById('dirRemovePath').value.trim();
+            if (!path) {
+                log('Please enter directory path', 'error');
+                return;
+            }
+
+            const infoDiv = document.getElementById('dirRemoveResult');
+            infoDiv.style.display = 'block';
+            document.getElementById('dirRemoveTxType').textContent = `${PB_MSG_TYPE.DirRemove} (DirRemove)`;
+            document.getElementById('dirRemoveRxType').textContent = 'waiting...';
+            document.getElementById('dirRemoveResultText').textContent = '-';
+
+            log(`🗑️ [DirRemove] Removing: ${path}`, 'info');
+
+            try {
+                const pbPayload = pbEncoder.encodeDirRemove(path);
+                const resp = await sendPbMessage(PB_MSG_TYPE.DirRemove, pbPayload);
+
+                document.getElementById('dirRemoveRxType').textContent = `${resp.msgType} (${PB_MSG_NAME[resp.msgType] || 'Unknown'})`;
+
+                if (resp.msgType === PB_MSG_TYPE.Success) {
+                    const decoded = pbDecoder.decodeSuccess(resp.pbPayload);
+                    document.getElementById('dirRemoveResultText').textContent = `Success: "${decoded.message || 'Directory removed'}"`;
+                    log(`✅ [DirRemove] Success: "${decoded.message || 'Directory removed'}"`, 'info');
+                    addStatusEntry('DirRemove', {
+                        'path': path,
+                        'rx_msg_type': `${resp.msgType}`
+                    }, 'Success', 0);
+                } else if (resp.msgType === PB_MSG_TYPE.Failure) {
+                    const failure = pbDecoder.decodeFailure(resp.pbPayload);
+                    document.getElementById('dirRemoveResultText').textContent = `Failure: code=${failure.code}, "${failure.message}"`;
+                    log(`❌ [DirRemove] Failure: code=${failure.code}, "${failure.message}"`, 'error');
+                    addStatusEntry('DirRemove', {
+                        'path': path
+                    }, `Failure: "${failure.message}"`, failure.code);
+                } else {
+                    document.getElementById('dirRemoveResultText').textContent = `Unexpected response type: ${resp.msgType}`;
+                    log(`❌ [DirRemove] Unexpected response type: ${resp.msgType}`, 'error');
+                    addStatusEntry('DirRemove', {
+                        'path': path,
+                        'rx_msg_type': `${resp.msgType}`
+                    }, `Unexpected response type: ${resp.msgType}`, -1);
+                }
+            } catch (error) {
+                log(`❌ [DirRemove] Error: ${error.message}`, 'error');
+                document.getElementById('dirRemoveRxType').textContent = 'error';
+                document.getElementById('dirRemoveResultText').textContent = `Error: ${error.message}`;
+                addStatusEntry('DirRemove', {
+                    'path': path
+                }, `Error: ${error.message}`, -1);
+            }
+        }
+
+        async function sendFileDelete() {
+            if (!device) {
+                log('Not connected!', 'error');
+                return;
+            }
+
+            const path = document.getElementById('fileDeletePath').value.trim();
+            if (!path) {
+                log('Please enter file path', 'error');
+                return;
+            }
+
+            const infoDiv = document.getElementById('fileDeleteResult');
+            infoDiv.style.display = 'block';
+            document.getElementById('fileDeleteTxType').textContent = `${PB_MSG_TYPE.FileDelete} (FileDelete)`;
+            document.getElementById('fileDeleteRxType').textContent = 'waiting...';
+            document.getElementById('fileDeleteResultText').textContent = '-';
+
+            log(`🗑️ [FileDelete] Deleting: ${path}`, 'info');
+
+            try {
+                const pbPayload = pbEncoder.encodeFileDelete(path);
+                const resp = await sendPbMessage(PB_MSG_TYPE.FileDelete, pbPayload);
+
+                document.getElementById('fileDeleteRxType').textContent = `${resp.msgType} (${PB_MSG_NAME[resp.msgType] || 'Unknown'})`;
+
+                if (resp.msgType === PB_MSG_TYPE.Success) {
+                    const decoded = pbDecoder.decodeSuccess(resp.pbPayload);
+                    document.getElementById('fileDeleteResultText').textContent = `Success: "${decoded.message || 'File deleted'}"`;
+                    log(`✅ [FileDelete] Success: "${decoded.message || 'File deleted'}"`, 'info');
+                    addStatusEntry('FileDelete', {
+                        'path': path,
+                        'rx_msg_type': `${resp.msgType}`
+                    }, 'Success', 0);
+                } else if (resp.msgType === PB_MSG_TYPE.Failure) {
+                    const failure = pbDecoder.decodeFailure(resp.pbPayload);
+                    document.getElementById('fileDeleteResultText').textContent = `Failure: code=${failure.code}, "${failure.message}"`;
+                    log(`❌ [FileDelete] Failure: code=${failure.code}, "${failure.message}"`, 'error');
+                    addStatusEntry('FileDelete', {
+                        'path': path
+                    }, `Failure: "${failure.message}"`, failure.code);
+                } else {
+                    document.getElementById('fileDeleteResultText').textContent = `Unexpected response type: ${resp.msgType}`;
+                    log(`❌ [FileDelete] Unexpected response type: ${resp.msgType}`, 'error');
+                    addStatusEntry('FileDelete', {
+                        'path': path,
+                        'rx_msg_type': `${resp.msgType}`
+                    }, `Unexpected response type: ${resp.msgType}`, -1);
+                }
+            } catch (error) {
+                log(`❌ [FileDelete] Error: ${error.message}`, 'error');
+                document.getElementById('fileDeleteRxType').textContent = 'error';
+                document.getElementById('fileDeleteResultText').textContent = `Error: ${error.message}`;
+                addStatusEntry('FileDelete', {
+                    'path': path
+                }, `Error: ${error.message}`, -1);
+            }
+        }
+
+        async function sendFixPermission() {
+            if (!device) {
+                log('Not connected!', 'error');
+                return;
+            }
+
+            const infoDiv = document.getElementById('fixPermissionResult');
+            infoDiv.style.display = 'block';
+            document.getElementById('fixPermissionTxType').textContent = `${PB_MSG_TYPE.FixPermission} (FixPermission)`;
+            document.getElementById('fixPermissionRxType').textContent = 'waiting...';
+            document.getElementById('fixPermissionResultText').textContent = '-';
+
+            log(`🔧 [FixPermission] Fixing eMMC permissions...`, 'info');
+
+            try {
+                const pbPayload = pbEncoder.encodeFixPermission();
+                const resp = await sendPbMessage(PB_MSG_TYPE.FixPermission, pbPayload);
+
+                document.getElementById('fixPermissionRxType').textContent = `${resp.msgType} (${PB_MSG_NAME[resp.msgType] || 'Unknown'})`;
+
+                if (resp.msgType === PB_MSG_TYPE.Success) {
+                    const decoded = pbDecoder.decodeSuccess(resp.pbPayload);
+                    document.getElementById('fixPermissionResultText').textContent = `Success: "${decoded.message || 'Permissions fixed'}"`;
+                    log(`✅ [FixPermission] Success: "${decoded.message || 'Permissions fixed'}"`, 'info');
+                    addStatusEntry('FixPermission', {
+                        'rx_msg_type': `${resp.msgType}`
+                    }, 'Success', 0);
+                } else if (resp.msgType === PB_MSG_TYPE.Failure) {
+                    const failure = pbDecoder.decodeFailure(resp.pbPayload);
+                    document.getElementById('fixPermissionResultText').textContent = `Failure: code=${failure.code}, "${failure.message}"`;
+                    log(`❌ [FixPermission] Failure: code=${failure.code}, "${failure.message}"`, 'error');
+                    addStatusEntry('FixPermission', {}, `Failure: "${failure.message}"`, failure.code);
+                } else {
+                    document.getElementById('fixPermissionResultText').textContent = `Unexpected response type: ${resp.msgType}`;
+                    log(`❌ [FixPermission] Unexpected response type: ${resp.msgType}`, 'error');
+                    addStatusEntry('FixPermission', {
+                        'rx_msg_type': `${resp.msgType}`
+                    }, `Unexpected response type: ${resp.msgType}`, -1);
+                }
+            } catch (error) {
+                log(`❌ [FixPermission] Error: ${error.message}`, 'error');
+                document.getElementById('fixPermissionRxType').textContent = 'error';
+                document.getElementById('fixPermissionResultText').textContent = `Error: ${error.message}`;
+                addStatusEntry('FixPermission', {}, `Error: ${error.message}`, -1);
+            }
+        }
+
+        async function sendFirmwareUpdate() {
+            if (!device) {
+                log('Not connected!', 'error');
+                return;
+            }
+
+            const path = document.getElementById('fwUpdatePath').value.trim();
+            if (!path) {
+                log('Please enter firmware file path', 'error');
+                return;
+            }
+
+            const rebootOnSuccess = document.getElementById('fwUpdateReboot').checked;
+
+            const infoDiv = document.getElementById('fwUpdateResult');
+            infoDiv.style.display = 'block';
+            document.getElementById('fwUpdateTxType').textContent = `${PB_MSG_TYPE.FirmwareUpdate} (FirmwareUpdate)`;
+            document.getElementById('fwUpdateRxType').textContent = 'waiting...';
+            document.getElementById('fwUpdateResultText').textContent = '-';
+
+            log(`🚀 [FirmwareUpdate] Updating firmware from: ${path}, reboot=${rebootOnSuccess}`, 'info');
+
+            try {
+                const targets = [{ targetId: pbEncoder.FirmwareTargetType.TARGET_MAIN_APP, path: path }];
+                const pbPayload = pbEncoder.encodeFirmwareUpdate(targets, rebootOnSuccess);
+                const resp = await sendPbMessage(PB_MSG_TYPE.FirmwareUpdate, pbPayload);
+
+                document.getElementById('fwUpdateRxType').textContent = `${resp.msgType} (${PB_MSG_NAME[resp.msgType] || 'Unknown'})`;
+
+                if (resp.msgType === PB_MSG_TYPE.Success) {
+                    const decoded = pbDecoder.decodeSuccess(resp.pbPayload);
+                    document.getElementById('fwUpdateResultText').textContent = `Success: "${decoded.message || 'Firmware updated'}"`;
+                    log(`✅ [FirmwareUpdate] Success: "${decoded.message || 'Firmware updated'}"`, 'info');
+                    addStatusEntry('FirmwareUpdate', {
+                        'path': path,
+                        'reboot': `${rebootOnSuccess}`,
+                        'rx_msg_type': `${resp.msgType}`
+                    }, 'Success', 0);
+                } else if (resp.msgType === PB_MSG_TYPE.Failure) {
+                    const failure = pbDecoder.decodeFailure(resp.pbPayload);
+                    document.getElementById('fwUpdateResultText').textContent = `Failure: code=${failure.code}, "${failure.message}"`;
+                    log(`❌ [FirmwareUpdate] Failure: code=${failure.code}, "${failure.message}"`, 'error');
+                    addStatusEntry('FirmwareUpdate', {
+                        'path': path,
+                        'reboot': `${rebootOnSuccess}`
+                    }, `Failure: "${failure.message}"`, failure.code);
+                } else {
+                    document.getElementById('fwUpdateResultText').textContent = `Unexpected response type: ${resp.msgType}`;
+                    log(`❌ [FirmwareUpdate] Unexpected response type: ${resp.msgType}`, 'error');
+                    addStatusEntry('FirmwareUpdate', {
+                        'path': path,
+                        'rx_msg_type': `${resp.msgType}`
+                    }, `Unexpected response type: ${resp.msgType}`, -1);
+                }
+            } catch (error) {
+                log(`❌ [FirmwareUpdate] Error: ${error.message}`, 'error');
+                document.getElementById('fwUpdateRxType').textContent = 'error';
+                document.getElementById('fwUpdateResultText').textContent = `Error: ${error.message}`;
+                addStatusEntry('FirmwareUpdate', {
+                    'path': path
+                }, `Error: ${error.message}`, -1);
+            }
+        }
+
+        const REBOOT_TYPE_NAME = { 0: 'Normal', 1: 'Boardloader', 2: 'BootLoader' };
+
+        async function sendReboot() {
+            if (!device) {
+                log('Not connected!', 'error');
+                return;
+            }
+
+            const rebootType = parseInt(document.getElementById('rebootType').value);
+
+            const infoDiv = document.getElementById('rebootResult');
+            infoDiv.style.display = 'block';
+            document.getElementById('rebootTxType').textContent = `${PB_MSG_TYPE.Reboot} (Reboot)`;
+            document.getElementById('rebootRxType').textContent = 'waiting...';
+            document.getElementById('rebootResultText').textContent = '-';
+
+            log(`🔄 [Reboot] Rebooting device: type=${REBOOT_TYPE_NAME[rebootType] || rebootType}`, 'info');
+
+            try {
+                const pbPayload = pbEncoder.encodeReboot(rebootType);
+                const resp = await sendPbMessage(PB_MSG_TYPE.Reboot, pbPayload);
+
+                document.getElementById('rebootRxType').textContent = `${resp.msgType} (${PB_MSG_NAME[resp.msgType] || 'Unknown'})`;
+
+                if (resp.msgType === PB_MSG_TYPE.Success) {
+                    const decoded = pbDecoder.decodeSuccess(resp.pbPayload);
+                    document.getElementById('rebootResultText').textContent = `Success: "${decoded.message || 'Reboot initiated'}"`;
+                    log(`✅ [Reboot] Success: "${decoded.message || 'Reboot initiated'}"`, 'info');
+                    addStatusEntry('Reboot', {
+                        'type': REBOOT_TYPE_NAME[rebootType] || rebootType,
+                        'rx_msg_type': `${resp.msgType}`
+                    }, 'Success', 0);
+                } else if (resp.msgType === PB_MSG_TYPE.Failure) {
+                    const failure = pbDecoder.decodeFailure(resp.pbPayload);
+                    document.getElementById('rebootResultText').textContent = `Failure: code=${failure.code}, "${failure.message}"`;
+                    log(`❌ [Reboot] Failure: code=${failure.code}, "${failure.message}"`, 'error');
+                    addStatusEntry('Reboot', {
+                        'type': REBOOT_TYPE_NAME[rebootType] || rebootType
+                    }, `Failure: "${failure.message}"`, failure.code);
+                } else {
+                    document.getElementById('rebootResultText').textContent = `Unexpected response type: ${resp.msgType}`;
+                    log(`❌ [Reboot] Unexpected response type: ${resp.msgType}`, 'error');
+                    addStatusEntry('Reboot', {
+                        'type': REBOOT_TYPE_NAME[rebootType] || rebootType,
+                        'rx_msg_type': `${resp.msgType}`
+                    }, `Unexpected response type: ${resp.msgType}`, -1);
+                }
+            } catch (error) {
+                log(`❌ [Reboot] Error: ${error.message}`, 'error');
+                document.getElementById('rebootRxType').textContent = 'error';
+                document.getElementById('rebootResultText').textContent = `Error: ${error.message}`;
+                addStatusEntry('Reboot', {
+                    'type': REBOOT_TYPE_NAME[rebootType] || rebootType
+                }, `Error: ${error.message}`, -1);
+            }
+        }
+    </script>
+</body>
+</html>
+

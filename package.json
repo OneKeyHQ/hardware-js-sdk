@@ -26,7 +26,7 @@
     "build": "lerna run build",
     "clean": "lerna clean --yes",
     "clean-workspace": "yarn clean && lerna run clean",
-    "lint": "eslint .",
+    "lint": "cross-env NODE_OPTIONS=--max-old-space-size=8192 eslint .",
     "lint:staged": "lint-staged",
     "test": "lerna run test",
     "setup": "yarn && yarn bootstrap && yarn build",

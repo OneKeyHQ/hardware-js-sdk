@@ -26,6 +26,7 @@ import {
   XCircle,
   Server,
   Info,
+  Usb,
 } from 'lucide-react';
 import { getDeviceLabel } from '@onekeyfe/hd-core';
 import packageJson from '../../package.json';
@@ -62,6 +63,11 @@ const navigationItems = [
     title: 'common.logs',
     url: '/logs',
     icon: FileText,
+  },
+  {
+    title: 'Pro2 Debug',
+    url: '/pro2-debug',
+    icon: Usb,
   },
 ];
 
