@@ -5,11 +5,12 @@
   "license": "MIT",
   "scripts": {
     "dev": "rm -rf dist && npx parcel index.html --target default",
-    "prebuild": "rm -rf dist"
+    "prebuild": "rm -rf dist",
+    "build": "npx parcel build index.html && node scripts/patch-html.js"
   },
   "dependencies": {
     "@noble/hashes": "^1.3.1",
-    "@onekeyfe/hd-common-connect-sdk": "1.1.15",
+    "@onekeyfe/hd-common-connect-sdk": "1.1.26-alpha.8",
     "lodash": "^4.17.21",
     "ripple-keypairs": "^1.3.0"
   },
@@ -31,5 +32,8 @@
       "publicUrl": "./",
       "outputFormat": "global"
     }
+  },
+  "resolutions": {
+    "axios": "1.15.2"
   }
 }
