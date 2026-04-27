@@ -1,274 +1,265 @@
 # OneKey Hardware Wallet Transport Layer
 
-## Overview
+## 两句话总结
 
-OneKey Hardware SDK采用分层架构设计，实现跨平台硬件钱包通信。
-
-## Architecture
-
-```
-Application Layer (DApps)
-    ↓
-SDK Interface (@onekeyfe/hd-core)
-    ↓
-Transport Abstraction (@onekeyfe/hd-transport)
-    ↓
-Platform Adapters (WebUSB/BLE/HTTP)
-    ↓
-Hardware Devices
-```
-
-## Core Components
-
-### Transport Interface
-
-```typescript
-// packages/hd-transport/src/types/transport.ts
-export type Transport = {
-  enumerate(): Promise<Array<OneKeyDeviceInfo>>;
-  acquire(input: AcquireInput): Promise<string>;
-  release(session: string, onclose: boolean): Promise<void>;
-  configure(signedData: JSON | string): Promise<void>;
-  call(session: string, name: string, data: Record<string, any>): Promise<MessageFromOneKey>;
-  // ... other methods
-};
-```
-
-### Protocol Constants
-
-```typescript
-// packages/hd-transport/src/constants.ts
-export const MESSAGE_TOP_CHAR = 0x003f;        // '?' chunk marker
-export const MESSAGE_HEADER_BYTE = 0x23;       // '#' protocol header
-export const HEADER_SIZE = 8;                  // Protocol header size
-export const BUFFER_SIZE = 63;                 // Data per chunk
-```
-
-## Message Protocol
-
-### Protocol Frame Structure
-
-```
-[Header: 2B][Type: 2B][Length: 4B][Protobuf Payload: Variable]
-[0x23 0x23] [uint16]  [uint32]    [Binary Data]
-```
-
-### USB HID Chunking
-
-**Standard Packet Format (64 bytes):**
-```
-┌─┬─────────────────────────────────────────────────────────────┐
-│?│                    Payload Data                             │
-│ │                    (63 bytes)                               │
-└─┴─────────────────────────────────────────────────────────────┘
- 1 byte                    63 bytes
-```
-
-**Key Implementation:**
-
-```typescript
-// packages/hd-transport/src/serialization/send.ts
-export const buildBuffers = (messages: Root, name: string, data: Record<string, unknown>) => {
-  const encodeBuffers = buildEncodeBuffers(messages, name, data);
-  const outBuffers: ByteBuffer[] = [];
-
-  for (const buf of encodeBuffers) {
-    const chunkBuffer = new ByteBuffer(64);
-    chunkBuffer.writeByte(MESSAGE_TOP_CHAR); // '?' marker
-    chunkBuffer.append(buf); // 63 bytes data
-    chunkBuffer.reset();
-    outBuffers.push(chunkBuffer);
-  }
-
-  return outBuffers;
-};
-```
-
-## Transport Implementations
-
-### HTTP Bridge Transport
-
-```typescript
-// packages/hd-transport-http/src/index.ts
-export default class HttpTransport {
-  async call(session: string, name: string, data: Record<string, unknown>) {
-    const messages = this._messages;
-    const o = buildOne(messages, name, data);
-    const outData = o.toString('hex');
-
-    const resData = await this._post({
-      url: `/call/${session}`,
-      body: outData,
-      timeout: name === 'Initialize' ? 10000 : undefined,
-    });
-
-    const jsonData = receiveOne(messages, resData);
-    return check.call(jsonData);
-  }
-}
-```
-
-### Node.js USB Transport (CLI)
-
-```typescript
-// packages/hd-transport-usb/src/index.ts
-export default class NodeUsbTransport {
-  async call(path: string, name: string, data: Record<string, unknown>) {
-    // Same protocol as WebUsbTransport, using libusb instead of browser WebUSB API
-    const encodeBuffers = buildEncodeBuffers(messages, name, data);
-
-    for (const buffer of encodeBuffers) {
-      const packet = new Uint8Array(64);
-      packet[0] = 0x3f; // '?' marker
-      packet.set(new Uint8Array(buffer), 1);
-      await transferOut(openDev.epOut, Buffer.from(packet)); // libusb endpoint
-    }
-
-    const resData = await this.receiveData(openDev);
-    const jsonData = receiveOne(messages, resData);
-    return check.call(jsonData);
-  }
-}
-```
-
-### WebUSB Transport
-
-```typescript
-// packages/hd-transport-web-device/src/webusb.ts
-export default class WebUsbTransport {
-  async call(session: string, name: string, data: Record<string, unknown>) {
-    // Send standard packets (64 bytes)
-    const encodeBuffers = buildEncodeBuffers(messages, name, data);
-
-    for (const buffer of encodeBuffers) {
-      const newArray = new Uint8Array(64);
-      newArray[0] = 63; // '?' marker
-      newArray.set(new Uint8Array(buffer), 1);
-      await device.transferOut(this.endpointId, newArray);
-    }
-
-    // Receive response
-    const resData = await this.receiveData(path);
-    const jsonData = receiveOne(messages, resData);
-    return check.call(jsonData);
-  }
-}
-```
-
-## Session Management
-
-### Session Lifecycle
-
-```
-1. enumerate() → 发现设备
-2. acquire() → 获取会话
-3. configure() → 配置协议
-4. call() → 执行方法
-5. release() → 释放会话
-```
-
-### Key Features
-
-- **独占访问**: 防止多应用冲突
-- **状态缓存**: 避免重复查询设备特性
-- **会话保持**: 批量操作复用连接
-- **自动超时**: 防止会话泄露
-## Communication Flow
-
-### Message Processing Pipeline
-
-```
-1. Protobuf Serialization → Binary Data
-2. Protocol Framing → [##][Type][Length][Payload]
-3. Chunking → 63-byte chunks with '?' markers
-4. USB Transfer → Hardware device (64-byte packets)
-5. Response Reception → 64-byte packets
-6. Reassembly → Complete message
-7. Protobuf Deserialization → Business object
-```
-
-### Core Serialization
-
-```typescript
-// packages/hd-transport/src/serialization/send.ts
-export function buildOne(messages: Root, name: string, data: Record<string, unknown>) {
-  const { Message, messageType } = createMessageFromName(messages, name);
-  const buffer = encodeProtobuf(Message, data);
-  return encodeProtocol(buffer, {
-    addTrezorHeaders: false,
-    chunked: false,
-    messageType,
-  });
-}
-
-// packages/hd-transport/src/serialization/receive.ts
-export function receiveOne(messages: Root, data: string) {
-  const bytebuffer = ByteBuffer.wrap(data, 'hex');
-  const { typeId, buffer } = decodeProtocol.decode(bytebuffer);
-  const { Message, messageName } = createMessageFromType(messages, typeId);
-  const message = decodeProtobuf.decode(Message, buffer);
-  return { message, type: messageName };
-}
-```
-
-## Error Handling
-
-### Error Types
-
-- **Connection Errors**: USB断开、BLE信号弱
-- **Protocol Errors**: 消息格式错误、校验失败
-- **Device Errors**: 设备拒绝、用户取消
-- **Timeout Errors**: 响应超时
-
-### Recovery Strategy
-
-- **自动重试**: 指数退避算法
-- **连接恢复**: 设备重新枚举和连接
-- **会话重建**: 协议状态重新初始化
-- **优雅降级**: 功能特性回退
-
-## Performance Optimization
-
-### USB HID Performance
-
-| Metric | Current Implementation |
-|--------|----------------------|
-| Packet Size | 64 bytes |
-| Effective Payload | 63 bytes |
-| Protocol Overhead | 1.6% (1 byte per 64) |
-
-### Caching Strategy
-
-- **全局会话缓存**: 防止多实例冲突
-- **设备状态缓存**: 避免重复查询features
-- **协议消息缓存**: 避免重复配置开销
-
-## Security
-
-### Session Security
-- 加密安全的会话ID生成
-- 会话超时自动清理
-- 独占访问控制
-
-### Data Protection
-- 敏感数据日志过滤
-- 内存数据自动清理
-- 协议完整性验证
+- **Protocol V1**（Pro1 / Mini / Touch / Classic）：USB 每包 64 字节，分包传输，连接后必须先发 `Initialize` 握手。
+- **Protocol V2**（Pro2）：USB 单帧最大 2048 字节，无需握手，直接调用系统级 API（文件系统、固件更新）。
 
 ---
 
-## Summary
+## 核心差异速查
 
-OneKey传输层通过分层架构、协议设计和错误恢复机制，成功解决了跨平台硬件钱包通信的复杂性：
+| | Protocol V1 | Protocol V2 (Pro2) |
+|---|---|---|
+| SOF 字节 | `0x3F` (`?`) | `0x5A` |
+| 单次传输上限 | **64 bytes**（固定分包） | **2048 bytes**（单帧） |
+| MessageID 字节序 | Big-endian | **Little-endian** |
+| 消息 ID 范围 | 1–999（Trezor 标准） | **60000–61199**（Pro2 专属） |
+| Protobuf schema | `messages.json` | `messages-pro2.json` |
+| 连接握手 | **必须** Initialize → Features | **无**，直接操作 |
+| 会话 ID | 有 `session_id` | 无 |
+| 帧校验 | 无 CRC | **CRC8**（init=0x30，覆盖 header + frame） |
+| 设备能力 | 钱包：签名、地址派生 | 系统：文件系统、固件更新 |
 
-**核心特性:**
-- **协议设计**: 统一的消息格式和分包机制
-- **会话管理**: 安全隔离的设备会话和自动清理
-- **错误恢复**: 智能重试和指数退避机制
-- **安全保护**: 全面防护常见攻击向量
+---
 
-**性能指标:**
-- **延迟**: 典型操作亚秒级响应
-- **可靠性**: 高成功率和自动错误恢复
-- **兼容性**: 支持所有OneKey设备型号和固件版本
-- **稳定性**: 成熟的协议栈和传输机制
+## 帧格式对比
+
+### Protocol V1 — 固定 64 字节分包
+
+```
+每个 USB 包（64 bytes）:
+┌──────┬──────────────────────────────────────────┐
+│ 0x3F │           Payload (63 bytes)              │
+└──────┴──────────────────────────────────────────┘
+  SOF
+
+第一包的 Payload 头部（消息起始帧）:
+┌──────────┬────────────┬────────────┬────────────────────┐
+│ 0x23 0x23│  Type 2B   │  Length 4B │  Protobuf bytes... │
+└──────────┴────────────┴────────────┴────────────────────┘
+   "##"     Big-endian   Big-endian
+```
+
+消息过长时拆成多个 64 字节包串行发送，每包首字节都是 `0x3F`。
+
+**Big-endian 示例**：`GetFeatures (msgType=55)` → `[0x00][0x37]`
+
+---
+
+### Protocol V2 — 单帧最大 2048 字节
+
+```
+Protocol V2 Frame（最大 2048 bytes）:
+┌──────┬──────┬──────┬───────────┬────────┬──────┬─────┬──────────┬──────────┬──────────┬─────┐
+│ 0x5A │ LenL │ LenH │ HeaderCRC │ Router │ Attr │ Seq │ MsgTypeL │ MsgTypeH │ PB Data  │ CRC │
+└──────┴──────┴──────┴───────────┴────────┴──────┴─────┴──────────┴──────────┴──────────┴─────┘
+   1B     1B    1B        1B        1B      1B    1B       1B          1B        N bytes    1B
+
+HeaderCRC = CRC8(bytes[0..3])   ← 校验 SOF+Len+Len
+FrameCRC  = CRC8(整个 frame)    ← 追加在末尾
+MsgType   = Little-endian uint16
+```
+
+**Little-endian 示例**：`FileRead (msgType=60804=0xEDC4)` → `[0xC4][0xED]`
+
+---
+
+## 连接与初始化流程
+
+### Protocol V1：必须握手
+
+```
+enumerate() → acquire() → Initialize → Features
+                                ↓
+                  TransportManager.reconfigure(features)
+                  （根据固件版本选择 messages schema）
+                                ↓
+                         设备就绪，执行钱包操作
+```
+
+`Initialize` 返回的 `Features` 包含 `session_id`、`device_id`、`firmware_version` 等，
+SDK 依赖这些信息选择正确的 protobuf schema。
+
+---
+
+### Protocol V2（Pro2）：跳过握手
+
+```
+enumerate() → acquire()
+                  ↓
+           detectProtocol(path)
+           按 USB Product ID 识别：
+             PID 0x53C1 (PID_PRO2) → V2
+             其他 PID                → V1
+                  ↓
+           originalDescriptor.protocolType = 'V2'  ← 写回设备描述符
+                  ↓
+           initialize() 检测到 V2，跳过 Initialize
+                  ↓
+           _initializePro2()
+           合成 Features { vendor, onekey_device_type: Pro2 }
+           TransportManager.reconfigure(undefined, 'V2')
+           加载 messages-pro2.json
+                  ↓
+           设备就绪，直接调用 pro2* 系方法
+```
+
+Pro2 **不支持** `Initialize` 消息。发送它会收到 `Failure_UnexpectedMessage`。
+
+> **关键实现细节**：`detectProtocol()` 在 `acquire()` 内部按 PID 立即判定，结果写入
+> `WebUsbTransport.deviceProtocol: Map<path, ProtocolType>`。
+> `acquire()` 完成后立即将结果同步到 `device.originalDescriptor.protocolType`，
+> 这样 `initialize()` 才能正确判断分支。
+>
+> BLE 路径不需要探测：Pro2 BLE 走独立的 `ElectronPro2BleTransport` 类，
+> `getProtocolType()` 直接返回 `'V2'`。
+
+---
+
+## 协议自动检测
+
+```typescript
+// packages/hd-transport-web-device/src/webusb.ts
+private detectProtocol(path: string): ProtocolType {
+  const deviceInfo = this.deviceList.find(d => d.path === path);
+  const protocol: ProtocolType =
+    deviceInfo?.device.productId === PID_PRO2 ? 'V2' : 'V1';
+  this.deviceProtocol.set(path, protocol);
+  return protocol;
+}
+
+getProtocolType(path: string): ProtocolType {
+  return this.deviceProtocol.get(path) ?? 'V1';
+}
+```
+
+`call()` 根据检测结果自动分支：
+- `V2` → `callProtocolV2()`，使用 `messages-pro2.json`
+- `V1` → 原有路径，使用 `messages.json`
+
+---
+
+## Schema 选择（callProtocolV2 内部）
+
+V2 帧内同时可能包含 V2 消息和 V1 消息（如未来扩展），选择规则：
+
+```
+编码（发送）:
+  messagesV2.lookupType(name) 成功     → 用 V2 schema
+  失败（name 只在 V1 schema 中）       → 回退 V1 messages schema
+
+解码（接收）:
+  rxMsgType >= 60000  → V2 schema (PROTOCOL_V2_SYS_MESSAGE_THRESHOLD)
+  rxMsgType <  60000  → V1 schema
+```
+
+---
+
+## Pro2 消息 ID 表
+
+| 消息名 | ID | 方向 | 说明 |
+|---|---|---|---|
+| Ping | 60206 | 请求 | 连接测试 |
+| Success | 60207 | 响应 | 操作成功 |
+| Failure | 60208 | 响应 | 操作失败，含错误码 |
+| Reboot | 60400 | 请求 | 重启设备 |
+| FixPermission | 60800 | 请求 | 修复文件系统权限 |
+| PathInfo | 60801 | 响应 | 文件/目录元数据 |
+| PathInfoQuery | 60802 | 请求 | 查询文件/目录元数据 |
+| File | 60803 | 响应 | 文件数据块 |
+| FileRead | 60804 | 请求 | 读取文件 |
+| FileWrite | 60805 | 请求 | 写入文件 |
+| FileDelete | 60806 | 请求 | 删除文件 |
+| Dir | 60807 | 响应 | 目录列表 |
+| DirList | 60808 | 请求 | 列目录 |
+| DirMake | 60809 | 请求 | 创建目录 |
+| DirRemove | 60810 | 请求 | 删除目录 |
+| FirmwareUpdate | 61000 | 请求 | 触发固件更新 |
+| FirmwareInstallProgress | 61001 | 响应 | 固件安装进度 |
+
+---
+
+## Pro2 SDK API
+
+```typescript
+import HardwareSDK from '@onekeyfe/hd-web-sdk';
+
+// 文件操作 (Pro2-only)
+await HardwareSDK.dirList(connectId, { path: '/' });
+await HardwareSDK.pathInfo(connectId, { path: '/res/icon.png' });
+await HardwareSDK.fileRead(connectId, { path: '/res/icon.png', offset: 0, totalSize: 0 });
+await HardwareSDK.fileWrite(connectId, {
+  path: '/tmp/test.txt',
+  offset: 0,
+  totalSize: 5,
+  data: new Uint8Array([0x68, 0x65, 0x6c, 0x6c, 0x6f]),
+});
+await HardwareSDK.fileDelete(connectId, { path: '/tmp/test.txt' });
+await HardwareSDK.dirMake(connectId, { path: '/tmp/mydir' });
+await HardwareSDK.dirRemove(connectId, { path: '/tmp/mydir' });
+
+// 设备管理 (使用通用 API，内部自动分发到 Protocol V2)
+await HardwareSDK.deviceRebootToBootloader(connectId);
+await HardwareSDK.deviceRebootToBoardloader(connectId);
+```
+
+---
+
+## CRC8 算法
+
+```typescript
+// poly = 0x07（CRC-8/SMBUS 变体），init = 0x30
+function crc8(data: Uint8Array, init = 0x30): number {
+  let crc = init;
+  for (const byte of data) {
+    crc ^= byte;
+    for (let i = 0; i < 8; i++) {
+      crc = crc & 0x80 ? (crc << 1) ^ 0x07 : crc << 1;
+      crc &= 0xff;
+    }
+  }
+  return crc;
+}
+```
+
+两处用到：
+1. **HeaderCRC**：对 `[SOF, LenL, LenH]` 前 3 字节计算，结果填入第 4 字节
+2. **FrameCRC**：对整帧（含 header + payload）计算，追加在末尾
+
+---
+
+## Protobuf Schema 来源
+
+| 文件 | 来源 | 生成方式 |
+|---|---|---|
+| `packages/hd-transport/messages.json` | `submodules/firmware/common/protob/*.proto` | `yarn update-protobuf` |
+| `packages/hd-transport/messages-pro2.json` | `submodules/firmware-pro2/sys/protobuf/onekey_protocol/legacy/` | `yarn update-protobuf`（Pro2 分支） |
+| `packages/core/src/data/messages/messages.json` | 同上，core 副本 | 同步生成 |
+| `packages/core/src/data/messages/messages-pro2.json` | 同上，core 副本 | 同步生成 |
+
+**Pro2 schema 特殊处理**：
+- `messages_emmc.proto` 中消息名带 `Emmc` 前缀（如 `EmmcFileRead`），构建脚本用 `sed` 去除前缀
+- `Success`/`Failure` 来自 `messages_common.proto`（不在 management proto 中）
+- `Reboot` 是 Protocol V2 专属，无对应 proto 源文件，在脚本中手动追加
+- `FailureType` 的限定名（`hw.trezor.messages.common.FailureType`）需 `sed` 去除命名空间，否则 pbjs 静默丢弃
+
+---
+
+## 架构层次
+
+```
+Application (DApps)
+    ↓
+SDK Interface (@onekeyfe/hd-core)
+    ↓  Device.run() → acquire() → initialize()
+Transport Abstraction (@onekeyfe/hd-transport)
+    ↓  call() 自动分支
+WebUSB Transport (@onekeyfe/hd-transport-web-device)
+    ├── Protocol V1 path → buildEncodeBuffers() → 64B 分包 → receiveOne()
+    └── Protocol V2 path → buildPbFrame() → 单帧 → parseProtoV2Frame()
+    ↓
+Hardware Device
+    ├── Pro1 / Mini / Touch / Classic  (V1)
+    └── Pro2                           (V2)
+```
