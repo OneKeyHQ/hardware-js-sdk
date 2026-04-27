@@ -56,9 +56,7 @@ let sdkReadyPromise: Promise<typeof HardwareSDK> | null = null;
  *   2. Hidden wallet — enter passphrase via pinentry (secure OS dialog)
  *   3. Hidden wallet — enter passphrase on device screen
  */
-function resolvePassphraseByChoice(
-  choice: '1' | '2' | '3'
-): Promise<PinentryResult> {
+function resolvePassphraseByChoice(choice: '1' | '2' | '3'): Promise<PinentryResult> {
   if (choice === '1') return Promise.resolve({ value: '', passphraseOnDevice: false });
   if (choice === '2') return promptPassphraseViaPinentry();
   return Promise.resolve({ value: '', passphraseOnDevice: true });
