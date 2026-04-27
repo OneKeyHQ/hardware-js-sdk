@@ -214,8 +214,13 @@ export class LedgerAdapter implements IHardwareWallet {
     const devices = await this.connector.searchDevices();
     debugLog('[DMK] adapter.searchDevices raw:', JSON.stringify(devices));
 
-    // Update cache with scan results. connectId is now consistent
-    // (BLE: "A58F" from _resolveConnectId, USB: DMK path) across all write points.
+    // Replace cache with this round's raw result. DMK paths used as
+    // connectId on USB are ephemeral (new UUID after each replug), so
+    // incremental writes leave stale entries pointing at devices DMK no
+    // longer recognizes — the visible symptom is the same physical device
+    // appearing twice in the discovered list, one with a real name and one
+    // with the 'Ledger' placeholder from a connect-time event.
+    this._discoveredDevices.clear();
     for (const d of devices) {
       if (d.connectId) {
         this._discoveredDevices.set(d.connectId, this.connectorDeviceToDeviceInfo(d));

@@ -289,7 +289,7 @@ export class LedgerConnectorBase implements IConnector {
 
   async connect(deviceId?: string): Promise<ConnectorSession> {
     const dm = await this._getDeviceManager();
-    await this.searchDevices();
+    let discovered = await this.searchDevices();
 
     // Resolve external connectId -> DMK path via mapping table
     const dmkPath = deviceId ? this._getPathForConnectId(deviceId) : undefined;
@@ -325,11 +325,14 @@ export class LedgerConnectorBase implements IConnector {
           capabilities: { persistentDeviceIdentity: false },
         },
       };
+      // Use the real name from this round's discovery; falling back to
+      // 'Ledger' here would clobber the cached label set by searchDevices.
+      const realName = discovered.find(d => d.connectId === externalConnectId)?.name ?? 'Ledger';
       this._emit('device-connect', {
         device: {
           connectId: externalConnectId,
           deviceId: path,
-          name: 'Ledger',
+          name: realName,
         },
       });
       return session;
@@ -341,7 +344,7 @@ export class LedgerConnectorBase implements IConnector {
       // Retry once: clear signer state but keep DMK (and BLE scan) alive
       this._resetSignersAndSessions();
       const dm2 = await this._getDeviceManager();
-      await this.searchDevices();
+      discovered = await this.searchDevices();
 
       // Re-resolve path — device may have been re-discovered with new DMK path
       const retryPath = this._getPathForConnectId(externalConnectId);
