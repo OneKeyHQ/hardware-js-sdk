@@ -1,3 +1,12 @@
+import type {
+  dirList,
+  dirMake,
+  dirRemove,
+  fileDelete,
+  fileRead,
+  fileWrite,
+  pathInfo,
+} from './pro2';
 import type { off, on, removeAllListeners } from './event';
 import type { uiResponse } from './uiResponse';
 import type { init, updateSettings } from './init';
@@ -198,6 +207,17 @@ export type CoreApi = {
   firmwareUpdateV2: typeof firmwareUpdateV2;
   firmwareUpdateV3: typeof firmwareUpdateV3;
   cipherKeyValue: typeof cipherKeyValue;
+
+  /**
+   * File system & device control API (Pro2-only, Proto V0)
+   */
+  fileRead: typeof fileRead;
+  fileWrite: typeof fileWrite;
+  fileDelete: typeof fileDelete;
+  dirList: typeof dirList;
+  dirMake: typeof dirMake;
+  dirRemove: typeof dirRemove;
+  pathInfo: typeof pathInfo;
 
   /**
    * All network function

@@ -65,7 +65,7 @@ export default class TransportManager {
           );
         }
         await this.transport.init(LowLevelLogger, DevicePool.emitter, this.plugin);
-      } else if (env === 'desktop-web-ble') {
+      } else if (env === 'desktop-web-ble' || env === 'desktop-web-ble-pro2') {
         await this.transport.init(WebBleLogger, DevicePool.emitter);
       } else if (env === 'webusb' || env === 'desktop-webusb') {
         await this.transport.init(WebUsbLogger);
@@ -74,6 +74,9 @@ export default class TransportManager {
       }
       Log.debug('Configuring transports');
       await this.transport.configure(JSON.stringify(this.defaultMessages));
+      this.currentMessages = this.defaultMessages;
+      this.messageVersion = 'latest';
+      await this.configureProtocolV2Messages();
       Log.debug('Configuring transports done');
     } catch (error) {
       Log.debug('Initializing transports error: ', error);
@@ -83,8 +86,19 @@ export default class TransportManager {
     }
   }
 
-  static async reconfigure(features?: Features | undefined) {
-    Log.debug(`Begin reconfiguring transports`);
+  /**
+   * Re-load the transport's main protobuf schema based on a device's reported features.
+   *
+   * This handles message-version compatibility within Protocol V1 (e.g. Touch's classic
+   * vs latest schema). It is NOT used to switch between Protocol V1 and Protocol V2 —
+   * the transport already holds both schemas after initial configure(), and routes per
+   * device by `getProtocolType()`.
+   */
+  static async reconfigure(features?: Features) {
+    if (!features) {
+      return;
+    }
+
     const { messageVersion, messages } = getSupportMessageVersion(features);
 
     if (this.currentMessages === messages || !messages) {
@@ -128,6 +142,15 @@ export default class TransportManager {
 
   static getTransport() {
     return this.transport;
+  }
+
+  private static async configureProtocolV2Messages() {
+    const pro2Messages = DataManager.getProtobufMessages('pro2');
+    const { configureProtocolV2 } = this.transport;
+    if (pro2Messages && typeof configureProtocolV2 === 'function') {
+      await configureProtocolV2.call(this.transport, JSON.stringify(pro2Messages));
+      Log.debug('Protocol V2 messages configured');
+    }
   }
 
   static getDefaultMessages() {

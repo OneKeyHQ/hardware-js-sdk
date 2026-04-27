@@ -40,6 +40,15 @@ export { default as firmwareUpdateV2 } from './FirmwareUpdateV2';
 export { default as firmwareUpdateV3 } from './FirmwareUpdateV3';
 export { default as promptWebDeviceAccess } from './PromptWebDeviceAccess';
 
+// File system & device control API (Pro2-only, uses Proto V0 protocol)
+export { default as fileRead } from './FileRead';
+export { default as fileWrite } from './FileWrite';
+export { default as fileDelete } from './FileDelete';
+export { default as dirList } from './DirList';
+export { default as dirMake } from './DirMake';
+export { default as dirRemove } from './DirRemove';
+export { default as pathInfo } from './PathInfo';
+
 export { default as cipherKeyValue } from './CipherKeyValue';
 
 export { default as allNetworkGetAddress } from './allnetwork/AllNetworkGetAddress';

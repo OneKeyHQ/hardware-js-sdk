@@ -14,6 +14,8 @@ import { DataManager } from '../../data-manager';
 import { BaseMethod } from '../BaseMethod';
 import { DEVICE } from '../../events';
 
+import { PROTOCOL_V2_FILE_CHUNK_SIZE } from '@onekeyfe/hd-transport';
+
 import type {
   IFirmwareUpdateProgressType,
   IFirmwareUpdateTipMessage,
@@ -445,6 +447,175 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
         await wait(2000);
       }
     }
+  }
+
+  // ---- Pro2 (Protocol V2) firmware update helpers ----
+  //
+  // These methods speak Pro2's V2 protobuf schema (DirMake / FileWrite /
+  // FirmwareUpdate) and are only safe to call from a runProtocolV2() flow,
+  // i.e. when device.originalDescriptor.protocolType === 'V2'. They do not
+  // appear on the V1 firmware-update path.
+
+  /**
+   * Protocol V2: Create directory using DirMake message
+   */
+  async pro2CreateFolder(path: string) {
+    const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
+    await typedCall('DirMake', 'Success', { path });
+  }
+
+  /**
+   * Protocol V2: Write file chunks using FileWrite message.
+   * Equivalent to emmcCommonUpdateProcess but using Protocol V2 protobuf messages.
+   */
+  async pro2CommonUpdateProcess({
+    payload,
+    filePath,
+    processedSize,
+    totalSize,
+  }: PROTO.FirmwareUpload & {
+    filePath: string;
+    processedSize?: number;
+    totalSize?: number;
+  }) {
+    // PROTOCOL_V2_FILE_CHUNK_SIZE = 2048: derived from frame max (2200) minus FileWrite
+    // overhead (~50). Same value for USB and BLE — BLE Noble handles ATT-level
+    // fragmentation transparently.
+    const chunkSize = PROTOCOL_V2_FILE_CHUNK_SIZE;
+    const totalChunks = Math.ceil(payload.byteLength / chunkSize);
+    let offset = 0;
+    let currentFileProcessed = 0;
+
+    for (let i = 0; i < totalChunks; i++) {
+      const chunkStart = i * chunkSize;
+      const chunkEnd = Math.min(chunkStart + chunkSize, payload.byteLength);
+      const chunkLength = chunkEnd - chunkStart;
+      const chunk = payload.slice(chunkStart, chunkEnd);
+      const overwrite = i === 0;
+
+      let progress: number;
+      if (totalSize !== undefined && processedSize !== undefined) {
+        currentFileProcessed = processedSize + chunkEnd;
+        progress = Math.min(Math.ceil((currentFileProcessed / totalSize) * 100), 99);
+      } else {
+        progress = Math.min(Math.ceil(((i + 1) / totalChunks) * 100), 99);
+      }
+
+      const writeRes = await this.fileWriteWithRetry(
+        filePath,
+        chunkLength,
+        payload.byteLength,
+        offset,
+        chunk,
+        overwrite,
+        progress
+      );
+      // @ts-expect-error
+      offset += writeRes.message.processed_byte ?? chunkLength;
+      this.postProgressMessage(progress, 'transferData');
+    }
+
+    return totalSize !== undefined ? (processedSize ?? 0) + payload.byteLength : 0;
+  }
+
+  /**
+   * Protocol V2: Write file chunk with retry using FileWrite message.
+   */
+  async fileWriteWithRetry(
+    filePath: string,
+    chunkLength: number,
+    totalFileSize: number,
+    offset: number,
+    chunk: ArrayBuffer | Buffer,
+    overwrite: boolean,
+    progress: number | null
+  ) {
+    const writeFunc = async () => {
+      const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
+      // @ts-expect-error
+      const writeRes = await typedCall('FileWrite', 'File', {
+        file: {
+          path: filePath,
+          offset,
+          total_size: totalFileSize,
+          data: chunk,
+        },
+        overwrite,
+        append: offset !== 0,
+      });
+      if (writeRes.type !== 'File') {
+        // @ts-expect-error
+        if (writeRes.type === 'CallMethodError') {
+          if (((writeRes as any).message.error ?? '').indexOf(SESSION_ERROR) > -1) {
+            throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, SESSION_ERROR);
+          }
+        }
+        throw ERRORS.TypedError(
+          HardwareErrorCode.EmmcFileWriteFirmwareError,
+          'transfer data error'
+        );
+      }
+      return writeRes;
+    };
+
+    let retryCount = 10;
+    while (retryCount > 0) {
+      try {
+        const result = await writeFunc();
+        return result;
+      } catch (error) {
+        Log.error(`fileWrite error: `, error);
+        retryCount--;
+        if (retryCount === 0) {
+          throw ERRORS.TypedError(
+            HardwareErrorCode.EmmcFileWriteFirmwareError,
+            'transfer data error'
+          );
+        }
+        const env = DataManager.getSettings('env');
+        if (DataManager.isBleConnect(env)) {
+          await wait(3000);
+          await this.device.deviceConnector?.acquire(this.device.originalDescriptor.id, null, true);
+          await this.device.initialize();
+        }
+        await wait(2000);
+      }
+    }
+  }
+
+  /**
+   * Protocol V2: Trigger firmware update using FirmwareUpdate message.
+   * Uses targets[] to specify which chip + file path to install
+   */
+  async pro2StartFirmwareUpdate({
+    targets,
+    rebootOnSuccess = true,
+  }: {
+    targets: Array<{ target_id: number; path: string }>;
+    rebootOnSuccess?: boolean;
+  }) {
+    const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
+    let updateResponse: TypedResponseMessage<'Success'>;
+    try {
+      updateResponse = await typedCall('FirmwareUpdate', 'Success', {
+        targets,
+        reboot_on_success: rebootOnSuccess,
+      });
+    } catch (error) {
+      if (isDeviceDisconnectedError(error)) {
+        Log.log('Rebooting device');
+        updateResponse = {
+          type: 'Success',
+          message: { message: FIRMWARE_UPDATE_CONFIRM },
+        };
+      } else {
+        throw error;
+      }
+    }
+    if (updateResponse.type !== 'Success') {
+      throw ERRORS.TypedError(HardwareErrorCode.FirmwareError, 'firmware update error');
+    }
+    this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdating);
   }
 
   /**
