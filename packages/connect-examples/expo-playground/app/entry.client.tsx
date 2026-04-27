@@ -33,6 +33,7 @@ import ChainMethodsIndexPage from './routes/chains.$chainId._index';
 import ChainMethodExecutePage from './routes/chains.$chainId.$methodName';
 import DeviceMethodsIndexPage from './routes/device-methods._index';
 import DeviceMethodExecutePage from './routes/device-methods.$methodName';
+import Pro2DebugPage from './routes/pro2-debug';
 
 // Import styles
 import './tailwind.css';
@@ -140,6 +141,11 @@ const router = createHashRouter(
         {
           path: 'chains/:chainId/:methodName',
           element: <ChainMethodExecutePage />,
+        },
+
+        {
+          path: 'pro2-debug',
+          element: <Pro2DebugPage />,
         },
       ],
     },
