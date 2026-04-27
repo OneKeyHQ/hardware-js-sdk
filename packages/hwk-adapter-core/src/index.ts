@@ -108,6 +108,7 @@ export type {
   ConnectorSession,
   ConnectorEventType,
   ConnectorEventMap,
+  ConnectorUiEvent,
   IConnector,
   IHardwareBridge,
 } from './types/connector';

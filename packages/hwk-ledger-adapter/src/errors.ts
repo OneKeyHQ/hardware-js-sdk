@@ -11,6 +11,15 @@ export type LedgerFailure = Omit<Failure, 'payload'> & {
   payload: Failure['payload'] & { appName?: string };
 };
 
+export interface WrapErrorOptions {
+  /**
+   * Fallback app name when the raw error doesn't carry `appName` itself
+   * (DMK signer errors don't). Used by mapLedgerError so downstream
+   * AppNotOpen / WrongApp / AppTooOld toasts can interpolate `{appName}`.
+   */
+  defaultAppName?: string;
+}
+
 /**
  * Structurally compatible with `Failure`; writes `appName` only when provided,
  * so `'appName' in payload` is a reliable "has info" signal for consumers.
@@ -268,10 +277,14 @@ export function isTimeoutError(err: unknown): boolean {
 }
 
 /**
- * Map a Ledger DMK error to a HardwareErrorCode and human-readable message
- * with actionable recovery information for the caller.
+ * Map a Ledger DMK error to a HardwareErrorCode and human-readable message.
+ * `opts.defaultAppName` fills `appName` when the raw error doesn't carry it
+ * (DMK signer errors don't).
  */
-export function mapLedgerError(err: unknown): {
+export function mapLedgerError(
+  err: unknown,
+  opts?: WrapErrorOptions
+): {
   code: HardwareErrorCode;
   message: string;
   appName?: string;
@@ -322,10 +335,11 @@ export function mapLedgerError(err: unknown): {
     code = ethMapped ?? chainMapped ?? HardwareErrorCode.UnknownError;
   }
 
-  const appName =
+  const errAppName =
     err && typeof err === 'object'
       ? ((err as Record<string, unknown>).appName as string | undefined)
       : undefined;
+  const appName = errAppName ?? opts?.defaultAppName;
 
   return { code, message: enrichErrorMessage(code, originalMessage), appName };
 }

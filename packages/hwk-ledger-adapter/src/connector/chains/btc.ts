@@ -162,6 +162,7 @@ export async function btcSignTransaction(
     const path = normalizePath(params.path || "84'/0'/0'");
     const purpose = path.split('/')[0]?.replace(/'/g, '');
     const template = _purposeToTemplate(purpose, DefaultDescriptorTemplate);
+    debugLog('[LedgerConnector] btcSignTransaction wallet:', { path, purpose, template });
 
     const wallet = new DefaultWallet(path, template);
 
@@ -197,6 +198,7 @@ export async function btcSignPsbt(
     const path = normalizePath(params.path || "84'/0'/0'");
     const purpose = path.split('/')[0]?.replace(/'/g, '');
     const template = _purposeToTemplate(purpose, DefaultDescriptorTemplate);
+    debugLog('[LedgerConnector] btcSignPsbt wallet:', { path, purpose, template });
 
     const wallet = new DefaultWallet(path, template);
 
@@ -206,6 +208,7 @@ export async function btcSignPsbt(
       signature: Uint8Array;
       tapleafHash?: Uint8Array;
     }>;
+    debugLog('[LedgerConnector] btcSignPsbt signatures received:', signatures.length);
 
     const signedPsbtHex = _applySignaturesToPsbt(params.psbt, signatures);
     return { signedPsbt: signedPsbtHex };

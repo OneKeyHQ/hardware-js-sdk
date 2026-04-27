@@ -2,6 +2,7 @@ import type { ConnectorEventMap, ConnectorEventType } from '@onekeyfe/hwk-adapte
 import type { DeviceManagementKit } from '@ledgerhq/device-management-kit';
 import type { SignerManager } from '../../signer/SignerManager';
 import type { LedgerDeviceManager } from '../../device/LedgerDeviceManager';
+import type { WrapErrorOptions } from '../../errors';
 
 /**
  * Context provided by LedgerConnectorBase to per-chain handlers.
@@ -10,7 +11,7 @@ import type { LedgerDeviceManager } from '../../device/LedgerDeviceManager';
 export interface ConnectorContext {
   emit<K extends ConnectorEventType>(event: K, data: ConnectorEventMap[K]): void;
   invalidateSession(sessionId: string): void;
-  wrapError(err: unknown): Error;
+  wrapError(err: unknown, opts?: WrapErrorOptions): Error;
   getOrCreateDmk(): Promise<DeviceManagementKit>;
   getDeviceManager(): Promise<LedgerDeviceManager>;
   getSignerManager(): Promise<SignerManager>;

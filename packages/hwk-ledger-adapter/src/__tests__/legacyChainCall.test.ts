@@ -1,4 +1,4 @@
-import { isLegacyWrongAppError } from '../connector/chains/legacyAppRetry';
+import { isLegacyWrongAppError } from '../connector/chains/legacyChainCall';
 
 describe('isLegacyWrongAppError', () => {
   it('returns true for canonical wrong-app codes', () => {

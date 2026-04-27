@@ -21,6 +21,7 @@ import {
   tronSignTransaction,
 } from './chains';
 
+import type { WrapErrorOptions } from '../errors';
 import type { ConnectorContext } from './chains/types';
 import type { DeviceManagementKit } from '@ledgerhq/device-management-kit';
 import type {
@@ -75,6 +76,17 @@ export interface LedgerConnectorBaseOptions {
 // ---------------------------------------------------------------------------
 
 type EventHandler<K extends ConnectorEventType> = (data: ConnectorEventMap[K]) => void;
+
+/**
+ * Method-name prefix → Ledger app name. Keeps chain handlers free of
+ * per-site `defaultAppName` boilerplate; `_ctxForMethod` injects it.
+ */
+const METHOD_PREFIX_TO_APP_NAME: Record<string, string> = {
+  evm: 'Ethereum',
+  btc: 'Bitcoin',
+  sol: 'Solana',
+  tron: 'Tron',
+};
 
 // ---------------------------------------------------------------------------
 // Default signer kit importer (webpack/rspack — uses "exports" field)
@@ -215,7 +227,7 @@ export class LedgerConnectorBase implements IConnector {
       emit: <K extends ConnectorEventType>(event: K, data: ConnectorEventMap[K]) =>
         this._emit(event, data),
       invalidateSession: sid => this._invalidateSession(sid),
-      wrapError: err => this._wrapError(err),
+      wrapError: (err, opts) => this._wrapError(err, opts),
       getOrCreateDmk: () => this._getOrCreateDmk(),
       getDeviceManager: () => this._getDeviceManager(),
       getSignerManager: () => this._getSignerManager(),
@@ -367,45 +379,48 @@ export class LedgerConnectorBase implements IConnector {
 
   async call(sessionId: string, method: string, params: unknown): Promise<unknown> {
     debugLog('[DMK] call:', method, JSON.stringify(params));
+    // Bind the chain's Ledger app name to ctx.wrapError once per dispatch so
+    // chain handlers can call `ctx.wrapError(err)` with no per-site appName.
+    const ctx = this._ctxForMethod(method);
     switch (method) {
       // EVM
       case 'evmGetAddress':
-        return evmGetAddress(this._ctx, sessionId, params as EvmGetAddressCallParams);
+        return evmGetAddress(ctx, sessionId, params as EvmGetAddressCallParams);
       case 'evmSignTransaction':
-        return evmSignTransaction(this._ctx, sessionId, params as EvmSignTransactionCallParams);
+        return evmSignTransaction(ctx, sessionId, params as EvmSignTransactionCallParams);
       case 'evmSignMessage':
-        return evmSignMessage(this._ctx, sessionId, params as EvmSignMessageCallParams);
+        return evmSignMessage(ctx, sessionId, params as EvmSignMessageCallParams);
       case 'evmSignTypedData':
-        return evmSignTypedData(this._ctx, sessionId, params as EvmSignTypedDataCallParams);
+        return evmSignTypedData(ctx, sessionId, params as EvmSignTypedDataCallParams);
       // BTC
       case 'btcGetAddress':
-        return btcGetAddress(this._ctx, sessionId, params as BtcGetAddressCallParams);
+        return btcGetAddress(ctx, sessionId, params as BtcGetAddressCallParams);
       case 'btcGetPublicKey':
-        return btcGetPublicKey(this._ctx, sessionId, params as BtcGetPublicKeyCallParams);
+        return btcGetPublicKey(ctx, sessionId, params as BtcGetPublicKeyCallParams);
       case 'btcSignTransaction':
-        return btcSignTransaction(this._ctx, sessionId, params as BtcSignTransactionCallParams);
+        return btcSignTransaction(ctx, sessionId, params as BtcSignTransactionCallParams);
       case 'btcSignPsbt':
-        return btcSignPsbt(this._ctx, sessionId, params as BtcSignPsbtCallParams);
+        return btcSignPsbt(ctx, sessionId, params as BtcSignPsbtCallParams);
       case 'btcSignMessage':
-        return btcSignMessage(this._ctx, sessionId, params as BtcSignMessageCallParams);
+        return btcSignMessage(ctx, sessionId, params as BtcSignMessageCallParams);
       case 'btcGetMasterFingerprint':
         return btcGetMasterFingerprint(
-          this._ctx,
+          ctx,
           sessionId,
           params as { skipOpenApp?: boolean } | undefined
         );
       // SOL
       case 'solGetAddress':
-        return solGetAddress(this._ctx, sessionId, params as SolGetAddressCallParams);
+        return solGetAddress(ctx, sessionId, params as SolGetAddressCallParams);
       case 'solSignTransaction':
-        return solSignTransaction(this._ctx, sessionId, params as SolSignTransactionCallParams);
+        return solSignTransaction(ctx, sessionId, params as SolSignTransactionCallParams);
       case 'solSignMessage':
-        return solSignMessage(this._ctx, sessionId, params as SolSignMessageCallParams);
+        return solSignMessage(ctx, sessionId, params as SolSignMessageCallParams);
       // TRON
       case 'tronGetAddress':
-        return tronGetAddress(this._ctx, sessionId, params as TronGetAddressCallParams);
+        return tronGetAddress(ctx, sessionId, params as TronGetAddressCallParams);
       case 'tronSignTransaction':
-        return tronSignTransaction(this._ctx, sessionId, params as TronSignTransactionCallParams);
+        return tronSignTransaction(ctx, sessionId, params as TronSignTransactionCallParams);
       case 'tronSignMessage': {
         // Explicit public→internal mapping so a field-name drift fails at
         // compile time, not silently at runtime (see bug: public `messageHex`
@@ -415,7 +430,7 @@ export class LedgerConnectorBase implements IConnector {
           path: p.path,
           messageHex: p.messageHex,
         };
-        return tronSignMessage(this._ctx, sessionId, internalParams);
+        return tronSignMessage(ctx, sessionId, internalParams);
       }
       default:
         throw new Error(`LedgerConnector: unknown method "${method}"`);
@@ -622,8 +637,23 @@ export class LedgerConnectorBase implements IConnector {
   // Private -- Error handling
   // ---------------------------------------------------------------------------
 
-  private _wrapError(err: unknown): Error {
-    const mapped = mapLedgerError(err);
+  /**
+   * Return a per-call ctx with the chain's Ledger app name pre-bound to
+   * wrapError, so chain handlers don't need to repeat `{ defaultAppName: 'X' }`
+   * at every catch site. Falls through unchanged for unknown methods.
+   */
+  private _ctxForMethod(method: string): ConnectorContext {
+    const prefix = /^(evm|btc|sol|tron)/.exec(method)?.[1];
+    const defaultAppName = prefix ? METHOD_PREFIX_TO_APP_NAME[prefix] : undefined;
+    if (!defaultAppName) return this._ctx;
+    return {
+      ...this._ctx,
+      wrapError: (err, opts) => this._wrapError(err, { defaultAppName, ...opts }),
+    };
+  }
+
+  private _wrapError(err: unknown, opts?: WrapErrorOptions): Error {
+    const mapped = mapLedgerError(err, opts);
     const error = new Error(mapped.message);
     const src = (err && typeof err === 'object' ? err : {}) as Record<string, unknown>;
     // Preserve DMK / EthAppCommandError fields so downstream classifiers

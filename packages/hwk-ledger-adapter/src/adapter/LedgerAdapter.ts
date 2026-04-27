@@ -33,8 +33,8 @@ import type {
   BtcSignedTx,
   ChainCapability,
   ChainForFingerprint,
-  ConnectionType,
   ConnectorDevice,
+  ConnectorUiEvent,
   DeviceEventListener,
   DeviceInfo,
   EvmAddress,
@@ -1058,42 +1058,23 @@ export class LedgerAdapter implements IHardwareWallet {
     });
   };
 
-  private uiRequestHandler = (data: { type: string; payload?: unknown }): void => {
-    this.handleUiEvent(data);
-  };
-
-  private uiEventHandler = (data: { type: string; payload?: unknown }): void => {
-    this.handleUiEvent(data);
+  // Forward low-level connector 'ui-event' (the four EConnectorInteraction values)
+  // to the public hw.emitter so consumers only need to subscribe in one place
+  // (hw.on instead of also reaching into connector.on).
+  private uiEventForwarder = (event: ConnectorUiEvent): void => {
+    this.emitter.emit('ui-event', event);
   };
 
   private registerEventListeners(): void {
     this.connector.on('device-connect', this.deviceConnectHandler);
     this.connector.on('device-disconnect', this.deviceDisconnectHandler);
-    this.connector.on('ui-request', this.uiRequestHandler);
-    this.connector.on('ui-event', this.uiEventHandler);
+    this.connector.on('ui-event', this.uiEventForwarder);
   }
 
   private unregisterEventListeners(): void {
     this.connector.off('device-connect', this.deviceConnectHandler);
     this.connector.off('device-disconnect', this.deviceDisconnectHandler);
-    this.connector.off('ui-request', this.uiRequestHandler);
-    this.connector.off('ui-event', this.uiEventHandler);
-  }
-
-  private handleUiEvent(event: { type: string; payload?: unknown }): void {
-    if (!event.type) return;
-
-    const payload = event.payload as Record<string, unknown> | undefined;
-    const deviceInfo = payload ? this.extractDeviceInfoFromPayload(payload) : this.unknownDevice();
-
-    switch (event.type) {
-      case 'ui-request_confirmation':
-        this.emitter.emit(UI_REQUEST.REQUEST_BUTTON, {
-          type: UI_REQUEST.REQUEST_BUTTON,
-          payload: { device: deviceInfo },
-        });
-        break;
-    }
+    this.connector.off('ui-event', this.uiEventForwarder);
   }
 
   // ---------------------------------------------------------------------------
@@ -1114,29 +1095,6 @@ export class LedgerAdapter implements IHardwareWallet {
       label: device.name,
       connectionType: isBle ? 'ble' : 'usb',
       capabilities: device.capabilities,
-    };
-  }
-
-  private extractDeviceInfoFromPayload(payload: Record<string, unknown>): DeviceInfo {
-    return {
-      vendor: 'ledger',
-      model: (payload.model as string) ?? 'unknown',
-      firmwareVersion: '',
-      deviceId: (payload.deviceId as string) ?? (payload.id as string) ?? '',
-      connectId: (payload.connectId as string) ?? (payload.path as string) ?? '',
-      label: payload.label as string,
-      connectionType: 'usb' as ConnectionType,
-    };
-  }
-
-  private unknownDevice(): DeviceInfo {
-    return {
-      vendor: 'ledger',
-      model: 'unknown',
-      firmwareVersion: '',
-      deviceId: '',
-      connectId: '',
-      connectionType: 'usb',
     };
   }
 }
