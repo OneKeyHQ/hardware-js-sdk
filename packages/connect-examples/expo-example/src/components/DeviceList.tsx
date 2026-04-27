@@ -33,15 +33,27 @@ const CONNECTION_TYPE_STORE_KEY = '@onekey/connectionType';
  * Determine if the connection type should use hd-common-connect-sdk
  */
 const shouldUseCommonSdk = (connectionType: ConnectionType | null): boolean =>
-  connectionType === 'desktop-web-ble' || connectionType === 'webusb';
+  connectionType === 'desktop-web-ble' ||
+  connectionType === 'desktop-web-ble-pro2' ||
+  connectionType === 'webusb';
 
 /**
- * Check if switching between connection types requires app restart
+ * Check if switching between connection types requires app restart.
+ * Restart is needed when:
+ * - Switching between different SDK types (common sdk vs iframe sdk)
+ * - Switching between different transport classes within the same SDK
+ *   (e.g., ElectronBleTransport vs ElectronPro2BleTransport)
  */
 const needsRestartForSwitch = (from: ConnectionType | null, to: ConnectionType | null): boolean => {
+  if (from === to) return false;
   const fromUsesCommonSdk = shouldUseCommonSdk(from);
   const toUsesCommonSdk = shouldUseCommonSdk(to);
-  return fromUsesCommonSdk !== toUsesCommonSdk;
+  // Different SDK type -> restart
+  if (fromUsesCommonSdk !== toUsesCommonSdk) return true;
+  // Same SDK but different transport class -> also restart
+  // (switchTransport is a no-op in hd-common-connect-sdk)
+  if (fromUsesCommonSdk && toUsesCommonSdk && from !== to) return true;
+  return false;
 };
 
 const storeConnectionType = async (value: ConnectionType) => {
@@ -112,6 +124,10 @@ function DeviceListFC(
     getStoredConnectionType().then(storedType => {
       if (storedType) {
         setConnectionType(storedType);
+      } else if (Platform.OS === 'web' && (window as any).desktopApi) {
+        // In Electron, default to Desktop BLE Pro2 instead of Bridge
+        // to avoid axios compatibility issues in the renderer process
+        setConnectionType('desktop-web-ble-pro2');
       }
     });
   }, [setConnectionType]);
@@ -248,6 +264,7 @@ function DeviceListFC(
               <Picker.Item label="OneKey Bridge" value="bridge" />
               <Picker.Item label="WebUSB" value="webusb" />
               <Picker.Item label="Desktop Web BLE" value="desktop-web-ble" />
+              <Picker.Item label="Desktop BLE Pro2" value="desktop-web-ble-pro2" />
             </Picker>
             <Button onPress={handleRemoveSelected}>
               {intl.formatMessage({ id: 'action__clean_device' })}
