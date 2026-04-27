@@ -79,8 +79,8 @@ const NORMALIZED_NOTIFY_UUID = '0003';
 
 // Timeout and interval constants
 const BLUETOOTH_INIT_TIMEOUT = 10000; // 10 seconds for Bluetooth initialization
-const DEVICE_SCAN_TIMEOUT = 5000; // 5 seconds for device scanning
-const FAST_SCAN_TIMEOUT = 1500; // 1.5 seconds for fast targeted scanning
+const DEVICE_SCAN_TIMEOUT = 8000; // 8 seconds for device scanning (Pro2 has longer advertising interval)
+const FAST_SCAN_TIMEOUT = 8000; // 8 seconds for targeted scanning (Pro2 has longer advertising interval)
 const DEVICE_CHECK_INTERVAL = 500; // 500ms interval for periodic device checks
 const CONNECTION_TIMEOUT = 3000; // 3 seconds for device connection
 const SERVICE_DISCOVERY_TIMEOUT = 10000; // 10 seconds for service discovery
@@ -686,6 +686,14 @@ async function transmitHexDataToDevice(deviceId: string, hexData: string): Promi
 // Handle discovered device (for general enumeration only)
 function handleDeviceDiscovered(peripheral: Peripheral): void {
   const deviceName = peripheral.advertisement?.localName || 'Unknown Device';
+  const serviceUuids = peripheral.advertisement?.serviceUuids || [];
+
+  // Log ALL discovered devices to help identify Pro2 BLE service UUID
+  logger?.info(
+    `[NobleBLE] Scan found: name="${deviceName}" id=${
+      peripheral.id
+    } serviceUUIDs=[${serviceUuids.join(', ')}]`
+  );
 
   // Only process OneKey devices for general discovery
   if (!isOnekeyDevice(deviceName)) {
@@ -753,8 +761,8 @@ async function performTargetedScan(targetDeviceId: string): Promise<Peripheral |
     // Add local listener for this scan
     nobleInstance.on('discover', onDiscover);
 
-    // Start scanning
-    nobleInstance.startScanning(ONEKEY_SERVICE_UUIDS, false, (error?: Error) => {
+    // Start scanning — no service UUID filter (Pro2 may use different service UUID)
+    nobleInstance.startScanning([], false, (error?: Error) => {
       if (error) {
         clearTimeout(timeoutId);
         nobleInstance.removeListener('discover', onDiscover);
@@ -816,15 +824,19 @@ async function enumerateDevices(): Promise<DeviceInfo[]> {
       });
     };
 
-    // Set timeout for scanning
+    // Set timeout for scanning — use longer timeout to catch slow-advertising devices like Pro2
     const timeoutId = setTimeout(() => {
+      // Final collection before resolving — catches devices discovered near the deadline
+      checkDevices();
       cleanup();
       logger?.info('[NobleBLE] Scan completed, found devices:', devices.length);
       resolve(devices);
     }, DEVICE_SCAN_TIMEOUT);
 
-    // Start scanning for OneKey service UUIDs
-    nobleInstance.startScanning(ONEKEY_SERVICE_UUIDS, false, (error?: Error) => {
+    // Start scanning — use empty array to discover ALL BLE devices (Pro2 may use different service UUID)
+    // TODO: restore ONEKEY_SERVICE_UUIDS filter once Pro2 BLE service UUID is confirmed
+    logger?.info('[NobleBLE] Scanning for ALL BLE devices (no service UUID filter)');
+    nobleInstance.startScanning([], false, (error?: Error) => {
       if (error) {
         cleanup();
         logger?.error('[NobleBLE] Failed to start scanning:', error);
@@ -952,9 +964,9 @@ async function discoverServicesAndCharacteristics(
 
   // Main discovery logic as async function
   const discoveryPromise = (async (): Promise<CharacteristicPair> => {
-    // Step 1: Discover services (promisified)
+    // Step 1: Discover ALL services (no filter — Pro2 may use different service UUID)
     const services = await new Promise<Service[]>((resolve, reject) => {
-      peripheral.discoverServices(ONEKEY_SERVICE_UUIDS, (error, svc) => {
+      peripheral.discoverServices([], (error, svc) => {
         if (error) {
           logger?.error('[NobleBLE] Service discovery failed:', error);
           reject(ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, error.message));
@@ -964,26 +976,40 @@ async function discoverServicesAndCharacteristics(
       });
     });
 
+    // Log all discovered services
+    logger?.info(
+      '[NobleBLE] All services:',
+      services?.map(s => s.uuid)
+    );
+
     if (!services || services.length === 0) {
-      throw ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, 'No OneKey services found');
+      throw ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, 'No services found');
     }
 
-    const service = services[0];
-    logger?.info('[NobleBLE] Found service:', service.uuid);
-
-    // Step 2: Discover characteristics (promisified)
-    const characteristics = await new Promise<Characteristic[]>((resolve, reject) => {
-      service.discoverCharacteristics(
-        [ONEKEY_WRITE_CHARACTERISTIC_UUID, ONEKEY_NOTIFY_CHARACTERISTIC_UUID],
-        (error, chars) => {
-          if (error) {
-            logger?.error('[NobleBLE] Characteristic discovery failed:', error);
-            reject(ERRORS.TypedError(HardwareErrorCode.BleCharacteristicNotFound, error.message));
-          } else {
-            resolve(chars);
-          }
-        }
+    // Find OneKey service — try known UUID first, fall back to first service
+    let service = services.find(s => ONEKEY_SERVICE_UUIDS.includes(s.uuid));
+    if (!service) {
+      logger?.info(
+        '[NobleBLE] Known OneKey service UUID not found, trying first non-generic service'
       );
+      // Skip generic BLE services (1800=GAP, 1801=GATT, 180a=DeviceInfo)
+      service = services.find(s => !['1800', '1801', '180a'].includes(s.uuid)) || services[0];
+    }
+    if (!service) {
+      throw ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound);
+    }
+    logger?.info('[NobleBLE] Using service:', service.uuid);
+
+    // Step 2: Discover ALL characteristics (no filter)
+    const characteristics = await new Promise<Characteristic[]>((resolve, reject) => {
+      service.discoverCharacteristics([], (error, chars) => {
+        if (error) {
+          logger?.error('[NobleBLE] Characteristic discovery failed:', error);
+          reject(ERRORS.TypedError(HardwareErrorCode.BleCharacteristicNotFound, error.message));
+        } else {
+          resolve(chars);
+        }
+      });
     });
 
     // Step 3: Find required characteristics

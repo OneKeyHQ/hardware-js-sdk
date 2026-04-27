@@ -12,6 +12,7 @@ import transport, {
   COMMON_HEADER_SIZE,
   LogBlockCommand,
   type OneKeyDeviceInfoBase,
+  type ProtocolType,
 } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode, createDeferred, isOnekeyDevice } from '@onekeyfe/hd-shared';
 import { LoggerNames, getLogger } from '@onekeyfe/hd-core';
@@ -159,6 +160,11 @@ export default class ReactNativeBleTransport {
   emitter?: EventEmitter;
 
   firmwareUploadWriteRecoveryIds = new Set<string>();
+
+  // ReactNativeBleTransport speaks Protocol V1 only.
+  getProtocolType(_path: string): ProtocolType {
+    return 'V1';
+  }
 
   constructor(options: TransportOptions) {
     this.scanTimeout = options.scanTimeout ?? 3000;

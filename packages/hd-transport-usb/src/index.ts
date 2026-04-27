@@ -6,7 +6,7 @@ import { ERRORS, HardwareErrorCode, ONEKEY_WEBUSB_FILTER, wait } from '@onekeyfe
 import { HEADER_LENGTH, PACKET_SIZE, PAYLOAD_SIZE, REPORT_ID } from './constants';
 
 import type EventEmitter from 'events';
-import type { AcquireInput, OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
+import type { AcquireInput, OneKeyDeviceInfo, ProtocolType } from '@onekeyfe/hd-transport';
 
 const { parseConfigure, buildEncodeBuffers, decodeProtocol, receiveOne, check } = transport;
 
@@ -186,6 +186,11 @@ export default class NodeUsbTransport {
 
   /** set to true when cancel() is called; checked by retry loops */
   private cancelled = false;
+
+  // NodeUsbTransport speaks Protocol V1 only (no Pro2 USB support yet via libusb).
+  getProtocolType(_path: string): ProtocolType {
+    return 'V1';
+  }
 
   /**
    * Initialize transport.

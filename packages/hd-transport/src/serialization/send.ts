@@ -4,7 +4,7 @@
 import ByteBuffer from 'bytebuffer';
 
 import { encode as encodeProtobuf } from './protobuf';
-import { encode as encodeProtocol } from './protocol';
+import { encode as encodeProtocol } from './protocol-v1';
 import { createMessageFromName } from './protobuf/messages';
 import { BUFFER_SIZE, MESSAGE_TOP_CHAR } from '../constants';
 

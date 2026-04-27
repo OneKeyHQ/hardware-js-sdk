@@ -4,7 +4,11 @@ import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { request as http } from './http';
 import { DEFAULT_URL } from './constants';
 
-import type { AcquireInput, OneKeyDeviceInfoWithSession } from '@onekeyfe/hd-transport';
+import type {
+  AcquireInput,
+  OneKeyDeviceInfoWithSession,
+  ProtocolType,
+} from '@onekeyfe/hd-transport';
 
 const { check, buildOne, receiveOne, parseConfigure } = transport;
 
@@ -26,6 +30,11 @@ export default class EmulatorTransport {
   stopped = false;
 
   isOutdated = false;
+
+  // EmulatorTransport speaks Protocol V1 only.
+  getProtocolType(_path: string): ProtocolType {
+    return 'V1';
+  }
 
   url: string;
 

@@ -1,11 +1,11 @@
 /* eslint-disable no-undef */
-import transport, { LogBlockCommand } from '@onekeyfe/hd-transport';
+import transport, { LogBlockCommand, PROTOCOL_V2_USB_PID } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode, ONEKEY_WEBUSB_FILTER, wait } from '@onekeyfe/hd-shared';
 import ByteBuffer from 'bytebuffer';
 
-import type { AcquireInput, OneKeyDeviceInfoBase } from '@onekeyfe/hd-transport';
+import type { AcquireInput, OneKeyDeviceInfoBase, ProtocolType } from '@onekeyfe/hd-transport';
 
-const { parseConfigure, buildEncodeBuffers, decodeProtocol, receiveOne, check } = transport;
+const { parseConfigure, decodeProtocol, check, ProtocolV1, ProtocolV2 } = transport;
 
 const CONFIGURATION_ID = 1;
 const INTERFACE_ID = 0;
@@ -23,8 +23,24 @@ export interface DeviceInfo extends OneKeyDeviceInfoBase {
   device: USBDevice;
 }
 
+/** USB endpoint pair discovered at connect time */
+interface DeviceEndpoints {
+  interfaceNumber: number;
+  endpointIn: number;
+  endpointOut: number;
+}
+
 export default class WebUsbTransport {
   messages: ReturnType<typeof transport.parseConfigure> | undefined;
+
+  /** Protobuf schema for Protocol V2 devices (Pro2) */
+  messagesV2: ReturnType<typeof transport.parseConfigure> | undefined;
+
+  /** Per-path protocol type (set from PID at connect time) */
+  private deviceProtocol: Map<string, ProtocolType> = new Map();
+
+  /** Per-path USB endpoint / interface numbers (discovered from USB descriptors) */
+  private deviceEndpoints: Map<string, DeviceEndpoints> = new Map();
 
   name = 'WebUsbTransport';
 
@@ -65,12 +81,21 @@ export default class WebUsbTransport {
   }
 
   /**
-   * Configure transport protocol
+   * Configure Protocol V1 protobuf schema (legacy chunked 0x3F framing).
    */
   configure(signedData: any) {
     const messages = parseConfigure(signedData);
     this.configured = true;
     this.messages = messages;
+  }
+
+  /**
+   * Configure Protocol V2 protobuf schema (Pro2 0x5A framing).
+   * Called by TransportManager after the default configure().
+   */
+  configureProtocolV2(signedData: any) {
+    this.messagesV2 = parseConfigure(signedData);
+    this.Log?.debug('[WebUsbTransport] Protocol V2 schema configured');
   }
 
   /**
@@ -123,6 +148,16 @@ export default class WebUsbTransport {
       commType: 'webusb',
     }));
 
+    // Debug: log all discovered devices with PID to identify protocol version
+    for (const dev of onekeyDevices) {
+      const isProtocolV2 = dev.productId === PROTOCOL_V2_USB_PID;
+      this.Log.debug(
+        `[WebUSB] Device: name="${dev.productName}" serial="${dev.serialNumber}" ` +
+          `VID=0x${dev.vendorId.toString(16)} PID=0x${dev.productId.toString(16)} ` +
+          `${isProtocolV2 ? '→ Protocol V2' : '→ Protocol V1'}`
+      );
+    }
+
     return this.deviceList;
   }
 
@@ -133,11 +168,34 @@ export default class WebUsbTransport {
     if (!input.path) return;
     try {
       await this.connect(input.path ?? '', true);
+      // Determine protocol from PID (set after connect so deviceList is populated)
+      this.detectProtocol(input.path);
       return await Promise.resolve(input.path);
     } catch (e) {
       this.Log.debug('acquire error: ', e instanceof Error ? `${e.name}: ${e.message}` : String(e));
       throw e;
     }
+  }
+
+  /**
+   * Determine protocol type from USB Product ID.
+   * PID 0x53C1 (PROTOCOL_V2_USB_PID) → Protocol V2 (0x5A framing, Pro2)
+   * All other PIDs        → Protocol V1 (64-byte chunked, 0x3F framing, Pro1 and earlier)
+   *
+   * We rely on PID because it is set in firmware and uniquely identifies the device
+   * generation. No wire-level probe is needed.
+   */
+  private detectProtocol(path: string): ProtocolType {
+    const deviceInfo = this.deviceList.find(d => d.path === path);
+    const protocol: ProtocolType =
+      deviceInfo?.device.productId === PROTOCOL_V2_USB_PID ? 'V2' : 'V1';
+    this.deviceProtocol.set(path, protocol);
+    this.Log.debug(
+      `[WebUsbTransport] detectProtocol: path=${path} PID=0x${(
+        deviceInfo?.device.productId ?? 0
+      ).toString(16)} → ${protocol}`
+    );
+    return protocol;
   }
 
   /**
@@ -182,22 +240,62 @@ export default class WebUsbTransport {
   }
 
   /**
-   * Connect to specific device
+   * Discover vendor-class (0xFF) interface and its IN/OUT endpoint numbers from USB descriptors.
+   * Falls back to legacy hardcoded values if no vendor interface is found.
+   */
+  private discoverEndpoints(device: USBDevice): DeviceEndpoints {
+    for (const config of device.configurations) {
+      for (const iface of config.interfaces) {
+        for (const alt of iface.alternates) {
+          if (alt.interfaceClass === 0xff) {
+            let endpointIn = this.endpointId;
+            let endpointOut = this.endpointId;
+            for (const ep of alt.endpoints) {
+              if (ep.direction === 'in') endpointIn = ep.endpointNumber;
+              else endpointOut = ep.endpointNumber;
+            }
+            this.Log?.debug(
+              `[WebUsbTransport] discovered vendor interface ${iface.interfaceNumber}, ` +
+                `endpointIn=${endpointIn}, endpointOut=${endpointOut}`
+            );
+            return { interfaceNumber: iface.interfaceNumber, endpointIn, endpointOut };
+          }
+        }
+      }
+    }
+    // Fallback: legacy hardcoded values
+    this.Log?.debug('[WebUsbTransport] no vendor interface found, using defaults');
+    return {
+      interfaceNumber: this.interfaceId,
+      endpointIn: this.endpointId,
+      endpointOut: this.endpointId,
+    };
+  }
+
+  /**
+   * Connect to specific device.
+   * Discovers interface/endpoint numbers from USB descriptors on first connection.
    */
   async connectToDevice(path: string, first: boolean) {
     const device: USBDevice = await this.findDevice(path);
+    this.Log.debug(
+      '[WebUsbTransport] connecting to device:',
+      device.productName,
+      'PID:',
+      device.productId
+    );
+
     await device.open();
 
     if (first) {
       await device.selectConfiguration(this.configurationId);
-      try {
-        await device.reset();
-      } catch (error) {
-        // Ignore reset errors
-      }
     }
 
-    await device.claimInterface(this.interfaceId);
+    // Discover endpoints from USB descriptors (works for both Pro1 and Pro2)
+    const endpoints = this.discoverEndpoints(device);
+    this.deviceEndpoints.set(path, endpoints);
+
+    await device.claimInterface(endpoints.interfaceNumber);
   }
 
   async post(session: string, name: string, data: Record<string, unknown>) {
@@ -243,8 +341,10 @@ export default class WebUsbTransport {
     try {
       const currentDevice = await this.findDevice(path);
       if (currentDevice.opened) {
+        const endpoints = this.deviceEndpoints.get(path);
+        const ifaceNum = endpoints?.interfaceNumber ?? this.interfaceId;
         try {
-          await currentDevice.releaseInterface(this.interfaceId);
+          await currentDevice.releaseInterface(ifaceNum);
         } catch (releaseError) {
           this.Log.debug('[WebUsbTransport] releaseInterface before retry error:', releaseError);
         }
@@ -285,10 +385,12 @@ export default class WebUsbTransport {
         if (!device.opened) {
           await this.connect(path, false);
         }
+        const endpoints = this.deviceEndpoints.get(path);
+        const endpointOut = endpoints?.endpointOut ?? this.endpointId;
         const transferBuffer = this.toArrayBuffer(
           packet.buffer.slice(packet.byteOffset, packet.byteOffset + packet.byteLength)
         );
-        await device.transferOut(this.endpointId, transferBuffer);
+        await device.transferOut(endpointOut, transferBuffer);
         return;
       } catch (error) {
         lastError = error;
@@ -319,7 +421,9 @@ export default class WebUsbTransport {
         if (!device.opened) {
           await this.connect(path, false);
         }
-        const result = await device.transferIn(this.endpointId, length);
+        const endpoints = this.deviceEndpoints.get(path);
+        const endpointIn = endpoints?.endpointIn ?? this.endpointId;
+        const result = await device.transferIn(endpointIn, length);
         return this.getTransferInData(result);
       } catch (error) {
         lastError = error;
@@ -343,7 +447,7 @@ export default class WebUsbTransport {
   }
 
   /**
-   * Call device method
+   * Call device method — branches to Protocol V1 or Protocol V2 based on detected protocol.
    */
   async call(path: string, name: string, data: Record<string, unknown>) {
     if (this.messages == null) {
@@ -355,19 +459,26 @@ export default class WebUsbTransport {
       throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound);
     }
 
-    const { messages } = this;
+    const protocol = this.deviceProtocol.get(path) ?? 'V1';
+
     if (LogBlockCommand.has(name)) {
-      this.Log.debug('call-', ' name: ', name);
+      this.Log.debug('call-', ' name: ', name, ' protocol: ', protocol);
     } else {
-      this.Log.debug('call-', ' name: ', name, ' data: ', data);
+      this.Log.debug('call-', ' name: ', name, ' data: ', data, ' protocol: ', protocol);
     }
-    const encodeBuffers = buildEncodeBuffers(messages, name, data);
+
+    if (protocol === 'V2') {
+      return this.callProtocolV2(path, name, data);
+    }
+
+    // --- Protocol V1 path (Pro1 and earlier, 64-byte chunked 0x3F framing) ---
+    const { messages } = this;
+    const encodeBuffers = ProtocolV1.encode(messages, name, data);
 
     for (const buffer of encodeBuffers) {
       const newArray: Uint8Array = new Uint8Array(PACKET_SIZE);
       newArray[0] = 63;
       newArray.set(new Uint8Array(buffer), 1);
-      // console.log('send packet: ', newArray);
       await this.transferOutWithRetry(path, newArray);
     }
 
@@ -375,8 +486,85 @@ export default class WebUsbTransport {
     if (typeof resData !== 'string') {
       throw ERRORS.TypedError(HardwareErrorCode.NetworkError, 'Returning data is not string.');
     }
-    const jsonData = receiveOne(messages, resData);
+    const jsonData = ProtocolV1.decode(messages, resData);
     return check.call(jsonData);
+  }
+
+  /**
+   * Send/receive a single call over Protocol V2 (0x5A framing, Pro2).
+   *
+   * Encoding:  protobuf message → 2-byte LE msgType + pb bytes → Protocol V2 frame
+   * Decoding:  Protocol V2 frame → msgType + pb bytes → protobuf message
+   */
+  private async callProtocolV2(path: string, name: string, data: Record<string, unknown>) {
+    const protocolV1Messages = this.messages;
+    if (!this.messagesV2) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.TransportNotConfigured,
+        'Protocol V2 schema not configured'
+      );
+    }
+    if (!protocolV1Messages) {
+      throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
+    }
+
+    // USB endpoints reach the main MCU directly, so no proto-link routing fields
+    // (channel/packetSrc) are needed. BLE goes through a coprocessor UART bridge
+    // and must set them — see ElectronPro2BleTransport.call().
+    const frame = ProtocolV2.encode(
+      {
+        protocolV1: protocolV1Messages,
+        protocolV2: this.messagesV2,
+      },
+      name,
+      data
+    );
+
+    // Protocol V2 supports a larger single frame than Protocol V1 chunk packets.
+    await this.transferOutWithRetry(path, frame);
+
+    // 4. Single transferIn — read up to 4096 bytes
+    const rxDataView = await this.transferInWithRetry(path, 4096);
+    const rxBytes = new Uint8Array(
+      this.toArrayBuffer(
+        rxDataView.buffer.slice(
+          rxDataView.byteOffset,
+          rxDataView.byteOffset + rxDataView.byteLength
+        )
+      )
+    );
+
+    const decoded = ProtocolV2.decode(
+      {
+        protocolV1: protocolV1Messages,
+        protocolV2: this.messagesV2,
+      },
+      rxBytes
+    );
+
+    // Debug: log raw frame and decoded payload
+    this.Log.debug(
+      `[ProtocolV2] TX name=${name} | RX msgType=${decoded.msgType} pbPayload=${decoded.pbPayload.length}B`
+    );
+    this.Log.debug(
+      `[ProtocolV2] RX raw frame (${rxBytes.length}B): ${Array.from(
+        rxBytes.slice(0, Math.min(rxBytes.length, 64))
+      )
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join(' ')}${rxBytes.length > 64 ? '...' : ''}`
+    );
+    this.Log.debug(
+      `[ProtocolV2] RX pb hex (${decoded.pbPayload.length}B): ${Array.from(decoded.pbPayload)
+        .map((b: number) => b.toString(16).padStart(2, '0'))
+        .join(' ')}`
+    );
+
+    this.Log.debug(
+      `[ProtocolV2] Decoded ${decoded.messageName}:`,
+      JSON.stringify(decoded.message, null, 2)
+    );
+
+    return check.call(decoded);
   }
 
   /**
@@ -415,7 +603,19 @@ export default class WebUsbTransport {
    */
   async release(path: string) {
     const device: USBDevice = await this.findDevice(path);
-    await device.releaseInterface(this.interfaceId);
+    const endpoints = this.deviceEndpoints.get(path);
+    const ifaceNum = endpoints?.interfaceNumber ?? this.interfaceId;
+    await device.releaseInterface(ifaceNum);
     await device.close();
+    this.deviceProtocol.delete(path);
+    this.deviceEndpoints.delete(path);
+  }
+
+  /**
+   * Expose the detected protocol type for a given device path.
+   * Used by upper layers (e.g. TransportManager) to select the correct schema.
+   */
+  getProtocolType(path: string): ProtocolType {
+    return this.deviceProtocol.get(path) ?? 'V1';
   }
 }

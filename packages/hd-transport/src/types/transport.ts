@@ -1,5 +1,7 @@
 import type EventEmitter from 'events';
 
+export type ProtocolType = 'V1' | 'V2';
+
 export type OneKeyDeviceCommType =
   | 'usb'
   | 'webusb'
@@ -31,7 +33,9 @@ export type OneKeyDeviceInfoBase = {
 // TODO: sorting type by communication type
 export type OneKeyDeviceInfo = OneKeyDeviceInfoBase &
   OneKeyDeviceInfoWithSession &
-  OneKeyMobileDeviceInfo;
+  OneKeyMobileDeviceInfo & {
+    protocolType?: ProtocolType;
+  };
 
 export type AcquireInput = {
   path?: string;
@@ -54,6 +58,7 @@ export type Transport = {
   acquire(input: AcquireInput): Promise<string>;
   release(session: string, onclose: boolean): Promise<void>;
   configure(signedData: JSON | string): Promise<void>;
+  configureProtocolV2?: (signedData: JSON | string) => Promise<void> | void;
   call(session: string, name: string, data: Record<string, any>): Promise<MessageFromOneKey>;
   post(session: string, name: string, data: Record<string, any>): Promise<void>;
   read(session: string): Promise<MessageFromOneKey>;
@@ -62,6 +67,12 @@ export type Transport = {
   // reset the session of the transport
   // used to reset the session of the transport when the session is not valid
   disconnect?: (session: string) => Promise<void>;
+
+  // Returns the protocol type for a given device path.
+  // Single-protocol transports (HTTP, emulator, RN-BLE, etc.) always return 'V1'.
+  // The Pro2 USB transport detects per-device by USB PID; the Pro2 BLE transport
+  // is V2-only and returns 'V2'.
+  getProtocolType: (path: string) => ProtocolType;
 
   // web-usb, web-bluetooth request device
   promptDeviceAccess?: () => Promise<USBDevice | BluetoothDevice | null>;
