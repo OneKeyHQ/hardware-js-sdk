@@ -2,7 +2,7 @@ import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import transport, { LogBlockCommand } from '@onekeyfe/hd-transport';
 
 import type EventEmitter from 'events';
-import type { LowlevelTransportSharedPlugin } from '@onekeyfe/hd-transport';
+import type { LowlevelTransportSharedPlugin, ProtocolType } from '@onekeyfe/hd-transport';
 import type { LowLevelAcquireInput } from './types';
 
 const { check, buildBuffers, receiveOne, parseConfigure } = transport;
@@ -17,6 +17,11 @@ export default class LowlevelTransport {
   emitter?: EventEmitter;
 
   plugin: LowlevelTransportSharedPlugin = {} as LowlevelTransportSharedPlugin;
+
+  // LowlevelTransport speaks Protocol V1 only (the embedder provides byte plumbing only).
+  getProtocolType(_path: string): ProtocolType {
+    return 'V1';
+  }
 
   init(logger: any, emitter: EventEmitter, plugin: LowlevelTransportSharedPlugin) {
     this.Log = logger;

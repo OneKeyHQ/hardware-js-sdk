@@ -9,6 +9,7 @@ import {
 
 import type { Deferred } from '@onekeyfe/hd-shared';
 import type EventEmitter from 'events';
+import type { ProtocolType } from '@onekeyfe/hd-transport';
 // Import DesktopAPI type from hd-transport-electron
 import type { DesktopAPI } from '@onekeyfe/hd-transport-electron';
 
@@ -57,6 +58,11 @@ export default class ElectronBleTransport {
 
   // Disconnect listener cleanup functions
   private disconnectCleanups: Map<string, () => void> = new Map();
+
+  // ElectronBleTransport (legacy Pro1/Touch BLE) speaks Protocol V1 only.
+  getProtocolType(_path: string): ProtocolType {
+    return 'V1';
+  }
 
   // Handle bluetooth related errors with proper error code mapping
   private handleBluetoothError(error: any): never {

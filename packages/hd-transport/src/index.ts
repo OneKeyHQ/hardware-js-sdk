@@ -5,8 +5,16 @@ import {
   buildBuffers,
   buildEncodeBuffers,
   buildOne,
+  createMessageFromName,
+  createMessageFromType,
+  decodeProtobuf,
   decodeProtocol,
+  encodeProtobuf,
   parseConfigure,
+  ProtocolV1,
+  ProtocolV2,
+  PROTOCOL_V2_SYS_MESSAGE_THRESHOLD,
+  protoV2,
   receiveOne,
 } from './serialization';
 import * as check from './utils/highlevel-checks';
@@ -25,6 +33,7 @@ export type {
   LowLevelDevice,
   OneKeyDeviceInfoBase,
   OneKeyDeviceCommType,
+  ProtocolType,
 } from './types';
 
 export { Messages } from './types';
@@ -41,4 +50,12 @@ export default {
   receiveOne,
   parseConfigure,
   decodeProtocol,
+  protoV2,
+  ProtocolV1,
+  ProtocolV2,
+  PROTOCOL_V2_SYS_MESSAGE_THRESHOLD,
+  createMessageFromName,
+  createMessageFromType,
+  encodeProtobuf,
+  decodeProtobuf,
 };
