@@ -1,3 +1,4 @@
+/* eslint-disable import/order */
 const ProtoBuf = require('protobufjs/light');
 const ByteBuffer = require('bytebuffer');
 

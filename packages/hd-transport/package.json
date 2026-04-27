@@ -16,7 +16,7 @@
     "test": "jest",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "update:protobuf": "./scripts/protobuf-build.sh"
+    "update-protobuf": "./scripts/protobuf-build.sh"
   },
   "devDependencies": {
     "@types/bytebuffer": "^5.0.42",

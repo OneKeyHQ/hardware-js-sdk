@@ -1,0 +1,347 @@
+{
+  "nested": {
+    "Ping": {
+      "fields": {
+        "message": {
+          "type": "string",
+          "id": 1,
+          "options": {
+            "default": ""
+          }
+        },
+        "button_protection": {
+          "type": "bool",
+          "id": 2
+        }
+      }
+    },
+    "Success": {
+      "fields": {
+        "message": {
+          "type": "string",
+          "id": 1,
+          "options": {
+            "default": ""
+          }
+        }
+      }
+    },
+    "Failure": {
+      "fields": {
+        "code": {
+          "type": "FailureType",
+          "id": 1
+        },
+        "message": {
+          "type": "string",
+          "id": 2
+        }
+      }
+    },
+    "Reboot": {
+      "fields": {
+        "reboot_type": {
+          "rule": "required",
+          "type": "RebootType",
+          "id": 1
+        }
+      }
+    },
+    "FixPermission": {
+      "fields": {}
+    },
+    "PathInfo": {
+      "fields": {
+        "exist": {
+          "rule": "required",
+          "type": "bool",
+          "id": 1
+        },
+        "size": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 2
+        },
+        "year": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 3
+        },
+        "month": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 4
+        },
+        "day": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 5
+        },
+        "hour": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 6
+        },
+        "minute": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 7
+        },
+        "second": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 8
+        },
+        "readonly": {
+          "rule": "required",
+          "type": "bool",
+          "id": 9
+        },
+        "hidden": {
+          "rule": "required",
+          "type": "bool",
+          "id": 10
+        },
+        "system": {
+          "rule": "required",
+          "type": "bool",
+          "id": 11
+        },
+        "archive": {
+          "rule": "required",
+          "type": "bool",
+          "id": 12
+        },
+        "directory": {
+          "rule": "required",
+          "type": "bool",
+          "id": 13
+        }
+      }
+    },
+    "PathInfoQuery": {
+      "fields": {
+        "path": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "File": {
+      "fields": {
+        "path": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        },
+        "offset": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        },
+        "total_size": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 3
+        },
+        "data": {
+          "type": "bytes",
+          "id": 4
+        },
+        "data_hash": {
+          "type": "uint32",
+          "id": 5
+        },
+        "processed_byte": {
+          "type": "uint32",
+          "id": 6
+        }
+      }
+    },
+    "FileRead": {
+      "fields": {
+        "file": {
+          "rule": "required",
+          "type": "File",
+          "id": 1
+        },
+        "ui_percentage": {
+          "type": "uint32",
+          "id": 2
+        }
+      }
+    },
+    "FileWrite": {
+      "fields": {
+        "file": {
+          "rule": "required",
+          "type": "File",
+          "id": 1
+        },
+        "overwrite": {
+          "rule": "required",
+          "type": "bool",
+          "id": 2
+        },
+        "append": {
+          "rule": "required",
+          "type": "bool",
+          "id": 3
+        },
+        "ui_percentage": {
+          "type": "uint32",
+          "id": 4
+        }
+      }
+    },
+    "FileDelete": {
+      "fields": {
+        "path": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "Dir": {
+      "fields": {
+        "path": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        },
+        "child_dirs": {
+          "type": "string",
+          "id": 2
+        },
+        "child_files": {
+          "type": "string",
+          "id": 3
+        }
+      }
+    },
+    "DirList": {
+      "fields": {
+        "path": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "DirMake": {
+      "fields": {
+        "path": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "DirRemove": {
+      "fields": {
+        "path": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "MessageType": {
+      "values": {
+        "MessageType_Ping": 60206,
+        "MessageType_Success": 60207,
+        "MessageType_Failure": 60208,
+        "MessageType_Reboot": 60400,
+        "MessageType_FixPermission": 60800,
+        "MessageType_PathInfo": 60801,
+        "MessageType_PathInfoQuery": 60802,
+        "MessageType_File": 60803,
+        "MessageType_FileRead": 60804,
+        "MessageType_FileWrite": 60805,
+        "MessageType_FileDelete": 60806,
+        "MessageType_Dir": 60807,
+        "MessageType_DirList": 60808,
+        "MessageType_DirMake": 60809,
+        "MessageType_DirRemove": 60810,
+        "MessageType_FirmwareUpdate": 61000,
+        "MessageType_FirmwareInstallProgress": 61001
+      }
+    },
+    "FailureType": {
+      "values": {
+        "Failure_UnexpectedMessage": 1,
+        "Failure_ButtonExpected": 2,
+        "Failure_DataError": 3,
+        "Failure_ActionCancelled": 4,
+        "Failure_PinExpected": 5,
+        "Failure_PinCancelled": 6,
+        "Failure_PinInvalid": 7,
+        "Failure_InvalidSignature": 8,
+        "Failure_ProcessError": 9,
+        "Failure_NotEnoughFunds": 10,
+        "Failure_NotInitialized": 11,
+        "Failure_PinMismatch": 12,
+        "Failure_WipeCodeMismatch": 13,
+        "Failure_InvalidSession": 14,
+        "Failure_FirmwareError": 99
+      }
+    },
+    "FirmwareTargetType": {
+      "values": {
+        "TARGET_MAIN_APP": 0,
+        "TARGET_MAIN_BOOT": 1,
+        "TARGET_BLE": 2,
+        "TARGET_SE1": 3,
+        "TARGET_SE2": 4,
+        "TARGET_SE3": 5,
+        "TARGET_SE4": 6,
+        "TARGET_RESOURCE": 10
+      }
+    },
+    "RebootType": {
+      "values": {
+        "REBOOT_NORMAL": 0,
+        "REBOOT_BOARDLOADER": 1,
+        "REBOOT_BOOTLOADER": 2
+      }
+    },
+    "FirmwareTarget": {
+      "fields": {
+        "target_id": {
+          "rule": "required",
+          "type": "FirmwareTargetType",
+          "id": 1
+        },
+        "path": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        }
+      }
+    },
+    "FirmwareUpdate": {
+      "fields": {
+        "targets": {
+          "rule": "repeated",
+          "type": "FirmwareTarget",
+          "id": 1
+        },
+        "reboot_on_success": {
+          "type": "bool",
+          "id": 2
+        }
+      }
+    },
+    "FirmwareInstallProgress": {
+      "fields": {
+        "progress": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
+        }
+      }
+    }
+  }
+}
