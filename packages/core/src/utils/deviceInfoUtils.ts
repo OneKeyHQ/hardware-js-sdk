@@ -27,6 +27,9 @@ export const getDeviceType = (features?: Features): IDeviceType => {
       return EDeviceType.Touch;
     case 'PRO':
       return EDeviceType.Pro;
+    case 'PRO2':
+    case 'pro2':
+      return EDeviceType.Pro2;
     case 'PURE':
       return EDeviceType.ClassicPure;
     default:
@@ -74,6 +77,7 @@ export const getDeviceTypeByBleName = (name?: string): IDeviceType => {
   if (name.startsWith('T')) return EDeviceType.Touch;
   if (name.startsWith('Touch')) return EDeviceType.Touch;
 
+  if (name.startsWith('Pro2')) return EDeviceType.Pro2;
   if (name.startsWith('Pro')) return EDeviceType.Pro;
 
   return EDeviceType.Unknown;

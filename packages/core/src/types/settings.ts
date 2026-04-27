@@ -10,6 +10,7 @@ export type transportEnv =
   | 'webusb'
   | 'desktop-webusb'
   | 'desktop-web-ble'
+  | 'desktop-web-ble-pro2'
   | 'emulator'
   | 'lowlevel'
   | 'node-usb';
@@ -83,7 +84,7 @@ export type IBLEFirmwareReleaseInfo = {
   };
 };
 
-type IKnownDevice = Exclude<IDeviceType, 'unknown'>;
+type IKnownDevice = Exclude<IDeviceType, 'unknown' | 'pro2'>;
 
 /**
  * Device firmware configuration map

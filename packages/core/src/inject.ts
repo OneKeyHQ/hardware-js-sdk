@@ -148,6 +148,15 @@ export const createCoreApi = (
   deviceFlags: (connectId, params) => call({ ...params, connectId, method: 'deviceFlags' }),
   deviceRebootToBoardloader: connectId => call({ connectId, method: 'deviceRebootToBoardloader' }),
   deviceRebootToBootloader: connectId => call({ connectId, method: 'deviceRebootToBootloader' }),
+
+  // File system & device control API (Pro2-only, Proto V0)
+  fileRead: (connectId, params) => call({ ...params, connectId, method: 'fileRead' }),
+  fileWrite: (connectId, params) => call({ ...params, connectId, method: 'fileWrite' }),
+  fileDelete: (connectId, params) => call({ ...params, connectId, method: 'fileDelete' }),
+  dirList: (connectId, params) => call({ ...params, connectId, method: 'dirList' }),
+  dirMake: (connectId, params) => call({ ...params, connectId, method: 'dirMake' }),
+  dirRemove: (connectId, params) => call({ ...params, connectId, method: 'dirRemove' }),
+  pathInfo: (connectId, params) => call({ ...params, connectId, method: 'pathInfo' }),
   deviceRecovery: (connectId, params) => call({ ...params, connectId, method: 'deviceRecovery' }),
   deviceReset: (connectId, params) => call({ ...params, connectId, method: 'deviceReset' }),
   deviceSettings: (connectId, params) => call({ ...params, connectId, method: 'deviceSettings' }),

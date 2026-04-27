@@ -4,6 +4,7 @@ import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
 
 import MessagesJSON from '../data/messages/messages.json';
 import MessagesLegacyV1JSON from '../data/messages/messages_legacy_v1.json';
+import MessagesPro2JSON from '../data/messages/messages-pro2.json';
 import {
   LoggerNames,
   getDeviceBLEFirmwareVersion,
@@ -40,7 +41,7 @@ export const FIRMWARE_FIELDS = [
 
 export type IFirmwareField = (typeof FIRMWARE_FIELDS)[number];
 
-export type MessageVersion = 'latest' | 'v1';
+export type MessageVersion = 'latest' | 'v1' | 'pro2';
 
 const FIRMWARE_FIELD_TYPE_MAP: Readonly<Record<IFirmwareField, EFirmwareType>> = {
   firmware: EFirmwareType.Universal,
@@ -62,7 +63,9 @@ function getFirmwareTypeFromField(firmwareField: IFirmwareField): EFirmwareType 
 }
 
 export default class DataManager {
-  static deviceMap: DeviceTypeMap = {
+  static deviceMap: DeviceTypeMap & {
+    [k: string]: DeviceTypeMap[keyof DeviceTypeMap] | undefined;
+  } = {
     [EDeviceType.Classic]: {
       firmware: [],
       ble: [],
@@ -96,6 +99,7 @@ export default class DataManager {
   static messages: { [version in MessageVersion]: JSON } = {
     latest: MessagesJSON as unknown as JSON,
     v1: MessagesLegacyV1JSON as unknown as JSON,
+    pro2: MessagesPro2JSON as unknown as JSON,
   };
 
   static lastCheckTimestamp = 0;
@@ -489,7 +493,10 @@ export default class DataManager {
   }
 
   static isBleConnect = (env: ConnectSettings['env']) =>
-    env === 'react-native' || env === 'lowlevel' || env === 'desktop-web-ble';
+    env === 'react-native' ||
+    env === 'lowlevel' ||
+    env === 'desktop-web-ble' ||
+    env === 'desktop-web-ble-pro2';
 
   /** Desktop WebUSB doesn't need browser permission prompt */
   static isDesktopWebUsb = (env: ConnectSettings['env']) => env === 'desktop-webusb';
