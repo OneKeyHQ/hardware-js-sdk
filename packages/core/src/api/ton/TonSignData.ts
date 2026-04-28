@@ -9,7 +9,10 @@ import type { TonSignDataParams } from '../../types/api/tonSignData';
 
 export default class TonSignData extends BaseMethod<HardwareTonSignData> {
   init() {
-    this.strictCheckDeviceSupport = true;
+    // Keep strict-check off until the firmware release that ships TonSignData
+    // is decided — we don't yet know the min versions for touch/classic1s.
+    // Flip back to true and add getVersionRange() once those numbers land.
+    this.strictCheckDeviceSupport = false;
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
@@ -44,22 +47,6 @@ export default class TonSignData extends BaseMethod<HardwareTonSignData> {
       workchain: this.payload.workchain,
       is_bounceable: this.payload.isBounceable,
       is_testnet_only: this.payload.isTestnetOnly,
-    };
-  }
-
-  // Required because strictCheckDeviceSupport=true above. Without an entry
-  // here, BaseMethod returns an empty range and the core treats every
-  // device as unsupported, blocking the call before run() ever fires.
-  // Aligned with TonSignMessage's getFixInitStateErrorVersionRange() — bump
-  // when the firmware release that ships TonSignData lands.
-  getVersionRange() {
-    return {
-      model_touch: {
-        min: '4.13.0',
-      },
-      model_classic1s: {
-        min: '3.12.0',
-      },
     };
   }
 
