@@ -88,6 +88,30 @@ const METHOD_PREFIX_TO_APP_NAME: Record<string, string> = {
   tron: 'Tron',
 };
 
+/**
+ * Render call params as non-sensitive metadata for the SDK log bus. Raw
+ * payloads (serializedTx / psbt / rawTxHex / messageHex / typed data) MUST
+ * NOT enter the log stream — hosts may forward it to telemetry / persistent
+ * stores. We surface only path, length-of-payload, and a few harmless flags.
+ */
+function summarizeCallParams(_method: string, params: unknown): string {
+  if (!params || typeof params !== 'object') return '';
+  const p = params as Record<string, unknown>;
+  const safe: Record<string, unknown> = {};
+  if (typeof p.path === 'string') safe.path = p.path;
+  if (typeof p.showOnDevice === 'boolean') safe.showOnDevice = p.showOnDevice;
+  if (typeof p.checkOnDevice === 'boolean') safe.checkOnDevice = p.checkOnDevice;
+  for (const key of ['serializedTx', 'rawTxHex', 'messageHex', 'message', 'psbt', 'data']) {
+    const v = p[key];
+    if (typeof v === 'string') safe[`${key}.len`] = v.length;
+    else if (v !== undefined) safe[`${key}.type`] = typeof v;
+  }
+  if (Array.isArray(p.tokenSignatures)) {
+    safe.tokenSignaturesCount = p.tokenSignatures.length;
+  }
+  return JSON.stringify(safe);
+}
+
 // ---------------------------------------------------------------------------
 // Default signer kit importer (webpack/rspack — uses "exports" field)
 // ---------------------------------------------------------------------------
@@ -381,7 +405,7 @@ export class LedgerConnectorBase implements IConnector {
   // ---------------------------------------------------------------------------
 
   async call(sessionId: string, method: string, params: unknown): Promise<unknown> {
-    debugLog('[DMK] call:', method, JSON.stringify(params));
+    debugLog('[DMK] call:', method, summarizeCallParams(method, params));
     // Bind the chain's Ledger app name to ctx.wrapError once per dispatch so
     // chain handlers can call `ctx.wrapError(err)` with no per-site appName.
     const ctx = this._ctxForMethod(method);

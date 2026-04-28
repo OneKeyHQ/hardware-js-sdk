@@ -47,6 +47,22 @@ export default class TonSignData extends BaseMethod<HardwareTonSignData> {
     };
   }
 
+  // Required because strictCheckDeviceSupport=true above. Without an entry
+  // here, BaseMethod returns an empty range and the core treats every
+  // device as unsupported, blocking the call before run() ever fires.
+  // Aligned with TonSignMessage's getFixInitStateErrorVersionRange() — bump
+  // when the firmware release that ships TonSignData lands.
+  getVersionRange() {
+    return {
+      model_touch: {
+        min: '4.13.0',
+      },
+      model_classic1s: {
+        min: '3.12.0',
+      },
+    };
+  }
+
   async run() {
     const res = await this.device.commands.typedCall('TonSignData', 'TonSignedData', {
       ...this.params,
