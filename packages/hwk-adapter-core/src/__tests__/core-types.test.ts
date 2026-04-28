@@ -9,10 +9,11 @@ import { HardwareErrorCode } from '../index';
 describe('HardwareErrorCode contract', () => {
   it('every code is 5-digit (>= 10000)', () => {
     for (const [name, value] of Object.entries(HardwareErrorCode)) {
-      if (typeof value !== 'number') continue;
-      expect({ name, value }).toMatchObject({ name, value: expect.any(Number) });
-      expect(value).toBeGreaterThanOrEqual(10000);
-      expect(value).toBeLessThanOrEqual(99999);
+      if (typeof value === 'number') {
+        expect({ name, value }).toMatchObject({ name, value: expect.any(Number) });
+        expect(value).toBeGreaterThanOrEqual(10000);
+        expect(value).toBeLessThanOrEqual(99999);
+      }
     }
   });
 

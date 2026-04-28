@@ -14,12 +14,7 @@
 
 import { execFile, execFileSync } from 'node:child_process';
 
-const PINENTRY_PROGRAMS = [
-  'pinentry-mac',
-  'pinentry',
-  'pinentry-gnome3',
-  'pinentry-qt',
-];
+const PINENTRY_PROGRAMS = ['pinentry-mac', 'pinentry', 'pinentry-gnome3', 'pinentry-qt'];
 
 // Assuan protocol percent-encodes %, CR, and LF in D data lines.
 // Without decoding, a passphrase containing `%` would be silently corrupted
@@ -46,8 +41,7 @@ export function parsePinentryStdout(stdout: string): {
 } {
   // Pinentry error code 83886179 is the canonical "user cancelled" signal —
   // surfaces either as a non-zero exit or as an ERR line.
-  const cancelled =
-    stdout.includes('ERR 83886179') || stdout.includes('Operation cancelled');
+  const cancelled = stdout.includes('ERR 83886179') || stdout.includes('Operation cancelled');
 
   const dataChunks = stdout
     .split(/\r?\n/)
@@ -89,9 +83,7 @@ export function promptPassphraseViaPinentry(): Promise<PinentryResult> {
   return new Promise((resolve, reject) => {
     const pinentryBin = findPinentry();
     if (!pinentryBin) {
-      process.stderr.write(
-        '[onekey-hw] No pinentry found, falling back to on-device entry.\n'
-      );
+      process.stderr.write('[onekey-hw] No pinentry found, falling back to on-device entry.\n');
       resolve({ value: '', passphraseOnDevice: true });
       return;
     }

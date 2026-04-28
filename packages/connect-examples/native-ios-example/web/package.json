@@ -32,5 +32,8 @@
       "publicUrl": "./",
       "outputFormat": "global"
     }
+  },
+  "resolutions": {
+    "axios": "1.15.2"
   }
 }

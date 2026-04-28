@@ -23,9 +23,7 @@ describe('decodeAssuanData', () => {
   });
 
   it('decodes CR (%0D) and LF (%0A)', () => {
-    expect(decodeAssuanData('line1%0Dline2%0Aline3')).toBe(
-      'line1\rline2\nline3'
-    );
+    expect(decodeAssuanData('line1%0Dline2%0Aline3')).toBe('line1\rline2\nline3');
   });
 
   it('handles trailing percent encoding', () => {
@@ -84,8 +82,7 @@ describe('decodeAssuanData', () => {
 
 describe('parsePinentryStdout', () => {
   it('parses a real pinentry-mac success response', () => {
-    const stdout =
-      'OK Pleased to meet you, process 38946\nOK\nOK\nD a%25b%25c\nOK\n';
+    const stdout = 'OK Pleased to meet you, process 38946\nOK\nOK\nD a%25b%25c\nOK\n';
     expect(parsePinentryStdout(stdout)).toEqual({
       data: 'a%b%c',
       cancelled: false,
@@ -99,8 +96,7 @@ describe('parsePinentryStdout', () => {
   });
 
   it('flags cancellation via ERR 83886179', () => {
-    const stdout =
-      'OK Pleased to meet you\nOK\nOK\nERR 83886179 Operation cancelled\n';
+    const stdout = 'OK Pleased to meet you\nOK\nOK\nERR 83886179 Operation cancelled\n';
     expect(parsePinentryStdout(stdout)).toEqual({ cancelled: true });
   });
 
