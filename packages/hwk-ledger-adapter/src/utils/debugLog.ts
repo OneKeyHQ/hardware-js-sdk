@@ -1,33 +1,16 @@
 /**
- * SDK-internal logger sink.
+ * SDK-internal debug logger.
  *
- * Off by default. The host app injects a sink via `setLogger(fn)` so debug
- * output flows into the host's logging pipeline (e.g. defaultLogger).
- *
- * Cross-process note: this module holds a per-runtime singleton. In MV3
- * extensions where the SDK runs split between the service worker (adapter)
- * and an offscreen document (connector), each process must call
- * `setLogger(...)` independently — they don't share state.
+ * Emits a `log` event onto the SDK-global event bus (`sdkEventBus`). Hosts
+ * subscribe via `onSdkEvent(...)` and route to their own logging pipeline.
+ * No subscribers = silent (and zero stringification cost).
  */
-
-export type LogLevel = 'debug' | 'error';
-export type Logger = (level: LogLevel, ...args: unknown[]) => void;
-
-let logger: Logger | null = null;
-
-/**
- * Inject a logger sink. Pass `null` to silence the SDK.
- * Each process / runtime needs its own call (module state is not shared
- * across MV3 SW ↔ offscreen).
- */
-export function setLogger(fn: Logger | null): void {
-  logger = fn;
-}
+import { emitLog } from './sdkEventBus';
 
 export function debugLog(...args: unknown[]): void {
-  logger?.('debug', ...args);
+  emitLog('debug', ...args);
 }
 
 export function debugError(...args: unknown[]): void {
-  logger?.('error', ...args);
+  emitLog('error', ...args);
 }

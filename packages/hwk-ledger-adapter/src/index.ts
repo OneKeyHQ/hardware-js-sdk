@@ -32,9 +32,9 @@ export type {
 export { isDeviceLockedError, ledgerFailure, mapLedgerError } from './errors';
 export type { LedgerFailure } from './errors';
 
-// Debug logging (opt-in via host-injected sink)
-export { setLogger } from './utils/debugLog';
-export type { LogLevel, Logger } from './utils/debugLog';
+// SDK-global event bus (logs today; extensible for firmware progress / etc.)
+export { onSdkEvent, offSdkEvent } from './utils/sdkEventBus';
+export type { SdkEvent, SdkEventListener, SdkLogEvent } from './utils/sdkEventBus';
 
 // BLE utilities (shared by connector packages)
 export { extractBleHexId } from './utils/bleIdentity';
