@@ -1,5 +1,17 @@
 {
   "nested": {
+    "GetProtoVersion": {
+      "fields": {}
+    },
+    "ProtoVersion": {
+      "fields": {
+        "proto_version": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
+        }
+      }
+    },
     "Ping": {
       "fields": {
         "message": {
@@ -8,10 +20,6 @@
           "options": {
             "default": ""
           }
-        },
-        "button_protection": {
-          "type": "bool",
-          "id": 2
         }
       }
     },
@@ -36,21 +44,427 @@
           "type": "string",
           "id": 2
         }
+      },
+      "nested": {
+        "FailureType": {
+          "values": {
+            "Failure_UnexpectedMessage": 1,
+            "Failure_ButtonExpected": 2,
+            "Failure_DataError": 3,
+            "Failure_ActionCancelled": 4,
+            "Failure_PinExpected": 5,
+            "Failure_PinCancelled": 6,
+            "Failure_PinInvalid": 7,
+            "Failure_InvalidSignature": 8,
+            "Failure_ProcessError": 9,
+            "Failure_NotEnoughFunds": 10,
+            "Failure_NotInitialized": 11,
+            "Failure_PinMismatch": 12,
+            "Failure_WipeCodeMismatch": 13,
+            "Failure_InvalidSession": 14,
+            "Failure_FirmwareError": 99
+          }
+        }
       }
     },
-    "Reboot": {
+    "DevRebootType": {
+      "values": {
+        "Normal": 0,
+        "Boardloader": 1,
+        "Bootloader": 2
+      }
+    },
+    "DevReboot": {
       "fields": {
         "reboot_type": {
           "rule": "required",
-          "type": "RebootType",
+          "type": "DevRebootType",
           "id": 1
         }
       }
     },
-    "FixPermission": {
+    "DeviceType": {
+      "values": {
+        "CLASSIC1": 0,
+        "CLASSIC1S": 1,
+        "MINI": 2,
+        "TOUCH": 3,
+        "PRO": 5,
+        "CLASSIC1S_PURE": 6
+      }
+    },
+    "DevSeType": {
+      "values": {
+        "THD89": 0,
+        "SE608A": 1
+      }
+    },
+    "DevSEState": {
+      "values": {
+        "BOOT": 0,
+        "APP_FACTORY": 51,
+        "APP": 85
+      }
+    },
+    "DevFirmwareImageInfo": {
+      "fields": {
+        "version": {
+          "type": "string",
+          "id": 10
+        },
+        "build_id": {
+          "type": "string",
+          "id": 20
+        },
+        "hash": {
+          "type": "bytes",
+          "id": 30
+        }
+      }
+    },
+    "DevHardwareInfo": {
+      "fields": {
+        "device_type": {
+          "type": "DeviceType",
+          "id": 10
+        },
+        "serial_no": {
+          "type": "string",
+          "id": 11
+        },
+        "hardware_version": {
+          "type": "string",
+          "id": 100
+        },
+        "hardware_version_raw_adc": {
+          "type": "uint32",
+          "id": 101
+        }
+      }
+    },
+    "DevMainMcuInfo": {
+      "fields": {
+        "board": {
+          "type": "DevFirmwareImageInfo",
+          "id": 10
+        },
+        "boot": {
+          "type": "DevFirmwareImageInfo",
+          "id": 20
+        },
+        "app": {
+          "type": "DevFirmwareImageInfo",
+          "id": 30
+        }
+      }
+    },
+    "DevBluetoothInfo": {
+      "fields": {
+        "boot": {
+          "type": "DevFirmwareImageInfo",
+          "id": 20
+        },
+        "app": {
+          "type": "DevFirmwareImageInfo",
+          "id": 30
+        },
+        "adv_name": {
+          "type": "string",
+          "id": 100
+        },
+        "mac": {
+          "type": "bytes",
+          "id": 110
+        }
+      }
+    },
+    "DevSEInfo": {
+      "fields": {
+        "boot": {
+          "type": "DevFirmwareImageInfo",
+          "id": 20
+        },
+        "app": {
+          "type": "DevFirmwareImageInfo",
+          "id": 30
+        },
+        "type": {
+          "type": "DevSeType",
+          "id": 100
+        },
+        "state": {
+          "type": "DevSEState",
+          "id": 110
+        }
+      }
+    },
+    "DevInfoTargets": {
+      "fields": {
+        "hw": {
+          "type": "bool",
+          "id": 100
+        },
+        "fw": {
+          "type": "bool",
+          "id": 200
+        },
+        "bt": {
+          "type": "bool",
+          "id": 300
+        },
+        "se1": {
+          "type": "bool",
+          "id": 400
+        },
+        "se2": {
+          "type": "bool",
+          "id": 410
+        },
+        "se3": {
+          "type": "bool",
+          "id": 420
+        },
+        "se4": {
+          "type": "bool",
+          "id": 430
+        },
+        "status": {
+          "type": "bool",
+          "id": 10000
+        }
+      }
+    },
+    "DevInfoTypes": {
+      "fields": {
+        "version": {
+          "type": "bool",
+          "id": 10
+        },
+        "build_id": {
+          "type": "bool",
+          "id": 20
+        },
+        "hash": {
+          "type": "bool",
+          "id": 30
+        },
+        "specific": {
+          "type": "bool",
+          "id": 40
+        }
+      }
+    },
+    "DevStatus": {
+      "fields": {
+        "language": {
+          "type": "string",
+          "id": 100
+        },
+        "bt_enable": {
+          "type": "bool",
+          "id": 101
+        },
+        "init_states": {
+          "type": "bool",
+          "id": 102
+        },
+        "backup_required": {
+          "type": "bool",
+          "id": 200
+        },
+        "passphrase_protection": {
+          "type": "bool",
+          "id": 201
+        },
+        "label": {
+          "type": "string",
+          "id": 300
+        }
+      }
+    },
+    "DevGetDeviceInfo": {
+      "fields": {
+        "targets": {
+          "type": "DevInfoTargets",
+          "id": 1
+        },
+        "types": {
+          "type": "DevInfoTypes",
+          "id": 2
+        }
+      }
+    },
+    "DeviceInfo": {
+      "fields": {
+        "protocol_version": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
+        },
+        "hw": {
+          "type": "DevHardwareInfo",
+          "id": 100
+        },
+        "fw": {
+          "type": "DevMainMcuInfo",
+          "id": 200
+        },
+        "bt": {
+          "type": "DevBluetoothInfo",
+          "id": 300
+        },
+        "se1": {
+          "type": "DevSEInfo",
+          "id": 400
+        },
+        "se2": {
+          "type": "DevSEInfo",
+          "id": 410
+        },
+        "se3": {
+          "type": "DevSEInfo",
+          "id": 420
+        },
+        "se4": {
+          "type": "DevSEInfo",
+          "id": 430
+        },
+        "status": {
+          "type": "DevStatus",
+          "id": 10000
+        }
+      }
+    },
+    "DevFirmwareTargetType": {
+      "values": {
+        "TARGET_MAIN_APP": 0,
+        "TARGET_MAIN_BOOT": 1,
+        "TARGET_BT": 2,
+        "TARGET_SE1": 3,
+        "TARGET_SE2": 4,
+        "TARGET_SE3": 5,
+        "TARGET_SE4": 6,
+        "TARGET_RESOURCE": 10
+      }
+    },
+    "DevFirmwareTarget": {
+      "fields": {
+        "target_id": {
+          "rule": "required",
+          "type": "DevFirmwareTargetType",
+          "id": 1
+        },
+        "path": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        }
+      }
+    },
+    "DevFirmwareUpdate": {
+      "fields": {
+        "targets": {
+          "rule": "repeated",
+          "type": "DevFirmwareTarget",
+          "id": 1
+        }
+      }
+    },
+    "DevFirmwareInstallProgress": {
+      "fields": {
+        "target_id": {
+          "rule": "required",
+          "type": "DevFirmwareTargetType",
+          "id": 1
+        },
+        "progress": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        },
+        "stage": {
+          "type": "string",
+          "id": 3
+        }
+      }
+    },
+    "DevFirmwareUpdateStatusEntry": {
+      "fields": {
+        "target_id": {
+          "rule": "required",
+          "type": "DevFirmwareTargetType",
+          "id": 1
+        },
+        "status": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        }
+      }
+    },
+    "DevGetFirmwareUpdateStatus": {
       "fields": {}
     },
-    "PathInfo": {
+    "DevFirmwareUpdateStatus": {
+      "fields": {
+        "targets": {
+          "rule": "repeated",
+          "type": "DevFirmwareUpdateStatusEntry",
+          "id": 1
+        }
+      }
+    },
+    "FactoryDeviceInfoSettings": {
+      "fields": {
+        "serial_no": {
+          "type": "string",
+          "id": 1
+        },
+        "cpu_info": {
+          "type": "string",
+          "id": 2
+        },
+        "pre_firmware": {
+          "type": "string",
+          "id": 3
+        }
+      }
+    },
+    "FactoryGetDeviceInfo": {
+      "fields": {}
+    },
+    "FactoryDeviceInfo": {
+      "fields": {
+        "serial_no": {
+          "type": "string",
+          "id": 1
+        },
+        "spi_flash_info": {
+          "type": "string",
+          "id": 2
+        },
+        "se_info": {
+          "type": "string",
+          "id": 3
+        },
+        "nft_voucher": {
+          "type": "bytes",
+          "id": 4
+        },
+        "cpu_info": {
+          "type": "string",
+          "id": 5
+        },
+        "pre_firmware": {
+          "type": "string",
+          "id": 6
+        }
+      }
+    },
+    "FilesystemFixPermission": {
+      "fields": {}
+    },
+    "FilesystemPathInfo": {
       "fields": {
         "exist": {
           "rule": "required",
@@ -119,7 +533,7 @@
         }
       }
     },
-    "PathInfoQuery": {
+    "FilesystemPathInfoQuery": {
       "fields": {
         "path": {
           "rule": "required",
@@ -128,7 +542,7 @@
         }
       }
     },
-    "File": {
+    "FilesystemFile": {
       "fields": {
         "path": {
           "rule": "required",
@@ -159,24 +573,28 @@
         }
       }
     },
-    "FileRead": {
+    "FilesystemFileRead": {
       "fields": {
         "file": {
           "rule": "required",
-          "type": "File",
+          "type": "FilesystemFile",
           "id": 1
+        },
+        "chunk_len": {
+          "type": "uint32",
+          "id": 2
         },
         "ui_percentage": {
           "type": "uint32",
-          "id": 2
+          "id": 3
         }
       }
     },
-    "FileWrite": {
+    "FilesystemFileWrite": {
       "fields": {
         "file": {
           "rule": "required",
-          "type": "File",
+          "type": "FilesystemFile",
           "id": 1
         },
         "overwrite": {
@@ -195,7 +613,7 @@
         }
       }
     },
-    "FileDelete": {
+    "FilesystemFileDelete": {
       "fields": {
         "path": {
           "rule": "required",
@@ -204,7 +622,7 @@
         }
       }
     },
-    "Dir": {
+    "FilesystemDir": {
       "fields": {
         "path": {
           "rule": "required",
@@ -221,7 +639,23 @@
         }
       }
     },
-    "DirList": {
+    "FilesystemDirList": {
+      "fields": {
+        "path": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        },
+        "depth": {
+          "type": "uint32",
+          "id": 2,
+          "options": {
+            "default": 0
+          }
+        }
+      }
+    },
+    "FilesystemDirMake": {
       "fields": {
         "path": {
           "rule": "required",
@@ -230,7 +664,7 @@
         }
       }
     },
-    "DirMake": {
+    "FilesystemDirRemove": {
       "fields": {
         "path": {
           "rule": "required",
@@ -239,108 +673,39 @@
         }
       }
     },
-    "DirRemove": {
-      "fields": {
-        "path": {
-          "rule": "required",
-          "type": "string",
-          "id": 1
-        }
-      }
+    "FilesystemFormat": {
+      "fields": {}
     },
     "MessageType": {
       "values": {
+        "MessageType_FactoryDeviceInfoSettings": 60000,
+        "MessageType_FactoryGetDeviceInfo": 60001,
+        "MessageType_FactoryDeviceInfo": 60002,
+        "MessageType_GetProtoVersion": 60200,
+        "MessageType_ProtoVersion": 60201,
+        "MessageType_StartSession": 60205,
         "MessageType_Ping": 60206,
         "MessageType_Success": 60207,
         "MessageType_Failure": 60208,
-        "MessageType_Reboot": 60400,
-        "MessageType_FixPermission": 60800,
-        "MessageType_PathInfo": 60801,
-        "MessageType_PathInfoQuery": 60802,
-        "MessageType_File": 60803,
-        "MessageType_FileRead": 60804,
-        "MessageType_FileWrite": 60805,
-        "MessageType_FileDelete": 60806,
-        "MessageType_Dir": 60807,
-        "MessageType_DirList": 60808,
-        "MessageType_DirMake": 60809,
-        "MessageType_DirRemove": 60810,
-        "MessageType_FirmwareUpdate": 61000,
-        "MessageType_FirmwareInstallProgress": 61001
-      }
-    },
-    "FailureType": {
-      "values": {
-        "Failure_UnexpectedMessage": 1,
-        "Failure_ButtonExpected": 2,
-        "Failure_DataError": 3,
-        "Failure_ActionCancelled": 4,
-        "Failure_PinExpected": 5,
-        "Failure_PinCancelled": 6,
-        "Failure_PinInvalid": 7,
-        "Failure_InvalidSignature": 8,
-        "Failure_ProcessError": 9,
-        "Failure_NotEnoughFunds": 10,
-        "Failure_NotInitialized": 11,
-        "Failure_PinMismatch": 12,
-        "Failure_WipeCodeMismatch": 13,
-        "Failure_InvalidSession": 14,
-        "Failure_FirmwareError": 99
-      }
-    },
-    "FirmwareTargetType": {
-      "values": {
-        "TARGET_MAIN_APP": 0,
-        "TARGET_MAIN_BOOT": 1,
-        "TARGET_BLE": 2,
-        "TARGET_SE1": 3,
-        "TARGET_SE2": 4,
-        "TARGET_SE3": 5,
-        "TARGET_SE4": 6,
-        "TARGET_RESOURCE": 10
-      }
-    },
-    "RebootType": {
-      "values": {
-        "REBOOT_NORMAL": 0,
-        "REBOOT_BOARDLOADER": 1,
-        "REBOOT_BOOTLOADER": 2
-      }
-    },
-    "FirmwareTarget": {
-      "fields": {
-        "target_id": {
-          "rule": "required",
-          "type": "FirmwareTargetType",
-          "id": 1
-        },
-        "path": {
-          "rule": "required",
-          "type": "string",
-          "id": 2
-        }
-      }
-    },
-    "FirmwareUpdate": {
-      "fields": {
-        "targets": {
-          "rule": "repeated",
-          "type": "FirmwareTarget",
-          "id": 1
-        },
-        "reboot_on_success": {
-          "type": "bool",
-          "id": 2
-        }
-      }
-    },
-    "FirmwareInstallProgress": {
-      "fields": {
-        "progress": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 1
-        }
+        "MessageType_DevReboot": 60400,
+        "MessageType_DevGetDeviceInfo": 60600,
+        "MessageType_DeviceInfo": 60601,
+        "MessageType_FilesystemFixPermission": 60800,
+        "MessageType_FilesystemPathInfo": 60801,
+        "MessageType_FilesystemPathInfoQuery": 60802,
+        "MessageType_FilesystemFile": 60803,
+        "MessageType_FilesystemFileRead": 60804,
+        "MessageType_FilesystemFileWrite": 60805,
+        "MessageType_FilesystemFileDelete": 60806,
+        "MessageType_FilesystemDir": 60807,
+        "MessageType_FilesystemDirList": 60808,
+        "MessageType_FilesystemDirMake": 60809,
+        "MessageType_FilesystemDirRemove": 60810,
+        "MessageType_FilesystemFormat": 60811,
+        "MessageType_DevFirmwareUpdate": 61000,
+        "MessageType_DevFirmwareInstallProgress": 61001,
+        "MessageType_DevGetFirmwareUpdateStatus": 61002,
+        "MessageType_DevFirmwareUpdateStatus": 61003
       }
     }
   }

@@ -4393,6 +4393,263 @@ export enum CommandFlags {
   Factory_Only = 1,
 }
 
+// GetProtoVersion
+export type GetProtoVersion = {};
+
+// ProtoVersion
+export type ProtoVersion = {
+  proto_version: number;
+};
+
+export enum DevRebootType {
+  Normal = 0,
+  Boardloader = 1,
+  Bootloader = 2,
+}
+
+// DevReboot
+export type DevReboot = {
+  reboot_type: DevRebootType;
+};
+
+export enum DeviceType {
+  CLASSIC1 = 0,
+  CLASSIC1S = 1,
+  MINI = 2,
+  TOUCH = 3,
+  PRO = 5,
+  CLASSIC1S_PURE = 6,
+}
+
+export enum DevSeType {
+  THD89 = 0,
+  SE608A = 1,
+}
+
+export enum DevSEState {
+  BOOT = 0,
+  APP_FACTORY = 51,
+  APP = 85,
+}
+
+// DevFirmwareImageInfo
+export type DevFirmwareImageInfo = {
+  version?: string;
+  build_id?: string;
+  hash?: string;
+};
+
+// DevHardwareInfo
+export type DevHardwareInfo = {
+  device_type?: DeviceType;
+  serial_no?: string;
+  hardware_version?: string;
+  hardware_version_raw_adc?: number;
+};
+
+// DevMainMcuInfo
+export type DevMainMcuInfo = {
+  board?: DevFirmwareImageInfo;
+  boot?: DevFirmwareImageInfo;
+  app?: DevFirmwareImageInfo;
+};
+
+// DevBluetoothInfo
+export type DevBluetoothInfo = {
+  boot?: DevFirmwareImageInfo;
+  app?: DevFirmwareImageInfo;
+  adv_name?: string;
+  mac?: string;
+};
+
+// DevSEInfo
+export type DevSEInfo = {
+  boot?: DevFirmwareImageInfo;
+  app?: DevFirmwareImageInfo;
+  type?: DevSeType;
+  state?: DevSEState;
+};
+
+// DevInfoTargets
+export type DevInfoTargets = {
+  hw?: boolean;
+  fw?: boolean;
+  bt?: boolean;
+  se1?: boolean;
+  se2?: boolean;
+  se3?: boolean;
+  se4?: boolean;
+  status?: boolean;
+};
+
+// DevInfoTypes
+export type DevInfoTypes = {
+  version?: boolean;
+  build_id?: boolean;
+  hash?: boolean;
+  specific?: boolean;
+};
+
+// DevStatus
+export type DevStatus = {
+  language?: string;
+  bt_enable?: boolean;
+  init_states?: boolean;
+  backup_required?: boolean;
+  passphrase_protection?: boolean;
+  label?: string;
+};
+
+// DevGetDeviceInfo
+export type DevGetDeviceInfo = {
+  targets?: DevInfoTargets;
+  types?: DevInfoTypes;
+};
+
+export enum DevFirmwareTargetType {
+  TARGET_MAIN_APP = 0,
+  TARGET_MAIN_BOOT = 1,
+  TARGET_BT = 2,
+  TARGET_SE1 = 3,
+  TARGET_SE2 = 4,
+  TARGET_SE3 = 5,
+  TARGET_SE4 = 6,
+  TARGET_RESOURCE = 10,
+}
+
+// DevFirmwareTarget
+export type DevFirmwareTarget = {
+  target_id: DevFirmwareTargetType;
+  path: string;
+};
+
+// DevFirmwareUpdate
+export type DevFirmwareUpdate = {
+  targets: DevFirmwareTarget[];
+};
+
+// DevFirmwareInstallProgress
+export type DevFirmwareInstallProgress = {
+  target_id: DevFirmwareTargetType;
+  progress: number;
+  stage?: string;
+};
+
+// DevFirmwareUpdateStatusEntry
+export type DevFirmwareUpdateStatusEntry = {
+  target_id: DevFirmwareTargetType;
+  status: number;
+};
+
+// DevGetFirmwareUpdateStatus
+export type DevGetFirmwareUpdateStatus = {};
+
+// DevFirmwareUpdateStatus
+export type DevFirmwareUpdateStatus = {
+  targets: DevFirmwareUpdateStatusEntry[];
+};
+
+// FactoryDeviceInfoSettings
+export type FactoryDeviceInfoSettings = {
+  serial_no?: string;
+  cpu_info?: string;
+  pre_firmware?: string;
+};
+
+// FactoryGetDeviceInfo
+export type FactoryGetDeviceInfo = {};
+
+// FactoryDeviceInfo
+export type FactoryDeviceInfo = {
+  serial_no?: string;
+  spi_flash_info?: string;
+  se_info?: string;
+  nft_voucher?: string;
+  cpu_info?: string;
+  pre_firmware?: string;
+};
+
+// FilesystemFixPermission
+export type FilesystemFixPermission = {};
+
+// FilesystemPathInfo
+export type FilesystemPathInfo = {
+  exist: boolean;
+  size: number;
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+  readonly: boolean;
+  hidden: boolean;
+  system: boolean;
+  archive: boolean;
+  directory: boolean;
+};
+
+// FilesystemPathInfoQuery
+export type FilesystemPathInfoQuery = {
+  path: string;
+};
+
+// FilesystemFile
+export type FilesystemFile = {
+  path: string;
+  offset: number;
+  total_size: number;
+  data?: Buffer | ArrayBuffer | string;
+  data_hash?: number;
+  processed_byte?: number;
+};
+
+// FilesystemFileRead
+export type FilesystemFileRead = {
+  file: FilesystemFile;
+  chunk_len?: number;
+  ui_percentage?: number;
+};
+
+// FilesystemFileWrite
+export type FilesystemFileWrite = {
+  file: FilesystemFile;
+  overwrite: boolean;
+  append: boolean;
+  ui_percentage?: number;
+};
+
+// FilesystemFileDelete
+export type FilesystemFileDelete = {
+  path: string;
+};
+
+// FilesystemDir
+export type FilesystemDir = {
+  path: string;
+  child_dirs?: string;
+  child_files?: string;
+};
+
+// FilesystemDirList
+export type FilesystemDirList = {
+  path: string;
+  depth?: number;
+};
+
+// FilesystemDirMake
+export type FilesystemDirMake = {
+  path: string;
+};
+
+// FilesystemDirRemove
+export type FilesystemDirRemove = {
+  path: string;
+};
+
+// FilesystemFormat
+export type FilesystemFormat = {};
+
 // custom connect definitions
 export type MessageType = {
   AlephiumGetAddress: AlephiumGetAddress;
@@ -4949,6 +5206,39 @@ export type MessageType = {
   TronSignMessage: TronSignMessage;
   TronMessageSignature: TronMessageSignature;
   facotry: facotry;
+  GetProtoVersion: GetProtoVersion;
+  ProtoVersion: ProtoVersion;
+  DevReboot: DevReboot;
+  DevFirmwareImageInfo: DevFirmwareImageInfo;
+  DevHardwareInfo: DevHardwareInfo;
+  DevMainMcuInfo: DevMainMcuInfo;
+  DevBluetoothInfo: DevBluetoothInfo;
+  DevSEInfo: DevSEInfo;
+  DevInfoTargets: DevInfoTargets;
+  DevInfoTypes: DevInfoTypes;
+  DevStatus: DevStatus;
+  DevGetDeviceInfo: DevGetDeviceInfo;
+  DevFirmwareTarget: DevFirmwareTarget;
+  DevFirmwareUpdate: DevFirmwareUpdate;
+  DevFirmwareInstallProgress: DevFirmwareInstallProgress;
+  DevFirmwareUpdateStatusEntry: DevFirmwareUpdateStatusEntry;
+  DevGetFirmwareUpdateStatus: DevGetFirmwareUpdateStatus;
+  DevFirmwareUpdateStatus: DevFirmwareUpdateStatus;
+  FactoryDeviceInfoSettings: FactoryDeviceInfoSettings;
+  FactoryGetDeviceInfo: FactoryGetDeviceInfo;
+  FactoryDeviceInfo: FactoryDeviceInfo;
+  FilesystemFixPermission: FilesystemFixPermission;
+  FilesystemPathInfo: FilesystemPathInfo;
+  FilesystemPathInfoQuery: FilesystemPathInfoQuery;
+  FilesystemFile: FilesystemFile;
+  FilesystemFileRead: FilesystemFileRead;
+  FilesystemFileWrite: FilesystemFileWrite;
+  FilesystemFileDelete: FilesystemFileDelete;
+  FilesystemDir: FilesystemDir;
+  FilesystemDirList: FilesystemDirList;
+  FilesystemDirMake: FilesystemDirMake;
+  FilesystemDirRemove: FilesystemDirRemove;
+  FilesystemFormat: FilesystemFormat;
 };
 
 export type MessageKey = keyof MessageType;

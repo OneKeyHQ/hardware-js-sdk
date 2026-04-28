@@ -24,7 +24,7 @@ export default class FileWrite extends BaseMethod<FileWriteParams> {
   }
 
   async run() {
-    const res = await (this.device.commands as any).call('FileWrite', {
+    const res = await (this.device.commands as any).call('FilesystemFileWrite', {
       file: {
         path: this.params.path,
         offset: this.params.offset,

@@ -5,6 +5,7 @@ import {
   HardwareErrorCode,
   createDeferred,
 } from '@onekeyfe/hd-shared';
+import { PROTOCOL_V2_FILE_CHUNK_SIZE } from '@onekeyfe/hd-transport';
 
 import { FirmwareUpdateTipMessage, UI_REQUEST, createUiMessage } from '../../events/ui-request';
 import { DevicePool } from '../../device/DevicePool';
@@ -14,14 +15,12 @@ import { DataManager } from '../../data-manager';
 import { BaseMethod } from '../BaseMethod';
 import { DEVICE } from '../../events';
 
-import { PROTOCOL_V2_FILE_CHUNK_SIZE } from '@onekeyfe/hd-transport';
-
 import type {
   IFirmwareUpdateProgressType,
   IFirmwareUpdateTipMessage,
 } from '../../events/ui-request';
 import type { PROTO } from '../../constants';
-import type { RebootType } from '@onekeyfe/hd-transport';
+import type { DevRebootType, RebootType } from '@onekeyfe/hd-transport';
 import type { Deferred } from '@onekeyfe/hd-shared';
 import type { KnownDevice } from '../../types';
 import type { TypedResponseMessage } from '../../device/DeviceCommands';
@@ -449,26 +448,26 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
     }
   }
 
-  // ---- Pro2 (Protocol V2) firmware update helpers ----
+  // ---- Protocol V2 firmware update helpers ----
   //
-  // These methods speak Pro2's V2 protobuf schema (DirMake / FileWrite /
-  // FirmwareUpdate) and are only safe to call from a runProtocolV2() flow,
-  // i.e. when device.originalDescriptor.protocolType === 'V2'. They do not
-  // appear on the V1 firmware-update path.
+  // These methods speak Protocol V2 protobuf schema (FilesystemDirMake /
+  // FilesystemFileWrite / DevFirmwareUpdate) and are only safe to call from
+  // a runProtocolV2() flow, i.e. when device.originalDescriptor.protocolType === 'V2'.
+  // They do not appear on the V1 firmware-update path.
 
   /**
-   * Protocol V2: Create directory using DirMake message
+   * Protocol V2: Create directory using FilesystemDirMake message
    */
-  async pro2CreateFolder(path: string) {
+  async protocolV2CreateFolder(path: string) {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
-    await typedCall('DirMake', 'Success', { path });
+    await typedCall('FilesystemDirMake', 'Success', { path });
   }
 
   /**
-   * Protocol V2: Write file chunks using FileWrite message.
+   * Protocol V2: Write file chunks using FilesystemFileWrite message.
    * Equivalent to emmcCommonUpdateProcess but using Protocol V2 protobuf messages.
    */
-  async pro2CommonUpdateProcess({
+  async protocolV2CommonUpdateProcess({
     payload,
     filePath,
     processedSize,
@@ -478,9 +477,9 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
     processedSize?: number;
     totalSize?: number;
   }) {
-    // PROTOCOL_V2_FILE_CHUNK_SIZE = 2048: derived from frame max (2200) minus FileWrite
-    // overhead (~50). Same value for USB and BLE — BLE Noble handles ATT-level
-    // fragmentation transparently.
+    // PROTOCOL_V2_FILE_CHUNK_SIZE = 2048: derived from frame max (2200) minus
+    // FilesystemFileWrite overhead. Same value for USB and BLE; BLE Noble handles
+    // ATT-level fragmentation transparently.
     const chunkSize = PROTOCOL_V2_FILE_CHUNK_SIZE;
     const totalChunks = Math.ceil(payload.byteLength / chunkSize);
     let offset = 0;
@@ -503,14 +502,12 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
 
       const writeRes = await this.fileWriteWithRetry(
         filePath,
-        chunkLength,
         payload.byteLength,
         offset,
         chunk,
         overwrite,
         progress
       );
-      // @ts-expect-error
       offset += writeRes.message.processed_byte ?? chunkLength;
       this.postProgressMessage(progress, 'transferData');
     }
@@ -519,21 +516,19 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
   }
 
   /**
-   * Protocol V2: Write file chunk with retry using FileWrite message.
+   * Protocol V2: Write file chunk with retry using FilesystemFileWrite message.
    */
   async fileWriteWithRetry(
     filePath: string,
-    chunkLength: number,
     totalFileSize: number,
     offset: number,
     chunk: ArrayBuffer | Buffer,
     overwrite: boolean,
     progress: number | null
-  ) {
+  ): Promise<TypedResponseMessage<'FilesystemFile'>> {
     const writeFunc = async () => {
       const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
-      // @ts-expect-error
-      const writeRes = await typedCall('FileWrite', 'File', {
+      const writeRes = await typedCall('FilesystemFileWrite', 'FilesystemFile', {
         file: {
           path: filePath,
           offset,
@@ -542,10 +537,10 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
         },
         overwrite,
         append: offset !== 0,
+        ui_percentage: progress ?? undefined,
       });
-      if (writeRes.type !== 'File') {
-        // @ts-expect-error
-        if (writeRes.type === 'CallMethodError') {
+      if (writeRes.type !== 'FilesystemFile') {
+        if ((writeRes as any).type === 'CallMethodError') {
           if (((writeRes as any).message.error ?? '').indexOf(SESSION_ERROR) > -1) {
             throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, SESSION_ERROR);
           }
@@ -581,25 +576,23 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
         await wait(2000);
       }
     }
+    throw ERRORS.TypedError(HardwareErrorCode.EmmcFileWriteFirmwareError, 'transfer data error');
   }
 
   /**
-   * Protocol V2: Trigger firmware update using FirmwareUpdate message.
+   * Protocol V2: Trigger firmware update using DevFirmwareUpdate message.
    * Uses targets[] to specify which chip + file path to install
    */
-  async pro2StartFirmwareUpdate({
+  async protocolV2StartFirmwareUpdate({
     targets,
-    rebootOnSuccess = true,
   }: {
     targets: Array<{ target_id: number; path: string }>;
-    rebootOnSuccess?: boolean;
   }) {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
     let updateResponse: TypedResponseMessage<'Success'>;
     try {
-      updateResponse = await typedCall('FirmwareUpdate', 'Success', {
+      updateResponse = await typedCall('DevFirmwareUpdate', 'Success', {
         targets,
-        reboot_on_success: rebootOnSuccess,
       });
     } catch (error) {
       if (isDeviceDisconnectedError(error)) {
@@ -616,6 +609,32 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
       throw ERRORS.TypedError(HardwareErrorCode.FirmwareError, 'firmware update error');
     }
     this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdating);
+  }
+
+  /**
+   * @description Device reboot over Protocol V2
+   * @param rebootType Reboot type, see the DevRebootType enum
+   */
+  async protocolV2Reboot(rebootType: DevRebootType) {
+    const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
+    try {
+      const res = await typedCall('DevReboot', 'Success', {
+        reboot_type: rebootType,
+      });
+      return res.message;
+    } catch (error) {
+      // Device disconnection during reboot is expected behavior
+      if (
+        error instanceof Error &&
+        (error.message.includes('device was disconnected') ||
+          error.message.includes('transferIn') ||
+          error.message.includes('USBDevice'))
+      ) {
+        // This is expected - device successfully rebooted and disconnected
+        return { message: 'Device rebooted successfully' };
+      }
+      throw error;
+    }
   }
 
   /**

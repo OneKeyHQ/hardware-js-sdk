@@ -10,7 +10,6 @@ export type transportEnv =
   | 'webusb'
   | 'desktop-webusb'
   | 'desktop-web-ble'
-  | 'desktop-web-ble-pro2'
   | 'emulator'
   | 'lowlevel'
   | 'node-usb';

@@ -19,21 +19,17 @@ const CONNECTION_TYPE_STORE_KEY = '@onekey/connectionType';
  * Determine if the connection type should use hd-common-connect-sdk
  */
 const shouldUseCommonSdk = (connectionType: ConnectionType | null): boolean =>
-  connectionType === 'desktop-web-ble' ||
-  connectionType === 'desktop-web-ble-pro2' ||
-  connectionType === 'webusb';
+  connectionType === 'desktop-web-ble' || connectionType === 'webusb';
 
 /**
  * Map connection type to SDK env parameter
  */
 const getSDKEnv = (
   connectionType: ConnectionType | null
-): 'webusb' | 'emulator' | 'desktop-web-ble' | 'desktop-web-ble-pro2' | 'web' => {
+): 'webusb' | 'emulator' | 'desktop-web-ble' | 'web' => {
   switch (connectionType) {
     case 'desktop-web-ble':
       return 'desktop-web-ble';
-    case 'desktop-web-ble-pro2':
-      return 'desktop-web-ble-pro2';
     case 'webusb':
       return 'webusb';
     case 'emulator':
@@ -75,11 +71,11 @@ export const getHardwareSDKInstance = memoizee(
           fetchConfig: true,
         };
 
-        // Get stored connection type to determine SDK type and transport
-        // In Electron, default to Desktop BLE Pro2 if no stored preference
+        // Get stored connection type to determine SDK type and transport.
+        // In Electron, Desktop BLE now auto-detects Protocol V1/V2.
         let storedConnectionType = await getStoredConnectionType();
         if (!storedConnectionType && Platform.OS === 'web' && (window as any).desktopApi) {
-          storedConnectionType = 'desktop-web-ble-pro2';
+          storedConnectionType = 'desktop-web-ble';
         }
         const useCommonSdk = shouldUseCommonSdk(storedConnectionType);
 

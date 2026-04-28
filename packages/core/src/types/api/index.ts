@@ -6,7 +6,7 @@ import type {
   fileRead,
   fileWrite,
   pathInfo,
-} from './pro2';
+} from './protocolV2';
 import type { off, on, removeAllListeners } from './event';
 import type { uiResponse } from './uiResponse';
 import type { init, updateSettings } from './init';
@@ -209,7 +209,7 @@ export type CoreApi = {
   cipherKeyValue: typeof cipherKeyValue;
 
   /**
-   * File system & device control API (Pro2-only, Proto V0)
+   * File system & device control API (Protocol V2 only)
    */
   fileRead: typeof fileRead;
   fileWrite: typeof fileWrite;

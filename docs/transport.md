@@ -1,265 +1,176 @@
-# OneKey Hardware Wallet Transport Layer
+# OneKey Hardware SDK 传输层设计
 
 ## 两句话总结
 
-- **Protocol V1**（Pro1 / Mini / Touch / Classic）：USB 每包 64 字节，分包传输，连接后必须先发 `Initialize` 握手。
-- **Protocol V2**（Pro2）：USB 单帧最大 2048 字节，无需握手，直接调用系统级 API（文件系统、固件更新）。
+- Protocol V1 服务现有 Classic / Mini / Touch / Pro 等设备，USB 和 BLE 都使用旧的分包协议，并通过 `Initialize -> Features` 建立设备上下文。
+- Protocol V2 服务 Pro2，USB 和 BLE 都使用 `0x5A` 帧协议；SDK 在连接后主动发送 `GetProtoVersion` 探测，成功才切换到 V2，失败回落 V1。
 
----
+## 协议差异
 
-## 核心差异速查
+| 项目       | Protocol V1                     | Protocol V2                                          |
+| ---------- | ------------------------------- | ---------------------------------------------------- |
+| 设备       | Classic / Mini / Touch / Pro 等 | Pro2                                                 |
+| 传输       | USB、BLE、Bridge                | WebUSB、Electron BLE、React Native BLE               |
+| 帧头       | `0x3F` 分包，payload 内含 `##`  | `0x5A` 完整帧                                        |
+| message id | big-endian                      | little-endian                                        |
+| 完整性校验 | 无额外 CRC                      | header CRC8 + frame CRC8                             |
+| 初始化     | `Initialize -> Features`        | `GetProtoVersion` 探测，`Ping` 初始化                |
+| schema     | `messages.json`                 | `messages-pro2.json`，必要时可 fallback 到 V1 schema |
 
-| | Protocol V1 | Protocol V2 (Pro2) |
-|---|---|---|
-| SOF 字节 | `0x3F` (`?`) | `0x5A` |
-| 单次传输上限 | **64 bytes**（固定分包） | **2048 bytes**（单帧） |
-| MessageID 字节序 | Big-endian | **Little-endian** |
-| 消息 ID 范围 | 1–999（Trezor 标准） | **60000–61199**（Pro2 专属） |
-| Protobuf schema | `messages.json` | `messages-pro2.json` |
-| 连接握手 | **必须** Initialize → Features | **无**，直接操作 |
-| 会话 ID | 有 `session_id` | 无 |
-| 帧校验 | 无 CRC | **CRC8**（init=0x30，覆盖 header + frame） |
-| 设备能力 | 钱包：签名、地址派生 | 系统：文件系统、固件更新 |
+## WebUSB 流程
 
----
+WebUSB 不再使用 PID 判断协议。当前流程是：
 
-## 帧格式对比
+```mermaid
+flowchart TD
+  Devices["getDevices()"]
+  Acquire["acquire(path)"]
+  Connect["connectToDevice(path)"]
+  Endpoints["discoverEndpoints(device)"]
+  Probe["probeProtocolV2(path)"]
+  V2["callProtocolV2(GetProtoVersion) 返回 ProtoVersion: V2"]
+  V1["失败或 1500ms 超时: reset connection -> V1"]
+  Call["call(path, name, data)"]
+  CallV1["V1: ProtocolV1.encode/decode"]
+  CallV2["V2: ProtocolV2.encode/decode"]
 
-### Protocol V1 — 固定 64 字节分包
-
-```
-每个 USB 包（64 bytes）:
-┌──────┬──────────────────────────────────────────┐
-│ 0x3F │           Payload (63 bytes)              │
-└──────┴──────────────────────────────────────────┘
-  SOF
-
-第一包的 Payload 头部（消息起始帧）:
-┌──────────┬────────────┬────────────┬────────────────────┐
-│ 0x23 0x23│  Type 2B   │  Length 4B │  Protobuf bytes... │
-└──────────┴────────────┴────────────┴────────────────────┘
-   "##"     Big-endian   Big-endian
-```
-
-消息过长时拆成多个 64 字节包串行发送，每包首字节都是 `0x3F`。
-
-**Big-endian 示例**：`GetFeatures (msgType=55)` → `[0x00][0x37]`
-
----
-
-### Protocol V2 — 单帧最大 2048 字节
-
-```
-Protocol V2 Frame（最大 2048 bytes）:
-┌──────┬──────┬──────┬───────────┬────────┬──────┬─────┬──────────┬──────────┬──────────┬─────┐
-│ 0x5A │ LenL │ LenH │ HeaderCRC │ Router │ Attr │ Seq │ MsgTypeL │ MsgTypeH │ PB Data  │ CRC │
-└──────┴──────┴──────┴───────────┴────────┴──────┴─────┴──────────┴──────────┴──────────┴─────┘
-   1B     1B    1B        1B        1B      1B    1B       1B          1B        N bytes    1B
-
-HeaderCRC = CRC8(bytes[0..3])   ← 校验 SOF+Len+Len
-FrameCRC  = CRC8(整个 frame)    ← 追加在末尾
-MsgType   = Little-endian uint16
+  Devices --> Acquire --> Connect --> Endpoints --> Probe
+  Probe --> V2 --> Call
+  Probe --> V1 --> Call
+  Call --> CallV1
+  Call --> CallV2
 ```
 
-**Little-endian 示例**：`FileRead (msgType=60804=0xEDC4)` → `[0xC4][0xED]`
+`discoverEndpoints()` 只用于找到 USB interface 和 endpoint，不参与协议判断。
 
----
+## Electron BLE 流程
 
-## 连接与初始化流程
+Electron BLE 的默认入口是 `desktop-web-ble`。它内部同时支持 V1 和 V2：
 
-### Protocol V1：必须握手
+```mermaid
+flowchart TD
+  Enumerate["enumerate()"]
+  Acquire["acquire(uuid)"]
+  Connect["connect + subscribe"]
+  Probe["probeProtocolV2(uuid)"]
+  V2["GetProtoVersion 成功: V2"]
+  V1["失败或超时: V1"]
+  Call["call(uuid, name, data)"]
+  CallV1["V1: legacy BLE chunk reassembly"]
+  CallV2["V2: 0x5A frame reassembly"]
 
-```
-enumerate() → acquire() → Initialize → Features
-                                ↓
-                  TransportManager.reconfigure(features)
-                  （根据固件版本选择 messages schema）
-                                ↓
-                         设备就绪，执行钱包操作
-```
-
-`Initialize` 返回的 `Features` 包含 `session_id`、`device_id`、`firmware_version` 等，
-SDK 依赖这些信息选择正确的 protobuf schema。
-
----
-
-### Protocol V2（Pro2）：跳过握手
-
-```
-enumerate() → acquire()
-                  ↓
-           detectProtocol(path)
-           按 USB Product ID 识别：
-             PID 0x53C1 (PID_PRO2) → V2
-             其他 PID                → V1
-                  ↓
-           originalDescriptor.protocolType = 'V2'  ← 写回设备描述符
-                  ↓
-           initialize() 检测到 V2，跳过 Initialize
-                  ↓
-           _initializePro2()
-           合成 Features { vendor, onekey_device_type: Pro2 }
-           TransportManager.reconfigure(undefined, 'V2')
-           加载 messages-pro2.json
-                  ↓
-           设备就绪，直接调用 pro2* 系方法
+  Enumerate --> Acquire --> Connect --> Probe
+  Probe --> V2 --> Call
+  Probe --> V1 --> Call
+  Call --> CallV1
+  Call --> CallV2
 ```
 
-Pro2 **不支持** `Initialize` 消息。发送它会收到 `Failure_UnexpectedMessage`。
+调用方只需要选择 `desktop-web-ble`。Electron BLE transport 会在连接后自动判断 V1/V2，不再提供按设备型号拆分的 env alias。
 
-> **关键实现细节**：`detectProtocol()` 在 `acquire()` 内部按 PID 立即判定，结果写入
-> `WebUsbTransport.deviceProtocol: Map<path, ProtocolType>`。
-> `acquire()` 完成后立即将结果同步到 `device.originalDescriptor.protocolType`，
-> 这样 `initialize()` 才能正确判断分支。
->
-> BLE 路径不需要探测：Pro2 BLE 走独立的 `ElectronPro2BleTransport` 类，
-> `getProtocolType()` 直接返回 `'V2'`。
+## React Native BLE 流程
 
----
+移动端 BLE 入口是 `packages/hd-transport-react-native`，由 `hd-ble-sdk` 在 `react-native` env 下使用。它和 Electron BLE 使用同一套主动探测原则：
 
-## 协议自动检测
+```mermaid
+flowchart TD
+  Enumerate["enumerate()"]
+  Acquire["acquire(uuid)"]
+  Connect["connect + discover services + subscribe"]
+  Probe["probeProtocolV2(uuid)"]
+  V2["GetProtoVersion 成功: V2"]
+  V1["失败或 1500ms 超时: V1"]
+  Call["call(uuid, name, data)"]
+  CallV1["V1: legacy BLE chunk reassembly"]
+  CallV2["V2: BLE UART router + 0x5A frame reassembly"]
 
-```typescript
-// packages/hd-transport-web-device/src/webusb.ts
-private detectProtocol(path: string): ProtocolType {
-  const deviceInfo = this.deviceList.find(d => d.path === path);
-  const protocol: ProtocolType =
-    deviceInfo?.device.productId === PID_PRO2 ? 'V2' : 'V1';
-  this.deviceProtocol.set(path, protocol);
-  return protocol;
-}
-
-getProtocolType(path: string): ProtocolType {
-  return this.deviceProtocol.get(path) ?? 'V1';
-}
+  Enumerate --> Acquire --> Connect --> Probe
+  Probe --> V2 --> Call
+  Probe --> V1 --> Call
+  Call --> CallV1
+  Call --> CallV2
 ```
 
-`call()` 根据检测结果自动分支：
-- `V2` → `callProtocolV2()`，使用 `messages-pro2.json`
-- `V1` → 原有路径，使用 `messages.json`
+移动端 descriptor 主要使用 `id` 作为连接标识，因此 `Device.acquire()` 在 BLE 环境下会用 descriptor `id` 查询 transport 探测到的 protocol type。
 
----
+## schema 配置
 
-## Schema 选择（callProtocolV2 内部）
+初始化 transport 时会配置两份 schema：
 
-V2 帧内同时可能包含 V2 消息和 V1 消息（如未来扩展），选择规则：
-
-```
-编码（发送）:
-  messagesV2.lookupType(name) 成功     → 用 V2 schema
-  失败（name 只在 V1 schema 中）       → 回退 V1 messages schema
-
-解码（接收）:
-  rxMsgType >= 60000  → V2 schema (PROTOCOL_V2_SYS_MESSAGE_THRESHOLD)
-  rxMsgType <  60000  → V1 schema
+```ts
+transport.configure(messagesV1);
+transport.configureProtocolV2(messagesPro2);
 ```
 
----
+Protocol V2 encode/decode 的 schema 选择规则：
 
-## Pro2 消息 ID 表
+| 阶段   | 规则                                                  |
+| ------ | ----------------------------------------------------- |
+| encode | 优先在 V2 schema 查找消息名；找不到则回退 V1 schema   |
+| decode | `msgType >= 60000` 使用 V2 schema，否则使用 V1 schema |
 
-| 消息名 | ID | 方向 | 说明 |
-|---|---|---|---|
-| Ping | 60206 | 请求 | 连接测试 |
-| Success | 60207 | 响应 | 操作成功 |
-| Failure | 60208 | 响应 | 操作失败，含错误码 |
-| Reboot | 60400 | 请求 | 重启设备 |
-| FixPermission | 60800 | 请求 | 修复文件系统权限 |
-| PathInfo | 60801 | 响应 | 文件/目录元数据 |
-| PathInfoQuery | 60802 | 请求 | 查询文件/目录元数据 |
-| File | 60803 | 响应 | 文件数据块 |
-| FileRead | 60804 | 请求 | 读取文件 |
-| FileWrite | 60805 | 请求 | 写入文件 |
-| FileDelete | 60806 | 请求 | 删除文件 |
-| Dir | 60807 | 响应 | 目录列表 |
-| DirList | 60808 | 请求 | 列目录 |
-| DirMake | 60809 | 请求 | 创建目录 |
-| DirRemove | 60810 | 请求 | 删除目录 |
-| FirmwareUpdate | 61000 | 请求 | 触发固件更新 |
-| FirmwareInstallProgress | 61001 | 响应 | 固件安装进度 |
+这样 Protocol V2 系统消息进入 typedCall 类型面，同时不会破坏 V1 业务消息的类型。
 
----
+## Protocol Session 层
 
-## Pro2 SDK API
+V2 协议公共能力放在 `packages/hd-transport/src/protocol-session.ts`：
 
-```typescript
-import HardwareSDK from '@onekeyfe/hd-web-sdk';
+| 能力                       | 职责                                                       |
+| -------------------------- | ---------------------------------------------------------- |
+| `ProtocolV2Session`        | 统一执行 V2 encode、写 frame、读 frame、decode、超时和日志 |
+| `ProtocolV2FrameAssembler` | 根据 `0x5A` frame length 重组 USB/BLE 分片，并校验最大长度 |
+| `probeProtocolV2()`        | 连接后发送 `GetProtoVersion`，成功返回 V2，失败走回退钩子 |
 
-// 文件操作 (Pro2-only)
-await HardwareSDK.dirList(connectId, { path: '/' });
-await HardwareSDK.pathInfo(connectId, { path: '/res/icon.png' });
-await HardwareSDK.fileRead(connectId, { path: '/res/icon.png', offset: 0, totalSize: 0 });
-await HardwareSDK.fileWrite(connectId, {
-  path: '/tmp/test.txt',
-  offset: 0,
-  totalSize: 5,
-  data: new Uint8Array([0x68, 0x65, 0x6c, 0x6c, 0x6f]),
-});
-await HardwareSDK.fileDelete(connectId, { path: '/tmp/test.txt' });
-await HardwareSDK.dirMake(connectId, { path: '/tmp/mydir' });
-await HardwareSDK.dirRemove(connectId, { path: '/tmp/mydir' });
+具体 transport 只提供平台相关能力：
 
-// 设备管理 (使用通用 API，内部自动分发到 Protocol V2)
-await HardwareSDK.deviceRebootToBootloader(connectId);
-await HardwareSDK.deviceRebootToBoardloader(connectId);
+| Transport        | 保留职责                                              |
+| ---------------- | ----------------------------------------------------- |
+| WebUSB           | USB 设备授权、endpoint discovery、transferIn/out retry |
+| Electron BLE     | noble 连接、订阅、hex 写入、BLE 错误映射              |
+| React Native BLE | BLE PLX 连接、service/characteristic 发现、base64 写入 |
+
+这个层级让后续新增协议或新增传输方式时只扩展 session/channel 边界，不把协议细节继续散落到每个 transport 实现里。
+
+## Device 生命周期
+
+`Device.acquire()` 会在 transport 探测完成后调用 `getProtocolType(path/id)`，并把结果写入 `originalDescriptor.protocolType`。
+
+```mermaid
+flowchart TD
+  DeviceAcquire["Device.acquire()"]
+  TransportAcquire["Transport.acquire()"]
+  ProtocolType["Transport.getProtocolType()"]
+  Descriptor["Device.originalDescriptor.protocolType"]
+  Initialize["Device.initialize()"]
+
+  DeviceAcquire --> TransportAcquire --> ProtocolType --> Descriptor --> Initialize
 ```
 
----
+初始化分支：
 
-## CRC8 算法
+- `V1`：执行传统 `Initialize`，写入真实 `Features`，再按 features 重新选择 schema。
+- `V2`：执行 `Ping` 验证链路，通过 `DevGetDeviceInfo` 获取 Protocol V2 设备信息，再由 `Protocol V2 feature adapter` 归一化为 `Features`。如果早期固件暂时没有返回完整 device info，会回退到 descriptor 生成最小 `Features`，并保留 `serial_no/onekey_serial_no/device_id` 作为 connectId/uuid 来源。
 
-```typescript
-// poly = 0x07（CRC-8/SMBUS 变体），init = 0x30
-function crc8(data: Uint8Array, init = 0x30): number {
-  let crc = init;
-  for (const byte of data) {
-    crc ^= byte;
-    for (let i = 0; i < 8; i++) {
-      crc = crc & 0x80 ? (crc << 1) ^ 0x07 : crc << 1;
-      crc &= 0xff;
-    }
-  }
-  return crc;
-}
+## 固件更新流程
+
+Protocol V2 固件更新分为两个阶段：
+
+```mermaid
+flowchart TD
+  Mkdir["FilesystemDirMake"]
+  Resource["FilesystemFileWrite(resource)"]
+  Bootloader["FilesystemFileWrite(bootloader)"]
+  Firmware["FilesystemFileWrite(firmware)"]
+  Update["DevFirmwareUpdate(targets: resource / bootloader / firmware)"]
+
+  Mkdir --> Resource --> Bootloader --> Firmware --> Update
 ```
 
-两处用到：
-1. **HeaderCRC**：对 `[SOF, LenL, LenH]` 前 3 字节计算，结果填入第 4 字节
-2. **FrameCRC**：对整帧（含 header + payload）计算，追加在末尾
+resource 和 bootloader 写入后必须进入 `targets`，SDK 不依赖固件端隐式扫描。
 
----
+## 兼容性边界
 
-## Protobuf Schema 来源
-
-| 文件 | 来源 | 生成方式 |
-|---|---|---|
-| `packages/hd-transport/messages.json` | `submodules/firmware/common/protob/*.proto` | `yarn update-protobuf` |
-| `packages/hd-transport/messages-pro2.json` | `submodules/firmware-pro2/sys/protobuf/onekey_protocol/legacy/` | `yarn update-protobuf`（Pro2 分支） |
-| `packages/core/src/data/messages/messages.json` | 同上，core 副本 | 同步生成 |
-| `packages/core/src/data/messages/messages-pro2.json` | 同上，core 副本 | 同步生成 |
-
-**Pro2 schema 特殊处理**：
-- `messages_emmc.proto` 中消息名带 `Emmc` 前缀（如 `EmmcFileRead`），构建脚本用 `sed` 去除前缀
-- `Success`/`Failure` 来自 `messages_common.proto`（不在 management proto 中）
-- `Reboot` 是 Protocol V2 专属，无对应 proto 源文件，在脚本中手动追加
-- `FailureType` 的限定名（`hw.trezor.messages.common.FailureType`）需 `sed` 去除命名空间，否则 pbjs 静默丢弃
-
----
-
-## 架构层次
-
-```
-Application (DApps)
-    ↓
-SDK Interface (@onekeyfe/hd-core)
-    ↓  Device.run() → acquire() → initialize()
-Transport Abstraction (@onekeyfe/hd-transport)
-    ↓  call() 自动分支
-WebUSB Transport (@onekeyfe/hd-transport-web-device)
-    ├── Protocol V1 path → buildEncodeBuffers() → 64B 分包 → receiveOne()
-    └── Protocol V2 path → buildPbFrame() → 单帧 → parseProtoV2Frame()
-    ↓
-Hardware Device
-    ├── Pro1 / Mini / Touch / Classic  (V1)
-    └── Pro2                           (V2)
-```
+- V1 设备无法响应 V2 `GetProtoVersion`，探测失败后会回落 V1。
+- V2 设备不支持传统 `Initialize/GetFeatures`，因此初始化必须走 Protocol V2 分支。
+- 协议选择不暴露给应用层；应用层继续使用 connectId 和原有 API。
+- V2 文件写入使用 `FilesystemFileWrite`，返回 `FilesystemFile`，不能继续使用旧的 `FileWrite/File` 名称。

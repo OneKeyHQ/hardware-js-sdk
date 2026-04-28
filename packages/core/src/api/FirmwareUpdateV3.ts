@@ -1,7 +1,7 @@
 import { EDeviceType, ERRORS, HardwareError, HardwareErrorCode, wait } from '@onekeyfe/hd-shared';
 import semver from 'semver';
 import JSZip from 'jszip';
-import { RebootType } from '@onekeyfe/hd-transport';
+import { DevRebootType } from '@onekeyfe/hd-transport';
 
 import { FirmwareUpdateTipMessage, UI_REQUEST } from '../events/ui-request';
 import { validateParams } from './helpers/paramsValidator';
@@ -19,41 +19,27 @@ import { DataManager } from '../data-manager';
 import { FirmwareUpdateBaseMethod } from './firmware/FirmwareUpdateBaseMethod';
 import { DevicePool } from '../device/DevicePool';
 import { DEVICE } from '../events';
+import {
+  ProtocolV2FirmwareTargetType,
+  protocolV2FileNameToTargetId,
+} from '../protocols/protocol-v2';
 
 import type { FirmwareUpdateV3Params } from '../types/api/firmwareUpdate';
 import type { Deferred, EFirmwareType } from '@onekeyfe/hd-shared';
 import type { TypedResponseMessage } from '../device/DeviceCommands';
 
-/**
- * Pro2 FirmwareTargetType enum (from messages-pro2.json)
- */
-const Pro2FirmwareTargetType = {
-  TARGET_MAIN_APP: 0,
-  TARGET_MAIN_BOOT: 1,
-  TARGET_BLE: 2,
-  TARGET_SE1: 3,
-  TARGET_SE2: 4,
-  TARGET_SE3: 5,
-  TARGET_SE4: 6,
-  TARGET_RESOURCE: 10,
-} as const;
-
-/**
- * Map firmware file name to Pro2 target_id
- */
-function pro2FileNameToTargetId(fileName: string): number {
-  if (fileName.includes('ble')) return Pro2FirmwareTargetType.TARGET_BLE;
-  if (fileName.includes('bootloader')) return Pro2FirmwareTargetType.TARGET_MAIN_BOOT;
-  if (fileName.includes('se1')) return Pro2FirmwareTargetType.TARGET_SE1;
-  if (fileName.includes('se2')) return Pro2FirmwareTargetType.TARGET_SE2;
-  if (fileName.includes('se3')) return Pro2FirmwareTargetType.TARGET_SE3;
-  if (fileName.includes('se4')) return Pro2FirmwareTargetType.TARGET_SE4;
-  return Pro2FirmwareTargetType.TARGET_MAIN_APP;
-}
-
 const Log = getLogger(LoggerNames.Method);
 
 export const MIN_UPDATE_V3_BOOTLOADER_VERSION = '2.8.0';
+
+type FirmwareUpdateStrategy = {
+  protocol: 'V1' | 'V2';
+  run: () => Promise<{
+    bootloaderVersion: string;
+    bleVersion: string;
+    firmwareVersion: string;
+  }>;
+};
 
 /**
  * FirmwareUpdateV3 flow
@@ -107,15 +93,32 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
   }
 
   async run() {
+    const strategy = this.getFirmwareUpdateStrategy();
+    Log.debug(`FirmwareUpdateV3 strategy: Protocol ${strategy.protocol}`);
+    return strategy.run();
+  }
+
+  private getFirmwareUpdateStrategy(): FirmwareUpdateStrategy {
     const { device } = this;
 
-    // Pro2 takes a completely separate update path (Protocol V2 messages, no
-    // bootloader-version gating, no GetFeatures completion polling). The V1
-    // flow below is left untouched.
     if (device.originalDescriptor?.protocolType === 'V2') {
-      return this.runProtocolV2();
+      return {
+        protocol: 'V2',
+        run: () => this.runProtocolV2(),
+      };
     }
 
+    return {
+      protocol: 'V1',
+      run: () => this.runProtocolV1(),
+    };
+  }
+
+  /**
+   * Protocol V1 firmware update strategy for existing Pro devices.
+   */
+  private async runProtocolV1() {
+    const { device } = this;
     const { features } = device;
 
     const deviceType = getDeviceType(features);
@@ -162,33 +165,26 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
   }
 
   /**
-   * Pro2 (Protocol V2) firmware update flow.
+   * Protocol V2 firmware update strategy.
    *
    * Differences from the V1 flow that justify a separate method:
-   *   - No bootloader-version gate. Pro2 doesn't expose `bootloader_version`
+   *   - No bootloader-version gate. Protocol V2 doesn't expose `bootloader_version`
    *     through its V2 protobuf schema and the V2 firmware itself decides
-   *     whether install is allowed (via the FirmwareUpdate Failure code).
+   *     whether install is allowed (via the DevFirmwareUpdate Failure code).
    *   - No legacy `enterBootloaderMode()` (which would send `DeviceBackToBoot`,
-   *     a V1-only message). When Pro2's bootloader handoff is finalized,
-   *     swap in `Reboot { reboot_type: BootLoader }` here.
-   *   - No GetFeatures polling for completion: `FirmwareUpdate` is treated as
-   *     a synchronous request — Success means install finished; if
-   *     `reboot_on_success` is true the device reboots itself.
+   *     a V1-only message). When Protocol V2 bootloader handoff is finalized,
+   *     swap in `DevReboot { reboot_type: Bootloader }` here.
+   *   - No GetFeatures polling for completion: `DevFirmwareUpdate` is treated as
+   *     a synchronous request. Success means the firmware accepted the install flow.
    *
    * Common helpers reused from the V1 flow: `prepareResourceBinary`,
    * `prepareFirmwareAndBleBinary`, `prepareBootloaderBinary`,
-   * `pro2CommonUpdateProcess`, `pro2CreateFolder`, `pro2StartFirmwareUpdate`.
+   * `protocolV2CommonUpdateProcess`, `protocolV2CreateFolder`,
+   * `protocolV2StartFirmwareUpdate`.
    */
   private async runProtocolV2() {
     const { device } = this;
     const { features } = device;
-
-    if (getDeviceType(features) !== EDeviceType.Pro2) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.RuntimeError,
-        'protocolType=V2 requires a Pro2 device'
-      );
-    }
 
     if (!features) {
       throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Device features not available');
@@ -218,9 +214,9 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
       );
     }
 
-    await this.pro2EnterBootloader();
+    await this.enterProtocolV2Bootloader();
 
-    await this.executeUpdateProtocolV2({
+    await this.executeProtocolV2Update({
       resourceBinary,
       fwBinaryMap,
       bootloaderBinary,
@@ -229,7 +225,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdateCompleted);
     DevicePool.resetState();
 
-    // Pro2's V2 schema has no GetFeatures, so the post-install version triplet
+    // Protocol V2 schema has no GetFeatures, so the post-install version triplet
     // V1 returns is not available here. Caller code that depends on these
     // version strings must be guarded by protocolType !== 'V2'.
     return {
@@ -240,35 +236,35 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
   }
 
   /**
-   * Reboot Pro2 into bootloader before file write + FirmwareUpdate.
+   * Reboot the Protocol V2 device into bootloader before file write + DevFirmwareUpdate.
    *
-   * Mirrors what the pro2-debug script's Reboot tab does
-   * (`Reboot { reboot_type: BootLoader }`), but routes through the SDK's
-   * `this.reboot()` helper (typedCall under the hood) instead of writing
+   * Mirrors what the Protocol V2 debug script's Reboot tab does
+   * (`DevReboot { reboot_type: Bootloader }`), but routes through the SDK's
+   * `this.protocolV2Reboot()` helper (typedCall under the hood) instead of writing
    * raw WebUSB bytes. The helper already tolerates the device dropping the
    * USB connection mid-call, which is the expected behavior on reboot.
    *
-   * Pro2 bootloader-mode is still in flux on the firmware side. Once it
+   * Protocol V2 bootloader-mode is still in flux on the firmware side. Once it
    * stabilizes, add a reconnect + Ping verification step after the wait
    * below to confirm we're talking to bootloader before file writes.
    */
-  private async pro2EnterBootloader() {
+  private async enterProtocolV2Bootloader() {
     this.postTipMessage(FirmwareUpdateTipMessage.AutoRebootToBootloader);
-    await this.reboot(RebootType.BootLoader);
+    await this.protocolV2Reboot(DevRebootType.Bootloader);
     // Brief settle delay; replace with proper reconnect/Ping handshake once
-    // Pro2 bootloader-mode is finalized.
+    // Protocol V2 bootloader-mode is finalized.
     await wait(1500);
     this.postTipMessage(FirmwareUpdateTipMessage.GoToBootloaderSuccess);
   }
 
   /**
-   * Pro2 file-write + FirmwareUpdate trigger.
+   * Protocol V2 file-write + DevFirmwareUpdate trigger.
    *
-   * Filesystem layout follows the pro2-debug script's `vol1:` convention.
-   * If the Pro2 firmware later anchors firmware payloads elsewhere, update
+   * Filesystem layout follows the Protocol V2 debug script's `vol1:` convention.
+   * If the Protocol V2 firmware later anchors firmware payloads elsewhere, update
    * the path constants below.
    */
-  private async executeUpdateProtocolV2({
+  private async executeProtocolV2Update({
     resourceBinary,
     fwBinaryMap,
     bootloaderBinary,
@@ -286,53 +282,65 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
 
     this.postTipMessage(FirmwareUpdateTipMessage.StartTransferData);
 
+    const targets: Array<{ target_id: number; path: string }> = [];
+
     if (resourceBinary) {
-      // Resource files live under `vol1:res/`. DirMake first so FileWrite
-      // doesn't fail on a missing parent directory.
-      await this.pro2CreateFolder(`vol1:res/`);
+      // Resource files live under `vol1:res/`. FilesystemDirMake first so
+      // FilesystemFileWrite doesn't fail on a missing parent directory.
+      const resourcePath = `vol1:res/`;
+      await this.protocolV2CreateFolder(resourcePath);
       const file = await JSZip.loadAsync(resourceBinary);
       const files = Object.entries(file.files);
       for (const [fileName, entry] of files) {
         const name = fileName.split('/').pop();
         if (!entry.dir && fileName.indexOf('__MACOSX') === -1 && name) {
           const data = await entry.async('arraybuffer');
-          processedSize = await this.pro2CommonUpdateProcess({
+          processedSize = await this.protocolV2CommonUpdateProcess({
             payload: data,
-            filePath: `vol1:res/${name}`,
+            filePath: `${resourcePath}${name}`,
             processedSize,
             totalSize,
           });
         }
       }
+      targets.push({
+        target_id: ProtocolV2FirmwareTargetType.TARGET_RESOURCE,
+        path: resourcePath,
+      });
     }
 
     if (bootloaderBinary) {
-      processedSize = await this.pro2CommonUpdateProcess({
+      const bootloaderPath = `vol1:bootloader.bin`;
+      processedSize = await this.protocolV2CommonUpdateProcess({
         payload: bootloaderBinary,
-        filePath: `vol1:bootloader.bin`,
+        filePath: bootloaderPath,
         processedSize,
         totalSize,
+      });
+      targets.push({
+        target_id: ProtocolV2FirmwareTargetType.TARGET_MAIN_BOOT,
+        path: bootloaderPath,
       });
     }
 
     for (const fwbinary of fwBinaryMap) {
-      processedSize = await this.pro2CommonUpdateProcess({
+      const firmwarePath = `vol1:${fwbinary.fileName}`;
+      processedSize = await this.protocolV2CommonUpdateProcess({
         payload: fwbinary.binary,
-        filePath: `vol1:${fwbinary.fileName}`,
+        filePath: firmwarePath,
         processedSize,
         totalSize,
+      });
+      targets.push({
+        target_id: protocolV2FileNameToTargetId(fwbinary.fileName),
+        path: firmwarePath,
       });
     }
 
     this.postTipMessage(FirmwareUpdateTipMessage.ConfirmOnDevice);
-    const targets = fwBinaryMap.map(fw => ({
-      target_id: pro2FileNameToTargetId(fw.fileName),
-      path: `vol1:${fw.fileName}`,
-    }));
-    // FirmwareUpdate is treated as synchronous: device responds Success only
-    // after install finishes (then auto-reboots if reboot_on_success=true).
-    // No Ping polling needed.
-    await this.pro2StartFirmwareUpdate({ targets, rebootOnSuccess: true });
+    // DevFirmwareUpdate is treated as synchronous from the SDK side: Success means
+    // the firmware accepted the install flow. No GetFeatures polling is available.
+    await this.protocolV2StartFirmwareUpdate({ targets });
   }
 
   private validateDeviceAndVersion(deviceType: EDeviceType, bootloaderVersion: string) {

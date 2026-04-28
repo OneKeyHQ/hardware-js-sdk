@@ -69,9 +69,8 @@ export type Transport = {
   disconnect?: (session: string) => Promise<void>;
 
   // Returns the protocol type for a given device path.
-  // Single-protocol transports (HTTP, emulator, RN-BLE, etc.) always return 'V1'.
-  // The Pro2 USB transport detects per-device by USB PID; the Pro2 BLE transport
-  // is V2-only and returns 'V2'.
+  // Single-protocol transports (HTTP, emulator, etc.) return 'V1'.
+  // Protocol V2-capable transports return the probed protocol for each device.
   getProtocolType: (path: string) => ProtocolType;
 
   // web-usb, web-bluetooth request device

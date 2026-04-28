@@ -9,24 +9,12 @@ export const BUFFER_SIZE = 63;
  */
 export const COMMON_HEADER_SIZE = 6;
 
-// ---- Protocol V2 (Pro2) ----
-
-/**
- * USB Product ID for Pro2 — used by WebUSB transport to detect Protocol V2 devices.
- *
- * TODO(pro2-pid): Pro2 currently shares 0x53c1 with Classic / Mini / Pro / Touch
- * firmware (see ONEKEY_WEBUSB_FILTER comments in packages/shared/src/constants.ts).
- * That means PID-only detection mis-identifies V1 devices as V2 when Pro2 firmware
- * leaves this PID. Production fix: assign a Pro2-specific PID and update this
- * constant. Until then this detection is only safe in environments where only
- * Pro2 devices connect.
- */
-export const PROTOCOL_V2_USB_PID = 0x53c1;
+// ---- Protocol V2 (Pro2 USB / BLE transports) ----
 
 /** Maximum size of a Protocol V2 frame including header + payload + CRC */
 export const PROTOCOL_V2_FRAME_MAX_BYTES = 2200;
 
-/** Safe data chunk for FileWrite payload (frame max minus FileWrite overhead, ~50B) */
+/** Safe data chunk for FilesystemFileWrite payload (frame max minus message overhead, ~50B) */
 export const PROTOCOL_V2_FILE_CHUNK_SIZE = 2048;
 
 /**

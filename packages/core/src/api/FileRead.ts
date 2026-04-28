@@ -18,7 +18,7 @@ export default class FileRead extends BaseMethod<FileReadParams> {
   }
 
   async run() {
-    const res = await (this.device.commands as any).call('FileRead', {
+    const res = await (this.device.commands as any).call('FilesystemFileRead', {
       file: {
         path: this.params.path,
         offset: this.params.offset,

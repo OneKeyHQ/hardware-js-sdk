@@ -15,11 +15,19 @@ Hardware-js-sdk is designed to allow third-party developers to quickly access th
 | [@onekeyfe/hd-transport-react-native](./packages/hd-transport-react-native) | communication lib for React Native                                    |
 | [@onekeyfe/hd-transport-webusb](./packages/hd-transport-webusb)             | communication lib for WebUSB                                          |
 | [@onekeyfe/hd-shared](./packages/shared)                                    | Tools, error definitions, constants                                   |
-| [@onekeyfe/hardware-cli](./packages/hd-cli)                                | CLI for AI agent integration (Claude Code, Cursor, etc.)              |
+| [@onekeyfe/hardware-cli](./packages/hd-cli)                                 | CLI for AI agent integration (Claude Code, Cursor, etc.)              |
 
 ## Documentation
 
 See the full documentation on [developer.onekey.so](https://developer.onekey.so/connect-to-hardware/hardware-sdk).
+
+Local engineering docs:
+
+- [CLAUDE.md](./CLAUDE.md) - Claude / agent workflow entry
+- [docs/README.md](./docs/README.md) - local documentation index
+- [docs/architecture.md](./docs/architecture.md) - SDK architecture and protocol ownership
+- [docs/transport.md](./docs/transport.md) - transport flow and Protocol V1/V2 detection
+- [docs/protocol-v2.md](./docs/protocol-v2.md) - Protocol V2 details
 
 ## hardware-js-sdk development
 
@@ -39,14 +47,17 @@ Run a dev build:
 - `yarn dev:shared` (shared package)
 
 ### Development with example desktop app (Recommend)
+
 - `yarn bootstrap && yarn build`
 - `yarn example:desktop`
 
 ### Development with example mobile app
+
 - `yarn bootstrap && yarn build`
 - `yarn example` select ios or android in menu.
 
 ### Development with example web app
+
 - Build web sdk
 - Edit connect src in `packages/connect-examples/expo-example/src/constants/connect.ts`, change `CONNECT_SRC` to `https://localhost:8087/`
 - `yarn dev:web`
