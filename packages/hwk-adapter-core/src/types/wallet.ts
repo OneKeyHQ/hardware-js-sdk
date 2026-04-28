@@ -164,7 +164,8 @@ export interface IHardwareWallet<TConfig = unknown>
   disconnectDevice(connectId: string): Promise<void>;
   getDeviceInfo(connectId: string, deviceId: string): Promise<Response<DeviceInfo>>;
   getSupportedChains(): ChainCapability[];
-  cancel(connectId: string): void;
+  /** Abort the in-flight call. Omit connectId to cancel whatever is active. */
+  cancel(connectId?: string): void;
 
   /** Respond to any pending `ui-request-*`. */
   uiResponse(response: UiResponseEvent): void;

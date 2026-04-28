@@ -28,6 +28,8 @@ export enum HardwareErrorCode {
   InvalidParams = 10002,
   OperationTimeout = 10003,
   MethodNotSupported = 10004,
+  /** User dismissed in-app cancel UI. Distinct from UserRejected (on-device). */
+  UserAborted = 10005,
 
   // --- 10100s Device state ---
   DeviceNotFound = 10100,

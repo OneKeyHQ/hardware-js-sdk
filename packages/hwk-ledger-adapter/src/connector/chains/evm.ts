@@ -164,7 +164,7 @@ async function _getEthSigner(ctx: ConnectorContext, sessionId: string) {
 
   // Expose DeviceAction canceller to the connector so that cancel(sessionId)
   // can release DMK's intent queue slot and unsubscribe cleanly.
-  signer.onRegisterCanceller = (cancel: () => void) => {
+  signer.onRegisterCanceller = cancel => {
     ctx.registerCanceller(sessionId, cancel);
   };
 

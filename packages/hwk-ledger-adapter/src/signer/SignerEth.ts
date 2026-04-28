@@ -3,6 +3,7 @@ import { hexToBytes } from '@onekeyfe/hwk-adapter-core';
 import { deviceActionToPromise } from './deviceActionToPromise';
 import { debugLog } from '../utils/debugLog';
 
+import type { CancelReason } from './deviceActionToPromise';
 import type { SignerEth as ISdkSignerEth, TypedData } from '@ledgerhq/device-signer-kit-ethereum';
 import type { SignerEvmAddress, SignerEvmSignature } from '../types';
 
@@ -24,7 +25,7 @@ export class SignerEth {
    * for the underlying DeviceAction. Caller can invoke it to release DMK's
    * IntentQueue slot and unsubscribe from the action's observable.
    */
-  onRegisterCanceller?: (cancel: () => void) => void;
+  onRegisterCanceller?: (cancel: (reason?: CancelReason) => void) => void;
 
   async getAddress(
     derivationPath: string,

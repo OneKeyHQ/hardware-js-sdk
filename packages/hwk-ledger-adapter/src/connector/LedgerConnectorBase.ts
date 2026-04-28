@@ -1,3 +1,5 @@
+import { HardwareErrorCode } from '@onekeyfe/hwk-adapter-core';
+
 import { LedgerDeviceManager } from '../device/LedgerDeviceManager';
 import { SignerManager } from '../signer/SignerManager';
 import { mapLedgerError } from '../errors';
@@ -22,6 +24,7 @@ import {
 } from './chains';
 
 import type { WrapErrorOptions } from '../errors';
+import type { CancelReason } from '../signer/deviceActionToPromise';
 import type { ConnectorContext } from './chains/types';
 import type { DeviceManagementKit } from '@ledgerhq/device-management-kit';
 import type {
@@ -189,7 +192,7 @@ export class LedgerConnectorBase implements IConnector {
   // IConnector.cancel(sessionId) invokes the registered canceller, which
   // unsubscribes the observable and releases DMK's IntentQueue slot.
   // ---------------------------------------------------------------------------
-  private readonly _cancellers = new Map<string, () => void>();
+  private readonly _cancellers = new Map<string, (reason?: CancelReason) => void>();
 
   // ---------------------------------------------------------------------------
   // Per-session DMK state subscriptions
@@ -483,7 +486,11 @@ export class LedgerConnectorBase implements IConnector {
     );
     this._unwatchSessionState(sessionId);
     this._signerManager?.invalidate(sessionId);
-    this._cancellers.get(sessionId)?.();
+    this._cancellers.get(sessionId)?.({
+      code: HardwareErrorCode.DeviceDisconnected,
+      tag: 'DeviceDisconnected',
+      message: 'Device disconnected',
+    });
     this._cancellers.delete(sessionId);
     this._emit('device-disconnect', { connectId: externalConnectId });
   }

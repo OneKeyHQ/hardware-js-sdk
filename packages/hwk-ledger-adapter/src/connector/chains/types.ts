@@ -3,6 +3,7 @@ import type { DeviceManagementKit } from '@ledgerhq/device-management-kit';
 import type { SignerManager } from '../../signer/SignerManager';
 import type { LedgerDeviceManager } from '../../device/LedgerDeviceManager';
 import type { WrapErrorOptions } from '../../errors';
+import type { CancelReason } from '../../signer/deviceActionToPromise';
 
 /**
  * Context provided by LedgerConnectorBase to per-chain handlers.
@@ -29,7 +30,7 @@ export interface ConnectorContext {
    * DMK's intent queue slot. Chain handlers should register immediately after
    * creating a DeviceAction and clear in a `finally` block.
    */
-  registerCanceller(sessionId: string, cancel: () => void): void;
+  registerCanceller(sessionId: string, cancel: (reason?: CancelReason) => void): void;
 
   /** Clear any canceller previously registered for this session. */
   clearCanceller(sessionId: string): void;

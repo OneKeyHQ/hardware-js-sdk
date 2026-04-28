@@ -3,6 +3,7 @@ import { hexToBytes } from '@onekeyfe/hwk-adapter-core';
 import { deviceActionToPromise } from './deviceActionToPromise';
 import { debugError, debugLog } from '../utils/debugLog';
 
+import type { CancelReason } from './deviceActionToPromise';
 import type { SignerBtc as ISdkSignerBtc } from '@ledgerhq/device-signer-kit-bitcoin';
 import type { SignerBtcAddress } from '../types';
 
@@ -27,7 +28,7 @@ const INTERACTIVE_TIMEOUT_MS = 5 * 60_000;
 export class SignerBtc {
   onInteraction?: (interaction: string) => void;
 
-  onRegisterCanceller?: (cancel: () => void) => void;
+  onRegisterCanceller?: (cancel: (reason?: CancelReason) => void) => void;
 
   // eslint-disable-next-line no-useless-constructor, no-empty-function
   constructor(private readonly _sdk: ISdkSignerBtc) {}

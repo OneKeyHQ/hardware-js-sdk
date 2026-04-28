@@ -276,6 +276,12 @@ export function isTimeoutError(err: unknown): boolean {
   return false;
 }
 
+/** Stuck-state APDU response from a chain app — recover via connector reset. */
+export function isStuckAppStateError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  return (err as Record<string, unknown>)._tag === 'UnknownDeviceExchangeError';
+}
+
 /**
  * Map a Ledger DMK error to a HardwareErrorCode and human-readable message.
  * `opts.defaultAppName` fills `appName` when the raw error doesn't carry it

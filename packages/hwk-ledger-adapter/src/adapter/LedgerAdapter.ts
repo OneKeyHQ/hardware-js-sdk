@@ -14,6 +14,7 @@ import {
 import {
   isDeviceDisconnectedError,
   isDeviceLockedError,
+  isStuckAppStateError,
   isTimeoutError,
   ledgerFailure,
   mapLedgerError,
@@ -441,12 +442,25 @@ export class LedgerAdapter implements IHardwareWallet {
     this.emitter.off(event, listener);
   }
 
-  cancel(connectId: string): void {
-    const sessionId = this._sessions.get(connectId) ?? connectId;
-    // Force-cancel the active job so in-flight signer work aborts even if it's
-    // marked non-interruptible; queue.clear would kill queued follow-ups too.
-    this._jobQueue.forceCancelActive(connectId || '__ledger_default__');
-    void this.connector.cancel(sessionId);
+  cancel(connectId?: string): void {
+    // signal.reason carries `code: UserAborted`; rethrown by _abortable on caller's catch.
+    const userAbortReason = Object.assign(new Error('User aborted operation'), {
+      code: HardwareErrorCode.UserAborted,
+      _tag: 'UserAborted',
+    });
+    this._uiRegistry.cancel();
+    if (connectId) {
+      const sessionId = this._sessions.get(connectId) ?? connectId;
+      this._jobQueue.forceCancelActive(connectId, userAbortReason);
+      void this.connector.cancel(sessionId);
+      return;
+    }
+    // No connectId — toast-driven cancels don't carry one; abort everything active.
+    this._jobQueue.forceCancelActive('__ledger_default__', userAbortReason);
+    for (const [cid, sid] of this._sessions) {
+      if (cid) this._jobQueue.forceCancelActive(cid, userAbortReason);
+      void this.connector.cancel(sid);
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -864,6 +878,12 @@ export class LedgerAdapter implements IHardwareWallet {
         this._discoveredDevices.delete(resolvedConnectId);
         return this._retryWithFreshConnection(resolvedConnectId, method, params, signal, err);
       }
+      if (isStuckAppStateError(err)) {
+        // Chain app stuck after interrupted APDU — needs connector.reset() (escalated inside).
+        debugLog('[LedgerAdapter] stuck app state, retrying with full reset...');
+        this._discoveredDevices.clear();
+        return this._retryWithFreshConnection(resolvedConnectId, method, params, signal, err);
+      }
       throw err;
     }
   }
@@ -898,7 +918,11 @@ export class LedgerAdapter implements IHardwareWallet {
       );
     } catch (retryErr) {
       if (signal.aborted) throw retryErr;
-      if (!isDeviceDisconnectedError(retryErr) && !isTimeoutError(retryErr)) {
+      if (
+        !isDeviceDisconnectedError(retryErr) &&
+        !isTimeoutError(retryErr) &&
+        !isStuckAppStateError(retryErr)
+      ) {
         throw retryErr;
       }
       debugLog(

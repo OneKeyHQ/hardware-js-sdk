@@ -158,11 +158,11 @@ export class DeviceJobQueue {
     return true;
   }
 
-  /** Force cancel regardless of interruptibility. Use for device stuck recovery. */
-  forceCancelActive(deviceId: string): boolean {
+  /** Force cancel regardless of interruptibility. `reason` becomes signal.reason. */
+  forceCancelActive(deviceId: string, reason?: Error): boolean {
     const active = this._active.get(deviceId);
     if (!active) return false;
-    active.abortController.abort(new Error('Force cancelled for recovery'));
+    active.abortController.abort(reason ?? new Error('Force cancelled for recovery'));
     return true;
   }
 

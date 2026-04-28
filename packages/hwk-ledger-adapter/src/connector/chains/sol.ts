@@ -119,7 +119,7 @@ async function _createSolSigner(ctx: ConnectorContext, sessionId: string): Promi
     });
   };
 
-  signer.onRegisterCanceller = (cancel: () => void) => {
+  signer.onRegisterCanceller = cancel => {
     ctx.registerCanceller(sessionId, cancel);
   };
 
