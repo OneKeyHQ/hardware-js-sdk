@@ -1,5 +1,4 @@
 import type { Response } from './response';
-import type { ProgressCallback } from './chain-evm';
 
 export interface SolGetAddressParams {
   path: string;
@@ -48,13 +47,6 @@ export interface ISolMethods {
     deviceId: string,
     params: SolGetAddressParams
   ): Promise<Response<SolAddress>>;
-
-  solGetAddresses(
-    connectId: string,
-    deviceId: string,
-    params: SolGetAddressParams[],
-    onProgress?: ProgressCallback
-  ): Promise<Response<SolAddress[]>>;
 
   solSignTransaction(
     connectId: string,

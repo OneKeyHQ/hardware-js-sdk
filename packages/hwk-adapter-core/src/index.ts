@@ -23,7 +23,6 @@ export type {
   EvmSignTypedDataHash,
   EIP712Domain,
   EvmSignature,
-  ProgressCallback,
   IEvmMethods,
 } from './types/chain-evm';
 

@@ -191,6 +191,36 @@ export class LedgerConnectorBase implements IConnector {
   // ---------------------------------------------------------------------------
   private readonly _cancellers = new Map<string, () => void>();
 
+  // ---------------------------------------------------------------------------
+  // Per-session DMK state subscriptions
+  //
+  // DMK only emits `device-disconnect` on the connector when `disconnect()`
+  // is called explicitly. To pick up autonomous disconnects (USB unplug,
+  // BLE drop, device sleep, DMK transport reset) we subscribe to
+  // `_dmk.getDeviceSessionState({sessionId})` per active session and emit
+  // `device-disconnect` ourselves the moment DMK reports the device went
+  // to NOT_CONNECTED. The subscription is torn down on disconnect /
+  // reset / observable completion to avoid leaks.
+  // ---------------------------------------------------------------------------
+  private readonly _sessionStateSubs = new Map<string, { unsubscribe: () => void }>();
+
+  // ---------------------------------------------------------------------------
+  // Diagnostic device-list subscription
+  //
+  // Long-lived listenToAvailableDevices subscription that LOGS ONLY (no
+  // behaviour change). Its job is to make it visible in the metro/console
+  // logs whether DMK proactively re-emits an updated device list after a
+  // USB unplug / BLE drop, or whether the BehaviorSubject value goes stale
+  // until the next searchDevices() poke. This determines whether a future
+  // "Block 3" (clear caches on autonomous device removal) is feasible.
+  //
+  // Started lazily on the first searchDevices() call (DMK exists by then),
+  // torn down by `_resetAll`. Survives across searchDevices calls.
+  // ---------------------------------------------------------------------------
+  private _diagDeviceListSub: { unsubscribe: () => void } | null = null;
+
+  private _diagDeviceListPrev = new Set<string>();
+
   /**
    * Resolves a Ledger signer kit module by package name.
    * Override via constructor to use CJS paths for Metro (React Native).
@@ -257,12 +287,15 @@ export class LedgerConnectorBase implements IConnector {
   // ---------------------------------------------------------------------------
 
   async searchDevices(): Promise<ConnectorDevice[]> {
+    debugLog('[DMK] connector.searchDevices() entry');
     const dm = await this._getDeviceManager();
+    this._startDiagnosticDeviceListListen();
 
     let descriptors = await dm.enumerate();
 
     // If no devices found, trigger permission dialog / BLE scanning via startDiscovering
     if (descriptors.length === 0) {
+      debugLog('[DMK] connector.searchDevices() empty, calling requestDevice');
       try {
         await dm.requestDevice();
       } catch {
@@ -280,6 +313,11 @@ export class LedgerConnectorBase implements IConnector {
         model: d.type,
       };
     });
+    debugLog(
+      `[DMK] connector.searchDevices() return count=${result.length} ids=[${result
+        .map(r => r.connectId)
+        .join(',')}] paths=[${result.map(r => r.deviceId).join(',')}]`
+    );
     return result;
   }
 
@@ -313,6 +351,7 @@ export class LedgerConnectorBase implements IConnector {
 
     const doConnect = async (path: string): Promise<ConnectorSession> => {
       const sessionId = await dm.connect(path);
+      this._watchSessionState(sessionId, externalConnectId);
       const session: ConnectorSession = {
         sessionId,
         deviceInfo: {
@@ -369,10 +408,123 @@ export class LedgerConnectorBase implements IConnector {
 
     const deviceId = this._deviceManager.getDeviceId(sessionId);
     this._signerManager?.invalidate(sessionId);
+    this._unwatchSessionState(sessionId);
     await this._deviceManager.disconnect(sessionId);
 
     if (deviceId) {
       this._emit('device-disconnect', { connectId: deviceId });
+    }
+  }
+
+  /**
+   * Subscribe to DMK's per-session state observable so that any autonomous
+   * disconnect (USB unplug, BLE drop, device sleep, transport reset) is
+   * surfaced as a `device-disconnect` event — without this, the upstream
+   * `LedgerAdapter._sessions` map would hold a dead session entry until
+   * the next call hit `DeviceSessionNotFound`.
+   *
+   * Best-effort: any error subscribing is swallowed so a flaky DMK
+   * doesn't break the connect path.
+   */
+  private _watchSessionState(sessionId: string, externalConnectId: string): void {
+    const dmk = this._dmk;
+    if (!dmk) return;
+    const previous = this._sessionStateSubs.get(sessionId);
+    if (previous) {
+      try {
+        previous.unsubscribe();
+      } catch {
+        // ignore
+      }
+    }
+    try {
+      const sub = dmk.getDeviceSessionState({ sessionId }).subscribe({
+        next: (state: { deviceStatus?: string }) => {
+          // String-compare against DeviceStatus.NOT_CONNECTED ("NOT CONNECTED")
+          // to avoid pulling the runtime enum import (kept type-only for
+          // Metro/RN compatibility — see _importLedgerKit).
+          if (state?.deviceStatus === 'NOT CONNECTED') {
+            this._handleAutonomousDisconnect(sessionId, externalConnectId);
+          }
+        },
+        error: () => {
+          // DMK closed the observable abnormally — treat as disconnect.
+          this._handleAutonomousDisconnect(sessionId, externalConnectId);
+        },
+        complete: () => {
+          // Observable completed — session is gone from DMK's POV.
+          this._handleAutonomousDisconnect(sessionId, externalConnectId);
+        },
+      });
+      this._sessionStateSubs.set(sessionId, sub);
+    } catch (err) {
+      debugLog('[DMK] _watchSessionState subscribe failed:', err);
+    }
+  }
+
+  private _unwatchSessionState(sessionId: string): void {
+    const sub = this._sessionStateSubs.get(sessionId);
+    if (!sub) return;
+    try {
+      sub.unsubscribe();
+    } catch {
+      // ignore
+    }
+    this._sessionStateSubs.delete(sessionId);
+  }
+
+  private _handleAutonomousDisconnect(sessionId: string, externalConnectId: string): void {
+    if (!this._sessionStateSubs.has(sessionId)) return; // already handled
+    debugLog(
+      '[DMK] autonomous disconnect detected — sessionId:',
+      sessionId,
+      'connectId:',
+      externalConnectId
+    );
+    this._unwatchSessionState(sessionId);
+    this._signerManager?.invalidate(sessionId);
+    this._cancellers.get(sessionId)?.();
+    this._cancellers.delete(sessionId);
+    this._emit('device-disconnect', { connectId: externalConnectId });
+  }
+
+  /**
+   * Start a long-lived listenToAvailableDevices subscription whose only job
+   * is to log every emission (with diff vs previous) so we can determine
+   * whether DMK proactively re-emits the device list when a USB device is
+   * unplugged or a BLE peripheral disappears. Pure observation — does NOT
+   * touch any cache or emit any event. See _diagDeviceListSub comment for
+   * rationale.
+   */
+  private _startDiagnosticDeviceListListen(): void {
+    if (this._diagDeviceListSub) return;
+    const dmk = this._dmk;
+    if (!dmk) return;
+    debugLog('[DMK][diag] starting long-lived listenToAvailableDevices subscription');
+    try {
+      this._diagDeviceListSub = dmk.listenToAvailableDevices({}).subscribe({
+        next: (devices: ReadonlyArray<{ id: string; name?: string }>) => {
+          const curr = new Set(devices.map(d => d.id));
+          const added: string[] = [];
+          const removed: string[] = [];
+          for (const id of curr) if (!this._diagDeviceListPrev.has(id)) added.push(id);
+          for (const id of this._diagDeviceListPrev) if (!curr.has(id)) removed.push(id);
+          debugLog(
+            `[DMK][diag] emit count=${devices.length} ids=[${devices
+              .map(d => d.id)
+              .join(',')}] added=[${added.join(',')}] removed=[${removed.join(',')}]`
+          );
+          this._diagDeviceListPrev = curr;
+        },
+        error: (err: unknown) => {
+          debugLog('[DMK][diag] listen error', (err as Error)?.message ?? String(err));
+        },
+        complete: () => {
+          debugLog('[DMK][diag] listen complete');
+        },
+      });
+    } catch (err) {
+      debugLog('[DMK][diag] subscribe failed', (err as Error)?.message ?? String(err));
     }
   }
 
@@ -610,6 +762,25 @@ export class LedgerConnectorBase implements IConnector {
       }
     }
     this._cancellers.clear();
+    // Tear down per-session state subscriptions so we don't keep observing
+    // a DMK we're about to drop.
+    for (const sub of this._sessionStateSubs.values()) {
+      try {
+        sub.unsubscribe();
+      } catch {
+        // ignore
+      }
+    }
+    this._sessionStateSubs.clear();
+    if (this._diagDeviceListSub) {
+      try {
+        this._diagDeviceListSub.unsubscribe();
+      } catch {
+        // ignore
+      }
+      this._diagDeviceListSub = null;
+    }
+    this._diagDeviceListPrev = new Set();
     this._signerManager?.clearAll();
     this._deviceManager?.dispose();
     this._deviceManager = null;

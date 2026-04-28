@@ -49,7 +49,6 @@ import type {
   IConnector,
   IHardwareWallet,
   Interruptibility,
-  ProgressCallback,
   Response,
   SolAddress,
   SolGetAddressParams,
@@ -211,6 +210,9 @@ export class LedgerAdapter implements IHardwareWallet {
   async searchDevices(): Promise<DeviceInfo[]> {
     await this._ensureDevicePermission();
 
+    debugLog(
+      `[LedgerAdapter] searchDevices() entry, cacheBefore=${this._discoveredDevices.size}`
+    );
     const devices = await this.connector.searchDevices();
     debugLog('[DMK] adapter.searchDevices raw:', JSON.stringify(devices));
 
@@ -232,6 +234,11 @@ export class LedgerAdapter implements IHardwareWallet {
       await this._ensureDevicePermission();
     }
 
+    debugLog(
+      `[LedgerAdapter] searchDevices() return count=${this._discoveredDevices.size} ids=[${[
+        ...this._discoveredDevices.keys(),
+      ].join(',')}]`
+    );
     return Array.from(this._discoveredDevices.values());
   }
 
@@ -308,60 +315,12 @@ export class LedgerAdapter implements IHardwareWallet {
     }
   }
 
-  /**
-   * Batch version of callChain — checks permission once,
-   * fingerprint is verified on the first call inside connectorCall.
-   */
-  private async callChainBatch<TParam, TResult>(
-    connectId: string,
-    deviceId: string,
-    chain: string,
-    method: string,
-    params: TParam[],
-    onProgress?: ProgressCallback,
-    skipFingerprint = false
-  ): Promise<Response<TResult[]>> {
-    await this._ensureDevicePermission(connectId, deviceId);
-    const results: TResult[] = [];
-    for (let i = 0; i < params.length; i++) {
-      try {
-        const result = await this.connectorCall(connectId, method, params[i], {
-          chain: chain as ChainForFingerprint,
-          deviceId,
-          // Only verify fingerprint on the first call in the batch
-          skipFingerprint: skipFingerprint || i > 0,
-        });
-        results.push(result as TResult);
-        onProgress?.({ index: i, total: params.length });
-      } catch (err) {
-        return this.errorToFailure(err);
-      }
-    }
-    return success(results);
-  }
-
   // ---------------------------------------------------------------------------
   // EVM chain methods
   // ---------------------------------------------------------------------------
 
   evmGetAddress(connectId: string, deviceId: string, params: EvmGetAddressParams) {
     return this.callChain<EvmAddress>(connectId, deviceId, 'evm', 'evmGetAddress', params);
-  }
-
-  evmGetAddresses(
-    connectId: string,
-    deviceId: string,
-    params: EvmGetAddressParams[],
-    onProgress?: ProgressCallback
-  ) {
-    return this.callChainBatch<EvmGetAddressParams, EvmAddress>(
-      connectId,
-      deviceId,
-      'evm',
-      'evmGetAddress',
-      params,
-      onProgress
-    );
   }
 
   evmSignTransaction(connectId: string, deviceId: string, params: EvmSignTxParams) {
@@ -382,22 +341,6 @@ export class LedgerAdapter implements IHardwareWallet {
 
   btcGetAddress(connectId: string, deviceId: string, params: BtcGetAddressParams) {
     return this.callChain<BtcAddress>(connectId, deviceId, 'btc', 'btcGetAddress', params);
-  }
-
-  btcGetAddresses(
-    connectId: string,
-    deviceId: string,
-    params: BtcGetAddressParams[],
-    onProgress?: ProgressCallback
-  ) {
-    return this.callChainBatch<BtcGetAddressParams, BtcAddress>(
-      connectId,
-      deviceId,
-      'btc',
-      'btcGetAddress',
-      params,
-      onProgress
-    );
   }
 
   btcGetPublicKey(connectId: string, deviceId: string, params: BtcGetPublicKeyParams) {
@@ -434,22 +377,6 @@ export class LedgerAdapter implements IHardwareWallet {
     return this.callChain<SolAddress>(connectId, deviceId, 'sol', 'solGetAddress', params);
   }
 
-  solGetAddresses(
-    connectId: string,
-    deviceId: string,
-    params: SolGetAddressParams[],
-    onProgress?: ProgressCallback
-  ) {
-    return this.callChainBatch<SolGetAddressParams, SolAddress>(
-      connectId,
-      deviceId,
-      'sol',
-      'solGetAddress',
-      params,
-      onProgress
-    );
-  }
-
   solSignTransaction(connectId: string, deviceId: string, params: SolSignTxParams) {
     return this.callChain<SolSignedTx>(connectId, deviceId, 'sol', 'solSignTransaction', params);
   }
@@ -464,23 +391,6 @@ export class LedgerAdapter implements IHardwareWallet {
 
   tronGetAddress(connectId: string, deviceId: string, params: TronGetAddressParams) {
     return this.callChain<TronAddress>(connectId, deviceId, 'tron', 'tronGetAddress', params, true);
-  }
-
-  tronGetAddresses(
-    connectId: string,
-    deviceId: string,
-    params: TronGetAddressParams[],
-    onProgress?: ProgressCallback
-  ) {
-    return this.callChainBatch<TronGetAddressParams, TronAddress>(
-      connectId,
-      deviceId,
-      'tron',
-      'tronGetAddress',
-      params,
-      onProgress,
-      true
-    );
   }
 
   tronSignTransaction(connectId: string, deviceId: string, params: TronSignTxParams) {
@@ -721,7 +631,12 @@ export class LedgerAdapter implements IHardwareWallet {
       return connectId;
     }
 
-    // 2. Any existing session (Ledger IDs are temporary, any session is fine)
+    // 2. Any existing session (Ledger IDs are temporary, any session is fine).
+    //    This is the warm-path optimization: trust the cache and let the
+    //    retry/escalate logic in connectorCall heal stale sessions on demand.
+    //    For this to be safe, the connector MUST proactively emit
+    //    `device-disconnect` whenever DMK reports the underlying device went
+    //    away (handled in LedgerConnectorBase via getDeviceSessionState).
     if (this._sessions.size > 0) {
       // size > 0 guarantees .next().value is defined
       const firstKey = this._sessions.keys().next().value as string;
@@ -893,7 +808,6 @@ export class LedgerAdapter implements IHardwareWallet {
       signal,
       this.ensureConnected(connectId)
     );
-    LedgerAdapter._throwIfAborted(signal);
     const sessionId = this._sessions.get(resolvedConnectId);
     debugLog(
       '[LedgerAdapter] connectorCall resolved:',
@@ -943,7 +857,6 @@ export class LedgerAdapter implements IHardwareWallet {
       }
       if (isDeviceLockedError(err)) {
         await this._waitForDeviceConnect(signal);
-        LedgerAdapter._throwIfAborted(signal);
         return LedgerAdapter._abortable(signal, this.connector.call(sessionId, method, params));
       }
       if (isTimeoutError(err)) {
@@ -955,7 +868,16 @@ export class LedgerAdapter implements IHardwareWallet {
     }
   }
 
-  /** Clear stale session, reconnect, and retry the call. */
+  /**
+   * Clear stale session, reconnect, and retry the call.
+   *
+   * Two-stage recovery: the inner retry first re-uses the current DMK to
+   * cut latency; if that still fails with a disconnect/timeout, the DMK
+   * itself is likely wedged (transport stuck after an abnormal teardown
+   * — process killed, USB yanked, browser kept the offscreen page across
+   * a session boundary). In that case we fully `connector.reset()` to
+   * force a fresh DMK + transport on the next round.
+   */
   private async _retryWithFreshConnection(
     resolvedConnectId: string,
     method: string,
@@ -964,14 +886,41 @@ export class LedgerAdapter implements IHardwareWallet {
     originalErr: unknown
   ): Promise<unknown> {
     this._sessions.delete(resolvedConnectId);
-    LedgerAdapter._throwIfAborted(signal);
-    const retryConnectId = await this.ensureConnected();
-    LedgerAdapter._throwIfAborted(signal);
+    const retryConnectId = await LedgerAdapter._abortable(signal, this.ensureConnected());
     const retrySessionId = this._sessions.get(retryConnectId);
     if (!retrySessionId) {
       throw originalErr;
     }
-    return LedgerAdapter._abortable(signal, this.connector.call(retrySessionId, method, params));
+    try {
+      return await LedgerAdapter._abortable(
+        signal,
+        this.connector.call(retrySessionId, method, params)
+      );
+    } catch (retryErr) {
+      if (signal.aborted) throw retryErr;
+      if (!isDeviceDisconnectedError(retryErr) && !isTimeoutError(retryErr)) {
+        throw retryErr;
+      }
+      debugLog(
+        '[LedgerAdapter] fresh-session retry still failed; resetting connector and rebuilding DMK'
+      );
+      // Full reset: drops _dmk, _deviceManager, _signerManager, ID maps
+      // and in-flight cancellers. Next ensureConnected() will rebuild from
+      // the ground up via _doConnect → connector.connect → fresh DMK.
+      this.connector.reset();
+      this._sessions.clear();
+      this._discoveredDevices.clear();
+      this._connectingPromise = null;
+      const finalConnectId = await LedgerAdapter._abortable(signal, this.ensureConnected());
+      const finalSessionId = this._sessions.get(finalConnectId);
+      if (!finalSessionId) {
+        throw originalErr;
+      }
+      return LedgerAdapter._abortable(
+        signal,
+        this.connector.call(finalSessionId, method, params)
+      );
+    }
   }
 
   /**
