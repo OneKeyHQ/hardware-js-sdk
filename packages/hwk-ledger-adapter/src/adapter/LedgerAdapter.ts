@@ -14,7 +14,6 @@ import {
 import {
   isDeviceDisconnectedError,
   isDeviceLockedError,
-  isStuckAppStateError,
   isTimeoutError,
   ledgerFailure,
   mapLedgerError,
@@ -878,12 +877,7 @@ export class LedgerAdapter implements IHardwareWallet {
         this._discoveredDevices.delete(resolvedConnectId);
         return this._retryWithFreshConnection(resolvedConnectId, method, params, signal, err);
       }
-      if (isStuckAppStateError(err)) {
-        // Chain app stuck after interrupted APDU — needs connector.reset() (escalated inside).
-        debugLog('[LedgerAdapter] stuck app state, retrying with full reset...');
-        this._discoveredDevices.clear();
-        return this._retryWithFreshConnection(resolvedConnectId, method, params, signal, err);
-      }
+      // DeviceAppStuck propagates untouched — only manual on-device exit recovers.
       throw err;
     }
   }
@@ -918,11 +912,7 @@ export class LedgerAdapter implements IHardwareWallet {
       );
     } catch (retryErr) {
       if (signal.aborted) throw retryErr;
-      if (
-        !isDeviceDisconnectedError(retryErr) &&
-        !isTimeoutError(retryErr) &&
-        !isStuckAppStateError(retryErr)
-      ) {
+      if (!isDeviceDisconnectedError(retryErr) && !isTimeoutError(retryErr)) {
         throw retryErr;
       }
       debugLog(

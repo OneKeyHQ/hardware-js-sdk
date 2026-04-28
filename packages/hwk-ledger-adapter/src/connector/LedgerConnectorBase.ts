@@ -2,7 +2,7 @@ import { HardwareErrorCode } from '@onekeyfe/hwk-adapter-core';
 
 import { LedgerDeviceManager } from '../device/LedgerDeviceManager';
 import { SignerManager } from '../signer/SignerManager';
-import { mapLedgerError } from '../errors';
+import { isStuckAppStateError, mapLedgerError } from '../errors';
 import { debugLog } from '../utils/debugLog';
 import {
   btcGetAddress,
@@ -541,6 +541,20 @@ export class LedgerConnectorBase implements IConnector {
 
   async call(sessionId: string, method: string, params: unknown): Promise<unknown> {
     debugLog('[DMK] call:', method, JSON.stringify(params));
+    try {
+      return await this._dispatch(sessionId, method, params);
+    } catch (err) {
+      // Stuck app (e.g. 0x6901) — SDK can't recover; let app prompt user.
+      if (!isStuckAppStateError(err)) throw err;
+      throw Object.assign(new Error('Ledger app is unresponsive'), {
+        code: HardwareErrorCode.DeviceAppStuck,
+        _tag: 'DeviceAppStuck',
+        originalError: err,
+      });
+    }
+  }
+
+  private async _dispatch(sessionId: string, method: string, params: unknown): Promise<unknown> {
     // Bind the chain's Ledger app name to ctx.wrapError once per dispatch so
     // chain handlers can call `ctx.wrapError(err)` with no per-site appName.
     const ctx = this._ctxForMethod(method);
