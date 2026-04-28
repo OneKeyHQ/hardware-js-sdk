@@ -279,7 +279,14 @@ export function isTimeoutError(err: unknown): boolean {
 /** Stuck-state APDU response from a chain app — recover via connector reset. */
 export function isStuckAppStateError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;
-  return (err as Record<string, unknown>)._tag === 'UnknownDeviceExchangeError';
+  const tag = (err as Record<string, unknown>)._tag;
+  // AlreadySendingApduError = a previous stuck call left DMK's IntentQueue slot
+  // held; subsequent calls fail synchronously with this tag.
+  if (tag === 'UnknownDeviceExchangeError' || tag === 'AlreadySendingApduError') {
+    return true;
+  }
+  // Wrapped paths may hide the tag — match APDU 6901 anywhere in the chain.
+  return extractApduHex(err) === '6901';
 }
 
 /**
