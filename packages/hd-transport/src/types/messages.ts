@@ -4232,7 +4232,7 @@ export type TonSignData = {
   payload: string;
   schema?: string;
   appdomain: string;
-  timestamp: number;
+  timestamp: UintType;
   from_address?: string;
   wallet_version?: TonWalletVersion;
   wallet_id?: number;
