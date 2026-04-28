@@ -1,29 +1,16 @@
 /**
- * SDK-global event bus.
- *
- * All cross-runtime SDK events (logs today; firmware progress / battery
- * state / etc. tomorrow) flow through a single typed channel. Hosts
- * subscribe with `onSdkEvent(listener)` once and switch on `event.type`.
- *
- * Cross-process note: this bus is a per-runtime singleton. In MV3 extensions
- * where the SDK runs split between the service worker (adapter) and an
- * offscreen document (connector), each process must subscribe independently.
- * Typically the offscreen process forwards events over IPC to the service
- * worker so all events converge into one consumer pipeline.
+ * SDK-global event bus. Per-runtime singleton — each process subscribes
+ * independently; cross-process hosts forward events over their own IPC.
  */
 
 export type SdkLogEvent = {
   type: 'log';
   level: 'debug' | 'error';
-  /** Pre-stringified payload. Hosts pass through to their logger as-is. */
+  /** Pre-stringified payload. */
   message: string;
 };
 
-/**
- * Discriminated union of all SDK-global events. Add new variants here when
- * extending — host adapters automatically see the new `type` and can dispatch
- * via the same `onSdkEvent` subscription instead of wiring a new IPC channel.
- */
+/** Add new variants here; hosts dispatch on `event.type`. */
 export type SdkEvent = SdkLogEvent;
 
 export type SdkEventListener = (event: SdkEvent) => void;
@@ -47,17 +34,12 @@ export function emitSdkEvent(event: SdkEvent): void {
     try {
       listener(event);
     } catch {
-      // Never let a misbehaving listener take down the SDK.
+      // Misbehaving listeners must not take down the SDK.
     }
   }
 }
 
-/**
- * SDK-internal: stringify args once and emit a log event. Caller can be
- * arbitrary internal code (chain handler, AppManager, errors helper) — no
- * connector instance required, so log events still flow even outside a
- * device call.
- */
+/** Stringify args once and emit a log event. No-op when no subscribers. */
 export function emitLog(level: 'debug' | 'error', ...args: unknown[]): void {
   if (listeners.size === 0) return;
   const message = args.map(a => (typeof a === 'string' ? a : safeStringify(a))).join(' ');

@@ -1,10 +1,4 @@
-/**
- * SDK-internal debug logger.
- *
- * Emits a `log` event onto the SDK-global event bus (`sdkEventBus`). Hosts
- * subscribe via `onSdkEvent(...)` and route to their own logging pipeline.
- * No subscribers = silent (and zero stringification cost).
- */
+/** SDK-internal log helpers. Emit through `sdkEventBus`; silent if nobody subscribes. */
 import { emitLog } from './sdkEventBus';
 
 export function debugLog(...args: unknown[]): void {

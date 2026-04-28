@@ -284,6 +284,7 @@ async function _createBtcSigner(ctx: ConnectorContext, sessionId: string): Promi
   // DMK-specific values (sign-transaction, sign-personal-message,
   // verify-address) collapse to ConfirmOnDevice via the helper.
   signer.onInteraction = (interaction: string) => {
+    debugLog('[LedgerConnector] btc.onInteraction:', interaction);
     ctx.emit('ui-event', {
       type: collapseSignerInteraction(interaction),
       payload: { sessionId },
