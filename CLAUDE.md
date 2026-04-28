@@ -1,8 +1,59 @@
-# OneKey Hardware SDK - Claude 文档指引
+# Claude / Agent 工作入口
 
-## 📚 Context7 文档支持
+这份文件只放协作者入口和工程约束，不承载完整技术说明。详细文档以 `docs/README.md` 为索引。
 
-本项目已在 Context7 上索引，可通过 MCP 工具获取最新文档和代码示例：
+## 先读什么
+
+按任务类型选择入口：
+
+| 任务                                    | 首选文档                                |
+| --------------------------------------- | --------------------------------------- |
+| 了解整体架构                            | `docs/architecture.md`                  |
+| 调试 WebUSB / BLE / TransportManager    | `docs/transport.md`                     |
+| 处理 Pro2 / Protocol V2 / firmware-pro2 | `docs/protocol-v2.md`                   |
+| 链集成、签名、地址派生                  | `docs/chain.md`、`docs/chain-evm.md`    |
+| SLIP39、PIN、设备安全状态               | `docs/slip39.md`、`docs/attachToPin.md` |
+| 设备方法支持矩阵                        | `docs/device-method-support.md`         |
+
+完整目录见 `docs/README.md`。
+
+## 当前架构边界
+
+- Protocol V1 服务 Classic / Mini / Touch / Pro 等现有设备，USB 和 BLE 都支持。
+- Protocol V2 服务 Pro2，USB 和 BLE 都支持。
+- 协议判断必须在连接后主动探测，不能依赖 PID、productName 或 descriptor。
+- WebUSB / Electron BLE / React Native BLE 都通过 `GetProtoVersion` 探测 V2，失败或超时回落 V1。
+- `desktop-web-ble` 是默认 Electron BLE 入口，不再按设备型号拆分 env alias。
+- Protocol V2 不走传统 `Initialize/GetFeatures`，而是 `Ping + DevGetDeviceInfo` 后通过 `Protocol V2 feature adapter` 归一成 `Features`；早期固件不支持完整信息时才回退最小 `Features`。
+
+## Protocol V2 改动注意事项
+
+- `messages-pro2.json` 来源是 `submodules/firmware-pro2/sys/protobuf/onekey_protocol/latest`。
+- 当前 Protocol V2 schema 依赖 `firmware-pro2` 的 `origin/dev_romloader_split`，因为该分支包含 `Filesystem*`、`DevFirmwareUpdate`、`DevReboot` 等消息。
+- Protocol V2 文件操作应使用 `FilesystemFileWrite` / `FilesystemDirMake` 等新消息名。
+- Protocol V2 固件安装应使用 `DevFirmwareUpdate.targets` 显式传入 resource、bootloader、firmware 路径。
+- 如果修改 protobuf，优先改生成脚本并重新生成 JSON/types，不要手改生成产物。
+
+## 常用验证命令
+
+根目录目前没有 `build:all` script；全仓构建入口是 `yarn build`（`lerna run build`）。协议和 protobuf 变更建议先按依赖顺序验证：
+
+```bash
+yarn --cwd packages/hd-transport test --runInBand
+yarn --cwd packages/hd-transport build
+yarn --cwd packages/hd-transport-web-device build
+yarn --cwd packages/hd-transport-react-native build
+yarn --cwd packages/hd-common-connect-sdk build
+yarn --cwd packages/core build
+NODE_OPTIONS=--max-old-space-size=8192 yarn lint --quiet
+git diff --check
+```
+
+全仓 lint 容易吃内存，默认加 `NODE_OPTIONS=--max-old-space-size=8192`。
+
+## Context7
+
+本项目可通过 Context7 查询：
 
 ```json
 {
@@ -11,63 +62,23 @@
 }
 ```
 
-**使用方法**：
-- 使用 `mcp__context7__get-library-docs` 工具获取文档
-- Library ID: `/onekeyhq/hardware-js-sdk`
-- 可指定 topic 参数聚焦特定主题，如 `transport`、`signing`、`bip39` 等
+查询主题建议使用精确 topic，例如 `transport`、`Protocol V2`、`firmware update`、`signing`、`SLIP39`。
 
-## 📁 问题分流指引
+## CLI 入口
 
-根据问题类型，请参考对应的专业文档：
+`@onekeyfe/cli` 是完整钱包 CLI：
 
-### 🔌 连接与传输问题
-**症状**: WebUSB权限错误、设备连接失败、传输超时
-- 📖 **参考**: [docs/transport.md](./docs/transport.md)
-- 🤖 **Agent**: hardware-sdk-expert
-
-### ⛓️ 区块链集成问题
-**症状**: 签名失败、地址生成错误、交易构建问题
-- 📖 **参考**: [docs/chain.md](./docs/chain.md)
-- 🤖 **Agent**: hardware-sdk-expert
-
-### 🔐 助记词与密钥管理
-**症状**: SLIP39恢复失败、密钥派生错误、种子生成问题
-- 📖 **参考**: [docs/slip39.md](./docs/slip39.md)
-- 🤖 **Agent**: hardware-sdk-expert
-
-### 🏗️ 架构与开发问题
-**症状**: 构建失败、依赖问题、monorepo结构疑问
-- 📖 **参考**: [docs/architecture.md](./docs/architecture.md)
-- 🤖 **Agent**: hardware-sdk-expert
-
-### 🤖 AI Agent 集成 / CLI 使用
-**症状**: CLI 命令使用、Agent Skill 配置、链支持查询
-- 📖 **文档**: developer-portal 的 `agent-integration.mdx`
-- 🔧 **`@onekeyfe/cli`**（`onekey` 命令）— 全功能钱包 CLI：`auth login` 选择登录方式（mnemonic / app-transfer / hardware），`balance` / `transfer` / `swap` / `device ...` 等业务命令登录后自动沿用该模式
-- 🔧 **`@onekeyfe/hardware-cli`**（`onekey-hw` 命令）— 纯硬件钱包 CLI，AI Agent 直连设备优先选它
-
-如果你要**通过 `onekey` CLI 使用硬件钱包**：
 ```bash
 npm install -g @onekeyfe/cli
-
-# Step 1：登录时选择硬件模式（--hardware 只在 auth login 上有）
 onekey auth login --hardware
-
-# Step 2：登录后的业务命令不需要再加 flag，自动走硬件钱包
 onekey balance --chain eth
 onekey device search
-onekey device firmware
 ```
 
-如果要**只调硬件操作、不走 onekey 账户体系**（更轻、AI Agent 场景友好）：
+`@onekeyfe/hardware-cli` 是纯硬件 CLI，更适合 AI Agent 直连设备：
+
 ```bash
 npm install -g @onekeyfe/hardware-cli
 onekey-hw search
 onekey-hw get-address --chain evm --use-empty-passphrase
 ```
-
-## 🤖 专业Agent
-
-**hardware-sdk-expert** - 硬件SDK架构专家
-- 擅长：三层架构分析、WebUSB/BLE协议、BIP32/BIP39/SLIP39
-- 工作方式：优先查阅相关文档，然后进行代码分析

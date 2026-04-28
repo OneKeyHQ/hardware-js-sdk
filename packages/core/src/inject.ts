@@ -149,7 +149,7 @@ export const createCoreApi = (
   deviceRebootToBoardloader: connectId => call({ connectId, method: 'deviceRebootToBoardloader' }),
   deviceRebootToBootloader: connectId => call({ connectId, method: 'deviceRebootToBootloader' }),
 
-  // File system & device control API (Pro2-only, Proto V0)
+  // File system & device control API (Protocol V2 only)
   fileRead: (connectId, params) => call({ ...params, connectId, method: 'fileRead' }),
   fileWrite: (connectId, params) => call({ ...params, connectId, method: 'fileWrite' }),
   fileDelete: (connectId, params) => call({ ...params, connectId, method: 'fileDelete' }),

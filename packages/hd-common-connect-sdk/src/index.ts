@@ -20,11 +20,7 @@ import HardwareSdk, {
 } from '@onekeyfe/hd-core';
 import { ERRORS, HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
 import HttpTransport from '@onekeyfe/hd-transport-http';
-import {
-  ElectronBleTransport,
-  ElectronPro2BleTransport,
-  WebUsbTransport,
-} from '@onekeyfe/hd-transport-web-device';
+import { ElectronAutoBleTransport, WebUsbTransport } from '@onekeyfe/hd-transport-web-device';
 import LowlevelTransport from '@onekeyfe/hd-transport-lowlevel';
 import EmulatorTransport from '@onekeyfe/hd-transport-emulator';
 
@@ -42,8 +38,9 @@ const eventEmitter = new EventEmitter();
 const Log = getLogger(LoggerNames.HdCommonConnectSdk);
 
 const getTransport = async (env: ConnectSettings['env']) => {
-  if (env === 'desktop-web-ble') return ElectronBleTransport;
-  if (env === 'desktop-web-ble-pro2') return ElectronPro2BleTransport;
+  if (env === 'desktop-web-ble') {
+    return ElectronAutoBleTransport;
+  }
   if (env === 'webusb' || env === 'desktop-webusb') return WebUsbTransport;
   if (env === 'lowlevel') return LowlevelTransport;
   if (env === 'node-usb') {

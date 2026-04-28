@@ -116,6 +116,8 @@ const TYPE_PATCH = {
   'Features.onekey_se03_state': 'string | null',
   'Features.onekey_se04_state': 'string | null',
   'HDNodePathType.node': 'HDNodeType | string',
+  'File.data': 'Buffer | ArrayBuffer | string',
+  'FilesystemFile.data': 'Buffer | ArrayBuffer | string',
   'FirmwareUpload.payload': 'Buffer | ArrayBuffer',
   'EthereumGetAddress.encoded_network': 'ArrayBuffer',
   'EthereumDefinitions.encoded_network': 'ArrayBuffer',

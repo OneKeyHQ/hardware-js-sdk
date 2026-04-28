@@ -6,8 +6,16 @@
 const fs = require('fs');
 const path = require('path');
 
-const json = require('../messages.json');
 const { RULE_PATCH, TYPE_PATCH, DEFINITION_PATCH, SKIP, UINT_TYPE } = require('./protobuf-patches');
+
+const readJson = filePath => JSON.parse(fs.readFileSync(filePath, 'utf8'));
+
+const localMessagesJsonPath = path.join(__dirname, '../messages.json');
+const coreMessagesJsonPath = path.join(__dirname, '../../core/src/data/messages/messages.json');
+const json = readJson(
+  fs.existsSync(localMessagesJsonPath) ? localMessagesJsonPath : coreMessagesJsonPath
+);
+const optionalJsonFiles = ['../messages-pro2.json'];
 
 const args = process.argv.slice(2);
 
@@ -25,6 +33,8 @@ const FIELD_TYPES = {
 };
 
 const types = []; // { type: 'enum | message', name: string, value: string[], exact?: boolean };
+
+const hasParsedType = name => types.some(t => t && t.name === name);
 
 // enums used as keys (string), used as values (number) by default
 const ENUM_KEYS = [
@@ -111,8 +121,9 @@ const useDefinition = def => {
   return clean.replace(/\/\/ @typescript-variant(.*)/, '').replace(/\/\/ @flowtype-variant:/, '');
 };
 
-const parseMessage = (messageName, message, depth = 0) => {
+const parseMessage = (messageName, message, depth = 0, skipExisting = false) => {
   if (messageName === 'google') return;
+  if (!depth && skipExisting && hasParsedType(messageName)) return;
   const value = [];
   // add comment line
   if (!depth) value.push(`// ${messageName}`);
@@ -120,7 +131,9 @@ const parseMessage = (messageName, message, depth = 0) => {
 
   // declare nested values
   if (message.nested) {
-    Object.keys(message.nested).map(item => parseMessage(item, message.nested[item], depth + 1));
+    Object.keys(message.nested).map(item =>
+      parseMessage(item, message.nested[item], depth + 1, skipExisting)
+    );
   }
 
   if (message.values) {
@@ -175,6 +188,13 @@ const parseMessage = (messageName, message, depth = 0) => {
 
 // top level messages and nested messages
 Object.keys(json.nested).map(e => parseMessage(e, json.nested[e]));
+
+optionalJsonFiles.forEach(jsonFile => {
+  const jsonPath = path.join(__dirname, jsonFile);
+  if (!fs.existsSync(jsonPath)) return;
+  const optionalJson = readJson(jsonPath);
+  Object.keys(optionalJson.nested).map(e => parseMessage(e, optionalJson.nested[e], 0, true));
+});
 
 // types needs reordering (used before defined)
 const ORDER = {

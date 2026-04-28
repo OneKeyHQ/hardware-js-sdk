@@ -1,6 +1,6 @@
 import type { Response } from '../params';
 
-// ── Shared response shapes (Pro2 file system, Proto V0) ─────────────────
+// ── Shared response shapes (Protocol V2 file system) ────────────────────
 
 export type FileOpSuccess = { message?: string };
 

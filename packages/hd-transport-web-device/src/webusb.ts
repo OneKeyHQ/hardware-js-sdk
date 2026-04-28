@@ -1,11 +1,18 @@
 /* eslint-disable no-undef */
-import transport, { LogBlockCommand, PROTOCOL_V2_USB_PID } from '@onekeyfe/hd-transport';
+import transport, {
+  LogBlockCommand,
+  PROTOCOL_V2_CHANNEL_USB,
+  PROTOCOL_V2_FRAME_MAX_BYTES,
+  ProtocolV2FrameAssembler,
+  ProtocolV2Session,
+  probeProtocolV2,
+} from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode, ONEKEY_WEBUSB_FILTER, wait } from '@onekeyfe/hd-shared';
 import ByteBuffer from 'bytebuffer';
 
 import type { AcquireInput, OneKeyDeviceInfoBase, ProtocolType } from '@onekeyfe/hd-transport';
 
-const { parseConfigure, decodeProtocol, check, ProtocolV1, ProtocolV2 } = transport;
+const { parseConfigure, decodeProtocol, check, ProtocolV1 } = transport;
 
 const CONFIGURATION_ID = 1;
 const INTERFACE_ID = 0;
@@ -14,6 +21,7 @@ const PACKET_SIZE = 64;
 const HEADER_LENGTH = 6;
 const PACKET_IO_MAX_RETRIES = 3;
 const PACKET_IO_RETRY_DELAY = 300;
+const PROTOCOL_PROBE_TIMEOUT = 1500;
 
 /**
  * Device information with path and WebUSB device instance
@@ -33,10 +41,10 @@ interface DeviceEndpoints {
 export default class WebUsbTransport {
   messages: ReturnType<typeof transport.parseConfigure> | undefined;
 
-  /** Protobuf schema for Protocol V2 devices (Pro2) */
+  /** Protobuf schema for Protocol V2 transports. */
   messagesV2: ReturnType<typeof transport.parseConfigure> | undefined;
 
-  /** Per-path protocol type (set from PID at connect time) */
+  /** Per-path protocol type detected by active wire-level probe after connect. */
   private deviceProtocol: Map<string, ProtocolType> = new Map();
 
   /** Per-path USB endpoint / interface numbers (discovered from USB descriptors) */
@@ -90,8 +98,7 @@ export default class WebUsbTransport {
   }
 
   /**
-   * Configure Protocol V2 protobuf schema (Pro2 0x5A framing).
-   * Called by TransportManager after the default configure().
+   * Cache the Protocol V2 protobuf schema.
    */
   configureProtocolV2(signedData: any) {
     this.messagesV2 = parseConfigure(signedData);
@@ -148,13 +155,11 @@ export default class WebUsbTransport {
       commType: 'webusb',
     }));
 
-    // Debug: log all discovered devices with PID to identify protocol version
+    // Debug: log all discovered devices. Protocol is detected after acquire via wire probe.
     for (const dev of onekeyDevices) {
-      const isProtocolV2 = dev.productId === PROTOCOL_V2_USB_PID;
       this.Log.debug(
         `[WebUSB] Device: name="${dev.productName}" serial="${dev.serialNumber}" ` +
-          `VID=0x${dev.vendorId.toString(16)} PID=0x${dev.productId.toString(16)} ` +
-          `${isProtocolV2 ? '→ Protocol V2' : '→ Protocol V1'}`
+          `VID=0x${dev.vendorId.toString(16)} PID=0x${dev.productId.toString(16)}`
       );
     }
 
@@ -168,8 +173,7 @@ export default class WebUsbTransport {
     if (!input.path) return;
     try {
       await this.connect(input.path ?? '', true);
-      // Determine protocol from PID (set after connect so deviceList is populated)
-      this.detectProtocol(input.path);
+      await this.detectProtocol(input.path);
       return await Promise.resolve(input.path);
     } catch (e) {
       this.Log.debug('acquire error: ', e instanceof Error ? `${e.name}: ${e.message}` : String(e));
@@ -178,23 +182,13 @@ export default class WebUsbTransport {
   }
 
   /**
-   * Determine protocol type from USB Product ID.
-   * PID 0x53C1 (PROTOCOL_V2_USB_PID) → Protocol V2 (0x5A framing, Pro2)
-   * All other PIDs        → Protocol V1 (64-byte chunked, 0x3F framing, Pro1 and earlier)
-   *
-   * We rely on PID because it is set in firmware and uniquely identifies the device
-   * generation. No wire-level probe is needed.
+   * Determine protocol type by probing the wire protocol after connect.
+   * Protocol V2 must answer GetProtoVersion; otherwise we keep the legacy V1 path.
    */
-  private detectProtocol(path: string): ProtocolType {
-    const deviceInfo = this.deviceList.find(d => d.path === path);
-    const protocol: ProtocolType =
-      deviceInfo?.device.productId === PROTOCOL_V2_USB_PID ? 'V2' : 'V1';
+  private async detectProtocol(path: string): Promise<ProtocolType> {
+    const protocol: ProtocolType = (await this.probeProtocolV2(path)) ? 'V2' : 'V1';
     this.deviceProtocol.set(path, protocol);
-    this.Log.debug(
-      `[WebUsbTransport] detectProtocol: path=${path} PID=0x${(
-        deviceInfo?.device.productId ?? 0
-      ).toString(16)} → ${protocol}`
-    );
+    this.Log.debug(`[WebUsbTransport] detectProtocol: path=${path} -> ${protocol}`);
     return protocol;
   }
 
@@ -291,7 +285,7 @@ export default class WebUsbTransport {
       await device.selectConfiguration(this.configurationId);
     }
 
-    // Discover endpoints from USB descriptors (works for both Pro1 and Pro2)
+    // Discover endpoints from USB descriptors; descriptors are not used for protocol selection.
     const endpoints = this.discoverEndpoints(device);
     this.deviceEndpoints.set(path, endpoints);
 
@@ -446,8 +440,43 @@ export default class WebUsbTransport {
     throw lastError;
   }
 
+  private async resetConnectionAfterProbe(path: string) {
+    try {
+      const device = await this.findDevice(path);
+      if (device.opened) {
+        const endpoints = this.deviceEndpoints.get(path);
+        const ifaceNum = endpoints?.interfaceNumber ?? this.interfaceId;
+        try {
+          await device.releaseInterface(ifaceNum);
+        } catch (error) {
+          this.Log.debug('[WebUsbTransport] releaseInterface after protocol probe error:', error);
+        }
+        await device.close();
+      }
+    } catch (error) {
+      this.Log.debug('[WebUsbTransport] close after protocol probe error:', error);
+    }
+
+    await this.getConnectedDevices();
+    await this.connect(path, false);
+  }
+
+  private async probeProtocolV2(path: string) {
+    if (!this.messages || !this.messagesV2) {
+      return false;
+    }
+
+    return probeProtocolV2({
+      call: (name, data, options) => this.callProtocolV2(path, name, data, options?.timeoutMs),
+      timeoutMs: PROTOCOL_PROBE_TIMEOUT,
+      logger: this.Log,
+      logPrefix: 'WebUsbTransport',
+      onProbeFailed: async () => this.resetConnectionAfterProbe(path),
+    });
+  }
+
   /**
-   * Call device method — branches to Protocol V1 or Protocol V2 based on detected protocol.
+   * Call device method — branches to Protocol V1 or Protocol V2 based on active probe.
    */
   async call(path: string, name: string, data: Record<string, unknown>) {
     if (this.messages == null) {
@@ -471,7 +500,7 @@ export default class WebUsbTransport {
       return this.callProtocolV2(path, name, data);
     }
 
-    // --- Protocol V1 path (Pro1 and earlier, 64-byte chunked 0x3F framing) ---
+    // --- Protocol V1 path (64-byte chunked 0x3F framing) ---
     const { messages } = this;
     const encodeBuffers = ProtocolV1.encode(messages, name, data);
 
@@ -491,12 +520,17 @@ export default class WebUsbTransport {
   }
 
   /**
-   * Send/receive a single call over Protocol V2 (0x5A framing, Pro2).
+   * Send/receive a single call over Protocol V2 (0x5A framing).
    *
    * Encoding:  protobuf message → 2-byte LE msgType + pb bytes → Protocol V2 frame
    * Decoding:  Protocol V2 frame → msgType + pb bytes → protobuf message
    */
-  private async callProtocolV2(path: string, name: string, data: Record<string, unknown>) {
+  private async callProtocolV2(
+    path: string,
+    name: string,
+    data: Record<string, unknown>,
+    timeoutMs?: number
+  ) {
     const protocolV1Messages = this.messages;
     if (!this.messagesV2) {
       throw ERRORS.TypedError(
@@ -508,63 +542,44 @@ export default class WebUsbTransport {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
     }
 
-    // USB endpoints reach the main MCU directly, so no proto-link routing fields
-    // (channel/packetSrc) are needed. BLE goes through a coprocessor UART bridge
-    // and must set them — see ElectronPro2BleTransport.call().
-    const frame = ProtocolV2.encode(
-      {
+    const session = new ProtocolV2Session({
+      schemas: {
         protocolV1: protocolV1Messages,
         protocolV2: this.messagesV2,
       },
-      name,
-      data
-    );
+      router: PROTOCOL_V2_CHANNEL_USB,
+      writeFrame: frame => this.transferOutWithRetry(path, frame),
+      readFrame: () => this.receiveProtocolV2Frame(path),
+      logger: this.Log,
+      logPrefix: 'ProtocolV2 WebUSB',
+      createTimeoutError: (_messageName, timeoutMs) =>
+        new Error(`Protocol V2 response timeout after ${timeoutMs}ms for ${name}`),
+    });
 
-    // Protocol V2 supports a larger single frame than Protocol V1 chunk packets.
-    await this.transferOutWithRetry(path, frame);
+    return session.call(name, data, { timeoutMs });
+  }
 
-    // 4. Single transferIn — read up to 4096 bytes
-    const rxDataView = await this.transferInWithRetry(path, 4096);
-    const rxBytes = new Uint8Array(
-      this.toArrayBuffer(
-        rxDataView.buffer.slice(
-          rxDataView.byteOffset,
-          rxDataView.byteOffset + rxDataView.byteLength
+  private async receiveProtocolV2Frame(path: string): Promise<Uint8Array> {
+    const assembler = new ProtocolV2FrameAssembler(PROTOCOL_V2_FRAME_MAX_BYTES);
+    let frame: Uint8Array | undefined;
+
+    while (!frame) {
+      const dataView = await this.transferInWithRetry(path, PROTOCOL_V2_FRAME_MAX_BYTES);
+      const bytes = new Uint8Array(
+        this.toArrayBuffer(
+          dataView.buffer.slice(dataView.byteOffset, dataView.byteOffset + dataView.byteLength)
         )
-      )
-    );
-
-    const decoded = ProtocolV2.decode(
-      {
-        protocolV1: protocolV1Messages,
-        protocolV2: this.messagesV2,
-      },
-      rxBytes
-    );
-
-    // Debug: log raw frame and decoded payload
-    this.Log.debug(
-      `[ProtocolV2] TX name=${name} | RX msgType=${decoded.msgType} pbPayload=${decoded.pbPayload.length}B`
-    );
-    this.Log.debug(
-      `[ProtocolV2] RX raw frame (${rxBytes.length}B): ${Array.from(
-        rxBytes.slice(0, Math.min(rxBytes.length, 64))
-      )
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join(' ')}${rxBytes.length > 64 ? '...' : ''}`
-    );
-    this.Log.debug(
-      `[ProtocolV2] RX pb hex (${decoded.pbPayload.length}B): ${Array.from(decoded.pbPayload)
-        .map((b: number) => b.toString(16).padStart(2, '0'))
-        .join(' ')}`
-    );
-
-    this.Log.debug(
-      `[ProtocolV2] Decoded ${decoded.messageName}:`,
-      JSON.stringify(decoded.message, null, 2)
-    );
-
-    return check.call(decoded);
+      );
+      try {
+        frame = assembler.push(bytes);
+      } catch (error) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.NetworkError,
+          error instanceof Error ? error.message : String(error)
+        );
+      }
+    }
+    return frame;
   }
 
   /**

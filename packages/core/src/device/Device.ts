@@ -41,6 +41,7 @@ import { DataManager } from '../data-manager';
 import TransportManager from '../data-manager/TransportManager';
 import { toHardened } from '../api/helpers/pathUtils';
 import { existCapability } from '../utils/capabilitieUtils';
+import { getProtocolV2Features } from '../protocols/protocol-v2';
 
 import type { PROTO } from '../constants';
 import type {
@@ -303,7 +304,7 @@ export class Device extends EventEmitter {
 
       // Propagate protocol version detected during acquire.
       const detectedProtocol = TransportManager.transport?.getProtocolType?.(
-        this.originalDescriptor.path
+        DataManager.isBleConnect(env) ? this.originalDescriptor.id : this.originalDescriptor.path
       );
       if (detectedProtocol) {
         this.originalDescriptor.protocolType = detectedProtocol;
@@ -471,9 +472,9 @@ export class Device extends EventEmitter {
   }
 
   async initialize(options?: InitOptions) {
-    // Protocol V2 (Pro2) 不支持传统 Initialize，直接使用专用初始化流程。
+    // Protocol V2 不支持传统 Initialize，直接使用协议专用初始化流程。
     if (this.originalDescriptor.protocolType === 'V2') {
-      await this._initializePro2();
+      await this._initializeProtocolV2();
       return;
     }
 
@@ -526,46 +527,35 @@ export class Device extends EventEmitter {
   }
 
   /**
-   * Pro2 device initialization (Protocol V2).
+   * Device initialization over Protocol V2.
    *
-   * Pro2 does NOT support legacy Initialize/GetFeatures messages.
-   * Its protobuf schema only has: Ping, file ops, FirmwareUpdate, Reboot.
-   *
-   * The transport already holds both V1 and V2 schemas after initial configure(),
-   * and routes per-device by `getProtocolType()`. No schema reconfigure is needed
-   * here — we just verify communication via Ping and synthesize the minimum
-   * `Features` shape downstream code reads.
+   * Protocol V2 不走传统 Initialize/GetFeatures。这里通过
+   * Ping + DevGetDeviceInfo 建立统一的 Features 视图。
    */
-  private async _initializePro2() {
-    Log.debug('Initialize Pro2 device via Ping');
+  private async _initializeProtocolV2() {
+    Log.debug('Initialize device via Protocol V2 feature adapter');
 
     try {
-      // 使用 Ping 验证通信链路。
-      const { message } = await Promise.race([
-        this.commands.typedCall('Ping', 'Success', { message: 'init' }),
+      const features = await Promise.race([
+        getProtocolV2Features({
+          commands: this.commands,
+          descriptor: this.originalDescriptor,
+          onDeviceInfoError: error => {
+            Log.debug('Protocol V2 DevGetDeviceInfo fallback:', error);
+          },
+        }),
         new Promise<never>((_, reject) => {
           setTimeout(() => {
             reject(ERRORS.TypedError(HardwareErrorCode.DeviceInitializeFailed));
           }, 10 * 1000);
         }),
       ]);
-      Log.debug('Pro2 Ping response:', message);
+      Log.debug('Protocol V2 normalized features:', features);
+      this._updateFeatures(features);
     } catch (error) {
-      Log.error('Pro2 Ping failed:', error);
+      Log.error('Protocol V2 initialization failed:', error);
       throw error;
     }
-
-    // Pro2 没有 GetFeatures。设备基础信息来自 USB/BLE descriptor，没有的字段（firmware_version、
-    // bootloader_version、passphrase_protection 等）下游必须显式按 protocolType=='V2' 分支处理。
-    const descriptorId = this.originalDescriptor.path || this.originalDescriptor.id || '';
-    const syntheticFeatures = {
-      vendor: 'onekey.so',
-      onekey_device_type: EDeviceType.Pro2,
-      device_id: descriptorId,
-      unlocked: true,
-      initialized: true,
-    } as unknown as Features;
-    this._updateFeatures(syntheticFeatures);
   }
 
   async getFeatures() {

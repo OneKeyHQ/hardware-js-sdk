@@ -12,7 +12,9 @@ export default class DirMake extends BaseMethod<DirMakeParams> {
   }
 
   async run() {
-    const res = await (this.device.commands as any).call('DirMake', { path: this.params.path });
+    const res = await (this.device.commands as any).call('FilesystemDirMake', {
+      path: this.params.path,
+    });
     return Promise.resolve(res.message);
   }
 }

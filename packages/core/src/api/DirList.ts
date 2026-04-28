@@ -12,7 +12,9 @@ export default class DirList extends BaseMethod<DirListParams> {
   }
 
   async run() {
-    const res = await (this.device.commands as any).call('DirList', { path: this.params.path });
+    const res = await (this.device.commands as any).call('FilesystemDirList', {
+      path: this.params.path,
+    });
     return Promise.resolve(res.message);
   }
 }

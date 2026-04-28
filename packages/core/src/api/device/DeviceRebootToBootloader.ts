@@ -1,7 +1,6 @@
-import { EDeviceType } from '@onekeyfe/hd-shared';
+import { DevRebootType } from '@onekeyfe/hd-transport';
 
 import { BaseMethod } from '../BaseMethod';
-import { getDeviceType } from '../../utils/deviceInfoUtils';
 
 import type { RebootToBootloader } from '@onekeyfe/hd-transport';
 
@@ -24,9 +23,11 @@ export default class DeviceRebootToBootloader extends BaseMethod<RebootToBootloa
   }
 
   async run() {
-    // Pro2 uses its own Reboot message with reboot_type enum
-    if (getDeviceType(this.device.features) === EDeviceType.Pro2) {
-      const res = await (this.device.commands as any).call('Reboot', { reboot_type: 2 });
+    // Protocol V2 uses DevReboot with reboot_type enum.
+    if (this.device.originalDescriptor?.protocolType === 'V2') {
+      const res = await this.device.commands.typedCall('DevReboot', 'Success', {
+        reboot_type: DevRebootType.Bootloader,
+      });
       return Promise.resolve(res.message);
     }
 

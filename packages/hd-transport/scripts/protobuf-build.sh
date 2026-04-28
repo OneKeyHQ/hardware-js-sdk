@@ -77,19 +77,14 @@ fi
 # ============================================================
 # BUILD Pro2 messages-pro2.json
 # ============================================================
-# Source: submodules/firmware-pro2/sys/protobuf/onekey_protocol/legacy/
+# Preferred source: submodules/firmware-pro2/sys/protobuf/onekey_protocol/latest/
+# Fallback source: submodules/firmware-pro2/sys/protobuf/onekey_protocol/legacy/
 #
-# The Pro2 device uses two parallel message ID spaces:
-#   - Legacy transport (0x3F framing): EmmcFileRead=30104, EmmcDirList=30108, ...
-#   - Proto V0 transport (0x5A framing): FileRead=60804, DirList=60808, ...
+# Latest firmware-pro2 defines the Protocol V2 schema directly (Filesystem*,
+# Dev* names). Older firmware-pro2 commits only exposed legacy Emmc* messages,
+# so the fallback block below still remaps those into Protocol V2 system names.
 #
-# The protobuf message STRUCTURES are identical; only the MessageType IDs differ.
-# We derive messages-pro2.json from the firmware-pro2 proto files by:
-#   1. Extracting messages_emmc.proto + management messages (Ping/Success/Failure/Reboot)
-#   2. Stripping the "Emmc" prefix from message names
-#   3. Remapping MessageType IDs from 30xxx → 60xxx (and special cases below)
-#
-# ID mapping (firmware legacy → Proto V0):
+# ID mapping (firmware legacy → Protocol V2 system IDs):
 #   Ping=1          → 60206    Success=2        → 60207    Failure=3     → 60208
 #   Reboot=30000    → 60400
 #   EmmcFixPermission=30100 → 60800    EmmcPath=30101 → 60801
@@ -103,8 +98,50 @@ fi
 cd "$PARENT_PATH"
 
 SRC_PRO2_LEGACY="$REPO_ROOT/submodules/firmware-pro2/sys/protobuf/onekey_protocol/legacy"
+SRC_PRO2_LATEST="$REPO_ROOT/submodules/firmware-pro2/sys/protobuf/onekey_protocol/latest"
 
-if [ -d "$SRC_PRO2_LEGACY" ] && ls "$SRC_PRO2_LEGACY"/messages*.proto 1>/dev/null 2>&1; then
+if [ -d "$SRC_PRO2_LATEST" ] && ls "$SRC_PRO2_LATEST"/messages*.proto 1>/dev/null 2>&1; then
+    echo "=== Building Pro2 messages from firmware-pro2 latest protobuf schema ==="
+    TMP_PROTO="$PARENT_PATH/messages-pro2-tmp.proto"
+
+    {
+        echo 'syntax = "proto2";'
+        echo ''
+
+        grep -hv \
+            -e '^import ' -e '^syntax' -e '^package' -e 'option java_' \
+            -e '^option ' \
+            "$SRC_PRO2_LATEST"/messages*.proto \
+            | grep -v '    reserved '
+
+        echo ''
+        echo '// MessageType enum with Protocol V2 system IDs from firmware-pro2 legacy mapping'
+        echo 'enum MessageType {'
+        awk '
+            /MessageType_FactoryDeviceInfoSettings = 60000/ { in_range = 1 }
+            in_range {
+                if ($0 ~ /^ }/) { exit }
+                print
+            }
+        ' "$SRC_PRO2_LEGACY/messages.proto"
+        echo '}'
+    } > "$TMP_PROTO"
+
+    npx pbjs -t json \
+        -p "$PARENT_PATH" \
+        -o "$PARENT_PATH/../messages-pro2.json" \
+        --keep-case \
+        "$(basename "$TMP_PROTO")"
+
+    rm -f "$TMP_PROTO"
+
+    cp "$PARENT_PATH/../messages-pro2.json" "$CORE_MESSAGES_DIR/messages-pro2.json"
+    echo "Pro2 messages-pro2.json generated from firmware-pro2 latest schema and copied to core"
+
+    yarn prettier --write "$PARENT_PATH/../messages-pro2.json"
+    yarn prettier --write "$CORE_MESSAGES_DIR/messages-pro2.json"
+    echo "=== Pro2 messages build complete ==="
+elif [ -d "$SRC_PRO2_LEGACY" ] && ls "$SRC_PRO2_LEGACY"/messages*.proto 1>/dev/null 2>&1; then
     echo "=== Building Pro2 messages from firmware-pro2 submodule ==="
     TMP_PROTO="$PARENT_PATH/messages-pro2-tmp.proto"
 
@@ -118,7 +155,7 @@ if [ -d "$SRC_PRO2_LEGACY" ] && ls "$SRC_PRO2_LEGACY"/messages*.proto 1>/dev/nul
 
         # Ping from messages_management.proto
         # Success, Failure from messages_common.proto (that's where they live in firmware-pro2)
-        # Reboot is a Pro V0-only message not in legacy protos — defined manually below
+        # Reboot is a Protocol V2 system message not in legacy protos — defined manually below
         echo '// --- Ping ---'
         awk '/^message Ping /,/^}/' "$SRC_PRO2_LEGACY/messages_management.proto" || true
         echo ''
@@ -134,7 +171,7 @@ if [ -d "$SRC_PRO2_LEGACY" ] && ls "$SRC_PRO2_LEGACY"/messages*.proto 1>/dev/nul
             echo '}'
             echo ''
         done
-        echo '// --- Reboot (Pro V0 only, not in legacy protos) ---'
+        echo '// --- Reboot (Protocol V2 only, not in legacy protos) ---'
         echo 'message Reboot {'
         echo '    required RebootType reboot_type = 1;'
         echo '}'
@@ -153,7 +190,7 @@ if [ -d "$SRC_PRO2_LEGACY" ] && ls "$SRC_PRO2_LEGACY"/messages*.proto 1>/dev/nul
 
     # ----------------------------------------------------------------
     # Step 2: rename — strip "Emmc" prefix, order matters (longest match first),
-    #         rename EmmcFile.len → total_size to match Proto V0 semantics.
+    #         rename EmmcFile.len → total_size to match Protocol V2 semantics.
     #         Use space/{/; as word-boundary substitute (macOS BSD sed has no \b).
     # ----------------------------------------------------------------
     sed -i '' \
@@ -177,7 +214,7 @@ if [ -d "$SRC_PRO2_LEGACY" ] && ls "$SRC_PRO2_LEGACY"/messages*.proto 1>/dev/nul
     # ----------------------------------------------------------------
     cat >> "$TMP_PROTO" << 'ENUM_EOF'
 
-// MessageType enum with Proto V0 IDs (mapped from firmware-pro2 legacy IDs)
+// MessageType enum with Protocol V2 system IDs (mapped from firmware-pro2 legacy IDs)
 enum MessageType {
     MessageType_Ping                    = 60206;
     MessageType_Success                 = 60207;

@@ -33,16 +33,13 @@ const CONNECTION_TYPE_STORE_KEY = '@onekey/connectionType';
  * Determine if the connection type should use hd-common-connect-sdk
  */
 const shouldUseCommonSdk = (connectionType: ConnectionType | null): boolean =>
-  connectionType === 'desktop-web-ble' ||
-  connectionType === 'desktop-web-ble-pro2' ||
-  connectionType === 'webusb';
+  connectionType === 'desktop-web-ble' || connectionType === 'webusb';
 
 /**
  * Check if switching between connection types requires app restart.
  * Restart is needed when:
  * - Switching between different SDK types (common sdk vs iframe sdk)
  * - Switching between different transport classes within the same SDK
- *   (e.g., ElectronBleTransport vs ElectronPro2BleTransport)
  */
 const needsRestartForSwitch = (from: ConnectionType | null, to: ConnectionType | null): boolean => {
   if (from === to) return false;
@@ -125,9 +122,9 @@ function DeviceListFC(
       if (storedType) {
         setConnectionType(storedType);
       } else if (Platform.OS === 'web' && (window as any).desktopApi) {
-        // In Electron, default to Desktop BLE Pro2 instead of Bridge
+        // In Electron, default to Desktop BLE instead of Bridge
         // to avoid axios compatibility issues in the renderer process
-        setConnectionType('desktop-web-ble-pro2');
+        setConnectionType('desktop-web-ble');
       }
     });
   }, [setConnectionType]);
@@ -264,7 +261,6 @@ function DeviceListFC(
               <Picker.Item label="OneKey Bridge" value="bridge" />
               <Picker.Item label="WebUSB" value="webusb" />
               <Picker.Item label="Desktop Web BLE" value="desktop-web-ble" />
-              <Picker.Item label="Desktop BLE Pro2" value="desktop-web-ble-pro2" />
             </Picker>
             <Button onPress={handleRemoveSelected}>
               {intl.formatMessage({ id: 'action__clean_device' })}

@@ -41,7 +41,7 @@ export const FIRMWARE_FIELDS = [
 
 export type IFirmwareField = (typeof FIRMWARE_FIELDS)[number];
 
-export type MessageVersion = 'latest' | 'v1' | 'pro2';
+export type MessageVersion = 'latest' | 'v1' | 'protocolV2';
 
 const FIRMWARE_FIELD_TYPE_MAP: Readonly<Record<IFirmwareField, EFirmwareType>> = {
   firmware: EFirmwareType.Universal,
@@ -99,7 +99,7 @@ export default class DataManager {
   static messages: { [version in MessageVersion]: JSON } = {
     latest: MessagesJSON as unknown as JSON,
     v1: MessagesLegacyV1JSON as unknown as JSON,
-    pro2: MessagesPro2JSON as unknown as JSON,
+    protocolV2: MessagesPro2JSON as unknown as JSON,
   };
 
   static lastCheckTimestamp = 0;
@@ -493,10 +493,7 @@ export default class DataManager {
   }
 
   static isBleConnect = (env: ConnectSettings['env']) =>
-    env === 'react-native' ||
-    env === 'lowlevel' ||
-    env === 'desktop-web-ble' ||
-    env === 'desktop-web-ble-pro2';
+    env === 'react-native' || env === 'lowlevel' || env === 'desktop-web-ble';
 
   /** Desktop WebUSB doesn't need browser permission prompt */
   static isDesktopWebUsb = (env: ConnectSettings['env']) => env === 'desktop-webusb';

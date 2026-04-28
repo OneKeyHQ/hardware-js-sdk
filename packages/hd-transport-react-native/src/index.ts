@@ -12,7 +12,11 @@ import transport, {
   COMMON_HEADER_SIZE,
   LogBlockCommand,
   type OneKeyDeviceInfoBase,
+  PROTOCOL_V2_CHANNEL_BLE_UART,
   type ProtocolType,
+  ProtocolV2FrameAssembler,
+  ProtocolV2Session,
+  probeProtocolV2,
 } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode, createDeferred, isOnekeyDevice } from '@onekeyfe/hd-shared';
 import { LoggerNames, getLogger } from '@onekeyfe/hd-core';
@@ -39,6 +43,8 @@ const { check, buildBuffers, receiveOne, parseConfigure } = transport;
 const Log = getLogger(LoggerNames.HdBleTransport);
 
 const transportCache: Record<string, BleTransport> = {};
+const BLE_RESPONSE_TIMEOUT_MS = 30_000;
+const PROTOCOL_PROBE_TIMEOUT_MS = 1500;
 
 let connectOptions: Record<string, unknown> = {
   requestMTU: 256,
@@ -93,6 +99,8 @@ export default class ReactNativeBleTransport {
 
   _messages: ReturnType<typeof transport.parseConfigure> | undefined;
 
+  _messagesV2: ReturnType<typeof transport.parseConfigure> | undefined;
+
   name = 'ReactNativeBleTransport';
 
   configured = false;
@@ -105,10 +113,10 @@ export default class ReactNativeBleTransport {
 
   emitter?: EventEmitter;
 
-  // ReactNativeBleTransport speaks Protocol V1 only.
-  getProtocolType(_path: string): ProtocolType {
-    return 'V1';
-  }
+  /** Per-device protocol type detected by active wire-level probe after connect. */
+  private deviceProtocol: Map<string, ProtocolType> = new Map();
+
+  private protocolV2Assemblers: Map<string, ProtocolV2FrameAssembler> = new Map();
 
   constructor(options: TransportOptions) {
     this.scanTimeout = options.scanTimeout ?? 3000;
@@ -122,6 +130,11 @@ export default class ReactNativeBleTransport {
     const messages = parseConfigure(signedData);
     this.configured = true;
     this._messages = messages;
+  }
+
+  configureProtocolV2(signedData: any) {
+    this._messagesV2 = parseConfigure(signedData);
+    Log?.debug('[ReactNativeBleTransport] Protocol V2 schema configured');
   }
 
   listen() {
@@ -414,6 +427,10 @@ export default class ReactNativeBleTransport {
     );
     transportCache[uuid] = transport;
 
+    this.protocolV2Assemblers.set(uuid, new ProtocolV2FrameAssembler());
+
+    const protocolType = await this.detectProtocol(uuid);
+
     this.emitter?.emit('device-connect', {
       name: device.name,
       id: device.id,
@@ -438,7 +455,7 @@ export default class ReactNativeBleTransport {
       }
     });
 
-    return { uuid };
+    return { uuid, protocolType };
   }
 
   _monitorCharacteristic(characteristic: Characteristic, uuid: string): Subscription {
@@ -491,6 +508,10 @@ export default class ReactNativeBleTransport {
 
       try {
         const data = Buffer.from(c.value as string, 'base64');
+        if (this.deviceProtocol.get(uuid) === 'V2') {
+          this.handleProtocolV2Notification(uuid, new Uint8Array(data));
+          return;
+        }
         // console.log('[hd-transport-react-native] Received a packet, ', 'buffer: ', data);
         if (isHeaderChunk(data)) {
           bufferLength = data.readInt32BE(5);
@@ -538,6 +559,8 @@ export default class ReactNativeBleTransport {
       transport.notifySubscription = undefined;
 
       delete transportCache[uuid];
+      this.deviceProtocol.delete(uuid);
+      this.protocolV2Assemblers.delete(uuid);
 
       // Temporary close the Android disconnect after each request
       if (Platform.OS === 'android') {
@@ -568,13 +591,7 @@ export default class ReactNativeBleTransport {
       throw ERRORS.TypedError(HardwareErrorCode.TransportCallInProgress);
     }
 
-    const transport = transportCache[uuid];
-    if (!transport) {
-      throw ERRORS.TypedError(HardwareErrorCode.TransportNotFound);
-    }
-
-    this.runPromise = createDeferred();
-    const messages = this._messages;
+    const protocol = this.getProtocolType(uuid);
     // Upload resources on low-end phones may OOM
     if (name === 'ResourceUpdate' || name === 'ResourceAck') {
       Log?.debug('transport-react-native', 'call-', ' name: ', name, ' data: ', {
@@ -582,11 +599,27 @@ export default class ReactNativeBleTransport {
         hash: data?.hash,
       });
     } else if (LogBlockCommand.has(name)) {
-      Log?.debug('transport-react-native', 'call-', ' name: ', name);
+      Log?.debug('transport-react-native', 'call-', ' name: ', name, ' protocol: ', protocol);
     } else {
-      Log?.debug('transport-react-native', 'call-', ' name: ', name, ' data: ', data);
+      Log?.debug(
+        'transport-react-native',
+        'call-',
+        ' name: ',
+        name,
+        ' data: ',
+        data,
+        ' protocol: ',
+        protocol
+      );
     }
 
+    if (protocol === 'V2') {
+      return this.callProtocolV2(uuid, name, data);
+    }
+
+    const transport = this.getCachedTransport(uuid);
+    this.runPromise = createDeferred();
+    const messages = this._messages;
     const buffers = buildBuffers(messages, name, data);
 
     async function writeChunkedData(
@@ -738,6 +771,8 @@ export default class ReactNativeBleTransport {
     if (transportCache[session]) {
       delete transportCache[session];
     }
+    this.deviceProtocol.delete(session);
+    this.protocolV2Assemblers.delete(session);
 
     // emit the disconnect event
     try {
@@ -759,5 +794,122 @@ export default class ReactNativeBleTransport {
       // this.runPromise.reject(new Error('Transport_CallCanceled'));
     }
     this.runPromise = null;
+  }
+
+  private getCachedTransport(uuid: string) {
+    const transport = transportCache[uuid];
+    if (!transport) {
+      throw ERRORS.TypedError(HardwareErrorCode.TransportNotFound);
+    }
+    return transport;
+  }
+
+  private async detectProtocol(uuid: string): Promise<ProtocolType> {
+    const protocol: ProtocolType = (await this.probeProtocolV2(uuid)) ? 'V2' : 'V1';
+    this.deviceProtocol.set(uuid, protocol);
+    Log?.debug(`[ReactNativeBleTransport] detectProtocol: uuid=${uuid} -> ${protocol}`);
+    return protocol;
+  }
+
+  private async probeProtocolV2(uuid: string) {
+    if (!this._messages || !this._messagesV2) {
+      return false;
+    }
+
+    return probeProtocolV2({
+      call: (name, data, options) => this.callProtocolV2(uuid, name, data, options?.timeoutMs),
+      timeoutMs: PROTOCOL_PROBE_TIMEOUT_MS,
+      logger: Log,
+      logPrefix: 'ReactNativeBleTransport',
+      onBeforeProbe: () => {
+        this.deviceProtocol.set(uuid, 'V2');
+        this.protocolV2Assemblers.get(uuid)?.reset();
+      },
+      onProbeFailed: () => {
+        this.protocolV2Assemblers.get(uuid)?.reset();
+      },
+    });
+  }
+
+  private handleProtocolV2Notification(uuid: string, data: Uint8Array) {
+    try {
+      if (data.length === 0) return;
+
+      const assembler = this.protocolV2Assemblers.get(uuid);
+      if (!assembler) return;
+
+      const frameData = assembler.push(data);
+      if (!frameData) return;
+      this.runPromise?.resolve(frameData);
+    } catch (error) {
+      Log?.debug('[ReactNativeBleTransport] Protocol V2 notification error:', error);
+      this.runPromise?.reject(ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError));
+    }
+  }
+
+  private async writeProtocolV2Frame(transport: BleTransport, frame: Uint8Array) {
+    const packetCapacity = Platform.OS === 'ios' ? IOS_PACKET_LENGTH : ANDROID_PACKET_LENGTH;
+
+    for (let offset = 0; offset < frame.length; offset += packetCapacity) {
+      const chunk = frame.slice(offset, offset + packetCapacity);
+      await transport.writeCharacteristic.writeWithoutResponse(
+        Buffer.from(chunk).toString('base64')
+      );
+    }
+  }
+
+  private async callProtocolV2(
+    uuid: string,
+    name: string,
+    data: Record<string, unknown>,
+    timeoutMs = BLE_RESPONSE_TIMEOUT_MS
+  ) {
+    if (!this._messages || !this._messagesV2) {
+      throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
+    }
+
+    const forceRun = name === 'Initialize' || name === 'Cancel' || name === 'GetProtoVersion';
+    if (this.runPromise && !forceRun) {
+      throw ERRORS.TypedError(HardwareErrorCode.TransportCallInProgress);
+    }
+
+    const transport = this.getCachedTransport(uuid);
+    this.runPromise = createDeferred();
+
+    try {
+      const session = new ProtocolV2Session({
+        schemas: {
+          protocolV1: this._messages,
+          protocolV2: this._messagesV2,
+        },
+        router: PROTOCOL_V2_CHANNEL_BLE_UART,
+        writeFrame: frame => this.writeProtocolV2Frame(transport, frame),
+        readFrame: async () => {
+          const rxFrame = await this.runPromise?.promise;
+          if (!(rxFrame instanceof Uint8Array)) {
+            throw new Error('Protocol V2 response is not Uint8Array');
+          }
+          return rxFrame;
+        },
+        logger: Log,
+        logPrefix: 'ProtocolV2 RN-BLE',
+        createTimeoutError: (_messageName, timeout) =>
+          ERRORS.TypedError(
+            HardwareErrorCode.BleTimeoutError,
+            `BLE response timeout after ${timeout}ms for ${name}`
+          ),
+      });
+
+      return await session.call(name, data, { timeoutMs });
+    } catch (e) {
+      Log?.error('[ReactNativeBleTransport] Protocol V2 call error:', e);
+      throw e;
+    } finally {
+      this.runPromise = null;
+    }
+  }
+
+  getProtocolType(path: string): ProtocolType {
+    return this.deviceProtocol.get(path) ?? 'V1';
   }
 }

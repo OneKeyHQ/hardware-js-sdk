@@ -1,6 +1,6 @@
 // Pro2 System Protocol Messages (60000-61199 range)
 //
-// These messages are used over the Proto V0 (0x5A) transport layer.
+// These messages are used over the Protocol V2 (0x5A) transport layer.
 // Message IDs are in little-endian format in the frame header.
 //
 // Source of truth: webusb_test.html encoder/decoder comments
