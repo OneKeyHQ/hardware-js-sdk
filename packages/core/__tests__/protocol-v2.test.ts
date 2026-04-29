@@ -1,5 +1,6 @@
 import JSZip from 'jszip';
 
+import FileWrite from '../src/api/FileWrite';
 import FirmwareUpdateV3 from '../src/api/FirmwareUpdateV3';
 import { getProtocolV2Features, normalizeProtocolV2Features } from '../src/protocols/protocol-v2';
 
@@ -96,7 +97,18 @@ describe('Protocol V2 feature adapter', () => {
     expect(features.ble_enable).toBe(true);
   });
 
-  test('falls back to descriptor id when DevGetDeviceInfo is unavailable', async () => {
+  test('marks fallback features as unavailable when DeviceInfo is missing', () => {
+    const features = normalizeProtocolV2Features(descriptor as any);
+
+    expect(features.device_id).toBe('usb-path');
+    expect(features.serial_no).toBe('usb-path');
+    expect(features.onekey_serial_no).toBe('usb-path');
+    expect(features.initialized).toBe(false);
+    expect(features.unlocked).toBe(false);
+    expect(features.firmware_present).toBe(false);
+  });
+
+  test('throws when DevGetDeviceInfo is unavailable', async () => {
     const onDeviceInfoError = jest.fn();
     const commands = {
       typedCall: jest
@@ -105,11 +117,13 @@ describe('Protocol V2 feature adapter', () => {
         .mockRejectedValueOnce(new Error('unsupported')),
     };
 
-    const features = await getProtocolV2Features({
-      commands: commands as any,
-      descriptor: descriptor as any,
-      onDeviceInfoError,
-    });
+    await expect(
+      getProtocolV2Features({
+        commands: commands as any,
+        descriptor: descriptor as any,
+        onDeviceInfoError,
+      })
+    ).rejects.toThrow('unsupported');
 
     expect(commands.typedCall).toHaveBeenNthCalledWith(1, 'Ping', 'Success', { message: 'init' });
     expect(commands.typedCall).toHaveBeenNthCalledWith(
@@ -126,13 +140,75 @@ describe('Protocol V2 feature adapter', () => {
       })
     );
     expect(onDeviceInfoError).toHaveBeenCalledTimes(1);
-    expect(features.device_id).toBe('usb-path');
-    expect(features.serial_no).toBe('usb-path');
-    expect(features.onekey_serial_no).toBe('usb-path');
   });
 });
 
 describe('Protocol V2 firmware update targets', () => {
+  test('uses Protocol V2 features after BLE final reconnect without legacy Initialize', async () => {
+    const method = new FirmwareUpdateV3({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV3',
+      },
+    });
+    const acquire = jest.fn().mockResolvedValue({ uuid: 'ble-session' });
+    const typedCall = jest.fn().mockImplementation((name: string) => {
+      if (name === 'Ping') {
+        return Promise.resolve({ type: 'Success', message: { message: 'init' } });
+      }
+      if (name === 'DevGetDeviceInfo') {
+        return Promise.resolve({
+          type: 'DeviceInfo',
+          message: {
+            hw: { serial_no: 'PR2SERIAL' },
+            fw: {
+              boot: { version: '0.2.0' },
+              app: { version: '1.2.3' },
+            },
+            bt: {
+              app: { version: '4.5.6' },
+            },
+            status: {},
+          },
+        });
+      }
+      return Promise.reject(new Error(`unexpected call ${name}`));
+    });
+    const commands = { typedCall };
+
+    (method as any).isBleReconnect = jest.fn(() => true);
+    (method as any).device = {
+      originalDescriptor: { id: 'ble-id', path: 'ble-path', protocolType: 'V2' },
+      deviceConnector: { acquire },
+      getCommands: () => commands,
+      _updateFeatures: jest.fn(),
+    };
+
+    const versions = await (method as any).waitForProtocolV2FinalFeatures();
+
+    expect(acquire).toHaveBeenCalledWith('ble-id', null, true);
+    expect(typedCall).toHaveBeenNthCalledWith(
+      1,
+      'Ping',
+      'Success',
+      { message: 'init' },
+      { timeoutMs: 5000 }
+    );
+    expect(typedCall).toHaveBeenNthCalledWith(
+      2,
+      'DevGetDeviceInfo',
+      'DeviceInfo',
+      expect.any(Object),
+      { timeoutMs: 5000 }
+    );
+    expect(typedCall).not.toHaveBeenCalledWith('Initialize', 'Features', {});
+    expect(versions).toEqual({
+      bootloaderVersion: '0.2.0',
+      bleVersion: '4.5.6',
+      firmwareVersion: '1.2.3',
+    });
+  });
+
   test('passes resource, bootloader, BLE, SE and app files to DevFirmwareUpdate targets', async () => {
     const resourceZip = new JSZip();
     resourceZip.file('icons/home.png', new Uint8Array([1, 2, 3]));
@@ -152,6 +228,9 @@ describe('Protocol V2 firmware update targets', () => {
       return Number(params.processedSize ?? 0) + Number(params.payload.byteLength);
     });
     (method as any).protocolV2StartFirmwareUpdate = jest.fn().mockResolvedValue(undefined);
+    (method as any).waitForProtocolV2FirmwareUpdateComplete = jest
+      .fn()
+      .mockResolvedValue(undefined);
 
     await (method as any).executeProtocolV2Update({
       resourceBinary,
@@ -189,5 +268,119 @@ describe('Protocol V2 firmware update targets', () => {
         { target_id: 0, path: 'vol1:firmware.bin' },
       ],
     });
+    expect((method as any).waitForProtocolV2FirmwareUpdateComplete).toHaveBeenCalled();
+  });
+
+  test('uses absolute processed_byte offsets and disables append for firmware file writes', async () => {
+    const method = new FirmwareUpdateV3({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV3',
+      },
+    });
+    const typedCall = jest.fn((_name: string, _resType: string, params: any) =>
+      Promise.resolve({
+        type: 'FilesystemFile',
+        message: {
+          processed_byte: params.file.offset + params.file.data.byteLength,
+        },
+      })
+    );
+
+    (method as any).device = {
+      getCommands: () => ({ typedCall }),
+    };
+    method.postProgressMessage = jest.fn();
+
+    await (method as any).protocolV2CommonUpdateProcess({
+      payload: new Uint8Array(4097).buffer,
+      filePath: 'vol1:firmware.bin',
+      processedSize: 0,
+      totalSize: 4097,
+    });
+
+    const writePayloads = typedCall.mock.calls.map(call => call[2]);
+    expect(writePayloads.map(payload => payload.file.offset)).toEqual([0, 2048, 4096]);
+    expect(writePayloads.map(payload => payload.file.data.byteLength)).toEqual([2048, 2048, 1]);
+    expect(writePayloads.map(payload => payload.overwrite)).toEqual([true, false, false]);
+    expect(writePayloads.every(payload => payload.append === false)).toBe(true);
+  });
+
+  test('consumes Protocol V2 install progress before final update success', async () => {
+    const method = new FirmwareUpdateV3({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV3',
+      },
+    });
+    const typedCall = jest.fn().mockResolvedValue({ type: 'Success', message: { message: 'ok' } });
+
+    (method as any).device = {
+      getCommands: () => ({ typedCall }),
+    };
+    method.postProgressMessage = jest.fn();
+    method.postTipMessage = jest.fn();
+
+    await (method as any).protocolV2StartFirmwareUpdate({
+      targets: [{ target_id: 0, path: 'vol1:firmware.bin' }],
+    });
+
+    const callOptions = typedCall.mock.calls[0][3];
+    expect(callOptions.intermediateTypes).toEqual(['DevFirmwareInstallProgress']);
+    callOptions.onIntermediateResponse({
+      type: 'DevFirmwareInstallProgress',
+      message: { target_id: 0, progress: 42 },
+    });
+
+    expect(method.postProgressMessage).toHaveBeenCalledWith(42, 'installingFirmware');
+  });
+});
+
+describe('Protocol V2 file write method', () => {
+  test('uses offset-driven overwrite and append defaults', async () => {
+    const call = jest.fn().mockResolvedValue({ message: { processed_byte: 1 } });
+    const method = new FileWrite({
+      id: 1,
+      payload: {
+        method: 'fileWrite',
+        path: 'vol1:test.bin',
+        offset: 1,
+        totalSize: 2,
+        data: new Uint8Array([1]),
+      },
+    });
+    (method as any).device = { commands: { call } };
+
+    method.init();
+    await method.run();
+
+    expect(call).toHaveBeenCalledWith('FilesystemFileWrite', {
+      file: {
+        path: 'vol1:test.bin',
+        offset: 1,
+        total_size: 2,
+        data: new Uint8Array([1]),
+      },
+      overwrite: false,
+      append: true,
+    });
+  });
+
+  test('rejects chunks larger than the Protocol V2 file payload limit', async () => {
+    const method = new FileWrite({
+      id: 1,
+      payload: {
+        method: 'fileWrite',
+        path: 'vol1:test.bin',
+        offset: 0,
+        totalSize: 2049,
+        data: new Uint8Array(2049),
+      },
+    });
+    (method as any).device = { commands: { call: jest.fn() } };
+
+    method.init();
+
+    await expect(method.run()).rejects.toThrow('FilesystemFileWrite data too large');
   });
 });

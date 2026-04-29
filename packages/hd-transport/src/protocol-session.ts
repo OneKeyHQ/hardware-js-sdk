@@ -29,6 +29,8 @@ export type ProtocolV2SessionOptions = {
 
 export type ProtocolV2CallOptions = {
   timeoutMs?: number;
+  intermediateTypes?: string[];
+  onIntermediateResponse?: (response: MessageFromOneKey) => void;
 };
 
 export { concatUint8Arrays, ProtocolV2FrameAssembler };
@@ -107,23 +109,40 @@ export class ProtocolV2Session {
         packetSrc,
         router,
       });
+      const expectedSeq = frame[6];
 
       await writeFrame(frame);
-      return readFrame();
+
+      // Some Protocol V2 operations emit progress notifications before the
+      // terminal response. Consume those frames here so callers still see a
+      // request/terminal-response shaped API.
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const rxFrame = await readFrame();
+        const decoded = ProtocolV2.decode(schemas, rxFrame);
+        if (decoded.seq !== expectedSeq) {
+          throw new Error(
+            `Protocol V2 seq mismatch for ${name}: expected ${expectedSeq}, got ${decoded.seq}`
+          );
+        }
+        logger?.debug?.(
+          `[${logPrefix}] TX name=${name} seq=${expectedSeq} | RX seq=${decoded.seq} msgType=${decoded.msgType} pbPayload=${decoded.pbPayload.length}B`
+        );
+
+        const response = check.call(decoded);
+        if (callOptions.intermediateTypes?.includes(response.type)) {
+          callOptions.onIntermediateResponse?.(response);
+          continue;
+        }
+        return response;
+      }
     };
 
-    const rxFrame = await withProtocolTimeout(callPromise(), callOptions.timeoutMs, () =>
+    return withProtocolTimeout(callPromise(), callOptions.timeoutMs, () =>
       createTimeoutError
         ? createTimeoutError(name, callOptions.timeoutMs ?? 0)
         : new Error(`Protocol V2 response timeout after ${callOptions.timeoutMs}ms for ${name}`)
     );
-
-    const decoded = ProtocolV2.decode(schemas, rxFrame);
-    logger?.debug?.(
-      `[${logPrefix}] TX name=${name} | RX msgType=${decoded.msgType} pbPayload=${decoded.pbPayload.length}B`
-    );
-
-    return check.call(decoded);
   }
 }
 
@@ -150,9 +169,21 @@ export async function probeProtocolV2({
     await onBeforeProbe?.();
     const response = await call('GetProtoVersion', {}, { timeoutMs });
     return response.type === 'ProtoVersion';
-  } catch (error) {
-    logger?.debug?.(`[${logPrefix}] Protocol V2 probe failed:`, getErrorMessage(error));
-    await onProbeFailed?.(error);
-    return false;
+  } catch (versionError) {
+    logger?.debug?.(
+      `[${logPrefix}] Protocol V2 version probe failed:`,
+      getErrorMessage(versionError)
+    );
+    try {
+      const response = await call('DevGetFirmwareUpdateStatus', {}, { timeoutMs });
+      return response.type === 'DevFirmwareUpdateStatus';
+    } catch (bootloaderError) {
+      logger?.debug?.(
+        `[${logPrefix}] Protocol V2 bootloader probe failed:`,
+        getErrorMessage(bootloaderError)
+      );
+      await onProbeFailed?.(bootloaderError);
+      return false;
+    }
   }
 }

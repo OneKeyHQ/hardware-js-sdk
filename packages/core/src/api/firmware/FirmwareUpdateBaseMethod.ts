@@ -481,24 +481,20 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
     // FilesystemFileWrite overhead. Same value for USB and BLE; BLE Noble handles
     // ATT-level fragmentation transparently.
     const chunkSize = PROTOCOL_V2_FILE_CHUNK_SIZE;
-    const totalChunks = Math.ceil(payload.byteLength / chunkSize);
     let offset = 0;
-    let currentFileProcessed = 0;
-
-    for (let i = 0; i < totalChunks; i++) {
-      const chunkStart = i * chunkSize;
-      const chunkEnd = Math.min(chunkStart + chunkSize, payload.byteLength);
-      const chunkLength = chunkEnd - chunkStart;
-      const chunk = payload.slice(chunkStart, chunkEnd);
-      const overwrite = i === 0;
-
-      let progress: number;
+    const getUploadProgress = (fileOffset: number) => {
       if (totalSize !== undefined && processedSize !== undefined) {
-        currentFileProcessed = processedSize + chunkEnd;
-        progress = Math.min(Math.ceil((currentFileProcessed / totalSize) * 100), 99);
-      } else {
-        progress = Math.min(Math.ceil(((i + 1) / totalChunks) * 100), 99);
+        return Math.min(Math.ceil(((processedSize + fileOffset) / totalSize) * 100), 99);
       }
+      return Math.min(Math.ceil((fileOffset / payload.byteLength) * 100), 99);
+    };
+
+    while (offset < payload.byteLength) {
+      const chunkEnd = Math.min(offset + chunkSize, payload.byteLength);
+      const chunkLength = chunkEnd - offset;
+      const chunk = payload.slice(offset, chunkEnd);
+      const overwrite = offset === 0;
+      const progress = getUploadProgress(chunkEnd);
 
       const writeRes = await this.fileWriteWithRetry(
         filePath,
@@ -508,8 +504,15 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
         overwrite,
         progress
       );
-      offset += writeRes.message.processed_byte ?? chunkLength;
-      this.postProgressMessage(progress, 'transferData');
+      const nextOffset = writeRes.message.processed_byte ?? offset + chunkLength;
+      if (nextOffset <= offset || nextOffset > payload.byteLength) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.EmmcFileWriteFirmwareError,
+          `invalid processed_byte ${nextOffset} for offset ${offset}`
+        );
+      }
+      offset = nextOffset;
+      this.postProgressMessage(getUploadProgress(offset), 'transferData');
     }
 
     return totalSize !== undefined ? (processedSize ?? 0) + payload.byteLength : 0;
@@ -536,7 +539,7 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
           data: chunk,
         },
         overwrite,
-        append: offset !== 0,
+        append: false,
         ui_percentage: progress ?? undefined,
       });
       if (writeRes.type !== 'FilesystemFile') {
@@ -591,9 +594,22 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
     let updateResponse: TypedResponseMessage<'Success'>;
     try {
-      updateResponse = await typedCall('DevFirmwareUpdate', 'Success', {
-        targets,
-      });
+      updateResponse = await typedCall(
+        'DevFirmwareUpdate',
+        'Success',
+        {
+          targets,
+        },
+        {
+          intermediateTypes: ['DevFirmwareInstallProgress'],
+          onIntermediateResponse: (response: { message?: { progress?: number } }) => {
+            const progress = Number(response.message?.progress);
+            if (Number.isFinite(progress)) {
+              this.postProgressMessage(Math.min(progress, 99), 'installingFirmware');
+            }
+          },
+        }
+      );
     } catch (error) {
       if (isDeviceDisconnectedError(error)) {
         Log.log('Rebooting device');

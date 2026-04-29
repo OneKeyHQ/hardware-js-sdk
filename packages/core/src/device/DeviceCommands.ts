@@ -12,7 +12,12 @@ import {
 } from '../utils/tracing';
 
 import type { Device } from './Device';
-import type { FailureType, Messages, Transport } from '@onekeyfe/hd-transport';
+import type {
+  FailureType,
+  Messages,
+  Transport,
+  TransportCallOptions,
+} from '@onekeyfe/hd-transport';
 
 export type PassphrasePromptResponse = {
   passphrase?: string;
@@ -22,13 +27,13 @@ export type PassphrasePromptResponse = {
 };
 
 type MessageType = Messages.MessageType;
-type MessageKey = keyof MessageType;
+type MessageKey = Extract<keyof MessageType, string>;
 export type TypedResponseMessage<T extends MessageKey> = {
   type: T;
   message: MessageType[T];
 };
 type TypedCallResponseMap = {
-  [K in keyof MessageType]: TypedResponseMessage<K>;
+  [K in MessageKey]: TypedResponseMessage<K>;
 };
 export type DefaultMessageResponse = TypedCallResponseMap[keyof MessageType];
 
@@ -224,12 +229,13 @@ export class DeviceCommands {
   // Sends an async message to the opened device.
   async call(
     type: MessageKey,
-    msg: DefaultMessageResponse['message'] = {}
+    msg?: DefaultMessageResponse['message'],
+    options?: TransportCallOptions
   ): Promise<DefaultMessageResponse> {
     Log.debug('[DeviceCommands] [call] Sending', type);
 
     try {
-      const promise = this.transport.call(this.mainId, type, msg) as any;
+      const promise = this.transport.call(this.mainId, type, msg ?? {}, options) as any;
       this.callPromise = promise;
       const res = await promise;
       if (res.type === 'Failure') {
@@ -283,19 +289,22 @@ export class DeviceCommands {
   typedCall<T extends MessageKey, R extends MessageKey[]>(
     type: T,
     resType: R,
-    msg?: MessageType[T]
+    msg?: MessageType[T],
+    options?: TransportCallOptions
   ): Promise<TypedCallResponseMap[R[number]]>;
 
   typedCall<T extends MessageKey, R extends MessageKey>(
     type: T,
     resType: R,
-    msg?: MessageType[T]
+    msg?: MessageType[T],
+    options?: TransportCallOptions
   ): Promise<TypedResponseMessage<R>>;
 
   async typedCall(
     type: MessageKey,
     resType: MessageKey | MessageKey[],
-    msg?: DefaultMessageResponse['message']
+    msg?: DefaultMessageResponse['message'],
+    options?: TransportCallOptions
   ) {
     if (this.disposed) {
       throw ERRORS.TypedError(
@@ -321,7 +330,7 @@ export class DeviceCommands {
       // ignore logging errors
     }
 
-    const response = await this._commonCall(type, msg);
+    const response = await this._commonCall(type, msg, options);
     try {
       assertType(response, resType);
     } catch (error) {
@@ -357,8 +366,12 @@ export class DeviceCommands {
     return response;
   }
 
-  async _commonCall(type: MessageKey, msg?: DefaultMessageResponse['message']) {
-    const resp = await this.call(type, msg);
+  async _commonCall(
+    type: MessageKey,
+    msg?: DefaultMessageResponse['message'],
+    options?: TransportCallOptions
+  ) {
+    const resp = await this.call(type, msg, options);
     return this._filterCommonTypes(resp, type);
   }
 

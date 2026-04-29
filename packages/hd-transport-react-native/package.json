@@ -19,7 +19,6 @@
     "lint:fix": "eslint . --fix"
   },
   "dependencies": {
-    "@onekeyfe/hd-core": "1.1.26-alpha.8",
     "@onekeyfe/hd-shared": "1.1.26-alpha.8",
     "@onekeyfe/hd-transport": "1.1.26-alpha.8",
     "@onekeyfe/react-native-ble-utils": "^0.1.4",

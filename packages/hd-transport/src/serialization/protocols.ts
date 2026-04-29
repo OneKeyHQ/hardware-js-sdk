@@ -65,7 +65,7 @@ export const ProtocolV2 = {
   },
 
   decode(schemas: ProtocolV2Schemas, frame: Uint8Array) {
-    const { msgType, pbPayload } = parseProtoV2Frame(frame);
+    const { msgType, pbPayload, seq } = parseProtoV2Frame(frame);
     const decodeMessages = resolveProtocolV2DecodeSchema(msgType, schemas);
     const { Message, messageName } = createMessageFromType(decodeMessages, msgType);
     const rxByteBuffer = ByteBuffer.wrap(Buffer.from(pbPayload) as unknown as ArrayBuffer);
@@ -76,6 +76,7 @@ export const ProtocolV2 = {
       messageName,
       msgType,
       pbPayload,
+      seq,
       type: messageName,
     };
   },

@@ -19,7 +19,7 @@ import {
 
 import type { Deferred } from '@onekeyfe/hd-shared';
 import type { DesktopAPI } from '@onekeyfe/hd-transport-electron';
-import type { OneKeyDeviceInfo, ProtocolType } from '@onekeyfe/hd-transport';
+import type { OneKeyDeviceInfo, ProtocolType, TransportCallOptions } from '@onekeyfe/hd-transport';
 import type EventEmitter from 'events';
 
 const { parseConfigure, buildBuffers, receiveOne, check } = transport;
@@ -89,6 +89,10 @@ export default class ElectronAutoBleTransport {
   private v1Buffers: Map<string, { buffer: number[]; bufferLength: number }> = new Map();
 
   private v2Assemblers: Map<string, ProtocolV2FrameAssembler> = new Map();
+
+  private v2FrameQueue: Uint8Array[] = [];
+
+  private v2FramePromise: Deferred<Uint8Array> | null = null;
 
   private notificationCleanups: Map<string, () => void> = new Map();
 
@@ -197,7 +201,9 @@ export default class ElectronAutoBleTransport {
     }
 
     if (forceCleanRunPromise && this.runPromise) {
-      this.runPromise.reject(ERRORS.TypedError(HardwareErrorCode.BleForceCleanRunPromise));
+      const error = ERRORS.TypedError(HardwareErrorCode.BleForceCleanRunPromise);
+      this.runPromise.reject(error);
+      this.rejectProtocolV2Frame(error);
     }
 
     try {
@@ -259,6 +265,15 @@ export default class ElectronAutoBleTransport {
       };
     } catch (error) {
       this.Log?.error('[Auto BLE] acquire failed:', error);
+      try {
+        if (window.desktopApi?.nobleBle && this.connectedDevices.has(uuid)) {
+          await window.desktopApi.nobleBle.unsubscribe(uuid);
+          await window.desktopApi.nobleBle.disconnect(uuid);
+        }
+      } catch (cleanupError) {
+        this.Log?.debug('[Auto BLE] acquire cleanup failed:', cleanupError);
+      }
+      this.cleanupDeviceState(uuid);
       throw error;
     }
   }
@@ -291,7 +306,8 @@ export default class ElectronAutoBleTransport {
     }
 
     return probeProtocolV2({
-      call: (name, data, options) => this.callProtocolV2(uuid, name, data, options?.timeoutMs),
+      call: (name: string, data: Record<string, unknown>, options?: { timeoutMs?: number }) =>
+        this.callProtocolV2(uuid, name, data, options),
       timeoutMs: PROTOCOL_PROBE_TIMEOUT_MS,
       logger: this.Log,
       logPrefix: 'Auto BLE',
@@ -359,7 +375,9 @@ export default class ElectronAutoBleTransport {
     if (hexData === 'PAIRING_REJECTED') {
       this.Log?.debug('[Auto BLE] Pairing rejection detected for device:', deviceId);
       if (this.runPromise) {
-        this.runPromise.reject(ERRORS.TypedError(HardwareErrorCode.BleDeviceBondedCanceled));
+        const error = ERRORS.TypedError(HardwareErrorCode.BleDeviceBondedCanceled);
+        this.runPromise.reject(error);
+        this.rejectProtocolV2Frame(error);
       }
       return;
     }
@@ -374,22 +392,68 @@ export default class ElectronAutoBleTransport {
 
   private handleProtocolV2Notification(deviceId: string, hexData: string): void {
     try {
+      if (!this.runPromise) {
+        this.v2Assemblers.get(deviceId)?.reset();
+        this.resetProtocolV2Frames();
+        return;
+      }
+
       const bytes = hexToBytes(hexData);
       if (bytes.length === 0) return;
 
       const assembler = this.v2Assemblers.get(deviceId);
       if (!assembler) return;
 
-      const frameData = assembler.push(bytes);
-      if (!frameData) return;
-
-      if (this.runPromise) {
-        this.runPromise.resolve(frameData);
+      let frameData = assembler.push(bytes);
+      while (frameData) {
+        this.resolveProtocolV2Frame(frameData);
+        frameData = assembler.push(new Uint8Array(0));
       }
     } catch (error) {
       this.Log?.error('[Auto BLE] Protocol V2 notification error:', error);
       if (this.runPromise) {
-        this.runPromise.reject(ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError));
+        const notifyError = ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError);
+        this.runPromise.reject(notifyError);
+        this.rejectProtocolV2Frame(notifyError);
+      }
+    }
+  }
+
+  private resolveProtocolV2Frame(frame: Uint8Array) {
+    if (this.v2FramePromise) {
+      this.v2FramePromise.resolve(frame);
+      this.v2FramePromise = null;
+      return;
+    }
+    this.v2FrameQueue.push(frame);
+  }
+
+  private rejectProtocolV2Frame(error: Error) {
+    this.v2FrameQueue = [];
+    if (this.v2FramePromise) {
+      this.v2FramePromise.reject(error);
+      this.v2FramePromise = null;
+    }
+  }
+
+  private resetProtocolV2Frames() {
+    this.v2FrameQueue = [];
+    this.v2FramePromise = null;
+  }
+
+  private async readProtocolV2Frame() {
+    const queuedFrame = this.v2FrameQueue.shift();
+    if (queuedFrame) {
+      return queuedFrame;
+    }
+
+    const framePromise = createDeferred<Uint8Array>();
+    this.v2FramePromise = framePromise;
+    try {
+      return await framePromise.promise;
+    } finally {
+      if (this.v2FramePromise === framePromise) {
+        this.v2FramePromise = null;
       }
     }
   }
@@ -410,7 +474,12 @@ export default class ElectronAutoBleTransport {
     }
   }
 
-  async call(uuid: string, name: string, data: Record<string, unknown>) {
+  async call(
+    uuid: string,
+    name: string,
+    data: Record<string, unknown>,
+    options?: TransportCallOptions
+  ) {
     if (!this._messages) {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
     }
@@ -427,7 +496,7 @@ export default class ElectronAutoBleTransport {
     }
 
     if (protocol === 'V2') {
-      return this.callProtocolV2(uuid, name, data);
+      return this.callProtocolV2(uuid, name, data, options);
     }
     return this.callProtocolV1(uuid, name, data);
   }
@@ -482,18 +551,33 @@ export default class ElectronAutoBleTransport {
     uuid: string,
     name: string,
     data: Record<string, unknown>,
-    timeoutMs = BLE_RESPONSE_TIMEOUT_MS
+    options?: TransportCallOptions
   ) {
     if (!this._messages || !this._messagesV2) {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
     }
 
     const forceRun = name === 'Initialize' || name === 'Cancel' || name === 'GetProtoVersion';
-    if (this.runPromise && !forceRun) {
-      throw ERRORS.TypedError(HardwareErrorCode.TransportCallInProgress);
+    if (this.runPromise) {
+      if (!forceRun) {
+        throw ERRORS.TypedError(HardwareErrorCode.TransportCallInProgress);
+      }
+      const error = ERRORS.TypedError(HardwareErrorCode.BleForceCleanRunPromise);
+      this.runPromise.reject(error);
+      this.rejectProtocolV2Frame(error);
+      this.runPromise = null;
     }
 
-    this.runPromise = createDeferred();
+    const runPromise = createDeferred<Uint8Array | string>();
+    runPromise.promise.catch(() => undefined);
+    this.runPromise = runPromise;
+    this.v2Assemblers.get(uuid)?.reset();
+    this.resetProtocolV2Frames();
+    let completed = false;
+    const callOptions = {
+      ...options,
+      timeoutMs: options?.timeoutMs ?? BLE_RESPONSE_TIMEOUT_MS,
+    };
 
     try {
       const session = new ProtocolV2Session({
@@ -502,9 +586,9 @@ export default class ElectronAutoBleTransport {
           protocolV2: this._messagesV2,
         },
         router: PROTOCOL_V2_CHANNEL_BLE_UART,
-        writeFrame: frame => this.writeWithChunking(uuid, bytesToHex(frame)),
+        writeFrame: (frame: Uint8Array) => this.writeWithChunking(uuid, bytesToHex(frame)),
         readFrame: async () => {
-          const rxFrame = await this.runPromise?.promise;
+          const rxFrame = await this.readProtocolV2Frame();
           if (!(rxFrame instanceof Uint8Array)) {
             throw new Error('Response is not Uint8Array');
           }
@@ -512,19 +596,29 @@ export default class ElectronAutoBleTransport {
         },
         logger: this.Log,
         logPrefix: 'ProtocolV2 BLE',
-        createTimeoutError: (_messageName, timeout) =>
+        createTimeoutError: (_messageName: string, timeout: number) =>
           ERRORS.TypedError(
             HardwareErrorCode.BleTimeoutError,
             `BLE response timeout after ${timeout}ms for ${name}`
           ),
       });
 
-      return await session.call(name, data, { timeoutMs });
+      const result = await session.call(name, data, callOptions);
+      completed = true;
+      return result;
     } catch (e) {
+      this.v2Assemblers.get(uuid)?.reset();
+      this.resetProtocolV2Frames();
       this.Log?.error('[Auto BLE] Protocol V2 call error:', e);
       throw e;
     } finally {
-      this.runPromise = null;
+      if (!completed) {
+        this.v2Assemblers.get(uuid)?.reset();
+      }
+      this.resetProtocolV2Frames();
+      if (this.runPromise === runPromise) {
+        this.runPromise = null;
+      }
     }
   }
 

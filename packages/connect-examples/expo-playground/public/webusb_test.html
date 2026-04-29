@@ -575,17 +575,17 @@
             const statusBarContent = document.getElementById('statusBarContent');
             const entry = document.createElement('div');
             entry.className = 'status-entry';
-            
+
             const time = new Date().toLocaleTimeString();
             let html = `<div class="status-entry-header">${cmdName}</div>`;
             html += `<div class="status-entry-content">`;
-            
+
             if (params) {
                 for (const [key, value] of Object.entries(params)) {
                     html += `<div class="param"><span class="key">${key}:</span><span class="value">${value}</span></div>`;
                 }
             }
-            
+
             if (result) {
                 if (errorCode !== null && errorCode !== 0) {
                     html += `<div class="param"><span class="key">Error Code:</span><span class="error">${errorCode}</span></div>`;
@@ -594,13 +594,13 @@
                     html += `<div class="param"><span class="key">Result:</span><span class="success">${result}</span></div>`;
                 }
             }
-            
+
             html += `</div>`;
             html += `<div class="status-entry-time">${time}</div>`;
-            
+
             entry.innerHTML = html;
             statusBarContent.insertBefore(entry, statusBarContent.firstChild);
-            
+
             if (statusBarContent.children.length > 20) {
                 statusBarContent.removeChild(statusBarContent.lastChild);
             }
@@ -663,7 +663,7 @@
         async function connect() {
             try {
                 log('Requesting USB device...', 'info');
-                
+
                 device = await navigator.usb.requestDevice({
                     filters: [{ vendorId: VID }]
                 });
@@ -681,7 +681,7 @@
                             if (alt.interfaceClass === 0xFF) {  // Vendor class
                                 interfaceNumber = iface.interfaceNumber;
                                 log(`Found vendor interface: ${interfaceNumber}`, 'info');
-                                
+
                                 for (const ep of alt.endpoints) {
                                     if (ep.direction === 'in') {
                                         endpointIn = ep.endpointNumber;
@@ -1464,7 +1464,7 @@
                 while (offset < startOffset + totalLength && !fileReadAborted) {
                     const remaining = (startOffset + totalLength) - offset;
                     const thisChunkSize = Math.min(chunkSize, remaining);
-                    
+
                     const resp = await sendFileReadChunk(filePath, offset, thisChunkSize);
 
                     if (resp.data && resp.data.length > 0) {
@@ -1487,7 +1487,7 @@
                         const hexPreview = Array.from(fileReadData.slice(0, 1024))
                             .map(b => b.toString(16).padStart(2, '0'))
                             .join(' ');
-                        const hexText = fileReadData.length > 1024 
+                        const hexText = fileReadData.length > 1024
                             ? hexPreview + ' ... (truncated, total ' + fileReadData.length + ' bytes)'
                             : hexPreview;
                         document.getElementById('fileReadDataHex').value = hexText;
@@ -1512,7 +1512,7 @@
                     document.getElementById('fileReadStatus').textContent = 'Completed!';
                     updateFileReadProgress(100, 'Complete!');
                     log(`✅ File read complete: ${formatBytes(readTotal)} in ${elapsed.toFixed(2)}s (${formatBytes(avgSpeed)}/s)`, 'info');
-                    
+
                     const hexText = Array.from(fileReadData)
                         .map(b => b.toString(16).padStart(2, '0'))
                         .join(' ');
@@ -1820,7 +1820,7 @@
             document.getElementById('stopTestBtn').disabled = false;
             document.getElementById('testProgress').style.display = 'block';
             document.getElementById('testResult').style.display = 'block';
-            
+
             updateTestProgress(0, '准备开始...');
             updateTestResult('运行中', 0, 0, null, 0, 0);
 
@@ -1909,9 +1909,9 @@
         async function runSingleTestRound(testFileSize, testDir, testFile, totalSteps, currentRound, totalRounds, progressCallback) {
             let passed = 0;
             let failed = 0;
-            
+
             const roundProgress = totalRounds > 1 ? `[${currentRound}/${totalRounds}] ` : '';
-            
+
             try {
                 // Step 1: Ping
                 const stepProgress1 = ((currentRound - 1) * totalSteps + 1) / (totalRounds * totalSteps) * 100;
@@ -2060,7 +2060,7 @@
                         const fileBytes = pbEncoder.encodeFile(testFile, offset, testFileSize, chunk);
                         const pbPayload = pbEncoder.encodeFileWrite(fileBytes, true, false);
                         const resp = await sendPbMessage(PB_MSG_TYPE.FileWrite, pbPayload, 10000);
-                        
+
                         if (resp.msgType === PB_MSG_TYPE.File) {
                             const file = pbDecoder.decodeFile(resp.pbPayload);
                             offset = file.processedByte !== null ? file.processedByte : (offset + chunk.length);
@@ -2249,7 +2249,7 @@
                     const partialOffset = Math.floor(testFileSize / 4);
                     const partialLen = Math.min(512, testFileSize - partialOffset);
                     const file = await sendFileReadChunk(testFile, partialOffset, partialLen);
-                    
+
                     if (file.data && file.data.length > 0) {
                         let partialOk = true;
                         for (let i = 0; i < file.data.length; i++) {
@@ -2546,7 +2546,7 @@
                     document.getElementById('pathInfoSize').textContent = formatBytes(pathInfo.size);
                     document.getElementById('pathInfoIsDir').textContent = pathInfo.directory ? 'Yes' : 'No';
                     document.getElementById('pathInfoTime').textContent = `${pathInfo.year}-${String(pathInfo.month).padStart(2, '0')}-${String(pathInfo.day).padStart(2, '0')} ${String(pathInfo.hour).padStart(2, '0')}:${String(pathInfo.minute).padStart(2, '0')}:${String(pathInfo.second).padStart(2, '0')}`;
-                    
+
                     const attrs = [];
                     if (pathInfo.readonly) attrs.push('ReadOnly');
                     if (pathInfo.hidden) attrs.push('Hidden');
@@ -2995,4 +2995,3 @@
     </script>
 </body>
 </html>
-
