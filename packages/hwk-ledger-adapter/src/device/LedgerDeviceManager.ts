@@ -40,9 +40,7 @@ export class LedgerDeviceManager {
           resolved = true;
           this._discovered.clear();
           debugLog(
-            `[DMK] enumerate raw count=${devices.length} ids=[${devices
-              .map(d => d.id)
-              .join(',')}]`
+            `[DMK] enumerate raw count=${devices.length} ids=[${devices.map(d => d.id).join(',')}]`
           );
           for (const d of devices) {
             this._discovered.set(d.id, d);

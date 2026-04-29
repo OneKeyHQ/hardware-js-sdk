@@ -210,9 +210,7 @@ export class LedgerAdapter implements IHardwareWallet {
   async searchDevices(): Promise<DeviceInfo[]> {
     await this._ensureDevicePermission();
 
-    debugLog(
-      `[LedgerAdapter] searchDevices() entry, cacheBefore=${this._discoveredDevices.size}`
-    );
+    debugLog(`[LedgerAdapter] searchDevices() entry, cacheBefore=${this._discoveredDevices.size}`);
     const devices = await this.connector.searchDevices();
     debugLog('[DMK] adapter.searchDevices raw:', JSON.stringify(devices));
 
@@ -930,10 +928,7 @@ export class LedgerAdapter implements IHardwareWallet {
       if (!finalSessionId) {
         throw originalErr;
       }
-      return LedgerAdapter._abortable(
-        signal,
-        this.connector.call(finalSessionId, method, params)
-      );
+      return LedgerAdapter._abortable(signal, this.connector.call(finalSessionId, method, params));
     }
   }
 

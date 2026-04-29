@@ -75,7 +75,7 @@ export function deviceActionToPromise<T>(
 
     // Expose a canceller for external abort. Optional reason tags the rejection.
     if (onRegisterCanceller) {
-      onRegisterCanceller((reason) => {
+      onRegisterCanceller(reason => {
         if (settled) return;
         settled = true;
         if (timer) clearTimeout(timer);
