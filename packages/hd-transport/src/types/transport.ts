@@ -46,6 +46,12 @@ export type AcquireInput = {
 
 export type MessageFromOneKey = { type: string; message: Record<string, any> };
 
+export type TransportCallOptions = {
+  timeoutMs?: number;
+  intermediateTypes?: string[];
+  onIntermediateResponse?: (response: MessageFromOneKey) => void;
+};
+
 type ITransportInitFn = (
   logger?: any,
   emitter?: EventEmitter,
@@ -59,7 +65,12 @@ export type Transport = {
   release(session: string, onclose: boolean): Promise<void>;
   configure(signedData: JSON | string): Promise<void>;
   configureProtocolV2?: (signedData: JSON | string) => Promise<void> | void;
-  call(session: string, name: string, data: Record<string, any>): Promise<MessageFromOneKey>;
+  call(
+    session: string,
+    name: string,
+    data: Record<string, any>,
+    options?: TransportCallOptions
+  ): Promise<MessageFromOneKey>;
   post(session: string, name: string, data: Record<string, any>): Promise<void>;
   read(session: string): Promise<MessageFromOneKey>;
   cancel(): Promise<void>;

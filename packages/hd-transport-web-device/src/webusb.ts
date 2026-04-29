@@ -10,7 +10,12 @@ import transport, {
 import { ERRORS, HardwareErrorCode, ONEKEY_WEBUSB_FILTER, wait } from '@onekeyfe/hd-shared';
 import ByteBuffer from 'bytebuffer';
 
-import type { AcquireInput, OneKeyDeviceInfoBase, ProtocolType } from '@onekeyfe/hd-transport';
+import type {
+  AcquireInput,
+  OneKeyDeviceInfoBase,
+  ProtocolType,
+  TransportCallOptions,
+} from '@onekeyfe/hd-transport';
 
 const { parseConfigure, decodeProtocol, check, ProtocolV1 } = transport;
 
@@ -461,13 +466,37 @@ export default class WebUsbTransport {
     await this.connect(path, false);
   }
 
+  private async withProtocolV2ReadTimeout<T>(
+    path: string,
+    promise: Promise<T>,
+    timeoutMs: number
+  ): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        promise,
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => {
+            this.resetConnectionAfterProbe(path).catch(error => {
+              this.Log.debug('[WebUsbTransport] reset after Protocol V2 timeout failed:', error);
+            });
+            reject(new Error(`Protocol V2 read timeout after ${timeoutMs}ms`));
+          }, timeoutMs);
+        }),
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
   private async probeProtocolV2(path: string) {
     if (!this.messages || !this.messagesV2) {
       return false;
     }
 
     return probeProtocolV2({
-      call: (name, data, options) => this.callProtocolV2(path, name, data, options?.timeoutMs),
+      call: (name: string, data: Record<string, unknown>, options?: { timeoutMs?: number }) =>
+        this.callProtocolV2(path, name, data, options),
       timeoutMs: PROTOCOL_PROBE_TIMEOUT,
       logger: this.Log,
       logPrefix: 'WebUsbTransport',
@@ -478,7 +507,12 @@ export default class WebUsbTransport {
   /**
    * Call device method — branches to Protocol V1 or Protocol V2 based on active probe.
    */
-  async call(path: string, name: string, data: Record<string, unknown>) {
+  async call(
+    path: string,
+    name: string,
+    data: Record<string, unknown>,
+    options?: TransportCallOptions
+  ) {
     if (this.messages == null) {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
     }
@@ -497,7 +531,7 @@ export default class WebUsbTransport {
     }
 
     if (protocol === 'V2') {
-      return this.callProtocolV2(path, name, data);
+      return this.callProtocolV2(path, name, data, options);
     }
 
     // --- Protocol V1 path (64-byte chunked 0x3F framing) ---
@@ -529,7 +563,7 @@ export default class WebUsbTransport {
     path: string,
     name: string,
     data: Record<string, unknown>,
-    timeoutMs?: number
+    options?: TransportCallOptions
   ) {
     const protocolV1Messages = this.messages;
     if (!this.messagesV2) {
@@ -548,23 +582,27 @@ export default class WebUsbTransport {
         protocolV2: this.messagesV2,
       },
       router: PROTOCOL_V2_CHANNEL_USB,
-      writeFrame: frame => this.transferOutWithRetry(path, frame),
-      readFrame: () => this.receiveProtocolV2Frame(path),
+      writeFrame: (frame: Uint8Array) => this.transferOutWithRetry(path, frame),
+      readFrame: () => this.receiveProtocolV2Frame(path, options?.timeoutMs),
       logger: this.Log,
       logPrefix: 'ProtocolV2 WebUSB',
-      createTimeoutError: (_messageName, timeoutMs) =>
+      createTimeoutError: (_messageName: string, timeoutMs: number) =>
         new Error(`Protocol V2 response timeout after ${timeoutMs}ms for ${name}`),
     });
 
-    return session.call(name, data, { timeoutMs });
+    return session.call(name, data, options);
   }
 
-  private async receiveProtocolV2Frame(path: string): Promise<Uint8Array> {
+  private async receiveProtocolV2Frame(path: string, timeoutMs?: number): Promise<Uint8Array> {
     const assembler = new ProtocolV2FrameAssembler(PROTOCOL_V2_FRAME_MAX_BYTES);
     let frame: Uint8Array | undefined;
+    const deadline = timeoutMs ? Date.now() + timeoutMs : undefined;
 
     while (!frame) {
-      const dataView = await this.transferInWithRetry(path, PROTOCOL_V2_FRAME_MAX_BYTES);
+      const transferIn = this.transferInWithRetry(path, PROTOCOL_V2_FRAME_MAX_BYTES);
+      const dataView = deadline
+        ? await this.withProtocolV2ReadTimeout(path, transferIn, Math.max(deadline - Date.now(), 1))
+        : await transferIn;
       const bytes = new Uint8Array(
         this.toArrayBuffer(
           dataView.buffer.slice(dataView.byteOffset, dataView.byteOffset + dataView.byteLength)

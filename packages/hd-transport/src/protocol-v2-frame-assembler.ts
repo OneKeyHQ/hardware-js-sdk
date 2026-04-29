@@ -12,7 +12,7 @@ export function concatUint8Arrays(arrays: Uint8Array[]): Uint8Array {
 }
 
 export class ProtocolV2FrameAssembler {
-  private chunks: Uint8Array[] = [];
+  private buffer = new Uint8Array(0);
 
   private readonly maxFrameBytes: number;
 
@@ -21,32 +21,31 @@ export class ProtocolV2FrameAssembler {
   }
 
   reset() {
-    this.chunks = [];
+    this.buffer = new Uint8Array(0);
   }
 
   push(chunk: Uint8Array): Uint8Array | undefined {
-    if (chunk.length === 0) return undefined;
+    if (chunk.length > 0) {
+      this.buffer = concatUint8Arrays([this.buffer, chunk]);
+    }
 
-    this.chunks.push(chunk);
-    const assembled = concatUint8Arrays(this.chunks);
+    if (this.buffer.length < 3) return undefined;
 
-    if (assembled.length < 3) return undefined;
-
-    if (assembled[0] !== 0x5a) {
+    if (this.buffer[0] !== 0x5a) {
       this.reset();
       throw new Error('Invalid Protocol V2 SOF');
     }
 
-    const expectedLen = assembled[1] + assembled[2] * 256;
+    const expectedLen = this.buffer[1] + this.buffer[2] * 256;
     if (expectedLen > this.maxFrameBytes) {
       this.reset();
       throw new Error(`Protocol V2 frame too large: ${expectedLen}`);
     }
 
-    if (assembled.length < expectedLen) return undefined;
+    if (this.buffer.length < expectedLen) return undefined;
 
-    const frame = assembled.slice(0, expectedLen);
-    this.reset();
+    const frame = this.buffer.slice(0, expectedLen);
+    this.buffer = this.buffer.slice(expectedLen);
     return frame;
   }
 }

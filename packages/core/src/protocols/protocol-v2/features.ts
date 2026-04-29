@@ -133,12 +133,12 @@ function createBaseFeatures(descriptor: DeviceDescriptor): Features {
     passphrase_protection: false,
     language: null,
     label: null,
-    initialized: true,
+    initialized: false,
     revision: null,
     bootloader_hash: null,
     imported: null,
-    unlocked: true,
-    firmware_present: true,
+    unlocked: false,
+    firmware_present: false,
     needs_backup: null,
     flags: null,
     model: 'pro2',
@@ -228,22 +228,32 @@ export async function getProtocolV2Features({
   commands,
   descriptor,
   onDeviceInfoError,
+  timeoutMs,
 }: {
   commands: DeviceCommands;
   descriptor: DeviceDescriptor;
   onDeviceInfoError?: (error: unknown) => void;
+  timeoutMs?: number;
 }) {
-  await commands.typedCall('Ping', 'Success', { message: 'init' });
+  const callOptions = timeoutMs ? { timeoutMs } : undefined;
+  if (callOptions) {
+    await commands.typedCall('Ping', 'Success', { message: 'init' }, callOptions);
+  } else {
+    await commands.typedCall('Ping', 'Success', { message: 'init' });
+  }
 
   try {
-    const { message } = await commands.typedCall(
-      'DevGetDeviceInfo',
-      'DeviceInfo',
-      PROTOCOL_V2_DEVICE_INFO_REQUEST
-    );
+    const { message } = callOptions
+      ? await commands.typedCall(
+          'DevGetDeviceInfo',
+          'DeviceInfo',
+          PROTOCOL_V2_DEVICE_INFO_REQUEST,
+          callOptions
+        )
+      : await commands.typedCall('DevGetDeviceInfo', 'DeviceInfo', PROTOCOL_V2_DEVICE_INFO_REQUEST);
     return normalizeProtocolV2Features(descriptor, message as unknown as ProtocolV2DeviceInfo);
   } catch (error) {
     onDeviceInfoError?.(error);
-    return normalizeProtocolV2Features(descriptor);
+    throw error;
   }
 }

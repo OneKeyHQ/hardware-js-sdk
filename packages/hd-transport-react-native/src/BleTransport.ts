@@ -1,10 +1,11 @@
 import { BleErrorCode } from 'react-native-ble-plx';
-import { LoggerNames, getLogger, wait } from '@onekeyfe/hd-core';
+import { wait } from '@onekeyfe/hd-shared';
 
 import type { Characteristic, Device, Subscription } from 'react-native-ble-plx';
-// import { wait } from '@onekeyfe/hd-core/src/utils';
 
-const Log = getLogger(LoggerNames.HdBleTransport);
+import { bleLogger } from './logger';
+
+const Log = bleLogger;
 
 export default class BleTransport {
   id: string;

@@ -54,11 +54,28 @@ const protocolV2Messages = parseConfigure({
         },
       },
     },
+    DevFirmwareUpdate: {
+      fields: {},
+    },
+    DevFirmwareInstallProgress: {
+      fields: {
+        target_id: {
+          type: 'uint32',
+          id: 1,
+        },
+        progress: {
+          type: 'uint32',
+          id: 2,
+        },
+      },
+    },
     MessageType: {
       values: {
         MessageType_GetProtoVersion: 60200,
         MessageType_ProtoVersion: 60201,
         MessageType_Ping: 60206,
+        MessageType_DevFirmwareUpdate: 61000,
+        MessageType_DevFirmwareInstallProgress: 61001,
       },
     },
   },
@@ -67,6 +84,13 @@ const protocolV2Messages = parseConfigure({
 const schemas = {
   protocolV1: protocolV1Messages,
   protocolV2: protocolV2Messages,
+};
+
+const rewriteSeq = (frame, seq) => {
+  const copy = new Uint8Array(frame);
+  copy[6] = seq;
+  copy[copy.length - 1] = protoV2.crc8(copy, copy.length - 1);
+  return copy;
 };
 
 describe('Protocol V2 framing and session', () => {
@@ -86,6 +110,7 @@ describe('Protocol V2 framing and session', () => {
       messageName: 'ProtoVersion',
       msgType: 60201,
       pbPayload: parsed.pbPayload,
+      seq: parsed.seq,
       message: {
         major_version: 1,
         minor_version: 2,
@@ -122,6 +147,26 @@ describe('Protocol V2 framing and session', () => {
     expect(() => assembler.push(oversized)).toThrow('Protocol V2 frame too large');
   });
 
+  test('keeps bytes after the first complete frame for the next read', () => {
+    const first = ProtocolV2.encode(schemas, 'ProtoVersion', {
+      major_version: 1,
+      minor_version: 0,
+      patch_version: 0,
+    });
+    const second = ProtocolV2.encode(schemas, 'ProtoVersion', {
+      major_version: 2,
+      minor_version: 0,
+      patch_version: 0,
+    });
+    const assembler = new ProtocolV2FrameAssembler();
+    const combined = new Uint8Array(first.length + second.length);
+    combined.set(first, 0);
+    combined.set(second, first.length);
+
+    expect(assembler.push(combined)).toEqual(first);
+    expect(assembler.push(new Uint8Array(0))).toEqual(second);
+  });
+
   test('session writes one encoded frame and decodes the response frame', async () => {
     const written = [];
     const response = ProtocolV2.encode(schemas, 'ProtoVersion', {
@@ -136,7 +181,8 @@ describe('Protocol V2 framing and session', () => {
         written.push(frame);
         return Promise.resolve();
       },
-      readFrame: () => Promise.resolve(response),
+      readFrame: () =>
+        Promise.resolve(rewriteSeq(response, protoV2.parseProtoV2Frame(written[0]).seq)),
     });
 
     const result = await session.call('GetProtoVersion', {});
@@ -149,6 +195,73 @@ describe('Protocol V2 framing and session', () => {
         major_version: 2,
         minor_version: 0,
         patch_version: 1,
+      },
+    });
+  });
+
+  test('session rejects response frames with a mismatched seq', async () => {
+    const response = ProtocolV2.encode(schemas, 'ProtoVersion', {
+      major_version: 2,
+      minor_version: 0,
+      patch_version: 1,
+    });
+    const session = new ProtocolV2Session({
+      schemas,
+      router: 1,
+      writeFrame: () => Promise.resolve(),
+      readFrame: () => Promise.resolve(response),
+    });
+
+    await expect(session.call('GetProtoVersion', {})).rejects.toThrow('Protocol V2 seq mismatch');
+  });
+
+  test('session consumes intermediate response frames before returning the final response', async () => {
+    const written = [];
+    const progress = ProtocolV2.encode(schemas, 'DevFirmwareInstallProgress', {
+      target_id: 0,
+      progress: 42,
+    });
+    const success = ProtocolV2.encode(schemas, 'Success', {
+      message: 'ok',
+    });
+    const onIntermediateResponse = jest.fn();
+    const readFrame = jest.fn(() => {
+      const seq = protoV2.parseProtoV2Frame(written[0]).seq;
+      return Promise.resolve(
+        readFrame.mock.calls.length === 1 ? rewriteSeq(progress, seq) : rewriteSeq(success, seq)
+      );
+    });
+    const session = new ProtocolV2Session({
+      schemas,
+      router: 1,
+      writeFrame: frame => {
+        written.push(frame);
+        return Promise.resolve();
+      },
+      readFrame,
+    });
+
+    const result = await session.call(
+      'DevFirmwareUpdate',
+      {},
+      {
+        intermediateTypes: ['DevFirmwareInstallProgress'],
+        onIntermediateResponse,
+      }
+    );
+
+    expect(readFrame).toHaveBeenCalledTimes(2);
+    expect(onIntermediateResponse).toHaveBeenCalledWith({
+      type: 'DevFirmwareInstallProgress',
+      message: {
+        target_id: 0,
+        progress: 42,
+      },
+    });
+    expect(result).toEqual({
+      type: 'Success',
+      message: {
+        message: 'ok',
       },
     });
   });
@@ -167,5 +280,22 @@ describe('Protocol V2 framing and session', () => {
         timeoutMs: 1,
       })
     ).resolves.toBe(false);
+  });
+
+  test('probeProtocolV2 recognizes V2 bootloader status responses', async () => {
+    const call = jest.fn(name => {
+      if (name === 'GetProtoVersion') {
+        return Promise.reject(new Error('unsupported'));
+      }
+      return Promise.resolve({ type: 'DevFirmwareUpdateStatus', message: { targets: [] } });
+    });
+
+    await expect(
+      probeProtocolV2({
+        call,
+        timeoutMs: 1,
+      })
+    ).resolves.toBe(true);
+    expect(call).toHaveBeenNthCalledWith(2, 'DevGetFirmwareUpdateStatus', {}, { timeoutMs: 1 });
   });
 });

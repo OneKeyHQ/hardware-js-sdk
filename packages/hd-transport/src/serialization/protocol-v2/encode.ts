@@ -1,5 +1,6 @@
 import { PROTO_DATA_TYPE_PACKET, PROTO_HEAD_CRC_SIZE, PROTO_HEAD_SOF } from './constants';
 import { crc8 } from './crc8';
+import { PROTOCOL_V2_FRAME_MAX_BYTES } from '../../constants';
 
 // Per-session sequence counter; increments on each frame, never 0
 let protoSeq = 0;
@@ -25,6 +26,12 @@ export function buildProtoV2Frame(
 ): Uint8Array {
   const payloadLen = payload ? payload.length : 0;
   const frameLen = payloadLen + PROTO_HEAD_CRC_SIZE;
+  if (frameLen > PROTOCOL_V2_FRAME_MAX_BYTES) {
+    throw new Error(`Protocol V2 frame too large: ${frameLen}`);
+  }
+  if (frameLen > 0xffff) {
+    throw new Error(`Protocol V2 frame length overflow: ${frameLen}`);
+  }
   const frame = new Uint8Array(frameLen);
 
   // Advance sequence counter (skip 0)

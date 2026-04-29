@@ -596,8 +596,9 @@ export class Device extends EventEmitter {
           commands: this.commands,
           descriptor: this.originalDescriptor,
           onDeviceInfoError: error => {
-            Log.debug('Protocol V2 DevGetDeviceInfo fallback:', error);
+            Log.debug('Protocol V2 DevGetDeviceInfo failed:', error);
           },
+          timeoutMs: 10 * 1000,
         }),
         new Promise<never>((_, reject) => {
           setTimeout(() => {

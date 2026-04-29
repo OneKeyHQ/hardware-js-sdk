@@ -75,16 +75,16 @@ sequenceDiagram
     Note over SDK: 封装消息 (如 GetAddress)
     SDK->>SDK: Protobuf 序列化
     SDK->>SDK: 添加 6 字节 Header (## + Type + Size)
-    
+
     Note over SDK: 分包 (每包 64 字节)
     SDK->>USB: transferOut (Packet 1: Header + Data)
     USB->>MCU: 接收首包，解析总长度
     SDK->>USB: transferOut (Packet 2: Data)
     USB->>MCU: 接收续包
     SDK->>USB: transferOut (Packet 3: Data...)
-    
+
     Note over MCU: 业务处理...
-    
+
     MCU->>USB: 返回首包 (## + Type + Size)
     USB-->>SDK: transferIn (64B)
     MCU->>USB: 返回续包...
@@ -104,14 +104,14 @@ sequenceDiagram
     SDK->>SDK: Protobuf 序列化
     SDK->>SDK: 计算全帧 CRC8 (Init: 0x30)
     SDK->>SDK: 构造帧 [0x5A][Len][CRC_H][Router][Attr][Seq][Payload][CRC_A]
-    
+
     Note over SDK: 单帧传输 (无需 SDK 分包)
     SDK->>USB: transferOut (单次最大 2048B)
     USB->>MCU: 硬件 DMA 直接接收全帧
-    
+
     Note over MCU: 校验 CRC8 & 任务分发
     MCU->>MCU: ZBus Dispatch to Crypto Task
-    
+
     Note over MCU: 返回响应
     MCU->>USB: 发送响应帧 (0x5A 起始)
     USB-->>SDK: transferIn (一次性读取完整响应)
@@ -135,12 +135,12 @@ sequenceDiagram
 async function detectProtocol(device) {
   try {
     // 1. 尝试用新协议打招呼
-    const probePacket = Pro2Serializer.buildProbePacket(); 
+    const probePacket = Pro2Serializer.buildProbePacket();
     await device.transferOut(probePacket);
-    
+
     const res = await device.transferIn(64);
     const firstByte = res.data.getUint8(0);
-    
+
     if (firstByte === 0x5A) {
       return 'PROTO_V0';
     } else if (firstByte === 0x3F) {
