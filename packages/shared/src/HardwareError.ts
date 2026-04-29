@@ -480,6 +480,11 @@ export const HardwareErrorCode = {
   TooManyInputs: 827,
 
   /**
+   * The two PIN entries did not match while setting/changing PIN on device
+   */
+  PinMismatch: 828,
+
+  /**
    * Lowlevel transport connect error
    */
   LowlevelTrasnportConnectError: 900,
@@ -629,6 +634,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.DeviceSettingsNotProvided]: 'No setting provided',
   [HardwareErrorCode.DeviceSettingsLanguageNotSupport]: 'Language not supported',
   [HardwareErrorCode.TooManyInputs]: 'Too many inputs',
+  [HardwareErrorCode.PinMismatch]: 'PIN mismatch',
 
   /**
    * Lowlevel transport

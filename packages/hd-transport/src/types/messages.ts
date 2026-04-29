@@ -4219,6 +4219,34 @@ export type TonSignedProof = {
   signature?: string;
 };
 
+export enum TonSignDataType {
+  TEXT = 0,
+  BINARY = 1,
+  CELL = 2,
+}
+
+// TonSignData
+export type TonSignData = {
+  address_n: number[];
+  type: TonSignDataType;
+  payload: string;
+  schema?: string;
+  appdomain: string;
+  timestamp: UintType;
+  from_address?: string;
+  wallet_version?: TonWalletVersion;
+  wallet_id?: number;
+  workchain?: TonWorkChain;
+  is_bounceable?: boolean;
+  is_testnet_only?: boolean;
+};
+
+// TonSignedData
+export type TonSignedData = {
+  signature?: string;
+  digest?: string;
+};
+
 // TronGetAddress
 export type TronGetAddress = {
   address_n: number[];
@@ -4898,6 +4926,8 @@ export type MessageType = {
   TonSignedMessage: TonSignedMessage;
   TonSignProof: TonSignProof;
   TonSignedProof: TonSignedProof;
+  TonSignData: TonSignData;
+  TonSignedData: TonSignedData;
   TronGetAddress: TronGetAddress;
   TronAddress: TronAddress;
   TronTransferContract: TronTransferContract;

@@ -28,6 +28,8 @@ export enum HardwareErrorCode {
   InvalidParams = 10002,
   OperationTimeout = 10003,
   MethodNotSupported = 10004,
+  /** User dismissed in-app cancel UI. Distinct from UserRejected (on-device). */
+  UserAborted = 10005,
 
   // --- 10100s Device state ---
   DeviceNotFound = 10100,
@@ -37,6 +39,10 @@ export enum HardwareErrorCode {
   DeviceNotInitialized = 10104,
   DeviceInBootloader = 10105,
   DeviceMismatch = 10106,
+  /** Chain app wedged (e.g. Ledger BTC 0x6901). User must exit app on device. */
+  DeviceAppStuck = 10107,
+  /** Vendor (Ledger / Trezor) doesn't support the chain at all. */
+  ChainNotSupported = 10108,
 
   // --- 10200s Firmware ---
   FirmwareTooOld = 10200,

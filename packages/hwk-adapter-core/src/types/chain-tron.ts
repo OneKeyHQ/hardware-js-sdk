@@ -1,5 +1,4 @@
 import type { Response } from './response';
-import type { ProgressCallback } from './chain-evm';
 
 export interface TronGetAddressParams {
   path: string;
@@ -40,13 +39,6 @@ export interface ITronMethods {
     deviceId: string,
     params: TronGetAddressParams
   ): Promise<Response<TronAddress>>;
-
-  tronGetAddresses(
-    connectId: string,
-    deviceId: string,
-    params: TronGetAddressParams[],
-    onProgress?: ProgressCallback
-  ): Promise<Response<TronAddress[]>>;
 
   tronSignTransaction(
     connectId: string,

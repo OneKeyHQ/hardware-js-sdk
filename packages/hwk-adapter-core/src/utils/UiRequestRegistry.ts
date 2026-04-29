@@ -114,7 +114,8 @@ export class UiRequestRegistry {
     this.cancel();
   }
 
-  hasPending(requestType: string): boolean {
-    return this.pending.has(requestType);
+  hasPending(requestType?: string): boolean {
+    if (requestType) return this.pending.has(requestType);
+    return this.pending.size > 0;
   }
 }

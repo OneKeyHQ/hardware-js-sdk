@@ -155,6 +155,7 @@ async function _getEthSigner(ctx: ConnectorContext, sessionId: string) {
   // DMK-specific values (verify-address, sign-transaction, sign-typed-data,
   // sign-personal-message) collapse to ConfirmOnDevice via the helper.
   signer.onInteraction = (interaction: string) => {
+    debugLog('[LedgerConnector] evm.onInteraction:', interaction);
     ctx.emit('ui-event', {
       type: collapseSignerInteraction(interaction),
       payload: { sessionId },
@@ -163,7 +164,7 @@ async function _getEthSigner(ctx: ConnectorContext, sessionId: string) {
 
   // Expose DeviceAction canceller to the connector so that cancel(sessionId)
   // can release DMK's intent queue slot and unsubscribe cleanly.
-  signer.onRegisterCanceller = (cancel: () => void) => {
+  signer.onRegisterCanceller = cancel => {
     ctx.registerCanceller(sessionId, cancel);
   };
 

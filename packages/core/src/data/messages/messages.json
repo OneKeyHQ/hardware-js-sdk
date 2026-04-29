@@ -11569,6 +11569,102 @@
         }
       }
     },
+    "TonSignData": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "type": {
+          "rule": "required",
+          "type": "TonSignDataType",
+          "id": 2
+        },
+        "payload": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 3
+        },
+        "schema": {
+          "type": "string",
+          "id": 4
+        },
+        "appdomain": {
+          "rule": "required",
+          "type": "string",
+          "id": 5
+        },
+        "timestamp": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 6
+        },
+        "from_address": {
+          "type": "string",
+          "id": 7
+        },
+        "wallet_version": {
+          "type": "TonWalletVersion",
+          "id": 8,
+          "options": {
+            "default": "V4R2"
+          }
+        },
+        "wallet_id": {
+          "type": "uint32",
+          "id": 9,
+          "options": {
+            "default": 698983191
+          }
+        },
+        "workchain": {
+          "type": "TonWorkChain",
+          "id": 10,
+          "options": {
+            "default": "BASECHAIN"
+          }
+        },
+        "is_bounceable": {
+          "type": "bool",
+          "id": 11,
+          "options": {
+            "default": false
+          }
+        },
+        "is_testnet_only": {
+          "type": "bool",
+          "id": 12,
+          "options": {
+            "default": false
+          }
+        }
+      },
+      "nested": {
+        "TonSignDataType": {
+          "values": {
+            "TEXT": 0,
+            "BINARY": 1,
+            "CELL": 2
+          }
+        }
+      }
+    },
+    "TonSignedData": {
+      "fields": {
+        "signature": {
+          "type": "bytes",
+          "id": 1
+        },
+        "digest": {
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
     "TronGetAddress": {
       "fields": {
         "address_n": {
@@ -12501,6 +12597,8 @@
         "MessageType_TonSignProof": 11905,
         "MessageType_TonSignedProof": 11906,
         "MessageType_TonTxAck": 11907,
+        "MessageType_TonSignData": 11908,
+        "MessageType_TonSignedData": 11909,
         "MessageType_ScdoGetAddress": 12001,
         "MessageType_ScdoAddress": 12002,
         "MessageType_ScdoSignTx": 12003,

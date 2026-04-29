@@ -2,6 +2,8 @@ import type { ConnectorEventMap, ConnectorEventType } from '@onekeyfe/hwk-adapte
 import type { DeviceManagementKit } from '@ledgerhq/device-management-kit';
 import type { SignerManager } from '../../signer/SignerManager';
 import type { LedgerDeviceManager } from '../../device/LedgerDeviceManager';
+import type { WrapErrorOptions } from '../../errors';
+import type { CancelReason } from '../../signer/deviceActionToPromise';
 
 /**
  * Context provided by LedgerConnectorBase to per-chain handlers.
@@ -10,7 +12,7 @@ import type { LedgerDeviceManager } from '../../device/LedgerDeviceManager';
 export interface ConnectorContext {
   emit<K extends ConnectorEventType>(event: K, data: ConnectorEventMap[K]): void;
   invalidateSession(sessionId: string): void;
-  wrapError(err: unknown): Error;
+  wrapError(err: unknown, opts?: WrapErrorOptions): Error;
   getOrCreateDmk(): Promise<DeviceManagementKit>;
   getDeviceManager(): Promise<LedgerDeviceManager>;
   getSignerManager(): Promise<SignerManager>;
@@ -28,7 +30,7 @@ export interface ConnectorContext {
    * DMK's intent queue slot. Chain handlers should register immediately after
    * creating a DeviceAction and clear in a `finally` block.
    */
-  registerCanceller(sessionId: string, cancel: () => void): void;
+  registerCanceller(sessionId: string, cancel: (reason?: CancelReason) => void): void;
 
   /** Clear any canceller previously registered for this session. */
   clearCanceller(sessionId: string): void;

@@ -171,24 +171,6 @@ describe('LedgerAdapter', () => {
     });
   });
 
-  describe('evmGetAddresses', () => {
-    it('should return multiple addresses', async () => {
-      connector.call
-        .mockResolvedValueOnce({ address: '0xABCD' })
-        .mockResolvedValueOnce({ address: '0xDEF0' });
-
-      await adapter.connectDevice('dev-1');
-      const result = await adapter.evmGetAddresses('dev-1', '', [
-        { path: "m/44'/60'/0'/0/0" },
-        { path: "m/44'/60'/0'/0/1" },
-      ]);
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.payload).toHaveLength(2);
-      }
-    });
-  });
-
   describe('evmSignMessage', () => {
     it('should return signature on success', async () => {
       connector.call.mockResolvedValueOnce({

@@ -7,6 +7,13 @@ import type { DeviceAction, DeviceActionState } from '../types';
 /** Default timeout for non-interactive operations (e.g. getAddress without showOnDevice). */
 const DEFAULT_TIMEOUT_MS = 30_000;
 
+/** Optional context attached to the rejection when a canceller fires. */
+export interface CancelReason {
+  code?: number;
+  tag?: string;
+  message?: string;
+}
+
 /**
  * Convert a DMK DeviceAction (Observable-based) into a Promise.
  * Handles pending -> completed/error state transitions and interaction callbacks.
@@ -27,7 +34,7 @@ export function deviceActionToPromise<T>(
   action: DeviceAction<T>,
   onInteraction?: (interaction: string) => void,
   timeoutMs: number = DEFAULT_TIMEOUT_MS,
-  onRegisterCanceller?: (cancel: () => void) => void
+  onRegisterCanceller?: (cancel: (reason?: CancelReason) => void) => void
 ): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     let settled = false;
@@ -66,14 +73,26 @@ export function deviceActionToPromise<T>(
     // Start initial timer
     resetTimer();
 
-    // Expose a canceller for external abort (release DMK queue slot + unsubscribe).
+    // Expose a canceller for external abort. Optional reason tags the rejection.
     if (onRegisterCanceller) {
-      onRegisterCanceller(() => {
+      onRegisterCanceller(reason => {
         if (settled) return;
         settled = true;
         if (timer) clearTimeout(timer);
         cancelAction();
-        reject(new Error('Device action cancelled'));
+        const err = new Error(reason?.message ?? 'Device action cancelled');
+        if (reason?.code !== undefined) {
+          (err as Error & { code?: number }).code = reason.code;
+        }
+        if (reason?.tag) {
+          Object.defineProperty(err, '_tag', {
+            value: reason.tag,
+            configurable: true,
+            enumerable: false,
+            writable: true,
+          });
+        }
+        reject(err);
       });
     }
 

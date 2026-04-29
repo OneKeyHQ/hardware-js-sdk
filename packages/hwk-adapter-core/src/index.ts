@@ -23,7 +23,6 @@ export type {
   EvmSignTypedDataHash,
   EIP712Domain,
   EvmSignature,
-  ProgressCallback,
   IEvmMethods,
 } from './types/chain-evm';
 
@@ -108,6 +107,7 @@ export type {
   ConnectorSession,
   ConnectorEventType,
   ConnectorEventMap,
+  ConnectorUiEvent,
   IConnector,
   IHardwareBridge,
 } from './types/connector';

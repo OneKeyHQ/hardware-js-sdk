@@ -10,6 +10,7 @@ import type { ChainForFingerprint } from './fingerprint';
 import type { ActiveJobInfo, Interruptibility } from '../utils/DeviceJobQueue';
 import type { UI_REQUEST, UiResponseEvent } from '../events/ui-request';
 import type { SDK } from '../events/sdk';
+import type { ConnectorUiEvent } from './connector';
 
 export type ChainCapability = 'evm' | 'btc' | 'sol' | 'tron';
 
@@ -59,7 +60,7 @@ export type SdkEvent =
   | { type: typeof SDK.DEVICE_UNRESPONSIVE; payload: { connectId: string } }
   | { type: typeof SDK.DEVICE_RECOVERED; payload: { connectId: string } };
 
-export type HardwareEvent = DeviceEvent | UiRequestEvent | SdkEvent;
+export type HardwareEvent = DeviceEvent | UiRequestEvent | SdkEvent | ConnectorUiEvent;
 export type DeviceEventListener = (event: HardwareEvent) => void;
 
 /**
@@ -69,6 +70,11 @@ export type DeviceEventListener = (event: HardwareEvent) => void;
  * and the value is the narrowed event object the listener will receive.
  */
 export interface HardwareEventMap {
+  // Low-level connector UI event (forwarded from IConnector 'ui-event').
+  // Carries the four EConnectorInteraction values: ConfirmOnDevice / ConfirmOpenApp /
+  // UnlockDevice / InteractionComplete. Subscribe with hw.on('ui-event', handler).
+  'ui-event': ConnectorUiEvent;
+
   // Device events
   [DEVICE.CONNECT]: { type: typeof DEVICE.CONNECT; payload: DeviceInfo };
   [DEVICE.DISCONNECT]: { type: typeof DEVICE.DISCONNECT; payload: { connectId: string } };
@@ -158,7 +164,8 @@ export interface IHardwareWallet<TConfig = unknown>
   disconnectDevice(connectId: string): Promise<void>;
   getDeviceInfo(connectId: string, deviceId: string): Promise<Response<DeviceInfo>>;
   getSupportedChains(): ChainCapability[];
-  cancel(connectId: string): void;
+  /** Abort the in-flight call. Omit connectId to cancel whatever is active. */
+  cancel(connectId?: string): void;
 
   /** Respond to any pending `ui-request-*`. */
   uiResponse(response: UiResponseEvent): void;
