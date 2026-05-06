@@ -39,7 +39,7 @@ export type PathInfoResult = {
 
 export declare function fileRead(
   connectId: string,
-  params: { path: string; offset: number; totalSize: number }
+  params: { path: string; offset: number; totalSize: number; chunkLen?: number }
 ): Response<FileInfo>;
 
 export declare function fileWrite(
@@ -48,7 +48,7 @@ export declare function fileWrite(
     path: string;
     offset: number;
     totalSize: number;
-    data: Uint8Array | string;
+    data: ArrayBuffer | Uint8Array | string;
     overwrite?: boolean;
     append?: boolean;
   }

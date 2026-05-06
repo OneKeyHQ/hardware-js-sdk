@@ -27,6 +27,31 @@ const FIRMWARE_UPDATE_METHODS = new Set([
   'deviceUpdateBootloader',
 ]);
 
+function getProtocolV2FileWriteDataSize(data: unknown): number | undefined {
+  if (data instanceof ArrayBuffer) return data.byteLength;
+  if (ArrayBuffer.isView(data)) return data.byteLength;
+  if (typeof data === 'string') return new TextEncoder().encode(data).byteLength;
+  return undefined;
+}
+
+function normalizeProtocolV2FileParams(
+  method: string,
+  params: Record<string, unknown>
+): Record<string, unknown> {
+  if (method !== 'fileWrite') return params;
+
+  const dataSize = getProtocolV2FileWriteDataSize(params.data);
+  if (!dataSize) return params;
+
+  const totalSize = Number(params.totalSize);
+  if (Number.isFinite(totalSize) && totalSize > 0) return params;
+
+  return {
+    ...params,
+    totalSize: dataSize,
+  };
+}
+
 function hasFirmwareVersionInfo(versions: FirmwareVersionInfo): boolean {
   return Boolean(versions.bootloaderVersion || versions.firmwareVersion || versions.bleVersion);
 }
@@ -116,8 +141,10 @@ export function useHardwareMethodExecution({
             }
           : params;
 
+      const normalizedParams = normalizeProtocolV2FileParams(methodConfig.method, executionParams);
+
       // 调用硬件 API
-      const result = await callHardwareAPI(methodConfig.method, executionParams);
+      const result = await callHardwareAPI(methodConfig.method, normalizedParams);
 
       if (result.success) {
         let firmwareVersions = FIRMWARE_UPDATE_METHODS.has(methodConfig.method)
