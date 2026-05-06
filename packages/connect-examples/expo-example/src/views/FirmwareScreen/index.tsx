@@ -28,10 +28,59 @@ import { selectDeviceAtom } from '../../atoms/deviceAtoms';
 import type { IDeviceListInstance } from '../../components/DeviceList';
 
 type UpdateType = 'ble' | 'firmware' | 'source' | 'bootloader';
+type UpdateVersions = {
+  bootloaderVersion?: string;
+  firmwareVersion?: string;
+  bleVersion?: string;
+};
 type UpdateState = {
   success: boolean;
   payload?: string;
+  versions?: UpdateVersions;
 };
+
+function FirmwareUpdateResult({ updateState }: { updateState?: UpdateState }) {
+  const intl = useIntl();
+
+  if (!updateState) return null;
+
+  const versionRows = updateState.versions
+    ? [
+        {
+          label: intl.formatMessage({ id: 'label__device_bootloader_version' }),
+          value: updateState.versions.bootloaderVersion,
+        },
+        {
+          label: intl.formatMessage({ id: 'label__device_firmware_version' }),
+          value: updateState.versions.firmwareVersion,
+        },
+        {
+          label: intl.formatMessage({ id: 'label__device_bluetooth_version' }),
+          value: updateState.versions.bleVersion,
+        },
+      ].filter(row => row.value)
+    : [];
+
+  return (
+    <Stack gap="$1">
+      <Text color={updateState.success ? '$text' : '$textCritical'}>
+        {updateState.success ? intl.formatMessage({ id: 'tip__update_success' }) : updateState.payload}
+      </Text>
+      {updateState.success && versionRows.length > 0 && (
+        <Stack gap="$1" padding="$2" backgroundColor="$bgHover" borderRadius="$2">
+          {versionRows.map(row => (
+            <XStack key={row.label} justifyContent="space-between" gap="$4">
+              <Text color="$textSubdued">{row.label}</Text>
+              <Text color="$text" fontWeight="bold">
+                {row.value}
+              </Text>
+            </XStack>
+          ))}
+        </Stack>
+      )}
+    </Stack>
+  );
+}
 
 interface FirmwareActionButtonProps {
   title: string;
@@ -68,13 +117,7 @@ function FirmwareActionButton({ title, onUpdate, deviceType }: FirmwareActionBut
       >
         {intl.formatMessage({ id: 'label__reboot_device_board_model' })}
       </Button>
-      {updateState && (
-        <Text color={updateState?.success ? '$text' : '$textCritical'}>
-          {updateState?.success
-            ? intl.formatMessage({ id: 'tip__update_success' })
-            : updateState?.payload}
-        </Text>
-      )}
+      <FirmwareUpdateResult updateState={updateState} />
     </Stack>
   );
 }
@@ -173,13 +216,7 @@ function FirmwareLocalFile({ title, type, onUpdate, deviceType }: FirmwareLocalF
       >
         {intl.formatMessage({ id: 'action__update' })}
       </Button>
-      {updateState && (
-        <Text color={updateState?.success ? '$text' : '$textCritical'}>
-          {updateState?.success
-            ? intl.formatMessage({ id: 'tip__update_success' })
-            : updateState?.payload}
-        </Text>
-      )}
+      <FirmwareUpdateResult updateState={updateState} />
     </Stack>
   );
 }
@@ -373,13 +410,7 @@ function FirmwareMultipleFiles({ title, onUpdate, deviceType }: FirmwareMultiple
 
       {loading && <Text>{intl.formatMessage({ id: 'tip__updating' })}...</Text>}
 
-      {updateState && (
-        <Text color={updateState?.success ? '$text' : '$textCritical'}>
-          {updateState?.success
-            ? intl.formatMessage({ id: 'tip__update_success' })
-            : updateState?.payload}
-        </Text>
-      )}
+      <FirmwareUpdateResult updateState={updateState} />
     </Stack>
   );
 }
@@ -427,47 +458,53 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
     }
   }, [sdk, selectDevice?.connectId]);
 
-  useEffect(() => {
-    if (!sdk) return;
+  const loadDeviceFeatures = useCallback(async () => {
     if (selectDevice?.connectId == null) {
       setFeatures(undefined);
       setOnekeyFeatures(undefined);
-      return;
+      return undefined;
     }
 
-    const loadDeviceFeatures = async () => {
-      setConnecting(true);
-      setFeatures(undefined);
-      setOnekeyFeatures(undefined);
-      setError(undefined);
+    if (!sdk) {
+      return undefined;
+    }
 
-      try {
-        console.log('Loading device features for:', selectDevice.connectId);
+    setConnecting(true);
+    setFeatures(undefined);
+    setOnekeyFeatures(undefined);
+    setError(undefined);
 
-        const featuresRes = await sdk.getFeatures(selectDevice.connectId);
-        console.log('getFeatures result:', featuresRes);
+    try {
+      console.log('Loading device features for:', selectDevice.connectId);
 
-        if (featuresRes.success) {
-          const fetchedFeatures = featuresRes.payload;
-          console.log('Features loaded successfully, now loading OneKey features...');
-          const fetchedOnekeyFeatures = await loadOnekeyFeatures();
+      const featuresRes = await sdk.getFeatures(selectDevice.connectId);
+      console.log('getFeatures result:', featuresRes);
 
-          setFeatures(fetchedFeatures);
-          setOnekeyFeatures(fetchedOnekeyFeatures);
-        } else {
-          console.error('Failed to get features:', featuresRes.payload.error);
-          setError(featuresRes.payload.error);
-        }
-      } catch (error) {
-        console.error('Exception in loadDeviceFeatures:', error);
-        setError(error instanceof Error ? error.message : String(error));
-      } finally {
-        setConnecting(false);
+      if (featuresRes.success) {
+        const fetchedFeatures = featuresRes.payload;
+        console.log('Features loaded successfully, now loading OneKey features...');
+        const fetchedOnekeyFeatures = await loadOnekeyFeatures();
+
+        setFeatures(fetchedFeatures);
+        setOnekeyFeatures(fetchedOnekeyFeatures);
+        return fetchedFeatures;
       }
-    };
 
-    loadDeviceFeatures();
-  }, [sdk, selectDevice?.connectId, loadOnekeyFeatures]);
+      console.error('Failed to get features:', featuresRes.payload.error);
+      setError(featuresRes.payload.error);
+      return undefined;
+    } catch (error) {
+      console.error('Exception in loadDeviceFeatures:', error);
+      setError(error instanceof Error ? error.message : String(error));
+      return undefined;
+    } finally {
+      setConnecting(false);
+    }
+  }, [loadOnekeyFeatures, sdk, selectDevice?.connectId]);
+
+  useEffect(() => {
+    void loadDeviceFeatures();
+  }, [loadDeviceFeatures]);
 
   const disconnectDevice = useCallback(() => {
     setFeatures(undefined);
@@ -500,16 +537,20 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
           platform: 'web',
         });
         setShowUpdateDialog(false);
+        if (res.success) {
+          await loadDeviceFeatures();
+        }
         return {
           success: res.success,
           payload: res.success ? undefined : res.payload?.error,
+          versions: res.success ? res.payload : undefined,
         };
       } catch (error: any) {
         setShowUpdateDialog(false);
         return { payload: error.message || 'Unknown error occurred', success: false };
       }
     },
-    [features, intl, sdk, selectDevice, setShowUpdateDialog]
+    [features, intl, loadDeviceFeatures, sdk, selectDevice, setShowUpdateDialog]
   );
 
   const updateFirmware = useCallback(
@@ -560,6 +601,7 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
             payload: res.payload.error,
           };
         }
+        await loadDeviceFeatures();
         return {
           success: true,
         };
@@ -589,6 +631,7 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
             payload: res.payload.error,
           };
         }
+        await loadDeviceFeatures();
         return {
           success: true,
         };
@@ -606,6 +649,7 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
             payload: res.payload.error,
           };
         }
+        await loadDeviceFeatures();
         return {
           success: true,
         };
@@ -628,7 +672,7 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
         };
       }
     },
-    [deviceTypeLowerCase, features, intl, sdk, selectDevice]
+    [deviceTypeLowerCase, features, intl, loadDeviceFeatures, sdk, selectDevice]
   );
 
   const rebootBoardModel = useCallback(async () => {

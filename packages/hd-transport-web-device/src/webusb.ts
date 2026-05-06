@@ -27,6 +27,8 @@ const HEADER_LENGTH = 6;
 const PACKET_IO_MAX_RETRIES = 3;
 const PACKET_IO_RETRY_DELAY = 300;
 const PROTOCOL_PROBE_TIMEOUT = 1500;
+const PROTOCOL_V2_PRODUCT_NAME_RE = /\bpro\s*2\b|pro2/i;
+const LEGACY_PROTOCOL_PRODUCT_NAME_RE = /\bonekey\s+(classic|mini|pro|touch)\b/i;
 
 /**
  * Device information with path and WebUSB device instance
@@ -49,8 +51,11 @@ export default class WebUsbTransport {
   /** Protobuf schema for Protocol V2 transports. */
   messagesV2: ReturnType<typeof transport.parseConfigure> | undefined;
 
-  /** Per-path protocol type detected by active wire-level probe after connect. */
+  /** Per-path protocol type detected by descriptor heuristic or active wire-level probe. */
   private deviceProtocol: Map<string, ProtocolType> = new Map();
+
+  /** Marks whether a cached protocol came from a USB descriptor heuristic or active probe. */
+  private deviceProtocolSource: Map<string, 'heuristic' | 'probe'> = new Map();
 
   /** Per-path USB endpoint / interface numbers (discovered from USB descriptors) */
   private deviceEndpoints: Map<string, DeviceEndpoints> = new Map();
@@ -187,14 +192,50 @@ export default class WebUsbTransport {
   }
 
   /**
-   * Determine protocol type by probing the wire protocol after connect.
-   * Protocol V2 must answer GetProtoVersion; otherwise we keep the legacy V1 path.
+   * Determine protocol type after connect.
+   * Known legacy descriptors can skip probing; otherwise Protocol V2 must answer
+   * GetProtoVersion or bootloader status before we select the V2 path.
    */
   private async detectProtocol(path: string): Promise<ProtocolType> {
+    const cachedProtocol = this.deviceProtocol.get(path);
+    if (cachedProtocol) {
+      this.Log.debug(
+        `[WebUsbTransport] detectProtocol: path=${path} -> ${cachedProtocol} (cached)`
+      );
+      return cachedProtocol;
+    }
+
+    const heuristicProtocol = this.detectProtocolFromUsbDescriptor(path);
+    if (heuristicProtocol) {
+      this.deviceProtocol.set(path, heuristicProtocol);
+      this.deviceProtocolSource.set(path, 'heuristic');
+      this.Log.debug(
+        `[WebUsbTransport] detectProtocol: path=${path} -> ${heuristicProtocol} (descriptor)`
+      );
+      return heuristicProtocol;
+    }
+
     const protocol: ProtocolType = (await this.probeProtocolV2(path)) ? 'V2' : 'V1';
     this.deviceProtocol.set(path, protocol);
+    this.deviceProtocolSource.set(path, 'probe');
     this.Log.debug(`[WebUsbTransport] detectProtocol: path=${path} -> ${protocol}`);
     return protocol;
+  }
+
+  private detectProtocolFromUsbDescriptor(path: string): ProtocolType | undefined {
+    const deviceInfo = this.deviceList.find(d => d.path === path);
+    const productName = deviceInfo?.device.productName?.trim();
+    if (!productName) return undefined;
+
+    if (PROTOCOL_V2_PRODUCT_NAME_RE.test(productName)) {
+      return undefined;
+    }
+
+    if (LEGACY_PROTOCOL_PRODUCT_NAME_RE.test(productName)) {
+      return 'V1';
+    }
+
+    return undefined;
   }
 
   /**
@@ -660,7 +701,13 @@ export default class WebUsbTransport {
     const ifaceNum = endpoints?.interfaceNumber ?? this.interfaceId;
     await device.releaseInterface(ifaceNum);
     await device.close();
-    this.deviceProtocol.delete(path);
+    if (
+      this.deviceProtocol.get(path) !== 'V2' &&
+      this.deviceProtocolSource.get(path) !== 'heuristic'
+    ) {
+      this.deviceProtocol.delete(path);
+      this.deviceProtocolSource.delete(path);
+    }
     this.deviceEndpoints.delete(path);
   }
 

@@ -199,20 +199,32 @@ describe('Protocol V2 framing and session', () => {
     });
   });
 
-  test('session rejects response frames with a mismatched seq', async () => {
+  test('session accepts response frames with a device-owned seq', async () => {
     const response = ProtocolV2.encode(schemas, 'ProtoVersion', {
       major_version: 2,
       minor_version: 0,
       patch_version: 1,
     });
+    const logger = {
+      debug: jest.fn(),
+    };
     const session = new ProtocolV2Session({
       schemas,
       router: 1,
       writeFrame: () => Promise.resolve(),
       readFrame: () => Promise.resolve(response),
+      logger,
     });
 
-    await expect(session.call('GetProtoVersion', {})).rejects.toThrow('Protocol V2 seq mismatch');
+    await expect(session.call('GetProtoVersion', {})).resolves.toEqual({
+      type: 'ProtoVersion',
+      message: {
+        major_version: 2,
+        minor_version: 0,
+        patch_version: 1,
+      },
+    });
+    expect(logger.debug).toHaveBeenCalledWith(expect.stringContaining('seq differs'));
   });
 
   test('session consumes intermediate response frames before returning the final response', async () => {

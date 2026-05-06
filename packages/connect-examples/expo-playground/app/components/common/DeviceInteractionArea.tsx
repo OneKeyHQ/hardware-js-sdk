@@ -26,6 +26,12 @@ interface FirmwareProgressData {
   progressType: 'transferData' | 'installingFirmware';
 }
 
+interface FirmwareVersionInfo {
+  bootloaderVersion?: string;
+  firmwareVersion?: string;
+  bleVersion?: string;
+}
+
 interface DeviceInteractionAreaProps {
   status: ExecutionStatus;
   deviceAction?: {
@@ -39,6 +45,7 @@ interface DeviceInteractionAreaProps {
   isCancelling?: boolean;
   // 添加固件进度相关属性
   firmwareProgress?: FirmwareProgressData | null;
+  firmwareVersions?: FirmwareVersionInfo | null;
   // 添加当前设备信息
   currentDevice?: DeviceInfo | null;
 }
@@ -52,6 +59,7 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
   onReset,
   isCancelling = false,
   firmwareProgress,
+  firmwareVersions,
   currentDevice,
 }) => {
   const { t } = useTranslation();
@@ -133,6 +141,22 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
 
   const statusConfig = getStatusConfig();
   const progressConfig = getFirmwareProgressConfig();
+  const firmwareVersionRows = firmwareVersions
+    ? [
+        {
+          label: t('common.bootVersion'),
+          value: firmwareVersions.bootloaderVersion,
+        },
+        {
+          label: t('common.firmwareVersion'),
+          value: firmwareVersions.firmwareVersion,
+        },
+        {
+          label: t('common.bluetoothVersion'),
+          value: firmwareVersions.bleVersion,
+        },
+      ].filter(row => row.value)
+    : [];
 
   return (
     <Card className="bg-card border border-border/50 shadow-sm h-full flex flex-col">
@@ -231,6 +255,25 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
               </div>
               <Progress value={firmwareProgress.progress} className="h-2 mb-1" />
               <p className="text-xs text-muted-foreground">{progressConfig.description}</p>
+            </div>
+          )}
+
+          {status === 'success' && firmwareVersionRows.length > 0 && (
+            <div className="w-full mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <span className="text-sm font-medium text-green-800">
+                  {t('components.deviceInteractionArea.updatedVersions')}
+                </span>
+              </div>
+              <div className="space-y-1">
+                {firmwareVersionRows.map(row => (
+                  <div key={row.label} className="flex items-center justify-between gap-3 text-xs">
+                    <span className="text-green-700">{row.label}</span>
+                    <span className="font-mono font-medium text-green-900">{row.value}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

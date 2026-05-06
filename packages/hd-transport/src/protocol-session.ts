@@ -88,7 +88,7 @@ export class ProtocolV2Session {
     this.options = options;
   }
 
-  async call(
+  call(
     name: string,
     data: Record<string, unknown>,
     callOptions: ProtocolV2CallOptions = {}
@@ -121,8 +121,8 @@ export class ProtocolV2Session {
         const rxFrame = await readFrame();
         const decoded = ProtocolV2.decode(schemas, rxFrame);
         if (decoded.seq !== expectedSeq) {
-          throw new Error(
-            `Protocol V2 seq mismatch for ${name}: expected ${expectedSeq}, got ${decoded.seq}`
+          logger?.debug?.(
+            `[${logPrefix}] seq differs for ${name}: tx=${expectedSeq}, rx=${decoded.seq}`
           );
         }
         logger?.debug?.(
@@ -132,9 +132,9 @@ export class ProtocolV2Session {
         const response = check.call(decoded);
         if (callOptions.intermediateTypes?.includes(response.type)) {
           callOptions.onIntermediateResponse?.(response);
-          continue;
+        } else {
+          return response;
         }
-        return response;
       }
     };
 

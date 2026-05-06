@@ -894,6 +894,7 @@ export const zh = {
         transferringDataDesc: '正在将固件数据传输到设备...',
         installingFirmware: '安装固件',
         installingFirmwareDesc: '正在安装固件，请勿断开设备...',
+        updatedVersions: '更新后的版本',
       },
       webusb: {
         authorize: {
