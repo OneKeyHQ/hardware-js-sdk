@@ -36,6 +36,16 @@ interface MethodCategory {
   methods: UnifiedMethodConfig[];
 }
 
+const PROTOCOL_V2_FILE_SYSTEM_METHODS = new Set([
+  'pathinfo',
+  'dirlist',
+  'dirmake',
+  'dirremove',
+  'fileread',
+  'filewrite',
+  'filedelete',
+]);
+
 const DeviceMethodsIndexPage: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -116,7 +126,8 @@ const DeviceMethodsIndexPage: React.FC = () => {
         methodName.includes('bootloader') ||
         methodName.includes('check') ||
         methodName.includes('bridge') ||
-        methodName.includes('reboot')
+        methodName.includes('reboot') ||
+        PROTOCOL_V2_FILE_SYSTEM_METHODS.has(methodName)
       ) {
         firmwareMethods.push(method);
       }

@@ -7,7 +7,7 @@ export type FileWriteParams = {
   path: string;
   offset: number;
   totalSize: number;
-  data: Uint8Array | string;
+  data: ArrayBuffer | Uint8Array | string;
   overwrite?: boolean;
   append?: boolean;
 };

@@ -4,6 +4,7 @@ export type FileReadParams = {
   path: string;
   offset: number;
   totalSize: number;
+  chunkLen?: number;
 };
 
 export default class FileRead extends BaseMethod<FileReadParams> {
@@ -14,6 +15,7 @@ export default class FileRead extends BaseMethod<FileReadParams> {
       path: this.payload.path,
       offset: this.payload.offset ?? 0,
       totalSize: this.payload.totalSize ?? 0,
+      chunkLen: this.payload.chunkLen,
     };
   }
 
@@ -24,6 +26,7 @@ export default class FileRead extends BaseMethod<FileReadParams> {
         offset: this.params.offset,
         total_size: this.params.totalSize,
       },
+      chunk_len: this.params.chunkLen,
     });
     return Promise.resolve(res.message);
   }

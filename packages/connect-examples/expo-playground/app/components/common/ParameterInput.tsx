@@ -219,7 +219,8 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
   };
 
   // 获取文件参数配置
-  const getFileParameterConfig = (paramName: string) => {
+  const getFileParameterConfig = (field: ParameterField) => {
+    const paramName = field.name;
     // 根据参数名称智能推断文件类型配置
     const getConfigByPattern = () => {
       if (/firmware/i.test(paramName)) {
@@ -250,11 +251,18 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
           description: t('components.firmwareFileUpload.resourceDesc'),
         };
       }
+      if (/data/i.test(paramName)) {
+        return {
+          accept: field.accept || '.bin',
+          title: field.label || paramName,
+          description: field.description || '',
+        };
+      }
       // 默认配置
       return {
-        accept: '.bin',
-        title: t('components.firmwareFileUpload.firmwareFile'),
-        description: t('components.firmwareFileUpload.firmwareDesc'),
+        accept: field.accept || '.bin',
+        title: field.label || t('components.firmwareFileUpload.firmwareFile'),
+        description: field.description || t('components.firmwareFileUpload.firmwareDesc'),
       };
     };
 
@@ -271,7 +279,7 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
 
   // 渲染文件选择器
   const renderFilePicker = (field: ParameterField) => {
-    const config = getFileParameterConfig(field.name);
+    const config = getFileParameterConfig(field);
     const currentValue = getParameterValue(field) as File | null;
 
     // 优先使用字段配置的accept，否则使用默认配置

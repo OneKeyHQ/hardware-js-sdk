@@ -110,7 +110,7 @@ const api: UnifiedMethodConfig[] = [
     noDeviceIdReq: true,
     presets: [
       {
-        title: 'Update multiple firmware',
+        title: 'Protocol V2 one-stop update',
         parameters: [
           {
             name: 'platform',
@@ -170,6 +170,206 @@ const api: UnifiedMethodConfig[] = [
             accept: '.zip',
             visible: true,
             editable: true,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'pathInfo',
+    description: 'methodDescriptions.pathInfo',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'Protocol V2 path info',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Path',
+            placeholder: 'vol1:firmware.bin',
+            value: 'vol1:firmware.bin',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'dirList',
+    description: 'methodDescriptions.dirList',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'Protocol V2 list directory',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Path',
+            placeholder: 'vol1:',
+            value: 'vol1:',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'dirMake',
+    description: 'methodDescriptions.dirMake',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'Protocol V2 make directory',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Path',
+            placeholder: 'vol1:updates',
+            value: 'vol1:updates',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'dirRemove',
+    description: 'methodDescriptions.dirRemove',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'Protocol V2 remove directory',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Path',
+            placeholder: 'vol1:updates',
+            value: 'vol1:updates',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'fileRead',
+    description: 'methodDescriptions.fileRead',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'Protocol V2 read file chunk',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Path',
+            placeholder: 'vol1:firmware.bin',
+            value: 'vol1:firmware.bin',
+          },
+          {
+            name: 'offset',
+            type: 'number',
+            required: true,
+            label: 'Offset',
+            value: 0,
+          },
+          {
+            name: 'totalSize',
+            type: 'number',
+            required: true,
+            label: 'Total Size',
+            value: 0,
+          },
+          {
+            name: 'chunkLen',
+            type: 'number',
+            required: false,
+            label: 'Chunk Length',
+            value: 1400,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'fileWrite',
+    description: 'methodDescriptions.fileWrite',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'Protocol V2 write file chunk',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Path',
+            placeholder: 'vol1:test.bin',
+            value: 'vol1:test.bin',
+          },
+          {
+            name: 'offset',
+            type: 'number',
+            required: true,
+            label: 'Offset',
+            value: 0,
+          },
+          {
+            name: 'totalSize',
+            type: 'number',
+            required: false,
+            label: 'Total Size',
+            description: 'Leave 0 to use the selected file size for a single chunk write.',
+            value: 0,
+          },
+          {
+            name: 'data',
+            type: 'file',
+            required: true,
+            label: 'File Data',
+            description: 'One Protocol V2 chunk. Keep it at 2048 bytes or smaller.',
+            accept: '.bin,.txt,.json',
+            visible: true,
+            editable: true,
+          },
+          {
+            name: 'overwrite',
+            type: 'boolean',
+            required: false,
+            label: 'Overwrite',
+            value: true,
+          },
+          {
+            name: 'append',
+            type: 'boolean',
+            required: false,
+            label: 'Append',
+            value: false,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'fileDelete',
+    description: 'methodDescriptions.fileDelete',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'Protocol V2 delete file',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Path',
+            placeholder: 'vol1:test.bin',
+            value: 'vol1:test.bin',
           },
         ],
       },

@@ -5,6 +5,7 @@ set -euxo pipefail
 echo $#
 
 PARENT_PATH=$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd -P )
+PACKAGE_ROOT="$PARENT_PATH/.."
 
 SRC="../../submodules/firmware/common/protob"
 DIST="."
@@ -32,30 +33,43 @@ if [[ "$LANG" != "typescript" && "$LANG" != "flow" ]];
         exit 1
 fi
 
+if [[ "$SRC" = /* ]]; then
+    SRC_PATH="$SRC"
+else
+    SRC_PATH="$PACKAGE_ROOT/$SRC"
+fi
+
+if [[ "$DIST" = /* ]]; then
+    DIST_PATH="$DIST"
+else
+    DIST_PATH="$PACKAGE_ROOT/$DIST"
+fi
+
 
 # ============================================================
 # BUILD Pro1 messages.json  (requires firmware submodule)
 # ============================================================
 # Combines all messages*.proto files from firmware submodule into
 # messages.json, then copies to core package.
-if [ -d "$SRC" ] && ls "$SRC"/messages*.proto 1>/dev/null 2>&1; then
+if [ -d "$SRC_PATH" ] && ls "$SRC_PATH"/messages*.proto 1>/dev/null 2>&1; then
     echo "=== Building Pro1 (legacy) protobuf messages ==="
-    echo 'syntax = "proto2";' > $DIST/messages.proto
-    echo 'import "google/protobuf/descriptor.proto";' >> $DIST/messages.proto
-    echo "Build proto file from $SRC"
-    grep -hv -e '^import ' -e '^syntax' -e '^package' -e 'option java_' $SRC/messages*.proto \
+    TMP_PROTO="$DIST_PATH/messages-tmp.proto"
+    echo 'syntax = "proto2";' > "$TMP_PROTO"
+    echo 'import "google/protobuf/descriptor.proto";' >> "$TMP_PROTO"
+    echo "Build proto file from $SRC_PATH"
+    grep -hv -e '^import ' -e '^syntax' -e '^package' -e 'option java_' "$SRC_PATH"/messages*.proto \
     | sed 's/ hw\.trezor\.messages\.common\./ /' \
     | sed 's/ common\./ /' \
     | sed 's/ ethereum_definitions\./ /' \
     | sed 's/ management\./ /' \
     | sed 's/^option /\/\/ option /' \
-    | grep -v '    reserved '>> $DIST/messages.proto
+    | grep -v '    reserved '>> "$TMP_PROTO"
 
-    npx pbjs -t json -p $DIST -o $DIST/messages.json --keep-case messages.proto
-    rm $DIST/messages.proto
+    npx pbjs -t json -p "$DIST_PATH" -o "$DIST_PATH/messages.json" --keep-case "$TMP_PROTO"
+    rm "$TMP_PROTO"
 
     # Copy to core package
-    cp $DIST/messages.json "$CORE_MESSAGES_DIR/messages.json"
+    cp "$DIST_PATH/messages.json" "$CORE_MESSAGES_DIR/messages.json"
     echo "Pro1 messages.json copied to core"
 
     echo "generating type definitions for: $LANG"
@@ -64,11 +78,11 @@ if [ -d "$SRC" ] && ls "$SRC"/messages*.proto 1>/dev/null 2>&1; then
 
     node ./protobuf-types.js $LANG
 
-    yarn prettier --write ../messages.json
-    yarn prettier --write "$CORE_MESSAGES_DIR/messages.json"
-    yarn prettier --write **/messages.ts
+    yarn --cwd "$PACKAGE_ROOT" prettier --write "$DIST_PATH/messages.json"
+    yarn --cwd "$PACKAGE_ROOT" prettier --write "$CORE_MESSAGES_DIR/messages.json"
+    yarn --cwd "$PACKAGE_ROOT" prettier --write "$PACKAGE_ROOT/src/types/messages.ts"
 else
-    echo "⚠️  firmware submodule not found at $SRC"
+    echo "⚠️  firmware submodule not found at $SRC_PATH"
     echo "    Skipping Pro1 protobuf build. To enable:"
     echo "    git submodule update --init submodules/firmware"
 fi
