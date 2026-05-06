@@ -931,6 +931,7 @@ export const en = {
         transferringDataDesc: 'Transferring firmware data to device...',
         installingFirmware: 'Installing Firmware',
         installingFirmwareDesc: 'Installing firmware, please do not disconnect device...',
+        updatedVersions: 'Updated Versions',
       },
       webusb: {
         authorize: {

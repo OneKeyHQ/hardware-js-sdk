@@ -24,6 +24,33 @@ interface MethodExecutorProps {
   type?: 'standard' | 'firmware';
 }
 
+interface FirmwareVersionInfo {
+  bootloaderVersion?: string;
+  firmwareVersion?: string;
+  bleVersion?: string;
+}
+
+function getFirmwareVersionsFromResult(result: unknown): FirmwareVersionInfo | null {
+  if (!result || typeof result !== 'object') return null;
+  const data = (result as { firmwareVersions?: unknown }).firmwareVersions;
+  if (!data || typeof data !== 'object') return null;
+
+  const versions = data as Record<string, unknown>;
+  const firmwareVersions = {
+    bootloaderVersion:
+      typeof versions.bootloaderVersion === 'string' ? versions.bootloaderVersion : undefined,
+    firmwareVersion:
+      typeof versions.firmwareVersion === 'string' ? versions.firmwareVersion : undefined,
+    bleVersion: typeof versions.bleVersion === 'string' ? versions.bleVersion : undefined,
+  };
+
+  return firmwareVersions.bootloaderVersion ||
+    firmwareVersions.firmwareVersion ||
+    firmwareVersions.bleVersion
+    ? firmwareVersions
+    : null;
+}
+
 const MethodExecutor: React.FC<MethodExecutorProps> = ({
   methodConfig,
   executionHandler,
@@ -45,6 +72,7 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
 
   // 方法级别的执行日志状态
   const [executionStartTime, setExecutionStartTime] = useState<number | null>(null);
+  const [firmwareVersions, setFirmwareVersions] = useState<FirmwareVersionInfo | null>(null);
 
   // 使用新的 Hooks
   const { currentDevice, deviceModel, deviceTheme, isConnected } = useDeviceInfo();
@@ -75,6 +103,16 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
     [selectPreset]
   );
 
+  const handleExecutionResult = useCallback(
+    (result: unknown) => {
+      if (type === 'firmware') {
+        setFirmwareVersions(getFirmwareVersionsFromResult(result));
+      }
+      onResult?.(result);
+    },
+    [onResult, type]
+  );
+
   // 执行状态管理
   const {
     status,
@@ -86,7 +124,7 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
     setDeviceAction,
   } = useMethodExecution({
     type,
-    onResult,
+    onResult: handleExecutionResult,
     onError,
   });
 
@@ -129,11 +167,14 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
 
     // 记录执行开始时间，用于过滤当前执行的日志
     setExecutionStartTime(Date.now());
+    if (type === 'firmware') {
+      setFirmwareVersions(null);
+    }
 
     // 使用 hardwareStore 的完整执行参数（包含通用参数）
     const finalExecutionParams = getExecutionParameters();
     await execute(finalExecutionParams, executionHandler);
-  }, [isConnected, execute, getExecutionParameters, executionHandler, toast, t]);
+  }, [isConnected, execute, getExecutionParameters, executionHandler, toast, t, type]);
 
   // 取消操作
   const handleCancel = useCallback(async () => {
@@ -153,6 +194,7 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
     // 如果是固件更新，重置固件进度状态
     if (type === 'firmware') {
       resetFirmwareProgress();
+      setFirmwareVersions(null);
     }
   }, [status, handleCancel, resetExecution, resetParameters, type, resetFirmwareProgress]);
 
@@ -233,6 +275,7 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
               onReset={handleReset}
               isCancelling={isCancelling}
               firmwareProgress={type === 'firmware' ? progressData : undefined}
+              firmwareVersions={type === 'firmware' ? firmwareVersions : undefined}
               currentDevice={currentDevice}
             />
           </div>
