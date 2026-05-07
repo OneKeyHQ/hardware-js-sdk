@@ -489,4 +489,28 @@ describe('Protocol V2 file read method', () => {
       chunks: 2,
     });
   });
+
+  test('decodes protobuf bytes hex string returned by transport', async () => {
+    const call = jest.fn().mockResolvedValue({
+      message: {
+        data: '0102ff',
+      },
+    });
+    const method = new FileRead({
+      id: 1,
+      payload: {
+        method: 'fileRead',
+        path: 'vol0:test.bin',
+        offset: 0,
+        totalSize: 3,
+        chunkLen: 512,
+      },
+    });
+    (method as any).device = { commands: { call } };
+
+    method.init();
+    const result = await method.run();
+
+    expect(result.data).toEqual(new Uint8Array([1, 2, 255]));
+  });
 });
