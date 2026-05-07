@@ -1,6 +1,7 @@
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { BaseMethod } from './BaseMethod';
+import { hexToBytes, isHexString, stripHexPrefix } from './helpers/hexUtils';
 
 export type FileReadParams = {
   path: string;
@@ -44,6 +45,12 @@ function toUint8Array(value: unknown): Uint8Array {
   if (value instanceof ArrayBuffer) return new Uint8Array(value);
   if (ArrayBuffer.isView(value)) {
     return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+  }
+  if (typeof value === 'string') {
+    const hex = stripHexPrefix(value);
+    if (!hex) return new Uint8Array(0);
+    if (!isHexString(hex) || hex.length % 2 !== 0) return new Uint8Array(0);
+    return hexToBytes(hex);
   }
   return new Uint8Array(0);
 }
