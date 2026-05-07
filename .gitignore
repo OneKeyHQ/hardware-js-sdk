@@ -80,3 +80,5 @@ packages/connect-examples/expo-example/web-build
 
 # Expo web export
 **/web-build
+.vercel
+.env*.local
