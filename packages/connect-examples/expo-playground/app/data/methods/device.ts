@@ -27,6 +27,260 @@ const api: UnifiedMethodConfig[] = [
     noDeviceIdReq: true,
     presets: [],
   },
+  {
+    method: 'getProtoVersion',
+    description: 'methodDescriptions.getProtoVersion',
+    noDeviceIdReq: true,
+    presets: [],
+  },
+  {
+    method: 'ping',
+    description: 'methodDescriptions.ping',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'Protocol V2 ping',
+        parameters: [
+          {
+            name: 'message',
+            type: 'string',
+            required: false,
+            label: 'Message',
+            description: 'Message echoed in the Success response',
+            value: 'Hello from WebUSB!',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'devGetDeviceInfo',
+    description: 'methodDescriptions.devGetDeviceInfo',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'All device info',
+        parameters: [
+          {
+            name: 'targetHw',
+            type: 'boolean',
+            required: false,
+            label: 'Hardware',
+            value: true,
+          },
+          {
+            name: 'targetFw',
+            type: 'boolean',
+            required: false,
+            label: 'Firmware',
+            value: true,
+          },
+          {
+            name: 'targetBt',
+            type: 'boolean',
+            required: false,
+            label: 'Bluetooth',
+            value: true,
+          },
+          {
+            name: 'targetSe1',
+            type: 'boolean',
+            required: false,
+            label: 'SE1',
+            value: true,
+          },
+          {
+            name: 'targetSe2',
+            type: 'boolean',
+            required: false,
+            label: 'SE2',
+            value: true,
+          },
+          {
+            name: 'targetSe3',
+            type: 'boolean',
+            required: false,
+            label: 'SE3',
+            value: true,
+          },
+          {
+            name: 'targetSe4',
+            type: 'boolean',
+            required: false,
+            label: 'SE4',
+            value: true,
+          },
+          {
+            name: 'targetStatus',
+            type: 'boolean',
+            required: false,
+            label: 'Status',
+            value: true,
+          },
+          {
+            name: 'includeVersion',
+            type: 'boolean',
+            required: false,
+            label: 'Version',
+            value: true,
+          },
+          {
+            name: 'includeBuildId',
+            type: 'boolean',
+            required: false,
+            label: 'Build ID',
+            value: true,
+          },
+          {
+            name: 'includeHash',
+            type: 'boolean',
+            required: false,
+            label: 'Hash',
+            value: false,
+          },
+          {
+            name: 'includeSpecific',
+            type: 'boolean',
+            required: false,
+            label: 'Specific',
+            value: true,
+          },
+        ],
+      },
+      {
+        title: 'Custom targets and types',
+        parameters: [
+          {
+            name: 'targets',
+            type: 'textarea',
+            required: false,
+            label: 'Targets',
+            description: 'DevInfoTargets JSON',
+            value: {
+              hw: true,
+              fw: true,
+              bt: true,
+              se1: true,
+              se2: true,
+              se3: true,
+              se4: true,
+              status: true,
+            },
+          },
+          {
+            name: 'types',
+            type: 'textarea',
+            required: false,
+            label: 'Types',
+            description: 'DevInfoTypes JSON',
+            value: {
+              version: true,
+              build_id: true,
+              hash: false,
+              specific: true,
+            },
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'devReboot',
+    description: 'methodDescriptions.devReboot',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'Normal reboot',
+        parameters: [
+          {
+            name: 'rebootType',
+            type: 'select',
+            required: true,
+            label: 'Reboot Type',
+            options: [
+              { label: 'Normal', value: '0' },
+              { label: 'Boardloader', value: '1' },
+              { label: 'Bootloader', value: '2' },
+            ],
+            value: '0',
+          },
+        ],
+      },
+      {
+        title: 'Reboot to boardloader',
+        parameters: [
+          {
+            name: 'rebootType',
+            type: 'select',
+            required: true,
+            label: 'Reboot Type',
+            options: [
+              { label: 'Normal', value: '0' },
+              { label: 'Boardloader', value: '1' },
+              { label: 'Bootloader', value: '2' },
+            ],
+            value: '1',
+          },
+        ],
+      },
+      {
+        title: 'Reboot to bootloader',
+        parameters: [
+          {
+            name: 'rebootType',
+            type: 'select',
+            required: true,
+            label: 'Reboot Type',
+            options: [
+              { label: 'Normal', value: '0' },
+              { label: 'Boardloader', value: '1' },
+              { label: 'Bootloader', value: '2' },
+            ],
+            value: '2',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'factoryGetDeviceInfo',
+    description: 'methodDescriptions.factoryGetDeviceInfo',
+    noDeviceIdReq: true,
+    presets: [],
+  },
+  {
+    method: 'factoryDeviceInfoSettings',
+    description: 'methodDescriptions.factoryDeviceInfoSettings',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'Set factory device info',
+        parameters: [
+          {
+            name: 'serial_no',
+            type: 'string',
+            required: false,
+            label: 'Serial No',
+            value: '',
+          },
+          {
+            name: 'cpu_info',
+            type: 'string',
+            required: false,
+            label: 'CPU Info',
+            value: '',
+          },
+          {
+            name: 'pre_firmware',
+            type: 'string',
+            required: false,
+            label: 'Pre Firmware',
+            value: '',
+          },
+        ],
+      },
+    ],
+  },
 
   // === 设备管理 ===
   {

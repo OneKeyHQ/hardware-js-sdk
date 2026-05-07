@@ -5,7 +5,6 @@ import transport, {
   PROTOCOL_V2_FRAME_MAX_BYTES,
   ProtocolV2FrameAssembler,
   ProtocolV2Session,
-  probeProtocolV2,
 } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode, ONEKEY_WEBUSB_FILTER, wait } from '@onekeyfe/hd-shared';
 import ByteBuffer from 'bytebuffer';
@@ -26,9 +25,7 @@ const PACKET_SIZE = 64;
 const HEADER_LENGTH = 6;
 const PACKET_IO_MAX_RETRIES = 3;
 const PACKET_IO_RETRY_DELAY = 300;
-const PROTOCOL_PROBE_TIMEOUT = 1500;
-const PROTOCOL_V2_PRODUCT_NAME_RE = /\bpro\s*2\b|pro2/i;
-const LEGACY_PROTOCOL_PRODUCT_NAME_RE = /\bonekey\s+(classic|mini|pro|touch)\b/i;
+const PROTOCOL_PROBE_TIMEOUT = 1000;
 
 /**
  * Device information with path and WebUSB device instance
@@ -45,17 +42,18 @@ interface DeviceEndpoints {
   endpointOut: number;
 }
 
+interface TransferCancelToken {
+  cancelled: boolean;
+}
+
 export default class WebUsbTransport {
   messages: ReturnType<typeof transport.parseConfigure> | undefined;
 
   /** Protobuf schema for Protocol V2 transports. */
   messagesV2: ReturnType<typeof transport.parseConfigure> | undefined;
 
-  /** Per-path protocol type detected by descriptor heuristic or active wire-level probe. */
+  /** Per-path protocol type detected by active wire-level probe. */
   private deviceProtocol: Map<string, ProtocolType> = new Map();
-
-  /** Marks whether a cached protocol came from a USB descriptor heuristic or active probe. */
-  private deviceProtocolSource: Map<string, 'heuristic' | 'probe'> = new Map();
 
   /** Per-path USB endpoint / interface numbers (discovered from USB descriptors) */
   private deviceEndpoints: Map<string, DeviceEndpoints> = new Map();
@@ -183,7 +181,7 @@ export default class WebUsbTransport {
     if (!input.path) return;
     try {
       await this.connect(input.path ?? '', true);
-      await this.detectProtocol(input.path);
+      await this.detectProtocol(input.path, input.expectedProtocol);
       return await Promise.resolve(input.path);
     } catch (e) {
       this.Log.debug('acquire error: ', e instanceof Error ? `${e.name}: ${e.message}` : String(e));
@@ -193,49 +191,45 @@ export default class WebUsbTransport {
 
   /**
    * Determine protocol type after connect.
-   * Known legacy descriptors can skip probing; otherwise Protocol V2 must answer
-   * GetProtoVersion or bootloader status before we select the V2 path.
+   * Probe Protocol V1 first with Initialize. If it does not answer in time,
+   * fall back to a Protocol V2 Ping probe.
    */
-  private async detectProtocol(path: string): Promise<ProtocolType> {
-    const cachedProtocol = this.deviceProtocol.get(path);
-    if (cachedProtocol) {
-      this.Log.debug(
-        `[WebUsbTransport] detectProtocol: path=${path} -> ${cachedProtocol} (cached)`
-      );
-      return cachedProtocol;
-    }
-
-    const heuristicProtocol = this.detectProtocolFromUsbDescriptor(path);
-    if (heuristicProtocol) {
-      this.deviceProtocol.set(path, heuristicProtocol);
-      this.deviceProtocolSource.set(path, 'heuristic');
-      this.Log.debug(
-        `[WebUsbTransport] detectProtocol: path=${path} -> ${heuristicProtocol} (descriptor)`
-      );
-      return heuristicProtocol;
-    }
-
-    const protocol: ProtocolType = (await this.probeProtocolV2(path)) ? 'V2' : 'V1';
-    this.deviceProtocol.set(path, protocol);
-    this.deviceProtocolSource.set(path, 'probe');
-    this.Log.debug(`[WebUsbTransport] detectProtocol: path=${path} -> ${protocol}`);
-    return protocol;
+  private createProtocolMismatchError(expected: ProtocolType) {
+    return ERRORS.TypedError(
+      HardwareErrorCode.RuntimeError,
+      `Device protocol mismatch: expected ${expected}, but device did not respond to expected protocol`
+    );
   }
 
-  private detectProtocolFromUsbDescriptor(path: string): ProtocolType | undefined {
-    const deviceInfo = this.deviceList.find(d => d.path === path);
-    const productName = deviceInfo?.device.productName?.trim();
-    if (!productName) return undefined;
-
-    if (PROTOCOL_V2_PRODUCT_NAME_RE.test(productName)) {
-      return undefined;
+  private async detectProtocol(
+    path: string,
+    expectedProtocol?: ProtocolType
+  ): Promise<ProtocolType> {
+    if (expectedProtocol === 'V1') {
+      if (await this.probeProtocolV1(path)) {
+        this.deviceProtocol.set(path, 'V1');
+        this.Log.debug(`[WebUsbTransport] detectProtocol: path=${path} -> V1 (expected)`);
+        return 'V1';
+      }
+      throw this.createProtocolMismatchError(expectedProtocol);
     }
 
-    if (LEGACY_PROTOCOL_PRODUCT_NAME_RE.test(productName)) {
-      return 'V1';
+    if (expectedProtocol === 'V2') {
+      if (await this.probeProtocolV2ByPing(path)) {
+        this.deviceProtocol.set(path, 'V2');
+        this.Log.debug(`[WebUsbTransport] detectProtocol: path=${path} -> V2 (expected)`);
+        return 'V2';
+      }
+      throw this.createProtocolMismatchError(expectedProtocol);
     }
 
-    return undefined;
+    let protocol: ProtocolType = 'V1';
+    if (!(await this.probeProtocolV1(path)) && (await this.probeProtocolV2ByPing(path))) {
+      protocol = 'V2';
+    }
+    this.deviceProtocol.set(path, protocol);
+    this.Log.debug(`[WebUsbTransport] detectProtocol: path=${path} -> ${protocol}`);
+    return protocol;
   }
 
   /**
@@ -327,7 +321,11 @@ export default class WebUsbTransport {
 
     await device.open();
 
-    if (first) {
+    if (
+      first ||
+      !device.configuration ||
+      device.configuration.configurationValue !== this.configurationId
+    ) {
       await device.selectConfiguration(this.configurationId);
     }
 
@@ -453,9 +451,16 @@ export default class WebUsbTransport {
     throw lastError;
   }
 
-  private async transferInWithRetry(path: string, length: number): Promise<DataView> {
+  private async transferInWithRetry(
+    path: string,
+    length: number,
+    cancelToken?: TransferCancelToken
+  ): Promise<DataView> {
     let lastError: unknown;
     for (let attempt = 1; attempt <= PACKET_IO_MAX_RETRIES; attempt += 1) {
+      if (cancelToken?.cancelled) {
+        throw new Error('transferIn cancelled');
+      }
       try {
         const device = await this.findDevice(path);
         if (!device.opened) {
@@ -467,6 +472,9 @@ export default class WebUsbTransport {
         return this.getTransferInData(result);
       } catch (error) {
         lastError = error;
+        if (cancelToken?.cancelled) {
+          throw error;
+        }
         const shouldRetry = attempt < PACKET_IO_MAX_RETRIES && this.isRetryablePacketIoError(error);
         if (!shouldRetry) {
           throw error;
@@ -507,21 +515,42 @@ export default class WebUsbTransport {
     await this.connect(path, false);
   }
 
-  private async withProtocolV2ReadTimeout<T>(
+  private async withProtocolReadTimeout<T>(
     path: string,
     promise: Promise<T>,
-    timeoutMs: number
+    timeoutMs: number,
+    protocol: ProtocolType,
+    onTimeout?: () => void
   ): Promise<T> {
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let timedOut = false;
+    const waitForeverAfterTimeout = () => new Promise<never>(() => {});
+    const guardedPromise = promise.then(
+      value => (timedOut ? waitForeverAfterTimeout() : value),
+      error => {
+        if (timedOut) {
+          return waitForeverAfterTimeout();
+        }
+        throw error;
+      }
+    );
     try {
       return await Promise.race([
-        promise,
+        guardedPromise,
         new Promise<never>((_, reject) => {
-          timer = setTimeout(() => {
-            this.resetConnectionAfterProbe(path).catch(error => {
-              this.Log.debug('[WebUsbTransport] reset after Protocol V2 timeout failed:', error);
-            });
-            reject(new Error(`Protocol V2 read timeout after ${timeoutMs}ms`));
+          timer = setTimeout(async () => {
+            timedOut = true;
+            onTimeout?.();
+            try {
+              await this.resetConnectionAfterProbe(path);
+            } catch (error) {
+              this.Log.debug(
+                `[WebUsbTransport] reset after Protocol ${protocol} timeout failed:`,
+                error
+              );
+            } finally {
+              reject(new Error(`Protocol ${protocol} read timeout after ${timeoutMs}ms`));
+            }
           }, timeoutMs);
         }),
       ]);
@@ -530,19 +559,38 @@ export default class WebUsbTransport {
     }
   }
 
-  private async probeProtocolV2(path: string) {
+  private async probeProtocolV1(path: string) {
+    if (!this.messages) {
+      return false;
+    }
+
+    try {
+      await this.callProtocolV1(path, 'Initialize', {}, { timeoutMs: PROTOCOL_PROBE_TIMEOUT });
+      return true;
+    } catch (error) {
+      this.Log.debug('[WebUsbTransport] Protocol V1 Initialize probe failed:', error);
+      return false;
+    }
+  }
+
+  private async probeProtocolV2ByPing(path: string) {
     if (!this.messages || !this.messagesV2) {
       return false;
     }
 
-    return probeProtocolV2({
-      call: (name: string, data: Record<string, unknown>, options?: { timeoutMs?: number }) =>
-        this.callProtocolV2(path, name, data, options),
-      timeoutMs: PROTOCOL_PROBE_TIMEOUT,
-      logger: this.Log,
-      logPrefix: 'WebUsbTransport',
-      onProbeFailed: async () => this.resetConnectionAfterProbe(path),
-    });
+    try {
+      await this.callProtocolV2(
+        path,
+        'Ping',
+        { message: 'probe' },
+        { timeoutMs: PROTOCOL_PROBE_TIMEOUT }
+      );
+      return true;
+    } catch (error) {
+      this.Log.debug('[WebUsbTransport] Protocol V2 Ping probe failed:', error);
+      await this.resetConnectionAfterProbe(path);
+      return false;
+    }
   }
 
   /**
@@ -575,8 +623,20 @@ export default class WebUsbTransport {
       return this.callProtocolV2(path, name, data, options);
     }
 
-    // --- Protocol V1 path (64-byte chunked 0x3F framing) ---
+    return this.callProtocolV1(path, name, data, options);
+  }
+
+  private async callProtocolV1(
+    path: string,
+    name: string,
+    data: Record<string, unknown>,
+    options?: TransportCallOptions
+  ) {
     const { messages } = this;
+    if (!messages) {
+      throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
+    }
+
     const encodeBuffers = ProtocolV1.encode(messages, name, data);
 
     for (const buffer of encodeBuffers) {
@@ -586,7 +646,7 @@ export default class WebUsbTransport {
       await this.transferOutWithRetry(path, newArray);
     }
 
-    const resData = await this.receiveData(path);
+    const resData = await this.receiveData(path, options?.timeoutMs);
     if (typeof resData !== 'string') {
       throw ERRORS.TypedError(HardwareErrorCode.NetworkError, 'Returning data is not string.');
     }
@@ -640,9 +700,18 @@ export default class WebUsbTransport {
     const deadline = timeoutMs ? Date.now() + timeoutMs : undefined;
 
     while (!frame) {
-      const transferIn = this.transferInWithRetry(path, PROTOCOL_V2_FRAME_MAX_BYTES);
+      const cancelToken = { cancelled: false };
+      const transferIn = this.transferInWithRetry(path, PROTOCOL_V2_FRAME_MAX_BYTES, cancelToken);
       const dataView = deadline
-        ? await this.withProtocolV2ReadTimeout(path, transferIn, Math.max(deadline - Date.now(), 1))
+        ? await this.withProtocolReadTimeout(
+            path,
+            transferIn,
+            Math.max(deadline - Date.now(), 1),
+            'V2',
+            () => {
+              cancelToken.cancelled = true;
+            }
+          )
         : await transferIn;
       const bytes = new Uint8Array(
         this.toArrayBuffer(
@@ -664,8 +733,25 @@ export default class WebUsbTransport {
   /**
    * Receive data from device
    */
-  async receiveData(path: string) {
-    const firstPacketData = await this.transferInWithRetry(path, PACKET_SIZE);
+  async receiveData(path: string, timeoutMs?: number) {
+    const deadline = timeoutMs ? Date.now() + timeoutMs : undefined;
+    const readPacket = async () => {
+      const cancelToken = { cancelled: false };
+      const transferIn = this.transferInWithRetry(path, PACKET_SIZE, cancelToken);
+      return deadline
+        ? this.withProtocolReadTimeout(
+            path,
+            transferIn,
+            Math.max(deadline - Date.now(), 1),
+            'V1',
+            () => {
+              cancelToken.cancelled = true;
+            }
+          )
+        : transferIn;
+    };
+
+    const firstPacketData = await readPacket();
     const firstData = this.toArrayBuffer(firstPacketData.buffer.slice(1));
     const { length, typeId, restBuffer } = decodeProtocol.decodeChunked(firstData);
 
@@ -679,7 +765,7 @@ export default class WebUsbTransport {
     }
 
     while (decoded.offset < lengthWithHeader) {
-      const packetData = await this.transferInWithRetry(path, PACKET_SIZE);
+      const packetData = await readPacket();
       const buffer = this.toArrayBuffer(packetData.buffer.slice(1));
       if (lengthWithHeader - decoded.offset >= PACKET_SIZE) {
         decoded.append(buffer);
@@ -701,13 +787,7 @@ export default class WebUsbTransport {
     const ifaceNum = endpoints?.interfaceNumber ?? this.interfaceId;
     await device.releaseInterface(ifaceNum);
     await device.close();
-    if (
-      this.deviceProtocol.get(path) !== 'V2' &&
-      this.deviceProtocolSource.get(path) !== 'heuristic'
-    ) {
-      this.deviceProtocol.delete(path);
-      this.deviceProtocolSource.delete(path);
-    }
+    this.deviceProtocol.delete(path);
     this.deviceEndpoints.delete(path);
   }
 

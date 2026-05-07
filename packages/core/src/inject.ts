@@ -150,6 +150,19 @@ export const createCoreApi = (
   deviceRebootToBootloader: connectId => call({ connectId, method: 'deviceRebootToBootloader' }),
 
   // File system & device control API (Protocol V2 only)
+  getProtoVersion: connectId => call({ connectId, method: 'getProtoVersion' }),
+  ping: (connectId, params) => call({ ...params, connectId, method: 'ping' }),
+  devReboot: (connectId, params) => call({ ...params, connectId, method: 'devReboot' }),
+  devGetDeviceInfo: (connectId, params) =>
+    call({ ...params, connectId, method: 'devGetDeviceInfo' }),
+  devFirmwareUpdate: (connectId, params) =>
+    call({ ...params, connectId, method: 'devFirmwareUpdate' }),
+  devGetFirmwareUpdateStatus: connectId =>
+    call({ connectId, method: 'devGetFirmwareUpdateStatus' }),
+  factoryDeviceInfoSettings: (connectId, params) =>
+    call({ ...params, connectId, method: 'factoryDeviceInfoSettings' }),
+  factoryGetDeviceInfo: connectId => call({ connectId, method: 'factoryGetDeviceInfo' }),
+  filesystemFixPermission: connectId => call({ connectId, method: 'filesystemFixPermission' }),
   fileRead: (connectId, params) => call({ ...params, connectId, method: 'fileRead' }),
   fileWrite: (connectId, params) => call({ ...params, connectId, method: 'fileWrite' }),
   fileDelete: (connectId, params) => call({ ...params, connectId, method: 'fileDelete' }),
@@ -157,6 +170,21 @@ export const createCoreApi = (
   dirMake: (connectId, params) => call({ ...params, connectId, method: 'dirMake' }),
   dirRemove: (connectId, params) => call({ ...params, connectId, method: 'dirRemove' }),
   pathInfo: (connectId, params) => call({ ...params, connectId, method: 'pathInfo' }),
+  filesystemFileRead: (connectId, params) =>
+    call({ ...params, connectId, method: 'filesystemFileRead' }),
+  filesystemFileWrite: (connectId, params) =>
+    call({ ...params, connectId, method: 'filesystemFileWrite' }),
+  filesystemFileDelete: (connectId, params) =>
+    call({ ...params, connectId, method: 'filesystemFileDelete' }),
+  filesystemDirList: (connectId, params) =>
+    call({ ...params, connectId, method: 'filesystemDirList' }),
+  filesystemDirMake: (connectId, params) =>
+    call({ ...params, connectId, method: 'filesystemDirMake' }),
+  filesystemDirRemove: (connectId, params) =>
+    call({ ...params, connectId, method: 'filesystemDirRemove' }),
+  filesystemPathInfoQuery: (connectId, params) =>
+    call({ ...params, connectId, method: 'filesystemPathInfoQuery' }),
+  filesystemFormat: connectId => call({ connectId, method: 'filesystemFormat' }),
   deviceRecovery: (connectId, params) => call({ ...params, connectId, method: 'deviceRecovery' }),
   deviceReset: (connectId, params) => call({ ...params, connectId, method: 'deviceReset' }),
   deviceSettings: (connectId, params) => call({ ...params, connectId, method: 'deviceSettings' }),

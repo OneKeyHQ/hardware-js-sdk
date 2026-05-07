@@ -24,12 +24,42 @@ interface FirmwareVersionInfo {
 const FIRMWARE_UPDATE_METHODS = new Set([
   'firmwareUpdateV2',
   'firmwareUpdateV3',
+  'devFirmwareUpdate',
   'deviceUpdateBootloader',
 ]);
+
+const PROTOCOL_V2_PATH_METHODS = new Set([
+  'devFirmwareUpdate',
+  'pathInfo',
+  'dirList',
+  'dirMake',
+  'dirRemove',
+  'fileRead',
+  'fileWrite',
+  'fileDelete',
+  'filesystemPathInfoQuery',
+  'filesystemDirList',
+  'filesystemDirMake',
+  'filesystemDirRemove',
+  'filesystemFileRead',
+  'filesystemFileWrite',
+  'filesystemFileDelete',
+]);
+
+function normalizeProtocolV2Path(path: string): string {
+  const value = path.trim();
+  if (!value || value === '/') return 'vol0:';
+  if (value.startsWith('/')) return `vol0:${value.slice(1)}`;
+  return value;
+}
 
 function getProtocolV2FileWriteDataSize(data: unknown): number | undefined {
   if (data instanceof ArrayBuffer) return data.byteLength;
   if (ArrayBuffer.isView(data)) return data.byteLength;
+  if (data && typeof data === 'object' && 'size' in data) {
+    const size = Number((data as { size?: unknown }).size);
+    return Number.isFinite(size) ? size : undefined;
+  }
   if (typeof data === 'string') return new TextEncoder().encode(data).byteLength;
   return undefined;
 }
@@ -38,16 +68,36 @@ function normalizeProtocolV2FileParams(
   method: string,
   params: Record<string, unknown>
 ): Record<string, unknown> {
-  if (method !== 'fileWrite') return params;
+  let normalizedParams = params;
 
-  const dataSize = getProtocolV2FileWriteDataSize(params.data);
-  if (!dataSize) return params;
+  if (PROTOCOL_V2_PATH_METHODS.has(method)) {
+    normalizedParams = { ...normalizedParams };
+    if (typeof normalizedParams.path === 'string') {
+      normalizedParams.path = normalizeProtocolV2Path(normalizedParams.path);
+    }
 
-  const totalSize = Number(params.totalSize);
-  if (Number.isFinite(totalSize) && totalSize > 0) return params;
+    if (Array.isArray(normalizedParams.targets)) {
+      normalizedParams.targets = normalizedParams.targets.map(target => {
+        if (!target || typeof target !== 'object') return target;
+        const item = target as Record<string, unknown>;
+        return {
+          ...item,
+          ...(typeof item.path === 'string' ? { path: normalizeProtocolV2Path(item.path) } : {}),
+        };
+      });
+    }
+  }
+
+  if (method !== 'fileWrite' && method !== 'filesystemFileWrite') return normalizedParams;
+
+  const dataSize = getProtocolV2FileWriteDataSize(normalizedParams.data);
+  if (!dataSize) return normalizedParams;
+
+  const totalSize = Number(normalizedParams.totalSize);
+  if (Number.isFinite(totalSize) && totalSize > 0) return normalizedParams;
 
   return {
-    ...params,
+    ...normalizedParams,
     totalSize: dataSize,
   };
 }

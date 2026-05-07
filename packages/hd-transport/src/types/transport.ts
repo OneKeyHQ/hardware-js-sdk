@@ -42,6 +42,7 @@ export type AcquireInput = {
   previous?: string | null;
   uuid?: string;
   forceCleanRunPromise?: boolean;
+  expectedProtocol?: ProtocolType;
 };
 
 export type MessageFromOneKey = { type: string; message: Record<string, any> };

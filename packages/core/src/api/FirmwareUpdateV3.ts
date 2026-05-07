@@ -286,7 +286,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
   /**
    * Protocol V2 file-write + DevFirmwareUpdate trigger.
    *
-   * Filesystem layout follows the Protocol V2 debug script's `vol1:` convention.
+   * Filesystem layout follows the Protocol V2 debug script's `vol0:` convention.
    * If the Protocol V2 firmware later anchors firmware payloads elsewhere, update
    * the path constants below.
    */
@@ -311,9 +311,9 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     const targets: Array<{ target_id: number; path: string }> = [];
 
     if (resourceBinary) {
-      // Resource files live under `vol1:res/`. FilesystemDirMake first so
+      // Resource files live under `vol0:res/`. FilesystemDirMake first so
       // FilesystemFileWrite doesn't fail on a missing parent directory.
-      const resourcePath = `vol1:res/`;
+      const resourcePath = `vol0:res/`;
       await this.protocolV2CreateFolder(resourcePath);
       const file = await JSZip.loadAsync(resourceBinary);
       const files = Object.entries(file.files);
@@ -336,7 +336,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     }
 
     if (bootloaderBinary) {
-      const bootloaderPath = `vol1:bootloader.bin`;
+      const bootloaderPath = `vol0:bootloader.bin`;
       processedSize = await this.protocolV2CommonUpdateProcess({
         payload: bootloaderBinary,
         filePath: bootloaderPath,
@@ -350,7 +350,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     }
 
     for (const fwbinary of fwBinaryMap) {
-      const firmwarePath = `vol1:${fwbinary.fileName}`;
+      const firmwarePath = `vol0:${fwbinary.fileName}`;
       processedSize = await this.protocolV2CommonUpdateProcess({
         payload: fwbinary.binary,
         filePath: firmwarePath,

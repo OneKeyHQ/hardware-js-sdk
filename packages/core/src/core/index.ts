@@ -102,6 +102,7 @@ const parseInitOptions = (method?: BaseMethod): InitOptions => ({
   passphraseState: method?.payload.passphraseState,
   deviceId: method?.payload.deviceId,
   deriveCardano: method && hasDeriveCardano(method),
+  connectProtocol: method?.payload.connectProtocol,
 });
 
 let _core: Core;
@@ -819,7 +820,7 @@ function canSkipInitialize(method: BaseMethod, device: Device): boolean {
  */
 async function connectDeviceForBle(method: BaseMethod, device: Device, retryCount = 0) {
   try {
-    await device.acquire();
+    await device.acquire(method.payload.connectProtocol);
     if (method.payload?.onlyConnectBleDevice) {
       return;
     }

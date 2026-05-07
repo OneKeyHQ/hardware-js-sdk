@@ -51,6 +51,20 @@ export function bytesToHex(bytes: Uint8Array): string {
     .join('');
 }
 
+const PROTOCOL_V2_DEBUG_HEX_LIMIT = 256;
+
+function bytesToDebugHex(bytes: Uint8Array): string {
+  const visibleBytes =
+    bytes.length > PROTOCOL_V2_DEBUG_HEX_LIMIT
+      ? bytes.slice(0, PROTOCOL_V2_DEBUG_HEX_LIMIT)
+      : bytes;
+  const suffix =
+    bytes.length > PROTOCOL_V2_DEBUG_HEX_LIMIT
+      ? `...(+${bytes.length - PROTOCOL_V2_DEBUG_HEX_LIMIT}B)`
+      : '';
+  return `${bytesToHex(visibleBytes)}${suffix}`;
+}
+
 export function getErrorMessage(error: unknown) {
   if (!error) return '';
   if (typeof error === 'string') return error;
@@ -111,6 +125,12 @@ export class ProtocolV2Session {
       });
       const expectedSeq = frame[6];
 
+      logger?.debug?.(
+        `[${logPrefix}] TX frame name=${name} len=${frame.length} router=${frame[4]} attr=${
+          frame[5]
+        } seq=${expectedSeq} hex=${bytesToDebugHex(frame)}`
+      );
+
       await writeFrame(frame);
 
       // Some Protocol V2 operations emit progress notifications before the
@@ -119,6 +139,11 @@ export class ProtocolV2Session {
       // eslint-disable-next-line no-constant-condition
       while (true) {
         const rxFrame = await readFrame();
+        logger?.debug?.(
+          `[${logPrefix}] RX frame len=${rxFrame.length} router=${rxFrame[4]} attr=${
+            rxFrame[5]
+          } seq=${rxFrame[6]} hex=${bytesToDebugHex(rxFrame)}`
+        );
         const decoded = ProtocolV2.decode(schemas, rxFrame);
         if (decoded.seq !== expectedSeq) {
           logger?.debug?.(

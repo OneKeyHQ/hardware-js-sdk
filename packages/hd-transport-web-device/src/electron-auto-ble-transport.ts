@@ -6,7 +6,6 @@ import transport, {
   ProtocolV2Session,
   bytesToHex,
   hexToBytes,
-  probeProtocolV2,
 } from '@onekeyfe/hd-transport';
 import {
   ERRORS,
@@ -33,6 +32,7 @@ declare global {
 export type BleAcquireInput = {
   uuid: string;
   forceCleanRunPromise?: boolean;
+  expectedProtocol?: ProtocolType;
 };
 
 interface PacketProcessResult {
@@ -59,13 +59,13 @@ const BLE_WRITE_DELAY_MS = 5;
 const BLE_WRITE_MAX_RETRIES = 3;
 const BLE_WRITE_RETRY_DELAY_MS = 300;
 const BLE_RESPONSE_TIMEOUT_MS = 30_000;
-const PROTOCOL_PROBE_TIMEOUT_MS = 1500;
+const PROTOCOL_PROBE_TIMEOUT_MS = 1000;
 
 /**
  * Desktop Electron BLE transport with automatic Protocol V1/V2 detection.
  *
  * Protocol V1 devices continue using chunked packets. Protocol V2 is detected
- * after connect by probing GetProtoVersion, then uses 0x5A frames for later calls.
+ * after a Protocol V1 Initialize timeout by probing Protocol V2 Ping.
  */
 export default class ElectronAutoBleTransport {
   private _messages: ReturnType<typeof transport.parseConfigure> | undefined;
@@ -194,7 +194,7 @@ export default class ElectronAutoBleTransport {
   }
 
   async acquire(input: BleAcquireInput) {
-    const { uuid, forceCleanRunPromise } = input;
+    const { uuid, forceCleanRunPromise, expectedProtocol } = input;
 
     if (!uuid) {
       throw ERRORS.TypedError(HardwareErrorCode.BleRequiredUUID);
@@ -251,7 +251,7 @@ export default class ElectronAutoBleTransport {
       );
       this.disconnectCleanups.set(uuid, disconnectCleanup);
 
-      const protocolType = await this.detectProtocol(uuid);
+      const protocolType = await this.detectProtocol(uuid, expectedProtocol);
 
       this.emitter?.emit('device-connect', {
         name: device.name,
@@ -293,32 +293,80 @@ export default class ElectronAutoBleTransport {
     }
   }
 
-  private async detectProtocol(uuid: string): Promise<ProtocolType> {
-    const protocol: ProtocolType = (await this.probeProtocolV2(uuid)) ? 'V2' : 'V1';
+  private createProtocolMismatchError(expected: ProtocolType) {
+    return ERRORS.TypedError(
+      HardwareErrorCode.RuntimeError,
+      `Device protocol mismatch: expected ${expected}, but device did not respond to expected protocol`
+    );
+  }
+
+  private async detectProtocol(
+    uuid: string,
+    expectedProtocol?: ProtocolType
+  ): Promise<ProtocolType> {
+    if (expectedProtocol === 'V1') {
+      if (await this.probeProtocolV1(uuid)) {
+        this.deviceProtocol.set(uuid, 'V1');
+        this.Log?.debug(`[Auto BLE] detectProtocol: uuid=${uuid} -> V1 (expected)`);
+        return 'V1';
+      }
+      throw this.createProtocolMismatchError(expectedProtocol);
+    }
+
+    if (expectedProtocol === 'V2') {
+      if (await this.probeProtocolV2ByPing(uuid)) {
+        this.deviceProtocol.set(uuid, 'V2');
+        this.Log?.debug(`[Auto BLE] detectProtocol: uuid=${uuid} -> V2 (expected)`);
+        return 'V2';
+      }
+      throw this.createProtocolMismatchError(expectedProtocol);
+    }
+
+    let protocol: ProtocolType = 'V1';
+    if (!(await this.probeProtocolV1(uuid)) && (await this.probeProtocolV2ByPing(uuid))) {
+      protocol = 'V2';
+    }
     this.deviceProtocol.set(uuid, protocol);
     this.Log?.debug(`[Auto BLE] detectProtocol: uuid=${uuid} -> ${protocol}`);
     return protocol;
   }
 
-  private async probeProtocolV2(uuid: string) {
+  private async probeProtocolV1(uuid: string) {
+    if (!this._messages) {
+      return false;
+    }
+
+    try {
+      this.deviceProtocol.set(uuid, 'V1');
+      await this.callProtocolV1(uuid, 'Initialize', {}, { timeoutMs: PROTOCOL_PROBE_TIMEOUT_MS });
+      return true;
+    } catch (error) {
+      this.Log?.debug('[Auto BLE] Protocol V1 Initialize probe failed:', error);
+      return false;
+    }
+  }
+
+  private async probeProtocolV2ByPing(uuid: string) {
     if (!this._messages || !this._messagesV2) {
       return false;
     }
 
-    return probeProtocolV2({
-      call: (name: string, data: Record<string, unknown>, options?: { timeoutMs?: number }) =>
-        this.callProtocolV2(uuid, name, data, options),
-      timeoutMs: PROTOCOL_PROBE_TIMEOUT_MS,
-      logger: this.Log,
-      logPrefix: 'Auto BLE',
-      onBeforeProbe: () => {
-        this.deviceProtocol.set(uuid, 'V2');
-        this.v2Assemblers.get(uuid)?.reset();
-      },
-      onProbeFailed: () => {
-        this.v2Assemblers.get(uuid)?.reset();
-      },
-    });
+    try {
+      this.deviceProtocol.set(uuid, 'V2');
+      this.v2Assemblers.get(uuid)?.reset();
+      await this.callProtocolV2(
+        uuid,
+        'Ping',
+        { message: 'probe' },
+        { timeoutMs: PROTOCOL_PROBE_TIMEOUT_MS }
+      );
+      return true;
+    } catch (error) {
+      this.v2Assemblers.get(uuid)?.reset();
+      this.resetProtocolV2Frames();
+      this.Log?.debug('[Auto BLE] Protocol V2 Ping probe failed:', error);
+      return false;
+    }
   }
 
   private async writeWithChunking(uuid: string, hexData: string): Promise<void> {
@@ -498,10 +546,15 @@ export default class ElectronAutoBleTransport {
     if (protocol === 'V2') {
       return this.callProtocolV2(uuid, name, data, options);
     }
-    return this.callProtocolV1(uuid, name, data);
+    return this.callProtocolV1(uuid, name, data, options);
   }
 
-  private async callProtocolV1(uuid: string, name: string, data: Record<string, unknown>) {
+  private async callProtocolV1(
+    uuid: string,
+    name: string,
+    data: Record<string, unknown>,
+    options?: TransportCallOptions
+  ) {
     if (!this._messages) {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
     }
@@ -511,9 +564,12 @@ export default class ElectronAutoBleTransport {
       throw ERRORS.TypedError(HardwareErrorCode.TransportCallInProgress);
     }
 
-    this.runPromise = createDeferred();
+    const runPromise = createDeferred<Uint8Array | string>();
+    runPromise.promise.catch(() => undefined);
+    this.runPromise = runPromise;
     const messages = this._messages;
     const buffers = buildBuffers(messages, name, data);
+    let timeout: ReturnType<typeof setTimeout> | undefined;
 
     try {
       if (!window.desktopApi?.nobleBle) {
@@ -532,7 +588,21 @@ export default class ElectronAutoBleTransport {
         await window.desktopApi.nobleBle.write(uuid, hexString);
       }
 
-      const response = await this.runPromise.promise;
+      const response = await Promise.race([
+        runPromise.promise,
+        new Promise<never>((_, reject) => {
+          if (options?.timeoutMs) {
+            timeout = setTimeout(() => {
+              const error = ERRORS.TypedError(
+                HardwareErrorCode.BleTimeoutError,
+                `BLE response timeout after ${options.timeoutMs}ms for ${name}`
+              );
+              runPromise.reject(error);
+              reject(error);
+            }, options.timeoutMs);
+          }
+        }),
+      ]);
       if (typeof response !== 'string') {
         throw new Error('Returning data is not string.');
       }
@@ -543,7 +613,10 @@ export default class ElectronAutoBleTransport {
       this.Log?.error('[Auto BLE] Protocol V1 call error:', e);
       throw e;
     } finally {
-      this.runPromise = null;
+      if (timeout) clearTimeout(timeout);
+      if (this.runPromise === runPromise) {
+        this.runPromise = null;
+      }
     }
   }
 

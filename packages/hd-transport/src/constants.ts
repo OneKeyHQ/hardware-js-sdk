@@ -27,5 +27,5 @@ export const PROTOCOL_V2_CHANNEL_USB = 0;
 export const PROTOCOL_V2_CHANNEL_BLE_UART = 1;
 export const PROTOCOL_V2_CHANNEL_SOCKET = 2;
 
-/** Protocol V2 packet_src for protobuf command/response traffic */
-export const PROTOCOL_V2_PACKET_SRC_COMMAND = 1;
+/** Protocol V2 packet_src for protobuf message traffic. Firmware routes 0 to the protobuf dispatcher. */
+export const PROTOCOL_V2_PACKET_SRC_COMMAND = 0;

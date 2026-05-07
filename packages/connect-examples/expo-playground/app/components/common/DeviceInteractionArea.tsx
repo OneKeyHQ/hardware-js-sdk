@@ -48,6 +48,8 @@ interface DeviceInteractionAreaProps {
   firmwareVersions?: FirmwareVersionInfo | null;
   // 添加当前设备信息
   currentDevice?: DeviceInfo | null;
+  title?: string | null;
+  compact?: boolean;
 }
 
 const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
@@ -61,8 +63,12 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
   firmwareProgress,
   firmwareVersions,
   currentDevice,
+  title,
+  compact = false,
 }) => {
   const { t } = useTranslation();
+  const panelTitle =
+    title === undefined ? t('components.methodExecutor.expectedUserExperience') : title;
 
   // 获取状态配置
   const getStatusConfig = () => {
@@ -160,15 +166,23 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
 
   return (
     <Card className="bg-card border border-border/50 shadow-sm h-full flex flex-col">
-      <CardHeader className="pb-1 flex-shrink-0">
-        <CardTitle className="text-sm text-foreground flex items-center justify-between">
-          {t('components.methodExecutor.expectedUserExperience')}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="flex-1 flex flex-col min-h-0">
+      {panelTitle && (
+        <CardHeader className="pb-1 flex-shrink-0">
+          <CardTitle className="text-sm text-foreground flex items-center justify-between">
+            {panelTitle}
+          </CardTitle>
+        </CardHeader>
+      )}
+      <CardContent className={`flex-1 flex flex-col min-h-0 ${compact ? 'p-4' : ''}`}>
         <div className="flex flex-col items-center justify-center h-full">
           {/* 设备展示区域 - 占用更多空间 */}
-          <div className="flex-1 w-full flex items-center justify-center min-h-0 mb-6">
+          <div
+            className={
+              compact
+                ? 'flex-1 w-full flex items-center justify-center min-h-[96px] mb-3'
+                : 'flex-1 w-full flex items-center justify-center min-h-0 mb-6'
+            }
+          >
             {status === 'success' ? (
               <div className="w-full h-full flex items-center justify-center">
                 <DeviceActionAnimation
@@ -190,7 +204,7 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
                 />
               </div>
             ) : deviceAction ? (
-              <div className="w-100 h-100">
+              <div className={compact ? 'w-28 h-28' : 'w-100 h-100'}>
                 <DeviceActionAnimation
                   action={deviceAction.actionType}
                   deviceModel={deviceModel}
@@ -202,10 +216,14 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center">
                 {/* 设备图片或默认图标 */}
-                <div className="relative mb-8">
+                <div className={`relative ${compact ? 'mb-2' : 'mb-8'}`}>
                   {currentDevice ? (
                     /* 显示真实设备图片 */
-                    <div className="w-32 h-48 flex items-center justify-center">
+                    <div
+                      className={`${
+                        compact ? 'w-16 h-24' : 'w-32 h-48'
+                      } flex items-center justify-center`}
+                    >
                       <img
                         src={getDeviceImagePath(currentDevice.deviceType)}
                         alt={`OneKey ${currentDevice.deviceType || 'Device'}`}
@@ -214,7 +232,11 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
                     </div>
                   ) : (
                     /* 默认设备图标 */
-                    <div className="w-24 h-36 bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm relative overflow-hidden">
+                    <div
+                      className={`${
+                        compact ? 'w-16 h-24' : 'w-24 h-36'
+                      } bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm relative overflow-hidden`}
+                    >
                       {/* 屏幕区域 */}
                       <div className="absolute top-3 left-3 right-3 h-20 bg-gray-900 dark:bg-gray-100 rounded-sm"></div>
 
@@ -225,11 +247,11 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
                 </div>
 
                 {/* 设备信息 */}
-                <div className="text-center space-y-3">
-                  <h3 className="text-base font-medium text-foreground">
+                <div className={`text-center ${compact ? 'space-y-1' : 'space-y-3'}`}>
+                  <h3 className={`${compact ? 'text-sm' : 'text-base'} font-medium text-foreground`}>
                     {currentDevice ? `OneKey ${currentDevice.deviceType || 'Device'}` : ''}
                   </h3>
-                  <p className="text-sm text-muted-foreground">
+                  <p className={`${compact ? 'text-xs' : 'text-sm'} text-muted-foreground`}>
                     {status === 'idle'
                       ? currentDevice
                         ? t('components.methodExecutor.deviceConnected')
@@ -278,11 +300,13 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
           )}
 
           {/* 执行控制按钮 - 并排布局，恢复文字 */}
-          <div className="w-full grid grid-cols-2 gap-4 flex-shrink-0">
+          <div className={`w-full grid grid-cols-2 ${compact ? 'gap-3' : 'gap-4'} flex-shrink-0`}>
             <Button
               onClick={onExecute}
               disabled={status === 'loading' || status === 'device-interaction'}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground h-11 text-sm flex items-center gap-2"
+              className={`bg-primary hover:bg-primary/90 text-primary-foreground ${
+                compact ? 'h-10' : 'h-11'
+              } text-sm flex items-center gap-2`}
             >
               {status === 'loading' || status === 'device-interaction' ? (
                 <>
@@ -306,8 +330,10 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
               disabled={status === 'idle' || status === 'error' || isCancelling}
               className={
                 status === 'loading' || status === 'device-interaction'
-                  ? 'h-11 text-sm flex items-center gap-2'
-                  : 'border-border text-foreground hover:bg-muted h-11 text-sm flex items-center gap-2'
+                  ? `${compact ? 'h-10' : 'h-11'} text-sm flex items-center gap-2`
+                  : `border-border text-foreground hover:bg-muted ${
+                      compact ? 'h-10' : 'h-11'
+                    } text-sm flex items-center gap-2`
               }
             >
               {isCancelling ? (

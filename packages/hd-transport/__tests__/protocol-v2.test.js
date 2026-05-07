@@ -54,6 +54,14 @@ const protocolV2Messages = parseConfigure({
         },
       },
     },
+    Success: {
+      fields: {
+        message: {
+          type: 'string',
+          id: 1,
+        },
+      },
+    },
     DevFirmwareUpdate: {
       fields: {},
     },
@@ -74,6 +82,7 @@ const protocolV2Messages = parseConfigure({
         MessageType_GetProtoVersion: 60200,
         MessageType_ProtoVersion: 60201,
         MessageType_Ping: 60206,
+        MessageType_Success: 60207,
         MessageType_DevFirmwareUpdate: 61000,
         MessageType_DevFirmwareInstallProgress: 61001,
       },
@@ -119,13 +128,13 @@ describe('Protocol V2 framing and session', () => {
     });
   });
 
-  test('uses V1 schema fallback when a V2 frame carries a V1 message type', () => {
+  test('decodes Protocol V2 frames with the Protocol V2 catalog first', () => {
     const frame = ProtocolV2.encode(schemas, 'Success', {
       message: 'ok',
     });
 
     const parsed = protoV2.parseProtoV2Frame(frame);
-    expect(parsed.msgType).toBe(2);
+    expect(parsed.msgType).toBe(60207);
 
     const decoded = ProtocolV2.decode(schemas, frame);
     expect(decoded.type).toBe('Success');
@@ -188,6 +197,8 @@ describe('Protocol V2 framing and session', () => {
     const result = await session.call('GetProtoVersion', {});
 
     expect(written).toHaveLength(1);
+    expect(written[0][4]).toBe(1);
+    expect(written[0][5]).toBe(0);
     expect(protoV2.parseProtoV2Frame(written[0]).msgType).toBe(60200);
     expect(result).toEqual({
       type: 'ProtoVersion',

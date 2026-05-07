@@ -41,6 +41,16 @@ export { default as firmwareUpdateV3 } from './FirmwareUpdateV3';
 export { default as promptWebDeviceAccess } from './PromptWebDeviceAccess';
 
 // File system & device control API (Protocol V2 only)
+export { default as getProtoVersion } from './protocol-v2/GetProtoVersion';
+export { default as ping } from './protocol-v2/Ping';
+export { default as devReboot } from './protocol-v2/DevReboot';
+export { default as devGetDeviceInfo } from './protocol-v2/DevGetDeviceInfo';
+export { default as devFirmwareUpdate } from './protocol-v2/DevFirmwareUpdate';
+export { default as devGetFirmwareUpdateStatus } from './protocol-v2/DevGetFirmwareUpdateStatus';
+export { default as factoryDeviceInfoSettings } from './protocol-v2/FactoryDeviceInfoSettings';
+export { default as factoryGetDeviceInfo } from './protocol-v2/FactoryGetDeviceInfo';
+export { default as filesystemFixPermission } from './protocol-v2/FilesystemFixPermission';
+export { default as filesystemFormat } from './protocol-v2/FilesystemFormat';
 export { default as fileRead } from './FileRead';
 export { default as fileWrite } from './FileWrite';
 export { default as fileDelete } from './FileDelete';
@@ -48,6 +58,13 @@ export { default as dirList } from './DirList';
 export { default as dirMake } from './DirMake';
 export { default as dirRemove } from './DirRemove';
 export { default as pathInfo } from './PathInfo';
+export { default as filesystemFileRead } from './FileRead';
+export { default as filesystemFileWrite } from './FileWrite';
+export { default as filesystemFileDelete } from './FileDelete';
+export { default as filesystemDirList } from './DirList';
+export { default as filesystemDirMake } from './DirMake';
+export { default as filesystemDirRemove } from './DirRemove';
+export { default as filesystemPathInfoQuery } from './PathInfo';
 
 export { default as cipherKeyValue } from './CipherKeyValue';
 

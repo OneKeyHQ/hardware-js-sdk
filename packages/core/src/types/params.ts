@@ -1,3 +1,5 @@
+import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
+
 export interface CommonParams {
   keepSession?: boolean;
   /**
@@ -52,6 +54,11 @@ export interface CommonParams {
    * Use pre-initialized device state (BLE only)
    */
   usePreInitialize?: boolean;
+
+  /**
+   * Expected transport protocol. If omitted, SDK probes Protocol V1 then Protocol V2.
+   */
+  connectProtocol?: HardwareConnectProtocol;
 }
 
 export type Params<T> = CommonParams & T & { bundle?: undefined };
