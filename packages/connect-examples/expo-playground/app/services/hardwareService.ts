@@ -11,6 +11,7 @@ import {
 import { useHardwareStore } from '../store/hardwareStore';
 import { METHODS_REQUIRING_PASSPHRASE_CHECK } from '../utils/constants';
 import { previewHardwareParams } from './previewHardwareParams';
+import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
 // 使用 hd-core 的标准类型
 export type ApiResponse<T = any> = Success<T> | Unsuccessful;
 export type HardwareApiMethod = keyof CoreApi;
@@ -272,7 +273,9 @@ export async function callHardwareAPI(
   }
 }
 // 搜索设备
-export async function searchDevices(): Promise<ApiResponse> {
+export async function searchDevices(params?: {
+  connectProtocol?: HardwareConnectProtocol;
+}): Promise<ApiResponse> {
   logRequest('Searching for devices');
 
   const currentTransport = TransportManager.getCurrentTransport();
@@ -314,7 +317,7 @@ export async function searchDevices(): Promise<ApiResponse> {
     }
 
     // 对于所有transport类型，使用标准的searchDevices
-    const response = await sdkInstance.searchDevices();
+    const response = await sdkInstance.searchDevices(params);
 
     if (response.success && response.payload) {
       logResponse('Devices found', {

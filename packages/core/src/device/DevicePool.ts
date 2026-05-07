@@ -150,7 +150,7 @@ export class DevicePool extends EventEmitter {
     if (!device) {
       device = Device.fromDescriptor(descriptor);
       device.deviceConnector = this.connector;
-      await device.connect();
+      await device.connect(initOptions?.connectProtocol);
       await device.initialize(initOptions);
       await device.release();
     }

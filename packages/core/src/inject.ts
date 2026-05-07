@@ -103,7 +103,7 @@ export const createCoreApi = (
   /**
    * 搜索设备
    */
-  searchDevices: () => call({ method: 'searchDevices' }),
+  searchDevices: params => call({ ...params, method: 'searchDevices' }),
 
   /**
    * 获取设备信息
