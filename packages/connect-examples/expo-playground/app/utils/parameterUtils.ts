@@ -11,6 +11,8 @@ const JSON_PARAMETER_NAMES = [
   'outputs',
   'refTxs',
   'payload',
+  'targets',
+  'types',
 ] as const;
 
 /**

@@ -1,11 +1,28 @@
 import type {
+  devFirmwareUpdate,
+  devGetDeviceInfo,
+  devGetFirmwareUpdateStatus,
+  devReboot,
   dirList,
   dirMake,
   dirRemove,
+  factoryDeviceInfoSettings,
+  factoryGetDeviceInfo,
   fileDelete,
   fileRead,
   fileWrite,
+  filesystemDirList,
+  filesystemDirMake,
+  filesystemDirRemove,
+  filesystemFileDelete,
+  filesystemFileRead,
+  filesystemFileWrite,
+  filesystemFixPermission,
+  filesystemFormat,
+  filesystemPathInfoQuery,
+  getProtoVersion,
   pathInfo,
+  ping,
 } from './protocolV2';
 import type { off, on, removeAllListeners } from './event';
 import type { uiResponse } from './uiResponse';
@@ -208,6 +225,15 @@ export type CoreApi = {
   /**
    * File system & device control API (Protocol V2 only)
    */
+  getProtoVersion: typeof getProtoVersion;
+  ping: typeof ping;
+  devReboot: typeof devReboot;
+  devGetDeviceInfo: typeof devGetDeviceInfo;
+  devFirmwareUpdate: typeof devFirmwareUpdate;
+  devGetFirmwareUpdateStatus: typeof devGetFirmwareUpdateStatus;
+  factoryDeviceInfoSettings: typeof factoryDeviceInfoSettings;
+  factoryGetDeviceInfo: typeof factoryGetDeviceInfo;
+  filesystemFixPermission: typeof filesystemFixPermission;
   fileRead: typeof fileRead;
   fileWrite: typeof fileWrite;
   fileDelete: typeof fileDelete;
@@ -215,6 +241,14 @@ export type CoreApi = {
   dirMake: typeof dirMake;
   dirRemove: typeof dirRemove;
   pathInfo: typeof pathInfo;
+  filesystemFileRead: typeof filesystemFileRead;
+  filesystemFileWrite: typeof filesystemFileWrite;
+  filesystemFileDelete: typeof filesystemFileDelete;
+  filesystemDirList: typeof filesystemDirList;
+  filesystemDirMake: typeof filesystemDirMake;
+  filesystemDirRemove: typeof filesystemDirRemove;
+  filesystemPathInfoQuery: typeof filesystemPathInfoQuery;
+  filesystemFormat: typeof filesystemFormat;
 
   /**
    * All network function

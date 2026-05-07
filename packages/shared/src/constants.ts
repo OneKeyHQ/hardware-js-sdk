@@ -1,5 +1,13 @@
 import { HardwareErrorCode } from './HardwareError';
 
+export const HARDWARE_CONNECT_PROTOCOL = {
+  V1: 'V1',
+  V2: 'V2',
+} as const;
+
+export type HardwareConnectProtocol =
+  (typeof HARDWARE_CONNECT_PROTOCOL)[keyof typeof HARDWARE_CONNECT_PROTOCOL];
+
 export const ONEKEY_WEBUSB_FILTER = [
   { vendorId: 0x1209, productId: 0x53c0 }, // Classic Boot、Classic1s Boot、Mini Boot
   { vendorId: 0x1209, productId: 0x53c1 }, // Classic Firmware、Classic1s Firmware、Mini Firmware、Pro Firmware、Touch Firmware

@@ -50,7 +50,7 @@ import type {
   PassphraseRequestPayload,
 } from '../events';
 import type { PassphrasePromptResponse } from './DeviceCommands';
-import type { Deferred } from '@onekeyfe/hd-shared';
+import type { Deferred, HardwareConnectProtocol } from '@onekeyfe/hd-shared';
 import type { OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
 import type DeviceConnector from './DeviceConnector';
 
@@ -59,6 +59,7 @@ export type InitOptions = {
   deviceId?: string;
   passphraseState?: string;
   deriveCardano?: boolean;
+  connectProtocol?: HardwareConnectProtocol;
 };
 
 export type RunOptions = {
@@ -284,18 +285,25 @@ export class Device extends EventEmitter {
     });
   }
 
-  async acquire() {
+  async acquire(connectProtocol?: HardwareConnectProtocol) {
     const env = DataManager.getSettings('env');
     const mainIdKey = DataManager.isBleConnect(env) ? 'id' : 'session';
     try {
       if (DataManager.isBleConnect(env)) {
-        const res = await this.deviceConnector?.acquire(this.originalDescriptor.id);
+        const res = await this.deviceConnector?.acquire(
+          this.originalDescriptor.id,
+          undefined,
+          undefined,
+          connectProtocol
+        );
         this.mainId = (res as unknown as any).uuid ?? '';
         Log.debug('Expected uuid:', this.mainId);
       } else {
         this.mainId = await this.deviceConnector?.acquire(
           this.originalDescriptor.path,
-          this.originalDescriptor.session
+          this.originalDescriptor.session,
+          undefined,
+          connectProtocol
         );
         Log.debug('Expected session id:', this.mainId);
       }
@@ -629,7 +637,7 @@ export class Device extends EventEmitter {
       const env = DataManager.getSettings('env');
       if (env !== 'react-native') {
         try {
-          await this.acquire();
+          await this.acquire(options.connectProtocol);
         } catch (error) {
           this.runPromise = null;
           return Promise.reject(error);

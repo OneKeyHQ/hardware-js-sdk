@@ -310,7 +310,7 @@
             <div class="test-config">
                 <div>
                     <label>File path (on device):</label>
-                    <input type="text" id="fileReadPath" placeholder="vol1:filename.bin" value="vol1:test.bin">
+                    <input type="text" id="fileReadPath" placeholder="vol0:filename.bin" value="vol0:test.bin">
                 </div>
                 <div>
                     <label>Chunk size (bytes):</label>
@@ -357,7 +357,7 @@
             <div class="test-config">
                 <div>
                     <label>Target path (on device):</label>
-                    <input type="text" id="fileWritePath" placeholder="vol1:filename.bin" value="vol1:test.bin">
+                    <input type="text" id="fileWritePath" placeholder="vol0:filename.bin" value="vol0:test.bin">
                 </div>
                 <div>
                     <label>Chunk size (bytes):</label>
@@ -382,7 +382,7 @@
 
         <div id="pb-tab-pathinfo" class="tab-content">
             <label>Path (on device):</label>
-            <input type="text" id="pathInfoPath" placeholder="vol1:filename.bin" value="vol1:test.bin">
+            <input type="text" id="pathInfoPath" placeholder="vol0:filename.bin" value="vol0:test.bin">
             <div class="flex" style="margin-top: 10px;">
                 <button onclick="sendPathInfo()" id="sendPathInfoBtn" disabled>📋 Query Path Info</button>
             </div>
@@ -399,7 +399,7 @@
 
         <div id="pb-tab-dirlist" class="tab-content">
             <label>Directory path (on device):</label>
-            <input type="text" id="dirListPath" placeholder="vol1:" value="vol1:">
+            <input type="text" id="dirListPath" placeholder="vol0:" value="vol0:">
             <div class="flex" style="margin-top: 10px;">
                 <button onclick="sendDirList()" id="sendDirListBtn" disabled>📂 List Directory</button>
             </div>
@@ -414,7 +414,7 @@
 
         <div id="pb-tab-dirmake" class="tab-content">
             <label>Directory path (on device):</label>
-            <input type="text" id="dirMakePath" placeholder="vol1:new_dir" value="vol1:test_dir">
+            <input type="text" id="dirMakePath" placeholder="vol0:new_dir" value="vol0:test_dir">
             <div class="flex" style="margin-top: 10px;">
                 <button onclick="sendDirMake()" id="sendDirMakeBtn" disabled>📁 Create Directory</button>
             </div>
@@ -427,7 +427,7 @@
 
         <div id="pb-tab-dirremove" class="tab-content">
             <label>Directory path (on device):</label>
-            <input type="text" id="dirRemovePath" placeholder="vol1:dir_to_remove" value="vol1:test_dir">
+            <input type="text" id="dirRemovePath" placeholder="vol0:dir_to_remove" value="vol0:test_dir">
             <div class="flex" style="margin-top: 10px;">
                 <button onclick="sendDirRemove()" id="sendDirRemoveBtn" disabled>🗑️ Remove Directory</button>
             </div>
@@ -440,7 +440,7 @@
 
         <div id="pb-tab-filedelete" class="tab-content">
             <label>File path (on device):</label>
-            <input type="text" id="fileDeletePath" placeholder="vol1:filename.bin" value="vol1:test.bin">
+            <input type="text" id="fileDeletePath" placeholder="vol0:filename.bin" value="vol0:test.bin">
             <div class="flex" style="margin-top: 10px;">
                 <button onclick="sendFileDelete()" id="sendFileDeleteBtn" disabled>🗑️ Delete File</button>
             </div>
@@ -465,7 +465,7 @@
 
         <div id="pb-tab-fwupdate" class="tab-content">
             <label>Firmware file path (on device):</label>
-            <input type="text" id="fwUpdatePath" placeholder="vol1:firmware.bin" value="vol1:firmware.bin">
+            <input type="text" id="fwUpdatePath" placeholder="vol0:firmware.bin" value="vol0:firmware.bin">
             <div class="flex" style="margin-top: 10px; align-items: center;">
                 <label style="margin: 0; display: flex; align-items: center; gap: 8px;">
                     <input type="checkbox" id="fwUpdateReboot" checked style="width: auto; margin: 0;">
@@ -508,7 +508,7 @@
             </div>
             <div style="margin-bottom: 15px;">
                 <label>测试路径:</label>
-                <input type="text" id="testPath" value="vol1:test_dir" style="width: 200px;">
+                <input type="text" id="testPath" value="vol0:test_dir" style="width: 200px;">
             </div>
             <div style="margin-bottom: 15px;">
                 <label>测试次数:</label>
@@ -1825,7 +1825,7 @@
             updateTestResult('运行中', 0, 0, null, 0, 0);
 
             const testFileSize = parseInt(document.getElementById('testFileSize').value) || 8192;
-            const testDir = document.getElementById('testPath').value || 'vol1:test_dir';
+            const testDir = document.getElementById('testPath').value || 'vol0:test_dir';
             const testCount = parseInt(document.getElementById('testCount').value) || 1;
             const testFile = testDir + '/test.bin';
 
@@ -2003,9 +2003,9 @@
                 const stepProgress4 = ((currentRound - 1) * totalSteps + 4) / (totalRounds * totalSteps) * 100;
                 updateTestProgress(stepProgress4, `${roundProgress}4. DirList`);
                 if (progressCallback) progressCallback(4, passed, failed);
-                log('🧪 [Test] Step 4: DirList("vol1:")', 'info');
+                log('🧪 [Test] Step 4: DirList("vol0:")', 'info');
                 try {
-                    const pbPayload = pbEncoder.encodeDirList('vol1:');
+                    const pbPayload = pbEncoder.encodeDirList('vol0:');
                     const resp = await sendPbMessage(PB_MSG_TYPE.DirList, pbPayload);
                     if (resp.msgType === PB_MSG_TYPE.Dir) {
                         const dir = pbDecoder.decodeDir(resp.pbPayload);
@@ -2015,7 +2015,7 @@
                             log(`✅ [Test] Step 4: DirList → Found ${dirName}`, 'info');
                             addStatusEntry('Test-4.DirList', {
                                 'msg_type': `${PB_MSG_TYPE.DirList}`,
-                                'path': 'vol1:',
+                                'path': 'vol0:',
                                 'rx_msg_type': `${resp.msgType}`,
                                 'found': dirName
                             }, 'Success', 0);
@@ -2024,7 +2024,7 @@
                             log(`⚠️ [Test] Step 4: DirList → ${dirName} not found in list`, 'info');
                             addStatusEntry('Test-4.DirList', {
                                 'msg_type': `${PB_MSG_TYPE.DirList}`,
-                                'path': 'vol1:',
+                                'path': 'vol0:',
                                 'rx_msg_type': `${resp.msgType}`
                             }, 'Warning: dir not found', 0);
                             passed++;
@@ -2036,7 +2036,7 @@
                     log(`❌ [Test] Step 4: DirList failed: ${e.message}`, 'error');
                     addStatusEntry('Test-4.DirList', {
                         'msg_type': `${PB_MSG_TYPE.DirList}`,
-                        'path': 'vol1:'
+                        'path': 'vol0:'
                     }, `Failed: ${e.message}`, -1);
                     failed++;
                     throw e;
@@ -2427,9 +2427,9 @@
                 const stepProgress14 = ((currentRound - 1) * totalSteps + 14) / (totalRounds * totalSteps) * 100;
                 updateTestProgress(stepProgress14, `${roundProgress}14. DirList (verify removed)`);
                 if (progressCallback) progressCallback(14, passed, failed);
-                log('🧪 [Test] Step 14: DirList("vol1:") - verify removed', 'info');
+                log('🧪 [Test] Step 14: DirList("vol0:") - verify removed', 'info');
                 try {
-                    const pbPayload = pbEncoder.encodeDirList('vol1:');
+                    const pbPayload = pbEncoder.encodeDirList('vol0:');
                     const resp = await sendPbMessage(PB_MSG_TYPE.DirList, pbPayload);
                     if (resp.msgType === PB_MSG_TYPE.Dir) {
                         const dir = pbDecoder.decodeDir(resp.pbPayload);
@@ -2439,7 +2439,7 @@
                             log(`✅ [Test] Step 14: DirList → ${dirName} removed`, 'info');
                             addStatusEntry('Test-14.DirList', {
                                 'msg_type': `${PB_MSG_TYPE.DirList}`,
-                                'path': 'vol1:',
+                                'path': 'vol0:',
                                 'rx_msg_type': `${resp.msgType}`,
                                 'removed': dirName
                             }, 'Success: Dir removed', 0);
@@ -2448,7 +2448,7 @@
                             log(`⚠️ [Test] Step 14: DirList → ${dirName} still in list`, 'info');
                             addStatusEntry('Test-14.DirList', {
                                 'msg_type': `${PB_MSG_TYPE.DirList}`,
-                                'path': 'vol1:',
+                                'path': 'vol0:',
                                 'rx_msg_type': `${resp.msgType}`
                             }, 'Warning: dir still exists', 0);
                             passed++;
@@ -2460,7 +2460,7 @@
                     log(`❌ [Test] Step 14: DirList failed: ${e.message}`, 'error');
                     addStatusEntry('Test-14.DirList', {
                         'msg_type': `${PB_MSG_TYPE.DirList}`,
-                        'path': 'vol1:'
+                        'path': 'vol0:'
                     }, `Failed: ${e.message}`, -1);
                     failed++;
                     throw e;

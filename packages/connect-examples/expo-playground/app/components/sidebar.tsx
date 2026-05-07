@@ -13,7 +13,7 @@ import {
 } from './ui/sidebar';
 import { Badge } from './ui/Badge';
 import { Card, CardContent } from './ui/Card';
-import { Link, useLocation , useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useDeviceStore } from '../store/deviceStore';
 import { useTransportPersistence } from '../store/persistenceStore';
@@ -65,7 +65,7 @@ const navigationItems = [
     icon: FileText,
   },
   {
-    title: 'Pro2 Debug',
+    title: 'common.pro2Debug',
     url: '/pro2-debug',
     icon: Usb,
   },

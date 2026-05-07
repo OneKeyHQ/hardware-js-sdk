@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CoreApi, UiEvent, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
+import { CoreApi, LOG_EVENT, UiEvent, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { useDeviceStore } from '../../store/deviceStore';
 import { useHardwareStore } from '../../store/hardwareStore';
 
@@ -8,7 +8,7 @@ import { submitPin, submitPassphrase } from '../../services/hardwareService';
 import { EDeviceType } from '@onekeyfe/hd-shared';
 import GlobalDialogManager from '../global/GlobalDialogManager';
 import WebUsbAuthorizeDialog from '../global/WebUsbAuthorizeDialog';
-import { logData, logInfo, logError } from '../../utils/logger';
+import { logData, logInfo, logError, logHardware } from '../../utils/logger';
 import { SDKUtils } from '../../utils/hardwareInstance';
 import { create } from 'zustand';
 
@@ -61,6 +61,26 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
 
   const setupSDKEventListeners = useCallback(
     (sdkInstance: CoreApi) => {
+      sdkInstance.on(LOG_EVENT, (message: { payload?: unknown }) => {
+        const payload = message.payload;
+        const items = Array.isArray(payload) ? payload : [payload];
+        const text = items
+          .filter(item => item !== undefined && item !== null)
+          .map(item => (typeof item === 'string' ? item : JSON.stringify(item)))
+          .join(' ');
+
+        if (
+          !text ||
+          !/(ProtocolV2|WebUsbTransport|hd-transport-webusb|DeviceCommands|call-)/.test(text)
+        ) {
+          return;
+        }
+
+        logHardware('SDK debug log', {
+          message: text,
+        });
+      });
+
       // 监听SDK UI事件
       sdkInstance.on('UI_EVENT', (message: UiEvent) => {
         const latestCurrentDevice = useDeviceStore.getState().currentDevice;

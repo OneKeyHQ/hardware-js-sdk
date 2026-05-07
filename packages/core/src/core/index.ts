@@ -95,6 +95,7 @@ const parseInitOptions = (method?: BaseMethod): InitOptions => ({
   passphraseState: method?.payload.passphraseState,
   deviceId: method?.payload.deviceId,
   deriveCardano: method && hasDeriveCardano(method),
+  connectProtocol: method?.payload.connectProtocol,
 });
 
 let _core: Core;
@@ -704,7 +705,7 @@ let bleTimeoutRetry = 0;
 
 async function connectDeviceForBle(method: BaseMethod, device: Device) {
   try {
-    await device.acquire();
+    await device.acquire(method.payload.connectProtocol);
     if (method.payload?.onlyConnectBleDevice) {
       return;
     }

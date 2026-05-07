@@ -1,5 +1,6 @@
 import JSZip from 'jszip';
 
+import FileRead from '../src/api/FileRead';
 import FileWrite from '../src/api/FileWrite';
 import FirmwareUpdateV3 from '../src/api/FirmwareUpdateV3';
 import { getProtocolV2Features, normalizeProtocolV2Features } from '../src/protocols/protocol-v2';
@@ -251,21 +252,21 @@ describe('Protocol V2 firmware update targets', () => {
       ],
     });
 
-    expect((method as any).protocolV2CreateFolder).toHaveBeenCalledWith('vol1:res/');
+    expect((method as any).protocolV2CreateFolder).toHaveBeenCalledWith('vol0:res/');
     expect(writtenPaths).toEqual([
-      'vol1:res/home.png',
-      'vol1:bootloader.bin',
-      'vol1:ble-firmware.bin',
-      'vol1:se1-firmware.bin',
-      'vol1:firmware.bin',
+      'vol0:res/home.png',
+      'vol0:bootloader.bin',
+      'vol0:ble-firmware.bin',
+      'vol0:se1-firmware.bin',
+      'vol0:firmware.bin',
     ]);
     expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenCalledWith({
       targets: [
-        { target_id: 10, path: 'vol1:res/' },
-        { target_id: 1, path: 'vol1:bootloader.bin' },
-        { target_id: 2, path: 'vol1:ble-firmware.bin' },
-        { target_id: 3, path: 'vol1:se1-firmware.bin' },
-        { target_id: 0, path: 'vol1:firmware.bin' },
+        { target_id: 10, path: 'vol0:res/' },
+        { target_id: 1, path: 'vol0:bootloader.bin' },
+        { target_id: 2, path: 'vol0:ble-firmware.bin' },
+        { target_id: 3, path: 'vol0:se1-firmware.bin' },
+        { target_id: 0, path: 'vol0:firmware.bin' },
       ],
     });
     expect((method as any).waitForProtocolV2FirmwareUpdateComplete).toHaveBeenCalled();
@@ -337,7 +338,7 @@ describe('Protocol V2 firmware update targets', () => {
 });
 
 describe('Protocol V2 file write method', () => {
-  test('uses offset-driven overwrite and append defaults', async () => {
+  test('uses demo-aligned overwrite and append defaults', async () => {
     const call = jest.fn().mockResolvedValue({ message: { processed_byte: 1 } });
     const method = new FileWrite({
       id: 1,
@@ -362,11 +363,14 @@ describe('Protocol V2 file write method', () => {
         data: new Uint8Array([1]),
       },
       overwrite: false,
-      append: true,
+      append: false,
+      ui_percentage: 99,
     });
   });
 
-  test('rejects chunks larger than the Protocol V2 file payload limit', async () => {
+  test('splits data larger than the Protocol V2 file payload limit', async () => {
+    const data = new Uint8Array(2049);
+    const call = jest.fn().mockResolvedValue({ message: {} });
     const method = new FileWrite({
       id: 1,
       payload: {
@@ -374,13 +378,97 @@ describe('Protocol V2 file write method', () => {
         path: 'vol1:test.bin',
         offset: 0,
         totalSize: 2049,
-        data: new Uint8Array(2049),
+        data,
       },
     });
-    (method as any).device = { commands: { call: jest.fn() } };
+    (method as any).device = { commands: { call } };
 
     method.init();
+    const result = await method.run();
 
-    await expect(method.run()).rejects.toThrow('FilesystemFileWrite data too large');
+    expect(call).toHaveBeenCalledTimes(2);
+    expect(call).toHaveBeenNthCalledWith(1, 'FilesystemFileWrite', {
+      file: {
+        path: 'vol1:test.bin',
+        offset: 0,
+        total_size: 2049,
+        data: data.slice(0, 2048),
+      },
+      overwrite: true,
+      append: false,
+      ui_percentage: 99,
+    });
+    expect(call).toHaveBeenNthCalledWith(2, 'FilesystemFileWrite', {
+      file: {
+        path: 'vol1:test.bin',
+        offset: 2048,
+        total_size: 2049,
+        data: data.slice(2048),
+      },
+      overwrite: false,
+      append: false,
+      ui_percentage: 99,
+    });
+    expect(result).toMatchObject({
+      path: 'vol1:test.bin',
+      processed_byte: 2049,
+      chunks: 2,
+    });
+  });
+});
+
+describe('Protocol V2 file read method', () => {
+  test('reads full file in chunks when read length is 0', async () => {
+    const firstChunk = new Uint8Array(64).fill(1);
+    const call = jest
+      .fn()
+      .mockResolvedValueOnce({ message: { exist: true, size: 65, directory: false } })
+      .mockResolvedValueOnce({ message: { data: firstChunk } })
+      .mockResolvedValueOnce({ message: { data: new Uint8Array([2]) } });
+    const method = new FileRead({
+      id: 1,
+      payload: {
+        method: 'fileRead',
+        path: 'vol1:test.bin',
+        offset: 0,
+        totalSize: 0,
+        chunkLen: 64,
+      },
+    });
+    (method as any).device = { commands: { call } };
+
+    method.init();
+    const result = await method.run();
+
+    expect(call).toHaveBeenNthCalledWith(1, 'FilesystemPathInfoQuery', {
+      path: 'vol1:test.bin',
+    });
+    expect(call).toHaveBeenNthCalledWith(2, 'FilesystemFileRead', {
+      file: {
+        path: 'vol1:test.bin',
+        offset: 0,
+        total_size: 0,
+      },
+      chunk_len: 64,
+      ui_percentage: 99,
+    });
+    expect(call).toHaveBeenNthCalledWith(3, 'FilesystemFileRead', {
+      file: {
+        path: 'vol1:test.bin',
+        offset: 64,
+        total_size: 0,
+      },
+      chunk_len: 1,
+      ui_percentage: 99,
+    });
+    expect((result.data as Uint8Array).byteLength).toBe(65);
+    expect((result.data as Uint8Array)[0]).toBe(1);
+    expect((result.data as Uint8Array)[64]).toBe(2);
+    expect(result).toMatchObject({
+      path: 'vol1:test.bin',
+      offset: 0,
+      total_size: 65,
+      chunks: 2,
+    });
   });
 });

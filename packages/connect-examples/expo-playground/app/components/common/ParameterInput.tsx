@@ -18,6 +18,7 @@ interface ParameterInputProps {
   selectedPreset: string | null;
   onPresetChange: (presetTitle: string) => void;
   onParamChange?: (paramName: string, value: unknown) => void;
+  embedded?: boolean;
 }
 
 // 需要passphrase检查的方法列表
@@ -66,6 +67,7 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
   selectedPreset,
   onPresetChange,
   onParamChange,
+  embedded = false,
 }) => {
   const { t } = useTranslation();
   const {
@@ -478,9 +480,8 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
   const commonParams = getCommonParameters(t, methodConfig.method);
   const hasCommonParams = commonParams.length > 0;
 
-  return (
-    <Card className="bg-card border border-border/50 shadow-sm">
-      <CardContent className="space-y-2 pb-2 pt-2">
+  const content = (
+    <div className="space-y-2">
         {/* 优化的紧凑布局 */}
         <div className="space-y-2">
           {/* 预设选择器 - 如果有多个预设则显示在顶部 */}
@@ -569,6 +570,17 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
             </AlertDescription>
           </Alert>
         )}
+    </div>
+  );
+
+  if (embedded) {
+    return content;
+  }
+
+  return (
+    <Card className="bg-card border border-border/50 shadow-sm">
+      <CardContent className="space-y-2 pb-2 pt-2">
+        {content}
       </CardContent>
     </Card>
   );

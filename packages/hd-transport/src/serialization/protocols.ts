@@ -30,11 +30,12 @@ const resolveProtocolV2EncodeSchema = (name: string, schemas: ProtocolV2Schemas)
   }
 };
 
-const resolveProtocolV2DecodeSchema = (msgType: number, schemas: ProtocolV2Schemas) => {
-  if (msgType >= PROTOCOL_V2_SYS_MESSAGE_THRESHOLD) {
-    return schemas.protocolV2;
+const createProtocolV2MessageFromType = (msgType: number, schemas: ProtocolV2Schemas) => {
+  try {
+    return createMessageFromType(schemas.protocolV2, msgType);
+  } catch {
+    return createMessageFromType(schemas.protocolV1, msgType);
   }
-  return schemas.protocolV1;
 };
 
 export const ProtocolV1 = {
@@ -66,8 +67,7 @@ export const ProtocolV2 = {
 
   decode(schemas: ProtocolV2Schemas, frame: Uint8Array) {
     const { msgType, pbPayload, seq } = parseProtoV2Frame(frame);
-    const decodeMessages = resolveProtocolV2DecodeSchema(msgType, schemas);
-    const { Message, messageName } = createMessageFromType(decodeMessages, msgType);
+    const { Message, messageName } = createProtocolV2MessageFromType(msgType, schemas);
     const rxByteBuffer = ByteBuffer.wrap(Buffer.from(pbPayload) as unknown as ArrayBuffer);
     const message = decodeProtobuf(Message, rxByteBuffer);
 
