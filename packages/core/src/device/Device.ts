@@ -254,13 +254,13 @@ export class Device extends EventEmitter {
    * Device connect
    * @returns {Promise<boolean>}
    */
-  connect() {
+  connect(connectProtocol?: HardwareConnectProtocol) {
     const env = DataManager.getSettings('env');
     // eslint-disable-next-line no-async-promise-executor
     return new Promise<boolean>(async (resolve, reject) => {
       if (DataManager.isBleConnect(env)) {
         try {
-          await this.acquire();
+          await this.acquire(connectProtocol);
           resolve(true);
         } catch (error) {
           reject(error);
@@ -270,7 +270,7 @@ export class Device extends EventEmitter {
       // 不存在 Session ID 或存在 Session ID 但设备在别处使用，都需要 acquire 获取最新 sessionID
       if (!this.mainId || (!this.isUsedHere() && this.originalDescriptor)) {
         try {
-          await this.acquire();
+          await this.acquire(connectProtocol);
           resolve(true);
         } catch (error) {
           reject(error);

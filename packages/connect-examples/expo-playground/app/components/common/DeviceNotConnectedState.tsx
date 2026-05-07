@@ -6,17 +6,20 @@ import { useDeviceStore } from '../../store/deviceStore';
 import { searchDevices } from '../../services/hardwareService';
 import { useToast } from '../../hooks/use-toast';
 import { SDKUtils } from '../../utils/hardwareInstance';
+import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
 
 interface DeviceNotConnectedStateProps {
   className?: string;
   showFullPage?: boolean;
   title?: string;
   description?: string;
+  connectProtocol?: HardwareConnectProtocol;
 }
 
 export function DeviceNotConnectedState({
   className = '',
   showFullPage = false,
+  connectProtocol,
 }: DeviceNotConnectedStateProps) {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -49,7 +52,8 @@ export function DeviceNotConnectedState({
 
     try {
       // 搜索设备
-      const searchResult = await searchDevices();
+      const protocolParams = connectProtocol ? { connectProtocol } : undefined;
+      const searchResult = await searchDevices(protocolParams);
 
       if (searchResult.success && searchResult.payload) {
         const devices = searchResult.payload;
@@ -62,8 +66,10 @@ export function DeviceNotConnectedState({
 
           // 获取设备特征信息
           const sdk = await SDKUtils.getInstance();
-          if (targetDevice.connectId && targetDevice.deviceId) {
-            const featuresResult = await sdk.getFeatures(targetDevice.connectId);
+          if (targetDevice.features) {
+            setDeviceFeatures(targetDevice.features);
+          } else if (targetDevice.connectId && targetDevice.deviceId) {
+            const featuresResult = await sdk.getFeatures(targetDevice.connectId, protocolParams);
             if (featuresResult.success && featuresResult.payload) {
               setDeviceFeatures(featuresResult.payload);
             }

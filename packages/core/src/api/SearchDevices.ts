@@ -44,7 +44,9 @@ export default class SearchDevices extends BaseMethod {
       return devices;
     }
 
-    const { deviceList } = await DevicePool.getDevices(devicesDescriptor);
+    const { deviceList } = await DevicePool.getDevices(devicesDescriptor, undefined, {
+      connectProtocol: this.payload.connectProtocol,
+    });
     return deviceList.map(device => device.toMessageObject());
   }
 }
