@@ -158,6 +158,18 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
             }
             break;
 
+          case UI_REQUEST.DEVICE_PROGRESS:
+            if (message.payload && typeof message.payload === 'object') {
+              const payload = message.payload as { progress?: number };
+              if (typeof payload.progress === 'number') {
+                useFirmwareProgressStore.getState().setProgressData({
+                  progress: payload.progress,
+                  progressType: 'transferData',
+                });
+              }
+            }
+            break;
+
           default:
             break;
         }

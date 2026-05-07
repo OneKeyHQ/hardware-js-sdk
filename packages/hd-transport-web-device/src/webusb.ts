@@ -26,6 +26,12 @@ const HEADER_LENGTH = 6;
 const PACKET_IO_MAX_RETRIES = 3;
 const PACKET_IO_RETRY_DELAY = 300;
 const PROTOCOL_PROBE_TIMEOUT = 1000;
+const WEBUSB_FILE_WRITE_LOG_BLOCK_PATTERN = /(?:^|[^a-z])(?:raw)?(?:filesystem|emmc)?filewrite$/i;
+
+function shouldBlockWebUsbCallDataLog(name: string) {
+  const normalized = name.replace(/[_\s-]/g, '');
+  return LogBlockCommand.has(name) || WEBUSB_FILE_WRITE_LOG_BLOCK_PATTERN.test(normalized);
+}
 
 /**
  * Device information with path and WebUSB device instance
@@ -613,7 +619,7 @@ export default class WebUsbTransport {
 
     const protocol = this.deviceProtocol.get(path) ?? 'V1';
 
-    if (LogBlockCommand.has(name)) {
+    if (shouldBlockWebUsbCallDataLog(name)) {
       this.Log.debug('call-', ' name: ', name, ' protocol: ', protocol);
     } else {
       this.Log.debug('call-', ' name: ', name, ' data: ', data, ' protocol: ', protocol);

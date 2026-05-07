@@ -3,6 +3,7 @@ import JSZip from 'jszip';
 import FileRead from '../src/api/FileRead';
 import FileWrite from '../src/api/FileWrite';
 import FirmwareUpdateV3 from '../src/api/FirmwareUpdateV3';
+import { UI_REQUEST } from '../src/events/ui-request';
 import { getProtocolV2Features, normalizeProtocolV2Features } from '../src/protocols/protocol-v2';
 
 jest.mock('../src/data/config', () => ({
@@ -351,6 +352,7 @@ describe('Protocol V2 file write method', () => {
       },
     });
     (method as any).device = { commands: { call } };
+    method.postMessage = jest.fn();
 
     method.init();
     await method.run();
@@ -365,6 +367,11 @@ describe('Protocol V2 file write method', () => {
       overwrite: false,
       append: false,
       ui_percentage: 99,
+    });
+    expect(method.postMessage).toHaveBeenCalledWith({
+      event: 'UI_EVENT',
+      type: UI_REQUEST.DEVICE_PROGRESS,
+      payload: { progress: 100 },
     });
   });
 
@@ -382,6 +389,7 @@ describe('Protocol V2 file write method', () => {
       },
     });
     (method as any).device = { commands: { call } };
+    method.postMessage = jest.fn();
 
     method.init();
     const result = await method.run();
@@ -413,6 +421,16 @@ describe('Protocol V2 file write method', () => {
       path: 'vol1:test.bin',
       processed_byte: 2049,
       chunks: 2,
+    });
+    expect(method.postMessage).toHaveBeenNthCalledWith(1, {
+      event: 'UI_EVENT',
+      type: UI_REQUEST.DEVICE_PROGRESS,
+      payload: { progress: 99 },
+    });
+    expect(method.postMessage).toHaveBeenNthCalledWith(2, {
+      event: 'UI_EVENT',
+      type: UI_REQUEST.DEVICE_PROGRESS,
+      payload: { progress: 100 },
     });
   });
 });

@@ -2,6 +2,7 @@ import { PROTOCOL_V2_FILE_CHUNK_SIZE } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { BaseMethod } from './BaseMethod';
+import { UI_REQUEST, createUiMessage } from '../events/ui-request';
 
 export type FileWriteParams = {
   path: string;
@@ -44,6 +45,23 @@ function normalizeChunkSize(value: unknown): number {
     Math.max(Math.floor(numeric), MIN_FILE_CHUNK_SIZE),
     PROTOCOL_V2_FILE_CHUNK_SIZE
   );
+}
+
+function getConfirmedProgress(
+  processedByte: number,
+  totalSize: number,
+  written: number,
+  dataLength: number
+) {
+  if (Number.isFinite(processedByte) && Number.isFinite(totalSize) && totalSize > 0) {
+    if (processedByte >= totalSize) return 100;
+    return Math.min(Math.max(Math.floor((processedByte / totalSize) * 100), 0), 99);
+  }
+  if (dataLength > 0) {
+    if (written >= dataLength) return 100;
+    return Math.min(Math.max(Math.floor((written / dataLength) * 100), 0), 99);
+  }
+  return 100;
 }
 
 export default class FileWrite extends BaseMethod<FileWriteParams> {
@@ -122,6 +140,18 @@ export default class FileWrite extends BaseMethod<FileWriteParams> {
         throw ERRORS.TypedError(
           HardwareErrorCode.RuntimeError,
           `FilesystemFileWrite invalid processed_byte ${processedByte}`
+        );
+      }
+
+      const confirmedProcessedByte =
+        Number.isFinite(processedByte) && processedByte > offset
+          ? processedByte
+          : startOffset + written;
+      if (typeof this.postMessage === 'function') {
+        this.postMessage(
+          createUiMessage(UI_REQUEST.DEVICE_PROGRESS, {
+            progress: getConfirmedProgress(confirmedProcessedByte, totalSize, written, dataLength),
+          })
         );
       }
       chunkIndex += 1;
