@@ -1,5 +1,7 @@
 const { parseConfigure } = require('../src/serialization/protobuf/messages');
 const { ProtocolV1 } = require('../src/protocols');
+const { decodeEnvelope, decodeFirstChunk } = require('../src/protocols/v1/decode');
+const transport = require('../src').default;
 
 const messages = {
   StellarPaymentOp: {
@@ -89,6 +91,17 @@ const fixtures = [
 
 const parsedMessages = parseConfigure({
   nested: { hw: { nested: { trezor: { nested: { messages: { nested: messages } } } } } },
+});
+
+describe('legacy default transport exports', () => {
+  test('keeps Protocol V1 compatibility aliases on the default export', () => {
+    expect(transport.buildOne).toBe(ProtocolV1.encodeEnvelope);
+    expect(transport.buildEncodeBuffers).toBe(ProtocolV1.encodeMessageChunks);
+    expect(transport.buildBuffers).toBe(ProtocolV1.encodeTransportPackets);
+    expect(transport.receiveOne).toBe(ProtocolV1.decodeMessage);
+    expect(transport.decodeProtocol.decode).toBe(decodeEnvelope);
+    expect(transport.decodeProtocol.decodeChunked).toBe(decodeFirstChunk);
+  });
 });
 
 describe('encoding json -> protobuf -> json', () => {

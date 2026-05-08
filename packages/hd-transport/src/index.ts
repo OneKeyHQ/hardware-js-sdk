@@ -9,6 +9,7 @@ import {
   parseConfigure,
 } from './serialization';
 import { PROTOCOL_V2_SYS_MESSAGE_THRESHOLD, ProtocolV1, ProtocolV2 } from './protocols';
+import { decodeEnvelope, decodeFirstChunk } from './protocols/v1/decode';
 import * as protocolV2Codec from './protocols/v2';
 import {
   ProtocolV2FrameAssembler,
@@ -24,6 +25,15 @@ import * as check from './utils/highlevel-checks';
 
 protobuf.util.Long = Long;
 protobuf.configure();
+
+export const buildOne = ProtocolV1.encodeEnvelope;
+export const buildEncodeBuffers = ProtocolV1.encodeMessageChunks;
+export const buildBuffers = ProtocolV1.encodeTransportPackets;
+export const receiveOne = ProtocolV1.decodeMessage;
+export const decodeProtocol = {
+  decode: decodeEnvelope,
+  decodeChunked: decodeFirstChunk,
+};
 
 export type {
   Transport,
@@ -52,7 +62,12 @@ export * from './protocols/v2/session';
 
 export default {
   check,
+  buildOne,
+  buildBuffers,
+  buildEncodeBuffers,
+  receiveOne,
   parseConfigure,
+  decodeProtocol,
   protocolV2: protocolV2Codec,
   ProtocolV1,
   ProtocolV2,

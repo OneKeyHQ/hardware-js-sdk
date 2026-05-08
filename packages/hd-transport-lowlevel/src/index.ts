@@ -1,14 +1,48 @@
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import transport, { LogBlockCommand } from '@onekeyfe/hd-transport';
+import transport, {
+  LogBlockCommand,
+  PROTOCOL_V1_MESSAGE_HEADER_SIZE,
+  PROTOCOL_V2_CHANNEL_BLE_UART,
+  ProtocolV2FrameAssembler,
+  ProtocolV2Session,
+  bytesToHex,
+  concatUint8Arrays,
+  hexToBytes,
+  probeProtocolV2 as probeProtocolV2Helper,
+  withProtocolTimeout,
+} from '@onekeyfe/hd-transport';
 
 import type EventEmitter from 'events';
-import type { LowlevelTransportSharedPlugin, ProtocolType } from '@onekeyfe/hd-transport';
+import type {
+  LowLevelDevice,
+  LowlevelTransportSharedPlugin,
+  ProtocolType,
+  TransportCallOptions,
+} from '@onekeyfe/hd-transport';
 import type { LowLevelAcquireInput } from './types';
 
 const { check, ProtocolV1, parseConfigure } = transport;
 
+const PROTOCOL_PROBE_TIMEOUT_MS = 1000;
+const LOWLEVEL_PROTOCOL_TIMEOUT_MS = 30_000;
+const LOWLEVEL_PROTOCOL_V2_PACKET_LENGTH = 64;
+
+function inferProtocolTypeFromDeviceName(name?: string | null): ProtocolType | undefined {
+  return /\bpro\s*2\b/i.test(name ?? '') ? 'V2' : undefined;
+}
+
+function isProtocolV1TransportChunk(data: Uint8Array) {
+  return data.length >= 9 && data[0] === 0x3f && data[1] === 0x23 && data[2] === 0x23;
+}
+
+function readProtocolV1PayloadLength(data: Uint8Array) {
+  return data[5] * 0x1000000 + data[6] * 0x10000 + data[7] * 0x100 + data[8];
+}
+
 export default class LowlevelTransport {
   _messages: ReturnType<typeof transport.parseConfigure> | undefined;
+
+  _messagesV2: ReturnType<typeof transport.parseConfigure> | undefined;
 
   configured = false;
 
@@ -18,9 +52,12 @@ export default class LowlevelTransport {
 
   plugin: LowlevelTransportSharedPlugin = {} as LowlevelTransportSharedPlugin;
 
-  // LowlevelTransport speaks Protocol V1 only (the embedder provides byte plumbing only).
-  getProtocolType(_path: string): ProtocolType {
-    return 'V1';
+  private deviceProtocol: Map<string, ProtocolType> = new Map();
+
+  private protocolV2Assemblers: Map<string, ProtocolV2FrameAssembler> = new Map();
+
+  getProtocolType(path: string): ProtocolType {
+    return this.deviceProtocol.get(path) ?? 'V1';
   }
 
   init(logger: any, emitter: EventEmitter, plugin: LowlevelTransportSharedPlugin) {
@@ -36,18 +73,31 @@ export default class LowlevelTransport {
     this._messages = messages;
   }
 
+  configureProtocolV2(signedData: any) {
+    this._messagesV2 = parseConfigure(signedData);
+  }
+
   listen() {
     // empty
   }
 
-  enumerate() {
-    return this.plugin.enumerate();
+  async enumerate() {
+    const devices = await this.plugin.enumerate();
+    return devices.map((device: LowLevelDevice) => {
+      const protocolType = inferProtocolTypeFromDeviceName(device.name);
+      if (protocolType) {
+        this.deviceProtocol.set(device.id, protocolType);
+      }
+      return {
+        ...device,
+        ...(protocolType ? { protocolType } : {}),
+      };
+    });
   }
 
   async acquire(input: LowLevelAcquireInput) {
     try {
       await this.plugin.connect(input.uuid);
-      return { uuid: input.uuid };
     } catch (error) {
       this.Log.debug('lowlelvel transport connect error: ', error);
       throw ERRORS.TypedError(
@@ -55,11 +105,18 @@ export default class LowlevelTransport {
         error.message ?? error
       );
     }
+
+    this.protocolV2Assemblers.set(input.uuid, new ProtocolV2FrameAssembler());
+    const expectedProtocol = input.expectedProtocol ?? this.deviceProtocol.get(input.uuid);
+    const protocolType = await this.detectProtocol(input.uuid, expectedProtocol);
+    return { uuid: input.uuid, protocolType };
   }
 
   async release(uuid: string) {
     try {
       await this.plugin.disconnect(uuid);
+      this.deviceProtocol.delete(uuid);
+      this.protocolV2Assemblers.delete(uuid);
       return true;
     } catch (error) {
       this.Log.debug('lowlelvel transport disconnect error: ', error);
@@ -67,18 +124,50 @@ export default class LowlevelTransport {
     }
   }
 
-  async call(uuid: string, name: string, data: Record<string, unknown>) {
+  async call(
+    uuid: string,
+    name: string,
+    data: Record<string, unknown>,
+    options?: TransportCallOptions
+  ) {
     if (this._messages === null || !this._messages) {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
     }
 
-    const messages = this._messages;
+    const protocol = this.getProtocolType(uuid);
     if (LogBlockCommand.has(name)) {
-      this.Log.debug('lowlevel-transport', 'call-', ' name: ', name);
+      this.Log.debug('lowlevel-transport', 'call-', ' name: ', name, ' protocol: ', protocol);
     } else {
-      this.Log.debug('lowlevel-transport', 'call-', ' name: ', name, ' data: ', data);
+      this.Log.debug(
+        'lowlevel-transport',
+        'call-',
+        ' name: ',
+        name,
+        ' data: ',
+        data,
+        ' protocol: ',
+        protocol
+      );
     }
 
+    if (protocol === 'V2') {
+      return this.callProtocolV2(uuid, name, data, options);
+    }
+
+    return this.callProtocolV1(uuid, name, data, options);
+  }
+
+  private async callProtocolV1(
+    uuid: string,
+    name: string,
+    data: Record<string, unknown>,
+    options?: TransportCallOptions
+  ) {
+    if (!this._messages) {
+      throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
+    }
+
+    const messages = this._messages;
     const buffers = ProtocolV1.encodeTransportPackets(messages, name, data);
     for (const o of buffers) {
       const outData = o.toString('hex');
@@ -93,15 +182,168 @@ export default class LowlevelTransport {
     }
 
     try {
-      const response = await this.plugin.receive();
-      if (typeof response !== 'string') {
-        throw new Error('Returning data is not string');
-      }
+      const response = await this.readProtocolV1Message(options?.timeoutMs);
       this.Log.debug('receive data: ', response);
       const jsonData = ProtocolV1.decodeMessage(messages, response);
       return check.call(jsonData);
     } catch (e) {
       this.Log.error('lowlevel call error: ', e);
+      throw e;
+    }
+  }
+
+  private createProtocolTimeoutError(name: string, timeout: number) {
+    return ERRORS.TypedError(
+      HardwareErrorCode.BleTimeoutError,
+      `Lowlevel response timeout after ${timeout}ms for ${name}`
+    );
+  }
+
+  private createProtocolMismatchError(expected: ProtocolType) {
+    return ERRORS.TypedError(
+      HardwareErrorCode.RuntimeError,
+      `Device protocol mismatch: expected ${expected}, but device did not respond to expected protocol`
+    );
+  }
+
+  private async detectProtocol(
+    uuid: string,
+    expectedProtocol?: ProtocolType
+  ): Promise<ProtocolType> {
+    if (expectedProtocol === 'V2') {
+      if (await this.probeProtocolV2(uuid)) {
+        this.deviceProtocol.set(uuid, 'V2');
+        this.Log?.debug(`[LowlevelTransport] detectProtocol: uuid=${uuid} -> V2 (expected)`);
+        return 'V2';
+      }
+      throw this.createProtocolMismatchError(expectedProtocol);
+    }
+
+    if (expectedProtocol === 'V1') {
+      this.deviceProtocol.set(uuid, 'V1');
+      return 'V1';
+    }
+
+    const cachedProtocol = this.deviceProtocol.get(uuid);
+    if (cachedProtocol === 'V2' && (await this.probeProtocolV2(uuid))) {
+      this.deviceProtocol.set(uuid, 'V2');
+      this.Log?.debug(`[LowlevelTransport] detectProtocol: uuid=${uuid} -> V2 (cached)`);
+      return 'V2';
+    }
+
+    this.deviceProtocol.set(uuid, 'V1');
+    return 'V1';
+  }
+
+  private async probeProtocolV2(uuid: string) {
+    if (!this._messages || !this._messagesV2) {
+      return false;
+    }
+
+    this.deviceProtocol.set(uuid, 'V2');
+    this.protocolV2Assemblers.get(uuid)?.reset();
+    return probeProtocolV2Helper({
+      call: (name, data, options) => this.callProtocolV2(uuid, name, data, options),
+      timeoutMs: PROTOCOL_PROBE_TIMEOUT_MS,
+      logger: this.Log,
+      logPrefix: 'ProtocolV2 Lowlevel-BLE',
+      onProbeFailed: () => {
+        this.protocolV2Assemblers.get(uuid)?.reset();
+      },
+    });
+  }
+
+  private async receiveHex(timeoutMs: number | undefined, commandName: string) {
+    const response = await withProtocolTimeout(this.plugin.receive(), timeoutMs, () =>
+      this.createProtocolTimeoutError(commandName, timeoutMs ?? 0)
+    );
+    if (typeof response !== 'string') {
+      throw new Error('Returning data is not string');
+    }
+    return response;
+  }
+
+  private async readProtocolV1Message(timeoutMs?: number) {
+    const first = await this.receiveHex(timeoutMs, 'ProtocolV1');
+    const firstData = hexToBytes(first);
+    if (!isProtocolV1TransportChunk(firstData)) {
+      return first;
+    }
+
+    const payloadLength = readProtocolV1PayloadLength(firstData);
+    let buffer = firstData.slice(3);
+    const expectedLength = PROTOCOL_V1_MESSAGE_HEADER_SIZE + payloadLength;
+
+    while (buffer.length < expectedLength) {
+      const next = await this.receiveHex(timeoutMs, 'ProtocolV1');
+      buffer = concatUint8Arrays([buffer, hexToBytes(next)]);
+    }
+
+    return bytesToHex(buffer.slice(0, expectedLength));
+  }
+
+  private async readProtocolV2Frame(uuid: string, timeoutMs?: number) {
+    let assembler = this.protocolV2Assemblers.get(uuid);
+    if (!assembler) {
+      assembler = new ProtocolV2FrameAssembler();
+      this.protocolV2Assemblers.set(uuid, assembler);
+    }
+
+    const queuedFrame = assembler.push(new Uint8Array(0));
+    if (queuedFrame) return queuedFrame;
+
+    let frame: Uint8Array | undefined;
+    while (!frame) {
+      const response = await this.receiveHex(timeoutMs, 'ProtocolV2');
+      const chunk = hexToBytes(response);
+      if (chunk.length > 0) {
+        frame = assembler.push(chunk);
+      }
+    }
+    return frame;
+  }
+
+  private async writeProtocolV2Frame(uuid: string, frame: Uint8Array) {
+    for (let offset = 0; offset < frame.length; offset += LOWLEVEL_PROTOCOL_V2_PACKET_LENGTH) {
+      const chunk = frame.slice(offset, offset + LOWLEVEL_PROTOCOL_V2_PACKET_LENGTH);
+      await this.plugin.send(uuid, bytesToHex(chunk));
+    }
+  }
+
+  private async callProtocolV2(
+    uuid: string,
+    name: string,
+    data: Record<string, unknown>,
+    options?: TransportCallOptions
+  ) {
+    if (!this._messages || !this._messagesV2) {
+      throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
+    }
+
+    const timeoutMs = options?.timeoutMs ?? LOWLEVEL_PROTOCOL_TIMEOUT_MS;
+    this.protocolV2Assemblers.get(uuid)?.reset();
+    const session = new ProtocolV2Session({
+      schemas: {
+        protocolV1: this._messages,
+        protocolV2: this._messagesV2,
+      },
+      router: PROTOCOL_V2_CHANNEL_BLE_UART,
+      writeFrame: (frame: Uint8Array) => this.writeProtocolV2Frame(uuid, frame),
+      readFrame: () => this.readProtocolV2Frame(uuid, timeoutMs),
+      logger: this.Log,
+      logPrefix: 'ProtocolV2 Lowlevel-BLE',
+      createTimeoutError: (_messageName: string, timeout: number) =>
+        this.createProtocolTimeoutError(name, timeout),
+    });
+
+    try {
+      return await session.call(name, data, {
+        ...options,
+        timeoutMs,
+      });
+    } catch (e) {
+      this.protocolV2Assemblers.get(uuid)?.reset();
+      this.Log.error('lowlevel Protocol V2 call error: ', e);
       throw e;
     }
   }
