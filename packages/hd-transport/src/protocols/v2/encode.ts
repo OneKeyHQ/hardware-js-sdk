@@ -19,7 +19,7 @@ let protoSeq = 0;
  *   [7..N-2] payload
  *   [N-1]    CRC8 of bytes 0 to N-2 (frame CRC)
  */
-export function buildProtoV2Frame(
+export function encodeFrame(
   payload: Uint8Array | null,
   packetSrc = 0,
   router = 0
@@ -65,7 +65,7 @@ export function buildProtoV2Frame(
  *   [0-1]  msgType as little-endian uint16
  *   [2..]  protobuf-encoded message bytes
  */
-export function buildPbFrame(
+export function encodeProtobufFrame(
   msgType: number,
   pbPayload: Uint8Array,
   packetSrc = 0,
@@ -75,5 +75,5 @@ export function buildPbFrame(
   payload[0] = msgType % 256;
   payload[1] = Math.floor(msgType / 256) % 256;
   payload.set(pbPayload, 2);
-  return buildProtoV2Frame(payload, packetSrc, router);
+  return encodeFrame(payload, packetSrc, router);
 }

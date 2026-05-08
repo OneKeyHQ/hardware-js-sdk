@@ -1,4 +1,7 @@
-import transport, { COMMON_HEADER_SIZE, LogBlockCommand } from '@onekeyfe/hd-transport';
+import transport, {
+  LogBlockCommand,
+  PROTOCOL_V1_MESSAGE_HEADER_SIZE,
+} from '@onekeyfe/hd-transport';
 import {
   ERRORS,
   HardwareErrorCode,
@@ -13,7 +16,7 @@ import type { ProtocolType } from '@onekeyfe/hd-transport';
 // Import DesktopAPI type from hd-transport-electron
 import type { DesktopAPI } from '@onekeyfe/hd-transport-electron';
 
-const { parseConfigure, buildBuffers, receiveOne, check } = transport;
+const { parseConfigure, ProtocolV1, check } = transport;
 
 // Noble BLE specific API interface
 declare global {
@@ -315,7 +318,7 @@ export default class ElectronBleTransport {
       this.Log?.debug('[Transport] Noble BLE call', 'name:', name, 'data:', data);
     }
 
-    const buffers = buildBuffers(messages, name, data);
+    const buffers = ProtocolV1.encodeTransportPackets(messages, name, data);
 
     try {
       if (!window.desktopApi?.nobleBle) {
@@ -349,7 +352,7 @@ export default class ElectronBleTransport {
         throw new Error('Returning data is not string.');
       }
 
-      const jsonData = receiveOne(messages, response);
+      const jsonData = ProtocolV1.decodeMessage(messages, response);
       return check.call(jsonData);
     } catch (e) {
       this.Log?.error('[Transport] Noble BLE call error:', e);
@@ -397,7 +400,10 @@ export default class ElectronBleTransport {
       }
 
       // Check if packet is complete
-      if (bufferState.buffer.length - COMMON_HEADER_SIZE >= bufferState.bufferLength) {
+      if (
+        bufferState.buffer.length - PROTOCOL_V1_MESSAGE_HEADER_SIZE >=
+        bufferState.bufferLength
+      ) {
         const completeBuffer = new Uint8Array(bufferState.buffer);
 
         // Reset buffer state

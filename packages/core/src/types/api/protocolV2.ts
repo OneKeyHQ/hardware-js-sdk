@@ -7,7 +7,7 @@ import type {
   DevRebootType,
   FactoryDeviceInfo,
   ProtoVersion,
-  DeviceInfo as ProtocolV2DeviceInfo,
+  ProtocolV2DeviceInfo,
   Success,
 } from '@onekeyfe/hd-transport';
 

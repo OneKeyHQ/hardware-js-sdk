@@ -103,6 +103,8 @@ export default class FileWrite extends BaseMethod<FileWriteParams> {
     }
 
     const chunkSize = normalizeChunkSize(this.params.chunkSize ?? this.params.chunkLen);
+    const overwrite = this.params.overwrite ?? false;
+    const append = this.params.append ?? false;
     let written = 0;
     let chunkIndex = 0;
     let lastMessage: Record<string, unknown> | undefined;
@@ -116,15 +118,15 @@ export default class FileWrite extends BaseMethod<FileWriteParams> {
         this.params.uiPercentage ??
         Math.min(Math.ceil(((written + chunk.byteLength) / dataLength) * 100), 99);
 
-      const res = await (this.device.commands as any).call('FilesystemFileWrite', {
+      const res = await this.device.commands.typedCall('FilesystemFileWrite', 'FilesystemFile', {
         file: {
           path: this.params.path,
           offset,
           total_size: totalSize,
           data: chunk,
         },
-        overwrite: isFirstChunk ? this.params.overwrite : false,
-        append: this.params.append ?? false,
+        overwrite: isFirstChunk ? overwrite : false,
+        append,
         ui_percentage: progress,
       });
 

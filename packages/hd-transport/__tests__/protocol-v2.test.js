@@ -1,11 +1,11 @@
-const { ProtocolV2 } = require('../src/serialization/protocols');
+const { ProtocolV2 } = require('../src/protocols');
 const { parseConfigure } = require('../src/serialization/protobuf/messages');
 const {
   ProtocolV2FrameAssembler,
   ProtocolV2Session,
   probeProtocolV2,
-} = require('../src/protocol-session');
-const protoV2 = require('../src/serialization/protocol-v2');
+} = require('../src/protocols/v2/session');
+const protocolV2 = require('../src/protocols/v2');
 
 const protocolV1Messages = parseConfigure({
   nested: {
@@ -17,9 +17,17 @@ const protocolV1Messages = parseConfigure({
         },
       },
     },
+    OnekeyGetFeatures: {
+      fields: {},
+    },
+    OnekeyFeatures: {
+      fields: {},
+    },
     MessageType: {
       values: {
         MessageType_Success: 2,
+        MessageType_OnekeyGetFeatures: 10025,
+        MessageType_OnekeyFeatures: 10026,
       },
     },
   },
@@ -98,22 +106,22 @@ const schemas = {
 const rewriteSeq = (frame, seq) => {
   const copy = new Uint8Array(frame);
   copy[6] = seq;
-  copy[copy.length - 1] = protoV2.crc8(copy, copy.length - 1);
+  copy[copy.length - 1] = protocolV2.crc8(copy, copy.length - 1);
   return copy;
 };
 
 describe('Protocol V2 framing and session', () => {
   test('encodes and decodes Protocol V2 protobuf frames', () => {
-    const frame = ProtocolV2.encode(schemas, 'ProtoVersion', {
+    const frame = ProtocolV2.encodeFrame(schemas, 'ProtoVersion', {
       major_version: 1,
       minor_version: 2,
       patch_version: 3,
     });
 
-    const parsed = protoV2.parseProtoV2Frame(frame);
+    const parsed = protocolV2.decodeFrame(frame);
     expect(parsed.msgType).toBe(60201);
 
-    const decoded = ProtocolV2.decode(schemas, frame);
+    const decoded = ProtocolV2.decodeFrame(schemas, frame);
     expect(decoded).toEqual({
       type: 'ProtoVersion',
       messageName: 'ProtoVersion',
@@ -128,21 +136,28 @@ describe('Protocol V2 framing and session', () => {
     });
   });
 
+  test('does not encode V1-only messages into Protocol V2 frames', () => {
+    expect(() => ProtocolV2.encodeFrame(schemas, 'Ping', { message: 'ok' })).not.toThrow();
+    expect(() => ProtocolV2.encodeFrame(schemas, 'OnekeyGetFeatures', {})).toThrow(
+      'Protocol V2 message "OnekeyGetFeatures" is not defined'
+    );
+  });
+
   test('decodes Protocol V2 frames with the Protocol V2 catalog first', () => {
-    const frame = ProtocolV2.encode(schemas, 'Success', {
+    const frame = ProtocolV2.encodeFrame(schemas, 'Success', {
       message: 'ok',
     });
 
-    const parsed = protoV2.parseProtoV2Frame(frame);
+    const parsed = protocolV2.decodeFrame(frame);
     expect(parsed.msgType).toBe(60207);
 
-    const decoded = ProtocolV2.decode(schemas, frame);
+    const decoded = ProtocolV2.decodeFrame(schemas, frame);
     expect(decoded.type).toBe('Success');
     expect(decoded.message).toEqual({ message: 'ok' });
   });
 
   test('reassembles split Protocol V2 frames and rejects oversized frames', () => {
-    const frame = ProtocolV2.encode(schemas, 'ProtoVersion', {
+    const frame = ProtocolV2.encodeFrame(schemas, 'ProtoVersion', {
       major_version: 1,
       minor_version: 0,
       patch_version: 0,
@@ -157,12 +172,12 @@ describe('Protocol V2 framing and session', () => {
   });
 
   test('keeps bytes after the first complete frame for the next read', () => {
-    const first = ProtocolV2.encode(schemas, 'ProtoVersion', {
+    const first = ProtocolV2.encodeFrame(schemas, 'ProtoVersion', {
       major_version: 1,
       minor_version: 0,
       patch_version: 0,
     });
-    const second = ProtocolV2.encode(schemas, 'ProtoVersion', {
+    const second = ProtocolV2.encodeFrame(schemas, 'ProtoVersion', {
       major_version: 2,
       minor_version: 0,
       patch_version: 0,
@@ -178,7 +193,7 @@ describe('Protocol V2 framing and session', () => {
 
   test('session writes one encoded frame and decodes the response frame', async () => {
     const written = [];
-    const response = ProtocolV2.encode(schemas, 'ProtoVersion', {
+    const response = ProtocolV2.encodeFrame(schemas, 'ProtoVersion', {
       major_version: 2,
       minor_version: 0,
       patch_version: 1,
@@ -191,7 +206,7 @@ describe('Protocol V2 framing and session', () => {
         return Promise.resolve();
       },
       readFrame: () =>
-        Promise.resolve(rewriteSeq(response, protoV2.parseProtoV2Frame(written[0]).seq)),
+        Promise.resolve(rewriteSeq(response, protocolV2.decodeFrame(written[0]).seq)),
     });
 
     const result = await session.call('GetProtoVersion', {});
@@ -199,7 +214,7 @@ describe('Protocol V2 framing and session', () => {
     expect(written).toHaveLength(1);
     expect(written[0][4]).toBe(1);
     expect(written[0][5]).toBe(0);
-    expect(protoV2.parseProtoV2Frame(written[0]).msgType).toBe(60200);
+    expect(protocolV2.decodeFrame(written[0]).msgType).toBe(60200);
     expect(result).toEqual({
       type: 'ProtoVersion',
       message: {
@@ -211,7 +226,7 @@ describe('Protocol V2 framing and session', () => {
   });
 
   test('session accepts response frames with a device-owned seq', async () => {
-    const response = ProtocolV2.encode(schemas, 'ProtoVersion', {
+    const response = ProtocolV2.encodeFrame(schemas, 'ProtoVersion', {
       major_version: 2,
       minor_version: 0,
       patch_version: 1,
@@ -240,16 +255,17 @@ describe('Protocol V2 framing and session', () => {
 
   test('session consumes intermediate response frames before returning the final response', async () => {
     const written = [];
-    const progress = ProtocolV2.encode(schemas, 'DevFirmwareInstallProgress', {
+    const progress = ProtocolV2.encodeFrame(schemas, 'DevFirmwareInstallProgress', {
       target_id: 0,
       progress: 42,
     });
-    const success = ProtocolV2.encode(schemas, 'Success', {
+    const success = ProtocolV2.encodeFrame(schemas, 'Success', {
       message: 'ok',
     });
     const onIntermediateResponse = jest.fn();
     const readFrame = jest.fn(() => {
-      const seq = protoV2.parseProtoV2Frame(written[0]).seq;
+      const [writtenFrame] = written;
+      const { seq } = protocolV2.decodeFrame(writtenFrame);
       return Promise.resolve(
         readFrame.mock.calls.length === 1 ? rewriteSeq(progress, seq) : rewriteSeq(success, seq)
       );

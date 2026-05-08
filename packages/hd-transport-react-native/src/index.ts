@@ -9,9 +9,9 @@ import {
 } from 'react-native-ble-plx';
 import ByteBuffer from 'bytebuffer';
 import transport, {
-  COMMON_HEADER_SIZE,
   LogBlockCommand,
   type OneKeyDeviceInfoBase,
+  PROTOCOL_V1_MESSAGE_HEADER_SIZE,
   PROTOCOL_V2_CHANNEL_BLE_UART,
   type ProtocolType,
   ProtocolV2FrameAssembler,
@@ -38,7 +38,7 @@ import type { Characteristic, Device, Subscription } from 'react-native-ble-plx'
 import type EventEmitter from 'events';
 import type { BleAcquireInput, TransportOptions } from './types';
 
-const { check, buildBuffers, receiveOne, parseConfigure } = transport;
+const { check, ProtocolV1, parseConfigure } = transport;
 
 const Log = bleLogger;
 
@@ -99,6 +99,10 @@ const resolveFirmwareUploadRetryDelay = (attempt: number, baseDelayMs = 200, max
   Math.min(baseDelayMs * 2 ** attempt, maxDelayMs);
 const BLE_RESPONSE_TIMEOUT_MS = 30_000;
 const PROTOCOL_PROBE_TIMEOUT_MS = 1000;
+
+function inferProtocolTypeFromDeviceName(name?: string | null): ProtocolType | undefined {
+  return /\bpro\s*2\b/i.test(name ?? '') ? 'V2' : undefined;
+}
 
 let connectOptions: Record<string, unknown> = {
   requestMTU: 256,
@@ -434,7 +438,12 @@ export default class ReactNativeBleTransport {
 
       const addDevice = (device: Device) => {
         if (deviceList.every(d => d.id !== device.id)) {
-          deviceList.push({ ...device, commType: 'ble' } as IOneKeyDevice);
+          const protocolType = inferProtocolTypeFromDeviceName(device.name ?? device.localName);
+          deviceList.push({
+            ...device,
+            commType: 'ble',
+            ...(protocolType ? { protocolType } : {}),
+          } as IOneKeyDevice);
         }
       };
 
@@ -652,7 +661,7 @@ export default class ReactNativeBleTransport {
           buffer = buffer.concat([...data]);
         }
 
-        if (buffer.length - COMMON_HEADER_SIZE >= bufferLength) {
+        if (buffer.length - PROTOCOL_V1_MESSAGE_HEADER_SIZE >= bufferLength) {
           const value = Buffer.from(buffer);
           // console.log(
           //   '[hd-transport-react-native] Received a complete packet of data, resolve Promise, this.runPromise: ',
@@ -774,7 +783,7 @@ export default class ReactNativeBleTransport {
     runPromise.promise.catch(() => undefined);
     this.runPromise = runPromise;
     const messages = this._messages;
-    const buffers = buildBuffers(messages, name, data);
+    const buffers = ProtocolV1.encodeTransportPackets(messages, name, data);
     let timeout: ReturnType<typeof setTimeout> | undefined;
 
     async function writeChunkedData(
@@ -949,7 +958,7 @@ export default class ReactNativeBleTransport {
       }
 
       Log?.debug('receive data: ', response);
-      const jsonData = receiveOne(messages, response);
+      const jsonData = ProtocolV1.decodeMessage(messages, response);
       return check.call(jsonData);
     } catch (e) {
       Log?.error('call error: ', e);
@@ -1085,6 +1094,12 @@ export default class ReactNativeBleTransport {
         return 'V2';
       }
       throw this.createProtocolMismatchError(expectedProtocol);
+    }
+
+    if (this.deviceProtocol.get(uuid) === 'V2' && (await this.probeProtocolV2ByPing(uuid))) {
+      this.deviceProtocol.set(uuid, 'V2');
+      Log?.debug(`[ReactNativeBleTransport] detectProtocol: uuid=${uuid} -> V2 (cached)`);
+      return 'V2';
     }
 
     let protocol: ProtocolType = 'V1';

@@ -1,6 +1,10 @@
 /* eslint-disable no-undef */
 import transport, {
   LogBlockCommand,
+  PROTOCOL_V1_CHUNK_PAYLOAD_SIZE,
+  PROTOCOL_V1_MESSAGE_HEADER_SIZE,
+  PROTOCOL_V1_REPORT_ID,
+  PROTOCOL_V1_USB_PACKET_SIZE,
   PROTOCOL_V2_CHANNEL_USB,
   PROTOCOL_V2_FRAME_MAX_BYTES,
   ProtocolV2FrameAssembler,
@@ -16,13 +20,15 @@ import type {
   TransportCallOptions,
 } from '@onekeyfe/hd-transport';
 
-const { parseConfigure, decodeProtocol, check, ProtocolV1 } = transport;
+const { parseConfigure, check, ProtocolV1 } = transport;
 
 const CONFIGURATION_ID = 1;
 const INTERFACE_ID = 0;
 const ENDPOINT_ID = 1;
-const PACKET_SIZE = 64;
-const HEADER_LENGTH = 6;
+const PACKET_SIZE = PROTOCOL_V1_USB_PACKET_SIZE;
+const PAYLOAD_SIZE = PROTOCOL_V1_CHUNK_PAYLOAD_SIZE;
+const REPORT_ID = PROTOCOL_V1_REPORT_ID;
+const HEADER_LENGTH = PROTOCOL_V1_MESSAGE_HEADER_SIZE;
 const PACKET_IO_MAX_RETRIES = 3;
 const PACKET_IO_RETRY_DELAY = 300;
 const PROTOCOL_PROBE_TIMEOUT = 1000;
@@ -33,12 +39,17 @@ function shouldBlockWebUsbCallDataLog(name: string) {
   return LogBlockCommand.has(name) || WEBUSB_FILE_WRITE_LOG_BLOCK_PATTERN.test(normalized);
 }
 
+function inferProtocolTypeFromDeviceName(name?: string | null): ProtocolType | undefined {
+  return /\bpro\s*2\b/i.test(name ?? '') ? 'V2' : undefined;
+}
+
 /**
  * Device information with path and WebUSB device instance
  */
 export interface DeviceInfo extends OneKeyDeviceInfoBase {
   path: string;
   device: USBDevice;
+  protocolType?: ProtocolType;
 }
 
 /** USB endpoint pair discovered at connect time */
@@ -60,6 +71,9 @@ export default class WebUsbTransport {
 
   /** Per-path protocol type detected by active wire-level probe. */
   private deviceProtocol: Map<string, ProtocolType> = new Map();
+
+  /** 按设备缓存 Protocol V2 frame assembler，保留同一次读取里多出来的后续 frame。 */
+  private protocolV2Assemblers: Map<string, ProtocolV2FrameAssembler> = new Map();
 
   /** Per-path USB endpoint / interface numbers (discovered from USB descriptors) */
   private deviceEndpoints: Map<string, DeviceEndpoints> = new Map();
@@ -167,6 +181,7 @@ export default class WebUsbTransport {
       path: device.serialNumber as string,
       device,
       commType: 'webusb',
+      protocolType: inferProtocolTypeFromDeviceName(device.productName),
     }));
 
     // Debug: log all discovered devices. Protocol is detected after acquire via wire probe.
@@ -227,6 +242,12 @@ export default class WebUsbTransport {
         return 'V2';
       }
       throw this.createProtocolMismatchError(expectedProtocol);
+    }
+
+    if (this.deviceProtocol.get(path) === 'V2' && (await this.probeProtocolV2ByPing(path))) {
+      this.deviceProtocol.set(path, 'V2');
+      this.Log.debug(`[WebUsbTransport] detectProtocol: path=${path} -> V2 (cached)`);
+      return 'V2';
     }
 
     let protocol: ProtocolType = 'V1';
@@ -338,6 +359,12 @@ export default class WebUsbTransport {
     // Discover endpoints from USB descriptors; descriptors are not used for protocol selection.
     const endpoints = this.discoverEndpoints(device);
     this.deviceEndpoints.set(path, endpoints);
+    if (!this.protocolV2Assemblers.has(path)) {
+      this.protocolV2Assemblers.set(
+        path,
+        new ProtocolV2FrameAssembler(PROTOCOL_V2_FRAME_MAX_BYTES)
+      );
+    }
 
     await device.claimInterface(endpoints.interfaceNumber);
   }
@@ -501,6 +528,8 @@ export default class WebUsbTransport {
   }
 
   private async resetConnectionAfterProbe(path: string) {
+    this.protocolV2Assemblers.get(path)?.reset();
+
     try {
       const device = await this.findDevice(path);
       if (device.opened) {
@@ -643,11 +672,11 @@ export default class WebUsbTransport {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
     }
 
-    const encodeBuffers = ProtocolV1.encode(messages, name, data);
+    const encodeBuffers = ProtocolV1.encodeMessageChunks(messages, name, data);
 
     for (const buffer of encodeBuffers) {
       const newArray: Uint8Array = new Uint8Array(PACKET_SIZE);
-      newArray[0] = 63;
+      newArray[0] = REPORT_ID;
       newArray.set(new Uint8Array(buffer), 1);
       await this.transferOutWithRetry(path, newArray);
     }
@@ -656,7 +685,7 @@ export default class WebUsbTransport {
     if (typeof resData !== 'string') {
       throw ERRORS.TypedError(HardwareErrorCode.NetworkError, 'Returning data is not string.');
     }
-    const jsonData = ProtocolV1.decode(messages, resData);
+    const jsonData = ProtocolV1.decodeMessage(messages, resData);
     return check.call(jsonData);
   }
 
@@ -697,12 +726,18 @@ export default class WebUsbTransport {
         new Error(`Protocol V2 response timeout after ${timeoutMs}ms for ${name}`),
     });
 
+    this.protocolV2Assemblers.get(path)?.reset();
     return session.call(name, data, options);
   }
 
   private async receiveProtocolV2Frame(path: string, timeoutMs?: number): Promise<Uint8Array> {
-    const assembler = new ProtocolV2FrameAssembler(PROTOCOL_V2_FRAME_MAX_BYTES);
-    let frame: Uint8Array | undefined;
+    let assembler = this.protocolV2Assemblers.get(path);
+    if (!assembler) {
+      assembler = new ProtocolV2FrameAssembler(PROTOCOL_V2_FRAME_MAX_BYTES);
+      this.protocolV2Assemblers.set(path, assembler);
+    }
+
+    let frame: Uint8Array | undefined = assembler.push(new Uint8Array(0));
     const deadline = timeoutMs ? Date.now() + timeoutMs : undefined;
 
     while (!frame) {
@@ -759,7 +794,7 @@ export default class WebUsbTransport {
 
     const firstPacketData = await readPacket();
     const firstData = this.toArrayBuffer(firstPacketData.buffer.slice(1));
-    const { length, typeId, restBuffer } = decodeProtocol.decodeChunked(firstData);
+    const { length, typeId, restBuffer } = ProtocolV1.decodeFirstChunk(firstData);
 
     // eslint-disable-next-line @typescript-eslint/restrict-plus-operands
     const lengthWithHeader = Number(length + HEADER_LENGTH);
@@ -773,7 +808,7 @@ export default class WebUsbTransport {
     while (decoded.offset < lengthWithHeader) {
       const packetData = await readPacket();
       const buffer = this.toArrayBuffer(packetData.buffer.slice(1));
-      if (lengthWithHeader - decoded.offset >= PACKET_SIZE) {
+      if (lengthWithHeader - decoded.offset >= PAYLOAD_SIZE) {
         decoded.append(buffer);
       } else {
         decoded.append(buffer.slice(0, lengthWithHeader - decoded.offset));
@@ -794,6 +829,7 @@ export default class WebUsbTransport {
     await device.releaseInterface(ifaceNum);
     await device.close();
     this.deviceProtocol.delete(path);
+    this.protocolV2Assemblers.delete(path);
     this.deviceEndpoints.delete(path);
   }
 

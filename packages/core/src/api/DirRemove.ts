@@ -12,7 +12,7 @@ export default class DirRemove extends BaseMethod<DirRemoveParams> {
   }
 
   async run() {
-    const res = await (this.device.commands as any).call('FilesystemDirRemove', {
+    const res = await this.device.commands.typedCall('FilesystemDirRemove', 'Success', {
       path: this.params.path,
     });
     return Promise.resolve(res.message);

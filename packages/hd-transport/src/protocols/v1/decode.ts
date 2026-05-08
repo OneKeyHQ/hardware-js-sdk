@@ -1,6 +1,6 @@
 import ByteBuffer from 'bytebuffer';
 
-import { MESSAGE_HEADER_BYTE } from '../../constants';
+import { PROTOCOL_V1_HEADER_BYTE } from '../../constants';
 
 /**
  * Reads meta information from buffer
@@ -24,7 +24,7 @@ const readHeaderChunked = (buffer: ByteBuffer) => {
   return { sharp1, sharp2, typeId, length };
 };
 
-export const decode = (byteBuffer: ByteBuffer) => {
+export const decodeEnvelope = (byteBuffer: ByteBuffer) => {
   const { typeId } = readHeader(byteBuffer);
 
   return {
@@ -35,13 +35,13 @@ export const decode = (byteBuffer: ByteBuffer) => {
 
 // Parses first raw input that comes from Trezor and returns some information about the whole message.
 // [compatibility]: accept Buffer just like decode does. But this would require changes in lower levels
-export const decodeChunked = (bytes: ArrayBuffer) => {
+export const decodeFirstChunk = (bytes: ArrayBuffer) => {
   // convert to ByteBuffer so it's easier to read
   const byteBuffer = ByteBuffer.wrap(bytes, undefined, undefined, true);
 
   const { sharp1, sharp2, typeId, length } = readHeaderChunked(byteBuffer);
 
-  if (sharp1 !== MESSAGE_HEADER_BYTE || sharp2 !== MESSAGE_HEADER_BYTE) {
+  if (sharp1 !== PROTOCOL_V1_HEADER_BYTE || sharp2 !== PROTOCOL_V1_HEADER_BYTE) {
     throw new Error("Didn't receive expected header signature.");
   }
 

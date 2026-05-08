@@ -1,6 +1,6 @@
 import transport, {
-  COMMON_HEADER_SIZE,
   LogBlockCommand,
+  PROTOCOL_V1_MESSAGE_HEADER_SIZE,
   PROTOCOL_V2_CHANNEL_BLE_UART,
   ProtocolV2FrameAssembler,
   ProtocolV2Session,
@@ -21,7 +21,7 @@ import type { DesktopAPI } from '@onekeyfe/hd-transport-electron';
 import type { OneKeyDeviceInfo, ProtocolType, TransportCallOptions } from '@onekeyfe/hd-transport';
 import type EventEmitter from 'events';
 
-const { parseConfigure, buildBuffers, receiveOne, check } = transport;
+const { parseConfigure, ProtocolV1, check } = transport;
 
 declare global {
   interface Window {
@@ -41,18 +41,25 @@ interface PacketProcessResult {
   error?: string;
 }
 
+function inferProtocolTypeFromDeviceName(name?: string | null): ProtocolType | undefined {
+  return /\bpro\s*2\b/i.test(name ?? '') ? 'V2' : undefined;
+}
+
 const toBleDescriptor = (
   device: { id: string; name: string | null },
   protocolType?: ProtocolType
-): OneKeyDeviceInfo =>
-  ({
+): OneKeyDeviceInfo => {
+  const resolvedProtocolType = protocolType ?? inferProtocolTypeFromDeviceName(device.name);
+
+  return {
     id: device.id,
     name: device.name,
     path: device.id,
     debug: false,
     commType: 'electron-ble',
-    ...(protocolType ? { protocolType } : {}),
-  } as OneKeyDeviceInfo);
+    ...(resolvedProtocolType ? { protocolType: resolvedProtocolType } : {}),
+  } as OneKeyDeviceInfo;
+};
 
 const BLE_PACKET_SIZE = 192;
 const BLE_WRITE_DELAY_MS = 5;
@@ -322,6 +329,12 @@ export default class ElectronAutoBleTransport {
       throw this.createProtocolMismatchError(expectedProtocol);
     }
 
+    if (this.deviceProtocol.get(uuid) === 'V2' && (await this.probeProtocolV2ByPing(uuid))) {
+      this.deviceProtocol.set(uuid, 'V2');
+      this.Log?.debug(`[Auto BLE] detectProtocol: uuid=${uuid} -> V2 (cached)`);
+      return 'V2';
+    }
+
     let protocol: ProtocolType = 'V1';
     if (!(await this.probeProtocolV1(uuid)) && (await this.probeProtocolV2ByPing(uuid))) {
       protocol = 'V2';
@@ -568,7 +581,7 @@ export default class ElectronAutoBleTransport {
     runPromise.promise.catch(() => undefined);
     this.runPromise = runPromise;
     const messages = this._messages;
-    const buffers = buildBuffers(messages, name, data);
+    const buffers = ProtocolV1.encodeTransportPackets(messages, name, data);
     let timeout: ReturnType<typeof setTimeout> | undefined;
 
     try {
@@ -607,7 +620,7 @@ export default class ElectronAutoBleTransport {
         throw new Error('Returning data is not string.');
       }
 
-      const jsonData = receiveOne(messages, response);
+      const jsonData = ProtocolV1.decodeMessage(messages, response);
       return check.call(jsonData);
     } catch (e) {
       this.Log?.error('[Auto BLE] Protocol V1 call error:', e);
@@ -725,7 +738,10 @@ export default class ElectronAutoBleTransport {
         bufferState.buffer = bufferState.buffer.concat([...data]);
       }
 
-      if (bufferState.buffer.length - COMMON_HEADER_SIZE >= bufferState.bufferLength) {
+      if (
+        bufferState.buffer.length - PROTOCOL_V1_MESSAGE_HEADER_SIZE >=
+        bufferState.bufferLength
+      ) {
         const completeBuffer = new Uint8Array(bufferState.buffer);
         bufferState.bufferLength = 0;
         bufferState.buffer = [];

@@ -10,7 +10,7 @@ import type {
   ProtocolType,
 } from '@onekeyfe/hd-transport';
 
-const { check, buildOne, receiveOne, parseConfigure } = transport;
+const { check, ProtocolV1, parseConfigure } = transport;
 
 type IncompleteRequestOptions = {
   body?: Array<any> | Record<string, unknown> | string;
@@ -130,7 +130,7 @@ export default class EmulatorTransport {
       this.Log.debug('call-', ' name: ', name, ' data: ', data);
     }
 
-    const o = buildOne(messages, name, data);
+    const o = ProtocolV1.encodeEnvelope(messages, name, data);
     const outData = o.toString('hex');
     const resData = await this._post({
       url: `/call/${session}`,
@@ -140,7 +140,7 @@ export default class EmulatorTransport {
     if (typeof resData !== 'string') {
       throw ERRORS.TypedError(HardwareErrorCode.NetworkError, 'Returning data is not string.');
     }
-    const jsonData = receiveOne(messages, resData);
+    const jsonData = ProtocolV1.decodeMessage(messages, resData);
     return check.call(jsonData);
   }
 
@@ -149,7 +149,7 @@ export default class EmulatorTransport {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
     }
     const messages = this._messages;
-    const outData = buildOne(messages, name, data).toString('hex');
+    const outData = ProtocolV1.encodeEnvelope(messages, name, data).toString('hex');
     await this._post({
       url: `/post/${session}`,
       body: outData,
@@ -167,7 +167,7 @@ export default class EmulatorTransport {
     if (typeof resData !== 'string') {
       throw ERRORS.TypedError(HardwareErrorCode.NetworkError, 'Returning data is not string.');
     }
-    const jsonData = receiveOne(messages, resData);
+    const jsonData = ProtocolV1.decodeMessage(messages, resData);
     return check.call(jsonData);
   }
 

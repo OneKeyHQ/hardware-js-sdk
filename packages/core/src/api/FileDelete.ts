@@ -12,7 +12,7 @@ export default class FileDelete extends BaseMethod<FileDeleteParams> {
   }
 
   async run() {
-    const res = await (this.device.commands as any).call('FilesystemFileDelete', {
+    const res = await this.device.commands.typedCall('FilesystemFileDelete', 'Success', {
       path: this.params.path,
     });
     return Promise.resolve(res.message);

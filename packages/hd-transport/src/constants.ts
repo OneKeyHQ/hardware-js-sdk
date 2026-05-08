@@ -1,31 +1,38 @@
 // ---- Protocol V1 (Pro1 / Touch / Mini / Classic) ----
 
-export const MESSAGE_TOP_CHAR = 0x003f;
-export const MESSAGE_HEADER_BYTE = 0x23;
-export const HEADER_SIZE = 1 + 1 + 4 + 2;
-export const BUFFER_SIZE = 63;
-/**
- * exclude ?##
- */
-export const COMMON_HEADER_SIZE = 6;
+/** Protocol V1 USB report 标记，ASCII '?'。 */
+export const PROTOCOL_V1_REPORT_ID = 0x3f;
+
+/** Protocol V1 envelope 头部标记，ASCII '#'。 */
+export const PROTOCOL_V1_HEADER_BYTE = 0x23;
+
+/** Protocol V1 单个 chunk 去掉 report 标记后的可用 payload 长度。 */
+export const PROTOCOL_V1_CHUNK_PAYLOAD_SIZE = 63;
+
+/** Protocol V1 USB packet 长度：report 标记 + chunk payload。 */
+export const PROTOCOL_V1_USB_PACKET_SIZE = PROTOCOL_V1_CHUNK_PAYLOAD_SIZE + 1;
+
+/** Protocol V1 message metadata：message type 2 字节 + payload length 4 字节。 */
+export const PROTOCOL_V1_MESSAGE_HEADER_SIZE = 2 + 4;
+
+/** Protocol V1 envelope metadata：## + message type + payload length。 */
+export const PROTOCOL_V1_ENVELOPE_HEADER_SIZE = 1 + 1 + PROTOCOL_V1_MESSAGE_HEADER_SIZE;
 
 // ---- Protocol V2 (Pro2 USB / BLE transports) ----
 
-/** Maximum size of a Protocol V2 frame including header + payload + CRC */
-export const PROTOCOL_V2_FRAME_MAX_BYTES = 2200;
+/** Protocol V2 单帧最大长度，包含 header、payload 和 CRC；需容纳 4096 数据块及 protobuf 开销。 */
+export const PROTOCOL_V2_FRAME_MAX_BYTES = 4608;
 
-/** Safe data chunk for FilesystemFileWrite payload (frame max minus message overhead, ~50B) */
-export const PROTOCOL_V2_FILE_CHUNK_SIZE = 2048;
+/** FilesystemFileWrite 的文件数据分块大小；frame 上限额外预留 protobuf / frame 开销。 */
+export const PROTOCOL_V2_FILE_CHUNK_SIZE = 4096;
 
 /**
- * Protocol V2 routing channel IDs.
- * The firmware multiplexes the V2 frame across transports.
- * USB endpoints talk directly to the main MCU (no proto-link routing needed),
- * while BLE goes through the BLE coprocessor's UART bridge and must specify CHANNEL=1.
+ * Protocol V2 路由 channel。
+ * USB 端点直接到主 MCU，不需要 proto-link 路由；BLE 需要经过 BLE 协处理器 UART bridge。
  */
 export const PROTOCOL_V2_CHANNEL_USB = 0;
 export const PROTOCOL_V2_CHANNEL_BLE_UART = 1;
 export const PROTOCOL_V2_CHANNEL_SOCKET = 2;
 
-/** Protocol V2 packet_src for protobuf message traffic. Firmware routes 0 to the protobuf dispatcher. */
+/** protobuf 命令流的 packet_src，固件侧会把 0 路由到 protobuf dispatcher。 */
 export const PROTOCOL_V2_PACKET_SRC_COMMAND = 0;

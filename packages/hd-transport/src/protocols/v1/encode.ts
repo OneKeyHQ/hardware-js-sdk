@@ -1,6 +1,10 @@
 import ByteBuffer from 'bytebuffer';
 
-import { BUFFER_SIZE, HEADER_SIZE, MESSAGE_HEADER_BYTE } from '../../constants';
+import {
+  PROTOCOL_V1_CHUNK_PAYLOAD_SIZE,
+  PROTOCOL_V1_ENVELOPE_HEADER_SIZE,
+  PROTOCOL_V1_HEADER_BYTE,
+} from '../../constants';
 
 type Options<Chunked> = {
   chunked: Chunked;
@@ -8,19 +12,22 @@ type Options<Chunked> = {
   messageType: number;
 };
 
-function encode(data: ByteBuffer, options: Options<true>): Buffer[];
-function encode(data: ByteBuffer, options: Options<false>): Buffer;
-function encode(data: any, options: any): any {
+function encodeEnvelope(data: ByteBuffer, options: Options<true>): Buffer[];
+function encodeEnvelope(data: ByteBuffer, options: Options<false>): Buffer;
+function encodeEnvelope(data: any, options: any): any {
   const { addTrezorHeaders, chunked, messageType } = options;
   // eslint-disable-next-line @typescript-eslint/restrict-plus-operands
-  const fullSize = (addTrezorHeaders ? HEADER_SIZE : HEADER_SIZE - 2) + data.limit;
+  const fullSize =
+    (addTrezorHeaders
+      ? PROTOCOL_V1_ENVELOPE_HEADER_SIZE
+      : PROTOCOL_V1_ENVELOPE_HEADER_SIZE - 2) + data.limit;
 
   const encodedByteBuffer = new ByteBuffer(fullSize);
 
   if (addTrezorHeaders) {
     // 2*1 byte
-    encodedByteBuffer.writeByte(MESSAGE_HEADER_BYTE);
-    encodedByteBuffer.writeByte(MESSAGE_HEADER_BYTE);
+    encodedByteBuffer.writeByte(PROTOCOL_V1_HEADER_BYTE);
+    encodedByteBuffer.writeByte(PROTOCOL_V1_HEADER_BYTE);
   }
 
   // 2 bytes
@@ -39,7 +46,7 @@ function encode(data: any, options: any): any {
   }
 
   const result: Buffer[] = [];
-  const size = BUFFER_SIZE;
+  const size = PROTOCOL_V1_CHUNK_PAYLOAD_SIZE;
 
   // How many pieces will there actually be
   const count = Math.floor((encodedByteBuffer.limit - 1) / size) + 1 || 1;
@@ -56,4 +63,4 @@ function encode(data: any, options: any): any {
   return result;
 }
 
-export { encode };
+export { encodeEnvelope };
