@@ -1,7 +1,7 @@
 import { CRC8_INIT } from './constants';
 
-// CRC-8 lookup table (same as firmware crc8.c, polynomial init=0x30)
-// Extracted from OneKey Pro2 webusb test reference implementation
+// Protocol V2 帧校验用的 CRC-8 查表，不是设备或业务数据。
+// 表值与固件侧 crc8 实现保持一致；初始值见 CRC8_INIT。
 export const CRC8_TABLE = new Uint8Array([
   0x00, 0x5e, 0xbc, 0xe2, 0x61, 0x3f, 0xdd, 0x83, 0xc2, 0x9c, 0x7e, 0x20, 0xa3, 0xfd, 0x1f, 0x41,
   0x9d, 0xc3, 0x21, 0x7f, 0xfc, 0xa2, 0x40, 0x1e, 0x5f, 0x01, 0xe3, 0xbd, 0x3e, 0x60, 0x82, 0xdc,
@@ -22,8 +22,7 @@ export const CRC8_TABLE = new Uint8Array([
 ]);
 
 /**
- * Compute CRC-8 over `len` bytes of `data`.
- * Uses the lookup table with init=0x30 (same as OneKey Pro2 firmware).
+ * 计算 data 前 len 个字节的 CRC-8，使用与固件侧一致的初始值。
  */
 export function crc8(data: Uint8Array, len: number): number {
   let crc = CRC8_INIT;
