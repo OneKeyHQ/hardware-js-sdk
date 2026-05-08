@@ -1,6 +1,6 @@
 # OneKey Protocol V2
 
-本文档描述 WebUSB、Electron BLE 和 React Native BLE 上使用的 Protocol V2。Protocol V2 目前服务 Pro2，主要覆盖协议探测、文件系统、固件更新和设备重启。
+本文档描述 WebUSB、Electron BLE、React Native BLE 和 lowlevel BLE 上使用的 Protocol V2。Protocol V2 目前服务 Pro2，主要覆盖协议探测、文件系统、固件更新和设备重启。
 
 ## 与 Protocol V1 的关系
 
@@ -49,6 +49,19 @@ Protocol V2 使用 `0x5A` 起始字节和两段 CRC8。
 | `CRC`       | 对除最后 CRC 外的整帧计算 CRC8         |
 
 当前 SDK 使用的最大 V2 frame 长度是 `2200` bytes，文件写入 chunk size 是 `2048` bytes。
+
+### CRC8 说明
+
+`HeaderCRC` 和末尾 `CRC` 是 Protocol V2 wire protocol 的必需字段，不是调试信息，也不是设备业务数据。设备端会校验 host 发出的 frame，SDK 端也会校验设备返回的 frame；缺失或计算不一致时，常见结果是设备不响应、返回错误，或 SDK 在 decode 阶段抛出 CRC mismatch。
+
+SDK 的实现放在 `packages/hd-transport/src/protocols/v2/crc8.ts`。其中 `CRC8_TABLE` 是 256 项预计算查表，等价于按位计算同一个 CRC8 算法。保留查表有两个原因：
+
+- 与固件侧 `crc8` 实现保持逐字节一致，减少多语言实现时的参数漂移。
+- 避免每个 frame 都重新按位计算，尤其是文件写入和固件更新会发送大量 frame。
+
+如果使用 SDK 提供的 WebUSB、Electron BLE、React Native BLE 或 lowlevel transport，应用层和原生 BLE 插件不需要自己计算 CRC8。lowlevel 原生侧只需要把 BLE notification 按 frame 长度重组成完整 `0x5A` frame，并原样交给 JS SDK；CRC8 的计算和校验由 `hd-transport` 完成。
+
+只有在完全绕过 SDK、自己实现 Protocol V2 encode/decode 时，才需要在 Kotlin、Swift 或其他语言里实现同样的 CRC8 算法。此时可以使用查表，也可以按位计算，但输出必须与 SDK 的 `crc8(data, len)` 完全一致。
 
 ## protobuf payload
 
@@ -114,19 +127,19 @@ endpoint/interface discovery 来自 USB descriptor，但只用于 I/O 路由，�
 
 ## BLE
 
-Electron BLE 和 React Native BLE 使用 Router `1`。桌面默认 env 是 `desktop-web-ble`，移动端默认 env 是 `react-native`，两者内部都自动支持 V1/V2。
+Electron BLE、React Native BLE 和 lowlevel BLE 使用 Router `1`。桌面默认 env 是 `desktop-web-ble`，React Native 移动端默认 env 是 `react-native`，原生 WebView/Swift/Kotlin/Flutter 集成使用 `lowlevel`。这些 transport 内部都自动支持 V1/V2。
 
 ```mermaid
 flowchart TD
-  Connect["nobleBle.connect(uuid)"]
-  Subscribe["nobleBle.subscribe(uuid)"]
+  Connect["BLE connect(uuid)"]
+  Subscribe["subscribe notify characteristic"]
   Probe["GetProtoVersion probe"]
   Call["call() 按检测结果进入 V1 或 V2 分支"]
 
   Connect --> Subscribe --> Probe --> Call
 ```
 
-BLE 写入会按 GATT write 能力拆成小块，接收端会按 V2 frame length 重组完整 `0x5A` 帧。
+BLE 写入会按 GATT write 能力拆成小块，接收端会按 V2 frame length 重组完整 `0x5A` 帧。lowlevel 插件必须把原生 notification 转成完整 V1 message 或完整 V2 frame 后再 resolve `receive()`，不能把单个 BLE notification 直接返回给 SDK。
 
 V2 的 encode/decode、超时、探测和 frame 重组由 `hd-transport` 的 Protocol Session 层统一实现。BLE transport 只负责把完整 V2 frame 切成平台可写入的小包，并把 notification bytes 喂给 `ProtocolV2FrameAssembler`。
 
@@ -209,13 +222,14 @@ SDK 会先把 resource、bootloader、firmware 写入 `vol1:`，再把所有需�
 
 | 模块                      | 入口                                                                  |
 | ------------------------- | --------------------------------------------------------------------- |
-| V2 frame encode/decode    | `packages/hd-transport/src/serialization/protocol-v2/`                |
-| V1/V2 schema 路由         | `packages/hd-transport/src/serialization/protocols.ts`                |
-| V2 session / frame 组装   | `packages/hd-transport/src/protocol-session.ts`                       |
+| V2 CRC8 / frame encode/decode | `packages/hd-transport/src/protocols/v2/`                         |
+| V1/V2 schema 路由         | `packages/hd-transport/src/serialization/protobuf/`                   |
+| V2 session / frame 组装   | `packages/hd-transport/src/protocols/v2/session.ts`、`frame-assembler.ts` |
 | Protocol V2 feature adapter      | `packages/core/src/protocols/protocol-v2/features.ts`          |
 | WebUSB 自动探测           | `packages/hd-transport-web-device/src/webusb.ts`                      |
 | Electron BLE 自动探测     | `packages/hd-transport-web-device/src/electron-auto-ble-transport.ts` |
 | React Native BLE 自动探测 | `packages/hd-transport-react-native/src/index.ts`                     |
+| lowlevel BLE 自动探测     | `packages/hd-transport-lowlevel/src/index.ts`                         |
 | env 到 transport 映射     | `packages/hd-common-connect-sdk/src/index.ts`                         |
 | Protocol V2 初始化分支           | `packages/core/src/device/Device.ts`                                  |
-| Protocol V2 固件更新             | `packages/core/src/api/FirmwareUpdateV3.ts`                           |
+| Protocol V2 固件更新             | `packages/core/src/api/FirmwareUpdateV4.ts`                           |
