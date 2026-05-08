@@ -1,5 +1,4 @@
 import type { QrResponseData } from '../types/qr';
-import type { PreemptionDecision } from '../utils/DeviceJobQueue';
 
 export const UI_EVENT = 'UI_EVENT';
 
@@ -13,7 +12,9 @@ export const UI_REQUEST = {
   REQUEST_DEVICE_PERMISSION: 'ui-request-device-permission',
   REQUEST_SELECT_DEVICE: 'ui-request-select-device',
   REQUEST_DEVICE_CONNECT: 'ui-request-device-connect',
-  REQUEST_PREEMPTION: 'ui-request-preemption',
+  // Ledger BTC App: account index >= 100 requires display=true. Adapter asks
+  // the user once per session before promoting the call.
+  REQUEST_BTC_HIGH_INDEX_CONFIRM: 'ui-request-btc-high-index-confirm',
   CLOSE_UI_WINDOW: 'ui-close',
   DEVICE_PROGRESS: 'ui-device_progress',
   FIRMWARE_PROGRESS: 'ui-firmware-progress',
@@ -28,9 +29,20 @@ export const UI_RESPONSE = {
   RECEIVE_SELECT_DEVICE: 'receive-select-device',
   RECEIVE_DEVICE_CONNECT: 'receive-device-connect',
   RECEIVE_DEVICE_PERMISSION: 'receive-device-permission',
-  RECEIVE_PREEMPTION: 'receive-preemption',
+  RECEIVE_BTC_HIGH_INDEX_CONFIRM: 'receive-btc-high-index-confirm',
   CANCEL: 'cancel',
 } as const;
+
+export type DevicePermissionDeniedReason =
+  | 'bluetoothTurnedOff'
+  | 'permissionDenied'
+  | (string & Record<never, never>);
+
+export type DevicePermissionResponse = {
+  granted: boolean;
+  reason?: DevicePermissionDeniedReason;
+  message?: string;
+};
 
 export type UiResponseEvent =
   | {
@@ -66,11 +78,11 @@ export type UiResponseEvent =
     }
   | {
       type: typeof UI_RESPONSE.RECEIVE_DEVICE_PERMISSION;
-      payload: { granted: boolean };
+      payload: DevicePermissionResponse;
     }
   | {
-      type: typeof UI_RESPONSE.RECEIVE_PREEMPTION;
-      payload: { decision: PreemptionDecision };
+      type: typeof UI_RESPONSE.RECEIVE_BTC_HIGH_INDEX_CONFIRM;
+      payload: { confirmed: boolean };
     }
   | {
       type: typeof UI_RESPONSE.CANCEL;

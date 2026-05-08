@@ -30,11 +30,26 @@ describe('LedgerWebHidConnector', () => {
       expect(resolve(c, { path: 'ble-path', name: 'Nano X a58f', transport: 'BLE' })).toBe('A58F');
     });
 
-    it('falls back to descriptor.path when BLE name has no hex suffix', () => {
+    it('treats RN_BLE descriptors as BLE in the shared DMK transport check', () => {
       const c = new LedgerWebHidConnector();
-      expect(resolve(c, { path: 'ble-fallback', name: 'Nano X', transport: 'BLE' })).toBe(
-        'ble-fallback'
-      );
+      expect(
+        resolve(c, {
+          path: 'CC26DD6E-3493-1698-A22D-81FFA13FEA67',
+          name: 'Nano X a58f',
+          transport: 'RN_BLE',
+        })
+      ).toBe('A58F');
+    });
+
+    it('does not derive BLE identity from descriptor.path', () => {
+      const c = new LedgerWebHidConnector();
+      expect(
+        resolve(c, {
+          path: 'CC26DD6E-3493-1698-A22D-81FFA13FEA67',
+          name: 'Andox',
+          transport: 'BLE',
+        })
+      ).toBe('');
     });
   });
 });
