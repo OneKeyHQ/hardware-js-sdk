@@ -10,7 +10,7 @@ import type { TransportType } from '../../utils/hardwareInstance';
 import { DeviceInfo } from '../../types/hardware';
 import { Button } from '../ui/Button';
 import { Signal, ExternalLink, Info, Usb, Server } from 'lucide-react';
-import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
+import { EDeviceType, ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
 import { UI_RESPONSE } from '@onekeyfe/hd-core';
 
 interface TransportSwitcherProps {
@@ -84,23 +84,32 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
         if (featuresResult.success && featuresResult.payload) {
           setDeviceFeatures(featuresResult.payload);
 
-          // 获取OneKey特定的features
-          const onekeyFeaturesResult = await sdk.getOnekeyFeatures(targetDevice.connectId);
-          if (onekeyFeaturesResult.success && onekeyFeaturesResult.payload) {
-            // 更新设备信息，包含onekeyFeatures
+          // Protocol V2 的 OneKey 字段已经由 getFeatures 归一化，避免重复跑一次设备初始化。
+          if (featuresResult.payload.onekey_device_type === EDeviceType.Pro2) {
             const updatedDevice = {
               ...targetDevice,
               features: featuresResult.payload,
-              onekeyFeatures: onekeyFeaturesResult.payload,
+              onekeyFeatures: featuresResult.payload as DeviceInfo['onekeyFeatures'],
             };
             setCurrentDevice(updatedDevice);
           } else {
-            // 即使获取onekeyFeatures失败，也设置基本的设备信息
-            const updatedDevice = {
-              ...targetDevice,
-              features: featuresResult.payload,
-            };
-            setCurrentDevice(updatedDevice);
+            const onekeyFeaturesResult = await sdk.getOnekeyFeatures(targetDevice.connectId);
+            if (onekeyFeaturesResult.success && onekeyFeaturesResult.payload) {
+              // 更新设备信息，包含onekeyFeatures
+              const updatedDevice = {
+                ...targetDevice,
+                features: featuresResult.payload,
+                onekeyFeatures: onekeyFeaturesResult.payload,
+              };
+              setCurrentDevice(updatedDevice);
+            } else {
+              // 即使获取onekeyFeatures失败，也设置基本的设备信息
+              const updatedDevice = {
+                ...targetDevice,
+                features: featuresResult.payload,
+              };
+              setCurrentDevice(updatedDevice);
+            }
           }
         } else {
           setCurrentDevice(targetDevice);

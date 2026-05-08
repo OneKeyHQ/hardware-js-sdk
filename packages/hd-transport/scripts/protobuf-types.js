@@ -16,6 +16,11 @@ const json = readJson(
   fs.existsSync(localMessagesJsonPath) ? localMessagesJsonPath : coreMessagesJsonPath
 );
 const optionalJsonFiles = ['../messages-pro2.json'];
+const OPTIONAL_DUPLICATE_TYPE_ALIASES = {
+  DeviceInfo: 'ProtocolV2DeviceInfo',
+};
+const messageTypeAliases = {};
+const skipMessageTypeKeys = new Set(Object.values(OPTIONAL_DUPLICATE_TYPE_ALIASES));
 
 const args = process.argv.slice(2);
 
@@ -193,7 +198,15 @@ optionalJsonFiles.forEach(jsonFile => {
   const jsonPath = path.join(__dirname, jsonFile);
   if (!fs.existsSync(jsonPath)) return;
   const optionalJson = readJson(jsonPath);
-  Object.keys(optionalJson.nested).map(e => parseMessage(e, optionalJson.nested[e], 0, true));
+  Object.keys(optionalJson.nested).map(e => {
+    const alias = hasParsedType(e) ? OPTIONAL_DUPLICATE_TYPE_ALIASES[e] : undefined;
+    if (alias) {
+      parseMessage(alias, optionalJson.nested[e]);
+      messageTypeAliases[e] = [e, alias];
+      return;
+    }
+    parseMessage(e, optionalJson.nested[e], 0, true);
+  });
 });
 
 // types needs reordering (used before defined)
@@ -243,10 +256,14 @@ if (!isTypescript) {
   types
     .flatMap(t => (t && t.type === 'message' ? [t] : []))
     .forEach(t => {
+      if (skipMessageTypeKeys.has(t.name)) return;
+      const messageTypeValue = messageTypeAliases[t.name]
+        ? messageTypeAliases[t.name].join(' | ')
+        : t.name;
       if (t.exact) {
-        lines.push(`    ${t.name}: $Exact<${t.name}>;`);
+        lines.push(`    ${t.name}: $Exact<${messageTypeValue}>;`);
       } else {
-        lines.push(`    ${t.name}: ${t.name};`);
+        lines.push(`    ${t.name}: ${messageTypeValue};`);
       }
       // lines.push('    ' + t.name + ': $Exact<' + t.name + '>;');
     });
@@ -273,7 +290,11 @@ export type TypedCall = <T: MessageKey, R: MessageKey>(
   types
     .flatMap(t => (t && t.type === 'message' ? [t] : []))
     .forEach(t => {
-      lines.push(`    ${t.name}: ${t.name};`);
+      if (skipMessageTypeKeys.has(t.name)) return;
+      const messageTypeValue = messageTypeAliases[t.name]
+        ? messageTypeAliases[t.name].join(' | ')
+        : t.name;
+      lines.push(`    ${t.name}: ${messageTypeValue};`);
     });
   lines.push('};');
 

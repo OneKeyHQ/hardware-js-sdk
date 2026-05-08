@@ -288,13 +288,14 @@ export class Device extends EventEmitter {
   async acquire(connectProtocol?: HardwareConnectProtocol) {
     const env = DataManager.getSettings('env');
     const mainIdKey = DataManager.isBleConnect(env) ? 'id' : 'session';
+    const expectedProtocol = connectProtocol ?? this.originalDescriptor.protocolType;
     try {
       if (DataManager.isBleConnect(env)) {
         const res = await this.deviceConnector?.acquire(
           this.originalDescriptor.id,
           undefined,
           undefined,
-          connectProtocol
+          expectedProtocol
         );
         this.mainId = (res as unknown as any).uuid ?? '';
         Log.debug('Expected uuid:', this.mainId);
@@ -303,7 +304,7 @@ export class Device extends EventEmitter {
           this.originalDescriptor.path,
           this.originalDescriptor.session,
           undefined,
-          connectProtocol
+          expectedProtocol
         );
         Log.debug('Expected session id:', this.mainId);
       }

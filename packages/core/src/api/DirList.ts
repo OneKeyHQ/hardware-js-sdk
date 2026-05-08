@@ -16,7 +16,7 @@ export default class DirList extends BaseMethod<DirListParams> {
   }
 
   async run() {
-    const res = await (this.device.commands as any).call('FilesystemDirList', {
+    const res = await this.device.commands.typedCall('FilesystemDirList', 'FilesystemDir', {
       path: this.params.path,
       depth: this.params.depth,
     });

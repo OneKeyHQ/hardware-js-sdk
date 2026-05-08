@@ -314,7 +314,7 @@
                 </div>
                 <div>
                     <label>Chunk size (bytes):</label>
-                    <input type="number" id="fileReadChunkSize" min="64" max="2048" value="512">
+                    <input type="number" id="fileReadChunkSize" min="64" max="4096" value="4096">
                 </div>
             </div>
             <div class="test-config">
@@ -361,7 +361,7 @@
                 </div>
                 <div>
                     <label>Chunk size (bytes):</label>
-                    <input type="number" id="fileWriteChunkSize" min="64" max="2048" value="512">
+                    <input type="number" id="fileWriteChunkSize" min="64" max="4096" value="4096">
                 </div>
             </div>
             <div class="flex" style="margin-top: 10px;">
@@ -549,8 +549,8 @@
     <script>
         const VID = 0x1209;
         const PID = 0x53c1;  // OneKey Pro 2
-        const PACKET_SIZE = 2048;  // WebUSB packet size (max single transfer)
-        const RX_BUFFER_SIZE = 4096;  // Receive buffer for large responses
+        const PACKET_SIZE = 4096;  // WebUSB file payload chunk size
+        const RX_BUFFER_SIZE = 4608;  // 4096 payload + Protocol V2/protobuf overhead
 
         let device = null;
         let interfaceNumber = 0;
@@ -1399,9 +1399,9 @@
                 return;
             }
 
-            const chunkSize = parseInt(document.getElementById('fileReadChunkSize').value) || 512;
-            if (chunkSize < 64 || chunkSize > 2048) {
-                log('Chunk size must be 64-2048 bytes', 'error');
+            const chunkSize = parseInt(document.getElementById('fileReadChunkSize').value) || 4096;
+            if (chunkSize < 64 || chunkSize > 4096) {
+                log('Chunk size must be 64-4096 bytes', 'error');
                 return;
             }
 
@@ -1683,9 +1683,9 @@
                 return;
             }
 
-            const chunkSize = parseInt(document.getElementById('fileWriteChunkSize').value) || 512;
-            if (chunkSize < 64 || chunkSize > 2048) {
-                log('Chunk size must be 64-2048 bytes', 'error');
+            const chunkSize = parseInt(document.getElementById('fileWriteChunkSize').value) || 4096;
+            if (chunkSize < 64 || chunkSize > 4096) {
+                log('Chunk size must be 64-4096 bytes', 'error');
                 return;
             }
 

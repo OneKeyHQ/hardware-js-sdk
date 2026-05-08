@@ -20,7 +20,7 @@ export interface ProtoV2Frame {
  *
  * Returns the decoded msgType, raw protobuf payload, and sequence number.
  */
-export function parseProtoV2Frame(data: Uint8Array): ProtoV2Frame {
+export function decodeFrame(data: Uint8Array): ProtoV2Frame {
   if (data.length < PROTO_HEAD_CRC_SIZE) {
     throw new Error(`Protocol V2 frame too short: ${data.length} bytes`);
   }

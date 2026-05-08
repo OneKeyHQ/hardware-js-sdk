@@ -5,7 +5,7 @@ import type EventEmitter from 'events';
 import type { LowlevelTransportSharedPlugin, ProtocolType } from '@onekeyfe/hd-transport';
 import type { LowLevelAcquireInput } from './types';
 
-const { check, buildBuffers, receiveOne, parseConfigure } = transport;
+const { check, ProtocolV1, parseConfigure } = transport;
 
 export default class LowlevelTransport {
   _messages: ReturnType<typeof transport.parseConfigure> | undefined;
@@ -79,7 +79,7 @@ export default class LowlevelTransport {
       this.Log.debug('lowlevel-transport', 'call-', ' name: ', name, ' data: ', data);
     }
 
-    const buffers = buildBuffers(messages, name, data);
+    const buffers = ProtocolV1.encodeTransportPackets(messages, name, data);
     for (const o of buffers) {
       const outData = o.toString('hex');
       // Upload resources on low-end phones may OOM
@@ -98,7 +98,7 @@ export default class LowlevelTransport {
         throw new Error('Returning data is not string');
       }
       this.Log.debug('receive data: ', response);
-      const jsonData = receiveOne(messages, response);
+      const jsonData = ProtocolV1.decodeMessage(messages, response);
       return check.call(jsonData);
     } catch (e) {
       this.Log.error('lowlevel call error: ', e);

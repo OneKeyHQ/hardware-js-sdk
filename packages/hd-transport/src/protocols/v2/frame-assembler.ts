@@ -1,4 +1,4 @@
-import { PROTOCOL_V2_FRAME_MAX_BYTES } from './constants';
+import { PROTOCOL_V2_FRAME_MAX_BYTES } from '../../constants';
 
 export function concatUint8Arrays(arrays: Uint8Array[]): Uint8Array {
   const totalLength = arrays.reduce((sum, arr) => sum + arr.length, 0);

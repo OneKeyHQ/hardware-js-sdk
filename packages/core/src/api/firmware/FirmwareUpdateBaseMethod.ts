@@ -477,9 +477,8 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
     processedSize?: number;
     totalSize?: number;
   }) {
-    // PROTOCOL_V2_FILE_CHUNK_SIZE = 2048: derived from frame max (2200) minus
-    // FilesystemFileWrite overhead. Same value for USB and BLE; BLE Noble handles
-    // ATT-level fragmentation transparently.
+    // Same value for USB and BLE; BLE Noble handles ATT-level fragmentation transparently.
+    // Protocol V2 frame max keeps room for this file chunk plus protobuf/frame overhead.
     const chunkSize = PROTOCOL_V2_FILE_CHUNK_SIZE;
     let offset = 0;
     const getUploadProgress = (fileOffset: number) => {

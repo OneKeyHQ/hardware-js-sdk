@@ -12,9 +12,13 @@ export default class PathInfo extends BaseMethod<PathInfoParams> {
   }
 
   async run() {
-    const res = await (this.device.commands as any).call('FilesystemPathInfoQuery', {
-      path: this.params.path,
-    });
+    const res = await this.device.commands.typedCall(
+      'FilesystemPathInfoQuery',
+      'FilesystemPathInfo',
+      {
+        path: this.params.path,
+      }
+    );
     return Promise.resolve(res.message);
   }
 }

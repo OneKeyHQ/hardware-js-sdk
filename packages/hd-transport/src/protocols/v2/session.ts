@@ -1,10 +1,10 @@
-import { PROTOCOL_V2_PACKET_SRC_COMMAND } from './constants';
-import { ProtocolV2FrameAssembler, concatUint8Arrays } from './protocol-v2-frame-assembler';
-import { ProtocolV2 } from './serialization/protocols';
-import * as check from './utils/highlevel-checks';
+import { PROTOCOL_V2_PACKET_SRC_COMMAND } from '../../constants';
+import { ProtocolV2FrameAssembler, concatUint8Arrays } from './frame-assembler';
+import { ProtocolV2 } from '..';
+import * as check from '../../utils/highlevel-checks';
 
 import type { Root } from 'protobufjs/light';
-import type { MessageFromOneKey } from './types';
+import type { MessageFromOneKey } from '../../types';
 
 export type ProtocolV2Schemas = {
   protocolV1: Root;
@@ -119,7 +119,7 @@ export class ProtocolV2Session {
     } = this.options;
 
     const callPromise = async () => {
-      const frame = ProtocolV2.encode(schemas, name, data, {
+      const frame = ProtocolV2.encodeFrame(schemas, name, data, {
         packetSrc,
         router,
       });
@@ -144,7 +144,7 @@ export class ProtocolV2Session {
             rxFrame[5]
           } seq=${rxFrame[6]} hex=${bytesToDebugHex(rxFrame)}`
         );
-        const decoded = ProtocolV2.decode(schemas, rxFrame);
+        const decoded = ProtocolV2.decodeFrame(schemas, rxFrame);
         if (decoded.seq !== expectedSeq) {
           logger?.debug?.(
             `[${logPrefix}] seq differs for ${name}: tx=${expectedSeq}, rx=${decoded.seq}`

@@ -1,11 +1,16 @@
 import ByteBuffer from 'bytebuffer';
 
-import { buildEncodeBuffers } from './send';
-import { receiveOne } from './receive';
-import { createMessageFromName, createMessageFromType } from './protobuf/messages';
-import { encode as encodeProtobuf } from './protobuf/encode';
-import { decode as decodeProtobuf } from './protobuf/decode';
-import { buildPbFrame, parseProtoV2Frame } from './protocol-v2';
+import {
+  encodeEnvelopeMessage,
+  encodeMessageChunks,
+  encodeTransportPackets,
+} from './v1/packets';
+import { decodeFirstChunk } from './v1/decode';
+import { decodeMessage as decodeV1Message } from './v1/receive';
+import { createMessageFromName, createMessageFromType } from '../serialization/protobuf/messages';
+import { encode as encodeProtobuf } from '../serialization/protobuf/encode';
+import { decode as decodeProtobuf } from '../serialization/protobuf/decode';
+import { encodeProtobufFrame, decodeFrame as decodeV2Frame } from './v2';
 
 import type { Root } from 'protobufjs/light';
 
@@ -26,7 +31,7 @@ const resolveProtocolV2EncodeSchema = (name: string, schemas: ProtocolV2Schemas)
     schemas.protocolV2.lookupType(name);
     return schemas.protocolV2;
   } catch {
-    return schemas.protocolV1;
+    throw new Error(`Protocol V2 message "${name}" is not defined in Protocol V2 schema`);
   }
 };
 
@@ -39,17 +44,16 @@ const createProtocolV2MessageFromType = (msgType: number, schemas: ProtocolV2Sch
 };
 
 export const ProtocolV1 = {
-  encode(messages: Root, name: string, data: Record<string, unknown>) {
-    return buildEncodeBuffers(messages, name, data);
-  },
+  encodeEnvelope: encodeEnvelopeMessage,
+  encodeMessageChunks,
+  encodeTransportPackets,
+  decodeFirstChunk,
 
-  decode(messages: Root, data: string) {
-    return receiveOne(messages, data);
-  },
+  decodeMessage: decodeV1Message,
 };
 
 export const ProtocolV2 = {
-  encode(
+  encodeFrame(
     schemas: ProtocolV2Schemas,
     name: string,
     data: Record<string, unknown>,
@@ -62,11 +66,11 @@ export const ProtocolV2 = {
     const rawPbBuffer = pbBuffer.toBuffer() as unknown as ArrayBuffer;
     const pbBytes = new Uint8Array(rawPbBuffer);
 
-    return buildPbFrame(messageType, pbBytes, options.packetSrc, options.router);
+    return encodeProtobufFrame(messageType, pbBytes, options.packetSrc, options.router);
   },
 
-  decode(schemas: ProtocolV2Schemas, frame: Uint8Array) {
-    const { msgType, pbPayload, seq } = parseProtoV2Frame(frame);
+  decodeFrame(schemas: ProtocolV2Schemas, frame: Uint8Array) {
+    const { msgType, pbPayload, seq } = decodeV2Frame(frame);
     const { Message, messageName } = createProtocolV2MessageFromType(msgType, schemas);
     const rxByteBuffer = ByteBuffer.wrap(Buffer.from(pbPayload) as unknown as ArrayBuffer);
     const message = decodeProtobuf(Message, rxByteBuffer);

@@ -3,8 +3,11 @@ import JSZip from 'jszip';
 import FileRead from '../src/api/FileRead';
 import FileWrite from '../src/api/FileWrite';
 import FirmwareUpdateV3 from '../src/api/FirmwareUpdateV3';
+import GetOnekeyFeatures from '../src/api/GetOnekeyFeatures';
 import { UI_REQUEST } from '../src/events/ui-request';
 import { getProtocolV2Features, normalizeProtocolV2Features } from '../src/protocols/protocol-v2';
+
+import type { DeviceCommands } from '../src/device/DeviceCommands';
 
 jest.mock('../src/data/config', () => ({
   getSDKVersion: jest.fn(() => '1.0.0'),
@@ -121,7 +124,7 @@ describe('Protocol V2 feature adapter', () => {
 
     await expect(
       getProtocolV2Features({
-        commands: commands as any,
+        commands: commands as unknown as DeviceCommands,
         descriptor: descriptor as any,
         onDeviceInfoError,
       })
@@ -142,6 +145,41 @@ describe('Protocol V2 feature adapter', () => {
       })
     );
     expect(onDeviceInfoError).toHaveBeenCalledTimes(1);
+  });
+
+  test('returns Protocol V2 oneKey fields without calling legacy OnekeyGetFeatures', async () => {
+    const method = new GetOnekeyFeatures({
+      id: 1,
+      payload: {
+        method: 'getOnekeyFeatures',
+      },
+    });
+    const typedCall = jest.fn();
+
+    (method as any).device = {
+      originalDescriptor: { protocolType: 'V2' },
+      commands: { typedCall },
+      features: {
+        label: 'ignored label',
+        onekey_device_type: 'pro2',
+        onekey_firmware_version: '1.2.3',
+        onekey_firmware_build_id: 'app-build',
+        onekey_serial_no: 'PR2SERIAL',
+        onekey_ble_name: 'Pro2 BLE',
+      },
+    };
+
+    const message = await method.run();
+
+    expect(typedCall).not.toHaveBeenCalled();
+    expect(message).toMatchObject({
+      onekey_device_type: 'pro2',
+      onekey_firmware_version: '1.2.3',
+      onekey_firmware_build_id: 'app-build',
+      onekey_serial_no: 'PR2SERIAL',
+      onekey_ble_name: 'Pro2 BLE',
+    });
+    expect(message).not.toHaveProperty('label');
   });
 });
 
@@ -280,13 +318,18 @@ describe('Protocol V2 firmware update targets', () => {
         method: 'firmwareUpdateV3',
       },
     });
-    const typedCall = jest.fn((_name: string, _resType: string, params: any) =>
-      Promise.resolve({
-        type: 'FilesystemFile',
-        message: {
-          processed_byte: params.file.offset + params.file.data.byteLength,
-        },
-      })
+    const typedCall = jest.fn(
+      (
+        _name: string,
+        _resType: string,
+        params: { file: { offset: number; data: { byteLength: number } } }
+      ) =>
+        Promise.resolve({
+          type: 'FilesystemFile',
+          message: {
+            processed_byte: params.file.offset + params.file.data.byteLength,
+          },
+        })
     );
 
     (method as any).device = {
@@ -302,9 +345,9 @@ describe('Protocol V2 firmware update targets', () => {
     });
 
     const writePayloads = typedCall.mock.calls.map(call => call[2]);
-    expect(writePayloads.map(payload => payload.file.offset)).toEqual([0, 2048, 4096]);
-    expect(writePayloads.map(payload => payload.file.data.byteLength)).toEqual([2048, 2048, 1]);
-    expect(writePayloads.map(payload => payload.overwrite)).toEqual([true, false, false]);
+    expect(writePayloads.map(payload => payload.file.offset)).toEqual([0, 4096]);
+    expect(writePayloads.map(payload => payload.file.data.byteLength)).toEqual([4096, 1]);
+    expect(writePayloads.map(payload => payload.overwrite)).toEqual([true, false]);
     expect(writePayloads.every(payload => payload.append === false)).toBe(true);
   });
 
@@ -340,7 +383,7 @@ describe('Protocol V2 firmware update targets', () => {
 
 describe('Protocol V2 file write method', () => {
   test('uses demo-aligned overwrite and append defaults', async () => {
-    const call = jest.fn().mockResolvedValue({ message: { processed_byte: 1 } });
+    const typedCall = jest.fn().mockResolvedValue({ message: { processed_byte: 1 } });
     const method = new FileWrite({
       id: 1,
       payload: {
@@ -351,13 +394,13 @@ describe('Protocol V2 file write method', () => {
         data: new Uint8Array([1]),
       },
     });
-    (method as any).device = { commands: { call } };
+    (method as any).device = { commands: { typedCall } };
     method.postMessage = jest.fn();
 
     method.init();
     await method.run();
 
-    expect(call).toHaveBeenCalledWith('FilesystemFileWrite', {
+    expect(typedCall).toHaveBeenCalledWith('FilesystemFileWrite', 'FilesystemFile', {
       file: {
         path: 'vol1:test.bin',
         offset: 1,
@@ -376,42 +419,42 @@ describe('Protocol V2 file write method', () => {
   });
 
   test('splits data larger than the Protocol V2 file payload limit', async () => {
-    const data = new Uint8Array(2049);
-    const call = jest.fn().mockResolvedValue({ message: {} });
+    const data = new Uint8Array(4097);
+    const typedCall = jest.fn().mockResolvedValue({ message: {} });
     const method = new FileWrite({
       id: 1,
       payload: {
         method: 'fileWrite',
         path: 'vol1:test.bin',
         offset: 0,
-        totalSize: 2049,
+        totalSize: 4097,
         data,
       },
     });
-    (method as any).device = { commands: { call } };
+    (method as any).device = { commands: { typedCall } };
     method.postMessage = jest.fn();
 
     method.init();
     const result = await method.run();
 
-    expect(call).toHaveBeenCalledTimes(2);
-    expect(call).toHaveBeenNthCalledWith(1, 'FilesystemFileWrite', {
+    expect(typedCall).toHaveBeenCalledTimes(2);
+    expect(typedCall).toHaveBeenNthCalledWith(1, 'FilesystemFileWrite', 'FilesystemFile', {
       file: {
         path: 'vol1:test.bin',
         offset: 0,
-        total_size: 2049,
-        data: data.slice(0, 2048),
+        total_size: 4097,
+        data: data.slice(0, 4096),
       },
       overwrite: true,
       append: false,
       ui_percentage: 99,
     });
-    expect(call).toHaveBeenNthCalledWith(2, 'FilesystemFileWrite', {
+    expect(typedCall).toHaveBeenNthCalledWith(2, 'FilesystemFileWrite', 'FilesystemFile', {
       file: {
         path: 'vol1:test.bin',
-        offset: 2048,
-        total_size: 2049,
-        data: data.slice(2048),
+        offset: 4096,
+        total_size: 4097,
+        data: data.slice(4096),
       },
       overwrite: false,
       append: false,
@@ -419,7 +462,7 @@ describe('Protocol V2 file write method', () => {
     });
     expect(result).toMatchObject({
       path: 'vol1:test.bin',
-      processed_byte: 2049,
+      processed_byte: 4097,
       chunks: 2,
     });
     expect(method.postMessage).toHaveBeenNthCalledWith(1, {
@@ -438,7 +481,7 @@ describe('Protocol V2 file write method', () => {
 describe('Protocol V2 file read method', () => {
   test('reads full file in chunks when read length is 0', async () => {
     const firstChunk = new Uint8Array(64).fill(1);
-    const call = jest
+    const typedCall = jest
       .fn()
       .mockResolvedValueOnce({ message: { exist: true, size: 65, directory: false } })
       .mockResolvedValueOnce({ message: { data: firstChunk } })
@@ -453,15 +496,20 @@ describe('Protocol V2 file read method', () => {
         chunkLen: 64,
       },
     });
-    (method as any).device = { commands: { call } };
+    (method as any).device = { commands: { typedCall } };
 
     method.init();
     const result = await method.run();
 
-    expect(call).toHaveBeenNthCalledWith(1, 'FilesystemPathInfoQuery', {
-      path: 'vol1:test.bin',
-    });
-    expect(call).toHaveBeenNthCalledWith(2, 'FilesystemFileRead', {
+    expect(typedCall).toHaveBeenNthCalledWith(
+      1,
+      'FilesystemPathInfoQuery',
+      'FilesystemPathInfo',
+      {
+        path: 'vol1:test.bin',
+      }
+    );
+    expect(typedCall).toHaveBeenNthCalledWith(2, 'FilesystemFileRead', 'FilesystemFile', {
       file: {
         path: 'vol1:test.bin',
         offset: 0,
@@ -470,7 +518,7 @@ describe('Protocol V2 file read method', () => {
       chunk_len: 64,
       ui_percentage: 99,
     });
-    expect(call).toHaveBeenNthCalledWith(3, 'FilesystemFileRead', {
+    expect(typedCall).toHaveBeenNthCalledWith(3, 'FilesystemFileRead', 'FilesystemFile', {
       file: {
         path: 'vol1:test.bin',
         offset: 64,
@@ -479,9 +527,9 @@ describe('Protocol V2 file read method', () => {
       chunk_len: 1,
       ui_percentage: 99,
     });
-    expect((result.data as Uint8Array).byteLength).toBe(65);
-    expect((result.data as Uint8Array)[0]).toBe(1);
-    expect((result.data as Uint8Array)[64]).toBe(2);
+    expect(result.data.byteLength).toBe(65);
+    expect(result.data[0]).toBe(1);
+    expect(result.data[64]).toBe(2);
     expect(result).toMatchObject({
       path: 'vol1:test.bin',
       offset: 0,
@@ -491,7 +539,7 @@ describe('Protocol V2 file read method', () => {
   });
 
   test('decodes protobuf bytes hex string returned by transport', async () => {
-    const call = jest.fn().mockResolvedValue({
+    const typedCall = jest.fn().mockResolvedValue({
       message: {
         data: '0102ff',
       },
@@ -506,7 +554,7 @@ describe('Protocol V2 file read method', () => {
         chunkLen: 512,
       },
     });
-    (method as any).device = { commands: { call } };
+    (method as any).device = { commands: { typedCall } };
 
     method.init();
     const result = await method.run();

@@ -4478,6 +4478,19 @@ export type DevGetDeviceInfo = {
   types?: DevInfoTypes;
 };
 
+// ProtocolV2DeviceInfo
+export type ProtocolV2DeviceInfo = {
+  protocol_version: number;
+  hw?: DevHardwareInfo;
+  fw?: DevMainMcuInfo;
+  bt?: DevBluetoothInfo;
+  se1?: DevSEInfo;
+  se2?: DevSEInfo;
+  se3?: DevSEInfo;
+  se4?: DevSEInfo;
+  status?: DevStatus;
+};
+
 export enum DevFirmwareTargetType {
   TARGET_MAIN_APP = 0,
   TARGET_MAIN_BOOT = 1,
@@ -4571,7 +4584,7 @@ export type FilesystemFile = {
   path: string;
   offset: number;
   total_size: number;
-  data?: Buffer | ArrayBuffer | string;
+  data?: Buffer | ArrayBuffer | Uint8Array | string;
   data_hash?: number;
   processed_byte?: number;
 };
@@ -4946,7 +4959,7 @@ export type MessageType = {
   BixinBackupDeviceAck: BixinBackupDeviceAck;
   DeviceInfoSettings: DeviceInfoSettings;
   GetDeviceInfo: GetDeviceInfo;
-  DeviceInfo: DeviceInfo;
+  DeviceInfo: DeviceInfo | ProtocolV2DeviceInfo;
   ReadSEPublicKey: ReadSEPublicKey;
   SEPublicKey: SEPublicKey;
   WriteSEPublicCert: WriteSEPublicCert;

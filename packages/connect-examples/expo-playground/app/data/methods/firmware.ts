@@ -364,10 +364,10 @@ const api: UnifiedMethodConfig[] = [
             label: 'Chunk Length',
             validation: {
               min: 64,
-              max: 2048,
+              max: 4096,
             },
             visible: true,
-            value: 512,
+            value: 4096,
           },
           {
             name: 'uiPercentage',
@@ -418,12 +418,12 @@ const api: UnifiedMethodConfig[] = [
             type: 'number',
             required: false,
             label: 'Chunk Size',
-            description: 'Upload chunk size. Protocol V2 maximum is 2048 bytes.',
+            description: 'Upload chunk size. WebUSB maximum is 4096 bytes.',
             validation: {
               min: 64,
-              max: 2048,
+              max: 4096,
             },
-            value: 2048,
+            value: 4096,
           },
           {
             name: 'data',
@@ -548,10 +548,10 @@ const api: UnifiedMethodConfig[] = [
             label: 'Chunk Length',
             validation: {
               min: 64,
-              max: 2048,
+              max: 4096,
             },
             visible: true,
-            value: 512,
+            value: 4096,
           },
           {
             name: 'uiPercentage',
@@ -602,12 +602,12 @@ const api: UnifiedMethodConfig[] = [
             type: 'number',
             required: false,
             label: 'Chunk Size',
-            description: 'Upload chunk size. Protocol V2 maximum is 2048 bytes.',
+            description: 'Upload chunk size. WebUSB maximum is 4096 bytes.',
             validation: {
               min: 64,
-              max: 2048,
+              max: 4096,
             },
-            value: 2048,
+            value: 4096,
           },
           {
             name: 'data',

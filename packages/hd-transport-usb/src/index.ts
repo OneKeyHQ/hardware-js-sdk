@@ -1,14 +1,23 @@
 import ByteBuffer from 'bytebuffer';
 import * as usb from 'usb';
-import transport, { LogBlockCommand } from '@onekeyfe/hd-transport';
+import transport, {
+  LogBlockCommand,
+  PROTOCOL_V1_CHUNK_PAYLOAD_SIZE,
+  PROTOCOL_V1_MESSAGE_HEADER_SIZE,
+  PROTOCOL_V1_REPORT_ID,
+  PROTOCOL_V1_USB_PACKET_SIZE,
+} from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode, ONEKEY_WEBUSB_FILTER, wait } from '@onekeyfe/hd-shared';
-
-import { HEADER_LENGTH, PACKET_SIZE, PAYLOAD_SIZE, REPORT_ID } from './constants';
 
 import type EventEmitter from 'events';
 import type { AcquireInput, OneKeyDeviceInfo, ProtocolType } from '@onekeyfe/hd-transport';
 
-const { parseConfigure, buildEncodeBuffers, decodeProtocol, receiveOne, check } = transport;
+const { parseConfigure, ProtocolV1, check } = transport;
+
+const PACKET_SIZE = PROTOCOL_V1_USB_PACKET_SIZE;
+const REPORT_ID = PROTOCOL_V1_REPORT_ID;
+const PAYLOAD_SIZE = PROTOCOL_V1_CHUNK_PAYLOAD_SIZE;
+const HEADER_LENGTH = PROTOCOL_V1_MESSAGE_HEADER_SIZE;
 
 /** USB interface number for vendor-specific communication */
 const INTERFACE_NUMBER = 0;
@@ -225,7 +234,7 @@ export default class NodeUsbTransport {
     if (!this.messages) {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
     }
-    const encodeBuffers = buildEncodeBuffers(this.messages, name, data);
+    const encodeBuffers = ProtocolV1.encodeMessageChunks(this.messages, name, data);
     await this.sendAllChunksWithRetry(path, encodeBuffers);
   }
 
@@ -242,7 +251,7 @@ export default class NodeUsbTransport {
     if (!this.messages) {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
     }
-    return receiveOne(this.messages, resData);
+    return ProtocolV1.decodeMessage(this.messages, resData);
   }
 
   /**
@@ -346,7 +355,7 @@ export default class NodeUsbTransport {
     }
 
     // Encode protobuf message into 63-byte chunks (same as WebUsbTransport)
-    const encodeBuffers = buildEncodeBuffers(messages, name, data);
+    const encodeBuffers = ProtocolV1.encodeMessageChunks(messages, name, data);
 
     // Send all chunks with retry — if any chunk fails and reconnects,
     // restart the entire send sequence from chunk 0 (device resets state on reconnect)
@@ -357,7 +366,7 @@ export default class NodeUsbTransport {
     if (typeof resData !== 'string') {
       throw ERRORS.TypedError(HardwareErrorCode.NetworkError, 'Returning data is not string.');
     }
-    const jsonData = receiveOne(messages, resData);
+    const jsonData = ProtocolV1.decodeMessage(messages, resData);
     return check.call(jsonData);
   }
 
@@ -610,7 +619,7 @@ export default class NodeUsbTransport {
     const firstData = skipReportByte(firstPacket);
 
     // Decode header: ## marker → { typeId, length, restBuffer }
-    const { length, typeId, restBuffer } = decodeProtocol.decodeChunked(toArrayBuffer(firstData));
+    const { length, typeId, restBuffer } = ProtocolV1.decodeFirstChunk(toArrayBuffer(firstData));
 
     // Allocate result: typeId(2) + length(4) + payload(length)
     const lengthWithHeader = Number(length) + HEADER_LENGTH;
@@ -639,5 +648,3 @@ export default class NodeUsbTransport {
     return Buffer.from(result as unknown as ArrayBuffer).toString('hex');
   }
 }
-
-export { PACKET_SIZE } from './constants';

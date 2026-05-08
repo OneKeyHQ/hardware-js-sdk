@@ -1,3 +1,4 @@
+import { PROTOCOL_V2_FILE_CHUNK_SIZE } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { BaseMethod } from './BaseMethod';
@@ -11,16 +12,14 @@ export type FileReadParams = {
   uiPercentage?: number;
 };
 
-const DEFAULT_FILE_READ_CHUNK_SIZE = 512;
 const MIN_FILE_READ_CHUNK_SIZE = 64;
-const MAX_FILE_READ_CHUNK_SIZE = 2048;
 
 function normalizeChunkSize(value: unknown): number {
   const numeric = Number(value);
-  if (!Number.isFinite(numeric) || numeric <= 0) return DEFAULT_FILE_READ_CHUNK_SIZE;
+  if (!Number.isFinite(numeric) || numeric <= 0) return PROTOCOL_V2_FILE_CHUNK_SIZE;
   return Math.min(
     Math.max(Math.floor(numeric), MIN_FILE_READ_CHUNK_SIZE),
-    MAX_FILE_READ_CHUNK_SIZE
+    PROTOCOL_V2_FILE_CHUNK_SIZE
   );
 }
 
@@ -75,9 +74,13 @@ export default class FileRead extends BaseMethod<FileReadParams> {
     let totalLength = Number.isFinite(requestedLength) && requestedLength > 0 ? requestedLength : 0;
 
     if (totalLength === 0) {
-      const pathInfoRes = await (this.device.commands as any).call('FilesystemPathInfoQuery', {
-        path: this.params.path,
-      });
+      const pathInfoRes = await this.device.commands.typedCall(
+        'FilesystemPathInfoQuery',
+        'FilesystemPathInfo',
+        {
+          path: this.params.path,
+        }
+      );
       const fileSize = toFiniteNumber(pathInfoRes.message?.size);
       if (!pathInfoRes.message?.exist || pathInfoRes.message?.directory) {
         throw ERRORS.TypedError(
@@ -104,7 +107,7 @@ export default class FileRead extends BaseMethod<FileReadParams> {
       const progress =
         this.params.uiPercentage ??
         Math.min(Math.ceil(((read + readLen) / Math.max(totalLength, 1)) * 100), 99);
-      const res = await (this.device.commands as any).call('FilesystemFileRead', {
+      const res = await this.device.commands.typedCall('FilesystemFileRead', 'FilesystemFile', {
         file: {
           path: this.params.path,
           offset,

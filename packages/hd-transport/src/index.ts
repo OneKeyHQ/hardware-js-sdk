@@ -2,21 +2,14 @@ import * as protobuf from 'protobufjs/light';
 import Long from 'long';
 
 import {
-  PROTOCOL_V2_SYS_MESSAGE_THRESHOLD,
-  ProtocolV1,
-  ProtocolV2,
-  buildBuffers,
-  buildEncodeBuffers,
-  buildOne,
   createMessageFromName,
   createMessageFromType,
   decodeProtobuf,
-  decodeProtocol,
   encodeProtobuf,
   parseConfigure,
-  protoV2,
-  receiveOne,
 } from './serialization';
+import { PROTOCOL_V2_SYS_MESSAGE_THRESHOLD, ProtocolV1, ProtocolV2 } from './protocols';
+import * as protocolV2Codec from './protocols/v2';
 import {
   ProtocolV2FrameAssembler,
   ProtocolV2Session,
@@ -26,7 +19,7 @@ import {
   hexToBytes,
   probeProtocolV2,
   withProtocolTimeout,
-} from './protocol-session';
+} from './protocols/v2/session';
 import * as check from './utils/highlevel-checks';
 
 protobuf.util.Long = Long;
@@ -52,17 +45,15 @@ export * from './types/messages';
 export * from './utils/logBlockCommand';
 
 export * from './constants';
-export * from './protocol-session';
+export * from './protocols';
+export * as protocolV1 from './protocols/v1';
+export * as protocolV2 from './protocols/v2';
+export * from './protocols/v2/session';
 
 export default {
   check,
-  buildOne,
-  buildBuffers,
-  buildEncodeBuffers,
-  receiveOne,
   parseConfigure,
-  decodeProtocol,
-  protoV2,
+  protocolV2: protocolV2Codec,
   ProtocolV1,
   ProtocolV2,
   PROTOCOL_V2_SYS_MESSAGE_THRESHOLD,
