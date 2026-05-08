@@ -16,8 +16,8 @@ import transport, {
   type ProtocolType,
   ProtocolV2FrameAssembler,
   ProtocolV2Session,
-  probeProtocolV2 as probeProtocolV2Helper,
   type TransportCallOptions,
+  probeProtocolV2 as probeProtocolV2Helper,
 } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode, createDeferred, isOnekeyDevice } from '@onekeyfe/hd-shared';
 

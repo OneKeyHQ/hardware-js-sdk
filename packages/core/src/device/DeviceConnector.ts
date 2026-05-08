@@ -1,4 +1,5 @@
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+
 import { safeThrowError } from '../constants';
 import { DataManager } from '../data-manager';
 import TransportManager from '../data-manager/TransportManager';
