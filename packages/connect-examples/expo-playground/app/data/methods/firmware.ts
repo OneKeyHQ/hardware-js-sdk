@@ -105,8 +105,8 @@ const api: UnifiedMethodConfig[] = [
     ],
   },
   {
-    method: 'firmwareUpdateV3',
-    description: 'methodDescriptions.firmwareUpdateV3',
+    method: 'firmwareUpdateV4',
+    description: 'methodDescriptions.firmwareUpdateV4',
     noDeviceIdReq: true,
     presets: [
       {

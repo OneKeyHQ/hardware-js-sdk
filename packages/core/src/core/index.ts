@@ -649,6 +649,7 @@ function initDevice(method: BaseMethod) {
   } else if (allDevices.length > 1) {
     throw ERRORS.TypedError(
       [
+        'firmwareUpdateV4',
         'firmwareUpdateV3',
         'firmwareUpdateV2',
         'checkFirmwareRelease',

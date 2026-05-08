@@ -56,9 +56,20 @@ export interface FirmwareUpdateV3Params {
   platform: IPlatform;
 }
 
+export type FirmwareUpdateV4Params = FirmwareUpdateV3Params;
+
 export declare function firmwareUpdateV3(
   connectId: string | undefined,
   params: Params<FirmwareUpdateV3Params>
+): Response<{
+  bleVersion: string;
+  firmwareVersion: string;
+  bootloaderVersion: string;
+}>;
+
+export declare function firmwareUpdateV4(
+  connectId: string | undefined,
+  params: Params<FirmwareUpdateV4Params>
 ): Response<{
   bleVersion: string;
   firmwareVersion: string;

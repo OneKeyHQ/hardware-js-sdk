@@ -1,7 +1,6 @@
 import { EDeviceType, ERRORS, HardwareError, HardwareErrorCode, wait } from '@onekeyfe/hd-shared';
 import semver from 'semver';
 import JSZip from 'jszip';
-import { DevRebootType } from '@onekeyfe/hd-transport';
 
 import { FirmwareUpdateTipMessage, UI_REQUEST } from '../events/ui-request';
 import { validateParams } from './helpers/paramsValidator';
@@ -19,11 +18,6 @@ import { DataManager } from '../data-manager';
 import { FirmwareUpdateBaseMethod } from './firmware/FirmwareUpdateBaseMethod';
 import { DevicePool } from '../device/DevicePool';
 import { DEVICE } from '../events';
-import {
-  ProtocolV2FirmwareTargetType,
-  getProtocolV2Features,
-  protocolV2FileNameToTargetId,
-} from '../protocols/protocol-v2';
 
 import type { FirmwareUpdateV3Params } from '../types/api/firmwareUpdate';
 import type { Deferred, EFirmwareType } from '@onekeyfe/hd-shared';
@@ -32,26 +26,6 @@ import type { TypedResponseMessage } from '../device/DeviceCommands';
 const Log = getLogger(LoggerNames.Method);
 
 export const MIN_UPDATE_V3_BOOTLOADER_VERSION = '2.8.0';
-const PROTOCOL_V2_BOOTLOADER_RECONNECT_TIMEOUT = 60 * 1000;
-const PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT = 5 * 1000;
-const PROTOCOL_V2_INSTALL_TIMEOUT = 5 * 60 * 1000;
-const PROTOCOL_V2_TARGET_STATUS_FINISHED = 0;
-const PROTOCOL_V2_TARGET_STATUS_IN_PROGRESS = 1;
-const PROTOCOL_V2_TARGET_STATUS_FAILED = 2;
-
-type FirmwareUpdateStrategy = {
-  protocol: 'V1' | 'V2';
-  run: () => Promise<{
-    bootloaderVersion: string;
-    bleVersion: string;
-    firmwareVersion: string;
-  }>;
-};
-
-type ProtocolV2FirmwareUpdateStatusTarget = {
-  target_id: number;
-  status: number;
-};
 
 /**
  * FirmwareUpdateV3 flow
@@ -105,25 +79,14 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
   }
 
   async run() {
-    const strategy = this.getFirmwareUpdateStrategy();
-    Log.debug(`FirmwareUpdateV3 strategy: Protocol ${strategy.protocol}`);
-    return strategy.run();
-  }
-
-  private getFirmwareUpdateStrategy(): FirmwareUpdateStrategy {
-    const { device } = this;
-
-    if (device.originalDescriptor?.protocolType === 'V2') {
-      return {
-        protocol: 'V2',
-        run: () => this.runProtocolV2(),
-      };
+    if (this.device.originalDescriptor?.protocolType === 'V2') {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        'Protocol V2 firmware update must use firmwareUpdateV4'
+      );
     }
-
-    return {
-      protocol: 'V1',
-      run: () => this.runProtocolV1(),
-    };
+    Log.debug('FirmwareUpdateV3 strategy: Protocol V1');
+    return this.runProtocolV1();
   }
 
   /**
@@ -174,348 +137,6 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
       bootloaderBinary,
     });
     return updateResult;
-  }
-
-  /**
-   * Protocol V2 firmware update strategy.
-   *
-   * Differences from the V1 flow that justify a separate method:
-   *   - No bootloader-version gate. Protocol V2 doesn't expose `bootloader_version`
-   *     through its V2 protobuf schema and the V2 firmware itself decides
-   *     whether install is allowed (via the DevFirmwareUpdate Failure code).
-   *   - No legacy `enterBootloaderMode()` (which would send `DeviceBackToBoot`,
-   *     a V1-only message). When Protocol V2 bootloader handoff is finalized,
-   *     swap in `DevReboot { reboot_type: Bootloader }` here.
-   *   - No legacy GetFeatures polling for completion. Install completion is checked
-   *     via DevGetFirmwareUpdateStatus, then final versions are read through
-   *     Ping + DevGetDeviceInfo.
-   *
-   * Common helpers reused from the V1 flow: `prepareResourceBinary`,
-   * `prepareFirmwareAndBleBinary`, `prepareBootloaderBinary`,
-   * `protocolV2CommonUpdateProcess`, `protocolV2CreateFolder`,
-   * `protocolV2StartFirmwareUpdate`.
-   */
-  private async runProtocolV2() {
-    const { device } = this;
-    const { features } = device;
-
-    if (!features) {
-      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Device features not available');
-    }
-
-    const deviceFirmwareType = getFirmwareType(features);
-    const firmwareType = this.params.firmwareType ?? deviceFirmwareType;
-    this.isSwitchFirmware = firmwareType !== deviceFirmwareType;
-
-    let resourceBinary: ArrayBuffer | null = null;
-    let fwBinaryMap: { fileName: string; binary: ArrayBuffer }[] = [];
-    let bootloaderBinary: ArrayBuffer | null = null;
-    try {
-      this.postTipMessage(FirmwareUpdateTipMessage.StartDownloadFirmware);
-      resourceBinary = await this.prepareResourceBinary(firmwareType);
-      fwBinaryMap = await this.prepareFirmwareAndBleBinary(firmwareType);
-      bootloaderBinary = await this.prepareBootloaderBinary(firmwareType);
-      this.postTipMessage(FirmwareUpdateTipMessage.FinishDownloadFirmware);
-    } catch (err) {
-      throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
-    }
-
-    if (!bootloaderBinary && fwBinaryMap.length === 0) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.FirmwareUpdateDownloadFailed,
-        'No firmware to update'
-      );
-    }
-
-    await this.enterProtocolV2Bootloader();
-
-    await this.executeProtocolV2Update({
-      resourceBinary,
-      fwBinaryMap,
-      bootloaderBinary,
-    });
-
-    const versions = await this.waitForProtocolV2FinalFeatures();
-    this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdateCompleted);
-    DevicePool.resetState();
-
-    return versions;
-  }
-
-  /**
-   * Reboot the Protocol V2 device into bootloader before file write + DevFirmwareUpdate.
-   *
-   * Mirrors what the Protocol V2 debug script's Reboot tab does
-   * (`DevReboot { reboot_type: Bootloader }`), but routes through the SDK's
-   * `this.protocolV2Reboot()` helper (typedCall under the hood) instead of writing
-   * raw WebUSB bytes. The helper already tolerates the device dropping the
-   * USB connection mid-call, which is the expected behavior on reboot.
-   *
-   * After the reboot we reconnect and query DevGetFirmwareUpdateStatus as the
-   * bootloader-side readiness check before file writes.
-   */
-  private async enterProtocolV2Bootloader() {
-    this.postTipMessage(FirmwareUpdateTipMessage.AutoRebootToBootloader);
-    await this.protocolV2Reboot(DevRebootType.Bootloader);
-    await this.waitForProtocolV2BootloaderReady(PROTOCOL_V2_BOOTLOADER_RECONNECT_TIMEOUT);
-    this.postTipMessage(FirmwareUpdateTipMessage.GoToBootloaderSuccess);
-  }
-
-  private async waitForProtocolV2BootloaderReady(timeout: number) {
-    const startTime = Date.now();
-    let lastError: unknown;
-    while (Date.now() - startTime < timeout) {
-      try {
-        await this.reconnectProtocolV2Device();
-        await this.queryProtocolV2FirmwareUpdateStatus();
-        return;
-      } catch (error) {
-        lastError = error;
-        Log.log('Protocol V2 bootloader not ready yet: ', error);
-        await wait(1000);
-      }
-    }
-    throw ERRORS.TypedError(
-      HardwareErrorCode.DeviceNotFound,
-      `Protocol V2 bootloader not ready within ${timeout / 1000}s: ${this.normalizeErrorMessage(
-        lastError
-      )}`
-    );
-  }
-
-  /**
-   * Protocol V2 file-write + DevFirmwareUpdate trigger.
-   *
-   * Filesystem layout follows the Protocol V2 debug script's `vol0:` convention.
-   * If the Protocol V2 firmware later anchors firmware payloads elsewhere, update
-   * the path constants below.
-   */
-  private async executeProtocolV2Update({
-    resourceBinary,
-    fwBinaryMap,
-    bootloaderBinary,
-  }: {
-    resourceBinary: ArrayBuffer | null;
-    fwBinaryMap: { fileName: string; binary: ArrayBuffer }[];
-    bootloaderBinary: ArrayBuffer | null;
-  }) {
-    let totalSize = 0;
-    let processedSize = 0;
-
-    if (resourceBinary) totalSize += resourceBinary.byteLength;
-    for (const fwbinary of fwBinaryMap) totalSize += fwbinary.binary.byteLength;
-    if (bootloaderBinary) totalSize += bootloaderBinary.byteLength;
-
-    this.postTipMessage(FirmwareUpdateTipMessage.StartTransferData);
-
-    const targets: Array<{ target_id: number; path: string }> = [];
-
-    if (resourceBinary) {
-      // Resource files live under `vol0:res/`. FilesystemDirMake first so
-      // FilesystemFileWrite doesn't fail on a missing parent directory.
-      const resourcePath = `vol0:res/`;
-      await this.protocolV2CreateFolder(resourcePath);
-      const file = await JSZip.loadAsync(resourceBinary);
-      const files = Object.entries(file.files);
-      for (const [fileName, entry] of files) {
-        const name = fileName.split('/').pop();
-        if (!entry.dir && fileName.indexOf('__MACOSX') === -1 && name) {
-          const data = await entry.async('arraybuffer');
-          processedSize = await this.protocolV2CommonUpdateProcess({
-            payload: data,
-            filePath: `${resourcePath}${name}`,
-            processedSize,
-            totalSize,
-          });
-        }
-      }
-      targets.push({
-        target_id: ProtocolV2FirmwareTargetType.TARGET_RESOURCE,
-        path: resourcePath,
-      });
-    }
-
-    if (bootloaderBinary) {
-      const bootloaderPath = `vol0:bootloader.bin`;
-      processedSize = await this.protocolV2CommonUpdateProcess({
-        payload: bootloaderBinary,
-        filePath: bootloaderPath,
-        processedSize,
-        totalSize,
-      });
-      targets.push({
-        target_id: ProtocolV2FirmwareTargetType.TARGET_MAIN_BOOT,
-        path: bootloaderPath,
-      });
-    }
-
-    for (const fwbinary of fwBinaryMap) {
-      const firmwarePath = `vol0:${fwbinary.fileName}`;
-      processedSize = await this.protocolV2CommonUpdateProcess({
-        payload: fwbinary.binary,
-        filePath: firmwarePath,
-        processedSize,
-        totalSize,
-      });
-      targets.push({
-        target_id: protocolV2FileNameToTargetId(fwbinary.fileName),
-        path: firmwarePath,
-      });
-    }
-
-    this.postTipMessage(FirmwareUpdateTipMessage.ConfirmOnDevice);
-    // DevFirmwareUpdate Success means the firmware accepted the install flow.
-    // Completion is checked through DevGetFirmwareUpdateStatus.
-    await this.protocolV2StartFirmwareUpdate({ targets });
-    await this.waitForProtocolV2FirmwareUpdateComplete(targets);
-  }
-
-  private async queryProtocolV2FirmwareUpdateStatus() {
-    const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
-    return typedCall(
-      'DevGetFirmwareUpdateStatus',
-      'DevFirmwareUpdateStatus',
-      {},
-      {
-        timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
-      }
-    );
-  }
-
-  private async waitForProtocolV2FirmwareUpdateComplete(
-    targets: Array<{ target_id: number; path: string }>
-  ) {
-    const expectedTargetIds = new Set(targets.map(target => target.target_id));
-    const startTime = Date.now();
-    let lastError: unknown;
-
-    while (Date.now() - startTime < PROTOCOL_V2_INSTALL_TIMEOUT) {
-      try {
-        const statusRes = await this.queryProtocolV2FirmwareUpdateStatus();
-        const statusTargets = (statusRes.message.targets ??
-          []) as ProtocolV2FirmwareUpdateStatusTarget[];
-        const failedTarget = statusTargets.find(
-          target =>
-            expectedTargetIds.has(target.target_id) &&
-            target.status === PROTOCOL_V2_TARGET_STATUS_FAILED
-        );
-        if (failedTarget) {
-          throw ERRORS.TypedError(
-            HardwareErrorCode.FirmwareError,
-            `Protocol V2 firmware target ${failedTarget.target_id} failed`
-          );
-        }
-
-        const completedTargets = statusTargets.filter(
-          target =>
-            expectedTargetIds.has(target.target_id) &&
-            target.status === PROTOCOL_V2_TARGET_STATUS_FINISHED
-        );
-        if (completedTargets.length === expectedTargetIds.size && expectedTargetIds.size > 0) {
-          return;
-        }
-
-        const inProgressTarget = statusTargets.find(
-          target =>
-            expectedTargetIds.has(target.target_id) &&
-            target.status === PROTOCOL_V2_TARGET_STATUS_IN_PROGRESS
-        );
-        if (inProgressTarget) {
-          this.postProgressMessage(99, 'installingFirmware');
-        }
-      } catch (error) {
-        lastError = error;
-        if (error instanceof HardwareError && error.errorCode === HardwareErrorCode.FirmwareError) {
-          throw error;
-        }
-        Log.log('Protocol V2 firmware status query failed: ', error);
-        try {
-          await this.waitForProtocolV2BootloaderReady(PROTOCOL_V2_BOOTLOADER_RECONNECT_TIMEOUT);
-        } catch (reconnectError) {
-          Log.log('Protocol V2 bootloader reconnect while installing failed: ', reconnectError);
-        }
-      }
-      await wait(1000);
-    }
-
-    throw ERRORS.TypedError(
-      HardwareErrorCode.RuntimeError,
-      `Protocol V2 firmware update status timeout: ${this.normalizeErrorMessage(lastError)}`
-    );
-  }
-
-  private async waitForProtocolV2FinalFeatures() {
-    const features = await this.waitForProtocolV2ReconnectAndFeatures(
-      PROTOCOL_V2_BOOTLOADER_RECONNECT_TIMEOUT
-    );
-    this.device._updateFeatures(features);
-
-    const bootloaderVersion = getDeviceBootloaderVersion(features).join('.');
-    const bleVersion = getDeviceBLEFirmwareVersion(features).join('.');
-    const firmwareVersion = getDeviceFirmwareVersion(features).join('.');
-    if (firmwareVersion === '0.0.0') {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.FirmwareError,
-        'Protocol V2 firmware update finished but app firmware version is still 0.0.0'
-      );
-    }
-
-    return {
-      bootloaderVersion,
-      bleVersion,
-      firmwareVersion,
-    };
-  }
-
-  private async waitForProtocolV2ReconnectAndFeatures(timeout: number) {
-    const startTime = Date.now();
-    let lastError: unknown;
-
-    while (Date.now() - startTime < timeout) {
-      try {
-        await this.reconnectProtocolV2Device();
-        const features = await getProtocolV2Features({
-          commands: this.device.getCommands(),
-          descriptor: this.device.originalDescriptor,
-          onDeviceInfoError: error => {
-            Log.debug('Protocol V2 post-update DevGetDeviceInfo failed:', error);
-          },
-          timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
-        });
-        return features;
-      } catch (error) {
-        lastError = error;
-        Log.log('Protocol V2 final reconnect/features not ready yet: ', error);
-        await wait(1000);
-      }
-    }
-
-    throw ERRORS.TypedError(
-      HardwareErrorCode.DeviceNotFound,
-      `Protocol V2 final features not ready within ${timeout / 1000}s: ${this.normalizeErrorMessage(
-        lastError
-      )}`
-    );
-  }
-
-  private async reconnectProtocolV2Device() {
-    if (this.isBleReconnect()) {
-      await this.device.deviceConnector?.acquire(this.device.originalDescriptor.id, null, true);
-      return;
-    }
-
-    const deviceDiff = await this.device.deviceConnector?.enumerate();
-    const devicesDescriptor = deviceDiff?.descriptors ?? [];
-
-    const { deviceList } = await DevicePool.getDevices(devicesDescriptor, this.connectId);
-    if (deviceList.length !== 1) {
-      throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound);
-    }
-
-    this.device.updateFromCache(deviceList[0]);
-    await this.device.acquire();
-    this.device.commands.disposed = false;
-    this.device.getCommands().mainId = this.device.mainId ?? '';
   }
 
   private validateDeviceAndVersion(deviceType: EDeviceType, bootloaderVersion: string) {

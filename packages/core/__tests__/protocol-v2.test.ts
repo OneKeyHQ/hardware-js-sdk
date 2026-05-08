@@ -3,6 +3,7 @@ import JSZip from 'jszip';
 import FileRead from '../src/api/FileRead';
 import FileWrite from '../src/api/FileWrite';
 import FirmwareUpdateV3 from '../src/api/FirmwareUpdateV3';
+import FirmwareUpdateV4 from '../src/api/FirmwareUpdateV4';
 import GetOnekeyFeatures from '../src/api/GetOnekeyFeatures';
 import { UI_REQUEST } from '../src/events/ui-request';
 import { getProtocolV2Features, normalizeProtocolV2Features } from '../src/protocols/protocol-v2';
@@ -184,11 +185,25 @@ describe('Protocol V2 feature adapter', () => {
 });
 
 describe('Protocol V2 firmware update targets', () => {
-  test('uses Protocol V2 features after BLE final reconnect without legacy Initialize', async () => {
+  test('keeps Protocol V2 firmware updates off the legacy firmwareUpdateV3 path', async () => {
     const method = new FirmwareUpdateV3({
       id: 1,
       payload: {
         method: 'firmwareUpdateV3',
+      },
+    });
+    (method as any).device = {
+      originalDescriptor: { protocolType: 'V2' },
+    };
+
+    await expect(method.run()).rejects.toThrow('firmwareUpdateV4');
+  });
+
+  test('uses Protocol V2 features after BLE final reconnect without legacy Initialize', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
       },
     });
     const acquire = jest.fn().mockResolvedValue({ uuid: 'ble-session' });
@@ -253,10 +268,10 @@ describe('Protocol V2 firmware update targets', () => {
     const resourceZip = new JSZip();
     resourceZip.file('icons/home.png', new Uint8Array([1, 2, 3]));
     const resourceBinary = await resourceZip.generateAsync({ type: 'arraybuffer' });
-    const method = new FirmwareUpdateV3({
+    const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
-        method: 'firmwareUpdateV3',
+        method: 'firmwareUpdateV4',
       },
     });
 
@@ -312,10 +327,10 @@ describe('Protocol V2 firmware update targets', () => {
   });
 
   test('uses absolute processed_byte offsets and disables append for firmware file writes', async () => {
-    const method = new FirmwareUpdateV3({
+    const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
-        method: 'firmwareUpdateV3',
+        method: 'firmwareUpdateV4',
       },
     });
     const typedCall = jest.fn(
@@ -352,10 +367,10 @@ describe('Protocol V2 firmware update targets', () => {
   });
 
   test('consumes Protocol V2 install progress before final update success', async () => {
-    const method = new FirmwareUpdateV3({
+    const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
-        method: 'firmwareUpdateV3',
+        method: 'firmwareUpdateV4',
       },
     });
     const typedCall = jest.fn().mockResolvedValue({ type: 'Success', message: { message: 'ok' } });

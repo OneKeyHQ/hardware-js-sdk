@@ -28,6 +28,7 @@ export type {
   FirmwareUpdateParams,
   FirmwareUpdateBinaryParams,
   FirmwareUpdateV3Params,
+  FirmwareUpdateV4Params,
 } from './firmwareUpdate';
 export type { AllFirmwareRelease } from './checkAllFirmwareRelease';
 
