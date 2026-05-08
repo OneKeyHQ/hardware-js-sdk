@@ -24,6 +24,7 @@ interface FirmwareVersionInfo {
 const FIRMWARE_UPDATE_METHODS = new Set([
   'firmwareUpdateV2',
   'firmwareUpdateV3',
+  'firmwareUpdateV4',
   'devFirmwareUpdate',
   'deviceUpdateBootloader',
 ]);

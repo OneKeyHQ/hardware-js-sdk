@@ -16,6 +16,7 @@ import transport, {
   type ProtocolType,
   ProtocolV2FrameAssembler,
   ProtocolV2Session,
+  probeProtocolV2 as probeProtocolV2Helper,
   type TransportCallOptions,
 } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode, createDeferred, isOnekeyDevice } from '@onekeyfe/hd-shared';
@@ -1088,7 +1089,7 @@ export default class ReactNativeBleTransport {
     }
 
     if (expectedProtocol === 'V2') {
-      if (await this.probeProtocolV2ByPing(uuid)) {
+      if (await this.probeProtocolV2(uuid)) {
         this.deviceProtocol.set(uuid, 'V2');
         Log?.debug(`[ReactNativeBleTransport] detectProtocol: uuid=${uuid} -> V2 (expected)`);
         return 'V2';
@@ -1096,14 +1097,14 @@ export default class ReactNativeBleTransport {
       throw this.createProtocolMismatchError(expectedProtocol);
     }
 
-    if (this.deviceProtocol.get(uuid) === 'V2' && (await this.probeProtocolV2ByPing(uuid))) {
+    if (this.deviceProtocol.get(uuid) === 'V2' && (await this.probeProtocolV2(uuid))) {
       this.deviceProtocol.set(uuid, 'V2');
       Log?.debug(`[ReactNativeBleTransport] detectProtocol: uuid=${uuid} -> V2 (cached)`);
       return 'V2';
     }
 
     let protocol: ProtocolType = 'V1';
-    if (!(await this.probeProtocolV1(uuid)) && (await this.probeProtocolV2ByPing(uuid))) {
+    if (!(await this.probeProtocolV1(uuid)) && (await this.probeProtocolV2(uuid))) {
       protocol = 'V2';
     }
     this.deviceProtocol.set(uuid, protocol);
@@ -1126,27 +1127,23 @@ export default class ReactNativeBleTransport {
     }
   }
 
-  private async probeProtocolV2ByPing(uuid: string) {
+  private async probeProtocolV2(uuid: string) {
     if (!this._messages || !this._messagesV2) {
       return false;
     }
 
-    try {
-      this.deviceProtocol.set(uuid, 'V2');
-      this.protocolV2Assemblers.get(uuid)?.reset();
-      await this.callProtocolV2(
-        uuid,
-        'Ping',
-        { message: 'probe' },
-        { timeoutMs: PROTOCOL_PROBE_TIMEOUT_MS }
-      );
-      return true;
-    } catch (error) {
-      this.protocolV2Assemblers.get(uuid)?.reset();
-      this.resetProtocolV2Frames();
-      Log?.debug('[ReactNativeBleTransport] Protocol V2 Ping probe failed:', error);
-      return false;
-    }
+    this.deviceProtocol.set(uuid, 'V2');
+    this.protocolV2Assemblers.get(uuid)?.reset();
+    return probeProtocolV2Helper({
+      call: (name, data, options) => this.callProtocolV2(uuid, name, data, options),
+      timeoutMs: PROTOCOL_PROBE_TIMEOUT_MS,
+      logger: Log,
+      logPrefix: 'ProtocolV2 RN-BLE',
+      onProbeFailed: () => {
+        this.protocolV2Assemblers.get(uuid)?.reset();
+        this.resetProtocolV2Frames();
+      },
+    });
   }
 
   private handleProtocolV2Notification(uuid: string, data: Uint8Array) {

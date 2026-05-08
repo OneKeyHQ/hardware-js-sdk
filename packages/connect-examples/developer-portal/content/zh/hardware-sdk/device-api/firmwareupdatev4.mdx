@@ -1,24 +1,24 @@
 ---
-title: firmwareUpdateV3
+title: firmwareUpdateV4
 ---
 
-# firmwareUpdateV3
+# firmwareUpdateV4
 
-## 固件更新 (V3)
+## Protocol V2 固件更新
 
-OneKey Pro 旧固件更新流程。Protocol V2 设备请使用 [firmwareUpdateV4](./firmwareupdatev4)。
+Protocol V2 设备的新固件更新流程。该方法独立于 `firmwareUpdateV3`，会使用 Protocol V2 的重启、文件系统写入、安装触发和状态查询消息完成完整升级。
 
-- 设备：仅限 OneKey Pro
-- 引导要求：Boot 版本 >= 4.8.0
+- 设备：Protocol V2 设备
+- 流程：`DevReboot` -> `FilesystemFileWrite` -> `DevFirmwareUpdate` -> `DevGetFirmwareUpdateStatus` -> `DevGetDeviceInfo`
 
 ```typescript
-const res = await HardwareSDK.firmwareUpdateV3(connectId, {
+const res = await HardwareSDK.firmwareUpdateV4(connectId, {
   platform: 'desktop', // 'native' | 'desktop' | 'ext' | 'web' | 'web-embed'
 
   // 方式 A：指定版本号（可选择任意子集）
-  firmwareVersion: [4, 10, 0],
-  bleVersion: [4, 10, 0],
-  bootloaderVersion: [4, 8, 0],
+  firmwareVersion: [1, 0, 0],
+  bleVersion: [1, 0, 0],
+  bootloaderVersion: [1, 0, 0],
 
   // 方式 B：自定义二进制文件（按需使用）
   // firmwareBinary: ArrayBuffer,
@@ -54,18 +54,6 @@ const res = await HardwareSDK.firmwareUpdateV3(connectId, {
     bleVersion: string,
     firmwareVersion: string,
     bootloaderVersion: string,
-  }
-}
-```
-
-### 错误
-
-```typescript
-{
-  success: false,
-  payload: {
-    error: string, // 错误信息
-    code: number   // 错误码
   }
 }
 ```

@@ -85,6 +85,26 @@ const protocolV2Messages = parseConfigure({
         },
       },
     },
+    PartialNested: {
+      fields: {
+        child: {
+          type: 'NestedChild',
+          id: 1,
+        },
+        label: {
+          type: 'string',
+          id: 2,
+        },
+      },
+    },
+    NestedChild: {
+      fields: {
+        value: {
+          type: 'string',
+          id: 1,
+        },
+      },
+    },
     MessageType: {
       values: {
         MessageType_GetProtoVersion: 60200,
@@ -93,6 +113,7 @@ const protocolV2Messages = parseConfigure({
         MessageType_Success: 60207,
         MessageType_DevFirmwareUpdate: 61000,
         MessageType_DevFirmwareInstallProgress: 61001,
+        MessageType_PartialNested: 62000,
       },
     },
   },
@@ -154,6 +175,18 @@ describe('Protocol V2 framing and session', () => {
     const decoded = ProtocolV2.decodeFrame(schemas, frame);
     expect(decoded.type).toBe('Success');
     expect(decoded.message).toEqual({ message: 'ok' });
+  });
+
+  test('decodes missing optional nested messages as null', () => {
+    const frame = ProtocolV2.encodeFrame(schemas, 'PartialNested', {
+      label: 'only label',
+    });
+
+    const decoded = ProtocolV2.decodeFrame(schemas, frame);
+    expect(decoded.message).toEqual({
+      child: null,
+      label: 'only label',
+    });
   });
 
   test('reassembles split Protocol V2 frames and rejects oversized frames', () => {
@@ -328,6 +361,21 @@ describe('Protocol V2 framing and session', () => {
       }
       return Promise.resolve({ type: 'DevFirmwareUpdateStatus', message: { targets: [] } });
     });
+
+    await expect(
+      probeProtocolV2({
+        call,
+        timeoutMs: 1,
+      })
+    ).resolves.toBe(true);
+    expect(call).toHaveBeenNthCalledWith(2, 'DevGetFirmwareUpdateStatus', {}, { timeoutMs: 1 });
+  });
+
+  test('probeProtocolV2 falls back to bootloader status after non-version responses', async () => {
+    const call = jest
+      .fn()
+      .mockResolvedValueOnce({ type: 'Failure', message: { message: 'unsupported' } })
+      .mockResolvedValueOnce({ type: 'DevFirmwareUpdateStatus', message: { targets: [] } });
 
     await expect(
       probeProtocolV2({

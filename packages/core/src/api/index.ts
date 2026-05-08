@@ -38,6 +38,7 @@ export { default as getNextU2FCounter } from './u2f/GetNextU2FCounter';
 export { default as firmwareUpdate } from './FirmwareUpdate';
 export { default as firmwareUpdateV2 } from './FirmwareUpdateV2';
 export { default as firmwareUpdateV3 } from './FirmwareUpdateV3';
+export { default as firmwareUpdateV4 } from './FirmwareUpdateV4';
 export { default as promptWebDeviceAccess } from './PromptWebDeviceAccess';
 
 // File system & device control API (Protocol V2 only)

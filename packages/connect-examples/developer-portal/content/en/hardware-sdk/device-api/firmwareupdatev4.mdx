@@ -1,24 +1,24 @@
 ---
-title: firmwareUpdateV3
+title: firmwareUpdateV4
 ---
 
-# firmwareUpdateV3
+# firmwareUpdateV4
 
-## Firmware update (V3)
+## Protocol V2 firmware update
 
-Legacy OneKey Pro firmware update flow. Use [firmwareUpdateV4](./firmwareupdatev4) for Protocol V2 devices.
+New firmware update flow for Protocol V2 devices. This method is independent from `firmwareUpdateV3` and uses Protocol V2 reboot, filesystem write, install trigger, and status polling messages for the full update.
 
-- Device: OneKey Pro only
-- Boot requirement: Boot version ≥ 4.8.0
+- Device: Protocol V2 devices
+- Flow: `DevReboot` -> `FilesystemFileWrite` -> `DevFirmwareUpdate` -> `DevGetFirmwareUpdateStatus` -> `DevGetDeviceInfo`
 
 ```typescript
-const res = await HardwareSDK.firmwareUpdateV3(connectId, {
+const res = await HardwareSDK.firmwareUpdateV4(connectId, {
   platform: 'desktop', // 'native' | 'desktop' | 'ext' | 'web' | 'web-embed'
 
   // Option A: specify versions (pick any subset)
-  firmwareVersion: [4, 10, 0],
-  bleVersion: [4, 10, 0],
-  bootloaderVersion: [4, 8, 0],
+  firmwareVersion: [1, 0, 0],
+  bleVersion: [1, 0, 0],
+  bootloaderVersion: [1, 0, 0],
 
   // Option B: custom binaries (as needed)
   // firmwareBinary: ArrayBuffer,
@@ -54,18 +54,6 @@ const res = await HardwareSDK.firmwareUpdateV3(connectId, {
     bleVersion: string,
     firmwareVersion: string,
     bootloaderVersion: string,
-  }
-}
-```
-
-### Error
-
-```typescript
-{
-  success: false,
-  payload: {
-    error: string, // error message
-    code: number   // error code
   }
 }
 ```

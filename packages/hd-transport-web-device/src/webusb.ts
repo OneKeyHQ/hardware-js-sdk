@@ -9,6 +9,7 @@ import transport, {
   PROTOCOL_V2_FRAME_MAX_BYTES,
   ProtocolV2FrameAssembler,
   ProtocolV2Session,
+  probeProtocolV2 as probeProtocolV2Helper,
 } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode, ONEKEY_WEBUSB_FILTER, wait } from '@onekeyfe/hd-shared';
 import ByteBuffer from 'bytebuffer';
@@ -236,7 +237,7 @@ export default class WebUsbTransport {
     }
 
     if (expectedProtocol === 'V2') {
-      if (await this.probeProtocolV2ByPing(path)) {
+      if (await this.probeProtocolV2(path)) {
         this.deviceProtocol.set(path, 'V2');
         this.Log.debug(`[WebUsbTransport] detectProtocol: path=${path} -> V2 (expected)`);
         return 'V2';
@@ -244,14 +245,14 @@ export default class WebUsbTransport {
       throw this.createProtocolMismatchError(expectedProtocol);
     }
 
-    if (this.deviceProtocol.get(path) === 'V2' && (await this.probeProtocolV2ByPing(path))) {
+    if (this.deviceProtocol.get(path) === 'V2' && (await this.probeProtocolV2(path))) {
       this.deviceProtocol.set(path, 'V2');
       this.Log.debug(`[WebUsbTransport] detectProtocol: path=${path} -> V2 (cached)`);
       return 'V2';
     }
 
     let protocol: ProtocolType = 'V1';
-    if (!(await this.probeProtocolV1(path)) && (await this.probeProtocolV2ByPing(path))) {
+    if (!(await this.probeProtocolV1(path)) && (await this.probeProtocolV2(path))) {
       protocol = 'V2';
     }
     this.deviceProtocol.set(path, protocol);
@@ -608,24 +609,18 @@ export default class WebUsbTransport {
     }
   }
 
-  private async probeProtocolV2ByPing(path: string) {
+  private async probeProtocolV2(path: string) {
     if (!this.messages || !this.messagesV2) {
       return false;
     }
 
-    try {
-      await this.callProtocolV2(
-        path,
-        'Ping',
-        { message: 'probe' },
-        { timeoutMs: PROTOCOL_PROBE_TIMEOUT }
-      );
-      return true;
-    } catch (error) {
-      this.Log.debug('[WebUsbTransport] Protocol V2 Ping probe failed:', error);
-      await this.resetConnectionAfterProbe(path);
-      return false;
-    }
+    return probeProtocolV2Helper({
+      call: (name, data, options) => this.callProtocolV2(path, name, data, options),
+      timeoutMs: PROTOCOL_PROBE_TIMEOUT,
+      logger: this.Log,
+      logPrefix: 'ProtocolV2 WebUSB',
+      onProbeFailed: () => this.resetConnectionAfterProbe(path),
+    });
   }
 
   /**

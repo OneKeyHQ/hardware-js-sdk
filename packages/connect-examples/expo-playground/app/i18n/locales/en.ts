@@ -313,8 +313,9 @@ export const en = {
       filecoinGetAddress: 'Get address for your account.',
       filecoinSignTransaction: 'Sign a transaction with your private key.',
       firmwareUpdateV2: 'compatible with all devices',
-      firmwareUpdateV3:
-        'Protocol V2/Pro one-stop firmware update with progress and final version refresh',
+      firmwareUpdateV3: 'Legacy OneKey Pro firmware update flow',
+      firmwareUpdateV4:
+        'Protocol V2 one-stop firmware update with progress and final version refresh',
       getProtoVersion: 'Protocol V2 protocol version query',
       ping: 'Protocol V2 device liveness test',
       devReboot: 'Protocol V2 device reboot',

@@ -511,7 +511,7 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
     onDisconnectDevice?.();
   }, [onDisconnectDevice]);
 
-  const firmwareUpdateV3 = useCallback(
+  const firmwareUpdateMultipleFiles = useCallback(
     async ({
       firmwareBinary,
       bleBinary,
@@ -529,7 +529,9 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
       if (!selectDevice) return { payload: 'need connect device', success: false };
       setShowUpdateDialog(true);
       try {
-        const res = await sdk.firmwareUpdateV3(selectDevice.connectId, {
+        const updateMethod =
+          deviceTypeLowerCase === EDeviceType.Pro2 ? sdk.firmwareUpdateV4 : sdk.firmwareUpdateV3;
+        const res = await updateMethod(selectDevice.connectId, {
           firmwareBinary,
           bleBinary,
           bootloaderBinary,
@@ -550,7 +552,15 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
         return { payload: error.message || 'Unknown error occurred', success: false };
       }
     },
-    [features, intl, loadDeviceFeatures, sdk, selectDevice, setShowUpdateDialog]
+    [
+      deviceTypeLowerCase,
+      features,
+      intl,
+      loadDeviceFeatures,
+      sdk,
+      selectDevice,
+      setShowUpdateDialog,
+    ]
   );
 
   const updateFirmware = useCallback(
@@ -813,10 +823,10 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
                     deviceType={deviceTypeLowerCase}
                     title={
                       deviceTypeLowerCase === EDeviceType.Pro2
-                        ? 'Firmware Update V3 (Pro2 Proto V0)'
+                        ? 'Firmware Update V4 (Protocol V2)'
                         : intl.formatMessage({ id: 'label__device_update_firmware_v3' })
                     }
-                    onUpdate={firmwareUpdateV3}
+                    onUpdate={firmwareUpdateMultipleFiles}
                   />
                 )}
                 <FirmwareLocalFile
