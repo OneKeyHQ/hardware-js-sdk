@@ -220,8 +220,12 @@ export default class LowlevelTransport {
     }
 
     if (expectedProtocol === 'V1') {
-      this.deviceProtocol.set(uuid, 'V1');
-      return 'V1';
+      if (await this.probeProtocolV1(uuid)) {
+        this.deviceProtocol.set(uuid, 'V1');
+        this.Log?.debug(`[LowlevelTransport] detectProtocol: uuid=${uuid} -> V1 (expected)`);
+        return 'V1';
+      }
+      throw this.createProtocolMismatchError(expectedProtocol);
     }
 
     const cachedProtocol = this.deviceProtocol.get(uuid);
@@ -231,8 +235,28 @@ export default class LowlevelTransport {
       return 'V2';
     }
 
-    this.deviceProtocol.set(uuid, 'V1');
-    return 'V1';
+    let protocol: ProtocolType = 'V1';
+    if (!(await this.probeProtocolV1(uuid)) && (await this.probeProtocolV2(uuid))) {
+      protocol = 'V2';
+    }
+    this.deviceProtocol.set(uuid, protocol);
+    this.Log?.debug(`[LowlevelTransport] detectProtocol: uuid=${uuid} -> ${protocol}`);
+    return protocol;
+  }
+
+  private async probeProtocolV1(uuid: string) {
+    if (!this._messages) {
+      return false;
+    }
+
+    try {
+      this.deviceProtocol.set(uuid, 'V1');
+      await this.callProtocolV1(uuid, 'Initialize', {}, { timeoutMs: PROTOCOL_PROBE_TIMEOUT_MS });
+      return true;
+    } catch (error) {
+      this.Log?.debug('[LowlevelTransport] Protocol V1 Initialize probe failed:', error);
+      return false;
+    }
   }
 
   private async probeProtocolV2(uuid: string) {

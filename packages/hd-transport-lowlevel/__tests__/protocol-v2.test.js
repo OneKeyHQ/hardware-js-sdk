@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-var-requires */
 const LowlevelTransport = require('../src').default;
 const { parseConfigure } = require('../../hd-transport/src/serialization/protobuf/messages');
 const { ProtocolV1, ProtocolV2 } = require('../../hd-transport/src/protocols');
@@ -74,6 +75,9 @@ const createPlugin = ({ devices, responses }) => ({
   send: jest.fn(() => Promise.resolve()),
   receive: jest.fn(() => {
     const next = responses.shift();
+    if (next instanceof Error) {
+      return Promise.reject(next);
+    }
     if (!next) {
       return Promise.reject(new Error('No queued response'));
     }
@@ -155,5 +159,41 @@ describe('LowlevelTransport protocol framing', () => {
       },
     });
     expect(plugin.send).toHaveBeenCalled();
+  });
+
+  test('falls back to Protocol V2 probe for unnamed Protocol V2 devices', async () => {
+    const probeResponse = ProtocolV2.encodeFrame(
+      schemas,
+      'ProtoVersion',
+      {
+        major_version: 2,
+        minor_version: 0,
+        patch_version: 0,
+      },
+      { router: PROTOCOL_V2_CHANNEL_BLE_UART }
+    );
+    const plugin = createPlugin({
+      devices: [{ id: 'unknown-pro2-id', name: 'Unknown BLE Device', commType: 'ble' }],
+      responses: [new Error('Protocol V1 probe timed out'), bytesToHex(probeResponse)],
+    });
+    const lowlevel = configureTransport(plugin);
+
+    await expect(lowlevel.acquire({ uuid: 'unknown-pro2-id' })).resolves.toEqual({
+      uuid: 'unknown-pro2-id',
+      protocolType: 'V2',
+    });
+    expect(lowlevel.getProtocolType('unknown-pro2-id')).toBe('V2');
+  });
+
+  test('verifies expected Protocol V1 instead of trusting the requested protocol', async () => {
+    const plugin = createPlugin({
+      devices: [{ id: 'v2-id', name: 'Unknown BLE Device', commType: 'ble' }],
+      responses: [new Error('Protocol V1 probe timed out')],
+    });
+    const lowlevel = configureTransport(plugin);
+
+    await expect(lowlevel.acquire({ uuid: 'v2-id', expectedProtocol: 'V1' })).rejects.toThrow(
+      'Device protocol mismatch: expected V1'
+    );
   });
 });

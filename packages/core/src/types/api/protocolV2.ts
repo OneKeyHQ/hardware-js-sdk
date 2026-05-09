@@ -152,7 +152,7 @@ export declare function devGetDeviceInfo(
 export declare function devFirmwareUpdate(
   connectId: string,
   params: DevFirmwareUpdateParams
-): Response<Success>;
+): Response<Success | DevFirmwareUpdateStatus>;
 
 export declare function devGetFirmwareUpdateStatus(
   connectId: string

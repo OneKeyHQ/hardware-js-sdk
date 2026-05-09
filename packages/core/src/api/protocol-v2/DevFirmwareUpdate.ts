@@ -1,5 +1,9 @@
 import { BaseMethod } from '../BaseMethod';
-import { PROTOCOL_V2_FIRMWARE_UPDATE_OPTIONS, normalizeFirmwareTargets } from './helpers';
+import {
+  PROTOCOL_V2_FIRMWARE_UPDATE_OPTIONS,
+  PROTOCOL_V2_FIRMWARE_UPDATE_RESPONSE_TYPES,
+  normalizeFirmwareTargets,
+} from './helpers';
 
 import type { DevFirmwareUpdateParams } from './helpers';
 
@@ -18,7 +22,7 @@ export default class DevFirmwareUpdate extends BaseMethod<DevFirmwareUpdateParam
   async run() {
     const res = await this.device.commands.typedCall(
       'DevFirmwareUpdate',
-      'Success',
+      PROTOCOL_V2_FIRMWARE_UPDATE_RESPONSE_TYPES,
       {
         targets: normalizeFirmwareTargets(this.params),
       },

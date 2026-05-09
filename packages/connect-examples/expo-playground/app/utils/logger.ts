@@ -3,11 +3,18 @@ import type { UnifiedLogEntry, LogType } from '../components/common/UnifiedLogge
 
 export type logData = Record<string, unknown> | undefined;
 
+type LogOptions = {
+  console?: boolean;
+  persist?: boolean;
+  store?: boolean;
+};
+
 // Create a unified log entry
 export function createUnifiedLogEntry(
   type: LogType,
   message: string,
-  data?: logData
+  data?: logData,
+  options: { transient?: boolean } = {}
 ): UnifiedLogEntry {
   return {
     id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -17,6 +24,7 @@ export function createUnifiedLogEntry(
     message,
     content: data || null,
     data,
+    ...(options.transient ? { transient: true } : {}),
   };
 }
 
@@ -66,11 +74,15 @@ export function logResponse(message: string, data?: logData) {
 }
 
 // Log hardware-level details (e.g., final params to device)
-export function logHardware(message: string, data?: logData) {
-  console.info(`[HARDWARE] ${message}`, data || '');
+export function logHardware(message: string, data?: logData, options: LogOptions = {}) {
+  const { console: shouldWriteConsole = true, persist = true, store = true } = options;
+  if (shouldWriteConsole) {
+    console.info(`[HARDWARE] ${message}`, data || '');
+  }
+  if (!store) return;
   try {
     const store = useDeviceStore.getState();
-    store.addLog(createUnifiedLogEntry('hardware', message, data));
+    store.addLog(createUnifiedLogEntry('hardware', message, data, { transient: !persist }));
   } catch (e) {
     console.error('Failed to add log to store:', e);
   }

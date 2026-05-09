@@ -21,6 +21,7 @@ import {
   getProtocolV2Features,
   protocolV2FileNameToTargetId,
 } from '../protocols/protocol-v2';
+import { PROTOCOL_V2_FIRMWARE_UPDATE_RESPONSE_TYPES } from './protocol-v2/helpers';
 
 import type { FirmwareUpdateV4Params } from '../types/api/firmwareUpdate';
 import type { EFirmwareType } from '@onekeyfe/hd-shared';
@@ -30,13 +31,13 @@ import type { TypedResponseMessage } from '../device/DeviceCommands';
 const Log = getLogger(LoggerNames.Method);
 
 const SESSION_ERROR = 'session not found';
-const FIRMWARE_UPDATE_CONFIRM = 'Firmware install confirmed';
 const PROTOCOL_V2_BOOTLOADER_RECONNECT_TIMEOUT = 60 * 1000;
 const PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT = 5 * 1000;
 const PROTOCOL_V2_INSTALL_TIMEOUT = 5 * 60 * 1000;
 const PROTOCOL_V2_TARGET_STATUS_FINISHED = 0;
 const PROTOCOL_V2_TARGET_STATUS_IN_PROGRESS = 1;
 const PROTOCOL_V2_TARGET_STATUS_FAILED = 2;
+const PROTOCOL_V2_CONNECT_PROTOCOL = 'V2';
 
 type ProtocolV2FirmwareUpdateStatusTarget = {
   target_id: number;
@@ -477,7 +478,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
   private async reconnectProtocolV2Device() {
     if (this.isBleReconnect()) {
-      await this.device.deviceConnector?.acquire(this.device.originalDescriptor.id, null, true);
+      await this.acquireProtocolV2BleDevice();
       return;
     }
 
@@ -600,7 +601,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         const env = DataManager.getSettings('env');
         if (DataManager.isBleConnect(env)) {
           await wait(3000);
-          await this.device.deviceConnector?.acquire(this.device.originalDescriptor.id, null, true);
+          await this.acquireProtocolV2BleDevice();
           await this.device.initialize();
         }
         await wait(2000);
@@ -609,17 +610,25 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     throw ERRORS.TypedError(HardwareErrorCode.EmmcFileWriteFirmwareError, 'transfer data error');
   }
 
+  private async acquireProtocolV2BleDevice() {
+    await this.device.deviceConnector?.acquire(
+      this.device.originalDescriptor.id,
+      null,
+      true,
+      PROTOCOL_V2_CONNECT_PROTOCOL
+    );
+  }
+
   private async protocolV2StartFirmwareUpdate({
     targets,
   }: {
     targets: Array<{ target_id: number; path: string }>;
   }) {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
-    let updateResponse: TypedResponseMessage<'Success'>;
     try {
-      updateResponse = await typedCall(
+      await typedCall(
         'DevFirmwareUpdate',
-        'Success',
+        PROTOCOL_V2_FIRMWARE_UPDATE_RESPONSE_TYPES,
         {
           targets,
         },
@@ -636,16 +645,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     } catch (error) {
       if (isDeviceDisconnectedError(error)) {
         Log.log('Rebooting device');
-        updateResponse = {
-          type: 'Success',
-          message: { message: FIRMWARE_UPDATE_CONFIRM },
-        };
       } else {
         throw error;
       }
-    }
-    if (updateResponse.type !== 'Success') {
-      throw ERRORS.TypedError(HardwareErrorCode.FirmwareError, 'firmware update error');
     }
     this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdating);
   }

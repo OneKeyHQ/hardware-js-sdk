@@ -37,6 +37,95 @@ type TypedCallResponseMap = {
 };
 export type DefaultMessageResponse = TypedCallResponseMap[keyof MessageType];
 
+const MAX_DEBUG_ARRAY_ITEMS = 20;
+const MAX_DEBUG_OBJECT_KEYS = 40;
+const MAX_DEBUG_STRING_LENGTH = 512;
+const MAX_DEBUG_DEPTH = 4;
+
+function getBinaryByteLength(value: unknown): number | undefined {
+  if (value instanceof ArrayBuffer) {
+    return value.byteLength;
+  }
+
+  if (ArrayBuffer.isView(value)) {
+    return value.byteLength;
+  }
+
+  if (typeof Blob !== 'undefined' && value instanceof Blob) {
+    return value.size;
+  }
+
+  return undefined;
+}
+
+function summarizeRedactedData(value: unknown): string {
+  const byteLength = getBinaryByteLength(value);
+  if (byteLength !== undefined) {
+    return `[redacted data: ${byteLength} bytes]`;
+  }
+
+  if (typeof value === 'string') {
+    return `[redacted data: string length=${value.length}]`;
+  }
+
+  if (Array.isArray(value)) {
+    return `[redacted data: array length=${value.length}]`;
+  }
+
+  if (value && typeof value === 'object') {
+    return `[redacted data: object keys=${Object.keys(value).length}]`;
+  }
+
+  return `[redacted data: ${typeof value}]`;
+}
+
+function sanitizeDebugPayload(value: unknown, key = '', depth = 0): unknown {
+  if (key === 'data' && value !== null && value !== undefined) {
+    return summarizeRedactedData(value);
+  }
+
+  const byteLength = getBinaryByteLength(value);
+  if (byteLength !== undefined) {
+    return `[binary: ${byteLength} bytes]`;
+  }
+
+  if (typeof value === 'string') {
+    return value.length > MAX_DEBUG_STRING_LENGTH
+      ? `${value.slice(0, MAX_DEBUG_STRING_LENGTH)}... (len=${value.length})`
+      : value;
+  }
+
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+
+  if (depth >= MAX_DEBUG_DEPTH) {
+    return Array.isArray(value)
+      ? `[array length=${value.length}]`
+      : `[object keys=${Object.keys(value).length}]`;
+  }
+
+  if (Array.isArray(value)) {
+    const items = value
+      .slice(0, MAX_DEBUG_ARRAY_ITEMS)
+      .map(item => sanitizeDebugPayload(item, key, depth + 1));
+    if (value.length > MAX_DEBUG_ARRAY_ITEMS) {
+      items.push(`... (${value.length - MAX_DEBUG_ARRAY_ITEMS} more)`);
+    }
+    return items;
+  }
+
+  const entries = Object.entries(value).slice(0, MAX_DEBUG_OBJECT_KEYS);
+  const sanitized: Record<string, unknown> = {};
+  entries.forEach(([entryKey, entryValue]) => {
+    sanitized[entryKey] = sanitizeDebugPayload(entryValue, entryKey, depth + 1);
+  });
+  if (Object.keys(value).length > MAX_DEBUG_OBJECT_KEYS) {
+    sanitized.__truncated__ = `${Object.keys(value).length - MAX_DEBUG_OBJECT_KEYS} more keys`;
+  }
+  return sanitized;
+}
+
 const assertType = (res: DefaultMessageResponse, resType: string | string[]) => {
   const splitResTypes = Array.isArray(resType) ? resType : resType.split('|');
   if (!splitResTypes.includes(res.type)) {
@@ -324,7 +413,7 @@ export class DeviceCommands {
       ] as any;
       if (!skipTypes.includes(type) && msg) {
         // Use debug channel to avoid noise escalation
-        Log.debug('[DeviceCommands] [typedCall] Sending payload', type, msg);
+        Log.debug('[DeviceCommands] [typedCall] Sending payload', type, sanitizeDebugPayload(msg));
       }
     } catch (e) {
       // ignore logging errors
@@ -343,6 +432,12 @@ export class DeviceCommands {
       // throw bridge network error
       if (error instanceof HardwareError) {
         if (error.errorCode === HardwareErrorCode.ResponseUnexpectTypeError) {
+          Log.debug('[DeviceCommands] [typedCall] Unexpected response type', {
+            request: type,
+            expected: resType,
+            received: response.type,
+            response: sanitizeDebugPayload(response.message),
+          });
           // Do not intercept CallMethodError
           // Do not intercept “assertType: Response of unexpected type” error
           // Blocking the above two messages will not know what the specific error message is, and the specific error should be handled by the subsequent business logic.
@@ -356,7 +451,7 @@ export class DeviceCommands {
           if (error.message.indexOf('BridgeDeviceDisconnected') > -1) {
             throw ERRORS.TypedError(HardwareErrorCode.BridgeDeviceDisconnected);
           }
-          throw ERRORS.TypedError(HardwareErrorCode.ResponseUnexpectTypeError);
+          throw error;
         }
       } else {
         // throw error anyway, next call should be resolved properly// throw error anyway, next call should be resolved properly
@@ -372,18 +467,19 @@ export class DeviceCommands {
     options?: TransportCallOptions
   ) {
     const resp = await this.call(type, msg, options);
-    return this._filterCommonTypes(resp, type);
+    return this._filterCommonTypes(resp, type, options);
   }
 
   _filterCommonTypes(
     res: DefaultMessageResponse,
-    callType: MessageKey
+    callType: MessageKey,
+    options?: TransportCallOptions
   ): Promise<DefaultMessageResponse> {
     try {
       if (DataManager.getSettings('env') === 'react-native') {
-        Log.debug('_filterCommonTypes: ', JSON.stringify(res));
+        Log.debug('_filterCommonTypes: ', JSON.stringify(sanitizeDebugPayload(res)));
       } else {
-        Log.debug('_filterCommonTypes: ', res);
+        Log.debug('_filterCommonTypes: ', sanitizeDebugPayload(res));
       }
     } catch (error) {
       // ignore
@@ -485,7 +581,7 @@ export class DeviceCommands {
       } else {
         this.device.emit(DEVICE.BUTTON, this.device, res.message);
       }
-      return this._commonCall('ButtonAck', {});
+      return this._commonCall('ButtonAck', {}, options);
     }
 
     if (res.type === 'EntropyRequest') {
@@ -498,11 +594,11 @@ export class DeviceCommands {
           if (pin === '@@ONEKEY_INPUT_PIN_IN_DEVICE') {
             // only classic\1s\mini\pure
             this.device.setCancelableAction(() => this.cancelDeviceOnOneKeyDevice());
-            return this._commonCall('BixinPinInputOnDevice').finally(() => {
+            return this._commonCall('BixinPinInputOnDevice', {}, options).finally(() => {
               this.device.clearCancelableAction();
             });
           }
-          return this._commonCall('PinMatrixAck', { pin });
+          return this._commonCall('PinMatrixAck', { pin }, options);
         },
         error => Promise.reject(error)
       );
@@ -517,12 +613,12 @@ export class DeviceCommands {
 
         // Attach PIN on device
         if (attachPinOnDevice && existsAttachPinUser) {
-          return this._commonCall('PassphraseAck', { on_device_attach_pin: true });
+          return this._commonCall('PassphraseAck', { on_device_attach_pin: true }, options);
         }
 
         return !passphraseOnDevice
-          ? this._commonCall('PassphraseAck', { passphrase })
-          : this._commonCall('PassphraseAck', { on_device: true });
+          ? this._commonCall('PassphraseAck', { passphrase }, options)
+          : this._commonCall('PassphraseAck', { on_device: true }, options);
       });
     }
 

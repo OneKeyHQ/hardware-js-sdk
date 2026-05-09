@@ -52,7 +52,7 @@ Protocol V2 使用 `0x5A` 开头的完整 frame，并带有两段 CRC8：
 | `Payload` | `MsgTypeL MsgTypeH + protobuf bytes` |
 | `CRC` | 对除最后 CRC 外的整帧计算 CRC8 |
 
-CRC8 是 Protocol V2 协议必需字段，不是设备数据。使用 `@onekeyfe/hd-common-connect-sdk` 的 `lowlevel` 环境时，JS SDK 会负责计算和校验 CRC8；原生 Kotlin/Swift/Flutter 插件只需要把 BLE notification 按 `LenL/LenH` 重组成完整 `0x5A` frame，并把完整 frame 的 hex 字符串从 `receive()` 返回。不要去掉 header、payload 或末尾 CRC。
+CRC8 是 Protocol V2 协议必需字段，不是设备数据。使用 `@onekeyfe/hd-common-connect-sdk` 的 `lowlevel` 环境时，JS SDK 会负责计算 CRC8、重组 frame 并校验 CRC8；原生 Kotlin/Swift/Flutter 插件可以把单个 BLE notification chunk 的 hex 字符串从 `receive()` 返回，也可以返回已经重组好的完整 `0x5A` frame。无论哪种方式，都不要去掉 header、payload 或末尾 CRC。
 
 只有在完全绕过 OneKey SDK、自己实现 Protocol V2 encode/decode 时，才需要在原生侧实现同样的 CRC8 算法。
 
@@ -86,7 +86,7 @@ export type LowlevelTransportSharedPlugin = {
 | 数据包大小 | 固定 64 字节 | 可变长度 (取决于 MTU) |
 | 每个包前缀 | 所有包都有 `0x3F` | 仅头部包有 `0x3F 0x23 0x23` |
 | 填充 | 零填充到 64 字节 | 无需填充 |
-| `receive()` 返回 | 每次一个 64 字节帧 | **Protocol V1 完整消息，或 Protocol V2 完整 `0x5A` frame** |
+| `receive()` 返回 | 每次一个 64 字节帧 | **单个 BLE notification chunk，或完整 Protocol V1/V2 消息** |
 
 ---
 
@@ -207,7 +207,7 @@ class BleMessageAssembler {
 
 ### Protocol V2 frame 重组规则
 
-如果 notification 的第一个字节是 `0x5A`，或当前已经处于 V2 frame 缓冲中，就按 Protocol V2 处理：
+如果你选择在原生侧提前重组 V2 frame，可以按下面的规则处理。SDK 的 lowlevel transport 自身也会做同样的重组，因此原生侧直接转发 notification chunk 也是可行的：
 
 - 累积 notification bytes。
 - 缓冲区至少 3 字节后，用 `LenL | (LenH << 8)` 读取总 frame 长度。
@@ -247,11 +247,11 @@ function onProtocolV2Notification(data: Uint8Array, resolveFrame: (hex: string) 
 ### 常见错误
 
 ```typescript
-// ❌ 错误: 返回单个 BLE notification 或重新分片成 64 字节包
-receive() { return this.messageQueue.shift() }
+// ❌ 错误: 去掉 Protocol V2 header/CRC，只返回 payload
+receive() { return this.payloadOnlyQueue.shift() }
 
-// ✅ 正确: 返回完整重组后的 V1 消息或 V2 frame
-receive() { return this.completeMessagePromise }
+// ✅ 正确: 返回原始 notification chunk，或完整重组后的 V1/V2 frame
+receive() { return this.rawChunkOrCompleteFramePromise }
 ```
 
 ```typescript
@@ -274,7 +274,7 @@ import HardwareSDK from '@onekeyfe/hd-common-connect-sdk'
 const plugin = {
   enumerate: () => Promise.resolve([{ id: 'foo', name: 'bar' }]),
   send: (uuid, data) => { /* 发送 hex 数据 */ },
-  receive: () => { /* WebUSB: 64字节帧 / BLE: 完整消息 */ },
+  receive: () => { /* BLE: 原始 notification chunk 或完整消息 */ },
   connect: (uuid) => { /* BLE Android: 先配对! */ },
   disconnect: (uuid) => { /* 清理连接 */ },
   init: () => { /* 初始化 BLE 栈 */ },

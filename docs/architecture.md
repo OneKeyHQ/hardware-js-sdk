@@ -50,9 +50,11 @@ flowchart TD
 
 - `ProtocolV2Session`：负责 V2 encode、frame 写入、frame 读取、decode、超时和统一日志。
 - `ProtocolV2FrameAssembler`：负责 BLE/USB 分片后的 `0x5A` frame 重组和长度校验。
-- `probeProtocolV2()`：负责连接后主动 `GetProtoVersion` 探测和失败回退钩子。
+- `probeProtocolV2()`：公共 V2 probe helper，负责 `GetProtoVersion` / bootloader status 探测和失败回退钩子。
 
-WebUSB、Electron BLE、React Native BLE 只负责各自的物理连接、读写、订阅和平台错误映射，不再各自复制 V2 协议会话逻辑。
+各 transport 的 `detectProtocol()` 会先执行 V1 `Initialize` probe，再按需要调用公共 V2 probe helper；显式 `connectProtocol` 则只验证指定协议。
+
+WebUSB、Electron BLE、React Native BLE 和 lowlevel BLE 只负责各自的物理连接、读写、订阅/桥接和平台错误映射，不再各自复制 V2 协议会话逻辑。
 
 ## Protocol V2 Feature Adapter
 
@@ -68,23 +70,27 @@ WebUSB、Electron BLE、React Native BLE 只负责各自的物理连接、读写
 
 ## 自动协议探测
 
-支持 Protocol V2 的传输实现会在 `acquire()` 后主动探测协议：
+支持 Protocol V2 的传输实现会在 `acquire()` 后主动探测协议。默认路径先验证 V1，V1 失败后再 probe V2；如果调用方显式传入 `connectProtocol`，则只验证指定协议：
 
 ```mermaid
 flowchart TD
   Enumerate["enumerate()"]
   Acquire["acquire()"]
   Connect["connect / subscribe"]
-  Probe["发送 Protocol V2 GetProtoVersion"]
-  V2["返回 ProtoVersion: 标记为 Protocol V2"]
-  V1["超时或失败: 回落 Protocol V1"]
+  ProbeV1["Protocol V1 Initialize"]
+  V1["Initialize 成功: 标记 Protocol V1"]
+  ProbeV2["Protocol V2 GetProtoVersion / bootloader status"]
+  V2["V2 probe 成功: 标记 Protocol V2"]
+  FallbackV1["V1/V2 均失败: 保持 Protocol V1"]
   Init["Device.initialize()"]
   InitV1["V1: Initialize -> Features"]
   InitV2["V2: Ping + DevGetDeviceInfo -> normalized Features"]
 
-  Enumerate --> Acquire --> Connect --> Probe
-  Probe --> V2 --> Init
-  Probe --> V1 --> Init
+  Enumerate --> Acquire --> Connect --> ProbeV1
+  ProbeV1 --> V1 --> Init
+  ProbeV1 --> ProbeV2
+  ProbeV2 --> V2 --> Init
+  ProbeV2 --> FallbackV1 --> Init
   Init --> InitV1
   Init --> InitV2
 ```

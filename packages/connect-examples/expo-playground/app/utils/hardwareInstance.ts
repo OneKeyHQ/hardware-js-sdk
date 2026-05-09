@@ -7,6 +7,17 @@ let initialized = false;
 
 export type TransportType = 'webusb' | 'jsbridge' | 'emulator';
 
+export const SDK_DEBUG_LOG_STORAGE_KEY = 'ONEKEY_CAPTURE_SDK_DEBUG_LOGS';
+
+export function isSdkDebugEnabled(): boolean {
+  if (typeof window === 'undefined') return true;
+  try {
+    return window.localStorage.getItem(SDK_DEBUG_LOG_STORAGE_KEY) !== 'false';
+  } catch {
+    return true;
+  }
+}
+
 export interface SDKInitResult {
   HardwareSDK: CoreApi;
   initialized: boolean;
@@ -39,7 +50,7 @@ export const getHardwareSDKInstance = memoizee(
       logInfo(`Initializing SDK with transport: ${transport}`);
 
       const settings: Partial<ConnectSettings> = {
-        debug: true,
+        debug: isSdkDebugEnabled(),
         fetchConfig: true,
         env: getSDKEnv(transport),
       };
