@@ -53,6 +53,11 @@ export function bytesToHex(bytes: Uint8Array): string {
 }
 
 const PROTOCOL_V2_DEBUG_HEX_LIMIT = 256;
+const HIGH_VOLUME_PROTOCOL_V2_CALLS = new Set(['FilesystemFileWrite', 'FileWrite']);
+
+function shouldReduceProtocolV2Debug(name: string) {
+  return HIGH_VOLUME_PROTOCOL_V2_CALLS.has(name);
+}
 
 function bytesToDebugHex(bytes: Uint8Array): string {
   const visibleBytes =
@@ -143,12 +148,15 @@ export class ProtocolV2Session {
         router,
       });
       const expectedSeq = frame[6];
+      const shouldReduceDebug = shouldReduceProtocolV2Debug(name);
 
-      logger?.debug?.(
-        `[${logPrefix}] TX frame name=${name} len=${frame.length} router=${frame[4]} attr=${
-          frame[5]
-        } seq=${expectedSeq} hex=${bytesToDebugHex(frame)}`
-      );
+      if (!shouldReduceDebug) {
+        logger?.debug?.(
+          `[${logPrefix}] TX frame name=${name} len=${frame.length} router=${frame[4]} attr=${
+            frame[5]
+          } seq=${expectedSeq} hex=${bytesToDebugHex(frame)}`
+        );
+      }
 
       await writeFrame(frame);
 
@@ -158,20 +166,24 @@ export class ProtocolV2Session {
       // eslint-disable-next-line no-constant-condition
       while (true) {
         const rxFrame = await readFrame();
-        logger?.debug?.(
-          `[${logPrefix}] RX frame len=${rxFrame.length} router=${rxFrame[4]} attr=${
-            rxFrame[5]
-          } seq=${rxFrame[6]} hex=${bytesToDebugHex(rxFrame)}`
-        );
+        if (!shouldReduceDebug) {
+          logger?.debug?.(
+            `[${logPrefix}] RX frame len=${rxFrame.length} router=${rxFrame[4]} attr=${
+              rxFrame[5]
+            } seq=${rxFrame[6]} hex=${bytesToDebugHex(rxFrame)}`
+          );
+        }
         const decoded = ProtocolV2.decodeFrame(schemas, rxFrame);
-        if (decoded.seq !== expectedSeq) {
+        if (!shouldReduceDebug && decoded.seq !== expectedSeq) {
           logger?.debug?.(
             `[${logPrefix}] seq differs for ${name}: tx=${expectedSeq}, rx=${decoded.seq}`
           );
         }
-        logger?.debug?.(
-          `[${logPrefix}] TX name=${name} seq=${expectedSeq} | RX seq=${decoded.seq} msgType=${decoded.msgType} pbPayload=${decoded.pbPayload.length}B`
-        );
+        if (!shouldReduceDebug) {
+          logger?.debug?.(
+            `[${logPrefix}] TX name=${name} seq=${expectedSeq} | RX seq=${decoded.seq} msgType=${decoded.msgType} pbPayload=${decoded.pbPayload.length}B`
+          );
+        }
 
         const response = check.call(decoded);
         if (callOptions.intermediateTypes?.includes(response.type)) {

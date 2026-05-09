@@ -35,6 +35,11 @@ const PACKET_IO_RETRY_DELAY = 300;
 const PROTOCOL_PROBE_TIMEOUT = 1000;
 const WEBUSB_FILE_WRITE_LOG_BLOCK_PATTERN = /(?:^|[^a-z])(?:raw)?(?:filesystem|emmc)?filewrite$/i;
 
+function shouldSuppressWebUsbCallLog(name: string) {
+  const normalized = name.replace(/[_\s-]/g, '');
+  return WEBUSB_FILE_WRITE_LOG_BLOCK_PATTERN.test(normalized);
+}
+
 function shouldBlockWebUsbCallDataLog(name: string) {
   const normalized = name.replace(/[_\s-]/g, '');
   return LogBlockCommand.has(name) || WEBUSB_FILE_WRITE_LOG_BLOCK_PATTERN.test(normalized);
@@ -643,7 +648,9 @@ export default class WebUsbTransport {
 
     const protocol = this.deviceProtocol.get(path) ?? 'V1';
 
-    if (shouldBlockWebUsbCallDataLog(name)) {
+    if (shouldSuppressWebUsbCallLog(name)) {
+      // 高频文件写入不要逐包发 debug 事件，否则浏览器侧会被日志处理拖慢。
+    } else if (shouldBlockWebUsbCallDataLog(name)) {
       this.Log.debug('call-', ' name: ', name, ' protocol: ', protocol);
     } else {
       this.Log.debug('call-', ' name: ', name, ' data: ', data, ' protocol: ', protocol);

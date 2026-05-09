@@ -41,6 +41,17 @@ const MAX_DEBUG_ARRAY_ITEMS = 20;
 const MAX_DEBUG_OBJECT_KEYS = 40;
 const MAX_DEBUG_STRING_LENGTH = 512;
 const MAX_DEBUG_DEPTH = 4;
+const HIGH_VOLUME_DEBUG_CALLS = new Set([
+  'FilesystemFileWrite',
+  'FileWrite',
+  'EmmcFileWrite',
+  'FirmwareUpload',
+  'ResourceAck',
+]);
+
+function shouldReduceDebugForCall(type: string) {
+  return HIGH_VOLUME_DEBUG_CALLS.has(type);
+}
 
 function getBinaryByteLength(value: unknown): number | undefined {
   if (value instanceof ArrayBuffer) {
@@ -321,7 +332,10 @@ export class DeviceCommands {
     msg?: DefaultMessageResponse['message'],
     options?: TransportCallOptions
   ): Promise<DefaultMessageResponse> {
-    Log.debug('[DeviceCommands] [call] Sending', type);
+    const shouldReduceDebug = shouldReduceDebugForCall(type);
+    if (!shouldReduceDebug) {
+      Log.debug('[DeviceCommands] [call] Sending', type);
+    }
 
     try {
       const promise = this.transport.call(this.mainId, type, msg ?? {}, options) as any;
@@ -329,7 +343,7 @@ export class DeviceCommands {
       const res = await promise;
       if (res.type === 'Failure') {
         LogCore.debug('[DeviceCommands] [call] Received', res.type, res.message);
-      } else {
+      } else if (!shouldReduceDebug) {
         LogCore.debug('[DeviceCommands] [call] Received', res.type);
       }
       return res;
@@ -410,6 +424,11 @@ export class DeviceCommands {
         'PassphraseAck',
         'Cancel',
         'BixinPinInputOnDevice',
+        'FilesystemFileWrite',
+        'FileWrite',
+        'EmmcFileWrite',
+        'FirmwareUpload',
+        'ResourceAck',
       ] as any;
       if (!skipTypes.includes(type) && msg) {
         // Use debug channel to avoid noise escalation
@@ -476,7 +495,9 @@ export class DeviceCommands {
     options?: TransportCallOptions
   ): Promise<DefaultMessageResponse> {
     try {
-      if (DataManager.getSettings('env') === 'react-native') {
+      if (shouldReduceDebugForCall(callType)) {
+        // 高频文件写入每个 chunk 都会经过这里，避免 debug log 反向拖慢传输。
+      } else if (DataManager.getSettings('env') === 'react-native') {
         Log.debug('_filterCommonTypes: ', JSON.stringify(sanitizeDebugPayload(res)));
       } else {
         Log.debug('_filterCommonTypes: ', sanitizeDebugPayload(res));

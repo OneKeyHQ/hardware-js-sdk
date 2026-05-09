@@ -129,6 +129,10 @@ export interface FirmwareProgress {
     device: Device;
     progress: number;
     progressType: IFirmwareUpdateProgressType;
+    transferredBytes?: number;
+    totalBytes?: number;
+    rateBytesPerSecond?: number;
+    elapsedMs?: number;
   };
 }
 
@@ -144,6 +148,10 @@ export interface DeviceProgress {
   type: typeof UI_REQUEST.DEVICE_PROGRESS;
   payload: {
     progress?: number;
+    transferredBytes?: number;
+    totalBytes?: number;
+    rateBytesPerSecond?: number;
+    elapsedMs?: number;
   };
 }
 

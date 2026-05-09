@@ -484,7 +484,12 @@ describe('Protocol V2 file write method', () => {
     expect(method.postMessage).toHaveBeenCalledWith({
       event: 'UI_EVENT',
       type: UI_REQUEST.DEVICE_PROGRESS,
-      payload: { progress: 100 },
+      payload: expect.objectContaining({
+        progress: 100,
+        transferredBytes: 1,
+        totalBytes: 1,
+        elapsedMs: expect.any(Number),
+      }),
     });
   });
 
@@ -538,12 +543,22 @@ describe('Protocol V2 file write method', () => {
     expect(method.postMessage).toHaveBeenNthCalledWith(1, {
       event: 'UI_EVENT',
       type: UI_REQUEST.DEVICE_PROGRESS,
-      payload: { progress: 99 },
+      payload: expect.objectContaining({
+        progress: 99,
+        transferredBytes: 4096,
+        totalBytes: 4097,
+        elapsedMs: expect.any(Number),
+      }),
     });
     expect(method.postMessage).toHaveBeenNthCalledWith(2, {
       event: 'UI_EVENT',
       type: UI_REQUEST.DEVICE_PROGRESS,
-      payload: { progress: 100 },
+      payload: expect.objectContaining({
+        progress: 100,
+        transferredBytes: 4097,
+        totalBytes: 4097,
+        elapsedMs: expect.any(Number),
+      }),
     });
   });
 });
