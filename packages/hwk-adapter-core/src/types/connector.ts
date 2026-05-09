@@ -31,6 +31,8 @@ export type ConnectorEventType = 'device-connect' | 'device-disconnect' | 'ui-re
  * These map to user-facing prompts (confirm on device, open app, etc.).
  */
 export enum EConnectorInteraction {
+  /** Adapter is actively searching for the device (no session yet) */
+  Searching = 'searching',
   /** Device requires user to open a specific app */
   ConfirmOpenApp = 'confirm-open-app',
   /** Device requires user to unlock */
@@ -41,7 +43,12 @@ export enum EConnectorInteraction {
   InteractionComplete = 'interaction-complete',
 }
 
+// All variants share the same payload shape so that emit sites where the
+// `type` is a broad `EConnectorInteraction` value (e.g. piped through
+// `collapseSignerInteraction`) still type-check. Searching has no session
+// yet so it carries an empty `sessionId`.
 export type ConnectorUiEvent =
+  | { type: EConnectorInteraction.Searching; payload: { sessionId: string } }
   | { type: EConnectorInteraction.ConfirmOpenApp; payload: { sessionId: string } }
   | { type: EConnectorInteraction.UnlockDevice; payload: { sessionId: string } }
   | { type: EConnectorInteraction.ConfirmOnDevice; payload: { sessionId: string } }

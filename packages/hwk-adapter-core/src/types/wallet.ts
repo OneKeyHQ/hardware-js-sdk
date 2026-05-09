@@ -7,7 +7,6 @@ import type { ISolMethods } from './chain-sol';
 import type { ITronMethods } from './chain-tron';
 import type { QrDisplayData } from './qr';
 import type { ChainForFingerprint } from './fingerprint';
-import type { ActiveJobInfo, Interruptibility } from '../utils/DeviceJobQueue';
 import type { UI_REQUEST, UiResponseEvent } from '../events/ui-request';
 import type { SDK } from '../events/sdk';
 import type { ConnectorUiEvent } from './connector';
@@ -42,14 +41,23 @@ export type UiRequestEvent =
   | { type: typeof UI_REQUEST.REQUEST_SELECT_DEVICE; payload: { devices: DeviceInfo[] } }
   | {
       type: typeof UI_REQUEST.REQUEST_DEVICE_CONNECT;
-      payload: { message: string };
-    }
-  | {
-      type: typeof UI_REQUEST.REQUEST_PREEMPTION;
       payload: {
-        deviceId: string;
-        currentJob: ActiveJobInfo;
-        newJob: { label?: string; interruptibility: Interruptibility };
+        /** Vendor that emitted the request, e.g. 'ledger', 'trezor'. */
+        vendor: string;
+        /**
+         * Why the SDK is asking for a reconnect. Lets the app render
+         * vendor-aware copy without inspecting message strings.
+         * - 'device-not-found': search returned 0 / device not reachable.
+         * Future values can be added (e.g. 'pairing-failed') as new fallback
+         * causes are surfaced.
+         */
+        reason: string;
+        /**
+         * Best-effort English fallback. Apps should prefer rendering via
+         * `vendor` + `reason` for i18n; fall back to this if the combination
+         * isn't recognized.
+         */
+        message: string;
       };
     }
   | { type: typeof UI_REQUEST.CLOSE_UI_WINDOW; payload: Record<string, never> };
@@ -115,14 +123,18 @@ export interface HardwareEventMap {
   };
   [UI_REQUEST.REQUEST_DEVICE_CONNECT]: {
     type: typeof UI_REQUEST.REQUEST_DEVICE_CONNECT;
-    payload: { message: string };
-  };
-  [UI_REQUEST.REQUEST_PREEMPTION]: {
-    type: typeof UI_REQUEST.REQUEST_PREEMPTION;
     payload: {
-      deviceId: string;
-      currentJob: ActiveJobInfo;
-      newJob: { label?: string; interruptibility: Interruptibility };
+      vendor: string;
+      reason: string;
+      message: string;
+    };
+  };
+  [UI_REQUEST.REQUEST_BTC_HIGH_INDEX_CONFIRM]: {
+    type: typeof UI_REQUEST.REQUEST_BTC_HIGH_INDEX_CONFIRM;
+    payload: {
+      vendor: string;
+      path: string;
+      accountIndex: number;
     };
   };
   [UI_REQUEST.CLOSE_UI_WINDOW]: {

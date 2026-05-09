@@ -11,10 +11,16 @@ export interface DeviceDescriptor {
   vendor?: number;
   /** Device type/model identifier */
   type?: string;
-  /** BLE device name (e.g., "Nano X 123A") — contains stable 4-digit HEX suffix */
+  /** Human-readable display name from the transport layer. */
   name?: string;
+  /** Stable Ledger BLE identifier from the raw RN BLE `Device.name` field. */
+  bleName?: string;
+  /** User-visible Ledger BLE local name from the raw RN BLE `Device.localName` field. */
+  localName?: string;
   /** Transport identifier (e.g., 'WEB-HID', 'BLE') */
   transport?: string;
+  /** BLE RSSI when provided by the transport scanner. */
+  rssi?: number | null;
 }
 
 export interface DeviceConnectEvent {

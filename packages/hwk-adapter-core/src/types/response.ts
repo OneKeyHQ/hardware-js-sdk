@@ -10,6 +10,7 @@ export interface Failure {
   payload: {
     error: string;
     code: HardwareErrorCode;
+    params?: Record<string, unknown>;
   };
 }
 
@@ -19,6 +20,13 @@ export function success<T>(payload: T): Success<T> {
   return { success: true, payload };
 }
 
-export function failure(code: HardwareErrorCode, error: string): Failure {
-  return { success: false, payload: { error, code } };
+export function failure(
+  code: HardwareErrorCode,
+  error: string,
+  params?: Record<string, unknown>
+): Failure {
+  return {
+    success: false,
+    payload: { error, code, ...(params ? { params } : {}) },
+  };
 }

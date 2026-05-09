@@ -1,221 +1,156 @@
 /**
- * Per-device serial job queue with preemption support and stuck recovery.
- * Ensures that only one operation runs at a time per device, with intelligent
- * handling of conflicting operations.
- *
- * The 'confirm' level uses the standard UI request/response flow:
- * emits REQUEST_PREEMPTION → waits for RECEIVE_PREEMPTION via UiRequestRegistry.
+ * Pure FIFO job queue. Every enqueue chains onto the tail; jobs run one at
+ * a time across all devices. The queue is intentionally passive — it does
+ * NOT decide whether to interrupt or ask the user. Those are application-
+ * layer concerns owned by the caller (e.g. a UI button handler that wants
+ * to ask "device is busy, interrupt current?" before submitting). The
+ * queue exposes inspection (`getActiveJob`) and explicit cancellation
+ * (`cancelActive` / `cancelAll`) so callers can implement those policies
+ * synchronously, without racing against in-flight enqueues.
  */
 
-import { UI_REQUEST } from '../events/ui-request';
-
-import type { UiRequestRegistry } from './UiRequestRegistry';
-
-export type Interruptibility = 'none' | 'safe' | 'confirm';
-
-export type PreemptionDecision = 'cancel-current' | 'wait' | 'reject-new';
-
 export interface JobOptions {
-  interruptibility?: Interruptibility;
   label?: string;
+  rejectIfBusy?: boolean;
+  busyError?: Error;
 }
 
 export interface ActiveJobInfo {
+  deviceId: string;
   label?: string;
-  interruptibility: Interruptibility;
   startedAt: number;
 }
 
-export interface PreemptionEvent {
-  deviceId: string;
-  currentJob: ActiveJobInfo;
-  newJob: { label?: string; interruptibility: Interruptibility };
-}
-
 interface ActiveJob {
-  options: Required<Pick<JobOptions, 'interruptibility'>> & Pick<JobOptions, 'label'>;
+  deviceId: string;
+  label?: string;
   abortController: AbortController;
   startedAt: number;
 }
 
-export interface DeviceJobQueueDeps {
-  /** Emit a UI request event to the frontend. */
-  emit: (event: string, data: unknown) => void;
-  /** Registry for waiting on UI responses. */
-  uiRegistry: UiRequestRegistry;
-}
-
 export class DeviceJobQueue {
-  private readonly _queues = new Map<string, Promise<unknown>>();
+  private _tail: Promise<unknown> = Promise.resolve();
 
-  private readonly _active = new Map<string, ActiveJob>();
+  private _active: ActiveJob | null = null;
 
-  private readonly _deps: DeviceJobQueueDeps | null;
+  private readonly _jobs = new Map<object, { deviceId: string }>();
 
-  /** Incremented on clear() so stale queued jobs can detect invalidation. */
+  /** Incremented on clear() so queued-but-not-yet-running jobs detect invalidation. */
   private _generation = 0;
 
-  constructor(deps?: DeviceJobQueueDeps) {
-    this._deps = deps ?? null;
-  }
+  private readonly _generationCancelReasons = new Map<number, Error>();
 
   /**
-   * Enqueue a job for a specific device.
-   * If a job is already running for this device, behavior depends on interruptibility:
-   * - 'none': new job queues silently (no preemption possible)
-   * - 'safe': current job is auto-cancelled, new job runs immediately after
-   * - 'confirm': emits REQUEST_PREEMPTION and waits for UI response
+   * Enqueue a job. Runs after every previously-enqueued job has settled.
+   * `deviceId` is a label only — used by inspection / cancellation routing.
    */
   async enqueue<T>(
     deviceId: string,
     job: (signal: AbortSignal) => Promise<T>,
     options: JobOptions = {}
   ): Promise<T> {
-    const interruptibility = options.interruptibility ?? 'confirm';
-    const active = this._active.get(deviceId);
-
-    if (active) {
-      switch (active.options.interruptibility) {
-        case 'none':
-          // Cannot interrupt, just queue behind
-          break;
-        case 'safe':
-          // Auto-cancel current safe operation
-          active.abortController.abort(new Error('Preempted by new operation'));
-          break;
-        case 'confirm': {
-          // If a preemption dialog is already pending, reject immediately.
-          // The user is already deciding for a previous request — don't
-          // overwrite the UiRequestRegistry slot (single-slot per type).
-          if (this._deps?.uiRegistry.hasPending(UI_REQUEST.REQUEST_PREEMPTION)) {
-            throw Object.assign(
-              new Error(`Device busy: a preemption decision is already pending`),
-              { hardwareErrorCode: 'DEVICE_BUSY' }
-            );
-          }
-          const decision = await this._requestPreemptionDecision(deviceId, active, {
-            label: options.label,
-            interruptibility,
-          });
-          switch (decision) {
-            case 'cancel-current':
-              active.abortController.abort(new Error('Cancelled by user via preemption'));
-              break;
-            case 'reject-new':
-              throw Object.assign(
-                new Error(`Device busy: ${active.options.label ?? 'unknown operation'}`),
-                { hardwareErrorCode: 'DEVICE_BUSY' }
-              );
-            case 'wait':
-              break;
-            default:
-              // Unknown decision value from UI — fall back to safest option: wait.
-              break;
-          }
-          break;
-        }
-      }
+    if (options.rejectIfBusy && this._jobs.size > 0) {
+      throw options.busyError ?? new Error('Device is busy');
     }
 
     const ac = new AbortController();
-    const prev = this._queues.get(deviceId) ?? Promise.resolve();
     const gen = this._generation;
+    const prev = this._tail;
+    const jobToken = {};
+    const activeJob: ActiveJob = {
+      deviceId,
+      label: options.label,
+      abortController: ac,
+      startedAt: Date.now(),
+    };
+    this._jobs.set(jobToken, { deviceId });
 
     const next = prev
       .catch(() => {})
       .then(async () => {
         if (this._generation !== gen) {
-          throw new Error('Job cancelled: queue was cleared');
+          throw (
+            this._generationCancelReasons.get(gen) ?? new Error('Job cancelled: queue was cleared')
+          );
         }
-        this._active.set(deviceId, {
-          options: { interruptibility, label: options.label },
-          abortController: ac,
-          startedAt: Date.now(),
-        });
+        this._active = activeJob;
         try {
           return await job(ac.signal);
         } finally {
-          this._active.delete(deviceId);
+          // Identity guard: a previous job's deferred finally must not
+          // null out a successor's `_active`.
+          if (this._active === activeJob) {
+            this._active = null;
+          }
         }
+      })
+      .finally(() => {
+        this._jobs.delete(jobToken);
       });
 
-    const tail = next.catch(() => {});
-    this._queues.set(deviceId, tail);
-    tail.then(() => {
-      if (this._queues.get(deviceId) === tail) {
-        this._queues.delete(deviceId);
-      }
-    });
+    this._tail = next.catch(() => {});
     return next;
   }
 
-  /** Manually cancel the active job on a device. Returns false if job is non-interruptible. */
-  cancelActive(deviceId: string): boolean {
-    const active = this._active.get(deviceId);
-    if (!active) return false;
-    if (active.options.interruptibility === 'none') return false;
-    active.abortController.abort(new Error('Manually cancelled'));
+  /** Cancel the active job. If `deviceId` is given, only cancels when it matches. */
+  cancelActive(deviceId?: string): boolean {
+    if (!this._active) return false;
+    if (deviceId && this._active.deviceId !== deviceId) return false;
+    this._active.abortController.abort(new Error('Manually cancelled'));
     return true;
   }
 
-  /** Force cancel regardless of interruptibility. `reason` becomes signal.reason. */
-  forceCancelActive(deviceId: string, reason?: Error): boolean {
-    const active = this._active.get(deviceId);
-    if (!active) return false;
-    active.abortController.abort(reason ?? new Error('Force cancelled for recovery'));
+  /** Force cancel the active job. `reason` becomes signal.reason. */
+  forceCancelActive(deviceId?: string, reason?: Error): boolean {
+    if (!this._active) return false;
+    if (deviceId && this._active.deviceId !== deviceId) return false;
+    this._active.abortController.abort(reason ?? new Error('Force cancelled for recovery'));
     return true;
   }
 
-  /** Get info about the currently active job for a device, or null if idle. */
-  getActiveJob(deviceId: string): ActiveJobInfo | null {
-    const active = this._active.get(deviceId);
-    if (!active) return null;
+  /** Cancel the active job (alias for callers that previously needed multi-device cancel). */
+  cancelAllActive(reason?: Error): void {
+    if (!this._active) return;
+    this._active.abortController.abort(reason ?? new Error('Cancelled by cancelAllActive'));
+  }
+
+  /** Cancel the active job and invalidate queued jobs that have not started. */
+  cancelActiveAndPending(deviceId?: string, reason?: Error): boolean {
+    if (deviceId && this._active && this._active.deviceId !== deviceId) {
+      return false;
+    }
+    this.clear(reason ?? new Error('Cancelled by cancelActiveAndPending'));
+    return true;
+  }
+
+  /** Get info about the currently active job, or null if idle. */
+  getActiveJob(deviceId?: string): ActiveJobInfo | null {
+    if (!this._active) return null;
+    if (deviceId && this._active.deviceId !== deviceId) return null;
     return {
-      label: active.options.label,
-      interruptibility: active.options.interruptibility,
-      startedAt: active.startedAt,
+      deviceId: this._active.deviceId,
+      label: this._active.label,
+      startedAt: this._active.startedAt,
     };
   }
 
-  clear(): void {
-    this._generation++;
-    for (const active of this._active.values()) {
-      active.abortController.abort(new Error('Queue cleared'));
-    }
-    this._active.clear();
-    this._queues.clear();
+  /** True if any job is currently running. */
+  isBusy(): boolean {
+    return this._jobs.size > 0;
   }
 
-  /**
-   * Request preemption decision via UI request/response flow.
-   * Falls back to 'wait' if deps are not provided.
-   */
-  private async _requestPreemptionDecision(
-    deviceId: string,
-    active: ActiveJob,
-    newJob: { label?: string; interruptibility: Interruptibility }
-  ): Promise<PreemptionDecision> {
-    if (!this._deps) return 'wait';
-
-    const { emit, uiRegistry } = this._deps;
-
-    emit(UI_REQUEST.REQUEST_PREEMPTION, {
-      type: UI_REQUEST.REQUEST_PREEMPTION,
-      payload: {
-        deviceId,
-        currentJob: {
-          label: active.options.label,
-          interruptibility: active.options.interruptibility,
-          startedAt: active.startedAt,
-        },
-        newJob,
-      },
-    });
-
-    const response = await uiRegistry.wait<{ decision: PreemptionDecision }>(
-      UI_REQUEST.REQUEST_PREEMPTION
-    );
-
-    return response?.decision ?? 'wait';
+  clear(reason?: Error): void {
+    const cancelledGeneration = this._generation;
+    this._generation++;
+    const cancelReason = reason ?? new Error('Job cancelled: queue was cleared');
+    this._generationCancelReasons.set(cancelledGeneration, cancelReason);
+    for (const generation of this._generationCancelReasons.keys()) {
+      if (generation < this._generation - 10) {
+        this._generationCancelReasons.delete(generation);
+      }
+    }
+    if (this._active) {
+      this._active.abortController.abort(cancelReason);
+    }
   }
 }

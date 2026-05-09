@@ -58,6 +58,14 @@ export enum HardwareErrorCode {
    * permission" toast and let the user retry manually.
    */
   DevicePermissionDenied = 10303,
+  /**
+   * BLE SMP pairing did not complete within the GATT bonding window.
+   * GATT connected but the device didn't acknowledge SMP — typically
+   * because the user didn't confirm the passkey on the device, or the
+   * device went out of range mid-pairing. Distinct from OperationTimeout
+   * (generic) and from DeviceLocked (Secure Element actually locked).
+   */
+  BlePairingTimeout = 10304,
 
   // --- 10400s PIN / Passphrase ---
   PinInvalid = 10400,
@@ -65,7 +73,8 @@ export enum HardwareErrorCode {
   PassphraseRejected = 10402,
 
   // --- 10500s App lifecycle ---
-  AppNotOpen = 10500,
+  /** Chain app NOT INSTALLED on device. User must install via Ledger Live. */
+  AppNotInstalled = 10500,
   WrongApp = 10501,
   /** 0x911c Command code not supported — app predates current SDK. */
   AppTooOld = 10502,
@@ -99,3 +108,26 @@ export enum HardwareErrorCode {
   /** 0xb007 Aborted due to unexpected state (malformed PSBT / missing UTXO). */
   BtcUnexpectedState = 11301,
 }
+
+/**
+ * Device-level failures the SDK cannot self-recover from — affect the entire
+ * batch (vs per-chain failures like AppNotInstalled / WrongApp which soft-
+ * skip in onboarding). Combined with `accounts.length === 0`, signals
+ * genuine orphan. Also reused as the batch-abort whitelist for HWK.
+ * Single source of truth.
+ *
+ * UserRejected (device-side reject) is included: pressing reject is an
+ * explicit "I don't consent" — continuing the batch to ask again on the
+ * next chain is harassment, not helpful.
+ */
+export const ORPHAN_ELIGIBLE_ERROR_CODES: number[] = [
+  HardwareErrorCode.UserAborted,
+  HardwareErrorCode.UserRejected,
+  HardwareErrorCode.DeviceNotFound,
+  HardwareErrorCode.DeviceDisconnected,
+  HardwareErrorCode.DeviceMismatch,
+  HardwareErrorCode.DeviceAppStuck,
+  HardwareErrorCode.TransportError,
+  HardwareErrorCode.DevicePermissionDenied,
+  HardwareErrorCode.BlePairingTimeout,
+];

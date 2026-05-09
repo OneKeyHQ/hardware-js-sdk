@@ -1,4 +1,8 @@
-import { LedgerConnectorBase, extractBleHexId } from '@onekeyfe/hwk-ledger-adapter';
+import {
+  LedgerConnectorBase,
+  extractBleHexId,
+  isLedgerDmkBleTransport,
+} from '@onekeyfe/hwk-ledger-adapter';
 
 import type { DeviceDescriptor } from '@onekeyfe/hwk-adapter-core';
 import type { DeviceManagementKit } from '@ledgerhq/device-management-kit';
@@ -35,8 +39,8 @@ export class LedgerWebHidConnector extends LedgerConnectorBase {
    * For USB devices, the DMK path (ephemeral UUID) is used as-is.
    */
   protected override _resolveConnectId(descriptor: DeviceDescriptor): string {
-    if (descriptor.transport === 'BLE') {
-      return extractBleHexId(descriptor.name) || descriptor.path;
+    if (isLedgerDmkBleTransport(descriptor.transport)) {
+      return extractBleHexId(descriptor.name) || '';
     }
     return descriptor.path;
   }

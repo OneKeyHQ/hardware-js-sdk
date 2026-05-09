@@ -20,7 +20,7 @@ export function enrichErrorMessage(code: HardwareErrorCode, originalMessage: str
       return `${originalMessage}. The request was rejected on the device.`;
     case HardwareErrorCode.WrongApp:
       return `${originalMessage}. Please open the correct app on your device.`;
-    case HardwareErrorCode.AppNotOpen:
+    case HardwareErrorCode.AppNotInstalled:
       return `${originalMessage}. The required app is not installed on the device.`;
     case HardwareErrorCode.TransportNotAvailable:
       return `${originalMessage}. Ensure the device bridge/transport is available and running.`;

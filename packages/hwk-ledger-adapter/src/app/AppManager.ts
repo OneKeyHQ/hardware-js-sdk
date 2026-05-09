@@ -6,6 +6,7 @@ import {
   isSuccessCommandResult,
 } from '@ledgerhq/device-management-kit';
 
+import { ERROR_TAG } from '../errors';
 import { debugLog } from '../utils/debugLog';
 
 /**
@@ -122,7 +123,34 @@ export class AppManager {
       debugLog('[AppManager] currentApp:', result.data.name);
       return result.data.name;
     }
-    throw new Error('Failed to get current app from device');
+    // DMK returns errors as result.error rather than throwing — surface the
+    // tag / errorCode / originalError so transport-level failures aren't
+    // swallowed under a generic "Failed to get current app" string.
+    const errResult = result as unknown as { error?: Record<string, unknown> };
+    const dmkErr = errResult.error ?? {};
+    const original = (dmkErr as { originalError?: unknown }).originalError;
+    debugLog(
+      '[AppManager] _getCurrentApp failed sessionId=',
+      sessionId,
+      'tag=',
+      (dmkErr as { _tag?: string })._tag,
+      'errorCode=',
+      (dmkErr as { errorCode?: unknown }).errorCode,
+      'message=',
+      (dmkErr as { message?: string }).message,
+      'originalErrorMessage=',
+      (original as { message?: string })?.message ?? String(original ?? '')
+    );
+    throw Object.assign(
+      new Error(
+        (dmkErr as { message?: string }).message ?? 'Failed to get current app from device'
+      ),
+      {
+        _tag: (dmkErr as { _tag?: string })._tag,
+        errorCode: (dmkErr as { errorCode?: unknown }).errorCode,
+        originalError: original,
+      }
+    );
   }
 
   private async _openApp(sessionId: string, appName: string): Promise<void> {
@@ -134,7 +162,7 @@ export class AppManager {
       const { statusCode } = result as Record<string, unknown>;
       debugLog('[AppManager] openApp failed:', appName, 'statusCode:', statusCode);
       throw Object.assign(new Error(`Failed to open "${appName}"`), {
-        _tag: 'OpenAppCommandError',
+        _tag: ERROR_TAG.OpenAppCommand,
         errorCode: String(statusCode ?? ''),
         statusCode,
         appName,
