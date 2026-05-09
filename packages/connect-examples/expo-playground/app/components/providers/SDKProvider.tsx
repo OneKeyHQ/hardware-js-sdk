@@ -52,6 +52,10 @@ function truncateSdkDebugText(text: string): string {
 export interface FirmwareProgressData {
   progress: number;
   progressType: 'transferData' | 'installingFirmware';
+  transferredBytes?: number;
+  totalBytes?: number;
+  rateBytesPerSecond?: number;
+  elapsedMs?: number;
 }
 
 export const useFirmwareProgressStore = create<{
@@ -81,6 +85,14 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
   const lastSdkRef = useRef<CoreApi | null>(null);
   const sdkDebugLogQueueRef = useRef<string[]>([]);
   const sdkDebugLogFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const progressUpdateRef = useRef<{ time: number; progress: number }>({
+    time: 0,
+    progress: -1,
+  });
+  const progressLogRef = useRef<{ time: number; progress: number }>({
+    time: 0,
+    progress: -1,
+  });
 
   const flushSdkDebugLogs = useCallback(() => {
     sdkDebugLogFlushTimerRef.current = null;
@@ -108,6 +120,55 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
   const setupSDKEventListeners = useCallback(
     (sdkInstance: CoreApi) => {
       const sdkDebugEnabled = isSdkDebugEnabled();
+
+      const updateFirmwareProgress = (
+        data: FirmwareProgressData,
+        options: { force?: boolean } = {}
+      ) => {
+        const now = Date.now();
+        const previous = progressUpdateRef.current;
+        const shouldUpdate =
+          options.force ||
+          data.progress >= 100 ||
+          data.progress === 0 ||
+          (data.progress !== previous.progress && now - previous.time >= 100) ||
+          now - previous.time >= 100;
+
+        if (!shouldUpdate) return;
+
+        progressUpdateRef.current = {
+          time: now,
+          progress: data.progress,
+        };
+        useFirmwareProgressStore.getState().setProgressData(data);
+      };
+
+      const logProgressEvent = (type: UiEvent['type'], data: FirmwareProgressData) => {
+        const now = Date.now();
+        const previous = progressLogRef.current;
+        if (data.progress < 100 && now - previous.time < 1000) {
+          return;
+        }
+        progressLogRef.current = {
+          time: now,
+          progress: data.progress,
+        };
+        logHardware(
+          'SDK progress event',
+          {
+            type,
+            progress: data.progress,
+            progressType: data.progressType,
+            transferredBytes: data.transferredBytes,
+            totalBytes: data.totalBytes,
+            rateBytesPerSecond: data.rateBytesPerSecond,
+          },
+          {
+            console: false,
+            persist: false,
+          }
+        );
+      };
 
       sdkInstance.on(LOG_EVENT, (message: { payload?: unknown }) => {
         if (!sdkDebugEnabled) {
@@ -144,14 +205,19 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
       // 监听SDK UI事件
       sdkInstance.on('UI_EVENT', (message: UiEvent) => {
         const latestCurrentDevice = useDeviceStore.getState().currentDevice;
-        logInfo(`收到UI事件: ${message.type}`, message.payload as logData);
+        const isProgressEvent =
+          message.type === UI_REQUEST.DEVICE_PROGRESS ||
+          message.type === UI_REQUEST.FIRMWARE_PROGRESS;
+        if (!isProgressEvent) {
+          logInfo(`收到UI事件: ${message.type}`, message.payload as logData);
+        }
 
         // 处理设备动作状态
         if (message.type === UI_REQUEST.CLOSE_UI_WINDOW) {
           clearDeviceAction();
           // 重置固件进度状态
           useFirmwareProgressStore.getState().reset();
-        } else if (message.type) {
+        } else if (message.type && !isProgressEvent) {
           setDeviceAction({
             isActive: true,
             actionType: message.type,
@@ -202,30 +268,52 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
             break;
           }
 
-          case 'ui-firmware-progress':
+          case UI_REQUEST.FIRMWARE_PROGRESS:
             if (message.payload && typeof message.payload === 'object') {
               const payload = message.payload as {
                 progress?: number;
                 progressType?: string;
+                transferredBytes?: number;
+                totalBytes?: number;
+                rateBytesPerSecond?: number;
+                elapsedMs?: number;
                 [key: string]: unknown;
               };
               if (typeof payload.progress === 'number' && payload.progressType) {
-                useFirmwareProgressStore.getState().setProgressData({
+                const progressData = {
                   progress: payload.progress,
                   progressType: payload.progressType as 'transferData' | 'installingFirmware',
-                });
+                  transferredBytes: payload.transferredBytes,
+                  totalBytes: payload.totalBytes,
+                  rateBytesPerSecond: payload.rateBytesPerSecond,
+                  elapsedMs: payload.elapsedMs,
+                };
+                updateFirmwareProgress(progressData, { force: payload.progress >= 100 });
+                logProgressEvent(message.type, progressData);
               }
             }
             break;
 
           case UI_REQUEST.DEVICE_PROGRESS:
             if (message.payload && typeof message.payload === 'object') {
-              const payload = message.payload as { progress?: number };
+              const payload = message.payload as {
+                progress?: number;
+                transferredBytes?: number;
+                totalBytes?: number;
+                rateBytesPerSecond?: number;
+                elapsedMs?: number;
+              };
               if (typeof payload.progress === 'number') {
-                useFirmwareProgressStore.getState().setProgressData({
+                const progressData = {
                   progress: payload.progress,
                   progressType: 'transferData',
-                });
+                  transferredBytes: payload.transferredBytes,
+                  totalBytes: payload.totalBytes,
+                  rateBytesPerSecond: payload.rateBytesPerSecond,
+                  elapsedMs: payload.elapsedMs,
+                } satisfies FirmwareProgressData;
+                updateFirmwareProgress(progressData, { force: payload.progress >= 100 });
+                logProgressEvent(message.type, progressData);
               }
             }
             break;

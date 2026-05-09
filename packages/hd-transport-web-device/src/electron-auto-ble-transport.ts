@@ -22,6 +22,13 @@ import type { DesktopAPI } from '@onekeyfe/hd-transport-electron';
 import type { OneKeyDeviceInfo, ProtocolType, TransportCallOptions } from '@onekeyfe/hd-transport';
 import type EventEmitter from 'events';
 
+const FILE_WRITE_LOG_BLOCK_PATTERN = /(?:^|[^a-z])(?:raw)?(?:filesystem|emmc)?filewrite$/i;
+
+function shouldSuppressHighVolumeCallLog(name: string) {
+  const normalized = name.replace(/[_\s-]/g, '');
+  return FILE_WRITE_LOG_BLOCK_PATTERN.test(normalized);
+}
+
 const { parseConfigure, ProtocolV1, check } = transport;
 
 declare global {
@@ -547,7 +554,9 @@ export default class ElectronAutoBleTransport {
     }
 
     const protocol = this.deviceProtocol.get(uuid) ?? 'V1';
-    if (LogBlockCommand.has(name)) {
+    if (shouldSuppressHighVolumeCallLog(name)) {
+      // 高频文件写入不要逐包发 debug 事件，否则调试日志会反向拖慢传输。
+    } else if (LogBlockCommand.has(name)) {
       this.Log?.debug('[Auto BLE] call', 'name:', name, 'protocol:', protocol);
     } else {
       this.Log?.debug('[Auto BLE] call', 'name:', name, 'data:', data, 'protocol:', protocol);

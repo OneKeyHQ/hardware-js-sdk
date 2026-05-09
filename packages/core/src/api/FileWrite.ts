@@ -108,6 +108,7 @@ export default class FileWrite extends BaseMethod<FileWriteParams> {
     let written = 0;
     let chunkIndex = 0;
     let lastMessage: Record<string, unknown> | undefined;
+    const startTime = Date.now();
 
     while (written < dataLength) {
       const chunkEnd = Math.min(written + chunkSize, dataLength);
@@ -150,9 +151,16 @@ export default class FileWrite extends BaseMethod<FileWriteParams> {
           ? processedByte
           : startOffset + written;
       if (typeof this.postMessage === 'function') {
+        const elapsedMs = Date.now() - startTime;
+        const transferredBytes = Math.min(written, dataLength);
         this.postMessage(
           createUiMessage(UI_REQUEST.DEVICE_PROGRESS, {
             progress: getConfirmedProgress(confirmedProcessedByte, totalSize, written, dataLength),
+            transferredBytes,
+            totalBytes: dataLength,
+            rateBytesPerSecond:
+              elapsedMs > 0 ? Math.round((transferredBytes / elapsedMs) * 1000) : undefined,
+            elapsedMs,
           })
         );
       }

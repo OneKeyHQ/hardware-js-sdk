@@ -18,6 +18,7 @@ import ExecutionPanel from './ExecutionPanel';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card, CardContent } from '../ui/Card';
+import { Progress } from '../ui/Progress';
 import type { UnifiedLogEntry } from './UnifiedLogger';
 
 interface MethodExecutorProps {
@@ -787,6 +788,42 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
     }
   };
 
+  const renderDebugProgress = () => {
+    if (type !== 'firmware' || !progressData) return null;
+
+    const transferredText =
+      progressData.transferredBytes !== undefined && progressData.totalBytes !== undefined
+        ? `${formatBytes(progressData.transferredBytes)} / ${formatBytes(progressData.totalBytes)}`
+        : undefined;
+    const rateText =
+      progressData.rateBytesPerSecond !== undefined
+        ? `${formatBytes(progressData.rateBytesPerSecond)}/s`
+        : undefined;
+
+    return (
+      <div className="rounded-lg border border-border/50 bg-muted/30 p-3">
+        <div className="mb-2 flex items-center gap-2">
+          <BarChart3 className="h-4 w-4 text-blue-600" />
+          <span className="text-sm font-medium text-foreground">
+            {progressData.progressType === 'installingFirmware'
+              ? t('components.deviceInteractionArea.installingFirmware')
+              : t('components.deviceInteractionArea.transferringData')}
+          </span>
+          <span className="ml-auto text-xs font-medium text-muted-foreground">
+            {progressData.progress}%
+          </span>
+        </div>
+        <Progress value={progressData.progress} className="mb-2 h-2" />
+        {(transferredText || rateText) && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            {transferredText ? <span>{transferredText}</span> : null}
+            {rateText ? <span>{rateText}</span> : null}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   if (layout === 'debug-first') {
     return (
       <div className={`flex flex-col gap-3 min-h-0 ${className}`}>
@@ -856,6 +893,8 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
               onParamChange={handleParamChange}
               embedded
             />
+
+            {renderDebugProgress()}
           </CardContent>
         </Card>
 
