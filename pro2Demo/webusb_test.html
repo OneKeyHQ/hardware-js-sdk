@@ -314,7 +314,7 @@
                 </div>
                 <div>
                     <label>Chunk size (bytes):</label>
-                    <input type="number" id="fileReadChunkSize" min="64" max="2048" value="512">
+                    <input type="number" id="fileReadChunkSize" min="64" max="4096" value="4096">
                 </div>
             </div>
             <div class="test-config">
@@ -361,7 +361,7 @@
                 </div>
                 <div>
                     <label>Chunk size (bytes):</label>
-                    <input type="number" id="fileWriteChunkSize" min="64" max="2048" value="512">
+                    <input type="number" id="fileWriteChunkSize" min="64" max="4096" value="4096">
                 </div>
             </div>
             <div class="flex" style="margin-top: 10px;">
@@ -549,8 +549,8 @@
     <script>
         const VID = 0x1209;
         const PID = 0x53c1;  // OneKey Pro 2
-        const PACKET_SIZE = 2048;  // WebUSB packet size (max single transfer)
-        const RX_BUFFER_SIZE = 4096;  // Receive buffer for large responses
+        const PACKET_SIZE = 4096;  // WebUSB file payload chunk size
+        const RX_BUFFER_SIZE = 4608;  // 4096 payload + Protocol V2/protobuf overhead
 
         let device = null;
         let interfaceNumber = 0;
@@ -731,7 +731,7 @@
             }
         }
 
-        // ==================== Proto V0 ====================
+        // ==================== Protocol V2 ====================
         const PROTO_HEAD_SOF = 0x5A;
         const PROTO_PRE_HEAD_SIZE = 4;
         const PROTO_HEAD_CRC_SIZE = 8;
@@ -1152,17 +1152,41 @@
             const payload = new Uint8Array(2 + pbPayload.length);
             payload.set(msgTypeBytes, 0);
             payload.set(pbPayload, 2);
-            // Wrap in proto v0 frame
+            // Wrap in Protocol V2 frame
             return buildProtoFrame(payload, packetSrc, router);
         }
 
         function parsePbResponse(data) {
-            // data is the payload from proto v0 frame (after header, before CRC)
+            // data is the payload from Protocol V2 frame (after header, before CRC)
             // Format: 2-byte msg_type (little-endian) + protobuf payload
             if (data.length < 2) return null;
             const msgType = data[0] | (data[1] << 8);
             const pbPayload = data.slice(2);
             return { msgType, pbPayload };
+        }
+
+        function parseProtoFrame(frame) {
+            if (!frame || frame.length < PROTO_HEAD_CRC_SIZE || frame[0] !== PROTO_HEAD_SOF) {
+                throw new Error('Invalid Protocol V2 frame');
+            }
+
+            const frameLen = frame[1] | (frame[2] << 8);
+            if (frameLen < PROTO_HEAD_CRC_SIZE || frameLen > frame.length) {
+                throw new Error(`Invalid Protocol V2 frame length: ${frameLen}`);
+            }
+
+            const exactFrame = frame.slice(0, frameLen);
+            const expectedHeaderCrc = crc8(exactFrame, 3);
+            if (exactFrame[3] !== expectedHeaderCrc) {
+                throw new Error(`Header CRC mismatch: expected 0x${expectedHeaderCrc.toString(16).padStart(2, '0')}, got 0x${exactFrame[3].toString(16).padStart(2, '0')}`);
+            }
+
+            const expectedFrameCrc = crc8(exactFrame, frameLen - 1);
+            if (exactFrame[frameLen - 1] !== expectedFrameCrc) {
+                throw new Error(`Frame CRC mismatch: expected 0x${expectedFrameCrc.toString(16).padStart(2, '0')}, got 0x${exactFrame[frameLen - 1].toString(16).padStart(2, '0')}`);
+            }
+
+            return exactFrame.slice(7, frameLen - 1);
         }
 
         function switchPbTab(tabName) {
@@ -1192,12 +1216,7 @@
             }
 
             const rxData = new Uint8Array(result.data.buffer);
-            if (rxData[0] !== PROTO_HEAD_SOF || rxData.length < PROTO_HEAD_CRC_SIZE) {
-                throw new Error('Invalid proto frame');
-            }
-
-            const frameLen = rxData[1] | (rxData[2] << 8);
-            const payloadData = rxData.slice(7, frameLen - 1);
+            const payloadData = parseProtoFrame(rxData);
             const resp = parsePbResponse(payloadData);
 
             if (!resp) {
@@ -1253,10 +1272,9 @@
                     const rxHex = Array.from(rxData).map(b => b.toString(16).padStart(2, '0')).join(' ');
                     log(`📥 PB RX (${rxData.length} bytes): ${rxHex}`, 'rx');
 
-                    // Parse proto v0 frame to extract payload
-                    if (rxData[0] === PROTO_HEAD_SOF && rxData.length >= PROTO_HEAD_CRC_SIZE) {
-                        const frameLen = rxData[1] | (rxData[2] << 8);
-                        const payloadData = rxData.slice(7, frameLen - 1);
+                    // Parse Protocol V2 frame to extract payload
+                    try {
+                        const payloadData = parseProtoFrame(rxData);
                         const resp = parsePbResponse(payloadData);
 
                         if (resp) {
@@ -1288,6 +1306,8 @@
                                 }, `Unexpected msg_type: ${resp.msgType}`, -1);
                             }
                         }
+                    } catch (error) {
+                        throw new Error(`Invalid Protocol V2 frame: ${error.message}`);
                     }
                 }
             } catch (error) {
@@ -1339,12 +1359,7 @@
 
                 const rxData = new Uint8Array(result.data.buffer);
 
-                if (rxData[0] !== PROTO_HEAD_SOF || rxData.length < PROTO_HEAD_CRC_SIZE) {
-                    throw new Error('Invalid proto frame');
-                }
-
-                const frameLen = rxData[1] | (rxData[2] << 8);
-                const payloadData = rxData.slice(7, frameLen - 1);
+                const payloadData = parseProtoFrame(rxData);
                 const resp = parsePbResponse(payloadData);
 
                 if (!resp) {
@@ -1399,9 +1414,9 @@
                 return;
             }
 
-            const chunkSize = parseInt(document.getElementById('fileReadChunkSize').value) || 512;
-            if (chunkSize < 64 || chunkSize > 2048) {
-                log('Chunk size must be 64-2048 bytes', 'error');
+            const chunkSize = parseInt(document.getElementById('fileReadChunkSize').value) || 4096;
+            if (chunkSize < 64 || chunkSize > 4096) {
+                log('Chunk size must be 64-4096 bytes', 'error');
                 return;
             }
 
@@ -1615,13 +1630,8 @@
 
                 const rxData = new Uint8Array(result.data.buffer);
 
-                // Parse proto v0 frame
-                if (rxData[0] !== PROTO_HEAD_SOF || rxData.length < PROTO_HEAD_CRC_SIZE) {
-                    throw new Error('Invalid proto frame');
-                }
-
-                const frameLen = rxData[1] | (rxData[2] << 8);
-                const payloadData = rxData.slice(7, frameLen - 1);
+                // Parse Protocol V2 frame
+                const payloadData = parseProtoFrame(rxData);
                 const resp = parsePbResponse(payloadData);
 
                 if (!resp) {
@@ -1683,9 +1693,9 @@
                 return;
             }
 
-            const chunkSize = parseInt(document.getElementById('fileWriteChunkSize').value) || 512;
-            if (chunkSize < 64 || chunkSize > 2048) {
-                log('Chunk size must be 64-2048 bytes', 'error');
+            const chunkSize = parseInt(document.getElementById('fileWriteChunkSize').value) || 4096;
+            if (chunkSize < 64 || chunkSize > 4096) {
+                log('Chunk size must be 64-4096 bytes', 'error');
                 return;
             }
 

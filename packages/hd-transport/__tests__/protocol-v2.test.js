@@ -286,6 +286,42 @@ describe('Protocol V2 framing and session', () => {
     expect(logger.debug).toHaveBeenCalledWith(expect.stringContaining('seq differs'));
   });
 
+  test('session skips unrelated terminal frames when expected response types are provided', async () => {
+    const stale = ProtocolV2.encodeFrame(schemas, 'Success', {
+      message: 'stale response',
+    });
+    const response = ProtocolV2.encodeFrame(schemas, 'ProtoVersion', {
+      major_version: 2,
+      minor_version: 0,
+      patch_version: 1,
+    });
+    const logger = {
+      debug: jest.fn(),
+    };
+    const readFrame = jest.fn().mockResolvedValueOnce(stale).mockResolvedValueOnce(response);
+    const session = new ProtocolV2Session({
+      schemas,
+      router: 1,
+      writeFrame: () => Promise.resolve(),
+      readFrame,
+      logger,
+    });
+
+    await expect(
+      session.call('GetProtoVersion', {}, { expectedTypes: ['ProtoVersion'] })
+    ).resolves.toEqual({
+      type: 'ProtoVersion',
+      message: {
+        major_version: 2,
+        minor_version: 0,
+        patch_version: 1,
+      },
+    });
+
+    expect(readFrame).toHaveBeenCalledTimes(2);
+    expect(logger.debug).toHaveBeenCalledWith(expect.stringContaining('skip unexpected response'));
+  });
+
   test('session consumes intermediate response frames before returning the final response', async () => {
     const written = [];
     const progress = ProtocolV2.encodeFrame(schemas, 'DevFirmwareInstallProgress', {
@@ -368,7 +404,15 @@ describe('Protocol V2 framing and session', () => {
         timeoutMs: 1,
       })
     ).resolves.toBe(true);
-    expect(call).toHaveBeenNthCalledWith(2, 'DevGetFirmwareUpdateStatus', {}, { timeoutMs: 1 });
+    expect(call).toHaveBeenNthCalledWith(
+      2,
+      'DevGetFirmwareUpdateStatus',
+      {},
+      {
+        timeoutMs: 1,
+        expectedTypes: ['DevFirmwareUpdateStatus'],
+      }
+    );
   });
 
   test('probeProtocolV2 falls back to bootloader status after non-version responses', async () => {
@@ -383,6 +427,14 @@ describe('Protocol V2 framing and session', () => {
         timeoutMs: 1,
       })
     ).resolves.toBe(true);
-    expect(call).toHaveBeenNthCalledWith(2, 'DevGetFirmwareUpdateStatus', {}, { timeoutMs: 1 });
+    expect(call).toHaveBeenNthCalledWith(
+      2,
+      'DevGetFirmwareUpdateStatus',
+      {},
+      {
+        timeoutMs: 1,
+        expectedTypes: ['DevFirmwareUpdateStatus'],
+      }
+    );
   });
 });

@@ -9,7 +9,7 @@ import { EDeviceType } from '@onekeyfe/hd-shared';
 import GlobalDialogManager from '../global/GlobalDialogManager';
 import WebUsbAuthorizeDialog from '../global/WebUsbAuthorizeDialog';
 import { logData, logInfo, logError, logHardware } from '../../utils/logger';
-import { SDKUtils } from '../../utils/hardwareInstance';
+import { SDKUtils, isSdkDebugEnabled } from '../../utils/hardwareInstance';
 import { create } from 'zustand';
 
 // 声明全局弹窗管理器类型
@@ -25,6 +25,27 @@ declare global {
 
 interface SDKProviderProps {
   children: React.ReactNode;
+}
+
+const SDK_DEBUG_LOG_PATTERN =
+  /(ProtocolV2|WebUsbTransport|hd-transport-webusb|DeviceCommands|call-)/;
+const SDK_DEBUG_LOG_FLUSH_INTERVAL_MS = 300;
+const SDK_DEBUG_LOG_MAX_QUEUE_LENGTH = 200;
+const SDK_DEBUG_LOG_MAX_BATCH_LENGTH = 60;
+const SDK_DEBUG_LOG_MAX_TEXT_LENGTH = 1800;
+
+function stringifySdkLogItem(item: unknown): string {
+  if (typeof item === 'string') return item;
+  try {
+    return JSON.stringify(item);
+  } catch {
+    return String(item);
+  }
+}
+
+function truncateSdkDebugText(text: string): string {
+  if (text.length <= SDK_DEBUG_LOG_MAX_TEXT_LENGTH) return text;
+  return `${text.slice(0, SDK_DEBUG_LOG_MAX_TEXT_LENGTH)}...`;
 }
 
 // 固件进度状态管理
@@ -58,27 +79,66 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
     | typeof UI_RESPONSE.SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE
   >(UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE);
   const lastSdkRef = useRef<CoreApi | null>(null);
+  const sdkDebugLogQueueRef = useRef<string[]>([]);
+  const sdkDebugLogFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const flushSdkDebugLogs = useCallback(() => {
+    sdkDebugLogFlushTimerRef.current = null;
+
+    const queuedLogs = sdkDebugLogQueueRef.current.splice(0);
+    if (queuedLogs.length === 0) return;
+
+    const droppedCount = Math.max(queuedLogs.length - SDK_DEBUG_LOG_MAX_BATCH_LENGTH, 0);
+    const visibleLogs = queuedLogs.slice(-SDK_DEBUG_LOG_MAX_BATCH_LENGTH);
+
+    logHardware(
+      'SDK debug log',
+      {
+        count: queuedLogs.length,
+        ...(droppedCount > 0 ? { dropped: droppedCount } : {}),
+        message: visibleLogs.join('\n'),
+      },
+      {
+        console: false,
+        persist: false,
+      }
+    );
+  }, []);
 
   const setupSDKEventListeners = useCallback(
     (sdkInstance: CoreApi) => {
+      const sdkDebugEnabled = isSdkDebugEnabled();
+
       sdkInstance.on(LOG_EVENT, (message: { payload?: unknown }) => {
+        if (!sdkDebugEnabled) {
+          return;
+        }
+
         const payload = message.payload;
         const items = Array.isArray(payload) ? payload : [payload];
         const text = items
           .filter(item => item !== undefined && item !== null)
-          .map(item => (typeof item === 'string' ? item : JSON.stringify(item)))
+          .map(stringifySdkLogItem)
           .join(' ');
 
-        if (
-          !text ||
-          !/(ProtocolV2|WebUsbTransport|hd-transport-webusb|DeviceCommands|call-)/.test(text)
-        ) {
+        if (!text || !SDK_DEBUG_LOG_PATTERN.test(text)) {
           return;
         }
 
-        logHardware('SDK debug log', {
-          message: text,
-        });
+        sdkDebugLogQueueRef.current.push(truncateSdkDebugText(text));
+        if (sdkDebugLogQueueRef.current.length > SDK_DEBUG_LOG_MAX_QUEUE_LENGTH) {
+          sdkDebugLogQueueRef.current.splice(
+            0,
+            sdkDebugLogQueueRef.current.length - SDK_DEBUG_LOG_MAX_QUEUE_LENGTH
+          );
+        }
+
+        if (!sdkDebugLogFlushTimerRef.current) {
+          sdkDebugLogFlushTimerRef.current = setTimeout(
+            flushSdkDebugLogs,
+            SDK_DEBUG_LOG_FLUSH_INTERVAL_MS
+          );
+        }
       });
 
       // 监听SDK UI事件
@@ -184,7 +244,7 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
         logInfo('device-disconnect', device);
       });
     },
-    [setDeviceAction, clearDeviceAction]
+    [setDeviceAction, clearDeviceAction, flushSdkDebugLogs]
   );
 
   // 初始化SDK
@@ -247,6 +307,16 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
   useEffect(() => {
     handleInitializeSDK();
   }, [handleInitializeSDK]);
+
+  useEffect(() => {
+    return () => {
+      if (sdkDebugLogFlushTimerRef.current) {
+        clearTimeout(sdkDebugLogFlushTimerRef.current);
+        sdkDebugLogFlushTimerRef.current = null;
+      }
+      sdkDebugLogQueueRef.current = [];
+    };
+  }, []);
 
   return (
     <>

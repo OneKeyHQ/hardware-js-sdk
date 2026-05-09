@@ -2,6 +2,7 @@ import JSZip from 'jszip';
 
 import FileRead from '../src/api/FileRead';
 import FileWrite from '../src/api/FileWrite';
+import DevFirmwareUpdate from '../src/api/protocol-v2/DevFirmwareUpdate';
 import FirmwareUpdateV3 from '../src/api/FirmwareUpdateV3';
 import FirmwareUpdateV4 from '../src/api/FirmwareUpdateV4';
 import GetOnekeyFeatures from '../src/api/GetOnekeyFeatures';
@@ -241,7 +242,7 @@ describe('Protocol V2 firmware update targets', () => {
 
     const versions = await (method as any).waitForProtocolV2FinalFeatures();
 
-    expect(acquire).toHaveBeenCalledWith('ble-id', null, true);
+    expect(acquire).toHaveBeenCalledWith('ble-id', null, true, 'V2');
     expect(typedCall).toHaveBeenNthCalledWith(
       1,
       'Ping',
@@ -386,6 +387,7 @@ describe('Protocol V2 firmware update targets', () => {
     });
 
     const callOptions = typedCall.mock.calls[0][3];
+    expect(typedCall.mock.calls[0][1]).toEqual(['Success', 'DevFirmwareUpdateStatus']);
     expect(callOptions.intermediateTypes).toEqual(['DevFirmwareInstallProgress']);
     callOptions.onIntermediateResponse({
       type: 'DevFirmwareInstallProgress',
@@ -393,6 +395,59 @@ describe('Protocol V2 firmware update targets', () => {
     });
 
     expect(method.postProgressMessage).toHaveBeenCalledWith(42, 'installingFirmware');
+  });
+
+  test('accepts Protocol V2 firmware update status as start response', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const typedCall = jest.fn().mockResolvedValue({
+      type: 'DevFirmwareUpdateStatus',
+      message: { targets: [{ target_id: 0, status: 1 }] },
+    });
+
+    (method as any).device = {
+      getCommands: () => ({ typedCall }),
+    };
+    method.postProgressMessage = jest.fn();
+    method.postTipMessage = jest.fn();
+
+    await (method as any).protocolV2StartFirmwareUpdate({
+      targets: [{ target_id: 0, path: 'vol1:firmware.bin' }],
+    });
+
+    expect(typedCall.mock.calls[0][1]).toEqual(['Success', 'DevFirmwareUpdateStatus']);
+    expect(method.postTipMessage).toHaveBeenCalledWith('FirmwareUpdating');
+  });
+});
+
+describe('Protocol V2 firmware update method', () => {
+  test('returns DevFirmwareUpdateStatus from low-level update trigger', async () => {
+    const method = new DevFirmwareUpdate({
+      id: 1,
+      payload: {
+        method: 'devFirmwareUpdate',
+        path: 'vol0:firmware.bin',
+      },
+    });
+    method.init();
+
+    const typedCall = jest.fn().mockResolvedValue({
+      type: 'DevFirmwareUpdateStatus',
+      message: { targets: [{ target_id: 0, status: 1 }] },
+    });
+
+    (method as any).device = {
+      commands: { typedCall },
+    };
+
+    await expect(method.run()).resolves.toEqual({
+      targets: [{ target_id: 0, status: 1 }],
+    });
+    expect(typedCall.mock.calls[0][1]).toEqual(['Success', 'DevFirmwareUpdateStatus']);
   });
 });
 

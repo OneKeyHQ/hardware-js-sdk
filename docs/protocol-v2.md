@@ -10,21 +10,25 @@ Protocol V2 服务 Pro2。Pro2 同样支持 USB 和 BLE，但不走传统 `Initi
 
 ## 主动协议探测
 
-SDK 不使用 PID、productName 或 descriptor 判断协议。支持 Protocol V2 的 transport 会在连接后发送 V2 `GetProtoVersion`：
+SDK 不使用 PID、productName 或 descriptor 作为唯一判断依据。支持 Protocol V2 的 transport 会在连接后做主动探测：如果调用方显式传入 `connectProtocol`，就只验证指定协议；否则默认先用 Protocol V1 `Initialize` 验证现有设备，失败后再发送 Protocol V2 `GetProtoVersion` / bootloader status probe。这样现有 V1 设备保持原路径，未知名称或 bootloader 名称不稳定的 Pro2 也能回落到 V2。
 
 ```mermaid
 flowchart TD
   Connect["connect / subscribe"]
-  Probe["Protocol V2: GetProtoVersion"]
-  UseV2["ProtoVersion: 使用 Protocol V2"]
-  UseV1["失败/超时: 使用 Protocol V1"]
+  ProbeV1["Protocol V1: Initialize"]
+  ProbeV2["Protocol V2: GetProtoVersion / bootloader status"]
+  UseV1["Initialize 成功: 使用 Protocol V1"]
+  UseV2["V2 probe 成功: 使用 Protocol V2"]
+  FallbackV1["V1/V2 均失败: 保持 Protocol V1"]
 
-  Connect --> Probe
-  Probe --> UseV2
-  Probe --> UseV1
+  Connect --> ProbeV1
+  ProbeV1 --> UseV1
+  ProbeV1 --> ProbeV2
+  ProbeV2 --> UseV2
+  ProbeV2 --> FallbackV1
 ```
 
-WebUSB 探测失败后会重置连接，避免失败的 V2 帧影响后续 V1 `Initialize`。BLE 探测失败后清空 V2 接收缓存，并继续使用 V1 BLE 分包逻辑。
+当显式要求 `V2` 时，SDK 会直接 probe V2；当枚举或缓存已经标记为 `V2` 时，也会优先验证 V2。WebUSB 在 V2 probe 失败后会重置连接，避免失败帧影响后续调用；BLE 探测失败后清空 V2 接收缓存，并继续使用 V1 BLE 分包逻辑。
 
 ## 帧格式
 
@@ -48,7 +52,7 @@ Protocol V2 使用 `0x5A` 起始字节和两段 CRC8。
 | `Payload`   | protobuf message type + protobuf bytes |
 | `CRC`       | 对除最后 CRC 外的整帧计算 CRC8         |
 
-当前 SDK 使用的最大 V2 frame 长度是 `2200` bytes，文件写入 chunk size 是 `2048` bytes。
+当前 SDK 使用的最大 V2 frame 长度是 `4608` bytes，文件写入 chunk size 是 `4096` bytes。
 
 ### CRC8 说明
 
@@ -59,7 +63,7 @@ SDK 的实现放在 `packages/hd-transport/src/protocols/v2/crc8.ts`。其中 `C
 - 与固件侧 `crc8` 实现保持逐字节一致，减少多语言实现时的参数漂移。
 - 避免每个 frame 都重新按位计算，尤其是文件写入和固件更新会发送大量 frame。
 
-如果使用 SDK 提供的 WebUSB、Electron BLE、React Native BLE 或 lowlevel transport，应用层和原生 BLE 插件不需要自己计算 CRC8。lowlevel 原生侧只需要把 BLE notification 按 frame 长度重组成完整 `0x5A` frame，并原样交给 JS SDK；CRC8 的计算和校验由 `hd-transport` 完成。
+如果使用 SDK 提供的 WebUSB、Electron BLE、React Native BLE 或 lowlevel transport，应用层和原生 BLE 插件不需要自己计算 CRC8。lowlevel 原生侧可以直接把 BLE notification chunk 的 hex 字符串返回给 JS SDK，也可以返回已经重组好的完整 `0x5A` frame；无论哪种方式都不要去掉 header、payload 或末尾 CRC，CRC8 的计算和校验由 `hd-transport` 完成。
 
 只有在完全绕过 SDK、自己实现 Protocol V2 encode/decode 时，才需要在 Kotlin、Swift 或其他语言里实现同样的 CRC8 算法。此时可以使用查表，也可以按位计算，但输出必须与 SDK 的 `crc8(data, len)` 完全一致。
 
@@ -139,7 +143,7 @@ flowchart TD
   Connect --> Subscribe --> Probe --> Call
 ```
 
-BLE 写入会按 GATT write 能力拆成小块，接收端会按 V2 frame length 重组完整 `0x5A` 帧。lowlevel 插件必须把原生 notification 转成完整 V1 message 或完整 V2 frame 后再 resolve `receive()`，不能把单个 BLE notification 直接返回给 SDK。
+BLE 写入会按 GATT write 能力拆成小块，接收端会按 V2 frame length 重组完整 `0x5A` 帧。React Native BLE 和 Electron BLE 在 transport 内部从 notify callback 组帧；lowlevel transport 会在 JS 侧从 `receive()` 返回的 hex chunk 继续重组 V1/V2，因此原生插件可以返回单个 BLE notification，也可以返回完整 V1 message / V2 frame。
 
 V2 的 encode/decode、超时、探测和 frame 重组由 `hd-transport` 的 Protocol Session 层统一实现。BLE transport 只负责把完整 V2 frame 切成平台可写入的小包，并把 notification bytes 喂给 `ProtocolV2FrameAssembler`。
 

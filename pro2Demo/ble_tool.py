@@ -74,7 +74,7 @@ class DeviceItem:
 
 
 # ---------------------------------------------------------------------------
-# Protocol V0 – frame building and minimal protobuf helpers
+# Protocol V2 – frame building and minimal protobuf helpers
 # (same algorithm as webusb_upgrade.html)
 # ---------------------------------------------------------------------------
 
@@ -101,6 +101,8 @@ _PROTO_HEAD_SOF       = 0x5A
 _PROTO_HEAD_CRC_SIZE  = 8      # 7 header bytes + 1 tail CRC
 _PROTO_DATA_TYPE_PKT  = 0
 _CRC8_INIT            = 0x30
+_PROTOCOL_V2_FRAME_MAX_BYTES = 4608
+_PROTOCOL_V2_FILE_CHUNK_SIZE = 4096
 
 _PB_MSG_TYPE_PING      = 60206
 _PB_MSG_TYPE_SUCCESS   = 60207
@@ -143,10 +145,10 @@ def _decode_varint(data: bytes | bytearray, offset: int) -> tuple[int, int]:
 
 
 def _calc_max_chunk(mtu: int, device_path: str) -> int:
-    """Compute max data bytes that fit in one MTU-sized Proto V0 + FileWrite frame.
+    """Compute max data bytes that fit in one MTU-sized Protocol V2 + FileWrite frame.
 
     Frame layout (bytes):
-      Proto V0:   SOF(1) len(2) pre-CRC(1) router(1) attr(1) seq(1) <payload> tail-CRC(1)  → 8 B
+      Protocol V2: SOF(1) len(2) header-CRC(1) router(1) attr(1) seq(1) <payload> tail-CRC(1)  → 8 B
       msg_type:   2 B (uint16 LE prefix inside payload)
       FileWrite:  tag+len for embedded File message(4 B) + overwrite(2 B) + append(2 B)    → 8 B
       File fixed: path tag+len+bytes  offset tag+varint(5)  total_size tag+varint(5)
@@ -213,7 +215,7 @@ def pb_decode_failure(pb: bytes) -> tuple[int, str]:
 
 
 def build_proto_frame(payload: bytes, packet_src: int = 0, router: int = 0) -> bytes:
-    """Wrap payload in a Proto V0 frame (SOF + len + pre-CRC + attr + seq + payload + tail-CRC)."""
+    """Wrap payload in a Protocol V2 frame (SOF + len + header CRC + attr + seq + payload + tail CRC)."""
     global _proto_seq
     payload_len = len(payload)
     frame_len   = payload_len + _PROTO_HEAD_CRC_SIZE
@@ -236,17 +238,56 @@ def build_proto_frame(payload: bytes, packet_src: int = 0, router: int = 0) -> b
 
 def build_pb_frame(msg_type: int, pb_payload: bytes,
                    packet_src: int = 0, router: int = 0) -> bytes:
-    """Build a Proto V0 frame carrying  msg_type (2-byte LE) + protobuf payload."""
+    """Build a Protocol V2 frame carrying msg_type (2-byte LE) + protobuf payload."""
     payload = bytes([msg_type & 0xFF, (msg_type >> 8) & 0xFF]) + pb_payload
     return build_proto_frame(payload, packet_src, router)
 
 
+class ProtocolV2FrameAssembler:
+    def __init__(self, max_frame_bytes: int = _PROTOCOL_V2_FRAME_MAX_BYTES):
+        self.max_frame_bytes = max_frame_bytes
+        self.buffer = bytearray()
+
+    def reset(self):
+        self.buffer.clear()
+
+    def push(self, chunk: bytes | bytearray) -> list[bytes]:
+        if chunk:
+            self.buffer.extend(chunk)
+
+        frames: list[bytes] = []
+        while len(self.buffer) >= 3:
+            if self.buffer[0] != _PROTO_HEAD_SOF:
+                self.reset()
+                raise ValueError("Invalid Protocol V2 SOF")
+
+            frame_len = self.buffer[1] | (self.buffer[2] << 8)
+            if frame_len < _PROTO_HEAD_CRC_SIZE:
+                self.reset()
+                raise ValueError(f"Protocol V2 frame too short: {frame_len}")
+            if frame_len > self.max_frame_bytes:
+                self.reset()
+                raise ValueError(f"Protocol V2 frame too large: {frame_len}")
+            if len(self.buffer) < frame_len:
+                break
+
+            frames.append(bytes(self.buffer[:frame_len]))
+            del self.buffer[:frame_len]
+
+        return frames
+
+
 def parse_proto_frame(frame: bytes) -> bytes | None:
-    """Extract the inner payload from a Proto V0 frame, or None if malformed."""
+    """Extract the inner payload from a Protocol V2 frame, or None if malformed."""
     if len(frame) < _PROTO_HEAD_CRC_SIZE or frame[0] != _PROTO_HEAD_SOF:
         return None
     frame_len = frame[1] | (frame[2] << 8)
-    if frame_len > len(frame):
+    if frame_len < _PROTO_HEAD_CRC_SIZE or frame_len > len(frame):
+        return None
+    frame = frame[:frame_len]
+    if frame[3] != _crc8(frame, 3):
+        return None
+    if frame[frame_len - 1] != _crc8(frame, frame_len - 1):
         return None
     return bytes(frame[7:frame_len - 1])
 
@@ -584,8 +625,8 @@ class BLEToolWindow(QMainWindow):
 
         right_layout.addWidget(svc_group, 3)
 
-        # Protocol V0 (tabbed: Ping | File Write)
-        proto_group = QGroupBox("Protocol V0")
+        # Protocol V2 (tabbed: Ping | File Write)
+        proto_group = QGroupBox("Protocol V2")
         proto_layout = QVBoxLayout(proto_group)
         proto_layout.setContentsMargins(8, 8, 8, 4)
         proto_layout.setSpacing(4)
@@ -658,11 +699,11 @@ class BLEToolWindow(QMainWindow):
         fw_chunk_bar = QHBoxLayout()
         fw_chunk_bar.addWidget(QLabel("Chunk:"))
         self.fw_chunk_spin = QSpinBox()
-        self.fw_chunk_spin.setRange(16, 2048)
+        self.fw_chunk_spin.setRange(16, _PROTOCOL_V2_FILE_CHUNK_SIZE)
         self.fw_chunk_spin.setSingleStep(64)
-        self.fw_chunk_spin.setValue(2048)
+        self.fw_chunk_spin.setValue(_PROTOCOL_V2_FILE_CHUNK_SIZE)
         self.fw_chunk_spin.setSuffix(" B")
-        self.fw_chunk_spin.setToolTip("Auto-set to MTU-derived max after connection")
+        self.fw_chunk_spin.setToolTip("Protocol V2 file payload chunk size")
         fw_chunk_bar.addWidget(self.fw_chunk_spin)
         self.lbl_chunk_mtu = QLabel("(connect to auto-set)")
         self.lbl_chunk_mtu.setStyleSheet("color: #888; font-size: 11px;")
@@ -946,10 +987,12 @@ class BLEToolWindow(QMainWindow):
         mtu = self._negotiated_mtu
         if mtu <= 0:
             return
-        self.fw_chunk_spin.setRange(16, 2048)
+        self.fw_chunk_spin.setRange(16, _PROTOCOL_V2_FILE_CHUNK_SIZE)
         self.fw_chunk_spin.setSingleStep(64)
-        self.fw_chunk_spin.setValue(2048)
-        self.lbl_chunk_mtu.setText(f"(MTU {mtu}, chunk max 2048 B)")
+        self.fw_chunk_spin.setValue(_PROTOCOL_V2_FILE_CHUNK_SIZE)
+        self.lbl_chunk_mtu.setText(
+            f"(MTU {mtu}, chunk max {_PROTOCOL_V2_FILE_CHUNK_SIZE} B)"
+        )
 
     def _on_connection_done(self, success: bool, msg: str):
         self._log(msg)
@@ -1199,7 +1242,7 @@ class BLEToolWindow(QMainWindow):
                     char.setText(2, value_str)
                     return
 
-    # ---- Ping (Proto V0) --------------------------------------------------
+    # ---- Ping (Protocol V2) ------------------------------------------------
 
     def _on_ping(self):
         if not self._client:
@@ -1242,17 +1285,21 @@ class BLEToolWindow(QMainWindow):
                     return
 
                 try:
-                    rx_data = await asyncio.wait_for(response_queue.get(), timeout=5.0)
+                    rx_data = await self._read_protocol_v2_frame(response_queue, timeout=5.0)
                 except asyncio.TimeoutError:
                     self.log_signal.emit("Ping: timeout — no response received.")
                     self.ping_result_signal.emit(False, "Timeout")
+                    return
+                except ValueError as exc:
+                    self.log_signal.emit(f"Ping: malformed Protocol V2 frame in response: {exc}")
+                    self.ping_result_signal.emit(False, "Bad frame")
                     return
 
                 self.log_signal.emit(f"Ping RX ({len(rx_data)}B): {rx_data.hex(' ')}")
 
                 payload = parse_proto_frame(rx_data)
                 if payload is None:
-                    self.log_signal.emit("Ping: malformed Proto V0 frame in response.")
+                    self.log_signal.emit("Ping: malformed Protocol V2 frame in response.")
                     self.ping_result_signal.emit(False, "Bad frame")
                     return
 
@@ -1293,7 +1340,7 @@ class BLEToolWindow(QMainWindow):
         self.lbl_ping_result.setText(f'<span style="color:{color}">{text}</span>')
         self.btn_ping.setEnabled(True)
 
-    # ---- File I/O (Proto V0) ------------------------------------------------
+    # ---- File I/O (Protocol V2) ---------------------------------------------
 
     def _fio_uuid(self) -> str | None:
         uuid = self.write_char_combo.currentData()
@@ -1326,6 +1373,21 @@ class BLEToolWindow(QMainWindow):
                 return notify_uuid
         return None
 
+    async def _read_protocol_v2_frame(self, queue: asyncio.Queue,
+                                      timeout: float = 3.0) -> bytes:
+        assembler = ProtocolV2FrameAssembler()
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+
+        while True:
+            remaining = deadline - loop.time()
+            if remaining <= 0:
+                raise asyncio.TimeoutError
+            chunk = await asyncio.wait_for(queue.get(), timeout=remaining)
+            frames = assembler.push(chunk)
+            if frames:
+                return frames[0]
+
     async def _fio_transact(self, char, frame: bytes,
                             queue: asyncio.Queue, timeout: float = 3.0,
                             *, frag_size: int = 244,
@@ -1346,7 +1408,7 @@ class BLEToolWindow(QMainWindow):
             for i in range(0, len(frame), frag_size):
                 await self._client.write_gatt_char(
                     char, frame[i:i + frag_size], response=False)
-        return await asyncio.wait_for(queue.get(), timeout=timeout)
+        return await self._read_protocol_v2_frame(queue, timeout=timeout)
 
     def _fio_parse_response(self, rx: bytes) -> tuple[int, bytes] | None:
         payload = parse_proto_frame(rx)

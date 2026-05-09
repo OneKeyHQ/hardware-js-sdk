@@ -49,6 +49,7 @@ export type MessageFromOneKey = { type: string; message: Record<string, any> };
 
 export type TransportCallOptions = {
   timeoutMs?: number;
+  expectedTypes?: string[];
   intermediateTypes?: string[];
   onIntermediateResponse?: (response: MessageFromOneKey) => void;
 };

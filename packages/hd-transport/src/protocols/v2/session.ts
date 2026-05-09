@@ -29,6 +29,7 @@ export type ProtocolV2SessionOptions = {
 
 export type ProtocolV2CallOptions = {
   timeoutMs?: number;
+  expectedTypes?: string[];
   intermediateTypes?: string[];
   onIntermediateResponse?: (response: MessageFromOneKey) => void;
 };
@@ -63,6 +64,24 @@ function bytesToDebugHex(bytes: Uint8Array): string {
       ? `...(+${bytes.length - PROTOCOL_V2_DEBUG_HEX_LIMIT}B)`
       : '';
   return `${bytesToHex(visibleBytes)}${suffix}`;
+}
+
+const COMMON_TERMINAL_RESPONSE_TYPES = new Set([
+  'Failure',
+  'ButtonRequest',
+  'EntropyRequest',
+  'PinMatrixRequest',
+  'PassphraseRequest',
+  'Deprecated_PassphraseStateRequest',
+  'WordRequest',
+]);
+
+function isExpectedTerminalResponse(
+  response: MessageFromOneKey,
+  expectedTypes: string[] | undefined
+) {
+  if (!expectedTypes || expectedTypes.length === 0) return true;
+  return expectedTypes.includes(response.type) || COMMON_TERMINAL_RESPONSE_TYPES.has(response.type);
 }
 
 export function getErrorMessage(error: unknown) {
@@ -157,8 +176,14 @@ export class ProtocolV2Session {
         const response = check.call(decoded);
         if (callOptions.intermediateTypes?.includes(response.type)) {
           callOptions.onIntermediateResponse?.(response);
-        } else {
+        } else if (isExpectedTerminalResponse(response, callOptions.expectedTypes)) {
           return response;
+        } else {
+          logger?.debug?.(
+            `[${logPrefix}] skip unexpected response for ${name}: expected=${callOptions.expectedTypes?.join(
+              '|'
+            )} got=${response.type}`
+          );
         }
       }
     };
@@ -193,7 +218,11 @@ export async function probeProtocolV2({
   let versionError: unknown;
   try {
     await onBeforeProbe?.();
-    const response = await call('GetProtoVersion', {}, { timeoutMs });
+    const response = await call(
+      'GetProtoVersion',
+      {},
+      { timeoutMs, expectedTypes: ['ProtoVersion'] }
+    );
     if (response.type === 'ProtoVersion') {
       return true;
     }
@@ -207,7 +236,14 @@ export async function probeProtocolV2({
     getErrorMessage(versionError)
   );
   try {
-    const response = await call('DevGetFirmwareUpdateStatus', {}, { timeoutMs });
+    const response = await call(
+      'DevGetFirmwareUpdateStatus',
+      {},
+      {
+        timeoutMs,
+        expectedTypes: ['DevFirmwareUpdateStatus'],
+      }
+    );
     if (response.type === 'DevFirmwareUpdateStatus') {
       return true;
     }

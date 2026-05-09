@@ -11,6 +11,7 @@ import { useHardwareMethodExecution } from '../hooks/useHardwareMethodExecution'
 import { useDeviceStore } from '../store/deviceStore';
 import { device } from '../data/methods/device';
 import { firmware } from '../data/methods/firmware';
+import { isSdkDebugEnabled } from '../utils/hardwareInstance';
 import { logHardware } from '../utils/logger';
 import type { UnifiedMethodConfig } from '../data/types';
 
@@ -144,9 +145,9 @@ const PRO2_METHOD_WIRE_INFO: Record<string, MethodWireInfo> = {
   devFirmwareUpdate: {
     tx: '61000 (DevFirmwareUpdate)',
     txPayload: PRO2_DYNAMIC_PAYLOAD,
-    rx: '61001 (DevFirmwareInstallProgress) / 60207 (Success)',
+    rx: '61001 (DevFirmwareInstallProgress) / 61003 (DevFirmwareUpdateStatus) / 60207 (Success)',
     rxPayload: PRO2_DYNAMIC_RESPONSE,
-    decoded: 'Progress / Success',
+    decoded: 'Progress / DevFirmwareUpdateStatus / Success',
   },
   devGetFirmwareUpdateStatus: {
     tx: '61002 (DevGetFirmwareUpdateStatus)',
@@ -392,6 +393,7 @@ export default function Pro2DebugPage() {
     );
   }, [pro2Methods, selectedMethodName]);
   const selectedWireInfo = selectedMethod ? PRO2_METHOD_WIRE_INFO[selectedMethod.method] : null;
+  const sdkDebugEnabled = isSdkDebugEnabled();
 
   const handleMethodExecution = useCallback(
     async (params: Record<string, unknown>): Promise<Record<string, unknown>> => {
@@ -428,7 +430,9 @@ export default function Pro2DebugPage() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Badge variant="secondary">SDK debug: enabled</Badge>
+              <Badge variant={sdkDebugEnabled ? 'secondary' : 'outline'}>
+                SDK debug: {sdkDebugEnabled ? 'enabled' : 'off'}
+              </Badge>
               <Badge variant={currentDevice ? 'default' : 'outline'}>
                 {currentDevice ? currentDevice.connectId : 'No device'}
               </Badge>

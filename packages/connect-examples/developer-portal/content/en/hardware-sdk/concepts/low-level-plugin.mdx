@@ -54,7 +54,7 @@ Protocol V2 uses a complete frame that starts with `0x5A` and includes two CRC8 
 | `Payload` | `MsgTypeL MsgTypeH + protobuf bytes` |
 | `CRC` | CRC8 over the whole frame except the final CRC byte |
 
-CRC8 is a required Protocol V2 wire-format field, not device data. When using `@onekeyfe/hd-common-connect-sdk` with the `lowlevel` environment, the JS SDK calculates and verifies CRC8. The native Kotlin/Swift/Flutter plugin only needs to reassemble BLE notifications into a complete `0x5A` frame using `LenL/LenH`, then return the complete frame as a hex string from `receive()`. Do not strip the header, payload, or final CRC.
+CRC8 is a required Protocol V2 wire-format field, not device data. When using `@onekeyfe/hd-common-connect-sdk` with the `lowlevel` environment, the JS SDK calculates CRC8, reassembles frames, and verifies CRC8. The native Kotlin/Swift/Flutter plugin can return a single BLE notification chunk as a hex string from `receive()`, or it can return an already reassembled complete `0x5A` frame. In either mode, do not strip the header, payload, or final CRC.
 
 Only implement the same CRC8 algorithm on the native side if you completely bypass the OneKey SDK and implement Protocol V2 encode/decode yourself.
 
@@ -88,7 +88,7 @@ export type LowlevelTransportSharedPlugin = {
 | Packet size | Fixed 64 bytes | Variable (MTU-dependent) |
 | Packet prefix | `0x3F` on every packet | `0x3F 0x23 0x23` only on header |
 | Padding | Zero-pad to 64 bytes | No padding needed |
-| `receive()` returns | One 64-byte frame at a time | **Complete Protocol V1 message, or complete Protocol V2 `0x5A` frame** |
+| `receive()` returns | One 64-byte frame at a time | **Single BLE notification chunk, or complete Protocol V1/V2 message** |
 
 ---
 
@@ -209,7 +209,7 @@ class BleMessageAssembler {
 
 ### Protocol V2 frame reassembly
 
-If a notification starts with `0x5A`, or the plugin is already buffering a V2 frame, process it as Protocol V2:
+If you choose to reassemble V2 frames on the native side, use the rules below. The SDK lowlevel transport performs the same reassembly itself, so forwarding raw notification chunks is also valid:
 
 - Accumulate notification bytes.
 - Once at least 3 bytes are buffered, read the total frame length with `LenL | (LenH << 8)`.
@@ -249,11 +249,11 @@ function onProtocolV2Notification(data: Uint8Array, resolveFrame: (hex: string) 
 ### Common Mistakes
 
 ```typescript
-// ❌ WRONG: Returning a single BLE notification or re-fragmenting into 64-byte packets
-receive() { return this.messageQueue.shift() }
+// ❌ WRONG: Strip the Protocol V2 header/CRC and return only payload bytes
+receive() { return this.payloadOnlyQueue.shift() }
 
-// ✅ CORRECT: Return a complete reassembled V1 message or V2 frame
-receive() { return this.completeMessagePromise }
+// ✅ CORRECT: Return a raw notification chunk, or a complete reassembled V1/V2 frame
+receive() { return this.rawChunkOrCompleteFramePromise }
 ```
 
 ```typescript
@@ -276,7 +276,7 @@ import HardwareSDK from '@onekeyfe/hd-common-connect-sdk'
 const plugin = {
   enumerate: () => Promise.resolve([{ id: 'foo', name: 'bar' }]),
   send: (uuid, data) => { /* Send hex data */ },
-  receive: () => { /* WebUSB: 64-byte frame / BLE: Complete message */ },
+  receive: () => { /* BLE: raw notification chunk or complete message */ },
   connect: (uuid) => { /* BLE Android: Bond first! */ },
   disconnect: (uuid) => { /* Clean up connection */ },
   init: () => { /* Initialize BLE stack */ },

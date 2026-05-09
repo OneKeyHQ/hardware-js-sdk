@@ -34,6 +34,7 @@ export interface UnifiedLogEntry {
   content?: string | Record<string, unknown> | null;
   data?: Record<string, unknown>;
   description?: string;
+  transient?: boolean;
 }
 
 interface UnifiedLoggerProps {

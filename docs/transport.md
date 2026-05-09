@@ -3,7 +3,7 @@
 ## 两句话总结
 
 - Protocol V1 服务现有 Classic / Mini / Touch / Pro 等设备，USB 和 BLE 都使用旧的分包协议，并通过 `Initialize -> Features` 建立设备上下文。
-- Protocol V2 服务 Pro2，USB 和 BLE 都使用 `0x5A` 帧协议；SDK 在连接后主动发送 `GetProtoVersion` 探测，成功才切换到 V2，失败回落 V1。
+- Protocol V2 服务 Pro2，USB 和 BLE 都使用 `0x5A` 帧协议；SDK 在连接后主动探测 V1/V2，成功后把协议类型写回 descriptor。
 
 ## 协议差异
 
@@ -27,16 +27,20 @@ flowchart TD
   Acquire["acquire(path)"]
   Connect["connectToDevice(path)"]
   Endpoints["discoverEndpoints(device)"]
-  Probe["probeProtocolV2(path)"]
-  V2["callProtocolV2(GetProtoVersion) 返回 ProtoVersion: V2"]
-  V1["失败或 1500ms 超时: reset connection -> V1"]
+  ProbeV1["probeProtocolV1(Initialize)"]
+  V1["Initialize 成功: V1"]
+  ProbeV2["probeProtocolV2(GetProtoVersion / bootloader status)"]
+  V2["V2 probe 成功: V2"]
+  FallbackV1["V1/V2 均失败: V1"]
   Call["call(path, name, data)"]
   CallV1["V1: ProtocolV1.encode/decode"]
   CallV2["V2: ProtocolV2.encode/decode"]
 
-  Devices --> Acquire --> Connect --> Endpoints --> Probe
-  Probe --> V2 --> Call
-  Probe --> V1 --> Call
+  Devices --> Acquire --> Connect --> Endpoints --> ProbeV1
+  ProbeV1 --> V1 --> Call
+  ProbeV1 --> ProbeV2
+  ProbeV2 --> V2 --> Call
+  ProbeV2 --> FallbackV1 --> Call
   Call --> CallV1
   Call --> CallV2
 ```
@@ -52,16 +56,20 @@ flowchart TD
   Enumerate["enumerate()"]
   Acquire["acquire(uuid)"]
   Connect["connect + subscribe"]
-  Probe["probeProtocolV2(uuid)"]
-  V2["GetProtoVersion 成功: V2"]
-  V1["失败或超时: V1"]
+  ProbeV1["probeProtocolV1(Initialize)"]
+  V1["Initialize 成功: V1"]
+  ProbeV2["probeProtocolV2(GetProtoVersion / bootloader status)"]
+  V2["V2 probe 成功: V2"]
+  FallbackV1["V1/V2 均失败: V1"]
   Call["call(uuid, name, data)"]
   CallV1["V1: legacy BLE chunk reassembly"]
   CallV2["V2: 0x5A frame reassembly"]
 
-  Enumerate --> Acquire --> Connect --> Probe
-  Probe --> V2 --> Call
-  Probe --> V1 --> Call
+  Enumerate --> Acquire --> Connect --> ProbeV1
+  ProbeV1 --> V1 --> Call
+  ProbeV1 --> ProbeV2
+  ProbeV2 --> V2 --> Call
+  ProbeV2 --> FallbackV1 --> Call
   Call --> CallV1
   Call --> CallV2
 ```
@@ -77,16 +85,20 @@ flowchart TD
   Enumerate["enumerate()"]
   Acquire["acquire(uuid)"]
   Connect["connect + discover services + subscribe"]
-  Probe["probeProtocolV2(uuid)"]
-  V2["GetProtoVersion 成功: V2"]
-  V1["失败或 1500ms 超时: V1"]
+  ProbeV1["probeProtocolV1(Initialize)"]
+  V1["Initialize 成功: V1"]
+  ProbeV2["probeProtocolV2(GetProtoVersion / bootloader status)"]
+  V2["V2 probe 成功: V2"]
+  FallbackV1["V1/V2 均失败: V1"]
   Call["call(uuid, name, data)"]
   CallV1["V1: legacy BLE chunk reassembly"]
   CallV2["V2: BLE UART router + 0x5A frame reassembly"]
 
-  Enumerate --> Acquire --> Connect --> Probe
-  Probe --> V2 --> Call
-  Probe --> V1 --> Call
+  Enumerate --> Acquire --> Connect --> ProbeV1
+  ProbeV1 --> V1 --> Call
+  ProbeV1 --> ProbeV2
+  ProbeV2 --> V2 --> Call
+  ProbeV2 --> FallbackV1 --> Call
   Call --> CallV1
   Call --> CallV2
 ```
@@ -119,7 +131,8 @@ V2 协议公共能力放在 `packages/hd-transport/src/protocol-session.ts`：
 | -------------------------- | ---------------------------------------------------------- |
 | `ProtocolV2Session`        | 统一执行 V2 encode、写 frame、读 frame、decode、超时和日志 |
 | `ProtocolV2FrameAssembler` | 根据 `0x5A` frame length 重组 USB/BLE 分片，并校验最大长度 |
-| `probeProtocolV2()`        | 连接后发送 `GetProtoVersion`，成功返回 V2，失败走回退钩子 |
+| `probeProtocolV1()`        | 默认路径先发送 `Initialize`，成功继续走 V1 初始化           |
+| `probeProtocolV2()`        | V1 失败、显式 V2 或缓存 V2 时发送 `GetProtoVersion` / bootloader status probe |
 
 具体 transport 只提供平台相关能力：
 
@@ -128,6 +141,7 @@ V2 协议公共能力放在 `packages/hd-transport/src/protocol-session.ts`：
 | WebUSB           | USB 设备授权、endpoint discovery、transferIn/out retry |
 | Electron BLE     | noble 连接、订阅、hex 写入、BLE 错误映射              |
 | React Native BLE | BLE PLX 连接、service/characteristic 发现、base64 写入 |
+| lowlevel BLE     | 原生桥接 `enumerate/connect/send/receive`，JS 侧重组 V1/V2 |
 
 这个层级让后续新增协议或新增传输方式时只扩展 session/channel 边界，不把协议细节继续散落到每个 transport 实现里。
 
@@ -170,7 +184,7 @@ resource 和 bootloader 写入后必须进入 `targets`，SDK 不依赖固件端
 
 ## 兼容性边界
 
-- V1 设备无法响应 V2 `GetProtoVersion`，探测失败后会回落 V1。
+- V1 设备会优先通过 `Initialize` 探测成功；无法响应 V2 `GetProtoVersion` 时仍保持 V1。
 - V2 设备不支持传统 `Initialize/GetFeatures`，因此初始化必须走 Protocol V2 分支。
 - 协议选择不暴露给应用层；应用层继续使用 connectId 和原有 API。
 - V2 文件写入使用 `FilesystemFileWrite`，返回 `FilesystemFile`，不能继续使用旧的 `FileWrite/File` 名称。
