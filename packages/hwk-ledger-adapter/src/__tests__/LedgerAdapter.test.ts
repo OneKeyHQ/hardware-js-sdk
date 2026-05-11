@@ -342,6 +342,78 @@ describe('LedgerAdapter', () => {
     });
   });
 
+  describe('stuck-app (APDU 0x6901) retry', () => {
+    // Stax-specific failure mode: the device returns 0x6901 when
+    // OpenAppCommand lands during the post-CloseApp UI transition,
+    // before the user can confirm. A short pause + single retry recovers.
+
+    function makeStuckErr(): Error {
+      return Object.assign(new Error('Ledger app is unresponsive'), {
+        _tag: 'DeviceAppStuck',
+        code: HardwareErrorCode.DeviceAppStuck,
+      });
+    }
+
+    it('retries once and succeeds when DeviceAppStuck clears on the second attempt', async () => {
+      connector.call
+        .mockRejectedValueOnce(makeStuckErr())
+        .mockResolvedValueOnce({ address: '0xABCD', publicKey: '0xpk' });
+
+      await adapter.connectDevice('dev-1');
+
+      const result = await adapter.evmGetAddress('dev-1', '', {
+        path: "m/44'/60'/0'/0/0",
+        showOnDevice: false,
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.payload.address).toBe('0xABCD');
+      }
+      // 1 stuck + 1 successful retry; connector.reset called between them.
+      expect(connector.call).toHaveBeenCalledTimes(2);
+      expect(connector.reset).toHaveBeenCalled();
+    });
+
+    it('surfaces the original DeviceAppStuck error after a second 0x6901', async () => {
+      connector.call
+        .mockRejectedValueOnce(makeStuckErr())
+        .mockRejectedValueOnce(makeStuckErr());
+
+      await adapter.connectDevice('dev-1');
+
+      const result = await adapter.evmGetAddress('dev-1', '', {
+        path: "m/44'/60'/0'/0/0",
+        showOnDevice: false,
+      });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.payload.code).toBe(HardwareErrorCode.DeviceAppStuck);
+      }
+      expect(connector.call).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not retry for non-stuck errors', async () => {
+      connector.call.mockRejectedValueOnce(
+        Object.assign(new Error('User rejected on device'), {
+          _tag: 'UserRejected',
+          code: HardwareErrorCode.UserRejected,
+        })
+      );
+
+      await adapter.connectDevice('dev-1');
+
+      const result = await adapter.evmGetAddress('dev-1', '', {
+        path: "m/44'/60'/0'/0/0",
+        showOnDevice: false,
+      });
+
+      expect(result.success).toBe(false);
+      expect(connector.call).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('Solana methods', () => {
     it('should return address for solGetAddress', async () => {
       connector.call.mockResolvedValueOnce({ address: 'SoLAddr123', path: "m/44'/501'/0'" });
