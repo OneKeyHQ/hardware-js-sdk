@@ -81,7 +81,9 @@ describe('SignerManager', () => {
       {} as never
     );
 
-    await expect(Promise.race([reportPromise, Promise.resolve('blocked')])).resolves.toBeUndefined();
+    await expect(
+      Promise.race([reportPromise, Promise.resolve('blocked')])
+    ).resolves.toBeUndefined();
     expect(originalReport).toHaveBeenCalledTimes(1);
   });
 });

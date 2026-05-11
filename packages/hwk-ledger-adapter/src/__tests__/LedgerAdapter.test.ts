@@ -376,9 +376,7 @@ describe('LedgerAdapter', () => {
     });
 
     it('surfaces the original DeviceAppStuck error after a second 0x6901', async () => {
-      connector.call
-        .mockRejectedValueOnce(makeStuckErr())
-        .mockRejectedValueOnce(makeStuckErr());
+      connector.call.mockRejectedValueOnce(makeStuckErr()).mockRejectedValueOnce(makeStuckErr());
 
       await adapter.connectDevice('dev-1');
 

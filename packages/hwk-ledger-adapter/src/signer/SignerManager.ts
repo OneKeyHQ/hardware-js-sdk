@@ -8,10 +8,7 @@ import type { DeviceManagementKit } from '@ledgerhq/device-management-kit';
 import type { SignerEth as ISdkSignerEth } from '@ledgerhq/device-signer-kit-ethereum';
 import type { ContextModule } from '@ledgerhq/context-module';
 
-type SignerEthBuilderFn = (args: {
-  dmk: DeviceManagementKit;
-  sessionId: string;
-}) =>
+type SignerEthBuilderFn = (args: { dmk: DeviceManagementKit; sessionId: string }) =>
   | {
       withContextModule?(contextModule: ContextModule): { build(): ISdkSignerEth };
       build(): ISdkSignerEth;
@@ -52,9 +49,7 @@ export class SignerManager {
   clearAll(): void {}
 
   private static _defaultBuilder(): SignerEthBuilderFn {
-    return args => {
-      return new SignerEthBuilder(args);
-    };
+    return args => new SignerEthBuilder(args);
   }
 
   private static _createContextModule(): ContextModule {

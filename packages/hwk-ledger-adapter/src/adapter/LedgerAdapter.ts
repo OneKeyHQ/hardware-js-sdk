@@ -1176,10 +1176,7 @@ export class LedgerAdapter implements IHardwareWallet {
           // Second stuck-app hit → genuinely needs user action; surface
           // the original error so callers see a consistent _tag.
           if (isStuckAppStateError(retryErr)) {
-            debugLog(
-              '[LedgerAdapter] stuck-app retry exhausted (2nd 6901): method=',
-              method
-            );
+            debugLog('[LedgerAdapter] stuck-app retry exhausted (2nd 6901): method=', method);
             throw err;
           }
           debugLog(

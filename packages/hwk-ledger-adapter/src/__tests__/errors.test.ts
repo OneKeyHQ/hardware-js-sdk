@@ -229,14 +229,13 @@ describe('mapLedgerError', () => {
     expect(result.code).toBe(HardwareErrorCode.DeviceNotFound);
   });
 
-  it.each([
-    ERROR_TAG.NoAccessibleDevice,
-    ERROR_TAG.UnknownDevice,
-    ERROR_TAG.DeviceNotInitialized,
-  ])('should map %s to DeviceNotFound', tag => {
-    const result = mapLedgerError({ _tag: tag });
-    expect(result.code).toBe(HardwareErrorCode.DeviceNotFound);
-  });
+  it.each([ERROR_TAG.NoAccessibleDevice, ERROR_TAG.UnknownDevice, ERROR_TAG.DeviceNotInitialized])(
+    'should map %s to DeviceNotFound',
+    tag => {
+      const result = mapLedgerError({ _tag: tag });
+      expect(result.code).toBe(HardwareErrorCode.DeviceNotFound);
+    }
+  );
 
   it('should map OpeningConnectionError to DeviceBusy', () => {
     const result = mapLedgerError({ _tag: ERROR_TAG.OpeningConnection });

@@ -59,8 +59,7 @@ const APP_NOT_INSTALLED_CODES = new Set(['6807', '26631']);
  * basic/blind signing. Used to distinguish APDU 0x6a80 ("Invalid data")
  * caused by a blind-sign fallback from a generic malformed transaction.
  */
-const STEP_BLIND_SIGN_TRANSACTION_FALLBACK =
-  'signer.eth.steps.blindSignTransactionFallback';
+const STEP_BLIND_SIGN_TRANSACTION_FALLBACK = 'signer.eth.steps.blindSignTransactionFallback';
 
 /**
  * Read the Ledger Ethereum App APDU error code from a DMK error object.
@@ -171,9 +170,7 @@ function classifyEthAppError(err: unknown): HardwareErrorCode | null {
   // 0x6a80 is a broad "Invalid data" APDU. Only report blind-signing
   // guidance when DMK actually entered the blind-sign fallback branch.
   if (ethCode === '6a80') {
-    return hasBlindSignFallbackStep(err)
-      ? HardwareErrorCode.EvmBlindSigningRequired
-      : null;
+    return hasBlindSignFallbackStep(err) ? HardwareErrorCode.EvmBlindSigningRequired : null;
   }
 
   return mapEthAppErrorCode(ethCode);

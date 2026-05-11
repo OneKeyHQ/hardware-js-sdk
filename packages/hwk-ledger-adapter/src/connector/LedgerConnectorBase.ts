@@ -946,12 +946,8 @@ export class LedgerConnectorBase implements IConnector {
     const mapped = hasSerializedCode
       ? {
           code: src.code as HardwareErrorCode,
-          message:
-            typeof src.message === 'string' ? src.message : 'Unknown Ledger error',
-          appName:
-            typeof src.appName === 'string'
-              ? src.appName
-              : opts?.defaultAppName,
+          message: typeof src.message === 'string' ? src.message : 'Unknown Ledger error',
+          appName: typeof src.appName === 'string' ? src.appName : opts?.defaultAppName,
         }
       : mapLedgerError(err, opts);
     const error = new Error(mapped.message);
