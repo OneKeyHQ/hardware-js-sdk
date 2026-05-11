@@ -24,6 +24,10 @@ export default class BleTransport {
 
   disconnectSubscription?: Subscription;
 
+  notifyTransactionId?: string;
+
+  monitorToken?: number;
+
   static MAX_RETRIES = 5;
 
   static RETRY_DELAY = 2000;

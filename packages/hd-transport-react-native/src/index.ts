@@ -26,8 +26,10 @@ import { subscribeBleOn } from './subscribeBleOn';
 import {
   ANDROID_PACKET_LENGTH,
   IOS_PACKET_LENGTH,
+  getBleUuidKey,
   getBluetoothServiceUuids,
   getInfosForServiceUuid,
+  isSameBleUuid,
 } from './constants';
 import { isHeaderChunk } from './utils/validateNotify';
 import BleTransport from './BleTransport';
@@ -100,9 +102,26 @@ const resolveFirmwareUploadRetryDelay = (attempt: number, baseDelayMs = 200, max
   Math.min(baseDelayMs * 2 ** attempt, maxDelayMs);
 const BLE_RESPONSE_TIMEOUT_MS = 30_000;
 const PROTOCOL_PROBE_TIMEOUT_MS = 1000;
+const PROTOCOL_V2_PROBE_TIMEOUT_MS = 5000;
+const DEVICE_SCAN_TIMEOUT_MS = 8000;
+const IOS_NOTIFY_READY_DELAY_MS = 150;
 
 function inferProtocolTypeFromDeviceName(name?: string | null): ProtocolType | undefined {
   return /\bpro\s*2\b/i.test(name ?? '') ? 'V2' : undefined;
+}
+
+function getDeviceDisplayName(device?: Device | null) {
+  return device?.name || device?.localName || null;
+}
+
+function isGenericBleService(uuid?: string | null) {
+  return ['1800', '1801', '180a'].includes(getBleUuidKey(uuid));
+}
+
+function hasKnownOneKeyService(device?: Device | null) {
+  return (device?.serviceUUIDs ?? []).some(serviceUuid =>
+    getInfosForServiceUuid(serviceUuid, 'classic')
+  );
 }
 
 let connectOptions: Record<string, unknown> = {
@@ -115,7 +134,8 @@ export type IOneKeyDevice = OneKeyDeviceInfoBase & Device;
 
 const tryToGetConfiguration = (device: Device) => {
   if (!device || !device.serviceUUIDs) return null;
-  const [serviceUUID] = device.serviceUUIDs;
+  const serviceUUID = device.serviceUUIDs.find(uuid => getInfosForServiceUuid(uuid, 'classic'));
+  if (!serviceUUID) return null;
   const infos = getInfosForServiceUuid(serviceUUID, 'classic');
   if (!infos) return null;
   return infos;
@@ -166,7 +186,7 @@ export default class ReactNativeBleTransport {
 
   stopped = false;
 
-  scanTimeout = 3000;
+  scanTimeout = DEVICE_SCAN_TIMEOUT_MS;
 
   runPromise: Deferred<any> | null = null;
 
@@ -183,8 +203,12 @@ export default class ReactNativeBleTransport {
 
   private protocolV2FramePromise: Deferred<Uint8Array> | null = null;
 
+  private monitorTokens: Map<string, number> = new Map();
+
+  private nextMonitorToken = 1;
+
   constructor(options: TransportOptions) {
-    this.scanTimeout = options.scanTimeout ?? 3000;
+    this.scanTimeout = options.scanTimeout ?? DEVICE_SCAN_TIMEOUT_MS;
   }
 
   init(logger: any, emitter: EventEmitter) {
@@ -230,7 +254,29 @@ export default class ReactNativeBleTransport {
       }
     }
 
+    let fallbackServiceUuid: string | undefined;
+
     if (!infos) {
+      const services = await device.services();
+      Log?.debug(
+        '[ReactNativeBleTransport] Known OneKey service UUID not found, discovered services:',
+        services?.map(service => service.uuid)
+      );
+
+      const knownService = services.find(service =>
+        getInfosForServiceUuid(service.uuid, 'classic')
+      );
+      const fallbackService =
+        knownService ?? services.find(service => !isGenericBleService(service.uuid)) ?? services[0];
+
+      if (fallbackService) {
+        fallbackServiceUuid = fallbackService.uuid;
+        characteristics = await device.characteristicsForService(fallbackService.uuid);
+        Log?.debug('[ReactNativeBleTransport] Using fallback BLE service:', fallbackService.uuid);
+      }
+    }
+
+    if (!infos && !fallbackServiceUuid) {
       try {
         Log?.debug('cancel connection when service not found');
         await device.cancelConnection();
@@ -240,7 +286,13 @@ export default class ReactNativeBleTransport {
       throw ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound);
     }
 
-    const { serviceUuid, writeUuid, notifyUuid } = infos;
+    const serviceUuid = infos?.serviceUuid ?? fallbackServiceUuid;
+    const writeUuid = infos?.writeUuid ?? '00000002-0000-1000-8000-00805f9b34fb';
+    const notifyUuid = infos?.notifyUuid ?? '00000003-0000-1000-8000-00805f9b34fb';
+
+    if (!serviceUuid) {
+      throw ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound);
+    }
 
     if (!characteristics) {
       characteristics = await device.characteristicsForService(serviceUuid);
@@ -253,9 +305,9 @@ export default class ReactNativeBleTransport {
     let writeCharacteristic;
     let notifyCharacteristic;
     for (const c of characteristics) {
-      if (c.uuid === writeUuid) {
+      if (isSameBleUuid(c.uuid, writeUuid)) {
         writeCharacteristic = c;
-      } else if (c.uuid === notifyUuid) {
+      } else if (isSameBleUuid(c.uuid, notifyUuid)) {
         notifyCharacteristic = c;
       }
     }
@@ -289,6 +341,10 @@ export default class ReactNativeBleTransport {
     transport.disconnectSubscription = device.onDisconnected(() => {
       if (this.firmwareUploadWriteRecoveryIds.has(uuid)) {
         Log?.debug('device disconnect ignored during FirmwareUpload write recovery: ', uuid);
+        return;
+      }
+      if (transportCache[uuid] !== transport) {
+        Log?.debug('device disconnect ignored for stale transport: ', device?.id);
         return;
       }
 
@@ -391,6 +447,7 @@ export default class ReactNativeBleTransport {
       blePlxManager.startDeviceScan(
         null,
         {
+          allowDuplicates: true,
           scanMode: ScanMode.LowLatency,
         },
         (error, device) => {
@@ -418,14 +475,41 @@ export default class ReactNativeBleTransport {
             return;
           }
 
-          if (isOnekeyDevice(device?.name ?? null, device?.id)) {
+          const displayName = getDeviceDisplayName(device);
+          const isOneKey =
+            isOnekeyDevice(device?.name ?? null, device?.id) ||
+            isOnekeyDevice(device?.localName ?? null, device?.id) ||
+            hasKnownOneKeyService(device);
+          const shouldTraceCandidate =
+            !!displayName && /onekey|bixinkey|pro\s*2|pro\b|touch|^k\d|^t\d/i.test(displayName);
+
+          if (shouldTraceCandidate) {
+            Log?.debug('[ReactNativeBleTransport] scan candidate', {
+              name: device?.name,
+              localName: device?.localName,
+              id: device?.id,
+              serviceUUIDs: device?.serviceUUIDs,
+              accepted: isOneKey,
+            });
+          }
+
+          if (isOneKey) {
             Log?.debug('search device start ======================');
-            const { name, localName, id } = device ?? {};
+            const { name, localName, id, serviceUUIDs } = device ?? {};
             Log?.debug(
-              `device name: ${name ?? ''}\nlocalName: ${localName ?? ''}\nid: ${id ?? ''}`
+              `device name: ${name ?? ''}\nlocalName: ${localName ?? ''}\nid: ${
+                id ?? ''
+              }\nserviceUUIDs: ${(serviceUUIDs ?? []).join(',')}`
             );
             addDevice(device as unknown as Device);
             Log?.debug('search device end ======================\n');
+          } else if (displayName && /\bpro\s*2\b/i.test(displayName)) {
+            Log?.debug('[ReactNativeBleTransport] Pro2-like BLE device was not accepted:', {
+              name: device?.name,
+              localName: device?.localName,
+              id: device?.id,
+              serviceUUIDs: device?.serviceUUIDs,
+            });
           }
         }
       );
@@ -439,9 +523,11 @@ export default class ReactNativeBleTransport {
 
       const addDevice = (device: Device) => {
         if (deviceList.every(d => d.id !== device.id)) {
-          const protocolType = inferProtocolTypeFromDeviceName(device.name ?? device.localName);
+          const displayName = getDeviceDisplayName(device) ?? 'Unknown BLE Device';
+          const protocolType = inferProtocolTypeFromDeviceName(displayName);
           deviceList.push({
             ...device,
+            name: displayName,
             commType: 'ble',
             ...(protocolType ? { protocolType } : {}),
           } as IOneKeyDevice);
@@ -477,6 +563,7 @@ export default class ReactNativeBleTransport {
       const error = ERRORS.TypedError(HardwareErrorCode.BleForceCleanRunPromise);
       this.runPromise.reject(error);
       this.rejectProtocolV2Frame(error);
+      this.runPromise = null;
       Log?.debug('Force clean Bluetooth run promise, forceCleanRunPromise: ', forceCleanRunPromise);
     }
 
@@ -538,7 +625,7 @@ export default class ReactNativeBleTransport {
       Log?.debug('not connected, try to connect to device: ', uuid);
 
       try {
-        await device.connect(connectOptions);
+        device = await device.connect(connectOptions);
       } catch (e) {
         Log?.debug('not connected, try to connect to device has error: ', e);
         if (
@@ -548,7 +635,7 @@ export default class ReactNativeBleTransport {
           connectOptions = {};
           Log?.debug('second try to reconnect without params');
           try {
-            await device.connect();
+            device = await device.connect();
           } catch (e) {
             Log?.debug('last try to reconnect error: ', e);
             // last try to reconnect device if this issue exists
@@ -556,7 +643,7 @@ export default class ReactNativeBleTransport {
             if (e.errorCode === BleErrorCode.OperationCancelled) {
               Log?.debug('last try to reconnect');
               await device.cancelConnection();
-              await device.connect();
+              device = await device.connect();
             }
           }
         } else {
@@ -571,13 +658,25 @@ export default class ReactNativeBleTransport {
     await this.release(uuid);
 
     const transport = new BleTransport(device, writeCharacteristic, notifyCharacteristic);
+    const monitorToken = this.nextMonitorToken;
+    this.nextMonitorToken += 1;
+    const notifyTransactionId = `${uuid}:notify:${monitorToken}`;
+    transport.monitorToken = monitorToken;
+    transport.notifyTransactionId = notifyTransactionId;
+    this.monitorTokens.set(uuid, monitorToken);
     transport.notifySubscription = this._monitorCharacteristic(
       transport.notifyCharacteristic,
-      uuid
+      uuid,
+      monitorToken,
+      notifyTransactionId
     );
     transportCache[uuid] = transport;
 
     this.protocolV2Assemblers.set(uuid, new ProtocolV2FrameAssembler());
+
+    if (Platform.OS === 'ios') {
+      await new Promise<void>(resolve => setTimeout(resolve, IOS_NOTIFY_READY_DELAY_MS));
+    }
 
     const protocolType = await this.detectProtocol(uuid, expectedProtocol);
 
@@ -592,10 +691,16 @@ export default class ReactNativeBleTransport {
     return { uuid, protocolType };
   }
 
-  _monitorCharacteristic(characteristic: Characteristic, uuid: string): Subscription {
+  _monitorCharacteristic(
+    characteristic: Characteristic,
+    uuid: string,
+    monitorToken: number,
+    notifyTransactionId: string
+  ): Subscription {
     let bufferLength = 0;
     let buffer: any[] = [];
     const subscription = characteristic.monitor((error, c) => {
+      const isCurrentMonitor = this.monitorTokens.get(uuid) === monitorToken;
       if (error) {
         Log?.debug(
           `error monitor ${characteristic.uuid}, deviceId: ${characteristic.deviceID}: ${
@@ -604,6 +709,10 @@ export default class ReactNativeBleTransport {
         );
         if (this.firmwareUploadWriteRecoveryIds.has(uuid)) {
           Log?.debug('notify error ignored during FirmwareUpload write recovery: ', uuid);
+          return;
+        }
+        if (!isCurrentMonitor) {
+          Log?.debug('monitor error ignored for stale transport: ', uuid, notifyTransactionId);
           return;
         }
         if (this.runPromise) {
@@ -644,6 +753,11 @@ export default class ReactNativeBleTransport {
         return;
       }
 
+      if (!isCurrentMonitor) {
+        Log?.debug('monitor data ignored for stale transport: ', uuid, notifyTransactionId);
+        return;
+      }
+
       if (!c) {
         throw ERRORS.TypedError(HardwareErrorCode.BleMonitorError);
       }
@@ -680,15 +794,27 @@ export default class ReactNativeBleTransport {
         this.runPromise?.reject(notifyError);
         this.rejectProtocolV2Frame(notifyError);
       }
-    }, uuid);
+    }, notifyTransactionId);
 
     return subscription;
   }
 
   async release(uuid: string) {
     const transport = transportCache[uuid];
+    if (this.runPromise) {
+      const error = ERRORS.TypedError(HardwareErrorCode.BleForceCleanRunPromise);
+      this.runPromise.reject(error);
+      this.runPromise = null;
+      this.rejectProtocolV2Frame(error);
+    } else {
+      this.resetProtocolV2Frames();
+    }
 
     if (transport) {
+      if (this.monitorTokens.get(uuid) === transport.monitorToken) {
+        this.monitorTokens.delete(uuid);
+      }
+
       // Clean up disconnect subscription first to prevent callbacks on released transport
       Log?.debug('release: removing disconnect subscription for device: ', uuid);
       transport.disconnectSubscription?.remove();
@@ -702,14 +828,25 @@ export default class ReactNativeBleTransport {
       transport.notifySubscription?.remove();
       transport.notifySubscription = undefined;
 
+      if (transport.notifyTransactionId) {
+        try {
+          await this.blePlxManager?.cancelTransaction(transport.notifyTransactionId);
+        } catch (e) {
+          Log?.debug('release: cancel notify transaction error (ignored): ', e?.message || e);
+        }
+      }
+
       delete transportCache[uuid];
       this.deviceProtocol.delete(uuid);
-      this.protocolV2Assemblers.delete(uuid);
+    }
 
-      // Temporary close the Android disconnect after each request
-      if (Platform.OS === 'android') {
-        // await this.blePlxManager?.cancelDeviceConnection(uuid);
-      }
+    this.protocolV2Assemblers.get(uuid)?.reset();
+    this.protocolV2Assemblers.delete(uuid);
+
+    try {
+      await this.blePlxManager?.cancelTransaction(uuid);
+    } catch (e) {
+      Log?.debug('release: cancel transaction error (ignored): ', e?.message || e);
     }
 
     return Promise.resolve(true);
@@ -962,7 +1099,11 @@ export default class ReactNativeBleTransport {
       const jsonData = ProtocolV1.decodeMessage(messages, response);
       return check.call(jsonData);
     } catch (e) {
-      Log?.error('call error: ', e);
+      if (name === 'Initialize' && options?.timeoutMs === PROTOCOL_PROBE_TIMEOUT_MS) {
+        Log?.debug('[ReactNativeBleTransport] Protocol V1 Initialize probe call failed:', e);
+      } else {
+        Log?.error('call error: ', e);
+      }
       throw e;
     } finally {
       if (timeout) clearTimeout(timeout);
@@ -1136,7 +1277,7 @@ export default class ReactNativeBleTransport {
     this.protocolV2Assemblers.get(uuid)?.reset();
     return probeProtocolV2Helper({
       call: (name, data, options) => this.callProtocolV2(uuid, name, data, options),
-      timeoutMs: PROTOCOL_PROBE_TIMEOUT_MS,
+      timeoutMs: PROTOCOL_V2_PROBE_TIMEOUT_MS,
       logger: Log,
       logPrefix: 'ProtocolV2 RN-BLE',
       onProbeFailed: () => {
@@ -1211,14 +1352,21 @@ export default class ReactNativeBleTransport {
     }
   }
 
-  private async writeProtocolV2Frame(transport: BleTransport, frame: Uint8Array) {
+  private async writeProtocolV2Frame(
+    transport: BleTransport,
+    frame: Uint8Array,
+    options?: { writeWithResponse?: boolean }
+  ) {
     const packetCapacity = Platform.OS === 'ios' ? IOS_PACKET_LENGTH : ANDROID_PACKET_LENGTH;
 
     for (let offset = 0; offset < frame.length; offset += packetCapacity) {
       const chunk = frame.slice(offset, offset + packetCapacity);
-      await transport.writeCharacteristic.writeWithoutResponse(
-        Buffer.from(chunk).toString('base64')
-      );
+      const base64 = Buffer.from(chunk).toString('base64');
+      if (options?.writeWithResponse) {
+        await transport.writeCharacteristic.writeWithResponse(base64);
+      } else {
+        await transport.writeCharacteristic.writeWithoutResponse(base64);
+      }
     }
   }
 
@@ -1254,6 +1402,14 @@ export default class ReactNativeBleTransport {
       ...options,
       timeoutMs: options?.timeoutMs ?? BLE_RESPONSE_TIMEOUT_MS,
     };
+    const writeWithResponse = LogBlockCommand.has(name);
+
+    if (writeWithResponse) {
+      Log?.debug(
+        '[ReactNativeBleTransport] Protocol V2 high-volume write uses writeWithResponse:',
+        name
+      );
+    }
 
     try {
       const session = new ProtocolV2Session({
@@ -1262,7 +1418,8 @@ export default class ReactNativeBleTransport {
           protocolV2: this._messagesV2,
         },
         router: PROTOCOL_V2_CHANNEL_BLE_UART,
-        writeFrame: (frame: Uint8Array) => this.writeProtocolV2Frame(transport, frame),
+        writeFrame: (frame: Uint8Array) =>
+          this.writeProtocolV2Frame(transport, frame, { writeWithResponse }),
         readFrame: async () => {
           const rxFrame = await this.readProtocolV2Frame();
           if (!(rxFrame instanceof Uint8Array)) {

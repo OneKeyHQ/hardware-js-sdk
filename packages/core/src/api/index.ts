@@ -46,6 +46,7 @@ export { default as getProtoVersion } from './protocol-v2/GetProtoVersion';
 export { default as ping } from './protocol-v2/Ping';
 export { default as devReboot } from './protocol-v2/DevReboot';
 export { default as devGetDeviceInfo } from './protocol-v2/DevGetDeviceInfo';
+export { default as devGetOnboardingStatus } from './protocol-v2/DevGetOnboardingStatus';
 export { default as devFirmwareUpdate } from './protocol-v2/DevFirmwareUpdate';
 export { default as devGetFirmwareUpdateStatus } from './protocol-v2/DevGetFirmwareUpdateStatus';
 export { default as factoryDeviceInfoSettings } from './protocol-v2/FactoryDeviceInfoSettings';

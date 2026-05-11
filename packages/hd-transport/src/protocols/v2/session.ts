@@ -227,51 +227,23 @@ export async function probeProtocolV2({
   onBeforeProbe?: () => Promise<void> | void;
   onProbeFailed?: (error: unknown) => Promise<void> | void;
 }) {
-  let versionError: unknown;
+  let pingError: unknown;
   try {
     await onBeforeProbe?.();
     const response = await call(
-      'GetProtoVersion',
-      {},
-      { timeoutMs, expectedTypes: ['ProtoVersion'] }
+      'Ping',
+      { message: 'probe' },
+      { timeoutMs, expectedTypes: ['Success'] }
     );
-    if (response.type === 'ProtoVersion') {
+    if (response.type === 'Success') {
       return true;
     }
-    versionError = new Error(`unexpected response type ${response.type}`);
+    pingError = new Error(`unexpected response type ${response.type}`);
   } catch (error) {
-    versionError = error;
+    pingError = error;
   }
 
-  logger?.debug?.(
-    `[${logPrefix}] Protocol V2 version probe failed:`,
-    getErrorMessage(versionError)
-  );
-  try {
-    const response = await call(
-      'DevGetFirmwareUpdateStatus',
-      {},
-      {
-        timeoutMs,
-        expectedTypes: ['DevFirmwareUpdateStatus'],
-      }
-    );
-    if (response.type === 'DevFirmwareUpdateStatus') {
-      return true;
-    }
-    const bootloaderError = new Error(`unexpected response type ${response.type}`);
-    logger?.debug?.(
-      `[${logPrefix}] Protocol V2 bootloader probe failed:`,
-      getErrorMessage(bootloaderError)
-    );
-    await onProbeFailed?.(bootloaderError);
-    return false;
-  } catch (bootloaderError) {
-    logger?.debug?.(
-      `[${logPrefix}] Protocol V2 bootloader probe failed:`,
-      getErrorMessage(bootloaderError)
-    );
-    await onProbeFailed?.(bootloaderError);
-    return false;
-  }
+  logger?.debug?.(`[${logPrefix}] Protocol V2 ping probe failed:`, getErrorMessage(pingError));
+  await onProbeFailed?.(pingError);
+  return false;
 }

@@ -815,6 +815,16 @@ function canSkipInitialize(method: BaseMethod, device: Device): boolean {
   return true;
 }
 
+function isRetryableBleProtocolV2ProbeError(method: BaseMethod, error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return (
+    method.payload.connectProtocol === 'V2' &&
+    message.includes('Device protocol mismatch') &&
+    message.includes('expected V2') &&
+    message.includes('did not respond to expected protocol')
+  );
+}
+
 /**
  * If the Bluetooth connection times out, retry up to 6 times
  * @param retryCount - Current retry count (default 0)
@@ -834,7 +844,12 @@ async function connectDeviceForBle(method: BaseMethod, device: Device, retryCoun
       });
     }
   } catch (err) {
-    if (err.errorCode === HardwareErrorCode.BleTimeoutError && retryCount < 6) {
+    if (
+      (err.errorCode === HardwareErrorCode.BleTimeoutError ||
+        err.errorCode === HardwareErrorCode.BleConnectedError ||
+        isRetryableBleProtocolV2ProbeError(method, err)) &&
+      retryCount < 6
+    ) {
       const nextRetry = retryCount + 1;
       Log.debug(`Bluetooth connect timeout and will retry, retry count: ${nextRetry}`);
       await wait(3000);

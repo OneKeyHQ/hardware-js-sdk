@@ -1,7 +1,8 @@
-import type { Response } from '../params';
+import type { CommonParams, Response } from '../params';
 import type {
   DevFirmwareTarget,
   DevFirmwareUpdateStatus,
+  DevOnboardingStatus,
   DevInfoTargets,
   DevInfoTypes,
   DevRebootType,
@@ -138,24 +139,39 @@ export declare function pathInfo(
   params: { path: string }
 ): Response<PathInfoResult>;
 
-export declare function getProtoVersion(connectId: string): Response<ProtoVersion>;
+export declare function getProtoVersion(
+  connectId: string,
+  params?: CommonParams
+): Response<ProtoVersion>;
 
-export declare function ping(connectId: string, params?: { message?: string }): Response<Success>;
+export declare function ping(
+  connectId: string,
+  params?: CommonParams & { message?: string }
+): Response<Success>;
 
-export declare function devReboot(connectId: string, params: DevRebootParams): Response<Success>;
+export declare function devReboot(
+  connectId: string,
+  params: CommonParams & DevRebootParams
+): Response<Success>;
 
 export declare function devGetDeviceInfo(
   connectId: string,
-  params?: DevGetDeviceInfoParams
+  params?: CommonParams & DevGetDeviceInfoParams
 ): Response<ProtocolV2DeviceInfo>;
+
+export declare function devGetOnboardingStatus(
+  connectId: string,
+  params?: CommonParams
+): Response<DevOnboardingStatus>;
 
 export declare function devFirmwareUpdate(
   connectId: string,
-  params: DevFirmwareUpdateParams
+  params: CommonParams & DevFirmwareUpdateParams
 ): Response<Success | DevFirmwareUpdateStatus>;
 
 export declare function devGetFirmwareUpdateStatus(
-  connectId: string
+  connectId: string,
+  params?: CommonParams
 ): Response<DevFirmwareUpdateStatus>;
 
 export declare function factoryDeviceInfoSettings(

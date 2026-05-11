@@ -150,15 +150,18 @@ export const createCoreApi = (
   deviceRebootToBootloader: connectId => call({ connectId, method: 'deviceRebootToBootloader' }),
 
   // File system & device control API (Protocol V2 only)
-  getProtoVersion: connectId => call({ connectId, method: 'getProtoVersion' }),
+  getProtoVersion: (connectId, params) =>
+    call({ ...params, connectId, method: 'getProtoVersion' }),
   ping: (connectId, params) => call({ ...params, connectId, method: 'ping' }),
   devReboot: (connectId, params) => call({ ...params, connectId, method: 'devReboot' }),
   devGetDeviceInfo: (connectId, params) =>
     call({ ...params, connectId, method: 'devGetDeviceInfo' }),
+  devGetOnboardingStatus: (connectId, params) =>
+    call({ ...params, connectId, method: 'devGetOnboardingStatus' }),
   devFirmwareUpdate: (connectId, params) =>
     call({ ...params, connectId, method: 'devFirmwareUpdate' }),
-  devGetFirmwareUpdateStatus: connectId =>
-    call({ connectId, method: 'devGetFirmwareUpdateStatus' }),
+  devGetFirmwareUpdateStatus: (connectId, params) =>
+    call({ ...params, connectId, method: 'devGetFirmwareUpdateStatus' }),
   factoryDeviceInfoSettings: (connectId, params) =>
     call({ ...params, connectId, method: 'factoryDeviceInfoSettings' }),
   factoryGetDeviceInfo: connectId => call({ connectId, method: 'factoryGetDeviceInfo' }),

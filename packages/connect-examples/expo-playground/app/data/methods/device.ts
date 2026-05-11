@@ -185,6 +185,12 @@ const api: UnifiedMethodConfig[] = [
     ],
   },
   {
+    method: 'devGetOnboardingStatus',
+    description: 'methodDescriptions.devGetOnboardingStatus',
+    noDeviceIdReq: true,
+    presets: [],
+  },
+  {
     method: 'devReboot',
     description: 'methodDescriptions.devReboot',
     noDeviceIdReq: true,

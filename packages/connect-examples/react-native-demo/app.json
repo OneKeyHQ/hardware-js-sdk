@@ -1,10 +1,11 @@
 {
   "expo": {
-    "name": "ReactNativeDemo",
-    "slug": "react-native-demo",
+    "name": "OneKey RN Demo",
+    "slug": "onekey-rn-demo",
     "version": "0.1.0",
     "sdkVersion": "54.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "updates": {
       "fallbackToCacheTimeout": 0
@@ -17,13 +18,14 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Camera access is required to scan the QR codes displayed on the hardware wallet.",
         "NSBluetoothAlwaysUsageDescription": "Bluetooth is required to discover and connect to your OneKey hardware device.",
-        "NSBluetoothPeripheralUsageDescription": "Bluetooth is required to discover and connect to your OneKey hardware device.",
+        "NSBluetoothPeripheralUsageDescription": "Bluetooth is required to discover and connect to your OneKey hardware device."
       },
-      "bundleIdentifier": "com.anonymous.react-native-demo",
+      "bundleIdentifier": "com.caikaisheng.onekey.reactnativedemo",
       "appleTeamId": "CTK8P5SY9G"
     },
     "android": {
       "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "permissions": [
@@ -36,7 +38,8 @@
     },
     "web": {
       "bundler": "metro",
-      "output": "single"
+      "output": "single",
+      "favicon": "./assets/favicon.png"
     }
   }
 }

@@ -26,6 +26,7 @@ import {
   XCircle,
   Server,
   Info,
+  ListChecks,
   Usb,
 } from 'lucide-react';
 import { getDeviceLabel } from '@onekeyfe/hd-core';
@@ -65,9 +66,19 @@ const navigationItems = [
     icon: FileText,
   },
   {
+    title: 'common.proDebug',
+    url: '/pro-debug',
+    icon: Usb,
+  },
+  {
     title: 'common.pro2Debug',
     url: '/pro2-debug',
     icon: Usb,
+  },
+  {
+    title: 'common.pro2Onboarding',
+    url: '/pro2-onboarding',
+    icon: ListChecks,
   },
 ];
 

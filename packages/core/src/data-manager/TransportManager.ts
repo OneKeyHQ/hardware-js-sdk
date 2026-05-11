@@ -17,6 +17,7 @@ const LowLevelLogger = getLogger(LoggerNames.HdTransportLowLevel);
 const NodeUsbLogger = getLogger(LoggerNames.HdTransportNodeUsb);
 const WebBleLogger = getLogger(LoggerNames.HdWebBleTransport);
 const WebUsbLogger = getLogger(LoggerNames.HdTransportWebUsb);
+const REACT_NATIVE_BLE_SCAN_TIMEOUT_MS = 8000;
 
 /**
  * transport 在同一个环境中只会存在一个
@@ -123,7 +124,9 @@ export default class TransportManager {
     const env = DataManager.getSettings('env');
     if (env === 'react-native') {
       /** Actually initializes the ReactNativeTransport */
-      this.transport = new TransportConstructor({ scanTimeout: 3000 }) as unknown as Transport;
+      this.transport = new TransportConstructor({
+        scanTimeout: REACT_NATIVE_BLE_SCAN_TIMEOUT_MS,
+      }) as unknown as Transport;
     } else {
       /** Actually initializes the HttpTransport */
       this.transport = new TransportConstructor() as unknown as Transport;

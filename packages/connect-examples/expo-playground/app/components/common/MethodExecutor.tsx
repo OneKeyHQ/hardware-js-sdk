@@ -208,6 +208,14 @@ function getMethodFromLog(log: UnifiedLogEntry, record: DebugLogRecord): string 
   return match?.[1] || title || 'Command';
 }
 
+function isProtocolTraceLog(title: string): boolean {
+  return title.includes('demo protocol trace') || title.includes('debug protocol trace');
+}
+
+function isDecodedResponseLog(title: string): boolean {
+  return title.includes('decoded response');
+}
+
 type CommandStatusEntry = {
   id: string;
   method: string;
@@ -226,7 +234,7 @@ function buildCommandStatusEntries(logs: UnifiedLogEntry[]) {
     const record = getLogRecord(log);
     const method = getMethodFromLog(log, record);
 
-    if (title.includes('Pro2 demo protocol trace')) {
+    if (isProtocolTraceLog(title)) {
       const requestRecord =
         record.request_parameters &&
         typeof record.request_parameters === 'object' &&
@@ -260,7 +268,7 @@ function buildCommandStatusEntries(logs: UnifiedLogEntry[]) {
       return;
     }
 
-    if (title.includes('Pro2 decoded response')) {
+    if (isDecodedResponseLog(title)) {
       const target = [...entries]
         .reverse()
         .find(entry => entry.method === method && entry.result?.value === 'Sending...');
@@ -323,19 +331,26 @@ function buildCommandStatusEntries(logs: UnifiedLogEntry[]) {
       return;
     }
 
-    // 成功态由 Pro2 decoded response 合并到同一条命令状态里，避免状态区重复刷屏。
+    // 成功态由 decoded response 合并到同一条命令状态里，避免状态区重复刷屏。
   });
 
   return entries.reverse().slice(0, 20);
 }
 
+type RawLogTone = 'success' | 'error' | 'accent' | 'tx' | 'rx' | 'info';
+type RawLogLine = {
+  id: string;
+  tone: RawLogTone;
+  text: string;
+};
+
 function buildRawLogLines(logs: UnifiedLogEntry[]) {
-  return [...logs].reverse().flatMap(log => {
+  return [...logs].reverse().flatMap<RawLogLine>(log => {
     const title = log.title || log.message || '';
     const record = getLogRecord(log);
     const time = formatLogTime(log);
 
-    if (title.includes('Pro2 demo protocol trace')) {
+    if (isProtocolTraceLog(title)) {
       return [
         {
           id: `${log.id}-tx`,
@@ -350,7 +365,7 @@ function buildRawLogLines(logs: UnifiedLogEntry[]) {
       ];
     }
 
-    if (title.includes('Pro2 decoded response')) {
+    if (isDecodedResponseLog(title)) {
       return [
         {
           id: `${log.id}-rx`,
@@ -382,7 +397,8 @@ function buildRawLogLines(logs: UnifiedLogEntry[]) {
       ];
     }
 
-    const tone = log.type === 'error' ? 'error' : log.type === 'response' ? 'success' : 'info';
+    const tone: RawLogTone =
+      log.type === 'error' ? 'error' : log.type === 'response' ? 'success' : 'info';
     return [{ id: log.id, tone, text: `[${time}] ${title}` }];
   });
 }

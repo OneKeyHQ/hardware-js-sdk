@@ -13,6 +13,9 @@ const JSON_PARAMETER_NAMES = [
   'payload',
   'targets',
   'types',
+  'firmwareVersion',
+  'bleVersion',
+  'bootloaderVersion',
 ] as const;
 
 /**

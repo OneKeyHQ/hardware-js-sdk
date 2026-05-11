@@ -169,6 +169,7 @@
   "message__download_latest_ui_resource_success": "Download latest Ui resource success",
   "message__reboot_to_bootloader": "Reboot to bootloader...",
   "message__wait_begin_update": "Wait begin update...",
+  "message__firmware_reconnect_device": "Rebooting and reconnecting device...",
   "message__confirm_on_device": "Confirm on device...",
   "message__firmware_erase_success": "Firmware installing...",
   "message__firmware_start_transfer": "Firmware start transfer...",

@@ -2,6 +2,7 @@ import type {
   devFirmwareUpdate,
   devGetDeviceInfo,
   devGetFirmwareUpdateStatus,
+  devGetOnboardingStatus,
   devReboot,
   dirList,
   dirMake,
@@ -238,6 +239,7 @@ export type CoreApi = {
   ping: typeof ping;
   devReboot: typeof devReboot;
   devGetDeviceInfo: typeof devGetDeviceInfo;
+  devGetOnboardingStatus: typeof devGetOnboardingStatus;
   devFirmwareUpdate: typeof devFirmwareUpdate;
   devGetFirmwareUpdateStatus: typeof devGetFirmwareUpdateStatus;
   factoryDeviceInfoSettings: typeof factoryDeviceInfoSettings;

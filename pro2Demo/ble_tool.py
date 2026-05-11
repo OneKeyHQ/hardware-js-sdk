@@ -14,6 +14,7 @@ from PyQt5.QtWidgets import (
     QHeaderView, QTextEdit, QLineEdit, QComboBox, QGroupBox,
     QMessageBox, QDialog, QDialogButtonBox, QMenu, QAction,
     QInputDialog, QSpinBox, QFileDialog, QProgressBar, QTabWidget,
+    QCheckBox,
 )
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QObject
 from PyQt5.QtGui import QColor, QFont
@@ -74,7 +75,7 @@ class DeviceItem:
 
 
 # ---------------------------------------------------------------------------
-# Protocol V2 – frame building and minimal protobuf helpers
+# Protocol V0 – frame building and minimal protobuf helpers
 # (same algorithm as webusb_upgrade.html)
 # ---------------------------------------------------------------------------
 
@@ -101,17 +102,38 @@ _PROTO_HEAD_SOF       = 0x5A
 _PROTO_HEAD_CRC_SIZE  = 8      # 7 header bytes + 1 tail CRC
 _PROTO_DATA_TYPE_PKT  = 0
 _CRC8_INIT            = 0x30
-_PROTOCOL_V2_FRAME_MAX_BYTES = 4608
-_PROTOCOL_V2_FILE_CHUNK_SIZE = 4096
 
-_PB_MSG_TYPE_PING      = 60206
-_PB_MSG_TYPE_SUCCESS   = 60207
-_PB_MSG_TYPE_FAILURE   = 60208
-_PB_MSG_TYPE_FILE      = 60803
-_PB_MSG_TYPE_FILEWRITE = 60805
+_PB_MSG_TYPE_PING            = 60206
+_PB_MSG_TYPE_SUCCESS         = 60207
+_PB_MSG_TYPE_FAILURE         = 60208
+_PB_MSG_TYPE_REBOOT          = 60400
+_PB_MSG_TYPE_FILE            = 60803
+_PB_MSG_TYPE_FILEWRITE       = 60805
+_PB_MSG_TYPE_FIRMWARE_UPDATE            = 61000
+_PB_MSG_TYPE_GET_FIRMWARE_UPDATE_STATUS = 61002
+_PB_MSG_TYPE_FIRMWARE_UPDATE_STATUS     = 61003
 _PB_MSG_NAMES = {
     60206: "Ping", 60207: "Success", 60208: "Failure",
+    60400: "Reboot",
     60803: "File", 60805: "FileWrite",
+    61000: "FirmwareUpdate",
+    61002: "GetFirmwareUpdateStatus",
+    61003: "FirmwareUpdateStatus",
+}
+
+# DevFirmwareUpdateStatusEntry.status
+_FW_UPDATE_STATUS_NAMES = {0: "finished", 1: "in_progress", 2: "failed"}
+
+# Reboot.RebootType
+_REBOOT_TYPE_NORMAL      = 0
+_REBOOT_TYPE_BOARDLOADER = 1
+_REBOOT_TYPE_BOOTLOADER  = 2
+_REBOOT_TYPE_NAMES = {0: "Normal", 1: "Boardloader", 2: "BootLoader"}
+
+# FirmwareTargetType
+_FW_TARGET_NAMES = {
+    0: "Main App", 1: "Main Bootloader", 2: "BLE",
+    3: "SE1", 4: "SE2", 5: "SE3", 6: "SE4", 10: "Resource",
 }
 
 _proto_seq = 0
@@ -145,10 +167,10 @@ def _decode_varint(data: bytes | bytearray, offset: int) -> tuple[int, int]:
 
 
 def _calc_max_chunk(mtu: int, device_path: str) -> int:
-    """Compute max data bytes that fit in one MTU-sized Protocol V2 + FileWrite frame.
+    """Compute max data bytes that fit in one MTU-sized Proto V0 + FileWrite frame.
 
     Frame layout (bytes):
-      Protocol V2: SOF(1) len(2) header-CRC(1) router(1) attr(1) seq(1) <payload> tail-CRC(1)  → 8 B
+      Proto V0:   SOF(1) len(2) pre-CRC(1) router(1) attr(1) seq(1) <payload> tail-CRC(1)  → 8 B
       msg_type:   2 B (uint16 LE prefix inside payload)
       FileWrite:  tag+len for embedded File message(4 B) + overwrite(2 B) + append(2 B)    → 8 B
       File fixed: path tag+len+bytes  offset tag+varint(5)  total_size tag+varint(5)
@@ -215,7 +237,7 @@ def pb_decode_failure(pb: bytes) -> tuple[int, str]:
 
 
 def build_proto_frame(payload: bytes, packet_src: int = 0, router: int = 0) -> bytes:
-    """Wrap payload in a Protocol V2 frame (SOF + len + header CRC + attr + seq + payload + tail CRC)."""
+    """Wrap payload in a Proto V0 frame (SOF + len + pre-CRC + attr + seq + payload + tail-CRC)."""
     global _proto_seq
     payload_len = len(payload)
     frame_len   = payload_len + _PROTO_HEAD_CRC_SIZE
@@ -238,56 +260,17 @@ def build_proto_frame(payload: bytes, packet_src: int = 0, router: int = 0) -> b
 
 def build_pb_frame(msg_type: int, pb_payload: bytes,
                    packet_src: int = 0, router: int = 0) -> bytes:
-    """Build a Protocol V2 frame carrying msg_type (2-byte LE) + protobuf payload."""
+    """Build a Proto V0 frame carrying  msg_type (2-byte LE) + protobuf payload."""
     payload = bytes([msg_type & 0xFF, (msg_type >> 8) & 0xFF]) + pb_payload
     return build_proto_frame(payload, packet_src, router)
 
 
-class ProtocolV2FrameAssembler:
-    def __init__(self, max_frame_bytes: int = _PROTOCOL_V2_FRAME_MAX_BYTES):
-        self.max_frame_bytes = max_frame_bytes
-        self.buffer = bytearray()
-
-    def reset(self):
-        self.buffer.clear()
-
-    def push(self, chunk: bytes | bytearray) -> list[bytes]:
-        if chunk:
-            self.buffer.extend(chunk)
-
-        frames: list[bytes] = []
-        while len(self.buffer) >= 3:
-            if self.buffer[0] != _PROTO_HEAD_SOF:
-                self.reset()
-                raise ValueError("Invalid Protocol V2 SOF")
-
-            frame_len = self.buffer[1] | (self.buffer[2] << 8)
-            if frame_len < _PROTO_HEAD_CRC_SIZE:
-                self.reset()
-                raise ValueError(f"Protocol V2 frame too short: {frame_len}")
-            if frame_len > self.max_frame_bytes:
-                self.reset()
-                raise ValueError(f"Protocol V2 frame too large: {frame_len}")
-            if len(self.buffer) < frame_len:
-                break
-
-            frames.append(bytes(self.buffer[:frame_len]))
-            del self.buffer[:frame_len]
-
-        return frames
-
-
 def parse_proto_frame(frame: bytes) -> bytes | None:
-    """Extract the inner payload from a Protocol V2 frame, or None if malformed."""
+    """Extract the inner payload from a Proto V0 frame, or None if malformed."""
     if len(frame) < _PROTO_HEAD_CRC_SIZE or frame[0] != _PROTO_HEAD_SOF:
         return None
     frame_len = frame[1] | (frame[2] << 8)
-    if frame_len < _PROTO_HEAD_CRC_SIZE or frame_len > len(frame):
-        return None
-    frame = frame[:frame_len]
-    if frame[3] != _crc8(frame, 3):
-        return None
-    if frame[frame_len - 1] != _crc8(frame, frame_len - 1):
+    if frame_len > len(frame):
         return None
     return bytes(frame[7:frame_len - 1])
 
@@ -347,6 +330,82 @@ def pb_encode_file_write(file_bytes: bytes, overwrite: bool, append: bool) -> by
         + _encode_pb_bool(2, overwrite)
         + _encode_pb_bool(3, append)
     )
+
+
+def pb_encode_reboot(reboot_type: int) -> bytes:
+    """Encode  Reboot { required RebootType reboot_type = 1; }"""
+    return _encode_pb_uint32(1, reboot_type, required=True)
+
+
+def pb_encode_firmware_target(target_id: int, path: str) -> bytes:
+    """Encode  FirmwareTarget { required FirmwareTargetType target_id=1; required string path=2; }"""
+    return (
+        _encode_pb_uint32(1, target_id, required=True)
+        + _encode_pb_string(2, path)
+    )
+
+
+def pb_encode_firmware_update(targets: list[tuple[int, str]],
+                              reboot_on_success: bool | None = None) -> bytes:
+    """Encode  FirmwareUpdate { repeated FirmwareTarget targets=1; optional bool reboot_on_success=2; }
+
+    *targets* is a list of (target_id, path) tuples.
+    """
+    result = b""
+    for target_id, path in targets:
+        result += _encode_pb_message(1, pb_encode_firmware_target(target_id, path))
+    if reboot_on_success is not None:
+        result += _encode_pb_bool(2, reboot_on_success)
+    return result
+
+
+def pb_encode_get_firmware_update_status() -> bytes:
+    """Encode  DevGetFirmwareUpdateStatus { }  (no fields)."""
+    return b""
+
+
+def pb_decode_firmware_update_status_entry(pb: bytes) -> dict:
+    """Decode  DevFirmwareUpdateStatusEntry { target_id=1 (uint32), status=2 (uint32) }."""
+    result = {"target_id": 0, "status": 0}
+    offset = 0
+    while offset < len(pb):
+        tag, offset = _decode_varint(pb, offset)
+        fn, wt = tag >> 3, tag & 0x7
+        if wt == 0:
+            val, offset = _decode_varint(pb, offset)
+            if fn == 1:   result["target_id"] = val
+            elif fn == 2: result["status"] = val
+        elif wt == 2:
+            ln, offset = _decode_varint(pb, offset)
+            offset += ln  # skip unknown length-delimited
+        else:
+            break
+    return result
+
+
+def pb_decode_firmware_update_status(pb: bytes) -> list[dict]:
+    """Decode  DevFirmwareUpdateStatus { repeated DevFirmwareUpdateStatusEntry targets=1 }.
+
+    Returns a list of {"target_id", "status"} dicts.
+    """
+    targets: list[dict] = []
+    offset = 0
+    while offset < len(pb):
+        tag, offset = _decode_varint(pb, offset)
+        fn, wt = tag >> 3, tag & 0x7
+        if fn == 1 and wt == 2:
+            ln, offset = _decode_varint(pb, offset)
+            entry = pb_decode_firmware_update_status_entry(pb[offset:offset + ln])
+            targets.append(entry)
+            offset += ln
+        elif wt == 0:
+            _, offset = _decode_varint(pb, offset)
+        elif wt == 2:
+            ln, offset = _decode_varint(pb, offset)
+            offset += ln
+        else:
+            break
+    return targets
 
 
 
@@ -468,6 +527,9 @@ class BLEToolWindow(QMainWindow):
     pairing_request = pyqtSignal(str, int, str)  # device_path, passkey, mode
     ping_result_signal = pyqtSignal(bool, str)     # success, result_text
     fw_progress_signal = pyqtSignal(int, str)      # percent 0-100, status text
+    reboot_result_signal = pyqtSignal(bool, str)        # success, result_text
+    fw_update_result_signal = pyqtSignal(bool, str)     # success, result_text
+    fw_status_result_signal = pyqtSignal(bool, str)     # success, result_text
 
     def __init__(self):
         super().__init__()
@@ -625,8 +687,8 @@ class BLEToolWindow(QMainWindow):
 
         right_layout.addWidget(svc_group, 3)
 
-        # Protocol V2 (tabbed: Ping | File Write)
-        proto_group = QGroupBox("Protocol V2")
+        # Protocol V0 (tabbed: Ping | File Write)
+        proto_group = QGroupBox("Protocol V0")
         proto_layout = QVBoxLayout(proto_group)
         proto_layout.setContentsMargins(8, 8, 8, 4)
         proto_layout.setSpacing(4)
@@ -699,11 +761,11 @@ class BLEToolWindow(QMainWindow):
         fw_chunk_bar = QHBoxLayout()
         fw_chunk_bar.addWidget(QLabel("Chunk:"))
         self.fw_chunk_spin = QSpinBox()
-        self.fw_chunk_spin.setRange(16, _PROTOCOL_V2_FILE_CHUNK_SIZE)
+        self.fw_chunk_spin.setRange(16, 2048)
         self.fw_chunk_spin.setSingleStep(64)
-        self.fw_chunk_spin.setValue(_PROTOCOL_V2_FILE_CHUNK_SIZE)
+        self.fw_chunk_spin.setValue(2048)
         self.fw_chunk_spin.setSuffix(" B")
-        self.fw_chunk_spin.setToolTip("Protocol V2 file payload chunk size")
+        self.fw_chunk_spin.setToolTip("Auto-set to MTU-derived max after connection")
         fw_chunk_bar.addWidget(self.fw_chunk_spin)
         self.lbl_chunk_mtu = QLabel("(connect to auto-set)")
         self.lbl_chunk_mtu.setStyleSheet("color: #888; font-size: 11px;")
@@ -731,6 +793,97 @@ class BLEToolWindow(QMainWindow):
         fw_lay.addWidget(self.lbl_fw_status)
 
         self.proto_tabs.addTab(fw_tab, "File Write")
+
+        # -- FW Update tab --
+        fwu_tab = QWidget()
+        fwu_lay = QVBoxLayout(fwu_tab)
+        fwu_lay.setContentsMargins(4, 8, 4, 4)
+        fwu_lay.setSpacing(4)
+
+        fwu_target_bar = QHBoxLayout()
+        fwu_target_bar.addWidget(QLabel("Target:"))
+        self.fwu_target_combo = QComboBox()
+        for tid in (0, 1, 2, 3, 4, 5, 6, 10):
+            self.fwu_target_combo.addItem(f"{_FW_TARGET_NAMES[tid]} ({tid})", tid)
+        fwu_target_bar.addWidget(self.fwu_target_combo, 1)
+        fwu_lay.addLayout(fwu_target_bar)
+
+        fwu_path_bar = QHBoxLayout()
+        fwu_path_bar.addWidget(QLabel("Device path:"))
+        self.fwu_path = QLineEdit("vol1:firmware.bin")
+        fwu_path_bar.addWidget(self.fwu_path, 1)
+        fwu_lay.addLayout(fwu_path_bar)
+
+        fwu_opt_bar = QHBoxLayout()
+        self.fwu_reboot_chk = QCheckBox("Reboot on success")
+        self.fwu_reboot_chk.setChecked(True)
+        fwu_opt_bar.addWidget(self.fwu_reboot_chk)
+        fwu_opt_bar.addStretch()
+        self.btn_fwu_send = QPushButton("Update Firmware")
+        self.btn_fwu_send.setMinimumHeight(28)
+        self.btn_fwu_send.setEnabled(False)
+        fwu_opt_bar.addWidget(self.btn_fwu_send)
+        fwu_lay.addLayout(fwu_opt_bar)
+
+        self.lbl_fwu_result = QLabel("")
+        self.lbl_fwu_result.setWordWrap(True)
+        fwu_lay.addWidget(self.lbl_fwu_result)
+        fwu_lay.addStretch()
+
+        self.proto_tabs.addTab(fwu_tab, "FW Update")
+
+        # -- FW Status tab (DevGetFirmwareUpdateStatus) --
+        fws_tab = QWidget()
+        fws_lay = QVBoxLayout(fws_tab)
+        fws_lay.setContentsMargins(4, 8, 4, 4)
+        fws_lay.setSpacing(4)
+
+        fws_btn_bar = QHBoxLayout()
+        fws_btn_bar.addWidget(QLabel(
+            "Query last firmware update record (DevGetFirmwareUpdateStatus)"))
+        fws_btn_bar.addStretch()
+        self.btn_fws_query = QPushButton("Query Status")
+        self.btn_fws_query.setMinimumHeight(28)
+        self.btn_fws_query.setEnabled(False)
+        fws_btn_bar.addWidget(self.btn_fws_query)
+        fws_lay.addLayout(fws_btn_bar)
+
+        self.fws_result_text = QTextEdit()
+        self.fws_result_text.setReadOnly(True)
+        self.fws_result_text.setFont(QFont("Consolas", 9))
+        self.fws_result_text.setFixedHeight(110)
+        self.fws_result_text.setStyleSheet(
+            "QTextEdit { background: #1a1a1a; color: #eee; "
+            "border: 1px solid #444; border-radius: 4px; "
+            "font-family: monospace; font-size: 11px; }")
+        fws_lay.addWidget(self.fws_result_text)
+
+        self.proto_tabs.addTab(fws_tab, "FW Status")
+
+        # -- Reboot tab --
+        reboot_tab = QWidget()
+        reboot_lay = QVBoxLayout(reboot_tab)
+        reboot_lay.setContentsMargins(4, 8, 4, 4)
+        reboot_lay.setSpacing(4)
+
+        reboot_type_bar = QHBoxLayout()
+        reboot_type_bar.addWidget(QLabel("Reboot type:"))
+        self.reboot_type_combo = QComboBox()
+        for rt in (_REBOOT_TYPE_NORMAL, _REBOOT_TYPE_BOARDLOADER, _REBOOT_TYPE_BOOTLOADER):
+            self.reboot_type_combo.addItem(f"{_REBOOT_TYPE_NAMES[rt]} ({rt})", rt)
+        reboot_type_bar.addWidget(self.reboot_type_combo, 1)
+        self.btn_reboot = QPushButton("Reboot Device")
+        self.btn_reboot.setMinimumHeight(28)
+        self.btn_reboot.setEnabled(False)
+        reboot_type_bar.addWidget(self.btn_reboot)
+        reboot_lay.addLayout(reboot_type_bar)
+
+        self.lbl_reboot_result = QLabel("")
+        self.lbl_reboot_result.setWordWrap(True)
+        reboot_lay.addWidget(self.lbl_reboot_result)
+        reboot_lay.addStretch()
+
+        self.proto_tabs.addTab(reboot_tab, "Reboot")
 
         proto_layout.addWidget(self.proto_tabs)
         right_layout.addWidget(proto_group)
@@ -780,6 +933,12 @@ class BLEToolWindow(QMainWindow):
         self.btn_fw_abort.clicked.connect(self._on_fw_abort)
         self.fw_progress_signal.connect(self._on_fw_progress)
         self.fio_device_path.textChanged.connect(self._update_chunk_from_mtu)
+        self.btn_reboot.clicked.connect(self._on_reboot)
+        self.reboot_result_signal.connect(self._on_reboot_result)
+        self.btn_fwu_send.clicked.connect(self._on_fw_update)
+        self.fw_update_result_signal.connect(self._on_fw_update_result)
+        self.btn_fws_query.clicked.connect(self._on_fw_status)
+        self.fw_status_result_signal.connect(self._on_fw_status_result)
 
     # ---- Logging ----------------------------------------------------------
 
@@ -987,12 +1146,10 @@ class BLEToolWindow(QMainWindow):
         mtu = self._negotiated_mtu
         if mtu <= 0:
             return
-        self.fw_chunk_spin.setRange(16, _PROTOCOL_V2_FILE_CHUNK_SIZE)
+        self.fw_chunk_spin.setRange(16, 2048)
         self.fw_chunk_spin.setSingleStep(64)
-        self.fw_chunk_spin.setValue(_PROTOCOL_V2_FILE_CHUNK_SIZE)
-        self.lbl_chunk_mtu.setText(
-            f"(MTU {mtu}, chunk max {_PROTOCOL_V2_FILE_CHUNK_SIZE} B)"
-        )
+        self.fw_chunk_spin.setValue(2048)
+        self.lbl_chunk_mtu.setText(f"(MTU {mtu}, chunk max 2048 B)")
 
     def _on_connection_done(self, success: bool, msg: str):
         self._log(msg)
@@ -1002,6 +1159,9 @@ class BLEToolWindow(QMainWindow):
             self.btn_disconnect.setEnabled(True)
             self.btn_ping.setEnabled(True)
             self.btn_fw_send.setEnabled(True)
+            self.btn_reboot.setEnabled(True)
+            self.btn_fwu_send.setEnabled(True)
+            self.btn_fws_query.setEnabled(True)
             if HAS_DBUS:
                 self.btn_pair.setEnabled(True)
         else:
@@ -1242,7 +1402,7 @@ class BLEToolWindow(QMainWindow):
                     char.setText(2, value_str)
                     return
 
-    # ---- Ping (Protocol V2) ------------------------------------------------
+    # ---- Ping (Proto V0) --------------------------------------------------
 
     def _on_ping(self):
         if not self._client:
@@ -1285,21 +1445,17 @@ class BLEToolWindow(QMainWindow):
                     return
 
                 try:
-                    rx_data = await self._read_protocol_v2_frame(response_queue, timeout=5.0)
+                    rx_data = await asyncio.wait_for(response_queue.get(), timeout=5.0)
                 except asyncio.TimeoutError:
                     self.log_signal.emit("Ping: timeout — no response received.")
                     self.ping_result_signal.emit(False, "Timeout")
-                    return
-                except ValueError as exc:
-                    self.log_signal.emit(f"Ping: malformed Protocol V2 frame in response: {exc}")
-                    self.ping_result_signal.emit(False, "Bad frame")
                     return
 
                 self.log_signal.emit(f"Ping RX ({len(rx_data)}B): {rx_data.hex(' ')}")
 
                 payload = parse_proto_frame(rx_data)
                 if payload is None:
-                    self.log_signal.emit("Ping: malformed Protocol V2 frame in response.")
+                    self.log_signal.emit("Ping: malformed Proto V0 frame in response.")
                     self.ping_result_signal.emit(False, "Bad frame")
                     return
 
@@ -1340,7 +1496,223 @@ class BLEToolWindow(QMainWindow):
         self.lbl_ping_result.setText(f'<span style="color:{color}">{text}</span>')
         self.btn_ping.setEnabled(True)
 
-    # ---- File I/O (Protocol V2) ---------------------------------------------
+    # ---- Generic single-shot pb command (Reboot, FW Update, ...) -----------
+
+    def _send_pb_command(self, msg_type: int, pb_payload: bytes,
+                         result_signal: pyqtSignal, *,
+                         timeout: float = 5.0,
+                         label: str = "Command",
+                         extra_decoders: dict | None = None) -> bool:
+        """Send a Proto V0 / pb command and emit (success, text) on *result_signal*.
+
+        Returns False synchronously if the request could not be dispatched
+        (no client / no write characteristic / no notify char in service);
+        otherwise the asynchronous result is delivered via *result_signal*.
+
+        *extra_decoders* maps  rx_msg_type -> callable(pb_bytes) -> str  for
+        commands whose success response is not a generic  Success  message
+        (e.g. DevFirmwareUpdateStatus).  When the rx msg type matches, the
+        decoder's return string is emitted with success=True.
+        """
+        if not self._client:
+            self._log(f"{label}: not connected.")
+            return False
+
+        uuid = self.write_char_combo.currentData()
+        if not uuid:
+            self._log(f"{label}: no write characteristic selected.")
+            return False
+
+        notify_uuid = self._fio_find_notify_uuid(uuid)
+        if not notify_uuid:
+            self._log(f"{label}: no notify characteristic in same service — "
+                      "cannot receive ACK.")
+            return False
+
+        frame = build_pb_frame(msg_type, pb_payload, router=1)
+        self._log(f"{label} TX → {uuid}  ({len(frame)}B): {frame.hex(' ')}")
+
+        loop = self._async._loop
+
+        async def _run():
+            queue: asyncio.Queue[bytes] = asyncio.Queue()
+
+            def _notify_cb(handle, data: bytearray):
+                loop.call_soon_threadsafe(queue.put_nowait, bytes(data))
+
+            try:
+                await self._client.start_notify(notify_uuid, _notify_cb)
+                await self._client.write_gatt_char(uuid, frame, response=False)
+
+                try:
+                    rx = await asyncio.wait_for(queue.get(), timeout=timeout)
+                except asyncio.TimeoutError:
+                    self.log_signal.emit(f"{label}: timeout — no response.")
+                    result_signal.emit(False, "Timeout")
+                    return
+
+                self.log_signal.emit(f"{label} RX ({len(rx)}B): {rx.hex(' ')}")
+
+                payload = parse_proto_frame(rx)
+                if payload is None:
+                    result_signal.emit(False, "Bad frame")
+                    return
+                parsed = parse_pb_response(payload)
+                if parsed is None:
+                    result_signal.emit(False, "Bad payload")
+                    return
+
+                rx_type, pb = parsed
+                rx_name = _PB_MSG_NAMES.get(rx_type, f"Unknown({rx_type})")
+                if extra_decoders and rx_type in extra_decoders:
+                    try:
+                        decoded = extra_decoders[rx_type](pb)
+                    except Exception as exc:
+                        self.log_signal.emit(
+                            f"{label} decode error for {rx_name}: {exc}")
+                        result_signal.emit(False, f"Decode error: {exc}")
+                        return
+                    self.log_signal.emit(
+                        f"{label} OK  msg_type={rx_type} ({rx_name})  "
+                        f"response={decoded}")
+                    result_signal.emit(True, decoded)
+                elif rx_type == _PB_MSG_TYPE_SUCCESS:
+                    decoded = pb_decode_success(pb)
+                    self.log_signal.emit(
+                        f"{label} OK  msg_type={rx_type} ({rx_name})  "
+                        f'response="{decoded}"')
+                    result_signal.emit(True, f'Success: "{decoded}"')
+                elif rx_type == _PB_MSG_TYPE_FAILURE:
+                    code, decoded = pb_decode_failure(pb)
+                    self.log_signal.emit(
+                        f"{label} FAIL  msg_type={rx_type} ({rx_name})  "
+                        f'code={code}  "{decoded}"')
+                    result_signal.emit(False, f'Failure code={code}: "{decoded}"')
+                else:
+                    self.log_signal.emit(
+                        f"{label} unexpected msg_type={rx_type} ({rx_name})")
+                    result_signal.emit(
+                        False, f"Unexpected msg_type={rx_type} ({rx_name})")
+
+            except Exception as exc:
+                self.log_signal.emit(f"{label} error: {exc}")
+                result_signal.emit(False, f"Error: {exc}")
+            finally:
+                try:
+                    await self._client.stop_notify(notify_uuid)
+                except Exception:
+                    pass
+
+        self._async.run(_run())
+        return True
+
+    # ---- Reboot -----------------------------------------------------------
+
+    def _on_reboot(self):
+        rt = self.reboot_type_combo.currentData()
+        rt_name = _REBOOT_TYPE_NAMES.get(rt, str(rt))
+
+        # Confirmation – reboot is destructive enough to warrant a prompt.
+        reply = QMessageBox.question(
+            self, "Confirm Reboot",
+            f"Reboot device into {rt_name} mode?\n\n"
+            "The BLE connection will drop.",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if reply != QMessageBox.Yes:
+            return
+
+        pb_payload = pb_encode_reboot(rt)
+        self.lbl_reboot_result.setText(f"Sending Reboot ({rt_name})…")
+        self.btn_reboot.setEnabled(False)
+        ok = self._send_pb_command(
+            _PB_MSG_TYPE_REBOOT, pb_payload,
+            self.reboot_result_signal, timeout=5.0,
+            label=f"Reboot[{rt_name}]")
+        if not ok:
+            self.btn_reboot.setEnabled(True)
+            self.lbl_reboot_result.setText("")
+
+    def _on_reboot_result(self, success: bool, text: str):
+        color = "#2ecc71" if success else "#e74c3c"
+        self.lbl_reboot_result.setText(f'<span style="color:{color}">{text}</span>')
+        # Re-enable only if still connected (device may have dropped after Success).
+        self.btn_reboot.setEnabled(self._client is not None)
+
+    # ---- Firmware Update ---------------------------------------------------
+
+    def _on_fw_update(self):
+        target_id = self.fwu_target_combo.currentData()
+        target_name = _FW_TARGET_NAMES.get(target_id, str(target_id))
+        path = self.fwu_path.text().strip()
+        if not path:
+            self._log("FW Update: device path is empty.")
+            return
+        reboot = self.fwu_reboot_chk.isChecked()
+
+        pb_payload = pb_encode_firmware_update([(target_id, path)], reboot)
+        self.lbl_fwu_result.setText(
+            f"Updating {target_name} from {path} (reboot={reboot})…")
+        self.btn_fwu_send.setEnabled(False)
+        # Firmware install can take a while – use a longer timeout.
+        ok = self._send_pb_command(
+            _PB_MSG_TYPE_FIRMWARE_UPDATE, pb_payload,
+            self.fw_update_result_signal, timeout=60.0,
+            label=f"FwUpdate[{target_name}]")
+        if not ok:
+            self.btn_fwu_send.setEnabled(True)
+            self.lbl_fwu_result.setText("")
+
+    def _on_fw_update_result(self, success: bool, text: str):
+        color = "#2ecc71" if success else "#e74c3c"
+        self.lbl_fwu_result.setText(f'<span style="color:{color}">{text}</span>')
+        self.btn_fwu_send.setEnabled(self._client is not None)
+
+    # ---- Firmware Update Status (DevGetFirmwareUpdateStatus) ---------------
+
+    @staticmethod
+    def _format_fw_update_status(pb: bytes) -> str:
+        entries = pb_decode_firmware_update_status(pb)
+        if not entries:
+            return "FirmwareUpdateStatus: (no targets)"
+        lines = ["FirmwareUpdateStatus:"]
+        for e in entries:
+            tid = e["target_id"]
+            st = e["status"]
+            t_name = _FW_TARGET_NAMES.get(tid, f"target {tid}")
+            s_name = _FW_UPDATE_STATUS_NAMES.get(st, f"status {st}")
+            lines.append(f"  • {t_name} ({tid}) → {s_name} ({st})")
+        return "\n".join(lines)
+
+    def _on_fw_status(self):
+        pb_payload = pb_encode_get_firmware_update_status()
+        self.fws_result_text.setPlainText("Querying…")
+        self.btn_fws_query.setEnabled(False)
+        ok = self._send_pb_command(
+            _PB_MSG_TYPE_GET_FIRMWARE_UPDATE_STATUS, pb_payload,
+            self.fw_status_result_signal, timeout=5.0,
+            label="GetFwUpdateStatus",
+            extra_decoders={
+                _PB_MSG_TYPE_FIRMWARE_UPDATE_STATUS: self._format_fw_update_status,
+            })
+        if not ok:
+            self.btn_fws_query.setEnabled(True)
+            self.fws_result_text.clear()
+
+    def _on_fw_status_result(self, success: bool, text: str):
+        self.fws_result_text.setPlainText(text)
+        if not success:
+            self.fws_result_text.setStyleSheet(
+                "QTextEdit { background: #1a1a1a; color: #e74c3c; "
+                "border: 1px solid #e74c3c; border-radius: 4px; "
+                "font-family: monospace; font-size: 11px; }")
+        else:
+            self.fws_result_text.setStyleSheet(
+                "QTextEdit { background: #1a1a1a; color: #2ecc71; "
+                "border: 1px solid #2ecc71; border-radius: 4px; "
+                "font-family: monospace; font-size: 11px; }")
+        self.btn_fws_query.setEnabled(self._client is not None)
+
+    # ---- File I/O (Proto V0) ------------------------------------------------
 
     def _fio_uuid(self) -> str | None:
         uuid = self.write_char_combo.currentData()
@@ -1373,21 +1745,6 @@ class BLEToolWindow(QMainWindow):
                 return notify_uuid
         return None
 
-    async def _read_protocol_v2_frame(self, queue: asyncio.Queue,
-                                      timeout: float = 3.0) -> bytes:
-        assembler = ProtocolV2FrameAssembler()
-        loop = asyncio.get_running_loop()
-        deadline = loop.time() + timeout
-
-        while True:
-            remaining = deadline - loop.time()
-            if remaining <= 0:
-                raise asyncio.TimeoutError
-            chunk = await asyncio.wait_for(queue.get(), timeout=remaining)
-            frames = assembler.push(chunk)
-            if frames:
-                return frames[0]
-
     async def _fio_transact(self, char, frame: bytes,
                             queue: asyncio.Queue, timeout: float = 3.0,
                             *, frag_size: int = 244,
@@ -1408,7 +1765,7 @@ class BLEToolWindow(QMainWindow):
             for i in range(0, len(frame), frag_size):
                 await self._client.write_gatt_char(
                     char, frame[i:i + frag_size], response=False)
-        return await self._read_protocol_v2_frame(queue, timeout=timeout)
+        return await asyncio.wait_for(queue.get(), timeout=timeout)
 
     def _fio_parse_response(self, rx: bytes) -> tuple[int, bytes] | None:
         payload = parse_proto_frame(rx)
@@ -1647,6 +2004,12 @@ class BLEToolWindow(QMainWindow):
         self.lbl_ping_result.setText("")
         self.write_char_combo.clear()
         self.btn_fw_send.setEnabled(False)
+        self.btn_reboot.setEnabled(False)
+        self.btn_fwu_send.setEnabled(False)
+        self.btn_fws_query.setEnabled(False)
+        self.lbl_reboot_result.setText("")
+        self.lbl_fwu_result.setText("")
+        self.fws_result_text.clear()
         self.fw_progress.setVisible(False)
         self.lbl_fw_status.setText("")
         self.fw_file_info.clear()

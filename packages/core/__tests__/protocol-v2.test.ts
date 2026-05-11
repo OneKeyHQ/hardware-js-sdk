@@ -1,11 +1,14 @@
 import JSZip from 'jszip';
+import { DevRebootType } from '@onekeyfe/hd-transport';
 
 import FileRead from '../src/api/FileRead';
 import FileWrite from '../src/api/FileWrite';
 import DevFirmwareUpdate from '../src/api/protocol-v2/DevFirmwareUpdate';
+import DevGetOnboardingStatus from '../src/api/protocol-v2/DevGetOnboardingStatus';
 import FirmwareUpdateV3 from '../src/api/FirmwareUpdateV3';
 import FirmwareUpdateV4 from '../src/api/FirmwareUpdateV4';
 import GetOnekeyFeatures from '../src/api/GetOnekeyFeatures';
+import { DataManager } from '../src/data-manager';
 import { UI_REQUEST } from '../src/events/ui-request';
 import { getProtocolV2Features, normalizeProtocolV2Features } from '../src/protocols/protocol-v2';
 
@@ -265,6 +268,131 @@ describe('Protocol V2 firmware update targets', () => {
     });
   });
 
+  test('runs Protocol V2 upload and install without rebooting to bootloader first', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    method.init();
+
+    (method as any).device = {
+      originalDescriptor: { id: 'ble-id', path: 'ble-path', protocolType: 'V2' },
+      features: { capabilities: [] },
+    };
+    (method as any).prepareResourceBinary = jest.fn().mockResolvedValue(null);
+    (method as any).prepareFirmwareAndBleBinary = jest.fn().mockResolvedValue([
+      {
+        fileName: 'ble-firmware.bin',
+        binary: new Uint8Array([1, 2, 3]).buffer,
+      },
+    ]);
+    (method as any).prepareBootloaderBinary = jest.fn().mockResolvedValue(null);
+    (method as any).executeProtocolV2Update = jest.fn().mockResolvedValue(undefined);
+    (method as any).exitProtocolV2BootloaderToNormal = jest.fn().mockResolvedValue(undefined);
+    (method as any).waitForProtocolV2FinalFeatures = jest.fn().mockResolvedValue({
+      bootloaderVersion: '0.2.0',
+      bleVersion: '4.5.6',
+      firmwareVersion: '1.2.3',
+    });
+    (method as any).protocolV2Reboot = jest.fn();
+    method.postTipMessage = jest.fn();
+
+    await method.run();
+
+    expect((method as any).executeProtocolV2Update).toHaveBeenCalledWith({
+      resourceBinary: null,
+      fwBinaryMap: [
+        {
+          fileName: 'ble-firmware.bin',
+          binary: expect.any(ArrayBuffer),
+        },
+      ],
+      bootloaderBinary: null,
+    });
+    expect((method as any).protocolV2Reboot).not.toHaveBeenCalledWith(DevRebootType.Bootloader);
+    expect(method.postTipMessage).not.toHaveBeenCalledWith('AutoRebootToBootloader');
+  });
+
+  test('reboots Protocol V2 firmware flow back to normal before final feature polling', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    method.postTipMessage = jest.fn();
+    (method as any).protocolV2Reboot = jest.fn().mockResolvedValue({
+      message: 'Device rebooted successfully',
+    });
+
+    await (method as any).exitProtocolV2BootloaderToNormal();
+
+    expect(method.postTipMessage).toHaveBeenCalledWith('SwitchFirmwareReconnectDevice');
+    expect((method as any).protocolV2Reboot).toHaveBeenCalledWith(DevRebootType.Normal);
+  });
+
+  test('treats iOS BLE RxError 6 during Protocol V2 reboot as expected disconnect', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const typedCall = jest
+      .fn()
+      .mockRejectedValue(
+        new Error(
+          "The operation couldn't be completed. (MultiplatformBleAdapter.RxError error 6.)"
+        )
+      );
+
+    (method as any).device = {
+      getCommands: () => ({ typedCall }),
+    };
+
+    await expect((method as any).protocolV2Reboot(DevRebootType.Normal)).resolves.toEqual({
+      message: 'Device rebooted successfully',
+    });
+  });
+
+  test('continues Protocol V2 install polling through temporary expected V2 probe failures', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const typedCall = jest
+      .fn()
+      .mockRejectedValueOnce(
+        new Error(
+          'Device protocol mismatch: expected V2, but device did not respond to expected protocol'
+        )
+      )
+      .mockResolvedValueOnce({
+        type: 'DevFirmwareUpdateStatus',
+        message: {
+          targets: [{ target_id: 2, status: 0 }],
+        },
+      });
+    const reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
+
+    (method as any).device = {
+      getCommands: () => ({ typedCall }),
+    };
+    (method as any).reconnectProtocolV2Device = reconnectProtocolV2Device;
+    method.postProgressMessage = jest.fn();
+
+    await (method as any).waitForProtocolV2FirmwareUpdateComplete([
+      { target_id: 2, path: 'vol1:ble-firmware.bin' },
+    ]);
+
+    expect(reconnectProtocolV2Device).toHaveBeenCalledTimes(1);
+    expect(typedCall).toHaveBeenCalledTimes(2);
+  });
+
   test('passes resource, bootloader, BLE, SE and app files to DevFirmwareUpdate targets', async () => {
     const resourceZip = new JSZip();
     resourceZip.file('icons/home.png', new Uint8Array([1, 2, 3]));
@@ -307,21 +435,21 @@ describe('Protocol V2 firmware update targets', () => {
       ],
     });
 
-    expect((method as any).protocolV2CreateFolder).toHaveBeenCalledWith('vol0:res/');
+    expect((method as any).protocolV2CreateFolder).toHaveBeenCalledWith('vol1:res/');
     expect(writtenPaths).toEqual([
-      'vol0:res/home.png',
-      'vol0:bootloader.bin',
-      'vol0:ble-firmware.bin',
-      'vol0:se1-firmware.bin',
-      'vol0:firmware.bin',
+      'vol1:res/home.png',
+      'vol1:bootloader.bin',
+      'vol1:ble-firmware.bin',
+      'vol1:se1-firmware.bin',
+      'vol1:firmware.bin',
     ]);
     expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenCalledWith({
       targets: [
-        { target_id: 10, path: 'vol0:res/' },
-        { target_id: 1, path: 'vol0:bootloader.bin' },
-        { target_id: 2, path: 'vol0:ble-firmware.bin' },
-        { target_id: 3, path: 'vol0:se1-firmware.bin' },
-        { target_id: 0, path: 'vol0:firmware.bin' },
+        { target_id: 10, path: 'vol1:res/' },
+        { target_id: 1, path: 'vol1:bootloader.bin' },
+        { target_id: 2, path: 'vol1:ble-firmware.bin' },
+        { target_id: 3, path: 'vol1:se1-firmware.bin' },
+        { target_id: 0, path: 'vol1:firmware.bin' },
       ],
     });
     expect((method as any).waitForProtocolV2FirmwareUpdateComplete).toHaveBeenCalled();
@@ -365,6 +493,48 @@ describe('Protocol V2 firmware update targets', () => {
     expect(writePayloads.map(payload => payload.file.data.byteLength)).toEqual([4096, 1]);
     expect(writePayloads.map(payload => payload.overwrite)).toEqual([true, false]);
     expect(writePayloads.every(payload => payload.append === false)).toBe(true);
+  });
+
+  test('caps native BLE firmware upload chunks below the WebUSB limit', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const typedCall = jest.fn(
+      (
+        _name: string,
+        _resType: string,
+        params: { file: { offset: number; data: { byteLength: number } } }
+      ) =>
+        Promise.resolve({
+          type: 'FilesystemFile',
+          message: {
+            processed_byte: params.file.offset + params.file.data.byteLength,
+          },
+        })
+    );
+
+    (method as any).params = {
+      platform: 'native',
+      chunkSize: 4096,
+    };
+    (method as any).device = {
+      getCommands: () => ({ typedCall }),
+    };
+    method.postProgressMessage = jest.fn();
+
+    await (method as any).protocolV2CommonUpdateProcess({
+      payload: new Uint8Array(1801).buffer,
+      filePath: 'vol1:ble-firmware.bin',
+      processedSize: 0,
+      totalSize: 1801,
+    });
+
+    const writePayloads = typedCall.mock.calls.map(call => call[2]);
+    expect(writePayloads.map(payload => payload.file.offset)).toEqual([0, 1800]);
+    expect(writePayloads.map(payload => payload.file.data.byteLength)).toEqual([1800, 1]);
   });
 
   test('consumes Protocol V2 install progress before final update success', async () => {
@@ -448,6 +618,38 @@ describe('Protocol V2 firmware update method', () => {
       targets: [{ target_id: 0, status: 1 }],
     });
     expect(typedCall.mock.calls[0][1]).toEqual(['Success', 'DevFirmwareUpdateStatus']);
+  });
+});
+
+describe('Protocol V2 onboarding status method', () => {
+  test('returns DevOnboardingStatus from low-level status query', async () => {
+    const method = new DevGetOnboardingStatus({
+      id: 1,
+      payload: {
+        method: 'devGetOnboardingStatus',
+      },
+    });
+    method.init();
+
+    const typedCall = jest.fn().mockResolvedValue({
+      type: 'DevOnboardingStatus',
+      message: {
+        page_index: 2,
+        page_count: 5,
+        page_name: 'backup',
+      },
+    });
+
+    (method as any).device = {
+      commands: { typedCall },
+    };
+
+    await expect(method.run()).resolves.toEqual({
+      page_index: 2,
+      page_count: 5,
+      page_name: 'backup',
+    });
+    expect(typedCall).toHaveBeenCalledWith('DevGetOnboardingStatus', 'DevOnboardingStatus', {});
   });
 });
 
@@ -560,6 +762,36 @@ describe('Protocol V2 file write method', () => {
         elapsedMs: expect.any(Number),
       }),
     });
+  });
+
+  test('uses the BLE chunk limit by default in BLE environments', async () => {
+    const getSettingsSpy = jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native');
+    const data = new Uint8Array(1801);
+    const typedCall = jest.fn().mockResolvedValue({ message: {} });
+    const method = new FileWrite({
+      id: 1,
+      payload: {
+        method: 'fileWrite',
+        path: 'vol1:test.bin',
+        offset: 0,
+        totalSize: 1801,
+        data,
+      },
+    });
+    (method as any).device = { commands: { typedCall } };
+    method.postMessage = jest.fn();
+
+    try {
+      method.init();
+      await method.run();
+    } finally {
+      getSettingsSpy.mockRestore();
+    }
+
+    expect(typedCall).toHaveBeenCalledTimes(2);
+    expect(typedCall.mock.calls[0][2].file.data.byteLength).toBe(1800);
+    expect(typedCall.mock.calls[1][2].file.offset).toBe(1800);
+    expect(typedCall.mock.calls[1][2].file.data.byteLength).toBe(1);
   });
 });
 

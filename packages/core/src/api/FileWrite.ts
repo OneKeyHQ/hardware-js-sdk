@@ -1,8 +1,12 @@
-import { PROTOCOL_V2_FILE_CHUNK_SIZE } from '@onekeyfe/hd-transport';
+import {
+  PROTOCOL_V2_BLE_FILE_CHUNK_SIZE,
+  PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE,
+} from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { BaseMethod } from './BaseMethod';
 import { UI_REQUEST, createUiMessage } from '../events/ui-request';
+import { DataManager } from '../data-manager';
 
 export type FileWriteParams = {
   path: string;
@@ -17,6 +21,14 @@ export type FileWriteParams = {
 };
 
 const MIN_FILE_CHUNK_SIZE = 64;
+
+function getProtocolV2FileChunkLimit() {
+  const env = DataManager.getSettings('env');
+  if (env && DataManager.isBleConnect(env)) {
+    return PROTOCOL_V2_BLE_FILE_CHUNK_SIZE;
+  }
+  return PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE;
+}
 
 async function dataToUint8Array(data: FileWriteParams['data'] | Blob): Promise<Uint8Array> {
   if (typeof data === 'string') {
@@ -38,13 +50,10 @@ async function dataToUint8Array(data: FileWriteParams['data'] | Blob): Promise<U
   throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Unsupported FilesystemFileWrite data');
 }
 
-function normalizeChunkSize(value: unknown): number {
+function normalizeChunkSize(value: unknown, maxChunkSize: number): number {
   const numeric = Number(value);
-  if (!Number.isFinite(numeric) || numeric <= 0) return PROTOCOL_V2_FILE_CHUNK_SIZE;
-  return Math.min(
-    Math.max(Math.floor(numeric), MIN_FILE_CHUNK_SIZE),
-    PROTOCOL_V2_FILE_CHUNK_SIZE
-  );
+  if (!Number.isFinite(numeric) || numeric <= 0) return maxChunkSize;
+  return Math.min(Math.max(Math.floor(numeric), MIN_FILE_CHUNK_SIZE), maxChunkSize);
 }
 
 function getConfirmedProgress(
@@ -102,7 +111,10 @@ export default class FileWrite extends BaseMethod<FileWriteParams> {
       );
     }
 
-    const chunkSize = normalizeChunkSize(this.params.chunkSize ?? this.params.chunkLen);
+    const chunkSize = normalizeChunkSize(
+      this.params.chunkSize ?? this.params.chunkLen,
+      getProtocolV2FileChunkLimit()
+    );
     const overwrite = this.params.overwrite ?? false;
     const append = this.params.append ?? false;
     let written = 0;
