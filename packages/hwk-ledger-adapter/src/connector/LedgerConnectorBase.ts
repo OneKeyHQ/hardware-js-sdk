@@ -302,6 +302,21 @@ export class LedgerConnectorBase implements IConnector {
       descriptor: d,
       connectId: this._resolveConnectId(d),
     }));
+    debugLog(
+      '[DMK] connector.searchDevices() raw descriptors:',
+      resolvedDescriptors.map(({ descriptor: d, connectId }) => ({
+        id: d?.path,
+        path: d?.path,
+        connectId,
+        deviceName: d?.name,
+        'device.name': d?.bleName,
+        localName: d?.localName,
+        bleName: d?.bleName,
+        model: d?.type,
+        transport: d?.transport,
+        rssi: d?.rssi,
+      }))
+    );
     const bleConnectIdCounts = new Map<string, number>();
     for (const item of resolvedDescriptors) {
       if (isLedgerBleDescriptor(this.connectionType, item.descriptor)) {

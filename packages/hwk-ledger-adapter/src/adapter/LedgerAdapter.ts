@@ -211,6 +211,17 @@ export class LedgerAdapter implements IHardwareWallet {
 
     debugLog(`[LedgerAdapter] searchDevices() entry, cacheBefore=${this._discoveredDevices.size}`);
     const devices = await this.connector.searchDevices();
+    debugLog(
+      '[DMK] adapter.searchDevices raw:',
+      devices.map(device => ({
+        id: device?.deviceId,
+        deviceId: device?.deviceId,
+        connectId: device?.connectId,
+        deviceName: device?.name,
+        'device.name': device?.name,
+        model: device?.model,
+      }))
+    );
 
     // Replace cache with this round's raw result. DMK paths used as
     // connectId on USB are ephemeral (new UUID after each replug), so
