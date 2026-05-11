@@ -4,7 +4,7 @@
   "private": true,
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
-    "start": "EXPO_USE_STATIC=0 expo start",
+    "start": "EXPO_USE_STATIC=0 node ./node_modules/.bin/expo start",
     "android": "expo run:android --device",
     "ios": "expo run:ios --device",
     "web": "expo start --web",

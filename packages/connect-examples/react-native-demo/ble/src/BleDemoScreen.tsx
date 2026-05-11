@@ -20,6 +20,11 @@ import { Buffer } from 'buffer';
 
 import HardwareBLESDK from '@onekeyfe/hd-ble-sdk';
 import {
+  configureProtocolV2BleTuning,
+  resetProtocolV2BleTuning,
+  type ProtocolV2BleTuning,
+} from '@onekeyfe/hd-transport-react-native';
+import {
   DEVICE_EVENT,
   LOG_EVENT,
   UI_EVENT,
@@ -37,6 +42,14 @@ const PRO2_DEMO_FILE_PATH = 'vol0:rn-demo.txt';
 const PRO2_DEMO_DIR_PATH = 'vol0:rn-demo-dir';
 const PRO2_FIRMWARE_STAGING_PATH = 'vol1:ble-firmware.bin';
 const PRO2_BLE_CHUNK_SIZE = 1800;
+const DEFAULT_IOS_PACKET_LENGTH = 128;
+const DEFAULT_ANDROID_PACKET_LENGTH = 192;
+const DEFAULT_IOS_BURST_SIZE = 4;
+const DEFAULT_ANDROID_BURST_SIZE = 6;
+const DEFAULT_IOS_PAUSE_MS = 6;
+const DEFAULT_ANDROID_PAUSE_MS = 2;
+const DEFAULT_IOS_FLUSH_DELAY_MS = 20;
+const DEFAULT_ANDROID_FLUSH_DELAY_MS = 8;
 
 type LogLine = { ts: string; level: 'info' | 'warn' | 'error' | 'debug'; msg: string };
 type BusyAction = null | string;
@@ -46,6 +59,7 @@ type FirmwareProgressState = {
   transferredBytes?: number;
   totalBytes?: number;
   rateBytesPerSecond?: number;
+  elapsedMs?: number;
 };
 type FirmwareResultState = {
   bootloaderVersion?: string;
@@ -73,6 +87,101 @@ type Pro2MethodGroup = {
   title: string;
   methods: Pro2MethodAction[];
 };
+type SpeedTestProfile = {
+  key: string;
+  label: string;
+  chunkSize: number;
+  tuning: ProtocolV2BleTuning;
+  note: string;
+};
+type SpeedTestResult = {
+  key: string;
+  label: string;
+  status: 'running' | 'success' | 'failed';
+  chunkSize: number;
+  packetLength: number;
+  burstSize: number;
+  pauseMs: number;
+  flushDelayMs: number;
+  writeWithResponse: boolean;
+  totalDurationMs?: number;
+  transferDurationMs?: number;
+  rateBytesPerSecond?: number;
+  transferredBytes?: number;
+  error?: string;
+};
+
+const SPEED_TEST_PROFILES: SpeedTestProfile[] = [
+  {
+    key: 'safe-900',
+    label: 'Safe 900B',
+    chunkSize: 900,
+    tuning: {},
+    note: 'Lower file chunk, default transport pacing',
+  },
+  {
+    key: 'balanced-1200',
+    label: 'Balanced 1200B',
+    chunkSize: 1200,
+    tuning: {},
+    note: 'Middle chunk, good for stability comparison',
+  },
+  {
+    key: 'default-1800',
+    label: 'Default 1800B',
+    chunkSize: PRO2_BLE_CHUNK_SIZE,
+    tuning: {},
+    note: 'Current SDK BLE max chunk and default transport pacing',
+  },
+  {
+    key: 'faster-pacing',
+    label: 'Faster pacing',
+    chunkSize: PRO2_BLE_CHUNK_SIZE,
+    tuning: {
+      iosPacketLength: 160,
+      androidPacketLength: 220,
+      highVolumeWriteBurstSize: 6,
+      highVolumeWritePauseMs: 3,
+      highVolumeWriteFlushDelayMs: 10,
+    },
+    note: 'Larger BLE packets and shorter pauses',
+  },
+  {
+    key: 'aggressive-pacing',
+    label: 'Aggressive',
+    chunkSize: PRO2_BLE_CHUNK_SIZE,
+    tuning: {
+      iosPacketLength: 192,
+      androidPacketLength: 244,
+      highVolumeWriteBurstSize: 8,
+      highVolumeWritePauseMs: 2,
+      highVolumeWriteFlushDelayMs: 8,
+    },
+    note: 'Use only when faster pacing is stable',
+  },
+  {
+    key: 'max-packet-244',
+    label: 'Max packet 244',
+    chunkSize: PRO2_BLE_CHUNK_SIZE,
+    tuning: {
+      iosPacketLength: 244,
+      androidPacketLength: 244,
+      highVolumeWriteBurstSize: 8,
+      highVolumeWritePauseMs: 2,
+      highVolumeWriteFlushDelayMs: 8,
+    },
+    note: 'Observed stable upper payload on iOS Pro2 BLE diagnostics',
+  },
+  {
+    key: 'with-response',
+    label: 'WithResponse baseline',
+    chunkSize: PRO2_BLE_CHUNK_SIZE,
+    tuning: {
+      highVolumeWriteWithResponse: true,
+    },
+    note: 'Slower ACK-per-packet baseline for comparison',
+  },
+];
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F3F4F6' },
@@ -93,6 +202,7 @@ const styles = StyleSheet.create({
   },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   actionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 },
+  profileGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
   btn: {
     marginTop: 10,
     alignSelf: 'flex-start',
@@ -103,6 +213,23 @@ const styles = StyleSheet.create({
   },
   btnMuted: { backgroundColor: '#4B5563' },
   btnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
+  profileBtn: {
+    width: '48%',
+    minWidth: 140,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    backgroundColor: '#FFFFFF',
+    padding: 10,
+  },
+  profileBtnActive: {
+    borderColor: '#2563EB',
+    backgroundColor: '#EFF6FF',
+  },
+  profileLabel: { color: '#111827', fontSize: 13, fontWeight: '700' },
+  profileLabelActive: { color: '#1D4ED8' },
+  profileNote: { marginTop: 4, color: '#6B7280', fontSize: 11, lineHeight: 15 },
+  profileMeta: { marginTop: 4, color: '#374151', fontSize: 11, lineHeight: 15 },
   listItem: {
     paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -210,6 +337,49 @@ const formatDuration = (durationMs?: number) => {
   return `${(value / 1000).toFixed(2)}s`;
 };
 
+const getPlatformPacketLength = (profile: SpeedTestProfile) =>
+  Platform.OS === 'ios'
+    ? profile.tuning.iosPacketLength ?? DEFAULT_IOS_PACKET_LENGTH
+    : profile.tuning.androidPacketLength ?? DEFAULT_ANDROID_PACKET_LENGTH;
+
+const getPlatformBurstSize = (profile: SpeedTestProfile) =>
+  profile.tuning.highVolumeWriteBurstSize ??
+  (Platform.OS === 'ios' ? DEFAULT_IOS_BURST_SIZE : DEFAULT_ANDROID_BURST_SIZE);
+
+const getPlatformPauseMs = (profile: SpeedTestProfile) =>
+  profile.tuning.highVolumeWritePauseMs ??
+  (Platform.OS === 'ios' ? DEFAULT_IOS_PAUSE_MS : DEFAULT_ANDROID_PAUSE_MS);
+
+const getPlatformFlushDelayMs = (profile: SpeedTestProfile) =>
+  profile.tuning.highVolumeWriteFlushDelayMs ??
+  (Platform.OS === 'ios' ? DEFAULT_IOS_FLUSH_DELAY_MS : DEFAULT_ANDROID_FLUSH_DELAY_MS);
+
+const getProfileMeta = (profile: SpeedTestProfile) =>
+  `chunk ${profile.chunkSize}B · packet ${getPlatformPacketLength(profile)}B · burst ${getPlatformBurstSize(
+    profile
+  )} · pause ${getPlatformPauseMs(profile)}ms · flush ${getPlatformFlushDelayMs(profile)}ms${
+    profile.tuning.highVolumeWriteWithResponse ? ' · withResponse' : ''
+  }`;
+
+const createSpeedTestResult = (
+  profile: SpeedTestProfile,
+  status: SpeedTestResult['status'],
+  details: Partial<SpeedTestResult> = {}
+): SpeedTestResult => ({
+  key: profile.key,
+  label: profile.label,
+  status,
+  chunkSize: profile.chunkSize,
+  packetLength: getPlatformPacketLength(profile),
+  burstSize: getPlatformBurstSize(profile),
+  pauseMs: getPlatformPauseMs(profile),
+  flushDelayMs: getPlatformFlushDelayMs(profile),
+  writeWithResponse: !!profile.tuning.highVolumeWriteWithResponse,
+  ...details,
+});
+
+const delay = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+
 const summarizeUiPayload = (payload: any) => {
   if (!payload) return undefined;
   if (payload.progress !== undefined) {
@@ -291,12 +461,15 @@ export const BleDemoScreen = () => {
   const [firmwareTimings, setFirmwareTimings] = useState<FirmwareTiming[]>([]);
   const [firmwareTimingSummary, setFirmwareTimingSummary] =
     useState<FirmwareTimingSummary | null>(null);
+  const [selectedSpeedProfileKey, setSelectedSpeedProfileKey] = useState('default-1800');
+  const [speedTestResults, setSpeedTestResults] = useState<SpeedTestResult[]>([]);
   const [logs, setLogs] = useState<LogLine[]>([]);
 
   const sdkRef = useRef<CoreApi | null>(null);
   const bleRef = useRef<BlePlxManager | null>(null);
   const lastProgressLogAtRef = useRef(0);
   const lastSdkLogAtRef = useRef(0);
+  const firmwareProgressRef = useRef<FirmwareProgressState | null>(null);
   const firmwareStageRef = useRef<{
     totalStartAt?: number;
     activeKey?: string;
@@ -386,7 +559,9 @@ export const BleDemoScreen = () => {
         transferredBytes: payload.transferredBytes,
         totalBytes: payload.totalBytes,
         rateBytesPerSecond: payload.rateBytesPerSecond,
+        elapsedMs: payload.elapsedMs,
       };
+      firmwareProgressRef.current = nextProgress;
       setFirmwareProgress(nextProgress);
       if (nextProgress.progressType && FIRMWARE_PROGRESS_STATUS[nextProgress.progressType]) {
         setFirmwareStatus(FIRMWARE_PROGRESS_STATUS[nextProgress.progressType]);
@@ -819,21 +994,43 @@ export const BleDemoScreen = () => {
     return arrayBufferFromBase64(base64);
   }, []);
 
-  const runBleFirmwareUpdate = useCallback(async () => {
+  const selectedSpeedProfile = useMemo(
+    () =>
+      SPEED_TEST_PROFILES.find(profile => profile.key === selectedSpeedProfileKey) ??
+      SPEED_TEST_PROFILES[0],
+    [selectedSpeedProfileKey]
+  );
+
+  const upsertSpeedTestResult = useCallback((result: SpeedTestResult) => {
+    setSpeedTestResults(prev => {
+      const filtered = prev.filter(item => item.key !== result.key);
+      return [result, ...filtered].slice(0, 20);
+    });
+  }, []);
+
+  const runBleFirmwareUpdate = useCallback(async (profile: SpeedTestProfile, batch = false) => {
     if (!sdkRef.current || !selected?.connectId) {
       Alert.alert('Tip', 'Please select a Pro2 device first');
-      return;
+      return createSpeedTestResult(profile, 'failed', { error: 'No selected Pro2 device' });
     }
 
+    const runStartedAt = Date.now();
     try {
-      setBusy('ble-firmware');
+      if (!batch) setBusy(`ble-firmware:${profile.key}`);
+      upsertSpeedTestResult(createSpeedTestResult(profile, 'running'));
+      configureProtocolV2BleTuning(profile.tuning);
+      firmwareProgressRef.current = null;
       firmwareStageRef.current = { totalStartAt: Date.now(), timings: [] };
       setFirmwareTimings([]);
       setFirmwareTimingSummary(null);
       setFirmwareProgress({ progress: 0, progressType: 'prepare' });
       setFirmwareResult(null);
-      setFirmwareStatus(`Loading ${PRO2_BLE_FIRMWARE_FILE_NAME}`);
-      appendLog('info', `Loading bundled BLE firmware: ${PRO2_BLE_FIRMWARE_FILE_NAME}`);
+      setFirmwareStatus(`Loading ${PRO2_BLE_FIRMWARE_FILE_NAME} (${profile.label})`);
+      appendLog('info', {
+        speedProfile: profile.label,
+        tuning: getProfileMeta(profile),
+        note: profile.note,
+      });
 
       startFirmwareStage('loadAsset', 'Load bundled asset');
       const bleBinary = await loadBundledBleFirmware();
@@ -841,24 +1038,35 @@ export const BleDemoScreen = () => {
       appendLog('info', {
         bleBinary: PRO2_BLE_FIRMWARE_FILE_NAME,
         size: formatBytes(bleBinary.byteLength),
-        chunkSize: PRO2_BLE_CHUNK_SIZE,
+        chunkSize: profile.chunkSize,
       });
 
-      setFirmwareStatus('Running firmwareUpdateV4');
+      setFirmwareStatus(`Running firmwareUpdateV4 (${profile.label})`);
       const res = await (sdkRef.current as any).firmwareUpdateV4(selected.connectId, {
         ...PROTOCOL_V2_PARAMS,
         platform: 'native',
         forcedUpdateRes: false,
         bleBinary,
-        chunkSize: PRO2_BLE_CHUNK_SIZE,
+        chunkSize: profile.chunkSize,
       });
       appendLog('info', { firmwareUpdateV4: res });
+
+      const transferStage = firmwareStageRef.current.timings.find(item => item.key === 'transfer');
+      const progressSnapshot = firmwareProgressRef.current;
 
       if (!res?.success) {
         setFirmwareStatus('BLE firmware update failed');
         finishFirmwareTimingSummary('failed');
-        appendLog('error', `BLE firmware update failed: ${res?.payload?.error || 'unknown'}`);
-        return;
+        const failedResult = createSpeedTestResult(profile, 'failed', {
+          totalDurationMs: Date.now() - runStartedAt,
+          transferDurationMs: transferStage?.durationMs,
+          rateBytesPerSecond: progressSnapshot?.rateBytesPerSecond,
+          transferredBytes: progressSnapshot?.transferredBytes,
+          error: res?.payload?.error || 'unknown',
+        });
+        upsertSpeedTestResult(failedResult);
+        appendLog('error', `BLE firmware update failed: ${failedResult.error}`);
+        return failedResult;
       }
 
       const versions = (res.payload || {}) as FirmwareResultState;
@@ -866,12 +1074,31 @@ export const BleDemoScreen = () => {
       setFirmwareProgress(prev => ({ ...(prev || {}), progress: 100 }));
       setFirmwareStatus('Normal mode ready');
       finishFirmwareTimingSummary('success');
+      const successResult = createSpeedTestResult(profile, 'success', {
+        totalDurationMs: Date.now() - runStartedAt,
+        transferDurationMs: transferStage?.durationMs,
+        rateBytesPerSecond: progressSnapshot?.rateBytesPerSecond,
+        transferredBytes: progressSnapshot?.transferredBytes,
+      });
+      upsertSpeedTestResult(successResult);
+      return successResult;
     } catch (e: any) {
       setFirmwareStatus('BLE firmware update error');
       appendLog('error', `firmwareUpdateV4 error: ${e?.message || e}`);
       finishFirmwareTimingSummary('failed');
+      const failedResult = createSpeedTestResult(profile, 'failed', {
+        totalDurationMs: Date.now() - runStartedAt,
+        rateBytesPerSecond: firmwareProgressRef.current?.rateBytesPerSecond,
+        transferredBytes: firmwareProgressRef.current?.transferredBytes,
+        error: e?.message || String(e),
+      });
+      upsertSpeedTestResult(failedResult);
+      return failedResult;
     } finally {
-      setBusy(null);
+      if (!batch) {
+        resetProtocolV2BleTuning();
+        setBusy(null);
+      }
     }
   }, [
     appendLog,
@@ -880,11 +1107,31 @@ export const BleDemoScreen = () => {
     loadBundledBleFirmware,
     selected?.connectId,
     startFirmwareStage,
+    upsertSpeedTestResult,
   ]);
 
   const onBleFirmwareUpdate = useCallback(() => {
-    void runBleFirmwareUpdate();
-  }, [runBleFirmwareUpdate]);
+    void runBleFirmwareUpdate(selectedSpeedProfile);
+  }, [runBleFirmwareUpdate, selectedSpeedProfile]);
+
+  const runSpeedMatrix = useCallback(async () => {
+    if (!sdkRef.current || !selected?.connectId) {
+      Alert.alert('Tip', 'Please select a Pro2 device first');
+      return;
+    }
+
+    try {
+      setBusy('speed-matrix');
+      setSpeedTestResults([]);
+      for (const profile of SPEED_TEST_PROFILES) {
+        await runBleFirmwareUpdate(profile, true);
+        await delay(3000);
+      }
+    } finally {
+      resetProtocolV2BleTuning();
+      setBusy(null);
+    }
+  }, [runBleFirmwareUpdate, selected?.connectId]);
 
   const clearLogs = useCallback(() => setLogs([]), []);
 
@@ -977,7 +1224,35 @@ export const BleDemoScreen = () => {
             {formatBytes(PRO2_BLE_FIRMWARE_FILE_SIZE)})
           </Text>
           <Text style={styles.hint}>
-            Target: TARGET_BT (2) · {PRO2_FIRMWARE_STAGING_PATH} · chunk: {PRO2_BLE_CHUNK_SIZE} B
+            Target: TARGET_BT (2) · {PRO2_FIRMWARE_STAGING_PATH}
+          </Text>
+          <Text style={styles.methodGroupTitle}>Speed Profiles</Text>
+          <View style={styles.profileGrid}>
+            {SPEED_TEST_PROFILES.map(profile => {
+              const selectedProfile = profile.key === selectedSpeedProfile.key;
+              return (
+                <TouchableOpacity
+                  key={profile.key}
+                  style={[styles.profileBtn, selectedProfile ? styles.profileBtnActive : null]}
+                  onPress={() => setSelectedSpeedProfileKey(profile.key)}
+                  disabled={!!busy}
+                >
+                  <Text
+                    style={[
+                      styles.profileLabel,
+                      selectedProfile ? styles.profileLabelActive : null,
+                    ]}
+                  >
+                    {profile.label}
+                  </Text>
+                  <Text style={styles.profileMeta}>{getProfileMeta(profile)}</Text>
+                  <Text style={styles.profileNote}>{profile.note}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <Text style={styles.hint}>
+            Selected: {selectedSpeedProfile.label} · {getProfileMeta(selectedSpeedProfile)}
           </Text>
           <TouchableOpacity
             style={styles.btn}
@@ -985,7 +1260,16 @@ export const BleDemoScreen = () => {
             disabled={actionDisabled}
           >
             <Text style={styles.btnText}>
-              {busy === 'ble-firmware' ? 'Updating...' : 'Update BLE Firmware'}
+              {String(busy).startsWith('ble-firmware') ? 'Updating...' : 'Run Selected Profile'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.btn, styles.btnMuted]}
+            onPress={() => void runSpeedMatrix()}
+            disabled={actionDisabled}
+          >
+            <Text style={styles.btnText}>
+              {busy === 'speed-matrix' ? 'Running Matrix...' : 'Run Matrix'}
             </Text>
           </TouchableOpacity>
           <View style={styles.progressOuter}>
@@ -1020,6 +1304,21 @@ export const BleDemoScreen = () => {
               {firmwareTimings.map(item => (
                 <Text key={`${item.key}-${item.startAt}`} style={styles.metaText}>
                   {item.label}: {formatDuration(item.durationMs)}
+                </Text>
+              ))}
+            </View>
+          ) : null}
+          {speedTestResults.length ? (
+            <View style={styles.metaBlock}>
+              <Text style={styles.metaText}>Speed Matrix:</Text>
+              {speedTestResults.map(item => (
+                <Text key={item.key} style={styles.metaText}>
+                  {item.label}: {item.status} · chunk {item.chunkSize}B · packet{' '}
+                  {item.packetLength}B · burst {item.burstSize} · pause {item.pauseMs}ms ·{' '}
+                  {formatBytes(item.rateBytesPerSecond)}/s · transfer{' '}
+                  {formatDuration(item.transferDurationMs)} · total{' '}
+                  {formatDuration(item.totalDurationMs)}
+                  {item.error ? ` · ${item.error}` : ''}
                 </Text>
               ))}
             </View>

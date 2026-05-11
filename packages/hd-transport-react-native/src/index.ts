@@ -111,6 +111,71 @@ const HIGH_VOLUME_WRITE_FLUSH_DELAY_MS = Platform.OS === 'ios' ? 20 : 8;
 
 const delay = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 
+export type ProtocolV2BleTuning = {
+  iosPacketLength?: number;
+  androidPacketLength?: number;
+  highVolumeWriteBurstSize?: number;
+  highVolumeWritePauseMs?: number;
+  highVolumeWriteFlushDelayMs?: number;
+  highVolumeWriteWithResponse?: boolean;
+};
+
+type ResolvedProtocolV2BleTuning = Required<ProtocolV2BleTuning>;
+
+const DEFAULT_PROTOCOL_V2_BLE_TUNING: ResolvedProtocolV2BleTuning = {
+  iosPacketLength: IOS_PACKET_LENGTH,
+  androidPacketLength: ANDROID_PACKET_LENGTH,
+  highVolumeWriteBurstSize: HIGH_VOLUME_WRITE_BURST_SIZE,
+  highVolumeWritePauseMs: HIGH_VOLUME_WRITE_PAUSE_MS,
+  highVolumeWriteFlushDelayMs: HIGH_VOLUME_WRITE_FLUSH_DELAY_MS,
+  highVolumeWriteWithResponse: false,
+};
+
+let protocolV2BleTuning: ResolvedProtocolV2BleTuning = { ...DEFAULT_PROTOCOL_V2_BLE_TUNING };
+
+const normalizePositiveInteger = (value: unknown, fallback: number) => {
+  const normalized = Number(value);
+  if (!Number.isFinite(normalized) || normalized <= 0) return fallback;
+  return Math.floor(normalized);
+};
+
+export function configureProtocolV2BleTuning(tuning: ProtocolV2BleTuning = {}) {
+  protocolV2BleTuning = {
+    iosPacketLength: normalizePositiveInteger(
+      tuning.iosPacketLength,
+      protocolV2BleTuning.iosPacketLength
+    ),
+    androidPacketLength: normalizePositiveInteger(
+      tuning.androidPacketLength,
+      protocolV2BleTuning.androidPacketLength
+    ),
+    highVolumeWriteBurstSize: normalizePositiveInteger(
+      tuning.highVolumeWriteBurstSize,
+      protocolV2BleTuning.highVolumeWriteBurstSize
+    ),
+    highVolumeWritePauseMs: normalizePositiveInteger(
+      tuning.highVolumeWritePauseMs,
+      protocolV2BleTuning.highVolumeWritePauseMs
+    ),
+    highVolumeWriteFlushDelayMs: normalizePositiveInteger(
+      tuning.highVolumeWriteFlushDelayMs,
+      protocolV2BleTuning.highVolumeWriteFlushDelayMs
+    ),
+    highVolumeWriteWithResponse:
+      tuning.highVolumeWriteWithResponse ?? protocolV2BleTuning.highVolumeWriteWithResponse,
+  };
+  Log?.debug('[ReactNativeBleTransport] Protocol V2 BLE tuning configured:', protocolV2BleTuning);
+}
+
+export function resetProtocolV2BleTuning() {
+  protocolV2BleTuning = { ...DEFAULT_PROTOCOL_V2_BLE_TUNING };
+  Log?.debug('[ReactNativeBleTransport] Protocol V2 BLE tuning reset:', protocolV2BleTuning);
+}
+
+export function getProtocolV2BleTuning() {
+  return { ...protocolV2BleTuning };
+}
+
 function inferProtocolTypeFromDeviceName(name?: string | null): ProtocolType | undefined {
   return /\bpro\s*2\b/i.test(name ?? '') ? 'V2' : undefined;
 }
@@ -1362,15 +1427,20 @@ export default class ReactNativeBleTransport {
     frame: Uint8Array,
     options?: { highVolume?: boolean; writeWithResponse?: boolean }
   ) {
-    const packetCapacity = Platform.OS === 'ios' ? IOS_PACKET_LENGTH : ANDROID_PACKET_LENGTH;
-    const shouldThrottle = !!options?.highVolume && !options?.writeWithResponse;
+    const tuning = getProtocolV2BleTuning();
+    const packetCapacity =
+      Platform.OS === 'ios' ? tuning.iosPacketLength : tuning.androidPacketLength;
+    const writeWithResponse =
+      !!options?.writeWithResponse ||
+      (!!options?.highVolume && tuning.highVolumeWriteWithResponse);
+    const shouldThrottle = !!options?.highVolume && !writeWithResponse;
     let packetsWritten = 0;
 
     try {
       for (let offset = 0; offset < frame.length; offset += packetCapacity) {
         const chunk = frame.slice(offset, offset + packetCapacity);
         const base64 = Buffer.from(chunk).toString('base64');
-        if (options?.writeWithResponse) {
+        if (writeWithResponse) {
           await transport.writeCharacteristic.writeWithResponse(base64);
         } else {
           await transport.writeCharacteristic.writeWithoutResponse(base64);
@@ -1379,18 +1449,18 @@ export default class ReactNativeBleTransport {
 
         if (
           shouldThrottle &&
-          packetsWritten % HIGH_VOLUME_WRITE_BURST_SIZE === 0 &&
+          packetsWritten % tuning.highVolumeWriteBurstSize === 0 &&
           offset + packetCapacity < frame.length
         ) {
-          await delay(HIGH_VOLUME_WRITE_PAUSE_MS);
+          await delay(tuning.highVolumeWritePauseMs);
         }
       }
 
       if (shouldThrottle) {
-        await delay(HIGH_VOLUME_WRITE_FLUSH_DELAY_MS);
+        await delay(tuning.highVolumeWriteFlushDelayMs);
       }
     } catch (error) {
-      if (options?.highVolume && !options?.writeWithResponse && packetsWritten === 0) {
+      if (options?.highVolume && !writeWithResponse && packetsWritten === 0) {
         Log?.debug(
           '[ReactNativeBleTransport] Protocol V2 high-volume writeWithoutResponse failed before data was sent, fallback to writeWithResponse:',
           error
@@ -1440,14 +1510,17 @@ export default class ReactNativeBleTransport {
     const highVolumeWrite = LogBlockCommand.has(name);
 
     if (highVolumeWrite) {
+      const tuning = getProtocolV2BleTuning();
       Log?.debug(
         '[ReactNativeBleTransport] Protocol V2 high-volume write uses throttled writeWithoutResponse:',
         name,
         {
-          packetCapacity: Platform.OS === 'ios' ? IOS_PACKET_LENGTH : ANDROID_PACKET_LENGTH,
-          burstSize: HIGH_VOLUME_WRITE_BURST_SIZE,
-          pauseMs: HIGH_VOLUME_WRITE_PAUSE_MS,
-          flushDelayMs: HIGH_VOLUME_WRITE_FLUSH_DELAY_MS,
+          packetCapacity:
+            Platform.OS === 'ios' ? tuning.iosPacketLength : tuning.androidPacketLength,
+          burstSize: tuning.highVolumeWriteBurstSize,
+          pauseMs: tuning.highVolumeWritePauseMs,
+          flushDelayMs: tuning.highVolumeWriteFlushDelayMs,
+          writeWithResponse: tuning.highVolumeWriteWithResponse,
         }
       );
     }
