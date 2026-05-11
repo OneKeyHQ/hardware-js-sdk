@@ -5,6 +5,7 @@ import {
   OpenAppCommand,
   isSuccessCommandResult,
 } from '@ledgerhq/device-management-kit';
+import { HardwareErrorCode } from '@onekeyfe/hwk-adapter-core';
 
 import { ERROR_TAG } from '../errors';
 import { debugLog } from '../utils/debugLog';
@@ -160,9 +161,11 @@ export class AppManager {
     });
     if (!isSuccessCommandResult(result)) {
       const { statusCode } = result as Record<string, unknown>;
+      const hasStatusCode = statusCode != null && statusCode !== '';
       debugLog('[AppManager] openApp failed:', appName, 'statusCode:', statusCode);
       throw Object.assign(new Error(`Failed to open "${appName}"`), {
         _tag: ERROR_TAG.OpenAppCommand,
+        code: hasStatusCode ? undefined : HardwareErrorCode.AppNotInstalled,
         errorCode: String(statusCode ?? ''),
         statusCode,
         appName,

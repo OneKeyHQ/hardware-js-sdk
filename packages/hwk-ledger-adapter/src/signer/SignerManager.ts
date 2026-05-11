@@ -6,11 +6,20 @@ import { debugLog } from '../utils/debugLog';
 
 import type { DeviceManagementKit } from '@ledgerhq/device-management-kit';
 import type { SignerEth as ISdkSignerEth } from '@ledgerhq/device-signer-kit-ethereum';
+import type { ContextModule } from '@ledgerhq/context-module';
 
 type SignerEthBuilderFn = (args: {
   dmk: DeviceManagementKit;
   sessionId: string;
-}) => { build(): ISdkSignerEth } | Promise<{ build(): ISdkSignerEth }>;
+}) =>
+  | {
+      withContextModule?(contextModule: ContextModule): { build(): ISdkSignerEth };
+      build(): ISdkSignerEth;
+    }
+  | Promise<{
+      withContextModule?(contextModule: ContextModule): { build(): ISdkSignerEth };
+      build(): ISdkSignerEth;
+    }>;
 
 /**
  * Per-sessionId SignerEth factory. Builds fresh on every call — DMK signers
@@ -30,7 +39,10 @@ export class SignerManager {
   async getOrCreate(sessionId: string): Promise<SignerEth> {
     debugLog('[DMK] SignerManager.getOrCreate:', { sessionId });
     const builder = await this._builderFn({ dmk: this._dmk, sessionId });
-    return new SignerEth(builder.build());
+    const builderWithContext = builder.withContextModule
+      ? builder.withContextModule(SignerManager._createContextModule())
+      : builder;
+    return new SignerEth(builderWithContext.build());
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars, class-methods-use-this
@@ -41,8 +53,26 @@ export class SignerManager {
 
   private static _defaultBuilder(): SignerEthBuilderFn {
     return args => {
-      const contextModule = new ContextModuleBuilder({}).removeDefaultLoaders().build();
-      return new SignerEthBuilder(args).withContextModule(contextModule);
+      return new SignerEthBuilder(args);
     };
+  }
+
+  private static _createContextModule(): ContextModule {
+    const contextModule = new ContextModuleBuilder({}).removeDefaultLoaders().build();
+    return SignerManager.wrapBlindSigningReportNonBlocking(contextModule);
+  }
+
+  static wrapBlindSigningReportNonBlocking<T extends ContextModule>(contextModule: T): T {
+    const report = contextModule.report.bind(contextModule);
+    contextModule.report = async params => {
+      try {
+        void report(params).catch(err => {
+          debugLog('[DMK] ContextModule.report failed:', err);
+        });
+      } catch (err) {
+        debugLog('[DMK] ContextModule.report failed:', err);
+      }
+    };
+    return contextModule;
   }
 }

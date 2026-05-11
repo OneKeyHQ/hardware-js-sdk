@@ -229,6 +229,32 @@ describe('mapLedgerError', () => {
     expect(result.code).toBe(HardwareErrorCode.DeviceNotFound);
   });
 
+  it.each([
+    ERROR_TAG.NoAccessibleDevice,
+    ERROR_TAG.UnknownDevice,
+    ERROR_TAG.DeviceNotInitialized,
+  ])('should map %s to DeviceNotFound', tag => {
+    const result = mapLedgerError({ _tag: tag });
+    expect(result.code).toBe(HardwareErrorCode.DeviceNotFound);
+  });
+
+  it('should map OpeningConnectionError to DeviceBusy', () => {
+    const result = mapLedgerError({ _tag: ERROR_TAG.OpeningConnection });
+    expect(result.code).toBe(HardwareErrorCode.DeviceBusy);
+  });
+
+  it.each([
+    ERROR_TAG.DeviceSessionRefresher,
+    ERROR_TAG.DeviceDisconnectedBeforeSendingApdu,
+    ERROR_TAG.DeviceDisconnectedWhileSending,
+    ERROR_TAG.Disconnect,
+    ERROR_TAG.ReconnectionFailed,
+    ERROR_TAG.WebHIDDisconnect,
+  ])('should map %s to DeviceDisconnected', tag => {
+    const result = mapLedgerError({ _tag: tag });
+    expect(result.code).toBe(HardwareErrorCode.DeviceDisconnected);
+  });
+
   it('should map timeout to OperationTimeout', () => {
     const result = mapLedgerError(
       Object.assign(new Error('APDU timeout'), { _tag: 'SendApduTimeoutError' })
@@ -258,6 +284,42 @@ describe('mapLedgerError', () => {
     const result = mapLedgerError({ errorCode: '6808' });
     expect(result.code).toBe(HardwareErrorCode.SolanaBlindSigningRequired);
     expect(result.message).toContain('Blind signing');
+  });
+
+  it('should not map Ethereum app 0x6a80 to blind signing without step metadata', () => {
+    const result = mapLedgerError({
+      _tag: ERROR_TAG.EthAppCommand,
+      errorCode: '6a80',
+      message: 'Invalid data',
+    });
+    expect(result.code).toBe(HardwareErrorCode.UnknownError);
+    expect(result.message).toBe('Invalid data');
+  });
+
+  it('should map Ethereum app 0x6a80 to EvmBlindSigningRequired with blind fallback step', () => {
+    const result = mapLedgerError({
+      _tag: ERROR_TAG.EthAppCommand,
+      errorCode: '6a80',
+      message: 'Invalid data',
+      _lastStep: 'signer.eth.steps.blindSignTransactionFallback',
+    });
+    expect(result.code).toBe(HardwareErrorCode.EvmBlindSigningRequired);
+    expect(result.message).toContain('Blind signing');
+  });
+
+  it('should map Ethereum app 0x6a80 to EvmBlindSigningRequired when step history includes blind fallback', () => {
+    const result = mapLedgerError({
+      _tag: ERROR_TAG.EthAppCommand,
+      errorCode: '6a80',
+      message: 'Invalid data',
+      _lastStep: 'signer.eth.steps.detectBlindSigning',
+      _deviceActionSteps: [
+        'signer.eth.steps.signTransaction',
+        'signer.eth.steps.blindSignTransactionFallback',
+        'signer.eth.steps.detectBlindSigning',
+      ],
+    });
+    expect(result.code).toBe(HardwareErrorCode.EvmBlindSigningRequired);
   });
 
   it('should map Tron 0x6a8d (hex) to TronCustomContractRequired', () => {

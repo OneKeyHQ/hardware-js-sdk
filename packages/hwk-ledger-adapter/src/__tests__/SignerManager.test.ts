@@ -35,6 +35,23 @@ describe('SignerManager', () => {
     expect(mockSignerBuilder).toHaveBeenCalledTimes(2);
   });
 
+  it('should inject non-blocking context module into custom signer builders', async () => {
+    const build = jest.fn().mockReturnValue({ getAddress: jest.fn() });
+    const withContextModule = jest.fn().mockReturnValue({ build });
+    const signerBuilder = jest.fn().mockReturnValue({
+      withContextModule,
+      build: jest.fn(),
+    });
+    manager = new SignerManager(mockDmk, signerBuilder);
+
+    await manager.getOrCreate('session-1');
+
+    expect(withContextModule).toHaveBeenCalledTimes(1);
+    const contextModule = withContextModule.mock.calls[0]?.[0];
+    expect(contextModule).toEqual(expect.objectContaining({ report: expect.any(Function) }));
+    expect(build).toHaveBeenCalledTimes(1);
+  });
+
   it('should clear cache for a specific sessionId', async () => {
     await manager.getOrCreate('session-1');
     manager.invalidate('session-1');
@@ -48,5 +65,23 @@ describe('SignerManager', () => {
     manager.clearAll();
     await manager.getOrCreate('session-1');
     expect(mockSignerBuilder).toHaveBeenCalledTimes(3);
+  });
+
+  it('should not wait for blind-signing report failures', async () => {
+    const originalReport = jest.fn((_params: unknown) => new Promise<void>(() => {}));
+    const contextModule = {
+      getContexts: jest.fn(),
+      getFieldContext: jest.fn(),
+      getTypedDataFilters: jest.fn(),
+      getSolanaContext: jest.fn(),
+      report: originalReport,
+    };
+
+    const reportPromise = SignerManager.wrapBlindSigningReportNonBlocking(contextModule).report(
+      {} as never
+    );
+
+    await expect(Promise.race([reportPromise, Promise.resolve('blocked')])).resolves.toBeUndefined();
+    expect(originalReport).toHaveBeenCalledTimes(1);
   });
 });

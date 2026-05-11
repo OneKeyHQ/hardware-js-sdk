@@ -4,6 +4,7 @@ import {
   GetAppAndVersionCommand,
   OpenAppCommand,
 } from '@ledgerhq/device-management-kit';
+import { HardwareErrorCode } from '@onekeyfe/hwk-adapter-core';
 
 import { AppManager } from '../app/AppManager';
 
@@ -145,6 +146,20 @@ describe('AppManager', () => {
       await expect(appManager.ensureAppOpen('session-1', 'Ethereum')).rejects.toThrow(
         /failed to open/i
       );
+    });
+
+    it('throws AppNotInstalled when OpenAppCommand fails without a status code', async () => {
+      dmk.sendCommand.mockImplementation(async (params: { command: unknown }) => {
+        if (params.command instanceof GetAppAndVersionCommand) {
+          return appResult('BOLOS');
+        }
+        return { error: {} };
+      });
+
+      await expect(appManager.ensureAppOpen('session-1', 'Tron')).rejects.toMatchObject({
+        code: HardwareErrorCode.AppNotInstalled,
+        appName: 'Tron',
+      });
     });
   });
 });
