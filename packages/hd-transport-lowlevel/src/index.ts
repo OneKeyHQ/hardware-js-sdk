@@ -24,6 +24,7 @@ import type { LowLevelAcquireInput } from './types';
 const { check, ProtocolV1, parseConfigure } = transport;
 
 const PROTOCOL_PROBE_TIMEOUT_MS = 1000;
+const PROTOCOL_V2_PROBE_TIMEOUT_MS = 5000;
 const LOWLEVEL_PROTOCOL_TIMEOUT_MS = 30_000;
 const LOWLEVEL_PROTOCOL_V2_PACKET_LENGTH = 64;
 
@@ -187,7 +188,11 @@ export default class LowlevelTransport {
       const jsonData = ProtocolV1.decodeMessage(messages, response);
       return check.call(jsonData);
     } catch (e) {
-      this.Log.error('lowlevel call error: ', e);
+      if (name === 'Initialize' && options?.timeoutMs === PROTOCOL_PROBE_TIMEOUT_MS) {
+        this.Log.debug('[LowlevelTransport] Protocol V1 Initialize probe call failed:', e);
+      } else {
+        this.Log.error('lowlevel call error: ', e);
+      }
       throw e;
     }
   }
@@ -268,7 +273,7 @@ export default class LowlevelTransport {
     this.protocolV2Assemblers.get(uuid)?.reset();
     return probeProtocolV2Helper({
       call: (name, data, options) => this.callProtocolV2(uuid, name, data, options),
-      timeoutMs: PROTOCOL_PROBE_TIMEOUT_MS,
+      timeoutMs: PROTOCOL_V2_PROBE_TIMEOUT_MS,
       logger: this.Log,
       logPrefix: 'ProtocolV2 Lowlevel-BLE',
       onProbeFailed: () => {

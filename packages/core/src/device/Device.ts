@@ -294,7 +294,7 @@ export class Device extends EventEmitter {
         const res = await this.deviceConnector?.acquire(
           this.originalDescriptor.id,
           undefined,
-          undefined,
+          true,
           expectedProtocol
         );
         this.mainId = (res as unknown as any).uuid ?? '';

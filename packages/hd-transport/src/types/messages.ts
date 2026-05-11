@@ -4491,6 +4491,16 @@ export type ProtocolV2DeviceInfo = {
   status?: DevStatus;
 };
 
+// DevGetOnboardingStatus
+export type DevGetOnboardingStatus = {};
+
+// DevOnboardingStatus
+export type DevOnboardingStatus = {
+  page_index?: number;
+  page_count?: number;
+  page_name?: string;
+};
+
 export enum DevFirmwareTargetType {
   TARGET_MAIN_APP = 0,
   TARGET_MAIN_BOOT = 1,
@@ -5201,6 +5211,8 @@ export type MessageType = {
   DevInfoTypes: DevInfoTypes;
   DevStatus: DevStatus;
   DevGetDeviceInfo: DevGetDeviceInfo;
+  DevGetOnboardingStatus: DevGetOnboardingStatus;
+  DevOnboardingStatus: DevOnboardingStatus;
   DevFirmwareTarget: DevFirmwareTarget;
   DevFirmwareUpdate: DevFirmwareUpdate;
   DevFirmwareInstallProgress: DevFirmwareInstallProgress;

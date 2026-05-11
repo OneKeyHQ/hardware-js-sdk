@@ -335,6 +335,25 @@
         }
       }
     },
+    "DevGetOnboardingStatus": {
+      "fields": {}
+    },
+    "DevOnboardingStatus": {
+      "fields": {
+        "page_index": {
+          "type": "uint32",
+          "id": 1
+        },
+        "page_count": {
+          "type": "uint32",
+          "id": 2
+        },
+        "page_name": {
+          "type": "string",
+          "id": 3
+        }
+      }
+    },
     "DevFirmwareTargetType": {
       "values": {
         "TARGET_MAIN_APP": 0,
@@ -690,6 +709,8 @@
         "MessageType_DevReboot": 60400,
         "MessageType_DevGetDeviceInfo": 60600,
         "MessageType_DeviceInfo": 60601,
+        "MessageType_DevGetOnboardingStatus": 60602,
+        "MessageType_DevOnboardingStatus": 60603,
         "MessageType_FilesystemFixPermission": 60800,
         "MessageType_FilesystemPathInfo": 60801,
         "MessageType_FilesystemPathInfoQuery": 60802,

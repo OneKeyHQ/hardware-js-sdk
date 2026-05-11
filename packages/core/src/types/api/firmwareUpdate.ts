@@ -41,6 +41,7 @@ export declare function firmwareUpdateV2(
 export interface FirmwareUpdateV3Params {
   bleVersion?: number[];
   bleBinary?: ArrayBuffer;
+  chunkSize?: number;
 
   firmwareVersion?: number[];
   firmwareBinary?: ArrayBuffer;

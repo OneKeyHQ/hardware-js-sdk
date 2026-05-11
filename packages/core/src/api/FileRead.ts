@@ -1,8 +1,12 @@
-import { PROTOCOL_V2_FILE_CHUNK_SIZE } from '@onekeyfe/hd-transport';
+import {
+  PROTOCOL_V2_BLE_FILE_CHUNK_SIZE,
+  PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE,
+} from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { BaseMethod } from './BaseMethod';
 import { hexToBytes, isHexString, stripHexPrefix } from './helpers/hexUtils';
+import { DataManager } from '../data-manager';
 
 export type FileReadParams = {
   path: string;
@@ -14,13 +18,18 @@ export type FileReadParams = {
 
 const MIN_FILE_READ_CHUNK_SIZE = 64;
 
-function normalizeChunkSize(value: unknown): number {
+function getProtocolV2FileReadChunkLimit() {
+  const env = DataManager.getSettings('env');
+  if (env && DataManager.isBleConnect(env)) {
+    return PROTOCOL_V2_BLE_FILE_CHUNK_SIZE;
+  }
+  return PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE;
+}
+
+function normalizeChunkSize(value: unknown, maxChunkSize: number): number {
   const numeric = Number(value);
-  if (!Number.isFinite(numeric) || numeric <= 0) return PROTOCOL_V2_FILE_CHUNK_SIZE;
-  return Math.min(
-    Math.max(Math.floor(numeric), MIN_FILE_READ_CHUNK_SIZE),
-    PROTOCOL_V2_FILE_CHUNK_SIZE
-  );
+  if (!Number.isFinite(numeric) || numeric <= 0) return maxChunkSize;
+  return Math.min(Math.max(Math.floor(numeric), MIN_FILE_READ_CHUNK_SIZE), maxChunkSize);
 }
 
 function toFiniteNumber(value: unknown): number | undefined {
@@ -70,7 +79,10 @@ export default class FileRead extends BaseMethod<FileReadParams> {
   async run() {
     const startOffset = this.params.offset ?? 0;
     const requestedLength = Number(this.params.totalSize);
-    const chunkSize = normalizeChunkSize(this.params.chunkLen);
+    const chunkSize = normalizeChunkSize(
+      this.params.chunkLen,
+      getProtocolV2FileReadChunkLimit()
+    );
     let totalLength = Number.isFinite(requestedLength) && requestedLength > 0 ? requestedLength : 0;
 
     if (totalLength === 0) {

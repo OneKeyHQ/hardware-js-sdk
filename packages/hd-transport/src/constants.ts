@@ -23,8 +23,14 @@ export const PROTOCOL_V1_ENVELOPE_HEADER_SIZE = 1 + 1 + PROTOCOL_V1_MESSAGE_HEAD
 /** Protocol V2 单帧最大长度，包含 header、payload 和 CRC；需容纳 4096 数据块及 protobuf 开销。 */
 export const PROTOCOL_V2_FRAME_MAX_BYTES = 4608;
 
-/** FilesystemFileWrite 的文件数据分块大小；frame 上限额外预留 protobuf / frame 开销。 */
-export const PROTOCOL_V2_FILE_CHUNK_SIZE = 4096;
+/** WebUSB 下 FilesystemFileWrite 的文件数据分块大小。 */
+export const PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE = 4096;
+
+/** BLE 下 FilesystemFileWrite 的文件数据分块大小。 */
+export const PROTOCOL_V2_BLE_FILE_CHUNK_SIZE = 1800;
+
+/** @deprecated 使用按传输区分的 PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE / PROTOCOL_V2_BLE_FILE_CHUNK_SIZE。 */
+export const PROTOCOL_V2_FILE_CHUNK_SIZE = PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE;
 
 /**
  * Protocol V2 路由 channel。

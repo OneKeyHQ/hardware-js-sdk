@@ -1,5 +1,5 @@
 {
-  "name": "expo-example",
+  "name": "onekey-expo-demo",
   "version": "1.1.26-alpha.8",
   "scripts": {
     "start": "cross-env CONNECT_SRC=https://localhost:8087/ yarn expo start --dev-client",

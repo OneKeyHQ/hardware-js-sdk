@@ -34,10 +34,13 @@ export default class SearchDevices extends BaseMethod {
         const lowerId = device.id?.toLowerCase();
         if (!seenIds.has(lowerId)) {
           seenIds.add(lowerId);
+          const bleName =
+            device.name ?? (device as unknown as { localName?: string }).localName ?? '';
           devices.push({
             ...device,
             connectId: device.id,
-            deviceType: getDeviceTypeByBleName(device.name ?? ''),
+            name: bleName || device.name,
+            deviceType: getDeviceTypeByBleName(bleName),
           });
         }
       }

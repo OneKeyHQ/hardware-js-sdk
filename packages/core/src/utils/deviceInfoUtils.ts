@@ -71,14 +71,14 @@ export const getDeviceType = (features?: Features): IDeviceType => {
 export const getDeviceTypeByBleName = (name?: string): IDeviceType => {
   if (!name) return EDeviceType.Unknown;
 
-  if (name.startsWith('BixinKey')) return EDeviceType.Classic;
-  if (name.startsWith('K')) return EDeviceType.Classic;
+  if (/^BixinKey/i.test(name)) return EDeviceType.Classic;
+  if (/^K/i.test(name)) return EDeviceType.Classic;
 
-  if (name.startsWith('T')) return EDeviceType.Touch;
-  if (name.startsWith('Touch')) return EDeviceType.Touch;
+  if (/^T/i.test(name)) return EDeviceType.Touch;
+  if (/^Touch/i.test(name)) return EDeviceType.Touch;
 
-  if (name.startsWith('Pro2')) return EDeviceType.Pro2;
-  if (name.startsWith('Pro')) return EDeviceType.Pro;
+  if (/\bPro\s*2\b/i.test(name) || /^Pro2/i.test(name)) return EDeviceType.Pro2;
+  if (/\bPro\b/i.test(name) || /^Pro/i.test(name)) return EDeviceType.Pro;
 
   return EDeviceType.Unknown;
 };

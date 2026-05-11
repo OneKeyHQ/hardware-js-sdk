@@ -704,6 +704,16 @@ function initDeviceForBle(method: BaseMethod) {
  */
 let bleTimeoutRetry = 0;
 
+function isRetryableBleProtocolV2ProbeError(method: BaseMethod, error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return (
+    method.payload.connectProtocol === 'V2' &&
+    message.includes('Device protocol mismatch') &&
+    message.includes('expected V2') &&
+    message.includes('did not respond to expected protocol')
+  );
+}
+
 async function connectDeviceForBle(method: BaseMethod, device: Device) {
   try {
     await device.acquire(method.payload.connectProtocol);
@@ -712,7 +722,12 @@ async function connectDeviceForBle(method: BaseMethod, device: Device) {
     }
     await device.initialize(parseInitOptions(method));
   } catch (err) {
-    if (err.errorCode === HardwareErrorCode.BleTimeoutError && bleTimeoutRetry <= 5) {
+    if (
+      (err.errorCode === HardwareErrorCode.BleTimeoutError ||
+        err.errorCode === HardwareErrorCode.BleConnectedError ||
+        isRetryableBleProtocolV2ProbeError(method, err)) &&
+      bleTimeoutRetry <= 5
+    ) {
       bleTimeoutRetry += 1;
       Log.debug(`Bletooth connect timeout and will retry, retry count: ${bleTimeoutRetry}`);
       await wait(3000);

@@ -374,67 +374,43 @@ describe('Protocol V2 framing and session', () => {
     });
   });
 
-  test('probeProtocolV2 returns true only for ProtoVersion responses', async () => {
-    await expect(
-      probeProtocolV2({
-        call: () => Promise.resolve({ type: 'ProtoVersion', message: {} }),
-        timeoutMs: 1,
-      })
-    ).resolves.toBe(true);
-
+  test('probeProtocolV2 accepts Ping success as a normal V2 probe response', async () => {
     await expect(
       probeProtocolV2({
         call: () => Promise.resolve({ type: 'Success', message: {} }),
         timeoutMs: 1,
       })
+    ).resolves.toBe(true);
+
+    await expect(
+      probeProtocolV2({
+        call: () => Promise.resolve({ type: 'Failure', message: {} }),
+        timeoutMs: 1,
+      })
     ).resolves.toBe(false);
   });
 
-  test('probeProtocolV2 recognizes V2 bootloader status responses', async () => {
-    const call = jest.fn(name => {
-      if (name === 'GetProtoVersion') {
-        return Promise.reject(new Error('unsupported'));
-      }
-      return Promise.resolve({ type: 'DevFirmwareUpdateStatus', message: { targets: [] } });
-    });
+  test('probeProtocolV2 only uses Ping for acquire probing', async () => {
+    const call = jest.fn().mockRejectedValue(new Error('ping timeout'));
+    const onProbeFailed = jest.fn();
 
     await expect(
       probeProtocolV2({
         call,
         timeoutMs: 1,
+        onProbeFailed,
       })
-    ).resolves.toBe(true);
+    ).resolves.toBe(false);
     expect(call).toHaveBeenNthCalledWith(
-      2,
-      'DevGetFirmwareUpdateStatus',
-      {},
+      1,
+      'Ping',
+      { message: 'probe' },
       {
         timeoutMs: 1,
-        expectedTypes: ['DevFirmwareUpdateStatus'],
+        expectedTypes: ['Success'],
       }
     );
-  });
-
-  test('probeProtocolV2 falls back to bootloader status after non-version responses', async () => {
-    const call = jest
-      .fn()
-      .mockResolvedValueOnce({ type: 'Failure', message: { message: 'unsupported' } })
-      .mockResolvedValueOnce({ type: 'DevFirmwareUpdateStatus', message: { targets: [] } });
-
-    await expect(
-      probeProtocolV2({
-        call,
-        timeoutMs: 1,
-      })
-    ).resolves.toBe(true);
-    expect(call).toHaveBeenNthCalledWith(
-      2,
-      'DevGetFirmwareUpdateStatus',
-      {},
-      {
-        timeoutMs: 1,
-        expectedTypes: ['DevFirmwareUpdateStatus'],
-      }
-    );
+    expect(call).toHaveBeenCalledTimes(1);
+    expect(onProbeFailed).toHaveBeenCalledWith(expect.any(Error));
   });
 });
