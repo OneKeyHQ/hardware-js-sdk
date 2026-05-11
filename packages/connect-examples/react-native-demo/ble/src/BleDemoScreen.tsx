@@ -59,6 +59,10 @@ type FirmwareTiming = {
   endAt?: number;
   durationMs?: number;
 };
+type FirmwareTimingSummary = {
+  status: 'success' | 'failed';
+  totalDurationMs?: number;
+};
 type Pro2MethodAction = {
   key: string;
   label: string;
@@ -281,6 +285,8 @@ export const BleDemoScreen = () => {
   const [firmwareProgress, setFirmwareProgress] = useState<FirmwareProgressState | null>(null);
   const [firmwareResult, setFirmwareResult] = useState<FirmwareResultState | null>(null);
   const [firmwareTimings, setFirmwareTimings] = useState<FirmwareTiming[]>([]);
+  const [firmwareTimingSummary, setFirmwareTimingSummary] =
+    useState<FirmwareTimingSummary | null>(null);
   const [logs, setLogs] = useState<LogLine[]>([]);
 
   const sdkRef = useRef<CoreApi | null>(null);
@@ -349,6 +355,8 @@ export const BleDemoScreen = () => {
       finishFirmwareStage();
       const totalStartAt = firmwareStageRef.current.totalStartAt;
       const totalDurationMs = totalStartAt ? Date.now() - totalStartAt : undefined;
+      setFirmwareTimingSummary({ status, totalDurationMs });
+      syncFirmwareTimings();
       const summary = firmwareStageRef.current.timings.map(item => ({
         stage: item.label,
         duration: formatDuration(item.durationMs),
@@ -361,7 +369,7 @@ export const BleDemoScreen = () => {
         },
       });
     },
-    [appendLog, finishFirmwareStage]
+    [appendLog, finishFirmwareStage, syncFirmwareTimings]
   );
 
   const handleProgressEvent = useCallback(
@@ -802,6 +810,7 @@ export const BleDemoScreen = () => {
       setBusy('ble-firmware');
       firmwareStageRef.current = { totalStartAt: Date.now(), timings: [] };
       setFirmwareTimings([]);
+      setFirmwareTimingSummary(null);
       setFirmwareProgress({ progress: 0, progressType: 'prepare' });
       setFirmwareResult(null);
       setFirmwareStatus(`Loading ${PRO2_BLE_FIRMWARE_FILE_NAME}`);
@@ -829,7 +838,7 @@ export const BleDemoScreen = () => {
       if (!res?.success) {
         setFirmwareStatus('BLE firmware update failed');
         finishFirmwareTimingSummary('failed');
-        Alert.alert('BLE firmware update failed', res?.payload?.error || 'unknown');
+        appendLog('error', `BLE firmware update failed: ${res?.payload?.error || 'unknown'}`);
         return;
       }
 
@@ -842,7 +851,6 @@ export const BleDemoScreen = () => {
       setFirmwareStatus('BLE firmware update error');
       appendLog('error', `firmwareUpdateV4 error: ${e?.message || e}`);
       finishFirmwareTimingSummary('failed');
-      Alert.alert('BLE firmware update error', e?.message || String(e));
     } finally {
       setBusy(null);
     }
@@ -856,16 +864,7 @@ export const BleDemoScreen = () => {
   ]);
 
   const onBleFirmwareUpdate = useCallback(() => {
-    Alert.alert(
-      'Start Pro2 BLE firmware update?',
-      `${PRO2_BLE_FIRMWARE_FILE_NAME} (${formatBytes(
-        PRO2_BLE_FIRMWARE_FILE_SIZE
-      )}) will be sent over BLE. The device may reboot and require confirmation.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Start', style: 'destructive', onPress: () => void runBleFirmwareUpdate() },
-      ]
-    );
+    void runBleFirmwareUpdate();
   }, [runBleFirmwareUpdate]);
 
   const clearLogs = useCallback(() => setLogs([]), []);
@@ -889,21 +888,6 @@ export const BleDemoScreen = () => {
           <Text style={styles.subtitle}>
             Protocol V2 scan, device info, status, and bundled BLE firmware update.
           </Text>
-        </View>
-
-        <View style={styles.card}>
-          <View style={styles.row}>
-            <Text style={styles.sectionTitle}>Initialize</Text>
-            <TouchableOpacity
-              style={styles.btn}
-              onPress={initSdk}
-              disabled={sdkReady || initializing}
-            >
-              <Text style={styles.btnText}>
-                {sdkReady ? 'Initialized' : initializing ? 'Initializing...' : 'Init SDK'}
-              </Text>
-            </TouchableOpacity>
-          </View>
         </View>
 
         <View style={styles.card}>
@@ -993,21 +977,27 @@ export const BleDemoScreen = () => {
           </Text>
           {firmwareResult ? (
             <View style={styles.metaBlock}>
+              <Text style={styles.metaText}>Result:</Text>
               <Text style={styles.metaText}>
-                Result: bootloader={firmwareResult.bootloaderVersion || '-'} · ble=
-                {firmwareResult.bleVersion || '-'} · firmware=
-                {firmwareResult.firmwareVersion || '-'}
+                Bootloader: {firmwareResult.bootloaderVersion || '-'}
+              </Text>
+              <Text style={styles.metaText}>BLE: {firmwareResult.bleVersion || '-'}</Text>
+              <Text style={styles.metaText}>
+                Firmware: {firmwareResult.firmwareVersion || '-'}
               </Text>
             </View>
           ) : null}
-          {firmwareTimings.length ? (
+          {firmwareTimings.length || firmwareTimingSummary ? (
             <View style={styles.metaBlock}>
               <Text style={styles.metaText}>
-                Timing:{' '}
-                {firmwareTimings
-                  .map(item => `${item.label}=${formatDuration(item.durationMs)}`)
-                  .join(' · ')}
+                Timing: {firmwareTimingSummary?.status || 'running'} · Total:{' '}
+                {formatDuration(firmwareTimingSummary?.totalDurationMs)}
               </Text>
+              {firmwareTimings.map(item => (
+                <Text key={`${item.key}-${item.startAt}`} style={styles.metaText}>
+                  {item.label}: {formatDuration(item.durationMs)}
+                </Text>
+              ))}
             </View>
           ) : null}
         </View>

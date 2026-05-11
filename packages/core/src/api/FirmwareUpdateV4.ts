@@ -541,9 +541,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const bleVersion = getDeviceBLEFirmwareVersion(features).join('.');
     const firmwareVersion = getDeviceFirmwareVersion(features).join('.');
     if (firmwareVersion === '0.0.0') {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.FirmwareError,
-        'Protocol V2 firmware update finished but app firmware version is still 0.0.0'
+      Log.warn(
+        'Protocol V2 firmware update finished but app firmware version is still 0.0.0. This is allowed for Pro2 debug BLE-only update flows.'
       );
     }
 
