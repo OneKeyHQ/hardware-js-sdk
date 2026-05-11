@@ -8,15 +8,18 @@ import { supportInputPinOnSoftware, supportModifyHomescreen } from '../utils/dev
 import { createDeviceMessage } from '../events/device';
 import { UI_REQUEST } from '../constants/ui-request';
 import { DEVICE, FIRMWARE, createFirmwareMessage, createUiMessage } from '../events';
+import { getHDPath, toHardened } from './helpers/pathUtils';
 import { getBleFirmwareReleaseInfo, getFirmwareReleaseInfo } from './firmware/releaseHelper';
 import {
   LoggerNames,
   getDeviceFirmwareVersion,
+  getDeviceType,
   getFirmwareType,
   getLogger,
   getMethodVersionRange,
 } from '../utils';
 import { generateInstanceId } from '../utils/tracing';
+import { DeviceModelToTypes } from '../types';
 
 import type { Device } from '../device/Device';
 import type DeviceConnector from '../device/DeviceConnector';
@@ -26,6 +29,31 @@ import type { RequestContext } from '../utils/tracing';
 import type { CoreContext } from '../core';
 
 const Log = getLogger(LoggerNames.Method);
+
+const isEvmLedgerLegacyPathWithHighIndex = (path: unknown) => {
+  let addressN: number[] | undefined;
+  if (typeof path === 'string') {
+    try {
+      addressN = getHDPath(path);
+    } catch {
+      return false;
+    }
+  } else if (Array.isArray(path)) {
+    addressN = path.map((item: unknown) => Number(item));
+  }
+
+  return (
+    Array.isArray(addressN) &&
+    addressN.length === 4 &&
+    addressN[0] === toHardened(44) &&
+    addressN[1] === toHardened(60) &&
+    addressN[2] === toHardened(0) &&
+    addressN[3] > 1 &&
+    addressN[3] < toHardened(0)
+  );
+};
+
+const EVM_LEDGER_LEGACY_METHODS = ['evmGetAddress', 'evmGetPublicKey'];
 
 export abstract class BaseMethod<Params = undefined> {
   responseID: number;
@@ -240,8 +268,25 @@ export abstract class BaseMethod<Params = undefined> {
     }
   }
 
+  private shouldPromptSafetyCheckForEvmLedgerLegacyPath() {
+    if (!EVM_LEDGER_LEGACY_METHODS.includes(this.name)) {
+      return false;
+    }
+
+    const deviceType = getDeviceType(this.device.features);
+    if (!DeviceModelToTypes.model_touch.includes(deviceType)) {
+      return false;
+    }
+
+    const paths = Array.isArray(this.payload?.bundle)
+      ? this.payload.bundle.map((item: { path?: unknown }) => item?.path)
+      : [this.payload?.path];
+
+    return paths.some(isEvmLedgerLegacyPathWithHighIndex);
+  }
+
   /**
-   * Automatic check safety_check level for Kovan, Ropsten, Rinkeby, Goerli test networks.
+   * Automatic check safety_check level for selected calls that require temporary relaxed checks.
    * @returns {void}
    */
   async checkSafetyLevelOnTestNet() {
@@ -251,6 +296,9 @@ export abstract class BaseMethod<Params = undefined> {
       this.name === 'evmSignTransaction' &&
       [3, 4, 5, 420, 11155111].includes(Number(this.payload?.transaction?.chainId))
     ) {
+      checkFlag = true;
+    }
+    if (this.shouldPromptSafetyCheckForEvmLedgerLegacyPath()) {
       checkFlag = true;
     }
     if (checkFlag && this.device.features?.safety_checks === 'Strict') {
