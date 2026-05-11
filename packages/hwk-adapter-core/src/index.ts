@@ -1,4 +1,4 @@
-export { HardwareErrorCode } from './types/errors';
+export { HardwareErrorCode, ORPHAN_ELIGIBLE_ERROR_CODES } from './types/errors';
 
 export type { Success, Failure, Response } from './types/response';
 export { success, failure } from './types/response';
@@ -23,7 +23,6 @@ export type {
   EvmSignTypedDataHash,
   EIP712Domain,
   EvmSignature,
-  ProgressCallback,
   IEvmMethods,
 } from './types/chain-evm';
 
@@ -83,7 +82,11 @@ export type {
 
 export { DEVICE_EVENT, DEVICE } from './events/device';
 export { UI_EVENT, UI_REQUEST, UI_RESPONSE } from './events/ui-request';
-export type { UiResponseEvent } from './events/ui-request';
+export type {
+  DevicePermissionDeniedReason,
+  DevicePermissionResponse,
+  UiResponseEvent,
+} from './events/ui-request';
 export { SDK } from './events/sdk';
 
 export type {
@@ -94,20 +97,14 @@ export type {
 } from './types/transport';
 
 export { DeviceJobQueue } from './utils/DeviceJobQueue';
-export type {
-  Interruptibility,
-  PreemptionDecision,
-  JobOptions,
-  ActiveJobInfo,
-  PreemptionEvent,
-  DeviceJobQueueDeps,
-} from './utils/DeviceJobQueue';
+export type { JobOptions, ActiveJobInfo } from './utils/DeviceJobQueue';
 
 export type {
   ConnectorDevice,
   ConnectorSession,
   ConnectorEventType,
   ConnectorEventMap,
+  ConnectorUiEvent,
   IConnector,
   IHardwareBridge,
 } from './types/connector';

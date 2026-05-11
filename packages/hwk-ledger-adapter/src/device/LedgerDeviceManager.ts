@@ -39,7 +39,9 @@ export class LedgerDeviceManager {
           if (resolved) return;
           resolved = true;
           this._discovered.clear();
-          debugLog('[DMK] enumerate raw devices:', devices.length);
+          debugLog(
+            `[DMK] enumerate raw count=${devices.length} ids=[${devices.map(d => d.id).join(',')}]`
+          );
           for (const d of devices) {
             this._discovered.set(d.id, d);
           }
@@ -52,6 +54,7 @@ export class LedgerDeviceManager {
                 type: d.deviceModel.model,
                 name: d.name,
                 transport: d.transport,
+                rssi: d.rssi,
               }))
             );
           } else {
@@ -77,6 +80,7 @@ export class LedgerDeviceManager {
             type: d.deviceModel.model,
             name: d.name,
             transport: d.transport,
+            rssi: d.rssi,
           }))
         );
       }
@@ -105,6 +109,7 @@ export class LedgerDeviceManager {
                 type: d.deviceModel.model,
                 name: d.name,
                 transport: d.transport,
+                rssi: d.rssi,
               },
             });
           }
@@ -123,6 +128,63 @@ export class LedgerDeviceManager {
   stopListening(): void {
     this._listenSub?.unsubscribe();
     this._listenSub = null;
+  }
+
+  /**
+   * Resolve to the latest snapshot of advertising devices observed within
+   * `timeoutMs`. Rewrites `_discovered` so it tracks the live list.
+   *
+   * `listenToAvailableDevices` is a BehaviorSubject — it emits the cached
+   * list on subscribe and *only* re-emits when the list changes. A stable
+   * list of currently-advertising devices therefore produces only the
+   * subscription frame; treating that frame as "fossil to be discarded"
+   * caused devices to flicker in/out of the UI as searches alternated
+   * between "saw a change frame" and "saw only the cached frame".
+   *
+   * The window still gives a chance for the active scan to update the list
+   * (e.g. drop a peripheral that just stopped broadcasting), but if nothing
+   * changes we trust the snapshot — DMK silence on a stable list means
+   * "everything's still there".
+   */
+  getLiveDevices(timeoutMs = 1500): Promise<DmkDiscoveredDevice[]> {
+    debugLog(`[DMK] getLiveDevices() called, timeoutMs=${timeoutMs}`);
+    // Ensure a discovery is in flight; no-op if already scanning.
+    void this.requestDevice();
+
+    return new Promise<DmkDiscoveredDevice[]>(resolve => {
+      let done = false;
+      let lastSeen: DmkDiscoveredDevice[] = [];
+      let sub: { unsubscribe: () => void } | null = null;
+
+      const finish = (devices: DmkDiscoveredDevice[]) => {
+        if (done) return;
+        done = true;
+        sub?.unsubscribe();
+        clearTimeout(timer);
+        this._discovered.clear();
+        for (const d of devices) this._discovered.set(d.id, d);
+        debugLog(
+          `[DMK] getLiveDevices() resolved count=${devices.length} ids=[${devices
+            .map(d => d.id)
+            .join(',')}]`
+        );
+        resolve(devices);
+      };
+
+      // On timeout, accept whatever we last saw.
+      const timer = setTimeout(() => finish(lastSeen), timeoutMs);
+
+      sub = this._dmk.listenToAvailableDevices({}).subscribe({
+        next: devices => {
+          lastSeen = devices;
+        },
+        error: err => {
+          debugError('[DMK] getLiveDevices() error:', err);
+          finish(lastSeen);
+        },
+        complete: () => finish(lastSeen),
+      });
+    });
   }
 
   /**
@@ -153,6 +215,11 @@ export class LedgerDeviceManager {
       },
     });
     return Promise.resolve();
+  }
+
+  /** Lookup a previously-discovered device's display name. */
+  getDeviceName(deviceId: string): string | undefined {
+    return this._discovered.get(deviceId)?.name;
   }
 
   /** Connect to a previously discovered device. Returns sessionId. */
@@ -203,5 +270,19 @@ export class LedgerDeviceManager {
     this._sessions.clear();
     this._sessionToDevice.clear();
     this._dmk.close();
+  }
+
+  /**
+   * Tear down RxJS subscriptions and local state without closing the DMK.
+   * For light-reset paths that want to drop session state but keep the
+   * underlying transport alive for retry. Call this instead of orphaning
+   * the manager — bare null assignment leaks _listenSub / _discoverySub.
+   */
+  disposeKeepingDmk(): void {
+    this.stopListening();
+    this.stopDiscovery();
+    this._discovered.clear();
+    this._sessions.clear();
+    this._sessionToDevice.clear();
   }
 }

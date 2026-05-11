@@ -530,6 +530,10 @@ export class DeviceCommands {
         error = ERRORS.TypedError(HardwareErrorCode.PinCancelled);
       }
 
+      if (code === 'Failure_PinMismatch') {
+        error = ERRORS.TypedError(HardwareErrorCode.PinMismatch, message);
+      }
+
       if (code === 'Failure_DataError') {
         if (message === 'Please confirm the BlindSign enabled') {
           error = ERRORS.TypedError(HardwareErrorCode.BlindSignDisabled);

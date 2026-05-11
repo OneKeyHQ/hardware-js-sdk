@@ -347,6 +347,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     if (bootloaderBinary) totalSize += bootloaderBinary.byteLength;
 
     this.postTipMessage(FirmwareUpdateTipMessage.StartTransferData);
+    const transferStartTime = Date.now();
 
     const targets: Array<{ target_id: number; path: string }> = [];
 
@@ -364,6 +365,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             filePath: `${resourcePath}${name}`,
             processedSize,
             totalSize,
+            transferStartTime,
           });
         }
       }
@@ -380,6 +382,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         filePath: bootloaderPath,
         processedSize,
         totalSize,
+        transferStartTime,
       });
       targets.push({
         target_id: ProtocolV2FirmwareTargetType.TARGET_MAIN_BOOT,
@@ -394,6 +397,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         filePath: firmwarePath,
         processedSize,
         totalSize,
+        transferStartTime,
       });
       targets.push({
         target_id: protocolV2FileNameToTargetId(fwbinary.fileName),
@@ -614,10 +618,12 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     filePath,
     processedSize,
     totalSize,
+    transferStartTime = Date.now(),
   }: PROTO.FirmwareUpload & {
     filePath: string;
     processedSize?: number;
     totalSize?: number;
+    transferStartTime?: number;
   }) {
     const chunkSize = this.getProtocolV2FirmwareChunkSize();
     let offset = 0;
@@ -651,7 +657,19 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         );
       }
       offset = nextOffset;
-      this.postProgressMessage(getUploadProgress(offset), 'transferData');
+      const elapsedMs = Date.now() - transferStartTime;
+      const transferredBytes =
+        totalSize !== undefined && processedSize !== undefined
+          ? Math.min(processedSize + offset, totalSize)
+          : offset;
+      const totalBytes = totalSize ?? payload.byteLength;
+      this.postProgressMessage(getUploadProgress(offset), 'transferData', {
+        transferredBytes,
+        totalBytes,
+        rateBytesPerSecond:
+          elapsedMs > 0 ? Math.round((transferredBytes / elapsedMs) * 1000) : undefined,
+        elapsedMs,
+      });
     }
 
     return totalSize !== undefined ? (processedSize ?? 0) + payload.byteLength : 0;

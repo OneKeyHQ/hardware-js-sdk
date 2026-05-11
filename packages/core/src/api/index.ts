@@ -171,6 +171,7 @@ export { default as dnxSignTransaction } from './dynex/DnxSignTransaction';
 export { default as tonGetAddress } from './ton/TonGetAddress';
 export { default as tonSignMessage } from './ton/TonSignMessage';
 export { default as tonSignProof } from './ton/TonSignProof';
+export { default as tonSignData } from './ton/TonSignData';
 
 export { default as scdoGetAddress } from './scdo/ScdoGetAddress';
 export { default as scdoSignTransaction } from './scdo/ScdoSignTransaction';

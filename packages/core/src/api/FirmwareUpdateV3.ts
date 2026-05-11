@@ -265,6 +265,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     }
 
     this.postTipMessage(FirmwareUpdateTipMessage.StartTransferData);
+    const transferStartTime = Date.now();
 
     // Process resource zip contents
     if (resourceBinary) {
@@ -279,6 +280,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
             filePath: `0:res/${name}`,
             processedSize,
             totalSize,
+            transferStartTime,
           });
         }
       }
@@ -290,6 +292,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
         filePath: `0:boot/bootloader.bin`,
         processedSize,
         totalSize,
+        transferStartTime,
       });
     }
 
@@ -302,6 +305,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
           filePath: `0:updates/${fwbinary.fileName}`,
           processedSize,
           totalSize,
+          transferStartTime,
         });
       }
     }

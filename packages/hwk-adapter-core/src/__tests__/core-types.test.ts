@@ -54,7 +54,8 @@ describe('HardwareErrorCode contract', () => {
   });
 
   it('app lifecycle (10500-10599)', () => {
-    expect(HardwareErrorCode.AppNotOpen).toBe(10500);
+    expect(HardwareErrorCode.AppNotInstalled).toBe(10500);
+    expect((HardwareErrorCode as Record<string, unknown>).AppNotOpen).toBeUndefined();
     expect(HardwareErrorCode.WrongApp).toBe(10501);
     expect(HardwareErrorCode.AppTooOld).toBe(10502);
   });

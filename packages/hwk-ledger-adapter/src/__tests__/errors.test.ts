@@ -1,6 +1,7 @@
 import { HardwareErrorCode } from '@onekeyfe/hwk-adapter-core';
 
 import {
+  ERROR_TAG,
   isDeviceDisconnectedError,
   isDeviceLockedError,
   isTimeoutError,
@@ -194,10 +195,38 @@ describe('mapLedgerError', () => {
     expect(result.message).toContain('open the correct app');
   });
 
+  it('should map OpenAppCommand 0x6807 to AppNotInstalled', () => {
+    const result = mapLedgerError({
+      _tag: ERROR_TAG.OpenAppCommand,
+      statusCode: 0x6807,
+      errorCode: '6807',
+      message: 'Failed to open Bitcoin',
+    });
+    expect(result.code).toBe(HardwareErrorCode.AppNotInstalled);
+  });
+
+  it('should not map OpenAppCommand without app-not-installed signal to AppNotInstalled', () => {
+    const result = mapLedgerError({
+      _tag: ERROR_TAG.OpenAppCommand,
+      statusCode: 0x6985,
+      errorCode: '6985',
+      message: 'Failed to open Bitcoin',
+    });
+    expect(result.code).toBe(HardwareErrorCode.UserRejected);
+  });
+
   it('should map device disconnected to DeviceDisconnected', () => {
     const result = mapLedgerError({ _tag: 'DeviceNotRecognizedError', message: 'gone' });
     expect(result.code).toBe(HardwareErrorCode.DeviceDisconnected);
     expect(result.message).toContain('reconnect');
+  });
+
+  it('should map BLE not-advertising to DeviceNotFound', () => {
+    const result = mapLedgerError({
+      _tag: 'DeviceNotAdvertisingError',
+      message: 'Ledger device is not currently advertising',
+    });
+    expect(result.code).toBe(HardwareErrorCode.DeviceNotFound);
   });
 
   it('should map timeout to OperationTimeout', () => {
@@ -299,5 +328,18 @@ describe('ledgerFailure', () => {
   it('omits appName key when explicitly passed undefined', () => {
     const r = ledgerFailure(HardwareErrorCode.DeviceLocked, 'locked', undefined);
     expect('appName' in r.payload).toBe(false);
+  });
+
+  it('includes params in payload when provided', () => {
+    const r = ledgerFailure(
+      HardwareErrorCode.DevicePermissionDenied,
+      'denied',
+      undefined,
+      undefined,
+      {
+        permissionDeniedReason: 'bluetoothTurnedOff',
+      }
+    );
+    expect(r.payload.params).toEqual({ permissionDeniedReason: 'bluetoothTurnedOff' });
   });
 });

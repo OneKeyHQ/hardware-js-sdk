@@ -87,21 +87,12 @@ export interface EvmSignature {
   address?: string;
 }
 
-export type ProgressCallback = (progress: { index: number; total: number }) => void;
-
 export interface IEvmMethods {
   evmGetAddress(
     connectId: string,
     deviceId: string,
     params: EvmGetAddressParams
   ): Promise<Response<EvmAddress>>;
-
-  evmGetAddresses(
-    connectId: string,
-    deviceId: string,
-    params: EvmGetAddressParams[],
-    onProgress?: ProgressCallback
-  ): Promise<Response<EvmAddress[]>>;
 
   evmSignTransaction(
     connectId: string,

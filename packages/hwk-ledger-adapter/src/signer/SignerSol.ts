@@ -1,5 +1,6 @@
 import { deviceActionToPromise } from './deviceActionToPromise';
 
+import type { CancelReason } from './deviceActionToPromise';
 import type { SignerSolana as ISdkSignerSol } from '@ledgerhq/device-signer-kit-solana';
 
 // Extract parameter types from the real SignerSolana interface to avoid deep path imports.
@@ -16,7 +17,7 @@ type SolMsgOptions = Parameters<ISdkSignerSol['signMessage']>[2];
 export class SignerSol {
   onInteraction?: (interaction: string) => void;
 
-  onRegisterCanceller?: (cancel: () => void) => void;
+  onRegisterCanceller?: (cancel: (reason?: CancelReason) => void) => void;
 
   // eslint-disable-next-line no-useless-constructor, no-empty-function
   constructor(private readonly _sdk: ISdkSignerSol) {}

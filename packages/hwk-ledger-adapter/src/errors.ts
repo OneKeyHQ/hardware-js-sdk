@@ -2,26 +2,27 @@ import { HardwareErrorCode, enrichErrorMessage } from '@onekeyfe/hwk-adapter-cor
 
 import type { Failure } from '@onekeyfe/hwk-adapter-core';
 
-/**
- * Ledger-specific Failure: adds `appName` for "the currently-open app" — a
- * Ledger hardware concept not shared with other vendors, so it lives here
- * rather than in core's generic Failure.
- */
+// `_tag` survives errorToFailure → re-throw so SDK classifiers keep working.
 export type LedgerFailure = Omit<Failure, 'payload'> & {
-  payload: Failure['payload'] & { appName?: string };
+  payload: Failure['payload'] & { appName?: string; _tag?: string };
 };
 
-/**
- * Structurally compatible with `Failure`; writes `appName` only when provided,
- * so `'appName' in payload` is a reliable "has info" signal for consumers.
- */
+export interface WrapErrorOptions {
+  /** Fallback when err has no `appName` (DMK signer errors don't carry it). */
+  defaultAppName?: string;
+}
+
 export function ledgerFailure(
   code: HardwareErrorCode,
   error: string,
-  appName?: string
+  appName?: string,
+  tag?: string,
+  params?: Record<string, unknown>
 ): LedgerFailure {
   const payload: LedgerFailure['payload'] = { error, code };
   if (appName !== undefined) payload.appName = appName;
+  if (tag !== undefined) payload._tag = tag;
+  if (params !== undefined) payload.params = params;
   return { success: false, payload };
 }
 
@@ -67,11 +68,11 @@ const STEP_BLIND_SIGN_FALLBACK = 'signer.eth.steps.blindSignTransactionFallback'
 function getEthAppErrorCode(err: unknown): string | null {
   if (!err || typeof err !== 'object') return null;
   const e = err as Record<string, unknown>;
-  if (e._tag === 'EthAppCommandError' && typeof e.errorCode === 'string') {
+  if (e._tag === ERROR_TAG.EthAppCommand && typeof e.errorCode === 'string') {
     return e.errorCode.toLowerCase();
   }
   const orig = e.originalError as Record<string, unknown> | undefined;
-  if (orig?._tag === 'EthAppCommandError' && typeof orig.errorCode === 'string') {
+  if (orig?._tag === ERROR_TAG.EthAppCommand && typeof orig.errorCode === 'string') {
     return orig.errorCode.toLowerCase();
   }
   return null;
@@ -171,16 +172,128 @@ function mapEthAppError(ethCode: string, lastStep: string | undefined): Hardware
   }
 }
 
-/** Check if an error (or any error in its chain) represents a locked Ledger device. */
+// Centralized `_tag` constants — single source of truth for both writes and
+// classifier comparisons. Typos fail at compile time.
+export const ERROR_TAG = {
+  // SDK-mint
+  DeviceNotAdvertising: 'DeviceNotAdvertisingError', // BLE scan miss
+  BlePairingTimeout: 'BlePairingTimeoutError', // SMP 30s timeout
+  BleGattBondingFailed: 'BleGattBondingFailedError', // other GATT failure
+  UserAborted: 'UserAborted',
+  DeviceAppStuck: 'DeviceAppStuck', // chain app wedged (APDU 0x6901)
+  DeviceTransportStuck: 'DeviceTransportStuck', // DMK transport queue wedged
+
+  // DMK-reuse (DMK throws same string; we synthesize too)
+  DeviceLocked: 'DeviceLockedError',
+  DeviceNotRecognized: 'DeviceNotRecognizedError',
+  DeviceSessionNotFound: 'DeviceSessionNotFound',
+  OpenAppCommand: 'OpenAppCommandError',
+
+  // DMK-only (read only)
+  EthAppCommand: 'EthAppCommandError',
+  UserRefusedOnDevice: 'UserRefusedOnDevice',
+  WrongAppOpened: 'WrongAppOpenedError',
+  InvalidStatusWord: 'InvalidStatusWordError',
+  AlreadySendingApdu: 'AlreadySendingApduError',
+  UnknownDeviceExchange: 'UnknownDeviceExchangeError',
+  NoAccessibleDevice: 'NoAccessibleDeviceError',
+  UnknownDevice: 'UnknownDeviceError',
+  DeviceSessionRefresher: 'DeviceSessionRefresherError',
+  DeviceNotInitialized: 'DeviceNotInitializedError',
+  OpeningConnection: 'OpeningConnectionError',
+  DeviceDisconnectedBeforeSendingApdu: 'DeviceDisconnectedBeforeSendingApdu',
+  DeviceDisconnectedWhileSending: 'DeviceDisconnectedWhileSendingError',
+  Disconnect: 'DisconnectError',
+  ReconnectionFailed: 'ReconnectionFailedError',
+  WebHIDDisconnect: 'WebHIDDisconnectError',
+  // ble-plx surfaces this when GATT notification setup fails — typical
+  // outcome when the user doesn't confirm pairing on the device, or the
+  // existing bond is invalid. Observed in production after ~30s.
+  PairingRefused: 'PairingRefusedError',
+} as const;
+
+export type SdkErrorTag = (typeof ERROR_TAG)[keyof typeof ERROR_TAG];
+
+// Strict: only SE-locked. DeviceNotAdvertising / BlePairingTimeout etc are
+// their own classifiers — don't conflate.
 export function isDeviceLockedError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;
   const e = err as Record<string, unknown>;
   if (e.errorCode != null && LOCKED_ERROR_CODES.has(String(e.errorCode))) return true;
   if (e.statusCode != null && LOCKED_ERROR_CODES.has(String(e.statusCode))) return true;
-  if (e._tag === 'DeviceLockedError') return true;
+  if (e._tag === ERROR_TAG.DeviceLocked) return true;
   if (e.originalError != null && isDeviceLockedError(e.originalError)) return true;
   if (e.error != null && e._tag && isDeviceLockedError(e.error)) return true;
   return false;
+}
+
+// BLE scan miss — peripheral not seen, recoverable via unlock prompt.
+export function isDeviceNotAdvertisingError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  return (err as { _tag?: string })._tag === ERROR_TAG.DeviceNotAdvertising;
+}
+
+// GATT bonding failed (non-timeout). Not auto-retryable.
+export function isBleGattBondingFailedError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  return (err as { _tag?: string })._tag === ERROR_TAG.BleGattBondingFailed;
+}
+
+// Any BLE pairing failure (DMK-native, ble-plx, our own). All map to
+// `code: BlePairingTimeout` so batch fail-closes uniformly. User-cancel of
+// the system pairing dialog also lands here — to the user it's the same
+// "didn't pair" outcome, no need to disambiguate.
+const PAIRING_FAILURE_TAGS = new Set<string>([
+  ERROR_TAG.BlePairingTimeout,
+  ERROR_TAG.BleGattBondingFailed,
+  ERROR_TAG.PairingRefused,
+]);
+export function isBlePairingFailureError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const tag = (err as { _tag?: string })._tag;
+  if (tag && PAIRING_FAILURE_TAGS.has(tag)) return true;
+  const orig = (err as { originalError?: unknown }).originalError;
+  if (orig != null && isBlePairingFailureError(orig)) return true;
+  return false;
+}
+
+// "Connection is broken" — next call can't reuse the session. Used by
+// Layer 2 fail-closed gate.
+const CONNECTION_LEVEL_TAGS: Set<string> = new Set([
+  ERROR_TAG.DeviceLocked,
+  ERROR_TAG.DeviceNotAdvertising,
+  ERROR_TAG.BlePairingTimeout,
+  ERROR_TAG.BleGattBondingFailed,
+  ERROR_TAG.PairingRefused,
+  ERROR_TAG.DeviceNotRecognized,
+  ERROR_TAG.NoAccessibleDevice,
+  ERROR_TAG.UnknownDevice,
+  ERROR_TAG.DeviceSessionNotFound,
+  ERROR_TAG.DeviceSessionRefresher,
+  ERROR_TAG.DeviceNotInitialized,
+  ERROR_TAG.OpeningConnection,
+  ERROR_TAG.DeviceDisconnectedBeforeSendingApdu,
+  ERROR_TAG.DeviceDisconnectedWhileSending,
+  ERROR_TAG.Disconnect,
+  ERROR_TAG.ReconnectionFailed,
+  ERROR_TAG.WebHIDDisconnect,
+]);
+
+export function isConnectionLevelError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const tag = (err as { _tag?: string })._tag;
+  if (tag && CONNECTION_LEVEL_TAGS.has(tag)) return true;
+  // Recurse into nested DMK error envelopes (originalError / error.{_tag})
+  const e = err as Record<string, unknown>;
+  if (e.originalError != null && isConnectionLevelError(e.originalError)) return true;
+  if (e.error != null && e._tag && isConnectionLevelError(e.error)) return true;
+  return false;
+}
+
+/** Expose for connector — used to decide whether to pass an error through
+ *  unchanged or wrap as BleGattBondingFailed. */
+export function isKnownConnectionTag(tag: unknown): boolean {
+  return typeof tag === 'string' && CONNECTION_LEVEL_TAGS.has(tag);
 }
 
 /** Check if a status/error code exists in the given set, crawling the error chain. */
@@ -198,7 +311,7 @@ function hasStatusCode(err: unknown, codeSet: Set<string>): boolean {
 export function isUserRejectedError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;
   const e = err as Record<string, unknown>;
-  if (e._tag === 'UserRefusedOnDevice') return true;
+  if (e._tag === ERROR_TAG.UserRefusedOnDevice) return true;
   if (typeof e.message === 'string' && /denied|rejected|refused/i.test(e.message)) return true;
   if (hasStatusCode(err, USER_REJECTED_CODES)) return true;
   return false;
@@ -208,7 +321,7 @@ export function isUserRejectedError(err: unknown): boolean {
 export function isWrongAppError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;
   const e = err as Record<string, unknown>;
-  if (e._tag === 'WrongAppOpenedError' || e._tag === 'InvalidStatusWordError') {
+  if (e._tag === ERROR_TAG.WrongAppOpened || e._tag === ERROR_TAG.InvalidStatusWord) {
     if (hasStatusCode(err, WRONG_APP_CODES)) return true;
   }
   if (typeof e.message === 'string') {
@@ -224,7 +337,6 @@ export function isWrongAppError(err: unknown): boolean {
 export function isAppNotInstalledError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;
   const e = err as Record<string, unknown>;
-  if (e._tag === 'OpenAppCommandError') return true;
   if (typeof e.message === 'string' && /unknown application/i.test(e.message)) return true;
   if (hasStatusCode(err, APP_NOT_INSTALLED_CODES)) return true;
   return false;
@@ -234,7 +346,8 @@ export function isAppNotInstalledError(err: unknown): boolean {
 export function isDeviceDisconnectedError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;
   const e = err as Record<string, unknown>;
-  if (e._tag === 'DeviceNotRecognizedError' || e._tag === 'DeviceSessionNotFound') return true;
+  if (e._tag === ERROR_TAG.DeviceNotRecognized || e._tag === ERROR_TAG.DeviceSessionNotFound)
+    return true;
   if (typeof e.message === 'string') {
     const msg = e.message.toLowerCase();
     if (
@@ -267,11 +380,39 @@ export function isTimeoutError(err: unknown): boolean {
   return false;
 }
 
+/** Chain app wedged: APDU 0x6901 — only the user pressing both buttons recovers. */
+export function isAppStuckByApdu(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const tag = (err as Record<string, unknown>)._tag;
+  if (tag === ERROR_TAG.DeviceAppStuck) return true; // already wrapped form
+  return extractApduHex(err) === '6901';
+}
+
+/** DMK transport / IntentQueue slot wedged — recover via connector.reset(). */
+export function isTransportStuck(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const tag = (err as Record<string, unknown>)._tag;
+  return (
+    tag === ERROR_TAG.DeviceTransportStuck || // already wrapped form
+    tag === ERROR_TAG.UnknownDeviceExchange ||
+    tag === ERROR_TAG.AlreadySendingApdu
+  );
+}
+
+/** Union: any stuck state, regardless of root cause. Used by Layer 2 catch. */
+export function isStuckAppStateError(err: unknown): boolean {
+  return isAppStuckByApdu(err) || isTransportStuck(err);
+}
+
 /**
- * Map a Ledger DMK error to a HardwareErrorCode and human-readable message
- * with actionable recovery information for the caller.
+ * Map a Ledger DMK error to a HardwareErrorCode and human-readable message.
+ * `opts.defaultAppName` fills `appName` when the raw error doesn't carry it
+ * (DMK signer errors don't).
  */
-export function mapLedgerError(err: unknown): {
+export function mapLedgerError(
+  err: unknown,
+  opts?: WrapErrorOptions
+): {
   code: HardwareErrorCode;
   message: string;
   appName?: string;
@@ -289,8 +430,13 @@ export function mapLedgerError(err: unknown): {
 
   let code: HardwareErrorCode;
 
+  // DeviceLocked: _tag handoff (unlock-device) or APDU 0x5515/0x6982.
   if (isDeviceLockedError(err)) {
     code = HardwareErrorCode.DeviceLocked;
+  } else if (isDeviceNotAdvertisingError(err)) {
+    code = HardwareErrorCode.DeviceNotFound;
+  } else if (isBlePairingFailureError(err)) {
+    code = HardwareErrorCode.BlePairingTimeout;
   } else if (isUserRejectedError(err)) {
     // User rejection (0x6985) must win over EthAppError mapping — a user-cancelled
     // blind-sign is not a "please enable Blind signing" situation.
@@ -298,7 +444,7 @@ export function mapLedgerError(err: unknown): {
   } else if (isWrongAppError(err)) {
     code = HardwareErrorCode.WrongApp;
   } else if (isAppNotInstalledError(err)) {
-    code = HardwareErrorCode.AppNotOpen;
+    code = HardwareErrorCode.AppNotInstalled;
   } else if (isDeviceDisconnectedError(err)) {
     code = HardwareErrorCode.DeviceDisconnected;
   } else if (isTimeoutError(err)) {
@@ -322,10 +468,11 @@ export function mapLedgerError(err: unknown): {
     code = ethMapped ?? chainMapped ?? HardwareErrorCode.UnknownError;
   }
 
-  const appName =
+  const errAppName =
     err && typeof err === 'object'
       ? ((err as Record<string, unknown>).appName as string | undefined)
       : undefined;
+  const appName = errAppName ?? opts?.defaultAppName;
 
   return { code, message: enrichErrorMessage(code, originalMessage), appName };
 }

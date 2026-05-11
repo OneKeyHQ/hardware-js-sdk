@@ -1,11 +1,21 @@
 import { DeviceActionStatus } from '@ledgerhq/device-management-kit';
 
-import { debugLog } from '../utils/debugLog';
-
 import type { DeviceAction, DeviceActionState } from '../types';
 
-/** Default timeout for non-interactive operations (e.g. getAddress without showOnDevice). */
-const DEFAULT_TIMEOUT_MS = 30_000;
+/**
+ * Idle watchdog: fires iff transport wedged (no DMK emission).
+ * 65s > DMK's own 60s waitForDeviceUnlock — DMK fires first in normal
+ * cases; we only catch the case where DMK itself is stuck.
+ * Paused during interactive pending.
+ */
+const IDLE_WATCHDOG_MS = 65_000;
+
+/** Optional context attached to the rejection when a canceller fires. */
+export interface CancelReason {
+  code?: number;
+  tag?: string;
+  message?: string;
+}
 
 /**
  * Convert a DMK DeviceAction (Observable-based) into a Promise.
@@ -16,8 +26,9 @@ const DEFAULT_TIMEOUT_MS = 30_000;
  * so upstream error classifiers can distinguish failure contexts (e.g. Blind signing
  * disabled vs. generic Invalid data).
  *
- * @param timeoutMs  Timeout in ms. Resets each time the Observable emits (device is alive).
- *                   Pass 0 to disable. Default: 30s.
+ * @param timeoutMs  Idle watchdog ms. Re-armed on each emission, paused
+ *                   during interactive pending. 0 disables. Default 65s
+ *                   (covers DMK's 60s + margin; we're a backstop only).
  * @param onRegisterCanceller  Optional callback that receives a function which, when
  *                             called, unsubscribes and cancels the underlying DeviceAction
  *                             (releases DMK's IntentQueue slot). Caller is responsible
@@ -26,8 +37,8 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 export function deviceActionToPromise<T>(
   action: DeviceAction<T>,
   onInteraction?: (interaction: string) => void,
-  timeoutMs: number = DEFAULT_TIMEOUT_MS,
-  onRegisterCanceller?: (cancel: () => void) => void
+  timeoutMs: number = IDLE_WATCHDOG_MS,
+  onRegisterCanceller?: (cancel: (reason?: CancelReason) => void) => void
 ): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     let settled = false;
@@ -41,64 +52,72 @@ export function deviceActionToPromise<T>(
       try {
         sub?.unsubscribe();
       } catch {
-        // subscription may already be closed; ignore
+        // Subscription may already be closed.
       }
       try {
         action.cancel();
       } catch {
-        // DMK action may already be settled; ignore
+        // DMK action may already be settled.
       }
     };
 
-    const resetTimer = () => {
+    const armIdleWatchdog = () => {
       if (timer) clearTimeout(timer);
       if (timeoutMs > 0) {
         timer = setTimeout(() => {
           if (!settled) {
             settled = true;
             cancelAction();
-            reject(new Error('Device action timed out — device may be locked or disconnected'));
+            reject(
+              new Error(
+                'Ledger transport unresponsive: no DMK state change within the watchdog window. The device may have lost connection.'
+              )
+            );
           }
         }, timeoutMs);
       }
     };
 
-    // Start initial timer
-    resetTimer();
+    armIdleWatchdog();
 
-    // Expose a canceller for external abort (release DMK queue slot + unsubscribe).
+    // Expose a canceller for external abort. Optional reason tags the rejection.
     if (onRegisterCanceller) {
-      onRegisterCanceller(() => {
-        if (settled) return;
+      onRegisterCanceller(reason => {
+        if (settled) {
+          return;
+        }
         settled = true;
         if (timer) clearTimeout(timer);
         cancelAction();
-        reject(new Error('Device action cancelled'));
+        const err = new Error(reason?.message ?? 'Device action cancelled');
+        if (reason?.code !== undefined) {
+          (err as Error & { code?: number }).code = reason.code;
+        }
+        if (reason?.tag) {
+          Object.defineProperty(err, '_tag', {
+            value: reason.tag,
+            configurable: true,
+            enumerable: false,
+            writable: true,
+          });
+        }
+        reject(err);
       });
     }
 
-    debugLog('[DMK-Observable] subscribing to action.observable...');
     sub = action.observable.subscribe({
       next: (state: DeviceActionState<T>) => {
-        // Drop late emissions post-cancel; otherwise resetTimer re-arms an unclearable timer.
-        if (settled) return;
-        resetTimer(); // device is alive → reset timeout
+        // Drop post-settle emissions to avoid leaking the watchdog.
+        if (settled) {
+          return;
+        }
+        armIdleWatchdog();
 
         // Track last DMK step so caller can disambiguate failure contexts
         // (e.g. 0x6a80 during blindSignTransactionFallback = Blind signing disabled)
         const step = (state as { intermediateValue?: { step?: string } })?.intermediateValue?.step;
         if (step) lastStep = step;
 
-        debugLog(
-          '[DMK-Observable] state:',
-          JSON.stringify({
-            status: state.status,
-            intermediateValue:
-              state.status === DeviceActionStatus.Pending ? state.intermediateValue : undefined,
-            hasOutput: state.status === DeviceActionStatus.Completed,
-            hasError: state.status === DeviceActionStatus.Error,
-          })
-        );
         if (state.status === DeviceActionStatus.Completed) {
           settled = true;
           if (timer) clearTimeout(timer);
@@ -114,6 +133,13 @@ export function deviceActionToPromise<T>(
         } else if (state.status === DeviceActionStatus.Pending && onInteraction) {
           const interaction = state.intermediateValue?.requiredUserInteraction;
           if (interaction && interaction !== 'none') {
+            // unlock-device is DMK's own bounded poll. Other interaction
+            // states keep the caller-provided watchdog so a stuck observable
+            // cannot hold the queue slot forever.
+            if (interaction === 'unlock-device' && timer) {
+              clearTimeout(timer);
+              timer = null;
+            }
             onInteraction(String(interaction));
           }
         }

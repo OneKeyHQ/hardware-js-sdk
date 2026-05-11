@@ -1,4 +1,9 @@
-import { HardwareErrorCode, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hwk-adapter-core';
+import {
+  HardwareErrorCode,
+  UI_REQUEST,
+  UI_RESPONSE,
+  deriveDeviceFingerprint,
+} from '@onekeyfe/hwk-adapter-core';
 
 import { LedgerAdapter } from '../adapter/LedgerAdapter';
 
@@ -75,6 +80,15 @@ function createMockConnector(): IConnector & {
   return connector;
 }
 
+async function waitForCondition(condition: () => boolean): Promise<void> {
+  for (let i = 0; i < 10; i += 1) {
+    if (condition()) return;
+    await new Promise(resolve => {
+      setTimeout(resolve, 0);
+    });
+  }
+}
+
 describe('LedgerAdapter', () => {
   let adapter: LedgerAdapter;
   let connector: ReturnType<typeof createMockConnector>;
@@ -122,6 +136,62 @@ describe('LedgerAdapter', () => {
       expect(connector.connect).toHaveBeenCalledWith('dev-1');
     });
 
+    it('should map direct BLE connect when target is not advertising to DeviceNotFound', async () => {
+      const bleConnector = createMockConnector();
+      (bleConnector as unknown as { connectionType: string }).connectionType = 'ble';
+      bleConnector.searchDevices.mockResolvedValue([]);
+      const bleAdapter = new LedgerAdapter(bleConnector);
+      bleAdapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, () => {
+        bleAdapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_DEVICE_PERMISSION,
+          payload: { granted: true },
+        });
+      });
+
+      const result = await bleAdapter.connectDevice('dev-1');
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.payload.code).toBe(HardwareErrorCode.DeviceNotFound);
+      }
+      expect(bleConnector.connect).not.toHaveBeenCalled();
+    });
+
+    it('should not auto-pick the first BLE device when connectId is empty', async () => {
+      const bleConnector = createMockConnector();
+      (bleConnector as unknown as { connectionType: string }).connectionType = 'ble';
+      bleConnector.searchDevices.mockResolvedValue([
+        {
+          connectId: 'A58F',
+          deviceId: 'A58F',
+          name: 'Leo',
+          model: 'nanoX',
+        } as ConnectorDevice,
+        {
+          connectId: '0738',
+          deviceId: '0738',
+          name: 'Andox',
+          model: 'nanoX',
+        } as ConnectorDevice,
+      ]);
+      const bleAdapter = new LedgerAdapter(bleConnector);
+      bleAdapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, () => {
+        bleAdapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_DEVICE_PERMISSION,
+          payload: { granted: true },
+        });
+      });
+
+      const result = await bleAdapter.connectDevice('');
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.payload.code).toBe(HardwareErrorCode.DeviceNotFound);
+      }
+      expect(bleConnector.searchDevices).not.toHaveBeenCalled();
+      expect(bleConnector.connect).not.toHaveBeenCalled();
+    });
+
     it('should disconnect without error', async () => {
       await adapter.connectDevice('dev-1');
       await expect(adapter.disconnectDevice('dev-1')).resolves.toBeUndefined();
@@ -130,6 +200,45 @@ describe('LedgerAdapter', () => {
   });
 
   describe('evmGetAddress', () => {
+    it('rejects a concurrent chain call with DeviceBusy instead of queueing it', async () => {
+      let resolveFirstCall: (value: unknown) => void = () => {};
+      connector.call
+        .mockImplementationOnce(
+          () =>
+            new Promise(resolve => {
+              resolveFirstCall = resolve;
+            })
+        )
+        .mockResolvedValueOnce({
+          address: '0xSECOND',
+          publicKey: '0xpk2',
+        });
+
+      await adapter.connectDevice('dev-1');
+
+      const first = adapter.evmGetAddress('dev-1', '', {
+        path: "m/44'/60'/0'/0/0",
+        showOnDevice: false,
+      });
+
+      await waitForCondition(() => connector.call.mock.calls.length === 1);
+      expect(connector.call).toHaveBeenCalledTimes(1);
+
+      const second = await adapter.evmGetAddress('dev-1', '', {
+        path: "m/44'/60'/0'/0/1",
+        showOnDevice: false,
+      });
+      resolveFirstCall({ address: '0xFIRST', publicKey: '0xpk1' });
+
+      const firstResult = await first;
+      expect(firstResult.success).toBe(true);
+      expect(second.success).toBe(false);
+      if (!second.success) {
+        expect(second.payload.code).toBe(HardwareErrorCode.DeviceBusy);
+      }
+      expect(connector.call).toHaveBeenCalledTimes(1);
+    });
+
     it('should return address on success', async () => {
       connector.call.mockResolvedValueOnce({
         address: '0xABCD',
@@ -168,24 +277,6 @@ describe('LedgerAdapter', () => {
           showOnDevice: true,
         })
       );
-    });
-  });
-
-  describe('evmGetAddresses', () => {
-    it('should return multiple addresses', async () => {
-      connector.call
-        .mockResolvedValueOnce({ address: '0xABCD' })
-        .mockResolvedValueOnce({ address: '0xDEF0' });
-
-      await adapter.connectDevice('dev-1');
-      const result = await adapter.evmGetAddresses('dev-1', '', [
-        { path: "m/44'/60'/0'/0/0" },
-        { path: "m/44'/60'/0'/0/1" },
-      ]);
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.payload).toHaveLength(2);
-      }
     });
   });
 
@@ -319,6 +410,114 @@ describe('LedgerAdapter', () => {
         'btcGetPublicKey',
         expect.objectContaining({ path: "m/84'/0'/0'" })
       );
+    });
+
+    it('rejects concurrent BTC high-index calls instead of queueing them', async () => {
+      let resolveFirstCall: ((value: unknown) => void) | undefined;
+      connector.call.mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            resolveFirstCall = resolve;
+          })
+      );
+      await adapter.connectDevice('dev-1');
+
+      const prompts: unknown[] = [];
+      adapter.on(UI_REQUEST.REQUEST_BTC_HIGH_INDEX_CONFIRM, event => {
+        prompts.push(event);
+      });
+
+      const first = adapter.btcGetPublicKey('dev-1', '', {
+        path: "m/84'/0'/100'",
+        coin: 'btc',
+      });
+      const second = adapter.btcGetPublicKey('dev-1', '', {
+        path: "m/84'/0'/101'",
+        coin: 'btc',
+      });
+
+      await waitForCondition(() => prompts.length === 1);
+      adapter.uiResponse({
+        type: UI_RESPONSE.RECEIVE_BTC_HIGH_INDEX_CONFIRM,
+        payload: { confirmed: true },
+      });
+
+      await waitForCondition(() => connector.call.mock.calls.length === 1);
+      expect(prompts).toHaveLength(1);
+      expect(connector.call).toHaveBeenCalledTimes(1);
+      expect(connector.call).toHaveBeenCalledWith(
+        'session-abc',
+        'btcGetPublicKey',
+        expect.objectContaining({ path: "m/84'/0'/100'", showOnDevice: true })
+      );
+
+      resolveFirstCall?.({ xpub: 'xpub6First' });
+      const [firstResult, secondResult] = await Promise.all([first, second]);
+
+      expect(prompts).toHaveLength(1);
+      expect(firstResult.success).toBe(true);
+      expect(secondResult.success).toBe(false);
+      if (!secondResult.success) {
+        expect(secondResult.payload.code).toBe(HardwareErrorCode.DeviceBusy);
+      }
+      expect(connector.call).toHaveBeenCalledWith(
+        'session-abc',
+        'btcGetPublicKey',
+        expect.objectContaining({ path: "m/84'/0'/100'", showOnDevice: true })
+      );
+      expect(connector.call).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects later device jobs while BTC high-index confirmation is pending', async () => {
+      connector.call.mockResolvedValueOnce({ xpub: 'xpub6High' });
+      await adapter.connectDevice('dev-1');
+
+      const prompts: unknown[] = [];
+      adapter.on(UI_REQUEST.REQUEST_BTC_HIGH_INDEX_CONFIRM, event => {
+        prompts.push(event);
+      });
+
+      const highIndex = adapter.btcGetPublicKey('dev-1', '', {
+        path: "m/84'/0'/100'",
+        coin: 'btc',
+      });
+
+      await new Promise(resolve => {
+        setTimeout(resolve, 0);
+      });
+      expect(prompts).toHaveLength(1);
+      expect(connector.call).not.toHaveBeenCalled();
+
+      const signing = adapter.btcSignMessage('dev-1', '', {
+        path: "m/84'/0'/0'/0/0",
+        coin: 'btc',
+        messageHex: '0x48656c6c6f',
+      });
+
+      await new Promise(resolve => {
+        setTimeout(resolve, 0);
+      });
+      expect(connector.call).not.toHaveBeenCalled();
+
+      adapter.uiResponse({
+        type: UI_RESPONSE.RECEIVE_BTC_HIGH_INDEX_CONFIRM,
+        payload: { confirmed: true },
+      });
+
+      const [highIndexResult, signingResult] = await Promise.all([highIndex, signing]);
+
+      expect(highIndexResult.success).toBe(true);
+      expect(signingResult.success).toBe(false);
+      if (!signingResult.success) {
+        expect(signingResult.payload.code).toBe(HardwareErrorCode.DeviceBusy);
+      }
+      expect(connector.call).toHaveBeenNthCalledWith(
+        1,
+        'session-abc',
+        'btcGetPublicKey',
+        expect.objectContaining({ path: "m/84'/0'/100'", showOnDevice: true })
+      );
+      expect(connector.call).toHaveBeenCalledTimes(1);
     });
 
     it('btcSignTransaction forwards PSBT and returns serialized tx', async () => {
@@ -474,6 +673,57 @@ describe('LedgerAdapter', () => {
         expect.objectContaining({ messageHex: '0x48656c6c6f' })
       );
     });
+
+    it('tronGetAddress rejects before returning a target address when fingerprint mismatches', async () => {
+      const expectedFingerprint = deriveDeviceFingerprint('TExpectedFingerprintAddress');
+      connector.call
+        .mockResolvedValueOnce({ address: 'TActualFingerprintAddress' })
+        .mockResolvedValueOnce({ address: 'TSHOULD_NOT_RETURN', publicKey: '0xpub' });
+
+      await adapter.connectDevice('dev-1');
+      const result = await adapter.tronGetAddress('dev-1', expectedFingerprint, {
+        path: "m/44'/195'/1'/0/0",
+        showOnDevice: false,
+      });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.payload.code).toBe(HardwareErrorCode.DeviceMismatch);
+      }
+      expect(connector.call).toHaveBeenCalledWith(
+        'session-abc',
+        'tronGetAddress',
+        expect.objectContaining({ path: "m/44'/195'/0'/0/0", showOnDevice: false })
+      );
+      expect(connector.call).not.toHaveBeenCalledWith(
+        'session-abc',
+        'tronGetAddress',
+        expect.objectContaining({ path: "m/44'/195'/1'/0/0" })
+      );
+    });
+
+    it('tronSignTransaction rejects before signing when fingerprint mismatches', async () => {
+      const expectedFingerprint = deriveDeviceFingerprint('TExpectedFingerprintAddress');
+      connector.call
+        .mockResolvedValueOnce({ address: 'TActualFingerprintAddress' })
+        .mockResolvedValueOnce({ signature: 'SHOULD_NOT_SIGN' });
+
+      await adapter.connectDevice('dev-1');
+      const result = await adapter.tronSignTransaction('dev-1', expectedFingerprint, {
+        path: "m/44'/195'/0'/0/0",
+        rawTxHex: '0x0a02',
+      });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.payload.code).toBe(HardwareErrorCode.DeviceMismatch);
+      }
+      expect(connector.call).not.toHaveBeenCalledWith(
+        'session-abc',
+        'tronSignTransaction',
+        expect.any(Object)
+      );
+    });
   });
 
   describe('cancel', () => {
@@ -575,6 +825,55 @@ describe('LedgerAdapter', () => {
       await expect(adapter.searchDevices()).rejects.toMatchObject({
         code: HardwareErrorCode.DevicePermissionDenied,
       });
+    });
+
+    it('preserves permission denial detail when the consumer replies granted=false with reason', async () => {
+      (
+        adapter as unknown as { emitter: { removeAllListeners(e: string): void } }
+      ).emitter.removeAllListeners(UI_REQUEST.REQUEST_DEVICE_PERMISSION);
+      adapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, () => {
+        adapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_DEVICE_PERMISSION,
+          payload: {
+            granted: false,
+            reason: 'bluetoothTurnedOff',
+          },
+        });
+      });
+
+      await expect(adapter.searchDevices()).rejects.toMatchObject({
+        code: HardwareErrorCode.DevicePermissionDenied,
+        reason: 'bluetoothTurnedOff',
+      });
+    });
+
+    it('preserves permission denial detail in chain call failure payload', async () => {
+      (
+        adapter as unknown as { emitter: { removeAllListeners(e: string): void } }
+      ).emitter.removeAllListeners(UI_REQUEST.REQUEST_DEVICE_PERMISSION);
+      adapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, () => {
+        adapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_DEVICE_PERMISSION,
+          payload: {
+            granted: false,
+            reason: 'bluetoothTurnedOff',
+          },
+        });
+      });
+
+      const result = await adapter.evmGetAddress('dev-1', '', {
+        path: "m/44'/60'/0'/0/0",
+        showOnDevice: false,
+      });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.payload.code).toBe(HardwareErrorCode.DevicePermissionDenied);
+        expect(result.payload.params).toEqual({
+          permissionDeniedReason: 'bluetoothTurnedOff',
+        });
+      }
+      expect(connector.call).not.toHaveBeenCalled();
     });
   });
 
@@ -696,6 +995,110 @@ describe('LedgerAdapter', () => {
       );
     });
 
+    it('should reconnect the original target after timeout reset', async () => {
+      const expectedAddress = '0x1111111111111111111111111111111111111111';
+      const expectedFingerprint = deriveDeviceFingerprint(expectedAddress);
+
+      await adapter.connectDevice('dev-1');
+
+      connector.call
+        .mockResolvedValueOnce({ address: expectedAddress })
+        .mockRejectedValueOnce(
+          Object.assign(new Error('apdu timeout'), { _tag: 'SendApduTimeoutError' })
+        )
+        .mockResolvedValueOnce({ address: expectedAddress })
+        .mockResolvedValueOnce({ signature: '0xSIGNED' });
+
+      connector.searchDevices.mockResolvedValueOnce([
+        { connectId: 'dev-new', deviceId: 'dev-new', name: 'Nano S', model: 'nanoS' },
+        { connectId: 'dev-1', deviceId: 'dev-1', name: 'Nano X', model: 'nanoX' },
+      ]);
+      connector.connect.mockResolvedValueOnce({
+        sessionId: 'session-target',
+        deviceInfo: {
+          vendor: 'ledger',
+          model: 'nanoX',
+          firmwareVersion: 'unknown',
+          deviceId: 'dev-1',
+          connectId: 'dev-1',
+          connectionType: 'usb',
+        },
+      });
+
+      const result = await adapter.evmSignMessage('dev-1', expectedFingerprint, {
+        path: "m/44'/60'/0'/0/0",
+        message: 'Hello',
+      });
+
+      expect(result.success).toBe(true);
+      expect(connector.connect).toHaveBeenLastCalledWith('dev-1');
+      expect(connector.connect).not.toHaveBeenCalledWith('dev-new');
+      expect(connector.call).toHaveBeenLastCalledWith(
+        'session-target',
+        'evmSignMessage',
+        expect.objectContaining({ path: "m/44'/60'/0'/0/0", message: 'Hello' })
+      );
+    });
+
+    it('should reset dirty timeout retry state before the next chain call', async () => {
+      await adapter.connectDevice('dev-1');
+
+      connector.connect
+        .mockResolvedValueOnce({
+          sessionId: 'session-retry',
+          deviceInfo: {
+            vendor: 'ledger',
+            model: 'nanoX',
+            firmwareVersion: 'unknown',
+            deviceId: 'dev-1',
+            connectId: 'dev-1',
+            connectionType: 'usb',
+          },
+        } as ConnectorSession)
+        .mockResolvedValueOnce({
+          sessionId: 'session-final',
+          deviceInfo: {
+            vendor: 'ledger',
+            model: 'nanoX',
+            firmwareVersion: 'unknown',
+            deviceId: 'dev-1',
+            connectId: 'dev-1',
+            connectionType: 'usb',
+          },
+        } as ConnectorSession);
+
+      connector.call
+        .mockRejectedValueOnce(
+          Object.assign(new Error('apdu timeout'), { _tag: 'SendApduTimeoutError' })
+        )
+        .mockRejectedValueOnce(
+          Object.assign(new Error('InvalidResponseFormatError'), {
+            _tag: 'InvalidResponseFormatError',
+          })
+        )
+        .mockResolvedValueOnce({ address: '0xRECOVERED', publicKey: '0xpk' });
+
+      const failed = await adapter.btcGetPublicKey('dev-1', '', {
+        path: "m/44'/0'/0'",
+        showOnDevice: false,
+      });
+      expect(failed.success).toBe(false);
+      expect(connector.reset).toHaveBeenCalledTimes(2);
+
+      const recovered = await adapter.evmGetAddress('', '', {
+        path: "m/44'/60'/0'/0/0",
+        showOnDevice: false,
+      });
+
+      expect(recovered.success).toBe(true);
+      expect(connector.connect).toHaveBeenCalledTimes(3);
+      expect(connector.call).toHaveBeenLastCalledWith(
+        'session-final',
+        'evmGetAddress',
+        expect.objectContaining({ path: "m/44'/60'/0'/0/0" })
+      );
+    });
+
     it('should auto-select first device when multiple devices found and handleSelectDevice is off (default)', async () => {
       connector.searchDevices.mockResolvedValueOnce([
         { connectId: 'dev-A', deviceId: 'dev-A', name: 'Nano X', model: 'nanoX' },
@@ -722,6 +1125,135 @@ describe('LedgerAdapter', () => {
 
       expect(result.success).toBe(true);
       expect(connector.connect).toHaveBeenCalledWith('dev-A');
+    });
+
+    it('should capture a synchronous select-device response from the UI handler', async () => {
+      const selectAdapter = new LedgerAdapter(connector, { handleSelectDevice: true });
+      selectAdapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, () => {
+        selectAdapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_DEVICE_PERMISSION,
+          payload: { granted: true },
+        });
+      });
+      selectAdapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
+        const selected = event.payload.devices.find(d => d.connectId === 'dev-B');
+        selectAdapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
+          payload: { sdkConnectId: selected?.connectId ?? 'dev-B' },
+        });
+      });
+
+      connector.searchDevices.mockResolvedValueOnce([
+        { connectId: 'dev-A', deviceId: 'dev-A', name: 'Nano X', model: 'nanoX' },
+        { connectId: 'dev-B', deviceId: 'dev-B', name: 'Nano S', model: 'nanoS' },
+      ]);
+      connector.connect.mockResolvedValueOnce({
+        sessionId: 'session-B',
+        deviceInfo: {
+          vendor: 'ledger',
+          model: 'nanoS',
+          firmwareVersion: 'unknown',
+          deviceId: 'dev-B',
+          connectId: 'dev-B',
+          connectionType: 'usb',
+        },
+      });
+      connector.call.mockResolvedValueOnce({ address: '0xSELECTED' });
+
+      const result = await selectAdapter.evmGetAddress('', '', {
+        path: "m/44'/60'/0'/0/0",
+        showOnDevice: false,
+      });
+
+      expect(result.success).toBe(true);
+      expect(connector.connect).toHaveBeenCalledWith('dev-B');
+    });
+
+    it('should reject BLE business calls with an empty connectId instead of auto-selecting a device', async () => {
+      const bleConnector = createMockConnector();
+      (bleConnector as unknown as { connectionType: string }).connectionType = 'ble';
+      bleConnector.searchDevices.mockResolvedValueOnce([
+        { connectId: 'A58F', deviceId: 'A58F', name: 'Leo', model: 'nanoX' },
+        { connectId: '0738', deviceId: '0738', name: 'Andox', model: 'nanoX' },
+      ]);
+      const bleAdapter = new LedgerAdapter(bleConnector);
+      bleAdapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, () => {
+        bleAdapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_DEVICE_PERMISSION,
+          payload: { granted: true },
+        });
+      });
+
+      const result = await bleAdapter.btcGetPublicKey('', '', {
+        path: "m/44'/0'/0'",
+        showOnDevice: false,
+      });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.payload.code).toBe(HardwareErrorCode.DeviceNotFound);
+      }
+      expect(bleConnector.searchDevices).not.toHaveBeenCalled();
+      expect(bleConnector.connect).not.toHaveBeenCalled();
+    });
+
+    it('should retry BLE connection-level errors with the original connectId', async () => {
+      const bleConnector = createMockConnector();
+      (bleConnector as unknown as { connectionType: string }).connectionType = 'ble';
+      bleConnector.searchDevices.mockResolvedValue([
+        { connectId: 'A58F', deviceId: 'dmk-path-a58f', name: 'Leo', model: 'nanoX' },
+      ]);
+      bleConnector.connect
+        .mockResolvedValueOnce({
+          sessionId: 'session-a58f-initial',
+          deviceInfo: {
+            vendor: 'ledger',
+            model: 'nanoX',
+            firmwareVersion: 'unknown',
+            deviceId: 'dmk-path-a58f',
+            connectId: 'A58F',
+            connectionType: 'ble',
+          },
+        } as ConnectorSession)
+        .mockResolvedValueOnce({
+          sessionId: 'session-a58f-retry',
+          deviceInfo: {
+            vendor: 'ledger',
+            model: 'nanoX',
+            firmwareVersion: 'unknown',
+            deviceId: 'dmk-path-a58f',
+            connectId: 'A58F',
+            connectionType: 'ble',
+          },
+        } as ConnectorSession);
+      bleConnector.call
+        .mockRejectedValueOnce(
+          Object.assign(new Error('session not found'), { _tag: 'DeviceSessionNotFound' })
+        )
+        .mockResolvedValueOnce({ address: '0xBLE', publicKey: '0xpk' });
+
+      const bleAdapter = new LedgerAdapter(bleConnector);
+      bleAdapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, () => {
+        bleAdapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_DEVICE_PERMISSION,
+          payload: { granted: true },
+        });
+      });
+
+      await bleAdapter.connectDevice('A58F');
+      const result = await bleAdapter.evmGetAddress('A58F', '', {
+        path: "m/44'/60'/0'/0/0",
+        showOnDevice: false,
+      });
+
+      expect(result.success).toBe(true);
+      expect(bleConnector.connect).toHaveBeenLastCalledWith('A58F');
+      expect(bleConnector.connect).not.toHaveBeenCalledWith(undefined);
+      expect(bleConnector.call).toHaveBeenLastCalledWith(
+        'session-a58f-retry',
+        'evmGetAddress',
+        expect.objectContaining({ path: "m/44'/60'/0'/0/0" })
+      );
     });
   });
 

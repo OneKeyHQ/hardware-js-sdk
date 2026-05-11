@@ -419,6 +419,8 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'tonSignMessage' }),
   tonSignProof: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'tonSignProof' }),
+  tonSignData: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'tonSignData' }),
 
   scdoGetAddress: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'scdoGetAddress' }),

@@ -28,6 +28,13 @@ const Log = getLogger(LoggerNames.Method);
 const SESSION_ERROR = 'session not found';
 const FIRMWARE_UPDATE_CONFIRM = 'Firmware install confirmed';
 
+type FirmwareProgressMetadata = {
+  transferredBytes?: number;
+  totalBytes?: number;
+  rateBytesPerSecond?: number;
+  elapsedMs?: number;
+};
+
 const isDeviceDisconnectedError = (error: unknown) => {
   const message = error instanceof Error ? error.message : String(error ?? '');
   return (
@@ -82,12 +89,17 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
    * @description Post the progress message
    * @param progress Post the percentage of the progress
    */
-  postProgressMessage = (progress: number, progressType: IFirmwareUpdateProgressType) => {
+  postProgressMessage = (
+    progress: number,
+    progressType: IFirmwareUpdateProgressType,
+    metadata: FirmwareProgressMetadata = {}
+  ) => {
     this.postMessage(
       createUiMessage(UI_REQUEST.FIRMWARE_PROGRESS, {
         device: this.device.toMessageObject() as KnownDevice,
         progress,
         progressType,
+        ...metadata,
       })
     );
   };
@@ -325,10 +337,12 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
     filePath,
     processedSize,
     totalSize,
+    transferStartTime = Date.now(),
   }: PROTO.FirmwareUpload & {
     filePath: string;
     processedSize?: number;
     totalSize?: number;
+    transferStartTime?: number;
   }) {
     if (!filePath.startsWith('0:')) {
       throw new Error('filePath must start with 0:');
@@ -338,7 +352,6 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
     const chunkSize = 1024 * perPackageSize;
     const totalChunks = Math.ceil(payload.byteLength / chunkSize);
     let offset = 0;
-    let currentFileProcessed = 0;
 
     for (let i = 0; i < totalChunks; i++) {
       const chunkStart = i * chunkSize;
@@ -350,7 +363,7 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
       // Calculate progress based on whether we're tracking overall progress or single file progress
       let progress: number;
       if (totalSize !== undefined && processedSize !== undefined) {
-        currentFileProcessed = processedSize + chunkEnd;
+        const currentFileProcessed = processedSize + chunkEnd;
         progress = Math.min(Math.ceil((currentFileProcessed / totalSize) * 100), 99);
       } else {
         progress = Math.min(Math.ceil(((i + 1) / totalChunks) * 100), 99);
@@ -366,7 +379,17 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
       );
       // @ts-expect-error
       offset += writeRes.message.processed_byte;
-      this.postProgressMessage(progress, 'transferData');
+      const elapsedMs = Date.now() - transferStartTime;
+      const transferredBytes =
+        totalSize !== undefined && processedSize !== undefined ? processedSize + offset : offset;
+      const totalBytes = totalSize ?? payload.byteLength;
+      this.postProgressMessage(progress, 'transferData', {
+        transferredBytes,
+        totalBytes,
+        rateBytesPerSecond:
+          elapsedMs > 0 ? Math.round((transferredBytes / elapsedMs) * 1000) : undefined,
+        elapsedMs,
+      });
     }
 
     // Return processed size only if we're tracking overall progress

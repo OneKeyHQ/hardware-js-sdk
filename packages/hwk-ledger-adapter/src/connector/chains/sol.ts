@@ -2,6 +2,7 @@ import { bytesToHex, hexToBytes } from '@onekeyfe/hwk-adapter-core';
 
 import { collapseSignerInteraction, normalizePath } from './utils';
 import { SignerSol } from '../../signer/SignerSol';
+import { debugLog } from '../../utils/debugLog';
 
 import type { ConnectorContext } from './types';
 
@@ -111,13 +112,14 @@ async function _createSolSigner(ctx: ConnectorContext, sessionId: string): Promi
   // DMK-specific values (verify-address, sign-transaction, sign-personal-message)
   // collapse to ConfirmOnDevice via the helper.
   signer.onInteraction = (interaction: string) => {
+    debugLog('[LedgerConnector] sol.onInteraction:', interaction);
     ctx.emit('ui-event', {
       type: collapseSignerInteraction(interaction),
       payload: { sessionId },
     });
   };
 
-  signer.onRegisterCanceller = (cancel: () => void) => {
+  signer.onRegisterCanceller = cancel => {
     ctx.registerCanceller(sessionId, cancel);
   };
 

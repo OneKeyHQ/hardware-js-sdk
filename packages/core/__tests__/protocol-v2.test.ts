@@ -486,6 +486,7 @@ describe('Protocol V2 firmware update targets', () => {
       filePath: 'vol1:firmware.bin',
       processedSize: 0,
       totalSize: 4097,
+      transferStartTime: Date.now() - 1000,
     });
 
     const writePayloads = typedCall.mock.calls.map(call => call[2]);
@@ -493,6 +494,16 @@ describe('Protocol V2 firmware update targets', () => {
     expect(writePayloads.map(payload => payload.file.data.byteLength)).toEqual([4096, 1]);
     expect(writePayloads.map(payload => payload.overwrite)).toEqual([true, false]);
     expect(writePayloads.every(payload => payload.append === false)).toBe(true);
+    expect(method.postProgressMessage).toHaveBeenLastCalledWith(
+      99,
+      'transferData',
+      expect.objectContaining({
+        transferredBytes: 4097,
+        totalBytes: 4097,
+        rateBytesPerSecond: expect.any(Number),
+        elapsedMs: expect.any(Number),
+      })
+    );
   });
 
   test('caps native BLE firmware upload chunks below the WebUSB limit', async () => {

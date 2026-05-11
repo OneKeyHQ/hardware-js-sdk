@@ -146,6 +146,7 @@ import type { dnxSignTransaction } from './dnxSignTransaction';
 import type { tonGetAddress } from './tonGetAddress';
 import type { tonSignMessage } from './tonSignMessage';
 import type { tonSignProof } from './tonSignProof';
+import type { tonSignData } from './tonSignData';
 import type { scdoGetAddress } from './scdoGetAddress';
 import type { scdoSignMessage } from './scdoSignMessage';
 import type { scdoSignTransaction } from './scdoSignTransaction';
@@ -435,6 +436,7 @@ export type CoreApi = {
   tonGetAddress: typeof tonGetAddress;
   tonSignMessage: typeof tonSignMessage;
   tonSignProof: typeof tonSignProof;
+  tonSignData: typeof tonSignData;
 
   /**
    * SCDO Network

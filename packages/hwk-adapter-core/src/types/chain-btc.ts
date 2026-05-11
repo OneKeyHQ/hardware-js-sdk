@@ -1,5 +1,4 @@
 import type { Response } from './response';
-import type { ProgressCallback } from './chain-evm';
 
 export interface BtcGetAddressParams {
   path: string;
@@ -111,13 +110,6 @@ export interface IBtcMethods {
     deviceId: string,
     params: BtcGetAddressParams
   ): Promise<Response<BtcAddress>>;
-
-  btcGetAddresses(
-    connectId: string,
-    deviceId: string,
-    params: BtcGetAddressParams[],
-    onProgress?: ProgressCallback
-  ): Promise<Response<BtcAddress[]>>;
 
   btcGetPublicKey(
     connectId: string,

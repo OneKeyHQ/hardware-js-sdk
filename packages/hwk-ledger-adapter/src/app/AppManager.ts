@@ -6,6 +6,9 @@ import {
   isSuccessCommandResult,
 } from '@ledgerhq/device-management-kit';
 
+import { ERROR_TAG } from '../errors';
+import { debugLog } from '../utils/debugLog';
+
 /**
  * Map of chain ticker symbols to the Ledger app name
  * that must be open to sign transactions for that chain.
@@ -65,9 +68,16 @@ export class AppManager {
    * 5. Poll until the device confirms the target app is running.
    */
   /**
-   * @param onConfirmOnDevice Called after OpenAppCommand succeeds —
-   *   the device is now showing a confirmation prompt to the user.
-   *   NOT called if the app is already open or if the app is not installed.
+   * @param onConfirmOnDevice Called BEFORE OpenAppCommand is issued — the
+   *   device is about to display "Open <app>" on screen and wait for the
+   *   user's button press. UI consumers should show their "open app" prompt
+   *   in response. NOT called when the target app is already open (no user
+   *   interaction needed in that case).
+   *
+   * Important: OpenAppCommand is blocking. It does not resolve until the user
+   *   has physically confirmed on the device, so anything that runs AFTER
+   *   `await this._openApp(...)` lands AFTER the prompt is already gone.
+   *   Hence the callback must fire BEFORE that await.
    */
   async ensureAppOpen(
     sessionId: string,
@@ -87,11 +97,14 @@ export class AppManager {
       await this._waitForApp(sessionId, DASHBOARD_APP_NAME);
     }
 
-    // Open the target app — throws if not installed (0x6807)
-    await this._openApp(sessionId, targetAppName);
-
-    // Device is now showing the confirm prompt
+    // Notify UI BEFORE issuing the open-app APDU. OpenAppCommand blocks until
+    // the user confirms on device, so by the time `_openApp` resolves the
+    // prompt is already gone — the UI must be told ahead of the APDU.
     onConfirmOnDevice?.();
+
+    // Open the target app — throws if not installed (0x6807).
+    // Resolves only after the user has confirmed on the device screen.
+    await this._openApp(sessionId, targetAppName);
 
     // Poll until the target app is confirmed open
     await this._waitForApp(sessionId, targetAppName);
@@ -107,9 +120,37 @@ export class AppManager {
       command: new GetAppAndVersionCommand(),
     });
     if (isSuccessCommandResult(result)) {
+      debugLog('[AppManager] currentApp:', result.data.name);
       return result.data.name;
     }
-    throw new Error('Failed to get current app from device');
+    // DMK returns errors as result.error rather than throwing — surface the
+    // tag / errorCode / originalError so transport-level failures aren't
+    // swallowed under a generic "Failed to get current app" string.
+    const errResult = result as unknown as { error?: Record<string, unknown> };
+    const dmkErr = errResult.error ?? {};
+    const original = (dmkErr as { originalError?: unknown }).originalError;
+    debugLog(
+      '[AppManager] _getCurrentApp failed sessionId=',
+      sessionId,
+      'tag=',
+      (dmkErr as { _tag?: string })._tag,
+      'errorCode=',
+      (dmkErr as { errorCode?: unknown }).errorCode,
+      'message=',
+      (dmkErr as { message?: string }).message,
+      'originalErrorMessage=',
+      (original as { message?: string })?.message ?? String(original ?? '')
+    );
+    throw Object.assign(
+      new Error(
+        (dmkErr as { message?: string }).message ?? 'Failed to get current app from device'
+      ),
+      {
+        _tag: (dmkErr as { _tag?: string })._tag,
+        errorCode: (dmkErr as { errorCode?: unknown }).errorCode,
+        originalError: original,
+      }
+    );
   }
 
   private async _openApp(sessionId: string, appName: string): Promise<void> {
@@ -119,8 +160,9 @@ export class AppManager {
     });
     if (!isSuccessCommandResult(result)) {
       const { statusCode } = result as Record<string, unknown>;
+      debugLog('[AppManager] openApp failed:', appName, 'statusCode:', statusCode);
       throw Object.assign(new Error(`Failed to open "${appName}"`), {
-        _tag: 'OpenAppCommandError',
+        _tag: ERROR_TAG.OpenAppCommand,
         errorCode: String(statusCode ?? ''),
         statusCode,
         appName,
@@ -129,6 +171,7 @@ export class AppManager {
   }
 
   private async _closeCurrentApp(sessionId: string): Promise<void> {
+    debugLog('[AppManager] closeCurrentApp');
     await this._dmk.sendCommand({
       sessionId,
       command: new CloseAppCommand(),
@@ -140,15 +183,23 @@ export class AppManager {
    * or throw after `_maxRetries` attempts.
    */
   private async _waitForApp(sessionId: string, expectedAppName: string): Promise<void> {
+    let lastSeen = '';
     for (let i = 0; i < this._maxRetries; i++) {
       await this._wait();
       const current = await this._getCurrentApp(sessionId);
+      lastSeen = current;
       if (current === expectedAppName) {
         return;
       }
     }
+    debugLog(
+      '[AppManager] waitForApp exhausted: expected=',
+      expectedAppName,
+      'lastSeen=',
+      lastSeen
+    );
     throw new Error(
-      `Ledger: failed to open "${expectedAppName}" after ${this._maxRetries} retries`
+      `Ledger: failed to open "${expectedAppName}" after ${this._maxRetries} retries (last seen: ${lastSeen})`
     );
   }
 

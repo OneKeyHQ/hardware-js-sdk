@@ -27,7 +27,7 @@ describe('DeviceJobQueue', () => {
     expect(order).toEqual([1, 2]);
   });
 
-  it('should allow parallel jobs for different devices', async () => {
+  it('should serialize jobs across different devices (global serial queue)', async () => {
     const queue = new DeviceJobQueue();
     const order: string[] = [];
 
@@ -40,7 +40,69 @@ describe('DeviceJobQueue', () => {
     });
 
     await Promise.all([job1, job2]);
-    expect(order).toEqual(['d2', 'd1']);
+    expect(order).toEqual(['d1', 'd2']);
+  });
+
+  it('rejectIfBusy rejects a new job instead of queueing it', async () => {
+    const queue = new DeviceJobQueue();
+    const busyError = Object.assign(new Error('Device is busy'), {
+      code: 10102,
+    });
+    const started: string[] = [];
+    let releaseFirst: () => void = () => {};
+
+    const first = queue.enqueue('device-1', async () => {
+      started.push('first');
+      await new Promise<void>(resolve => {
+        releaseFirst = resolve;
+      });
+      return 'first';
+    });
+
+    const second = queue.enqueue(
+      'device-1',
+      async () => {
+        started.push('second');
+        return 'second';
+      },
+      { rejectIfBusy: true, busyError }
+    );
+
+    await expect(second).rejects.toBe(busyError);
+    releaseFirst();
+    await expect(first).resolves.toBe('first');
+    expect(started).toEqual(['first']);
+  });
+
+  it('rejectIfBusy keeps rejecting until a cancelled active job settles', async () => {
+    const queue = new DeviceJobQueue();
+    const busyError = Object.assign(new Error('Device is busy'), {
+      code: 10102,
+    });
+    let rejectActive: (reason?: unknown) => void = () => {};
+
+    const active = queue.enqueue('device-1', async signal => {
+      await new Promise<void>((_, reject) => {
+        rejectActive = reject;
+        signal.addEventListener('abort', () => {
+          setTimeout(() => reject(signal.reason), 30);
+        });
+      });
+    });
+
+    await new Promise(r => setTimeout(r, 5));
+    queue.clear();
+
+    await expect(
+      queue.enqueue('device-1', async () => 'early', { rejectIfBusy: true, busyError })
+    ).rejects.toBe(busyError);
+
+    rejectActive(new Error('active settled'));
+    await expect(active).rejects.toBeDefined();
+
+    await expect(
+      queue.enqueue('device-1', async () => 'after', { rejectIfBusy: true, busyError })
+    ).resolves.toBe('after');
   });
 
   it('should continue after a failed job', async () => {
@@ -81,7 +143,7 @@ describe('DeviceJobQueue', () => {
         });
         return 'A';
       },
-      { interruptibility: 'none', label: 'Job A' }
+      { label: 'Job A' }
     );
 
     // Step 2: Enqueue Job B for device "d1" — chains behind A
@@ -92,7 +154,7 @@ describe('DeviceJobQueue', () => {
         await new Promise(r => setTimeout(r, 100));
         return 'B';
       },
-      { interruptibility: 'none', label: 'Job B' }
+      { label: 'Job B' }
     );
 
     // Step 3: Wait for A to start running, then clear()
@@ -109,7 +171,7 @@ describe('DeviceJobQueue', () => {
         await new Promise(r => setTimeout(r, 100));
         return 'C';
       },
-      { interruptibility: 'none', label: 'Job C' }
+      { label: 'Job C' }
     );
 
     const results = await Promise.allSettled([jobAPromise, jobBPromise, jobCPromise]);
@@ -121,5 +183,92 @@ describe('DeviceJobQueue', () => {
     expect(started).not.toContain('B');
     // C should succeed
     expect(results[2]).toEqual({ status: 'fulfilled', value: 'C' });
+  });
+
+  it('cancelActiveAndPending() should reject queued jobs with the cancel reason', async () => {
+    const queue = new DeviceJobQueue();
+    const started: string[] = [];
+    const cancelReason = Object.assign(new Error('User aborted operation'), {
+      code: 400,
+      _tag: 'UserAborted',
+    });
+
+    const jobA = queue.enqueue('d', async signal => {
+      started.push('A');
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(resolve, 200);
+        signal.addEventListener('abort', () => {
+          clearTimeout(timer);
+          reject(signal.reason);
+        });
+      });
+    });
+
+    const jobB = queue.enqueue('d', async () => {
+      started.push('B');
+      return 'B';
+    });
+
+    await new Promise(r => setTimeout(r, 5));
+    expect(queue.cancelActiveAndPending('d', cancelReason)).toBe(true);
+
+    const results = await Promise.allSettled([jobA, jobB]);
+
+    expect(results[0]).toEqual({ status: 'rejected', reason: cancelReason });
+    expect(results[1]).toEqual({ status: 'rejected', reason: cancelReason });
+    expect(started).toEqual(['A']);
+  });
+
+  it('clear() during running job does not clobber successor _active (identity guard)', async () => {
+    const queue = new DeviceJobQueue();
+
+    // Long job that will be aborted by clear() but takes a moment to actually exit
+    const j1 = queue.enqueue('d', async signal => {
+      await new Promise<void>((resolve, reject) => {
+        const t = setTimeout(resolve, 500);
+        signal.addEventListener('abort', () => {
+          clearTimeout(t);
+          // Delay finally execution so it races with j2's _active set
+          setTimeout(() => reject(signal.reason), 30);
+        });
+      });
+    });
+
+    await new Promise(r => setTimeout(r, 5));
+    queue.clear();
+
+    // Enqueue j2 immediately after clear — it sets _active.
+    // j1's deferred finally must NOT null j2's _active.
+    const j2 = queue.enqueue('d', async () => {
+      await new Promise(r => setTimeout(r, 60));
+      // After j1's stale finally fires (~30ms after abort), _active should
+      // still point to j2 because of the identity guard.
+      expect(queue.getActiveJob()?.deviceId).toBe('d');
+      return 'j2';
+    });
+
+    await expect(j1).rejects.toBeDefined();
+    await expect(j2).resolves.toBe('j2');
+  });
+
+  it('isBusy reflects the active slot', async () => {
+    const queue = new DeviceJobQueue();
+    expect(queue.isBusy()).toBe(false);
+
+    let release: () => void = () => {};
+    const j = queue.enqueue(
+      'd',
+      () =>
+        new Promise<void>(r => {
+          release = r;
+        })
+    );
+
+    await new Promise(r => setTimeout(r, 5));
+    expect(queue.isBusy()).toBe(true);
+
+    release();
+    await j;
+    expect(queue.isBusy()).toBe(false);
   });
 });

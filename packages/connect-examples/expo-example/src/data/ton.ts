@@ -164,6 +164,62 @@ const api: PlaygroundProps[] = [
       },
     ],
   },
+  {
+    method: 'tonSignData',
+    description: 'Sign Data (TON Connect signData)',
+    presupposes: [
+      {
+        title: 'Text',
+        value: {
+          path: "m/44'/607'/0'",
+          // TonSignDataType.TEXT = 0
+          type: 0,
+          // hex of "Hello OneKey"
+          payload: '48656c6c6f204f6e654b6579',
+          appdomain: 'onekey.so',
+          timestamp: Math.floor(Date.now() / 1000),
+          fromAddress: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
+          walletVersion: 3,
+          isBounceable: false,
+          isTestnetOnly: false,
+        },
+      },
+      {
+        title: 'Binary',
+        value: {
+          path: "m/44'/607'/0'",
+          // TonSignDataType.BINARY = 1
+          type: 1,
+          // arbitrary binary bytes as hex
+          payload: '00112233445566778899aabbccddeeff',
+          appdomain: 'onekey.so',
+          timestamp: Math.floor(Date.now() / 1000),
+          fromAddress: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
+          walletVersion: 3,
+          isBounceable: false,
+          isTestnetOnly: false,
+        },
+      },
+      {
+        title: 'Cell',
+        value: {
+          path: "m/44'/607'/0'",
+          // TonSignDataType.CELL = 2
+          type: 2,
+          // BoC hex of the cell payload
+          payload: 'b5ee9c7241010101000e000018000000004f6e654b65792043656c6c3cc87b8a',
+          // TL-B schema of the cell payload (required by TON Connect for cell type)
+          schema: 'text_comment#00000000 text:string = InternalMsgBody;',
+          appdomain: 'onekey.so',
+          timestamp: Math.floor(Date.now() / 1000),
+          fromAddress: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
+          walletVersion: 3,
+          isBounceable: false,
+          isTestnetOnly: false,
+        },
+      },
+    ],
+  },
 ];
 
 export default api;

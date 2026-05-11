@@ -10,7 +10,7 @@ const RESPONSE_TO_REQUEST: Record<string, string> = {
   [UI_RESPONSE.RECEIVE_SELECT_DEVICE]: UI_REQUEST.REQUEST_SELECT_DEVICE,
   [UI_RESPONSE.RECEIVE_DEVICE_CONNECT]: UI_REQUEST.REQUEST_DEVICE_CONNECT,
   [UI_RESPONSE.RECEIVE_DEVICE_PERMISSION]: UI_REQUEST.REQUEST_DEVICE_PERMISSION,
-  [UI_RESPONSE.RECEIVE_PREEMPTION]: UI_REQUEST.REQUEST_PREEMPTION,
+  [UI_RESPONSE.RECEIVE_BTC_HIGH_INDEX_CONFIRM]: UI_REQUEST.REQUEST_BTC_HIGH_INDEX_CONFIRM,
   // RECEIVE_QR_RESPONSE maps to QR_DISPLAY or QR_SCAN — resolved dynamically below.
 };
 
@@ -26,8 +26,13 @@ type PendingEntry = {
 
 /**
  * Per-type single-slot registry for adapter-level UI requests. A new `wait`
- * of the same type preempts (rejects) the prior one. Unknown response types
- * are dropped silently so the public `uiResponse` entry never throws.
+ * of the same type supersedes (rejects) the prior pending entry. With the
+ * job queue running globally serially, cross-type collisions don't occur in
+ * normal flow — same-type preemption is a defensive measure for callers
+ * that fire the same request twice without waiting on the first.
+ *
+ * Unknown response types are dropped silently so the public `uiResponse`
+ * entry never throws.
  */
 export class UiRequestRegistry {
   private pending = new Map<string, PendingEntry>();
@@ -114,7 +119,8 @@ export class UiRequestRegistry {
     this.cancel();
   }
 
-  hasPending(requestType: string): boolean {
-    return this.pending.has(requestType);
+  hasPending(requestType?: string): boolean {
+    if (requestType) return this.pending.has(requestType);
+    return this.pending.size > 0;
   }
 }

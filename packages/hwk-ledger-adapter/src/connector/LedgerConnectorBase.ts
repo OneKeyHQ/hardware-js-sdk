@@ -1,7 +1,20 @@
+import { HardwareErrorCode } from '@onekeyfe/hwk-adapter-core';
+
 import { LedgerDeviceManager } from '../device/LedgerDeviceManager';
 import { SignerManager } from '../signer/SignerManager';
-import { mapLedgerError } from '../errors';
+import {
+  ERROR_TAG,
+  isAppStuckByApdu,
+  isKnownConnectionTag,
+  isTransportStuck,
+  mapLedgerError,
+} from '../errors';
 import { debugLog } from '../utils/debugLog';
+import {
+  isLedgerBleConnectionType,
+  isLedgerBleDescriptor,
+  isValidLedgerBleConnectId,
+} from '../utils/ledgerDmkTransport';
 import {
   btcGetAddress,
   btcGetMasterFingerprint,
@@ -21,6 +34,8 @@ import {
   tronSignTransaction,
 } from './chains';
 
+import type { WrapErrorOptions } from '../errors';
+import type { CancelReason } from '../signer/deviceActionToPromise';
 import type { ConnectorContext } from './chains/types';
 import type { DeviceManagementKit } from '@ledgerhq/device-management-kit';
 import type {
@@ -75,6 +90,17 @@ export interface LedgerConnectorBaseOptions {
 // ---------------------------------------------------------------------------
 
 type EventHandler<K extends ConnectorEventType> = (data: ConnectorEventMap[K]) => void;
+
+/**
+ * Method-name prefix → Ledger app name. Keeps chain handlers free of
+ * per-site `defaultAppName` boilerplate; `_ctxForMethod` injects it.
+ */
+const METHOD_PREFIX_TO_APP_NAME: Record<string, string> = {
+  evm: 'Ethereum',
+  btc: 'Bitcoin',
+  sol: 'Solana',
+  tron: 'Tron',
+};
 
 // ---------------------------------------------------------------------------
 // Default signer kit importer (webpack/rspack — uses "exports" field)
@@ -151,14 +177,6 @@ export class LedgerConnectorBase implements IConnector {
 
   private _pathToConnectId = new Map<string, string>(); // "D5:75:7D:4B:51:E8" -> "A58F"
 
-  /** Register a connectId <-> path mapping from a device descriptor. */
-  private _registerDeviceId(descriptor: DeviceDescriptor): string {
-    const connectId = this._resolveConnectId(descriptor);
-    this._connectIdToPath.set(connectId, descriptor.path);
-    this._pathToConnectId.set(descriptor.path, connectId);
-    return connectId;
-  }
-
   /** Get DMK path from external connectId. Falls back to connectId itself. */
   private _getPathForConnectId(connectId: string): string {
     return this._connectIdToPath.get(connectId) ?? connectId;
@@ -177,7 +195,20 @@ export class LedgerConnectorBase implements IConnector {
   // IConnector.cancel(sessionId) invokes the registered canceller, which
   // unsubscribes the observable and releases DMK's IntentQueue slot.
   // ---------------------------------------------------------------------------
-  private readonly _cancellers = new Map<string, () => void>();
+  private readonly _cancellers = new Map<string, (reason?: CancelReason) => void>();
+
+  // ---------------------------------------------------------------------------
+  // Per-session DMK state subscriptions
+  //
+  // DMK only emits `device-disconnect` on the connector when `disconnect()`
+  // is called explicitly. To pick up autonomous disconnects (USB unplug,
+  // BLE drop, device sleep, DMK transport reset) we subscribe to
+  // `_dmk.getDeviceSessionState({sessionId})` per active session and emit
+  // `device-disconnect` ourselves the moment DMK reports the device went
+  // to NOT_CONNECTED. The subscription is torn down on disconnect /
+  // reset / observable completion to avoid leaks.
+  // ---------------------------------------------------------------------------
+  private readonly _sessionStateSubs = new Map<string, { unsubscribe: () => void }>();
 
   /**
    * Resolves a Ledger signer kit module by package name.
@@ -215,7 +246,7 @@ export class LedgerConnectorBase implements IConnector {
       emit: <K extends ConnectorEventType>(event: K, data: ConnectorEventMap[K]) =>
         this._emit(event, data),
       invalidateSession: sid => this._invalidateSession(sid),
-      wrapError: err => this._wrapError(err),
+      wrapError: (err, opts) => this._wrapError(err, opts),
       getOrCreateDmk: () => this._getOrCreateDmk(),
       getDeviceManager: () => this._getDeviceManager(),
       getSignerManager: () => this._getSignerManager(),
@@ -240,27 +271,68 @@ export class LedgerConnectorBase implements IConnector {
     return descriptor.path;
   }
 
+  /**
+   * Authoritative discovery for this transport. Default = enumerate snapshot
+   * (USB/HID). BLE overrides to drive from a live scan window since DMK's
+   * enumerate() cache survives peripherals going offline.
+   */
+  protected async _discoverDescriptors(dm: LedgerDeviceManager): Promise<DeviceDescriptor[]> {
+    let descriptors = await dm.enumerate();
+    if (descriptors.length === 0) {
+      try {
+        await dm.requestDevice();
+      } catch {
+        // User may cancel the permission dialog
+      }
+      descriptors = await dm.enumerate();
+    }
+    return descriptors;
+  }
+
   // ---------------------------------------------------------------------------
   // IConnector -- Device discovery
   // ---------------------------------------------------------------------------
 
   async searchDevices(): Promise<ConnectorDevice[]> {
+    debugLog('[DMK] connector.searchDevices() entry');
     const dm = await this._getDeviceManager();
 
-    let descriptors = await dm.enumerate();
-
-    // If no devices found, trigger permission dialog / BLE scanning via startDiscovering
-    if (descriptors.length === 0) {
-      try {
-        await dm.requestDevice();
-      } catch {
-        // User may cancel the permission dialog -- that's OK
+    const descriptors = await this._discoverDescriptors(dm);
+    const resolvedDescriptors = descriptors.map(d => ({
+      descriptor: d,
+      connectId: this._resolveConnectId(d),
+    }));
+    const bleConnectIdCounts = new Map<string, number>();
+    for (const item of resolvedDescriptors) {
+      if (isLedgerBleDescriptor(this.connectionType, item.descriptor)) {
+        if (!isValidLedgerBleConnectId(item.connectId)) {
+          debugLog(`[DMK] connector.searchDevices() invalid BLE connectId=${item.connectId}`);
+          throw Object.assign(
+            new Error('Ledger BLE connectId must be the 4-character BLE identifier'),
+            { code: HardwareErrorCode.DeviceNotFound }
+          );
+        }
+        bleConnectIdCounts.set(item.connectId, (bleConnectIdCounts.get(item.connectId) ?? 0) + 1);
       }
-      descriptors = await dm.enumerate();
+    }
+    const duplicateBleConnectId = Array.from(bleConnectIdCounts.entries()).find(
+      ([, count]) => count > 1
+    )?.[0];
+    if (duplicateBleConnectId) {
+      debugLog(
+        `[DMK] connector.searchDevices() duplicate BLE connectId=${duplicateBleConnectId} counts=${JSON.stringify(
+          Array.from(bleConnectIdCounts.entries())
+        )}`
+      );
+      throw Object.assign(
+        new Error(`Duplicate Ledger BLE connectId detected: ${duplicateBleConnectId}`),
+        { code: HardwareErrorCode.DeviceNotFound }
+      );
     }
 
-    const result: ConnectorDevice[] = descriptors.map(d => {
-      const connectId = this._registerDeviceId(d);
+    const result: ConnectorDevice[] = resolvedDescriptors.map(({ descriptor: d, connectId }) => {
+      this._connectIdToPath.set(connectId, d.path);
+      this._pathToConnectId.set(d.path, connectId);
       return {
         connectId,
         deviceId: d.path,
@@ -268,6 +340,11 @@ export class LedgerConnectorBase implements IConnector {
         model: d.type,
       };
     });
+    debugLog(
+      `[DMK] connector.searchDevices() return count=${result.length} ids=[${result
+        .map(r => r.connectId)
+        .join(',')}] paths=[${result.map(r => r.deviceId).join(',')}]`
+    );
     return result;
   }
 
@@ -276,31 +353,88 @@ export class LedgerConnectorBase implements IConnector {
   // ---------------------------------------------------------------------------
 
   async connect(deviceId?: string): Promise<ConnectorSession> {
-    const dm = await this._getDeviceManager();
-    await this.searchDevices();
-
-    // Resolve external connectId -> DMK path via mapping table
-    const dmkPath = deviceId ? this._getPathForConnectId(deviceId) : undefined;
-
-    // If no path found, pick first available device
-    let targetPath = dmkPath;
+    // Trust caller's deviceId — search has already happened upstream
+    // (UI scan flow). When caller didn't specify, fall back to a fresh
+    // search so we have something to connect to.
+    let targetPath = deviceId ? this._getPathForConnectId(deviceId) : undefined;
     if (!targetPath) {
-      const descriptors = await dm.enumerate();
-      if (descriptors.length === 0) {
+      const discovered = await this.searchDevices();
+      if (discovered.length === 0) {
         throw new Error(
           `No Ledger device found. Make sure the device is connected${
-            this.connectionType === 'ble' ? ' nearby with Bluetooth enabled' : ' via USB'
+            isLedgerBleConnectionType(this.connectionType)
+              ? ' nearby with Bluetooth enabled'
+              : ' via USB'
           } and unlocked.`
         );
       }
-      targetPath = descriptors[0].path;
+      targetPath = discovered[0].deviceId;
     }
 
-    // External connectId for session/events — always use the mapped ID
     const externalConnectId = this._getConnectIdForPath(targetPath);
 
+    // No active SMP timeout — let dm.connect resolve/reject naturally based
+    // on what DMK / iOS BLE stack actually report. iOS has its own ~30s SMP
+    // timeout; we trust it. The previous active 30s timer mis-judged slow-
+    // but-successful pairings (user took 35s to confirm passkey).
+    // 5min hang ceiling only catches genuine DMK stuck-promise (very rare).
+    const HANG_CEILING_MS = 5 * 60_000;
+    const dmConnectWithObserve = async (dm: LedgerDeviceManager, path: string): Promise<string> => {
+      if (!isLedgerBleConnectionType(this.connectionType)) return dm.connect(path);
+
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+      let timedOut = false;
+      const connectPromise = dm.connect(path);
+      const hangPromise = new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          timedOut = true;
+          const err = new Error(
+            `Ledger BLE connect did not return within ${
+              HANG_CEILING_MS / 60_000
+            }min — DMK hang fallback.`
+          ) as Error & { _tag?: string; code?: number };
+          err._tag = ERROR_TAG.BlePairingTimeout;
+          err.code = HardwareErrorCode.BlePairingTimeout;
+          reject(err);
+        }, HANG_CEILING_MS);
+      });
+      try {
+        return await Promise.race([connectPromise, hangPromise]);
+      } catch (err) {
+        const e = err as {
+          _tag?: string;
+          message?: string;
+          errorCode?: unknown;
+          statusCode?: unknown;
+          originalError?: { _tag?: string; message?: string };
+        };
+        debugLog('[DMK] dm.connect rejected — observed:', {
+          _tag: e?._tag,
+          message: e?.message,
+          errorCode: e?.errorCode,
+          statusCode: e?.statusCode,
+          originalTag: e?.originalError?._tag,
+          originalMessage: e?.originalError?.message,
+        });
+        if (timedOut) {
+          void connectPromise.then(
+            sessionId => dm.disconnect(sessionId).catch(() => undefined),
+            () => undefined
+          );
+        }
+        throw err;
+      } finally {
+        if (timeoutId) clearTimeout(timeoutId);
+      }
+    };
+
+    // Resolve dm lazily — _resetSignersAndSessions during retry replaces
+    // _deviceManager, so capturing it in a closure would use a stale instance
+    // whose _discovered Map has been disposed.
     const doConnect = async (path: string): Promise<ConnectorSession> => {
-      const sessionId = await dm.connect(path);
+      const dm = await this._getDeviceManager();
+      const sessionId = await dmConnectWithObserve(dm, path);
+      this._watchSessionState(sessionId, externalConnectId);
       const session: ConnectorSession = {
         sessionId,
         deviceInfo: {
@@ -313,39 +447,63 @@ export class LedgerConnectorBase implements IConnector {
           capabilities: { persistentDeviceIdentity: false },
         },
       };
+      // dm.connect() requires the descriptor in _discovered, so name lookup
+      // will succeed; fallback covers any transient race.
+      const name = dm.getDeviceName(path) ?? 'Ledger';
       this._emit('device-connect', {
-        device: {
-          connectId: externalConnectId,
-          deviceId: path,
-          name: 'Ledger',
-        },
+        device: { connectId: externalConnectId, deviceId: path, name },
       });
       return session;
     };
 
     try {
       return await doConnect(targetPath);
-    } catch {
-      // Retry once: clear signer state but keep DMK (and BLE scan) alive
+    } catch (err) {
+      // GATT failed — clean up local state and let the adapter own recovery.
+      // We don't search-and-retry here: Layer 1 (`_doConnect` in LedgerAdapter)
+      // is the single recovery owner. Doing a second doConnect here just
+      // doubles the timeout the user sees before the unlock dialog appears.
       this._resetSignersAndSessions();
-      const dm2 = await this._getDeviceManager();
-      await this.searchDevices();
 
-      // Re-resolve path — device may have been re-discovered with new DMK path
-      const retryPath = this._getPathForConnectId(externalConnectId);
-      if (!retryPath || retryPath === externalConnectId) {
-        // Mapping not found — try first available
-        const descriptors = await dm2.enumerate();
-        if (descriptors.length === 0) {
-          throw new Error(
-            `No Ledger device found after retry. Make sure the device is connected${
-              this.connectionType === 'ble' ? ' nearby with Bluetooth enabled' : ' via USB'
-            } and unlocked.`
-          );
+      // BLE GATT failures split into 3 tags:
+      //   BlePairingTimeout — our 30s timeout (pre-classified above)
+      //   BleGattBondingFailed — anything else (PeerRemoved / BleError /
+      //                          iOS SMP reject / unknown transport)
+      //   DeviceNotAdvertising — pre-GATT scan miss (only from connectDevice)
+      if (isLedgerBleConnectionType(this.connectionType)) {
+        const tag = (err as { _tag?: string } | null | undefined)?._tag;
+
+        // If DMK already gave a recognized tag (locked / disconnected / pairing
+        // / transport-class), pass through untouched so SDK classifiers can
+        // route on the real cause. We only wrap completely untagged errors.
+        if (isKnownConnectionTag(tag)) {
+          throw err;
         }
-        return doConnect(descriptors[0].path);
+
+        // Untagged failure — wrap as BleGattBondingFailed so upstream still
+        // has a code path. Original error preserved on `originalError`.
+        const wrapped = new Error(
+          'Ledger Bluetooth pairing failed. Make sure the device is unlocked and nearby, then try again.'
+        ) as Error & { _tag?: string; code?: number; originalError?: unknown };
+        wrapped._tag = ERROR_TAG.BleGattBondingFailed;
+        wrapped.code = HardwareErrorCode.BlePairingTimeout;
+        wrapped.originalError = err;
+        throw wrapped;
       }
-      return doConnect(retryPath);
+
+      // USB/HID: typed errors flow through unchanged so APDU/transport
+      // diagnostics aren't masked. Unknown failure → "unplugged".
+      if (err && typeof err === 'object' && (err as { _tag?: string })._tag) {
+        const taggedError =
+          err instanceof Error
+            ? err
+            : Object.assign(
+                new Error((err as { message?: string }).message ?? 'Ledger device error'),
+                err
+              );
+        throw taggedError;
+      }
+      throw new Error('Ledger device appears unplugged. Plug in the device and try again.');
     }
   }
 
@@ -354,11 +512,88 @@ export class LedgerConnectorBase implements IConnector {
 
     const deviceId = this._deviceManager.getDeviceId(sessionId);
     this._signerManager?.invalidate(sessionId);
+    this._unwatchSessionState(sessionId);
     await this._deviceManager.disconnect(sessionId);
 
     if (deviceId) {
       this._emit('device-disconnect', { connectId: deviceId });
     }
+  }
+
+  /**
+   * Subscribe to DMK's per-session state observable so that any autonomous
+   * disconnect (USB unplug, BLE drop, device sleep, transport reset) is
+   * surfaced as a `device-disconnect` event — without this, the upstream
+   * `LedgerAdapter._sessions` map would hold a dead session entry until
+   * the next call hit `DeviceSessionNotFound`.
+   *
+   * Best-effort: any error subscribing is swallowed so a flaky DMK
+   * doesn't break the connect path.
+   */
+  private _watchSessionState(sessionId: string, externalConnectId: string): void {
+    const dmk = this._dmk;
+    if (!dmk) return;
+    const previous = this._sessionStateSubs.get(sessionId);
+    if (previous) {
+      try {
+        previous.unsubscribe();
+      } catch {
+        // ignore
+      }
+    }
+    try {
+      const sub = dmk.getDeviceSessionState({ sessionId }).subscribe({
+        next: (state: { deviceStatus?: string }) => {
+          // String-compare against DeviceStatus.NOT_CONNECTED ("NOT CONNECTED")
+          // to avoid pulling the runtime enum import (kept type-only for
+          // Metro/RN compatibility — see _importLedgerKit).
+          if (state?.deviceStatus === 'NOT CONNECTED') {
+            this._handleAutonomousDisconnect(sessionId, externalConnectId);
+          }
+        },
+        error: () => {
+          // DMK closed the observable abnormally — treat as disconnect.
+          this._handleAutonomousDisconnect(sessionId, externalConnectId);
+        },
+        complete: () => {
+          // Observable completed — session is gone from DMK's POV.
+          this._handleAutonomousDisconnect(sessionId, externalConnectId);
+        },
+      });
+      this._sessionStateSubs.set(sessionId, sub);
+    } catch (err) {
+      debugLog('[DMK] _watchSessionState subscribe failed:', err);
+    }
+  }
+
+  private _unwatchSessionState(sessionId: string): void {
+    const sub = this._sessionStateSubs.get(sessionId);
+    if (!sub) return;
+    try {
+      sub.unsubscribe();
+    } catch {
+      // ignore
+    }
+    this._sessionStateSubs.delete(sessionId);
+  }
+
+  private _handleAutonomousDisconnect(sessionId: string, externalConnectId: string): void {
+    if (!this._sessionStateSubs.has(sessionId)) return; // already handled
+    debugLog(
+      '[DMK] autonomous disconnect detected — sessionId:',
+      sessionId,
+      'connectId:',
+      externalConnectId
+    );
+    this._unwatchSessionState(sessionId);
+    this._signerManager?.invalidate(sessionId);
+    this._cancellers.get(sessionId)?.({
+      code: HardwareErrorCode.DeviceDisconnected,
+      tag: 'DeviceDisconnected',
+      message: 'Device disconnected',
+    });
+    this._cancellers.delete(sessionId);
+    this._emit('device-disconnect', { connectId: externalConnectId });
   }
 
   // ---------------------------------------------------------------------------
@@ -367,45 +602,78 @@ export class LedgerConnectorBase implements IConnector {
 
   async call(sessionId: string, method: string, params: unknown): Promise<unknown> {
     debugLog('[DMK] call:', method, JSON.stringify(params));
+    try {
+      return await this._dispatch(sessionId, method, params);
+    } catch (err) {
+      // True chain-app stuck (APDU 0x6901): user must back out of the
+      // app on the device — keep the "press both buttons to exit" message.
+      if (isAppStuckByApdu(err)) {
+        throw Object.assign(new Error('Ledger app is unresponsive'), {
+          code: HardwareErrorCode.DeviceAppStuck,
+          _tag: ERROR_TAG.DeviceAppStuck,
+          originalError: err,
+        });
+      }
+      // DMK transport queue wedged (AlreadySendingApdu / UnknownDeviceExchange):
+      // device + app are fine, only our SDK-side comms got tangled. Surface
+      // as TransportError so the user sees a "communication interrupted,
+      // please retry" message instead of a misleading "exit app" prompt.
+      // Layer 2 (LedgerAdapter._runConnectorCall) will reset the connector
+      // before re-throwing so the next call rebuilds a clean DMK instance.
+      if (isTransportStuck(err)) {
+        throw Object.assign(new Error('Device communication interrupted, please retry'), {
+          code: HardwareErrorCode.TransportError,
+          _tag: ERROR_TAG.DeviceTransportStuck,
+          originalError: err,
+        });
+      }
+      throw err;
+    }
+  }
+
+  private async _dispatch(sessionId: string, method: string, params: unknown): Promise<unknown> {
+    // Bind the chain's Ledger app name to ctx.wrapError once per dispatch so
+    // chain handlers can call `ctx.wrapError(err)` with no per-site appName.
+    const ctx = this._ctxForMethod(method);
     switch (method) {
       // EVM
       case 'evmGetAddress':
-        return evmGetAddress(this._ctx, sessionId, params as EvmGetAddressCallParams);
+        return evmGetAddress(ctx, sessionId, params as EvmGetAddressCallParams);
       case 'evmSignTransaction':
-        return evmSignTransaction(this._ctx, sessionId, params as EvmSignTransactionCallParams);
+        return evmSignTransaction(ctx, sessionId, params as EvmSignTransactionCallParams);
       case 'evmSignMessage':
-        return evmSignMessage(this._ctx, sessionId, params as EvmSignMessageCallParams);
+        return evmSignMessage(ctx, sessionId, params as EvmSignMessageCallParams);
       case 'evmSignTypedData':
-        return evmSignTypedData(this._ctx, sessionId, params as EvmSignTypedDataCallParams);
+        return evmSignTypedData(ctx, sessionId, params as EvmSignTypedDataCallParams);
       // BTC
       case 'btcGetAddress':
-        return btcGetAddress(this._ctx, sessionId, params as BtcGetAddressCallParams);
+        return btcGetAddress(ctx, sessionId, params as BtcGetAddressCallParams);
       case 'btcGetPublicKey':
-        return btcGetPublicKey(this._ctx, sessionId, params as BtcGetPublicKeyCallParams);
+        return btcGetPublicKey(ctx, sessionId, params as BtcGetPublicKeyCallParams);
       case 'btcSignTransaction':
-        return btcSignTransaction(this._ctx, sessionId, params as BtcSignTransactionCallParams);
+        return btcSignTransaction(ctx, sessionId, params as BtcSignTransactionCallParams);
       case 'btcSignPsbt':
-        return btcSignPsbt(this._ctx, sessionId, params as BtcSignPsbtCallParams);
+        return btcSignPsbt(ctx, sessionId, params as BtcSignPsbtCallParams);
       case 'btcSignMessage':
-        return btcSignMessage(this._ctx, sessionId, params as BtcSignMessageCallParams);
+        return btcSignMessage(ctx, sessionId, params as BtcSignMessageCallParams);
       case 'btcGetMasterFingerprint':
         return btcGetMasterFingerprint(
-          this._ctx,
+          ctx,
           sessionId,
           params as { skipOpenApp?: boolean } | undefined
         );
       // SOL
       case 'solGetAddress':
-        return solGetAddress(this._ctx, sessionId, params as SolGetAddressCallParams);
+        return solGetAddress(ctx, sessionId, params as SolGetAddressCallParams);
       case 'solSignTransaction':
-        return solSignTransaction(this._ctx, sessionId, params as SolSignTransactionCallParams);
+        return solSignTransaction(ctx, sessionId, params as SolSignTransactionCallParams);
       case 'solSignMessage':
-        return solSignMessage(this._ctx, sessionId, params as SolSignMessageCallParams);
+        return solSignMessage(ctx, sessionId, params as SolSignMessageCallParams);
       // TRON
       case 'tronGetAddress':
-        return tronGetAddress(this._ctx, sessionId, params as TronGetAddressCallParams);
+        return tronGetAddress(ctx, sessionId, params as TronGetAddressCallParams);
       case 'tronSignTransaction':
-        return tronSignTransaction(this._ctx, sessionId, params as TronSignTransactionCallParams);
+        return tronSignTransaction(ctx, sessionId, params as TronSignTransactionCallParams);
       case 'tronSignMessage': {
         // Explicit public→internal mapping so a field-name drift fails at
         // compile time, not silently at runtime (see bug: public `messageHex`
@@ -415,7 +683,7 @@ export class LedgerConnectorBase implements IConnector {
           path: p.path,
           messageHex: p.messageHex,
         };
-        return tronSignMessage(this._ctx, sessionId, internalParams);
+        return tronSignMessage(ctx, sessionId, internalParams);
       }
       default:
         throw new Error(`LedgerConnector: unknown method "${method}"`);
@@ -570,13 +838,18 @@ export class LedgerConnectorBase implements IConnector {
   }
 
   /**
-   * Light reset: clear signer/session state but keep DMK, BLE scan, and ID mapping alive.
+   * Light reset: clear signer/session state but keep DMK and ID mapping alive.
    * Used by connect() retry — we want to re-discover with the same transport.
+   *
+   * Note: drops the device manager but tears down its RxJS subs first via
+   * disposeKeepingDmk(). Bare null-assignment would leak _listenSub /
+   * _discoverySub and double-scan after the next _initManagers().
    */
   private _resetSignersAndSessions(): void {
     debugLog('[DMK] _resetSignersAndSessions called');
     this._signerManager?.clearAll();
     this._signerManager = null;
+    this._deviceManager?.disposeKeepingDmk();
     this._deviceManager = null;
   }
 
@@ -592,6 +865,16 @@ export class LedgerConnectorBase implements IConnector {
       }
     }
     this._cancellers.clear();
+    // Tear down per-session state subscriptions so we don't keep observing
+    // a DMK we're about to drop.
+    for (const sub of this._sessionStateSubs.values()) {
+      try {
+        sub.unsubscribe();
+      } catch {
+        // ignore
+      }
+    }
+    this._sessionStateSubs.clear();
     this._signerManager?.clearAll();
     this._deviceManager?.dispose();
     this._deviceManager = null;
@@ -622,10 +905,25 @@ export class LedgerConnectorBase implements IConnector {
   // Private -- Error handling
   // ---------------------------------------------------------------------------
 
-  private _wrapError(err: unknown): Error {
-    const mapped = mapLedgerError(err);
-    const error = new Error(mapped.message);
+  /**
+   * Return a per-call ctx with the chain's Ledger app name pre-bound to
+   * wrapError, so chain handlers don't need to repeat `{ defaultAppName: 'X' }`
+   * at every catch site. Falls through unchanged for unknown methods.
+   */
+  private _ctxForMethod(method: string): ConnectorContext {
+    const prefix = /^(evm|btc|sol|tron)/.exec(method)?.[1];
+    const defaultAppName = prefix ? METHOD_PREFIX_TO_APP_NAME[prefix] : undefined;
+    if (!defaultAppName) return this._ctx;
+    return {
+      ...this._ctx,
+      wrapError: (err, opts) => this._wrapError(err, { defaultAppName, ...opts }),
+    };
+  }
+
+  private _wrapError(err: unknown, opts?: WrapErrorOptions): Error {
+    const mapped = mapLedgerError(err, opts);
     const src = (err && typeof err === 'object' ? err : {}) as Record<string, unknown>;
+    const error = new Error(mapped.message);
     // Preserve DMK / EthAppCommandError fields so downstream classifiers
     // (including cross-layer `wrapError` → caller re-classification) can still
     // key on APDU code and step context attached by deviceActionToPromise.
