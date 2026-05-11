@@ -91,9 +91,15 @@ const isDeviceDisconnectedError = (error: unknown) => {
   const compactMessage = message.replace(/\s+/g, '');
   return (
     message.includes('device was disconnected') ||
+    message.includes('device disconnected') ||
+    message.includes('device disconnect') ||
     message.includes('was disconnected') ||
     message.includes('bledevicedisconnected') ||
     message.includes('bleconnectederror') ||
+    message.includes('connected error is always runtime error') ||
+    message.includes('connection has timed out unexpectedly') ||
+    message.includes('connection error has occured') ||
+    message.includes('connection error has occurred') ||
     message.includes('transferIn') ||
     message.includes('transferin') ||
     message.includes('usbdevice') ||

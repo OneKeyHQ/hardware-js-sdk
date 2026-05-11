@@ -357,6 +357,26 @@ describe('Protocol V2 firmware update targets', () => {
     });
   });
 
+  test('treats direct disconnect during Protocol V2 normal reboot as expected', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const typedCall = jest
+      .fn()
+      .mockRejectedValue(new Error('Connection error has occured: Device disconnected'));
+
+    (method as any).device = {
+      getCommands: () => ({ typedCall }),
+    };
+
+    await expect((method as any).protocolV2Reboot(DevRebootType.Normal)).resolves.toEqual({
+      message: 'Device rebooted successfully',
+    });
+  });
+
   test('continues Protocol V2 install polling through temporary expected V2 probe failures', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
