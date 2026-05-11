@@ -66,8 +66,12 @@ type FirmwareTimingSummary = {
 type Pro2MethodAction = {
   key: string;
   label: string;
-  danger?: boolean;
   run: (sdk: any, connectId: string) => Promise<any>;
+};
+type Pro2MethodGroup = {
+  key: string;
+  title: string;
+  methods: Pro2MethodAction[];
 };
 
 const styles = StyleSheet.create({
@@ -78,6 +82,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '700', color: '#111827' },
   subtitle: { marginTop: 6, fontSize: 13, lineHeight: 18, color: '#4B5563' },
   sectionTitle: { marginTop: 18, fontSize: 15, fontWeight: '600', color: '#111827' },
+  methodGroupTitle: { marginTop: 12, fontSize: 13, fontWeight: '600', color: '#374151' },
   card: {
     marginTop: 12,
     borderRadius: 14,
@@ -96,7 +101,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: '#2563EB',
   },
-  btnDanger: { backgroundColor: '#DC2626' },
   btnMuted: { backgroundColor: '#4B5563' },
   btnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
   listItem: {
@@ -619,20 +623,20 @@ export const BleDemoScreen = () => {
     [appendLog, selected?.connectId]
   );
 
-  const pro2Methods = useMemo<Pro2MethodAction[]>(
-    () => [
-      {
+  const pro2MethodGroups = useMemo<Pro2MethodGroup[]>(() => {
+    const methods: Record<string, Pro2MethodAction> = {
+      getProtoVersion: {
         key: 'getProtoVersion',
         label: 'getProtoVersion',
         run: (sdk, connectId) => sdk.getProtoVersion(connectId, PROTOCOL_V2_PARAMS),
       },
-      {
+      ping: {
         key: 'ping',
         label: 'ping',
         run: (sdk, connectId) =>
           sdk.ping(connectId, { ...PROTOCOL_V2_PARAMS, message: 'rn-pro2-demo' }),
       },
-      {
+      devGetDeviceInfo: {
         key: 'devGetDeviceInfo',
         label: 'devGetDeviceInfo',
         run: (sdk, connectId) =>
@@ -652,25 +656,25 @@ export const BleDemoScreen = () => {
             includeSpecific: true,
           }),
       },
-      {
+      devGetOnboardingStatus: {
         key: 'devGetOnboardingStatus',
         label: 'devGetOnboardingStatus',
         run: (sdk, connectId) => sdk.devGetOnboardingStatus(connectId, PROTOCOL_V2_PARAMS),
       },
-      {
-        key: 'devGetFirmwareUpdateStatus',
-        label: 'devGetFirmwareUpdateStatus',
-        run: (sdk, connectId) => sdk.devGetFirmwareUpdateStatus(connectId, PROTOCOL_V2_PARAMS),
+      devRebootNormal: {
+        key: 'devRebootNormal',
+        label: 'devReboot(Normal)',
+        run: (sdk, connectId) =>
+          sdk.devReboot(connectId, { ...PROTOCOL_V2_PARAMS, rebootType: 'Normal' }),
       },
-      {
+      factoryGetDeviceInfo: {
         key: 'factoryGetDeviceInfo',
         label: 'factoryGetDeviceInfo',
         run: (sdk, connectId) => sdk.factoryGetDeviceInfo(connectId),
       },
-      {
+      factoryDeviceInfoSettings: {
         key: 'factoryDeviceInfoSettings',
         label: 'factoryDeviceInfoSettings',
-        danger: true,
         run: (sdk, connectId) =>
           sdk.factoryDeviceInfoSettings(connectId, {
             ...PROTOCOL_V2_PARAMS,
@@ -679,7 +683,22 @@ export const BleDemoScreen = () => {
             preFirmware: 'RN-DEMO-FW',
           }),
       },
-      {
+      devGetFirmwareUpdateStatus: {
+        key: 'devGetFirmwareUpdateStatus',
+        label: 'devGetFirmwareUpdateStatus',
+        run: (sdk, connectId) => sdk.devGetFirmwareUpdateStatus(connectId, PROTOCOL_V2_PARAMS),
+      },
+      devFirmwareUpdate: {
+        key: 'devFirmwareUpdate',
+        label: 'devFirmwareUpdate(TARGET_BT)',
+        run: (sdk, connectId) =>
+          sdk.devFirmwareUpdate(connectId, {
+            ...PROTOCOL_V2_PARAMS,
+            target_id: 2,
+            path: PRO2_FIRMWARE_STAGING_PATH,
+          }),
+      },
+      filesystemPathInfoQuery: {
         key: 'filesystemPathInfoQuery',
         label: 'filesystemPathInfoQuery',
         run: (sdk, connectId) =>
@@ -688,26 +707,25 @@ export const BleDemoScreen = () => {
             path: PRO2_DEMO_FILE_PATH,
           }),
       },
-      {
+      filesystemDirList: {
         key: 'filesystemDirList',
         label: 'filesystemDirList',
         run: (sdk, connectId) =>
           sdk.filesystemDirList(connectId, { ...PROTOCOL_V2_PARAMS, path: 'vol0:', depth: 1 }),
       },
-      {
+      filesystemDirMake: {
         key: 'filesystemDirMake',
         label: 'filesystemDirMake',
         run: (sdk, connectId) =>
           sdk.filesystemDirMake(connectId, { ...PROTOCOL_V2_PARAMS, path: PRO2_DEMO_DIR_PATH }),
       },
-      {
+      filesystemDirRemove: {
         key: 'filesystemDirRemove',
         label: 'filesystemDirRemove',
-        danger: true,
         run: (sdk, connectId) =>
           sdk.filesystemDirRemove(connectId, { ...PROTOCOL_V2_PARAMS, path: PRO2_DEMO_DIR_PATH }),
       },
-      {
+      filesystemFileWrite: {
         key: 'filesystemFileWrite',
         label: 'filesystemFileWrite',
         run: (sdk, connectId) =>
@@ -721,7 +739,7 @@ export const BleDemoScreen = () => {
             append: false,
           }),
       },
-      {
+      filesystemFileRead: {
         key: 'filesystemFileRead',
         label: 'filesystemFileRead',
         run: (sdk, connectId) =>
@@ -733,57 +751,58 @@ export const BleDemoScreen = () => {
             chunkLen: PRO2_BLE_CHUNK_SIZE,
           }),
       },
-      {
+      filesystemFileDelete: {
         key: 'filesystemFileDelete',
         label: 'filesystemFileDelete',
-        danger: true,
         run: (sdk, connectId) =>
           sdk.filesystemFileDelete(connectId, { ...PROTOCOL_V2_PARAMS, path: PRO2_DEMO_FILE_PATH }),
       },
-      {
+      filesystemFixPermission: {
         key: 'filesystemFixPermission',
         label: 'filesystemFixPermission',
         run: (sdk, connectId) => sdk.filesystemFixPermission(connectId),
       },
-      {
-        key: 'devFirmwareUpdate',
-        label: 'devFirmwareUpdate(TARGET_BT)',
-        danger: true,
-        run: (sdk, connectId) =>
-          sdk.devFirmwareUpdate(connectId, {
-            ...PROTOCOL_V2_PARAMS,
-            target_id: 2,
-            path: PRO2_FIRMWARE_STAGING_PATH,
-          }),
-      },
-      {
-        key: 'devRebootNormal',
-        label: 'devReboot(Normal)',
-        danger: true,
-        run: (sdk, connectId) =>
-          sdk.devReboot(connectId, { ...PROTOCOL_V2_PARAMS, rebootType: 'Normal' }),
-      },
-      {
+      filesystemFormat: {
         key: 'filesystemFormat',
         label: 'filesystemFormat',
-        danger: true,
         run: (sdk, connectId) => sdk.filesystemFormat(connectId),
       },
-    ],
-    []
-  );
+    };
+
+    const buildGroup = (key: string, title: string, methodKeys: string[]) => ({
+      key,
+      title,
+      methods: methodKeys.map(methodKey => methods[methodKey]).filter(Boolean),
+    });
+
+    return [
+      buildGroup('device', 'Device / Factory', [
+        'getProtoVersion',
+        'ping',
+        'devGetDeviceInfo',
+        'devGetOnboardingStatus',
+        'devRebootNormal',
+        'factoryGetDeviceInfo',
+        'factoryDeviceInfoSettings',
+      ]),
+      buildGroup('firmware', 'Firmware', ['devGetFirmwareUpdateStatus', 'devFirmwareUpdate']),
+      buildGroup('filesystem', 'Filesystem', [
+        'filesystemPathInfoQuery',
+        'filesystemDirList',
+        'filesystemDirMake',
+        'filesystemDirRemove',
+        'filesystemFileWrite',
+        'filesystemFileRead',
+        'filesystemFileDelete',
+        'filesystemFixPermission',
+        'filesystemFormat',
+      ]),
+    ];
+  }, []);
 
   const onRunPro2Method = useCallback(
     (method: Pro2MethodAction) => {
-      const run = () => void runPro2Call(method.key, method.label, method.run);
-      if (!method.danger) {
-        run();
-        return;
-      }
-      Alert.alert('Run dangerous Pro2 method?', method.label, [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Run', style: 'destructive', onPress: run },
-      ]);
+      void runPro2Call(method.key, method.label, method.run);
     },
     [runPro2Call]
   );
@@ -932,18 +951,23 @@ export const BleDemoScreen = () => {
           <Text style={styles.hint}>
             Default file path: {PRO2_DEMO_FILE_PATH} · chunk: {PRO2_BLE_CHUNK_SIZE} B
           </Text>
-          <View style={styles.actionGrid}>
-            {pro2Methods.map(method => (
-              <TouchableOpacity
-                key={method.key}
-                style={[styles.btn, method.danger ? styles.btnDanger : null]}
-                onPress={() => onRunPro2Method(method)}
-                disabled={actionDisabled}
-              >
-                <Text style={styles.btnText}>{method.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          {pro2MethodGroups.map(group => (
+            <View key={group.key}>
+              <Text style={styles.methodGroupTitle}>{group.title}</Text>
+              <View style={styles.actionGrid}>
+                {group.methods.map(method => (
+                  <TouchableOpacity
+                    key={method.key}
+                    style={styles.btn}
+                    onPress={() => onRunPro2Method(method)}
+                    disabled={actionDisabled}
+                  >
+                    <Text style={styles.btnText}>{method.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          ))}
         </View>
 
         <View style={styles.card}>
@@ -956,7 +980,7 @@ export const BleDemoScreen = () => {
             Target: TARGET_BT (2) · {PRO2_FIRMWARE_STAGING_PATH} · chunk: {PRO2_BLE_CHUNK_SIZE} B
           </Text>
           <TouchableOpacity
-            style={[styles.btn, styles.btnDanger]}
+            style={styles.btn}
             onPress={onBleFirmwareUpdate}
             disabled={actionDisabled}
           >
