@@ -105,6 +105,11 @@ const PROTOCOL_PROBE_TIMEOUT_MS = 1000;
 const PROTOCOL_V2_PROBE_TIMEOUT_MS = 5000;
 const DEVICE_SCAN_TIMEOUT_MS = 8000;
 const IOS_NOTIFY_READY_DELAY_MS = 150;
+const HIGH_VOLUME_WRITE_BURST_SIZE = Platform.OS === 'ios' ? 4 : 6;
+const HIGH_VOLUME_WRITE_PAUSE_MS = Platform.OS === 'ios' ? 6 : 2;
+const HIGH_VOLUME_WRITE_FLUSH_DELAY_MS = Platform.OS === 'ios' ? 20 : 8;
+
+const delay = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 
 function inferProtocolTypeFromDeviceName(name?: string | null): ProtocolType | undefined {
   return /\bpro\s*2\b/i.test(name ?? '') ? 'V2' : undefined;
@@ -1355,18 +1360,48 @@ export default class ReactNativeBleTransport {
   private async writeProtocolV2Frame(
     transport: BleTransport,
     frame: Uint8Array,
-    options?: { writeWithResponse?: boolean }
+    options?: { highVolume?: boolean; writeWithResponse?: boolean }
   ) {
     const packetCapacity = Platform.OS === 'ios' ? IOS_PACKET_LENGTH : ANDROID_PACKET_LENGTH;
+    const shouldThrottle = !!options?.highVolume && !options?.writeWithResponse;
+    let packetsWritten = 0;
 
-    for (let offset = 0; offset < frame.length; offset += packetCapacity) {
-      const chunk = frame.slice(offset, offset + packetCapacity);
-      const base64 = Buffer.from(chunk).toString('base64');
-      if (options?.writeWithResponse) {
-        await transport.writeCharacteristic.writeWithResponse(base64);
-      } else {
-        await transport.writeCharacteristic.writeWithoutResponse(base64);
+    try {
+      for (let offset = 0; offset < frame.length; offset += packetCapacity) {
+        const chunk = frame.slice(offset, offset + packetCapacity);
+        const base64 = Buffer.from(chunk).toString('base64');
+        if (options?.writeWithResponse) {
+          await transport.writeCharacteristic.writeWithResponse(base64);
+        } else {
+          await transport.writeCharacteristic.writeWithoutResponse(base64);
+        }
+        packetsWritten += 1;
+
+        if (
+          shouldThrottle &&
+          packetsWritten % HIGH_VOLUME_WRITE_BURST_SIZE === 0 &&
+          offset + packetCapacity < frame.length
+        ) {
+          await delay(HIGH_VOLUME_WRITE_PAUSE_MS);
+        }
       }
+
+      if (shouldThrottle) {
+        await delay(HIGH_VOLUME_WRITE_FLUSH_DELAY_MS);
+      }
+    } catch (error) {
+      if (options?.highVolume && !options?.writeWithResponse && packetsWritten === 0) {
+        Log?.debug(
+          '[ReactNativeBleTransport] Protocol V2 high-volume writeWithoutResponse failed before data was sent, fallback to writeWithResponse:',
+          error
+        );
+        await this.writeProtocolV2Frame(transport, frame, {
+          highVolume: true,
+          writeWithResponse: true,
+        });
+        return;
+      }
+      throw error;
     }
   }
 
@@ -1402,12 +1437,18 @@ export default class ReactNativeBleTransport {
       ...options,
       timeoutMs: options?.timeoutMs ?? BLE_RESPONSE_TIMEOUT_MS,
     };
-    const writeWithResponse = LogBlockCommand.has(name);
+    const highVolumeWrite = LogBlockCommand.has(name);
 
-    if (writeWithResponse) {
+    if (highVolumeWrite) {
       Log?.debug(
-        '[ReactNativeBleTransport] Protocol V2 high-volume write uses writeWithResponse:',
-        name
+        '[ReactNativeBleTransport] Protocol V2 high-volume write uses throttled writeWithoutResponse:',
+        name,
+        {
+          packetCapacity: Platform.OS === 'ios' ? IOS_PACKET_LENGTH : ANDROID_PACKET_LENGTH,
+          burstSize: HIGH_VOLUME_WRITE_BURST_SIZE,
+          pauseMs: HIGH_VOLUME_WRITE_PAUSE_MS,
+          flushDelayMs: HIGH_VOLUME_WRITE_FLUSH_DELAY_MS,
+        }
       );
     }
 
@@ -1419,7 +1460,7 @@ export default class ReactNativeBleTransport {
         },
         router: PROTOCOL_V2_CHANNEL_BLE_UART,
         writeFrame: (frame: Uint8Array) =>
-          this.writeProtocolV2Frame(transport, frame, { writeWithResponse }),
+          this.writeProtocolV2Frame(transport, frame, { highVolume: highVolumeWrite }),
         readFrame: async () => {
           const rxFrame = await this.readProtocolV2Frame();
           if (!(rxFrame instanceof Uint8Array)) {
