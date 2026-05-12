@@ -55,11 +55,11 @@ const WRONG_APP_CODES = new Set(['6e00', '28160', '6d00', '27904', '6a83', '2726
 const APP_NOT_INSTALLED_CODES = new Set(['6807', '26631']);
 
 /**
- * DMK step value emitted just before a blind-sign failure.
- * Used to distinguish APDU 0x6a80 ("Invalid data") caused by disabled
- * Blind signing vs. a genuinely malformed transaction.
+ * DMK step value emitted when SignTransactionDeviceAction retries with
+ * basic/blind signing. Used to distinguish APDU 0x6a80 ("Invalid data")
+ * caused by a blind-sign fallback from a generic malformed transaction.
  */
-const STEP_BLIND_SIGN_FALLBACK = 'signer.eth.steps.blindSignTransactionFallback';
+const STEP_BLIND_SIGN_TRANSACTION_FALLBACK = 'signer.eth.steps.blindSignTransactionFallback';
 
 /**
  * Read the Ledger Ethereum App APDU error code from a DMK error object.
@@ -144,21 +144,12 @@ function mapBtcAppError(hex: string): HardwareErrorCode | null {
 }
 
 /**
- * Map a Ledger Ethereum App APDU status word to a HardwareErrorCode.
- * `lastStep` (attached by `deviceActionToPromise`) is used only to refine
- * ambiguous codes like 0x6a80.
+ * Map unambiguous Ledger Ethereum App APDU status words to HardwareErrorCode.
+ * Ambiguous status words, such as 0x6a80, are classified with full error
+ * context in `classifyEthAppError`.
  */
-function mapEthAppError(ethCode: string, lastStep: string | undefined): HardwareErrorCode | null {
+function mapEthAppErrorCode(ethCode: string): HardwareErrorCode | null {
   switch (ethCode) {
-    case '6a80':
-      // "Invalid data". If DMK had just fallen back to blind signing, the
-      // only plausible cause is that Blind signing is disabled on the device.
-      if (lastStep === STEP_BLIND_SIGN_FALLBACK) {
-        return HardwareErrorCode.EvmBlindSigningRequired;
-      }
-      // Other call sites (e.g. clear-sign with malformed context) — keep
-      // unknown so the raw message surfaces and the bug can be diagnosed.
-      return null;
     case '6984':
       return HardwareErrorCode.EvmClearSignPluginMissing;
     case '6a84':
@@ -170,6 +161,19 @@ function mapEthAppError(ethCode: string, lastStep: string | undefined): Hardware
     default:
       return null;
   }
+}
+
+function classifyEthAppError(err: unknown): HardwareErrorCode | null {
+  const ethCode = getEthAppErrorCode(err);
+  if (!ethCode) return null;
+
+  // 0x6a80 is a broad "Invalid data" APDU. Only report blind-signing
+  // guidance when DMK actually entered the blind-sign fallback branch.
+  if (ethCode === '6a80') {
+    return hasBlindSignFallbackStep(err) ? HardwareErrorCode.EvmBlindSigningRequired : null;
+  }
+
+  return mapEthAppErrorCode(ethCode);
 }
 
 // Centralized `_tag` constants — single source of truth for both writes and
@@ -279,6 +283,25 @@ const CONNECTION_LEVEL_TAGS: Set<string> = new Set([
   ERROR_TAG.WebHIDDisconnect,
 ]);
 
+const DEVICE_NOT_FOUND_TAGS: Set<string> = new Set([
+  ERROR_TAG.NoAccessibleDevice,
+  ERROR_TAG.UnknownDevice,
+  ERROR_TAG.DeviceNotInitialized,
+]);
+
+const DEVICE_BUSY_TAGS: Set<string> = new Set([ERROR_TAG.OpeningConnection]);
+
+const DEVICE_DISCONNECTED_TAGS: Set<string> = new Set([
+  ERROR_TAG.DeviceNotRecognized,
+  ERROR_TAG.DeviceSessionNotFound,
+  ERROR_TAG.DeviceSessionRefresher,
+  ERROR_TAG.DeviceDisconnectedBeforeSendingApdu,
+  ERROR_TAG.DeviceDisconnectedWhileSending,
+  ERROR_TAG.Disconnect,
+  ERROR_TAG.ReconnectionFailed,
+  ERROR_TAG.WebHIDDisconnect,
+]);
+
 export function isConnectionLevelError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;
   const tag = (err as { _tag?: string })._tag;
@@ -304,6 +327,44 @@ function hasStatusCode(err: unknown, codeSet: Set<string>): boolean {
   if (e.statusCode != null && codeSet.has(String(e.statusCode))) return true;
   if (e.originalError != null && hasStatusCode(e.originalError, codeSet)) return true;
   if (e.error != null && e._tag && hasStatusCode(e.error, codeSet)) return true;
+  return false;
+}
+
+function hasBlindSignFallbackStep(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as Record<string, unknown>;
+
+  if (e._lastStep === STEP_BLIND_SIGN_TRANSACTION_FALLBACK) return true;
+
+  if (
+    Array.isArray(e._deviceActionSteps) &&
+    e._deviceActionSteps.includes(STEP_BLIND_SIGN_TRANSACTION_FALLBACK)
+  ) {
+    return true;
+  }
+
+  if (e.originalError != null && hasBlindSignFallbackStep(e.originalError)) return true;
+  if (e.error != null && e._tag && hasBlindSignFallbackStep(e.error)) return true;
+  return false;
+}
+
+function isDeviceNotFoundError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const tag = (err as { _tag?: string })._tag;
+  if (tag && DEVICE_NOT_FOUND_TAGS.has(tag)) return true;
+  const e = err as Record<string, unknown>;
+  if (e.originalError != null && isDeviceNotFoundError(e.originalError)) return true;
+  if (e.error != null && e._tag && isDeviceNotFoundError(e.error)) return true;
+  return false;
+}
+
+function isDeviceBusyError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const tag = (err as { _tag?: string })._tag;
+  if (tag && DEVICE_BUSY_TAGS.has(tag)) return true;
+  const e = err as Record<string, unknown>;
+  if (e.originalError != null && isDeviceBusyError(e.originalError)) return true;
+  if (e.error != null && e._tag && isDeviceBusyError(e.error)) return true;
   return false;
 }
 
@@ -333,7 +394,7 @@ export function isWrongAppError(err: unknown): boolean {
   return false;
 }
 
-/** Check for app not installed on device (OpenAppCommand returns 0x6807). */
+/** Check for app not installed on device. */
 export function isAppNotInstalledError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;
   const e = err as Record<string, unknown>;
@@ -346,8 +407,8 @@ export function isAppNotInstalledError(err: unknown): boolean {
 export function isDeviceDisconnectedError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;
   const e = err as Record<string, unknown>;
-  if (e._tag === ERROR_TAG.DeviceNotRecognized || e._tag === ERROR_TAG.DeviceSessionNotFound)
-    return true;
+  const tag = e._tag;
+  if (typeof tag === 'string' && DEVICE_DISCONNECTED_TAGS.has(tag)) return true;
   if (typeof e.message === 'string') {
     const msg = e.message.toLowerCase();
     if (
@@ -433,8 +494,10 @@ export function mapLedgerError(
   // DeviceLocked: _tag handoff (unlock-device) or APDU 0x5515/0x6982.
   if (isDeviceLockedError(err)) {
     code = HardwareErrorCode.DeviceLocked;
-  } else if (isDeviceNotAdvertisingError(err)) {
+  } else if (isDeviceNotAdvertisingError(err) || isDeviceNotFoundError(err)) {
     code = HardwareErrorCode.DeviceNotFound;
+  } else if (isDeviceBusyError(err)) {
+    code = HardwareErrorCode.DeviceBusy;
   } else if (isBlePairingFailureError(err)) {
     code = HardwareErrorCode.BlePairingTimeout;
   } else if (isUserRejectedError(err)) {
@@ -450,14 +513,7 @@ export function mapLedgerError(
   } else if (isTimeoutError(err)) {
     code = HardwareErrorCode.OperationTimeout;
   } else {
-    // Ethereum App APDU-specific classification (uses _lastStep attached by
-    // deviceActionToPromise to disambiguate 0x6a80).
-    const ethCode = getEthAppErrorCode(err);
-    const lastStep =
-      err && typeof err === 'object'
-        ? ((err as Record<string, unknown>)._lastStep as string | undefined)
-        : undefined;
-    const ethMapped = ethCode ? mapEthAppError(ethCode, lastStep) : null;
+    const ethMapped = classifyEthAppError(err);
 
     // Solana / Tron / BTC APDU codes — disjoint from EVM's table, single-pass lookup.
     const apduHex = ethMapped ? null : extractApduHex(err);

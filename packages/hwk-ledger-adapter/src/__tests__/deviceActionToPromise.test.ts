@@ -1,13 +1,16 @@
 import { deviceActionToPromise } from '../signer/deviceActionToPromise';
 
+import type { DeviceAction } from '../types';
+
 function createMockAction<T>(
-  steps: Array<{ status: string; output?: T; error?: unknown; intermediateValue?: any }>
-) {
+  steps: Array<{ status: string; output?: T; error?: unknown; intermediateValue?: unknown }>
+): DeviceAction<T> {
   return {
+    cancel: jest.fn(),
     observable: {
       subscribe(observer: {
-        next: (v: any) => void;
-        error?: (e: any) => void;
+        next: (v: unknown) => void;
+        error?: (e: unknown) => void;
         complete?: () => void;
       }) {
         for (const step of steps) {
@@ -17,7 +20,7 @@ function createMockAction<T>(
         return { unsubscribe: () => {} };
       },
     },
-  };
+  } as unknown as DeviceAction<T>;
 }
 
 describe('deviceActionToPromise', () => {
@@ -33,6 +36,39 @@ describe('deviceActionToPromise', () => {
   it('should reject on error status', async () => {
     const action = createMockAction([{ status: 'error', error: new Error('device locked') }]);
     await expect(deviceActionToPromise(action)).rejects.toThrow('device locked');
+  });
+
+  it('should attach non-enumerable step context to rejected errors', async () => {
+    const error = new Error('Invalid data');
+    const action = createMockAction([
+      {
+        status: 'pending',
+        intermediateValue: { step: 'signer.eth.steps.signTransaction' },
+      },
+      {
+        status: 'pending',
+        intermediateValue: { step: 'signer.eth.steps.blindSignTransactionFallback' },
+      },
+      {
+        status: 'pending',
+        intermediateValue: { step: 'signer.eth.steps.detectBlindSigning' },
+      },
+      { status: 'error', error },
+    ]);
+
+    await expect(deviceActionToPromise(action)).rejects.toMatchObject({
+      message: 'Invalid data',
+    });
+    expect((error as Error & { _lastStep?: string })._lastStep).toBe(
+      'signer.eth.steps.detectBlindSigning'
+    );
+    expect((error as Error & { _deviceActionSteps?: string[] })._deviceActionSteps).toEqual([
+      'signer.eth.steps.signTransaction',
+      'signer.eth.steps.blindSignTransactionFallback',
+      'signer.eth.steps.detectBlindSigning',
+    ]);
+    expect(Object.keys(error)).not.toContain('_lastStep');
+    expect(Object.keys(error)).not.toContain('_deviceActionSteps');
   });
 
   it('should propagate unlock-device via onInteraction without rejecting', async () => {
@@ -70,7 +106,7 @@ describe('deviceActionToPromise', () => {
     const action = {
       cancel,
       observable: {
-        subscribe(observer: { next: (v: any) => void }) {
+        subscribe(observer: { next: (v: unknown) => void }) {
           observer.next({
             status: 'pending',
             intermediateValue: { requiredUserInteraction: 'confirm-on-device' },
@@ -78,7 +114,7 @@ describe('deviceActionToPromise', () => {
           return { unsubscribe: jest.fn() };
         },
       },
-    };
+    } as unknown as DeviceAction<unknown>;
 
     void deviceActionToPromise(action, onInteraction, 10).catch(rejectSpy);
     await new Promise(resolve => {

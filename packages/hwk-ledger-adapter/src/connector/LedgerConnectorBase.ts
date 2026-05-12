@@ -102,6 +102,10 @@ const METHOD_PREFIX_TO_APP_NAME: Record<string, string> = {
   tron: 'Tron',
 };
 
+const HARDWARE_ERROR_CODE_VALUES = new Set<number>(
+  Object.values(HardwareErrorCode).filter((value): value is number => typeof value === 'number')
+);
+
 // ---------------------------------------------------------------------------
 // Default signer kit importer (webpack/rspack — uses "exports" field)
 // ---------------------------------------------------------------------------
@@ -302,6 +306,21 @@ export class LedgerConnectorBase implements IConnector {
       descriptor: d,
       connectId: this._resolveConnectId(d),
     }));
+    debugLog(
+      '[DMK] connector.searchDevices() raw descriptors:',
+      resolvedDescriptors.map(({ descriptor: d, connectId }) => ({
+        id: d?.path,
+        path: d?.path,
+        connectId,
+        deviceName: d?.name,
+        'device.name': d?.bleName,
+        localName: d?.localName,
+        bleName: d?.bleName,
+        model: d?.type,
+        transport: d?.transport,
+        rssi: d?.rssi,
+      }))
+    );
     const bleConnectIdCounts = new Map<string, number>();
     for (const item of resolvedDescriptors) {
       if (isLedgerBleDescriptor(this.connectionType, item.descriptor)) {
@@ -921,8 +940,16 @@ export class LedgerConnectorBase implements IConnector {
   }
 
   private _wrapError(err: unknown, opts?: WrapErrorOptions): Error {
-    const mapped = mapLedgerError(err, opts);
     const src = (err && typeof err === 'object' ? err : {}) as Record<string, unknown>;
+    const hasSerializedCode =
+      typeof src.code === 'number' && HARDWARE_ERROR_CODE_VALUES.has(src.code);
+    const mapped = hasSerializedCode
+      ? {
+          code: src.code as HardwareErrorCode,
+          message: typeof src.message === 'string' ? src.message : 'Unknown Ledger error',
+          appName: typeof src.appName === 'string' ? src.appName : opts?.defaultAppName,
+        }
+      : mapLedgerError(err, opts);
     const error = new Error(mapped.message);
     // Preserve DMK / EthAppCommandError fields so downstream classifiers
     // (including cross-layer `wrapError` → caller re-classification) can still
@@ -933,6 +960,7 @@ export class LedgerConnectorBase implements IConnector {
       _tag: src._tag,
       errorCode: src.errorCode,
       _lastStep: src._lastStep,
+      _deviceActionSteps: src._deviceActionSteps,
     });
     // Non-enumerable: DMK errors can carry APDU payloads / signing
     // intermediates that shouldn't leak into JSON.stringify / log transports.

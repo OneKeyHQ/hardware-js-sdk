@@ -43,6 +43,7 @@ export function deviceActionToPromise<T>(
   return new Promise<T>((resolve, reject) => {
     let settled = false;
     let lastStep: string | undefined;
+    const observedSteps: string[] = [];
     // eslint-disable-next-line prefer-const -- assigned once after declaration, but must be declared before use in cleanup
     let sub: { unsubscribe: () => void };
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -116,7 +117,12 @@ export function deviceActionToPromise<T>(
         // Track last DMK step so caller can disambiguate failure contexts
         // (e.g. 0x6a80 during blindSignTransactionFallback = Blind signing disabled)
         const step = (state as { intermediateValue?: { step?: string } })?.intermediateValue?.step;
-        if (step) lastStep = step;
+        if (step) {
+          lastStep = step;
+          if (observedSteps[observedSteps.length - 1] !== step) {
+            observedSteps.push(step);
+          }
+        }
 
         if (state.status === DeviceActionStatus.Completed) {
           settled = true;
@@ -129,7 +135,7 @@ export function deviceActionToPromise<T>(
           if (timer) clearTimeout(timer);
           onInteraction?.('interaction-complete');
           sub?.unsubscribe();
-          rejectWithLastStep(state.error, lastStep, reject);
+          rejectWithStepContext(state.error, lastStep, observedSteps, reject);
         } else if (state.status === DeviceActionStatus.Pending && onInteraction) {
           const interaction = state.intermediateValue?.requiredUserInteraction;
           if (interaction && interaction !== 'none') {
@@ -149,7 +155,7 @@ export function deviceActionToPromise<T>(
           settled = true;
           if (timer) clearTimeout(timer);
           sub?.unsubscribe();
-          rejectWithLastStep(err, lastStep, reject);
+          rejectWithStepContext(err, lastStep, observedSteps, reject);
         }
       },
       complete: () => {
@@ -164,24 +170,34 @@ export function deviceActionToPromise<T>(
 }
 
 /**
- * Reject with the DMK error after annotating the last step observed before
- * failure. The step is attached as a non-enumerable property so it doesn't
- * pollute JSON.stringify / log output, but classifiers can still read it via
- * `(err as any)._lastStep`.
+ * Reject with the DMK error after annotating observed step context. These
+ * fields are non-enumerable so they do not pollute JSON.stringify / log
+ * output, but classifiers can still read them.
  */
-function rejectWithLastStep(
+function rejectWithStepContext(
   err: unknown,
   lastStep: string | undefined,
+  observedSteps: string[],
   reject: (reason: unknown) => void
 ): void {
-  if (err && typeof err === 'object' && lastStep) {
+  if (err && typeof err === 'object' && (lastStep || observedSteps.length > 0)) {
     try {
-      Object.defineProperty(err, '_lastStep', {
-        value: lastStep,
-        configurable: true,
-        enumerable: false,
-        writable: true,
-      });
+      if (lastStep) {
+        Object.defineProperty(err, '_lastStep', {
+          value: lastStep,
+          configurable: true,
+          enumerable: false,
+          writable: true,
+        });
+      }
+      if (observedSteps.length > 0) {
+        Object.defineProperty(err, '_deviceActionSteps', {
+          value: [...observedSteps],
+          configurable: true,
+          enumerable: false,
+          writable: true,
+        });
+      }
     } catch {
       // Frozen error objects — give up, classifier will fall back.
     }

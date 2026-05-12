@@ -211,6 +211,17 @@ export class LedgerAdapter implements IHardwareWallet {
 
     debugLog(`[LedgerAdapter] searchDevices() entry, cacheBefore=${this._discoveredDevices.size}`);
     const devices = await this.connector.searchDevices();
+    debugLog(
+      '[DMK] adapter.searchDevices raw:',
+      devices.map(device => ({
+        id: device?.deviceId,
+        deviceId: device?.deviceId,
+        connectId: device?.connectId,
+        deviceName: device?.name,
+        'device.name': device?.name,
+        model: device?.model,
+      }))
+    );
 
     // Replace cache with this round's raw result. DMK paths used as
     // connectId on USB are ephemeral (new UUID after each replug), so
@@ -241,6 +252,11 @@ export class LedgerAdapter implements IHardwareWallet {
   // Layer 2 retry budget after connection-class error. Each round delegates
   // to Layer 1 (which owns the unlock prompt). Layer 2 never emits UI itself.
   private static readonly MAX_BUSINESS_RETRY_BUDGET = 3;
+
+  // Stuck-app (APDU 0x6901) retry pause. Ledger Stax often returns 6901 when
+  // OpenAppCommand lands mid-transition right after CloseApp; a short wait
+  // lets the device finish its UI animation before we retry once.
+  private static readonly STUCK_APP_RETRY_DELAY_MS = 500;
 
   // Layer 1 confirm budget. After N failed Confirm cycles (user keeps clicking
   // Confirm but device never shows up / never unlocks), throw DeviceNotFound
@@ -1124,16 +1140,53 @@ export class LedgerAdapter implements IHardwareWallet {
         isStuckApp: isStuckAppStateError(err),
       });
 
-      // Stuck DMK slot — reset transport + surface error, no retry.
+      // Stuck DMK slot — reset transport, wait briefly, retry ONCE.
+      // Trigger: Stax CloseApp→OpenApp race returns APDU 6901 before the
+      // user can react. A short pause lets the device finish its transition;
+      // on persistent 6901 the user really does need to act, so surface it.
       if (isStuckAppStateError(err)) {
         try {
           this._sessions.delete(resolvedConnectId);
           this._discoveredDevices.delete(resolvedConnectId);
           this.connector.reset?.();
         } catch {
-          // best-effort reset — fall through and surface the original error
+          // best-effort reset — fall through to retry
         }
-        throw err;
+        debugLog(
+          '[LedgerAdapter] stuck-app retry: method=',
+          method,
+          'delayMs=',
+          LedgerAdapter.STUCK_APP_RETRY_DELAY_MS,
+          '_tag=',
+          (err as Record<string, unknown> | null | undefined)?._tag
+        );
+        try {
+          const retryResult = await this._retryAfterStuckApp(
+            resolvedConnectId,
+            method,
+            effectiveParams,
+            signal,
+            err,
+            fingerprint
+          );
+          debugLog('[LedgerAdapter] stuck-app retry succeeded: method=', method);
+          return retryResult;
+        } catch (retryErr) {
+          if (signal.aborted) throw retryErr;
+          // Second stuck-app hit → genuinely needs user action; surface
+          // the original error so callers see a consistent _tag.
+          if (isStuckAppStateError(retryErr)) {
+            debugLog('[LedgerAdapter] stuck-app retry exhausted (2nd 6901): method=', method);
+            throw err;
+          }
+          debugLog(
+            '[LedgerAdapter] stuck-app retry threw non-stuck error: method=',
+            method,
+            'retryErrTag=',
+            (retryErr as Record<string, unknown> | null | undefined)?._tag
+          );
+          throw retryErr;
+        }
       }
 
       // Connection-class error → Layer 2 retry (bounded budget).
@@ -1244,6 +1297,74 @@ export class LedgerAdapter implements IHardwareWallet {
       // Business errors (BlindSigning, AppStuck, etc.) propagate untouched.
       throw err;
     }
+  }
+
+  /**
+   * Stuck-app recovery: pause for the device's UI transition, then retry once.
+   *
+   * Caller has already cleared the session + reset connector. We wait so Stax
+   * finishes its post-CloseApp animation, then go through ensureConnected +
+   * fingerprint check + call exactly once. Caller decides what to do on a
+   * second stuck-app hit.
+   */
+  private async _retryAfterStuckApp(
+    resolvedConnectId: string,
+    method: string,
+    params: unknown,
+    signal: AbortSignal,
+    originalErr: unknown,
+    fingerprint?: {
+      chain: ChainForFingerprint;
+      deviceId: string;
+      skipFingerprint: boolean;
+    }
+  ): Promise<unknown> {
+    await this._sleepAbortable(LedgerAdapter.STUCK_APP_RETRY_DELAY_MS, signal);
+
+    // BLE: keep the same connectId so we don't re-prompt the user to pair.
+    // USB: pass undefined; ensureConnected enumerates fresh.
+    const retryTargetConnectId = isLedgerBleConnectionType(this.connector.connectionType)
+      ? resolvedConnectId
+      : undefined;
+    const retryConnectId = await this.ensureConnected(retryTargetConnectId, signal);
+    const retrySessionId = this._sessions.get(retryConnectId);
+    if (!retrySessionId) throw originalErr;
+
+    if (fingerprint && !fingerprint.skipFingerprint && fingerprint.deviceId) {
+      const fp = await this._abortable(
+        signal,
+        this._verifyDeviceFingerprintWithSession(
+          retrySessionId,
+          fingerprint.deviceId,
+          fingerprint.chain
+        )
+      );
+      if (!fp.success) {
+        throw Object.assign(new Error(formatDeviceMismatchError(fp.expected, fp.actual)), {
+          code: HardwareErrorCode.DeviceMismatch,
+        });
+      }
+    }
+
+    return this._abortable(signal, this.connector.call(retrySessionId, method, params));
+  }
+
+  private _sleepAbortable(ms: number, signal: AbortSignal): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (signal.aborted) {
+        reject((signal.reason as Error | undefined) ?? new Error('Aborted'));
+        return;
+      }
+      const timer = setTimeout(() => {
+        signal.removeEventListener('abort', onAbort);
+        resolve();
+      }, ms);
+      const onAbort = () => {
+        clearTimeout(timer);
+        reject((signal.reason as Error | undefined) ?? new Error('Aborted'));
+      };
+      signal.addEventListener('abort', onAbort, { once: true });
+    });
   }
 
   /**
