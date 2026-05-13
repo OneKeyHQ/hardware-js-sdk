@@ -371,7 +371,14 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
       this.device.on(DEVICE.PASSPHRASE, onSignalAbort);
 
       preCheckDeviceSupport(this.device, method);
-      await method.checkSafetyLevelOnTestNet();
+      if (this.temporarySafetyCheckPrompted) {
+        method.temporarySafetyCheckPrompted = true;
+      } else {
+        const appliedTemporarySafetyCheck = await method.checkSafetyLevelOnTestNet();
+        if (appliedTemporarySafetyCheck) {
+          this.temporarySafetyCheckPrompted = true;
+        }
+      }
 
       const response = await method.run();
 

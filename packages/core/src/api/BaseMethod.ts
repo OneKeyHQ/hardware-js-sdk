@@ -145,6 +145,8 @@ export abstract class BaseMethod<Params = undefined> {
 
   context?: CoreContext;
 
+  temporarySafetyCheckPrompted = false;
+
   constructor(message: { id?: number; payload: any }) {
     const { payload } = message;
     this.name = payload.method;
@@ -287,9 +289,13 @@ export abstract class BaseMethod<Params = undefined> {
 
   /**
    * Automatic check safety_check level for selected calls that require temporary relaxed checks.
-   * @returns {void}
+   * @returns whether a temporary safety check prompt was applied.
    */
   async checkSafetyLevelOnTestNet() {
+    if (this.temporarySafetyCheckPrompted) {
+      return false;
+    }
+
     let checkFlag = false;
     // 3 - Ropsten, 4 - Rinkeby, 5 - Goerli, 420 - Optimism Goerli, 11155111 - zkSync Sepolia
     if (
@@ -306,7 +312,11 @@ export abstract class BaseMethod<Params = undefined> {
       await this.device.commands.typedCall('ApplySettings', 'Success', {
         safety_checks: 'PromptTemporarily',
       });
+      this.temporarySafetyCheckPrompted = true;
+      return true;
     }
+
+    return false;
   }
 
   dispose() {}
