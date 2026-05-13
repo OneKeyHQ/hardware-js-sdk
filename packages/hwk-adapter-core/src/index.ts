@@ -70,6 +70,7 @@ export { CHAIN_FINGERPRINT_PATHS, deriveDeviceFingerprint } from './types/finger
 
 export type {
   IHardwareWallet,
+  SearchDevicesOptions,
   PassphraseResponse,
   ChainCapability,
   DeviceEvent,

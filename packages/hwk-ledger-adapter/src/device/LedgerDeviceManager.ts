@@ -1,3 +1,4 @@
+import { ERROR_TAG } from '../errors';
 import { debugError, debugLog } from '../utils/debugLog';
 
 import type { DeviceChangeEvent, DeviceDescriptor } from '@onekeyfe/hwk-adapter-core';
@@ -39,9 +40,7 @@ export class LedgerDeviceManager {
           if (resolved) return;
           resolved = true;
           this._discovered.clear();
-          debugLog(
-            `[DMK] enumerate raw count=${devices.length} ids=[${devices.map(d => d.id).join(',')}]`
-          );
+          debugLog(`[DMK] enumerate count=${devices.length} ids=[${devices.map(d => d.id).join(',')}]`);
           for (const d of devices) {
             this._discovered.set(d.id, d);
           }
@@ -52,6 +51,7 @@ export class LedgerDeviceManager {
               devices.map(d => ({
                 path: d.id,
                 type: d.deviceModel.model,
+                modelName: d.deviceModel.name,
                 name: d.name,
                 transport: d.transport,
                 rssi: d.rssi,
@@ -78,6 +78,7 @@ export class LedgerDeviceManager {
           devices.map(d => ({
             path: d.id,
             type: d.deviceModel.model,
+            modelName: d.deviceModel.name,
             name: d.name,
             transport: d.transport,
             rssi: d.rssi,
@@ -107,6 +108,7 @@ export class LedgerDeviceManager {
               descriptor: {
                 path: d.id,
                 type: d.deviceModel.model,
+                modelName: d.deviceModel.name,
                 name: d.name,
                 transport: d.transport,
                 rssi: d.rssi,
@@ -164,9 +166,7 @@ export class LedgerDeviceManager {
         this._discovered.clear();
         for (const d of devices) this._discovered.set(d.id, d);
         debugLog(
-          `[DMK] getLiveDevices() resolved count=${devices.length} ids=[${devices
-            .map(d => d.id)
-            .join(',')}]`
+          `[DMK] getLiveDevices() resolved count=${devices.length} ids=[${devices.map(d => d.id).join(',')}]`
         );
         resolve(devices);
       };
@@ -222,11 +222,33 @@ export class LedgerDeviceManager {
     return this._discovered.get(deviceId)?.name;
   }
 
+  /** Lookup minimal model/signal info from a previously-discovered device. */
+  getDiscoveredDeviceInfo(deviceId: string):
+    | { model?: string; modelName?: string; name?: string; rssi?: number | null }
+    | undefined {
+    const d = this._discovered.get(deviceId);
+    if (!d) return undefined;
+    return {
+      model: d.deviceModel?.model,
+      modelName: d.deviceModel?.name,
+      name: d.name,
+      rssi: d.rssi,
+    };
+  }
+
+  hasDiscoveredDevice(deviceId: string): boolean {
+    return this._discovered.has(deviceId);
+  }
+
   /** Connect to a previously discovered device. Returns sessionId. */
   async connect(deviceId: string): Promise<string> {
     const device = this._discovered.get(deviceId);
     if (!device) {
-      throw new Error(`Device "${deviceId}" not found. Call enumerate() or listen() first.`);
+      const err = new Error(
+        `Device "${deviceId}" not found in discovery cache. Call enumerate() or listen() first.`
+      ) as Error & { _tag?: string };
+      err._tag = ERROR_TAG.DeviceNotInDiscoveryCache;
+      throw err;
     }
     const sessionId = await this._dmk.connect({ device });
     this._sessions.set(deviceId, sessionId);

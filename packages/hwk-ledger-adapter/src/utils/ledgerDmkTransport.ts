@@ -25,7 +25,3 @@ export function isLedgerBleDescriptor(
 ): boolean {
   return isLedgerBleConnectionType(connectionType) || isLedgerDmkBleTransport(descriptor.transport);
 }
-
-export function isValidLedgerBleConnectId(connectId?: string): boolean {
-  return /^[0-9A-Fa-f]{4}$/.test(connectId ?? '');
-}

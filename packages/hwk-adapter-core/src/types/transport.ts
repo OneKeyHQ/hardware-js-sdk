@@ -9,11 +9,13 @@ export interface DeviceDescriptor {
   product?: number;
   /** USB vendor ID */
   vendor?: number;
-  /** Device type/model identifier */
+  /** Device type/model identifier (e.g. "nanoX"). */
   type?: string;
+  /** Human-readable model name (e.g. "Ledger Nano X"). */
+  modelName?: string;
   /** Human-readable display name from the transport layer. */
   name?: string;
-  /** Stable Ledger BLE identifier from the raw RN BLE `Device.name` field. */
+  /** Raw Ledger BLE advertisement name from RN BLE `Device.name`, when available. */
   bleName?: string;
   /** User-visible Ledger BLE local name from the raw RN BLE `Device.localName` field. */
   localName?: string;
@@ -21,6 +23,14 @@ export interface DeviceDescriptor {
   transport?: string;
   /** BLE RSSI when provided by the transport scanner. */
   rssi?: number | null;
+  /** BLE advertised service UUIDs, when provided by the scanner. */
+  serviceUUIDs?: string[] | null;
+  /** BLE connectable flag, when provided by the scanner. */
+  isConnectable?: boolean | null;
+  /** USB product name, when provided by the transport. */
+  productName?: string;
+  /** USB serial number, when provided by the transport. */
+  serialNumber?: string;
 }
 
 export interface DeviceConnectEvent {

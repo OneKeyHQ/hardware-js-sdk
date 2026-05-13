@@ -54,6 +54,9 @@
     "@onekeyfe/hwk-adapter-core": "1.1.26-alpha.13",
     "@onekeyfe/hwk-ledger-adapter": "1.1.26-alpha.13"
   },
+  "peerDependencies": {
+    "react-native": "*"
+  },
   "devDependencies": {
     "rimraf": "^5.0.0",
     "tsup": "^8.0.0",

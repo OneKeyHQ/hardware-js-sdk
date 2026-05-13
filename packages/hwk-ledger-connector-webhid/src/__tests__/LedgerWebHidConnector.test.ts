@@ -25,12 +25,14 @@ describe('LedgerWebHidConnector', () => {
       );
     });
 
-    it('extracts 4-hex suffix for BLE-via-WebHID descriptors', () => {
+    it('uses descriptor.path for BLE-via-WebHID descriptors too', () => {
       const c = new LedgerWebHidConnector();
-      expect(resolve(c, { path: 'ble-path', name: 'Nano X a58f', transport: 'BLE' })).toBe('A58F');
+      expect(resolve(c, { path: 'ble-path', name: 'Nano X a58f', transport: 'BLE' })).toBe(
+        'ble-path'
+      );
     });
 
-    it('treats RN_BLE descriptors as BLE in the shared DMK transport check', () => {
+    it('keeps RN_BLE descriptor.path as connectId', () => {
       const c = new LedgerWebHidConnector();
       expect(
         resolve(c, {
@@ -38,10 +40,10 @@ describe('LedgerWebHidConnector', () => {
           name: 'Nano X a58f',
           transport: 'RN_BLE',
         })
-      ).toBe('A58F');
+      ).toBe('CC26DD6E-3493-1698-A22D-81FFA13FEA67');
     });
 
-    it('does not derive BLE identity from descriptor.path', () => {
+    it('does not require a BLE name to resolve connectId', () => {
       const c = new LedgerWebHidConnector();
       expect(
         resolve(c, {
@@ -49,7 +51,7 @@ describe('LedgerWebHidConnector', () => {
           name: 'Andox',
           transport: 'BLE',
         })
-      ).toBe('');
+      ).toBe('CC26DD6E-3493-1698-A22D-81FFA13FEA67');
     });
   });
 });

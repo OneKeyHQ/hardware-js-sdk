@@ -181,6 +181,7 @@ function classifyEthAppError(err: unknown): HardwareErrorCode | null {
 export const ERROR_TAG = {
   // SDK-mint
   DeviceNotAdvertising: 'DeviceNotAdvertisingError', // BLE scan miss
+  DeviceNotInDiscoveryCache: 'DeviceNotInDiscoveryCacheError', // dm.connect() before enumerate
   BlePairingTimeout: 'BlePairingTimeoutError', // SMP 30s timeout
   BleGattBondingFailed: 'BleGattBondingFailedError', // other GATT failure
   UserAborted: 'UserAborted',
