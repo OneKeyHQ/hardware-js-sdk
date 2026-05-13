@@ -10,9 +10,7 @@ import {
   mapLedgerError,
 } from '../errors';
 import { debugLog } from '../utils/debugLog';
-import {
-  isLedgerBleConnectionType,
-} from '../utils/ledgerDmkTransport';
+import { isLedgerBleConnectionType } from '../utils/ledgerDmkTransport';
 import {
   btcGetAddress,
   btcGetMasterFingerprint,
@@ -301,18 +299,16 @@ export class LedgerConnectorBase implements IConnector {
       descriptor: d,
       connectId: this._resolveConnectId(d),
     }));
-    const result: ConnectorDevice[] = resolvedDescriptors.map(({ descriptor: d, connectId }) => {
-      return {
-        connectId,
-        deviceId: d.path,
-        name: d.name || d.type || 'Ledger',
-        model: d.type,
-        modelName: d.modelName,
-        rssi: d.rssi,
-        isConnectable: d.isConnectable,
-        serialNumber: d.serialNumber,
-      };
-    });
+    const result: ConnectorDevice[] = resolvedDescriptors.map(({ descriptor: d, connectId }) => ({
+      connectId,
+      deviceId: d.path,
+      name: d.name || d.type || 'Ledger',
+      model: d.type,
+      modelName: d.modelName,
+      rssi: d.rssi,
+      isConnectable: d.isConnectable,
+      serialNumber: d.serialNumber,
+    }));
     debugLog(
       `[DMK] connector.searchDevices() return count=${result.length} ids=[${result
         .map(r => r.connectId)

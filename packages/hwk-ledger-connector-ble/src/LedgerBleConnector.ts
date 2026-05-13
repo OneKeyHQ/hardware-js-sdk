@@ -1,5 +1,4 @@
 import { Platform } from 'react-native';
-
 import { LedgerConnectorBase } from '@onekeyfe/hwk-ledger-adapter';
 
 import type { LedgerDeviceManager } from '@onekeyfe/hwk-ledger-adapter';

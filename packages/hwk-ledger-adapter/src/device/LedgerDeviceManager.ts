@@ -40,7 +40,9 @@ export class LedgerDeviceManager {
           if (resolved) return;
           resolved = true;
           this._discovered.clear();
-          debugLog(`[DMK] enumerate count=${devices.length} ids=[${devices.map(d => d.id).join(',')}]`);
+          debugLog(
+            `[DMK] enumerate count=${devices.length} ids=[${devices.map(d => d.id).join(',')}]`
+          );
           for (const d of devices) {
             this._discovered.set(d.id, d);
           }
@@ -166,7 +168,9 @@ export class LedgerDeviceManager {
         this._discovered.clear();
         for (const d of devices) this._discovered.set(d.id, d);
         debugLog(
-          `[DMK] getLiveDevices() resolved count=${devices.length} ids=[${devices.map(d => d.id).join(',')}]`
+          `[DMK] getLiveDevices() resolved count=${devices.length} ids=[${devices
+            .map(d => d.id)
+            .join(',')}]`
         );
         resolve(devices);
       };
@@ -223,9 +227,9 @@ export class LedgerDeviceManager {
   }
 
   /** Lookup minimal model/signal info from a previously-discovered device. */
-  getDiscoveredDeviceInfo(deviceId: string):
-    | { model?: string; modelName?: string; name?: string; rssi?: number | null }
-    | undefined {
+  getDiscoveredDeviceInfo(
+    deviceId: string
+  ): { model?: string; modelName?: string; name?: string; rssi?: number | null } | undefined {
     const d = this._discovered.get(deviceId);
     if (!d) return undefined;
     return {

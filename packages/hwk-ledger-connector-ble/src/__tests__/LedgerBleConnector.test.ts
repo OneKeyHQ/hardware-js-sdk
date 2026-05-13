@@ -1,8 +1,8 @@
-jest.mock('react-native', () => ({ Platform: { OS: 'ios' } }), { virtual: true });
-
 import { LedgerBleConnector } from '../LedgerBleConnector';
 
 import type { DeviceDescriptor } from '@onekeyfe/hwk-adapter-core';
+
+jest.mock('react-native', () => ({ Platform: { OS: 'ios' } }), { virtual: true });
 
 describe('LedgerBleConnector', () => {
   it('constructs without throwing', () => {
