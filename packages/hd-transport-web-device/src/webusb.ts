@@ -246,6 +246,11 @@ export default class WebUsbTransport {
         this.Log.debug(`[WebUsbTransport] detectProtocol: path=${path} -> V2 (cached expected)`);
         return 'V2';
       }
+      if (this.deviceList.find(device => device.path === path)?.protocolType === 'V2') {
+        this.deviceProtocol.set(path, 'V2');
+        this.Log.debug(`[WebUsbTransport] detectProtocol: path=${path} -> V2 (descriptor)`);
+        return 'V2';
+      }
       if (await this.probeProtocolV2(path)) {
         this.deviceProtocol.set(path, 'V2');
         this.Log.debug(`[WebUsbTransport] detectProtocol: path=${path} -> V2 (expected)`);
