@@ -115,31 +115,67 @@ SRC_PRO2_LEGACY="$REPO_ROOT/submodules/firmware-pro2/sys/protobuf/onekey_protoco
 SRC_PRO2_LATEST="$REPO_ROOT/submodules/firmware-pro2/sys/protobuf/onekey_protocol/latest"
 
 if [ -d "$SRC_PRO2_LATEST" ] && ls "$SRC_PRO2_LATEST"/messages*.proto 1>/dev/null 2>&1; then
-    echo "=== Building Pro2 messages from firmware-pro2 latest protobuf schema ==="
+    echo "=== Building Pro2 messages from firmware-pro2 legacy + latest protobuf schema ==="
     TMP_PROTO="$PARENT_PATH/messages-pro2-tmp.proto"
 
     {
         echo 'syntax = "proto2";'
+        echo 'import "google/protobuf/descriptor.proto";'
         echo ''
 
+        # Pro2 firmware keeps chain/app protocols under legacy/, and Protocol V2
+        # device/filesystem/firmware protocols under latest/.  Build one flat
+        # schema so Protocol V2 framing can also encode legacy public-chain calls.
+        grep -hv \
+            -e '^import ' -e '^syntax' -e '^package' -e 'option java_' \
+            "$SRC_PRO2_LEGACY"/messages*.proto \
+            | sed 's/ hw\.onekey\.messages\.[a-zA-Z_]*\./ /g' \
+            | sed 's/ crypto\./ /g' \
+            | sed 's/ ethereum_definitions\./ /g' \
+            | sed 's/ management\./ /g' \
+            | sed 's/^option /\/\/ option /' \
+            | grep -v '    reserved '
+
+        echo ''
+        echo '// --- Protocol V2 system messages ---'
         grep -hv \
             -e '^import ' -e '^syntax' -e '^package' -e 'option java_' \
             -e '^option ' \
             "$SRC_PRO2_LATEST"/messages*.proto \
             | grep -v '    reserved '
 
-        echo ''
-        echo '// MessageType enum with Protocol V2 system IDs from firmware-pro2 legacy mapping'
-        echo 'enum MessageType {'
-        awk '
-            /MessageType_FactoryDeviceInfoSettings = 60000/ { in_range = 1 }
-            in_range {
-                if ($0 ~ /^ }/) { exit }
-                print
-            }
-        ' "$SRC_PRO2_LEGACY/messages.proto"
-        echo '}'
+        if ! grep -q '^message DevGetOnboardingStatus ' "$SRC_PRO2_LATEST"/messages*.proto; then
+            echo ''
+            echo '// --- Onboarding status (kept until firmware-pro2 latest proto exports it) ---'
+            echo 'message DevGetOnboardingStatus {'
+            echo '}'
+            echo ''
+            echo 'message DevOnboardingStatus {'
+            echo '    optional uint32 page_index = 1;'
+            echo '    optional uint32 page_count = 2;'
+            echo '    optional string page_name = 3;'
+            echo '}'
+        fi
     } > "$TMP_PROTO"
+
+    if ! grep -q 'MessageType_DevGetOnboardingStatus' "$TMP_PROTO"; then
+        node - "$TMP_PROTO" <<'NODE'
+const fs = require('fs');
+
+const protoPath = process.argv[2];
+const proto = fs.readFileSync(protoPath, 'utf8');
+const updated = proto.replace(
+  /(    MessageType_DeviceInfo\s*=\s*60601[^\n]*;\n)/,
+  `$1    MessageType_DevGetOnboardingStatus = 60602;\n    MessageType_DevOnboardingStatus = 60603;\n`
+);
+
+if (updated === proto) {
+  throw new Error('Unable to insert onboarding MessageType entries into Pro2 schema');
+}
+
+fs.writeFileSync(protoPath, updated);
+NODE
+    fi
 
     npx pbjs -t json \
         -p "$PARENT_PATH" \
@@ -150,10 +186,12 @@ if [ -d "$SRC_PRO2_LATEST" ] && ls "$SRC_PRO2_LATEST"/messages*.proto 1>/dev/nul
     rm -f "$TMP_PROTO"
 
     cp "$PARENT_PATH/../messages-pro2.json" "$CORE_MESSAGES_DIR/messages-pro2.json"
-    echo "Pro2 messages-pro2.json generated from firmware-pro2 latest schema and copied to core"
+    echo "Pro2 messages-pro2.json generated from firmware-pro2 legacy + latest schema and copied to core"
 
     yarn prettier --write "$PARENT_PATH/../messages-pro2.json"
     yarn prettier --write "$CORE_MESSAGES_DIR/messages-pro2.json"
+    node ./protobuf-types.js $LANG
+    yarn --cwd "$PACKAGE_ROOT" prettier --write "$PACKAGE_ROOT/src/types/messages.ts"
     echo "=== Pro2 messages build complete ==="
 elif [ -d "$SRC_PRO2_LEGACY" ] && ls "$SRC_PRO2_LEGACY"/messages*.proto 1>/dev/null 2>&1; then
     echo "=== Building Pro2 messages from firmware-pro2 submodule ==="
@@ -234,6 +272,8 @@ enum MessageType {
     MessageType_Success                 = 60207;
     MessageType_Failure                 = 60208;
     MessageType_Reboot                  = 60400;
+    MessageType_DevGetOnboardingStatus  = 60602;
+    MessageType_DevOnboardingStatus     = 60603;
     MessageType_FixPermission           = 60800;
     MessageType_PathInfo                = 60801;
     MessageType_PathInfoQuery           = 60802;
@@ -297,6 +337,15 @@ message FirmwareUpdate {
 message FirmwareInstallProgress {
     required uint32 progress = 1;
 }
+
+message DevGetOnboardingStatus {
+}
+
+message DevOnboardingStatus {
+    optional uint32 page_index = 1;
+    optional uint32 page_count = 2;
+    optional string page_name = 3;
+}
 ENUM_EOF
 
     # ----------------------------------------------------------------
@@ -316,6 +365,8 @@ ENUM_EOF
 
     yarn prettier --write "$PARENT_PATH/../messages-pro2.json"
     yarn prettier --write "$CORE_MESSAGES_DIR/messages-pro2.json"
+    node ./protobuf-types.js $LANG
+    yarn --cwd "$PACKAGE_ROOT" prettier --write "$PACKAGE_ROOT/src/types/messages.ts"
     echo "=== Pro2 messages build complete ==="
 else
     echo "⚠️  firmware-pro2 submodule not found at $SRC_PRO2_LEGACY"
