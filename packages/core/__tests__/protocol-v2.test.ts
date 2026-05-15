@@ -8,10 +8,12 @@ import DevGetOnboardingStatus from '../src/api/protocol-v2/DevGetOnboardingStatu
 import FirmwareUpdateV3 from '../src/api/FirmwareUpdateV3';
 import FirmwareUpdateV4 from '../src/api/FirmwareUpdateV4';
 import GetOnekeyFeatures from '../src/api/GetOnekeyFeatures';
+import KaspaGetAddress from '../src/api/kaspa/KaspaGetAddress';
 import { DataManager } from '../src/data-manager';
 import { Device } from '../src/device/Device';
 import { UI_REQUEST } from '../src/events/ui-request';
 import { getProtocolV2Features, normalizeProtocolV2Features } from '../src/protocols/protocol-v2';
+import { shouldSkipMethodSupportCheck } from '../src/utils';
 
 import type { DeviceCommands } from '../src/device/DeviceCommands';
 
@@ -119,6 +121,16 @@ describe('Protocol V2 feature adapter', () => {
     expect(features.firmware_present).toBe(false);
   });
 
+  test('bypasses legacy method support checks for Protocol V2 fallback features', () => {
+    const features = normalizeProtocolV2Features({
+      ...descriptor,
+      protocolType: 'V2',
+    } as any);
+
+    expect(shouldSkipMethodSupportCheck(features, 'V2')).toBe(true);
+    expect(shouldSkipMethodSupportCheck(features)).toBe(true);
+  });
+
   test('initializes Protocol V2 features with Ping only while DeviceInfo is unsupported', async () => {
     const onDeviceInfoError = jest.fn();
     const commands = {
@@ -135,6 +147,39 @@ describe('Protocol V2 feature adapter', () => {
     expect(commands.typedCall).toHaveBeenNthCalledWith(1, 'Ping', 'Success', { message: 'init' });
     expect(commands.typedCall).toHaveBeenCalledTimes(1);
     expect(onDeviceInfoError).not.toHaveBeenCalled();
+  });
+
+  test('does not block method-level legacy version checks on Protocol V2', async () => {
+    const method = new KaspaGetAddress({
+      id: 1,
+      payload: {
+        method: 'kaspaGetAddress',
+        path: "m/44'/111111'/0'/0/0",
+        prefix: 'kaspa',
+        showOnOneKey: false,
+        useTweak: false,
+      },
+    });
+    const typedCall = jest.fn().mockResolvedValue({
+      type: 'KaspaAddress',
+      message: {
+        address: 'kaspa:test-address',
+      },
+    });
+
+    method.init();
+    method.postMessage = jest.fn();
+    (method as any).device = {
+      originalDescriptor: { protocolType: 'V2' },
+      features: normalizeProtocolV2Features({ ...descriptor, protocolType: 'V2' } as any),
+      commands: { typedCall },
+      toMessageObject: jest.fn(() => ({})),
+    };
+
+    await expect(method.run()).resolves.toMatchObject({
+      address: 'kaspa:test-address',
+    });
+    expect(typedCall).toHaveBeenCalledWith('KaspaGetAddress', 'KaspaAddress', expect.any(Object));
   });
 
   test('returns Protocol V2 oneKey fields without calling legacy OnekeyGetFeatures', async () => {

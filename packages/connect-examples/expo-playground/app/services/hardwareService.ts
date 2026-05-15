@@ -9,7 +9,7 @@ import {
   TransportManager,
 } from '../utils/hardwareInstance';
 import { useHardwareStore } from '../store/hardwareStore';
-import { METHODS_REQUIRING_PASSPHRASE_CHECK } from '../utils/constants';
+import { methodSupportsCommonParameters } from '../utils/constants';
 import { previewHardwareParams } from './previewHardwareParams';
 import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
 // 使用 hd-core 的标准类型
@@ -185,7 +185,7 @@ export async function callHardwareAPI(
 
     // FOR EXAMPLE APP: 如果参数中没有 passphraseState (或者为空)，则尝试从设备获取
     // app-monorepo 的逻辑更复杂，这里简化以满足 example 的需求
-    if (connectId && METHODS_REQUIRING_PASSPHRASE_CHECK.includes(method)) {
+    if (connectId && methodSupportsCommonParameters(method)) {
       // 只有当 params.passphraseState 是空字符串、undefined 或 null 时才尝试获取
       if (
         params.passphraseState === '' ||

@@ -113,6 +113,7 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
       {
         console: false,
         persist: false,
+        store: false,
       }
     );
   }, []);
