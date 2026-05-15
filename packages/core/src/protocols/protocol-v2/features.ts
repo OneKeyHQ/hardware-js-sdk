@@ -2,7 +2,7 @@ import { EDeviceType } from '@onekeyfe/hd-shared';
 
 import type { Features } from '../../types';
 import type { DeviceCommands } from '../../device/DeviceCommands';
-import type { OneKeyDeviceInfo as DeviceDescriptor, Messages } from '@onekeyfe/hd-transport';
+import type { OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
 
 type ProtocolV2Bytes = Uint8Array | number[] | string;
 
@@ -52,24 +52,24 @@ type ProtocolV2DeviceInfo = {
   };
 };
 
-const PROTOCOL_V2_DEVICE_INFO_REQUEST: Messages.MessageType['DevGetDeviceInfo'] = {
-  targets: {
-    hw: true,
-    fw: true,
-    bt: true,
-    se1: true,
-    se2: true,
-    se3: true,
-    se4: true,
-    status: true,
-  },
-  types: {
-    version: true,
-    build_id: true,
-    hash: true,
-    specific: true,
-  },
-};
+// const PROTOCOL_V2_DEVICE_INFO_REQUEST = {
+//   targets: {
+//     hw: true,
+//     fw: true,
+//     bt: true,
+//     se1: true,
+//     se2: true,
+//     se3: true,
+//     se4: true,
+//     status: true,
+//   },
+//   types: {
+//     version: true,
+//     build_id: true,
+//     hash: true,
+//     specific: true,
+//   },
+// };
 
 function parseVersion(version?: string | null): [number, number, number] {
   if (!version) return [0, 0, 0];
@@ -227,7 +227,6 @@ export function normalizeProtocolV2Features(
 export async function getProtocolV2Features({
   commands,
   descriptor,
-  onDeviceInfoError,
   timeoutMs,
 }: {
   commands: DeviceCommands;
@@ -242,18 +241,26 @@ export async function getProtocolV2Features({
     await commands.typedCall('Ping', 'Success', { message: 'init' });
   }
 
-  try {
-    const { message } = callOptions
-      ? await commands.typedCall(
-          'DevGetDeviceInfo',
-          'DeviceInfo',
-          PROTOCOL_V2_DEVICE_INFO_REQUEST,
-          callOptions
-        )
-      : await commands.typedCall('DevGetDeviceInfo', 'DeviceInfo', PROTOCOL_V2_DEVICE_INFO_REQUEST);
-    return normalizeProtocolV2Features(descriptor, message as unknown as ProtocolV2DeviceInfo);
-  } catch (error) {
-    onDeviceInfoError?.(error);
-    throw error;
-  }
+  // 当前 Pro2 固件暂不支持 DevGetDeviceInfo，初始化阶段只保留 Ping。
+  // 固件支持后再恢复下面这段 DeviceInfo 读取，用于补全版本、序列号和状态字段。
+  // try {
+  //   const { message } = callOptions
+  //     ? await commands.typedCall(
+  //         'DevGetDeviceInfo',
+  //         'DeviceInfo',
+  //         PROTOCOL_V2_DEVICE_INFO_REQUEST,
+  //         callOptions
+  //       )
+  //     : await commands.typedCall(
+  //         'DevGetDeviceInfo',
+  //         'DeviceInfo',
+  //         PROTOCOL_V2_DEVICE_INFO_REQUEST
+  //       );
+  //   return normalizeProtocolV2Features(descriptor, message as unknown as ProtocolV2DeviceInfo);
+  // } catch (error) {
+  //   onDeviceInfoError?.(error);
+  //   throw error;
+  // }
+
+  return normalizeProtocolV2Features(descriptor);
 }
