@@ -16,6 +16,12 @@ const commitSha =
   process.env.EXPO_PUBLIC_COMMIT_SHA ||
   '';
 const shortCommitSha = commitSha ? commitSha.slice(0, 7) : 'dev';
+const shouldRunForVercelOnly = process.argv.includes('--if-vercel');
+
+if (shouldRunForVercelOnly && process.env.VERCEL !== '1') {
+  console.log('[vercel-build] skip expo-example output: not running on Vercel');
+  process.exit(0);
+}
 
 function run(command, args, options = {}) {
   console.log(`\n[vercel-build] ${command} ${args.join(' ')}`);
@@ -47,8 +53,6 @@ function copyDirectory(source, target) {
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.cpSync(source, target, { recursive: true });
 }
-
-run('yarn', ['build']);
 
 run('yarn', ['--cwd', expoExampleRoot, 'expo', 'export:web'], {
   env: {
