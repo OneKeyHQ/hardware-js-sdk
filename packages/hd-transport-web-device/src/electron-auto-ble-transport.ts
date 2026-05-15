@@ -744,10 +744,7 @@ export default class ElectronAutoBleTransport {
         bufferState.buffer = bufferState.buffer.concat([...data]);
       }
 
-      if (
-        bufferState.buffer.length - PROTOCOL_V1_MESSAGE_HEADER_SIZE >=
-        bufferState.bufferLength
-      ) {
+      if (bufferState.buffer.length - PROTOCOL_V1_MESSAGE_HEADER_SIZE >= bufferState.bufferLength) {
         const completeBuffer = new Uint8Array(bufferState.buffer);
         bufferState.bufferLength = 0;
         bufferState.buffer = [];

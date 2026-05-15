@@ -400,10 +400,7 @@ export default class ElectronBleTransport {
       }
 
       // Check if packet is complete
-      if (
-        bufferState.buffer.length - PROTOCOL_V1_MESSAGE_HEADER_SIZE >=
-        bufferState.bufferLength
-      ) {
+      if (bufferState.buffer.length - PROTOCOL_V1_MESSAGE_HEADER_SIZE >= bufferState.bufferLength) {
         const completeBuffer = new Uint8Array(bufferState.buffer);
 
         // Reset buffer state

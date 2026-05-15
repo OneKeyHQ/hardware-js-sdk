@@ -16,11 +16,9 @@ function encodeEnvelope(data: ByteBuffer, options: Options<true>): Buffer[];
 function encodeEnvelope(data: ByteBuffer, options: Options<false>): Buffer;
 function encodeEnvelope(data: any, options: any): any {
   const { addTrezorHeaders, chunked, messageType } = options;
-  // eslint-disable-next-line @typescript-eslint/restrict-plus-operands
   const fullSize =
-    (addTrezorHeaders
-      ? PROTOCOL_V1_ENVELOPE_HEADER_SIZE
-      : PROTOCOL_V1_ENVELOPE_HEADER_SIZE - 2) + data.limit;
+    (addTrezorHeaders ? PROTOCOL_V1_ENVELOPE_HEADER_SIZE : PROTOCOL_V1_ENVELOPE_HEADER_SIZE - 2) +
+    Number(data.limit);
 
   const encodedByteBuffer = new ByteBuffer(fullSize);
 

@@ -150,8 +150,7 @@ export const createCoreApi = (
   deviceRebootToBootloader: connectId => call({ connectId, method: 'deviceRebootToBootloader' }),
 
   // File system & device control API (Protocol V2 only)
-  getProtoVersion: (connectId, params) =>
-    call({ ...params, connectId, method: 'getProtoVersion' }),
+  getProtoVersion: (connectId, params) => call({ ...params, connectId, method: 'getProtoVersion' }),
   ping: (connectId, params) => call({ ...params, connectId, method: 'ping' }),
   devReboot: (connectId, params) => call({ ...params, connectId, method: 'devReboot' }),
   devGetDeviceInfo: (connectId, params) =>

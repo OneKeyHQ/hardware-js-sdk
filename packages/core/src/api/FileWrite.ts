@@ -92,7 +92,7 @@ export default class FileWrite extends BaseMethod<FileWriteParams> {
   }
 
   async run() {
-    const data = await dataToUint8Array(this.params.data as FileWriteParams['data'] | Blob);
+    const data = await dataToUint8Array(this.params.data);
     const dataLength = data.byteLength;
     const offsetValue = Number(this.params.offset ?? 0);
     const startOffset = Number.isFinite(offsetValue) && offsetValue > 0 ? offsetValue : 0;

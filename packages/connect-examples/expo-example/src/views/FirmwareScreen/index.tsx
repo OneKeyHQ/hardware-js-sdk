@@ -64,7 +64,9 @@ function FirmwareUpdateResult({ updateState }: { updateState?: UpdateState }) {
   return (
     <Stack gap="$1">
       <Text color={updateState.success ? '$text' : '$textCritical'}>
-        {updateState.success ? intl.formatMessage({ id: 'tip__update_success' }) : updateState.payload}
+        {updateState.success
+          ? intl.formatMessage({ id: 'tip__update_success' })
+          : updateState.payload}
       </Text>
       {updateState.success && versionRows.length > 0 && (
         <Stack gap="$1" padding="$2" backgroundColor="$bgHover" borderRadius="$2">
@@ -503,7 +505,7 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
   }, [loadOnekeyFeatures, sdk, selectDevice?.connectId]);
 
   useEffect(() => {
-    void loadDeviceFeatures();
+    loadDeviceFeatures();
   }, [loadDeviceFeatures]);
 
   const disconnectDevice = useCallback(() => {

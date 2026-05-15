@@ -79,10 +79,7 @@ export default class FileRead extends BaseMethod<FileReadParams> {
   async run() {
     const startOffset = this.params.offset ?? 0;
     const requestedLength = Number(this.params.totalSize);
-    const chunkSize = normalizeChunkSize(
-      this.params.chunkLen,
-      getProtocolV2FileReadChunkLimit()
-    );
+    const chunkSize = normalizeChunkSize(this.params.chunkLen, getProtocolV2FileReadChunkLimit());
     let totalLength = Number.isFinite(requestedLength) && requestedLength > 0 ? requestedLength : 0;
 
     if (totalLength === 0) {

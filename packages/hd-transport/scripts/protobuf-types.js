@@ -192,13 +192,13 @@ const parseMessage = (messageName, message, depth = 0, skipExisting = false) => 
 };
 
 // top level messages and nested messages
-Object.keys(json.nested).map(e => parseMessage(e, json.nested[e]));
+Object.keys(json.nested).forEach(e => parseMessage(e, json.nested[e]));
 
 optionalJsonFiles.forEach(jsonFile => {
   const jsonPath = path.join(__dirname, jsonFile);
   if (!fs.existsSync(jsonPath)) return;
   const optionalJson = readJson(jsonPath);
-  Object.keys(optionalJson.nested).map(e => {
+  Object.keys(optionalJson.nested).forEach(e => {
     const alias = hasParsedType(e) ? OPTIONAL_DUPLICATE_TYPE_ALIASES[e] : undefined;
     if (alias) {
       parseMessage(alias, optionalJson.nested[e]);
