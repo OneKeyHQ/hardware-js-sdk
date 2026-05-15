@@ -39,7 +39,7 @@
     "@tamagui/toast": "1.90.2",
     "@ton/core": "^0.57.0",
     "asyncstorage-down": "^4.2.0",
-    "axios": "1.15.2",
+    "axios": "1.16.0",
     "bchaddrjs": "^0.5.2",
     "bitcoinjs-lib": "^6.1.5",
     "bn.js": "^5.2.1",
