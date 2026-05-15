@@ -19,11 +19,7 @@ let protoSeq = 0;
  *   [7..N-2] payload
  *   [N-1]    CRC8 of bytes 0 to N-2 (frame CRC)
  */
-export function encodeFrame(
-  payload: Uint8Array | null,
-  packetSrc = 0,
-  router = 0
-): Uint8Array {
+export function encodeFrame(payload: Uint8Array | null, packetSrc = 0, router = 0): Uint8Array {
   const payloadLen = payload ? payload.length : 0;
   const frameLen = payloadLen + PROTO_HEAD_CRC_SIZE;
   if (frameLen > PROTOCOL_V2_FRAME_MAX_BYTES) {

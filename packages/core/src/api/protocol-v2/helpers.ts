@@ -69,10 +69,8 @@ export const PROTOCOL_V2_FIRMWARE_UPDATE_OPTIONS: TransportCallOptions = {
   intermediateTypes: ['DevFirmwareInstallProgress'],
 };
 
-export const PROTOCOL_V2_FIRMWARE_UPDATE_RESPONSE_TYPES: (
-  | 'Success'
-  | 'DevFirmwareUpdateStatus'
-)[] = ['Success', 'DevFirmwareUpdateStatus'];
+export const PROTOCOL_V2_FIRMWARE_UPDATE_RESPONSE_TYPES: ('Success' | 'DevFirmwareUpdateStatus')[] =
+  ['Success', 'DevFirmwareUpdateStatus'];
 
 export function normalizeRebootType(value: RebootTypeInput | undefined): DevRebootType {
   if (typeof value === 'number') return value;

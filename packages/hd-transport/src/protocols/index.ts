@@ -1,16 +1,12 @@
 import ByteBuffer from 'bytebuffer';
 
-import {
-  encodeEnvelopeMessage,
-  encodeMessageChunks,
-  encodeTransportPackets,
-} from './v1/packets';
+import { encodeEnvelopeMessage, encodeMessageChunks, encodeTransportPackets } from './v1/packets';
 import { decodeFirstChunk } from './v1/decode';
 import { decodeMessage as decodeV1Message } from './v1/receive';
 import { createMessageFromName, createMessageFromType } from '../serialization/protobuf/messages';
 import { encode as encodeProtobuf } from '../serialization/protobuf/encode';
 import { decode as decodeProtobuf } from '../serialization/protobuf/decode';
-import { encodeProtobufFrame, decodeFrame as decodeV2Frame } from './v2';
+import { decodeFrame as decodeV2Frame, encodeProtobufFrame } from './v2';
 
 import type { Root } from 'protobufjs/light';
 
