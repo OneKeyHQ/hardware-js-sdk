@@ -4,6 +4,7 @@ import { LedgerDeviceManager } from '../device/LedgerDeviceManager';
 import { SignerManager } from '../signer/SignerManager';
 import {
   ERROR_TAG,
+  createMultipleUsbLedgerDevicesError,
   isAppStuckByApdu,
   isKnownConnectionTag,
   isTransportStuck,
@@ -287,6 +288,18 @@ export class LedgerConnectorBase implements IConnector {
     return descriptors;
   }
 
+  private _assertSingleUsbDescriptor(descriptors: DeviceDescriptor[]): void {
+    if (isLedgerBleConnectionType(this.connectionType) || descriptors.length <= 1) {
+      return;
+    }
+    debugLog(
+      `[DMK] Multiple Ledger USB devices found (${
+        descriptors.length
+      }); refusing to choose by ephemeral path. paths=[${descriptors.map(d => d.path).join(',')}]`
+    );
+    throw createMultipleUsbLedgerDevicesError();
+  }
+
   // ---------------------------------------------------------------------------
   // IConnector -- Device discovery
   // ---------------------------------------------------------------------------
@@ -295,6 +308,7 @@ export class LedgerConnectorBase implements IConnector {
     const dm = await this._getDeviceManager();
 
     const descriptors = await this._discoverDescriptors(dm);
+    this._assertSingleUsbDescriptor(descriptors);
     const resolvedDescriptors = descriptors.map(d => ({
       descriptor: d,
       connectId: this._resolveConnectId(d),
@@ -329,6 +343,10 @@ export class LedgerConnectorBase implements IConnector {
     // Only the explicit-connectId path gets the BLE direct-connect treatment.
     const callerSuppliedConnectId = Boolean(deviceId);
     let targetPath = deviceId;
+    if (callerSuppliedConnectId && !isLedgerBleConnectionType(this.connectionType)) {
+      const dm = await this._getDeviceManager();
+      this._assertSingleUsbDescriptor(await this._discoverDescriptors(dm));
+    }
     if (!targetPath) {
       const discovered = await this.searchDevices();
       if (discovered.length === 0) {

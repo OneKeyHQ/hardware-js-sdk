@@ -15,6 +15,7 @@ import {
 
 import {
   ERROR_TAG,
+  createMultipleUsbLedgerDevicesError,
   isConnectionLevelError,
   isDeviceDisconnectedError,
   isDeviceLockedError,
@@ -74,15 +75,6 @@ import type {
   UiResponseEvent,
 } from '@onekeyfe/hwk-adapter-core';
 
-export interface LedgerAdapterOptions {
-  /**
-   * `true` — emit `REQUEST_SELECT_DEVICE` on multi-device discovery and await
-   * `uiResponse({ type: RECEIVE_SELECT_DEVICE, payload: { sdkConnectId } })`.
-   * `false` (default) — silently pick the first device.
-   */
-  handleSelectDevice?: boolean;
-}
-
 /**
  * Result of `_verifyDeviceFingerprint`.
  *
@@ -122,8 +114,6 @@ export class LedgerAdapter implements IHardwareWallet {
 
   private readonly emitter = new TypedEventEmitter<HardwareEventMap>();
 
-  private readonly _handleSelectDevice: boolean;
-
   private _discoveredDevices = new Map<string, DeviceInfo>();
 
   private _sessions = new Map<string, string>();
@@ -148,9 +138,8 @@ export class LedgerAdapter implements IHardwareWallet {
   // Shared across concurrent callers — only `cancel()` aborts.
   private _doConnectAbortController: AbortController | null = null;
 
-  constructor(connector: IConnector, options?: LedgerAdapterOptions) {
+  constructor(connector: IConnector) {
     this.connector = connector;
-    this._handleSelectDevice = options?.handleSelectDevice ?? false;
     this._jobQueue = new DeviceJobQueue();
     this.registerEventListeners();
   }
@@ -616,7 +605,7 @@ export class LedgerAdapter implements IHardwareWallet {
    *
    * - If a session already exists for the given connectId, reuse it.
    * - If ANY session exists (Ledger IDs are ephemeral), reuse it.
-   * - Otherwise: search → 1 device: auto-connect, multiple: ask user, 0: throw.
+   * - Otherwise: search → 1 USB device: auto-connect, multiple USB devices: throw, 0: throw.
    */
   // Mutex for ensureConnected — prevents concurrent calls from establishing duplicate connections
   private _connectingPromise: Promise<string> | null = null;
@@ -883,6 +872,13 @@ export class LedgerAdapter implements IHardwareWallet {
     devices: DeviceInfo[],
     targetConnectId?: string
   ): Promise<string> {
+    if (!isLedgerBleConnectionType(this.connector.connectionType) && devices.length > 1) {
+      debugLog(
+        `[DMK] Multiple Ledger USB devices found (${devices.length}); refusing to auto-select by ephemeral connectId.`
+      );
+      throw createMultipleUsbLedgerDevicesError();
+    }
+
     if (targetConnectId) {
       const target = devices.find(
         d => d.connectId === targetConnectId || d.deviceId === targetConnectId
@@ -905,10 +901,13 @@ export class LedgerAdapter implements IHardwareWallet {
       });
     }
 
-    const chosenConnectId =
-      devices.length === 1 ? devices[0].connectId : await this._chooseDeviceFromList(devices);
+    if (devices.length !== 1) {
+      throw Object.assign(new Error('Ledger device not found.'), {
+        code: HardwareErrorCode.DeviceNotFound,
+      });
+    }
 
-    return this._connectDeviceOrThrow(chosenConnectId);
+    return this._connectDeviceOrThrow(devices[0].connectId);
   }
 
   private async _connectDeviceOrThrow(chosenConnectId: string): Promise<string> {
@@ -925,53 +924,6 @@ export class LedgerAdapter implements IHardwareWallet {
       throw rethrow;
     }
     return chosenConnectId;
-  }
-
-  private async _chooseDeviceFromList(devices: DeviceInfo[]): Promise<string> {
-    if (!this._handleSelectDevice) {
-      debugLog(
-        `[DMK] Multiple Ledger devices found (${devices.length}); handleSelectDevice=false, picking first (${devices[0].connectId}).`
-      );
-      return devices[0].connectId;
-    }
-
-    let response: { sdkConnectId: string } | undefined;
-    try {
-      const waitPromise = this._uiRegistry.wait<{ sdkConnectId: string }>(
-        UI_REQUEST.REQUEST_SELECT_DEVICE
-      );
-      this.emitter.emit(UI_REQUEST.REQUEST_SELECT_DEVICE, {
-        type: UI_REQUEST.REQUEST_SELECT_DEVICE,
-        payload: { devices },
-      });
-      response = await waitPromise;
-    } catch (err) {
-      // Defensive: same-type re-fire of REQUEST_SELECT_DEVICE could preempt
-      // this wait. Surface as UserAborted — _doConnect's catch only treats
-      // Locked / NotAdvertising / Disconnected as recoverable; raw
-      // UiRequestPreempted would escape the retry loop.
-      if ((err as { _tag?: string })?._tag === UI_REQUEST_PREEMPTED_TAG) {
-        this.emitter.emit(UI_REQUEST.CLOSE_UI_WINDOW, {
-          type: UI_REQUEST.CLOSE_UI_WINDOW,
-          payload: {},
-        });
-        throw Object.assign(new Error('Device selection superseded'), {
-          _tag: ERROR_TAG.UserAborted,
-          code: HardwareErrorCode.UserAborted,
-          cause: err,
-        });
-      }
-      throw err;
-    }
-
-    const chosen = devices.find(d => d.connectId === response?.sdkConnectId);
-    if (!chosen) {
-      throw Object.assign(
-        new Error(`Selected sdkConnectId '${response?.sdkConnectId}' not in discovered list`),
-        { _tag: ERROR_TAG.DeviceNotRecognized }
-      );
-    }
-    return chosen.connectId;
   }
 
   /**

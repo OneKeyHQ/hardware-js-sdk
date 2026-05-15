@@ -3,11 +3,11 @@ import { HardwareErrorCode } from '@onekeyfe/hwk-adapter-core';
 import { LedgerConnectorBase } from '../connector/LedgerConnectorBase';
 import { ERROR_TAG } from '../errors';
 
-import type { DeviceDescriptor } from '@onekeyfe/hwk-adapter-core';
+import type { ConnectionType, DeviceDescriptor } from '@onekeyfe/hwk-adapter-core';
 
-class BleSearchConnector extends LedgerConnectorBase {
-  constructor(private readonly descriptors: DeviceDescriptor[]) {
-    super(async () => ({}), { connectionType: 'ble', dmk: {} as any });
+class SearchConnector extends LedgerConnectorBase {
+  constructor(private readonly descriptors: DeviceDescriptor[], connectionType: ConnectionType) {
+    super(async () => ({}), { connectionType, dmk: {} as any });
   }
 
   protected override async _discoverDescriptors(): Promise<DeviceDescriptor[]> {
@@ -61,15 +61,18 @@ describe('LedgerConnectorBase error wrapping', () => {
 
 describe('LedgerConnectorBase BLE discovery', () => {
   it('allows transport ids as BLE connectId even when they are not four-character names', async () => {
-    const connector = new BleSearchConnector([
-      {
-        path: 'D5:75:7D:4B:51:E8',
-        name: 'Nano X 123',
-        bleName: 'A58F',
-        transport: 'RN_BLE',
-        type: 'nanoX',
-      },
-    ]);
+    const connector = new SearchConnector(
+      [
+        {
+          path: 'D5:75:7D:4B:51:E8',
+          name: 'Nano X 123',
+          bleName: 'A58F',
+          transport: 'RN_BLE',
+          type: 'nanoX',
+        },
+      ],
+      'ble'
+    );
 
     await expect(connector.searchDevices()).resolves.toEqual([
       expect.objectContaining({
@@ -82,6 +85,31 @@ describe('LedgerConnectorBase BLE discovery', () => {
   });
 });
 
+describe('LedgerConnectorBase USB single-device guard', () => {
+  const usbDescriptors: DeviceDescriptor[] = [
+    {
+      path: 'usb-path-a',
+      name: 'Ledger Stax',
+      transport: 'WEB-HID',
+      type: 'stax',
+    },
+    {
+      path: 'usb-path-b',
+      name: 'Ledger Nano Gen5',
+      transport: 'WEB-HID',
+      type: 'apex',
+    },
+  ];
+
+  it('rejects USB search when multiple Ledger devices are visible', async () => {
+    const connector = new SearchConnector(usbDescriptors, 'usb');
+
+    await expect(connector.searchDevices()).rejects.toMatchObject({
+      code: HardwareErrorCode.DeviceOneDeviceOnly,
+      message: expect.stringContaining('Multiple Ledger USB devices are connected'),
+    });
+  });
+});
 describe('LedgerConnectorBase BLE direct-connect gate', () => {
   const TARGET_PATH = 'D5:75:7D:4B:51:E8';
 

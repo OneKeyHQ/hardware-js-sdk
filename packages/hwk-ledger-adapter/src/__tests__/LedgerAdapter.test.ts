@@ -1151,7 +1151,6 @@ describe('LedgerAdapter', () => {
         .mockResolvedValueOnce({ signature: '0xSIGNED' });
 
       connector.searchDevices.mockResolvedValueOnce([
-        { connectId: 'dev-new', deviceId: 'dev-new', name: 'Nano S', model: 'nanoS' },
         { connectId: 'dev-1', deviceId: 'dev-1', name: 'Nano X', model: 'nanoX' },
       ]);
       connector.connect.mockResolvedValueOnce({
@@ -1173,7 +1172,6 @@ describe('LedgerAdapter', () => {
 
       expect(result.success).toBe(true);
       expect(connector.connect).toHaveBeenLastCalledWith('dev-1');
-      expect(connector.connect).not.toHaveBeenCalledWith('dev-new');
       expect(connector.call).toHaveBeenLastCalledWith(
         'session-target',
         'evmSignMessage',
@@ -1240,7 +1238,7 @@ describe('LedgerAdapter', () => {
       );
     });
 
-    it('should auto-select first device when multiple devices found and handleSelectDevice is off (default)', async () => {
+    it('should reject multiple USB devices instead of auto-selecting the first one', async () => {
       connector.searchDevices.mockResolvedValueOnce([
         { connectId: 'dev-A', deviceId: 'dev-A', name: 'Nano X', model: 'nanoX' },
         { connectId: 'dev-B', deviceId: 'dev-B', name: 'Nano S', model: 'nanoS' },
@@ -1258,56 +1256,17 @@ describe('LedgerAdapter', () => {
       });
       connector.call.mockResolvedValueOnce({ address: '0xFALLBACK' });
 
-      // No UI handler set — should fall back to first device
       const result = await adapter.evmGetAddress('', '', {
         path: "m/44'/60'/0'/0/0",
         showOnDevice: false,
       });
 
-      expect(result.success).toBe(true);
-      expect(connector.connect).toHaveBeenCalledWith('dev-A');
-    });
-
-    it('should capture a synchronous select-device response from the UI handler', async () => {
-      const selectAdapter = new LedgerAdapter(connector, { handleSelectDevice: true });
-      selectAdapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, () => {
-        selectAdapter.uiResponse({
-          type: UI_RESPONSE.RECEIVE_DEVICE_PERMISSION,
-          payload: { granted: true },
-        });
-      });
-      selectAdapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
-        const selected = event.payload.devices.find(d => d.connectId === 'dev-B');
-        selectAdapter.uiResponse({
-          type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
-          payload: { sdkConnectId: selected?.connectId ?? 'dev-B' },
-        });
-      });
-
-      connector.searchDevices.mockResolvedValueOnce([
-        { connectId: 'dev-A', deviceId: 'dev-A', name: 'Nano X', model: 'nanoX' },
-        { connectId: 'dev-B', deviceId: 'dev-B', name: 'Nano S', model: 'nanoS' },
-      ]);
-      connector.connect.mockResolvedValueOnce({
-        sessionId: 'session-B',
-        deviceInfo: {
-          vendor: 'ledger',
-          model: 'nanoS',
-          firmwareVersion: 'unknown',
-          deviceId: 'dev-B',
-          connectId: 'dev-B',
-          connectionType: 'usb',
-        },
-      });
-      connector.call.mockResolvedValueOnce({ address: '0xSELECTED' });
-
-      const result = await selectAdapter.evmGetAddress('', '', {
-        path: "m/44'/60'/0'/0/0",
-        showOnDevice: false,
-      });
-
-      expect(result.success).toBe(true);
-      expect(connector.connect).toHaveBeenCalledWith('dev-B');
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.payload.code).toBe(HardwareErrorCode.DeviceOneDeviceOnly);
+        expect(result.payload.error).toContain('Multiple Ledger USB devices are connected');
+      }
+      expect(connector.connect).not.toHaveBeenCalled();
     });
 
     it('should reject BLE business calls with an empty connectId instead of auto-selecting a device', async () => {
