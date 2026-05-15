@@ -242,6 +242,10 @@ export default class WebUsbTransport {
     }
 
     if (expectedProtocol === 'V2') {
+      if (this.deviceProtocol.get(path) === 'V2') {
+        this.Log.debug(`[WebUsbTransport] detectProtocol: path=${path} -> V2 (cached expected)`);
+        return 'V2';
+      }
       if (await this.probeProtocolV2(path)) {
         this.deviceProtocol.set(path, 'V2');
         this.Log.debug(`[WebUsbTransport] detectProtocol: path=${path} -> V2 (expected)`);
@@ -830,7 +834,6 @@ export default class WebUsbTransport {
     const ifaceNum = endpoints?.interfaceNumber ?? this.interfaceId;
     await device.releaseInterface(ifaceNum);
     await device.close();
-    this.deviceProtocol.delete(path);
     this.protocolV2Assemblers.delete(path);
     this.deviceEndpoints.delete(path);
   }

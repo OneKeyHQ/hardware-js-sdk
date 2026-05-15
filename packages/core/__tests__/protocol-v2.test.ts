@@ -9,6 +9,7 @@ import FirmwareUpdateV3 from '../src/api/FirmwareUpdateV3';
 import FirmwareUpdateV4 from '../src/api/FirmwareUpdateV4';
 import GetOnekeyFeatures from '../src/api/GetOnekeyFeatures';
 import { DataManager } from '../src/data-manager';
+import { Device } from '../src/device/Device';
 import { UI_REQUEST } from '../src/events/ui-request';
 import { getProtocolV2Features, normalizeProtocolV2Features } from '../src/protocols/protocol-v2';
 
@@ -185,6 +186,47 @@ describe('Protocol V2 feature adapter', () => {
       onekey_ble_name: 'Pro2 BLE',
     });
     expect(message).not.toHaveProperty('label');
+  });
+
+  test('reuses cached Protocol V2 features after the first initialization', async () => {
+    const device = Device.fromDescriptor({
+      path: 'usb-path',
+      protocolType: 'V2',
+    } as any);
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce({ type: 'Success', message: { message: 'init' } })
+      .mockResolvedValueOnce({
+        type: 'DeviceInfo',
+        message: {
+          hw: { serial_no: 'PR2SERIAL' },
+          status: { init_states: true },
+        },
+      });
+
+    (device as any).commands = { typedCall };
+
+    await device.initialize();
+    await device.initialize();
+
+    expect(device.features?.device_id).toBe('PR2SERIAL');
+    expect(typedCall).toHaveBeenCalledTimes(2);
+    expect(typedCall).toHaveBeenNthCalledWith(
+      1,
+      'Ping',
+      'Success',
+      { message: 'init' },
+      {
+        timeoutMs: 10000,
+      }
+    );
+    expect(typedCall).toHaveBeenNthCalledWith(
+      2,
+      'DevGetDeviceInfo',
+      'DeviceInfo',
+      expect.any(Object),
+      { timeoutMs: 10000 }
+    );
   });
 });
 
