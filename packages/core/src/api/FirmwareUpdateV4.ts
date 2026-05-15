@@ -135,7 +135,7 @@ const isProtocolV2PollingTransientError = (error: unknown) => {
  * It intentionally does not fall back to FirmwareUpdateV3/V1 behavior:
  * - upload uses FilesystemFileWrite
  * - install uses DevFirmwareUpdate
- * - completion reboots to normal, then polls Ping and final DevGetDeviceInfo
+ * - completion reboots to normal, then polls Ping
  */
 export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareUpdateV4Params> {
   init() {
@@ -511,7 +511,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             await this.reconnectProtocolV2Device();
           } catch (reconnectError) {
             lastError = reconnectError;
-            Log.log('Protocol V2 firmware install reconnect/status polling failed: ', reconnectError);
+            Log.log(
+              'Protocol V2 firmware install reconnect/status polling failed: ',
+              reconnectError
+            );
           }
           try {
             await this.pingProtocolV2Device();
@@ -569,15 +572,12 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         const features = await getProtocolV2Features({
           commands: this.device.getCommands(),
           descriptor: this.device.originalDescriptor,
-          onDeviceInfoError: error => {
-            Log.debug('Protocol V2 post-update DevGetDeviceInfo failed:', error);
-          },
           timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
         });
         return features;
       } catch (error) {
         lastError = error;
-        Log.log('Protocol V2 normal mode not ready, polling Ping/DevGetDeviceInfo: ', error);
+        Log.log('Protocol V2 normal mode not ready, polling Ping: ', error);
         await wait(1000);
       }
     }

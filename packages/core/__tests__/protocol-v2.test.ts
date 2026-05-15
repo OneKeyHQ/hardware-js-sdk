@@ -119,38 +119,22 @@ describe('Protocol V2 feature adapter', () => {
     expect(features.firmware_present).toBe(false);
   });
 
-  test('throws when DevGetDeviceInfo is unavailable', async () => {
+  test('initializes Protocol V2 features with Ping only while DeviceInfo is unsupported', async () => {
     const onDeviceInfoError = jest.fn();
     const commands = {
-      typedCall: jest
-        .fn()
-        .mockResolvedValueOnce({ type: 'Success', message: { message: 'pong' } })
-        .mockRejectedValueOnce(new Error('unsupported')),
+      typedCall: jest.fn().mockResolvedValueOnce({ type: 'Success', message: { message: 'pong' } }),
     };
 
-    await expect(
-      getProtocolV2Features({
-        commands: commands as unknown as DeviceCommands,
-        descriptor: descriptor as any,
-        onDeviceInfoError,
-      })
-    ).rejects.toThrow('unsupported');
+    const features = await getProtocolV2Features({
+      commands: commands as unknown as DeviceCommands,
+      descriptor: descriptor as any,
+      onDeviceInfoError,
+    });
 
+    expect(features.device_id).toBe('usb-path');
     expect(commands.typedCall).toHaveBeenNthCalledWith(1, 'Ping', 'Success', { message: 'init' });
-    expect(commands.typedCall).toHaveBeenNthCalledWith(
-      2,
-      'DevGetDeviceInfo',
-      'DeviceInfo',
-      expect.objectContaining({
-        targets: expect.objectContaining({
-          hw: true,
-          fw: true,
-          bt: true,
-          status: true,
-        }),
-      })
-    );
-    expect(onDeviceInfoError).toHaveBeenCalledTimes(1);
+    expect(commands.typedCall).toHaveBeenCalledTimes(1);
+    expect(onDeviceInfoError).not.toHaveBeenCalled();
   });
 
   test('returns Protocol V2 oneKey fields without calling legacy OnekeyGetFeatures', async () => {
@@ -195,22 +179,15 @@ describe('Protocol V2 feature adapter', () => {
     } as any);
     const typedCall = jest
       .fn()
-      .mockResolvedValueOnce({ type: 'Success', message: { message: 'init' } })
-      .mockResolvedValueOnce({
-        type: 'DeviceInfo',
-        message: {
-          hw: { serial_no: 'PR2SERIAL' },
-          status: { init_states: true },
-        },
-      });
+      .mockResolvedValueOnce({ type: 'Success', message: { message: 'init' } });
 
     (device as any).commands = { typedCall };
 
     await device.initialize();
     await device.initialize();
 
-    expect(device.features?.device_id).toBe('PR2SERIAL');
-    expect(typedCall).toHaveBeenCalledTimes(2);
+    expect(device.features?.device_id).toBe('usb-path');
+    expect(typedCall).toHaveBeenCalledTimes(1);
     expect(typedCall).toHaveBeenNthCalledWith(
       1,
       'Ping',
@@ -219,13 +196,6 @@ describe('Protocol V2 feature adapter', () => {
       {
         timeoutMs: 10000,
       }
-    );
-    expect(typedCall).toHaveBeenNthCalledWith(
-      2,
-      'DevGetDeviceInfo',
-      'DeviceInfo',
-      expect.any(Object),
-      { timeoutMs: 10000 }
     );
   });
 });
@@ -257,22 +227,6 @@ describe('Protocol V2 firmware update targets', () => {
       if (name === 'Ping') {
         return Promise.resolve({ type: 'Success', message: { message: 'init' } });
       }
-      if (name === 'DevGetDeviceInfo') {
-        return Promise.resolve({
-          type: 'DeviceInfo',
-          message: {
-            hw: { serial_no: 'PR2SERIAL' },
-            fw: {
-              boot: { version: '0.2.0' },
-              app: { version: '1.2.3' },
-            },
-            bt: {
-              app: { version: '4.5.6' },
-            },
-            status: {},
-          },
-        });
-      }
       return Promise.reject(new Error(`unexpected call ${name}`));
     });
     const commands = { typedCall };
@@ -295,18 +249,12 @@ describe('Protocol V2 firmware update targets', () => {
       { message: 'init' },
       { timeoutMs: 5000 }
     );
-    expect(typedCall).toHaveBeenNthCalledWith(
-      2,
-      'DevGetDeviceInfo',
-      'DeviceInfo',
-      expect.any(Object),
-      { timeoutMs: 5000 }
-    );
+    expect(typedCall).toHaveBeenCalledTimes(1);
     expect(typedCall).not.toHaveBeenCalledWith('Initialize', 'Features', {});
     expect(versions).toEqual({
-      bootloaderVersion: '0.2.0',
-      bleVersion: '4.5.6',
-      firmwareVersion: '1.2.3',
+      bootloaderVersion: '0.0.0',
+      bleVersion: '0.0.0',
+      firmwareVersion: '0.0.0',
     });
   });
 
@@ -385,9 +333,7 @@ describe('Protocol V2 firmware update targets', () => {
     const typedCall = jest
       .fn()
       .mockRejectedValue(
-        new Error(
-          "The operation couldn't be completed. (MultiplatformBleAdapter.RxError error 6.)"
-        )
+        new Error("The operation couldn't be completed. (MultiplatformBleAdapter.RxError error 6.)")
       );
 
     (method as any).device = {
@@ -880,14 +826,9 @@ describe('Protocol V2 file read method', () => {
     method.init();
     const result = await method.run();
 
-    expect(typedCall).toHaveBeenNthCalledWith(
-      1,
-      'FilesystemPathInfoQuery',
-      'FilesystemPathInfo',
-      {
-        path: 'vol1:test.bin',
-      }
-    );
+    expect(typedCall).toHaveBeenNthCalledWith(1, 'FilesystemPathInfoQuery', 'FilesystemPathInfo', {
+      path: 'vol1:test.bin',
+    });
     expect(typedCall).toHaveBeenNthCalledWith(2, 'FilesystemFileRead', 'FilesystemFile', {
       file: {
         path: 'vol1:test.bin',
