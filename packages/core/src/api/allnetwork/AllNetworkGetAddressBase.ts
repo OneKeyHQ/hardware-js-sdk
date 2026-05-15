@@ -12,7 +12,12 @@ import { validateParams } from '../helpers/paramsValidator';
 import { PROTO } from '../../constants';
 import { findMethod } from '../utils';
 import { DEVICE, IFRAME, createUiMessage } from '../../events';
-import { getDeviceFirmwareVersion, getFirmwareType, getMethodVersionRange } from '../../utils';
+import {
+  getDeviceFirmwareVersion,
+  getFirmwareType,
+  getMethodVersionRange,
+  shouldSkipMethodSupportCheck,
+} from '../../utils';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { onDeviceButtonHandler } from '../../core';
 import {
@@ -455,6 +460,10 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
  * @param method BaseMethod
  */
 function preCheckDeviceSupport(device: Device, method: BaseMethod) {
+  if (shouldSkipMethodSupportCheck(device.features, device.originalDescriptor?.protocolType)) {
+    return;
+  }
+
   const versionRange = getMethodVersionRange(
     device.features,
     type => method.getVersionRange()[type]

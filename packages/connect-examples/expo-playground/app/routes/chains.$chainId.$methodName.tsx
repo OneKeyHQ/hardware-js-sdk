@@ -77,6 +77,7 @@ const ChainMethodExecutePage: React.FC = () => {
                 methodConfig={selectedMethod}
                 executionHandler={handleMethodExecution}
                 type="standard"
+                showWirePreview
               />
             </div>
           </div>

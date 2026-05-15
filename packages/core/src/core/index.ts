@@ -23,6 +23,7 @@ import {
   getLogger,
   getMethodVersionRange,
   setLoggerPostMessage,
+  shouldSkipMethodSupportCheck,
   wait,
 } from '../utils';
 import {
@@ -343,6 +344,10 @@ const onCallDevice = async (
         device.features,
         type => method.getVersionRange()[type]
       );
+      const skipMethodSupportCheck = shouldSkipMethodSupportCheck(
+        device.features,
+        device.originalDescriptor?.protocolType
+      );
 
       if (device.features) {
         await DataManager.checkAndReloadData();
@@ -393,7 +398,7 @@ const onCallDevice = async (
           );
         }
 
-        if (versionRange) {
+        if (!skipMethodSupportCheck && versionRange) {
           if (
             semver.valid(versionRange.min) &&
             semver.lt(currentFirmwareVersion, versionRange.min)
@@ -425,7 +430,7 @@ const onCallDevice = async (
               createDeprecatedHardwareError(currentFirmwareVersion, versionRange.max, method.name)
             );
           }
-        } else if (method.strictCheckDeviceSupport) {
+        } else if (!skipMethodSupportCheck && method.strictCheckDeviceSupport) {
           throw createDeviceNotSupportMethodError(method.name, getFirmwareType(device.features));
         }
       }

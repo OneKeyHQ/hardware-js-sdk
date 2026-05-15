@@ -9,12 +9,14 @@ import { useFirmwareProgress } from '../providers/SDKProvider';
 import { useDeviceStore } from '../../store/deviceStore';
 import { useHardwareStore } from '../../store/hardwareStore';
 import { separateParameters } from '../../utils/parameterUtils';
+import { methodSupportsCommonParameters } from '../../utils/constants';
 import type { UnifiedMethodConfig } from '~/data/types';
 import type { CommonParametersState } from '../../store/hardwareStore';
 // 导入子组件
 import ParameterInput from './ParameterInput';
 import DeviceInteractionArea from './DeviceInteractionArea';
 import ExecutionPanel from './ExecutionPanel';
+import MethodWirePreview from './MethodWirePreview';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card, CardContent } from '../ui/Card';
@@ -31,6 +33,7 @@ interface MethodExecutorProps {
   devicePanelTitle?: string | null;
   layout?: 'default' | 'debug-first';
   debugPanel?: React.ReactNode;
+  showWirePreview?: boolean;
 }
 
 interface FirmwareVersionInfo {
@@ -43,9 +46,7 @@ type DebugLogRecord = Record<string, unknown>;
 
 function getLogRecord(log: UnifiedLogEntry): DebugLogRecord {
   const data = log.data || log.content;
-  return data && typeof data === 'object' && !Array.isArray(data)
-    ? (data as DebugLogRecord)
-    : {};
+  return data && typeof data === 'object' && !Array.isArray(data) ? (data as DebugLogRecord) : {};
 }
 
 function getLogTimestamp(log: UnifiedLogEntry): Date {
@@ -387,14 +388,8 @@ function buildRawLogLines(logs: UnifiedLogEntry[]) {
       ];
     }
 
-    if (title.includes('SDK debug log') && typeof record.message === 'string') {
-      return [
-        {
-          id: log.id,
-          tone: 'info' as const,
-          text: `[${time}] ${formatRawLogText(record.message)}`,
-        },
-      ];
+    if (title.includes('SDK debug log')) {
+      return [];
     }
 
     const tone: RawLogTone =
@@ -552,6 +547,7 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
   devicePanelTitle,
   layout = 'default',
   debugPanel,
+  showWirePreview = false,
 }) => {
   const { toast } = useToast();
   const { t } = useTranslation();
@@ -581,12 +577,27 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
     reset: resetParameters,
   } = useMethodParameters({ methodConfig });
 
-  // 同步 useMethodParameters 的参数到 hardwareStore
+  const supportsCommonParameters = methodSupportsCommonParameters(methodConfig.method);
+
+  // 同步 useMethodParameters 的参数到 hardwareStore，空对象也要覆盖，避免切换方法后残留上一个方法的参数。
   useEffect(() => {
-    if (Object.keys(methodParams).length > 0) {
-      setMethodParameters(methodParams);
-    }
+    setMethodParameters(methodParams);
   }, [methodParams, setMethodParameters]);
+
+  const getScopedExecutionParameters = useCallback(() => {
+    const params = getExecutionParameters();
+    if (supportsCommonParameters) {
+      return params;
+    }
+    return separateParameters(params).methodParams;
+  }, [getExecutionParameters, supportsCommonParameters]);
+
+  const scopedRequestData = useMemo(() => {
+    if (supportsCommonParameters) {
+      return storeExecutionParameters;
+    }
+    return separateParameters(storeExecutionParameters).methodParams;
+  }, [storeExecutionParameters, supportsCommonParameters]);
 
   // 处理预设选择
   const handlePresetChange = useCallback(
@@ -666,9 +677,9 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
     }
 
     // 使用 hardwareStore 的完整执行参数（包含通用参数）
-    const finalExecutionParams = getExecutionParameters();
+    const finalExecutionParams = getScopedExecutionParameters();
     await execute(finalExecutionParams, executionHandler);
-  }, [isConnected, execute, getExecutionParameters, executionHandler, toast, t, type]);
+  }, [isConnected, execute, getScopedExecutionParameters, executionHandler, toast, t, type]);
 
   // 取消操作
   const handleCancel = useCallback(async () => {
@@ -776,7 +787,7 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
     className?: string;
   } = {}) => (
     <ExecutionPanel
-      requestData={storeExecutionParameters}
+      requestData={scopedRequestData}
       onSaveRequest={handleRequestParamsEdit}
       logs={currentExecutionLogs}
       onClearLogs={handleClearExecutionLogs}
@@ -933,18 +944,18 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
         />
       </div>
 
+      {showWirePreview && (
+        <MethodWirePreview methodConfig={methodConfig} requestData={scopedRequestData} />
+      )}
+
       {/* 主要内容区域 - 紧凑高度 */}
       <div className="w-full min-h-[380px] h-full">
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 h-full">
           {/* 左侧：设备交互动效 */}
-          <div className="lg:col-span-2 flex flex-col h-full min-h-0">
-            {renderDeviceArea()}
-          </div>
+          <div className="lg:col-span-2 flex flex-col h-full min-h-0">{renderDeviceArea()}</div>
 
           {/* 右侧：执行面板 */}
-          <div className="lg:col-span-3 flex flex-col h-full min-h-0">
-            {renderExecutionPanel()}
-          </div>
+          <div className="lg:col-span-3 flex flex-col h-full min-h-0">{renderExecutionPanel()}</div>
         </div>
       </div>
     </div>

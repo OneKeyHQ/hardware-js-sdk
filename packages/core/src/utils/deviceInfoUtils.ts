@@ -156,6 +156,11 @@ export const getMethodVersionRange = (
   return versionRange;
 };
 
+export const shouldSkipMethodSupportCheck = (
+  features: Features | undefined,
+  protocolType?: string
+): boolean => protocolType === 'V2' || getDeviceType(features) === EDeviceType.Pro2;
+
 export const getFirmwareType = (features: Features | undefined) => {
   if (!features) {
     return EFirmwareType.Universal;

@@ -15,6 +15,7 @@ import {
   getFirmwareType,
   getLogger,
   getMethodVersionRange,
+  shouldSkipMethodSupportCheck,
 } from '../utils';
 import { generateInstanceId } from '../utils/tracing';
 
@@ -213,6 +214,15 @@ export abstract class BaseMethod<Params = undefined> {
     }
   ) {
     if (!checkCondition()) {
+      return;
+    }
+
+    if (
+      shouldSkipMethodSupportCheck(
+        this.device.features,
+        this.device.originalDescriptor?.protocolType
+      )
+    ) {
       return;
     }
 
