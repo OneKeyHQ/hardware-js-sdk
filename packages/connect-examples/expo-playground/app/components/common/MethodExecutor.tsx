@@ -16,7 +16,6 @@ import type { CommonParametersState } from '../../store/hardwareStore';
 import ParameterInput from './ParameterInput';
 import DeviceInteractionArea from './DeviceInteractionArea';
 import ExecutionPanel from './ExecutionPanel';
-import MethodWirePreview from './MethodWirePreview';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card, CardContent } from '../ui/Card';
@@ -33,7 +32,6 @@ interface MethodExecutorProps {
   devicePanelTitle?: string | null;
   layout?: 'default' | 'debug-first';
   debugPanel?: React.ReactNode;
-  showWirePreview?: boolean;
 }
 
 interface FirmwareVersionInfo {
@@ -210,25 +208,70 @@ function getMethodFromLog(log: UnifiedLogEntry, record: DebugLogRecord): string 
 }
 
 function isProtocolTraceLog(title: string): boolean {
-  return title.includes('demo protocol trace') || title.includes('debug protocol trace');
+  return title.includes('protocol trace');
 }
 
 function isDecodedResponseLog(title: string): boolean {
   return title.includes('decoded response');
 }
 
-type CommandStatusEntry = {
+function isProtocolTransportLog(title: string): boolean {
+  return title.includes('Protocol V2 raw transport');
+}
+
+type RawLogTone = 'success' | 'error' | 'accent' | 'tx' | 'rx' | 'info';
+type RawLogLine = {
+  id: string;
+  tone: RawLogTone;
+  text: string;
+};
+
+function getProtocolTransportLine(record: DebugLogRecord): string | undefined {
+  return typeof record.line === 'string' ? record.line : undefined;
+}
+
+function getProtocolTransportTone(line: string): RawLogTone {
+  if (/\bTX\b/.test(line)) return 'tx';
+  if (/\bRX\b/.test(line)) return 'rx';
+  return 'info';
+}
+
+function buildHardwareRawTransportLines(logs: UnifiedLogEntry[]) {
+  return logs
+    .flatMap<RawLogLine>(log => {
+      const title = log.title || log.message || '';
+      if (!isProtocolTransportLog(title)) return [];
+
+      const line = getProtocolTransportLine(getLogRecord(log));
+      if (!line) return [];
+
+      return [
+        {
+          id: log.id,
+          tone: getProtocolTransportTone(line),
+          text: line,
+        },
+      ];
+    })
+    .slice(-80);
+}
+
+type HardwareRawDataEntry = {
   id: string;
   method: string;
-  params: Array<{ key: string; value: unknown; tone?: 'success' | 'error' | 'accent' }>;
-  result?: { value: unknown; tone: 'success' | 'error' | 'accent' };
+  fields: Array<{
+    key: string;
+    value: unknown;
+    tone?: 'success' | 'error' | 'accent' | 'tx' | 'rx';
+    block?: boolean;
+  }>;
   startedAt: number;
   time: string;
   uploadBytes?: number;
 };
 
-function buildCommandStatusEntries(logs: UnifiedLogEntry[]) {
-  const entries: CommandStatusEntry[] = [];
+function buildHardwareRawDataEntries(logs: UnifiedLogEntry[]) {
+  const entries: HardwareRawDataEntry[] = [];
 
   logs.forEach(log => {
     const title = log.title || log.message || '';
@@ -242,12 +285,6 @@ function buildCommandStatusEntries(logs: UnifiedLogEntry[]) {
         !Array.isArray(record.request_parameters)
           ? (record.request_parameters as Record<string, unknown>)
           : undefined;
-      const requestParameters =
-        requestRecord !== undefined
-          ? Object.entries(requestRecord)
-              .filter(([key]) => !(isUploadMethod(method) && key === 'data'))
-              .map(([key, value]) => ({ key, value }))
-          : [];
       const uploadBytes =
         isUploadMethod(method) && requestRecord
           ? getUploadBytesFromRequestParameters(requestRecord)
@@ -256,12 +293,11 @@ function buildCommandStatusEntries(logs: UnifiedLogEntry[]) {
       entries.push({
         id: log.id,
         method,
-        params: [
-          ...requestParameters,
-          { key: 'TX msg_type', value: record.tx_msg_type, tone: 'accent' },
-          { key: 'TX payload', value: record.tx_payload },
+        fields: [
+          { key: 'Encoded data', value: record.encoded ?? requestRecord, tone: 'tx', block: true },
+          { key: 'TX msg_type', value: record.tx_msg_type, tone: 'tx' },
+          { key: 'TX payload', value: record.tx_payload, tone: 'tx', block: true },
         ],
-        result: { value: 'Sending...', tone: 'accent' },
         startedAt: getLogTimeMs(log),
         time: formatLogTime(log),
         uploadBytes,
@@ -272,7 +308,7 @@ function buildCommandStatusEntries(logs: UnifiedLogEntry[]) {
     if (isDecodedResponseLog(title)) {
       const target = [...entries]
         .reverse()
-        .find(entry => entry.method === method && entry.result?.value === 'Sending...');
+        .find(entry => entry.method === method && !entry.fields.some(field => field.key === 'Decoded data'));
       const resultValue =
         record.decoded_result !== undefined
           ? record.decoded_result
@@ -280,14 +316,15 @@ function buildCommandStatusEntries(logs: UnifiedLogEntry[]) {
       const finishedAt = getLogTimeMs(log);
 
       if (target) {
-        target.params.push(
-          { key: 'RX msg_type', value: record.rx_msg_type, tone: 'success' },
-          { key: 'RX payload', value: record.rx_payload, tone: 'success' }
+        target.fields.push(
+          { key: 'RX msg_type', value: record.rx_msg_type, tone: 'rx' },
+          { key: 'RX payload', value: record.rx_payload, tone: 'rx', block: true },
+          { key: 'Decoded data', value: resultValue, tone: 'success', block: true }
         );
         if (isUploadMethod(method)) {
           const uploadBytes = target.uploadBytes ?? getUploadBytesFromResult(resultValue);
           const durationMs = finishedAt - target.startedAt;
-          target.params.push(
+          target.fields.push(
             { key: 'Duration', value: formatDuration(durationMs), tone: 'success' },
             { key: 'Uploaded', value: formatBytes(uploadBytes), tone: 'success' },
             {
@@ -297,7 +334,6 @@ function buildCommandStatusEntries(logs: UnifiedLogEntry[]) {
             }
           );
         }
-        target.result = { value: resultValue, tone: 'success' };
         target.time = formatLogTime(log);
         return;
       }
@@ -305,11 +341,11 @@ function buildCommandStatusEntries(logs: UnifiedLogEntry[]) {
       entries.push({
         id: log.id,
         method,
-        params: [
-          { key: 'RX msg_type', value: record.rx_msg_type, tone: 'success' },
-          { key: 'RX payload', value: record.rx_payload, tone: 'success' },
+        fields: [
+          { key: 'RX msg_type', value: record.rx_msg_type, tone: 'rx' },
+          { key: 'RX payload', value: record.rx_payload, tone: 'rx', block: true },
+          { key: 'Decoded data', value: resultValue, tone: 'success', block: true },
         ],
-        result: { value: resultValue, tone: 'success' },
         startedAt: finishedAt,
         time: formatLogTime(log),
       });
@@ -324,26 +360,25 @@ function buildCommandStatusEntries(logs: UnifiedLogEntry[]) {
       entries.push({
         id: log.id,
         method,
-        params: [{ key: 'error', value: record.error || record.originalError || title }],
-        result: { value: formatInlineValue(record.error || title), tone: 'error' },
+        fields: [
+          {
+            key: 'Error',
+            value: record.error || record.originalError || title,
+            tone: 'error',
+            block: true,
+          },
+        ],
         startedAt: getLogTimeMs(log),
         time: formatLogTime(log),
       });
       return;
     }
 
-    // 成功态由 decoded response 合并到同一条命令状态里，避免状态区重复刷屏。
+    // 成功态由 decoded response 合并到同一条硬件原始数据里，避免重复刷屏。
   });
 
   return entries.reverse().slice(0, 20);
 }
-
-type RawLogTone = 'success' | 'error' | 'accent' | 'tx' | 'rx' | 'info';
-type RawLogLine = {
-  id: string;
-  tone: RawLogTone;
-  text: string;
-};
 
 function buildRawLogLines(logs: UnifiedLogEntry[]) {
   return [...logs].reverse().flatMap<RawLogLine>(log => {
@@ -351,8 +386,21 @@ function buildRawLogLines(logs: UnifiedLogEntry[]) {
     const record = getLogRecord(log);
     const time = formatLogTime(log);
 
+    if (isProtocolTransportLog(title)) {
+      const line = getProtocolTransportLine(record);
+      if (!line) return [];
+      return [{ id: log.id, tone: getProtocolTransportTone(line), text: `[${time}] ${line}` }];
+    }
+
     if (isProtocolTraceLog(title)) {
       return [
+        {
+          id: `${log.id}-encoded`,
+          tone: 'tx' as const,
+          text: `[${time}] Encoded:\n${formatRawLogText(
+            formatBlockValue(record.encoded ?? record.request_parameters ?? record.tx_payload)
+          )}`,
+        },
         {
           id: `${log.id}-tx`,
           tone: 'tx' as const,
@@ -415,30 +463,50 @@ function toneClassName(tone?: 'success' | 'error' | 'accent' | 'tx' | 'rx' | 'in
   }
 }
 
-function Pro2DemoConsole({
+export function ProtocolExecutionLog({
   logs,
   onClearLogs,
+  layout = 'grid',
+  panelHeightClassName = 'h-[420px] xl:h-[520px]',
 }: {
   logs: UnifiedLogEntry[];
   onClearLogs: () => void;
+  layout?: 'grid' | 'stacked';
+  panelHeightClassName?: string;
 }) {
-  const commandEntries = buildCommandStatusEntries(logs);
+  const hardwareRawLines = buildHardwareRawTransportLines(logs);
+  const hardwareEntries = buildHardwareRawDataEntries(logs);
   const rawLines = buildRawLogLines(logs);
+  const gridClassName =
+    layout === 'stacked' ? 'grid grid-cols-1 gap-3' : 'grid grid-cols-1 xl:grid-cols-2 gap-3';
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+    <div className={gridClassName}>
       <Card className="rounded-xl border border-border/60 bg-card shadow-sm">
         <CardContent className="p-4 space-y-3">
           <div className="flex items-center gap-2 text-foreground">
             <BarChart3 className="h-4 w-4 text-primary" />
-            <h3 className="text-base font-semibold">Command Status</h3>
+            <h3 className="text-base font-semibold">Hardware Raw Data</h3>
           </div>
-          <div className="h-[420px] xl:h-[520px] overflow-y-auto rounded-lg bg-[#171717] p-3 font-mono text-[11px] leading-relaxed">
-            {commandEntries.length === 0 ? (
-              <div className="text-neutral-500">No command status yet.</div>
+          <div
+            className={`${panelHeightClassName} overflow-y-auto rounded-lg bg-[#171717] p-3 font-mono text-[11px] leading-relaxed`}
+          >
+            {hardwareRawLines.length > 0 ? (
+              <div className="space-y-1">
+                {hardwareRawLines.map(line => (
+                  <div
+                    key={line.id}
+                    className={`${toneClassName(line.tone)} whitespace-pre-wrap break-all`}
+                  >
+                    {line.text}
+                  </div>
+                ))}
+              </div>
+            ) : hardwareEntries.length === 0 ? (
+              <div className="text-neutral-500">No hardware data yet.</div>
             ) : (
-              <div className="space-y-3">
-                {commandEntries.map(entry => (
+              <div className="space-y-4">
+                {hardwareEntries.map(entry => (
                   <div
                     key={entry.id}
                     className="border-b border-[#3a3a3a] pb-3 last:border-b-0 last:pb-0"
@@ -446,28 +514,26 @@ function Pro2DemoConsole({
                     <div className="mb-1.5 text-sm font-semibold text-neutral-300">
                       {entry.method}
                     </div>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1">
-                      {entry.params.map(param => (
-                        <span key={param.key} className="inline-flex min-w-0 gap-1">
-                          <span className="text-neutral-500">{param.key}:</span>
-                          <span className={`${toneClassName(param.tone)} break-all`}>
-                            {formatInlineValue(param.value)}
-                          </span>
-                        </span>
+                    <div className="space-y-2">
+                      {entry.fields.map(field => (
+                        <div key={field.key} className="min-w-0">
+                          <div className="mb-0.5 text-neutral-500">{field.key}</div>
+                          {field.block ? (
+                            <pre
+                              className={`${toneClassName(
+                                field.tone
+                              )} max-h-[180px] overflow-auto whitespace-pre-wrap break-words rounded-md bg-black/20 p-2`}
+                            >
+                              {formatRawLogText(formatBlockValue(field.value))}
+                            </pre>
+                          ) : (
+                            <div className={`${toneClassName(field.tone)} break-all`}>
+                              {formatInlineValue(field.value)}
+                            </div>
+                          )}
+                        </div>
                       ))}
                     </div>
-                    {entry.result ? (
-                      <div className="mt-2">
-                        <span className="text-neutral-500">Result:</span>
-                        <pre
-                          className={`${toneClassName(
-                            entry.result.tone
-                          )} mt-1 max-h-[240px] overflow-auto whitespace-pre-wrap break-words rounded-md bg-black/20 p-2`}
-                        >
-                          {formatBlockValue(entry.result.value)}
-                        </pre>
-                      </div>
-                    ) : null}
                     <div className="mt-2 text-[11px] text-neutral-600">{entry.time}</div>
                   </div>
                 ))}
@@ -482,7 +548,7 @@ function Pro2DemoConsole({
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-foreground">
               <Terminal className="h-4 w-4 text-primary" />
-              <h3 className="text-base font-semibold">Log</h3>
+              <h3 className="text-base font-semibold">Execution Logs</h3>
             </div>
             <Button
               variant="outline"
@@ -494,7 +560,9 @@ function Pro2DemoConsole({
               Clear Log
             </Button>
           </div>
-          <div className="h-[420px] xl:h-[520px] overflow-y-auto rounded-lg bg-[#171717] p-3 font-mono text-[11px] leading-relaxed">
+          <div
+            className={`${panelHeightClassName} overflow-y-auto rounded-lg bg-[#171717] p-3 font-mono text-[11px] leading-relaxed`}
+          >
             {rawLines.length === 0 ? (
               <div className="text-neutral-500">No logs yet.</div>
             ) : (
@@ -547,7 +615,6 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
   devicePanelTitle,
   layout = 'default',
   debugPanel,
-  showWirePreview = false,
 }) => {
   const { toast } = useToast();
   const { t } = useTranslation();
@@ -927,7 +994,7 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
 
         {debugPanel ? <div className="flex-shrink-0">{debugPanel}</div> : null}
 
-        <Pro2DemoConsole logs={currentExecutionLogs} onClearLogs={handleClearExecutionLogs} />
+        <ProtocolExecutionLog logs={currentExecutionLogs} onClearLogs={handleClearExecutionLogs} />
       </div>
     );
   }
@@ -944,18 +1011,16 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
         />
       </div>
 
-      {showWirePreview && (
-        <MethodWirePreview methodConfig={methodConfig} requestData={scopedRequestData} />
-      )}
-
       {/* 主要内容区域 - 紧凑高度 */}
-      <div className="w-full min-h-[380px] h-full">
+      <div className="w-full min-h-[520px] h-full">
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 h-full">
           {/* 左侧：设备交互动效 */}
-          <div className="lg:col-span-2 flex flex-col h-full min-h-0">{renderDeviceArea()}</div>
+          <div className="lg:col-span-2 flex flex-col h-full min-h-0">{renderDeviceArea(true)}</div>
 
           {/* 右侧：执行面板 */}
-          <div className="lg:col-span-3 flex flex-col h-full min-h-0">{renderExecutionPanel()}</div>
+          <div className="lg:col-span-3 flex flex-col h-full min-h-0">
+            {renderExecutionPanel({ defaultParamsCollapsed: true })}
+          </div>
         </div>
       </div>
     </div>
