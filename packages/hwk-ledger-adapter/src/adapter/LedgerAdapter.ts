@@ -57,6 +57,7 @@ import type {
   IConnector,
   IHardwareWallet,
   Response,
+  SearchDevicesOptions,
   SolAddress,
   SolGetAddressParams,
   SolSignMsgParams,
@@ -206,22 +207,18 @@ export class LedgerAdapter implements IHardwareWallet {
   // Device management
   // ---------------------------------------------------------------------------
 
-  async searchDevices(): Promise<DeviceInfo[]> {
+  async searchDevices(options?: SearchDevicesOptions): Promise<DeviceInfo[]> {
+    if (options?.resetSession) {
+      this._doConnectAbortController?.abort();
+      this._sessions.clear();
+      this._connectingPromise = null;
+      this._doConnectAbortController = null;
+      this._btcHighIndexConfirmedThisSession = false;
+    }
+
     await this._ensureDevicePermission();
 
-    debugLog(`[LedgerAdapter] searchDevices() entry, cacheBefore=${this._discoveredDevices.size}`);
     const devices = await this.connector.searchDevices();
-    debugLog(
-      '[DMK] adapter.searchDevices raw:',
-      devices.map(device => ({
-        id: device?.deviceId,
-        deviceId: device?.deviceId,
-        connectId: device?.connectId,
-        deviceName: device?.name,
-        'device.name': device?.name,
-        model: device?.model,
-      }))
-    );
 
     // Replace cache with this round's raw result. DMK paths used as
     // connectId on USB are ephemeral (new UUID after each replug), so
@@ -282,19 +279,6 @@ export class LedgerAdapter implements IHardwareWallet {
       }
 
       await this._ensureDevicePermission(connectId);
-
-      // Pre-GATT freshness gate: BLE GATT on an asleep peripheral wedges
-      // iOS bonding. Throw NotAdvertising → Layer 1 re-prompts unlock.
-      if (isLedgerBleConnectionType(this.connector.connectionType)) {
-        const fresh = (await this.searchDevices()).some(d => d.connectId === connectId);
-        if (!fresh) {
-          const err = new Error(
-            'Ledger device is not currently advertising. Wake up and unlock the device, keep it nearby, then try again.'
-          );
-          (err as Error & { _tag?: string })._tag = ERROR_TAG.DeviceNotAdvertising;
-          throw err;
-        }
-      }
 
       const session = await this.connector.connect(connectId);
       this._sessions.set(connectId, session.sessionId);
@@ -526,20 +510,10 @@ export class LedgerAdapter implements IHardwareWallet {
     deviceId: string,
     chain: ChainForFingerprint
   ): Promise<Response<string>> {
-    debugLog(
-      '[LedgerAdapter] getChainFingerprint called, chain:',
-      chain,
-      'connectId:',
-      connectId || '(empty)',
-      'sessions:',
-      this._sessions.size
-    );
-    debugLog('[LedgerAdapter] getChainFingerprint permission ok, computing fingerprint');
     try {
       const fingerprint = await this._computeChainFingerprint(chain, (method, params) =>
         this.connectorCall(connectId, method, params, undefined, deviceId)
       );
-      debugLog('[LedgerAdapter] getChainFingerprint result:', fingerprint?.substring(0, 20));
       return success(fingerprint);
     } catch (err) {
       debugError('[LedgerAdapter] getChainFingerprint error:', chain, err);
@@ -813,6 +787,28 @@ export class LedgerAdapter implements IHardwareWallet {
   // Bounded by MAX_DOCONNECT_CONFIRMS — after N Confirms with no progress,
   // throw DeviceNotFound so the user is kicked out of the loop.
   private async _doConnect(internalSignal: AbortSignal, targetConnectId?: string): Promise<string> {
+    if (isLedgerBleConnectionType(this.connector.connectionType) && targetConnectId) {
+      try {
+        return await this._connectDeviceOrThrow(targetConnectId);
+      } catch (err) {
+        if (
+          !isDeviceLockedError(err) &&
+          !isDeviceNotAdvertisingError(err) &&
+          !isDeviceDisconnectedError(err)
+        ) {
+          throw err;
+        }
+        this._discoveredDevices.delete(targetConnectId);
+        if (isDeviceDisconnectedError(err)) {
+          try {
+            this.connector.reset?.();
+          } catch {
+            // best-effort
+          }
+        }
+      }
+    }
+
     let confirms = 0;
     while (!internalSignal.aborted) {
       // Tell consumers we're actively scanning. Re-emitted at every iteration
@@ -892,9 +888,13 @@ export class LedgerAdapter implements IHardwareWallet {
         d => d.connectId === targetConnectId || d.deviceId === targetConnectId
       );
       if (!target) {
-        throw Object.assign(new Error(`Target Ledger unavailable: ${targetConnectId}`), {
+        const err = Object.assign(new Error(`Target Ledger unavailable: ${targetConnectId}`), {
           code: HardwareErrorCode.DeviceNotFound,
-        });
+        }) as Error & { _tag?: string };
+        if (isLedgerBleConnectionType(this.connector.connectionType)) {
+          err._tag = ERROR_TAG.DeviceNotAdvertising;
+        }
+        throw err;
       }
       return this._connectDeviceOrThrow(target.connectId);
     }
@@ -1086,14 +1086,6 @@ export class LedgerAdapter implements IHardwareWallet {
     // running — other concurrent callers aren't affected.
     const resolvedConnectId = await this.ensureConnected(connectId, signal);
     const sessionId = this._sessions.get(resolvedConnectId);
-    debugLog(
-      '[LedgerAdapter] connectorCall resolved:',
-      method,
-      'resolvedConnectId:',
-      resolvedConnectId,
-      'sessionId:',
-      sessionId
-    );
     if (!sessionId) {
       throw Object.assign(new Error('Auto-connect succeeded but no session found'), {
         _tag: ERROR_TAG.DeviceSessionNotFound,
@@ -1621,18 +1613,18 @@ export class LedgerAdapter implements IHardwareWallet {
   // ---------------------------------------------------------------------------
 
   private connectorDeviceToDeviceInfo(device: ConnectorDevice): DeviceInfo {
-    // BLE connectId is a stable 4-digit HEX (e.g. "A58F") from device name.
-    // USB connectId is an ephemeral UUID. Use this to infer connectionType.
-    const isBle = device.connectId && /^[0-9A-Fa-f]{4}$/.test(device.connectId);
-
     return {
       vendor: 'ledger',
       model: device.model ?? 'unknown',
+      modelName: device.modelName,
       firmwareVersion: '',
       deviceId: device.deviceId,
       connectId: device.connectId,
       label: device.name,
-      connectionType: isBle ? 'ble' : 'usb',
+      connectionType: this.connector.connectionType,
+      rssi: device.rssi,
+      isConnectable: device.isConnectable,
+      serialNumber: device.serialNumber,
       capabilities: device.capabilities,
     };
   }

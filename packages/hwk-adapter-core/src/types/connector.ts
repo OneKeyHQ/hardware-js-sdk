@@ -13,7 +13,16 @@ export interface ConnectorDevice {
   connectId: string;
   deviceId: string;
   name: string;
+  /** Machine model id (e.g. "nanoX"). */
   model?: string;
+  /** Human-readable model name (e.g. "Ledger Nano X"). */
+  modelName?: string;
+  /** BLE signal strength (BLE only). */
+  rssi?: number | null;
+  /** BLE connectable flag (BLE only). */
+  isConnectable?: boolean | null;
+  /** USB serial number (USB only). */
+  serialNumber?: string;
 
   /** Device capabilities — available from scan time */
   capabilities?: DeviceCapabilities;

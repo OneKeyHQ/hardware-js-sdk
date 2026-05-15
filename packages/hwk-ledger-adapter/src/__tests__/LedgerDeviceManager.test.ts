@@ -106,6 +106,14 @@ describe('LedgerDeviceManager', () => {
   });
 
   describe('session tracking', () => {
+    it('reports whether a device has been discovered', async () => {
+      expect(manager.hasDiscoveredDevice('dev-1')).toBe(false);
+      const p = manager.enumerate();
+      dmk._emitList([DEVICE_1]);
+      await p;
+      expect(manager.hasDiscoveredDevice('dev-1')).toBe(true);
+    });
+
     it('should track deviceId → sessionId', async () => {
       const p = manager.enumerate();
       dmk._emitList([DEVICE_1]);

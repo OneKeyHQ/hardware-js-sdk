@@ -171,7 +171,7 @@ export interface IHardwareWallet<TConfig = unknown>
   switchTransport(type: TransportType): Promise<void>;
 
   // Device
-  searchDevices(): Promise<DeviceInfo[]>;
+  searchDevices(options?: SearchDevicesOptions): Promise<DeviceInfo[]>;
   connectDevice(connectId: string): Promise<Response<string>>;
   disconnectDevice(connectId: string): Promise<void>;
   getDeviceInfo(connectId: string, deviceId: string): Promise<Response<DeviceInfo>>;
@@ -209,4 +209,15 @@ export interface IHardwareWallet<TConfig = unknown>
     listener: (event: HardwareEventMap[K]) => void
   ): void;
   off(event: string, listener: DeviceEventListener): void;
+}
+
+export interface SearchDevicesOptions {
+  /**
+   * Clear cached adapter sessions before scanning.
+   *
+   * Use this for an explicit "search/add another device" flow on transports
+   * whose connectId is not stable, such as Ledger WebHID. Normal refresh scans
+   * should leave this false so an active session can still be reused.
+   */
+  resetSession?: boolean;
 }

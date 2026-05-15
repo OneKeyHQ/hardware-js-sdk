@@ -181,6 +181,7 @@ function classifyEthAppError(err: unknown): HardwareErrorCode | null {
 export const ERROR_TAG = {
   // SDK-mint
   DeviceNotAdvertising: 'DeviceNotAdvertisingError', // BLE scan miss
+  DeviceNotInDiscoveryCache: 'DeviceNotInDiscoveryCacheError', // dm.connect() before enumerate
   BlePairingTimeout: 'BlePairingTimeoutError', // SMP 30s timeout
   BleGattBondingFailed: 'BleGattBondingFailedError', // other GATT failure
   UserAborted: 'UserAborted',
@@ -287,6 +288,9 @@ const DEVICE_NOT_FOUND_TAGS: Set<string> = new Set([
   ERROR_TAG.NoAccessibleDevice,
   ERROR_TAG.UnknownDevice,
   ERROR_TAG.DeviceNotInitialized,
+  // SDK-internal: dm.connect() called before _discovered was populated.
+  // Map to DeviceNotFound so non-BLE-direct paths get a sensible error code.
+  ERROR_TAG.DeviceNotInDiscoveryCache,
 ]);
 
 const DEVICE_BUSY_TAGS: Set<string> = new Set([ERROR_TAG.OpeningConnection]);

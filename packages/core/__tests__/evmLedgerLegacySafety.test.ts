@@ -128,6 +128,86 @@ describe('EVM Ledger legacy path safety checks', () => {
     runSpy.mockRestore();
   });
 
+  it('only applies temporary safety checks once during one allNetwork request even when features stay strict', async () => {
+    const { device, typedCall } = createDevice('PRO');
+    (findMethod as jest.Mock).mockImplementation(message => new EvmGetAddress(message));
+    const runSpy = jest
+      .spyOn(EvmGetAddress.prototype, 'run')
+      .mockResolvedValueOnce([
+        {
+          path: "m/44'/60'/0'/2",
+          address: '0x0000000000000000000000000000000000000002',
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          path: "m/44'/60'/0'/3",
+          address: '0x0000000000000000000000000000000000000003',
+        },
+      ]);
+    const method = new TestAllNetworkMethod({
+      id: 1,
+      payload: {
+        method: 'allNetworkGetAddressByLoop',
+        connectId: 'connect-id',
+        deviceId: 'device-id',
+        bundle: [],
+      },
+    });
+    method.device = {
+      ...device,
+      on: jest.fn(),
+      off: jest.fn(),
+    } as any;
+
+    await method.callMethod(
+      'evmGetAddress',
+      {
+        bundle: [
+          {
+            path: "m/44'/60'/0'/2",
+            showOnOneKey: false,
+            chainId: 1,
+            _originRequestParams: {
+              network: 'evm',
+              path: "m/44'/60'/0'/2",
+              showOnOneKey: false,
+              chainName: '1',
+            },
+          },
+        ],
+      },
+      0
+    );
+
+    await method.callMethod(
+      'evmGetAddress',
+      {
+        bundle: [
+          {
+            path: "m/44'/60'/0'/3",
+            showOnOneKey: false,
+            chainId: 1,
+            _originRequestParams: {
+              network: 'evm',
+              path: "m/44'/60'/0'/3",
+              showOnOneKey: false,
+              chainName: '1',
+            },
+          },
+        ],
+      },
+      0
+    );
+
+    expect(typedCall).toHaveBeenCalledTimes(1);
+    expect(typedCall).toHaveBeenCalledWith('ApplySettings', 'Success', {
+      safety_checks: 'PromptTemporarily',
+    });
+
+    runSpy.mockRestore();
+  });
+
   it.each(["m/44'/60'/0'/0", "m/44'/60'/0'/1"])(
     'keeps safety checks unchanged for legal ledger legacy path %s',
     async path => {

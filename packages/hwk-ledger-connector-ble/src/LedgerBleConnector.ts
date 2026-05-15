@@ -1,4 +1,5 @@
-import { LedgerConnectorBase, extractBleHexId } from '@onekeyfe/hwk-ledger-adapter';
+import { Platform } from 'react-native';
+import { LedgerConnectorBase } from '@onekeyfe/hwk-ledger-adapter';
 
 import type { LedgerDeviceManager } from '@onekeyfe/hwk-ledger-adapter';
 import type { DeviceDescriptor } from '@onekeyfe/hwk-adapter-core';
@@ -8,6 +9,9 @@ type RnBleRawDevice = {
   id?: string;
   name?: string | null;
   localName?: string | null;
+  rssi?: number | null;
+  serviceUUIDs?: string[] | null;
+  isConnectable?: boolean | null;
 };
 
 type RnBleTransportDiscoveredDevice = {
@@ -29,14 +33,12 @@ type RnBleTransportWithMapper = {
   ) => RnBleMapResult;
 };
 
-type LedgerBleDeviceDescriptor = DeviceDescriptor & {
-  bleName?: string;
-  localName?: string;
-};
-
 type RnBleMetadata = {
   bleName?: string;
   localName?: string;
+  rssi?: number | null;
+  serviceUUIDs?: string[] | null;
+  isConnectable?: boolean | null;
 };
 
 const rnBleMetadataByPath = new Map<string, RnBleMetadata>();
@@ -55,10 +57,13 @@ function patchLedgerRnBleTransportMetadata(transport: unknown): unknown {
   ) {
     if (device.id) {
       rnBleMetadataByPath.set(device.id, {
-        // On RN BLE, `name` is the stable Ledger four-character identifier
-        // (for example A58F), while `localName` is the user-visible label.
+        // RN BLE exposes the raw advertisement name separately from localName.
+        // Keep both for diagnostics/display, but do not use either as connectId.
         bleName: device.name ?? undefined,
         localName: device.localName ?? undefined,
+        rssi: device.rssi,
+        serviceUUIDs: device.serviceUUIDs,
+        isConnectable: device.isConnectable,
       });
     }
 
@@ -68,9 +73,6 @@ function patchLedgerRnBleTransportMetadata(transport: unknown): unknown {
     }
     return result.map((mappedDevice: RnBleTransportDiscoveredDevice) => ({
       ...mappedDevice,
-      // Preserve the stable BLE identifier through DMK's DiscoveredDevice.name.
-      // The UI display name is carried separately via localName below.
-      name: device.name || device.localName || mappedDevice.name || '',
       localName: device.localName || mappedDevice.localName,
     }));
   };
@@ -96,18 +98,14 @@ export class LedgerBleConnector extends LedgerConnectorBase {
         return ((args: Parameters<TransportFactory>[0]) =>
           patchLedgerRnBleTransportMetadata(RNBleTransportFactory(args))) as TransportFactory;
       },
-      { connectionType: 'ble', dmk: options?.dmk }
+      {
+        connectionType: 'ble',
+        dmk: options?.dmk,
+        // iOS Core Bluetooth wedges ~30s on connect to non-advertising peripherals.
+        requirePreFlightScan: Platform.OS === 'ios',
+      }
     );
     this._livenessProbeTimeoutMs = options?.livenessProbeTimeoutMs ?? 800;
-  }
-
-  protected override _resolveConnectId(descriptor: DeviceDescriptor): string {
-    const ledgerBleDescriptor = descriptor as LedgerBleDeviceDescriptor;
-    return (
-      extractBleHexId(ledgerBleDescriptor.bleName) ||
-      extractBleHexId(ledgerBleDescriptor.name) ||
-      ''
-    );
   }
 
   /** BLE discovery uses a fresh scan window; enumerate cache is ignored. */
@@ -120,9 +118,12 @@ export class LedgerBleConnector extends LedgerConnectorBase {
       return {
         path: d.id,
         type: d.deviceModel.model,
+        modelName: d.deviceModel.name,
         name: metadata?.localName || d.name,
         bleName: metadata?.bleName || d.name,
         localName: metadata?.localName,
+        serviceUUIDs: metadata?.serviceUUIDs,
+        isConnectable: metadata?.isConnectable,
         transport: d.transport,
         rssi: d.rssi,
       };

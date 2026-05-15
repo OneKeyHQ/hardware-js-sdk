@@ -37,10 +37,9 @@ export { onSdkEvent, offSdkEvent } from './utils/sdkEventBus';
 export type { SdkEvent, SdkEventListener, SdkLogEvent } from './utils/sdkEventBus';
 
 // BLE utilities (shared by connector packages)
-export { extractBleHexId } from './utils/bleIdentity';
+export { debugLog } from './utils/debugLog';
 export {
   isLedgerBleConnectionType,
   isLedgerBleDescriptor,
   isLedgerDmkBleTransport,
-  isValidLedgerBleConnectId,
 } from './utils/ledgerDmkTransport';

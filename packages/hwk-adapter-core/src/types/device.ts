@@ -25,13 +25,22 @@ export interface DeviceCapabilities {
 
 export interface DeviceInfo {
   vendor: VendorType;
+  /** Machine model id (e.g. "nanoX"). */
   model: string;
+  /** Human-readable model name (e.g. "Ledger Nano X"). */
+  modelName?: string;
   firmwareVersion: string;
   deviceId: string;
   connectId: string;
   label?: string;
   connectionType: ConnectionType;
   battery?: number;
+  /** BLE signal strength (BLE only). */
+  rssi?: number | null;
+  /** BLE connectable flag (BLE only). */
+  isConnectable?: boolean | null;
+  /** USB serial number (USB only). */
+  serialNumber?: string;
 
   /** Device capabilities — varies by vendor, model, and connection type */
   capabilities?: DeviceCapabilities;

@@ -124,6 +124,29 @@ describe('LedgerAdapter', () => {
       });
       expect(connector.searchDevices).toHaveBeenCalled();
     });
+
+    it('marks BLE scan results as BLE when connectId is a transport id', async () => {
+      (connector as unknown as { connectionType: string }).connectionType = 'ble';
+      connector.searchDevices.mockResolvedValueOnce([
+        {
+          connectId: 'D5:75:7D:4B:51:E8',
+          deviceId: 'D5:75:7D:4B:51:E8',
+          name: 'Nano X 123',
+          model: 'nanoX',
+        } as ConnectorDevice,
+      ]);
+
+      const devices = await adapter.searchDevices();
+
+      expect(devices[0]).toMatchObject({
+        vendor: 'ledger',
+        model: 'nanoX',
+        deviceId: 'D5:75:7D:4B:51:E8',
+        connectId: 'D5:75:7D:4B:51:E8',
+        label: 'Nano X 123',
+        connectionType: 'ble',
+      });
+    });
   });
 
   describe('connectDevice / disconnectDevice', () => {
@@ -136,7 +159,7 @@ describe('LedgerAdapter', () => {
       expect(connector.connect).toHaveBeenCalledWith('dev-1');
     });
 
-    it('should map direct BLE connect when target is not advertising to DeviceNotFound', async () => {
+    it('should directly connect a BLE device when connectId is provided', async () => {
       const bleConnector = createMockConnector();
       (bleConnector as unknown as { connectionType: string }).connectionType = 'ble';
       bleConnector.searchDevices.mockResolvedValue([]);
@@ -150,11 +173,12 @@ describe('LedgerAdapter', () => {
 
       const result = await bleAdapter.connectDevice('dev-1');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.payload.code).toBe(HardwareErrorCode.DeviceNotFound);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.payload).toBe('dev-1');
       }
-      expect(bleConnector.connect).not.toHaveBeenCalled();
+      expect(bleConnector.searchDevices).not.toHaveBeenCalled();
+      expect(bleConnector.connect).toHaveBeenCalledWith('dev-1');
     });
 
     it('should not auto-pick the first BLE device when connectId is empty', async () => {
@@ -1019,6 +1043,53 @@ describe('LedgerAdapter', () => {
       );
     });
 
+    it('should not reuse a stale USB session after searchDevices requests a session reset', async () => {
+      connector.call.mockResolvedValueOnce({
+        address: '0xOLD',
+        publicKey: '0xold',
+      });
+
+      const first = await adapter.evmGetAddress('', '', {
+        path: "m/44'/60'/0'/0/0",
+        showOnDevice: false,
+      });
+      expect(first.success).toBe(true);
+      expect(connector.connect).toHaveBeenCalledWith('dev-1');
+
+      connector.searchDevices.mockResolvedValue([
+        { connectId: 'dev-2', deviceId: 'dev-2', name: 'Nano Y', model: 'nanoY' },
+      ]);
+      connector.connect.mockResolvedValue({
+        sessionId: 'session-dev-2',
+        deviceInfo: {
+          vendor: 'ledger',
+          model: 'nanoY',
+          firmwareVersion: 'unknown',
+          deviceId: 'dev-2',
+          connectId: 'dev-2',
+          connectionType: 'usb',
+        },
+      } as ConnectorSession);
+      connector.call.mockResolvedValueOnce({
+        address: '0xNEW',
+        publicKey: '0xnew',
+      });
+
+      await adapter.searchDevices({ resetSession: true });
+      const second = await adapter.evmGetAddress('', '', {
+        path: "m/44'/60'/0'/0/0",
+        showOnDevice: false,
+      });
+
+      expect(second.success).toBe(true);
+      expect(connector.connect).toHaveBeenLastCalledWith('dev-2');
+      expect(connector.call).toHaveBeenLastCalledWith(
+        'session-dev-2',
+        'evmGetAddress',
+        expect.any(Object)
+      );
+    });
+
     it('should retry with fresh connection on disconnect error', async () => {
       // First: establish a session
       await adapter.connectDevice('dev-1');
@@ -1265,6 +1336,91 @@ describe('LedgerAdapter', () => {
       }
       expect(bleConnector.searchDevices).not.toHaveBeenCalled();
       expect(bleConnector.connect).not.toHaveBeenCalled();
+    });
+
+    it('should directly connect BLE business calls when connectId is provided', async () => {
+      const bleConnector = createMockConnector();
+      (bleConnector as unknown as { connectionType: string }).connectionType = 'ble';
+      bleConnector.searchDevices.mockResolvedValueOnce([
+        { connectId: 'dev-A', deviceId: 'dev-A', name: 'Nano X', model: 'nanoX' },
+      ]);
+      bleConnector.connect.mockResolvedValueOnce({
+        sessionId: 'session-dev-A',
+        deviceInfo: {
+          vendor: 'ledger',
+          model: 'nanoX',
+          firmwareVersion: 'unknown',
+          deviceId: 'dev-A',
+          connectId: 'dev-A',
+          connectionType: 'ble',
+        },
+      } as ConnectorSession);
+      bleConnector.call.mockResolvedValueOnce({ address: '0xBLE', publicKey: '0xpk' });
+      const bleAdapter = new LedgerAdapter(bleConnector);
+      bleAdapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, () => {
+        bleAdapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_DEVICE_PERMISSION,
+          payload: { granted: true },
+        });
+      });
+
+      const result = await bleAdapter.evmGetAddress('dev-A', '', {
+        path: "m/44'/60'/0'/0/0",
+        showOnDevice: false,
+      });
+
+      expect(result.success).toBe(true);
+      expect(bleConnector.searchDevices).not.toHaveBeenCalled();
+      expect(bleConnector.connect).toHaveBeenCalledWith('dev-A');
+      expect(bleConnector.call).toHaveBeenCalledWith(
+        'session-dev-A',
+        'evmGetAddress',
+        expect.objectContaining({ path: "m/44'/60'/0'/0/0" })
+      );
+    });
+
+    it('should recover BLE direct-connect failures by retrying the same connectId', async () => {
+      const bleConnector = createMockConnector();
+      (bleConnector as unknown as { connectionType: string }).connectionType = 'ble';
+      bleConnector.searchDevices.mockResolvedValue([
+        { connectId: 'dev-A', deviceId: 'dev-A', name: 'Nano X', model: 'nanoX' },
+      ]);
+      bleConnector.connect
+        .mockRejectedValueOnce(
+          Object.assign(new Error('not advertising'), {
+            _tag: 'DeviceNotAdvertisingError',
+            code: HardwareErrorCode.DeviceNotFound,
+          })
+        )
+        .mockResolvedValueOnce({
+          sessionId: 'session-dev-A',
+          deviceInfo: {
+            vendor: 'ledger',
+            model: 'nanoX',
+            firmwareVersion: 'unknown',
+            deviceId: 'dev-A',
+            connectId: 'dev-A',
+            connectionType: 'ble',
+          },
+        } as ConnectorSession);
+      bleConnector.call.mockResolvedValueOnce({ address: '0xBLE', publicKey: '0xpk' });
+      const bleAdapter = new LedgerAdapter(bleConnector);
+      bleAdapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, () => {
+        bleAdapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_DEVICE_PERMISSION,
+          payload: { granted: true },
+        });
+      });
+
+      const result = await bleAdapter.evmGetAddress('dev-A', '', {
+        path: "m/44'/60'/0'/0/0",
+        showOnDevice: false,
+      });
+
+      expect(result.success).toBe(true);
+      expect(bleConnector.connect).toHaveBeenNthCalledWith(1, 'dev-A');
+      expect(bleConnector.connect).toHaveBeenNthCalledWith(2, 'dev-A');
+      expect(bleConnector.connect).not.toHaveBeenCalledWith(undefined);
     });
 
     it('should retry BLE connection-level errors with the original connectId', async () => {

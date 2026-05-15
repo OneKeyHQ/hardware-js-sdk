@@ -10,11 +10,7 @@ import {
   mapLedgerError,
 } from '../errors';
 import { debugLog } from '../utils/debugLog';
-import {
-  isLedgerBleConnectionType,
-  isLedgerBleDescriptor,
-  isValidLedgerBleConnectId,
-} from '../utils/ledgerDmkTransport';
+import { isLedgerBleConnectionType } from '../utils/ledgerDmkTransport';
 import {
   btcGetAddress,
   btcGetMasterFingerprint,
@@ -106,6 +102,10 @@ const HARDWARE_ERROR_CODE_VALUES = new Set<number>(
   Object.values(HardwareErrorCode).filter((value): value is number => typeof value === 'number')
 );
 
+// Slow-advertising peripherals (screensaver, post-unpair) can advertise on
+// ~1s intervals, so the 800ms list-scan window is too tight at connect time.
+const BLE_CONNECT_SCAN_TIMEOUT_MS = 1500;
+
 // ---------------------------------------------------------------------------
 // Default signer kit importer (webpack/rspack — uses "exports" field)
 // ---------------------------------------------------------------------------
@@ -150,7 +150,14 @@ async function defaultLedgerKitImporter(pkg: string): Promise<any> {
  * Subclasses only need to:
  * 1. Supply a transport factory via the constructor.
  * 2. Optionally override `_resolveConnectId()` for transport-specific
- *    device identity resolution (e.g. BLE hex ID extraction).
+ *    device identity resolution.
+ *
+ * Invariant: one instance = one transport. `connectionType` is fixed at
+ * construction. To switch transport (e.g. desktop BLE ↔ WebHID), the host
+ * must build a new connector instance and replace the old one — don't add
+ * multiple transports to a single instance. Lifting this constraint would
+ * require routing `connectionType` from `descriptor.transport` per-device
+ * and updating every `this.connectionType` branch in this file.
  */
 export class LedgerConnectorBase implements IConnector {
   private _deviceManager: LedgerDeviceManager | null = null;
@@ -169,27 +176,6 @@ export class LedgerConnectorBase implements IConnector {
   private readonly _createTransport: TransportFactory;
 
   public readonly connectionType: ConnectionType;
-
-  // ---------------------------------------------------------------------------
-  // ConnectId <-> DMK path mapping
-  //
-  // DMK uses internal paths (BLE MAC, USB UUID) that may change across sessions.
-  // _resolveConnectId() maps these to stable external IDs (BLE: "A58F", USB: same).
-  // This bidirectional map is the SINGLE SOURCE OF TRUTH for all connectId usage.
-  // ---------------------------------------------------------------------------
-  private _connectIdToPath = new Map<string, string>(); // "A58F" -> "D5:75:7D:4B:51:E8"
-
-  private _pathToConnectId = new Map<string, string>(); // "D5:75:7D:4B:51:E8" -> "A58F"
-
-  /** Get DMK path from external connectId. Falls back to connectId itself. */
-  private _getPathForConnectId(connectId: string): string {
-    return this._connectIdToPath.get(connectId) ?? connectId;
-  }
-
-  /** Get external connectId from DMK path. Falls back to path itself. */
-  private _getConnectIdForPath(path: string): string {
-    return this._pathToConnectId.get(path) ?? path;
-  }
 
   // ---------------------------------------------------------------------------
   // Per-session DeviceAction cancellers
@@ -224,6 +210,11 @@ export class LedgerConnectorBase implements IConnector {
   /** Context object passed to per-chain handler functions. */
   private readonly _ctx: ConnectorContext;
 
+  /** When true, BLE direct-connect throws NotAdvertising if the pre-flight
+   *  scan can't see the device — guard for GATT stacks that wedge on
+   *  non-advertising peripherals (iOS). */
+  private readonly _requirePreFlightScan: boolean;
+
   constructor(
     createTransport: TransportFactory,
     options?: {
@@ -235,12 +226,15 @@ export class LedgerConnectorBase implements IConnector {
        * For Metro (React Native): pass a resolver that uses CJS paths.
        */
       importLedgerKit?: (pkg: string) => Promise<any>;
+      /** Default false. RN-iOS subclass should pass `true`. */
+      requirePreFlightScan?: boolean;
     }
   ) {
     this._createTransport = createTransport;
     this.connectionType = options?.connectionType ?? 'usb';
     this._providedDmk = options?.dmk;
     this._importLedgerKit = options?.importLedgerKit ?? defaultLedgerKitImporter;
+    this._requirePreFlightScan = options?.requirePreFlightScan ?? false;
     if (this._providedDmk) {
       this._initManagers(this._providedDmk);
     }
@@ -269,7 +263,7 @@ export class LedgerConnectorBase implements IConnector {
   /**
    * Resolve the connectId for a discovered device descriptor.
    * Default: use the DMK path (ephemeral UUID).
-   * Override in subclasses to extract stable identifiers (e.g. BLE hex ID).
+   * Override in subclasses only when the public connectId differs from the transport path.
    */
   protected _resolveConnectId(descriptor: DeviceDescriptor): string {
     return descriptor.path;
@@ -298,7 +292,6 @@ export class LedgerConnectorBase implements IConnector {
   // ---------------------------------------------------------------------------
 
   async searchDevices(): Promise<ConnectorDevice[]> {
-    debugLog('[DMK] connector.searchDevices() entry');
     const dm = await this._getDeviceManager();
 
     const descriptors = await this._discoverDescriptors(dm);
@@ -306,59 +299,16 @@ export class LedgerConnectorBase implements IConnector {
       descriptor: d,
       connectId: this._resolveConnectId(d),
     }));
-    debugLog(
-      '[DMK] connector.searchDevices() raw descriptors:',
-      resolvedDescriptors.map(({ descriptor: d, connectId }) => ({
-        id: d?.path,
-        path: d?.path,
-        connectId,
-        deviceName: d?.name,
-        'device.name': d?.bleName,
-        localName: d?.localName,
-        bleName: d?.bleName,
-        model: d?.type,
-        transport: d?.transport,
-        rssi: d?.rssi,
-      }))
-    );
-    const bleConnectIdCounts = new Map<string, number>();
-    for (const item of resolvedDescriptors) {
-      if (isLedgerBleDescriptor(this.connectionType, item.descriptor)) {
-        if (!isValidLedgerBleConnectId(item.connectId)) {
-          debugLog(`[DMK] connector.searchDevices() invalid BLE connectId=${item.connectId}`);
-          throw Object.assign(
-            new Error('Ledger BLE connectId must be the 4-character BLE identifier'),
-            { code: HardwareErrorCode.DeviceNotFound }
-          );
-        }
-        bleConnectIdCounts.set(item.connectId, (bleConnectIdCounts.get(item.connectId) ?? 0) + 1);
-      }
-    }
-    const duplicateBleConnectId = Array.from(bleConnectIdCounts.entries()).find(
-      ([, count]) => count > 1
-    )?.[0];
-    if (duplicateBleConnectId) {
-      debugLog(
-        `[DMK] connector.searchDevices() duplicate BLE connectId=${duplicateBleConnectId} counts=${JSON.stringify(
-          Array.from(bleConnectIdCounts.entries())
-        )}`
-      );
-      throw Object.assign(
-        new Error(`Duplicate Ledger BLE connectId detected: ${duplicateBleConnectId}`),
-        { code: HardwareErrorCode.DeviceNotFound }
-      );
-    }
-
-    const result: ConnectorDevice[] = resolvedDescriptors.map(({ descriptor: d, connectId }) => {
-      this._connectIdToPath.set(connectId, d.path);
-      this._pathToConnectId.set(d.path, connectId);
-      return {
-        connectId,
-        deviceId: d.path,
-        name: d.name || d.type || 'Ledger',
-        model: d.type,
-      };
-    });
+    const result: ConnectorDevice[] = resolvedDescriptors.map(({ descriptor: d, connectId }) => ({
+      connectId,
+      deviceId: d.path,
+      name: d.name || d.type || 'Ledger',
+      model: d.type,
+      modelName: d.modelName,
+      rssi: d.rssi,
+      isConnectable: d.isConnectable,
+      serialNumber: d.serialNumber,
+    }));
     debugLog(
       `[DMK] connector.searchDevices() return count=${result.length} ids=[${result
         .map(r => r.connectId)
@@ -375,7 +325,10 @@ export class LedgerConnectorBase implements IConnector {
     // Trust caller's deviceId — search has already happened upstream
     // (UI scan flow). When caller didn't specify, fall back to a fresh
     // search so we have something to connect to.
-    let targetPath = deviceId ? this._getPathForConnectId(deviceId) : undefined;
+    //
+    // Only the explicit-connectId path gets the BLE direct-connect treatment.
+    const callerSuppliedConnectId = Boolean(deviceId);
+    let targetPath = deviceId;
     if (!targetPath) {
       const discovered = await this.searchDevices();
       if (discovered.length === 0) {
@@ -390,7 +343,7 @@ export class LedgerConnectorBase implements IConnector {
       targetPath = discovered[0].deviceId;
     }
 
-    const externalConnectId = this._getConnectIdForPath(targetPath);
+    const externalConnectId = targetPath;
 
     // No active SMP timeout — let dm.connect resolve/reject naturally based
     // on what DMK / iOS BLE stack actually report. iOS has its own ~30s SMP
@@ -450,19 +403,56 @@ export class LedgerConnectorBase implements IConnector {
     // Resolve dm lazily — _resetSignersAndSessions during retry replaces
     // _deviceManager, so capturing it in a closure would use a stale instance
     // whose _discovered Map has been disposed.
+    // BLE direct-connect: caller supplied a connectId on a BLE transport.
+    const isBleDirectConnect =
+      isLedgerBleConnectionType(this.connectionType) && callerSuppliedConnectId;
+
+    const throwNotAdvertising = (): never => {
+      const err = new Error(
+        'Ledger device is not currently advertising. Wake up and unlock the device, keep it nearby, then try again.'
+      ) as Error & { _tag?: string; code?: number };
+      err._tag = ERROR_TAG.DeviceNotAdvertising;
+      err.code = HardwareErrorCode.DeviceNotFound;
+      throw err;
+    };
+
     const doConnect = async (path: string): Promise<ConnectorSession> => {
       const dm = await this._getDeviceManager();
-      const sessionId = await dmConnectWithObserve(dm, path);
+      // BLE direct-connect: refresh _discovered (DMK requires it before connect).
+      // iOS throws early on empty scan to avoid the ~30s GATT/SMP wedge;
+      // others trust the caller and let dm.connect() surface its own error.
+      if (isBleDirectConnect && !dm.hasDiscoveredDevice(path)) {
+        const live = await dm.getLiveDevices(BLE_CONNECT_SCAN_TIMEOUT_MS);
+        if (this._requirePreFlightScan && !live.some(d => d.id === path)) {
+          throwNotAdvertising();
+        }
+      }
+      let sessionId: string;
+      try {
+        sessionId = await dmConnectWithObserve(dm, path);
+      } catch (err) {
+        // LedgerDeviceManager.connect() tags this when path isn't in _discovered.
+        if (
+          isBleDirectConnect &&
+          (err as { _tag?: string } | null)?._tag === ERROR_TAG.DeviceNotInDiscoveryCache
+        ) {
+          throwNotAdvertising();
+        }
+        throw err;
+      }
       this._watchSessionState(sessionId, externalConnectId);
+      const info = dm.getDiscoveredDeviceInfo(path);
       const session: ConnectorSession = {
         sessionId,
         deviceInfo: {
           vendor: 'ledger',
-          model: 'unknown',
+          model: info?.model ?? 'unknown',
+          modelName: info?.modelName,
           firmwareVersion: 'unknown',
           deviceId: path,
           connectId: externalConnectId,
           connectionType: this.connectionType,
+          rssi: info?.rssi,
           capabilities: { persistentDeviceIdentity: false },
         },
       };
@@ -830,16 +820,14 @@ export class LedgerConnectorBase implements IConnector {
 
   /**
    * Replace an old session with a new one after app switch.
-   * Updates the connectId→path mapping so subsequent calls() use the new session,
-   * and emits device-connect so the adapter updates its _sessions Map.
+   * Emits device-connect so the adapter updates its _sessions Map.
    */
   private _replaceSession(oldSessionId: string, _newSessionId: string): void {
-    // Find the connectId that was mapped to the old session's device path
     const dm = this._deviceManager;
     if (!dm) return;
 
     const oldDeviceId = dm.getDeviceId(oldSessionId);
-    const connectId = oldDeviceId ? this._pathToConnectId.get(oldDeviceId) : undefined;
+    const connectId = oldDeviceId;
 
     // Invalidate old signer cache
     this._signerManager?.invalidate(oldSessionId);
@@ -857,7 +845,7 @@ export class LedgerConnectorBase implements IConnector {
   }
 
   /**
-   * Light reset: clear signer/session state but keep DMK and ID mapping alive.
+   * Light reset: clear signer/session state but keep DMK alive.
    * Used by connect() retry — we want to re-discover with the same transport.
    *
    * Note: drops the device manager but tears down its RxJS subs first via
@@ -899,8 +887,6 @@ export class LedgerConnectorBase implements IConnector {
     this._deviceManager = null;
     this._signerManager = null;
     this._dmk = null;
-    this._connectIdToPath.clear();
-    this._pathToConnectId.clear();
   }
 
   // ---------------------------------------------------------------------------

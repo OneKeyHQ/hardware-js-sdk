@@ -2,6 +2,8 @@ import { LedgerBleConnector } from '../LedgerBleConnector';
 
 import type { DeviceDescriptor } from '@onekeyfe/hwk-adapter-core';
 
+jest.mock('react-native', () => ({ Platform: { OS: 'ios' } }), { virtual: true });
+
 describe('LedgerBleConnector', () => {
   it('constructs without throwing', () => {
     expect(() => new LedgerBleConnector()).not.toThrow();
@@ -19,7 +21,7 @@ describe('LedgerBleConnector', () => {
       )._resolveConnectId(descriptor);
     }
 
-    it('extracts 4-hex suffix from device name and uppercases it', () => {
+    it('uses the transport path as BLE connectId instead of the BLE name', () => {
       const c = new LedgerBleConnector();
       expect(
         resolve(c, {
@@ -27,10 +29,10 @@ describe('LedgerBleConnector', () => {
           name: 'Nano X a58f',
           transport: 'BLE',
         })
-      ).toBe('A58F');
+      ).toBe('D5:75:7D:4B:51:E8');
     });
 
-    it('prefers the explicit RN BLE identifier over the display name', () => {
+    it('keeps Android/iOS RN BLE transport ids as connectId even when bleName exists', () => {
       const c = new LedgerBleConnector();
       expect(
         resolve(c, {
@@ -40,23 +42,14 @@ describe('LedgerBleConnector', () => {
           localName: 'Nano X 123',
           transport: 'RN_BLE',
         })
-      ).toBe('A58F');
+      ).toBe('D5:75:7D:4B:51:E8');
     });
 
-    it('does not derive BLE identity from descriptor.path', () => {
+    it('does not require a four-character BLE name to resolve connectId', () => {
       const c = new LedgerBleConnector();
-      expect(
-        resolve(c, {
-          path: 'ACE4CF88-3DC0-E39F-1E5C-CC707B1E3F64',
-          name: 'Leo',
-          transport: 'BLE',
-        })
-      ).toBe('');
-    });
-
-    it('returns empty connectId when BLE name has no four-character suffix', () => {
-      const c = new LedgerBleConnector();
-      expect(resolve(c, { path: 'only-path', transport: 'RN_BLE', name: 'nano X123' })).toBe('');
+      expect(resolve(c, { path: 'only-path', transport: 'RN_BLE', name: 'nano X123' })).toBe(
+        'only-path'
+      );
     });
   });
 });
