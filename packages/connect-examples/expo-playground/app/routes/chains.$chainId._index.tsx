@@ -111,7 +111,9 @@ function getRequiresDeviceConfirmation(method: UnifiedMethodConfig) {
   }
 
   return method.presets.some(preset =>
-    preset.parameters.some(parameter => parameter.name === 'showOnOneKey' && parameter.value === true)
+    preset.parameters.some(
+      parameter => parameter.name === 'showOnOneKey' && parameter.value === true
+    )
   );
 }
 
@@ -124,10 +126,13 @@ const ChainMethodsIndexPage: React.FC = () => {
 
   const { selectedChain, isChainNotFound } = useMethodResolver({ chainId });
 
-  const getTranslatedDescription = useCallback((description?: string) => {
-    if (!description) return '';
-    return description.startsWith('methodDescriptions.') ? t(description) : description;
-  }, [t]);
+  const getTranslatedDescription = useCallback(
+    (description?: string) => {
+      if (!description) return '';
+      return description.startsWith('methodDescriptions.') ? t(description) : description;
+    },
+    [t]
+  );
 
   const filteredMethods = useMemo(
     () =>
@@ -171,7 +176,9 @@ const ChainMethodsIndexPage: React.FC = () => {
       return undefined;
     }
 
-    return filteredMethods.find(method => method.method === selectedMethodName) || filteredMethods[0];
+    return (
+      filteredMethods.find(method => method.method === selectedMethodName) || filteredMethods[0]
+    );
   }, [filteredMethods, selectedMethodName]);
 
   const activePreset = activeMethod?.presets[0];
@@ -181,7 +188,9 @@ const ChainMethodsIndexPage: React.FC = () => {
     activePresetParameters.length - PARAMETER_PREVIEW_LIMIT,
     0
   );
-  const requiresDeviceConfirmation = activeMethod ? getRequiresDeviceConfirmation(activeMethod) : false;
+  const requiresDeviceConfirmation = activeMethod
+    ? getRequiresDeviceConfirmation(activeMethod)
+    : false;
 
   useEffect(() => {
     if (!activeMethod) {
@@ -202,8 +211,8 @@ const ChainMethodsIndexPage: React.FC = () => {
     <ChainBoundary chainId={chainId} checkNotFound={isChainNotFound}>
       {selectedChain && (
         <PageLayout fixedHeight={true}>
-          <div className="flex h-full min-h-0 flex-col px-4 py-3">
-            <div className="mb-3 flex flex-shrink-0 flex-col gap-3">
+          <div className="flex h-full min-h-0 flex-col px-5 py-4">
+            <div className="mb-4 flex flex-shrink-0 flex-col gap-4">
               <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                 <Breadcrumb
                   items={[
@@ -235,59 +244,33 @@ const ChainMethodsIndexPage: React.FC = () => {
                 </div>
               </div>
 
-              <section className="rounded-lg border border-border/70 bg-card/80 p-3">
-                <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-muted/30">
-                      <ChainIcon chainId={selectedChain.id} size={24} />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h1 className="truncate text-lg font-semibold text-foreground">
-                          {selectedChain.id}
-                        </h1>
-                        <span className="rounded-full border border-border/70 px-2 py-0.5 text-xs text-muted-foreground">
-                          {t('chains.methodsCount', {
-                            count: filteredMethods.length,
-                          })}
-                        </span>
-                      </div>
-                      <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
-                        Select a method, review its presets, then open the full runner.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2 text-xs">
-                    <span className="rounded-full border border-border/70 bg-background px-2.5 py-1 text-muted-foreground">
-                      WebUSB ready
-                    </span>
-                    <span className="rounded-full border border-border/70 bg-background px-2.5 py-1 text-muted-foreground">
-                      {selectedChain.methods.reduce(
-                        (count, method) => count + method.presets.length,
-                        0
-                      )}{' '}
-                      presets
-                    </span>
-                    <span className="rounded-full border border-border/70 bg-background px-2.5 py-1 text-muted-foreground">
-                      Device confirmation
-                    </span>
-                  </div>
-                </div>
-              </section>
-
               <DeviceNotConnectedState />
             </div>
 
-            <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[minmax(320px,420px)_1fr]">
+            <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 lg:grid-cols-[minmax(380px,520px)_1fr]">
               <section className="flex min-h-[280px] min-w-0 flex-col overflow-hidden rounded-lg border border-border/70 bg-card/80">
-                <div className="border-b border-border/70 p-3">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <h2 className="truncate text-sm font-semibold text-foreground">Methods</h2>
-                      <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                        Grouped by chain action
-                      </p>
+                <div className="border-b border-border/70 p-4">
+                  <div className="mb-4 flex items-start justify-between gap-4">
+                    <div className="flex min-w-0 items-start gap-3">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-background">
+                        <ChainIcon chainId={selectedChain.id} size={24} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h1 className="truncate text-lg font-semibold text-foreground">
+                            {selectedChain.id}
+                          </h1>
+                          <span className="rounded-full border border-border/70 px-2 py-0.5 text-xs text-muted-foreground">
+                            {t('chains.methodsCount', {
+                              count: filteredMethods.length,
+                            })}
+                          </span>
+                        </div>
+                        <div className="mt-1 text-sm font-medium text-foreground">Methods</div>
+                        <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+                          Select a method and inspect its presets before opening the runner.
+                        </p>
+                      </div>
                     </div>
                     <SlidersHorizontal className="h-4 w-4 shrink-0 text-muted-foreground" />
                   </div>
@@ -302,9 +285,9 @@ const ChainMethodsIndexPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="min-h-0 flex-1 overflow-y-auto p-2">
+                <div className="min-h-0 flex-1 overflow-y-auto p-3">
                   {groupedMethods.map(group => (
-                    <div key={group.category} className="mb-3 last:mb-0">
+                    <div key={group.category} className="mb-4 last:mb-0">
                       <div className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-normal text-muted-foreground">
                         {CATEGORY_LABELS[group.category]}
                       </div>
@@ -312,13 +295,14 @@ const ChainMethodsIndexPage: React.FC = () => {
                         {group.methods.map(method => {
                           const isActive = activeMethod?.method === method.method;
                           const description =
-                            getTranslatedDescription(method.description) || 'No description available';
+                            getTranslatedDescription(method.description) ||
+                            'No description available';
 
                           return (
                             <button
                               key={`${selectedChain.id}-${method.method}`}
                               type="button"
-                              className={`w-full rounded-md border px-3 py-2 text-left transition-colors ${
+                              className={`w-full rounded-md border px-4 py-3 text-left transition-colors ${
                                 isActive
                                   ? 'border-primary/50 bg-primary/10 text-foreground'
                                   : 'border-transparent bg-transparent text-muted-foreground hover:border-border/70 hover:bg-muted/40 hover:text-foreground'
@@ -340,7 +324,7 @@ const ChainMethodsIndexPage: React.FC = () => {
                                   </span>
                                 </div>
                               </div>
-                              <p className="mt-1 line-clamp-2 text-xs leading-relaxed">
+                              <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed">
                                 {description}
                               </p>
                             </button>
@@ -368,10 +352,10 @@ const ChainMethodsIndexPage: React.FC = () => {
               <section className="min-h-[360px] min-w-0 overflow-hidden rounded-lg border border-border/70 bg-card/80">
                 {activeMethod ? (
                   <div className="flex h-full min-h-0 flex-col">
-                    <div className="border-b border-border/70 p-4">
+                    <div className="border-b border-border/70 p-5">
                       <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
                         <div className="min-w-0">
-                          <div className="mb-2 flex flex-wrap items-center gap-2">
+                          <div className="mb-3 flex flex-wrap items-center gap-2">
                             <span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs text-primary">
                               {CATEGORY_LABELS[getMethodCategory(activeMethod)]}
                             </span>
@@ -390,7 +374,7 @@ const ChainMethodsIndexPage: React.FC = () => {
                           <h2 className="break-words font-mono text-lg font-semibold text-foreground">
                             {activeMethod.method}
                           </h2>
-                          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">
+                          <p className="mt-2 max-w-4xl text-sm leading-relaxed text-muted-foreground">
                             {getTranslatedDescription(activeMethod.description) ||
                               'No description available'}
                           </p>
@@ -408,42 +392,44 @@ const ChainMethodsIndexPage: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="min-h-0 flex-1 overflow-y-auto p-4">
-                      <div className="grid gap-4 xl:grid-cols-[minmax(220px,280px)_1fr]">
-                        <div className="rounded-lg border border-border/70 bg-background p-3">
-                          <div className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
-                            Presets
-                          </div>
-                          <div className="mt-3 space-y-3">
-                            <div>
-                              <div className="text-sm font-semibold text-foreground">
-                                {activePreset?.title || 'No preset'}
-                              </div>
-                              {activePreset?.description && (
-                                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                                  {activePreset.description}
-                                </p>
-                              )}
+                    <div className="min-h-0 flex-1 overflow-y-auto">
+                      <div className="border-b border-border/70 px-5 py-4">
+                        <div className="grid gap-4 text-sm xl:grid-cols-[minmax(240px,1.4fr)_repeat(2,minmax(110px,0.45fr))]">
+                          <div className="min-w-0">
+                            <div className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
+                              Active preset
                             </div>
-                            <div className="grid grid-cols-2 gap-2 text-xs">
-                              <div className="rounded-md border border-border/70 bg-card px-2 py-2">
-                                <div className="text-muted-foreground">Available</div>
-                                <div className="mt-1 font-mono text-sm font-semibold text-foreground">
-                                  {activeMethod.presets.length}
-                                </div>
-                              </div>
-                              <div className="rounded-md border border-border/70 bg-card px-2 py-2">
-                                <div className="text-muted-foreground">Parameters</div>
-                                <div className="mt-1 font-mono text-sm font-semibold text-foreground">
-                                  {activePresetParameters.length}
-                                </div>
-                              </div>
+                            <div className="mt-1 truncate font-semibold text-foreground">
+                              {activePreset?.title || 'No preset'}
+                            </div>
+                            {activePreset?.description && (
+                              <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+                                {activePreset.description}
+                              </p>
+                            )}
+                          </div>
+                          <div>
+                            <div className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
+                              Presets
+                            </div>
+                            <div className="mt-1 font-mono text-base font-semibold text-foreground">
+                              {activeMethod.presets.length}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
+                              Parameters
+                            </div>
+                            <div className="mt-1 font-mono text-base font-semibold text-foreground">
+                              {activePresetParameters.length}
                             </div>
                           </div>
                         </div>
+                      </div>
 
-                        <div className="min-w-0 rounded-lg border border-border/70 bg-background">
-                          <div className="flex items-center justify-between gap-3 border-b border-border/70 px-3 py-2">
+                      <div className="p-5">
+                        <div className="min-w-0 overflow-hidden rounded-lg border border-border/70 bg-background">
+                          <div className="flex items-center justify-between gap-3 border-b border-border/70 px-4 py-3">
                             <div>
                               <div className="text-sm font-semibold text-foreground">
                                 Parameter preview
@@ -456,13 +442,13 @@ const ChainMethodsIndexPage: React.FC = () => {
 
                           <div className="overflow-x-auto">
                             {visibleParameters.length > 0 ? (
-                              <table className="w-full min-w-[560px] text-left text-xs">
+                              <table className="w-full min-w-[640px] text-left text-xs">
                                 <thead className="border-b border-border/70 text-muted-foreground">
                                   <tr>
-                                    <th className="px-3 py-2 font-medium">Name</th>
-                                    <th className="px-3 py-2 font-medium">Type</th>
-                                    <th className="px-3 py-2 font-medium">Required</th>
-                                    <th className="px-3 py-2 font-medium">Sample</th>
+                                    <th className="px-4 py-2.5 font-medium">Name</th>
+                                    <th className="px-4 py-2.5 font-medium">Type</th>
+                                    <th className="px-4 py-2.5 font-medium">Required</th>
+                                    <th className="px-4 py-2.5 font-medium">Sample</th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -471,7 +457,7 @@ const ChainMethodsIndexPage: React.FC = () => {
                                       key={parameter.name}
                                       className="border-b border-border/50 last:border-0"
                                     >
-                                      <td className="max-w-[180px] px-3 py-2">
+                                      <td className="max-w-[220px] px-4 py-3">
                                         <div className="truncate font-medium text-foreground">
                                           {getParameterLabel(parameter)}
                                         </div>
@@ -481,10 +467,10 @@ const ChainMethodsIndexPage: React.FC = () => {
                                           </div>
                                         )}
                                       </td>
-                                      <td className="px-3 py-2 font-mono text-muted-foreground">
+                                      <td className="px-4 py-3 font-mono text-muted-foreground">
                                         {parameter.type}
                                       </td>
-                                      <td className="px-3 py-2">
+                                      <td className="px-4 py-3">
                                         <span
                                           className={`rounded-full border px-2 py-0.5 ${
                                             parameter.required
@@ -495,7 +481,7 @@ const ChainMethodsIndexPage: React.FC = () => {
                                           {parameter.required ? 'Yes' : 'No'}
                                         </span>
                                       </td>
-                                      <td className="max-w-[260px] px-3 py-2">
+                                      <td className="max-w-[320px] px-4 py-3">
                                         <div className="truncate font-mono text-muted-foreground">
                                           {formatParameterValue(parameter.value)}
                                         </div>
@@ -512,7 +498,7 @@ const ChainMethodsIndexPage: React.FC = () => {
                           </div>
 
                           {remainingParameterCount > 0 && (
-                            <div className="border-t border-border/70 px-3 py-2 text-xs text-muted-foreground">
+                            <div className="border-t border-border/70 px-4 py-3 text-xs text-muted-foreground">
                               {remainingParameterCount} more parameters are available in the runner.
                             </div>
                           )}

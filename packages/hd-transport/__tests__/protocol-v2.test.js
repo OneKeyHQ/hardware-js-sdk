@@ -85,6 +85,9 @@ const protocolV2Messages = parseConfigure({
         },
       },
     },
+    FileWrite: {
+      fields: {},
+    },
     PartialNested: {
       fields: {
         child: {
@@ -111,6 +114,7 @@ const protocolV2Messages = parseConfigure({
         MessageType_ProtoVersion: 60201,
         MessageType_Ping: 60206,
         MessageType_Success: 60207,
+        MessageType_FileWrite: 60805,
         MessageType_DevFirmwareUpdate: 61000,
         MessageType_DevFirmwareInstallProgress: 61001,
         MessageType_PartialNested: 62000,
@@ -284,6 +288,67 @@ describe('Protocol V2 framing and session', () => {
       },
     });
     expect(logger.debug).toHaveBeenCalledWith(expect.stringContaining('seq differs'));
+  });
+
+  test('session logs decoded transmit and receive payloads', async () => {
+    const response = ProtocolV2.encodeFrame(schemas, 'Success', {
+      message: 'accepted',
+    });
+    const logger = {
+      debug: jest.fn(),
+    };
+    const session = new ProtocolV2Session({
+      schemas,
+      router: 1,
+      writeFrame: () => Promise.resolve(),
+      readFrame: () => Promise.resolve(response),
+      logger,
+      logPrefix: 'ProtocolV2 Test',
+    });
+
+    await expect(session.call('Ping', { message: 'hello' })).resolves.toEqual({
+      type: 'Success',
+      message: {
+        message: 'accepted',
+      },
+    });
+
+    expect(logger.debug).toHaveBeenCalledWith('[ProtocolV2 Test] TX payload name=Ping', {
+      message: 'hello',
+    });
+    expect(logger.debug).toHaveBeenCalledWith(
+      '[ProtocolV2 Test] RX payload type=Success msgType=60207',
+      {
+        message: 'accepted',
+      }
+    );
+  });
+
+  test('session suppresses payload logs for file transfer calls', async () => {
+    const response = ProtocolV2.encodeFrame(schemas, 'Success', {
+      message: 'ok',
+    });
+    const logger = {
+      debug: jest.fn(),
+    };
+    const session = new ProtocolV2Session({
+      schemas,
+      router: 1,
+      writeFrame: () => Promise.resolve(),
+      readFrame: () => Promise.resolve(response),
+      logger,
+    });
+
+    await expect(session.call('FileWrite', {})).resolves.toEqual({
+      type: 'Success',
+      message: {
+        message: 'ok',
+      },
+    });
+
+    expect(logger.debug.mock.calls.some(([message]) => String(message).includes('payload'))).toBe(
+      false
+    );
   });
 
   test('session skips unrelated terminal frames when expected response types are provided', async () => {

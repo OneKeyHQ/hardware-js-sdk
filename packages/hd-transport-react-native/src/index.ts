@@ -55,7 +55,10 @@ const HIGH_VOLUME_WRITE_BURST_SIZE = Platform.OS === 'ios' ? 4 : 6;
 const HIGH_VOLUME_WRITE_PAUSE_MS = Platform.OS === 'ios' ? 6 : 2;
 const HIGH_VOLUME_WRITE_FLUSH_DELAY_MS = Platform.OS === 'ios' ? 20 : 8;
 
-const delay = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+const delay = (ms: number) =>
+  new Promise<void>(resolve => {
+    setTimeout(resolve, ms);
+  });
 
 export type ProtocolV2BleTuning = {
   iosPacketLength?: number;
@@ -609,7 +612,9 @@ export default class ReactNativeBleTransport {
     this.protocolV2Assemblers.set(uuid, new ProtocolV2FrameAssembler());
 
     if (Platform.OS === 'ios') {
-      await new Promise<void>(resolve => setTimeout(resolve, IOS_NOTIFY_READY_DELAY_MS));
+      await new Promise<void>(resolve => {
+        setTimeout(resolve, IOS_NOTIFY_READY_DELAY_MS);
+      });
     }
 
     const protocolType = await this.detectProtocol(uuid, expectedProtocol);
@@ -1147,7 +1152,8 @@ export default class ReactNativeBleTransport {
     this.deviceProtocol.set(uuid, 'V2');
     this.protocolV2Assemblers.get(uuid)?.reset();
     return probeProtocolV2Helper({
-      call: (name, data, options) => this.callProtocolV2(uuid, name, data, options),
+      call: (name: string, data: Record<string, unknown>, options?: TransportCallOptions) =>
+        this.callProtocolV2(uuid, name, data, options),
       timeoutMs: PROTOCOL_V2_PROBE_TIMEOUT_MS,
       logger: Log,
       logPrefix: 'ProtocolV2 RN-BLE',
@@ -1232,8 +1238,7 @@ export default class ReactNativeBleTransport {
     const packetCapacity =
       Platform.OS === 'ios' ? tuning.iosPacketLength : tuning.androidPacketLength;
     const writeWithResponse =
-      !!options?.writeWithResponse ||
-      (!!options?.highVolume && tuning.highVolumeWriteWithResponse);
+      !!options?.writeWithResponse || (!!options?.highVolume && tuning.highVolumeWriteWithResponse);
     const shouldThrottle = !!options?.highVolume && !writeWithResponse;
     let packetsWritten = 0;
 

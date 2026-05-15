@@ -355,9 +355,11 @@ const getPlatformFlushDelayMs = (profile: SpeedTestProfile) =>
   (Platform.OS === 'ios' ? DEFAULT_IOS_FLUSH_DELAY_MS : DEFAULT_ANDROID_FLUSH_DELAY_MS);
 
 const getProfileMeta = (profile: SpeedTestProfile) =>
-  `chunk ${profile.chunkSize}B · packet ${getPlatformPacketLength(profile)}B · burst ${getPlatformBurstSize(
+  `chunk ${profile.chunkSize}B · packet ${getPlatformPacketLength(
     profile
-  )} · pause ${getPlatformPauseMs(profile)}ms · flush ${getPlatformFlushDelayMs(profile)}ms${
+  )}B · burst ${getPlatformBurstSize(profile)} · pause ${getPlatformPauseMs(
+    profile
+  )}ms · flush ${getPlatformFlushDelayMs(profile)}ms${
     profile.tuning.highVolumeWriteWithResponse ? ' · withResponse' : ''
   }`;
 
@@ -459,8 +461,9 @@ export const BleDemoScreen = () => {
   const [firmwareProgress, setFirmwareProgress] = useState<FirmwareProgressState | null>(null);
   const [firmwareResult, setFirmwareResult] = useState<FirmwareResultState | null>(null);
   const [firmwareTimings, setFirmwareTimings] = useState<FirmwareTiming[]>([]);
-  const [firmwareTimingSummary, setFirmwareTimingSummary] =
-    useState<FirmwareTimingSummary | null>(null);
+  const [firmwareTimingSummary, setFirmwareTimingSummary] = useState<FirmwareTimingSummary | null>(
+    null
+  );
   const [selectedSpeedProfileKey, setSelectedSpeedProfileKey] = useState('default-1800');
   const [speedTestResults, setSpeedTestResults] = useState<SpeedTestResult[]>([]);
   const [logs, setLogs] = useState<LogLine[]>([]);
@@ -514,7 +517,9 @@ export const BleDemoScreen = () => {
       const state = firmwareStageRef.current;
       const stageKey = key ?? state.activeKey;
       if (!stageKey) return;
-      const active = [...state.timings].reverse().find(item => item.key === stageKey && !item.endAt);
+      const active = [...state.timings]
+        .reverse()
+        .find(item => item.key === stageKey && !item.endAt);
       if (active) {
         active.endAt = nowMs;
         active.durationMs = active.endAt - active.startAt;
@@ -698,11 +703,15 @@ export const BleDemoScreen = () => {
       sdkRef.current.on(LOG_EVENT, (evt: any) => {
         const nowMs = Date.now();
         const message = summarizeSdkLogPayload(evt?.payload);
-        if (/FileWrite|FilesystemFileWrite|EmmcFileWrite/i.test(message)) {
+        if (
+          /FileRead|FileWrite|FilesystemFileRead|FilesystemFileWrite|EmmcFileRead|EmmcFileWrite/i.test(
+            message
+          )
+        ) {
           return;
         }
         const isImportantLog =
-          /scan candidate|search device|Initializing transports|set transport|searchDevices|DevGet|FirmwareUpdate|Ping|ProtoVersion/i.test(
+          /scan candidate|search device|Initializing transports|set transport|searchDevices|ProtocolV2|TX payload|RX payload|DevGet|FirmwareUpdate|Ping|ProtoVersion/i.test(
             message
           );
         if (!isImportantLog && nowMs - lastSdkLogAtRef.current < 1000) return;
@@ -1008,107 +1017,112 @@ export const BleDemoScreen = () => {
     });
   }, []);
 
-  const runBleFirmwareUpdate = useCallback(async (profile: SpeedTestProfile, batch = false) => {
-    if (!sdkRef.current || !selected?.connectId) {
-      Alert.alert('Tip', 'Please select a Pro2 device first');
-      return createSpeedTestResult(profile, 'failed', { error: 'No selected Pro2 device' });
-    }
+  const runBleFirmwareUpdate = useCallback(
+    async (profile: SpeedTestProfile, batch = false) => {
+      if (!sdkRef.current || !selected?.connectId) {
+        Alert.alert('Tip', 'Please select a Pro2 device first');
+        return createSpeedTestResult(profile, 'failed', { error: 'No selected Pro2 device' });
+      }
 
-    const runStartedAt = Date.now();
-    try {
-      if (!batch) setBusy(`ble-firmware:${profile.key}`);
-      upsertSpeedTestResult(createSpeedTestResult(profile, 'running'));
-      configureProtocolV2BleTuning(profile.tuning);
-      firmwareProgressRef.current = null;
-      firmwareStageRef.current = { totalStartAt: Date.now(), timings: [] };
-      setFirmwareTimings([]);
-      setFirmwareTimingSummary(null);
-      setFirmwareProgress({ progress: 0, progressType: 'prepare' });
-      setFirmwareResult(null);
-      setFirmwareStatus(`Loading ${PRO2_BLE_FIRMWARE_FILE_NAME} (${profile.label})`);
-      appendLog('info', {
-        speedProfile: profile.label,
-        tuning: getProfileMeta(profile),
-        note: profile.note,
-      });
+      const runStartedAt = Date.now();
+      try {
+        if (!batch) setBusy(`ble-firmware:${profile.key}`);
+        upsertSpeedTestResult(createSpeedTestResult(profile, 'running'));
+        configureProtocolV2BleTuning(profile.tuning);
+        firmwareProgressRef.current = null;
+        firmwareStageRef.current = { totalStartAt: Date.now(), timings: [] };
+        setFirmwareTimings([]);
+        setFirmwareTimingSummary(null);
+        setFirmwareProgress({ progress: 0, progressType: 'prepare' });
+        setFirmwareResult(null);
+        setFirmwareStatus(`Loading ${PRO2_BLE_FIRMWARE_FILE_NAME} (${profile.label})`);
+        appendLog('info', {
+          speedProfile: profile.label,
+          tuning: getProfileMeta(profile),
+          note: profile.note,
+        });
 
-      startFirmwareStage('loadAsset', 'Load bundled asset');
-      const bleBinary = await loadBundledBleFirmware();
-      finishFirmwareStage('loadAsset');
-      appendLog('info', {
-        bleBinary: PRO2_BLE_FIRMWARE_FILE_NAME,
-        size: formatBytes(bleBinary.byteLength),
-        chunkSize: profile.chunkSize,
-      });
+        startFirmwareStage('loadAsset', 'Load bundled asset');
+        const bleBinary = await loadBundledBleFirmware();
+        finishFirmwareStage('loadAsset');
+        appendLog('info', {
+          bleBinary: PRO2_BLE_FIRMWARE_FILE_NAME,
+          size: formatBytes(bleBinary.byteLength),
+          chunkSize: profile.chunkSize,
+        });
 
-      setFirmwareStatus(`Running firmwareUpdateV4 (${profile.label})`);
-      const res = await (sdkRef.current as any).firmwareUpdateV4(selected.connectId, {
-        ...PROTOCOL_V2_PARAMS,
-        platform: 'native',
-        forcedUpdateRes: false,
-        bleBinary,
-        chunkSize: profile.chunkSize,
-      });
-      appendLog('info', { firmwareUpdateV4: res });
+        setFirmwareStatus(`Running firmwareUpdateV4 (${profile.label})`);
+        const res = await (sdkRef.current as any).firmwareUpdateV4(selected.connectId, {
+          ...PROTOCOL_V2_PARAMS,
+          platform: 'native',
+          forcedUpdateRes: false,
+          bleBinary,
+          chunkSize: profile.chunkSize,
+        });
+        appendLog('info', { firmwareUpdateV4: res });
 
-      const transferStage = firmwareStageRef.current.timings.find(item => item.key === 'transfer');
-      const progressSnapshot = firmwareProgressRef.current;
+        const transferStage = firmwareStageRef.current.timings.find(
+          item => item.key === 'transfer'
+        );
+        const progressSnapshot = firmwareProgressRef.current;
 
-      if (!res?.success) {
-        setFirmwareStatus('BLE firmware update failed');
-        finishFirmwareTimingSummary('failed');
-        const failedResult = createSpeedTestResult(profile, 'failed', {
+        if (!res?.success) {
+          setFirmwareStatus('BLE firmware update failed');
+          finishFirmwareTimingSummary('failed');
+          const failedResult = createSpeedTestResult(profile, 'failed', {
+            totalDurationMs: Date.now() - runStartedAt,
+            transferDurationMs: transferStage?.durationMs,
+            rateBytesPerSecond: progressSnapshot?.rateBytesPerSecond,
+            transferredBytes: progressSnapshot?.transferredBytes,
+            error: res?.payload?.error || 'unknown',
+          });
+          upsertSpeedTestResult(failedResult);
+          appendLog('error', `BLE firmware update failed: ${failedResult.error}`);
+          return failedResult;
+        }
+
+        const versions = (res.payload || {}) as FirmwareResultState;
+        setFirmwareResult(versions);
+        setFirmwareProgress(prev => ({ ...(prev || {}), progress: 100 }));
+        setFirmwareStatus('Normal mode ready');
+        finishFirmwareTimingSummary('success');
+        const successResult = createSpeedTestResult(profile, 'success', {
           totalDurationMs: Date.now() - runStartedAt,
           transferDurationMs: transferStage?.durationMs,
           rateBytesPerSecond: progressSnapshot?.rateBytesPerSecond,
           transferredBytes: progressSnapshot?.transferredBytes,
-          error: res?.payload?.error || 'unknown',
+        });
+        upsertSpeedTestResult(successResult);
+        return successResult;
+      } catch (e: any) {
+        setFirmwareStatus('BLE firmware update error');
+        appendLog('error', `firmwareUpdateV4 error: ${e?.message || e}`);
+        finishFirmwareTimingSummary('failed');
+        const failedResult = createSpeedTestResult(profile, 'failed', {
+          totalDurationMs: Date.now() - runStartedAt,
+          rateBytesPerSecond: firmwareProgressRef.current?.rateBytesPerSecond,
+          transferredBytes: firmwareProgressRef.current?.transferredBytes,
+          error: e?.message || String(e),
         });
         upsertSpeedTestResult(failedResult);
-        appendLog('error', `BLE firmware update failed: ${failedResult.error}`);
         return failedResult;
+      } finally {
+        if (!batch) {
+          resetProtocolV2BleTuning();
+          setBusy(null);
+        }
       }
-
-      const versions = (res.payload || {}) as FirmwareResultState;
-      setFirmwareResult(versions);
-      setFirmwareProgress(prev => ({ ...(prev || {}), progress: 100 }));
-      setFirmwareStatus('Normal mode ready');
-      finishFirmwareTimingSummary('success');
-      const successResult = createSpeedTestResult(profile, 'success', {
-        totalDurationMs: Date.now() - runStartedAt,
-        transferDurationMs: transferStage?.durationMs,
-        rateBytesPerSecond: progressSnapshot?.rateBytesPerSecond,
-        transferredBytes: progressSnapshot?.transferredBytes,
-      });
-      upsertSpeedTestResult(successResult);
-      return successResult;
-    } catch (e: any) {
-      setFirmwareStatus('BLE firmware update error');
-      appendLog('error', `firmwareUpdateV4 error: ${e?.message || e}`);
-      finishFirmwareTimingSummary('failed');
-      const failedResult = createSpeedTestResult(profile, 'failed', {
-        totalDurationMs: Date.now() - runStartedAt,
-        rateBytesPerSecond: firmwareProgressRef.current?.rateBytesPerSecond,
-        transferredBytes: firmwareProgressRef.current?.transferredBytes,
-        error: e?.message || String(e),
-      });
-      upsertSpeedTestResult(failedResult);
-      return failedResult;
-    } finally {
-      if (!batch) {
-        resetProtocolV2BleTuning();
-        setBusy(null);
-      }
-    }
-  }, [
-    appendLog,
-    finishFirmwareStage,
-    finishFirmwareTimingSummary,
-    loadBundledBleFirmware,
-    selected?.connectId,
-    startFirmwareStage,
-    upsertSpeedTestResult,
-  ]);
+    },
+    [
+      appendLog,
+      finishFirmwareStage,
+      finishFirmwareTimingSummary,
+      loadBundledBleFirmware,
+      selected?.connectId,
+      startFirmwareStage,
+      upsertSpeedTestResult,
+    ]
+  );
 
   const onBleFirmwareUpdate = useCallback(() => {
     void runBleFirmwareUpdate(selectedSpeedProfile);
@@ -1220,12 +1234,9 @@ export const BleDemoScreen = () => {
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Pro2 BLE Firmware Update</Text>
           <Text style={styles.hint}>
-            Bundled file: {PRO2_BLE_FIRMWARE_FILE_NAME} (
-            {formatBytes(PRO2_BLE_FIRMWARE_FILE_SIZE)})
+            Bundled file: {PRO2_BLE_FIRMWARE_FILE_NAME} ({formatBytes(PRO2_BLE_FIRMWARE_FILE_SIZE)})
           </Text>
-          <Text style={styles.hint}>
-            Target: TARGET_BT (2) · {PRO2_FIRMWARE_STAGING_PATH}
-          </Text>
+          <Text style={styles.hint}>Target: TARGET_BT (2) · {PRO2_FIRMWARE_STAGING_PATH}</Text>
           <Text style={styles.methodGroupTitle}>Speed Profiles</Text>
           <View style={styles.profileGrid}>
             {SPEED_TEST_PROFILES.map(profile => {
@@ -1290,9 +1301,7 @@ export const BleDemoScreen = () => {
                 Bootloader: {firmwareResult.bootloaderVersion || '-'}
               </Text>
               <Text style={styles.metaText}>BLE: {firmwareResult.bleVersion || '-'}</Text>
-              <Text style={styles.metaText}>
-                Firmware: {firmwareResult.firmwareVersion || '-'}
-              </Text>
+              <Text style={styles.metaText}>Firmware: {firmwareResult.firmwareVersion || '-'}</Text>
             </View>
           ) : null}
           {firmwareTimings.length || firmwareTimingSummary ? (
@@ -1313,8 +1322,8 @@ export const BleDemoScreen = () => {
               <Text style={styles.metaText}>Speed Matrix:</Text>
               {speedTestResults.map(item => (
                 <Text key={item.key} style={styles.metaText}>
-                  {item.label}: {item.status} · chunk {item.chunkSize}B · packet{' '}
-                  {item.packetLength}B · burst {item.burstSize} · pause {item.pauseMs}ms ·{' '}
+                  {item.label}: {item.status} · chunk {item.chunkSize}B · packet {item.packetLength}
+                  B · burst {item.burstSize} · pause {item.pauseMs}ms ·{' '}
                   {formatBytes(item.rateBytesPerSecond)}/s · transfer{' '}
                   {formatDuration(item.transferDurationMs)} · total{' '}
                   {formatDuration(item.totalDurationMs)}

@@ -272,7 +272,8 @@ export default class LowlevelTransport {
     this.deviceProtocol.set(uuid, 'V2');
     this.protocolV2Assemblers.get(uuid)?.reset();
     return probeProtocolV2Helper({
-      call: (name, data, options) => this.callProtocolV2(uuid, name, data, options),
+      call: (name: string, data: Record<string, unknown>, options?: TransportCallOptions) =>
+        this.callProtocolV2(uuid, name, data, options),
       timeoutMs: PROTOCOL_V2_PROBE_TIMEOUT_MS,
       logger: this.Log,
       logPrefix: 'ProtocolV2 Lowlevel-BLE',

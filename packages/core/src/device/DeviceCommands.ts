@@ -42,8 +42,11 @@ const MAX_DEBUG_OBJECT_KEYS = 40;
 const MAX_DEBUG_STRING_LENGTH = 512;
 const MAX_DEBUG_DEPTH = 4;
 const HIGH_VOLUME_DEBUG_CALLS = new Set([
+  'FilesystemFileRead',
   'FilesystemFileWrite',
+  'FileRead',
   'FileWrite',
+  'EmmcFileRead',
   'EmmcFileWrite',
   'FirmwareUpload',
   'ResourceAck',
@@ -424,8 +427,11 @@ export class DeviceCommands {
         'PassphraseAck',
         'Cancel',
         'BixinPinInputOnDevice',
+        'FilesystemFileRead',
         'FilesystemFileWrite',
+        'FileRead',
         'FileWrite',
+        'EmmcFileRead',
         'EmmcFileWrite',
         'FirmwareUpload',
         'ResourceAck',
