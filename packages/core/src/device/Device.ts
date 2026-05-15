@@ -543,6 +543,11 @@ export class Device extends EventEmitter {
   async initialize(options?: InitOptions) {
     // Protocol V2 不支持传统 Initialize，直接使用协议专用初始化流程。
     if (this.originalDescriptor.protocolType === 'V2') {
+      this.passphraseState = options?.passphraseState;
+      if (this.features && !this.featuresNeedsReload && !options?.initSession) {
+        Log.debug('Skip Protocol V2 feature adapter; cached features are available');
+        return;
+      }
       await this._initializeProtocolV2();
       return;
     }
