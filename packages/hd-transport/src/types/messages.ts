@@ -4232,7 +4232,7 @@ export type TonSignData = {
   payload: string;
   schema?: string;
   appdomain: string;
-  timestamp: UintType;
+  timestamp: number;
   from_address?: string;
   wallet_version?: TonWalletVersion;
   wallet_id?: number;
@@ -4393,6 +4393,132 @@ export enum CommandFlags {
   Factory_Only = 1,
 }
 
+// experimental_message
+export type experimental_message = {};
+
+// experimental_field
+export type experimental_field = {};
+
+export type TextMemo = {
+  text: string;
+};
+
+export type RefundMemo = {
+  address: string;
+  mac: string;
+};
+
+export type CoinPurchaseMemo = {
+  coin_type: number;
+  amount: UintType;
+  address: string;
+  mac: string;
+};
+
+export type PaymentRequestMemo = {
+  text_memo?: TextMemo;
+  refund_memo?: RefundMemo;
+  coin_purchase_memo?: CoinPurchaseMemo;
+};
+
+// TxAckPaymentRequest
+export type TxAckPaymentRequest = {
+  nonce?: string;
+  recipient_name: string;
+  memos?: PaymentRequestMemo[];
+  amount?: UintType;
+  signature: string;
+};
+
+// SetBusy
+export type SetBusy = {
+  expiry_ms?: number;
+};
+
+// GetFirmwareHash
+export type GetFirmwareHash = {
+  challenge?: string;
+};
+
+// FirmwareHash
+export type FirmwareHash = {
+  hash: string;
+};
+
+// GetNonce
+export type GetNonce = {};
+
+// Nonce
+export type Nonce = {
+  nonce: string;
+};
+
+// WriteSEPrivateKey
+export type WriteSEPrivateKey = {
+  private_key: string;
+};
+
+// UnlockPath
+export type UnlockPath = {
+  address_n: number[];
+  mac?: string;
+};
+
+// UnlockedPathRequest
+export type UnlockedPathRequest = {
+  mac?: string;
+};
+
+export enum MoneroNetworkType {
+  MAINNET = 0,
+  TESTNET = 1,
+  STAGENET = 2,
+  FAKECHAIN = 3,
+}
+
+// TxDetailsAmount
+export type TxDetailsAmount = {
+  num: string;
+  decimals: number;
+  symbol: string;
+};
+
+// TxDetailsAddress
+export type TxDetailsAddress = {
+  key: number;
+  address: string;
+  owner?: string;
+  icon?: string;
+};
+
+// TxDetailsNetwork
+export type TxDetailsNetwork = {
+  coin_type: number;
+  chain_id?: number;
+};
+
+// TxDetailsGeneral
+export type TxDetailsGeneral = {
+  key: number;
+  value: string;
+  is_overview: boolean;
+};
+
+export enum TxDetailsDisplayType {
+  DISPLAY_TYPE_INFO = 0,
+  DISPLAY_TYPE_SIGN = 1,
+}
+
+// TxDetailsPage
+export type TxDetailsPage = {
+  title: string;
+  display_type: TxDetailsDisplayType;
+  amount?: UintType;
+  network?: TxDetailsNetwork;
+  address: TxDetailsAddress[];
+  general: TxDetailsGeneral[];
+};
+
 // GetProtoVersion
 export type GetProtoVersion = {};
 
@@ -4517,16 +4643,6 @@ export type ProtocolV2DeviceInfo = {
   se3?: DevSEInfo;
   se4?: DevSEInfo;
   status?: DevStatus;
-};
-
-// DevGetOnboardingStatus
-export type DevGetOnboardingStatus = {};
-
-// DevOnboardingStatus
-export type DevOnboardingStatus = {
-  page_index?: number;
-  page_count?: number;
-  page_name?: string;
 };
 
 export enum DevFirmwareTargetType {
@@ -4672,6 +4788,16 @@ export type FilesystemDirRemove = {
 
 // FilesystemFormat
 export type FilesystemFormat = {};
+
+// DevGetOnboardingStatus
+export type DevGetOnboardingStatus = {};
+
+// DevOnboardingStatus
+export type DevOnboardingStatus = {
+  page_index?: number;
+  page_count?: number;
+  page_name?: string;
+};
 
 // custom connect definitions
 export type MessageType = {
@@ -5229,6 +5355,26 @@ export type MessageType = {
   TronSignMessage: TronSignMessage;
   TronMessageSignature: TronMessageSignature;
   facotry: facotry;
+  experimental_message: experimental_message;
+  experimental_field: experimental_field;
+  TextMemo: TextMemo;
+  RefundMemo: RefundMemo;
+  CoinPurchaseMemo: CoinPurchaseMemo;
+  PaymentRequestMemo: PaymentRequestMemo;
+  TxAckPaymentRequest: TxAckPaymentRequest;
+  SetBusy: SetBusy;
+  GetFirmwareHash: GetFirmwareHash;
+  FirmwareHash: FirmwareHash;
+  GetNonce: GetNonce;
+  Nonce: Nonce;
+  WriteSEPrivateKey: WriteSEPrivateKey;
+  UnlockPath: UnlockPath;
+  UnlockedPathRequest: UnlockedPathRequest;
+  TxDetailsAmount: TxDetailsAmount;
+  TxDetailsAddress: TxDetailsAddress;
+  TxDetailsNetwork: TxDetailsNetwork;
+  TxDetailsGeneral: TxDetailsGeneral;
+  TxDetailsPage: TxDetailsPage;
   GetProtoVersion: GetProtoVersion;
   ProtoVersion: ProtoVersion;
   DevReboot: DevReboot;
@@ -5241,8 +5387,6 @@ export type MessageType = {
   DevInfoTypes: DevInfoTypes;
   DevStatus: DevStatus;
   DevGetDeviceInfo: DevGetDeviceInfo;
-  DevGetOnboardingStatus: DevGetOnboardingStatus;
-  DevOnboardingStatus: DevOnboardingStatus;
   DevFirmwareTarget: DevFirmwareTarget;
   DevFirmwareUpdate: DevFirmwareUpdate;
   DevFirmwareInstallProgress: DevFirmwareInstallProgress;
@@ -5264,6 +5408,8 @@ export type MessageType = {
   FilesystemDirMake: FilesystemDirMake;
   FilesystemDirRemove: FilesystemDirRemove;
   FilesystemFormat: FilesystemFormat;
+  DevGetOnboardingStatus: DevGetOnboardingStatus;
+  DevOnboardingStatus: DevOnboardingStatus;
 };
 
 export type MessageKey = keyof MessageType;
