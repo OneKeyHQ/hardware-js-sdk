@@ -179,8 +179,8 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
           <div
             className={
               compact
-                ? 'flex-1 w-full flex items-center justify-center min-h-[96px] mb-3'
-                : 'flex-1 w-full flex items-center justify-center min-h-0 mb-6'
+                ? 'order-2 flex-1 w-full flex items-center justify-center min-h-[96px] mb-3'
+                : 'order-2 flex-1 w-full flex items-center justify-center min-h-0 mb-6'
             }
           >
             {status === 'success' ? (
@@ -267,7 +267,7 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
 
           {/* 固件更新进度显示 */}
           {firmwareProgress && progressConfig && (
-            <div className="w-full mb-4 p-3 bg-muted/30 rounded-lg border border-border/50">
+            <div className="order-3 w-full mb-4 p-3 bg-muted/30 rounded-lg border border-border/50">
               <div className="flex items-center gap-2 mb-2">
                 <div className={progressConfig.color}>{progressConfig.icon}</div>
                 <span className="text-sm font-medium text-foreground">{progressConfig.title}</span>
@@ -281,7 +281,7 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
           )}
 
           {status === 'success' && firmwareVersionRows.length > 0 && (
-            <div className="w-full mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+            <div className="order-4 w-full mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
               <div className="flex items-center gap-2 mb-2">
                 <CheckCircle className="h-4 w-4 text-green-600" />
                 <span className="text-sm font-medium text-green-800">
@@ -300,7 +300,11 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
           )}
 
           {/* 执行控制按钮 - 并排布局，恢复文字 */}
-          <div className={`w-full grid grid-cols-2 ${compact ? 'gap-3' : 'gap-4'} flex-shrink-0`}>
+          <div
+            className={`w-full grid grid-cols-2 ${
+              compact ? 'order-1 mb-3 gap-3' : 'order-5 gap-4'
+            } flex-shrink-0`}
+          >
             <Button
               onClick={onExecute}
               disabled={status === 'loading' || status === 'device-interaction'}

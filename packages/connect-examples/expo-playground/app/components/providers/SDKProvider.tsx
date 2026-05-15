@@ -29,6 +29,8 @@ interface SDKProviderProps {
 
 const SDK_DEBUG_LOG_PATTERN =
   /(ProtocolV2|WebUsbTransport|hd-transport-webusb|DeviceCommands|call-)/;
+const SDK_PROTOCOL_V2_RAW_LOG_PATTERN =
+  /\[ProtocolV2[^\]]*\]\s+(TX frame|RX frame|TX name=.*\|\s*RX seq=|RX payload type=|TX payload name=)/;
 const SDK_DEBUG_LOG_FLUSH_INTERVAL_MS = 300;
 const SDK_DEBUG_LOG_MAX_QUEUE_LENGTH = 200;
 const SDK_DEBUG_LOG_MAX_BATCH_LENGTH = 60;
@@ -46,6 +48,13 @@ function stringifySdkLogItem(item: unknown): string {
 function truncateSdkDebugText(text: string): string {
   if (text.length <= SDK_DEBUG_LOG_MAX_TEXT_LENGTH) return text;
   return `${text.slice(0, SDK_DEBUG_LOG_MAX_TEXT_LENGTH)}...`;
+}
+
+function getProtocolV2RawLogLines(text: string): string[] {
+  return text
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => SDK_PROTOCOL_V2_RAW_LOG_PATTERN.test(line));
 }
 
 // 固件进度状态管理
@@ -186,6 +195,17 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
         if (!text || !SDK_DEBUG_LOG_PATTERN.test(text)) {
           return;
         }
+
+        getProtocolV2RawLogLines(text).forEach(line => {
+          logHardware(
+            'Protocol V2 raw transport',
+            { line },
+            {
+              console: false,
+              persist: false,
+            }
+          );
+        });
 
         sdkDebugLogQueueRef.current.push(truncateSdkDebugText(text));
         if (sdkDebugLogQueueRef.current.length > SDK_DEBUG_LOG_MAX_QUEUE_LENGTH) {
