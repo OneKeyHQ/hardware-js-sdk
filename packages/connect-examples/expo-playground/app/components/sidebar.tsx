@@ -80,6 +80,11 @@ const navigationItems = [
     url: '/pro2-onboarding',
     icon: ListChecks,
   },
+  {
+    title: 'common.methodBatchTest',
+    url: '/method-batch-test',
+    icon: ListChecks,
+  },
 ];
 
 export function AppSidebar() {

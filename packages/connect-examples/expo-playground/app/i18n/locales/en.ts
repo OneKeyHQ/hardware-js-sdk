@@ -31,6 +31,7 @@ export const en = {
       proDebug: 'Pro Debug',
       pro2Debug: 'Pro2 Debug',
       pro2Onboarding: 'Pro2 Onboarding',
+      methodBatchTest: 'Chain Method Batch Test',
       navigation: 'Navigation',
       current: 'Current',
       toggleTheme: 'Toggle Theme',
