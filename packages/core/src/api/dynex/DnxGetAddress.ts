@@ -1,7 +1,10 @@
+import { createDeviceNotSupportMethodError } from '@onekeyfe/hd-shared';
+
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
+import { getFirmwareType } from '../../utils';
 
 import type { DnxGetAddress as HardwareDnxGetAddress } from '@onekeyfe/hd-transport';
 import type { DnxAddress, DnxGetAddressParams } from '../../types';
@@ -47,6 +50,10 @@ export default class DnxGetAddress extends BaseMethod<HardwareDnxGetAddress[]> {
   }
 
   async run() {
+    if (this.device.originalDescriptor?.protocolType === 'V2') {
+      throw createDeviceNotSupportMethodError(this.name, getFirmwareType(this.device.features));
+    }
+
     const responses: DnxAddress[] = [];
 
     for (let i = 0; i < this.params.length; i++) {

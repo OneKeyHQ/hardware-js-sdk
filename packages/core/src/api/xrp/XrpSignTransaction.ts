@@ -29,7 +29,7 @@ export default class XrpGetAddress extends BaseMethod<XrpSignTransactionParams> 
       { name: 'payment', type: 'object' },
     ]);
     validateParams(transaction.payment, [
-      { name: 'amount', type: 'number', required: true },
+      { name: 'amount', type: 'uint', required: true },
       { name: 'destination', type: 'string', required: true },
       { name: 'destinationTag', type: 'number' },
     ]);

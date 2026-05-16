@@ -36,6 +36,7 @@ import DeviceMethodExecutePage from './routes/device-methods.$methodName';
 import ProDebugPage from './routes/pro-debug';
 import Pro2DebugPage from './routes/pro2-debug';
 import Pro2OnboardingPage from './routes/pro2-onboarding';
+import MethodBatchTestPage from './routes/method-batch-test';
 
 // Import styles
 import './tailwind.css';
@@ -156,6 +157,10 @@ const router = createHashRouter(
         {
           path: 'pro2-onboarding',
           element: <Pro2OnboardingPage />,
+        },
+        {
+          path: 'method-batch-test',
+          element: <MethodBatchTestPage />,
         },
       ],
     },

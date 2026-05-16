@@ -1,6 +1,10 @@
 import JSZip from 'jszip';
+import { HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { DevRebootType } from '@onekeyfe/hd-transport';
 
+import ConfluxSignTransaction from '../src/api/conflux/ConfluxSignTransaction';
+import DnxGetAddress from '../src/api/dynex/DnxGetAddress';
+import DnxSignTransaction from '../src/api/dynex/DnxSignTransaction';
 import FileRead from '../src/api/FileRead';
 import FileWrite from '../src/api/FileWrite';
 import DevFirmwareUpdate from '../src/api/protocol-v2/DevFirmwareUpdate';
@@ -8,7 +12,10 @@ import DevGetOnboardingStatus from '../src/api/protocol-v2/DevGetOnboardingStatu
 import FirmwareUpdateV3 from '../src/api/FirmwareUpdateV3';
 import FirmwareUpdateV4 from '../src/api/FirmwareUpdateV4';
 import GetOnekeyFeatures from '../src/api/GetOnekeyFeatures';
+import { batchGetPublickeys } from '../src/api/helpers/batchGetPublickeys';
 import KaspaGetAddress from '../src/api/kaspa/KaspaGetAddress';
+import TronSignMessage from '../src/api/tron/TronSignMessage';
+import XrpSignTransaction from '../src/api/xrp/XrpSignTransaction';
 import { DataManager } from '../src/data-manager';
 import { Device } from '../src/device/Device';
 import { UI_REQUEST } from '../src/events/ui-request';
@@ -182,6 +189,35 @@ describe('Protocol V2 feature adapter', () => {
     expect(typedCall).toHaveBeenCalledWith('KaspaGetAddress', 'KaspaAddress', expect.any(Object));
   });
 
+  test('does not block legacy batch public key support checks on Protocol V2', async () => {
+    const paths = [{ address_n: [0x8000002c, 0x80000000, 0x80000000] }] as any;
+    const typedCall = jest.fn().mockResolvedValue({
+      type: 'EcdsaPublicKeys',
+      message: {
+        root_fingerprint: 123,
+        public_keys: [],
+        hd_nodes: [{}],
+      },
+    });
+    const device = {
+      originalDescriptor: { protocolType: 'V2' },
+      features: normalizeProtocolV2Features({ ...descriptor, protocolType: 'V2' } as any),
+      commands: { typedCall },
+    };
+
+    await expect(
+      batchGetPublickeys(device as any, paths, 'secp256k1', 0, { includeNode: true })
+    ).resolves.toMatchObject({
+      root_fingerprint: 123,
+      hd_nodes: [{}],
+    });
+    expect(typedCall).toHaveBeenCalledWith('BatchGetPublickeys', 'EcdsaPublicKeys', {
+      paths,
+      ecdsa_curve_name: 'secp256k1',
+      include_node: true,
+    });
+  });
+
   test('returns Protocol V2 oneKey fields without calling legacy OnekeyGetFeatures', async () => {
     const method = new GetOnekeyFeatures({
       id: 1,
@@ -242,6 +278,127 @@ describe('Protocol V2 feature adapter', () => {
         timeoutMs: 10000,
       }
     );
+  });
+});
+
+describe('API compatibility handling', () => {
+  test('returns a typed unsupported error for Tron sign message V1 before device binding', () => {
+    const method = new TronSignMessage({
+      id: 1,
+      payload: {
+        method: 'tronSignMessage',
+        path: "m/44'/195'/0'/0/0",
+        messageHex: '0x1234',
+        messageType: 'V1',
+      },
+    });
+
+    expect(() => method.init()).toThrow(
+      expect.objectContaining({
+        errorCode: HardwareErrorCode.DeviceNotSupportMethod,
+      })
+    );
+  });
+
+  test('accepts string XRP payment amount values', () => {
+    const method = new XrpSignTransaction({
+      id: 1,
+      payload: {
+        method: 'xrpSignTransaction',
+        path: "m/44'/144'/0'/0/0",
+        transaction: {
+          fee: '100000',
+          flags: 2147483648,
+          sequence: 25,
+          maxLedgerVersion: 8820051,
+          payment: {
+            amount: '100000000',
+            destination: 'rBKz5MC2iXdoS3XgnNSYmF69K1Yo4NS3Ws',
+          },
+        },
+      },
+    });
+
+    expect(() => method.init()).not.toThrow();
+    expect(method.params.payment?.amount).toBe('100000000');
+  });
+
+  test('accepts Conflux base32 recipient addresses without hex formatting them', () => {
+    const to = 'cfx:aak2rra2njvd77ezwjvx04kkds9fzagfe6ku8scz91';
+    const method = new ConfluxSignTransaction({
+      id: 1,
+      payload: {
+        method: 'confluxSignTransaction',
+        path: "m/44'/503'/0'/0/0",
+        transaction: {
+          to,
+          value: '0x0',
+          data: '0x',
+          chainId: 1,
+          nonce: '0x00',
+          epochHeight: '0x00',
+          gasLimit: '0x5208',
+          storageLimit: '0x5208',
+          gasPrice: '0xbebc200',
+        },
+      },
+    });
+
+    expect(() => method.init()).not.toThrow();
+    expect(method.formattedTx?.to).toBe(to);
+  });
+
+  test('returns a typed unsupported error for Dynex signing on Protocol V2', async () => {
+    const method = new DnxSignTransaction({
+      id: 1,
+      payload: {
+        method: 'dnxSignTransaction',
+        path: "m/44'/29538'/0'/0/0",
+        inputs: [
+          {
+            prevIndex: 1,
+            globalIndex: 1,
+            txPubkey: '00',
+            prevOutPubkey: '00',
+            amount: '1',
+          },
+        ],
+        toAddress: 'dnx-address',
+        amount: '1',
+        fee: '1',
+      },
+    });
+
+    method.init();
+    (method as any).device = {
+      originalDescriptor: { protocolType: 'V2' },
+      features: normalizeProtocolV2Features({ ...descriptor, protocolType: 'V2' } as any),
+    };
+
+    await expect(method.run()).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.DeviceNotSupportMethod,
+    });
+  });
+
+  test('returns a typed unsupported error for Dynex address on Protocol V2', async () => {
+    const method = new DnxGetAddress({
+      id: 1,
+      payload: {
+        method: 'dnxGetAddress',
+        path: "m/44'/29538'/0'/0/0",
+        showOnOneKey: false,
+      },
+    });
+
+    method.init();
+    (method as any).device = {
+      originalDescriptor: { protocolType: 'V2' },
+      features: normalizeProtocolV2Features({ ...descriptor, protocolType: 'V2' } as any),
+    };
+
+    await expect(method.run()).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.DeviceNotSupportMethod,
+    });
   });
 });
 

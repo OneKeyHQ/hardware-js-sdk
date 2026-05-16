@@ -28,7 +28,7 @@ export default class TronSignMessage extends BaseMethod<HardwareTronSignMessage>
     if (this.payload.messageType === 'V1' || this.payload.messageType == null) {
       throw createDeviceNotSupportMethodError(
         'TronSignMessage',
-        getFirmwareType(this.device.features)
+        getFirmwareType(this.device?.features)
       );
     }
 
