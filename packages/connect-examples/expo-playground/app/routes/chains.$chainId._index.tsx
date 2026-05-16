@@ -23,6 +23,7 @@ import { ChainIcon } from '../components/icons/ChainIcon';
 import { processParameters } from '../utils/parameterUtils';
 import { cancelHardwareOperation } from '../services/hardwareService';
 import { logHardware } from '../utils/logger';
+import { formatJsonPreview } from '../utils/jsonPreview';
 import { ProtocolExecutionLog } from '../components/common/MethodExecutor';
 import type { MethodPreset, UnifiedMethodConfig } from '../data/types';
 
@@ -127,7 +128,8 @@ function summarizeInlineLogValue(value: unknown, depth = 0): unknown {
   }
 
   if (Array.isArray(value)) {
-    const items = value.length > INLINE_LOG_ARRAY_LIMIT ? value.slice(0, INLINE_LOG_ARRAY_LIMIT) : value;
+    const items =
+      value.length > INLINE_LOG_ARRAY_LIMIT ? value.slice(0, INLINE_LOG_ARRAY_LIMIT) : value;
     const summarized = items.map(item => summarizeInlineLogValue(item, depth + 1));
     return value.length > INLINE_LOG_ARRAY_LIMIT
       ? [...summarized, `... (${value.length - INLINE_LOG_ARRAY_LIMIT} more items)`]
@@ -253,18 +255,6 @@ function getPresetExecutionParams(preset?: MethodPreset) {
   );
 }
 
-function formatJsonPreview(value: unknown) {
-  if (value === undefined) {
-    return '';
-  }
-
-  try {
-    return typeof value === 'string' ? value : JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
-}
-
 const ChainMethodsIndexPage: React.FC = () => {
   const { chainId } = useParams();
   const navigate = useNavigate();
@@ -345,6 +335,26 @@ const ChainMethodsIndexPage: React.FC = () => {
   const activeRequestPayload = useMemo(
     () => getInlineExecutionParams(activePreset),
     [activePreset, getInlineExecutionParams]
+  );
+  const activeRequestPreview = useMemo(
+    () =>
+      formatJsonPreview(activeRequestPayload, {
+        maxDepth: 6,
+        maxArrayItems: 12,
+        maxStringLength: 512,
+      }),
+    [activeRequestPayload]
+  );
+  const inlineResponsePreview = useMemo(
+    () =>
+      inlineExecution.response !== undefined
+        ? formatJsonPreview(inlineExecution.response, {
+            maxDepth: 6,
+            maxArrayItems: 20,
+            maxStringLength: 512,
+          })
+        : '',
+    [inlineExecution.response]
   );
 
   const currentExecutionLogs = useMemo(() => {
@@ -631,7 +641,7 @@ const ChainMethodsIndexPage: React.FC = () => {
                                 Request payload
                               </div>
                               <pre className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words p-4 font-mono text-xs leading-relaxed text-muted-foreground">
-                                {formatJsonPreview(activeRequestPayload)}
+                                {activeRequestPreview}
                               </pre>
                             </div>
 
@@ -699,7 +709,7 @@ const ChainMethodsIndexPage: React.FC = () => {
 
                                 {inlineExecution.response !== undefined && (
                                   <pre className="overflow-auto whitespace-pre-wrap break-words rounded-md border border-border/70 bg-muted/30 p-3 text-xs leading-relaxed text-foreground">
-                                    {formatJsonPreview(inlineExecution.response)}
+                                    {inlineResponsePreview}
                                   </pre>
                                 )}
                               </div>

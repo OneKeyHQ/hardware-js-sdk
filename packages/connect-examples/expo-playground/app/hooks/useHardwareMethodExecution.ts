@@ -177,13 +177,15 @@ export function useHardwareMethodExecution({
         throw new Error('方法配置未找到');
       }
 
-      if (requireDevice && !currentDevice) {
+      const needsConnectedDevice = requireDevice && !methodConfig.noConnIdReq;
+
+      if (needsConnectedDevice && !currentDevice) {
         throw new Error('设备未连接');
       }
 
       // 构建执行参数
       const executionParams =
-        requireDevice && currentDevice
+        needsConnectedDevice && currentDevice
           ? {
               connectId: currentDevice.connectId,
               // 只有在方法需要 deviceId 时才传递

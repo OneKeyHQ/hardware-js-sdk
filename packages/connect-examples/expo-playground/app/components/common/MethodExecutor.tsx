@@ -10,6 +10,7 @@ import { useDeviceStore } from '../../store/deviceStore';
 import { useHardwareStore } from '../../store/hardwareStore';
 import { separateParameters } from '../../utils/parameterUtils';
 import { methodSupportsCommonParameters } from '../../utils/constants';
+import { summarizeJsonValue } from '../../utils/jsonPreview';
 import type { UnifiedMethodConfig } from '~/data/types';
 import type { CommonParametersState } from '../../store/hardwareStore';
 // 导入子组件
@@ -141,29 +142,12 @@ function getUploadBytesFromRequestParameters(params: Record<string, unknown>): n
 }
 
 function summarizeLogValue(value: unknown, depth = 0, maxDepth = 5): unknown {
-  if (typeof value === 'bigint') return value.toString();
-  if (value === undefined || value === null || typeof value !== 'object') return value;
-
-  if (value instanceof ArrayBuffer) return `<${formatBytes(value.byteLength)}>`;
-  if (ArrayBuffer.isView(value)) return `<${formatBytes(value.byteLength)}>`;
-  if (typeof Blob !== 'undefined' && value instanceof Blob) {
-    const fileName = 'name' in value && typeof value.name === 'string' ? value.name : 'Blob';
-    return `${fileName} (${formatBytes(value.size)})`;
-  }
-  if (Array.isArray(value)) {
-    return depth >= maxDepth
-      ? `[${value.length} items]`
-      : value.map(item => summarizeLogValue(item, depth + 1, maxDepth));
-  }
-  if (value instanceof Date) return value.toISOString();
-  if (depth >= maxDepth) return '[Object]';
-
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>).map(([key, item]) => [
-      key,
-      summarizeLogValue(item, depth + 1, maxDepth),
-    ])
-  );
+  return summarizeJsonValue(value, {
+    maxDepth: Math.max(maxDepth - depth, 1),
+    maxArrayItems: 40,
+    maxObjectKeys: 60,
+    maxStringLength: 512,
+  });
 }
 
 function formatInlineValue(value: unknown, maxDepth = 3): string {
@@ -308,7 +292,10 @@ function buildHardwareRawDataEntries(logs: UnifiedLogEntry[]) {
     if (isDecodedResponseLog(title)) {
       const target = [...entries]
         .reverse()
-        .find(entry => entry.method === method && !entry.fields.some(field => field.key === 'Decoded data'));
+        .find(
+          entry =>
+            entry.method === method && !entry.fields.some(field => field.key === 'Decoded data')
+        );
       const resultValue =
         record.decoded_result !== undefined
           ? record.decoded_result
@@ -716,6 +703,9 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
     });
   }, [globalLogs, executionStartTime]);
 
+  const requiresConnectedDevice = !methodConfig.noConnIdReq;
+  const canRunWithoutConnectedDevice = !requiresConnectedDevice || isConnected;
+
   // 监听全局设备动作状态
   useEffect(() => {
     if (globalDeviceAction.isActive && globalDeviceAction.actionType) {
@@ -728,7 +718,7 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
 
   // 执行方法
   const handleExecute = useCallback(async () => {
-    if (!isConnected) {
+    if (!canRunWithoutConnectedDevice) {
       toast({
         title: t('components.methodExecutor.deviceNotConnected'),
         description: t('components.methodExecutor.connectDeviceFirst'),
@@ -746,7 +736,15 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
     // 使用 hardwareStore 的完整执行参数（包含通用参数）
     const finalExecutionParams = getScopedExecutionParameters();
     await execute(finalExecutionParams, executionHandler);
-  }, [isConnected, execute, getScopedExecutionParameters, executionHandler, toast, t, type]);
+  }, [
+    canRunWithoutConnectedDevice,
+    execute,
+    getScopedExecutionParameters,
+    executionHandler,
+    toast,
+    t,
+    type,
+  ]);
 
   // 取消操作
   const handleCancel = useCallback(async () => {
@@ -936,7 +934,11 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
                     {getDebugStatusText()}
                   </Badge>
                   <Badge variant="outline" className="text-[11px]">
-                    {currentDevice ? currentDevice.connectId : 'No device'}
+                    {currentDevice
+                      ? currentDevice.connectId
+                      : requiresConnectedDevice
+                      ? 'No device'
+                      : 'No connection required'}
                   </Badge>
                 </div>
               </div>
@@ -944,7 +946,7 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
               <div className="flex items-center gap-2 lg:justify-end">
                 <Button
                   onClick={handleExecute}
-                  disabled={!isConnected || isExecutionDisabled}
+                  disabled={!canRunWithoutConnectedDevice || isExecutionDisabled}
                   className="h-9 px-4"
                 >
                   {isExecutionDisabled ? (

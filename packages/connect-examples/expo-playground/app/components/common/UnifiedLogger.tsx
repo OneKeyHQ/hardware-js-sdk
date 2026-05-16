@@ -20,6 +20,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../../hooks/use-toast';
 import CollapsibleJsonViewer from './CollapsibleJsonViewer';
+import { formatJsonPreview, getSearchableJsonText } from '../../utils/jsonPreview';
 
 // 兼容现有的日志类型定义
 export type LogType = 'request' | 'response' | 'hardware' | 'error' | 'info';
@@ -63,7 +64,10 @@ const SmartContentDisplay: React.FC<{
 
   // 如果是字符串，直接显示
   if (typeof content === 'string') {
-    const lines = content.split('\n');
+    const displayContent = formatJsonPreview(content, {
+      maxStringLength: compact ? 1200 : 3000,
+    });
+    const lines = displayContent.split('\n');
     if (lines.length <= 3) {
       return (
         <pre
@@ -71,7 +75,7 @@ const SmartContentDisplay: React.FC<{
             compact ? 'text-[11px] p-1.5' : 'text-xs p-2'
           } bg-muted/30 dark:bg-muted/20 rounded-md whitespace-pre-wrap break-words min-w-0 overflow-hidden leading-relaxed`}
         >
-          {content}
+          {displayContent}
         </pre>
       );
     }
@@ -85,7 +89,7 @@ const SmartContentDisplay: React.FC<{
             compact ? 'text-[11px] p-1.5' : 'text-xs p-2'
           } bg-muted/30 dark:bg-muted/20 rounded-md whitespace-pre-wrap break-words min-w-0 overflow-hidden leading-relaxed`}
         >
-          {isExpanded ? content : previewContent}
+          {isExpanded ? displayContent : previewContent}
         </pre>
         <Button
           variant="ghost"
@@ -211,9 +215,9 @@ const UnifiedLogger: React.FC<UnifiedLoggerProps> = ({
           log.description || '',
           log.message || '',
           typeof normalizedLog.content === 'string'
-            ? normalizedLog.content
+            ? getSearchableJsonText(normalizedLog.content)
             : normalizedLog.content
-            ? JSON.stringify(normalizedLog.content)
+            ? getSearchableJsonText(normalizedLog.content)
             : '',
         ]
           .join(' ')
@@ -254,8 +258,12 @@ const UnifiedLogger: React.FC<UnifiedLoggerProps> = ({
       const normalizedLog = normalizeLogEntry(log);
       const content = normalizedLog.content
         ? typeof normalizedLog.content === 'string'
-          ? normalizedLog.content
-          : JSON.stringify(normalizedLog.content, null, 2)
+          ? formatJsonPreview(normalizedLog.content, { maxStringLength: 3000 })
+          : formatJsonPreview(normalizedLog.content, {
+              maxDepth: 6,
+              maxArrayItems: 20,
+              maxStringLength: 512,
+            })
         : '';
 
       const logText = `[${normalizedLog.timestamp.toLocaleString()}] [${log.type.toUpperCase()}] ${
@@ -371,7 +379,9 @@ const UnifiedLogger: React.FC<UnifiedLoggerProps> = ({
                           {config.icon}
                           {log.type}
                         </Badge>
-                        <span className={`${compact ? 'text-[10px]' : 'text-xs'} text-muted-foreground`}>
+                        <span
+                          className={`${compact ? 'text-[10px]' : 'text-xs'} text-muted-foreground`}
+                        >
                           {log.normalizedTimestamp.toLocaleString()}
                         </span>
                       </div>
@@ -386,11 +396,17 @@ const UnifiedLogger: React.FC<UnifiedLoggerProps> = ({
                     </div>
 
                     <div className={compact ? 'space-y-0' : 'space-y-0.5'}>
-                      <h4 className={`${compact ? 'text-[11px]' : 'text-xs'} font-medium ${config.color}`}>
+                      <h4
+                        className={`${compact ? 'text-[11px]' : 'text-xs'} font-medium ${
+                          config.color
+                        }`}
+                      >
                         {log.normalizedTitle}
                       </h4>
                       {log.description && (
-                        <p className={`${compact ? 'text-[11px]' : 'text-xs'} text-muted-foreground`}>
+                        <p
+                          className={`${compact ? 'text-[11px]' : 'text-xs'} text-muted-foreground`}
+                        >
                           {log.description}
                         </p>
                       )}
