@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
+import { summarizeJsonValue } from '../utils/jsonPreview';
 
 // 通用参数状态
 export interface CommonParametersState {
@@ -213,8 +214,16 @@ function calculateExecutionParameters(
 
   console.log('[HardwareStore] 📋 计算执行参数:', {
     原始通用参数: commonParams,
-    原始方法参数: methodParams,
-    最终执行参数: cleanParams,
+    原始方法参数: summarizeJsonValue(methodParams, {
+      maxDepth: 5,
+      maxArrayItems: 12,
+      maxStringLength: 256,
+    }),
+    最终执行参数: summarizeJsonValue(cleanParams, {
+      maxDepth: 5,
+      maxArrayItems: 12,
+      maxStringLength: 256,
+    }),
   });
 
   return cleanParams;

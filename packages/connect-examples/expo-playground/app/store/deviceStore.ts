@@ -5,6 +5,7 @@ import { DeviceInfo } from '../types/hardware';
 import type { UnifiedLogEntry } from '../components/common/UnifiedLogger';
 
 import { isClassicModelDevice, isTouchModelDevice } from '../utils/deviceTypeUtils';
+import { summarizeJsonValue } from '../utils/jsonPreview';
 import type { IDeviceType, Features } from '@onekeyfe/hd-core';
 import {
   UiEvent,
@@ -125,6 +126,19 @@ const MAX_TRANSIENT_LOG_ENTRIES = 300;
 
 let lastPersistedDeviceStoreValue: string | null = null;
 
+const getSafePersistedLogData = (data: Record<string, unknown> | null) => {
+  if (!data) return null;
+  const summarized = summarizeJsonValue(data, {
+    maxDepth: 6,
+    maxArrayItems: 20,
+    maxObjectKeys: 60,
+    maxStringLength: 512,
+  });
+  return summarized && typeof summarized === 'object' && !Array.isArray(summarized)
+    ? (summarized as Record<string, unknown>)
+    : { value: summarized };
+};
+
 // 智能压缩函数 - 使用LZ-string进行真正的压缩
 const compressData = (data: Record<string, unknown>): string => {
   try {
@@ -232,8 +246,9 @@ const filterUIEventData = (log: UnifiedLogEntry): UnifiedLogEntry => {
 const compressLogEntry = (log: UnifiedLogEntry, config: LogStorageConfig): CompressedLogEntry => {
   // 先过滤UI事件数据
   const filteredLog = filterUIEventData(log);
-  const logData =
-    filteredLog.data || (typeof filteredLog.content === 'object' ? filteredLog.content : null);
+  const logData = getSafePersistedLogData(
+    filteredLog.data || (typeof filteredLog.content === 'object' ? filteredLog.content : null)
+  );
 
   if (!config.compressionEnabled || !logData) {
     return {
@@ -438,7 +453,9 @@ export const useDeviceStore = create<DeviceState>()(
               const timestamp =
                 typeof log.timestamp === 'string' ? log.timestamp : log.timestamp.toISOString();
               const message = log.message || log.title || '';
-              const data = log.data || (typeof log.content === 'object' ? log.content : null);
+              const data = getSafePersistedLogData(
+                log.data || (typeof log.content === 'object' ? log.content : null)
+              );
               return `[${timestamp}] ${log.type.toUpperCase()}: ${message}${
                 data ? '\nData: ' + JSON.stringify(data, null, 2) : ''
               }`;
@@ -446,7 +463,19 @@ export const useDeviceStore = create<DeviceState>()(
             .join('\n\n');
         }
 
-        return JSON.stringify(logs, null, 2);
+        return JSON.stringify(
+          logs.map(log => ({
+            ...log,
+            data: getSafePersistedLogData(
+              log.data || (typeof log.content === 'object' ? log.content : null)
+            ),
+            content: getSafePersistedLogData(
+              log.data || (typeof log.content === 'object' ? log.content : null)
+            ),
+          })),
+          null,
+          2
+        );
       },
 
       // Device type helpers
