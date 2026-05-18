@@ -752,7 +752,12 @@ export class LedgerAdapter implements IHardwareWallet {
     }
 
     if (connectId && this._sessions.has(connectId)) return connectId;
-    if (this._sessions.size > 0) {
+    // Ambient fallback only when caller didn't specify a target. If caller
+    // passed an explicit connectId that's not in the map, fall through to
+    // _doConnect() to re-resolve THAT device — never silently route to
+    // whatever happens to be the first session entry (caused multi-device
+    // drift when a stale entry for B made calls for A return B's session).
+    if (!connectId && this._sessions.size > 0) {
       return this._sessions.keys().next().value as string;
     }
 
@@ -883,16 +888,38 @@ export class LedgerAdapter implements IHardwareWallet {
       const target = devices.find(
         d => d.connectId === targetConnectId || d.deviceId === targetConnectId
       );
-      if (!target) {
-        const err = Object.assign(new Error(`Target Ledger unavailable: ${targetConnectId}`), {
-          code: HardwareErrorCode.DeviceNotFound,
-        }) as Error & { _tag?: string };
-        if (isLedgerBleConnectionType(this.connector.connectionType)) {
-          err._tag = ERROR_TAG.DeviceNotAdvertising;
-        }
-        throw err;
+      if (target) {
+        return this._connectDeviceOrThrow(target.connectId);
       }
-      return this._connectDeviceOrThrow(target.connectId);
+
+      // USB single-device fallback: target connectId not found in fresh
+      // enumeration but exactly one device is present. Most likely the same
+      // physical device came back with a new ephemeral path after replug.
+      // Accept it.
+      //
+      // IMPORTANT: `devices.length` is the FRESH searchDevices() result, NOT
+      // cached `_discoveredDevices`. Do NOT "simplify" this to use
+      // _sessions.size or _discoveredDevices.size — those can carry ghost
+      // entries from failed device-state subscriptions, which would resurrect
+      // the multi-device drift bug.
+      if (
+        !isLedgerBleConnectionType(this.connector.connectionType) &&
+        devices.length === 1
+      ) {
+        debugLog(
+          `[LedgerAdapter] target ${targetConnectId} not in fresh enumeration; ` +
+            `accepting sole USB device ${devices[0].connectId} (assumed ephemeral path change)`
+        );
+        return this._connectDeviceOrThrow(devices[0].connectId);
+      }
+
+      const err = Object.assign(new Error(`Target Ledger unavailable: ${targetConnectId}`), {
+        code: HardwareErrorCode.DeviceNotFound,
+      }) as Error & { _tag?: string };
+      if (isLedgerBleConnectionType(this.connector.connectionType)) {
+        err._tag = ERROR_TAG.DeviceNotAdvertising;
+      }
+      throw err;
     }
 
     if (isLedgerBleConnectionType(this.connector.connectionType)) {
@@ -1166,10 +1193,11 @@ export class LedgerAdapter implements IHardwareWallet {
             // from APDU 0x5515 (rare hardware-direct), and _doConnect's
             // dialog still covers it via the same UI request.
 
-            const retryConnectId = isLedgerBleConnectionType(this.connector.connectionType)
-              ? resolvedConnectId
-              : undefined;
-            const reConnectId = await this.ensureConnected(retryConnectId, signal);
+            // Preserve connectId across retry to prevent multi-device drift.
+            // USB ephemeral path change after replug is handled by
+            // _connectFirstOrSelect's single-device fallback below, not by
+            // dropping the connectId here.
+            const reConnectId = await this.ensureConnected(resolvedConnectId, signal);
             const reSessionId = this._sessions.get(reConnectId);
             if (!reSessionId) throw lastErr;
 
@@ -1265,12 +1293,11 @@ export class LedgerAdapter implements IHardwareWallet {
   ): Promise<unknown> {
     await this._sleepAbortable(LedgerAdapter.STUCK_APP_RETRY_DELAY_MS, signal);
 
-    // BLE: keep the same connectId so we don't re-prompt the user to pair.
-    // USB: pass undefined; ensureConnected enumerates fresh.
-    const retryTargetConnectId = isLedgerBleConnectionType(this.connector.connectionType)
-      ? resolvedConnectId
-      : undefined;
-    const retryConnectId = await this.ensureConnected(retryTargetConnectId, signal);
+    // Preserve connectId across retry to prevent multi-device drift. Device
+    // didn't disconnect for stuck-app (APDU 6901) so connectId is still
+    // valid; for genuine USB replug, _connectFirstOrSelect's single-device
+    // fallback handles ephemeral path change.
+    const retryConnectId = await this.ensureConnected(resolvedConnectId, signal);
     const retrySessionId = this._sessions.get(retryConnectId);
     if (!retrySessionId) throw originalErr;
 
