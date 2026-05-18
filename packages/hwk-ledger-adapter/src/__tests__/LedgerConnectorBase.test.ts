@@ -128,9 +128,18 @@ describe('LedgerConnectorBase BLE direct-connect gate', () => {
   }
 
   function setupConnector(requirePreFlightScan: boolean) {
+    // _watchSessionState now propagates subscribe failures (so missing
+    // subscriptions can't silently leave ghost entries in the adapter's
+    // _sessions map). Provide a no-op observable so happy-path connect()
+    // tests don't trip on the new strict behavior.
+    const fakeDmk = {
+      getDeviceSessionState: jest.fn().mockReturnValue({
+        subscribe: jest.fn().mockReturnValue({ unsubscribe: jest.fn() }),
+      }),
+    };
     const connector = new LedgerConnectorBase(async () => ({}), {
       connectionType: 'ble',
-      dmk: {} as any,
+      dmk: fakeDmk as any,
       requirePreFlightScan,
     });
     return connector;

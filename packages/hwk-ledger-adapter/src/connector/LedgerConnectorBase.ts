@@ -458,7 +458,24 @@ export class LedgerConnectorBase implements IConnector {
         }
         throw err;
       }
-      this._watchSessionState(sessionId, externalConnectId);
+      try {
+        this._watchSessionState(sessionId, externalConnectId);
+      } catch (subErr) {
+        // Subscription is the only mechanism for detecting autonomous
+        // disconnects — failing without it leaks a ghost session into the
+        // adapter's _sessions map. Disconnect the just-created DMK session
+        // and surface the failure so connect() catch wraps it normally.
+        debugLog(
+          '[DMK] state subscription failed during connect; disconnecting session:',
+          subErr
+        );
+        try {
+          await dm.disconnect(sessionId);
+        } catch {
+          // best-effort cleanup
+        }
+        throw subErr;
+      }
       const info = dm.getDiscoveredDeviceInfo(path);
       const session: ConnectorSession = {
         sessionId,
@@ -568,29 +585,30 @@ export class LedgerConnectorBase implements IConnector {
         // ignore
       }
     }
-    try {
-      const sub = dmk.getDeviceSessionState({ sessionId }).subscribe({
-        next: (state: { deviceStatus?: string }) => {
-          // String-compare against DeviceStatus.NOT_CONNECTED ("NOT CONNECTED")
-          // to avoid pulling the runtime enum import (kept type-only for
-          // Metro/RN compatibility — see _importLedgerKit).
-          if (state?.deviceStatus === 'NOT CONNECTED') {
-            this._handleAutonomousDisconnect(sessionId, externalConnectId);
-          }
-        },
-        error: () => {
-          // DMK closed the observable abnormally — treat as disconnect.
+    // Subscribe failure is fatal: without this subscription we can't detect
+    // autonomous disconnect (USB unplug, BLE drop, sleep), which leaks ghost
+    // entries into the adapter's _sessions map and can route subsequent calls
+    // to the wrong device. Let the error propagate so connect() cleans up the
+    // just-created DMK session and fails loudly.
+    const sub = dmk.getDeviceSessionState({ sessionId }).subscribe({
+      next: (state: { deviceStatus?: string }) => {
+        // String-compare against DeviceStatus.NOT_CONNECTED ("NOT CONNECTED")
+        // to avoid pulling the runtime enum import (kept type-only for
+        // Metro/RN compatibility — see _importLedgerKit).
+        if (state?.deviceStatus === 'NOT CONNECTED') {
           this._handleAutonomousDisconnect(sessionId, externalConnectId);
-        },
-        complete: () => {
-          // Observable completed — session is gone from DMK's POV.
-          this._handleAutonomousDisconnect(sessionId, externalConnectId);
-        },
-      });
-      this._sessionStateSubs.set(sessionId, sub);
-    } catch (err) {
-      debugLog('[DMK] _watchSessionState subscribe failed:', err);
-    }
+        }
+      },
+      error: () => {
+        // DMK closed the observable abnormally — treat as disconnect.
+        this._handleAutonomousDisconnect(sessionId, externalConnectId);
+      },
+      complete: () => {
+        // Observable completed — session is gone from DMK's POV.
+        this._handleAutonomousDisconnect(sessionId, externalConnectId);
+      },
+    });
+    this._sessionStateSubs.set(sessionId, sub);
   }
 
   private _unwatchSessionState(sessionId: string): void {
