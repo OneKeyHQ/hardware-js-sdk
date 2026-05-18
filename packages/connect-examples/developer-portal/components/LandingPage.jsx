@@ -140,12 +140,12 @@ export function LandingPage({ locale = 'en' }) {
       cta: copy.viewDocs,
     },
     {
-      title: isZh ? 'AI Agent 集成' : 'AI Agent Integration',
+      title: isZh ? 'OneKey Agent Wallet' : 'OneKey Agent Wallet',
       description: isZh
-        ? '让 Claude Code 等 AI Agent 通过 CLI 与硬件钱包交互，支持 27+ 链安全签名。'
-        : 'Let AI agents like Claude Code interact with hardware wallets via CLI. 27+ chains with secure signing.',
+        ? '在 OneKey GUI 中管理 Agent 钱包，绑定 keyless 账号，并将高风险操作交给硬件确认。'
+        : 'Manage agent wallets in the OneKey GUI, bind keyless accounts, and escalate high-risk actions to hardware confirmation.',
       icon: Bot,
-      href: `/${locale}/hardware-sdk/agent-integration`,
+      href: `/${locale}/agent-wallet`,
       cta: copy.viewDocs,
     },
   ]

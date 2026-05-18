@@ -1,0 +1,25 @@
+export default {
+  index: {
+    title: 'Agent Wallet',
+    display: 'hidden',
+    theme: {
+      layout: 'full',
+      sidebar: false,
+      toc: false,
+      pagination: false,
+      breadcrumb: false,
+      timestamp: false,
+      footer: false,
+      copyPage: false,
+    },
+  },
+  overview: 'Overview',
+  quickstart: 'Quickstart',
+  capabilities: 'Capabilities',
+  'wallet-skills': 'Wallet Skills',
+  recipes: 'Recipes',
+  'wallet-session': 'Agent Wallet Session',
+  'keyless-binding': 'Keyless Binding',
+  'hardware-control': 'Hardware Control',
+  safety: 'Safety Rules',
+};

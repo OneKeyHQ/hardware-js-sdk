@@ -65,6 +65,12 @@
   transform: translateY(-4px);
 }
 
+@media (max-width: 1120px) {
+  .searchHotkeyWrap {
+    display: none;
+  }
+}
+
 @media (max-width: 768px) {
   .assistActions {
     margin-right: 4px;

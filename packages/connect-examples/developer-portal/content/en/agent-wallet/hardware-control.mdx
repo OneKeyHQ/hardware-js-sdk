@@ -1,0 +1,69 @@
+---
+title: Hardware Control
+---
+
+# Hardware Control
+
+Hardware control lets an Agent Wallet workflow escalate sensitive operations to a OneKey hardware wallet. This is OneKey's core difference from agent wallets that only rely on software custody or TEE signing.
+
+## When To Escalate
+
+| Flow | Hardware expectation |
+| --- | --- |
+| High-value transfer | User reviews recipient, amount, chain, and fee on the OneKey device. |
+| Contract interaction | Agent runs simulation first, then the device displays clear-signing details when supported. |
+| Swap execution | Agent quotes and builds first; device confirmation happens only after the user approves execution. |
+| Hidden wallet | Passphrase mode is explicit so the agent does not guess whether a hidden wallet is active. |
+| Device trust check | `onekey device verify` confirms the connected device before using it for signing. |
+
+## Connect and Login
+
+List connected devices:
+
+```bash
+onekey device search
+```
+
+Authenticate with a hardware wallet:
+
+```bash
+onekey auth login --hardware
+```
+
+When multiple devices are connected, select one explicitly:
+
+```bash
+onekey auth login --hardware --device-id <uuid>
+```
+
+For hidden wallets, make passphrase handling explicit in non-interactive environments:
+
+```bash
+onekey auth login --hardware --passphrase-mode none
+onekey auth login --hardware --passphrase-mode on-host
+onekey auth login --hardware --passphrase-mode on-device
+```
+
+## Active Session
+
+Hardware-backed sessions are reported by `onekey auth status` as:
+
+| Field | Expected value |
+| --- | --- |
+| `loginMethod` | `hardware` |
+| `walletKind` | `hw` |
+| `device` | Connected OneKey device info |
+| `passphraseMode` | `none`, `on_host`, or `on_device` |
+
+After login, follow-up commands use the active session automatically.
+
+## Device Lifecycle
+
+```bash
+onekey device verify
+onekey device change-pin
+onekey device toggle-passphrase
+onekey device settings
+```
+
+Do not bypass physical confirmation. If the device is locked, disconnected, asks for PIN or passphrase, or rejects a request, report that state and stop.

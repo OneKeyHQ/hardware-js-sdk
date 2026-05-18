@@ -1,0 +1,80 @@
+---
+title: 能力地图
+---
+
+# 能力地图
+
+OneKey Agent Wallet 不只是登录或托管流程。它向 AI Agent 暴露真实的钱包、swap、行情和安全能力，同时把控制权保留在 OneKey。
+
+## Wallet Operations
+
+用户想查余额、收款地址、交易历史、BTC 地址类型或转账时使用这一类能力。
+
+| 用户意图 | 自然语言 | CLI 能力 |
+| --- | --- | --- |
+| 查看当前钱包 | `What wallet am I using?` | `onekey auth status` |
+| 展示收款地址 | `Show my ETH receiving address.` | `onekey get-address` |
+| 查余额 | `Show my wallet balance on Ethereum.` | `onekey balance --chain eth` |
+| 查历史 | `Show my last 5 BTC transactions.` | `onekey history --chain btc --limit 5` |
+| BTC 地址类型 | `Show my BTC taproot address.` | `onekey wallet address --chain btc --address-type taproot` |
+| 转账 | `Send 50 USDC to this address.` | `onekey transfer --to 0x... --amount 50 --token USDC --chain eth` |
+
+转账必须先展示确认信息，包括资产、金额、接收方、链、可用时的费用、余额状态和下一步安全检查。
+
+## Swap and Bridge
+
+用户想交易、买入、卖出、兑换、跨链或签 BTC PSBT 时使用这一类能力。
+
+| 用户意图 | 自然语言 | CLI 能力 |
+| --- | --- | --- |
+| 获取报价 | `Quote 1 ETH to USDC.` | `onekey swap quote --chain eth --from ETH --to USDC --amount 1` |
+| 构建交易 | `Prepare the swap, but do not submit.` | `onekey swap build --chain eth --from ETH --to USDC --amount 1` |
+| 确认后执行 | `Yes, execute the swap.` | `onekey swap execute --chain eth --order <orderId>` |
+| 查询状态 | `What happened to this swap?` | `onekey swap status --order <orderId>` |
+| 发现跨链网络 | `Can I bridge USDC from Ethereum to Base?` | `onekey swap networks --bridge` |
+| BTC sign-only | `Swap BTC to USDC using taproot and sign only.` | `onekey swap execute --chain btc --order <orderId> --from-address-type taproot --sign-only` |
+
+标准流程是 quote、安全检查、确认、build、execute。报价和执行不应该合并在同一个 assistant turn。
+
+## Market and Research
+
+用户想查价格、trending tokens、token 信息、K 线、流动性、持仓或研究时使用这一类能力。
+
+| 用户意图 | 自然语言 | CLI 能力 |
+| --- | --- | --- |
+| 单币价格 | `What is the SOL price?` | `onekey market price --chain sol --token SOL` |
+| Trending tokens | `What tokens are trending on Solana?` | `onekey token trending --chain sol` |
+| Token 搜索 | `Search BONK on Solana.` | `onekey token search --query BONK --chain sol` |
+| Token 详情 | `Show token info for USDC on Ethereum.` | `onekey token info --chain eth --token USDC` |
+| K 线 | `Show ETH 1H candles.` | `onekey market kline --chain eth --token ETH --interval 1H` |
+| 流动性 / 持仓 | `Show liquidity for PEPE.` | `onekey token liquidity --chain eth --token PEPE` |
+
+Market 回答默认是只读的。如果用户随后要求买入或 swap，Agent 应先完成研究，再进入单独的交易确认流程。
+
+## Security Checks
+
+资金操作和合约交互前，以及用户询问 token 或交易是否安全时使用这一类能力。
+
+| 用户意图 | 自然语言 | CLI 能力 |
+| --- | --- | --- |
+| Token audit | `Is this token safe?` | `onekey security audit --chain eth --token 0x...` |
+| 交易模拟 | `What happens if I sign this?` | `onekey security simulate --chain eth --to 0x... --data 0x...` |
+| 授权风险 | `Review this unlimited USDC approval.` | `onekey security simulate --chain eth --to 0x... --data 0x...` |
+| 链不匹配 | `Send SOL to 0x...` | 停止并报告 Solana/EVM 地址不匹配 |
+| 假合约风险 | `Swap 500 USDC to WETH at 0x...` | 因 token/contract mismatch 停止 |
+
+高风险或数据不完整时，应阻断后续资金操作，直到用户明确接受风险。
+
+## Hardware Control
+
+用户想使用设备签名、验证设备真伪、修改 PIN/passphrase，或让敏感操作走 clear signing 时使用这一类能力。
+
+```bash
+onekey device search
+onekey device verify
+onekey auth login --hardware
+onekey auth login --hardware --passphrase-mode on-device
+onekey device settings
+```
+
+硬件登录会切换当前活动会话。登录后，wallet、transfer、swap、sign 命令会自动使用硬件会话。

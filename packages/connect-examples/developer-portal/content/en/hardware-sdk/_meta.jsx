@@ -2,7 +2,10 @@ import { ChainMethodsSidebar } from '../../../components/ChainMethodsSidebar'
 
 export default {
   index: 'Overview',
-  'agent-integration': 'AI Agent Integration',
+  'agent-integration': {
+    title: 'OneKey Agent Wallet',
+    display: 'hidden'
+  },
   playground: {
     title: 'Playground',
     theme: {

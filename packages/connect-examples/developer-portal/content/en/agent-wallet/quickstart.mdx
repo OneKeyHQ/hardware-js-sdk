@@ -1,0 +1,106 @@
+---
+title: Quickstart
+---
+
+# Quickstart
+
+This path gets an AI client talking to OneKey, then proves wallet, market, swap, and hardware flows in small steps. The user can type natural language; the skill turns that into schema-backed `onekey` CLI calls.
+
+Start with read-only prompts. Quotes, builds, audits, and simulations should explain what would happen without moving funds. Transfers, swap execution, approvals, broadcasts, and signing all require an explicit confirmation turn.
+
+## 1. Install the CLI
+
+```bash
+npm install -g @onekeyfe/cli
+onekey version
+onekey schema --list
+```
+
+The CLI package name is `@onekeyfe/cli`; the executable is `onekey`.
+
+## 2. Install the Skills
+
+### Claude Code
+
+```text
+/plugin marketplace add OneKeyHQ/onekey-wallet-skills
+/plugin install onekey-wallet-skills
+```
+
+### Codex
+
+Tell Codex:
+
+```text
+Fetch and follow instructions from https://raw.githubusercontent.com/OneKeyHQ/onekey-wallet-skills/main/.codex/INSTALL.md
+```
+
+### Cursor, OpenCode, and OpenClaw
+
+Use the install guide in the [`onekey-wallet-skills`](https://github.com/OneKeyHQ/onekey-wallet-skills) repository for each client. The skills all call the same `onekey` CLI and discover command schemas before choosing parameters.
+
+## 3. Pair an Agent Wallet
+
+Ask your AI client:
+
+```text
+Connect my OneKey Agent Wallet.
+```
+
+The expected CLI flow is:
+
+```bash
+onekey auth login --app-transfer
+onekey auth status
+onekey get-address
+```
+
+The OneKey GUI provides the Agent Wallet payload. The CLI stores the active session in the local OneKey CLI vault and uses the operating system credential store for protected material.
+
+## 4. Try Read-Only Requests
+
+Start with requests that do not move funds:
+
+| Natural-language request | Expected command family |
+| --- | --- |
+| `Show my wallet balance.` | `onekey balance --chain eth` |
+| `Show my receiving address for ETH.` | `onekey get-address` |
+| `What tokens are trending right now?` | `onekey token trending` |
+| `What is the price of SOL?` | `onekey market price --chain sol --token SOL` |
+| `Show ETH 1H candles.` | `onekey market kline --chain eth --token ETH --interval 1H` |
+
+## 5. Quote Before You Trade
+
+Ask:
+
+```text
+Quote a swap from 1 ETH to USDC. Do not execute yet.
+```
+
+Expected command sequence:
+
+```bash
+onekey swap quote --chain eth --from ETH --to USDC --amount 1
+onekey security audit --chain eth --token <token-or-contract>
+onekey swap build --chain eth --from ETH --to USDC --amount 1
+```
+
+The skill should show the route, amount, estimated output, fees when available, risk state, and ask for confirmation before `swap execute`.
+
+## 6. Use Hardware Confirmation
+
+For higher-risk actions, ask:
+
+```text
+Use my OneKey hardware wallet for this transfer.
+```
+
+Expected flow:
+
+```bash
+onekey device search
+onekey auth login --hardware
+onekey auth status
+```
+
+After hardware login, normal commands use the active hardware-backed session automatically. Do not add a separate `--hardware` flag to balance, transfer, swap, or signing commands unless the specific command schema exposes it.

@@ -38,7 +38,7 @@ export default async function LocaleLayout({ children, params }) {
       <Layout
         navbar={navbar}
         pageMap={pageMap}
-        docsRepositoryBase="https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/developer-portal"
+        docsRepositoryBase="https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/developer-portal"
         i18n={[
           { locale: 'en', name: 'English' },
           { locale: 'zh', name: '简体中文' }

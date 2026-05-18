@@ -1,0 +1,69 @@
+---
+title: 硬件控制
+---
+
+# 硬件控制
+
+硬件控制让 Agent Wallet 工作流可以把敏感操作升级到 OneKey 硬件钱包。这是 OneKey 和只依赖软件托管或 TEE 签名的 agent wallet 的核心差异。
+
+## 什么时候升级到硬件
+
+| 场景 | 硬件期望 |
+| --- | --- |
+| 大额转账 | 用户在 OneKey 设备上复核接收方、金额、链和费用。 |
+| 合约交互 | Agent 先运行 simulation；支持时设备展示 clear-signing 信息。 |
+| Swap 执行 | Agent 先 quote/build；只有用户确认执行后才进入设备确认。 |
+| 隐藏钱包 | 显式声明 passphrase mode，Agent 不猜当前是否为隐藏钱包。 |
+| 设备可信检查 | 使用 `onekey device verify` 验证已连接设备后再签名。 |
+
+## 连接并登录
+
+列出已连接设备：
+
+```bash
+onekey device search
+```
+
+使用硬件钱包认证：
+
+```bash
+onekey auth login --hardware
+```
+
+多台设备同时连接时，显式选择设备：
+
+```bash
+onekey auth login --hardware --device-id <uuid>
+```
+
+隐藏钱包场景下，非交互环境必须明确 passphrase 处理方式：
+
+```bash
+onekey auth login --hardware --passphrase-mode none
+onekey auth login --hardware --passphrase-mode on-host
+onekey auth login --hardware --passphrase-mode on-device
+```
+
+## 活动会话
+
+硬件会话在 `onekey auth status` 中体现为：
+
+| 字段 | 预期值 |
+| --- | --- |
+| `loginMethod` | `hardware` |
+| `walletKind` | `hw` |
+| `device` | 已连接的 OneKey 设备信息 |
+| `passphraseMode` | `none`、`on_host` 或 `on_device` |
+
+登录完成后，后续命令会自动使用当前活动会话。
+
+## 设备生命周期
+
+```bash
+onekey device verify
+onekey device change-pin
+onekey device toggle-passphrase
+onekey device settings
+```
+
+不要绕过物理确认。如果设备锁定、断开、要求 PIN/passphrase，或拒绝请求，Agent 应报告状态并停止。

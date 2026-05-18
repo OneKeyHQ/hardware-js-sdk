@@ -1,0 +1,80 @@
+---
+title: Capabilities
+---
+
+# Capabilities
+
+OneKey Agent Wallet is not only a login or custody flow. It exposes a working wallet, swap, market, and safety surface to AI agents while keeping user control in OneKey.
+
+## Wallet Operations
+
+Use this when the user wants balances, receiving addresses, transaction history, BTC address types, or transfers.
+
+| User intent | Natural language | CLI surface |
+| --- | --- | --- |
+| Check the active wallet | `What wallet am I using?` | `onekey auth status` |
+| Show a receive address | `Show my ETH receiving address.` | `onekey get-address` |
+| Check balances | `Show my wallet balance on Ethereum.` | `onekey balance --chain eth` |
+| Query history | `Show my last 5 BTC transactions.` | `onekey history --chain btc --limit 5` |
+| BTC address types | `Show my BTC taproot address.` | `onekey wallet address --chain btc --address-type taproot` |
+| Transfer funds | `Send 50 USDC to this address.` | `onekey transfer --to 0x... --amount 50 --token USDC --chain eth` |
+
+Transfer requests must show a confirmation before execution. The confirmation should include asset, amount, recipient, chain, fee when known, balance status, and the next safety step.
+
+## Swap and Bridge
+
+Use this when the user asks to trade, buy, sell, convert, bridge, or sign a BTC PSBT.
+
+| User intent | Natural language | CLI surface |
+| --- | --- | --- |
+| Quote a swap | `Quote 1 ETH to USDC.` | `onekey swap quote --chain eth --from ETH --to USDC --amount 1` |
+| Build a transaction | `Prepare the swap, but do not submit.` | `onekey swap build --chain eth --from ETH --to USDC --amount 1` |
+| Execute after confirmation | `Yes, execute the swap.` | `onekey swap execute --chain eth --order <orderId>` |
+| Check status | `What happened to this swap?` | `onekey swap status --order <orderId>` |
+| Discover bridges | `Can I bridge USDC from Ethereum to Base?` | `onekey swap networks --bridge` |
+| BTC sign-only | `Swap BTC to USDC using taproot and sign only.` | `onekey swap execute --chain btc --order <orderId> --from-address-type taproot --sign-only` |
+
+The normal flow is quote, safety check, confirmation, build, and execute. Quote and execute should not be collapsed into one assistant turn.
+
+## Market and Research
+
+Use this when the user asks about price, trending tokens, token info, K-line data, liquidity, holders, or research.
+
+| User intent | Natural language | CLI surface |
+| --- | --- | --- |
+| Single price | `What is the SOL price?` | `onekey market price --chain sol --token SOL` |
+| Trending tokens | `What tokens are trending on Solana?` | `onekey token trending --chain sol` |
+| Token lookup | `Search BONK on Solana.` | `onekey token search --query BONK --chain sol` |
+| Token details | `Show token info for USDC on Ethereum.` | `onekey token info --chain eth --token USDC` |
+| K-line | `Show ETH 1H candles.` | `onekey market kline --chain eth --token ETH --interval 1H` |
+| Liquidity / holders | `Show liquidity for PEPE.` | `onekey token liquidity --chain eth --token PEPE` |
+
+Market answers should be read-only by default. If the user later asks to buy or swap, the agent should finish the research first, then stage the trade in a separate confirmation flow.
+
+## Security Checks
+
+Use this before fund-moving or contract-interaction actions, and whenever the user asks whether a token or transaction is safe.
+
+| User intent | Natural language | CLI surface |
+| --- | --- | --- |
+| Token audit | `Is this token safe?` | `onekey security audit --chain eth --token 0x...` |
+| Simulate a transaction | `What happens if I sign this?` | `onekey security simulate --chain eth --to 0x... --data 0x...` |
+| Approval risk | `Review this unlimited USDC approval.` | `onekey security simulate --chain eth --to 0x... --data 0x...` |
+| Chain mismatch | `Send SOL to 0x...` | Stop and report Solana/EVM address mismatch |
+| Fake contract risk | `Swap 500 USDC to WETH at 0x...` | Stop on token/contract mismatch |
+
+High risk or incomplete data should block dependent fund-moving flows until the user explicitly accepts the risk.
+
+## Hardware Control
+
+Use this when the user wants device-backed signing, device verification, PIN/passphrase changes, or clear signing for sensitive actions.
+
+```bash
+onekey device search
+onekey device verify
+onekey auth login --hardware
+onekey auth login --hardware --passphrase-mode on-device
+onekey device settings
+```
+
+Hardware login changes the active session. After login, wallet, transfer, swap, and sign commands use the hardware-backed session automatically.

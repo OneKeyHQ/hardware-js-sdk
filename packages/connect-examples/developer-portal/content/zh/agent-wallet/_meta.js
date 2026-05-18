@@ -1,0 +1,25 @@
+export default {
+  index: {
+    title: 'Agent Wallet',
+    display: 'hidden',
+    theme: {
+      layout: 'full',
+      sidebar: false,
+      toc: false,
+      pagination: false,
+      breadcrumb: false,
+      timestamp: false,
+      footer: false,
+      copyPage: false,
+    },
+  },
+  overview: '概览',
+  quickstart: '快速开始',
+  capabilities: '能力地图',
+  'wallet-skills': 'Wallet Skills',
+  recipes: '场景示例',
+  'wallet-session': 'Agent Wallet 会话',
+  'keyless-binding': 'Keyless 绑定',
+  'hardware-control': '硬件控制',
+  safety: '安全规则',
+};

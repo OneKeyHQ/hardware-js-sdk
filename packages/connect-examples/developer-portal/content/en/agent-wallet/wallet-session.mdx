@@ -1,0 +1,72 @@
+---
+title: Agent Wallet Session
+---
+
+# Agent Wallet Session
+
+An Agent Wallet session is the active wallet context an AI agent uses through the `onekey` CLI. In the current CLI source, this flow is exposed as App Transfer / App Bot Wallet login.
+
+## What It Unlocks
+
+Once the session is active, the agent can use the same wallet context across read-only and write flows:
+
+| Capability | Example |
+| --- | --- |
+| Wallet state | `onekey balance --chain eth` |
+| Receive address | `onekey get-address` |
+| History | `onekey history --chain eth --detail` |
+| Market context | `onekey token trending --chain sol` |
+| Swap preparation | `onekey swap quote --chain eth --from ETH --to USDC --amount 1` |
+| Safety checks | `onekey security audit --chain eth --token 0x...` |
+
+This is why the user does not need to paste private keys or manually pass an address into every prompt. The agent should read the active session and explain which wallet it is using.
+
+## Login
+
+```bash
+onekey auth login --app-transfer
+```
+
+The OneKey GUI provides the payload. The CLI imports the session into the local OneKey CLI vault and uses the operating system credential store for protected material.
+
+You can also pass a payload explicitly when an automation environment provides it:
+
+```bash
+onekey auth login --app-transfer --payload <json-or-base64-json>
+```
+
+## Status
+
+Use `auth status` before every operation family:
+
+```bash
+onekey auth status
+```
+
+The current schema reports:
+
+| Field | Meaning |
+| --- | --- |
+| `authStatus` | `authenticated` or `unauthenticated` |
+| `loginMethod` | `app_transfer` or `hardware` |
+| `walletKind` | `hd` for App Transfer sessions, `hw` for hardware sessions |
+| `displayAddress` | Active wallet address shown to the user |
+| `storageBackend` | OS credential store used by the CLI |
+
+## Lifecycle
+
+| Step | Agent behavior |
+| --- | --- |
+| Before any action | Run `onekey auth status` and report unauthenticated state clearly. |
+| Before read-only actions | Use the active address and chain defaults; ask only for missing chain or token context. |
+| Before fund-moving actions | Show the active address, chain, amount, recipient, fee/risk state, and ask for confirmation. |
+| After session changes | Re-run `onekey auth status`; do not assume the previous address still applies. |
+| On logout | Stop using the old wallet context immediately. |
+
+## Logout
+
+```bash
+onekey auth logout
+```
+
+Agents should call logout only when the user explicitly asks to end the active session.

@@ -1,0 +1,106 @@
+---
+title: 快速开始
+---
+
+# 快速开始
+
+这条路径会让 AI client 接入 OneKey，然后用小步骤验证 Wallet、Market、Swap 和硬件确认流程。用户可以直接输入自然语言，skill 会把请求转换成 schema-backed `onekey` CLI 调用。
+
+先从只读 prompt 开始。Quote、build、audit、simulation 只解释将会发生什么，不移动资金。Transfer、swap execute、approval、broadcast、signing 都必须有一次明确确认。
+
+## 1. 安装 CLI
+
+```bash
+npm install -g @onekeyfe/cli
+onekey version
+onekey schema --list
+```
+
+CLI 包名是 `@onekeyfe/cli`，可执行命令是 `onekey`。
+
+## 2. 安装 Skills
+
+### Claude Code
+
+```text
+/plugin marketplace add OneKeyHQ/onekey-wallet-skills
+/plugin install onekey-wallet-skills
+```
+
+### Codex
+
+告诉 Codex：
+
+```text
+Fetch and follow instructions from https://raw.githubusercontent.com/OneKeyHQ/onekey-wallet-skills/main/.codex/INSTALL.md
+```
+
+### Cursor、OpenCode、OpenClaw
+
+按 [`onekey-wallet-skills`](https://github.com/OneKeyHQ/onekey-wallet-skills) 仓库里的对应安装说明接入。所有 skills 都调用同一个 `onekey` CLI，并在选择参数前读取命令 schema。
+
+## 3. 配对 Agent Wallet
+
+在 AI client 里输入：
+
+```text
+Connect my OneKey Agent Wallet.
+```
+
+预期 CLI 流程：
+
+```bash
+onekey auth login --app-transfer
+onekey auth status
+onekey get-address
+```
+
+OneKey GUI 提供 Agent Wallet payload。CLI 会将活动会话存入本地 OneKey CLI vault，并使用操作系统凭据存储保护敏感材料。
+
+## 4. 先试只读请求
+
+先从不会移动资金的请求开始：
+
+| 自然语言请求 | 预期命令族 |
+| --- | --- |
+| `Show my wallet balance.` | `onekey balance --chain eth` |
+| `Show my receiving address for ETH.` | `onekey get-address` |
+| `What tokens are trending right now?` | `onekey token trending` |
+| `What is the price of SOL?` | `onekey market price --chain sol --token SOL` |
+| `Show ETH 1H candles.` | `onekey market kline --chain eth --token ETH --interval 1H` |
+
+## 5. 交易前先报价
+
+输入：
+
+```text
+Quote a swap from 1 ETH to USDC. Do not execute yet.
+```
+
+预期命令序列：
+
+```bash
+onekey swap quote --chain eth --from ETH --to USDC --amount 1
+onekey security audit --chain eth --token <token-or-contract>
+onekey swap build --chain eth --from ETH --to USDC --amount 1
+```
+
+Skill 应展示 route、amount、预计输出、可用时的费用、风险状态，并在 `swap execute` 前请求确认。
+
+## 6. 使用硬件确认
+
+高风险操作可以输入：
+
+```text
+Use my OneKey hardware wallet for this transfer.
+```
+
+预期流程：
+
+```bash
+onekey device search
+onekey auth login --hardware
+onekey auth status
+```
+
+硬件登录后，普通命令会自动使用当前硬件会话。除非某个命令的 schema 明确暴露对应参数，否则不要给 balance、transfer、swap 或 signing 命令额外添加 `--hardware`。
