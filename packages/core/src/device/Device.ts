@@ -939,9 +939,13 @@ export class Device extends EventEmitter {
       this.features,
       Enum_Capability.Capability_AttachToPin
     );
+    const isPro2 = getDeviceType(this.features) === EDeviceType.Pro2;
 
     const supportUnlock =
-      supportAttachPinCapability || (versionRange && semver.gte(firmwareVersion, versionRange.min));
+      supportAttachPinCapability ||
+      // Pro2 V2 暂未从 features 暴露 capabilities，先直连该方法用于固件联调。
+      isPro2 ||
+      (versionRange && semver.gte(firmwareVersion, versionRange.min));
 
     if (supportUnlock) {
       const res = await this.commands.typedCall('UnLockDevice', 'UnLockDeviceResponse');
