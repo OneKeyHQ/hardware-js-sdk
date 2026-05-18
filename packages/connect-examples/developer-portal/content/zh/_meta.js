@@ -17,6 +17,7 @@ export default {
     title: 'Agent Wallet',
     type: 'menu',
     items: {
+      landing: { title: '首页', href: '/zh/agent-wallet/' },
       overview: { title: '概览', href: '/zh/agent-wallet/overview' },
       quickstart: { title: '快速开始', href: '/zh/agent-wallet/quickstart' },
       capabilities: {

@@ -17,6 +17,7 @@ export default {
     title: 'Agent Wallet',
     type: 'menu',
     items: {
+      landing: { title: 'Landing', href: '/en/agent-wallet/' },
       overview: { title: 'Overview', href: '/en/agent-wallet/overview' },
       quickstart: { title: 'Quickstart', href: '/en/agent-wallet/quickstart' },
       capabilities: {
