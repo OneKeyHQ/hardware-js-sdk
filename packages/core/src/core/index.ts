@@ -1,6 +1,7 @@
 import semver from 'semver';
 import EventEmitter from 'events';
 import {
+  EDeviceType,
   ERRORS,
   ERROR_CODES_REQUIRE_RELEASE,
   HardwareError,
@@ -19,6 +20,7 @@ import {
   enableLog,
   getDeviceBLEFirmwareVersion,
   getDeviceFirmwareVersion,
+  getDeviceType,
   getFirmwareType,
   getLogger,
   getMethodVersionRange,
@@ -992,6 +994,8 @@ export const cancel = (context: CoreContext, connectId?: string) => {
 const checkPassphraseEnableState = (method: BaseMethod, features?: Features) => {
   if (!method.useDevicePassphraseState) return;
 
+  const isPro2 = getDeviceType(features) === EDeviceType.Pro2;
+
   if (features?.passphrase_protection === true) {
     const hasNoPassphraseState =
       method.payload.passphraseState == null || method.payload.passphraseState === '';
@@ -1004,7 +1008,7 @@ const checkPassphraseEnableState = (method: BaseMethod, features?: Features) => 
     }
   }
 
-  if (features?.passphrase_protection === false && method.payload.passphraseState) {
+  if (features?.passphrase_protection === false && method.payload.passphraseState && !isPro2) {
     DevicePool.clearDeviceCache(method.payload.connectId);
     throw ERRORS.TypedError(HardwareErrorCode.DeviceNotOpenedPassphrase);
   }

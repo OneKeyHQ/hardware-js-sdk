@@ -68,7 +68,11 @@ export const supportNewPassphrase = (features?: Features): SupportFeatureType =>
   if (!features) return { support: false };
 
   const deviceType = getDeviceType(features);
-  if (deviceType === EDeviceType.Touch || deviceType === EDeviceType.Pro) {
+  if (
+    deviceType === EDeviceType.Touch ||
+    deviceType === EDeviceType.Pro ||
+    deviceType === EDeviceType.Pro2
+  ) {
     return { support: true };
   }
 
@@ -86,6 +90,8 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (
 ) => {
   const { features, commands } = device;
   const locked = features?.unlocked === false;
+  const deviceType = getDeviceType(features);
+  const isPro2 = deviceType === EDeviceType.Pro2;
 
   const { passphraseState, newSession, unlockedAttachPin } = await getPassphraseState(
     features,
@@ -95,12 +101,12 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (
     }
   );
 
-  const isModeT =
-    getDeviceType(features) === EDeviceType.Touch || getDeviceType(features) === EDeviceType.Pro;
+  const isModeT = deviceType === EDeviceType.Touch || deviceType === EDeviceType.Pro;
 
   // 如果可以获取到 passphraseState，但是设备 features 显示设备未开启 passphrase，需要刷新设备状态
   // if passphraseState can be obtained, but the device features show that the device has not enabled passphrase, the device status needs to be refreshed
-  const needRefreshWithPassphrase = passphraseState && features?.passphrase_protection !== true;
+  const needRefreshWithPassphrase =
+    !isPro2 && passphraseState && features?.passphrase_protection !== true;
   // 如果 Touch/Pro 在之前是锁定状态，刷新设备状态
   // if Touch/Pro was locked before, refresh the device state
   const needRefreshWithLocked = isModeT && locked;
@@ -110,10 +116,17 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (
     await device.getFeatures();
   }
 
+  if (isPro2 && device.features && (passphraseState || newSession)) {
+    device.features.passphrase_protection = true;
+    if (newSession) {
+      device.features.session_id = newSession;
+    }
+  }
+
   // Attach to pin try to fix internal state
   if (features?.device_id) {
     device.updateInternalState(
-      device.features?.passphrase_protection ?? false,
+      (device.features?.passphrase_protection ?? false) || isPro2,
       passphraseState,
       device.features?.device_id ?? '',
       newSession,
@@ -148,6 +161,8 @@ export const getPassphraseState = async (
   );
   const supportGetPassphraseState =
     supportAttachPinCapability ||
+    // Pro2 V2 暂未从 features 暴露 capabilities，先直连该方法用于固件联调。
+    deviceType === EDeviceType.Pro2 ||
     (deviceType === EDeviceType.Pro && semver.gte(firmwareVersion.join('.'), '4.15.0'));
 
   if (supportGetPassphraseState) {

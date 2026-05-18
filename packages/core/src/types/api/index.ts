@@ -162,6 +162,7 @@ import type { neoSignTransaction } from './neoSignTransaction';
 import type { ConnectSettings } from '../settings';
 
 export * from './export';
+export type { GetPassphraseStatePayload } from './getPassphraseState';
 
 export type CoreApi = {
   /**

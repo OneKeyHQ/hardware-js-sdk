@@ -130,7 +130,7 @@ function createBaseFeatures(descriptor: DeviceDescriptor): Features {
     bootloader_mode: false,
     device_id: descriptorId,
     pin_protection: null,
-    passphrase_protection: false,
+    passphrase_protection: null,
     language: null,
     label: null,
     initialized: false,

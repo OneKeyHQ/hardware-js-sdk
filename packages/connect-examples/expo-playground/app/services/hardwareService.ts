@@ -16,6 +16,18 @@ import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
 export type ApiResponse<T = any> = Success<T> | Unsuccessful;
 export type HardwareApiMethod = keyof CoreApi;
 
+const extractPassphraseState = (payload: unknown): string | undefined => {
+  if (typeof payload === 'string') return payload;
+  if (!payload || typeof payload !== 'object') return undefined;
+
+  const maybeState = (payload as { passphrase_state?: unknown; passphraseState?: unknown })
+    .passphrase_state;
+  if (typeof maybeState === 'string') return maybeState;
+
+  const maybeLegacyState = (payload as { passphraseState?: unknown }).passphraseState;
+  return typeof maybeLegacyState === 'string' ? maybeLegacyState : undefined;
+};
+
 // 获取SDK实例的简化函数
 async function getSDKInstance(): Promise<CoreApi> {
   return getCurrentSDKInstance();
@@ -127,7 +139,7 @@ export async function submitPassphrase(
 // 获取设备的passphraseState
 export async function getPassphraseState(
   connectId: string
-): Promise<ApiResponse<string | undefined>> {
+): Promise<ApiResponse> {
   if (typeof window === 'undefined') {
     return {
       success: false,
@@ -197,13 +209,14 @@ export async function callHardwareAPI(
         );
         try {
           const passphraseResult = await getPassphraseState(connectId as string);
-          if (passphraseResult.success && typeof passphraseResult.payload === 'string') {
-            logInfo(`Passphrase state obtained from device: ${passphraseResult.payload}`);
-            params.passphraseState = passphraseResult.payload;
+          const passphraseState = passphraseResult.success
+            ? extractPassphraseState(passphraseResult.payload)
+            : undefined;
+          if (passphraseState) {
+            logInfo(`Passphrase state obtained from device: ${passphraseState}`);
+            params.passphraseState = passphraseState;
             // IMPORTANT: Update the store's commonParameter so the UI reflects the fetched value
-            useHardwareStore
-              .getState()
-              .setCommonParameter('passphraseState', passphraseResult.payload);
+            useHardwareStore.getState().setCommonParameter('passphraseState', passphraseState);
           } else {
             logInfo('Device passphrase protection not enabled or failed to get state from device.');
             // Ensure passphraseState is explicitly an empty string if not enabled/fetched

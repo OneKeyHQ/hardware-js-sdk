@@ -25,6 +25,41 @@ import type {
 /** SearchDevice enriched with features fetched after discovery */
 type EnrichedSearchDevice = SearchDevice & { features?: Features };
 
+function extractPassphraseSession(payload: unknown): {
+  passphraseState?: string;
+  sessionId?: string;
+} {
+  if (typeof payload === 'string') {
+    return { passphraseState: payload };
+  }
+  if (!payload || typeof payload !== 'object') {
+    return {};
+  }
+
+  const statePayload = payload as {
+    passphrase_state?: unknown;
+    passphraseState?: unknown;
+    session_id?: unknown;
+    sessionId?: unknown;
+  };
+
+  let passphraseState: string | undefined;
+  if (typeof statePayload.passphrase_state === 'string') {
+    passphraseState = statePayload.passphrase_state;
+  } else if (typeof statePayload.passphraseState === 'string') {
+    passphraseState = statePayload.passphraseState;
+  }
+
+  let sessionId: string | undefined;
+  if (typeof statePayload.session_id === 'string') {
+    sessionId = statePayload.session_id;
+  } else if (typeof statePayload.sessionId === 'string') {
+    sessionId = statePayload.sessionId;
+  }
+
+  return { passphraseState, sessionId };
+}
+
 const program = new Command();
 
 program
@@ -687,7 +722,16 @@ sessionCmd
         outputResult(globalOpts, psResult);
         return;
       }
-      const passphraseState = psResult.payload;
+      const { passphraseState, sessionId: passphraseSessionId } = extractPassphraseSession(
+        psResult.payload
+      );
+      if (!passphraseState) {
+        outputResult(globalOpts, {
+          success: false,
+          payload: { error: 'getPassphraseState did not return passphraseState' },
+        });
+        return;
+      }
 
       // 4. Get address to verify + extract deviceId
       const addrResult = await sdk.evmGetAddress(connectId, device.deviceId || '', {
@@ -712,7 +756,7 @@ sessionCmd
       });
       const featPayload = featResult?.success ? featResult.payload : undefined;
       const deviceId = featPayload?.device_id || device.deviceId || '';
-      const sessionId = featPayload?.session_id || '';
+      const sessionId = passphraseSessionId || featPayload?.session_id || '';
 
       // 6. Save to keychain
       if (passphraseState && deviceId && sessionId) {
@@ -869,6 +913,7 @@ async function prepareSession(
     deviceId?: string;
     features?: {
       device_id?: string;
+      onekey_device_type?: string;
       session_id?: string;
       passphrase_protection?: boolean | null;
       unlocked?: boolean | null;
@@ -883,6 +928,7 @@ async function prepareSession(
   // getFeatures failures here are non-fatal — we fall through to Step 3
   // which will fail with a clearer error if the device is truly unreachable.
   let deviceId = device.features?.device_id || device.deviceId || '';
+  let deviceType = device.features?.onekey_device_type;
   let unlocked = device.features?.unlocked;
   let passphraseProtection = device.features?.passphrase_protection;
 
@@ -891,6 +937,7 @@ async function prepareSession(
       const featResult = await sdk.getFeatures(connectId);
       if (featResult?.success && featResult.payload) {
         deviceId = featResult.payload.device_id || deviceId;
+        deviceType = featResult.payload.onekey_device_type || deviceType;
         unlocked = featResult.payload.unlocked;
         passphraseProtection = featResult.payload.passphrase_protection;
       }
@@ -918,7 +965,7 @@ async function prepareSession(
   }
 
   // ── Step 4: Check passphrase protection ──────────────────────────
-  if (passphraseProtection === false) {
+  if (passphraseProtection === false && deviceType !== 'pro2' && deviceType !== 'PRO2') {
     return undefined;
   }
 
@@ -940,7 +987,12 @@ async function prepareSession(
   });
 
   if (psResult.success && psResult.payload) {
-    const passphraseState = psResult.payload;
+    const { passphraseState, sessionId: passphraseSessionId } = extractPassphraseSession(
+      psResult.payload
+    );
+    if (!passphraseState) {
+      return undefined;
+    }
     globalOpts.passphraseState = passphraseState;
 
     // Save session to keychain for next invocation.
@@ -954,7 +1006,8 @@ async function prepareSession(
         passphraseState,
         skipPassphraseCheck: true,
       });
-      const sessionId = featAfter?.success ? featAfter.payload?.session_id : undefined;
+      const sessionId =
+        passphraseSessionId || (featAfter?.success ? featAfter.payload?.session_id : undefined);
       if (sessionId) {
         await saveSessionToKeychain(deviceId, passphraseState, sessionId);
         await preloadSessionFromKeychain(deviceId);
