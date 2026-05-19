@@ -1747,11 +1747,17 @@ export class LedgerAdapter implements IHardwareWallet {
       'code' in err &&
       typeof (err as { code: unknown }).code === 'number'
     ) {
-      const e = err as { code: number; message?: string; appName?: string; reason?: string };
+      const e = err as {
+        code: number;
+        message?: string;
+        appName?: string;
+        reason?: string;
+        params?: Record<string, unknown>;
+      };
       const params =
         e.code === HardwareErrorCode.DevicePermissionDenied && e.reason
           ? { permissionDeniedReason: e.reason }
-          : undefined;
+          : e.params;
       return ledgerFailure(e.code, e.message ?? 'Unknown error', e.appName, tag, params);
     }
 

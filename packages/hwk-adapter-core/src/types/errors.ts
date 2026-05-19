@@ -80,6 +80,11 @@ export enum HardwareErrorCode {
   WrongApp = 10501,
   /** 0x911c Command code not supported — app predates current SDK. */
   AppTooOld = 10502,
+  /**
+   * Not enough free storage on the device for the requested install/update.
+   * User must uninstall some apps first (or pick a smaller target).
+   */
+  DeviceOutOfMemory = 10503,
 
   // --- 11000s EVM (Ledger Ethereum App) APDU-specific ---
   /** 0x6a80 Invalid data — observed on blindSignTransactionFallback when the
