@@ -21,24 +21,30 @@ const GITHUB_REPO_URL = 'https://github.com/OneKeyHQ/onekey-wallet-skills'
 const copyByLocale = {
   en: {
     eyebrow: 'OneKey Agent Wallet',
-    title: 'Wallets, built for AI agents.',
+    titleLead: 'AI signs.',
+    titleEmphasis: 'You confirm on hardware.',
     subtitle:
-      'Install one skill pack. Your agents can read balances, research markets, and stage transactions in plain language — while users keep control through OneKey GUI and hardware.',
+      'Skills let agents read balances, research markets, and prepare transactions. Every fund move ends on a OneKey device the user must approve — with the full transaction shown on screen.',
     primaryCta: 'Install skills',
     secondaryCta: 'Explore capabilities',
+
+    installEyebrow: 'Install',
     installTitle: 'One command, every AI agent.',
     installSubtitle:
       'Powered by the open skills CLI. Auto-detects Claude Code, Codex, Cursor, OpenCode, and 50+ more.',
     installCopyLabel: 'Copy',
     installCopiedLabel: 'Copied',
     installCommandSrLabel: 'Install command',
-    installNote: 'Running multiple AI agents on the same machine? Pass --agent <name> to target a specific one.',
+    installNote:
+      'Running multiple AI agents on the same machine? Pass --agent <name> to target a specific one.',
+
     proof: [
       '4 wallet skills',
       'Claude Code · Codex · Cursor · OpenCode',
       'One npx command',
       'Hardware confirmation for fund moves',
     ],
+
     sectionEyebrow: 'Skill-first wallet layer',
     sectionTitle: 'Everything an agent needs at the wallet boundary.',
     cards: [
@@ -85,24 +91,25 @@ const copyByLocale = {
         href: 'capabilities',
       },
     ],
+
     finalEyebrow: 'Start now',
     finalTitle: 'Install in one command. Ship in an afternoon.',
     finalCta: 'Read the quickstart',
     finalSecondary: 'Browse the GitHub repo',
+
     heroImageAlt:
-      'OneKey hardware wallet performing clear signing for an AI agent transaction',
-    heroSessionLabel: 'Agent Wallet session',
-    heroSessionValue: 'Keyless-bound account',
-    heroConfirmLabel: 'Hardware confirmation required',
-    heroConfirmValue: 'Review on device',
+      'A OneKey hardware wallet displaying a Gnosis Safe transaction flagged as a high-risk delegatecall, awaiting user approval on device.',
   },
   zh: {
     eyebrow: 'OneKey Agent Wallet',
-    title: '为 AI Agent 打造的钱包。',
+    titleLead: 'AI 来签名，',
+    titleEmphasis: '你在硬件上确认。',
     subtitle:
-      '一条命令装好 skills。Agent 用自然语言查余额、研究行情、准备交易，关键控制权留给 OneKey GUI 和硬件钱包。',
+      'Skills 让 Agent 读余额、研究行情、准备交易。每一笔资金动作都在 OneKey 设备上最后一审——交易内容完整显示在屏幕上，由用户确认。',
     primaryCta: '安装 Skills',
     secondaryCta: '查看能力',
+
+    installEyebrow: '安装',
     installTitle: '一条命令，覆盖所有 AI Agent。',
     installSubtitle:
       '基于开源 skills CLI。自动识别 Claude Code、Codex、Cursor、OpenCode 等 50+ AI agent。',
@@ -110,12 +117,14 @@ const copyByLocale = {
     installCopiedLabel: '已复制',
     installCommandSrLabel: '安装命令',
     installNote: '一台机器装了多个 AI agent？加上 --agent <name> 参数指定其中一个。',
+
     proof: [
       '4 个钱包 Skills',
       'Claude Code · Codex · Cursor · OpenCode',
       '一条 npx 命令',
       '资金操作硬件确认',
     ],
+
     sectionEyebrow: 'Skill-first 钱包能力层',
     sectionTitle: 'Agent 在钱包边界需要的能力，一次装好。',
     cards: [
@@ -162,15 +171,14 @@ const copyByLocale = {
         href: 'capabilities',
       },
     ],
+
     finalEyebrow: '现在开始',
     finalTitle: '一条命令装好，一个下午跑通。',
     finalCta: '查看快速开始',
     finalSecondary: '在 GitHub 查看源码',
-    heroImageAlt: 'OneKey 硬件钱包对 AI agent 发起的交易进行 clear signing',
-    heroSessionLabel: 'Agent Wallet 会话',
-    heroSessionValue: '已绑定 keyless',
-    heroConfirmLabel: '需要硬件确认',
-    heroConfirmValue: '在设备上审核',
+
+    heroImageAlt:
+      'OneKey 硬件钱包显示一笔被识别为高风险 delegatecall 的 Gnosis Safe 交易，等待用户在设备上确认。',
   },
 }
 
@@ -227,58 +235,31 @@ export function AgentWalletLanding({ locale = 'en' }) {
   return (
     <div className="landing-page flex min-h-screen max-w-full flex-col overflow-x-hidden bg-[#101111] text-white">
       <main className="flex flex-col">
+        {/* HERO — copy + product shot */}
         <section className="relative overflow-hidden">
           <div
             aria-hidden="true"
-            className="absolute inset-0 bg-[radial-gradient(circle_at_76%_16%,rgba(22,214,41,0.2),transparent_30%),radial-gradient(circle_at_8%_14%,rgba(87,230,104,0.11),transparent_28%)]"
+            className="absolute inset-0 bg-[radial-gradient(circle_at_76%_16%,rgba(22,214,41,0.18),transparent_30%),radial-gradient(circle_at_8%_14%,rgba(87,230,104,0.1),transparent_28%)]"
           />
           <div
             aria-hidden="true"
             className="absolute inset-x-0 top-0 h-[540px] bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:56px_56px] [mask-image:linear-gradient(180deg,#000,transparent)]"
           />
 
-          <div className="relative mx-auto grid min-h-[760px] w-full max-w-[1440px] grid-cols-1 gap-12 overflow-hidden px-5 pb-16 pt-20 md:px-6 lg:grid-cols-[minmax(0,0.96fr)_minmax(0,1.04fr)] lg:px-16 lg:pt-20">
+          <div className="relative mx-auto grid w-full max-w-[1440px] grid-cols-1 gap-12 px-5 pb-12 pt-20 md:px-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-16 lg:px-16 lg:pb-20 lg:pt-24">
             <div className="flex w-full min-w-0 max-w-[720px] flex-col justify-center">
               <div className="w-fit rounded-full border border-[#57E668]/35 bg-[#57E668]/10 px-4 py-2 text-[14px] font-semibold leading-5 text-[#57E668]">
                 {copy.eyebrow}
               </div>
               <h1 className="mt-6 max-w-full text-[44px] font-semibold leading-[1.02] md:text-[64px] lg:text-[76px]">
-                {copy.title}
+                <span className="block text-white/45">{copy.titleLead}</span>
+                <span className="block text-white">{copy.titleEmphasis}</span>
               </h1>
-              <p className="mt-7 max-w-full text-[18px] leading-[30px] text-white/68 md:max-w-[660px]">
+              <p className="mt-7 max-w-full text-[18px] leading-[30px] text-white/68 md:max-w-[560px]">
                 {copy.subtitle}
               </p>
 
-              <div className="mt-8 w-full min-w-0 overflow-hidden rounded-[20px] border border-white/10 bg-[#141616]/88 shadow-[0_24px_70px_rgba(0,0,0,0.36)] backdrop-blur">
-                <div className="flex items-start justify-between gap-3 p-5">
-                  <div>
-                    <div className="text-[16px] font-semibold leading-5 text-white">
-                      {copy.installTitle}
-                    </div>
-                    <p className="mt-2 max-w-[440px] text-[13px] leading-5 text-white/60">
-                      {copy.installSubtitle}
-                    </p>
-                  </div>
-                  <Sparkles className="mt-1 size-5 shrink-0 text-[#57E668]" aria-hidden="true" />
-                </div>
-                <div className="border-t border-white/10 p-5">
-                  <div className="relative">
-                    <pre className="m-0 overflow-x-auto rounded-[14px] bg-[#0C0D0D] p-4 pr-[110px] text-[14px] leading-[22px] text-[#D7FFDC]">
-                      <code aria-label={copy.installCommandSrLabel}>{INSTALL_COMMAND}</code>
-                    </pre>
-                    <div className="absolute right-3 top-3">
-                      <CopyButton
-                        text={INSTALL_COMMAND}
-                        label={copy.installCopyLabel}
-                        copiedLabel={copy.installCopiedLabel}
-                      />
-                    </div>
-                  </div>
-                  <p className="m-0 mt-3 text-[13px] leading-5 text-white/55">{copy.installNote}</p>
-                </div>
-              </div>
-
-              <div className="mt-6 flex flex-wrap gap-3">
+              <div className="mt-8 flex flex-wrap gap-3">
                 <Link
                   href={`${basePath}/agent-wallet/quickstart/`}
                   className="rounded-full bg-[linear-gradient(90deg,#57E668_0%,#16D629_100%)] px-8 py-[18px] text-[16px] font-semibold leading-5 text-[#101111] no-underline transition-opacity hover:opacity-90"
@@ -294,40 +275,64 @@ export function AgentWalletLanding({ locale = 'en' }) {
               </div>
             </div>
 
-            <div className="flex min-w-0 items-center">
-              <div className="relative aspect-[1/0.9] w-full overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_52%_42%,rgba(87,230,104,0.2),transparent_34%),linear-gradient(145deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] shadow-[0_32px_120px_rgba(0,0,0,0.48)]">
-                <div className="absolute inset-9 overflow-hidden rounded-[22px] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1),0_28px_80px_rgba(0,0,0,0.42)]">
-                  <Image
-                    src="/landing-page/agent-clear-signing.jpg"
-                    alt={copy.heroImageAlt}
-                    fill
-                    priority
-                    sizes="(min-width: 1024px) 50vw, 100vw"
-                    className="object-cover"
-                  />
-                  <div
-                    aria-hidden="true"
-                    className="absolute inset-0 bg-[linear-gradient(90deg,rgba(16,17,17,0.04),rgba(16,17,17,0.18))]"
-                  />
+            <div className="relative flex min-w-0 items-center justify-center">
+              <Image
+                src="/landing-page/agent-clear-signing.jpg"
+                alt={copy.heroImageAlt}
+                width={1440}
+                height={1800}
+                priority
+                sizes="(min-width: 1024px) 56vw, 100vw"
+                className="h-auto w-full max-w-[680px]"
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* INSTALL — its own moment, full width */}
+        <section className="mx-auto w-full max-w-[1440px] px-6 lg:px-16">
+          <div className="relative overflow-hidden rounded-[24px] border border-white/10 bg-[#141616] shadow-[0_24px_70px_rgba(0,0,0,0.36)]">
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_90%_0%,rgba(87,230,104,0.12),transparent_45%)]"
+            />
+            <div className="relative grid gap-8 p-6 md:p-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:items-center lg:gap-12 lg:p-10">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Sparkles className="size-4 text-[#57E668]" aria-hidden="true" />
+                  <span className="text-[13px] font-semibold uppercase tracking-[0.08em] text-[#57E668]">
+                    {copy.installEyebrow}
+                  </span>
                 </div>
-                <div
-                  aria-hidden="true"
-                  className="absolute inset-x-[60px] inset-y-[72px] rounded-[26px] border border-[#57E668]/40 shadow-[0_0_34px_rgba(87,230,104,0.18),inset_0_0_28px_rgba(87,230,104,0.08)]"
-                />
-                <div className="absolute bottom-20 left-5 grid max-w-[220px] gap-1 rounded-[14px] border border-white/15 bg-[#111312]/85 p-4 shadow-[0_18px_50px_rgba(0,0,0,0.36)] backdrop-blur-xl">
-                  <span className="text-[12px] leading-4 text-white/55">{copy.heroSessionLabel}</span>
-                  <strong className="text-[14px] leading-[18px] text-white">{copy.heroSessionValue}</strong>
+                <h2 className="mt-3 text-[26px] font-semibold leading-[1.15] md:text-[34px]">
+                  {copy.installTitle}
+                </h2>
+                <p className="mt-3 max-w-[520px] text-[15px] leading-[24px] text-white/65">
+                  {copy.installSubtitle}
+                </p>
+              </div>
+
+              <div className="w-full min-w-0">
+                <div className="relative">
+                  <pre className="m-0 overflow-x-auto rounded-[14px] bg-[#0C0D0D] p-4 pr-[110px] text-[14px] leading-[22px] text-[#D7FFDC]">
+                    <code aria-label={copy.installCommandSrLabel}>{INSTALL_COMMAND}</code>
+                  </pre>
+                  <div className="absolute right-3 top-3">
+                    <CopyButton
+                      text={INSTALL_COMMAND}
+                      label={copy.installCopyLabel}
+                      copiedLabel={copy.installCopiedLabel}
+                    />
+                  </div>
                 </div>
-                <div className="absolute right-5 top-20 grid max-w-[240px] gap-1 rounded-[14px] border border-[#57E668]/35 bg-[#111312]/85 p-4 shadow-[0_18px_50px_rgba(0,0,0,0.36)] backdrop-blur-xl">
-                  <span className="text-[12px] leading-4 text-white/55">{copy.heroConfirmLabel}</span>
-                  <strong className="text-[14px] leading-[18px] text-white">{copy.heroConfirmValue}</strong>
-                </div>
+                <p className="m-0 mt-3 text-[12px] leading-5 text-white/55">{copy.installNote}</p>
               </div>
             </div>
           </div>
         </section>
 
-        <section className="mx-auto -mt-4 grid w-full max-w-[1440px] grid-cols-1 gap-3 px-6 md:grid-cols-2 lg:grid-cols-4 lg:px-16">
+        {/* PROOF BAR */}
+        <section className="mx-auto mt-6 grid w-full max-w-[1440px] grid-cols-1 gap-3 px-6 md:grid-cols-2 lg:grid-cols-4 lg:px-16">
           {copy.proof.map((item) => (
             <div
               key={item}
@@ -338,6 +343,7 @@ export function AgentWalletLanding({ locale = 'en' }) {
           ))}
         </section>
 
+        {/* CAPABILITY CARDS */}
         <section className="mx-auto w-full max-w-[1440px] px-6 py-28 lg:px-16">
           <div className="max-w-[820px]">
             <span className="text-[14px] font-semibold leading-5 text-[#57E668]">
@@ -375,6 +381,7 @@ export function AgentWalletLanding({ locale = 'en' }) {
           </div>
         </section>
 
+        {/* FINAL CTA */}
         <section className="mx-auto w-full max-w-[1440px] px-6 pb-28 lg:px-16">
           <div className="flex flex-col items-start gap-7 rounded-[24px] border border-white/10 bg-[#222] p-8 lg:flex-row lg:items-center lg:justify-between lg:p-12">
             <div>
