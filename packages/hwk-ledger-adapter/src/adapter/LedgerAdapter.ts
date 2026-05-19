@@ -225,12 +225,8 @@ export class LedgerAdapter implements IHardwareWallet {
 
     const devices = await this.connector.searchDevices();
 
-    // Replace cache with this round's raw result. DMK paths used as
-    // connectId on USB are ephemeral (new UUID after each replug), so
-    // incremental writes leave stale entries pointing at devices DMK no
-    // longer recognizes — the visible symptom is the same physical device
-    // appearing twice in the discovered list, one with a real name and one
-    // with the 'Ledger' placeholder from a connect-time event.
+    // Replace cache with this round's raw result. DMK paths used as connectId
+    // on USB are ephemeral — incremental writes leave stale entries.
     this._discoveredDevices.clear();
     for (const d of devices) {
       if (d.connectId) {
@@ -238,7 +234,6 @@ export class LedgerAdapter implements IHardwareWallet {
       }
     }
 
-    // If no devices found, ensure permission (no connectId = search context)
     if (this._discoveredDevices.size === 0) {
       await this._ensureDevicePermission();
     }
@@ -259,7 +254,6 @@ export class LedgerAdapter implements IHardwareWallet {
     return Array.from(this._discoveredDevices.values());
   }
 
-  /** Compact snapshot helpers for diagnostic logs. */
   private _snapshotSessions(): Array<{ connectId: string; sessionId: string }> {
     return [...this._sessions.entries()].map(([connectId, sessionId]) => ({
       connectId,
@@ -279,6 +273,31 @@ export class LedgerAdapter implements IHardwareWallet {
       label: info.label,
       serial: info.serialNumber,
     }));
+  }
+
+  // Enforce USB single-session invariant — see connectDevice.
+  private async _evictAllSessions(reason: string): Promise<void> {
+    if (this._sessions.size === 0) return;
+    const stale = [...this._sessions.entries()];
+    debugLog(
+      '[SESS-DBG] evictAllSessions reason=',
+      reason,
+      'evicting=',
+      stale.map(([cid, sid]) => ({ connectId: cid, sessionId: sid }))
+    );
+    this._sessions.clear();
+    for (const [, sid] of stale) {
+      try {
+        await this.connector.disconnect(sid);
+      } catch (err) {
+        debugLog(
+          '[SESS-DBG] evictAllSessions disconnect failed sessionId=',
+          sid,
+          'err=',
+          (err as { message?: string })?.message
+        );
+      }
+    }
   }
 
   // Layer 2 retry budget after connection-class error. Each round delegates
@@ -319,6 +338,13 @@ export class LedgerAdapter implements IHardwareWallet {
         throw Object.assign(new Error('Ledger BLE connectId is required.'), {
           code: HardwareErrorCode.DeviceNotFound,
         });
+      }
+
+      // USB invariant: at most one session. Drop any pre-existing session
+      // before opening a new one — guards ensureConnected's empty-connectId
+      // ambient fallback against ghost entries.
+      if (!isLedgerBleConnectionType(this.connector.connectionType)) {
+        await this._evictAllSessions('connectDevice');
       }
 
       await this._ensureDevicePermission(connectId);
@@ -912,13 +938,29 @@ export class LedgerAdapter implements IHardwareWallet {
     // whatever happens to be the first session entry (caused multi-device
     // drift when a stale entry for B made calls for A return B's session).
     if (!connectId && this._sessions.size > 0) {
+      // USB invariant violated → fail loud rather than route to a possibly-
+      // wrong device. connectDevice evicts, so size>1 here should be impossible.
+      if (
+        !isLedgerBleConnectionType(this.connector.connectionType) &&
+        this._sessions.size > 1
+      ) {
+        debugLog(
+          '[SESS-DBG] ensureConnected ABORT multiple USB sessions present sessions=',
+          this._snapshotSessions()
+        );
+        throw Object.assign(
+          new Error(
+            'Ledger USB session invariant violated: more than one session is active. Please reconnect the device.'
+          ),
+          { code: HardwareErrorCode.DeviceOneDeviceOnly }
+        );
+      }
       const ambient = this._sessions.keys().next().value as string;
       debugLog(
         '[SESS-DBG] ensureConnected RESOLVED path=ambient-fallback chosenConnectId=',
         ambient,
         'sessionId=',
-        this._sessions.get(ambient),
-        'WARNING: caller passed empty connectId, routing to first session entry'
+        this._sessions.get(ambient)
       );
       return ambient;
     }
