@@ -21,8 +21,7 @@ const GITHUB_REPO_URL = 'https://github.com/OneKeyHQ/onekey-wallet-skills'
 const copyByLocale = {
   en: {
     eyebrow: 'OneKey Agent Wallet',
-    titleLead: 'AI signs.',
-    titleEmphasis: 'You confirm on hardware.',
+    title: 'Wallets, built for AI agents.',
     subtitle:
       'Skills let agents read balances, research markets, and prepare transactions. Every fund move ends on a OneKey device the user must approve — with the full transaction shown on screen.',
     primaryCta: 'Install skills',
@@ -102,8 +101,7 @@ const copyByLocale = {
   },
   zh: {
     eyebrow: 'OneKey Agent Wallet',
-    titleLead: 'AI 来签名，',
-    titleEmphasis: '你在硬件上确认。',
+    title: '为 AI Agent 打造的钱包。',
     subtitle:
       'Skills 让 Agent 读余额、研究行情、准备交易。每一笔资金动作都在 OneKey 设备上最后一审——交易内容完整显示在屏幕上，由用户确认。',
     primaryCta: '安装 Skills',
@@ -252,8 +250,7 @@ export function AgentWalletLanding({ locale = 'en' }) {
                 {copy.eyebrow}
               </div>
               <h1 className="mt-6 max-w-full text-[44px] font-semibold leading-[1.02] md:text-[64px] lg:text-[76px]">
-                <span className="block text-white/45">{copy.titleLead}</span>
-                <span className="block text-white">{copy.titleEmphasis}</span>
+                {copy.title}
               </h1>
               <p className="mt-7 max-w-full text-[18px] leading-[30px] text-white/68 md:max-w-[560px]">
                 {copy.subtitle}
@@ -276,15 +273,21 @@ export function AgentWalletLanding({ locale = 'en' }) {
             </div>
 
             <div className="relative flex min-w-0 items-center justify-center">
-              <Image
-                src="/landing-page/agent-clear-signing.jpg"
-                alt={copy.heroImageAlt}
-                width={1440}
-                height={1800}
-                priority
-                sizes="(min-width: 1024px) 56vw, 100vw"
-                className="h-auto w-full max-w-[680px]"
-              />
+              <div className="relative w-full max-w-[680px]">
+                <Image
+                  src="/landing-page/agent-clear-signing.jpg"
+                  alt={copy.heroImageAlt}
+                  width={1440}
+                  height={1800}
+                  priority
+                  sizes="(min-width: 1024px) 56vw, 100vw"
+                  className="h-auto w-full"
+                />
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-x-0 bottom-0 h-[45%] bg-[linear-gradient(to_top,#101111_0%,rgba(16,17,17,0.96)_28%,rgba(16,17,17,0.7)_55%,transparent_100%)]"
+                />
+              </div>
             </div>
           </div>
         </section>
