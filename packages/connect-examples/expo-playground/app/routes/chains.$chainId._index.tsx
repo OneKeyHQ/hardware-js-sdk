@@ -23,7 +23,7 @@ import { ChainIcon } from '../components/icons/ChainIcon';
 import { processParameters } from '../utils/parameterUtils';
 import { cancelHardwareOperation } from '../services/hardwareService';
 import { logHardware } from '../utils/logger';
-import { formatJsonPreview } from '../utils/jsonPreview';
+import { formatJsonPreview, formatUntruncatedJsonPreview } from '../utils/jsonPreview';
 import { ProtocolExecutionLog } from '../components/common/MethodExecutor';
 import type { MethodPreset, UnifiedMethodConfig } from '../data/types';
 
@@ -338,10 +338,8 @@ const ChainMethodsIndexPage: React.FC = () => {
   );
   const activeRequestPreview = useMemo(
     () =>
-      formatJsonPreview(activeRequestPayload, {
-        maxDepth: 6,
-        maxArrayItems: 12,
-        maxStringLength: 512,
+      formatUntruncatedJsonPreview(activeRequestPayload, {
+        indent: 2,
       }),
     [activeRequestPayload]
   );

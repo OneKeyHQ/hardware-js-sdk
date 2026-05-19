@@ -4,7 +4,7 @@ import { Button } from '../ui/Button';
 import { Alert, AlertDescription } from '../ui/Alert';
 import { Save, X } from 'lucide-react';
 import { Textarea } from '../ui/Textarea';
-import { getJsonPreview } from '../../utils/jsonPreview';
+import { getUntruncatedJsonPreview } from '../../utils/jsonPreview';
 
 interface JsonEditorProps {
   data: Record<string, unknown> | null;
@@ -31,10 +31,8 @@ const JsonEditor = forwardRef<JsonEditorRef, JsonEditorProps>(
     const preview = useMemo(
       () =>
         data
-          ? getJsonPreview(data, {
-              maxDepth: 6,
-              maxArrayItems: 12,
-              maxStringLength: 512,
+          ? getUntruncatedJsonPreview(data, {
+              indent: 2,
             })
           : null,
       [data]

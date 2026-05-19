@@ -20,6 +20,13 @@ const DEFAULT_PREVIEW_OPTIONS: Required<JsonPreviewOptions> = {
   indent: 2,
 };
 
+const UNTRUNCATED_PREVIEW_OPTIONS: JsonPreviewOptions = {
+  maxDepth: Number.MAX_SAFE_INTEGER,
+  maxArrayItems: Number.MAX_SAFE_INTEGER,
+  maxObjectKeys: Number.MAX_SAFE_INTEGER,
+  maxStringLength: Number.MAX_SAFE_INTEGER,
+};
+
 function normalizeOptions(options: JsonPreviewOptions = {}): Required<JsonPreviewOptions> {
   return {
     ...DEFAULT_PREVIEW_OPTIONS,
@@ -163,6 +170,23 @@ export function getJsonPreview(value: unknown, options?: JsonPreviewOptions): Js
 
 export function formatJsonPreview(value: unknown, options?: JsonPreviewOptions): string {
   return getJsonPreview(value, options).text;
+}
+
+export function getUntruncatedJsonPreview(
+  value: unknown,
+  options?: Pick<JsonPreviewOptions, 'indent'>
+): JsonPreviewResult {
+  return getJsonPreview(value, {
+    ...UNTRUNCATED_PREVIEW_OPTIONS,
+    ...options,
+  });
+}
+
+export function formatUntruncatedJsonPreview(
+  value: unknown,
+  options?: Pick<JsonPreviewOptions, 'indent'>
+): string {
+  return getUntruncatedJsonPreview(value, options).text;
 }
 
 export function getSearchableJsonText(value: unknown, options?: JsonPreviewOptions): string {
