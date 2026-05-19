@@ -1,67 +1,46 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import {
   ArrowUpRight,
   Bot,
-  CheckCircle2,
+  Check,
   Code2,
+  Copy,
   LockKeyhole,
   ShieldCheck,
   Sparkles,
   WalletCards,
 } from 'lucide-react'
 
+const INSTALL_COMMAND = 'npx skills add OneKeyHQ/onekey-wallet-skills'
+const GITHUB_REPO_URL = 'https://github.com/OneKeyHQ/onekey-wallet-skills'
+
 const copyByLocale = {
   en: {
     eyebrow: 'OneKey Agent Wallet',
-    title: 'Build wallet-native AI agents with OneKey',
+    title: 'Wallets, built for AI agents.',
     subtitle:
-      'Install wallet skills first. Agents can read balances, research markets, quote swaps, and prepare transactions in natural language while OneKey GUI and hardware keep users in control.',
+      'Install one skill pack. Your agents can read balances, research markets, and stage transactions in plain language — while users keep control through OneKey GUI and hardware.',
     primaryCta: 'Install skills',
-    secondaryCta: 'See what agents can do',
-    installTitle: 'Start with skills',
+    secondaryCta: 'Explore capabilities',
+    installTitle: 'One command, every AI agent.',
     installSubtitle:
-      'Users ask in natural language. The skills handle schema discovery, CLI preflight, and safe command routing behind the scenes.',
-    installOptions: [
-      {
-        id: 'claude',
-        label: 'Claude Code',
-        command:
-          '/plugin marketplace add OneKeyHQ/onekey-wallet-skills\n/plugin install onekey-wallet-skills',
-        note: 'Native plugin install for Claude Code.',
-      },
-      {
-        id: 'codex',
-        label: 'Codex',
-        command:
-          'Fetch and follow instructions from https://raw.githubusercontent.com/OneKeyHQ/onekey-wallet-skills/main/.codex/INSTALL.md',
-        note: 'Codex follows the repo install guide and discovers the four wallet skills.',
-      },
-      {
-        id: 'cursor',
-        label: 'Cursor',
-        command: 'git clone https://github.com/OneKeyHQ/onekey-wallet-skills',
-        note: 'Point Cursor at the plugin directory, then ask wallet prompts directly.',
-      },
-      {
-        id: 'opencode',
-        label: 'OpenCode',
-        command:
-          'Fetch and follow instructions from https://raw.githubusercontent.com/OneKeyHQ/onekey-wallet-skills/main/.opencode/INSTALL.md',
-        note: 'OpenCode uses the same skill pack and command schema.',
-      },
-    ],
+      'Powered by the open skills CLI. Auto-detects Claude Code, Codex, Cursor, OpenCode, and 50+ more.',
+    installCopyLabel: 'Copy',
+    installCopiedLabel: 'Copied',
+    installCommandSrLabel: 'Install command',
+    installNote: 'Running multiple AI agents on the same machine? Pass --agent <name> to target a specific one.',
     proof: [
       '4 wallet skills',
-      'Claude Code, Codex, Cursor, OpenCode, OpenClaw',
-      'CLI handled by skills',
+      'Claude Code · Codex · Cursor · OpenCode',
+      'One npx command',
       'Hardware confirmation for fund moves',
     ],
     sectionEyebrow: 'Skill-first wallet layer',
-    sectionTitle:
-      'Make the first step installation, not a wall of terminal commands.',
+    sectionTitle: 'Everything an agent needs at the wallet boundary.',
     cards: [
       {
         title: 'Wallet Skills',
@@ -106,62 +85,39 @@ const copyByLocale = {
         href: 'capabilities',
       },
     ],
-    modelTitle: 'Users speak to the skill. OneKey handles the wallet boundary.',
-    modelItems: [
-      'The visible onboarding path is skill installation and natural-language prompts, not manual CLI setup.',
-      'Skills use the current schema to route wallet, market, swap, and security requests without exposing raw command dumps to users.',
-      'Fund-moving actions are staged, risk-checked, and can be escalated to OneKey hardware for clear signing.',
-    ],
-    finalTitle: 'Give agents usable wallet capabilities without turning private keys into prompts.',
-    finalCta: 'Start with the quickstart',
+    finalEyebrow: 'Start now',
+    finalTitle: 'Install in one command. Ship in an afternoon.',
+    finalCta: 'Read the quickstart',
+    finalSecondary: 'Browse the GitHub repo',
+    heroImageAlt:
+      'OneKey hardware wallet performing clear signing for an AI agent transaction',
+    heroSessionLabel: 'Agent Wallet session',
+    heroSessionValue: 'Keyless-bound account',
+    heroConfirmLabel: 'Hardware confirmation required',
+    heroConfirmValue: 'Review on device',
   },
   zh: {
     eyebrow: 'OneKey Agent Wallet',
-    title: '让 AI Agent 用上 OneKey 钱包',
+    title: '为 AI Agent 打造的钱包。',
     subtitle:
-      '先安装 Wallet Skills。用户用自然语言查余额、研究行情、报价 swap、准备交易，OneKey GUI 和硬件钱包继续保留关键控制权。',
+      '一条命令装好 skills。Agent 用自然语言查余额、研究行情、准备交易，关键控制权留给 OneKey GUI 和硬件钱包。',
     primaryCta: '安装 Skills',
     secondaryCta: '查看能力',
-    installTitle: '先安装 Skills',
+    installTitle: '一条命令，覆盖所有 AI Agent。',
     installSubtitle:
-      '用户不需要手写 CLI。Skills 会在背后完成 schema discovery、CLI preflight 和安全路由。',
-    installOptions: [
-      {
-        id: 'claude',
-        label: 'Claude Code',
-        command:
-          '/plugin marketplace add OneKeyHQ/onekey-wallet-skills\n/plugin install onekey-wallet-skills',
-        note: 'Claude Code 使用原生 plugin 安装路径。',
-      },
-      {
-        id: 'codex',
-        label: 'Codex',
-        command:
-          'Fetch and follow instructions from https://raw.githubusercontent.com/OneKeyHQ/onekey-wallet-skills/main/.codex/INSTALL.md',
-        note: 'Codex 按仓库安装说明接入四个钱包 skills。',
-      },
-      {
-        id: 'cursor',
-        label: 'Cursor',
-        command: 'git clone https://github.com/OneKeyHQ/onekey-wallet-skills',
-        note: '把 Cursor 指向 plugin 目录后，直接输入钱包请求。',
-      },
-      {
-        id: 'opencode',
-        label: 'OpenCode',
-        command:
-          'Fetch and follow instructions from https://raw.githubusercontent.com/OneKeyHQ/onekey-wallet-skills/main/.opencode/INSTALL.md',
-        note: 'OpenCode 使用同一套 skill pack 和命令 schema。',
-      },
-    ],
+      '基于开源 skills CLI。自动识别 Claude Code、Codex、Cursor、OpenCode 等 50+ AI agent。',
+    installCopyLabel: '复制',
+    installCopiedLabel: '已复制',
+    installCommandSrLabel: '安装命令',
+    installNote: '一台机器装了多个 AI agent？加上 --agent <name> 参数指定其中一个。',
     proof: [
       '4 个钱包 Skills',
-      '支持 Claude Code / Codex / Cursor / OpenCode / OpenClaw',
-      'CLI 由 Skills 处理',
-      '资金操作交给硬件确认',
+      'Claude Code · Codex · Cursor · OpenCode',
+      '一条 npx 命令',
+      '资金操作硬件确认',
     ],
     sectionEyebrow: 'Skill-first 钱包能力层',
-    sectionTitle: '第一步应该是安装 Skills，而不是让用户面对一大段终端命令。',
+    sectionTitle: 'Agent 在钱包边界需要的能力，一次装好。',
     cards: [
       {
         title: 'Wallet Skills',
@@ -206,14 +162,15 @@ const copyByLocale = {
         href: 'capabilities',
       },
     ],
-    modelTitle: '用户面对的是 Skill，钱包边界交给 OneKey。',
-    modelItems: [
-      '可见的 onboarding 是 skill 安装和自然语言 prompt，不是手动 CLI 初始化。',
-      'Skills 根据当前 schema 路由钱包、行情、交易和安全请求，不把原始命令 dump 给用户。',
-      '涉及资金移动的动作会先预览、检查风险，并可升级到 OneKey 硬件完成 clear signing。',
-    ],
-    finalTitle: '让 Agent 拥有可用的钱包能力，但不要把私钥变成 prompt。',
-    finalCta: '从快速开始进入',
+    finalEyebrow: '现在开始',
+    finalTitle: '一条命令装好，一个下午跑通。',
+    finalCta: '查看快速开始',
+    finalSecondary: '在 GitHub 查看源码',
+    heroImageAlt: 'OneKey 硬件钱包对 AI agent 发起的交易进行 clear signing',
+    heroSessionLabel: 'Agent Wallet 会话',
+    heroSessionValue: '已绑定 keyless',
+    heroConfirmLabel: '需要硬件确认',
+    heroConfirmValue: '在设备上审核',
   },
 }
 
@@ -224,66 +181,100 @@ const getCardHref = (basePath, href) =>
     ? `${basePath}/agent-wallet/${href.replace('#', '/#')}`
     : `${basePath}/agent-wallet/${href}/`
 
+function CopyButton({ text, label, copiedLabel }) {
+  const [copied, setCopied] = useState(false)
+  const timeoutRef = useRef(null)
+
+  useEffect(
+    () => () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+    },
+    [],
+  )
+
+  const onCopy = async () => {
+    if (typeof navigator === 'undefined' || !navigator.clipboard) return
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+      timeoutRef.current = setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // Clipboard API requires a secure context and user gesture; fail quietly.
+    }
+  }
+
+  const Icon = copied ? Check : Copy
+
+  return (
+    <button
+      type="button"
+      onClick={onCopy}
+      aria-label={copied ? copiedLabel : `${label}: ${text}`}
+      aria-live="polite"
+      className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[12px] font-semibold leading-4 text-white/80 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#57E668]"
+    >
+      <Icon className="size-3.5" aria-hidden="true" />
+      <span>{copied ? copiedLabel : label}</span>
+    </button>
+  )
+}
+
 export function AgentWalletLanding({ locale = 'en' }) {
   const copy = getCopy(locale)
   const basePath = `/${locale}`
-  const [selectedClient, setSelectedClient] = useState('claude')
-  const selectedInstall =
-    copy.installOptions.find((option) => option.id === selectedClient) ?? copy.installOptions[0]
 
   return (
     <div className="landing-page flex min-h-screen max-w-full flex-col overflow-x-hidden bg-[#101111] text-white">
       <main className="flex flex-col">
         <section className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_76%_16%,rgba(22,214,41,0.2),transparent_30%),radial-gradient(circle_at_8%_14%,rgba(87,230,104,0.11),transparent_28%)]" />
-          <div className="absolute inset-x-0 top-0 h-[540px] bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:56px_56px] [mask-image:linear-gradient(180deg,#000,transparent)]" />
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 bg-[radial-gradient(circle_at_76%_16%,rgba(22,214,41,0.2),transparent_30%),radial-gradient(circle_at_8%_14%,rgba(87,230,104,0.11),transparent_28%)]"
+          />
+          <div
+            aria-hidden="true"
+            className="absolute inset-x-0 top-0 h-[540px] bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:56px_56px] [mask-image:linear-gradient(180deg,#000,transparent)]"
+          />
 
           <div className="relative mx-auto grid min-h-[760px] w-full max-w-[1440px] grid-cols-1 gap-12 overflow-hidden px-5 pb-16 pt-20 md:px-6 lg:grid-cols-[minmax(0,0.96fr)_minmax(0,1.04fr)] lg:px-16 lg:pt-20">
             <div className="flex w-full min-w-0 max-w-[720px] flex-col justify-center">
               <div className="w-fit rounded-full border border-[#57E668]/35 bg-[#57E668]/10 px-4 py-2 text-[14px] font-semibold leading-5 text-[#57E668]">
                 {copy.eyebrow}
               </div>
-              <h1 className="mt-6 max-w-full text-[52px] font-semibold leading-[0.96] md:text-[76px] lg:text-[88px]">
+              <h1 className="mt-6 max-w-full text-[44px] font-semibold leading-[1.02] md:text-[64px] lg:text-[76px]">
                 {copy.title}
               </h1>
               <p className="mt-7 max-w-full text-[18px] leading-[30px] text-white/68 md:max-w-[660px]">
                 {copy.subtitle}
               </p>
+
               <div className="mt-8 w-full min-w-0 overflow-hidden rounded-[20px] border border-white/10 bg-[#141616]/88 shadow-[0_24px_70px_rgba(0,0,0,0.36)] backdrop-blur">
-                <div className="border-b border-white/10 p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <div className="text-[18px] font-semibold leading-6 text-white">
-                        {copy.installTitle}
-                      </div>
+                <div className="flex items-start justify-between gap-3 p-5">
+                  <div>
+                    <div className="text-[16px] font-semibold leading-5 text-white">
+                      {copy.installTitle}
                     </div>
-                    <Sparkles className="size-5 text-[#57E668]" />
+                    <p className="mt-2 max-w-[440px] text-[13px] leading-5 text-white/60">
+                      {copy.installSubtitle}
+                    </p>
                   </div>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {copy.installOptions.map((option) => {
-                      const isActive = option.id === selectedInstall.id
-                      return (
-                        <button
-                          key={option.id}
-                          type="button"
-                          onClick={() => setSelectedClient(option.id)}
-                          className={`rounded-full px-3.5 py-2 text-[13px] font-semibold leading-4 transition-colors ${
-                            isActive
-                              ? 'bg-[#57E668] text-[#101111]'
-                              : 'border border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white'
-                          }`}
-                        >
-                          {option.label}
-                        </button>
-                      )
-                    })}
-                  </div>
+                  <Sparkles className="mt-1 size-5 shrink-0 text-[#57E668]" aria-hidden="true" />
                 </div>
-                <div className="grid gap-3 p-4">
-                  <pre className="m-0 min-h-[72px] overflow-x-auto rounded-[14px] bg-[#0C0D0D] p-4 text-[13px] leading-[22px] text-[#D7FFDC]">
-                    <code>{selectedInstall.command}</code>
-                  </pre>
-                  <p className="m-0 text-[13px] leading-5 text-white/52">{selectedInstall.note}</p>
+                <div className="border-t border-white/10 p-5">
+                  <div className="relative">
+                    <pre className="m-0 overflow-x-auto rounded-[14px] bg-[#0C0D0D] p-4 pr-[110px] text-[14px] leading-[22px] text-[#D7FFDC]">
+                      <code aria-label={copy.installCommandSrLabel}>{INSTALL_COMMAND}</code>
+                    </pre>
+                    <div className="absolute right-3 top-3">
+                      <CopyButton
+                        text={INSTALL_COMMAND}
+                        label={copy.installCopyLabel}
+                        copiedLabel={copy.installCopiedLabel}
+                      />
+                    </div>
+                  </div>
+                  <p className="m-0 mt-3 text-[13px] leading-5 text-white/55">{copy.installNote}</p>
                 </div>
               </div>
 
@@ -305,23 +296,31 @@ export function AgentWalletLanding({ locale = 'en' }) {
 
             <div className="flex min-w-0 items-center">
               <div className="relative aspect-[1/0.9] w-full overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_52%_42%,rgba(87,230,104,0.2),transparent_34%),linear-gradient(145deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] shadow-[0_32px_120px_rgba(0,0,0,0.48)]">
-                <div className="absolute inset-9 overflow-hidden rounded-[22px] bg-[linear-gradient(90deg,rgba(16,17,17,0.04),rgba(16,17,17,0.18)),url('/landing-page/agent-clear-signing.jpg')] bg-cover bg-center shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1),0_28px_80px_rgba(0,0,0,0.42)]" />
-                <div className="absolute inset-x-[60px] inset-y-[72px] rounded-[26px] border border-[#57E668]/40 shadow-[0_0_34px_rgba(87,230,104,0.18),inset_0_0_28px_rgba(87,230,104,0.08)]" />
+                <div className="absolute inset-9 overflow-hidden rounded-[22px] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1),0_28px_80px_rgba(0,0,0,0.42)]">
+                  <Image
+                    src="/landing-page/agent-clear-signing.jpg"
+                    alt={copy.heroImageAlt}
+                    fill
+                    priority
+                    sizes="(min-width: 1024px) 50vw, 100vw"
+                    className="object-cover"
+                  />
+                  <div
+                    aria-hidden="true"
+                    className="absolute inset-0 bg-[linear-gradient(90deg,rgba(16,17,17,0.04),rgba(16,17,17,0.18))]"
+                  />
+                </div>
+                <div
+                  aria-hidden="true"
+                  className="absolute inset-x-[60px] inset-y-[72px] rounded-[26px] border border-[#57E668]/40 shadow-[0_0_34px_rgba(87,230,104,0.18),inset_0_0_28px_rgba(87,230,104,0.08)]"
+                />
                 <div className="absolute bottom-20 left-5 grid max-w-[220px] gap-1 rounded-[14px] border border-white/15 bg-[#111312]/85 p-4 shadow-[0_18px_50px_rgba(0,0,0,0.36)] backdrop-blur-xl">
-                  <span className="text-[12px] leading-4 text-white/55">
-                    {locale === 'zh' ? 'Agent Wallet 会话' : 'Agent Wallet session'}
-                  </span>
-                  <strong className="text-[14px] leading-[18px] text-white">
-                    {locale === 'zh' ? '已绑定 keyless' : 'Keyless-bound account'}
-                  </strong>
+                  <span className="text-[12px] leading-4 text-white/55">{copy.heroSessionLabel}</span>
+                  <strong className="text-[14px] leading-[18px] text-white">{copy.heroSessionValue}</strong>
                 </div>
                 <div className="absolute right-5 top-20 grid max-w-[240px] gap-1 rounded-[14px] border border-[#57E668]/35 bg-[#111312]/85 p-4 shadow-[0_18px_50px_rgba(0,0,0,0.36)] backdrop-blur-xl">
-                  <span className="text-[12px] leading-4 text-white/55">
-                    {locale === 'zh' ? '需要硬件确认' : 'Hardware confirmation required'}
-                  </span>
-                  <strong className="text-[14px] leading-[18px] text-white">
-                    {locale === 'zh' ? '在设备上审核' : 'Review on device'}
-                  </strong>
+                  <span className="text-[12px] leading-4 text-white/55">{copy.heroConfirmLabel}</span>
+                  <strong className="text-[14px] leading-[18px] text-white">{copy.heroConfirmValue}</strong>
                 </div>
               </div>
             </div>
@@ -358,7 +357,7 @@ export function AgentWalletLanding({ locale = 'en' }) {
               >
                 <div>
                   <span className="flex size-10 items-center justify-center rounded-full bg-[#191919] text-[#57E668]">
-                    <card.icon className="size-5" />
+                    <card.icon className="size-5" aria-hidden="true" />
                   </span>
                   <h3 className="mt-6 text-[22px] font-semibold leading-7 text-white">
                     {card.title}
@@ -369,7 +368,7 @@ export function AgentWalletLanding({ locale = 'en' }) {
                 </div>
                 <span className="mt-7 inline-flex items-center gap-1.5 text-[16px] font-semibold text-[#16D629]">
                   {locale === 'zh' ? '查看文档' : 'Read docs'}
-                  <ArrowUpRight className="size-4" />
+                  <ArrowUpRight className="size-4" aria-hidden="true" />
                 </span>
               </Link>
             ))}
@@ -377,34 +376,31 @@ export function AgentWalletLanding({ locale = 'en' }) {
         </section>
 
         <section className="mx-auto w-full max-w-[1440px] px-6 pb-28 lg:px-16">
-          <div className="grid gap-8 rounded-[24px] border border-white/10 bg-[#222] p-8 lg:grid-cols-[0.82fr_1fr] lg:p-10">
+          <div className="flex flex-col items-start gap-7 rounded-[24px] border border-white/10 bg-[#222] p-8 lg:flex-row lg:items-center lg:justify-between lg:p-12">
             <div>
-              <LockKeyhole className="size-8 text-[#57E668]" />
-              <h2 className="mt-6 text-[32px] font-semibold leading-[1.1] md:text-[44px]">
-                {copy.modelTitle}
+              <span className="text-[14px] font-semibold leading-5 text-[#57E668]">
+                {copy.finalEyebrow}
+              </span>
+              <h2 className="mt-3 max-w-[680px] text-[28px] font-semibold leading-[1.15] md:text-[40px]">
+                {copy.finalTitle}
               </h2>
             </div>
-            <div className="grid gap-4">
-              {copy.modelItems.map((item) => (
-                <div
-                  key={item}
-                  className="flex gap-3 rounded-[16px] border border-white/10 bg-[#191919] p-5 text-[16px] leading-6 text-white/75"
-                >
-                  <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-[#57E668]" />
-                  <span>{item}</span>
-                </div>
-              ))}
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-5 rounded-[16px] bg-[#101111] p-5">
-                <strong className="max-w-[560px] text-[22px] leading-7 text-white">
-                  {copy.finalTitle}
-                </strong>
-                <Link
-                  href={`${basePath}/agent-wallet/quickstart/`}
-                  className="rounded-full bg-[linear-gradient(90deg,#57E668_0%,#16D629_100%)] px-6 py-3 text-[15px] font-semibold text-[#101111] no-underline"
-                >
-                  {copy.finalCta}
-                </Link>
-              </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <Link
+                href={`${basePath}/agent-wallet/quickstart/`}
+                className="rounded-full bg-[linear-gradient(90deg,#57E668_0%,#16D629_100%)] px-7 py-[14px] text-[15px] font-semibold leading-5 text-[#101111] no-underline transition-opacity hover:opacity-90"
+              >
+                {copy.finalCta}
+              </Link>
+              <a
+                href={GITHUB_REPO_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-6 py-[14px] text-[15px] font-semibold leading-5 text-white no-underline transition-colors hover:bg-white/10"
+              >
+                {copy.finalSecondary}
+                <ArrowUpRight className="size-4" aria-hidden="true" />
+              </a>
             </div>
           </div>
         </section>
