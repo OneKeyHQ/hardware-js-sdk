@@ -44,12 +44,6 @@ The agent talks to OneKey through the `onekey-wallet-skills` package and the `on
 
 ## Current Implementation
 
-The current implementation uses the `@onekeyfe/cli` package from `apps/cli` and the external [`onekey-wallet-skills`](https://github.com/OneKeyHQ/onekey-wallet-skills) repository. The CLI package is published as `@onekeyfe/cli` and exposes the `onekey` binary.
+The public entry point is the external [`onekey-wallet-skills`](https://github.com/OneKeyHQ/onekey-wallet-skills) repository. The skills support Claude Code, Codex, Cursor, OpenCode, and OpenClaw, and they route natural-language requests into wallet, swap, market, and security workflows.
 
-Core flows:
-
-- `onekey auth login --app-transfer` pairs a OneKey App Agent Wallet session.
-- `onekey auth login --hardware` starts a connected OneKey hardware wallet session.
-- `onekey schema --list` and `onekey schema <command>` expose machine-readable command contracts.
-- `onekey auth status` is the source of truth for the active session.
-- `onekey balance`, `onekey transfer`, `onekey swap`, `onekey token`, `onekey market`, and `onekey security` provide the business capability surface.
+The `@onekeyfe/cli` package remains the implementation layer behind the skills. Skills use its live schema to discover supported commands and parameters, pair App Transfer or hardware-backed sessions, and keep responses structured instead of exposing raw terminal output to users.

@@ -44,12 +44,6 @@ Agent 通过 `onekey-wallet-skills` 和 `onekey` CLI 调用 OneKey 能力。用�
 
 ## 当前实现
 
-当前实现基于 `apps/cli` 中的 `@onekeyfe/cli` 包，以及外部 [`onekey-wallet-skills`](https://github.com/OneKeyHQ/onekey-wallet-skills) 仓库。CLI 包名是 `@onekeyfe/cli`，可执行命令是 `onekey`。
+公开入口是外部 [`onekey-wallet-skills`](https://github.com/OneKeyHQ/onekey-wallet-skills) 仓库。Skills 支持 Claude Code、Codex、Cursor、OpenCode 和 OpenClaw，并把自然语言请求路由到 wallet、swap、market 和 security 工作流。
 
-核心流程：
-
-- `onekey auth login --app-transfer`：配对 OneKey App Agent Wallet 会话。
-- `onekey auth login --hardware`：启动已连接的 OneKey 硬件钱包会话。
-- `onekey schema --list` 和 `onekey schema <command>`：暴露机器可理解的命令契约。
-- `onekey auth status`：确认当前活动会话的事实来源。
-- `onekey balance`、`onekey transfer`、`onekey swap`、`onekey token`、`onekey market`、`onekey security`：提供业务能力面。
+`@onekeyfe/cli` 仍然是 skills 背后的实现层。Skills 会通过实时 schema 发现支持的命令和参数，配对 App Transfer 或硬件会话，并保持结构化回答，而不是把原始终端输出暴露给用户。

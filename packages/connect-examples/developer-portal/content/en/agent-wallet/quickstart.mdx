@@ -4,21 +4,11 @@ title: Quickstart
 
 # Quickstart
 
-This path gets an AI client talking to OneKey, then proves wallet, market, swap, and hardware flows in small steps. The user can type natural language; the skill turns that into schema-backed `onekey` CLI calls.
+Start by installing the OneKey wallet skills in your AI client. After that, users can ask wallet questions in natural language; the skills handle CLI preflight, schema discovery, and safe command routing behind the scenes.
 
-Start with read-only prompts. Quotes, builds, audits, and simulations should explain what would happen without moving funds. Transfers, swap execution, approvals, broadcasts, and signing all require an explicit confirmation turn.
+Read-only requests should return results immediately. Quotes, builds, audits, and simulations explain what would happen without moving funds. Transfers, swap execution, approvals, broadcasts, and signing require an explicit confirmation turn.
 
-## 1. Install the CLI
-
-```bash
-npm install -g @onekeyfe/cli
-onekey version
-onekey schema --list
-```
-
-The CLI package name is `@onekeyfe/cli`; the executable is `onekey`.
-
-## 2. Install the Skills
+## 1. Install the Skills
 
 ### Claude Code
 
@@ -35,11 +25,19 @@ Tell Codex:
 Fetch and follow instructions from https://raw.githubusercontent.com/OneKeyHQ/onekey-wallet-skills/main/.codex/INSTALL.md
 ```
 
-### Cursor, OpenCode, and OpenClaw
+### Cursor
 
-Use the install guide in the [`onekey-wallet-skills`](https://github.com/OneKeyHQ/onekey-wallet-skills) repository for each client. The skills all call the same `onekey` CLI and discover command schemas before choosing parameters.
+Clone the skill pack and point Cursor at the plugin directory:
 
-## 3. Pair an Agent Wallet
+```bash
+git clone https://github.com/OneKeyHQ/onekey-wallet-skills
+```
+
+### OpenCode and OpenClaw
+
+Use the install guide in the [`onekey-wallet-skills`](https://github.com/OneKeyHQ/onekey-wallet-skills) repository for each client. Every client uses the same four skills: wallet, swap, market, and security.
+
+## 2. Connect an Agent Wallet
 
 Ask your AI client:
 
@@ -47,29 +45,23 @@ Ask your AI client:
 Connect my OneKey Agent Wallet.
 ```
 
-The expected CLI flow is:
+The skill pairs the local session through OneKey GUI App Transfer and summarizes the active wallet. If the `onekey` CLI is missing, the skill preflight installs it before continuing; users should not need to set up CLI commands manually.
 
-```bash
-onekey auth login --app-transfer
-onekey auth status
-onekey get-address
-```
+## 3. Try Read-Only Prompts
 
-The OneKey GUI provides the Agent Wallet payload. The CLI stores the active session in the local OneKey CLI vault and uses the operating system credential store for protected material.
+Start with prompts that do not move funds:
 
-## 4. Try Read-Only Requests
-
-Start with requests that do not move funds:
-
-| Natural-language request | Expected command family |
+| Ask the AI client | Skill route |
 | --- | --- |
-| `Show my wallet balance.` | `onekey balance --chain eth` |
-| `Show my receiving address for ETH.` | `onekey get-address` |
-| `What tokens are trending right now?` | `onekey token trending` |
-| `What is the price of SOL?` | `onekey market price --chain sol --token SOL` |
-| `Show ETH 1H candles.` | `onekey market kline --chain eth --token ETH --interval 1H` |
+| `Show my wallet balance.` | Wallet |
+| `Show my receiving address for ETH.` | Wallet |
+| `What tokens are trending right now?` | Market |
+| `What is the price of SOL?` | Market |
+| `Is this token safe before I buy it?` | Security |
 
-## 5. Quote Before You Trade
+The response should be result-first: wallet state, route, risk, and one useful next step. It should not dump raw terminal output.
+
+## 4. Quote Before Trading
 
 Ask:
 
@@ -77,17 +69,9 @@ Ask:
 Quote a swap from 1 ETH to USDC. Do not execute yet.
 ```
 
-Expected command sequence:
+The swap skill should quote, run the relevant safety checks, show the expected route and output, and stop before execution. A later confirmation such as `Yes, execute the swap` should only execute the already-reviewed order.
 
-```bash
-onekey swap quote --chain eth --from ETH --to USDC --amount 1
-onekey security audit --chain eth --token <token-or-contract>
-onekey swap build --chain eth --from ETH --to USDC --amount 1
-```
-
-The skill should show the route, amount, estimated output, fees when available, risk state, and ask for confirmation before `swap execute`.
-
-## 6. Use Hardware Confirmation
+## 5. Use Hardware Confirmation
 
 For higher-risk actions, ask:
 
@@ -95,12 +79,4 @@ For higher-risk actions, ask:
 Use my OneKey hardware wallet for this transfer.
 ```
 
-Expected flow:
-
-```bash
-onekey device search
-onekey auth login --hardware
-onekey auth status
-```
-
-After hardware login, normal commands use the active hardware-backed session automatically. Do not add a separate `--hardware` flag to balance, transfer, swap, or signing commands unless the specific command schema exposes it.
+The wallet skill switches to a hardware-backed session and fund-moving actions can be escalated to device-side clear signing. After hardware login, normal wallet, transfer, swap, and signing prompts use the active hardware-backed session automatically.

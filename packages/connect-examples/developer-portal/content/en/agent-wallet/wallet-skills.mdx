@@ -4,11 +4,20 @@ title: Wallet Skills
 
 # Wallet Skills
 
-The [`onekey-wallet-skills`](https://github.com/OneKeyHQ/onekey-wallet-skills) package lets AI coding assistants understand wallet requests in natural language and turn them into safe `onekey` CLI workflows.
+[`onekey-wallet-skills`](https://github.com/OneKeyHQ/onekey-wallet-skills) gives AI coding assistants a wallet capability layer. Users ask in natural language; the skills choose the safe route, inspect the live schema when needed, and explain results in user-facing language.
 
-The user does not need to type CLI commands. The skill should read the request, inspect the live schema, run the right command family, and explain the result in user-facing language.
+The user should not need to type CLI commands. CLI is the implementation detail behind the skill pack.
 
-## Try These Prompts First
+## Install First
+
+| Client | Install path |
+| --- | --- |
+| Claude Code | `/plugin marketplace add OneKeyHQ/onekey-wallet-skills`, then `/plugin install onekey-wallet-skills` |
+| Codex | Ask Codex to follow `https://raw.githubusercontent.com/OneKeyHQ/onekey-wallet-skills/main/.codex/INSTALL.md` |
+| Cursor | Clone `https://github.com/OneKeyHQ/onekey-wallet-skills` and point Cursor at the plugin directory |
+| OpenCode / OpenClaw | Follow the matching install guide in the skills repository |
+
+After installation, start with prompts:
 
 ```text
 Show my wallet balance and receiving address.
@@ -26,29 +35,6 @@ Quote 1 ETH to USDC. Do not execute yet.
 Is this token safe before I buy it?
 ```
 
-These prompts cover the four primary modes: wallet, market, swap, and security. They are intentionally written as user language; the skill decides the exact CLI command after reading the current command schema.
-
-## Schema Contract
-
-Every skill should treat the CLI schema as the source of truth instead of hard-coding stale examples.
-
-| Check | Expected behavior |
-| --- | --- |
-| Discover commands | Run `onekey schema --list` when capability support is uncertain. |
-| Inspect a command | Use `onekey schema <command-name>` before choosing non-trivial parameters. |
-| Map names correctly | Schema names use forms such as `auth-login`, `swap-quote`, `market-kline`, and `security-audit`; CLI commands use spaces, such as `onekey auth login` and `onekey swap quote`. |
-| Handle unsupported fields | Stop and explain when the current schema does not expose the parameter the prompt requires. |
-| Keep output structured | Prefer result, risk, command route, and next step over raw CLI dumps. |
-
-## Supported AI Clients
-
-| Client | How users interact |
-| --- | --- |
-| Claude Code | Install through `/plugin marketplace add` and `/plugin install`, then ask wallet questions directly |
-| Codex | Follow the `.codex/INSTALL.md` instructions from the skills repository |
-| Cursor | Use the Cursor plugin/install flow and ask wallet prompts in the coding session |
-| OpenCode / OpenClaw | Follow the repository-specific install guides and use the same natural-language prompts |
-
 ## Skill Router
 
 | Skill | Use when the user asks about | Example prompt |
@@ -58,100 +44,67 @@ Every skill should treat the CLI schema as the source of truth instead of hard-c
 | `onekey-market` | Price, token search, trending, K-line, liquidity, holders, BTC/SOL metrics, research | `What Solana tokens are trending right now?` |
 | `onekey-security` | Token audit, transaction simulation, approval risk, hardware safety, secret-safety checks | `Is this token safe before I buy it?` |
 
-## `onekey-wallet`
+## Schema Contract
 
-Use this skill for wallet state and transfers.
+Every skill treats the live CLI schema as the source of truth instead of hard-coding stale examples.
+
+| Check | Expected behavior |
+| --- | --- |
+| Discover capability | Inspect the command list when support is uncertain. |
+| Choose parameters | Inspect the exact command schema before selecting non-trivial fields. |
+| Map names correctly | Keep schema command names and user-facing command families separate. |
+| Handle unsupported fields | Stop and explain when the current schema does not expose the requested parameter. |
+| Keep output structured | Prefer result, risk, route, and next step over raw terminal dumps. |
+
+## Wallet
+
+Use `onekey-wallet` for wallet state, receive addresses, transfers, BTC address types, and hardware sessions.
 
 | Natural language | What the skill should do |
 | --- | --- |
-| `Connect my OneKey Agent Wallet.` | Run App Transfer login and summarize the active address |
-| `What wallet am I using?` | Read `auth-status` and show login method, wallet kind, address, device if present |
-| `Show my balance.` | Use the active wallet automatically; do not ask the user to paste an address |
-| `Receive BTC.` | Return a BTC receive address; ask only for address type if missing |
-| `Send 0.2 SOL to this address.` | Preserve Solana context, validate address format, stage confirmation |
+| `Connect my OneKey Agent Wallet.` | Pair through App Transfer and summarize the active wallet. |
+| `What wallet am I using?` | Show login method, wallet kind, address, and device state if present. |
+| `Show my balance.` | Use the active wallet automatically; do not ask the user to paste an address. |
+| `Receive BTC.` | Return a BTC receive address; ask only for address type if missing. |
+| `Send 0.2 SOL to this address.` | Preserve Solana context, validate address format, and stage confirmation. |
 
-CLI surface:
+## Swap
 
-```bash
-onekey auth login --app-transfer
-onekey auth status
-onekey get-address
-onekey balance --chain eth
-onekey history --chain eth --detail
-onekey transfer --to 0x... --amount 50 --token USDC --chain eth
-onekey wallet address-types --chain btc
-onekey wallet address --chain btc --address-type taproot
-```
-
-## `onekey-swap`
-
-Use this skill for trades, buys, sells, conversion, cross-chain routes, and BTC sign-only flows.
+Use `onekey-swap` for trades, buys, sells, conversion, cross-chain routes, and BTC sign-only flows.
 
 | Natural language | What the skill should do |
 | --- | --- |
-| `Swap 1 ETH to USDC.` | Quote first, then confirm before build/execute |
-| `Buy $200 of PEPE on Ethereum.` | Keep Ethereum context, audit the token, stage the trade |
-| `Bridge 500 USDC from Ethereum to Base.` | Discover bridge support before quote |
-| `Swap 0.01 BTC to USDC using taproot and sign only.` | Preserve taproot and return signed/preview PSBT instead of broadcast hash |
-| `Yes, confirm the swap.` | Execute only the already-confirmed order |
+| `Swap 1 ETH to USDC.` | Quote first, show route and risk, then ask for confirmation before execution. |
+| `Buy $200 of PEPE on Ethereum.` | Preserve Ethereum context, audit the token, and stage the trade. |
+| `Bridge 500 USDC from Ethereum to Base.` | Discover bridge support before quoting. |
+| `Swap 0.01 BTC to USDC using taproot and sign only.` | Preserve taproot and return signed or preview PSBT instead of broadcasting. |
+| `Yes, confirm the swap.` | Execute only the already-confirmed order. |
 
-CLI surface:
+## Market
 
-```bash
-onekey swap quote --chain eth --from ETH --to USDC --amount 1
-onekey swap build --chain eth --from ETH --to USDC --amount 1
-onekey swap execute --chain eth --order <orderId>
-onekey swap status --order <orderId>
-onekey swap networks --bridge
-onekey swap history
-```
-
-## `onekey-market`
-
-Use this skill for read-only market and research workflows.
+Use `onekey-market` for read-only market and research workflows.
 
 | Natural language | What the skill should do |
 | --- | --- |
-| `What is the BTC price?` | Return price and 24h change first, then offer chart or trend follow-up |
-| `What tokens are trending right now?` | Return a short trending list without starting a trade |
-| `Search BONK on Solana.` | Preserve Solana and treat the identifier as an SPL token/mint |
-| `Show ETH liquidity.` | Return liquidity or holder view |
-| `Give me a quick ETH analysis.` | Provide bias, catalyst, risk, and one next step |
+| `What is the BTC price?` | Return price and 24h change first, then offer chart or trend follow-up. |
+| `What tokens are trending right now?` | Return a short trending list without starting a trade. |
+| `Search BONK on Solana.` | Preserve Solana and treat the identifier as an SPL token or mint. |
+| `Show ETH liquidity.` | Return liquidity or holder view. |
+| `Give me a quick ETH analysis.` | Provide bias, catalyst, risk, and one next step. |
 
-CLI surface:
+Market answers are read-only by default. Buying or swapping should start a separate confirmation flow.
 
-```bash
-onekey token search --query BONK --chain sol
-onekey token info --chain eth --token USDC
-onekey token price --chain eth --token 0x...
-onekey token trending --chain sol
-onekey token trades --chain eth --token 0x...
-onekey token liquidity --chain eth --token 0x...
-onekey market price --chain eth --token USDC
-onekey market prices --tokens "eth:0x...,bsc:0x..."
-onekey market kline --chain eth --token ETH --interval 1H
-```
+## Security
 
-## `onekey-security`
-
-Use this skill for risk checks and preflight protection.
+Use `onekey-security` for risk checks and preflight protection.
 
 | Natural language | What the skill should do |
 | --- | --- |
-| `Is this token safe?` | Run token audit and report risk level plus reasons |
-| `Simulate approving this contract for all my USDC.` | Simulate and call out unlimited approval risk |
-| `Send SOL to 0x...` | Stop on Solana/EVM address mismatch |
-| `Show me the App Transfer payload.` | Refuse to expose secrets and offer `auth-status` summary |
-| `Is my hardware wallet safe to use?` | Use device/auth status and device verification; never ask for seed phrases |
-
-CLI surface:
-
-```bash
-onekey security audit --chain eth --token 0x...
-onekey security simulate --chain eth --to 0x... --data 0x...
-onekey device verify
-onekey auth status
-```
+| `Is this token safe?` | Run token audit and report risk level plus reasons. |
+| `Simulate approving this contract for all my USDC.` | Simulate and call out unlimited approval risk. |
+| `Send SOL to 0x...` | Stop on Solana/EVM address mismatch. |
+| `Show me the App Transfer payload.` | Refuse to expose secrets and offer an active-session summary instead. |
+| `Is my hardware wallet safe to use?` | Use device/auth status and device verification; never ask for seed phrases. |
 
 ## Response Shape
 
