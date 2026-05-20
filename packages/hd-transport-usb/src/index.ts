@@ -473,17 +473,16 @@ export default class NodeUsbTransport {
   }
 
   private getDeviceInterface(dev: usb.Device): usb.Interface {
-    const vendorInterface = dev.interfaces.find(
-      iface => iface.descriptor.bInterfaceClass === 0xff
-    );
-    const defaultInterface = dev.interfaces.find(
-      iface => iface.descriptor.bInterfaceNumber === INTERFACE_NUMBER
-    );
-    const iface = vendorInterface ?? defaultInterface ?? dev.interfaces[0];
-
-    if (!iface) {
+    const { interfaces } = dev;
+    if (!interfaces?.length) {
       throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound, 'USB interface not found');
     }
+
+    const vendorInterface = interfaces.find(iface => iface.descriptor.bInterfaceClass === 0xff);
+    const defaultInterface = interfaces.find(
+      iface => iface.descriptor.bInterfaceNumber === INTERFACE_NUMBER
+    );
+    const iface = vendorInterface ?? defaultInterface ?? interfaces[0];
 
     return iface;
   }
@@ -920,26 +919,19 @@ export default class NodeUsbTransport {
    * Receive a complete protobuf response from the device.
    * Reads 64-byte packets, strips 0x3F marker, reassembles into hex string.
    */
-  private async receiveData(
-    path: string,
-    dev: OpenDevice,
-    timeoutMs?: number
-  ): Promise<string> {
+  private async receiveData(path: string, dev: OpenDevice, timeoutMs?: number): Promise<string> {
     const deadline = timeoutMs ? Date.now() + timeoutMs : undefined;
     const readPacket = async () => {
       const transferIn = this.transferInWithRetry(path, this.getOpenDevice(path), PACKET_SIZE);
       return deadline
-        ? this.withProtocolReadTimeout(
-            path,
-            transferIn,
-            Math.max(deadline - Date.now(), 1),
-            'V1'
-          )
+        ? this.withProtocolReadTimeout(path, transferIn, Math.max(deadline - Date.now(), 1), 'V1')
         : transferIn;
     };
 
     // Read first packet, skip report byte
-    const firstPacket = timeoutMs ? await readPacket() : await this.transferInWithRetry(path, dev, PACKET_SIZE);
+    const firstPacket = timeoutMs
+      ? await readPacket()
+      : await this.transferInWithRetry(path, dev, PACKET_SIZE);
     const firstData = skipReportByte(firstPacket);
 
     // Decode header: ## marker → { typeId, length, restBuffer }
