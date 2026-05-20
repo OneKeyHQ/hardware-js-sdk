@@ -20,6 +20,7 @@ export function OneKeyNavbar({
 }) {
   const logoPositionClass = align === 'left' ? 'x:max-md:me-auto' : 'x:me-auto'
   const alignClass = align === 'left' ? 'x:me-auto' : ''
+  const logoStyle = align === 'right' ? { marginRight: 'auto' } : undefined
   const navWrapperClass = cn(
     'x:mx-auto x:flex x:max-w-(--nextra-content-width) x:items-center x:gap-4 x:pl-[max(env(safe-area-inset-left),1.5rem)] x:pr-[max(env(safe-area-inset-right),1.5rem)]',
     'x:justify-end',
@@ -30,12 +31,18 @@ export function OneKeyNavbar({
     <NextLink
       href={typeof logoLink === 'string' ? logoLink : '/'}
       className={cn('x:flex x:items-center', logoPositionClass, 'x:transition-opacity x:focus-visible:nextra-focus x:hover:opacity-75')}
+      style={logoStyle}
       aria-label="Home page"
     >
       {logo}
     </NextLink>
   ) : (
-    <div className={cn('x:flex x:items-center', logoPositionClass)}>{logo}</div>
+    <div
+      className={cn('x:flex x:items-center', logoPositionClass)}
+      style={logoStyle}
+    >
+      {logo}
+    </div>
   )
 
   const projectAction = projectLink && <Anchor href={projectLink}>{projectIcon}</Anchor>

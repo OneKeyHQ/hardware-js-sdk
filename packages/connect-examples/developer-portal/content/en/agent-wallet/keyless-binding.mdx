@@ -1,0 +1,46 @@
+---
+title: Keyless Binding
+---
+
+# Keyless Binding
+
+Keyless binding is the product boundary that lets users manage an Agent Wallet in the OneKey GUI without memorizing, exporting, or pasting private keys into an agent runtime.
+
+The CLI receives an App Transfer session. It should not expose raw key material, decrypted credentials, access tokens, seed phrases, or keychain contents to the agent.
+
+## User Experience
+
+For the user, this should feel like a managed wallet rather than a key-management exercise:
+
+| User need | OneKey behavior |
+| --- | --- |
+| Create an automation wallet | Create and manage the Agent Wallet in OneKey GUI. |
+| Use it from an AI client | Pair through App Transfer instead of pasting keys. |
+| Know which wallet is active | Let the agent read `onekey auth status` and show the address. |
+| Move funds | Require an explicit confirmation; optionally escalate to hardware control. |
+| End access | Use `onekey auth logout` to clear the active CLI session. |
+
+## Responsibility Split
+
+| Surface | Responsibility |
+| --- | --- |
+| OneKey GUI | Create and manage the Agent Wallet and keyless account relationship |
+| `onekey` CLI | Hold the active session, expose schema-backed wallet commands, and use the OS credential store |
+| Agent runtime | Read schemas, call commands, summarize results, and request confirmation for writes |
+
+## Agent Rules
+
+- Treat the GUI-managed Agent Wallet as the source of the account relationship.
+- Use `onekey auth status` instead of guessing which wallet is active.
+- Use `onekey get-address` to show the active address before fund-moving actions.
+- Never ask the user to paste private keys, seed phrases, or decrypted credentials.
+- Never print keychain paths or credential payloads as an answer.
+
+## Useful Commands
+
+```bash
+onekey auth status
+onekey get-address
+onekey balance --chain eth
+onekey history --chain eth --detail
+```

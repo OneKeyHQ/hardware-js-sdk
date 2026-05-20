@@ -9,6 +9,12 @@ export function NavbarMenuActiveMarker({ lang }) {
   // Calculate active sections based on pathname
   const activeSection = useMemo(() => {
     if (
+      pathname === `/${lang}/agent-wallet` ||
+      pathname.startsWith(`/${lang}/agent-wallet/`)
+    ) {
+      return 'agent-wallet'
+    }
+    if (
       pathname === `/${lang}/hardware-sdk` ||
       pathname.startsWith(`/${lang}/hardware-sdk/`)
     ) {
@@ -36,22 +42,27 @@ export function NavbarMenuActiveMarker({ lang }) {
       ${activeSection === 'hardware-integration' ? `
         #onekey-navbar-hardware-sdk {
           font-weight: 500;
-          color: var(--tw-prose-links, currentColor);
+          color: var(--tw-prose-links, currentColor) !important;
+        }
+      ` : ''}
+      ${activeSection === 'agent-wallet' ? `
+        #onekey-navbar-agent-wallet {
+          font-weight: 500;
+          color: var(--tw-prose-links, currentColor) !important;
         }
       ` : ''}
       ${activeSection === 'offline-signing' ? `
         #onekey-navbar-air-gap {
           font-weight: 500;
-          color: var(--tw-prose-links, currentColor);
+          color: var(--tw-prose-links, currentColor) !important;
         }
       ` : ''}
       ${activeSection === 'dapp-integration' ? `
         #onekey-navbar-connect-to-software {
           font-weight: 500;
-          color: var(--tw-prose-links, currentColor);
+          color: var(--tw-prose-links, currentColor) !important;
         }
       ` : ''}
     `}</style>
   )
 }
-

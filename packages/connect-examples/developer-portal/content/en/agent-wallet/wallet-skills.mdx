@@ -1,0 +1,121 @@
+---
+title: Wallet Skills
+---
+
+# Wallet Skills
+
+[`onekey-wallet-skills`](https://github.com/OneKeyHQ/onekey-wallet-skills) gives AI coding assistants a wallet capability layer. Users ask in natural language; the skills choose the safe route, inspect the live schema when needed, and explain results in user-facing language.
+
+The user should not need to type CLI commands. CLI is the implementation detail behind the skill pack.
+
+## Install First
+
+| Client | Install path |
+| --- | --- |
+| Claude Code | `/plugin marketplace add OneKeyHQ/onekey-wallet-skills`, then `/plugin install onekey-wallet-skills` |
+| Codex | Ask Codex to follow `https://raw.githubusercontent.com/OneKeyHQ/onekey-wallet-skills/main/.codex/INSTALL.md` |
+| Cursor | Clone `https://github.com/OneKeyHQ/onekey-wallet-skills` and point Cursor at the plugin directory |
+| OpenCode / OpenClaw | Follow the matching install guide in the skills repository |
+
+After installation, start with prompts:
+
+```text
+Show my wallet balance and receiving address.
+```
+
+```text
+What Solana tokens are trending right now?
+```
+
+```text
+Quote 1 ETH to USDC. Do not execute yet.
+```
+
+```text
+Is this token safe before I buy it?
+```
+
+## Skill Router
+
+| Skill | Use when the user asks about | Example prompt |
+| --- | --- | --- |
+| `onekey-wallet` | Login, active wallet, balance, receive address, history, transfer, BTC/SOL wallet operations, hardware discovery | `Show my wallet balance and receiving address.` |
+| `onekey-swap` | Swap, buy, sell, convert, bridge, swap status, BTC sign-only PSBT | `Swap 1 ETH to USDC, but show me the quote first.` |
+| `onekey-market` | Price, token search, trending, K-line, liquidity, holders, BTC/SOL metrics, research | `What Solana tokens are trending right now?` |
+| `onekey-security` | Token audit, transaction simulation, approval risk, hardware safety, secret-safety checks | `Is this token safe before I buy it?` |
+
+## Schema Contract
+
+Every skill treats the live CLI schema as the source of truth instead of hard-coding stale examples.
+
+| Check | Expected behavior |
+| --- | --- |
+| Discover capability | Inspect the command list when support is uncertain. |
+| Choose parameters | Inspect the exact command schema before selecting non-trivial fields. |
+| Map names correctly | Keep schema command names and user-facing command families separate. |
+| Handle unsupported fields | Stop and explain when the current schema does not expose the requested parameter. |
+| Keep output structured | Prefer result, risk, route, and next step over raw terminal dumps. |
+
+## Wallet
+
+Use `onekey-wallet` for wallet state, receive addresses, transfers, BTC address types, and hardware sessions.
+
+| Natural language | What the skill should do |
+| --- | --- |
+| `Connect my OneKey Agent Wallet.` | Pair through App Transfer and summarize the active wallet. |
+| `What wallet am I using?` | Show login method, wallet kind, address, and device state if present. |
+| `Show my balance.` | Use the active wallet automatically; do not ask the user to paste an address. |
+| `Receive BTC.` | Return a BTC receive address; ask only for address type if missing. |
+| `Send 0.2 SOL to this address.` | Preserve Solana context, validate address format, and stage confirmation. |
+
+## Swap
+
+Use `onekey-swap` for trades, buys, sells, conversion, cross-chain routes, and BTC sign-only flows.
+
+| Natural language | What the skill should do |
+| --- | --- |
+| `Swap 1 ETH to USDC.` | Quote first, show route and risk, then ask for confirmation before execution. |
+| `Buy $200 of PEPE on Ethereum.` | Preserve Ethereum context, audit the token, and stage the trade. |
+| `Bridge 500 USDC from Ethereum to Base.` | Discover bridge support before quoting. |
+| `Swap 0.01 BTC to USDC using taproot and sign only.` | Preserve taproot and return signed or preview PSBT instead of broadcasting. |
+| `Yes, confirm the swap.` | Execute only the already-confirmed order. |
+
+## Market
+
+Use `onekey-market` for read-only market and research workflows.
+
+| Natural language | What the skill should do |
+| --- | --- |
+| `What is the BTC price?` | Return price and 24h change first, then offer chart or trend follow-up. |
+| `What tokens are trending right now?` | Return a short trending list without starting a trade. |
+| `Search BONK on Solana.` | Preserve Solana and treat the identifier as an SPL token or mint. |
+| `Show ETH liquidity.` | Return liquidity or holder view. |
+| `Give me a quick ETH analysis.` | Provide bias, catalyst, risk, and one next step. |
+
+Market answers are read-only by default. Buying or swapping should start a separate confirmation flow.
+
+## Security
+
+Use `onekey-security` for risk checks and preflight protection.
+
+| Natural language | What the skill should do |
+| --- | --- |
+| `Is this token safe?` | Run token audit and report risk level plus reasons. |
+| `Simulate approving this contract for all my USDC.` | Simulate and call out unlimited approval risk. |
+| `Send SOL to 0x...` | Stop on Solana/EVM address mismatch. |
+| `Show me the App Transfer payload.` | Refuse to expose secrets and offer an active-session summary instead. |
+| `Is my hardware wallet safe to use?` | Use device/auth status and device verification; never ask for seed phrases. |
+
+## Response Shape
+
+Good skill responses are result-first and short:
+
+```text
+Route: swap-quote
+Fields: chain=eth, from=ETH, to=USDC, amount=1
+Quote: 1 ETH -> <estimated USDC>
+Risk: <audit or simulation state>
+Next: I can build the transaction and ask for confirmation.
+```
+
+Fund-moving responses must end with a confirmation question. Read-only market and wallet responses should end with one useful follow-up, not a trading action.

@@ -1,0 +1,124 @@
+---
+title: 场景示例
+---
+
+# 场景示例
+
+这些例子展示用户可以如何跟 AI Agent 说话，以及 OneKey skill 背后应该做什么。
+
+## 查看钱包状态
+
+用户：
+
+```text
+Show my wallet balance and receiving address.
+```
+
+预期流程：
+
+```bash
+onekey auth status
+onekey get-address
+onekey balance --chain eth
+```
+
+好的回答形态：
+
+```text
+Active wallet: 0x...
+Ethereum balance: ...
+Receiving address: 0x...
+Next: I can show history, quote a swap, or prepare a transfer.
+```
+
+## 买入前先研究
+
+用户：
+
+```text
+What Solana tokens are trending, and is BONK worth a closer look?
+```
+
+预期流程：
+
+```bash
+onekey token trending --chain sol
+onekey token search --query BONK --chain sol
+onekey token info --chain sol --token BONK
+```
+
+Agent 应先回答市场上下文。除非用户在后续明确要求交易，否则不应该直接进入 swap。
+
+## 报价、确认、执行
+
+用户：
+
+```text
+Swap 1 ETH to USDC, but show me the quote before execution.
+```
+
+预期流程：
+
+```bash
+onekey balance --chain eth
+onekey swap quote --chain eth --from ETH --to USDC --amount 1
+onekey security audit --chain eth --token USDC
+onekey swap build --chain eth --from ETH --to USDC --amount 1
+```
+
+确认信息应包括：
+
+| 字段 | 示例 |
+| --- | --- |
+| Action | Swap |
+| Route | ETH -> USDC on Ethereum |
+| Amount | 1 ETH |
+| Estimated output | 来自 quote 结果 |
+| Fees | 可用时来自 quote/build 结果 |
+| Risk | Audit 或 simulation 状态 |
+| Next step | `Proceed? (yes/no)` |
+
+只有用户确认后才执行：
+
+```bash
+onekey swap execute --chain eth --order <orderId>
+```
+
+## 硬件钱包转账
+
+用户：
+
+```text
+Use my OneKey hardware wallet to send 50 USDC to 0x...
+```
+
+预期流程：
+
+```bash
+onekey device search
+onekey auth login --hardware
+onekey auth status
+onekey balance --chain eth --token USDC
+onekey transfer --to 0x... --amount 50 --token USDC --chain eth
+```
+
+转账确认必须说明设备确认步骤。如果设备锁定、断开、要求 PIN/passphrase，或拒绝请求，Agent 应停止并报告状态。
+
+## BTC Sign-Only PSBT
+
+用户：
+
+```text
+Swap 0.01 BTC to USDC using taproot and sign only.
+```
+
+预期流程：
+
+```bash
+onekey wallet address --chain btc --address-type taproot
+onekey swap quote --chain btc --from BTC --to USDC --amount 0.01
+onekey swap build --chain btc --from BTC --to USDC --amount 0.01
+onekey swap execute --chain btc --order <orderId> --from-address-type taproot --sign-only
+```
+
+回答应是 signed 或 preview-ready PSBT，而不是已经广播的交易哈希。

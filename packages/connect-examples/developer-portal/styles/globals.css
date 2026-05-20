@@ -1580,15 +1580,36 @@ html:has(.landing-page) body {
 }
 
 body:has(.landing-page) .nextra-navbar-blur {
-  background-color: rgba(255, 255, 255, 0.8) !important;
-  backdrop-filter: blur(14px) saturate(160%) !important;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.08) !important;
+  background-color: rgba(16, 17, 17, 0.72) !important;
+  backdrop-filter: blur(18px) saturate(150%) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
 
 html.dark body:has(.landing-page) .nextra-navbar-blur {
-  background-color: rgba(255, 255, 255, 0.8) !important;
-  backdrop-filter: blur(14px) saturate(160%) !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.18) !important;
+  background-color: rgba(16, 17, 17, 0.72) !important;
+  backdrop-filter: blur(18px) saturate(150%) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+body:has(.landing-page) header.nextra-navbar a,
+body:has(.landing-page) header.nextra-navbar button {
+  color: rgba(255, 255, 255, 0.64) !important;
+}
+
+body:has(.landing-page) header.nextra-navbar a:hover,
+body:has(.landing-page) header.nextra-navbar button:hover {
+  color: rgba(255, 255, 255, 0.92) !important;
+}
+
+body:has(.landing-page) header.nextra-navbar a[aria-current="true"],
+body:has(.landing-page) header.nextra-navbar button[data-onekey-nav-active="true"] {
+  color: #ffffff !important;
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  header.nextra-navbar .onekey-logo-subtitle {
+    display: none;
+  }
 }
 
 /* Landing page footer styles */

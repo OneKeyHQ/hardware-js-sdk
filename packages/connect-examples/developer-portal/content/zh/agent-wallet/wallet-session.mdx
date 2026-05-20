@@ -1,0 +1,72 @@
+---
+title: Agent Wallet 会话
+---
+
+# Agent Wallet 会话
+
+Agent Wallet 会话是 AI Agent 通过 `onekey` CLI 使用的活动钱包上下文。在当前 CLI 源码里，这条流程暴露为 App Transfer / App Bot Wallet login。
+
+## 解锁哪些能力
+
+会话激活后，Agent 可以在同一个钱包上下文里使用只读和写操作：
+
+| 能力 | 示例 |
+| --- | --- |
+| 钱包状态 | `onekey balance --chain eth` |
+| 收款地址 | `onekey get-address` |
+| 历史记录 | `onekey history --chain eth --detail` |
+| 行情上下文 | `onekey token trending --chain sol` |
+| Swap 准备 | `onekey swap quote --chain eth --from ETH --to USDC --amount 1` |
+| 安全检查 | `onekey security audit --chain eth --token 0x...` |
+
+这也是用户不需要把私钥粘贴给 Agent，也不需要在每个 prompt 里重复传地址的原因。Agent 应读取活动会话，并说明当前使用的是哪个钱包。
+
+## 登录
+
+```bash
+onekey auth login --app-transfer
+```
+
+OneKey GUI 提供 payload。CLI 会将会话导入本地 OneKey CLI vault，并使用操作系统凭据存储保护敏感材料。
+
+如果自动化环境已经拿到 payload，也可以显式传入：
+
+```bash
+onekey auth login --app-transfer --payload <json-or-base64-json>
+```
+
+## 状态
+
+每一类操作开始前都应读取 `auth status`：
+
+```bash
+onekey auth status
+```
+
+当前 schema 会返回：
+
+| 字段 | 含义 |
+| --- | --- |
+| `authStatus` | `authenticated` 或 `unauthenticated` |
+| `loginMethod` | `app_transfer` 或 `hardware` |
+| `walletKind` | App Transfer 会话为 `hd`，硬件会话为 `hw` |
+| `displayAddress` | 展示给用户的活动钱包地址 |
+| `storageBackend` | CLI 使用的系统凭据存储 |
+
+## 生命周期
+
+| 阶段 | Agent 行为 |
+| --- | --- |
+| 任何操作前 | 运行 `onekey auth status`，清楚报告未认证状态。 |
+| 只读操作前 | 使用活动地址和链默认值；只在缺少链或 token 上下文时询问。 |
+| 资金操作前 | 展示活动地址、链、金额、接收方、费用/风险状态，并请求确认。 |
+| 会话变化后 | 重新运行 `onekey auth status`，不要沿用旧地址假设。 |
+| 退出后 | 立即停止使用旧钱包上下文。 |
+
+## 退出
+
+```bash
+onekey auth logout
+```
+
+只有在用户明确要求结束当前会话时，Agent 才应该调用 logout。

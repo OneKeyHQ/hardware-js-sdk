@@ -1,0 +1,124 @@
+---
+title: Recipes
+---
+
+# Recipes
+
+These examples show how a user can talk to an AI agent and what the OneKey skill should do behind the scenes.
+
+## Check Wallet State
+
+User:
+
+```text
+Show my wallet balance and receiving address.
+```
+
+Expected flow:
+
+```bash
+onekey auth status
+onekey get-address
+onekey balance --chain eth
+```
+
+Good response shape:
+
+```text
+Active wallet: 0x...
+Ethereum balance: ...
+Receiving address: 0x...
+Next: I can show history, quote a swap, or prepare a transfer.
+```
+
+## Research Before Buying
+
+User:
+
+```text
+What Solana tokens are trending, and is BONK worth a closer look?
+```
+
+Expected flow:
+
+```bash
+onekey token trending --chain sol
+onekey token search --query BONK --chain sol
+onekey token info --chain sol --token BONK
+```
+
+The agent should answer with market context first. It should not start a swap unless the user asks to trade in a later turn.
+
+## Quote, Confirm, Execute
+
+User:
+
+```text
+Swap 1 ETH to USDC, but show me the quote before execution.
+```
+
+Expected flow:
+
+```bash
+onekey balance --chain eth
+onekey swap quote --chain eth --from ETH --to USDC --amount 1
+onekey security audit --chain eth --token USDC
+onekey swap build --chain eth --from ETH --to USDC --amount 1
+```
+
+The confirmation should show:
+
+| Field | Example |
+| --- | --- |
+| Action | Swap |
+| Route | ETH -> USDC on Ethereum |
+| Amount | 1 ETH |
+| Estimated output | From quote result |
+| Fees | From quote/build result when available |
+| Risk | Audit or simulation status |
+| Next step | `Proceed? (yes/no)` |
+
+Only after the user confirms:
+
+```bash
+onekey swap execute --chain eth --order <orderId>
+```
+
+## Hardware-Backed Transfer
+
+User:
+
+```text
+Use my OneKey hardware wallet to send 50 USDC to 0x...
+```
+
+Expected flow:
+
+```bash
+onekey device search
+onekey auth login --hardware
+onekey auth status
+onekey balance --chain eth --token USDC
+onekey transfer --to 0x... --amount 50 --token USDC --chain eth
+```
+
+The transfer confirmation must mention the device confirmation step. If the device is locked, disconnected, asks for PIN/passphrase, or rejects the request, the agent should stop and report that state.
+
+## BTC Sign-Only PSBT
+
+User:
+
+```text
+Swap 0.01 BTC to USDC using taproot and sign only.
+```
+
+Expected flow:
+
+```bash
+onekey wallet address --chain btc --address-type taproot
+onekey swap quote --chain btc --from BTC --to USDC --amount 0.01
+onekey swap build --chain btc --from BTC --to USDC --amount 0.01
+onekey swap execute --chain btc --order <orderId> --from-address-type taproot --sign-only
+```
+
+The response should be a signed or preview-ready PSBT, not a broadcasted transaction hash.
