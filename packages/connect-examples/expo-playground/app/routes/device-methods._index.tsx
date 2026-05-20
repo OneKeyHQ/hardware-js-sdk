@@ -44,7 +44,7 @@ const PROTOCOL_V2_FILE_SYSTEM_METHODS = new Set([
 
 const DeviceMethodsIndexPage: React.FC = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { t } = useTranslation();
   const { currentDevice } = useDeviceStore();
   const { executeMethod } = useHardwareMethodExecution();
@@ -132,8 +132,9 @@ const DeviceMethodsIndexPage: React.FC = () => {
       return undefined;
     }
 
-    return allMethods.find(method => method.method === selectedMethodName) || allMethods[0];
-  }, [allMethods, selectedMethodName]);
+    const targetMethodName = methodQuery || selectedMethodName;
+    return allMethods.find(method => method.method === targetMethodName) || allMethods[0];
+  }, [allMethods, methodQuery, selectedMethodName]);
 
   const activeCategoryId = useMemo(() => {
     if (!activeMethod) {
@@ -156,17 +157,6 @@ const DeviceMethodsIndexPage: React.FC = () => {
   }, [activeMethod?.description, t]);
 
   useEffect(() => {
-    if (!methodQuery) {
-      return;
-    }
-
-    const targetMethod = allMethods.find(method => method.method === methodQuery);
-    if (targetMethod) {
-      navigate(`/device-methods/${targetMethod.method}`, { replace: true });
-    }
-  }, [allMethods, methodQuery, navigate]);
-
-  useEffect(() => {
     if (!activeMethod) {
       setSelectedMethodName(null);
       return;
@@ -176,6 +166,16 @@ const DeviceMethodsIndexPage: React.FC = () => {
       setSelectedMethodName(activeMethod.method);
     }
   }, [activeMethod, selectedMethodName]);
+
+  const handleSelectMethod = useCallback(
+    (methodName: string) => {
+      setSelectedMethodName(methodName);
+      const nextSearchParams = new URLSearchParams(searchParams);
+      nextSearchParams.set('method', methodName);
+      setSearchParams(nextSearchParams, { replace: false });
+    },
+    [searchParams, setSearchParams]
+  );
 
   const handleMethodExecution = useCallback(
     async (params: Record<string, unknown>): Promise<Record<string, unknown>> => {
@@ -314,7 +314,7 @@ const DeviceMethodsIndexPage: React.FC = () => {
                                     ? 'border-primary/50 bg-primary/10 text-foreground'
                                     : 'border-transparent bg-transparent text-muted-foreground hover:border-border/70 hover:bg-muted/40 hover:text-foreground'
                                 }`}
-                                onClick={() => setSelectedMethodName(method.method)}
+                                onClick={() => handleSelectMethod(method.method)}
                               >
                                 <div className="flex min-w-0 items-center gap-2">
                                   <span className="block min-w-0 flex-1 truncate font-mono text-xs font-semibold">

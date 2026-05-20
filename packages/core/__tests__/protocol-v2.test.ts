@@ -138,49 +138,21 @@ describe('Protocol V2 feature adapter', () => {
     expect(shouldSkipMethodSupportCheck(features)).toBe(true);
   });
 
-  test('initializes Protocol V2 features with Ping and DeviceGetDeviceInfo', async () => {
-    const onDeviceInfoError = jest.fn();
+  test('initializes Protocol V2 features with Ping only while DeviceGetDeviceInfo is disabled', async () => {
     const commands = {
       typedCall: jest
         .fn()
-        .mockResolvedValueOnce({ type: 'Success', message: { message: 'pong' } })
-        .mockResolvedValueOnce({
-          type: 'DeviceInfo',
-          message: {
-            hw: { serial_no: 'PR2SERIAL' },
-            fw: { app: { version: '1.2.3' } },
-          },
-        }),
+        .mockResolvedValueOnce({ type: 'Success', message: { message: 'pong' } }),
     };
 
     const features = await getProtocolV2Features({
       commands: commands as unknown as DeviceCommands,
       descriptor: descriptor as any,
-      onDeviceInfoError,
     });
 
-    expect(features.device_id).toBe('PR2SERIAL');
+    expect(features.device_id).toBe('usb-path');
     expect(commands.typedCall).toHaveBeenNthCalledWith(1, 'Ping', 'Success', { message: 'init' });
-    expect(commands.typedCall).toHaveBeenNthCalledWith(2, 'DeviceGetDeviceInfo', 'DeviceInfo', {
-      targets: {
-        hw: true,
-        fw: true,
-        bt: true,
-        se1: true,
-        se2: true,
-        se3: true,
-        se4: true,
-        status: true,
-      },
-      types: {
-        version: true,
-        build_id: true,
-        hash: true,
-        specific: true,
-      },
-    });
-    expect(commands.typedCall).toHaveBeenCalledTimes(2);
-    expect(onDeviceInfoError).not.toHaveBeenCalled();
+    expect(commands.typedCall).toHaveBeenCalledTimes(1);
   });
 
   test('does not block method-level legacy version checks on Protocol V2', async () => {
@@ -287,8 +259,7 @@ describe('Protocol V2 feature adapter', () => {
     } as any);
     const typedCall = jest
       .fn()
-      .mockResolvedValueOnce({ type: 'Success', message: { message: 'init' } })
-      .mockRejectedValueOnce(new Error('DeviceGetDeviceInfo unavailable'));
+      .mockResolvedValueOnce({ type: 'Success', message: { message: 'init' } });
 
     (device as any).commands = { typedCall };
 
@@ -296,24 +267,12 @@ describe('Protocol V2 feature adapter', () => {
     await device.initialize();
 
     expect(device.features?.device_id).toBe('usb-path');
-    expect(typedCall).toHaveBeenCalledTimes(2);
+    expect(typedCall).toHaveBeenCalledTimes(1);
     expect(typedCall).toHaveBeenNthCalledWith(
       1,
       'Ping',
       'Success',
       { message: 'init' },
-      {
-        timeoutMs: 10000,
-      }
-    );
-    expect(typedCall).toHaveBeenNthCalledWith(
-      2,
-      'DeviceGetDeviceInfo',
-      'DeviceInfo',
-      expect.objectContaining({
-        targets: expect.objectContaining({ hw: true, fw: true, status: true }),
-        types: expect.objectContaining({ version: true, build_id: true }),
-      }),
       {
         timeoutMs: 10000,
       }
@@ -469,9 +428,6 @@ describe('Protocol V2 firmware update targets', () => {
       if (name === 'Ping') {
         return Promise.resolve({ type: 'Success', message: { message: 'init' } });
       }
-      if (name === 'DeviceGetDeviceInfo') {
-        return Promise.reject(new Error('DeviceGetDeviceInfo unavailable'));
-      }
       return Promise.reject(new Error(`unexpected call ${name}`));
     });
     const commands = { typedCall };
@@ -494,17 +450,7 @@ describe('Protocol V2 firmware update targets', () => {
       { message: 'init' },
       { timeoutMs: 5000 }
     );
-    expect(typedCall).toHaveBeenNthCalledWith(
-      2,
-      'DeviceGetDeviceInfo',
-      'DeviceInfo',
-      expect.objectContaining({
-        targets: expect.objectContaining({ hw: true, fw: true, status: true }),
-        types: expect.objectContaining({ version: true, build_id: true }),
-      }),
-      { timeoutMs: 5000 }
-    );
-    expect(typedCall).toHaveBeenCalledTimes(2);
+    expect(typedCall).toHaveBeenCalledTimes(1);
     expect(typedCall).not.toHaveBeenCalledWith('Initialize', 'Features', {});
     expect(versions).toEqual({
       bootloaderVersion: '0.0.0',
