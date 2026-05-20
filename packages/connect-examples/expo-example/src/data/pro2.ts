@@ -65,6 +65,11 @@ const api: PlaygroundProps[] = [
     ],
   },
   {
+    method: 'deviceGetOnboardingStatus',
+    description: 'Get Protocol V2 onboarding status.',
+    noDeviceIdReq: true,
+  },
+  {
     method: 'deviceReboot',
     description: 'Reboot Protocol V2 device.',
     noDeviceIdReq: true,
