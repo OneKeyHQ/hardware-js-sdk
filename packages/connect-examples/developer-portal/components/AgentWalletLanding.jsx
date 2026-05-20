@@ -37,13 +37,6 @@ const copyByLocale = {
     installNote:
       'Running multiple AI agents on the same machine? Pass --agent <name> to target a specific one.',
 
-    proof: [
-      '4 wallet skills',
-      'Claude Code · Codex · Cursor · OpenCode',
-      'One npx command',
-      'Hardware confirmation for fund moves',
-    ],
-
     sectionEyebrow: 'Skill-first wallet layer',
     sectionTitle: 'Everything an agent needs at the wallet boundary.',
     cards: [
@@ -115,13 +108,6 @@ const copyByLocale = {
     installCopiedLabel: '已复制',
     installCommandSrLabel: '安装命令',
     installNote: '一台机器装了多个 AI agent？加上 --agent <name> 参数指定其中一个。',
-
-    proof: [
-      '4 个钱包 Skills',
-      'Claude Code · Codex · Cursor · OpenCode',
-      '一条 npx 命令',
-      '资金操作硬件确认',
-    ],
 
     sectionEyebrow: 'Skill-first 钱包能力层',
     sectionTitle: 'Agent 在钱包边界需要的能力，一次装好。',
@@ -332,18 +318,6 @@ export function AgentWalletLanding({ locale = 'en' }) {
               </div>
             </div>
           </div>
-        </section>
-
-        {/* PROOF BAR */}
-        <section className="mx-auto mt-6 grid w-full max-w-[1440px] grid-cols-1 gap-3 px-6 md:grid-cols-2 lg:grid-cols-4 lg:px-16">
-          {copy.proof.map((item) => (
-            <div
-              key={item}
-              className="min-h-[86px] rounded-[16px] border border-white/10 bg-[#222]/80 px-5 py-6 text-[15px] font-semibold leading-5 text-white/85"
-            >
-              {item}
-            </div>
-          ))}
         </section>
 
         {/* CAPABILITY CARDS */}
