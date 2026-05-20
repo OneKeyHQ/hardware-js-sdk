@@ -24,7 +24,7 @@ import styles from './DocAIChatWidget.module.css';
  * Priority:
  *   1. NEXT_PUBLIC_DOCS_AI_API_URL env var — explicit override (local dev, staging)
  *   2. Hostname-based mapping:
- *        *.onekey.so       →  https://rag.onekey.so/api/chat
+ *        *.onekey.so       →  https://rag.onekeycn.com/api/chat
  *        anything else     →  https://rag.onekeytest.com/api/chat
  *
  * Local dev example — add to developer-portal/.env.local:
@@ -40,7 +40,7 @@ const resolveApiUrl = () => {
 
   // Production: use the matching RAG service for the deployment domain
   if (hostname === 'onekey.so' || hostname.endsWith('.onekey.so')) {
-    return 'https://rag.onekey.so/api/chat';
+    return 'https://rag.onekeycn.com/api/chat';
   }
 
   // Test env, localhost, and all other origins → test RAG service

@@ -13,6 +13,7 @@ export default {
       copyPage: false,
     },
   },
+  /*
   'agent-wallet': {
     title: 'Agent Wallet',
     type: 'menu',
@@ -44,6 +45,7 @@ export default {
       safety: { title: 'Safety Rules', href: '/en/agent-wallet/safety' },
     },
   },
+  */
   // Navigation menus with dropdown items
   'hardware-sdk': {
     title: 'Hardware Integration',

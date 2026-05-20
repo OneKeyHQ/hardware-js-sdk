@@ -11,7 +11,7 @@ import {
   ArrowUpRight,
   ChevronDown,
   X,
-  Bot,
+  // Bot,
 } from 'lucide-react'
 
 const heroSecurity05 = '/landing-page/security-05.png'
@@ -139,6 +139,7 @@ export function LandingPage({ locale = 'en' }) {
       href: `/${locale}/hardware-sdk/transport/native-ble`,
       cta: copy.viewDocs,
     },
+    /*
     {
       title: isZh ? 'OneKey Agent Wallet' : 'OneKey Agent Wallet',
       description: isZh
@@ -148,6 +149,7 @@ export function LandingPage({ locale = 'en' }) {
       href: `/${locale}/agent-wallet`,
       cta: copy.viewDocs,
     },
+    */
   ]
 
   const dappCards = [
