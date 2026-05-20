@@ -53,24 +53,24 @@ type ProtocolV2DeviceInfo = {
   };
 };
 
-const PROTOCOL_V2_DEVICE_INFO_REQUEST = {
-  targets: {
-    hw: true,
-    fw: true,
-    bt: true,
-    se1: true,
-    se2: true,
-    se3: true,
-    se4: true,
-    status: true,
-  },
-  types: {
-    version: true,
-    build_id: true,
-    hash: true,
-    specific: true,
-  },
-};
+// const PROTOCOL_V2_DEVICE_INFO_REQUEST = {
+//   targets: {
+//     hw: true,
+//     fw: true,
+//     bt: true,
+//     se1: true,
+//     se2: true,
+//     se3: true,
+//     se4: true,
+//     status: true,
+//   },
+//   types: {
+//     version: true,
+//     build_id: true,
+//     hash: true,
+//     specific: true,
+//   },
+// };
 
 function parseVersion(version?: string | null): [number, number, number] {
   if (!version) return [0, 0, 0];
@@ -228,7 +228,7 @@ export function normalizeProtocolV2Features(
 export async function getProtocolV2Features({
   commands,
   descriptor,
-  onDeviceInfoError,
+  // onDeviceInfoError,
   timeoutMs,
 }: {
   commands: DeviceCommands;
@@ -243,22 +243,25 @@ export async function getProtocolV2Features({
     await commands.typedCall('Ping', 'Success', { message: 'init' });
   }
 
-  try {
-    const { message } = callOptions
-      ? await commands.typedCall(
-          'DeviceGetDeviceInfo',
-          'DeviceInfo',
-          PROTOCOL_V2_DEVICE_INFO_REQUEST,
-          callOptions
-        )
-      : await commands.typedCall(
-          'DeviceGetDeviceInfo',
-          'DeviceInfo',
-          PROTOCOL_V2_DEVICE_INFO_REQUEST
-        );
-    return normalizeProtocolV2Features(descriptor, message as unknown as ProtocolV2DeviceInfo);
-  } catch (error) {
-    onDeviceInfoError?.(error);
-    return normalizeProtocolV2Features(descriptor);
-  }
+  // DeviceGetDeviceInfo 暂时关闭，避免初始化阶段依赖固件侧 DeviceInfo 支持。
+  // try {
+  //   const { message } = callOptions
+  //     ? await commands.typedCall(
+  //         'DeviceGetDeviceInfo',
+  //         'DeviceInfo',
+  //         PROTOCOL_V2_DEVICE_INFO_REQUEST,
+  //         callOptions
+  //       )
+  //     : await commands.typedCall(
+  //         'DeviceGetDeviceInfo',
+  //         'DeviceInfo',
+  //         PROTOCOL_V2_DEVICE_INFO_REQUEST
+  //       );
+  //   return normalizeProtocolV2Features(descriptor, message as unknown as ProtocolV2DeviceInfo);
+  // } catch (error) {
+  //   onDeviceInfoError?.(error);
+  //   return normalizeProtocolV2Features(descriptor);
+  // }
+
+  return normalizeProtocolV2Features(descriptor);
 }
