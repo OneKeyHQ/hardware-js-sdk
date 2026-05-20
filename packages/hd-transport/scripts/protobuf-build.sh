@@ -94,20 +94,20 @@ fi
 # Preferred source: submodules/firmware-pro2/sys/protobuf/onekey_protocol/latest/
 # Fallback source: submodules/firmware-pro2/sys/protobuf/onekey_protocol/legacy/
 #
-# Latest firmware-pro2 defines the Protocol V2 schema directly (Filesystem*,
-# Dev* names). Older firmware-pro2 commits only exposed legacy Emmc* messages,
+# Latest firmware-pro2 defines the Protocol V2 schema directly (Device*,
+# Filesystem* names). Older firmware-pro2 commits only exposed legacy Emmc* messages,
 # so the fallback block below still remaps those into Protocol V2 system names.
 #
 # ID mapping (firmware legacy → Protocol V2 system IDs):
 #   Ping=1          → 60206    Success=2        → 60207    Failure=3     → 60208
-#   Reboot=30000    → 60400
+#   DeviceReboot=30000    → 60400
 #   EmmcFixPermission=30100 → 60800    EmmcPath=30101 → 60801
 #   EmmcPathInfo=30102      → 60802    EmmcFile=30103 → 60803
 #   EmmcFileRead=30104      → 60804    EmmcFileWrite=30105 → 60805
 #   EmmcFileDelete=30106    → 60806    EmmcDir=30107  → 60807
 #   EmmcDirList=30108       → 60808    EmmcDirMake=30109   → 60809
 #   EmmcDirRemove=30110     → 60810
-#   FirmwareUpdateEmmc=30001 → 61000   FirmwareInstallProgress=30002 → 61001
+#   DeviceFirmwareUpdate=30001 → 61000   DeviceFirmwareInstallProgress=30002 → 61001
 # ============================================================
 cd "$PARENT_PATH"
 
@@ -144,13 +144,13 @@ if [ -d "$SRC_PRO2_LATEST" ] && ls "$SRC_PRO2_LATEST"/messages*.proto 1>/dev/nul
             "$SRC_PRO2_LATEST"/messages*.proto \
             | grep -v '    reserved '
 
-        if ! grep -q '^message DevGetOnboardingStatus ' "$SRC_PRO2_LATEST"/messages*.proto; then
+        if ! grep -q '^message DeviceGetOnboardingStatus ' "$SRC_PRO2_LATEST"/messages*.proto; then
             echo ''
             echo '// --- Onboarding status (kept until firmware-pro2 latest proto exports it) ---'
-            echo 'message DevGetOnboardingStatus {'
+            echo 'message DeviceGetOnboardingStatus {'
             echo '}'
             echo ''
-            echo 'message DevOnboardingStatus {'
+            echo 'message DeviceOnboardingStatus {'
             echo '    optional uint32 page_index = 1;'
             echo '    optional uint32 page_count = 2;'
             echo '    optional string page_name = 3;'
@@ -158,7 +158,7 @@ if [ -d "$SRC_PRO2_LATEST" ] && ls "$SRC_PRO2_LATEST"/messages*.proto 1>/dev/nul
         fi
     } > "$TMP_PROTO"
 
-    if ! grep -q 'MessageType_DevGetOnboardingStatus' "$TMP_PROTO"; then
+    if ! grep -q 'MessageType_DeviceGetOnboardingStatus' "$TMP_PROTO"; then
         node - "$TMP_PROTO" <<'NODE'
 const fs = require('fs');
 
@@ -166,7 +166,7 @@ const protoPath = process.argv[2];
 const proto = fs.readFileSync(protoPath, 'utf8');
 const updated = proto.replace(
   /(    MessageType_DeviceInfo\s*=\s*60601[^\n]*;\n)/,
-  `$1    MessageType_DevGetOnboardingStatus = 60602;\n    MessageType_DevOnboardingStatus = 60603;\n`
+  `$1    MessageType_DeviceGetOnboardingStatus = 60602;\n    MessageType_DeviceOnboardingStatus = 60603;\n`
 );
 
 if (updated === proto) {
@@ -198,7 +198,7 @@ elif [ -d "$SRC_PRO2_LEGACY" ] && ls "$SRC_PRO2_LEGACY"/messages*.proto 1>/dev/n
     TMP_PROTO="$PARENT_PATH/messages-pro2-tmp.proto"
 
     # ----------------------------------------------------------------
-    # Step 1: extract Ping/Success/Failure/Reboot from messages_management.proto
+    # Step 1: extract Ping/Success/Failure from messages_management.proto
     #         and all messages from messages_emmc.proto
     # ----------------------------------------------------------------
     {
@@ -207,7 +207,7 @@ elif [ -d "$SRC_PRO2_LEGACY" ] && ls "$SRC_PRO2_LEGACY"/messages*.proto 1>/dev/n
 
         # Ping from messages_management.proto
         # Success, Failure from messages_common.proto (that's where they live in firmware-pro2)
-        # Reboot is a Protocol V2 system message not in legacy protos — defined manually below
+        # DeviceReboot is a Protocol V2 system message not in legacy protos — defined manually below
         echo '// --- Ping ---'
         awk '/^message Ping /,/^}/' "$SRC_PRO2_LEGACY/messages_management.proto" || true
         echo ''
@@ -223,9 +223,9 @@ elif [ -d "$SRC_PRO2_LEGACY" ] && ls "$SRC_PRO2_LEGACY"/messages*.proto 1>/dev/n
             echo '}'
             echo ''
         done
-        echo '// --- Reboot (Protocol V2 only, not in legacy protos) ---'
-        echo 'message Reboot {'
-        echo '    required RebootType reboot_type = 1;'
+        echo '// --- DeviceReboot (Protocol V2 only, not in legacy protos) ---'
+        echo 'message DeviceReboot {'
+        echo '    required DeviceRebootType reboot_type = 1;'
         echo '}'
         echo ''
 
@@ -271,9 +271,9 @@ enum MessageType {
     MessageType_Ping                    = 60206;
     MessageType_Success                 = 60207;
     MessageType_Failure                 = 60208;
-    MessageType_Reboot                  = 60400;
-    MessageType_DevGetOnboardingStatus  = 60602;
-    MessageType_DevOnboardingStatus     = 60603;
+    MessageType_DeviceReboot            = 60400;
+    MessageType_DeviceGetOnboardingStatus = 60602;
+    MessageType_DeviceOnboardingStatus    = 60603;
     MessageType_FixPermission           = 60800;
     MessageType_PathInfo                = 60801;
     MessageType_PathInfoQuery           = 60802;
@@ -285,8 +285,10 @@ enum MessageType {
     MessageType_DirList                 = 60808;
     MessageType_DirMake                 = 60809;
     MessageType_DirRemove               = 60810;
-    MessageType_FirmwareUpdate          = 61000;
-    MessageType_FirmwareInstallProgress = 61001;
+    MessageType_DeviceFirmwareUpdate    = 61000;
+    MessageType_DeviceFirmwareInstallProgress = 61001;
+    MessageType_DeviceGetFirmwareUpdateStatus = 61002;
+    MessageType_DeviceFirmwareUpdateStatus = 61003;
 }
 
 enum FailureType {
@@ -307,41 +309,55 @@ enum FailureType {
     Failure_FirmwareError      = 99;
 }
 
-enum FirmwareTargetType {
-    TARGET_MAIN_APP     = 0;
-    TARGET_MAIN_BOOT    = 1;
-    TARGET_BLE          = 2;
-    TARGET_SE1          = 3;
-    TARGET_SE2          = 4;
-    TARGET_SE3          = 5;
-    TARGET_SE4          = 6;
+enum DeviceFirmwareTargetType {
+    TARGET_INVALID      = 0;
+    TARGET_ROMLOADER    = 1;
+    TARGET_BOOTLOADER   = 2;
+    TARGET_FIRMWARE_P1  = 3;
+    TARGET_FIRMWARE_P2  = 4;
+    TARGET_COPROCESSOR  = 5;
+    TARGET_SE           = 6;
     TARGET_RESOURCE     = 10;
 }
 
-enum RebootType {
-    REBOOT_NORMAL       = 0;
-    REBOOT_BOARDLOADER  = 1;
-    REBOOT_BOOTLOADER   = 2;
+enum DeviceRebootType {
+    Normal              = 0;
+    Boardloader         = 1;
+    Bootloader          = 2;
 }
 
-message FirmwareTarget {
-    required FirmwareTargetType target_id = 1;
-    required string             path      = 2;
+message DeviceFirmwareTarget {
+    required DeviceFirmwareTargetType target_id = 1;
+    required string                   path      = 2;
 }
 
-message FirmwareUpdate {
-    repeated FirmwareTarget targets           = 1;
-    optional bool           reboot_on_success = 2;
+message DeviceFirmwareUpdate {
+    repeated DeviceFirmwareTarget targets        = 1;
+    optional uint32               max_concurrent = 2;
 }
 
-message FirmwareInstallProgress {
-    required uint32 progress = 1;
+message DeviceFirmwareInstallProgress {
+    required DeviceFirmwareTargetType target_id = 1;
+    required uint32                   progress  = 2;
+    optional string                   stage     = 3;
 }
 
-message DevGetOnboardingStatus {
+message DeviceFirmwareUpdateStatusEntry {
+    required DeviceFirmwareTargetType target_id = 1;
+    required uint32                   status    = 2;
 }
 
-message DevOnboardingStatus {
+message DeviceGetFirmwareUpdateStatus {
+}
+
+message DeviceFirmwareUpdateStatus {
+    repeated DeviceFirmwareUpdateStatusEntry targets = 1;
+}
+
+message DeviceGetOnboardingStatus {
+}
+
+message DeviceOnboardingStatus {
     optional uint32 page_index = 1;
     optional uint32 page_count = 2;
     optional string page_name = 3;

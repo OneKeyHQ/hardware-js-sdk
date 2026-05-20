@@ -15,7 +15,7 @@ export const CATEGORY_ICONS = {
 } as const;
 
 // 分类颜色映射
-export const CATEGORY_COLORS: Record<MethodCategory, string> = {
+export const CATEGORY_COLORS: Record<string, string> = {
   address: 'text-blue-600 bg-blue-50 border-blue-200',
   publicKey: 'text-green-600 bg-green-50 border-green-200',
   transaction: 'text-orange-600 bg-orange-50 border-orange-200',

@@ -1,6 +1,6 @@
 import { ERRORS, HardwareError, HardwareErrorCode, wait } from '@onekeyfe/hd-shared';
 import {
-  DevRebootType,
+  DeviceRebootType,
   PROTOCOL_V2_BLE_FILE_CHUNK_SIZE,
   PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE,
 } from '@onekeyfe/hd-transport';
@@ -52,7 +52,7 @@ type ProtocolV2FirmwareUpdateStatusTarget = {
 
 type ProtocolV2FirmwareUpdateStartResponse =
   | TypedResponseMessage<'Success'>
-  | TypedResponseMessage<'DevFirmwareUpdateStatus'>
+  | TypedResponseMessage<'DeviceFirmwareUpdateStatus'>
   | undefined;
 
 const getUnknownErrorText = (error: unknown) => {
@@ -123,7 +123,7 @@ const isProtocolV2PollingTransientError = (error: unknown) => {
   return (
     isDeviceDisconnectedError(error) ||
     isProtocolV2ReconnectProbeError(error) ||
-    (message.includes('response timeout') && message.includes('devgetfirmwareupdatestatus')) ||
+    (message.includes('response timeout') && message.includes('devicegetfirmwareupdatestatus')) ||
     message.includes('device not found') ||
     message.includes('transportnotfound')
   );
@@ -134,7 +134,7 @@ const isProtocolV2PollingTransientError = (error: unknown) => {
  *
  * It intentionally does not fall back to FirmwareUpdateV3/V1 behavior:
  * - upload uses FilesystemFileWrite
- * - install uses DevFirmwareUpdate
+ * - install uses DeviceFirmwareUpdate
  * - completion reboots to normal, then polls Ping
  */
 export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareUpdateV4Params> {
@@ -391,7 +391,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         transferStartTime,
       });
       targets.push({
-        target_id: ProtocolV2FirmwareTargetType.TARGET_MAIN_BOOT,
+        target_id: ProtocolV2FirmwareTargetType.TARGET_BOOTLOADER,
         path: bootloaderPath,
       });
     }
@@ -419,8 +419,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   private async queryProtocolV2FirmwareUpdateStatus() {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
     return typedCall(
-      'DevGetFirmwareUpdateStatus',
-      'DevFirmwareUpdateStatus',
+      'DeviceGetFirmwareUpdateStatus',
+      'DeviceFirmwareUpdateStatus',
       {},
       {
         timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
@@ -485,7 +485,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     if (startResponse?.type === 'Success') {
       return;
     }
-    if (startResponse?.type === 'DevFirmwareUpdateStatus') {
+    if (startResponse?.type === 'DeviceFirmwareUpdateStatus') {
       const statusTargets = (startResponse.message.targets ??
         []) as ProtocolV2FirmwareUpdateStatusTarget[];
       if (this.assertProtocolV2TargetStatus(statusTargets, expectedTargetIds)) {
@@ -541,7 +541,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
   private async exitProtocolV2BootloaderToNormal() {
     this.postTipMessage(FirmwareUpdateTipMessage.SwitchFirmwareReconnectDevice);
-    await this.protocolV2Reboot(DevRebootType.Normal);
+    await this.protocolV2Reboot(DeviceRebootType.Normal);
   }
 
   private async waitForProtocolV2FinalFeatures() {
@@ -760,13 +760,13 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     let response: ProtocolV2FirmwareUpdateStartResponse;
     try {
       response = await typedCall(
-        'DevFirmwareUpdate',
+        'DeviceFirmwareUpdate',
         PROTOCOL_V2_FIRMWARE_UPDATE_RESPONSE_TYPES,
         {
           targets,
         },
         {
-          intermediateTypes: ['DevFirmwareInstallProgress'],
+          intermediateTypes: ['DeviceFirmwareInstallProgress'],
           onIntermediateResponse: (response: { message?: { progress?: number } }) => {
             const progress = Number(response.message?.progress);
             if (Number.isFinite(progress)) {
@@ -786,10 +786,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return response;
   }
 
-  private async protocolV2Reboot(rebootType: DevRebootType) {
+  private async protocolV2Reboot(rebootType: DeviceRebootType) {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
     try {
-      const res = await typedCall('DevReboot', 'Success', {
+      const res = await typedCall('DeviceReboot', 'Success', {
         reboot_type: rebootType,
       });
       return res.message;

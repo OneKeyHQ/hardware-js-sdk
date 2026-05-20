@@ -94,9 +94,9 @@ Protocol V2 frame 的 payload 格式：
 | `Ping`                       | 60206 | Host -> Device | 链路检查           |
 | `Success`                    | 60207 | Device -> Host | 通用成功响应       |
 | `Failure`                    | 60208 | Device -> Host | 通用失败响应       |
-| `DevGetDeviceInfo`           | 60600 | Host -> Device | 查询 Protocol V2 设备信息 |
+| `DeviceGetDeviceInfo`           | 60600 | Host -> Device | 查询 Protocol V2 设备信息 |
 | `DeviceInfo`                 | 60601 | Device -> Host | Protocol V2 设备信息响应  |
-| `DevReboot`                  | 60400 | Host -> Device | 设备重启           |
+| `DeviceReboot`                  | 60400 | Host -> Device | 设备重启           |
 | `FilesystemPathInfo`         | 60801 | Device -> Host | 文件或目录信息     |
 | `FilesystemPathInfoQuery`    | 60802 | Host -> Device | 查询文件或目录     |
 | `FilesystemFile`             | 60803 | Device -> Host | 文件数据或写入进度 |
@@ -107,10 +107,10 @@ Protocol V2 frame 的 payload 格式：
 | `FilesystemDirList`          | 60808 | Host -> Device | 列目录             |
 | `FilesystemDirMake`          | 60809 | Host -> Device | 创建目录           |
 | `FilesystemDirRemove`        | 60810 | Host -> Device | 删除目录           |
-| `DevFirmwareUpdate`          | 61000 | Host -> Device | 触发固件安装       |
-| `DevFirmwareInstallProgress` | 61001 | Device -> Host | 固件安装进度       |
-| `DevGetFirmwareUpdateStatus` | 61002 | Host -> Device | 查询更新状态       |
-| `DevFirmwareUpdateStatus`    | 61003 | Device -> Host | 更新状态响应       |
+| `DeviceFirmwareUpdate`          | 61000 | Host -> Device | 触发固件安装       |
+| `DeviceFirmwareInstallProgress` | 61001 | Device -> Host | 固件安装进度       |
+| `DeviceGetFirmwareUpdateStatus` | 61002 | Host -> Device | 查询更新状态       |
+| `DeviceFirmwareUpdateStatus`    | 61003 | Device -> Host | 更新状态响应       |
 
 ## WebUSB
 
@@ -154,7 +154,7 @@ Protocol V2 不支持 V1 的 `GetFeatures`。SDK 初始化时使用：
 ```mermaid
 flowchart TD
   Ping["Ping"]
-  DeviceInfo["DevGetDeviceInfo(targets: hw/fw/bt/se*/status, types: version/build_id/hash/specific)"]
+  DeviceInfo["DeviceGetDeviceInfo(targets: hw/fw/bt/se*/status, types: version/build_id/hash/specific)"]
   Adapter["Protocol V2 feature adapter -> Features"]
 
   Ping --> DeviceInfo --> Adapter
@@ -187,30 +187,32 @@ SDK 上传时第一块使用 `overwrite=true, append=false`，后续块使用 `o
 
 ## 固件更新
 
-Protocol V2 固件更新使用 `DevFirmwareUpdate`：
+Protocol V2 固件更新使用 `DeviceFirmwareUpdate`：
 
 ```protobuf
-message DevFirmwareTarget {
-  required DevFirmwareTargetType target_id = 1;
+message DeviceFirmwareTarget {
+  required DeviceFirmwareTargetType target_id = 1;
   required string path = 2;
 }
 
-message DevFirmwareUpdate {
-  repeated DevFirmwareTarget targets = 1;
+message DeviceFirmwareUpdate {
+  repeated DeviceFirmwareTarget targets = 1;
 }
 ```
 
 target 映射：
 
-| target                   | 含义       |
-| ------------------------ | ---------- |
-| `TARGET_MAIN_APP`        | 主固件     |
-| `TARGET_MAIN_BOOT`       | bootloader |
-| `TARGET_BT`              | 蓝牙固件   |
-| `TARGET_SE1..TARGET_SE4` | SE 固件    |
-| `TARGET_RESOURCE`        | 资源包     |
+| target                 | 含义       |
+| ---------------------- | ---------- |
+| `TARGET_ROMLOADER`     | romloader  |
+| `TARGET_BOOTLOADER`    | bootloader |
+| `TARGET_FIRMWARE_P1`   | 主固件 P1  |
+| `TARGET_FIRMWARE_P2`   | 主固件 P2  |
+| `TARGET_COPROCESSOR`   | 蓝牙/协处理器固件 |
+| `TARGET_SE`            | SE 固件    |
+| `TARGET_RESOURCE`      | 资源包     |
 
-SDK 会先把 resource、bootloader、firmware 写入 `vol1:`，再把所有需要安装的路径传入 `DevFirmwareUpdate.targets`。
+SDK 会先把 resource、bootloader、firmware 写入 `vol1:`，再把所有需要安装的路径传入 `DeviceFirmwareUpdate.targets`。
 
 ## schema 来源
 
@@ -220,7 +222,7 @@ SDK 会先把 resource、bootloader、firmware 写入 `vol1:`，再把所有需�
 | `packages/core/src/data/messages/messages-pro2.json` | 同上，同步到 core 运行时数据                                   |
 | `packages/hd-transport/src/types/messages.ts`        | 由 protobuf 生成脚本输出，包含 Protocol V2 类型联合             |
 
-当前 Pro2 子模块跟随 `origin/dev_romloader_split`，因为该分支包含 romloader split 相关 schema 和 `Filesystem*/DevFirmwareUpdate` 消息。
+当前 Pro2 子模块跟随 `origin/dev_romloader_split`，因为该分支包含 romloader split 相关 schema 和 `Filesystem*/DeviceFirmwareUpdate` 消息。
 
 ## 实现入口
 

@@ -5,9 +5,9 @@ import {
   normalizeFirmwareTargets,
 } from './helpers';
 
-import type { DevFirmwareUpdateParams } from './helpers';
+import type { DeviceFirmwareUpdateParams } from './helpers';
 
-export default class DevFirmwareUpdate extends BaseMethod<DevFirmwareUpdateParams> {
+export default class DeviceFirmwareUpdate extends BaseMethod<DeviceFirmwareUpdateParams> {
   init() {
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
@@ -21,7 +21,7 @@ export default class DevFirmwareUpdate extends BaseMethod<DevFirmwareUpdateParam
 
   async run() {
     const res = await this.device.commands.typedCall(
-      'DevFirmwareUpdate',
+      'DeviceFirmwareUpdate',
       PROTOCOL_V2_FIRMWARE_UPDATE_RESPONSE_TYPES,
       {
         targets: normalizeFirmwareTargets(this.params),

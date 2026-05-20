@@ -1,9 +1,9 @@
 import { BaseMethod } from '../BaseMethod';
 import { buildTargets, buildTypes } from './helpers';
 
-import type { DevGetDeviceInfoParams } from './helpers';
+import type { DeviceGetDeviceInfoParams } from './helpers';
 
-export default class DevGetDeviceInfo extends BaseMethod<DevGetDeviceInfoParams> {
+export default class DeviceGetDeviceInfo extends BaseMethod<DeviceGetDeviceInfoParams> {
   init() {
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
@@ -26,7 +26,7 @@ export default class DevGetDeviceInfo extends BaseMethod<DevGetDeviceInfoParams>
   }
 
   async run() {
-    const res = await this.device.commands.typedCall('DevGetDeviceInfo', 'DeviceInfo', {
+    const res = await this.device.commands.typedCall('DeviceGetDeviceInfo', 'DeviceInfo', {
       targets: buildTargets(this.params),
       types: buildTypes(this.params),
     });

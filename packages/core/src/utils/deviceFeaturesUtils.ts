@@ -5,7 +5,10 @@ import { Enum_Capability } from '@onekeyfe/hd-transport';
 
 import { toHardened } from '../api/helpers/pathUtils';
 import { DeviceModelToTypes, DeviceTypeToModels } from '../types';
-import DataManager, { type IFirmwareField, type MessageVersion } from '../data-manager/DataManager';
+import DataManager, {
+  type IFirmwareField,
+  type ProtocolV1MessageSchema,
+} from '../data-manager/DataManager';
 import { PROTOBUF_MESSAGE_CONFIG } from '../data-manager/MessagesConfig';
 import { getDeviceType } from './deviceInfoUtils';
 import { getDeviceFirmwareVersion } from './deviceVersionUtils';
@@ -15,13 +18,13 @@ import type { Device } from '../device/Device';
 import type { DeviceCommands } from '../device/DeviceCommands';
 import type { Features, SupportFeatureType } from '../types';
 
-export const getSupportMessageVersion = (
+export const getSupportProtocolV1MessageSchema = (
   features: Features | undefined
-): { messages: JSON; messageVersion: MessageVersion } => {
+): { messages: JSON; protocolV1MessageSchema: ProtocolV1MessageSchema } => {
   if (!features)
     return {
-      messages: DataManager.messages.latest,
-      messageVersion: 'latest',
+      messages: DataManager.messages.protocolV1Current,
+      protocolV1MessageSchema: 'protocolV1Current',
     };
 
   const currentDeviceVersion = getDeviceFirmwareVersion(features).join('.');
@@ -37,18 +40,18 @@ export const getSupportMessageVersion = (
   const sortedDeviceVersionConfigs =
     deviceVersionConfigs?.sort((a, b) => semver.compare(b.minVersion, a.minVersion)) ?? [];
 
-  for (const { minVersion, messageVersion } of sortedDeviceVersionConfigs) {
+  for (const { minVersion, protocolV1MessageSchema } of sortedDeviceVersionConfigs) {
     if (semver.gte(currentDeviceVersion, minVersion)) {
       return {
-        messages: DataManager.messages[messageVersion],
-        messageVersion,
+        messages: DataManager.messages[protocolV1MessageSchema],
+        protocolV1MessageSchema,
       };
     }
   }
 
   return {
-    messages: DataManager.messages.latest,
-    messageVersion: 'latest',
+    messages: DataManager.messages.protocolV1Current,
+    protocolV1MessageSchema: 'protocolV1Current',
   };
 };
 

@@ -484,11 +484,11 @@
         "MessageType_Ping": 60206,
         "MessageType_Success": 60207,
         "MessageType_Failure": 60208,
-        "MessageType_DevReboot": 60400,
-        "MessageType_DevGetDeviceInfo": 60600,
+        "MessageType_DeviceReboot": 60400,
+        "MessageType_DeviceGetDeviceInfo": 60600,
         "MessageType_DeviceInfo": 60601,
-        "MessageType_DevGetOnboardingStatus": 60602,
-        "MessageType_DevOnboardingStatus": 60603,
+        "MessageType_DeviceGetOnboardingStatus": 60602,
+        "MessageType_DeviceOnboardingStatus": 60603,
         "MessageType_FilesystemFixPermission": 60800,
         "MessageType_FilesystemPathInfo": 60801,
         "MessageType_FilesystemPathInfoQuery": 60802,
@@ -501,10 +501,10 @@
         "MessageType_FilesystemDirMake": 60809,
         "MessageType_FilesystemDirRemove": 60810,
         "MessageType_FilesystemFormat": 60811,
-        "MessageType_DevFirmwareUpdate": 61000,
-        "MessageType_DevFirmwareInstallProgress": 61001,
-        "MessageType_DevGetFirmwareUpdateStatus": 61002,
-        "MessageType_DevFirmwareUpdateStatus": 61003
+        "MessageType_DeviceFirmwareUpdate": 61000,
+        "MessageType_DeviceFirmwareInstallProgress": 61001,
+        "MessageType_DeviceGetFirmwareUpdateStatus": 61002,
+        "MessageType_DeviceFirmwareUpdateStatus": 61003
       }
     },
     "AlephiumGetAddress": {
@@ -11790,18 +11790,18 @@
         }
       }
     },
-    "DevRebootType": {
+    "DeviceRebootType": {
       "values": {
         "Normal": 0,
         "Boardloader": 1,
         "Bootloader": 2
       }
     },
-    "DevReboot": {
+    "DeviceReboot": {
       "fields": {
         "reboot_type": {
           "rule": "required",
-          "type": "DevRebootType",
+          "type": "DeviceRebootType",
           "id": 1
         }
       }
@@ -11816,20 +11816,20 @@
         "CLASSIC1S_PURE": 6
       }
     },
-    "DevSeType": {
+    "DeviceSeType": {
       "values": {
         "THD89": 0,
         "SE608A": 1
       }
     },
-    "DevSEState": {
+    "DeviceSEState": {
       "values": {
         "BOOT": 0,
         "APP_FACTORY": 51,
         "APP": 85
       }
     },
-    "DevFirmwareImageInfo": {
+    "DeviceFirmwareImageInfo": {
       "fields": {
         "version": {
           "type": "string",
@@ -11845,9 +11845,9 @@
         }
       }
     },
-    "DevHardwareInfo": {
+    "DeviceHardwareInfo": {
       "fields": {
-        "device_type": {
+        "Device_type": {
           "type": "DeviceType",
           "id": 10
         },
@@ -11865,30 +11865,30 @@
         }
       }
     },
-    "DevMainMcuInfo": {
+    "DeviceMainMcuInfo": {
       "fields": {
         "board": {
-          "type": "DevFirmwareImageInfo",
+          "type": "DeviceFirmwareImageInfo",
           "id": 10
         },
         "boot": {
-          "type": "DevFirmwareImageInfo",
+          "type": "DeviceFirmwareImageInfo",
           "id": 20
         },
         "app": {
-          "type": "DevFirmwareImageInfo",
+          "type": "DeviceFirmwareImageInfo",
           "id": 30
         }
       }
     },
-    "DevBluetoothInfo": {
+    "DeviceBluetoothInfo": {
       "fields": {
         "boot": {
-          "type": "DevFirmwareImageInfo",
+          "type": "DeviceFirmwareImageInfo",
           "id": 20
         },
         "app": {
-          "type": "DevFirmwareImageInfo",
+          "type": "DeviceFirmwareImageInfo",
           "id": 30
         },
         "adv_name": {
@@ -11901,27 +11901,27 @@
         }
       }
     },
-    "DevSEInfo": {
+    "DeviceSEInfo": {
       "fields": {
         "boot": {
-          "type": "DevFirmwareImageInfo",
+          "type": "DeviceFirmwareImageInfo",
           "id": 20
         },
         "app": {
-          "type": "DevFirmwareImageInfo",
+          "type": "DeviceFirmwareImageInfo",
           "id": 30
         },
         "type": {
-          "type": "DevSeType",
+          "type": "DeviceSeType",
           "id": 100
         },
         "state": {
-          "type": "DevSEState",
+          "type": "DeviceSEState",
           "id": 110
         }
       }
     },
-    "DevInfoTargets": {
+    "DeviceInfoTargets": {
       "fields": {
         "hw": {
           "type": "bool",
@@ -11957,7 +11957,7 @@
         }
       }
     },
-    "DevInfoTypes": {
+    "DeviceInfoTypes": {
       "fields": {
         "version": {
           "type": "bool",
@@ -11977,7 +11977,7 @@
         }
       }
     },
-    "DevStatus": {
+    "DeviceStatus": {
       "fields": {
         "language": {
           "type": "string",
@@ -12005,14 +12005,14 @@
         }
       }
     },
-    "DevGetDeviceInfo": {
+    "DeviceGetDeviceInfo": {
       "fields": {
         "targets": {
-          "type": "DevInfoTargets",
+          "type": "DeviceInfoTargets",
           "id": 1
         },
         "types": {
-          "type": "DevInfoTypes",
+          "type": "DeviceInfoTypes",
           "id": 2
         }
       }
@@ -12025,56 +12025,56 @@
           "id": 1
         },
         "hw": {
-          "type": "DevHardwareInfo",
+          "type": "DeviceHardwareInfo",
           "id": 100
         },
         "fw": {
-          "type": "DevMainMcuInfo",
+          "type": "DeviceMainMcuInfo",
           "id": 200
         },
         "bt": {
-          "type": "DevBluetoothInfo",
+          "type": "DeviceBluetoothInfo",
           "id": 300
         },
         "se1": {
-          "type": "DevSEInfo",
+          "type": "DeviceSEInfo",
           "id": 400
         },
         "se2": {
-          "type": "DevSEInfo",
+          "type": "DeviceSEInfo",
           "id": 410
         },
         "se3": {
-          "type": "DevSEInfo",
+          "type": "DeviceSEInfo",
           "id": 420
         },
         "se4": {
-          "type": "DevSEInfo",
+          "type": "DeviceSEInfo",
           "id": 430
         },
         "status": {
-          "type": "DevStatus",
+          "type": "DeviceStatus",
           "id": 10000
         }
       }
     },
-    "DevFirmwareTargetType": {
+    "DeviceFirmwareTargetType": {
       "values": {
-        "TARGET_MAIN_APP": 0,
-        "TARGET_MAIN_BOOT": 1,
-        "TARGET_BT": 2,
-        "TARGET_SE1": 3,
-        "TARGET_SE2": 4,
-        "TARGET_SE3": 5,
-        "TARGET_SE4": 6,
+        "TARGET_INVALID": 0,
+        "TARGET_ROMLOADER": 1,
+        "TARGET_BOOTLOADER": 2,
+        "TARGET_FIRMWARE_P1": 3,
+        "TARGET_FIRMWARE_P2": 4,
+        "TARGET_COPROCESSOR": 5,
+        "TARGET_SE": 6,
         "TARGET_RESOURCE": 10
       }
     },
-    "DevFirmwareTarget": {
+    "DeviceFirmwareTarget": {
       "fields": {
         "target_id": {
           "rule": "required",
-          "type": "DevFirmwareTargetType",
+          "type": "DeviceFirmwareTargetType",
           "id": 1
         },
         "path": {
@@ -12084,20 +12084,24 @@
         }
       }
     },
-    "DevFirmwareUpdate": {
+    "DeviceFirmwareUpdate": {
       "fields": {
         "targets": {
           "rule": "repeated",
-          "type": "DevFirmwareTarget",
+          "type": "DeviceFirmwareTarget",
           "id": 1
+        },
+        "max_concurrent": {
+          "type": "uint32",
+          "id": 2
         }
       }
     },
-    "DevFirmwareInstallProgress": {
+    "DeviceFirmwareInstallProgress": {
       "fields": {
         "target_id": {
           "rule": "required",
-          "type": "DevFirmwareTargetType",
+          "type": "DeviceFirmwareTargetType",
           "id": 1
         },
         "progress": {
@@ -12111,11 +12115,11 @@
         }
       }
     },
-    "DevFirmwareUpdateStatusEntry": {
+    "DeviceFirmwareUpdateStatusEntry": {
       "fields": {
         "target_id": {
           "rule": "required",
-          "type": "DevFirmwareTargetType",
+          "type": "DeviceFirmwareTargetType",
           "id": 1
         },
         "status": {
@@ -12125,14 +12129,14 @@
         }
       }
     },
-    "DevGetFirmwareUpdateStatus": {
+    "DeviceGetFirmwareUpdateStatus": {
       "fields": {}
     },
-    "DevFirmwareUpdateStatus": {
+    "DeviceFirmwareUpdateStatus": {
       "fields": {
         "targets": {
           "rule": "repeated",
-          "type": "DevFirmwareUpdateStatusEntry",
+          "type": "DeviceFirmwareUpdateStatusEntry",
           "id": 1
         }
       }
@@ -12399,10 +12403,10 @@
     "FilesystemFormat": {
       "fields": {}
     },
-    "DevGetOnboardingStatus": {
+    "DeviceGetOnboardingStatus": {
       "fields": {}
     },
-    "DevOnboardingStatus": {
+    "DeviceOnboardingStatus": {
       "fields": {
         "page_index": {
           "type": "uint32",

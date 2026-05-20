@@ -1,11 +1,11 @@
 import type { CommonParams, Response } from '../params';
 import type {
-  DevFirmwareTarget,
-  DevFirmwareUpdateStatus,
-  DevOnboardingStatus,
-  DevInfoTargets,
-  DevInfoTypes,
-  DevRebootType,
+  DeviceFirmwareTarget,
+  DeviceFirmwareUpdateStatus,
+  DeviceOnboardingStatus,
+  DeviceInfoTargets,
+  DeviceInfoTypes,
+  DeviceRebootType,
   FactoryDeviceInfo,
   ProtoVersion,
   ProtocolV2DeviceInfo,
@@ -48,14 +48,14 @@ export type PathInfoResult = {
   directory?: boolean;
 };
 
-export type DevRebootParams = {
-  rebootType?: DevRebootType | string | number;
-  reboot_type?: DevRebootType | string | number;
+export type DeviceRebootParams = {
+  rebootType?: DeviceRebootType | string | number;
+  reboot_type?: DeviceRebootType | string | number;
 };
 
-export type DevGetDeviceInfoParams = {
-  targets?: DevInfoTargets;
-  types?: DevInfoTypes;
+export type DeviceGetDeviceInfoParams = {
+  targets?: DeviceInfoTargets;
+  types?: DeviceInfoTypes;
   targetHw?: boolean;
   targetFw?: boolean;
   targetBt?: boolean;
@@ -70,10 +70,10 @@ export type DevGetDeviceInfoParams = {
   includeSpecific?: boolean;
 };
 
-export type DevFirmwareUpdateParams = {
-  targets?: DevFirmwareTarget[];
-  targetId?: DevFirmwareTarget['target_id'] | string | number;
-  target_id?: DevFirmwareTarget['target_id'] | string | number;
+export type DeviceFirmwareUpdateParams = {
+  targets?: DeviceFirmwareTarget[];
+  targetId?: DeviceFirmwareTarget['target_id'] | string | number;
+  target_id?: DeviceFirmwareTarget['target_id'] | string | number;
   path?: string;
 };
 
@@ -149,30 +149,30 @@ export declare function ping(
   params?: CommonParams & { message?: string }
 ): Response<Success>;
 
-export declare function devReboot(
+export declare function deviceReboot(
   connectId: string,
-  params: CommonParams & DevRebootParams
+  params: CommonParams & DeviceRebootParams
 ): Response<Success>;
 
-export declare function devGetDeviceInfo(
+export declare function deviceGetDeviceInfo(
   connectId: string,
-  params?: CommonParams & DevGetDeviceInfoParams
+  params?: CommonParams & DeviceGetDeviceInfoParams
 ): Response<ProtocolV2DeviceInfo>;
 
-export declare function devGetOnboardingStatus(
+export declare function deviceGetOnboardingStatus(
   connectId: string,
   params?: CommonParams
-): Response<DevOnboardingStatus>;
+): Response<DeviceOnboardingStatus>;
 
-export declare function devFirmwareUpdate(
+export declare function deviceFirmwareUpdate(
   connectId: string,
-  params: CommonParams & DevFirmwareUpdateParams
-): Response<Success | DevFirmwareUpdateStatus>;
+  params: CommonParams & DeviceFirmwareUpdateParams
+): Response<Success | DeviceFirmwareUpdateStatus>;
 
-export declare function devGetFirmwareUpdateStatus(
+export declare function deviceGetFirmwareUpdateStatus(
   connectId: string,
   params?: CommonParams
-): Response<DevFirmwareUpdateStatus>;
+): Response<DeviceFirmwareUpdateStatus>;
 
 export declare function factoryDeviceInfoSettings(
   connectId: string,

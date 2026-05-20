@@ -14,21 +14,21 @@ OneKey 硬件钱包对 EVM (以太坊虚拟机) 兼容链的支持，建立在�
 
 OneKey SDK is designed to provide a seamless developer experience by abstracting away the complexities of different hardware firmware versions. It achieves this through an automatic protocol detection mechanism.
 
-### 3.1 Protocol Dialects: `legacyV1` vs `latest`
+### 3.1 Protocol V1 Schema Dialects: `protocolV1Legacy` vs `protocolV1Current`
 
 The SDK internally manages two primary protocol "dialects" for communicating with the device:
 
-- **`legacyV1` (Trezor-compatible Protocol):** Used for older generations of OneKey firmware. This protocol is compatible with the message format originally defined by Trezor.
-- **`latest` (Native OneKey Protocol):** Used for modern OneKey firmware. This is a more feature-rich, native protocol that supports the latest EIPs and optimizations, such as EIP-7702.
+- **`protocolV1Legacy` (Trezor-compatible schema):** Used for older generations of OneKey firmware. This schema is compatible with the message format originally defined by Trezor.
+- **`protocolV1Current` (Native OneKey Protocol V1 schema):** Used for modern Protocol V1 firmware. This is a more feature-rich, native schema that supports newer EIPs and optimizations, such as EIP-7702.
 
 ### 3.2 Automatic Protocol Switching
 
 The SDK automatically determines which protocol to use at runtime.
 
-- **Detection:** When a method like `EVMSignTransaction` is called, it uses `TransportManager.getMessageVersion()` to query the connected device's protocol version.
+- **Detection:** When a method like `EVMSignTransaction` is called, it uses `TransportManager.getProtocolV1MessageSchema()` to query the Protocol V1 message schema selected from the connected device features.
 - **Switching Logic:**
-  - If the device returns `'v1'`, the SDK invokes the signing logic with a compatibility flag (`supportTrezor: true`), instructing it to format messages for the legacy protocol.
-  - Otherwise, it defaults to using the native `latest` protocol.
+  - If the device returns `'protocolV1Legacy'`, the SDK invokes the signing logic with a compatibility flag (`supportTrezor: true`), instructing it to format messages for the legacy schema.
+  - Otherwise, it defaults to using the native `protocolV1Current` schema.
 
 This ensures that developers can write a single piece of code that works across all generations of OneKey hardware without needing to worry about the underlying communication differences.
 
@@ -119,7 +119,7 @@ EIP-712 结构化数据签名在 SDK 中通过两条路径实现：
 - **关键逻辑:**
   - **批量处理:** 方法内部会自动将单个请求和批量（`bundle`）请求统一为数组进行处理。
   - **参数验证:** 验证 `path` 的有效性，并处理可选参数 `showOnOneKey`（默认为 `true`，在设备上显示地址）和 `chainId`。
-  - **协议切换:** 调用 `TransportManager.getMessageVersion()` 来决定使用 `legacyV1` 还是 `latest` 的 `getAddress` 实现。
+  - **协议切换:** 调用 `TransportManager.getProtocolV1MessageSchema()` 来决定使用 `legacyV1` 还是 `latest` 的 `getAddress` 实现。
   - **设备交互:** 循环处理批量请求，对每个请求都向设备发起一次 `typedCall` 调用。
 
 ### 5.2 `EVMSignMessage`
@@ -129,7 +129,7 @@ EIP-712 结构化数据签名在 SDK 中通过两条路径实现：
 - **关键逻辑:**
   - **Hex 输入:** 调用者需要传入十六进制格式的消息 (`messageHex`)。
   - **参数验证:** 验证 `path` 和 `messageHex` 的有效性，并支持可选的 `chainId` 参数。
-  - **协议切换:** 同样使用 `TransportManager.getMessageVersion()` 来选择 `legacyV1` 或 `latest` 实现。
+  - **协议切换:** 同样使用 `TransportManager.getProtocolV1MessageSchema()` 来选择 `legacyV1` 或 `latest` 实现。
   - **设备交互:** 将格式化后的参数（地址路径、消息、链 ID）通过 `typedCall` 发送到设备进行签名。
 
 
@@ -143,7 +143,7 @@ EIP-712 结构化数据签名在 SDK 中通过两条路径实现：
     - `maxFeePerGas` 和 `maxPriorityFeePerGas` 存在 `=>` **EIP-1559**
     - 否则 `=>` **Legacy**
   - **动态参数验证:** 根据检测到的交易类型，应用不同的验证规则，确保所有必需的字段（如 `gasPrice` 或 `maxFeePerGas`）都存在。
-  - **协议切换:** 同样使用 `TransportManager.getMessageVersion()` 来选择 `legacyV1` 或 `latest` 实现。注意：EIP-7702 在 `legacyV1` 模式下不被支持。
+  - **协议切换:** 同样使用 `TransportManager.getProtocolV1MessageSchema()` 来选择 `legacyV1` 或 `latest` 实现。注意：EIP-7702 在 `legacyV1` 模式下不被支持。
   - **设备交互:** 根据交易类型，调用 `latest` 模块中对应的 `evmSignTx`, `evmSignTxEip1559`, 或 `evmSignTxEip7702` 函数，将交易数据分块发送给设备进行签名。
 
 ### 5.4 `EVMSignTypedData`

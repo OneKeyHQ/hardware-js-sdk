@@ -25,12 +25,12 @@ const FIRMWARE_UPDATE_METHODS = new Set([
   'firmwareUpdateV2',
   'firmwareUpdateV3',
   'firmwareUpdateV4',
-  'devFirmwareUpdate',
+  'deviceFirmwareUpdate',
   'deviceUpdateBootloader',
 ]);
 
 const PROTOCOL_V2_PATH_METHODS = new Set([
-  'devFirmwareUpdate',
+  'deviceFirmwareUpdate',
   'pathInfo',
   'dirList',
   'dirMake',

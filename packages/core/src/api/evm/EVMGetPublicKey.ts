@@ -57,7 +57,7 @@ export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKeyOneK
   }
 
   getEvmPublicKey(param: EthereumGetPublicKey) {
-    if (TransportManager.getMessageVersion() === 'v1') {
+    if (TransportManager.getProtocolV1MessageSchema() === 'protocolV1Legacy') {
       return getPublicKeyLegacyV1({
         typedCall: this.device.commands.typedCall.bind(this.device.commands),
         param,

@@ -1,23 +1,23 @@
-import { DevRebootType } from '@onekeyfe/hd-transport';
+import { DeviceRebootType } from '@onekeyfe/hd-transport';
 
 import type {
-  DevFirmwareTarget,
-  DevFirmwareTargetType,
-  DevInfoTargets,
-  DevInfoTypes,
+  DeviceFirmwareTarget,
+  DeviceFirmwareTargetType,
+  DeviceInfoTargets,
+  DeviceInfoTypes,
   TransportCallOptions,
 } from '@onekeyfe/hd-transport';
 
-export type RebootTypeInput = DevRebootType | keyof typeof DevRebootType | string | number;
+export type RebootTypeInput = DeviceRebootType | keyof typeof DeviceRebootType | string | number;
 
-export type DevRebootParams = {
+export type DeviceRebootParams = {
   rebootType?: RebootTypeInput;
   reboot_type?: RebootTypeInput;
 };
 
-export type DevGetDeviceInfoParams = {
-  targets?: DevInfoTargets;
-  types?: DevInfoTypes;
+export type DeviceGetDeviceInfoParams = {
+  targets?: DeviceInfoTargets;
+  types?: DeviceInfoTypes;
   targetHw?: boolean;
   targetFw?: boolean;
   targetBt?: boolean;
@@ -32,18 +32,18 @@ export type DevGetDeviceInfoParams = {
   includeSpecific?: boolean;
 };
 
-export type DevFirmwareTargetInput =
-  | DevFirmwareTarget
+export type DeviceFirmwareTargetInput =
+  | DeviceFirmwareTarget
   | {
-      targetId?: DevFirmwareTargetType | string | number;
-      target_id?: DevFirmwareTargetType | string | number;
+      targetId?: DeviceFirmwareTargetType | string | number;
+      target_id?: DeviceFirmwareTargetType | string | number;
       path: string;
     };
 
-export type DevFirmwareUpdateParams = {
-  targets?: DevFirmwareTargetInput[];
-  targetId?: DevFirmwareTargetType | string | number;
-  target_id?: DevFirmwareTargetType | string | number;
+export type DeviceFirmwareUpdateParams = {
+  targets?: DeviceFirmwareTargetInput[];
+  targetId?: DeviceFirmwareTargetType | string | number;
+  target_id?: DeviceFirmwareTargetType | string | number;
   path?: string;
 };
 
@@ -56,42 +56,42 @@ export type FactoryDeviceInfoSettingsParams = {
   preFirmware?: string;
 };
 
-const DEV_REBOOT_TYPES: Record<string, DevRebootType> = {
-  Normal: DevRebootType.Normal,
-  normal: DevRebootType.Normal,
-  Boardloader: DevRebootType.Boardloader,
-  boardloader: DevRebootType.Boardloader,
-  Bootloader: DevRebootType.Bootloader,
-  bootloader: DevRebootType.Bootloader,
+const DEVICE_REBOOT_TYPES: Record<string, DeviceRebootType> = {
+  Normal: DeviceRebootType.Normal,
+  normal: DeviceRebootType.Normal,
+  Boardloader: DeviceRebootType.Boardloader,
+  boardloader: DeviceRebootType.Boardloader,
+  Bootloader: DeviceRebootType.Bootloader,
+  bootloader: DeviceRebootType.Bootloader,
 };
 
 export const PROTOCOL_V2_FIRMWARE_UPDATE_OPTIONS: TransportCallOptions = {
-  intermediateTypes: ['DevFirmwareInstallProgress'],
+  intermediateTypes: ['DeviceFirmwareInstallProgress'],
 };
 
-export const PROTOCOL_V2_FIRMWARE_UPDATE_RESPONSE_TYPES: ('Success' | 'DevFirmwareUpdateStatus')[] =
-  ['Success', 'DevFirmwareUpdateStatus'];
+export const PROTOCOL_V2_FIRMWARE_UPDATE_RESPONSE_TYPES: ('Success' | 'DeviceFirmwareUpdateStatus')[] =
+  ['Success', 'DeviceFirmwareUpdateStatus'];
 
-export function normalizeRebootType(value: RebootTypeInput | undefined): DevRebootType {
+export function normalizeRebootType(value: RebootTypeInput | undefined): DeviceRebootType {
   if (typeof value === 'number') return value;
   if (typeof value === 'string') {
     const numeric = Number(value);
     if (Number.isFinite(numeric)) return numeric;
-    if (value in DEV_REBOOT_TYPES) return DEV_REBOOT_TYPES[value];
+    if (value in DEVICE_REBOOT_TYPES) return DEVICE_REBOOT_TYPES[value];
   }
-  return DevRebootType.Normal;
+  return DeviceRebootType.Normal;
 }
 
 function normalizeTargetId(
-  value: DevFirmwareTargetType | string | number | undefined
-): DevFirmwareTargetType {
+  value: DeviceFirmwareTargetType | string | number | undefined
+): DeviceFirmwareTargetType {
   if (typeof value === 'number') return value;
   const numeric = Number(value);
   if (Number.isFinite(numeric)) return numeric;
   return 0;
 }
 
-export function normalizeFirmwareTargets(params: DevFirmwareUpdateParams): DevFirmwareTarget[] {
+export function normalizeFirmwareTargets(params: DeviceFirmwareUpdateParams): DeviceFirmwareTarget[] {
   const targets =
     params.targets ??
     (params.path
@@ -109,10 +109,10 @@ export function normalizeFirmwareTargets(params: DevFirmwareUpdateParams): DevFi
   }));
 }
 
-export function buildTargets(params: DevGetDeviceInfoParams): DevInfoTargets | undefined {
+export function buildTargets(params: DeviceGetDeviceInfoParams): DeviceInfoTargets | undefined {
   if (params.targets) return params.targets;
 
-  const targets: DevInfoTargets = {
+  const targets: DeviceInfoTargets = {
     hw: params.targetHw,
     fw: params.targetFw,
     bt: params.targetBt,
@@ -125,10 +125,10 @@ export function buildTargets(params: DevGetDeviceInfoParams): DevInfoTargets | u
   return Object.values(targets).some(value => value !== undefined) ? targets : undefined;
 }
 
-export function buildTypes(params: DevGetDeviceInfoParams): DevInfoTypes | undefined {
+export function buildTypes(params: DeviceGetDeviceInfoParams): DeviceInfoTypes | undefined {
   if (params.types) return params.types;
 
-  const types: DevInfoTypes = {
+  const types: DeviceInfoTypes = {
     version: params.includeVersion,
     build_id: params.includeBuildId,
     hash: params.includeHash,

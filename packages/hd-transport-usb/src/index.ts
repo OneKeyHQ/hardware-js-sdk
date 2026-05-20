@@ -6,11 +6,21 @@ import transport, {
   PROTOCOL_V1_MESSAGE_HEADER_SIZE,
   PROTOCOL_V1_REPORT_ID,
   PROTOCOL_V1_USB_PACKET_SIZE,
+  PROTOCOL_V2_CHANNEL_USB,
+  PROTOCOL_V2_FRAME_MAX_BYTES,
+  ProtocolV2FrameAssembler,
+  ProtocolV2Session,
+  probeProtocolV2 as probeProtocolV2Helper,
 } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode, ONEKEY_WEBUSB_FILTER, wait } from '@onekeyfe/hd-shared';
 
 import type EventEmitter from 'events';
-import type { AcquireInput, OneKeyDeviceInfo, ProtocolType } from '@onekeyfe/hd-transport';
+import type {
+  AcquireInput,
+  OneKeyDeviceInfo,
+  ProtocolType,
+  TransportCallOptions,
+} from '@onekeyfe/hd-transport';
 
 const { parseConfigure, ProtocolV1, check } = transport;
 
@@ -34,6 +44,7 @@ const SERIAL_READ_TIMEOUT_MS = 5000;
 /** Packet I/O retry configuration (matches WebUsbTransport) */
 const PACKET_IO_MAX_RETRIES = 3;
 const PACKET_IO_RETRY_DELAY = 300;
+const PROTOCOL_PROBE_TIMEOUT = 1000;
 
 /**
  * Opened device state — holds the USB device, claimed interface, and endpoints.
@@ -172,6 +183,9 @@ function toArrayBuffer(buf: Buffer): ArrayBuffer {
 export default class NodeUsbTransport {
   messages: ReturnType<typeof transport.parseConfigure> | undefined;
 
+  /** Protobuf schema for Protocol V2 transports. */
+  messagesV2: ReturnType<typeof transport.parseConfigure> | undefined;
+
   name = 'NodeUsbTransport';
 
   version = '';
@@ -190,16 +204,17 @@ export default class NodeUsbTransport {
   /** path → opened device state */
   private openDevices = new Map<string, OpenDevice>();
 
+  /** Per-path protocol type detected by active wire-level probe. */
+  private deviceProtocol: Map<string, ProtocolType> = new Map();
+
+  /** Per-path Protocol V2 frame assembler, preserving buffered frames during reads. */
+  private protocolV2Assemblers: Map<string, ProtocolV2FrameAssembler> = new Map();
+
   /** per-path reconnect lock to prevent concurrent reconnects */
   private reconnectLocks = new Map<string, Promise<OpenDevice>>();
 
   /** set to true when cancel() is called; checked by retry loops */
   private cancelled = false;
-
-  // NodeUsbTransport speaks Protocol V1 only (no Pro2 USB support yet via libusb).
-  getProtocolType(_path: string): ProtocolType {
-    return 'V1';
-  }
 
   /**
    * Initialize transport.
@@ -216,6 +231,11 @@ export default class NodeUsbTransport {
     this.configured = true;
     this.messages = messages;
     return Promise.resolve();
+  }
+
+  configureProtocolV2(signedData: any) {
+    this.messagesV2 = parseConfigure(signedData);
+    this.Log?.debug('[NodeUsbTransport] Protocol V2 schema configured');
   }
 
   listen() {
@@ -289,7 +309,7 @@ export default class NodeUsbTransport {
   /**
    * Acquire device — open USB device, claim interface, return path (string).
    */
-  acquire(input: AcquireInput): Promise<string> {
+  async acquire(input: AcquireInput): Promise<string> {
     const path = input.path ?? '';
     if (!path) {
       throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound, 'No device path provided');
@@ -297,7 +317,8 @@ export default class NodeUsbTransport {
 
     try {
       this.openDevice(path);
-      return Promise.resolve(path);
+      await this.detectProtocol(path, input.expectedProtocol);
+      return path;
     } catch (error: any) {
       this.Log?.debug('NodeUsbTransport acquire error: ', error);
       throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound, error.message ?? String(error));
@@ -308,6 +329,12 @@ export default class NodeUsbTransport {
    * Release device — release interface and close.
    */
   async release(path: string, _onclose?: boolean): Promise<void> {
+    await this.closeOpenDevice(path);
+    this.deviceProtocol.delete(path);
+    this.protocolV2Assemblers.delete(path);
+  }
+
+  private async closeOpenDevice(path: string): Promise<void> {
     const openDev = this.openDevices.get(path);
     if (!openDev) return;
 
@@ -336,7 +363,12 @@ export default class NodeUsbTransport {
    * Call device method — encode protobuf, send packets, receive response.
    * This is the core method that replaces LowlevelTransport's call + UsbPlugin's send/receive.
    */
-  async call(path: string, name: string, data: Record<string, unknown>) {
+  async call(
+    path: string,
+    name: string,
+    data: Record<string, unknown>,
+    options?: TransportCallOptions
+  ) {
     this.cancelled = false;
 
     if (!this.messages) {
@@ -347,13 +379,38 @@ export default class NodeUsbTransport {
       throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound, `Device not acquired: ${path}`);
     }
 
-    const { messages } = this;
+    const protocol = this.deviceProtocol.get(path) ?? 'V1';
     if (LogBlockCommand.has(name)) {
-      this.Log?.debug('NodeUsbTransport call-', ' name: ', name);
+      this.Log?.debug('NodeUsbTransport call-', ' name: ', name, ' protocol: ', protocol);
     } else {
-      this.Log?.debug('NodeUsbTransport call-', ' name: ', name, ' data: ', data);
+      this.Log?.debug(
+        'NodeUsbTransport call-',
+        ' name: ',
+        name,
+        ' data: ',
+        data,
+        ' protocol: ',
+        protocol
+      );
     }
 
+    if (protocol === 'V2') {
+      return this.callProtocolV2(path, name, data, options);
+    }
+
+    return this.callProtocolV1(path, name, data, options);
+  }
+
+  private async callProtocolV1(
+    path: string,
+    name: string,
+    data: Record<string, unknown>,
+    options?: TransportCallOptions
+  ) {
+    const { messages } = this;
+    if (!messages) {
+      throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
+    }
     // Encode protobuf message into 63-byte chunks (same as WebUsbTransport)
     const encodeBuffers = ProtocolV1.encodeMessageChunks(messages, name, data);
 
@@ -362,7 +419,7 @@ export default class NodeUsbTransport {
     await this.sendAllChunksWithRetry(path, encodeBuffers);
 
     // Receive response — re-resolve in case reconnect happened during send
-    const resData = await this.receiveData(path, this.getOpenDevice(path));
+    const resData = await this.receiveData(path, this.getOpenDevice(path), options?.timeoutMs);
     if (typeof resData !== 'string') {
       throw ERRORS.TypedError(HardwareErrorCode.NetworkError, 'Returning data is not string.');
     }
@@ -415,6 +472,22 @@ export default class NodeUsbTransport {
     );
   }
 
+  private getDeviceInterface(dev: usb.Device): usb.Interface {
+    const vendorInterface = dev.interfaces.find(
+      iface => iface.descriptor.bInterfaceClass === 0xff
+    );
+    const defaultInterface = dev.interfaces.find(
+      iface => iface.descriptor.bInterfaceNumber === INTERFACE_NUMBER
+    );
+    const iface = vendorInterface ?? defaultInterface ?? dev.interfaces[0];
+
+    if (!iface) {
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound, 'USB interface not found');
+    }
+
+    return iface;
+  }
+
   /**
    * Reconnect device before retrying a failed transfer (aligned with WebUsbTransport).
    * Uses per-path lock to prevent concurrent reconnects to the same device.
@@ -437,9 +510,9 @@ export default class NodeUsbTransport {
       );
       await wait(attempt * PACKET_IO_RETRY_DELAY);
 
-      // Close the existing device
+      // Close the existing device without clearing the detected protocol cache.
       try {
-        await this.release(path);
+        await this.closeOpenDevice(path);
       } catch (releaseError) {
         this.Log?.debug('[NodeUsbTransport] release before retry error:', releaseError);
       }
@@ -566,7 +639,7 @@ export default class NodeUsbTransport {
     try {
       dev.timeout = TRANSFER_TIMEOUT_MS;
 
-      const iface = dev.interface(INTERFACE_NUMBER);
+      const iface = this.getDeviceInterface(dev);
 
       // On Linux, detach kernel driver if active
       if (process.platform === 'linux') {
@@ -581,12 +654,14 @@ export default class NodeUsbTransport {
 
       iface.claim();
 
-      const epIn = iface.endpoints.find(
-        (e): e is usb.InEndpoint => e.direction === 'in' && e.address === ENDPOINT_IN
-      );
-      const epOut = iface.endpoints.find(
-        (e): e is usb.OutEndpoint => e.direction === 'out' && e.address === ENDPOINT_OUT
-      );
+      const epIn =
+        iface.endpoints.find(
+          (e): e is usb.InEndpoint => e.direction === 'in' && e.address === ENDPOINT_IN
+        ) ?? iface.endpoints.find((e): e is usb.InEndpoint => e.direction === 'in');
+      const epOut =
+        iface.endpoints.find(
+          (e): e is usb.OutEndpoint => e.direction === 'out' && e.address === ENDPOINT_OUT
+        ) ?? iface.endpoints.find((e): e is usb.OutEndpoint => e.direction === 'out');
 
       if (!epIn || !epOut) {
         throw ERRORS.TypedError(
@@ -609,13 +684,262 @@ export default class NodeUsbTransport {
     }
   }
 
+  private createProtocolMismatchError(expected: ProtocolType) {
+    return ERRORS.TypedError(
+      HardwareErrorCode.RuntimeError,
+      `Device protocol mismatch: expected ${expected}, but device did not respond to expected protocol`
+    );
+  }
+
+  private async detectProtocol(
+    path: string,
+    expectedProtocol?: ProtocolType
+  ): Promise<ProtocolType> {
+    if (expectedProtocol === 'V1') {
+      if (await this.probeProtocolV1(path)) {
+        this.deviceProtocol.set(path, 'V1');
+        this.Log?.debug(`[NodeUsbTransport] detectProtocol: path=${path} -> V1 (expected)`);
+        return 'V1';
+      }
+      throw this.createProtocolMismatchError(expectedProtocol);
+    }
+
+    if (expectedProtocol === 'V2') {
+      if (await this.probeProtocolV2(path)) {
+        this.deviceProtocol.set(path, 'V2');
+        this.Log?.debug(`[NodeUsbTransport] detectProtocol: path=${path} -> V2 (expected)`);
+        return 'V2';
+      }
+      throw this.createProtocolMismatchError(expectedProtocol);
+    }
+
+    if (this.deviceProtocol.get(path) === 'V2' && (await this.probeProtocolV2(path))) {
+      this.deviceProtocol.set(path, 'V2');
+      this.Log?.debug(`[NodeUsbTransport] detectProtocol: path=${path} -> V2 (cached)`);
+      return 'V2';
+    }
+
+    let protocol: ProtocolType = 'V1';
+    if (!(await this.probeProtocolV1(path)) && (await this.probeProtocolV2(path))) {
+      protocol = 'V2';
+    }
+    this.deviceProtocol.set(path, protocol);
+    this.Log?.debug(`[NodeUsbTransport] detectProtocol: path=${path} -> ${protocol}`);
+    return protocol;
+  }
+
+  private async resetConnectionAfterProbe(path: string) {
+    this.protocolV2Assemblers.get(path)?.reset();
+
+    try {
+      await this.closeOpenDevice(path);
+    } catch (error) {
+      this.Log?.debug('[NodeUsbTransport] close after protocol probe error:', error);
+    }
+
+    await this.enumerate();
+    this.openDevice(path);
+  }
+
+  private async withProtocolReadTimeout<T>(
+    path: string,
+    promise: Promise<T>,
+    timeoutMs: number,
+    protocol: ProtocolType
+  ): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let timedOut = false;
+    const waitForeverAfterTimeout = () => new Promise<never>(() => {});
+    const guardedPromise = promise.then(
+      value => (timedOut ? waitForeverAfterTimeout() : value),
+      error => {
+        if (timedOut) {
+          return waitForeverAfterTimeout();
+        }
+        throw error;
+      }
+    );
+    try {
+      return await Promise.race([
+        guardedPromise,
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(async () => {
+            timedOut = true;
+            try {
+              await this.resetConnectionAfterProbe(path);
+            } catch (error) {
+              this.Log?.debug(
+                `[NodeUsbTransport] reset after Protocol ${protocol} timeout failed:`,
+                error
+              );
+            } finally {
+              reject(new Error(`Protocol ${protocol} read timeout after ${timeoutMs}ms`));
+            }
+          }, timeoutMs);
+        }),
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
+  private async probeProtocolV1(path: string) {
+    if (!this.messages) {
+      return false;
+    }
+
+    try {
+      await this.callProtocolV1(path, 'Initialize', {}, { timeoutMs: PROTOCOL_PROBE_TIMEOUT });
+      return true;
+    } catch (error) {
+      this.Log?.debug('[NodeUsbTransport] Protocol V1 Initialize probe failed:', error);
+      return false;
+    }
+  }
+
+  private async probeProtocolV2(path: string) {
+    if (!this.messages || !this.messagesV2) {
+      return false;
+    }
+
+    return probeProtocolV2Helper({
+      call: (name, data, options) => this.callProtocolV2(path, name, data, options),
+      timeoutMs: PROTOCOL_PROBE_TIMEOUT,
+      logger: this.Log,
+      logPrefix: 'ProtocolV2 NodeUSB',
+      onProbeFailed: () => this.resetConnectionAfterProbe(path),
+    });
+  }
+
+  private async writeProtocolV2Frame(path: string, frame: Uint8Array) {
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= PACKET_IO_MAX_RETRIES; attempt++) {
+      if (this.cancelled) {
+        throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromOutside, 'Cancelled');
+      }
+      try {
+        await transferOutOnce(this.getOpenDevice(path).epOut, Buffer.from(frame));
+        return;
+      } catch (error) {
+        lastError = error;
+        const shouldRetry = attempt < PACKET_IO_MAX_RETRIES && this.isRetryableError(error);
+        if (!shouldRetry) {
+          throw error;
+        }
+        try {
+          await this.reconnectForRetry(path, 'out', attempt, error);
+        } catch (reconnectError) {
+          lastError = reconnectError;
+          this.Log?.debug(
+            `[NodeUsbTransport] Protocol V2 write reconnect failed on retry ${attempt}/${PACKET_IO_MAX_RETRIES}: ${this.getErrorMessage(
+              reconnectError
+            )}`
+          );
+          break;
+        }
+      }
+    }
+    throw lastError;
+  }
+
+  private async receiveProtocolV2Frame(path: string, timeoutMs?: number): Promise<Uint8Array> {
+    let assembler = this.protocolV2Assemblers.get(path);
+    if (!assembler) {
+      assembler = new ProtocolV2FrameAssembler(PROTOCOL_V2_FRAME_MAX_BYTES);
+      this.protocolV2Assemblers.set(path, assembler);
+    }
+
+    let frame: Uint8Array | undefined = assembler.push(new Uint8Array(0));
+    const deadline = timeoutMs ? Date.now() + timeoutMs : undefined;
+
+    while (!frame) {
+      const transferIn = this.transferInWithRetry(
+        path,
+        this.getOpenDevice(path),
+        PROTOCOL_V2_FRAME_MAX_BYTES
+      );
+      const packet = deadline
+        ? await this.withProtocolReadTimeout(
+            path,
+            transferIn,
+            Math.max(deadline - Date.now(), 1),
+            'V2'
+          )
+        : await transferIn;
+      const bytes = new Uint8Array(
+        packet.buffer.slice(packet.byteOffset, packet.byteOffset + packet.byteLength)
+      );
+      try {
+        frame = assembler.push(bytes);
+      } catch (error) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.NetworkError,
+          error instanceof Error ? error.message : String(error)
+        );
+      }
+    }
+    return frame;
+  }
+
+  private async callProtocolV2(
+    path: string,
+    name: string,
+    data: Record<string, unknown>,
+    options?: TransportCallOptions
+  ) {
+    const protocolV1Messages = this.messages;
+    if (!this.messagesV2) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.TransportNotConfigured,
+        'Protocol V2 schema not configured'
+      );
+    }
+    if (!protocolV1Messages) {
+      throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
+    }
+
+    const session = new ProtocolV2Session({
+      schemas: {
+        protocolV1: protocolV1Messages,
+        protocolV2: this.messagesV2,
+      },
+      router: PROTOCOL_V2_CHANNEL_USB,
+      writeFrame: (frame: Uint8Array) => this.writeProtocolV2Frame(path, frame),
+      readFrame: () => this.receiveProtocolV2Frame(path, options?.timeoutMs),
+      logger: this.Log,
+      logPrefix: 'ProtocolV2 NodeUSB',
+      createTimeoutError: (_messageName: string, timeoutMs: number) =>
+        new Error(`Protocol V2 response timeout after ${timeoutMs}ms for ${name}`),
+    });
+
+    this.protocolV2Assemblers.get(path)?.reset();
+    return session.call(name, data, options);
+  }
+
   /**
    * Receive a complete protobuf response from the device.
    * Reads 64-byte packets, strips 0x3F marker, reassembles into hex string.
    */
-  private async receiveData(path: string, dev: OpenDevice): Promise<string> {
+  private async receiveData(
+    path: string,
+    dev: OpenDevice,
+    timeoutMs?: number
+  ): Promise<string> {
+    const deadline = timeoutMs ? Date.now() + timeoutMs : undefined;
+    const readPacket = async () => {
+      const transferIn = this.transferInWithRetry(path, this.getOpenDevice(path), PACKET_SIZE);
+      return deadline
+        ? this.withProtocolReadTimeout(
+            path,
+            transferIn,
+            Math.max(deadline - Date.now(), 1),
+            'V1'
+          )
+        : transferIn;
+    };
+
     // Read first packet, skip report byte
-    const firstPacket = await this.transferInWithRetry(path, dev, PACKET_SIZE);
+    const firstPacket = timeoutMs ? await readPacket() : await this.transferInWithRetry(path, dev, PACKET_SIZE);
     const firstData = skipReportByte(firstPacket);
 
     // Decode header: ## marker → { typeId, length, restBuffer }
@@ -633,7 +957,7 @@ export default class NodeUsbTransport {
     // Read subsequent packets until complete
     // Re-resolve device on each iteration so we use a fresh handle after any reconnect
     while (decoded.offset < lengthWithHeader) {
-      const packet = await this.transferInWithRetry(path, this.getOpenDevice(path), PACKET_SIZE);
+      const packet = await readPacket();
       const pktData = skipReportByte(packet);
       const buf = toArrayBuffer(pktData);
       if (lengthWithHeader - decoded.offset >= PAYLOAD_SIZE) {
@@ -646,5 +970,9 @@ export default class NodeUsbTransport {
     decoded.reset();
     const result = decoded.toBuffer();
     return Buffer.from(result as unknown as ArrayBuffer).toString('hex');
+  }
+
+  getProtocolType(path: string): ProtocolType {
+    return this.deviceProtocol.get(path) ?? 'V1';
   }
 }

@@ -20,7 +20,7 @@ const api: PlaygroundProps[] = [
     ],
   },
   {
-    method: 'devGetDeviceInfo',
+    method: 'deviceGetDeviceInfo',
     description: 'Get Protocol V2 device information.',
     noDeviceIdReq: true,
     presupposes: [
@@ -65,7 +65,7 @@ const api: PlaygroundProps[] = [
     ],
   },
   {
-    method: 'devReboot',
+    method: 'deviceReboot',
     description: 'Reboot Protocol V2 device.',
     noDeviceIdReq: true,
     presupposes: [
@@ -110,14 +110,14 @@ const api: PlaygroundProps[] = [
     ],
   },
   {
-    method: 'devFirmwareUpdate',
+    method: 'deviceFirmwareUpdate',
     description: 'Install Protocol V2 firmware target from device filesystem path.',
     noDeviceIdReq: true,
     presupposes: [
       {
         title: 'Main app',
         value: {
-          targetId: 0,
+          targetId: 3,
           path: 'vol0:firmware.bin',
         },
       },
@@ -126,7 +126,7 @@ const api: PlaygroundProps[] = [
         value: {
           targets: [
             {
-              target_id: 0,
+              target_id: 3,
               path: 'vol0:firmware.bin',
             },
           ],
@@ -135,7 +135,7 @@ const api: PlaygroundProps[] = [
     ],
   },
   {
-    method: 'devGetFirmwareUpdateStatus',
+    method: 'deviceGetFirmwareUpdateStatus',
     description: 'Get Protocol V2 firmware update status.',
     noDeviceIdReq: true,
   },

@@ -4,9 +4,9 @@ import DataManager from './DataManager';
 import { LoggerNames, getLogger } from '../utils';
 // eslint-disable-next-line import/no-cycle
 import { DevicePool } from '../device/DevicePool';
-import { getSupportMessageVersion } from '../utils/deviceFeaturesUtils';
+import { getSupportProtocolV1MessageSchema } from '../utils/deviceFeaturesUtils';
 
-import type { MessageVersion } from './DataManager';
+import type { ProtocolV1MessageSchema } from './DataManager';
 import type { LowlevelTransportSharedPlugin, Transport } from '@onekeyfe/hd-transport';
 import type { Features } from '../types';
 
@@ -33,7 +33,7 @@ export default class TransportManager {
 
   static reactNativeInit = false;
 
-  static messageVersion: MessageVersion = 'latest';
+  static protocolV1MessageSchema: ProtocolV1MessageSchema = 'protocolV1Current';
 
   static plugin: LowlevelTransportSharedPlugin | null = null;
 
@@ -41,7 +41,7 @@ export default class TransportManager {
     Log.debug('transport manager load');
     this.defaultMessages = DataManager.getProtobufMessages();
     this.currentMessages = this.defaultMessages;
-    this.messageVersion = 'latest';
+    this.protocolV1MessageSchema = 'protocolV1Current';
   }
 
   static async configure() {
@@ -76,7 +76,7 @@ export default class TransportManager {
       Log.debug('Configuring transports');
       await this.transport.configure(JSON.stringify(this.defaultMessages));
       this.currentMessages = this.defaultMessages;
-      this.messageVersion = 'latest';
+      this.protocolV1MessageSchema = 'protocolV1Current';
       await this.configureProtocolV2Messages();
       Log.debug('Configuring transports done');
     } catch (error) {
@@ -90,8 +90,8 @@ export default class TransportManager {
   /**
    * Re-load the transport's main protobuf schema based on a device's reported features.
    *
-   * This handles message-version compatibility within Protocol V1 (e.g. Touch's classic
-   * vs latest schema). It is NOT used to switch between Protocol V1 and Protocol V2 —
+   * This handles protobuf schema compatibility within Protocol V1 (e.g. Touch's legacy
+   * vs current Protocol V1 schema). It is NOT used to switch between Protocol V1 and Protocol V2 —
    * the transport already holds both schemas after initial configure(), and routes per
    * device by `getProtocolType()`.
    */
@@ -100,18 +100,18 @@ export default class TransportManager {
       return;
     }
 
-    const { messageVersion, messages } = getSupportMessageVersion(features);
+    const { protocolV1MessageSchema, messages } = getSupportProtocolV1MessageSchema(features);
 
     if (this.currentMessages === messages || !messages) {
       return;
     }
 
-    Log.debug(`Reconfiguring transports version:${messageVersion}`);
+    Log.debug(`Reconfiguring transports Protocol V1 schema:${protocolV1MessageSchema}`);
 
     try {
       await this.transport.configure(JSON.stringify(messages));
       this.currentMessages = messages;
-      this.messageVersion = messageVersion;
+      this.protocolV1MessageSchema = protocolV1MessageSchema;
     } catch (error) {
       throw ERRORS.TypedError(
         HardwareErrorCode.TransportInvalidProtobuf,
@@ -164,7 +164,7 @@ export default class TransportManager {
     return this.currentMessages;
   }
 
-  static getMessageVersion() {
-    return this.messageVersion;
+  static getProtocolV1MessageSchema() {
+    return this.protocolV1MessageSchema;
   }
 }

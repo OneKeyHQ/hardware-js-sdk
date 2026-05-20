@@ -1,9 +1,9 @@
 import type {
-  devFirmwareUpdate,
-  devGetDeviceInfo,
-  devGetFirmwareUpdateStatus,
-  devGetOnboardingStatus,
-  devReboot,
+  deviceFirmwareUpdate,
+  deviceGetDeviceInfo,
+  deviceGetFirmwareUpdateStatus,
+  deviceGetOnboardingStatus,
+  deviceReboot,
   dirList,
   dirMake,
   dirRemove,
@@ -236,11 +236,11 @@ export type CoreApi = {
    */
   getProtoVersion: typeof getProtoVersion;
   ping: typeof ping;
-  devReboot: typeof devReboot;
-  devGetDeviceInfo: typeof devGetDeviceInfo;
-  devGetOnboardingStatus: typeof devGetOnboardingStatus;
-  devFirmwareUpdate: typeof devFirmwareUpdate;
-  devGetFirmwareUpdateStatus: typeof devGetFirmwareUpdateStatus;
+  deviceReboot: typeof deviceReboot;
+  deviceGetDeviceInfo: typeof deviceGetDeviceInfo;
+  deviceGetOnboardingStatus: typeof deviceGetOnboardingStatus;
+  deviceFirmwareUpdate: typeof deviceFirmwareUpdate;
+  deviceGetFirmwareUpdateStatus: typeof deviceGetFirmwareUpdateStatus;
   factoryDeviceInfoSettings: typeof factoryDeviceInfoSettings;
   factoryGetDeviceInfo: typeof factoryGetDeviceInfo;
   filesystemFixPermission: typeof filesystemFixPermission;

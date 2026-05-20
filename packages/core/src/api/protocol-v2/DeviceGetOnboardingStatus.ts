@@ -1,6 +1,6 @@
 import { BaseMethod } from '../BaseMethod';
 
-export default class DevGetFirmwareUpdateStatus extends BaseMethod {
+export default class DeviceGetOnboardingStatus extends BaseMethod {
   init() {
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
@@ -9,8 +9,8 @@ export default class DevGetFirmwareUpdateStatus extends BaseMethod {
 
   async run() {
     const res = await this.device.commands.typedCall(
-      'DevGetFirmwareUpdateStatus',
-      'DevFirmwareUpdateStatus',
+      'DeviceGetOnboardingStatus',
+      'DeviceOnboardingStatus',
       {}
     );
     return Promise.resolve(res.message);

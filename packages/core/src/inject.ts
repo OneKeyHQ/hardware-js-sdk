@@ -152,15 +152,15 @@ export const createCoreApi = (
   // File system & device control API (Protocol V2 only)
   getProtoVersion: (connectId, params) => call({ ...params, connectId, method: 'getProtoVersion' }),
   ping: (connectId, params) => call({ ...params, connectId, method: 'ping' }),
-  devReboot: (connectId, params) => call({ ...params, connectId, method: 'devReboot' }),
-  devGetDeviceInfo: (connectId, params) =>
-    call({ ...params, connectId, method: 'devGetDeviceInfo' }),
-  devGetOnboardingStatus: (connectId, params) =>
-    call({ ...params, connectId, method: 'devGetOnboardingStatus' }),
-  devFirmwareUpdate: (connectId, params) =>
-    call({ ...params, connectId, method: 'devFirmwareUpdate' }),
-  devGetFirmwareUpdateStatus: (connectId, params) =>
-    call({ ...params, connectId, method: 'devGetFirmwareUpdateStatus' }),
+  deviceReboot: (connectId, params) => call({ ...params, connectId, method: 'deviceReboot' }),
+  deviceGetDeviceInfo: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceGetDeviceInfo' }),
+  deviceGetOnboardingStatus: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceGetOnboardingStatus' }),
+  deviceFirmwareUpdate: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceFirmwareUpdate' }),
+  deviceGetFirmwareUpdateStatus: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceGetFirmwareUpdateStatus' }),
   factoryDeviceInfoSettings: (connectId, params) =>
     call({ ...params, connectId, method: 'factoryDeviceInfoSettings' }),
   factoryGetDeviceInfo: connectId => call({ connectId, method: 'factoryGetDeviceInfo' }),

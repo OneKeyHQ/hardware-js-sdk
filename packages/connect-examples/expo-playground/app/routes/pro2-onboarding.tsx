@@ -25,7 +25,7 @@ import { useDeviceStore } from '../store/deviceStore';
 import { SDKUtils } from '../utils/hardwareInstance';
 import { logHardware } from '../utils/logger';
 
-import type { DevOnboardingStatus } from '@onekeyfe/hd-transport';
+import type { DeviceOnboardingStatus } from '@onekeyfe/hd-transport';
 
 type PollSource = 'mock' | 'real';
 
@@ -35,7 +35,7 @@ type PollRecord = {
   timestamp: string;
   durationMs: number;
   success: boolean;
-  status?: DevOnboardingStatus;
+  status?: DeviceOnboardingStatus;
   error?: string;
 };
 
@@ -45,11 +45,11 @@ const MAX_POLL_INTERVAL_MS = 60_000;
 const MAX_HISTORY_LENGTH = 12;
 
 const ONBOARDING_WIRE_INFO = {
-  txMsgType: '60602 (DevGetOnboardingStatus)',
+  txMsgType: '60602 (DeviceGetOnboardingStatus)',
   txPayload: 'ba ec',
-  rxMsgType: '60603 (DevOnboardingStatus)',
+  rxMsgType: '60603 (DeviceOnboardingStatus)',
   rxPayload: 'bb ec + page_index/page_count/page_name',
-  decoded: 'DevOnboardingStatus',
+  decoded: 'DeviceOnboardingStatus',
 };
 
 const MOCK_ONBOARDING_PAGES = [
@@ -67,7 +67,7 @@ function clampPollInterval(value: string | number) {
   return Math.min(MAX_POLL_INTERVAL_MS, Math.max(MIN_POLL_INTERVAL_MS, Math.round(numeric)));
 }
 
-function normalizeStatus(payload: unknown): DevOnboardingStatus {
+function normalizeStatus(payload: unknown): DeviceOnboardingStatus {
   if (!payload || typeof payload !== 'object') return {};
 
   const data = payload as Record<string, unknown>;
@@ -78,7 +78,7 @@ function normalizeStatus(payload: unknown): DevOnboardingStatus {
   };
 }
 
-function getProgressValue(status: DevOnboardingStatus | null) {
+function getProgressValue(status: DeviceOnboardingStatus | null) {
   if (!status?.page_count) return 0;
   const pageIndex = status.page_index ?? 0;
   return Math.min(100, Math.max(0, Math.round((pageIndex / status.page_count) * 100)));
@@ -250,7 +250,7 @@ export default function Pro2OnboardingPage() {
   const [intervalInput, setIntervalInput] = useState(String(DEFAULT_POLL_INTERVAL_MS));
   const [isPolling, setIsPolling] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [status, setStatus] = useState<DevOnboardingStatus | null>(null);
+  const [status, setStatus] = useState<DeviceOnboardingStatus | null>(null);
   const [rawResponse, setRawResponse] = useState<unknown>(null);
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<PollRecord[]>([]);
@@ -262,7 +262,7 @@ export default function Pro2OnboardingPage() {
   const pollIntervalMs = useMemo(() => clampPollInterval(intervalInput), [intervalInput]);
   const progress = useMemo(() => getProgressValue(status), [status]);
 
-  const buildMockStatus = useCallback((): DevOnboardingStatus => {
+  const buildMockStatus = useCallback((): DeviceOnboardingStatus => {
     const pageIndex = mockIndexRef.current % MOCK_ONBOARDING_PAGES.length;
     mockIndexRef.current += 1;
 
@@ -275,16 +275,16 @@ export default function Pro2OnboardingPage() {
 
   const requestRealStatus = useCallback(async () => {
     if (!currentDevice?.connectId) {
-      throw new Error('设备未连接，无法调用真实 DevGetOnboardingStatus');
+      throw new Error('设备未连接，无法调用真实 DeviceGetOnboardingStatus');
     }
 
-    const response = await callHardwareAPI('devGetOnboardingStatus', {
+    const response = await callHardwareAPI('deviceGetOnboardingStatus', {
       connectId: currentDevice.connectId,
       connectProtocol: HARDWARE_CONNECT_PROTOCOL.V2,
     });
 
     if (!response.success) {
-      throw new Error(response.payload?.error || 'DevGetOnboardingStatus 调用失败');
+      throw new Error(response.payload?.error || 'DeviceGetOnboardingStatus 调用失败');
     }
 
     return {
@@ -501,7 +501,7 @@ export default function Pro2OnboardingPage() {
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h1 className="text-2xl font-semibold text-foreground">Pro2 Onboarding</h1>
-              <p className="mt-1 text-sm text-muted-foreground">DevGetOnboardingStatus polling</p>
+              <p className="mt-1 text-sm text-muted-foreground">DeviceGetOnboardingStatus polling</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant={isPolling ? 'default' : 'outline'}>

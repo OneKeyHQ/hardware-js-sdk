@@ -160,7 +160,10 @@ function getAddressN(params: Record<string, unknown>) {
   }
 }
 
-function buildTonEncodedPayload(method: string, params: Record<string, unknown>) {
+function buildTonEncodedPayload(
+  method: string,
+  params: Record<string, unknown>
+): Record<string, unknown> {
   if (method === 'tonGetAddress' && Array.isArray(params.bundle)) {
     return {
       bundle: params.bundle.map(item =>
