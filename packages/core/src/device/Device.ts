@@ -598,8 +598,8 @@ export class Device extends EventEmitter {
   /**
    * Device initialization over Protocol V2.
    *
-   * Protocol V2 不走传统 Initialize/GetFeatures。当前固件暂不支持
-   * DevGetDeviceInfo，初始化阶段只通过 Ping 建立基础 Features 视图。
+   * Protocol V2 不走传统 Initialize/GetFeatures，而是通过 Ping 验证链路后，
+   * 使用 DeviceGetDeviceInfo 补全统一 Features 视图。
    */
   private async _initializeProtocolV2() {
     Log.debug('Initialize device via Protocol V2 feature adapter');
@@ -609,6 +609,9 @@ export class Device extends EventEmitter {
         getProtocolV2Features({
           commands: this.commands,
           descriptor: this.originalDescriptor,
+          onDeviceInfoError: error => {
+            Log.warn('Protocol V2 DeviceGetDeviceInfo failed, fallback to descriptor:', error);
+          },
           timeoutMs: 10 * 1000,
         }),
         new Promise<never>((_, reject) => {

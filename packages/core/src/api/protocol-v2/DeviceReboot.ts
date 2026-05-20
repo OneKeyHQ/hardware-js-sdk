@@ -1,9 +1,9 @@
 import { BaseMethod } from '../BaseMethod';
 import { normalizeRebootType } from './helpers';
 
-import type { DevRebootParams } from './helpers';
+import type { DeviceRebootParams } from './helpers';
 
-export default class DevReboot extends BaseMethod<DevRebootParams> {
+export default class DeviceReboot extends BaseMethod<DeviceRebootParams> {
   init() {
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
@@ -14,7 +14,7 @@ export default class DevReboot extends BaseMethod<DevRebootParams> {
   }
 
   async run() {
-    const res = await this.device.commands.typedCall('DevReboot', 'Success', {
+    const res = await this.device.commands.typedCall('DeviceReboot', 'Success', {
       reboot_type: normalizeRebootType(this.params.reboot_type ?? this.params.rebootType),
     });
     return Promise.resolve(res.message);

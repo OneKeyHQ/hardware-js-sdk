@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   AlertTriangle,
@@ -44,6 +44,7 @@ const PROTOCOL_V2_FILE_SYSTEM_METHODS = new Set([
 
 const DeviceMethodsIndexPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { t } = useTranslation();
   const { currentDevice } = useDeviceStore();
   const { executeMethod } = useHardwareMethodExecution();
@@ -53,6 +54,7 @@ const DeviceMethodsIndexPage: React.FC = () => {
   });
 
   const allMethods = useMemo<UnifiedMethodConfig[]>(() => [...device.api, ...firmware.api], []);
+  const methodQuery = searchParams.get('method')?.trim();
 
   const categories = useMemo((): MethodCategory[] => {
     const basicMethods: UnifiedMethodConfig[] = [];
@@ -71,8 +73,8 @@ const DeviceMethodsIndexPage: React.FC = () => {
           'getpassphrasestate',
           'getprotoversion',
           'ping',
-          'devgetdeviceinfo',
-          'devgetonboardingstatus',
+          'devicegetdeviceinfo',
+          'devicegetonboardingstatus',
           'cancel',
           'devicesupportfeatures',
           'getlogs',
@@ -152,6 +154,17 @@ const DeviceMethodsIndexPage: React.FC = () => {
       ? t(activeMethod.description)
       : activeMethod.description;
   }, [activeMethod?.description, t]);
+
+  useEffect(() => {
+    if (!methodQuery) {
+      return;
+    }
+
+    const targetMethod = allMethods.find(method => method.method === methodQuery);
+    if (targetMethod) {
+      navigate(`/device-methods/${targetMethod.method}`, { replace: true });
+    }
+  }, [allMethods, methodQuery, navigate]);
 
   useEffect(() => {
     if (!activeMethod) {

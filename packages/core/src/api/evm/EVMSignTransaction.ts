@@ -122,7 +122,7 @@ export default class EVMSignTransaction extends BaseMethod {
 
     if (formattedTx == null) throw ERRORS.TypedError('Runtime', 'formattedTx is not set');
 
-    if (TransportManager.getMessageVersion() === 'v1') {
+    if (TransportManager.getProtocolV1MessageSchema() === 'protocolV1Legacy') {
       return signTransactionLegacyV1({
         typedCall: this.device.commands.typedCall.bind(this.device.commands),
         addressN,

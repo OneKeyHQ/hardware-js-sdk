@@ -820,11 +820,11 @@ export const BleDemoScreen = () => {
         run: (sdk, connectId) =>
           sdk.ping(connectId, { ...PROTOCOL_V2_PARAMS, message: 'rn-pro2-demo' }),
       },
-      devGetDeviceInfo: {
-        key: 'devGetDeviceInfo',
-        label: 'devGetDeviceInfo',
+      deviceGetDeviceInfo: {
+        key: 'deviceGetDeviceInfo',
+        label: 'deviceGetDeviceInfo',
         run: (sdk, connectId) =>
-          sdk.devGetDeviceInfo(connectId, {
+          sdk.deviceGetDeviceInfo(connectId, {
             ...PROTOCOL_V2_PARAMS,
             targetHw: true,
             targetFw: true,
@@ -840,16 +840,16 @@ export const BleDemoScreen = () => {
             includeSpecific: true,
           }),
       },
-      devGetOnboardingStatus: {
-        key: 'devGetOnboardingStatus',
-        label: 'devGetOnboardingStatus',
-        run: (sdk, connectId) => sdk.devGetOnboardingStatus(connectId, PROTOCOL_V2_PARAMS),
+      deviceGetOnboardingStatus: {
+        key: 'deviceGetOnboardingStatus',
+        label: 'deviceGetOnboardingStatus',
+        run: (sdk, connectId) => sdk.deviceGetOnboardingStatus(connectId, PROTOCOL_V2_PARAMS),
       },
-      devRebootNormal: {
-        key: 'devRebootNormal',
-        label: 'devReboot(Normal)',
+      deviceRebootNormal: {
+        key: 'deviceRebootNormal',
+        label: 'deviceReboot(Normal)',
         run: (sdk, connectId) =>
-          sdk.devReboot(connectId, { ...PROTOCOL_V2_PARAMS, rebootType: 'Normal' }),
+          sdk.deviceReboot(connectId, { ...PROTOCOL_V2_PARAMS, rebootType: 'Normal' }),
       },
       factoryGetDeviceInfo: {
         key: 'factoryGetDeviceInfo',
@@ -867,18 +867,18 @@ export const BleDemoScreen = () => {
             preFirmware: 'RN-DEMO-FW',
           }),
       },
-      devGetFirmwareUpdateStatus: {
-        key: 'devGetFirmwareUpdateStatus',
-        label: 'devGetFirmwareUpdateStatus',
-        run: (sdk, connectId) => sdk.devGetFirmwareUpdateStatus(connectId, PROTOCOL_V2_PARAMS),
+      deviceGetFirmwareUpdateStatus: {
+        key: 'deviceGetFirmwareUpdateStatus',
+        label: 'deviceGetFirmwareUpdateStatus',
+        run: (sdk, connectId) => sdk.deviceGetFirmwareUpdateStatus(connectId, PROTOCOL_V2_PARAMS),
       },
-      devFirmwareUpdate: {
-        key: 'devFirmwareUpdate',
-        label: 'devFirmwareUpdate(TARGET_BT)',
+      deviceFirmwareUpdate: {
+        key: 'deviceFirmwareUpdate',
+        label: 'deviceFirmwareUpdate(TARGET_COPROCESSOR)',
         run: (sdk, connectId) =>
-          sdk.devFirmwareUpdate(connectId, {
+          sdk.deviceFirmwareUpdate(connectId, {
             ...PROTOCOL_V2_PARAMS,
-            target_id: 2,
+            target_id: 5,
             path: PRO2_FIRMWARE_STAGING_PATH,
           }),
       },
@@ -963,13 +963,13 @@ export const BleDemoScreen = () => {
       buildGroup('device', 'Device / Factory', [
         'getProtoVersion',
         'ping',
-        'devGetDeviceInfo',
-        'devGetOnboardingStatus',
-        'devRebootNormal',
+        'deviceGetDeviceInfo',
+        'deviceGetOnboardingStatus',
+        'deviceRebootNormal',
         'factoryGetDeviceInfo',
         'factoryDeviceInfoSettings',
       ]),
-      buildGroup('firmware', 'Firmware', ['devGetFirmwareUpdateStatus', 'devFirmwareUpdate']),
+      buildGroup('firmware', 'Firmware', ['deviceGetFirmwareUpdateStatus', 'deviceFirmwareUpdate']),
       buildGroup('filesystem', 'Filesystem', [
         'filesystemPathInfoQuery',
         'filesystemDirList',
@@ -1236,7 +1236,7 @@ export const BleDemoScreen = () => {
           <Text style={styles.hint}>
             Bundled file: {PRO2_BLE_FIRMWARE_FILE_NAME} ({formatBytes(PRO2_BLE_FIRMWARE_FILE_SIZE)})
           </Text>
-          <Text style={styles.hint}>Target: TARGET_BT (2) · {PRO2_FIRMWARE_STAGING_PATH}</Text>
+          <Text style={styles.hint}>Target: TARGET_COPROCESSOR (5) · {PRO2_FIRMWARE_STAGING_PATH}</Text>
           <Text style={styles.methodGroupTitle}>Speed Profiles</Text>
           <View style={styles.profileGrid}>
             {SPEED_TEST_PROFILES.map(profile => {

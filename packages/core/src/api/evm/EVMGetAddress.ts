@@ -44,7 +44,7 @@ export default class EvmGetAddress extends BaseMethod<EthereumGetAddressOneKey[]
   }
 
   async getEvmAddress(param: EthereumGetAddressOneKey) {
-    if (TransportManager.getMessageVersion() === 'v1') {
+    if (TransportManager.getProtocolV1MessageSchema() === 'protocolV1Legacy') {
       return getAddressLegacyV1({
         typedCall: this.device.commands.typedCall.bind(this.device.commands),
         param,

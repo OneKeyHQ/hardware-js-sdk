@@ -3,8 +3,8 @@
 // These messages are used over the Protocol V2 (0x5A) transport layer.
 // Message IDs are in little-endian format in the frame header.
 //
-// Source of truth: webusb_test.html encoder/decoder comments
-// This file is the authoritative .proto definition for the Pro2 sys API.
+// Legacy fallback definition kept for older firmware-pro2 checkouts that do not
+// export the latest Protocol V2 proto set.
 
 syntax = "proto2";
 
@@ -15,7 +15,7 @@ enum MessageType {
     MessageType_Ping                    = 60206;
     MessageType_Success                 = 60207;
     MessageType_Failure                 = 60208;
-    MessageType_Reboot                  = 60400;
+    MessageType_DeviceReboot            = 60400;
     MessageType_FixPermission           = 60800;
     MessageType_PathInfo                = 60801;
     MessageType_PathInfoQuery           = 60802;
@@ -27,8 +27,10 @@ enum MessageType {
     MessageType_DirList                 = 60808;
     MessageType_DirMake                 = 60809;
     MessageType_DirRemove               = 60810;
-    MessageType_FirmwareUpdate          = 61000;
-    MessageType_FirmwareInstallProgress = 61001;
+    MessageType_DeviceFirmwareUpdate    = 61000;
+    MessageType_DeviceFirmwareInstallProgress = 61001;
+    MessageType_DeviceGetFirmwareUpdateStatus = 61002;
+    MessageType_DeviceFirmwareUpdateStatus = 61003;
 }
 
 // ============================================================
@@ -53,21 +55,21 @@ enum FailureType {
     Failure_FirmwareError      = 99;
 }
 
-enum FirmwareTargetType {
-    TARGET_MAIN_APP      = 0;
-    TARGET_MAIN_BOOT     = 1;
-    TARGET_BLE           = 2;
-    TARGET_SE1           = 3;
-    TARGET_SE2           = 4;
-    TARGET_SE3           = 5;
-    TARGET_SE4           = 6;
+enum DeviceFirmwareTargetType {
+    TARGET_INVALID       = 0;
+    TARGET_ROMLOADER     = 1;
+    TARGET_BOOTLOADER    = 2;
+    TARGET_FIRMWARE_P1   = 3;
+    TARGET_FIRMWARE_P2   = 4;
+    TARGET_COPROCESSOR   = 5;
+    TARGET_SE            = 6;
     TARGET_RESOURCE      = 10;
 }
 
-enum RebootType {
-    REBOOT_NORMAL       = 0;
-    REBOOT_BOARDLOADER  = 1;
-    REBOOT_BOOTLOADER   = 2;
+enum DeviceRebootType {
+    Normal              = 0;
+    Boardloader         = 1;
+    Bootloader          = 2;
 }
 
 // ============================================================
@@ -97,8 +99,8 @@ message Ping {
 }
 
 // Host → Device: reboot into normal / boardloader / bootloader
-message Reboot {
-    required RebootType reboot_type = 1;
+message DeviceReboot {
+    required DeviceRebootType reboot_type = 1;
 }
 
 // ============================================================
@@ -197,19 +199,33 @@ message DirRemove {
 // Firmware Update
 // ============================================================
 
-message FirmwareTarget {
-    required FirmwareTargetType target_id = 1;
-    required string             path      = 2;
+message DeviceFirmwareTarget {
+    required DeviceFirmwareTargetType target_id = 1;
+    required string                   path      = 2;
 }
 
 // Host → Device: initiate firmware update
-// Device → Host: FirmwareInstallProgress (repeated) then Success or Failure
-message FirmwareUpdate {
-    repeated FirmwareTarget targets           = 1;
-    optional bool           reboot_on_success = 2;
+// Device → Host: DeviceFirmwareInstallProgress (repeated) then Success or Failure
+message DeviceFirmwareUpdate {
+    repeated DeviceFirmwareTarget targets        = 1;
+    optional uint32               max_concurrent = 2;
 }
 
 // Device → Host: firmware installation progress notification
-message FirmwareInstallProgress {
-    required uint32 progress = 1;
+message DeviceFirmwareInstallProgress {
+    required DeviceFirmwareTargetType target_id = 1;
+    required uint32                   progress  = 2;
+    optional string                   stage     = 3;
+}
+
+message DeviceFirmwareUpdateStatusEntry {
+    required DeviceFirmwareTargetType target_id = 1;
+    required uint32                   status    = 2;
+}
+
+message DeviceGetFirmwareUpdateStatus {
+}
+
+message DeviceFirmwareUpdateStatus {
+    repeated DeviceFirmwareUpdateStatusEntry targets = 1;
 }

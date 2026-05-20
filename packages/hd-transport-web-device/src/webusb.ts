@@ -45,10 +45,6 @@ function shouldBlockWebUsbCallDataLog(name: string) {
   return LogBlockCommand.has(name) || WEBUSB_FILE_WRITE_LOG_BLOCK_PATTERN.test(normalized);
 }
 
-function inferProtocolTypeFromDeviceName(name?: string | null): ProtocolType | undefined {
-  return /\bpro\s*2\b/i.test(name ?? '') ? 'V2' : undefined;
-}
-
 /**
  * Device information with path and WebUSB device instance
  */
@@ -187,7 +183,6 @@ export default class WebUsbTransport {
       path: device.serialNumber as string,
       device,
       commType: 'webusb',
-      protocolType: inferProtocolTypeFromDeviceName(device.productName),
     }));
 
     // Debug: log all discovered devices. Protocol is detected after acquire via wire probe.
@@ -242,15 +237,6 @@ export default class WebUsbTransport {
     }
 
     if (expectedProtocol === 'V2') {
-      if (this.deviceProtocol.get(path) === 'V2') {
-        this.Log.debug(`[WebUsbTransport] detectProtocol: path=${path} -> V2 (cached expected)`);
-        return 'V2';
-      }
-      if (this.deviceList.find(device => device.path === path)?.protocolType === 'V2') {
-        this.deviceProtocol.set(path, 'V2');
-        this.Log.debug(`[WebUsbTransport] detectProtocol: path=${path} -> V2 (descriptor)`);
-        return 'V2';
-      }
       if (await this.probeProtocolV2(path)) {
         this.deviceProtocol.set(path, 'V2');
         this.Log.debug(`[WebUsbTransport] detectProtocol: path=${path} -> V2 (expected)`);
@@ -839,6 +825,8 @@ export default class WebUsbTransport {
     const ifaceNum = endpoints?.interfaceNumber ?? this.interfaceId;
     await device.releaseInterface(ifaceNum);
     await device.close();
+    this.deviceProtocol.delete(path);
+    this.protocolV2Assemblers.get(path)?.reset();
     this.protocolV2Assemblers.delete(path);
     this.deviceEndpoints.delete(path);
   }

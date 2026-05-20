@@ -70,10 +70,10 @@ const protocolV2Messages = parseConfigure({
         },
       },
     },
-    DevFirmwareUpdate: {
+    DeviceFirmwareUpdate: {
       fields: {},
     },
-    DevFirmwareInstallProgress: {
+    DeviceFirmwareInstallProgress: {
       fields: {
         target_id: {
           type: 'uint32',
@@ -115,8 +115,8 @@ const protocolV2Messages = parseConfigure({
         MessageType_Ping: 60206,
         MessageType_Success: 60207,
         MessageType_FileWrite: 60805,
-        MessageType_DevFirmwareUpdate: 61000,
-        MessageType_DevFirmwareInstallProgress: 61001,
+        MessageType_DeviceFirmwareUpdate: 61000,
+        MessageType_DeviceFirmwareInstallProgress: 61001,
         MessageType_PartialNested: 62000,
       },
     },
@@ -389,7 +389,7 @@ describe('Protocol V2 framing and session', () => {
 
   test('session consumes intermediate response frames before returning the final response', async () => {
     const written = [];
-    const progress = ProtocolV2.encodeFrame(schemas, 'DevFirmwareInstallProgress', {
+    const progress = ProtocolV2.encodeFrame(schemas, 'DeviceFirmwareInstallProgress', {
       target_id: 0,
       progress: 42,
     });
@@ -415,17 +415,17 @@ describe('Protocol V2 framing and session', () => {
     });
 
     const result = await session.call(
-      'DevFirmwareUpdate',
+      'DeviceFirmwareUpdate',
       {},
       {
-        intermediateTypes: ['DevFirmwareInstallProgress'],
+        intermediateTypes: ['DeviceFirmwareInstallProgress'],
         onIntermediateResponse,
       }
     );
 
     expect(readFrame).toHaveBeenCalledTimes(2);
     expect(onIntermediateResponse).toHaveBeenCalledWith({
-      type: 'DevFirmwareInstallProgress',
+      type: 'DeviceFirmwareInstallProgress',
       message: {
         target_id: 0,
         progress: 42,

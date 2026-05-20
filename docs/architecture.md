@@ -63,7 +63,7 @@ WebUSB、Electron BLE、React Native BLE 和 lowlevel BLE 只负责各自的物�
 | 协议 | 数据来源                  | 归一化输出                                |
 | ---- | ------------------------- | ----------------------------------------- |
 | V1   | `Initialize -> Features`  | 原生 `Features`                           |
-| V2   | `Ping + DevGetDeviceInfo` | Protocol V2 `DeviceInfo` 映射到 `Features` |
+| V2   | `Ping + DeviceGetDeviceInfo` | Protocol V2 `DeviceInfo` 映射到 `Features` |
 | V2 fallback | USB/BLE descriptor | 最小 `Features`，保证 connectId/uuid 稳定 |
 
 这样 `Device.toMessageObject()`、事件输出、固件判断和上层 API 都继续读取统一字段，而不需要在每个业务方法里理解 Protocol V2 的 `DeviceInfo` schema。
@@ -84,7 +84,7 @@ flowchart TD
   FallbackV1["V1/V2 均失败: 保持 Protocol V1"]
   Init["Device.initialize()"]
   InitV1["V1: Initialize -> Features"]
-  InitV2["V2: Ping + DevGetDeviceInfo -> normalized Features"]
+  InitV2["V2: Ping + DeviceGetDeviceInfo -> normalized Features"]
 
   Enumerate --> Acquire --> Connect --> ProbeV1
   ProbeV1 --> V1 --> Init
@@ -111,7 +111,7 @@ V1 设备仍可在 `Initialize` 后通过 `TransportManager.reconfigure(features
 `Device.acquire()` 完成后会从 transport 读取检测到的协议类型，并写回 `originalDescriptor.protocolType`。后续 `Device.initialize()` 基于该字段选择初始化路径：
 
 - V1：发送 `Initialize`，使用真实 `Features`
-- V2：发送 `Ping` 验证链路，再用 `DevGetDeviceInfo` 生成统一 `Features`
+- V2：发送 `Ping` 验证链路，再用 `DeviceGetDeviceInfo` 生成统一 `Features`
 
 Protocol V2 当前没有传统 `GetFeatures`。为了保证事件和后续 API 能使用同一套设备标识，feature adapter 会始终填充 `device_id`、`serial_no` 和 `onekey_serial_no`，并尽量补齐 firmware、bootloader、BLE、SE、label 和 passphrase 状态字段。
 
@@ -124,12 +124,12 @@ flowchart TD
   Prepare["prepare binaries"]
   Mkdir["FilesystemDirMake"]
   Write["FilesystemFileWrite(resource / bootloader / firmware)"]
-  Update["DevFirmwareUpdate(targets)"]
+  Update["DeviceFirmwareUpdate(targets)"]
 
   Prepare --> Mkdir --> Write --> Update
 ```
 
-`DevFirmwareUpdate.targets` 必须包含所有需要安装的文件，包括 resource、bootloader 和 firmware。SDK 不假设固件端会隐式扫描已写入路径。
+`DeviceFirmwareUpdate.targets` 必须包含所有需要安装的文件，包括 resource、bootloader 和 firmware。SDK 不假设固件端会隐式扫描已写入路径。
 
 ## 包职责速查
 

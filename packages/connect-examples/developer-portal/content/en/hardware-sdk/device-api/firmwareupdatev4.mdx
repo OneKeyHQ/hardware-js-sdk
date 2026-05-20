@@ -9,7 +9,7 @@ title: firmwareUpdateV4
 New firmware update flow for Protocol V2 devices. This method is independent from `firmwareUpdateV3` and uses Protocol V2 reboot, filesystem write, install trigger, and status polling messages for the full update.
 
 - Device: Protocol V2 devices
-- Flow: `DevReboot` -> `FilesystemFileWrite` -> `DevFirmwareUpdate` -> `DevGetFirmwareUpdateStatus` -> `DevGetDeviceInfo`
+- Flow: `DeviceReboot` -> `FilesystemFileWrite` -> `DeviceFirmwareUpdate` -> `DeviceGetFirmwareUpdateStatus` -> `DeviceGetDeviceInfo`
 
 ```typescript
 const res = await HardwareSDK.firmwareUpdateV4(connectId, {

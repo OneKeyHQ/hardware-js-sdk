@@ -125,6 +125,14 @@ const router = createHashRouter(
         },
 
         {
+          path: 'device-method',
+          element: <DeviceMethodsIndexPage />,
+        },
+        {
+          path: 'device-method/:methodName',
+          element: <DeviceMethodExecutePage />,
+        },
+        {
           path: 'device-methods',
           element: <DeviceMethodsIndexPage />,
         },

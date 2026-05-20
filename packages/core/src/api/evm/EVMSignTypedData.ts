@@ -262,8 +262,8 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
 
     let supportTrezor = false;
     let response: MessageResponse<MessageKey>;
-    switch (TransportManager.getMessageVersion()) {
-      case 'v1':
+    switch (TransportManager.getProtocolV1MessageSchema()) {
+      case 'protocolV1Legacy':
         supportTrezor = true;
         response = await signTypedDataLegacyV1({
           typedCall: this.device.commands.typedCall.bind(this.device.commands),
@@ -274,7 +274,7 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
         });
         break;
 
-      case 'latest':
+      case 'protocolV1Current':
       default:
         supportTrezor = false;
         response = await signTypedData({
@@ -310,8 +310,8 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
   }) {
     if (!domainHash) throw ERRORS.TypedError('Runtime', 'domainHash is required');
 
-    switch (TransportManager.getMessageVersion()) {
-      case 'v1':
+    switch (TransportManager.getProtocolV1MessageSchema()) {
+      case 'protocolV1Legacy':
         return signTypedHashLegacyV1({
           typedCall,
           addressN,
@@ -321,7 +321,7 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
           device: this.device,
         });
 
-      case 'latest':
+      case 'protocolV1Current':
       default:
         return signTypedHash({
           typedCall,

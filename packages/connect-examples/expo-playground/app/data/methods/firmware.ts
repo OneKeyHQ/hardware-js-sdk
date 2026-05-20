@@ -325,8 +325,8 @@ const api: UnifiedMethodConfig[] = [
     ],
   },
   {
-    method: 'devFirmwareUpdate',
-    description: 'methodDescriptions.devFirmwareUpdate',
+    method: 'deviceFirmwareUpdate',
+    description: 'methodDescriptions.deviceFirmwareUpdate',
     noDeviceIdReq: true,
     presets: [
       {
@@ -338,16 +338,15 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Target',
             options: [
-              { label: 'Main App', value: '0' },
-              { label: 'Main Bootloader', value: '1' },
-              { label: 'Bluetooth', value: '2' },
-              { label: 'SE1', value: '3' },
-              { label: 'SE2', value: '4' },
-              { label: 'SE3', value: '5' },
-              { label: 'SE4', value: '6' },
+              { label: 'Romloader', value: '1' },
+              { label: 'Bootloader', value: '2' },
+              { label: 'Firmware P1', value: '3' },
+              { label: 'Firmware P2', value: '4' },
+              { label: 'Coprocessor', value: '5' },
+              { label: 'Secure Element', value: '6' },
               { label: 'Resource', value: '10' },
             ],
-            value: '0',
+            value: '3',
           },
           {
             name: 'path',
@@ -367,10 +366,10 @@ const api: UnifiedMethodConfig[] = [
             type: 'textarea',
             required: true,
             label: 'Targets',
-            description: 'DevFirmwareTarget JSON array',
+            description: 'DeviceFirmwareTarget JSON array',
             value: [
               {
-                target_id: 0,
+                target_id: 3,
                 path: 'vol0:firmware.bin',
               },
             ],
@@ -380,8 +379,8 @@ const api: UnifiedMethodConfig[] = [
     ],
   },
   {
-    method: 'devGetFirmwareUpdateStatus',
-    description: 'methodDescriptions.devGetFirmwareUpdateStatus',
+    method: 'deviceGetFirmwareUpdateStatus',
+    description: 'methodDescriptions.deviceGetFirmwareUpdateStatus',
     noDeviceIdReq: true,
     presets: [],
   },

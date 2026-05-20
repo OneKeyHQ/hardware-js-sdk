@@ -23,9 +23,9 @@ const PRO2_METHOD_GROUPS = [
     methods: [
       'getProtoVersion',
       'ping',
-      'devGetDeviceInfo',
-      'devGetOnboardingStatus',
-      'devReboot',
+      'deviceGetDeviceInfo',
+      'deviceGetOnboardingStatus',
+      'deviceReboot',
       'factoryGetDeviceInfo',
       'factoryDeviceInfoSettings',
     ],
@@ -34,7 +34,7 @@ const PRO2_METHOD_GROUPS = [
     id: 'firmware',
     title: 'Firmware',
     icon: Zap,
-    methods: ['devFirmwareUpdate', 'devGetFirmwareUpdateStatus'],
+    methods: ['deviceFirmwareUpdate', 'deviceGetFirmwareUpdateStatus'],
   },
   {
     id: 'filesystemAliases',
@@ -65,13 +65,13 @@ const DEFAULT_SELECTED_METHOD = 'dirList';
 const PRO2_METHOD_LABELS: Record<string, string> = {
   getProtoVersion: 'Proto Version',
   ping: 'Ping',
-  devGetDeviceInfo: 'Device Info',
-  devReboot: 'Reboot',
-  devGetOnboardingStatus: 'Onboarding',
+  deviceGetDeviceInfo: 'Device Info',
+  deviceReboot: 'Reboot',
+  deviceGetOnboardingStatus: 'Onboarding',
   factoryGetDeviceInfo: 'Factory Info',
   factoryDeviceInfoSettings: 'Factory Settings',
-  devFirmwareUpdate: 'FW Update',
-  devGetFirmwareUpdateStatus: 'FW Status',
+  deviceFirmwareUpdate: 'FW Update',
+  deviceGetFirmwareUpdateStatus: 'FW Status',
   pathInfo: 'Path Info',
   dirList: 'Dir List',
   dirMake: 'Dir Make',
@@ -116,26 +116,26 @@ const PRO2_METHOD_WIRE_INFO: Record<string, MethodWireInfo> = {
     rxPayload: '2f eb 0a 12 48 65 6c 6c 6f 20 66 72 6f 6d 20 57 65 62 55 53 42 21',
     decoded: 'Success: "Hello from WebUSB!"',
   },
-  devGetDeviceInfo: {
-    tx: '60600 (DevGetDeviceInfo)',
+  deviceGetDeviceInfo: {
+    tx: '60600 (DeviceGetDeviceInfo)',
     txPayload: PRO2_DYNAMIC_PAYLOAD,
     rx: '60601 (DeviceInfo)',
     rxPayload: PRO2_DYNAMIC_RESPONSE,
     decoded: 'DeviceInfo',
   },
-  devReboot: {
-    tx: '60400 (DevReboot)',
+  deviceReboot: {
+    tx: '60400 (DeviceReboot)',
     txPayload: PRO2_DYNAMIC_PAYLOAD,
     rx: '60207 (Success)',
     rxPayload: PRO2_DYNAMIC_RESPONSE,
     decoded: 'Success.message',
   },
-  devGetOnboardingStatus: {
-    tx: '60602 (DevGetOnboardingStatus)',
+  deviceGetOnboardingStatus: {
+    tx: '60602 (DeviceGetOnboardingStatus)',
     txPayload: 'ba ec',
-    rx: '60603 (DevOnboardingStatus)',
+    rx: '60603 (DeviceOnboardingStatus)',
     rxPayload: 'bb ec + page_index/page_count/page_name',
-    decoded: 'DevOnboardingStatus',
+    decoded: 'DeviceOnboardingStatus',
   },
   factoryGetDeviceInfo: {
     tx: '60001 (FactoryGetDeviceInfo)',
@@ -151,19 +151,19 @@ const PRO2_METHOD_WIRE_INFO: Record<string, MethodWireInfo> = {
     rxPayload: PRO2_DYNAMIC_RESPONSE,
     decoded: 'Success.message',
   },
-  devFirmwareUpdate: {
-    tx: '61000 (DevFirmwareUpdate)',
+  deviceFirmwareUpdate: {
+    tx: '61000 (DeviceFirmwareUpdate)',
     txPayload: PRO2_DYNAMIC_PAYLOAD,
-    rx: '61001 (DevFirmwareInstallProgress) / 61003 (DevFirmwareUpdateStatus) / 60207 (Success)',
+    rx: '61001 (DeviceFirmwareInstallProgress) / 61003 (DeviceFirmwareUpdateStatus) / 60207 (Success)',
     rxPayload: PRO2_DYNAMIC_RESPONSE,
-    decoded: 'Progress / DevFirmwareUpdateStatus / Success',
+    decoded: 'Progress / DeviceFirmwareUpdateStatus / Success',
   },
-  devGetFirmwareUpdateStatus: {
-    tx: '61002 (DevGetFirmwareUpdateStatus)',
+  deviceGetFirmwareUpdateStatus: {
+    tx: '61002 (DeviceGetFirmwareUpdateStatus)',
     txPayload: '4a ee',
-    rx: '61003 (DevFirmwareUpdateStatus)',
+    rx: '61003 (DeviceFirmwareUpdateStatus)',
     rxPayload: PRO2_DYNAMIC_RESPONSE,
-    decoded: 'DevFirmwareUpdateStatus',
+    decoded: 'DeviceFirmwareUpdateStatus',
   },
   filesystemFixPermission: {
     tx: '60800 (FilesystemFixPermission)',

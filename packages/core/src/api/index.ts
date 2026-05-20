@@ -44,11 +44,11 @@ export { default as promptWebDeviceAccess } from './PromptWebDeviceAccess';
 // File system & device control API (Protocol V2 only)
 export { default as getProtoVersion } from './protocol-v2/GetProtoVersion';
 export { default as ping } from './protocol-v2/Ping';
-export { default as devReboot } from './protocol-v2/DevReboot';
-export { default as devGetDeviceInfo } from './protocol-v2/DevGetDeviceInfo';
-export { default as devGetOnboardingStatus } from './protocol-v2/DevGetOnboardingStatus';
-export { default as devFirmwareUpdate } from './protocol-v2/DevFirmwareUpdate';
-export { default as devGetFirmwareUpdateStatus } from './protocol-v2/DevGetFirmwareUpdateStatus';
+export { default as deviceReboot } from './protocol-v2/DeviceReboot';
+export { default as deviceGetDeviceInfo } from './protocol-v2/DeviceGetDeviceInfo';
+export { default as deviceGetOnboardingStatus } from './protocol-v2/DeviceGetOnboardingStatus';
+export { default as deviceFirmwareUpdate } from './protocol-v2/DeviceFirmwareUpdate';
+export { default as deviceGetFirmwareUpdateStatus } from './protocol-v2/DeviceGetFirmwareUpdateStatus';
 export { default as factoryDeviceInfoSettings } from './protocol-v2/FactoryDeviceInfoSettings';
 export { default as factoryGetDeviceInfo } from './protocol-v2/FactoryGetDeviceInfo';
 export { default as filesystemFixPermission } from './protocol-v2/FilesystemFixPermission';

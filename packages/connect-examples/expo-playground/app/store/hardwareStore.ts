@@ -247,7 +247,7 @@ export async function convertFilesToArrayBuffers(
 
   // 处理文件参数
   for (const [key, value] of Object.entries(result)) {
-    if (value instanceof File) {
+    if (typeof File !== 'undefined' && value instanceof File) {
       try {
         const arrayBuffer = await fileToArrayBuffer(value);
         result[key] = arrayBuffer;

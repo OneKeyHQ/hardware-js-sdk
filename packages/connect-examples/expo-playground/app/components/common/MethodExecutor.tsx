@@ -41,6 +41,14 @@ interface FirmwareVersionInfo {
   bleVersion?: string;
 }
 
+type ExecutionPreviewState = {
+  status: 'idle' | 'loading' | 'success' | 'error';
+  request?: Record<string, unknown>;
+  response?: unknown;
+  error?: string;
+  durationMs?: number;
+};
+
 type DebugLogRecord = Record<string, unknown>;
 
 function getLogRecord(log: UnifiedLogEntry): DebugLogRecord {
@@ -450,6 +458,34 @@ function toneClassName(tone?: 'success' | 'error' | 'accent' | 'tx' | 'rx' | 'in
   }
 }
 
+function previewStatusLabel(status: ExecutionPreviewState['status']) {
+  switch (status) {
+    case 'loading':
+      return 'Running';
+    case 'success':
+      return 'Success';
+    case 'error':
+      return 'Error';
+    case 'idle':
+    default:
+      return 'Idle';
+  }
+}
+
+function previewStatusClassName(status: ExecutionPreviewState['status']) {
+  switch (status) {
+    case 'success':
+      return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300';
+    case 'error':
+      return 'border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-300';
+    case 'loading':
+      return 'border-primary/30 bg-primary/10 text-primary';
+    case 'idle':
+    default:
+      return 'border-border/70 text-muted-foreground';
+  }
+}
+
 export function ProtocolExecutionLog({
   logs,
   onClearLogs,
@@ -617,6 +653,9 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
   // 方法级别的执行日志状态
   const [executionStartTime, setExecutionStartTime] = useState<number | null>(null);
   const [firmwareVersions, setFirmwareVersions] = useState<FirmwareVersionInfo | null>(null);
+  const [executionPreview, setExecutionPreview] = useState<ExecutionPreviewState>({
+    status: 'idle',
+  });
 
   // 使用新的 Hooks
   const { currentDevice, deviceModel, deviceTheme, isConnected } = useDeviceInfo();
@@ -652,6 +691,10 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
     }
     return separateParameters(storeExecutionParameters).methodParams;
   }, [storeExecutionParameters, supportsCommonParameters]);
+
+  useEffect(() => {
+    setExecutionPreview({ status: 'idle' });
+  }, [methodConfig.method]);
 
   // 处理预设选择
   const handlePresetChange = useCallback(
@@ -718,11 +761,18 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
 
   // 执行方法
   const handleExecute = useCallback(async () => {
+    const finalExecutionParams = getScopedExecutionParameters();
+
     if (!canRunWithoutConnectedDevice) {
       toast({
         title: t('components.methodExecutor.deviceNotConnected'),
         description: t('components.methodExecutor.connectDeviceFirst'),
         variant: 'destructive',
+      });
+      setExecutionPreview({
+        status: 'error',
+        request: finalExecutionParams,
+        error: t('components.methodExecutor.connectDeviceFirst'),
       });
       return;
     }
@@ -733,9 +783,42 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
       setFirmwareVersions(null);
     }
 
-    // 使用 hardwareStore 的完整执行参数（包含通用参数）
-    const finalExecutionParams = getScopedExecutionParameters();
-    await execute(finalExecutionParams, executionHandler);
+    setExecutionPreview({
+      status: 'loading',
+      request: finalExecutionParams,
+    });
+
+    const startTime = Date.now();
+    await execute(finalExecutionParams, async executionParams => {
+      try {
+        const result = await executionHandler(executionParams);
+        const isFailureResult =
+          result &&
+          typeof result === 'object' &&
+          (result as { success?: unknown }).success === false;
+
+        setExecutionPreview({
+          status: isFailureResult ? 'error' : 'success',
+          request: executionParams,
+          response: result,
+          error: isFailureResult
+            ? formatInlineValue((result as { payload?: unknown }).payload)
+            : undefined,
+          durationMs: Date.now() - startTime,
+        });
+
+        return result;
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        setExecutionPreview({
+          status: 'error',
+          request: executionParams,
+          error: errorMessage,
+          durationMs: Date.now() - startTime,
+        });
+        throw error;
+      }
+    });
   }, [
     canRunWithoutConnectedDevice,
     execute,
@@ -758,6 +841,7 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
     }
     resetExecution();
     resetParameters();
+    setExecutionPreview({ status: 'idle' });
     // 重置执行开始时间，清空执行日志显示
     setExecutionStartTime(null);
 
@@ -820,6 +904,76 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
   );
 
   const isExecutionDisabled = status === 'loading' || status === 'device-interaction';
+
+  const renderPayloadResponsePanel = (compact = false) => {
+    const requestPayload = executionPreview.request ?? scopedRequestData;
+    const minHeightClassName = compact ? 'min-h-[180px]' : 'min-h-[240px]';
+
+    return (
+      <Card className="overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm">
+        <CardContent className="p-0">
+          <div className="grid min-h-0 grid-cols-1 xl:grid-cols-2">
+            <div
+              className={`flex ${minHeightClassName} min-w-0 flex-col border-b border-border/70 xl:border-b-0 xl:border-r`}
+            >
+              <div className="border-b border-border/70 px-4 py-2.5 text-sm font-semibold text-foreground">
+                Request payload
+              </div>
+              <pre className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words p-4 font-mono text-xs leading-relaxed text-muted-foreground">
+                {formatBlockValue(requestPayload)}
+              </pre>
+            </div>
+
+            <div className={`flex ${minHeightClassName} min-w-0 flex-col`}>
+              <div className="flex items-center justify-between gap-3 border-b border-border/70 px-4 py-2.5">
+                <div className="text-sm font-semibold text-foreground">Response</div>
+                <span
+                  className={`rounded-full border px-2 py-0.5 text-xs ${previewStatusClassName(
+                    executionPreview.status
+                  )}`}
+                >
+                  {previewStatusLabel(executionPreview.status)}
+                </span>
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-auto p-4">
+                {executionPreview.durationMs !== undefined && (
+                  <div className="mb-3 text-xs text-muted-foreground">
+                    Duration: {executionPreview.durationMs}ms
+                  </div>
+                )}
+
+                {executionPreview.status === 'idle' && (
+                  <div className="rounded-md border border-dashed border-border/70 px-3 py-8 text-center text-sm text-muted-foreground">
+                    Execute the selected method to view the response here.
+                  </div>
+                )}
+
+                {executionPreview.status === 'loading' && (
+                  <div className="flex items-center gap-2 rounded-md border border-primary/20 bg-primary/5 px-3 py-3 text-sm text-primary">
+                    <Clock className="h-4 w-4 animate-spin" />
+                    Waiting for device response...
+                  </div>
+                )}
+
+                {executionPreview.error && (
+                  <div className="mb-3 rounded-md border border-red-500/20 bg-red-500/5 px-3 py-3 text-sm text-red-600 dark:text-red-300">
+                    {executionPreview.error}
+                  </div>
+                )}
+
+                {executionPreview.response !== undefined && (
+                  <pre className="overflow-auto whitespace-pre-wrap break-words rounded-md border border-border/70 bg-muted/30 p-3 text-xs leading-relaxed text-foreground">
+                    {formatBlockValue(executionPreview.response)}
+                  </pre>
+                )}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
 
   const renderDeviceArea = (compact = false) => (
     <DeviceInteractionArea
@@ -996,6 +1150,8 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
 
         {debugPanel ? <div className="flex-shrink-0">{debugPanel}</div> : null}
 
+        {renderPayloadResponsePanel(true)}
+
         <ProtocolExecutionLog logs={currentExecutionLogs} onClearLogs={handleClearExecutionLogs} />
       </div>
     );
@@ -1020,8 +1176,12 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
           <div className="lg:col-span-2 flex flex-col h-full min-h-0">{renderDeviceArea(true)}</div>
 
           {/* 右侧：执行面板 */}
-          <div className="lg:col-span-3 flex flex-col h-full min-h-0">
-            {renderExecutionPanel({ defaultParamsCollapsed: true })}
+          <div className="lg:col-span-3 flex flex-col h-full min-h-0 gap-2">
+            {renderPayloadResponsePanel(true)}
+            {renderExecutionPanel({
+              defaultParamsCollapsed: true,
+              className: 'min-h-0 flex-1',
+            })}
           </div>
         </div>
       </div>

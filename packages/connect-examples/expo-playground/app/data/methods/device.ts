@@ -54,8 +54,8 @@ const api: UnifiedMethodConfig[] = [
     ],
   },
   {
-    method: 'devGetDeviceInfo',
-    description: 'methodDescriptions.devGetDeviceInfo',
+    method: 'deviceGetDeviceInfo',
+    description: 'methodDescriptions.deviceGetDeviceInfo',
     noDeviceIdReq: true,
     presets: [
       {
@@ -185,14 +185,14 @@ const api: UnifiedMethodConfig[] = [
     ],
   },
   {
-    method: 'devGetOnboardingStatus',
-    description: 'methodDescriptions.devGetOnboardingStatus',
+    method: 'deviceGetOnboardingStatus',
+    description: 'methodDescriptions.deviceGetOnboardingStatus',
     noDeviceIdReq: true,
     presets: [],
   },
   {
-    method: 'devReboot',
-    description: 'methodDescriptions.devReboot',
+    method: 'deviceReboot',
+    description: 'methodDescriptions.deviceReboot',
     noDeviceIdReq: true,
     presets: [
       {

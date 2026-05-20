@@ -41,7 +41,8 @@ export const FIRMWARE_FIELDS = [
 
 export type IFirmwareField = (typeof FIRMWARE_FIELDS)[number];
 
-export type MessageVersion = 'latest' | 'v1' | 'protocolV2';
+export type ProtocolV1MessageSchema = 'protocolV1Current' | 'protocolV1Legacy';
+export type ProtobufMessageSchema = ProtocolV1MessageSchema | 'protocolV2';
 
 const FIRMWARE_FIELD_TYPE_MAP: Readonly<Record<IFirmwareField, EFirmwareType>> = {
   firmware: EFirmwareType.Universal,
@@ -96,9 +97,9 @@ export default class DataManager {
 
   static settings: ConnectSettings;
 
-  static messages: { [version in MessageVersion]: JSON } = {
-    latest: MessagesJSON as unknown as JSON,
-    v1: MessagesLegacyV1JSON as unknown as JSON,
+  static messages: { [schema in ProtobufMessageSchema]: JSON } = {
+    protocolV1Current: MessagesJSON as unknown as JSON,
+    protocolV1Legacy: MessagesLegacyV1JSON as unknown as JSON,
     protocolV2: MessagesPro2JSON as unknown as JSON,
   };
 
@@ -476,8 +477,8 @@ export default class DataManager {
     }
   }
 
-  static getProtobufMessages(messageVersion: MessageVersion = 'latest'): JSON {
-    return this.messages[messageVersion];
+  static getProtobufMessages(schema: ProtobufMessageSchema = 'protocolV1Current'): JSON {
+    return this.messages[schema];
   }
 
   static getSettings(key?: undefined): ConnectSettings;

@@ -9,7 +9,7 @@ jest.mock('../src/data/config', () => ({
 }));
 
 jest.mock('../src/data-manager/TransportManager', () => ({
-  getMessageVersion: jest.fn(() => 'v2'),
+  getProtocolV1MessageSchema: jest.fn(() => 'protocolV1Current'),
 }));
 
 jest.mock('../src/device/Device', () => ({

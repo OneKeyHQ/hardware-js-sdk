@@ -63,6 +63,13 @@ const getCommonParameters = (t: (key: string) => string, methodName: string): Pa
   ];
 };
 
+const getFileValueName = (value: unknown): string | null => {
+  if (typeof File !== 'undefined' && value instanceof File) {
+    return value.name;
+  }
+  return null;
+};
+
 const ParameterInput: React.FC<ParameterInputProps> = ({
   methodConfig,
   selectedPreset,
@@ -114,7 +121,7 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
     }
 
     return []; // 没有可显示的参数
-  }, [methodConfig, hasBundleParam, selectedPreset, presets]);
+  }, [selectedPreset, presets]);
 
   // 参数变化处理
   const handleParamChange = (paramName: string, value: unknown) => {
@@ -230,7 +237,8 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
   // 渲染文件选择器
   const renderFilePicker = (field: ParameterField) => {
     const config = getFileParameterConfig(field);
-    const currentValue = getParameterValue(field) as File | null;
+    const currentValue = getParameterValue(field);
+    const currentFileName = getFileValueName(currentValue);
 
     // 优先使用字段配置的accept，否则使用默认配置
     const acceptTypes = field.accept || config.accept;
@@ -251,8 +259,8 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
                 className="absolute inset-0 w-full h-full opacity-0 z-10"
               />
               <div className="bg-background border border-border rounded-md px-3 py-1.5 text-xs hover:bg-muted/50 hover:border-primary cursor-pointer transition-colors select-none">
-                {currentValue ? (
-                  <span className="text-foreground cursor-pointer">{currentValue.name}</span>
+                {currentFileName ? (
+                  <span className="text-foreground cursor-pointer">{currentFileName}</span>
                 ) : (
                   <span className="text-muted-foreground cursor-pointer">
                     {t('components.parameterInput.selectFirmwareFile', { title: config.title })}
