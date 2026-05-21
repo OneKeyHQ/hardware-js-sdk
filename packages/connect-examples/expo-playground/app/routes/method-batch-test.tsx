@@ -124,11 +124,11 @@ function getCaseSearchText(testCase: BatchCase) {
 function getStatusBadgeClass(status: BatchStatus | 'ready') {
   switch (status) {
     case 'success':
-      return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300';
+      return 'border-primary bg-primary text-primary-foreground shadow-sm';
     case 'error':
       return 'border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-300';
     case 'running':
-      return 'border-primary/30 bg-primary/10 text-primary';
+      return 'border-primary bg-primary text-primary-foreground shadow-sm';
     case 'cancelled':
       return 'border-border/70 bg-muted/40 text-muted-foreground';
     default:
@@ -137,7 +137,7 @@ function getStatusBadgeClass(status: BatchStatus | 'ready') {
 }
 
 function BatchStatusIcon({ status }: { status: BatchStatus | 'ready' }) {
-  if (status === 'success') return <CheckCircle2 className="h-4 w-4 text-emerald-500" />;
+  if (status === 'success') return <CheckCircle2 className="h-4 w-4 text-primary" />;
   if (status === 'error') return <XCircle className="h-4 w-4 text-red-500" />;
   if (status === 'running') return <Loader2 className="h-4 w-4 animate-spin text-primary" />;
   if (status === 'cancelled') return <Square className="h-4 w-4 text-muted-foreground" />;
@@ -436,9 +436,7 @@ const MethodBatchTestPage: React.FC = () => {
             <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
               <div className="rounded-md border border-border/70 bg-background px-2 py-1.5">
                 <div className="text-muted-foreground">Success</div>
-                <div className="font-semibold text-emerald-600 dark:text-emerald-300">
-                  {summary.success}
-                </div>
+                <div className="font-semibold text-foreground">{summary.success}</div>
               </div>
               <div className="rounded-md border border-border/70 bg-background px-2 py-1.5">
                 <div className="text-muted-foreground">Failed</div>

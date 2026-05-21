@@ -92,7 +92,7 @@ const ExecutionPanel: React.FC<ExecutionPanelProps> = ({
                   size="sm"
                   onClick={handleCopyParams}
                   disabled={disabled}
-                  className="h-7 px-2 text-xs bg-green-50 text-green-700 hover:bg-green-100 border-green-100"
+                  className="h-7 border-primary bg-primary px-2 text-xs text-primary-foreground hover:bg-primary/90"
                 >
                   <Copy className="h-2.5 w-2.5 mr-0.5" />
                   {copied ? t('common.copied') : t('common.copy')}

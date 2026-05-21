@@ -475,11 +475,11 @@ function previewStatusLabel(status: ExecutionPreviewState['status']) {
 function previewStatusClassName(status: ExecutionPreviewState['status']) {
   switch (status) {
     case 'success':
-      return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300';
+      return 'border-primary bg-primary text-primary-foreground shadow-sm';
     case 'error':
       return 'border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-300';
     case 'loading':
-      return 'border-primary/30 bg-primary/10 text-primary';
+      return 'border-primary bg-primary text-primary-foreground shadow-sm';
     case 'idle':
     default:
       return 'border-border/70 text-muted-foreground';
@@ -950,7 +950,7 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
                 )}
 
                 {executionPreview.status === 'loading' && (
-                  <div className="flex items-center gap-2 rounded-md border border-primary/20 bg-primary/5 px-3 py-3 text-sm text-primary">
+                  <div className="flex items-center gap-2 rounded-md border border-primary bg-primary px-3 py-3 text-sm font-medium text-primary-foreground">
                     <Clock className="h-4 w-4 animate-spin" />
                     Waiting for device response...
                   </div>
