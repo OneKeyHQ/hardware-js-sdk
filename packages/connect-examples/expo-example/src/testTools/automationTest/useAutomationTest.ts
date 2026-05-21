@@ -1501,13 +1501,13 @@ export function useAutomationTest() {
 
   const getCurrentDeviceEvmAddress = useCallback(
     async (sdk: CoreApi, connectId: string, deviceId: string): Promise<string> => {
-      const result = (await runWithRetry('evmGetAddress:current-wallet', () =>
+      const result = await runWithRetry('evmGetAddress:current-wallet', () =>
         sdk.evmGetAddress(connectId, deviceId, {
           path: EVM_ADDRESS_PATH,
           showOnOneKey: false,
           useEmptyPassphrase: true,
         })
-      )) as { success: boolean; payload?: unknown };
+      );
 
       if (!result.success) {
         throw new Error(
@@ -1669,60 +1669,56 @@ export function useAutomationTest() {
       }
 
       const suiteName = getSuiteName(suiteType);
-      const expectedTotal = filterTitles?.size ?? countSdkCasePaths(scenario, suiteType, selectedPassphraseVariants);
+      const expectedTotal =
+        filterTitles?.size ?? countSdkCasePaths(scenario, suiteType, selectedPassphraseVariants);
       const results: TestCaseResult[] = [];
       for (const slip39Case of slip39Cases) {
-        if (
-          !hasMatchingRetryTitle(
-            filterTitles,
-            title => title.startsWith(`${slip39Case.id} / `)
-          )
-        ) {
-          continue;
-        }
-        // Fetch fresh features per iteration to avoid stale passphrase_protection state
-        const deviceFeatures = await fetchDeviceFeatures(sdk, connectId);
-        const ppResult = await preparePassphraseIteration(
-          sdk,
-          connectId,
-          deviceFeatures,
-          slip39Case.passphrase,
-          'SLIP39',
-          results,
-          suiteType,
-          suiteName
-        );
-        if (ppResult.ok) {
-          const { passphraseState } = ppResult;
+        if (hasMatchingRetryTitle(filterTitles, title => title.startsWith(`${slip39Case.id} / `))) {
+          // Fetch fresh features per iteration to avoid stale passphrase_protection state
+          const deviceFeatures = await fetchDeviceFeatures(sdk, connectId);
+          const ppResult = await preparePassphraseIteration(
+            sdk,
+            connectId,
+            deviceFeatures,
+            slip39Case.passphrase,
+            'SLIP39',
+            results,
+            suiteType,
+            suiteName
+          );
+          if (ppResult.ok) {
+            const { passphraseState } = ppResult;
 
-          for (const methodData of slip39Case.data) {
-            const expectedMap =
-              caseType === 'address' ? methodData.expectedAddress : methodData.expectedPublicKey;
-            const expectedPaths = Object.keys(expectedMap || {});
+            for (const methodData of slip39Case.data) {
+              const expectedMap =
+                caseType === 'address' ? methodData.expectedAddress : methodData.expectedPublicKey;
+              const expectedPaths = Object.keys(expectedMap || {});
 
-            for (const expectedPath of expectedPaths) {
-              if (!runningRef.current) {
-                break;
+              for (const expectedPath of expectedPaths) {
+                if (!runningRef.current) {
+                  break;
+                }
+                const caseTitle = `${slip39Case.id} / ${
+                  methodData.name || methodData.method
+                } / ${expectedPath}`;
+                if (!filterTitles || filterTitles.has(caseTitle)) {
+                  const caseResult = await runSdkMethodCase(
+                    sdk,
+                    connectId,
+                    deviceId,
+                    scenario,
+                    slip39Case,
+                    methodData,
+                    expectedPath,
+                    caseType,
+                    passphraseState
+                  );
+                  results.push(caseResult);
+                  incrementCompletedTests();
+                  notifyLiveCaseUpdate(suiteType, suiteName, results, expectedTotal);
+                  await delay(SDK_CASE_DELAY_MS);
+                }
               }
-              const caseTitle = `${slip39Case.id} / ${methodData.name || methodData.method} / ${expectedPath}`;
-              if (filterTitles && !filterTitles.has(caseTitle)) {
-                continue;
-              }
-              const caseResult = await runSdkMethodCase(
-                sdk,
-                connectId,
-                deviceId,
-                scenario,
-                slip39Case,
-                methodData,
-                expectedPath,
-                caseType,
-                passphraseState
-              );
-              results.push(caseResult);
-              incrementCompletedTests();
-              notifyLiveCaseUpdate(suiteType, suiteName, results, expectedTotal);
-              await delay(SDK_CASE_DELAY_MS);
             }
           }
         }
@@ -1880,58 +1876,54 @@ export function useAutomationTest() {
       }
 
       const suiteName = getSuiteName(suiteType);
-      const expectedTotal = filterTitles?.size ?? countSdkCasePaths(scenario, suiteType, selectedPassphraseVariants);
+      const expectedTotal =
+        filterTitles?.size ?? countSdkCasePaths(scenario, suiteType, selectedPassphraseVariants);
 
       const results: TestCaseResult[] = [];
       for (const bip39Case of bip39Cases) {
-        if (
-          !hasMatchingRetryTitle(
-            filterTitles,
-            title => title.startsWith(`${bip39Case.id} / `)
-          )
-        ) {
-          continue;
-        }
-        // Fetch fresh features per iteration to avoid stale passphrase_protection state
-        const deviceFeatures2 = await fetchDeviceFeatures(sdk, connectId);
-        const ppResult = await preparePassphraseIteration(
-          sdk,
-          connectId,
-          deviceFeatures2,
-          bip39Case.passphrase,
-          'BIP39_IMPORT',
-          results,
-          suiteType,
-          suiteName
-        );
-        if (ppResult.ok) {
-          const { passphraseState } = ppResult;
+        if (hasMatchingRetryTitle(filterTitles, title => title.startsWith(`${bip39Case.id} / `))) {
+          // Fetch fresh features per iteration to avoid stale passphrase_protection state
+          const deviceFeatures2 = await fetchDeviceFeatures(sdk, connectId);
+          const ppResult = await preparePassphraseIteration(
+            sdk,
+            connectId,
+            deviceFeatures2,
+            bip39Case.passphrase,
+            'BIP39_IMPORT',
+            results,
+            suiteType,
+            suiteName
+          );
+          if (ppResult.ok) {
+            const { passphraseState } = ppResult;
 
-          for (const methodCase of bip39Case.data) {
-            const expectedPaths = Object.keys(methodCase.expectedByPath || {});
-            for (const expectedPath of expectedPaths) {
-              if (!runningRef.current) {
-                break;
+            for (const methodCase of bip39Case.data) {
+              const expectedPaths = Object.keys(methodCase.expectedByPath || {});
+              for (const expectedPath of expectedPaths) {
+                if (!runningRef.current) {
+                  break;
+                }
+                const caseTitle = `${bip39Case.id} / ${
+                  methodCase.name || methodCase.method
+                } / ${expectedPath}`;
+                if (!filterTitles || filterTitles.has(caseTitle)) {
+                  const caseResult = await runAutomationSdkBatchCase(
+                    sdk,
+                    connectId,
+                    deviceId,
+                    scenario,
+                    bip39Case,
+                    methodCase,
+                    expectedPath,
+                    caseType,
+                    passphraseState
+                  );
+                  results.push(caseResult);
+                  incrementCompletedTests();
+                  notifyLiveCaseUpdate(suiteType, suiteName, results, expectedTotal);
+                  await delay(SDK_CASE_DELAY_MS);
+                }
               }
-              const caseTitle = `${bip39Case.id} / ${methodCase.name || methodCase.method} / ${expectedPath}`;
-              if (filterTitles && !filterTitles.has(caseTitle)) {
-                continue;
-              }
-              const caseResult = await runAutomationSdkBatchCase(
-                sdk,
-                connectId,
-                deviceId,
-                scenario,
-                bip39Case,
-                methodCase,
-                expectedPath,
-                caseType,
-                passphraseState
-              );
-              results.push(caseResult);
-              incrementCompletedTests();
-              notifyLiveCaseUpdate(suiteType, suiteName, results, expectedTotal);
-              await delay(SDK_CASE_DELAY_MS);
             }
           }
         }
@@ -1981,140 +1973,137 @@ export function useAutomationTest() {
           : BIP39_CREATE_PUBKEY_PROBES;
 
       const suiteName = getSuiteName(suiteType);
-      const expectedTotal = filterTitles?.size ?? countSdkCasePaths(scenario, suiteType, selectedPassphraseVariants);
+      const expectedTotal =
+        filterTitles?.size ?? countSdkCasePaths(scenario, suiteType, selectedPassphraseVariants);
 
       const results: TestCaseResult[] = [];
       for (const variantId of selectedPassphraseVariants) {
         if (!runningRef.current) {
           break;
         }
-        if (!hasMatchingRetryTitle(filterTitles, title => title.endsWith(` / ${variantId}`))) {
-          continue;
-        }
+        if (hasMatchingRetryTitle(filterTitles, title => title.endsWith(` / ${variantId}`))) {
+          const passphraseLiteral = getScenarioPassphraseLiteral(scenario, variantId);
+          // Fetch fresh features per iteration to avoid stale passphrase_protection state
+          const deviceFeatures3 = await fetchDeviceFeatures(sdk, connectId);
+          const ppResult = await preparePassphraseIteration(
+            sdk,
+            connectId,
+            deviceFeatures3,
+            passphraseLiteral,
+            'BIP39_CREATE',
+            results,
+            suiteType,
+            suiteName
+          );
+          if (ppResult.ok) {
+            const { passphraseState } = ppResult;
 
-        const passphraseLiteral = getScenarioPassphraseLiteral(scenario, variantId);
-        // Fetch fresh features per iteration to avoid stale passphrase_protection state
-        const deviceFeatures3 = await fetchDeviceFeatures(sdk, connectId);
-        const ppResult = await preparePassphraseIteration(
-          sdk,
-          connectId,
-          deviceFeatures3,
-          passphraseLiteral,
-          'BIP39_CREATE',
-          results,
-          suiteType,
-          suiteName
-        );
-        if (!ppResult.ok) {
-          // skip this variant
-        } else {
-          const { passphraseState } = ppResult;
+            const passphraseDisplay = formatPassphraseDisplay(passphraseLiteral);
+            const seed = mnemonicToSeed(mnemonicWords.join(' '), passphraseLiteral);
+            for (const probe of probes) {
+              const caseTitle = `${scenario.id} / ${probe.caseName} / ${probe.path} / ${variantId}`;
+              if (!filterTitles || filterTitles.has(caseTitle)) {
+                const startedAtCase = Date.now();
+                let expected = '';
 
-          const passphraseDisplay = formatPassphraseDisplay(passphraseLiteral);
-          const seed = mnemonicToSeed(mnemonicWords.join(' '), passphraseLiteral);
-          for (const probe of probes) {
-            const caseTitle = `${scenario.id} / ${probe.caseName} / ${probe.path} / ${variantId}`;
-            if (filterTitles && !filterTitles.has(caseTitle)) {
-              continue;
-            }
-            const startedAtCase = Date.now();
-            let expected = '';
-
-            try {
-              expected = buildBip39CreateExpectedValue(
-                probe.method,
-                probe.caseName,
-                seed,
-                probe.path
-              );
-              if (!expected) {
-                throw new Error(`Missing expected ${caseType} value for ${probe.caseName}`);
-              }
-
-              const sdkParams: Record<string, unknown> = {
-                path: probe.path,
-                showOnOneKey: false,
-                passphraseState,
-                useEmptyPassphrase: !passphraseLiteral,
-              };
-
-              const result = (await runWithRetry(`${probe.method}:${probe.path}`, () => {
-                const method = (sdk as Record<string, unknown>)[probe.method];
-                if (typeof method !== 'function') {
-                  throw new Error(`SDK method not found: ${probe.method}`);
-                }
-                return (method as (...args: unknown[]) => Promise<unknown>)(
-                  connectId,
-                  deviceId,
-                  sdkParams
-                );
-              })) as { success: boolean; payload?: unknown };
-
-              if (!result.success) {
-                results.push({
-                  title: caseTitle,
-                  method: probe.method,
-                  expected,
-                  actual: '',
-                  passed: false,
-                  error:
-                    (result.payload as { error?: string } | undefined)?.error || 'Unknown error',
-                  duration: Date.now() - startedAtCase,
-                  metadata: {
-                    path: probe.path,
-                    passphrase: passphraseDisplay,
-                  },
-                });
-              } else {
-                const actual = extractComparisonValue(
-                  result.payload,
-                  caseType,
-                  probe.method,
-                  probe.caseName
-                );
-                const passed = actual === expected;
-                if (!passed) {
-                  addLog(
-                    `[MISMATCH] ${scenario.id} / ${probe.caseName} / ${probe.path} / ${variantId}`
+                try {
+                  expected = buildBip39CreateExpectedValue(
+                    probe.method,
+                    probe.caseName,
+                    seed,
+                    probe.path
                   );
-                  addLog(`  expected: ${expected}`);
-                  addLog(`  actual:   ${actual}`);
-                }
-                results.push({
-                  title: caseTitle,
-                  method: probe.method,
-                  expected,
-                  actual,
-                  passed,
-                  duration: Date.now() - startedAtCase,
-                  metadata: {
-                    path: probe.path,
-                    passphrase: passphraseDisplay,
-                    source: mnemonicStoreResult?.sequenceId || scenario.phonePilotSequenceId,
-                  },
-                });
-              }
-            } catch (error) {
-              results.push({
-                title: caseTitle,
-                method: probe.method,
-                expected,
-                actual: '',
-                passed: false,
-                error: error instanceof Error ? error.message : String(error),
-                duration: Date.now() - startedAtCase,
-                metadata: {
-                  path: probe.path,
-                  passphrase: passphraseDisplay,
-                },
-              });
-            }
+                  if (!expected) {
+                    throw new Error(`Missing expected ${caseType} value for ${probe.caseName}`);
+                  }
 
-            incrementCompletedTests();
-            notifyLiveCaseUpdate(suiteType, suiteName, results, expectedTotal);
-            await delay(SDK_CASE_DELAY_MS);
+                  const sdkParams: Record<string, unknown> = {
+                    path: probe.path,
+                    showOnOneKey: false,
+                    passphraseState,
+                    useEmptyPassphrase: !passphraseLiteral,
+                  };
+
+                  const result = (await runWithRetry(`${probe.method}:${probe.path}`, () => {
+                    const method = (sdk as Record<string, unknown>)[probe.method];
+                    if (typeof method !== 'function') {
+                      throw new Error(`SDK method not found: ${probe.method}`);
+                    }
+                    return (method as (...args: unknown[]) => Promise<unknown>)(
+                      connectId,
+                      deviceId,
+                      sdkParams
+                    );
+                  })) as { success: boolean; payload?: unknown };
+
+                  if (!result.success) {
+                    results.push({
+                      title: caseTitle,
+                      method: probe.method,
+                      expected,
+                      actual: '',
+                      passed: false,
+                      error:
+                        (result.payload as { error?: string } | undefined)?.error ||
+                        'Unknown error',
+                      duration: Date.now() - startedAtCase,
+                      metadata: {
+                        path: probe.path,
+                        passphrase: passphraseDisplay,
+                      },
+                    });
+                  } else {
+                    const actual = extractComparisonValue(
+                      result.payload,
+                      caseType,
+                      probe.method,
+                      probe.caseName
+                    );
+                    const passed = actual === expected;
+                    if (!passed) {
+                      addLog(
+                        `[MISMATCH] ${scenario.id} / ${probe.caseName} / ${probe.path} / ${variantId}`
+                      );
+                      addLog(`  expected: ${expected}`);
+                      addLog(`  actual:   ${actual}`);
+                    }
+                    results.push({
+                      title: caseTitle,
+                      method: probe.method,
+                      expected,
+                      actual,
+                      passed,
+                      duration: Date.now() - startedAtCase,
+                      metadata: {
+                        path: probe.path,
+                        passphrase: passphraseDisplay,
+                        source: mnemonicStoreResult?.sequenceId || scenario.phonePilotSequenceId,
+                      },
+                    });
+                  }
+                } catch (error) {
+                  results.push({
+                    title: caseTitle,
+                    method: probe.method,
+                    expected,
+                    actual: '',
+                    passed: false,
+                    error: error instanceof Error ? error.message : String(error),
+                    duration: Date.now() - startedAtCase,
+                    metadata: {
+                      path: probe.path,
+                      passphrase: passphraseDisplay,
+                    },
+                  });
+                }
+
+                incrementCompletedTests();
+                notifyLiveCaseUpdate(suiteType, suiteName, results, expectedTotal);
+                await delay(SDK_CASE_DELAY_MS);
+              }
+            }
           }
-        } // end else (!ppResult.ok)
+        }
       }
 
       cleanupPassphraseLoop();
@@ -2198,185 +2187,181 @@ export function useAutomationTest() {
       }
 
       const suiteName = getSuiteName(suiteType);
-      const expectedTotal = filterTitles?.size ?? countSdkCasePaths(scenario, suiteType, variantIds);
+      const expectedTotal =
+        filterTitles?.size ?? countSdkCasePaths(scenario, suiteType, variantIds);
 
       const results: TestCaseResult[] = [];
       for (const variantId of variantIds) {
         if (!runningRef.current) {
           break;
         }
-        if (
-          !hasMatchingRetryTitle(filterTitles, title => title.includes(` / ${variantId} / `))
-        ) {
-          continue;
-        }
+        if (hasMatchingRetryTitle(filterTitles, title => title.includes(` / ${variantId} / `))) {
+          const passphraseLiteral = getScenarioPassphraseLiteral(scenario, variantId);
+          // Fetch fresh features per iteration to avoid stale passphrase_protection state
+          const deviceFeatures4 = await fetchDeviceFeatures(sdk, connectId);
+          const ppResult = await preparePassphraseIteration(
+            sdk,
+            connectId,
+            deviceFeatures4,
+            passphraseLiteral,
+            'SLIP39_CREATE',
+            results,
+            suiteType,
+            suiteName
+          );
+          if (ppResult.ok) {
+            const { passphraseState } = ppResult;
 
-        const passphraseLiteral = getScenarioPassphraseLiteral(scenario, variantId);
-        // Fetch fresh features per iteration to avoid stale passphrase_protection state
-        const deviceFeatures4 = await fetchDeviceFeatures(sdk, connectId);
-        const ppResult = await preparePassphraseIteration(
-          sdk,
-          connectId,
-          deviceFeatures4,
-          passphraseLiteral,
-          'SLIP39_CREATE',
-          results,
-          suiteType,
-          suiteName
-        );
-        if (!ppResult.ok) {
-          // skip this variant
-        } else {
-          const { passphraseState } = ppResult;
+            const passphraseDisplay = formatPassphraseDisplay(passphraseLiteral);
+            for (const methodData of templateCase.data) {
+              const expectedMap =
+                caseType === 'address' ? methodData.expectedAddress : methodData.expectedPublicKey;
+              const expectedPaths = Object.keys(expectedMap || {});
 
-          const passphraseDisplay = formatPassphraseDisplay(passphraseLiteral);
-          for (const methodData of templateCase.data) {
-            const expectedMap =
-              caseType === 'address' ? methodData.expectedAddress : methodData.expectedPublicKey;
-            const expectedPaths = Object.keys(expectedMap || {});
-
-            for (const expectedPath of expectedPaths) {
-              if (!runningRef.current) {
-                break;
-              }
-              const caseTitle = `${scenario.id} / ${
-                methodData.name || methodData.method
-              } / ${variantId} / ${expectedPath}`;
-              if (filterTitles && !filterTitles.has(caseTitle)) {
-                continue;
-              }
-
-              const startedAtCase = Date.now();
-              let expected = '';
-
-              try {
-                const generatorParams = {
-                  ...(methodData.params || {}),
-                  path: expectedPath,
-                };
-                const generatorResult =
-                  caseType === 'address'
-                    ? await generateMultiChainAddressFromSLIP39({
-                        shares: shareMnemonics,
-                        passphrase: passphraseLiteral,
-                        method: methodData.method,
-                        params: generatorParams,
-                      })
-                    : await generateMultiChainPublicKeyFromSLIP39({
-                        shares: shareMnemonics,
-                        passphrase: passphraseLiteral,
-                        method: methodData.method,
-                        params: generatorParams,
-                      });
-
-                if (!generatorResult.success) {
-                  throw new Error(
-                    generatorResult.error || 'Failed to generate expected value from SLIP39 shares'
-                  );
+              for (const expectedPath of expectedPaths) {
+                if (!runningRef.current) {
+                  break;
                 }
+                const caseTitle = `${scenario.id} / ${
+                  methodData.name || methodData.method
+                } / ${variantId} / ${expectedPath}`;
+                if (!filterTitles || filterTitles.has(caseTitle)) {
+                  const startedAtCase = Date.now();
+                  let expected = '';
 
-                expected = extractComparisonValue(
-                  generatorResult.payload,
-                  caseType,
-                  methodData.method,
-                  methodData.name
-                );
-                if (!expected) {
-                  throw new Error('Generated expected value is empty');
-                }
+                  try {
+                    const generatorParams = {
+                      ...(methodData.params || {}),
+                      path: expectedPath,
+                    };
+                    const generatorResult =
+                      caseType === 'address'
+                        ? await generateMultiChainAddressFromSLIP39({
+                            shares: shareMnemonics,
+                            passphrase: passphraseLiteral,
+                            method: methodData.method,
+                            params: generatorParams,
+                          })
+                        : await generateMultiChainPublicKeyFromSLIP39({
+                            shares: shareMnemonics,
+                            passphrase: passphraseLiteral,
+                            method: methodData.method,
+                            params: generatorParams,
+                          });
 
-                const sdkMethodParams: Record<string, unknown> = {
-                  ...(methodData.params || {}),
-                  path: expectedPath,
-                  showOnOneKey: false,
-                  passphraseState,
-                  useEmptyPassphrase: !passphraseLiteral,
-                };
-
-                const sdkResult = (await runWithRetry(
-                  `${methodData.method}:${expectedPath}`,
-                  () => {
-                    const method = (sdk as Record<string, unknown>)[methodData.method];
-                    if (typeof method !== 'function') {
-                      throw new Error(`SDK method not found: ${methodData.method}`);
+                    if (!generatorResult.success) {
+                      throw new Error(
+                        generatorResult.error ||
+                          'Failed to generate expected value from SLIP39 shares'
+                      );
                     }
-                    return (method as (...args: unknown[]) => Promise<unknown>)(
-                      connectId,
-                      deviceId,
-                      sdkMethodParams
-                    );
-                  }
-                )) as { success: boolean; payload?: unknown };
 
-                if (!sdkResult.success) {
-                  results.push({
-                    title: caseTitle,
-                    method: methodData.method,
-                    expected,
-                    actual: '',
-                    passed: false,
-                    error:
-                      (sdkResult.payload as { error?: string } | undefined)?.error ||
-                      'Unknown error',
-                    duration: Date.now() - startedAtCase,
-                    metadata: {
-                      passphrase: passphraseDisplay,
-                      shares: String(shareMnemonics.length),
-                    },
-                  });
-                } else {
-                  const actual = extractComparisonValue(
-                    sdkResult.payload,
-                    caseType,
-                    methodData.method,
-                    methodData.name
-                  );
-                  const passed = actual === expected;
-                  if (!passed) {
-                    addLog(
-                      `[MISMATCH] ${scenario.id} / ${
-                        methodData.name || methodData.method
-                      } / ${variantId} / ${expectedPath}`
+                    expected = extractComparisonValue(
+                      generatorResult.payload,
+                      caseType,
+                      methodData.method,
+                      methodData.name
                     );
-                    addLog(`  expected: ${expected}`);
-                    addLog(`  actual:   ${actual}`);
+                    if (!expected) {
+                      throw new Error('Generated expected value is empty');
+                    }
+
+                    const sdkMethodParams: Record<string, unknown> = {
+                      ...(methodData.params || {}),
+                      path: expectedPath,
+                      showOnOneKey: false,
+                      passphraseState,
+                      useEmptyPassphrase: !passphraseLiteral,
+                    };
+
+                    const sdkResult = (await runWithRetry(
+                      `${methodData.method}:${expectedPath}`,
+                      () => {
+                        const method = (sdk as Record<string, unknown>)[methodData.method];
+                        if (typeof method !== 'function') {
+                          throw new Error(`SDK method not found: ${methodData.method}`);
+                        }
+                        return (method as (...args: unknown[]) => Promise<unknown>)(
+                          connectId,
+                          deviceId,
+                          sdkMethodParams
+                        );
+                      }
+                    )) as { success: boolean; payload?: unknown };
+
+                    if (!sdkResult.success) {
+                      results.push({
+                        title: caseTitle,
+                        method: methodData.method,
+                        expected,
+                        actual: '',
+                        passed: false,
+                        error:
+                          (sdkResult.payload as { error?: string } | undefined)?.error ||
+                          'Unknown error',
+                        duration: Date.now() - startedAtCase,
+                        metadata: {
+                          passphrase: passphraseDisplay,
+                          shares: String(shareMnemonics.length),
+                        },
+                      });
+                    } else {
+                      const actual = extractComparisonValue(
+                        sdkResult.payload,
+                        caseType,
+                        methodData.method,
+                        methodData.name
+                      );
+                      const passed = actual === expected;
+                      if (!passed) {
+                        addLog(
+                          `[MISMATCH] ${scenario.id} / ${
+                            methodData.name || methodData.method
+                          } / ${variantId} / ${expectedPath}`
+                        );
+                        addLog(`  expected: ${expected}`);
+                        addLog(`  actual:   ${actual}`);
+                      }
+                      results.push({
+                        title: caseTitle,
+                        method: methodData.method,
+                        expected,
+                        actual,
+                        passed,
+                        duration: Date.now() - startedAtCase,
+                        metadata: {
+                          passphrase: passphraseDisplay,
+                          shares: String(shareMnemonics.length),
+                          threshold: String(
+                            mnemonicStoreResult?.threshold || scenario.threshold || 0
+                          ),
+                        },
+                      });
+                    }
+                  } catch (error) {
+                    results.push({
+                      title: caseTitle,
+                      method: methodData.method,
+                      expected,
+                      actual: '',
+                      passed: false,
+                      error: error instanceof Error ? error.message : String(error),
+                      duration: Date.now() - startedAtCase,
+                      metadata: {
+                        passphrase: passphraseDisplay,
+                        shares: String(shareMnemonics.length),
+                      },
+                    });
                   }
-                  results.push({
-                    title: caseTitle,
-                    method: methodData.method,
-                    expected,
-                    actual,
-                    passed,
-                    duration: Date.now() - startedAtCase,
-                    metadata: {
-                      passphrase: passphraseDisplay,
-                      shares: String(shareMnemonics.length),
-                      threshold: String(mnemonicStoreResult?.threshold || scenario.threshold || 0),
-                    },
-                  });
+
+                  incrementCompletedTests();
+                  notifyLiveCaseUpdate(suiteType, suiteName, results, expectedTotal);
+                  await delay(SDK_CASE_DELAY_MS);
                 }
-              } catch (error) {
-                results.push({
-                  title: caseTitle,
-                  method: methodData.method,
-                  expected,
-                  actual: '',
-                  passed: false,
-                  error: error instanceof Error ? error.message : String(error),
-                  duration: Date.now() - startedAtCase,
-                  metadata: {
-                    passphrase: passphraseDisplay,
-                    shares: String(shareMnemonics.length),
-                  },
-                });
               }
-
-              incrementCompletedTests();
-              notifyLiveCaseUpdate(suiteType, suiteName, results, expectedTotal);
-              await delay(SDK_CASE_DELAY_MS);
             }
           }
-        } // end else (!ppResult.ok)
+        }
       }
 
       cleanupPassphraseLoop();
@@ -2445,157 +2430,165 @@ export function useAutomationTest() {
         }
 
         for (const passphrase of specialPassphrases) {
-          if (
-            !hasMatchingRetryTitle(filterTitles, title => title.endsWith(`「${passphrase}」`))
-          ) {
-            continue;
-          }
-          currentPassphraseRef.current = passphrase;
-          addLog(`Testing special passphrase: 「${passphrase}」`);
+          if (hasMatchingRetryTitle(filterTitles, title => title.endsWith(`「${passphrase}」`))) {
+            currentPassphraseRef.current = passphrase;
+            addLog(`Testing special passphrase: 「${passphrase}」`);
 
-          const psResult = (await runWithRetry(`getPassphraseState:special`, () =>
-            sdk.getPassphraseState(connectId, {
-              initSession: true,
-              useEmptyPassphrase: false,
-            })
-          )) as { success: boolean; payload?: string };
+            const psResult = await runWithRetry(`getPassphraseState:special`, () =>
+              sdk.getPassphraseState(connectId, {
+                initSession: true,
+                useEmptyPassphrase: false,
+              })
+            );
 
-          if (!psResult.success) {
-            results.push({
-              title: `getPassphraseState for 「${passphrase}」`,
-              passed: false,
-              error: 'getPassphraseState failed',
-              duration: Date.now() - startedAt,
-            });
-            notifyLiveCaseUpdate('specialPassphrase', 'Special Passphrase', results);
-          } else {
-            const passphraseState = psResult.payload || '';
+            if (!psResult.success) {
+              results.push({
+                title: `getPassphraseState for 「${passphrase}」`,
+                passed: false,
+                error: 'getPassphraseState failed',
+                duration: Date.now() - startedAt,
+              });
+              notifyLiveCaseUpdate('specialPassphrase', 'Special Passphrase', results);
+            } else {
+              const passphraseState = psResult.payload || '';
 
-            for (const method of methods) {
-              if (!runningRef.current) {
-                break;
-              }
+              for (const method of methods) {
+                if (!runningRef.current) {
+                  break;
+                }
 
-              const caseTitle = `${method} / 「${passphrase}」`;
-              if (filterTitles && !filterTitles.has(caseTitle)) {
-                continue;
-              }
-              const caseStart = Date.now();
-              try {
-                const mockFn = (mockDevice as Record<string, unknown>)[method];
-                if (typeof mockFn !== 'function') {
-                  results.push({
-                    title: caseTitle,
-                    method,
-                    passed: false,
-                    error: `mockDevice.${method} not found`,
-                    duration: Date.now() - caseStart,
-                  });
-                  notifyLiveCaseUpdate('specialPassphrase', 'Special Passphrase', results);
-                } else {
-                  const mockRes = (await mockFn('', '', {
-                    path: SPECIAL_PASSPHRASE_METHOD_PATHS[method],
-                    mnemonic: mnemonic.trim(),
-                    passphrase,
-                  })) as { payload?: { address?: string } };
-
-                  const expected = mockRes?.payload?.address || '';
-
-                  const sdkMethod = (sdk as Record<string, unknown>)[method];
-                  if (typeof sdkMethod !== 'function') {
-                    results.push({
-                      title: caseTitle,
-                      method,
-                      expected,
-                      passed: false,
-                      error: `SDK method ${method} not found`,
-                      duration: Date.now() - caseStart,
-                    });
-                    notifyLiveCaseUpdate('specialPassphrase', 'Special Passphrase', results);
-                  } else {
-                    const sdkResult = (await runWithRetry(`${method}:special`, () =>
-                      (sdkMethod as (...args: unknown[]) => Promise<unknown>)(connectId, deviceId, {
+                const caseTitle = `${method} / 「${passphrase}」`;
+                if (!filterTitles || filterTitles.has(caseTitle)) {
+                  const caseStart = Date.now();
+                  try {
+                    const mockFn = (mockDevice as Record<string, unknown>)[method];
+                    if (typeof mockFn !== 'function') {
+                      results.push({
+                        title: caseTitle,
+                        method,
+                        passed: false,
+                        error: `mockDevice.${method} not found`,
+                        duration: Date.now() - caseStart,
+                      });
+                      notifyLiveCaseUpdate('specialPassphrase', 'Special Passphrase', results);
+                    } else {
+                      const mockRes = (await mockFn('', '', {
                         path: SPECIAL_PASSPHRASE_METHOD_PATHS[method],
-                        showOnOneKey: false,
-                        passphraseState,
-                        useEmptyPassphrase: false,
-                      })
-                    )) as { success: boolean; payload?: { address?: string; error?: string } };
+                        mnemonic: mnemonic.trim(),
+                        passphrase,
+                      })) as { payload?: { address?: string } };
 
-                    if (!sdkResult.success) {
-                      // Check device compatibility
-                      let handledAsExpectedFail = false;
-                      if (deviceFeaturesRef.current) {
-                        const expectedOverride = compatibilityManager.getExpectedOverride(
-                          deviceFeaturesRef.current,
-                          method,
-                          SPECIAL_PASSPHRASE_METHOD_PATHS[method]
-                        );
-                        if (expectedOverride === false) {
-                          addLog(
-                            `[EXPECTED_FAIL] ${method} / 「${passphrase}」 — device does not support this method`
-                          );
-                          results.push({
-                            title: caseTitle,
-                            method,
-                            expected: '(expected failure)',
-                            actual: sdkResult.payload?.error || 'SDK call failed',
-                            passed: true,
-                            duration: Date.now() - caseStart,
-                            metadata: { passphrase, deviceCompat: 'expected failure' },
-                          });
-                          notifyLiveCaseUpdate('specialPassphrase', 'Special Passphrase', results);
-                          handledAsExpectedFail = true;
-                        }
-                      }
-                      if (!handledAsExpectedFail) {
+                      const expected = mockRes?.payload?.address || '';
+
+                      const sdkMethod = (sdk as Record<string, unknown>)[method];
+                      if (typeof sdkMethod !== 'function') {
                         results.push({
                           title: caseTitle,
                           method,
                           expected,
                           passed: false,
-                          error: sdkResult.payload?.error || 'SDK call failed',
+                          error: `SDK method ${method} not found`,
                           duration: Date.now() - caseStart,
-                          metadata: { passphrase },
                         });
                         notifyLiveCaseUpdate('specialPassphrase', 'Special Passphrase', results);
-                      }
-                    } else {
-                      const actual = sdkResult.payload?.address || '';
-                      const passed = actual.toLowerCase() === expected.toLowerCase();
-                      if (!passed) {
-                        addLog(`[MISMATCH] ${method} / 「${passphrase}」`);
-                        addLog(`  expected: ${expected}`);
-                        addLog(`  actual:   ${actual}`);
-                      }
+                      } else {
+                        const sdkResult = (await runWithRetry(`${method}:special`, () =>
+                          (sdkMethod as (...args: unknown[]) => Promise<unknown>)(
+                            connectId,
+                            deviceId,
+                            {
+                              path: SPECIAL_PASSPHRASE_METHOD_PATHS[method],
+                              showOnOneKey: false,
+                              passphraseState,
+                              useEmptyPassphrase: false,
+                            }
+                          )
+                        )) as { success: boolean; payload?: { address?: string; error?: string } };
 
-                      results.push({
-                        title: caseTitle,
-                        method,
-                        expected,
-                        actual,
-                        passed,
-                        duration: Date.now() - caseStart,
-                        metadata: { passphrase },
-                      });
-                    } // end else (!sdkResult.success)
-                  } // end else (typeof sdkMethod !== 'function')
-                } // end else (typeof mockFn !== 'function')
-              } catch (error) {
+                        if (!sdkResult.success) {
+                          // Check device compatibility
+                          let handledAsExpectedFail = false;
+                          if (deviceFeaturesRef.current) {
+                            const expectedOverride = compatibilityManager.getExpectedOverride(
+                              deviceFeaturesRef.current,
+                              method,
+                              SPECIAL_PASSPHRASE_METHOD_PATHS[method]
+                            );
+                            if (expectedOverride === false) {
+                              addLog(
+                                `[EXPECTED_FAIL] ${method} / 「${passphrase}」 — device does not support this method`
+                              );
+                              results.push({
+                                title: caseTitle,
+                                method,
+                                expected: '(expected failure)',
+                                actual: sdkResult.payload?.error || 'SDK call failed',
+                                passed: true,
+                                duration: Date.now() - caseStart,
+                                metadata: { passphrase, deviceCompat: 'expected failure' },
+                              });
+                              notifyLiveCaseUpdate(
+                                'specialPassphrase',
+                                'Special Passphrase',
+                                results
+                              );
+                              handledAsExpectedFail = true;
+                            }
+                          }
+                          if (!handledAsExpectedFail) {
+                            results.push({
+                              title: caseTitle,
+                              method,
+                              expected,
+                              passed: false,
+                              error: sdkResult.payload?.error || 'SDK call failed',
+                              duration: Date.now() - caseStart,
+                              metadata: { passphrase },
+                            });
+                            notifyLiveCaseUpdate(
+                              'specialPassphrase',
+                              'Special Passphrase',
+                              results
+                            );
+                          }
+                        } else {
+                          const actual = sdkResult.payload?.address || '';
+                          const passed = actual.toLowerCase() === expected.toLowerCase();
+                          if (!passed) {
+                            addLog(`[MISMATCH] ${method} / 「${passphrase}」`);
+                            addLog(`  expected: ${expected}`);
+                            addLog(`  actual:   ${actual}`);
+                          }
+
+                          results.push({
+                            title: caseTitle,
+                            method,
+                            expected,
+                            actual,
+                            passed,
+                            duration: Date.now() - caseStart,
+                            metadata: { passphrase },
+                          });
+                        } // end else (!sdkResult.success)
+                      } // end else (typeof sdkMethod !== 'function')
+                    } // end else (typeof mockFn !== 'function')
+                  } catch (error) {
                     results.push({
                       title: caseTitle,
-                  method,
-                  passed: false,
-                  error: error instanceof Error ? error.message : String(error),
-                  duration: Date.now() - caseStart,
-                });
-              }
+                      method,
+                      passed: false,
+                      error: error instanceof Error ? error.message : String(error),
+                      duration: Date.now() - caseStart,
+                    });
+                  }
 
-              incrementCompletedTests();
-              notifyLiveCaseUpdate('specialPassphrase', 'Special Passphrase', results);
-              await delay(SDK_CASE_DELAY_MS);
-            }
-          } // end else (!psResult.success)
+                  incrementCompletedTests();
+                  notifyLiveCaseUpdate('specialPassphrase', 'Special Passphrase', results);
+                  await delay(SDK_CASE_DELAY_MS);
+                }
+              }
+            } // end else (!psResult.success)
+          }
         }
       } catch (error) {
         results.push({
@@ -2772,112 +2765,111 @@ export function useAutomationTest() {
         addLog(`[SecurityCheck] Running ${testCases.length} test cases`);
 
         for (const testCase of testCases) {
-          if (filterTitles && !filterTitles.has(testCase.title)) {
-            continue;
-          }
-          const caseStart = Date.now();
-          const { method, params, expect: expectedResult, title } = testCase;
+          if (!filterTitles || filterTitles.has(testCase.title)) {
+            const caseStart = Date.now();
+            const { method, params, expect: expectedResult, title } = testCase;
 
-          try {
-            const sdkMethod = (sdk as Record<string, unknown>)[method];
-            if (typeof sdkMethod !== 'function') {
+            try {
+              const sdkMethod = (sdk as Record<string, unknown>)[method];
+              if (typeof sdkMethod !== 'function') {
+                results.push({
+                  title,
+                  method,
+                  passed: false,
+                  error: `SDK method ${method} not found`,
+                  duration: Date.now() - caseStart,
+                });
+                incrementCompletedTests();
+                notifyLiveCaseUpdate('securityCheck', 'Security Check', results);
+              } else {
+                setPendingUiActions(
+                  'securityCheck',
+                  title,
+                  expectedResult
+                    ? [
+                        ...Array<DeviceUiAction>(testCase.confirmCount ?? 1).fill('confirm'),
+                        ...(testCase.noSlide ? [] : (['slide'] as DeviceUiAction[])),
+                      ]
+                    : []
+                );
+
+                let sdkResult: { success: boolean; payload?: { error?: string } };
+                try {
+                  const resultOrTimeout = await Promise.race([
+                    (sdkMethod as (...args: unknown[]) => Promise<unknown>)(
+                      connectId,
+                      deviceId,
+                      withMainWalletCommonParams(params, forceUseEmptyPassphrase)
+                    ),
+                    new Promise<'timeout'>(resolve => {
+                      setTimeout(() => {
+                        resolve('timeout');
+                      }, 45_000);
+                    }),
+                  ]);
+                  if (resultOrTimeout === 'timeout') {
+                    sdk.cancel(connectId);
+                    await sdk.getFeatures(connectId, { retryCount: 1 });
+                    sdkResult = { success: false, payload: { error: 'timeout after 45s' } };
+                  } else {
+                    sdkResult = resultOrTimeout as typeof sdkResult;
+                  }
+                } catch (callError) {
+                  sdkResult = {
+                    success: false,
+                    payload: {
+                      error: callError instanceof Error ? callError.message : String(callError),
+                    },
+                  };
+                }
+
+                // Allow device-specific overrides (e.g. Pro doesn't support DNX)
+                const coinType = (() => {
+                  const path: string =
+                    ((params as Record<string, unknown>)?.path as string) ??
+                    ((
+                      (params as Record<string, unknown>)?.inputs as Array<Record<string, unknown>>
+                    )?.[0]?.path as string) ??
+                    '';
+                  return path.split('/')[2]?.replace(/'/g, '') ?? '';
+                })();
+                const deviceFeats = deviceFeaturesRef.current ?? {};
+                const expected = getDeviceExpected(deviceFeats, method, coinType, expectedResult, {
+                  securityChecksDisabled: false,
+                });
+
+                const actualSuccess = sdkResult.success;
+                const passed = expected ? actualSuccess : !actualSuccess;
+                const expectedLabel = expected ? 'success' : 'failure';
+                const actualLabel = actualSuccess
+                  ? 'success'
+                  : `failure(${sdkResult.payload?.error ?? ''})`;
+
+                results.push({
+                  title,
+                  method,
+                  expected: expectedLabel,
+                  actual: actualLabel,
+                  passed,
+                  duration: Date.now() - caseStart,
+                });
+              } // end else (typeof sdkMethod !== 'function')
+            } catch (error) {
               results.push({
                 title,
                 method,
                 passed: false,
-                error: `SDK method ${method} not found`,
+                error: error instanceof Error ? error.message : String(error),
                 duration: Date.now() - caseStart,
               });
-              incrementCompletedTests();
-              notifyLiveCaseUpdate('securityCheck', 'Security Check', results);
-            } else {
-              setPendingUiActions(
-                'securityCheck',
-                title,
-                expectedResult
-                  ? [
-                      ...Array<DeviceUiAction>(testCase.confirmCount ?? 1).fill('confirm'),
-                      ...(testCase.noSlide ? [] : (['slide'] as DeviceUiAction[])),
-                    ]
-                  : []
-              );
+            } finally {
+              clearPendingUiActions();
+            }
 
-              let sdkResult: { success: boolean; payload?: { error?: string } };
-              try {
-                const resultOrTimeout = await Promise.race([
-                  (sdkMethod as (...args: unknown[]) => Promise<unknown>)(
-                    connectId,
-                    deviceId,
-                    withMainWalletCommonParams(params, forceUseEmptyPassphrase)
-                  ),
-                  new Promise<'timeout'>(resolve => {
-                    setTimeout(() => {
-                      resolve('timeout');
-                    }, 45_000);
-                  }),
-                ]);
-                if (resultOrTimeout === 'timeout') {
-                  sdk.cancel(connectId);
-                  await sdk.getFeatures(connectId, { retryCount: 1 });
-                  sdkResult = { success: false, payload: { error: 'timeout after 45s' } };
-                } else {
-                  sdkResult = resultOrTimeout as typeof sdkResult;
-                }
-              } catch (callError) {
-                sdkResult = {
-                  success: false,
-                  payload: {
-                    error: callError instanceof Error ? callError.message : String(callError),
-                  },
-                };
-              }
-
-              // Allow device-specific overrides (e.g. Pro doesn't support DNX)
-              const coinType = (() => {
-                const path: string =
-                  ((params as Record<string, unknown>)?.path as string) ??
-                  ((
-                    (params as Record<string, unknown>)?.inputs as Array<Record<string, unknown>>
-                  )?.[0]?.path as string) ??
-                  '';
-                return path.split('/')[2]?.replace(/'/g, '') ?? '';
-              })();
-              const deviceFeats = deviceFeaturesRef.current ?? {};
-              const expected = getDeviceExpected(deviceFeats, method, coinType, expectedResult, {
-                securityChecksDisabled: false,
-              });
-
-              const actualSuccess = sdkResult.success;
-              const passed = expected ? actualSuccess : !actualSuccess;
-              const expectedLabel = expected ? 'success' : 'failure';
-              const actualLabel = actualSuccess
-                ? 'success'
-                : `failure(${sdkResult.payload?.error ?? ''})`;
-
-              results.push({
-                title,
-                method,
-                expected: expectedLabel,
-                actual: actualLabel,
-                passed,
-                duration: Date.now() - caseStart,
-              });
-            } // end else (typeof sdkMethod !== 'function')
-          } catch (error) {
-            results.push({
-              title,
-              method,
-              passed: false,
-              error: error instanceof Error ? error.message : String(error),
-              duration: Date.now() - caseStart,
-            });
-          } finally {
-            clearPendingUiActions();
+            incrementCompletedTests();
+            notifyLiveCaseUpdate('securityCheck', 'Security Check', results);
+            await delay(SDK_CASE_DELAY_MS);
           }
-
-          incrementCompletedTests();
-          notifyLiveCaseUpdate('securityCheck', 'Security Check', results);
-          await delay(SDK_CASE_DELAY_MS);
         }
       } catch (error) {
         results.push({
@@ -2928,68 +2920,67 @@ export function useAutomationTest() {
             for (const presuppose of entry.presupposes ?? []) {
               const caseStart = Date.now();
               const caseTitle = `${chain.symbol} / ${entry.method} / ${presuppose.title}`;
-              if (filterTitles && !filterTitles.has(caseTitle)) {
-                continue;
-              }
-              setPendingUiActions('chainMethodBatch', caseTitle, [
-                ...Array<DeviceUiAction>(entry.confirmCount ?? 0).fill('confirm'),
-                ...(entry.noSlide || !entry.confirmCount ? [] : (['slide'] as DeviceUiAction[])),
-              ]);
-              try {
-                const sdkMethod = (sdk as Record<string, unknown>)[entry.method];
-                if (typeof sdkMethod !== 'function') {
-                  results.push({
-                    title: caseTitle,
-                    method: entry.method,
-                    passed: false,
-                    error: `SDK method ${entry.method} not found`,
-                    duration: Date.now() - caseStart,
-                  });
-                  incrementCompletedTests();
-                  notifyLiveCaseUpdate('chainMethodBatch', 'Chain Method Batch', results);
-                } else {
-                  const sdkResult = await (
-                    sdkMethod as (
-                      ...args: unknown[]
-                    ) => Promise<{ success: boolean; payload?: { error?: string } }>
-                  )(
-                    connectId,
-                    deviceId,
-                    withMainWalletCommonParams(presuppose.value, forceUseEmptyPassphrase)
-                  );
-
-                  if (sdkResult.success) {
-                    results.push({
-                      title: caseTitle,
-                      method: entry.method,
-                      passed: true,
-                      duration: Date.now() - caseStart,
-                    });
-                  } else {
+              if (!filterTitles || filterTitles.has(caseTitle)) {
+                setPendingUiActions('chainMethodBatch', caseTitle, [
+                  ...Array<DeviceUiAction>(entry.confirmCount ?? 0).fill('confirm'),
+                  ...(entry.noSlide || !entry.confirmCount ? [] : (['slide'] as DeviceUiAction[])),
+                ]);
+                try {
+                  const sdkMethod = (sdk as Record<string, unknown>)[entry.method];
+                  if (typeof sdkMethod !== 'function') {
                     results.push({
                       title: caseTitle,
                       method: entry.method,
                       passed: false,
-                      error: sdkResult.payload?.error ?? 'unknown error',
+                      error: `SDK method ${entry.method} not found`,
                       duration: Date.now() - caseStart,
                     });
-                  }
-                }
-              } catch (err) {
-                results.push({
-                  title: caseTitle,
-                  method: entry.method,
-                  passed: false,
-                  error: err instanceof Error ? err.message : String(err),
-                  duration: Date.now() - caseStart,
-                });
-              } finally {
-                clearPendingUiActions();
-              }
+                    incrementCompletedTests();
+                    notifyLiveCaseUpdate('chainMethodBatch', 'Chain Method Batch', results);
+                  } else {
+                    const sdkResult = await (
+                      sdkMethod as (
+                        ...args: unknown[]
+                      ) => Promise<{ success: boolean; payload?: { error?: string } }>
+                    )(
+                      connectId,
+                      deviceId,
+                      withMainWalletCommonParams(presuppose.value, forceUseEmptyPassphrase)
+                    );
 
-              incrementCompletedTests();
-              notifyLiveCaseUpdate('chainMethodBatch', 'Chain Method Batch', results);
-              await delay(SDK_CASE_DELAY_MS);
+                    if (sdkResult.success) {
+                      results.push({
+                        title: caseTitle,
+                        method: entry.method,
+                        passed: true,
+                        duration: Date.now() - caseStart,
+                      });
+                    } else {
+                      results.push({
+                        title: caseTitle,
+                        method: entry.method,
+                        passed: false,
+                        error: sdkResult.payload?.error ?? 'unknown error',
+                        duration: Date.now() - caseStart,
+                      });
+                    }
+                  }
+                } catch (err) {
+                  results.push({
+                    title: caseTitle,
+                    method: entry.method,
+                    passed: false,
+                    error: err instanceof Error ? err.message : String(err),
+                    duration: Date.now() - caseStart,
+                  });
+                } finally {
+                  clearPendingUiActions();
+                }
+
+                incrementCompletedTests();
+                notifyLiveCaseUpdate('chainMethodBatch', 'Chain Method Batch', results);
+                await delay(SDK_CASE_DELAY_MS);
+              }
             }
           }
         }
@@ -3052,7 +3043,11 @@ export function useAutomationTest() {
             );
           }
         } else {
-          const preparation = await prepareStandaloneMainWallet(SDK, ctx.connectId, 'SecurityCheck');
+          const preparation = await prepareStandaloneMainWallet(
+            SDK,
+            ctx.connectId,
+            'SecurityCheck'
+          );
           forceUseEmptyPassphrase = preparation.forceUseEmptyPassphrase;
 
           setPendingUiActions('deviceSettings', 'disable safety checks', ['confirm']);
@@ -3719,10 +3714,9 @@ export function useAutomationTest() {
       const totalSuites = selectedScenarios.reduce(
         (sum, scenario) =>
           sum +
-          (
-            retrySelection
-              ? Array.from(retrySelection.get(scenario.id)?.keys() || [])
-              : buildSelectedSuites(scenario, effectiveRequestedSuites)
+          (retrySelection
+            ? Array.from(retrySelection.get(scenario.id)?.keys() || [])
+            : buildSelectedSuites(scenario, effectiveRequestedSuites)
           ).length,
         0
       );
@@ -3760,12 +3754,13 @@ export function useAutomationTest() {
         }
       }
 
+      const startLogMessage = retrySelection
+        ? '=== Retry Failed Cases Started ==='
+        : '=== Automation Test Started ===';
       addLog(
-        retrySelection
-          ? '=== Retry Failed Cases Started ==='
-          : mode === 'debug'
-            ? '=== Automation Debug Test Started ==='
-            : '=== Automation Test Started ==='
+        mode === 'debug' && !retrySelection
+          ? '=== Automation Debug Test Started ==='
+          : startLogMessage
       );
       addLog(`Scenario count: ${selectedScenarios.length}`);
       if (retrySelection) {
@@ -4116,12 +4111,13 @@ export function useAutomationTest() {
         currentPassphrase: null,
       }));
 
+      const completedLogMessage = retrySelection
+        ? '=== Retry Failed Cases Completed ==='
+        : '=== Automation Test Completed ===';
       addLog(
-        retrySelection
-          ? '=== Retry Failed Cases Completed ==='
-          : mode === 'debug'
-            ? '=== Automation Debug Test Completed ==='
-            : '=== Automation Test Completed ==='
+        mode === 'debug' && !retrySelection
+          ? '=== Automation Debug Test Completed ==='
+          : completedLogMessage
       );
       addLog(`Passed scenarios: ${report.passedScenarios}/${report.totalScenarios}`);
       addLog(`Failed scenarios: ${report.failedScenarios}`);

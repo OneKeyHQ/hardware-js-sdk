@@ -148,9 +148,7 @@ export const canStartAutomationAtom = atom(get => {
   const isConnected = get(phonePilotConnectionStateAtom) === 'connected';
   const isRunning = get(isAutomationRunningAtom);
   const config = get(automationConfigAtom);
-  const scenarioDrivenIds = config.scenarioIds.filter(
-    id => id !== STANDALONE_MODULE_SCENARIO_ID
-  );
+  const scenarioDrivenIds = config.scenarioIds.filter(id => id !== STANDALONE_MODULE_SCENARIO_ID);
   const hasStandaloneSuites = config.testSuites.some(suiteType =>
     STANDALONE_TEST_SUITES.includes(suiteType)
   );
