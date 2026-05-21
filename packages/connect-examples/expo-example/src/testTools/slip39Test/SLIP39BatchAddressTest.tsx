@@ -475,7 +475,7 @@ function ExecuteView({
         const { method } = item;
         if (method === 'evmGetPublicKey' && publicKey && !publicKey.startsWith('0x')) {
           publicKey = `0x${publicKey}`;
-        } else if (method === 'suiGetPublicKey' && publicKey && !publicKey.startsWith('00')) {
+        } else if (method === 'suiGetPublicKey' && publicKey && publicKey.length === 64) {
           publicKey = `00${publicKey}`;
         }
 

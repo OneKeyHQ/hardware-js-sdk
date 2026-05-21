@@ -50,6 +50,8 @@ export class PhonePilotClient {
 
   private connectionState: ConnectionState = 'disconnected';
 
+  private armConnected = false;
+
   private onStateChange?: (state: ConnectionState) => void;
 
   private requestId = 0;
@@ -144,12 +146,14 @@ export class PhonePilotClient {
       if (!this.sessionId) {
         throw new Error('MCP connection succeeded but mcp-session-id header is missing');
       }
+      this.armConnected = false;
       await this.sendNotification('notifications/initialized', {});
 
       this.updateState('connected');
       return true;
     } catch (error) {
       this.sessionId = null;
+      this.armConnected = false;
       console.error('PhonePilot MCP connection failed:', error);
       this.updateState('error');
       return false;
@@ -174,7 +178,55 @@ export class PhonePilotClient {
       }
       this.sessionId = null;
     }
+    this.armConnected = false;
     this.updateState('disconnected');
+  }
+
+  private isArmDisconnectedError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error);
+    return message.includes('Not connected to arm controller');
+  }
+
+  private async armConnectInternal(): Promise<ArmConnectResult> {
+    const result = await this.callTool<ArmConnectResult>('arm-connect', {});
+    if (!result.success) {
+      this.armConnected = false;
+      throw new Error(result.message || 'arm-connect failed');
+    }
+    this.armConnected = true;
+    return result;
+  }
+
+  private async ensureArmConnected(forceReconnect = false): Promise<void> {
+    if (!forceReconnect && this.armConnected) {
+      return;
+    }
+
+    await this.armConnectInternal();
+  }
+
+  private async withArmConnection<T>(operation: () => Promise<T>): Promise<T> {
+    if (this.armConnected) {
+      return operation();
+    }
+
+    try {
+      const result = await operation();
+      // Operation succeeded without an explicit arm-connect call, which means
+      // the arm session is already active on the PhonePilot side.
+      this.armConnected = true;
+      return result;
+    } catch (error) {
+      if (!this.isArmDisconnectedError(error)) {
+        throw error;
+      }
+
+      this.armConnected = false;
+      await this.ensureArmConnected(true);
+      const result = await operation();
+      this.armConnected = true;
+      return result;
+    }
   }
 
   private async sendRequest<T>(
@@ -333,27 +385,35 @@ export class PhonePilotClient {
   }
 
   async armConnect(): Promise<ArmConnectResult> {
-    return this.callTool<ArmConnectResult>('arm-connect', {});
+    return this.armConnectInternal();
   }
 
   async armDisconnect(): Promise<ArmDisconnectResult> {
-    return this.callTool<ArmDisconnectResult>('arm-disconnect', {});
+    try {
+      return await this.callTool<ArmDisconnectResult>('arm-disconnect', {});
+    } finally {
+      this.armConnected = false;
+    }
   }
 
   async armMove(x: number, y: number, captureFrame = false): Promise<ArmMoveResult> {
-    const { result, frame } = await this.callToolWithImage<ArmMoveResult>('arm-move', {
-      x,
-      y,
-      captureFrame,
-    });
+    const { result, frame } = await this.withArmConnection(() =>
+      this.callToolWithImage<ArmMoveResult>('arm-move', {
+        x,
+        y,
+        captureFrame,
+      })
+    );
     return { ...result, frame };
   }
 
   async armClick(depth = 12, captureFrame = false): Promise<ArmClickResult> {
-    const { result, frame } = await this.callToolWithImage<ArmClickResult>('arm-click', {
-      depth,
-      captureFrame,
-    });
+    const { result, frame } = await this.withArmConnection(() =>
+      this.callToolWithImage<ArmClickResult>('arm-click', {
+        depth,
+        captureFrame,
+      })
+    );
     return { ...result, frame };
   }
 
@@ -368,27 +428,32 @@ export class PhonePilotClient {
   }
 
   async confirmAction(): Promise<ActionResult> {
-    return this.callTool<ActionResult>('confirm-action', { action: 'confirm' });
+    return this.withArmConnection(() =>
+      this.callTool<ActionResult>('confirm-action', { action: 'confirm' })
+    );
   }
 
   async cancelAction(): Promise<ActionResult> {
-    return this.callTool<ActionResult>('confirm-action', { action: 'cancel' });
+    return this.withArmConnection(() =>
+      this.callTool<ActionResult>('confirm-action', { action: 'cancel' })
+    );
   }
 
   async slideConfirm(): Promise<ActionResult> {
-    return this.callTool<ActionResult>('confirm-action', { action: 'slide' });
+    return this.withArmConnection(() =>
+      this.callTool<ActionResult>('confirm-action', { action: 'slide' })
+    );
   }
 
   async executeActionSequence(
     steps: Array<'confirm' | 'cancel' | 'slide'>,
     options?: { startDelayMs?: number; betweenStepsDelayMs?: number; returnFrame?: boolean }
   ): Promise<ActionSequenceResult> {
-    const { result, frame } = await this.callToolWithImage<ActionSequenceResult>(
-      'confirm-action-sequence',
-      {
+    const { result, frame } = await this.withArmConnection(() =>
+      this.callToolWithImage<ActionSequenceResult>('confirm-action-sequence', {
         steps,
         ...options,
-      }
+      })
     );
     return { ...result, frame };
   }
@@ -401,22 +466,23 @@ export class PhonePilotClient {
     betweenStepsDelayMs?: number;
     returnFrame?: boolean;
   }): Promise<AutomationPresetExecutionResult> {
-    const { result, frame } = await this.callToolWithImage<AutomationPresetExecutionResult>(
-      'execute-automation-preset',
-      input
+    const { result, frame } = await this.withArmConnection(() =>
+      this.callToolWithImage<AutomationPresetExecutionResult>('execute-automation-preset', input)
     );
     return { ...result, frame };
   }
 
   async inputPin(pin: string): Promise<ActionResult> {
-    return this.callTool<ActionResult>('input-pin', { pin });
+    return this.withArmConnection(() => this.callTool<ActionResult>('input-pin', { pin }));
   }
 
   async executeSequence(sequenceId: string): Promise<ExecuteSequenceResult> {
-    const { result, frame } = await this.callToolWithImage<ExecuteSequenceResult>(
-      'execute-sequence',
-      { sequenceId },
-      LONG_TIMEOUT_MS
+    const { result, frame } = await this.withArmConnection(() =>
+      this.callToolWithImage<ExecuteSequenceResult>(
+        'execute-sequence',
+        { sequenceId },
+        LONG_TIMEOUT_MS
+      )
     );
     return {
       ...result,
