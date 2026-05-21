@@ -3268,55 +3268,65 @@ export function useAutomationTest() {
       retrySelection?: RetryCaseSelection
     ): Promise<TestSuiteResult[]> => {
       const nextSuiteResults = [...suiteResults];
+      const runSdkBatchSuite = async (
+        suiteType: Extract<TestSuiteType, 'sdkAddressBatch' | 'sdkPubkeyBatch'>
+      ) => {
+        const retrySuiteFilter = getRetrySuiteFilter(retrySelection, scenario.id, suiteType);
+
+        if (scenario.walletType === 'bip39') {
+          if (scenario.flowType === 'import') {
+            return runBip39ImportSdkSuite(
+              suiteType,
+              scenario,
+              sdk,
+              connectId,
+              deviceId,
+              config.passphraseVariants,
+              retrySuiteFilter
+            );
+          }
+
+          return runBip39CreateDynamicSuite(
+            suiteType,
+            scenario,
+            sdk,
+            connectId,
+            deviceId,
+            config.passphraseVariants,
+            mnemonicStoreResult,
+            retrySuiteFilter
+          );
+        }
+
+        if (scenario.flowType === 'create') {
+          return runSlip39CreateDynamicSuite(
+            suiteType,
+            scenario,
+            sdk,
+            connectId,
+            deviceId,
+            config.passphraseVariants,
+            mnemonicStoreResult,
+            retrySuiteFilter
+          );
+        }
+
+        return runSlip39SdkSuite(
+          suiteType,
+          scenario,
+          sdk,
+          connectId,
+          deviceId,
+          config.passphraseVariants,
+          retrySuiteFilter
+        );
+      };
 
       if (
         selectedSuites.includes('sdkAddressBatch') &&
         !shouldStopBySuiteFailure(config.stopOnFirstError, nextSuiteResults)
       ) {
-        const bip39AddressResult =
-          scenario.flowType === 'import'
-            ? await runBip39ImportSdkSuite(
-                'sdkAddressBatch',
-                scenario,
-                sdk,
-                connectId,
-                deviceId,
-                config.passphraseVariants,
-                getRetrySuiteFilter(retrySelection, scenario.id, 'sdkAddressBatch')
-              )
-            : await runBip39CreateDynamicSuite(
-                'sdkAddressBatch',
-                scenario,
-                sdk,
-                connectId,
-                deviceId,
-                config.passphraseVariants,
-                mnemonicStoreResult,
-                getRetrySuiteFilter(retrySelection, scenario.id, 'sdkAddressBatch')
-              );
-        const slip39AddressResult =
-          scenario.flowType === 'create'
-            ? await runSlip39CreateDynamicSuite(
-                'sdkAddressBatch',
-                scenario,
-                sdk,
-                connectId,
-                deviceId,
-                config.passphraseVariants,
-                mnemonicStoreResult,
-                getRetrySuiteFilter(retrySelection, scenario.id, 'sdkAddressBatch')
-              )
-            : await runSlip39SdkSuite(
-                'sdkAddressBatch',
-                scenario,
-                sdk,
-                connectId,
-                deviceId,
-                config.passphraseVariants,
-                getRetrySuiteFilter(retrySelection, scenario.id, 'sdkAddressBatch')
-              );
-        const sdkAddressResult =
-          scenario.walletType === 'bip39' ? bip39AddressResult : slip39AddressResult;
+        const sdkAddressResult = await runSdkBatchSuite('sdkAddressBatch');
         nextSuiteResults.push(sdkAddressResult);
         if (liveScenarioCtxRef.current) {
           liveScenarioCtxRef.current.completedSuiteResults = [...nextSuiteResults];
@@ -3328,50 +3338,7 @@ export function useAutomationTest() {
         selectedSuites.includes('sdkPubkeyBatch') &&
         !shouldStopBySuiteFailure(config.stopOnFirstError, nextSuiteResults)
       ) {
-        const bip39PubkeyResult =
-          scenario.flowType === 'import'
-            ? await runBip39ImportSdkSuite(
-                'sdkPubkeyBatch',
-                scenario,
-                sdk,
-                connectId,
-                deviceId,
-                config.passphraseVariants,
-                getRetrySuiteFilter(retrySelection, scenario.id, 'sdkPubkeyBatch')
-              )
-            : await runBip39CreateDynamicSuite(
-                'sdkPubkeyBatch',
-                scenario,
-                sdk,
-                connectId,
-                deviceId,
-                config.passphraseVariants,
-                mnemonicStoreResult,
-                getRetrySuiteFilter(retrySelection, scenario.id, 'sdkPubkeyBatch')
-              );
-        const slip39PubkeyResult =
-          scenario.flowType === 'create'
-            ? await runSlip39CreateDynamicSuite(
-                'sdkPubkeyBatch',
-                scenario,
-                sdk,
-                connectId,
-                deviceId,
-                config.passphraseVariants,
-                mnemonicStoreResult,
-                getRetrySuiteFilter(retrySelection, scenario.id, 'sdkPubkeyBatch')
-              )
-            : await runSlip39SdkSuite(
-                'sdkPubkeyBatch',
-                scenario,
-                sdk,
-                connectId,
-                deviceId,
-                config.passphraseVariants,
-                getRetrySuiteFilter(retrySelection, scenario.id, 'sdkPubkeyBatch')
-              );
-        const sdkPubkeyResult =
-          scenario.walletType === 'bip39' ? bip39PubkeyResult : slip39PubkeyResult;
+        const sdkPubkeyResult = await runSdkBatchSuite('sdkPubkeyBatch');
         nextSuiteResults.push(sdkPubkeyResult);
         if (liveScenarioCtxRef.current) {
           liveScenarioCtxRef.current.completedSuiteResults = [...nextSuiteResults];
