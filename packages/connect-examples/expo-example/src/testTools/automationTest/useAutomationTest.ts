@@ -51,6 +51,7 @@ import {
   type HealthCheckResponse,
   type MnemonicStoreResult,
   type PassphraseVariantId,
+  STANDALONE_MODULE_SCENARIO_ID,
   STANDALONE_TEST_SUITES,
   type ScenarioReportResult,
   type TestCaseResult,
@@ -106,7 +107,6 @@ const SLIP39_CREATE_ALLOWED_VARIANTS: PassphraseVariantId[] = ['normal', 'passph
 const RESET_SEQUENCE_LOCKED = 'reset-wallet-locked';
 const RESET_SEQUENCE_UNLOCKED = 'reset-wallet-unlocked';
 const DEBUG_SKIP_DEVICE_FLOW_REASON = 'debug mode skipped device flow';
-const STANDALONE_MODULE_SCENARIO_ID = 'bip39_import_12_api';
 
 /**
  * Timing constants — aligned with SLIP39 standalone test timings.
@@ -591,9 +591,11 @@ function buildEffectiveSelectedScenarios(
 ): AutomationScenario[] {
   const scenarioMap = new Map<AutomationScenario['id'], AutomationScenario>();
 
-  scenarioIds.forEach(id => {
-    scenarioMap.set(id, getAutomationScenario(id));
-  });
+  scenarioIds
+    .filter(id => id !== STANDALONE_MODULE_SCENARIO_ID)
+    .forEach(id => {
+      scenarioMap.set(id, getAutomationScenario(id));
+    });
 
   if (hasStandaloneSuiteSelection(selectedSuites)) {
     scenarioMap.set(
@@ -4255,7 +4257,9 @@ export function useAutomationTest() {
     connectionState,
     progress,
     logs,
-    scenarios: getAllAutomationScenarios(),
+    scenarios: getAllAutomationScenarios().filter(
+      scenario => scenario.id !== STANDALONE_MODULE_SCENARIO_ID
+    ),
     connectPhonePilot,
     disconnectPhonePilot,
     startAutomation,

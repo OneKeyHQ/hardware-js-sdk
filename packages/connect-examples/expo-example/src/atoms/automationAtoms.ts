@@ -5,7 +5,10 @@
 import { atom } from 'jotai';
 import { atomWithStorage } from 'jotai/utils';
 
-import { STANDALONE_TEST_SUITES } from '../services/phonePilotMcp/types';
+import {
+  STANDALONE_MODULE_SCENARIO_ID,
+  STANDALONE_TEST_SUITES,
+} from '../services/phonePilotMcp/types';
 
 import type {
   AutomationTestConfig,
@@ -145,11 +148,14 @@ export const canStartAutomationAtom = atom(get => {
   const isConnected = get(phonePilotConnectionStateAtom) === 'connected';
   const isRunning = get(isAutomationRunningAtom);
   const config = get(automationConfigAtom);
+  const scenarioDrivenIds = config.scenarioIds.filter(
+    id => id !== STANDALONE_MODULE_SCENARIO_ID
+  );
   const hasStandaloneSuites = config.testSuites.some(suiteType =>
     STANDALONE_TEST_SUITES.includes(suiteType)
   );
   const hasRunnableScenarioModule =
-    config.scenarioIds.length > 0 &&
+    scenarioDrivenIds.length > 0 &&
     (config.devicePreparationMode === 'deviceFlowOnly' || config.testSuites.length > 0);
   const hasRunnableStandaloneModule =
     config.devicePreparationMode !== 'deviceFlowOnly' && hasStandaloneSuites;
