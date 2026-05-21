@@ -21,6 +21,10 @@ import { Device } from '../src/device/Device';
 import { UI_REQUEST } from '../src/events/ui-request';
 import { getProtocolV2Features, normalizeProtocolV2Features } from '../src/protocols/protocol-v2';
 import { shouldSkipMethodSupportCheck } from '../src/utils';
+import {
+  getPassphraseState,
+  getPassphraseStateWithRefreshDeviceInfo,
+} from '../src/utils/deviceFeaturesUtils';
 
 import type { DeviceCommands } from '../src/device/DeviceCommands';
 
@@ -117,6 +121,113 @@ describe('Protocol V2 feature adapter', () => {
     expect(features.ble_enable).toBe(true);
   });
 
+  test('uses GetPassphraseState payloads compatible with Pro1 passphrase flow', async () => {
+    const features = normalizeProtocolV2Features(descriptor as any);
+    const typedCall = jest.fn().mockResolvedValue({
+      type: 'PassphraseState',
+      message: {
+        passphrase_state: 'state-1',
+        session_id: 'session-1',
+        unlocked_attach_pin: false,
+      },
+    });
+    const commands = { typedCall } as unknown as DeviceCommands;
+
+    await getPassphraseState(features, commands, {
+      expectPassphraseState: 'state-1',
+    });
+    expect(typedCall).toHaveBeenLastCalledWith('GetPassphraseState', 'PassphraseState', {
+      passphrase_state: 'state-1',
+    });
+
+    await getPassphraseState(features, commands, {
+      expectPassphraseState: 'state-2',
+      allowCreateAttachPin: true,
+    });
+    expect(typedCall).toHaveBeenLastCalledWith('GetPassphraseState', 'PassphraseState', {
+      passphrase_state: 'state-2',
+      allow_create_attach_pin: true,
+    });
+
+    await getPassphraseState(features, commands, {
+      onlyMainPin: true,
+    });
+    expect(typedCall).toHaveBeenLastCalledWith('GetPassphraseState', 'PassphraseState', {
+      _only_main_pin: true,
+    });
+  });
+
+  test('stores Pro2 passphrase sessions without selecting them implicitly', async () => {
+    const device = Device.fromDescriptor({ ...descriptor, protocolType: 'V2' } as any);
+    const typedCall = jest.fn().mockResolvedValue({
+      type: 'PassphraseState',
+      message: {
+        passphrase_state: 'state-auto',
+        session_id: 'session-auto',
+        unlocked_attach_pin: false,
+      },
+    });
+
+    (device as any).features = normalizeProtocolV2Features({
+      ...descriptor,
+      protocolType: 'V2',
+    } as any);
+    (device as any).commands = { typedCall };
+
+    await expect(getPassphraseStateWithRefreshDeviceInfo(device)).resolves.toMatchObject({
+      passphraseState: 'state-auto',
+      newSession: 'session-auto',
+    });
+
+    expect(device.passphraseState).toBeUndefined();
+    expect(device.features?.passphrase_protection).toBe(true);
+    expect(device.features?.session_id).toBe('session-auto');
+    expect(device.getInternalState()).toBeUndefined();
+    device.passphraseState = 'state-auto';
+    expect(device.getInternalState()).toBe('session-auto');
+    expect(typedCall).toHaveBeenLastCalledWith('GetPassphraseState', 'PassphraseState', {
+      passphrase_state: undefined,
+    });
+  });
+
+  test('does not mark Pro2 passphrase enabled from a main PIN session alone', async () => {
+    const device = Device.fromDescriptor({ ...descriptor, protocolType: 'V2' } as any);
+    const typedCall = jest.fn().mockResolvedValue({
+      type: 'PassphraseState',
+      message: {
+        session_id: 'main-pin-session',
+        unlocked_attach_pin: false,
+      },
+    });
+
+    (device as any).features = normalizeProtocolV2Features(
+      {
+        ...descriptor,
+        protocolType: 'V2',
+      } as any,
+      {
+        status: {
+          passphrase_protection: false,
+        },
+      }
+    );
+    (device as any).commands = { typedCall };
+
+    await expect(
+      getPassphraseStateWithRefreshDeviceInfo(device, { onlyMainPin: true })
+    ).resolves.toMatchObject({
+      passphraseState: undefined,
+      newSession: 'main-pin-session',
+    });
+
+    expect(device.features?.passphrase_protection).toBe(false);
+    expect(device.features?.session_id).toBe('main-pin-session');
+    expect(device.getInternalState()).toBeUndefined();
+    expect(typedCall).toHaveBeenLastCalledWith('GetPassphraseState', 'PassphraseState', {
+      _only_main_pin: true,
+    });
+  });
+
   test('marks fallback features as unavailable when DeviceInfo is missing', () => {
     const features = normalizeProtocolV2Features(descriptor as any);
 
@@ -138,11 +249,21 @@ describe('Protocol V2 feature adapter', () => {
     expect(shouldSkipMethodSupportCheck(features)).toBe(true);
   });
 
-  test('initializes Protocol V2 features with Ping only while DeviceGetDeviceInfo is disabled', async () => {
+  test('initializes Protocol V2 features from DeviceGetDeviceInfo after Ping', async () => {
     const commands = {
       typedCall: jest
         .fn()
-        .mockResolvedValueOnce({ type: 'Success', message: { message: 'pong' } }),
+        .mockResolvedValueOnce({ type: 'Success', message: { message: 'pong' } })
+        .mockResolvedValueOnce({
+          type: 'DeviceInfo',
+          message: {
+            hw: { serial_no: 'PR2SERIAL' },
+            status: {
+              init_states: true,
+              passphrase_protection: true,
+            },
+          },
+        }),
     };
 
     const features = await getProtocolV2Features({
@@ -150,9 +271,39 @@ describe('Protocol V2 feature adapter', () => {
       descriptor: descriptor as any,
     });
 
-    expect(features.device_id).toBe('usb-path');
+    expect(features.device_id).toBe('PR2SERIAL');
+    expect(features.initialized).toBe(true);
+    expect(features.passphrase_protection).toBe(true);
     expect(commands.typedCall).toHaveBeenNthCalledWith(1, 'Ping', 'Success', { message: 'init' });
-    expect(commands.typedCall).toHaveBeenCalledTimes(1);
+    expect(commands.typedCall).toHaveBeenNthCalledWith(
+      2,
+      'DeviceGetDeviceInfo',
+      'DeviceInfo',
+      {
+        targets: expect.objectContaining({ status: true }),
+        types: expect.objectContaining({ specific: true }),
+      }
+    );
+  });
+
+  test('falls back to descriptor features when Protocol V2 DeviceGetDeviceInfo fails', async () => {
+    const onDeviceInfoError = jest.fn();
+    const commands = {
+      typedCall: jest
+        .fn()
+        .mockResolvedValueOnce({ type: 'Success', message: { message: 'pong' } })
+        .mockRejectedValueOnce(new Error('DeviceInfo not supported')),
+    };
+
+    const features = await getProtocolV2Features({
+      commands: commands as unknown as DeviceCommands,
+      descriptor: descriptor as any,
+      onDeviceInfoError,
+    });
+
+    expect(features.device_id).toBe('usb-path');
+    expect(features.passphrase_protection).toBeNull();
+    expect(onDeviceInfoError).toHaveBeenCalledWith(expect.any(Error));
   });
 
   test('does not block method-level legacy version checks on Protocol V2', async () => {
@@ -259,20 +410,42 @@ describe('Protocol V2 feature adapter', () => {
     } as any);
     const typedCall = jest
       .fn()
-      .mockResolvedValueOnce({ type: 'Success', message: { message: 'init' } });
+      .mockResolvedValueOnce({ type: 'Success', message: { message: 'init' } })
+      .mockResolvedValueOnce({
+        type: 'DeviceInfo',
+        message: {
+          hw: { serial_no: 'PR2SERIAL' },
+          status: {
+            passphrase_protection: true,
+          },
+        },
+      });
 
     (device as any).commands = { typedCall };
 
     await device.initialize();
     await device.initialize();
 
-    expect(device.features?.device_id).toBe('usb-path');
-    expect(typedCall).toHaveBeenCalledTimes(1);
+    expect(device.features?.device_id).toBe('PR2SERIAL');
+    expect(device.features?.passphrase_protection).toBe(true);
+    expect(typedCall).toHaveBeenCalledTimes(2);
     expect(typedCall).toHaveBeenNthCalledWith(
       1,
       'Ping',
       'Success',
       { message: 'init' },
+      {
+        timeoutMs: 10000,
+      }
+    );
+    expect(typedCall).toHaveBeenNthCalledWith(
+      2,
+      'DeviceGetDeviceInfo',
+      'DeviceInfo',
+      {
+        targets: expect.objectContaining({ status: true }),
+        types: expect.objectContaining({ specific: true }),
+      },
       {
         timeoutMs: 10000,
       }
@@ -428,6 +601,9 @@ describe('Protocol V2 firmware update targets', () => {
       if (name === 'Ping') {
         return Promise.resolve({ type: 'Success', message: { message: 'init' } });
       }
+      if (name === 'DeviceGetDeviceInfo') {
+        return Promise.resolve({ type: 'DeviceInfo', message: {} });
+      }
       return Promise.reject(new Error(`unexpected call ${name}`));
     });
     const commands = { typedCall };
@@ -450,7 +626,17 @@ describe('Protocol V2 firmware update targets', () => {
       { message: 'init' },
       { timeoutMs: 5000 }
     );
-    expect(typedCall).toHaveBeenCalledTimes(1);
+    expect(typedCall).toHaveBeenNthCalledWith(
+      2,
+      'DeviceGetDeviceInfo',
+      'DeviceInfo',
+      {
+        targets: expect.objectContaining({ status: true }),
+        types: expect.objectContaining({ specific: true }),
+      },
+      { timeoutMs: 5000 }
+    );
+    expect(typedCall).toHaveBeenCalledTimes(2);
     expect(typedCall).not.toHaveBeenCalledWith('Initialize', 'Features', {});
     expect(versions).toEqual({
       bootloaderVersion: '0.0.0',
@@ -858,7 +1044,11 @@ describe('Protocol V2 onboarding status method', () => {
       page_count: 5,
       page_name: 'backup',
     });
-    expect(typedCall).toHaveBeenCalledWith('DeviceGetOnboardingStatus', 'DeviceOnboardingStatus', {});
+    expect(typedCall).toHaveBeenCalledWith(
+      'DeviceGetOnboardingStatus',
+      'DeviceOnboardingStatus',
+      {}
+    );
   });
 });
 

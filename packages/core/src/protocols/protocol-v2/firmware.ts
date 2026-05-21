@@ -1,5 +1,5 @@
 /**
- * Protocol V2 DeviceFirmwareTargetType enum (from messages-pro2.json).
+ * Protocol V2 DeviceFirmwareTargetType enum (from messages-protocol-v2.json).
  */
 export const ProtocolV2FirmwareTargetType = {
   TARGET_INVALID: 0,

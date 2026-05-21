@@ -28,7 +28,7 @@ const PROTOCOL_V2_PROBE_TIMEOUT_MS = 5000;
 const LOWLEVEL_PROTOCOL_TIMEOUT_MS = 30_000;
 const LOWLEVEL_PROTOCOL_V2_PACKET_LENGTH = 64;
 
-function inferProtocolTypeFromDeviceName(name?: string | null): ProtocolType | undefined {
+function inferProtocolHintFromDeviceName(name?: string | null): ProtocolType | undefined {
   return /\bpro\s*2\b/i.test(name ?? '') ? 'V2' : undefined;
 }
 
@@ -54,6 +54,8 @@ export default class LowlevelTransport {
   plugin: LowlevelTransportSharedPlugin = {} as LowlevelTransportSharedPlugin;
 
   private deviceProtocol: Map<string, ProtocolType> = new Map();
+
+  private deviceProtocolHints: Map<string, ProtocolType> = new Map();
 
   private protocolV2Assemblers: Map<string, ProtocolV2FrameAssembler> = new Map();
 
@@ -85,14 +87,11 @@ export default class LowlevelTransport {
   async enumerate() {
     const devices = await this.plugin.enumerate();
     return devices.map((device: LowLevelDevice) => {
-      const protocolType = inferProtocolTypeFromDeviceName(device.name);
-      if (protocolType) {
-        this.deviceProtocol.set(device.id, protocolType);
+      const protocolHint = inferProtocolHintFromDeviceName(device.name);
+      if (protocolHint) {
+        this.deviceProtocolHints.set(device.id, protocolHint);
       }
-      return {
-        ...device,
-        ...(protocolType ? { protocolType } : {}),
-      };
+      return device;
     });
   }
 
@@ -108,8 +107,14 @@ export default class LowlevelTransport {
     }
 
     this.protocolV2Assemblers.set(input.uuid, new ProtocolV2FrameAssembler());
-    const expectedProtocol = input.expectedProtocol ?? this.deviceProtocol.get(input.uuid);
-    const protocolType = await this.detectProtocol(input.uuid, expectedProtocol);
+    const protocolHint = input.expectedProtocol
+      ? undefined
+      : this.deviceProtocolHints.get(input.uuid);
+    const protocolType = await this.detectProtocol(
+      input.uuid,
+      input.expectedProtocol,
+      protocolHint
+    );
     return { uuid: input.uuid, protocolType };
   }
 
@@ -117,6 +122,7 @@ export default class LowlevelTransport {
     try {
       await this.plugin.disconnect(uuid);
       this.deviceProtocol.delete(uuid);
+      this.deviceProtocolHints.delete(uuid);
       this.protocolV2Assemblers.delete(uuid);
       return true;
     } catch (error) {
@@ -213,7 +219,8 @@ export default class LowlevelTransport {
 
   private async detectProtocol(
     uuid: string,
-    expectedProtocol?: ProtocolType
+    expectedProtocol?: ProtocolType,
+    protocolHint?: ProtocolType
   ): Promise<ProtocolType> {
     if (expectedProtocol === 'V2') {
       if (await this.probeProtocolV2(uuid)) {
@@ -231,6 +238,12 @@ export default class LowlevelTransport {
         return 'V1';
       }
       throw this.createProtocolMismatchError(expectedProtocol);
+    }
+
+    if (protocolHint === 'V2' && (await this.probeProtocolV2(uuid))) {
+      this.deviceProtocol.set(uuid, 'V2');
+      this.Log?.debug(`[LowlevelTransport] detectProtocol: uuid=${uuid} -> V2 (hint)`);
+      return 'V2';
     }
 
     const cachedProtocol = this.deviceProtocol.get(uuid);

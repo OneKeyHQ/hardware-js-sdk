@@ -89,7 +89,7 @@ fi
 
 
 # ============================================================
-# BUILD Pro2 messages-pro2.json
+# BUILD Protocol V2 messages-protocol-v2.json
 # ============================================================
 # Preferred source: submodules/firmware-pro2/sys/protobuf/onekey_protocol/latest/
 # Fallback source: submodules/firmware-pro2/sys/protobuf/onekey_protocol/legacy/
@@ -115,8 +115,8 @@ SRC_PRO2_LEGACY="$REPO_ROOT/submodules/firmware-pro2/sys/protobuf/onekey_protoco
 SRC_PRO2_LATEST="$REPO_ROOT/submodules/firmware-pro2/sys/protobuf/onekey_protocol/latest"
 
 if [ -d "$SRC_PRO2_LATEST" ] && ls "$SRC_PRO2_LATEST"/messages*.proto 1>/dev/null 2>&1; then
-    echo "=== Building Pro2 messages from firmware-pro2 legacy + latest protobuf schema ==="
-    TMP_PROTO="$PARENT_PATH/messages-pro2-tmp.proto"
+    echo "=== Building Protocol V2 messages from firmware-pro2 legacy + latest protobuf schema ==="
+    TMP_PROTO="$PARENT_PATH/messages-protocol-v2-tmp.proto"
 
     {
         echo 'syntax = "proto2";'
@@ -179,23 +179,23 @@ NODE
 
     npx pbjs -t json \
         -p "$PARENT_PATH" \
-        -o "$PARENT_PATH/../messages-pro2.json" \
+        -o "$PARENT_PATH/../messages-protocol-v2.json" \
         --keep-case \
         "$(basename "$TMP_PROTO")"
 
     rm -f "$TMP_PROTO"
 
-    cp "$PARENT_PATH/../messages-pro2.json" "$CORE_MESSAGES_DIR/messages-pro2.json"
-    echo "Pro2 messages-pro2.json generated from firmware-pro2 legacy + latest schema and copied to core"
+    cp "$PARENT_PATH/../messages-protocol-v2.json" "$CORE_MESSAGES_DIR/messages-protocol-v2.json"
+    echo "Protocol V2 messages-protocol-v2.json generated from firmware-pro2 legacy + latest schema and copied to core"
 
-    yarn prettier --write "$PARENT_PATH/../messages-pro2.json"
-    yarn prettier --write "$CORE_MESSAGES_DIR/messages-pro2.json"
+    yarn prettier --write "$PARENT_PATH/../messages-protocol-v2.json"
+    yarn prettier --write "$CORE_MESSAGES_DIR/messages-protocol-v2.json"
     node ./protobuf-types.js $LANG
     yarn --cwd "$PACKAGE_ROOT" prettier --write "$PACKAGE_ROOT/src/types/messages.ts"
-    echo "=== Pro2 messages build complete ==="
+    echo "=== Protocol V2 messages build complete ==="
 elif [ -d "$SRC_PRO2_LEGACY" ] && ls "$SRC_PRO2_LEGACY"/messages*.proto 1>/dev/null 2>&1; then
-    echo "=== Building Pro2 messages from firmware-pro2 submodule ==="
-    TMP_PROTO="$PARENT_PATH/messages-pro2-tmp.proto"
+    echo "=== Building Protocol V2 messages from firmware-pro2 submodule ==="
+    TMP_PROTO="$PARENT_PATH/messages-protocol-v2-tmp.proto"
 
     # ----------------------------------------------------------------
     # Step 1: extract Ping/Success/Failure from messages_management.proto
@@ -369,21 +369,21 @@ ENUM_EOF
     # ----------------------------------------------------------------
     npx pbjs -t json \
         -p "$PARENT_PATH" \
-        -o "$PARENT_PATH/../messages-pro2.json" \
+        -o "$PARENT_PATH/../messages-protocol-v2.json" \
         --keep-case \
         "$(basename "$TMP_PROTO")"
 
     rm -f "$TMP_PROTO"
 
     # Copy to core package
-    cp "$PARENT_PATH/../messages-pro2.json" "$CORE_MESSAGES_DIR/messages-pro2.json"
-    echo "Pro2 messages-pro2.json generated from firmware-pro2 submodule and copied to core"
+    cp "$PARENT_PATH/../messages-protocol-v2.json" "$CORE_MESSAGES_DIR/messages-protocol-v2.json"
+    echo "Protocol V2 messages-protocol-v2.json generated from firmware-pro2 submodule and copied to core"
 
-    yarn prettier --write "$PARENT_PATH/../messages-pro2.json"
-    yarn prettier --write "$CORE_MESSAGES_DIR/messages-pro2.json"
+    yarn prettier --write "$PARENT_PATH/../messages-protocol-v2.json"
+    yarn prettier --write "$CORE_MESSAGES_DIR/messages-protocol-v2.json"
     node ./protobuf-types.js $LANG
     yarn --cwd "$PACKAGE_ROOT" prettier --write "$PACKAGE_ROOT/src/types/messages.ts"
-    echo "=== Pro2 messages build complete ==="
+    echo "=== Protocol V2 messages build complete ==="
 else
     echo "⚠️  firmware-pro2 submodule not found at $SRC_PRO2_LEGACY"
     echo "    Skipping Pro2 protobuf build. To enable:"

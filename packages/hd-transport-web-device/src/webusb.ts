@@ -45,6 +45,10 @@ function shouldBlockWebUsbCallDataLog(name: string) {
   return LogBlockCommand.has(name) || WEBUSB_FILE_WRITE_LOG_BLOCK_PATTERN.test(normalized);
 }
 
+function inferProtocolHintFromDeviceName(name?: string | null): ProtocolType | undefined {
+  return /\bpro\s*2\b/i.test(name ?? '') ? 'V2' : undefined;
+}
+
 /**
  * Device information with path and WebUSB device instance
  */
@@ -73,6 +77,8 @@ export default class WebUsbTransport {
 
   /** Per-path protocol type detected by active wire-level probe. */
   private deviceProtocol: Map<string, ProtocolType> = new Map();
+
+  private deviceProtocolHints: Map<string, ProtocolType> = new Map();
 
   /** 按设备缓存 Protocol V2 frame assembler，保留同一次读取里多出来的后续 frame。 */
   private protocolV2Assemblers: Map<string, ProtocolV2FrameAssembler> = new Map();
@@ -179,11 +185,19 @@ export default class WebUsbTransport {
       return isOneKey && hasSerialNumber;
     });
 
-    this.deviceList = onekeyDevices.map(device => ({
-      path: device.serialNumber as string,
-      device,
-      commType: 'webusb',
-    }));
+    this.deviceList = onekeyDevices.map(device => {
+      const path = device.serialNumber as string;
+      const protocolHint = inferProtocolHintFromDeviceName(device.productName);
+      if (protocolHint) {
+        this.deviceProtocolHints.set(path, protocolHint);
+      }
+
+      return {
+        path,
+        device,
+        commType: 'webusb',
+      };
+    });
 
     // Debug: log all discovered devices. Protocol is detected after acquire via wire probe.
     for (const dev of onekeyDevices) {
@@ -203,7 +217,15 @@ export default class WebUsbTransport {
     if (!input.path) return;
     try {
       await this.connect(input.path ?? '', true);
-      await this.detectProtocol(input.path, input.expectedProtocol);
+      const deviceName = this.deviceList.find(device => device.path === input.path)?.device
+        .productName;
+      const protocolHint = input.expectedProtocol
+        ? undefined
+        : this.deviceProtocolHints.get(input.path) ?? inferProtocolHintFromDeviceName(deviceName);
+      if (protocolHint) {
+        this.deviceProtocolHints.set(input.path, protocolHint);
+      }
+      await this.detectProtocol(input.path, input.expectedProtocol, protocolHint);
       return await Promise.resolve(input.path);
     } catch (e) {
       this.Log.debug('acquire error: ', e instanceof Error ? `${e.name}: ${e.message}` : String(e));
@@ -225,7 +247,8 @@ export default class WebUsbTransport {
 
   private async detectProtocol(
     path: string,
-    expectedProtocol?: ProtocolType
+    expectedProtocol?: ProtocolType,
+    protocolHint?: ProtocolType
   ): Promise<ProtocolType> {
     if (expectedProtocol === 'V1') {
       if (await this.probeProtocolV1(path)) {
@@ -243,6 +266,12 @@ export default class WebUsbTransport {
         return 'V2';
       }
       throw this.createProtocolMismatchError(expectedProtocol);
+    }
+
+    if (protocolHint === 'V2' && (await this.probeProtocolV2(path))) {
+      this.deviceProtocol.set(path, 'V2');
+      this.Log.debug(`[WebUsbTransport] detectProtocol: path=${path} -> V2 (hint)`);
+      return 'V2';
     }
 
     if (this.deviceProtocol.get(path) === 'V2' && (await this.probeProtocolV2(path))) {
@@ -689,8 +718,8 @@ export default class WebUsbTransport {
   /**
    * Send/receive a single call over Protocol V2 (0x5A framing).
    *
-   * Encoding:  protobuf message → 2-byte LE msgType + pb bytes → Protocol V2 frame
-   * Decoding:  Protocol V2 frame → msgType + pb bytes → protobuf message
+   * Encoding:  protobuf message → 2-byte LE messageTypeId + pb bytes → Protocol V2 frame
+   * Decoding:  Protocol V2 frame → messageTypeId + pb bytes → protobuf message
    */
   private async callProtocolV2(
     path: string,
@@ -826,6 +855,7 @@ export default class WebUsbTransport {
     await device.releaseInterface(ifaceNum);
     await device.close();
     this.deviceProtocol.delete(path);
+    this.deviceProtocolHints.delete(path);
     this.protocolV2Assemblers.get(path)?.reset();
     this.protocolV2Assemblers.delete(path);
     this.deviceEndpoints.delete(path);

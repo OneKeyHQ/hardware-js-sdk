@@ -1,7 +1,10 @@
 import semver from 'semver';
 import { isNaN } from 'lodash';
 import { EDeviceType, type EFirmwareType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import { Enum_Capability } from '@onekeyfe/hd-transport';
+import {
+  Enum_Capability,
+  type GetPassphraseState as GetPassphraseStateMessage,
+} from '@onekeyfe/hd-transport';
 
 import { toHardened } from '../api/helpers/pathUtils';
 import { DeviceModelToTypes, DeviceTypeToModels } from '../types';
@@ -23,8 +26,8 @@ export const getSupportProtocolV1MessageSchema = (
 ): { messages: JSON; protocolV1MessageSchema: ProtocolV1MessageSchema } => {
   if (!features)
     return {
-      messages: DataManager.messages.protocolV1Current,
-      protocolV1MessageSchema: 'protocolV1Current',
+      messages: DataManager.messages.v1CurrentSchema,
+      protocolV1MessageSchema: 'v1CurrentSchema',
     };
 
   const currentDeviceVersion = getDeviceFirmwareVersion(features).join('.');
@@ -50,8 +53,8 @@ export const getSupportProtocolV1MessageSchema = (
   }
 
   return {
-    messages: DataManager.messages.protocolV1Current,
-    protocolV1MessageSchema: 'protocolV1Current',
+    messages: DataManager.messages.v1CurrentSchema,
+    protocolV1MessageSchema: 'v1CurrentSchema',
   };
 };
 
@@ -89,6 +92,7 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (
   options?: {
     expectPassphraseState?: string;
     onlyMainPin?: boolean;
+    allowCreateAttachPin?: boolean;
   }
 ) => {
   const { features, commands } = device;
@@ -119,8 +123,10 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (
     await device.getFeatures();
   }
 
-  if (isPro2 && device.features && (passphraseState || newSession)) {
-    device.features.passphrase_protection = true;
+  if (isPro2 && device.features) {
+    if (passphraseState) {
+      device.features.passphrase_protection = true;
+    }
     if (newSession) {
       device.features.session_id = newSession;
     }
@@ -146,6 +152,7 @@ export const getPassphraseState = async (
   options?: {
     expectPassphraseState?: string;
     onlyMainPin?: boolean;
+    allowCreateAttachPin?: boolean;
   }
 ): Promise<{
   passphraseState: string | undefined;
@@ -169,9 +176,18 @@ export const getPassphraseState = async (
     (deviceType === EDeviceType.Pro && semver.gte(firmwareVersion.join('.'), '4.15.0'));
 
   if (supportGetPassphraseState) {
-    const { message, type } = await commands.typedCall('GetPassphraseState', 'PassphraseState', {
-      passphrase_state: options?.onlyMainPin ? undefined : options?.expectPassphraseState,
-    });
+    const payload: GetPassphraseStateMessage = options?.onlyMainPin
+      ? { _only_main_pin: true }
+      : { passphrase_state: options?.expectPassphraseState };
+    if (options?.allowCreateAttachPin) {
+      payload.allow_create_attach_pin = true;
+    }
+
+    const { message, type } = await commands.typedCall(
+      'GetPassphraseState',
+      'PassphraseState',
+      payload
+    );
 
     // @ts-expect-error
     if (type === 'CallMethodError') {

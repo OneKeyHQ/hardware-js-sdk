@@ -562,7 +562,7 @@ const onCallDevice = async (
       // Check to see if it is safe to use Passphrase
       checkPassphraseEnableState(method, device.features);
 
-      if (device.hasUsePassphrase() && method.useDevicePassphraseState) {
+      if (shouldCheckPassphraseState(method, device)) {
         // check version
         const support = supportNewPassphrase(device.features);
         if (!support.support) {
@@ -1115,8 +1115,6 @@ export const cancel = (context: CoreContext, connectId?: string) => {
 const checkPassphraseEnableState = (method: BaseMethod, features?: Features) => {
   if (!method.useDevicePassphraseState) return;
 
-  const isPro2 = getDeviceType(features) === EDeviceType.Pro2;
-
   if (features?.passphrase_protection === true) {
     const hasNoPassphraseState =
       method.payload.passphraseState == null || method.payload.passphraseState === '';
@@ -1129,10 +1127,20 @@ const checkPassphraseEnableState = (method: BaseMethod, features?: Features) => 
     }
   }
 
-  if (features?.passphrase_protection === false && method.payload.passphraseState && !isPro2) {
+  if (features?.passphrase_protection === false && method.payload.passphraseState) {
     DevicePool.clearDeviceCache(method.payload.connectId);
     throw ERRORS.TypedError(HardwareErrorCode.DeviceNotOpenedPassphrase);
   }
+};
+
+const shouldCheckPassphraseState = (method: BaseMethod, device: Device) => {
+  if (!method.useDevicePassphraseState) return false;
+
+  const isPro2 = getDeviceType(device.features) === EDeviceType.Pro2;
+  const pro2ExplicitWalletSelection =
+    isPro2 && (!!method.payload?.passphraseState || !!method.payload?.useEmptyPassphrase);
+
+  return device.hasUsePassphrase() || pro2ExplicitWalletSelection;
 };
 
 const cleanup = () => {

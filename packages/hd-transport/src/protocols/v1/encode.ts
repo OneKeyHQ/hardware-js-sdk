@@ -9,13 +9,13 @@ import {
 type Options<Chunked> = {
   chunked: Chunked;
   addTrezorHeaders: boolean;
-  messageType: number;
+  messageTypeId: number;
 };
 
 function encodeEnvelope(data: ByteBuffer, options: Options<true>): Buffer[];
 function encodeEnvelope(data: ByteBuffer, options: Options<false>): Buffer;
 function encodeEnvelope(data: any, options: any): any {
-  const { addTrezorHeaders, chunked, messageType } = options;
+  const { addTrezorHeaders, chunked, messageTypeId } = options;
   const fullSize =
     (addTrezorHeaders ? PROTOCOL_V1_ENVELOPE_HEADER_SIZE : PROTOCOL_V1_ENVELOPE_HEADER_SIZE - 2) +
     Number(data.limit);
@@ -29,7 +29,7 @@ function encodeEnvelope(data: any, options: any): any {
   }
 
   // 2 bytes
-  encodedByteBuffer.writeUint16(messageType);
+  encodedByteBuffer.writeUint16(messageTypeId);
 
   // 4 bytes (so 8 in total)
   encodedByteBuffer.writeUint32(data.limit);

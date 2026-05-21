@@ -15,7 +15,7 @@
 | message id | big-endian                      | little-endian                                        |
 | 完整性校验 | 无额外 CRC                      | header CRC8 + frame CRC8                             |
 | 初始化     | `Initialize -> Features`        | `GetProtoVersion` 探测，`Ping` 初始化                |
-| schema     | `messages.json`                 | `messages-pro2.json`，必要时可 fallback 到 V1 schema |
+| schema     | `messages.json`                 | `messages-protocol-v2.json`，必要时可 fallback 到 V1 schema |
 
 ## WebUSB 流程
 
@@ -111,7 +111,7 @@ flowchart TD
 
 ```ts
 transport.configure(messagesV1);
-transport.configureProtocolV2(messagesPro2);
+transport.configureProtocolV2(messagesProtocolV2);
 ```
 
 Protocol V2 encode/decode 的 schema 选择规则：
@@ -119,7 +119,7 @@ Protocol V2 encode/decode 的 schema 选择规则：
 | 阶段   | 规则                                                  |
 | ------ | ----------------------------------------------------- |
 | encode | 优先在 V2 schema 查找消息名；找不到则回退 V1 schema   |
-| decode | `msgType >= 60000` 使用 V2 schema，否则使用 V1 schema |
+| decode | `messageTypeId >= 60000` 使用 V2 schema，否则使用 V1 schema |
 
 这样 Protocol V2 系统消息进入 typedCall 类型面，同时不会破坏 V1 业务消息的类型。
 

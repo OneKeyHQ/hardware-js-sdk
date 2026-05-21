@@ -9,7 +9,11 @@ export type GetPassphraseStatePayload =
       passphrase_protection?: boolean | null;
     };
 
+export type GetPassphraseStateParams = CommonParams & {
+  allowCreateAttachPin?: boolean;
+};
+
 export declare function getPassphraseState(
   connectId?: string,
-  params?: CommonParams
+  params?: GetPassphraseStateParams
 ): Response<GetPassphraseStatePayload>;

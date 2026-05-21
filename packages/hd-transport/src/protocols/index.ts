@@ -31,11 +31,11 @@ const resolveProtocolV2EncodeSchema = (name: string, schemas: ProtocolV2Schemas)
   }
 };
 
-const createProtocolV2MessageFromType = (msgType: number, schemas: ProtocolV2Schemas) => {
+const createProtocolV2MessageFromType = (messageTypeId: number, schemas: ProtocolV2Schemas) => {
   try {
-    return createMessageFromType(schemas.protocolV2, msgType);
+    return createMessageFromType(schemas.protocolV2, messageTypeId);
   } catch {
-    return createMessageFromType(schemas.protocolV1, msgType);
+    return createMessageFromType(schemas.protocolV1, messageTypeId);
   }
 };
 
@@ -56,25 +56,25 @@ export const ProtocolV2 = {
     options: ProtocolV2FrameOptions = {}
   ) {
     const encodeMessages = resolveProtocolV2EncodeSchema(name, schemas);
-    const { Message, messageType } = createMessageFromName(encodeMessages, name);
+    const { Message, messageTypeId } = createMessageFromName(encodeMessages, name);
     const pbBuffer = encodeProtobuf(Message, data);
     pbBuffer.reset();
     const rawPbBuffer = pbBuffer.toBuffer() as unknown as ArrayBuffer;
     const pbBytes = new Uint8Array(rawPbBuffer);
 
-    return encodeProtobufFrame(messageType, pbBytes, options.packetSrc, options.router);
+    return encodeProtobufFrame(messageTypeId, pbBytes, options.packetSrc, options.router);
   },
 
   decodeFrame(schemas: ProtocolV2Schemas, frame: Uint8Array) {
-    const { msgType, pbPayload, seq } = decodeV2Frame(frame);
-    const { Message, messageName } = createProtocolV2MessageFromType(msgType, schemas);
+    const { messageTypeId, pbPayload, seq } = decodeV2Frame(frame);
+    const { Message, messageName } = createProtocolV2MessageFromType(messageTypeId, schemas);
     const rxByteBuffer = ByteBuffer.wrap(Buffer.from(pbPayload) as unknown as ArrayBuffer);
     const message = decodeProtobuf(Message, rxByteBuffer);
 
     return {
       message,
       messageName,
-      msgType,
+      messageTypeId,
       pbPayload,
       seq,
       type: messageName,

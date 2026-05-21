@@ -24,14 +24,14 @@
 - 协议判断必须在连接后主动探测，不能依赖 PID、productName 或 descriptor。
 - WebUSB / Electron BLE / React Native BLE 都通过 `GetProtoVersion` 探测 V2，失败或超时回落 V1。
 - `desktop-web-ble` 是默认 Electron BLE 入口，不再按设备型号拆分 env alias。
-- Protocol V2 不走传统 `Initialize/GetFeatures`，而是 `Ping + DevGetDeviceInfo` 后通过 `Protocol V2 feature adapter` 归一成 `Features`；早期固件不支持完整信息时才回退最小 `Features`。
+- Protocol V2 不走传统 `Initialize/GetFeatures`，而是 `Ping + DeviceGetDeviceInfo` 后通过 `Protocol V2 feature adapter` 归一成 `Features`；早期固件不支持完整信息时才回退最小 `Features`。
 
 ## Protocol V2 改动注意事项
 
-- `messages-pro2.json` 来源是 `submodules/firmware-pro2/sys/protobuf/onekey_protocol/latest`。
-- 当前 Protocol V2 schema 依赖 `firmware-pro2` 的 `origin/dev_romloader_split`，因为该分支包含 `Filesystem*`、`DevFirmwareUpdate`、`DevReboot` 等消息。
+- `messages-protocol-v2.json` 来源是 `submodules/firmware-pro2/sys/protobuf/onekey_protocol/latest`。
+- 当前 Protocol V2 schema 依赖 `firmware-pro2` 的 `origin/dev_romloader_split`，因为该分支包含 `Filesystem*`、`DeviceFirmwareUpdate`、`DeviceReboot` 等消息。
 - Protocol V2 文件操作应使用 `FilesystemFileWrite` / `FilesystemDirMake` 等新消息名。
-- Protocol V2 固件安装应使用 `DevFirmwareUpdate.targets` 显式传入 resource、bootloader、firmware 路径。
+- Protocol V2 固件安装应使用 `DeviceFirmwareUpdate.targets` 显式传入 resource、bootloader、firmware 路径。
 - 如果修改 protobuf，优先改生成脚本并重新生成 JSON/types，不要手改生成产物。
 
 ## 常用验证命令
