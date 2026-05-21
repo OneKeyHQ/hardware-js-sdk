@@ -115,4 +115,3 @@ writeWithResponse 作为提速方案
 - 如果 raw write 自身很低，瓶颈在 RN BLE / iOS BLE / `react-native-ble-plx` 写入队列。
 - 如果 Ping RTT 很低但固件升级慢，瓶颈更偏设备端文件系统或 flash 写入。
 - 如果 Ping RTT 接近 `180-220ms`，则 `1800B` 下 `8-10 KB/s` 属于当前串行模型的自然结果。
-

@@ -48,10 +48,28 @@ const protocolV2Schema = {
         },
       },
     },
+    Ping: {
+      fields: {
+        message: {
+          type: 'string',
+          id: 1,
+        },
+      },
+    },
+    Success: {
+      fields: {
+        message: {
+          type: 'string',
+          id: 1,
+        },
+      },
+    },
     MessageType: {
       values: {
         MessageType_GetProtoVersion: 60200,
         MessageType_ProtoVersion: 60201,
+        MessageType_Ping: 60206,
+        MessageType_Success: 60207,
       },
     },
   },
@@ -119,11 +137,9 @@ describe('LowlevelTransport protocol framing', () => {
   test('detects Protocol V2 devices and reassembles split Protocol V2 notifications', async () => {
     const probeResponse = ProtocolV2.encodeFrame(
       schemas,
-      'ProtoVersion',
+      'Success',
       {
-        major_version: 2,
-        minor_version: 0,
-        patch_version: 0,
+        message: 'probe',
       },
       { router: PROTOCOL_V2_CHANNEL_BLE_UART }
     );
@@ -144,7 +160,7 @@ describe('LowlevelTransport protocol framing', () => {
     const lowlevel = configureTransport(plugin);
 
     await expect(lowlevel.enumerate()).resolves.toEqual([
-      { id: 'pro2-id', name: 'OneKey Pro 2', commType: 'ble', protocolType: 'V2' },
+      { id: 'pro2-id', name: 'OneKey Pro 2', commType: 'ble' },
     ]);
     await expect(lowlevel.acquire({ uuid: 'pro2-id' })).resolves.toEqual({
       uuid: 'pro2-id',
@@ -164,11 +180,9 @@ describe('LowlevelTransport protocol framing', () => {
   test('falls back to Protocol V2 probe for unnamed Protocol V2 devices', async () => {
     const probeResponse = ProtocolV2.encodeFrame(
       schemas,
-      'ProtoVersion',
+      'Success',
       {
-        major_version: 2,
-        minor_version: 0,
-        patch_version: 0,
+        message: 'probe',
       },
       { router: PROTOCOL_V2_CHANNEL_BLE_UART }
     );
@@ -183,6 +197,46 @@ describe('LowlevelTransport protocol framing', () => {
       protocolType: 'V2',
     });
     expect(lowlevel.getProtocolType('unknown-pro2-id')).toBe('V2');
+  });
+
+  test('resets the lowlevel connection before probing Protocol V2 after a V1 timeout', async () => {
+    const probeResponse = ProtocolV2.encodeFrame(
+      schemas,
+      'Success',
+      {
+        message: 'probe',
+      },
+      { router: PROTOCOL_V2_CHANNEL_BLE_UART }
+    );
+    let staleReceivePending = false;
+    let resetAfterTimeout = false;
+    const plugin = createPlugin({
+      devices: [{ id: 'slow-v2-id', name: 'Unknown BLE Device', commType: 'ble' }],
+      responses: [],
+    });
+    plugin.disconnect.mockImplementation(() => {
+      staleReceivePending = false;
+      resetAfterTimeout = true;
+      return Promise.resolve();
+    });
+    plugin.receive.mockImplementation(() => {
+      if (!staleReceivePending && !resetAfterTimeout) {
+        staleReceivePending = true;
+        return new Promise(() => {});
+      }
+      if (staleReceivePending) {
+        return Promise.reject(new Error('stale receive still pending'));
+      }
+      return Promise.resolve(bytesToHex(probeResponse));
+    });
+    const lowlevel = configureTransport(plugin);
+
+    await expect(lowlevel.acquire({ uuid: 'slow-v2-id' })).resolves.toEqual({
+      uuid: 'slow-v2-id',
+      protocolType: 'V2',
+    });
+    expect(plugin.disconnect).toHaveBeenCalledWith('slow-v2-id');
+    expect(plugin.connect).toHaveBeenCalledTimes(2);
   });
 
   test('verifies expected Protocol V1 instead of trusting the requested protocol', async () => {
