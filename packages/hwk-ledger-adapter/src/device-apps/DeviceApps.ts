@@ -1,5 +1,4 @@
 import { DeviceActionStatus } from '@ledgerhq/device-management-kit';
-import { HardwareErrorCode } from '@onekeyfe/hwk-adapter-core';
 import { Subject } from 'rxjs';
 
 import { deviceActionToPromise } from '../signer/deviceActionToPromise';
@@ -144,75 +143,6 @@ export class DeviceApps {
     };
   }
 
-  /**
-   * Pre-flight space check. Mirrors DMK's PredictOutOfMemoryTask using the
-   * data we already expose (listInstalled / listAvailable / getOsVersion).
-   * Fails fast with HardwareErrorCode.DeviceOutOfMemory before issuing the
-   * actual install — saves the user the time-to-fail of DMK's state machine.
-   */
-  private async _assertEnoughSpace(appName: string): Promise<void> {
-    let osVersion: GetOsVersionResponse;
-    let installed: AppMetadata[];
-    let available: AppMetadata[];
-    try {
-      [osVersion, installed, available] = await Promise.all([
-        this._fetchOsVersion(),
-        this.listInstalled(),
-        this.listAvailable(),
-      ]);
-    } catch (err) {
-      // Precheck is best-effort — if we can't fetch metadata (locked, network,
-      // etc.) defer to DMK's install flow which has its own retry / error
-      // handling. Skipping the precheck only loses fail-fast, not correctness.
-      debugLog('[DeviceApps] precheck skipped:', (err as { message?: string })?.message);
-      return;
-    }
-
-    if (installed.some(a => a.versionName === appName)) return; // DMK no-ops, skip precheck
-    const target = available.find(a => a.versionName === appName);
-    if (!target) return; // DMK will surface "App not found in manager API" itself
-
-    const capacity = getDeviceCapacity(osVersion.targetId);
-    if (!capacity) return; // unknown device model — defer to DMK
-    const blockSize = capacity.getBlockSize(osVersion.seVersion);
-    const totalBlocks = Math.floor(capacity.memorySize / blockSize);
-    const blocks = (b: number | null) => Math.ceil((b ?? 0) / blockSize);
-
-    const usedBlocks = installed.reduce((sum, a) => sum + blocks(a.bytes), 0);
-    const neededBlocks = blocks(target.bytes);
-
-    debugLog(
-      '[DeviceApps] space check',
-      'targetId=', osVersion.targetId.toString(16),
-      'memorySize=', capacity.memorySize,
-      'blockSize=', blockSize,
-      'usedBlocks=', usedBlocks,
-      'neededBlocks=', neededBlocks,
-      'totalBlocks=', totalBlocks,
-    );
-
-    if (usedBlocks + neededBlocks > totalBlocks) {
-      const usedBytes = usedBlocks * blockSize;
-      const neededBytes = neededBlocks * blockSize;
-      const freeBytes = Math.max(0, capacity.memorySize - usedBytes);
-      throw Object.assign(
-        new Error(
-          `Not enough space to install "${appName}": needs ${neededBytes} bytes, ${freeBytes} bytes free of ${capacity.memorySize}.`,
-        ),
-        {
-          code: HardwareErrorCode.DeviceOutOfMemory,
-          _tag: 'OutOfMemoryDAError',
-          appName,
-          params: {
-            requiredBytes: neededBytes,
-            availableBytes: freeBytes,
-            totalBytes: capacity.memorySize,
-          },
-        },
-      );
-    }
-  }
-
   // Sole sendCommand wrapper — surfaces unlock-device interaction through
   // the same onInteraction pipeline as the device-action methods.
   private async _fetchOsVersion(): Promise<GetOsVersionResponse> {
@@ -240,16 +170,23 @@ export class DeviceApps {
     if (!appName) throw new Error('DeviceApps.install: appName is required');
     debugLog('[DeviceApps] install:', appName);
 
-    await this._assertEnoughSpace(appName);
-
+    // Use InstallOrUpdateAppsDeviceAction (DMK's high-level entry) instead of
+    // InstallAppDeviceAction. It runs UPDATE_DEVICE_METADATA → BUILD_INSTALL_PLAN
+    // → CHECK_IF_ENOUGH_MEMORY → INSTALL_APPLICATION, so OOM fails fast (zero
+    // bytes written) and the metadata refresh feeds PredictOutOfMemoryTask the
+    // accurate firmware/customImage/languagePack sizes — no client-side estimate.
     const action = (this._dmk as unknown as DmkExecuteCapable).executeDeviceAction({
       sessionId: this._sessionId,
-      deviceAction: new this._ledgerKit.InstallAppDeviceAction({
-        input: { appName, unlockTimeout: options?.unlockTimeout },
+      deviceAction: new this._ledgerKit.InstallOrUpdateAppsDeviceAction({
+        input: {
+          applications: [{ name: appName }],
+          allowMissingApplication: false,
+          unlockTimeout: options?.unlockTimeout,
+        },
       }),
     });
 
-    await deviceActionToPromise<void>(
+    await deviceActionToPromise<InstallOrUpdateAppsOutput>(
       action,
       this.onInteraction,
       INSTALL_TIMEOUT_MS,
@@ -257,12 +194,16 @@ export class DeviceApps {
       onProgress
         ? intermediateValue => {
             const iv = intermediateValue as
-              | { progress?: number; requiredUserInteraction?: string }
+              | {
+                  requiredUserInteraction?: string;
+                  installPlan?: { currentProgress?: number } | null;
+                }
               | undefined;
-            if (typeof iv?.progress === 'number') {
+            const progress = iv?.installPlan?.currentProgress;
+            if (typeof progress === 'number') {
               onProgress({
-                progress: iv.progress,
-                requiredUserInteraction: iv.requiredUserInteraction,
+                progress,
+                requiredUserInteraction: iv?.requiredUserInteraction,
               });
             }
           }
@@ -302,50 +243,19 @@ function applicationToMetadata(app: DmkApplication): AppMetadata {
   };
 }
 
-interface DeviceCapacity {
-  memorySize: number;
-  getBlockSize: (firmwareVersion: string) => number;
-}
-
-// Mirrors DMK's StaticDeviceModelDataSource. `mask` matches the top byte of
-// targetId; the lower 16 bits encode hardware revision (ignored for memory).
-const DEVICE_CAPACITIES: ReadonlyArray<{ mask: number; capacity: DeviceCapacity }> = [
-  // Nano S — block size 4K on fw<2.0, 2K on >=2.0. Default 4K (conservative).
-  {
-    mask: 0x31100000,
-    capacity: {
-      memorySize: 320 * 1024,
-      getBlockSize: fw => (parseMajor(fw) >= 2 ? 2 * 1024 : 4 * 1024),
-    },
-  },
-  // Nano S Plus
-  { mask: 0x33100000, capacity: { memorySize: 1533 * 1024, getBlockSize: () => 32 } },
-  // Nano X
-  { mask: 0x33000000, capacity: { memorySize: 2 * 1024 * 1024, getBlockSize: () => 4 * 1024 } },
-  // Stax
-  { mask: 0x33200000, capacity: { memorySize: 1533 * 1024, getBlockSize: () => 32 } },
-  // Flex
-  { mask: 0x33300000, capacity: { memorySize: 1533 * 1024, getBlockSize: () => 32 } },
-  // Apex / Nano Gen5
-  { mask: 0x33400000, capacity: { memorySize: 1533 * 1024, getBlockSize: () => 32 } },
-];
-
-function getDeviceCapacity(targetId: number): DeviceCapacity | undefined {
-  const masked = targetId & 0xffff0000;
-  return DEVICE_CAPACITIES.find(d => d.mask === masked)?.capacity;
-}
-
-function parseMajor(version: string): number {
-  const m = /^(\d+)/.exec(version);
-  return m ? Number(m[1]) : 0;
-}
 
 // Loosened DMK surface (we receive the module via dynamic importLedgerKit).
 export interface LedgerKitModule {
   ListAppsWithMetadataDeviceAction: new (args: { input: unknown }) => unknown;
-  InstallAppDeviceAction: new (args: { input: unknown }) => unknown;
+  InstallOrUpdateAppsDeviceAction: new (args: { input: unknown }) => unknown;
   GetOsVersionCommand: new () => unknown;
   isSuccessCommandResult: (result: unknown) => result is { data: GetOsVersionResponse };
+}
+
+interface InstallOrUpdateAppsOutput {
+  successfullyInstalled: unknown[];
+  alreadyInstalled: string[];
+  missingApplications: string[];
 }
 
 interface DmkExecuteCapable {
