@@ -73,15 +73,15 @@ Protocol V2 frame 的 payload 格式：
 
 ```
 ┌──────────┬──────────┬────────────────────┐
-│ MsgTypeL │ MsgTypeH │ Protobuf payload   │
+│ TypeIdL  │ TypeIdH  │ Protobuf payload   │
 └──────────┴──────────┴────────────────────┘
     1B         1B          N bytes
 ```
 
-`MsgType` 是 little-endian `uint16`。SDK 按消息 ID 选择 schema：
+`messageTypeId` 是 little-endian `uint16`。SDK 按消息 ID 选择 schema：
 
-- `msgType >= 60000`：使用 `messages-pro2.json`
-- `msgType < 60000`：使用 `messages.json`
+- `messageTypeId >= 60000`：使用 `messages-protocol-v2.json`
+- `messageTypeId < 60000`：使用 `messages.json`
 
 发送时优先在 Protocol V2 schema 里查找消息名，找不到再回退 V1 schema。
 
@@ -218,8 +218,8 @@ SDK 会先把 resource、bootloader、firmware 写入 `vol1:`，再把所有需�
 
 | 文件                                                 | 来源                                                           |
 | ---------------------------------------------------- | -------------------------------------------------------------- |
-| `packages/hd-transport/messages-pro2.json`           | `submodules/firmware-pro2/sys/protobuf/onekey_protocol/latest` |
-| `packages/core/src/data/messages/messages-pro2.json` | 同上，同步到 core 运行时数据                                   |
+| `packages/hd-transport/messages-protocol-v2.json`           | `submodules/firmware-pro2/sys/protobuf/onekey_protocol/latest` |
+| `packages/core/src/data/messages/messages-protocol-v2.json` | 同上，同步到 core 运行时数据                                   |
 | `packages/hd-transport/src/types/messages.ts`        | 由 protobuf 生成脚本输出，包含 Protocol V2 类型联合             |
 
 当前 Pro2 子模块跟随 `origin/dev_romloader_split`，因为该分支包含 romloader split 相关 schema 和 `Filesystem*/DeviceFirmwareUpdate` 消息。

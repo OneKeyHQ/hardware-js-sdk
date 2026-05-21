@@ -4,7 +4,7 @@ import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
 
 import MessagesJSON from '../data/messages/messages.json';
 import MessagesLegacyV1JSON from '../data/messages/messages_legacy_v1.json';
-import MessagesPro2JSON from '../data/messages/messages-pro2.json';
+import MessagesProtocolV2JSON from '../data/messages/messages-protocol-v2.json';
 import {
   LoggerNames,
   getDeviceBLEFirmwareVersion,
@@ -41,8 +41,8 @@ export const FIRMWARE_FIELDS = [
 
 export type IFirmwareField = (typeof FIRMWARE_FIELDS)[number];
 
-export type ProtocolV1MessageSchema = 'protocolV1Current' | 'protocolV1Legacy';
-export type ProtobufMessageSchema = ProtocolV1MessageSchema | 'protocolV2';
+export type ProtocolV1MessageSchema = 'v1CurrentSchema' | 'v1LegacySchema';
+export type ProtobufMessageSchema = ProtocolV1MessageSchema | 'v2Schema';
 
 const FIRMWARE_FIELD_TYPE_MAP: Readonly<Record<IFirmwareField, EFirmwareType>> = {
   firmware: EFirmwareType.Universal,
@@ -98,9 +98,9 @@ export default class DataManager {
   static settings: ConnectSettings;
 
   static messages: { [schema in ProtobufMessageSchema]: JSON } = {
-    protocolV1Current: MessagesJSON as unknown as JSON,
-    protocolV1Legacy: MessagesLegacyV1JSON as unknown as JSON,
-    protocolV2: MessagesPro2JSON as unknown as JSON,
+    v1CurrentSchema: MessagesJSON as unknown as JSON,
+    v1LegacySchema: MessagesLegacyV1JSON as unknown as JSON,
+    v2Schema: MessagesProtocolV2JSON as unknown as JSON,
   };
 
   static lastCheckTimestamp = 0;
@@ -477,7 +477,7 @@ export default class DataManager {
     }
   }
 
-  static getProtobufMessages(schema: ProtobufMessageSchema = 'protocolV1Current'): JSON {
+  static getProtobufMessages(schema: ProtobufMessageSchema = 'v1CurrentSchema'): JSON {
     return this.messages[schema];
   }
 

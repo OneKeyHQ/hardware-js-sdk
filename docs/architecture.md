@@ -102,7 +102,7 @@ flowchart TD
 `TransportManager` 负责初始化当前运行环境对应的 transport，并在初始化时同时配置：
 
 - 默认 V1 protobuf schema：`messages.json`
-- Protocol V2 protobuf schema：`messages-pro2.json`
+- Protocol V2 protobuf schema：`messages-protocol-v2.json`
 
 V1 设备仍可在 `Initialize` 后通过 `TransportManager.reconfigure(features)` 切换到适配固件版本的 schema。V2 设备不走 `Initialize/GetFeatures`，因此不依赖 features 重新选择协议；协议选择由 transport 的 `getProtocolType(path)` 返回。
 

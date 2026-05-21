@@ -543,8 +543,8 @@ export class Device extends EventEmitter {
   /**
    * Device initialization over Protocol V2.
    *
-   * Protocol V2 不走传统 Initialize/GetFeatures，当前仅通过 Ping 验证链路，
-   * 然后使用 descriptor 生成临时 Features 视图。
+   * Protocol V2 不走传统 Initialize/GetFeatures，当前通过 Ping 验证链路，
+   * 再用 DeviceGetDeviceInfo 归一成 legacy-style Features 视图。
    */
   private async _initializeProtocolV2() {
     Log.debug('Initialize device via Protocol V2 feature adapter');

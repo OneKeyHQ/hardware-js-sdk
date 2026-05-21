@@ -58,18 +58,18 @@ export function encodeFrame(payload: Uint8Array | null, packetSrc = 0, router = 
  * Build a Protocol V2 frame carrying a protobuf message.
  *
  * Payload layout:
- *   [0-1]  msgType as little-endian uint16
+ *   [0-1]  messageTypeId as little-endian uint16
  *   [2..]  protobuf-encoded message bytes
  */
 export function encodeProtobufFrame(
-  msgType: number,
+  messageTypeId: number,
   pbPayload: Uint8Array,
   packetSrc = 0,
   router = 0
 ): Uint8Array {
   const payload = new Uint8Array(2 + pbPayload.length);
-  payload[0] = msgType % 256;
-  payload[1] = Math.floor(msgType / 256) % 256;
+  payload[0] = messageTypeId % 256;
+  payload[1] = Math.floor(messageTypeId / 256) % 256;
   payload.set(pbPayload, 2);
   return encodeFrame(payload, packetSrc, router);
 }

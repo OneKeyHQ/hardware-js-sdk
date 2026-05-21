@@ -16,7 +16,11 @@ export default class GetPassphraseState extends BaseMethod {
       return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceInitializeFailed));
 
     const { passphraseState, newSession, unlockedAttachPin } =
-      await getPassphraseStateWithRefreshDeviceInfo(this.device);
+      await getPassphraseStateWithRefreshDeviceInfo(this.device, {
+        expectPassphraseState: this.payload.passphraseState,
+        onlyMainPin: this.payload.useEmptyPassphrase,
+        allowCreateAttachPin: this.payload.allowCreateAttachPin,
+      });
 
     const { features } = this.device;
     const isPro2 = getDeviceType(features) === EDeviceType.Pro2;

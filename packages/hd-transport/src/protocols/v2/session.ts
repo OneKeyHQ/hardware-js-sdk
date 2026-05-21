@@ -285,10 +285,10 @@ export class ProtocolV2Session {
         }
         if (!shouldReduceDebug) {
           logger?.debug?.(
-            `[${logPrefix}] TX name=${name} seq=${expectedSeq} | RX seq=${decoded.seq} msgType=${decoded.msgType} pbPayload=${decoded.pbPayload.length}B`
+            `[${logPrefix}] TX name=${name} seq=${expectedSeq} | RX seq=${decoded.seq} messageTypeId=${decoded.messageTypeId} pbPayload=${decoded.pbPayload.length}B`
           );
           logger?.debug?.(
-            `[${logPrefix}] RX payload type=${decoded.type} msgType=${decoded.msgType}`,
+            `[${logPrefix}] RX payload type=${decoded.type} messageTypeId=${decoded.messageTypeId}`,
             sanitizeProtocolV2DebugPayload(decoded.message)
           );
         }

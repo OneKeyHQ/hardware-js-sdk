@@ -33,7 +33,7 @@ export default class TransportManager {
 
   static reactNativeInit = false;
 
-  static protocolV1MessageSchema: ProtocolV1MessageSchema = 'protocolV1Current';
+  static protocolV1MessageSchema: ProtocolV1MessageSchema = 'v1CurrentSchema';
 
   static plugin: LowlevelTransportSharedPlugin | null = null;
 
@@ -41,7 +41,7 @@ export default class TransportManager {
     Log.debug('transport manager load');
     this.defaultMessages = DataManager.getProtobufMessages();
     this.currentMessages = this.defaultMessages;
-    this.protocolV1MessageSchema = 'protocolV1Current';
+    this.protocolV1MessageSchema = 'v1CurrentSchema';
   }
 
   static async configure() {
@@ -76,7 +76,7 @@ export default class TransportManager {
       Log.debug('Configuring transports');
       await this.transport.configure(JSON.stringify(this.defaultMessages));
       this.currentMessages = this.defaultMessages;
-      this.protocolV1MessageSchema = 'protocolV1Current';
+      this.protocolV1MessageSchema = 'v1CurrentSchema';
       await this.configureProtocolV2Messages();
       Log.debug('Configuring transports done');
     } catch (error) {
@@ -148,7 +148,7 @@ export default class TransportManager {
   }
 
   private static async configureProtocolV2Messages() {
-    const protocolV2Messages = DataManager.getProtobufMessages('protocolV2');
+    const protocolV2Messages = DataManager.getProtobufMessages('v2Schema');
     const { configureProtocolV2 } = this.transport;
     if (protocolV2Messages && typeof configureProtocolV2 === 'function') {
       await configureProtocolV2.call(this.transport, JSON.stringify(protocolV2Messages));

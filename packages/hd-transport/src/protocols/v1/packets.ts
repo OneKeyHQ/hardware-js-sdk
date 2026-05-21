@@ -8,13 +8,13 @@ import { PROTOCOL_V1_CHUNK_PAYLOAD_SIZE, PROTOCOL_V1_REPORT_ID } from '../../con
 import type { Root } from 'protobufjs/light';
 
 export function encodeEnvelopeMessage(messages: Root, name: string, data: Record<string, unknown>) {
-  const { Message, messageType } = createMessageFromName(messages, name);
+  const { Message, messageTypeId } = createMessageFromName(messages, name);
 
   const buffer = encodeProtobuf(Message, data);
   return encodeEnvelope(buffer, {
     addTrezorHeaders: false,
     chunked: false,
-    messageType,
+    messageTypeId,
   });
 }
 
@@ -23,12 +23,12 @@ export const encodeMessageChunks = (
   name: string,
   data: Record<string, unknown>
 ) => {
-  const { Message, messageType } = createMessageFromName(messages, name);
+  const { Message, messageTypeId } = createMessageFromName(messages, name);
   const buffer = encodeProtobuf(Message, data);
   return encodeEnvelope(buffer, {
     addTrezorHeaders: true,
     chunked: true,
-    messageType,
+    messageTypeId,
   });
 };
 

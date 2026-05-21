@@ -144,13 +144,13 @@ describe('Protocol V2 framing and session', () => {
     });
 
     const parsed = protocolV2.decodeFrame(frame);
-    expect(parsed.msgType).toBe(60201);
+    expect(parsed.messageTypeId).toBe(60201);
 
     const decoded = ProtocolV2.decodeFrame(schemas, frame);
     expect(decoded).toEqual({
       type: 'ProtoVersion',
       messageName: 'ProtoVersion',
-      msgType: 60201,
+      messageTypeId: 60201,
       pbPayload: parsed.pbPayload,
       seq: parsed.seq,
       message: {
@@ -174,7 +174,7 @@ describe('Protocol V2 framing and session', () => {
     });
 
     const parsed = protocolV2.decodeFrame(frame);
-    expect(parsed.msgType).toBe(60207);
+    expect(parsed.messageTypeId).toBe(60207);
 
     const decoded = ProtocolV2.decodeFrame(schemas, frame);
     expect(decoded.type).toBe('Success');
@@ -251,7 +251,7 @@ describe('Protocol V2 framing and session', () => {
     expect(written).toHaveLength(1);
     expect(written[0][4]).toBe(1);
     expect(written[0][5]).toBe(0);
-    expect(protocolV2.decodeFrame(written[0]).msgType).toBe(60200);
+    expect(protocolV2.decodeFrame(written[0]).messageTypeId).toBe(60200);
     expect(result).toEqual({
       type: 'ProtoVersion',
       message: {
@@ -317,7 +317,7 @@ describe('Protocol V2 framing and session', () => {
       message: 'hello',
     });
     expect(logger.debug).toHaveBeenCalledWith(
-      '[ProtocolV2 Test] RX payload type=Success msgType=60207',
+      '[ProtocolV2 Test] RX payload type=Success messageTypeId=60207',
       {
         message: 'accepted',
       }

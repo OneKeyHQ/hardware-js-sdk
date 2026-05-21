@@ -3,8 +3,8 @@ import { crc8 } from './crc8';
 
 export interface ProtoV2Frame {
   /** Little-endian message type ID */
-  msgType: number;
-  /** Raw protobuf-encoded payload (bytes after the 2-byte msgType) */
+  messageTypeId: number;
+  /** Raw protobuf-encoded payload (bytes after the 2-byte messageTypeId) */
   pbPayload: Uint8Array;
   /** Sequence number from the frame header */
   seq: number;
@@ -18,7 +18,7 @@ export interface ProtoV2Frame {
  *   - Header CRC (bytes 0-2)
  *   - Frame CRC (full frame except last byte)
  *
- * Returns the decoded msgType, raw protobuf payload, and sequence number.
+ * Returns the decoded messageTypeId, raw protobuf payload, and sequence number.
  */
 export function decodeFrame(data: Uint8Array): ProtoV2Frame {
   if (data.length < PROTO_HEAD_CRC_SIZE) {
@@ -62,11 +62,11 @@ export function decodeFrame(data: Uint8Array): ProtoV2Frame {
   const payloadData = data.slice(7, frameLen - 1);
 
   if (payloadData.length < 2) {
-    throw new Error(`Protocol V2 payload too short (need ≥2 bytes for msgType)`);
+    throw new Error(`Protocol V2 payload too short (need >=2 bytes for messageTypeId)`);
   }
 
-  const msgType = payloadData[0] + payloadData[1] * 256;
+  const messageTypeId = payloadData[0] + payloadData[1] * 256;
   const pbPayload = payloadData.slice(2);
 
-  return { msgType, pbPayload, seq };
+  return { messageTypeId, pbPayload, seq };
 }

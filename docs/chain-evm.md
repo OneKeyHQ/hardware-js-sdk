@@ -14,12 +14,12 @@ OneKey 硬件钱包对 EVM (以太坊虚拟机) 兼容链的支持，建立在�
 
 OneKey SDK is designed to provide a seamless developer experience by abstracting away the complexities of different hardware firmware versions. It achieves this through an automatic protocol detection mechanism.
 
-### 3.1 Protocol V1 Schema Dialects: `protocolV1Legacy` vs `protocolV1Current`
+### 3.1 Protocol V1 Schema Dialects: `v1LegacySchema` vs `v1CurrentSchema`
 
 The SDK internally manages two primary protocol "dialects" for communicating with the device:
 
-- **`protocolV1Legacy` (Trezor-compatible schema):** Used for older generations of OneKey firmware. This schema is compatible with the message format originally defined by Trezor.
-- **`protocolV1Current` (Native OneKey Protocol V1 schema):** Used for modern Protocol V1 firmware. This is a more feature-rich, native schema that supports newer EIPs and optimizations, such as EIP-7702.
+- **`v1LegacySchema` (Trezor-compatible schema):** Used for older generations of OneKey firmware. This schema is compatible with the message format originally defined by Trezor.
+- **`v1CurrentSchema` (Native OneKey Protocol V1 schema):** Used for modern Protocol V1 firmware. This is a more feature-rich, native schema that supports newer EIPs and optimizations, such as EIP-7702.
 
 ### 3.2 Automatic Protocol Switching
 
@@ -27,8 +27,8 @@ The SDK automatically determines which protocol to use at runtime.
 
 - **Detection:** When a method like `EVMSignTransaction` is called, it uses `TransportManager.getProtocolV1MessageSchema()` to query the Protocol V1 message schema selected from the connected device features.
 - **Switching Logic:**
-  - If the device returns `'protocolV1Legacy'`, the SDK invokes the signing logic with a compatibility flag (`supportTrezor: true`), instructing it to format messages for the legacy schema.
-  - Otherwise, it defaults to using the native `protocolV1Current` schema.
+  - If the device returns `'v1LegacySchema'`, the SDK invokes the signing logic with a compatibility flag (`supportTrezor: true`), instructing it to format messages for the legacy schema.
+  - Otherwise, it defaults to using the native `v1CurrentSchema` schema.
 
 This ensures that developers can write a single piece of code that works across all generations of OneKey hardware without needing to worry about the underlying communication differences.
 
