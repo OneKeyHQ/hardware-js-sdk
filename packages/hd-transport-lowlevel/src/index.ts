@@ -254,12 +254,42 @@ export default class LowlevelTransport {
     }
 
     let protocol: ProtocolType = 'V1';
-    if (!(await this.probeProtocolV1(uuid)) && (await this.probeProtocolV2(uuid))) {
-      protocol = 'V2';
+    const protocolV1Detected = await this.probeProtocolV1(uuid);
+    if (!protocolV1Detected) {
+      await this.resetConnectionAfterProbe(uuid, 'V1');
+      if (await this.probeProtocolV2(uuid)) {
+        protocol = 'V2';
+      }
     }
     this.deviceProtocol.set(uuid, protocol);
     this.Log?.debug(`[LowlevelTransport] detectProtocol: uuid=${uuid} -> ${protocol}`);
     return protocol;
+  }
+
+  private async resetConnectionAfterProbe(uuid: string, protocol: ProtocolType) {
+    this.protocolV2Assemblers.get(uuid)?.reset();
+
+    try {
+      await this.plugin.disconnect(uuid);
+    } catch (error) {
+      this.Log?.debug(
+        `[LowlevelTransport] disconnect after Protocol ${protocol} probe failed:`,
+        error
+      );
+    }
+
+    try {
+      await this.plugin.connect(uuid);
+    } catch (error) {
+      this.Log?.debug(
+        `[LowlevelTransport] reconnect after Protocol ${protocol} probe failed:`,
+        error
+      );
+      throw ERRORS.TypedError(
+        HardwareErrorCode.LowlevelTrasnportConnectError,
+        error.message ?? error
+      );
+    }
   }
 
   private async probeProtocolV1(uuid: string) {
@@ -290,8 +320,9 @@ export default class LowlevelTransport {
       timeoutMs: PROTOCOL_V2_PROBE_TIMEOUT_MS,
       logger: this.Log,
       logPrefix: 'ProtocolV2 Lowlevel-BLE',
-      onProbeFailed: () => {
+      onProbeFailed: async () => {
         this.protocolV2Assemblers.get(uuid)?.reset();
+        await this.resetConnectionAfterProbe(uuid, 'V2');
       },
     });
   }
