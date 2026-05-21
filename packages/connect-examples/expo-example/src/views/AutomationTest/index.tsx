@@ -44,6 +44,10 @@ function AutomationTestContent() {
   const progressPercentage = useAtomValue(progressPercentageAtom);
   const report = useAtomValue(effectiveReportAtom);
   const [activeTab, setActiveTab] = useState('report');
+  const hasFailedCases =
+    report?.scenarioResults.some(scenario =>
+      scenario.suiteResults.some(suite => suite.results.some(item => !item.passed && !item.skipped))
+    ) ?? false;
 
   const downloadJson = useCallback((data: unknown, filename: string) => {
     const json = JSON.stringify(data, null, 2);
@@ -127,6 +131,17 @@ function AutomationTestContent() {
                 disabled={!canStart || isRunning}
               >
                 开始
+              </Button>
+              <Button
+                size="$3"
+                theme="red"
+                height={34}
+                borderRadius="$2"
+                paddingHorizontal="$3"
+                onPress={automation.retryFailedCases}
+                disabled={!hasFailedCases || isRunning}
+              >
+                重跑失败
               </Button>
               <Button
                 size="$3"

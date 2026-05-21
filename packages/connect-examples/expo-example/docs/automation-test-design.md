@@ -145,6 +145,10 @@ interface AutomationScenario {
   - 地址：`testTools/slip39Test/addressData`
   - 公钥：`testTools/slip39Test/pubKeyData`
 - `scenarioResolver` 通过 `slip39DatasetId + passphraseVariantId` 组装 case id，例如 `count20_one_passphrase_2`
+- `expo-example` 不直接控制多份助记词导入过程，只负责下发 `phonePilotSequenceId`
+- 多份导入的 share 切换逻辑在 `PhonePilot/electron/mcp/sequences.ts` 的 `generateSlip39ShareSteps()` 中生成
+- `2-of-3` 场景会从 PhonePilot 配置的 3 份 share 中随机选择 2 份导入；本仓库的数据集只校验达到阈值所需的 2 份结果
+- 如果出现“第一份导入完成后切换到第二份时点错”的问题，应优先检查 PhonePilot 的 share 切换步骤，而不是 `useAutomationTest.ts`
 
 ### Passphrase literal
 

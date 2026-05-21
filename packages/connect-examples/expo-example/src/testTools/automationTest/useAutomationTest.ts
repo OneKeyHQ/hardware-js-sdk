@@ -29,6 +29,7 @@ import {
   automationReportAtom,
   cameraFrameAtom,
   clearLogsAtom,
+  effectiveReportAtom,
   initLiveReportAtom,
   liveReportAtom,
   phonePilotConnectionStateAtom,
@@ -122,6 +123,7 @@ const DEVICE_FLOW_ONLY_SUITES: TestSuiteType[] = ['deviceFlow'];
 type DeviceUiAction = 'confirm' | 'slide';
 
 type AutomationRunMode = 'full' | 'debug';
+type RetryCaseSelection = Map<AutomationScenario['id'], Map<TestSuiteType, Set<string>>>;
 
 interface PreparationResult {
   success: boolean;
@@ -332,7 +334,7 @@ function normalizeComparisonValue(
     ) {
       return `0x${value}`;
     }
-    if (method === 'suiGetPublicKey' && !value.startsWith('00')) {
+    if (method === 'suiGetPublicKey' && value.length === 64) {
       return `00${value}`;
     }
   }
@@ -481,6 +483,17 @@ async function fetchDeviceFeatures(
 ): Promise<Record<string, unknown> | undefined> {
   const result = await sdk.getFeatures(connectId);
   return result.success ? result.payload : undefined;
+}
+
+function withMainWalletCommonParams<T>(params: T, forceUseEmptyPassphrase: boolean): T {
+  if (!forceUseEmptyPassphrase || !params || typeof params !== 'object') {
+    return params;
+  }
+
+  return {
+    ...(params as Record<string, unknown>),
+    useEmptyPassphrase: true,
+  } as T;
 }
 
 function getBip39ImportProbeAddress(scenario: AutomationScenario): string {
@@ -683,9 +696,61 @@ function shouldStopBySuiteFailure(
   return stopOnFirstError && suiteResults.some(item => item.status === 'failed');
 }
 
+function buildFailedCaseSelection(report: TestReport): RetryCaseSelection {
+  const selection: RetryCaseSelection = new Map();
+
+  report.scenarioResults.forEach(scenario => {
+    scenario.suiteResults.forEach(suite => {
+      const failedTitles = suite.results
+        .filter(item => !item.passed && !item.skipped)
+        .map(item => item.title);
+
+      if (failedTitles.length === 0) {
+        return;
+      }
+
+      const suiteSelection = selection.get(scenario.scenarioId) ?? new Map();
+      suiteSelection.set(suite.suiteType, new Set(failedTitles));
+      selection.set(scenario.scenarioId, suiteSelection);
+    });
+  });
+
+  return selection;
+}
+
+function getRetrySuiteFilter(
+  retrySelection: RetryCaseSelection | undefined,
+  scenarioId: AutomationScenario['id'],
+  suiteType: TestSuiteType
+): Set<string> | undefined {
+  return retrySelection?.get(scenarioId)?.get(suiteType);
+}
+
+function countRetrySelectionTests(retrySelection: RetryCaseSelection): number {
+  let total = 0;
+  retrySelection.forEach(suiteSelection => {
+    suiteSelection.forEach(caseTitles => {
+      total += caseTitles.size;
+    });
+  });
+  return total;
+}
+
+function hasMatchingRetryTitle(
+  filterTitles: Set<string> | undefined,
+  predicate: (title: string) => boolean
+): boolean {
+  if (!filterTitles) {
+    return true;
+  }
+
+  return Array.from(filterTitles).some(predicate);
+}
+
 export function useAutomationTest() {
   const [connectionState, setConnectionState] = useAtom(phonePilotConnectionStateAtom);
   const config = useAtomValue(automationConfigAtom);
+  const currentReport = useAtomValue(effectiveReportAtom);
   const [progress, setProgress] = useAtom(automationProgressAtom);
   const setReport = useSetAtom(automationReportAtom);
   const setLiveReport = useSetAtom(liveReportAtom);
@@ -1381,6 +1446,33 @@ export function useAutomationTest() {
     [addLog, ensurePassphraseState, notifyLiveCaseUpdate, setProgress]
   );
 
+  const prepareStandaloneMainWallet = useCallback(
+    async (
+      sdk: CoreApi,
+      connectId: string,
+      suiteLabel: 'SecurityCheck' | 'ChainMethodBatch'
+    ): Promise<{ forceUseEmptyPassphrase: boolean }> => {
+      const featuresBefore = await fetchDeviceFeatures(sdk, connectId);
+      let featuresAfter = featuresBefore;
+
+      if (featuresBefore?.passphrase_protection) {
+        addLog(`[${suiteLabel}] Disabling passphrase_protection`);
+        await sdk.deviceSettings(connectId, { usePassphrase: false });
+        featuresAfter = await fetchDeviceFeatures(sdk, connectId);
+      }
+
+      const forceUseEmptyPassphrase = featuresAfter?.passphrase_protection === true;
+      if (forceUseEmptyPassphrase) {
+        addLog(
+          `[${suiteLabel}] passphrase_protection is still enabled; forcing useEmptyPassphrase for main-wallet SDK calls`
+        );
+      }
+
+      return { forceUseEmptyPassphrase };
+    },
+    [addLog]
+  );
+
   const cleanupPassphraseLoop = useCallback(() => {
     // Flush any pending live update before closing the suite
     flushLiveUpdate();
@@ -1558,7 +1650,8 @@ export function useAutomationTest() {
       sdk: CoreApi,
       connectId: string,
       deviceId: string,
-      selectedPassphraseVariants: PassphraseVariantId[]
+      selectedPassphraseVariants: PassphraseVariantId[],
+      filterTitles?: Set<string>
     ): Promise<TestSuiteResult> => {
       updateSuiteProgress(suiteType, scenario);
       const startedAt = Date.now();
@@ -1574,9 +1667,17 @@ export function useAutomationTest() {
       }
 
       const suiteName = getSuiteName(suiteType);
-      const expectedTotal = countSdkCasePaths(scenario, suiteType, selectedPassphraseVariants);
+      const expectedTotal = filterTitles?.size ?? countSdkCasePaths(scenario, suiteType, selectedPassphraseVariants);
       const results: TestCaseResult[] = [];
       for (const slip39Case of slip39Cases) {
+        if (
+          !hasMatchingRetryTitle(
+            filterTitles,
+            title => title.startsWith(`${slip39Case.id} / `)
+          )
+        ) {
+          continue;
+        }
         // Fetch fresh features per iteration to avoid stale passphrase_protection state
         const deviceFeatures = await fetchDeviceFeatures(sdk, connectId);
         const ppResult = await preparePassphraseIteration(
@@ -1600,6 +1701,10 @@ export function useAutomationTest() {
             for (const expectedPath of expectedPaths) {
               if (!runningRef.current) {
                 break;
+              }
+              const caseTitle = `${slip39Case.id} / ${methodData.name || methodData.method} / ${expectedPath}`;
+              if (filterTitles && !filterTitles.has(caseTitle)) {
+                continue;
               }
               const caseResult = await runSdkMethodCase(
                 sdk,
@@ -1756,7 +1861,8 @@ export function useAutomationTest() {
       sdk: CoreApi,
       connectId: string,
       deviceId: string,
-      selectedPassphraseVariants: PassphraseVariantId[]
+      selectedPassphraseVariants: PassphraseVariantId[],
+      filterTitles?: Set<string>
     ): Promise<TestSuiteResult> => {
       updateSuiteProgress(suiteType, scenario);
       const startedAt = Date.now();
@@ -1772,10 +1878,18 @@ export function useAutomationTest() {
       }
 
       const suiteName = getSuiteName(suiteType);
-      const expectedTotal = countSdkCasePaths(scenario, suiteType, selectedPassphraseVariants);
+      const expectedTotal = filterTitles?.size ?? countSdkCasePaths(scenario, suiteType, selectedPassphraseVariants);
 
       const results: TestCaseResult[] = [];
       for (const bip39Case of bip39Cases) {
+        if (
+          !hasMatchingRetryTitle(
+            filterTitles,
+            title => title.startsWith(`${bip39Case.id} / `)
+          )
+        ) {
+          continue;
+        }
         // Fetch fresh features per iteration to avoid stale passphrase_protection state
         const deviceFeatures2 = await fetchDeviceFeatures(sdk, connectId);
         const ppResult = await preparePassphraseIteration(
@@ -1796,6 +1910,10 @@ export function useAutomationTest() {
             for (const expectedPath of expectedPaths) {
               if (!runningRef.current) {
                 break;
+              }
+              const caseTitle = `${bip39Case.id} / ${methodCase.name || methodCase.method} / ${expectedPath}`;
+              if (filterTitles && !filterTitles.has(caseTitle)) {
+                continue;
               }
               const caseResult = await runAutomationSdkBatchCase(
                 sdk,
@@ -1839,7 +1957,8 @@ export function useAutomationTest() {
       connectId: string,
       deviceId: string,
       selectedPassphraseVariants: PassphraseVariantId[],
-      mnemonicStoreResult: MnemonicStoreResult | null
+      mnemonicStoreResult: MnemonicStoreResult | null,
+      filterTitles?: Set<string>
     ): Promise<TestSuiteResult> => {
       updateSuiteProgress(suiteType, scenario);
       const startedAt = Date.now();
@@ -1860,12 +1979,15 @@ export function useAutomationTest() {
           : BIP39_CREATE_PUBKEY_PROBES;
 
       const suiteName = getSuiteName(suiteType);
-      const expectedTotal = countSdkCasePaths(scenario, suiteType, selectedPassphraseVariants);
+      const expectedTotal = filterTitles?.size ?? countSdkCasePaths(scenario, suiteType, selectedPassphraseVariants);
 
       const results: TestCaseResult[] = [];
       for (const variantId of selectedPassphraseVariants) {
         if (!runningRef.current) {
           break;
+        }
+        if (!hasMatchingRetryTitle(filterTitles, title => title.endsWith(` / ${variantId}`))) {
+          continue;
         }
 
         const passphraseLiteral = getScenarioPassphraseLiteral(scenario, variantId);
@@ -1889,6 +2011,10 @@ export function useAutomationTest() {
           const passphraseDisplay = formatPassphraseDisplay(passphraseLiteral);
           const seed = mnemonicToSeed(mnemonicWords.join(' '), passphraseLiteral);
           for (const probe of probes) {
+            const caseTitle = `${scenario.id} / ${probe.caseName} / ${probe.path} / ${variantId}`;
+            if (filterTitles && !filterTitles.has(caseTitle)) {
+              continue;
+            }
             const startedAtCase = Date.now();
             let expected = '';
 
@@ -1924,7 +2050,7 @@ export function useAutomationTest() {
 
               if (!result.success) {
                 results.push({
-                  title: `${scenario.id} / ${probe.caseName} / ${probe.path} / ${variantId}`,
+                  title: caseTitle,
                   method: probe.method,
                   expected,
                   actual: '',
@@ -1953,7 +2079,7 @@ export function useAutomationTest() {
                   addLog(`  actual:   ${actual}`);
                 }
                 results.push({
-                  title: `${scenario.id} / ${probe.caseName} / ${probe.path} / ${variantId}`,
+                  title: caseTitle,
                   method: probe.method,
                   expected,
                   actual,
@@ -1968,7 +2094,7 @@ export function useAutomationTest() {
               }
             } catch (error) {
               results.push({
-                title: `${scenario.id} / ${probe.caseName} / ${probe.path} / ${variantId}`,
+                title: caseTitle,
                 method: probe.method,
                 expected,
                 actual: '',
@@ -2012,7 +2138,8 @@ export function useAutomationTest() {
       connectId: string,
       deviceId: string,
       selectedPassphraseVariants: PassphraseVariantId[],
-      mnemonicStoreResult: MnemonicStoreResult | null
+      mnemonicStoreResult: MnemonicStoreResult | null,
+      filterTitles?: Set<string>
     ): Promise<TestSuiteResult> => {
       updateSuiteProgress(suiteType, scenario);
       const startedAt = Date.now();
@@ -2069,12 +2196,17 @@ export function useAutomationTest() {
       }
 
       const suiteName = getSuiteName(suiteType);
-      const expectedTotal = countSdkCasePaths(scenario, suiteType, variantIds);
+      const expectedTotal = filterTitles?.size ?? countSdkCasePaths(scenario, suiteType, variantIds);
 
       const results: TestCaseResult[] = [];
       for (const variantId of variantIds) {
         if (!runningRef.current) {
           break;
+        }
+        if (
+          !hasMatchingRetryTitle(filterTitles, title => title.includes(` / ${variantId} / `))
+        ) {
+          continue;
         }
 
         const passphraseLiteral = getScenarioPassphraseLiteral(scenario, variantId);
@@ -2104,6 +2236,12 @@ export function useAutomationTest() {
             for (const expectedPath of expectedPaths) {
               if (!runningRef.current) {
                 break;
+              }
+              const caseTitle = `${scenario.id} / ${
+                methodData.name || methodData.method
+              } / ${variantId} / ${expectedPath}`;
+              if (filterTitles && !filterTitles.has(caseTitle)) {
+                continue;
               }
 
               const startedAtCase = Date.now();
@@ -2170,9 +2308,7 @@ export function useAutomationTest() {
 
                 if (!sdkResult.success) {
                   results.push({
-                    title: `${scenario.id} / ${
-                      methodData.name || methodData.method
-                    } / ${variantId} / ${expectedPath}`,
+                    title: caseTitle,
                     method: methodData.method,
                     expected,
                     actual: '',
@@ -2204,9 +2340,7 @@ export function useAutomationTest() {
                     addLog(`  actual:   ${actual}`);
                   }
                   results.push({
-                    title: `${scenario.id} / ${
-                      methodData.name || methodData.method
-                    } / ${variantId} / ${expectedPath}`,
+                    title: caseTitle,
                     method: methodData.method,
                     expected,
                     actual,
@@ -2221,9 +2355,7 @@ export function useAutomationTest() {
                 }
               } catch (error) {
                 results.push({
-                  title: `${scenario.id} / ${
-                    methodData.name || methodData.method
-                  } / ${variantId} / ${expectedPath}`,
+                  title: caseTitle,
                   method: methodData.method,
                   expected,
                   actual: '',
@@ -2265,7 +2397,8 @@ export function useAutomationTest() {
       scenario: AutomationScenario,
       sdk: CoreApi,
       connectId: string,
-      deviceId: string
+      deviceId: string,
+      filterTitles?: Set<string>
     ): Promise<TestSuiteResult> => {
       updateSuiteProgress('specialPassphrase', scenario);
       const startedAt = Date.now();
@@ -2310,6 +2443,11 @@ export function useAutomationTest() {
         }
 
         for (const passphrase of specialPassphrases) {
+          if (
+            !hasMatchingRetryTitle(filterTitles, title => title.endsWith(`「${passphrase}」`))
+          ) {
+            continue;
+          }
           currentPassphraseRef.current = passphrase;
           addLog(`Testing special passphrase: 「${passphrase}」`);
 
@@ -2336,12 +2474,16 @@ export function useAutomationTest() {
                 break;
               }
 
+              const caseTitle = `${method} / 「${passphrase}」`;
+              if (filterTitles && !filterTitles.has(caseTitle)) {
+                continue;
+              }
               const caseStart = Date.now();
               try {
                 const mockFn = (mockDevice as Record<string, unknown>)[method];
                 if (typeof mockFn !== 'function') {
                   results.push({
-                    title: `${method} / 「${passphrase}」`,
+                    title: caseTitle,
                     method,
                     passed: false,
                     error: `mockDevice.${method} not found`,
@@ -2360,7 +2502,7 @@ export function useAutomationTest() {
                   const sdkMethod = (sdk as Record<string, unknown>)[method];
                   if (typeof sdkMethod !== 'function') {
                     results.push({
-                      title: `${method} / 「${passphrase}」`,
+                      title: caseTitle,
                       method,
                       expected,
                       passed: false,
@@ -2392,7 +2534,7 @@ export function useAutomationTest() {
                             `[EXPECTED_FAIL] ${method} / 「${passphrase}」 — device does not support this method`
                           );
                           results.push({
-                            title: `${method} / 「${passphrase}」`,
+                            title: caseTitle,
                             method,
                             expected: '(expected failure)',
                             actual: sdkResult.payload?.error || 'SDK call failed',
@@ -2406,7 +2548,7 @@ export function useAutomationTest() {
                       }
                       if (!handledAsExpectedFail) {
                         results.push({
-                          title: `${method} / 「${passphrase}」`,
+                          title: caseTitle,
                           method,
                           expected,
                           passed: false,
@@ -2426,7 +2568,7 @@ export function useAutomationTest() {
                       }
 
                       results.push({
-                        title: `${method} / 「${passphrase}」`,
+                        title: caseTitle,
                         method,
                         expected,
                         actual,
@@ -2438,8 +2580,8 @@ export function useAutomationTest() {
                   } // end else (typeof sdkMethod !== 'function')
                 } // end else (typeof mockFn !== 'function')
               } catch (error) {
-                results.push({
-                  title: `${method} / 「${passphrase}」`,
+                    results.push({
+                      title: caseTitle,
                   method,
                   passed: false,
                   error: error instanceof Error ? error.message : String(error),
@@ -2602,20 +2744,23 @@ export function useAutomationTest() {
   );
 
   const runSecurityCheckSuite = useCallback(
-    async (sdk: CoreApi, connectId: string, deviceId: string): Promise<TestSuiteResult> => {
+    async (
+      sdk: CoreApi,
+      connectId: string,
+      deviceId: string,
+      filterTitles?: Set<string>
+    ): Promise<TestSuiteResult> => {
       const startedAt = Date.now();
       const results: TestCaseResult[] = [];
       addLog('[SecurityCheck] Starting blind signature security check suite');
       setupUIListener(sdk, executeNextPendingUiAction);
 
       try {
-        // Disable passphrase_protection and set safetyChecks: 0 (strict).
-        // The device first requires a button confirm, then a final slide confirm.
-        const featuresBeforeCheck = await fetchDeviceFeatures(sdk, connectId);
-        if (featuresBeforeCheck?.passphrase_protection) {
-          addLog('[SecurityCheck] Disabling passphrase_protection');
-          await sdk.deviceSettings(connectId, { usePassphrase: false });
-        }
+        const { forceUseEmptyPassphrase } = await prepareStandaloneMainWallet(
+          sdk,
+          connectId,
+          'SecurityCheck'
+        );
         setPendingUiActions('deviceSettings', 'disable safety checks', ['confirm']);
         // @ts-expect-error safetyChecks not in type definitions yet
         await sdk.deviceSettings(connectId, { safetyChecks: 0 });
@@ -2625,6 +2770,9 @@ export function useAutomationTest() {
         addLog(`[SecurityCheck] Running ${testCases.length} test cases`);
 
         for (const testCase of testCases) {
+          if (filterTitles && !filterTitles.has(testCase.title)) {
+            continue;
+          }
           const caseStart = Date.now();
           const { method, params, expect: expectedResult, title } = testCase;
 
@@ -2658,7 +2806,7 @@ export function useAutomationTest() {
                   (sdkMethod as (...args: unknown[]) => Promise<unknown>)(
                     connectId,
                     deviceId,
-                    params
+                    withMainWalletCommonParams(params, forceUseEmptyPassphrase)
                   ),
                   new Promise<'timeout'>(resolve => {
                     setTimeout(() => {
@@ -2749,24 +2897,38 @@ export function useAutomationTest() {
       executeNextPendingUiAction,
       incrementCompletedTests,
       notifyLiveCaseUpdate,
+      prepareStandaloneMainWallet,
       setPendingUiActions,
       setupUIListener,
     ]
   );
 
   const runChainMethodBatchSuite = useCallback(
-    async (sdk: CoreApi, connectId: string, deviceId: string): Promise<TestSuiteResult> => {
+    async (
+      sdk: CoreApi,
+      connectId: string,
+      deviceId: string,
+      filterTitles?: Set<string>
+    ): Promise<TestSuiteResult> => {
       const startedAt = Date.now();
       const results: TestCaseResult[] = [];
       addLog('[ChainMethodBatch] Starting chain method batch suite');
       setupUIListener(sdk, executeNextPendingUiAction);
 
       try {
+        const { forceUseEmptyPassphrase } = await prepareStandaloneMainWallet(
+          sdk,
+          connectId,
+          'ChainMethodBatch'
+        );
         for (const chain of chainTestData) {
           for (const entry of chain.data) {
             for (const presuppose of entry.presupposes ?? []) {
               const caseStart = Date.now();
               const caseTitle = `${chain.symbol} / ${entry.method} / ${presuppose.title}`;
+              if (filterTitles && !filterTitles.has(caseTitle)) {
+                continue;
+              }
               setPendingUiActions('chainMethodBatch', caseTitle, [
                 ...Array<DeviceUiAction>(entry.confirmCount ?? 0).fill('confirm'),
                 ...(entry.noSlide || !entry.confirmCount ? [] : (['slide'] as DeviceUiAction[])),
@@ -2788,7 +2950,11 @@ export function useAutomationTest() {
                     sdkMethod as (
                       ...args: unknown[]
                     ) => Promise<{ success: boolean; payload?: { error?: string } }>
-                  )(connectId, deviceId, presuppose.value);
+                  )(
+                    connectId,
+                    deviceId,
+                    withMainWalletCommonParams(presuppose.value, forceUseEmptyPassphrase)
+                  );
 
                   if (sdkResult.success) {
                     results.push({
@@ -2850,6 +3016,7 @@ export function useAutomationTest() {
       executeNextPendingUiAction,
       incrementCompletedTests,
       notifyLiveCaseUpdate,
+      prepareStandaloneMainWallet,
       setPendingUiActions,
       setupUIListener,
     ]
@@ -2871,15 +3038,20 @@ export function useAutomationTest() {
         const preparedContext = singleSecurityCheckPreparedRef.current;
         const canReusePreparation =
           preparedContext?.connectId === ctx.connectId && preparedContext.deviceId === ctx.deviceId;
+        let forceUseEmptyPassphrase = false;
 
         if (canReusePreparation) {
           addLog('[SecurityCheck] Reusing existing single-case device preparation');
-        } else {
-          const featuresBeforeCheck = await fetchDeviceFeatures(SDK, ctx.connectId);
-          if (featuresBeforeCheck?.passphrase_protection) {
-            addLog('[SecurityCheck] Disabling passphrase_protection');
-            await SDK.deviceSettings(ctx.connectId, { usePassphrase: false });
+          const featuresAfterPreparation = await fetchDeviceFeatures(SDK, ctx.connectId);
+          forceUseEmptyPassphrase = featuresAfterPreparation?.passphrase_protection === true;
+          if (forceUseEmptyPassphrase) {
+            addLog(
+              '[SecurityCheck] passphrase_protection remains enabled; forcing useEmptyPassphrase for this case'
+            );
           }
+        } else {
+          const preparation = await prepareStandaloneMainWallet(SDK, ctx.connectId, 'SecurityCheck');
+          forceUseEmptyPassphrase = preparation.forceUseEmptyPassphrase;
 
           setPendingUiActions('deviceSettings', 'disable safety checks', ['confirm']);
           // @ts-expect-error safetyChecks not in type definitions yet
@@ -2918,7 +3090,7 @@ export function useAutomationTest() {
               (sdkMethod as (...args: unknown[]) => Promise<unknown>)(
                 ctx.connectId,
                 ctx.deviceId,
-                testCase.params
+                withMainWalletCommonParams(testCase.params, forceUseEmptyPassphrase)
               ),
               new Promise<'timeout'>(resolve => {
                 setTimeout(() => {
@@ -2991,6 +3163,7 @@ export function useAutomationTest() {
       clearPendingUiActions,
       executeNextPendingUiAction,
       finalizeSingleSdkRun,
+      prepareStandaloneMainWallet,
       prepareSingleSdkRun,
       setPendingUiActions,
       setupUIListener,
@@ -3010,6 +3183,11 @@ export function useAutomationTest() {
       addLog(`[Single][ChainMethodBatch] ${testCase.title}`);
 
       try {
+        const { forceUseEmptyPassphrase } = await prepareStandaloneMainWallet(
+          SDK,
+          ctx.connectId,
+          'ChainMethodBatch'
+        );
         setPendingUiActions('chainMethodBatch', testCase.title, [
           ...Array<DeviceUiAction>(testCase.confirmCount).fill('confirm'),
           ...Array<DeviceUiAction>(testCase.slideCount).fill('slide'),
@@ -3028,7 +3206,11 @@ export function useAutomationTest() {
             sdkMethod as (
               ...args: unknown[]
             ) => Promise<{ success: boolean; payload?: { error?: string } }>
-          )(ctx.connectId, ctx.deviceId, testCase.params);
+          )(
+            ctx.connectId,
+            ctx.deviceId,
+            withMainWalletCommonParams(testCase.params, forceUseEmptyPassphrase)
+          );
 
           results.push({
             title: testCase.title,
@@ -3065,6 +3247,7 @@ export function useAutomationTest() {
       clearPendingUiActions,
       executeNextPendingUiAction,
       finalizeSingleSdkRun,
+      prepareStandaloneMainWallet,
       prepareSingleSdkRun,
       setPendingUiActions,
       setupUIListener,
@@ -3079,7 +3262,8 @@ export function useAutomationTest() {
       sdk: CoreApi,
       connectId: string,
       deviceId: string,
-      mnemonicStoreResult: MnemonicStoreResult | null
+      mnemonicStoreResult: MnemonicStoreResult | null,
+      retrySelection?: RetryCaseSelection
     ): Promise<TestSuiteResult[]> => {
       const nextSuiteResults = [...suiteResults];
 
@@ -3095,7 +3279,8 @@ export function useAutomationTest() {
                 sdk,
                 connectId,
                 deviceId,
-                config.passphraseVariants
+                config.passphraseVariants,
+                getRetrySuiteFilter(retrySelection, scenario.id, 'sdkAddressBatch')
               )
             : await runBip39CreateDynamicSuite(
                 'sdkAddressBatch',
@@ -3104,7 +3289,8 @@ export function useAutomationTest() {
                 connectId,
                 deviceId,
                 config.passphraseVariants,
-                mnemonicStoreResult
+                mnemonicStoreResult,
+                getRetrySuiteFilter(retrySelection, scenario.id, 'sdkAddressBatch')
               );
         const slip39AddressResult =
           scenario.flowType === 'create'
@@ -3115,7 +3301,8 @@ export function useAutomationTest() {
                 connectId,
                 deviceId,
                 config.passphraseVariants,
-                mnemonicStoreResult
+                mnemonicStoreResult,
+                getRetrySuiteFilter(retrySelection, scenario.id, 'sdkAddressBatch')
               )
             : await runSlip39SdkSuite(
                 'sdkAddressBatch',
@@ -3123,7 +3310,8 @@ export function useAutomationTest() {
                 sdk,
                 connectId,
                 deviceId,
-                config.passphraseVariants
+                config.passphraseVariants,
+                getRetrySuiteFilter(retrySelection, scenario.id, 'sdkAddressBatch')
               );
         const sdkAddressResult =
           scenario.walletType === 'bip39' ? bip39AddressResult : slip39AddressResult;
@@ -3146,7 +3334,8 @@ export function useAutomationTest() {
                 sdk,
                 connectId,
                 deviceId,
-                config.passphraseVariants
+                config.passphraseVariants,
+                getRetrySuiteFilter(retrySelection, scenario.id, 'sdkPubkeyBatch')
               )
             : await runBip39CreateDynamicSuite(
                 'sdkPubkeyBatch',
@@ -3155,7 +3344,8 @@ export function useAutomationTest() {
                 connectId,
                 deviceId,
                 config.passphraseVariants,
-                mnemonicStoreResult
+                mnemonicStoreResult,
+                getRetrySuiteFilter(retrySelection, scenario.id, 'sdkPubkeyBatch')
               );
         const slip39PubkeyResult =
           scenario.flowType === 'create'
@@ -3166,7 +3356,8 @@ export function useAutomationTest() {
                 connectId,
                 deviceId,
                 config.passphraseVariants,
-                mnemonicStoreResult
+                mnemonicStoreResult,
+                getRetrySuiteFilter(retrySelection, scenario.id, 'sdkPubkeyBatch')
               )
             : await runSlip39SdkSuite(
                 'sdkPubkeyBatch',
@@ -3174,7 +3365,8 @@ export function useAutomationTest() {
                 sdk,
                 connectId,
                 deviceId,
-                config.passphraseVariants
+                config.passphraseVariants,
+                getRetrySuiteFilter(retrySelection, scenario.id, 'sdkPubkeyBatch')
               );
         const sdkPubkeyResult =
           scenario.walletType === 'bip39' ? bip39PubkeyResult : slip39PubkeyResult;
@@ -3194,7 +3386,8 @@ export function useAutomationTest() {
           scenario,
           sdk,
           connectId,
-          deviceId
+          deviceId,
+          getRetrySuiteFilter(retrySelection, scenario.id, 'specialPassphrase')
         );
         nextSuiteResults.push(specialPassphraseResult);
         if (liveScenarioCtxRef.current) {
@@ -3208,7 +3401,12 @@ export function useAutomationTest() {
         scenario.supportedSuites.includes('securityCheck') &&
         !shouldStopBySuiteFailure(config.stopOnFirstError, nextSuiteResults)
       ) {
-        const securityCheckResult = await runSecurityCheckSuite(sdk, connectId, deviceId);
+        const securityCheckResult = await runSecurityCheckSuite(
+          sdk,
+          connectId,
+          deviceId,
+          getRetrySuiteFilter(retrySelection, scenario.id, 'securityCheck')
+        );
         nextSuiteResults.push(securityCheckResult);
         if (liveScenarioCtxRef.current) {
           liveScenarioCtxRef.current.completedSuiteResults = [...nextSuiteResults];
@@ -3221,7 +3419,12 @@ export function useAutomationTest() {
         scenario.supportedSuites.includes('chainMethodBatch') &&
         !shouldStopBySuiteFailure(config.stopOnFirstError, nextSuiteResults)
       ) {
-        const chainMethodBatchResult = await runChainMethodBatchSuite(sdk, connectId, deviceId);
+        const chainMethodBatchResult = await runChainMethodBatchSuite(
+          sdk,
+          connectId,
+          deviceId,
+          getRetrySuiteFilter(retrySelection, scenario.id, 'chainMethodBatch')
+        );
         nextSuiteResults.push(chainMethodBatchResult);
         if (liveScenarioCtxRef.current) {
           liveScenarioCtxRef.current.completedSuiteResults = [...nextSuiteResults];
@@ -3502,7 +3705,7 @@ export function useAutomationTest() {
   );
 
   const runAutomation = useCallback(
-    async (mode: AutomationRunMode): Promise<void> => {
+    async (mode: AutomationRunMode, retrySelection?: RetryCaseSelection): Promise<void> => {
       if (runningRef.current) {
         addLog('Automation is already running');
         return;
@@ -3539,24 +3742,33 @@ export function useAutomationTest() {
         config.devicePreparationMode === 'deviceFlowOnly'
           ? DEVICE_FLOW_ONLY_SUITES
           : config.testSuites;
-      const selectedScenarios = buildEffectiveSelectedScenarios(
-        config.scenarioIds,
-        effectiveRequestedSuites
-      );
+      const selectedScenarios = retrySelection
+        ? currentReport?.scenarioResults
+            .filter(scenarioResult => retrySelection.has(scenarioResult.scenarioId))
+            .map(scenarioResult => getAutomationScenario(scenarioResult.scenarioId)) || []
+        : buildEffectiveSelectedScenarios(config.scenarioIds, effectiveRequestedSuites);
       const totalSuites = selectedScenarios.reduce(
-        (sum, scenario) => sum + buildSelectedSuites(scenario, effectiveRequestedSuites).length,
-        0
-      );
-      const totalTests = selectedScenarios.reduce(
         (sum, scenario) =>
           sum +
-          countScenarioTotalTests(
-            scenario,
-            buildSelectedSuites(scenario, effectiveRequestedSuites),
-            config.passphraseVariants
-          ),
+          (
+            retrySelection
+              ? Array.from(retrySelection.get(scenario.id)?.keys() || [])
+              : buildSelectedSuites(scenario, effectiveRequestedSuites)
+          ).length,
         0
       );
+      const totalTests = retrySelection
+        ? countRetrySelectionTests(retrySelection)
+        : selectedScenarios.reduce(
+            (sum, scenario) =>
+              sum +
+              countScenarioTotalTests(
+                scenario,
+                buildSelectedSuites(scenario, effectiveRequestedSuites),
+                config.passphraseVariants
+              ),
+            0
+          );
       const { connectId } = selectedDevice;
       const startTime = Date.now();
       initLiveReport({ totalScenarios: selectedScenarios.length, startTime });
@@ -3580,11 +3792,16 @@ export function useAutomationTest() {
       }
 
       addLog(
-        mode === 'debug'
-          ? '=== Automation Debug Test Started ==='
-          : '=== Automation Test Started ==='
+        retrySelection
+          ? '=== Retry Failed Cases Started ==='
+          : mode === 'debug'
+            ? '=== Automation Debug Test Started ==='
+            : '=== Automation Test Started ==='
       );
       addLog(`Scenario count: ${selectedScenarios.length}`);
+      if (retrySelection) {
+        addLog(`Retry failed cases: ${totalTests}`);
+      }
       addLog(`Device preparation mode: ${config.devicePreparationMode}`);
       if (health) {
         addLog(`PhonePilot MCP ready: ${health.mcpReady ? 'yes' : 'no'}`);
@@ -3638,7 +3855,9 @@ export function useAutomationTest() {
             `\n--- Scenario ${scenarioIndex + 1}/${selectedScenarios.length}: ${scenario.title} ---`
           );
           // deviceFlowOnly: only run deviceFlow suite regardless of testSuites config
-          const selectedSuites = buildSelectedSuites(scenario, effectiveRequestedSuites);
+          const selectedSuites = retrySelection
+            ? Array.from(retrySelection.get(scenario.id)?.keys() || [])
+            : buildSelectedSuites(scenario, effectiveRequestedSuites);
           const scenarioStartedAt = Date.now();
           liveScenarioCtxRef.current = {
             scenario,
@@ -3697,7 +3916,8 @@ export function useAutomationTest() {
                 SDK,
                 connectId,
                 debugRunContext.deviceId,
-                debugRunContext.mnemonicStoreResult
+                debugRunContext.mnemonicStoreResult,
+                retrySelection
               );
               scenarioReport = buildScenarioReport(
                 scenario,
@@ -3857,7 +4077,8 @@ export function useAutomationTest() {
                       SDK,
                       connectId,
                       deviceId,
-                      preparation.mnemonicStoreResult
+                      preparation.mnemonicStoreResult,
+                      retrySelection
                     );
                   }
 
@@ -3927,9 +4148,11 @@ export function useAutomationTest() {
       }));
 
       addLog(
-        mode === 'debug'
-          ? '=== Automation Debug Test Completed ==='
-          : '=== Automation Test Completed ==='
+        retrySelection
+          ? '=== Retry Failed Cases Completed ==='
+          : mode === 'debug'
+            ? '=== Automation Debug Test Completed ==='
+            : '=== Automation Test Completed ==='
       );
       addLog(`Passed scenarios: ${report.passedScenarios}/${report.totalScenarios}`);
       addLog(`Failed scenarios: ${report.failedScenarios}`);
@@ -3948,6 +4171,7 @@ export function useAutomationTest() {
       executeScenarioPreparation,
       markScenarioCompleted,
       markSuiteCompleted,
+      currentReport,
       refreshDeviceId,
       refreshPhonePilotHealth,
       resetProgress,
@@ -3971,6 +4195,25 @@ export function useAutomationTest() {
     }
   }, [config.devicePreparationMode, runAutomation]);
   // Note: deviceFlowOnly uses 'full' run mode — SDK suites are skipped inside runAutomation
+
+  const retryFailedCases = useCallback(async (): Promise<void> => {
+    if (!currentReport) {
+      addLog('No report available for retry');
+      return;
+    }
+
+    const retrySelection = buildFailedCaseSelection(currentReport);
+    if (retrySelection.size === 0) {
+      addLog('No failed cases to retry');
+      return;
+    }
+
+    if (config.devicePreparationMode === 'sdkOnly') {
+      await runAutomation('debug', retrySelection);
+    } else {
+      await runAutomation('full', retrySelection);
+    }
+  }, [addLog, config.devicePreparationMode, currentReport, runAutomation]);
 
   const stopAutomation = useCallback(async () => {
     runningRef.current = false;
@@ -4016,6 +4259,7 @@ export function useAutomationTest() {
     connectPhonePilot,
     disconnectPhonePilot,
     startAutomation,
+    retryFailedCases,
     stopAutomation,
     captureFrame,
     runSingleSecurityCheckCase,
