@@ -523,18 +523,6 @@ export class LedgerConnectorBase implements IConnector {
       // dm.connect() requires the descriptor in _discovered, so name lookup
       // will succeed; fallback covers any transient race.
       const name = dm.getDeviceName(path) ?? 'Ledger';
-      debugLog(
-        '[SESS-DBG] connector.connect SUCCESS dmPath=',
-        path,
-        'externalConnectId=',
-        externalConnectId,
-        'newSessionId=',
-        sessionId,
-        'name=',
-        name,
-        'model=',
-        info?.model
-      );
       this._emit('device-connect', {
         device: { connectId: externalConnectId, deviceId: path, name },
       });
@@ -631,22 +619,8 @@ export class LedgerConnectorBase implements IConnector {
     // entries into the adapter's _sessions map and can route subsequent calls
     // to the wrong device. Let the error propagate so connect() cleans up the
     // just-created DMK session and fails loudly.
-    debugLog(
-      '[SESS-DBG] _watchSessionState SUBSCRIBE sessionId=',
-      sessionId,
-      'connectId=',
-      externalConnectId
-    );
     const sub = dmk.getDeviceSessionState({ sessionId }).subscribe({
       next: (state: { deviceStatus?: string }) => {
-        debugLog(
-          '[SESS-DBG] _watchSessionState NEXT sessionId=',
-          sessionId,
-          'connectId=',
-          externalConnectId,
-          'deviceStatus=',
-          state?.deviceStatus
-        );
         // String-compare against DeviceStatus.NOT_CONNECTED ("NOT CONNECTED")
         // to avoid pulling the runtime enum import (kept type-only for
         // Metro/RN compatibility — see _importLedgerKit).
@@ -654,25 +628,11 @@ export class LedgerConnectorBase implements IConnector {
           this._handleAutonomousDisconnect(sessionId, externalConnectId);
         }
       },
-      error: (err: unknown) => {
-        debugLog(
-          '[SESS-DBG] _watchSessionState ERROR sessionId=',
-          sessionId,
-          'connectId=',
-          externalConnectId,
-          'err=',
-          (err as { message?: string })?.message
-        );
+      error: () => {
         // DMK closed the observable abnormally — treat as disconnect.
         this._handleAutonomousDisconnect(sessionId, externalConnectId);
       },
       complete: () => {
-        debugLog(
-          '[SESS-DBG] _watchSessionState COMPLETE sessionId=',
-          sessionId,
-          'connectId=',
-          externalConnectId
-        );
         // Observable completed — session is gone from DMK's POV.
         this._handleAutonomousDisconnect(sessionId, externalConnectId);
       },
@@ -692,21 +652,7 @@ export class LedgerConnectorBase implements IConnector {
   }
 
   private _handleAutonomousDisconnect(sessionId: string, externalConnectId: string): void {
-    if (!this._sessionStateSubs.has(sessionId)) {
-      debugLog(
-        '[SESS-DBG] _handleAutonomousDisconnect SKIP (already handled) sessionId=',
-        sessionId,
-        'connectId=',
-        externalConnectId
-      );
-      return;
-    }
-    debugLog(
-      '[SESS-DBG] _handleAutonomousDisconnect FIRE sessionId=',
-      sessionId,
-      'connectId=',
-      externalConnectId
-    );
+    if (!this._sessionStateSubs.has(sessionId)) return; // already handled
     debugLog(
       '[DMK] autonomous disconnect detected — sessionId:',
       sessionId,

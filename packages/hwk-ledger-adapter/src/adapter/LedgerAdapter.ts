@@ -204,21 +204,12 @@ export class LedgerAdapter implements IHardwareWallet {
   // ---------------------------------------------------------------------------
 
   async searchDevices(options?: SearchDevicesOptions): Promise<DeviceInfo[]> {
-    debugLog(
-      '[SESS-DBG] searchDevices ENTER resetSession=',
-      options?.resetSession ?? false,
-      'sessionsBefore=',
-      this._snapshotSessions(),
-      'discoveredBefore=',
-      this._snapshotDiscovered()
-    );
     if (options?.resetSession) {
       this._doConnectAbortController?.abort();
       this._sessions.clear();
       this._connectingPromise = null;
       this._doConnectAbortController = null;
       this._btcHighIndexConfirmedThisSession = false;
-      debugLog('[SESS-DBG] searchDevices cleared _sessions (resetSession=true)');
     }
 
     await this._ensureDevicePermission();
@@ -239,63 +230,24 @@ export class LedgerAdapter implements IHardwareWallet {
     }
 
     debugLog(
-      '[SESS-DBG] searchDevices RETURN count=',
-      this._discoveredDevices.size,
-      'devices=',
-      devices.map(d => ({
-        connectId: d.connectId,
-        deviceId: d.deviceId,
-        name: d.name,
-        serial: d.serialNumber,
-      })),
-      'sessionsAfter=',
-      this._snapshotSessions()
+      `[LedgerAdapter] searchDevices() return count=${this._discoveredDevices.size} ids=[${[
+        ...this._discoveredDevices.keys(),
+      ].join(',')}]`
     );
     return Array.from(this._discoveredDevices.values());
   }
 
-  private _snapshotSessions(): Array<{ connectId: string; sessionId: string }> {
-    return [...this._sessions.entries()].map(([connectId, sessionId]) => ({
-      connectId,
-      sessionId,
-    }));
-  }
-
-  private _snapshotDiscovered(): Array<{
-    connectId: string;
-    deviceId: string;
-    label?: string;
-    serial?: string;
-  }> {
-    return [...this._discoveredDevices.entries()].map(([connectId, info]) => ({
-      connectId,
-      deviceId: info.deviceId,
-      label: info.label,
-      serial: info.serialNumber,
-    }));
-  }
-
-  // Enforce USB single-session invariant — see connectDevice.
-  private async _evictAllSessions(reason: string): Promise<void> {
+  // Enforce USB single-session invariant — see connectDevice. Drops every
+  // existing session, best-effort disconnecting each at the connector layer.
+  private async _evictAllSessions(): Promise<void> {
     if (this._sessions.size === 0) return;
-    const stale = [...this._sessions.entries()];
-    debugLog(
-      '[SESS-DBG] evictAllSessions reason=',
-      reason,
-      'evicting=',
-      stale.map(([cid, sid]) => ({ connectId: cid, sessionId: sid }))
-    );
+    const stale = [...this._sessions.values()];
     this._sessions.clear();
-    for (const [, sid] of stale) {
+    for (const sid of stale) {
       try {
         await this.connector.disconnect(sid);
-      } catch (err) {
-        debugLog(
-          '[SESS-DBG] evictAllSessions disconnect failed sessionId=',
-          sid,
-          'err=',
-          (err as { message?: string })?.message
-        );
+      } catch {
+        // best-effort
       }
     }
   }
@@ -325,14 +277,6 @@ export class LedgerAdapter implements IHardwareWallet {
   }
 
   async connectDevice(connectId: string): Promise<Response<string>> {
-    debugLog(
-      '[SESS-DBG] connectDevice ENTER connectId=',
-      connectId || '(empty)',
-      'sessionsBefore=',
-      this._snapshotSessions(),
-      'discoveredBefore=',
-      this._snapshotDiscovered()
-    );
     try {
       if (isLedgerBleConnectionType(this.connector.connectionType) && !connectId) {
         throw Object.assign(new Error('Ledger BLE connectId is required.'), {
@@ -344,28 +288,13 @@ export class LedgerAdapter implements IHardwareWallet {
       // before opening a new one — guards ensureConnected's empty-connectId
       // ambient fallback against ghost entries.
       if (!isLedgerBleConnectionType(this.connector.connectionType)) {
-        await this._evictAllSessions('connectDevice');
+        await this._evictAllSessions();
       }
 
       await this._ensureDevicePermission(connectId);
 
       const session = await this.connector.connect(connectId);
-      const prev = this._sessions.get(connectId);
       this._sessions.set(connectId, session.sessionId);
-      debugLog(
-        '[SESS-DBG] connectDevice SET _sessions connectId=',
-        connectId,
-        'newSessionId=',
-        session.sessionId,
-        'replacedPrevSessionId=',
-        prev ?? '(none)',
-        'sessionInfoDeviceId=',
-        session.deviceInfo?.deviceId,
-        'sessionInfoSerial=',
-        session.deviceInfo?.serialNumber,
-        'sessionsAfter=',
-        this._snapshotSessions()
-      );
 
       if (session.deviceInfo) {
         this._discoveredDevices.set(connectId, session.deviceInfo);
@@ -373,12 +302,6 @@ export class LedgerAdapter implements IHardwareWallet {
 
       return success(connectId);
     } catch (err) {
-      debugLog(
-        '[SESS-DBG] connectDevice ERROR connectId=',
-        connectId,
-        'err=',
-        (err as { message?: string })?.message
-      );
       return this.errorToFailure(err);
     }
   }
@@ -914,22 +837,7 @@ export class LedgerAdapter implements IHardwareWallet {
       });
     }
 
-    debugLog(
-      '[SESS-DBG] ensureConnected ENTER inputConnectId=',
-      connectId || '(empty)',
-      'sessions=',
-      this._snapshotSessions(),
-      'discovered=',
-      this._snapshotDiscovered()
-    );
-
     if (connectId && this._sessions.has(connectId)) {
-      debugLog(
-        '[SESS-DBG] ensureConnected RESOLVED path=fast-cache connectId=',
-        connectId,
-        'sessionId=',
-        this._sessions.get(connectId)
-      );
       return connectId;
     }
     // Ambient fallback only when caller didn't specify a target. If caller
@@ -944,10 +852,6 @@ export class LedgerAdapter implements IHardwareWallet {
         !isLedgerBleConnectionType(this.connector.connectionType) &&
         this._sessions.size > 1
       ) {
-        debugLog(
-          '[SESS-DBG] ensureConnected ABORT multiple USB sessions present sessions=',
-          this._snapshotSessions()
-        );
         throw Object.assign(
           new Error(
             'Ledger USB session invariant violated: more than one session is active. Please reconnect the device.'
@@ -955,20 +859,8 @@ export class LedgerAdapter implements IHardwareWallet {
           { code: HardwareErrorCode.DeviceOneDeviceOnly }
         );
       }
-      const ambient = this._sessions.keys().next().value as string;
-      debugLog(
-        '[SESS-DBG] ensureConnected RESOLVED path=ambient-fallback chosenConnectId=',
-        ambient,
-        'sessionId=',
-        this._sessions.get(ambient)
-      );
-      return ambient;
+      return this._sessions.keys().next().value as string;
     }
-    debugLog(
-      '[SESS-DBG] ensureConnected path=doConnect (no fast match)',
-      'connectId=',
-      connectId || '(empty)'
-    );
 
     if (!this._connectingPromise) {
       this._doConnectAbortController = new AbortController();
@@ -1181,18 +1073,7 @@ export class LedgerAdapter implements IHardwareWallet {
     },
     permissionDeviceId?: string
   ): Promise<unknown> {
-    debugLog(
-      '[SESS-DBG] connectorCall ENTER method=',
-      method,
-      'callerConnectId=',
-      connectId || '(empty)',
-      'callerDeviceId=',
-      fingerprint?.deviceId ?? permissionDeviceId ?? '(none)',
-      'sessions=',
-      this._snapshotSessions(),
-      'discovered=',
-      this._snapshotDiscovered()
-    );
+    debugLog('[LedgerAdapter] connectorCall:', method, 'connectId:', connectId || '(empty)');
 
     // Queue is global serial; deviceId is just a label for inspection / cancellation.
     const queueKey = connectId || '__ledger_default__';
@@ -1775,25 +1656,10 @@ export class LedgerAdapter implements IHardwareWallet {
 
   private deviceConnectHandler = (data: { device: ConnectorDevice }): void => {
     const deviceInfo = this.connectorDeviceToDeviceInfo(data.device);
-    const hadSession = this._sessions.get(deviceInfo.connectId);
     this._discoveredDevices.set(deviceInfo.connectId, deviceInfo);
     // Clear any stale session for this connectId so ensureConnected() does a fresh connect.
     // This handles the case where the connector reconnected internally (e.g. TRON app switch).
     this._sessions.delete(deviceInfo.connectId);
-    debugLog(
-      '[SESS-DBG] deviceConnectHandler EVENT connectId=',
-      deviceInfo.connectId,
-      'deviceId=',
-      deviceInfo.deviceId,
-      'label=',
-      deviceInfo.label,
-      'serial=',
-      deviceInfo.serialNumber,
-      'staleSessionDeleted=',
-      hadSession ?? '(none)',
-      'sessionsAfter=',
-      this._snapshotSessions()
-    );
     this.emitter.emit(DEVICE.CONNECT, {
       type: DEVICE.CONNECT,
       payload: deviceInfo,
@@ -1801,22 +1667,8 @@ export class LedgerAdapter implements IHardwareWallet {
   };
 
   private deviceDisconnectHandler = (data: { connectId: string }): void => {
-    const lostSession = this._sessions.get(data.connectId);
-    const lostDeviceInfo = this._discoveredDevices.get(data.connectId);
     this._discoveredDevices.delete(data.connectId);
     this._sessions.delete(data.connectId);
-    debugLog(
-      '[SESS-DBG] deviceDisconnectHandler EVENT connectId=',
-      data.connectId,
-      'removedSessionId=',
-      lostSession ?? '(none)',
-      'removedDeviceId=',
-      lostDeviceInfo?.deviceId,
-      'removedSerial=',
-      lostDeviceInfo?.serialNumber,
-      'sessionsAfter=',
-      this._snapshotSessions()
-    );
     this.emitter.emit(DEVICE.DISCONNECT, {
       type: DEVICE.DISCONNECT,
       payload: { connectId: data.connectId },
