@@ -116,6 +116,10 @@ export default class ElectronAutoBleTransport {
 
   private disconnectCleanups: Map<string, () => void> = new Map();
 
+  private notificationTokens: Map<string, number> = new Map();
+
+  private nextNotificationToken = 1;
+
   private handleBluetoothError(error: any): never {
     if (error && typeof error === 'object') {
       if ('code' in error) {
@@ -157,6 +161,7 @@ export default class ElectronAutoBleTransport {
     if (this.activeProtocolV2Call?.uuid === deviceId) {
       this.activeProtocolV2Call = null;
     }
+    this.notificationTokens.delete(deviceId);
 
     const notifyCleanup = this.notificationCleanups.get(deviceId);
     if (notifyCleanup) {
@@ -263,13 +268,7 @@ export default class ElectronAutoBleTransport {
 
       await window.desktopApi.nobleBle.subscribe(uuid);
 
-      const cleanup = window.desktopApi.nobleBle.onNotification(
-        (deviceId: string, data: string) => {
-          if (deviceId === uuid) {
-            this.handleNotification(uuid, data);
-          }
-        }
-      );
+      const cleanup = this.createNotificationSubscription(uuid);
       this.notificationCleanups.set(uuid, cleanup);
 
       const disconnectCleanup = window.desktopApi.nobleBle.onDeviceDisconnected(
@@ -371,12 +370,68 @@ export default class ElectronAutoBleTransport {
     }
 
     let protocol: ProtocolType = 'V1';
-    if (!(await this.probeProtocolV1(uuid)) && (await this.probeProtocolV2(uuid))) {
-      protocol = 'V2';
+    const protocolV1Detected = await this.probeProtocolV1(uuid);
+    if (!protocolV1Detected) {
+      await this.resetProbeStateAfterProtocolProbe(uuid, 'V1');
+      if (await this.probeProtocolV2(uuid)) {
+        protocol = 'V2';
+      }
     }
     this.deviceProtocol.set(uuid, protocol);
     this.Log?.debug(`[Auto BLE] detectProtocol: uuid=${uuid} -> ${protocol}`);
     return protocol;
+  }
+
+  private createNotificationSubscription(uuid: string) {
+    if (!window.desktopApi?.nobleBle) {
+      throw new Error('Noble BLE API not available');
+    }
+
+    const notificationToken = this.nextNotificationToken;
+    this.nextNotificationToken += 1;
+    this.notificationTokens.set(uuid, notificationToken);
+
+    return window.desktopApi.nobleBle.onNotification((deviceId: string, data: string) => {
+      if (deviceId === uuid && this.notificationTokens.get(uuid) === notificationToken) {
+        this.handleNotification(uuid, data);
+      }
+    });
+  }
+
+  private async resetProbeStateAfterProtocolProbe(uuid: string, protocol: ProtocolType) {
+    this.v1Buffers.set(uuid, { buffer: [], bufferLength: 0 });
+    this.v2Assemblers.get(uuid)?.reset();
+    this.resetProtocolV2Frames(uuid);
+    if (this.activeProtocolV2Call?.uuid === uuid) {
+      this.activeProtocolV2Call = null;
+    }
+    if (this.runPromise) {
+      const error = ERRORS.TypedError(HardwareErrorCode.BleForceCleanRunPromise);
+      this.runPromise.reject(error);
+      this.runPromise = null;
+    }
+
+    const notifyCleanup = this.notificationCleanups.get(uuid);
+    if (notifyCleanup) {
+      notifyCleanup();
+      this.notificationCleanups.delete(uuid);
+    }
+    this.notificationTokens.delete(uuid);
+
+    try {
+      await window.desktopApi?.nobleBle?.unsubscribe(uuid);
+    } catch (error) {
+      this.Log?.debug(`[Auto BLE] unsubscribe after Protocol ${protocol} probe failed:`, error);
+    }
+    try {
+      await window.desktopApi?.nobleBle?.subscribe(uuid);
+    } catch (error) {
+      this.Log?.debug(`[Auto BLE] resubscribe after Protocol ${protocol} probe failed:`, error);
+      throw error;
+    }
+
+    const cleanup = this.createNotificationSubscription(uuid);
+    this.notificationCleanups.set(uuid, cleanup);
   }
 
   private async probeProtocolV1(uuid: string) {

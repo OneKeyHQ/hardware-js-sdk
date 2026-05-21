@@ -5,6 +5,13 @@ import {
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { BaseMethod } from './BaseMethod';
+import {
+  validateNonEmptyString,
+  validateNonNegativeInteger,
+  validateOptionalNonNegativeInteger,
+  validateOptionalPercentage,
+  validateRequiredData,
+} from './helpers/filesystemValidation';
 import { UI_REQUEST, createUiMessage } from '../events/ui-request';
 import { DataManager } from '../data-manager';
 
@@ -47,7 +54,10 @@ async function dataToUint8Array(data: FileWriteParams['data'] | Blob): Promise<U
     return new Uint8Array(await data.arrayBuffer());
   }
 
-  throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Unsupported FilesystemFileWrite data');
+  throw ERRORS.TypedError(
+    HardwareErrorCode.CallMethodInvalidParameter,
+    'Unsupported FilesystemFileWrite data'
+  );
 }
 
 function normalizeChunkSize(value: unknown, maxChunkSize: number): number {
@@ -77,17 +87,19 @@ export default class FileWrite extends BaseMethod<FileWriteParams> {
   init() {
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
-    const offset = this.payload.offset ?? 0;
+    validateRequiredData(this.payload.data, 'data');
+    const path = validateNonEmptyString(this.payload.path, 'path');
+    const offset = validateNonNegativeInteger(this.payload.offset, 'offset', 0);
     this.params = {
-      path: this.payload.path,
+      path,
       offset,
-      totalSize: this.payload.totalSize ?? 0,
+      totalSize: validateNonNegativeInteger(this.payload.totalSize, 'totalSize', 0),
       data: this.payload.data,
-      chunkSize: this.payload.chunkSize,
-      chunkLen: this.payload.chunkLen,
+      chunkSize: validateOptionalNonNegativeInteger(this.payload.chunkSize, 'chunkSize'),
+      chunkLen: validateOptionalNonNegativeInteger(this.payload.chunkLen, 'chunkLen'),
       overwrite: this.payload.overwrite ?? offset === 0,
       append: this.payload.append ?? false,
-      uiPercentage: this.payload.uiPercentage,
+      uiPercentage: validateOptionalPercentage(this.payload.uiPercentage, 'uiPercentage'),
     };
   }
 

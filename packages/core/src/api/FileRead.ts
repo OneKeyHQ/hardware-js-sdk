@@ -5,6 +5,12 @@ import {
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { BaseMethod } from './BaseMethod';
+import {
+  validateNonEmptyString,
+  validateNonNegativeInteger,
+  validateOptionalNonNegativeInteger,
+  validateOptionalPercentage,
+} from './helpers/filesystemValidation';
 import { hexToBytes, isHexString, stripHexPrefix } from './helpers/hexUtils';
 import { DataManager } from '../data-manager';
 
@@ -67,12 +73,13 @@ export default class FileRead extends BaseMethod<FileReadParams> {
   init() {
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
+    const path = validateNonEmptyString(this.payload.path, 'path');
     this.params = {
-      path: this.payload.path,
-      offset: this.payload.offset ?? 0,
-      totalSize: this.payload.totalSize ?? 0,
-      chunkLen: this.payload.chunkLen,
-      uiPercentage: this.payload.uiPercentage,
+      path,
+      offset: validateNonNegativeInteger(this.payload.offset, 'offset', 0),
+      totalSize: validateNonNegativeInteger(this.payload.totalSize, 'totalSize', 0),
+      chunkLen: validateOptionalNonNegativeInteger(this.payload.chunkLen, 'chunkLen'),
+      uiPercentage: validateOptionalPercentage(this.payload.uiPercentage, 'uiPercentage'),
     };
   }
 

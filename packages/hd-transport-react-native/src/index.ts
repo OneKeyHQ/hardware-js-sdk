@@ -1153,12 +1153,67 @@ export default class ReactNativeBleTransport {
     }
 
     let protocol: ProtocolType = 'V1';
-    if (!(await this.probeProtocolV1(uuid)) && (await this.probeProtocolV2(uuid))) {
-      protocol = 'V2';
+    const protocolV1Detected = await this.probeProtocolV1(uuid);
+    if (!protocolV1Detected) {
+      await this.resetProbeStateAfterProtocolProbe(uuid, 'V1');
+      if (await this.probeProtocolV2(uuid)) {
+        protocol = 'V2';
+      }
     }
     this.deviceProtocol.set(uuid, protocol);
     Log?.debug(`[ReactNativeBleTransport] detectProtocol: uuid=${uuid} -> ${protocol}`);
     return protocol;
+  }
+
+  private async resetProbeStateAfterProtocolProbe(uuid: string, protocol: ProtocolType) {
+    const transport = transportCache[uuid];
+    this.protocolV2Assemblers.get(uuid)?.reset();
+    this.resetProtocolV2Frames(uuid);
+    if (this.activeProtocolV2Call?.uuid === uuid) {
+      this.activeProtocolV2Call = null;
+    }
+    if (this.runPromise) {
+      const error = ERRORS.TypedError(HardwareErrorCode.BleForceCleanRunPromise);
+      this.runPromise.reject(error);
+      this.runPromise = null;
+    }
+
+    if (!transport) return;
+
+    const previousNotifyTransactionId = transport.notifyTransactionId;
+    if (this.monitorTokens.get(uuid) === transport.monitorToken) {
+      this.monitorTokens.delete(uuid);
+    }
+    transport.notifySubscription?.remove();
+    transport.notifySubscription = undefined;
+    if (previousNotifyTransactionId) {
+      try {
+        await this.blePlxManager?.cancelTransaction(previousNotifyTransactionId);
+      } catch (error) {
+        Log?.debug(
+          `[ReactNativeBleTransport] cancel notify after Protocol ${protocol} probe failed:`,
+          error?.message || error
+        );
+      }
+    }
+
+    const monitorToken = this.nextMonitorToken;
+    this.nextMonitorToken += 1;
+    const notifyTransactionId = `${uuid}:notify:${monitorToken}`;
+    transport.monitorToken = monitorToken;
+    transport.notifyTransactionId = notifyTransactionId;
+    this.monitorTokens.set(uuid, monitorToken);
+    transport.notifySubscription = this._monitorCharacteristic(
+      transport.notifyCharacteristic,
+      uuid,
+      monitorToken,
+      notifyTransactionId
+    );
+    if (Platform.OS === 'ios') {
+      await new Promise<void>(resolve => {
+        setTimeout(resolve, IOS_NOTIFY_READY_DELAY_MS);
+      });
+    }
   }
 
   private async probeProtocolV1(uuid: string) {

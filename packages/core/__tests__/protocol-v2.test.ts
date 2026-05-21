@@ -5,6 +5,7 @@ import { DeviceRebootType } from '@onekeyfe/hd-transport';
 import ConfluxSignTransaction from '../src/api/conflux/ConfluxSignTransaction';
 import DnxGetAddress from '../src/api/dynex/DnxGetAddress';
 import DnxSignTransaction from '../src/api/dynex/DnxSignTransaction';
+import DirList from '../src/api/DirList';
 import FileRead from '../src/api/FileRead';
 import FileWrite from '../src/api/FileWrite';
 import DeviceFirmwareUpdate from '../src/api/protocol-v2/DeviceFirmwareUpdate';
@@ -275,15 +276,10 @@ describe('Protocol V2 feature adapter', () => {
     expect(features.initialized).toBe(true);
     expect(features.passphrase_protection).toBe(true);
     expect(commands.typedCall).toHaveBeenNthCalledWith(1, 'Ping', 'Success', { message: 'init' });
-    expect(commands.typedCall).toHaveBeenNthCalledWith(
-      2,
-      'DeviceGetDeviceInfo',
-      'DeviceInfo',
-      {
-        targets: expect.objectContaining({ status: true }),
-        types: expect.objectContaining({ specific: true }),
-      }
-    );
+    expect(commands.typedCall).toHaveBeenNthCalledWith(2, 'DeviceGetDeviceInfo', 'DeviceInfo', {
+      targets: expect.objectContaining({ status: true }),
+      types: expect.objectContaining({ specific: true }),
+    });
   });
 
   test('falls back to descriptor features when Protocol V2 DeviceGetDeviceInfo fails', async () => {
@@ -1006,6 +1002,7 @@ describe('Protocol V2 firmware update method', () => {
       id: 1,
       payload: {
         method: 'deviceFirmwareUpdate',
+        targetId: 3,
         path: 'vol0:firmware.bin',
       },
     });
@@ -1024,6 +1021,55 @@ describe('Protocol V2 firmware update method', () => {
       targets: [{ target_id: 0, status: 1 }],
     });
     expect(typedCall.mock.calls[0][1]).toEqual(['Success', 'DeviceFirmwareUpdateStatus']);
+    expect(typedCall.mock.calls[0][2]).toEqual({
+      targets: [{ target_id: 3, path: 'vol0:firmware.bin' }],
+    });
+  });
+
+  test('rejects missing or invalid firmware targets before transport call', async () => {
+    const typedCall = jest.fn();
+    const method = new DeviceFirmwareUpdate({
+      id: 1,
+      payload: {
+        method: 'deviceFirmwareUpdate',
+        path: 'vol0:firmware.bin',
+      },
+    });
+    method.init();
+    (method as any).device = {
+      commands: { typedCall },
+    };
+
+    await expect(method.run()).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.CallMethodInvalidParameter,
+    });
+    expect(typedCall).not.toHaveBeenCalled();
+  });
+
+  test('accepts targetId alias inside firmware targets', async () => {
+    const typedCall = jest.fn().mockResolvedValue({ message: {} });
+    const method = new DeviceFirmwareUpdate({
+      id: 1,
+      payload: {
+        method: 'deviceFirmwareUpdate',
+        targets: [
+          {
+            target_id: undefined,
+            targetId: 3,
+            path: 'vol0:firmware.bin',
+          },
+        ],
+      } as any,
+    });
+    method.init();
+    (method as any).device = {
+      commands: { typedCall },
+    };
+
+    await method.run();
+    expect(typedCall.mock.calls[0][2]).toEqual({
+      targets: [{ target_id: 3, path: 'vol0:firmware.bin' }],
+    });
   });
 });
 
@@ -1064,6 +1110,36 @@ describe('Protocol V2 onboarding status method', () => {
 });
 
 describe('Protocol V2 file write method', () => {
+  test('rejects invalid write parameters before transport call', () => {
+    expect(() => {
+      const method = new FileWrite({
+        id: 1,
+        payload: {
+          method: 'fileWrite',
+          path: 'vol1:test.bin',
+          offset: -1,
+          data: new Uint8Array([1]),
+        },
+      });
+      method.init();
+    }).toThrow(
+      expect.objectContaining({ errorCode: HardwareErrorCode.CallMethodInvalidParameter })
+    );
+
+    expect(() => {
+      const method = new FileWrite({
+        id: 1,
+        payload: {
+          method: 'fileWrite',
+          path: 'vol1:test.bin',
+        } as any,
+      });
+      method.init();
+    }).toThrow(
+      expect.objectContaining({ errorCode: HardwareErrorCode.CallMethodInvalidParameter })
+    );
+  });
+
   test('uses demo-aligned overwrite and append defaults', async () => {
     const typedCall = jest.fn().mockResolvedValue({ message: { processed_byte: 1 } });
     const method = new FileWrite({
@@ -1206,6 +1282,50 @@ describe('Protocol V2 file write method', () => {
 });
 
 describe('Protocol V2 file read method', () => {
+  test('rejects invalid read and directory parameters before transport call', () => {
+    expect(() => {
+      const method = new FileRead({
+        id: 1,
+        payload: {
+          method: 'fileRead',
+          path: '',
+          offset: 0,
+        },
+      });
+      method.init();
+    }).toThrow(
+      expect.objectContaining({ errorCode: HardwareErrorCode.CallMethodInvalidParameter })
+    );
+
+    expect(() => {
+      const method = new FileRead({
+        id: 1,
+        payload: {
+          method: 'fileRead',
+          path: 'vol1:test.bin',
+          totalSize: -1,
+        },
+      });
+      method.init();
+    }).toThrow(
+      expect.objectContaining({ errorCode: HardwareErrorCode.CallMethodInvalidParameter })
+    );
+
+    expect(() => {
+      const method = new DirList({
+        id: 1,
+        payload: {
+          method: 'dirList',
+          path: 'vol1:',
+          depth: -1,
+        },
+      });
+      method.init();
+    }).toThrow(
+      expect.objectContaining({ errorCode: HardwareErrorCode.CallMethodInvalidParameter })
+    );
+  });
+
   test('reads full file in chunks when read length is 0', async () => {
     const firstChunk = new Uint8Array(64).fill(1);
     const typedCall = jest

@@ -1,4 +1,8 @@
 import { BaseMethod } from './BaseMethod';
+import {
+  validateNonEmptyString,
+  validateOptionalNonNegativeInteger,
+} from './helpers/filesystemValidation';
 
 export type DirListParams = {
   path: string;
@@ -10,8 +14,8 @@ export default class DirList extends BaseMethod<DirListParams> {
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
     this.params = {
-      path: this.payload.path,
-      depth: this.payload.depth,
+      path: validateNonEmptyString(this.payload.path, 'path'),
+      depth: validateOptionalNonNegativeInteger(this.payload.depth, 'depth'),
     };
   }
 
