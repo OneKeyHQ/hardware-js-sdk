@@ -76,28 +76,28 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
       case 'loading':
         return {
           icon: <Clock className="h-5 w-5 animate-spin" />,
-          color: 'text-blue-600',
-          bgColor: 'bg-blue-50',
-          borderColor: 'border-blue-200',
-          badgeColor: 'bg-blue-100 text-blue-800 border-blue-300',
+          color: 'text-primary-foreground',
+          bgColor: 'bg-primary',
+          borderColor: 'border-primary',
+          badgeColor: 'bg-primary text-primary-foreground border-primary',
           message: t('components.methodExecutor.executing'),
         };
       case 'device-interaction':
         return {
           icon: <Clock className="h-5 w-5 animate-pulse" />,
-          color: 'text-green-600',
-          bgColor: 'bg-green-50',
-          borderColor: 'border-green-200',
-          badgeColor: 'bg-green-100 text-green-800 border-green-300',
+          color: 'text-primary-foreground',
+          bgColor: 'bg-primary',
+          borderColor: 'border-primary',
+          badgeColor: 'bg-primary text-primary-foreground border-primary',
           message: t('deviceOperations.deviceInstructions'),
         };
       case 'success':
         return {
           icon: <CheckCircle className="h-5 w-5" />,
-          color: 'text-green-600',
-          bgColor: 'bg-green-50',
-          borderColor: 'border-green-200',
-          badgeColor: 'bg-green-100 text-green-800 border-green-300',
+          color: 'text-primary-foreground',
+          bgColor: 'bg-primary',
+          borderColor: 'border-primary',
+          badgeColor: 'bg-primary text-primary-foreground border-primary',
           message: t('components.methodExecutor.executionSuccess'),
         };
       case 'error':
@@ -281,18 +281,20 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
           )}
 
           {status === 'success' && firmwareVersionRows.length > 0 && (
-            <div className="order-4 w-full mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+            <div className="order-4 w-full mb-4 rounded-lg border border-primary bg-primary p-3 text-primary-foreground">
               <div className="flex items-center gap-2 mb-2">
-                <CheckCircle className="h-4 w-4 text-green-600" />
-                <span className="text-sm font-medium text-green-800">
+                <CheckCircle className="h-4 w-4 text-primary-foreground" />
+                <span className="text-sm font-medium text-primary-foreground">
                   {t('components.deviceInteractionArea.updatedVersions')}
                 </span>
               </div>
               <div className="space-y-1">
                 {firmwareVersionRows.map(row => (
                   <div key={row.label} className="flex items-center justify-between gap-3 text-xs">
-                    <span className="text-green-700">{row.label}</span>
-                    <span className="font-mono font-medium text-green-900">{row.value}</span>
+                    <span className="text-primary-foreground/80">{row.label}</span>
+                    <span className="font-mono font-medium text-primary-foreground">
+                      {row.value}
+                    </span>
                   </div>
                 ))}
               </div>

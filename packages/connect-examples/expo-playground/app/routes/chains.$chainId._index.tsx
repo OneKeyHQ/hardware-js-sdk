@@ -4,20 +4,14 @@ import { useTranslation } from 'react-i18next';
 import { getHDPath } from '@onekeyfe/hd-core';
 import { ArrowRight, Layers, Loader2, Play, RotateCcw } from 'lucide-react';
 import { Button } from '../components/ui/Button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../components/ui/Select';
 import { PageLayout } from '../components/common/PageLayout';
 import { DeviceNotConnectedState } from '../components/common/DeviceNotConnectedState';
 import { ChainBoundary } from '../components/common/ChainBoundary';
 import { Breadcrumb } from '../components/ui/Breadcrumb';
+import ParameterInput from '../components/common/ParameterInput';
 import { useMethodResolver } from '../hooks/useMethodResolver';
 import { useHardwareMethodExecution } from '../hooks/useHardwareMethodExecution';
-import { useHardwareStore } from '../store/hardwareStore';
+import { useHardwareStore, type CommonParametersState } from '../store/hardwareStore';
 import { useDeviceStore } from '../store/deviceStore';
 import { ChainIcon } from '../components/icons/ChainIcon';
 import { processParameters } from '../utils/parameterUtils';
@@ -46,6 +40,7 @@ const COMMON_PROTOCOL_FIELDS = new Set([
   'deriveCardano',
   'skipPassphraseCheck',
 ]);
+const COMMON_PARAMETER_NAMES = new Set(['useEmptyPassphrase', 'passphraseState', 'deriveCardano']);
 
 const TON_WIRE_INFO: Record<string, { tx: string; rx: string; decoded: string }> = {
   tonGetAddress: {
@@ -258,6 +253,63 @@ function getPresetExecutionParams(preset?: MethodPreset) {
   );
 }
 
+function splitPresetExecutionParams(preset?: MethodPreset): {
+  methodParams: Record<string, unknown>;
+  commonParams: Partial<CommonParametersState>;
+} {
+  const params = getPresetExecutionParams(preset);
+  const methodParams: Record<string, unknown> = {};
+  const commonParams: Partial<CommonParametersState> = {};
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (!COMMON_PARAMETER_NAMES.has(key)) {
+      methodParams[key] = value;
+      return;
+    }
+
+    if (key === 'useEmptyPassphrase') {
+      commonParams.useEmptyPassphrase = Boolean(value);
+    } else if (key === 'deriveCardano') {
+      commonParams.deriveCardano = Boolean(value);
+    } else if (key === 'passphraseState') {
+      commonParams.passphraseState = String(value);
+    }
+  });
+
+  return { methodParams, commonParams };
+}
+
+function inlineStatusLabel(status: InlineExecutionState['status']) {
+  switch (status) {
+    case 'loading':
+      return 'Running';
+    case 'success':
+      return 'Success';
+    case 'cancelled':
+      return 'Cancelled';
+    case 'error':
+      return 'Error';
+    case 'idle':
+    default:
+      return 'Idle';
+  }
+}
+
+function inlineStatusClassName(status: InlineExecutionState['status']) {
+  switch (status) {
+    case 'success':
+    case 'loading':
+      return 'border-primary bg-primary text-primary-foreground shadow-sm';
+    case 'error':
+      return 'border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-300';
+    case 'cancelled':
+      return 'border-border/70 bg-muted/40 text-muted-foreground';
+    case 'idle':
+    default:
+      return 'border-border/70 text-muted-foreground';
+  }
+}
+
 const ChainMethodsIndexPage: React.FC = () => {
   const { chainId } = useParams();
   const navigate = useNavigate();
@@ -270,7 +322,12 @@ const ChainMethodsIndexPage: React.FC = () => {
 
   const { selectedChain, isChainNotFound } = useMethodResolver({ chainId });
   const { executeMethod, canExecute, currentDevice } = useHardwareMethodExecution();
-  const { commonParameters } = useHardwareStore();
+  const {
+    commonParameters,
+    methodParameters,
+    setMethodParameters,
+    setCommonParameters,
+  } = useHardwareStore();
   const { logs: globalLogs } = useDeviceStore();
 
   const methods = useMemo(() => selectedChain?.methods ?? [], [selectedChain?.methods]);
@@ -322,22 +379,30 @@ const ChainMethodsIndexPage: React.FC = () => {
     setIsInlineCancelling(false);
   }, [activeMethod?.method, activePreset?.title]);
 
+  useEffect(() => {
+    const { methodParams, commonParams } = splitPresetExecutionParams(activePreset);
+    setMethodParameters(methodParams);
+    if (Object.keys(commonParams).length > 0) {
+      setCommonParameters(commonParams);
+    }
+  }, [activePreset, setCommonParameters, setMethodParameters]);
+
   const handleOpenRunner = (methodName: string) => {
     navigate(`/chains/${chainId}/${methodName}`);
   };
 
   const getInlineExecutionParams = useCallback(
-    (preset?: MethodPreset) =>
+    () =>
       cleanExecutionParams({
-        ...getPresetExecutionParams(preset),
+        ...methodParameters,
         ...commonParameters,
       }),
-    [commonParameters]
+    [commonParameters, methodParameters]
   );
 
   const activeRequestPayload = useMemo(
-    () => getInlineExecutionParams(activePreset),
-    [activePreset, getInlineExecutionParams]
+    () => getInlineExecutionParams(),
+    [getInlineExecutionParams]
   );
   const activeRequestPreview = useMemo(
     () =>
@@ -602,7 +667,7 @@ const ChainMethodsIndexPage: React.FC = () => {
                             <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
                               <div className="min-w-0">
                                 <div className="text-sm font-semibold text-foreground">
-                                  Active preset
+                                  Method parameters
                                 </div>
                                 {activePreset?.description && (
                                   <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
@@ -610,29 +675,14 @@ const ChainMethodsIndexPage: React.FC = () => {
                                   </p>
                                 )}
                               </div>
-                              <div className="w-full shrink-0 xl:w-[300px]">
-                                {activeMethod.presets.length > 1 ? (
-                                  <Select
-                                    value={activePreset?.title || ''}
-                                    onValueChange={setSelectedPresetTitle}
-                                  >
-                                    <SelectTrigger className="h-8 bg-card text-xs">
-                                      <SelectValue placeholder="Select preset" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {activeMethod.presets.map(preset => (
-                                        <SelectItem key={preset.title} value={preset.title}>
-                                          {preset.title}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                ) : (
-                                  <div className="truncate rounded-md border border-border/70 bg-card px-3 py-1.5 text-sm font-semibold text-foreground">
-                                    {activePreset?.title || 'No preset'}
-                                  </div>
-                                )}
-                              </div>
+                            </div>
+                            <div className="mt-3">
+                              <ParameterInput
+                                methodConfig={activeMethod}
+                                selectedPreset={activePreset?.title || null}
+                                onPresetChange={setSelectedPresetTitle}
+                                embedded
+                              />
                             </div>
                           </div>
 
@@ -652,27 +702,11 @@ const ChainMethodsIndexPage: React.FC = () => {
                                   Response
                                 </div>
                                 <span
-                                  className={`rounded-full border px-2 py-0.5 text-xs ${
-                                    inlineExecution.status === 'success'
-                                      ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300'
-                                      : inlineExecution.status === 'error'
-                                      ? 'border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-300'
-                                      : inlineExecution.status === 'loading'
-                                      ? 'border-primary/30 bg-primary/10 text-primary'
-                                      : inlineExecution.status === 'cancelled'
-                                      ? 'border-border/70 bg-muted/40 text-muted-foreground'
-                                      : 'border-border/70 text-muted-foreground'
-                                  }`}
+                                  className={`rounded-full border px-2 py-0.5 text-xs ${inlineStatusClassName(
+                                    inlineExecution.status
+                                  )}`}
                                 >
-                                  {inlineExecution.status === 'idle'
-                                    ? 'Idle'
-                                    : inlineExecution.status === 'loading'
-                                    ? 'Running'
-                                    : inlineExecution.status === 'success'
-                                    ? 'Success'
-                                    : inlineExecution.status === 'cancelled'
-                                    ? 'Cancelled'
-                                    : 'Error'}
+                                  {inlineStatusLabel(inlineExecution.status)}
                                 </span>
                               </div>
 
@@ -690,7 +724,7 @@ const ChainMethodsIndexPage: React.FC = () => {
                                 )}
 
                                 {inlineExecution.status === 'loading' && (
-                                  <div className="flex items-center gap-2 rounded-md border border-primary/20 bg-primary/5 px-3 py-3 text-sm text-primary">
+                                  <div className="flex items-center gap-2 rounded-md border border-primary bg-primary px-3 py-3 text-sm font-medium text-primary-foreground">
                                     <Loader2 className="h-4 w-4 animate-spin" />
                                     Waiting for device response...
                                   </div>
