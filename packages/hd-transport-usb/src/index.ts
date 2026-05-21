@@ -310,6 +310,8 @@ export default class NodeUsbTransport {
    * Acquire device — open USB device, claim interface, return path (string).
    */
   async acquire(input: AcquireInput): Promise<string> {
+    this.cancelled = false;
+
     const path = input.path ?? '';
     if (!path) {
       throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound, 'No device path provided');
