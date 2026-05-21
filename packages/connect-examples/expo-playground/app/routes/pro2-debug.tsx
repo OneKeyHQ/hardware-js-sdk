@@ -23,8 +23,7 @@ const PRO2_METHOD_GROUPS = [
     methods: [
       'getProtoVersion',
       'ping',
-      // DeviceGetDeviceInfo 暂时关闭，避免直接调用固件侧 DeviceInfo。
-      // 'deviceGetDeviceInfo',
+      'deviceGetDeviceInfo',
       'deviceGetOnboardingStatus',
       'deviceReboot',
       'factoryGetDeviceInfo',
@@ -66,7 +65,7 @@ const DEFAULT_SELECTED_METHOD = 'dirList';
 const PRO2_METHOD_LABELS: Record<string, string> = {
   getProtoVersion: 'Proto Version',
   ping: 'Ping',
-  // deviceGetDeviceInfo: 'Device Info',
+  deviceGetDeviceInfo: 'Device Info',
   deviceReboot: 'Reboot',
   deviceGetOnboardingStatus: 'Onboarding',
   factoryGetDeviceInfo: 'Factory Info',
@@ -117,13 +116,13 @@ const PRO2_METHOD_WIRE_INFO: Record<string, MethodWireInfo> = {
     rxPayload: '2f eb 0a 12 48 65 6c 6c 6f 20 66 72 6f 6d 20 57 65 62 55 53 42 21',
     decoded: 'Success: "Hello from WebUSB!"',
   },
-  // deviceGetDeviceInfo: {
-  //   tx: '60600 (DeviceGetDeviceInfo)',
-  //   txPayload: PRO2_DYNAMIC_PAYLOAD,
-  //   rx: '60601 (DeviceInfo)',
-  //   rxPayload: PRO2_DYNAMIC_RESPONSE,
-  //   decoded: 'DeviceInfo',
-  // },
+  deviceGetDeviceInfo: {
+    tx: '60600 (DeviceGetDeviceInfo)',
+    txPayload: PRO2_DYNAMIC_PAYLOAD,
+    rx: '60601 (DeviceInfo)',
+    rxPayload: PRO2_DYNAMIC_RESPONSE,
+    decoded: 'DeviceInfo',
+  },
   deviceReboot: {
     tx: '60400 (DeviceReboot)',
     txPayload: PRO2_DYNAMIC_PAYLOAD,

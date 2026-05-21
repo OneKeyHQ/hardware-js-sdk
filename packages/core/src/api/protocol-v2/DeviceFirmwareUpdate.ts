@@ -20,11 +20,12 @@ export default class DeviceFirmwareUpdate extends BaseMethod<DeviceFirmwareUpdat
   }
 
   async run() {
+    const targets = normalizeFirmwareTargets(this.params);
     const res = await this.device.commands.typedCall(
       'DeviceFirmwareUpdate',
       PROTOCOL_V2_FIRMWARE_UPDATE_RESPONSE_TYPES,
       {
-        targets: normalizeFirmwareTargets(this.params),
+        targets,
       },
       PROTOCOL_V2_FIRMWARE_UPDATE_OPTIONS
     );

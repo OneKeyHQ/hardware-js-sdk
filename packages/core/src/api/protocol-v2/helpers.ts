@@ -1,5 +1,7 @@
 import { DeviceRebootType } from '@onekeyfe/hd-transport';
 
+import { invalidParameter, validateNonEmptyString } from '../helpers/filesystemValidation';
+
 import type {
   DeviceFirmwareTarget,
   DeviceFirmwareTargetType,
@@ -69,8 +71,10 @@ export const PROTOCOL_V2_FIRMWARE_UPDATE_OPTIONS: TransportCallOptions = {
   intermediateTypes: ['DeviceFirmwareInstallProgress'],
 };
 
-export const PROTOCOL_V2_FIRMWARE_UPDATE_RESPONSE_TYPES: ('Success' | 'DeviceFirmwareUpdateStatus')[] =
-  ['Success', 'DeviceFirmwareUpdateStatus'];
+export const PROTOCOL_V2_FIRMWARE_UPDATE_RESPONSE_TYPES: (
+  | 'Success'
+  | 'DeviceFirmwareUpdateStatus'
+)[] = ['Success', 'DeviceFirmwareUpdateStatus'];
 
 export function normalizeRebootType(value: RebootTypeInput | undefined): DeviceRebootType {
   if (typeof value === 'number') return value;
@@ -83,15 +87,24 @@ export function normalizeRebootType(value: RebootTypeInput | undefined): DeviceR
 }
 
 function normalizeTargetId(
-  value: DeviceFirmwareTargetType | string | number | undefined
+  value: DeviceFirmwareTargetType | string | number | undefined,
+  name: string
 ): DeviceFirmwareTargetType {
-  if (typeof value === 'number') return value;
+  if (value === undefined || value === null) {
+    throw invalidParameter(`Missing required parameter: ${name}`);
+  }
+  if (typeof value === 'number') {
+    if (Number.isSafeInteger(value) && value > 0) return value;
+    throw invalidParameter(`Parameter [${name}] must be a valid firmware target id.`);
+  }
   const numeric = Number(value);
-  if (Number.isFinite(numeric)) return numeric;
-  return 0;
+  if (Number.isSafeInteger(numeric) && numeric > 0) return numeric;
+  throw invalidParameter(`Parameter [${name}] must be a valid firmware target id.`);
 }
 
-export function normalizeFirmwareTargets(params: DeviceFirmwareUpdateParams): DeviceFirmwareTarget[] {
+export function normalizeFirmwareTargets(
+  params: DeviceFirmwareUpdateParams
+): DeviceFirmwareTarget[] {
   const targets =
     params.targets ??
     (params.path
@@ -103,10 +116,20 @@ export function normalizeFirmwareTargets(params: DeviceFirmwareUpdateParams): De
         ]
       : []);
 
-  return targets.map(target => ({
-    target_id: normalizeTargetId('target_id' in target ? target.target_id : target.targetId),
-    path: target.path,
-  }));
+  if (!Array.isArray(targets) || targets.length === 0) {
+    throw invalidParameter('Parameter [targets] must contain at least one firmware target.');
+  }
+
+  return targets.map((target, index) => {
+    if (!target || typeof target !== 'object') {
+      throw invalidParameter(`Parameter [targets.${index}] must be an object.`);
+    }
+    const targetId = target.target_id ?? target.targetId;
+    return {
+      target_id: normalizeTargetId(targetId, `targets.${index}.target_id`),
+      path: validateNonEmptyString(target.path, `targets.${index}.path`),
+    };
+  });
 }
 
 export function buildTargets(params: DeviceGetDeviceInfoParams): DeviceInfoTargets | undefined {
