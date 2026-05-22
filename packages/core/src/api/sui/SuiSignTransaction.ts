@@ -1,5 +1,6 @@
 import semver from 'semver';
 import { bytesToHex } from '@noble/hashes/utils';
+import { EDeviceType } from '@onekeyfe/hd-shared';
 
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
@@ -9,12 +10,8 @@ import { formatAnyHex } from '../helpers/hexUtils';
 import { getDeviceFirmwareVersion, getDeviceType } from '../../utils';
 import { DeviceModelToTypes } from '../../types';
 
-import type {
-  SuiSignTx as HardwareSuiSignTx,
-  SuiSignedTx,
-  TypedCall,
-} from '@onekeyfe/hd-transport';
-import type { TypedResponseMessage } from '../../device/DeviceCommands';
+import type { SuiSignTx as HardwareSuiSignTx, SuiSignedTx } from '@onekeyfe/hd-transport';
+import type { TypedCall, TypedResponseMessage } from '../../device/DeviceCommands';
 
 type SuiSignTx = Omit<HardwareSuiSignTx, 'data_initial_chunk' | 'data_length'> & HardwareSuiSignTx;
 
@@ -53,6 +50,13 @@ export default class SuiSignTransaction extends BaseMethod<SuiSignTx> {
   }
 
   supportChunkTransfer() {
+    if (
+      this.device.originalDescriptor?.protocolType === 'V2' ||
+      getDeviceType(this.device.features) === EDeviceType.Pro2
+    ) {
+      return true;
+    }
+
     const deviceType = getDeviceType(this.device.features);
     const deviceFirmwareVersion = getDeviceFirmwareVersion(this.device.features).join('.');
 
@@ -85,7 +89,7 @@ export default class SuiSignTransaction extends BaseMethod<SuiSignTx> {
 
     if (!data_length) {
       // sign Done
-      return res.message;
+      return res.message as SuiSignedTx;
     }
 
     const payload = data.subarray(offset, offset + data_length);
@@ -104,7 +108,7 @@ export default class SuiSignTransaction extends BaseMethod<SuiSignTx> {
   async run() {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
     let offset = 0;
-    let data: Buffer;
+    let data = Buffer.alloc(0);
 
     if (this.supportChunkTransfer()) {
       offset = this.chunkByteSize;
@@ -121,7 +125,6 @@ export default class SuiSignTransaction extends BaseMethod<SuiSignTx> {
       ...this.params,
     });
 
-    // @ts-expect-error
     return this.processTxRequest(typedCall, res, data, offset);
   }
 }

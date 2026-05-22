@@ -1,8 +1,11 @@
+import { createDeviceNotSupportMethodError } from '@onekeyfe/hd-shared';
+
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
+import { getFirmwareType, shouldSkipMethodSupportCheck } from '../../utils';
 
 import type { EthereumSignMessageEIP712 } from '@onekeyfe/hd-transport';
 
@@ -44,6 +47,15 @@ export default class EVMSignMessageEIP712 extends BaseMethod<EthereumSignMessage
   }
 
   async run() {
+    if (
+      shouldSkipMethodSupportCheck(
+        this.device.features,
+        this.device.originalDescriptor?.protocolType
+      )
+    ) {
+      throw createDeviceNotSupportMethodError(this.name, getFirmwareType(this.device.features));
+    }
+
     const res = await this.device.commands.typedCall(
       'EthereumSignMessageEIP712',
       'EthereumMessageSignature',

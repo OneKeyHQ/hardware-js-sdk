@@ -10,11 +10,13 @@ import FileRead from '../src/api/FileRead';
 import FileWrite from '../src/api/FileWrite';
 import DeviceFirmwareUpdate from '../src/api/protocol-v2/DeviceFirmwareUpdate';
 import DeviceGetOnboardingStatus from '../src/api/protocol-v2/DeviceGetOnboardingStatus';
+import EVMSignMessageEIP712 from '../src/api/evm/EVMSignMessageEIP712';
 import FirmwareUpdateV3 from '../src/api/FirmwareUpdateV3';
 import FirmwareUpdateV4 from '../src/api/FirmwareUpdateV4';
 import GetOnekeyFeatures from '../src/api/GetOnekeyFeatures';
 import { batchGetPublickeys } from '../src/api/helpers/batchGetPublickeys';
 import KaspaGetAddress from '../src/api/kaspa/KaspaGetAddress';
+import SuiSignTransaction from '../src/api/sui/SuiSignTransaction';
 import TronSignMessage from '../src/api/tron/TronSignMessage';
 import XrpSignTransaction from '../src/api/xrp/XrpSignTransaction';
 import { DataManager } from '../src/data-manager';
@@ -450,6 +452,34 @@ describe('Protocol V2 feature adapter', () => {
 });
 
 describe('API compatibility handling', () => {
+  test('returns a typed unsupported error for deprecated EIP712 message signing on Protocol V2', async () => {
+    const method = new EVMSignMessageEIP712({
+      id: 1,
+      payload: {
+        method: 'evmSignMessageEIP712',
+        path: "m/44'/60'/0'/0/0",
+        domainHash: '0x'.concat('11'.repeat(32)),
+        messageHash: '0x'.concat('22'.repeat(32)),
+      },
+    });
+
+    method.init();
+    (method as any).device = {
+      features: {
+        onekey_device_type: 'pro2',
+      },
+      originalDescriptor: {
+        protocolType: 'V2',
+      },
+    };
+
+    await expect(method.run()).rejects.toEqual(
+      expect.objectContaining({
+        errorCode: HardwareErrorCode.DeviceNotSupportMethod,
+      })
+    );
+  });
+
   test('returns a typed unsupported error for Tron sign message V1 before device binding', () => {
     const method = new TronSignMessage({
       id: 1,
@@ -466,6 +496,50 @@ describe('API compatibility handling', () => {
         errorCode: HardwareErrorCode.DeviceNotSupportMethod,
       })
     );
+  });
+
+  test('uses chunk transfer for large Sui transactions on Protocol V2', async () => {
+    const rawTx = '0x'.concat('ab'.repeat(5000));
+    const typedCall = jest.fn(async () => ({
+      type: 'SuiSignedTx',
+      message: {
+        public_key: '',
+        signature: '',
+      },
+    }));
+    const method = new SuiSignTransaction({
+      id: 1,
+      payload: {
+        method: 'suiSignTransaction',
+        path: "m/44'/784'/0'/0'/0'",
+        rawTx,
+      },
+    });
+
+    method.init();
+    (method as any).device = {
+      features: {
+        onekey_device_type: 'pro2',
+      },
+      originalDescriptor: {
+        protocolType: 'V2',
+      },
+      getCommands: () => ({
+        typedCall,
+      }),
+    };
+
+    await method.run();
+
+    expect(typedCall).toHaveBeenCalledTimes(1);
+    const [, , params] = typedCall.mock.calls[0];
+    expect(params).toEqual(
+      expect.objectContaining({
+        raw_tx: '',
+        data_length: 5000,
+      })
+    );
+    expect(params.data_initial_chunk).toHaveLength(2048);
   });
 
   test('accepts string XRP payment amount values', () => {
