@@ -22,10 +22,11 @@ import CollapsibleJsonViewer from '../components/common/CollapsibleJsonViewer';
 import { callHardwareAPI, searchDevices } from '../services/hardwareService';
 import { useToast } from '../hooks/use-toast';
 import { useDeviceStore } from '../store/deviceStore';
-import { SDKUtils } from '../utils/hardwareInstance';
 import { logHardware } from '../utils/logger';
+import { createPro2DeviceInfo } from '../utils/pro2Device';
 
 import type { DeviceOnboardingStatus } from '@onekeyfe/hd-transport';
+import type { DeviceInfo } from '../types/hardware';
 
 type PollSource = 'mock' | 'real';
 
@@ -319,7 +320,9 @@ export default function Pro2OnboardingPage() {
         return;
       }
 
-      const devices = searchResult.payload;
+      const devices = (searchResult.payload as DeviceInfo[]).map(device =>
+        createPro2DeviceInfo(device)
+      );
       setConnectedDevices(devices);
 
       if (!devices.length) {
@@ -332,25 +335,8 @@ export default function Pro2OnboardingPage() {
       }
 
       const targetDevice = devices[0];
-      const sdk = await SDKUtils.getInstance();
-
-      if (targetDevice.features) {
-        setDeviceFeatures(targetDevice.features);
-        setCurrentDevice(targetDevice);
-      } else if (targetDevice.connectId && targetDevice.deviceId) {
-        const featuresResult = await sdk.getFeatures(targetDevice.connectId, protocolParams);
-        if (featuresResult.success && featuresResult.payload) {
-          setDeviceFeatures(featuresResult.payload);
-          setCurrentDevice({
-            ...targetDevice,
-            features: featuresResult.payload,
-          });
-        } else {
-          setCurrentDevice(targetDevice);
-        }
-      } else {
-        setCurrentDevice(targetDevice);
-      }
+      setDeviceFeatures(targetDevice.features);
+      setCurrentDevice(targetDevice);
 
       toast({
         title: 'Device connected',

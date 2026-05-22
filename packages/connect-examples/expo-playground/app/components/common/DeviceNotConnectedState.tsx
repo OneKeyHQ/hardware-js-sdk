@@ -6,7 +6,9 @@ import { useDeviceStore } from '../../store/deviceStore';
 import { searchDevices } from '../../services/hardwareService';
 import { useToast } from '../../hooks/use-toast';
 import { SDKUtils } from '../../utils/hardwareInstance';
+import { createPro2DeviceInfo } from '../../utils/pro2Device';
 import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
+import type { DeviceInfo } from '../../types/hardware';
 
 interface DeviceNotConnectedStateProps {
   className?: string;
@@ -14,12 +16,14 @@ interface DeviceNotConnectedStateProps {
   title?: string;
   description?: string;
   connectProtocol?: HardwareConnectProtocol;
+  pro2Only?: boolean;
 }
 
 export function DeviceNotConnectedState({
   className = '',
   showFullPage = false,
   connectProtocol,
+  pro2Only = false,
 }: DeviceNotConnectedStateProps) {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -56,12 +60,28 @@ export function DeviceNotConnectedState({
       const searchResult = await searchDevices(protocolParams);
 
       if (searchResult.success && searchResult.payload) {
-        const devices = searchResult.payload;
+        const foundDevices = searchResult.payload as DeviceInfo[];
+        const devices = pro2Only
+          ? foundDevices.map(device => createPro2DeviceInfo(device))
+          : foundDevices;
         setConnectedDevices(devices);
 
         // 自动连接第一个设备
         if (devices.length > 0) {
           const targetDevice = devices[0];
+
+          if (pro2Only) {
+            setCurrentDevice(targetDevice);
+            setDeviceFeatures(targetDevice.features);
+
+            toast({
+              title: t('device.connected'),
+              description: `${t('device.connectedTo')} ${targetDevice.label || targetDevice.name}`,
+              variant: 'default',
+            });
+            return;
+          }
+
           setCurrentDevice(targetDevice);
 
           // 获取设备特征信息
