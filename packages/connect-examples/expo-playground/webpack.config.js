@@ -1,8 +1,97 @@
 /* eslint-disable no-undef */
 const path = require('path');
+const fs = require('fs');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 const webpack = require('webpack');
+
+const repoRoot = path.resolve(__dirname, '../../..');
+const deviceUpdateRoot = path.join(repoRoot, 'device_update');
+const deviceUpdateBinDir = path.join(deviceUpdateRoot, 'bin');
+const deviceUpdateAssetsDir = path.join(deviceUpdateRoot, 'assets');
+const ignoredDeviceUpdateNames = new Set(['.DS_Store', 'Thumbs.db', 'desktop.ini']);
+const deviceUpdateBinaries = {
+  romloader: 'pro2_romloader_v3_msc.bin',
+  updateRom: 'pro2_boot_update_rom_signed.bin',
+  bluetooth: 'pro2_bluetooth_signed.bin',
+  firmware: 'pro2_firmware_signed.bin',
+};
+
+function readFileSize(filePath) {
+  try {
+    return fs.statSync(filePath).size;
+  } catch {
+    return 0;
+  }
+}
+
+function listDeviceUpdateAssets(dir, prefix = '') {
+  if (!fs.existsSync(dir)) return [];
+
+  return fs
+    .readdirSync(dir, { withFileTypes: true })
+    .flatMap(entry => {
+      if (ignoredDeviceUpdateNames.has(entry.name)) return [];
+      const absolutePath = path.join(dir, entry.name);
+      const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) {
+        return listDeviceUpdateAssets(absolutePath, relativePath);
+      }
+      if (!entry.isFile()) return [];
+      return [
+        {
+          relativePath,
+          sourcePath: `assets/${relativePath}`,
+          size: readFileSize(absolutePath),
+        },
+      ];
+    })
+    .sort((a, b) => a.relativePath.localeCompare(b.relativePath));
+}
+
+function createDeviceUpdateManifest() {
+  const binaries = Object.fromEntries(
+    Object.entries(deviceUpdateBinaries).map(([key, name]) => {
+      const filePath = path.join(deviceUpdateBinDir, name);
+      return [
+        key,
+        {
+          name,
+          sourcePath: `bin/${name}`,
+          size: readFileSize(filePath),
+          available: fs.existsSync(filePath),
+        },
+      ];
+    })
+  );
+
+  return {
+    generatedAt: new Date().toISOString(),
+    binaries,
+    assets: listDeviceUpdateAssets(deviceUpdateAssetsDir),
+  };
+}
+
+class DeviceUpdateManifestPlugin {
+  apply(compiler) {
+    compiler.hooks.thisCompilation.tap('DeviceUpdateManifestPlugin', compilation => {
+      compilation.hooks.processAssets.tap(
+        {
+          name: 'DeviceUpdateManifestPlugin',
+          stage: compiler.webpack.Compilation.PROCESS_ASSETS_STAGE_ADDITIONS,
+        },
+        () => {
+          compilation.emitAsset(
+            'device-update/manifest.json',
+            new compiler.webpack.sources.RawSource(
+              `${JSON.stringify(createDeviceUpdateManifest(), null, 2)}\n`
+            )
+          );
+        }
+      );
+    });
+  }
+}
 
 module.exports = async (env, argv) => {
   // Dynamically import ESM-only rehype-highlight
@@ -143,8 +232,28 @@ module.exports = async (env, argv) => {
               ignore: ['**/index.html'], // 忽略 index.html，因为 HtmlWebpackPlugin 会处理它
             },
           },
+          ...(fs.existsSync(deviceUpdateBinDir)
+            ? [
+                {
+                  from: deviceUpdateBinDir,
+                  to: 'device-update/bin',
+                },
+              ]
+            : []),
+          ...(fs.existsSync(deviceUpdateAssetsDir)
+            ? [
+                {
+                  from: deviceUpdateAssetsDir,
+                  to: 'device-update/assets',
+                  globOptions: {
+                    ignore: ['**/.DS_Store', '**/Thumbs.db', '**/desktop.ini'],
+                  },
+                },
+              ]
+            : []),
         ],
       }),
+      new DeviceUpdateManifestPlugin(),
       new webpack.ProvidePlugin({
         Buffer: ['buffer', 'Buffer'],
         process: ['process/browser.js'],

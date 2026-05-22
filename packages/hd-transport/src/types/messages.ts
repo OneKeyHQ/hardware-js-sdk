@@ -4792,6 +4792,11 @@ export type FilesystemDirRemove = {
 // FilesystemFormat
 export type FilesystemFormat = {};
 
+// FilesystemDiskControl
+export type FilesystemDiskControl = {
+  enable: number;
+};
+
 // DeviceGetOnboardingStatus
 export type DeviceGetOnboardingStatus = {};
 
@@ -5411,6 +5416,7 @@ export type MessageType = {
   FilesystemDirMake: FilesystemDirMake;
   FilesystemDirRemove: FilesystemDirRemove;
   FilesystemFormat: FilesystemFormat;
+  FilesystemDiskControl: FilesystemDiskControl;
   DeviceGetOnboardingStatus: DeviceGetOnboardingStatus;
   DeviceOnboardingStatus: DeviceOnboardingStatus;
 };

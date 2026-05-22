@@ -53,22 +53,61 @@ type ProtocolV2DeviceInfo = {
   };
 };
 
-const PROTOCOL_V2_DEVICE_INFO_REQUEST = {
-  targets: {
-    hw: true,
-    fw: true,
-    bt: true,
-    se1: true,
-    se2: true,
-    se3: true,
-    se4: true,
-    status: true,
+// const PROTOCOL_V2_DEVICE_INFO_REQUEST = {
+//   targets: {
+//     hw: true,
+//     fw: true,
+//     bt: true,
+//     se1: true,
+//     se2: true,
+//     se3: true,
+//     se4: true,
+//     status: true,
+//   },
+//   types: {
+//     version: true,
+//     build_id: true,
+//     hash: true,
+//     specific: true,
+//   },
+// };
+
+const MOCK_PROTOCOL_V2_DEVICE_INFO: ProtocolV2DeviceInfo = {
+  protocol_version: 2,
+  hw: {
+    Device_type: 1,
+    device_type: 1,
+    serial_no: '000000000000',
+    hardware_version: 'mock',
   },
-  types: {
-    version: true,
-    build_id: true,
-    hash: true,
-    specific: true,
+  fw: {
+    board: {
+      version: '0.0.0',
+      build_id: 'mock',
+    },
+    boot: {
+      version: '0.0.0',
+      build_id: 'mock',
+    },
+    app: {
+      version: '0.0.0',
+      build_id: 'mock',
+    },
+  },
+  bt: {
+    app: {
+      version: '0.0.0',
+      build_id: 'mock',
+    },
+    adv_name: 'OneKey Pro 2',
+  },
+  status: {
+    language: 'en-US',
+    bt_enable: true,
+    init_states: true,
+    backup_required: false,
+    passphrase_protection: false,
+    label: 'OneKey Pro 2',
   },
 };
 
@@ -228,7 +267,6 @@ export function normalizeProtocolV2Features(
 export async function getProtocolV2Features({
   commands,
   descriptor,
-  onDeviceInfoError,
   timeoutMs,
 }: {
   commands: DeviceCommands;
@@ -243,22 +281,24 @@ export async function getProtocolV2Features({
     await commands.typedCall('Ping', 'Success', { message: 'init' });
   }
 
-  try {
-    const { message } = callOptions
-      ? await commands.typedCall(
-          'DeviceGetDeviceInfo',
-          'DeviceInfo',
-          PROTOCOL_V2_DEVICE_INFO_REQUEST,
-          callOptions
-        )
-      : await commands.typedCall(
-          'DeviceGetDeviceInfo',
-          'DeviceInfo',
-          PROTOCOL_V2_DEVICE_INFO_REQUEST
-        );
-    return normalizeProtocolV2Features(descriptor, message as unknown as ProtocolV2DeviceInfo);
-  } catch (error) {
-    onDeviceInfoError?.(error);
-    return normalizeProtocolV2Features(descriptor);
-  }
+  // Temporarily skip the real DeviceGetDeviceInfo request while Pro2 update flow is being debugged.
+  // try {
+  //   const { message } = callOptions
+  //     ? await commands.typedCall(
+  //         'DeviceGetDeviceInfo',
+  //         'DeviceInfo',
+  //         PROTOCOL_V2_DEVICE_INFO_REQUEST,
+  //         callOptions
+  //       )
+  //     : await commands.typedCall(
+  //         'DeviceGetDeviceInfo',
+  //         'DeviceInfo',
+  //         PROTOCOL_V2_DEVICE_INFO_REQUEST
+  //       );
+  //   return normalizeProtocolV2Features(descriptor, message as unknown as ProtocolV2DeviceInfo);
+  // } catch (error) {
+  //   onDeviceInfoError?.(error);
+  //   return normalizeProtocolV2Features(descriptor);
+  // }
+  return normalizeProtocolV2Features(descriptor, MOCK_PROTOCOL_V2_DEVICE_INFO);
 }

@@ -219,3 +219,8 @@ export declare function filesystemPathInfoQuery(
 ): ReturnType<typeof pathInfo>;
 
 export declare function filesystemFormat(connectId: string): Response<Success>;
+
+export declare function filesystemDiskControl(
+  connectId: string,
+  params: CommonParams & { enable: number | string; timeoutMs?: number | string }
+): Response<Success>;

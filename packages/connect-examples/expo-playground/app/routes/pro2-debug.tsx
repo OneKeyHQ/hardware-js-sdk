@@ -49,6 +49,7 @@ const PRO2_METHOD_GROUPS = [
     methods: [
       'filesystemFixPermission',
       'filesystemFormat',
+      'filesystemDiskControl',
       'filesystemPathInfoQuery',
       'filesystemDirList',
       'filesystemDirMake',
@@ -81,6 +82,7 @@ const PRO2_METHOD_LABELS: Record<string, string> = {
   fileDelete: 'File Delete',
   filesystemFixPermission: 'Fix Permission',
   filesystemFormat: 'Format',
+  filesystemDiskControl: 'Disk Control',
   filesystemPathInfoQuery: 'Raw Path Info',
   filesystemDirList: 'Raw Dir List',
   filesystemDirMake: 'Raw Dir Make',
