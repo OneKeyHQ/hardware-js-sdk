@@ -187,6 +187,8 @@ export const createCoreApi = (
   filesystemPathInfoQuery: (connectId, params) =>
     call({ ...params, connectId, method: 'filesystemPathInfoQuery' }),
   filesystemFormat: connectId => call({ connectId, method: 'filesystemFormat' }),
+  filesystemDiskControl: (connectId, params) =>
+    call({ ...params, connectId, method: 'filesystemDiskControl' }),
   deviceRecovery: (connectId, params) => call({ ...params, connectId, method: 'deviceRecovery' }),
   deviceReset: (connectId, params) => call({ ...params, connectId, method: 'deviceReset' }),
   deviceSettings: (connectId, params) => call({ ...params, connectId, method: 'deviceSettings' }),

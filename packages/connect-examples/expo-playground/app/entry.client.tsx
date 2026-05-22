@@ -35,6 +35,7 @@ import DeviceMethodsIndexPage from './routes/device-methods._index';
 import DeviceMethodExecutePage from './routes/device-methods.$methodName';
 import ProDebugPage from './routes/pro-debug';
 import Pro2DebugPage from './routes/pro2-debug';
+import Pro2UpdatePage from './routes/pro2-update';
 import Pro2OnboardingPage from './routes/pro2-onboarding';
 import MethodBatchTestPage from './routes/method-batch-test';
 
@@ -161,6 +162,10 @@ const router = createHashRouter(
         {
           path: 'pro2-debug',
           element: <Pro2DebugPage />,
+        },
+        {
+          path: 'pro2-update',
+          element: <Pro2UpdatePage />,
         },
         {
           path: 'pro2-onboarding',

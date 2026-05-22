@@ -28,6 +28,7 @@ import {
   Info,
   ListChecks,
   Usb,
+  UploadCloud,
 } from 'lucide-react';
 import { getDeviceLabel } from '@onekeyfe/hd-core';
 import packageJson from '../../package.json';
@@ -74,6 +75,11 @@ const navigationItems = [
     title: 'common.pro2Debug',
     url: '/pro2-debug',
     icon: Usb,
+  },
+  {
+    title: 'common.pro2Update',
+    url: '/pro2-update',
+    icon: UploadCloud,
   },
   {
     title: 'common.pro2Onboarding',

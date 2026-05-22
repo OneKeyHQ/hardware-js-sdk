@@ -501,6 +501,7 @@
         "MessageType_FilesystemDirMake": 60809,
         "MessageType_FilesystemDirRemove": 60810,
         "MessageType_FilesystemFormat": 60811,
+        "MessageType_FilesystemDiskControl": 60812,
         "MessageType_DeviceFirmwareUpdate": 61000,
         "MessageType_DeviceFirmwareInstallProgress": 61001,
         "MessageType_DeviceGetFirmwareUpdateStatus": 61002,
@@ -12402,6 +12403,15 @@
     },
     "FilesystemFormat": {
       "fields": {}
+    },
+    "FilesystemDiskControl": {
+      "fields": {
+        "enable": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
+        }
+      }
     },
     "DeviceGetOnboardingStatus": {
       "fields": {}
