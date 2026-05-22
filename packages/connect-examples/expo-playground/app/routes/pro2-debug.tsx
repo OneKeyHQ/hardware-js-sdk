@@ -456,6 +456,7 @@ export default function Pro2DebugPage() {
             <DeviceNotConnectedState
               showFullPage={false}
               connectProtocol={HARDWARE_CONNECT_PROTOCOL.V2}
+              pro2Only
             />
           </div>
         )}

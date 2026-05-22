@@ -27,6 +27,7 @@ import {
 import { useFirmwareProgress } from '../components/providers/SDKProvider';
 import { useToast } from '../hooks/use-toast';
 import { useDeviceStore } from '../store/deviceStore';
+import { createPro2DeviceInfo } from '../utils/pro2Device';
 import type { DeviceInfo } from '../types/hardware';
 
 type WorkflowTarget = 'all' | 'step1' | 'step2' | 'step3' | 'step4';
@@ -514,13 +515,14 @@ export default function Pro2UpdatePage() {
           assertRunning();
           const response = await searchDevices({ connectProtocol: HARDWARE_CONNECT_PROTOCOL.V2 });
           if (response.success && Array.isArray(response.payload) && response.payload.length > 0) {
-            const device = response.payload[0] as DeviceInfo;
-            setConnectedDevices(response.payload as DeviceInfo[]);
+            const devices = (response.payload as DeviceInfo[]).map(item =>
+              createPro2DeviceInfo(item)
+            );
+            const device = devices[0];
+            setConnectedDevices(devices);
             setCurrentDevice(device);
             currentDeviceRef.current = device;
-            if (device.features) {
-              setDeviceFeatures(device.features);
-            }
+            setDeviceFeatures(device.features);
             addLog('ok', `${label}: connected ${device.connectId}`);
             return device;
           }
@@ -1198,7 +1200,7 @@ export default function Pro2UpdatePage() {
             </div>
           </div>
 
-          <DeviceNotConnectedState connectProtocol={HARDWARE_CONNECT_PROTOCOL.V2} />
+          <DeviceNotConnectedState connectProtocol={HARDWARE_CONNECT_PROTOCOL.V2} pro2Only />
 
           {directoryRequest ? (
             <Card className="rounded-xl border border-primary/30 bg-primary/5 shadow-sm">
