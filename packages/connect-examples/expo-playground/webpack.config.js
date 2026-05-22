@@ -72,6 +72,20 @@ function createDeviceUpdateManifest() {
   };
 }
 
+function normalizePublicOrigin(origin) {
+  if (!origin) return '';
+  const value = origin.trim().replace(/\/+$/, '');
+  if (!value) return '';
+  if (/^https?:\/\//i.test(value)) return value;
+  return `https://${value}`;
+}
+
+function normalizePublicPathPrefix(pathPrefix) {
+  const value = (pathPrefix || '/').trim();
+  const withLeadingSlash = value.startsWith('/') ? value : `/${value}`;
+  return withLeadingSlash.endsWith('/') ? withLeadingSlash : `${withLeadingSlash}/`;
+}
+
 class DeviceUpdateManifestPlugin {
   apply(compiler) {
     compiler.hooks.thisCompilation.tap('DeviceUpdateManifestPlugin', compilation => {
@@ -107,6 +121,23 @@ module.exports = async (env, argv) => {
   const indexHtmlFilename = hasCommit ? '../index.html' : 'index.html';
   const fallbackHtmlFilename = hasCommit ? '../404.html' : '404.html';
   const staticBasePath = hasCommit ? `./${commitSha}/` : './';
+  const isVercel = process.env.VERCEL === '1' || process.env.VERCEL === 'true';
+  const defaultPublicOrigin = process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : isProduction
+      ? 'https://hardware-example.onekeytest.com'
+      : '';
+  const publicOrigin = normalizePublicOrigin(
+    process.env.PLAYGROUND_PUBLIC_ORIGIN || process.env.PUBLIC_ORIGIN || defaultPublicOrigin
+  );
+  const deployedBasePath = normalizePublicPathPrefix(
+    process.env.PLAYGROUND_PUBLIC_BASE_PATH ||
+      process.env.PUBLIC_BASE_PATH ||
+      (isVercel ? '/' : '/expo-playground/')
+  );
+  const deployedAssetBasePath = hasCommit ? `${deployedBasePath}${commitSha}/` : deployedBasePath;
+  const ogUrl = publicOrigin ? `${publicOrigin}${deployedBasePath}` : './';
+  const ogImageUrl = publicOrigin ? `${publicOrigin}${deployedAssetBasePath}og.jpg` : `${staticBasePath}og.jpg`;
   const buildTime = new Date().toISOString();
 
   return {
@@ -212,6 +243,8 @@ module.exports = async (env, argv) => {
         ...(htmlPublicPath ? { publicPath: htmlPublicPath } : {}),
         templateParameters: {
           BASE_PATH: staticBasePath,
+          OG_URL: ogUrl,
+          OG_IMAGE_URL: ogImageUrl,
         },
       }),
       new HtmlWebpackPlugin({
@@ -221,6 +254,8 @@ module.exports = async (env, argv) => {
         ...(htmlPublicPath ? { publicPath: htmlPublicPath } : {}),
         templateParameters: {
           BASE_PATH: staticBasePath,
+          OG_URL: ogUrl,
+          OG_IMAGE_URL: ogImageUrl,
         },
       }),
       new CopyWebpackPlugin({
