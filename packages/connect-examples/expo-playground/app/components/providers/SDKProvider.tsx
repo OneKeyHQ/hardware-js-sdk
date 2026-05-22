@@ -253,6 +253,7 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
             if (
               latestCurrentDevice &&
               (latestCurrentDevice.deviceType === EDeviceType.Pro ||
+                latestCurrentDevice.deviceType === EDeviceType.Pro2 ||
                 latestCurrentDevice.deviceType === EDeviceType.Touch)
             ) {
               submitPin('@@ONEKEY_INPUT_PIN_IN_DEVICE').catch(console.error);

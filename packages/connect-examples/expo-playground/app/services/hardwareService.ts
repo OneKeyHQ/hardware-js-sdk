@@ -9,23 +9,156 @@ import {
   TransportManager,
 } from '../utils/hardwareInstance';
 import { useHardwareStore } from '../store/hardwareStore';
+import { useDeviceStore } from '../store/deviceStore';
 import { methodSupportsCommonParameters } from '../utils/constants';
 import { previewHardwareParams } from './previewHardwareParams';
 import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
+import type { Features } from '@onekeyfe/hd-core';
 // 使用 hd-core 的标准类型
 export type ApiResponse<T = any> = Success<T> | Unsuccessful;
 export type HardwareApiMethod = keyof CoreApi;
 
-const extractPassphraseState = (payload: unknown): string | undefined => {
-  if (typeof payload === 'string') return payload;
-  if (!payload || typeof payload !== 'object') return undefined;
+type PassphraseStateMetadata = {
+  passphraseState?: string;
+  passphraseProtection?: boolean | null;
+};
+
+const getFeaturePassphraseProtection = (features?: Features | null): boolean | undefined => {
+  return typeof features?.passphrase_protection === 'boolean'
+    ? features.passphrase_protection
+    : undefined;
+};
+
+const extractPassphraseStateMetadata = (payload: unknown): PassphraseStateMetadata => {
+  if (typeof payload === 'string') return { passphraseState: payload };
+  if (!payload || typeof payload !== 'object') return {};
 
   const maybeState = (payload as { passphrase_state?: unknown; passphraseState?: unknown })
     .passphrase_state;
-  if (typeof maybeState === 'string') return maybeState;
-
   const maybeLegacyState = (payload as { passphraseState?: unknown }).passphraseState;
-  return typeof maybeLegacyState === 'string' ? maybeLegacyState : undefined;
+  const maybePassphraseProtection = (payload as { passphrase_protection?: unknown })
+    .passphrase_protection;
+
+  return {
+    passphraseState:
+      typeof maybeState === 'string'
+        ? maybeState
+        : typeof maybeLegacyState === 'string'
+        ? maybeLegacyState
+        : undefined,
+    passphraseProtection:
+      typeof maybePassphraseProtection === 'boolean' ? maybePassphraseProtection : undefined,
+  };
+};
+
+const clearPassphraseState = (params: Record<string, unknown>) => {
+  delete params.passphraseState;
+  useHardwareStore.getState().setCommonParameter('passphraseState', '');
+};
+
+const updateCachedDeviceFeatures = (connectId: string, features: Features) => {
+  const deviceState = useDeviceStore.getState();
+  deviceState.setDeviceFeatures(features);
+
+  if (deviceState.currentDevice?.connectId === connectId) {
+    deviceState.setCurrentDevice({
+      ...deviceState.currentDevice,
+      features,
+    });
+  }
+};
+
+const resolvePassphraseProtection = async (
+  sdk: CoreApi,
+  connectId: string
+): Promise<boolean | undefined> => {
+  const deviceState = useDeviceStore.getState();
+  const cachedFeatures =
+    deviceState.currentDevice?.connectId === connectId
+      ? deviceState.currentDevice.features ?? deviceState.deviceFeatures
+      : undefined;
+  const cachedPassphraseProtection = getFeaturePassphraseProtection(cachedFeatures);
+
+  if (cachedPassphraseProtection !== undefined) {
+    return cachedPassphraseProtection;
+  }
+
+  const featuresResult = await sdk.getFeatures(connectId);
+  if (!featuresResult.success || !featuresResult.payload) {
+    return undefined;
+  }
+
+  updateCachedDeviceFeatures(connectId, featuresResult.payload);
+  return getFeaturePassphraseProtection(featuresResult.payload);
+};
+
+const preparePassphraseParams = async (
+  sdk: CoreApi,
+  method: HardwareApiMethod,
+  params: Record<string, unknown>,
+  connectId: string
+) => {
+  if (!methodSupportsCommonParameters(method)) return;
+
+  if (params.useEmptyPassphrase === true) {
+    clearPassphraseState(params);
+    return;
+  }
+
+  const passphraseProtection = await resolvePassphraseProtection(sdk, connectId);
+
+  if (passphraseProtection === false) {
+    if (params.passphraseState) {
+      logInfo('Device passphrase protection is disabled. Clearing stale passphraseState.');
+    }
+    clearPassphraseState(params);
+    return;
+  }
+
+  if (passphraseProtection !== true) {
+    logInfo('Device passphrase protection is unknown. Skipping automatic passphraseState fetch.');
+    return;
+  }
+
+  if (
+    params.passphraseState !== '' &&
+    params.passphraseState !== undefined &&
+    params.passphraseState !== null
+  ) {
+    logInfo(`Using existing passphrase state from params: ${params.passphraseState}`);
+    return;
+  }
+
+  logInfo(
+    `PassphraseState is empty in params for method: ${method}, attempting to fetch from device.`
+  );
+
+  try {
+    const passphraseResult = await getPassphraseState(connectId);
+    const passphraseMetadata = passphraseResult.success
+      ? extractPassphraseStateMetadata(passphraseResult.payload)
+      : {};
+
+    if (passphraseMetadata.passphraseProtection === false) {
+      logInfo('Device passphrase protection not enabled. Clearing passphraseState.');
+      clearPassphraseState(params);
+      return;
+    }
+
+    if (passphraseMetadata.passphraseState) {
+      logInfo(`Passphrase state obtained from device: ${passphraseMetadata.passphraseState}`);
+      params.passphraseState = passphraseMetadata.passphraseState;
+      useHardwareStore
+        .getState()
+        .setCommonParameter('passphraseState', passphraseMetadata.passphraseState);
+    } else {
+      logInfo('Device passphrase protection enabled but no passphraseState was returned.');
+      clearPassphraseState(params);
+    }
+  } catch (passphraseError) {
+    logError('Failed to get passphrase state from device', { passphraseError });
+    clearPassphraseState(params);
+  }
 };
 
 // 获取SDK实例的简化函数
@@ -137,9 +270,7 @@ export async function submitPassphrase(
 }
 
 // 获取设备的passphraseState
-export async function getPassphraseState(
-  connectId: string
-): Promise<ApiResponse> {
+export async function getPassphraseState(connectId: string): Promise<ApiResponse> {
   if (typeof window === 'undefined') {
     return {
       success: false,
@@ -195,43 +326,8 @@ export async function callHardwareAPI(
 
     const { connectId, deviceId } = params;
 
-    // FOR EXAMPLE APP: 如果参数中没有 passphraseState (或者为空)，则尝试从设备获取
-    // app-monorepo 的逻辑更复杂，这里简化以满足 example 的需求
-    if (connectId && methodSupportsCommonParameters(method)) {
-      // 只有当 params.passphraseState 是空字符串、undefined 或 null 时才尝试获取
-      if (
-        params.passphraseState === '' ||
-        params.passphraseState === undefined ||
-        params.passphraseState === null
-      ) {
-        logInfo(
-          `PassphraseState is empty in params for method: ${method}, attempting to fetch from device.`
-        );
-        try {
-          const passphraseResult = await getPassphraseState(connectId as string);
-          const passphraseState = passphraseResult.success
-            ? extractPassphraseState(passphraseResult.payload)
-            : undefined;
-          if (passphraseState) {
-            logInfo(`Passphrase state obtained from device: ${passphraseState}`);
-            params.passphraseState = passphraseState;
-            // IMPORTANT: Update the store's commonParameter so the UI reflects the fetched value
-            useHardwareStore.getState().setCommonParameter('passphraseState', passphraseState);
-          } else {
-            logInfo('Device passphrase protection not enabled or failed to get state from device.');
-            // Ensure passphraseState is explicitly an empty string if not enabled/fetched
-            params.passphraseState = '';
-            useHardwareStore.getState().setCommonParameter('passphraseState', '');
-          }
-        } catch (passphraseError) {
-          logError('Failed to get passphrase state from device', { passphraseError });
-          // In case of error, ensure it's an empty string to avoid unexpected behavior
-          params.passphraseState = '';
-          useHardwareStore.getState().setCommonParameter('passphraseState', '');
-        }
-      } else {
-        logInfo(`Using existing passphrase state from params: ${params.passphraseState}`);
-      }
+    if (connectId && typeof connectId === 'string') {
+      await preparePassphraseParams(sdk, method, params, connectId);
     }
 
     // 打印最终传入硬件的关键参数（尽量不变形，保持与 hd-core 接口一致）

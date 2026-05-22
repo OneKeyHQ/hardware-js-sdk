@@ -150,6 +150,7 @@ const MethodBatchTestPage: React.FC = () => {
   const [presetMode, setPresetMode] = useState<PresetMode>('first');
   const [groupFilter, setGroupFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [results, setResults] = useState<Partial<Record<string, BatchResult>>>({});
   const [isRunning, setIsRunning] = useState(false);
   const [isStopping, setIsStopping] = useState(false);
@@ -219,6 +220,15 @@ const MethodBatchTestPage: React.FC = () => {
       progress: total > 0 ? Math.round((completed / total) * 100) : 0,
     };
   }, [filteredCases, results]);
+
+  const selectedCase = useMemo(() => {
+    if (!selectedCaseId) return null;
+    return filteredCases.find(testCase => testCase.id === selectedCaseId) ?? null;
+  }, [filteredCases, selectedCaseId]);
+
+  const resultCases = useMemo(() => {
+    return selectedCase ? [selectedCase] : filteredCases;
+  }, [filteredCases, selectedCase]);
 
   const setCaseResult = useCallback((caseId: string, update: Partial<BatchResult>) => {
     setResults(current => ({
@@ -320,6 +330,7 @@ const MethodBatchTestPage: React.FC = () => {
 
   const handleReset = useCallback(() => {
     stopRequestedRef.current = false;
+    setSelectedCaseId(null);
     setResults({});
   }, []);
 
@@ -469,8 +480,10 @@ const MethodBatchTestPage: React.FC = () => {
                     <button
                       key={testCase.id}
                       type="button"
-                      className="flex w-full gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/30"
-                      onClick={() => setSearchTerm(testCase.method.method)}
+                      className={`flex w-full gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/30 ${
+                        selectedCaseId === testCase.id ? 'bg-muted/40' : ''
+                      }`}
+                      onClick={() => setSelectedCaseId(testCase.id)}
                     >
                       <BatchStatusIcon status={status} />
                       <div className="min-w-0 flex-1">
@@ -513,7 +526,7 @@ const MethodBatchTestPage: React.FC = () => {
 
             <div className="min-h-0 overflow-y-auto p-4">
               <div className="space-y-3">
-                {filteredCases.map(testCase => {
+                {resultCases.map(testCase => {
                   const result = results[testCase.id];
                   if (!result || result.status === 'pending') return null;
 
@@ -559,7 +572,14 @@ const MethodBatchTestPage: React.FC = () => {
                   );
                 })}
 
-                {Object.keys(results).length === 0 && (
+                {selectedCase &&
+                  (!results[selectedCase.id] || results[selectedCase.id]?.status === 'pending') && (
+                    <div className="flex min-h-[240px] items-center justify-center rounded-lg border border-dashed border-border/70 px-6 text-center text-sm text-muted-foreground">
+                      This selected case has no completed result yet.
+                    </div>
+                  )}
+
+                {!selectedCase && Object.keys(results).length === 0 && (
                   <div className="flex min-h-[360px] items-center justify-center rounded-lg border border-dashed border-border/70 px-6 text-center text-sm text-muted-foreground">
                     Run visible cases to collect method responses and SDK errors.
                   </div>

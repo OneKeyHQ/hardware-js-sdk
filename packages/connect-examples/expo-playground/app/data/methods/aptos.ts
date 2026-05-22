@@ -141,6 +141,34 @@ const api: UnifiedMethodConfig[] = [
     ],
   },
   {
+    method: 'aptosSignInMessage',
+
+    presets: [
+      {
+        title: 'Sign message',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            description: 'BIP32 derivation path',
+            value: "m/44'/637'/0'/0'/0'",
+          },
+          {
+            name: 'payload',
+            type: 'textarea',
+            required: true,
+            label: 'Payload',
+            description: 'Aptos sign-in message payload',
+            value:
+              'localhost:3000 wants you to sign in with your Aptos account:\\n0xeb2d1d9bbfca9d892e124e858f1dc449935a3f785f8860892e03fb9820db1839\\n\\nSigning into demo application\\n\\nURI: https://dapp-example.onekeytest.com\\nVersion: 1.0.0\\nNonce: 0.72024fabf0bbd\\nIssued At: 2025-08-20T08:58:22.851Z\\nExpiration Time: 2025-08-21T08:58:22.851Z\\nNot Before: 2025-08-20T08:58:22.851Z\\nRequest ID: abc\\nChain ID: aptos--1\\nResources:\\n- resource.1\\n- resource.2',
+          },
+        ],
+      },
+    ],
+  },
+  {
     method: 'aptosSignTransaction',
 
     presets: [

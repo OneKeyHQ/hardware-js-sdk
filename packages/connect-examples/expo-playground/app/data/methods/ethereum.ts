@@ -374,6 +374,44 @@ const api: UnifiedMethodConfig[] = [
         ],
       },
       {
+        title: 'Sign Transaction (AccessList)',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            description: 'BIP32 derivation path',
+            value: "m/44'/60'/0'/0/0",
+          },
+          {
+            name: 'transaction',
+            type: 'textarea',
+            required: true,
+            label: 'Transaction',
+            description: 'Legacy transaction object with access list',
+            value: {
+              to: '0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8',
+              chainId: 1,
+              nonce: '0x0',
+              gasLimit: '0x5208',
+              gasPrice: '0xbebc200',
+              value: '0x63c201797a045',
+              data: '0x',
+              accessList: [
+                {
+                  address: '0x283f227c4bd38ece252c4ae7ece650b0e913f1f9',
+                  storageKeys: [
+                    '0xe9fb0a90f9bd0d647017c4b86b03d6aacb2dadde129ad4e427a2779fe75f7aac',
+                    '0x4288cae9cd1968c85927ae5dec536583d14e0eedd10fc9b69836385650845596',
+                  ],
+                },
+              ],
+            },
+          },
+        ],
+      },
+      {
         title: 'Sign EIP1559 Transaction(Empty data 1)',
         parameters: [
           {
@@ -554,6 +592,45 @@ const api: UnifiedMethodConfig[] = [
         ],
       },
       {
+        title: 'Sign Transaction EIP1559 (AccessList)',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            description: 'BIP32 derivation path',
+            value: "m/44'/60'/0'/0/0",
+          },
+          {
+            name: 'transaction',
+            type: 'textarea',
+            required: true,
+            label: 'Transaction',
+            description: 'EIP1559 transaction object with access list',
+            value: {
+              to: '0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8',
+              chainId: 1,
+              nonce: '0x0',
+              gasLimit: '0x5208',
+              maxFeePerGas: '0xbebc200',
+              maxPriorityFeePerGas: '0x9502f900',
+              value: '0x63c201797a045',
+              data: '0x',
+              accessList: [
+                {
+                  address: '0x283f227c4bd38ece252c4ae7ece650b0e913f1f9',
+                  storageKeys: [
+                    '0xe9fb0a90f9bd0d647017c4b86b03d6aacb2dadde129ad4e427a2779fe75f7aac',
+                    '0x4288cae9cd1968c85927ae5dec536583d14e0eedd10fc9b69836385650845596',
+                  ],
+                },
+              ],
+            },
+          },
+        ],
+      },
+      {
         title: 'EIP-7702 Simple7702Account',
         parameters: [
           {
@@ -706,6 +783,44 @@ const api: UnifiedMethodConfig[] = [
         ],
       },
       {
+        title: 'EIP-7702 Additional Authorization',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            description: 'BIP32 derivation path',
+            value: "m/44'/60'/0'/0/0",
+          },
+          {
+            name: 'transaction',
+            type: 'textarea',
+            required: true,
+            label: 'Transaction',
+            description: 'EIP7702 transaction with additional authorization',
+            value: {
+              to: '0x4Cd241E8d1510e30b2076397afc7508Ae59C66c9',
+              value: '0x0',
+              data: '0x',
+              chainId: 1,
+              nonce: '0x5',
+              gasLimit: '0x7530',
+              maxFeePerGas: '0xbebc200',
+              maxPriorityFeePerGas: '0x9502f900',
+              accessList: [],
+              authorizationList: [
+                {
+                  chainId: 1,
+                  address: '0x4Cd241E8d1510e30b2076397afc7508Ae59C66c9',
+                  nonce: '0x5',
+                },
+              ],
+            },
+          },
+        ],
+      },
+      {
         title: 'EIP-7702 With Pre-signed Authorization (Flattened)',
         parameters: [
           {
@@ -721,7 +836,8 @@ const api: UnifiedMethodConfig[] = [
             type: 'textarea',
             required: true,
             label: 'Transaction',
-            description: 'EIP7702 transaction with pre-signed authorization using flattened yParity,r,s structure',
+            description:
+              'EIP7702 transaction with pre-signed authorization using flattened yParity,r,s structure',
             value: {
               to: '0x4Cd241E8d1510e30b2076397afc7508Ae59C66c9',
               value: '0x0',
@@ -951,6 +1067,271 @@ const api: UnifiedMethodConfig[] = [
         ],
       },
       {
+        title: 'Sign Normal (Mini parsed capability)',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            description: 'BIP32 derivation path',
+            value: "m/44'/60'/0'/0/0",
+          },
+          {
+            name: 'metamaskV4Compat',
+            type: 'boolean',
+            value: true,
+          },
+          {
+            name: 'domainHash',
+            type: 'string',
+            value: '0x1a7d32d5c8bc7642896c6b5e4d9d0b5b31c4ae4d1400d3c4a861e5d3cc4f1101',
+          },
+          {
+            name: 'messageHash',
+            type: 'string',
+            value: '0x2bd59f0cb70845baf6b36b29f0db1d54a1f146db41b8e3ddfc0ef5a3d54ef102',
+          },
+          {
+            name: 'chainId',
+            type: 'number',
+            value: 1,
+          },
+          {
+            name: 'data',
+            type: 'textarea',
+            value: {
+              types: {
+                EIP712Domain: [{ name: 'name', type: 'string' }],
+                WalletProfile: [
+                  { name: 'walletName', type: 'string' },
+                  { name: 'memberCount', type: 'uint64' },
+                ],
+              },
+              primaryType: 'WalletProfile',
+              domain: {
+                name: 'mini.parsed.example',
+              },
+              message: {
+                walletName: 'OneKey Mini',
+                memberCount: '3',
+              },
+            },
+          },
+        ],
+      },
+      {
+        title: 'Blind Sign (Mini parsed capability, >16 struct fields)',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            description: 'BIP32 derivation path',
+            value: "m/44'/60'/0'/0/0",
+          },
+          {
+            name: 'metamaskV4Compat',
+            type: 'boolean',
+            value: true,
+          },
+          {
+            name: 'domainHash',
+            type: 'string',
+            value: '0x3c0a11222f6d2526648531f5f801c9a4f58e53ce8c29c293b0dfdb9e58ab2203',
+          },
+          {
+            name: 'messageHash',
+            type: 'string',
+            value: '0x4f7ae317286be7b19d1f9c4e4103b754d4d5b2f422f5d35308d1ec847ef43204',
+          },
+          {
+            name: 'chainId',
+            type: 'number',
+            value: 1,
+          },
+          {
+            name: 'data',
+            type: 'textarea',
+            value: {
+              types: {
+                EIP712Domain: [{ name: 'name', type: 'string' }],
+                BigStruct: [
+                  { name: 'field01', type: 'uint256' },
+                  { name: 'field02', type: 'uint256' },
+                  { name: 'field03', type: 'uint256' },
+                  { name: 'field04', type: 'uint256' },
+                  { name: 'field05', type: 'uint256' },
+                  { name: 'field06', type: 'uint256' },
+                  { name: 'field07', type: 'uint256' },
+                  { name: 'field08', type: 'uint256' },
+                  { name: 'field09', type: 'uint256' },
+                  { name: 'field10', type: 'uint256' },
+                  { name: 'field11', type: 'uint256' },
+                  { name: 'field12', type: 'uint256' },
+                  { name: 'field13', type: 'uint256' },
+                  { name: 'field14', type: 'uint256' },
+                  { name: 'field15', type: 'uint256' },
+                  { name: 'field16', type: 'uint256' },
+                  { name: 'field17', type: 'uint256' },
+                ],
+              },
+              primaryType: 'BigStruct',
+              domain: {
+                name: 'mini.blind.max-fields',
+              },
+              message: {
+                field01: '1',
+                field02: '2',
+                field03: '3',
+                field04: '4',
+                field05: '5',
+                field06: '6',
+                field07: '7',
+                field08: '8',
+                field09: '9',
+                field10: '10',
+                field11: '11',
+                field12: '12',
+                field13: '13',
+                field14: '14',
+                field15: '15',
+                field16: '16',
+                field17: '17',
+              },
+            },
+          },
+        ],
+      },
+      {
+        title: 'Blind Sign (Mini parsed capability, string >1536 bytes)',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            description: 'BIP32 derivation path',
+            value: "m/44'/60'/0'/0/0",
+          },
+          {
+            name: 'metamaskV4Compat',
+            type: 'boolean',
+            value: true,
+          },
+          {
+            name: 'domainHash',
+            type: 'string',
+            value: '0x5ad2f0c59b9f517d064614bcb5fd8f207e1aa0b13dc45942c1791003ca2b3305',
+          },
+          {
+            name: 'messageHash',
+            type: 'string',
+            value: '0x6ce32e7c80db5cfd4b1eb7bb38701fd9bd92bb73a70f0d2a95e05af01d4c4406',
+          },
+          {
+            name: 'chainId',
+            type: 'number',
+            value: 1,
+          },
+          {
+            name: 'data',
+            type: 'textarea',
+            value: {
+              types: {
+                EIP712Domain: [{ name: 'name', type: 'string' }],
+                LongNote: [{ name: 'note', type: 'string' }],
+              },
+              primaryType: 'LongNote',
+              domain: {
+                name: 'mini.blind.long-note',
+              },
+              message: {
+                note: `${'OneKeyMini'.repeat(154)}`,
+              },
+            },
+          },
+        ],
+      },
+      {
+        title: 'Blind Sign (Mini parsed capability, MetaMask v4 struct array >24)',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            description: 'BIP32 derivation path',
+            value: "m/44'/60'/0'/0/0",
+          },
+          {
+            name: 'metamaskV4Compat',
+            type: 'boolean',
+            value: true,
+          },
+          {
+            name: 'domainHash',
+            type: 'string',
+            value: '0x7d1a15c6280d2018738d78fce9b50581b67d62047bdbcd03f59060f4505d5507',
+          },
+          {
+            name: 'messageHash',
+            type: 'string',
+            value: '0x8eb8d73477aa18dbede5dd58e4fd500f57057b0fd7b5ff86ed438dcf61ae6608',
+          },
+          {
+            name: 'chainId',
+            type: 'number',
+            value: 1,
+          },
+          {
+            name: 'data',
+            type: 'textarea',
+            value: {
+              types: {
+                EIP712Domain: [{ name: 'name', type: 'string' }],
+                Member: [{ name: 'name', type: 'string' }],
+                Team: [{ name: 'members', type: 'Member[]' }],
+              },
+              primaryType: 'Team',
+              domain: {
+                name: 'mini.blind.member-array',
+              },
+              message: {
+                members: [
+                  { name: 'member-01' },
+                  { name: 'member-02' },
+                  { name: 'member-03' },
+                  { name: 'member-04' },
+                  { name: 'member-05' },
+                  { name: 'member-06' },
+                  { name: 'member-07' },
+                  { name: 'member-08' },
+                  { name: 'member-09' },
+                  { name: 'member-10' },
+                  { name: 'member-11' },
+                  { name: 'member-12' },
+                  { name: 'member-13' },
+                  { name: 'member-14' },
+                  { name: 'member-15' },
+                  { name: 'member-16' },
+                  { name: 'member-17' },
+                  { name: 'member-18' },
+                  { name: 'member-19' },
+                  { name: 'member-20' },
+                  { name: 'member-21' },
+                  { name: 'member-22' },
+                  { name: 'member-23' },
+                  { name: 'member-24' },
+                  { name: 'member-25' },
+                ],
+              },
+            },
+          },
+        ],
+      },
+      {
         title: 'Sign Nested array',
         parameters: [
           {
@@ -1086,6 +1467,73 @@ const api: UnifiedMethodConfig[] = [
               },
               domain: {
                 chainId: '0x1',
+                verifyingContract: '0x673f21761c5400531a37554a602fe0407addd0dd',
+              },
+              primaryType: 'SafeTx',
+              message: {
+                to: '0x5618207d27d78f09f61a5d92190d58c453feb4b7',
+                value: '10000000000000',
+                data: '0x',
+                operation: '0',
+                safeTxGas: '0',
+                baseGas: '0',
+                gasPrice: '0',
+                gasToken: '0x0000000000000000000000000000000000000000',
+                refundReceiver: '0x0000000000000000000000000000000000000000',
+                nonce: '0',
+              },
+            },
+          },
+        ],
+      },
+      {
+        title: 'Sign Gnosis Safe Tx(ChainId: 10 进制)',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            description: 'BIP32 derivation path',
+            value: "m/44'/60'/0'/0/0",
+          },
+          {
+            name: 'domainHash',
+            type: 'string',
+            value: '9e4b8f7c6d5e4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f0a9b',
+          },
+          {
+            name: 'messageHash',
+            type: 'string',
+            value: '5af73f1c5230924b60ba2c00e31ad5a5a5e6b7a45c9b93b5e2fa5c90e616e2f3',
+          },
+          {
+            name: 'data',
+            type: 'textarea',
+            required: true,
+            label: 'Typed Data',
+            description: 'Gnosis Safe transaction typed data with decimal chain ID',
+            value: {
+              types: {
+                SafeTx: [
+                  { name: 'to', type: 'address' },
+                  { name: 'value', type: 'uint256' },
+                  { name: 'data', type: 'bytes' },
+                  { name: 'operation', type: 'uint8' },
+                  { name: 'safeTxGas', type: 'uint256' },
+                  { name: 'baseGas', type: 'uint256' },
+                  { name: 'gasPrice', type: 'uint256' },
+                  { name: 'gasToken', type: 'address' },
+                  { name: 'refundReceiver', type: 'address' },
+                  { name: 'nonce', type: 'uint256' },
+                ],
+                EIP712Domain: [
+                  { name: 'chainId', type: 'uint256' },
+                  { name: 'verifyingContract', type: 'address' },
+                ],
+              },
+              domain: {
+                chainId: '311',
                 verifyingContract: '0x673f21761c5400531a37554a602fe0407addd0dd',
               },
               primaryType: 'SafeTx',
