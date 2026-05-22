@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AlertTriangle,
   CheckCircle2,
   FileUp,
   FolderOpen,
@@ -138,7 +139,7 @@ const REQUIRED_FILES: Array<{ key: RequiredFileKey; label: string; expectedName:
   },
   {
     key: 'updateRom',
-    label: 'Update ROM',
+    label: 'Update Bootloader',
     expectedName: 'pro2_boot_update_rom_signed.bin',
   },
   {
@@ -194,7 +195,7 @@ const STEP_CONFIG: Array<{ id: WorkflowStepId; title: string; description: strin
   {
     id: 'step1',
     title: 'Step 1',
-    description: 'Update romloader',
+    description: 'Update bootloader',
   },
   {
     id: 'step2',
@@ -1170,10 +1171,22 @@ export default function Pro2UpdatePage() {
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h1 className="text-2xl font-semibold text-foreground">OneKey Pro 2 Update</h1>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-2xl font-semibold text-foreground">OneKey Pro 2 Update</h1>
+                <Badge variant="outline" className="border-amber-300 text-amber-700">
+                  Non-standard process
+                </Badge>
+              </div>
               <p className="mt-1 text-sm text-muted-foreground">
                 Romloader, resources, bluetooth, and firmware workflow.
               </p>
+              <div className="mt-2 flex max-w-3xl items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>
+                  When the boot UI appears, swipe from the top-left corner to the bottom-right
+                  corner within 3 seconds and hold to stay in romloader mode.
+                </span>
+              </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant={sdkInitState.isInitialized ? 'default' : 'outline'}>
