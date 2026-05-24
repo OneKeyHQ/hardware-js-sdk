@@ -16,6 +16,8 @@ export function enrichErrorMessage(code: HardwareErrorCode, originalMessage: str
       return `${originalMessage}. Please reconnect the device and try again.`;
     case HardwareErrorCode.DeviceLocked:
       return `${originalMessage}. Please unlock your device and try again.`;
+    case HardwareErrorCode.DeviceOneDeviceOnly:
+      return `${originalMessage}. Disconnect the extra device and try again.`;
     case HardwareErrorCode.UserRejected:
       return `${originalMessage}. The request was rejected on the device.`;
     case HardwareErrorCode.WrongApp:
