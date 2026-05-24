@@ -38,7 +38,10 @@ export function deviceActionToPromise<T>(
   action: DeviceAction<T>,
   onInteraction?: (interaction: string) => void,
   timeoutMs: number = IDLE_WATCHDOG_MS,
-  onRegisterCanceller?: (cancel: (reason?: CancelReason) => void) => void
+  onRegisterCanceller?: (cancel: (reason?: CancelReason) => void) => void,
+  // Raw intermediateValue per Pending tick — for callers that need DMK-specific
+  // fields beyond requiredUserInteraction (e.g. install progress).
+  onIntermediate?: (intermediateValue: unknown) => void
 ): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     let settled = false;
@@ -136,17 +139,26 @@ export function deviceActionToPromise<T>(
           onInteraction?.('interaction-complete');
           sub?.unsubscribe();
           rejectWithStepContext(state.error, lastStep, observedSteps, reject);
-        } else if (state.status === DeviceActionStatus.Pending && onInteraction) {
-          const interaction = state.intermediateValue?.requiredUserInteraction;
-          if (interaction && interaction !== 'none') {
-            // unlock-device is DMK's own bounded poll. Other interaction
-            // states keep the caller-provided watchdog so a stuck observable
-            // cannot hold the queue slot forever.
-            if (interaction === 'unlock-device' && timer) {
-              clearTimeout(timer);
-              timer = null;
+        } else if (state.status === DeviceActionStatus.Pending) {
+          if (onIntermediate) {
+            try {
+              onIntermediate(state.intermediateValue);
+            } catch {
+              // listener errors must not abort the device action
             }
-            onInteraction(String(interaction));
+          }
+          if (onInteraction) {
+            const interaction = state.intermediateValue?.requiredUserInteraction;
+            if (interaction && interaction !== 'none') {
+              // unlock-device is DMK's own bounded poll. Other interaction
+              // states keep the caller-provided watchdog so a stuck observable
+              // cannot hold the queue slot forever.
+              if (interaction === 'unlock-device' && timer) {
+                clearTimeout(timer);
+                timer = null;
+              }
+              onInteraction(String(interaction));
+            }
           }
         }
       },

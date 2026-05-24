@@ -1545,4 +1545,87 @@ describe('LedgerAdapter', () => {
       }
     });
   });
+
+  describe('app management', () => {
+    it('listInstalledApps routes through connector.call with listInstalledApps method', async () => {
+      connector.call.mockResolvedValueOnce([
+        {
+          versionName: 'Bitcoin',
+          versionId: 1,
+          version: '2.4.1',
+          versionDisplayName: 'Bitcoin',
+          description: 'BTC app',
+          icon: null,
+          bytes: 12345,
+          currencyId: 'bitcoin',
+          isDevTools: false,
+        },
+      ]);
+      await adapter.connectDevice('dev-1');
+      const result = await adapter.listInstalledApps('dev-1');
+
+      expect(connector.call).toHaveBeenCalledWith('session-abc', 'listInstalledApps', {});
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.payload[0].versionName).toBe('Bitcoin');
+      }
+    });
+
+    it('listAvailableApps routes through connector.call with listAvailableApps method', async () => {
+      connector.call.mockResolvedValueOnce([]);
+      await adapter.connectDevice('dev-1');
+      const result = await adapter.listAvailableApps('dev-1');
+
+      expect(connector.call).toHaveBeenCalledWith('session-abc', 'listAvailableApps', {});
+      expect(result.success).toBe(true);
+    });
+
+    it('installApp passes appName + onProgress callback through params', async () => {
+      connector.call.mockResolvedValueOnce(undefined);
+      await adapter.connectDevice('dev-1');
+      const result = await adapter.installApp('dev-1', 'Cardano');
+
+      expect(result.success).toBe(true);
+      const [sessionId, method, params] = connector.call.mock.calls[0];
+      expect(sessionId).toBe('session-abc');
+      expect(method).toBe('installApp');
+      expect(params).toMatchObject({ appName: 'Cardano' });
+      expect(typeof (params as { onProgress?: unknown }).onProgress).toBe('function');
+    });
+
+    it('installApp progress callback re-emits adapter app-install-progress events', async () => {
+      let capturedOnProgress: ((p: unknown) => void) | undefined;
+      connector.call.mockImplementationOnce(async (_sessionId, _method, params) => {
+        capturedOnProgress = (params as { onProgress: (p: unknown) => void }).onProgress;
+        capturedOnProgress?.({ progress: 0.5, requiredUserInteraction: 'none' });
+        return undefined;
+      });
+      const events: unknown[] = [];
+      adapter.on('app-install-progress', evt => events.push(evt));
+
+      await adapter.connectDevice('dev-1');
+      await adapter.installApp('dev-1', 'Cardano');
+
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        type: 'app-install-progress',
+        payload: { connectId: 'dev-1', appName: 'Cardano', progress: 0.5 },
+      });
+    });
+
+    it('installApp surfaces connector errors as failure response', async () => {
+      connector.call.mockRejectedValueOnce(
+        Object.assign(new Error('Allow secure connection rejected'), {
+          code: HardwareErrorCode.UserAborted,
+        })
+      );
+      await adapter.connectDevice('dev-1');
+      const result = await adapter.installApp('dev-1', 'Cardano');
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.payload.code).toBe(HardwareErrorCode.UserAborted);
+      }
+    });
+  });
 });

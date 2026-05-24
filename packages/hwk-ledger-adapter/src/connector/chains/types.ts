@@ -1,5 +1,6 @@
 import type { ConnectorEventMap, ConnectorEventType } from '@onekeyfe/hwk-adapter-core';
 import type { DeviceManagementKit } from '@ledgerhq/device-management-kit';
+import type { DeviceAppsManager } from '../../device-apps/DeviceAppsManager';
 import type { SignerManager } from '../../signer/SignerManager';
 import type { LedgerDeviceManager } from '../../device/LedgerDeviceManager';
 import type { WrapErrorOptions } from '../../errors';
@@ -16,6 +17,7 @@ export interface ConnectorContext {
   getOrCreateDmk(): Promise<DeviceManagementKit>;
   getDeviceManager(): Promise<LedgerDeviceManager>;
   getSignerManager(): Promise<SignerManager>;
+  getDeviceAppsManager(): Promise<DeviceAppsManager>;
   clearAllSigners(): void;
   /**
    * Notify the connector that a session has been replaced (e.g. after app switch).

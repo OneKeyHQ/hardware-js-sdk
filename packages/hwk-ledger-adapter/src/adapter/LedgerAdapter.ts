@@ -28,6 +28,13 @@ import { isLedgerBleConnectionType } from '../utils/ledgerDmkTransport';
 import { debugError, debugLog } from '../utils/debugLog';
 
 import type {
+  AppMetadata,
+  FirmwareVersion,
+  InstallAppCallParams,
+  InstallProgressCallback,
+  LedgerDeviceInfo,
+} from '../device-apps/DeviceApps';
+import type {
   BtcAddress,
   BtcGetAddressParams,
   BtcGetPublicKeyParams,
@@ -432,6 +439,66 @@ export class LedgerAdapter implements IHardwareWallet {
 
   tronSignMessage(connectId: string, deviceId: string, params: TronSignMsgParams) {
     return this.callChain<TronSignature>(connectId, deviceId, 'tron', 'tronSignMessage', params);
+  }
+
+  // ---------------------------------------------------------------------------
+  // App management — OS-level Ledger app install / list. Bypasses fingerprint
+  // and chain-handler dispatch; installApp progress is forwarded to the adapter
+  // emitter as 'app-install-progress' events.
+  // ---------------------------------------------------------------------------
+
+  async installApp(connectId: string, appName: string): Promise<Response<void>> {
+    try {
+      const params: InstallAppCallParams & { onProgress?: InstallProgressCallback } = {
+        appName,
+        onProgress: progress => {
+          this.emitter.emit('app-install-progress' as never, {
+            type: 'app-install-progress',
+            payload: { connectId, appName, ...progress },
+          } as never);
+        },
+      };
+      await this.connectorCall(connectId, 'installApp', params);
+      return success(undefined);
+    } catch (err) {
+      return this.errorToFailure(err);
+    }
+  }
+
+  async listInstalledApps(connectId: string): Promise<Response<AppMetadata[]>> {
+    try {
+      const result = await this.connectorCall(connectId, 'listInstalledApps', {});
+      return success(result as AppMetadata[]);
+    } catch (err) {
+      return this.errorToFailure(err);
+    }
+  }
+
+  async listAvailableApps(connectId: string): Promise<Response<AppMetadata[]>> {
+    try {
+      const result = await this.connectorCall(connectId, 'listAvailableApps', {});
+      return success(result as AppMetadata[]);
+    } catch (err) {
+      return this.errorToFailure(err);
+    }
+  }
+
+  async getLedgerFirmwareVersion(connectId: string): Promise<Response<FirmwareVersion>> {
+    try {
+      const result = await this.connectorCall(connectId, 'getFirmwareVersion', {});
+      return success(result as FirmwareVersion);
+    } catch (err) {
+      return this.errorToFailure(err);
+    }
+  }
+
+  async getLedgerDeviceInfo(connectId: string): Promise<Response<LedgerDeviceInfo>> {
+    try {
+      const result = await this.connectorCall(connectId, 'getDeviceInfo', {});
+      return success(result as LedgerDeviceInfo);
+    } catch (err) {
+      return this.errorToFailure(err);
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -1548,11 +1615,17 @@ export class LedgerAdapter implements IHardwareWallet {
       'code' in err &&
       typeof (err as { code: unknown }).code === 'number'
     ) {
-      const e = err as { code: number; message?: string; appName?: string; reason?: string };
+      const e = err as {
+        code: number;
+        message?: string;
+        appName?: string;
+        reason?: string;
+        params?: Record<string, unknown>;
+      };
       const params =
         e.code === HardwareErrorCode.DevicePermissionDenied && e.reason
           ? { permissionDeniedReason: e.reason }
-          : undefined;
+          : e.params;
       return ledgerFailure(e.code, e.message ?? 'Unknown error', e.appName, tag, params);
     }
 

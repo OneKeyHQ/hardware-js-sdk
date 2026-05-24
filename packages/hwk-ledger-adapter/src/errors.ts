@@ -407,6 +407,17 @@ export function isAppNotInstalledError(err: unknown): boolean {
   return false;
 }
 
+/** DMK install ran out of space on the device. */
+export function isOutOfMemoryError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as Record<string, unknown>;
+  if (e._tag === 'OutOfMemoryDAError') return true;
+  if (typeof e.message === 'string' && /out of memory|not enough.*space|insufficient.*memory/i.test(e.message)) {
+    return true;
+  }
+  return false;
+}
+
 /** Check for device disconnected errors. */
 export function isDeviceDisconnectedError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;
@@ -512,6 +523,8 @@ export function mapLedgerError(
     code = HardwareErrorCode.WrongApp;
   } else if (isAppNotInstalledError(err)) {
     code = HardwareErrorCode.AppNotInstalled;
+  } else if (isOutOfMemoryError(err)) {
+    code = HardwareErrorCode.DeviceOutOfMemory;
   } else if (isDeviceDisconnectedError(err)) {
     code = HardwareErrorCode.DeviceDisconnected;
   } else if (isTimeoutError(err)) {
