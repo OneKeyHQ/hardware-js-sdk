@@ -9,6 +9,7 @@ import type { ConfluxSignMessageCIP23 as HardwareConfluxSignMessageCIP23 } from 
 export default class ConfluxSignMessageCIP23 extends BaseMethod<HardwareConfluxSignMessageCIP23> {
   init() {
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = true;
 
     validateParams(this.payload, [
       { name: 'path', required: true },

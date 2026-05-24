@@ -13,6 +13,7 @@ export default class BTCSignPsbt extends BaseMethod<SignPsbt> {
   init() {
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = true;
 
     validateParams(this.payload, [
       { name: 'psbt', type: 'hexString', required: true },

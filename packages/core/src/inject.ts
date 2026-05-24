@@ -142,7 +142,7 @@ export const createCoreApi = (
 
   testInitializeDeviceDuration: (connectId, params) =>
     call({ ...params, connectId, method: 'testInitializeDeviceDuration' }),
-
+  preInitialize: (connectId, params) => call({ ...params, connectId, method: 'preInitialize' }),
   deviceBackup: connectId => call({ connectId, method: 'deviceBackup' }),
   deviceChangePin: (connectId, params) => call({ ...params, connectId, method: 'deviceChangePin' }),
   deviceFlags: (connectId, params) => call({ ...params, connectId, method: 'deviceFlags' }),

@@ -81,6 +81,19 @@ const api: PlaygroundProps[] = [
     noDeviceIdReq: true,
   },
   {
+    method: 'preInitialize',
+    description: 'Pre-initialize device (BLE)',
+    noDeviceIdReq: true,
+    presupposes: [
+      {
+        title: 'Pre-initialize',
+        value: {
+          initSession: true,
+        },
+      },
+    ],
+  },
+  {
     method: 'checkFirmwareRelease',
     description: 'Check firmware release of a device',
     noDeviceIdReq: true,

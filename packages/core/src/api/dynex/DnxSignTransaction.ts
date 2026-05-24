@@ -14,6 +14,7 @@ export default class DnxSignTransaction extends BaseMethod<DnxSignTx> {
   init() {
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = true;
 
     const { payload } = this;
     // init params

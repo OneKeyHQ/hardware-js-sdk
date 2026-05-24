@@ -46,10 +46,12 @@ export default class EVMSignTransaction extends BaseMethod {
   init() {
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = true;
 
     validateParams(this.payload, [
       { name: 'path', required: true },
       { name: 'transaction', type: 'object', required: true },
+      { name: 'usePreInitialize', type: 'boolean' },
     ]);
     const { path, transaction } = this.payload;
     this.addressN = validatePath(path, 3);

@@ -13,12 +13,14 @@ export default class EVMSignMessage extends BaseMethod<EthereumSignMessageOneKey
   init() {
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = true;
 
     // check payload
     validateParams(this.payload, [
       { name: 'path', required: true },
       { name: 'messageHex', type: 'hexString', required: true },
       { name: 'chainId', type: 'number' },
+      { name: 'usePreInitialize', type: 'boolean' },
     ]);
 
     const { path, messageHex, chainId } = this.payload;

@@ -52,6 +52,7 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
   init() {
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = true;
 
     validateParams(this.payload, [
       { name: 'path', required: true },
@@ -60,6 +61,7 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
       { name: 'domainHash', type: 'hexString' },
       { name: 'messageHash', type: 'hexString' },
       { name: 'chainId', type: 'number' },
+      { name: 'usePreInitialize', type: 'boolean' },
     ]);
 
     const { path, data, metamaskV4Compat, domainHash, messageHash, chainId } = this.payload;

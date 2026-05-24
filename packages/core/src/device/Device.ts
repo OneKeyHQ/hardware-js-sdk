@@ -62,6 +62,7 @@ export type InitOptions = {
 
 export type RunOptions = {
   keepSession?: boolean;
+  skipInitialize?: boolean;
 } & InitOptions;
 
 const parseRunOptions = (options?: RunOptions): RunOptions => {
@@ -195,6 +196,18 @@ export class Device extends EventEmitter {
   passphraseState: string | undefined = undefined;
 
   pendingCallbackPromise?: Deferred<void>;
+
+  /** Pre-initialize timestamp (ms) */
+  private preInitializedAt?: number;
+
+  /** Pre-initialize context, used to verify state consistency before skipping */
+  private preInitializeMeta?: {
+    passphraseState?: string;
+    deviceId?: string;
+  };
+
+  /** Last Initialize duration (ms), reported as "saved" when a skip happens */
+  private lastInitializeDurationMs?: number;
 
   constructor(descriptor: DeviceDescriptor, sdkInstanceId?: string) {
     super();
@@ -355,6 +368,60 @@ export class Device extends EventEmitter {
     this.deviceAcquired = false;
   }
 
+  /**
+   * Pre-initialize: connect + Initialize ahead of the sign. Only runs the
+   * fallback init when features are missing (gate on `!this.features`, not
+   * isUsedHere which is always false on BLE); otherwise just records the mark.
+   */
+  async preInitialize(initOptions?: InitOptions) {
+    if (!this.features) {
+      await this.acquire();
+      await this.initialize(initOptions);
+    }
+    this.markPreInitialized({
+      passphraseState: initOptions?.passphraseState,
+      deviceId: initOptions?.deviceId,
+    });
+  }
+
+  markPreInitialized(meta?: { passphraseState?: string; deviceId?: string }) {
+    this.preInitializedAt = Date.now();
+    this.preInitializeMeta = meta
+      ? {
+          passphraseState: meta.passphraseState === '' ? undefined : meta.passphraseState,
+          deviceId: meta.deviceId === '' ? undefined : meta.deviceId,
+        }
+      : undefined;
+  }
+
+  clearPreInitialized() {
+    this.preInitializedAt = undefined;
+    this.preInitializeMeta = undefined;
+  }
+
+  isPreInitializeMetaMatch(payload?: { passphraseState?: string; deviceId?: string }) {
+    if (!this.preInitializeMeta) return true;
+    const passphraseState = payload?.passphraseState === '' ? undefined : payload?.passphraseState;
+    const deviceId = payload?.deviceId === '' ? undefined : payload?.deviceId;
+    return (
+      this.preInitializeMeta.passphraseState === passphraseState &&
+      this.preInitializeMeta.deviceId === deviceId
+    );
+  }
+
+  isPreInitializedValid(ttlMs: number) {
+    if (!this.preInitializedAt) return false;
+    return Date.now() - this.preInitializedAt <= ttlMs;
+  }
+
+  setLastInitializeDuration(durationMs: number) {
+    this.lastInitializeDurationMs = durationMs;
+  }
+
+  getLastInitializeDuration() {
+    return this.lastInitializeDurationMs;
+  }
+
   getCommands() {
     return this.commands;
   }
@@ -482,13 +549,7 @@ export class Device extends EventEmitter {
     payload.passphrase_state = options?.passphraseState;
     payload.is_contains_attach = true;
 
-    Log.debug('Initialize device begin:', {
-      deviceId: options?.deviceId,
-      passphraseState: options?.passphraseState,
-      initSession: options?.initSession,
-      InitializePayload: payload,
-    });
-
+    const initStartAt = Date.now();
     try {
       // @ts-expect-error
       const { message } = await Promise.race([
@@ -501,7 +562,8 @@ export class Device extends EventEmitter {
         }),
       ]);
 
-      Log.debug('Initialize device end: ', message);
+      const initCostMs = Date.now() - initStartAt;
+      this.setLastInitializeDuration(initCostMs);
       this._updateFeatures(message, options?.initSession);
       await TransportManager.reconfigure(this.features);
     } catch (error) {
@@ -588,7 +650,9 @@ export class Device extends EventEmitter {
 
         try {
           if (fn) {
-            await this.initialize(options);
+            if (!options?.skipInitialize) {
+              await this.initialize(options);
+            }
           }
         } catch (error) {
           this.runPromise = null;

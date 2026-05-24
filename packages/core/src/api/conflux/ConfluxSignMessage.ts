@@ -9,6 +9,7 @@ import type { ConfluxSignMessage as HardwareConfluxSignMessage } from '@onekeyfe
 export default class ConfluxSignMessage extends BaseMethod<HardwareConfluxSignMessage> {
   init() {
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = true;
 
     // check payload
     validateParams(this.payload, [

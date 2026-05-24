@@ -10,6 +10,7 @@ export default class ScdoSignMessage extends BaseMethod<HardwareScdoSignMessage>
   init() {
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = true;
 
     // check payload
     validateParams(this.payload, [

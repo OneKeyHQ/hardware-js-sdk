@@ -12,6 +12,8 @@ export default class NexaSignTransaction extends BaseMethod<NexaSignTransactionP
   hasBundle = false;
 
   init() {
+    this.allowUsePreInitialize = true;
+
     const payload = this.payload as NexaSignTransactionParams;
 
     payload.inputs.forEach(input => {

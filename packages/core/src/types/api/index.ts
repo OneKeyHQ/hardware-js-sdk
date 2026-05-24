@@ -2,6 +2,7 @@ import type { off, on, removeAllListeners } from './event';
 import type { uiResponse } from './uiResponse';
 import type { init, updateSettings } from './init';
 import type { testInitializeDeviceDuration } from './testInitializeDeviceDuration';
+import type { preInitialize } from './preInitialize';
 import type { getLogs } from './getLogs';
 import type { checkBridgeStatus } from './checkBridgeStatus';
 import type { checkBridgeRelease } from './checkBridgeRelease';
@@ -152,6 +153,7 @@ export type CoreApi = {
    * Test function
    */
   testInitializeDeviceDuration: typeof testInitializeDeviceDuration;
+  preInitialize: typeof preInitialize;
 
   /**
    * Core function
