@@ -15,6 +15,7 @@ import {
 
 import {
   ERROR_TAG,
+  createMultipleUsbLedgerDevicesError,
   isConnectionLevelError,
   isDeviceDisconnectedError,
   isDeviceLockedError,
@@ -74,15 +75,6 @@ import type {
   UiResponseEvent,
 } from '@onekeyfe/hwk-adapter-core';
 
-export interface LedgerAdapterOptions {
-  /**
-   * `true` — emit `REQUEST_SELECT_DEVICE` on multi-device discovery and await
-   * `uiResponse({ type: RECEIVE_SELECT_DEVICE, payload: { sdkConnectId } })`.
-   * `false` (default) — silently pick the first device.
-   */
-  handleSelectDevice?: boolean;
-}
-
 /**
  * Result of `_verifyDeviceFingerprint`.
  *
@@ -122,8 +114,6 @@ export class LedgerAdapter implements IHardwareWallet {
 
   private readonly emitter = new TypedEventEmitter<HardwareEventMap>();
 
-  private readonly _handleSelectDevice: boolean;
-
   private _discoveredDevices = new Map<string, DeviceInfo>();
 
   private _sessions = new Map<string, string>();
@@ -148,9 +138,8 @@ export class LedgerAdapter implements IHardwareWallet {
   // Shared across concurrent callers — only `cancel()` aborts.
   private _doConnectAbortController: AbortController | null = null;
 
-  constructor(connector: IConnector, options?: LedgerAdapterOptions) {
+  constructor(connector: IConnector) {
     this.connector = connector;
-    this._handleSelectDevice = options?.handleSelectDevice ?? false;
     this._jobQueue = new DeviceJobQueue();
     this.registerEventListeners();
   }
@@ -220,12 +209,8 @@ export class LedgerAdapter implements IHardwareWallet {
 
     const devices = await this.connector.searchDevices();
 
-    // Replace cache with this round's raw result. DMK paths used as
-    // connectId on USB are ephemeral (new UUID after each replug), so
-    // incremental writes leave stale entries pointing at devices DMK no
-    // longer recognizes — the visible symptom is the same physical device
-    // appearing twice in the discovered list, one with a real name and one
-    // with the 'Ledger' placeholder from a connect-time event.
+    // Replace cache with this round's raw result. DMK paths used as connectId
+    // on USB are ephemeral — incremental writes leave stale entries.
     this._discoveredDevices.clear();
     for (const d of devices) {
       if (d.connectId) {
@@ -233,7 +218,6 @@ export class LedgerAdapter implements IHardwareWallet {
       }
     }
 
-    // If no devices found, ensure permission (no connectId = search context)
     if (this._discoveredDevices.size === 0) {
       await this._ensureDevicePermission();
     }
@@ -244,6 +228,20 @@ export class LedgerAdapter implements IHardwareWallet {
       ].join(',')}]`
     );
     return Array.from(this._discoveredDevices.values());
+  }
+
+  // USB single-session invariant: evict all sessions, best-effort (see connectDevice).
+  private async _evictAllSessions(): Promise<void> {
+    if (this._sessions.size === 0) return;
+    const stale = [...this._sessions.values()];
+    this._sessions.clear();
+    for (const sid of stale) {
+      try {
+        await this.connector.disconnect(sid);
+      } catch {
+        // best-effort
+      }
+    }
   }
 
   // Layer 2 retry budget after connection-class error. Each round delegates
@@ -276,6 +274,12 @@ export class LedgerAdapter implements IHardwareWallet {
         throw Object.assign(new Error('Ledger BLE connectId is required.'), {
           code: HardwareErrorCode.DeviceNotFound,
         });
+      }
+
+      // USB single-session invariant: evict any stale session before opening
+      // a new one — guards ensureConnected's ambient fallback against ghosts.
+      if (!isLedgerBleConnectionType(this.connector.connectionType)) {
+        await this._evictAllSessions();
       }
 
       await this._ensureDevicePermission(connectId);
@@ -616,7 +620,7 @@ export class LedgerAdapter implements IHardwareWallet {
    *
    * - If a session already exists for the given connectId, reuse it.
    * - If ANY session exists (Ledger IDs are ephemeral), reuse it.
-   * - Otherwise: search → 1 device: auto-connect, multiple: ask user, 0: throw.
+   * - Otherwise: search → exactly 1 USB device auto-connects; multiple or none throws.
    */
   // Mutex for ensureConnected — prevents concurrent calls from establishing duplicate connections
   private _connectingPromise: Promise<string> | null = null;
@@ -763,7 +767,20 @@ export class LedgerAdapter implements IHardwareWallet {
     }
 
     if (connectId && this._sessions.has(connectId)) return connectId;
-    if (this._sessions.size > 0) {
+    // Ambient fallback only when the caller gave no target. On an explicit
+    // connectId miss, re-resolve THAT device via _doConnect — never route to
+    // the first session entry (a stale entry for B once made A's calls hit B).
+    if (!connectId && this._sessions.size > 0) {
+      // Fail loud rather than route to a wrong device; connectDevice evicts
+      // first, so size>1 here should be impossible.
+      if (!isLedgerBleConnectionType(this.connector.connectionType) && this._sessions.size > 1) {
+        throw Object.assign(
+          new Error(
+            'Ledger USB session invariant violated: more than one session is active. Please reconnect the device.'
+          ),
+          { code: HardwareErrorCode.DeviceOneDeviceOnly }
+        );
+      }
       return this._sessions.keys().next().value as string;
     }
 
@@ -883,20 +900,44 @@ export class LedgerAdapter implements IHardwareWallet {
     devices: DeviceInfo[],
     targetConnectId?: string
   ): Promise<string> {
+    if (!isLedgerBleConnectionType(this.connector.connectionType) && devices.length > 1) {
+      debugLog(
+        `[DMK] Multiple Ledger USB devices found (${devices.length}); refusing to auto-select by ephemeral connectId.`
+      );
+      throw createMultipleUsbLedgerDevicesError();
+    }
+
     if (targetConnectId) {
       const target = devices.find(
         d => d.connectId === targetConnectId || d.deviceId === targetConnectId
       );
-      if (!target) {
-        const err = Object.assign(new Error(`Target Ledger unavailable: ${targetConnectId}`), {
-          code: HardwareErrorCode.DeviceNotFound,
-        }) as Error & { _tag?: string };
-        if (isLedgerBleConnectionType(this.connector.connectionType)) {
-          err._tag = ERROR_TAG.DeviceNotAdvertising;
-        }
-        throw err;
+      if (target) {
+        return this._connectDeviceOrThrow(target.connectId);
       }
-      return this._connectDeviceOrThrow(target.connectId);
+
+      // USB single-device fallback: target not in fresh enumeration but exactly
+      // one device present — assume same device, new ephemeral path after replug.
+      //
+      // IMPORTANT: `devices.length` is the FRESH searchDevices() result, NOT
+      // cached `_discoveredDevices`. Do NOT "simplify" this to use
+      // _sessions.size or _discoveredDevices.size — those can carry ghost
+      // entries from failed device-state subscriptions, which would resurrect
+      // the multi-device drift bug.
+      if (!isLedgerBleConnectionType(this.connector.connectionType) && devices.length === 1) {
+        debugLog(
+          `[LedgerAdapter] target ${targetConnectId} not in fresh enumeration; ` +
+            `accepting sole USB device ${devices[0].connectId} (assumed ephemeral path change)`
+        );
+        return this._connectDeviceOrThrow(devices[0].connectId);
+      }
+
+      const err = Object.assign(new Error(`Target Ledger unavailable: ${targetConnectId}`), {
+        code: HardwareErrorCode.DeviceNotFound,
+      }) as Error & { _tag?: string };
+      if (isLedgerBleConnectionType(this.connector.connectionType)) {
+        err._tag = ERROR_TAG.DeviceNotAdvertising;
+      }
+      throw err;
     }
 
     if (isLedgerBleConnectionType(this.connector.connectionType)) {
@@ -905,10 +946,13 @@ export class LedgerAdapter implements IHardwareWallet {
       });
     }
 
-    const chosenConnectId =
-      devices.length === 1 ? devices[0].connectId : await this._chooseDeviceFromList(devices);
+    if (devices.length !== 1) {
+      throw Object.assign(new Error('Ledger device not found.'), {
+        code: HardwareErrorCode.DeviceNotFound,
+      });
+    }
 
-    return this._connectDeviceOrThrow(chosenConnectId);
+    return this._connectDeviceOrThrow(devices[0].connectId);
   }
 
   private async _connectDeviceOrThrow(chosenConnectId: string): Promise<string> {
@@ -925,53 +969,6 @@ export class LedgerAdapter implements IHardwareWallet {
       throw rethrow;
     }
     return chosenConnectId;
-  }
-
-  private async _chooseDeviceFromList(devices: DeviceInfo[]): Promise<string> {
-    if (!this._handleSelectDevice) {
-      debugLog(
-        `[DMK] Multiple Ledger devices found (${devices.length}); handleSelectDevice=false, picking first (${devices[0].connectId}).`
-      );
-      return devices[0].connectId;
-    }
-
-    let response: { sdkConnectId: string } | undefined;
-    try {
-      const waitPromise = this._uiRegistry.wait<{ sdkConnectId: string }>(
-        UI_REQUEST.REQUEST_SELECT_DEVICE
-      );
-      this.emitter.emit(UI_REQUEST.REQUEST_SELECT_DEVICE, {
-        type: UI_REQUEST.REQUEST_SELECT_DEVICE,
-        payload: { devices },
-      });
-      response = await waitPromise;
-    } catch (err) {
-      // Defensive: same-type re-fire of REQUEST_SELECT_DEVICE could preempt
-      // this wait. Surface as UserAborted — _doConnect's catch only treats
-      // Locked / NotAdvertising / Disconnected as recoverable; raw
-      // UiRequestPreempted would escape the retry loop.
-      if ((err as { _tag?: string })?._tag === UI_REQUEST_PREEMPTED_TAG) {
-        this.emitter.emit(UI_REQUEST.CLOSE_UI_WINDOW, {
-          type: UI_REQUEST.CLOSE_UI_WINDOW,
-          payload: {},
-        });
-        throw Object.assign(new Error('Device selection superseded'), {
-          _tag: ERROR_TAG.UserAborted,
-          code: HardwareErrorCode.UserAborted,
-          cause: err,
-        });
-      }
-      throw err;
-    }
-
-    const chosen = devices.find(d => d.connectId === response?.sdkConnectId);
-    if (!chosen) {
-      throw Object.assign(
-        new Error(`Selected sdkConnectId '${response?.sdkConnectId}' not in discovered list`),
-        { _tag: ERROR_TAG.DeviceNotRecognized }
-      );
-    }
-    return chosen.connectId;
   }
 
   /**
@@ -1214,10 +1211,9 @@ export class LedgerAdapter implements IHardwareWallet {
             // from APDU 0x5515 (rare hardware-direct), and _doConnect's
             // dialog still covers it via the same UI request.
 
-            const retryConnectId = isLedgerBleConnectionType(this.connector.connectionType)
-              ? resolvedConnectId
-              : undefined;
-            const reConnectId = await this.ensureConnected(retryConnectId, signal);
+            // Preserve connectId across retry to prevent multi-device drift;
+            // USB replug is handled by _connectFirstOrSelect's fallback.
+            const reConnectId = await this.ensureConnected(resolvedConnectId, signal);
             const reSessionId = this._sessions.get(reConnectId);
             if (!reSessionId) throw lastErr;
 
@@ -1313,12 +1309,9 @@ export class LedgerAdapter implements IHardwareWallet {
   ): Promise<unknown> {
     await this._sleepAbortable(LedgerAdapter.STUCK_APP_RETRY_DELAY_MS, signal);
 
-    // BLE: keep the same connectId so we don't re-prompt the user to pair.
-    // USB: pass undefined; ensureConnected enumerates fresh.
-    const retryTargetConnectId = isLedgerBleConnectionType(this.connector.connectionType)
-      ? resolvedConnectId
-      : undefined;
-    const retryConnectId = await this.ensureConnected(retryTargetConnectId, signal);
+    // Preserve connectId across retry (APDU 6901 didn't disconnect, so it's
+    // still valid); USB replug is handled by _connectFirstOrSelect's fallback.
+    const retryConnectId = await this.ensureConnected(resolvedConnectId, signal);
     const retrySessionId = this._sessions.get(retryConnectId);
     if (!retrySessionId) throw originalErr;
 
