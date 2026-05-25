@@ -900,13 +900,6 @@ export class LedgerAdapter implements IHardwareWallet {
     devices: DeviceInfo[],
     targetConnectId?: string
   ): Promise<string> {
-    if (!isLedgerBleConnectionType(this.connector.connectionType) && devices.length > 1) {
-      debugLog(
-        `[DMK] Multiple Ledger USB devices found (${devices.length}); refusing to auto-select by ephemeral connectId.`
-      );
-      throw createMultipleUsbLedgerDevicesError();
-    }
-
     if (targetConnectId) {
       const target = devices.find(
         d => d.connectId === targetConnectId || d.deviceId === targetConnectId
@@ -944,6 +937,12 @@ export class LedgerAdapter implements IHardwareWallet {
       throw Object.assign(new Error('Ledger BLE connectId is required.'), {
         code: HardwareErrorCode.DeviceNotFound,
       });
+    }
+
+    // No target + multiple USB devices: refuse to auto-pick by ephemeral
+    // connectId (the multi-device drift bug). Caller must specify which device.
+    if (devices.length > 1) {
+      throw createMultipleUsbLedgerDevicesError();
     }
 
     if (devices.length !== 1) {

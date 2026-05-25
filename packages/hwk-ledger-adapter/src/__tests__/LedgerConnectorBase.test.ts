@@ -85,7 +85,7 @@ describe('LedgerConnectorBase BLE discovery', () => {
   });
 });
 
-describe('LedgerConnectorBase USB single-device guard', () => {
+describe('LedgerConnectorBase USB discovery', () => {
   const usbDescriptors: DeviceDescriptor[] = [
     {
       path: 'usb-path-a',
@@ -101,13 +101,12 @@ describe('LedgerConnectorBase USB single-device guard', () => {
     },
   ];
 
-  it('rejects USB search when multiple Ledger devices are visible', async () => {
+  it('returns all USB devices (single-device restriction is enforced on auto-connect, not discovery)', async () => {
     const connector = new SearchConnector(usbDescriptors, 'usb');
 
-    await expect(connector.searchDevices()).rejects.toMatchObject({
-      code: HardwareErrorCode.DeviceOneDeviceOnly,
-      message: expect.stringContaining('Multiple Ledger USB devices are connected'),
-    });
+    const devices = await connector.searchDevices();
+
+    expect(devices.map(d => d.connectId)).toEqual(['usb-path-a', 'usb-path-b']);
   });
 });
 describe('LedgerConnectorBase BLE direct-connect gate', () => {
