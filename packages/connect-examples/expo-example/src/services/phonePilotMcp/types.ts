@@ -220,6 +220,8 @@ export type AutomationScenarioId =
   | 'ok40090_slip39_import_33_1of1'
   | 'ok40090_slip39_import_33_2of3';
 
+export const STANDALONE_MODULE_SCENARIO_ID: AutomationScenarioId = 'bip39_import_12_api';
+
 export type Slip39DatasetId =
   | 'count20_one'
   | 'count20_two'
