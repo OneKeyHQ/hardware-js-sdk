@@ -33,7 +33,7 @@
     "check-versions": "node scripts/check-versions.js",
     "publish-packages": "yarn check-versions && lerna publish from-package",
     "update-protobuf": "lerna run update:protobuf --scope=@onekeyfe/hd-transport",
-    "update-version": "lerna version --no-git-tag-version",
+    "update-version": "lerna version --no-git-tag-version --force-publish='*'",
     "example": "cd ./packages/connect-examples/expo-example && yarn start",
     "example:web": "cd ./packages/connect-examples/expo-example && cross-env CONNECT_SRC=https://localhost:8087 yarn start",
     "example:desktop": "cd ./packages/connect-examples/electron-example && yarn dev",
