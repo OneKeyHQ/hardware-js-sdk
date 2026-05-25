@@ -786,7 +786,7 @@ function canSkipInitialize(method: BaseMethod, device: Device): boolean {
   if (!method.allowUsePreInitialize) reasons.push('method.disallow');
   // Caller must explicitly opt in per call (on-demand, more flexible).
   if (!method.payload?.usePreInitialize) reasons.push('payload.usePreInitialize=false');
-  // Context must match (passphrase/deviceId)
+  // Context must match the passphrase state used during pre-initialize.
   if (!device.isPreInitializeMetaMatch(method.payload)) reasons.push('meta.mismatch');
   // Device must have been initialized before (has features)
   if (!device.features) reasons.push('features.missing');
@@ -821,7 +821,6 @@ async function connectDeviceForBle(method: BaseMethod, device: Device, retryCoun
       await device.initialize(initOptions);
       device.markPreInitialized({
         passphraseState: initOptions.passphraseState,
-        deviceId: initOptions.deviceId,
       });
     }
   } catch (err) {

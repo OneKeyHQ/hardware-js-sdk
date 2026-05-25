@@ -203,7 +203,6 @@ export class Device extends EventEmitter {
   /** Pre-initialize context, used to verify state consistency before skipping */
   private preInitializeMeta?: {
     passphraseState?: string;
-    deviceId?: string;
   };
 
   /** Last Initialize duration (ms), reported as "saved" when a skip happens */
@@ -380,16 +379,14 @@ export class Device extends EventEmitter {
     }
     this.markPreInitialized({
       passphraseState: initOptions?.passphraseState,
-      deviceId: initOptions?.deviceId,
     });
   }
 
-  markPreInitialized(meta?: { passphraseState?: string; deviceId?: string }) {
+  markPreInitialized(meta?: { passphraseState?: string }) {
     this.preInitializedAt = Date.now();
     this.preInitializeMeta = meta
       ? {
           passphraseState: meta.passphraseState === '' ? undefined : meta.passphraseState,
-          deviceId: meta.deviceId === '' ? undefined : meta.deviceId,
         }
       : undefined;
   }
@@ -399,14 +396,10 @@ export class Device extends EventEmitter {
     this.preInitializeMeta = undefined;
   }
 
-  isPreInitializeMetaMatch(payload?: { passphraseState?: string; deviceId?: string }) {
+  isPreInitializeMetaMatch(payload?: { passphraseState?: string }) {
     if (!this.preInitializeMeta) return true;
     const passphraseState = payload?.passphraseState === '' ? undefined : payload?.passphraseState;
-    const deviceId = payload?.deviceId === '' ? undefined : payload?.deviceId;
-    return (
-      this.preInitializeMeta.passphraseState === passphraseState &&
-      this.preInitializeMeta.deviceId === deviceId
-    );
+    return this.preInitializeMeta.passphraseState === passphraseState;
   }
 
   isPreInitializedValid(ttlMs: number) {

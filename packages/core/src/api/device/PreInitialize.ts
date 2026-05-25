@@ -10,12 +10,10 @@ const Log = getLogger(LoggerNames.Core);
 const parseInitOptions = (payload?: {
   initSession?: boolean;
   passphraseState?: string;
-  deviceId?: string;
   deriveCardano?: boolean;
 }): InitOptions => ({
   initSession: payload?.initSession,
   passphraseState: payload?.passphraseState,
-  deviceId: payload?.deviceId,
   deriveCardano: payload?.deriveCardano,
 });
 
