@@ -1269,6 +1269,34 @@ describe('LedgerAdapter', () => {
       expect(connector.connect).not.toHaveBeenCalled();
     });
 
+    it('connects the explicitly targeted device even when multiple USB devices are present', async () => {
+      connector.searchDevices.mockResolvedValueOnce([
+        { connectId: 'dev-A', deviceId: 'dev-A', name: 'Nano X', model: 'nanoX' },
+        { connectId: 'dev-B', deviceId: 'dev-B', name: 'Nano S', model: 'nanoS' },
+      ]);
+      connector.connect.mockResolvedValueOnce({
+        sessionId: 'session-B',
+        deviceInfo: {
+          vendor: 'ledger',
+          model: 'nanoS',
+          firmwareVersion: 'unknown',
+          deviceId: 'dev-B',
+          connectId: 'dev-B',
+          connectionType: 'usb',
+        },
+      });
+      connector.call.mockResolvedValueOnce({ address: '0xTARGET', publicKey: '0xpk' });
+
+      const result = await adapter.evmGetAddress('dev-B', '', {
+        path: "m/44'/60'/0'/0/0",
+        showOnDevice: false,
+      });
+
+      expect(result.success).toBe(true);
+      expect(connector.connect).toHaveBeenCalledWith('dev-B');
+      expect(connector.connect).not.toHaveBeenCalledWith('dev-A');
+    });
+
     it('should reject BLE business calls with an empty connectId instead of auto-selecting a device', async () => {
       const bleConnector = createMockConnector();
       (bleConnector as unknown as { connectionType: string }).connectionType = 'ble';
