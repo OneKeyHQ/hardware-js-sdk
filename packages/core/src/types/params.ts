@@ -47,6 +47,11 @@ export interface CommonParams {
    * Only connect device, not initialize device, only ble connect
    */
   onlyConnectBleDevice?: boolean;
+
+  /**
+   * Use pre-initialized device state (BLE only)
+   */
+  usePreInitialize?: boolean;
 }
 
 export type Params<T> = CommonParams & T & { bundle?: undefined };

@@ -133,6 +133,30 @@ export abstract class BaseMethod<Params = undefined> {
    */
   skipForceUpdateCheck = false;
 
+  /** Allow skipping Initialize (sign methods only; never getAddress/getPublicKey). @default false */
+  allowUsePreInitialize = false;
+
+  /** Pre-warm signal method (fire-and-forget; core dedups + hangs up). @default false */
+  isPreWarmSignal = false;
+
+  /** Pre-warm dedup TTL (ms) */
+  preWarmTtl = 60 * 1000;
+
+  /** Pre-warm dedup key: connectId + passphraseState + deviceId + method name */
+  getPreWarmKey(): string {
+    const payload = (this.payload ?? {}) as {
+      connectId?: string;
+      passphraseState?: string;
+      deviceId?: string;
+    };
+    return [
+      this.connectId ?? payload.connectId ?? '',
+      payload.passphraseState ?? '',
+      payload.deviceId ?? '',
+      this.name,
+    ].join('|');
+  }
+
   /**
    * 严格检查设备是否支持该方法，不支持则抛出错误
    * @experiment 默认不严格检查，如果需要严格检查，则需要设置为 true

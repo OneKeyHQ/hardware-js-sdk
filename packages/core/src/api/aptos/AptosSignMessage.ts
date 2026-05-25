@@ -10,6 +10,7 @@ export default class AptosSignMessage extends BaseMethod<HardwareAptosSignMessag
   init() {
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = true;
 
     // check payload
     validateParams(this.payload, [

@@ -43,6 +43,11 @@ export default function CommonParamsView() {
           value={!!commonParams.initSession}
           onToggle={value => handleSetParam('initSession', value)}
         />
+        <SwitchInput
+          label="usePreInitialize"
+          value={!!commonParams.usePreInitialize}
+          onToggle={value => handleSetParam('usePreInitialize', value)}
+        />
         <CommonInput
           label={intl.formatMessage({ id: 'label__retry_count' })}
           type="number"

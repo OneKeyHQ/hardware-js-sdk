@@ -113,13 +113,20 @@ export default class RequestQueue {
 
     callbackPromise.promise.finally(() => {
       Log.debug(`Callback task completed for connectId: ${connectId}`);
-      this.pendingCallbackTasks.delete(connectId);
+      // Delete by identity so a newer task that replaced this slot isn't orphaned.
+      if (this.pendingCallbackTasks.get(connectId) === callbackPromise) {
+        this.pendingCallbackTasks.delete(connectId);
+      }
     });
   }
 
-  public async waitForPendingCallbackTasks(connectId: string): Promise<void> {
+  public async waitForPendingCallbackTasks(
+    connectId: string,
+    exceptTask?: Deferred<void>
+  ): Promise<void> {
     const pendingTask = this.pendingCallbackTasks.get(connectId);
-    if (pendingTask) {
+    // Skip only the caller's own task (self-wait); a different one is still awaited.
+    if (pendingTask && pendingTask !== exceptTask) {
       Log.debug(`Waiting for pending callback task to complete for connectId: ${connectId}`);
       await pendingTask.promise;
     }

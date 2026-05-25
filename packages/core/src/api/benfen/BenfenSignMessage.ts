@@ -10,6 +10,7 @@ export default class BenfenSignMessage extends BaseMethod<HardwareBenfenSignMess
   init() {
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = true;
 
     validateParams(this.payload, [
       { name: 'path', required: true },

@@ -11,6 +11,7 @@ export default class NostrSignSchnorr extends BaseMethod<SignSchnorr> {
   init() {
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = true;
 
     const { payload } = this;
     validateParams(payload, [

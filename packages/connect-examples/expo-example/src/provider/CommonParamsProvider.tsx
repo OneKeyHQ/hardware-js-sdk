@@ -12,6 +12,7 @@ const defaultParams: CommonParams = {
   detectBootloaderDevice: false,
   skipWebDevicePrompt: false,
   skipPassphraseCheck: false,
+  usePreInitialize: false,
 };
 
 const CommonParamsContext = createContext<{

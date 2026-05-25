@@ -1,4 +1,5 @@
 export { default as testInitializeDeviceDuration } from './test/TestInitializeDeviceDuration';
+export { default as preInitialize } from './device/PreInitialize';
 
 export { default as searchDevices } from './SearchDevices';
 export { default as getFeatures } from './GetFeatures';

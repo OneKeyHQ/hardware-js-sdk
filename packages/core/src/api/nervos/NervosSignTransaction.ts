@@ -19,6 +19,7 @@ export default class NervosSignTransaction extends BaseMethod<NervosSignTx> {
   init() {
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode];
+    this.allowUsePreInitialize = true;
 
     // check payload
     validateParams(this.payload, [

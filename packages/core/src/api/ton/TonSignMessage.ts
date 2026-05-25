@@ -26,6 +26,7 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
     this.strictCheckDeviceSupport = true;
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = true;
 
     // init params
     validateParams(this.payload, [

@@ -42,6 +42,7 @@ import {
 import { Device } from '../device/Device';
 import { DeviceList } from '../device/DeviceList';
 import { DevicePool } from '../device/DevicePool';
+import { PollingStateManager } from './PollingStateManager';
 import { findMethod } from '../api/utils';
 import { DataManager } from '../data-manager';
 import { UI_REQUEST as UI_REQUEST_CONST } from '../constants/ui-request';
@@ -73,6 +74,12 @@ import type {
 import type { BaseMethod } from '../api/BaseMethod';
 
 const Log = getLogger(LoggerNames.Core);
+const PRE_INITIALIZE_TTL_MS = 60 * 1000;
+
+// Dedup/coalesce state for "pre-warm signal" methods (isPreWarmSignal),
+// keyed by getPreWarmKey(): coalesce in-flight, skip if warmed within TTL.
+const preWarmInflight = new Map<string, Promise<any>>();
+const preWarmDoneAt = new Map<string, number>();
 
 export type CoreContext = ReturnType<Core['getCoreContext']>;
 
@@ -103,8 +110,7 @@ let _connector: DeviceConnector | undefined;
 let _uiPromises: UiPromise<UiPromiseResponse['type']>[] = []; // Waiting for ui response
 
 const deviceCacheMap = new Map<string, Device>();
-let pollingId = 1;
-const pollingState: Record<number, boolean> = {};
+const pollingManager = new PollingStateManager();
 
 let preConnectCache: {
   passphraseState: string | undefined;
@@ -206,7 +212,54 @@ export const callAPI = async (context: CoreContext, message: CoreMessage) => {
     return createResponseMessage(method.responseID, false, { error });
   }
 
+  if (method.isPreWarmSignal) {
+    return handlePreWarmSignal(context, message, method);
+  }
+
   return onCallDevice(context, message, method);
+};
+
+// Wrapper for "pre-warm signal" methods: coalesce in-flight same-key pre-warm,
+// skip if warmed within TTL, else run + track. The "hang up so the next real
+// call waits" part lives in onCallDevice (setPrePendingCallPromise).
+const handlePreWarmSignal = async (
+  context: CoreContext,
+  message: CoreMessage,
+  method: BaseMethod
+): Promise<any> => {
+  const key = method.getPreWarmKey();
+
+  const inflight = preWarmInflight.get(key);
+  if (inflight) {
+    // reply with THIS call's responseID (not the other call's response object)
+    try {
+      await inflight;
+    } catch {
+      // pre-warm is best-effort; ignore its failure for the coalesced caller
+    }
+    return createResponseMessage(method.responseID, true, true);
+  }
+
+  const doneAt = preWarmDoneAt.get(key);
+  if (typeof doneAt === 'number' && Date.now() - doneAt <= method.preWarmTtl) {
+    return createResponseMessage(method.responseID, true, true);
+  }
+
+  const run = onCallDevice(context, message, method);
+  preWarmInflight.set(key, run);
+  try {
+    const result = await run;
+    // Only remember the warm if it actually succeeded — a failed pre-warm must
+    // not suppress the next pre-warm within the TTL.
+    if (result?.success === true && result?.payload === true) {
+      preWarmDoneAt.set(key, Date.now());
+    }
+    return result;
+  } finally {
+    if (preWarmInflight.get(key) === run) {
+      preWarmInflight.delete(key);
+    }
+  }
 };
 
 const waitWithTimeout = async (promise: Promise<any>, timeout: number) => {
@@ -244,7 +297,15 @@ const onCallDevice = async (
 
   updateMethodRequestContext(method, { status: 'running' });
 
-  const connectStateChange = preConnectCache.passphraseState !== method.payload.passphraseState;
+  // Normalize undefined / null / '' to '' — they all mean "main wallet, no
+  // passphrase". Without this, the first call (preConnectCache starts undefined)
+  // or any '' call after a non-'' one is wrongly treated as a passphrase switch
+  // and needlessly clears the device cache -> forces a re-enumeration Initialize.
+  // A real switch ('' <-> 'stateX', or 'stateX' <-> 'stateY') still differs.
+  const normalizePassphraseState = (s?: string | null) => s || '';
+  const connectStateChange =
+    normalizePassphraseState(preConnectCache.passphraseState) !==
+    normalizePassphraseState(method.payload.passphraseState);
 
   preConnectCache = {
     passphraseState: method.payload.passphraseState,
@@ -264,18 +325,31 @@ const onCallDevice = async (
 
   const task = requestQueue.createTask(method);
 
+  // Pre-warm holds the device as a per-connectId callback task so a concurrent
+  // real call waits (before ensureConnected) instead of racing its Initialize.
+  // Only covers pre-warm -> real-call ordering; the reverse is fail-closed.
+  let preWarmCallbackTask: Deferred<void> | undefined;
+  if (method.isPreWarmSignal && method.connectId) {
+    preWarmCallbackTask = createDeferred<void>();
+    context.registerCallbackTask(method.connectId, preWarmCallbackTask);
+  }
+
   let device: Device;
   try {
     /**
      * Polling to ensure successful connection
      */
-    if (pollingState[pollingId]) {
-      pollingState[pollingId] = false;
-    }
-    pollingId += 1;
-
-    device = await ensureConnected(context, method, pollingId, task.abortController?.signal);
+    const connectId = method.connectId ?? '';
+    const pollingId = pollingManager.start(connectId);
+    device = await ensureConnected(
+      context,
+      method,
+      connectId,
+      pollingId,
+      task.abortController?.signal
+    );
   } catch (e) {
+    preWarmCallbackTask?.resolve();
     console.log('ensureConnected error: ', e);
 
     completeMethodRequestContext(method, e);
@@ -291,6 +365,7 @@ const onCallDevice = async (
   }
 
   if (method.payload?.onlyConnectBleDevice) {
+    preWarmCallbackTask?.resolve();
     Log.debug('Call API - only connect ble device: ', device?.mainId);
     return createResponseMessage(method.responseID, true, null);
   }
@@ -330,8 +405,9 @@ const onCallDevice = async (
   );
 
   try {
+    // Wait for any pending task except our own (self-wait would deadlock).
     if (method.connectId) {
-      await context.waitForCallbackTasks(method.connectId);
+      await context.waitForCallbackTasks(method.connectId, preWarmCallbackTask);
     }
 
     await waitForPendingPromise(getPrePendingCallPromise, setPrePendingCallPromise);
@@ -525,7 +601,6 @@ const onCallDevice = async (
 
       try {
         const response: object = await method.run();
-        Log.debug('Call API - Inner Method Run: ');
         messageResponse = createResponseMessage(method.responseID, true, response);
         requestQueue.resolveRequest(method.responseID, messageResponse);
         completeMethodRequestContext(method);
@@ -548,6 +623,7 @@ const onCallDevice = async (
 
     const runOptions: RunOptions = {
       keepSession: method.payload.keepSession,
+      skipInitialize: canSkipInitialize(method, device),
       ...parseInitOptions(method),
     };
     const deviceRun = () => device.run(inner, runOptions);
@@ -569,6 +645,9 @@ const onCallDevice = async (
     Log.debug('Call API - Run Error: ', error);
     completeMethodRequestContext(method, error);
   } finally {
+    // Release the pre-warm callback task so the next real call can proceed.
+    preWarmCallbackTask?.resolve();
+
     const response = messageResponse;
 
     if (response) {
@@ -698,23 +777,59 @@ function initDeviceForBle(method: BaseMethod) {
 }
 
 /**
- * If the Bluetooth connection times out, retry 6 times
+ * Check if we can skip initialize for this method
  */
-let bleTimeoutRetry = 0;
+function canSkipInitialize(method: BaseMethod, device: Device): boolean {
+  const reasons: string[] = [];
+  // Must have allowUsePreInitialize enabled on method (the safety gate:
+  // only sign-style methods opt in; getAddress/getPublicKey never do).
+  if (!method.allowUsePreInitialize) reasons.push('method.disallow');
+  // Caller must explicitly opt in per call (on-demand, more flexible).
+  if (!method.payload?.usePreInitialize) reasons.push('payload.usePreInitialize=false');
+  // Context must match (passphrase/deviceId)
+  if (!device.isPreInitializeMetaMatch(method.payload)) reasons.push('meta.mismatch');
+  // Device must have been initialized before (has features)
+  if (!device.features) reasons.push('features.missing');
+  // Must be within pre-initialize TTL
+  if (!device.isPreInitializedValid(PRE_INITIALIZE_TTL_MS)) reasons.push('ttl.expired');
 
-async function connectDeviceForBle(method: BaseMethod, device: Device) {
+  if (reasons.length) {
+    Log.debug(`[PRE-INIT][MISS] method=${method.name} ${reasons.join(',')}`);
+    return false;
+  }
+
+  const savedMs = device.getLastInitializeDuration();
+  const saved = typeof savedMs === 'number' ? `saved ${savedMs}ms` : 'within TTL + meta match';
+  Log.debug(`[PRE-INIT][HIT] method=${method.name} skip Initialize (${saved})`);
+
+  return true;
+}
+
+/**
+ * If the Bluetooth connection times out, retry up to 6 times
+ * @param retryCount - Current retry count (default 0)
+ */
+async function connectDeviceForBle(method: BaseMethod, device: Device, retryCount = 0) {
   try {
     await device.acquire();
     if (method.payload?.onlyConnectBleDevice) {
       return;
     }
-    await device.initialize(parseInitOptions(method));
+    // Skip initialize if conditions are met
+    if (!canSkipInitialize(method, device)) {
+      const initOptions = parseInitOptions(method);
+      await device.initialize(initOptions);
+      device.markPreInitialized({
+        passphraseState: initOptions.passphraseState,
+        deviceId: initOptions.deviceId,
+      });
+    }
   } catch (err) {
-    if (err.errorCode === HardwareErrorCode.BleTimeoutError && bleTimeoutRetry <= 5) {
-      bleTimeoutRetry += 1;
-      Log.debug(`Bletooth connect timeout and will retry, retry count: ${bleTimeoutRetry}`);
+    if (err.errorCode === HardwareErrorCode.BleTimeoutError && retryCount < 6) {
+      const nextRetry = retryCount + 1;
+      Log.debug(`Bluetooth connect timeout and will retry, retry count: ${nextRetry}`);
       await wait(3000);
-      await connectDeviceForBle(method, device);
+      await connectDeviceForBle(method, device, nextRetry);
     } else {
       throw err;
     }
@@ -726,6 +841,7 @@ type IPollFn<T> = (time?: number) => T;
 const ensureConnected = async (
   _context: CoreContext,
   method: BaseMethod,
+  connectId: string,
   pollingId: number,
   abortSignal?: AbortSignal
 ) => {
@@ -757,7 +873,7 @@ const ensureConnected = async (
         return;
       }
 
-      if (!pollingState[pollingId]) {
+      if (!pollingManager.isActive(connectId, pollingId)) {
         Log.debug('EnsureConnected function stop, polling id: ', pollingId);
         reject(ERRORS.TypedError(HardwareErrorCode.PollingStop));
         return;
@@ -815,8 +931,6 @@ const ensureConnected = async (
            * Bluetooth should call initialize here
            */
           if (DataManager.isBleConnect(env)) {
-            bleTimeoutRetry = 0;
-
             if (abort()) {
               return;
             }
@@ -879,7 +993,7 @@ const ensureConnected = async (
       // eslint-disable-next-line no-promise-executor-return
       return setTimeout(() => resolve(poll(time * 1.5)), time);
     });
-  pollingState[pollingId] = true;
+  // pollingManager.start(connectId) already registered this pollingId as active
   return poll();
 };
 
@@ -1013,6 +1127,7 @@ const onDeviceConnectHandler = (device: Device) => {
 };
 
 const onDeviceDisconnectHandler = (device: Device) => {
+  device.clearPreInitialized();
   const env = DataManager.getSettings('env');
   const deviceObject = DataManager.isBleConnect(env) ? device : device.toMessageObject();
   postMessage(createDeviceMessage(DEVICE.DISCONNECT, { device: deviceObject as KnownDevice }));
@@ -1189,8 +1304,8 @@ export default class Core extends EventEmitter {
       registerCallbackTask: (connectId: string, callbackPromise: Deferred<any>) => {
         this.requestQueue.registerPendingCallbackTask(connectId, callbackPromise);
       },
-      waitForCallbackTasks: (connectId: string) =>
-        this.requestQueue.waitForPendingCallbackTasks(connectId),
+      waitForCallbackTasks: (connectId: string, exceptTask?: Deferred<void>) =>
+        this.requestQueue.waitForPendingCallbackTasks(connectId, exceptTask),
       cancelCallbackTasks: (connectId: string) => this.requestQueue.cancelCallbackTasks(connectId),
     };
   }
@@ -1221,10 +1336,10 @@ export default class Core extends EventEmitter {
       }
 
       case IFRAME.CALL: {
-        Log.log('call API: ', message);
+        Log.log(`[${Date.now()}][CALL_API]`, message);
         const response = await callAPI(this.getCoreContext(), message);
         const { success, payload } = response;
-        Log.log('call API Response: ', response);
+        Log.log(`[${Date.now()}][CALL_API_RESPONSE]`, response);
         if (success) {
           return response;
         }
@@ -1257,6 +1372,9 @@ export default class Core extends EventEmitter {
   dispose() {
     _deviceList = undefined;
     _connector = undefined;
+    deviceCacheMap.clear();
+    preWarmInflight.clear();
+    preWarmDoneAt.clear();
     Log.debug(`[Core] Disposing SDK instance: ${this.sdkInstanceId}`);
     cleanupSdkInstance(this.sdkInstanceId);
   }
