@@ -212,6 +212,8 @@ export const callAPI = async (context: CoreContext, message: CoreMessage) => {
     return createResponseMessage(method.responseID, false, { error });
   }
 
+  // only the pre-warm signal (PreInitialize) forks here; normal methods fall
+  // through to onCallDevice below, so the pre-warm dedup/guards never touch them
   if (method.isPreWarmSignal) {
     return handlePreWarmSignal(context, message, method);
   }
@@ -227,6 +229,11 @@ const handlePreWarmSignal = async (
   message: CoreMessage,
   method: BaseMethod
 ): Promise<any> => {
+  // no connectId: can't target a device safely, skip pre-warm (ack only)
+  if (!method.connectId) {
+    return createResponseMessage(method.responseID, true, true);
+  }
+
   const key = method.getPreWarmKey();
 
   const inflight = preWarmInflight.get(key);
@@ -781,16 +788,17 @@ function initDeviceForBle(method: BaseMethod) {
  */
 function canSkipInitialize(method: BaseMethod, device: Device): boolean {
   const reasons: string[] = [];
-  // Must have allowUsePreInitialize enabled on method (the safety gate:
-  // only sign-style methods opt in; getAddress/getPublicKey never do).
+  // only sign-style methods opt in; getAddress/getPublicKey never do
   if (!method.allowUsePreInitialize) reasons.push('method.disallow');
-  // Caller must explicitly opt in per call (on-demand, more flexible).
+  // caller must opt in per call
   if (!method.payload?.usePreInitialize) reasons.push('payload.usePreInitialize=false');
-  // Context must match (passphrase/deviceId)
+  // no connectId: can't pin the target device, never skip
+  if (!method.connectId) reasons.push('connectId.missing');
+  // passphrase state must match the pre-initialize
   if (!device.isPreInitializeMetaMatch(method.payload)) reasons.push('meta.mismatch');
-  // Device must have been initialized before (has features)
+  // device must have been initialized before (has features)
   if (!device.features) reasons.push('features.missing');
-  // Must be within pre-initialize TTL
+  // within pre-initialize TTL
   if (!device.isPreInitializedValid(PRE_INITIALIZE_TTL_MS)) reasons.push('ttl.expired');
 
   if (reasons.length) {
@@ -821,7 +829,6 @@ async function connectDeviceForBle(method: BaseMethod, device: Device, retryCoun
       await device.initialize(initOptions);
       device.markPreInitialized({
         passphraseState: initOptions.passphraseState,
-        deviceId: initOptions.deviceId,
       });
     }
   } catch (err) {

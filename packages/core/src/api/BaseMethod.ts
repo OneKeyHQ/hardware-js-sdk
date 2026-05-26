@@ -142,17 +142,15 @@ export abstract class BaseMethod<Params = undefined> {
   /** Pre-warm dedup TTL (ms) */
   preWarmTtl = 60 * 1000;
 
-  /** Pre-warm dedup key: connectId + passphraseState + deviceId + method name */
+  /** Pre-warm dedup key: connectId + passphraseState + method name */
   getPreWarmKey(): string {
     const payload = (this.payload ?? {}) as {
       connectId?: string;
       passphraseState?: string;
-      deviceId?: string;
     };
     return [
       this.connectId ?? payload.connectId ?? '',
       payload.passphraseState ?? '',
-      payload.deviceId ?? '',
       this.name,
     ].join('|');
   }
