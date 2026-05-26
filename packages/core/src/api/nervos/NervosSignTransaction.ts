@@ -5,7 +5,7 @@ import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
 
-import type { NervosSignTransactionParams, NervosSignedTx } from '../../types';
+import type { DeviceFirmwareRange, NervosSignTransactionParams, NervosSignedTx } from '../../types';
 import type { NervosSignTx as HardwareNervosSignTx, TypedCall } from '@onekeyfe/hd-transport';
 import type { TypedResponseMessage } from '../../device/DeviceCommands';
 
@@ -40,8 +40,12 @@ export default class NervosSignTransaction extends BaseMethod<NervosSignTx> {
     };
   }
 
-  getVersionRange() {
+  getVersionRange(): DeviceFirmwareRange {
     return {
+      pro2: {
+        min: '0.0.0',
+        unsupported: true,
+      },
       model_mini: {
         min: '3.7.0',
       },

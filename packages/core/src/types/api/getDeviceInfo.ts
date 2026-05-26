@@ -1,0 +1,97 @@
+import type { CommonParams, Response } from '../params';
+import type { Features, IDeviceType, OnekeyFeatures } from '../device';
+import type { EFirmwareType } from '@onekeyfe/hd-shared';
+import type { ProtocolV2DeviceInfo } from '@onekeyfe/hd-transport';
+
+export type DeviceInfoProtocol = 'V1' | 'V2' | 'unknown';
+
+export type DeviceInfoSource = 'features' | 'onekeyFeatures' | 'deviceGetDeviceInfo';
+
+export type DeviceInfoScope = 'basic' | 'versions' | 'verify' | 'full';
+
+export type GetDeviceInfoParams = {
+  scope?: DeviceInfoScope;
+  refresh?: boolean;
+  includeRaw?: boolean;
+};
+
+export type DeviceInfoMode = 'normal' | 'bootloader' | 'notInitialized' | 'unknown';
+
+export type DeviceInfoStatus = {
+  mode: DeviceInfoMode;
+  initialized: boolean | null;
+  bootloaderMode: boolean | null;
+  unlocked: boolean | null;
+  passphraseProtection: boolean | null;
+  backupRequired: boolean | null;
+  language: string | null;
+  bleEnabled?: boolean | null;
+};
+
+export type UnifiedDeviceInfoVersions = {
+  firmware: string | null;
+  bootloader: string | null;
+  board: string | null;
+  ble: string | null;
+  se01?: string | null;
+  se02?: string | null;
+  se03?: string | null;
+  se04?: string | null;
+  se01Boot?: string | null;
+  se02Boot?: string | null;
+  se03Boot?: string | null;
+  se04Boot?: string | null;
+};
+
+export type UnifiedDeviceInfoVerify = {
+  firmwareBuildId?: string;
+  firmwareHash?: string;
+  bootloaderBuildId?: string;
+  bootloaderHash?: string;
+  boardBuildId?: string;
+  boardHash?: string;
+  bleBuildId?: string;
+  bleHash?: string;
+  se01BuildId?: string;
+  se01Hash?: string;
+  se02BuildId?: string;
+  se02Hash?: string;
+  se03BuildId?: string;
+  se03Hash?: string;
+  se04BuildId?: string;
+  se04Hash?: string;
+  se01BootBuildId?: string;
+  se01BootHash?: string;
+  se02BootBuildId?: string;
+  se02BootHash?: string;
+  se03BootBuildId?: string;
+  se03BootHash?: string;
+  se04BootBuildId?: string;
+  se04BootHash?: string;
+};
+
+export type UnifiedDeviceInfoRaw = {
+  features?: Features;
+  onekeyFeatures?: OnekeyFeatures;
+  protocolV2DeviceInfo?: ProtocolV2DeviceInfo;
+};
+
+export type UnifiedDeviceInfo = {
+  protocol: DeviceInfoProtocol;
+  sources: DeviceInfoSource[];
+  deviceType: IDeviceType;
+  firmwareType: EFirmwareType;
+  deviceId: string;
+  serialNo: string;
+  label: string | null;
+  bleName: string | null;
+  status: DeviceInfoStatus;
+  versions: UnifiedDeviceInfoVersions;
+  verify?: UnifiedDeviceInfoVerify;
+  raw?: UnifiedDeviceInfoRaw;
+};
+
+export declare function getDeviceInfo(
+  connectId?: string,
+  params?: CommonParams & GetDeviceInfoParams
+): Response<UnifiedDeviceInfo>;

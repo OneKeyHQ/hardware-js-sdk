@@ -5428,8 +5428,29 @@ export type MessageResponse<T extends MessageKey> = {
   message: MessageType[T];
 };
 
-export type TypedCall = <T extends MessageKey, R extends MessageKey>(
-  type: T,
-  resType: R,
-  message?: MessageType[T]
-) => Promise<MessageResponse<R>>;
+export type MessageResponseMap = {
+  [K in MessageKey]: MessageResponse<K>;
+};
+
+export type TypedCall = {
+  <T extends MessageKey, R extends readonly MessageKey[]>(
+    type: T,
+    resType: R,
+    message?: MessageType[T]
+  ): Promise<MessageResponseMap[R[number]]>;
+  <T extends MessageKey, R extends MessageKey>(
+    type: T,
+    resType: R,
+    message?: MessageType[T]
+  ): Promise<MessageResponse<R>>;
+  <T extends MessageKey, R extends readonly MessageKey[]>(
+    type: T,
+    resType: R,
+    message?: any
+  ): Promise<MessageResponseMap[R[number]]>;
+  <T extends MessageKey, R extends MessageKey>(
+    type: T,
+    resType: R,
+    message?: any
+  ): Promise<MessageResponse<R>>;
+};

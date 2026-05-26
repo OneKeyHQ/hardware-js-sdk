@@ -27,7 +27,7 @@ import {
 import { useFirmwareProgress } from '../components/providers/SDKProvider';
 import { useToast } from '../hooks/use-toast';
 import { useDeviceStore } from '../store/deviceStore';
-import { createPro2DeviceInfo } from '../utils/pro2Device';
+import { createPro2DeviceInfo, isPro2DeviceInfo } from '../utils/pro2Device';
 import type { DeviceInfo } from '../types/hardware';
 
 type WorkflowTarget = 'all' | 'step1' | 'step2' | 'step3' | 'step4';
@@ -505,7 +505,7 @@ export default function Pro2UpdatePage() {
 
   const connectDevice = useCallback(
     async (timeoutMs: number, label: string): Promise<DeviceInfo> => {
-      addLog('info', `${label}: connecting with Protocol V2`);
+      addLog('info', `${label}: detecting device protocol`);
       const deadline = Date.now() + timeoutMs;
       let lastError = '';
 
@@ -513,11 +513,16 @@ export default function Pro2UpdatePage() {
       try {
         while (Date.now() < deadline) {
           assertRunning();
-          const response = await searchDevices({ connectProtocol: HARDWARE_CONNECT_PROTOCOL.V2 });
+          const response = await searchDevices();
           if (response.success && Array.isArray(response.payload) && response.payload.length > 0) {
-            const devices = (response.payload as DeviceInfo[]).map(item =>
-              createPro2DeviceInfo(item)
-            );
+            const devices = (response.payload as DeviceInfo[])
+              .filter(isPro2DeviceInfo)
+              .map(item => createPro2DeviceInfo(item));
+            if (!devices.length) {
+              lastError = 'No Pro2 device found';
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              continue;
+            }
             const device = devices[0];
             setConnectedDevices(devices);
             setCurrentDevice(device);
@@ -1200,7 +1205,7 @@ export default function Pro2UpdatePage() {
             </div>
           </div>
 
-          <DeviceNotConnectedState connectProtocol={HARDWARE_CONNECT_PROTOCOL.V2} pro2Only />
+          <DeviceNotConnectedState pro2Only />
 
           {directoryRequest ? (
             <Card className="rounded-xl border border-primary/30 bg-primary/5 shadow-sm">

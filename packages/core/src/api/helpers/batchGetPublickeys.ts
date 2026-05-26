@@ -7,7 +7,7 @@ import {
 import { supportBatchPublicKey } from '../../utils/deviceFeaturesUtils';
 import { isEqualBip44CoinType } from './pathUtils';
 import { splitArray } from '../../utils/arrayUtils';
-import { getDeviceType, getFirmwareType, shouldSkipMethodSupportCheck } from '../../utils';
+import { getDeviceType, getFirmwareType } from '../../utils';
 import { DeviceModelToTypes } from '../../types';
 
 import type { EcdsaPublicKeys, Path } from '@onekeyfe/hd-transport';
@@ -28,9 +28,7 @@ export async function batchGetPublickeys(
     throw TypedError(HardwareErrorCode.ForbiddenKeyPath, 'Path length must be greater than 3');
   }
 
-  const supportsBatchPublicKey =
-    shouldSkipMethodSupportCheck(device.features, device.originalDescriptor?.protocolType) ||
-    supportBatchPublicKey(device.features, options);
+  const supportsBatchPublicKey = supportBatchPublicKey(device.features, options);
   if (!supportsBatchPublicKey) {
     throw createDeviceNotSupportMethodError('BatchGetPublickeys', getFirmwareType(device.features));
   }

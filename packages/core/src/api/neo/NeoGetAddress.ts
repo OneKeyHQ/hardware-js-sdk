@@ -5,6 +5,7 @@ import { UI_REQUEST } from '../../constants/ui-request';
 
 import type { NeoGetAddress as HardwareNeoGetAddress } from '@onekeyfe/hd-transport';
 import type { NeoAddress, NeoGetAddressParams } from '../../types/api/neoGetAddress';
+import type { DeviceFirmwareRange } from '../../types';
 
 export default class NeoGetAddress extends BaseMethod<HardwareNeoGetAddress[]> {
   hasBundle = false;
@@ -37,8 +38,12 @@ export default class NeoGetAddress extends BaseMethod<HardwareNeoGetAddress[]> {
     });
   }
 
-  getVersionRange() {
+  getVersionRange(): DeviceFirmwareRange {
     return {
+      pro2: {
+        min: '0.0.0',
+        unsupported: true,
+      },
       pro: {
         min: '4.12.0',
       },

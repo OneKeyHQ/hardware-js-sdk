@@ -132,8 +132,8 @@ export const getMethodVersionRange = (
   getVersionRange: (deviceModel: IDeviceType | IDeviceModel) => IVersionRange | undefined
 ): IVersionRange | undefined => {
   const deviceType = getDeviceType(features);
-  let versionRange: IVersionRange | undefined = getVersionRange(deviceType);
 
+  const versionRange = getVersionRange(deviceType);
   if (versionRange) {
     return versionRange;
   }
@@ -146,20 +146,18 @@ export const getMethodVersionRange = (
   ];
   for (const model of modelFallbacks) {
     if (DeviceModelToTypes[model].includes(deviceType)) {
-      versionRange = getVersionRange(model);
+      const versionRange = getVersionRange(model);
       if (versionRange) {
         return versionRange;
       }
     }
   }
 
-  return versionRange;
+  return undefined;
 };
 
-export const shouldSkipMethodSupportCheck = (
-  features: Features | undefined,
-  protocolType?: string
-): boolean => protocolType === 'V2' || getDeviceType(features) === EDeviceType.Pro2;
+export const isMethodVersionRangeUnsupported = (versionRange?: IVersionRange): boolean =>
+  versionRange?.unsupported === true;
 
 export const getFirmwareType = (features: Features | undefined) => {
   if (!features) {

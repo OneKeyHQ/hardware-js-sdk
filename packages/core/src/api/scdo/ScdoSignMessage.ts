@@ -5,6 +5,7 @@ import { validateParams } from '../helpers/paramsValidator';
 import { stripHexPrefix } from '../helpers/hexUtils';
 
 import type { ScdoSignMessage as HardwareScdoSignMessage } from '@onekeyfe/hd-transport';
+import type { DeviceFirmwareRange } from '../../types';
 
 export default class ScdoSignMessage extends BaseMethod<HardwareScdoSignMessage> {
   init() {
@@ -27,8 +28,12 @@ export default class ScdoSignMessage extends BaseMethod<HardwareScdoSignMessage>
     };
   }
 
-  getVersionRange() {
+  getVersionRange(): DeviceFirmwareRange {
     return {
+      pro2: {
+        min: '0.0.0',
+        unsupported: true,
+      },
       model_touch: {
         min: '4.10.0',
       },

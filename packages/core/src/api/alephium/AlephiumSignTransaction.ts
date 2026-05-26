@@ -11,7 +11,7 @@ import type {
   AlephiumSignTx as HardwareAlephiumSignTx,
   TypedCall,
 } from '@onekeyfe/hd-transport';
-import type { AlephiumSignTransactionParams } from '../../types';
+import type { AlephiumSignTransactionParams, DeviceFirmwareRange } from '../../types';
 import type { TypedResponseMessage } from '../../device/DeviceCommands';
 
 export default class AlephiumSignTransaction extends BaseMethod<HardwareAlephiumSignTx> {
@@ -38,8 +38,12 @@ export default class AlephiumSignTransaction extends BaseMethod<HardwareAlephium
     };
   }
 
-  getVersionRange() {
+  getVersionRange(): DeviceFirmwareRange {
     return {
+      pro2: {
+        min: '0.0.0',
+        unsupported: true,
+      },
       model_touch: {
         min: '4.10.0',
       },

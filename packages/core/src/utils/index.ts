@@ -11,7 +11,7 @@ export {
   getDeviceUUID,
   getDeviceLabel,
   getMethodVersionRange,
-  shouldSkipMethodSupportCheck,
+  isMethodVersionRangeUnsupported,
   getFirmwareType,
 } from './deviceInfoUtils';
 export {

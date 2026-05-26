@@ -15,7 +15,7 @@ import {
   getFirmwareType,
   getLogger,
   getMethodVersionRange,
-  shouldSkipMethodSupportCheck,
+  isMethodVersionRangeUnsupported,
 } from '../utils';
 import { generateInstanceId } from '../utils/tracing';
 
@@ -217,20 +217,15 @@ export abstract class BaseMethod<Params = undefined> {
       return;
     }
 
-    if (
-      shouldSkipMethodSupportCheck(
-        this.device.features,
-        this.device.originalDescriptor?.protocolType
-      )
-    ) {
-      return;
-    }
-
     const firmwareVersion = getDeviceFirmwareVersion(this.device.features)?.join('.');
     const versionRange = getMethodVersionRange(
       this.device.features,
       type => getVersionRange()[type]
     );
+
+    if (isMethodVersionRangeUnsupported(versionRange)) {
+      throw createDeviceNotSupportMethodError(this.name, getFirmwareType(this.device.features));
+    }
 
     if (!versionRange) {
       if (options?.strictCheckDeviceSupport) {

@@ -23,7 +23,7 @@ import { callHardwareAPI, searchDevices } from '../services/hardwareService';
 import { useToast } from '../hooks/use-toast';
 import { useDeviceStore } from '../store/deviceStore';
 import { logHardware } from '../utils/logger';
-import { createPro2DeviceInfo } from '../utils/pro2Device';
+import { createPro2DeviceInfo, isPro2DeviceInfo } from '../utils/pro2Device';
 
 import type { DeviceOnboardingStatus } from '@onekeyfe/hd-transport';
 import type { DeviceInfo } from '../types/hardware';
@@ -307,8 +307,7 @@ export default function Pro2OnboardingPage() {
     setIsConnecting(true);
 
     try {
-      const protocolParams = { connectProtocol: HARDWARE_CONNECT_PROTOCOL.V2 };
-      const searchResult = await searchDevices(protocolParams);
+      const searchResult = await searchDevices();
 
       if (!searchResult.success || !searchResult.payload) {
         toast({
@@ -320,9 +319,9 @@ export default function Pro2OnboardingPage() {
         return;
       }
 
-      const devices = (searchResult.payload as DeviceInfo[]).map(device =>
-        createPro2DeviceInfo(device)
-      );
+      const devices = (searchResult.payload as DeviceInfo[])
+        .filter(isPro2DeviceInfo)
+        .map(device => createPro2DeviceInfo(device));
       setConnectedDevices(devices);
 
       if (!devices.length) {

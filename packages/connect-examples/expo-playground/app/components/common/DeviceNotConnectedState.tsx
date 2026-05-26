@@ -6,7 +6,7 @@ import { useDeviceStore } from '../../store/deviceStore';
 import { searchDevices } from '../../services/hardwareService';
 import { useToast } from '../../hooks/use-toast';
 import { SDKUtils } from '../../utils/hardwareInstance';
-import { createPro2DeviceInfo } from '../../utils/pro2Device';
+import { createPro2DeviceInfo, isPro2DeviceInfo } from '../../utils/pro2Device';
 import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
 import type { DeviceInfo } from '../../types/hardware';
 
@@ -56,13 +56,13 @@ export function DeviceNotConnectedState({
 
     try {
       // 搜索设备
-      const protocolParams = connectProtocol ? { connectProtocol } : undefined;
+      const protocolParams = !pro2Only && connectProtocol ? { connectProtocol } : undefined;
       const searchResult = await searchDevices(protocolParams);
 
       if (searchResult.success && searchResult.payload) {
         const foundDevices = searchResult.payload as DeviceInfo[];
         const devices = pro2Only
-          ? foundDevices.map(device => createPro2DeviceInfo(device))
+          ? foundDevices.filter(isPro2DeviceInfo).map(device => createPro2DeviceInfo(device))
           : foundDevices;
         setConnectedDevices(devices);
 

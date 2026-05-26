@@ -91,6 +91,11 @@ const navigationItems = [
     url: '/method-batch-test',
     icon: ListChecks,
   },
+  {
+    title: 'common.deviceInfoTimingTest',
+    url: '/device-info-timing-test',
+    icon: ListChecks,
+  },
 ];
 
 export function AppSidebar() {

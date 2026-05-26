@@ -4,7 +4,7 @@ import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
 
 import type { ScdoGetAddress as HardwareScdoGetAddress } from '@onekeyfe/hd-transport';
-import type { ScdoAddress, ScdoGetAddressParams } from '../../types';
+import type { DeviceFirmwareRange, ScdoAddress, ScdoGetAddressParams } from '../../types';
 
 export default class ScdoGetAddress extends BaseMethod<HardwareScdoGetAddress[]> {
   hasBundle = false;
@@ -38,8 +38,12 @@ export default class ScdoGetAddress extends BaseMethod<HardwareScdoGetAddress[]>
     });
   }
 
-  getVersionRange() {
+  getVersionRange(): DeviceFirmwareRange {
     return {
+      pro2: {
+        min: '0.0.0',
+        unsupported: true,
+      },
       model_touch: {
         min: '4.10.0',
       },

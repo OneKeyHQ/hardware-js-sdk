@@ -4,7 +4,7 @@ import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
 
 import type { NervosGetAddress as HardwareNervosGetAddress } from '@onekeyfe/hd-transport';
-import type { NervosAddress, NervosGetAddressParams } from '../../types';
+import type { DeviceFirmwareRange, NervosAddress, NervosGetAddressParams } from '../../types';
 
 export default class NervosGetAddress extends BaseMethod<HardwareNervosGetAddress[]> {
   hasBundle = false;
@@ -40,8 +40,12 @@ export default class NervosGetAddress extends BaseMethod<HardwareNervosGetAddres
     });
   }
 
-  getVersionRange() {
+  getVersionRange(): DeviceFirmwareRange {
     return {
+      pro2: {
+        min: '0.0.0',
+        unsupported: true,
+      },
       model_mini: {
         min: '3.7.0',
       },

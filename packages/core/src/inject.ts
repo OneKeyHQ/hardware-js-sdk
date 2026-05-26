@@ -109,6 +109,7 @@ export const createCoreApi = (
    * 获取设备信息
    */
   getFeatures: (connectId, params) => call({ ...params, connectId, method: 'getFeatures' }),
+  getDeviceInfo: (connectId, params) => call({ ...params, connectId, method: 'getDeviceInfo' }),
   getOnekeyFeatures: (connectId, params) =>
     call({ ...params, connectId, method: 'getOnekeyFeatures' }),
 

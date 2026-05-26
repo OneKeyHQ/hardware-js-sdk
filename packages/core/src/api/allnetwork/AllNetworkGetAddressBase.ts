@@ -16,7 +16,7 @@ import {
   getDeviceFirmwareVersion,
   getFirmwareType,
   getMethodVersionRange,
-  shouldSkipMethodSupportCheck,
+  isMethodVersionRangeUnsupported,
 } from '../../utils';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { onDeviceButtonHandler } from '../../core';
@@ -460,15 +460,15 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
  * @param method BaseMethod
  */
 function preCheckDeviceSupport(device: Device, method: BaseMethod) {
-  if (shouldSkipMethodSupportCheck(device.features, device.originalDescriptor?.protocolType)) {
-    return;
-  }
-
   const versionRange = getMethodVersionRange(
     device.features,
     type => method.getVersionRange()[type]
   );
   const currentVersion = getDeviceFirmwareVersion(device.features).join('.');
+
+  if (isMethodVersionRangeUnsupported(versionRange)) {
+    throw ERRORS.createDeviceNotSupportMethodError(method.name, getFirmwareType(device.features));
+  }
 
   if (
     versionRange &&
@@ -492,20 +492,9 @@ function handleSkippableHardwareError(
   method: BaseMethod
 ): HardwareError | undefined {
   let error: HardwareError | undefined;
-  const skipMethodSupportCheck = shouldSkipMethodSupportCheck(
-    device.features,
-    device.originalDescriptor?.protocolType
-  );
 
   if (e instanceof HardwareError && e.errorCode !== HardwareErrorCode.RuntimeError) {
     const { errorCode } = e;
-    if (
-      skipMethodSupportCheck &&
-      (errorCode === HardwareErrorCode.CallMethodNeedUpgradeFirmware ||
-        errorCode === HardwareErrorCode.DeviceNotSupportMethod)
-    ) {
-      return undefined;
-    }
     if (errorCode === HardwareErrorCode.CallMethodNeedUpgradeFirmware) {
       error = e;
     } else if (errorCode === HardwareErrorCode.DeviceNotSupportMethod) {
@@ -515,15 +504,19 @@ function handleSkippableHardwareError(
     e.message?.includes('Failure_UnexpectedMessage') ||
     e.message?.includes('Failure_UnknownMessage')
   ) {
-    if (skipMethodSupportCheck) {
-      return undefined;
-    }
-
     const versionRange = getMethodVersionRange(
       device.features,
       type => method.getVersionRange()[type]
     );
     const currentVersion = getDeviceFirmwareVersion(device.features).join('.');
+
+    if (isMethodVersionRangeUnsupported(versionRange)) {
+      error = ERRORS.createDeviceNotSupportMethodError(
+        method.name,
+        getFirmwareType(device.features)
+      );
+      return error;
+    }
 
     if (
       versionRange &&

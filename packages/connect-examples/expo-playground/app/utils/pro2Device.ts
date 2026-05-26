@@ -1,7 +1,7 @@
 import { EDeviceType } from '@onekeyfe/hd-shared';
 
 import type { DeviceInfo } from '../types/hardware';
-import type { Features, OnekeyFeatures } from '@onekeyfe/hd-core';
+import type { Features } from '@onekeyfe/hd-core';
 
 const PRO2_FEATURES: Partial<Features> = {
   vendor: 'OneKey',
@@ -44,10 +44,6 @@ const PRO2_FEATURES: Partial<Features> = {
   onekey_device_type: EDeviceType.Pro2,
 };
 
-const PRO2_ONEKEY_FEATURES: Partial<OnekeyFeatures> = {
-  onekey_device_type: EDeviceType.Pro2,
-};
-
 export function createPro2DeviceInfo(device: DeviceInfo): DeviceInfo {
   const features = {
     ...PRO2_FEATURES,
@@ -62,10 +58,16 @@ export function createPro2DeviceInfo(device: DeviceInfo): DeviceInfo {
     name: device.name || 'OneKey Pro 2',
     label: device.label || 'OneKey Pro 2',
     features,
-    onekeyFeatures: {
-      ...PRO2_ONEKEY_FEATURES,
-      ...device.onekeyFeatures,
-      onekey_device_type: EDeviceType.Pro2,
-    } as OnekeyFeatures,
+    onekeyFeatures: device.onekeyFeatures,
   };
+}
+
+export function isPro2DeviceInfo(device?: DeviceInfo | null): device is DeviceInfo {
+  if (!device) return false;
+  const model = (device.features?.model ?? '').toLowerCase();
+  return (
+    device.deviceType === EDeviceType.Pro2 ||
+    device.features?.onekey_device_type === EDeviceType.Pro2 ||
+    model === 'pro2'
+  );
 }
