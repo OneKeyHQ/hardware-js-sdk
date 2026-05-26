@@ -1,5 +1,7 @@
 import { DeviceActionStatus } from '@ledgerhq/device-management-kit';
 
+import { debugLog } from '../utils/debugLog';
+
 import type { DeviceAction, DeviceActionState } from '../types';
 
 /**
@@ -46,6 +48,7 @@ export function deviceActionToPromise<T>(
   return new Promise<T>((resolve, reject) => {
     let settled = false;
     let lastStep: string | undefined;
+    let activeInteraction: string | undefined;
     const observedSteps: string[] = [];
     // eslint-disable-next-line prefer-const -- assigned once after declaration, but must be declared before use in cleanup
     let sub: { unsubscribe: () => void };
@@ -63,6 +66,47 @@ export function deviceActionToPromise<T>(
       } catch {
         // DMK action may already be settled.
       }
+    };
+
+    const clearActiveInteraction = () => {
+      if (activeInteraction) {
+        activeInteraction = undefined;
+        onInteraction?.('interaction-complete');
+        return true;
+      }
+      return false;
+    };
+
+    const emitInteraction = (interaction: unknown) => {
+      if (!onInteraction) {
+        return;
+      }
+
+      if (!interaction || interaction === 'none') {
+        clearActiveInteraction();
+        return;
+      }
+
+      const interactionName = String(interaction);
+      if (interactionName === activeInteraction) {
+        return;
+      }
+
+      activeInteraction = interactionName;
+      debugLog(
+        '[DeviceAction] requiredUserInteraction',
+        `interaction=${interactionName}`,
+        `step=${lastStep ?? 'unknown'}`,
+        `observedSteps=${observedSteps.join(',') || 'none'}`
+      );
+      // unlock-device is DMK's own bounded poll. Other interaction
+      // states keep the caller-provided watchdog so a stuck observable
+      // cannot hold the queue slot forever.
+      if (interaction === 'unlock-device' && timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      onInteraction(interactionName);
     };
 
     const armIdleWatchdog = () => {
@@ -130,13 +174,17 @@ export function deviceActionToPromise<T>(
         if (state.status === DeviceActionStatus.Completed) {
           settled = true;
           if (timer) clearTimeout(timer);
-          onInteraction?.('interaction-complete');
+          if (!clearActiveInteraction()) {
+            onInteraction?.('interaction-complete');
+          }
           sub?.unsubscribe();
           resolve(state.output);
         } else if (state.status === DeviceActionStatus.Error) {
           settled = true;
           if (timer) clearTimeout(timer);
-          onInteraction?.('interaction-complete');
+          if (!clearActiveInteraction()) {
+            onInteraction?.('interaction-complete');
+          }
           sub?.unsubscribe();
           rejectWithStepContext(state.error, lastStep, observedSteps, reject);
         } else if (state.status === DeviceActionStatus.Pending) {
@@ -149,16 +197,7 @@ export function deviceActionToPromise<T>(
           }
           if (onInteraction) {
             const interaction = state.intermediateValue?.requiredUserInteraction;
-            if (interaction && interaction !== 'none') {
-              // unlock-device is DMK's own bounded poll. Other interaction
-              // states keep the caller-provided watchdog so a stuck observable
-              // cannot hold the queue slot forever.
-              if (interaction === 'unlock-device' && timer) {
-                clearTimeout(timer);
-                timer = null;
-              }
-              onInteraction(String(interaction));
-            }
+            emitInteraction(interaction);
           }
         }
       },

@@ -138,6 +138,112 @@ describe('deviceActionToPromise', () => {
     expect(onInteraction).toHaveBeenCalledWith('interaction-complete');
   });
 
+  it('should clear active interaction when DMK reports none after a prompt', async () => {
+    const onInteraction = jest.fn();
+    let observer:
+      | {
+          next: (v: unknown) => void;
+          error?: (e: unknown) => void;
+          complete?: () => void;
+        }
+      | undefined;
+    const action = {
+      cancel: jest.fn(),
+      observable: {
+        subscribe(nextObserver: {
+          next: (v: unknown) => void;
+          error?: (e: unknown) => void;
+          complete?: () => void;
+        }) {
+          observer = nextObserver;
+          return { unsubscribe: jest.fn() };
+        },
+      },
+    } as unknown as DeviceAction<string>;
+    const promise = deviceActionToPromise(action, onInteraction, 0);
+
+    observer?.next({
+      status: 'pending',
+      intermediateValue: {
+        requiredUserInteraction: 'allow-secure-connection',
+        step: 'os.installOrUpdateApps.steps.updateDeviceMetadata',
+      },
+    });
+    observer?.next({
+      status: 'pending',
+      intermediateValue: {
+        requiredUserInteraction: 'none',
+        step: 'os.installOrUpdateApps.steps.updateDeviceMetadata',
+      },
+    });
+
+    expect(onInteraction).toHaveBeenNthCalledWith(1, 'allow-secure-connection');
+    expect(onInteraction).toHaveBeenNthCalledWith(2, 'interaction-complete');
+
+    observer?.next({ status: 'completed', output: 'done' });
+
+    await expect(promise).resolves.toBe('done');
+    expect(onInteraction).toHaveBeenNthCalledWith(3, 'interaction-complete');
+  });
+
+  it('should not clear interaction repeatedly for consecutive none states', async () => {
+    const onInteraction = jest.fn();
+    const action = createMockAction([
+      {
+        status: 'pending',
+        intermediateValue: {
+          requiredUserInteraction: 'allow-secure-connection',
+          step: 'os.installOrUpdateApps.steps.updateDeviceMetadata',
+        },
+      },
+      {
+        status: 'pending',
+        intermediateValue: {
+          requiredUserInteraction: 'none',
+          step: 'os.installOrUpdateApps.steps.updateDeviceMetadata',
+        },
+      },
+      {
+        status: 'pending',
+        intermediateValue: {
+          requiredUserInteraction: 'none',
+          step: 'os.installOrUpdateApps.steps.updateDeviceMetadata',
+        },
+      },
+      { status: 'completed', output: 'done' },
+    ]);
+
+    await deviceActionToPromise(action, onInteraction);
+
+    expect(onInteraction).toHaveBeenNthCalledWith(1, 'allow-secure-connection');
+    expect(onInteraction).toHaveBeenNthCalledWith(2, 'interaction-complete');
+    expect(onInteraction).toHaveBeenNthCalledWith(3, 'interaction-complete');
+    expect(onInteraction).toHaveBeenCalledTimes(3);
+  });
+
+  it('should not emit duplicate events for repeated active interaction states', async () => {
+    const onInteraction = jest.fn();
+    const action = createMockAction([
+      {
+        status: 'pending',
+        intermediateValue: { requiredUserInteraction: 'confirm-on-device' },
+      },
+      {
+        status: 'pending',
+        intermediateValue: { requiredUserInteraction: 'confirm-on-device' },
+      },
+      { status: 'pending', intermediateValue: { requiredUserInteraction: 'none' } },
+      { status: 'completed', output: 'done' },
+    ]);
+
+    await deviceActionToPromise(action, onInteraction);
+
+    expect(onInteraction).toHaveBeenNthCalledWith(1, 'confirm-on-device');
+    expect(onInteraction).toHaveBeenNthCalledWith(2, 'interaction-complete');
+    expect(onInteraction).toHaveBeenNthCalledWith(3, 'interaction-complete');
+    expect(onInteraction).toHaveBeenCalledTimes(3);
+  });
+
   it('should reject if observable completes without result', async () => {
     const action = createMockAction([{ status: 'pending' }]);
     await expect(deviceActionToPromise(action)).rejects.toThrow('completed without result');
