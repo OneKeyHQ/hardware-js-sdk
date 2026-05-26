@@ -24,21 +24,14 @@ export default class GetPassphraseState extends BaseMethod {
 
     const { features } = this.device;
     const isPro2 = getDeviceType(features) === EDeviceType.Pro2;
-
-    if (isPro2) {
-      return Promise.resolve({
-        passphrase_state: passphraseState,
-        session_id: newSession ?? features?.session_id ?? undefined,
-        unlocked_attach_pin: unlockedAttachPin,
-        passphrase_protection: features?.passphrase_protection ?? null,
-      });
-    }
+    const passphraseProtection = features?.passphrase_protection ?? null;
 
     // refresh device info
-    if (features && features.passphrase_protection === true) {
-      return Promise.resolve(passphraseState);
-    }
-
-    return Promise.resolve(undefined);
+    return Promise.resolve({
+      passphrase_state: isPro2 || passphraseProtection === true ? passphraseState : undefined,
+      session_id: newSession ?? features?.session_id ?? undefined,
+      unlocked_attach_pin: unlockedAttachPin ?? features?.unlocked_attach_pin,
+      passphrase_protection: passphraseProtection,
+    });
   }
 }

@@ -1,13 +1,11 @@
 import type { CommonParams, Response } from '../params';
 
-export type GetPassphraseStatePayload =
-  | string
-  | {
-      passphrase_state?: string;
-      session_id?: string;
-      unlocked_attach_pin?: boolean;
-      passphrase_protection?: boolean | null;
-    };
+export type GetPassphraseStatePayload = {
+  passphrase_state?: string;
+  session_id?: string;
+  unlocked_attach_pin?: boolean;
+  passphrase_protection?: boolean | null;
+};
 
 export type GetPassphraseStateParams = CommonParams & {
   allowCreateAttachPin?: boolean;

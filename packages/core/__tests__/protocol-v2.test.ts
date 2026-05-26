@@ -13,6 +13,7 @@ import DeviceGetOnboardingStatus from '../src/api/protocol-v2/DeviceGetOnboardin
 import EVMSignMessageEIP712 from '../src/api/evm/EVMSignMessageEIP712';
 import FirmwareUpdateV3 from '../src/api/FirmwareUpdateV3';
 import FirmwareUpdateV4 from '../src/api/FirmwareUpdateV4';
+import GetPassphraseState from '../src/api/GetPassphraseState';
 import GetOnekeyFeatures from '../src/api/GetOnekeyFeatures';
 import { batchGetPublickeys } from '../src/api/helpers/batchGetPublickeys';
 import SuiSignTransaction from '../src/api/sui/SuiSignTransaction';
@@ -162,6 +163,51 @@ describe('Protocol V2 feature adapter', () => {
     expect(typedCall).toHaveBeenLastCalledWith('GetPassphraseState', 'PassphraseState', {
       _only_main_pin: true,
     });
+  });
+
+  test('returns unified GetPassphraseState object payload for existing Pro devices', async () => {
+    const features = {
+      device_id: 'pro-device-id',
+      onekey_device_type: 'PRO',
+      onekey_firmware_version: '4.15.0',
+      passphrase_protection: true,
+      session_id: 'feature-session',
+      unlocked_attach_pin: true,
+    };
+    const typedCall = jest.fn().mockResolvedValue({
+      type: 'PassphraseState',
+      message: {
+        passphrase_state: 'state-pro',
+        session_id: 'session-pro',
+        unlocked_attach_pin: false,
+      },
+    });
+    const updateInternalState = jest.fn();
+    const method = new GetPassphraseState({
+      payload: {
+        method: 'getPassphraseState',
+        connectId: 'connect-id',
+      },
+    });
+    method.device = {
+      features,
+      commands: { typedCall },
+      updateInternalState,
+    } as any;
+
+    await expect(method.run()).resolves.toEqual({
+      passphrase_state: 'state-pro',
+      session_id: 'session-pro',
+      unlocked_attach_pin: false,
+      passphrase_protection: true,
+    });
+    expect(updateInternalState).toHaveBeenCalledWith(
+      true,
+      'state-pro',
+      'pro-device-id',
+      'session-pro',
+      'feature-session'
+    );
   });
 
   test('stores Pro2 passphrase sessions without selecting them implicitly', async () => {
@@ -337,10 +383,7 @@ describe('Protocol V2 feature adapter', () => {
     stellar.init();
     benfen.init();
 
-    const stellarRange = getMethodVersionRange(
-      features,
-      type => stellar.getVersionRange()[type]
-    );
+    const stellarRange = getMethodVersionRange(features, type => stellar.getVersionRange()[type]);
     const benfenRange = getMethodVersionRange(features, type => benfen.getVersionRange()[type]);
     const neuraiRange = getMethodVersionRange(
       features,
@@ -521,7 +564,7 @@ describe('API compatibility handling', () => {
 
   test('uses chunk transfer for large Sui transactions on Protocol V2', async () => {
     const rawTx = '0x'.concat('ab'.repeat(5000));
-    const typedCall = jest.fn(async () => ({
+    const typedCall = jest.fn(() => ({
       type: 'SuiSignedTx',
       message: {
         public_key: '',
