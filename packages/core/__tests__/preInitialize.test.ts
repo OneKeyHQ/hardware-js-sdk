@@ -16,7 +16,7 @@ describe('preInitialize', () => {
     expect(
       device.isPreInitializeMetaMatch({
         passphraseState: 'passphrase-state',
-      }),
+      })
     ).toBe(true);
   });
 });
