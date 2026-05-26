@@ -6,7 +6,7 @@ import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex, stripHexStartZeroes } from '../helpers/hexUtils';
 
-import type { ScdoSignTransactionParams } from '../../types';
+import type { DeviceFirmwareRange, ScdoSignTransactionParams } from '../../types';
 import type {
   ScdoSignTx as HardwareScdoSignTx,
   ScdoSignedTx,
@@ -51,8 +51,12 @@ export default class ScdoSignTransaction extends BaseMethod<HardwareScdoSignTx> 
     };
   }
 
-  getVersionRange() {
+  getVersionRange(): DeviceFirmwareRange {
     return {
+      pro2: {
+        min: '0.0.0',
+        unsupported: true,
+      },
       model_touch: {
         min: '4.10.0',
       },

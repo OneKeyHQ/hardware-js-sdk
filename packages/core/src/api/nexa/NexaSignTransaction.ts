@@ -6,7 +6,7 @@ import { validateParams } from '../helpers/paramsValidator';
 
 import type { TypedResponseMessage } from '../../device/DeviceCommands';
 import type { TypedCall } from '@onekeyfe/hd-transport';
-import type { NexaSignTransactionParams, NexaSignature } from '../../types';
+import type { DeviceFirmwareRange, NexaSignTransactionParams, NexaSignature } from '../../types';
 
 export default class NexaSignTransaction extends BaseMethod<NexaSignTransactionParams> {
   hasBundle = false;
@@ -27,8 +27,12 @@ export default class NexaSignTransaction extends BaseMethod<NexaSignTransactionP
     this.params = payload;
   }
 
-  getVersionRange() {
+  getVersionRange(): DeviceFirmwareRange {
     return {
+      pro2: {
+        min: '0.0.0',
+        unsupported: true,
+      },
       model_mini: {
         min: '3.2.0',
       },

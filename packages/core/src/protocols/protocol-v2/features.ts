@@ -53,61 +53,22 @@ type ProtocolV2DeviceInfo = {
   };
 };
 
-// const PROTOCOL_V2_DEVICE_INFO_REQUEST = {
-//   targets: {
-//     hw: true,
-//     fw: true,
-//     bt: true,
-//     se1: true,
-//     se2: true,
-//     se3: true,
-//     se4: true,
-//     status: true,
-//   },
-//   types: {
-//     version: true,
-//     build_id: true,
-//     hash: true,
-//     specific: true,
-//   },
-// };
-
-const MOCK_PROTOCOL_V2_DEVICE_INFO: ProtocolV2DeviceInfo = {
-  protocol_version: 2,
-  hw: {
-    Device_type: 1,
-    device_type: 1,
-    serial_no: '000000000000',
-    hardware_version: 'mock',
+export const PROTOCOL_V2_DEVICE_INFO_REQUEST = {
+  targets: {
+    hw: true,
+    fw: true,
+    bt: true,
+    se1: true,
+    se2: true,
+    se3: true,
+    se4: true,
+    status: true,
   },
-  fw: {
-    board: {
-      version: '0.0.0',
-      build_id: 'mock',
-    },
-    boot: {
-      version: '0.0.0',
-      build_id: 'mock',
-    },
-    app: {
-      version: '0.0.0',
-      build_id: 'mock',
-    },
-  },
-  bt: {
-    app: {
-      version: '0.0.0',
-      build_id: 'mock',
-    },
-    adv_name: 'OneKey Pro 2',
-  },
-  status: {
-    language: 'en-US',
-    bt_enable: true,
-    init_states: true,
-    backup_required: false,
-    passphrase_protection: false,
-    label: 'OneKey Pro 2',
+  types: {
+    version: true,
+    build_id: true,
+    hash: true,
+    specific: true,
   },
 };
 
@@ -200,6 +161,7 @@ function createBaseFeatures(descriptor: DeviceDescriptor): Features {
     auto_lock_delay_ms: null,
     display_rotation: null,
     experimental_features: null,
+    protocol_version: null,
     onekey_device_type: EDeviceType.Pro2,
     onekey_serial_no: descriptorId,
     serial_no: descriptorId,
@@ -229,6 +191,7 @@ export function normalizeProtocolV2Features(
     device_id: serialNo,
     serial_no: serialNo,
     onekey_serial_no: serialNo,
+    protocol_version: deviceInfo.protocol_version ?? features.protocol_version,
     label: deviceInfo.status?.label ?? features.label,
     language: deviceInfo.status?.language ?? features.language,
     initialized: deviceInfo.status?.init_states ?? features.initialized,
@@ -246,6 +209,7 @@ export function normalizeProtocolV2Features(
     onekey_boot_build_id: getImageBuildId(deviceInfo.fw?.boot),
     onekey_boot_hash: getImageHash(deviceInfo.fw?.boot),
     onekey_board_version: getImageVersion(deviceInfo.fw?.board),
+    onekey_board_build_id: getImageBuildId(deviceInfo.fw?.board),
     onekey_board_hash: getImageHash(deviceInfo.fw?.board),
     onekey_ble_version: getImageVersion(deviceInfo.bt?.app),
     ble_ver: getImageVersion(deviceInfo.bt?.app),
@@ -254,12 +218,30 @@ export function normalizeProtocolV2Features(
     onekey_se01_version: getImageVersion(deviceInfo.se1?.app),
     onekey_se01_hash: getImageHash(deviceInfo.se1?.app),
     onekey_se01_build_id: getImageBuildId(deviceInfo.se1?.app),
+    onekey_se01_boot_version: getImageVersion(deviceInfo.se1?.boot),
+    onekey_se01_boot_hash: getImageHash(deviceInfo.se1?.boot),
+    onekey_se01_boot_build_id: getImageBuildId(deviceInfo.se1?.boot),
     onekey_se01_state: getSeState(deviceInfo.se1),
     onekey_se02_version: getImageVersion(deviceInfo.se2?.app),
+    onekey_se02_hash: getImageHash(deviceInfo.se2?.app),
+    onekey_se02_build_id: getImageBuildId(deviceInfo.se2?.app),
+    onekey_se02_boot_version: getImageVersion(deviceInfo.se2?.boot),
+    onekey_se02_boot_hash: getImageHash(deviceInfo.se2?.boot),
+    onekey_se02_boot_build_id: getImageBuildId(deviceInfo.se2?.boot),
     onekey_se02_state: getSeState(deviceInfo.se2),
     onekey_se03_version: getImageVersion(deviceInfo.se3?.app),
+    onekey_se03_hash: getImageHash(deviceInfo.se3?.app),
+    onekey_se03_build_id: getImageBuildId(deviceInfo.se3?.app),
+    onekey_se03_boot_version: getImageVersion(deviceInfo.se3?.boot),
+    onekey_se03_boot_hash: getImageHash(deviceInfo.se3?.boot),
+    onekey_se03_boot_build_id: getImageBuildId(deviceInfo.se3?.boot),
     onekey_se03_state: getSeState(deviceInfo.se3),
     onekey_se04_version: getImageVersion(deviceInfo.se4?.app),
+    onekey_se04_hash: getImageHash(deviceInfo.se4?.app),
+    onekey_se04_build_id: getImageBuildId(deviceInfo.se4?.app),
+    onekey_se04_boot_version: getImageVersion(deviceInfo.se4?.boot),
+    onekey_se04_boot_hash: getImageHash(deviceInfo.se4?.boot),
+    onekey_se04_boot_build_id: getImageBuildId(deviceInfo.se4?.boot),
     onekey_se04_state: getSeState(deviceInfo.se4),
   };
 }
@@ -271,7 +253,6 @@ export async function getProtocolV2Features({
 }: {
   commands: DeviceCommands;
   descriptor: DeviceDescriptor;
-  onDeviceInfoError?: (error: unknown) => void;
   timeoutMs?: number;
 }) {
   const callOptions = timeoutMs ? { timeoutMs } : undefined;
@@ -281,24 +262,17 @@ export async function getProtocolV2Features({
     await commands.typedCall('Ping', 'Success', { message: 'init' });
   }
 
-  // Temporarily skip the real DeviceGetDeviceInfo request while Pro2 update flow is being debugged.
-  // try {
-  //   const { message } = callOptions
-  //     ? await commands.typedCall(
-  //         'DeviceGetDeviceInfo',
-  //         'DeviceInfo',
-  //         PROTOCOL_V2_DEVICE_INFO_REQUEST,
-  //         callOptions
-  //       )
-  //     : await commands.typedCall(
-  //         'DeviceGetDeviceInfo',
-  //         'DeviceInfo',
-  //         PROTOCOL_V2_DEVICE_INFO_REQUEST
-  //       );
-  //   return normalizeProtocolV2Features(descriptor, message as unknown as ProtocolV2DeviceInfo);
-  // } catch (error) {
-  //   onDeviceInfoError?.(error);
-  //   return normalizeProtocolV2Features(descriptor);
-  // }
-  return normalizeProtocolV2Features(descriptor, MOCK_PROTOCOL_V2_DEVICE_INFO);
+  const { message } = callOptions
+    ? await commands.typedCall(
+        'DeviceGetDeviceInfo',
+        'DeviceInfo',
+        PROTOCOL_V2_DEVICE_INFO_REQUEST,
+        callOptions
+      )
+    : await commands.typedCall(
+        'DeviceGetDeviceInfo',
+        'DeviceInfo',
+        PROTOCOL_V2_DEVICE_INFO_REQUEST
+      );
+  return normalizeProtocolV2Features(descriptor, message as unknown as ProtocolV2DeviceInfo);
 }

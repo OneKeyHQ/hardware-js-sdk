@@ -278,11 +278,18 @@ export type MessageResponse<T: MessageKey> = {
     message: $ElementType<MessageType, T>;
 };
 
-export type TypedCall = <T: MessageKey, R: MessageKey>(
+export type TypedCall = {
+  <T: MessageKey, R: $ReadOnlyArray<MessageKey>>(
     type: T,
     resType: R,
     message?: $ElementType<MessageType, T>
-) => Promise<MessageResponse<R>>;
+  ): Promise<MessageResponse<$ElementType<R, number>>>;
+  <T: MessageKey, R: MessageKey>(
+    type: T,
+    resType: R,
+    message?: $ElementType<MessageType, T>
+  ): Promise<MessageResponse<R>>;
+};
 `);
 } else {
   lines.push('// custom connect definitions');
@@ -307,11 +314,32 @@ export type MessageResponse<T extends MessageKey> = {
     message: MessageType[T];
 };
 
-export type TypedCall = <T extends MessageKey, R extends MessageKey>(
-    type: T,
-    resType: R,
-    message?: MessageType[T],
-) => Promise<MessageResponse<R>>;
+export type MessageResponseMap = {
+    [K in MessageKey]: MessageResponse<K>;
+};
+
+export type TypedCall = {
+    <T extends MessageKey, R extends readonly MessageKey[]>(
+        type: T,
+        resType: R,
+        message?: MessageType[T],
+    ): Promise<MessageResponseMap[R[number]]>;
+    <T extends MessageKey, R extends MessageKey>(
+        type: T,
+        resType: R,
+        message?: MessageType[T],
+    ): Promise<MessageResponse<R>>;
+    <T extends MessageKey, R extends readonly MessageKey[]>(
+        type: T,
+        resType: R,
+        message?: any,
+    ): Promise<MessageResponseMap[R[number]]>;
+    <T extends MessageKey, R extends MessageKey>(
+        type: T,
+        resType: R,
+        message?: any,
+    ): Promise<MessageResponse<R>>;
+};
 `);
 }
 

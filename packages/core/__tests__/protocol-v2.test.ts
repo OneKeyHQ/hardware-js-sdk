@@ -15,15 +15,17 @@ import FirmwareUpdateV3 from '../src/api/FirmwareUpdateV3';
 import FirmwareUpdateV4 from '../src/api/FirmwareUpdateV4';
 import GetOnekeyFeatures from '../src/api/GetOnekeyFeatures';
 import { batchGetPublickeys } from '../src/api/helpers/batchGetPublickeys';
-import KaspaGetAddress from '../src/api/kaspa/KaspaGetAddress';
 import SuiSignTransaction from '../src/api/sui/SuiSignTransaction';
 import TronSignMessage from '../src/api/tron/TronSignMessage';
 import XrpSignTransaction from '../src/api/xrp/XrpSignTransaction';
+import StellarGetAddress from '../src/api/stellar/StellarGetAddress';
+import BenfenSignMessage from '../src/api/benfen/BenfenSignMessage';
+import { getBitcoinForkVersionRange } from '../src/api/btc/helpers/versionLimit';
 import { DataManager } from '../src/data-manager';
 import { Device } from '../src/device/Device';
 import { UI_REQUEST } from '../src/events/ui-request';
 import { getProtocolV2Features, normalizeProtocolV2Features } from '../src/protocols/protocol-v2';
-import { shouldSkipMethodSupportCheck } from '../src/utils';
+import { getMethodVersionRange, isMethodVersionRangeUnsupported } from '../src/utils';
 import {
   getPassphraseState,
   getPassphraseStateWithRefreshDeviceInfo,
@@ -44,6 +46,7 @@ const descriptor = {
 describe('Protocol V2 feature adapter', () => {
   test('normalizes Protocol V2 DeviceInfo into existing Features fields', () => {
     const features = normalizeProtocolV2Features(descriptor as any, {
+      protocol_version: 1,
       hw: {
         serial_no: 'PR2SERIAL',
       },
@@ -99,6 +102,7 @@ describe('Protocol V2 feature adapter', () => {
     expect(features.serial_no).toBe('PR2SERIAL');
     expect(features.onekey_serial_no).toBe('PR2SERIAL');
     expect(features.onekey_device_type).toBe('pro2');
+    expect(features.protocol_version).toBe(1);
     expect(features.major_version).toBe(1);
     expect(features.minor_version).toBe(2);
     expect(features.patch_version).toBe(3);
@@ -242,16 +246,6 @@ describe('Protocol V2 feature adapter', () => {
     expect(features.firmware_present).toBe(false);
   });
 
-  test('bypasses legacy method support checks for Protocol V2 fallback features', () => {
-    const features = normalizeProtocolV2Features({
-      ...descriptor,
-      protocolType: 'V2',
-    } as any);
-
-    expect(shouldSkipMethodSupportCheck(features, 'V2')).toBe(true);
-    expect(shouldSkipMethodSupportCheck(features)).toBe(true);
-  });
-
   test('initializes Protocol V2 features from DeviceGetDeviceInfo after Ping', async () => {
     const commands = {
       typedCall: jest
@@ -284,8 +278,7 @@ describe('Protocol V2 feature adapter', () => {
     });
   });
 
-  test('falls back to descriptor features when Protocol V2 DeviceGetDeviceInfo fails', async () => {
-    const onDeviceInfoError = jest.fn();
+  test('fails initialization when Protocol V2 DeviceGetDeviceInfo fails', async () => {
     const commands = {
       typedCall: jest
         .fn()
@@ -293,48 +286,70 @@ describe('Protocol V2 feature adapter', () => {
         .mockRejectedValueOnce(new Error('DeviceInfo not supported')),
     };
 
-    const features = await getProtocolV2Features({
-      commands: commands as unknown as DeviceCommands,
-      descriptor: descriptor as any,
-      onDeviceInfoError,
-    });
-
-    expect(features.device_id).toBe('usb-path');
-    expect(features.passphrase_protection).toBeNull();
-    expect(onDeviceInfoError).toHaveBeenCalledWith(expect.any(Error));
+    await expect(
+      getProtocolV2Features({
+        commands: commands as unknown as DeviceCommands,
+        descriptor: descriptor as any,
+      })
+    ).rejects.toThrow('DeviceInfo not supported');
   });
 
-  test('does not block method-level legacy version checks on Protocol V2', async () => {
-    const method = new KaspaGetAddress({
+  test('does not inherit Pro or Pro model fallback ranges for Protocol V2 devices', () => {
+    const features = normalizeProtocolV2Features({ ...descriptor, protocolType: 'V2' } as any);
+    const checkedTypes: string[] = [];
+
+    const versionRange = getMethodVersionRange(features, type => {
+      checkedTypes.push(type);
+      if (type === 'pro' || type === 'model_touch') {
+        return { min: '4.10.0' };
+      }
+      return undefined;
+    });
+
+    expect(versionRange).toBeUndefined();
+    expect(checkedTypes).toEqual(['pro2']);
+  });
+
+  test('marks known unsupported public-chain methods as unsupported on Protocol V2', () => {
+    const features = normalizeProtocolV2Features({ ...descriptor, protocolType: 'V2' } as any, {
+      fw: {
+        app: {
+          version: '9.9.9',
+        },
+      },
+    });
+    const stellar = new StellarGetAddress({
       id: 1,
       payload: {
-        method: 'kaspaGetAddress',
-        path: "m/44'/111111'/0'/0/0",
-        prefix: 'kaspa',
-        showOnOneKey: false,
-        useTweak: false,
+        method: 'stellarGetAddress',
+        path: "m/44'/148'/0'",
       },
     });
-    const typedCall = jest.fn().mockResolvedValue({
-      type: 'KaspaAddress',
-      message: {
-        address: 'kaspa:test-address',
+    const benfen = new BenfenSignMessage({
+      id: 1,
+      payload: {
+        method: 'benfenSignMessage',
+        path: "m/44'/728'/0'/0'/0'",
+        messageHex: '0x1234',
       },
     });
 
-    method.init();
-    method.postMessage = jest.fn();
-    (method as any).device = {
-      originalDescriptor: { protocolType: 'V2' },
-      features: normalizeProtocolV2Features({ ...descriptor, protocolType: 'V2' } as any),
-      commands: { typedCall },
-      toMessageObject: jest.fn(() => ({})),
-    };
+    stellar.init();
+    benfen.init();
 
-    await expect(method.run()).resolves.toMatchObject({
-      address: 'kaspa:test-address',
-    });
-    expect(typedCall).toHaveBeenCalledWith('KaspaGetAddress', 'KaspaAddress', expect.any(Object));
+    const stellarRange = getMethodVersionRange(
+      features,
+      type => stellar.getVersionRange()[type]
+    );
+    const benfenRange = getMethodVersionRange(features, type => benfen.getVersionRange()[type]);
+    const neuraiRange = getMethodVersionRange(
+      features,
+      type => getBitcoinForkVersionRange(['Neurai'])[type]
+    );
+
+    expect(isMethodVersionRangeUnsupported(stellarRange)).toBe(true);
+    expect(isMethodVersionRangeUnsupported(benfenRange)).toBe(true);
+    expect(isMethodVersionRangeUnsupported(neuraiRange)).toBe(true);
   });
 
   test('does not block legacy batch public key support checks on Protocol V2', async () => {
@@ -349,7 +364,13 @@ describe('Protocol V2 feature adapter', () => {
     });
     const device = {
       originalDescriptor: { protocolType: 'V2' },
-      features: normalizeProtocolV2Features({ ...descriptor, protocolType: 'V2' } as any),
+      features: normalizeProtocolV2Features({ ...descriptor, protocolType: 'V2' } as any, {
+        fw: {
+          app: {
+            version: '4.14.0',
+          },
+        },
+      }),
       commands: { typedCall },
     };
 

@@ -85,7 +85,35 @@ export type SearchDevice = {
 
 export type Device = KnownDevice;
 
-export type Features = PROTO.Features;
+type OnekeyFeatureExtensions = Partial<
+  Pick<
+    PROTO.OnekeyFeatures,
+    | 'onekey_board_build_id'
+    | 'onekey_se02_hash'
+    | 'onekey_se03_hash'
+    | 'onekey_se04_hash'
+    | 'onekey_se02_build_id'
+    | 'onekey_se03_build_id'
+    | 'onekey_se04_build_id'
+    | 'onekey_se01_boot_version'
+    | 'onekey_se02_boot_version'
+    | 'onekey_se03_boot_version'
+    | 'onekey_se04_boot_version'
+    | 'onekey_se01_boot_hash'
+    | 'onekey_se02_boot_hash'
+    | 'onekey_se03_boot_hash'
+    | 'onekey_se04_boot_hash'
+    | 'onekey_se01_boot_build_id'
+    | 'onekey_se02_boot_build_id'
+    | 'onekey_se03_boot_build_id'
+    | 'onekey_se04_boot_build_id'
+  >
+>;
+
+export type Features = PROTO.Features &
+  OnekeyFeatureExtensions & {
+    protocol_version?: number | null;
+  };
 
 export type OnekeyFeatures = PROTO.OnekeyFeatures;
 
@@ -138,6 +166,7 @@ export type ITransportStatus = 'valid' | 'outdated';
 export type IVersionRange = {
   min: string;
   max?: string;
+  unsupported?: boolean;
 };
 
 export type DeviceFirmwareRange = {

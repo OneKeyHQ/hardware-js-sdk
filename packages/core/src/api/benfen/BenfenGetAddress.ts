@@ -6,7 +6,7 @@ import { hex2BfcAddress, publicKeyToAddress } from './normalize';
 import { supportBatchPublicKey } from '../../utils/deviceFeaturesUtils';
 import { batchGetPublickeys } from '../helpers/batchGetPublickeys';
 
-import type { BenfenAddress, BenfenGetAddressParams } from '../../types';
+import type { BenfenAddress, BenfenGetAddressParams, DeviceFirmwareRange } from '../../types';
 import type { BenfenGetAddress as HardwareBenfenGetAddress } from '@onekeyfe/hd-transport';
 
 export default class BenfenGetAddress extends BaseMethod<HardwareBenfenGetAddress[]> {
@@ -47,8 +47,12 @@ export default class BenfenGetAddress extends BaseMethod<HardwareBenfenGetAddres
     });
   }
 
-  getVersionRange() {
+  getVersionRange(): DeviceFirmwareRange {
     return {
+      pro2: {
+        min: '0.0.0',
+        unsupported: true,
+      },
       pro: {
         min: '4.12.0',
       },

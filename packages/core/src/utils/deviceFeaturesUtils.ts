@@ -231,7 +231,10 @@ export const supportBatchPublicKey = (
 
   const deviceType = getDeviceType(features);
   // btc batch get public key
-  if (!!options?.includeNode && deviceType === EDeviceType.Pro) {
+  if (
+    !!options?.includeNode &&
+    (deviceType === EDeviceType.Pro || deviceType === EDeviceType.Pro2)
+  ) {
     return semver.gte(currentVersion, '4.14.0');
   }
   if (!!options?.includeNode && deviceType === EDeviceType.Touch) {
@@ -248,7 +251,11 @@ export const supportBatchPublicKey = (
   }
 
   // support batch get public key
-  if (deviceType === EDeviceType.Touch || deviceType === EDeviceType.Pro) {
+  if (
+    deviceType === EDeviceType.Touch ||
+    deviceType === EDeviceType.Pro ||
+    deviceType === EDeviceType.Pro2
+  ) {
     return semver.gte(currentVersion, '3.1.0');
   }
 

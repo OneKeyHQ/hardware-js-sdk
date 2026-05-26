@@ -3,6 +3,7 @@ export { default as preInitialize } from './device/PreInitialize';
 
 export { default as searchDevices } from './SearchDevices';
 export { default as getFeatures } from './GetFeatures';
+export { default as getDeviceInfo } from './GetDeviceInfo';
 export { default as getOnekeyFeatures } from './GetOnekeyFeatures';
 export { default as getPassphraseState } from './GetPassphraseState';
 export { default as getLogs } from './GetLogs';
