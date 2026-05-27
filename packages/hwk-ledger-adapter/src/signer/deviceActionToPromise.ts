@@ -1,5 +1,7 @@
 import { DeviceActionStatus } from '@ledgerhq/device-management-kit';
 
+import { debugLog } from '../utils/debugLog';
+
 import type { DeviceAction, DeviceActionState } from '../types';
 
 /**
@@ -38,11 +40,13 @@ export function deviceActionToPromise<T>(
   action: DeviceAction<T>,
   onInteraction?: (interaction: string) => void,
   timeoutMs: number = IDLE_WATCHDOG_MS,
-  onRegisterCanceller?: (cancel: (reason?: CancelReason) => void) => void
+  onRegisterCanceller?: (cancel: (reason?: CancelReason) => void) => void,
+  onIntermediate?: (intermediateValue: unknown) => void
 ): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     let settled = false;
     let lastStep: string | undefined;
+    let activeInteraction: string | undefined;
     const observedSteps: string[] = [];
     // eslint-disable-next-line prefer-const -- assigned once after declaration, but must be declared before use in cleanup
     let sub: { unsubscribe: () => void };
@@ -62,12 +66,65 @@ export function deviceActionToPromise<T>(
       }
     };
 
+    const clearActiveInteraction = () => {
+      if (activeInteraction) {
+        debugLog(
+          '[DeviceAction] requiredUserInteraction',
+          'interaction=none',
+          `prev=${activeInteraction}`,
+          `step=${lastStep ?? 'unknown'}`
+        );
+        activeInteraction = undefined;
+        onInteraction?.('interaction-complete');
+        return true;
+      }
+      return false;
+    };
+
+    const emitInteraction = (interaction: unknown) => {
+      if (!onInteraction) {
+        return;
+      }
+
+      if (!interaction || interaction === 'none') {
+        clearActiveInteraction();
+        return;
+      }
+
+      const interactionName = String(interaction);
+      if (interactionName === activeInteraction) {
+        return;
+      }
+
+      activeInteraction = interactionName;
+      debugLog(
+        '[DeviceAction] requiredUserInteraction',
+        `interaction=${interactionName}`,
+        `step=${lastStep ?? 'unknown'}`
+      );
+      // unlock-device is DMK's own bounded poll. Other interaction
+      // states keep the caller-provided watchdog so a stuck observable
+      // cannot hold the queue slot forever.
+      if (interaction === 'unlock-device' && timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      onInteraction(interactionName);
+    };
+
+    const completeInteraction = () => {
+      if (!clearActiveInteraction()) {
+        onInteraction?.('interaction-complete');
+      }
+    };
+
     const armIdleWatchdog = () => {
       if (timer) clearTimeout(timer);
       if (timeoutMs > 0) {
         timer = setTimeout(() => {
           if (!settled) {
             settled = true;
+            completeInteraction();
             cancelAction();
             reject(
               new Error(
@@ -89,6 +146,7 @@ export function deviceActionToPromise<T>(
         }
         settled = true;
         if (timer) clearTimeout(timer);
+        completeInteraction();
         cancelAction();
         const err = new Error(reason?.message ?? 'Device action cancelled');
         if (reason?.code !== undefined) {
@@ -127,26 +185,26 @@ export function deviceActionToPromise<T>(
         if (state.status === DeviceActionStatus.Completed) {
           settled = true;
           if (timer) clearTimeout(timer);
-          onInteraction?.('interaction-complete');
+          completeInteraction();
           sub?.unsubscribe();
           resolve(state.output);
         } else if (state.status === DeviceActionStatus.Error) {
           settled = true;
           if (timer) clearTimeout(timer);
-          onInteraction?.('interaction-complete');
+          completeInteraction();
           sub?.unsubscribe();
           rejectWithStepContext(state.error, lastStep, observedSteps, reject);
-        } else if (state.status === DeviceActionStatus.Pending && onInteraction) {
-          const interaction = state.intermediateValue?.requiredUserInteraction;
-          if (interaction && interaction !== 'none') {
-            // unlock-device is DMK's own bounded poll. Other interaction
-            // states keep the caller-provided watchdog so a stuck observable
-            // cannot hold the queue slot forever.
-            if (interaction === 'unlock-device' && timer) {
-              clearTimeout(timer);
-              timer = null;
+        } else if (state.status === DeviceActionStatus.Pending) {
+          if (onIntermediate) {
+            try {
+              onIntermediate(state.intermediateValue);
+            } catch {
+              // listener errors must not abort the device action
             }
-            onInteraction(String(interaction));
+          }
+          if (onInteraction) {
+            const interaction = state.intermediateValue?.requiredUserInteraction;
+            emitInteraction(interaction);
           }
         }
       },
@@ -154,6 +212,7 @@ export function deviceActionToPromise<T>(
         if (!settled) {
           settled = true;
           if (timer) clearTimeout(timer);
+          completeInteraction();
           sub?.unsubscribe();
           rejectWithStepContext(err, lastStep, observedSteps, reject);
         }
@@ -162,6 +221,7 @@ export function deviceActionToPromise<T>(
         if (!settled) {
           settled = true;
           if (timer) clearTimeout(timer);
+          completeInteraction();
           reject(new Error('Device action completed without result'));
         }
       },
