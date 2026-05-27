@@ -244,6 +244,46 @@ describe('deviceActionToPromise', () => {
     expect(onInteraction).toHaveBeenCalledTimes(3);
   });
 
+  it('should clear active interaction when observable errors directly', async () => {
+    const onInteraction = jest.fn();
+    let observer:
+      | {
+          next: (v: unknown) => void;
+          error?: (e: unknown) => void;
+          complete?: () => void;
+        }
+      | undefined;
+    const action = {
+      cancel: jest.fn(),
+      observable: {
+        subscribe(nextObserver: {
+          next: (v: unknown) => void;
+          error?: (e: unknown) => void;
+          complete?: () => void;
+        }) {
+          observer = nextObserver;
+          return { unsubscribe: jest.fn() };
+        },
+      },
+    } as unknown as DeviceAction<string>;
+    const error = new Error('transport failed');
+    const promise = deviceActionToPromise(action, onInteraction, 0);
+
+    observer?.next({
+      status: 'pending',
+      intermediateValue: {
+        requiredUserInteraction: 'allow-secure-connection',
+        step: 'os.installOrUpdateApps.steps.updateDeviceMetadata',
+      },
+    });
+    observer?.error?.(error);
+
+    await expect(promise).rejects.toThrow('transport failed');
+    expect(onInteraction).toHaveBeenNthCalledWith(1, 'allow-secure-connection');
+    expect(onInteraction).toHaveBeenNthCalledWith(2, 'interaction-complete');
+    expect(onInteraction).toHaveBeenCalledTimes(2);
+  });
+
   it('should reject if observable completes without result', async () => {
     const action = createMockAction([{ status: 'pending' }]);
     await expect(deviceActionToPromise(action)).rejects.toThrow('completed without result');

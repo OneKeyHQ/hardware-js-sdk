@@ -1580,7 +1580,7 @@ describe('LedgerAdapter', () => {
       expect(result.success).toBe(true);
     });
 
-    it('installApp passes appName + onProgress callback through params', async () => {
+    it('installApp passes appName through params (no function refs)', async () => {
       connector.call.mockResolvedValueOnce(undefined);
       await adapter.connectDevice('dev-1');
       const result = await adapter.installApp('dev-1', 'Cardano');
@@ -1589,28 +1589,47 @@ describe('LedgerAdapter', () => {
       const [sessionId, method, params] = connector.call.mock.calls[0];
       expect(sessionId).toBe('session-abc');
       expect(method).toBe('installApp');
-      expect(params).toMatchObject({ appName: 'Cardano' });
-      expect(typeof (params as { onProgress?: unknown }).onProgress).toBe('function');
+      expect(params).toEqual({ appName: 'Cardano' });
+      // Params must be serializable — no function refs may cross the connector
+      // boundary (would be dropped by IHardwareBridge structured-clone / JSON).
+      for (const value of Object.values(params as Record<string, unknown>)) {
+        expect(typeof value).not.toBe('function');
+      }
     });
 
-    it('installApp progress callback re-emits adapter app-install-progress events', async () => {
-      let capturedOnProgress: ((p: unknown) => void) | undefined;
-      connector.call.mockImplementationOnce(async (_sessionId, _method, params) => {
-        capturedOnProgress = (params as { onProgress: (p: unknown) => void }).onProgress;
-        capturedOnProgress?.({ progress: 0.5, requiredUserInteraction: 'none' });
-        return undefined;
-      });
+    it('forwards connector app-install-progress events with connectId re-keyed from sessionId', async () => {
+      connector.call.mockResolvedValueOnce(undefined);
       const events: unknown[] = [];
       adapter.on('app-install-progress', evt => events.push(evt));
 
       await adapter.connectDevice('dev-1');
+      // Simulate the connector emitting progress mid-install.
+      connector._emit('app-install-progress', {
+        sessionId: 'session-abc',
+        appName: 'Cardano',
+        progress: 0.5,
+      });
       await adapter.installApp('dev-1', 'Cardano');
 
       expect(events).toHaveLength(1);
-      expect(events[0]).toMatchObject({
+      expect(events[0]).toEqual({
         type: 'app-install-progress',
         payload: { connectId: 'dev-1', appName: 'Cardano', progress: 0.5 },
       });
+    });
+
+    it('drops app-install-progress events with no matching session', async () => {
+      const events: unknown[] = [];
+      adapter.on('app-install-progress', evt => events.push(evt));
+
+      // No connectDevice() called → _sessions is empty → forwarder drops.
+      connector._emit('app-install-progress', {
+        sessionId: 'stale-session',
+        appName: 'Cardano',
+        progress: 0.1,
+      });
+
+      expect(events).toHaveLength(0);
     });
 
     it('installApp surfaces connector errors as failure response', async () => {

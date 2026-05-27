@@ -25,18 +25,32 @@ export interface AppMetadata {
   isDevTools: boolean;
 }
 
+/**
+ * Progress fraction reported by DMK's InstallOrUpdateAppsDeviceAction.
+ * Note: DMK's raw `requiredUserInteraction` for install (e.g. allow-secure-connection,
+ * allow-manager) is intentionally NOT exposed here — those signals are routed through
+ * the public 'ui-event' channel (collapsed to EConnectorInteraction) and additionally
+ * captured via debugLog in the connector for diagnosis.
+ */
 export interface InstallProgress {
   progress: number;
-  requiredUserInteraction?: string;
 }
 
 export type InstallProgressCallback = (progress: InstallProgress) => void;
 
 export interface InstallAppCallParams {
   appName: string;
-  unlockTimeout?: number;
-  // In-process function ref forwarded through connector.call (params typed unknown).
-  onProgress?: InstallProgressCallback;
+}
+
+/** Raised by DeviceApps.install when DMK reports the requested app is not in the catalog. */
+export class AppNotFoundInCatalogError extends Error {
+  readonly missingApplications: string[];
+
+  constructor(missing: string[]) {
+    super(`Ledger app not found in catalog: ${missing.join(', ')}`);
+    this.name = 'AppNotFoundInCatalogError';
+    this.missingApplications = missing;
+  }
 }
 
 export interface ListInstalledAppsCallParams {
@@ -185,29 +199,39 @@ export class DeviceApps {
       }),
     });
 
-    await deviceActionToPromise<InstallOrUpdateAppsOutput>(
+    const result = await deviceActionToPromise<InstallOrUpdateAppsOutput>(
       action,
       this.onInteraction,
       INSTALL_TIMEOUT_MS,
       this.onRegisterCanceller,
-      onProgress
-        ? intermediateValue => {
-            const iv = intermediateValue as
-              | {
-                  requiredUserInteraction?: string;
-                  installPlan?: { currentProgress?: number } | null;
-                }
-              | undefined;
-            const progress = iv?.installPlan?.currentProgress;
-            if (typeof progress === 'number') {
-              onProgress({
-                progress,
-                requiredUserInteraction: iv?.requiredUserInteraction,
-              });
+      intermediateValue => {
+        const iv = intermediateValue as
+          | {
+              requiredUserInteraction?: string;
+              installPlan?: { currentProgress?: number } | null;
             }
-          }
-        : undefined,
+          | undefined;
+        // Surface DMK's install-specific interaction string (e.g. allow-secure-connection,
+        // allow-manager, verify-app) into the debug log for post-hoc diagnosis. The
+        // public 'ui-event' channel still emits the collapsed EConnectorInteraction so
+        // existing UI consumers keep working.
+        if (iv?.requiredUserInteraction && iv.requiredUserInteraction !== 'none') {
+          debugLog('[DeviceApps] install interaction:', iv.requiredUserInteraction);
+        }
+        const progress = iv?.installPlan?.currentProgress;
+        if (onProgress && typeof progress === 'number') {
+          onProgress({ progress });
+        }
+      },
     );
+
+    // DMK can resolve Completed with `missingApplications` populated when the
+    // requested name is not in the catalog. allowMissingApplication=false should
+    // make DMK reject, but we double-check on this side so the adapter never
+    // returns success(undefined) for an install that didn't actually install.
+    if (result?.missingApplications?.length > 0) {
+      throw new AppNotFoundInCatalogError(result.missingApplications);
+    }
   }
 }
 

@@ -30,8 +30,6 @@ import { debugError, debugLog } from '../utils/debugLog';
 import type {
   AppMetadata,
   FirmwareVersion,
-  InstallAppCallParams,
-  InstallProgressCallback,
   LedgerDeviceInfo,
 } from '../device-apps/DeviceApps';
 import type {
@@ -449,16 +447,10 @@ export class LedgerAdapter implements IHardwareWallet {
 
   async installApp(connectId: string, appName: string): Promise<Response<void>> {
     try {
-      const params: InstallAppCallParams & { onProgress?: InstallProgressCallback } = {
-        appName,
-        onProgress: progress => {
-          this.emitter.emit('app-install-progress' as never, {
-            type: 'app-install-progress',
-            payload: { connectId, appName, ...progress },
-          } as never);
-        },
-      };
-      await this.connectorCall(connectId, 'installApp', params);
+      // Progress is emitted from the connector via the 'app-install-progress'
+      // event (see appInstallProgressForwarder); no callback is passed here so
+      // installApp params stay fully serializable across IHardwareBridge.
+      await this.connectorCall(connectId, 'installApp', { appName });
       return success(undefined);
     } catch (err) {
       return this.errorToFailure(err);
@@ -1669,16 +1661,42 @@ export class LedgerAdapter implements IHardwareWallet {
     this.emitter.emit('ui-event', event);
   };
 
+  // Forward 'app-install-progress' from the connector (carries sessionId) to the
+  // public hw.emitter as a connectId-keyed event. We translate sessionId → connectId
+  // via the live _sessions map; if no mapping exists (race during teardown) we drop.
+  private appInstallProgressForwarder = (data: {
+    sessionId: string;
+    appName: string;
+    progress: number;
+  }): void => {
+    let connectId: string | undefined;
+    for (const [cid, sid] of this._sessions) {
+      if (sid === data.sessionId) {
+        connectId = cid;
+        break;
+      }
+    }
+    if (!connectId) {
+      return;
+    }
+    this.emitter.emit('app-install-progress', {
+      type: 'app-install-progress',
+      payload: { connectId, appName: data.appName, progress: data.progress },
+    });
+  };
+
   private registerEventListeners(): void {
     this.connector.on('device-connect', this.deviceConnectHandler);
     this.connector.on('device-disconnect', this.deviceDisconnectHandler);
     this.connector.on('ui-event', this.uiEventForwarder);
+    this.connector.on('app-install-progress', this.appInstallProgressForwarder);
   }
 
   private unregisterEventListeners(): void {
     this.connector.off('device-connect', this.deviceConnectHandler);
     this.connector.off('device-disconnect', this.deviceDisconnectHandler);
     this.connector.off('ui-event', this.uiEventForwarder);
+    this.connector.off('app-install-progress', this.appInstallProgressForwarder);
   }
 
   // ---------------------------------------------------------------------------

@@ -112,12 +112,19 @@ export function deviceActionToPromise<T>(
       onInteraction(interactionName);
     };
 
+    const completeInteraction = () => {
+      if (!clearActiveInteraction()) {
+        onInteraction?.('interaction-complete');
+      }
+    };
+
     const armIdleWatchdog = () => {
       if (timer) clearTimeout(timer);
       if (timeoutMs > 0) {
         timer = setTimeout(() => {
           if (!settled) {
             settled = true;
+            completeInteraction();
             cancelAction();
             reject(
               new Error(
@@ -139,6 +146,7 @@ export function deviceActionToPromise<T>(
         }
         settled = true;
         if (timer) clearTimeout(timer);
+        completeInteraction();
         cancelAction();
         const err = new Error(reason?.message ?? 'Device action cancelled');
         if (reason?.code !== undefined) {
@@ -177,17 +185,13 @@ export function deviceActionToPromise<T>(
         if (state.status === DeviceActionStatus.Completed) {
           settled = true;
           if (timer) clearTimeout(timer);
-          if (!clearActiveInteraction()) {
-            onInteraction?.('interaction-complete');
-          }
+          completeInteraction();
           sub?.unsubscribe();
           resolve(state.output);
         } else if (state.status === DeviceActionStatus.Error) {
           settled = true;
           if (timer) clearTimeout(timer);
-          if (!clearActiveInteraction()) {
-            onInteraction?.('interaction-complete');
-          }
+          completeInteraction();
           sub?.unsubscribe();
           rejectWithStepContext(state.error, lastStep, observedSteps, reject);
         } else if (state.status === DeviceActionStatus.Pending) {
@@ -208,6 +212,7 @@ export function deviceActionToPromise<T>(
         if (!settled) {
           settled = true;
           if (timer) clearTimeout(timer);
+          completeInteraction();
           sub?.unsubscribe();
           rejectWithStepContext(err, lastStep, observedSteps, reject);
         }
@@ -216,6 +221,7 @@ export function deviceActionToPromise<T>(
         if (!settled) {
           settled = true;
           if (timer) clearTimeout(timer);
+          completeInteraction();
           reject(new Error('Device action completed without result'));
         }
       },

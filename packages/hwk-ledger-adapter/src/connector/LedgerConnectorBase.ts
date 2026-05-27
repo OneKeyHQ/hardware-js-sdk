@@ -724,11 +724,27 @@ export class LedgerConnectorBase implements IConnector {
         return tronSignMessage(ctx, sessionId, internalParams);
       }
       // OS-level device management — symmetric to chain handlers.
+      // Each case uses try/catch/finally to mirror chain handlers: catch wraps
+      // raw DMK errors (so mapLedgerError / isOutOfMemoryError run) and
+      // invalidates the session (so a stale sid isn't reused by subsequent
+      // listInstalledApps / signTransaction calls).
       case 'installApp': {
         const p = params as InstallAppCallParams;
         const apps = await _getDeviceApps(ctx, sessionId);
         try {
-          return await apps.install(p.appName, p.onProgress);
+          // Progress callback is built here (not on params) so the function ref
+          // never crosses the IHardwareBridge boundary. Emits as a connector
+          // event; the adapter re-emits to its public typed emitter.
+          return await apps.install(p.appName, ({ progress }) => {
+            ctx.emit('app-install-progress', {
+              sessionId,
+              appName: p.appName,
+              progress,
+            });
+          });
+        } catch (err) {
+          ctx.invalidateSession(sessionId);
+          throw ctx.wrapError(err);
         } finally {
           ctx.clearCanceller(sessionId);
         }
@@ -737,6 +753,9 @@ export class LedgerConnectorBase implements IConnector {
         const apps = await _getDeviceApps(ctx, sessionId);
         try {
           return await apps.listInstalled(params as ListInstalledAppsCallParams);
+        } catch (err) {
+          ctx.invalidateSession(sessionId);
+          throw ctx.wrapError(err);
         } finally {
           ctx.clearCanceller(sessionId);
         }
@@ -745,6 +764,9 @@ export class LedgerConnectorBase implements IConnector {
         const apps = await _getDeviceApps(ctx, sessionId);
         try {
           return await apps.listAvailable();
+        } catch (err) {
+          ctx.invalidateSession(sessionId);
+          throw ctx.wrapError(err);
         } finally {
           ctx.clearCanceller(sessionId);
         }
@@ -753,6 +775,9 @@ export class LedgerConnectorBase implements IConnector {
         const apps = await _getDeviceApps(ctx, sessionId);
         try {
           return await apps.getFirmwareVersion();
+        } catch (err) {
+          ctx.invalidateSession(sessionId);
+          throw ctx.wrapError(err);
         } finally {
           ctx.clearCanceller(sessionId);
         }
@@ -761,6 +786,9 @@ export class LedgerConnectorBase implements IConnector {
         const apps = await _getDeviceApps(ctx, sessionId);
         try {
           return await apps.getDeviceInfo();
+        } catch (err) {
+          ctx.invalidateSession(sessionId);
+          throw ctx.wrapError(err);
         } finally {
           ctx.clearCanceller(sessionId);
         }
