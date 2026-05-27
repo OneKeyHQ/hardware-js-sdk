@@ -408,12 +408,22 @@ export function isAppNotInstalledError(err: unknown): boolean {
 }
 
 /** DMK install ran out of space on the device. */
+const OUT_OF_MEMORY_MESSAGE_SUBSTRINGS = [
+  'out of memory',
+  'not enough space',
+  'insufficient memory',
+];
+
 export function isOutOfMemoryError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;
   const e = err as Record<string, unknown>;
   if (e._tag === 'OutOfMemoryDAError') return true;
-  if (typeof e.message === 'string' && /out of memory|not enough.*space|insufficient.*memory/i.test(e.message)) {
-    return true;
+  if (typeof e.message === 'string') {
+    const msg = e.message.toLowerCase();
+    // Plain substring check (no regex) avoids ReDoS on adversarial inputs:
+    // the previous /not enough.*space|insufficient.*memory/i pattern could
+    // backtrack catastrophically on crafted strings like "not enough" × N.
+    return OUT_OF_MEMORY_MESSAGE_SUBSTRINGS.some(s => msg.includes(s));
   }
   return false;
 }
