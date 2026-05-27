@@ -83,6 +83,15 @@ export interface HardwareEventMap {
   // UnlockDevice / InteractionComplete. Subscribe with hw.on('ui-event', handler).
   'ui-event': ConnectorUiEvent;
 
+  // OS-level Ledger app install progress (forwarded from IConnector
+  // 'app-install-progress'). The adapter re-emits with `connectId` instead
+  // of the connector-internal `sessionId`. Subscribe with
+  // hw.on('app-install-progress', handler).
+  'app-install-progress': {
+    type: 'app-install-progress';
+    payload: { connectId: string; appName: string; progress: number };
+  };
+
   // Device events
   [DEVICE.CONNECT]: { type: typeof DEVICE.CONNECT; payload: DeviceInfo };
   [DEVICE.DISCONNECT]: { type: typeof DEVICE.DISCONNECT; payload: { connectId: string } };

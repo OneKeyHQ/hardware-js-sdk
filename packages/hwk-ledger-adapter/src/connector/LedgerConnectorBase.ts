@@ -29,10 +29,17 @@ import {
   tronSignMessage,
   tronSignTransaction,
 } from './chains';
+import { DeviceAppsManager } from '../device-apps/DeviceAppsManager';
+import { collapseSignerInteraction } from './chains/utils';
 
+import type {
+  DeviceApps,
+  InstallAppCallParams,
+  ListInstalledAppsCallParams,
+} from '../device-apps/DeviceApps';
+import type { ConnectorContext } from './chains/types';
 import type { WrapErrorOptions } from '../errors';
 import type { CancelReason } from '../signer/deviceActionToPromise';
-import type { ConnectorContext } from './chains/types';
 import type { DeviceManagementKit } from '@ledgerhq/device-management-kit';
 import type {
   ConnectionType,
@@ -133,6 +140,22 @@ async function defaultLedgerKitImporter(pkg: string): Promise<any> {
   }
 }
 
+// Mirrors _getEthSigner in chains/evm.ts.
+async function _getDeviceApps(ctx: ConnectorContext, sessionId: string): Promise<DeviceApps> {
+  const manager = await ctx.getDeviceAppsManager();
+  const apps = await manager.getOrCreate(sessionId);
+  apps.onInteraction = (interaction: string) => {
+    ctx.emit('ui-event', {
+      type: collapseSignerInteraction(interaction),
+      payload: { sessionId },
+    });
+  };
+  apps.onRegisterCanceller = cancel => {
+    ctx.registerCanceller(sessionId, cancel);
+  };
+  return apps;
+}
+
 // ---------------------------------------------------------------------------
 // LedgerConnectorBase
 // ---------------------------------------------------------------------------
@@ -163,6 +186,8 @@ export class LedgerConnectorBase implements IConnector {
   private _deviceManager: LedgerDeviceManager | null = null;
 
   private _signerManager: SignerManager | null = null;
+
+  private _deviceAppsManager: DeviceAppsManager | null = null;
 
   private _dmk: DeviceManagementKit | null = null;
 
@@ -248,6 +273,7 @@ export class LedgerConnectorBase implements IConnector {
       getOrCreateDmk: () => this._getOrCreateDmk(),
       getDeviceManager: () => this._getDeviceManager(),
       getSignerManager: () => this._getSignerManager(),
+      getDeviceAppsManager: () => this._getDeviceAppsManager(),
       clearAllSigners: () => this._signerManager?.clearAll(),
       replaceSession: (oldSid, newSid) => this._replaceSession(oldSid, newSid),
       registerCanceller: (sid, cancel) => this._cancellers.set(sid, cancel),
@@ -694,6 +720,76 @@ export class LedgerConnectorBase implements IConnector {
         };
         return tronSignMessage(ctx, sessionId, internalParams);
       }
+      // OS-level device management — symmetric to chain handlers.
+      // Each case uses try/catch/finally to mirror chain handlers: catch wraps
+      // raw DMK errors (so mapLedgerError / isOutOfMemoryError run) and
+      // invalidates the session (so a stale sid isn't reused by subsequent
+      // listInstalledApps / signTransaction calls).
+      case 'installApp': {
+        const p = params as InstallAppCallParams;
+        const apps = await _getDeviceApps(ctx, sessionId);
+        try {
+          // Progress callback is built here (not on params) so the function ref
+          // never crosses the IHardwareBridge boundary. Emits as a connector
+          // event; the adapter re-emits to its public typed emitter.
+          return await apps.install(p.appName, ({ progress }) => {
+            ctx.emit('app-install-progress', {
+              sessionId,
+              appName: p.appName,
+              progress,
+            });
+          });
+        } catch (err) {
+          ctx.invalidateSession(sessionId);
+          throw ctx.wrapError(err);
+        } finally {
+          ctx.clearCanceller(sessionId);
+        }
+      }
+      case 'listInstalledApps': {
+        const apps = await _getDeviceApps(ctx, sessionId);
+        try {
+          return await apps.listInstalled(params as ListInstalledAppsCallParams);
+        } catch (err) {
+          ctx.invalidateSession(sessionId);
+          throw ctx.wrapError(err);
+        } finally {
+          ctx.clearCanceller(sessionId);
+        }
+      }
+      case 'listAvailableApps': {
+        const apps = await _getDeviceApps(ctx, sessionId);
+        try {
+          return await apps.listAvailable();
+        } catch (err) {
+          ctx.invalidateSession(sessionId);
+          throw ctx.wrapError(err);
+        } finally {
+          ctx.clearCanceller(sessionId);
+        }
+      }
+      case 'getFirmwareVersion': {
+        const apps = await _getDeviceApps(ctx, sessionId);
+        try {
+          return await apps.getFirmwareVersion();
+        } catch (err) {
+          ctx.invalidateSession(sessionId);
+          throw ctx.wrapError(err);
+        } finally {
+          ctx.clearCanceller(sessionId);
+        }
+      }
+      case 'getDeviceInfo': {
+        const apps = await _getDeviceApps(ctx, sessionId);
+        try {
+          return await apps.getDeviceInfo();
+        } catch (err) {
+          ctx.invalidateSession(sessionId);
+          throw ctx.wrapError(err);
+        } finally {
+          ctx.clearCanceller(sessionId);
+        }
+      }
       default:
         throw new Error(`LedgerConnector: unknown method "${method}"`);
     }
@@ -796,6 +892,7 @@ export class LedgerConnectorBase implements IConnector {
       const mod = await importKit('@ledgerhq/device-signer-kit-ethereum');
       return new mod.SignerEthBuilder(args);
     });
+    this._deviceAppsManager = new DeviceAppsManager(dmk, importKit);
   }
 
   private async _getDeviceManager(): Promise<LedgerDeviceManager> {
@@ -812,6 +909,14 @@ export class LedgerConnectorBase implements IConnector {
       this._initManagers(dmk);
     }
     return this._signerManager!;
+  }
+
+  private async _getDeviceAppsManager(): Promise<DeviceAppsManager> {
+    if (!this._deviceAppsManager) {
+      const dmk = await this._getOrCreateDmk();
+      this._initManagers(dmk);
+    }
+    return this._deviceAppsManager!;
   }
 
   private _invalidateSession(sessionId: string): void {
@@ -856,6 +961,8 @@ export class LedgerConnectorBase implements IConnector {
     debugLog('[DMK] _resetSignersAndSessions called');
     this._signerManager?.clearAll();
     this._signerManager = null;
+    this._deviceAppsManager?.clearAll();
+    this._deviceAppsManager = null;
     this._deviceManager?.disposeKeepingDmk();
     this._deviceManager = null;
   }
@@ -883,9 +990,11 @@ export class LedgerConnectorBase implements IConnector {
     }
     this._sessionStateSubs.clear();
     this._signerManager?.clearAll();
+    this._deviceAppsManager?.clearAll();
     this._deviceManager?.dispose();
     this._deviceManager = null;
     this._signerManager = null;
+    this._deviceAppsManager = null;
     this._dmk = null;
   }
 

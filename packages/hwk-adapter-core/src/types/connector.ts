@@ -33,7 +33,12 @@ export interface ConnectorSession {
   deviceInfo: DeviceInfo;
 }
 
-export type ConnectorEventType = 'device-connect' | 'device-disconnect' | 'ui-request' | 'ui-event';
+export type ConnectorEventType =
+  | 'device-connect'
+  | 'device-disconnect'
+  | 'ui-request'
+  | 'ui-event'
+  | 'app-install-progress';
 
 /**
  * Interaction event types emitted via 'ui-event'.
@@ -68,6 +73,10 @@ export interface ConnectorEventMap {
   'device-disconnect': { connectId: string };
   'ui-request': { type: string; payload?: unknown };
   'ui-event': ConnectorUiEvent;
+  // OS-level Ledger app install progress. Emitted from inside the connector
+  // so the callback ref never has to cross the IHardwareBridge boundary.
+  // `progress` is a 0..1 fraction reported by DMK's InstallOrUpdateAppsDeviceAction.
+  'app-install-progress': { sessionId: string; appName: string; progress: number };
 }
 
 export interface IConnector {
