@@ -86,6 +86,12 @@ type IFingerprintVerifyResult =
   | { success: true }
   | { success: false; expected: string; actual: string };
 
+type ConnectorCallFingerprint = {
+  chain: ChainForFingerprint;
+  deviceId: string;
+  skipFingerprint: boolean;
+};
+
 // Fingerprints are deterministic 16-char hashes of fixed testnet paths,
 // not secrets — safe to log.
 function formatDeviceMismatchError(expected: string, actual: string): string {
@@ -756,7 +762,8 @@ export class LedgerAdapter implements IHardwareWallet {
   // doesn't kill caller B's await.
   private async ensureConnected(
     connectId: string | undefined,
-    signal: AbortSignal
+    signal: AbortSignal,
+    allowUsbEphemeralFallback = false
   ): Promise<string> {
     if (signal.aborted) LedgerAdapter._throwIfAborted(signal);
 
@@ -789,7 +796,7 @@ export class LedgerAdapter implements IHardwareWallet {
       const innerSignal = this._doConnectAbortController.signal;
       this._connectingPromise = (async () => {
         try {
-          return await this._doConnect(innerSignal, connectId);
+          return await this._doConnect(innerSignal, connectId, allowUsbEphemeralFallback);
         } finally {
           this._connectingPromise = null;
           this._doConnectAbortController = null;
@@ -803,7 +810,11 @@ export class LedgerAdapter implements IHardwareWallet {
   // Layer 1 main loop — the ONLY place in SDK that emits unlock dialog.
   // Bounded by MAX_DOCONNECT_CONFIRMS — after N Confirms with no progress,
   // throw DeviceNotFound so the user is kicked out of the loop.
-  private async _doConnect(internalSignal: AbortSignal, targetConnectId?: string): Promise<string> {
+  private async _doConnect(
+    internalSignal: AbortSignal,
+    targetConnectId?: string,
+    allowUsbEphemeralFallback = false
+  ): Promise<string> {
     if (isLedgerBleConnectionType(this.connector.connectionType) && targetConnectId) {
       try {
         return await this._connectDeviceOrThrow(targetConnectId);
@@ -854,7 +865,11 @@ export class LedgerAdapter implements IHardwareWallet {
 
       if (devices.length > 0) {
         try {
-          return await this._connectFirstOrSelect(devices, targetConnectId);
+          return await this._connectFirstOrSelect(
+            devices,
+            targetConnectId,
+            allowUsbEphemeralFallback
+          );
         } catch (err) {
           // PairingFailure / DeviceMismatch / unclassified → throw out, no
           // Layer 1 retry. PairingRefused = user declined system pair prompt
@@ -898,7 +913,8 @@ export class LedgerAdapter implements IHardwareWallet {
 
   private async _connectFirstOrSelect(
     devices: DeviceInfo[],
-    targetConnectId?: string
+    targetConnectId?: string,
+    allowUsbEphemeralFallback = false
   ): Promise<string> {
     if (targetConnectId) {
       const target = devices.find(
@@ -908,18 +924,25 @@ export class LedgerAdapter implements IHardwareWallet {
         return this._connectDeviceOrThrow(target.connectId);
       }
 
-      // USB single-device fallback: target not in fresh enumeration but exactly
-      // one device present — assume same device, new ephemeral path after replug.
+      // Decision: a stale USB target + fresh search returning exactly one
+      // Ledger is not proof that the sole Ledger is the original device. It
+      // might be A after a replug (safe to recover), or B after A was unplugged
+      // (wrong-device risk).
       //
-      // IMPORTANT: `devices.length` is the FRESH searchDevices() result, NOT
-      // cached `_discoveredDevices`. Do NOT "simplify" this to use
-      // _sessions.size or _discoveredDevices.size — those can carry ghost
-      // entries from failed device-state subscriptions, which would resurrect
-      // the multi-device drift bug.
-      if (!isLedgerBleConnectionType(this.connector.connectionType) && devices.length === 1) {
+      // We only take this recovery path when the business call supplied a
+      // stable wallet fingerprint (`deviceId`) and did not opt out of
+      // fingerprint checks. The connection is then provisional: the caller must
+      // run `_verifyDeviceFingerprintWithSession` before sending the real APDU.
+      // Calls without that identity check fail closed with DeviceNotFound so
+      // the host can ask the user to reconnect/select again.
+      if (
+        !isLedgerBleConnectionType(this.connector.connectionType) &&
+        devices.length === 1 &&
+        allowUsbEphemeralFallback
+      ) {
         debugLog(
           `[LedgerAdapter] target ${targetConnectId} not in fresh enumeration; ` +
-            `accepting sole USB device ${devices[0].connectId} (assumed ephemeral path change)`
+            `accepting sole USB device ${devices[0].connectId} for fingerprint-verified recovery`
         );
         return this._connectDeviceOrThrow(devices[0].connectId);
       }
@@ -982,11 +1005,7 @@ export class LedgerAdapter implements IHardwareWallet {
     connectId: string,
     method: string,
     params: unknown,
-    fingerprint?: {
-      chain: ChainForFingerprint;
-      deviceId: string;
-      skipFingerprint: boolean;
-    },
+    fingerprint?: ConnectorCallFingerprint,
     permissionDeviceId?: string
   ): Promise<unknown> {
     debugLog('[LedgerAdapter] connectorCall:', method, 'connectId:', connectId || '(empty)');
@@ -1050,11 +1069,7 @@ export class LedgerAdapter implements IHardwareWallet {
     method: string,
     params: unknown,
     signal: AbortSignal,
-    fingerprint?: {
-      chain: ChainForFingerprint;
-      deviceId: string;
-      skipFingerprint: boolean;
-    },
+    fingerprint?: ConnectorCallFingerprint,
     permissionDeviceId?: string
   ): Promise<unknown> {
     LedgerAdapter._throwIfAborted(signal);
@@ -1076,11 +1091,17 @@ export class LedgerAdapter implements IHardwareWallet {
       effectiveParams = gatedParams;
     }
 
+    const allowUsbEphemeralFallback = !!fingerprint?.deviceId && !fingerprint.skipFingerprint;
+
     // Wrap ensureConnected in _abortable so an abort during device discovery /
     // user-connect UI wait rejects this caller immediately. The underlying
     // _doConnect / _connectingPromise is shared across callers and continues
     // running — other concurrent callers aren't affected.
-    const resolvedConnectId = await this.ensureConnected(connectId, signal);
+    const resolvedConnectId = await this.ensureConnected(
+      connectId,
+      signal,
+      allowUsbEphemeralFallback
+    );
     const sessionId = this._sessions.get(resolvedConnectId);
     if (!sessionId) {
       throw Object.assign(new Error('Auto-connect succeeded but no session found'), {
@@ -1210,9 +1231,14 @@ export class LedgerAdapter implements IHardwareWallet {
             // from APDU 0x5515 (rare hardware-direct), and _doConnect's
             // dialog still covers it via the same UI request.
 
-            // Preserve connectId across retry to prevent multi-device drift;
-            // USB replug is handled by _connectFirstOrSelect's fallback.
-            const reConnectId = await this.ensureConnected(resolvedConnectId, signal);
+            // Preserve connectId across retry to prevent multi-device drift.
+            // USB replug fallback is allowed only when this call will verify
+            // the device fingerprint before sending the business APDU.
+            const reConnectId = await this.ensureConnected(
+              resolvedConnectId,
+              signal,
+              allowUsbEphemeralFallback
+            );
             const reSessionId = this._sessions.get(reConnectId);
             if (!reSessionId) throw lastErr;
 
@@ -1300,17 +1326,18 @@ export class LedgerAdapter implements IHardwareWallet {
     params: unknown,
     signal: AbortSignal,
     originalErr: unknown,
-    fingerprint?: {
-      chain: ChainForFingerprint;
-      deviceId: string;
-      skipFingerprint: boolean;
-    }
+    fingerprint?: ConnectorCallFingerprint
   ): Promise<unknown> {
     await this._sleepAbortable(LedgerAdapter.STUCK_APP_RETRY_DELAY_MS, signal);
 
     // Preserve connectId across retry (APDU 6901 didn't disconnect, so it's
-    // still valid); USB replug is handled by _connectFirstOrSelect's fallback.
-    const retryConnectId = await this.ensureConnected(resolvedConnectId, signal);
+    // still valid). If a USB replug changed the connectId, recover only when
+    // the call has a fingerprint check queued immediately after reconnect.
+    const retryConnectId = await this.ensureConnected(
+      resolvedConnectId,
+      signal,
+      !!fingerprint?.deviceId && !fingerprint.skipFingerprint
+    );
     const retrySessionId = this._sessions.get(retryConnectId);
     if (!retrySessionId) throw originalErr;
 
@@ -1364,18 +1391,19 @@ export class LedgerAdapter implements IHardwareWallet {
     params: unknown,
     signal: AbortSignal,
     originalErr: unknown,
-    fingerprint?: {
-      chain: ChainForFingerprint;
-      deviceId: string;
-      skipFingerprint: boolean;
-    }
+    fingerprint?: ConnectorCallFingerprint
   ): Promise<unknown> {
     this.connector.reset();
     this._sessions.clear();
     this._discoveredDevices.clear();
     this._connectingPromise = null;
 
-    const retryConnectId = await this.ensureConnected(targetConnectId, signal);
+    const allowUsbEphemeralFallback = !!fingerprint?.deviceId && !fingerprint.skipFingerprint;
+    const retryConnectId = await this.ensureConnected(
+      targetConnectId,
+      signal,
+      allowUsbEphemeralFallback
+    );
     const retrySessionId = this._sessions.get(retryConnectId);
     if (!retrySessionId) {
       throw originalErr;
@@ -1417,7 +1445,11 @@ export class LedgerAdapter implements IHardwareWallet {
       this._sessions.clear();
       this._discoveredDevices.clear();
       this._connectingPromise = null;
-      const finalConnectId = await this.ensureConnected(targetConnectId, signal);
+      const finalConnectId = await this.ensureConnected(
+        targetConnectId,
+        signal,
+        allowUsbEphemeralFallback
+      );
       const finalSessionId = this._sessions.get(finalConnectId);
       if (!finalSessionId) {
         throw originalErr;

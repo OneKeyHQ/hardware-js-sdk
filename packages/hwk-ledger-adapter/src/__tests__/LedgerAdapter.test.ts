@@ -1090,15 +1090,20 @@ describe('LedgerAdapter', () => {
       );
     });
 
-    it('should retry with fresh connection on disconnect error', async () => {
+    it('should retry with a recovered USB connectId when fingerprint verification is available', async () => {
+      const expectedAddress = '0x1111111111111111111111111111111111111111';
+      const expectedFingerprint = deriveDeviceFingerprint(expectedAddress);
+
       // First: establish a session
       await adapter.connectDevice('dev-1');
 
       // Simulate disconnect error on first call, success on retry
       connector.call
+        .mockResolvedValueOnce({ address: expectedAddress })
         .mockRejectedValueOnce(
           Object.assign(new Error('session not found'), { _tag: 'DeviceSessionNotFound' })
         )
+        .mockResolvedValueOnce({ address: expectedAddress })
         .mockResolvedValueOnce({ address: '0xRETRY' });
 
       // After disconnect, searchDevices returns a new device ID (DMK regenerates UUIDs)
@@ -1117,7 +1122,7 @@ describe('LedgerAdapter', () => {
         },
       });
 
-      const result = await adapter.evmGetAddress('dev-1', '', {
+      const result = await adapter.evmGetAddress('dev-1', expectedFingerprint, {
         path: "m/44'/60'/0'/0/0",
         showOnDevice: false,
       });
@@ -1134,6 +1139,29 @@ describe('LedgerAdapter', () => {
         'evmGetAddress',
         expect.any(Object)
       );
+    });
+
+    it('should fail closed when a USB target misses and no device fingerprint is available', async () => {
+      await adapter.connectDevice('dev-1');
+
+      connector.call.mockRejectedValueOnce(
+        Object.assign(new Error('session not found'), { _tag: 'DeviceSessionNotFound' })
+      );
+      connector.searchDevices.mockResolvedValueOnce([
+        { connectId: 'dev-new', deviceId: 'dev-new', name: 'Nano X', model: 'nanoX' },
+      ]);
+
+      const result = await adapter.evmGetAddress('dev-1', '', {
+        path: "m/44'/60'/0'/0/0",
+        showOnDevice: false,
+      });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.payload.code).toBe(HardwareErrorCode.DeviceNotFound);
+        expect(result.payload.error).toContain('Target Ledger unavailable: dev-1');
+      }
+      expect(connector.connect).not.toHaveBeenCalledWith('dev-new');
     });
 
     it('should reconnect the original target after timeout reset', async () => {
