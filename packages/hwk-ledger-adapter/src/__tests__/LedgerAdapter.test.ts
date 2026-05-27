@@ -1090,15 +1090,20 @@ describe('LedgerAdapter', () => {
       );
     });
 
-    it('should retry with fresh connection on disconnect error', async () => {
+    it('should retry with a recovered USB connectId when fingerprint verification is available', async () => {
+      const expectedAddress = '0x1111111111111111111111111111111111111111';
+      const expectedFingerprint = deriveDeviceFingerprint(expectedAddress);
+
       // First: establish a session
       await adapter.connectDevice('dev-1');
 
       // Simulate disconnect error on first call, success on retry
       connector.call
+        .mockResolvedValueOnce({ address: expectedAddress })
         .mockRejectedValueOnce(
           Object.assign(new Error('session not found'), { _tag: 'DeviceSessionNotFound' })
         )
+        .mockResolvedValueOnce({ address: expectedAddress })
         .mockResolvedValueOnce({ address: '0xRETRY' });
 
       // After disconnect, searchDevices returns a new device ID (DMK regenerates UUIDs)
@@ -1117,7 +1122,7 @@ describe('LedgerAdapter', () => {
         },
       });
 
-      const result = await adapter.evmGetAddress('dev-1', '', {
+      const result = await adapter.evmGetAddress('dev-1', expectedFingerprint, {
         path: "m/44'/60'/0'/0/0",
         showOnDevice: false,
       });
@@ -1136,6 +1141,29 @@ describe('LedgerAdapter', () => {
       );
     });
 
+    it('should fail closed when a USB target misses and no device fingerprint is available', async () => {
+      await adapter.connectDevice('dev-1');
+
+      connector.call.mockRejectedValueOnce(
+        Object.assign(new Error('session not found'), { _tag: 'DeviceSessionNotFound' })
+      );
+      connector.searchDevices.mockResolvedValueOnce([
+        { connectId: 'dev-new', deviceId: 'dev-new', name: 'Nano X', model: 'nanoX' },
+      ]);
+
+      const result = await adapter.evmGetAddress('dev-1', '', {
+        path: "m/44'/60'/0'/0/0",
+        showOnDevice: false,
+      });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.payload.code).toBe(HardwareErrorCode.DeviceNotFound);
+        expect(result.payload.error).toContain('Target Ledger unavailable: dev-1');
+      }
+      expect(connector.connect).not.toHaveBeenCalledWith('dev-new');
+    });
+
     it('should reconnect the original target after timeout reset', async () => {
       const expectedAddress = '0x1111111111111111111111111111111111111111';
       const expectedFingerprint = deriveDeviceFingerprint(expectedAddress);
@@ -1151,7 +1179,6 @@ describe('LedgerAdapter', () => {
         .mockResolvedValueOnce({ signature: '0xSIGNED' });
 
       connector.searchDevices.mockResolvedValueOnce([
-        { connectId: 'dev-new', deviceId: 'dev-new', name: 'Nano S', model: 'nanoS' },
         { connectId: 'dev-1', deviceId: 'dev-1', name: 'Nano X', model: 'nanoX' },
       ]);
       connector.connect.mockResolvedValueOnce({
@@ -1173,7 +1200,6 @@ describe('LedgerAdapter', () => {
 
       expect(result.success).toBe(true);
       expect(connector.connect).toHaveBeenLastCalledWith('dev-1');
-      expect(connector.connect).not.toHaveBeenCalledWith('dev-new');
       expect(connector.call).toHaveBeenLastCalledWith(
         'session-target',
         'evmSignMessage',
@@ -1240,7 +1266,7 @@ describe('LedgerAdapter', () => {
       );
     });
 
-    it('should auto-select first device when multiple devices found and handleSelectDevice is off (default)', async () => {
+    it('should reject multiple USB devices instead of auto-selecting the first one', async () => {
       connector.searchDevices.mockResolvedValueOnce([
         { connectId: 'dev-A', deviceId: 'dev-A', name: 'Nano X', model: 'nanoX' },
         { connectId: 'dev-B', deviceId: 'dev-B', name: 'Nano S', model: 'nanoS' },
@@ -1258,32 +1284,20 @@ describe('LedgerAdapter', () => {
       });
       connector.call.mockResolvedValueOnce({ address: '0xFALLBACK' });
 
-      // No UI handler set — should fall back to first device
       const result = await adapter.evmGetAddress('', '', {
         path: "m/44'/60'/0'/0/0",
         showOnDevice: false,
       });
 
-      expect(result.success).toBe(true);
-      expect(connector.connect).toHaveBeenCalledWith('dev-A');
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.payload.code).toBe(HardwareErrorCode.DeviceOneDeviceOnly);
+        expect(result.payload.error).toContain('Multiple Ledger USB devices are connected');
+      }
+      expect(connector.connect).not.toHaveBeenCalled();
     });
 
-    it('should capture a synchronous select-device response from the UI handler', async () => {
-      const selectAdapter = new LedgerAdapter(connector, { handleSelectDevice: true });
-      selectAdapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, () => {
-        selectAdapter.uiResponse({
-          type: UI_RESPONSE.RECEIVE_DEVICE_PERMISSION,
-          payload: { granted: true },
-        });
-      });
-      selectAdapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
-        const selected = event.payload.devices.find(d => d.connectId === 'dev-B');
-        selectAdapter.uiResponse({
-          type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
-          payload: { sdkConnectId: selected?.connectId ?? 'dev-B' },
-        });
-      });
-
+    it('connects the explicitly targeted device even when multiple USB devices are present', async () => {
       connector.searchDevices.mockResolvedValueOnce([
         { connectId: 'dev-A', deviceId: 'dev-A', name: 'Nano X', model: 'nanoX' },
         { connectId: 'dev-B', deviceId: 'dev-B', name: 'Nano S', model: 'nanoS' },
@@ -1299,15 +1313,16 @@ describe('LedgerAdapter', () => {
           connectionType: 'usb',
         },
       });
-      connector.call.mockResolvedValueOnce({ address: '0xSELECTED' });
+      connector.call.mockResolvedValueOnce({ address: '0xTARGET', publicKey: '0xpk' });
 
-      const result = await selectAdapter.evmGetAddress('', '', {
+      const result = await adapter.evmGetAddress('dev-B', '', {
         path: "m/44'/60'/0'/0/0",
         showOnDevice: false,
       });
 
       expect(result.success).toBe(true);
       expect(connector.connect).toHaveBeenCalledWith('dev-B');
+      expect(connector.connect).not.toHaveBeenCalledWith('dev-A');
     });
 
     it('should reject BLE business calls with an empty connectId instead of auto-selecting a device', async () => {

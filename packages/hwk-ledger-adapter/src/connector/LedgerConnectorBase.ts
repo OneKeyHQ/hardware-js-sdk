@@ -315,6 +315,12 @@ export class LedgerConnectorBase implements IConnector {
 
   // ---------------------------------------------------------------------------
   // IConnector -- Device discovery
+  //
+  // Discovery never throws on multiple USB devices — it returns the full list.
+  // The "connect exactly one device" rule is enforced upstream: an explicit
+  // connectId connects that device (or fails as not-found), and only the
+  // no-connectId USB path rejects when more than one device is present
+  // (see LedgerAdapter._connectFirstOrSelect).
   // ---------------------------------------------------------------------------
 
   async searchDevices(): Promise<ConnectorDevice[]> {
@@ -466,7 +472,19 @@ export class LedgerConnectorBase implements IConnector {
         }
         throw err;
       }
-      this._watchSessionState(sessionId, externalConnectId);
+      try {
+        this._watchSessionState(sessionId, externalConnectId);
+      } catch (subErr) {
+        // Subscription failure is fatal (see _watchSessionState) — disconnect
+        // the just-created DMK session so connect()'s catch wraps it normally.
+        debugLog('[DMK] state subscription failed during connect; disconnecting session:', subErr);
+        try {
+          await dm.disconnect(sessionId);
+        } catch {
+          // best-effort cleanup
+        }
+        throw subErr;
+      }
       const info = dm.getDiscoveredDeviceInfo(path);
       const session: ConnectorSession = {
         sessionId,
@@ -562,8 +580,7 @@ export class LedgerConnectorBase implements IConnector {
    * `LedgerAdapter._sessions` map would hold a dead session entry until
    * the next call hit `DeviceSessionNotFound`.
    *
-   * Best-effort: any error subscribing is swallowed so a flaky DMK
-   * doesn't break the connect path.
+   * Subscribe failure is fatal — see the inline note at the subscribe call.
    */
   private _watchSessionState(sessionId: string, externalConnectId: string): void {
     const dmk = this._dmk;
@@ -576,29 +593,30 @@ export class LedgerConnectorBase implements IConnector {
         // ignore
       }
     }
-    try {
-      const sub = dmk.getDeviceSessionState({ sessionId }).subscribe({
-        next: (state: { deviceStatus?: string }) => {
-          // String-compare against DeviceStatus.NOT_CONNECTED ("NOT CONNECTED")
-          // to avoid pulling the runtime enum import (kept type-only for
-          // Metro/RN compatibility — see _importLedgerKit).
-          if (state?.deviceStatus === 'NOT CONNECTED') {
-            this._handleAutonomousDisconnect(sessionId, externalConnectId);
-          }
-        },
-        error: () => {
-          // DMK closed the observable abnormally — treat as disconnect.
+    // Subscribe failure is fatal: without this subscription we can't detect
+    // autonomous disconnect (USB unplug, BLE drop, sleep), which leaks ghost
+    // entries into the adapter's _sessions map and can route subsequent calls
+    // to the wrong device. Let the error propagate so connect() cleans up the
+    // just-created DMK session and fails loudly.
+    const sub = dmk.getDeviceSessionState({ sessionId }).subscribe({
+      next: (state: { deviceStatus?: string }) => {
+        // String-compare against DeviceStatus.NOT_CONNECTED ("NOT CONNECTED")
+        // to avoid pulling the runtime enum import (kept type-only for
+        // Metro/RN compatibility — see _importLedgerKit).
+        if (state?.deviceStatus === 'NOT CONNECTED') {
           this._handleAutonomousDisconnect(sessionId, externalConnectId);
-        },
-        complete: () => {
-          // Observable completed — session is gone from DMK's POV.
-          this._handleAutonomousDisconnect(sessionId, externalConnectId);
-        },
-      });
-      this._sessionStateSubs.set(sessionId, sub);
-    } catch (err) {
-      debugLog('[DMK] _watchSessionState subscribe failed:', err);
-    }
+        }
+      },
+      error: () => {
+        // DMK closed the observable abnormally — treat as disconnect.
+        this._handleAutonomousDisconnect(sessionId, externalConnectId);
+      },
+      complete: () => {
+        // Observable completed — session is gone from DMK's POV.
+        this._handleAutonomousDisconnect(sessionId, externalConnectId);
+      },
+    });
+    this._sessionStateSubs.set(sessionId, sub);
   }
 
   private _unwatchSessionState(sessionId: string): void {

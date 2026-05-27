@@ -43,6 +43,8 @@ export enum HardwareErrorCode {
   DeviceAppStuck = 10107,
   /** Vendor (Ledger / Trezor) doesn't support the chain at all. */
   ChainNotSupported = 10108,
+  /** Current operation supports only one connected device. */
+  DeviceOneDeviceOnly = 10109,
 
   // --- 10200s Firmware ---
   FirmwareTooOld = 10200,
@@ -129,6 +131,7 @@ export const ORPHAN_ELIGIBLE_ERROR_CODES: number[] = [
   HardwareErrorCode.DeviceDisconnected,
   HardwareErrorCode.DeviceMismatch,
   HardwareErrorCode.DeviceAppStuck,
+  HardwareErrorCode.DeviceOneDeviceOnly,
   HardwareErrorCode.TransportError,
   HardwareErrorCode.DevicePermissionDenied,
   HardwareErrorCode.BlePairingTimeout,

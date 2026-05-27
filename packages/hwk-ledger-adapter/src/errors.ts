@@ -2,6 +2,15 @@ import { HardwareErrorCode, enrichErrorMessage } from '@onekeyfe/hwk-adapter-cor
 
 import type { Failure } from '@onekeyfe/hwk-adapter-core';
 
+export const MULTIPLE_USB_LEDGER_DEVICES_ERROR_MESSAGE =
+  'Multiple Ledger USB devices are connected. Please connect only one Ledger device and try again.';
+
+export function createMultipleUsbLedgerDevicesError(): Error & { code: HardwareErrorCode } {
+  return Object.assign(new Error(MULTIPLE_USB_LEDGER_DEVICES_ERROR_MESSAGE), {
+    code: HardwareErrorCode.DeviceOneDeviceOnly,
+  });
+}
+
 // `_tag` survives errorToFailure → re-throw so SDK classifiers keep working.
 export type LedgerFailure = Omit<Failure, 'payload'> & {
   payload: Failure['payload'] & { appName?: string; _tag?: string };

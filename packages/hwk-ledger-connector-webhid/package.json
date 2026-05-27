@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hwk-ledger-connector-webhid",
-  "version": "1.1.27-alpha.3",
+  "version": "1.1.27-alpha.4",
   "description": "IConnector implementation for Ledger hardware wallets via WebHID (DMK)",
   "author": "OneKey",
   "license": "MIT",
@@ -49,8 +49,8 @@
     "@ledgerhq/device-signer-kit-ethereum": "^1.9.0",
     "@ledgerhq/device-signer-kit-solana": "^1.7.0",
     "@ledgerhq/device-transport-kit-web-hid": "^1.0.0",
-    "@onekeyfe/hwk-adapter-core": "1.1.27-alpha.3",
-    "@onekeyfe/hwk-ledger-adapter": "1.1.27-alpha.3"
+    "@onekeyfe/hwk-adapter-core": "1.1.27-alpha.4",
+    "@onekeyfe/hwk-ledger-adapter": "1.1.27-alpha.4"
   },
   "devDependencies": {
     "rimraf": "^5.0.0",

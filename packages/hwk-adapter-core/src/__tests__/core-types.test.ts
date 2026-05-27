@@ -33,6 +33,7 @@ describe('HardwareErrorCode contract', () => {
     expect(HardwareErrorCode.DeviceNotInitialized).toBe(10104);
     expect(HardwareErrorCode.DeviceInBootloader).toBe(10105);
     expect(HardwareErrorCode.DeviceMismatch).toBe(10106);
+    expect(HardwareErrorCode.DeviceOneDeviceOnly).toBe(10109);
   });
 
   it('firmware (10200-10299)', () => {
