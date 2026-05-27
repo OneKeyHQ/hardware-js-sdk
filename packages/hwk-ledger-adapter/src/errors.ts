@@ -407,22 +407,11 @@ export function isAppNotInstalledError(err: unknown): boolean {
   return false;
 }
 
-/** DMK install ran out of space on the device. */
+/** DMK install ran out of space on the device. Identified by the DMK error tag. */
 export function isOutOfMemoryError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;
   const e = err as Record<string, unknown>;
-  if (e._tag === 'OutOfMemoryDAError') return true;
-  if (typeof e.message === 'string') {
-    const msg = e.message.toLowerCase();
-    // Substring AND-checks preserve the prior regex semantics (".*" between
-    // tokens — "not enough free space", "insufficient available memory") while
-    // staying linear-time. The earlier /not enough.*space|insufficient.*memory/i
-    // pattern was flagged by CodeQL as ReDoS-prone.
-    if (msg.includes('out of memory')) return true;
-    if (msg.includes('not enough') && msg.includes('space')) return true;
-    if (msg.includes('insufficient') && msg.includes('memory')) return true;
-  }
-  return false;
+  return e._tag === 'OutOfMemoryDAError';
 }
 
 /** Check for device disconnected errors. */
