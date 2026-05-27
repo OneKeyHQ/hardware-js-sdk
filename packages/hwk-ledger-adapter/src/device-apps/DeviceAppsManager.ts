@@ -9,17 +9,14 @@ export class DeviceAppsManager {
 
   private readonly _importLedgerKit: (pkg: string) => Promise<unknown>;
 
-  constructor(
-    dmk: DeviceManagementKit,
-    importLedgerKit: (pkg: string) => Promise<unknown>,
-  ) {
+  constructor(dmk: DeviceManagementKit, importLedgerKit: (pkg: string) => Promise<unknown>) {
     this._dmk = dmk;
     this._importLedgerKit = importLedgerKit;
   }
 
   async getOrCreate(sessionId: string): Promise<DeviceApps> {
     const ledgerKit = (await this._importLedgerKit(
-      '@ledgerhq/device-management-kit',
+      '@ledgerhq/device-management-kit'
     )) as LedgerKitModule;
     return new DeviceApps(this._dmk, sessionId, ledgerKit);
   }

@@ -27,11 +27,7 @@ import {
 import { isLedgerBleConnectionType } from '../utils/ledgerDmkTransport';
 import { debugError, debugLog } from '../utils/debugLog';
 
-import type {
-  AppMetadata,
-  FirmwareVersion,
-  LedgerDeviceInfo,
-} from '../device-apps/DeviceApps';
+import type { AppMetadata, FirmwareVersion, LedgerDeviceInfo } from '../device-apps/DeviceApps';
 import type {
   BtcAddress,
   BtcGetAddressParams,

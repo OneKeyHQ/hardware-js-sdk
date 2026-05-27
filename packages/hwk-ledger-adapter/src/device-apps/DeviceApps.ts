@@ -1,13 +1,11 @@
+/* eslint-disable max-classes-per-file -- DeviceApps + the duck-typed custom DeviceActions stay co-located because the custom actions only exist to feed deviceActionToPromise / DMK's executeDeviceAction. */
 import { DeviceActionStatus } from '@ledgerhq/device-management-kit';
 import { Subject } from 'rxjs';
 
 import { deviceActionToPromise } from '../signer/deviceActionToPromise';
 import { debugLog } from '../utils/debugLog';
 
-import type {
-  DeviceManagementKit,
-  GetOsVersionResponse,
-} from '@ledgerhq/device-management-kit';
+import type { DeviceManagementKit, GetOsVersionResponse } from '@ledgerhq/device-management-kit';
 import type { Observable } from 'rxjs';
 import type { CancelReason } from '../signer/deviceActionToPromise';
 
@@ -88,11 +86,13 @@ export class DeviceApps {
 
   onRegisterCanceller?: (cancel: (reason?: CancelReason) => void) => void;
 
+  /* eslint-disable no-useless-constructor, no-empty-function -- TS parameter properties pattern */
   constructor(
     private readonly _dmk: DeviceManagementKit,
     private readonly _sessionId: string,
-    private readonly _ledgerKit: LedgerKitModule,
+    private readonly _ledgerKit: LedgerKitModule
   ) {}
+  /* eslint-enable no-useless-constructor, no-empty-function */
 
   async listInstalled(options?: { unlockTimeout?: number }): Promise<AppMetadata[]> {
     const action = (this._dmk as unknown as DmkExecuteCapable).executeDeviceAction({
@@ -105,11 +105,9 @@ export class DeviceApps {
       action,
       this.onInteraction,
       undefined,
-      this.onRegisterCanceller,
+      this.onRegisterCanceller
     );
-    return result
-      .filter((a): a is DmkApplication => a !== null)
-      .map(applicationToMetadata);
+    return result.filter((a): a is DmkApplication => a !== null).map(applicationToMetadata);
   }
 
   // Catalog lookup via custom device action — DMK has no typed wrapper for this.
@@ -126,7 +124,7 @@ export class DeviceApps {
       action,
       this.onInteraction,
       undefined,
-      this.onRegisterCanceller,
+      this.onRegisterCanceller
     );
     return result.map(applicationToMetadata);
   }
@@ -172,14 +170,14 @@ export class DeviceApps {
       action,
       this.onInteraction,
       undefined,
-      this.onRegisterCanceller,
+      this.onRegisterCanceller
     );
   }
 
   async install(
     appName: string,
     onProgress?: InstallProgressCallback,
-    options?: { unlockTimeout?: number },
+    options?: { unlockTimeout?: number }
   ): Promise<void> {
     if (!appName) throw new Error('DeviceApps.install: appName is required');
     debugLog('[DeviceApps] install:', appName);
@@ -222,7 +220,7 @@ export class DeviceApps {
         if (onProgress && typeof progress === 'number') {
           onProgress({ progress });
         }
-      },
+      }
     );
 
     // DMK can resolve Completed with `missingApplications` populated when the
@@ -265,7 +263,6 @@ function applicationToMetadata(app: DmkApplication): AppMetadata {
     isDevTools: app.isDevTools,
   };
 }
-
 
 // Loosened DMK surface (we receive the module via dynamic importLedgerKit).
 export interface LedgerKitModule {
@@ -315,6 +312,7 @@ type OsVersionDeps = {
 class GetOsVersionDeviceAction {
   readonly input = undefined;
 
+  // eslint-disable-next-line no-useless-constructor, no-empty-function
   constructor(private readonly _deps: OsVersionDeps) {}
 
   _execute(internalApi: { sendCommand: (cmd: unknown) => Promise<unknown> }): {
@@ -362,7 +360,7 @@ class ListAvailableAppsDeviceAction {
   private readonly _GetOsVersionCommand: new () => unknown;
 
   private readonly _isSuccessCommandResult: (
-    result: unknown,
+    result: unknown
   ) => result is { data: GetOsVersionResponse };
 
   constructor(deps: OsVersionDeps) {

@@ -141,10 +141,7 @@ async function defaultLedgerKitImporter(pkg: string): Promise<any> {
 }
 
 // Mirrors _getEthSigner in chains/evm.ts.
-async function _getDeviceApps(
-  ctx: ConnectorContext,
-  sessionId: string,
-): Promise<DeviceApps> {
+async function _getDeviceApps(ctx: ConnectorContext, sessionId: string): Promise<DeviceApps> {
   const manager = await ctx.getDeviceAppsManager();
   const apps = await manager.getOrCreate(sessionId);
   apps.onInteraction = (interaction: string) => {
