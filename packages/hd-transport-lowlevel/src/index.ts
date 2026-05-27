@@ -59,8 +59,8 @@ export default class LowlevelTransport {
 
   private protocolV2Assemblers: Map<string, ProtocolV2FrameAssembler> = new Map();
 
-  getProtocolType(path: string): ProtocolType {
-    return this.deviceProtocol.get(path) ?? 'V1';
+  getProtocolType(path: string): ProtocolType | undefined {
+    return this.deviceProtocol.get(path);
   }
 
   init(logger: any, emitter: EventEmitter, plugin: LowlevelTransportSharedPlugin) {
@@ -142,6 +142,12 @@ export default class LowlevelTransport {
     }
 
     const protocol = this.getProtocolType(uuid);
+    if (!protocol) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        `Device protocol has not been detected for ${uuid}`
+      );
+    }
     if (LogBlockCommand.has(name)) {
       this.Log.debug('lowlevel-transport', 'call-', ' name: ', name, ' protocol: ', protocol);
     } else {
@@ -217,6 +223,19 @@ export default class LowlevelTransport {
     );
   }
 
+  private createProtocolDetectionError() {
+    return ERRORS.TypedError(
+      HardwareErrorCode.BleTimeoutError,
+      'Unable to detect BLE protocol: device did not respond to Protocol V1 Initialize or Protocol V2 Ping'
+    );
+  }
+
+  private clearProbeProtocol(uuid: string, protocol: ProtocolType) {
+    if (this.deviceProtocol.get(uuid) === protocol) {
+      this.deviceProtocol.delete(uuid);
+    }
+  }
+
   private async detectProtocol(
     uuid: string,
     expectedProtocol?: ProtocolType,
@@ -253,17 +272,22 @@ export default class LowlevelTransport {
       return 'V2';
     }
 
-    let protocol: ProtocolType = 'V1';
     const protocolV1Detected = await this.probeProtocolV1(uuid);
-    if (!protocolV1Detected) {
-      await this.resetConnectionAfterProbe(uuid, 'V1');
-      if (await this.probeProtocolV2(uuid)) {
-        protocol = 'V2';
-      }
+    if (protocolV1Detected) {
+      this.deviceProtocol.set(uuid, 'V1');
+      this.Log?.debug(`[LowlevelTransport] detectProtocol: uuid=${uuid} -> V1`);
+      return 'V1';
     }
-    this.deviceProtocol.set(uuid, protocol);
-    this.Log?.debug(`[LowlevelTransport] detectProtocol: uuid=${uuid} -> ${protocol}`);
-    return protocol;
+
+    await this.resetConnectionAfterProbe(uuid, 'V1');
+    if (await this.probeProtocolV2(uuid)) {
+      this.deviceProtocol.set(uuid, 'V2');
+      this.Log?.debug(`[LowlevelTransport] detectProtocol: uuid=${uuid} -> V2`);
+      return 'V2';
+    }
+
+    this.deviceProtocol.delete(uuid);
+    throw this.createProtocolDetectionError();
   }
 
   private async resetConnectionAfterProbe(uuid: string, protocol: ProtocolType) {
@@ -302,6 +326,7 @@ export default class LowlevelTransport {
       await this.callProtocolV1(uuid, 'Initialize', {}, { timeoutMs: PROTOCOL_PROBE_TIMEOUT_MS });
       return true;
     } catch (error) {
+      this.clearProbeProtocol(uuid, 'V1');
       this.Log?.debug('[LowlevelTransport] Protocol V1 Initialize probe failed:', error);
       return false;
     }
@@ -314,17 +339,26 @@ export default class LowlevelTransport {
 
     this.deviceProtocol.set(uuid, 'V2');
     this.protocolV2Assemblers.get(uuid)?.reset();
-    return probeProtocolV2Helper({
-      call: (name: string, data: Record<string, unknown>, options?: TransportCallOptions) =>
-        this.callProtocolV2(uuid, name, data, options),
-      timeoutMs: PROTOCOL_V2_PROBE_TIMEOUT_MS,
-      logger: this.Log,
-      logPrefix: 'ProtocolV2 Lowlevel-BLE',
-      onProbeFailed: async () => {
-        this.protocolV2Assemblers.get(uuid)?.reset();
-        await this.resetConnectionAfterProbe(uuid, 'V2');
-      },
-    });
+    try {
+      const detected = await probeProtocolV2Helper({
+        call: (name: string, data: Record<string, unknown>, options?: TransportCallOptions) =>
+          this.callProtocolV2(uuid, name, data, options),
+        timeoutMs: PROTOCOL_V2_PROBE_TIMEOUT_MS,
+        logger: this.Log,
+        logPrefix: 'ProtocolV2 Lowlevel-BLE',
+        onProbeFailed: async () => {
+          this.protocolV2Assemblers.get(uuid)?.reset();
+          await this.resetConnectionAfterProbe(uuid, 'V2');
+        },
+      });
+      if (!detected) {
+        this.clearProbeProtocol(uuid, 'V2');
+      }
+      return detected;
+    } catch (error) {
+      this.clearProbeProtocol(uuid, 'V2');
+      throw error;
+    }
   }
 
   private async receiveHex(timeoutMs: number | undefined, commandName: string) {

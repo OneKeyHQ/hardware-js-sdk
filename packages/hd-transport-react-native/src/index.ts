@@ -856,7 +856,12 @@ export default class ReactNativeBleTransport {
 
       try {
         const data = Buffer.from(c.value as string, 'base64');
-        if (this.deviceProtocol.get(uuid) === 'V2') {
+        const protocol = this.deviceProtocol.get(uuid);
+        if (!protocol) {
+          Log?.debug('monitor data ignored before protocol detection: ', uuid);
+          return;
+        }
+        if (protocol === 'V2') {
           this.handleProtocolV2Notification(uuid, new Uint8Array(data));
           return;
         }
@@ -973,6 +978,12 @@ export default class ReactNativeBleTransport {
     }
 
     const protocol = this.getProtocolType(uuid);
+    if (!protocol) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        `Device protocol has not been detected for ${uuid}`
+      );
+    }
     // Upload resources on low-end phones may OOM
     if (name === 'ResourceUpdate' || name === 'ResourceAck') {
       Log?.debug('transport-react-native', 'call-', ' name: ', name, ' data: ', {
@@ -1316,6 +1327,19 @@ export default class ReactNativeBleTransport {
     );
   }
 
+  private createProtocolDetectionError() {
+    return ERRORS.TypedError(
+      HardwareErrorCode.BleTimeoutError,
+      'Unable to detect BLE protocol: device did not respond to Protocol V1 Initialize or Protocol V2 Ping'
+    );
+  }
+
+  private clearProbeProtocol(uuid: string, protocol: ProtocolType) {
+    if (this.deviceProtocol.get(uuid) === protocol) {
+      this.deviceProtocol.delete(uuid);
+    }
+  }
+
   private async detectProtocol(
     uuid: string,
     expectedProtocol?: ProtocolType,
@@ -1351,17 +1375,22 @@ export default class ReactNativeBleTransport {
       return 'V2';
     }
 
-    let protocol: ProtocolType = 'V1';
     const protocolV1Detected = await this.probeProtocolV1(uuid);
-    if (!protocolV1Detected) {
-      await this.resetProbeStateAfterProtocolProbe(uuid, 'V1');
-      if (await this.probeProtocolV2(uuid)) {
-        protocol = 'V2';
-      }
+    if (protocolV1Detected) {
+      this.deviceProtocol.set(uuid, 'V1');
+      Log?.debug(`[ReactNativeBleTransport] detectProtocol: uuid=${uuid} -> V1`);
+      return 'V1';
     }
-    this.deviceProtocol.set(uuid, protocol);
-    Log?.debug(`[ReactNativeBleTransport] detectProtocol: uuid=${uuid} -> ${protocol}`);
-    return protocol;
+
+    await this.resetProbeStateAfterProtocolProbe(uuid, 'V1');
+    if (await this.probeProtocolV2(uuid)) {
+      this.deviceProtocol.set(uuid, 'V2');
+      Log?.debug(`[ReactNativeBleTransport] detectProtocol: uuid=${uuid} -> V2`);
+      return 'V2';
+    }
+
+    this.deviceProtocol.delete(uuid);
+    throw this.createProtocolDetectionError();
   }
 
   private async resetProbeStateAfterProtocolProbe(uuid: string, protocol: ProtocolType) {
@@ -1425,6 +1454,7 @@ export default class ReactNativeBleTransport {
       await this.callProtocolV1(uuid, 'Initialize', {}, { timeoutMs: PROTOCOL_PROBE_TIMEOUT_MS });
       return true;
     } catch (error) {
+      this.clearProbeProtocol(uuid, 'V1');
       Log?.debug('[ReactNativeBleTransport] Protocol V1 Initialize probe failed:', error);
       return false;
     }
@@ -1437,7 +1467,7 @@ export default class ReactNativeBleTransport {
 
     this.deviceProtocol.set(uuid, 'V2');
     this.protocolV2Assemblers.get(uuid)?.reset();
-    return probeProtocolV2Helper({
+    const detected = await probeProtocolV2Helper({
       call: (name: string, data: Record<string, unknown>, options?: TransportCallOptions) =>
         this.callProtocolV2(uuid, name, data, options),
       timeoutMs: PROTOCOL_V2_PROBE_TIMEOUT_MS,
@@ -1448,6 +1478,10 @@ export default class ReactNativeBleTransport {
         this.resetProtocolV2Frames(uuid);
       },
     });
+    if (!detected) {
+      this.clearProbeProtocol(uuid, 'V2');
+    }
+    return detected;
   }
 
   private handleProtocolV2Notification(uuid: string, data: Uint8Array) {
@@ -1683,7 +1717,7 @@ export default class ReactNativeBleTransport {
     }
   }
 
-  getProtocolType(path: string): ProtocolType {
-    return this.deviceProtocol.get(path) ?? 'V1';
+  getProtocolType(path: string): ProtocolType | undefined {
+    return this.deviceProtocol.get(path);
   }
 }

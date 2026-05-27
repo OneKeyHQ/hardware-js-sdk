@@ -334,6 +334,19 @@ export default class ElectronAutoBleTransport {
     );
   }
 
+  private createProtocolDetectionError() {
+    return ERRORS.TypedError(
+      HardwareErrorCode.BleTimeoutError,
+      'Unable to detect BLE protocol: device did not respond to Protocol V1 Initialize or Protocol V2 Ping'
+    );
+  }
+
+  private clearProbeProtocol(uuid: string, protocol: ProtocolType) {
+    if (this.deviceProtocol.get(uuid) === protocol) {
+      this.deviceProtocol.delete(uuid);
+    }
+  }
+
   private async detectProtocol(
     uuid: string,
     expectedProtocol?: ProtocolType,
@@ -369,17 +382,22 @@ export default class ElectronAutoBleTransport {
       return 'V2';
     }
 
-    let protocol: ProtocolType = 'V1';
     const protocolV1Detected = await this.probeProtocolV1(uuid);
-    if (!protocolV1Detected) {
-      await this.resetProbeStateAfterProtocolProbe(uuid, 'V1');
-      if (await this.probeProtocolV2(uuid)) {
-        protocol = 'V2';
-      }
+    if (protocolV1Detected) {
+      this.deviceProtocol.set(uuid, 'V1');
+      this.Log?.debug(`[Auto BLE] detectProtocol: uuid=${uuid} -> V1`);
+      return 'V1';
     }
-    this.deviceProtocol.set(uuid, protocol);
-    this.Log?.debug(`[Auto BLE] detectProtocol: uuid=${uuid} -> ${protocol}`);
-    return protocol;
+
+    await this.resetProbeStateAfterProtocolProbe(uuid, 'V1');
+    if (await this.probeProtocolV2(uuid)) {
+      this.deviceProtocol.set(uuid, 'V2');
+      this.Log?.debug(`[Auto BLE] detectProtocol: uuid=${uuid} -> V2`);
+      return 'V2';
+    }
+
+    this.deviceProtocol.delete(uuid);
+    throw this.createProtocolDetectionError();
   }
 
   private createNotificationSubscription(uuid: string) {
@@ -444,6 +462,7 @@ export default class ElectronAutoBleTransport {
       await this.callProtocolV1(uuid, 'Initialize', {}, { timeoutMs: PROTOCOL_PROBE_TIMEOUT_MS });
       return true;
     } catch (error) {
+      this.clearProbeProtocol(uuid, 'V1');
       this.Log?.debug('[Auto BLE] Protocol V1 Initialize probe failed:', error);
       return false;
     }
@@ -456,7 +475,7 @@ export default class ElectronAutoBleTransport {
 
     this.deviceProtocol.set(uuid, 'V2');
     this.v2Assemblers.get(uuid)?.reset();
-    return probeProtocolV2Helper({
+    const detected = await probeProtocolV2Helper({
       call: (name, data, options) => this.callProtocolV2(uuid, name, data, options),
       timeoutMs: PROTOCOL_PROBE_TIMEOUT_MS,
       logger: this.Log,
@@ -466,6 +485,10 @@ export default class ElectronAutoBleTransport {
         this.resetProtocolV2Frames(uuid);
       },
     });
+    if (!detected) {
+      this.clearProbeProtocol(uuid, 'V2');
+    }
+    return detected;
   }
 
   private async writeWithChunking(uuid: string, hexData: string): Promise<void> {
@@ -529,7 +552,11 @@ export default class ElectronAutoBleTransport {
       return;
     }
 
-    const protocol = this.deviceProtocol.get(deviceId) ?? 'V1';
+    const protocol = this.deviceProtocol.get(deviceId);
+    if (!protocol) {
+      this.Log?.debug('[Auto BLE] Ignore notification before protocol detection:', deviceId);
+      return;
+    }
     if (protocol === 'V2') {
       this.handleProtocolV2Notification(deviceId, hexData);
       return;
@@ -649,7 +676,13 @@ export default class ElectronAutoBleTransport {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotFound, `Device ${uuid} not connected`);
     }
 
-    const protocol = this.deviceProtocol.get(uuid) ?? 'V1';
+    const protocol = this.deviceProtocol.get(uuid);
+    if (!protocol) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        `Device protocol has not been detected for ${uuid}`
+      );
+    }
     if (shouldSuppressHighVolumeCallLog(name)) {
       // 高频文件写入不要逐包发 debug 事件，否则调试日志会反向拖慢传输。
     } else if (LogBlockCommand.has(name)) {
@@ -866,7 +899,7 @@ export default class ElectronAutoBleTransport {
     }
   }
 
-  getProtocolType(path: string): ProtocolType {
-    return this.deviceProtocol.get(path) ?? 'V1';
+  getProtocolType(path: string): ProtocolType | undefined {
+    return this.deviceProtocol.get(path);
   }
 }
