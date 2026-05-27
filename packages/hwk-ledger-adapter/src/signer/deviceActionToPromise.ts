@@ -41,8 +41,6 @@ export function deviceActionToPromise<T>(
   onInteraction?: (interaction: string) => void,
   timeoutMs: number = IDLE_WATCHDOG_MS,
   onRegisterCanceller?: (cancel: (reason?: CancelReason) => void) => void,
-  // Raw intermediateValue per Pending tick — for callers that need DMK-specific
-  // fields beyond requiredUserInteraction (e.g. install progress).
   onIntermediate?: (intermediateValue: unknown) => void
 ): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -70,6 +68,12 @@ export function deviceActionToPromise<T>(
 
     const clearActiveInteraction = () => {
       if (activeInteraction) {
+        debugLog(
+          '[DeviceAction] requiredUserInteraction',
+          'interaction=none',
+          `prev=${activeInteraction}`,
+          `step=${lastStep ?? 'unknown'}`
+        );
         activeInteraction = undefined;
         onInteraction?.('interaction-complete');
         return true;
@@ -96,8 +100,7 @@ export function deviceActionToPromise<T>(
       debugLog(
         '[DeviceAction] requiredUserInteraction',
         `interaction=${interactionName}`,
-        `step=${lastStep ?? 'unknown'}`,
-        `observedSteps=${observedSteps.join(',') || 'none'}`
+        `step=${lastStep ?? 'unknown'}`
       );
       // unlock-device is DMK's own bounded poll. Other interaction
       // states keep the caller-provided watchdog so a stuck observable
