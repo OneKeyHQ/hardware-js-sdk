@@ -245,6 +245,13 @@ export default class WebUsbTransport {
     );
   }
 
+  private createProtocolDetectionError() {
+    return ERRORS.TypedError(
+      HardwareErrorCode.RuntimeError,
+      'Unable to detect USB protocol: device did not respond to Protocol V1 Initialize or Protocol V2 Ping'
+    );
+  }
+
   private async detectProtocol(
     path: string,
     expectedProtocol?: ProtocolType,
@@ -280,13 +287,20 @@ export default class WebUsbTransport {
       return 'V2';
     }
 
-    let protocol: ProtocolType = 'V1';
-    if (!(await this.probeProtocolV1(path)) && (await this.probeProtocolV2(path))) {
-      protocol = 'V2';
+    if (await this.probeProtocolV1(path)) {
+      this.deviceProtocol.set(path, 'V1');
+      this.Log.debug(`[WebUsbTransport] detectProtocol: path=${path} -> V1`);
+      return 'V1';
     }
-    this.deviceProtocol.set(path, protocol);
-    this.Log.debug(`[WebUsbTransport] detectProtocol: path=${path} -> ${protocol}`);
-    return protocol;
+
+    if (await this.probeProtocolV2(path)) {
+      this.deviceProtocol.set(path, 'V2');
+      this.Log.debug(`[WebUsbTransport] detectProtocol: path=${path} -> V2`);
+      return 'V2';
+    }
+
+    this.deviceProtocol.delete(path);
+    throw this.createProtocolDetectionError();
   }
 
   /**
@@ -670,7 +684,13 @@ export default class WebUsbTransport {
       throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound);
     }
 
-    const protocol = this.deviceProtocol.get(path) ?? 'V1';
+    const protocol = this.deviceProtocol.get(path);
+    if (!protocol) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        `Device protocol has not been detected for ${path}`
+      );
+    }
 
     if (shouldSuppressWebUsbCallLog(name)) {
       // 高频文件写入不要逐包发 debug 事件，否则浏览器侧会被日志处理拖慢。
@@ -865,7 +885,7 @@ export default class WebUsbTransport {
    * Expose the detected protocol type for a given device path.
    * Used by upper layers (e.g. TransportManager) to select the correct schema.
    */
-  getProtocolType(path: string): ProtocolType {
-    return this.deviceProtocol.get(path) ?? 'V1';
+  getProtocolType(path: string): ProtocolType | undefined {
+    return this.deviceProtocol.get(path);
   }
 }

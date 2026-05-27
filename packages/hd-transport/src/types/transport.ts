@@ -83,8 +83,9 @@ export type Transport = {
 
   // Returns the protocol type for a given device path.
   // Single-protocol transports (HTTP, emulator, etc.) return 'V1'.
-  // Protocol V2-capable transports return the probed protocol for each device.
-  getProtocolType: (path: string) => ProtocolType;
+  // Protocol V2-capable transports return the probed protocol for each device,
+  // or undefined before protocol detection succeeds.
+  getProtocolType: (path: string) => ProtocolType | undefined;
 
   // web-usb, web-bluetooth request device
   promptDeviceAccess?: () => Promise<USBDevice | BluetoothDevice | null>;

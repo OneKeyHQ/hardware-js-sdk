@@ -290,31 +290,35 @@ export class Device extends EventEmitter {
     const mainIdKey = DataManager.isBleConnect(env) ? 'id' : 'session';
     const expectedProtocol = connectProtocol ?? this.originalDescriptor.protocolType;
     try {
+      let acquireResult: unknown;
       if (DataManager.isBleConnect(env)) {
-        const res = await this.deviceConnector?.acquire(
+        acquireResult = await this.deviceConnector?.acquire(
           this.originalDescriptor.id,
           undefined,
           true,
           expectedProtocol
         );
-        this.mainId = (res as unknown as any).uuid ?? '';
+        this.mainId = (acquireResult as any)?.uuid ?? '';
         Log.debug('Expected uuid:', this.mainId);
       } else {
-        this.mainId = await this.deviceConnector?.acquire(
+        acquireResult = await this.deviceConnector?.acquire(
           this.originalDescriptor.path,
           this.originalDescriptor.session,
           undefined,
           expectedProtocol
         );
+        this.mainId = acquireResult as string | undefined;
         Log.debug('Expected session id:', this.mainId);
       }
       this.deviceAcquired = true;
       this.updateDescriptor({ [mainIdKey]: this.mainId } as unknown as DeviceDescriptor);
 
       // Propagate protocol version detected during acquire.
-      const detectedProtocol = TransportManager.transport?.getProtocolType?.(
-        DataManager.isBleConnect(env) ? this.originalDescriptor.id : this.originalDescriptor.path
-      );
+      const detectedProtocol =
+        (acquireResult as { protocolType?: HardwareConnectProtocol } | undefined)?.protocolType ??
+        TransportManager.transport?.getProtocolType?.(
+          DataManager.isBleConnect(env) ? this.originalDescriptor.id : this.originalDescriptor.path
+        );
       if (detectedProtocol) {
         this.originalDescriptor.protocolType = detectedProtocol;
       }

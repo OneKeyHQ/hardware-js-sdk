@@ -9,9 +9,7 @@ import {
   EOneKeyBleMessageKeys,
   ERRORS,
   HardwareErrorCode,
-  ONEKEY_NOTIFY_CHARACTERISTIC_UUID,
   ONEKEY_SERVICE_UUID,
-  ONEKEY_WRITE_CHARACTERISTIC_UUID,
   isHeaderChunk,
   isOnekeyDevice,
   wait,
@@ -72,6 +70,7 @@ const devicePacketStates = new Map<string, PacketAssemblyState>();
 
 // Service UUIDs to scan for - using constants from hd-shared
 const ONEKEY_SERVICE_UUIDS = [ONEKEY_SERVICE_UUID];
+const PRO2_ADVERTISEMENT_SERVICE_UUID_KEYS = new Set(['fffd']);
 
 // Pre-normalized characteristic identifiers for fast comparison
 const NORMALIZED_WRITE_UUID = '0002';
@@ -102,6 +101,36 @@ interface PacketProcessResult {
   isComplete: boolean;
   completePacket?: string;
   error?: string;
+}
+
+function getBleUuidKey(uuid?: string | null) {
+  const normalized = (uuid ?? '').replace(/-/g, '').toLowerCase();
+  return normalized.length >= 8 ? normalized.substring(4, 8) : normalized;
+}
+
+const NORMALIZED_ONEKEY_SERVICE_UUIDS = new Set([
+  ...ONEKEY_SERVICE_UUIDS.map(uuid => getBleUuidKey(uuid)),
+  '0001',
+]);
+
+function isGenericBleService(uuid?: string | null) {
+  return ['1800', '1801', '180a', '180f'].includes(getBleUuidKey(uuid));
+}
+
+function hasOneKeyAdvertisementService(peripheral: Peripheral) {
+  const serviceUuids = peripheral.advertisement?.serviceUuids ?? [];
+  return serviceUuids.some(uuid => {
+    const uuidKey = getBleUuidKey(uuid);
+    return (
+      NORMALIZED_ONEKEY_SERVICE_UUIDS.has(uuidKey) ||
+      PRO2_ADVERTISEMENT_SERVICE_UUID_KEYS.has(uuidKey)
+    );
+  });
+}
+
+function isOneKeyPeripheral(peripheral: Peripheral) {
+  const deviceName = peripheral.advertisement?.localName || null;
+  return isOnekeyDevice(deviceName, peripheral.id) || hasOneKeyAdvertisementService(peripheral);
 }
 
 // Process incoming BLE notification data with proper packet reassembly
@@ -688,20 +717,21 @@ function handleDeviceDiscovered(peripheral: Peripheral): void {
   const deviceName = peripheral.advertisement?.localName || 'Unknown Device';
   const serviceUuids = peripheral.advertisement?.serviceUuids || [];
 
-  // Log ALL discovered devices to help identify Pro2 BLE service UUID
-  logger?.info(
-    `[NobleBLE] Scan found: name="${deviceName}" id=${
-      peripheral.id
-    } serviceUUIDs=[${serviceUuids.join(', ')}]`
-  );
-
-  // Only process OneKey devices for general discovery
-  if (!isOnekeyDevice(deviceName)) {
+  // Only process OneKey candidates for general discovery. Avoid logging every
+  // ambient BLE peripheral; it makes Pro2 debugging hard to read.
+  if (!isOneKeyPeripheral(peripheral)) {
     return;
   }
 
-  logger?.info('[NobleBLE] Discovered OneKey device:', deviceName);
+  const isNewDevice = !discoveredDevices.has(peripheral.id);
   discoveredDevices.set(peripheral.id, peripheral);
+  if (isNewDevice) {
+    logger?.info('[NobleBLE] Discovered OneKey BLE device:', {
+      name: deviceName,
+      id: peripheral.id,
+      serviceUUIDs: serviceUuids,
+    });
+  }
 }
 
 // Ensure discover listener is properly set up
@@ -833,9 +863,9 @@ async function enumerateDevices(): Promise<DeviceInfo[]> {
       resolve(devices);
     }, DEVICE_SCAN_TIMEOUT);
 
-    // Start scanning — use empty array to discover ALL BLE devices (Pro2 may use different service UUID)
-    // TODO: restore ONEKEY_SERVICE_UUIDS filter once Pro2 BLE service UUID is confirmed
-    logger?.info('[NobleBLE] Scanning for ALL BLE devices (no service UUID filter)');
+    // Start scanning without a service UUID filter so Pro2 advertisements with
+    // short vendor UUIDs can be found, but only OneKey candidates are logged/returned.
+    logger?.info('[NobleBLE] Scanning for OneKey BLE devices');
     nobleInstance.startScanning([], false, (error?: Error) => {
       if (error) {
         cleanup();
@@ -986,23 +1016,26 @@ async function discoverServicesAndCharacteristics(
       throw ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, 'No services found');
     }
 
-    // Find OneKey service — try known UUID first, fall back to first service
-    let service = services.find(s => ONEKEY_SERVICE_UUIDS.includes(s.uuid));
+    // Find OneKey service — Noble may expose 128-bit UUIDs as short UUID keys.
+    let service = services.find(s => NORMALIZED_ONEKEY_SERVICE_UUIDS.has(getBleUuidKey(s.uuid)));
     if (!service) {
       logger?.info(
-        '[NobleBLE] Known OneKey service UUID not found, trying first non-generic service'
+        '[NobleBLE] Known OneKey service UUID not found, trying first vendor service'
       );
-      // Skip generic BLE services (1800=GAP, 1801=GATT, 180a=DeviceInfo)
-      service = services.find(s => !['1800', '1801', '180a'].includes(s.uuid)) || services[0];
+      service =
+        services.find(s => PRO2_ADVERTISEMENT_SERVICE_UUID_KEYS.has(getBleUuidKey(s.uuid))) ||
+        services.find(s => !isGenericBleService(s.uuid)) ||
+        services[0];
     }
     if (!service) {
       throw ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound);
     }
-    logger?.info('[NobleBLE] Using service:', service.uuid);
+    const selectedService = service;
+    logger?.info('[NobleBLE] Using service:', selectedService.uuid);
 
     // Step 2: Discover ALL characteristics (no filter)
     const characteristics = await new Promise<Characteristic[]>((resolve, reject) => {
-      service.discoverCharacteristics([], (error, chars) => {
+      selectedService.discoverCharacteristics([], (error, chars) => {
         if (error) {
           logger?.error('[NobleBLE] Characteristic discovery failed:', error);
           reject(ERRORS.TypedError(HardwareErrorCode.BleCharacteristicNotFound, error.message));

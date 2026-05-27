@@ -124,14 +124,33 @@ describe('LowlevelTransport protocol framing', () => {
     }).map(chunk => chunk.toString('hex'));
     const plugin = createPlugin({
       devices: [{ id: 'classic-id', name: 'OneKey Classic', commType: 'ble' }],
-      responses: responseChunks,
+      responses: [...responseChunks, ...responseChunks],
     });
     const lowlevel = configureTransport(plugin);
 
+    await expect(lowlevel.acquire({ uuid: 'classic-id' })).resolves.toEqual({
+      uuid: 'classic-id',
+      protocolType: 'V1',
+    });
     await expect(lowlevel.call('classic-id', 'Initialize', {})).resolves.toEqual({
       type: 'Success',
       message: { message: 'ok' },
     });
+  });
+
+  test('rejects calls before protocol detection', async () => {
+    const responseChunks = ProtocolV1.encodeTransportPackets(schemas.protocolV1, 'Success', {
+      message: 'ok',
+    }).map(chunk => chunk.toString('hex'));
+    const plugin = createPlugin({
+      devices: [{ id: 'classic-id', name: 'OneKey Classic', commType: 'ble' }],
+      responses: responseChunks,
+    });
+    const lowlevel = configureTransport(plugin);
+
+    await expect(lowlevel.call('classic-id', 'Initialize', {})).rejects.toThrow(
+      'Device protocol has not been detected'
+    );
   });
 
   test('detects Protocol V2 devices and reassembles split Protocol V2 notifications', async () => {
@@ -249,5 +268,21 @@ describe('LowlevelTransport protocol framing', () => {
     await expect(lowlevel.acquire({ uuid: 'v2-id', expectedProtocol: 'V1' })).rejects.toThrow(
       'Device protocol mismatch: expected V1'
     );
+  });
+
+  test('rejects automatic detection instead of caching V1 when both protocol probes fail', async () => {
+    const plugin = createPlugin({
+      devices: [{ id: 'flaky-pro2-id', name: 'Unknown BLE Device', commType: 'ble' }],
+      responses: [
+        new Error('Protocol V1 probe timed out'),
+        new Error('Protocol V2 probe timed out'),
+      ],
+    });
+    const lowlevel = configureTransport(plugin);
+
+    await expect(lowlevel.acquire({ uuid: 'flaky-pro2-id' })).rejects.toThrow(
+      'Unable to detect BLE protocol'
+    );
+    expect(lowlevel.getProtocolType('flaky-pro2-id')).toBeUndefined();
   });
 });
