@@ -1,5 +1,8 @@
 import { PROTO_HEAD_CRC_SIZE, PROTO_HEAD_SOF } from './constants';
 import { crc8 } from './crc8';
+import { logProtocolV2Debug } from './debug';
+
+import type { ProtocolV2FrameDebugOptions } from './debug';
 
 export interface ProtoV2Frame {
   /** Little-endian message type ID */
@@ -20,7 +23,10 @@ export interface ProtoV2Frame {
  *
  * Returns the decoded messageTypeId, raw protobuf payload, and sequence number.
  */
-export function decodeFrame(data: Uint8Array): ProtoV2Frame {
+export function decodeFrame(
+  data: Uint8Array,
+  debugOptions?: ProtocolV2FrameDebugOptions
+): ProtoV2Frame {
   if (data.length < PROTO_HEAD_CRC_SIZE) {
     throw new Error(`Protocol V2 frame too short: ${data.length} bytes`);
   }
@@ -67,6 +73,20 @@ export function decodeFrame(data: Uint8Array): ProtoV2Frame {
 
   const messageTypeId = payloadData[0] + payloadData[1] * 256;
   const pbPayload = payloadData.slice(2);
+
+  logProtocolV2Debug(debugOptions, 'decode raw frame', {
+    frameLen,
+    dataLength: data.length,
+    router: data[4],
+    attr: data[5],
+    seq,
+    headerCrc: data[3],
+    expectedHeaderCrc,
+    frameCrc: data[frameLen - 1],
+    expectedFrameCrc,
+    messageTypeId,
+    pbPayloadLength: pbPayload.length,
+  });
 
   return { messageTypeId, pbPayload, seq };
 }

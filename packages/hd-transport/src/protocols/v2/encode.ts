@@ -1,6 +1,9 @@
 import { PROTO_DATA_TYPE_PACKET, PROTO_HEAD_CRC_SIZE, PROTO_HEAD_SOF } from './constants';
 import { crc8 } from './crc8';
+import { logProtocolV2Debug } from './debug';
 import { PROTOCOL_V2_FRAME_MAX_BYTES } from '../../constants';
+
+import type { ProtocolV2FrameDebugOptions } from './debug';
 
 // Per-session sequence counter; increments on each frame, never 0
 let protoSeq = 0;
@@ -19,7 +22,14 @@ let protoSeq = 0;
  *   [7..N-2] payload
  *   [N-1]    CRC8 of bytes 0 to N-2 (frame CRC)
  */
-export function encodeFrame(payload: Uint8Array | null, packetSrc = 0, router = 0): Uint8Array {
+export function encodeFrame(
+  payload: Uint8Array | null,
+  packetSrc?: number,
+  router?: number,
+  debugOptions?: ProtocolV2FrameDebugOptions
+): Uint8Array {
+  const resolvedPacketSrc = packetSrc ?? 0;
+  const resolvedRouter = router ?? 0;
   const payloadLen = payload ? payload.length : 0;
   const frameLen = payloadLen + PROTO_HEAD_CRC_SIZE;
   if (frameLen > PROTOCOL_V2_FRAME_MAX_BYTES) {
@@ -37,8 +47,8 @@ export function encodeFrame(payload: Uint8Array | null, packetSrc = 0, router = 
   frame[1] = frameLen % 256;
   frame[2] = Math.floor(frameLen / 256) % 256;
   frame[3] = 0; // placeholder — filled in below
-  frame[4] = router % 256;
-  frame[5] = (packetSrc % 16) * 4 + (PROTO_DATA_TYPE_PACKET % 4);
+  frame[4] = resolvedRouter % 256;
+  frame[5] = (resolvedPacketSrc % 16) * 4 + (PROTO_DATA_TYPE_PACKET % 4);
   frame[6] = protoSeq;
 
   // CRC8 over first 3 bytes (SOF + length)
@@ -50,6 +60,17 @@ export function encodeFrame(payload: Uint8Array | null, packetSrc = 0, router = 
 
   // CRC8 over entire frame except last byte
   frame[frameLen - 1] = crc8(frame, frameLen - 1);
+
+  logProtocolV2Debug(debugOptions, 'encode raw frame', {
+    frameLen,
+    payloadLen,
+    packetSrc: resolvedPacketSrc,
+    router: frame[4],
+    attr: frame[5],
+    seq: frame[6],
+    headerCrc: frame[3],
+    frameCrc: frame[frameLen - 1],
+  });
 
   return frame;
 }
@@ -64,12 +85,17 @@ export function encodeFrame(payload: Uint8Array | null, packetSrc = 0, router = 
 export function encodeProtobufFrame(
   messageTypeId: number,
   pbPayload: Uint8Array,
-  packetSrc = 0,
-  router = 0
+  packetSrc?: number,
+  router?: number,
+  debugOptions?: ProtocolV2FrameDebugOptions
 ): Uint8Array {
   const payload = new Uint8Array(2 + pbPayload.length);
   payload[0] = messageTypeId % 256;
   payload[1] = Math.floor(messageTypeId / 256) % 256;
   payload.set(pbPayload, 2);
-  return encodeFrame(payload, packetSrc, router);
+  return encodeFrame(payload, packetSrc, router, {
+    ...debugOptions,
+    messageTypeId,
+    pbPayloadLength: pbPayload.length,
+  });
 }

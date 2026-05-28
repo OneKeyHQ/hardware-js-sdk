@@ -116,7 +116,7 @@ sequenceDiagram
 ```ts
 // Step 1: Get passphrase state (prompts user once)
 const state = await HardwareSDK.getPassphraseState(connectId);
-const passphraseState = state.payload;
+const passphraseState = state.payload.passphrase_state;
 
 // Step 2: Use passphraseState in subsequent calls (no more prompts)
 const commonParams = {

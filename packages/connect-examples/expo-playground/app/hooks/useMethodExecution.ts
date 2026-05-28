@@ -3,6 +3,7 @@ import { useToast } from './use-toast';
 import { convertFilesToArrayBuffers } from '../store/hardwareStore';
 import { cancelHardwareOperation } from '../services/hardwareService';
 import { logRequest, logResponse } from '../utils/logger';
+import { getParameterDisplayValue, isLazyParameterValue } from '../utils/parameterUtils';
 import type { ExecutionStatus } from '~/data/types';
 import type { UiEvent } from '@onekeyfe/hd-core';
 import { useFirmwareProgressStore } from '../components/providers/SDKProvider';
@@ -44,6 +45,10 @@ function formatByteSize(value: number): string {
 }
 
 function summarizeExecutionLogValue(value: unknown, depth = 0): unknown {
+  if (isLazyParameterValue(value)) {
+    return summarizeExecutionLogValue(getParameterDisplayValue(value), depth);
+  }
+
   if (typeof value === 'bigint') return value.toString();
   if (value === undefined || value === null || typeof value !== 'object') {
     if (typeof value === 'string' && value.length > MAX_LOG_STRING_LENGTH) {

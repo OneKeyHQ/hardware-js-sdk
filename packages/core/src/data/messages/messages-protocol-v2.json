@@ -12413,22 +12413,34 @@
         }
       }
     },
+    "OnboardingStep": {
+      "values": {
+        "ONBOARDING_STEP_UNKNOWN": 0,
+        "ONBOARDING_STEP_SECURITY_CHECK": 1,
+        "ONBOARDING_STEP_PIN": 2,
+        "ONBOARDING_STEP_SETUP_CHOICE": 3,
+        "ONBOARDING_STEP_CREATE_NEW": 4,
+        "ONBOARDING_STEP_SEEDCARD_BACKUP": 5,
+        "ONBOARDING_STEP_RESTORE_CHOICE": 6,
+        "ONBOARDING_STEP_RESTORE_MNEMONIC": 7,
+        "ONBOARDING_STEP_RESTORE_MNEMONIC_SEEDCARD_BACKUP": 8,
+        "ONBOARDING_STEP_RESTORE_SEEDCARD": 9,
+        "ONBOARDING_STEP_DONE": 100
+      }
+    },
     "DeviceGetOnboardingStatus": {
       "fields": {}
     },
     "DeviceOnboardingStatus": {
       "fields": {
-        "page_index": {
-          "type": "uint32",
+        "step": {
+          "rule": "required",
+          "type": "OnboardingStep",
           "id": 1
-        },
-        "page_count": {
-          "type": "uint32",
-          "id": 2
         },
         "page_name": {
           "type": "string",
-          "id": 3
+          "id": 2
         }
       }
     },

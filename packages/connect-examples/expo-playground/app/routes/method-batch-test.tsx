@@ -31,7 +31,11 @@ import { signerMethodsRegistry } from '../hooks/useMethodsRegistry';
 import { useHardwareMethodExecution } from '../hooks/useHardwareMethodExecution';
 import { cancelHardwareOperation } from '../services/hardwareService';
 import { useHardwareStore } from '../store/hardwareStore';
-import { processParameters } from '../utils/parameterUtils';
+import {
+  getParameterDisplayValue,
+  isLazyParameterValue,
+  processParameters,
+} from '../utils/parameterUtils';
 import type { MethodPreset, UnifiedMethodConfig } from '../data/types';
 
 type BatchStatus = 'pending' | 'running' | 'success' | 'error' | 'cancelled';
@@ -62,6 +66,10 @@ const DEFAULT_PRESET: MethodPreset = {
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 function summarizePreviewValue(value: unknown, depth = 0): unknown {
+  if (isLazyParameterValue(value)) {
+    return summarizePreviewValue(getParameterDisplayValue(value), depth);
+  }
+
   if (typeof value === 'bigint') return value.toString();
   if (value === undefined || value === null || typeof value !== 'object') return value;
   if (value instanceof ArrayBuffer) return `<ArrayBuffer ${value.byteLength} B>`;

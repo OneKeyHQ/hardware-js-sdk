@@ -243,12 +243,15 @@ export class ProtocolV2Session {
     } = this.options;
 
     const callPromise = async () => {
+      const shouldReduceDebug = shouldReduceProtocolV2Debug(name);
       const frame = ProtocolV2.encodeFrame(schemas, name, data, {
         packetSrc,
         router,
+        logger: shouldReduceDebug ? undefined : logger,
+        logPrefix,
+        context: `tx:${name}`,
       });
       const expectedSeq = frame[6];
-      const shouldReduceDebug = shouldReduceProtocolV2Debug(name);
 
       if (!shouldReduceDebug) {
         logger?.debug?.(
@@ -277,7 +280,11 @@ export class ProtocolV2Session {
             } seq=${rxFrame[6]} hex=${bytesToDebugHex(rxFrame)}`
           );
         }
-        const decoded = ProtocolV2.decodeFrame(schemas, rxFrame);
+        const decoded = ProtocolV2.decodeFrame(schemas, rxFrame, {
+          logger: shouldReduceDebug ? undefined : logger,
+          logPrefix,
+          context: `rx:${name}`,
+        });
         if (!shouldReduceDebug && decoded.seq !== expectedSeq) {
           logger?.debug?.(
             `[${logPrefix}] seq differs for ${name}: tx=${expectedSeq}, rx=${decoded.seq}`

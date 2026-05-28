@@ -1,3 +1,5 @@
+import { getParameterDisplayValue, isLazyParameterValue } from './parameterUtils';
+
 export interface JsonPreviewOptions {
   maxDepth?: number;
   maxArrayItems?: number;
@@ -50,6 +52,14 @@ function summarizeValue(
   depth: number,
   seen: WeakSet<object>
 ): { value: unknown; truncated: boolean } {
+  if (isLazyParameterValue(value)) {
+    const preview = summarizeValue(getParameterDisplayValue(value), options, depth, seen);
+    return {
+      value: preview.value,
+      truncated: true,
+    };
+  }
+
   if (typeof value === 'bigint') {
     return { value: value.toString(), truncated: false };
   }

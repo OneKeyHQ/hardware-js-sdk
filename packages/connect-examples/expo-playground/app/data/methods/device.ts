@@ -54,6 +54,63 @@ const api: UnifiedMethodConfig[] = [
     ],
   },
   {
+    method: 'getDeviceInfo',
+    description: 'methodDescriptions.getDeviceInfo',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'Basic',
+        parameters: [
+          {
+            name: 'scope',
+            type: 'select',
+            required: false,
+            label: 'Scope',
+            options: [
+              { label: 'Basic', value: 'basic' },
+              { label: 'Versions', value: 'versions' },
+              { label: 'Verify', value: 'verify' },
+              { label: 'Full', value: 'full' },
+            ],
+            value: 'basic',
+          },
+        ],
+      },
+      {
+        title: 'Full with raw data',
+        parameters: [
+          {
+            name: 'scope',
+            type: 'select',
+            required: false,
+            label: 'Scope',
+            options: [
+              { label: 'Basic', value: 'basic' },
+              { label: 'Versions', value: 'versions' },
+              { label: 'Verify', value: 'verify' },
+              { label: 'Full', value: 'full' },
+            ],
+            value: 'full',
+          },
+          {
+            name: 'includeRaw',
+            type: 'boolean',
+            required: false,
+            label: 'Include Raw',
+            value: true,
+          },
+          {
+            name: 'refresh',
+            type: 'boolean',
+            required: false,
+            label: 'Force Refresh',
+            value: true,
+          },
+        ],
+      },
+    ],
+  },
+  {
     method: 'deviceGetDeviceInfo',
     description: 'methodDescriptions.deviceGetDeviceInfo',
     noDeviceIdReq: true,

@@ -9,7 +9,7 @@ import { ExternalLink } from 'lucide-react';
 import type { ParameterField, UnifiedMethodConfig } from '../../data/types';
 import { useHardwareStore } from '../../store/hardwareStore';
 import { Alert, AlertDescription } from '../ui/Alert';
-import { parseParameterValue } from '../../utils/parameterUtils';
+import { getParameterDisplayValue, parseParameterValue } from '../../utils/parameterUtils';
 import type { CommonParametersState } from '../../store/hardwareStore';
 import { methodSupportsCommonParameters } from '../../utils/constants';
 import { getJsonPreview } from '../../utils/jsonPreview';
@@ -308,15 +308,16 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
 
     // 对于 textarea 类型，如果值是对象，需要序列化为 JSON 字符串显示
     const getDisplayPreview = (val: unknown): { text: string; truncated: boolean } => {
-      if (field.type === 'textarea' && typeof val === 'object' && val !== null) {
-        const preview = getJsonPreview(val, {
+      const displayValue = getParameterDisplayValue(val);
+      if (field.type === 'textarea' && typeof displayValue === 'object' && displayValue !== null) {
+        const preview = getJsonPreview(displayValue, {
           maxDepth: 6,
           maxArrayItems: 12,
           maxStringLength: 512,
         });
         return { text: preview.text, truncated: preview.truncated };
       }
-      return { text: String(val || ''), truncated: false };
+      return { text: String(displayValue || ''), truncated: false };
     };
     const displayPreview = getDisplayPreview(value);
     const isReadonlyPreview = displayPreview.truncated;

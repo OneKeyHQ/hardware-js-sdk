@@ -1,0 +1,135 @@
+---
+title: Get Device Info
+---
+
+# Get Device Info
+
+## Get unified device information
+
+Returns a unified view of the device's hardware, firmware, and security state. This API automatically handles the difference between Protocol V1 (Classic, Mini, Touch, Pro) and Protocol V2 (Pro2) devices — you don't need to know which protocol the device uses.
+
+For V1 devices, information is gathered from `GetFeatures` and optionally `OnekeyGetFeatures`. For V2 devices (Pro2), it uses `DeviceGetDeviceInfo` internally. The result is normalized into a single `UnifiedDeviceInfo` structure.
+
+```typescript
+const response = await HardwareSDK.getDeviceInfo(connectId, {
+  scope: 'basic',
+});
+```
+
+### Params
+
+[**Optional common params**](/en/hardware-sdk/core-api-guide#common-params)
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `scope` | `'basic' \| 'versions' \| 'verify' \| 'full'` | No | Controls how much information to retrieve. Defaults to `'basic'`. |
+| `refresh` | `boolean` | No | When `true`, forces a fresh read from the device instead of using cached data. |
+| `includeRaw` | `boolean` | No | When `true`, includes the raw protocol-specific response in `payload.raw`. |
+
+#### Scope levels
+
+| Scope | What it includes |
+|-------|-----------------|
+| `basic` | Device type, firmware type, IDs, serial number, label, BLE name, status (mode, initialized, locked, passphrase protection, backup, language). |
+| `versions` | Everything in `basic` + firmware/bootloader/board/BLE/SE version numbers. For V1 devices, this calls `OnekeyGetFeatures` to get detailed versions. |
+| `verify` | Everything in `versions` + build IDs and hashes for each firmware component. For V2 devices, this triggers a fresh `DeviceGetDeviceInfo` call. |
+| `full` | All available information (same as `verify` with the most complete data). |
+
+### Example
+
+```typescript
+// Basic device info
+const basic = await HardwareSDK.getDeviceInfo(connectId);
+
+// Full info with raw protocol data
+const full = await HardwareSDK.getDeviceInfo(connectId, {
+  scope: 'full',
+  includeRaw: true,
+});
+
+if (full.success) {
+  const { protocol, deviceType, versions, status, verify } = full.payload;
+  console.log(`Protocol: ${protocol}`);        // 'V1' or 'V2'
+  console.log(`Device: ${deviceType}`);         // e.g. 'pro', 'pro2', 'classic1s'
+  console.log(`FW: ${versions.firmware}`);
+  console.log(`Initialized: ${status.initialized}`);
+}
+```
+
+### Result
+
+```typescript
+{
+    success: true,
+    payload: {
+        protocol: 'V1' | 'V2' | 'unknown',     // which protocol the device uses
+        sources: string[],                        // data sources used (e.g. ['features', 'deviceGetDeviceInfo'])
+        deviceType: string,                       // device model (e.g. 'pro', 'pro2', 'classic1s', 'mini', 'touch')
+        firmwareType: string,                     // firmware type
+        deviceId: string,                         // device identifier (seed-derived)
+        serialNo: string,                         // hardware serial number
+        label: string | null,                     // user-set device label
+        bleName: string | null,                   // BLE advertising name
+        status: {
+            mode: 'normal' | 'bootloader' | 'notInitialized' | 'unknown',
+            initialized: boolean | null,
+            bootloaderMode: boolean | null,
+            unlocked: boolean | null,
+            passphraseProtection: boolean | null,
+            backupRequired: boolean | null,
+            language: string | null,
+            bleEnabled: boolean | null,
+        },
+        versions: {                               // included when scope >= 'versions'
+            firmware: string | null,
+            bootloader: string | null,
+            board: string | null,
+            ble: string | null,
+            se01: string | null,
+            se02: string | null,
+            se03: string | null,
+            se04: string | null,
+            se01Boot: string | null,
+            se02Boot: string | null,
+            se03Boot: string | null,
+            se04Boot: string | null,
+        },
+        verify: {                                 // included when scope >= 'verify'
+            firmwareBuildId: string | undefined,
+            firmwareHash: string | undefined,
+            bootloaderBuildId: string | undefined,
+            bootloaderHash: string | undefined,
+            // ... buildId and hash for each component (board, ble, se01-se04, se01Boot-se04Boot)
+        },
+        raw: {                                    // included when includeRaw is true
+            features: object | undefined,         // V1 Features
+            onekeyFeatures: object | undefined,   // V1 OnekeyFeatures
+            protocolV2DeviceInfo: object | undefined,  // V2 DeviceInfo
+        },
+    }
+}
+```
+
+### Error
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code: number // error code
+    }
+}
+```
+
+### Migration from getFeatures / deviceGetDeviceInfo
+
+If you were previously using `getFeatures` + `getOnekeyFeatures` (V1) or `deviceGetDeviceInfo` (V2), you can now use `getDeviceInfo` as a single, protocol-agnostic replacement:
+
+| Before | After |
+|--------|-------|
+| `getFeatures` for basic device state | `getDeviceInfo(connectId, { scope: 'basic' })` |
+| `getFeatures` + `getOnekeyFeatures` for versions | `getDeviceInfo(connectId, { scope: 'versions' })` |
+| `deviceGetDeviceInfo` (Pro2 only) | `getDeviceInfo(connectId, { scope: 'full' })` |
+
+> `getFeatures` and `deviceGetDeviceInfo` remain available for backward compatibility and advanced use cases (e.g. performance testing specific protocol calls). For most integrations, `getDeviceInfo` is the recommended approach.

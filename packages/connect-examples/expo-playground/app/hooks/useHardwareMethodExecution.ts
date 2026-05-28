@@ -7,6 +7,7 @@ import {
 import { useDeviceStore } from '../store/deviceStore';
 import { callHardwareAPI } from '../services/hardwareService';
 import { SDKUtils } from '../utils/hardwareInstance';
+import { resolveLazyParameterValues } from '../utils/parameterUtils';
 import type { UnifiedMethodConfig } from '~/data/types';
 import type { DeviceInfo } from '../types/hardware';
 import type { Features } from '@onekeyfe/hd-core';
@@ -194,7 +195,8 @@ export function useHardwareMethodExecution({
             }
           : params;
 
-      const normalizedParams = normalizeProtocolV2FileParams(methodConfig.method, executionParams);
+      const resolvedExecutionParams = resolveLazyParameterValues(executionParams);
+      const normalizedParams = normalizeProtocolV2FileParams(methodConfig.method, resolvedExecutionParams);
 
       // 调用硬件 API
       const result = await callHardwareAPI(methodConfig.method, normalizedParams);

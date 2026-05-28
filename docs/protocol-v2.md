@@ -233,7 +233,7 @@ SDK 会先把 resource、bootloader、firmware 写入 `vol1:`，再把所有需�
 | V2 session / frame 组装   | `packages/hd-transport/src/protocols/v2/session.ts`、`frame-assembler.ts` |
 | Protocol V2 feature adapter      | `packages/core/src/protocols/protocol-v2/features.ts`          |
 | WebUSB 自动探测           | `packages/hd-transport-web-device/src/webusb.ts`                      |
-| Electron BLE 自动探测     | `packages/hd-transport-web-device/src/electron-auto-ble-transport.ts` |
+| Electron BLE 自动探测     | `packages/hd-transport-web-device/src/electron-ble-transport.ts`      |
 | React Native BLE 自动探测 | `packages/hd-transport-react-native/src/index.ts`                     |
 | lowlevel BLE 自动探测     | `packages/hd-transport-lowlevel/src/index.ts`                         |
 | env 到 transport 映射     | `packages/hd-common-connect-sdk/src/index.ts`                         |

@@ -1,0 +1,135 @@
+---
+title: 获取设备信息
+---
+
+# 获取设备信息
+
+## 获取统一的设备信息
+
+返回设备硬件、固件和安全状态的统一视图。此 API 自动处理 Protocol V1（Classic、Mini、Touch、Pro）和 Protocol V2（Pro2）设备之间的差异 — 你无需关心设备使用哪种协议。
+
+对于 V1 设备，信息来自 `GetFeatures` 和可选的 `OnekeyGetFeatures`。对于 V2 设备（Pro2），内部使用 `DeviceGetDeviceInfo`。结果被归一化为统一的 `UnifiedDeviceInfo` 结构。
+
+```typescript
+const response = await HardwareSDK.getDeviceInfo(connectId, {
+  scope: 'basic',
+});
+```
+
+### 参数
+
+[**可选通用参数**](/zh/hardware-sdk/core-api-guide#common-params)
+
+| 名称 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `scope` | `'basic' \| 'versions' \| 'verify' \| 'full'` | 否 | 控制获取信息的详细程度。默认为 `'basic'`。 |
+| `refresh` | `boolean` | 否 | 为 `true` 时，强制从设备重新读取而非使用缓存数据。 |
+| `includeRaw` | `boolean` | 否 | 为 `true` 时，在 `payload.raw` 中包含原始协议响应。 |
+
+#### Scope 级别
+
+| Scope | 包含内容 |
+|-------|---------|
+| `basic` | 设备类型、固件类型、ID、序列号、标签、蓝牙名称、状态（模式、初始化、锁定、密码短语保护、备份、语言）。 |
+| `versions` | `basic` 的全部内容 + 各固件/引导加载器/主板/蓝牙/SE 版本号。V1 设备会额外调用 `OnekeyGetFeatures` 获取详细版本。 |
+| `verify` | `versions` 的全部内容 + 各固件组件的 build ID 和哈希值。V2 设备会触发一次新的 `DeviceGetDeviceInfo` 调用。 |
+| `full` | 所有可用信息（与 `verify` 相同，包含最完整的数据）。 |
+
+### 示例
+
+```typescript
+// 基本设备信息
+const basic = await HardwareSDK.getDeviceInfo(connectId);
+
+// 完整信息（含原始协议数据）
+const full = await HardwareSDK.getDeviceInfo(connectId, {
+  scope: 'full',
+  includeRaw: true,
+});
+
+if (full.success) {
+  const { protocol, deviceType, versions, status, verify } = full.payload;
+  console.log(`协议: ${protocol}`);          // 'V1' 或 'V2'
+  console.log(`设备: ${deviceType}`);         // 如 'pro', 'pro2', 'classic1s'
+  console.log(`固件: ${versions.firmware}`);
+  console.log(`已初始化: ${status.initialized}`);
+}
+```
+
+### 返回结果
+
+```typescript
+{
+    success: true,
+    payload: {
+        protocol: 'V1' | 'V2' | 'unknown',     // 设备使用的协议
+        sources: string[],                        // 使用的数据源（如 ['features', 'deviceGetDeviceInfo']）
+        deviceType: string,                       // 设备型号（如 'pro', 'pro2', 'classic1s', 'mini', 'touch'）
+        firmwareType: string,                     // 固件类型
+        deviceId: string,                         // 设备标识符（种子派生）
+        serialNo: string,                         // 硬件序列号
+        label: string | null,                     // 用户设置的设备标签
+        bleName: string | null,                   // 蓝牙广播名称
+        status: {
+            mode: 'normal' | 'bootloader' | 'notInitialized' | 'unknown',
+            initialized: boolean | null,           // 是否已初始化
+            bootloaderMode: boolean | null,        // 是否在引导加载器模式
+            unlocked: boolean | null,              // 是否已解锁
+            passphraseProtection: boolean | null,  // 是否启用密码短语保护
+            backupRequired: boolean | null,        // 是否需要备份
+            language: string | null,               // 设备语言
+            bleEnabled: boolean | null,            // 蓝牙是否启用
+        },
+        versions: {                               // scope >= 'versions' 时包含
+            firmware: string | null,
+            bootloader: string | null,
+            board: string | null,
+            ble: string | null,
+            se01: string | null,
+            se02: string | null,
+            se03: string | null,
+            se04: string | null,
+            se01Boot: string | null,
+            se02Boot: string | null,
+            se03Boot: string | null,
+            se04Boot: string | null,
+        },
+        verify: {                                 // scope >= 'verify' 时包含
+            firmwareBuildId: string | undefined,
+            firmwareHash: string | undefined,
+            bootloaderBuildId: string | undefined,
+            bootloaderHash: string | undefined,
+            // ... 每个组件的 buildId 和 hash（board, ble, se01-se04, se01Boot-se04Boot）
+        },
+        raw: {                                    // includeRaw 为 true 时包含
+            features: object | undefined,         // V1 Features
+            onekeyFeatures: object | undefined,   // V1 OnekeyFeatures
+            protocolV2DeviceInfo: object | undefined,  // V2 DeviceInfo
+        },
+    }
+}
+```
+
+### 错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误消息
+        code: number // 错误码
+    }
+}
+```
+
+### 从 getFeatures / deviceGetDeviceInfo 迁移
+
+如果你之前使用 `getFeatures` + `getOnekeyFeatures`（V1）或 `deviceGetDeviceInfo`（V2），现在可以使用 `getDeviceInfo` 作为单一的、协议无关的替代方案：
+
+| 之前 | 之后 |
+|------|------|
+| `getFeatures` 获取基本设备状态 | `getDeviceInfo(connectId, { scope: 'basic' })` |
+| `getFeatures` + `getOnekeyFeatures` 获取版本 | `getDeviceInfo(connectId, { scope: 'versions' })` |
+| `deviceGetDeviceInfo`（仅 Pro2） | `getDeviceInfo(connectId, { scope: 'full' })` |
+
+> `getFeatures` 和 `deviceGetDeviceInfo` 仍然可用，保持向后兼容并适用于高级用例（如对特定协议调用进行性能测试）。对于大多数集成场景，推荐使用 `getDeviceInfo`。

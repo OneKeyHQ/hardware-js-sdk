@@ -4797,13 +4797,26 @@ export type FilesystemDiskControl = {
   enable: number;
 };
 
+export enum OnboardingStep {
+  UNKNOWN = 0,
+  SECURITY_CHECK = 1,
+  PIN = 2,
+  SETUP_CHOICE = 3,
+  CREATE_NEW = 4,
+  SEEDCARD_BACKUP = 5,
+  RESTORE_CHOICE = 6,
+  RESTORE_MNEMONIC = 7,
+  RESTORE_MNEMONIC_SEEDCARD_BACKUP = 8,
+  RESTORE_SEEDCARD = 9,
+  DONE = 100,
+}
+
 // DeviceGetOnboardingStatus
 export type DeviceGetOnboardingStatus = {};
 
 // DeviceOnboardingStatus
 export type DeviceOnboardingStatus = {
-  page_index?: number;
-  page_count?: number;
+  step: OnboardingStep;
   page_name?: string;
 };
 

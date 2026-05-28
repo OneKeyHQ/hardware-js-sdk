@@ -18,6 +18,38 @@ const api: PlaygroundProps[] = [
     noDeviceIdReq: true,
   },
   {
+    method: 'getDeviceInfo',
+    description: 'Get unified device info (supports V1 and V2 protocol)',
+    noDeviceIdReq: true,
+    presupposes: [
+      {
+        title: 'Basic',
+        value: {
+          scope: 'basic',
+        },
+      },
+      {
+        title: 'Versions',
+        value: {
+          scope: 'versions',
+        },
+      },
+      {
+        title: 'Verify',
+        value: {
+          scope: 'verify',
+        },
+      },
+      {
+        title: 'Full (with raw)',
+        value: {
+          scope: 'full',
+          includeRaw: true,
+        },
+      },
+    ],
+  },
+  {
     method: 'getPassphraseState',
     description: 'Get passphrase state of a device',
     noDeviceIdReq: true,

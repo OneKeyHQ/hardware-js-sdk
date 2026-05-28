@@ -1213,9 +1213,8 @@ describe('Protocol V2 onboarding status method', () => {
     const typedCall = jest.fn().mockResolvedValue({
       type: 'DeviceOnboardingStatus',
       message: {
-        page_index: 2,
-        page_count: 5,
-        page_name: 'backup',
+        step: 4,
+        page_name: 'Recovery Phrase',
       },
     });
 
@@ -1224,9 +1223,8 @@ describe('Protocol V2 onboarding status method', () => {
     };
 
     await expect(method.run()).resolves.toEqual({
-      page_index: 2,
-      page_count: 5,
-      page_name: 'backup',
+      step: 4,
+      page_name: 'Recovery Phrase',
     });
     expect(typedCall).toHaveBeenCalledWith(
       'DeviceGetOnboardingStatus',
