@@ -14,10 +14,14 @@ import { useHardwareMethodExecution } from '../hooks/useHardwareMethodExecution'
 import { useHardwareStore, type CommonParametersState } from '../store/hardwareStore';
 import { useDeviceStore } from '../store/deviceStore';
 import { ChainIcon } from '../components/icons/ChainIcon';
-import { processParameters } from '../utils/parameterUtils';
+import {
+  getParameterDisplayValue,
+  isLazyParameterValue,
+  processParameters,
+} from '../utils/parameterUtils';
 import { cancelHardwareOperation } from '../services/hardwareService';
 import { logHardware } from '../utils/logger';
-import { formatJsonPreview, formatUntruncatedJsonPreview } from '../utils/jsonPreview';
+import { formatJsonPreview } from '../utils/jsonPreview';
 import { ProtocolExecutionLog } from '../components/common/MethodExecutor';
 import type { MethodPreset, UnifiedMethodConfig } from '../data/types';
 
@@ -101,6 +105,10 @@ function cleanProtocolPayload(params: Record<string, unknown>) {
 }
 
 function summarizeInlineLogValue(value: unknown, depth = 0): unknown {
+  if (isLazyParameterValue(value)) {
+    return summarizeInlineLogValue(getParameterDisplayValue(value), depth);
+  }
+
   if (typeof value === 'bigint') return value.toString();
   if (value === undefined || value === null || typeof value !== 'object') {
     if (typeof value === 'string' && value.length > INLINE_LOG_STRING_LIMIT) {
@@ -406,8 +414,12 @@ const ChainMethodsIndexPage: React.FC = () => {
   );
   const activeRequestPreview = useMemo(
     () =>
-      formatUntruncatedJsonPreview(activeRequestPayload, {
+      formatJsonPreview(activeRequestPayload, {
         indent: 2,
+        maxDepth: 6,
+        maxArrayItems: 20,
+        maxObjectKeys: 60,
+        maxStringLength: 512,
       }),
     [activeRequestPayload]
   );

@@ -10,11 +10,9 @@ import {
   ERRORS,
   HardwareErrorCode,
   ONEKEY_SERVICE_UUID,
-  isHeaderChunk,
   isOnekeyDevice,
   wait,
 } from '@onekeyfe/hd-shared';
-import { COMMON_HEADER_SIZE } from '@onekeyfe/hd-transport';
 import pRetry from 'p-retry';
 
 import { safeLog } from './types/noble-extended';
@@ -53,15 +51,6 @@ const subscribedDevices = new Map<string, boolean>(); // Track subscription stat
 // 🔒 Subscription operation state tracking to prevent race conditions
 const subscriptionOperations = new Map<string, 'subscribing' | 'unsubscribing' | 'idle'>();
 
-// Packet reassembly state for each device
-interface PacketAssemblyState {
-  bufferLength: number;
-  buffer: number[];
-  packetCount: number;
-  messageId?: string; // Add message ID to track concurrent requests
-}
-const devicePacketStates = new Map<string, PacketAssemblyState>();
-
 // Windows-only response watchdog state moved to utils/windows-ble-recovery
 
 // Pairing-related state removed
@@ -93,16 +82,6 @@ const ABORTABLE_WRITE_ERROR_PATTERNS = [
   /status:\s*3/i, // Windows pairing cancelled / GATT write failed
 ];
 
-// Validation limits
-const MIN_HEADER_LENGTH = 9; // Minimum header chunk length
-
-// Packet processing result types
-interface PacketProcessResult {
-  isComplete: boolean;
-  completePacket?: string;
-  error?: string;
-}
-
 function getBleUuidKey(uuid?: string | null) {
   const normalized = (uuid ?? '').replace(/-/g, '').toLowerCase();
   return normalized.length >= 8 ? normalized.substring(4, 8) : normalized;
@@ -133,91 +112,19 @@ function isOneKeyPeripheral(peripheral: Peripheral) {
   return isOnekeyDevice(deviceName, peripheral.id) || hasOneKeyAdvertisementService(peripheral);
 }
 
-// Process incoming BLE notification data with proper packet reassembly
-function processNotificationData(deviceId: string, data: Buffer): PacketProcessResult {
-  //  notification telemetry
-  logger?.info('[NobleBLE] Notification', {
+/**
+ * Forward a single BLE notification chunk (not an assembled packet) to the
+ * renderer-side transport. Packet reassembly is handled by ElectronBleTransport.
+ */
+function emitRawNotification(deviceId: string, data: Buffer): void {
+  logger?.info('[NobleBLE] Raw notification', {
     deviceId,
     dataLength: data.length,
+    firstBytes: data.subarray(0, 8).toString('hex'),
   });
 
-  // Get or initialize packet state for this device
-  let packetState = devicePacketStates.get(deviceId);
-  if (!packetState) {
-    packetState = { bufferLength: 0, buffer: [], packetCount: 0 };
-    devicePacketStates.set(deviceId, packetState);
-    logger?.info('[NobleBLE] Initialized new packet state for device:', deviceId);
-  }
-
-  try {
-    if (isHeaderChunk(data)) {
-      // Validate header chunk
-      if (data.length < MIN_HEADER_LENGTH) {
-        return { isComplete: false, error: 'Invalid header chunk: too short' };
-      }
-
-      // Generate message ID for this packet sequence
-      const messageId = `${deviceId}-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-
-      // Reset packet state for new message
-      packetState.bufferLength = data.readInt32BE(5);
-      packetState.buffer = [...data.subarray(3)];
-      packetState.packetCount = 1;
-      packetState.messageId = messageId;
-
-      // Only validate for negative lengths (which would be invalid)
-      if (packetState.bufferLength < 0) {
-        logger?.error('[NobleBLE] Invalid negative packet length detected:', {
-          length: packetState.bufferLength,
-          dataLength: data.length,
-          rawHeader: data.subarray(0, Math.min(16, data.length)).toString('hex'),
-          lengthBytes: data.subarray(5, 9).toString('hex'),
-        });
-        resetPacketState(packetState);
-        return { isComplete: false, error: 'Invalid packet length in header' };
-      }
-    } else {
-      // Validate we have an active packet session
-      if (packetState.bufferLength === 0) {
-        return { isComplete: false, error: 'Received data chunk without header' };
-      }
-
-      // Increment packet counter and append data
-      packetState.packetCount += 1;
-      packetState.buffer = packetState.buffer.concat([...data]);
-    }
-
-    // Check if packet is complete
-    if (packetState.buffer.length - COMMON_HEADER_SIZE >= packetState.bufferLength) {
-      const completeBuffer = Buffer.from(packetState.buffer);
-      const hexString = completeBuffer.toString('hex');
-
-      logger?.info('[NobleBLE] Packet assembled', {
-        deviceId,
-        totalPackets: packetState.packetCount,
-        expectedLength: packetState.bufferLength,
-        actualLength: packetState.buffer.length - COMMON_HEADER_SIZE,
-      });
-
-      // Reset packet state for next message
-      resetPacketState(packetState);
-
-      return { isComplete: true, completePacket: hexString };
-    }
-
-    return { isComplete: false };
-  } catch (error) {
-    resetPacketState(packetState);
-    return { isComplete: false, error: `Packet processing error: ${error}` };
-  }
-}
-
-// Reset packet state to clean state
-function resetPacketState(packetState: PacketAssemblyState): void {
-  packetState.bufferLength = 0;
-  packetState.buffer = [];
-  packetState.packetCount = 0;
-  packetState.messageId = undefined;
+  const appCb = notificationCallbacks.get(deviceId);
+  if (appCb) appCb(data.toString('hex'));
 }
 
 // Check Bluetooth availability - returns detailed state
@@ -279,7 +186,6 @@ function setupPersistentStateListener(): void {
       deviceCharacteristics.clear();
       subscribedDevices.clear();
       notificationCallbacks.clear();
-      devicePacketStates.clear();
       subscriptionOperations.clear();
       pairedDevices.clear();
 
@@ -457,7 +363,6 @@ function cleanupDevice(
     connectedDevices.delete(deviceId);
     deviceCharacteristics.delete(deviceId);
     notificationCallbacks.delete(deviceId);
-    devicePacketStates.delete(deviceId);
     subscribedDevices.delete(deviceId);
     subscriptionOperations.delete(deviceId);
     pairedDevices.delete(deviceId);
@@ -619,8 +524,7 @@ async function attemptWindowsWriteUntilPaired(
         subscriptionOperations,
         subscribedDevices,
         pairedDevices,
-        notificationCallbacks,
-        processNotificationData,
+        onNotificationData: emitRawNotification,
         logger,
       });
       logger?.info('[BLE-Write] Subscription refresh completed', { deviceId });
@@ -1019,9 +923,7 @@ async function discoverServicesAndCharacteristics(
     // Find OneKey service — Noble may expose 128-bit UUIDs as short UUID keys.
     let service = services.find(s => NORMALIZED_ONEKEY_SERVICE_UUIDS.has(getBleUuidKey(s.uuid)));
     if (!service) {
-      logger?.info(
-        '[NobleBLE] Known OneKey service UUID not found, trying first vendor service'
-      );
+      logger?.info('[NobleBLE] Known OneKey service UUID not found, trying first vendor service');
       service =
         services.find(s => PRO2_ADVERTISEMENT_SERVICE_UUID_KEYS.has(getBleUuidKey(s.uuid))) ||
         services.find(s => !isGenericBleService(s.uuid)) ||
@@ -1379,7 +1281,6 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
         existingCharacteristics.notify.removeAllListeners('data');
       }
       notificationCallbacks.delete(deviceId);
-      devicePacketStates.delete(deviceId);
       subscribedDevices.delete(deviceId);
       // Continue to re-setup the connection properly
     }
@@ -1490,7 +1391,6 @@ async function unsubscribeNotifications(deviceId: string): Promise<void> {
     // Remove all listeners and clear subscription status
     notifyCharacteristic.removeAllListeners('data');
     notificationCallbacks.delete(deviceId);
-    devicePacketStates.delete(deviceId);
     subscribedDevices.delete(deviceId);
   } finally {
     // 🔒 CRITICAL: Always clear operation state (even on error)
@@ -1557,14 +1457,6 @@ async function subscribeNotifications(
     // Just update the callback without re-subscribing
     notificationCallbacks.set(deviceId, callback);
 
-    // Reset packet state for new session
-    devicePacketStates.set(deviceId, {
-      bufferLength: 0,
-      buffer: [],
-      packetCount: 0,
-      messageId: undefined,
-    });
-
     // 🔒 Clear operation state
     subscriptionOperations.set(deviceId, 'idle');
     return Promise.resolve();
@@ -1580,14 +1472,6 @@ async function subscribeNotifications(
 
   // Store callback for this device
   notificationCallbacks.set(deviceId, callback);
-
-  // Reset packet state for new subscription session
-  devicePacketStates.set(deviceId, {
-    bufferLength: 0,
-    buffer: [],
-    packetCount: 0,
-    messageId: undefined,
-  });
 
   // Helper: rebuild a clean application-layer subscription
   async function rebuildAppSubscription(
@@ -1617,15 +1501,7 @@ async function subscribeNotifications(
         logger?.info('[NobleBLE] Device paired successfully', { deviceId });
       }
 
-      const result = processNotificationData(deviceId, data);
-      if (result.error) {
-        logger?.error('[NobleBLE] Packet processing error:', result.error);
-        return;
-      }
-      if (result.isComplete && result.completePacket) {
-        const appCb = notificationCallbacks.get(deviceId);
-        if (appCb) appCb(result.completePacket);
-      }
+      emitRawNotification(deviceId, data);
     });
   }
 

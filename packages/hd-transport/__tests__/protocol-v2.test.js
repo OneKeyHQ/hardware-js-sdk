@@ -317,6 +317,21 @@ describe('Protocol V2 framing and session', () => {
       message: 'hello',
     });
     expect(logger.debug).toHaveBeenCalledWith(
+      '[ProtocolV2 Test] encode raw frame',
+      expect.objectContaining({
+        context: 'tx:Ping',
+        messageTypeId: 60206,
+        router: 1,
+      })
+    );
+    expect(logger.debug).toHaveBeenCalledWith(
+      '[ProtocolV2 Test] decode raw frame',
+      expect.objectContaining({
+        context: 'rx:Ping',
+        messageTypeId: 60207,
+      })
+    );
+    expect(logger.debug).toHaveBeenCalledWith(
       '[ProtocolV2 Test] RX payload type=Success messageTypeId=60207',
       {
         message: 'accepted',
@@ -324,7 +339,7 @@ describe('Protocol V2 framing and session', () => {
     );
   });
 
-  test('session suppresses payload logs for file transfer calls', async () => {
+  test('session suppresses debug logs for file transfer calls', async () => {
     const response = ProtocolV2.encodeFrame(schemas, 'Success', {
       message: 'ok',
     });
@@ -346,9 +361,7 @@ describe('Protocol V2 framing and session', () => {
       },
     });
 
-    expect(logger.debug.mock.calls.some(([message]) => String(message).includes('payload'))).toBe(
-      false
-    );
+    expect(logger.debug).not.toHaveBeenCalled();
   });
 
   test('session skips unrelated terminal frames when expected response types are provided', async () => {

@@ -324,6 +324,7 @@ export const en = {
       getProtoVersion: 'Protocol V2 protocol version query',
       ping: 'Protocol V2 device liveness test',
       deviceReboot: 'Protocol V2 device reboot',
+      getDeviceInfo: 'Get unified device info (supports V1 and V2 protocol)',
       deviceGetDeviceInfo: 'Protocol V2 device information query',
       deviceGetOnboardingStatus: 'Protocol V2 onboarding status query',
       deviceFirmwareUpdate: 'Protocol V2 firmware install trigger',

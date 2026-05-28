@@ -116,7 +116,7 @@ sequenceDiagram
 ```ts
 // 步骤 1：获取 passphrase 状态（仅提示用户一次）
 const state = await HardwareSDK.getPassphraseState(connectId);
-const passphraseState = state.payload;
+const passphraseState = state.payload.passphrase_state;
 
 // 步骤 2：后续调用使用 passphraseState（不再提示）
 const commonParams = {

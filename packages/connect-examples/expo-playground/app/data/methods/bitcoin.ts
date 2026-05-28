@@ -1,4 +1,68 @@
 import type { UnifiedMethodConfig, ChainCategory } from '../types';
+import { createLazyParameterValue } from '../../utils/parameterUtils';
+
+const BIG_REF_TXS_GENERATED_OUTPUT_COUNT = 80000;
+const BIG_REF_TXS_HASH = 'b3eb628dd06261805ef2232a704a727c9eb1787bccbc62cf343b05bfd7b882c7';
+
+function createBigRefTxs() {
+  return [
+    {
+      hash: BIG_REF_TXS_HASH,
+      version: 2,
+      inputs: [
+        {
+          prev_hash: '141f43a36d8421b0d30f63b2d98461e5b6172b0be606b0ac0a917fe1aaa08ba9',
+          prev_index: 1,
+          script_sig: '',
+          sequence: 4294967295,
+        },
+      ],
+      bin_outputs: [
+        {
+          amount: 150000,
+          script_pubkey: 'a9144204752392de72c50f0591313f98937c67325a3d87',
+        },
+        {
+          amount: 116300,
+          script_pubkey: '512003b963b69e1b26e56546d9a7a47ef0fbee91573a1c85be8b98ea79b9b83b843c',
+        },
+        ...Array.from({ length: BIG_REF_TXS_GENERATED_OUTPUT_COUNT }, (_, i) => ({
+          amount: '100000000',
+          script_pubkey: `76a914${i.toString(16).padStart(40, '0')}88ac`,
+        })),
+      ],
+      lock_time: 0,
+    },
+  ];
+}
+
+const bigRefTxsPreview = [
+  {
+    hash: BIG_REF_TXS_HASH,
+    version: 2,
+    inputs: [
+      {
+        prev_hash: '141f43a36d8421b0d30f63b2d98461e5b6172b0be606b0ac0a917fe1aaa08ba9',
+        prev_index: 1,
+        script_sig: '',
+        sequence: 4294967295,
+      },
+    ],
+    bin_outputs: [
+      {
+        amount: 150000,
+        script_pubkey: 'a9144204752392de72c50f0591313f98937c67325a3d87',
+      },
+      {
+        amount: 116300,
+        script_pubkey: '512003b963b69e1b26e56546d9a7a47ef0fbee91573a1c85be8b98ea79b9b83b843c',
+      },
+      `... (${BIG_REF_TXS_GENERATED_OUTPUT_COUNT} generated outputs are created on execution)`,
+    ],
+    lock_time: 0,
+  },
+];
+
 const api: UnifiedMethodConfig[] = [
   {
     method: 'btcGetAddress',
@@ -1210,37 +1274,11 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Reference Transactions',
             description: 'Reference transaction data with big outputs',
-            value: [
-              {
-                hash: 'b3eb628dd06261805ef2232a704a727c9eb1787bccbc62cf343b05bfd7b882c7',
-                version: 2,
-                inputs: [
-                  {
-                    prev_hash: '141f43a36d8421b0d30f63b2d98461e5b6172b0be606b0ac0a917fe1aaa08ba9',
-                    prev_index: 1,
-                    script_sig: '',
-                    sequence: 4294967295,
-                  },
-                ],
-                bin_outputs: [
-                  {
-                    amount: 150000,
-                    script_pubkey: 'a9144204752392de72c50f0591313f98937c67325a3d87',
-                  },
-                  {
-                    amount: 116300,
-                    script_pubkey:
-                      '512003b963b69e1b26e56546d9a7a47ef0fbee91573a1c85be8b98ea79b9b83b843c',
-                  },
-                  // 80,000 additional outputs for testing large transactions
-                  ...Array.from({ length: 80000 }, (_, i) => ({
-                    amount: '100000000',
-                    script_pubkey: `76a914${i.toString(16).padStart(40, '0')}88ac`,
-                  })),
-                ],
-                lock_time: 0,
-              },
-            ],
+            value: createLazyParameterValue({
+              label: 'Big Ref Txs',
+              previewValue: bigRefTxsPreview,
+              resolve: createBigRefTxs,
+            }),
           },
         ],
       },
