@@ -155,7 +155,8 @@ export default class ElectronBleTransport {
   private cleanupDeviceState(deviceId: string): void {
     this.connectedDevices.delete(deviceId);
     this.deviceProtocol.delete(deviceId);
-    this.deviceProtocolHints.delete(deviceId);
+    // Keep deviceProtocolHints — it's inferred from device name (e.g. "Pro 2" → V2)
+    // and doesn't depend on connection state. Preserving it avoids redundant V1 probe on reconnect.
     this.v1Buffers.delete(deviceId);
     this.v2Assemblers.delete(deviceId);
     this.resetProtocolV2Frames(deviceId);

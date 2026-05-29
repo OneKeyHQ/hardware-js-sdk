@@ -5114,6 +5114,135 @@
   resolved "https://registry.npmjs.org/@onekeyfe/cross-inpage-provider-types/-/cross-inpage-provider-types-2.2.67.tgz#e36a59855a1d781f296d7563a93cac868ae46098"
   integrity sha512-sjTF8kpcxWrZtFfHtdQhJ6KneyLTmg+Z4rnn0acEK5Vwoy07EjmF9xjBTyMoInrNwPc7OIwkaiXX+JYr0ovNgw==
 
+"@onekeyfe/hd-ble-sdk@1.1.27-alpha.35":
+  version "1.1.27-alpha.35"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-ble-sdk/-/hd-ble-sdk-1.1.27-alpha.35.tgz#342d34f2dfdfb8276c8341c903303b3800dd9d53"
+  integrity sha512-wjMPOqWmNJBMyLRnZQP+puo2L2x1A6NrH/KeJVX9hF9dMY+kK/JBSEMTfNShW5ZHXfufDwbQ4+FgN+7W4126Hg==
+  dependencies:
+    "@onekeyfe/hd-core" "1.1.27-alpha.35"
+    "@onekeyfe/hd-shared" "1.1.27-alpha.35"
+    "@onekeyfe/hd-transport-react-native" "1.1.27-alpha.35"
+
+"@onekeyfe/hd-common-connect-sdk@1.1.27-alpha.35":
+  version "1.1.27-alpha.35"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-common-connect-sdk/-/hd-common-connect-sdk-1.1.27-alpha.35.tgz#51cd2b1762421fb6ea2a204ba370d81d6dd2db56"
+  integrity sha512-GG3Nb3vvU4oQz8g+t2qnwd/GL8LcvsF5z+hurmfvMEv2Wpvz2S2UQ+AIWg1VGvd4qRIfeSOoqSApYKX1sOBiqA==
+  dependencies:
+    "@onekeyfe/hd-core" "1.1.27-alpha.35"
+    "@onekeyfe/hd-shared" "1.1.27-alpha.35"
+    "@onekeyfe/hd-transport-emulator" "1.1.27-alpha.35"
+    "@onekeyfe/hd-transport-http" "1.1.27-alpha.35"
+    "@onekeyfe/hd-transport-lowlevel" "1.1.27-alpha.35"
+    "@onekeyfe/hd-transport-usb" "1.1.27-alpha.35"
+    "@onekeyfe/hd-transport-web-device" "1.1.27-alpha.35"
+
+"@onekeyfe/hd-core@1.1.27-alpha.35":
+  version "1.1.27-alpha.35"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-core/-/hd-core-1.1.27-alpha.35.tgz#9a1cb9f83bf2ff773d0ec1d6e4d92b9deb7da7e9"
+  integrity sha512-X8LZ+l5dsEso4sunQHvSgKm1E+4NSuuZ7KARLxmKB8uZ8NHQMld7XGRsMlEj14x5NVjGO+Eglhe/HQ+eyFTt0g==
+  dependencies:
+    "@onekeyfe/hd-shared" "1.1.27-alpha.35"
+    "@onekeyfe/hd-transport" "1.1.27-alpha.35"
+    axios "1.15.2"
+    bignumber.js "^9.0.2"
+    bytebuffer "^5.0.1"
+    jszip "^3.10.1"
+    parse-uri "^1.0.7"
+    semver "^7.3.7"
+
+"@onekeyfe/hd-shared@1.1.27-alpha.35":
+  version "1.1.27-alpha.35"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-shared/-/hd-shared-1.1.27-alpha.35.tgz#112b368c5141bbf775f87b55a75138242cd8078d"
+  integrity sha512-dVjpgLx2lp+q5weVLg/sBdAuVHuo+5KnGo0jTzeeC+JxnZJd0/UQFLoPpQ08S8WcIPo6Nyos44fAnTdbmUJKDA==
+
+"@onekeyfe/hd-transport-electron@1.1.27-alpha.35":
+  version "1.1.27-alpha.35"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-transport-electron/-/hd-transport-electron-1.1.27-alpha.35.tgz#7c10909ae9b6add27ef63e89a81da3dc90130e02"
+  integrity sha512-kLVB0BvdS0E9Zty2dqCUIOAzAz+fIJNk8RozhxxMPkNsXND7dmzjj5ojcy4HHei1D/qGUnW9zfk3BSkUQNWKGg==
+  dependencies:
+    "@onekeyfe/hd-core" "1.1.27-alpha.35"
+    "@onekeyfe/hd-shared" "1.1.27-alpha.35"
+    "@onekeyfe/hd-transport" "1.1.27-alpha.35"
+    "@stoprocent/noble" "2.3.16"
+    p-retry "^4.6.2"
+
+"@onekeyfe/hd-transport-emulator@1.1.27-alpha.35":
+  version "1.1.27-alpha.35"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-transport-emulator/-/hd-transport-emulator-1.1.27-alpha.35.tgz#9b5e16748c68662f0fa768effe878f1e89990c24"
+  integrity sha512-DWEqPcFQSKMgVAstFNFt43L5MwYpQclZq/lXjI5Yhwj16j92F+I56q8qRk35eGJPFdfytdpLpvrET4/LcJZGOA==
+  dependencies:
+    "@onekeyfe/hd-shared" "1.1.27-alpha.35"
+    "@onekeyfe/hd-transport" "1.1.27-alpha.35"
+    axios "1.15.2"
+    secure-json-parse "^4.0.0"
+
+"@onekeyfe/hd-transport-http@1.1.27-alpha.35":
+  version "1.1.27-alpha.35"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-transport-http/-/hd-transport-http-1.1.27-alpha.35.tgz#f6da0f25109e7e1de8d4c657c0e20de5b738b40b"
+  integrity sha512-zSHQJuh1oR74KeWAQNc4LlDl9igGz55GfMAn0BPiNtNP6Som38I8x94CjbXpY5dikjEYgR77B2uob23kbA/sTw==
+  dependencies:
+    "@onekeyfe/hd-shared" "1.1.27-alpha.35"
+    "@onekeyfe/hd-transport" "1.1.27-alpha.35"
+    axios "1.15.2"
+    secure-json-parse "^4.0.0"
+
+"@onekeyfe/hd-transport-lowlevel@1.1.27-alpha.35":
+  version "1.1.27-alpha.35"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-transport-lowlevel/-/hd-transport-lowlevel-1.1.27-alpha.35.tgz#2fcbd34174e0ab562a5815e96f5b982e4cb42946"
+  integrity sha512-oDgfyM034GB/dMDGLVA8BPEWhzRDKsR87HxnIPZ0UmkUypBKGGc2A0L5E+kA3bUpajrjuHyZhmkUirWUSwEMSA==
+  dependencies:
+    "@onekeyfe/hd-shared" "1.1.27-alpha.35"
+    "@onekeyfe/hd-transport" "1.1.27-alpha.35"
+
+"@onekeyfe/hd-transport-react-native@1.1.27-alpha.35":
+  version "1.1.27-alpha.35"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-transport-react-native/-/hd-transport-react-native-1.1.27-alpha.35.tgz#de53f64e02d2c1ad83f9bd18561a0aaf5f0dd3bf"
+  integrity sha512-iR+zuU6xxQDBGgXILSjMwzeldjNTXZ4SdzBUlqj7ipNsvyD0fxN41F+vqPMJTTsZkOHe3EW60wZG9oVl1vqtwA==
+  dependencies:
+    "@onekeyfe/hd-core" "1.1.27-alpha.35"
+    "@onekeyfe/hd-shared" "1.1.27-alpha.35"
+    "@onekeyfe/hd-transport" "1.1.27-alpha.35"
+    "@onekeyfe/react-native-ble-utils" "^0.1.4"
+    react-native-ble-plx "3.5.1"
+
+"@onekeyfe/hd-transport-usb@1.1.27-alpha.35":
+  version "1.1.27-alpha.35"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-transport-usb/-/hd-transport-usb-1.1.27-alpha.35.tgz#9ea558902aef069d7bee5dec64dd162699072f51"
+  integrity sha512-cCGHdBIpg9tT7byO0r4PhJe+9mx7+8+RNIlVe6dZvJr3immrEV6rZNEQGtGzEWXmybo2zysmbehN0z0MB+Ul4Q==
+  dependencies:
+    "@onekeyfe/hd-shared" "1.1.27-alpha.35"
+    "@onekeyfe/hd-transport" "1.1.27-alpha.35"
+    bytebuffer "^5.0.1"
+    usb "^2.14.0"
+
+"@onekeyfe/hd-transport-web-device@1.1.27-alpha.35":
+  version "1.1.27-alpha.35"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-transport-web-device/-/hd-transport-web-device-1.1.27-alpha.35.tgz#2c4dcf88b3f0daf48b86aed1fb339e156e17072f"
+  integrity sha512-fZWwJt/5/Wqz9UF9WPNiMLATnI6WKb0LTpYm3cWHMV28iKPGguyNRHClgfwIjVMwPd0yROQihy2xQtYUfuBBkQ==
+  dependencies:
+    "@onekeyfe/hd-shared" "1.1.27-alpha.35"
+    "@onekeyfe/hd-transport" "1.1.27-alpha.35"
+
+"@onekeyfe/hd-transport@1.1.27-alpha.35":
+  version "1.1.27-alpha.35"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-transport/-/hd-transport-1.1.27-alpha.35.tgz#63a2a71207cb82a00fda8f4fd6f474e7d5cf71f2"
+  integrity sha512-+bPkuYnxRIHRiTIesxm0SEbSfB8ZAY8j7pFLgBSBaDKfxYEQq5Sw+cPJTd1LweYsvaxKE1bK4Olfyu5t4yZtAQ==
+  dependencies:
+    bytebuffer "^5.0.1"
+    long "^4.0.0"
+    protobufjs "^6.11.2"
+
+"@onekeyfe/hd-web-sdk@1.1.27-alpha.35":
+  version "1.1.27-alpha.35"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-web-sdk/-/hd-web-sdk-1.1.27-alpha.35.tgz#7d40b7f13a64c530e7d1380e1a8cda3a15fbf437"
+  integrity sha512-f3I94EnDGFklaTfHBKNoj22cRICu2Ok+uTGu0Kp6GXdXw3f6COSXei/bWwsG//bd/w2LYQfnnLP9j4zZi/dhjA==
+  dependencies:
+    "@onekeyfe/cross-inpage-provider-core" "2.2.67"
+    "@onekeyfe/hd-core" "1.1.27-alpha.35"
+    "@onekeyfe/hd-shared" "1.1.27-alpha.35"
+    "@onekeyfe/hd-transport-http" "1.1.27-alpha.35"
+    "@onekeyfe/hd-transport-web-device" "1.1.27-alpha.35"
+
 "@onekeyfe/react-native-ble-utils@^0.1.3":
   version "0.1.3"
   resolved "https://registry.yarnpkg.com/@onekeyfe/react-native-ble-utils/-/react-native-ble-utils-0.1.3.tgz#5b6b669c53e11b960b77554529d08ef0be2cbf71"
