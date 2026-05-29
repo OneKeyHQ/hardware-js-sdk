@@ -73,6 +73,7 @@ export type {
   SearchDevicesOptions,
   PassphraseResponse,
   ChainCapability,
+  ICommonCallParams,
   DeviceEvent,
   UiRequestEvent,
   SdkEvent,

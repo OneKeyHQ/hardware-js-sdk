@@ -1580,6 +1580,89 @@ describe('LedgerAdapter', () => {
     });
   });
 
+  describe('autoInstallApp (commonParams)', () => {
+    function makeAppNotInstalledErr(appName = 'Cardano'): Error {
+      return Object.assign(new Error(`Failed to open "${appName}"`), {
+        _tag: 'OpenAppCommandError',
+        errorCode: '6807',
+        statusCode: '6807',
+        appName,
+      });
+    }
+
+    const methodsCalled = () =>
+      connector.callImpl.mock.calls.map((c: unknown[]) => c[1]);
+
+    it('prompts, installs, then retries the original call on confirm', async () => {
+      connector.callImpl
+        .mockRejectedValueOnce(makeAppNotInstalledErr('Cardano')) // open app fails
+        .mockResolvedValueOnce(undefined) // installApp
+        .mockResolvedValueOnce({ address: '0xABCD', publicKey: '0xpk' }); // retry
+
+      await adapter.connectDevice('dev-1');
+
+      let requestedAppName: string | undefined;
+      adapter.on(UI_REQUEST.REQUEST_INSTALL_APP, evt => {
+        requestedAppName = (evt as { payload: { appName: string } }).payload.appName;
+        adapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_INSTALL_APP,
+          payload: { confirmed: true },
+        });
+      });
+
+      const result = await adapter.evmGetAddress(
+        'dev-1',
+        '',
+        { path: "m/44'/60'/0'/0/0" },
+        { autoInstallApp: true }
+      );
+
+      expect(requestedAppName).toBe('Cardano');
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.payload.address).toBe('0xABCD');
+      expect(methodsCalled()).toEqual(['evmGetAddress', 'installApp', 'evmGetAddress']);
+    });
+
+    it('surfaces the failure without installing when the user declines', async () => {
+      connector.callImpl.mockRejectedValueOnce(makeAppNotInstalledErr('Cardano'));
+      await adapter.connectDevice('dev-1');
+      adapter.on(UI_REQUEST.REQUEST_INSTALL_APP, () => {
+        adapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_INSTALL_APP,
+          payload: { confirmed: false },
+        });
+      });
+
+      const result = await adapter.evmGetAddress(
+        'dev-1',
+        '',
+        { path: "m/44'/60'/0'/0/0" },
+        { autoInstallApp: true }
+      );
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.payload.code).toBe(HardwareErrorCode.AppNotInstalled);
+      }
+      expect(methodsCalled()).not.toContain('installApp');
+    });
+
+    it('does not prompt when autoInstallApp is off (default failure path)', async () => {
+      connector.callImpl.mockRejectedValueOnce(makeAppNotInstalledErr('Cardano'));
+      await adapter.connectDevice('dev-1');
+      const onInstall = jest.fn();
+      adapter.on(UI_REQUEST.REQUEST_INSTALL_APP, onInstall);
+
+      const result = await adapter.evmGetAddress('dev-1', '', {
+        path: "m/44'/60'/0'/0/0",
+      });
+
+      expect(onInstall).not.toHaveBeenCalled();
+      expect(result.success).toBe(false);
+      expect(methodsCalled()).not.toContain('installApp');
+    });
+  });
+
   describe('app management', () => {
     it('listInstalledApps routes through connector.call with listInstalledApps method', async () => {
       connector.callImpl.mockResolvedValueOnce([

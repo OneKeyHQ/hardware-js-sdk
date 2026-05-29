@@ -25,6 +25,21 @@ export type HardwareUiEvent =
 
 export type ChainCapability = 'evm' | 'btc' | 'sol' | 'tron';
 
+/**
+ * Cross-chain / cross-vendor options passed alongside any chain method's
+ * own params (the optional last argument). Holds operation-level switches
+ * that aren't specific to one chain. Vendor-specific options can be added
+ * as typed sub-fields here when a vendor actually needs them.
+ */
+export interface ICommonCallParams {
+  /**
+   * When the required device app is missing, prompt the user (UI request)
+   * to install it, stream install progress, then retry the operation once.
+   * Off by default — preserves the plain "app not installed" failure.
+   */
+  autoInstallApp?: boolean;
+}
+
 export interface PassphraseResponse {
   passphrase: string;
   /** If true, passphrase will be entered on the device. `passphrase` field is ignored. */
@@ -71,6 +86,10 @@ export type UiRequestEvent =
          */
         message: string;
       };
+    }
+  | {
+      type: typeof UI_REQUEST.REQUEST_INSTALL_APP;
+      payload: { vendor: string; appName: string };
     }
   | { type: typeof UI_REQUEST.CLOSE_UI_WINDOW; payload: Record<string, never> };
 
@@ -151,6 +170,10 @@ export interface HardwareEventMap {
       path: string;
       accountIndex: number;
     };
+  };
+  [UI_REQUEST.REQUEST_INSTALL_APP]: {
+    type: typeof UI_REQUEST.REQUEST_INSTALL_APP;
+    payload: { vendor: string; appName: string };
   };
   [UI_REQUEST.CLOSE_UI_WINDOW]: {
     type: typeof UI_REQUEST.CLOSE_UI_WINDOW;
