@@ -141,6 +141,24 @@ describe('serializeConnectorError / rehydrateConnectorError', () => {
     expect(wire.params.originalError.statusCode).toBe('6d00');
   });
 
+  it('drops a non-JSON-safe field instead of crashing the transport', () => {
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+    const err = Object.assign(new Error('boom'), {
+      code: 9,
+      appName: 'Tron',
+      error: circular, // a sibling field with a circular ref
+    });
+
+    const s = serializeConnectorError(err);
+
+    // The circular field is dropped, the rest survives, and the whole thing
+    // is now safe to JSON.stringify (what the bridge does).
+    expect(s.params).not.toHaveProperty('error');
+    expect(s.params?.appName).toBe('Tron');
+    expect(() => JSON.stringify(s)).not.toThrow();
+  });
+
   it('handles non-object throwables', () => {
     expect(serializeConnectorError('plain string')).toEqual({
       message: 'plain string',

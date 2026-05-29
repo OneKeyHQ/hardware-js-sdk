@@ -309,6 +309,17 @@ export function serializeConnectorError(err: unknown): ConnectorSerializedError 
     };
   }
 
+  // The result crosses host bridges via JSON.stringify. Drop any single field
+  // that isn't JSON-safe (circular ref / non-serializable) so a pathological
+  // error degrades to "one field missing" instead of crashing the transport.
+  for (const key of Object.keys(params)) {
+    try {
+      JSON.stringify(params[key]);
+    } catch {
+      delete params[key];
+    }
+  }
+
   return {
     message,
     ...(code !== undefined ? { code } : {}),
