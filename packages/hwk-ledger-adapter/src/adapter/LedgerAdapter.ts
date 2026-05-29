@@ -149,8 +149,13 @@ export class LedgerAdapter implements IHardwareWallet {
   // Shared across concurrent callers — only `cancel()` aborts.
   private _doConnectAbortController: AbortController | null = null;
 
-  constructor(connector: IConnector) {
+  // Default for commonParams.autoInstallApp when a call doesn't specify it,
+  // so the host can opt the whole adapter in once instead of per call.
+  private readonly _defaultAutoInstallApp: boolean;
+
+  constructor(connector: IConnector, options?: { autoInstallApp?: boolean }) {
     this.connector = connector;
+    this._defaultAutoInstallApp = options?.autoInstallApp ?? false;
     this._jobQueue = new DeviceJobQueue();
     this.registerEventListeners();
   }
@@ -1289,16 +1294,33 @@ export class LedgerAdapter implements IHardwareWallet {
       // install runs as a direct connector call within THIS queue slot — going
       // through the public installApp/connectorCall would re-enter the serial
       // job queue and reject as busy.
+      const autoInstallApp =
+        commonParams?.autoInstallApp ?? this._defaultAutoInstallApp;
       const isAppMissing =
         isAppNotInstalledError(err) ||
         (err as { code?: number })?.code === HardwareErrorCode.AppNotInstalled;
-      if (commonParams?.autoInstallApp && isAppMissing) {
+      if (autoInstallApp && isAppMissing) {
         const appName =
           (err as { appName?: string })?.appName ?? mapLedgerError(err).appName;
         if (appName) {
           const confirmed = await this._waitForInstallAppConfirm(appName);
           if (!confirmed) throw err;
+          // Emit progress 0 immediately so the confirm dialog morphs into the
+          // "installing" view with no blank gap — DMK's setup (go-to-dashboard,
+          // metadata, build plan, secure channel) can take several seconds
+          // before the first real progress arrives.
+          this.emitter.emit('ui-event', {
+            type: EConnectorInteraction.AppInstallProgress,
+            payload: { connectId: resolvedConnectId, appName, progress: 0 },
+          });
           await this._callConnector(sessionId, 'installApp', { appName }, signal);
+          // Close the install UI before retrying so the retried operation's own
+          // device prompts (e.g. confirm-on-device) render normally instead of
+          // being absorbed by the install dialog.
+          this.emitter.emit(UI_REQUEST.CLOSE_UI_WINDOW, {
+            type: UI_REQUEST.CLOSE_UI_WINDOW,
+            payload: {},
+          });
           return await this._callConnector(sessionId, method, effectiveParams, signal);
         }
       }
