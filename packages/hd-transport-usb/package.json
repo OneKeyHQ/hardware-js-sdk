@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hd-transport-usb",
-  "version": "1.1.27-alpha.35",
+  "version": "1.1.27-alpha.36",
   "description": "OneKey hardware wallet direct USB transport plugin (libusb)",
   "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
   "license": "MIT",
@@ -20,8 +20,8 @@
     "lint:fix": "eslint . --fix"
   },
   "dependencies": {
-    "@onekeyfe/hd-shared": "1.1.27-alpha.35",
-    "@onekeyfe/hd-transport": "1.1.27-alpha.35",
+    "@onekeyfe/hd-shared": "1.1.27-alpha.36",
+    "@onekeyfe/hd-transport": "1.1.27-alpha.36",
     "bytebuffer": "^5.0.1",
     "usb": "^2.14.0"
   }
