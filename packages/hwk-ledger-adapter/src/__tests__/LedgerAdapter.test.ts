@@ -4,10 +4,10 @@ import {
   UI_REQUEST,
   UI_RESPONSE,
   deriveDeviceFingerprint,
+  serializeConnectorError,
 } from '@onekeyfe/hwk-adapter-core';
 
 import { LedgerAdapter } from '../adapter/LedgerAdapter';
-import { serializeConnectorError } from '../errors';
 
 import type {
   ConnectorDevice,

@@ -1,4 +1,8 @@
-import { EConnectorInteraction, HardwareErrorCode } from '@onekeyfe/hwk-adapter-core';
+import {
+  EConnectorInteraction,
+  HardwareErrorCode,
+  serializeConnectorError,
+} from '@onekeyfe/hwk-adapter-core';
 
 import { LedgerDeviceManager } from '../device/LedgerDeviceManager';
 import { SignerManager } from '../signer/SignerManager';
@@ -8,7 +12,6 @@ import {
   isKnownConnectionTag,
   isTransportStuck,
   mapLedgerError,
-  serializeConnectorError,
 } from '../errors';
 import { debugLog } from '../utils/debugLog';
 import { isLedgerBleConnectionType } from '../utils/ledgerDmkTransport';

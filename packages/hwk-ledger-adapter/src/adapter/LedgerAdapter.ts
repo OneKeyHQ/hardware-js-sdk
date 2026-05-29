@@ -10,6 +10,7 @@ import {
   UiRequestRegistry,
   deriveDeviceFingerprint,
   failure,
+  rehydrateConnectorError,
   success,
 } from '@onekeyfe/hwk-adapter-core';
 
@@ -1069,12 +1070,7 @@ export class LedgerAdapter implements IHardwareWallet {
    */
   private _unwrapConnectorResult(result: ConnectorCallResult): unknown {
     if (result.success) return result.payload;
-    const { message, code, errorCode, params } = result.error;
-    throw Object.assign(new Error(message), {
-      ...(code !== undefined ? { code } : {}),
-      ...(errorCode !== undefined ? { errorCode } : {}),
-      ...(params ?? {}),
-    });
+    throw rehydrateConnectorError(result.error);
   }
 
   /**
@@ -1724,6 +1720,10 @@ export class LedgerAdapter implements IHardwareWallet {
         }
       }
       if (!connectId) {
+        debugLog(
+          '[LedgerAdapter] dropping AppInstallProgress: no connectId for sessionId',
+          event.payload.sessionId
+        );
         return;
       }
       this.emitter.emit('ui-event', {

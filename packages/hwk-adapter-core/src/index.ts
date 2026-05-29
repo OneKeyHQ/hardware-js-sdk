@@ -77,6 +77,7 @@ export type {
   UiRequestEvent,
   SdkEvent,
   HardwareEvent,
+  HardwareUiEvent,
   HardwareEventMap,
   DeviceEventListener,
 } from './types/wallet';
@@ -108,10 +109,16 @@ export type {
   ConnectorUiEvent,
   ConnectorCallResult,
   ConnectorSerializedError,
+  ConnectorErrorParams,
   IConnector,
   IHardwareBridge,
 } from './types/connector';
-export { createBridgedConnector, EConnectorInteraction } from './types/connector';
+export {
+  createBridgedConnector,
+  EConnectorInteraction,
+  serializeConnectorError,
+  rehydrateConnectorError,
+} from './types/connector';
 
 export { TypedEventEmitter } from './utils/TypedEventEmitter';
 export {

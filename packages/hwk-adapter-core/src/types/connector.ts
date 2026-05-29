@@ -49,11 +49,39 @@ export interface ConnectorSession {
 // `errorCode` live at the top level; ALL other domain fields (`appName`,
 // `_tag`, `statusCode`, …) are nested under `params`.
 // =====================================================================
+
+/**
+ * Vendor-agnostic bag of extra error fields. Known keys are documented for
+ * discoverability; the index signature keeps it open so any connector can
+ * carry vendor-specific data without losing it across the bridge.
+ */
+export interface ConnectorErrorParams {
+  /** Vendor SDK error tag (e.g. Ledger DMK `_tag`). */
+  _tag?: string;
+  /** App involved, e.g. the Ledger app being opened/installed. */
+  appName?: string;
+  /** Transport / APDU status code (string or number depending on vendor). */
+  statusCode?: unknown;
+  /**
+   * Shallow snapshot of a nested cause. A raw Error does not survive JSON
+   * serialization (its `message`/`stack` are non-enumerable), so recovery
+   * predicates that recurse into a cause get this plain-object copy instead.
+   */
+  originalError?: {
+    message?: string;
+    code?: number;
+    errorCode?: string;
+    statusCode?: unknown;
+    _tag?: string;
+  };
+  [key: string]: unknown;
+}
+
 export interface ConnectorSerializedError {
   message: string;
   code?: number;
   errorCode?: string;
-  params?: Record<string, unknown>;
+  params?: ConnectorErrorParams;
 }
 
 export type ConnectorCallResult =
@@ -114,8 +142,12 @@ export interface IConnector {
   searchDevices(): Promise<ConnectorDevice[]>;
   connect(deviceId?: string): Promise<ConnectorSession>;
   disconnect(sessionId: string): Promise<void>;
-  // Resolves a discriminated result; device failures are returned as data,
-  // never thrown (see ConnectorCallResult).
+  // `call` resolves a discriminated result; device-level failures are returned
+  // as data, never thrown (see ConnectorCallResult). Only `call` uses this
+  // contract because it is the one method that carries rich, vendor-specific
+  // domain errors across the IHardwareBridge boundary, where a thrown Error
+  // would be stripped by the host bridge's error whitelist. The other methods
+  // surface plain operational failures and still reject normally.
   call(sessionId: string, method: string, params: unknown): Promise<ConnectorCallResult>;
   cancel(sessionId: string): Promise<void>;
 
@@ -221,4 +253,81 @@ export function createBridgedConnector(
     },
     reset: () => bridge.reset({ vendor }),
   };
+}
+
+// =====================================================================
+// ConnectorCallResult error (de)serialization — the canonical, vendor-agnostic
+// helpers every IConnector implementation / adapter should use, so the
+// "errors as data" contract is identical across vendors.
+// =====================================================================
+
+const SERIALIZED_ERROR_TOP_LEVEL_KEYS = new Set([
+  'message',
+  'code',
+  'errorCode',
+  'stack',
+  'params',
+]);
+
+/**
+ * Flatten a thrown error into the cross-boundary-safe `ConnectorSerializedError`
+ * shape. `message`/`code`/`errorCode` are lifted to the top level; every other
+ * own-enumerable field is copied into `params` so NO domain data is lost when
+ * the result crosses a host bridge (which may run thrown errors through a
+ * field whitelist). A nested `originalError` is shallow-snapshotted because a
+ * raw Error does not survive JSON serialization.
+ */
+export function serializeConnectorError(err: unknown): ConnectorSerializedError {
+  if (!err || typeof err !== 'object') {
+    return { message: typeof err === 'string' ? err : 'Unknown error' };
+  }
+  const e = err as Record<string, unknown>;
+  const message = typeof e.message === 'string' ? e.message : 'Unknown error';
+  const code = typeof e.code === 'number' ? e.code : undefined;
+  const errorCode = e.errorCode != null ? String(e.errorCode) : undefined;
+
+  const params: ConnectorErrorParams = {};
+  // Flatten an existing `params` bag, then copy every other own field (so
+  // vendor-specific keys like `_tag` / `statusCode` / `appName` / step context
+  // are preserved without being named here).
+  if (e.params && typeof e.params === 'object') {
+    Object.assign(params, e.params as Record<string, unknown>);
+  }
+  for (const key of Object.keys(e)) {
+    if (SERIALIZED_ERROR_TOP_LEVEL_KEYS.has(key)) continue;
+    params[key] = e[key];
+  }
+  const orig = e.originalError;
+  if (orig && typeof orig === 'object') {
+    const o = orig as Record<string, unknown>;
+    params.originalError = {
+      message: typeof o.message === 'string' ? o.message : undefined,
+      code: typeof o.code === 'number' ? o.code : undefined,
+      errorCode: o.errorCode != null ? String(o.errorCode) : undefined,
+      statusCode: o.statusCode,
+      _tag: typeof o._tag === 'string' ? o._tag : undefined,
+    };
+  }
+
+  return {
+    message,
+    ...(code !== undefined ? { code } : {}),
+    ...(errorCode !== undefined ? { errorCode } : {}),
+    ...(Object.keys(params).length ? { params } : {}),
+  };
+}
+
+/**
+ * Inverse of `serializeConnectorError`: rebuild a flat Error instance, lifting
+ * `params.*` back to own-properties so existing throw-based classifiers/recovery
+ * logic (which read `err._tag` / `err.code` / `err.appName` / …) keep working
+ * unchanged. The Result shape stays confined to the connector boundary.
+ */
+export function rehydrateConnectorError(error: ConnectorSerializedError): Error {
+  const { message, code, errorCode, params } = error;
+  return Object.assign(new Error(message), {
+    ...(code !== undefined ? { code } : {}),
+    ...(errorCode !== undefined ? { errorCode } : {}),
+    ...(params ?? {}),
+  });
 }
