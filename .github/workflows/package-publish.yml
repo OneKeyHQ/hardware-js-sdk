@@ -62,7 +62,17 @@ jobs:
           echo "🔨 Building packages..."
           yarn build
 
-
+      - name: Commit lockfile changes
+        run: |
+          if [ -n "$(git status --porcelain yarn.lock)" ]; then
+            echo "📦 Committing yarn.lock changes from CI environment..."
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add yarn.lock
+            git commit -m "chore: update yarn.lock [skip ci]"
+          else
+            echo "✅ yarn.lock is clean"
+          fi
 
       - name: Publish to NPM
         env:
