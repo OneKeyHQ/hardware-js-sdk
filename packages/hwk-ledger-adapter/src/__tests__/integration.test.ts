@@ -1,13 +1,17 @@
 import { UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hwk-adapter-core';
 
 import { LedgerAdapter } from '../adapter/LedgerAdapter';
+import { serializeConnectorError } from '../errors';
 
 import type { ConnectorDevice, ConnectorSession, IConnector } from '@onekeyfe/hwk-adapter-core';
 
-function createMockConnector(): IConnector {
+function createMockConnector(): IConnector & { callImpl: jest.Mock } {
   const handlers = new Map<string, Set<(...args: unknown[]) => void>>();
 
+  const callImpl = jest.fn().mockResolvedValue({});
+
   return {
+    callImpl,
     connectionType: 'usb' as const,
     searchDevices: jest.fn().mockResolvedValue([
       {
@@ -31,7 +35,14 @@ function createMockConnector(): IConnector {
     } as ConnectorSession),
 
     disconnect: jest.fn().mockResolvedValue(undefined),
-    call: jest.fn().mockResolvedValue({}),
+    call: jest.fn(async (sessionId: string, method: string, params: unknown) => {
+      try {
+        const payload = await callImpl(sessionId, method, params);
+        return { success: true, payload };
+      } catch (error) {
+        return { success: false, error: serializeConnectorError(error) };
+      }
+    }),
     cancel: jest.fn().mockResolvedValue(undefined),
 
     uiResponse: jest.fn(),
@@ -78,7 +89,7 @@ describe('LedgerAdapter Integration', () => {
     await adapter.connectDevice('dev-1');
 
     // Mock evmGetAddress response
-    (connector.call as ReturnType<typeof jest.fn>).mockResolvedValueOnce({
+    connector.callImpl.mockResolvedValueOnce({
       address: '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18',
       publicKey: '0xpk',
     });
@@ -92,7 +103,7 @@ describe('LedgerAdapter Integration', () => {
     }
 
     // Mock evmSignTransaction response
-    (connector.call as ReturnType<typeof jest.fn>).mockResolvedValueOnce({
+    connector.callImpl.mockResolvedValueOnce({
       v: '0x1c',
       r: '0xaabb',
       s: '0xccdd',

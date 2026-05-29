@@ -1,6 +1,6 @@
 import { HardwareErrorCode, enrichErrorMessage } from '@onekeyfe/hwk-adapter-core';
 
-import type { Failure } from '@onekeyfe/hwk-adapter-core';
+import type { ConnectorSerializedError, Failure } from '@onekeyfe/hwk-adapter-core';
 
 export const MULTIPLE_USB_LEDGER_DEVICES_ERROR_MESSAGE =
   'Multiple Ledger USB devices are connected. Please connect only one Ledger device and try again.';
@@ -553,4 +553,53 @@ export function mapLedgerError(
   const appName = errAppName ?? opts?.defaultAppName;
 
   return { code, message: enrichErrorMessage(code, originalMessage), appName };
+}
+
+/**
+ * Flatten a thrown connector error into the cross-boundary-safe
+ * `ConnectorSerializedError` shape (see ConnectorCallResult).
+ *
+ * Contract: only `message` / `code` / `errorCode` stay at the top level;
+ * every other domain field (`_tag`, `statusCode`, `appName`, and a shallow
+ * copy of `originalError` for recovery predicates that recurse into it) is
+ * nested under `params`. The SW-side adapter rehydrates this back into a flat
+ * Error via `_unwrapConnectorResult`, so downstream classifiers keep working.
+ *
+ * A raw Error does NOT survive JSON serialization (message/stack are
+ * non-enumerable) — that's exactly why we pluck fields explicitly here rather
+ * than letting the Error cross the bridge.
+ */
+export function serializeConnectorError(err: unknown): ConnectorSerializedError {
+  if (!err || typeof err !== 'object') {
+    return { message: typeof err === 'string' ? err : 'Unknown error' };
+  }
+  const e = err as Record<string, unknown>;
+  const message = typeof e.message === 'string' ? e.message : 'Unknown error';
+  const code = typeof e.code === 'number' ? e.code : undefined;
+  const errorCode = e.errorCode != null ? String(e.errorCode) : undefined;
+
+  const params: Record<string, unknown> = {
+    ...(e.params && typeof e.params === 'object' ? (e.params as Record<string, unknown>) : {}),
+  };
+  if (e._tag != null) params._tag = e._tag;
+  if (e.statusCode != null) params.statusCode = e.statusCode;
+  if (typeof e.appName === 'string') params.appName = e.appName;
+  const orig = e.originalError;
+  if (orig && typeof orig === 'object') {
+    const o = orig as Record<string, unknown>;
+    params.originalError = {
+      message: typeof o.message === 'string' ? o.message : undefined,
+      code: typeof o.code === 'number' ? o.code : undefined,
+      errorCode: o.errorCode != null ? String(o.errorCode) : undefined,
+      statusCode: o.statusCode,
+      _tag: typeof o._tag === 'string' ? o._tag : undefined,
+    };
+  }
+
+  return {
+    message,
+    ...(code !== undefined ? { code } : {}),
+    ...(errorCode !== undefined ? { errorCode } : {}),
+    ...(Object.keys(params).length ? { params } : {}),
+  };
 }

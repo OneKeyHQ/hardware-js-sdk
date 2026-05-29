@@ -1,3 +1,4 @@
+import type { ConnectorUiEvent, EConnectorInteraction } from './connector';
 import type { DEVICE } from '../events/device';
 import type { Response } from './response';
 import type { DeviceInfo, TransportType } from './device';
@@ -9,7 +10,18 @@ import type { QrDisplayData } from './qr';
 import type { ChainForFingerprint } from './fingerprint';
 import type { UI_REQUEST, UiResponseEvent } from '../events/ui-request';
 import type { SDK } from '../events/sdk';
-import type { ConnectorUiEvent } from './connector';
+
+/**
+ * Wallet-level `ui-event` variants. Same shape as `ConnectorUiEvent` except
+ * the AppInstallProgress variant's payload is re-keyed by the adapter from
+ * connector-internal `sessionId` to the public `connectId`.
+ */
+export type HardwareUiEvent =
+  | Exclude<ConnectorUiEvent, { type: EConnectorInteraction.AppInstallProgress }>
+  | {
+      type: EConnectorInteraction.AppInstallProgress;
+      payload: { connectId: string; appName: string; progress: number };
+    };
 
 export type ChainCapability = 'evm' | 'btc' | 'sol' | 'tron';
 
@@ -68,7 +80,7 @@ export type SdkEvent =
   | { type: typeof SDK.DEVICE_UNRESPONSIVE; payload: { connectId: string } }
   | { type: typeof SDK.DEVICE_RECOVERED; payload: { connectId: string } };
 
-export type HardwareEvent = DeviceEvent | UiRequestEvent | SdkEvent | ConnectorUiEvent;
+export type HardwareEvent = DeviceEvent | UiRequestEvent | SdkEvent | HardwareUiEvent;
 export type DeviceEventListener = (event: HardwareEvent) => void;
 
 /**
@@ -79,18 +91,12 @@ export type DeviceEventListener = (event: HardwareEvent) => void;
  */
 export interface HardwareEventMap {
   // Low-level connector UI event (forwarded from IConnector 'ui-event').
-  // Carries the four EConnectorInteraction values: ConfirmOnDevice / ConfirmOpenApp /
-  // UnlockDevice / InteractionComplete. Subscribe with hw.on('ui-event', handler).
-  'ui-event': ConnectorUiEvent;
-
-  // OS-level Ledger app install progress (forwarded from IConnector
-  // 'app-install-progress'). The adapter re-emits with `connectId` instead
-  // of the connector-internal `sessionId`. Subscribe with
-  // hw.on('app-install-progress', handler).
-  'app-install-progress': {
-    type: 'app-install-progress';
-    payload: { connectId: string; appName: string; progress: number };
-  };
+  // Carries every EConnectorInteraction variant — interaction prompts
+  // (ConfirmOnDevice / ConfirmOpenApp / UnlockDevice / InteractionComplete /
+  // Searching) and AppInstallProgress (Ledger OS-level app install). The
+  // adapter re-keys AppInstallProgress payload from connector-internal
+  // `sessionId` to public `connectId`. Subscribe with hw.on('ui-event', handler).
+  'ui-event': HardwareUiEvent;
 
   // Device events
   [DEVICE.CONNECT]: { type: typeof DEVICE.CONNECT; payload: DeviceInfo };

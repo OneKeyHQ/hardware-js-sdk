@@ -1,4 +1,5 @@
 import {
+  EConnectorInteraction,
   HardwareErrorCode,
   UI_REQUEST,
   UI_RESPONSE,
@@ -6,6 +7,7 @@ import {
 } from '@onekeyfe/hwk-adapter-core';
 
 import { LedgerAdapter } from '../adapter/LedgerAdapter';
+import { serializeConnectorError } from '../errors';
 
 import type {
   ConnectorDevice,
@@ -18,10 +20,16 @@ import type {
 function createMockConnector(): IConnector & {
   _handlers: Map<string, Set<(...args: unknown[]) => void>>;
   _emit: <K extends ConnectorEventType>(event: K, data: ConnectorEventMap[K]) => void;
+  // Tests configure this with raw payloads / rejections; `call` wraps it into
+  // the ConnectorCallResult contract (success:false instead of throwing).
+  callImpl: jest.Mock;
 } {
   const handlers = new Map<string, Set<(...args: unknown[]) => void>>();
 
+  const callImpl = jest.fn().mockResolvedValue({});
+
   const connector = {
+    callImpl,
     _handlers: handlers,
     _emit<K extends ConnectorEventType>(event: K, data: ConnectorEventMap[K]) {
       const set = handlers.get(event);
@@ -57,7 +65,16 @@ function createMockConnector(): IConnector & {
 
     disconnect: jest.fn().mockResolvedValue(undefined),
 
-    call: jest.fn().mockResolvedValue({}),
+    // Wraps callImpl into the ConnectorCallResult contract: device failures
+    // resolve as { success:false, error } rather than rejecting.
+    call: jest.fn(async (sessionId: string, method: string, params: unknown) => {
+      try {
+        const payload = await callImpl(sessionId, method, params);
+        return { success: true, payload };
+      } catch (error) {
+        return { success: false, error: serializeConnectorError(error) };
+      }
+    }),
 
     cancel: jest.fn().mockResolvedValue(undefined),
 
@@ -226,7 +243,7 @@ describe('LedgerAdapter', () => {
   describe('evmGetAddress', () => {
     it('rejects a concurrent chain call with DeviceBusy instead of queueing it', async () => {
       let resolveFirstCall: (value: unknown) => void = () => {};
-      connector.call
+      connector.callImpl
         .mockImplementationOnce(
           () =>
             new Promise(resolve => {
@@ -264,7 +281,7 @@ describe('LedgerAdapter', () => {
     });
 
     it('should return address on success', async () => {
-      connector.call.mockResolvedValueOnce({
+      connector.callImpl.mockResolvedValueOnce({
         address: '0xABCD',
         publicKey: '0xpk',
       });
@@ -282,7 +299,7 @@ describe('LedgerAdapter', () => {
     });
 
     it('should call connector with correct method and params', async () => {
-      connector.call.mockResolvedValueOnce({
+      connector.callImpl.mockResolvedValueOnce({
         address: '0xABCD',
         publicKey: '0xpk',
       });
@@ -306,7 +323,7 @@ describe('LedgerAdapter', () => {
 
   describe('evmSignMessage', () => {
     it('should return signature on success', async () => {
-      connector.call.mockResolvedValueOnce({
+      connector.callImpl.mockResolvedValueOnce({
         signature: `0x${'aabb'.padStart(64, '0')}${'ccdd'.padStart(64, '0')}1c`,
       });
 
@@ -324,7 +341,7 @@ describe('LedgerAdapter', () => {
 
   describe('evmSignTypedData', () => {
     it('should return signature on success with full mode', async () => {
-      connector.call.mockResolvedValueOnce({
+      connector.callImpl.mockResolvedValueOnce({
         signature: `0x${'aabb'.padStart(64, '0')}${'ccdd'.padStart(64, '0')}1c`,
       });
 
@@ -347,7 +364,7 @@ describe('LedgerAdapter', () => {
 
     it('should reject hash mode', async () => {
       // Connector validates and throws for hash mode
-      connector.call.mockRejectedValueOnce(
+      connector.callImpl.mockRejectedValueOnce(
         Object.assign(new Error('Ledger does not support hash-only EIP-712 signing.'), {
           code: HardwareErrorCode.MethodNotSupported,
         })
@@ -379,7 +396,7 @@ describe('LedgerAdapter', () => {
     }
 
     it('retries once and succeeds when DeviceAppStuck clears on the second attempt', async () => {
-      connector.call
+      connector.callImpl
         .mockRejectedValueOnce(makeStuckErr())
         .mockResolvedValueOnce({ address: '0xABCD', publicKey: '0xpk' });
 
@@ -400,7 +417,9 @@ describe('LedgerAdapter', () => {
     });
 
     it('surfaces the original DeviceAppStuck error after a second 0x6901', async () => {
-      connector.call.mockRejectedValueOnce(makeStuckErr()).mockRejectedValueOnce(makeStuckErr());
+      connector.callImpl
+        .mockRejectedValueOnce(makeStuckErr())
+        .mockRejectedValueOnce(makeStuckErr());
 
       await adapter.connectDevice('dev-1');
 
@@ -417,7 +436,7 @@ describe('LedgerAdapter', () => {
     });
 
     it('does not retry for non-stuck errors', async () => {
-      connector.call.mockRejectedValueOnce(
+      connector.callImpl.mockRejectedValueOnce(
         Object.assign(new Error('User rejected on device'), {
           _tag: 'UserRejected',
           code: HardwareErrorCode.UserRejected,
@@ -438,7 +457,7 @@ describe('LedgerAdapter', () => {
 
   describe('Solana methods', () => {
     it('should return address for solGetAddress', async () => {
-      connector.call.mockResolvedValueOnce({ address: 'SoLAddr123', path: "m/44'/501'/0'" });
+      connector.callImpl.mockResolvedValueOnce({ address: 'SoLAddr123', path: "m/44'/501'/0'" });
 
       await adapter.connectDevice('dev-1');
       const result = await adapter.solGetAddress('dev-1', '', { path: "m/44'/501'/0'" });
@@ -450,7 +469,7 @@ describe('LedgerAdapter', () => {
     });
 
     it('should return signature for solSignTransaction', async () => {
-      connector.call.mockResolvedValueOnce({ signature: 'solSig456' });
+      connector.callImpl.mockResolvedValueOnce({ signature: 'solSig456' });
 
       await adapter.connectDevice('dev-1');
       const result = await adapter.solSignTransaction('dev-1', '', {
@@ -466,7 +485,7 @@ describe('LedgerAdapter', () => {
 
   describe('BTC methods', () => {
     it('btcGetAddress forwards params and returns address', async () => {
-      connector.call.mockResolvedValueOnce({ address: 'bc1qxyz', path: "m/84'/0'/0'" });
+      connector.callImpl.mockResolvedValueOnce({ address: 'bc1qxyz', path: "m/84'/0'/0'" });
 
       await adapter.connectDevice('dev-1');
       const result = await adapter.btcGetAddress('dev-1', '', {
@@ -487,7 +506,7 @@ describe('LedgerAdapter', () => {
     });
 
     it('btcGetPublicKey forwards params and returns xpub', async () => {
-      connector.call.mockResolvedValueOnce({ xpub: 'xpub6Abc', path: "m/84'/0'/0'" });
+      connector.callImpl.mockResolvedValueOnce({ xpub: 'xpub6Abc', path: "m/84'/0'/0'" });
 
       await adapter.connectDevice('dev-1');
       const result = await adapter.btcGetPublicKey('dev-1', '', {
@@ -508,7 +527,7 @@ describe('LedgerAdapter', () => {
 
     it('rejects concurrent BTC high-index calls instead of queueing them', async () => {
       let resolveFirstCall: ((value: unknown) => void) | undefined;
-      connector.call.mockImplementationOnce(
+      connector.callImpl.mockImplementationOnce(
         () =>
           new Promise(resolve => {
             resolveFirstCall = resolve;
@@ -563,7 +582,7 @@ describe('LedgerAdapter', () => {
     });
 
     it('rejects later device jobs while BTC high-index confirmation is pending', async () => {
-      connector.call.mockResolvedValueOnce({ xpub: 'xpub6High' });
+      connector.callImpl.mockResolvedValueOnce({ xpub: 'xpub6High' });
       await adapter.connectDevice('dev-1');
 
       const prompts: unknown[] = [];
@@ -615,7 +634,7 @@ describe('LedgerAdapter', () => {
     });
 
     it('btcSignTransaction forwards PSBT and returns serialized tx', async () => {
-      connector.call.mockResolvedValueOnce({ serializedTx: 'aabbcc' });
+      connector.callImpl.mockResolvedValueOnce({ serializedTx: 'aabbcc' });
 
       await adapter.connectDevice('dev-1');
       const result = await adapter.btcSignTransaction('dev-1', '', {
@@ -638,7 +657,7 @@ describe('LedgerAdapter', () => {
     });
 
     it('btcSignPsbt forwards PSBT and returns signed PSBT', async () => {
-      connector.call.mockResolvedValueOnce({ signedPsbt: '70736274ff01signed' });
+      connector.callImpl.mockResolvedValueOnce({ signedPsbt: '70736274ff01signed' });
 
       await adapter.connectDevice('dev-1');
       const result = await adapter.btcSignPsbt('dev-1', '', {
@@ -659,7 +678,7 @@ describe('LedgerAdapter', () => {
     });
 
     it('btcSignMessage forwards params and returns signature (address optional)', async () => {
-      connector.call.mockResolvedValueOnce({ signature: '1fabcd' });
+      connector.callImpl.mockResolvedValueOnce({ signature: '1fabcd' });
 
       await adapter.connectDevice('dev-1');
       const result = await adapter.btcSignMessage('dev-1', '', {
@@ -682,7 +701,7 @@ describe('LedgerAdapter', () => {
     });
 
     it('btcGetMasterFingerprint forwards to connector with no params', async () => {
-      connector.call.mockResolvedValueOnce({ masterFingerprint: 'deadbeef' });
+      connector.callImpl.mockResolvedValueOnce({ masterFingerprint: 'deadbeef' });
 
       await adapter.connectDevice('dev-1');
       const result = await adapter.btcGetMasterFingerprint('dev-1', '');
@@ -701,7 +720,7 @@ describe('LedgerAdapter', () => {
 
   describe('Tron methods', () => {
     it('tronGetAddress forwards params and returns address + publicKey', async () => {
-      connector.call.mockResolvedValueOnce({
+      connector.callImpl.mockResolvedValueOnce({
         address: 'TRonAddr1',
         publicKey: '04pk',
         path: "m/44'/195'/0'/0/0",
@@ -725,7 +744,7 @@ describe('LedgerAdapter', () => {
     });
 
     it('tronSignTransaction forwards rawTxHex (+ optional tokenSignatures) and returns signature', async () => {
-      connector.call.mockResolvedValueOnce({ signature: 'trxSig1' });
+      connector.callImpl.mockResolvedValueOnce({ signature: 'trxSig1' });
 
       await adapter.connectDevice('dev-1');
       const result = await adapter.tronSignTransaction('dev-1', '', {
@@ -749,7 +768,7 @@ describe('LedgerAdapter', () => {
     });
 
     it('tronSignMessage forwards messageHex and returns signature', async () => {
-      connector.call.mockResolvedValueOnce({ signature: 'trxMsgSig' });
+      connector.callImpl.mockResolvedValueOnce({ signature: 'trxMsgSig' });
 
       await adapter.connectDevice('dev-1');
       const result = await adapter.tronSignMessage('dev-1', '', {
@@ -770,7 +789,7 @@ describe('LedgerAdapter', () => {
 
     it('tronGetAddress rejects before returning a target address when fingerprint mismatches', async () => {
       const expectedFingerprint = deriveDeviceFingerprint('TExpectedFingerprintAddress');
-      connector.call
+      connector.callImpl
         .mockResolvedValueOnce({ address: 'TActualFingerprintAddress' })
         .mockResolvedValueOnce({ address: 'TSHOULD_NOT_RETURN', publicKey: '0xpub' });
 
@@ -798,7 +817,7 @@ describe('LedgerAdapter', () => {
 
     it('tronSignTransaction rejects before signing when fingerprint mismatches', async () => {
       const expectedFingerprint = deriveDeviceFingerprint('TExpectedFingerprintAddress');
-      connector.call
+      connector.callImpl
         .mockResolvedValueOnce({ address: 'TActualFingerprintAddress' })
         .mockResolvedValueOnce({ signature: 'SHOULD_NOT_SIGN' });
 
@@ -1016,7 +1035,7 @@ describe('LedgerAdapter', () => {
 
   describe('auto-connect', () => {
     it('should auto search+connect when calling evmGetAddress without prior connectDevice', async () => {
-      connector.call.mockResolvedValueOnce({
+      connector.callImpl.mockResolvedValueOnce({
         address: '0xABCD',
         publicKey: '0xpk',
       });
@@ -1044,7 +1063,7 @@ describe('LedgerAdapter', () => {
     });
 
     it('should not reuse a stale USB session after searchDevices requests a session reset', async () => {
-      connector.call.mockResolvedValueOnce({
+      connector.callImpl.mockResolvedValueOnce({
         address: '0xOLD',
         publicKey: '0xold',
       });
@@ -1070,7 +1089,7 @@ describe('LedgerAdapter', () => {
           connectionType: 'usb',
         },
       } as ConnectorSession);
-      connector.call.mockResolvedValueOnce({
+      connector.callImpl.mockResolvedValueOnce({
         address: '0xNEW',
         publicKey: '0xnew',
       });
@@ -1098,7 +1117,7 @@ describe('LedgerAdapter', () => {
       await adapter.connectDevice('dev-1');
 
       // Simulate disconnect error on first call, success on retry
-      connector.call
+      connector.callImpl
         .mockResolvedValueOnce({ address: expectedAddress })
         .mockRejectedValueOnce(
           Object.assign(new Error('session not found'), { _tag: 'DeviceSessionNotFound' })
@@ -1144,7 +1163,7 @@ describe('LedgerAdapter', () => {
     it('should fail closed when a USB target misses and no device fingerprint is available', async () => {
       await adapter.connectDevice('dev-1');
 
-      connector.call.mockRejectedValueOnce(
+      connector.callImpl.mockRejectedValueOnce(
         Object.assign(new Error('session not found'), { _tag: 'DeviceSessionNotFound' })
       );
       connector.searchDevices.mockResolvedValueOnce([
@@ -1170,7 +1189,7 @@ describe('LedgerAdapter', () => {
 
       await adapter.connectDevice('dev-1');
 
-      connector.call
+      connector.callImpl
         .mockResolvedValueOnce({ address: expectedAddress })
         .mockRejectedValueOnce(
           Object.assign(new Error('apdu timeout'), { _tag: 'SendApduTimeoutError' })
@@ -1234,7 +1253,7 @@ describe('LedgerAdapter', () => {
           },
         } as ConnectorSession);
 
-      connector.call
+      connector.callImpl
         .mockRejectedValueOnce(
           Object.assign(new Error('apdu timeout'), { _tag: 'SendApduTimeoutError' })
         )
@@ -1282,7 +1301,7 @@ describe('LedgerAdapter', () => {
           connectionType: 'usb',
         },
       });
-      connector.call.mockResolvedValueOnce({ address: '0xFALLBACK' });
+      connector.callImpl.mockResolvedValueOnce({ address: '0xFALLBACK' });
 
       const result = await adapter.evmGetAddress('', '', {
         path: "m/44'/60'/0'/0/0",
@@ -1313,7 +1332,7 @@ describe('LedgerAdapter', () => {
           connectionType: 'usb',
         },
       });
-      connector.call.mockResolvedValueOnce({ address: '0xTARGET', publicKey: '0xpk' });
+      connector.callImpl.mockResolvedValueOnce({ address: '0xTARGET', publicKey: '0xpk' });
 
       const result = await adapter.evmGetAddress('dev-B', '', {
         path: "m/44'/60'/0'/0/0",
@@ -1370,7 +1389,7 @@ describe('LedgerAdapter', () => {
           connectionType: 'ble',
         },
       } as ConnectorSession);
-      bleConnector.call.mockResolvedValueOnce({ address: '0xBLE', publicKey: '0xpk' });
+      bleConnector.callImpl.mockResolvedValueOnce({ address: '0xBLE', publicKey: '0xpk' });
       const bleAdapter = new LedgerAdapter(bleConnector);
       bleAdapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, () => {
         bleAdapter.uiResponse({
@@ -1418,7 +1437,7 @@ describe('LedgerAdapter', () => {
             connectionType: 'ble',
           },
         } as ConnectorSession);
-      bleConnector.call.mockResolvedValueOnce({ address: '0xBLE', publicKey: '0xpk' });
+      bleConnector.callImpl.mockResolvedValueOnce({ address: '0xBLE', publicKey: '0xpk' });
       const bleAdapter = new LedgerAdapter(bleConnector);
       bleAdapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, () => {
         bleAdapter.uiResponse({
@@ -1467,7 +1486,7 @@ describe('LedgerAdapter', () => {
             connectionType: 'ble',
           },
         } as ConnectorSession);
-      bleConnector.call
+      bleConnector.callImpl
         .mockRejectedValueOnce(
           Object.assign(new Error('session not found'), { _tag: 'DeviceSessionNotFound' })
         )
@@ -1563,7 +1582,7 @@ describe('LedgerAdapter', () => {
 
   describe('app management', () => {
     it('listInstalledApps routes through connector.call with listInstalledApps method', async () => {
-      connector.call.mockResolvedValueOnce([
+      connector.callImpl.mockResolvedValueOnce([
         {
           versionName: 'Bitcoin',
           versionId: 1,
@@ -1587,7 +1606,7 @@ describe('LedgerAdapter', () => {
     });
 
     it('listAvailableApps routes through connector.call with listAvailableApps method', async () => {
-      connector.call.mockResolvedValueOnce([]);
+      connector.callImpl.mockResolvedValueOnce([]);
       await adapter.connectDevice('dev-1');
       const result = await adapter.listAvailableApps('dev-1');
 
@@ -1596,7 +1615,7 @@ describe('LedgerAdapter', () => {
     });
 
     it('installApp passes appName through params (no function refs)', async () => {
-      connector.call.mockResolvedValueOnce(undefined);
+      connector.callImpl.mockResolvedValueOnce(undefined);
       await adapter.connectDevice('dev-1');
       const result = await adapter.installApp('dev-1', 'Cardano');
 
@@ -1612,43 +1631,57 @@ describe('LedgerAdapter', () => {
       }
     });
 
-    it('forwards connector app-install-progress events with connectId re-keyed from sessionId', async () => {
-      connector.call.mockResolvedValueOnce(undefined);
+    it('forwards connector AppInstallProgress ui-event with connectId re-keyed from sessionId', async () => {
+      connector.callImpl.mockResolvedValueOnce(undefined);
       const events: unknown[] = [];
-      adapter.on('app-install-progress', evt => events.push(evt));
+      adapter.on('ui-event', evt => {
+        if (evt.type === EConnectorInteraction.AppInstallProgress) {
+          events.push(evt);
+        }
+      });
 
       await adapter.connectDevice('dev-1');
       // Simulate the connector emitting progress mid-install.
-      connector._emit('app-install-progress', {
-        sessionId: 'session-abc',
-        appName: 'Cardano',
-        progress: 0.5,
+      connector._emit('ui-event', {
+        type: EConnectorInteraction.AppInstallProgress,
+        payload: {
+          sessionId: 'session-abc',
+          appName: 'Cardano',
+          progress: 0.5,
+        },
       });
       await adapter.installApp('dev-1', 'Cardano');
 
       expect(events).toHaveLength(1);
       expect(events[0]).toEqual({
-        type: 'app-install-progress',
+        type: EConnectorInteraction.AppInstallProgress,
         payload: { connectId: 'dev-1', appName: 'Cardano', progress: 0.5 },
       });
     });
 
-    it('drops app-install-progress events with no matching session', async () => {
+    it('drops AppInstallProgress events with no matching session', async () => {
       const events: unknown[] = [];
-      adapter.on('app-install-progress', evt => events.push(evt));
+      adapter.on('ui-event', evt => {
+        if (evt.type === EConnectorInteraction.AppInstallProgress) {
+          events.push(evt);
+        }
+      });
 
       // No connectDevice() called → _sessions is empty → forwarder drops.
-      connector._emit('app-install-progress', {
-        sessionId: 'stale-session',
-        appName: 'Cardano',
-        progress: 0.1,
+      connector._emit('ui-event', {
+        type: EConnectorInteraction.AppInstallProgress,
+        payload: {
+          sessionId: 'stale-session',
+          appName: 'Cardano',
+          progress: 0.1,
+        },
       });
 
       expect(events).toHaveLength(0);
     });
 
     it('installApp surfaces connector errors as failure response', async () => {
-      connector.call.mockRejectedValueOnce(
+      connector.callImpl.mockRejectedValueOnce(
         Object.assign(new Error('Allow secure connection rejected'), {
           code: HardwareErrorCode.UserAborted,
         })

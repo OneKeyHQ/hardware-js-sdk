@@ -106,6 +106,8 @@ export type {
   ConnectorEventType,
   ConnectorEventMap,
   ConnectorUiEvent,
+  ConnectorCallResult,
+  ConnectorSerializedError,
   IConnector,
   IHardwareBridge,
 } from './types/connector';

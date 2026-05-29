@@ -42,6 +42,7 @@ import type {
   BtcSignedTx,
   ChainCapability,
   ChainForFingerprint,
+  ConnectorCallResult,
   ConnectorDevice,
   ConnectorUiEvent,
   DeviceEventListener,
@@ -448,14 +449,15 @@ export class LedgerAdapter implements IHardwareWallet {
   // ---------------------------------------------------------------------------
   // App management — OS-level Ledger app install / list. Bypasses fingerprint
   // and chain-handler dispatch; installApp progress is forwarded to the adapter
-  // emitter as 'app-install-progress' events.
+  // emitter via 'ui-event' AppInstallProgress events.
   // ---------------------------------------------------------------------------
 
   async installApp(connectId: string, appName: string): Promise<Response<void>> {
     try {
-      // Progress is emitted from the connector via the 'app-install-progress'
-      // event (see appInstallProgressForwarder); no callback is passed here so
-      // installApp params stay fully serializable across IHardwareBridge.
+      // Progress is emitted from the connector via a 'ui-event'
+      // AppInstallProgress variant (see uiEventForwarder); no callback is
+      // passed here so installApp params stay fully serializable across
+      // IHardwareBridge.
       await this.connectorCall(connectId, 'installApp', { appName });
       return success(undefined);
     } catch (err) {
@@ -599,7 +601,7 @@ export class LedgerAdapter implements IHardwareWallet {
 
     try {
       const fingerprint = await this._computeChainFingerprint(chain, (method, params) =>
-        this.connector.call(sessionId, method, params)
+        this._callConnector(sessionId, method, params)
       );
       if (fingerprint === deviceId) {
         return { success: true };
@@ -1056,6 +1058,42 @@ export class LedgerAdapter implements IHardwareWallet {
    * 3. Calls connector.call()
    * 4. On disconnect error: clears stale session, re-connects, retries once
    */
+  /**
+   * Unwrap a `ConnectorCallResult` back into the throw-based control flow this
+   * class relies on. On failure, rehydrate a FLAT Error (lifting `params.*`
+   * back to own-properties) so the downstream recovery predicates
+   * (`isStuckAppStateError`, `isDeviceLockedError`, …) and `mapLedgerError`
+   * (which read `err._tag` / `err.code` / `err.appName` / `err.originalError`)
+   * keep working exactly as before — the Result shape is confined to the
+   * connector boundary.
+   */
+  private _unwrapConnectorResult(result: ConnectorCallResult): unknown {
+    if (result.success) return result.payload;
+    const { message, code, errorCode, params } = result.error;
+    throw Object.assign(new Error(message), {
+      ...(code !== undefined ? { code } : {}),
+      ...(errorCode !== undefined ? { errorCode } : {}),
+      ...(params ?? {}),
+    });
+  }
+
+  /**
+   * `connector.call` + result unwrap, optionally raced against an abort
+   * signal. Returns the call payload or throws the rehydrated error. All
+   * `this.connector.call` usage goes through here so the Result→throw seam
+   * lives in one place.
+   */
+  private async _callConnector(
+    sessionId: string,
+    method: string,
+    params: unknown,
+    signal?: AbortSignal
+  ): Promise<unknown> {
+    const promise = this.connector.call(sessionId, method, params);
+    const result = signal ? await this._abortable(signal, promise) : await promise;
+    return this._unwrapConnectorResult(result);
+  }
+
   private async connectorCall(
     connectId: string,
     method: string,
@@ -1188,7 +1226,7 @@ export class LedgerAdapter implements IHardwareWallet {
           });
         }
       }
-      return await this._abortable(signal, this.connector.call(sessionId, method, effectiveParams));
+      return await this._callConnector(sessionId, method, effectiveParams, signal);
     } catch (err) {
       // If the abort fired, surface it directly — skip recovery paths.
       if (signal.aborted) throw err;
@@ -1315,10 +1353,7 @@ export class LedgerAdapter implements IHardwareWallet {
               }
             }
 
-            return await this._abortable(
-              signal,
-              this.connector.call(reSessionId, method, effectiveParams)
-            );
+            return await this._callConnector(reSessionId, method, effectiveParams, signal);
           } catch (retryErr) {
             if (signal.aborted) throw retryErr;
             lastErr = retryErr;
@@ -1412,7 +1447,7 @@ export class LedgerAdapter implements IHardwareWallet {
       }
     }
 
-    return this._abortable(signal, this.connector.call(retrySessionId, method, params));
+    return this._callConnector(retrySessionId, method, params, signal);
   }
 
   private _sleepAbortable(ms: number, signal: AbortSignal): Promise<void> {
@@ -1480,7 +1515,7 @@ export class LedgerAdapter implements IHardwareWallet {
         }
       }
 
-      return await this._abortable(signal, this.connector.call(retrySessionId, method, params));
+      return await this._callConnector(retrySessionId, method, params, signal);
     } catch (retryErr) {
       if (signal.aborted) throw retryErr;
       this.connector.reset();
@@ -1530,7 +1565,7 @@ export class LedgerAdapter implements IHardwareWallet {
         }
       }
 
-      return this._abortable(signal, this.connector.call(finalSessionId, method, params));
+      return this._callConnector(finalSessionId, method, params, signal);
     }
   }
 
@@ -1674,49 +1709,46 @@ export class LedgerAdapter implements IHardwareWallet {
     });
   };
 
-  // Forward low-level connector 'ui-event' (the four EConnectorInteraction values)
-  // to the public hw.emitter so consumers only need to subscribe in one place
-  // (hw.on instead of also reaching into connector.on).
+  // Forward connector `ui-event` to the public hw.emitter so consumers only
+  // need to subscribe in one place. For the AppInstallProgress variant we
+  // re-key sessionId → connectId via the live _sessions map; if no mapping
+  // exists (race during teardown) we drop. All other variants pass through
+  // unchanged.
   private uiEventForwarder = (event: ConnectorUiEvent): void => {
-    this.emitter.emit('ui-event', event);
-  };
-
-  // Forward 'app-install-progress' from the connector (carries sessionId) to the
-  // public hw.emitter as a connectId-keyed event. We translate sessionId → connectId
-  // via the live _sessions map; if no mapping exists (race during teardown) we drop.
-  private appInstallProgressForwarder = (data: {
-    sessionId: string;
-    appName: string;
-    progress: number;
-  }): void => {
-    let connectId: string | undefined;
-    for (const [cid, sid] of this._sessions) {
-      if (sid === data.sessionId) {
-        connectId = cid;
-        break;
+    if (event.type === EConnectorInteraction.AppInstallProgress) {
+      let connectId: string | undefined;
+      for (const [cid, sid] of this._sessions) {
+        if (sid === event.payload.sessionId) {
+          connectId = cid;
+          break;
+        }
       }
-    }
-    if (!connectId) {
+      if (!connectId) {
+        return;
+      }
+      this.emitter.emit('ui-event', {
+        type: EConnectorInteraction.AppInstallProgress,
+        payload: {
+          connectId,
+          appName: event.payload.appName,
+          progress: event.payload.progress,
+        },
+      });
       return;
     }
-    this.emitter.emit('app-install-progress', {
-      type: 'app-install-progress',
-      payload: { connectId, appName: data.appName, progress: data.progress },
-    });
+    this.emitter.emit('ui-event', event);
   };
 
   private registerEventListeners(): void {
     this.connector.on('device-connect', this.deviceConnectHandler);
     this.connector.on('device-disconnect', this.deviceDisconnectHandler);
     this.connector.on('ui-event', this.uiEventForwarder);
-    this.connector.on('app-install-progress', this.appInstallProgressForwarder);
   }
 
   private unregisterEventListeners(): void {
     this.connector.off('device-connect', this.deviceConnectHandler);
     this.connector.off('device-disconnect', this.deviceDisconnectHandler);
     this.connector.off('ui-event', this.uiEventForwarder);
-    this.connector.off('app-install-progress', this.appInstallProgressForwarder);
   }
 
   // ---------------------------------------------------------------------------

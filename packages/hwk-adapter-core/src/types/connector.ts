@@ -33,12 +33,34 @@ export interface ConnectorSession {
   deviceInfo: DeviceInfo;
 }
 
-export type ConnectorEventType =
-  | 'device-connect'
-  | 'device-disconnect'
-  | 'ui-request'
-  | 'ui-event'
-  | 'app-install-progress';
+// =====================================================================
+// Connector call result — device errors travel as DATA, not exceptions
+//
+// `IConnector.call` never throws for device-level failures. It resolves a
+// discriminated result so the failure crosses any process boundary
+// (IHardwareBridge / extension offscreen↔SW) as plain `data`. This mirrors
+// the OneKey HD-SDK `IDeviceResponseResult` contract.
+//
+// WHY: when a thrown Error crosses the extension JsBridge it is run through
+// `toPlainError`, a fixed field whitelist that drops custom own-properties
+// (e.g. `appName`). Returning the failure as data keeps every field intact.
+//
+// Contract for `ConnectorSerializedError`: only `message` / `code` /
+// `errorCode` live at the top level; ALL other domain fields (`appName`,
+// `_tag`, `statusCode`, …) are nested under `params`.
+// =====================================================================
+export interface ConnectorSerializedError {
+  message: string;
+  code?: number;
+  errorCode?: string;
+  params?: Record<string, unknown>;
+}
+
+export type ConnectorCallResult =
+  | { success: true; payload: unknown }
+  | { success: false; error: ConnectorSerializedError };
+
+export type ConnectorEventType = 'device-connect' | 'device-disconnect' | 'ui-request' | 'ui-event';
 
 /**
  * Interaction event types emitted via 'ui-event'.
@@ -55,28 +77,34 @@ export enum EConnectorInteraction {
   ConfirmOnDevice = 'confirm-on-device',
   /** Previous interaction completed — clear UI prompt */
   InteractionComplete = 'interaction-complete',
+  /**
+   * OS-level Ledger app install progress. `progress` is a 0..1 fraction
+   * reported by DMK's InstallOrUpdateAppsDeviceAction. Emitted from inside
+   * the connector so the progress callback ref never has to cross the
+   * IHardwareBridge boundary.
+   */
+  AppInstallProgress = 'app-install-progress',
 }
 
-// All variants share the same payload shape so that emit sites where the
-// `type` is a broad `EConnectorInteraction` value (e.g. piped through
-// `collapseSignerInteraction`) still type-check. Searching has no session
-// yet so it carries an empty `sessionId`.
+// Discriminated union: most variants only carry `sessionId`, but
+// AppInstallProgress also carries `appName` + `progress`. Searching has no
+// session yet so it carries an empty `sessionId`.
 export type ConnectorUiEvent =
   | { type: EConnectorInteraction.Searching; payload: { sessionId: string } }
   | { type: EConnectorInteraction.ConfirmOpenApp; payload: { sessionId: string } }
   | { type: EConnectorInteraction.UnlockDevice; payload: { sessionId: string } }
   | { type: EConnectorInteraction.ConfirmOnDevice; payload: { sessionId: string } }
-  | { type: EConnectorInteraction.InteractionComplete; payload: { sessionId: string } };
+  | { type: EConnectorInteraction.InteractionComplete; payload: { sessionId: string } }
+  | {
+      type: EConnectorInteraction.AppInstallProgress;
+      payload: { sessionId: string; appName: string; progress: number };
+    };
 
 export interface ConnectorEventMap {
   'device-connect': { device: ConnectorDevice };
   'device-disconnect': { connectId: string };
   'ui-request': { type: string; payload?: unknown };
   'ui-event': ConnectorUiEvent;
-  // OS-level Ledger app install progress. Emitted from inside the connector
-  // so the callback ref never has to cross the IHardwareBridge boundary.
-  // `progress` is a 0..1 fraction reported by DMK's InstallOrUpdateAppsDeviceAction.
-  'app-install-progress': { sessionId: string; appName: string; progress: number };
 }
 
 export interface IConnector {
@@ -86,7 +114,9 @@ export interface IConnector {
   searchDevices(): Promise<ConnectorDevice[]>;
   connect(deviceId?: string): Promise<ConnectorSession>;
   disconnect(sessionId: string): Promise<void>;
-  call(sessionId: string, method: string, params: unknown): Promise<unknown>;
+  // Resolves a discriminated result; device failures are returned as data,
+  // never thrown (see ConnectorCallResult).
+  call(sessionId: string, method: string, params: unknown): Promise<ConnectorCallResult>;
   cancel(sessionId: string): Promise<void>;
 
   /** Send a UI response (e.g. PIN, passphrase) to the device. */
@@ -121,7 +151,7 @@ export interface IHardwareBridge {
     sessionId: string;
     method: string;
     callParams: unknown;
-  }): Promise<unknown>;
+  }): Promise<ConnectorCallResult>;
   cancel(params: { vendor: VendorType; sessionId: string }): Promise<void>;
   uiResponse(params: { vendor: VendorType; response: UiResponseEvent }): void;
   reset(params: { vendor: VendorType }): void;
