@@ -448,7 +448,7 @@ export default class ReactNativeBleTransport {
       } catch (e) {
         Log?.debug('device disconnect error: ', e);
       } finally {
-        this.release(uuid);
+        this.release(uuid, true);
       }
     });
   }
@@ -635,16 +635,32 @@ export default class ReactNativeBleTransport {
       throw ERRORS.TypedError(HardwareErrorCode.BleRequiredUUID);
     }
 
-    let device: Device | null = null;
+    const cachedTransport = transportCache[uuid];
+    if (cachedTransport) {
+      const cachedProtocol = this.deviceProtocol.get(uuid);
+      const isCachedDeviceConnected = await cachedTransport.device.isConnected().catch(() => false);
+      if (
+        isCachedDeviceConnected &&
+        cachedProtocol &&
+        (!expectedProtocol || cachedProtocol === expectedProtocol)
+      ) {
+        Log?.debug(
+          '[ReactNativeBleTransport] reuse cached BLE transport:',
+          uuid,
+          cachedProtocol
+        );
+        return { uuid, protocolType: cachedProtocol };
+      }
 
-    if (transportCache[uuid]) {
       /**
-       * If the transport is not released due to an exception operation
-       * it will be handled again here
+       * If the transport is not reusable due to a protocol mismatch or stale
+       * connection, clean it up before creating a new transport instance.
        */
-      Log?.debug('transport not be released, will release: ', uuid);
-      await this.release(uuid);
+      Log?.debug('transport not reusable, will release: ', uuid);
+      await this.release(uuid, true);
     }
+
+    let device: Device | null = null;
 
     if (forceCleanRunPromise && this.runPromise) {
       const error = ERRORS.TypedError(HardwareErrorCode.BleForceCleanRunPromise);
@@ -747,7 +763,7 @@ export default class ReactNativeBleTransport {
         inferProtocolHintFromDeviceName(getDeviceDisplayName(device));
 
     // release transport before new transport instance
-    await this.release(uuid);
+    await this.release(uuid, true);
     if (protocolHint) {
       this.deviceProtocolHints.set(uuid, protocolHint);
     }
@@ -906,7 +922,7 @@ export default class ReactNativeBleTransport {
     return subscription;
   }
 
-  async release(uuid: string) {
+  async release(uuid: string, onclose = false) {
     const transport = transportCache[uuid];
     if (this.runPromise) {
       const error = ERRORS.TypedError(HardwareErrorCode.BleForceCleanRunPromise);
@@ -916,6 +932,15 @@ export default class ReactNativeBleTransport {
       this.activeProtocolV2Call = null;
     } else {
       this.resetProtocolV2Frames(uuid);
+    }
+
+    if (Platform.OS === 'android' && !onclose && transport) {
+      this.protocolV2Assemblers.get(uuid)?.reset();
+      this.resetProtocolV2Frames(uuid);
+      if (this.activeProtocolV2Call?.uuid === uuid) {
+        this.activeProtocolV2Call = null;
+      }
+      return Promise.resolve(true);
     }
 
     if (transport) {

@@ -444,7 +444,11 @@ export class DeviceCommands {
       // ignore logging errors
     }
 
-    const response = await this._commonCall(type, msg, options);
+    const expectedTypes = Array.isArray(resType) ? resType : resType.split('|');
+    const response = await this._commonCall(type, msg, {
+      ...options,
+      expectedTypes: options?.expectedTypes ?? expectedTypes,
+    });
     try {
       assertType(response, resType);
     } catch (error) {
