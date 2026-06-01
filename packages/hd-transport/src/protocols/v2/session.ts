@@ -267,59 +267,63 @@ export class ProtocolV2Session {
 
       await writeFrame(frame);
 
-      // Some Protocol V2 operations emit progress notifications before the
-      // terminal response. Consume those frames here so callers still see a
-      // request/terminal-response shaped API.
-      // eslint-disable-next-line no-constant-condition
-      while (true) {
-        const rxFrame = await readFrame();
-        if (!shouldReduceDebug) {
-          logger?.debug?.(
-            `[${logPrefix}] RX frame len=${rxFrame.length} router=${rxFrame[4]} attr=${
-              rxFrame[5]
-            } seq=${rxFrame[6]} hex=${bytesToDebugHex(rxFrame)}`
-          );
-        }
-        const decoded = ProtocolV2.decodeFrame(schemas, rxFrame, {
-          logger: shouldReduceDebug ? undefined : logger,
-          logPrefix,
-          context: `rx:${name}`,
-        });
-        if (!shouldReduceDebug && decoded.seq !== expectedSeq) {
-          logger?.debug?.(
-            `[${logPrefix}] seq differs for ${name}: tx=${expectedSeq}, rx=${decoded.seq}`
-          );
-        }
-        if (!shouldReduceDebug) {
-          logger?.debug?.(
-            `[${logPrefix}] TX name=${name} seq=${expectedSeq} | RX seq=${decoded.seq} messageTypeId=${decoded.messageTypeId} pbPayload=${decoded.pbPayload.length}B`
-          );
-          logger?.debug?.(
-            `[${logPrefix}] RX payload type=${decoded.type} messageTypeId=${decoded.messageTypeId}`,
-            sanitizeProtocolV2DebugPayload(decoded.message)
-          );
-        }
+      const readResponse = async () => {
+        // Some Protocol V2 operations emit progress notifications before the
+        // terminal response. Consume those frames here so callers still see a
+        // request/terminal-response shaped API.
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          const rxFrame = await readFrame();
+          if (!shouldReduceDebug) {
+            logger?.debug?.(
+              `[${logPrefix}] RX frame len=${rxFrame.length} router=${rxFrame[4]} attr=${
+                rxFrame[5]
+              } seq=${rxFrame[6]} hex=${bytesToDebugHex(rxFrame)}`
+            );
+          }
+          const decoded = ProtocolV2.decodeFrame(schemas, rxFrame, {
+            logger: shouldReduceDebug ? undefined : logger,
+            logPrefix,
+            context: `rx:${name}`,
+          });
+          if (!shouldReduceDebug && decoded.seq !== expectedSeq) {
+            logger?.debug?.(
+              `[${logPrefix}] seq differs for ${name}: tx=${expectedSeq}, rx=${decoded.seq}`
+            );
+          }
+          if (!shouldReduceDebug) {
+            logger?.debug?.(
+              `[${logPrefix}] TX name=${name} seq=${expectedSeq} | RX seq=${decoded.seq} messageTypeId=${decoded.messageTypeId} pbPayload=${decoded.pbPayload.length}B`
+            );
+            logger?.debug?.(
+              `[${logPrefix}] RX payload type=${decoded.type} messageTypeId=${decoded.messageTypeId}`,
+              sanitizeProtocolV2DebugPayload(decoded.message)
+            );
+          }
 
-        const response = check.call(decoded);
-        if (callOptions.intermediateTypes?.includes(response.type)) {
-          callOptions.onIntermediateResponse?.(response);
-        } else if (isExpectedTerminalResponse(response, callOptions.expectedTypes)) {
-          return response;
-        } else {
-          logger?.debug?.(
-            `[${logPrefix}] skip unexpected response for ${name}: expected=${callOptions.expectedTypes?.join(
-              '|'
-            )} got=${response.type}`
-          );
+          const response = check.call(decoded);
+          if (callOptions.intermediateTypes?.includes(response.type)) {
+            callOptions.onIntermediateResponse?.(response);
+          } else if (isExpectedTerminalResponse(response, callOptions.expectedTypes)) {
+            return response;
+          } else {
+            logger?.debug?.(
+              `[${logPrefix}] skip unexpected response for ${name}: expected=${callOptions.expectedTypes?.join(
+                '|'
+              )} got=${response.type}`
+            );
+          }
         }
-      }
+      };
+
+      return withProtocolTimeout(readResponse(), callOptions.timeoutMs, () =>
+        createTimeoutError
+          ? createTimeoutError(name, callOptions.timeoutMs ?? 0)
+          : new Error(`Protocol V2 response timeout after ${callOptions.timeoutMs}ms for ${name}`)
+      );
     };
 
-    return withProtocolTimeout(callPromise(), callOptions.timeoutMs, () =>
-      createTimeoutError
-        ? createTimeoutError(name, callOptions.timeoutMs ?? 0)
-        : new Error(`Protocol V2 response timeout after ${callOptions.timeoutMs}ms for ${name}`)
-    );
+    return callPromise();
   }
 }
 

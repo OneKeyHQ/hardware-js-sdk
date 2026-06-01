@@ -17,6 +17,8 @@ import GetPassphraseState from '../src/api/GetPassphraseState';
 import GetOnekeyFeatures from '../src/api/GetOnekeyFeatures';
 import { batchGetPublickeys } from '../src/api/helpers/batchGetPublickeys';
 import SuiSignTransaction from '../src/api/sui/SuiSignTransaction';
+import SolGetAddress from '../src/api/solana/SolGetAddress';
+import TronGetAddress from '../src/api/tron/TronGetAddress';
 import TronSignMessage from '../src/api/tron/TronSignMessage';
 import XrpSignTransaction from '../src/api/xrp/XrpSignTransaction';
 import StellarGetAddress from '../src/api/stellar/StellarGetAddress';
@@ -33,6 +35,7 @@ import {
 } from '../src/utils/deviceFeaturesUtils';
 
 import type { DeviceCommands } from '../src/device/DeviceCommands';
+import type { Features } from '../src/types';
 
 jest.mock('../src/data/config', () => ({
   getSDKVersion: jest.fn(() => '1.0.0'),
@@ -560,6 +563,40 @@ describe('API compatibility handling', () => {
         errorCode: HardwareErrorCode.DeviceNotSupportMethod,
       })
     );
+  });
+
+  test('marks Pro2 Tron and Solana address methods as unsupported', () => {
+    const features = {
+      onekey_device_type: 'pro2',
+    } as Features;
+
+    const tronMethod = new TronGetAddress({
+      id: 1,
+      payload: {
+        method: 'tronGetAddress',
+        path: "m/44'/195'/0'/0/0",
+        showOnOneKey: false,
+      },
+    });
+    const solMethod = new SolGetAddress({
+      id: 2,
+      payload: {
+        method: 'solGetAddress',
+        path: "m/44'/501'/0'/0'",
+        showOnOneKey: false,
+      },
+    });
+
+    expect(
+      isMethodVersionRangeUnsupported(
+        getMethodVersionRange(features, type => tronMethod.getVersionRange()[type])
+      )
+    ).toBe(true);
+    expect(
+      isMethodVersionRangeUnsupported(
+        getMethodVersionRange(features, type => solMethod.getVersionRange()[type])
+      )
+    ).toBe(true);
   });
 
   test('uses chunk transfer for large Sui transactions on Protocol V2', async () => {
