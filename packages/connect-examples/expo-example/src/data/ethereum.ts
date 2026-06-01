@@ -468,7 +468,7 @@ const api: PlaygroundProps[] = [
         },
       },
       {
-        title: 'EIP-7702 Additional Authorization',
+        title: 'EIP-7702 With Pre-signed Authorization (Test)',
         value: {
           path: "m/44'/60'/0'/0/0",
           transaction: {
@@ -485,7 +485,10 @@ const api: PlaygroundProps[] = [
               {
                 chainId: 1,
                 address: '0x4Cd241E8d1510e30b2076397afc7508Ae59C66c9',
-                nonce: '0x6',
+                nonce: '0x5',
+                yParity: 1,
+                r: '0xdeadbeef1234567890abcdef1234567890abcdef1234567890abcdef123456789',
+                s: '0xcafebabe567890abcdef1234567890abcdef1234567890abcdef1234567890abc',
               },
             ],
           },
