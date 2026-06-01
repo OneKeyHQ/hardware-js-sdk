@@ -203,8 +203,10 @@ function hasKnownOneKeyService(device?: Device | null) {
   );
 }
 
+const ANDROID_REQUEST_MTU = 256;
+
 const connectOptions: Record<string, unknown> = {
-  requestMTU: 256,
+  requestMTU: ANDROID_REQUEST_MTU,
   timeout: 3000,
   refreshGatt: 'OnConnected',
 };
@@ -218,6 +220,22 @@ const tryToGetConfiguration = (device: Device) => {
   const infos = getInfosForServiceUuid(serviceUUID, 'classic');
   if (!infos) return null;
   return infos;
+};
+
+const requestAndroidMtu = async (device: Device) => {
+  if (Platform.OS !== 'android') return device;
+
+  try {
+    const mtuDevice = await device.requestMTU(ANDROID_REQUEST_MTU);
+    Log?.debug('[ReactNativeBleTransport] Android MTU requested:', {
+      requested: ANDROID_REQUEST_MTU,
+      mtu: mtuDevice.mtu,
+    });
+    return mtuDevice;
+  } catch (error) {
+    Log?.debug('[ReactNativeBleTransport] Android MTU request failed:', error);
+    return device;
+  }
 };
 
 type IOBleErrorRemap = Error | BleError | null | undefined;
@@ -755,6 +773,7 @@ export default class ReactNativeBleTransport {
       }
     }
 
+    device = await requestAndroidMtu(device);
     const { writeCharacteristic, notifyCharacteristic } = await this.resolveCharacteristics(device);
 
     const protocolHint = expectedProtocol
@@ -1390,24 +1409,18 @@ export default class ReactNativeBleTransport {
     }
 
     if (expectedProtocol === 'V2') {
-      if (await this.probeProtocolV2(uuid)) {
-        this.deviceProtocol.set(uuid, 'V2');
-        Log?.debug(`[ReactNativeBleTransport] detectProtocol: uuid=${uuid} -> V2 (expected)`);
-        return 'V2';
-      }
-      throw this.createProtocolMismatchError(expectedProtocol);
+      this.deviceProtocol.set(uuid, 'V2');
+      Log?.debug(`[ReactNativeBleTransport] detectProtocol: uuid=${uuid} -> V2 (expected)`);
+      return 'V2';
     }
 
     if (protocolHint === 'V2') {
-      if (await this.probeProtocolV2(uuid)) {
-        this.deviceProtocol.set(uuid, 'V2');
-        Log?.debug(`[ReactNativeBleTransport] detectProtocol: uuid=${uuid} -> V2 (hint)`);
-        return 'V2';
-      }
-      throw this.createProtocolMismatchError('V2');
+      this.deviceProtocol.set(uuid, 'V2');
+      Log?.debug(`[ReactNativeBleTransport] detectProtocol: uuid=${uuid} -> V2 (hint)`);
+      return 'V2';
     }
 
-    if (this.deviceProtocol.get(uuid) === 'V2' && (await this.probeProtocolV2(uuid))) {
+    if (this.deviceProtocol.get(uuid) === 'V2') {
       this.deviceProtocol.set(uuid, 'V2');
       Log?.debug(`[ReactNativeBleTransport] detectProtocol: uuid=${uuid} -> V2 (cached)`);
       return 'V2';

@@ -364,21 +364,18 @@ export default class ElectronBleTransport {
     }
 
     if (expectedProtocol === 'V2') {
-      if (await this.probeProtocolV2(uuid)) {
-        this.deviceProtocol.set(uuid, 'V2');
-        this.Log?.debug(`[Electron BLE] detectProtocol: uuid=${uuid} -> V2 (expected)`);
-        return 'V2';
-      }
-      throw this.createProtocolMismatchError(expectedProtocol);
+      this.deviceProtocol.set(uuid, 'V2');
+      this.Log?.debug(`[Electron BLE] detectProtocol: uuid=${uuid} -> V2 (expected)`);
+      return 'V2';
     }
 
-    if (protocolHint === 'V2' && (await this.probeProtocolV2(uuid))) {
+    if (protocolHint === 'V2') {
       this.deviceProtocol.set(uuid, 'V2');
       this.Log?.debug(`[Electron BLE] detectProtocol: uuid=${uuid} -> V2 (hint)`);
       return 'V2';
     }
 
-    if (this.deviceProtocol.get(uuid) === 'V2' && (await this.probeProtocolV2(uuid))) {
+    if (this.deviceProtocol.get(uuid) === 'V2') {
       this.deviceProtocol.set(uuid, 'V2');
       this.Log?.debug(`[Electron BLE] detectProtocol: uuid=${uuid} -> V2 (cached)`);
       return 'V2';

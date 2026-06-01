@@ -53,7 +53,20 @@ type ProtocolV2DeviceInfo = {
   };
 };
 
-export const PROTOCOL_V2_DEVICE_INFO_REQUEST = {
+export const PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST = {
+  targets: {
+    hw: true,
+    fw: true,
+    bt: true,
+    status: true,
+  },
+  types: {
+    version: true,
+    specific: true,
+  },
+};
+
+export const PROTOCOL_V2_FULL_DEVICE_INFO_REQUEST = {
   targets: {
     hw: true,
     fw: true,
@@ -71,6 +84,8 @@ export const PROTOCOL_V2_DEVICE_INFO_REQUEST = {
     specific: true,
   },
 };
+
+export const PROTOCOL_V2_DEVICE_INFO_REQUEST = PROTOCOL_V2_FULL_DEVICE_INFO_REQUEST;
 
 function parseVersion(version?: string | null): [number, number, number] {
   if (!version) return [0, 0, 0];
@@ -256,23 +271,17 @@ export async function getProtocolV2Features({
   timeoutMs?: number;
 }) {
   const callOptions = timeoutMs ? { timeoutMs } : undefined;
-  if (callOptions) {
-    await commands.typedCall('Ping', 'Success', { message: 'init' }, callOptions);
-  } else {
-    await commands.typedCall('Ping', 'Success', { message: 'init' });
-  }
-
   const { message } = callOptions
     ? await commands.typedCall(
         'DeviceGetDeviceInfo',
         'DeviceInfo',
-        PROTOCOL_V2_DEVICE_INFO_REQUEST,
+        PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST,
         callOptions
       )
     : await commands.typedCall(
         'DeviceGetDeviceInfo',
         'DeviceInfo',
-        PROTOCOL_V2_DEVICE_INFO_REQUEST
+        PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST
       );
   return normalizeProtocolV2Features(descriptor, message as unknown as ProtocolV2DeviceInfo);
 }
