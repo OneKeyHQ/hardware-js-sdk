@@ -783,7 +783,7 @@ const api: UnifiedMethodConfig[] = [
         ],
       },
       {
-        title: 'EIP-7702 Additional Authorization',
+        title: 'EIP-7702 With Pre-signed Authorization (Test)',
         parameters: [
           {
             name: 'path',
@@ -798,11 +798,11 @@ const api: UnifiedMethodConfig[] = [
             type: 'textarea',
             required: true,
             label: 'Transaction',
-            description: 'EIP7702 transaction with additional authorization',
+            description: 'EIP7702 transaction with pre-signed authorization',
             value: {
               to: '0x4Cd241E8d1510e30b2076397afc7508Ae59C66c9',
               value: '0x0',
-              data: '0x',
+              data: '0x', // empty data for authorization only
               chainId: 1,
               nonce: '0x5',
               gasLimit: '0x7530',
@@ -814,6 +814,9 @@ const api: UnifiedMethodConfig[] = [
                   chainId: 1,
                   address: '0x4Cd241E8d1510e30b2076397afc7508Ae59C66c9',
                   nonce: '0x5',
+                  yParity: 1,
+                  r: '0xdeadbeef1234567890abcdef1234567890abcdef1234567890abcdef123456789',
+                  s: '0xcafebabe567890abcdef1234567890abcdef1234567890abcdef1234567890abc',
                 },
               ],
             },
