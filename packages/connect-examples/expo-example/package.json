@@ -1,6 +1,6 @@
 {
   "name": "onekey-expo-demo",
-  "version": "1.1.27-alpha.35",
+  "version": "1.1.27-alpha.38",
   "scripts": {
     "start": "cross-env CONNECT_SRC=https://localhost:8087/ yarn expo start --dev-client",
     "android": "yarn expo run:android",

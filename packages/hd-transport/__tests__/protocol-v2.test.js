@@ -262,6 +262,27 @@ describe('Protocol V2 framing and session', () => {
     });
   });
 
+  test('session starts response timeout after the frame is written', async () => {
+    const response = ProtocolV2.encodeFrame(schemas, 'Success', {
+      message: 'ok',
+    });
+    const session = new ProtocolV2Session({
+      schemas,
+      router: 1,
+      writeFrame: () => new Promise(resolve => setTimeout(resolve, 30)),
+      readFrame: () => Promise.resolve(response),
+    });
+
+    await expect(
+      session.call('Ping', { message: 'hello' }, { timeoutMs: 10, expectedTypes: ['Success'] })
+    ).resolves.toEqual({
+      type: 'Success',
+      message: {
+        message: 'ok',
+      },
+    });
+  });
+
   test('session accepts response frames with a device-owned seq', async () => {
     const response = ProtocolV2.encodeFrame(schemas, 'ProtoVersion', {
       major_version: 2,

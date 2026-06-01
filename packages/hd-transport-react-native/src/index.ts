@@ -22,6 +22,11 @@ import transport, {
 import { ERRORS, HardwareErrorCode, createDeferred, isOnekeyDevice } from '@onekeyfe/hd-shared';
 
 import { getConnectedDeviceIds, onDeviceBondState, pairDevice } from './BleManager';
+import {
+  hasWritableCapability,
+  resolveBleWriteMode,
+  resolveProtocolV2PacketCapacity,
+} from './bleStrategy';
 import { subscribeBleOn } from './subscribeBleOn';
 import {
   ANDROID_PACKET_LENGTH,
@@ -48,9 +53,10 @@ const Log = bleLogger;
 const transportCache: Record<string, BleTransport> = {};
 const BLE_RESPONSE_TIMEOUT_MS = 30_000;
 const PROTOCOL_PROBE_TIMEOUT_MS = 1000;
-const PROTOCOL_V2_PROBE_TIMEOUT_MS = 5000;
+const PROTOCOL_V2_PROBE_TIMEOUT_MS = 10_000;
 const DEVICE_SCAN_TIMEOUT_MS = 8000;
 const IOS_NOTIFY_READY_DELAY_MS = 150;
+const ANDROID_NOTIFY_READY_DELAY_MS = 300;
 const HIGH_VOLUME_WRITE_BURST_SIZE = Platform.OS === 'ios' ? 4 : 6;
 const HIGH_VOLUME_WRITE_PAUSE_MS = Platform.OS === 'ios' ? 6 : 2;
 const HIGH_VOLUME_WRITE_FLUSH_DELAY_MS = Platform.OS === 'ios' ? 20 : 8;
@@ -143,7 +149,7 @@ function hasKnownOneKeyService(device?: Device | null) {
   );
 }
 
-let connectOptions: Record<string, unknown> = {
+const connectOptions: Record<string, unknown> = {
   requestMTU: 256,
   timeout: 3000,
   refreshGatt: 'OnConnected',
@@ -430,11 +436,12 @@ export default class ReactNativeBleTransport {
       throw error;
     }
 
-    // check device is bonded
     if (Platform.OS === 'android') {
       const bondState = await pairDevice(uuid);
       if (bondState.bonding) {
         await onDeviceBondState(uuid);
+      } else if (!bondState.bonded) {
+        throw ERRORS.TypedError(HardwareErrorCode.BleDeviceNotBonded, 'device is not bonded');
       }
     }
 
@@ -460,7 +467,6 @@ export default class ReactNativeBleTransport {
           e.errorCode === BleErrorCode.DeviceMTUChangeFailed ||
           e.errorCode === BleErrorCode.OperationCancelled
         ) {
-          connectOptions = {};
           Log?.debug('first try to reconnect without params');
           device = await blePlxManager.connectToDevice(uuid);
         } else if (e.errorCode === BleErrorCode.DeviceAlreadyConnected) {
@@ -487,7 +493,6 @@ export default class ReactNativeBleTransport {
           e.errorCode === BleErrorCode.DeviceMTUChangeFailed ||
           e.errorCode === BleErrorCode.OperationCancelled
         ) {
-          connectOptions = {};
           Log?.debug('second try to reconnect without params');
           try {
             device = await device.connect();
@@ -590,7 +595,7 @@ export default class ReactNativeBleTransport {
       throw ERRORS.TypedError('BLECharacteristicNotFound: notify characteristic not found');
     }
 
-    if (!writeCharacteristic.isWritableWithResponse) {
+    if (!hasWritableCapability(writeCharacteristic)) {
       throw ERRORS.TypedError('BLECharacteristicNotWritable: write characteristic not writable');
     }
 
@@ -612,6 +617,9 @@ export default class ReactNativeBleTransport {
     }
 
     const transport = new BleTransport(device, writeCharacteristic, notifyCharacteristic);
+    if (Platform.OS === 'android') {
+      transport.mtuSize = typeof device.mtu === 'number' ? device.mtu : transport.mtuSize;
+    }
     const monitorToken = this.nextMonitorToken;
     this.nextMonitorToken += 1;
     const notifyTransactionId = `${uuid}:notify:${monitorToken}`;
@@ -632,6 +640,8 @@ export default class ReactNativeBleTransport {
       await new Promise<void>(resolve => {
         setTimeout(resolve, IOS_NOTIFY_READY_DELAY_MS);
       });
+    } else if (Platform.OS === 'android') {
+      await delay(ANDROID_NOTIFY_READY_DELAY_MS);
     }
 
     const protocolType = await this.detectProtocol(uuid, expectedProtocol, protocolHint);
@@ -1164,10 +1174,13 @@ export default class ReactNativeBleTransport {
       throw this.createProtocolMismatchError(expectedProtocol);
     }
 
-    if (protocolHint === 'V2' && (await this.probeProtocolV2(uuid))) {
-      this.deviceProtocol.set(uuid, 'V2');
-      Log?.debug(`[ReactNativeBleTransport] detectProtocol: uuid=${uuid} -> V2 (hint)`);
-      return 'V2';
+    if (protocolHint === 'V2') {
+      if (await this.probeProtocolV2(uuid)) {
+        this.deviceProtocol.set(uuid, 'V2');
+        Log?.debug(`[ReactNativeBleTransport] detectProtocol: uuid=${uuid} -> V2 (hint)`);
+        return 'V2';
+      }
+      throw this.createProtocolMismatchError('V2');
     }
 
     if (this.deviceProtocol.get(uuid) === 'V2' && (await this.probeProtocolV2(uuid))) {
@@ -1370,18 +1383,26 @@ export default class ReactNativeBleTransport {
     options?: { highVolume?: boolean; writeWithResponse?: boolean }
   ) {
     const tuning = getProtocolV2BleTuning();
-    const packetCapacity =
-      Platform.OS === 'ios' ? tuning.iosPacketLength : tuning.androidPacketLength;
+    const packetCapacity = resolveProtocolV2PacketCapacity({
+      platform: Platform.OS,
+      iosPacketLength: tuning.iosPacketLength,
+      androidPacketLength: tuning.androidPacketLength,
+      mtu: Platform.OS === 'android' ? transport.mtuSize : undefined,
+    });
     const writeWithResponse =
       !!options?.writeWithResponse || (!!options?.highVolume && tuning.highVolumeWriteWithResponse);
-    const shouldThrottle = !!options?.highVolume && !writeWithResponse;
+    const writeMode = resolveBleWriteMode(
+      transport.writeCharacteristic,
+      writeWithResponse ? 'withResponse' : 'withoutResponse'
+    );
+    const shouldThrottle = !!options?.highVolume && writeMode === 'withoutResponse';
     let packetsWritten = 0;
 
     try {
       for (let offset = 0; offset < frame.length; offset += packetCapacity) {
         const chunk = frame.slice(offset, offset + packetCapacity);
         const base64 = Buffer.from(chunk).toString('base64');
-        if (writeWithResponse) {
+        if (writeMode === 'withResponse') {
           await transport.writeCharacteristic.writeWithResponse(base64);
         } else {
           await transport.writeCharacteristic.writeWithoutResponse(base64);
@@ -1476,8 +1497,11 @@ export default class ReactNativeBleTransport {
           protocolV2: this._messagesV2,
         },
         router: PROTOCOL_V2_CHANNEL_BLE_UART,
-        writeFrame: (frame: Uint8Array) =>
-          this.writeProtocolV2Frame(transport, frame, { highVolume: highVolumeWrite }),
+        writeFrame: async (frame: Uint8Array) => {
+          await this.writeProtocolV2Frame(transport, frame, {
+            highVolume: highVolumeWrite,
+          });
+        },
         readFrame: async () => {
           const rxFrame = await this.readProtocolV2Frame(uuid);
           if (!(rxFrame instanceof Uint8Array)) {

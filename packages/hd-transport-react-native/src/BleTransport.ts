@@ -14,7 +14,7 @@ export default class BleTransport {
 
   device: Device;
 
-  mtuSize = 20;
+  mtuSize = 23;
 
   writeCharacteristic: Characteristic;
 
@@ -41,7 +41,6 @@ export default class BleTransport {
     this.device = device;
     this.writeCharacteristic = writeCharacteristic;
     this.notifyCharacteristic = notifyCharacteristic;
-    console.log(`BleTransport(${String(this.id)}) new instance`);
   }
 
   /**

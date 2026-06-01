@@ -147,6 +147,10 @@ export default class TronSignTransaction extends BaseMethod<TronSignTx> {
 
   getVersionRange() {
     return {
+      pro2: {
+        min: '0.0.0',
+        unsupported: true,
+      },
       model_mini: {
         min: '2.5.0',
       },
