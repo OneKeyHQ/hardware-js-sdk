@@ -286,7 +286,7 @@ export class ProtocolV2Session {
             logPrefix,
             context: `rx:${name}`,
           });
-          if (!shouldReduceDebug && decoded.seq !== expectedSeq) {
+          if (decoded.seq !== expectedSeq) {
             logger?.debug?.(
               `[${logPrefix}] seq differs for ${name}: tx=${expectedSeq}, rx=${decoded.seq}`
             );
