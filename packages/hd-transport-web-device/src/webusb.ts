@@ -267,21 +267,18 @@ export default class WebUsbTransport {
     }
 
     if (expectedProtocol === 'V2') {
-      if (await this.probeProtocolV2(path)) {
-        this.deviceProtocol.set(path, 'V2');
-        this.Log.debug(`[WebUsbTransport] detectProtocol: path=${path} -> V2 (expected)`);
-        return 'V2';
-      }
-      throw this.createProtocolMismatchError(expectedProtocol);
+      this.deviceProtocol.set(path, 'V2');
+      this.Log.debug(`[WebUsbTransport] detectProtocol: path=${path} -> V2 (expected)`);
+      return 'V2';
     }
 
-    if (protocolHint === 'V2' && (await this.probeProtocolV2(path))) {
+    if (protocolHint === 'V2') {
       this.deviceProtocol.set(path, 'V2');
       this.Log.debug(`[WebUsbTransport] detectProtocol: path=${path} -> V2 (hint)`);
       return 'V2';
     }
 
-    if (this.deviceProtocol.get(path) === 'V2' && (await this.probeProtocolV2(path))) {
+    if (this.deviceProtocol.get(path) === 'V2') {
       this.deviceProtocol.set(path, 'V2');
       this.Log.debug(`[WebUsbTransport] detectProtocol: path=${path} -> V2 (cached)`);
       return 'V2';

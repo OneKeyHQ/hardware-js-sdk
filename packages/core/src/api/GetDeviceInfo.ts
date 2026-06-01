@@ -4,6 +4,7 @@ import { EDeviceType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { UI_REQUEST } from '../constants/ui-request';
 import {
   PROTOCOL_V2_DEVICE_INFO_REQUEST,
+  PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST,
   normalizeProtocolV2Features,
 } from '../protocols/protocol-v2';
 import { getDeviceType } from '../utils';
@@ -43,6 +44,13 @@ function shouldReadProtocolV2DeviceInfo(params: GetDeviceInfoParams) {
     params.scope === 'verify' ||
     params.scope === 'full'
   );
+}
+
+function getProtocolV2DeviceInfoRequest(params: GetDeviceInfoParams) {
+  if (params.scope === 'verify' || params.scope === 'full') {
+    return PROTOCOL_V2_DEVICE_INFO_REQUEST;
+  }
+  return PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST;
 }
 
 function shouldReadOnekeyFeatures(params: GetDeviceInfoParams) {
@@ -105,7 +113,7 @@ export default class GetDeviceInfo extends BaseMethod<GetDeviceInfoParams> {
       const { message } = await this.device.commands.typedCall(
         'DeviceGetDeviceInfo',
         'DeviceInfo',
-        PROTOCOL_V2_DEVICE_INFO_REQUEST
+        getProtocolV2DeviceInfoRequest(this.params)
       );
       protocolV2DeviceInfo = message as unknown as ProtocolV2DeviceInfo;
       features = normalizeProtocolV2Features(this.device.originalDescriptor, protocolV2DeviceInfo);
