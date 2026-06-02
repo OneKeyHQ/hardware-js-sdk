@@ -38,6 +38,78 @@ const { check, buildBuffers, receiveOne, parseConfigure } = transport;
 const Log = getLogger(LoggerNames.HdBleTransport);
 
 const transportCache: Record<string, BleTransport> = {};
+const FIRMWARE_UPLOAD_WRITE_BURST_SIZE = Platform.OS === 'ios' ? 4 : 6;
+const FIRMWARE_UPLOAD_WRITE_PAUSE_MS = Platform.OS === 'ios' ? 8 : 10;
+const FIRMWARE_UPLOAD_WRITE_FLUSH_DELAY_MS = Platform.OS === 'ios' ? 24 : 24;
+const FIRMWARE_UPLOAD_WRITE_MAX_RETRIES = 3;
+const PROTOCOL_V1_BLE_PACKET_LENGTH = 64;
+const ANDROID_DEFAULT_MTU = 23;
+const ANDROID_GATT_CONGESTED_STATUS = 143;
+
+const delay = (ms: number) =>
+  new Promise<void>(resolve => {
+    setTimeout(resolve, ms);
+  });
+
+const resolveProtocolV1HighVolumePacketCapacity = ({
+  mtu,
+}: {
+  mtu?: number | null;
+}) => {
+  if (Platform.OS === 'ios') return IOS_PACKET_LENGTH;
+  if (Platform.OS !== 'android' || !mtu || mtu <= ANDROID_DEFAULT_MTU) {
+    return ANDROID_PACKET_LENGTH;
+  }
+
+  const attPayloadLength = Math.max(mtu - 3, PROTOCOL_V1_BLE_PACKET_LENGTH);
+  const cappedLength = Math.min(ANDROID_PACKET_LENGTH, attPayloadLength);
+  return Math.max(
+    PROTOCOL_V1_BLE_PACKET_LENGTH,
+    Math.floor(cappedLength / PROTOCOL_V1_BLE_PACKET_LENGTH) * PROTOCOL_V1_BLE_PACKET_LENGTH
+  );
+};
+
+const getErrorText = (error: unknown) => {
+  if (!error || typeof error !== 'object') return '';
+  const maybeError = error as {
+    reason?: unknown;
+    message?: unknown;
+    name?: unknown;
+  };
+  return [maybeError.reason, maybeError.message, maybeError.name]
+    .filter(value => typeof value === 'string')
+    .join(' ');
+};
+
+const isGattCongestedError = (error: unknown) => {
+  if (!error || typeof error !== 'object') return false;
+  const maybeError = error as {
+    androidErrorCode?: unknown;
+    status?: unknown;
+  };
+
+  if (
+    maybeError.androidErrorCode === ANDROID_GATT_CONGESTED_STATUS ||
+    maybeError.status === ANDROID_GATT_CONGESTED_STATUS
+  ) {
+    return true;
+  }
+
+  const text = getErrorText(error);
+  return text.includes('GATT_CONGESTED') || text.includes('status 143');
+};
+
+const shouldRetryFirmwareUploadWrite = (
+  error: unknown,
+  attempt: number,
+  maxRetries: number
+) => attempt < maxRetries && isGattCongestedError(error);
+
+const resolveFirmwareUploadRetryDelay = (
+  attempt: number,
+  baseDelayMs = 200,
+  maxDelayMs = 1200
+) => Math.min(baseDelayMs * 2 ** attempt, maxDelayMs);
 
 let connectOptions: Record<string, unknown> = {
   requestMTU: 256,
@@ -586,10 +658,19 @@ export default class ReactNativeBleTransport {
     async function writeChunkedData(
       buffers: ByteBuffer[],
       writeFunction: (data: string) => Promise<void>,
-      onError: (e: any) => void
+      onError: (e: any) => void,
+      chunkOptions?: {
+        packetCapacity?: number;
+        burstSize?: number;
+        pauseMs?: number;
+        flushDelayMs?: number;
+      }
     ) {
-      const packetCapacity = Platform.OS === 'ios' ? IOS_PACKET_LENGTH : ANDROID_PACKET_LENGTH;
+      const packetCapacity =
+        chunkOptions?.packetCapacity ??
+        (Platform.OS === 'ios' ? IOS_PACKET_LENGTH : ANDROID_PACKET_LENGTH);
       let index = 0;
+      let packetsWritten = 0;
       let chunk = ByteBuffer.allocate(packetCapacity);
 
       while (index < buffers.length) {
@@ -601,12 +682,25 @@ export default class ReactNativeBleTransport {
           chunk.reset();
           try {
             await writeFunction(chunk.toString('base64'));
+            packetsWritten += 1;
             chunk = ByteBuffer.allocate(packetCapacity);
+            if (
+              chunkOptions?.burstSize &&
+              chunkOptions.pauseMs &&
+              packetsWritten % chunkOptions.burstSize === 0 &&
+              index < buffers.length
+            ) {
+              await delay(chunkOptions.pauseMs);
+            }
           } catch (e) {
             onError(e);
             throw ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError);
           }
         }
+      }
+
+      if (chunkOptions?.flushDelayMs && packetsWritten > 0) {
+        await delay(chunkOptions.flushDelayMs);
       }
     }
 
@@ -620,14 +714,54 @@ export default class ReactNativeBleTransport {
         }
       );
     } else if (name === 'FirmwareUpload') {
+      const packetCapacity = resolveProtocolV1HighVolumePacketCapacity({
+        mtu: Platform.OS === 'android' ? transport.mtuSize : undefined,
+      });
+      Log?.debug('[ReactNativeBleTransport] FirmwareUpload write uses throttled BLE packets:', {
+        packetCapacity,
+        burstSize: FIRMWARE_UPLOAD_WRITE_BURST_SIZE,
+        pauseMs: FIRMWARE_UPLOAD_WRITE_PAUSE_MS,
+        flushDelayMs: FIRMWARE_UPLOAD_WRITE_FLUSH_DELAY_MS,
+        maxRetries: FIRMWARE_UPLOAD_WRITE_MAX_RETRIES,
+      });
+
       await writeChunkedData(
         buffers,
         async data => {
-          await transport.writeCharacteristic.writeWithoutResponse(data);
+          let attempt = 0;
+          // Retry only congestion. Other write errors should surface immediately.
+          // GATT_CONGESTED is usually transient backpressure from the Android BLE queue.
+          // eslint-disable-next-line no-constant-condition
+          while (true) {
+            try {
+              await transport.writeCharacteristic.writeWithoutResponse(data);
+              return;
+            } catch (error) {
+              if (
+                !shouldRetryFirmwareUploadWrite(error, attempt, FIRMWARE_UPLOAD_WRITE_MAX_RETRIES)
+              ) {
+                throw error;
+              }
+              const delayMs = resolveFirmwareUploadRetryDelay(attempt);
+              Log?.debug('[ReactNativeBleTransport] FirmwareUpload write retry:', {
+                attempt: attempt + 1,
+                delayMs,
+                error,
+              });
+              await delay(delayMs);
+              attempt += 1;
+            }
+          }
         },
         e => {
           this.runPromise = null;
           Log?.error('writeCharacteristic write error: ', e);
+        },
+        {
+          packetCapacity,
+          burstSize: FIRMWARE_UPLOAD_WRITE_BURST_SIZE,
+          pauseMs: FIRMWARE_UPLOAD_WRITE_PAUSE_MS,
+          flushDelayMs: FIRMWARE_UPLOAD_WRITE_FLUSH_DELAY_MS,
         }
       );
     } else {
