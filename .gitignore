@@ -82,3 +82,4 @@ packages/connect-examples/expo-example/web-build
 **/web-build
 .vercel
 .env*.local
+.worktrees/
