@@ -1590,8 +1590,7 @@ describe('LedgerAdapter', () => {
       });
     }
 
-    const methodsCalled = () =>
-      connector.callImpl.mock.calls.map((c: unknown[]) => c[1]);
+    const methodsCalled = () => connector.callImpl.mock.calls.map((c: unknown[]) => c[1]);
 
     it('prompts, installs, then retries the original call on confirm', async () => {
       connector.callImpl

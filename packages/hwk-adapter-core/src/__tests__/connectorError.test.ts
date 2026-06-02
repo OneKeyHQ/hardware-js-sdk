@@ -1,7 +1,4 @@
-import {
-  rehydrateConnectorError,
-  serializeConnectorError,
-} from '../types/connector';
+import { rehydrateConnectorError, serializeConnectorError } from '../types/connector';
 
 /**
  * Simulates a host bridge (e.g. the extension offscreen↔SW JsBridge) that runs
@@ -100,9 +97,10 @@ describe('serializeConnectorError / rehydrateConnectorError', () => {
       _tag: 'LockedDeviceError',
     });
 
-    const rehydrated = rehydrateConnectorError(
-      serializeConnectorError(err),
-    ) as unknown as Record<string, unknown>;
+    const rehydrated = rehydrateConnectorError(serializeConnectorError(err)) as unknown as Record<
+      string,
+      unknown
+    >;
 
     expect(rehydrated instanceof Error).toBe(true);
     expect(rehydrated.message).toBe('locked');

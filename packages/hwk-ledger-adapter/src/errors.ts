@@ -554,4 +554,3 @@ export function mapLedgerError(
 
   return { code, message: enrichErrorMessage(code, originalMessage), appName };
 }
-

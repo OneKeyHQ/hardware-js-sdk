@@ -1,8 +1,4 @@
-import {
-  UI_REQUEST,
-  UI_RESPONSE,
-  serializeConnectorError,
-} from '@onekeyfe/hwk-adapter-core';
+import { UI_REQUEST, UI_RESPONSE, serializeConnectorError } from '@onekeyfe/hwk-adapter-core';
 
 import { LedgerAdapter } from '../adapter/LedgerAdapter';
 

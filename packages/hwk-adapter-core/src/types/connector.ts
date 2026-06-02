@@ -294,8 +294,9 @@ export function serializeConnectorError(err: unknown): ConnectorSerializedError 
     Object.assign(params, e.params as Record<string, unknown>);
   }
   for (const key of Object.keys(e)) {
-    if (SERIALIZED_ERROR_TOP_LEVEL_KEYS.has(key)) continue;
-    params[key] = e[key];
+    if (!SERIALIZED_ERROR_TOP_LEVEL_KEYS.has(key)) {
+      params[key] = e[key];
+    }
   }
   const orig = e.originalError;
   if (orig && typeof orig === 'object') {

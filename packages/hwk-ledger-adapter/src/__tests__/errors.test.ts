@@ -1,7 +1,4 @@
-import {
-  HardwareErrorCode,
-  serializeConnectorError,
-} from '@onekeyfe/hwk-adapter-core';
+import { HardwareErrorCode, serializeConnectorError } from '@onekeyfe/hwk-adapter-core';
 
 import {
   ERROR_TAG,

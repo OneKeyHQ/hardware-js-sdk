@@ -44,7 +44,6 @@ import type {
   BtcSignedTx,
   ChainCapability,
   ChainForFingerprint,
-  ICommonCallParams,
   ConnectorCallResult,
   ConnectorDevice,
   ConnectorUiEvent,
@@ -60,6 +59,7 @@ import type {
   EvmSignedTx,
   HardwareEvent,
   HardwareEventMap,
+  ICommonCallParams,
   IConnector,
   IHardwareWallet,
   Response,
@@ -380,44 +380,152 @@ export class LedgerAdapter implements IHardwareWallet {
   // EVM chain methods
   // ---------------------------------------------------------------------------
 
-  evmGetAddress(connectId: string, deviceId: string, params: EvmGetAddressParams, commonParams?: ICommonCallParams) {
-    return this.callChain<EvmAddress>(connectId, deviceId, 'evm', 'evmGetAddress', params, commonParams);
+  evmGetAddress(
+    connectId: string,
+    deviceId: string,
+    params: EvmGetAddressParams,
+    commonParams?: ICommonCallParams
+  ) {
+    return this.callChain<EvmAddress>(
+      connectId,
+      deviceId,
+      'evm',
+      'evmGetAddress',
+      params,
+      commonParams
+    );
   }
 
-  evmSignTransaction(connectId: string, deviceId: string, params: EvmSignTxParams, commonParams?: ICommonCallParams) {
-    return this.callChain<EvmSignedTx>(connectId, deviceId, 'evm', 'evmSignTransaction', params, commonParams);
+  evmSignTransaction(
+    connectId: string,
+    deviceId: string,
+    params: EvmSignTxParams,
+    commonParams?: ICommonCallParams
+  ) {
+    return this.callChain<EvmSignedTx>(
+      connectId,
+      deviceId,
+      'evm',
+      'evmSignTransaction',
+      params,
+      commonParams
+    );
   }
 
-  evmSignMessage(connectId: string, deviceId: string, params: EvmSignMsgParams, commonParams?: ICommonCallParams) {
-    return this.callChain<EvmSignature>(connectId, deviceId, 'evm', 'evmSignMessage', params, commonParams);
+  evmSignMessage(
+    connectId: string,
+    deviceId: string,
+    params: EvmSignMsgParams,
+    commonParams?: ICommonCallParams
+  ) {
+    return this.callChain<EvmSignature>(
+      connectId,
+      deviceId,
+      'evm',
+      'evmSignMessage',
+      params,
+      commonParams
+    );
   }
 
-  evmSignTypedData(connectId: string, deviceId: string, params: EvmSignTypedDataParams, commonParams?: ICommonCallParams) {
-    return this.callChain<EvmSignature>(connectId, deviceId, 'evm', 'evmSignTypedData', params, commonParams);
+  evmSignTypedData(
+    connectId: string,
+    deviceId: string,
+    params: EvmSignTypedDataParams,
+    commonParams?: ICommonCallParams
+  ) {
+    return this.callChain<EvmSignature>(
+      connectId,
+      deviceId,
+      'evm',
+      'evmSignTypedData',
+      params,
+      commonParams
+    );
   }
 
   // ---------------------------------------------------------------------------
   // BTC chain methods
   // ---------------------------------------------------------------------------
 
-  btcGetAddress(connectId: string, deviceId: string, params: BtcGetAddressParams, commonParams?: ICommonCallParams) {
-    return this.callChain<BtcAddress>(connectId, deviceId, 'btc', 'btcGetAddress', params, commonParams);
+  btcGetAddress(
+    connectId: string,
+    deviceId: string,
+    params: BtcGetAddressParams,
+    commonParams?: ICommonCallParams
+  ) {
+    return this.callChain<BtcAddress>(
+      connectId,
+      deviceId,
+      'btc',
+      'btcGetAddress',
+      params,
+      commonParams
+    );
   }
 
-  btcGetPublicKey(connectId: string, deviceId: string, params: BtcGetPublicKeyParams, commonParams?: ICommonCallParams) {
-    return this.callChain<BtcPublicKey>(connectId, deviceId, 'btc', 'btcGetPublicKey', params, commonParams);
+  btcGetPublicKey(
+    connectId: string,
+    deviceId: string,
+    params: BtcGetPublicKeyParams,
+    commonParams?: ICommonCallParams
+  ) {
+    return this.callChain<BtcPublicKey>(
+      connectId,
+      deviceId,
+      'btc',
+      'btcGetPublicKey',
+      params,
+      commonParams
+    );
   }
 
-  btcSignTransaction(connectId: string, deviceId: string, params: BtcSignTxParams, commonParams?: ICommonCallParams) {
-    return this.callChain<BtcSignedTx>(connectId, deviceId, 'btc', 'btcSignTransaction', params, commonParams);
+  btcSignTransaction(
+    connectId: string,
+    deviceId: string,
+    params: BtcSignTxParams,
+    commonParams?: ICommonCallParams
+  ) {
+    return this.callChain<BtcSignedTx>(
+      connectId,
+      deviceId,
+      'btc',
+      'btcSignTransaction',
+      params,
+      commonParams
+    );
   }
 
-  btcSignPsbt(connectId: string, deviceId: string, params: BtcSignPsbtParams, commonParams?: ICommonCallParams) {
-    return this.callChain<BtcSignedPsbt>(connectId, deviceId, 'btc', 'btcSignPsbt', params, commonParams);
+  btcSignPsbt(
+    connectId: string,
+    deviceId: string,
+    params: BtcSignPsbtParams,
+    commonParams?: ICommonCallParams
+  ) {
+    return this.callChain<BtcSignedPsbt>(
+      connectId,
+      deviceId,
+      'btc',
+      'btcSignPsbt',
+      params,
+      commonParams
+    );
   }
 
-  btcSignMessage(connectId: string, deviceId: string, params: BtcSignMsgParams, commonParams?: ICommonCallParams) {
-    return this.callChain<BtcSignature>(connectId, deviceId, 'btc', 'btcSignMessage', params, commonParams);
+  btcSignMessage(
+    connectId: string,
+    deviceId: string,
+    params: BtcSignMsgParams,
+    commonParams?: ICommonCallParams
+  ) {
+    return this.callChain<BtcSignature>(
+      connectId,
+      deviceId,
+      'btc',
+      'btcSignMessage',
+      params,
+      commonParams
+    );
   }
 
   btcGetMasterFingerprint(connectId: string, deviceId: string, commonParams?: ICommonCallParams) {
@@ -435,32 +543,104 @@ export class LedgerAdapter implements IHardwareWallet {
   // SOL chain methods
   // ---------------------------------------------------------------------------
 
-  solGetAddress(connectId: string, deviceId: string, params: SolGetAddressParams, commonParams?: ICommonCallParams) {
-    return this.callChain<SolAddress>(connectId, deviceId, 'sol', 'solGetAddress', params, commonParams);
+  solGetAddress(
+    connectId: string,
+    deviceId: string,
+    params: SolGetAddressParams,
+    commonParams?: ICommonCallParams
+  ) {
+    return this.callChain<SolAddress>(
+      connectId,
+      deviceId,
+      'sol',
+      'solGetAddress',
+      params,
+      commonParams
+    );
   }
 
-  solSignTransaction(connectId: string, deviceId: string, params: SolSignTxParams, commonParams?: ICommonCallParams) {
-    return this.callChain<SolSignedTx>(connectId, deviceId, 'sol', 'solSignTransaction', params, commonParams);
+  solSignTransaction(
+    connectId: string,
+    deviceId: string,
+    params: SolSignTxParams,
+    commonParams?: ICommonCallParams
+  ) {
+    return this.callChain<SolSignedTx>(
+      connectId,
+      deviceId,
+      'sol',
+      'solSignTransaction',
+      params,
+      commonParams
+    );
   }
 
-  solSignMessage(connectId: string, deviceId: string, params: SolSignMsgParams, commonParams?: ICommonCallParams) {
-    return this.callChain<SolSignature>(connectId, deviceId, 'sol', 'solSignMessage', params, commonParams);
+  solSignMessage(
+    connectId: string,
+    deviceId: string,
+    params: SolSignMsgParams,
+    commonParams?: ICommonCallParams
+  ) {
+    return this.callChain<SolSignature>(
+      connectId,
+      deviceId,
+      'sol',
+      'solSignMessage',
+      params,
+      commonParams
+    );
   }
 
   // ---------------------------------------------------------------------------
   // TRON chain methods
   // ---------------------------------------------------------------------------
 
-  tronGetAddress(connectId: string, deviceId: string, params: TronGetAddressParams, commonParams?: ICommonCallParams) {
-    return this.callChain<TronAddress>(connectId, deviceId, 'tron', 'tronGetAddress', params, commonParams);
+  tronGetAddress(
+    connectId: string,
+    deviceId: string,
+    params: TronGetAddressParams,
+    commonParams?: ICommonCallParams
+  ) {
+    return this.callChain<TronAddress>(
+      connectId,
+      deviceId,
+      'tron',
+      'tronGetAddress',
+      params,
+      commonParams
+    );
   }
 
-  tronSignTransaction(connectId: string, deviceId: string, params: TronSignTxParams, commonParams?: ICommonCallParams) {
-    return this.callChain<TronSignedTx>(connectId, deviceId, 'tron', 'tronSignTransaction', params, commonParams);
+  tronSignTransaction(
+    connectId: string,
+    deviceId: string,
+    params: TronSignTxParams,
+    commonParams?: ICommonCallParams
+  ) {
+    return this.callChain<TronSignedTx>(
+      connectId,
+      deviceId,
+      'tron',
+      'tronSignTransaction',
+      params,
+      commonParams
+    );
   }
 
-  tronSignMessage(connectId: string, deviceId: string, params: TronSignMsgParams, commonParams?: ICommonCallParams) {
-    return this.callChain<TronSignature>(connectId, deviceId, 'tron', 'tronSignMessage', params, commonParams);
+  tronSignMessage(
+    connectId: string,
+    deviceId: string,
+    params: TronSignMsgParams,
+    commonParams?: ICommonCallParams
+  ) {
+    return this.callChain<TronSignature>(
+      connectId,
+      deviceId,
+      'tron',
+      'tronSignMessage',
+      params,
+      commonParams
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -1294,14 +1474,12 @@ export class LedgerAdapter implements IHardwareWallet {
       // install runs as a direct connector call within THIS queue slot — going
       // through the public installApp/connectorCall would re-enter the serial
       // job queue and reject as busy.
-      const autoInstallApp =
-        commonParams?.autoInstallApp ?? this._defaultAutoInstallApp;
+      const autoInstallApp = commonParams?.autoInstallApp ?? this._defaultAutoInstallApp;
       const isAppMissing =
         isAppNotInstalledError(err) ||
         (err as { code?: number })?.code === HardwareErrorCode.AppNotInstalled;
       if (autoInstallApp && isAppMissing) {
-        const appName =
-          (err as { appName?: string })?.appName ?? mapLedgerError(err).appName;
+        const appName = (err as { appName?: string })?.appName ?? mapLedgerError(err).appName;
         if (appName) {
           const confirmed = await this._waitForInstallAppConfirm(appName);
           if (!confirmed) throw err;
