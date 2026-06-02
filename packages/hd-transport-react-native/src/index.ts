@@ -25,7 +25,10 @@ import { getConnectedDeviceIds, onDeviceBondState, pairDevice } from './BleManag
 import {
   hasWritableCapability,
   resolveBleWriteMode,
+  resolveFirmwareUploadRetryDelay,
+  resolveProtocolV1HighVolumePacketCapacity,
   resolveProtocolV2PacketCapacity,
+  shouldRetryFirmwareUploadWrite,
 } from './bleStrategy';
 import { subscribeBleOn } from './subscribeBleOn';
 import {
@@ -60,6 +63,10 @@ const ANDROID_NOTIFY_READY_DELAY_MS = 300;
 const HIGH_VOLUME_WRITE_BURST_SIZE = Platform.OS === 'ios' ? 4 : 6;
 const HIGH_VOLUME_WRITE_PAUSE_MS = Platform.OS === 'ios' ? 6 : 2;
 const HIGH_VOLUME_WRITE_FLUSH_DELAY_MS = Platform.OS === 'ios' ? 20 : 8;
+const FIRMWARE_UPLOAD_WRITE_BURST_SIZE = Platform.OS === 'ios' ? 4 : 6;
+const FIRMWARE_UPLOAD_WRITE_PAUSE_MS = Platform.OS === 'ios' ? 8 : 10;
+const FIRMWARE_UPLOAD_WRITE_FLUSH_DELAY_MS = Platform.OS === 'ios' ? 24 : 24;
+const FIRMWARE_UPLOAD_WRITE_MAX_RETRIES = 3;
 
 const delay = (ms: number) =>
   new Promise<void>(resolve => {
@@ -435,11 +442,7 @@ export default class ReactNativeBleTransport {
         cachedProtocol &&
         (!expectedProtocol || cachedProtocol === expectedProtocol)
       ) {
-        Log?.debug(
-          '[ReactNativeBleTransport] reuse cached BLE transport:',
-          uuid,
-          cachedProtocol
-        );
+        Log?.debug('[ReactNativeBleTransport] reuse cached BLE transport:', uuid, cachedProtocol);
         return { uuid, protocolType: cachedProtocol };
       }
 
@@ -971,10 +974,19 @@ export default class ReactNativeBleTransport {
     async function writeChunkedData(
       buffers: ByteBuffer[],
       writeFunction: (data: string) => Promise<void>,
-      onError: (e: any) => void
+      onError: (e: any) => void,
+      chunkOptions?: {
+        packetCapacity?: number;
+        burstSize?: number;
+        pauseMs?: number;
+        flushDelayMs?: number;
+      }
     ) {
-      const packetCapacity = Platform.OS === 'ios' ? IOS_PACKET_LENGTH : ANDROID_PACKET_LENGTH;
+      const packetCapacity =
+        chunkOptions?.packetCapacity ??
+        (Platform.OS === 'ios' ? IOS_PACKET_LENGTH : ANDROID_PACKET_LENGTH);
       let index = 0;
+      let packetsWritten = 0;
       let chunk = ByteBuffer.allocate(packetCapacity);
 
       while (index < buffers.length) {
@@ -986,12 +998,25 @@ export default class ReactNativeBleTransport {
           chunk.reset();
           try {
             await writeFunction(chunk.toString('base64'));
+            packetsWritten += 1;
             chunk = ByteBuffer.allocate(packetCapacity);
+            if (
+              chunkOptions?.burstSize &&
+              chunkOptions.pauseMs &&
+              packetsWritten % chunkOptions.burstSize === 0 &&
+              index < buffers.length
+            ) {
+              await delay(chunkOptions.pauseMs);
+            }
           } catch (e) {
             onError(e);
             throw ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError);
           }
         }
+      }
+
+      if (chunkOptions?.flushDelayMs && packetsWritten > 0) {
+        await delay(chunkOptions.flushDelayMs);
       }
     }
 
@@ -1005,14 +1030,57 @@ export default class ReactNativeBleTransport {
         }
       );
     } else if (name === 'FirmwareUpload') {
+      const packetCapacity = resolveProtocolV1HighVolumePacketCapacity({
+        platform: Platform.OS,
+        iosPacketLength: IOS_PACKET_LENGTH,
+        androidPacketLength: ANDROID_PACKET_LENGTH,
+        mtu: Platform.OS === 'android' ? transport.mtuSize : undefined,
+      });
+      Log?.debug('[ReactNativeBleTransport] FirmwareUpload write uses throttled BLE packets:', {
+        packetCapacity,
+        burstSize: FIRMWARE_UPLOAD_WRITE_BURST_SIZE,
+        pauseMs: FIRMWARE_UPLOAD_WRITE_PAUSE_MS,
+        flushDelayMs: FIRMWARE_UPLOAD_WRITE_FLUSH_DELAY_MS,
+        maxRetries: FIRMWARE_UPLOAD_WRITE_MAX_RETRIES,
+      });
+
       await writeChunkedData(
         buffers,
         async data => {
-          await transport.writeCharacteristic.writeWithoutResponse(data);
+          let attempt = 0;
+          // Retry only congestion. Other write errors should surface immediately.
+          // GATT_CONGESTED is usually transient backpressure from the Android BLE queue.
+          // eslint-disable-next-line no-constant-condition
+          while (true) {
+            try {
+              await transport.writeCharacteristic.writeWithoutResponse(data);
+              return;
+            } catch (error) {
+              if (
+                !shouldRetryFirmwareUploadWrite(error, attempt, FIRMWARE_UPLOAD_WRITE_MAX_RETRIES)
+              ) {
+                throw error;
+              }
+              const delayMs = resolveFirmwareUploadRetryDelay(attempt);
+              Log?.debug('[ReactNativeBleTransport] FirmwareUpload write retry:', {
+                attempt: attempt + 1,
+                delayMs,
+                error,
+              });
+              await delay(delayMs);
+              attempt += 1;
+            }
+          }
         },
         e => {
           this.runPromise = null;
           Log?.error('writeCharacteristic write error: ', e);
+        },
+        {
+          packetCapacity,
+          burstSize: FIRMWARE_UPLOAD_WRITE_BURST_SIZE,
+          pauseMs: FIRMWARE_UPLOAD_WRITE_PAUSE_MS,
+          flushDelayMs: FIRMWARE_UPLOAD_WRITE_FLUSH_DELAY_MS,
         }
       );
     } else {
