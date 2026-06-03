@@ -10,12 +10,14 @@ import {
   UiRequestRegistry,
   deriveDeviceFingerprint,
   failure,
+  rehydrateConnectorError,
   success,
 } from '@onekeyfe/hwk-adapter-core';
 
 import {
   ERROR_TAG,
   createMultipleUsbLedgerDevicesError,
+  isAppNotInstalledError,
   isConnectionLevelError,
   isDeviceDisconnectedError,
   isDeviceLockedError,
@@ -42,6 +44,7 @@ import type {
   BtcSignedTx,
   ChainCapability,
   ChainForFingerprint,
+  ConnectorCallResult,
   ConnectorDevice,
   ConnectorUiEvent,
   DeviceEventListener,
@@ -56,6 +59,7 @@ import type {
   EvmSignedTx,
   HardwareEvent,
   HardwareEventMap,
+  ICommonCallParams,
   IConnector,
   IHardwareWallet,
   Response,
@@ -145,8 +149,13 @@ export class LedgerAdapter implements IHardwareWallet {
   // Shared across concurrent callers — only `cancel()` aborts.
   private _doConnectAbortController: AbortController | null = null;
 
-  constructor(connector: IConnector) {
+  // Default for commonParams.autoInstallApp when a call doesn't specify it,
+  // so the host can opt the whole adapter in once instead of per call.
+  private readonly _defaultAutoInstallApp: boolean;
+
+  constructor(connector: IConnector, options?: { autoInstallApp?: boolean }) {
     this.connector = connector;
+    this._defaultAutoInstallApp = options?.autoInstallApp ?? false;
     this._jobQueue = new DeviceJobQueue();
     this.registerEventListeners();
   }
@@ -345,14 +354,22 @@ export class LedgerAdapter implements IHardwareWallet {
     chain: string,
     method: string,
     params: unknown,
+    commonParams?: ICommonCallParams,
     skipFingerprint = false
   ): Promise<Response<T>> {
     try {
-      const result = await this.connectorCall(connectId, method, params, {
-        chain: chain as ChainForFingerprint,
-        deviceId,
-        skipFingerprint,
-      });
+      const result = await this.connectorCall(
+        connectId,
+        method,
+        params,
+        {
+          chain: chain as ChainForFingerprint,
+          deviceId,
+          skipFingerprint,
+        },
+        undefined,
+        commonParams
+      );
       return success(result as T);
     } catch (err) {
       return this.errorToFailure(err);
@@ -363,53 +380,162 @@ export class LedgerAdapter implements IHardwareWallet {
   // EVM chain methods
   // ---------------------------------------------------------------------------
 
-  evmGetAddress(connectId: string, deviceId: string, params: EvmGetAddressParams) {
-    return this.callChain<EvmAddress>(connectId, deviceId, 'evm', 'evmGetAddress', params);
+  evmGetAddress(
+    connectId: string,
+    deviceId: string,
+    params: EvmGetAddressParams,
+    commonParams?: ICommonCallParams
+  ) {
+    return this.callChain<EvmAddress>(
+      connectId,
+      deviceId,
+      'evm',
+      'evmGetAddress',
+      params,
+      commonParams
+    );
   }
 
-  evmSignTransaction(connectId: string, deviceId: string, params: EvmSignTxParams) {
-    return this.callChain<EvmSignedTx>(connectId, deviceId, 'evm', 'evmSignTransaction', params);
+  evmSignTransaction(
+    connectId: string,
+    deviceId: string,
+    params: EvmSignTxParams,
+    commonParams?: ICommonCallParams
+  ) {
+    return this.callChain<EvmSignedTx>(
+      connectId,
+      deviceId,
+      'evm',
+      'evmSignTransaction',
+      params,
+      commonParams
+    );
   }
 
-  evmSignMessage(connectId: string, deviceId: string, params: EvmSignMsgParams) {
-    return this.callChain<EvmSignature>(connectId, deviceId, 'evm', 'evmSignMessage', params);
+  evmSignMessage(
+    connectId: string,
+    deviceId: string,
+    params: EvmSignMsgParams,
+    commonParams?: ICommonCallParams
+  ) {
+    return this.callChain<EvmSignature>(
+      connectId,
+      deviceId,
+      'evm',
+      'evmSignMessage',
+      params,
+      commonParams
+    );
   }
 
-  evmSignTypedData(connectId: string, deviceId: string, params: EvmSignTypedDataParams) {
-    return this.callChain<EvmSignature>(connectId, deviceId, 'evm', 'evmSignTypedData', params);
+  evmSignTypedData(
+    connectId: string,
+    deviceId: string,
+    params: EvmSignTypedDataParams,
+    commonParams?: ICommonCallParams
+  ) {
+    return this.callChain<EvmSignature>(
+      connectId,
+      deviceId,
+      'evm',
+      'evmSignTypedData',
+      params,
+      commonParams
+    );
   }
 
   // ---------------------------------------------------------------------------
   // BTC chain methods
   // ---------------------------------------------------------------------------
 
-  btcGetAddress(connectId: string, deviceId: string, params: BtcGetAddressParams) {
-    return this.callChain<BtcAddress>(connectId, deviceId, 'btc', 'btcGetAddress', params);
+  btcGetAddress(
+    connectId: string,
+    deviceId: string,
+    params: BtcGetAddressParams,
+    commonParams?: ICommonCallParams
+  ) {
+    return this.callChain<BtcAddress>(
+      connectId,
+      deviceId,
+      'btc',
+      'btcGetAddress',
+      params,
+      commonParams
+    );
   }
 
-  btcGetPublicKey(connectId: string, deviceId: string, params: BtcGetPublicKeyParams) {
-    return this.callChain<BtcPublicKey>(connectId, deviceId, 'btc', 'btcGetPublicKey', params);
+  btcGetPublicKey(
+    connectId: string,
+    deviceId: string,
+    params: BtcGetPublicKeyParams,
+    commonParams?: ICommonCallParams
+  ) {
+    return this.callChain<BtcPublicKey>(
+      connectId,
+      deviceId,
+      'btc',
+      'btcGetPublicKey',
+      params,
+      commonParams
+    );
   }
 
-  btcSignTransaction(connectId: string, deviceId: string, params: BtcSignTxParams) {
-    return this.callChain<BtcSignedTx>(connectId, deviceId, 'btc', 'btcSignTransaction', params);
+  btcSignTransaction(
+    connectId: string,
+    deviceId: string,
+    params: BtcSignTxParams,
+    commonParams?: ICommonCallParams
+  ) {
+    return this.callChain<BtcSignedTx>(
+      connectId,
+      deviceId,
+      'btc',
+      'btcSignTransaction',
+      params,
+      commonParams
+    );
   }
 
-  btcSignPsbt(connectId: string, deviceId: string, params: BtcSignPsbtParams) {
-    return this.callChain<BtcSignedPsbt>(connectId, deviceId, 'btc', 'btcSignPsbt', params);
+  btcSignPsbt(
+    connectId: string,
+    deviceId: string,
+    params: BtcSignPsbtParams,
+    commonParams?: ICommonCallParams
+  ) {
+    return this.callChain<BtcSignedPsbt>(
+      connectId,
+      deviceId,
+      'btc',
+      'btcSignPsbt',
+      params,
+      commonParams
+    );
   }
 
-  btcSignMessage(connectId: string, deviceId: string, params: BtcSignMsgParams) {
-    return this.callChain<BtcSignature>(connectId, deviceId, 'btc', 'btcSignMessage', params);
+  btcSignMessage(
+    connectId: string,
+    deviceId: string,
+    params: BtcSignMsgParams,
+    commonParams?: ICommonCallParams
+  ) {
+    return this.callChain<BtcSignature>(
+      connectId,
+      deviceId,
+      'btc',
+      'btcSignMessage',
+      params,
+      commonParams
+    );
   }
 
-  btcGetMasterFingerprint(connectId: string, deviceId: string) {
+  btcGetMasterFingerprint(connectId: string, deviceId: string, commonParams?: ICommonCallParams) {
     return this.callChain<{ masterFingerprint: string }>(
       connectId,
       deviceId,
       'btc',
       'btcGetMasterFingerprint',
-      {}
+      {},
+      commonParams
     );
   }
 
@@ -417,45 +543,118 @@ export class LedgerAdapter implements IHardwareWallet {
   // SOL chain methods
   // ---------------------------------------------------------------------------
 
-  solGetAddress(connectId: string, deviceId: string, params: SolGetAddressParams) {
-    return this.callChain<SolAddress>(connectId, deviceId, 'sol', 'solGetAddress', params);
+  solGetAddress(
+    connectId: string,
+    deviceId: string,
+    params: SolGetAddressParams,
+    commonParams?: ICommonCallParams
+  ) {
+    return this.callChain<SolAddress>(
+      connectId,
+      deviceId,
+      'sol',
+      'solGetAddress',
+      params,
+      commonParams
+    );
   }
 
-  solSignTransaction(connectId: string, deviceId: string, params: SolSignTxParams) {
-    return this.callChain<SolSignedTx>(connectId, deviceId, 'sol', 'solSignTransaction', params);
+  solSignTransaction(
+    connectId: string,
+    deviceId: string,
+    params: SolSignTxParams,
+    commonParams?: ICommonCallParams
+  ) {
+    return this.callChain<SolSignedTx>(
+      connectId,
+      deviceId,
+      'sol',
+      'solSignTransaction',
+      params,
+      commonParams
+    );
   }
 
-  solSignMessage(connectId: string, deviceId: string, params: SolSignMsgParams) {
-    return this.callChain<SolSignature>(connectId, deviceId, 'sol', 'solSignMessage', params);
+  solSignMessage(
+    connectId: string,
+    deviceId: string,
+    params: SolSignMsgParams,
+    commonParams?: ICommonCallParams
+  ) {
+    return this.callChain<SolSignature>(
+      connectId,
+      deviceId,
+      'sol',
+      'solSignMessage',
+      params,
+      commonParams
+    );
   }
 
   // ---------------------------------------------------------------------------
   // TRON chain methods
   // ---------------------------------------------------------------------------
 
-  tronGetAddress(connectId: string, deviceId: string, params: TronGetAddressParams) {
-    return this.callChain<TronAddress>(connectId, deviceId, 'tron', 'tronGetAddress', params);
+  tronGetAddress(
+    connectId: string,
+    deviceId: string,
+    params: TronGetAddressParams,
+    commonParams?: ICommonCallParams
+  ) {
+    return this.callChain<TronAddress>(
+      connectId,
+      deviceId,
+      'tron',
+      'tronGetAddress',
+      params,
+      commonParams
+    );
   }
 
-  tronSignTransaction(connectId: string, deviceId: string, params: TronSignTxParams) {
-    return this.callChain<TronSignedTx>(connectId, deviceId, 'tron', 'tronSignTransaction', params);
+  tronSignTransaction(
+    connectId: string,
+    deviceId: string,
+    params: TronSignTxParams,
+    commonParams?: ICommonCallParams
+  ) {
+    return this.callChain<TronSignedTx>(
+      connectId,
+      deviceId,
+      'tron',
+      'tronSignTransaction',
+      params,
+      commonParams
+    );
   }
 
-  tronSignMessage(connectId: string, deviceId: string, params: TronSignMsgParams) {
-    return this.callChain<TronSignature>(connectId, deviceId, 'tron', 'tronSignMessage', params);
+  tronSignMessage(
+    connectId: string,
+    deviceId: string,
+    params: TronSignMsgParams,
+    commonParams?: ICommonCallParams
+  ) {
+    return this.callChain<TronSignature>(
+      connectId,
+      deviceId,
+      'tron',
+      'tronSignMessage',
+      params,
+      commonParams
+    );
   }
 
   // ---------------------------------------------------------------------------
   // App management — OS-level Ledger app install / list. Bypasses fingerprint
   // and chain-handler dispatch; installApp progress is forwarded to the adapter
-  // emitter as 'app-install-progress' events.
+  // emitter via 'ui-event' AppInstallProgress events.
   // ---------------------------------------------------------------------------
 
   async installApp(connectId: string, appName: string): Promise<Response<void>> {
     try {
-      // Progress is emitted from the connector via the 'app-install-progress'
-      // event (see appInstallProgressForwarder); no callback is passed here so
-      // installApp params stay fully serializable across IHardwareBridge.
+      // Progress is emitted from the connector via a 'ui-event'
+      // AppInstallProgress variant (see uiEventForwarder); no callback is
+      // passed here so installApp params stay fully serializable across
+      // IHardwareBridge.
       await this.connectorCall(connectId, 'installApp', { appName });
       return success(undefined);
     } catch (err) {
@@ -599,7 +798,7 @@ export class LedgerAdapter implements IHardwareWallet {
 
     try {
       const fingerprint = await this._computeChainFingerprint(chain, (method, params) =>
-        this.connector.call(sessionId, method, params)
+        this._callConnector(sessionId, method, params)
       );
       if (fingerprint === deviceId) {
         return { success: true };
@@ -798,6 +997,30 @@ export class LedgerAdapter implements IHardwareWallet {
         path,
         accountIndex,
       },
+    });
+
+    try {
+      const payload = await waitPromise;
+      return !!payload?.confirmed;
+    } catch (err) {
+      this.emitter.emit(UI_REQUEST.CLOSE_UI_WINDOW, {
+        type: UI_REQUEST.CLOSE_UI_WINDOW,
+        payload: {},
+      });
+      return false;
+    }
+  }
+
+  // Ask the user whether to install a missing app (autoInstallApp flow).
+  // Same register-then-emit ordering as the BTC high-index gate.
+  private async _waitForInstallAppConfirm(appName: string): Promise<boolean> {
+    const waitPromise = this._uiRegistry.wait<{ confirmed: boolean }>(
+      UI_REQUEST.REQUEST_INSTALL_APP
+    );
+
+    this.emitter.emit(UI_REQUEST.REQUEST_INSTALL_APP, {
+      type: UI_REQUEST.REQUEST_INSTALL_APP,
+      payload: { vendor: 'ledger', appName },
     });
 
     try {
@@ -1056,12 +1279,44 @@ export class LedgerAdapter implements IHardwareWallet {
    * 3. Calls connector.call()
    * 4. On disconnect error: clears stale session, re-connects, retries once
    */
+  /**
+   * Unwrap a `ConnectorCallResult` back into the throw-based control flow this
+   * class relies on. On failure, rehydrate a FLAT Error (lifting `params.*`
+   * back to own-properties) so the downstream recovery predicates
+   * (`isStuckAppStateError`, `isDeviceLockedError`, …) and `mapLedgerError`
+   * (which read `err._tag` / `err.code` / `err.appName` / `err.originalError`)
+   * keep working exactly as before — the Result shape is confined to the
+   * connector boundary.
+   */
+  private _unwrapConnectorResult(result: ConnectorCallResult): unknown {
+    if (result.success) return result.payload;
+    throw rehydrateConnectorError(result.error);
+  }
+
+  /**
+   * `connector.call` + result unwrap, optionally raced against an abort
+   * signal. Returns the call payload or throws the rehydrated error. All
+   * `this.connector.call` usage goes through here so the Result→throw seam
+   * lives in one place.
+   */
+  private async _callConnector(
+    sessionId: string,
+    method: string,
+    params: unknown,
+    signal?: AbortSignal
+  ): Promise<unknown> {
+    const promise = this.connector.call(sessionId, method, params);
+    const result = signal ? await this._abortable(signal, promise) : await promise;
+    return this._unwrapConnectorResult(result);
+  }
+
   private async connectorCall(
     connectId: string,
     method: string,
     params: unknown,
     fingerprint?: ConnectorCallFingerprint,
-    permissionDeviceId?: string
+    permissionDeviceId?: string,
+    commonParams?: ICommonCallParams
   ): Promise<unknown> {
     debugLog('[LedgerAdapter] connectorCall:', method, 'connectId:', connectId || '(empty)');
 
@@ -1071,7 +1326,15 @@ export class LedgerAdapter implements IHardwareWallet {
     return this._jobQueue.enqueue(
       queueKey,
       async signal =>
-        this._runConnectorCall(connectId, method, params, signal, fingerprint, permissionDeviceId),
+        this._runConnectorCall(
+          connectId,
+          method,
+          params,
+          signal,
+          fingerprint,
+          permissionDeviceId,
+          commonParams
+        ),
       {
         label: method,
         rejectIfBusy: true,
@@ -1125,7 +1388,8 @@ export class LedgerAdapter implements IHardwareWallet {
     params: unknown,
     signal: AbortSignal,
     fingerprint?: ConnectorCallFingerprint,
-    permissionDeviceId?: string
+    permissionDeviceId?: string,
+    commonParams?: ICommonCallParams
   ): Promise<unknown> {
     LedgerAdapter._throwIfAborted(signal);
     await this._ensureDevicePermission(
@@ -1188,7 +1452,7 @@ export class LedgerAdapter implements IHardwareWallet {
           });
         }
       }
-      return await this._abortable(signal, this.connector.call(sessionId, method, effectiveParams));
+      return await this._callConnector(sessionId, method, effectiveParams, signal);
     } catch (err) {
       // If the abort fired, surface it directly — skip recovery paths.
       if (signal.aborted) throw err;
@@ -1203,6 +1467,41 @@ export class LedgerAdapter implements IHardwareWallet {
         isNotAdvertising: isDeviceNotAdvertisingError(err),
         isStuckApp: isStuckAppStateError(err),
       });
+
+      // Auto-install: required app missing + caller opted in via commonParams.
+      // Ask the user, install (DMK returns to dashboard then installs, streaming
+      // AppInstallProgress ui-events), then retry the original op once. The
+      // install runs as a direct connector call within THIS queue slot — going
+      // through the public installApp/connectorCall would re-enter the serial
+      // job queue and reject as busy.
+      const autoInstallApp = commonParams?.autoInstallApp ?? this._defaultAutoInstallApp;
+      const isAppMissing =
+        isAppNotInstalledError(err) ||
+        (err as { code?: number })?.code === HardwareErrorCode.AppNotInstalled;
+      if (autoInstallApp && isAppMissing) {
+        const appName = (err as { appName?: string })?.appName ?? mapLedgerError(err).appName;
+        if (appName) {
+          const confirmed = await this._waitForInstallAppConfirm(appName);
+          if (!confirmed) throw err;
+          // Emit progress 0 immediately so the confirm dialog morphs into the
+          // "installing" view with no blank gap — DMK's setup (go-to-dashboard,
+          // metadata, build plan, secure channel) can take several seconds
+          // before the first real progress arrives.
+          this.emitter.emit('ui-event', {
+            type: EConnectorInteraction.AppInstallProgress,
+            payload: { connectId: resolvedConnectId, appName, progress: 0 },
+          });
+          await this._callConnector(sessionId, 'installApp', { appName }, signal);
+          // Close the install UI before retrying so the retried operation's own
+          // device prompts (e.g. confirm-on-device) render normally instead of
+          // being absorbed by the install dialog.
+          this.emitter.emit(UI_REQUEST.CLOSE_UI_WINDOW, {
+            type: UI_REQUEST.CLOSE_UI_WINDOW,
+            payload: {},
+          });
+          return await this._callConnector(sessionId, method, effectiveParams, signal);
+        }
+      }
 
       // Stuck DMK slot — reset transport, wait briefly, retry ONCE.
       // Trigger: Stax CloseApp→OpenApp race returns APDU 6901 before the
@@ -1315,10 +1614,7 @@ export class LedgerAdapter implements IHardwareWallet {
               }
             }
 
-            return await this._abortable(
-              signal,
-              this.connector.call(reSessionId, method, effectiveParams)
-            );
+            return await this._callConnector(reSessionId, method, effectiveParams, signal);
           } catch (retryErr) {
             if (signal.aborted) throw retryErr;
             lastErr = retryErr;
@@ -1412,7 +1708,7 @@ export class LedgerAdapter implements IHardwareWallet {
       }
     }
 
-    return this._abortable(signal, this.connector.call(retrySessionId, method, params));
+    return this._callConnector(retrySessionId, method, params, signal);
   }
 
   private _sleepAbortable(ms: number, signal: AbortSignal): Promise<void> {
@@ -1480,7 +1776,7 @@ export class LedgerAdapter implements IHardwareWallet {
         }
       }
 
-      return await this._abortable(signal, this.connector.call(retrySessionId, method, params));
+      return await this._callConnector(retrySessionId, method, params, signal);
     } catch (retryErr) {
       if (signal.aborted) throw retryErr;
       this.connector.reset();
@@ -1530,7 +1826,7 @@ export class LedgerAdapter implements IHardwareWallet {
         }
       }
 
-      return this._abortable(signal, this.connector.call(finalSessionId, method, params));
+      return this._callConnector(finalSessionId, method, params, signal);
     }
   }
 
@@ -1674,49 +1970,50 @@ export class LedgerAdapter implements IHardwareWallet {
     });
   };
 
-  // Forward low-level connector 'ui-event' (the four EConnectorInteraction values)
-  // to the public hw.emitter so consumers only need to subscribe in one place
-  // (hw.on instead of also reaching into connector.on).
+  // Forward connector `ui-event` to the public hw.emitter so consumers only
+  // need to subscribe in one place. For the AppInstallProgress variant we
+  // re-key sessionId → connectId via the live _sessions map; if no mapping
+  // exists (race during teardown) we drop. All other variants pass through
+  // unchanged.
   private uiEventForwarder = (event: ConnectorUiEvent): void => {
-    this.emitter.emit('ui-event', event);
-  };
-
-  // Forward 'app-install-progress' from the connector (carries sessionId) to the
-  // public hw.emitter as a connectId-keyed event. We translate sessionId → connectId
-  // via the live _sessions map; if no mapping exists (race during teardown) we drop.
-  private appInstallProgressForwarder = (data: {
-    sessionId: string;
-    appName: string;
-    progress: number;
-  }): void => {
-    let connectId: string | undefined;
-    for (const [cid, sid] of this._sessions) {
-      if (sid === data.sessionId) {
-        connectId = cid;
-        break;
+    if (event.type === EConnectorInteraction.AppInstallProgress) {
+      let connectId: string | undefined;
+      for (const [cid, sid] of this._sessions) {
+        if (sid === event.payload.sessionId) {
+          connectId = cid;
+          break;
+        }
       }
-    }
-    if (!connectId) {
+      if (!connectId) {
+        debugLog(
+          '[LedgerAdapter] dropping AppInstallProgress: no connectId for sessionId',
+          event.payload.sessionId
+        );
+        return;
+      }
+      this.emitter.emit('ui-event', {
+        type: EConnectorInteraction.AppInstallProgress,
+        payload: {
+          connectId,
+          appName: event.payload.appName,
+          progress: event.payload.progress,
+        },
+      });
       return;
     }
-    this.emitter.emit('app-install-progress', {
-      type: 'app-install-progress',
-      payload: { connectId, appName: data.appName, progress: data.progress },
-    });
+    this.emitter.emit('ui-event', event);
   };
 
   private registerEventListeners(): void {
     this.connector.on('device-connect', this.deviceConnectHandler);
     this.connector.on('device-disconnect', this.deviceDisconnectHandler);
     this.connector.on('ui-event', this.uiEventForwarder);
-    this.connector.on('app-install-progress', this.appInstallProgressForwarder);
   }
 
   private unregisterEventListeners(): void {
     this.connector.off('device-connect', this.deviceConnectHandler);
     this.connector.off('device-disconnect', this.deviceDisconnectHandler);
     this.connector.off('ui-event', this.uiEventForwarder);
-    this.connector.off('app-install-progress', this.appInstallProgressForwarder);
   }
 
   // ---------------------------------------------------------------------------

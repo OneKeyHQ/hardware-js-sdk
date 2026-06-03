@@ -1,4 +1,8 @@
-import { HardwareErrorCode } from '@onekeyfe/hwk-adapter-core';
+import {
+  EConnectorInteraction,
+  HardwareErrorCode,
+  serializeConnectorError,
+} from '@onekeyfe/hwk-adapter-core';
 
 import { LedgerDeviceManager } from '../device/LedgerDeviceManager';
 import { SignerManager } from '../signer/SignerManager';
@@ -43,6 +47,7 @@ import type { CancelReason } from '../signer/deviceActionToPromise';
 import type { DeviceManagementKit } from '@ledgerhq/device-management-kit';
 import type {
   ConnectionType,
+  ConnectorCallResult,
   ConnectorDevice,
   ConnectorEventMap,
   ConnectorEventType,
@@ -653,19 +658,30 @@ export class LedgerConnectorBase implements IConnector {
   // IConnector -- Method dispatch
   // ---------------------------------------------------------------------------
 
-  async call(sessionId: string, method: string, params: unknown): Promise<unknown> {
+  // Device failures are returned as a `ConnectorCallResult` (success:false),
+  // never thrown — so they cross the IHardwareBridge / extension offscreen↔SW
+  // boundary as plain data instead of being mangled by the JsBridge error
+  // whitelist (`toPlainError`). The SW-side adapter rehydrates and re-throws
+  // locally (see LedgerAdapter._unwrapConnectorResult).
+  async call(sessionId: string, method: string, params: unknown): Promise<ConnectorCallResult> {
     debugLog('[DMK] call:', method, JSON.stringify(params));
     try {
-      return await this._dispatch(sessionId, method, params);
+      const payload = await this._dispatch(sessionId, method, params);
+      return { success: true, payload };
     } catch (err) {
       // True chain-app stuck (APDU 0x6901): user must back out of the
       // app on the device — keep the "press both buttons to exit" message.
       if (isAppStuckByApdu(err)) {
-        throw Object.assign(new Error('Ledger app is unresponsive'), {
-          code: HardwareErrorCode.DeviceAppStuck,
-          _tag: ERROR_TAG.DeviceAppStuck,
-          originalError: err,
-        });
+        return {
+          success: false,
+          error: serializeConnectorError(
+            Object.assign(new Error('Ledger app is unresponsive'), {
+              code: HardwareErrorCode.DeviceAppStuck,
+              _tag: ERROR_TAG.DeviceAppStuck,
+              originalError: err,
+            })
+          ),
+        };
       }
       // DMK transport queue wedged (AlreadySendingApdu / UnknownDeviceExchange):
       // device + app are fine, only our SDK-side comms got tangled. Surface
@@ -674,13 +690,18 @@ export class LedgerConnectorBase implements IConnector {
       // Layer 2 (LedgerAdapter._runConnectorCall) will reset the connector
       // before re-throwing so the next call rebuilds a clean DMK instance.
       if (isTransportStuck(err)) {
-        throw Object.assign(new Error('Device communication interrupted, please retry'), {
-          code: HardwareErrorCode.TransportError,
-          _tag: ERROR_TAG.DeviceTransportStuck,
-          originalError: err,
-        });
+        return {
+          success: false,
+          error: serializeConnectorError(
+            Object.assign(new Error('Device communication interrupted, please retry'), {
+              code: HardwareErrorCode.TransportError,
+              _tag: ERROR_TAG.DeviceTransportStuck,
+              originalError: err,
+            })
+          ),
+        };
       }
-      throw err;
+      return { success: false, error: serializeConnectorError(err) };
     }
   }
 
@@ -748,13 +769,17 @@ export class LedgerConnectorBase implements IConnector {
         const apps = await _getDeviceApps(ctx, sessionId);
         try {
           // Progress callback is built here (not on params) so the function ref
-          // never crosses the IHardwareBridge boundary. Emits as a connector
-          // event; the adapter re-emits to its public typed emitter.
+          // never crosses the IHardwareBridge boundary. Emits as a `ui-event`
+          // AppInstallProgress variant; the adapter re-keys sessionId →
+          // connectId before re-emitting to its public typed emitter.
           return await apps.install(p.appName, ({ progress }) => {
-            ctx.emit('app-install-progress', {
-              sessionId,
-              appName: p.appName,
-              progress,
+            ctx.emit('ui-event', {
+              type: EConnectorInteraction.AppInstallProgress,
+              payload: {
+                sessionId,
+                appName: p.appName,
+                progress,
+              },
             });
           });
         } catch (err) {

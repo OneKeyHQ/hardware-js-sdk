@@ -1,4 +1,4 @@
-import { HardwareErrorCode } from '@onekeyfe/hwk-adapter-core';
+import { HardwareErrorCode, serializeConnectorError } from '@onekeyfe/hwk-adapter-core';
 
 import {
   ERROR_TAG,
@@ -402,5 +402,79 @@ describe('ledgerFailure', () => {
       }
     );
     expect(r.payload.params).toEqual({ permissionDeniedReason: 'bluetoothTurnedOff' });
+  });
+});
+
+describe('serializeConnectorError', () => {
+  it('hoists message/code/errorCode to the top level and nests domain fields under params', () => {
+    const err = Object.assign(new Error('boom'), {
+      code: HardwareErrorCode.WrongApp,
+      errorCode: '0x6511',
+      _tag: ERROR_TAG.WrongAppOpened,
+      statusCode: '6511',
+      appName: 'Bitcoin',
+    });
+    const s = serializeConnectorError(err);
+    expect(s.message).toBe('boom');
+    expect(s.code).toBe(HardwareErrorCode.WrongApp);
+    expect(s.errorCode).toBe('0x6511');
+    expect(s.params).toMatchObject({
+      _tag: ERROR_TAG.WrongAppOpened,
+      statusCode: '6511',
+      appName: 'Bitcoin',
+    });
+  });
+
+  it('preserves _lastStep / _deviceActionSteps so blind-sign survives the round-trip', () => {
+    // Raw EthApp error WITHOUT a pre-resolved `code` — exercises the path where
+    // the SW-side classifier must re-derive EvmBlindSigningRequired from the
+    // 0x6a80 APDU + blind-sign step context after the cross-boundary round-trip.
+    const raw = Object.assign(new Error('Invalid data'), {
+      _tag: ERROR_TAG.EthAppCommand,
+      errorCode: '6a80',
+      appName: 'Ethereum',
+      _lastStep: 'signer.eth.steps.blindSignTransactionFallback',
+      _deviceActionSteps: [
+        'signer.eth.steps.blindSignTransactionFallback',
+        'signer.eth.steps.detectBlindSigning',
+      ],
+    });
+
+    const s = serializeConnectorError(raw);
+    expect(s.params?._lastStep).toBe('signer.eth.steps.blindSignTransactionFallback');
+    expect(s.params?._deviceActionSteps).toEqual([
+      'signer.eth.steps.blindSignTransactionFallback',
+      'signer.eth.steps.detectBlindSigning',
+    ]);
+
+    // Rehydrate the flat error the way LedgerAdapter._unwrapConnectorResult does
+    // (lift params.* back to own-properties) and confirm classification holds.
+    const rehydrated = Object.assign(new Error(s.message), {
+      ...(s.code !== undefined ? { code: s.code } : {}),
+      ...(s.errorCode !== undefined ? { errorCode: s.errorCode } : {}),
+      ...(s.params ?? {}),
+    });
+    expect(mapLedgerError(rehydrated).code).toBe(HardwareErrorCode.EvmBlindSigningRequired);
+  });
+
+  it('does not deep-walk originalError beyond a shallow copy', () => {
+    const deep = Object.assign(new Error('outer'), {
+      originalError: Object.assign(new Error('inner'), {
+        _tag: 'InnerTag',
+        originalError: new Error('innermost'),
+      }),
+    });
+    const s = serializeConnectorError(deep);
+    const orig = s.params?.originalError as Record<string, unknown>;
+    expect(orig.message).toBe('inner');
+    expect(orig._tag).toBe('InnerTag');
+    // Only one level deep — the innermost envelope is intentionally dropped
+    // (nested serialization is fragile across the native bridge).
+    expect('originalError' in orig).toBe(false);
+  });
+
+  it('falls back to a plain message for non-object inputs', () => {
+    expect(serializeConnectorError('just a string')).toEqual({ message: 'just a string' });
+    expect(serializeConnectorError(undefined)).toEqual({ message: 'Unknown error' });
   });
 });

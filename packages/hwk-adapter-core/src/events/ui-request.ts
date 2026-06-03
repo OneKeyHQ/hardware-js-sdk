@@ -15,6 +15,9 @@ export const UI_REQUEST = {
   // Ledger BTC App: account index >= 100 requires display=true. Adapter asks
   // the user once per session before promoting the call.
   REQUEST_BTC_HIGH_INDEX_CONFIRM: 'ui-request-btc-high-index-confirm',
+  // Required app is not installed; with autoInstallApp on, ask the user
+  // whether to install it before retrying the operation.
+  REQUEST_INSTALL_APP: 'ui-request-install-app',
   CLOSE_UI_WINDOW: 'ui-close',
   DEVICE_PROGRESS: 'ui-device_progress',
   FIRMWARE_PROGRESS: 'ui-firmware-progress',
@@ -30,6 +33,7 @@ export const UI_RESPONSE = {
   RECEIVE_DEVICE_CONNECT: 'receive-device-connect',
   RECEIVE_DEVICE_PERMISSION: 'receive-device-permission',
   RECEIVE_BTC_HIGH_INDEX_CONFIRM: 'receive-btc-high-index-confirm',
+  RECEIVE_INSTALL_APP: 'receive-install-app',
   CANCEL: 'cancel',
 } as const;
 
@@ -82,6 +86,10 @@ export type UiResponseEvent =
     }
   | {
       type: typeof UI_RESPONSE.RECEIVE_BTC_HIGH_INDEX_CONFIRM;
+      payload: { confirmed: boolean };
+    }
+  | {
+      type: typeof UI_RESPONSE.RECEIVE_INSTALL_APP;
       payload: { confirmed: boolean };
     }
   | {

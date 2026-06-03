@@ -1,4 +1,5 @@
 import type { Response } from './response';
+import type { ICommonCallParams } from './wallet';
 
 export interface SolGetAddressParams {
   path: string;
@@ -45,18 +46,21 @@ export interface ISolMethods {
   solGetAddress(
     connectId: string,
     deviceId: string,
-    params: SolGetAddressParams
+    params: SolGetAddressParams,
+    commonParams?: ICommonCallParams
   ): Promise<Response<SolAddress>>;
 
   solSignTransaction(
     connectId: string,
     deviceId: string,
-    params: SolSignTxParams
+    params: SolSignTxParams,
+    commonParams?: ICommonCallParams
   ): Promise<Response<SolSignedTx>>;
 
   solSignMessage(
     connectId: string,
     deviceId: string,
-    params: SolSignMsgParams
+    params: SolSignMsgParams,
+    commonParams?: ICommonCallParams
   ): Promise<Response<SolSignature>>;
 }

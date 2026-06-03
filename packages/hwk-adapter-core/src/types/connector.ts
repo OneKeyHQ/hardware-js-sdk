@@ -33,12 +33,62 @@ export interface ConnectorSession {
   deviceInfo: DeviceInfo;
 }
 
-export type ConnectorEventType =
-  | 'device-connect'
-  | 'device-disconnect'
-  | 'ui-request'
-  | 'ui-event'
-  | 'app-install-progress';
+// =====================================================================
+// Connector call result — device errors travel as DATA, not exceptions
+//
+// `IConnector.call` never throws for device-level failures. It resolves a
+// discriminated result so the failure crosses any process boundary
+// (IHardwareBridge / extension offscreen↔SW) as plain `data`. This mirrors
+// the OneKey HD-SDK `IDeviceResponseResult` contract.
+//
+// WHY: when a thrown Error crosses the extension JsBridge it is run through
+// `toPlainError`, a fixed field whitelist that drops custom own-properties
+// (e.g. `appName`). Returning the failure as data keeps every field intact.
+//
+// Contract for `ConnectorSerializedError`: only `message` / `code` /
+// `errorCode` live at the top level; ALL other domain fields (`appName`,
+// `_tag`, `statusCode`, …) are nested under `params`.
+// =====================================================================
+
+/**
+ * Vendor-agnostic bag of extra error fields. Known keys are documented for
+ * discoverability; the index signature keeps it open so any connector can
+ * carry vendor-specific data without losing it across the bridge.
+ */
+export interface ConnectorErrorParams {
+  /** Vendor SDK error tag (e.g. Ledger DMK `_tag`). */
+  _tag?: string;
+  /** App involved, e.g. the Ledger app being opened/installed. */
+  appName?: string;
+  /** Transport / APDU status code (string or number depending on vendor). */
+  statusCode?: unknown;
+  /**
+   * Shallow snapshot of a nested cause. A raw Error does not survive JSON
+   * serialization (its `message`/`stack` are non-enumerable), so recovery
+   * predicates that recurse into a cause get this plain-object copy instead.
+   */
+  originalError?: {
+    message?: string;
+    code?: number;
+    errorCode?: string;
+    statusCode?: unknown;
+    _tag?: string;
+  };
+  [key: string]: unknown;
+}
+
+export interface ConnectorSerializedError {
+  message: string;
+  code?: number;
+  errorCode?: string;
+  params?: ConnectorErrorParams;
+}
+
+export type ConnectorCallResult =
+  | { success: true; payload: unknown }
+  | { success: false; error: ConnectorSerializedError };
+
+export type ConnectorEventType = 'device-connect' | 'device-disconnect' | 'ui-request' | 'ui-event';
 
 /**
  * Interaction event types emitted via 'ui-event'.
@@ -55,28 +105,34 @@ export enum EConnectorInteraction {
   ConfirmOnDevice = 'confirm-on-device',
   /** Previous interaction completed — clear UI prompt */
   InteractionComplete = 'interaction-complete',
+  /**
+   * OS-level Ledger app install progress. `progress` is a 0..1 fraction
+   * reported by DMK's InstallOrUpdateAppsDeviceAction. Emitted from inside
+   * the connector so the progress callback ref never has to cross the
+   * IHardwareBridge boundary.
+   */
+  AppInstallProgress = 'app-install-progress',
 }
 
-// All variants share the same payload shape so that emit sites where the
-// `type` is a broad `EConnectorInteraction` value (e.g. piped through
-// `collapseSignerInteraction`) still type-check. Searching has no session
-// yet so it carries an empty `sessionId`.
+// Discriminated union: most variants only carry `sessionId`, but
+// AppInstallProgress also carries `appName` + `progress`. Searching has no
+// session yet so it carries an empty `sessionId`.
 export type ConnectorUiEvent =
   | { type: EConnectorInteraction.Searching; payload: { sessionId: string } }
   | { type: EConnectorInteraction.ConfirmOpenApp; payload: { sessionId: string } }
   | { type: EConnectorInteraction.UnlockDevice; payload: { sessionId: string } }
   | { type: EConnectorInteraction.ConfirmOnDevice; payload: { sessionId: string } }
-  | { type: EConnectorInteraction.InteractionComplete; payload: { sessionId: string } };
+  | { type: EConnectorInteraction.InteractionComplete; payload: { sessionId: string } }
+  | {
+      type: EConnectorInteraction.AppInstallProgress;
+      payload: { sessionId: string; appName: string; progress: number };
+    };
 
 export interface ConnectorEventMap {
   'device-connect': { device: ConnectorDevice };
   'device-disconnect': { connectId: string };
   'ui-request': { type: string; payload?: unknown };
   'ui-event': ConnectorUiEvent;
-  // OS-level Ledger app install progress. Emitted from inside the connector
-  // so the callback ref never has to cross the IHardwareBridge boundary.
-  // `progress` is a 0..1 fraction reported by DMK's InstallOrUpdateAppsDeviceAction.
-  'app-install-progress': { sessionId: string; appName: string; progress: number };
 }
 
 export interface IConnector {
@@ -86,7 +142,13 @@ export interface IConnector {
   searchDevices(): Promise<ConnectorDevice[]>;
   connect(deviceId?: string): Promise<ConnectorSession>;
   disconnect(sessionId: string): Promise<void>;
-  call(sessionId: string, method: string, params: unknown): Promise<unknown>;
+  // `call` resolves a discriminated result; device-level failures are returned
+  // as data, never thrown (see ConnectorCallResult). Only `call` uses this
+  // contract because it is the one method that carries rich, vendor-specific
+  // domain errors across the IHardwareBridge boundary, where a thrown Error
+  // would be stripped by the host bridge's error whitelist. The other methods
+  // surface plain operational failures and still reject normally.
+  call(sessionId: string, method: string, params: unknown): Promise<ConnectorCallResult>;
   cancel(sessionId: string): Promise<void>;
 
   /** Send a UI response (e.g. PIN, passphrase) to the device. */
@@ -121,7 +183,7 @@ export interface IHardwareBridge {
     sessionId: string;
     method: string;
     callParams: unknown;
-  }): Promise<unknown>;
+  }): Promise<ConnectorCallResult>;
   cancel(params: { vendor: VendorType; sessionId: string }): Promise<void>;
   uiResponse(params: { vendor: VendorType; response: UiResponseEvent }): void;
   reset(params: { vendor: VendorType }): void;
@@ -191,4 +253,93 @@ export function createBridgedConnector(
     },
     reset: () => bridge.reset({ vendor }),
   };
+}
+
+// =====================================================================
+// ConnectorCallResult error (de)serialization — the canonical, vendor-agnostic
+// helpers every IConnector implementation / adapter should use, so the
+// "errors as data" contract is identical across vendors.
+// =====================================================================
+
+const SERIALIZED_ERROR_TOP_LEVEL_KEYS = new Set([
+  'message',
+  'code',
+  'errorCode',
+  'stack',
+  'params',
+]);
+
+/**
+ * Flatten a thrown error into the cross-boundary-safe `ConnectorSerializedError`
+ * shape. `message`/`code`/`errorCode` are lifted to the top level; every other
+ * own-enumerable field is copied into `params` so NO domain data is lost when
+ * the result crosses a host bridge (which may run thrown errors through a
+ * field whitelist). A nested `originalError` is shallow-snapshotted because a
+ * raw Error does not survive JSON serialization.
+ */
+export function serializeConnectorError(err: unknown): ConnectorSerializedError {
+  if (!err || typeof err !== 'object') {
+    return { message: typeof err === 'string' ? err : 'Unknown error' };
+  }
+  const e = err as Record<string, unknown>;
+  const message = typeof e.message === 'string' ? e.message : 'Unknown error';
+  const code = typeof e.code === 'number' ? e.code : undefined;
+  const errorCode = e.errorCode != null ? String(e.errorCode) : undefined;
+
+  const params: ConnectorErrorParams = {};
+  // Flatten an existing `params` bag, then copy every other own field (so
+  // vendor-specific keys like `_tag` / `statusCode` / `appName` / step context
+  // are preserved without being named here).
+  if (e.params && typeof e.params === 'object') {
+    Object.assign(params, e.params as Record<string, unknown>);
+  }
+  for (const key of Object.keys(e)) {
+    if (!SERIALIZED_ERROR_TOP_LEVEL_KEYS.has(key)) {
+      params[key] = e[key];
+    }
+  }
+  const orig = e.originalError;
+  if (orig && typeof orig === 'object') {
+    const o = orig as Record<string, unknown>;
+    params.originalError = {
+      message: typeof o.message === 'string' ? o.message : undefined,
+      code: typeof o.code === 'number' ? o.code : undefined,
+      errorCode: o.errorCode != null ? String(o.errorCode) : undefined,
+      statusCode: o.statusCode,
+      _tag: typeof o._tag === 'string' ? o._tag : undefined,
+    };
+  }
+
+  // The result crosses host bridges via JSON.stringify. Drop any single field
+  // that isn't JSON-safe (circular ref / non-serializable) so a pathological
+  // error degrades to "one field missing" instead of crashing the transport.
+  for (const key of Object.keys(params)) {
+    try {
+      JSON.stringify(params[key]);
+    } catch {
+      delete params[key];
+    }
+  }
+
+  return {
+    message,
+    ...(code !== undefined ? { code } : {}),
+    ...(errorCode !== undefined ? { errorCode } : {}),
+    ...(Object.keys(params).length ? { params } : {}),
+  };
+}
+
+/**
+ * Inverse of `serializeConnectorError`: rebuild a flat Error instance, lifting
+ * `params.*` back to own-properties so existing throw-based classifiers/recovery
+ * logic (which read `err._tag` / `err.code` / `err.appName` / …) keep working
+ * unchanged. The Result shape stays confined to the connector boundary.
+ */
+export function rehydrateConnectorError(error: ConnectorSerializedError): Error {
+  const { message, code, errorCode, params } = error;
+  return Object.assign(new Error(message), {
+    ...(code !== undefined ? { code } : {}),
+    ...(errorCode !== undefined ? { errorCode } : {}),
+    ...(params ?? {}),
+  });
 }

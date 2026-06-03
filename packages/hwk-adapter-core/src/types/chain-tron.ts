@@ -1,4 +1,5 @@
 import type { Response } from './response';
+import type { ICommonCallParams } from './wallet';
 
 export interface TronGetAddressParams {
   path: string;
@@ -37,18 +38,21 @@ export interface ITronMethods {
   tronGetAddress(
     connectId: string,
     deviceId: string,
-    params: TronGetAddressParams
+    params: TronGetAddressParams,
+    commonParams?: ICommonCallParams
   ): Promise<Response<TronAddress>>;
 
   tronSignTransaction(
     connectId: string,
     deviceId: string,
-    params: TronSignTxParams
+    params: TronSignTxParams,
+    commonParams?: ICommonCallParams
   ): Promise<Response<TronSignedTx>>;
 
   tronSignMessage(
     connectId: string,
     deviceId: string,
-    params: TronSignMsgParams
+    params: TronSignMsgParams,
+    commonParams?: ICommonCallParams
   ): Promise<Response<TronSignature>>;
 }

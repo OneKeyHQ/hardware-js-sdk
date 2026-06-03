@@ -1,4 +1,5 @@
 import type { Response } from './response';
+import type { ICommonCallParams } from './wallet';
 
 export interface EvmGetAddressParams {
   path: string;
@@ -91,24 +92,28 @@ export interface IEvmMethods {
   evmGetAddress(
     connectId: string,
     deviceId: string,
-    params: EvmGetAddressParams
+    params: EvmGetAddressParams,
+    commonParams?: ICommonCallParams
   ): Promise<Response<EvmAddress>>;
 
   evmSignTransaction(
     connectId: string,
     deviceId: string,
-    params: EvmSignTxParams
+    params: EvmSignTxParams,
+    commonParams?: ICommonCallParams
   ): Promise<Response<EvmSignedTx>>;
 
   evmSignMessage(
     connectId: string,
     deviceId: string,
-    params: EvmSignMsgParams
+    params: EvmSignMsgParams,
+    commonParams?: ICommonCallParams
   ): Promise<Response<EvmSignature>>;
 
   evmSignTypedData(
     connectId: string,
     deviceId: string,
-    params: EvmSignTypedDataParams
+    params: EvmSignTypedDataParams,
+    commonParams?: ICommonCallParams
   ): Promise<Response<EvmSignature>>;
 }

@@ -1,4 +1,5 @@
 import type { Response } from './response';
+import type { ICommonCallParams } from './wallet';
 
 export interface BtcGetAddressParams {
   path: string;
@@ -108,35 +109,41 @@ export interface IBtcMethods {
   btcGetAddress(
     connectId: string,
     deviceId: string,
-    params: BtcGetAddressParams
+    params: BtcGetAddressParams,
+    commonParams?: ICommonCallParams
   ): Promise<Response<BtcAddress>>;
 
   btcGetPublicKey(
     connectId: string,
     deviceId: string,
-    params: BtcGetPublicKeyParams
+    params: BtcGetPublicKeyParams,
+    commonParams?: ICommonCallParams
   ): Promise<Response<BtcPublicKey>>;
 
   btcSignTransaction(
     connectId: string,
     deviceId: string,
-    params: BtcSignTxParams
+    params: BtcSignTxParams,
+    commonParams?: ICommonCallParams
   ): Promise<Response<BtcSignedTx>>;
 
   btcSignPsbt(
     connectId: string,
     deviceId: string,
-    params: BtcSignPsbtParams
+    params: BtcSignPsbtParams,
+    commonParams?: ICommonCallParams
   ): Promise<Response<BtcSignedPsbt>>;
 
   btcSignMessage(
     connectId: string,
     deviceId: string,
-    params: BtcSignMsgParams
+    params: BtcSignMsgParams,
+    commonParams?: ICommonCallParams
   ): Promise<Response<BtcSignature>>;
 
   btcGetMasterFingerprint(
     connectId: string,
-    deviceId: string
+    deviceId: string,
+    commonParams?: ICommonCallParams
   ): Promise<Response<{ masterFingerprint: string }>>;
 }
