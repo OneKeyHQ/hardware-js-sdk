@@ -285,6 +285,33 @@ describe('Protocol V2 feature adapter', () => {
     });
   });
 
+  test('does not let skipPassphraseCheck hide Pro2 passphrase state mismatch', async () => {
+    const device = Device.fromDescriptor({ ...descriptor, protocolType: 'V2' } as any);
+    const typedCall = jest.fn().mockResolvedValue({
+      type: 'PassphraseState',
+      message: {
+        passphrase_state: 'wrong-state',
+        session_id: 'wrong-session',
+        unlocked_attach_pin: false,
+      },
+    });
+
+    (device as any).features = normalizeProtocolV2Features({
+      ...descriptor,
+      protocolType: 'V2',
+    } as any);
+    (device as any).commands = { typedCall };
+
+    await expect(device.checkPassphraseStateSafety('expected-state', false, true)).resolves.toBe(
+      false
+    );
+
+    expect(device.getInternalState()).toBeUndefined();
+    expect(typedCall).toHaveBeenLastCalledWith('GetPassphraseState', 'PassphraseState', {
+      passphrase_state: 'expected-state',
+    });
+  });
+
   test('marks fallback features as unavailable when DeviceInfo is missing', () => {
     const features = normalizeProtocolV2Features(descriptor as any);
 
@@ -649,7 +676,7 @@ describe('API compatibility handling', () => {
     );
   });
 
-  test('marks Pro2 Tron and Solana address methods as unsupported', () => {
+  test('does not mark Pro2 Tron and Solana address methods as unsupported', () => {
     const features = {
       onekey_device_type: 'pro2',
     } as Features;
@@ -675,12 +702,12 @@ describe('API compatibility handling', () => {
       isMethodVersionRangeUnsupported(
         getMethodVersionRange(features, type => tronMethod.getVersionRange()[type])
       )
-    ).toBe(true);
+    ).toBe(false);
     expect(
       isMethodVersionRangeUnsupported(
         getMethodVersionRange(features, type => solMethod.getVersionRange()[type])
       )
-    ).toBe(true);
+    ).toBe(false);
   });
 
   test('uses chunk transfer for large Sui transactions on Protocol V2', async () => {

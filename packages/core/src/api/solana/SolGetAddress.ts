@@ -39,12 +39,7 @@ export default class SolGetAddress extends BaseMethod<SolanaGetAddress[]> {
   }
 
   getVersionRange() {
-    return {
-      pro2: {
-        min: '0.0.0',
-        unsupported: true,
-      },
-    };
+    return {};
   }
 
   async run() {

@@ -40,10 +40,6 @@ export default class TronGetAddress extends BaseMethod<HardwareTronGetAddress[]>
 
   getVersionRange() {
     return {
-      pro2: {
-        min: '0.0.0',
-        unsupported: true,
-      },
       model_mini: {
         min: '2.5.0',
       },

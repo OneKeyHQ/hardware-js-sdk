@@ -997,14 +997,11 @@ export class Device extends EventEmitter {
         onlyMainPin: useEmptyPassphrase,
       });
 
-    if (skipPassphraseCheck) {
-      return true;
-    }
-
     // Main wallet and unlock Attach Pin, throw safe error
     const mainWalletUseAttachPin = unlockedAttachPin && useEmptyPassphrase;
     const useErrorAttachPin =
       unlockedAttachPin && passphraseState && passphraseState !== newPassphraseState;
+    const passphraseStateMismatch = !!passphraseState && passphraseState !== newPassphraseState;
 
     Log.debug('Check passphrase state safety: ', {
       passphraseState,
@@ -1012,6 +1009,14 @@ export class Device extends EventEmitter {
       unlockedAttachPin,
       useEmptyPassphrase,
     });
+
+    if (skipPassphraseCheck) {
+      if (passphraseStateMismatch) {
+        this.clearInternalState();
+        return false;
+      }
+      return true;
+    }
 
     if (mainWalletUseAttachPin || useErrorAttachPin) {
       try {
@@ -1024,7 +1029,7 @@ export class Device extends EventEmitter {
     }
 
     // When exists passphraseState, check passphraseState
-    if (passphraseState && passphraseState !== newPassphraseState) {
+    if (passphraseStateMismatch) {
       this.clearInternalState();
       return false;
     }
