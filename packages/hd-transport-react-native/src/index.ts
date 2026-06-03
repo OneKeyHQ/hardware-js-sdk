@@ -59,9 +59,7 @@ const delay = (ms: number) =>
     setTimeout(resolve, ms);
   });
 
-const getFirmwareUploadWriteRetryType = (
-  error: unknown
-): FirmwareUploadWriteRetryType | null => {
+const getFirmwareUploadWriteRetryType = (error: unknown): FirmwareUploadWriteRetryType | null => {
   if (!error || typeof error !== 'object') return null;
   const bleWriteError = error as {
     androidErrorCode?: unknown;
@@ -92,11 +90,8 @@ const getFirmwareUploadWriteRetryType = (
   return /GATT_CONGESTED|status\s*[:=]?\s*143/.test(text) ? 'congested' : null;
 };
 
-const resolveFirmwareUploadRetryDelay = (
-  attempt: number,
-  baseDelayMs = 200,
-  maxDelayMs = 1200
-) => Math.min(baseDelayMs * 2 ** attempt, maxDelayMs);
+const resolveFirmwareUploadRetryDelay = (attempt: number, baseDelayMs = 200, maxDelayMs = 1200) =>
+  Math.min(baseDelayMs * 2 ** attempt, maxDelayMs);
 
 let connectOptions: Record<string, unknown> = {
   requestMTU: 256,
@@ -312,8 +307,9 @@ export default class ReactNativeBleTransport {
         }
       }
 
-      const { writeCharacteristic, notifyCharacteristic } =
-        await this.resolveCharacteristics(device);
+      const { writeCharacteristic, notifyCharacteristic } = await this.resolveCharacteristics(
+        device
+      );
 
       transport.device = device;
       transport.writeCharacteristic = writeCharacteristic;
@@ -531,8 +527,7 @@ export default class ReactNativeBleTransport {
       }
     }
 
-    const { writeCharacteristic, notifyCharacteristic } =
-      await this.resolveCharacteristics(device);
+    const { writeCharacteristic, notifyCharacteristic } = await this.resolveCharacteristics(device);
 
     // release transport before new transport instance
     await this.release(uuid);
@@ -754,10 +749,7 @@ export default class ReactNativeBleTransport {
             await writeFunction(chunk.toString('base64'));
             packetsWritten += 1;
             chunk = ByteBuffer.allocate(FIRMWARE_UPLOAD_WRITE_PACKET_CAPACITY);
-            if (
-              packetsWritten % FIRMWARE_UPLOAD_WRITE_BURST_SIZE === 0 &&
-              index < buffers.length
-            ) {
+            if (packetsWritten % FIRMWARE_UPLOAD_WRITE_BURST_SIZE === 0 && index < buffers.length) {
               await delay(FIRMWARE_UPLOAD_WRITE_PAUSE_MS);
             }
           } catch (e) {
@@ -820,19 +812,17 @@ export default class ReactNativeBleTransport {
                 this.firmwareUploadWriteRecoveryIds.add(uuid);
               }
               await delay(delayMs);
+              attempt += 1;
               if (shouldReconnect) {
                 try {
                   await this.reconnectFirmwareUploadTransport(uuid, transport);
                 } catch (e) {
                   Log?.debug('[ReactNativeBleTransport] FirmwareUpload reconnect error:', e);
-                  attempt += 1;
                   if (attempt >= FIRMWARE_UPLOAD_WRITE_MAX_RETRIES) {
                     throw e;
                   }
-                  continue;
                 }
               }
-              attempt += 1;
             }
           }
         },
