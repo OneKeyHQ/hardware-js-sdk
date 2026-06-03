@@ -26,9 +26,26 @@ import { useDeviceStore } from '../store/deviceStore';
 import { logHardware } from '../utils/logger';
 import { createPro2DeviceInfo, isPro2DeviceInfo } from '../utils/pro2Device';
 
-import { OnboardingStep } from '@onekeyfe/hd-transport';
-import type { DeviceOnboardingStatus } from '@onekeyfe/hd-transport';
 import type { DeviceInfo } from '../types/hardware';
+
+enum OnboardingStep {
+  UNKNOWN = 0,
+  SECURITY_CHECK = 1,
+  PIN = 2,
+  SETUP_CHOICE = 3,
+  CREATE_NEW = 4,
+  SEEDCARD_BACKUP = 5,
+  RESTORE_CHOICE = 6,
+  RESTORE_MNEMONIC = 7,
+  RESTORE_MNEMONIC_SEEDCARD_BACKUP = 8,
+  RESTORE_SEEDCARD = 9,
+  DONE = 100,
+}
+
+type DeviceOnboardingStatus = {
+  step: OnboardingStep;
+  page_name?: string;
+};
 
 type PollSource = 'mock' | 'real';
 
