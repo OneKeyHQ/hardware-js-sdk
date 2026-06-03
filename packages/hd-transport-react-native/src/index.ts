@@ -38,6 +38,60 @@ const { check, buildBuffers, receiveOne, parseConfigure } = transport;
 const Log = getLogger(LoggerNames.HdBleTransport);
 
 const transportCache: Record<string, BleTransport> = {};
+const FIRMWARE_UPLOAD_WRITE_BURST_SIZE = Platform.OS === 'ios' ? 4 : 5;
+const FIRMWARE_UPLOAD_WRITE_PAUSE_MS = Platform.OS === 'ios' ? 8 : 10;
+const FIRMWARE_UPLOAD_WRITE_FLUSH_DELAY_MS = Platform.OS === 'ios' ? 24 : 30;
+const FIRMWARE_UPLOAD_WRITE_MAX_RETRIES = 8;
+const FIRMWARE_UPLOAD_RECONNECT_RETRY_DELAY_MS = 2000;
+const ANDROID_FIRMWARE_UPLOAD_PACKET_LENGTH = 192;
+const FIRMWARE_UPLOAD_WRITE_PACKET_CAPACITY =
+  Platform.OS === 'ios' ? IOS_PACKET_LENGTH : ANDROID_FIRMWARE_UPLOAD_PACKET_LENGTH;
+const ANDROID_GATT_CONGESTED_STATUS = 143;
+
+type FirmwareUploadWriteRetryType = 'congested' | 'reconnectable';
+type ResolvedBleCharacteristics = {
+  writeCharacteristic: Characteristic;
+  notifyCharacteristic: Characteristic;
+};
+
+const delay = (ms: number) =>
+  new Promise<void>(resolve => {
+    setTimeout(resolve, ms);
+  });
+
+const getFirmwareUploadWriteRetryType = (error: unknown): FirmwareUploadWriteRetryType | null => {
+  if (!error || typeof error !== 'object') return null;
+  const bleWriteError = error as {
+    androidErrorCode?: unknown;
+    status?: unknown;
+    errorCode?: unknown;
+    reason?: unknown;
+    message?: unknown;
+    name?: unknown;
+  };
+
+  if (
+    bleWriteError.errorCode === BleErrorCode.DeviceDisconnected ||
+    bleWriteError.errorCode === BleErrorCode.CharacteristicNotFound
+  ) {
+    return 'reconnectable';
+  }
+
+  if (
+    bleWriteError.androidErrorCode === ANDROID_GATT_CONGESTED_STATUS ||
+    bleWriteError.status === ANDROID_GATT_CONGESTED_STATUS
+  ) {
+    return 'congested';
+  }
+
+  const text = [bleWriteError.reason, bleWriteError.message, bleWriteError.name]
+    .filter(value => typeof value === 'string')
+    .join(' ');
+  return /GATT_CONGESTED|status\s*[:=]?\s*143/.test(text) ? 'congested' : null;
+};
+
+const resolveFirmwareUploadRetryDelay = (attempt: number, baseDelayMs = 200, maxDelayMs = 1200) =>
+  Math.min(baseDelayMs * 2 ** attempt, maxDelayMs);
 
 let connectOptions: Record<string, unknown> = {
   requestMTU: 256,
@@ -104,6 +158,8 @@ export default class ReactNativeBleTransport {
 
   emitter?: EventEmitter;
 
+  firmwareUploadWriteRecoveryIds = new Set<string>();
+
   constructor(options: TransportOptions) {
     this.scanTimeout = options.scanTimeout ?? 3000;
   }
@@ -126,6 +182,143 @@ export default class ReactNativeBleTransport {
     if (this.blePlxManager) return Promise.resolve(this.blePlxManager);
     this.blePlxManager = new BlePlxManager();
     return Promise.resolve(this.blePlxManager);
+  }
+
+  async resolveCharacteristics(device: Device): Promise<ResolvedBleCharacteristics> {
+    await device.discoverAllServicesAndCharacteristics();
+    let infos = tryToGetConfiguration(device);
+    let characteristics: Characteristic[] | undefined;
+
+    if (!infos) {
+      for (const serviceUuid of getBluetoothServiceUuids()) {
+        try {
+          characteristics = await device.characteristicsForService(serviceUuid);
+          infos = getInfosForServiceUuid(serviceUuid, 'classic');
+          break;
+        } catch (e) {
+          Log?.error(e);
+        }
+      }
+    }
+
+    if (!infos) {
+      try {
+        Log?.debug('cancel connection when service not found');
+        await device.cancelConnection();
+      } catch (e) {
+        Log?.debug('cancel connection error when service not found: ', e.message || e.reason);
+      }
+      throw ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound);
+    }
+
+    const { serviceUuid, writeUuid, notifyUuid } = infos;
+
+    if (!characteristics) {
+      characteristics = await device.characteristicsForService(serviceUuid);
+    }
+
+    if (!characteristics) {
+      throw ERRORS.TypedError(HardwareErrorCode.BleCharacteristicNotFound);
+    }
+
+    let writeCharacteristic;
+    let notifyCharacteristic;
+    for (const c of characteristics) {
+      if (c.uuid === writeUuid) {
+        writeCharacteristic = c;
+      } else if (c.uuid === notifyUuid) {
+        notifyCharacteristic = c;
+      }
+    }
+
+    if (!writeCharacteristic) {
+      throw ERRORS.TypedError('BLECharacteristicNotFound: write characteristic not found');
+    }
+
+    if (!notifyCharacteristic) {
+      throw ERRORS.TypedError('BLECharacteristicNotFound: notify characteristic not found');
+    }
+
+    if (!writeCharacteristic.isWritableWithResponse) {
+      throw ERRORS.TypedError('BLECharacteristicNotWritable: write characteristic not writable');
+    }
+
+    if (!notifyCharacteristic.isNotifiable) {
+      throw ERRORS.TypedError(
+        'BLECharacteristicNotNotifiable: notify characteristic not notifiable'
+      );
+    }
+
+    return {
+      writeCharacteristic,
+      notifyCharacteristic,
+    };
+  }
+
+  attachDisconnectSubscription(transport: BleTransport, device: Device, uuid: string) {
+    transport.disconnectSubscription?.remove();
+    transport.disconnectSubscription = device.onDisconnected(() => {
+      if (this.firmwareUploadWriteRecoveryIds.has(uuid)) {
+        Log?.debug('device disconnect ignored during FirmwareUpload write recovery: ', uuid);
+        return;
+      }
+
+      try {
+        Log?.debug('device disconnect: ', device?.id);
+        this.emitter?.emit('device-disconnect', {
+          name: device?.name,
+          id: device?.id,
+          connectId: device?.id,
+        });
+        if (this.runPromise) {
+          this.runPromise.reject(ERRORS.TypedError(HardwareErrorCode.BleConnectedError));
+        }
+      } catch (e) {
+        Log?.debug('device disconnect error: ', e);
+      } finally {
+        this.release(uuid);
+      }
+    });
+  }
+
+  async reconnectFirmwareUploadTransport(uuid: string, transport: BleTransport) {
+    this.firmwareUploadWriteRecoveryIds.add(uuid);
+    try {
+      transport.disconnectSubscription?.remove();
+      transport.disconnectSubscription = undefined;
+      transport.notifySubscription?.remove();
+      transport.notifySubscription = undefined;
+
+      let { device } = transport;
+      const isConnected = await device.isConnected().catch(() => false);
+      if (!isConnected) {
+        try {
+          device = await device.connect(connectOptions);
+        } catch (e) {
+          if (
+            e.errorCode === BleErrorCode.DeviceMTUChangeFailed ||
+            e.errorCode === BleErrorCode.OperationCancelled
+          ) {
+            connectOptions = {};
+            device = await device.connect();
+          } else if (e.errorCode !== BleErrorCode.DeviceAlreadyConnected) {
+            throw e;
+          }
+        }
+      }
+
+      const { writeCharacteristic, notifyCharacteristic } = await this.resolveCharacteristics(
+        device
+      );
+
+      transport.device = device;
+      transport.writeCharacteristic = writeCharacteristic;
+      transport.notifyCharacteristic = notifyCharacteristic;
+      transport.notifySubscription = this._monitorCharacteristic(notifyCharacteristic, uuid);
+      this.attachDisconnectSubscription(transport, device, uuid);
+    } finally {
+      this.firmwareUploadWriteRecoveryIds.delete(uuid);
+    }
   }
 
   /**
@@ -334,69 +527,7 @@ export default class ReactNativeBleTransport {
       }
     }
 
-    await device.discoverAllServicesAndCharacteristics();
-    let infos = tryToGetConfiguration(device);
-    let characteristics;
-
-    if (!infos) {
-      for (const serviceUuid of getBluetoothServiceUuids()) {
-        try {
-          characteristics = await device.characteristicsForService(serviceUuid);
-          infos = getInfosForServiceUuid(serviceUuid, 'classic');
-          break;
-        } catch (e) {
-          Log?.error(e);
-        }
-      }
-    }
-
-    if (!infos) {
-      try {
-        Log?.debug('cancel connection when service not found');
-        await device.cancelConnection();
-      } catch (e) {
-        Log?.debug('cancel connection error when service not found: ', e.message || e.reason);
-      }
-      throw ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound);
-    }
-
-    const { serviceUuid, writeUuid, notifyUuid } = infos;
-
-    if (!characteristics) {
-      characteristics = await device.characteristicsForService(serviceUuid);
-    }
-
-    if (!characteristics) {
-      throw ERRORS.TypedError(HardwareErrorCode.BleCharacteristicNotFound);
-    }
-
-    let writeCharacteristic;
-    let notifyCharacteristic;
-    for (const c of characteristics) {
-      if (c.uuid === writeUuid) {
-        writeCharacteristic = c;
-      } else if (c.uuid === notifyUuid) {
-        notifyCharacteristic = c;
-      }
-    }
-
-    if (!writeCharacteristic) {
-      throw ERRORS.TypedError('BLECharacteristicNotFound: write characteristic not found');
-    }
-
-    if (!notifyCharacteristic) {
-      throw ERRORS.TypedError('BLECharacteristicNotFound: notify characteristic not found');
-    }
-
-    if (!writeCharacteristic.isWritableWithResponse) {
-      throw ERRORS.TypedError('BLECharacteristicNotWritable: write characteristic not writable');
-    }
-
-    if (!notifyCharacteristic.isNotifiable) {
-      throw ERRORS.TypedError(
-        'BLECharacteristicNotNotifiable: notify characteristic not notifiable'
-      );
-    }
+    const { writeCharacteristic, notifyCharacteristic } = await this.resolveCharacteristics(device);
 
     // release transport before new transport instance
     await this.release(uuid);
@@ -414,23 +545,7 @@ export default class ReactNativeBleTransport {
       connectId: device.id,
     });
 
-    transport.disconnectSubscription = device.onDisconnected(() => {
-      try {
-        Log?.debug('device disconnect: ', device?.id);
-        this.emitter?.emit('device-disconnect', {
-          name: device?.name,
-          id: device?.id,
-          connectId: device?.id,
-        });
-        if (this.runPromise) {
-          this.runPromise.reject(ERRORS.TypedError(HardwareErrorCode.BleConnectedError));
-        }
-      } catch (e) {
-        Log?.debug('device disconnect error: ', e);
-      } finally {
-        this.release(uuid);
-      }
-    });
+    this.attachDisconnectSubscription(transport, device, uuid);
 
     return { uuid };
   }
@@ -445,6 +560,10 @@ export default class ReactNativeBleTransport {
             error as unknown as string
           }`
         );
+        if (this.firmwareUploadWriteRecoveryIds.has(uuid)) {
+          Log?.debug('notify error ignored during FirmwareUpload write recovery: ', uuid);
+          return;
+        }
         if (this.runPromise) {
           let ERROR:
             | typeof HardwareErrorCode.BleDeviceBondError
@@ -610,6 +729,41 @@ export default class ReactNativeBleTransport {
       }
     }
 
+    async function writeFirmwareUploadChunkedData(
+      buffers: ByteBuffer[],
+      writeFunction: (data: string) => Promise<void>,
+      onError: (e: any) => void
+    ) {
+      let index = 0;
+      let packetsWritten = 0;
+      let chunk = ByteBuffer.allocate(FIRMWARE_UPLOAD_WRITE_PACKET_CAPACITY);
+
+      while (index < buffers.length) {
+        const buffer = buffers[index].toBuffer();
+        chunk.append(buffer);
+        index += 1;
+
+        if (chunk.offset === FIRMWARE_UPLOAD_WRITE_PACKET_CAPACITY || index >= buffers.length) {
+          chunk.reset();
+          try {
+            await writeFunction(chunk.toString('base64'));
+            packetsWritten += 1;
+            chunk = ByteBuffer.allocate(FIRMWARE_UPLOAD_WRITE_PACKET_CAPACITY);
+            if (packetsWritten % FIRMWARE_UPLOAD_WRITE_BURST_SIZE === 0 && index < buffers.length) {
+              await delay(FIRMWARE_UPLOAD_WRITE_PAUSE_MS);
+            }
+          } catch (e) {
+            onError(e);
+            throw ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError);
+          }
+        }
+      }
+
+      if (packetsWritten > 0) {
+        await delay(FIRMWARE_UPLOAD_WRITE_FLUSH_DELAY_MS);
+      }
+    }
+
     if (name === 'EmmcFileWrite') {
       await writeChunkedData(
         buffers,
@@ -620,10 +774,57 @@ export default class ReactNativeBleTransport {
         }
       );
     } else if (name === 'FirmwareUpload') {
-      await writeChunkedData(
+      Log?.debug('[ReactNativeBleTransport] FirmwareUpload write uses throttled BLE packets:', {
+        packetCapacity: FIRMWARE_UPLOAD_WRITE_PACKET_CAPACITY,
+        burstSize: FIRMWARE_UPLOAD_WRITE_BURST_SIZE,
+        pauseMs: FIRMWARE_UPLOAD_WRITE_PAUSE_MS,
+        flushDelayMs: FIRMWARE_UPLOAD_WRITE_FLUSH_DELAY_MS,
+        maxRetries: FIRMWARE_UPLOAD_WRITE_MAX_RETRIES,
+      });
+
+      await writeFirmwareUploadChunkedData(
         buffers,
         async data => {
-          await transport.writeCharacteristic.writeWithoutResponse(data);
+          let attempt = 0;
+          // Retry only congestion. Other write errors should surface immediately.
+          // GATT_CONGESTED is usually transient backpressure from the Android BLE queue.
+          // eslint-disable-next-line no-constant-condition
+          while (true) {
+            try {
+              await transport.writeCharacteristic.writeWithoutResponse(data);
+              return;
+            } catch (error) {
+              const retryType = getFirmwareUploadWriteRetryType(error);
+              if (!retryType || attempt >= FIRMWARE_UPLOAD_WRITE_MAX_RETRIES) {
+                throw error;
+              }
+              const shouldReconnect = retryType === 'reconnectable';
+              const delayMs = shouldReconnect
+                ? FIRMWARE_UPLOAD_RECONNECT_RETRY_DELAY_MS
+                : resolveFirmwareUploadRetryDelay(attempt);
+              Log?.debug('[ReactNativeBleTransport] FirmwareUpload write retry:', {
+                attempt: attempt + 1,
+                delayMs,
+                reconnect: shouldReconnect,
+                error,
+              });
+              if (shouldReconnect) {
+                this.firmwareUploadWriteRecoveryIds.add(uuid);
+              }
+              await delay(delayMs);
+              attempt += 1;
+              if (shouldReconnect) {
+                try {
+                  await this.reconnectFirmwareUploadTransport(uuid, transport);
+                } catch (e) {
+                  Log?.debug('[ReactNativeBleTransport] FirmwareUpload reconnect error:', e);
+                  if (attempt >= FIRMWARE_UPLOAD_WRITE_MAX_RETRIES) {
+                    throw e;
+                  }
+                }
+              }
+            }
+          }
         },
         e => {
           this.runPromise = null;
