@@ -13,6 +13,7 @@ import HardwareSdk, {
   createUiMessage,
   enableLog,
   executeCallback,
+  getLogBlockLabel,
   getLogger,
   initCore,
   parseConnectSettings,
@@ -84,8 +85,9 @@ function handleMessage(message: CoreMessage) {
     return;
   }
 
+  const blockLog = getLogBlockLabel(message);
   if (event !== LOG_EVENT) {
-    Log.debug('hd-common-connect-sdk handleMessage', message);
+    Log.debug('hd-common-connect-sdk handleMessage', blockLog ?? message);
   }
   switch (event) {
     case UI_EVENT:
@@ -159,7 +161,8 @@ const init = async (
 };
 
 const call = async (params: any) => {
-  Log.debug('call: ', params);
+  const blockLog = getLogBlockLabel(params);
+  Log.debug('call: ', blockLog ?? params);
 
   try {
     const response = await postMessage({ event: IFRAME.CALL, type: IFRAME.CALL, payload: params });

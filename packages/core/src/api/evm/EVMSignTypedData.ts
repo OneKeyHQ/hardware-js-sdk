@@ -183,7 +183,7 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
         } else if (typeof memberData === 'object' && memberData !== null) {
           const memberTypeDefinition = types[memberTypeName][index];
           memberTypeName = memberTypeDefinition.type;
-          memberData = memberData[memberTypeDefinition.name];
+          memberData = (memberData as Record<string, unknown>)[memberTypeDefinition.name];
         } else {
           // TODO
         }
