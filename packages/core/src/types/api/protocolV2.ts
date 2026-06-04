@@ -2,11 +2,11 @@ import type { CommonParams, Response } from '../params';
 import type {
   DeviceFirmwareTarget,
   DeviceFirmwareUpdateStatus,
-  DeviceOnboardingStatus,
   DeviceInfoTargets,
   DeviceInfoTypes,
   DeviceRebootType,
   FactoryDeviceInfo,
+  OnboardingStatus,
   ProtoVersion,
   ProtocolV2DeviceInfo,
   Success,
@@ -162,7 +162,7 @@ export declare function deviceGetDeviceInfo(
 export declare function deviceGetOnboardingStatus(
   connectId: string,
   params?: CommonParams
-): Response<DeviceOnboardingStatus>;
+): Response<OnboardingStatus>;
 
 export declare function deviceFirmwareUpdate(
   connectId: string,

@@ -120,6 +120,14 @@ function removeReservedExecutionParams(params: Record<string, unknown>) {
   );
 }
 
+function prepareBatchParams(params: Record<string, unknown>) {
+  const nextParams = { ...params };
+  if (nextParams.useEmptyPassphrase === true) {
+    delete nextParams.passphraseState;
+  }
+  return nextParams;
+}
+
 function getMethodPresets(method: UnifiedMethodConfig, presetMode: PresetMode) {
   const presets = method.presets.length > 0 ? method.presets : [DEFAULT_PRESET];
   return presetMode === 'first' ? presets.slice(0, 1) : presets;
@@ -178,12 +186,14 @@ const MethodBatchTestPage: React.FC = () => {
       group.methods.flatMap((method, methodIndex) =>
         getMethodPresets(method, presetMode).map((preset, presetIndex) => {
           const methodParams = getPresetParams(preset);
-          const params = removeReservedExecutionParams(
-            Object.fromEntries(
-              Object.entries({
-                ...methodParams,
-                ...commonParameters,
-              }).filter(([, value]) => value !== undefined && value !== null && value !== '')
+          const params = prepareBatchParams(
+            removeReservedExecutionParams(
+              Object.fromEntries(
+                Object.entries({
+                  ...commonParameters,
+                  ...methodParams,
+                }).filter(([, value]) => value !== undefined && value !== null && value !== '')
+              )
             )
           );
           const id = `chain:${group.id}:${methodIndex}:${method.method}:${presetIndex}:${preset.title}`;

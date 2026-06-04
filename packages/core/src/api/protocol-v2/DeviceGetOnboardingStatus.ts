@@ -8,11 +8,7 @@ export default class DeviceGetOnboardingStatus extends BaseMethod {
   }
 
   async run() {
-    const res = await this.device.commands.typedCall(
-      'DeviceGetOnboardingStatus',
-      'DeviceOnboardingStatus',
-      {}
-    );
+    const res = await this.device.commands.typedCall('GetOnboardingStatus', 'OnboardingStatus', {});
     return Promise.resolve(res.message);
   }
 }

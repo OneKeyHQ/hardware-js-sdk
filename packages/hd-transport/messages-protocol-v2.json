@@ -487,8 +487,8 @@
         "MessageType_DeviceReboot": 60400,
         "MessageType_DeviceGetDeviceInfo": 60600,
         "MessageType_DeviceInfo": 60601,
-        "MessageType_DeviceGetOnboardingStatus": 60602,
-        "MessageType_DeviceOnboardingStatus": 60603,
+        "MessageType_GetOnboardingStatus": 60602,
+        "MessageType_OnboardingStatus": 60603,
         "MessageType_FilesystemFixPermission": 60800,
         "MessageType_FilesystemPathInfo": 60801,
         "MessageType_FilesystemPathInfoQuery": 60802,
@@ -12403,22 +12403,68 @@
     "FilesystemFormat": {
       "fields": {}
     },
-    "DeviceGetOnboardingStatus": {
+    "OnboardingStep": {
+      "values": {
+        "ONBOARDING_STEP_UNKNOWN": 0,
+        "ONBOARDING_STEP_DEVICE_VERIFICATION": 1,
+        "ONBOARDING_STEP_PERSONALIZATION": 2,
+        "ONBOARDING_STEP_SETUP": 3,
+        "ONBOARDING_STEP_FIRMWARE": 4
+      }
+    },
+    "GetOnboardingStatus": {
       "fields": {}
     },
-    "DeviceOnboardingStatus": {
+    "OnboardingStatus": {
       "fields": {
-        "page_index": {
-          "type": "uint32",
+        "step": {
+          "rule": "required",
+          "type": "OnboardingStep",
           "id": 1
         },
-        "page_count": {
-          "type": "uint32",
+        "setup": {
+          "type": "OnboardingSetup",
           "id": 2
         },
-        "page_name": {
-          "type": "string",
+        "detail_code": {
+          "type": "uint32",
           "id": 3
+        },
+        "detail_str": {
+          "type": "string",
+          "id": 4
+        }
+      }
+    },
+    "OnboardingSetup": {
+      "fields": {
+        "new_device": {
+          "type": "OnboardingNewDevice",
+          "id": 1
+        },
+        "restore": {
+          "type": "OnboardingRestore",
+          "id": 2
+        }
+      }
+    },
+    "OnboardingNewDevice": {
+      "fields": {
+        "seedcard_backup": {
+          "type": "bool",
+          "id": 1
+        }
+      }
+    },
+    "OnboardingRestore": {
+      "fields": {
+        "mnemonic": {
+          "type": "bool",
+          "id": 1
+        },
+        "seedcard": {
+          "type": "bool",
+          "id": 2
         }
       }
     },

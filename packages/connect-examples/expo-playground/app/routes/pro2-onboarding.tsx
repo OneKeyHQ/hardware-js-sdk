@@ -29,21 +29,25 @@ import type { DeviceInfo } from '../types/hardware';
 
 enum OnboardingStep {
   UNKNOWN = 0,
-  SECURITY_CHECK = 1,
-  PIN = 2,
-  SETUP_CHOICE = 3,
-  CREATE_NEW = 4,
-  SEEDCARD_BACKUP = 5,
-  RESTORE_CHOICE = 6,
-  RESTORE_MNEMONIC = 7,
-  RESTORE_MNEMONIC_SEEDCARD_BACKUP = 8,
-  RESTORE_SEEDCARD = 9,
-  DONE = 100,
+  DEVICE_VERIFICATION = 1,
+  PERSONALIZATION = 2,
+  SETUP = 3,
+  FIRMWARE = 4,
 }
 
-type DeviceOnboardingStatus = {
+type OnboardingStatus = {
   step: OnboardingStep;
-  page_name?: string;
+  setup?: {
+    new_device?: {
+      seedcard_backup?: boolean;
+    };
+    restore?: {
+      mnemonic?: boolean;
+      seedcard?: boolean;
+    };
+  };
+  detail_code?: number;
+  detail_str?: string;
 };
 
 type PollSource = 'mock' | 'real';
@@ -54,7 +58,7 @@ type PollRecord = {
   timestamp: string;
   durationMs: number;
   success: boolean;
-  status?: DeviceOnboardingStatus;
+  status?: OnboardingStatus;
   error?: string;
 };
 
@@ -64,25 +68,19 @@ const MAX_POLL_INTERVAL_MS = 60_000;
 const MAX_HISTORY_LENGTH = 12;
 
 const ONBOARDING_WIRE_INFO = {
-  txMsgType: '60602 (DeviceGetOnboardingStatus)',
+  txMsgType: '60602 (GetOnboardingStatus)',
   txPayload: 'ba ec',
-  rxMsgType: '60603 (DeviceOnboardingStatus)',
-  rxPayload: 'bb ec + step/page_name',
-  decoded: 'DeviceOnboardingStatus',
+  rxMsgType: '60603 (OnboardingStatus)',
+  rxPayload: 'bb ec + step/setup/detail_code/detail_str',
+  decoded: 'OnboardingStatus',
 };
 
 const STEP_LABELS: Record<number, string> = {
   [OnboardingStep.UNKNOWN]: 'Unknown',
-  [OnboardingStep.SECURITY_CHECK]: 'Security Check',
-  [OnboardingStep.PIN]: 'PIN Setup',
-  [OnboardingStep.SETUP_CHOICE]: 'Setup Choice',
-  [OnboardingStep.CREATE_NEW]: 'Create New Wallet',
-  [OnboardingStep.SEEDCARD_BACKUP]: 'SeedCard Backup',
-  [OnboardingStep.RESTORE_CHOICE]: 'Restore Choice',
-  [OnboardingStep.RESTORE_MNEMONIC]: 'Restore Mnemonic',
-  [OnboardingStep.RESTORE_MNEMONIC_SEEDCARD_BACKUP]: 'Restore Mnemonic SeedCard Backup',
-  [OnboardingStep.RESTORE_SEEDCARD]: 'Restore SeedCard',
-  [OnboardingStep.DONE]: 'Done',
+  [OnboardingStep.DEVICE_VERIFICATION]: 'Device Verification',
+  [OnboardingStep.PERSONALIZATION]: 'Personalization',
+  [OnboardingStep.SETUP]: 'Setup',
+  [OnboardingStep.FIRMWARE]: 'Firmware',
 };
 
 function getStepLabel(step?: OnboardingStep): string {
@@ -93,26 +91,24 @@ function getStepLabel(step?: OnboardingStep): string {
 // Ordered steps for progress calculation (linear ordering of main flow)
 const PROGRESS_STEPS = [
   OnboardingStep.UNKNOWN,
-  OnboardingStep.SECURITY_CHECK,
-  OnboardingStep.PIN,
-  OnboardingStep.SETUP_CHOICE,
-  OnboardingStep.CREATE_NEW,
-  OnboardingStep.SEEDCARD_BACKUP,
-  OnboardingStep.RESTORE_CHOICE,
-  OnboardingStep.RESTORE_MNEMONIC,
-  OnboardingStep.RESTORE_MNEMONIC_SEEDCARD_BACKUP,
-  OnboardingStep.RESTORE_SEEDCARD,
-  OnboardingStep.DONE,
+  OnboardingStep.DEVICE_VERIFICATION,
+  OnboardingStep.PERSONALIZATION,
+  OnboardingStep.SETUP,
+  OnboardingStep.FIRMWARE,
 ];
 
-// Mock flow simulates: SECURITY_CHECK → PIN → SETUP_CHOICE → CREATE_NEW → SEEDCARD_BACKUP → DONE
-const MOCK_FLOW: OnboardingStep[] = [
-  OnboardingStep.SECURITY_CHECK,
-  OnboardingStep.PIN,
-  OnboardingStep.SETUP_CHOICE,
-  OnboardingStep.CREATE_NEW,
-  OnboardingStep.SEEDCARD_BACKUP,
-  OnboardingStep.DONE,
+// Mock flow simulates the new 0..4 major-step model with setup branch details.
+const MOCK_FLOW: OnboardingStatus[] = [
+  { step: OnboardingStep.DEVICE_VERIFICATION, detail_str: 'Genuine check' },
+  { step: OnboardingStep.PERSONALIZATION, detail_str: 'PIN and device personalization' },
+  { step: OnboardingStep.SETUP },
+  { step: OnboardingStep.SETUP, setup: { new_device: {} }, detail_str: 'Create new wallet' },
+  {
+    step: OnboardingStep.SETUP,
+    setup: { new_device: { seedcard_backup: true } },
+    detail_str: 'SeedCard backup',
+  },
+  { step: OnboardingStep.FIRMWARE, detail_str: 'Wallet ready' },
 ];
 
 function clampPollInterval(value: string | number) {
@@ -121,19 +117,46 @@ function clampPollInterval(value: string | number) {
   return Math.min(MAX_POLL_INTERVAL_MS, Math.max(MIN_POLL_INTERVAL_MS, Math.round(numeric)));
 }
 
-function normalizeStatus(payload: unknown): DeviceOnboardingStatus {
+function normalizeSetup(payload: unknown): OnboardingStatus['setup'] {
+  if (!payload || typeof payload !== 'object') return undefined;
+
+  const data = payload as Record<string, unknown>;
+  const setup: NonNullable<OnboardingStatus['setup']> = {};
+
+  if (data.new_device && typeof data.new_device === 'object') {
+    const newDevice = data.new_device as Record<string, unknown>;
+    setup.new_device = {
+      seedcard_backup:
+        typeof newDevice.seedcard_backup === 'boolean' ? newDevice.seedcard_backup : undefined,
+    };
+  }
+
+  if (data.restore && typeof data.restore === 'object') {
+    const restore = data.restore as Record<string, unknown>;
+    setup.restore = {
+      mnemonic: typeof restore.mnemonic === 'boolean' ? restore.mnemonic : undefined,
+      seedcard: typeof restore.seedcard === 'boolean' ? restore.seedcard : undefined,
+    };
+  }
+
+  return Object.keys(setup).length ? setup : undefined;
+}
+
+function normalizeStatus(payload: unknown): OnboardingStatus {
   if (!payload || typeof payload !== 'object') return { step: OnboardingStep.UNKNOWN };
 
   const data = payload as Record<string, unknown>;
   return {
     step: typeof data.step === 'number' ? data.step : OnboardingStep.UNKNOWN,
-    page_name: typeof data.page_name === 'string' ? data.page_name : undefined,
+    setup: normalizeSetup(data.setup),
+    detail_code: typeof data.detail_code === 'number' ? data.detail_code : undefined,
+    detail_str: typeof data.detail_str === 'string' ? data.detail_str : undefined,
   };
 }
 
-function getProgressValue(status: DeviceOnboardingStatus | null) {
+function getProgressValue(status: OnboardingStatus | null) {
   if (!status) return 0;
-  if (status.step === OnboardingStep.DONE) return 100;
+  if (status.step === OnboardingStep.FIRMWARE) return 100;
 
   const idx = PROGRESS_STEPS.indexOf(status.step);
   if (idx < 0) return 0;
@@ -156,6 +179,31 @@ function getLatestLabel(record?: PollRecord) {
   if (!record) return 'Waiting';
   if (!record.success) return 'Error';
   return getStepLabel(record.status?.step);
+}
+
+function getSetupLabel(status?: OnboardingStatus | null) {
+  if (!status?.setup) return '';
+  const { setup } = status;
+
+  if (setup.new_device) {
+    return setup.new_device.seedcard_backup ? 'new_device.seedcard_backup' : 'new_device';
+  }
+
+  if (setup.restore) {
+    if (setup.restore.mnemonic) return 'restore.mnemonic';
+    if (setup.restore.seedcard) return 'restore.seedcard';
+    return 'restore';
+  }
+
+  return '';
+}
+
+function getStatusSubtitle(status?: OnboardingStatus | null) {
+  if (!status) return '';
+
+  const parts = [getSetupLabel(status), status.detail_str].filter(Boolean);
+  if (typeof status.detail_code === 'number') parts.push(`detail_code: ${status.detail_code}`);
+  return parts.join(' / ');
 }
 
 function StatusMetric({
@@ -187,168 +235,130 @@ function OnboardingFlowDoc() {
         </div>
 
         <div className="space-y-3 text-sm">
-          {/* ── 协议说明 ── */}
           <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
             <div className="mb-2 font-medium text-foreground">协议</div>
             <div className="space-y-1 font-mono text-xs text-muted-foreground">
-              <div>TX: DeviceGetOnboardingStatus (60602) — 空请求，App 定时轮询</div>
-              <div>RX: DeviceOnboardingStatus (60603) — step (枚举) + page_name (可选调试字段)</div>
+              <div>TX: GetOnboardingStatus (60602) — 空请求，App 定时轮询</div>
+              <div>
+                RX: OnboardingStatus (60603) — step + setup + detail_code + detail_str
+              </div>
             </div>
           </div>
 
-          {/* ── 流程总览 ── */}
           <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
-            <div className="mb-3 font-medium text-foreground">流程总览</div>
+            <div className="mb-3 font-medium text-foreground">新状态模型</div>
             <div className="text-xs text-muted-foreground">
-              <p className="mb-3">整个 Onboarding 分为 4 个阶段，所有路径共享前 3 个阶段，在 SETUP_CHOICE 处产生分支：</p>
+              <p className="mb-3">
+                固件现在只返回 0..4 大阶段，创建/恢复路径通过 setup 子状态表达；旧的
+                5/6/7/8/9/100 细状态不再作为 step 返回。
+              </p>
 
-              {/* 公共阶段 */}
-              <div className="mb-3 rounded border border-border/40 bg-background/50 p-2.5">
-                <div className="mb-1.5 text-xs font-medium text-foreground">公共阶段（所有路径）</div>
-                <div className="flex flex-wrap items-center gap-1.5 font-mono">
-                  <span className="rounded bg-blue-100 px-1.5 py-0.5 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">1 SECURITY_CHECK</span>
-                  <span>→</span>
-                  <span className="rounded bg-blue-100 px-1.5 py-0.5 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">2 PIN</span>
-                  <span>→</span>
-                  <span className="rounded bg-yellow-100 px-1.5 py-0.5 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200">3 SETUP_CHOICE</span>
-                </div>
-              </div>
-
-              {/* 分支 */}
-              <div className="space-y-2">
-                {/* 路径 A: 创建 */}
-                <div className="rounded border border-border/40 bg-background/50 p-2.5">
-                  <div className="mb-1.5 text-xs font-medium text-foreground">路径 A：创建新钱包</div>
-                  <div className="mb-1 text-muted-foreground">用户选择「设置为新设备」</div>
-                  <div className="flex flex-wrap items-center gap-1.5 font-mono">
-                    <span className="rounded bg-green-100 px-1.5 py-0.5 text-green-800 dark:bg-green-900/40 dark:text-green-200">4 CREATE_NEW</span>
-                    <span>→</span>
-                    <span className="rounded bg-purple-100 px-1.5 py-0.5 text-purple-800 dark:bg-purple-900/40 dark:text-purple-200">5 SEEDCARD_BACKUP</span>
-                    <span>→</span>
-                    <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200">100 DONE</span>
-                  </div>
-                  <div className="mt-1.5 text-muted-foreground">
-                    CREATE_NEW 包含：选择词数(12/18/24)/SLIP39 → 生成助记词 → 显示助记词 → 验证助记词 → Wallet Ready
-                  </div>
-                </div>
-
-                {/* 路径 B: 助记词恢复 */}
-                <div className="rounded border border-border/40 bg-background/50 p-2.5">
-                  <div className="mb-1.5 text-xs font-medium text-foreground">路径 B：助记词恢复</div>
-                  <div className="mb-1 text-muted-foreground">用户选择「恢复钱包」→ 选择「助记词恢复」</div>
-                  <div className="flex flex-wrap items-center gap-1.5 font-mono">
-                    <span className="rounded bg-orange-100 px-1.5 py-0.5 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200">6 RESTORE_CHOICE</span>
-                    <span>→</span>
-                    <span className="rounded bg-green-100 px-1.5 py-0.5 text-green-800 dark:bg-green-900/40 dark:text-green-200">7 RESTORE_MNEMONIC</span>
-                    <span>→</span>
-                    <span className="rounded bg-purple-100 px-1.5 py-0.5 text-purple-800 dark:bg-purple-900/40 dark:text-purple-200">8 RESTORE_..._BACKUP</span>
-                    <span>→</span>
-                    <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200">100 DONE</span>
-                  </div>
-                  <div className="mt-1.5 text-muted-foreground">
-                    RESTORE_MNEMONIC 包含：选择词数 → 逐词输入(BIP39) 或 逐份输入(SLIP39) → 写入 SE → Wallet Ready
-                  </div>
-                </div>
-
-                {/* 路径 C: SeedCard 恢复 */}
-                <div className="rounded border border-border/40 bg-background/50 p-2.5">
-                  <div className="mb-1.5 text-xs font-medium text-foreground">路径 C：SeedCard 恢复</div>
-                  <div className="mb-1 text-muted-foreground">用户选择「恢复钱包」→ 选择「SeedCard 恢复」</div>
-                  <div className="flex flex-wrap items-center gap-1.5 font-mono">
-                    <span className="rounded bg-orange-100 px-1.5 py-0.5 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200">6 RESTORE_CHOICE</span>
-                    <span>→</span>
-                    <span className="rounded bg-green-100 px-1.5 py-0.5 text-green-800 dark:bg-green-900/40 dark:text-green-200">9 RESTORE_SEEDCARD</span>
-                    <span>→</span>
-                    <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200">100 DONE</span>
-                  </div>
-                  <div className="mt-1.5 text-muted-foreground">
-                    RESTORE_SEEDCARD 包含：NFC 读取 SeedCard → 写入 SE → Wallet Ready。无需额外备份。
-                  </div>
-                </div>
+              <div className="flex flex-wrap items-center gap-1.5 font-mono">
+                <span className="rounded bg-muted px-1.5 py-0.5 text-foreground">0 UNKNOWN</span>
+                <span>→</span>
+                <span className="rounded bg-blue-100 px-1.5 py-0.5 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
+                  1 DEVICE_VERIFICATION
+                </span>
+                <span>→</span>
+                <span className="rounded bg-yellow-100 px-1.5 py-0.5 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200">
+                  2 PERSONALIZATION
+                </span>
+                <span>→</span>
+                <span className="rounded bg-green-100 px-1.5 py-0.5 text-green-800 dark:bg-green-900/40 dark:text-green-200">
+                  3 SETUP
+                </span>
+                <span>→</span>
+                <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200">
+                  4 FIRMWARE
+                </span>
               </div>
             </div>
           </div>
 
-          {/* ── 各阶段详细说明 ── */}
           <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
-            <div className="mb-2 font-medium text-foreground">各阶段包含的固件页面</div>
+            <div className="mb-2 font-medium text-foreground">旧状态映射</div>
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-border/40 text-muted-foreground">
-                  <th className="pb-1.5 text-left font-medium">值</th>
-                  <th className="pb-1.5 text-left font-medium">步骤</th>
-                  <th className="pb-1.5 text-left font-medium">包含的固件页面</th>
+                  <th className="pb-1.5 text-left font-medium">旧状态</th>
+                  <th className="pb-1.5 text-left font-medium">旧值</th>
+                  <th className="pb-1.5 text-left font-medium">当前固件返回</th>
                 </tr>
               </thead>
               <tbody className="text-foreground">
                 <tr className="border-b border-border/20">
-                  <td className="py-1.5 align-top">0</td>
-                  <td className="align-top">UNKNOWN</td>
-                  <td className="text-muted-foreground">设备未进入 onboarding，或正在启动中</td>
+                  <td className="py-1.5 align-top">UNKNOWN</td>
+                  <td className="align-top">0</td>
+                  <td className="text-muted-foreground">step = UNKNOWN</td>
                 </tr>
                 <tr className="border-b border-border/20">
-                  <td className="py-1.5 align-top">1</td>
-                  <td className="align-top">SECURITY_CHECK</td>
-                  <td className="text-muted-foreground">Hello → 选择语言 → 法律条款 → Let&apos;s get started → 连接 OneKey App (扫码) → Genuine Check (SE 验证设备真伪) → 给设备命名</td>
+                  <td className="py-1.5 align-top">SECURITY_CHECK</td>
+                  <td className="align-top">1</td>
+                  <td className="text-muted-foreground">step = DEVICE_VERIFICATION</td>
                 </tr>
                 <tr className="border-b border-border/20">
-                  <td className="py-1.5 align-top">2</td>
-                  <td className="align-top">PIN</td>
-                  <td className="text-muted-foreground">Create PIN 引导 → 输入新 PIN (4~50位) → 再次输入确认 → 不匹配则重试 → PIN Enabled</td>
+                  <td className="py-1.5 align-top">PIN</td>
+                  <td className="align-top">2</td>
+                  <td className="text-muted-foreground">step = PERSONALIZATION</td>
                 </tr>
                 <tr className="border-b border-border/20">
-                  <td className="py-1.5 align-top">3</td>
-                  <td className="align-top">SETUP_CHOICE</td>
-                  <td className="text-muted-foreground">Setup Option 页面：选择「创建新钱包」或「恢复钱包」（分支点）</td>
+                  <td className="py-1.5 align-top">SETUP_CHOICE</td>
+                  <td className="align-top">3</td>
+                  <td className="text-muted-foreground">step = SETUP，setup 为空</td>
                 </tr>
                 <tr className="border-b border-border/20">
-                  <td className="py-1.5 align-top">4</td>
-                  <td className="align-top">CREATE_NEW</td>
-                  <td className="text-muted-foreground">Recovery Phrase Types (12/18/24 词或 SLIP39) → 生成助记词 → Ready to Back Up → 逐词显示 → 验证助记词 → Wallet is Ready</td>
+                  <td className="py-1.5 align-top">CREATE_NEW</td>
+                  <td className="align-top">4</td>
+                  <td className="text-muted-foreground">step = SETUP + setup.new_device = {}</td>
                 </tr>
                 <tr className="border-b border-border/20">
-                  <td className="py-1.5 align-top">5</td>
-                  <td className="align-top">SEEDCARD_BACKUP</td>
-                  <td className="text-muted-foreground">Set Up SeedCard Backup 引导 → NFC 写入 SeedCard → Backup Verification</td>
+                  <td className="py-1.5 align-top">SEEDCARD_BACKUP</td>
+                  <td className="align-top">5</td>
+                  <td className="text-muted-foreground">
+                    step = SETUP + setup.new_device.seedcard_backup = true
+                  </td>
                 </tr>
                 <tr className="border-b border-border/20">
-                  <td className="py-1.5 align-top">6</td>
-                  <td className="align-top">RESTORE_CHOICE</td>
-                  <td className="text-muted-foreground">Restore Wallet 页面：选择恢复方式（助记词 / SeedCard）</td>
+                  <td className="py-1.5 align-top">RESTORE_CHOICE</td>
+                  <td className="align-top">6</td>
+                  <td className="text-muted-foreground">step = SETUP + setup.restore = {}</td>
                 </tr>
                 <tr className="border-b border-border/20">
-                  <td className="py-1.5 align-top">7</td>
-                  <td className="align-top">RESTORE_MNEMONIC</td>
-                  <td className="text-muted-foreground">选择词数 (12/18/24) → 逐词输入 (BIP39) 或逐份输入 (SLIP39) → 写入 SE → Wallet is Ready</td>
+                  <td className="py-1.5 align-top">RESTORE_MNEMONIC</td>
+                  <td className="align-top">7</td>
+                  <td className="text-muted-foreground">
+                    step = SETUP + setup.restore.mnemonic = true
+                  </td>
                 </tr>
                 <tr className="border-b border-border/20">
-                  <td className="py-1.5 align-top">8</td>
-                  <td className="whitespace-nowrap align-top">RESTORE_..._BACKUP</td>
-                  <td className="text-muted-foreground">助记词恢复完成后，提示将助记词备份到 SeedCard → NFC 写入 → Backup Verification</td>
+                  <td className="py-1.5 align-top">RESTORE_MNEMONIC_SEEDCARD_BACKUP</td>
+                  <td className="align-top">8</td>
+                  <td className="text-muted-foreground">当前固件无对应状态，恢复成功后进入 FIRMWARE</td>
                 </tr>
                 <tr className="border-b border-border/20">
-                  <td className="py-1.5 align-top">9</td>
-                  <td className="align-top">RESTORE_SEEDCARD</td>
-                  <td className="text-muted-foreground">NFC 读取 SeedCard → 写入 SE → Wallet is Ready（已有 SeedCard，无需再备份）</td>
+                  <td className="py-1.5 align-top">RESTORE_SEEDCARD</td>
+                  <td className="align-top">9</td>
+                  <td className="text-muted-foreground">
+                    step = SETUP + setup.restore.seedcard = true
+                  </td>
                 </tr>
                 <tr>
-                  <td className="py-1.5 align-top">100</td>
-                  <td className="align-top">DONE</td>
-                  <td className="text-muted-foreground">Onboarding 完成，设备进入固件主界面</td>
+                  <td className="py-1.5 align-top">DONE</td>
+                  <td className="align-top">100</td>
+                  <td className="text-muted-foreground">step = FIRMWARE，值是 4，不是 100</td>
                 </tr>
               </tbody>
             </table>
           </div>
 
-          {/* ── 注意事项 ── */}
           <div className="rounded-lg border border-orange-200/50 bg-orange-50/30 p-3 dark:border-orange-900/40 dark:bg-orange-950/10">
             <div className="mb-1 font-medium text-foreground">注意事项</div>
             <ul className="list-inside list-disc space-y-1 text-xs text-muted-foreground">
-              <li>步骤不是严格递增的：用户按返回时 step 会回退（如 SETUP_CHOICE → SECURITY_CHECK）</li>
-              <li>步骤可能被跳过：SEEDCARD_BACKUP (5) 和 RESTORE_MNEMONIC_SEEDCARD_BACKUP (8) 是可选的，可能直接跳到 DONE</li>
+              <li>步骤不是严格递增的：用户按返回时 step 会回退</li>
+              <li>step 只表示大阶段，创建/恢复细分必须读取 setup 子字段</li>
               <li>App 不能假设 step 只会向前推进，需要处理任意 step 跳转</li>
               <li>轮询无副作用，不会改变设备状态，可安全高频调用</li>
-              <li>page_name 是固件内部页面名（如 &quot;Recovery Phrase&quot;），仅用于调试</li>
+              <li>detail_code/detail_str 是固件调试信息，不应作为业务状态主键</li>
             </ul>
           </div>
         </div>
@@ -486,7 +496,7 @@ export default function Pro2OnboardingPage() {
   const [intervalInput, setIntervalInput] = useState(String(DEFAULT_POLL_INTERVAL_MS));
   const [isPolling, setIsPolling] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [status, setStatus] = useState<DeviceOnboardingStatus | null>(null);
+  const [status, setStatus] = useState<OnboardingStatus | null>(null);
   const [rawResponse, setRawResponse] = useState<unknown>(null);
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<PollRecord[]>([]);
@@ -498,15 +508,10 @@ export default function Pro2OnboardingPage() {
   const pollIntervalMs = useMemo(() => clampPollInterval(intervalInput), [intervalInput]);
   const progress = useMemo(() => getProgressValue(status), [status]);
 
-  const buildMockStatus = useCallback((): DeviceOnboardingStatus => {
+  const buildMockStatus = useCallback((): OnboardingStatus => {
     const idx = mockIndexRef.current % MOCK_FLOW.length;
     mockIndexRef.current += 1;
-    const step = MOCK_FLOW[idx];
-
-    return {
-      step,
-      page_name: getStepLabel(step),
-    };
+    return MOCK_FLOW[idx];
   }, []);
 
   const requestRealStatus = useCallback(async () => {
@@ -519,7 +524,7 @@ export default function Pro2OnboardingPage() {
     });
 
     if (!response.success) {
-      throw new Error(response.payload?.error || 'DeviceGetOnboardingStatus failed');
+      throw new Error(response.payload?.error || 'GetOnboardingStatus failed');
     }
 
     return {
@@ -718,7 +723,7 @@ export default function Pro2OnboardingPage() {
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h1 className="text-2xl font-semibold text-foreground">Pro2 Onboarding</h1>
-              <p className="mt-1 text-sm text-muted-foreground">DeviceGetOnboardingStatus polling</p>
+              <p className="mt-1 text-sm text-muted-foreground">GetOnboardingStatus polling</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant={isPolling ? 'default' : 'outline'}>
@@ -867,9 +872,9 @@ export default function Pro2OnboardingPage() {
                     >
                       {status ? getStepLabel(status.step) : 'No status yet'}
                     </div>
-                    {status?.page_name ? (
+                    {getStatusSubtitle(status) ? (
                       <div className="mt-1 text-sm text-muted-foreground">
-                        page: {status.page_name}
+                        {getStatusSubtitle(status)}
                       </div>
                     ) : null}
                   </div>

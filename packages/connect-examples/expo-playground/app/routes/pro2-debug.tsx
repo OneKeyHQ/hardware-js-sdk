@@ -132,11 +132,11 @@ const PRO2_METHOD_WIRE_INFO: Record<string, MethodWireInfo> = {
     decoded: 'Success.message',
   },
   deviceGetOnboardingStatus: {
-    tx: '60602 (DeviceGetOnboardingStatus)',
+    tx: '60602 (GetOnboardingStatus)',
     txPayload: 'ba ec',
-    rx: '60603 (DeviceOnboardingStatus)',
-    rxPayload: 'bb ec + page_index/page_count/page_name',
-    decoded: 'DeviceOnboardingStatus',
+    rx: '60603 (OnboardingStatus)',
+    rxPayload: 'bb ec + step/setup/detail_code/detail_str',
+    decoded: 'OnboardingStatus',
   },
   factoryGetDeviceInfo: {
     tx: '60001 (FactoryGetDeviceInfo)',

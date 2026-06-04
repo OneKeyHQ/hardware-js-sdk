@@ -4799,25 +4799,35 @@ export type FilesystemDiskControl = {
 
 export enum OnboardingStep {
   UNKNOWN = 0,
-  SECURITY_CHECK = 1,
-  PIN = 2,
-  SETUP_CHOICE = 3,
-  CREATE_NEW = 4,
-  SEEDCARD_BACKUP = 5,
-  RESTORE_CHOICE = 6,
-  RESTORE_MNEMONIC = 7,
-  RESTORE_MNEMONIC_SEEDCARD_BACKUP = 8,
-  RESTORE_SEEDCARD = 9,
-  DONE = 100,
+  DEVICE_VERIFICATION = 1,
+  PERSONALIZATION = 2,
+  SETUP = 3,
+  FIRMWARE = 4,
 }
 
-// DeviceGetOnboardingStatus
-export type DeviceGetOnboardingStatus = {};
+export type OnboardingNewDevice = {
+  seedcard_backup?: boolean;
+};
 
-// DeviceOnboardingStatus
-export type DeviceOnboardingStatus = {
+export type OnboardingRestore = {
+  mnemonic?: boolean;
+  seedcard?: boolean;
+};
+
+export type OnboardingSetup = {
+  new_device?: OnboardingNewDevice;
+  restore?: OnboardingRestore;
+};
+
+// GetOnboardingStatus
+export type GetOnboardingStatus = {};
+
+// OnboardingStatus
+export type OnboardingStatus = {
   step: OnboardingStep;
-  page_name?: string;
+  setup?: OnboardingSetup;
+  detail_code?: number;
+  detail_str?: string;
 };
 
 // custom connect definitions
@@ -5430,8 +5440,8 @@ export type MessageType = {
   FilesystemDirRemove: FilesystemDirRemove;
   FilesystemFormat: FilesystemFormat;
   FilesystemDiskControl: FilesystemDiskControl;
-  DeviceGetOnboardingStatus: DeviceGetOnboardingStatus;
-  DeviceOnboardingStatus: DeviceOnboardingStatus;
+  GetOnboardingStatus: GetOnboardingStatus;
+  OnboardingStatus: OnboardingStatus;
 };
 
 export type MessageKey = keyof MessageType;
@@ -5461,9 +5471,7 @@ export type TypedCall = {
     resType: R,
     message?: any
   ): Promise<MessageResponseMap[R[number]]>;
-  <T extends MessageKey, R extends MessageKey>(
-    type: T,
-    resType: R,
-    message?: any
-  ): Promise<MessageResponse<R>>;
+  <T extends MessageKey, R extends MessageKey>(type: T, resType: R, message?: any): Promise<
+    MessageResponse<R>
+  >;
 };

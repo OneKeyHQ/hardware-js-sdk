@@ -144,21 +144,41 @@ if [ -d "$SRC_PRO2_LATEST" ] && ls "$SRC_PRO2_LATEST"/messages*.proto 1>/dev/nul
             "$SRC_PRO2_LATEST"/messages*.proto \
             | grep -v '    reserved '
 
-        if ! grep -q '^message DeviceGetOnboardingStatus ' "$SRC_PRO2_LATEST"/messages*.proto; then
+        if ! grep -q '^message GetOnboardingStatus ' "$SRC_PRO2_LATEST"/messages*.proto; then
             echo ''
             echo '// --- Onboarding status (kept until firmware-pro2 latest proto exports it) ---'
-            echo 'message DeviceGetOnboardingStatus {'
+            echo 'enum OnboardingStep {'
+            echo '    ONBOARDING_STEP_UNKNOWN = 0;'
+            echo '    ONBOARDING_STEP_DEVICE_VERIFICATION = 1;'
+            echo '    ONBOARDING_STEP_PERSONALIZATION = 2;'
+            echo '    ONBOARDING_STEP_SETUP = 3;'
+            echo '    ONBOARDING_STEP_FIRMWARE = 4;'
             echo '}'
             echo ''
-            echo 'message DeviceOnboardingStatus {'
-            echo '    optional uint32 page_index = 1;'
-            echo '    optional uint32 page_count = 2;'
-            echo '    optional string page_name = 3;'
+            echo 'message GetOnboardingStatus {'
+            echo '}'
+            echo ''
+            echo 'message OnboardingStatus {'
+            echo '    message Setup {'
+            echo '        message NewDevice {'
+            echo '            optional bool seedcard_backup = 1;'
+            echo '        }'
+            echo '        message Restore {'
+            echo '            optional bool mnemonic = 1;'
+            echo '            optional bool seedcard = 2;'
+            echo '        }'
+            echo '        optional NewDevice new_device = 1;'
+            echo '        optional Restore restore = 2;'
+            echo '    }'
+            echo '    required OnboardingStep step = 1;'
+            echo '    optional Setup setup = 2;'
+            echo '    optional uint32 detail_code = 3;'
+            echo '    optional string detail_str = 4;'
             echo '}'
         fi
     } > "$TMP_PROTO"
 
-    if ! grep -q 'MessageType_DeviceGetOnboardingStatus' "$TMP_PROTO"; then
+    if ! grep -q 'MessageType_GetOnboardingStatus' "$TMP_PROTO"; then
         node - "$TMP_PROTO" <<'NODE'
 const fs = require('fs');
 
@@ -166,7 +186,7 @@ const protoPath = process.argv[2];
 const proto = fs.readFileSync(protoPath, 'utf8');
 const updated = proto.replace(
   /(    MessageType_DeviceInfo\s*=\s*60601[^\n]*;\n)/,
-  `$1    MessageType_DeviceGetOnboardingStatus = 60602;\n    MessageType_DeviceOnboardingStatus = 60603;\n`
+  `$1    MessageType_GetOnboardingStatus = 60602;\n    MessageType_OnboardingStatus = 60603;\n`
 );
 
 if (updated === proto) {
@@ -272,8 +292,8 @@ enum MessageType {
     MessageType_Success                 = 60207;
     MessageType_Failure                 = 60208;
     MessageType_DeviceReboot            = 60400;
-    MessageType_DeviceGetOnboardingStatus = 60602;
-    MessageType_DeviceOnboardingStatus    = 60603;
+    MessageType_GetOnboardingStatus       = 60602;
+    MessageType_OnboardingStatus          = 60603;
     MessageType_FixPermission           = 60800;
     MessageType_PathInfo                = 60801;
     MessageType_PathInfoQuery           = 60802;
@@ -354,13 +374,36 @@ message DeviceFirmwareUpdateStatus {
     repeated DeviceFirmwareUpdateStatusEntry targets = 1;
 }
 
-message DeviceGetOnboardingStatus {
+enum OnboardingStep {
+    ONBOARDING_STEP_UNKNOWN             = 0;
+    ONBOARDING_STEP_DEVICE_VERIFICATION = 1;
+    ONBOARDING_STEP_PERSONALIZATION     = 2;
+    ONBOARDING_STEP_SETUP               = 3;
+    ONBOARDING_STEP_FIRMWARE            = 4;
 }
 
-message DeviceOnboardingStatus {
-    optional uint32 page_index = 1;
-    optional uint32 page_count = 2;
-    optional string page_name = 3;
+message OnboardingNewDevice {
+    optional bool seedcard_backup = 1;
+}
+
+message OnboardingRestore {
+    optional bool mnemonic = 1;
+    optional bool seedcard = 2;
+}
+
+message OnboardingSetup {
+    optional OnboardingNewDevice new_device = 1;
+    optional OnboardingRestore   restore    = 2;
+}
+
+message GetOnboardingStatus {
+}
+
+message OnboardingStatus {
+    required OnboardingStep  step        = 1;
+    optional OnboardingSetup setup       = 2;
+    optional uint32          detail_code = 3;
+    optional string          detail_str  = 4;
 }
 ENUM_EOF
 

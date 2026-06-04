@@ -648,6 +648,7 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
     executionParameters: storeExecutionParameters,
     getExecutionParameters,
     setMethodParameters,
+    setCommonParameters,
   } = useHardwareStore();
 
   // 方法级别的执行日志状态
@@ -674,8 +675,13 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
 
   // 同步 useMethodParameters 的参数到 hardwareStore，空对象也要覆盖，避免切换方法后残留上一个方法的参数。
   useEffect(() => {
-    setMethodParameters(methodParams);
-  }, [methodParams, setMethodParameters]);
+    const { methodParams: nextMethodParams, commonParams } = separateParameters(methodParams);
+    setMethodParameters(nextMethodParams);
+
+    if (Object.keys(commonParams).length > 0) {
+      setCommonParameters(commonParams);
+    }
+  }, [methodParams, setCommonParameters, setMethodParameters]);
 
   const getScopedExecutionParameters = useCallback(() => {
     const params = getExecutionParameters();

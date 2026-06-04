@@ -192,8 +192,8 @@ function calculateExecutionParameters(
 ): Record<string, unknown> {
   // 合并所有参数
   const allParams = {
-    ...methodParams,
     ...commonParams,
+    ...methodParams,
   };
 
   // 过滤无效值
