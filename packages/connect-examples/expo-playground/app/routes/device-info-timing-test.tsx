@@ -10,7 +10,6 @@ import {
   Square,
   XCircle,
 } from 'lucide-react';
-import { HARDWARE_CONNECT_PROTOCOL } from '@onekeyfe/hd-shared';
 
 import { Badge } from '../components/ui/Badge';
 import { Breadcrumb } from '../components/ui/Breadcrumb';
@@ -322,7 +321,6 @@ const DeviceInfoTimingTestPage: React.FC = () => {
           }
 
           const request = {
-            connectProtocol: HARDWARE_CONNECT_PROTOCOL.V2,
             targets: testCase.targets,
             types,
           };

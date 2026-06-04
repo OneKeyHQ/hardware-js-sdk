@@ -11,7 +11,6 @@ import {
   Trash2,
   BarChart3,
 } from 'lucide-react';
-import { HARDWARE_CONNECT_PROTOCOL } from '@onekeyfe/hd-shared';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card, CardContent } from '../components/ui/Card';
@@ -27,7 +26,7 @@ import {
 import { useFirmwareProgress } from '../components/providers/SDKProvider';
 import { useToast } from '../hooks/use-toast';
 import { useDeviceStore } from '../store/deviceStore';
-import { createPro2DeviceInfo, isPro2DeviceInfo } from '../utils/pro2Device';
+import { isPro2DeviceInfo } from '../utils/pro2Device';
 import type { DeviceInfo } from '../types/hardware';
 
 type WorkflowTarget = 'all' | 'step1' | 'step2' | 'step3' | 'step4';
@@ -515,9 +514,7 @@ export default function Pro2UpdatePage() {
           assertRunning();
           const response = await searchDevices();
           if (response.success && Array.isArray(response.payload) && response.payload.length > 0) {
-            const devices = (response.payload as DeviceInfo[])
-              .filter(isPro2DeviceInfo)
-              .map(item => createPro2DeviceInfo(item));
+            const devices = (response.payload as DeviceInfo[]).filter(isPro2DeviceInfo);
             if (!devices.length) {
               lastError = 'No Pro2 device found';
               await new Promise(resolve => setTimeout(resolve, 1000));
@@ -555,7 +552,6 @@ export default function Pro2UpdatePage() {
       assertRunning();
       const response = await callHardwareAPI(method, {
         connectId,
-        connectProtocol: HARDWARE_CONNECT_PROTOCOL.V2,
         ...params,
       });
       if (!response.success) {

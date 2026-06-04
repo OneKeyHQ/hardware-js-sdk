@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Cpu, FileCode2, FolderOpen, Settings, Zap } from 'lucide-react';
-import { HARDWARE_CONNECT_PROTOCOL } from '@onekeyfe/hd-shared';
 import MethodExecutor from '../components/common/MethodExecutor';
 import { DeviceNotConnectedState } from '../components/common/DeviceNotConnectedState';
 import { PageLayout } from '../components/common/PageLayout';
@@ -411,10 +410,7 @@ export default function Pro2DebugPage() {
       if (!selectedMethod) {
         throw new Error('Method configuration not found');
       }
-      const executionParams = {
-        ...params,
-        connectProtocol: HARDWARE_CONNECT_PROTOCOL.V2,
-      };
+      const executionParams = { ...params };
       logHardware(
         'Pro2 demo protocol trace',
         buildWireLogData(selectedMethod, selectedWireInfo, executionParams)

@@ -6,8 +6,7 @@ import { useDeviceStore } from '../../store/deviceStore';
 import { searchDevices } from '../../services/hardwareService';
 import { useToast } from '../../hooks/use-toast';
 import { SDKUtils } from '../../utils/hardwareInstance';
-import { createPro2DeviceInfo, isPro2DeviceInfo } from '../../utils/pro2Device';
-import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
+import { isPro2DeviceInfo } from '../../utils/pro2Device';
 import type { DeviceInfo } from '../../types/hardware';
 
 interface DeviceNotConnectedStateProps {
@@ -15,14 +14,12 @@ interface DeviceNotConnectedStateProps {
   showFullPage?: boolean;
   title?: string;
   description?: string;
-  connectProtocol?: HardwareConnectProtocol;
   pro2Only?: boolean;
 }
 
 export function DeviceNotConnectedState({
   className = '',
   showFullPage = false,
-  connectProtocol,
   pro2Only = false,
 }: DeviceNotConnectedStateProps) {
   const { t } = useTranslation();
@@ -56,31 +53,16 @@ export function DeviceNotConnectedState({
 
     try {
       // 搜索设备
-      const protocolParams = !pro2Only && connectProtocol ? { connectProtocol } : undefined;
-      const searchResult = await searchDevices(protocolParams);
+      const searchResult = await searchDevices();
 
       if (searchResult.success && searchResult.payload) {
         const foundDevices = searchResult.payload as DeviceInfo[];
-        const devices = pro2Only
-          ? foundDevices.filter(isPro2DeviceInfo).map(device => createPro2DeviceInfo(device))
-          : foundDevices;
+        const devices = pro2Only ? foundDevices.filter(isPro2DeviceInfo) : foundDevices;
         setConnectedDevices(devices);
 
         // 自动连接第一个设备
         if (devices.length > 0) {
           const targetDevice = devices[0];
-
-          if (pro2Only) {
-            setCurrentDevice(targetDevice);
-            setDeviceFeatures(targetDevice.features);
-
-            toast({
-              title: t('device.connected'),
-              description: `${t('device.connectedTo')} ${targetDevice.label || targetDevice.name}`,
-              variant: 'default',
-            });
-            return;
-          }
 
           setCurrentDevice(targetDevice);
 
@@ -89,7 +71,7 @@ export function DeviceNotConnectedState({
           if (targetDevice.features) {
             setDeviceFeatures(targetDevice.features);
           } else if (targetDevice.connectId && targetDevice.deviceId) {
-            const featuresResult = await sdk.getFeatures(targetDevice.connectId, protocolParams);
+            const featuresResult = await sdk.getFeatures(targetDevice.connectId);
             if (featuresResult.success && featuresResult.payload) {
               setDeviceFeatures(featuresResult.payload);
             }

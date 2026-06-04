@@ -12,7 +12,6 @@ import {
   Usb,
   BookOpen,
 } from 'lucide-react';
-import { HARDWARE_CONNECT_PROTOCOL } from '@onekeyfe/hd-shared';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card, CardContent } from '../components/ui/Card';
@@ -24,7 +23,7 @@ import { callHardwareAPI, searchDevices } from '../services/hardwareService';
 import { useToast } from '../hooks/use-toast';
 import { useDeviceStore } from '../store/deviceStore';
 import { logHardware } from '../utils/logger';
-import { createPro2DeviceInfo, isPro2DeviceInfo } from '../utils/pro2Device';
+import { isPro2DeviceInfo } from '../utils/pro2Device';
 
 import type { DeviceInfo } from '../types/hardware';
 
@@ -290,7 +289,7 @@ function OnboardingFlowDoc() {
                 <tr className="border-b border-border/20">
                   <td className="py-1.5 align-top">1</td>
                   <td className="align-top">SECURITY_CHECK</td>
-                  <td className="text-muted-foreground">Hello → 选择语言 → 法律条款 → Let's get started → 连接 OneKey App (扫码) → Genuine Check (SE 验证设备真伪) → 给设备命名</td>
+                  <td className="text-muted-foreground">Hello → 选择语言 → 法律条款 → Let&apos;s get started → 连接 OneKey App (扫码) → Genuine Check (SE 验证设备真伪) → 给设备命名</td>
                 </tr>
                 <tr className="border-b border-border/20">
                   <td className="py-1.5 align-top">2</td>
@@ -349,7 +348,7 @@ function OnboardingFlowDoc() {
               <li>步骤可能被跳过：SEEDCARD_BACKUP (5) 和 RESTORE_MNEMONIC_SEEDCARD_BACKUP (8) 是可选的，可能直接跳到 DONE</li>
               <li>App 不能假设 step 只会向前推进，需要处理任意 step 跳转</li>
               <li>轮询无副作用，不会改变设备状态，可安全高频调用</li>
-              <li>page_name 是固件内部页面名（如 "Recovery Phrase"），仅用于调试</li>
+              <li>page_name 是固件内部页面名（如 &quot;Recovery Phrase&quot;），仅用于调试</li>
             </ul>
           </div>
         </div>
@@ -517,7 +516,6 @@ export default function Pro2OnboardingPage() {
 
     const response = await callHardwareAPI('deviceGetOnboardingStatus', {
       connectId: currentDevice.connectId,
-      connectProtocol: HARDWARE_CONNECT_PROTOCOL.V2,
     });
 
     if (!response.success) {
@@ -555,9 +553,7 @@ export default function Pro2OnboardingPage() {
         return;
       }
 
-      const devices = (searchResult.payload as DeviceInfo[])
-        .filter(isPro2DeviceInfo)
-        .map(device => createPro2DeviceInfo(device));
+      const devices = (searchResult.payload as DeviceInfo[]).filter(isPro2DeviceInfo);
       setConnectedDevices(devices);
 
       if (!devices.length) {
