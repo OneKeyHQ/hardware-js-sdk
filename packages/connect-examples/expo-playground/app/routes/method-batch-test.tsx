@@ -63,6 +63,8 @@ const DEFAULT_PRESET: MethodPreset = {
   parameters: [],
 };
 
+const RESERVED_EXECUTION_PARAM_NAMES = new Set(['connectId', 'deviceId', 'method']);
+
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 function summarizePreviewValue(value: unknown, depth = 0): unknown {
@@ -106,8 +108,15 @@ function getPresetParams(preset: MethodPreset) {
     Object.fromEntries(
       preset.parameters
         .filter(parameter => parameter.visible !== false && parameter.value !== undefined)
+        .filter(parameter => !RESERVED_EXECUTION_PARAM_NAMES.has(parameter.name))
         .map(parameter => [parameter.name, parameter.value])
     )
+  );
+}
+
+function removeReservedExecutionParams(params: Record<string, unknown>) {
+  return Object.fromEntries(
+    Object.entries(params).filter(([key]) => !RESERVED_EXECUTION_PARAM_NAMES.has(key))
   );
 }
 
@@ -169,11 +178,13 @@ const MethodBatchTestPage: React.FC = () => {
       group.methods.flatMap((method, methodIndex) =>
         getMethodPresets(method, presetMode).map((preset, presetIndex) => {
           const methodParams = getPresetParams(preset);
-          const params = Object.fromEntries(
-            Object.entries({
-              ...methodParams,
-              ...commonParameters,
-            }).filter(([, value]) => value !== undefined && value !== null && value !== '')
+          const params = removeReservedExecutionParams(
+            Object.fromEntries(
+              Object.entries({
+                ...methodParams,
+                ...commonParameters,
+              }).filter(([, value]) => value !== undefined && value !== null && value !== '')
+            )
           );
           const id = `chain:${group.id}:${methodIndex}:${method.method}:${presetIndex}:${preset.title}`;
 

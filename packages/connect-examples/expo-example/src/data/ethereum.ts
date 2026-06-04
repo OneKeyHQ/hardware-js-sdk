@@ -659,9 +659,6 @@ const api: PlaygroundProps[] = [
           messageHash: '182a9c8090b0facb90c403825fd01a144ce8d0152a8ad785be33e9f8884bd0f5',
           chainId: 1,
           useEmptyPassphrase: true,
-          connectId: 'TC01WBD202303160742560002553',
-          deviceId: '91CC3D3EDFE355DE7619148C',
-          method: 'evmSignTypedData',
         },
       },
       {
