@@ -1,7 +1,6 @@
 import semver from 'semver';
 import EventEmitter from 'events';
 import {
-  EDeviceType,
   ERRORS,
   ERROR_CODES_REQUIRE_RELEASE,
   HardwareError,
@@ -20,7 +19,6 @@ import {
   enableLog,
   getDeviceBLEFirmwareVersion,
   getDeviceFirmwareVersion,
-  getDeviceType,
   getFirmwareType,
   getLogger,
   getMethodVersionRange,
