@@ -51,7 +51,7 @@ import type {
 } from '../events';
 import type { PassphrasePromptResponse } from './DeviceCommands';
 import type { Deferred, HardwareConnectProtocol } from '@onekeyfe/hd-shared';
-import type { OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
+import type { OneKeyDeviceInfo as DeviceDescriptor, Success } from '@onekeyfe/hd-transport';
 import type DeviceConnector from './DeviceConnector';
 
 export type InitOptions = {
@@ -919,7 +919,11 @@ export class Device extends EventEmitter {
     return false;
   }
 
-  async lockDevice() {
+  async lockDevice(): Promise<Success> {
+    if (getDeviceType(this.features) === EDeviceType.Pro2) {
+      return { message: 'LockDevice skipped for Pro2' };
+    }
+
     const res = await this.commands.typedCall('LockDevice', 'Success', {});
     return res.message;
   }
