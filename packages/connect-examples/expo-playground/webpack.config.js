@@ -157,6 +157,27 @@ module.exports = async (env, argv) => {
       extensions: ['.tsx', '.ts', '.jsx', '.js', '.json', '.md', '.mdx'],
       alias: {
         '~': path.resolve(__dirname, 'app'),
+        '@onekeyfe/hd-common-connect-sdk': path.resolve(
+          repoRoot,
+          'packages/hd-common-connect-sdk'
+        ),
+        '@onekeyfe/hd-core': path.resolve(repoRoot, 'packages/core'),
+        '@onekeyfe/hd-shared': path.resolve(repoRoot, 'packages/shared'),
+        '@onekeyfe/hd-transport': path.resolve(repoRoot, 'packages/hd-transport'),
+        '@onekeyfe/hd-transport-emulator': path.resolve(
+          repoRoot,
+          'packages/hd-transport-emulator'
+        ),
+        '@onekeyfe/hd-transport-http': path.resolve(repoRoot, 'packages/hd-transport-http'),
+        '@onekeyfe/hd-transport-lowlevel': path.resolve(
+          repoRoot,
+          'packages/hd-transport-lowlevel'
+        ),
+        '@onekeyfe/hd-transport-usb': path.resolve(repoRoot, 'packages/hd-transport-usb'),
+        '@onekeyfe/hd-transport-web-device': path.resolve(
+          repoRoot,
+          'packages/hd-transport-web-device'
+        ),
       },
       fallback: {
         // Node.js polyfills for browser
