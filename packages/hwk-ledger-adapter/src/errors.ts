@@ -69,6 +69,20 @@ const APP_NOT_INSTALLED_CODES = new Set(['6807', '26631']);
  * caused by a blind-sign fallback from a generic malformed transaction.
  */
 const STEP_BLIND_SIGN_TRANSACTION_FALLBACK = 'signer.eth.steps.blindSignTransactionFallback';
+const STEP_DETECT_BLIND_SIGNING = 'signer.eth.steps.detectBlindSigning';
+const BLIND_SIGNING_STEPS = new Set([
+  STEP_BLIND_SIGN_TRANSACTION_FALLBACK,
+  STEP_DETECT_BLIND_SIGNING,
+]);
+
+function normalizeApduHex(value: unknown): string | null {
+  if (typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 0xffff) {
+    return value.toString(16).padStart(4, '0');
+  }
+  if (typeof value !== 'string') return null;
+  const raw = value.toLowerCase().replace(/^0x/, '');
+  return /^[0-9a-f]{1,4}$/i.test(raw) ? raw.padStart(4, '0') : null;
+}
 
 /**
  * Read the Ledger Ethereum App APDU error code from a DMK error object.
@@ -77,33 +91,34 @@ const STEP_BLIND_SIGN_TRANSACTION_FALLBACK = 'signer.eth.steps.blindSignTransact
 function getEthAppErrorCode(err: unknown): string | null {
   if (!err || typeof err !== 'object') return null;
   const e = err as Record<string, unknown>;
-  if (e._tag === ERROR_TAG.EthAppCommand && typeof e.errorCode === 'string') {
-    return e.errorCode.toLowerCase();
+  if (e._tag === ERROR_TAG.EthAppCommand) {
+    const code =
+      normalizeApduHex(e.errorCode) ??
+      normalizeApduHex(e.statusCode) ??
+      normalizeApduHex(e.code);
+    if (code) return code;
   }
   const orig = e.originalError as Record<string, unknown> | undefined;
-  if (orig?._tag === ERROR_TAG.EthAppCommand && typeof orig.errorCode === 'string') {
-    return orig.errorCode.toLowerCase();
+  if (orig?._tag === ERROR_TAG.EthAppCommand) {
+    return (
+      normalizeApduHex(orig.errorCode) ??
+      normalizeApduHex(orig.statusCode) ??
+      normalizeApduHex(orig.code)
+    );
   }
   return null;
 }
 
 /**
  * Extract an APDU status word in lowercase hex. Handles DMK's hex-string
- * `errorCode`, legacy TransportStatusError's numeric `statusCode`, and
- * recurses through `originalError` for wrapped errors.
+ * `errorCode`, numeric `statusCode`, and recurses through
+ * `originalError` for wrapped errors.
  */
 function extractApduHex(err: unknown): string | null {
   if (!err || typeof err !== 'object') return null;
   const e = err as Record<string, unknown>;
-  if (typeof e.errorCode === 'string' && /^[0-9a-f]+$/i.test(e.errorCode)) {
-    return e.errorCode.toLowerCase();
-  }
-  if (typeof e.statusCode === 'number' && Number.isFinite(e.statusCode)) {
-    return e.statusCode.toString(16).padStart(4, '0');
-  }
-  if (typeof e.statusCode === 'string' && /^[0-9a-f]+$/i.test(e.statusCode)) {
-    return e.statusCode.toLowerCase();
-  }
+  const direct = normalizeApduHex(e.errorCode) ?? normalizeApduHex(e.statusCode);
+  if (direct) return direct;
   if (e.originalError != null) {
     const nested = extractApduHex(e.originalError);
     if (nested) return nested;
@@ -177,12 +192,18 @@ function classifyEthAppError(err: unknown): HardwareErrorCode | null {
   if (!ethCode) return null;
 
   // 0x6a80 is a broad "Invalid data" APDU. Only report blind-signing
-  // guidance when DMK actually entered the blind-sign fallback branch.
+  // guidance when DMK actually entered the blind-signing flow.
   if (ethCode === '6a80') {
-    return hasBlindSignFallbackStep(err) ? HardwareErrorCode.EvmBlindSigningRequired : null;
+    return hasBlindSigningStep(err) ? HardwareErrorCode.EvmBlindSigningRequired : null;
   }
 
   return mapEthAppErrorCode(ethCode);
+}
+
+function classifyBlindSigningDetectionError(err: unknown): HardwareErrorCode | null {
+  if (!hasBlindSigningStep(err)) return null;
+  if (hasInvalidArgumentCode(err)) return HardwareErrorCode.EvmBlindSigningRequired;
+  return null;
 }
 
 // Centralized `_tag` constants — single source of truth for both writes and
@@ -347,21 +368,35 @@ function hasStatusCode(err: unknown, codeSet: Set<string>): boolean {
   return false;
 }
 
-function hasBlindSignFallbackStep(err: unknown): boolean {
+function hasDeviceActionStep(err: unknown, step: string): boolean {
   if (!err || typeof err !== 'object') return false;
   const e = err as Record<string, unknown>;
 
-  if (e._lastStep === STEP_BLIND_SIGN_TRANSACTION_FALLBACK) return true;
+  if (e._lastStep === step) return true;
 
-  if (
-    Array.isArray(e._deviceActionSteps) &&
-    e._deviceActionSteps.includes(STEP_BLIND_SIGN_TRANSACTION_FALLBACK)
-  ) {
+  if (Array.isArray(e._deviceActionSteps) && e._deviceActionSteps.includes(step)) {
     return true;
   }
 
-  if (e.originalError != null && hasBlindSignFallbackStep(e.originalError)) return true;
-  if (e.error != null && e._tag && hasBlindSignFallbackStep(e.error)) return true;
+  if (e.originalError != null && hasDeviceActionStep(e.originalError, step)) return true;
+  if (e.error != null && e._tag && hasDeviceActionStep(e.error, step)) return true;
+  return false;
+}
+
+function hasBlindSigningStep(err: unknown): boolean {
+  for (const step of BLIND_SIGNING_STEPS) {
+    if (hasDeviceActionStep(err, step)) return true;
+  }
+  return false;
+}
+
+function hasInvalidArgumentCode(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as Record<string, unknown>;
+  if (e.code === 'INVALID_ARGUMENT') return true;
+  if (typeof e.message === 'string' && e.message.includes('code=INVALID_ARGUMENT')) return true;
+  if (e.originalError != null && hasInvalidArgumentCode(e.originalError)) return true;
+  if (e.error != null && e._tag && hasInvalidArgumentCode(e.error)) return true;
   return false;
 }
 
@@ -558,7 +593,7 @@ export function mapLedgerError(
   } else if (isTimeoutError(err)) {
     code = HardwareErrorCode.OperationTimeout;
   } else {
-    const ethMapped = classifyEthAppError(err);
+    const ethMapped = classifyEthAppError(err) ?? classifyBlindSigningDetectionError(err);
 
     // Solana / Tron / BTC APDU codes — disjoint from EVM's table, single-pass lookup.
     const apduHex = ethMapped ? null : extractApduHex(err);

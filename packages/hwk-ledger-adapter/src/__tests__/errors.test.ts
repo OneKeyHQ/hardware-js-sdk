@@ -357,6 +357,26 @@ describe('mapLedgerError', () => {
     expect(result.message).toContain('Blind signing');
   });
 
+  it('should map Ethereum app numeric APDU code 0x6a80 to EvmBlindSigningRequired with blind fallback step', () => {
+    const result = mapLedgerError({
+      _tag: ERROR_TAG.EthAppCommand,
+      code: 0x6a80,
+      message: 'Invalid data',
+      _lastStep: 'signer.eth.steps.blindSignTransactionFallback',
+    });
+    expect(result.code).toBe(HardwareErrorCode.EvmBlindSigningRequired);
+  });
+
+  it('should map Ethereum app 0x6a80 to EvmBlindSigningRequired with blind signing detection step', () => {
+    const result = mapLedgerError({
+      _tag: ERROR_TAG.EthAppCommand,
+      errorCode: '6a80',
+      message: 'Invalid data',
+      _lastStep: 'signer.eth.steps.detectBlindSigning',
+    });
+    expect(result.code).toBe(HardwareErrorCode.EvmBlindSigningRequired);
+  });
+
   it('should map Ethereum app 0x6a80 to EvmBlindSigningRequired when step history includes blind fallback', () => {
     const result = mapLedgerError({
       _tag: ERROR_TAG.EthAppCommand,
@@ -370,6 +390,35 @@ describe('mapLedgerError', () => {
       ],
     });
     expect(result.code).toBe(HardwareErrorCode.EvmBlindSigningRequired);
+  });
+
+  it('should map typed data invalid argument during blind sign fallback to EvmBlindSigningRequired', () => {
+    const result = mapLedgerError({
+      code: 'INVALID_ARGUMENT',
+      message:
+        'ambiguous primary types or unused types: "Group", "Mail" (argument="types", code=INVALID_ARGUMENT, version=6.14.1)',
+      _lastStep: 'signer.eth.steps.blindSignTransactionFallback',
+    });
+    expect(result.code).toBe(HardwareErrorCode.EvmBlindSigningRequired);
+  });
+
+  it('should map typed data invalid argument during blind signing detection to EvmBlindSigningRequired', () => {
+    const result = mapLedgerError({
+      code: 'INVALID_ARGUMENT',
+      message:
+        'ambiguous primary types or unused types: "Group", "Mail" (argument="types", code=INVALID_ARGUMENT, version=6.14.1)',
+      _lastStep: 'signer.eth.steps.detectBlindSigning',
+    });
+    expect(result.code).toBe(HardwareErrorCode.EvmBlindSigningRequired);
+  });
+
+  it('should not map typed data invalid argument to blind signing without detection step', () => {
+    const result = mapLedgerError({
+      code: 'INVALID_ARGUMENT',
+      message:
+        'ambiguous primary types or unused types: "Group", "Mail" (argument="types", code=INVALID_ARGUMENT, version=6.14.1)',
+    });
+    expect(result.code).toBe(HardwareErrorCode.UnknownError);
   });
 
   it('should map Tron 0x6a8d (hex) to TronCustomContractRequired', () => {
