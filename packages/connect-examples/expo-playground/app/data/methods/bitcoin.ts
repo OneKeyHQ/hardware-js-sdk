@@ -990,7 +990,7 @@ const api: UnifiedMethodConfig[] = [
     description: 'methodDescriptions.btcSignPsbt',
     presets: [
       {
-        title: 'Sign psbt on testnet (泄漏助记词)',
+        title: 'Sign psbt on testnet',
         parameters: [
           {
             name: 'psbt',
@@ -999,7 +999,7 @@ const api: UnifiedMethodConfig[] = [
             label: 'PSBT',
             description: 'Partially Signed Bitcoin Transaction',
             value:
-              '70736274ff01005e02000000018db62b0ee90e41dd4bcf1af5f1418562e502ca6ee4673153233e8ac602d1e6ab0000000000ffffffff01a80300000000000022512003b963b69e1b26e56546d9a7a47ef0fbee91573a1c85be8b98ea79b9b83b843c000000000001012be80300000000000022512003b963b69e1b26e56546d9a7a47ef0fbee91573a1c85be8b98ea79b9b83b843c2116124b79f090c6a758ddeae85b9bb80241be2815b02b5375add84b23703d52bdb41900d0faf7235600008000000080000000800000000000000000011720124b79f090c6a758ddeae85b9bb80241be2815b02b5375add84b23703d52bdb40000',
+              '70736274ff0100db020000000141f56bec64ac3ed0a7900b61950525fcf9324f92771cb97f7f3a2f020b7a76000400000000fdffffff03307500000000000022512018ef253e59d4cb24a60607a6fc7c4cac95af3edad70813a198eeb5405c1c29b60000000000000000496a476262643400f4b1f1ca7515d009aee696ec84ee76e901139c6ad80269ebe7e6b6e8f42ae7b203d5a0bb72d71993e435d6c5a70e2aa4db500a62cfaae33c56050deefee64ec00096bdae000000000000225120c3f45119b701bc0384b45e064a4abbea7949c8c492e278f0f594a1fd83f148973c2e03000001012bf824010000000000225120c3f45119b701bc0384b45e064a4abbea7949c8c492e278f0f594a1fd83f14897011720f4b1f1ca7515d009aee696ec84ee76e901139c6ad80269ebe7e6b6e8f42ae7b200000000',
           },
           {
             name: 'coin',
@@ -1007,7 +1007,7 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Coin',
             description: 'Cryptocurrency symbol',
-            value: 'Bitcoin',
+            value: 'TEST',
           },
         ],
       },
