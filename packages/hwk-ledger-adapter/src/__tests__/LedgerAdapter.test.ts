@@ -1776,6 +1776,86 @@ describe('LedgerAdapter', () => {
       ]);
     });
 
+    it('allNetworkGetAddress only prompts once per app when the user keeps declining same-network items', async () => {
+      connector.callImpl
+        .mockResolvedValueOnce({ masterFingerprint: btcFingerprint })
+        .mockRejectedValueOnce(makeAppNotInstalledErr('Bitcoin'))
+        .mockRejectedValueOnce(makeAppNotInstalledErr('Bitcoin'))
+        .mockRejectedValueOnce(makeAppNotInstalledErr('Bitcoin'))
+        .mockRejectedValueOnce(makeAppNotInstalledErr('Bitcoin'))
+        .mockResolvedValueOnce({ address: evmFingerprintAddress })
+        .mockResolvedValueOnce({ address: '0xABCD', path: "m/44'/60'/0'/0/0" });
+
+      await adapter.connectDevice('dev-1');
+      const onInstall = jest.fn(() => {
+        adapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_INSTALL_APP,
+          payload: { confirmed: false },
+        });
+      });
+      adapter.on(UI_REQUEST.REQUEST_INSTALL_APP, onInstall);
+
+      const result = await adapter.allNetworkGetAddress('dev-1', '', {
+        autoInstallApp: true,
+        bundle: [
+          {
+            network: 'btc',
+            methodName: 'btcGetAddress',
+            path: "m/44'/0'/0'/0/0",
+            deviceId: btcFingerprint,
+          },
+          {
+            network: 'btc',
+            methodName: 'btcGetAddress',
+            path: "m/49'/0'/0'/0/0",
+            deviceId: btcFingerprint,
+          },
+          {
+            network: 'btc',
+            methodName: 'btcGetAddress',
+            path: "m/84'/0'/0'/0/0",
+            deviceId: btcFingerprint,
+          },
+          {
+            network: 'btc',
+            methodName: 'btcGetAddress',
+            path: "m/86'/0'/0'/0/0",
+            deviceId: btcFingerprint,
+          },
+          {
+            network: 'evm',
+            methodName: 'evmGetAddress',
+            path: "m/44'/60'/0'/0/0",
+            chainId: 1,
+            deviceId: evmFingerprint,
+          },
+        ],
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.payload).toHaveLength(5);
+        for (let i = 0; i < 4; i += 1) {
+          expect(result.payload[i].success).toBe(false);
+          expect(result.payload[i].payload?.code).toBe(HardwareErrorCode.UserAborted);
+        }
+        expect(result.payload[4].success).toBe(true);
+      }
+      expect(onInstall).toHaveBeenCalledTimes(1);
+      // Items 2-4 are short-circuited at the fingerprint pre-check (which also
+      // hits the Bitcoin app) — the declined-app cache fires there, so the
+      // subsequent btcGetAddress calls never run.
+      expect(methodsCalled()).toEqual([
+        'btcGetMasterFingerprint',
+        'btcGetAddress',
+        'btcGetMasterFingerprint',
+        'btcGetMasterFingerprint',
+        'btcGetMasterFingerprint',
+        'evmGetAddress',
+        'evmGetAddress',
+      ]);
+    });
+
     it('allNetworkGetAddress preserves normalized bundle params', async () => {
       connector.callImpl
         .mockResolvedValueOnce({ address: evmFingerprintAddress })

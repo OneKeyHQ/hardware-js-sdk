@@ -1514,8 +1514,23 @@ export class LedgerAdapter implements IHardwareWallet {
         }
         const appName = (err as { appName?: string })?.appName ?? mapLedgerError(err).appName;
         if (appName) {
+          // Per-bundle install decline cache: once the user has refused to
+          // install an app, subsequent items needing the same app skip the
+          // prompt and fail with UserAborted immediately. Mirrors the OOM
+          // short-circuit above.
+          if (installContext?.declinedAppNames?.has(appName)) {
+            throw Object.assign(err as Error, {
+              _tag: ERROR_TAG.UserAborted,
+              code: HardwareErrorCode.UserAborted,
+              appName,
+            });
+          }
           const confirmed = await this._waitForInstallAppConfirm(appName);
           if (!confirmed) {
+            if (installContext) {
+              installContext.declinedAppNames = installContext.declinedAppNames ?? new Set();
+              installContext.declinedAppNames.add(appName);
+            }
             throw Object.assign(err as Error, {
               _tag: ERROR_TAG.UserAborted,
               code: HardwareErrorCode.UserAborted,

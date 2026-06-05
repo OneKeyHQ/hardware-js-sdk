@@ -93,9 +93,7 @@ function getEthAppErrorCode(err: unknown): string | null {
   const e = err as Record<string, unknown>;
   if (e._tag === ERROR_TAG.EthAppCommand) {
     const code =
-      normalizeApduHex(e.errorCode) ??
-      normalizeApduHex(e.statusCode) ??
-      normalizeApduHex(e.code);
+      normalizeApduHex(e.errorCode) ?? normalizeApduHex(e.statusCode) ?? normalizeApduHex(e.code);
     if (code) return code;
   }
   const orig = e.originalError as Record<string, unknown> | undefined;

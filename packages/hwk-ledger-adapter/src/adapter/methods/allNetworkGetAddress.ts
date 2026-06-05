@@ -16,6 +16,7 @@ import type {
 
 export type LedgerInstallAppContext = {
   deviceOutOfMemoryError?: Error;
+  declinedAppNames?: Set<string>;
 };
 
 export type LedgerCallChain = <T>(
