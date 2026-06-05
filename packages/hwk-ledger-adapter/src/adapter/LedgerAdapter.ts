@@ -2059,8 +2059,10 @@ export class LedgerAdapter implements IHardwareWallet {
       }
       const { appName, progress } = event.payload;
       const key = `${connectId}:${appName}`;
-      // Reset baseline on app/device switch so the new stream's first frame passes.
-      if (this._installProgressLastKey !== key) {
+      // Reset baseline on app/device switch — and after the prior stream
+      // finished — so the next install of the same app emits intermediate
+      // frames instead of staying stuck at the final 1.0 baseline.
+      if (this._installProgressLastKey !== key || this._installProgressLastEmittedValue >= 1) {
         this._installProgressLastEmittedValue = -Infinity;
         this._installProgressLastKey = key;
       }
