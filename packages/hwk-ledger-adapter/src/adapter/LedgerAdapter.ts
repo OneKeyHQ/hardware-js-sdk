@@ -1581,8 +1581,8 @@ export class LedgerAdapter implements IHardwareWallet {
             type: UI_REQUEST.CLOSE_UI_WINDOW,
             payload: {},
           });
-          return await this._callConnector(
-            sessionId,
+          return await this._runConnectorCall(
+            resolvedConnectId,
             method,
             effectiveParams,
             signal,

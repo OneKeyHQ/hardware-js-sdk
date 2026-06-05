@@ -8,6 +8,7 @@ import {
 } from '@onekeyfe/hwk-adapter-core';
 
 import { LedgerAdapter } from '../adapter/LedgerAdapter';
+import { ERROR_TAG } from '../errors';
 
 import type {
   ConnectorDevice,
@@ -1904,6 +1905,7 @@ describe('LedgerAdapter', () => {
         expect(result.payload).toHaveLength(2);
         expect(result.payload[0].success).toBe(false);
         expect(result.payload[0].payload?.code).toBe(HardwareErrorCode.AppNotInstalled);
+        expect(result.payload[0].payload?._tag).toBe(ERROR_TAG.AppInstallVerifyFailed);
         expect(result.payload[1].success).toBe(true);
       }
       expect(onInstall).toHaveBeenCalledTimes(1);
