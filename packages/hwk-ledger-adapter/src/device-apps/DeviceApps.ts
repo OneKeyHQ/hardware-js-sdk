@@ -97,6 +97,25 @@ export class DeviceApps {
     return result.filter((a): a is DmkApplication => a !== null).map(applicationToMetadata);
   }
 
+  /** Installed app names via ListApps APDU. Offline (no manager-api), but still requires unlock + dashboard. */
+  async listInstalledNames(options?: { unlockTimeout?: number }): Promise<string[]> {
+    const action = (this._dmk as unknown as DmkExecuteCapable).executeDeviceAction({
+      sessionId: this._sessionId,
+      deviceAction: new this._ledgerKit.ListAppsDeviceAction({
+        input: { unlockTimeout: options?.unlockTimeout },
+      }),
+    });
+    const result = await deviceActionToPromise<Array<{ appName?: string } | null>>(
+      action,
+      this.onInteraction,
+      undefined,
+      this.onRegisterCanceller
+    );
+    return result
+      .map(entry => entry?.appName)
+      .filter((name): name is string => typeof name === 'string' && name.length > 0);
+  }
+
   // Catalog lookup via custom device action — DMK has no typed wrapper for this.
   async listAvailable(): Promise<AppMetadata[]> {
     const customAction = new ListAvailableAppsDeviceAction({
@@ -242,6 +261,7 @@ function applicationToMetadata(app: DmkApplication): AppMetadata {
 // Loosened DMK surface (we receive the module via dynamic importLedgerKit).
 export interface LedgerKitModule {
   ListAppsWithMetadataDeviceAction: new (args: { input: unknown }) => unknown;
+  ListAppsDeviceAction: new (args: { input: unknown }) => unknown;
   InstallOrUpdateAppsDeviceAction: new (args: { input: unknown }) => unknown;
   GetOsVersionCommand: new () => unknown;
   isSuccessCommandResult: (result: unknown) => result is { data: GetOsVersionResponse };

@@ -671,6 +671,16 @@ export class LedgerAdapter implements IHardwareWallet {
     }
   }
 
+  // Offline app-presence + unlock probe. No manager-api catalog (unlike listInstalledApps).
+  async listInstalledNames(connectId: string): Promise<Response<string[]>> {
+    try {
+      const result = await this.connectorCall(connectId, 'listInstalledNames', {});
+      return success(result as string[]);
+    } catch (err) {
+      return this.errorToFailure(err);
+    }
+  }
+
   async listAvailableApps(connectId: string): Promise<Response<AppMetadata[]>> {
     try {
       const result = await this.connectorCall(connectId, 'listAvailableApps', {});

@@ -800,6 +800,17 @@ export class LedgerConnectorBase implements IConnector {
           ctx.clearCanceller(sessionId);
         }
       }
+      case 'listInstalledNames': {
+        const apps = await _getDeviceApps(ctx, sessionId);
+        try {
+          return await apps.listInstalledNames(params as ListInstalledAppsCallParams);
+        } catch (err) {
+          ctx.invalidateSession(sessionId);
+          throw ctx.wrapError(err);
+        } finally {
+          ctx.clearCanceller(sessionId);
+        }
+      }
       case 'listAvailableApps': {
         const apps = await _getDeviceApps(ctx, sessionId);
         try {
