@@ -8,6 +8,7 @@ import {
   UI_REQUEST,
   UI_REQUEST_PREEMPTED_TAG,
   UiRequestRegistry,
+  createHwkError,
   deriveDeviceFingerprint,
   failure,
   rehydrateConnectorError,
@@ -1519,9 +1520,10 @@ export class LedgerAdapter implements IHardwareWallet {
           // prompt and fail with UserAborted immediately. Mirrors the OOM
           // short-circuit above.
           if (installContext?.declinedAppNames?.has(appName)) {
-            throw Object.assign(err as Error, {
-              _tag: ERROR_TAG.UserAborted,
+            throw createHwkError({
               code: HardwareErrorCode.UserAborted,
+              message: `User declined to install ${appName}`,
+              _tag: ERROR_TAG.UserAborted,
               appName,
             });
           }
@@ -1531,9 +1533,10 @@ export class LedgerAdapter implements IHardwareWallet {
               installContext.declinedAppNames = installContext.declinedAppNames ?? new Set();
               installContext.declinedAppNames.add(appName);
             }
-            throw Object.assign(err as Error, {
-              _tag: ERROR_TAG.UserAborted,
+            throw createHwkError({
               code: HardwareErrorCode.UserAborted,
+              message: `User declined to install ${appName}`,
+              _tag: ERROR_TAG.UserAborted,
               appName,
             });
           }

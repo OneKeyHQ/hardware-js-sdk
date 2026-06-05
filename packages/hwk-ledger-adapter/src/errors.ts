@@ -428,6 +428,13 @@ export function isUserRejectedError(err: unknown): boolean {
   return false;
 }
 
+/** Check for SDK-level user abort (declined install prompt, cancelled UI flow). */
+export function isUserAbortedError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as Record<string, unknown>;
+  return e._tag === ERROR_TAG.UserAborted;
+}
+
 /** Check for wrong app open on the device. */
 export function isWrongAppError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;
@@ -573,6 +580,11 @@ export function mapLedgerError(
     code = HardwareErrorCode.DeviceBusy;
   } else if (isBlePairingFailureError(err)) {
     code = HardwareErrorCode.BlePairingTimeout;
+  } else if (isUserAbortedError(err)) {
+    // SDK-level abort (e.g. user declined the install prompt). Distinct from
+    // on-device UserRejected — surface UserAborted so callers can tell apart
+    // "I closed the dialog" from "I pressed reject on the device".
+    code = HardwareErrorCode.UserAborted;
   } else if (isUserRejectedError(err)) {
     // User rejection (0x6985) must win over EthAppError mapping — a user-cancelled
     // blind-sign is not a "please enable Blind signing" situation.
