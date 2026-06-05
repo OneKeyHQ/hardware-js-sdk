@@ -17,6 +17,14 @@ import type {
 export type LedgerInstallAppContext = {
   deviceOutOfMemoryError?: Error;
   declinedAppNames?: Set<string>;
+  /**
+   * Apps for which installApp has resolved (successfully or not) within
+   * this bundle. Prevents an install-loop when DMK reports installApp
+   * success but the app is still missing on the device — without this,
+   * the retried main call would hit AppNotInstalled again and re-enter
+   * the install flow, prompting the user a second time.
+   */
+  installAttemptedAppNames?: Set<string>;
 };
 
 export type LedgerCallChain = <T>(

@@ -215,6 +215,10 @@ export const ERROR_TAG = {
   UserAborted: 'UserAborted',
   DeviceAppStuck: 'DeviceAppStuck', // chain app wedged (APDU 0x6901)
   DeviceTransportStuck: 'DeviceTransportStuck', // DMK transport queue wedged
+  // installApp resolved success but the app is still missing on device —
+  // DMK quirk. Surfaced as a distinct tag so callers can tell it apart from
+  // the original DMK-thrown AppNotInstalled.
+  AppInstallVerifyFailed: 'AppInstallVerifyFailedError',
 
   // DMK-reuse (DMK throws same string; we synthesize too)
   DeviceLocked: 'DeviceLockedError',

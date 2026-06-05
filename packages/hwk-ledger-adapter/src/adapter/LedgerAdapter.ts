@@ -1527,6 +1527,17 @@ export class LedgerAdapter implements IHardwareWallet {
               appName,
             });
           }
+          // Loop guard: if installApp already resolved once this bundle but
+          // the app is STILL missing, DMK is lying about success. Don't
+          // re-prompt — surface a clear failure so the bundle moves on.
+          if (installContext?.installAttemptedAppNames?.has(appName)) {
+            throw createHwkError({
+              code: HardwareErrorCode.AppNotInstalled,
+              message: `${appName} install reported success but the app is still missing on device`,
+              _tag: ERROR_TAG.AppInstallVerifyFailed,
+              appName,
+            });
+          }
           const confirmed = await this._waitForInstallAppConfirm(appName);
           if (!confirmed) {
             if (installContext) {
@@ -1558,6 +1569,11 @@ export class LedgerAdapter implements IHardwareWallet {
             }
             throw installErr;
           }
+          if (installContext) {
+            installContext.installAttemptedAppNames =
+              installContext.installAttemptedAppNames ?? new Set();
+            installContext.installAttemptedAppNames.add(appName);
+          }
           // Close the install UI before retrying so the retried operation's own
           // device prompts (e.g. confirm-on-device) render normally instead of
           // being absorbed by the install dialog.
@@ -1565,7 +1581,16 @@ export class LedgerAdapter implements IHardwareWallet {
             type: UI_REQUEST.CLOSE_UI_WINDOW,
             payload: {},
           });
-          return await this._callConnector(sessionId, method, effectiveParams, signal);
+          return await this._callConnector(
+            sessionId,
+            method,
+            effectiveParams,
+            signal,
+            fingerprint,
+            permissionDeviceId,
+            commonParams,
+            installContext
+          );
         }
       }
 

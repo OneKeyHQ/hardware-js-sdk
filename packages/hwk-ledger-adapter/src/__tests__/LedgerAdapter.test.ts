@@ -1856,6 +1856,59 @@ describe('LedgerAdapter', () => {
       ]);
     });
 
+    it('allNetworkGetAddress breaks the install loop when DMK reports success but app stays missing', async () => {
+      // Sequence: BTC item 1 verify → main call AppNotInstalled → user
+      // confirms → installApp resolves success → retry main call →
+      // AppNotInstalled AGAIN (DMK lied). Loop guard fires: item 1 fails
+      // with AppInstallVerifyFailed (no second prompt), bundle continues to
+      // EVM normally. Note retry bypasses the fingerprint check so the
+      // sequence has only one btcGetMasterFingerprint.
+      connector.callImpl
+        .mockResolvedValueOnce({ masterFingerprint: btcFingerprint })
+        .mockRejectedValueOnce(makeAppNotInstalledErr('Bitcoin'))
+        .mockResolvedValueOnce(undefined) // installApp resolves
+        .mockRejectedValueOnce(makeAppNotInstalledErr('Bitcoin')) // retry: still missing
+        .mockResolvedValueOnce({ address: evmFingerprintAddress })
+        .mockResolvedValueOnce({ address: '0xABCD', path: "m/44'/60'/0'/0/0" });
+
+      await adapter.connectDevice('dev-1');
+      const onInstall = jest.fn(() => {
+        adapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_INSTALL_APP,
+          payload: { confirmed: true },
+        });
+      });
+      adapter.on(UI_REQUEST.REQUEST_INSTALL_APP, onInstall);
+
+      const result = await adapter.allNetworkGetAddress('dev-1', '', {
+        autoInstallApp: true,
+        bundle: [
+          {
+            network: 'btc',
+            methodName: 'btcGetAddress',
+            path: "m/44'/0'/0'/0/0",
+            deviceId: btcFingerprint,
+          },
+          {
+            network: 'evm',
+            methodName: 'evmGetAddress',
+            path: "m/44'/60'/0'/0/0",
+            chainId: 1,
+            deviceId: evmFingerprint,
+          },
+        ],
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.payload).toHaveLength(2);
+        expect(result.payload[0].success).toBe(false);
+        expect(result.payload[0].payload?.code).toBe(HardwareErrorCode.AppNotInstalled);
+        expect(result.payload[1].success).toBe(true);
+      }
+      expect(onInstall).toHaveBeenCalledTimes(1);
+    });
+
     it('allNetworkGetAddress preserves normalized bundle params', async () => {
       connector.callImpl
         .mockResolvedValueOnce({ address: evmFingerprintAddress })
