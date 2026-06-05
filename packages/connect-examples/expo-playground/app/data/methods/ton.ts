@@ -294,6 +294,13 @@ const api: UnifiedMethodConfig[] = [
             value: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
           },
           {
+            name: 'jettonWalletAddress',
+            type: 'string',
+            required: true,
+            label: 'Jetton Wallet Address',
+            value: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
+          },
+          {
             name: 'jettonAmount',
             type: 'number',
             required: true,
@@ -380,6 +387,13 @@ const api: UnifiedMethodConfig[] = [
             type: 'string',
             required: true,
             label: 'Jetton Master Address',
+            value: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
+          },
+          {
+            name: 'jettonWalletAddress',
+            type: 'string',
+            required: true,
+            label: 'Jetton Wallet Address',
             value: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
           },
           {

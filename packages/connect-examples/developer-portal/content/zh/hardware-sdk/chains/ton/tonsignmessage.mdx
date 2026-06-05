@@ -44,6 +44,7 @@ const response = await HardwareSDK.tonSignMessage(connectId, deviceId, {
 * `isBounceable` - _可选_ `boolean` 消息是否可弹回（默认：false）
 * `isTestnetOnly` - _可选_ `boolean` 是否使用测试网（默认：false）
 * `jettonMasterAddress` - _可选_ `string` Jetton 主合约地址
+* `jettonWalletAddress` - _可选_ `string` Jetton 钱包合约地址
 * `jettonAmount` - _可选_ `number` 要转账的 Jetton 数量
 * `fwdFee` - _可选_ `number` Jetton 转账的转发费用
 * `comment` - _可选_ `string` 消息备注
@@ -79,6 +80,24 @@ const jettonResponse = await HardwareSDK.tonSignMessage(connectId, deviceId, {
     extDestination: ['UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_'],
     extTonAmount: [100],
     extPayload: ['48656c6c6f204f6e654b6579'],
+});
+
+// Jetton 转账
+const jettonTransferResponse = await HardwareSDK.tonSignMessage(connectId, deviceId, {
+    path: "m/44'/607'/0'",
+    destination: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
+    tonAmount: 100,
+    seqno: 0,
+    expireAt: Date.now() + 1000 * 60 * 60 * 24,
+    jettonMasterAddress: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
+    jettonWalletAddress: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
+    jettonAmount: 101,
+    fwdFee: 100,
+    comment: '48656c6c6f204f6e654b6579',
+    mode: 1,
+    walletVersion: 3,
+    isBounceable: false,
+    isTestnetOnly: false,
 });
 
 ```
