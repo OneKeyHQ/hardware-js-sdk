@@ -68,6 +68,8 @@ export enum HardwareErrorCode {
    * (generic) and from DeviceLocked (Secure Element actually locked).
    */
   BlePairingTimeout = 10304,
+  /** Remote network failure reaching a vendor's servers (HTTP/WS). Distinct from TransportError (local USB/BLE link). */
+  NetworkError = 10305,
 
   // --- 10400s PIN / Passphrase ---
   PinInvalid = 10400,

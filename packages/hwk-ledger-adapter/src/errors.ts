@@ -224,6 +224,10 @@ export const ERROR_TAG = {
   // outcome when the user doesn't confirm pairing on the device, or the
   // existing bond is invalid. Observed in production after ~30s.
   PairingRefused: 'PairingRefusedError',
+  // DMK remote-network failures (manager-api HTTP / secure-channel WS).
+  WebSocketConnection: 'WebSocketConnectionError',
+  HttpFetch: 'FetchError',
+  InvalidFirmwareMetadataResponse: 'InvalidGetFirmwareMetadataResponseError',
 } as const;
 
 export type SdkErrorTag = (typeof ERROR_TAG)[keyof typeof ERROR_TAG];
@@ -423,6 +427,22 @@ export function isOutOfMemoryError(err: unknown): boolean {
   return e._tag === 'OutOfMemoryDAError';
 }
 
+/** Remote network failure reaching Ledger's servers (HTTP or WS). Crawls the error chain. */
+const NETWORK_ERROR_TAGS = new Set<string>([
+  ERROR_TAG.WebSocketConnection,
+  ERROR_TAG.HttpFetch,
+  ERROR_TAG.InvalidFirmwareMetadataResponse,
+]);
+export function isNetworkError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as Record<string, unknown>;
+  const tag = e._tag;
+  if (typeof tag === 'string' && NETWORK_ERROR_TAGS.has(tag)) return true;
+  if (e.originalError != null && isNetworkError(e.originalError)) return true;
+  if (e.error != null && isNetworkError(e.error)) return true;
+  return false;
+}
+
 /** Check for device disconnected errors. */
 export function isDeviceDisconnectedError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;
@@ -530,6 +550,9 @@ export function mapLedgerError(
     code = HardwareErrorCode.AppNotInstalled;
   } else if (isOutOfMemoryError(err)) {
     code = HardwareErrorCode.DeviceOutOfMemory;
+  } else if (isNetworkError(err)) {
+    // Must precede isDeviceDisconnectedError — its message-substring match can trip on network errors.
+    code = HardwareErrorCode.NetworkError;
   } else if (isDeviceDisconnectedError(err)) {
     code = HardwareErrorCode.DeviceDisconnected;
   } else if (isTimeoutError(err)) {

@@ -28,6 +28,8 @@ export function enrichErrorMessage(code: HardwareErrorCode, originalMessage: str
       return `${originalMessage}. Not enough free space on the device. Please uninstall some apps and try again.`;
     case HardwareErrorCode.TransportNotAvailable:
       return `${originalMessage}. Ensure the device bridge/transport is available and running.`;
+    case HardwareErrorCode.NetworkError:
+      return `${originalMessage}. Network error — check your internet connection and try again.`;
     case HardwareErrorCode.FirmwareTooOld:
       return `${originalMessage}. Please update your device firmware.`;
     case HardwareErrorCode.DeviceNotInitialized:
