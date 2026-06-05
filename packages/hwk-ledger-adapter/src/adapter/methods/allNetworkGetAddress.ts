@@ -1,4 +1,4 @@
-import { HardwareErrorCode, success } from '@onekeyfe/hwk-adapter-core';
+import { HardwareErrorCode, failure, success } from '@onekeyfe/hwk-adapter-core';
 
 import type {
   AllNetworkAddressParams,
@@ -98,7 +98,11 @@ export function createAllNetworkGetAddress({
           chainFingerprints
         );
         if (isTopLevelAllNetworkFailure(response)) {
-          return { success: false, payload: response.payload };
+          return failure(
+            HardwareErrorCode.DeviceMismatch,
+            response.payload?.error ?? 'Device mismatch',
+            response.payload?.params
+          );
         }
         responses.push(response);
       }
