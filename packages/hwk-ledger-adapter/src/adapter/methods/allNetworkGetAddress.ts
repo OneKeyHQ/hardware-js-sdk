@@ -103,10 +103,7 @@ function isTopLevelAllNetworkFailure(response: AllNetworkAddressResponse): boole
   if (response.success) {
     return false;
   }
-  return (
-    response.payload?.code === HardwareErrorCode.UserAborted ||
-    response.payload?.code === HardwareErrorCode.DeviceMismatch
-  );
+  return response.payload?.code === HardwareErrorCode.DeviceMismatch;
 }
 
 function getItemDeviceId(item: AllNetworkAddressParams): string | undefined {

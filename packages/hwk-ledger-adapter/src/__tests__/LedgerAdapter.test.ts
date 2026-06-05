@@ -1725,11 +1725,12 @@ describe('LedgerAdapter', () => {
       ]);
     });
 
-    it('allNetworkGetAddress returns top-level UserAborted when the user declines app installation', async () => {
+    it('allNetworkGetAddress returns item UserAborted when the user declines app installation', async () => {
       connector.callImpl
         .mockResolvedValueOnce({ masterFingerprint: btcFingerprint })
         .mockRejectedValueOnce(makeAppNotInstalledErr('Bitcoin'))
-        .mockRejectedValueOnce(makeAppNotInstalledErr('Ethereum'));
+        .mockResolvedValueOnce({ address: evmFingerprintAddress })
+        .mockResolvedValueOnce({ address: '0xABCD', path: "m/44'/60'/0'/0/0" });
 
       await adapter.connectDevice('dev-1');
       const onInstall = jest.fn(() => {
@@ -1759,12 +1760,20 @@ describe('LedgerAdapter', () => {
         ],
       });
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.payload.code).toBe(HardwareErrorCode.UserAborted);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.payload).toHaveLength(2);
+        expect(result.payload[0].success).toBe(false);
+        expect(result.payload[0].payload?.code).toBe(HardwareErrorCode.UserAborted);
+        expect(result.payload[1].success).toBe(true);
       }
       expect(onInstall).toHaveBeenCalledTimes(1);
-      expect(methodsCalled()).toEqual(['btcGetMasterFingerprint', 'btcGetAddress']);
+      expect(methodsCalled()).toEqual([
+        'btcGetMasterFingerprint',
+        'btcGetAddress',
+        'evmGetAddress',
+        'evmGetAddress',
+      ]);
     });
 
     it('allNetworkGetAddress preserves normalized bundle params', async () => {
