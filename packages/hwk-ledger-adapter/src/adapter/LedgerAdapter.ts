@@ -278,6 +278,14 @@ export class LedgerAdapter implements IHardwareWallet {
   // populated by the runtime (Hermes/RN). Set in cancel(), cleared shortly.
   private _lastCancelReason: Error | undefined;
 
+  // Throttle AppInstallProgress by progress delta — DMK streams much faster
+  // than UIs need. Final frame (progress >= 1) always passes.
+  private static readonly APP_INSTALL_PROGRESS_MIN_DELTA = 0.05;
+
+  private _installProgressLastEmittedValue = -Infinity;
+
+  private _installProgressLastKey: string | undefined;
+
   private static _createDeviceBusyError(method: string): Error {
     return Object.assign(new Error(`Ledger device is busy while calling ${method}`), {
       code: HardwareErrorCode.DeviceBusy,
@@ -2001,12 +2009,24 @@ export class LedgerAdapter implements IHardwareWallet {
         );
         return;
       }
+      const { appName, progress } = event.payload;
+      const key = `${connectId}:${appName}`;
+      // Reset baseline on app/device switch so the new stream's first frame passes.
+      if (this._installProgressLastKey !== key) {
+        this._installProgressLastEmittedValue = -Infinity;
+        this._installProgressLastKey = key;
+      }
+      const delta = progress - this._installProgressLastEmittedValue;
+      if (delta < LedgerAdapter.APP_INSTALL_PROGRESS_MIN_DELTA && progress < 1) {
+        return;
+      }
+      this._installProgressLastEmittedValue = progress;
       this.emitter.emit('ui-event', {
         type: EConnectorInteraction.AppInstallProgress,
         payload: {
           connectId,
-          appName: event.payload.appName,
-          progress: event.payload.progress,
+          appName,
+          progress,
         },
       });
       return;
