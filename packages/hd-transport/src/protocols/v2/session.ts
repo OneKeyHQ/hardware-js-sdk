@@ -286,7 +286,7 @@ export class ProtocolV2Session {
             logPrefix,
             context: `rx:${name}`,
           });
-          if (decoded.seq !== expectedSeq) {
+          if (!shouldReduceDebug && decoded.seq !== expectedSeq) {
             logger?.debug?.(
               `[${logPrefix}] seq differs for ${name}: tx=${expectedSeq}, rx=${decoded.seq}`
             );
@@ -306,7 +306,7 @@ export class ProtocolV2Session {
             callOptions.onIntermediateResponse?.(response);
           } else if (isExpectedTerminalResponse(response, callOptions.expectedTypes)) {
             return response;
-          } else {
+          } else if (!shouldReduceDebug) {
             logger?.debug?.(
               `[${logPrefix}] skip unexpected response for ${name}: expected=${callOptions.expectedTypes?.join(
                 '|'

@@ -419,6 +419,8 @@
         "MessageType_TonSignProof": 11905,
         "MessageType_TonSignedProof": 11906,
         "MessageType_TonTxAck": 11907,
+        "MessageType_TonSignData": 11908,
+        "MessageType_TonSignedData": 11909,
         "MessageType_ScdoGetAddress": 12001,
         "MessageType_ScdoAddress": 12002,
         "MessageType_ScdoSignTx": 12003,
@@ -448,11 +450,6 @@
         "MessageType_NeoAddress": 12302,
         "MessageType_NeoSignTx": 12303,
         "MessageType_NeoSignedTx": 12304,
-        "MessageType_UiviewShowAddressRequest": 30200,
-        "MessageType_UiviewShowPublicKeyRequest": 30201,
-        "MessageType_UiviewConfirmTxRequest": 30202,
-        "MessageType_UiviewConfirmSignMessageRequest": 30203,
-        "MessageType_UiviewResponse": 30204,
         "MessageType_ReadSEPublicKey": 10004,
         "MessageType_SEPublicKey": 10005,
         "MessageType_WriteSEPublicCert": 10006,
@@ -463,6 +460,9 @@
         "MessageType_ResourceUpload": 10018,
         "MessageType_ZoomRequest": 10019,
         "MessageType_BlurRequest": 10032,
+        "MessageType_SetWallpaper": 10033,
+        "MessageType_GetWallpaper": 10034,
+        "MessageType_Wallpaper": 10035,
         "MessageType_ResourceRequest": 10020,
         "MessageType_ResourceAck": 10021,
         "MessageType_ResourceUpdate": 10022,
@@ -501,7 +501,6 @@
         "MessageType_FilesystemDirMake": 60809,
         "MessageType_FilesystemDirRemove": 60810,
         "MessageType_FilesystemFormat": 60811,
-        "MessageType_FilesystemDiskControl": 60812,
         "MessageType_DeviceFirmwareUpdate": 61000,
         "MessageType_DeviceFirmwareInstallProgress": 61001,
         "MessageType_DeviceGetFirmwareUpdateStatus": 61002,
@@ -4095,6 +4094,207 @@
         }
       }
     },
+    "DebugLinkInput": {
+      "fields": {
+        "x": {
+          "type": "uint32",
+          "id": 1
+        },
+        "y": {
+          "type": "uint32",
+          "id": 2
+        },
+        "duration_ms": {
+          "type": "uint32",
+          "id": 3
+        },
+        "x_end": {
+          "type": "uint32",
+          "id": 4
+        },
+        "y_end": {
+          "type": "uint32",
+          "id": 5
+        }
+      }
+    },
+    "DebugLinkLayout": {
+      "fields": {
+        "lines": {
+          "rule": "repeated",
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "DebugLinkReseedRandom": {
+      "fields": {
+        "value": {
+          "type": "uint32",
+          "id": 1
+        }
+      }
+    },
+    "DebugLinkRecordScreen": {
+      "fields": {
+        "target_directory": {
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "DebugLinkGetState": {
+      "fields": {
+        "wait_word_list": {
+          "type": "bool",
+          "id": 1
+        },
+        "wait_word_pos": {
+          "type": "bool",
+          "id": 2
+        },
+        "wait_layout": {
+          "type": "bool",
+          "id": 3
+        }
+      }
+    },
+    "DebugLinkState": {
+      "fields": {
+        "layout": {
+          "type": "bytes",
+          "id": 1
+        },
+        "pin": {
+          "type": "string",
+          "id": 2
+        },
+        "matrix": {
+          "type": "string",
+          "id": 3
+        },
+        "mnemonic_secret": {
+          "type": "bytes",
+          "id": 4
+        },
+        "node": {
+          "type": "HDNodeType",
+          "id": 5
+        },
+        "passphrase_protection": {
+          "type": "bool",
+          "id": 6
+        },
+        "reset_word": {
+          "type": "string",
+          "id": 7
+        },
+        "reset_entropy": {
+          "type": "bytes",
+          "id": 8
+        },
+        "recovery_fake_word": {
+          "type": "string",
+          "id": 9
+        },
+        "recovery_word_pos": {
+          "type": "uint32",
+          "id": 10
+        },
+        "reset_word_pos": {
+          "type": "uint32",
+          "id": 11
+        },
+        "mnemonic_type": {
+          "type": "BackupType",
+          "id": 12
+        },
+        "layout_lines": {
+          "rule": "repeated",
+          "type": "string",
+          "id": 13
+        }
+      }
+    },
+    "DebugLinkStop": {
+      "fields": {}
+    },
+    "DebugLinkLog": {
+      "fields": {
+        "level": {
+          "type": "uint32",
+          "id": 1
+        },
+        "bucket": {
+          "type": "string",
+          "id": 2
+        },
+        "text": {
+          "type": "string",
+          "id": 3
+        }
+      }
+    },
+    "DebugLinkMemoryRead": {
+      "fields": {
+        "address": {
+          "type": "uint32",
+          "id": 1
+        },
+        "length": {
+          "type": "uint32",
+          "id": 2
+        }
+      }
+    },
+    "DebugLinkMemory": {
+      "fields": {
+        "memory": {
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "DebugLinkMemoryWrite": {
+      "fields": {
+        "address": {
+          "type": "uint32",
+          "id": 1
+        },
+        "memory": {
+          "type": "bytes",
+          "id": 2
+        },
+        "flash": {
+          "type": "bool",
+          "id": 3
+        }
+      }
+    },
+    "DebugLinkFlashErase": {
+      "fields": {
+        "sector": {
+          "type": "uint32",
+          "id": 1
+        }
+      }
+    },
+    "DebugLinkEraseSdCard": {
+      "fields": {
+        "format": {
+          "type": "bool",
+          "id": 1
+        }
+      }
+    },
+    "DebugLinkWatchLayout": {
+      "fields": {
+        "watch": {
+          "type": "bool",
+          "id": 1
+        }
+      }
+    },
     "EosGetPublicKey": {
       "fields": {
         "address_n": {
@@ -5927,6 +6127,30 @@
         }
       }
     },
+    "InternalMyAddressRequest": {
+      "fields": {
+        "coin_type": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
+        },
+        "chain_id": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        },
+        "account_index": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 3
+        },
+        "derive_type": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 4
+        }
+      }
+    },
     "KaspaGetAddress": {
       "fields": {
         "address_n": {
@@ -7252,6 +7476,49 @@
         },
         "hash": {
           "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "WallpaperTarget": {
+      "values": {
+        "Home": 0,
+        "Lock": 1
+      }
+    },
+    "SetWallpaper": {
+      "fields": {
+        "target": {
+          "rule": "required",
+          "type": "WallpaperTarget",
+          "id": 1
+        },
+        "path": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        }
+      }
+    },
+    "GetWallpaper": {
+      "fields": {
+        "target": {
+          "rule": "required",
+          "type": "WallpaperTarget",
+          "id": 1
+        }
+      }
+    },
+    "Wallpaper": {
+      "fields": {
+        "target": {
+          "rule": "required",
+          "type": "WallpaperTarget",
+          "id": 1
+        },
+        "path": {
+          "rule": "required",
+          "type": "string",
           "id": 2
         }
       }
@@ -9430,142 +9697,6 @@
         }
       }
     },
-    "ScdoGetAddress": {
-      "fields": {
-        "address_n": {
-          "rule": "repeated",
-          "type": "uint32",
-          "id": 1,
-          "options": {
-            "packed": false
-          }
-        },
-        "show_display": {
-          "type": "bool",
-          "id": 2
-        }
-      }
-    },
-    "ScdoAddress": {
-      "fields": {
-        "address": {
-          "rule": "required",
-          "type": "string",
-          "id": 1
-        }
-      }
-    },
-    "ScdoSignTx": {
-      "fields": {
-        "address_n": {
-          "rule": "repeated",
-          "type": "uint32",
-          "id": 1,
-          "options": {
-            "packed": false
-          }
-        },
-        "nonce": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 2
-        },
-        "gas_price": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 3
-        },
-        "gas_limit": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 4
-        },
-        "to": {
-          "rule": "required",
-          "type": "string",
-          "id": 5
-        },
-        "value": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 6
-        },
-        "timestamp": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 7
-        },
-        "data_initial_chunk": {
-          "type": "bytes",
-          "id": 8,
-          "options": {
-            "default": ""
-          }
-        },
-        "data_length": {
-          "type": "uint32",
-          "id": 9,
-          "options": {
-            "default": 0
-          }
-        },
-        "tx_type": {
-          "type": "uint32",
-          "id": 10,
-          "options": {
-            "default": 0
-          }
-        }
-      }
-    },
-    "ScdoSignedTx": {
-      "fields": {
-        "data_length": {
-          "type": "uint32",
-          "id": 1
-        },
-        "signature": {
-          "type": "bytes",
-          "id": 2
-        }
-      }
-    },
-    "ScdoTxAck": {
-      "fields": {
-        "data_chunk": {
-          "type": "bytes",
-          "id": 1
-        }
-      }
-    },
-    "ScdoSignMessage": {
-      "fields": {
-        "address_n": {
-          "rule": "repeated",
-          "type": "uint32",
-          "id": 1,
-          "options": {
-            "packed": false
-          }
-        },
-        "message": {
-          "type": "bytes",
-          "id": 2
-        }
-      }
-    },
-    "ScdoSignedMessage": {
-      "fields": {
-        "signature": {
-          "type": "bytes",
-          "id": 1
-        },
-        "address": {
-          "type": "string",
-          "id": 2
-        }
-      }
-    },
     "SolanaOffChainMessageVersion": {
       "values": {
         "MESSAGE_VERSION_0": 0
@@ -11531,16 +11662,16 @@
         }
       }
     },
-    "TxDetailsAmount": {
+    "ViewAmount": {
       "fields": {
+        "is_unlimited": {
+          "rule": "required",
+          "type": "bool",
+          "id": 1
+        },
         "num": {
           "rule": "required",
           "type": "string",
-          "id": 1
-        },
-        "decimals": {
-          "rule": "required",
-          "type": "uint32",
           "id": 2
         },
         "symbol": {
@@ -11550,42 +11681,7 @@
         }
       }
     },
-    "TxDetailsAddress": {
-      "fields": {
-        "key": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 1
-        },
-        "address": {
-          "rule": "required",
-          "type": "string",
-          "id": 2
-        },
-        "owner": {
-          "type": "string",
-          "id": 3
-        },
-        "icon": {
-          "type": "string",
-          "id": 4
-        }
-      }
-    },
-    "TxDetailsNetwork": {
-      "fields": {
-        "coin_type": {
-          "rule": "required",
-          "type": "uint64",
-          "id": 1
-        },
-        "chain_id": {
-          "type": "uint64",
-          "id": 2
-        }
-      }
-    },
-    "TxDetailsGeneral": {
+    "ViewDetail": {
       "fields": {
         "key": {
           "rule": "required",
@@ -11601,44 +11697,48 @@
           "rule": "required",
           "type": "bool",
           "id": 3
+        },
+        "has_icon": {
+          "rule": "required",
+          "type": "bool",
+          "id": 4
         }
       }
     },
-    "TxDetailsDisplayType": {
-      "values": {
-        "DISPLAY_TYPE_INFO": 0,
-        "DISPLAY_TYPE_SIGN": 1
-      }
-    },
-    "TxDetailsPage": {
+    "ViewSignPage": {
       "fields": {
         "title": {
           "rule": "required",
           "type": "string",
           "id": 1
         },
-        "display_type": {
-          "rule": "required",
-          "type": "TxDetailsDisplayType",
-          "id": 2
-        },
         "amount": {
-          "type": "TxDetailsAmount",
-          "id": 3
-        },
-        "network": {
-          "type": "TxDetailsNetwork",
-          "id": 4
-        },
-        "address": {
-          "rule": "repeated",
-          "type": "TxDetailsAddress",
-          "id": 5
+          "type": "ViewAmount",
+          "id": 2
         },
         "general": {
           "rule": "repeated",
-          "type": "TxDetailsGeneral",
-          "id": 6
+          "type": "ViewDetail",
+          "id": 3
+        }
+      }
+    },
+    "ViewVerifyPage": {
+      "fields": {
+        "title": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        },
+        "address": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        },
+        "path": {
+          "rule": "required",
+          "type": "string",
+          "id": 3
         }
       }
     },
@@ -11721,6 +11821,102 @@
               "id": 12
             }
           }
+        }
+      }
+    },
+    "TonSignData": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "type": {
+          "rule": "required",
+          "type": "TonSignDataType",
+          "id": 2
+        },
+        "payload": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 3
+        },
+        "schema": {
+          "type": "string",
+          "id": 4
+        },
+        "appdomain": {
+          "rule": "required",
+          "type": "string",
+          "id": 5
+        },
+        "timestamp": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 6
+        },
+        "from_address": {
+          "type": "string",
+          "id": 7
+        },
+        "wallet_version": {
+          "type": "TonWalletVersion",
+          "id": 8,
+          "options": {
+            "default": "V4R2"
+          }
+        },
+        "wallet_id": {
+          "type": "uint32",
+          "id": 9,
+          "options": {
+            "default": 698983191
+          }
+        },
+        "workchain": {
+          "type": "TonWorkChain",
+          "id": 10,
+          "options": {
+            "default": "BASECHAIN"
+          }
+        },
+        "is_bounceable": {
+          "type": "bool",
+          "id": 11,
+          "options": {
+            "default": false
+          }
+        },
+        "is_testnet_only": {
+          "type": "bool",
+          "id": 12,
+          "options": {
+            "default": false
+          }
+        }
+      },
+      "nested": {
+        "TonSignDataType": {
+          "values": {
+            "TEXT": 0,
+            "BINARY": 1,
+            "CELL": 2
+          }
+        }
+      }
+    },
+    "TonSignedData": {
+      "fields": {
+        "signature": {
+          "type": "bytes",
+          "id": 1
+        },
+        "digest": {
+          "type": "bytes",
+          "id": 2
         }
       }
     },
@@ -11848,7 +12044,7 @@
     },
     "DeviceHardwareInfo": {
       "fields": {
-        "Device_type": {
+        "device_type": {
           "type": "DeviceType",
           "id": 10
         },
@@ -12091,10 +12287,6 @@
           "rule": "repeated",
           "type": "DeviceFirmwareTarget",
           "id": 1
-        },
-        "max_concurrent": {
-          "type": "uint32",
-          "id": 2
         }
       }
     },
@@ -12404,15 +12596,6 @@
     "FilesystemFormat": {
       "fields": {}
     },
-    "FilesystemDiskControl": {
-      "fields": {
-        "enable": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 1
-        }
-      }
-    },
     "OnboardingStep": {
       "values": {
         "ONBOARDING_STEP_UNKNOWN": 0,
@@ -12433,7 +12616,7 @@
           "id": 1
         },
         "setup": {
-          "type": "OnboardingSetup",
+          "type": "Setup",
           "id": 2
         },
         "detail_code": {
@@ -12444,37 +12627,41 @@
           "type": "string",
           "id": 4
         }
-      }
-    },
-    "OnboardingSetup": {
-      "fields": {
-        "new_device": {
-          "type": "OnboardingNewDevice",
-          "id": 1
-        },
-        "restore": {
-          "type": "OnboardingRestore",
-          "id": 2
-        }
-      }
-    },
-    "OnboardingNewDevice": {
-      "fields": {
-        "seedcard_backup": {
-          "type": "bool",
-          "id": 1
-        }
-      }
-    },
-    "OnboardingRestore": {
-      "fields": {
-        "mnemonic": {
-          "type": "bool",
-          "id": 1
-        },
-        "seedcard": {
-          "type": "bool",
-          "id": 2
+      },
+      "nested": {
+        "Setup": {
+          "fields": {
+            "new_device": {
+              "type": "NewDevice",
+              "id": 1
+            },
+            "restore": {
+              "type": "Restore",
+              "id": 2
+            }
+          },
+          "nested": {
+            "NewDevice": {
+              "fields": {
+                "seedcard_backup": {
+                  "type": "bool",
+                  "id": 1
+                }
+              }
+            },
+            "Restore": {
+              "fields": {
+                "mnemonic": {
+                  "type": "bool",
+                  "id": 1
+                },
+                "seedcard": {
+                  "type": "bool",
+                  "id": 2
+                }
+              }
+            }
+          }
         }
       }
     },

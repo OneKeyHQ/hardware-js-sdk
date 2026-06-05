@@ -49,6 +49,9 @@ export default class SuiGetAddress extends BaseMethod<HardwareSuiGetAddress[]> {
 
   getVersionRange() {
     return {
+      pro2: {
+        min: '0.0.0',
+      },
       model_mini: {
         min: '3.0.0',
       },

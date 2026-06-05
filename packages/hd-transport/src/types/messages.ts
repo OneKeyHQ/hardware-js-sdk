@@ -2866,8 +2866,6 @@ export type UnLockDeviceResponse = {
 // GetPassphraseState
 export type GetPassphraseState = {
   passphrase_state?: string;
-  _only_main_pin?: boolean;
-  allow_create_attach_pin?: boolean;
 };
 
 // PassphraseState
@@ -4432,6 +4430,23 @@ export type TxAckPaymentRequest = {
   signature: string;
 };
 
+// DebugLinkInput
+export type DebugLinkInput = {
+  x?: number;
+  y?: number;
+  duration_ms?: number;
+  x_end?: number;
+  y_end?: number;
+};
+
+// InternalMyAddressRequest
+export type InternalMyAddressRequest = {
+  coin_type: number;
+  chain_id: number;
+  account_index: number;
+  derive_type: number;
+};
+
 // SetBusy
 export type SetBusy = {
   expiry_ms?: number;
@@ -4460,6 +4475,28 @@ export type WriteSEPrivateKey = {
   private_key: string;
 };
 
+export enum WallpaperTarget {
+  Home = 0,
+  Lock = 1,
+}
+
+// SetWallpaper
+export type SetWallpaper = {
+  target: WallpaperTarget;
+  path: string;
+};
+
+// GetWallpaper
+export type GetWallpaper = {
+  target: WallpaperTarget;
+};
+
+// Wallpaper
+export type Wallpaper = {
+  target: WallpaperTarget;
+  path: string;
+};
+
 // UnlockPath
 export type UnlockPath = {
   address_n: number[];
@@ -4478,47 +4515,33 @@ export enum MoneroNetworkType {
   FAKECHAIN = 3,
 }
 
-// TxDetailsAmount
-export type TxDetailsAmount = {
+// ViewAmount
+export type ViewAmount = {
+  is_unlimited: boolean;
   num: string;
-  decimals: number;
   symbol: string;
 };
 
-// TxDetailsAddress
-export type TxDetailsAddress = {
-  key: number;
-  address: string;
-  owner?: string;
-  icon?: string;
-};
-
-// TxDetailsNetwork
-export type TxDetailsNetwork = {
-  coin_type: number;
-  chain_id?: number;
-};
-
-// TxDetailsGeneral
-export type TxDetailsGeneral = {
+// ViewDetail
+export type ViewDetail = {
   key: number;
   value: string;
   is_overview: boolean;
+  has_icon: boolean;
 };
 
-export enum TxDetailsDisplayType {
-  DISPLAY_TYPE_INFO = 0,
-  DISPLAY_TYPE_SIGN = 1,
-}
-
-// TxDetailsPage
-export type TxDetailsPage = {
+// ViewSignPage
+export type ViewSignPage = {
   title: string;
-  display_type: TxDetailsDisplayType;
   amount?: UintType;
-  network?: TxDetailsNetwork;
-  address: TxDetailsAddress[];
-  general: TxDetailsGeneral[];
+  general: ViewDetail[];
+};
+
+// ViewVerifyPage
+export type ViewVerifyPage = {
+  title: string;
+  address: string;
+  path: string;
 };
 
 // GetProtoVersion
@@ -4569,7 +4592,7 @@ export type DeviceFirmwareImageInfo = {
 
 // DeviceHardwareInfo
 export type DeviceHardwareInfo = {
-  Device_type?: DeviceType;
+  device_type?: DeviceType;
   serial_no?: string;
   hardware_version?: string;
   hardware_version_raw_adc?: number;
@@ -4667,7 +4690,6 @@ export type DeviceFirmwareTarget = {
 // DeviceFirmwareUpdate
 export type DeviceFirmwareUpdate = {
   targets: DeviceFirmwareTarget[];
-  max_concurrent?: number;
 };
 
 // DeviceFirmwareInstallProgress
@@ -4792,40 +4814,35 @@ export type FilesystemDirRemove = {
 // FilesystemFormat
 export type FilesystemFormat = {};
 
-// FilesystemDiskControl
-export type FilesystemDiskControl = {
-  enable: number;
-};
-
 export enum OnboardingStep {
-  UNKNOWN = 0,
-  DEVICE_VERIFICATION = 1,
-  PERSONALIZATION = 2,
-  SETUP = 3,
-  FIRMWARE = 4,
+  ONBOARDING_STEP_UNKNOWN = 0,
+  ONBOARDING_STEP_DEVICE_VERIFICATION = 1,
+  ONBOARDING_STEP_PERSONALIZATION = 2,
+  ONBOARDING_STEP_SETUP = 3,
+  ONBOARDING_STEP_FIRMWARE = 4,
 }
-
-export type OnboardingNewDevice = {
-  seedcard_backup?: boolean;
-};
-
-export type OnboardingRestore = {
-  mnemonic?: boolean;
-  seedcard?: boolean;
-};
-
-export type OnboardingSetup = {
-  new_device?: OnboardingNewDevice;
-  restore?: OnboardingRestore;
-};
 
 // GetOnboardingStatus
 export type GetOnboardingStatus = {};
 
+export type NewDevice = {
+  seedcard_backup?: boolean;
+};
+
+export type Restore = {
+  mnemonic?: boolean;
+  seedcard?: boolean;
+};
+
+export type Setup = {
+  new_device?: NewDevice;
+  restore?: Restore;
+};
+
 // OnboardingStatus
 export type OnboardingStatus = {
   step: OnboardingStep;
-  setup?: OnboardingSetup;
+  setup?: Setup;
   detail_code?: number;
   detail_str?: string;
 };
@@ -5393,19 +5410,23 @@ export type MessageType = {
   CoinPurchaseMemo: CoinPurchaseMemo;
   PaymentRequestMemo: PaymentRequestMemo;
   TxAckPaymentRequest: TxAckPaymentRequest;
+  DebugLinkInput: DebugLinkInput;
+  InternalMyAddressRequest: InternalMyAddressRequest;
   SetBusy: SetBusy;
   GetFirmwareHash: GetFirmwareHash;
   FirmwareHash: FirmwareHash;
   GetNonce: GetNonce;
   Nonce: Nonce;
   WriteSEPrivateKey: WriteSEPrivateKey;
+  SetWallpaper: SetWallpaper;
+  GetWallpaper: GetWallpaper;
+  Wallpaper: Wallpaper;
   UnlockPath: UnlockPath;
   UnlockedPathRequest: UnlockedPathRequest;
-  TxDetailsAmount: TxDetailsAmount;
-  TxDetailsAddress: TxDetailsAddress;
-  TxDetailsNetwork: TxDetailsNetwork;
-  TxDetailsGeneral: TxDetailsGeneral;
-  TxDetailsPage: TxDetailsPage;
+  ViewAmount: ViewAmount;
+  ViewDetail: ViewDetail;
+  ViewSignPage: ViewSignPage;
+  ViewVerifyPage: ViewVerifyPage;
   GetProtoVersion: GetProtoVersion;
   ProtoVersion: ProtoVersion;
   DeviceReboot: DeviceReboot;
@@ -5439,8 +5460,10 @@ export type MessageType = {
   FilesystemDirMake: FilesystemDirMake;
   FilesystemDirRemove: FilesystemDirRemove;
   FilesystemFormat: FilesystemFormat;
-  FilesystemDiskControl: FilesystemDiskControl;
   GetOnboardingStatus: GetOnboardingStatus;
+  NewDevice: NewDevice;
+  Restore: Restore;
+  Setup: Setup;
   OnboardingStatus: OnboardingStatus;
 };
 

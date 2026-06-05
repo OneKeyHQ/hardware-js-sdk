@@ -136,6 +136,36 @@ if [ -d "$SRC_PRO2_LATEST" ] && ls "$SRC_PRO2_LATEST"/messages*.proto 1>/dev/nul
             | sed 's/^option /\/\/ option /' \
             | grep -v '    reserved '
 
+        if ! grep -q '^message TonSignData ' "$SRC_PRO2_LEGACY"/messages*.proto; then
+            echo ''
+            echo '// --- TON signData (kept until firmware-pro2 legacy proto exports it) ---'
+            echo 'message TonSignData {'
+            echo '    repeated uint32 address_n = 1;'
+            echo '    required TonSignDataType type = 2;'
+            echo '    required bytes payload = 3;'
+            echo '    optional string schema = 4;'
+            echo '    required string appdomain = 5;'
+            echo '    required uint64 timestamp = 6;'
+            echo '    optional string from_address = 7;'
+            echo '    optional TonWalletVersion wallet_version = 8 [default=V4R2];'
+            echo '    optional uint32 wallet_id = 9 [default=698983191];'
+            echo '    optional TonWorkChain workchain = 10 [default=BASECHAIN];'
+            echo '    optional bool is_bounceable = 11 [default=false];'
+            echo '    optional bool is_testnet_only = 12 [default=false];'
+            echo ''
+            echo '    enum TonSignDataType {'
+            echo '        TEXT = 0;'
+            echo '        BINARY = 1;'
+            echo '        CELL = 2;'
+            echo '    }'
+            echo '}'
+            echo ''
+            echo 'message TonSignedData {'
+            echo '    optional bytes signature = 1;'
+            echo '    optional bytes digest = 2;'
+            echo '}'
+        fi
+
         echo ''
         echo '// --- Protocol V2 system messages ---'
         grep -hv \
@@ -177,6 +207,82 @@ if [ -d "$SRC_PRO2_LATEST" ] && ls "$SRC_PRO2_LATEST"/messages*.proto 1>/dev/nul
             echo '}'
         fi
     } > "$TMP_PROTO"
+
+    node - "$TMP_PROTO" <<'NODE'
+const fs = require('fs');
+
+const protoPath = process.argv[2];
+let proto = fs.readFileSync(protoPath, 'utf8');
+
+const replacements = [
+  ['MessageType_DevReboot', 'MessageType_DeviceReboot'],
+  ['MessageType_DevGetDeviceInfo', 'MessageType_DeviceGetDeviceInfo'],
+  ['MessageType_DevFirmwareUpdate', 'MessageType_DeviceFirmwareUpdate'],
+  ['MessageType_DevFirmwareInstallProgress', 'MessageType_DeviceFirmwareInstallProgress'],
+  ['MessageType_DevGetFirmwareUpdateStatus', 'MessageType_DeviceGetFirmwareUpdateStatus'],
+  ['MessageType_DevFirmwareUpdateStatus', 'MessageType_DeviceFirmwareUpdateStatus'],
+  ['DevRebootType', 'DeviceRebootType'],
+  ['DevReboot', 'DeviceReboot'],
+  ['DevSeType', 'DeviceSeType'],
+  ['DevSEState', 'DeviceSEState'],
+  ['DevFirmwareImageInfo', 'DeviceFirmwareImageInfo'],
+  ['DevHardwareInfo', 'DeviceHardwareInfo'],
+  ['DevMainMcuInfo', 'DeviceMainMcuInfo'],
+  ['DevBluetoothInfo', 'DeviceBluetoothInfo'],
+  ['DevSEInfo', 'DeviceSEInfo'],
+  ['DevInfoTargets', 'DeviceInfoTargets'],
+  ['DevInfoTypes', 'DeviceInfoTypes'],
+  ['DevStatus', 'DeviceStatus'],
+  ['DevGetDeviceInfo', 'DeviceGetDeviceInfo'],
+  ['DevFirmwareTargetType', 'DeviceFirmwareTargetType'],
+  ['DevFirmwareTarget', 'DeviceFirmwareTarget'],
+  ['DevFirmwareUpdateStatusEntry', 'DeviceFirmwareUpdateStatusEntry'],
+  ['DevFirmwareInstallProgress', 'DeviceFirmwareInstallProgress'],
+  ['DevGetFirmwareUpdateStatus', 'DeviceGetFirmwareUpdateStatus'],
+  ['DevFirmwareUpdateStatus', 'DeviceFirmwareUpdateStatus'],
+  ['DevFirmwareUpdate', 'DeviceFirmwareUpdate'],
+];
+
+for (const [from, to] of replacements) {
+  proto = proto.replace(new RegExp(`\\b${from}\\b`, 'g'), to);
+}
+
+proto = proto.replace(
+  /enum DeviceFirmwareTargetType \{[\s\S]*?\n\}/,
+  `enum DeviceFirmwareTargetType {
+    // declaration order matches firmware FwMgmtTarget_t.
+    TARGET_INVALID = 0;
+    TARGET_ROMLOADER = 1;
+    TARGET_BOOTLOADER = 2;
+    TARGET_FIRMWARE_P1 = 3;
+    TARGET_FIRMWARE_P2 = 4;
+    TARGET_COPROCESSOR = 5;
+    TARGET_SE = 6;
+    TARGET_RESOURCE = 10;
+}`
+);
+
+fs.writeFileSync(protoPath, proto);
+NODE
+
+    if ! grep -q 'MessageType_TonSignData' "$TMP_PROTO"; then
+        node - "$TMP_PROTO" <<'NODE'
+const fs = require('fs');
+
+const protoPath = process.argv[2];
+const proto = fs.readFileSync(protoPath, 'utf8');
+const updated = proto.replace(
+  /(    MessageType_TonTxAck\s*=\s*11907[^\n]*;\n)/,
+  `$1    MessageType_TonSignData = 11908 [(wire_in) = true];\n    MessageType_TonSignedData = 11909 [(wire_out) = true];\n`
+);
+
+if (updated === proto) {
+  throw new Error('Unable to insert TON signData MessageType entries into Pro2 schema');
+}
+
+fs.writeFileSync(protoPath, updated);
+NODE
+    fi
 
     if ! grep -q 'MessageType_GetOnboardingStatus' "$TMP_PROTO"; then
         node - "$TMP_PROTO" <<'NODE'

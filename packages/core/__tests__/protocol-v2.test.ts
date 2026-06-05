@@ -17,8 +17,15 @@ import GetDeviceInfo from '../src/api/GetDeviceInfo';
 import GetPassphraseState from '../src/api/GetPassphraseState';
 import GetOnekeyFeatures from '../src/api/GetOnekeyFeatures';
 import { batchGetPublickeys } from '../src/api/helpers/batchGetPublickeys';
+import SuiGetAddress from '../src/api/sui/SuiGetAddress';
+import SuiGetPublicKey from '../src/api/sui/SuiGetPublicKey';
+import SuiSignMessage from '../src/api/sui/SuiSignMessage';
 import SuiSignTransaction from '../src/api/sui/SuiSignTransaction';
 import SolGetAddress from '../src/api/solana/SolGetAddress';
+import TonGetAddress from '../src/api/ton/TonGetAddress';
+import TonSignData from '../src/api/ton/TonSignData';
+import TonSignMessage from '../src/api/ton/TonSignMessage';
+import TonSignProof from '../src/api/ton/TonSignProof';
 import TronGetAddress from '../src/api/tron/TronGetAddress';
 import TronSignMessage from '../src/api/tron/TronSignMessage';
 import XrpSignTransaction from '../src/api/xrp/XrpSignTransaction';
@@ -676,7 +683,7 @@ describe('API compatibility handling', () => {
     );
   });
 
-  test('does not mark Pro2 Tron and Solana address methods as unsupported', () => {
+  test('does not mark Pro2 Tron, Solana, TON and SUI methods as unsupported', () => {
     const features = {
       onekey_device_type: 'pro2',
     } as Features;
@@ -697,6 +704,66 @@ describe('API compatibility handling', () => {
         showOnOneKey: false,
       },
     });
+    const tonGetAddressMethod = new TonGetAddress({
+      id: 3,
+      payload: {
+        method: 'tonGetAddress',
+        path: "m/44'/607'/0'",
+        showOnOneKey: false,
+      },
+    });
+    const tonSignMessageMethod = new TonSignMessage({
+      id: 4,
+      payload: {
+        method: 'tonSignMessage',
+        path: "m/44'/607'/0'",
+      },
+    });
+    const tonSignProofMethod = new TonSignProof({
+      id: 5,
+      payload: {
+        method: 'tonSignProof',
+        path: "m/44'/607'/0'",
+      },
+    });
+    const tonSignDataMethod = new TonSignData({
+      id: 6,
+      payload: {
+        method: 'tonSignData',
+        path: "m/44'/607'/0'",
+      },
+    });
+    const suiGetAddressMethod = new SuiGetAddress({
+      id: 7,
+      payload: {
+        method: 'suiGetAddress',
+        path: "m/44'/784'/0'/0'/0'",
+        showOnOneKey: false,
+      },
+    });
+    const suiGetPublicKeyMethod = new SuiGetPublicKey({
+      id: 8,
+      payload: {
+        method: 'suiGetPublicKey',
+        path: "m/44'/784'/0'/0'/0'",
+      },
+    });
+    const suiSignMessageMethod = new SuiSignMessage({
+      id: 9,
+      payload: {
+        method: 'suiSignMessage',
+        path: "m/44'/784'/0'/0'/0'",
+        messageHex: '0x1234',
+      },
+    });
+    const suiSignTransactionMethod = new SuiSignTransaction({
+      id: 10,
+      payload: {
+        method: 'suiSignTransaction',
+        path: "m/44'/784'/0'/0'/0'",
+        rawTx: '0x1234',
+      },
+    });
 
     expect(
       isMethodVersionRangeUnsupported(
@@ -708,6 +775,48 @@ describe('API compatibility handling', () => {
         getMethodVersionRange(features, type => solMethod.getVersionRange()[type])
       )
     ).toBe(false);
+    expect(getMethodVersionRange(features, type => tonGetAddressMethod.getVersionRange()[type]))
+      .toEqual({
+        min: '0.0.0',
+      });
+    expect(getMethodVersionRange(features, type => tonSignMessageMethod.getVersionRange()[type]))
+      .toEqual({
+        min: '0.0.0',
+      });
+    expect(getMethodVersionRange(features, type => tonSignProofMethod.getVersionRange()[type]))
+      .toEqual({
+        min: '0.0.0',
+      });
+    expect(getMethodVersionRange(features, type => tonSignDataMethod.getVersionRange()[type]))
+      .toEqual({
+        min: '0.0.0',
+      });
+    expect(getMethodVersionRange(features, type => suiGetAddressMethod.getVersionRange()[type]))
+      .toEqual({
+        min: '0.0.0',
+      });
+    expect(getMethodVersionRange(features, type => suiGetPublicKeyMethod.getVersionRange()[type]))
+      .toEqual({
+        min: '0.0.0',
+      });
+    expect(getMethodVersionRange(features, type => suiSignMessageMethod.getVersionRange()[type]))
+      .toEqual({
+        min: '0.0.0',
+      });
+    expect(
+      getMethodVersionRange(features, type => suiSignTransactionMethod.getVersionRange()[type])
+    ).toEqual({
+      min: '0.0.0',
+    });
+  });
+
+  test('includes TON signData in the Protocol V2 protobuf schema', () => {
+    const protocolV2Messages = DataManager.getProtobufMessages('v2Schema') as any;
+
+    expect(protocolV2Messages.nested.TonSignData).toBeDefined();
+    expect(protocolV2Messages.nested.TonSignedData).toBeDefined();
+    expect(protocolV2Messages.nested.MessageType.values.MessageType_TonSignData).toBe(11908);
+    expect(protocolV2Messages.nested.MessageType.values.MessageType_TonSignedData).toBe(11909);
   });
 
   test('uses chunk transfer for large Sui transactions on Protocol V2', async () => {
