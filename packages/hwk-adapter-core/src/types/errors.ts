@@ -138,3 +138,38 @@ export const ORPHAN_ELIGIBLE_ERROR_CODES: number[] = [
   HardwareErrorCode.DevicePermissionDenied,
   HardwareErrorCode.BlePairingTimeout,
 ];
+
+// ---------------------------------------------------------------------------
+// Standard throwable for HWK adapters
+// ---------------------------------------------------------------------------
+
+export interface IHwkErrorPayload {
+  code: HardwareErrorCode;
+  message: string;
+  appName?: string;
+  _tag?: string;
+  params?: Record<string, unknown>;
+}
+
+export type HwkError = Error & {
+  code: HardwareErrorCode;
+  appName?: string;
+  _tag?: string;
+  params?: Record<string, unknown>;
+};
+
+/**
+ * Canonical throwable for HWK adapters. Plain Error + canonical extra fields,
+ * shape-compatible with `rehydrateConnectorError` so locally-thrown and
+ * cross-boundary errors are indistinguishable to downstream classifiers
+ * (`err.code` / `err._tag` / `err.appName`). Do NOT mutate caught errors
+ * with `Object.assign` — construct a fresh one via this factory.
+ */
+export function createHwkError(payload: IHwkErrorPayload): HwkError {
+  return Object.assign(new Error(payload.message), {
+    code: payload.code,
+    ...(payload._tag !== undefined && { _tag: payload._tag }),
+    ...(payload.appName !== undefined && { appName: payload.appName }),
+    ...(payload.params !== undefined && { params: payload.params }),
+  });
+}

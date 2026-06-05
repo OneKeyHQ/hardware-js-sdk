@@ -1,4 +1,5 @@
-export { HardwareErrorCode, ORPHAN_ELIGIBLE_ERROR_CODES } from './types/errors';
+export { HardwareErrorCode, ORPHAN_ELIGIBLE_ERROR_CODES, createHwkError } from './types/errors';
+export type { HwkError, IHwkErrorPayload } from './types/errors';
 
 export type { Success, Failure, Response } from './types/response';
 export { success, failure } from './types/response';
