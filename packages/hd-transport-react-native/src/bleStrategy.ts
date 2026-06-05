@@ -10,9 +10,7 @@ export type BleWriteCapability = {
 export type BleWriteMode = 'withResponse' | 'withoutResponse';
 
 export function hasWritableCapability(characteristic: BleWriteCapability) {
-  return !!(
-    characteristic.isWritableWithResponse || characteristic.isWritableWithoutResponse
-  );
+  return !!(characteristic.isWritableWithResponse || characteristic.isWritableWithoutResponse);
 }
 
 export function resolveBleWriteMode(

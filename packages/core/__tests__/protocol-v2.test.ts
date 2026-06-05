@@ -140,8 +140,9 @@ describe('Protocol V2 feature adapter', () => {
     expect(features.ble_enable).toBe(true);
   });
 
-  test('uses GetPassphraseState payloads compatible with Pro1 passphrase flow', async () => {
+  test('uses GetPassphraseState payloads compatible with Pro series passphrase flow', async () => {
     const features = normalizeProtocolV2Features(descriptor as any);
+    features.onekey_firmware_version = '4.15.0';
     const typedCall = jest.fn().mockResolvedValue({
       type: 'PassphraseState',
       message: {
@@ -236,6 +237,8 @@ describe('Protocol V2 feature adapter', () => {
       ...descriptor,
       protocolType: 'V2',
     } as any);
+    (device as any).features.onekey_firmware_version = '4.15.0';
+    (device as any).features.passphrase_protection = true;
     (device as any).commands = { typedCall };
 
     await expect(getPassphraseStateWithRefreshDeviceInfo(device)).resolves.toMatchObject({
@@ -245,7 +248,7 @@ describe('Protocol V2 feature adapter', () => {
 
     expect(device.passphraseState).toBeUndefined();
     expect(device.features?.passphrase_protection).toBe(true);
-    expect(device.features?.session_id).toBe('session-auto');
+    expect(device.features?.session_id).toBeNull();
     expect(device.getInternalState()).toBeUndefined();
     device.passphraseState = 'state-auto';
     expect(device.getInternalState()).toBe('session-auto');
@@ -275,6 +278,7 @@ describe('Protocol V2 feature adapter', () => {
         },
       }
     );
+    (device as any).features.onekey_firmware_version = '4.15.0';
     (device as any).commands = { typedCall };
 
     await expect(
@@ -285,7 +289,7 @@ describe('Protocol V2 feature adapter', () => {
     });
 
     expect(device.features?.passphrase_protection).toBe(false);
-    expect(device.features?.session_id).toBe('main-pin-session');
+    expect(device.features?.session_id).toBeNull();
     expect(device.getInternalState()).toBeUndefined();
     expect(typedCall).toHaveBeenLastCalledWith('GetPassphraseState', 'PassphraseState', {
       _only_main_pin: true,
@@ -307,6 +311,8 @@ describe('Protocol V2 feature adapter', () => {
       ...descriptor,
       protocolType: 'V2',
     } as any);
+    (device as any).features.onekey_firmware_version = '4.15.0';
+    (device as any).features.passphrase_protection = true;
     (device as any).commands = { typedCall };
 
     await expect(device.checkPassphraseStateSafety('expected-state', false, true)).resolves.toBe(
@@ -314,7 +320,7 @@ describe('Protocol V2 feature adapter', () => {
     );
 
     expect(device.getInternalState()).toBeUndefined();
-    expect(typedCall).toHaveBeenLastCalledWith('GetPassphraseState', 'PassphraseState', {
+    expect(typedCall).toHaveBeenNthCalledWith(1, 'GetPassphraseState', 'PassphraseState', {
       passphrase_state: 'expected-state',
     });
   });

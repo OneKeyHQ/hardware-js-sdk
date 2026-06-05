@@ -115,11 +115,6 @@ const HIGH_VOLUME_WRITE_BURST_SIZE = Platform.OS === 'ios' ? 4 : 6;
 const HIGH_VOLUME_WRITE_PAUSE_MS = Platform.OS === 'ios' ? 6 : 2;
 const HIGH_VOLUME_WRITE_FLUSH_DELAY_MS = Platform.OS === 'ios' ? 20 : 8;
 
-const delay = (ms: number) =>
-  new Promise<void>(resolve => {
-    setTimeout(resolve, ms);
-  });
-
 export type ProtocolV2BleTuning = {
   iosPacketLength?: number;
   androidPacketLength?: number;
@@ -489,7 +484,6 @@ export default class ReactNativeBleTransport {
             e.errorCode === BleErrorCode.DeviceMTUChangeFailed ||
             e.errorCode === BleErrorCode.OperationCancelled
           ) {
-            connectOptions = {};
             device = await device.connect();
           } else if (e.errorCode !== BleErrorCode.DeviceAlreadyConnected) {
             throw e;
@@ -504,7 +498,18 @@ export default class ReactNativeBleTransport {
       transport.device = device;
       transport.writeCharacteristic = writeCharacteristic;
       transport.notifyCharacteristic = notifyCharacteristic;
-      transport.notifySubscription = this._monitorCharacteristic(notifyCharacteristic, uuid);
+      const monitorToken = this.nextMonitorToken;
+      this.nextMonitorToken += 1;
+      const notifyTransactionId = `${uuid}:notify:${monitorToken}`;
+      transport.monitorToken = monitorToken;
+      transport.notifyTransactionId = notifyTransactionId;
+      this.monitorTokens.set(uuid, monitorToken);
+      transport.notifySubscription = this._monitorCharacteristic(
+        notifyCharacteristic,
+        uuid,
+        monitorToken,
+        notifyTransactionId
+      );
       this.attachDisconnectSubscription(transport, device, uuid);
     } finally {
       this.firmwareUploadWriteRecoveryIds.delete(uuid);
@@ -662,11 +667,7 @@ export default class ReactNativeBleTransport {
         cachedProtocol &&
         (!expectedProtocol || cachedProtocol === expectedProtocol)
       ) {
-        Log?.debug(
-          '[ReactNativeBleTransport] reuse cached BLE transport:',
-          uuid,
-          cachedProtocol
-        );
+        Log?.debug('[ReactNativeBleTransport] reuse cached BLE transport:', uuid, cachedProtocol);
         return { uuid, protocolType: cachedProtocol };
       }
 

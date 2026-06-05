@@ -1136,11 +1136,7 @@ const checkPassphraseEnableState = (method: BaseMethod, features?: Features) => 
 const shouldCheckPassphraseState = (method: BaseMethod, device: Device) => {
   if (!method.useDevicePassphraseState) return false;
 
-  const isPro2 = getDeviceType(device.features) === EDeviceType.Pro2;
-  const pro2ExplicitWalletSelection =
-    isPro2 && (!!method.payload?.passphraseState || !!method.payload?.useEmptyPassphrase);
-
-  return device.hasUsePassphrase() || pro2ExplicitWalletSelection;
+  return device.hasUsePassphrase();
 };
 
 const cleanup = () => {

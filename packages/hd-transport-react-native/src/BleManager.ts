@@ -1,9 +1,9 @@
 import BleUtils from '@onekeyfe/react-native-ble-utils';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
-import type { Peripheral } from '@onekeyfe/react-native-ble-utils';
-
 import { bleLogger } from './logger';
+
+import type { Peripheral } from '@onekeyfe/react-native-ble-utils';
 
 const Logger = bleLogger;
 
@@ -21,9 +21,6 @@ export const pairDevice = (macAddress: string) => BleUtils.pairDevice(macAddress
 
 export const onDeviceBondState = (bleMacAddress: string): Promise<Peripheral | undefined> =>
   new Promise((resolve, reject) => {
-    let timeout: ReturnType<typeof setTimeout> | undefined;
-    let cleanupListener: (() => void) | undefined;
-
     const cleanup = () => {
       if (timeout) {
         clearTimeout(timeout);
@@ -31,12 +28,12 @@ export const onDeviceBondState = (bleMacAddress: string): Promise<Peripheral | u
       if (cleanupListener) cleanupListener();
     };
 
-    timeout = setTimeout(() => {
+    const timeout = setTimeout(() => {
       cleanup();
       reject(ERRORS.TypedError(HardwareErrorCode.BleDeviceNotBonded, 'device is not bonded'));
     }, 60 * 1000);
 
-    cleanupListener = BleUtils.onDeviceBondState(peripheral => {
+    const cleanupListener = BleUtils.onDeviceBondState(peripheral => {
       if (peripheral.id?.toLowerCase() !== bleMacAddress.toLowerCase()) {
         return;
       }

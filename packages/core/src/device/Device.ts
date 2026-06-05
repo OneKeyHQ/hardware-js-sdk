@@ -906,7 +906,8 @@ export class Device extends EventEmitter {
   hasUsePassphrase() {
     const isModeT =
       getDeviceType(this.features) === EDeviceType.Touch ||
-      getDeviceType(this.features) === EDeviceType.Pro;
+      getDeviceType(this.features) === EDeviceType.Pro ||
+      getDeviceType(this.features) === EDeviceType.Pro2;
     const preCheckTouch = isModeT && this.features?.unlocked === false;
 
     return this.features && (!!this.features.passphrase_protection || preCheckTouch);
@@ -920,10 +921,6 @@ export class Device extends EventEmitter {
   }
 
   async lockDevice(): Promise<Success> {
-    if (getDeviceType(this.features) === EDeviceType.Pro2) {
-      return { message: 'LockDevice skipped for Pro2' };
-    }
-
     const res = await this.commands.typedCall('LockDevice', 'Success', {});
     return res.message;
   }
@@ -931,6 +928,9 @@ export class Device extends EventEmitter {
   supportUnlockVersionRange(): DeviceFirmwareRange {
     return {
       pro: {
+        min: '4.15.0',
+      },
+      pro2: {
         min: '4.15.0',
       },
     };
@@ -947,12 +947,8 @@ export class Device extends EventEmitter {
       this.features,
       Enum_Capability.Capability_AttachToPin
     );
-    const isPro2 = getDeviceType(this.features) === EDeviceType.Pro2;
-
     const supportUnlock =
       supportAttachPinCapability ||
-      // Pro2 V2 暂未从 features 暴露 capabilities，先直连该方法用于固件联调。
-      isPro2 ||
       (versionRange && semver.gte(firmwareVersion, versionRange.min));
 
     if (supportUnlock) {

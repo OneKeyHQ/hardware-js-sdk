@@ -1,9 +1,9 @@
 import { BleErrorCode } from 'react-native-ble-plx';
 import { wait } from '@onekeyfe/hd-shared';
 
-import type { Characteristic, Device, Subscription } from 'react-native-ble-plx';
-
 import { bleLogger } from './logger';
+
+import type { Characteristic, Device, Subscription } from 'react-native-ble-plx';
 
 const Log = bleLogger;
 
