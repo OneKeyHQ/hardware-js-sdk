@@ -27,9 +27,11 @@ import {
   ledgerFailure,
   mapLedgerError,
 } from '../errors';
+import { createAllNetworkGetAddress } from './methods/allNetworkGetAddress';
 import { isLedgerBleConnectionType } from '../utils/ledgerDmkTransport';
 import { debugError, debugLog } from '../utils/debugLog';
 
+import type { LedgerInstallAppContext } from './methods/allNetworkGetAddress';
 import type { AppMetadata, FirmwareVersion, LedgerDeviceInfo } from '../device-apps/DeviceApps';
 import type {
   BtcAddress,
@@ -352,6 +354,11 @@ export class LedgerAdapter implements IHardwareWallet {
     return ['evm', 'btc', 'sol', 'tron'];
   }
 
+  allNetworkGetAddress = createAllNetworkGetAddress({
+    callChain: this.callChain.bind(this),
+    getChainFingerprint: (connectId, chain) => this.getChainFingerprint(connectId, '', chain),
+  });
+
   // ---------------------------------------------------------------------------
   // Chain call helper
   // ---------------------------------------------------------------------------
@@ -363,7 +370,8 @@ export class LedgerAdapter implements IHardwareWallet {
     method: string,
     params: unknown,
     commonParams?: ICommonCallParams,
-    skipFingerprint = false
+    skipFingerprint = false,
+    installContext?: LedgerInstallAppContext
   ): Promise<Response<T>> {
     try {
       const result = await this.connectorCall(
@@ -376,7 +384,8 @@ export class LedgerAdapter implements IHardwareWallet {
           skipFingerprint,
         },
         undefined,
-        commonParams
+        commonParams,
+        installContext
       );
       return success(result as T);
     } catch (err) {
@@ -1334,7 +1343,8 @@ export class LedgerAdapter implements IHardwareWallet {
     params: unknown,
     fingerprint?: ConnectorCallFingerprint,
     permissionDeviceId?: string,
-    commonParams?: ICommonCallParams
+    commonParams?: ICommonCallParams,
+    installContext?: LedgerInstallAppContext
   ): Promise<unknown> {
     debugLog('[LedgerAdapter] connectorCall:', method, 'connectId:', connectId || '(empty)');
 
@@ -1351,7 +1361,8 @@ export class LedgerAdapter implements IHardwareWallet {
           signal,
           fingerprint,
           permissionDeviceId,
-          commonParams
+          commonParams,
+          installContext
         ),
       {
         label: method,
@@ -1407,7 +1418,8 @@ export class LedgerAdapter implements IHardwareWallet {
     signal: AbortSignal,
     fingerprint?: ConnectorCallFingerprint,
     permissionDeviceId?: string,
-    commonParams?: ICommonCallParams
+    commonParams?: ICommonCallParams,
+    installContext?: LedgerInstallAppContext
   ): Promise<unknown> {
     LedgerAdapter._throwIfAborted(signal);
     await this._ensureDevicePermission(
@@ -1497,10 +1509,19 @@ export class LedgerAdapter implements IHardwareWallet {
         isAppNotInstalledError(err) ||
         (err as { code?: number })?.code === HardwareErrorCode.AppNotInstalled;
       if (autoInstallApp && isAppMissing) {
+        if (installContext?.deviceOutOfMemoryError) {
+          throw installContext.deviceOutOfMemoryError;
+        }
         const appName = (err as { appName?: string })?.appName ?? mapLedgerError(err).appName;
         if (appName) {
           const confirmed = await this._waitForInstallAppConfirm(appName);
-          if (!confirmed) throw err;
+          if (!confirmed) {
+            throw Object.assign(err as Error, {
+              _tag: ERROR_TAG.UserAborted,
+              code: HardwareErrorCode.UserAborted,
+              appName,
+            });
+          }
           // Emit progress 0 immediately so the confirm dialog morphs into the
           // "installing" view with no blank gap — DMK's setup (go-to-dashboard,
           // metadata, build plan, secure channel) can take several seconds
@@ -1509,7 +1530,16 @@ export class LedgerAdapter implements IHardwareWallet {
             type: EConnectorInteraction.AppInstallProgress,
             payload: { connectId: resolvedConnectId, appName, progress: 0 },
           });
-          await this._callConnector(sessionId, 'installApp', { appName }, signal);
+          try {
+            await this._callConnector(sessionId, 'installApp', { appName }, signal);
+          } catch (installErr) {
+            if (mapLedgerError(installErr).code === HardwareErrorCode.DeviceOutOfMemory) {
+              if (installContext) {
+                installContext.deviceOutOfMemoryError = installErr as Error;
+              }
+            }
+            throw installErr;
+          }
           // Close the install UI before retrying so the retried operation's own
           // device prompts (e.g. confirm-on-device) render normally instead of
           // being absorbed by the install dialog.
