@@ -610,11 +610,7 @@ export class Device extends EventEmitter {
 
     try {
       const features = await Promise.race([
-        getProtocolV2Features({
-          commands: this.commands,
-          descriptor: this.originalDescriptor,
-          timeoutMs: 10 * 1000,
-        }),
+        this._readProtocolV2Features(10 * 1000),
         new Promise<never>((_, reject) => {
           setTimeout(() => {
             reject(ERRORS.TypedError(HardwareErrorCode.DeviceInitializeFailed));
@@ -629,9 +625,24 @@ export class Device extends EventEmitter {
     }
   }
 
+  private async _readProtocolV2Features(timeoutMs?: number) {
+    return getProtocolV2Features({
+      commands: this.commands,
+      descriptor: this.originalDescriptor,
+      timeoutMs,
+    });
+  }
+
   async getFeatures() {
+    if (this.originalDescriptor.protocolType === 'V2') {
+      const features = await this._readProtocolV2Features();
+      this._updateFeatures(features);
+      return features;
+    }
+
     const { message } = await this.commands.typedCall('GetFeatures', 'Features', {});
     this._updateFeatures(message);
+    return message;
   }
 
   _updateFeatures(feat: Features, initSession?: boolean) {
@@ -963,9 +974,8 @@ export class Device extends EventEmitter {
         return Promise.resolve(this.features);
       }
 
-      const featuresRes = await this.commands.typedCall('GetFeatures', 'Features');
-      this._updateFeatures(featuresRes.message);
-      return Promise.resolve(featuresRes.message);
+      const features = await this.getFeatures();
+      return Promise.resolve(features);
     }
 
     const { type } = await this.commands.typedCall('GetAddress', 'Address', {
@@ -979,9 +989,8 @@ export class Device extends EventEmitter {
     if (type === 'CallMethodError') {
       throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'unlock device error');
     }
-    const res = await this.commands.typedCall('GetFeatures', 'Features');
-    this._updateFeatures(res.message);
-    return Promise.resolve(res.message);
+    const features = await this.getFeatures();
+    return Promise.resolve(features);
   }
 
   async checkPassphraseStateSafety(

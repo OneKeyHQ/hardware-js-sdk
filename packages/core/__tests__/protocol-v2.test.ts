@@ -236,10 +236,15 @@ describe('Protocol V2 feature adapter', () => {
       },
     });
 
-    (device as any).features = normalizeProtocolV2Features({
-      ...descriptor,
-      protocolType: 'V2',
-    } as any);
+    (device as any).features = normalizeProtocolV2Features(
+      {
+        ...descriptor,
+        protocolType: 'V2',
+      } as any,
+      {
+        hw: { serial_no: 'PR2SERIAL' },
+      }
+    );
     (device as any).features.onekey_firmware_version = '4.15.0';
     (device as any).features.passphrase_protection = true;
     (device as any).commands = { typedCall };
@@ -331,12 +336,31 @@ describe('Protocol V2 feature adapter', () => {
   test('marks fallback features as unavailable when DeviceInfo is missing', () => {
     const features = normalizeProtocolV2Features(descriptor as any);
 
-    expect(features.device_id).toBe('usb-path');
+    expect(features.device_id).toBe('');
     expect(features.serial_no).toBe('usb-path');
     expect(features.onekey_serial_no).toBe('usb-path');
     expect(features.initialized).toBe(false);
     expect(features.unlocked).toBe(false);
     expect(features.firmware_present).toBe(false);
+  });
+
+  test('uses Protocol V2 DeviceInfo serial_no as device_id instead of descriptor id', () => {
+    const features = normalizeProtocolV2Features(
+      {
+        id: 'PR2000000000',
+        path: 'PR2000000000',
+        protocolType: 'V2',
+      } as any,
+      {
+        hw: {
+          serial_no: 'PR9999999999',
+        },
+      }
+    );
+
+    expect(features.device_id).toBe('PR9999999999');
+    expect(features.onekey_serial_no).toBe('PR9999999999');
+    expect(features.serial_no).toBe('PR9999999999');
   });
 
   test('initializes Protocol V2 features from lightweight DeviceGetDeviceInfo', async () => {
@@ -642,6 +666,131 @@ describe('Protocol V2 feature adapter', () => {
         timeoutMs: 10000,
       }
     );
+  });
+
+  test('refreshes Protocol V2 features without falling back to legacy GetFeatures', async () => {
+    const device = Device.fromDescriptor({
+      path: 'usb-path',
+      protocolType: 'V2',
+    } as any);
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce({
+        type: 'DeviceInfo',
+        message: {
+          hw: { serial_no: 'PR2SERIAL' },
+          fw: { app: { version: '1.2.3' } },
+          status: { init_states: true },
+        },
+      })
+      .mockResolvedValueOnce({
+        type: 'DeviceInfo',
+        message: {
+          hw: { serial_no: 'PR2SERIAL' },
+          fw: { app: { version: '1.2.4' } },
+          status: { init_states: true, passphrase_protection: true },
+        },
+      });
+
+    (device as any).commands = { typedCall };
+
+    await device.initialize();
+    await device.getFeatures();
+
+    expect(device.features).toMatchObject({
+      onekey_device_type: 'pro2',
+      onekey_serial_no: 'PR2SERIAL',
+      onekey_firmware_version: '1.2.4',
+      passphrase_protection: true,
+    });
+    expect(typedCall).toHaveBeenCalledTimes(2);
+    expect(typedCall).toHaveBeenNthCalledWith(
+      2,
+      'DeviceGetDeviceInfo',
+      'DeviceInfo',
+      {
+        targets: {
+          hw: true,
+          fw: true,
+          bt: true,
+          status: true,
+        },
+        types: {
+          version: true,
+          specific: true,
+        },
+      }
+    );
+    expect(typedCall).not.toHaveBeenCalledWith('GetFeatures', 'Features', {});
+  });
+
+  test('keeps Protocol V2 unlock fallback from overwriting Pro2 features with legacy features', async () => {
+    const device = Device.fromDescriptor({
+      path: 'usb-path',
+      protocolType: 'V2',
+    } as any);
+    const typedCall = jest.fn().mockImplementation((type: string) => {
+      if (type === 'GetAddress') {
+        return Promise.resolve({
+          type: 'Address',
+          message: { address: 'test-address' },
+        });
+      }
+      if (type === 'DeviceGetDeviceInfo') {
+        return Promise.resolve({
+          type: 'DeviceInfo',
+          message: {
+            hw: { serial_no: 'PR2SERIAL' },
+            fw: { app: { version: '1.2.3' } },
+            status: { init_states: true },
+          },
+        });
+      }
+      return Promise.resolve({
+        type: 'Features',
+        message: {
+          device_id: 'LEGACY-PRO',
+          onekey_device_type: 'PRO',
+        },
+      });
+    });
+
+    (device as any).commands = { typedCall };
+    (device as any).features = normalizeProtocolV2Features(
+      { ...descriptor, protocolType: 'V2' } as any,
+      {
+        hw: { serial_no: 'PR2SERIAL' },
+        fw: { app: { version: '1.2.3' } },
+        status: { init_states: true },
+      }
+    );
+
+    await device.unlockDevice();
+
+    expect(device.features).toMatchObject({
+      onekey_device_type: 'pro2',
+      device_id: 'PR2SERIAL',
+      onekey_firmware_version: '1.2.3',
+    });
+    expect(typedCall).toHaveBeenCalledWith('GetAddress', 'Address', {
+      address_n: [2147483692, 2147483649, 2147483648, 0, 0],
+      coin_name: 'Testnet',
+      script_type: 'SPENDADDRESS',
+      show_display: false,
+    });
+    expect(typedCall).toHaveBeenCalledWith('DeviceGetDeviceInfo', 'DeviceInfo', {
+      targets: {
+        hw: true,
+        fw: true,
+        bt: true,
+        status: true,
+      },
+      types: {
+        version: true,
+        specific: true,
+      },
+    });
+    expect(typedCall).not.toHaveBeenCalledWith('GetFeatures', 'Features', {});
   });
 });
 

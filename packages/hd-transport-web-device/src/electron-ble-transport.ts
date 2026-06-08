@@ -29,6 +29,10 @@ function shouldSuppressHighVolumeCallLog(name: string) {
   return FILE_WRITE_LOG_BLOCK_PATTERN.test(normalized);
 }
 
+function isLogBlockCommand(name: string) {
+  return (LogBlockCommand as Set<string> | undefined)?.has?.(name) ?? false;
+}
+
 const { parseConfigure, ProtocolV1, check } = transport;
 
 declare global {
@@ -684,7 +688,7 @@ export default class ElectronBleTransport {
     }
     if (shouldSuppressHighVolumeCallLog(name)) {
       // 高频文件写入不要逐包发 debug 事件，否则调试日志会反向拖慢传输。
-    } else if (LogBlockCommand.has(name)) {
+    } else if (isLogBlockCommand(name)) {
       this.Log?.debug('[Electron BLE] call', 'name:', name, 'protocol:', protocol);
     } else {
       this.Log?.debug('[Electron BLE] call', 'name:', name, 'data:', data, 'protocol:', protocol);

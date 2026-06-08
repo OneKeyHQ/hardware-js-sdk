@@ -40,9 +40,13 @@ function shouldSuppressWebUsbCallLog(name: string) {
   return WEBUSB_FILE_WRITE_LOG_BLOCK_PATTERN.test(normalized);
 }
 
+function isLogBlockCommand(name: string) {
+  return (LogBlockCommand as Set<string> | undefined)?.has?.(name) ?? false;
+}
+
 function shouldBlockWebUsbCallDataLog(name: string) {
   const normalized = name.replace(/[_\s-]/g, '');
-  return LogBlockCommand.has(name) || WEBUSB_FILE_WRITE_LOG_BLOCK_PATTERN.test(normalized);
+  return isLogBlockCommand(name) || WEBUSB_FILE_WRITE_LOG_BLOCK_PATTERN.test(normalized);
 }
 
 function inferProtocolHintFromDeviceName(name?: string | null): ProtocolType | undefined {

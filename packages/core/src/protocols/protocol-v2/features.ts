@@ -144,7 +144,7 @@ function createBaseFeatures(descriptor: DeviceDescriptor): Features {
     minor_version: 0,
     patch_version: 0,
     bootloader_mode: false,
-    device_id: descriptorId,
+    device_id: '',
     pin_protection: null,
     passphrase_protection: null,
     language: null,
@@ -190,8 +190,7 @@ export function normalizeProtocolV2Features(
   const features = createBaseFeatures(descriptor);
   if (!deviceInfo) return features;
 
-  const serialNo =
-    deviceInfo.hw?.serial_no || features.onekey_serial_no || getDescriptorId(descriptor);
+  const serialNo = deviceInfo.hw?.serial_no;
   const firmwareVersion = getImageVersion(deviceInfo.fw?.app);
   const [fwMajor, fwMinor, fwPatch] = parseVersion(firmwareVersion);
 
@@ -203,9 +202,9 @@ export function normalizeProtocolV2Features(
     fw_major: fwMajor,
     fw_minor: fwMinor,
     fw_patch: fwPatch,
-    device_id: serialNo,
-    serial_no: serialNo,
-    onekey_serial_no: serialNo,
+    device_id: serialNo ?? features.device_id,
+    serial_no: serialNo ?? features.serial_no,
+    onekey_serial_no: serialNo ?? features.onekey_serial_no,
     protocol_version: deviceInfo.protocol_version ?? features.protocol_version,
     label: deviceInfo.status?.label ?? features.label,
     language: deviceInfo.status?.language ?? features.language,
