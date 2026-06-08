@@ -39,6 +39,20 @@ import onekeyLogo from '../assets/onekey.png';
 // 版本信息
 const VERSION = packageJson.version;
 const COMMIT_SHA = process.env.COMMIT_SHA || 'dev-build';
+const PUSH_TIMESTAMP = process.env.PUSH_TIMESTAMP || process.env.BUILD_TIME || __BUILD_TIME__;
+
+const formatVersionTimestamp = (timestamp?: string) => {
+  if (!timestamp) return '';
+
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return timestamp;
+  }
+
+  return date.toISOString().replace('T', ' ').slice(0, 16);
+};
+
+const VERSION_TIMESTAMP = formatVersionTimestamp(PUSH_TIMESTAMP);
 
 const navigationItems = [
   {
@@ -317,6 +331,11 @@ export function AppSidebar() {
             <div className="text-xs text-muted-foreground font-mono">
               v{VERSION} • {COMMIT_SHA.slice(0, 8)}
             </div>
+            {VERSION_TIMESTAMP ? (
+              <div className="text-[10px] leading-4 text-muted-foreground/80 font-mono">
+                {VERSION_TIMESTAMP}
+              </div>
+            ) : null}
           </div>
         </div>
       </SidebarFooter>

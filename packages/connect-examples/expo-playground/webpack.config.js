@@ -139,6 +139,7 @@ module.exports = async (env, argv) => {
   const ogUrl = publicOrigin ? `${publicOrigin}${deployedBasePath}` : './';
   const ogImageUrl = publicOrigin ? `${publicOrigin}${deployedAssetBasePath}og.jpg` : `${staticBasePath}og.jpg`;
   const buildTime = new Date().toISOString();
+  const pushTimestamp = process.env.PUSH_TIMESTAMP || buildTime;
 
   return {
     entry: './app/entry.client.tsx',
@@ -318,6 +319,7 @@ module.exports = async (env, argv) => {
         'process.env.NODE_ENV': JSON.stringify(isProduction ? 'production' : 'development'),
         'process.env.COMMIT_SHA': JSON.stringify(isProduction && commitSha ? commitSha : 'dev'),
         'process.env.BUILD_TIME': JSON.stringify(buildTime),
+        'process.env.PUSH_TIMESTAMP': JSON.stringify(pushTimestamp),
         __COMMIT_SHA__: JSON.stringify(isProduction && commitSha ? commitSha : 'dev'),
         __BUILD_TIME__: JSON.stringify(buildTime),
       }),
