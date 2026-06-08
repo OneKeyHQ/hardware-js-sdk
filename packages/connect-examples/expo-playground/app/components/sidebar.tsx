@@ -29,6 +29,7 @@ import {
   ListChecks,
   Usb,
   UploadCloud,
+  Radio,
 } from 'lucide-react';
 import { getDeviceLabel } from '@onekeyfe/hd-core';
 import packageJson from '../../package.json';
@@ -109,6 +110,11 @@ const navigationItems = [
     title: 'common.deviceInfoTimingTest',
     url: '/device-info-timing-test',
     icon: ListChecks,
+  },
+  {
+    title: 'common.eventTest',
+    url: '/event-test',
+    icon: Radio,
   },
 ];
 

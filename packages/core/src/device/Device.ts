@@ -34,6 +34,7 @@ import {
   type Device as DeviceTyped,
   EOneKeyDeviceMode,
   type Features,
+  type IVersionArray,
   type UnavailableCapabilities,
 } from '../types';
 import { DEVICE, UI_REQUEST } from '../events';
@@ -41,7 +42,11 @@ import { DataManager } from '../data-manager';
 import TransportManager from '../data-manager/TransportManager';
 import { toHardened } from '../api/helpers/pathUtils';
 import { existCapability } from '../utils/capabilitieUtils';
-import { getProtocolV2Features } from '../protocols/protocol-v2';
+import { getProtocolV2DeviceInfo, normalizeProtocolV2Features } from '../protocols/protocol-v2';
+import {
+  buildProfileFromProtocolV1,
+  buildProfileFromProtocolV2,
+} from '../deviceProfile';
 
 import type { PROTO } from '../constants';
 import type {
@@ -53,6 +58,7 @@ import type { PassphrasePromptResponse } from './DeviceCommands';
 import type { Deferred, HardwareConnectProtocol } from '@onekeyfe/hd-shared';
 import type { OneKeyDeviceInfo as DeviceDescriptor, Success } from '@onekeyfe/hd-transport';
 import type DeviceConnector from './DeviceConnector';
+import type { DeviceProfile } from '../types/api/getDeviceInfo';
 
 export type InitOptions = {
   initSession?: boolean;
@@ -73,6 +79,13 @@ const parseRunOptions = (options?: RunOptions): RunOptions => {
 };
 
 const Log = getLogger(LoggerNames.Device);
+
+const profileVersionToArray = (version?: string | null): IVersionArray | null => {
+  if (!version) return null;
+  return version.split('.').map(part => Number(part) || 0) as IVersionArray;
+};
+
+const hasProtocolV2Profile = (profile?: DeviceProfile) => profile?.protocol === 'V2';
 
 export interface DeviceEvents {
   [DEVICE.PIN]: [Device, PROTO.PinMatrixRequestType | undefined, (err: any, pin: string) => void];
@@ -174,6 +187,11 @@ export class Device extends EventEmitter {
   features: Features | undefined = undefined;
 
   /**
+   * SDK 标准设备模型
+   */
+  profile: DeviceProfile | undefined = undefined;
+
+  /**
    * 是否需要更新设备信息
    */
   featuresNeedsReload = false;
@@ -233,23 +251,31 @@ export class Device extends EventEmitter {
     if (this.isUnacquired() || !this.features) return null;
 
     const env = DataManager.getSettings('env');
-    const deviceType = getDeviceType(this.features);
+    const deviceType = this.getCurrentDeviceType();
 
-    const bleName = getDeviceBleName(this.features);
-    const label = getDeviceLabel(this.features);
+    const bleName =
+      this.profile && hasProtocolV2Profile(this.profile)
+        ? this.profile.bleName
+        : this.profile?.bleName ?? getDeviceBleName(this.features);
+    const label =
+      this.profile && hasProtocolV2Profile(this.profile)
+        ? this.profile.label
+        : this.profile?.label ?? getDeviceLabel(this.features);
+    const serialNo = this.getCurrentSerialNo();
+    const deviceId = this.getCurrentDeviceId() || null;
 
     return {
       /** Android uses Mac address, iOS uses uuid, USB uses uuid  */
-      connectId: DataManager.isBleConnect(env) ? this.mainId || null : getDeviceUUID(this.features),
+      connectId: DataManager.isBleConnect(env) ? this.mainId || null : serialNo,
       /** Hardware ID, will not change at any time */
-      uuid: getDeviceUUID(this.features),
+      uuid: serialNo,
       commType: this.originalDescriptor.commType,
       sdkInstanceId: this.sdkInstanceId,
       instanceId: this.instanceId,
       createdAt: this.createdAt,
       deviceType,
       /** ID for current seeds, will clear after replace a new seed at device */
-      deviceId: this.features.device_id || null,
+      deviceId,
       path: this.originalDescriptor?.path,
       bleName,
       name: bleName || label || `OneKey ${deviceType?.toUpperCase()}`,
@@ -442,6 +468,31 @@ export class Device extends EventEmitter {
     return this.commands;
   }
 
+  getCurrentDeviceType() {
+    return this.profile?.deviceType ?? getDeviceType(this.features);
+  }
+
+  getCurrentDeviceId() {
+    if (this.profile) {
+      return this.profile.deviceId || undefined;
+    }
+    return this.features?.device_id || undefined;
+  }
+
+  getCurrentSerialNo() {
+    if (this.profile) {
+      return this.profile.serialNo || '';
+    }
+    return this.features ? getDeviceUUID(this.features) : '';
+  }
+
+  getCurrentPassphraseProtection() {
+    if (this.profile) {
+      return this.profile.status.passphraseProtection;
+    }
+    return this.features?.passphrase_protection;
+  }
+
   private generateStateKey(deviceId: string, passphraseState?: string) {
     if (passphraseState) {
       return `${deviceId}@${passphraseState}`;
@@ -455,10 +506,11 @@ export class Device extends EventEmitter {
       'getInternalState session param: ',
       `device_id: ${_deviceId}`,
       `features.device_id: ${this.features?.device_id}`,
+      `profile.deviceId: ${this.profile?.deviceId}`,
       `passphraseState: ${this.passphraseState}`
     );
 
-    const deviceId = _deviceId || this.features?.device_id;
+    const deviceId = _deviceId || this.getCurrentDeviceId();
     if (!deviceId) return undefined;
     // Security invariant: no passphraseState → no session lookup.
     // A previous fallback that scanned `${deviceId}@*` keys could silently
@@ -513,13 +565,13 @@ export class Device extends EventEmitter {
       `state: ${state}`,
       `initSession: ${initSession}`,
       `device_id: ${this.features?.device_id}`,
+      `profile.deviceId: ${this.profile?.deviceId}`,
       `passphraseState: ${this.passphraseState}`
     );
 
-    if (!this.features) return;
     if (!this.passphraseState && !initSession) return;
 
-    const deviceId = this.features?.device_id;
+    const deviceId = this.getCurrentDeviceId();
     if (!deviceId) return;
 
     const key = this.generateStateKey(deviceId, this.passphraseState);
@@ -533,7 +585,7 @@ export class Device extends EventEmitter {
   clearInternalState(_deviceId?: string) {
     Log.debug('clearInternalState param: ', _deviceId);
 
-    const deviceId = _deviceId || this.features?.device_id;
+    const deviceId = _deviceId || this.getCurrentDeviceId();
     if (!deviceId) return;
     const key = `${deviceId}`;
     delete deviceSessionCache[key];
@@ -609,14 +661,21 @@ export class Device extends EventEmitter {
     Log.debug('Initialize device via Protocol V2 feature adapter');
 
     try {
-      const features = await Promise.race([
-        this._readProtocolV2Features(10 * 1000),
+      const deviceInfo = await Promise.race([
+        this._readProtocolV2DeviceInfo(),
         new Promise<never>((_, reject) => {
           setTimeout(() => {
             reject(ERRORS.TypedError(HardwareErrorCode.DeviceInitializeFailed));
           }, 10 * 1000);
         }),
       ]);
+      const features = normalizeProtocolV2Features(this.originalDescriptor, deviceInfo);
+      this.updateProfile(
+        buildProfileFromProtocolV2({
+          deviceInfo,
+          sources: ['deviceGetDeviceInfo'],
+        })
+      );
       Log.debug('Protocol V2 normalized features:', features);
       this._updateFeatures(features);
     } catch (error) {
@@ -625,17 +684,22 @@ export class Device extends EventEmitter {
     }
   }
 
-  private async _readProtocolV2Features(timeoutMs?: number) {
-    return getProtocolV2Features({
+  private async _readProtocolV2DeviceInfo() {
+    return getProtocolV2DeviceInfo({
       commands: this.commands,
-      descriptor: this.originalDescriptor,
-      timeoutMs,
     });
   }
 
   async getFeatures() {
     if (this.originalDescriptor.protocolType === 'V2') {
-      const features = await this._readProtocolV2Features();
+      const deviceInfo = await this._readProtocolV2DeviceInfo();
+      const features = normalizeProtocolV2Features(this.originalDescriptor, deviceInfo);
+      this.updateProfile(
+        buildProfileFromProtocolV2({
+          deviceInfo,
+          sources: ['deviceGetDeviceInfo'],
+        })
+      );
       this._updateFeatures(features);
       return features;
     }
@@ -650,7 +714,7 @@ export class Device extends EventEmitter {
     if (this.features && this.features.session_id && !feat.session_id) {
       feat.session_id = this.features.session_id;
     }
-    if (this.features && this.features.device_id && feat.session_id) {
+    if (this.getCurrentDeviceId() && feat.session_id) {
       this.setInternalState(feat.session_id, initSession);
     }
     feat.unlocked = feat.unlocked ?? true;
@@ -658,8 +722,20 @@ export class Device extends EventEmitter {
     feat = fixFeaturesFirmwareVersion(feat);
 
     this.features = feat;
+    if (this.originalDescriptor.protocolType !== 'V2') {
+      this.updateProfile(
+        buildProfileFromProtocolV1({
+          features: feat,
+          sources: ['features'],
+        })
+      );
+    }
     this.featuresNeedsReload = false;
     this.emit(DEVICE.FEATURES, this, feat);
+  }
+
+  updateProfile(profile: DeviceProfile | undefined) {
+    this.profile = profile;
   }
 
   /**
@@ -691,6 +767,7 @@ export class Device extends EventEmitter {
     if (device.features) {
       this._updateFeatures(device.features);
     }
+    this.updateProfile(device.profile);
   }
 
   async run(fn?: () => Promise<void>, options?: RunOptions) {
@@ -823,6 +900,14 @@ export class Device extends EventEmitter {
   }
 
   getMode() {
+    if (this.profile) {
+      if (this.profile.status.mode === 'bootloader') return EOneKeyDeviceMode.bootloader;
+      if (this.profile.status.mode === 'notInitialized') return EOneKeyDeviceMode.notInitialized;
+      if (this.profile.status.noBackup === true) return EOneKeyDeviceMode.backupMode;
+      if (this.profile.status.mode === 'normal') return EOneKeyDeviceMode.normal;
+      if (hasProtocolV2Profile(this.profile)) return EOneKeyDeviceMode.normal;
+    }
+
     if (this.features?.bootloader_mode) {
       // bootloader mode
       return EOneKeyDeviceMode.bootloader;
@@ -843,11 +928,17 @@ export class Device extends EventEmitter {
   }
 
   getFirmwareVersion() {
+    const profileVersion = profileVersionToArray(this.profile?.versions.firmware);
+    if (profileVersion) return profileVersion;
+    if (hasProtocolV2Profile(this.profile)) return null;
     if (!this.features) return null;
     return getDeviceFirmwareVersion(this.features);
   }
 
   getBLEFirmwareVersion() {
+    const profileVersion = profileVersionToArray(this.profile?.versions.ble);
+    if (profileVersion) return profileVersion;
+    if (hasProtocolV2Profile(this.profile)) return null;
     if (!this.features) return null;
     return getDeviceBLEFirmwareVersion(this.features);
   }
@@ -877,14 +968,30 @@ export class Device extends EventEmitter {
   }
 
   isBootloader() {
+    if (this.profile) {
+      return (
+        this.profile.status.mode === 'bootloader' || this.profile.status.bootloaderMode === true
+      );
+    }
     return this.features && !!this.features.bootloader_mode;
   }
 
   isInitialized() {
+    if (this.profile) {
+      if (this.profile.status.initialized != null) return this.profile.status.initialized;
+      if (this.profile.status.mode === 'normal') return true;
+      if (this.profile.status.mode === 'notInitialized') return false;
+      if (hasProtocolV2Profile(this.profile)) return true;
+      if (this.features) return !!this.features.initialized;
+      return false;
+    }
     return this.features && !!this.features.initialized;
   }
 
   isSeedless() {
+    if (this.profile) {
+      return this.profile.status.noBackup === true;
+    }
     return this.features && !!this.features.no_backup;
   }
 
@@ -915,20 +1022,20 @@ export class Device extends EventEmitter {
   }
 
   hasUsePassphrase() {
+    const deviceType = this.getCurrentDeviceType();
     const isModeT =
-      getDeviceType(this.features) === EDeviceType.Touch ||
-      getDeviceType(this.features) === EDeviceType.Pro ||
-      getDeviceType(this.features) === EDeviceType.Pro2;
-    const preCheckTouch = isModeT && this.features?.unlocked === false;
+      deviceType === EDeviceType.Touch ||
+      deviceType === EDeviceType.Pro ||
+      deviceType === EDeviceType.Pro2;
+    const unlocked = this.profile ? this.profile.status.unlocked : this.features?.unlocked;
+    const preCheckTouch = isModeT && unlocked === false;
+    const passphraseProtection = this.getCurrentPassphraseProtection();
 
-    return this.features && (!!this.features.passphrase_protection || preCheckTouch);
+    return Boolean(passphraseProtection === true || preCheckTouch);
   }
 
   checkDeviceId(deviceId: string) {
-    if (this.features) {
-      return this.features.device_id === deviceId;
-    }
-    return false;
+    return this.getCurrentDeviceId() === deviceId;
   }
 
   async lockDevice(): Promise<Success> {
@@ -959,8 +1066,7 @@ export class Device extends EventEmitter {
       Enum_Capability.Capability_AttachToPin
     );
     const supportUnlock =
-      supportAttachPinCapability ||
-      (versionRange && semver.gte(firmwareVersion, versionRange.min));
+      supportAttachPinCapability || (versionRange && semver.gte(firmwareVersion, versionRange.min));
 
     if (supportUnlock) {
       const res = await this.commands.typedCall('UnLockDevice', 'UnLockDeviceResponse');
@@ -970,6 +1076,15 @@ export class Device extends EventEmitter {
           res.message.unlocked_attach_pin == null ? undefined : res.message.unlocked_attach_pin;
         this.features.passphrase_protection =
           res.message.passphrase_protection == null ? null : res.message.passphrase_protection;
+        if (this.profile && res.message.passphrase_protection != null) {
+          this.updateProfile({
+            ...this.profile,
+            status: {
+              ...this.profile.status,
+              passphraseProtection: res.message.passphrase_protection,
+            },
+          });
+        }
 
         return Promise.resolve(this.features);
       }

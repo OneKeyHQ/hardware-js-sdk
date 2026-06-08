@@ -2,24 +2,23 @@ import { EDeviceType } from '@onekeyfe/hd-shared';
 
 import type { Features } from '../../types';
 import type { DeviceCommands } from '../../device/DeviceCommands';
-import type { OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
 
-type ProtocolV2Bytes = Uint8Array | number[] | string;
+export type ProtocolV2Bytes = Uint8Array | number[] | string;
 
-type ProtocolV2FirmwareImageInfo = {
+export type ProtocolV2FirmwareImageInfo = {
   version?: string;
   build_id?: string;
   hash?: ProtocolV2Bytes;
 };
 
-type ProtocolV2SEInfo = {
+export type ProtocolV2SEInfo = {
   boot?: ProtocolV2FirmwareImageInfo;
   app?: ProtocolV2FirmwareImageInfo;
   type?: number;
   state?: number;
 };
 
-type ProtocolV2DeviceInfo = {
+export type ProtocolV2DeviceInfo = {
   protocol_version?: number;
   hw?: {
     Device_type?: number;
@@ -66,6 +65,23 @@ export const PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST = {
   },
 };
 
+export const PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST = {
+  targets: {
+    hw: true,
+    fw: true,
+    bt: true,
+    se1: true,
+    se2: true,
+    se3: true,
+    se4: true,
+    status: true,
+  },
+  types: {
+    version: true,
+    specific: true,
+  },
+};
+
 export const PROTOCOL_V2_FULL_DEVICE_INFO_REQUEST = {
   targets: {
     hw: true,
@@ -86,6 +102,7 @@ export const PROTOCOL_V2_FULL_DEVICE_INFO_REQUEST = {
 };
 
 export const PROTOCOL_V2_DEVICE_INFO_REQUEST = PROTOCOL_V2_FULL_DEVICE_INFO_REQUEST;
+export const PROTOCOL_V2_DEVICE_INFO_TIMEOUT_MS = 10 * 1000;
 
 function parseVersion(version?: string | null): [number, number, number] {
   if (!version) return [0, 0, 0];
@@ -105,10 +122,6 @@ function bytesToHex(value: unknown): string | undefined {
     return value.map(byte => Number(byte).toString(16).padStart(2, '0')).join('');
   }
   return undefined;
-}
-
-function getDescriptorId(descriptor: DeviceDescriptor) {
-  return descriptor.path || descriptor.id || '';
 }
 
 function getImageVersion(image?: ProtocolV2FirmwareImageInfo) {
@@ -136,8 +149,7 @@ function getSeState(se?: ProtocolV2SEInfo) {
   }
 }
 
-function createBaseFeatures(descriptor: DeviceDescriptor): Features {
-  const descriptorId = getDescriptorId(descriptor);
+function createBaseFeatures(): Features {
   return {
     vendor: 'onekey.so',
     major_version: 0,
@@ -178,16 +190,16 @@ function createBaseFeatures(descriptor: DeviceDescriptor): Features {
     experimental_features: null,
     protocol_version: null,
     onekey_device_type: EDeviceType.Pro2,
-    onekey_serial_no: descriptorId,
-    serial_no: descriptorId,
+    onekey_serial_no: '',
+    serial_no: '',
   };
 }
 
 export function normalizeProtocolV2Features(
-  descriptor: DeviceDescriptor,
+  _descriptor: unknown,
   deviceInfo?: ProtocolV2DeviceInfo
 ): Features {
-  const features = createBaseFeatures(descriptor);
+  const features = createBaseFeatures();
   if (!deviceInfo) return features;
 
   const serialNo = deviceInfo.hw?.serial_no;
@@ -266,21 +278,24 @@ export async function getProtocolV2Features({
   timeoutMs,
 }: {
   commands: DeviceCommands;
-  descriptor: DeviceDescriptor;
+  descriptor: unknown;
   timeoutMs?: number;
 }) {
-  const callOptions = timeoutMs ? { timeoutMs } : undefined;
-  const { message } = callOptions
-    ? await commands.typedCall(
-        'DeviceGetDeviceInfo',
-        'DeviceInfo',
-        PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST,
-        callOptions
-      )
-    : await commands.typedCall(
-        'DeviceGetDeviceInfo',
-        'DeviceInfo',
-        PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST
-      );
-  return normalizeProtocolV2Features(descriptor, message as unknown as ProtocolV2DeviceInfo);
+  const message = await getProtocolV2DeviceInfo({ commands, timeoutMs });
+  return normalizeProtocolV2Features(descriptor, message);
+}
+
+export async function getProtocolV2DeviceInfo({
+  commands,
+  timeoutMs = PROTOCOL_V2_DEVICE_INFO_TIMEOUT_MS,
+  request = PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST,
+}: {
+  commands: DeviceCommands;
+  timeoutMs?: number;
+  request?: object;
+}): Promise<ProtocolV2DeviceInfo> {
+  const { message } = await commands.typedCall('DeviceGetDeviceInfo', 'DeviceInfo', request, {
+    timeoutMs,
+  });
+  return message as unknown as ProtocolV2DeviceInfo;
 }

@@ -1,7 +1,7 @@
 import semver from 'semver';
 import { EDeviceType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
-import { getDeviceFirmwareVersion, getDeviceType } from '../../../utils';
+import { getDeviceFirmwareVersion } from '../../../utils';
 
 import type { Device } from '../../../device/Device';
 import type { MessageResponse, TypedCall } from '@onekeyfe/hd-transport';
@@ -24,7 +24,7 @@ export const signTypedHash = async ({
   | MessageResponse<'EthereumTypedDataSignature'>
   | MessageResponse<'EthereumTypedDataSignatureOneKey'>
 > => {
-  const deviceType = getDeviceType(device.features);
+  const deviceType = device.getCurrentDeviceType();
   if (deviceType === EDeviceType.Touch || deviceType === EDeviceType.Pro) {
     // Touch Pro Sign NestedArrays
     const currentVersion = getDeviceFirmwareVersion(device.features).join('.');

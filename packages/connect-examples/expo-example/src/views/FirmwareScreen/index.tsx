@@ -20,7 +20,7 @@ import { FirmwareUpdateEvent } from './FirmwareUpdateEvent';
 import { DeviceFieldContext } from './DeviceFieldContext';
 import { DeviceInfoFieldGroup, DeviceSeFieldGroup } from './DeviceFieldGroup';
 import { ExportDeviceInfo, formatCurrentTime, getDeviceMode } from './ExportDeviceInfo';
-import { getDeviceBasicInfo } from '../../utils/deviceUtils';
+import { getFirmwareDeviceSummary } from '../../utils/deviceUtils';
 import { HardwareInputPinDialogProvider } from '../../provider/HardwareInputPinProvider';
 import { useMedia } from '../../provider/MediaProvider';
 import { selectDeviceAtom } from '../../atoms/deviceAtoms';
@@ -439,7 +439,7 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
     bootloaderVersion,
     boardloaderVersion,
     firmwareVersion,
-  } = getDeviceBasicInfo(features, onekeyFeatures);
+  } = getFirmwareDeviceSummary(features, onekeyFeatures);
   const deviceTypeLowerCase = deviceType.toLowerCase();
 
   const loadOnekeyFeatures = useCallback(async () => {

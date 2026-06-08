@@ -5,11 +5,13 @@ import { UI_REQUEST } from '../constants/ui-request';
 import {
   PROTOCOL_V2_DEVICE_INFO_REQUEST,
   PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST,
-  normalizeProtocolV2Features,
+  PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST,
+  getProtocolV2DeviceInfo,
 } from '../protocols/protocol-v2';
+import { buildProfileFromProtocolV2 } from '../deviceProfile';
 import { getDeviceType } from '../utils';
 import { fixVersion } from '../utils/deviceFeaturesUtils';
-import { buildUnifiedDeviceInfo } from './helpers/deviceInfo';
+import { buildDeviceProfile } from './helpers/deviceInfo';
 import { BaseMethod } from './BaseMethod';
 
 import type {
@@ -18,7 +20,6 @@ import type {
   GetDeviceInfoParams,
 } from '../types/api/getDeviceInfo';
 import type { Features, OnekeyFeatures } from '../types';
-import type { ProtocolV2DeviceInfo } from '@onekeyfe/hd-transport';
 
 const DEVICE_INFO_SCOPES: readonly DeviceInfoScope[] = ['basic', 'versions', 'verify', 'full'];
 
@@ -37,18 +38,12 @@ function normalizeScope(scope: unknown): GetDeviceInfoParams['scope'] {
   );
 }
 
-function shouldReadProtocolV2DeviceInfo(params: GetDeviceInfoParams) {
-  return (
-    params.refresh === true ||
-    params.includeRaw === true ||
-    params.scope === 'verify' ||
-    params.scope === 'full'
-  );
-}
-
 function getProtocolV2DeviceInfoRequest(params: GetDeviceInfoParams) {
   if (params.scope === 'verify' || params.scope === 'full') {
     return PROTOCOL_V2_DEVICE_INFO_REQUEST;
+  }
+  if (params.scope === 'versions') {
+    return PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST;
   }
   return PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST;
 }
@@ -105,30 +100,19 @@ export default class GetDeviceInfo extends BaseMethod<GetDeviceInfoParams> {
   }
 
   private async runProtocolV2() {
-    const sources: DeviceInfoSource[] = ['features'];
-    let { features } = this.device;
-    let protocolV2DeviceInfo: ProtocolV2DeviceInfo | undefined;
-
-    if (shouldReadProtocolV2DeviceInfo(this.params)) {
-      const { message } = await this.device.commands.typedCall(
-        'DeviceGetDeviceInfo',
-        'DeviceInfo',
-        getProtocolV2DeviceInfoRequest(this.params)
-      );
-      protocolV2DeviceInfo = message as unknown as ProtocolV2DeviceInfo;
-      features = normalizeProtocolV2Features(this.device.originalDescriptor, protocolV2DeviceInfo);
-      this.device._updateFeatures(features);
-      sources.push('deviceGetDeviceInfo');
-    }
-
-    return buildUnifiedDeviceInfo({
-      protocol: 'V2',
-      features,
-      protocolV2DeviceInfo,
+    const sources: DeviceInfoSource[] = ['deviceGetDeviceInfo'];
+    const protocolV2DeviceInfo = await getProtocolV2DeviceInfo({
+      commands: this.device.commands,
+      request: getProtocolV2DeviceInfoRequest(this.params),
+    });
+    const profile = buildProfileFromProtocolV2({
+      deviceInfo: protocolV2DeviceInfo,
       sources,
       scope: this.params.scope,
       includeRaw: this.params.includeRaw,
     });
+    this.device.updateProfile?.(profile);
+    return profile;
   }
 
   private async runProtocolV1() {
@@ -149,7 +133,7 @@ export default class GetDeviceInfo extends BaseMethod<GetDeviceInfoParams> {
       sources.push('onekeyFeatures');
     }
 
-    return buildUnifiedDeviceInfo({
+    const profile = buildDeviceProfile({
       protocol: 'V1',
       features,
       onekeyFeatures,
@@ -157,5 +141,7 @@ export default class GetDeviceInfo extends BaseMethod<GetDeviceInfoParams> {
       scope: this.params.scope,
       includeRaw: this.params.includeRaw,
     });
+    this.device.updateProfile?.(profile);
+    return profile;
   }
 }

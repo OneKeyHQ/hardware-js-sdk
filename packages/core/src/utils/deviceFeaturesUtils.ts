@@ -97,7 +97,7 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (
 ) => {
   const { features, commands } = device;
   const locked = features?.unlocked === false;
-  const deviceType = getDeviceType(features);
+  const deviceType = device.getCurrentDeviceType();
 
   const { passphraseState, newSession, unlockedAttachPin } = await getPassphraseState(
     features,
@@ -107,11 +107,15 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (
     }
   );
 
-  const isModeT = deviceType === EDeviceType.Touch || deviceType === EDeviceType.Pro;
+  const isModeT =
+    deviceType === EDeviceType.Touch ||
+    deviceType === EDeviceType.Pro ||
+    deviceType === EDeviceType.Pro2;
 
   // 如果可以获取到 passphraseState，但是设备 features 显示设备未开启 passphrase，需要刷新设备状态
   // if passphraseState can be obtained, but the device features show that the device has not enabled passphrase, the device status needs to be refreshed
-  const needRefreshWithPassphrase = passphraseState && features?.passphrase_protection !== true;
+  const needRefreshWithPassphrase =
+    passphraseState && device.getCurrentPassphraseProtection() !== true;
   // 如果 Touch/Pro 在之前是锁定状态，刷新设备状态
   // if Touch/Pro was locked before, refresh the device state
   const needRefreshWithLocked = isModeT && locked;
@@ -122,11 +126,12 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (
   }
 
   // Attach to pin try to fix internal state
-  if (features?.device_id) {
+  const deviceId = device.getCurrentDeviceId();
+  if (deviceId) {
     device.updateInternalState(
-      device.features?.passphrase_protection ?? false,
+      device.getCurrentPassphraseProtection() ?? false,
       passphraseState,
-      device.features?.device_id ?? '',
+      deviceId,
       newSession,
       device.features?.session_id
     );

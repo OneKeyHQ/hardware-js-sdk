@@ -171,11 +171,11 @@ export type {
   DeviceInfoScope,
   DeviceInfoSource,
   DeviceInfoStatus,
+  DeviceProfile,
   GetDeviceInfoParams,
-  UnifiedDeviceInfo,
-  UnifiedDeviceInfoRaw,
-  UnifiedDeviceInfoVerify,
-  UnifiedDeviceInfoVersions,
+  DeviceProfileRaw,
+  DeviceProfileVerify,
+  DeviceProfileVersions,
 } from './getDeviceInfo';
 export type { GetPassphraseStateParams, GetPassphraseStatePayload } from './getPassphraseState';
 

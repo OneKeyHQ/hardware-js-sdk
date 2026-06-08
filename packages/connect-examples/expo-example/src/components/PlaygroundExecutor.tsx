@@ -7,10 +7,13 @@ import { useDevice } from '../provider/DeviceProvider';
 import { useCommonParams } from '../provider/CommonParamsProvider';
 import { Button } from './ui/Button';
 
+import type { CommonParams } from '@onekeyfe/hd-core';
+
 export type MethodPayload = {
   method: string;
   noConnIdReq?: boolean;
   noDeviceIdReq?: boolean;
+  connectProtocol?: CommonParams['connectProtocol'];
 };
 
 interface PlaygroundExecutorProps {
@@ -45,6 +48,7 @@ const PlaygroundExecutor: React.FC<PlaygroundExecutorProps> = ({
         const rawParams = await onAcquireParams();
         requestParams = {
           ...commonParams,
+          connectProtocol: methodPayload.connectProtocol ?? commonParams.connectProtocol,
           retryCount: 1,
           ...rawParams,
         };
@@ -62,6 +66,7 @@ const PlaygroundExecutor: React.FC<PlaygroundExecutorProps> = ({
       } catch (error) {
         requestParams = {
           ...commonParams,
+          connectProtocol: methodPayload.connectProtocol ?? commonParams.connectProtocol,
           retryCount: 1,
         };
       }
@@ -70,8 +75,8 @@ const PlaygroundExecutor: React.FC<PlaygroundExecutorProps> = ({
 
       let res;
       if (methodPayload.noConnIdReq) {
-        console.info('[REQUEST] call sdk', { method });
-        res = await (sdk as any)[method]();
+        console.info('[REQUEST] call sdk', { method, params: requestParams });
+        res = await (sdk as any)[method](requestParams);
       } else if (methodPayload.noDeviceIdReq) {
         // if (!selectedDevice) return intl.formatMessage({ id: 'tip__need_connect_device_first' });
         console.info('[REQUEST] call sdk', { method, connectId, params: requestParams });

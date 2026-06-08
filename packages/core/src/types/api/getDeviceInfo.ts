@@ -1,7 +1,7 @@
 import type { CommonParams, Response } from '../params';
 import type { Features, IDeviceType, OnekeyFeatures } from '../device';
 import type { EFirmwareType } from '@onekeyfe/hd-shared';
-import type { ProtocolV2DeviceInfo } from '@onekeyfe/hd-transport';
+import type { ProtocolV2DeviceInfo } from '../../protocols/protocol-v2/features';
 
 export type DeviceInfoProtocol = 'V1' | 'V2' | 'unknown';
 
@@ -24,11 +24,12 @@ export type DeviceInfoStatus = {
   unlocked: boolean | null;
   passphraseProtection: boolean | null;
   backupRequired: boolean | null;
+  noBackup: boolean | null;
   language: string | null;
   bleEnabled?: boolean | null;
 };
 
-export type UnifiedDeviceInfoVersions = {
+export type DeviceProfileVersions = {
   firmware: string | null;
   bootloader: string | null;
   board: string | null;
@@ -43,7 +44,7 @@ export type UnifiedDeviceInfoVersions = {
   se04Boot?: string | null;
 };
 
-export type UnifiedDeviceInfoVerify = {
+export type DeviceProfileVerify = {
   firmwareBuildId?: string;
   firmwareHash?: string;
   bootloaderBuildId?: string;
@@ -70,13 +71,13 @@ export type UnifiedDeviceInfoVerify = {
   se04BootHash?: string;
 };
 
-export type UnifiedDeviceInfoRaw = {
+export type DeviceProfileRaw = {
   features?: Features;
   onekeyFeatures?: OnekeyFeatures;
   protocolV2DeviceInfo?: ProtocolV2DeviceInfo;
 };
 
-export type UnifiedDeviceInfo = {
+export type DeviceProfile = {
   protocol: DeviceInfoProtocol;
   sources: DeviceInfoSource[];
   deviceType: IDeviceType;
@@ -86,12 +87,12 @@ export type UnifiedDeviceInfo = {
   label: string | null;
   bleName: string | null;
   status: DeviceInfoStatus;
-  versions: UnifiedDeviceInfoVersions;
-  verify?: UnifiedDeviceInfoVerify;
-  raw?: UnifiedDeviceInfoRaw;
+  versions: DeviceProfileVersions;
+  verify?: DeviceProfileVerify;
+  raw?: DeviceProfileRaw;
 };
 
 export declare function getDeviceInfo(
   connectId?: string,
   params?: CommonParams & GetDeviceInfoParams
-): Response<UnifiedDeviceInfo>;
+): Response<DeviceProfile>;

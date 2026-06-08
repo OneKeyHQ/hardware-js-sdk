@@ -7,7 +7,7 @@ import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { DeviceModelToTypes } from '../../types';
-import { getDeviceFirmwareVersion, getDeviceType, getMethodVersionRange } from '../../utils';
+import { getDeviceFirmwareVersion, getMethodVersionRange } from '../../utils';
 import { formatAnyHex, stripHexStartZeroes } from '../helpers/hexUtils';
 import { cutString } from '../helpers/stringUtils';
 
@@ -170,7 +170,7 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
     data: string
   ): Promise<TonTxAck | TonSignedMessageResponse> => {
     if (!request.init_data_length) {
-      const deviceType = getDeviceType(this.device.features);
+      const deviceType = this.device.getCurrentDeviceType();
       const hasClassic = DeviceModelToTypes.model_classic1s.includes(deviceType);
       // use signing_message_repr sign, not exists signning_message, skip validate
       const hasSigningMessageRepr = request.signning_message == null;

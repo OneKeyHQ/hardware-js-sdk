@@ -729,7 +729,7 @@ function initDevice(method: BaseMethod) {
   let device: Device | typeof undefined;
   const allDevices = _deviceList.allDevices();
 
-  if (method.payload?.detectBootloaderDevice && allDevices.some(d => d.features?.bootloader_mode)) {
+  if (method.payload?.detectBootloaderDevice && allDevices.some(d => d.isBootloader())) {
     throw ERRORS.TypedError(HardwareErrorCode.DeviceDetectInBootloaderMode);
   }
 
@@ -1113,7 +1113,11 @@ export const cancel = (context: CoreContext, connectId?: string) => {
 const checkPassphraseEnableState = (method: BaseMethod, features?: Features) => {
   if (!method.useDevicePassphraseState) return;
 
-  if (features?.passphrase_protection === true) {
+  const passphraseProtection = method.device
+    ? method.device.getCurrentPassphraseProtection()
+    : features?.passphrase_protection;
+
+  if (passphraseProtection === true) {
     const hasNoPassphraseState =
       method.payload.passphraseState == null || method.payload.passphraseState === '';
     const shouldRequirePassphrase =
@@ -1125,7 +1129,7 @@ const checkPassphraseEnableState = (method: BaseMethod, features?: Features) => 
     }
   }
 
-  if (features?.passphrase_protection === false && method.payload.passphraseState) {
+  if (passphraseProtection === false && method.payload.passphraseState) {
     DevicePool.clearDeviceCache(method.payload.connectId);
     throw ERRORS.TypedError(HardwareErrorCode.DeviceNotOpenedPassphrase);
   }

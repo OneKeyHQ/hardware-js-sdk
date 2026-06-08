@@ -10,6 +10,7 @@ import {
 } from '../utils/hardwareInstance';
 import { useHardwareStore } from '../store/hardwareStore';
 import { useDeviceStore } from '../store/deviceStore';
+import { useEventTestStore } from '../store/eventTestStore';
 import { methodSupportsCommonParameters } from '../utils/constants';
 import { previewHardwareParams } from './previewHardwareParams';
 import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
@@ -233,10 +234,16 @@ export async function submitPin(pin: string | null): Promise<void> {
 
   try {
     const sdkInstance = await getSDKInstance();
-    sdkInstance.uiResponse({
+    const response = {
       type: UI_RESPONSE.RECEIVE_PIN,
       payload: pin || '@@ONEKEY_INPUT_PIN_IN_DEVICE',
+    };
+    useEventTestStore.getState().recordEvent({
+      source: 'UI_EVENT',
+      type: response.type,
+      payload: response.payload,
     });
+    sdkInstance.uiResponse(response);
     logResponse('PIN response submitted successfully');
   } catch (error) {
     logError('Failed to submit PIN response', { error });
@@ -254,14 +261,20 @@ export async function submitPassphrase(
 
   try {
     const sdkInstance = await getSDKInstance();
-    sdkInstance.uiResponse({
+    const response = {
       type: UI_RESPONSE.RECEIVE_PASSPHRASE,
       payload: {
         value: passphrase || '',
         passphraseOnDevice: onDevice,
         save: save,
       },
+    };
+    useEventTestStore.getState().recordEvent({
+      source: 'UI_EVENT',
+      type: response.type,
+      payload: response.payload,
     });
+    sdkInstance.uiResponse(response);
     logResponse('Passphrase response submitted successfully');
   } catch (error) {
     logError('Failed to submit passphrase response', { error });

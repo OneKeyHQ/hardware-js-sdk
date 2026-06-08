@@ -2,7 +2,7 @@ import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import TransportManager from '../data-manager/TransportManager';
 import DataManager from '../data-manager/DataManager';
-import { LoggerNames, getDeviceType, getLogger, patchFeatures } from '../utils';
+import { LoggerNames, getLogger, patchFeatures } from '../utils';
 import { DEVICE, type PassphraseRequestPayload } from '../events';
 import { DeviceModelToTypes } from '../types';
 import {
@@ -601,7 +601,7 @@ export class DeviceCommands {
     }
 
     if (res.type === 'ButtonRequest') {
-      const deviceType = getDeviceType(this.device.features);
+      const deviceType = this.device.getCurrentDeviceType();
       if (DeviceModelToTypes.model_mini.includes(deviceType)) {
         this.device.setCancelableAction(() => this.cancelDeviceOnOneKeyDevice());
       } else {

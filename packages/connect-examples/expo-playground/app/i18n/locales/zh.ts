@@ -34,6 +34,7 @@ export const zh = {
       pro2Onboarding: 'Pro2 引导流程',
       methodBatchTest: '链方法批量测试',
       deviceInfoTimingTest: '设备信息耗时测试',
+      eventTest: '事件测试',
       navigation: '导航',
       current: '当前',
       toggleTheme: '切换主题',

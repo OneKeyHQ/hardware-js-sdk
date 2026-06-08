@@ -15,7 +15,7 @@ export default class GetFeatures extends BaseMethod {
   }
 
   run() {
-    if (this.payload?.detectBootloaderDevice && this.device.features?.bootloader_mode) {
+    if (this.payload?.detectBootloaderDevice && this.device.isBootloader()) {
       return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceDetectInBootloaderMode));
     }
     return Promise.resolve(this.device.features);

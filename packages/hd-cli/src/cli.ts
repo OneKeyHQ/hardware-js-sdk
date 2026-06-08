@@ -14,6 +14,8 @@ import {
   resolveSignTransaction,
 } from './chains';
 
+import { EDeviceType } from '@onekeyfe/hd-shared';
+import { getDeviceType } from '@onekeyfe/hd-core';
 import type {
   EthereumSignTypedDataMessage,
   EthereumSignTypedDataTypes,
@@ -783,7 +785,7 @@ sessionCmd
       const searchResult = await sdk.searchDevices();
       const device = // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
         (searchResult?.payload as any)?.[0];
-      const deviceId = device?.features?.device_id || device?.deviceId;
+      const deviceId = device?.deviceId || device?.features?.device_id;
       if (deviceId) {
         await clearSessionFromKeychain(deviceId);
       }
@@ -928,7 +930,7 @@ async function prepareSession(
   // getFeatures failures here are non-fatal — we fall through to Step 3
   // which will fail with a clearer error if the device is truly unreachable.
   let deviceId = device.features?.device_id || device.deviceId || '';
-  let deviceType = device.features?.onekey_device_type;
+  let deviceType = getDeviceType(device.features as Features | undefined);
   let unlocked = device.features?.unlocked;
   let passphraseProtection = device.features?.passphrase_protection;
 
@@ -937,7 +939,7 @@ async function prepareSession(
       const featResult = await sdk.getFeatures(connectId);
       if (featResult?.success && featResult.payload) {
         deviceId = featResult.payload.device_id || deviceId;
-        deviceType = featResult.payload.onekey_device_type || deviceType;
+        deviceType = getDeviceType(featResult.payload) || deviceType;
         unlocked = featResult.payload.unlocked;
         passphraseProtection = featResult.payload.passphrase_protection;
       }
@@ -965,7 +967,7 @@ async function prepareSession(
   }
 
   // ── Step 4: Check passphrase protection ──────────────────────────
-  if (passphraseProtection === false && deviceType !== 'pro2' && deviceType !== 'PRO2') {
+  if (passphraseProtection === false && deviceType !== EDeviceType.Pro2) {
     return undefined;
   }
 

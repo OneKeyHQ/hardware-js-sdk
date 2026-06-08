@@ -39,6 +39,7 @@ import Pro2UpdatePage from './routes/pro2-update';
 import Pro2OnboardingPage from './routes/pro2-onboarding';
 import MethodBatchTestPage from './routes/method-batch-test';
 import DeviceInfoTimingTestPage from './routes/device-info-timing-test';
+import EventTestPage from './routes/event-test';
 
 // Import styles
 import './tailwind.css';
@@ -179,6 +180,10 @@ const router = createHashRouter(
         {
           path: 'device-info-timing-test',
           element: <DeviceInfoTimingTestPage />,
+        },
+        {
+          path: 'event-test',
+          element: <EventTestPage />,
         },
       ],
     },

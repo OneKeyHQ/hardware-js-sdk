@@ -9,7 +9,7 @@ import type { Features, OnekeyFeatures } from '@onekeyfe/hd-transport';
 
 export const getReleaseUrl = ({ features }: { features?: Features }) => {
   const deviceType = getDeviceType(features)?.toUpperCase() || 'UNKNOWN';
-  // const { firmwareUrl, bleVersion } = getDeviceBasicInfo(features, onekeyFeatures);
+  // const { firmwareUrl, bleVersion } = getFirmwareDeviceSummary(features, onekeyFeatures);
   // classic 类型（包括classci 1s, mini, classic），不需要更新bootloader
   const firmwareVersion = getDeviceFirmwareVersion(features).join('.');
   const bootloaderVersion = `${getDeviceBootloaderVersion(features)?.join('.')}`;
@@ -45,7 +45,7 @@ export const getReleaseUrl = ({ features }: { features?: Features }) => {
   }
 };
 
-export function getDeviceBasicInfo(
+export function getFirmwareDeviceSummary(
   features: Features | undefined,
   onekeyFeatures: OnekeyFeatures | undefined
 ) {
@@ -99,7 +99,7 @@ export function getDeviceInfo(
     bootloaderVersion,
     boardloaderVersion,
     firmwareVersion,
-  } = getDeviceBasicInfo(features, onekeyFeatures);
+  } = getFirmwareDeviceSummary(features, onekeyFeatures);
 
   const firmwareHash = onekeyFeatures?.onekey_firmware_hash || features?.onekey_firmware_hash;
 

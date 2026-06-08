@@ -3,11 +3,9 @@ import { blake2s } from '@noble/hashes/blake2s';
 import JSZip from 'jszip';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
-import { getDeviceFirmwareVersion } from '../../utils/deviceVersionUtils';
 import {
   LoggerNames,
   getDeviceBootloaderVersion,
-  getDeviceType,
   getLogger,
   wait,
 } from '../../utils';
@@ -107,7 +105,7 @@ export const uploadFirmware = async (
   },
   isUpdateBootloader?: boolean
 ) => {
-  const deviceType = getDeviceType(device.features);
+  const deviceType = device.getCurrentDeviceType();
   if (DeviceModelToTypes.model_mini.includes(deviceType)) {
     postConfirmationMessage(device);
     postProgressTip(device, 'ConfirmOnDevice', postMessage);
@@ -429,7 +427,7 @@ const emmcFileWriteWithRetry = async (
         const deviceDiff = await device.deviceConnector?.enumerate();
         const devicesDescriptor = deviceDiff?.descriptors ?? [];
         const { deviceList } = await DevicePool.getDevices(devicesDescriptor, undefined);
-        if (deviceList.length === 1 && deviceList[0]?.features?.bootloader_mode) {
+        if (deviceList.length === 1 && deviceList[0]?.isBootloader()) {
           device.updateFromCache(deviceList[0]);
           await device.acquire();
           device.getCommands().mainId = device.mainId ?? '';

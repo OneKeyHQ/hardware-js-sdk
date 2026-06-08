@@ -7,7 +7,7 @@ import {
 import { supportBatchPublicKey } from '../../utils/deviceFeaturesUtils';
 import { isEqualBip44CoinType } from './pathUtils';
 import { splitArray } from '../../utils/arrayUtils';
-import { getDeviceType, getFirmwareType } from '../../utils';
+import { getFirmwareType } from '../../utils';
 import { DeviceModelToTypes } from '../../types';
 
 import type { EcdsaPublicKeys, Path } from '@onekeyfe/hd-transport';
@@ -39,7 +39,7 @@ export async function batchGetPublickeys(
   }
 
   let batchSize = 10;
-  const deviceType = getDeviceType(device.features);
+  const deviceType = device.getCurrentDeviceType();
   if (DeviceModelToTypes.model_mini.includes(deviceType)) {
     batchSize = 10;
   } else if (DeviceModelToTypes.model_touch.includes(deviceType)) {

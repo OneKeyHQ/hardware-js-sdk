@@ -13,7 +13,6 @@ import { getBleFirmwareReleaseInfo, getFirmwareReleaseInfo } from './firmware/re
 import {
   LoggerNames,
   getDeviceFirmwareVersion,
-  getDeviceType,
   getFirmwareType,
   getLogger,
   getMethodVersionRange,
@@ -302,7 +301,7 @@ export abstract class BaseMethod<Params = undefined> {
       return false;
     }
 
-    const deviceType = getDeviceType(this.device.features);
+    const deviceType = this.device.getCurrentDeviceType();
     if (!DeviceModelToTypes.model_touch.includes(deviceType)) {
       return false;
     }

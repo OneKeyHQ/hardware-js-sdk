@@ -7,7 +7,7 @@ import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
-import { getDeviceFirmwareVersion, getDeviceType } from '../../utils';
+import { getDeviceFirmwareVersion } from '../../utils';
 import { DeviceModelToTypes } from '../../types';
 
 import type { SuiSignTx as HardwareSuiSignTx, SuiSignedTx } from '@onekeyfe/hd-transport';
@@ -55,12 +55,12 @@ export default class SuiSignTransaction extends BaseMethod<SuiSignTx> {
   supportChunkTransfer() {
     if (
       this.device.originalDescriptor?.protocolType === 'V2' ||
-      getDeviceType(this.device.features) === EDeviceType.Pro2
+      this.device.getCurrentDeviceType() === EDeviceType.Pro2
     ) {
       return true;
     }
 
-    const deviceType = getDeviceType(this.device.features);
+    const deviceType = this.device.getCurrentDeviceType();
     const deviceFirmwareVersion = getDeviceFirmwareVersion(this.device.features).join('.');
 
     if (DeviceModelToTypes.model_mini.includes(deviceType)) {

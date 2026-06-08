@@ -2,7 +2,6 @@ import { EDeviceType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { UI_REQUEST } from '../constants/ui-request';
 import { getPassphraseStateWithRefreshDeviceInfo } from '../utils/deviceFeaturesUtils';
-import { getDeviceType } from '../utils/deviceInfoUtils';
 import { BaseMethod } from './BaseMethod';
 
 export default class GetPassphraseState extends BaseMethod {
@@ -23,8 +22,8 @@ export default class GetPassphraseState extends BaseMethod {
     });
 
     const { features } = this.device;
-    const passphraseProtection = features?.passphrase_protection ?? null;
-    const deviceType = getDeviceType(features);
+    const passphraseProtection = this.device.getCurrentPassphraseProtection() ?? null;
+    const deviceType = this.device.getCurrentDeviceType();
     const isProSeries = deviceType === EDeviceType.Pro || deviceType === EDeviceType.Pro2;
 
     // refresh device info

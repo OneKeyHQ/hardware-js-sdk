@@ -9,7 +9,7 @@ import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex, parseChainId, stripHexStartZeroes } from '../helpers/hexUtils';
-import { getDeviceFirmwareVersion, getDeviceType } from '../../utils';
+import { getDeviceFirmwareVersion } from '../../utils';
 import { existCapability } from '../../utils/capabilitieUtils';
 import {
   DeviceModelToTypes,
@@ -349,7 +349,7 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
     let biggerLimit = 1024; // 1k
 
     const currentVersion = getDeviceFirmwareVersion(this.device.features).join('.');
-    const currentDeviceType = getDeviceType(this.device.features);
+    const currentDeviceType = this.device.getCurrentDeviceType();
     const supportBiggerDataVersion = '4.4.0';
 
     const supportBiggerData =
@@ -532,7 +532,7 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
   }
 
   supportSignTyped() {
-    const deviceType = getDeviceType(this.device.features);
+    const deviceType = this.device.getCurrentDeviceType();
     if (DeviceModelToTypes.model_mini.includes(deviceType)) {
       const currentVersion = getDeviceFirmwareVersion(this.device.features).join('.');
       const supportSignTypedVersion = '2.2.0';
@@ -564,7 +564,7 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
     // For Classic / Mini:
     // - If parsed typed-data capability is missing, keep using blind-sign.
     // - For Mini with parsed capability, add extra format checks before parsed signing.
-    const deviceType = getDeviceType(this.device.features);
+    const deviceType = this.device.getCurrentDeviceType();
     if (
       DeviceModelToTypes.model_mini.includes(deviceType) &&
       (!supportEip712OnClassic || this.hasClassicFamilyTypedDataFormatViolations(this.params.data))

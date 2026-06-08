@@ -234,8 +234,8 @@ const ApiPayload = () => {
   return (
     <Stack>
       <HandleSDKEvents />
-      <DeviceProvider>
-        <CommonParamsProvider>
+      <CommonParamsProvider>
+        <DeviceProvider>
           <CommonParamsView />
           <ExpandModeProvider>
             <PanelView title="API Payload" renderRight={renderPayloadTabs}>
@@ -250,8 +250,8 @@ const ApiPayload = () => {
           </ExpandModeProvider>
           <UploadScreen />
           <ChangeScreenComponent />
-        </CommonParamsProvider>
-      </DeviceProvider>
+        </DeviceProvider>
+      </CommonParamsProvider>
     </Stack>
   );
 };
