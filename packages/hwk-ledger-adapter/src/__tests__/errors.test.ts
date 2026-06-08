@@ -4,6 +4,7 @@ import {
   ERROR_TAG,
   isDeviceDisconnectedError,
   isDeviceLockedError,
+  isNetworkError,
   isTimeoutError,
   isUserRejectedError,
   isWrongAppError,
@@ -22,6 +23,7 @@ describe('error detector shared guards', () => {
     isWrongAppError,
     isDeviceDisconnectedError,
     isTimeoutError,
+    isNetworkError,
   ];
 
   it.each(detectors)('%o should return false for null/undefined', fn => {
@@ -173,6 +175,36 @@ describe('isTimeoutError', () => {
 });
 
 // ---------------------------------------------------------------------------
+// isNetworkError
+// ---------------------------------------------------------------------------
+
+describe('isNetworkError', () => {
+  it('should detect _tag WebSocketConnectionError (secure channel)', () => {
+    expect(isNetworkError({ _tag: 'WebSocketConnectionError' })).toBe(true);
+  });
+
+  it('should detect _tag FetchError (manager-api HTTP)', () => {
+    expect(isNetworkError({ _tag: 'FetchError' })).toBe(true);
+  });
+
+  it('should detect _tag InvalidGetFirmwareMetadataResponseError (manager-api metadata)', () => {
+    expect(isNetworkError({ _tag: 'InvalidGetFirmwareMetadataResponseError' })).toBe(true);
+  });
+
+  it('should detect in error chain (originalError)', () => {
+    expect(isNetworkError({ originalError: { _tag: 'WebSocketConnectionError' } })).toBe(true);
+  });
+
+  it('should detect in error chain (_tag + .error)', () => {
+    expect(isNetworkError({ _tag: 'SomeWrapper', error: { _tag: 'FetchError' } })).toBe(true);
+  });
+
+  it('should NOT match unrelated device errors', () => {
+    expect(isNetworkError({ _tag: 'DeviceLockedError' })).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // mapLedgerError
 // ---------------------------------------------------------------------------
 
@@ -219,6 +251,25 @@ describe('mapLedgerError', () => {
     const result = mapLedgerError({ _tag: 'DeviceNotRecognizedError', message: 'gone' });
     expect(result.code).toBe(HardwareErrorCode.DeviceDisconnected);
     expect(result.message).toContain('reconnect');
+  });
+
+  it('should map WebSocketConnectionError to NetworkError', () => {
+    const result = mapLedgerError({ _tag: 'WebSocketConnectionError', message: 'connect failed' });
+    expect(result.code).toBe(HardwareErrorCode.NetworkError);
+    expect(result.message).toContain('connection');
+  });
+
+  it('should map manager-api FetchError to NetworkError', () => {
+    const result = mapLedgerError({ _tag: 'FetchError', message: 'fetch failed' });
+    expect(result.code).toBe(HardwareErrorCode.NetworkError);
+  });
+
+  it('should map InvalidGetFirmwareMetadataResponseError to NetworkError', () => {
+    const result = mapLedgerError({
+      _tag: 'InvalidGetFirmwareMetadataResponseError',
+      message: 'Invalid Firmware Metadata response error.',
+    });
+    expect(result.code).toBe(HardwareErrorCode.NetworkError);
   });
 
   it('should map BLE not-advertising to DeviceNotFound', () => {
@@ -306,6 +357,26 @@ describe('mapLedgerError', () => {
     expect(result.message).toContain('Blind signing');
   });
 
+  it('should map Ethereum app numeric APDU code 0x6a80 to EvmBlindSigningRequired with blind fallback step', () => {
+    const result = mapLedgerError({
+      _tag: ERROR_TAG.EthAppCommand,
+      code: 0x6a80,
+      message: 'Invalid data',
+      _lastStep: 'signer.eth.steps.blindSignTransactionFallback',
+    });
+    expect(result.code).toBe(HardwareErrorCode.EvmBlindSigningRequired);
+  });
+
+  it('should map Ethereum app 0x6a80 to EvmBlindSigningRequired with blind signing detection step', () => {
+    const result = mapLedgerError({
+      _tag: ERROR_TAG.EthAppCommand,
+      errorCode: '6a80',
+      message: 'Invalid data',
+      _lastStep: 'signer.eth.steps.detectBlindSigning',
+    });
+    expect(result.code).toBe(HardwareErrorCode.EvmBlindSigningRequired);
+  });
+
   it('should map Ethereum app 0x6a80 to EvmBlindSigningRequired when step history includes blind fallback', () => {
     const result = mapLedgerError({
       _tag: ERROR_TAG.EthAppCommand,
@@ -319,6 +390,35 @@ describe('mapLedgerError', () => {
       ],
     });
     expect(result.code).toBe(HardwareErrorCode.EvmBlindSigningRequired);
+  });
+
+  it('should map typed data invalid argument during blind sign fallback to EvmBlindSigningRequired', () => {
+    const result = mapLedgerError({
+      code: 'INVALID_ARGUMENT',
+      message:
+        'ambiguous primary types or unused types: "Group", "Mail" (argument="types", code=INVALID_ARGUMENT, version=6.14.1)',
+      _lastStep: 'signer.eth.steps.blindSignTransactionFallback',
+    });
+    expect(result.code).toBe(HardwareErrorCode.EvmBlindSigningRequired);
+  });
+
+  it('should map typed data invalid argument during blind signing detection to EvmBlindSigningRequired', () => {
+    const result = mapLedgerError({
+      code: 'INVALID_ARGUMENT',
+      message:
+        'ambiguous primary types or unused types: "Group", "Mail" (argument="types", code=INVALID_ARGUMENT, version=6.14.1)',
+      _lastStep: 'signer.eth.steps.detectBlindSigning',
+    });
+    expect(result.code).toBe(HardwareErrorCode.EvmBlindSigningRequired);
+  });
+
+  it('should not map typed data invalid argument to blind signing without detection step', () => {
+    const result = mapLedgerError({
+      code: 'INVALID_ARGUMENT',
+      message:
+        'ambiguous primary types or unused types: "Group", "Mail" (argument="types", code=INVALID_ARGUMENT, version=6.14.1)',
+    });
+    expect(result.code).toBe(HardwareErrorCode.UnknownError);
   });
 
   it('should map Tron 0x6a8d (hex) to TronCustomContractRequired', () => {

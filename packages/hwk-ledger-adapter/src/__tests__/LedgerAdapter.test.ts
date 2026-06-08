@@ -8,6 +8,7 @@ import {
 } from '@onekeyfe/hwk-adapter-core';
 
 import { LedgerAdapter } from '../adapter/LedgerAdapter';
+import { ERROR_TAG } from '../errors';
 
 import type {
   ConnectorDevice,
@@ -1581,6 +1582,12 @@ describe('LedgerAdapter', () => {
   });
 
   describe('autoInstallApp (commonParams)', () => {
+    const evmFingerprintAddress = '0xabcd000000000000000000000000000000000000';
+    const evmFingerprint = deriveDeviceFingerprint(evmFingerprintAddress);
+    const solFingerprintAddress = 'SoLExpectedFingerprintAddress';
+    const solFingerprint = deriveDeviceFingerprint(solFingerprintAddress);
+    const btcFingerprint = 'deadbeef';
+
     function makeAppNotInstalledErr(appName = 'Cardano'): Error {
       return Object.assign(new Error(`Failed to open "${appName}"`), {
         _tag: 'OpenAppCommandError',
@@ -1622,7 +1629,7 @@ describe('LedgerAdapter', () => {
       expect(methodsCalled()).toEqual(['evmGetAddress', 'installApp', 'evmGetAddress']);
     });
 
-    it('surfaces the failure without installing when the user declines', async () => {
+    it('surfaces UserAborted without installing when the user declines', async () => {
       connector.callImpl.mockRejectedValueOnce(makeAppNotInstalledErr('Cardano'));
       await adapter.connectDevice('dev-1');
       adapter.on(UI_REQUEST.REQUEST_INSTALL_APP, () => {
@@ -1641,7 +1648,7 @@ describe('LedgerAdapter', () => {
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.payload.code).toBe(HardwareErrorCode.AppNotInstalled);
+        expect(result.payload.code).toBe(HardwareErrorCode.UserAborted);
       }
       expect(methodsCalled()).not.toContain('installApp');
     });
@@ -1659,6 +1666,499 @@ describe('LedgerAdapter', () => {
       expect(onInstall).not.toHaveBeenCalled();
       expect(result.success).toBe(false);
       expect(methodsCalled()).not.toContain('installApp');
+    });
+
+    it('allNetworkGetAddress returns item failures when install runs out of memory', async () => {
+      connector.callImpl
+        .mockResolvedValueOnce({ address: evmFingerprintAddress })
+        .mockRejectedValueOnce(makeAppNotInstalledErr('Ethereum'))
+        .mockRejectedValueOnce(
+          Object.assign(new Error('Not enough space'), {
+            _tag: 'OutOfMemoryDAError',
+          })
+        )
+        .mockResolvedValueOnce({ address: solFingerprintAddress })
+        .mockRejectedValueOnce(makeAppNotInstalledErr('Solana'));
+
+      await adapter.connectDevice('dev-1');
+      const onInstall = jest.fn(() => {
+        adapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_INSTALL_APP,
+          payload: { confirmed: true },
+        });
+      });
+      adapter.on(UI_REQUEST.REQUEST_INSTALL_APP, onInstall);
+
+      const result = await adapter.allNetworkGetAddress('dev-1', '', {
+        autoInstallApp: true,
+        bundle: [
+          {
+            network: 'evm',
+            methodName: 'evmGetAddress',
+            path: "m/44'/60'/0'/0/0",
+            chainId: 1,
+            deviceId: evmFingerprint,
+          },
+          {
+            network: 'sol',
+            methodName: 'solGetAddress',
+            path: "m/44'/501'/0'/0'",
+            deviceId: solFingerprint,
+          },
+        ],
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.payload).toHaveLength(2);
+        expect(result.payload[0].success).toBe(false);
+        expect(result.payload[0].payload?.code).toBe(HardwareErrorCode.DeviceOutOfMemory);
+        expect(result.payload[1].success).toBe(false);
+        expect(result.payload[1].payload?.code).toBe(HardwareErrorCode.DeviceOutOfMemory);
+      }
+      expect(onInstall).toHaveBeenCalledTimes(1);
+      expect(methodsCalled()).toEqual([
+        'evmGetAddress',
+        'evmGetAddress',
+        'installApp',
+        'solGetAddress',
+        'solGetAddress',
+      ]);
+    });
+
+    it('allNetworkGetAddress returns item UserAborted when the user declines app installation', async () => {
+      connector.callImpl
+        .mockResolvedValueOnce({ masterFingerprint: btcFingerprint })
+        .mockRejectedValueOnce(makeAppNotInstalledErr('Bitcoin'))
+        .mockResolvedValueOnce({ address: evmFingerprintAddress })
+        .mockResolvedValueOnce({ address: '0xABCD', path: "m/44'/60'/0'/0/0" });
+
+      await adapter.connectDevice('dev-1');
+      const onInstall = jest.fn(() => {
+        adapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_INSTALL_APP,
+          payload: { confirmed: false },
+        });
+      });
+      adapter.on(UI_REQUEST.REQUEST_INSTALL_APP, onInstall);
+
+      const result = await adapter.allNetworkGetAddress('dev-1', '', {
+        autoInstallApp: true,
+        bundle: [
+          {
+            network: 'btc',
+            methodName: 'btcGetAddress',
+            path: "m/49'/0'/0'/0/0",
+            deviceId: btcFingerprint,
+          },
+          {
+            network: 'evm',
+            methodName: 'evmGetAddress',
+            path: "m/44'/60'/0'/0/0",
+            chainId: 1,
+            deviceId: evmFingerprint,
+          },
+        ],
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.payload).toHaveLength(2);
+        expect(result.payload[0].success).toBe(false);
+        expect(result.payload[0].payload?.code).toBe(HardwareErrorCode.UserAborted);
+        expect(result.payload[1].success).toBe(true);
+      }
+      expect(onInstall).toHaveBeenCalledTimes(1);
+      expect(methodsCalled()).toEqual([
+        'btcGetMasterFingerprint',
+        'btcGetAddress',
+        'evmGetAddress',
+        'evmGetAddress',
+      ]);
+    });
+
+    it('allNetworkGetAddress only prompts once per app when the user keeps declining same-network items', async () => {
+      connector.callImpl
+        .mockResolvedValueOnce({ masterFingerprint: btcFingerprint })
+        .mockRejectedValueOnce(makeAppNotInstalledErr('Bitcoin'))
+        .mockRejectedValueOnce(makeAppNotInstalledErr('Bitcoin'))
+        .mockRejectedValueOnce(makeAppNotInstalledErr('Bitcoin'))
+        .mockRejectedValueOnce(makeAppNotInstalledErr('Bitcoin'))
+        .mockResolvedValueOnce({ address: evmFingerprintAddress })
+        .mockResolvedValueOnce({ address: '0xABCD', path: "m/44'/60'/0'/0/0" });
+
+      await adapter.connectDevice('dev-1');
+      const onInstall = jest.fn(() => {
+        adapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_INSTALL_APP,
+          payload: { confirmed: false },
+        });
+      });
+      adapter.on(UI_REQUEST.REQUEST_INSTALL_APP, onInstall);
+
+      const result = await adapter.allNetworkGetAddress('dev-1', '', {
+        autoInstallApp: true,
+        bundle: [
+          {
+            network: 'btc',
+            methodName: 'btcGetAddress',
+            path: "m/44'/0'/0'/0/0",
+            deviceId: btcFingerprint,
+          },
+          {
+            network: 'btc',
+            methodName: 'btcGetAddress',
+            path: "m/49'/0'/0'/0/0",
+            deviceId: btcFingerprint,
+          },
+          {
+            network: 'btc',
+            methodName: 'btcGetAddress',
+            path: "m/84'/0'/0'/0/0",
+            deviceId: btcFingerprint,
+          },
+          {
+            network: 'btc',
+            methodName: 'btcGetAddress',
+            path: "m/86'/0'/0'/0/0",
+            deviceId: btcFingerprint,
+          },
+          {
+            network: 'evm',
+            methodName: 'evmGetAddress',
+            path: "m/44'/60'/0'/0/0",
+            chainId: 1,
+            deviceId: evmFingerprint,
+          },
+        ],
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.payload).toHaveLength(5);
+        for (let i = 0; i < 4; i += 1) {
+          expect(result.payload[i].success).toBe(false);
+          expect(result.payload[i].payload?.code).toBe(HardwareErrorCode.UserAborted);
+        }
+        expect(result.payload[4].success).toBe(true);
+      }
+      expect(onInstall).toHaveBeenCalledTimes(1);
+      // Items 2-4 are short-circuited at the fingerprint pre-check (which also
+      // hits the Bitcoin app) — the declined-app cache fires there, so the
+      // subsequent btcGetAddress calls never run.
+      expect(methodsCalled()).toEqual([
+        'btcGetMasterFingerprint',
+        'btcGetAddress',
+        'btcGetMasterFingerprint',
+        'btcGetMasterFingerprint',
+        'btcGetMasterFingerprint',
+        'evmGetAddress',
+        'evmGetAddress',
+      ]);
+    });
+
+    it('allNetworkGetAddress breaks the install loop when DMK reports success but app stays missing', async () => {
+      // Sequence: BTC item 1 verify → main call AppNotInstalled → user
+      // confirms → installApp resolves success → retry main call →
+      // AppNotInstalled AGAIN (DMK lied). Loop guard fires: item 1 fails
+      // with AppInstallVerifyFailed (no second prompt), bundle continues to
+      // EVM normally. Note retry bypasses the fingerprint check so the
+      // sequence has only one btcGetMasterFingerprint.
+      connector.callImpl
+        .mockResolvedValueOnce({ masterFingerprint: btcFingerprint })
+        .mockRejectedValueOnce(makeAppNotInstalledErr('Bitcoin'))
+        .mockResolvedValueOnce(undefined) // installApp resolves
+        .mockRejectedValueOnce(makeAppNotInstalledErr('Bitcoin')) // retry: still missing
+        .mockResolvedValueOnce({ address: evmFingerprintAddress })
+        .mockResolvedValueOnce({ address: '0xABCD', path: "m/44'/60'/0'/0/0" });
+
+      await adapter.connectDevice('dev-1');
+      const onInstall = jest.fn(() => {
+        adapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_INSTALL_APP,
+          payload: { confirmed: true },
+        });
+      });
+      adapter.on(UI_REQUEST.REQUEST_INSTALL_APP, onInstall);
+
+      const result = await adapter.allNetworkGetAddress('dev-1', '', {
+        autoInstallApp: true,
+        bundle: [
+          {
+            network: 'btc',
+            methodName: 'btcGetAddress',
+            path: "m/44'/0'/0'/0/0",
+            deviceId: btcFingerprint,
+          },
+          {
+            network: 'evm',
+            methodName: 'evmGetAddress',
+            path: "m/44'/60'/0'/0/0",
+            chainId: 1,
+            deviceId: evmFingerprint,
+          },
+        ],
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.payload).toHaveLength(2);
+        expect(result.payload[0].success).toBe(false);
+        expect(result.payload[0].payload?.code).toBe(HardwareErrorCode.AppNotInstalled);
+        expect(result.payload[0].payload?._tag).toBe(ERROR_TAG.AppInstallVerifyFailed);
+        expect(result.payload[1].success).toBe(true);
+      }
+      expect(onInstall).toHaveBeenCalledTimes(1);
+    });
+
+    it('allNetworkGetAddress preserves normalized bundle params', async () => {
+      connector.callImpl
+        .mockResolvedValueOnce({ address: evmFingerprintAddress })
+        .mockResolvedValueOnce({ address: '0xABCD', path: "m/44'/60'/0'/0/0" });
+
+      await adapter.connectDevice('dev-1');
+
+      const result = await adapter.allNetworkGetAddress('dev-1', '', {
+        bundle: [
+          {
+            network: 'evm',
+            methodName: 'evmGetAddress',
+            path: "m/44'/60'/0'/0/0",
+            chainId: 1,
+            showOnDevice: true,
+            customField: 'kept',
+            deviceId: evmFingerprint,
+          },
+        ],
+      });
+
+      expect(result.success).toBe(true);
+      expect(connector.call).toHaveBeenCalledWith(
+        'session-abc',
+        'evmGetAddress',
+        expect.objectContaining({
+          network: 'evm',
+          methodName: 'evmGetAddress',
+          path: "m/44'/60'/0'/0/0",
+          showOnDevice: true,
+          chainId: 1,
+          customField: 'kept',
+        })
+      );
+    });
+
+    it('allNetworkGetAddress verifies each item with its own chain fingerprint', async () => {
+      const expectedAddress = '0xabcd000000000000000000000000000000000000';
+      const expectedFingerprint = deriveDeviceFingerprint(expectedAddress);
+      connector.callImpl
+        .mockResolvedValueOnce({ address: expectedAddress })
+        .mockResolvedValueOnce({ address: '0xBUNDLE', path: "m/44'/60'/0'/0/0" });
+
+      await adapter.connectDevice('dev-1');
+
+      const result = await adapter.allNetworkGetAddress('dev-1', 'wrong-global-device-id', {
+        bundle: [
+          {
+            network: 'evm',
+            methodName: 'evmGetAddress',
+            path: "m/44'/60'/0'/0/0",
+            chainId: 1,
+            deviceId: expectedFingerprint,
+          },
+        ],
+      });
+
+      expect(result.success).toBe(true);
+      expect(connector.call).toHaveBeenNthCalledWith(
+        1,
+        'session-abc',
+        'evmGetAddress',
+        expect.objectContaining({ path: "m/44'/60'/0'/0/0", showOnDevice: false })
+      );
+      expect(connector.call).toHaveBeenNthCalledWith(
+        2,
+        'session-abc',
+        'evmGetAddress',
+        expect.objectContaining({
+          network: 'evm',
+          methodName: 'evmGetAddress',
+          path: "m/44'/60'/0'/0/0",
+          deviceId: expectedFingerprint,
+        })
+      );
+    });
+
+    it('allNetworkGetAddress stops at top level when any item fingerprint mismatches', async () => {
+      const liveAddress = '0xabcd000000000000000000000000000000000000';
+      const wrongFingerprint = deriveDeviceFingerprint(
+        '0x0000000000000000000000000000000000000001'
+      );
+      connector.callImpl
+        .mockResolvedValueOnce({ address: liveAddress })
+        .mockResolvedValueOnce({ address: '0xSHOULD_NOT_RUN' });
+
+      await adapter.connectDevice('dev-1');
+
+      const result = await adapter.allNetworkGetAddress('dev-1', '', {
+        bundle: [
+          {
+            network: 'evm',
+            methodName: 'evmGetAddress',
+            path: "m/44'/60'/0'/0/0",
+            chainId: 1,
+            deviceId: wrongFingerprint,
+          },
+          {
+            network: 'evm',
+            methodName: 'evmGetAddress',
+            path: "m/44'/60'/0'/0/1",
+            chainId: 1,
+            deviceId: wrongFingerprint,
+          },
+        ],
+      });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.payload.code).toBe(HardwareErrorCode.DeviceMismatch);
+      }
+      expect(methodsCalled()).toEqual(['evmGetAddress']);
+    });
+
+    it('allNetworkGetAddress bootstraps and returns a chain fingerprint when an item has none', async () => {
+      const expectedAddress = '0xabcd000000000000000000000000000000000000';
+      const expectedFingerprint = deriveDeviceFingerprint(expectedAddress);
+      connector.callImpl
+        .mockResolvedValueOnce({ address: '0xBUNDLE', path: "m/44'/60'/0'/0/0" })
+        .mockResolvedValueOnce({ address: expectedAddress });
+
+      await adapter.connectDevice('dev-1');
+
+      const result = await adapter.allNetworkGetAddress('dev-1', '', {
+        bundle: [
+          {
+            network: 'evm',
+            methodName: 'evmGetAddress',
+            path: "m/44'/60'/0'/0/0",
+            chainId: 1,
+          },
+        ],
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.payload[0].success).toBe(true);
+        expect(result.payload[0].payload?.address).toBe('0xBUNDLE');
+        expect(result.payload[0].payload?.chainFingerprint).toBe(expectedFingerprint);
+        expect(result.payload[0].payload?.chainFingerprintChain).toBe('evm');
+      }
+      expect(methodsCalled()).toEqual(['evmGetAddress', 'evmGetAddress']);
+    });
+
+    it('allNetworkGetAddress reuses a bootstrapped fingerprint for later items on the same chain', async () => {
+      const expectedAddress = '0xabcd000000000000000000000000000000000000';
+      const expectedFingerprint = deriveDeviceFingerprint(expectedAddress);
+      connector.callImpl
+        .mockResolvedValueOnce({ address: '0xBUNDLE1', path: "m/44'/60'/0'/0/0" })
+        .mockResolvedValueOnce({ address: expectedAddress })
+        .mockResolvedValueOnce({ address: expectedAddress })
+        .mockResolvedValueOnce({ address: '0xBUNDLE2', path: "m/44'/60'/0'/0/1" });
+
+      await adapter.connectDevice('dev-1');
+
+      const result = await adapter.allNetworkGetAddress('dev-1', '', {
+        bundle: [
+          {
+            network: 'evm',
+            methodName: 'evmGetAddress',
+            path: "m/44'/60'/0'/0/0",
+            chainId: 1,
+          },
+          {
+            network: 'evm',
+            methodName: 'evmGetAddress',
+            path: "m/44'/60'/0'/0/1",
+            chainId: 1,
+          },
+        ],
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.payload).toHaveLength(2);
+        expect(result.payload[0].success).toBe(true);
+        expect(result.payload[0].payload?.chainFingerprint).toBe(expectedFingerprint);
+        expect(result.payload[1].success).toBe(true);
+        expect(result.payload[1].payload?.chainFingerprint).toBe(expectedFingerprint);
+      }
+      expect(methodsCalled()).toEqual([
+        'evmGetAddress',
+        'evmGetAddress',
+        'evmGetAddress',
+        'evmGetAddress',
+      ]);
+    });
+
+    it('allNetworkGetAddress adds Ledger coin params for BTC fork networks inside the adapter', async () => {
+      connector.callImpl
+        .mockResolvedValueOnce({ masterFingerprint: btcFingerprint })
+        .mockResolvedValueOnce({ xpub: 'xpub-doge', path: "m/44'/3'/0'" });
+
+      await adapter.connectDevice('dev-1');
+
+      const result = await adapter.allNetworkGetAddress('dev-1', '', {
+        bundle: [
+          {
+            network: 'doge',
+            methodName: 'btcGetPublicKey',
+            path: "m/44'/3'/0'",
+            deviceId: btcFingerprint,
+          },
+        ],
+      });
+
+      expect(result.success).toBe(true);
+      expect(connector.call).toHaveBeenCalledWith(
+        'session-abc',
+        'btcGetPublicKey',
+        expect.objectContaining({
+          network: 'doge',
+          methodName: 'btcGetPublicKey',
+          path: "m/44'/3'/0'",
+          coin: 'Dogecoin',
+        })
+      );
+    });
+
+    it('allNetworkGetAddress returns item failure for unsupported method without throwing', async () => {
+      await adapter.connectDevice('dev-1');
+
+      await expect(
+        adapter.allNetworkGetAddress('dev-1', '', {
+          bundle: [
+            {
+              network: 'doge',
+              methodName: 'dogeGetAddress' as never,
+              path: "m/44'/3'/0'",
+            },
+          ],
+        })
+      ).resolves.toEqual({
+        success: true,
+        payload: [
+          expect.objectContaining({
+            network: 'doge',
+            methodName: 'dogeGetAddress',
+            path: "m/44'/3'/0'",
+            success: false,
+            payload: {
+              code: HardwareErrorCode.InvalidParams,
+              error: 'Unsupported allNetwork method: dogeGetAddress',
+            },
+          }),
+        ],
+      });
+      expect(connector.call).not.toHaveBeenCalled();
     });
   });
 

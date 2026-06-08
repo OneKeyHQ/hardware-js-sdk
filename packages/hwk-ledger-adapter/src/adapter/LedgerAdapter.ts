@@ -8,6 +8,7 @@ import {
   UI_REQUEST,
   UI_REQUEST_PREEMPTED_TAG,
   UiRequestRegistry,
+  createHwkError,
   deriveDeviceFingerprint,
   failure,
   rehydrateConnectorError,
@@ -27,9 +28,11 @@ import {
   ledgerFailure,
   mapLedgerError,
 } from '../errors';
+import { createAllNetworkGetAddress } from './methods/allNetworkGetAddress';
 import { isLedgerBleConnectionType } from '../utils/ledgerDmkTransport';
 import { debugError, debugLog } from '../utils/debugLog';
 
+import type { LedgerInstallAppContext } from './methods/allNetworkGetAddress';
 import type { AppMetadata, FirmwareVersion, LedgerDeviceInfo } from '../device-apps/DeviceApps';
 import type {
   BtcAddress,
@@ -278,6 +281,14 @@ export class LedgerAdapter implements IHardwareWallet {
   // populated by the runtime (Hermes/RN). Set in cancel(), cleared shortly.
   private _lastCancelReason: Error | undefined;
 
+  // Throttle AppInstallProgress by progress delta — DMK streams much faster
+  // than UIs need. Final frame (progress >= 1) always passes.
+  private static readonly APP_INSTALL_PROGRESS_MIN_DELTA = 0.05;
+
+  private _installProgressLastEmittedValue = -Infinity;
+
+  private _installProgressLastKey: string | undefined;
+
   private static _createDeviceBusyError(method: string): Error {
     return Object.assign(new Error(`Ledger device is busy while calling ${method}`), {
       code: HardwareErrorCode.DeviceBusy,
@@ -344,6 +355,11 @@ export class LedgerAdapter implements IHardwareWallet {
     return ['evm', 'btc', 'sol', 'tron'];
   }
 
+  allNetworkGetAddress = createAllNetworkGetAddress({
+    callChain: this.callChain.bind(this),
+    getChainFingerprint: (connectId, chain) => this.getChainFingerprint(connectId, '', chain),
+  });
+
   // ---------------------------------------------------------------------------
   // Chain call helper
   // ---------------------------------------------------------------------------
@@ -355,7 +371,8 @@ export class LedgerAdapter implements IHardwareWallet {
     method: string,
     params: unknown,
     commonParams?: ICommonCallParams,
-    skipFingerprint = false
+    skipFingerprint = false,
+    installContext?: LedgerInstallAppContext
   ): Promise<Response<T>> {
     try {
       const result = await this.connectorCall(
@@ -368,7 +385,8 @@ export class LedgerAdapter implements IHardwareWallet {
           skipFingerprint,
         },
         undefined,
-        commonParams
+        commonParams,
+        installContext
       );
       return success(result as T);
     } catch (err) {
@@ -666,6 +684,16 @@ export class LedgerAdapter implements IHardwareWallet {
     try {
       const result = await this.connectorCall(connectId, 'listInstalledApps', {});
       return success(result as AppMetadata[]);
+    } catch (err) {
+      return this.errorToFailure(err);
+    }
+  }
+
+  // Offline app-presence + unlock probe. No manager-api catalog (unlike listInstalledApps).
+  async listInstalledNames(connectId: string): Promise<Response<string[]>> {
+    try {
+      const result = await this.connectorCall(connectId, 'listInstalledNames', {});
+      return success(result as string[]);
     } catch (err) {
       return this.errorToFailure(err);
     }
@@ -1316,7 +1344,8 @@ export class LedgerAdapter implements IHardwareWallet {
     params: unknown,
     fingerprint?: ConnectorCallFingerprint,
     permissionDeviceId?: string,
-    commonParams?: ICommonCallParams
+    commonParams?: ICommonCallParams,
+    installContext?: LedgerInstallAppContext
   ): Promise<unknown> {
     debugLog('[LedgerAdapter] connectorCall:', method, 'connectId:', connectId || '(empty)');
 
@@ -1333,7 +1362,8 @@ export class LedgerAdapter implements IHardwareWallet {
           signal,
           fingerprint,
           permissionDeviceId,
-          commonParams
+          commonParams,
+          installContext
         ),
       {
         label: method,
@@ -1389,7 +1419,8 @@ export class LedgerAdapter implements IHardwareWallet {
     signal: AbortSignal,
     fingerprint?: ConnectorCallFingerprint,
     permissionDeviceId?: string,
-    commonParams?: ICommonCallParams
+    commonParams?: ICommonCallParams,
+    installContext?: LedgerInstallAppContext
   ): Promise<unknown> {
     LedgerAdapter._throwIfAborted(signal);
     await this._ensureDevicePermission(
@@ -1479,10 +1510,47 @@ export class LedgerAdapter implements IHardwareWallet {
         isAppNotInstalledError(err) ||
         (err as { code?: number })?.code === HardwareErrorCode.AppNotInstalled;
       if (autoInstallApp && isAppMissing) {
+        if (installContext?.deviceOutOfMemoryError) {
+          throw installContext.deviceOutOfMemoryError;
+        }
         const appName = (err as { appName?: string })?.appName ?? mapLedgerError(err).appName;
         if (appName) {
+          // Per-bundle install decline cache: once the user has refused to
+          // install an app, subsequent items needing the same app skip the
+          // prompt and fail with UserAborted immediately. Mirrors the OOM
+          // short-circuit above.
+          if (installContext?.declinedAppNames?.has(appName)) {
+            throw createHwkError({
+              code: HardwareErrorCode.UserAborted,
+              message: `User declined to install ${appName}`,
+              _tag: ERROR_TAG.UserAborted,
+              appName,
+            });
+          }
+          // Loop guard: if installApp already resolved once this bundle but
+          // the app is STILL missing, DMK is lying about success. Don't
+          // re-prompt — surface a clear failure so the bundle moves on.
+          if (installContext?.installAttemptedAppNames?.has(appName)) {
+            throw createHwkError({
+              code: HardwareErrorCode.AppNotInstalled,
+              message: `${appName} install reported success but the app is still missing on device`,
+              _tag: ERROR_TAG.AppInstallVerifyFailed,
+              appName,
+            });
+          }
           const confirmed = await this._waitForInstallAppConfirm(appName);
-          if (!confirmed) throw err;
+          if (!confirmed) {
+            if (installContext) {
+              installContext.declinedAppNames = installContext.declinedAppNames ?? new Set();
+              installContext.declinedAppNames.add(appName);
+            }
+            throw createHwkError({
+              code: HardwareErrorCode.UserAborted,
+              message: `User declined to install ${appName}`,
+              _tag: ERROR_TAG.UserAborted,
+              appName,
+            });
+          }
           // Emit progress 0 immediately so the confirm dialog morphs into the
           // "installing" view with no blank gap — DMK's setup (go-to-dashboard,
           // metadata, build plan, secure channel) can take several seconds
@@ -1491,7 +1559,21 @@ export class LedgerAdapter implements IHardwareWallet {
             type: EConnectorInteraction.AppInstallProgress,
             payload: { connectId: resolvedConnectId, appName, progress: 0 },
           });
-          await this._callConnector(sessionId, 'installApp', { appName }, signal);
+          try {
+            await this._callConnector(sessionId, 'installApp', { appName }, signal);
+          } catch (installErr) {
+            if (mapLedgerError(installErr).code === HardwareErrorCode.DeviceOutOfMemory) {
+              if (installContext) {
+                installContext.deviceOutOfMemoryError = installErr as Error;
+              }
+            }
+            throw installErr;
+          }
+          if (installContext) {
+            installContext.installAttemptedAppNames =
+              installContext.installAttemptedAppNames ?? new Set();
+            installContext.installAttemptedAppNames.add(appName);
+          }
           // Close the install UI before retrying so the retried operation's own
           // device prompts (e.g. confirm-on-device) render normally instead of
           // being absorbed by the install dialog.
@@ -1499,7 +1581,16 @@ export class LedgerAdapter implements IHardwareWallet {
             type: UI_REQUEST.CLOSE_UI_WINDOW,
             payload: {},
           });
-          return await this._callConnector(sessionId, method, effectiveParams, signal);
+          return await this._runConnectorCall(
+            resolvedConnectId,
+            method,
+            effectiveParams,
+            signal,
+            fingerprint,
+            permissionDeviceId,
+            commonParams,
+            installContext
+          );
         }
       }
 
@@ -1991,12 +2082,26 @@ export class LedgerAdapter implements IHardwareWallet {
         );
         return;
       }
+      const { appName, progress } = event.payload;
+      const key = `${connectId}:${appName}`;
+      // Reset baseline on app/device switch — and after the prior stream
+      // finished — so the next install of the same app emits intermediate
+      // frames instead of staying stuck at the final 1.0 baseline.
+      if (this._installProgressLastKey !== key || this._installProgressLastEmittedValue >= 1) {
+        this._installProgressLastEmittedValue = -Infinity;
+        this._installProgressLastKey = key;
+      }
+      const delta = progress - this._installProgressLastEmittedValue;
+      if (delta < LedgerAdapter.APP_INSTALL_PROGRESS_MIN_DELTA && progress < 1) {
+        return;
+      }
+      this._installProgressLastEmittedValue = progress;
       this.emitter.emit('ui-event', {
         type: EConnectorInteraction.AppInstallProgress,
         payload: {
           connectId,
-          appName: event.payload.appName,
-          progress: event.payload.progress,
+          appName,
+          progress,
         },
       });
       return;

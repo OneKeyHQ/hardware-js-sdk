@@ -10,6 +10,7 @@ import type { QrDisplayData } from './qr';
 import type { ChainForFingerprint } from './fingerprint';
 import type { UI_REQUEST, UiResponseEvent } from '../events/ui-request';
 import type { SDK } from '../events/sdk';
+import type { HardwareErrorCode } from './errors';
 
 /**
  * Wallet-level `ui-event` variants. Same shape as `ConnectorUiEvent` except
@@ -39,6 +40,39 @@ export interface ICommonCallParams {
    */
   autoInstallApp?: boolean;
 }
+
+export interface AllNetworkAddressParams {
+  network: string;
+  path: string;
+  showOnDevice?: boolean;
+  methodName:
+    | 'evmGetAddress'
+    | 'btcGetAddress'
+    | 'btcGetPublicKey'
+    | 'solGetAddress'
+    | 'tronGetAddress';
+  [key: string]: unknown;
+}
+
+export interface AllNetworkGetAddressParams extends ICommonCallParams {
+  bundle: AllNetworkAddressParams[];
+}
+
+export type AllNetworkAddressResponsePayload = Record<string, unknown> & {
+  error?: string;
+  code?: HardwareErrorCode | number;
+  errorCode?: string | number;
+  connectId?: string;
+  deviceId?: string;
+  chainFingerprint?: string;
+  chainFingerprintChain?: ChainForFingerprint;
+  params?: Record<string, unknown>;
+};
+
+export type AllNetworkAddressResponse = AllNetworkAddressParams & {
+  success: boolean;
+  payload?: AllNetworkAddressResponsePayload;
+};
 
 export interface PassphraseResponse {
   passphrase: string;
@@ -216,6 +250,12 @@ export interface IHardwareWallet<TConfig = unknown>
   getSupportedChains(): ChainCapability[];
   /** Abort the in-flight call. Omit connectId to cancel whatever is active. */
   cancel(connectId?: string): void;
+
+  allNetworkGetAddress(
+    connectId: string,
+    deviceId: string,
+    params: AllNetworkGetAddressParams
+  ): Promise<Response<AllNetworkAddressResponse[]>>;
 
   /** Respond to any pending `ui-request-*`. */
   uiResponse(response: UiResponseEvent): void;
