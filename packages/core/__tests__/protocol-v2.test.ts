@@ -22,6 +22,9 @@ import SuiGetPublicKey from '../src/api/sui/SuiGetPublicKey';
 import SuiSignMessage from '../src/api/sui/SuiSignMessage';
 import SuiSignTransaction from '../src/api/sui/SuiSignTransaction';
 import SolGetAddress from '../src/api/solana/SolGetAddress';
+import SolSignMessage from '../src/api/solana/SolSignMessage';
+import SolSignOffchainMessage from '../src/api/solana/SolSignOffchainMessage';
+import SolSignTransaction from '../src/api/solana/SolSignTransaction';
 import TonGetAddress from '../src/api/ton/TonGetAddress';
 import TonSignData from '../src/api/ton/TonSignData';
 import TonSignMessage from '../src/api/ton/TonSignMessage';
@@ -811,6 +814,72 @@ describe('API compatibility handling', () => {
       });
     expect(
       getMethodVersionRange(features, type => suiSignTransactionMethod.getVersionRange()[type])
+    ).toEqual({
+      min: '0.0.0',
+    });
+  });
+
+  test('allows Pro2 Solana signing methods through Protocol V2 version checks', () => {
+    const features = {
+      onekey_device_type: 'pro2',
+    } as Features;
+
+    const solSignMessageMethod = new SolSignMessage({
+      id: 1,
+      payload: {
+        method: 'solSignMessage',
+        path: "m/44'/501'/0'/0'",
+        messageHex: '48656c6c6f',
+      },
+    });
+    const solSignOffchainMessageMethod = new SolSignOffchainMessage({
+      id: 2,
+      payload: {
+        method: 'solSignOffchainMessage',
+        path: "m/44'/501'/0'/0'",
+        messageHex: '48656c6c6f',
+      },
+    });
+    const solSignTransactionMethod = new SolSignTransaction({
+      id: 3,
+      payload: {
+        method: 'solSignTransaction',
+        path: "m/44'/501'/0'/0'",
+        rawTx: '00',
+      },
+    });
+    const solSignVersionedTransactionMethod = new SolSignTransaction({
+      id: 4,
+      payload: {
+        method: 'solSignTransaction',
+        path: "m/44'/501'/0'/0'",
+        rawTx: '80',
+      },
+    });
+
+    solSignTransactionMethod.init();
+    solSignVersionedTransactionMethod.init();
+
+    expect(
+      getMethodVersionRange(features, type => solSignMessageMethod.getVersionRange()[type])
+    ).toEqual({
+      min: '0.0.0',
+    });
+    expect(
+      getMethodVersionRange(features, type => solSignOffchainMessageMethod.getVersionRange()[type])
+    ).toEqual({
+      min: '0.0.0',
+    });
+    expect(
+      getMethodVersionRange(features, type => solSignTransactionMethod.getVersionRange()[type])
+    ).toEqual({
+      min: '0.0.0',
+    });
+    expect(
+      getMethodVersionRange(
+        features,
+        type => solSignVersionedTransactionMethod.getVersionRange()[type]
+      )
     ).toEqual({
       min: '0.0.0',
     });

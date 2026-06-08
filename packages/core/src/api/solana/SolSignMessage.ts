@@ -32,7 +32,6 @@ export default class SolSignMessage extends BaseMethod<HardwareSolSignUnsafeMess
     return {
       pro2: {
         min: '0.0.0',
-        unsupported: true,
       },
       pro: {
         min: '4.12.0',
