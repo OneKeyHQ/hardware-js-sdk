@@ -216,37 +216,49 @@ export class LedgerAdapter implements IHardwareWallet {
   // ---------------------------------------------------------------------------
 
   async searchDevices(options?: SearchDevicesOptions): Promise<DeviceInfo[]> {
-    if (options?.resetSession) {
-      this._doConnectAbortController?.abort();
-      this._sessions.clear();
-      this._connectingPromise = null;
-      this._doConnectAbortController = null;
-      this._btcHighIndexConfirmedThisSession = false;
-    }
-
-    await this._ensureDevicePermission();
-
-    const devices = await this.connector.searchDevices();
-
-    // Replace cache with this round's raw result. DMK paths used as connectId
-    // on USB are ephemeral — incremental writes leave stale entries.
-    this._discoveredDevices.clear();
-    for (const d of devices) {
-      if (d.connectId) {
-        this._discoveredDevices.set(d.connectId, this.connectorDeviceToDeviceInfo(d));
+    debugLog('[LedgerAdapter][REQ]', { method: 'searchDevices', params: options });
+    try {
+      if (options?.resetSession) {
+        this._doConnectAbortController?.abort();
+        this._sessions.clear();
+        this._connectingPromise = null;
+        this._doConnectAbortController = null;
+        this._btcHighIndexConfirmedThisSession = false;
       }
-    }
 
-    if (this._discoveredDevices.size === 0) {
       await this._ensureDevicePermission();
-    }
 
-    debugLog(
-      `[LedgerAdapter] searchDevices() return count=${this._discoveredDevices.size} ids=[${[
-        ...this._discoveredDevices.keys(),
-      ].join(',')}]`
-    );
-    return Array.from(this._discoveredDevices.values());
+      const devices = await this.connector.searchDevices();
+
+      // Replace cache with this round's raw result. DMK paths used as connectId
+      // on USB are ephemeral — incremental writes leave stale entries.
+      this._discoveredDevices.clear();
+      for (const d of devices) {
+        if (d.connectId) {
+          this._discoveredDevices.set(d.connectId, this.connectorDeviceToDeviceInfo(d));
+        }
+      }
+
+      if (this._discoveredDevices.size === 0) {
+        await this._ensureDevicePermission();
+      }
+
+      const result = Array.from(this._discoveredDevices.values());
+      debugLog('[LedgerAdapter][RES]', {
+        method: 'searchDevices',
+        success: true,
+        payload: result,
+      });
+      return result;
+    } catch (err) {
+      const e = err as Record<string, unknown> | null | undefined;
+      debugLog('[LedgerAdapter][RES]', {
+        method: 'searchDevices',
+        success: false,
+        error: { message: e?.message, _tag: e?._tag, code: e?.code ?? e?.errorCode },
+      });
+      throw err;
+    }
   }
 
   // USB single-session invariant: evict all sessions, best-effort (see connectDevice).
@@ -296,6 +308,7 @@ export class LedgerAdapter implements IHardwareWallet {
   }
 
   async connectDevice(connectId: string): Promise<Response<string>> {
+    debugLog('[LedgerAdapter][REQ]', { method: 'connectDevice', connectId, params: { connectId } });
     try {
       if (isLedgerBleConnectionType(this.connector.connectionType) && !connectId) {
         throw Object.assign(new Error('Ledger BLE connectId is required.'), {
@@ -318,21 +331,40 @@ export class LedgerAdapter implements IHardwareWallet {
         this._discoveredDevices.set(connectId, session.deviceInfo);
       }
 
-      return success(connectId);
+      const result = success(connectId);
+      debugLog('[LedgerAdapter][RES]', { method: 'connectDevice', success: true, payload: result });
+      return result;
     } catch (err) {
-      return this.errorToFailure(err);
+      const failureResult = this.errorToFailure<string>(err);
+      debugLog('[LedgerAdapter][RES]', {
+        method: 'connectDevice',
+        success: false,
+        payload: failureResult,
+      });
+      return failureResult;
     }
   }
 
   async disconnectDevice(connectId: string): Promise<void> {
+    debugLog('[LedgerAdapter][REQ]', {
+      method: 'disconnectDevice',
+      connectId,
+      params: { connectId },
+    });
     const sessionId = this._sessions.get(connectId);
     if (sessionId) {
       await this.connector.disconnect(sessionId);
       this._sessions.delete(connectId);
     }
+    debugLog('[LedgerAdapter][RES]', { method: 'disconnectDevice', success: true });
   }
 
   async getDeviceInfo(connectId: string, deviceId: string): Promise<Response<DeviceInfo>> {
+    debugLog('[LedgerAdapter][REQ]', {
+      method: 'getDeviceInfo',
+      connectId,
+      params: { connectId, deviceId },
+    });
     await this._ensureDevicePermission(connectId, deviceId);
 
     // Look up the device in the cache populated by event handlers / searchDevices.
@@ -342,13 +374,21 @@ export class LedgerAdapter implements IHardwareWallet {
       Array.from(this._discoveredDevices.values()).find(d => d.deviceId === deviceId);
 
     if (cached) {
-      return success(cached);
+      const result = success(cached);
+      debugLog('[LedgerAdapter][RES]', { method: 'getDeviceInfo', success: true, payload: result });
+      return result;
     }
 
-    return failure(
+    const notFound = failure(
       HardwareErrorCode.DeviceNotFound,
       'Device not found in cache. Call searchDevices() or wait for a device-connected event first.'
     );
+    debugLog('[LedgerAdapter][RES]', {
+      method: 'getDeviceInfo',
+      success: false,
+      payload: notFound,
+    });
+    return notFound;
   }
 
   getSupportedChains(): ChainCapability[] {
@@ -1347,30 +1387,50 @@ export class LedgerAdapter implements IHardwareWallet {
     commonParams?: ICommonCallParams,
     installContext?: LedgerInstallAppContext
   ): Promise<unknown> {
-    debugLog('[LedgerAdapter] connectorCall:', method, 'connectId:', connectId || '(empty)');
+    // [REQ] / [RES] are the canonical request/response trace for any operation
+    // that hits the device — chain methods, installApp, list*, firmware, etc.
+    // Diagnostic / recovery debugLog lines below are NOT a duplicate: they log
+    // what the SDK decides to do about an error, not the response itself.
+    debugLog('[LedgerAdapter][REQ]', { method, connectId: connectId || '(empty)', params });
 
     // Queue is global serial; deviceId is just a label for inspection / cancellation.
     const queueKey = connectId || '__ledger_default__';
 
-    return this._jobQueue.enqueue(
-      queueKey,
-      async signal =>
-        this._runConnectorCall(
-          connectId,
-          method,
-          params,
-          signal,
-          fingerprint,
-          permissionDeviceId,
-          commonParams,
-          installContext
-        ),
-      {
-        label: method,
-        rejectIfBusy: true,
-        busyError: LedgerAdapter._createDeviceBusyError(method),
-      }
-    );
+    try {
+      const result = await this._jobQueue.enqueue(
+        queueKey,
+        async signal =>
+          this._runConnectorCall(
+            connectId,
+            method,
+            params,
+            signal,
+            fingerprint,
+            permissionDeviceId,
+            commonParams,
+            installContext
+          ),
+        {
+          label: method,
+          rejectIfBusy: true,
+          busyError: LedgerAdapter._createDeviceBusyError(method),
+        }
+      );
+      debugLog('[LedgerAdapter][RES]', { method, success: true, payload: result });
+      return result;
+    } catch (err) {
+      const e = err as Record<string, unknown> | null | undefined;
+      debugLog('[LedgerAdapter][RES]', {
+        method,
+        success: false,
+        error: {
+          message: e?.message,
+          _tag: e?._tag,
+          code: e?.code ?? e?.errorCode,
+        },
+      });
+      throw err;
+    }
   }
 
   /**

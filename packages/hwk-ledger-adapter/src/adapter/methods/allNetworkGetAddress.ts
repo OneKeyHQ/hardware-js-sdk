@@ -1,5 +1,7 @@
 import { HardwareErrorCode, failure, success } from '@onekeyfe/hwk-adapter-core';
 
+import { debugLog } from '../../utils/debugLog';
+
 import type {
   AllNetworkAddressParams,
   AllNetworkAddressResponse,
@@ -69,6 +71,11 @@ export function createAllNetworkGetAddress({
     _deviceId: string,
     params: AllNetworkGetAddressParams
   ): Promise<Response<AllNetworkAddressResponse[]>> {
+    // Bundle-level REQ/RES. Each item inside still produces its own [REQ]/[RES]
+    // pair via connectorCall — this top-level trace shows the batch shape so a
+    // log reader can correlate the user's intent with the per-item activity.
+    debugLog('[LedgerAdapter][REQ]', { method: 'allNetworkGetAddress', connectId, params });
+
     const installContext: LedgerInstallAppContext = {};
     const commonParams: ICommonCallParams = {
       autoInstallApp: params.autoInstallApp,
@@ -98,17 +105,29 @@ export function createAllNetworkGetAddress({
         );
         if (isTopLevelAllNetworkFailure(response)) {
           const code = response.payload?.code ?? HardwareErrorCode.DeviceMismatch;
-          return failure(
+          const result = failure(
             code,
             response.payload?.error ?? 'All-network get-address aborted',
             response.payload?.params
           );
+          debugLog('[LedgerAdapter][RES]', {
+            method: 'allNetworkGetAddress',
+            success: false,
+            payload: result,
+          });
+          return result;
         }
         responses.push(response);
       }
     }
 
-    return success(responses);
+    const result = success(responses);
+    debugLog('[LedgerAdapter][RES]', {
+      method: 'allNetworkGetAddress',
+      success: true,
+      payload: result,
+    });
+    return result;
   };
 }
 
