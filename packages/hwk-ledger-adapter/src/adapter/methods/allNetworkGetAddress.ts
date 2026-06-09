@@ -16,7 +16,6 @@ import type {
 
 export type LedgerInstallAppContext = {
   deviceOutOfMemoryError?: Error;
-  declinedAppNames?: Set<string>;
   /**
    * Apps for which installApp has resolved (successfully or not) within
    * this bundle. Prevents an install-loop when DMK reports installApp
@@ -98,9 +97,10 @@ export function createAllNetworkGetAddress({
           chainFingerprints
         );
         if (isTopLevelAllNetworkFailure(response)) {
+          const code = response.payload?.code ?? HardwareErrorCode.DeviceMismatch;
           return failure(
-            HardwareErrorCode.DeviceMismatch,
-            response.payload?.error ?? 'Device mismatch',
+            code,
+            response.payload?.error ?? 'All-network get-address aborted',
             response.payload?.params
           );
         }
@@ -116,7 +116,8 @@ function isTopLevelAllNetworkFailure(response: AllNetworkAddressResponse): boole
   if (response.success) {
     return false;
   }
-  return response.payload?.code === HardwareErrorCode.DeviceMismatch;
+  const code = response.payload?.code;
+  return code === HardwareErrorCode.DeviceMismatch || code === HardwareErrorCode.UserAborted;
 }
 
 function getItemDeviceId(item: AllNetworkAddressParams): string | undefined {
