@@ -35,7 +35,7 @@ export type TypedResponseMessage<T extends MessageKey> = {
 type TypedCallResponseMap = {
   [K in MessageKey]: TypedResponseMessage<K>;
 };
-export type DefaultMessageResponse = TypedCallResponseMap[keyof MessageType];
+export type DefaultMessageResponse = TypedCallResponseMap[MessageKey];
 
 const MAX_DEBUG_ARRAY_ITEMS = 20;
 const MAX_DEBUG_OBJECT_KEYS = 40;

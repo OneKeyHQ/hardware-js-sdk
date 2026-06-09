@@ -1,14 +1,11 @@
 import type { CommonParams, Response } from '../params';
 import type {
-  DeviceFirmwareTarget,
-  DeviceFirmwareUpdateStatus,
-  DeviceInfoTargets,
-  DeviceInfoTypes,
-  DeviceRebootType,
+  DevFirmwareTarget,
+  DevFirmwareUpdateStatus,
+  DevRebootType,
   FactoryDeviceInfo,
   OnboardingStatus,
   ProtoVersion,
-  ProtocolV2DeviceInfo,
   Success,
 } from '@onekeyfe/hd-transport';
 
@@ -49,31 +46,14 @@ export type PathInfoResult = {
 };
 
 export type DeviceRebootParams = {
-  rebootType?: DeviceRebootType | string | number;
-  reboot_type?: DeviceRebootType | string | number;
-};
-
-export type DeviceGetDeviceInfoParams = {
-  targets?: DeviceInfoTargets;
-  types?: DeviceInfoTypes;
-  targetHw?: boolean;
-  targetFw?: boolean;
-  targetBt?: boolean;
-  targetSe1?: boolean;
-  targetSe2?: boolean;
-  targetSe3?: boolean;
-  targetSe4?: boolean;
-  targetStatus?: boolean;
-  includeVersion?: boolean;
-  includeBuildId?: boolean;
-  includeHash?: boolean;
-  includeSpecific?: boolean;
+  rebootType?: DevRebootType | string | number;
+  reboot_type?: DevRebootType | string | number;
 };
 
 export type DeviceFirmwareUpdateParams = {
-  targets?: DeviceFirmwareTarget[];
-  targetId?: DeviceFirmwareTarget['target_id'] | string | number;
-  target_id?: DeviceFirmwareTarget['target_id'] | string | number;
+  targets?: DevFirmwareTarget[];
+  targetId?: DevFirmwareTarget['target_id'] | string | number;
+  target_id?: DevFirmwareTarget['target_id'] | string | number;
   path?: string;
 };
 
@@ -154,11 +134,6 @@ export declare function deviceReboot(
   params: CommonParams & DeviceRebootParams
 ): Response<Success>;
 
-export declare function deviceGetDeviceInfo(
-  connectId: string,
-  params?: CommonParams & DeviceGetDeviceInfoParams
-): Response<ProtocolV2DeviceInfo>;
-
 export declare function deviceGetOnboardingStatus(
   connectId: string,
   params?: CommonParams
@@ -167,12 +142,12 @@ export declare function deviceGetOnboardingStatus(
 export declare function deviceFirmwareUpdate(
   connectId: string,
   params: CommonParams & DeviceFirmwareUpdateParams
-): Response<Success | DeviceFirmwareUpdateStatus>;
+): Response<Success | DevFirmwareUpdateStatus>;
 
 export declare function deviceGetFirmwareUpdateStatus(
   connectId: string,
   params?: CommonParams
-): Response<DeviceFirmwareUpdateStatus>;
+): Response<DevFirmwareUpdateStatus>;
 
 export declare function factoryDeviceInfoSettings(
   connectId: string,

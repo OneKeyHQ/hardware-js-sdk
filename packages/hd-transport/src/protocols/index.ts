@@ -35,11 +35,29 @@ const resolveProtocolV2EncodeSchema = (name: string, schemas: ProtocolV2Schemas)
   }
 };
 
+const PROTOCOL_V2_LEGACY_DECODE_ALLOWLIST = new Set([
+  'ButtonRequest',
+  'EntropyRequest',
+  'PinMatrixRequest',
+  'PassphraseRequest',
+  'Deprecated_PassphraseStateRequest',
+  'WordRequest',
+]);
+
 const createProtocolV2MessageFromType = (messageTypeId: number, schemas: ProtocolV2Schemas) => {
   try {
     return createMessageFromType(schemas.protocolV2, messageTypeId);
-  } catch {
-    return createMessageFromType(schemas.protocolV1, messageTypeId);
+  } catch (protocolV2Error) {
+    let legacyMessage: ReturnType<typeof createMessageFromType>;
+    try {
+      legacyMessage = createMessageFromType(schemas.protocolV1, messageTypeId);
+    } catch {
+      throw protocolV2Error;
+    }
+    if (PROTOCOL_V2_LEGACY_DECODE_ALLOWLIST.has(legacyMessage.messageName)) {
+      return legacyMessage;
+    }
+    throw protocolV2Error;
   }
 };
 

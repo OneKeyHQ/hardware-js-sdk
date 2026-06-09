@@ -1,4 +1,4 @@
-import { DeviceRebootType } from '@onekeyfe/hd-transport';
+import { DevRebootType } from '@onekeyfe/hd-transport';
 
 import { BaseMethod } from '../BaseMethod';
 
@@ -23,10 +23,10 @@ export default class DeviceRebootToBoardloader extends BaseMethod<RebootToBoardl
   }
 
   async run() {
-    // Protocol V2 uses DeviceReboot with reboot_type enum.
+    // Protocol V2 uses DevReboot with reboot_type enum.
     if (this.device.originalDescriptor?.protocolType === 'V2') {
-      const res = await this.device.commands.typedCall('DeviceReboot', 'Success', {
-        reboot_type: DeviceRebootType.Boardloader,
+      const res = await this.device.commands.typedCall('DevReboot', 'Success', {
+        reboot_type: DevRebootType.Boardloader,
       });
       return Promise.resolve(res.message);
     }

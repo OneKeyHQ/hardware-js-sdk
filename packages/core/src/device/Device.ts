@@ -42,7 +42,10 @@ import { DataManager } from '../data-manager';
 import TransportManager from '../data-manager/TransportManager';
 import { toHardened } from '../api/helpers/pathUtils';
 import { existCapability } from '../utils/capabilitieUtils';
-import { getProtocolV2DeviceInfo, normalizeProtocolV2Features } from '../protocols/protocol-v2';
+import {
+  buildProtocolV2FeaturesFromProfile,
+  requestProtocolV2DeviceInfo,
+} from '../protocols/protocol-v2/features';
 import {
   buildProfileFromProtocolV1,
   buildProfileFromProtocolV2,
@@ -654,29 +657,31 @@ export class Device extends EventEmitter {
   /**
    * Device initialization over Protocol V2.
    *
-   * Protocol V2 不走传统 Initialize/GetFeatures，直接用轻量 DeviceGetDeviceInfo
-   * 归一成 legacy-style Features 视图。
+   * Protocol V2 不走传统 Initialize/GetFeatures，先建立标准 DeviceProfile，
+   * 再同步一份 legacy Features 视图给旧事件和兼容 API。
    */
   private async _initializeProtocolV2() {
-    Log.debug('Initialize device via Protocol V2 feature adapter');
+    Log.debug('Initialize device via Protocol V2 profile adapter');
 
     try {
       const deviceInfo = await Promise.race([
-        this._readProtocolV2DeviceInfo(),
+        requestProtocolV2DeviceInfo({
+          commands: this.commands,
+        }),
         new Promise<never>((_, reject) => {
           setTimeout(() => {
             reject(ERRORS.TypedError(HardwareErrorCode.DeviceInitializeFailed));
           }, 10 * 1000);
         }),
       ]);
-      const features = normalizeProtocolV2Features(this.originalDescriptor, deviceInfo);
-      this.updateProfile(
-        buildProfileFromProtocolV2({
-          deviceInfo,
-          sources: ['deviceGetDeviceInfo'],
-        })
-      );
-      Log.debug('Protocol V2 normalized features:', features);
+      const profile = buildProfileFromProtocolV2({
+        deviceInfo,
+        sources: ['deviceInfo'],
+        scope: 'verify',
+      });
+      const features = buildProtocolV2FeaturesFromProfile(profile, deviceInfo);
+      this.updateProfile(profile);
+      Log.debug('Protocol V2 profile:', profile);
       this._updateFeatures(features);
     } catch (error) {
       Log.error('Protocol V2 initialization failed:', error);
@@ -684,22 +689,18 @@ export class Device extends EventEmitter {
     }
   }
 
-  private async _readProtocolV2DeviceInfo() {
-    return getProtocolV2DeviceInfo({
-      commands: this.commands,
-    });
-  }
-
   async getFeatures() {
     if (this.originalDescriptor.protocolType === 'V2') {
-      const deviceInfo = await this._readProtocolV2DeviceInfo();
-      const features = normalizeProtocolV2Features(this.originalDescriptor, deviceInfo);
-      this.updateProfile(
-        buildProfileFromProtocolV2({
-          deviceInfo,
-          sources: ['deviceGetDeviceInfo'],
-        })
-      );
+      const deviceInfo = await requestProtocolV2DeviceInfo({
+        commands: this.commands,
+      });
+      const profile = buildProfileFromProtocolV2({
+        deviceInfo,
+        sources: ['deviceInfo'],
+        scope: 'verify',
+      });
+      const features = buildProtocolV2FeaturesFromProfile(profile, deviceInfo);
+      this.updateProfile(profile);
       this._updateFeatures(features);
       return features;
     }

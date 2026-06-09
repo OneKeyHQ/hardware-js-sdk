@@ -8,7 +8,7 @@ title: 获取设备信息
 
 返回设备硬件、固件和安全状态的统一视图。此 API 自动处理 Protocol V1（Classic、Mini、Touch、Pro）和 Protocol V2（Pro2）设备之间的差异 — 你无需关心设备使用哪种协议。
 
-对于 V1 设备，信息来自 `GetFeatures` 和可选的 `OnekeyGetFeatures`。对于 V2 设备（Pro2），内部使用 `DeviceGetDeviceInfo`。结果被归一化为统一的 `UnifiedDeviceInfo` 结构。
+对于 V1 设备，信息来自 `GetFeatures` 和可选的 `OnekeyGetFeatures`。对于 V2 设备（Pro2），SDK 内部读取 Protocol V2 的 `DevGetDeviceInfo` 消息。结果被归一化为统一的 `DeviceProfile` 结构。
 
 ```typescript
 const response = await HardwareSDK.getDeviceInfo(connectId, {
@@ -32,7 +32,7 @@ const response = await HardwareSDK.getDeviceInfo(connectId, {
 |-------|---------|
 | `basic` | 设备类型、固件类型、ID、序列号、标签、蓝牙名称、状态（模式、初始化、锁定、密码短语保护、备份、语言）。 |
 | `versions` | `basic` 的全部内容 + 各固件/引导加载器/主板/蓝牙/SE 版本号。V1 设备会额外调用 `OnekeyGetFeatures` 获取详细版本。 |
-| `verify` | `versions` 的全部内容 + 各固件组件的 build ID 和哈希值。V2 设备会触发一次新的 `DeviceGetDeviceInfo` 调用。 |
+| `verify` | `versions` 的全部内容 + 各固件组件的 build ID 和哈希值。V2 设备会触发一次内部 `DevGetDeviceInfo` 读取。 |
 | `full` | 所有可用信息（与 `verify` 相同，包含最完整的数据）。 |
 
 ### 示例
@@ -63,7 +63,7 @@ if (full.success) {
     success: true,
     payload: {
         protocol: 'V1' | 'V2' | 'unknown',     // 设备使用的协议
-        sources: string[],                        // 使用的数据源（如 ['features', 'deviceGetDeviceInfo']）
+        sources: string[],                        // 使用的数据源（如 ['features', 'deviceInfo']）
         deviceType: string,                       // 设备型号（如 'pro', 'pro2', 'classic1s', 'mini', 'touch'）
         firmwareType: string,                     // 固件类型
         deviceId: string,                         // 设备标识符（种子派生）
@@ -122,14 +122,14 @@ if (full.success) {
 }
 ```
 
-### 从 getFeatures / deviceGetDeviceInfo 迁移
+### 从 getFeatures 迁移
 
-如果你之前使用 `getFeatures` + `getOnekeyFeatures`（V1）或 `deviceGetDeviceInfo`（V2），现在可以使用 `getDeviceInfo` 作为单一的、协议无关的替代方案：
+如果你之前使用 `getFeatures` + `getOnekeyFeatures`，现在可以使用 `getDeviceInfo` 作为单一的、协议无关的替代方案：
 
 | 之前 | 之后 |
 |------|------|
 | `getFeatures` 获取基本设备状态 | `getDeviceInfo(connectId, { scope: 'basic' })` |
 | `getFeatures` + `getOnekeyFeatures` 获取版本 | `getDeviceInfo(connectId, { scope: 'versions' })` |
-| `deviceGetDeviceInfo`（仅 Pro2） | `getDeviceInfo(connectId, { scope: 'full' })` |
+| Protocol V2 原始设备信息排查 | `getDeviceInfo(connectId, { scope: 'full', includeRaw: true })` |
 
-> `getFeatures` 和 `deviceGetDeviceInfo` 仍然可用，保持向后兼容并适用于高级用例（如对特定协议调用进行性能测试）。对于大多数集成场景，推荐使用 `getDeviceInfo`。
+> `getFeatures` 仅保留为 legacy 兼容入口。新接入应使用 `getDeviceInfo`，它返回标准 `DeviceProfile` 模型。

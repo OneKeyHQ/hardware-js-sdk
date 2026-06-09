@@ -1,51 +1,32 @@
-import { DeviceRebootType } from '@onekeyfe/hd-transport';
+import { DevRebootType } from '@onekeyfe/hd-transport';
 
 import { invalidParameter, validateNonEmptyString } from '../helpers/filesystemValidation';
 
 import type {
-  DeviceFirmwareTarget,
-  DeviceFirmwareTargetType,
-  DeviceInfoTargets,
-  DeviceInfoTypes,
+  DevFirmwareTarget,
+  DevFirmwareTargetType,
   TransportCallOptions,
 } from '@onekeyfe/hd-transport';
 
-export type RebootTypeInput = DeviceRebootType | keyof typeof DeviceRebootType | string | number;
+export type RebootTypeInput = DevRebootType | keyof typeof DevRebootType | string | number;
 
 export type DeviceRebootParams = {
   rebootType?: RebootTypeInput;
   reboot_type?: RebootTypeInput;
 };
 
-export type DeviceGetDeviceInfoParams = {
-  targets?: DeviceInfoTargets;
-  types?: DeviceInfoTypes;
-  targetHw?: boolean;
-  targetFw?: boolean;
-  targetBt?: boolean;
-  targetSe1?: boolean;
-  targetSe2?: boolean;
-  targetSe3?: boolean;
-  targetSe4?: boolean;
-  targetStatus?: boolean;
-  includeVersion?: boolean;
-  includeBuildId?: boolean;
-  includeHash?: boolean;
-  includeSpecific?: boolean;
-};
-
 export type DeviceFirmwareTargetInput =
-  | DeviceFirmwareTarget
+  | DevFirmwareTarget
   | {
-      targetId?: DeviceFirmwareTargetType | string | number;
-      target_id?: DeviceFirmwareTargetType | string | number;
+      targetId?: DevFirmwareTargetType | string | number;
+      target_id?: DevFirmwareTargetType | string | number;
       path: string;
     };
 
 export type DeviceFirmwareUpdateParams = {
   targets?: DeviceFirmwareTargetInput[];
-  targetId?: DeviceFirmwareTargetType | string | number;
-  target_id?: DeviceFirmwareTargetType | string | number;
+  targetId?: DevFirmwareTargetType | string | number;
+  target_id?: DevFirmwareTargetType | string | number;
   path?: string;
 };
 
@@ -58,53 +39,53 @@ export type FactoryDeviceInfoSettingsParams = {
   preFirmware?: string;
 };
 
-const DEVICE_REBOOT_TYPES: Record<string, DeviceRebootType> = {
-  Normal: DeviceRebootType.Normal,
-  normal: DeviceRebootType.Normal,
-  Boardloader: DeviceRebootType.Boardloader,
-  boardloader: DeviceRebootType.Boardloader,
-  Bootloader: DeviceRebootType.Bootloader,
-  bootloader: DeviceRebootType.Bootloader,
+const DEVICE_REBOOT_TYPES: Record<string, DevRebootType> = {
+  Normal: DevRebootType.Normal,
+  normal: DevRebootType.Normal,
+  Boardloader: DevRebootType.Boardloader,
+  boardloader: DevRebootType.Boardloader,
+  Bootloader: DevRebootType.Bootloader,
+  bootloader: DevRebootType.Bootloader,
 };
 
 export const PROTOCOL_V2_FIRMWARE_UPDATE_OPTIONS: TransportCallOptions = {
-  intermediateTypes: ['DeviceFirmwareInstallProgress'],
+  intermediateTypes: ['DevFirmwareInstallProgress'],
 };
 
-export const PROTOCOL_V2_FIRMWARE_UPDATE_RESPONSE_TYPES: (
-  | 'Success'
-  | 'DeviceFirmwareUpdateStatus'
-)[] = ['Success', 'DeviceFirmwareUpdateStatus'];
+export const PROTOCOL_V2_FIRMWARE_UPDATE_RESPONSE_TYPES: ('Success' | 'DevFirmwareUpdateStatus')[] = [
+  'Success',
+  'DevFirmwareUpdateStatus',
+];
 
-export function normalizeRebootType(value: RebootTypeInput | undefined): DeviceRebootType {
+export function normalizeRebootType(value: RebootTypeInput | undefined): DevRebootType {
   if (typeof value === 'number') return value;
   if (typeof value === 'string') {
     const numeric = Number(value);
     if (Number.isFinite(numeric)) return numeric;
     if (value in DEVICE_REBOOT_TYPES) return DEVICE_REBOOT_TYPES[value];
   }
-  return DeviceRebootType.Normal;
+  return DevRebootType.Normal;
 }
 
 function normalizeTargetId(
-  value: DeviceFirmwareTargetType | string | number | undefined,
+  value: DevFirmwareTargetType | string | number | undefined,
   name: string
-): DeviceFirmwareTargetType {
+): DevFirmwareTargetType {
   if (value === undefined || value === null) {
     throw invalidParameter(`Missing required parameter: ${name}`);
   }
   if (typeof value === 'number') {
-    if (Number.isSafeInteger(value) && value > 0) return value;
+    if (Number.isSafeInteger(value) && value >= 0) return value;
     throw invalidParameter(`Parameter [${name}] must be a valid firmware target id.`);
   }
   const numeric = Number(value);
-  if (Number.isSafeInteger(numeric) && numeric > 0) return numeric;
+  if (Number.isSafeInteger(numeric) && numeric >= 0) return numeric;
   throw invalidParameter(`Parameter [${name}] must be a valid firmware target id.`);
 }
 
 export function normalizeFirmwareTargets(
   params: DeviceFirmwareUpdateParams
-): DeviceFirmwareTarget[] {
+): DevFirmwareTarget[] {
   const targets =
     params.targets ??
     (params.path
@@ -130,32 +111,4 @@ export function normalizeFirmwareTargets(
       path: validateNonEmptyString(target.path, `targets.${index}.path`),
     };
   });
-}
-
-export function buildTargets(params: DeviceGetDeviceInfoParams): DeviceInfoTargets | undefined {
-  if (params.targets) return params.targets;
-
-  const targets: DeviceInfoTargets = {
-    hw: params.targetHw,
-    fw: params.targetFw,
-    bt: params.targetBt,
-    se1: params.targetSe1,
-    se2: params.targetSe2,
-    se3: params.targetSe3,
-    se4: params.targetSe4,
-    status: params.targetStatus,
-  };
-  return Object.values(targets).some(value => value !== undefined) ? targets : undefined;
-}
-
-export function buildTypes(params: DeviceGetDeviceInfoParams): DeviceInfoTypes | undefined {
-  if (params.types) return params.types;
-
-  const types: DeviceInfoTypes = {
-    version: params.includeVersion,
-    build_id: params.includeBuildId,
-    hash: params.includeHash,
-    specific: params.includeSpecific,
-  };
-  return Object.values(types).some(value => value !== undefined) ? types : undefined;
 }

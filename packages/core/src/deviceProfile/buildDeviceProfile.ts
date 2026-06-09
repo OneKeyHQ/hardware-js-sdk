@@ -325,7 +325,7 @@ export function buildProfileFromProtocolV1({
 
 export function buildProfileFromProtocolV2({
   deviceInfo,
-  sources = ['deviceGetDeviceInfo'],
+  sources = ['deviceInfo'],
   scope = 'basic',
   includeRaw = false,
 }: BuildProtocolV2ProfileParams): DeviceProfile {

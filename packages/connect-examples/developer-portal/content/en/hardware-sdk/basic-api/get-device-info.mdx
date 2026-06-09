@@ -8,7 +8,7 @@ title: Get Device Info
 
 Returns a unified view of the device's hardware, firmware, and security state. This API automatically handles the difference between Protocol V1 (Classic, Mini, Touch, Pro) and Protocol V2 (Pro2) devices — you don't need to know which protocol the device uses.
 
-For V1 devices, information is gathered from `GetFeatures` and optionally `OnekeyGetFeatures`. For V2 devices (Pro2), it uses `DeviceGetDeviceInfo` internally. The result is normalized into a single `UnifiedDeviceInfo` structure.
+For V1 devices, information is gathered from `GetFeatures` and optionally `OnekeyGetFeatures`. For V2 devices (Pro2), the SDK reads the Protocol V2 `DevGetDeviceInfo` message internally. The result is normalized into a single `DeviceProfile` structure.
 
 ```typescript
 const response = await HardwareSDK.getDeviceInfo(connectId, {
@@ -32,7 +32,7 @@ const response = await HardwareSDK.getDeviceInfo(connectId, {
 |-------|-----------------|
 | `basic` | Device type, firmware type, IDs, serial number, label, BLE name, status (mode, initialized, locked, passphrase protection, backup, language). |
 | `versions` | Everything in `basic` + firmware/bootloader/board/BLE/SE version numbers. For V1 devices, this calls `OnekeyGetFeatures` to get detailed versions. |
-| `verify` | Everything in `versions` + build IDs and hashes for each firmware component. For V2 devices, this triggers a fresh `DeviceGetDeviceInfo` call. |
+| `verify` | Everything in `versions` + build IDs and hashes for each firmware component. For V2 devices, this triggers a fresh internal `DevGetDeviceInfo` read. |
 | `full` | All available information (same as `verify` with the most complete data). |
 
 ### Example
@@ -63,7 +63,7 @@ if (full.success) {
     success: true,
     payload: {
         protocol: 'V1' | 'V2' | 'unknown',     // which protocol the device uses
-        sources: string[],                        // data sources used (e.g. ['features', 'deviceGetDeviceInfo'])
+        sources: string[],                        // data sources used (e.g. ['features', 'deviceInfo'])
         deviceType: string,                       // device model (e.g. 'pro', 'pro2', 'classic1s', 'mini', 'touch')
         firmwareType: string,                     // firmware type
         deviceId: string,                         // device identifier (seed-derived)
@@ -122,14 +122,14 @@ if (full.success) {
 }
 ```
 
-### Migration from getFeatures / deviceGetDeviceInfo
+### Migration from getFeatures
 
-If you were previously using `getFeatures` + `getOnekeyFeatures` (V1) or `deviceGetDeviceInfo` (V2), you can now use `getDeviceInfo` as a single, protocol-agnostic replacement:
+If you were previously using `getFeatures` + `getOnekeyFeatures`, you can now use `getDeviceInfo` as a single, protocol-agnostic replacement:
 
 | Before | After |
 |--------|-------|
 | `getFeatures` for basic device state | `getDeviceInfo(connectId, { scope: 'basic' })` |
 | `getFeatures` + `getOnekeyFeatures` for versions | `getDeviceInfo(connectId, { scope: 'versions' })` |
-| `deviceGetDeviceInfo` (Pro2 only) | `getDeviceInfo(connectId, { scope: 'full' })` |
+| Protocol V2 raw device info inspection | `getDeviceInfo(connectId, { scope: 'full', includeRaw: true })` |
 
-> `getFeatures` and `deviceGetDeviceInfo` remain available for backward compatibility and advanced use cases (e.g. performance testing specific protocol calls). For most integrations, `getDeviceInfo` is the recommended approach.
+> `getFeatures` remains available for legacy compatibility only. New integrations should use `getDeviceInfo`, which returns the standard `DeviceProfile` model.

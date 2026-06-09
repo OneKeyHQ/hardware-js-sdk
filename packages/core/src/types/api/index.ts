@@ -1,6 +1,5 @@
 import type {
   deviceFirmwareUpdate,
-  deviceGetDeviceInfo,
   deviceGetFirmwareUpdateStatus,
   deviceGetOnboardingStatus,
   deviceReboot,
@@ -254,7 +253,6 @@ export type CoreApi = {
   getProtoVersion: typeof getProtoVersion;
   ping: typeof ping;
   deviceReboot: typeof deviceReboot;
-  deviceGetDeviceInfo: typeof deviceGetDeviceInfo;
   deviceGetOnboardingStatus: typeof deviceGetOnboardingStatus;
   deviceFirmwareUpdate: typeof deviceFirmwareUpdate;
   deviceGetFirmwareUpdateStatus: typeof deviceGetFirmwareUpdateStatus;

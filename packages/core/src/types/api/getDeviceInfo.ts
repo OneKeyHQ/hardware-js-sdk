@@ -5,7 +5,7 @@ import type { ProtocolV2DeviceInfo } from '../../protocols/protocol-v2/features'
 
 export type DeviceInfoProtocol = 'V1' | 'V2' | 'unknown';
 
-export type DeviceInfoSource = 'features' | 'onekeyFeatures' | 'deviceGetDeviceInfo';
+export type DeviceInfoSource = 'features' | 'onekeyFeatures' | 'deviceInfo';
 
 export type DeviceInfoScope = 'basic' | 'versions' | 'verify' | 'full';
 

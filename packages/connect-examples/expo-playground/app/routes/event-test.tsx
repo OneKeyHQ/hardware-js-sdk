@@ -10,7 +10,15 @@ import {
   Search,
   XCircle,
 } from 'lucide-react';
-import { DEVICE, FIRMWARE_EVENT, IFRAME, LOG_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
+import {
+  DEVICE,
+  FIRMWARE,
+  FIRMWARE_EVENT,
+  IFRAME,
+  LOG_EVENT,
+  UI_REQUEST,
+  UI_RESPONSE,
+} from '@onekeyfe/hd-core';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
@@ -54,6 +62,12 @@ const EVENT_SOURCES: EventTestSource[] = [
   'API',
 ];
 
+const API_SUCCESS_EXPECTATION: EventExpectation = {
+  source: 'API',
+  type: 'api-call-success',
+  label: 'API 调用成功',
+};
+
 const EVENT_CATALOG = [
   {
     group: 'UI 请求',
@@ -85,7 +99,12 @@ const EVENT_CATALOG = [
   {
     group: '固件/日志',
     source: 'FIRMWARE_EVENT' as EventTestSource,
-    events: [FIRMWARE_EVENT, LOG_EVENT],
+    events: [FIRMWARE.RELEASE_INFO, FIRMWARE.BLE_RELEASE_INFO, FIRMWARE_EVENT],
+  },
+  {
+    group: '日志',
+    source: 'LOG_EVENT' as EventTestSource,
+    events: [LOG_EVENT],
   },
 ];
 
@@ -98,6 +117,7 @@ const SCENARIOS: EventScenario[] = [
     requireDevice: false,
     params: {},
     expectations: [
+      API_SUCCESS_EXPECTATION,
       {
         source: 'DEVICE_EVENT',
         type: DEVICE.CONNECT,
@@ -109,15 +129,17 @@ const SCENARIOS: EventScenario[] = [
   {
     id: 'get-features',
     title: '读取 Features',
-    description: '触发 getFeatures，期望 SDK 下发 features 设备事件，并返回设备基础能力。',
+    description: '触发 getFeatures，验证 API 能返回设备基础能力；features 事件仅在 SDK 刷新设备信息时出现。',
     method: 'getFeatures',
     requireDevice: true,
     params: {},
     expectations: [
+      API_SUCCESS_EXPECTATION,
       {
         source: 'DEVICE_EVENT',
         type: DEVICE.FEATURES,
-        label: '收到 features',
+        label: '刷新 features 事件',
+        optional: true,
       },
     ],
   },
@@ -133,6 +155,7 @@ const SCENARIOS: EventScenario[] = [
       showOnOneKey: true,
     },
     expectations: [
+      API_SUCCESS_EXPECTATION,
       {
         source: 'UI_EVENT',
         type: UI_REQUEST.REQUEST_BUTTON,
@@ -153,6 +176,7 @@ const SCENARIOS: EventScenario[] = [
     requireDevice: true,
     params: {},
     expectations: [
+      API_SUCCESS_EXPECTATION,
       {
         source: 'UI_EVENT',
         type: UI_REQUEST.REQUEST_PASSPHRASE,
@@ -266,12 +290,13 @@ export default function EventTestPage() {
   const summary = useMemo(() => {
     const required = matchedExpectations.filter(item => !item.expectation.optional);
     const passed = required.filter(item => item.matchedEntry).length;
+    const optional = matchedExpectations.filter(item => item.expectation.optional);
+    const optionalPassed = optional.filter(item => item.matchedEntry).length;
     return {
       passed,
       total: required.length,
-      optionalPassed: matchedExpectations.filter(
-        item => item.expectation.optional && item.matchedEntry
-      ).length,
+      optionalPassed,
+      optionalTotal: optional.length,
     };
   }, [matchedExpectations]);
 
@@ -321,7 +346,7 @@ export default function EventTestPage() {
 
       const result =
         scenario.method === 'searchDevices'
-          ? await searchDevices()
+          ? await searchDevices(executionParams as Parameters<typeof searchDevices>[0])
           : await callHardwareAPI(scenario.method as HardwareApiMethod, executionParams);
 
       recordEvent({
@@ -551,6 +576,11 @@ export default function EventTestPage() {
                     {summary.passed}/{summary.total}
                   </Badge>
                 </CardTitle>
+                {summary.optionalTotal > 0 ? (
+                  <p className="mt-1 text-xs font-normal text-muted-foreground">
+                    可选事件 {summary.optionalPassed}/{summary.optionalTotal}
+                  </p>
+                ) : null}
               </CardHeader>
               <CardContent className="space-y-2">
                 {matchedExpectations.length === 0 ? (

@@ -27,14 +27,14 @@ import { device } from '../data/methods/device';
 import type { UnifiedMethodConfig } from '../data/types';
 
 type TimingStatus = 'pending' | 'running' | 'success' | 'error' | 'cancelled';
-type DeviceInfoTargetKey = 'hw' | 'fw' | 'bt' | 'se1' | 'se2' | 'se3' | 'se4' | 'status';
-type DeviceInfoTypeKey = 'version' | 'build_id' | 'hash' | 'specific';
+type DeviceInfoScope = 'basic' | 'versions' | 'verify' | 'full';
 
 type DeviceInfoTimingCase = {
   id: string;
   label: string;
   targetLabel: string;
-  targets: Partial<Record<DeviceInfoTargetKey, boolean>>;
+  scope: DeviceInfoScope;
+  includeRaw?: boolean;
 };
 
 type TimingStats = {
@@ -55,47 +55,21 @@ type TimingResult = TimingStats & {
 };
 
 const DEVICE_INFO_TARGET_CASES: DeviceInfoTimingCase[] = [
+  { id: 'basic', label: 'Basic Profile', targetLabel: 'scope=basic', scope: 'basic' },
+  { id: 'versions', label: 'Versions Profile', targetLabel: 'scope=versions', scope: 'versions' },
+  { id: 'verify', label: 'Verify Profile', targetLabel: 'scope=verify', scope: 'verify' },
+  { id: 'full', label: 'Full Profile', targetLabel: 'scope=full', scope: 'full' },
   {
-    id: 'all',
-    label: 'All Modules',
-    targetLabel: 'hw + fw + bt + se1-4 + status',
-    targets: {
-      hw: true,
-      fw: true,
-      bt: true,
-      se1: true,
-      se2: true,
-      se3: true,
-      se4: true,
-      status: true,
-    },
+    id: 'fullRaw',
+    label: 'Full Profile + Raw',
+    targetLabel: 'scope=full, includeRaw=true',
+    scope: 'full',
+    includeRaw: true,
   },
-  { id: 'hw', label: 'Hardware', targetLabel: 'hw', targets: { hw: true } },
-  { id: 'fw', label: 'Firmware', targetLabel: 'fw', targets: { fw: true } },
-  { id: 'bt', label: 'Bluetooth', targetLabel: 'bt', targets: { bt: true } },
-  { id: 'se1', label: 'Secure Element 1', targetLabel: 'se1', targets: { se1: true } },
-  { id: 'se2', label: 'Secure Element 2', targetLabel: 'se2', targets: { se2: true } },
-  { id: 'se3', label: 'Secure Element 3', targetLabel: 'se3', targets: { se3: true } },
-  { id: 'se4', label: 'Secure Element 4', targetLabel: 'se4', targets: { se4: true } },
-  { id: 'status', label: 'Status', targetLabel: 'status', targets: { status: true } },
 ];
-
-const DEVICE_INFO_TYPE_OPTIONS: { id: DeviceInfoTypeKey; label: string }[] = [
-  { id: 'version', label: 'Version' },
-  { id: 'build_id', label: 'Build ID' },
-  { id: 'hash', label: 'Hash' },
-  { id: 'specific', label: 'Specific' },
-];
-
-const DEFAULT_DEVICE_INFO_TYPES: Record<DeviceInfoTypeKey, boolean> = {
-  version: true,
-  build_id: true,
-  hash: false,
-  specific: true,
-};
 
 const DEFAULT_SELECTED_CASE_IDS = DEVICE_INFO_TARGET_CASES.map(testCase => testCase.id);
-const DEVICE_INFO_METHOD_NAME = 'deviceGetDeviceInfo';
+const DEVICE_INFO_METHOD_NAME = 'getDeviceInfo';
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -107,16 +81,6 @@ function clampRounds(value: string) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return 1;
   return Math.min(Math.max(Math.floor(parsed), 1), 20);
-}
-
-function buildInfoTypes(types: Record<DeviceInfoTypeKey, boolean>) {
-  return Object.fromEntries(
-    Object.entries(types).filter(([, value]) => value)
-  ) as Partial<Record<DeviceInfoTypeKey, boolean>>;
-}
-
-function hasSelectedInfoType(types: Record<DeviceInfoTypeKey, boolean>) {
-  return Object.values(types).some(Boolean);
 }
 
 function getStats(durations: number[]): TimingStats {
@@ -201,11 +165,9 @@ function TimingStatusIcon({ status }: { status: TimingStatus | 'ready' }) {
 const DeviceInfoTimingTestPage: React.FC = () => {
   const { executeMethod, currentDevice } = useHardwareMethodExecution();
   const [selectedCaseIds, setSelectedCaseIds] = useState<string[]>(DEFAULT_SELECTED_CASE_IDS);
-  const [infoTypes, setInfoTypes] =
-    useState<Record<DeviceInfoTypeKey, boolean>>(DEFAULT_DEVICE_INFO_TYPES);
   const [roundsInput, setRoundsInput] = useState('1');
   const [results, setResults] = useState<Partial<Record<string, TimingResult>>>({});
-  const [selectedCaseId, setSelectedCaseId] = useState<string>('all');
+  const [selectedCaseId, setSelectedCaseId] = useState<string>('basic');
   const [isRunning, setIsRunning] = useState(false);
   const [isStopping, setIsStopping] = useState(false);
   const stopRequestedRef = useRef(false);
@@ -216,7 +178,6 @@ const DeviceInfoTimingTestPage: React.FC = () => {
     () => DEVICE_INFO_TARGET_CASES.filter(testCase => selectedCaseIds.includes(testCase.id)),
     [selectedCaseIds]
   );
-  const infoTypesEnabled = hasSelectedInfoType(infoTypes);
 
   const summary = useMemo(() => {
     const visibleResults = selectedCases
@@ -262,13 +223,6 @@ const DeviceInfoTimingTestPage: React.FC = () => {
     });
   }, []);
 
-  const toggleInfoType = useCallback((typeId: DeviceInfoTypeKey, checked: boolean) => {
-    setInfoTypes(current => ({
-      ...current,
-      [typeId]: checked,
-    }));
-  }, []);
-
   const handleSelectAllCases = useCallback(() => {
     setSelectedCaseIds(DEFAULT_SELECTED_CASE_IDS);
   }, []);
@@ -279,12 +233,12 @@ const DeviceInfoTimingTestPage: React.FC = () => {
 
   const handleReset = useCallback(() => {
     stopRequestedRef.current = false;
-    setSelectedCaseId('all');
+    setSelectedCaseId('basic');
     setResults({});
   }, []);
 
   const runCases = useCallback(async () => {
-    if (!deviceInfoMethod || selectedCases.length === 0 || isRunning || !infoTypesEnabled) return;
+    if (!deviceInfoMethod || selectedCases.length === 0 || isRunning) return;
 
     stopRequestedRef.current = false;
     setIsRunning(true);
@@ -303,8 +257,6 @@ const DeviceInfoTimingTestPage: React.FC = () => {
       )
     );
 
-    const types = buildInfoTypes(infoTypes);
-
     try {
       for (const testCase of selectedCases) {
         const durations: number[] = [];
@@ -320,10 +272,13 @@ const DeviceInfoTimingTestPage: React.FC = () => {
             break;
           }
 
-          const request = {
-            targets: testCase.targets,
-            types,
+          const request: Record<string, unknown> = {
+            scope: testCase.scope,
+            refresh: true,
           };
+          if (testCase.includeRaw) {
+            request.includeRaw = true;
+          }
           setCaseResult(testCase.id, {
             status: 'running',
             request,
@@ -374,8 +329,6 @@ const DeviceInfoTimingTestPage: React.FC = () => {
   }, [
     deviceInfoMethod,
     executeMethod,
-    infoTypes,
-    infoTypesEnabled,
     isRunning,
     rounds,
     selectedCases,
@@ -395,8 +348,7 @@ const DeviceInfoTimingTestPage: React.FC = () => {
     }
   }, [currentDevice?.connectId]);
 
-  const runDisabled =
-    isRunning || !currentDevice || selectedCases.length === 0 || !deviceInfoMethod || !infoTypesEnabled;
+  const runDisabled = isRunning || !currentDevice || selectedCases.length === 0 || !deviceInfoMethod;
 
   return (
     <PageLayout fixedHeight={true}>
@@ -432,10 +384,10 @@ const DeviceInfoTimingTestPage: React.FC = () => {
 
         <div className="mb-3 grid flex-shrink-0 grid-cols-1 gap-3 2xl:grid-cols-[minmax(0,1fr)_340px]">
           <section className="rounded-lg border border-border/70 bg-card/80 p-3">
-            <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1.5fr)_minmax(240px,0.8fr)_160px]">
+            <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1fr)_160px]">
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-3">
-                  <Label className="text-xs text-muted-foreground">Modules</Label>
+                  <Label className="text-xs text-muted-foreground">Scopes</Label>
                   <div className="flex items-center gap-2">
                     <Button type="button" variant="ghost" size="sm" onClick={handleSelectAllCases}>
                       All
@@ -475,35 +427,6 @@ const DeviceInfoTimingTestPage: React.FC = () => {
               </div>
 
               <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">Info types</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {DEVICE_INFO_TYPE_OPTIONS.map(option => {
-                    const checkboxId = `device-info-type-${option.id}`;
-
-                    return (
-                      <label
-                        key={option.id}
-                        htmlFor={checkboxId}
-                        className="flex min-h-9 cursor-pointer items-center gap-2 rounded-md border border-border/70 bg-background px-3 py-2 text-sm"
-                      >
-                        <Checkbox
-                          id={checkboxId}
-                          checked={infoTypes[option.id]}
-                          onCheckedChange={checked => toggleInfoType(option.id, checked === true)}
-                        />
-                        <span className="truncate text-foreground">{option.label}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-                {!infoTypesEnabled && (
-                  <div className="rounded-md border border-red-500/20 bg-red-500/5 px-3 py-2 text-xs text-red-600 dark:text-red-300">
-                    Select at least one info type.
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-2">
                 <Label className="text-xs text-muted-foreground">Rounds</Label>
                 <Input
                   value={roundsInput}
@@ -525,7 +448,7 @@ const DeviceInfoTimingTestPage: React.FC = () => {
               <div>
                 <div className="text-sm font-semibold text-foreground">Timing summary</div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  {summary.completed}/{summary.total} modules completed
+                  {summary.completed}/{summary.total} scopes completed
                 </div>
               </div>
               <Cpu className="h-5 w-5 text-muted-foreground" />
@@ -558,7 +481,7 @@ const DeviceInfoTimingTestPage: React.FC = () => {
               <div className="sticky top-0 z-10 grid min-w-[780px] grid-cols-[36px_minmax(150px,1fr)_150px_110px_repeat(4,90px)_minmax(140px,1fr)] gap-3 border-b border-border/70 bg-card/95 px-4 py-3 text-xs font-medium text-muted-foreground backdrop-blur">
                 <span />
                 <span>Module</span>
-                <span>Target</span>
+                <span>Scope</span>
                 <span>Status</span>
                 <span>Last</span>
                 <span>Avg</span>
@@ -667,7 +590,7 @@ const DeviceInfoTimingTestPage: React.FC = () => {
                 </div>
               ) : (
                 <div className="flex min-h-[320px] items-center justify-center rounded-lg border border-dashed border-border/70 px-6 text-center text-sm text-muted-foreground">
-                  Run selected modules to collect timing data.
+                  Run selected scopes to collect timing data.
                 </div>
               )}
             </div>

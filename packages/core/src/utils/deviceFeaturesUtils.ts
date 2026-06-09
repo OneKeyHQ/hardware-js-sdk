@@ -1,10 +1,7 @@
 import semver from 'semver';
 import { isNaN } from 'lodash';
 import { EDeviceType, type EFirmwareType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import {
-  Enum_Capability,
-  type GetPassphraseState as GetPassphraseStateMessage,
-} from '@onekeyfe/hd-transport';
+import { Enum_Capability, type GetPassphraseState } from '@onekeyfe/hd-transport';
 
 import { toHardened } from '../api/helpers/pathUtils';
 import { DeviceModelToTypes, DeviceTypeToModels } from '../types';
@@ -20,6 +17,11 @@ import { existCapability } from './capabilitieUtils';
 import type { Device } from '../device/Device';
 import type { DeviceCommands } from '../device/DeviceCommands';
 import type { Features, IDeviceType, SupportFeatureType } from '../types';
+
+type GetPassphraseStateMessage = GetPassphraseState & {
+  _only_main_pin?: boolean;
+  allow_create_attach_pin?: boolean;
+};
 
 export const getSupportProtocolV1MessageSchema = (
   features: Features | undefined

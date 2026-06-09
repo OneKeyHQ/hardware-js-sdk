@@ -820,24 +820,14 @@ export const BleDemoScreen = () => {
         run: (sdk, connectId) =>
           sdk.ping(connectId, { ...PROTOCOL_V2_PARAMS, message: 'rn-pro2-demo' }),
       },
-      deviceGetDeviceInfo: {
-        key: 'deviceGetDeviceInfo',
-        label: 'deviceGetDeviceInfo',
+      getDeviceInfo: {
+        key: 'getDeviceInfo',
+        label: 'getDeviceInfo',
         run: (sdk, connectId) =>
-          sdk.deviceGetDeviceInfo(connectId, {
+          sdk.getDeviceInfo(connectId, {
             ...PROTOCOL_V2_PARAMS,
-            targetHw: true,
-            targetFw: true,
-            targetBt: true,
-            targetSe1: true,
-            targetSe2: true,
-            targetSe3: true,
-            targetSe4: true,
-            targetStatus: true,
-            includeVersion: true,
-            includeBuildId: true,
-            includeHash: true,
-            includeSpecific: true,
+            scope: 'full',
+            includeRaw: true,
           }),
       },
       deviceGetOnboardingStatus: {
@@ -963,7 +953,7 @@ export const BleDemoScreen = () => {
       buildGroup('device', 'Device / Factory', [
         'getProtoVersion',
         'ping',
-        'deviceGetDeviceInfo',
+        'getDeviceInfo',
         'deviceGetOnboardingStatus',
         'deviceRebootNormal',
         'factoryGetDeviceInfo',

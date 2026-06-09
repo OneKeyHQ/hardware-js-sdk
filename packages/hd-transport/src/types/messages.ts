@@ -2866,8 +2866,6 @@ export type UnLockDeviceResponse = {
 // GetPassphraseState
 export type GetPassphraseState = {
   passphrase_state?: string;
-  _only_main_pin?: boolean;
-  allow_create_attach_pin?: boolean;
 };
 
 // PassphraseState
@@ -4554,15 +4552,15 @@ export type ProtoVersion = {
   proto_version: number;
 };
 
-export enum DeviceRebootType {
+export enum DevRebootType {
   Normal = 0,
   Boardloader = 1,
   Bootloader = 2,
 }
 
-// DeviceReboot
-export type DeviceReboot = {
-  reboot_type: DeviceRebootType;
+// DevReboot
+export type DevReboot = {
+  reboot_type: DevRebootType;
 };
 
 export enum DeviceType {
@@ -4574,57 +4572,57 @@ export enum DeviceType {
   CLASSIC1S_PURE = 6,
 }
 
-export enum DeviceSeType {
+export enum DevSeType {
   THD89 = 0,
   SE608A = 1,
 }
 
-export enum DeviceSEState {
+export enum DevSEState {
   BOOT = 0,
   APP_FACTORY = 51,
   APP = 85,
 }
 
-// DeviceFirmwareImageInfo
-export type DeviceFirmwareImageInfo = {
+// DevFirmwareImageInfo
+export type DevFirmwareImageInfo = {
   version?: string;
   build_id?: string;
   hash?: string;
 };
 
-// DeviceHardwareInfo
-export type DeviceHardwareInfo = {
+// DevHardwareInfo
+export type DevHardwareInfo = {
   device_type?: DeviceType;
   serial_no?: string;
   hardware_version?: string;
   hardware_version_raw_adc?: number;
 };
 
-// DeviceMainMcuInfo
-export type DeviceMainMcuInfo = {
-  board?: DeviceFirmwareImageInfo;
-  boot?: DeviceFirmwareImageInfo;
-  app?: DeviceFirmwareImageInfo;
+// DevMainMcuInfo
+export type DevMainMcuInfo = {
+  board?: DevFirmwareImageInfo;
+  boot?: DevFirmwareImageInfo;
+  app?: DevFirmwareImageInfo;
 };
 
-// DeviceBluetoothInfo
-export type DeviceBluetoothInfo = {
-  boot?: DeviceFirmwareImageInfo;
-  app?: DeviceFirmwareImageInfo;
+// DevBluetoothInfo
+export type DevBluetoothInfo = {
+  boot?: DevFirmwareImageInfo;
+  app?: DevFirmwareImageInfo;
   adv_name?: string;
   mac?: string;
 };
 
-// DeviceSEInfo
-export type DeviceSEInfo = {
-  boot?: DeviceFirmwareImageInfo;
-  app?: DeviceFirmwareImageInfo;
-  type?: DeviceSeType;
-  state?: DeviceSEState;
+// DevSEInfo
+export type DevSEInfo = {
+  boot?: DevFirmwareImageInfo;
+  app?: DevFirmwareImageInfo;
+  type?: DevSeType;
+  state?: DevSEState;
 };
 
-// DeviceInfoTargets
-export type DeviceInfoTargets = {
+// DevInfoTargets
+export type DevInfoTargets = {
   hw?: boolean;
   fw?: boolean;
   bt?: boolean;
@@ -4635,16 +4633,16 @@ export type DeviceInfoTargets = {
   status?: boolean;
 };
 
-// DeviceInfoTypes
-export type DeviceInfoTypes = {
+// DevInfoTypes
+export type DevInfoTypes = {
   version?: boolean;
   build_id?: boolean;
   hash?: boolean;
   specific?: boolean;
 };
 
-// DeviceStatus
-export type DeviceStatus = {
+// DevStatus
+export type DevStatus = {
   language?: string;
   bt_enable?: boolean;
   init_states?: boolean;
@@ -4653,66 +4651,66 @@ export type DeviceStatus = {
   label?: string;
 };
 
-// DeviceGetDeviceInfo
-export type DeviceGetDeviceInfo = {
-  targets?: DeviceInfoTargets;
-  types?: DeviceInfoTypes;
+// DevGetDeviceInfo
+export type DevGetDeviceInfo = {
+  targets?: DevInfoTargets;
+  types?: DevInfoTypes;
 };
 
 // ProtocolV2DeviceInfo
 export type ProtocolV2DeviceInfo = {
   protocol_version: number;
-  hw?: DeviceHardwareInfo;
-  fw?: DeviceMainMcuInfo;
-  bt?: DeviceBluetoothInfo;
-  se1?: DeviceSEInfo;
-  se2?: DeviceSEInfo;
-  se3?: DeviceSEInfo;
-  se4?: DeviceSEInfo;
-  status?: DeviceStatus;
+  hw?: DevHardwareInfo;
+  fw?: DevMainMcuInfo;
+  bt?: DevBluetoothInfo;
+  se1?: DevSEInfo;
+  se2?: DevSEInfo;
+  se3?: DevSEInfo;
+  se4?: DevSEInfo;
+  status?: DevStatus;
 };
 
-export enum DeviceFirmwareTargetType {
-  TARGET_INVALID = 0,
-  TARGET_ROMLOADER = 1,
-  TARGET_BOOTLOADER = 2,
-  TARGET_FIRMWARE_P1 = 3,
-  TARGET_FIRMWARE_P2 = 4,
-  TARGET_COPROCESSOR = 5,
-  TARGET_SE = 6,
+export enum DevFirmwareTargetType {
+  TARGET_MAIN_APP = 0,
+  TARGET_MAIN_BOOT = 1,
+  TARGET_BT = 2,
+  TARGET_SE1 = 3,
+  TARGET_SE2 = 4,
+  TARGET_SE3 = 5,
+  TARGET_SE4 = 6,
   TARGET_RESOURCE = 10,
 }
 
-// DeviceFirmwareTarget
-export type DeviceFirmwareTarget = {
-  target_id: DeviceFirmwareTargetType;
+// DevFirmwareTarget
+export type DevFirmwareTarget = {
+  target_id: DevFirmwareTargetType;
   path: string;
 };
 
-// DeviceFirmwareUpdate
-export type DeviceFirmwareUpdate = {
-  targets: DeviceFirmwareTarget[];
+// DevFirmwareUpdate
+export type DevFirmwareUpdate = {
+  targets: DevFirmwareTarget[];
 };
 
-// DeviceFirmwareInstallProgress
-export type DeviceFirmwareInstallProgress = {
-  target_id: DeviceFirmwareTargetType;
+// DevFirmwareInstallProgress
+export type DevFirmwareInstallProgress = {
+  target_id: DevFirmwareTargetType;
   progress: number;
   stage?: string;
 };
 
-// DeviceFirmwareUpdateStatusEntry
-export type DeviceFirmwareUpdateStatusEntry = {
-  target_id: DeviceFirmwareTargetType;
+// DevFirmwareUpdateStatusEntry
+export type DevFirmwareUpdateStatusEntry = {
+  target_id: DevFirmwareTargetType;
   status: number;
 };
 
-// DeviceGetFirmwareUpdateStatus
-export type DeviceGetFirmwareUpdateStatus = {};
+// DevGetFirmwareUpdateStatus
+export type DevGetFirmwareUpdateStatus = {};
 
-// DeviceFirmwareUpdateStatus
-export type DeviceFirmwareUpdateStatus = {
-  targets: DeviceFirmwareUpdateStatusEntry[];
+// DevFirmwareUpdateStatus
+export type DevFirmwareUpdateStatus = {
+  targets: DevFirmwareUpdateStatusEntry[];
 };
 
 // FactoryDeviceInfoSettings
@@ -5431,22 +5429,22 @@ export type MessageType = {
   ViewVerifyPage: ViewVerifyPage;
   GetProtoVersion: GetProtoVersion;
   ProtoVersion: ProtoVersion;
-  DeviceReboot: DeviceReboot;
-  DeviceFirmwareImageInfo: DeviceFirmwareImageInfo;
-  DeviceHardwareInfo: DeviceHardwareInfo;
-  DeviceMainMcuInfo: DeviceMainMcuInfo;
-  DeviceBluetoothInfo: DeviceBluetoothInfo;
-  DeviceSEInfo: DeviceSEInfo;
-  DeviceInfoTargets: DeviceInfoTargets;
-  DeviceInfoTypes: DeviceInfoTypes;
-  DeviceStatus: DeviceStatus;
-  DeviceGetDeviceInfo: DeviceGetDeviceInfo;
-  DeviceFirmwareTarget: DeviceFirmwareTarget;
-  DeviceFirmwareUpdate: DeviceFirmwareUpdate;
-  DeviceFirmwareInstallProgress: DeviceFirmwareInstallProgress;
-  DeviceFirmwareUpdateStatusEntry: DeviceFirmwareUpdateStatusEntry;
-  DeviceGetFirmwareUpdateStatus: DeviceGetFirmwareUpdateStatus;
-  DeviceFirmwareUpdateStatus: DeviceFirmwareUpdateStatus;
+  DevReboot: DevReboot;
+  DevFirmwareImageInfo: DevFirmwareImageInfo;
+  DevHardwareInfo: DevHardwareInfo;
+  DevMainMcuInfo: DevMainMcuInfo;
+  DevBluetoothInfo: DevBluetoothInfo;
+  DevSEInfo: DevSEInfo;
+  DevInfoTargets: DevInfoTargets;
+  DevInfoTypes: DevInfoTypes;
+  DevStatus: DevStatus;
+  DevGetDeviceInfo: DevGetDeviceInfo;
+  DevFirmwareTarget: DevFirmwareTarget;
+  DevFirmwareUpdate: DevFirmwareUpdate;
+  DevFirmwareInstallProgress: DevFirmwareInstallProgress;
+  DevFirmwareUpdateStatusEntry: DevFirmwareUpdateStatusEntry;
+  DevGetFirmwareUpdateStatus: DevGetFirmwareUpdateStatus;
+  DevFirmwareUpdateStatus: DevFirmwareUpdateStatus;
   FactoryDeviceInfoSettings: FactoryDeviceInfoSettings;
   FactoryGetDeviceInfo: FactoryGetDeviceInfo;
   FactoryDeviceInfo: FactoryDeviceInfo;

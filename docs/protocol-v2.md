@@ -94,7 +94,7 @@ Protocol V2 frame 的 payload 格式：
 | `Ping`                       | 60206 | Host -> Device | 链路检查           |
 | `Success`                    | 60207 | Device -> Host | 通用成功响应       |
 | `Failure`                    | 60208 | Device -> Host | 通用失败响应       |
-| `DeviceGetDeviceInfo`           | 60600 | Host -> Device | 查询 Protocol V2 设备信息 |
+| `DevGetDeviceInfo`              | 60600 | Host -> Device | 查询 Protocol V2 设备信息 |
 | `DeviceInfo`                 | 60601 | Device -> Host | Protocol V2 设备信息响应  |
 | `DeviceReboot`                  | 60400 | Host -> Device | 设备重启           |
 | `FilesystemPathInfo`         | 60801 | Device -> Host | 文件或目录信息     |
@@ -154,8 +154,8 @@ Protocol V2 不支持 V1 的 `GetFeatures`。SDK 初始化时使用：
 ```mermaid
 flowchart TD
   Ping["Ping"]
-  DeviceInfo["DeviceGetDeviceInfo(targets: hw/fw/bt/se*/status, types: version/build_id/hash/specific)"]
-  Adapter["Protocol V2 feature adapter -> Features"]
+  DeviceInfo["DevGetDeviceInfo(scope/request)"]
+  Adapter["build DeviceProfile"]
 
   Ping --> DeviceInfo --> Adapter
 ```

@@ -62,8 +62,8 @@ const CollapsibleJsonViewer: React.FC<CollapsibleJsonViewerProps> = ({
     if (typeof value === 'string') {
       const preview = getJsonPreview(value, { maxStringLength: 1200 });
       return (
-        <div className="flex items-start gap-2 group min-w-0">
-          <span className="text-orange-600 dark:text-orange-400 break-words whitespace-pre-wrap min-w-0 flex-1 overflow-hidden">
+        <div className="flex items-start gap-2 group min-w-max">
+          <span className="min-w-0 flex-1 whitespace-pre text-orange-600 dark:text-orange-400">
             &quot;{preview.text}&quot;
           </span>
           <Button
@@ -104,7 +104,7 @@ const CollapsibleJsonViewer: React.FC<CollapsibleJsonViewerProps> = ({
   };
 
   return (
-    <div className="font-mono text-sm break-words whitespace-pre-wrap min-w-0 overflow-hidden">
+    <div className="min-w-max whitespace-pre font-mono text-xs leading-6">
       {renderValue(data)}
     </div>
   );
@@ -159,7 +159,7 @@ const ObjectViewer: React.FC<{
   }
 
   return (
-    <div className="group">
+    <div className="group min-w-max">
       <div className="flex items-center gap-2">
         <span className="text-gray-600 dark:text-gray-400">{'{'}</span>
         <Button
@@ -171,7 +171,7 @@ const ObjectViewer: React.FC<{
           <Copy className="h-3 w-3" />
         </Button>
       </div>
-      <div className="ml-4 border-l border-gray-200 dark:border-gray-700 pl-4">
+      <div className="ml-4 border-l border-gray-200 pl-4 dark:border-gray-700">
         {keys.map((key, index) => {
           const value = object[key];
           const isExpandable =
@@ -186,7 +186,7 @@ const ObjectViewer: React.FC<{
 
           return (
             <div key={key} className="py-1">
-              <div className="flex items-start gap-2 min-w-0">
+              <div className="flex items-start gap-2">
                 {shouldShowExpander ? (
                   <Button
                     variant="ghost"
@@ -203,12 +203,12 @@ const ObjectViewer: React.FC<{
                 ) : (
                   <div className="w-5" />
                 )}
-                <span className="text-purple-600 dark:text-purple-400 font-medium">
+                <span className="font-medium text-purple-600 dark:text-purple-400">
                   &quot;{key}&quot;
                 </span>
                 <span className="text-gray-600 dark:text-gray-400">:</span>
                 {(!shouldShowExpander || (!isExpanded && !shouldAutoExpand)) && (
-                  <div className="flex-1 inline-flex items-start min-w-0">
+                  <div className="inline-flex items-start">
                     {isExpandable ? (
                       <span className="text-gray-500 italic">{'{ ... }'}</span>
                     ) : isArrayExpandable ? (
@@ -216,7 +216,7 @@ const ObjectViewer: React.FC<{
                         [{(value as unknown[]).length} items]
                       </span>
                     ) : (
-                      <div className="min-w-0 flex-1">
+                      <div className="min-w-max">
                         <CollapsibleJsonViewer
                           data={value}
                           currentDepth={currentDepth + 1}
@@ -293,7 +293,7 @@ const ArrayViewer: React.FC<{
   const hiddenItemCount = Math.max(array.length - visibleItems.length, 0);
 
   return (
-    <div className="group">
+    <div className="group min-w-max">
       <div className="flex items-center gap-2">
         <Button
           variant="ghost"
@@ -323,8 +323,8 @@ const ArrayViewer: React.FC<{
           {visibleItems.map((item, index) => (
             <div key={index} className="py-1">
               <div className="flex items-start gap-2">
-                <span className="text-gray-500 text-xs">{index}:</span>
-                <div className="flex-1 inline-flex items-start">
+                <span className="text-xs text-gray-500">{index}:</span>
+                <div className="inline-flex items-start">
                   <CollapsibleJsonViewer
                     data={item}
                     currentDepth={currentDepth + 1}

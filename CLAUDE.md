@@ -24,7 +24,7 @@
 - 协议判断必须在连接后主动探测，不能依赖 PID、productName 或 descriptor。
 - WebUSB / Electron BLE / React Native BLE 都通过 `GetProtoVersion` 探测 V2，失败或超时回落 V1。
 - `desktop-web-ble` 是默认 Electron BLE 入口，不再按设备型号拆分 env alias。
-- Protocol V2 不走传统 `Initialize/GetFeatures`，而是 `Ping + DeviceGetDeviceInfo` 后通过 `Protocol V2 feature adapter` 归一成 `Features`；早期固件不支持完整信息时才回退最小 `Features`。
+- Protocol V2 不走传统 `Initialize/GetFeatures`，而是 `Ping + DevGetDeviceInfo` 后生成标准 `DeviceProfile`；legacy `Features` 只作为事件和旧 API 兼容视图同步。
 
 ## Protocol V2 改动注意事项
 

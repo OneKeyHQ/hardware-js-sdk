@@ -6,8 +6,8 @@ import {
   PROTOCOL_V2_DEVICE_INFO_REQUEST,
   PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST,
   PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST,
-  getProtocolV2DeviceInfo,
 } from '../protocols/protocol-v2';
+import { requestProtocolV2DeviceInfo } from '../protocols/protocol-v2/features';
 import { buildProfileFromProtocolV2 } from '../deviceProfile';
 import { getDeviceType } from '../utils';
 import { fixVersion } from '../utils/deviceFeaturesUtils';
@@ -38,7 +38,7 @@ function normalizeScope(scope: unknown): GetDeviceInfoParams['scope'] {
   );
 }
 
-function getProtocolV2DeviceInfoRequest(params: GetDeviceInfoParams) {
+function resolveProtocolV2DeviceInfoRequest(params: GetDeviceInfoParams) {
   if (params.scope === 'verify' || params.scope === 'full') {
     return PROTOCOL_V2_DEVICE_INFO_REQUEST;
   }
@@ -100,10 +100,10 @@ export default class GetDeviceInfo extends BaseMethod<GetDeviceInfoParams> {
   }
 
   private async runProtocolV2() {
-    const sources: DeviceInfoSource[] = ['deviceGetDeviceInfo'];
-    const protocolV2DeviceInfo = await getProtocolV2DeviceInfo({
+    const sources: DeviceInfoSource[] = ['deviceInfo'];
+    const protocolV2DeviceInfo = await requestProtocolV2DeviceInfo({
       commands: this.device.commands,
-      request: getProtocolV2DeviceInfoRequest(this.params),
+      request: resolveProtocolV2DeviceInfoRequest(this.params),
     });
     const profile = buildProfileFromProtocolV2({
       deviceInfo: protocolV2DeviceInfo,

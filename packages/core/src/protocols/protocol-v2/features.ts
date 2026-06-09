@@ -1,7 +1,10 @@
 import { EDeviceType } from '@onekeyfe/hd-shared';
 
+import { buildProfileFromProtocolV2 } from '../../deviceProfile';
+
 import type { Features } from '../../types';
 import type { DeviceCommands } from '../../device/DeviceCommands';
+import type { DeviceProfile } from '../../types/api/getDeviceInfo';
 
 export type ProtocolV2Bytes = Uint8Array | number[] | string;
 
@@ -110,32 +113,6 @@ function parseVersion(version?: string | null): [number, number, number] {
   return [major, minor, patch];
 }
 
-function bytesToHex(value: unknown): string | undefined {
-  if (!value) return undefined;
-  if (typeof value === 'string') return value;
-  if (value instanceof Uint8Array) {
-    return Array.from(value)
-      .map(byte => byte.toString(16).padStart(2, '0'))
-      .join('');
-  }
-  if (Array.isArray(value)) {
-    return value.map(byte => Number(byte).toString(16).padStart(2, '0')).join('');
-  }
-  return undefined;
-}
-
-function getImageVersion(image?: ProtocolV2FirmwareImageInfo) {
-  return image?.version || undefined;
-}
-
-function getImageBuildId(image?: ProtocolV2FirmwareImageInfo) {
-  return image?.build_id || undefined;
-}
-
-function getImageHash(image?: ProtocolV2FirmwareImageInfo) {
-  return bytesToHex(image?.hash);
-}
-
 function getSeState(se?: ProtocolV2SEInfo) {
   switch (se?.state) {
     case 0:
@@ -195,15 +172,12 @@ function createBaseFeatures(): Features {
   };
 }
 
-export function normalizeProtocolV2Features(
-  _descriptor: unknown,
+export function buildProtocolV2FeaturesFromProfile(
+  profile: DeviceProfile,
   deviceInfo?: ProtocolV2DeviceInfo
 ): Features {
   const features = createBaseFeatures();
-  if (!deviceInfo) return features;
-
-  const serialNo = deviceInfo.hw?.serial_no;
-  const firmwareVersion = getImageVersion(deviceInfo.fw?.app);
+  const firmwareVersion = profile.versions.firmware;
   const [fwMajor, fwMinor, fwPatch] = parseVersion(firmwareVersion);
 
   return {
@@ -214,78 +188,80 @@ export function normalizeProtocolV2Features(
     fw_major: fwMajor,
     fw_minor: fwMinor,
     fw_patch: fwPatch,
-    device_id: serialNo ?? features.device_id,
-    serial_no: serialNo ?? features.serial_no,
-    onekey_serial_no: serialNo ?? features.onekey_serial_no,
-    protocol_version: deviceInfo.protocol_version ?? features.protocol_version,
-    label: deviceInfo.status?.label ?? features.label,
-    language: deviceInfo.status?.language ?? features.language,
-    initialized: deviceInfo.status?.init_states ?? features.initialized,
-    passphrase_protection:
-      deviceInfo.status?.passphrase_protection ?? features.passphrase_protection,
-    needs_backup: deviceInfo.status?.backup_required ?? features.needs_backup,
-    ble_enable: deviceInfo.status?.bt_enable,
-    onekey_ble_name: deviceInfo.bt?.adv_name,
-    ble_name: deviceInfo.bt?.adv_name,
-    onekey_firmware_version: firmwareVersion,
-    onekey_firmware_build_id: getImageBuildId(deviceInfo.fw?.app),
-    onekey_firmware_hash: getImageHash(deviceInfo.fw?.app),
-    onekey_boot_version: getImageVersion(deviceInfo.fw?.boot),
-    bootloader_version: getImageVersion(deviceInfo.fw?.boot),
-    onekey_boot_build_id: getImageBuildId(deviceInfo.fw?.boot),
-    onekey_boot_hash: getImageHash(deviceInfo.fw?.boot),
-    onekey_board_version: getImageVersion(deviceInfo.fw?.board),
-    onekey_board_build_id: getImageBuildId(deviceInfo.fw?.board),
-    onekey_board_hash: getImageHash(deviceInfo.fw?.board),
-    onekey_ble_version: getImageVersion(deviceInfo.bt?.app),
-    ble_ver: getImageVersion(deviceInfo.bt?.app),
-    onekey_ble_build_id: getImageBuildId(deviceInfo.bt?.app),
-    onekey_ble_hash: getImageHash(deviceInfo.bt?.app),
-    onekey_se01_version: getImageVersion(deviceInfo.se1?.app),
-    onekey_se01_hash: getImageHash(deviceInfo.se1?.app),
-    onekey_se01_build_id: getImageBuildId(deviceInfo.se1?.app),
-    onekey_se01_boot_version: getImageVersion(deviceInfo.se1?.boot),
-    onekey_se01_boot_hash: getImageHash(deviceInfo.se1?.boot),
-    onekey_se01_boot_build_id: getImageBuildId(deviceInfo.se1?.boot),
-    onekey_se01_state: getSeState(deviceInfo.se1),
-    onekey_se02_version: getImageVersion(deviceInfo.se2?.app),
-    onekey_se02_hash: getImageHash(deviceInfo.se2?.app),
-    onekey_se02_build_id: getImageBuildId(deviceInfo.se2?.app),
-    onekey_se02_boot_version: getImageVersion(deviceInfo.se2?.boot),
-    onekey_se02_boot_hash: getImageHash(deviceInfo.se2?.boot),
-    onekey_se02_boot_build_id: getImageBuildId(deviceInfo.se2?.boot),
-    onekey_se02_state: getSeState(deviceInfo.se2),
-    onekey_se03_version: getImageVersion(deviceInfo.se3?.app),
-    onekey_se03_hash: getImageHash(deviceInfo.se3?.app),
-    onekey_se03_build_id: getImageBuildId(deviceInfo.se3?.app),
-    onekey_se03_boot_version: getImageVersion(deviceInfo.se3?.boot),
-    onekey_se03_boot_hash: getImageHash(deviceInfo.se3?.boot),
-    onekey_se03_boot_build_id: getImageBuildId(deviceInfo.se3?.boot),
-    onekey_se03_state: getSeState(deviceInfo.se3),
-    onekey_se04_version: getImageVersion(deviceInfo.se4?.app),
-    onekey_se04_hash: getImageHash(deviceInfo.se4?.app),
-    onekey_se04_build_id: getImageBuildId(deviceInfo.se4?.app),
-    onekey_se04_boot_version: getImageVersion(deviceInfo.se4?.boot),
-    onekey_se04_boot_hash: getImageHash(deviceInfo.se4?.boot),
-    onekey_se04_boot_build_id: getImageBuildId(deviceInfo.se4?.boot),
-    onekey_se04_state: getSeState(deviceInfo.se4),
+    device_id: profile.deviceId || features.device_id,
+    serial_no: profile.serialNo || features.serial_no,
+    onekey_serial_no: profile.serialNo || features.onekey_serial_no,
+    protocol_version: deviceInfo?.protocol_version ?? features.protocol_version,
+    label: profile.label,
+    language: profile.status.language,
+    initialized: profile.status.initialized ?? features.initialized,
+    passphrase_protection: profile.status.passphraseProtection,
+    needs_backup: profile.status.backupRequired,
+    ble_enable: profile.status.bleEnabled ?? undefined,
+    onekey_ble_name: profile.bleName ?? undefined,
+    ble_name: profile.bleName ?? undefined,
+    onekey_firmware_version: firmwareVersion ?? undefined,
+    onekey_firmware_build_id: profile.verify?.firmwareBuildId,
+    onekey_firmware_hash: profile.verify?.firmwareHash,
+    onekey_boot_version: profile.versions.bootloader ?? undefined,
+    bootloader_version: profile.versions.bootloader ?? undefined,
+    onekey_boot_build_id: profile.verify?.bootloaderBuildId,
+    onekey_boot_hash: profile.verify?.bootloaderHash,
+    onekey_board_version: profile.versions.board ?? undefined,
+    onekey_board_build_id: profile.verify?.boardBuildId,
+    onekey_board_hash: profile.verify?.boardHash,
+    onekey_ble_version: profile.versions.ble ?? undefined,
+    ble_ver: profile.versions.ble ?? undefined,
+    onekey_ble_build_id: profile.verify?.bleBuildId,
+    onekey_ble_hash: profile.verify?.bleHash,
+    onekey_se01_version: profile.versions.se01 ?? undefined,
+    onekey_se01_hash: profile.verify?.se01Hash,
+    onekey_se01_build_id: profile.verify?.se01BuildId,
+    onekey_se01_boot_version: profile.versions.se01Boot ?? undefined,
+    onekey_se01_boot_hash: profile.verify?.se01BootHash,
+    onekey_se01_boot_build_id: profile.verify?.se01BootBuildId,
+    onekey_se01_state: getSeState(deviceInfo?.se1),
+    onekey_se02_version: profile.versions.se02 ?? undefined,
+    onekey_se02_hash: profile.verify?.se02Hash,
+    onekey_se02_build_id: profile.verify?.se02BuildId,
+    onekey_se02_boot_version: profile.versions.se02Boot ?? undefined,
+    onekey_se02_boot_hash: profile.verify?.se02BootHash,
+    onekey_se02_boot_build_id: profile.verify?.se02BootBuildId,
+    onekey_se02_state: getSeState(deviceInfo?.se2),
+    onekey_se03_version: profile.versions.se03 ?? undefined,
+    onekey_se03_hash: profile.verify?.se03Hash,
+    onekey_se03_build_id: profile.verify?.se03BuildId,
+    onekey_se03_boot_version: profile.versions.se03Boot ?? undefined,
+    onekey_se03_boot_hash: profile.verify?.se03BootHash,
+    onekey_se03_boot_build_id: profile.verify?.se03BootBuildId,
+    onekey_se03_state: getSeState(deviceInfo?.se3),
+    onekey_se04_version: profile.versions.se04 ?? undefined,
+    onekey_se04_hash: profile.verify?.se04Hash,
+    onekey_se04_build_id: profile.verify?.se04BuildId,
+    onekey_se04_boot_version: profile.versions.se04Boot ?? undefined,
+    onekey_se04_boot_hash: profile.verify?.se04BootHash,
+    onekey_se04_boot_build_id: profile.verify?.se04BootBuildId,
+    onekey_se04_state: getSeState(deviceInfo?.se4),
   };
 }
 
-export async function getProtocolV2Features({
+export async function requestProtocolV2LegacyFeatures({
   commands,
-  descriptor,
   timeoutMs,
 }: {
   commands: DeviceCommands;
-  descriptor: unknown;
   timeoutMs?: number;
 }) {
-  const message = await getProtocolV2DeviceInfo({ commands, timeoutMs });
-  return normalizeProtocolV2Features(descriptor, message);
+  const message = await requestProtocolV2DeviceInfo({ commands, timeoutMs });
+  const profile = buildProfileFromProtocolV2({
+    deviceInfo: message,
+    sources: ['deviceInfo'],
+    scope: 'verify',
+  });
+  return buildProtocolV2FeaturesFromProfile(profile, message);
 }
 
-export async function getProtocolV2DeviceInfo({
+export async function requestProtocolV2DeviceInfo({
   commands,
   timeoutMs = PROTOCOL_V2_DEVICE_INFO_TIMEOUT_MS,
   request = PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST,
@@ -294,7 +270,7 @@ export async function getProtocolV2DeviceInfo({
   timeoutMs?: number;
   request?: object;
 }): Promise<ProtocolV2DeviceInfo> {
-  const { message } = await commands.typedCall('DeviceGetDeviceInfo', 'DeviceInfo', request, {
+  const { message } = await commands.typedCall('DevGetDeviceInfo', 'DeviceInfo', request, {
     timeoutMs,
   });
   return message as unknown as ProtocolV2DeviceInfo;

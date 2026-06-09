@@ -56,17 +56,16 @@ flowchart TD
 
 WebUSB、Electron BLE、React Native BLE 和 lowlevel BLE 只负责各自的物理连接、读写、订阅/桥接和平台错误映射，不再各自复制 V2 协议会话逻辑。
 
-## Protocol V2 Feature Adapter
+## Protocol V2 Device Profile
 
-`packages/core/src/protocols/protocol-v2/features.ts` 负责把 Protocol V2 设备信息归一成 SDK 现有 `Features` 视图：
+`packages/core/src/protocols/protocol-v2/features.ts` 负责读取 Protocol V2 设备信息，`packages/core/src/deviceProfile` 负责生成 SDK 标准 `DeviceProfile`。legacy `Features` 只保留给 `getFeatures()`、事件输出和旧逻辑兼容：
 
-| 协议 | 数据来源                  | 归一化输出                                |
-| ---- | ------------------------- | ----------------------------------------- |
-| V1   | `Initialize -> Features`  | 原生 `Features`                           |
-| V2   | `Ping + DeviceGetDeviceInfo` | Protocol V2 `DeviceInfo` 映射到 `Features` |
-| V2 fallback | USB/BLE descriptor | 最小 `Features`，保证 connectId/uuid 稳定 |
+| 协议 | 数据来源                  | 标准输出 | 兼容输出 |
+| ---- | ------------------------- | -------- | -------- |
+| V1   | `Initialize -> Features`  | `DeviceProfile` | 原生 `Features` |
+| V2   | `Ping + DevGetDeviceInfo` | `DeviceProfile` | 由 profile 同步的 legacy `Features` |
 
-这样 `Device.toMessageObject()`、事件输出、固件判断和上层 API 都继续读取统一字段，而不需要在每个业务方法里理解 Protocol V2 的 `DeviceInfo` schema。
+这样 SDK 内部判断优先使用 `DeviceProfile`，同时保持 `Device.toMessageObject()`、事件输出和历史上层逻辑对 `Features` 的兼容。
 
 ## 自动协议探测
 
@@ -84,7 +83,7 @@ flowchart TD
   FallbackV1["V1/V2 均失败: 保持 Protocol V1"]
   Init["Device.initialize()"]
   InitV1["V1: Initialize -> Features"]
-  InitV2["V2: Ping + DeviceGetDeviceInfo -> normalized Features"]
+  InitV2["V2: Ping + DevGetDeviceInfo -> DeviceProfile"]
 
   Enumerate --> Acquire --> Connect --> ProbeV1
   ProbeV1 --> V1 --> Init
@@ -111,9 +110,9 @@ V1 设备仍可在 `Initialize` 后通过 `TransportManager.reconfigure(features
 `Device.acquire()` 完成后会从 transport 读取检测到的协议类型，并写回 `originalDescriptor.protocolType`。后续 `Device.initialize()` 基于该字段选择初始化路径：
 
 - V1：发送 `Initialize`，使用真实 `Features`
-- V2：发送 `Ping` 验证链路，再用 `DeviceGetDeviceInfo` 生成统一 `Features`
+- V2：发送 `Ping` 验证链路，再用 `DevGetDeviceInfo` 生成标准 `DeviceProfile`
 
-Protocol V2 当前没有传统 `GetFeatures`。为了保证事件和后续 API 能使用同一套设备标识，feature adapter 会始终填充 `device_id`、`serial_no` 和 `onekey_serial_no`，并尽量补齐 firmware、bootloader、BLE、SE、label 和 passphrase 状态字段。
+Protocol V2 当前没有传统 `GetFeatures`。为了保证事件和旧 API 仍可工作，SDK 会从 `DeviceProfile` 同步一份 legacy `Features` 视图；设备身份以 `DeviceProfile.serialNo/deviceId` 为准。
 
 ## Protocol V2 文件和固件更新链路
 

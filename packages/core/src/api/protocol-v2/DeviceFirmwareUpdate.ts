@@ -6,6 +6,7 @@ import {
 } from './helpers';
 import { UI_REQUEST, createUiMessage } from '../../events/ui-request';
 import type { KnownDevice } from '../../types';
+import type { MessageFromOneKey } from '@onekeyfe/hd-transport';
 
 import type { DeviceFirmwareUpdateParams } from './helpers';
 
@@ -24,15 +25,15 @@ export default class DeviceFirmwareUpdate extends BaseMethod<DeviceFirmwareUpdat
   async run() {
     const targets = normalizeFirmwareTargets(this.params);
     const res = await this.device.commands.typedCall(
-      'DeviceFirmwareUpdate',
+      'DevFirmwareUpdate',
       PROTOCOL_V2_FIRMWARE_UPDATE_RESPONSE_TYPES,
       {
         targets,
       },
       {
         ...PROTOCOL_V2_FIRMWARE_UPDATE_OPTIONS,
-        onIntermediateResponse: response => {
-          if (response.type !== 'DeviceFirmwareInstallProgress') return;
+        onIntermediateResponse: (response: MessageFromOneKey) => {
+          if (response.type !== 'DevFirmwareInstallProgress') return;
           const progress = Number(response.message?.progress);
           if (!Number.isFinite(progress)) return;
           this.postMessage(

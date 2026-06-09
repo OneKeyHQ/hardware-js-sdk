@@ -91,23 +91,11 @@ fi
 # ============================================================
 # BUILD Protocol V2 messages-protocol-v2.json
 # ============================================================
-# Preferred source: submodules/firmware-pro2/sys/protobuf/onekey_protocol/latest/
-# Fallback source: submodules/firmware-pro2/sys/protobuf/onekey_protocol/legacy/
-#
-# Latest firmware-pro2 defines the Protocol V2 schema directly (Device*,
-# Filesystem* names). Older firmware-pro2 commits only exposed legacy Emmc* messages,
-# so the fallback block below still remaps those into Protocol V2 system names.
-#
-# ID mapping (firmware legacy → Protocol V2 system IDs):
-#   Ping=1          → 60206    Success=2        → 60207    Failure=3     → 60208
-#   DeviceReboot=30000    → 60400
-#   EmmcFixPermission=30100 → 60800    EmmcPath=30101 → 60801
-#   EmmcPathInfo=30102      → 60802    EmmcFile=30103 → 60803
-#   EmmcFileRead=30104      → 60804    EmmcFileWrite=30105 → 60805
-#   EmmcFileDelete=30106    → 60806    EmmcDir=30107  → 60807
-#   EmmcDirList=30108       → 60808    EmmcDirMake=30109   → 60809
-#   EmmcDirRemove=30110     → 60810
-#   DeviceFirmwareUpdate=30001 → 61000   DeviceFirmwareInstallProgress=30002 → 61001
+# Source of truth: submodules/firmware-pro2/sys/protobuf/onekey_protocol/.
+# Protocol V2 keeps chain/app protocols under legacy/ and system protocols under latest/.
+# The SDK flattens them into one protobuf schema for transport runtime, but it must keep
+# firmware message names and enum values intact. SDK-facing aliases belong in core/API code,
+# not in the protobuf schema.
 # ============================================================
 cd "$PARENT_PATH"
 
@@ -124,7 +112,7 @@ if [ -d "$SRC_PRO2_LATEST" ] && ls "$SRC_PRO2_LATEST"/messages*.proto 1>/dev/nul
         echo ''
 
         # Pro2 firmware keeps chain/app protocols under legacy/, and Protocol V2
-        # device/filesystem/firmware protocols under latest/.  Build one flat
+        # device/filesystem/firmware protocols under latest/. Build one flat
         # schema so Protocol V2 framing can also encode legacy public-chain calls.
         grep -hv \
             -e '^import ' -e '^syntax' -e '^package' -e 'option java_' \
@@ -208,63 +196,6 @@ if [ -d "$SRC_PRO2_LATEST" ] && ls "$SRC_PRO2_LATEST"/messages*.proto 1>/dev/nul
         fi
     } > "$TMP_PROTO"
 
-    node - "$TMP_PROTO" <<'NODE'
-const fs = require('fs');
-
-const protoPath = process.argv[2];
-let proto = fs.readFileSync(protoPath, 'utf8');
-
-const replacements = [
-  ['MessageType_DevReboot', 'MessageType_DeviceReboot'],
-  ['MessageType_DevGetDeviceInfo', 'MessageType_DeviceGetDeviceInfo'],
-  ['MessageType_DevFirmwareUpdate', 'MessageType_DeviceFirmwareUpdate'],
-  ['MessageType_DevFirmwareInstallProgress', 'MessageType_DeviceFirmwareInstallProgress'],
-  ['MessageType_DevGetFirmwareUpdateStatus', 'MessageType_DeviceGetFirmwareUpdateStatus'],
-  ['MessageType_DevFirmwareUpdateStatus', 'MessageType_DeviceFirmwareUpdateStatus'],
-  ['DevRebootType', 'DeviceRebootType'],
-  ['DevReboot', 'DeviceReboot'],
-  ['DevSeType', 'DeviceSeType'],
-  ['DevSEState', 'DeviceSEState'],
-  ['DevFirmwareImageInfo', 'DeviceFirmwareImageInfo'],
-  ['DevHardwareInfo', 'DeviceHardwareInfo'],
-  ['DevMainMcuInfo', 'DeviceMainMcuInfo'],
-  ['DevBluetoothInfo', 'DeviceBluetoothInfo'],
-  ['DevSEInfo', 'DeviceSEInfo'],
-  ['DevInfoTargets', 'DeviceInfoTargets'],
-  ['DevInfoTypes', 'DeviceInfoTypes'],
-  ['DevStatus', 'DeviceStatus'],
-  ['DevGetDeviceInfo', 'DeviceGetDeviceInfo'],
-  ['DevFirmwareTargetType', 'DeviceFirmwareTargetType'],
-  ['DevFirmwareTarget', 'DeviceFirmwareTarget'],
-  ['DevFirmwareUpdateStatusEntry', 'DeviceFirmwareUpdateStatusEntry'],
-  ['DevFirmwareInstallProgress', 'DeviceFirmwareInstallProgress'],
-  ['DevGetFirmwareUpdateStatus', 'DeviceGetFirmwareUpdateStatus'],
-  ['DevFirmwareUpdateStatus', 'DeviceFirmwareUpdateStatus'],
-  ['DevFirmwareUpdate', 'DeviceFirmwareUpdate'],
-];
-
-for (const [from, to] of replacements) {
-  proto = proto.replace(new RegExp(`\\b${from}\\b`, 'g'), to);
-}
-
-proto = proto.replace(
-  /enum DeviceFirmwareTargetType \{[\s\S]*?\n\}/,
-  `enum DeviceFirmwareTargetType {
-    // declaration order matches firmware FwMgmtTarget_t.
-    TARGET_INVALID = 0;
-    TARGET_ROMLOADER = 1;
-    TARGET_BOOTLOADER = 2;
-    TARGET_FIRMWARE_P1 = 3;
-    TARGET_FIRMWARE_P2 = 4;
-    TARGET_COPROCESSOR = 5;
-    TARGET_SE = 6;
-    TARGET_RESOURCE = 10;
-}`
-);
-
-fs.writeFileSync(protoPath, proto);
-NODE
-
     if ! grep -q 'MessageType_TonSignData' "$TMP_PROTO"; then
         node - "$TMP_PROTO" <<'NODE'
 const fs = require('fs');
@@ -303,6 +234,61 @@ fs.writeFileSync(protoPath, updated);
 NODE
     fi
 
+    node - "$TMP_PROTO" <<'NODE'
+const fs = require('fs');
+
+const protoPath = process.argv[2];
+const proto = fs.readFileSync(protoPath, 'utf8');
+const messageNames = new Set(
+  Array.from(proto.matchAll(/^\s*message\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{/gm)).map(
+    match => match[1]
+  )
+);
+const messageTypeNames = new Set(
+  Array.from(proto.matchAll(/^\s*MessageType_([A-Za-z_][A-Za-z0-9_]*)\s*=/gm)).map(
+    match => match[1]
+  )
+);
+const requiredMessages = [
+  'Ping',
+  'Success',
+  'Failure',
+  'DevReboot',
+  'DevGetDeviceInfo',
+  'DeviceInfo',
+  'DevFirmwareUpdate',
+  'DevFirmwareInstallProgress',
+  'DevGetFirmwareUpdateStatus',
+  'DevFirmwareUpdateStatus',
+  'FilesystemFixPermission',
+  'FilesystemPathInfo',
+  'FilesystemPathInfoQuery',
+  'FilesystemFile',
+  'FilesystemFileRead',
+  'FilesystemFileWrite',
+  'FilesystemFileDelete',
+  'FilesystemDir',
+  'FilesystemDirList',
+  'FilesystemDirMake',
+  'FilesystemDirRemove',
+  'FilesystemFormat',
+  'TonSignData',
+  'TonSignedData',
+  'GetOnboardingStatus',
+  'OnboardingStatus',
+];
+const missingMessages = requiredMessages.filter(name => !messageNames.has(name));
+const missingMessageTypes = requiredMessages.filter(name => !messageTypeNames.has(name));
+
+if (missingMessages.length > 0 || missingMessageTypes.length > 0) {
+  throw new Error(
+    `Protocol V2 schema missing required entries: messages=[${missingMessages.join(
+      ', '
+    )}], messageTypes=[${missingMessageTypes.join(', ')}]`
+  );
+}
+NODE
+
     npx pbjs -t json \
         -p "$PARENT_PATH" \
         -o "$PARENT_PATH/../messages-protocol-v2.json" \
@@ -319,222 +305,8 @@ NODE
     node ./protobuf-types.js $LANG
     yarn --cwd "$PACKAGE_ROOT" prettier --write "$PACKAGE_ROOT/src/types/messages.ts"
     echo "=== Protocol V2 messages build complete ==="
-elif [ -d "$SRC_PRO2_LEGACY" ] && ls "$SRC_PRO2_LEGACY"/messages*.proto 1>/dev/null 2>&1; then
-    echo "=== Building Protocol V2 messages from firmware-pro2 submodule ==="
-    TMP_PROTO="$PARENT_PATH/messages-protocol-v2-tmp.proto"
-
-    # ----------------------------------------------------------------
-    # Step 1: extract Ping/Success/Failure from messages_management.proto
-    #         and all messages from messages_emmc.proto
-    # ----------------------------------------------------------------
-    {
-        echo 'syntax = "proto2";'
-        echo ''
-
-        # Ping from messages_management.proto
-        # Success, Failure from messages_common.proto (that's where they live in firmware-pro2)
-        # DeviceReboot is a Protocol V2 system message not in legacy protos — defined manually below
-        echo '// --- Ping ---'
-        awk '/^message Ping /,/^}/' "$SRC_PRO2_LEGACY/messages_management.proto" || true
-        echo ''
-        echo '// --- Success / Failure ---'
-        for msg in Success Failure; do
-            awk "/^message ${msg} /,/^}/" "$SRC_PRO2_LEGACY/messages_common.proto" \
-                | grep -v 'enum FailureType' \
-                | grep -v 'Failure_[A-Za-z]' \
-                | grep -v '^\s*}$' \
-                | sed 's/ hw\.trezor\.messages\.[a-z_]*\.\([A-Z]\)/\1/g' \
-                | sed 's/ common\.\([A-Z]\)/\1/g' \
-                || true
-            echo '}'
-            echo ''
-        done
-        echo '// --- DeviceReboot (Protocol V2 only, not in legacy protos) ---'
-        echo 'message DeviceReboot {'
-        echo '    required DeviceRebootType reboot_type = 1;'
-        echo '}'
-        echo ''
-
-        echo ''
-        echo '// --- Emmc / File system messages (renamed, Emmc prefix stripped) ---'
-        # Extract messages_emmc.proto body (strip package/import/option/syntax lines)
-        grep -hv \
-            -e '^import ' -e '^syntax' -e '^package' -e 'option java_' \
-            -e '^option ' \
-            "$SRC_PRO2_LEGACY/messages_emmc.proto" \
-            | grep -v '    reserved '
-
-    } > "$TMP_PROTO"
-
-    # ----------------------------------------------------------------
-    # Step 2: rename — strip "Emmc" prefix, order matters (longest match first),
-    #         rename EmmcFile.len → total_size to match Protocol V2 semantics.
-    #         Use space/{/; as word-boundary substitute (macOS BSD sed has no \b).
-    # ----------------------------------------------------------------
-    sed -i '' \
-        -e 's/message EmmcFixPermission /message FixPermission /g' \
-        -e 's/message EmmcPathInfo /message PathInfoQuery /g' \
-        -e 's/message EmmcFileRead /message FileRead /g' \
-        -e 's/message EmmcFileWrite /message FileWrite /g' \
-        -e 's/message EmmcFileDelete /message FileDelete /g' \
-        -e 's/message EmmcDirList /message DirList /g' \
-        -e 's/message EmmcDirMake /message DirMake /g' \
-        -e 's/message EmmcDirRemove /message DirRemove /g' \
-        -e 's/message EmmcPath /message PathInfo /g' \
-        -e 's/message EmmcFile /message File /g' \
-        -e 's/message EmmcDir /message Dir /g' \
-        -e 's/ EmmcFile / File /g' \
-        -e 's/required uint32 len = 3/required uint32 total_size = 3/g' \
-        "$TMP_PROTO"
-
-    # ----------------------------------------------------------------
-    # Step 3: build the MessageType enum with remapped IDs
-    # ----------------------------------------------------------------
-    cat >> "$TMP_PROTO" << 'ENUM_EOF'
-
-// MessageType enum with Protocol V2 system IDs (mapped from firmware-pro2 legacy IDs)
-enum MessageType {
-    MessageType_Ping                    = 60206;
-    MessageType_Success                 = 60207;
-    MessageType_Failure                 = 60208;
-    MessageType_DeviceReboot            = 60400;
-    MessageType_GetOnboardingStatus       = 60602;
-    MessageType_OnboardingStatus          = 60603;
-    MessageType_FixPermission           = 60800;
-    MessageType_PathInfo                = 60801;
-    MessageType_PathInfoQuery           = 60802;
-    MessageType_File                    = 60803;
-    MessageType_FileRead                = 60804;
-    MessageType_FileWrite               = 60805;
-    MessageType_FileDelete              = 60806;
-    MessageType_Dir                     = 60807;
-    MessageType_DirList                 = 60808;
-    MessageType_DirMake                 = 60809;
-    MessageType_DirRemove               = 60810;
-    MessageType_DeviceFirmwareUpdate    = 61000;
-    MessageType_DeviceFirmwareInstallProgress = 61001;
-    MessageType_DeviceGetFirmwareUpdateStatus = 61002;
-    MessageType_DeviceFirmwareUpdateStatus = 61003;
-}
-
-enum FailureType {
-    Failure_UnexpectedMessage  = 1;
-    Failure_ButtonExpected     = 2;
-    Failure_DataError          = 3;
-    Failure_ActionCancelled    = 4;
-    Failure_PinExpected        = 5;
-    Failure_PinCancelled       = 6;
-    Failure_PinInvalid         = 7;
-    Failure_InvalidSignature   = 8;
-    Failure_ProcessError       = 9;
-    Failure_NotEnoughFunds     = 10;
-    Failure_NotInitialized     = 11;
-    Failure_PinMismatch        = 12;
-    Failure_WipeCodeMismatch   = 13;
-    Failure_InvalidSession     = 14;
-    Failure_FirmwareError      = 99;
-}
-
-enum DeviceFirmwareTargetType {
-    TARGET_INVALID      = 0;
-    TARGET_ROMLOADER    = 1;
-    TARGET_BOOTLOADER   = 2;
-    TARGET_FIRMWARE_P1  = 3;
-    TARGET_FIRMWARE_P2  = 4;
-    TARGET_COPROCESSOR  = 5;
-    TARGET_SE           = 6;
-    TARGET_RESOURCE     = 10;
-}
-
-enum DeviceRebootType {
-    Normal              = 0;
-    Boardloader         = 1;
-    Bootloader          = 2;
-}
-
-message DeviceFirmwareTarget {
-    required DeviceFirmwareTargetType target_id = 1;
-    required string                   path      = 2;
-}
-
-message DeviceFirmwareUpdate {
-    repeated DeviceFirmwareTarget targets        = 1;
-    optional uint32               max_concurrent = 2;
-}
-
-message DeviceFirmwareInstallProgress {
-    required DeviceFirmwareTargetType target_id = 1;
-    required uint32                   progress  = 2;
-    optional string                   stage     = 3;
-}
-
-message DeviceFirmwareUpdateStatusEntry {
-    required DeviceFirmwareTargetType target_id = 1;
-    required uint32                   status    = 2;
-}
-
-message DeviceGetFirmwareUpdateStatus {
-}
-
-message DeviceFirmwareUpdateStatus {
-    repeated DeviceFirmwareUpdateStatusEntry targets = 1;
-}
-
-enum OnboardingStep {
-    ONBOARDING_STEP_UNKNOWN             = 0;
-    ONBOARDING_STEP_DEVICE_VERIFICATION = 1;
-    ONBOARDING_STEP_PERSONALIZATION     = 2;
-    ONBOARDING_STEP_SETUP               = 3;
-    ONBOARDING_STEP_FIRMWARE            = 4;
-}
-
-message OnboardingNewDevice {
-    optional bool seedcard_backup = 1;
-}
-
-message OnboardingRestore {
-    optional bool mnemonic = 1;
-    optional bool seedcard = 2;
-}
-
-message OnboardingSetup {
-    optional OnboardingNewDevice new_device = 1;
-    optional OnboardingRestore   restore    = 2;
-}
-
-message GetOnboardingStatus {
-}
-
-message OnboardingStatus {
-    required OnboardingStep  step        = 1;
-    optional OnboardingSetup setup       = 2;
-    optional uint32          detail_code = 3;
-    optional string          detail_str  = 4;
-}
-ENUM_EOF
-
-    # ----------------------------------------------------------------
-    # Step 4: compile to JSON
-    # ----------------------------------------------------------------
-    npx pbjs -t json \
-        -p "$PARENT_PATH" \
-        -o "$PARENT_PATH/../messages-protocol-v2.json" \
-        --keep-case \
-        "$(basename "$TMP_PROTO")"
-
-    rm -f "$TMP_PROTO"
-
-    # Copy to core package
-    cp "$PARENT_PATH/../messages-protocol-v2.json" "$CORE_MESSAGES_DIR/messages-protocol-v2.json"
-    echo "Protocol V2 messages-protocol-v2.json generated from firmware-pro2 submodule and copied to core"
-
-    yarn prettier --write "$PARENT_PATH/../messages-protocol-v2.json"
-    yarn prettier --write "$CORE_MESSAGES_DIR/messages-protocol-v2.json"
-    node ./protobuf-types.js $LANG
-    yarn --cwd "$PACKAGE_ROOT" prettier --write "$PACKAGE_ROOT/src/types/messages.ts"
-    echo "=== Protocol V2 messages build complete ==="
 else
-    echo "⚠️  firmware-pro2 submodule not found at $SRC_PRO2_LEGACY"
-    echo "    Skipping Pro2 protobuf build. To enable:"
-    echo "    git submodule update --init submodules/firmware-pro2"
+    echo "firmware-pro2 latest protobuf schema not found at $SRC_PRO2_LATEST"
+    echo "Run: git submodule update --init submodules/firmware-pro2"
+    exit 1
 fi

@@ -163,7 +163,7 @@ flowchart TD
 初始化分支：
 
 - `V1`：执行传统 `Initialize`，写入真实 `Features`，再按 features 重新选择 schema。
-- `V2`：执行 `Ping` 验证链路，通过 `DeviceGetDeviceInfo` 获取 Protocol V2 设备信息，再由 `Protocol V2 feature adapter` 归一化为 `Features`。如果早期固件暂时没有返回完整 device info，会回退到 descriptor 生成最小 `Features`，并保留 `serial_no/onekey_serial_no/device_id` 作为 connectId/uuid 来源。
+- `V2`：执行 `Ping` 验证链路，通过 `DevGetDeviceInfo` 获取 Protocol V2 设备信息并生成标准 `DeviceProfile`。legacy `Features` 仅作为事件和旧 API 兼容视图同步，设备身份以 `DeviceProfile.serialNo/deviceId` 为准。
 
 ## 固件更新流程
 

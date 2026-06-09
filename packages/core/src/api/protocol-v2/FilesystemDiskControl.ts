@@ -1,8 +1,11 @@
+import { createDeviceNotSupportMethodError } from '@onekeyfe/hd-shared';
+
 import { BaseMethod } from '../BaseMethod';
 import {
   validateNonNegativeInteger,
   validateOptionalNonNegativeInteger,
 } from '../helpers/filesystemValidation';
+import { getFirmwareType } from '../../utils';
 
 export type FilesystemDiskControlParams = {
   enable?: number | string;
@@ -20,15 +23,6 @@ export default class FilesystemDiskControl extends BaseMethod<FilesystemDiskCont
   }
 
   async run() {
-    const timeoutMs = Number(this.params.timeoutMs);
-    const res = await this.device.commands.typedCall(
-      'FilesystemDiskControl',
-      'Success',
-      {
-        enable: Number(this.params.enable ?? 0),
-      },
-      Number.isFinite(timeoutMs) && timeoutMs > 0 ? { timeoutMs } : undefined
-    );
-    return Promise.resolve(res.message);
+    throw createDeviceNotSupportMethodError(this.name, getFirmwareType(this.device.features));
   }
 }

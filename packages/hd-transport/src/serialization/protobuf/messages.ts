@@ -13,8 +13,12 @@ export const createMessageFromName = (messages: protobuf.Root, name: string) => 
   const MessageType = messages.lookupEnum('MessageType');
   let messageTypeId = MessageType.values[`MessageType_${name}`];
 
-  if (!messageTypeId && Message.options) {
+  if (messageTypeId == null && Message.options) {
     messageTypeId = Message.options['(wire_type)'];
+  }
+
+  if (!Number.isInteger(messageTypeId)) {
+    throw new Error(`MessageType for "${name}" is not defined in protobuf schema`);
   }
 
   return {
