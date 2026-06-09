@@ -351,12 +351,22 @@ export class LedgerAdapter implements IHardwareWallet {
       connectId,
       params: { connectId },
     });
-    const sessionId = this._sessions.get(connectId);
-    if (sessionId) {
-      await this.connector.disconnect(sessionId);
-      this._sessions.delete(connectId);
+    try {
+      const sessionId = this._sessions.get(connectId);
+      if (sessionId) {
+        await this.connector.disconnect(sessionId);
+        this._sessions.delete(connectId);
+      }
+      debugLog('[LedgerAdapter][RES]', { method: 'disconnectDevice', success: true });
+    } catch (err) {
+      const e = err as Record<string, unknown> | null | undefined;
+      debugLog('[LedgerAdapter][RES]', {
+        method: 'disconnectDevice',
+        success: false,
+        error: { message: e?.message, _tag: e?._tag, code: e?.code ?? e?.errorCode },
+      });
+      throw err;
     }
-    debugLog('[LedgerAdapter][RES]', { method: 'disconnectDevice', success: true });
   }
 
   async getDeviceInfo(connectId: string, deviceId: string): Promise<Response<DeviceInfo>> {
@@ -365,30 +375,44 @@ export class LedgerAdapter implements IHardwareWallet {
       connectId,
       params: { connectId, deviceId },
     });
-    await this._ensureDevicePermission(connectId, deviceId);
+    try {
+      await this._ensureDevicePermission(connectId, deviceId);
 
-    // Look up the device in the cache populated by event handlers / searchDevices.
-    // Try connectId first (the USB path), then fall back to scanning by deviceId.
-    const cached =
-      this._discoveredDevices.get(connectId) ??
-      Array.from(this._discoveredDevices.values()).find(d => d.deviceId === deviceId);
+      // Look up the device in the cache populated by event handlers / searchDevices.
+      // Try connectId first (the USB path), then fall back to scanning by deviceId.
+      const cached =
+        this._discoveredDevices.get(connectId) ??
+        Array.from(this._discoveredDevices.values()).find(d => d.deviceId === deviceId);
 
-    if (cached) {
-      const result = success(cached);
-      debugLog('[LedgerAdapter][RES]', { method: 'getDeviceInfo', success: true, payload: result });
-      return result;
+      if (cached) {
+        const result = success(cached);
+        debugLog('[LedgerAdapter][RES]', {
+          method: 'getDeviceInfo',
+          success: true,
+          payload: result,
+        });
+        return result;
+      }
+
+      const notFound = failure(
+        HardwareErrorCode.DeviceNotFound,
+        'Device not found in cache. Call searchDevices() or wait for a device-connected event first.'
+      );
+      debugLog('[LedgerAdapter][RES]', {
+        method: 'getDeviceInfo',
+        success: false,
+        payload: notFound,
+      });
+      return notFound;
+    } catch (err) {
+      const e = err as Record<string, unknown> | null | undefined;
+      debugLog('[LedgerAdapter][RES]', {
+        method: 'getDeviceInfo',
+        success: false,
+        error: { message: e?.message, _tag: e?._tag, code: e?.code ?? e?.errorCode },
+      });
+      throw err;
     }
-
-    const notFound = failure(
-      HardwareErrorCode.DeviceNotFound,
-      'Device not found in cache. Call searchDevices() or wait for a device-connected event first.'
-    );
-    debugLog('[LedgerAdapter][RES]', {
-      method: 'getDeviceInfo',
-      success: false,
-      payload: notFound,
-    });
-    return notFound;
   }
 
   getSupportedChains(): ChainCapability[] {
