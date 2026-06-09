@@ -21,7 +21,7 @@ import {
 } from '../utils/parameterUtils';
 import { cancelHardwareOperation } from '../services/hardwareService';
 import { logHardware } from '../utils/logger';
-import { formatJsonPreview } from '../utils/jsonPreview';
+import { formatJsonPreview, formatUntruncatedJsonPreview } from '../utils/jsonPreview';
 import { ProtocolExecutionLog } from '../components/common/MethodExecutor';
 import type { MethodPreset, UnifiedMethodConfig } from '../data/types';
 
@@ -412,15 +412,8 @@ const ChainMethodsIndexPage: React.FC = () => {
     () => getInlineExecutionParams(),
     [getInlineExecutionParams]
   );
-  const activeRequestPreview = useMemo(
-    () =>
-      formatJsonPreview(activeRequestPayload, {
-        indent: 2,
-        maxDepth: 6,
-        maxArrayItems: 20,
-        maxObjectKeys: 60,
-        maxStringLength: 512,
-      }),
+  const activeRequestPayloadText = useMemo(
+    () => formatUntruncatedJsonPreview(activeRequestPayload, { indent: 2 }),
     [activeRequestPayload]
   );
   const inlineResponsePreview = useMemo(
@@ -704,7 +697,7 @@ const ChainMethodsIndexPage: React.FC = () => {
                                 Request payload
                               </div>
                               <pre className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words p-4 font-mono text-xs leading-relaxed text-muted-foreground">
-                                {activeRequestPreview}
+                                {activeRequestPayloadText}
                               </pre>
                             </div>
 

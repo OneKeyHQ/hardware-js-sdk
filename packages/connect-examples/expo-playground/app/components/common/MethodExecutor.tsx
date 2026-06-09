@@ -10,7 +10,7 @@ import { useDeviceStore } from '../../store/deviceStore';
 import { useHardwareStore } from '../../store/hardwareStore';
 import { separateParameters } from '../../utils/parameterUtils';
 import { methodSupportsCommonParameters } from '../../utils/constants';
-import { summarizeJsonValue } from '../../utils/jsonPreview';
+import { formatUntruncatedJsonPreview, summarizeJsonValue } from '../../utils/jsonPreview';
 import type { UnifiedMethodConfig } from '~/data/types';
 import type { CommonParametersState } from '../../store/hardwareStore';
 // 导入子组件
@@ -914,6 +914,7 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
   const renderPayloadResponsePanel = (compact = false) => {
     const requestPayload = executionPreview.request ?? scopedRequestData;
     const minHeightClassName = compact ? 'min-h-[180px]' : 'min-h-[240px]';
+    const requestPayloadText = formatUntruncatedJsonPreview(requestPayload, { indent: 2 });
 
     return (
       <Card className="overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm">
@@ -926,7 +927,7 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
                 Request payload
               </div>
               <pre className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words p-4 font-mono text-xs leading-relaxed text-muted-foreground">
-                {formatBlockValue(requestPayload)}
+                {requestPayloadText}
               </pre>
             </div>
 
