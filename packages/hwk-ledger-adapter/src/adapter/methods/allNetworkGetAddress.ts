@@ -136,7 +136,14 @@ function isTopLevelAllNetworkFailure(response: AllNetworkAddressResponse): boole
     return false;
   }
   const code = response.payload?.code;
-  return code === HardwareErrorCode.DeviceMismatch || code === HardwareErrorCode.UserAborted;
+  // Any explicit "no" from the user — SDK-level dialog dismissal (UserAborted)
+  // or on-device reject button (UserRejected, APDU 0x6985) — aborts the whole
+  // bundle. From the user's perspective both are "I said no, stop the batch".
+  return (
+    code === HardwareErrorCode.DeviceMismatch ||
+    code === HardwareErrorCode.UserAborted ||
+    code === HardwareErrorCode.UserRejected
+  );
 }
 
 function getItemDeviceId(item: AllNetworkAddressParams): string | undefined {
