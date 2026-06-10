@@ -46,6 +46,12 @@ type ProtocolV2FirmwareUpdateStatusTarget = {
   status: number;
 };
 
+// ZIP 魔数 'PK\x03\x04'（空包为 PK\x05\x06）；非 zip 即视为单文件 .bin 资源
+const isZipBinary = (binary: ArrayBuffer) => {
+  const bytes = new Uint8Array(binary.slice(0, 4));
+  return bytes.length >= 4 && bytes[0] === 0x50 && bytes[1] === 0x4b;
+};
+
 type ProtocolV2FirmwareUpdateStartResponse =
   | TypedResponseMessage<'Success'>
   | TypedResponseMessage<'DevFirmwareUpdateStatus'>
@@ -405,26 +411,42 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const targets: Array<{ target_id: number; path: string }> = [];
 
     if (resourceBinary) {
-      const resourcePath = `${PROTOCOL_V2_FIRMWARE_STAGING_VOLUME}res/`;
-      await this.protocolV2CreateFolder(resourcePath);
-      const file = await JSZip.loadAsync(resourceBinary);
-      const files = Object.entries(file.files);
-      for (const [fileName, entry] of files) {
-        const name = fileName.split('/').pop();
-        if (!entry.dir && fileName.indexOf('__MACOSX') === -1 && name) {
-          const data = await entry.async('arraybuffer');
-          processedSize = await this.protocolV2CommonUpdateProcess({
-            payload: data,
-            filePath: `${resourcePath}${name}`,
-            processedSize,
-            totalSize,
-          });
+      // resource 支持两种形态：zip 包（解包后逐文件上传，target path 指向目录）
+      // 或单个 .bin（直接上传，target path 指向文件）。按文件头识别。
+      if (isZipBinary(resourceBinary)) {
+        const resourcePath = `${PROTOCOL_V2_FIRMWARE_STAGING_VOLUME}res/`;
+        await this.protocolV2CreateFolder(resourcePath);
+        const file = await JSZip.loadAsync(resourceBinary);
+        const files = Object.entries(file.files);
+        for (const [fileName, entry] of files) {
+          const name = fileName.split('/').pop();
+          if (!entry.dir && fileName.indexOf('__MACOSX') === -1 && name) {
+            const data = await entry.async('arraybuffer');
+            processedSize = await this.protocolV2CommonUpdateProcess({
+              payload: data,
+              filePath: `${resourcePath}${name}`,
+              processedSize,
+              totalSize,
+            });
+          }
         }
+        targets.push({
+          target_id: ProtocolV2FirmwareTargetType.TARGET_RESOURCE,
+          path: resourcePath,
+        });
+      } else {
+        const resourceFilePath = `${PROTOCOL_V2_FIRMWARE_STAGING_VOLUME}resource.bin`;
+        processedSize = await this.protocolV2CommonUpdateProcess({
+          payload: resourceBinary,
+          filePath: resourceFilePath,
+          processedSize,
+          totalSize,
+        });
+        targets.push({
+          target_id: ProtocolV2FirmwareTargetType.TARGET_RESOURCE,
+          path: resourceFilePath,
+        });
       }
-      targets.push({
-        target_id: ProtocolV2FirmwareTargetType.TARGET_RESOURCE,
-        path: resourcePath,
-      });
     }
 
     if (bootloaderBinary) {
