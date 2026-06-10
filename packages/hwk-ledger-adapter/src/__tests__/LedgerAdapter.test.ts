@@ -1726,12 +1726,13 @@ describe('LedgerAdapter', () => {
       ]);
     });
 
-    it('allNetworkGetAddress returns item UserAborted when the user declines app installation', async () => {
+    it('allNetworkGetAddress aborts the entire bundle when the user declines app installation', async () => {
+      // New behavior: any UserAborted during the bundle (install-decline,
+      // BTC high-index decline, connect-cancel) fail-fasts the whole batch.
+      // Subsequent items are NOT attempted — the user's "no" propagates.
       connector.callImpl
         .mockResolvedValueOnce({ masterFingerprint: btcFingerprint })
-        .mockRejectedValueOnce(makeAppNotInstalledErr('Bitcoin'))
-        .mockResolvedValueOnce({ address: evmFingerprintAddress })
-        .mockResolvedValueOnce({ address: '0xABCD', path: "m/44'/60'/0'/0/0" });
+        .mockRejectedValueOnce(makeAppNotInstalledErr('Bitcoin'));
 
       await adapter.connectDevice('dev-1');
       const onInstall = jest.fn(() => {
@@ -1761,31 +1762,22 @@ describe('LedgerAdapter', () => {
         ],
       });
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.payload).toHaveLength(2);
-        expect(result.payload[0].success).toBe(false);
-        expect(result.payload[0].payload?.code).toBe(HardwareErrorCode.UserAborted);
-        expect(result.payload[1].success).toBe(true);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.payload?.code).toBe(HardwareErrorCode.UserAborted);
       }
       expect(onInstall).toHaveBeenCalledTimes(1);
-      expect(methodsCalled()).toEqual([
-        'btcGetMasterFingerprint',
-        'btcGetAddress',
-        'evmGetAddress',
-        'evmGetAddress',
-      ]);
+      // EVM item never runs after the BTC install decline.
+      expect(methodsCalled()).toEqual(['btcGetMasterFingerprint', 'btcGetAddress']);
     });
 
-    it('allNetworkGetAddress only prompts once per app when the user keeps declining same-network items', async () => {
+    it('allNetworkGetAddress fail-fast survives a large bundle: only one prompt even with many follow-ups', async () => {
+      // Sanity check that the bundle-wide abort holds regardless of how many
+      // items would have followed — the user sees one prompt, says no, and
+      // every remaining item (same network or not) is skipped.
       connector.callImpl
         .mockResolvedValueOnce({ masterFingerprint: btcFingerprint })
-        .mockRejectedValueOnce(makeAppNotInstalledErr('Bitcoin'))
-        .mockRejectedValueOnce(makeAppNotInstalledErr('Bitcoin'))
-        .mockRejectedValueOnce(makeAppNotInstalledErr('Bitcoin'))
-        .mockRejectedValueOnce(makeAppNotInstalledErr('Bitcoin'))
-        .mockResolvedValueOnce({ address: evmFingerprintAddress })
-        .mockResolvedValueOnce({ address: '0xABCD', path: "m/44'/60'/0'/0/0" });
+        .mockRejectedValueOnce(makeAppNotInstalledErr('Bitcoin'));
 
       await adapter.connectDevice('dev-1');
       const onInstall = jest.fn(() => {
@@ -1833,28 +1825,14 @@ describe('LedgerAdapter', () => {
         ],
       });
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.payload).toHaveLength(5);
-        for (let i = 0; i < 4; i += 1) {
-          expect(result.payload[i].success).toBe(false);
-          expect(result.payload[i].payload?.code).toBe(HardwareErrorCode.UserAborted);
-        }
-        expect(result.payload[4].success).toBe(true);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.payload?.code).toBe(HardwareErrorCode.UserAborted);
       }
       expect(onInstall).toHaveBeenCalledTimes(1);
-      // Items 2-4 are short-circuited at the fingerprint pre-check (which also
-      // hits the Bitcoin app) — the declined-app cache fires there, so the
-      // subsequent btcGetAddress calls never run.
-      expect(methodsCalled()).toEqual([
-        'btcGetMasterFingerprint',
-        'btcGetAddress',
-        'btcGetMasterFingerprint',
-        'btcGetMasterFingerprint',
-        'btcGetMasterFingerprint',
-        'evmGetAddress',
-        'evmGetAddress',
-      ]);
+      // First BTC item triggers the prompt, every later item — including the
+      // EVM one — is skipped.
+      expect(methodsCalled()).toEqual(['btcGetMasterFingerprint', 'btcGetAddress']);
     });
 
     it('allNetworkGetAddress breaks the install loop when DMK reports success but app stays missing', async () => {

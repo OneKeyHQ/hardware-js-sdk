@@ -1,5 +1,7 @@
 import { HardwareErrorCode, failure, success } from '@onekeyfe/hwk-adapter-core';
 
+import { debugLog } from '../../utils/debugLog';
+
 import type {
   AllNetworkAddressParams,
   AllNetworkAddressResponse,
@@ -16,7 +18,6 @@ import type {
 
 export type LedgerInstallAppContext = {
   deviceOutOfMemoryError?: Error;
-  declinedAppNames?: Set<string>;
   /**
    * Apps for which installApp has resolved (successfully or not) within
    * this bundle. Prevents an install-loop when DMK reports installApp
@@ -70,6 +71,11 @@ export function createAllNetworkGetAddress({
     _deviceId: string,
     params: AllNetworkGetAddressParams
   ): Promise<Response<AllNetworkAddressResponse[]>> {
+    // Bundle-level REQ/RES. Each item inside still produces its own [REQ]/[RES]
+    // pair via connectorCall — this top-level trace shows the batch shape so a
+    // log reader can correlate the user's intent with the per-item activity.
+    debugLog('[LedgerAdapter][REQ]', { method: 'allNetworkGetAddress', connectId, params });
+
     const installContext: LedgerInstallAppContext = {};
     const commonParams: ICommonCallParams = {
       autoInstallApp: params.autoInstallApp,
@@ -98,17 +104,30 @@ export function createAllNetworkGetAddress({
           chainFingerprints
         );
         if (isTopLevelAllNetworkFailure(response)) {
-          return failure(
-            HardwareErrorCode.DeviceMismatch,
-            response.payload?.error ?? 'Device mismatch',
+          const code = response.payload?.code ?? HardwareErrorCode.DeviceMismatch;
+          const result = failure(
+            code,
+            response.payload?.error ?? 'All-network get-address aborted',
             response.payload?.params
           );
+          debugLog('[LedgerAdapter][RES]', {
+            method: 'allNetworkGetAddress',
+            success: false,
+            payload: result,
+          });
+          return result;
         }
         responses.push(response);
       }
     }
 
-    return success(responses);
+    const result = success(responses);
+    debugLog('[LedgerAdapter][RES]', {
+      method: 'allNetworkGetAddress',
+      success: true,
+      payload: result,
+    });
+    return result;
   };
 }
 
@@ -116,7 +135,13 @@ function isTopLevelAllNetworkFailure(response: AllNetworkAddressResponse): boole
   if (response.success) {
     return false;
   }
-  return response.payload?.code === HardwareErrorCode.DeviceMismatch;
+  const code = response.payload?.code;
+  // User said "no" — SDK-dialog cancel and on-device reject both end the batch.
+  return (
+    code === HardwareErrorCode.DeviceMismatch ||
+    code === HardwareErrorCode.UserAborted ||
+    code === HardwareErrorCode.UserRejected
+  );
 }
 
 function getItemDeviceId(item: AllNetworkAddressParams): string | undefined {
