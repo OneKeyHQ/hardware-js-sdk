@@ -31,6 +31,7 @@ export const en = {
       proDebug: 'Pro Debug',
       pro2Debug: 'Pro2 Debug',
       pro2Update: 'Pro2 Update',
+      pro2SpecialUpdate: 'Pro2 Special Update',
       pro2Onboarding: 'Pro2 Onboarding',
       methodBatchTest: 'Chain Method Batch Test',
       eventTest: 'Event Test',

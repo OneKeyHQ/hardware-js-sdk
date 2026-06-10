@@ -94,6 +94,11 @@ const navigationItems = [
   {
     title: 'common.pro2Update',
     url: '/pro2-update',
+    icon: ListChecks,
+  },
+  {
+    title: 'common.pro2SpecialUpdate',
+    url: '/pro2-special-update',
     icon: UploadCloud,
   },
   {
