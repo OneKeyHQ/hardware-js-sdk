@@ -33,7 +33,8 @@ type WorkflowTarget = 'all' | 'step1' | 'step2' | 'step3' | 'step4';
 type WorkflowStepId = 'step1' | 'step2' | 'step3' | 'step4';
 type StepStatus = 'idle' | 'running' | 'success' | 'failed' | 'skipped';
 type LogLevel = 'info' | 'ok' | 'warn' | 'error';
-type RequiredFileKey = 'romloader' | 'updateRom' | 'bluetooth' | 'firmware';
+type SeFileKey = 'se1' | 'se2' | 'se3' | 'se4';
+type RequiredFileKey = 'romloader' | 'updateRom' | 'bluetooth' | 'firmware' | SeFileKey;
 
 type DirectoryHandle = {
   kind: 'directory';
@@ -152,6 +153,34 @@ const REQUIRED_FILES: Array<{ key: RequiredFileKey; label: string; expectedName:
     label: 'Firmware',
     expectedName: 'pro2_firmware_signed.bin',
   },
+  {
+    key: 'se1',
+    label: 'SE1 Firmware (optional)',
+    expectedName: 'pro2_se1_signed.bin',
+  },
+  {
+    key: 'se2',
+    label: 'SE2 Firmware (optional)',
+    expectedName: 'pro2_se2_signed.bin',
+  },
+  {
+    key: 'se3',
+    label: 'SE3 Firmware (optional)',
+    expectedName: 'pro2_se3_signed.bin',
+  },
+  {
+    key: 'se4',
+    label: 'SE4 Firmware (optional)',
+    expectedName: 'pro2_se4_signed.bin',
+  },
+];
+
+// DevFirmwareTargetType（messages_device.proto）：SE1-4 = 3-6
+const SE_FILE_CONFIG: Array<{ key: SeFileKey; targetId: number; devicePath: string }> = [
+  { key: 'se1', targetId: 3, devicePath: 'vol0:se1.bin' },
+  { key: 'se2', targetId: 4, devicePath: 'vol0:se2.bin' },
+  { key: 'se3', targetId: 5, devicePath: 'vol0:se3.bin' },
+  { key: 'se4', targetId: 6, devicePath: 'vol0:se4.bin' },
 ];
 
 function getDeviceUpdateBaseUrl() {
@@ -626,6 +655,25 @@ export default function Pro2UpdatePage() {
     [addLog, callApi, resetFirmwareProgress]
   );
 
+  const firmwareUpdateTargets = useCallback(
+    async (
+      connectId: string,
+      targets: Array<{ target_id: number; path: string }>,
+      label: string
+    ) => {
+      resetFirmwareProgress();
+      addLog(
+        'info',
+        `${label}: DeviceFirmwareUpdate targets=${targets
+          .map(target => `${target.target_id}:${target.path}`)
+          .join(', ')}`
+      );
+      await callApi('deviceFirmwareUpdate', connectId, { targets });
+      addLog('ok', `${label}: install command finished`);
+    },
+    [addLog, callApi, resetFirmwareProgress]
+  );
+
   const standalonePrelude = useCallback(
     async (label: string) => {
       const first = await connectDevice(CONNECT_TIMEOUT_MS, `${label}.pre.connect`);
@@ -835,6 +883,21 @@ export default function Pro2UpdatePage() {
     [files]
   );
 
+  /** 可选文件：未手动选择且默认包未确认可用（manifest available !== true）时返回 null，SE1-4 等可选目标用 */
+  const getOptionalFile = useCallback(
+    async (key: RequiredFileKey): Promise<File | null> => {
+      const selectedFile = files[key];
+      if (!selectedFile) return null;
+      if (selectedFile.mode === 'manual') return selectedFile.file;
+      if (selectedFile.available !== true) return null;
+      const blob = await fetchDeviceUpdateBlob(selectedFile.sourcePath);
+      return new File([blob], selectedFile.name, {
+        type: 'application/octet-stream',
+      });
+    },
+    [files]
+  );
+
   const getAssetsDirectory = useCallback(async () => {
     if (assetSource) return assetSource;
     const handle = await requestAssetsDirectory();
@@ -936,6 +999,15 @@ export default function Pro2UpdatePage() {
 
   const runStep4Once = useCallback(async () => {
     const firmwareFile = await requireFile('firmware');
+    // SE1-4 固件是可选目标：有文件（手动选择或默认包内可用）才参与本次安装
+    const seFiles: Array<{ targetId: number; devicePath: string; file: File; key: SeFileKey }> = [];
+    for (const seConfig of SE_FILE_CONFIG) {
+      const seFile = await getOptionalFile(seConfig.key);
+      if (seFile) {
+        seFiles.push({ ...seConfig, file: seFile });
+      }
+    }
+
     let connectId = (await connectDevice(CONNECT_TIMEOUT_MS, 'Step4.1')).connectId;
     await rebootDevice(connectId, 1, 'Step4.2');
     await wait(STEP4_POST_REBOOT_WAIT_MS, 'Step4.2');
@@ -959,8 +1031,24 @@ export default function Pro2UpdatePage() {
       addLog('info', `Step4.5: ${STEP4_CORE_PATH} already exists`);
     }
 
+    for (const seFile of seFiles) {
+      await writeFile(connectId, seFile.file, seFile.devicePath, `Step4.5 ${seFile.key}`);
+    }
+
     try {
-      await firmwareUpdate(connectId, 1, STEP4_CORE_PATH, 'Step4.6');
+      if (seFiles.length > 0) {
+        // SE 与主固件合并为一次 DeviceFirmwareUpdate 调用（targets 数组），SE 在前、主固件在后
+        await firmwareUpdateTargets(
+          connectId,
+          [
+            ...seFiles.map(seFile => ({ target_id: seFile.targetId, path: seFile.devicePath })),
+            { target_id: 1, path: STEP4_CORE_PATH },
+          ],
+          'Step4.6'
+        );
+      } else {
+        await firmwareUpdate(connectId, 1, STEP4_CORE_PATH, 'Step4.6');
+      }
     } catch (error) {
       addLog('warn', `Step4.6: ignored firmware update error: ${getErrorMessage(error)}`);
     }
@@ -971,6 +1059,8 @@ export default function Pro2UpdatePage() {
     addLog,
     connectDevice,
     firmwareUpdate,
+    firmwareUpdateTargets,
+    getOptionalFile,
     getPathInfo,
     pingDevice,
     rebootDevice,

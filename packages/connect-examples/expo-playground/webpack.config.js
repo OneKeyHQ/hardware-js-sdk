@@ -15,6 +15,12 @@ const deviceUpdateBinaries = {
   updateRom: 'pro2_boot_update_rom_signed.bin',
   bluetooth: 'pro2_bluetooth_signed.bin',
   firmware: 'pro2_firmware_signed.bin',
+  // SE1-4 固件为可选目标：bin 目录里没有对应文件时 manifest 标记 available=false，
+  // 页面会跳过这些 target（也可在页面上手动选择文件）
+  se1: 'pro2_se1_signed.bin',
+  se2: 'pro2_se2_signed.bin',
+  se3: 'pro2_se3_signed.bin',
+  se4: 'pro2_se4_signed.bin',
 };
 
 function readFileSize(filePath) {
