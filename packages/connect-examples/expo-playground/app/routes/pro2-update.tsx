@@ -25,7 +25,7 @@ const TARGET_FIELDS = [
   { param: 'se02Binary', label: 'SE02', targetId: 7, accept: '.bin' },
   { param: 'se03Binary', label: 'SE03', targetId: 8, accept: '.bin' },
   { param: 'se04Binary', label: 'SE04', targetId: 9, accept: '.bin' },
-  { param: 'resourceBinary', label: 'Resource', targetId: 10, accept: '.zip,.bin' },
+  { param: 'resourceBinary', label: 'Resource', targetId: 10, accept: '.bin' },
 ] as const;
 
 type TargetParam = (typeof TARGET_FIELDS)[number]['param'];

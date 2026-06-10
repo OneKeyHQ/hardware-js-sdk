@@ -1,4 +1,3 @@
-import JSZip from 'jszip';
 import { HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { DevRebootType } from '@onekeyfe/hd-transport';
 
@@ -1954,9 +1953,6 @@ describe('Protocol V2 firmware update targets', () => {
   });
 
   test('passes resource, bootloader, BLE, SE and app files to DevFirmwareUpdate targets', async () => {
-    const resourceZip = new JSZip();
-    resourceZip.file('icons/home.png', new Uint8Array([1, 2, 3]));
-    const resourceBinary = await resourceZip.generateAsync({ type: 'arraybuffer' });
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -1966,7 +1962,6 @@ describe('Protocol V2 firmware update targets', () => {
 
     const writtenPaths: string[] = [];
     method.postTipMessage = jest.fn();
-    (method as any).protocolV2CreateFolder = jest.fn().mockResolvedValue(undefined);
     (method as any).protocolV2CommonUpdateProcess = jest.fn().mockImplementation(params => {
       writtenPaths.push(params.filePath);
       return Number(params.processedSize ?? 0) + Number(params.payload.byteLength);
@@ -1977,7 +1972,8 @@ describe('Protocol V2 firmware update targets', () => {
       .mockResolvedValue(undefined);
 
     await (method as any).executeProtocolV2Update({
-      resourceBinary,
+      // resource 只支持单文件 .bin，整文件一次上传
+      resourceBinary: new Uint8Array([1, 2, 3]).buffer,
       bootloaderBinary: new Uint8Array([4, 5]).buffer,
       fwBinaryMap: [
         {
@@ -1995,18 +1991,17 @@ describe('Protocol V2 firmware update targets', () => {
       ],
     });
 
-    expect((method as any).protocolV2CreateFolder).toHaveBeenCalledWith('vol1:res/');
     expect(writtenPaths).toEqual([
-      'vol1:res/home.png',
+      'vol1:resource.bin',
       'vol1:bootloader.bin',
       'vol1:ble-firmware.bin',
       'vol1:se1-firmware.bin',
       'vol1:firmware.bin',
     ]);
-    // DevFirmwareTargetType（FwMgmtTarget_t）：BOOTLOADER=2, COPROCESSOR=5, SE01=6, APPLICATION_P1=3
+    // DevFirmwareTargetType（FwMgmtTarget_t）：RESOURCE=10, BOOTLOADER=2, COPROCESSOR=5, SE01=6, APPLICATION_P1=3
     expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenCalledWith({
       targets: [
-        { target_id: 10, path: 'vol1:res/' },
+        { target_id: 10, path: 'vol1:resource.bin' },
         { target_id: 2, path: 'vol1:bootloader.bin' },
         { target_id: 5, path: 'vol1:ble-firmware.bin' },
         { target_id: 6, path: 'vol1:se1-firmware.bin' },
@@ -2014,40 +2009,6 @@ describe('Protocol V2 firmware update targets', () => {
       ],
     });
     expect((method as any).waitForProtocolV2FirmwareUpdateComplete).toHaveBeenCalled();
-  });
-
-  test('uploads non-zip resource binaries as a single file target', async () => {
-    const method = new FirmwareUpdateV4({
-      id: 1,
-      payload: {
-        method: 'firmwareUpdateV4',
-      },
-    });
-
-    const writtenPaths: string[] = [];
-    method.postTipMessage = jest.fn();
-    (method as any).protocolV2CreateFolder = jest.fn().mockResolvedValue(undefined);
-    (method as any).protocolV2CommonUpdateProcess = jest.fn().mockImplementation(params => {
-      writtenPaths.push(params.filePath);
-      return Number(params.processedSize ?? 0) + Number(params.payload.byteLength);
-    });
-    (method as any).protocolV2StartFirmwareUpdate = jest.fn().mockResolvedValue(undefined);
-    (method as any).waitForProtocolV2FirmwareUpdateComplete = jest
-      .fn()
-      .mockResolvedValue(undefined);
-
-    // 非 zip（无 PK 魔数）的 resource 直接作为单文件上传，不走解包
-    await (method as any).executeProtocolV2Update({
-      resourceBinary: new Uint8Array([0xde, 0xad, 0xbe, 0xef]).buffer,
-      bootloaderBinary: null,
-      fwBinaryMap: [],
-    });
-
-    expect((method as any).protocolV2CreateFolder).not.toHaveBeenCalled();
-    expect(writtenPaths).toEqual(['vol1:resource.bin']);
-    expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenCalledWith({
-      targets: [{ target_id: 10, path: 'vol1:resource.bin' }],
-    });
   });
 
   test('passes explicit per-target binaries through without file name heuristics', async () => {
