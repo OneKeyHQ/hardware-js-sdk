@@ -34,7 +34,7 @@ type WorkflowStepId = 'step1' | 'step2' | 'step3' | 'step4';
 type StepStatus = 'idle' | 'running' | 'success' | 'failed' | 'skipped';
 type LogLevel = 'info' | 'ok' | 'warn' | 'error';
 type SeFileKey = 'se1' | 'se2' | 'se3' | 'se4';
-type RequiredFileKey = 'romloader' | 'updateRom' | 'bluetooth' | 'firmware' | SeFileKey;
+type RequiredFileKey = 'bootloader' | 'coprocessor' | 'appP1' | 'appP2' | SeFileKey;
 
 type DirectoryHandle = {
   kind: 'directory';
@@ -134,24 +134,24 @@ type AssetSource =
 
 const REQUIRED_FILES: Array<{ key: RequiredFileKey; label: string; expectedName: string }> = [
   {
-    key: 'romloader',
-    label: 'Romloader',
-    expectedName: 'pro2_romloader_v3_msc.bin',
-  },
-  {
-    key: 'updateRom',
-    label: 'Update Bootloader',
+    key: 'bootloader',
+    label: 'Bootloader',
     expectedName: 'pro2_boot_update_rom_signed.bin',
   },
   {
-    key: 'bluetooth',
-    label: 'Bluetooth',
+    key: 'coprocessor',
+    label: 'Coprocessor',
     expectedName: 'pro2_bluetooth_signed.bin',
   },
   {
-    key: 'firmware',
-    label: 'Firmware',
+    key: 'appP1',
+    label: 'APP P1',
     expectedName: 'pro2_firmware_signed.bin',
+  },
+  {
+    key: 'appP2',
+    label: 'APP P2 (optional)',
+    expectedName: 'pro2_app_p2_signed.bin',
   },
   {
     key: 'se1',
@@ -234,12 +234,12 @@ const STEP_CONFIG: Array<{ id: WorkflowStepId; title: string; description: strin
   {
     id: 'step3',
     title: 'Step 3',
-    description: 'Update bluetooth',
+    description: 'Update coprocessor',
   },
   {
     id: 'step4',
     title: 'Step 4',
-    description: 'Update firmware',
+    description: 'Update application (P1/P2)',
   },
 ];
 
@@ -254,10 +254,10 @@ const CONNECT_TIMEOUT_MS = 60_000;
 const PING_TIMEOUT_MS = 60_000;
 const DEVICE_FILE_WRITE_CHUNK_SIZE = 2048;
 const STEP1_BOOT_LOGO_PATH = 'vol0:assets/boot/boot_logo.bin';
-const STEP1_ROMLOADER_PATH = 'vol0:romloader.bin';
-const STEP1_UPDATE_ROM_PATH = 'vol0:update_rom.bin';
-const STEP3_BLUETOOTH_PATH = 'vol0:bluetooth.bin';
-const STEP4_CORE_PATH = 'vol0:core.bin';
+const STEP1_BOOTLOADER_PATH = 'vol0:update_rom.bin';
+const STEP3_COPROCESSOR_PATH = 'vol0:bluetooth.bin';
+const STEP4_APP_P1_PATH = 'vol0:core.bin';
+const STEP4_APP_P2_PATH = 'vol0:app_p2.bin';
 const STEP2_UPLOAD_DONE_WAIT_MS = 3000;
 const STEP3_POST_PING_WAIT_MS = 5000;
 const STEP3_DONE_WAIT_MS = 5000;
@@ -905,8 +905,7 @@ export default function Pro2UpdatePage() {
   }, [assetSource, requestAssetsDirectory]);
 
   const runStep1Once = useCallback(async () => {
-    const romloaderFile = await requireFile('romloader');
-    const updateRomFile = await requireFile('updateRom');
+    const bootloaderFile = await requireFile('bootloader');
 
     const device = await connectDevice(CONNECT_TIMEOUT_MS, 'Step1.1');
     let connectId = device.connectId;
@@ -921,18 +920,16 @@ export default function Pro2UpdatePage() {
       addLog('info', `Step1.3: ${STEP1_BOOT_LOGO_PATH} not found`);
     }
 
-    await writeFile(connectId, romloaderFile, STEP1_ROMLOADER_PATH, 'Step1.4');
-    await wait(1000, 'Step1.4 -> Step1.5');
-    await writeFile(connectId, updateRomFile, STEP1_UPDATE_ROM_PATH, 'Step1.5');
+    await writeFile(connectId, bootloaderFile, STEP1_BOOTLOADER_PATH, 'Step1.4');
     // TARGET_BOOTLOADER = 2（FwMgmtTarget_t）
-    await firmwareUpdate(connectId, 2, STEP1_UPDATE_ROM_PATH, 'Step1.6');
-    await rebootDevice(connectId, 0, 'Step1.7');
-    await wait(STEP1_REBOOT_WAIT_MS, 'Step1.7');
+    await firmwareUpdate(connectId, 2, STEP1_BOOTLOADER_PATH, 'Step1.5');
+    await rebootDevice(connectId, 0, 'Step1.6');
+    await wait(STEP1_REBOOT_WAIT_MS, 'Step1.6');
 
-    const secondDevice = await connectDevice(CONNECT_TIMEOUT_MS, 'Step1.8');
+    const secondDevice = await connectDevice(CONNECT_TIMEOUT_MS, 'Step1.7');
     connectId = secondDevice.connectId;
-    await rebootDevice(connectId, 0, 'Step1.9');
-    await wait(STEP1_SECOND_REBOOT_WAIT_MS, 'Step1.9');
+    await rebootDevice(connectId, 0, 'Step1.8');
+    await wait(STEP1_SECOND_REBOOT_WAIT_MS, 'Step1.8');
   }, [
     addLog,
     callApi,
@@ -965,7 +962,7 @@ export default function Pro2UpdatePage() {
 
   const runStep3Once = useCallback(
     async (initialConnectId?: string) => {
-      const bluetoothFile = await requireFile('bluetooth');
+      const coprocessorFile = await requireFile('coprocessor');
       let connectId = initialConnectId;
       if (!connectId) {
         connectId =
@@ -977,31 +974,32 @@ export default function Pro2UpdatePage() {
       await pingDevice(connectId, PING_TIMEOUT_MS, 'Step3.2');
       await wait(STEP3_POST_PING_WAIT_MS, 'Step3.2');
 
-      addLog('info', `Step3.3: check ${STEP3_BLUETOOTH_PATH}`);
+      addLog('info', `Step3.3: check ${STEP3_COPROCESSOR_PATH}`);
       let needsWrite = true;
       try {
-        const info = await getPathInfo(connectId, STEP3_BLUETOOTH_PATH);
+        const info = await getPathInfo(connectId, STEP3_COPROCESSOR_PATH);
         needsWrite = !info.exist;
       } catch (error) {
         addLog('warn', `Step3.3: path info failed, writing file: ${getErrorMessage(error)}`);
       }
 
       if (needsWrite) {
-        await writeFile(connectId, bluetoothFile, STEP3_BLUETOOTH_PATH, 'Step3.3');
+        await writeFile(connectId, coprocessorFile, STEP3_COPROCESSOR_PATH, 'Step3.3');
       } else {
-        addLog('info', `Step3.3: ${STEP3_BLUETOOTH_PATH} already exists`);
+        addLog('info', `Step3.3: ${STEP3_COPROCESSOR_PATH} already exists`);
       }
 
       // TARGET_COPROCESSOR = 5（FwMgmtTarget_t，蓝牙协处理器）
-      await firmwareUpdate(connectId, 5, STEP3_BLUETOOTH_PATH, 'Step3.4');
+      await firmwareUpdate(connectId, 5, STEP3_COPROCESSOR_PATH, 'Step3.4');
       await wait(STEP3_DONE_WAIT_MS, 'Step3.5');
     },
     [addLog, connectDevice, firmwareUpdate, getPathInfo, pingDevice, requireFile, wait, writeFile]
   );
 
   const runStep4Once = useCallback(async () => {
-    const firmwareFile = await requireFile('firmware');
-    // SE1-4 固件是可选目标：有文件（手动选择或默认包内可用）才参与本次安装
+    const appP1File = await requireFile('appP1');
+    // APP P2 与 SE1-4 为可选目标：有文件（手动选择或默认包内可用）才参与本次安装
+    const appP2File = await getOptionalFile('appP2');
     const seFiles: Array<{ targetId: number; devicePath: string; file: File; key: SeFileKey }> = [];
     for (const seConfig of SE_FILE_CONFIG) {
       const seFile = await getOptionalFile(seConfig.key);
@@ -1018,39 +1016,40 @@ export default function Pro2UpdatePage() {
     await pingDevice(connectId, PING_TIMEOUT_MS, 'Step4.4');
     await wait(STEP4_POST_PING_WAIT_MS, 'Step4.4');
 
-    addLog('info', `Step4.5: check ${STEP4_CORE_PATH}`);
+    addLog('info', `Step4.5: check ${STEP4_APP_P1_PATH}`);
     let needsWrite = true;
     try {
-      const info = await getPathInfo(connectId, STEP4_CORE_PATH);
+      const info = await getPathInfo(connectId, STEP4_APP_P1_PATH);
       needsWrite = !info.exist;
     } catch (error) {
       addLog('warn', `Step4.5: path info failed, writing file: ${getErrorMessage(error)}`);
     }
 
     if (needsWrite) {
-      await writeFile(connectId, firmwareFile, STEP4_CORE_PATH, 'Step4.5');
+      await writeFile(connectId, appP1File, STEP4_APP_P1_PATH, 'Step4.5');
     } else {
-      addLog('info', `Step4.5: ${STEP4_CORE_PATH} already exists`);
+      addLog('info', `Step4.5: ${STEP4_APP_P1_PATH} already exists`);
     }
 
+    if (appP2File) {
+      await writeFile(connectId, appP2File, STEP4_APP_P2_PATH, 'Step4.5 appP2');
+    }
     for (const seFile of seFiles) {
       await writeFile(connectId, seFile.file, seFile.devicePath, `Step4.5 ${seFile.key}`);
     }
 
+    // FwMgmtTarget_t：APPLICATION_P1 = 3、APPLICATION_P2 = 4、SE01-04 = 6-9
+    const installTargets: Array<{ target_id: number; path: string }> = [
+      ...seFiles.map(seFile => ({ target_id: seFile.targetId, path: seFile.devicePath })),
+      { target_id: 3, path: STEP4_APP_P1_PATH },
+      ...(appP2File ? [{ target_id: 4, path: STEP4_APP_P2_PATH }] : []),
+    ];
+
     try {
-      if (seFiles.length > 0) {
-        // SE 与主固件合并为一次 DeviceFirmwareUpdate 调用（targets 数组），SE 在前、主固件在后
-        await firmwareUpdateTargets(
-          connectId,
-          [
-            ...seFiles.map(seFile => ({ target_id: seFile.targetId, path: seFile.devicePath })),
-            // TARGET_APPLICATION_P1 = 3（FwMgmtTarget_t）
-            { target_id: 3, path: STEP4_CORE_PATH },
-          ],
-          'Step4.6'
-        );
+      if (installTargets.length > 1) {
+        await firmwareUpdateTargets(connectId, installTargets, 'Step4.6');
       } else {
-        await firmwareUpdate(connectId, 3, STEP4_CORE_PATH, 'Step4.6');
+        await firmwareUpdate(connectId, 3, STEP4_APP_P1_PATH, 'Step4.6');
       }
     } catch (error) {
       addLog('warn', `Step4.6: ignored firmware update error: ${getErrorMessage(error)}`);
@@ -1274,7 +1273,7 @@ export default function Pro2UpdatePage() {
                 </Badge>
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
-                Romloader, resources, bluetooth, and firmware workflow.
+                Bootloader, resources, coprocessor, and application (P1/P2) workflow.
               </p>
               <div className="mt-2 flex max-w-3xl items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
