@@ -152,6 +152,14 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       { name: 'forcedUpdateRes', type: 'boolean' },
       { name: 'bootloaderVersion', type: 'array' },
       { name: 'bootloaderBinary', type: 'buffer' },
+      { name: 'romloaderBinary', type: 'buffer' },
+      { name: 'applicationP1Binary', type: 'buffer' },
+      { name: 'applicationP2Binary', type: 'buffer' },
+      { name: 'coprocessorBinary', type: 'buffer' },
+      { name: 'se01Binary', type: 'buffer' },
+      { name: 'se02Binary', type: 'buffer' },
+      { name: 'se03Binary', type: 'buffer' },
+      { name: 'se04Binary', type: 'buffer' },
       { name: 'firmwareType', type: 'string' },
       { name: 'platform', type: 'string' },
     ]);
@@ -164,6 +172,14 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       bleVersion: payload.bleVersion,
       bootloaderVersion: payload.bootloaderVersion,
       bootloaderBinary: payload.bootloaderBinary,
+      romloaderBinary: payload.romloaderBinary,
+      applicationP1Binary: payload.applicationP1Binary,
+      applicationP2Binary: payload.applicationP2Binary,
+      coprocessorBinary: payload.coprocessorBinary,
+      se01Binary: payload.se01Binary,
+      se02Binary: payload.se02Binary,
+      se03Binary: payload.se03Binary,
+      se04Binary: payload.se04Binary,
       firmwareVersion: payload.firmwareVersion,
       resourceBinary: payload.resourceBinary,
       firmwareType: payload.firmwareType,
@@ -205,13 +221,15 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const firmwareType = this.params.firmwareType ?? deviceFirmwareType;
 
     let resourceBinary: ArrayBuffer | null = null;
-    let fwBinaryMap: { fileName: string; binary: ArrayBuffer }[] = [];
+    let fwBinaryMap: { fileName: string; binary: ArrayBuffer; targetId?: number }[] = [];
     let bootloaderBinary: ArrayBuffer | null = null;
     try {
       this.postTipMessage(FirmwareUpdateTipMessage.StartDownloadFirmware);
       resourceBinary = await this.prepareResourceBinary(firmwareType, legacyFeatures);
       fwBinaryMap = await this.prepareFirmwareAndBleBinary(firmwareType, legacyFeatures);
       bootloaderBinary = await this.prepareBootloaderBinary(firmwareType, legacyFeatures);
+      // 按 DevFirmwareTargetType 拆分的目标二进制（显式 target_id，不走文件名推断）
+      fwBinaryMap.push(...this.collectExplicitTargetBinaries());
       this.postTipMessage(FirmwareUpdateTipMessage.FinishDownloadFirmware);
     } catch (err) {
       throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
@@ -285,8 +303,45 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return null;
   }
 
+  /**
+   * 收集按 DevFirmwareTargetType 拆分的显式目标二进制。
+   * 文件名仅用于 staging 路径展示，target_id 已显式给定。
+   */
+  private collectExplicitTargetBinaries() {
+    const entries: { fileName: string; binary: ArrayBuffer; targetId: number }[] = [];
+    const push = (binary: ArrayBuffer | undefined, fileName: string, targetId: number) => {
+      if (binary) entries.push({ fileName, binary, targetId });
+    };
+
+    push(
+      this.params.romloaderBinary,
+      'romloader.bin',
+      ProtocolV2FirmwareTargetType.TARGET_ROMLOADER
+    );
+    push(
+      this.params.applicationP1Binary,
+      'application_p1.bin',
+      ProtocolV2FirmwareTargetType.TARGET_APPLICATION_P1
+    );
+    push(
+      this.params.applicationP2Binary,
+      'application_p2.bin',
+      ProtocolV2FirmwareTargetType.TARGET_APPLICATION_P2
+    );
+    push(
+      this.params.coprocessorBinary,
+      'coprocessor.bin',
+      ProtocolV2FirmwareTargetType.TARGET_COPROCESSOR
+    );
+    push(this.params.se01Binary, 'se01.bin', ProtocolV2FirmwareTargetType.TARGET_SE01);
+    push(this.params.se02Binary, 'se02.bin', ProtocolV2FirmwareTargetType.TARGET_SE02);
+    push(this.params.se03Binary, 'se03.bin', ProtocolV2FirmwareTargetType.TARGET_SE03);
+    push(this.params.se04Binary, 'se04.bin', ProtocolV2FirmwareTargetType.TARGET_SE04);
+    return entries;
+  }
+
   private async prepareFirmwareAndBleBinary(firmwareType: EFirmwareType, features: Features) {
-    const fwBinaryMap: { fileName: string; binary: ArrayBuffer }[] = [];
+    const fwBinaryMap: { fileName: string; binary: ArrayBuffer; targetId?: number }[] = [];
     if (this.params.firmwareBinary) {
       fwBinaryMap.push({
         fileName: 'firmware.bin',
@@ -335,7 +390,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     bootloaderBinary,
   }: {
     resourceBinary: ArrayBuffer | null;
-    fwBinaryMap: { fileName: string; binary: ArrayBuffer }[];
+    fwBinaryMap: { fileName: string; binary: ArrayBuffer; targetId?: number }[];
     bootloaderBinary: ArrayBuffer | null;
   }) {
     let totalSize = 0;
@@ -381,7 +436,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         totalSize,
       });
       targets.push({
-        target_id: ProtocolV2FirmwareTargetType.TARGET_MAIN_BOOT,
+        target_id: ProtocolV2FirmwareTargetType.TARGET_BOOTLOADER,
         path: bootloaderPath,
       });
     }
@@ -395,7 +450,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         totalSize,
       });
       targets.push({
-        target_id: protocolV2FileNameToTargetId(fwbinary.fileName),
+        target_id: fwbinary.targetId ?? protocolV2FileNameToTargetId(fwbinary.fileName),
         path: firmwarePath,
       });
     }

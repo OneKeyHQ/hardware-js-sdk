@@ -320,7 +320,7 @@ export const en = {
       firmwareUpdateV2: 'compatible with all devices',
       firmwareUpdateV3: 'Legacy OneKey Pro firmware update flow',
       firmwareUpdateV4:
-        'Protocol V2 one-stop firmware update with progress and final version refresh',
+        'Protocol V2 firmware update split by DevFirmwareTargetType: romloader, bootloader, application P1/P2, coprocessor, SE01-04 and resource targets',
       getProtoVersion: 'Protocol V2 protocol version query',
       ping: 'Protocol V2 device liveness test',
       deviceReboot: 'Protocol V2 device reboot',

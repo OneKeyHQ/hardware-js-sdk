@@ -175,12 +175,12 @@ const REQUIRED_FILES: Array<{ key: RequiredFileKey; label: string; expectedName:
   },
 ];
 
-// DevFirmwareTargetType（messages_device.proto）：SE1-4 = 3-6
+// DevFirmwareTargetType（matches firmware FwMgmtTarget_t）：SE01-04 = 6-9
 const SE_FILE_CONFIG: Array<{ key: SeFileKey; targetId: number; devicePath: string }> = [
-  { key: 'se1', targetId: 3, devicePath: 'vol0:se1.bin' },
-  { key: 'se2', targetId: 4, devicePath: 'vol0:se2.bin' },
-  { key: 'se3', targetId: 5, devicePath: 'vol0:se3.bin' },
-  { key: 'se4', targetId: 6, devicePath: 'vol0:se4.bin' },
+  { key: 'se1', targetId: 6, devicePath: 'vol0:se1.bin' },
+  { key: 'se2', targetId: 7, devicePath: 'vol0:se2.bin' },
+  { key: 'se3', targetId: 8, devicePath: 'vol0:se3.bin' },
+  { key: 'se4', targetId: 9, devicePath: 'vol0:se4.bin' },
 ];
 
 function getDeviceUpdateBaseUrl() {
@@ -924,7 +924,8 @@ export default function Pro2UpdatePage() {
     await writeFile(connectId, romloaderFile, STEP1_ROMLOADER_PATH, 'Step1.4');
     await wait(1000, 'Step1.4 -> Step1.5');
     await writeFile(connectId, updateRomFile, STEP1_UPDATE_ROM_PATH, 'Step1.5');
-    await firmwareUpdate(connectId, 1, STEP1_UPDATE_ROM_PATH, 'Step1.6');
+    // TARGET_BOOTLOADER = 2（FwMgmtTarget_t）
+    await firmwareUpdate(connectId, 2, STEP1_UPDATE_ROM_PATH, 'Step1.6');
     await rebootDevice(connectId, 0, 'Step1.7');
     await wait(STEP1_REBOOT_WAIT_MS, 'Step1.7');
 
@@ -991,7 +992,8 @@ export default function Pro2UpdatePage() {
         addLog('info', `Step3.3: ${STEP3_BLUETOOTH_PATH} already exists`);
       }
 
-      await firmwareUpdate(connectId, 2, STEP3_BLUETOOTH_PATH, 'Step3.4');
+      // TARGET_COPROCESSOR = 5（FwMgmtTarget_t，蓝牙协处理器）
+      await firmwareUpdate(connectId, 5, STEP3_BLUETOOTH_PATH, 'Step3.4');
       await wait(STEP3_DONE_WAIT_MS, 'Step3.5');
     },
     [addLog, connectDevice, firmwareUpdate, getPathInfo, pingDevice, requireFile, wait, writeFile]
@@ -1042,14 +1044,13 @@ export default function Pro2UpdatePage() {
           connectId,
           [
             ...seFiles.map(seFile => ({ target_id: seFile.targetId, path: seFile.devicePath })),
-            // TARGET_MAIN_APP = 0：固件按 target_id 校验 container 类型，
-            // 主固件（FIRMWARE container）传 1（BOOTLOADER）会直接 VERIFY 失败
-            { target_id: 0, path: STEP4_CORE_PATH },
+            // TARGET_APPLICATION_P1 = 3（FwMgmtTarget_t）
+            { target_id: 3, path: STEP4_CORE_PATH },
           ],
           'Step4.6'
         );
       } else {
-        await firmwareUpdate(connectId, 0, STEP4_CORE_PATH, 'Step4.6');
+        await firmwareUpdate(connectId, 3, STEP4_CORE_PATH, 'Step4.6');
       }
     } catch (error) {
       addLog('warn', `Step4.6: ignored firmware update error: ${getErrorMessage(error)}`);

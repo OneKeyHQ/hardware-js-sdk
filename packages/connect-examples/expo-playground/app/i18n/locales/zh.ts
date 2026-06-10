@@ -310,7 +310,7 @@ export const zh = {
       filecoinSignTransaction: '使用 Filecoin 私钥签名交易',
       firmwareUpdateV2: '兼容所有设备',
       firmwareUpdateV3: 'OneKey Pro 旧固件升级流程',
-      firmwareUpdateV4: 'Protocol V2 固件升级一条龙，包含进度和完成后的版本刷新',
+      firmwareUpdateV4: 'Protocol V2 固件升级，按 DevFirmwareTargetType 拆分：romloader、bootloader、application P1/P2、协处理器、SE01-04 与资源目标',
       getProtoVersion: 'Protocol V2 查询协议版本',
       ping: 'Protocol V2 设备连通性测试',
       deviceReboot: 'Protocol V2 设备重启',

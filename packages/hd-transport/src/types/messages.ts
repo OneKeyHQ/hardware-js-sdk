@@ -4430,23 +4430,6 @@ export type TxAckPaymentRequest = {
   signature: string;
 };
 
-// DebugLinkInput
-export type DebugLinkInput = {
-  x?: number;
-  y?: number;
-  duration_ms?: number;
-  x_end?: number;
-  y_end?: number;
-};
-
-// InternalMyAddressRequest
-export type InternalMyAddressRequest = {
-  coin_type: number;
-  chain_id: number;
-  account_index: number;
-  derive_type: number;
-};
-
 // SetBusy
 export type SetBusy = {
   expiry_ms?: number;
@@ -4475,28 +4458,6 @@ export type WriteSEPrivateKey = {
   private_key: string;
 };
 
-export enum WallpaperTarget {
-  Home = 0,
-  Lock = 1,
-}
-
-// SetWallpaper
-export type SetWallpaper = {
-  target: WallpaperTarget;
-  path: string;
-};
-
-// GetWallpaper
-export type GetWallpaper = {
-  target: WallpaperTarget;
-};
-
-// Wallpaper
-export type Wallpaper = {
-  target: WallpaperTarget;
-  path: string;
-};
-
 // UnlockPath
 export type UnlockPath = {
   address_n: number[];
@@ -4515,33 +4476,47 @@ export enum MoneroNetworkType {
   FAKECHAIN = 3,
 }
 
-// ViewAmount
-export type ViewAmount = {
-  is_unlimited: boolean;
+// TxDetailsAmount
+export type TxDetailsAmount = {
   num: string;
+  decimals: number;
   symbol: string;
 };
 
-// ViewDetail
-export type ViewDetail = {
+// TxDetailsAddress
+export type TxDetailsAddress = {
+  key: number;
+  address: string;
+  owner?: string;
+  icon?: string;
+};
+
+// TxDetailsNetwork
+export type TxDetailsNetwork = {
+  coin_type: number;
+  chain_id?: number;
+};
+
+// TxDetailsGeneral
+export type TxDetailsGeneral = {
   key: number;
   value: string;
   is_overview: boolean;
-  has_icon: boolean;
 };
 
-// ViewSignPage
-export type ViewSignPage = {
+export enum TxDetailsDisplayType {
+  DISPLAY_TYPE_INFO = 0,
+  DISPLAY_TYPE_SIGN = 1,
+}
+
+// TxDetailsPage
+export type TxDetailsPage = {
   title: string;
+  display_type: TxDetailsDisplayType;
   amount?: UintType;
-  general: ViewDetail[];
-};
-
-// ViewVerifyPage
-export type ViewVerifyPage = {
-  title: string;
-  address: string;
-  path: string;
+  network?: TxDetailsNetwork;
+  address: TxDetailsAddress[];
+  general: TxDetailsGeneral[];
 };
 
 // GetProtoVersion
@@ -4671,13 +4646,16 @@ export type ProtocolV2DeviceInfo = {
 };
 
 export enum DevFirmwareTargetType {
-  TARGET_MAIN_APP = 0,
-  TARGET_MAIN_BOOT = 1,
-  TARGET_BT = 2,
-  TARGET_SE1 = 3,
-  TARGET_SE2 = 4,
-  TARGET_SE3 = 5,
-  TARGET_SE4 = 6,
+  TARGET_INVALID = 0,
+  TARGET_ROMLOADER = 1,
+  TARGET_BOOTLOADER = 2,
+  TARGET_APPLICATION_P1 = 3,
+  TARGET_APPLICATION_P2 = 4,
+  TARGET_COPROCESSOR = 5,
+  TARGET_SE01 = 6,
+  TARGET_SE02 = 7,
+  TARGET_SE03 = 8,
+  TARGET_SE04 = 9,
   TARGET_RESOURCE = 10,
 }
 
@@ -5410,23 +5388,19 @@ export type MessageType = {
   CoinPurchaseMemo: CoinPurchaseMemo;
   PaymentRequestMemo: PaymentRequestMemo;
   TxAckPaymentRequest: TxAckPaymentRequest;
-  DebugLinkInput: DebugLinkInput;
-  InternalMyAddressRequest: InternalMyAddressRequest;
   SetBusy: SetBusy;
   GetFirmwareHash: GetFirmwareHash;
   FirmwareHash: FirmwareHash;
   GetNonce: GetNonce;
   Nonce: Nonce;
   WriteSEPrivateKey: WriteSEPrivateKey;
-  SetWallpaper: SetWallpaper;
-  GetWallpaper: GetWallpaper;
-  Wallpaper: Wallpaper;
   UnlockPath: UnlockPath;
   UnlockedPathRequest: UnlockedPathRequest;
-  ViewAmount: ViewAmount;
-  ViewDetail: ViewDetail;
-  ViewSignPage: ViewSignPage;
-  ViewVerifyPage: ViewVerifyPage;
+  TxDetailsAmount: TxDetailsAmount;
+  TxDetailsAddress: TxDetailsAddress;
+  TxDetailsNetwork: TxDetailsNetwork;
+  TxDetailsGeneral: TxDetailsGeneral;
+  TxDetailsPage: TxDetailsPage;
   GetProtoVersion: GetProtoVersion;
   ProtoVersion: ProtoVersion;
   DevReboot: DevReboot;

@@ -2003,16 +2003,63 @@ describe('Protocol V2 firmware update targets', () => {
       'vol1:se1-firmware.bin',
       'vol1:firmware.bin',
     ]);
+    // DevFirmwareTargetType（FwMgmtTarget_t）：BOOTLOADER=2, COPROCESSOR=5, SE01=6, APPLICATION_P1=3
     expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenCalledWith({
       targets: [
         { target_id: 10, path: 'vol1:res/' },
-        { target_id: 1, path: 'vol1:bootloader.bin' },
-        { target_id: 2, path: 'vol1:ble-firmware.bin' },
-        { target_id: 3, path: 'vol1:se1-firmware.bin' },
-        { target_id: 0, path: 'vol1:firmware.bin' },
+        { target_id: 2, path: 'vol1:bootloader.bin' },
+        { target_id: 5, path: 'vol1:ble-firmware.bin' },
+        { target_id: 6, path: 'vol1:se1-firmware.bin' },
+        { target_id: 3, path: 'vol1:firmware.bin' },
       ],
     });
     expect((method as any).waitForProtocolV2FirmwareUpdateComplete).toHaveBeenCalled();
+  });
+
+  test('passes explicit per-target binaries through without file name heuristics', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+        romloaderBinary: new Uint8Array([1]).buffer,
+        applicationP2Binary: new Uint8Array([2]).buffer,
+        se04Binary: new Uint8Array([3]).buffer,
+      },
+    });
+    method.init();
+
+    const explicit = (method as any).collectExplicitTargetBinaries();
+    expect(explicit).toEqual([
+      { fileName: 'romloader.bin', binary: expect.anything(), targetId: 1 },
+      { fileName: 'application_p2.bin', binary: expect.anything(), targetId: 4 },
+      { fileName: 'se04.bin', binary: expect.anything(), targetId: 9 },
+    ]);
+
+    method.postTipMessage = jest.fn();
+    (method as any).protocolV2CommonUpdateProcess = jest
+      .fn()
+      .mockImplementation(params =>
+        Promise.resolve(Number(params.processedSize ?? 0) + Number(params.payload.byteLength))
+      );
+    (method as any).protocolV2StartFirmwareUpdate = jest.fn().mockResolvedValue(undefined);
+    (method as any).waitForProtocolV2FirmwareUpdateComplete = jest
+      .fn()
+      .mockResolvedValue(undefined);
+
+    await (method as any).executeProtocolV2Update({
+      resourceBinary: null,
+      bootloaderBinary: null,
+      fwBinaryMap: explicit,
+    });
+
+    expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenCalledWith({
+      targets: [
+        { target_id: 1, path: 'vol1:romloader.bin' },
+        { target_id: 4, path: 'vol1:application_p2.bin' },
+        { target_id: 9, path: 'vol1:se04.bin' },
+      ],
+    });
   });
 
   test('uses absolute processed_byte offsets and disables append for firmware file writes', async () => {
