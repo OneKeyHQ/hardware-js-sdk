@@ -1042,12 +1042,14 @@ export default function Pro2UpdatePage() {
           connectId,
           [
             ...seFiles.map(seFile => ({ target_id: seFile.targetId, path: seFile.devicePath })),
-            { target_id: 1, path: STEP4_CORE_PATH },
+            // TARGET_MAIN_APP = 0：固件按 target_id 校验 container 类型，
+            // 主固件（FIRMWARE container）传 1（BOOTLOADER）会直接 VERIFY 失败
+            { target_id: 0, path: STEP4_CORE_PATH },
           ],
           'Step4.6'
         );
       } else {
-        await firmwareUpdate(connectId, 1, STEP4_CORE_PATH, 'Step4.6');
+        await firmwareUpdate(connectId, 0, STEP4_CORE_PATH, 'Step4.6');
       }
     } catch (error) {
       addLog('warn', `Step4.6: ignored firmware update error: ${getErrorMessage(error)}`);
