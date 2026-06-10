@@ -50,6 +50,74 @@ const api: PlaygroundProps[] = [
     ],
   },
   {
+    method: 'deviceGetDeviceInfo',
+    description:
+      'Raw Protocol V2 DevGetDeviceInfo (no DeviceProfile wrapping, Pro2 only). Use the checkboxes to pick request targets/types.',
+    noDeviceIdReq: true,
+    checkboxGroups: [
+      {
+        title: 'Targets',
+        fields: [
+          { path: 'targets.hw', label: 'hw' },
+          { path: 'targets.fw', label: 'fw' },
+          { path: 'targets.bt', label: 'bt' },
+          { path: 'targets.se1', label: 'se1' },
+          { path: 'targets.se2', label: 'se2' },
+          { path: 'targets.se3', label: 'se3' },
+          { path: 'targets.se4', label: 'se4' },
+          { path: 'targets.status', label: 'status' },
+        ],
+      },
+      {
+        title: 'Types',
+        fields: [
+          { path: 'types.version', label: 'version' },
+          { path: 'types.build_id', label: 'build_id' },
+          { path: 'types.hash', label: 'hash' },
+          { path: 'types.specific', label: 'specific' },
+        ],
+      },
+    ],
+    presupposes: [
+      {
+        title: 'Basic',
+        value: {
+          targets: {
+            hw: true,
+            fw: true,
+            bt: true,
+            status: true,
+          },
+          types: {
+            version: true,
+            specific: true,
+          },
+        },
+      },
+      {
+        title: 'Full',
+        value: {
+          targets: {
+            hw: true,
+            fw: true,
+            bt: true,
+            se1: true,
+            se2: true,
+            se3: true,
+            se4: true,
+            status: true,
+          },
+          types: {
+            version: true,
+            build_id: true,
+            hash: true,
+            specific: true,
+          },
+        },
+      },
+    ],
+  },
+  {
     method: 'getPassphraseState',
     description: 'Get passphrase state of a device',
     noDeviceIdReq: true,

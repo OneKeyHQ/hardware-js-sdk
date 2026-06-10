@@ -154,6 +154,8 @@ export const createCoreApi = (
   getProtoVersion: (connectId, params) => call({ ...params, connectId, method: 'getProtoVersion' }),
   ping: (connectId, params) => call({ ...params, connectId, method: 'ping' }),
   deviceReboot: (connectId, params) => call({ ...params, connectId, method: 'deviceReboot' }),
+  deviceGetDeviceInfo: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceGetDeviceInfo' }),
   deviceGetOnboardingStatus: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceGetOnboardingStatus' }),
   deviceFirmwareUpdate: (connectId, params) =>

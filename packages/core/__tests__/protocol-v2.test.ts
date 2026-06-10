@@ -9,6 +9,7 @@ import DirList from '../src/api/DirList';
 import FileRead from '../src/api/FileRead';
 import FileWrite from '../src/api/FileWrite';
 import DeviceFirmwareUpdate from '../src/api/protocol-v2/DeviceFirmwareUpdate';
+import DeviceGetDeviceInfo from '../src/api/protocol-v2/DeviceGetDeviceInfo';
 import DeviceGetOnboardingStatus from '../src/api/protocol-v2/DeviceGetOnboardingStatus';
 import EVMSignMessageEIP712 from '../src/api/evm/EVMSignMessageEIP712';
 import FirmwareUpdateV3 from '../src/api/FirmwareUpdateV3';
@@ -2228,6 +2229,83 @@ describe('Protocol V2 firmware update method', () => {
     expect(typedCall.mock.calls[0][2]).toEqual({
       targets: [{ target_id: 3, path: 'vol0:firmware.bin' }],
     });
+  });
+});
+
+describe('Protocol V2 raw device info method', () => {
+  const buildMethod = (payload: Record<string, unknown> = {}) => {
+    const method = new DeviceGetDeviceInfo({
+      id: 1,
+      payload: {
+        method: 'deviceGetDeviceInfo',
+        ...payload,
+      },
+    });
+    method.init();
+    return method;
+  };
+
+  test('passes requested targets/types through and returns the raw DeviceInfo message', async () => {
+    const method = buildMethod({
+      targets: { hw: true, se1: true, junk: true },
+      types: { version: true, hash: true },
+    });
+    const typedCall = jest.fn().mockResolvedValue({
+      type: 'DeviceInfo',
+      message: { protocol_version: 1, hw: { serial_no: 'PR2SERIAL' } },
+    });
+    (method as any).device = stubDevice({
+      originalDescriptor: { protocolType: 'V2' },
+      commands: { typedCall },
+    });
+
+    await expect(method.run()).resolves.toEqual({
+      protocol_version: 1,
+      hw: { serial_no: 'PR2SERIAL' },
+    });
+    // 未知 key（junk）被过滤，已选 key 原样透传，不构建 DeviceProfile
+    expect(typedCall).toHaveBeenCalledWith(
+      'DevGetDeviceInfo',
+      'DeviceInfo',
+      {
+        targets: { hw: true, se1: true },
+        types: { version: true, hash: true },
+      },
+      { timeoutMs: PROTOCOL_V2_DEVICE_INFO_TIMEOUT_MS }
+    );
+  });
+
+  test('defaults to the basic targets/types when none are given', async () => {
+    const method = buildMethod();
+    const typedCall = jest.fn().mockResolvedValue({ type: 'DeviceInfo', message: {} });
+    (method as any).device = stubDevice({
+      originalDescriptor: { protocolType: 'V2' },
+      commands: { typedCall },
+    });
+
+    await method.run();
+
+    expect(typedCall).toHaveBeenCalledWith(
+      'DevGetDeviceInfo',
+      'DeviceInfo',
+      {
+        targets: { hw: true, fw: true, bt: true, status: true },
+        types: { version: true, specific: true },
+      },
+      { timeoutMs: PROTOCOL_V2_DEVICE_INFO_TIMEOUT_MS }
+    );
+  });
+
+  test('rejects on Protocol V1 devices instead of sending an unknown message', async () => {
+    const method = buildMethod();
+    const typedCall = jest.fn();
+    (method as any).device = stubDevice({
+      originalDescriptor: { protocolType: 'V1' },
+      commands: { typedCall },
+    });
+
+    await expect(method.run()).rejects.toThrow();
+    expect(typedCall).not.toHaveBeenCalled();
   });
 });
 

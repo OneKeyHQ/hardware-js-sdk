@@ -46,6 +46,7 @@ export { default as promptWebDeviceAccess } from './PromptWebDeviceAccess';
 export { default as getProtoVersion } from './protocol-v2/GetProtoVersion';
 export { default as ping } from './protocol-v2/Ping';
 export { default as deviceReboot } from './protocol-v2/DeviceReboot';
+export { default as deviceGetDeviceInfo } from './protocol-v2/DeviceGetDeviceInfo';
 export { default as deviceGetOnboardingStatus } from './protocol-v2/DeviceGetOnboardingStatus';
 export { default as deviceFirmwareUpdate } from './protocol-v2/DeviceFirmwareUpdate';
 export { default as deviceGetFirmwareUpdateStatus } from './protocol-v2/DeviceGetFirmwareUpdateStatus';

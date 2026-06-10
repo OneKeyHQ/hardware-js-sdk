@@ -12,8 +12,10 @@ import type {
   DeviceRebootParams,
   FactoryDeviceInfoSettingsParams,
 } from '../../api/protocol-v2/helpers';
+import type { DeviceGetDeviceInfoParams } from '../../api/protocol-v2/DeviceGetDeviceInfo';
+import type { ProtocolV2DeviceInfo } from '../../protocols/protocol-v2/features';
 
-// 参数类型单源：以 api/protocol-v2/helpers.ts 的实现为准（type-only re-export，无运行时依赖）
+// 参数类型单源：以 api/protocol-v2 的实现为准（type-only re-export，无运行时依赖）
 export type {
   DeviceFirmwareTargetInput,
   DeviceFirmwareUpdateParams,
@@ -21,6 +23,11 @@ export type {
   FactoryDeviceInfoSettingsParams,
   RebootTypeInput,
 } from '../../api/protocol-v2/helpers';
+export type {
+  DeviceGetDeviceInfoParams,
+  DeviceGetDeviceInfoTargets,
+  DeviceGetDeviceInfoTypes,
+} from '../../api/protocol-v2/DeviceGetDeviceInfo';
 
 // ── Shared response shapes (Protocol V2 file system) ────────────────────
 
@@ -74,6 +81,11 @@ export declare function deviceReboot(
   connectId: string,
   params: CommonParams & DeviceRebootParams
 ): Response<Success>;
+
+export declare function deviceGetDeviceInfo(
+  connectId: string,
+  params?: CommonParams & DeviceGetDeviceInfoParams
+): Response<ProtocolV2DeviceInfo>;
 
 export declare function deviceGetOnboardingStatus(
   connectId: string,
