@@ -385,7 +385,7 @@ const api: UnifiedMethodConfig[] = [
     presets: [],
   },
   {
-    method: 'pathInfo',
+    method: 'filesystemPathInfoQuery',
     description: 'methodDescriptions.pathInfo',
     noDeviceIdReq: true,
     presets: [
@@ -405,7 +405,7 @@ const api: UnifiedMethodConfig[] = [
     ],
   },
   {
-    method: 'dirList',
+    method: 'filesystemDirList',
     description: 'methodDescriptions.dirList',
     noDeviceIdReq: true,
     presets: [
@@ -433,7 +433,7 @@ const api: UnifiedMethodConfig[] = [
     ],
   },
   {
-    method: 'dirMake',
+    method: 'filesystemDirMake',
     description: 'methodDescriptions.dirMake',
     noDeviceIdReq: true,
     presets: [
@@ -453,7 +453,7 @@ const api: UnifiedMethodConfig[] = [
     ],
   },
   {
-    method: 'dirRemove',
+    method: 'filesystemDirRemove',
     description: 'methodDescriptions.dirRemove',
     noDeviceIdReq: true,
     presets: [
@@ -473,7 +473,7 @@ const api: UnifiedMethodConfig[] = [
     ],
   },
   {
-    method: 'fileRead',
+    method: 'filesystemFileRead',
     description: 'methodDescriptions.fileRead',
     noDeviceIdReq: true,
     presets: [
@@ -529,7 +529,7 @@ const api: UnifiedMethodConfig[] = [
     ],
   },
   {
-    method: 'fileWrite',
+    method: 'filesystemFileWrite',
     description: 'methodDescriptions.fileWrite',
     noDeviceIdReq: true,
     presets: [
@@ -611,7 +611,7 @@ const api: UnifiedMethodConfig[] = [
     ],
   },
   {
-    method: 'fileDelete',
+    method: 'filesystemFileDelete',
     description: 'methodDescriptions.fileDelete',
     noDeviceIdReq: true,
     presets: [

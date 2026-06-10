@@ -152,6 +152,33 @@ export function resolveLazyParameterValues(
 }
 
 /**
+ * 展开点分参数名为嵌套对象。
+ *
+ * 例如 { 'targets.hw': true, 'types.hash': false } → { targets: { hw: true }, types: { hash: false } }。
+ * 不含 '.' 的 key 原样保留，用于 deviceGetDeviceInfo 等需要嵌套布尔参数的方法。
+ */
+export function unflattenParameters(data: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  Object.entries(data).forEach(([key, value]) => {
+    if (!key.includes('.')) {
+      result[key] = value;
+      return;
+    }
+    const segments = key.split('.');
+    let cursor = result;
+    for (let i = 0; i < segments.length - 1; i += 1) {
+      const segment = segments[i];
+      if (!cursor[segment] || typeof cursor[segment] !== 'object' || Array.isArray(cursor[segment])) {
+        cursor[segment] = {};
+      }
+      cursor = cursor[segment] as Record<string, unknown>;
+    }
+    cursor[segments[segments.length - 1]] = value;
+  });
+  return result;
+}
+
+/**
  * 分离通用参数和方法参数
  * @param data 原始参数数据
  * @returns 分离后的参数对象

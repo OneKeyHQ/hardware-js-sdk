@@ -39,7 +39,7 @@ const PRO2_METHOD_GROUPS = [
     id: 'filesystemAliases',
     title: 'Filesystem Aliases',
     icon: FolderOpen,
-    methods: ['pathInfo', 'dirList', 'dirMake', 'dirRemove', 'fileRead', 'fileWrite', 'fileDelete'],
+    methods: ['filesystemPathInfoQuery', 'filesystemDirList', 'filesystemDirMake', 'filesystemDirRemove', 'filesystemFileRead', 'filesystemFileWrite', 'filesystemFileDelete'],
   },
   {
     id: 'filesystemRaw',
@@ -60,7 +60,7 @@ const PRO2_METHOD_GROUPS = [
   },
 ] as const;
 
-const DEFAULT_SELECTED_METHOD = 'dirList';
+const DEFAULT_SELECTED_METHOD = 'filesystemDirList';
 
 const PRO2_METHOD_LABELS: Record<string, string> = {
   getProtoVersion: 'Proto Version',
@@ -281,7 +281,7 @@ const PRO2_METHOD_WIRE_INFO: Record<string, MethodWireInfo> = {
 };
 
 function isFileWriteMethod(method: string) {
-  return method === 'fileWrite' || method === 'filesystemFileWrite';
+  return method === 'filesystemFileWrite';
 }
 
 function getDataSummary(data: unknown) {

@@ -8,7 +8,7 @@ import { useDeviceInfo } from '../../hooks/useDeviceInfo';
 import { useFirmwareProgress } from '../providers/SDKProvider';
 import { useDeviceStore } from '../../store/deviceStore';
 import { useHardwareStore } from '../../store/hardwareStore';
-import { separateParameters } from '../../utils/parameterUtils';
+import { separateParameters, unflattenParameters } from '../../utils/parameterUtils';
 import { methodSupportsCommonParameters } from '../../utils/constants';
 import { formatUntruncatedJsonPreview, summarizeJsonValue } from '../../utils/jsonPreview';
 import type { UnifiedMethodConfig } from '~/data/types';
@@ -137,7 +137,7 @@ function getUploadBytesFromResult(result: unknown): number | undefined {
 }
 
 function isUploadMethod(method: string): boolean {
-  return method === 'fileWrite' || method === 'filesystemFileWrite';
+  return method === 'filesystemFileWrite';
 }
 
 function getUploadBytesFromRequestParameters(params: Record<string, unknown>): number | undefined {
@@ -686,16 +686,16 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
   const getScopedExecutionParameters = useCallback(() => {
     const params = getExecutionParameters();
     if (supportsCommonParameters) {
-      return params;
+      return unflattenParameters(params);
     }
-    return separateParameters(params).methodParams;
+    return unflattenParameters(separateParameters(params).methodParams);
   }, [getExecutionParameters, supportsCommonParameters]);
 
   const scopedRequestData = useMemo(() => {
     if (supportsCommonParameters) {
-      return storeExecutionParameters;
+      return unflattenParameters(storeExecutionParameters);
     }
-    return separateParameters(storeExecutionParameters).methodParams;
+    return unflattenParameters(separateParameters(storeExecutionParameters).methodParams);
   }, [storeExecutionParameters, supportsCommonParameters]);
 
   useEffect(() => {

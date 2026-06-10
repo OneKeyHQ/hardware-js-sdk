@@ -584,7 +584,7 @@ export default function Pro2UpdatePage() {
 
   const getPathInfo = useCallback(
     async (connectId: string, path: string) => {
-      const payload = await callApi('pathInfo', connectId, { path });
+      const payload = await callApi('filesystemPathInfoQuery', connectId, { path });
       return payload as PathInfoResult;
     },
     [callApi]
@@ -593,7 +593,7 @@ export default function Pro2UpdatePage() {
   const writeFile = useCallback(
     async (connectId: string, file: File, path: string, label: string) => {
       addLog('info', `${label}: write ${file.name} -> ${path} (${formatBytes(file.size)})`);
-      await callApi('fileWrite', connectId, {
+      await callApi('filesystemFileWrite', connectId, {
         path,
         offset: 0,
         totalSize: file.size,
@@ -673,7 +673,7 @@ export default function Pro2UpdatePage() {
       for (const dirPath of dirPaths) {
         if (createdDirs.has(dirPath)) continue;
         try {
-          await callApi('dirMake', connectId, { path: dirPath });
+          await callApi('filesystemDirMake', connectId, { path: dirPath });
         } catch (error) {
           const message = getErrorMessage(error);
           if (!isDirectoryAlreadyExistsError(message)) {
@@ -759,7 +759,7 @@ export default function Pro2UpdatePage() {
           getAssetDeviceDirPaths(item.relativePath),
           createdDirs
         );
-        await callApi('fileWrite', connectId, {
+        await callApi('filesystemFileWrite', connectId, {
           path: devicePath,
           offset: 0,
           totalSize: data.size,
@@ -852,7 +852,7 @@ export default function Pro2UpdatePage() {
     addLog('info', `Step1.3: check ${STEP1_BOOT_LOGO_PATH}`);
     const bootLogoInfo = await getPathInfo(connectId, STEP1_BOOT_LOGO_PATH);
     if (bootLogoInfo.exist) {
-      await callApi('fileDelete', connectId, { path: STEP1_BOOT_LOGO_PATH });
+      await callApi('filesystemFileDelete', connectId, { path: STEP1_BOOT_LOGO_PATH });
       addLog('ok', `Step1.3: deleted ${STEP1_BOOT_LOGO_PATH}`);
     } else {
       addLog('info', `Step1.3: ${STEP1_BOOT_LOGO_PATH} not found`);

@@ -316,6 +316,7 @@ export const zh = {
       ping: 'Protocol V2 设备连通性测试',
       deviceReboot: 'Protocol V2 设备重启',
       getDeviceInfo: '获取统一设备信息（支持 V1 和 V2 协议）',
+      deviceGetDeviceInfo: '原生 Protocol V2 DevGetDeviceInfo（不经 DeviceProfile 封装，仅 Pro2）；用复选框选择请求的 targets/types',
       deviceGetOnboardingStatus: 'Protocol V2 查询 onboarding 状态',
       deviceFirmwareUpdate: 'Protocol V2 触发固件安装',
       deviceGetFirmwareUpdateStatus: 'Protocol V2 查询固件安装状态',
