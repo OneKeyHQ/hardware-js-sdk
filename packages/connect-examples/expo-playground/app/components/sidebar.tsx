@@ -107,11 +107,6 @@ const navigationItems = [
     icon: ListChecks,
   },
   {
-    title: 'common.deviceInfoTimingTest',
-    url: '/device-info-timing-test',
-    icon: ListChecks,
-  },
-  {
     title: 'common.eventTest',
     url: '/event-test',
     icon: Radio,

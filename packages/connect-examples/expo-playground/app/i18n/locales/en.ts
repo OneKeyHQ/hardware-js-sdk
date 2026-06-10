@@ -33,7 +33,6 @@ export const en = {
       pro2Update: 'Pro2 Update',
       pro2Onboarding: 'Pro2 Onboarding',
       methodBatchTest: 'Chain Method Batch Test',
-      deviceInfoTimingTest: 'Device Info Timing Test',
       eventTest: 'Event Test',
       navigation: 'Navigation',
       current: 'Current',

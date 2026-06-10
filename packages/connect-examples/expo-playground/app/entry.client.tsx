@@ -38,7 +38,6 @@ import Pro2DebugPage from './routes/pro2-debug';
 import Pro2UpdatePage from './routes/pro2-update';
 import Pro2OnboardingPage from './routes/pro2-onboarding';
 import MethodBatchTestPage from './routes/method-batch-test';
-import DeviceInfoTimingTestPage from './routes/device-info-timing-test';
 import EventTestPage from './routes/event-test';
 
 // Import styles
@@ -176,10 +175,6 @@ const router = createHashRouter(
         {
           path: 'method-batch-test',
           element: <MethodBatchTestPage />,
-        },
-        {
-          path: 'device-info-timing-test',
-          element: <DeviceInfoTimingTestPage />,
         },
         {
           path: 'event-test',
