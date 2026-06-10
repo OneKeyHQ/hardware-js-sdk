@@ -8,29 +8,25 @@ import JSZip from 'jszip';
 
 import { FirmwareUpdateTipMessage, UI_REQUEST } from '../events/ui-request';
 import { validateParams } from './helpers/paramsValidator';
-import {
-  LoggerNames,
-  getDeviceBLEFirmwareVersion,
-  getDeviceBootloaderVersion,
-  getDeviceFirmwareVersion,
-  getFirmwareType,
-  getLogger,
-} from '../utils';
+import { LoggerNames, getFirmwareType, getLogger } from '../utils';
 import { getBinary, getSysResourceBinary } from './firmware/getBinary';
 import { DataManager } from '../data-manager';
 import { FirmwareUpdateBaseMethod } from './firmware/FirmwareUpdateBaseMethod';
 import { DevicePool } from '../device/DevicePool';
 import {
+  PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST,
   ProtocolV2FirmwareTargetType,
   protocolV2FileNameToTargetId,
 } from '../protocols/protocol-v2';
-import { requestProtocolV2LegacyFeatures } from '../protocols/protocol-v2/features';
+import { requestProtocolV2DeviceInfo } from '../protocols/protocol-v2/features';
+import { buildProfileFromProtocolV2 } from '../deviceProfile';
 import { PROTOCOL_V2_FIRMWARE_UPDATE_RESPONSE_TYPES } from './protocol-v2/helpers';
 
 import type { FirmwareUpdateV4Params } from '../types/api/firmwareUpdate';
 import type { EFirmwareType } from '@onekeyfe/hd-shared';
 import type { PROTO } from '../constants';
 import type { TypedResponseMessage } from '../device/DeviceCommands';
+import type { Features } from '../types';
 
 const Log = getLogger(LoggerNames.Method);
 
@@ -192,7 +188,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   }
 
   async run() {
-    if (this.device.originalDescriptor?.protocolType !== 'V2') {
+    if (!this.device.isProtocolV2()) {
       throw ERRORS.TypedError(
         HardwareErrorCode.RuntimeError,
         'firmwareUpdateV4 requires a Protocol V2 device'
@@ -204,14 +200,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   }
 
   private async runProtocolV2() {
-    const { device } = this;
-    const { features } = device;
-
-    if (!features) {
-      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Device features not available');
-    }
-
-    const deviceFirmwareType = getFirmwareType(features);
+    const legacyFeatures = await this.getProtocolV2LegacyFeatures();
+    const deviceFirmwareType = getFirmwareType(legacyFeatures);
     const firmwareType = this.params.firmwareType ?? deviceFirmwareType;
 
     let resourceBinary: ArrayBuffer | null = null;
@@ -219,9 +209,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     let bootloaderBinary: ArrayBuffer | null = null;
     try {
       this.postTipMessage(FirmwareUpdateTipMessage.StartDownloadFirmware);
-      resourceBinary = await this.prepareResourceBinary(firmwareType);
-      fwBinaryMap = await this.prepareFirmwareAndBleBinary(firmwareType);
-      bootloaderBinary = await this.prepareBootloaderBinary(firmwareType);
+      resourceBinary = await this.prepareResourceBinary(firmwareType, legacyFeatures);
+      fwBinaryMap = await this.prepareFirmwareAndBleBinary(firmwareType, legacyFeatures);
+      bootloaderBinary = await this.prepareBootloaderBinary(firmwareType, legacyFeatures);
       this.postTipMessage(FirmwareUpdateTipMessage.FinishDownloadFirmware);
     } catch (err) {
       throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
@@ -249,12 +239,20 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return versions;
   }
 
-  private async prepareResourceBinary(firmwareType: EFirmwareType) {
+  private async getProtocolV2LegacyFeatures() {
+    if (typeof this.device.getFeatures === 'function') {
+      return this.device.getFeatures();
+    }
+    if (this.device.features) {
+      return this.device.features;
+    }
+    throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Device features not available');
+  }
+
+  private async prepareResourceBinary(firmwareType: EFirmwareType, features: Features) {
     if (this.params.resourceBinary) {
       return this.params.resourceBinary;
     }
-    const { features } = this.device;
-    if (!features) return null;
     const resourceUrl = DataManager.getSysResourcesLatestRelease({
       features,
       forcedUpdateRes: this.params.forcedUpdateRes,
@@ -269,12 +267,13 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return null;
   }
 
-  private async prepareBootloaderBinary(firmwareType: EFirmwareType): Promise<ArrayBuffer | null> {
+  private async prepareBootloaderBinary(
+    firmwareType: EFirmwareType,
+    features: Features
+  ): Promise<ArrayBuffer | null> {
     if (this.params.bootloaderBinary) {
       return this.params.bootloaderBinary;
     }
-    const { features } = this.device;
-    if (!features) return null;
 
     if (this.params.bootloaderVersion) {
       const bootResourceUrl = DataManager.getBootloaderResource(features, firmwareType);
@@ -286,7 +285,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return null;
   }
 
-  private async prepareFirmwareAndBleBinary(firmwareType: EFirmwareType) {
+  private async prepareFirmwareAndBleBinary(firmwareType: EFirmwareType, features: Features) {
     const fwBinaryMap: { fileName: string; binary: ArrayBuffer }[] = [];
     if (this.params.firmwareBinary) {
       fwBinaryMap.push({
@@ -294,22 +293,19 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         binary: this.params.firmwareBinary,
       });
     } else if (this.params.firmwareVersion) {
-      const { features } = this.device;
-      if (features) {
-        const firmwareBinary = (
-          await getBinary({
-            features,
-            version: this.params.firmwareVersion,
-            updateType: 'firmware',
-            isUpdateBootloader: false,
-            firmwareType,
-          })
-        ).binary;
-        fwBinaryMap.push({
-          fileName: 'firmware.bin',
-          binary: firmwareBinary,
-        });
-      }
+      const firmwareBinary = (
+        await getBinary({
+          features,
+          version: this.params.firmwareVersion,
+          updateType: 'firmware',
+          isUpdateBootloader: false,
+          firmwareType,
+        })
+      ).binary;
+      fwBinaryMap.push({
+        fileName: 'firmware.bin',
+        binary: firmwareBinary,
+      });
     }
 
     if (this.params.bleBinary) {
@@ -318,19 +314,16 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         binary: this.params.bleBinary,
       });
     } else if (this.params.bleVersion) {
-      const { features } = this.device;
-      if (features) {
-        const bleBinary = await getBinary({
-          features,
-          version: this.params.bleVersion,
-          updateType: 'ble',
-          firmwareType,
-        });
-        fwBinaryMap.push({
-          fileName: 'ble-firmware.bin',
-          binary: bleBinary.binary,
-        });
-      }
+      const bleBinary = await getBinary({
+        features,
+        version: this.params.bleVersion,
+        updateType: 'ble',
+        firmwareType,
+      });
+      fwBinaryMap.push({
+        fileName: 'ble-firmware.bin',
+        binary: bleBinary.binary,
+      });
     }
 
     return fwBinaryMap;
@@ -541,14 +534,14 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   }
 
   private async waitForProtocolV2FinalFeatures() {
-    const features = await this.waitForProtocolV2ReconnectAndFeatures(
+    const profile = await this.waitForProtocolV2ReconnectAndProfile(
       PROTOCOL_V2_BOOTLOADER_RECONNECT_TIMEOUT
     );
-    this.device._updateFeatures(features);
+    this.device.updateProfile?.(profile);
 
-    const bootloaderVersion = getDeviceBootloaderVersion(features).join('.');
-    const bleVersion = getDeviceBLEFirmwareVersion(features).join('.');
-    const firmwareVersion = getDeviceFirmwareVersion(features).join('.');
+    const bootloaderVersion = profile.versions.bootloader ?? '0.0.0';
+    const bleVersion = profile.versions.ble ?? '0.0.0';
+    const firmwareVersion = profile.versions.firmware ?? '0.0.0';
     if (firmwareVersion === '0.0.0') {
       Log.warn(
         'Protocol V2 firmware update finished but app firmware version is still 0.0.0. This is allowed for Pro2 debug BLE-only update flows.'
@@ -562,18 +555,24 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     };
   }
 
-  private async waitForProtocolV2ReconnectAndFeatures(timeout: number) {
+  private async waitForProtocolV2ReconnectAndProfile(timeout: number) {
     const startTime = Date.now();
     let lastError: unknown;
 
     while (Date.now() - startTime < timeout) {
       try {
         await this.reconnectProtocolV2Device();
-        const features = await requestProtocolV2LegacyFeatures({
+        const deviceInfo = await requestProtocolV2DeviceInfo({
           commands: this.device.getCommands(),
           timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
+          // 更新完成判定只需要各 target 版本号；scope 与请求内容保持一致
+          request: PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST,
         });
-        return features;
+        return buildProfileFromProtocolV2({
+          deviceInfo,
+          sources: ['deviceInfo'],
+          scope: 'versions',
+        });
       } catch (error) {
         lastError = error;
         Log.log('Protocol V2 normal mode not ready, polling Ping: ', error);

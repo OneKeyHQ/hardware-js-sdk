@@ -24,7 +24,7 @@ export default class DeviceRebootToBoardloader extends BaseMethod<RebootToBoardl
 
   async run() {
     // Protocol V2 uses DevReboot with reboot_type enum.
-    if (this.device.originalDescriptor?.protocolType === 'V2') {
+    if (this.device.isProtocolV2()) {
       const res = await this.device.commands.typedCall('DevReboot', 'Success', {
         reboot_type: DevRebootType.Boardloader,
       });

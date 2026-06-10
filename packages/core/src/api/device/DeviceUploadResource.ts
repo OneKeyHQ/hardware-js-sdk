@@ -8,7 +8,6 @@ import { DeviceModelToTypes } from '../../types';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { hexToBytes } from '../helpers/hexUtils';
-import { getDeviceFirmwareVersion } from '../../utils';
 import { PROTO } from '../../constants';
 
 import type { DeviceUploadResourceParams, DeviceUploadResourceResponse } from '../../types';
@@ -38,7 +37,7 @@ export default class DeviceUploadResource extends BaseMethod<ResourceUpload> {
 
   checkUploadNFTSupport() {
     const deviceType = this.device.getCurrentDeviceType();
-    const currentVersion = getDeviceFirmwareVersion(this.device.features).join('.');
+    const currentVersion = this.device.getCurrentFirmwareVersionString() ?? '0.0.0';
     if (!DeviceModelToTypes.model_touch.includes(deviceType)) {
       throw ERRORS.TypedError(HardwareErrorCode.CallMethodError, 'Device Not Support Upload NFT');
     }
@@ -138,7 +137,7 @@ export default class DeviceUploadResource extends BaseMethod<ResourceUpload> {
       };
       response.applyScreen = true;
 
-      const firmwareVersion = getDeviceFirmwareVersion(this.device.features).join('.');
+      const firmwareVersion = this.device.getCurrentFirmwareVersionString() ?? '0.0.0';
       const deviceType = this.device.getCurrentDeviceType();
       if (deviceType === EDeviceType.Pro && semver.gte(firmwareVersion, '4.17.0')) {
         response.applyScreen = false;

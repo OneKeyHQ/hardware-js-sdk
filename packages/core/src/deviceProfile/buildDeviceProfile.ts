@@ -25,7 +25,10 @@ import type {
   DeviceProfileVersions,
 } from '../types/api/getDeviceInfo';
 import type { Features, OnekeyFeatures } from '../types';
-import type { ProtocolV2DeviceInfo } from '../protocols/protocol-v2/features';
+import type {
+  ProtocolV2DeviceInfo,
+  ProtocolV2FirmwareImageInfo,
+} from '../protocols/protocol-v2/features';
 
 type BuildProtocolV1ProfileParams = {
   protocol?: DeviceInfoProtocol;
@@ -41,20 +44,6 @@ type BuildProtocolV2ProfileParams = {
   sources?: DeviceInfoSource[];
   scope?: GetDeviceInfoParams['scope'];
   includeRaw?: boolean;
-};
-
-type ProtocolV2Bytes = Uint8Array | number[] | string;
-
-type ProtocolV2FirmwareImageInfo = {
-  version?: string;
-  build_id?: string;
-  hash?: ProtocolV2Bytes;
-};
-
-type ProtocolV2SEInfo = {
-  boot?: ProtocolV2FirmwareImageInfo;
-  app?: ProtocolV2FirmwareImageInfo;
-  state?: number;
 };
 
 const isMeaningfulVersion = (version?: string | null) => Boolean(version && version !== '0.0.0');
@@ -88,19 +77,6 @@ const getImageBuildId = (image?: ProtocolV2FirmwareImageInfo | null) =>
   image?.build_id ?? undefined;
 
 const getImageHash = (image?: ProtocolV2FirmwareImageInfo | null) => bytesToHex(image?.hash);
-
-const getSeState = (se?: ProtocolV2SEInfo | null) => {
-  switch (se?.state) {
-    case 0:
-      return 'BOOT';
-    case 51:
-      return 'APP_FACTORY';
-    case 85:
-      return 'APP';
-    default:
-      return null;
-  }
-};
 
 const shouldIncludeVerify = (scope?: GetDeviceInfoParams['scope']) =>
   scope === 'verify' || scope === 'full';
@@ -339,6 +315,10 @@ export function buildProfileFromProtocolV2({
     sources,
     deviceType: EDeviceType.Pro2,
     firmwareType: EFirmwareType.Universal,
+    // Protocol V2 的 DevGetDeviceInfo 没有 device_id 字段（固件 proto 仅提供 hw.serial_no），
+    // 这里只能回退 serialNo。注意语义差异：V1 的 device_id 随擦除/换种子轮换，serialNo 永不变化。
+    // 固件在 DevStatus 暴露 device_id 后，此处必须改为读取它，否则 wipe 后基于 deviceId 的
+    // session 缓存（deviceSessionCache）不会自然失效。
     deviceId: serialNo,
     serialNo,
     label,
@@ -355,5 +335,3 @@ export function buildProfileFromProtocolV2({
       : {}),
   };
 }
-
-export const getProtocolV2SeState = getSeState;

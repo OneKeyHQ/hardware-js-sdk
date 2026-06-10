@@ -17,11 +17,7 @@ import {
 import {
   LoggerNames,
   enableLog,
-  getDeviceBLEFirmwareVersion,
-  getDeviceFirmwareVersion,
-  getFirmwareType,
   getLogger,
-  getMethodVersionRange,
   isMethodVersionRangeUnsupported,
   setLoggerPostMessage,
   wait,
@@ -30,7 +26,6 @@ import {
   findDefectiveBatchDevice,
   getDefectiveDeviceInfo,
 } from '../utils/findDefectiveBatchDevice';
-import { supportNewPassphrase } from '../utils/deviceFeaturesUtils';
 import {
   cleanupSdkInstance,
   completeRequestContext,
@@ -423,11 +418,16 @@ const onCallDevice = async (
 
     const inner = async (): Promise<void> => {
       // check firmware version
-      const versionRange = getMethodVersionRange(
-        device.features,
+      const versionRange = device.getCurrentMethodVersionRange(
         type => method.getVersionRange()[type]
       );
+      const currentFirmwareVersion = device.getCurrentFirmwareVersionString() ?? '0.0.0';
+      const currentBleVersion = device.getCurrentBLEFirmwareVersionString() ?? '0.0.0';
+      const deviceFirmwareType = device.getCurrentFirmwareType();
+      let newVersionStatus: ReturnType<typeof DataManager.getFirmwareStatus> | undefined;
 
+      // 故障批次检测与远端强制升级门禁基于 V1 features/remote config，
+      // Pro2(V2) 暂不参与：profile 版的 firmwareStatus 需要 DataManager 支持后再接入。
       if (device.features) {
         await DataManager.checkAndReloadData();
 
@@ -445,12 +445,9 @@ const onCallDevice = async (
           }
         }
 
-        const deviceFirmwareType = getFirmwareType(device.features);
-        const newVersionStatus = DataManager.getFirmwareStatus(device.features, deviceFirmwareType);
+        newVersionStatus = DataManager.getFirmwareStatus(device.features, deviceFirmwareType);
         const bleVersionStatus = DataManager.getBLEFirmwareStatus(device.features);
 
-        const currentFirmwareVersion = getDeviceFirmwareVersion(device.features).join('.');
-        const currentBleVersion = getDeviceBLEFirmwareVersion(device.features).join('.');
         if (
           (newVersionStatus === 'required' || bleVersionStatus === 'required') &&
           method.skipForceUpdateCheck === false
@@ -476,46 +473,43 @@ const onCallDevice = async (
             currentVersions
           );
         }
+      }
 
-        if (isMethodVersionRangeUnsupported(versionRange)) {
-          throw createDeviceNotSupportMethodError(method.name, getFirmwareType(device.features));
-        }
+      if (isMethodVersionRangeUnsupported(versionRange)) {
+        throw createDeviceNotSupportMethodError(method.name, deviceFirmwareType);
+      }
 
-        if (versionRange) {
-          if (
-            semver.valid(versionRange.min) &&
-            semver.lt(currentFirmwareVersion, versionRange.min)
-          ) {
-            if (newVersionStatus === 'none' || newVersionStatus === 'valid') {
-              throw createNewFirmwareUnReleaseHardwareError({
-                currentVersion: currentFirmwareVersion,
-                requireVersion: versionRange.min,
-                methodName: method.name,
-                firmwareType: getFirmwareType(device.features),
-              });
-            }
-
-            return Promise.reject(
-              createNeedUpgradeFirmwareHardwareError({
-                currentVersion: currentFirmwareVersion,
-                requireVersion: versionRange.min,
-                methodName: method.name,
-                firmwareType: getFirmwareType(device.features),
-              })
-            );
+      if (versionRange) {
+        if (semver.valid(versionRange.min) && semver.lt(currentFirmwareVersion, versionRange.min)) {
+          if (newVersionStatus === 'none' || newVersionStatus === 'valid') {
+            throw createNewFirmwareUnReleaseHardwareError({
+              currentVersion: currentFirmwareVersion,
+              requireVersion: versionRange.min,
+              methodName: method.name,
+              firmwareType: deviceFirmwareType,
+            });
           }
-          if (
-            versionRange.max &&
-            semver.valid(versionRange.max) &&
-            semver.gte(currentFirmwareVersion, versionRange.max)
-          ) {
-            return Promise.reject(
-              createDeprecatedHardwareError(currentFirmwareVersion, versionRange.max, method.name)
-            );
-          }
-        } else if (method.strictCheckDeviceSupport) {
-          throw createDeviceNotSupportMethodError(method.name, getFirmwareType(device.features));
+
+          return Promise.reject(
+            createNeedUpgradeFirmwareHardwareError({
+              currentVersion: currentFirmwareVersion,
+              requireVersion: versionRange.min,
+              methodName: method.name,
+              firmwareType: deviceFirmwareType,
+            })
+          );
         }
+        if (
+          versionRange.max &&
+          semver.valid(versionRange.max) &&
+          semver.gte(currentFirmwareVersion, versionRange.max)
+        ) {
+          return Promise.reject(
+            createDeprecatedHardwareError(currentFirmwareVersion, versionRange.max, method.name)
+          );
+        }
+      } else if (method.strictCheckDeviceSupport) {
+        throw createDeviceNotSupportMethodError(method.name, deviceFirmwareType);
       }
 
       // check call method mode
@@ -553,7 +547,7 @@ const onCallDevice = async (
       method.checkDeviceSupportFeature();
 
       // reconfigure messages
-      if (_deviceList) {
+      if (_deviceList && device.features) {
         await TransportManager.reconfigure(device.features);
       }
 
@@ -562,7 +556,7 @@ const onCallDevice = async (
 
       if (shouldCheckPassphraseState(method, device)) {
         // check version
-        const support = supportNewPassphrase(device.features);
+        const support = device.supportNewPassphrase();
         if (!support.support) {
           return Promise.reject(
             ERRORS.TypedError(
@@ -803,8 +797,8 @@ function canSkipInitialize(method: BaseMethod, device: Device): boolean {
   if (!method.connectId) reasons.push('connectId.missing');
   // passphrase state must match the pre-initialize
   if (!device.isPreInitializeMetaMatch(method.payload)) reasons.push('meta.mismatch');
-  // device must have been initialized before (has features)
-  if (!device.features) reasons.push('features.missing');
+  // device must have been initialized before.
+  if (device.isUnacquired()) reasons.push('deviceInfo.missing');
   // within pre-initialize TTL
   if (!device.isPreInitializedValid(PRE_INITIALIZE_TTL_MS)) reasons.push('ttl.expired');
 

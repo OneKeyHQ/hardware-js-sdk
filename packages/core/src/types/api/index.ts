@@ -3,14 +3,8 @@ import type {
   deviceGetFirmwareUpdateStatus,
   deviceGetOnboardingStatus,
   deviceReboot,
-  dirList,
-  dirMake,
-  dirRemove,
   factoryDeviceInfoSettings,
   factoryGetDeviceInfo,
-  fileDelete,
-  fileRead,
-  fileWrite,
   filesystemDirList,
   filesystemDirMake,
   filesystemDirRemove,
@@ -22,7 +16,6 @@ import type {
   filesystemFormat,
   filesystemPathInfoQuery,
   getProtoVersion,
-  pathInfo,
   ping,
 } from './protocolV2';
 import type { off, on, removeAllListeners } from './event';
@@ -259,13 +252,6 @@ export type CoreApi = {
   factoryDeviceInfoSettings: typeof factoryDeviceInfoSettings;
   factoryGetDeviceInfo: typeof factoryGetDeviceInfo;
   filesystemFixPermission: typeof filesystemFixPermission;
-  fileRead: typeof fileRead;
-  fileWrite: typeof fileWrite;
-  fileDelete: typeof fileDelete;
-  dirList: typeof dirList;
-  dirMake: typeof dirMake;
-  dirRemove: typeof dirRemove;
-  pathInfo: typeof pathInfo;
   filesystemFileRead: typeof filesystemFileRead;
   filesystemFileWrite: typeof filesystemFileWrite;
   filesystemFileDelete: typeof filesystemFileDelete;

@@ -2,6 +2,8 @@ import AllNetworkGetAddressBase from '../src/api/allnetwork/AllNetworkGetAddress
 import EvmGetAddress from '../src/api/evm/EVMGetAddress';
 import EVMGetPublicKey from '../src/api/evm/EVMGetPublicKey';
 import { findMethod } from '../src/api/utils';
+import { getDeviceType, getFirmwareType, getMethodVersionRange } from '../src/utils';
+import { getDeviceFirmwareVersion } from '../src/utils/deviceVersionUtils';
 
 jest.mock('../src/data/config', () => ({
   getSDKVersion: jest.fn(() => '1.0.0'),
@@ -14,16 +16,25 @@ jest.mock('../src/api/utils', () => ({
 
 const createDevice = (onekeyDeviceType: string) => {
   const typedCall = jest.fn();
+  const features = {
+    onekey_device_type: onekeyDeviceType,
+    safety_checks: 'Strict',
+  };
   return {
     typedCall,
     device: {
-      features: {
-        onekey_device_type: onekeyDeviceType,
-        safety_checks: 'Strict',
-      },
+      features,
       commands: {
         typedCall,
       },
+      // BaseMethod 通过 Device accessor 读取设备状态，stub 复用真实工具函数保持映射一致
+      isProtocolV2: () => false,
+      getCurrentDeviceType: () => getDeviceType(features as any),
+      getCurrentSafetyChecks: () => features.safety_checks,
+      getCurrentFirmwareType: () => getFirmwareType(features as any),
+      getCurrentFirmwareVersionString: () => getDeviceFirmwareVersion(features as any)?.join('.'),
+      getCurrentMethodVersionRange: (fn: (model: any) => any) =>
+        getMethodVersionRange(features as any, fn),
     },
   };
 };

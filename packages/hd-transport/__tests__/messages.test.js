@@ -83,4 +83,12 @@ describe('messages', () => {
 
     expect(() => createMessageFromName(messages, name)).not.toThrow();
   });
+
+  test('createMessageFromName throws when message type id is missing', () => {
+    const messages = parseConfigure(json);
+
+    expect(() => createMessageFromName(messages, 'TxAckInputWrapper')).toThrow(
+      'MessageType for "TxAckInputWrapper" is not defined in protobuf schema'
+    );
+  });
 });

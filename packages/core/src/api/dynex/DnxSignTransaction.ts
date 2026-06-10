@@ -5,7 +5,6 @@ import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { stripHexPrefix } from '../helpers/hexUtils';
-import { getFirmwareType } from '../../utils';
 
 import type { TypedResponseMessage } from '../../device/DeviceCommands';
 import type { DnxSignature } from '../../types';
@@ -119,8 +118,8 @@ export default class DnxSignTransaction extends BaseMethod<DnxSignTx> {
   }
 
   async run() {
-    if (this.device.originalDescriptor?.protocolType === 'V2') {
-      throw createDeviceNotSupportMethodError(this.name, getFirmwareType(this.device.features));
+    if (this.device.isProtocolV2()) {
+      throw createDeviceNotSupportMethodError(this.name, this.device.getCurrentFirmwareType());
     }
 
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());

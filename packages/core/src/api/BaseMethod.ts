@@ -4,20 +4,12 @@ import {
   createNeedUpgradeFirmwareHardwareError,
 } from '@onekeyfe/hd-shared';
 
-import { supportInputPinOnSoftware, supportModifyHomescreen } from '../utils/deviceFeaturesUtils';
 import { createDeviceMessage } from '../events/device';
 import { UI_REQUEST } from '../constants/ui-request';
 import { DEVICE, FIRMWARE, createFirmwareMessage, createUiMessage } from '../events';
 import { getHDPath, toHardened } from './helpers/pathUtils';
 import { getBleFirmwareReleaseInfo, getFirmwareReleaseInfo } from './firmware/releaseHelper';
-import {
-  LoggerNames,
-  getDeviceFirmwareVersion,
-  getFirmwareType,
-  getLogger,
-  getMethodVersionRange,
-  isMethodVersionRangeUnsupported,
-} from '../utils';
+import { LoggerNames, getFirmwareType, getLogger, isMethodVersionRangeUnsupported } from '../utils';
 import { generateInstanceId } from '../utils/tracing';
 import { DeviceModelToTypes } from '../types';
 
@@ -225,7 +217,10 @@ export abstract class BaseMethod<Params = undefined> {
   }
 
   checkFirmwareRelease() {
-    if (!this.device || !this.device.features) return;
+    // 固件 release 元数据（DataManager remote config）目前只覆盖 Protocol V1 设备；
+    // Pro2 的更新流程由 firmwareUpdateV4 自行管理，这里显式跳过而不是依赖 features 为空。
+    if (!this.device || this.device.isProtocolV2()) return;
+    if (!this.device.features) return;
     const firmwareType = getFirmwareType(this.device.features);
     const releaseInfo = getFirmwareReleaseInfo(this.device.features, firmwareType);
     this.postMessage(
@@ -244,9 +239,9 @@ export abstract class BaseMethod<Params = undefined> {
   }
 
   checkDeviceSupportFeature() {
-    if (!this.device || !this.device.features) return;
-    const inputPinOnSoftware = supportInputPinOnSoftware(this.device.features);
-    const modifyHomescreen = supportModifyHomescreen(this.device.features);
+    if (!this.device || this.device.isUnacquired()) return;
+    const inputPinOnSoftware = this.device.supportInputPinOnSoftware();
+    const modifyHomescreen = this.device.supportModifyHomescreen();
 
     this.postMessage(
       createDeviceMessage(DEVICE.SUPPORT_FEATURES, {
@@ -268,19 +263,16 @@ export abstract class BaseMethod<Params = undefined> {
       return;
     }
 
-    const firmwareVersion = getDeviceFirmwareVersion(this.device.features)?.join('.');
-    const versionRange = getMethodVersionRange(
-      this.device.features,
-      type => getVersionRange()[type]
-    );
+    const firmwareVersion = this.device.getCurrentFirmwareVersionString() ?? '0.0.0';
+    const versionRange = this.device.getCurrentMethodVersionRange(type => getVersionRange()[type]);
 
     if (isMethodVersionRangeUnsupported(versionRange)) {
-      throw createDeviceNotSupportMethodError(this.name, getFirmwareType(this.device.features));
+      throw createDeviceNotSupportMethodError(this.name, this.device.getCurrentFirmwareType());
     }
 
     if (!versionRange) {
       if (options?.strictCheckDeviceSupport) {
-        throw createDeviceNotSupportMethodError(this.name, getFirmwareType(this.device.features));
+        throw createDeviceNotSupportMethodError(this.name, this.device.getCurrentFirmwareType());
       }
       // Equipment that does not need to be repaired
       return;
@@ -291,7 +283,7 @@ export abstract class BaseMethod<Params = undefined> {
         currentVersion: firmwareVersion,
         requireVersion: versionRange.min,
         methodName: this.name,
-        firmwareType: getFirmwareType(this.device.features),
+        firmwareType: this.device.getCurrentFirmwareType(),
       });
     }
   }
@@ -333,7 +325,7 @@ export abstract class BaseMethod<Params = undefined> {
     if (this.shouldPromptSafetyCheckForEvmLedgerLegacyPath()) {
       checkFlag = true;
     }
-    if (checkFlag && this.device.features?.safety_checks === 'Strict') {
+    if (checkFlag && this.device.getCurrentSafetyChecks() === 'Strict') {
       Log.debug('will change safety_checks level');
       await this.device.commands.typedCall('ApplySettings', 'Success', {
         safety_checks: 'PromptTemporarily',

@@ -4,7 +4,6 @@ import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { getFirmwareType } from '../../utils';
 
 import type { DnxGetAddress as HardwareDnxGetAddress } from '@onekeyfe/hd-transport';
 import type { DnxAddress, DnxGetAddressParams } from '../../types';
@@ -50,8 +49,8 @@ export default class DnxGetAddress extends BaseMethod<HardwareDnxGetAddress[]> {
   }
 
   async run() {
-    if (this.device.originalDescriptor?.protocolType === 'V2') {
-      throw createDeviceNotSupportMethodError(this.name, getFirmwareType(this.device.features));
+    if (this.device.isProtocolV2()) {
+      throw createDeviceNotSupportMethodError(this.name, this.device.getCurrentFirmwareType());
     }
 
     const responses: DnxAddress[] = [];

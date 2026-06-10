@@ -9,7 +9,6 @@ import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex, parseChainId, stripHexStartZeroes } from '../helpers/hexUtils';
-import { getDeviceFirmwareVersion } from '../../utils';
 import { existCapability } from '../../utils/capabilitieUtils';
 import {
   DeviceModelToTypes,
@@ -348,7 +347,7 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
 
     let biggerLimit = 1024; // 1k
 
-    const currentVersion = getDeviceFirmwareVersion(this.device.features).join('.');
+    const currentVersion = this.device.getCurrentFirmwareVersionString() ?? '0.0.0';
     const currentDeviceType = this.device.getCurrentDeviceType();
     const supportBiggerDataVersion = '4.4.0';
 
@@ -534,7 +533,7 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
   supportSignTyped() {
     const deviceType = this.device.getCurrentDeviceType();
     if (DeviceModelToTypes.model_mini.includes(deviceType)) {
-      const currentVersion = getDeviceFirmwareVersion(this.device.features).join('.');
+      const currentVersion = this.device.getCurrentFirmwareVersionString() ?? '0.0.0';
       const supportSignTypedVersion = '2.2.0';
 
       if (semver.lt(currentVersion, supportSignTypedVersion)) {

@@ -15,7 +15,6 @@ import { getDeviceFirmwareVersion } from './deviceVersionUtils';
 import { existCapability } from './capabilitieUtils';
 
 import type { Device } from '../device/Device';
-import type { DeviceCommands } from '../device/DeviceCommands';
 import type { Features, IDeviceType, SupportFeatureType } from '../types';
 
 type GetPassphraseStateMessage = GetPassphraseState & {
@@ -97,17 +96,13 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (
     allowCreateAttachPin?: boolean;
   }
 ) => {
-  const { features, commands } = device;
+  const { features } = device;
   const locked = features?.unlocked === false;
   const deviceType = device.getCurrentDeviceType();
 
-  const { passphraseState, newSession, unlockedAttachPin } = await getPassphraseState(
-    features,
-    commands,
-    {
-      ...options,
-    }
-  );
+  const { passphraseState, newSession, unlockedAttachPin } = await getPassphraseState(device, {
+    ...options,
+  });
 
   const isModeT =
     deviceType === EDeviceType.Touch ||
@@ -142,13 +137,13 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (
   return { passphraseState, newSession, unlockedAttachPin };
 };
 
+// 仅适用于 Protocol V1 的 Pro：Pro2 走独立版本线，不能套用 4.15.0 门槛
+// （Pro2 在 getPassphraseState 中通过 isProtocolV2 直接判定支持）。
 const supportProSeriesAttachPinPassphrase = (deviceType: IDeviceType, firmwareVersion: string) =>
-  (deviceType === EDeviceType.Pro || deviceType === EDeviceType.Pro2) &&
-  semver.gte(firmwareVersion, '4.15.0');
+  deviceType === EDeviceType.Pro && semver.gte(firmwareVersion, '4.15.0');
 
 export const getPassphraseState = async (
-  features: Features | undefined,
-  commands: DeviceCommands,
+  device: Device,
   options?: {
     expectPassphraseState?: string;
     onlyMainPin?: boolean;
@@ -159,19 +154,25 @@ export const getPassphraseState = async (
   newSession: string | undefined;
   unlockedAttachPin: boolean | undefined;
 }> => {
-  if (!features)
+  const { features, commands } = device;
+
+  // 设备尚未建立任何状态（V1 无 features 且无 profile）时无法判定，保持旧的空返回语义
+  if (!features && !device.profile)
     return { passphraseState: undefined, newSession: undefined, unlockedAttachPin: undefined };
 
-  const firmwareVersion = getDeviceFirmwareVersion(features);
-  const deviceType = getDeviceType(features);
+  const firmwareVersion = device.getCurrentFirmwareVersionString() ?? '0.0.0';
+  const deviceType = device.getCurrentDeviceType();
 
   const supportAttachPinCapability = existCapability(
     features,
     Enum_Capability.Capability_AttachToPin
   );
+  // Pro2 (Protocol V2) 协议自带 GetPassphraseState(10028)，固件从首个版本即支持，
+  // 不依赖 Pro 系列的 4.15.0 版本线；V2 也没有 GetAddress Testnet 探测这条 legacy 回退路径。
   const supportGetPassphraseState =
+    device.isProtocolV2() ||
     supportAttachPinCapability ||
-    supportProSeriesAttachPinPassphrase(deviceType, firmwareVersion.join('.'));
+    supportProSeriesAttachPinPassphrase(deviceType, firmwareVersion);
 
   if (supportGetPassphraseState) {
     const payload: GetPassphraseStateMessage = options?.onlyMainPin
@@ -218,47 +219,8 @@ export const getPassphraseState = async (
   };
 };
 
-export const supportBatchPublicKey = (
-  features?: Features,
-  options?: {
-    includeNode?: boolean;
-  }
-): boolean => {
-  if (!features) return false;
-  const currentVersion = getDeviceFirmwareVersion(features).join('.');
-
-  const deviceType = getDeviceType(features);
-  // btc batch get public key
-  if (
-    !!options?.includeNode &&
-    (deviceType === EDeviceType.Pro || deviceType === EDeviceType.Pro2)
-  ) {
-    return semver.gte(currentVersion, '4.14.0');
-  }
-  if (!!options?.includeNode && deviceType === EDeviceType.Touch) {
-    return semver.gte(currentVersion, '4.11.0');
-  }
-  if (!!options?.includeNode && DeviceModelToTypes.model_classic1s.includes(deviceType)) {
-    return semver.gte(currentVersion, '3.12.0');
-  }
-  if (!!options?.includeNode && DeviceModelToTypes.model_mini.includes(deviceType)) {
-    return semver.gte(currentVersion, '3.10.0');
-  }
-  if (options?.includeNode) {
-    return false;
-  }
-
-  // support batch get public key
-  if (
-    deviceType === EDeviceType.Touch ||
-    deviceType === EDeviceType.Pro ||
-    deviceType === EDeviceType.Pro2
-  ) {
-    return semver.gte(currentVersion, '3.1.0');
-  }
-
-  return semver.gte(currentVersion, '2.6.0');
-};
+// supportBatchPublicKey 已迁移为 device-aware 版本：
+// 见 api/helpers/batchGetPublickeys.ts 的 supportBatchPublicKeyByDevice
 
 export const supportModifyHomescreen = (features?: Features): SupportFeatureType => {
   if (!features) return { support: false };

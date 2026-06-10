@@ -7,7 +7,6 @@ import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { DeviceModelToTypes } from '../../types';
-import { getDeviceFirmwareVersion, getMethodVersionRange } from '../../utils';
 import { formatAnyHex, stripHexStartZeroes } from '../helpers/hexUtils';
 import { cutString } from '../helpers/stringUtils';
 
@@ -110,9 +109,8 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
   }
 
   checkSupportJettonAmountBytes() {
-    const firmwareVersion = getDeviceFirmwareVersion(this.device.features)?.join('.');
-    const versionRange = getMethodVersionRange(
-      this.device.features,
+    const firmwareVersion = this.device.getCurrentFirmwareVersionString() ?? '0.0.0';
+    const versionRange = this.device.getCurrentMethodVersionRange(
       type => this.getSupportJettonAmountBytesVersionRange()[type]
     );
 

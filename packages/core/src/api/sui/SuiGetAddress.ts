@@ -2,9 +2,8 @@ import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { supportBatchPublicKey } from '../../utils/deviceFeaturesUtils';
 import { publicKeyToAddress } from './normalize';
-import { batchGetPublickeys } from '../helpers/batchGetPublickeys';
+import { batchGetPublickeys, supportBatchPublicKeyByDevice } from '../helpers/batchGetPublickeys';
 
 import type { SuiAddress, SuiGetAddressParams } from '../../types';
 import type { SuiGetAddress as HardwareSuiGetAddress } from '@onekeyfe/hd-transport';
@@ -62,7 +61,7 @@ export default class SuiGetAddress extends BaseMethod<HardwareSuiGetAddress[]> {
   }
 
   async run() {
-    const supportsBatchPublicKey = supportBatchPublicKey(this.device?.features);
+    const supportsBatchPublicKey = supportBatchPublicKeyByDevice(this.device);
     let responses: SuiAddress[] = [];
     if (supportsBatchPublicKey) {
       const publicKeyRes = await batchGetPublickeys(this.device, this.params, 'ed25519', 784);

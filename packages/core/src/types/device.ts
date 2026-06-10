@@ -3,6 +3,7 @@ import { EDeviceType } from '@onekeyfe/hd-shared';
 import type { IVersionArray } from './settings';
 import type { PROTO } from '../constants';
 import type { OneKeyDeviceCommType } from '@onekeyfe/hd-transport';
+import type { DeviceProfile } from './api/getDeviceInfo';
 
 export type DeviceStatus = 'available' | 'occupied' | 'used';
 
@@ -33,7 +34,9 @@ export type KnownDevice = {
   name: string;
   error?: typeof undefined;
   mode: EOneKeyDeviceMode;
-  features: PROTO.Features;
+  profile?: DeviceProfile;
+  features?: PROTO.Features;
+  sessionId?: string | null;
   unavailableCapabilities: UnavailableCapabilities;
   bleFirmwareVersion: IVersionArray | null;
   firmwareVersion: IVersionArray | null;

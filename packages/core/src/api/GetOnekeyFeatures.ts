@@ -2,6 +2,9 @@ import semver from 'semver';
 
 import { UI_REQUEST } from '../constants/ui-request';
 import { fixVersion } from '../utils/deviceFeaturesUtils';
+import { PROTOCOL_V2_DEVICE_INFO_REQUEST } from '../protocols/protocol-v2';
+import { requestProtocolV2DeviceInfo } from '../protocols/protocol-v2/features';
+import { buildProfileFromProtocolV2, buildProtocolV2GetFeaturesPayload } from '../deviceProfile';
 import { BaseMethod } from './BaseMethod';
 
 import type { OnekeyFeatures } from '../types';
@@ -86,8 +89,23 @@ export default class GetOnekeyFeatures extends BaseMethod {
   }
 
   async run() {
-    if (this.device.originalDescriptor?.protocolType === 'V2') {
-      return Promise.resolve(pickOnekeyFeatures(this.device.features as OnekeyFeatures));
+    if (this.device.isProtocolV2()) {
+      // V2 没有 OnekeyGetFeatures 消息，也不缓存 legacy features：
+      // 取完整 DevGetDeviceInfo（含 SE/hash/build_id）后经兼容视图映射。
+      const deviceInfo = await requestProtocolV2DeviceInfo({
+        commands: this.device.commands,
+        request: PROTOCOL_V2_DEVICE_INFO_REQUEST,
+      });
+      const profile = this.device.applyProfileUpdate(
+        buildProfileFromProtocolV2({
+          deviceInfo,
+          sources: ['deviceInfo'],
+          scope: 'verify',
+        })
+      );
+      return pickOnekeyFeatures(
+        buildProtocolV2GetFeaturesPayload(profile, deviceInfo) as OnekeyFeatures
+      );
     }
 
     const { message } = await this.device.commands.typedCall('OnekeyGetFeatures', 'OnekeyFeatures');

@@ -8,10 +8,9 @@ import {
   PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST,
 } from '../protocols/protocol-v2';
 import { requestProtocolV2DeviceInfo } from '../protocols/protocol-v2/features';
-import { buildProfileFromProtocolV2 } from '../deviceProfile';
+import { buildProfileFromProtocolV1, buildProfileFromProtocolV2 } from '../deviceProfile';
 import { getDeviceType } from '../utils';
 import { fixVersion } from '../utils/deviceFeaturesUtils';
-import { buildDeviceProfile } from './helpers/deviceInfo';
 import { BaseMethod } from './BaseMethod';
 
 import type {
@@ -93,7 +92,7 @@ export default class GetDeviceInfo extends BaseMethod<GetDeviceInfoParams> {
   }
 
   async run() {
-    if (this.device.originalDescriptor?.protocolType === 'V2') {
+    if (this.device.isProtocolV2()) {
       return this.runProtocolV2();
     }
     return this.runProtocolV1();
@@ -111,7 +110,12 @@ export default class GetDeviceInfo extends BaseMethod<GetDeviceInfoParams> {
       scope: this.params.scope,
       includeRaw: this.params.includeRaw,
     });
-    this.device.updateProfile?.(profile);
+    // 缓存走字段级合并：basic 请求不能降级已有的完整 profile；返回值仍按请求 scope 给出
+    if (typeof this.device.applyProfileUpdate === 'function') {
+      this.device.applyProfileUpdate(profile);
+    } else {
+      this.device.updateProfile?.(profile);
+    }
     return profile;
   }
 
@@ -133,7 +137,7 @@ export default class GetDeviceInfo extends BaseMethod<GetDeviceInfoParams> {
       sources.push('onekeyFeatures');
     }
 
-    const profile = buildDeviceProfile({
+    const profile = buildProfileFromProtocolV1({
       protocol: 'V1',
       features,
       onekeyFeatures,

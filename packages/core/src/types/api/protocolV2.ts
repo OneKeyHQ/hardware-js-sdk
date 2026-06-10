@@ -1,13 +1,26 @@
 import type { CommonParams, Response } from '../params';
 import type {
-  DevFirmwareTarget,
   DevFirmwareUpdateStatus,
-  DevRebootType,
   FactoryDeviceInfo,
   OnboardingStatus,
   ProtoVersion,
   Success,
 } from '@onekeyfe/hd-transport';
+
+import type {
+  DeviceFirmwareUpdateParams,
+  DeviceRebootParams,
+  FactoryDeviceInfoSettingsParams,
+} from '../../api/protocol-v2/helpers';
+
+// 参数类型单源：以 api/protocol-v2/helpers.ts 的实现为准（type-only re-export，无运行时依赖）
+export type {
+  DeviceFirmwareTargetInput,
+  DeviceFirmwareUpdateParams,
+  DeviceRebootParams,
+  FactoryDeviceInfoSettingsParams,
+  RebootTypeInput,
+} from '../../api/protocol-v2/helpers';
 
 // ── Shared response shapes (Protocol V2 file system) ────────────────────
 
@@ -45,79 +58,7 @@ export type PathInfoResult = {
   directory?: boolean;
 };
 
-export type DeviceRebootParams = {
-  rebootType?: DevRebootType | string | number;
-  reboot_type?: DevRebootType | string | number;
-};
-
-export type DeviceFirmwareUpdateParams = {
-  targets?: DevFirmwareTarget[];
-  targetId?: DevFirmwareTarget['target_id'] | string | number;
-  target_id?: DevFirmwareTarget['target_id'] | string | number;
-  path?: string;
-};
-
-export type FactoryDeviceInfoSettingsParams = {
-  serial_no?: string;
-  serialNo?: string;
-  cpu_info?: string;
-  cpuInfo?: string;
-  pre_firmware?: string;
-  preFirmware?: string;
-};
-
 // ── Method signatures ─────────────────────────────────────────────────────
-
-export declare function fileRead(
-  connectId: string,
-  params: {
-    path: string;
-    offset?: number;
-    totalSize?: number;
-    chunkLen?: number;
-    uiPercentage?: number;
-  }
-): Response<FileInfo>;
-
-export declare function fileWrite(
-  connectId: string,
-  params: {
-    path: string;
-    offset?: number;
-    totalSize?: number;
-    chunkSize?: number;
-    chunkLen?: number;
-    data: ArrayBuffer | Uint8Array | Blob | string;
-    overwrite?: boolean;
-    append?: boolean;
-    uiPercentage?: number;
-  }
-): Response<FileInfo>;
-
-export declare function fileDelete(
-  connectId: string,
-  params: { path: string }
-): Response<FileOpSuccess>;
-
-export declare function dirList(
-  connectId: string,
-  params: { path: string; depth?: number }
-): Response<DirInfo>;
-
-export declare function dirMake(
-  connectId: string,
-  params: { path: string }
-): Response<FileOpSuccess>;
-
-export declare function dirRemove(
-  connectId: string,
-  params: { path: string }
-): Response<FileOpSuccess>;
-
-export declare function pathInfo(
-  connectId: string,
-  params: { path: string }
-): Response<PathInfoResult>;
 
 export declare function getProtoVersion(
   connectId: string,
@@ -160,38 +101,54 @@ export declare function filesystemFixPermission(connectId: string): Response<Suc
 
 export declare function filesystemFileRead(
   connectId: string,
-  params: Parameters<typeof fileRead>[1]
-): ReturnType<typeof fileRead>;
+  params: {
+    path: string;
+    offset?: number;
+    totalSize?: number;
+    chunkLen?: number;
+    uiPercentage?: number;
+  }
+): Response<FileInfo>;
 
 export declare function filesystemFileWrite(
   connectId: string,
-  params: Parameters<typeof fileWrite>[1]
-): ReturnType<typeof fileWrite>;
+  params: {
+    path: string;
+    offset?: number;
+    totalSize?: number;
+    chunkSize?: number;
+    chunkLen?: number;
+    data: ArrayBuffer | Uint8Array | Blob | string;
+    overwrite?: boolean;
+    append?: boolean;
+    uiPercentage?: number;
+  }
+): Response<FileInfo>;
 
 export declare function filesystemFileDelete(
   connectId: string,
-  params: Parameters<typeof fileDelete>[1]
-): ReturnType<typeof fileDelete>;
+  params: { path: string }
+): Response<FileOpSuccess>;
 
 export declare function filesystemDirList(
   connectId: string,
-  params: Parameters<typeof dirList>[1]
-): ReturnType<typeof dirList>;
+  params: { path: string; depth?: number }
+): Response<DirInfo>;
 
 export declare function filesystemDirMake(
   connectId: string,
-  params: Parameters<typeof dirMake>[1]
-): ReturnType<typeof dirMake>;
+  params: { path: string }
+): Response<FileOpSuccess>;
 
 export declare function filesystemDirRemove(
   connectId: string,
-  params: Parameters<typeof dirRemove>[1]
-): ReturnType<typeof dirRemove>;
+  params: { path: string }
+): Response<FileOpSuccess>;
 
 export declare function filesystemPathInfoQuery(
   connectId: string,
-  params: Parameters<typeof pathInfo>[1]
-): ReturnType<typeof pathInfo>;
+  params: { path: string }
+): Response<PathInfoResult>;
 
 export declare function filesystemFormat(connectId: string): Response<Success>;
 

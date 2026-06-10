@@ -3,12 +3,7 @@ import { blake2s } from '@noble/hashes/blake2s';
 import JSZip from 'jszip';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
-import {
-  LoggerNames,
-  getDeviceBootloaderVersion,
-  getLogger,
-  wait,
-} from '../../utils';
+import { LoggerNames, getDeviceBootloaderVersion, getLogger, wait } from '../../utils';
 import { DEVICE, UI_REQUEST, createUiMessage } from '../../events';
 import { DeviceModelToTypes } from '../../types';
 import { bytesToHex } from '../helpers/hexUtils';

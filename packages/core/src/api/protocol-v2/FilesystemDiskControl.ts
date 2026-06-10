@@ -5,7 +5,6 @@ import {
   validateNonNegativeInteger,
   validateOptionalNonNegativeInteger,
 } from '../helpers/filesystemValidation';
-import { getFirmwareType } from '../../utils';
 
 export type FilesystemDiskControlParams = {
   enable?: number | string;
@@ -22,7 +21,9 @@ export default class FilesystemDiskControl extends BaseMethod<FilesystemDiskCont
     };
   }
 
-  async run() {
-    throw createDeviceNotSupportMethodError(this.name, getFirmwareType(this.device.features));
+  run(): Promise<never> {
+    return Promise.reject(
+      createDeviceNotSupportMethodError(this.name, this.device.getCurrentFirmwareType())
+    );
   }
 }

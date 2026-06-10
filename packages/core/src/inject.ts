@@ -164,13 +164,6 @@ export const createCoreApi = (
     call({ ...params, connectId, method: 'factoryDeviceInfoSettings' }),
   factoryGetDeviceInfo: connectId => call({ connectId, method: 'factoryGetDeviceInfo' }),
   filesystemFixPermission: connectId => call({ connectId, method: 'filesystemFixPermission' }),
-  fileRead: (connectId, params) => call({ ...params, connectId, method: 'fileRead' }),
-  fileWrite: (connectId, params) => call({ ...params, connectId, method: 'fileWrite' }),
-  fileDelete: (connectId, params) => call({ ...params, connectId, method: 'fileDelete' }),
-  dirList: (connectId, params) => call({ ...params, connectId, method: 'dirList' }),
-  dirMake: (connectId, params) => call({ ...params, connectId, method: 'dirMake' }),
-  dirRemove: (connectId, params) => call({ ...params, connectId, method: 'dirRemove' }),
-  pathInfo: (connectId, params) => call({ ...params, connectId, method: 'pathInfo' }),
   filesystemFileRead: (connectId, params) =>
     call({ ...params, connectId, method: 'filesystemFileRead' }),
   filesystemFileWrite: (connectId, params) =>

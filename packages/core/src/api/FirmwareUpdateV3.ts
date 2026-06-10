@@ -79,7 +79,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
   }
 
   async run() {
-    if (this.device.originalDescriptor?.protocolType === 'V2') {
+    if (this.device.isProtocolV2()) {
       throw ERRORS.TypedError(
         HardwareErrorCode.RuntimeError,
         'Protocol V2 firmware update must use firmwareUpdateV4'

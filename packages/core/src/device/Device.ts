@@ -19,22 +19,30 @@ import {
   getDeviceLabel,
   getDeviceType,
   getDeviceUUID,
+  getFirmwareType,
   getLogger,
-  getMethodVersionRange,
 } from '../utils';
 import {
   fixFeaturesFirmwareVersion,
   getPassphraseStateWithRefreshDeviceInfo,
+  supportInputPinOnSoftware,
+  supportModifyHomescreen,
 } from '../utils/deviceFeaturesUtils';
 import { generateInstanceId } from '../utils/tracing';
 // eslint-disable-next-line import/no-cycle
 import { DeviceCommands } from './DeviceCommands';
 import {
+  DeviceModelToTypes,
+  DeviceTypeToModels,
   type DeviceFirmwareRange,
   type Device as DeviceTyped,
   EOneKeyDeviceMode,
   type Features,
+  type IDeviceModel,
+  type IDeviceType,
   type IVersionArray,
+  type IVersionRange,
+  type SupportFeatureType,
   type UnavailableCapabilities,
 } from '../types';
 import { DEVICE, UI_REQUEST } from '../events';
@@ -42,13 +50,11 @@ import { DataManager } from '../data-manager';
 import TransportManager from '../data-manager/TransportManager';
 import { toHardened } from '../api/helpers/pathUtils';
 import { existCapability } from '../utils/capabilitieUtils';
-import {
-  buildProtocolV2FeaturesFromProfile,
-  requestProtocolV2DeviceInfo,
-} from '../protocols/protocol-v2/features';
+import { requestProtocolV2DeviceInfo } from '../protocols/protocol-v2/features';
 import {
   buildProfileFromProtocolV1,
   buildProfileFromProtocolV2,
+  buildProtocolV2GetFeaturesPayload,
 } from '../deviceProfile';
 
 import type { PROTO } from '../constants';
@@ -87,8 +93,6 @@ const profileVersionToArray = (version?: string | null): IVersionArray | null =>
   if (!version) return null;
   return version.split('.').map(part => Number(part) || 0) as IVersionArray;
 };
-
-const hasProtocolV2Profile = (profile?: DeviceProfile) => profile?.protocol === 'V2';
 
 export interface DeviceEvents {
   [DEVICE.PIN]: [Device, PROTO.PinMatrixRequestType | undefined, (err: any, pin: string) => void];
@@ -185,7 +189,10 @@ export class Device extends EventEmitter {
   private deviceAcquired = false;
 
   /**
-   * 设备信息
+   * Protocol V1 原生 Features 缓存。
+   *
+   * SDK 内部标准设备模型是 profile；features 只作为 V1 原始状态和
+   * getFeatures() legacy API 的兼容数据使用。Protocol V2 不缓存这里。
    */
   features: Features | undefined = undefined;
 
@@ -195,7 +202,9 @@ export class Device extends EventEmitter {
   profile: DeviceProfile | undefined = undefined;
 
   /**
-   * 是否需要更新设备信息
+   * 是否需要更新设备信息。
+   *
+   * 历史名称保留用于兼容现有调用语义；对 V2 表示 profile 需要刷新。
    */
   featuresNeedsReload = false;
 
@@ -251,19 +260,13 @@ export class Device extends EventEmitter {
 
   // simplified object to pass via postMessage
   toMessageObject(): DeviceTyped | null {
-    if (this.isUnacquired() || !this.features) return null;
+    if (this.isUnacquired()) return null;
 
     const env = DataManager.getSettings('env');
     const deviceType = this.getCurrentDeviceType();
 
-    const bleName =
-      this.profile && hasProtocolV2Profile(this.profile)
-        ? this.profile.bleName
-        : this.profile?.bleName ?? getDeviceBleName(this.features);
-    const label =
-      this.profile && hasProtocolV2Profile(this.profile)
-        ? this.profile.label
-        : this.profile?.label ?? getDeviceLabel(this.features);
+    const bleName = this.getCurrentBleName();
+    const label = this.getCurrentLabel();
     const serialNo = this.getCurrentSerialNo();
     const deviceId = this.getCurrentDeviceId() || null;
 
@@ -285,6 +288,8 @@ export class Device extends EventEmitter {
       label: label || 'OneKey',
       mode: this.getMode(),
       features: this.features,
+      profile: this.profile,
+      sessionId: this.features?.session_id ?? null,
       firmwareVersion: this.getFirmwareVersion(),
       bleFirmwareVersion: this.getBLEFirmwareVersion(),
       unavailableCapabilities: this.unavailableCapabilities,
@@ -420,12 +425,10 @@ export class Device extends EventEmitter {
   }
 
   /**
-   * Pre-initialize: connect + Initialize ahead of the sign. Only runs the
-   * fallback init when features are missing (gate on `!this.features`, not
-   * isUsedHere which is always false on BLE); otherwise just records the mark.
+   * Pre-initialize: connect + Initialize ahead of the sign.
    */
   async preInitialize(initOptions?: InitOptions) {
-    if (!this.features) {
+    if (this.isUnacquired()) {
       await this.acquire();
       await this.initialize(initOptions);
     }
@@ -471,6 +474,24 @@ export class Device extends EventEmitter {
     return this.commands;
   }
 
+  /**
+   * 唯一协议判别器。
+   *
+   * profile 是连接后探测出的最可信结果，优先于 descriptor 上的 transport 提示；
+   * descriptor.protocolType 兜底（profile 建立前，例如 initialize 之前）。
+   * 全 SDK 的协议分支都必须走这里，不要直接读 originalDescriptor.protocolType
+   * 或 profile.protocol。
+   */
+  getProtocol(): 'V1' | 'V2' {
+    if (this.profile?.protocol === 'V2') return 'V2';
+    if (this.profile?.protocol === 'V1') return 'V1';
+    return this.originalDescriptor.protocolType === 'V2' ? 'V2' : 'V1';
+  }
+
+  isProtocolV2() {
+    return this.getProtocol() === 'V2';
+  }
+
   getCurrentDeviceType() {
     return this.profile?.deviceType ?? getDeviceType(this.features);
   }
@@ -489,11 +510,114 @@ export class Device extends EventEmitter {
     return this.features ? getDeviceUUID(this.features) : '';
   }
 
+  getCurrentBleName() {
+    // V2 不回退 legacy features，避免缓存残留的 V1 数据泄漏到 Pro2 视图
+    if (this.isProtocolV2()) return this.profile?.bleName ?? null;
+    return this.profile?.bleName ?? getDeviceBleName(this.features);
+  }
+
+  getCurrentLabel() {
+    if (this.isProtocolV2()) return this.profile?.label ?? null;
+    return this.profile?.label ?? getDeviceLabel(this.features);
+  }
+
   getCurrentPassphraseProtection() {
     if (this.profile) {
       return this.profile.status.passphraseProtection;
     }
     return this.features?.passphrase_protection;
+  }
+
+  getCurrentFirmwareType() {
+    return this.profile?.firmwareType ?? getFirmwareType(this.features);
+  }
+
+  getCurrentFirmwareVersionString() {
+    return this.profile?.versions.firmware ?? getDeviceFirmwareVersion(this.features)?.join('.');
+  }
+
+  getCurrentBLEFirmwareVersionString() {
+    if (this.profile?.versions.ble) return this.profile.versions.ble;
+    if (!this.features) return undefined;
+    return getDeviceBLEFirmwareVersion(this.features).join('.');
+  }
+
+  getCurrentSafetyChecks() {
+    return this.features?.safety_checks;
+  }
+
+  getCurrentMethodVersionRange(
+    getVersionRange: (deviceModel: IDeviceType | IDeviceModel) => IVersionRange | undefined
+  ) {
+    const deviceType = this.getCurrentDeviceType();
+    const versionRange = getVersionRange(deviceType);
+    if (versionRange) return versionRange;
+
+    // Most-specific model first; must match getMethodVersionRange in deviceInfoUtils,
+    // otherwise e.g. Classic1s resolves the looser model_mini range before model_classic1s.
+    const modelFallbacks: IDeviceModel[] = [
+      'model_classic1s',
+      'model_classic',
+      'model_mini',
+      'model_touch',
+    ];
+    for (const model of modelFallbacks) {
+      if (DeviceTypeToModels[deviceType]?.includes(model)) {
+        const fallbackRange = getVersionRange(model);
+        if (fallbackRange) return fallbackRange;
+      }
+    }
+    return undefined;
+  }
+
+  supportNewPassphrase(): SupportFeatureType {
+    const deviceType = this.getCurrentDeviceType();
+    if (
+      deviceType === EDeviceType.Touch ||
+      deviceType === EDeviceType.Pro ||
+      deviceType === EDeviceType.Pro2
+    ) {
+      return { support: true };
+    }
+
+    const firmwareVersion = this.getCurrentFirmwareVersionString();
+    return {
+      support: Boolean(firmwareVersion && semver.gte(firmwareVersion, '2.4.0')),
+      require: '2.4.0',
+    };
+  }
+
+  supportInputPinOnSoftware(): SupportFeatureType {
+    if (this.features) return supportInputPinOnSoftware(this.features);
+
+    const deviceType = this.getCurrentDeviceType();
+    if (
+      deviceType === EDeviceType.Touch ||
+      deviceType === EDeviceType.Pro ||
+      deviceType === EDeviceType.Pro2
+    ) {
+      return { support: false };
+    }
+
+    const firmwareVersion = this.getCurrentFirmwareVersionString();
+    return {
+      support: Boolean(firmwareVersion && semver.gte(firmwareVersion, '2.3.0')),
+      require: '2.3.0',
+    };
+  }
+
+  supportModifyHomescreen(): SupportFeatureType {
+    if (this.features) return supportModifyHomescreen(this.features);
+
+    const deviceType = this.getCurrentDeviceType();
+    if (DeviceModelToTypes.model_mini.includes(deviceType)) {
+      return { support: true };
+    }
+
+    const firmwareVersion = this.getCurrentFirmwareVersionString();
+    return {
+      support: Boolean(firmwareVersion && semver.gte(firmwareVersion, '3.4.0')),
+    };
   }
 
   private generateStateKey(deviceId: string, passphraseState?: string) {
@@ -601,10 +725,10 @@ export class Device extends EventEmitter {
 
   async initialize(options?: InitOptions) {
     // Protocol V2 不支持传统 Initialize，直接使用协议专用初始化流程。
-    if (this.originalDescriptor.protocolType === 'V2') {
+    if (this.isProtocolV2()) {
       this.passphraseState = options?.passphraseState;
-      if (this.features && !this.featuresNeedsReload && !options?.initSession) {
-        Log.debug('Skip Protocol V2 feature adapter; cached features are available');
+      if (this.profile && !this.featuresNeedsReload && !options?.initSession) {
+        Log.debug('Skip Protocol V2 profile adapter; cached profile is available');
         return;
       }
       await this._initializeProtocolV2();
@@ -657,8 +781,8 @@ export class Device extends EventEmitter {
   /**
    * Device initialization over Protocol V2.
    *
-   * Protocol V2 不走传统 Initialize/GetFeatures，先建立标准 DeviceProfile，
-   * 再同步一份 legacy Features 视图给旧事件和兼容 API。
+   * Protocol V2 不走传统 Initialize/GetFeatures，只建立标准 DeviceProfile。
+   * legacy Features 只在 getFeatures() 兼容出口临时生成。
    */
   private async _initializeProtocolV2() {
     Log.debug('Initialize device via Protocol V2 profile adapter');
@@ -674,15 +798,17 @@ export class Device extends EventEmitter {
           }, 10 * 1000);
         }),
       ]);
-      const profile = buildProfileFromProtocolV2({
-        deviceInfo,
-        sources: ['deviceInfo'],
-        scope: 'verify',
-      });
-      const features = buildProtocolV2FeaturesFromProfile(profile, deviceInfo);
-      this.updateProfile(profile);
+      // 默认请求不含 SE/hash 数据，scope 如实标注为 basic；
+      // 完整数据由 getDeviceInfo(scope:'verify'|'full') 获取。
+      const profile = this.applyProfileUpdate(
+        buildProfileFromProtocolV2({
+          deviceInfo,
+          sources: ['deviceInfo'],
+          scope: 'basic',
+        })
+      );
       Log.debug('Protocol V2 profile:', profile);
-      this._updateFeatures(features);
+      this.featuresNeedsReload = false;
     } catch (error) {
       Log.error('Protocol V2 initialization failed:', error);
       throw error;
@@ -690,19 +816,18 @@ export class Device extends EventEmitter {
   }
 
   async getFeatures() {
-    if (this.originalDescriptor.protocolType === 'V2') {
+    if (this.isProtocolV2()) {
       const deviceInfo = await requestProtocolV2DeviceInfo({
         commands: this.commands,
       });
-      const profile = buildProfileFromProtocolV2({
-        deviceInfo,
-        sources: ['deviceInfo'],
-        scope: 'verify',
-      });
-      const features = buildProtocolV2FeaturesFromProfile(profile, deviceInfo);
-      this.updateProfile(profile);
-      this._updateFeatures(features);
-      return features;
+      const profile = this.applyProfileUpdate(
+        buildProfileFromProtocolV2({
+          deviceInfo,
+          sources: ['deviceInfo'],
+          scope: 'basic',
+        })
+      );
+      return fixFeaturesFirmwareVersion(buildProtocolV2GetFeaturesPayload(profile, deviceInfo));
     }
 
     const { message } = await this.commands.typedCall('GetFeatures', 'Features', {});
@@ -723,7 +848,7 @@ export class Device extends EventEmitter {
     feat = fixFeaturesFirmwareVersion(feat);
 
     this.features = feat;
-    if (this.originalDescriptor.protocolType !== 'V2') {
+    if (!this.isProtocolV2()) {
       this.updateProfile(
         buildProfileFromProtocolV1({
           features: feat,
@@ -737,6 +862,37 @@ export class Device extends EventEmitter {
 
   updateProfile(profile: DeviceProfile | undefined) {
     this.profile = profile;
+  }
+
+  /**
+   * 字段级合并刷新 profile，并返回合并后的结果。
+   *
+   * basic 范围的刷新（initialize / getFeatures）拿不到 SE 版本和 verify 数据，
+   * 不能整体替换掉 getDeviceInfo(scope:'verify'|'full') 建立的完整 profile。
+   */
+  applyProfileUpdate(next: DeviceProfile): DeviceProfile {
+    const prev = this.profile;
+    if (!prev || prev.protocol !== next.protocol) {
+      this.updateProfile(next);
+      return next;
+    }
+
+    const versions = { ...prev.versions };
+    for (const [key, value] of Object.entries(next.versions)) {
+      if (value != null) {
+        (versions as Record<string, string | null | undefined>)[key] = value;
+      }
+    }
+
+    const merged: DeviceProfile = {
+      ...prev,
+      ...next,
+      versions,
+      verify: next.verify ?? prev.verify,
+      raw: next.raw ?? prev.raw,
+    };
+    this.updateProfile(merged);
+    return merged;
   }
 
   /**
@@ -757,7 +913,12 @@ export class Device extends EventEmitter {
     }
 
     if (forceUpdate) {
-      this.originalDescriptor = descriptor;
+      // 枚举得到的 descriptor 可能不带 protocolType（如 WebUSB enumerate），
+      // 不能让覆盖丢掉已探测的协议结果。
+      this.originalDescriptor = {
+        ...descriptor,
+        protocolType: descriptor.protocolType ?? this.originalDescriptor.protocolType,
+      };
     }
   }
 
@@ -906,7 +1067,9 @@ export class Device extends EventEmitter {
       if (this.profile.status.mode === 'notInitialized') return EOneKeyDeviceMode.notInitialized;
       if (this.profile.status.noBackup === true) return EOneKeyDeviceMode.backupMode;
       if (this.profile.status.mode === 'normal') return EOneKeyDeviceMode.normal;
-      if (hasProtocolV2Profile(this.profile)) return EOneKeyDeviceMode.normal;
+      // mode 'unknown'（V2 设备未上报 init_states）保守按未初始化处理，
+      // 与 isInitialized() 的 fail-closed 行为保持一致。
+      if (this.isProtocolV2()) return EOneKeyDeviceMode.notInitialized;
     }
 
     if (this.features?.bootloader_mode) {
@@ -931,7 +1094,7 @@ export class Device extends EventEmitter {
   getFirmwareVersion() {
     const profileVersion = profileVersionToArray(this.profile?.versions.firmware);
     if (profileVersion) return profileVersion;
-    if (hasProtocolV2Profile(this.profile)) return null;
+    if (this.isProtocolV2()) return null;
     if (!this.features) return null;
     return getDeviceFirmwareVersion(this.features);
   }
@@ -939,7 +1102,7 @@ export class Device extends EventEmitter {
   getBLEFirmwareVersion() {
     const profileVersion = profileVersionToArray(this.profile?.versions.ble);
     if (profileVersion) return profileVersion;
-    if (hasProtocolV2Profile(this.profile)) return null;
+    if (this.isProtocolV2()) return null;
     if (!this.features) return null;
     return getDeviceBLEFirmwareVersion(this.features);
   }
@@ -982,7 +1145,9 @@ export class Device extends EventEmitter {
       if (this.profile.status.initialized != null) return this.profile.status.initialized;
       if (this.profile.status.mode === 'normal') return true;
       if (this.profile.status.mode === 'notInitialized') return false;
-      if (hasProtocolV2Profile(this.profile)) return true;
+      // V2 设备未上报 init_states 时按未初始化处理（fail-closed）：
+      // 未知状态放行会让未初始化设备绕过 NOT_INITIALIZE 门禁。
+      if (this.isProtocolV2()) return false;
       if (this.features) return !!this.features.initialized;
       return false;
     }
@@ -997,12 +1162,12 @@ export class Device extends EventEmitter {
   }
 
   isUnacquired(): boolean {
-    return this.features === undefined;
+    return this.features === undefined && this.profile === undefined;
   }
 
   hasUnexpectedMode(allow: string[], require: string[]) {
     // both allow and require cases might generate single unexpected mode
-    if (this.features) {
+    if (!this.isUnacquired()) {
       // allow cases
       if (this.isBootloader() && !allow.includes(UI_REQUEST.BOOTLOADER)) {
         return UI_REQUEST.BOOTLOADER;
@@ -1045,20 +1210,19 @@ export class Device extends EventEmitter {
   }
 
   supportUnlockVersionRange(): DeviceFirmwareRange {
+    // 仅适用于 Protocol V1 的 Pro 系列；Pro2 走独立版本线，
+    // 且 Protocol V2 固件从首个版本即支持 UnLockDevice（见 unlockDevice 的 isProtocolV2 短路）。
     return {
       pro: {
-        min: '4.15.0',
-      },
-      pro2: {
         min: '4.15.0',
       },
     };
   }
 
   async unlockDevice() {
-    const firmwareVersion = getDeviceFirmwareVersion(this.features)?.join('.');
-    const versionRange = getMethodVersionRange(
-      this.features,
+    const firmwareVersion = this.getCurrentFirmwareVersionString() ?? '0.0.0';
+    // profile 优先的版本范围解析；features 仅作为 V1 capability 判断来源
+    const versionRange = this.getCurrentMethodVersionRange(
       type => this.supportUnlockVersionRange()[type]
     );
 
@@ -1066,32 +1230,49 @@ export class Device extends EventEmitter {
       this.features,
       Enum_Capability.Capability_AttachToPin
     );
+    // Pro2 (Protocol V2) 版本线独立于 Pro 系列，固件从首个版本即支持 UnLockDevice
     const supportUnlock =
-      supportAttachPinCapability || (versionRange && semver.gte(firmwareVersion, versionRange.min));
+      this.isProtocolV2() ||
+      supportAttachPinCapability ||
+      (versionRange &&
+        semver.valid(firmwareVersion) &&
+        semver.gte(firmwareVersion, versionRange.min));
 
     if (supportUnlock) {
       const res = await this.commands.typedCall('UnLockDevice', 'UnLockDeviceResponse');
+      // 解锁结果同步到 profile（标准模型），features 仅在 V1 缓存存在时回写
+      if (this.profile) {
+        this.updateProfile({
+          ...this.profile,
+          status: {
+            ...this.profile.status,
+            unlocked: res.message.unlocked == null ? null : res.message.unlocked,
+            ...(res.message.passphrase_protection != null
+              ? { passphraseProtection: res.message.passphrase_protection }
+              : {}),
+          },
+        });
+      }
       if (this.features) {
         this.features.unlocked = res.message.unlocked == null ? null : res.message.unlocked;
         this.features.unlocked_attach_pin =
           res.message.unlocked_attach_pin == null ? undefined : res.message.unlocked_attach_pin;
         this.features.passphrase_protection =
           res.message.passphrase_protection == null ? null : res.message.passphrase_protection;
-        if (this.profile && res.message.passphrase_protection != null) {
-          this.updateProfile({
-            ...this.profile,
-            status: {
-              ...this.profile.status,
-              passphraseProtection: res.message.passphrase_protection,
-            },
-          });
-        }
 
         return Promise.resolve(this.features);
       }
 
       const features = await this.getFeatures();
       return Promise.resolve(features);
+    }
+
+    // legacy 解锁探测仅适用于 Protocol V1 老固件；V2 固件必然支持 UnLockDevice
+    if (this.isProtocolV2()) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        'unlock device error: device firmware does not support UnLockDevice'
+      );
     }
 
     const { type } = await this.commands.typedCall('GetAddress', 'Address', {
@@ -1114,7 +1295,7 @@ export class Device extends EventEmitter {
     useEmptyPassphrase?: boolean,
     skipPassphraseCheck?: boolean
   ) {
-    if (!this.features) return false;
+    if (this.isUnacquired()) return false;
 
     const { passphraseState: newPassphraseState, unlockedAttachPin } =
       await getPassphraseStateWithRefreshDeviceInfo(this, {

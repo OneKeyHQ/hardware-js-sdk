@@ -15,14 +15,7 @@ import { validateParams } from './helpers/paramsValidator';
 import { DevicePool } from '../device/DevicePool';
 import { getBinary, getInfo, getSysResourceBinary } from './firmware/getBinary';
 import { updateResources, uploadFirmware } from './firmware/uploadFirmware';
-import {
-  LoggerNames,
-  getDeviceFirmwareVersion,
-  getDeviceUUID,
-  getFirmwareType,
-  getLogger,
-  wait,
-} from '../utils';
+import { LoggerNames, getDeviceFirmwareVersion, getDeviceUUID, getLogger, wait } from '../utils';
 import { FirmwareUpdateTipMessage, createUiMessage } from '../events/ui-request';
 import { DeviceModelToTypes } from '../types';
 import { DataManager } from '../data-manager';
@@ -276,7 +269,7 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
     const { features, commands } = device;
     const deviceType = device.getCurrentDeviceType();
 
-    const deviceFirmwareType = getFirmwareType(device.features);
+    const deviceFirmwareType = device.getCurrentFirmwareType();
     const firmwareType = params.firmwareType ?? deviceFirmwareType;
 
     this.checkVersionForCopyTouchResource(features, firmwareType);
