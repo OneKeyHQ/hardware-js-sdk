@@ -154,6 +154,32 @@ function transferOutOnce(ep: usb.OutEndpoint, data: Buffer): Promise<void> {
   });
 }
 
+function resetUsbDevice(dev: usb.Device): Promise<void> {
+  return new Promise(resolve => {
+    const reset = (dev as usb.Device & { reset?: (callback: (err?: Error) => void) => void }).reset;
+    if (typeof reset !== 'function') {
+      resolve();
+      return;
+    }
+    reset.call(dev, () => resolve());
+  });
+}
+
+function clearEndpointHalt(ep: usb.InEndpoint | usb.OutEndpoint): Promise<void> {
+  return new Promise(resolve => {
+    const clearHalt = (
+      ep as (usb.InEndpoint | usb.OutEndpoint) & {
+        clearHalt?: (callback: (err?: Error) => void) => void;
+      }
+    ).clearHalt;
+    if (typeof clearHalt !== 'function') {
+      resolve();
+      return;
+    }
+    clearHalt.call(ep, () => resolve());
+  });
+}
+
 /**
  * Skip the 0x3F protocol marker byte from a USB packet.
  */
@@ -210,6 +236,12 @@ export default class NodeUsbTransport {
   /** Per-path Protocol V2 frame assembler, preserving buffered frames during reads. */
   private protocolV2Assemblers: Map<string, ProtocolV2FrameAssembler> = new Map();
 
+  /** Per-path Protocol V2 session, preserving seq across API calls on the same device path. */
+  private protocolV2Sessions: Map<string, ProtocolV2Session> = new Map();
+
+  /** Current Protocol V2 read timeout, consumed by cached session readFrame closures. */
+  private protocolV2ReadTimeouts: Map<string, number | undefined> = new Map();
+
   /** per-path reconnect lock to prevent concurrent reconnects */
   private reconnectLocks = new Map<string, Promise<OpenDevice>>();
 
@@ -235,6 +267,8 @@ export default class NodeUsbTransport {
 
   configureProtocolV2(signedData: any) {
     this.messagesV2 = parseConfigure(signedData);
+    this.protocolV2Sessions.clear();
+    this.protocolV2ReadTimeouts.clear();
     this.Log?.debug('[NodeUsbTransport] Protocol V2 schema configured');
   }
 
@@ -318,7 +352,8 @@ export default class NodeUsbTransport {
     }
 
     try {
-      this.openDevice(path);
+      await this.closeOpenDevice(path);
+      await this.openDevice(path);
       await this.detectProtocol(path, input.expectedProtocol);
       return path;
     } catch (error: any) {
@@ -526,7 +561,7 @@ export default class NodeUsbTransport {
 
       // Re-enumerate to refresh device list, then re-open
       await this.enumerate();
-      this.openDevice(path);
+      await this.openDevice(path);
 
       const openDev = this.openDevices.get(path);
       if (!openDev) {
@@ -629,7 +664,7 @@ export default class NodeUsbTransport {
   /**
    * Open a USB device by path (serial number), claim interface, cache endpoints.
    */
-  private openDevice(path: string): void {
+  private async openDevice(path: string): Promise<void> {
     const existing = this.openDevices.get(path);
     if (existing) return;
 
@@ -641,9 +676,17 @@ export default class NodeUsbTransport {
       throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound, `USB device not found: ${path}`);
     }
 
-    dev.open();
-
     try {
+      dev.open();
+      dev.timeout = TRANSFER_TIMEOUT_MS;
+
+      await resetUsbDevice(dev);
+
+      try {
+        dev.open();
+      } catch {
+        // libusb keeps some devices open across reset; continue with the current handle.
+      }
       dev.timeout = TRANSFER_TIMEOUT_MS;
 
       const iface = this.getDeviceInterface(dev);
@@ -680,6 +723,10 @@ export default class NodeUsbTransport {
       epIn.timeout = TRANSFER_TIMEOUT_MS;
       epOut.timeout = TRANSFER_TIMEOUT_MS;
 
+      await clearEndpointHalt(epIn);
+      await clearEndpointHalt(epOut);
+      await this.drainStaleInput(epIn);
+
       this.openDevices.set(path, { device: dev, iface, epIn, epOut });
     } catch (err) {
       try {
@@ -688,6 +735,23 @@ export default class NodeUsbTransport {
         // ignore close errors during cleanup
       }
       throw err;
+    }
+  }
+
+  private async drainStaleInput(epIn: usb.InEndpoint): Promise<void> {
+    const originalTimeout = epIn.timeout;
+    epIn.timeout = 50;
+    try {
+      // Drain a small bounded number of packets left by the previous USB session.
+      for (let index = 0; index < 16; index += 1) {
+        try {
+          await transferInOnce(epIn, PACKET_SIZE);
+        } catch {
+          break;
+        }
+      }
+    } finally {
+      epIn.timeout = originalTimeout;
     }
   }
 
@@ -751,6 +815,8 @@ export default class NodeUsbTransport {
 
   private async resetConnectionAfterProbe(path: string) {
     this.protocolV2Assemblers.get(path)?.reset();
+    this.protocolV2Sessions.delete(path);
+    this.protocolV2ReadTimeouts.delete(path);
 
     try {
       await this.closeOpenDevice(path);
@@ -759,7 +825,7 @@ export default class NodeUsbTransport {
     }
 
     await this.enumerate();
-    this.openDevice(path);
+    await this.openDevice(path);
   }
 
   private async withProtocolReadTimeout<T>(
@@ -919,22 +985,31 @@ export default class NodeUsbTransport {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
     }
 
-    const session = new ProtocolV2Session({
-      schemas: {
-        protocolV1: protocolV1Messages,
-        protocolV2: this.messagesV2,
-      },
-      router: PROTOCOL_V2_CHANNEL_USB,
-      writeFrame: (frame: Uint8Array) => this.writeProtocolV2Frame(path, frame),
-      readFrame: () => this.receiveProtocolV2Frame(path, options?.timeoutMs),
-      logger: this.Log,
-      logPrefix: 'ProtocolV2 NodeUSB',
-      createTimeoutError: (_messageName: string, timeoutMs: number) =>
-        new Error(`Protocol V2 response timeout after ${timeoutMs}ms for ${name}`),
-    });
+    let session = this.protocolV2Sessions.get(path);
+    if (!session) {
+      session = new ProtocolV2Session({
+        schemas: {
+          protocolV1: protocolV1Messages,
+          protocolV2: this.messagesV2,
+        },
+        router: PROTOCOL_V2_CHANNEL_USB,
+        writeFrame: (frame: Uint8Array) => this.writeProtocolV2Frame(path, frame),
+        readFrame: () => this.receiveProtocolV2Frame(path, this.protocolV2ReadTimeouts.get(path)),
+        logger: this.Log,
+        logPrefix: 'ProtocolV2 NodeUSB',
+        createTimeoutError: (messageName: string, timeoutMs: number) =>
+          new Error(`Protocol V2 response timeout after ${timeoutMs}ms for ${messageName}`),
+      });
+      this.protocolV2Sessions.set(path, session);
+    }
 
+    this.protocolV2ReadTimeouts.set(path, options?.timeoutMs);
     this.protocolV2Assemblers.get(path)?.reset();
-    return session.call(name, data, options);
+    try {
+      return await session.call(name, data, options);
+    } finally {
+      this.protocolV2ReadTimeouts.delete(path);
+    }
   }
 
   /**

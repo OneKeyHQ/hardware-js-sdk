@@ -33,8 +33,7 @@ type WorkflowTarget = 'all' | 'step1' | 'step2' | 'step3' | 'step4';
 type WorkflowStepId = 'step1' | 'step2' | 'step3' | 'step4';
 type StepStatus = 'idle' | 'running' | 'success' | 'failed' | 'skipped';
 type LogLevel = 'info' | 'ok' | 'warn' | 'error';
-type SeFileKey = 'se1' | 'se2' | 'se3' | 'se4';
-type RequiredFileKey = 'bootloader' | 'coprocessor' | 'appP1' | 'appP2' | SeFileKey;
+type RequiredFileKey = 'romloader' | 'updateRom' | 'bluetooth' | 'firmware';
 
 type DirectoryHandle = {
   kind: 'directory';
@@ -134,53 +133,25 @@ type AssetSource =
 
 const REQUIRED_FILES: Array<{ key: RequiredFileKey; label: string; expectedName: string }> = [
   {
-    key: 'bootloader',
-    label: 'Bootloader',
+    key: 'romloader',
+    label: 'Romloader',
+    expectedName: 'pro2_romloader_v3_msc.bin',
+  },
+  {
+    key: 'updateRom',
+    label: 'Update ROM',
     expectedName: 'pro2_boot_update_rom_signed.bin',
   },
   {
-    key: 'coprocessor',
-    label: 'Coprocessor',
+    key: 'bluetooth',
+    label: 'Bluetooth',
     expectedName: 'pro2_bluetooth_signed.bin',
   },
   {
-    key: 'appP1',
-    label: 'APP P1',
+    key: 'firmware',
+    label: 'Firmware',
     expectedName: 'pro2_firmware_signed.bin',
   },
-  {
-    key: 'appP2',
-    label: 'APP P2 (optional)',
-    expectedName: 'pro2_app_p2_signed.bin',
-  },
-  {
-    key: 'se1',
-    label: 'SE1 Firmware (optional)',
-    expectedName: 'pro2_se1_signed.bin',
-  },
-  {
-    key: 'se2',
-    label: 'SE2 Firmware (optional)',
-    expectedName: 'pro2_se2_signed.bin',
-  },
-  {
-    key: 'se3',
-    label: 'SE3 Firmware (optional)',
-    expectedName: 'pro2_se3_signed.bin',
-  },
-  {
-    key: 'se4',
-    label: 'SE4 Firmware (optional)',
-    expectedName: 'pro2_se4_signed.bin',
-  },
-];
-
-// DevFirmwareTargetType（matches firmware FwMgmtTarget_t）：SE01-04 = 6-9
-const SE_FILE_CONFIG: Array<{ key: SeFileKey; targetId: number; devicePath: string }> = [
-  { key: 'se1', targetId: 6, devicePath: 'vol0:se1.bin' },
-  { key: 'se2', targetId: 7, devicePath: 'vol0:se2.bin' },
-  { key: 'se3', targetId: 8, devicePath: 'vol0:se3.bin' },
-  { key: 'se4', targetId: 9, devicePath: 'vol0:se4.bin' },
 ];
 
 function getDeviceUpdateBaseUrl() {
@@ -224,7 +195,7 @@ const STEP_CONFIG: Array<{ id: WorkflowStepId; title: string; description: strin
   {
     id: 'step1',
     title: 'Step 1',
-    description: 'Update bootloader',
+    description: 'Update romloader',
   },
   {
     id: 'step2',
@@ -234,12 +205,12 @@ const STEP_CONFIG: Array<{ id: WorkflowStepId; title: string; description: strin
   {
     id: 'step3',
     title: 'Step 3',
-    description: 'Update coprocessor',
+    description: 'Update bluetooth',
   },
   {
     id: 'step4',
     title: 'Step 4',
-    description: 'Update application (P1/P2)',
+    description: 'Update firmware',
   },
 ];
 
@@ -252,12 +223,14 @@ const INITIAL_STEP_STATUS: Record<WorkflowStepId, StepStatus> = {
 
 const CONNECT_TIMEOUT_MS = 60_000;
 const PING_TIMEOUT_MS = 60_000;
-const DEVICE_FILE_WRITE_CHUNK_SIZE = 2048;
+const DEVICE_FILE_WRITE_CHUNK_SIZE = 1024;
+const DEVICE_PATH_INFO_TIMEOUT_MS = 5000;
+const DEVICE_FILE_WRITE_TIMEOUT_MS = 10_000;
 const STEP1_BOOT_LOGO_PATH = 'vol0:assets/boot/boot_logo.bin';
-const STEP1_BOOTLOADER_PATH = 'vol0:update_rom.bin';
-const STEP3_COPROCESSOR_PATH = 'vol0:bluetooth.bin';
-const STEP4_APP_P1_PATH = 'vol0:core.bin';
-const STEP4_APP_P2_PATH = 'vol0:app_p2.bin';
+const STEP1_ROMLOADER_PATH = 'vol0:romloader.bin';
+const STEP1_UPDATE_ROM_PATH = 'vol0:update_rom.bin';
+const STEP3_BLUETOOTH_PATH = 'vol0:bluetooth.bin';
+const STEP4_CORE_PATH = 'vol0:core.bin';
 const STEP2_UPLOAD_DONE_WAIT_MS = 3000;
 const STEP3_POST_PING_WAIT_MS = 5000;
 const STEP3_DONE_WAIT_MS = 5000;
@@ -268,6 +241,7 @@ const STEP4_FINAL_CONNECT_TIMEOUT_MS = 30_000;
 const STEP1_REBOOT_WAIT_MS = 20_000;
 const STEP1_SECOND_REBOOT_WAIT_MS = 40_000;
 const STANDALONE_POST_REBOOT_WAIT_MS = 1000;
+const PROTOCOL_V2_CONNECT_PROTOCOL = 'V2';
 const IGNORED_ASSET_BASENAMES = new Set(['.DS_Store', 'Thumbs.db', 'desktop.ini']);
 
 function getErrorMessage(error: unknown) {
@@ -324,6 +298,18 @@ function isDirectoryAlreadyExistsError(message: string) {
     normalized.includes('exists') ||
     normalized.includes('exist') ||
     normalized.includes('eexist')
+  );
+}
+
+function isRebootLikelyStartedError(message: string) {
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes('device not found') ||
+    normalized.includes('needs permission') ||
+    normalized.includes('disconnected') ||
+    normalized.includes('action was interrupted') ||
+    normalized.includes('response timeout') ||
+    normalized.includes('read timeout')
   );
 }
 
@@ -490,12 +476,12 @@ export default function Pro2SpecialUpdatePage() {
     [addLog, assertRunning]
   );
 
-  const requestAssetsDirectory = useCallback(
-    async () =>
+  const requestDirectory = useCallback(
+    async (title: string, description: string) =>
       new Promise<DirectoryHandle>((resolve, reject) => {
         setDirectoryRequest({
-          title: 'Select assets source',
-          description: 'Pick the device_update/assets directory.',
+          title,
+          description,
           resolve,
           reject,
         });
@@ -510,10 +496,21 @@ export default function Pro2SpecialUpdatePage() {
     return handle;
   }, []);
 
+  const requestAssetsDirectory = useCallback(
+    async () =>
+      requestDirectory(
+        'Select assets source',
+        'Pick the device_update/assets directory.'
+      ),
+    [requestDirectory]
+  );
+
   const handleDirectoryRequest = useCallback(async () => {
     if (!directoryRequest) return;
     try {
-      const handle = await pickAssetsDirectory();
+      const picker = getDirectoryPicker();
+      const handle = await picker({ mode: 'read' });
+      setAssetSource({ mode: 'directory', handle });
       directoryRequest.resolve(handle);
       addLog('ok', `${directoryRequest.title}: ${handle.name}`);
     } catch (error) {
@@ -523,7 +520,7 @@ export default function Pro2SpecialUpdatePage() {
     } finally {
       setDirectoryRequest(null);
     }
-  }, [addLog, directoryRequest, pickAssetsDirectory]);
+  }, [addLog, directoryRequest]);
 
   const handleCancelDirectoryRequest = useCallback(() => {
     if (!directoryRequest) return;
@@ -541,7 +538,7 @@ export default function Pro2SpecialUpdatePage() {
       try {
         while (Date.now() < deadline) {
           assertRunning();
-          const response = await searchDevices();
+          const response = await searchDevices({ connectProtocol: PROTOCOL_V2_CONNECT_PROTOCOL });
           if (response.success && Array.isArray(response.payload) && response.payload.length > 0) {
             const devices = (response.payload as DeviceInfo[]).filter(isPro2DeviceInfo);
             if (!devices.length) {
@@ -581,6 +578,7 @@ export default function Pro2SpecialUpdatePage() {
       assertRunning();
       const response = await callHardwareAPI(method, {
         connectId,
+        connectProtocol: PROTOCOL_V2_CONNECT_PROTOCOL,
         ...params,
       });
       if (!response.success) {
@@ -613,7 +611,10 @@ export default function Pro2SpecialUpdatePage() {
 
   const getPathInfo = useCallback(
     async (connectId: string, path: string) => {
-      const payload = await callApi('filesystemPathInfoQuery', connectId, { path });
+      const payload = await callApi('pathInfo', connectId, {
+        path,
+        timeoutMs: DEVICE_PATH_INFO_TIMEOUT_MS,
+      });
       return payload as PathInfoResult;
     },
     [callApi]
@@ -622,7 +623,7 @@ export default function Pro2SpecialUpdatePage() {
   const writeFile = useCallback(
     async (connectId: string, file: File, path: string, label: string) => {
       addLog('info', `${label}: write ${file.name} -> ${path} (${formatBytes(file.size)})`);
-      await callApi('filesystemFileWrite', connectId, {
+      await callApi('fileWrite', connectId, {
         path,
         offset: 0,
         totalSize: file.size,
@@ -630,6 +631,7 @@ export default function Pro2SpecialUpdatePage() {
         data: file,
         overwrite: true,
         append: false,
+        timeoutMs: DEVICE_FILE_WRITE_TIMEOUT_MS,
       });
       addLog('ok', `${label}: write complete`);
     },
@@ -639,8 +641,16 @@ export default function Pro2SpecialUpdatePage() {
   const rebootDevice = useCallback(
     async (connectId: string, rebootType: number, label: string) => {
       addLog('info', `${label}: reboot type=${rebootType}`);
-      await callApi('deviceReboot', connectId, { rebootType });
-      addLog('ok', `${label}: reboot command accepted`);
+      try {
+        await callApi('deviceReboot', connectId, { rebootType });
+        addLog('ok', `${label}: reboot command accepted`);
+      } catch (error) {
+        const message = getErrorMessage(error);
+        if (!isRebootLikelyStartedError(message)) {
+          throw error;
+        }
+        addLog('warn', `${label}: reboot response unavailable, treating as reboot started: ${message}`);
+      }
     },
     [addLog, callApi]
   );
@@ -650,25 +660,6 @@ export default function Pro2SpecialUpdatePage() {
       resetFirmwareProgress();
       addLog('info', `${label}: DeviceFirmwareUpdate target=${targetId} path=${path}`);
       await callApi('deviceFirmwareUpdate', connectId, { targetId, path });
-      addLog('ok', `${label}: install command finished`);
-    },
-    [addLog, callApi, resetFirmwareProgress]
-  );
-
-  const firmwareUpdateTargets = useCallback(
-    async (
-      connectId: string,
-      targets: Array<{ target_id: number; path: string }>,
-      label: string
-    ) => {
-      resetFirmwareProgress();
-      addLog(
-        'info',
-        `${label}: DeviceFirmwareUpdate targets=${targets
-          .map(target => `${target.target_id}:${target.path}`)
-          .join(', ')}`
-      );
-      await callApi('deviceFirmwareUpdate', connectId, { targets });
       addLog('ok', `${label}: install command finished`);
     },
     [addLog, callApi, resetFirmwareProgress]
@@ -684,13 +675,6 @@ export default function Pro2SpecialUpdatePage() {
     },
     [connectDevice, rebootDevice, wait]
   );
-
-  const rebootToBoardloaderPrelude = useCallback(async () => {
-    const device = await connectDevice(CONNECT_TIMEOUT_MS, 'RunAll.boardloader.connect');
-    await rebootDevice(device.connectId, 1, 'RunAll.boardloader.reboot');
-    await wait(STANDALONE_POST_REBOOT_WAIT_MS, 'RunAll.boardloader');
-    await connectDevice(CONNECT_TIMEOUT_MS, 'RunAll.boardloader.reconnect');
-  }, [connectDevice, rebootDevice, wait]);
 
   const enumerateAssets = useCallback(async (root: DirectoryHandle) => {
     const results: AssetFile[] = [];
@@ -716,12 +700,30 @@ export default function Pro2SpecialUpdatePage() {
     return results;
   }, []);
 
+  const getAssetFiles = useCallback(
+    async (source: AssetSource) =>
+      source.mode === 'directory'
+        ? enumerateAssets(source.handle)
+        : source.files.map(item => ({
+            relativePath: item.relativePath.split('/').filter(Boolean),
+            sourcePath: item.sourcePath,
+            size: item.size,
+          })),
+    [enumerateAssets]
+  );
+
+  const getAssetBlob = useCallback(async (item: AssetFile) => {
+    if (item.file) return item.file;
+    if (item.sourcePath) return fetchDeviceUpdateBlob(item.sourcePath);
+    throw new Error(`Missing source for asset: ${getAssetRelativePath(item.relativePath)}`);
+  }, []);
+
   const ensureDeviceDirectories = useCallback(
     async (connectId: string, dirPaths: string[], createdDirs: Set<string>) => {
       for (const dirPath of dirPaths) {
         if (createdDirs.has(dirPath)) continue;
         try {
-          await callApi('filesystemDirMake', connectId, { path: dirPath });
+          await callApi('dirMake', connectId, { path: dirPath });
         } catch (error) {
           const message = getErrorMessage(error);
           if (!isDirectoryAlreadyExistsError(message)) {
@@ -736,14 +738,7 @@ export default function Pro2SpecialUpdatePage() {
 
   const uploadAssetsOverWebUsb = useCallback(
     async (connectId: string, source: AssetSource) => {
-      const assetFiles: AssetFile[] =
-        source.mode === 'directory'
-          ? await enumerateAssets(source.handle)
-          : source.files.map(item => ({
-              relativePath: item.relativePath.split('/').filter(Boolean),
-              sourcePath: item.sourcePath,
-              size: item.size,
-            }));
+      const assetFiles = await getAssetFiles(source);
       const totalBytes = assetFiles.reduce((sum, item) => sum + item.size, 0);
 
       if (assetFiles.length === 0) {
@@ -762,35 +757,16 @@ export default function Pro2SpecialUpdatePage() {
       const startedAt = Date.now();
       const createdDirs = new Set<string>();
 
-      const publishCopyProgress = (progress: CopyProgress) => {
-        setCopyProgress(progress);
-      };
-
-      publishCopyProgress({
-        copiedFiles: 0,
-        totalFiles: assetFiles.length,
-        copiedBytes: 0,
-        totalBytes,
-        currentFile: getAssetRelativePath(assetFiles[0]?.relativePath ?? []),
-        currentFileBytes: 0,
-        currentFileSize: assetFiles[0]?.size ?? 0,
-        rateBytesPerSecond: 0,
-        elapsedMs: 0,
-      });
-
       for (const item of assetFiles) {
         assertRunning();
-        if (!item.file && !item.sourcePath) {
-          throw new Error(`Missing source for asset: ${getAssetRelativePath(item.relativePath)}`);
-        }
-        const data = item.file ?? (await fetchDeviceUpdateBlob(item.sourcePath ?? ''));
         const currentFile = getAssetRelativePath(item.relativePath);
         const devicePath = getAssetDevicePath(item.relativePath);
+        const data = await getAssetBlob(item);
         const elapsedBeforeMs = Date.now() - startedAt;
         const currentRateBytesPerSecond =
           elapsedBeforeMs > 0 ? Math.round((copiedBytes / elapsedBeforeMs) * 1000) : 0;
 
-        publishCopyProgress({
+        setCopyProgress({
           copiedFiles,
           totalFiles: assetFiles.length,
           copiedBytes,
@@ -807,7 +783,7 @@ export default function Pro2SpecialUpdatePage() {
           getAssetDeviceDirPaths(item.relativePath),
           createdDirs
         );
-        await callApi('filesystemFileWrite', connectId, {
+        await callApi('fileWrite', connectId, {
           path: devicePath,
           offset: 0,
           totalSize: data.size,
@@ -815,13 +791,14 @@ export default function Pro2SpecialUpdatePage() {
           data,
           overwrite: true,
           append: false,
+          timeoutMs: DEVICE_FILE_WRITE_TIMEOUT_MS,
         });
 
         copiedFiles += 1;
         copiedBytes += data.size;
         const elapsedMs = Date.now() - startedAt;
         const rateBytesPerSecond = elapsedMs > 0 ? Math.round((copiedBytes / elapsedMs) * 1000) : 0;
-        publishCopyProgress({
+        setCopyProgress({
           copiedFiles,
           totalFiles: assetFiles.length,
           copiedBytes,
@@ -837,18 +814,6 @@ export default function Pro2SpecialUpdatePage() {
       const finalElapsedMs = Date.now() - startedAt;
       const finalRateBytesPerSecond =
         finalElapsedMs > 0 ? Math.round((copiedBytes / finalElapsedMs) * 1000) : 0;
-      publishCopyProgress({
-        copiedFiles,
-        totalFiles: assetFiles.length,
-        copiedBytes,
-        totalBytes,
-        currentFile: getAssetRelativePath(assetFiles[assetFiles.length - 1]?.relativePath ?? []),
-        currentFileBytes: assetFiles[assetFiles.length - 1]?.size ?? 0,
-        currentFileSize: assetFiles[assetFiles.length - 1]?.size ?? 0,
-        rateBytesPerSecond: finalRateBytesPerSecond,
-        elapsedMs: finalElapsedMs,
-      });
-
       addLog(
         'ok',
         `Step2.3: uploaded ${assetFiles.length} asset files at ${formatRate(
@@ -856,7 +821,7 @@ export default function Pro2SpecialUpdatePage() {
         )}`
       );
     },
-    [addLog, assertRunning, callApi, ensureDeviceDirectories, enumerateAssets]
+    [addLog, assertRunning, callApi, ensureDeviceDirectories, getAssetBlob, getAssetFiles]
   );
 
   const requireFile = useCallback(
@@ -883,21 +848,6 @@ export default function Pro2SpecialUpdatePage() {
     [files]
   );
 
-  /** 可选文件：未手动选择且默认包未确认可用（manifest available !== true）时返回 null，SE1-4 等可选目标用 */
-  const getOptionalFile = useCallback(
-    async (key: RequiredFileKey): Promise<File | null> => {
-      const selectedFile = files[key];
-      if (!selectedFile) return null;
-      if (selectedFile.mode === 'manual') return selectedFile.file;
-      if (selectedFile.available !== true) return null;
-      const blob = await fetchDeviceUpdateBlob(selectedFile.sourcePath);
-      return new File([blob], selectedFile.name, {
-        type: 'application/octet-stream',
-      });
-    },
-    [files]
-  );
-
   const getAssetsDirectory = useCallback(async () => {
     if (assetSource) return assetSource;
     const handle = await requestAssetsDirectory();
@@ -905,7 +855,8 @@ export default function Pro2SpecialUpdatePage() {
   }, [assetSource, requestAssetsDirectory]);
 
   const runStep1Once = useCallback(async () => {
-    const bootloaderFile = await requireFile('bootloader');
+    const romloaderFile = await requireFile('romloader');
+    const updateRomFile = await requireFile('updateRom');
 
     const device = await connectDevice(CONNECT_TIMEOUT_MS, 'Step1.1');
     let connectId = device.connectId;
@@ -914,22 +865,23 @@ export default function Pro2SpecialUpdatePage() {
     addLog('info', `Step1.3: check ${STEP1_BOOT_LOGO_PATH}`);
     const bootLogoInfo = await getPathInfo(connectId, STEP1_BOOT_LOGO_PATH);
     if (bootLogoInfo.exist) {
-      await callApi('filesystemFileDelete', connectId, { path: STEP1_BOOT_LOGO_PATH });
+      await callApi('fileDelete', connectId, { path: STEP1_BOOT_LOGO_PATH });
       addLog('ok', `Step1.3: deleted ${STEP1_BOOT_LOGO_PATH}`);
     } else {
       addLog('info', `Step1.3: ${STEP1_BOOT_LOGO_PATH} not found`);
     }
 
-    await writeFile(connectId, bootloaderFile, STEP1_BOOTLOADER_PATH, 'Step1.4');
-    // TARGET_BOOTLOADER = 2（FwMgmtTarget_t）
-    await firmwareUpdate(connectId, 2, STEP1_BOOTLOADER_PATH, 'Step1.5');
-    await rebootDevice(connectId, 0, 'Step1.6');
-    await wait(STEP1_REBOOT_WAIT_MS, 'Step1.6');
+    await writeFile(connectId, romloaderFile, STEP1_ROMLOADER_PATH, 'Step1.4');
+    await wait(1000, 'Step1.4 -> Step1.5');
+    await writeFile(connectId, updateRomFile, STEP1_UPDATE_ROM_PATH, 'Step1.5');
+    await firmwareUpdate(connectId, 1, STEP1_UPDATE_ROM_PATH, 'Step1.6');
+    await rebootDevice(connectId, 0, 'Step1.7');
+    await wait(STEP1_REBOOT_WAIT_MS, 'Step1.7');
 
-    const secondDevice = await connectDevice(CONNECT_TIMEOUT_MS, 'Step1.7');
+    const secondDevice = await connectDevice(CONNECT_TIMEOUT_MS, 'Step1.8');
     connectId = secondDevice.connectId;
-    await rebootDevice(connectId, 0, 'Step1.8');
-    await wait(STEP1_SECOND_REBOOT_WAIT_MS, 'Step1.8');
+    await rebootDevice(connectId, 0, 'Step1.9');
+    await wait(STEP1_SECOND_REBOOT_WAIT_MS, 'Step1.9');
   }, [
     addLog,
     callApi,
@@ -962,7 +914,7 @@ export default function Pro2SpecialUpdatePage() {
 
   const runStep3Once = useCallback(
     async (initialConnectId?: string) => {
-      const coprocessorFile = await requireFile('coprocessor');
+      const bluetoothFile = await requireFile('bluetooth');
       let connectId = initialConnectId;
       if (!connectId) {
         connectId =
@@ -974,40 +926,29 @@ export default function Pro2SpecialUpdatePage() {
       await pingDevice(connectId, PING_TIMEOUT_MS, 'Step3.2');
       await wait(STEP3_POST_PING_WAIT_MS, 'Step3.2');
 
-      addLog('info', `Step3.3: check ${STEP3_COPROCESSOR_PATH}`);
+      addLog('info', `Step3.3: check ${STEP3_BLUETOOTH_PATH}`);
       let needsWrite = true;
       try {
-        const info = await getPathInfo(connectId, STEP3_COPROCESSOR_PATH);
+        const info = await getPathInfo(connectId, STEP3_BLUETOOTH_PATH);
         needsWrite = !info.exist;
       } catch (error) {
         addLog('warn', `Step3.3: path info failed, writing file: ${getErrorMessage(error)}`);
       }
 
       if (needsWrite) {
-        await writeFile(connectId, coprocessorFile, STEP3_COPROCESSOR_PATH, 'Step3.3');
+        await writeFile(connectId, bluetoothFile, STEP3_BLUETOOTH_PATH, 'Step3.3');
       } else {
-        addLog('info', `Step3.3: ${STEP3_COPROCESSOR_PATH} already exists`);
+        addLog('info', `Step3.3: ${STEP3_BLUETOOTH_PATH} already exists`);
       }
 
-      // TARGET_COPROCESSOR = 5（FwMgmtTarget_t，蓝牙协处理器）
-      await firmwareUpdate(connectId, 5, STEP3_COPROCESSOR_PATH, 'Step3.4');
+      await firmwareUpdate(connectId, 2, STEP3_BLUETOOTH_PATH, 'Step3.4');
       await wait(STEP3_DONE_WAIT_MS, 'Step3.5');
     },
     [addLog, connectDevice, firmwareUpdate, getPathInfo, pingDevice, requireFile, wait, writeFile]
   );
 
   const runStep4Once = useCallback(async () => {
-    const appP1File = await requireFile('appP1');
-    // APP P2 与 SE1-4 为可选目标：有文件（手动选择或默认包内可用）才参与本次安装
-    const appP2File = await getOptionalFile('appP2');
-    const seFiles: Array<{ targetId: number; devicePath: string; file: File; key: SeFileKey }> = [];
-    for (const seConfig of SE_FILE_CONFIG) {
-      const seFile = await getOptionalFile(seConfig.key);
-      if (seFile) {
-        seFiles.push({ ...seConfig, file: seFile });
-      }
-    }
-
+    const firmwareFile = await requireFile('firmware');
     let connectId = (await connectDevice(CONNECT_TIMEOUT_MS, 'Step4.1')).connectId;
     await rebootDevice(connectId, 1, 'Step4.2');
     await wait(STEP4_POST_REBOOT_WAIT_MS, 'Step4.2');
@@ -1016,41 +957,23 @@ export default function Pro2SpecialUpdatePage() {
     await pingDevice(connectId, PING_TIMEOUT_MS, 'Step4.4');
     await wait(STEP4_POST_PING_WAIT_MS, 'Step4.4');
 
-    addLog('info', `Step4.5: check ${STEP4_APP_P1_PATH}`);
+    addLog('info', `Step4.5: check ${STEP4_CORE_PATH}`);
     let needsWrite = true;
     try {
-      const info = await getPathInfo(connectId, STEP4_APP_P1_PATH);
+      const info = await getPathInfo(connectId, STEP4_CORE_PATH);
       needsWrite = !info.exist;
     } catch (error) {
       addLog('warn', `Step4.5: path info failed, writing file: ${getErrorMessage(error)}`);
     }
 
     if (needsWrite) {
-      await writeFile(connectId, appP1File, STEP4_APP_P1_PATH, 'Step4.5');
+      await writeFile(connectId, firmwareFile, STEP4_CORE_PATH, 'Step4.5');
     } else {
-      addLog('info', `Step4.5: ${STEP4_APP_P1_PATH} already exists`);
+      addLog('info', `Step4.5: ${STEP4_CORE_PATH} already exists`);
     }
-
-    if (appP2File) {
-      await writeFile(connectId, appP2File, STEP4_APP_P2_PATH, 'Step4.5 appP2');
-    }
-    for (const seFile of seFiles) {
-      await writeFile(connectId, seFile.file, seFile.devicePath, `Step4.5 ${seFile.key}`);
-    }
-
-    // FwMgmtTarget_t：APPLICATION_P1 = 3、APPLICATION_P2 = 4、SE01-04 = 6-9
-    const installTargets: Array<{ target_id: number; path: string }> = [
-      ...seFiles.map(seFile => ({ target_id: seFile.targetId, path: seFile.devicePath })),
-      { target_id: 3, path: STEP4_APP_P1_PATH },
-      ...(appP2File ? [{ target_id: 4, path: STEP4_APP_P2_PATH }] : []),
-    ];
 
     try {
-      if (installTargets.length > 1) {
-        await firmwareUpdateTargets(connectId, installTargets, 'Step4.6');
-      } else {
-        await firmwareUpdate(connectId, 3, STEP4_APP_P1_PATH, 'Step4.6');
-      }
+      await firmwareUpdate(connectId, 1, STEP4_CORE_PATH, 'Step4.6');
     } catch (error) {
       addLog('warn', `Step4.6: ignored firmware update error: ${getErrorMessage(error)}`);
     }
@@ -1061,8 +984,6 @@ export default function Pro2SpecialUpdatePage() {
     addLog,
     connectDevice,
     firmwareUpdate,
-    firmwareUpdateTargets,
-    getOptionalFile,
     getPathInfo,
     pingDevice,
     rebootDevice,
@@ -1125,7 +1046,6 @@ export default function Pro2SpecialUpdatePage() {
 
       try {
         if (target === 'all') {
-          await rebootToBoardloaderPrelude();
           await runStep('step1', () => runWithAttempts('Step1', runStep1Once));
           await runStep('step2', () => runWithAttempts('Step2', () => runStep2Once()));
 
@@ -1206,7 +1126,6 @@ export default function Pro2SpecialUpdatePage() {
       runStep4Once,
       runWithAttempts,
       runningTarget,
-      rebootToBoardloaderPrelude,
       standalonePrelude,
       toast,
     ]
@@ -1273,7 +1192,7 @@ export default function Pro2SpecialUpdatePage() {
                 </Badge>
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
-                Bootloader, resources, coprocessor, and application (P1/P2) workflow.
+                Romloader, resources, bluetooth, and firmware workflow.
               </p>
               <div className="mt-2 flex max-w-3xl items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />

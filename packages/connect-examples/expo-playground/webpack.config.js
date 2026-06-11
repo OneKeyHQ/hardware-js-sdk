@@ -10,18 +10,11 @@ const deviceUpdateRoot = path.join(repoRoot, 'device_update');
 const deviceUpdateBinDir = path.join(deviceUpdateRoot, 'bin');
 const deviceUpdateAssetsDir = path.join(deviceUpdateRoot, 'assets');
 const ignoredDeviceUpdateNames = new Set(['.DS_Store', 'Thumbs.db', 'desktop.ini']);
-// key 与 pro2-update 页面的 RequiredFileKey 对应（FwMgmtTarget_t 拆分）
 const deviceUpdateBinaries = {
-  bootloader: 'pro2_boot_update_rom_signed.bin',
-  coprocessor: 'pro2_bluetooth_signed.bin',
-  appP1: 'pro2_firmware_signed.bin',
-  // APP P2 / SE1-4 为可选目标：bin 目录里没有对应文件时 manifest 标记 available=false，
-  // 页面会跳过这些 target（也可在页面上手动选择文件）
-  appP2: 'pro2_app_p2_signed.bin',
-  se1: 'pro2_se1_signed.bin',
-  se2: 'pro2_se2_signed.bin',
-  se3: 'pro2_se3_signed.bin',
-  se4: 'pro2_se4_signed.bin',
+  romloader: 'pro2_romloader_v3_msc.bin',
+  updateRom: 'pro2_boot_update_rom_signed.bin',
+  bluetooth: 'pro2_bluetooth_signed.bin',
+  firmware: 'pro2_firmware_signed.bin',
 };
 
 function readFileSize(filePath) {

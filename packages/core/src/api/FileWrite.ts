@@ -25,6 +25,7 @@ export type FileWriteParams = {
   overwrite?: boolean;
   append?: boolean;
   uiPercentage?: number;
+  timeoutMs?: number | string;
 };
 
 const MIN_FILE_CHUNK_SIZE = 64;
@@ -102,6 +103,7 @@ export default class FileWrite extends BaseMethod<FileWriteParams> {
       overwrite: this.payload.overwrite ?? offset === 0,
       append: this.payload.append ?? false,
       uiPercentage: validateOptionalPercentage(this.payload.uiPercentage, 'uiPercentage'),
+      timeoutMs: validateOptionalNonNegativeInteger(this.payload.timeoutMs, 'timeoutMs'),
     };
   }
 
@@ -135,6 +137,8 @@ export default class FileWrite extends BaseMethod<FileWriteParams> {
     let chunkIndex = 0;
     let lastMessage: Record<string, unknown> | undefined;
     const startTime = Date.now();
+    const timeoutMs =
+      this.params.timeoutMs === undefined ? undefined : Number(this.params.timeoutMs);
 
     while (written < dataLength) {
       const chunkEnd = Math.min(written + chunkSize, dataLength);
@@ -145,17 +149,24 @@ export default class FileWrite extends BaseMethod<FileWriteParams> {
         this.params.uiPercentage ??
         Math.min(Math.ceil(((written + chunk.byteLength) / dataLength) * 100), 99);
 
-      const res = await this.device.commands.typedCall('FilesystemFileWrite', 'FilesystemFile', {
-        file: {
-          path: this.params.path,
-          offset,
-          total_size: totalSize,
-          data: chunk,
+      const res = await this.device.commands.typedCall(
+        'FilesystemFileWrite',
+        'FilesystemFile',
+        {
+          file: {
+            path: this.params.path,
+            offset,
+            total_size: totalSize,
+            data: chunk,
+          },
+          overwrite: isFirstChunk ? overwrite : false,
+          append,
+          ui_percentage: progress,
         },
-        overwrite: isFirstChunk ? overwrite : false,
-        append,
-        ui_percentage: progress,
-      });
+        {
+          timeoutMs,
+        }
+      );
 
       lastMessage = res.message;
       const processedByte = Number(res.message?.processed_byte);

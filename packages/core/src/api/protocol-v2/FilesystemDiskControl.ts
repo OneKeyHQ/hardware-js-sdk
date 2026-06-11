@@ -1,5 +1,3 @@
-import { createDeviceNotSupportMethodError } from '@onekeyfe/hd-shared';
-
 import { BaseMethod } from '../BaseMethod';
 import {
   invalidParameter,
@@ -35,9 +33,18 @@ export default class FilesystemDiskControl extends BaseMethod<{
     };
   }
 
-  run(): Promise<never> {
-    return Promise.reject(
-      createDeviceNotSupportMethodError(this.name, this.device.getCurrentFirmwareType())
+  async run() {
+    const typedCall = this.device.commands.typedCall as any;
+    const res = await typedCall(
+      'FilesystemDiskControl',
+      'Success',
+      {
+        enable: this.params.enable,
+      },
+      {
+        timeoutMs: this.params.timeoutMs,
+      }
     );
+    return Promise.resolve(res.message);
   }
 }

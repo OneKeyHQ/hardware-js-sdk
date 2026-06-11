@@ -32,13 +32,13 @@ const FIRMWARE_UPDATE_METHODS = new Set([
 
 const PROTOCOL_V2_PATH_METHODS = new Set([
   'deviceFirmwareUpdate',
-  'filesystemPathInfoQuery',
-  'filesystemDirList',
-  'filesystemDirMake',
-  'filesystemDirRemove',
-  'filesystemFileRead',
-  'filesystemFileWrite',
-  'filesystemFileDelete',
+  'pathInfo',
+  'dirList',
+  'dirMake',
+  'dirRemove',
+  'fileRead',
+  'fileWrite',
+  'fileDelete',
   'filesystemPathInfoQuery',
   'filesystemDirList',
   'filesystemDirMake',
@@ -90,7 +90,7 @@ function normalizeProtocolV2FileParams(
     }
   }
 
-  if (method !== 'filesystemFileWrite') return normalizedParams;
+  if (method !== 'filesystemFileWrite' && method !== 'fileWrite') return normalizedParams;
 
   const dataSize = getProtocolV2FileWriteDataSize(normalizedParams.data);
   if (!dataSize) return normalizedParams;

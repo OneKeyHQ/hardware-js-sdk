@@ -111,7 +111,7 @@ export declare function factoryGetDeviceInfo(connectId: string): Response<Factor
 
 export declare function filesystemFixPermission(connectId: string): Response<Success>;
 
-export declare function filesystemFileRead(
+export declare function fileRead(
   connectId: string,
   params: {
     path: string;
@@ -122,7 +122,7 @@ export declare function filesystemFileRead(
   }
 ): Response<FileInfo>;
 
-export declare function filesystemFileWrite(
+export declare function fileWrite(
   connectId: string,
   params: {
     path: string;
@@ -134,33 +134,42 @@ export declare function filesystemFileWrite(
     overwrite?: boolean;
     append?: boolean;
     uiPercentage?: number;
+    timeoutMs?: number | string;
   }
 ): Response<FileInfo>;
 
-export declare function filesystemFileDelete(
+export declare function fileDelete(
   connectId: string,
   params: { path: string }
 ): Response<FileOpSuccess>;
 
-export declare function filesystemDirList(
+export declare function dirList(
   connectId: string,
   params: { path: string; depth?: number }
 ): Response<DirInfo>;
 
-export declare function filesystemDirMake(
+export declare function dirMake(
   connectId: string,
   params: { path: string }
 ): Response<FileOpSuccess>;
 
-export declare function filesystemDirRemove(
+export declare function dirRemove(
   connectId: string,
   params: { path: string }
 ): Response<FileOpSuccess>;
 
-export declare function filesystemPathInfoQuery(
+export declare function pathInfo(
   connectId: string,
-  params: { path: string }
+  params: { path: string; timeoutMs?: number | string }
 ): Response<PathInfoResult>;
+
+export declare const filesystemFileRead: typeof fileRead;
+export declare const filesystemFileWrite: typeof fileWrite;
+export declare const filesystemFileDelete: typeof fileDelete;
+export declare const filesystemDirList: typeof dirList;
+export declare const filesystemDirMake: typeof dirMake;
+export declare const filesystemDirRemove: typeof dirRemove;
+export declare const filesystemPathInfoQuery: typeof pathInfo;
 
 export declare function filesystemFormat(connectId: string): Response<Success>;
 

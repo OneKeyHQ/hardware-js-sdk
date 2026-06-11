@@ -55,6 +55,13 @@ export { default as factoryGetDeviceInfo } from './protocol-v2/FactoryGetDeviceI
 export { default as filesystemFixPermission } from './protocol-v2/FilesystemFixPermission';
 export { default as filesystemFormat } from './protocol-v2/FilesystemFormat';
 export { default as filesystemDiskControl } from './protocol-v2/FilesystemDiskControl';
+export { default as fileRead } from './FileRead';
+export { default as fileWrite } from './FileWrite';
+export { default as fileDelete } from './FileDelete';
+export { default as dirList } from './DirList';
+export { default as dirMake } from './DirMake';
+export { default as dirRemove } from './DirRemove';
+export { default as pathInfo } from './PathInfo';
 export { default as filesystemFileRead } from './FileRead';
 export { default as filesystemFileWrite } from './FileWrite';
 export { default as filesystemFileDelete } from './FileDelete';
