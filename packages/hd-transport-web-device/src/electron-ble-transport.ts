@@ -368,35 +368,32 @@ export default class ElectronBleTransport {
     }
 
     if (expectedProtocol === 'V2') {
+      // 免探测路径：调用方显式承诺该设备是 V2（例如固件升级重启后的重连场景，
+      // 上层已经探测过协议并通过 expectedProtocol 传回），这里不再重复探测。
       this.deviceProtocol.set(uuid, 'V2');
       this.Log?.debug(`[Electron BLE] detectProtocol: uuid=${uuid} -> V2 (expected)`);
       return 'V2';
     }
 
-    if (protocolHint === 'V2') {
-      this.deviceProtocol.set(uuid, 'V2');
-      this.Log?.debug(`[Electron BLE] detectProtocol: uuid=${uuid} -> V2 (hint)`);
-      return 'V2';
-    }
+    // 项目约束：协议判断必须在连接后主动探测，不能依赖设备名/PID/descriptor。
+    // 设备名 hint（如 "Pro 2"）只用于调整探测顺序：hint=V2 时先探 V2、失败回落 V1，
+    // 不能作为最终结论。
+    const probeOrder: ProtocolType[] =
+      protocolHint === 'V2' || this.deviceProtocol.get(uuid) === 'V2' ? ['V2', 'V1'] : ['V1', 'V2'];
 
-    if (this.deviceProtocol.get(uuid) === 'V2') {
-      this.deviceProtocol.set(uuid, 'V2');
-      this.Log?.debug(`[Electron BLE] detectProtocol: uuid=${uuid} -> V2 (cached)`);
-      return 'V2';
-    }
-
-    const protocolV1Detected = await this.probeProtocolV1(uuid);
-    if (protocolV1Detected) {
-      this.deviceProtocol.set(uuid, 'V1');
-      this.Log?.debug(`[Electron BLE] detectProtocol: uuid=${uuid} -> V1`);
-      return 'V1';
-    }
-
-    await this.resetProbeStateAfterProtocolProbe(uuid, 'V1');
-    if (await this.probeProtocolV2(uuid)) {
-      this.deviceProtocol.set(uuid, 'V2');
-      this.Log?.debug(`[Electron BLE] detectProtocol: uuid=${uuid} -> V2`);
-      return 'V2';
+    for (let i = 0; i < probeOrder.length; i += 1) {
+      const protocol = probeOrder[i];
+      if (i > 0) {
+        // 上一个协议探测失败后，重置订阅与缓冲，避免残留数据干扰下一个协议的探测。
+        await this.resetProbeStateAfterProtocolProbe(uuid, probeOrder[i - 1]);
+      }
+      const detected =
+        protocol === 'V1' ? await this.probeProtocolV1(uuid) : await this.probeProtocolV2(uuid);
+      if (detected) {
+        this.deviceProtocol.set(uuid, protocol);
+        this.Log?.debug(`[Electron BLE] detectProtocol: uuid=${uuid} -> ${protocol}`);
+        return protocol;
+      }
     }
 
     this.deviceProtocol.delete(uuid);
@@ -581,10 +578,8 @@ export default class ElectronBleTransport {
       const assembler = this.v2Assemblers.get(deviceId);
       if (!assembler) return;
 
-      let frameData = assembler.push(bytes);
-      while (frameData) {
+      for (const frameData of assembler.drain(bytes)) {
         this.resolveProtocolV2Frame(deviceId, frameData);
-        frameData = assembler.push(new Uint8Array(0));
       }
     } catch (error) {
       this.Log?.error('[Electron BLE] Protocol V2 notification error:', error);

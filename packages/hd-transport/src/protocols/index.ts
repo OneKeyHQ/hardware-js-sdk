@@ -21,6 +21,8 @@ type ProtocolV2Schemas = {
 type ProtocolV2FrameOptions = {
   packetSrc?: number;
   router?: number;
+  /** Sequence number (1-255). Managed per-session by ProtocolV2Session. */
+  seq?: number;
   logger?: ProtocolV2DebugLogger;
   logPrefix?: string;
   context?: string;
@@ -93,12 +95,19 @@ export const ProtocolV2 = {
       router: options.router ?? 0,
     });
 
-    return encodeProtobufFrame(messageTypeId, pbBytes, options.packetSrc, options.router, {
-      logger: options.logger,
-      logPrefix: options.logPrefix,
-      context: options.context ?? `encode:${name}`,
-      messageName: name,
-    });
+    return encodeProtobufFrame(
+      messageTypeId,
+      pbBytes,
+      options.packetSrc,
+      options.router,
+      {
+        logger: options.logger,
+        logPrefix: options.logPrefix,
+        context: options.context ?? `encode:${name}`,
+        messageName: name,
+      },
+      options.seq
+    );
   },
 
   decodeFrame(

@@ -1,10 +1,8 @@
 const { ProtocolV2 } = require('../src/protocols');
 const { parseConfigure } = require('../src/serialization/protobuf/messages');
-const {
-  ProtocolV2FrameAssembler,
-  ProtocolV2Session,
-  probeProtocolV2,
-} = require('../src/protocols/v2/session');
+const sessionModule = require('../src/protocols/v2/session');
+
+const { ProtocolV2FrameAssembler, ProtocolV2Session, probeProtocolV2 } = sessionModule;
 const protocolV2 = require('../src/protocols/v2');
 
 const protocolV1Messages = parseConfigure({
@@ -13,6 +11,14 @@ const protocolV1Messages = parseConfigure({
       fields: {
         message: {
           type: 'string',
+          id: 1,
+        },
+      },
+    },
+    ButtonRequest: {
+      fields: {
+        code: {
+          type: 'uint32',
           id: 1,
         },
       },
@@ -26,6 +32,7 @@ const protocolV1Messages = parseConfigure({
     MessageType: {
       values: {
         MessageType_Success: 2,
+        MessageType_ButtonRequest: 26,
         MessageType_OnekeyGetFeatures: 10025,
         MessageType_OnekeyFeatures: 10026,
       },
@@ -269,7 +276,10 @@ describe('Protocol V2 framing and session', () => {
     const session = new ProtocolV2Session({
       schemas,
       router: 1,
-      writeFrame: () => new Promise(resolve => setTimeout(resolve, 30)),
+      writeFrame: () =>
+        new Promise(resolve => {
+          setTimeout(resolve, 30);
+        }),
       readFrame: () => Promise.resolve(response),
     });
 
@@ -296,7 +306,7 @@ describe('Protocol V2 framing and session', () => {
       schemas,
       router: 1,
       writeFrame: () => Promise.resolve(),
-      readFrame: () => Promise.resolve(response),
+      readFrame: () => Promise.resolve(rewriteSeq(response, 200)),
       logger,
     });
 
@@ -487,6 +497,235 @@ describe('Protocol V2 framing and session', () => {
         timeoutMs: 1,
       })
     ).resolves.toBe(false);
+  });
+
+  test('decodeFrame rejects frames that are too short', () => {
+    expect(() => protocolV2.decodeFrame(new Uint8Array([0x5a, 0x08, 0x00]))).toThrow(
+      'Protocol V2 frame too short'
+    );
+  });
+
+  test('decodeFrame rejects frames with an invalid SOF byte', () => {
+    const frame = ProtocolV2.encodeFrame(schemas, 'Success', { message: 'ok' });
+    const corrupted = new Uint8Array(frame);
+    corrupted[0] = 0x00;
+    expect(() => protocolV2.decodeFrame(corrupted)).toThrow('Invalid SOF byte');
+  });
+
+  test('decodeFrame rejects frames with a header CRC mismatch', () => {
+    const frame = ProtocolV2.encodeFrame(schemas, 'Success', { message: 'ok' });
+    const corrupted = new Uint8Array(frame);
+    corrupted[3] = (corrupted[3] + 1) % 256;
+    expect(() => protocolV2.decodeFrame(corrupted)).toThrow('Header CRC mismatch');
+  });
+
+  test('decodeFrame rejects frames with a frame CRC mismatch', () => {
+    const frame = ProtocolV2.encodeFrame(schemas, 'Success', { message: 'ok' });
+    const corrupted = new Uint8Array(frame);
+    corrupted[corrupted.length - 1] = (corrupted[corrupted.length - 1] + 1) % 256;
+    expect(() => protocolV2.decodeFrame(corrupted)).toThrow('Frame CRC mismatch');
+  });
+
+  test('decodeFrame rejects frames whose payload is too short for a messageTypeId', () => {
+    // Raw frame with empty payload: 8 bytes of overhead, no messageTypeId.
+    const frame = protocolV2.encodeFrame(null);
+    expect(() => protocolV2.decodeFrame(frame)).toThrow('payload too short');
+  });
+
+  test('session call rejects when no response frame arrives before the timeout', async () => {
+    const session = new ProtocolV2Session({
+      schemas,
+      router: 1,
+      writeFrame: () => Promise.resolve(),
+      readFrame: () => new Promise(() => {}),
+    });
+
+    await expect(session.call('Ping', { message: 'x' }, { timeoutMs: 20 })).rejects.toThrow(
+      'Protocol V2 response timeout after 20ms for Ping'
+    );
+  });
+
+  test('session stops the read loop after a timeout instead of consuming later frames', async () => {
+    const success = ProtocolV2.encodeFrame(schemas, 'Success', { message: 'late' });
+    let resolveRead;
+    const readFrame = jest.fn(
+      () =>
+        new Promise(resolve => {
+          resolveRead = resolve;
+        })
+    );
+    const session = new ProtocolV2Session({
+      schemas,
+      router: 1,
+      writeFrame: () => Promise.resolve(),
+      readFrame,
+    });
+
+    await expect(
+      session.call('GetProtoVersion', {}, { timeoutMs: 10, expectedTypes: ['ProtoVersion'] })
+    ).rejects.toThrow('Protocol V2 response timeout');
+
+    // Without cancellation the loop would skip this unexpected Success frame
+    // and call readFrame again, stealing frames from the next call.
+    resolveRead(success);
+    await new Promise(resolve => {
+      setTimeout(resolve, 20);
+    });
+    expect(readFrame).toHaveBeenCalledTimes(1);
+  });
+
+  test('session serializes concurrent calls so responses cannot be stolen', async () => {
+    const events = [];
+    const written = [];
+    const session = new ProtocolV2Session({
+      schemas,
+      router: 1,
+      writeFrame: frame => {
+        written.push(frame);
+        events.push(`write:${written.length}`);
+        return new Promise(resolve => {
+          setTimeout(resolve, 10);
+        });
+      },
+      readFrame: () => {
+        events.push(`read:${written.length}`);
+        const [frame] = written.slice(-1);
+        const { seq } = protocolV2.decodeFrame(frame);
+        const response =
+          written.length === 1
+            ? ProtocolV2.encodeFrame(schemas, 'Success', { message: 'first' })
+            : ProtocolV2.encodeFrame(schemas, 'Success', { message: 'second' });
+        return Promise.resolve(rewriteSeq(response, seq));
+      },
+    });
+
+    const [first, second] = await Promise.all([
+      session.call('Ping', { message: '1' }, { expectedTypes: ['Success'] }),
+      session.call('Ping', { message: '2' }, { expectedTypes: ['Success'] }),
+    ]);
+
+    expect(first.message).toEqual({ message: 'first' });
+    expect(second.message).toEqual({ message: 'second' });
+    // The second call must not start writing before the first call finished.
+    expect(events).toEqual(['write:1', 'read:1', 'write:2', 'read:2']);
+  });
+
+  test('session keeps serving calls after a previous call failed', async () => {
+    const response = ProtocolV2.encodeFrame(schemas, 'Success', { message: 'ok' });
+    let shouldFail = true;
+    const session = new ProtocolV2Session({
+      schemas,
+      router: 1,
+      writeFrame: () => {
+        if (shouldFail) {
+          shouldFail = false;
+          return Promise.reject(new Error('transport write failed'));
+        }
+        return Promise.resolve();
+      },
+      readFrame: () => Promise.resolve(response),
+    });
+
+    await expect(session.call('Ping', { message: '1' })).rejects.toThrow('transport write failed');
+    await expect(session.call('Ping', { message: '2' })).resolves.toEqual({
+      type: 'Success',
+      message: { message: 'ok' },
+    });
+  });
+
+  test('session uses a per-session sequence counter starting at 1', async () => {
+    const written = [];
+    const makeSession = () =>
+      new ProtocolV2Session({
+        schemas,
+        router: 1,
+        writeFrame: frame => {
+          written.push(frame);
+          return Promise.resolve();
+        },
+        readFrame: () => {
+          const [frame] = written.slice(-1);
+          const { seq } = protocolV2.decodeFrame(frame);
+          return Promise.resolve(
+            rewriteSeq(ProtocolV2.encodeFrame(schemas, 'Success', { message: 'ok' }), seq)
+          );
+        },
+      });
+
+    const sessionA = makeSession();
+    await sessionA.call('Ping', { message: '1' });
+    await sessionA.call('Ping', { message: '2' });
+    const sessionB = makeSession();
+    await sessionB.call('Ping', { message: '3' });
+
+    expect(written.map(frame => frame[6])).toEqual([1, 2, 1]);
+  });
+
+  test('assembler throws and resets on frames with an impossible length field', () => {
+    const assembler = new ProtocolV2FrameAssembler();
+    // expectedLen = 0 < 8-byte minimum: without the guard this poisons the
+    // buffer forever and deadlocks drain loops.
+    expect(() => assembler.push(new Uint8Array([0x5a, 0x00, 0x00]))).toThrow(
+      'Protocol V2 frame length too small: 0'
+    );
+
+    // Buffer must have been reset so the next valid frame goes through.
+    const frame = ProtocolV2.encodeFrame(schemas, 'Success', { message: 'ok' });
+    expect(assembler.push(frame)).toEqual(frame);
+  });
+
+  test('assembler validates the header CRC as soon as 4 bytes arrive', () => {
+    const assembler = new ProtocolV2FrameAssembler();
+    const header = new Uint8Array([0x5a, 0x10, 0x00, 0x00]);
+    header[3] = (protocolV2.crc8(header, 3) + 1) % 256;
+
+    expect(() => assembler.push(header)).toThrow('Protocol V2 header CRC mismatch');
+
+    // Buffer was reset: a valid frame parses afterwards.
+    const frame = ProtocolV2.encodeFrame(schemas, 'Success', { message: 'ok' });
+    expect(assembler.push(frame)).toEqual(frame);
+  });
+
+  test('assembler drain returns every buffered complete frame', () => {
+    const first = ProtocolV2.encodeFrame(schemas, 'ProtoVersion', {
+      major_version: 1,
+      minor_version: 0,
+      patch_version: 0,
+    });
+    const second = ProtocolV2.encodeFrame(schemas, 'Success', { message: 'ok' });
+    const third = ProtocolV2.encodeFrame(schemas, 'Success', { message: 'last' });
+    const assembler = new ProtocolV2FrameAssembler();
+
+    const combined = new Uint8Array(first.length + second.length + 3);
+    combined.set(first, 0);
+    combined.set(second, first.length);
+    combined.set(third.slice(0, 3), first.length + second.length);
+
+    expect(assembler.drain(combined)).toEqual([first, second]);
+    expect(assembler.drain()).toEqual([]);
+    expect(assembler.drain(third.slice(3))).toEqual([third]);
+  });
+
+  test('decodes allowlisted legacy V1 interaction messages as a fallback', () => {
+    // ButtonRequest only exists in the V1 schema; the V2 decoder should fall
+    // back to it because it is on the legacy decode allowlist.
+    const frame = protocolV2.encodeProtobufFrame(26, new Uint8Array(0));
+    const decoded = ProtocolV2.decodeFrame(schemas, frame);
+    expect(decoded.type).toBe('ButtonRequest');
+  });
+
+  test('does not fall back to legacy V1 messages outside the allowlist', () => {
+    // OnekeyFeatures exists only in the V1 schema and is not allowlisted.
+    const frame = protocolV2.encodeProtobufFrame(10026, new Uint8Array(0));
+    expect(() => ProtocolV2.decodeFrame(schemas, frame)).toThrow();
+  });
+
+  test('hexToBytes converts valid hex and rejects malformed input', () => {
+    const { hexToBytes } = sessionModule;
+    expect(hexToBytes('5a0102')).toEqual(new Uint8Array([0x5a, 0x01, 0x02]));
+    expect(hexToBytes('')).toEqual(new Uint8Array(0));
+    expect(() => hexToBytes('abc')).toThrow('Invalid hex string: odd length');
+    expect(() => hexToBytes('zz')).toThrow('contains non-hex characters');
   });
 
   test('probeProtocolV2 only uses Ping for acquire probing', async () => {

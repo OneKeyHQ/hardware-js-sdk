@@ -1,4 +1,7 @@
-import { DevRebootType } from '@onekeyfe/hd-transport';
+import {
+  DevFirmwareTargetType as DevFirmwareTargetTypeEnum,
+  DevRebootType,
+} from '@onekeyfe/hd-transport';
 
 import { invalidParameter, validateNonEmptyString } from '../helpers/filesystemValidation';
 
@@ -65,6 +68,13 @@ export function normalizeRebootType(value: RebootTypeInput | undefined): DevRebo
   return DevRebootType.Normal;
 }
 
+// DevFirmwareTargetType 的合法数值域（数值枚举的反向映射键会被 filter 掉）
+const VALID_FIRMWARE_TARGET_IDS = new Set<number>(
+  Object.values(DevFirmwareTargetTypeEnum).filter(
+    (value): value is number => typeof value === 'number'
+  )
+);
+
 function normalizeTargetId(
   value: DevFirmwareTargetType | string | number | undefined,
   name: string
@@ -72,13 +82,17 @@ function normalizeTargetId(
   if (value === undefined || value === null) {
     throw invalidParameter(`Missing required parameter: ${name}`);
   }
-  if (typeof value === 'number') {
-    if (Number.isSafeInteger(value) && value >= 0) return value;
-    throw invalidParameter(`Parameter [${name}] must be a valid firmware target id.`);
+  const numeric = typeof value === 'number' ? value : Number(value);
+  // 校验值域：仅接受 DevFirmwareTargetType 中定义的 target id，
+  // 不再放行任意非负整数。
+  if (Number.isSafeInteger(numeric) && VALID_FIRMWARE_TARGET_IDS.has(numeric)) {
+    return numeric;
   }
-  const numeric = Number(value);
-  if (Number.isSafeInteger(numeric) && numeric >= 0) return numeric;
-  throw invalidParameter(`Parameter [${name}] must be a valid firmware target id.`);
+  throw invalidParameter(
+    `Parameter [${name}] must be a valid firmware target id (one of ${[
+      ...VALID_FIRMWARE_TARGET_IDS,
+    ].join(', ')}).`
+  );
 }
 
 export function normalizeFirmwareTargets(params: DeviceFirmwareUpdateParams): DevFirmwareTarget[] {

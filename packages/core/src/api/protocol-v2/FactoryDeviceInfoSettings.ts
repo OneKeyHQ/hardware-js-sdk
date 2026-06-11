@@ -4,6 +4,8 @@ import type { FactoryDeviceInfoSettingsParams } from './helpers';
 
 export default class FactoryDeviceInfoSettings extends BaseMethod<FactoryDeviceInfoSettingsParams> {
   init() {
+    // Protocol V2 (Pro2) 专属方法，core 调度层统一做非 V2 设备守卫
+    this.requireProtocolV2 = true;
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
     this.params = {

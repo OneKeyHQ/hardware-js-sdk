@@ -72,17 +72,12 @@ export default class NexaSignTransaction extends BaseMethod<NexaSignTransactionP
 
       const nextIndex = res.message.request_index;
       const input = this.params.inputs[nextIndex];
-      const response = await typedCall(
-        'NexaTxInputAck',
-        // @ts-expect-error
-        ['NexaTxInputRequest', 'NexaSignedTx'],
-        {
-          address_n: input.path,
-          raw_message: input.message,
-        }
-      );
+      const response = await typedCall('NexaTxInputAck', ['NexaTxInputRequest', 'NexaSignedTx'], {
+        // path 为字符串形式，归一为 address_n 数组（与 run() 中首个 input 的处理一致）
+        address_n: validatePath(input.path, 3),
+        raw_message: input.message,
+      });
 
-      // @ts-expect-error
       return this.processTxRequest(typedCall, response, nextIndex, signatures);
     }
 

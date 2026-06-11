@@ -17,10 +17,9 @@ import { existCapability } from './capabilitieUtils';
 import type { Device } from '../device/Device';
 import type { Features, IDeviceType, SupportFeatureType } from '../types';
 
-type GetPassphraseStateMessage = GetPassphraseState & {
-  _only_main_pin?: boolean;
-  allow_create_attach_pin?: boolean;
-};
+// 生成的 GetPassphraseState 已包含 _only_main_pin / allow_create_attach_pin，
+// 不再需要手动扩展字段。
+type GetPassphraseStateMessage = GetPassphraseState;
 
 export const getSupportProtocolV1MessageSchema = (
   features: Features | undefined

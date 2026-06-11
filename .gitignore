@@ -28,6 +28,10 @@ logs
 # automation test reports
 automation-report-*.json
 
+# protobuf build temp files (packages/hd-transport/scripts/protobuf-build.sh)
+messages-tmp.proto
+messages-protocol-v2-tmp.proto
+
 # build outputs
 lib
 libDev

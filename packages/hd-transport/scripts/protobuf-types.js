@@ -22,6 +22,13 @@ const OPTIONAL_DUPLICATE_TYPE_ALIASES = {
 const messageTypeAliases = {};
 const skipMessageTypeKeys = new Set(Object.values(OPTIONAL_DUPLICATE_TYPE_ALIASES));
 
+// V1/V2 duplicate-type merge bookkeeping.
+// When the same top-level type exists in both schemas with a different shape we emit
+// the union of both sides instead of silently keeping the V1 definition only.
+const mergedRuleOverrides = {}; // `${Type}.${field}` -> 'optional'
+const mergedTypeOverrides = {}; // `${Type}.${field}` -> 'v1JsType | v2JsType'
+const duplicateTypeMergeReport = []; // { name, diffs: string[] }
+
 const args = process.argv.slice(2);
 
 const isTypescript = args.includes('typescript');
@@ -160,11 +167,15 @@ const parseMessage = (messageName, message, depth = 0, skipExisting = false) => 
       Object.keys(message.fields).forEach(fieldName => {
         const field = message.fields[fieldName];
         const fieldKey = `${messageName}.${fieldName}`;
-        // find patch for "rule"
-        const fieldRule = RULE_PATCH[fieldKey] || field.rule;
+        // find patch for "rule" (hand-written patches win over V1/V2 merge overrides)
+        const fieldRule = RULE_PATCH[fieldKey] || mergedRuleOverrides[fieldKey] || field.rule;
         const rule = fieldRule === 'required' || fieldRule === 'repeated' ? ': ' : '?: ';
-        // find patch for "type"
-        let type = TYPE_PATCH[fieldKey] || FIELD_TYPES[field.type] || field.type;
+        // find patch for "type" (hand-written patches win over V1/V2 merge overrides)
+        let type =
+          TYPE_PATCH[fieldKey] ||
+          mergedTypeOverrides[fieldKey] ||
+          FIELD_TYPES[field.type] ||
+          field.type;
         // automatically convert all amount and fee fields to UINT_TYPE
         if (['amount', 'fee'].includes(fieldName)) {
           type = UINT_TYPE;
@@ -191,13 +202,148 @@ const parseMessage = (messageName, message, depth = 0, skipExisting = false) => 
   });
 };
 
-// top level messages and nested messages
-Object.keys(json.nested).forEach(e => parseMessage(e, json.nested[e]));
+const jsFieldType = protoType => FIELD_TYPES[protoType] || protoType;
 
+// Merge a duplicate Protocol V2 definition into its V1 counterpart (in-memory only,
+// messages.json / messages-protocol-v2.json on disk stay untouched).
+// Strategy:
+// - messages: emit the union of both sides' fields; a field present on one side only
+//   becomes optional
+// - field type conflict: emit a union type and warn
+// - field rule conflict (required/optional/repeated): keep the V1 rule and warn
+// - enums: emit the union of members; member value conflicts keep the V1 value and warn
+// - nested types are merged recursively
+const mergeDuplicateDefinition = (typeName, base, extra, diffs) => {
+  if (base.values || extra.values) {
+    if (!base.values || !extra.values) {
+      diffs.push('! kind conflict (enum vs message), keeping V1 definition');
+      console.warn(
+        `[protobuf-types] duplicate type "${typeName}" is an enum on one side and a message on the other, keeping V1`
+      );
+      return;
+    }
+    Object.entries(extra.values).forEach(([memberName, memberValue]) => {
+      if (!(memberName in base.values)) {
+        base.values[memberName] = memberValue;
+        diffs.push(`+ enum member ${memberName} = ${memberValue} (V2 only)`);
+      } else if (base.values[memberName] !== memberValue) {
+        diffs.push(
+          `! enum member ${memberName} value conflict: V1=${base.values[memberName]} V2=${memberValue}, keeping V1`
+        );
+        console.warn(
+          `[protobuf-types] enum "${typeName}.${memberName}" value differs between V1 (${base.values[memberName]}) and V2 (${memberValue}), keeping V1`
+        );
+      }
+    });
+    return;
+  }
+
+  if (extra.nested) {
+    base.nested = base.nested || {};
+    Object.keys(extra.nested).forEach(nestedName => {
+      if (base.nested[nestedName]) {
+        mergeDuplicateDefinition(
+          nestedName,
+          base.nested[nestedName],
+          extra.nested[nestedName],
+          diffs
+        );
+      } else {
+        base.nested[nestedName] = extra.nested[nestedName];
+        diffs.push(`+ nested type ${nestedName} (V2 only)`);
+      }
+    });
+  }
+
+  const extraFields = extra.fields || {};
+  if (!Object.keys(extraFields).length && !base.fields) return;
+  base.fields = base.fields || {};
+  const baseFields = base.fields;
+
+  Object.entries(extraFields).forEach(([fieldName, field]) => {
+    const fieldKey = `${typeName}.${fieldName}`;
+    if (!(fieldName in baseFields)) {
+      baseFields[fieldName] = field;
+      // field exists in V2 only -> always optional in the merged interface
+      if (field.rule) mergedRuleOverrides[fieldKey] = 'optional';
+      diffs.push(
+        `+ field ${fieldName}?: ${jsFieldType(field.type)}${
+          field.rule === 'repeated' ? '[]' : ''
+        } (V2 only, marked optional)`
+      );
+      return;
+    }
+    const baseField = baseFields[fieldName];
+    if (baseField.type !== field.type) {
+      const baseJsType = jsFieldType(baseField.type);
+      const extraJsType = jsFieldType(field.type);
+      if (baseJsType !== extraJsType) {
+        mergedTypeOverrides[fieldKey] = `${baseJsType} | ${extraJsType}`;
+        diffs.push(
+          `! field ${fieldName} type conflict: V1=${baseField.type} V2=${field.type}, emitting union ${baseJsType} | ${extraJsType}`
+        );
+        console.warn(
+          `[protobuf-types] field "${fieldKey}" type differs between V1 (${baseField.type}) and V2 (${field.type}), emitting union type`
+        );
+      }
+    }
+    if ((baseField.rule || 'optional') !== (field.rule || 'optional')) {
+      diffs.push(
+        `! field ${fieldName} rule conflict: V1=${baseField.rule || 'optional'} V2=${
+          field.rule || 'optional'
+        }, keeping V1`
+      );
+    }
+  });
+
+  Object.entries(baseFields).forEach(([fieldName, field]) => {
+    if (fieldName in extraFields) return;
+    const fieldKey = `${typeName}.${fieldName}`;
+    // field exists in V1 only -> always optional in the merged interface
+    if (field.rule && !mergedRuleOverrides[fieldKey]) {
+      mergedRuleOverrides[fieldKey] = 'optional';
+      diffs.push(`~ field ${fieldName} (V1 only): ${field.rule} -> optional`);
+    } else {
+      diffs.push(`~ field ${fieldName} (V1 only, already optional)`);
+    }
+  });
+};
+
+// Pass 1 (before parsing): merge duplicate V2 definitions into the V1 schema so the
+// generated interfaces contain the union of both protocols' fields. Previously the V2
+// side of a duplicate type was silently dropped, hiding V2-only fields/enum members.
+const optionalJsons = [];
 optionalJsonFiles.forEach(jsonFile => {
   const jsonPath = path.join(__dirname, jsonFile);
   if (!fs.existsSync(jsonPath)) return;
   const optionalJson = readJson(jsonPath);
+  optionalJsons.push(optionalJson);
+  Object.keys(optionalJson.nested).forEach(e => {
+    if (!json.nested[e]) return; // V2-only type, parsed after the V1 pass below
+    if (OPTIONAL_DUPLICATE_TYPE_ALIASES[e]) return; // kept as a separate aliased type
+    if (SKIP.includes(e)) return; // custom/hand-written definitions (MessageType, TxInput, ...)
+    const diffs = [];
+    mergeDuplicateDefinition(e, json.nested[e], optionalJson.nested[e], diffs);
+    if (diffs.length) duplicateTypeMergeReport.push({ name: e, diffs });
+  });
+});
+
+// Explicit drift report: every merged duplicate type and its V1/V2 differences.
+if (duplicateTypeMergeReport.length) {
+  console.log(
+    `[protobuf-types] ${duplicateTypeMergeReport.length} duplicate V1/V2 type(s) differ and were merged (field union):`
+  );
+  duplicateTypeMergeReport.forEach(({ name, diffs }) => {
+    console.log(`  - ${name}`);
+    diffs.forEach(diff => console.log(`      ${diff}`));
+  });
+}
+
+// top level messages and nested messages
+Object.keys(json.nested).forEach(e => parseMessage(e, json.nested[e]));
+
+// Pass 2: aliased duplicates (e.g. DeviceInfo -> ProtocolV2DeviceInfo) and V2-only types
+optionalJsons.forEach(optionalJson => {
   Object.keys(optionalJson.nested).forEach(e => {
     const alias = hasParsedType(e) ? OPTIONAL_DUPLICATE_TYPE_ALIASES[e] : undefined;
     if (alias) {
@@ -205,6 +351,7 @@ optionalJsonFiles.forEach(jsonFile => {
       messageTypeAliases[e] = [e, alias];
       return;
     }
+    if (json.nested[e]) return; // duplicate type, already merged into the V1 definition
     parseMessage(e, optionalJson.nested[e], 0, true);
   });
 });
@@ -328,16 +475,6 @@ export type TypedCall = {
         type: T,
         resType: R,
         message?: MessageType[T],
-    ): Promise<MessageResponse<R>>;
-    <T extends MessageKey, R extends readonly MessageKey[]>(
-        type: T,
-        resType: R,
-        message?: any,
-    ): Promise<MessageResponseMap[R[number]]>;
-    <T extends MessageKey, R extends MessageKey>(
-        type: T,
-        resType: R,
-        message?: any,
     ): Promise<MessageResponse<R>>;
 };
 `);

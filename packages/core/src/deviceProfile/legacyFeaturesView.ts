@@ -1,10 +1,10 @@
 import { EDeviceType } from '@onekeyfe/hd-shared';
 
-import { getProtocolV2SeState } from '../protocols/protocol-v2/features';
+import { getProtocolV2SeState, getProtocolV2SeType } from '../protocols/protocol-v2/features';
 
 import type { Features } from '../types';
 import type { DeviceProfile } from '../types/api/getDeviceInfo';
-import type { ProtocolV2DeviceInfo } from '../protocols/protocol-v2/features';
+import type { ProtocolV2DeviceInfo } from '@onekeyfe/hd-transport';
 
 const parseProtocolV2Version = (version?: string | null): [number, number, number] => {
   if (!version) return [0, 0, 0];
@@ -89,6 +89,8 @@ export const buildProtocolV2GetFeaturesPayload = (
     ble_ver: profile.versions.ble ?? undefined,
     onekey_ble_build_id: profile.verify?.bleBuildId,
     onekey_ble_hash: profile.verify?.bleHash,
+    // Pro2 的 SE 类型在 DevGetDeviceInfo 的 se1.type 上报（如 THD89）
+    onekey_se_type: getProtocolV2SeType(deviceInfo?.se1),
     onekey_se01_version: profile.versions.se01 ?? undefined,
     onekey_se01_hash: profile.verify?.se01Hash,
     onekey_se01_build_id: profile.verify?.se01BuildId,

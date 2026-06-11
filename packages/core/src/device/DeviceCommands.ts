@@ -140,6 +140,20 @@ function sanitizeDebugPayload(value: unknown, key = '', depth = 0): unknown {
   return sanitized;
 }
 
+/**
+ * 交互式 Ack（ButtonAck / PinMatrixAck / PassphraseAck 等）不应继承原调用的
+ * timeoutMs：设备在等待用户操作（确认、输入 PIN/passphrase），思考时间不可预估，
+ * 沿用业务调用的超时会把用户操作截断。仅保留 expectedTypes / intermediateTypes
+ * 等与响应类型相关的选项。
+ */
+const stripInteractiveAckTimeout = (
+  options?: TransportCallOptions
+): TransportCallOptions | undefined => {
+  if (!options) return options;
+  const { timeoutMs: _timeoutMs, ...rest } = options;
+  return rest;
+};
+
 const assertType = (res: DefaultMessageResponse, resType: string | string[]) => {
   const splitResTypes = Array.isArray(resType) ? resType : resType.split('|');
   if (!splitResTypes.includes(res.type)) {
@@ -612,7 +626,7 @@ export class DeviceCommands {
       } else {
         this.device.emit(DEVICE.BUTTON, this.device, res.message);
       }
-      return this._commonCall('ButtonAck', {}, options);
+      return this._commonCall('ButtonAck', {}, stripInteractiveAckTimeout(options));
     }
 
     if (res.type === 'EntropyRequest') {
@@ -625,11 +639,15 @@ export class DeviceCommands {
           if (pin === '@@ONEKEY_INPUT_PIN_IN_DEVICE') {
             // only classic\1s\mini\pure
             this.device.setCancelableAction(() => this.cancelDeviceOnOneKeyDevice());
-            return this._commonCall('BixinPinInputOnDevice', {}, options).finally(() => {
+            return this._commonCall(
+              'BixinPinInputOnDevice',
+              {},
+              stripInteractiveAckTimeout(options)
+            ).finally(() => {
               this.device.clearCancelableAction();
             });
           }
-          return this._commonCall('PinMatrixAck', { pin }, options);
+          return this._commonCall('PinMatrixAck', { pin }, stripInteractiveAckTimeout(options));
         },
         error => Promise.reject(error)
       );
@@ -644,12 +662,20 @@ export class DeviceCommands {
 
         // Attach PIN on device
         if (attachPinOnDevice && existsAttachPinUser) {
-          return this._commonCall('PassphraseAck', { on_device_attach_pin: true }, options);
+          return this._commonCall(
+            'PassphraseAck',
+            { on_device_attach_pin: true },
+            stripInteractiveAckTimeout(options)
+          );
         }
 
         return !passphraseOnDevice
-          ? this._commonCall('PassphraseAck', { passphrase }, options)
-          : this._commonCall('PassphraseAck', { on_device: true }, options);
+          ? this._commonCall('PassphraseAck', { passphrase }, stripInteractiveAckTimeout(options))
+          : this._commonCall(
+              'PassphraseAck',
+              { on_device: true },
+              stripInteractiveAckTimeout(options)
+            );
       });
     }
 

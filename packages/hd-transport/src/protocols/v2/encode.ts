@@ -5,8 +5,17 @@ import { PROTOCOL_V2_FRAME_MAX_BYTES } from '../../constants';
 
 import type { ProtocolV2FrameDebugOptions } from './debug';
 
-// Per-session sequence counter; increments on each frame, never 0
-let protoSeq = 0;
+// Default sequence number when callers do not manage one themselves.
+// Stateful per-session sequencing lives in ProtocolV2Session (session.ts),
+// which advances the counter via nextProtoSeq() and passes it in explicitly.
+const PROTO_SEQ_DEFAULT = 1;
+
+/**
+ * Advance a Protocol V2 sequence counter: 1-255, wraps around skipping 0.
+ */
+export function nextProtoSeq(current: number): number {
+  return current >= 255 ? 1 : current + 1;
+}
 
 /**
  * Build a raw Protocol V2 frame (0x5A framing).
@@ -26,22 +35,21 @@ export function encodeFrame(
   payload: Uint8Array | null,
   packetSrc?: number,
   router?: number,
-  debugOptions?: ProtocolV2FrameDebugOptions
+  debugOptions?: ProtocolV2FrameDebugOptions,
+  seq?: number
 ): Uint8Array {
   const resolvedPacketSrc = packetSrc ?? 0;
   const resolvedRouter = router ?? 0;
+  const resolvedSeq = seq ?? PROTO_SEQ_DEFAULT;
+  if (!Number.isInteger(resolvedSeq) || resolvedSeq < 1 || resolvedSeq > 255) {
+    throw new Error(`Protocol V2 seq out of range (1-255): ${resolvedSeq}`);
+  }
   const payloadLen = payload ? payload.length : 0;
   const frameLen = payloadLen + PROTO_HEAD_CRC_SIZE;
   if (frameLen > PROTOCOL_V2_FRAME_MAX_BYTES) {
     throw new Error(`Protocol V2 frame too large: ${frameLen}`);
   }
-  if (frameLen > 0xffff) {
-    throw new Error(`Protocol V2 frame length overflow: ${frameLen}`);
-  }
   const frame = new Uint8Array(frameLen);
-
-  // Advance sequence counter (skip 0)
-  protoSeq = protoSeq >= 255 ? 1 : protoSeq + 1;
 
   frame[0] = PROTO_HEAD_SOF;
   frame[1] = frameLen % 256;
@@ -49,7 +57,7 @@ export function encodeFrame(
   frame[3] = 0; // placeholder — filled in below
   frame[4] = resolvedRouter % 256;
   frame[5] = (resolvedPacketSrc % 16) * 4 + (PROTO_DATA_TYPE_PACKET % 4);
-  frame[6] = protoSeq;
+  frame[6] = resolvedSeq;
 
   // CRC8 over first 3 bytes (SOF + length)
   frame[3] = crc8(frame, 3);
@@ -87,15 +95,22 @@ export function encodeProtobufFrame(
   pbPayload: Uint8Array,
   packetSrc?: number,
   router?: number,
-  debugOptions?: ProtocolV2FrameDebugOptions
+  debugOptions?: ProtocolV2FrameDebugOptions,
+  seq?: number
 ): Uint8Array {
   const payload = new Uint8Array(2 + pbPayload.length);
   payload[0] = messageTypeId % 256;
   payload[1] = Math.floor(messageTypeId / 256) % 256;
   payload.set(pbPayload, 2);
-  return encodeFrame(payload, packetSrc, router, {
-    ...debugOptions,
-    messageTypeId,
-    pbPayloadLength: pbPayload.length,
-  });
+  return encodeFrame(
+    payload,
+    packetSrc,
+    router,
+    {
+      ...debugOptions,
+      messageTypeId,
+      pbPayloadLength: pbPayload.length,
+    },
+    seq
+  );
 }

@@ -417,6 +417,12 @@ const onCallDevice = async (
     await waitForPendingPromise(getPrePendingCallPromise, setPrePendingCallPromise);
 
     const inner = async (): Promise<void> => {
+      // Protocol V2 专属方法统一守卫：协议在 acquire/initialize 后已确定，
+      // 非 V2 设备直接抛出明确的 NotSupport 错误（见 BaseMethod.requireProtocolV2）。
+      if (method.requireProtocolV2 && !device.isProtocolV2()) {
+        throw createDeviceNotSupportMethodError(method.name, device.getCurrentFirmwareType());
+      }
+
       // check firmware version
       const versionRange = device.getCurrentMethodVersionRange(
         type => method.getVersionRange()[type]

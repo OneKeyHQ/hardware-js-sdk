@@ -71,6 +71,8 @@ function toUint8Array(value: unknown): Uint8Array {
 
 export default class FileRead extends BaseMethod<FileReadParams> {
   init() {
+    // Protocol V2 (Pro2) 专属方法，core 调度层统一做非 V2 设备守卫
+    this.requireProtocolV2 = true;
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
     const path = validateNonEmptyString(this.payload.path, 'path');

@@ -74,3 +74,16 @@ SDK 侧这些字段只出现在 `deviceSettings`(ApplySettings) 的**写入参�
 1. `protocols/protocol-v2/features.ts` 的 `ProtocolV2DeviceInfo` 类型与 `deviceProfile/buildDeviceProfile.ts` 的 `normalizeV2Status` 增加映射。
 2. `deviceId` 切换到固件上报值后，删除 `buildProfileFromProtocolV2` 中的 serialNo 回退注释块。
 3. `legacyFeaturesView.ts` 中对应占位值（`unlocked: false`、`pin_protection: null` 等）替换为真实值。
+
+## SDK 自造的临时 wire ID（待固件确认）
+
+`packages/hd-transport/scripts/protobuf-build.sh` 在 firmware-pro2 proto 尚未导出以下消息时，会向 Protocol V2 schema 注入手写定义和自造 wire ID。固件正式导出后，build 脚本会自动跳过注入并断言固件分配的 ID 与下表一致（不一致即构建失败）：
+
+| 消息 | 注入的 wire ID | 方向 | 状态 |
+| --- | --- | --- | --- |
+| `TonSignData` | 11908 | wire_in | 待固件确认 |
+| `TonSignedData` | 11909 | wire_out | 待固件确认 |
+| `GetOnboardingStatus` | 60602 | — | 待固件确认 |
+| `OnboardingStatus` | 60603 | — | 待固件确认 |
+
+固件若以不同 ID 导出这些消息，需要同步更新 `protobuf-build.sh` 中的注入 ID、断言表（`expectedInjectedIds`）和本表。

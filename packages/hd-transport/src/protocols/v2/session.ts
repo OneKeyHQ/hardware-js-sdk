@@ -1,5 +1,6 @@
 import { PROTOCOL_V2_PACKET_SRC_COMMAND } from '../../constants';
 import { ProtocolV2FrameAssembler, concatUint8Arrays } from './frame-assembler';
+import { nextProtoSeq } from './encode';
 import { ProtocolV2 } from '..';
 import * as check from '../../utils/highlevel-checks';
 import { LogBlockCommand } from '../../utils/logBlockCommand';
@@ -39,7 +40,12 @@ export { concatUint8Arrays, ProtocolV2FrameAssembler };
 
 export function hexToBytes(hex: string): Uint8Array {
   const clean = hex.replace(/\s+/g, '');
-  if (clean.length === 0 || clean.length % 2 !== 0) return new Uint8Array(0);
+  if (clean.length % 2 !== 0) {
+    throw new Error(`Invalid hex string: odd length ${clean.length}`);
+  }
+  if (!/^[0-9a-fA-F]*$/.test(clean)) {
+    throw new Error('Invalid hex string: contains non-hex characters');
+  }
   const bytes = new Uint8Array(clean.length / 2);
   for (let i = 0; i < bytes.length; i += 1) {
     bytes[i] = parseInt(clean.substring(i * 2, i * 2 + 2), 16);
@@ -53,7 +59,11 @@ export function bytesToHex(bytes: Uint8Array): string {
     .join('');
 }
 
-const PROTOCOL_V2_DEBUG_HEX_LIMIT = 256;
+// Frame header bytes worth logging: SOF, len lo/hi, header CRC, router, attr, seq.
+// The rest of the frame is protobuf payload and may contain sensitive fields
+// (mnemonic words via WordAck, PINs, seeds via LoadDevice, ...), so raw frame
+// hex logs must never include it.
+const PROTOCOL_V2_DEBUG_HEADER_BYTES = 7;
 const PROTOCOL_V2_DEBUG_ARRAY_ITEMS_LIMIT = 20;
 const PROTOCOL_V2_DEBUG_OBJECT_KEYS_LIMIT = 40;
 const PROTOCOL_V2_DEBUG_STRING_LIMIT = 512;
@@ -69,16 +79,10 @@ function shouldReduceProtocolV2Debug(name: string) {
   return HIGH_VOLUME_PROTOCOL_V2_CALLS.has(name);
 }
 
-function bytesToDebugHex(bytes: Uint8Array): string {
-  const visibleBytes =
-    bytes.length > PROTOCOL_V2_DEBUG_HEX_LIMIT
-      ? bytes.slice(0, PROTOCOL_V2_DEBUG_HEX_LIMIT)
-      : bytes;
-  const suffix =
-    bytes.length > PROTOCOL_V2_DEBUG_HEX_LIMIT
-      ? `...(+${bytes.length - PROTOCOL_V2_DEBUG_HEX_LIMIT}B)`
-      : '';
-  return `${bytesToHex(visibleBytes)}${suffix}`;
+function frameHeaderDebugHex(frame: Uint8Array): string {
+  // Only the frame header is dumped as hex; the payload is logged separately
+  // in sanitized/structured form (sanitizeProtocolV2DebugPayload).
+  return bytesToHex(frame.slice(0, PROTOCOL_V2_DEBUG_HEADER_BYTES));
 }
 
 function getBinaryByteLength(value: unknown): number | undefined {
@@ -202,7 +206,8 @@ export function getErrorMessage(error: unknown) {
 export async function withProtocolTimeout<T>(
   promise: Promise<T>,
   timeoutMs: number | undefined,
-  createTimeoutError: () => Error
+  createTimeoutError: () => Error,
+  onTimeout?: () => void
 ): Promise<T> {
   if (!timeoutMs) return promise;
 
@@ -211,7 +216,12 @@ export async function withProtocolTimeout<T>(
     return await Promise.race([
       promise,
       new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(createTimeoutError()), timeoutMs);
+        timer = setTimeout(() => {
+          // Give the caller a chance to cancel the underlying work; a plain
+          // Promise.race rejection leaves the raced promise running.
+          onTimeout?.();
+          reject(createTimeoutError());
+        }, timeoutMs);
       }),
     ]);
   } finally {
@@ -219,8 +229,21 @@ export async function withProtocolTimeout<T>(
   }
 }
 
+// Watchdog for the write phase only. Writing a single frame (max 4608 bytes)
+// is a bounded transport operation, unlike the read phase where long-running
+// device operations (firmware install, user confirmation) can legitimately
+// take minutes — so no default timeout is applied to reads.
+export const PROTOCOL_V2_WRITE_WATCHDOG_TIMEOUT_MS = 30000;
+
 export class ProtocolV2Session {
   private readonly options: ProtocolV2SessionOptions;
+
+  // Serializes call() invocations: responses are matched only by type, so two
+  // in-flight calls on the same session would steal each other's responses.
+  private pendingCall: Promise<unknown> = Promise.resolve();
+
+  // Per-session sequence counter (1-255, wraps skipping 0).
+  private protoSeq = 0;
 
   constructor(options: ProtocolV2SessionOptions) {
     this.options = options;
@@ -230,6 +253,19 @@ export class ProtocolV2Session {
     name: string,
     data: Record<string, unknown>,
     callOptions: ProtocolV2CallOptions = {}
+  ): Promise<MessageFromOneKey> {
+    const run = () => this.executeCall(name, data, callOptions);
+    const result = this.pendingCall.then(run, run);
+    // Keep the chain alive even when a call fails; errors still propagate to
+    // the per-call promise returned below.
+    this.pendingCall = result.catch(() => undefined);
+    return result;
+  }
+
+  private async executeCall(
+    name: string,
+    data: Record<string, unknown>,
+    callOptions: ProtocolV2CallOptions
   ): Promise<MessageFromOneKey> {
     const {
       schemas,
@@ -242,88 +278,113 @@ export class ProtocolV2Session {
       createTimeoutError,
     } = this.options;
 
-    const callPromise = async () => {
-      const shouldReduceDebug = shouldReduceProtocolV2Debug(name);
-      const frame = ProtocolV2.encodeFrame(schemas, name, data, {
-        packetSrc,
-        router,
-        logger: shouldReduceDebug ? undefined : logger,
-        logPrefix,
-        context: `tx:${name}`,
-      });
-      const expectedSeq = frame[6];
+    const shouldReduceDebug = shouldReduceProtocolV2Debug(name);
+    this.protoSeq = nextProtoSeq(this.protoSeq);
+    const frame = ProtocolV2.encodeFrame(schemas, name, data, {
+      packetSrc,
+      router,
+      seq: this.protoSeq,
+      logger: shouldReduceDebug ? undefined : logger,
+      logPrefix,
+      context: `tx:${name}`,
+    });
+    const expectedSeq = frame[6];
 
-      if (!shouldReduceDebug) {
-        logger?.debug?.(
-          `[${logPrefix}] TX payload name=${name}`,
-          sanitizeProtocolV2DebugPayload(data)
-        );
-        logger?.debug?.(
-          `[${logPrefix}] TX frame name=${name} len=${frame.length} router=${frame[4]} attr=${
-            frame[5]
-          } seq=${expectedSeq} hex=${bytesToDebugHex(frame)}`
-        );
-      }
-
-      await writeFrame(frame);
-
-      const readResponse = async () => {
-        // Some Protocol V2 operations emit progress notifications before the
-        // terminal response. Consume those frames here so callers still see a
-        // request/terminal-response shaped API.
-        // eslint-disable-next-line no-constant-condition
-        while (true) {
-          const rxFrame = await readFrame();
-          if (!shouldReduceDebug) {
-            logger?.debug?.(
-              `[${logPrefix}] RX frame len=${rxFrame.length} router=${rxFrame[4]} attr=${
-                rxFrame[5]
-              } seq=${rxFrame[6]} hex=${bytesToDebugHex(rxFrame)}`
-            );
-          }
-          const decoded = ProtocolV2.decodeFrame(schemas, rxFrame, {
-            logger: shouldReduceDebug ? undefined : logger,
-            logPrefix,
-            context: `rx:${name}`,
-          });
-          if (!shouldReduceDebug && decoded.seq !== expectedSeq) {
-            logger?.debug?.(
-              `[${logPrefix}] seq differs for ${name}: tx=${expectedSeq}, rx=${decoded.seq}`
-            );
-          }
-          if (!shouldReduceDebug) {
-            logger?.debug?.(
-              `[${logPrefix}] TX name=${name} seq=${expectedSeq} | RX seq=${decoded.seq} messageTypeId=${decoded.messageTypeId} pbPayload=${decoded.pbPayload.length}B`
-            );
-            logger?.debug?.(
-              `[${logPrefix}] RX payload type=${decoded.type} messageTypeId=${decoded.messageTypeId}`,
-              sanitizeProtocolV2DebugPayload(decoded.message)
-            );
-          }
-
-          const response = check.call(decoded);
-          if (callOptions.intermediateTypes?.includes(response.type)) {
-            callOptions.onIntermediateResponse?.(response);
-          } else if (isExpectedTerminalResponse(response, callOptions.expectedTypes)) {
-            return response;
-          } else if (!shouldReduceDebug) {
-            logger?.debug?.(
-              `[${logPrefix}] skip unexpected response for ${name}: expected=${callOptions.expectedTypes?.join(
-                '|'
-              )} got=${response.type}`
-            );
-          }
-        }
-      };
-
-      return withProtocolTimeout(readResponse(), callOptions.timeoutMs, () =>
-        createTimeoutError
-          ? createTimeoutError(name, callOptions.timeoutMs ?? 0)
-          : new Error(`Protocol V2 response timeout after ${callOptions.timeoutMs}ms for ${name}`)
+    if (!shouldReduceDebug) {
+      logger?.debug?.(
+        `[${logPrefix}] TX payload name=${name}`,
+        sanitizeProtocolV2DebugPayload(data)
       );
+      logger?.debug?.(
+        `[${logPrefix}] TX frame name=${name} len=${frame.length} router=${frame[4]} attr=${
+          frame[5]
+        } seq=${expectedSeq} headerHex=${frameHeaderDebugHex(frame)}`
+      );
+    }
+
+    // Lenient watchdog on the write phase only — see
+    // PROTOCOL_V2_WRITE_WATCHDOG_TIMEOUT_MS for the rationale.
+    await withProtocolTimeout(
+      writeFrame(frame),
+      PROTOCOL_V2_WRITE_WATCHDOG_TIMEOUT_MS,
+      () =>
+        new Error(
+          `Protocol V2 write timeout after ${PROTOCOL_V2_WRITE_WATCHDOG_TIMEOUT_MS}ms for ${name}`
+        )
+    );
+
+    // Cancellation flag for the read loop: when the response timeout fires,
+    // Promise.race alone would leave this loop running as a zombie that keeps
+    // consuming frames meant for the next call. The timeout callback flips the
+    // flag so the loop exits and discards any late frame.
+    const cancellation = { cancelled: false };
+
+    const readResponse = async (): Promise<MessageFromOneKey> => {
+      // Some Protocol V2 operations emit progress notifications before the
+      // terminal response. Consume those frames here so callers still see a
+      // request/terminal-response shaped API.
+      while (!cancellation.cancelled) {
+        const rxFrame = await readFrame();
+        if (cancellation.cancelled) {
+          // Timed out while waiting: drop the late frame and stop reading.
+          break;
+        }
+        if (!shouldReduceDebug) {
+          logger?.debug?.(
+            `[${logPrefix}] RX frame len=${rxFrame.length} router=${rxFrame[4]} attr=${
+              rxFrame[5]
+            } seq=${rxFrame[6]} headerHex=${frameHeaderDebugHex(rxFrame)}`
+          );
+        }
+        const decoded = ProtocolV2.decodeFrame(schemas, rxFrame, {
+          logger: shouldReduceDebug ? undefined : logger,
+          logPrefix,
+          context: `rx:${name}`,
+        });
+        if (!shouldReduceDebug && decoded.seq !== expectedSeq) {
+          logger?.debug?.(
+            `[${logPrefix}] seq differs for ${name}: tx=${expectedSeq}, rx=${decoded.seq}`
+          );
+        }
+        if (!shouldReduceDebug) {
+          logger?.debug?.(
+            `[${logPrefix}] TX name=${name} seq=${expectedSeq} | RX seq=${decoded.seq} messageTypeId=${decoded.messageTypeId} pbPayload=${decoded.pbPayload.length}B`
+          );
+          logger?.debug?.(
+            `[${logPrefix}] RX payload type=${decoded.type} messageTypeId=${decoded.messageTypeId}`,
+            sanitizeProtocolV2DebugPayload(decoded.message)
+          );
+        }
+
+        const response = check.call(decoded);
+        if (callOptions.intermediateTypes?.includes(response.type)) {
+          callOptions.onIntermediateResponse?.(response);
+        } else if (isExpectedTerminalResponse(response, callOptions.expectedTypes)) {
+          return response;
+        } else if (!shouldReduceDebug) {
+          logger?.debug?.(
+            `[${logPrefix}] skip unexpected response for ${name}: expected=${callOptions.expectedTypes?.join(
+              '|'
+            )} got=${response.type}`
+          );
+        }
+      }
+      // Only reachable after cancellation; the outer promise has already been
+      // rejected by the timeout, so this rejection is consumed by the race.
+      throw new Error(`Protocol V2 read loop cancelled after timeout for ${name}`);
     };
 
-    return callPromise();
+    return withProtocolTimeout(
+      readResponse(),
+      callOptions.timeoutMs,
+      () =>
+        createTimeoutError
+          ? createTimeoutError(name, callOptions.timeoutMs ?? 0)
+          : new Error(`Protocol V2 response timeout after ${callOptions.timeoutMs}ms for ${name}`),
+      () => {
+        cancellation.cancelled = true;
+      }
+    );
   }
 }
 

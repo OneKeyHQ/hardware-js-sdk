@@ -8,6 +8,7 @@ import { validateParams } from '../helpers/paramsValidator';
 
 import type {
   AlephiumSignedTx,
+  AlephiumTxRequest,
   AlephiumSignTx as HardwareAlephiumSignTx,
   TypedCall,
 } from '@onekeyfe/hd-transport';
@@ -62,7 +63,10 @@ export default class AlephiumSignTransaction extends BaseMethod<HardwareAlephium
     data: Buffer,
     scriptOpt?: Buffer,
     dataOffset = 0
-  ): Promise<AlephiumSignedTx> => {
+    // 设备可能在最后一个 AlephiumTxRequest（无 data_length）里返回签名，
+    // 该消息没有 address 字段，返回类型如实声明为联合类型
+  ): Promise<AlephiumSignedTx | AlephiumTxRequest> => {
+    const responseType = res.type;
     if (res.type === 'AlephiumSignedTx') {
       return res.message;
     }
@@ -113,7 +117,10 @@ export default class AlephiumSignTransaction extends BaseMethod<HardwareAlephium
       return this.processTxRequest(typedCall, response, data, scriptOpt, dataOffset);
     }
 
-    throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, `Unknown response type: ${res.type}`);
+    throw ERRORS.TypedError(
+      HardwareErrorCode.RuntimeError,
+      `Unknown response type: ${responseType}`
+    );
   };
 
   async run() {

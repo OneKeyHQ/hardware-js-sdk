@@ -134,15 +134,14 @@ export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactio
 
       const response = await typedCall(
         'KaspaTxInputAck',
-        // @ts-expect-error
         ['KaspaTxInputRequest', 'KaspaSignedTx'],
         {
-          address_n: input.path,
+          // params.inputs 的 path 可能是字符串或已解析数组，统一归一为 address_n 数组
+          address_n: validatePath(input.path, 3),
           raw_message: bytesToHex(rawMessage),
         }
       );
 
-      // @ts-expect-error
       return this.processTxRequest(typedCall, response, nextIndex, signature);
     }
 
@@ -164,12 +163,12 @@ export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactio
 
     const { device, params } = this;
 
-    // @ts-expect-error
     const response = await device.commands.typedCall(
       'KaspaSignTx',
       ['KaspaTxInputRequest', 'KaspaSignedTx'],
       {
-        address_n: input.path,
+        // init() 已把 path 归一为数组，这里再过一遍 validatePath 收窄类型
+        address_n: validatePath(input.path, 3),
         raw_message: bytesToHex(rawMessage),
         scheme: params.scheme,
         prefix: params.prefix,

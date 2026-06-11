@@ -22,7 +22,7 @@
 - Protocol V1 服务 Classic / Mini / Touch / Pro 等现有设备，USB 和 BLE 都支持。
 - Protocol V2 服务 Pro2，USB 和 BLE 都支持。
 - 协议判断必须在连接后主动探测，不能依赖 PID、productName 或 descriptor。
-- WebUSB / Electron BLE / React Native BLE 都通过 `GetProtoVersion` 探测 V2，失败或超时回落 V1。
+- WebUSB / Electron BLE / React Native BLE 都通过 `Ping {message:'probe'}` 探测 V2，失败或超时回落 V1。
 - `desktop-web-ble` 是默认 Electron BLE 入口，不再按设备型号拆分 env alias。
 - Protocol V2 不走传统 `Initialize/GetFeatures`，而是 `Ping + DevGetDeviceInfo` 后生成标准 `DeviceProfile`；legacy `Features` 只作为事件和旧 API 兼容视图同步。
 

@@ -154,6 +154,14 @@ export abstract class BaseMethod<Params = undefined> {
    */
   strictCheckDeviceSupport = false;
 
+  /**
+   * 方法是否仅支持 Protocol V2 设备（Pro2）。
+   * core 调度在设备协议确定（acquire + initialize）后统一守卫，
+   * 非 V2 设备直接抛出 NotSupport 错误，方法内部不必重复判断。
+   * @default false
+   */
+  requireProtocolV2 = false;
+
   // @ts-expect-error: strictPropertyInitialization
   postMessage: (message: CoreMessage) => void;
 

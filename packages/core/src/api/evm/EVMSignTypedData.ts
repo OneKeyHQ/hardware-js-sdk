@@ -25,10 +25,19 @@ import { encodeData, getFieldType, parseArrayType } from '../helpers/typeNameUti
 import type {
   EthereumTypedDataSignature,
   EthereumTypedDataStructAck,
+  EthereumTypedDataStructAckOneKey,
   MessageKey,
   MessageResponse,
   TypedCall,
 } from '@onekeyfe/hd-transport';
+
+/**
+ * EthereumTypedDataStructAckOneKey 与 EthereumTypedDataStructAck 的字段结构与
+ * 枚举数值完全一致（生成产物的 OneKey/Trezor 双份消息），仅枚举名义类型不同；
+ * 这里做无运行时成本的名义转换，避免在调用点散落 any。
+ */
+const toOneKeyStructAck = (ack: EthereumTypedDataStructAck): EthereumTypedDataStructAckOneKey =>
+  ack as unknown as EthereumTypedDataStructAckOneKey;
 
 export type EVMSignTypedDataParams = {
   addressN: number[];
@@ -129,7 +138,6 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
       if (supportTrezor) {
         response = await typedCall(
           'EthereumTypedDataStructAck',
-          // @ts-ignore
           [
             'EthereumTypedDataStructRequest',
             'EthereumTypedDataValueRequest',
@@ -140,13 +148,12 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
       } else {
         response = await typedCall(
           'EthereumTypedDataStructAckOneKey',
-          // @ts-ignore
           [
             'EthereumTypedDataStructRequestOneKey',
             'EthereumTypedDataValueRequestOneKey',
             'EthereumTypedDataSignatureOneKey',
           ],
-          dataStruckAck
+          toOneKeyStructAck(dataStruckAck)
         );
       }
     }
@@ -219,6 +226,15 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
 
     if (response.type === 'EthereumGnosisSafeTxRequest') {
       const { data } = this.params;
+      const verifyingContract = data.domain?.verifyingContract;
+      // EthereumGnosisSafeTxAck.verifyingContract 在 proto 中是 required 字段，
+      // Gnosis Safe 签名缺少 verifyingContract 没有意义，这里给出明确的参数错误。
+      if (!verifyingContract) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.CallMethodInvalidParameter,
+          'EIP712Domain.verifyingContract is required for Gnosis Safe transaction'
+        );
+      }
       const param = {
         to: data.message.to,
         value: formatAnyHex(new BigNumber(data.message.value).toString(16)),
@@ -231,11 +247,10 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
         refundReceiver: data.message.refundReceiver,
         nonce: formatAnyHex(new BigNumber(data.message.nonce).toString(16)),
         chain_id: parseChainId(data.domain.chainId),
-        verifyingContract: data.domain.verifyingContract,
+        verifyingContract,
       };
       response = await typedCall(
         'EthereumGnosisSafeTxAck',
-        // @ts-ignore
         ['EthereumTypedDataSignature', 'EthereumTypedDataSignatureOneKey'],
         param
       );

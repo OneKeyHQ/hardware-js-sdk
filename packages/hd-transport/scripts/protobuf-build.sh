@@ -45,6 +45,9 @@ else
     DIST_PATH="$PACKAGE_ROOT/$DIST"
 fi
 
+# Remove temp proto files on any exit, including failure paths
+trap 'rm -f "$DIST_PATH/messages-tmp.proto" "$PARENT_PATH/messages-protocol-v2-tmp.proto"' EXIT
+
 
 # ============================================================
 # BUILD Pro1 messages.json  (requires firmware submodule)
@@ -72,16 +75,15 @@ if [ -d "$SRC_PATH" ] && ls "$SRC_PATH"/messages*.proto 1>/dev/null 2>&1; then
     cp "$DIST_PATH/messages.json" "$CORE_MESSAGES_DIR/messages.json"
     echo "Pro1 messages.json copied to core"
 
-    echo "generating type definitions for: $LANG"
-
-    cd "$PARENT_PATH"
-
-    node ./protobuf-types.js $LANG
-
     yarn --cwd "$PACKAGE_ROOT" prettier --write "$DIST_PATH/messages.json"
     yarn --cwd "$PACKAGE_ROOT" prettier --write "$CORE_MESSAGES_DIR/messages.json"
-    yarn --cwd "$PACKAGE_ROOT" prettier --write "$PACKAGE_ROOT/src/types/messages.ts"
+    # Type generation (protobuf-types.js) runs once at the end of the Protocol V2
+    # section below, after both schemas are available.
 else
+    # Intentional asymmetry with the Protocol V2 section below: the legacy firmware
+    # submodule is optional (the committed messages.json stays in use when it is
+    # absent), while firmware-pro2 is the only source of the Protocol V2 schema,
+    # so its absence is a hard error (exit 1).
     echo "⚠️  firmware submodule not found at $SRC_PATH"
     echo "    Skipping Pro1 protobuf build. To enable:"
     echo "    git submodule update --init submodules/firmware"
@@ -284,7 +286,39 @@ if (missingMessages.length > 0 || missingMessageTypes.length > 0) {
   throw new Error(
     `Protocol V2 schema missing required entries: messages=[${missingMessages.join(
       ', '
-    )}], messageTypes=[${missingMessageTypes.join(', ')}]`
+    )}], messageTypes=[${missingMessageTypes.join(
+      ', '
+    )}]. Make sure submodules/firmware-pro2 is checked out on branch dev_romloader_split ` +
+      '(origin/dev_romloader_split), which contains the Filesystem*/DevFirmwareUpdate/DevReboot messages.'
+  );
+}
+
+// Provisional wire IDs injected by this script for messages the firmware proto does
+// not export yet (pending firmware confirmation, see
+// docs/protocol-v2-deviceinfo-field-gaps.md). If the firmware submodule starts
+// exporting these MessageType entries itself, the injection above is skipped and the
+// firmware-assigned IDs flow into TMP_PROTO — assert they still match the IDs the SDK
+// was built against, and fail loudly on any drift.
+const expectedInjectedIds = {
+  TonSignData: 11908,
+  TonSignedData: 11909,
+  GetOnboardingStatus: 60602,
+  OnboardingStatus: 60603,
+};
+const actualIds = {};
+for (const match of proto.matchAll(/^\s*MessageType_([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(\d+)/gm)) {
+  actualIds[match[1]] = Number(match[2]);
+}
+const idMismatches = Object.entries(expectedInjectedIds)
+  .filter(([name, id]) => name in actualIds && actualIds[name] !== id)
+  .map(([name, id]) => `${name}: expected ${id}, firmware proto has ${actualIds[name]}`);
+
+if (idMismatches.length > 0) {
+  throw new Error(
+    `Protocol V2 injected MessageType wire IDs conflict with the firmware proto: ${idMismatches.join(
+      '; '
+    )}. Update the injected IDs in protobuf-build.sh and the registry section in ` +
+      'docs/protocol-v2-deviceinfo-field-gaps.md.'
   );
 }
 NODE
@@ -300,13 +334,19 @@ NODE
     cp "$PARENT_PATH/../messages-protocol-v2.json" "$CORE_MESSAGES_DIR/messages-protocol-v2.json"
     echo "Protocol V2 messages-protocol-v2.json generated from firmware-pro2 legacy + latest schema and copied to core"
 
-    yarn prettier --write "$PARENT_PATH/../messages-protocol-v2.json"
-    yarn prettier --write "$CORE_MESSAGES_DIR/messages-protocol-v2.json"
+    yarn --cwd "$PACKAGE_ROOT" prettier --write "$PARENT_PATH/../messages-protocol-v2.json"
+    yarn --cwd "$PACKAGE_ROOT" prettier --write "$CORE_MESSAGES_DIR/messages-protocol-v2.json"
+
+    echo "generating type definitions for: $LANG"
     node ./protobuf-types.js $LANG
     yarn --cwd "$PACKAGE_ROOT" prettier --write "$PACKAGE_ROOT/src/types/messages.ts"
     echo "=== Protocol V2 messages build complete ==="
 else
+    # Unlike the optional Pro1 (legacy) section above, the firmware-pro2 submodule is
+    # the only source of the Protocol V2 schema, so a missing checkout is a hard error.
     echo "firmware-pro2 latest protobuf schema not found at $SRC_PRO2_LATEST"
+    echo "The Protocol V2 schema requires firmware-pro2 on branch dev_romloader_split."
     echo "Run: git submodule update --init submodules/firmware-pro2"
+    echo "Then: git -C submodules/firmware-pro2 fetch origin dev_romloader_split && git -C submodules/firmware-pro2 checkout origin/dev_romloader_split"
     exit 1
 fi

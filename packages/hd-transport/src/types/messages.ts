@@ -379,6 +379,7 @@ export type GetAddress = {
 // Address
 export type Address = {
   address: string;
+  mac?: string;
 };
 
 // GetOwnershipId
@@ -418,6 +419,14 @@ export type VerifyMessage = {
   coin_name?: string;
 };
 
+export type CoinJoinRequest = {
+  fee_rate: number;
+  no_fee_threshold: number;
+  min_registrable_amount: number;
+  mask_public_key: string;
+  signature: string;
+};
+
 // SignTx
 export type SignTx = {
   outputs_count: number;
@@ -432,6 +441,8 @@ export type SignTx = {
   branch_id?: number;
   amount_unit?: AmountUnit;
   decred_staking_ticket?: boolean;
+  serialize?: boolean;
+  coinjoin_request?: CoinJoinRequest;
 };
 
 export enum Enum_RequestType {
@@ -442,6 +453,7 @@ export enum Enum_RequestType {
   TXEXTRADATA = 4,
   TXORIGINPUT = 5,
   TXORIGOUTPUT = 6,
+  TXPAYMENTREQ = 7,
 }
 export type RequestType = keyof typeof Enum_RequestType;
 
@@ -486,6 +498,7 @@ type CommonTxInputType = {
   witness?: string; // used by EXTERNAL, depending on script_pubkey
   ownership_proof?: string; // used by EXTERNAL, depending on script_pubkey
   commitment_data?: string; // used by EXTERNAL, depending on ownership_proof
+  coinjoin_flags?: number; // Protocol V2 only (CoinJoin)
 };
 
 export type TxInputType =
@@ -688,12 +701,15 @@ export type OwnershipProof = {
 // AuthorizeCoinJoin
 export type AuthorizeCoinJoin = {
   coordinator: string;
-  max_total_fee: number;
+  max_total_fee?: number;
   fee_per_anonymity?: number;
   address_n: number[];
   coin_name?: string;
   script_type?: InputScriptType;
   amount_unit?: AmountUnit;
+  max_rounds?: number;
+  max_coordinator_fee_rate?: number;
+  max_fee_per_kvbyte?: number;
 };
 
 export type BIP32Address = {
@@ -2230,6 +2246,9 @@ export enum Enum_BackupType {
   Bip39 = 0,
   Slip39_Basic = 1,
   Slip39_Advanced = 2,
+  Slip39_Single_Extendable = 3,
+  Slip39_Basic_Extendable = 4,
+  Slip39_Advanced_Extendable = 5,
 }
 export type BackupType = keyof typeof Enum_BackupType;
 
@@ -2866,6 +2885,8 @@ export type UnLockDeviceResponse = {
 // GetPassphraseState
 export type GetPassphraseState = {
   passphrase_state?: string;
+  _only_main_pin?: boolean;
+  allow_create_attach_pin?: boolean;
 };
 
 // PassphraseState
@@ -2935,7 +2956,7 @@ export type MoneroTransactionRsigData = {
 export type MoneroGetAddress = {
   address_n: number[];
   show_display?: boolean;
-  network_type?: number;
+  network_type?: number | MoneroNetworkType;
   account?: number;
   minor?: number;
   payment_id?: string;
@@ -2949,7 +2970,7 @@ export type MoneroAddress = {
 // MoneroGetWatchKey
 export type MoneroGetWatchKey = {
   address_n: number[];
-  network_type?: number;
+  network_type?: number | MoneroNetworkType;
 };
 
 // MoneroWatchKey
@@ -2980,7 +3001,7 @@ export type MoneroTransactionData = {
 export type MoneroTransactionInitRequest = {
   version?: number;
   address_n: number[];
-  network_type?: number;
+  network_type?: number | MoneroNetworkType;
   tsx_data?: MoneroTransactionData;
 };
 
@@ -3110,7 +3131,7 @@ export type MoneroKeyImageExportInitRequest = {
   num?: number;
   hash?: string;
   address_n: number[];
-  network_type?: number;
+  network_type?: number | MoneroNetworkType;
   subs: MoneroSubAddressIndicesList[];
 };
 
@@ -3152,7 +3173,7 @@ export type MoneroKeyImageSyncFinalAck = {
 // MoneroGetTxKeyRequest
 export type MoneroGetTxKeyRequest = {
   address_n: number[];
-  network_type?: number;
+  network_type?: number | MoneroNetworkType;
   salt1?: string;
   salt2?: string;
   tx_enc_keys?: string;
@@ -3171,7 +3192,7 @@ export type MoneroGetTxKeyAck = {
 // MoneroLiveRefreshStartRequest
 export type MoneroLiveRefreshStartRequest = {
   address_n: number[];
-  network_type?: number;
+  network_type?: number | MoneroNetworkType;
 };
 
 // MoneroLiveRefreshStartAck
@@ -4199,6 +4220,7 @@ export type TonSignedMessage = {
   signature?: string;
   signning_message?: string;
   init_data_length?: number;
+  signing_message?: string;
 };
 
 // TonSignProof
@@ -4232,7 +4254,7 @@ export type TonSignData = {
   payload: string;
   schema?: string;
   appdomain: string;
-  timestamp: number;
+  timestamp: UintType;
   from_address?: string;
   wallet_version?: TonWalletVersion;
   wallet_id?: number;
@@ -4881,6 +4903,7 @@ export type MessageType = {
   SignMessage: SignMessage;
   MessageSignature: MessageSignature;
   VerifyMessage: VerifyMessage;
+  CoinJoinRequest: CoinJoinRequest;
   SignTx: SignTx;
   TxRequestDetailsType: TxRequestDetailsType;
   TxRequestSerializedType: TxRequestSerializedType;
@@ -5463,12 +5486,4 @@ export type TypedCall = {
     resType: R,
     message?: MessageType[T]
   ): Promise<MessageResponse<R>>;
-  <T extends MessageKey, R extends readonly MessageKey[]>(
-    type: T,
-    resType: R,
-    message?: any
-  ): Promise<MessageResponseMap[R[number]]>;
-  <T extends MessageKey, R extends MessageKey>(type: T, resType: R, message?: any): Promise<
-    MessageResponse<R>
-  >;
 };

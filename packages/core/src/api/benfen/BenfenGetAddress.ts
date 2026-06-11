@@ -78,7 +78,8 @@ export default class BenfenGetAddress extends BaseMethod<HardwareBenfenGetAddres
             'BenfenAddress',
             param
           );
-          address = addressRes.message.address;
+          // proto 里 BenfenAddress.address 是 optional；正常响应必然携带
+          address = addressRes.message.address ?? '';
         } else {
           address = publicKeyToAddress(publicKey);
         }
@@ -106,7 +107,7 @@ export default class BenfenGetAddress extends BaseMethod<HardwareBenfenGetAddres
           );
           const result = {
             path: serializedPath(param.address_n),
-            address: hex2BfcAddress(res.message.address),
+            address: hex2BfcAddress(res.message.address ?? ''),
           };
           if (this.shouldConfirm) {
             this.postPreviousAddressMessage(result);

@@ -14,7 +14,7 @@
 | 帧头       | `0x3F` 分包，payload 内含 `##`  | `0x5A` 完整帧                                        |
 | message id | big-endian                      | little-endian                                        |
 | 完整性校验 | 无额外 CRC                      | header CRC8 + frame CRC8                             |
-| 初始化     | `Initialize -> Features`        | `GetProtoVersion` 探测，`Ping` 初始化                |
+| 初始化     | `Initialize -> Features`        | `Ping {message:'probe'}` 探测并初始化                |
 | schema     | `messages.json`                 | `messages-protocol-v2.json`，必要时可 fallback 到 V1 schema |
 
 ## WebUSB 流程
@@ -31,7 +31,7 @@ flowchart TD
   Endpoints["discoverEndpoints(device)"]
   ProbeV1["probeProtocolV1(Initialize)"]
   V1["Initialize 成功: V1"]
-  ProbeV2["probeProtocolV2(GetProtoVersion / bootloader status)"]
+  ProbeV2["probeProtocolV2(Ping / bootloader status)"]
   V2["V2 probe 成功: V2"]
   FallbackV1["V1/V2 均失败: V1"]
   Call["call(path, name, data)"]
@@ -60,7 +60,7 @@ flowchart TD
   Connect["connect + subscribe"]
   ProbeV1["probeProtocolV1(Initialize)"]
   V1["Initialize 成功: V1"]
-  ProbeV2["probeProtocolV2(GetProtoVersion / bootloader status)"]
+  ProbeV2["probeProtocolV2(Ping / bootloader status)"]
   V2["V2 probe 成功: V2"]
   FallbackV1["V1/V2 均失败: V1"]
   Call["call(uuid, name, data)"]
@@ -89,7 +89,7 @@ flowchart TD
   Connect["connect + discover services + subscribe"]
   ProbeV1["probeProtocolV1(Initialize)"]
   V1["Initialize 成功: V1"]
-  ProbeV2["probeProtocolV2(GetProtoVersion / bootloader status)"]
+  ProbeV2["probeProtocolV2(Ping / bootloader status)"]
   V2["V2 probe 成功: V2"]
   FallbackV1["V1/V2 均失败: V1"]
   Call["call(uuid, name, data)"]
@@ -134,7 +134,7 @@ V2 协议公共能力放在 `packages/hd-transport/src/protocol-session.ts`：
 | `ProtocolV2Session`        | 统一执行 V2 encode、写 frame、读 frame、decode、超时和日志 |
 | `ProtocolV2FrameAssembler` | 根据 `0x5A` frame length 重组 USB/BLE 分片，并校验最大长度 |
 | `probeProtocolV1()`        | 默认路径先发送 `Initialize`，成功继续走 V1 初始化           |
-| `probeProtocolV2()`        | V1 失败、显式 V2 或缓存 V2 时发送 `GetProtoVersion` / bootloader status probe |
+| `probeProtocolV2()`        | V1 失败、显式 V2 或缓存 V2 时发送 `Ping {message:'probe'}` / bootloader status probe |
 
 具体 transport 只提供平台相关能力：
 
@@ -186,7 +186,7 @@ resource 和 bootloader 写入后必须进入 `targets`，SDK 不依赖固件端
 
 ## 兼容性边界
 
-- V1 设备会优先通过 `Initialize` 探测成功；无法响应 V2 `GetProtoVersion` 时仍保持 V1。
+- V1 设备会优先通过 `Initialize` 探测成功；无法响应 V2 `Ping` probe 时仍保持 V1。
 - V2 设备不支持传统 `Initialize/GetFeatures`，因此初始化必须走 Protocol V2 分支。
 - 协议选择不暴露给应用层；应用层继续使用 connectId 和原有 API。
 - V2 文件写入使用 `FilesystemFileWrite`，返回 `FilesystemFile`，不能继续使用旧的 `FileWrite/File` 名称。

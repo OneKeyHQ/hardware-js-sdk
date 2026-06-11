@@ -133,6 +133,14 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
     const { features, commands } = device;
     const deviceType = device.getCurrentDeviceType();
 
+    // Protocol V2 (Pro2) 固件升级走 DeviceFirmwareUpdate 流程，禁止进入 legacy 入口
+    if (device.isProtocolV2()) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        'Protocol V2 firmware update must use firmwareUpdateV4'
+      );
+    }
+
     if (!device.isBootloader() && features) {
       const uuid = getDeviceUUID(features);
       // should go to bootloader mode manually

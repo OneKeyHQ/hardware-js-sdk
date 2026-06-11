@@ -4,16 +4,15 @@ import type {
   FactoryDeviceInfo,
   OnboardingStatus,
   ProtoVersion,
+  ProtocolV2DeviceInfo,
   Success,
 } from '@onekeyfe/hd-transport';
-
 import type {
   DeviceFirmwareUpdateParams,
   DeviceRebootParams,
   FactoryDeviceInfoSettingsParams,
 } from '../../api/protocol-v2/helpers';
 import type { DeviceGetDeviceInfoParams } from '../../api/protocol-v2/DeviceGetDeviceInfo';
-import type { ProtocolV2DeviceInfo } from '../../protocols/protocol-v2/features';
 
 // 参数类型单源：以 api/protocol-v2 的实现为准（type-only re-export，无运行时依赖）
 export type {
@@ -49,6 +48,7 @@ export type DirInfo = {
   child_files?: string;
 };
 
+// proto 中 FilesystemPathInfo 的全部字段均为 required，类型与之保持一致
 export type PathInfoResult = {
   exist: boolean;
   size: number;
@@ -58,11 +58,11 @@ export type PathInfoResult = {
   hour: number;
   minute: number;
   second: number;
-  readonly?: boolean;
-  hidden?: boolean;
-  system?: boolean;
-  archive?: boolean;
-  directory?: boolean;
+  readonly: boolean;
+  hidden: boolean;
+  system: boolean;
+  archive: boolean;
+  directory: boolean;
 };
 
 // ── Method signatures ─────────────────────────────────────────────────────
@@ -166,5 +166,6 @@ export declare function filesystemFormat(connectId: string): Response<Success>;
 
 export declare function filesystemDiskControl(
   connectId: string,
-  params: CommonParams & { enable: number | string; timeoutMs?: number | string }
+  // enable 收紧为 boolean | 0 | 1（兼容历史的 '0' / '1' 字符串输入，内部归一化为 0/1）
+  params: CommonParams & { enable: boolean | 0 | 1; timeoutMs?: number | string }
 ): Response<Success>;

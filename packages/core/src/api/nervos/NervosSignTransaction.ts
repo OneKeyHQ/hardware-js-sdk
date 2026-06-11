@@ -6,7 +6,11 @@ import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
 
 import type { DeviceFirmwareRange, NervosSignTransactionParams, NervosSignedTx } from '../../types';
-import type { NervosSignTx as HardwareNervosSignTx, TypedCall } from '@onekeyfe/hd-transport';
+import type {
+  NervosSignTx as HardwareNervosSignTx,
+  NervosTxRequest,
+  TypedCall,
+} from '@onekeyfe/hd-transport';
 import type { TypedResponseMessage } from '../../device/DeviceCommands';
 
 type NervosSignTx = Omit<HardwareNervosSignTx, 'data_initial_chunk' | 'data_length'> & {
@@ -63,7 +67,9 @@ export default class NervosSignTransaction extends BaseMethod<NervosSignTx> {
     res: TypedResponseMessage<'NervosSignedTx'> | TypedResponseMessage<'NervosTxRequest'>,
     data: Buffer,
     offset = 0
-  ): Promise<NervosSignedTx> => {
+    // 设备可能在最后一个 NervosTxRequest（无 data_length）里返回签名，
+    // 该消息没有 address 字段，返回类型如实声明为联合类型
+  ): Promise<NervosSignedTx | (NervosTxRequest & { path: string })> => {
     if (res.type === 'NervosSignedTx') {
       if (!res?.message?.signature) {
         throw new Error('No signature returned');

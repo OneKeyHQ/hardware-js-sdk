@@ -1,9 +1,10 @@
 import type { CommonParams, Response } from '../params';
 import type { Features, IDeviceType, OnekeyFeatures } from '../device';
 import type { EFirmwareType } from '@onekeyfe/hd-shared';
-import type { ProtocolV2DeviceInfo } from '../../protocols/protocol-v2/features';
+import type { ProtocolType, ProtocolV2DeviceInfo } from '@onekeyfe/hd-transport';
 
-export type DeviceInfoProtocol = 'V1' | 'V2' | 'unknown';
+// 协议类型单源：从 hd-transport 的 ProtocolType 派生，只额外允许 'unknown'。
+export type DeviceInfoProtocol = ProtocolType | 'unknown';
 
 export type DeviceInfoSource = 'features' | 'onekeyFeatures' | 'deviceInfo';
 
@@ -26,7 +27,7 @@ export type DeviceInfoStatus = {
   backupRequired: boolean | null;
   noBackup: boolean | null;
   language: string | null;
-  bleEnabled?: boolean | null;
+  bleEnabled: boolean | null;
 };
 
 export type DeviceProfileVersions = {
