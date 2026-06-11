@@ -122,6 +122,43 @@ export const PROTOCOL_V2_FULL_DEVICE_INFO_REQUEST = {
 export const PROTOCOL_V2_DEVICE_INFO_REQUEST = PROTOCOL_V2_FULL_DEVICE_INFO_REQUEST;
 export const PROTOCOL_V2_DEVICE_INFO_TIMEOUT_MS = 10 * 1000;
 
+/**
+ * 临时开关（默认开启）：当前 Pro2 测试固件 / 早期工程板尚未实现 DevGetDeviceInfo，
+ * 真实调用只会超时失败。开启时跳过 wire 调用，直接返回 mock DeviceInfo；
+ * profile 的身份字段（serialNo/deviceId）由 buildProfileFromProtocolV2 的
+ * fallbackSerialNo（transport path）兜底。
+ *
+ * 固件实现 DevGetDeviceInfo 后：把默认值改回 false（或直接删除开关与 mock）。
+ * 注意：开启期间 FirmwareUpdateV4 的“升级完成版本比对”拿到的也是 mock 版本，
+ * 不能作为升级成功的依据。
+ */
+let protocolV2DeviceInfoMockEnabled = true;
+
+export const setProtocolV2DeviceInfoMock = (enabled: boolean) => {
+  protocolV2DeviceInfoMockEnabled = enabled;
+};
+
+export const isProtocolV2DeviceInfoMockEnabled = () => protocolV2DeviceInfoMockEnabled;
+
+/** 每次调用返回新对象，避免调用方原地修改互相污染。 */
+export const buildMockProtocolV2DeviceInfo = (): ProtocolV2DeviceInfo => ({
+  protocol_version: 2,
+  hw: {
+    // 留空：profile 身份走 fallbackSerialNo（transport path）
+    serial_no: '',
+  },
+  fw: {
+    app: { version: '0.1.0' },
+  },
+  bt: {},
+  status: {
+    init_states: true,
+    language: 'en_US',
+    passphrase_protection: false,
+    bt_enable: true,
+  },
+});
+
 export async function requestProtocolV2DeviceInfo({
   commands,
   timeoutMs = PROTOCOL_V2_DEVICE_INFO_TIMEOUT_MS,
@@ -131,6 +168,9 @@ export async function requestProtocolV2DeviceInfo({
   timeoutMs?: number;
   request?: DevGetDeviceInfo;
 }): Promise<ProtocolV2DeviceInfo> {
+  if (protocolV2DeviceInfoMockEnabled) {
+    return buildMockProtocolV2DeviceInfo();
+  }
   const { message } = await commands.typedCall('DevGetDeviceInfo', 'DeviceInfo', request, {
     timeoutMs,
   });

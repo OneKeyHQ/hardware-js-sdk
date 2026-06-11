@@ -42,7 +42,9 @@ import { Device } from '../src/device/Device';
 import { UI_REQUEST } from '../src/events/ui-request';
 import {
   PROTOCOL_V2_DEVICE_INFO_TIMEOUT_MS,
+  buildMockProtocolV2DeviceInfo,
   requestProtocolV2DeviceInfo,
+  setProtocolV2DeviceInfoMock,
 } from '../src/protocols/protocol-v2/features';
 import {
   buildProfileFromProtocolV2,
@@ -68,6 +70,12 @@ jest.mock('../src/data/config', () => ({
   getSDKVersion: jest.fn(() => '1.0.0'),
   DEFAULT_DOMAIN: 'https://jssdk.onekey.so/1.0.0/',
 }));
+
+// DevGetDeviceInfo mock 开关默认开启（早期工程板固件没有该消息）。
+// 本测试文件验证的是真实 wire 调用行为，统一关闭；mock 行为单独有用例覆盖。
+beforeAll(() => {
+  setProtocolV2DeviceInfoMock(false);
+});
 
 const descriptor = {
   id: 'ble-id',
@@ -132,6 +140,32 @@ async function requestProtocolV2LegacyFeatures({
 }
 
 describe('Protocol V2 feature adapter', () => {
+  test('skips DevGetDeviceInfo wire call and returns mock when mock is enabled', async () => {
+    const typedCall = jest.fn();
+    setProtocolV2DeviceInfoMock(true);
+    try {
+      const deviceInfo = await requestProtocolV2DeviceInfo({
+        commands: { typedCall } as unknown as DeviceCommands,
+      });
+      expect(typedCall).not.toHaveBeenCalled();
+      expect(deviceInfo).toEqual(buildMockProtocolV2DeviceInfo());
+      // 空 serial_no + fallbackSerialNo：身份字段回退 transport path
+      const profile = buildProfileFromProtocolV2({
+        deviceInfo,
+        fallbackSerialNo: 'usb-path',
+      });
+      expect(profile).toMatchObject({
+        protocol: 'V2',
+        deviceId: 'usb-path',
+        serialNo: 'usb-path',
+        status: { initialized: true },
+        versions: { firmware: '0.1.0' },
+      });
+    } finally {
+      setProtocolV2DeviceInfoMock(false);
+    }
+  });
+
   test('normalizes Protocol V2 DeviceInfo into existing Features fields', () => {
     const features = normalizeProtocolV2Features(descriptor as any, {
       protocol_version: 1,
