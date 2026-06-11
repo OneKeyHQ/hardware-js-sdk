@@ -10,10 +10,10 @@ export type HardwareConnectProtocol =
 
 export const ONEKEY_WEBUSB_FILTER = [
   { vendorId: 0x1209, productId: 0x53c0 }, // Classic Boot、Classic1s Boot、Mini Boot
-  { vendorId: 0x1209, productId: 0x53c1 }, // Classic Firmware、Classic1s Firmware、Mini Firmware、Pro Firmware、Touch Firmware
+  { vendorId: 0x1209, productId: 0x53c1 }, // Classic Firmware、Classic1s Firmware、Mini Firmware、Pro Firmware、Touch Firmware、Pro2（旧固件，勿删：存量设备仍以此 PID 枚举）
   { vendorId: 0x1209, productId: 0x4f4a }, // Pro Boot、Touch Boot、Pro2
   { vendorId: 0x1209, productId: 0x4f4b }, // Pro Firmware、Touch Firmware（Not implemented Trezor）、Pro2
-  { vendorId: 0x1209, productId: 0x4f4c }, // Pro Board、Pro2
+  { vendorId: 0x1209, productId: 0x4f4c }, // Pro Board、Pro2（新固件 PID）
   // { vendorId: 0x1209, productId: 0x4f50 }, // Touch Board
 ];
 

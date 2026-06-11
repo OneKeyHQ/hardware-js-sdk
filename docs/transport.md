@@ -19,6 +19,8 @@
 
 ## WebUSB 流程
 
+USB 设备发现统一走 `packages/shared/src/constants.ts` 的 `ONEKEY_WEBUSB_FILTER`（WebUSB `requestDevice`/`getDevices` 和 node-usb `enumerate` 共用）。Pro2 存在新旧两组 PID：旧固件枚举为 `0x1209/0x53c1`（与 Classic/Mini/Pro/Touch 共享），新固件枚举为 `0x1209/0x4f4c`（另含 `0x4f4a`/`0x4f4b` boot 形态），两组都必须保留在过滤列表中。
+
 WebUSB 不再使用 PID 判断协议。当前流程是：
 
 ```mermaid
