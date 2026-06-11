@@ -4555,9 +4555,20 @@ export enum DevRebootType {
   Bootloader = 2,
 }
 
+export enum DeviceRebootType {
+  Normal = 0,
+  Romloader = 1,
+  Bootloader = 2,
+}
+
 // DevReboot
 export type DevReboot = {
   reboot_type: DevRebootType;
+};
+
+// DeviceReboot
+export type DeviceReboot = {
+  reboot_type: DeviceRebootType;
 };
 
 export enum DeviceType {
@@ -4654,6 +4665,9 @@ export type DevGetDeviceInfo = {
   types?: DevInfoTypes;
 };
 
+// DeviceGetDeviceInfo
+export type DeviceGetDeviceInfo = DevGetDeviceInfo;
+
 // ProtocolV2DeviceInfo
 export type ProtocolV2DeviceInfo = {
   protocol_version: number;
@@ -4681,9 +4695,29 @@ export enum DevFirmwareTargetType {
   TARGET_RESOURCE = 10,
 }
 
+export enum DeviceFirmwareTargetType {
+  TARGET_INVALID = 0,
+  TARGET_ROMLOADER = 1,
+  TARGET_BOOTLOADER = 2,
+  TARGET_APPLICATION_P1 = 3,
+  TARGET_APPLICATION_P2 = 4,
+  TARGET_COPROCESSOR = 5,
+  TARGET_SE01 = 6,
+  TARGET_SE02 = 7,
+  TARGET_SE03 = 8,
+  TARGET_SE04 = 9,
+  TARGET_RESOURCE = 10,
+}
+
 // DevFirmwareTarget
 export type DevFirmwareTarget = {
   target_id: DevFirmwareTargetType;
+  path: string;
+};
+
+// DeviceFirmwareTarget
+export type DeviceFirmwareTarget = {
+  target_id: DeviceFirmwareTargetType;
   path: string;
 };
 
@@ -4692,9 +4726,22 @@ export type DevFirmwareUpdate = {
   targets: DevFirmwareTarget[];
 };
 
+// DeviceFirmwareUpdate
+export type DeviceFirmwareUpdate = {
+  targets: DeviceFirmwareTarget[];
+  max_concurrent?: number;
+};
+
 // DevFirmwareInstallProgress
 export type DevFirmwareInstallProgress = {
   target_id: DevFirmwareTargetType;
+  progress: number;
+  stage?: string;
+};
+
+// DeviceFirmwareInstallProgress
+export type DeviceFirmwareInstallProgress = {
+  target_id: DeviceFirmwareTargetType;
   progress: number;
   stage?: string;
 };
@@ -4705,12 +4752,26 @@ export type DevFirmwareUpdateStatusEntry = {
   status: number;
 };
 
+// DeviceFirmwareUpdateStatusEntry
+export type DeviceFirmwareUpdateStatusEntry = {
+  target_id: DeviceFirmwareTargetType;
+  status: number;
+};
+
 // DevGetFirmwareUpdateStatus
 export type DevGetFirmwareUpdateStatus = {};
+
+// DeviceGetFirmwareUpdateStatus
+export type DeviceGetFirmwareUpdateStatus = {};
 
 // DevFirmwareUpdateStatus
 export type DevFirmwareUpdateStatus = {
   targets: DevFirmwareUpdateStatusEntry[];
+};
+
+// DeviceFirmwareUpdateStatus
+export type DeviceFirmwareUpdateStatus = {
+  targets: DeviceFirmwareUpdateStatusEntry[];
 };
 
 // FactoryDeviceInfoSettings
@@ -5427,6 +5488,7 @@ export type MessageType = {
   GetProtoVersion: GetProtoVersion;
   ProtoVersion: ProtoVersion;
   DevReboot: DevReboot;
+  DeviceReboot: DeviceReboot;
   DevFirmwareImageInfo: DevFirmwareImageInfo;
   DevHardwareInfo: DevHardwareInfo;
   DevMainMcuInfo: DevMainMcuInfo;
@@ -5436,12 +5498,19 @@ export type MessageType = {
   DevInfoTypes: DevInfoTypes;
   DevStatus: DevStatus;
   DevGetDeviceInfo: DevGetDeviceInfo;
+  DeviceGetDeviceInfo: DeviceGetDeviceInfo;
   DevFirmwareTarget: DevFirmwareTarget;
+  DeviceFirmwareTarget: DeviceFirmwareTarget;
   DevFirmwareUpdate: DevFirmwareUpdate;
+  DeviceFirmwareUpdate: DeviceFirmwareUpdate;
   DevFirmwareInstallProgress: DevFirmwareInstallProgress;
+  DeviceFirmwareInstallProgress: DeviceFirmwareInstallProgress;
   DevFirmwareUpdateStatusEntry: DevFirmwareUpdateStatusEntry;
+  DeviceFirmwareUpdateStatusEntry: DeviceFirmwareUpdateStatusEntry;
   DevGetFirmwareUpdateStatus: DevGetFirmwareUpdateStatus;
+  DeviceGetFirmwareUpdateStatus: DeviceGetFirmwareUpdateStatus;
   DevFirmwareUpdateStatus: DevFirmwareUpdateStatus;
+  DeviceFirmwareUpdateStatus: DeviceFirmwareUpdateStatus;
   FactoryDeviceInfoSettings: FactoryDeviceInfoSettings;
   FactoryGetDeviceInfo: FactoryGetDeviceInfo;
   FactoryDeviceInfo: FactoryDeviceInfo;

@@ -105,7 +105,7 @@ export default class DeviceGetDeviceInfo extends BaseMethod<{
     }
 
     const res = await this.device.commands.typedCall(
-      'DevGetDeviceInfo',
+      'DeviceGetDeviceInfo',
       'DeviceInfo',
       {
         targets: this.params.targets,

@@ -1,17 +1,17 @@
 import {
-  DevFirmwareTargetType as DevFirmwareTargetTypeEnum,
-  DevRebootType,
+  DeviceFirmwareTargetType as DeviceFirmwareTargetTypeEnum,
+  DeviceRebootType,
 } from '@onekeyfe/hd-transport';
 
 import { invalidParameter, validateNonEmptyString } from '../helpers/filesystemValidation';
 
 import type {
-  DevFirmwareTarget,
-  DevFirmwareTargetType,
+  DeviceFirmwareTarget,
+  DeviceFirmwareTargetType,
   TransportCallOptions,
 } from '@onekeyfe/hd-transport';
 
-export type RebootTypeInput = DevRebootType | keyof typeof DevRebootType | string | number;
+export type RebootTypeInput = DeviceRebootType | keyof typeof DeviceRebootType | string | number;
 
 export type DeviceRebootParams = {
   rebootType?: RebootTypeInput;
@@ -19,17 +19,17 @@ export type DeviceRebootParams = {
 };
 
 export type DeviceFirmwareTargetInput =
-  | DevFirmwareTarget
+  | DeviceFirmwareTarget
   | {
-      targetId?: DevFirmwareTargetType | string | number;
-      target_id?: DevFirmwareTargetType | string | number;
+      targetId?: DeviceFirmwareTargetType | string | number;
+      target_id?: DeviceFirmwareTargetType | string | number;
       path: string;
     };
 
 export type DeviceFirmwareUpdateParams = {
   targets?: DeviceFirmwareTargetInput[];
-  targetId?: DevFirmwareTargetType | string | number;
-  target_id?: DevFirmwareTargetType | string | number;
+  targetId?: DeviceFirmwareTargetType | string | number;
+  target_id?: DeviceFirmwareTargetType | string | number;
   path?: string;
 };
 
@@ -42,43 +42,104 @@ export type FactoryDeviceInfoSettingsParams = {
   preFirmware?: string;
 };
 
-const DEVICE_REBOOT_TYPES: Record<string, DevRebootType> = {
-  Normal: DevRebootType.Normal,
-  normal: DevRebootType.Normal,
-  Boardloader: DevRebootType.Boardloader,
-  boardloader: DevRebootType.Boardloader,
-  Bootloader: DevRebootType.Bootloader,
-  bootloader: DevRebootType.Bootloader,
+const DEVICE_REBOOT_TYPES: Record<string, DeviceRebootType> = {
+  Normal: DeviceRebootType.Normal,
+  normal: DeviceRebootType.Normal,
+  Romloader: DeviceRebootType.Romloader,
+  romloader: DeviceRebootType.Romloader,
+  Boardloader: DeviceRebootType.Romloader,
+  boardloader: DeviceRebootType.Romloader,
+  Bootloader: DeviceRebootType.Bootloader,
+  bootloader: DeviceRebootType.Bootloader,
 };
 
 export const PROTOCOL_V2_FIRMWARE_UPDATE_OPTIONS: TransportCallOptions = {
-  intermediateTypes: ['DevFirmwareInstallProgress'],
+  intermediateTypes: ['DeviceFirmwareInstallProgress'],
 };
 
-export const PROTOCOL_V2_FIRMWARE_UPDATE_RESPONSE_TYPES: ('Success' | 'DevFirmwareUpdateStatus')[] =
-  ['Success', 'DevFirmwareUpdateStatus'];
+export const PROTOCOL_V2_FIRMWARE_UPDATE_RESPONSE_TYPES: (
+  | 'Success'
+  | 'DeviceFirmwareUpdateStatus'
+)[] = ['Success', 'DeviceFirmwareUpdateStatus'];
 
-export function normalizeRebootType(value: RebootTypeInput | undefined): DevRebootType {
+export const getProtocolV2UnknownErrorText = (error: unknown) => {
+  if (!error) {
+    return '';
+  }
+  if (typeof error === 'string') {
+    return error;
+  }
+
+  const parts: string[] = [];
+  if (error instanceof Error) {
+    parts.push(error.name, error.message);
+  }
+
+  if (typeof error === 'object') {
+    const record = error as Record<string, unknown>;
+    for (const field of ['name', 'message', 'reason', 'code', 'errorCode', 'nativeErrorCode']) {
+      const value = record[field];
+      if (value !== undefined && value !== null) {
+        parts.push(String(value));
+      }
+    }
+  }
+
+  const stringified = String(error);
+  if (stringified && stringified !== '[object Object]') {
+    parts.push(stringified);
+  }
+
+  return parts.filter(Boolean).join(' ');
+};
+
+export const isProtocolV2DeviceDisconnectedError = (error: unknown) => {
+  const message = getProtocolV2UnknownErrorText(error).toLowerCase();
+  const compactMessage = message.replace(/\s+/g, '');
+  return (
+    message.includes('notfounderror') ||
+    (message.includes("failed to execute 'open'") && message.includes('usbdevice')) ||
+    message.includes('device was disconnected') ||
+    message.includes('device disconnected') ||
+    message.includes('device disconnect') ||
+    message.includes('was disconnected') ||
+    message.includes('bledevicedisconnected') ||
+    message.includes('bleconnectederror') ||
+    message.includes('connected error is always runtime error') ||
+    message.includes('connection has timed out unexpectedly') ||
+    message.includes('connection error has occured') ||
+    message.includes('connection error has occurred') ||
+    message.includes('transferIn') ||
+    message.includes('transferin') ||
+    message.includes('usbdevice') ||
+    message.includes('multiplatformbleadapter') ||
+    message.includes('multipalformebleadapter') ||
+    compactMessage.includes('rxerrorerror6') ||
+    message.includes('rxerror error 6')
+  );
+};
+
+export function normalizeRebootType(value: RebootTypeInput | undefined): DeviceRebootType {
   if (typeof value === 'number') return value;
   if (typeof value === 'string') {
     const numeric = Number(value);
     if (Number.isFinite(numeric)) return numeric;
     if (value in DEVICE_REBOOT_TYPES) return DEVICE_REBOOT_TYPES[value];
   }
-  return DevRebootType.Normal;
+  return DeviceRebootType.Normal;
 }
 
 // DevFirmwareTargetType 的合法数值域（数值枚举的反向映射键会被 filter 掉）
 const VALID_FIRMWARE_TARGET_IDS = new Set<number>(
-  Object.values(DevFirmwareTargetTypeEnum).filter(
+  Object.values(DeviceFirmwareTargetTypeEnum).filter(
     (value): value is number => typeof value === 'number'
   )
 );
 
 function normalizeTargetId(
-  value: DevFirmwareTargetType | string | number | undefined,
+  value: DeviceFirmwareTargetType | string | number | undefined,
   name: string
-): DevFirmwareTargetType {
+): DeviceFirmwareTargetType {
   if (value === undefined || value === null) {
     throw invalidParameter(`Missing required parameter: ${name}`);
   }
@@ -95,7 +156,7 @@ function normalizeTargetId(
   );
 }
 
-export function normalizeFirmwareTargets(params: DeviceFirmwareUpdateParams): DevFirmwareTarget[] {
+export function normalizeFirmwareTargets(params: DeviceFirmwareUpdateParams): DeviceFirmwareTarget[] {
   const targets =
     params.targets ??
     (params.path

@@ -11,8 +11,8 @@ export default class DeviceGetFirmwareUpdateStatus extends BaseMethod {
 
   async run() {
     const res = await this.device.commands.typedCall(
-      'DevGetFirmwareUpdateStatus',
-      'DevFirmwareUpdateStatus',
+      'DeviceGetFirmwareUpdateStatus',
+      'DeviceFirmwareUpdateStatus',
       {}
     );
     return Promise.resolve(res.message);

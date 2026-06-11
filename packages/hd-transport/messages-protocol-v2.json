@@ -506,7 +506,13 @@
         "MessageType_DevFirmwareUpdate": 61000,
         "MessageType_DevFirmwareInstallProgress": 61001,
         "MessageType_DevGetFirmwareUpdateStatus": 61002,
-        "MessageType_DevFirmwareUpdateStatus": 61003
+        "MessageType_DevFirmwareUpdateStatus": 61003,
+        "MessageType_DeviceReboot": 60400,
+        "MessageType_DeviceGetDeviceInfo": 60600,
+        "MessageType_DeviceFirmwareUpdate": 61000,
+        "MessageType_DeviceFirmwareInstallProgress": 61001,
+        "MessageType_DeviceGetFirmwareUpdateStatus": 61002,
+        "MessageType_DeviceFirmwareUpdateStatus": 61003
       }
     },
     "AlephiumGetAddress": {
@@ -13246,6 +13252,116 @@
               }
             }
           }
+        }
+      }
+    },
+    "DeviceRebootType": {
+      "values": {
+        "Normal": 0,
+        "Romloader": 1,
+        "Bootloader": 2
+      }
+    },
+    "DeviceReboot": {
+      "fields": {
+        "reboot_type": {
+          "rule": "required",
+          "type": "DeviceRebootType",
+          "id": 1
+        }
+      }
+    },
+    "DeviceGetDeviceInfo": {
+      "fields": {
+        "targets": {
+          "type": "DevInfoTargets",
+          "id": 1
+        },
+        "types": {
+          "type": "DevInfoTypes",
+          "id": 2
+        }
+      }
+    },
+    "DeviceFirmwareTargetType": {
+      "values": {
+        "TARGET_INVALID": 0,
+        "TARGET_ROMLOADER": 1,
+        "TARGET_BOOTLOADER": 2,
+        "TARGET_APPLICATION_P1": 3,
+        "TARGET_APPLICATION_P2": 4,
+        "TARGET_COPROCESSOR": 5,
+        "TARGET_SE01": 6,
+        "TARGET_SE02": 7,
+        "TARGET_SE03": 8,
+        "TARGET_SE04": 9,
+        "TARGET_RESOURCE": 10
+      }
+    },
+    "DeviceFirmwareTarget": {
+      "fields": {
+        "target_id": {
+          "rule": "required",
+          "type": "DeviceFirmwareTargetType",
+          "id": 1
+        },
+        "path": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        }
+      }
+    },
+    "DeviceFirmwareUpdate": {
+      "fields": {
+        "targets": {
+          "rule": "repeated",
+          "type": "DeviceFirmwareTarget",
+          "id": 1
+        }
+      }
+    },
+    "DeviceFirmwareInstallProgress": {
+      "fields": {
+        "target_id": {
+          "rule": "required",
+          "type": "DeviceFirmwareTargetType",
+          "id": 1
+        },
+        "progress": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        },
+        "stage": {
+          "type": "string",
+          "id": 3
+        }
+      }
+    },
+    "DeviceFirmwareUpdateStatusEntry": {
+      "fields": {
+        "target_id": {
+          "rule": "required",
+          "type": "DeviceFirmwareTargetType",
+          "id": 1
+        },
+        "status": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        }
+      }
+    },
+    "DeviceGetFirmwareUpdateStatus": {
+      "fields": {}
+    },
+    "DeviceFirmwareUpdateStatus": {
+      "fields": {
+        "targets": {
+          "rule": "repeated",
+          "type": "DeviceFirmwareUpdateStatusEntry",
+          "id": 1
         }
       }
     }

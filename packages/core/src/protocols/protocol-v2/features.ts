@@ -1,6 +1,6 @@
 import { DevSEState, DevSeType } from '@onekeyfe/hd-transport';
 
-import type { DevGetDeviceInfo, DevSEInfo, ProtocolV2DeviceInfo } from '@onekeyfe/hd-transport';
+import type { DeviceGetDeviceInfo, DevSEInfo, ProtocolV2DeviceInfo } from '@onekeyfe/hd-transport';
 import type { DeviceCommands } from '../../device/DeviceCommands';
 
 // 单源类型：直接使用 hd-transport 生成的 ProtocolV2DeviceInfo / DevSEInfo /
@@ -166,12 +166,12 @@ export async function requestProtocolV2DeviceInfo({
 }: {
   commands: DeviceCommands;
   timeoutMs?: number;
-  request?: DevGetDeviceInfo;
+  request?: DeviceGetDeviceInfo;
 }): Promise<ProtocolV2DeviceInfo> {
   if (protocolV2DeviceInfoMockEnabled) {
     return buildMockProtocolV2DeviceInfo();
   }
-  const { message } = await commands.typedCall('DevGetDeviceInfo', 'DeviceInfo', request, {
+  const { message } = await commands.typedCall('DeviceGetDeviceInfo', 'DeviceInfo', request, {
     timeoutMs,
   });
   // 'DeviceInfo' 在生成类型里是 V1 DeviceInfo | ProtocolV2DeviceInfo 的合并；

@@ -1,6 +1,6 @@
 import { ERRORS, HardwareError, HardwareErrorCode, wait } from '@onekeyfe/hd-shared';
 import {
-  DevRebootType,
+  DeviceRebootType,
   PROTOCOL_V2_BLE_FILE_CHUNK_SIZE,
   PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE,
 } from '@onekeyfe/hd-transport';
@@ -19,7 +19,11 @@ import {
 } from '../protocols/protocol-v2';
 import { requestProtocolV2DeviceInfo } from '../protocols/protocol-v2/features';
 import { buildProfileFromProtocolV2 } from '../deviceProfile';
-import { PROTOCOL_V2_FIRMWARE_UPDATE_RESPONSE_TYPES } from './protocol-v2/helpers';
+import {
+  PROTOCOL_V2_FIRMWARE_UPDATE_RESPONSE_TYPES,
+  getProtocolV2UnknownErrorText,
+  isProtocolV2DeviceDisconnectedError,
+} from './protocol-v2/helpers';
 
 import type { FirmwareUpdateV4Params } from '../types/api/firmwareUpdate';
 import type { EFirmwareType } from '@onekeyfe/hd-shared';
@@ -33,9 +37,10 @@ const SESSION_ERROR = 'session not found';
 const PROTOCOL_V2_BOOTLOADER_RECONNECT_TIMEOUT = 60 * 1000;
 const PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT = 5 * 1000;
 const PROTOCOL_V2_INSTALL_TIMEOUT = 5 * 60 * 1000;
-const PROTOCOL_V2_TARGET_STATUS_FINISHED = 0;
+const PROTOCOL_V2_TARGET_STATUS_PENDING = 0;
 const PROTOCOL_V2_TARGET_STATUS_IN_PROGRESS = 1;
-const PROTOCOL_V2_TARGET_STATUS_FAILED = 2;
+const PROTOCOL_V2_TARGET_STATUS_FINISHED = 2;
+const PROTOCOL_V2_TARGET_STATUS_FAILED_MIN = 3;
 const PROTOCOL_V2_CONNECT_PROTOCOL = 'V2';
 const PROTOCOL_V2_FIRMWARE_STAGING_VOLUME = 'vol1:';
 const PROTOCOL_V2_MIN_FILE_CHUNK_SIZE = 64;
@@ -47,66 +52,11 @@ type ProtocolV2FirmwareUpdateStatusTarget = {
 
 type ProtocolV2FirmwareUpdateStartResponse =
   | TypedResponseMessage<'Success'>
-  | TypedResponseMessage<'DevFirmwareUpdateStatus'>
+  | TypedResponseMessage<'DeviceFirmwareUpdateStatus'>
   | undefined;
 
-const getUnknownErrorText = (error: unknown) => {
-  if (!error) {
-    return '';
-  }
-  if (typeof error === 'string') {
-    return error;
-  }
-
-  const parts: string[] = [];
-  if (error instanceof Error) {
-    parts.push(error.name, error.message);
-  }
-
-  if (typeof error === 'object') {
-    const record = error as Record<string, unknown>;
-    for (const field of ['name', 'message', 'reason', 'code', 'errorCode', 'nativeErrorCode']) {
-      const value = record[field];
-      if (value !== undefined && value !== null) {
-        parts.push(String(value));
-      }
-    }
-  }
-
-  const stringified = String(error);
-  if (stringified && stringified !== '[object Object]') {
-    parts.push(stringified);
-  }
-
-  return parts.filter(Boolean).join(' ');
-};
-
-const isDeviceDisconnectedError = (error: unknown) => {
-  const message = getUnknownErrorText(error).toLowerCase();
-  const compactMessage = message.replace(/\s+/g, '');
-  return (
-    message.includes('device was disconnected') ||
-    message.includes('device disconnected') ||
-    message.includes('device disconnect') ||
-    message.includes('was disconnected') ||
-    message.includes('bledevicedisconnected') ||
-    message.includes('bleconnectederror') ||
-    message.includes('connected error is always runtime error') ||
-    message.includes('connection has timed out unexpectedly') ||
-    message.includes('connection error has occured') ||
-    message.includes('connection error has occurred') ||
-    message.includes('transferIn') ||
-    message.includes('transferin') ||
-    message.includes('usbdevice') ||
-    message.includes('multiplatformbleadapter') ||
-    message.includes('multipalformebleadapter') ||
-    compactMessage.includes('rxerrorerror6') ||
-    message.includes('rxerror error 6')
-  );
-};
-
 const isProtocolV2ReconnectProbeError = (error: unknown) => {
-  const message = getUnknownErrorText(error).toLowerCase();
+  const message = getProtocolV2UnknownErrorText(error).toLowerCase();
   return (
     (message.includes('device protocol mismatch') && message.includes('expected v2')) ||
     message.includes('did not respond to expected protocol')
@@ -114,9 +64,9 @@ const isProtocolV2ReconnectProbeError = (error: unknown) => {
 };
 
 const isProtocolV2PollingTransientError = (error: unknown) => {
-  const message = getUnknownErrorText(error).toLowerCase();
+  const message = getProtocolV2UnknownErrorText(error).toLowerCase();
   return (
-    isDeviceDisconnectedError(error) ||
+    isProtocolV2DeviceDisconnectedError(error) ||
     isProtocolV2ReconnectProbeError(error) ||
     (message.includes('response timeout') && message.includes('devicegetfirmwareupdatestatus')) ||
     message.includes('device not found') ||
@@ -454,8 +404,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   private async queryProtocolV2FirmwareUpdateStatus() {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
     return typedCall(
-      'DevGetFirmwareUpdateStatus',
-      'DevFirmwareUpdateStatus',
+      'DeviceGetFirmwareUpdateStatus',
+      'DeviceFirmwareUpdateStatus',
       {},
       {
         timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
@@ -482,7 +432,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const failedTarget = statusTargets.find(
       target =>
         expectedTargetIds.has(target.target_id) &&
-        target.status === PROTOCOL_V2_TARGET_STATUS_FAILED
+        target.status >= PROTOCOL_V2_TARGET_STATUS_FAILED_MIN
     );
     if (failedTarget) {
       throw ERRORS.TypedError(
@@ -503,7 +453,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const inProgressTarget = statusTargets.find(
       target =>
         expectedTargetIds.has(target.target_id) &&
-        target.status === PROTOCOL_V2_TARGET_STATUS_IN_PROGRESS
+        (target.status === PROTOCOL_V2_TARGET_STATUS_PENDING ||
+          target.status === PROTOCOL_V2_TARGET_STATUS_IN_PROGRESS)
     );
     if (inProgressTarget) {
       this.postProgressMessage(99, 'installingFirmware');
@@ -520,7 +471,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     if (startResponse?.type === 'Success') {
       return;
     }
-    if (startResponse?.type === 'DevFirmwareUpdateStatus') {
+    if (startResponse?.type === 'DeviceFirmwareUpdateStatus') {
       const statusTargets = (startResponse.message.targets ??
         []) as ProtocolV2FirmwareUpdateStatusTarget[];
       if (this.assertProtocolV2TargetStatus(statusTargets, expectedTargetIds)) {
@@ -576,7 +527,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
   private async exitProtocolV2BootloaderToNormal() {
     this.postTipMessage(FirmwareUpdateTipMessage.SwitchFirmwareReconnectDevice);
-    await this.protocolV2Reboot(DevRebootType.Normal);
+    await this.protocolV2Reboot(DeviceRebootType.Normal);
   }
 
   private async waitForProtocolV2FinalFeatures() {
@@ -689,11 +640,15 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         overwrite,
         progress
       );
-      const nextOffset = writeRes.message.processed_byte ?? offset + chunkLength;
+      const processedByte = Number(writeRes.message.processed_byte);
+      const nextOffset =
+        Number.isFinite(processedByte) && processedByte > offset
+          ? processedByte
+          : offset + chunkLength;
       if (nextOffset <= offset || nextOffset > payload.byteLength) {
         throw ERRORS.TypedError(
           HardwareErrorCode.EmmcFileWriteFirmwareError,
-          `invalid processed_byte ${nextOffset} for offset ${offset}`
+          `invalid processed_byte ${writeRes.message.processed_byte} for offset ${offset}`
         );
       }
       offset = nextOffset;
@@ -782,13 +737,13 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     let response: ProtocolV2FirmwareUpdateStartResponse;
     try {
       response = await commands.typedCall(
-        'DevFirmwareUpdate',
+        'DeviceFirmwareUpdate',
         PROTOCOL_V2_FIRMWARE_UPDATE_RESPONSE_TYPES,
         {
           targets,
         },
         {
-          intermediateTypes: ['DevFirmwareInstallProgress'],
+          intermediateTypes: ['DeviceFirmwareInstallProgress'],
           onIntermediateResponse: (response: { message?: { progress?: number } }) => {
             const progress = Number(response.message?.progress);
             if (Number.isFinite(progress)) {
@@ -798,7 +753,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         }
       );
     } catch (error) {
-      if (isDeviceDisconnectedError(error)) {
+      if (isProtocolV2DeviceDisconnectedError(error)) {
         Log.log('Rebooting device');
       } else {
         throw error;
@@ -808,15 +763,15 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return response;
   }
 
-  private async protocolV2Reboot(rebootType: DevRebootType) {
+  private async protocolV2Reboot(rebootType: DeviceRebootType) {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
     try {
-      const res = await typedCall('DevReboot', 'Success', {
+      const res = await typedCall('DeviceReboot', 'Success', {
         reboot_type: rebootType,
       });
       return res.message;
     } catch (error) {
-      if (isDeviceDisconnectedError(error) || isProtocolV2ReconnectProbeError(error)) {
+      if (isProtocolV2DeviceDisconnectedError(error) || isProtocolV2ReconnectProbeError(error)) {
         return { message: 'Device rebooted successfully' };
       }
       throw error;
@@ -827,6 +782,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     if (!error) {
       return '';
     }
-    return getUnknownErrorText(error);
+    return getProtocolV2UnknownErrorText(error);
   }
 }
