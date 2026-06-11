@@ -29,7 +29,7 @@ export default class DeviceFirmwareUpdate extends BaseMethod<DeviceFirmwareUpdat
     const targets = normalizeFirmwareTargets(this.params);
     try {
       const res = await this.device.commands.typedCall(
-        'DeviceFirmwareUpdate',
+        'DevFirmwareUpdate',
         PROTOCOL_V2_FIRMWARE_UPDATE_RESPONSE_TYPES,
         {
           targets,
@@ -37,7 +37,7 @@ export default class DeviceFirmwareUpdate extends BaseMethod<DeviceFirmwareUpdat
         {
           ...PROTOCOL_V2_FIRMWARE_UPDATE_OPTIONS,
           onIntermediateResponse: (response: MessageFromOneKey) => {
-            if (response.type !== 'DeviceFirmwareInstallProgress') return;
+            if (response.type !== 'DevFirmwareInstallProgress') return;
             const progress = Number(response.message?.progress);
             if (!Number.isFinite(progress)) return;
             this.postMessage(

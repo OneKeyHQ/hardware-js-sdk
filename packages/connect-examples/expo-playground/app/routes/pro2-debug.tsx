@@ -23,7 +23,9 @@ const PRO2_METHOD_GROUPS = [
       'getProtoVersion',
       'ping',
       'getDeviceInfo',
+      'devGetDeviceInfo',
       'deviceGetOnboardingStatus',
+      'devReboot',
       'deviceReboot',
       'factoryGetDeviceInfo',
       'factoryDeviceInfoSettings',
@@ -33,7 +35,12 @@ const PRO2_METHOD_GROUPS = [
     id: 'firmware',
     title: 'Firmware',
     icon: Zap,
-    methods: ['deviceFirmwareUpdate', 'deviceGetFirmwareUpdateStatus'],
+    methods: [
+      'devFirmwareUpdate',
+      'devGetFirmwareUpdateStatus',
+      'deviceFirmwareUpdate',
+      'deviceGetFirmwareUpdateStatus',
+    ],
   },
   {
     id: 'filesystemAliases',
@@ -66,12 +73,16 @@ const PRO2_METHOD_LABELS: Record<string, string> = {
   getProtoVersion: 'Proto Version',
   ping: 'Ping',
   getDeviceInfo: 'Device Info',
+  devGetDeviceInfo: 'Dev Info',
+  devReboot: 'Dev Reboot',
   deviceReboot: 'Reboot',
   deviceGetOnboardingStatus: 'Onboarding',
   factoryGetDeviceInfo: 'Factory Info',
   factoryDeviceInfoSettings: 'Factory Settings',
   deviceFirmwareUpdate: 'FW Update',
   deviceGetFirmwareUpdateStatus: 'FW Status',
+  devFirmwareUpdate: 'Dev FW Update',
+  devGetFirmwareUpdateStatus: 'Dev FW Status',
   pathInfo: 'Path Info',
   dirList: 'Dir List',
   dirMake: 'Dir Make',
@@ -124,6 +135,20 @@ const PRO2_METHOD_WIRE_INFO: Record<string, MethodWireInfo> = {
     rxPayload: PRO2_DYNAMIC_RESPONSE,
     decoded: 'DeviceProfile',
   },
+  devGetDeviceInfo: {
+    tx: '60600 (DevGetDeviceInfo)',
+    txPayload: PRO2_DYNAMIC_PAYLOAD,
+    rx: '60601 (DeviceInfo)',
+    rxPayload: PRO2_DYNAMIC_RESPONSE,
+    decoded: 'DeviceProfile',
+  },
+  devReboot: {
+    tx: '60400 (DevReboot)',
+    txPayload: PRO2_DYNAMIC_PAYLOAD,
+    rx: '60207 (Success)',
+    rxPayload: PRO2_DYNAMIC_RESPONSE,
+    decoded: 'Success.message',
+  },
   deviceReboot: {
     tx: '60400 (DeviceReboot)',
     txPayload: PRO2_DYNAMIC_PAYLOAD,
@@ -153,18 +178,32 @@ const PRO2_METHOD_WIRE_INFO: Record<string, MethodWireInfo> = {
     decoded: 'Success.message',
   },
   deviceFirmwareUpdate: {
-    tx: '61000 (DeviceFirmwareUpdate)',
+    tx: '61000 (DeviceFirmwareUpdate alias -> DevFirmwareUpdate)',
     txPayload: PRO2_DYNAMIC_PAYLOAD,
-    rx: '61001 (DeviceFirmwareInstallProgress) / 61003 (DeviceFirmwareUpdateStatus) / 60207 (Success)',
+    rx: '61001 (DevFirmwareInstallProgress) / 61003 (DevFirmwareUpdateStatus) / 60207 (Success)',
     rxPayload: PRO2_DYNAMIC_RESPONSE,
-    decoded: 'Progress / DeviceFirmwareUpdateStatus / Success',
+    decoded: 'Progress / DevFirmwareUpdateStatus / Success',
   },
   deviceGetFirmwareUpdateStatus: {
-    tx: '61002 (DeviceGetFirmwareUpdateStatus)',
+    tx: '61002 (DeviceGetFirmwareUpdateStatus alias -> DevGetFirmwareUpdateStatus)',
     txPayload: '4a ee',
-    rx: '61003 (DeviceFirmwareUpdateStatus)',
+    rx: '61003 (DevFirmwareUpdateStatus)',
     rxPayload: PRO2_DYNAMIC_RESPONSE,
-    decoded: 'DeviceFirmwareUpdateStatus',
+    decoded: 'DevFirmwareUpdateStatus',
+  },
+  devFirmwareUpdate: {
+    tx: '61000 (DevFirmwareUpdate)',
+    txPayload: PRO2_DYNAMIC_PAYLOAD,
+    rx: '61001 (DevFirmwareInstallProgress) / 61003 (DevFirmwareUpdateStatus) / 60207 (Success)',
+    rxPayload: PRO2_DYNAMIC_RESPONSE,
+    decoded: 'Progress / DevFirmwareUpdateStatus / Success',
+  },
+  devGetFirmwareUpdateStatus: {
+    tx: '61002 (DevGetFirmwareUpdateStatus)',
+    txPayload: '4a ee',
+    rx: '61003 (DevFirmwareUpdateStatus)',
+    rxPayload: PRO2_DYNAMIC_RESPONSE,
+    decoded: 'DevFirmwareUpdateStatus',
   },
   filesystemFixPermission: {
     tx: '60800 (FilesystemFixPermission)',
@@ -284,6 +323,10 @@ function isFileWriteMethod(method: string) {
   return method === 'filesystemFileWrite';
 }
 
+function isCurrentSubmoduleMethod(method: string) {
+  return method.startsWith('dev') || method === 'getDeviceInfo';
+}
+
 function getDataSummary(data: unknown) {
   if (typeof Blob !== 'undefined' && data instanceof Blob) {
     const name = 'name' in data && typeof data.name === 'string' ? data.name : 'Blob';
@@ -346,6 +389,11 @@ function ProtocolDebugPanel({
           <span className="rounded-full border border-primary/30 px-2.5 py-1 text-xs text-primary">
             Protocol V2
           </span>
+          {isCurrentSubmoduleMethod(method.method) ? (
+            <span className="rounded-full border border-emerald-500/30 px-2.5 py-1 text-xs text-emerald-600">
+              current submodule
+            </span>
+          ) : null}
           <span className="rounded-full border border-primary/30 px-2.5 py-1 text-xs text-primary">
             vol0 defaults
           </span>

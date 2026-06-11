@@ -162,6 +162,13 @@ export const createCoreApi = (
     call({ ...params, connectId, method: 'deviceFirmwareUpdate' }),
   deviceGetFirmwareUpdateStatus: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceGetFirmwareUpdateStatus' }),
+  devReboot: (connectId, params) => call({ ...params, connectId, method: 'devReboot' }),
+  devGetDeviceInfo: (connectId, params) =>
+    call({ ...params, connectId, method: 'devGetDeviceInfo' }),
+  devFirmwareUpdate: (connectId, params) =>
+    call({ ...params, connectId, method: 'devFirmwareUpdate' }),
+  devGetFirmwareUpdateStatus: (connectId, params) =>
+    call({ ...params, connectId, method: 'devGetFirmwareUpdateStatus' }),
   factoryDeviceInfoSettings: (connectId, params) =>
     call({ ...params, connectId, method: 'factoryDeviceInfoSettings' }),
   factoryGetDeviceInfo: connectId => call({ connectId, method: 'factoryGetDeviceInfo' }),

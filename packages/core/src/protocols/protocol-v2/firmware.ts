@@ -1,22 +1,31 @@
-import { DeviceFirmwareTargetType } from '@onekeyfe/hd-transport';
-
 /**
- * 兼容别名：复用 hd-transport 生成的 DeviceFirmwareTargetType
- * （来源 firmware-pro2 messages_device.proto 的 FwMgmtTarget_t），
- * 不再维护手写副本。
+ * 当前 firmware-pro2 子模块的 DevFirmwareTargetType。
+ *
+ * 注意：仓库里的 hd-transport 生成物暂时仍带旧 target 名称；这里显式按
+ * submodules/firmware-pro2/sys/protobuf/onekey_protocol/latest/messages_device.proto
+ * 对齐当前子模块，避免运行时取到 undefined。
  */
-export const ProtocolV2FirmwareTargetType = DeviceFirmwareTargetType;
+export const ProtocolV2FirmwareTargetType = {
+  TARGET_MAIN_APP: 0,
+  TARGET_MAIN_BOOT: 1,
+  TARGET_BT: 2,
+  TARGET_SE1: 3,
+  TARGET_SE2: 4,
+  TARGET_SE3: 5,
+  TARGET_SE4: 6,
+  TARGET_RESOURCE: 10,
+} as const;
+
+export type ProtocolV2FirmwareTargetType =
+  (typeof ProtocolV2FirmwareTargetType)[keyof typeof ProtocolV2FirmwareTargetType];
 
 /**
  * Map Protocol V2 firmware file name to DevFirmwareUpdate target_id.
  */
-export function protocolV2FileNameToTargetId(fileName: string): DeviceFirmwareTargetType {
+export function protocolV2FileNameToTargetId(fileName: string): ProtocolV2FirmwareTargetType {
   const normalized = fileName.toLowerCase();
-  if (normalized.includes('romloader')) {
-    return DeviceFirmwareTargetType.TARGET_ROMLOADER;
-  }
   if (normalized.includes('bootloader') || normalized.includes('update_rom')) {
-    return DeviceFirmwareTargetType.TARGET_BOOTLOADER;
+    return ProtocolV2FirmwareTargetType.TARGET_MAIN_BOOT;
   }
   if (
     normalized.includes('coprocessor') ||
@@ -24,12 +33,11 @@ export function protocolV2FileNameToTargetId(fileName: string): DeviceFirmwareTa
     normalized.includes('bluetooth') ||
     normalized.includes('bt')
   ) {
-    return DeviceFirmwareTargetType.TARGET_COPROCESSOR;
+    return ProtocolV2FirmwareTargetType.TARGET_BT;
   }
-  if (normalized.includes('se4')) return DeviceFirmwareTargetType.TARGET_SE04;
-  if (normalized.includes('se3')) return DeviceFirmwareTargetType.TARGET_SE03;
-  if (normalized.includes('se2')) return DeviceFirmwareTargetType.TARGET_SE02;
-  if (normalized.includes('se')) return DeviceFirmwareTargetType.TARGET_SE01;
-  if (normalized.includes('p2')) return DeviceFirmwareTargetType.TARGET_APPLICATION_P2;
-  return DeviceFirmwareTargetType.TARGET_APPLICATION_P1;
+  if (normalized.includes('se4')) return ProtocolV2FirmwareTargetType.TARGET_SE4;
+  if (normalized.includes('se3')) return ProtocolV2FirmwareTargetType.TARGET_SE3;
+  if (normalized.includes('se2')) return ProtocolV2FirmwareTargetType.TARGET_SE2;
+  if (normalized.includes('se')) return ProtocolV2FirmwareTargetType.TARGET_SE1;
+  return ProtocolV2FirmwareTargetType.TARGET_MAIN_APP;
 }

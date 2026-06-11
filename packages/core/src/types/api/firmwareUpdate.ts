@@ -66,17 +66,17 @@ export interface FirmwareUpdateV4Params {
   chunkSize?: number;
   firmwareType?: EFirmwareType;
 
-  /** TARGET_ROMLOADER = 1 */
+  /** TARGET_MAIN_BOOT = 1 */
   romloaderBinary?: ArrayBuffer;
-  /** TARGET_BOOTLOADER = 2 */
+  /** TARGET_MAIN_BOOT = 1 */
   bootloaderBinary?: ArrayBuffer;
-  /** TARGET_APPLICATION_P1 = 3 */
+  /** TARGET_MAIN_APP = 0 */
   applicationP1Binary?: ArrayBuffer;
-  /** TARGET_APPLICATION_P2 = 4 */
+  /** TARGET_MAIN_APP = 0 */
   applicationP2Binary?: ArrayBuffer;
-  /** TARGET_COPROCESSOR = 5（蓝牙协处理器） */
+  /** TARGET_BT = 2 */
   coprocessorBinary?: ArrayBuffer;
-  /** TARGET_SE01-04 = 6-9 */
+  /** TARGET_SE1-4 = 3-6 */
   se01Binary?: ArrayBuffer;
   se02Binary?: ArrayBuffer;
   se03Binary?: ArrayBuffer;

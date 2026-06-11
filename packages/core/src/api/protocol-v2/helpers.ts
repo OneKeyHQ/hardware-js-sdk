@@ -1,17 +1,20 @@
-import {
-  DeviceFirmwareTargetType as DeviceFirmwareTargetTypeEnum,
-  DeviceRebootType,
-} from '@onekeyfe/hd-transport';
+import { DevRebootType, DeviceRebootType } from '@onekeyfe/hd-transport';
 
 import { invalidParameter, validateNonEmptyString } from '../helpers/filesystemValidation';
 
 import type {
-  DeviceFirmwareTarget,
-  DeviceFirmwareTargetType,
+  DevFirmwareTarget,
+  DevFirmwareTargetType,
   TransportCallOptions,
 } from '@onekeyfe/hd-transport';
 
-export type RebootTypeInput = DeviceRebootType | keyof typeof DeviceRebootType | string | number;
+export type RebootTypeInput =
+  | DevRebootType
+  | DeviceRebootType
+  | keyof typeof DevRebootType
+  | keyof typeof DeviceRebootType
+  | string
+  | number;
 
 export type DeviceRebootParams = {
   rebootType?: RebootTypeInput;
@@ -19,17 +22,17 @@ export type DeviceRebootParams = {
 };
 
 export type DeviceFirmwareTargetInput =
-  | DeviceFirmwareTarget
+  | DevFirmwareTarget
   | {
-      targetId?: DeviceFirmwareTargetType | string | number;
-      target_id?: DeviceFirmwareTargetType | string | number;
+      targetId?: DevFirmwareTargetType | string | number;
+      target_id?: DevFirmwareTargetType | string | number;
       path: string;
     };
 
 export type DeviceFirmwareUpdateParams = {
   targets?: DeviceFirmwareTargetInput[];
-  targetId?: DeviceFirmwareTargetType | string | number;
-  target_id?: DeviceFirmwareTargetType | string | number;
+  targetId?: DevFirmwareTargetType | string | number;
+  target_id?: DevFirmwareTargetType | string | number;
   path?: string;
 };
 
@@ -40,6 +43,17 @@ export type FactoryDeviceInfoSettingsParams = {
   cpuInfo?: string;
   pre_firmware?: string;
   preFirmware?: string;
+};
+
+const DEV_REBOOT_TYPES: Record<string, DevRebootType> = {
+  Normal: DevRebootType.Normal,
+  normal: DevRebootType.Normal,
+  Romloader: DevRebootType.Boardloader,
+  romloader: DevRebootType.Boardloader,
+  Boardloader: DevRebootType.Boardloader,
+  boardloader: DevRebootType.Boardloader,
+  Bootloader: DevRebootType.Bootloader,
+  bootloader: DevRebootType.Bootloader,
 };
 
 const DEVICE_REBOOT_TYPES: Record<string, DeviceRebootType> = {
@@ -54,13 +68,13 @@ const DEVICE_REBOOT_TYPES: Record<string, DeviceRebootType> = {
 };
 
 export const PROTOCOL_V2_FIRMWARE_UPDATE_OPTIONS: TransportCallOptions = {
-  intermediateTypes: ['DeviceFirmwareInstallProgress'],
+  intermediateTypes: ['DevFirmwareInstallProgress'],
 };
 
 export const PROTOCOL_V2_FIRMWARE_UPDATE_RESPONSE_TYPES: (
   | 'Success'
-  | 'DeviceFirmwareUpdateStatus'
-)[] = ['Success', 'DeviceFirmwareUpdateStatus'];
+  | 'DevFirmwareUpdateStatus'
+)[] = ['Success', 'DevFirmwareUpdateStatus'];
 
 export const getProtocolV2UnknownErrorText = (error: unknown) => {
   if (!error) {
@@ -119,7 +133,19 @@ export const isProtocolV2DeviceDisconnectedError = (error: unknown) => {
   );
 };
 
-export function normalizeRebootType(value: RebootTypeInput | undefined): DeviceRebootType {
+export function normalizeRebootType(value: RebootTypeInput | undefined): DevRebootType {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) return numeric;
+    if (value in DEV_REBOOT_TYPES) return DEV_REBOOT_TYPES[value];
+  }
+  return DevRebootType.Normal;
+}
+
+export function normalizeDeviceRebootType(
+  value: RebootTypeInput | undefined
+): DeviceRebootType {
   if (typeof value === 'number') return value;
   if (typeof value === 'string') {
     const numeric = Number(value);
@@ -129,17 +155,13 @@ export function normalizeRebootType(value: RebootTypeInput | undefined): DeviceR
   return DeviceRebootType.Normal;
 }
 
-// DevFirmwareTargetType 的合法数值域（数值枚举的反向映射键会被 filter 掉）
-const VALID_FIRMWARE_TARGET_IDS = new Set<number>(
-  Object.values(DeviceFirmwareTargetTypeEnum).filter(
-    (value): value is number => typeof value === 'number'
-  )
-);
+// 当前 firmware-pro2 子模块的 DevFirmwareTargetType 合法值。
+const VALID_FIRMWARE_TARGET_IDS = new Set<number>([0, 1, 2, 3, 4, 5, 6, 10]);
 
 function normalizeTargetId(
-  value: DeviceFirmwareTargetType | string | number | undefined,
+  value: DevFirmwareTargetType | string | number | undefined,
   name: string
-): DeviceFirmwareTargetType {
+): DevFirmwareTargetType {
   if (value === undefined || value === null) {
     throw invalidParameter(`Missing required parameter: ${name}`);
   }
@@ -147,7 +169,7 @@ function normalizeTargetId(
   // 校验值域：仅接受 DevFirmwareTargetType 中定义的 target id，
   // 不再放行任意非负整数。
   if (Number.isSafeInteger(numeric) && VALID_FIRMWARE_TARGET_IDS.has(numeric)) {
-    return numeric;
+    return numeric as DevFirmwareTargetType;
   }
   throw invalidParameter(
     `Parameter [${name}] must be a valid firmware target id (one of ${[
@@ -156,7 +178,7 @@ function normalizeTargetId(
   );
 }
 
-export function normalizeFirmwareTargets(params: DeviceFirmwareUpdateParams): DeviceFirmwareTarget[] {
+export function normalizeFirmwareTargets(params: DeviceFirmwareUpdateParams): DevFirmwareTarget[] {
   const targets =
     params.targets ??
     (params.path

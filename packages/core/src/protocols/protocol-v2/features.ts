@@ -171,7 +171,7 @@ export async function requestProtocolV2DeviceInfo({
   if (protocolV2DeviceInfoMockEnabled) {
     return buildMockProtocolV2DeviceInfo();
   }
-  const { message } = await commands.typedCall('DeviceGetDeviceInfo', 'DeviceInfo', request, {
+  const { message } = await commands.typedCall('DevGetDeviceInfo', 'DeviceInfo', request, {
     timeoutMs,
   });
   // 'DeviceInfo' 在生成类型里是 V1 DeviceInfo | ProtocolV2DeviceInfo 的合并；

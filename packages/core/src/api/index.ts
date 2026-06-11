@@ -50,6 +50,10 @@ export { default as deviceGetDeviceInfo } from './protocol-v2/DeviceGetDeviceInf
 export { default as deviceGetOnboardingStatus } from './protocol-v2/DeviceGetOnboardingStatus';
 export { default as deviceFirmwareUpdate } from './protocol-v2/DeviceFirmwareUpdate';
 export { default as deviceGetFirmwareUpdateStatus } from './protocol-v2/DeviceGetFirmwareUpdateStatus';
+export { default as devReboot } from './protocol-v2/DevReboot';
+export { default as devGetDeviceInfo } from './protocol-v2/DeviceGetDeviceInfo';
+export { default as devFirmwareUpdate } from './protocol-v2/DeviceFirmwareUpdate';
+export { default as devGetFirmwareUpdateStatus } from './protocol-v2/DeviceGetFirmwareUpdateStatus';
 export { default as factoryDeviceInfoSettings } from './protocol-v2/FactoryDeviceInfoSettings';
 export { default as factoryGetDeviceInfo } from './protocol-v2/FactoryGetDeviceInfo';
 export { default as filesystemFixPermission } from './protocol-v2/FilesystemFixPermission';

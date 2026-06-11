@@ -4,6 +4,10 @@ import type {
   deviceGetFirmwareUpdateStatus,
   deviceGetOnboardingStatus,
   deviceReboot,
+  devFirmwareUpdate,
+  devGetDeviceInfo,
+  devGetFirmwareUpdateStatus,
+  devReboot,
   dirList,
   dirMake,
   dirRemove,
@@ -258,6 +262,10 @@ export type CoreApi = {
   deviceGetOnboardingStatus: typeof deviceGetOnboardingStatus;
   deviceFirmwareUpdate: typeof deviceFirmwareUpdate;
   deviceGetFirmwareUpdateStatus: typeof deviceGetFirmwareUpdateStatus;
+  devReboot: typeof devReboot;
+  devGetDeviceInfo: typeof devGetDeviceInfo;
+  devFirmwareUpdate: typeof devFirmwareUpdate;
+  devGetFirmwareUpdateStatus: typeof devGetFirmwareUpdateStatus;
   factoryDeviceInfoSettings: typeof factoryDeviceInfoSettings;
   factoryGetDeviceInfo: typeof factoryGetDeviceInfo;
   filesystemFixPermission: typeof filesystemFixPermission;

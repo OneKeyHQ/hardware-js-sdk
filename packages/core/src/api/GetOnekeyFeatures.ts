@@ -90,8 +90,8 @@ export default class GetOnekeyFeatures extends BaseMethod {
 
   async run() {
     if (this.device.isProtocolV2()) {
-      // V2 没有 OnekeyGetFeatures 消息，也不缓存 legacy features：
-      // 取完整 DevGetDeviceInfo（含 SE/hash/build_id）后经兼容视图映射。
+      // V2 没有 OnekeyGetFeatures 消息：
+      // 取完整 DevGetDeviceInfo（含 SE/hash/build_id）后写入 features 兼容视图。
       const deviceInfo = await requestProtocolV2DeviceInfo({
         commands: this.device.commands,
         request: PROTOCOL_V2_DEVICE_INFO_REQUEST,
@@ -102,7 +102,8 @@ export default class GetOnekeyFeatures extends BaseMethod {
           sources: ['deviceInfo'],
           scope: 'verify',
           fallbackSerialNo: this.device.originalDescriptor?.path,
-        })
+        }),
+        deviceInfo
       );
       return pickOnekeyFeatures(
         buildProtocolV2GetFeaturesPayload(profile, deviceInfo) as OnekeyFeatures

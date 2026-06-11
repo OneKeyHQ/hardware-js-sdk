@@ -1,6 +1,6 @@
 import { ERRORS, HardwareError, HardwareErrorCode, wait } from '@onekeyfe/hd-shared';
 import {
-  DeviceRebootType,
+  DevRebootType,
   PROTOCOL_V2_BLE_FILE_CHUNK_SIZE,
   PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE,
 } from '@onekeyfe/hd-transport';
@@ -37,10 +37,9 @@ const SESSION_ERROR = 'session not found';
 const PROTOCOL_V2_BOOTLOADER_RECONNECT_TIMEOUT = 60 * 1000;
 const PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT = 5 * 1000;
 const PROTOCOL_V2_INSTALL_TIMEOUT = 5 * 60 * 1000;
-const PROTOCOL_V2_TARGET_STATUS_PENDING = 0;
+const PROTOCOL_V2_TARGET_STATUS_FINISHED = 0;
 const PROTOCOL_V2_TARGET_STATUS_IN_PROGRESS = 1;
-const PROTOCOL_V2_TARGET_STATUS_FINISHED = 2;
-const PROTOCOL_V2_TARGET_STATUS_FAILED_MIN = 3;
+const PROTOCOL_V2_TARGET_STATUS_FAILED = 2;
 const PROTOCOL_V2_CONNECT_PROTOCOL = 'V2';
 const PROTOCOL_V2_FIRMWARE_STAGING_VOLUME = 'vol1:';
 const PROTOCOL_V2_MIN_FILE_CHUNK_SIZE = 64;
@@ -52,7 +51,7 @@ type ProtocolV2FirmwareUpdateStatusTarget = {
 
 type ProtocolV2FirmwareUpdateStartResponse =
   | TypedResponseMessage<'Success'>
-  | TypedResponseMessage<'DeviceFirmwareUpdateStatus'>
+  | TypedResponseMessage<'DevFirmwareUpdateStatus'>
   | undefined;
 
 const isProtocolV2ReconnectProbeError = (error: unknown) => {
@@ -191,6 +190,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       );
     }
 
+    // TODO: 当前 firmware-pro2 子模块的 reboot/bootloader 流程还未稳定，先暂停自动进 bootloader。
+    // await this.enterProtocolV2BootloaderMode();
+
     await this.executeProtocolV2Update({
       resourceBinary,
       fwBinaryMap,
@@ -252,6 +254,41 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return null;
   }
 
+  private isProtocolV2BootloaderMode() {
+    if (typeof this.device.isBootloader === 'function') {
+      return this.device.isBootloader();
+    }
+    const profile = this.device.profile;
+    if (profile?.status?.mode === 'bootloader' || profile?.status?.bootloaderMode === true) {
+      return true;
+    }
+    return !!this.device.features?.bootloader_mode;
+  }
+
+  async enterProtocolV2BootloaderMode() {
+    if (this.isProtocolV2BootloaderMode()) {
+      return false;
+    }
+
+    try {
+      this.postTipMessage(FirmwareUpdateTipMessage.AutoRebootToBootloader);
+      await this.protocolV2Reboot(DevRebootType.Bootloader);
+      this.postTipMessage(FirmwareUpdateTipMessage.GoToBootloaderSuccess);
+      this.checkDeviceToBootloader(this.payload.connectId);
+      await this.checkPromise?.promise;
+      this.checkPromise = null;
+      await wait(1500);
+      await this.device.acquire?.();
+      return true;
+    } catch (error) {
+      if (error instanceof HardwareError) {
+        throw error;
+      }
+      Log.log('Protocol V2 auto go to bootloader mode failed: ', error);
+      throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateAutoEnterBootFailure);
+    }
+  }
+
   /**
    * 收集按 DevFirmwareTargetType 拆分的显式目标二进制。
    * 文件名仅用于 staging 路径展示，target_id 已显式给定。
@@ -265,27 +302,27 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     push(
       this.params.romloaderBinary,
       'romloader.bin',
-      ProtocolV2FirmwareTargetType.TARGET_ROMLOADER
+      ProtocolV2FirmwareTargetType.TARGET_MAIN_BOOT
     );
     push(
       this.params.applicationP1Binary,
       'application_p1.bin',
-      ProtocolV2FirmwareTargetType.TARGET_APPLICATION_P1
+      ProtocolV2FirmwareTargetType.TARGET_MAIN_APP
     );
     push(
       this.params.applicationP2Binary,
       'application_p2.bin',
-      ProtocolV2FirmwareTargetType.TARGET_APPLICATION_P2
+      ProtocolV2FirmwareTargetType.TARGET_MAIN_APP
     );
     push(
       this.params.coprocessorBinary,
       'coprocessor.bin',
-      ProtocolV2FirmwareTargetType.TARGET_COPROCESSOR
+      ProtocolV2FirmwareTargetType.TARGET_BT
     );
-    push(this.params.se01Binary, 'se01.bin', ProtocolV2FirmwareTargetType.TARGET_SE01);
-    push(this.params.se02Binary, 'se02.bin', ProtocolV2FirmwareTargetType.TARGET_SE02);
-    push(this.params.se03Binary, 'se03.bin', ProtocolV2FirmwareTargetType.TARGET_SE03);
-    push(this.params.se04Binary, 'se04.bin', ProtocolV2FirmwareTargetType.TARGET_SE04);
+    push(this.params.se01Binary, 'se01.bin', ProtocolV2FirmwareTargetType.TARGET_SE1);
+    push(this.params.se02Binary, 'se02.bin', ProtocolV2FirmwareTargetType.TARGET_SE2);
+    push(this.params.se03Binary, 'se03.bin', ProtocolV2FirmwareTargetType.TARGET_SE3);
+    push(this.params.se04Binary, 'se04.bin', ProtocolV2FirmwareTargetType.TARGET_SE4);
     return entries;
   }
 
@@ -377,7 +414,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         totalSize,
       });
       targets.push({
-        target_id: ProtocolV2FirmwareTargetType.TARGET_BOOTLOADER,
+        target_id: ProtocolV2FirmwareTargetType.TARGET_MAIN_BOOT,
         path: bootloaderPath,
       });
     }
@@ -396,6 +433,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       });
     }
 
+    if (totalSize > 0) {
+      this.postProgressMessage(100, 'transferData');
+    }
+
     this.postTipMessage(FirmwareUpdateTipMessage.ConfirmOnDevice);
     const startResponse = await this.protocolV2StartFirmwareUpdate({ targets });
     await this.waitForProtocolV2FirmwareUpdateComplete(targets, startResponse);
@@ -404,8 +445,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   private async queryProtocolV2FirmwareUpdateStatus() {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
     return typedCall(
-      'DeviceGetFirmwareUpdateStatus',
-      'DeviceFirmwareUpdateStatus',
+      'DevGetFirmwareUpdateStatus',
+      'DevFirmwareUpdateStatus',
       {},
       {
         timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
@@ -432,7 +473,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const failedTarget = statusTargets.find(
       target =>
         expectedTargetIds.has(target.target_id) &&
-        target.status >= PROTOCOL_V2_TARGET_STATUS_FAILED_MIN
+        target.status === PROTOCOL_V2_TARGET_STATUS_FAILED
     );
     if (failedTarget) {
       throw ERRORS.TypedError(
@@ -453,8 +494,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const inProgressTarget = statusTargets.find(
       target =>
         expectedTargetIds.has(target.target_id) &&
-        (target.status === PROTOCOL_V2_TARGET_STATUS_PENDING ||
-          target.status === PROTOCOL_V2_TARGET_STATUS_IN_PROGRESS)
+        target.status === PROTOCOL_V2_TARGET_STATUS_IN_PROGRESS
     );
     if (inProgressTarget) {
       this.postProgressMessage(99, 'installingFirmware');
@@ -471,7 +511,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     if (startResponse?.type === 'Success') {
       return;
     }
-    if (startResponse?.type === 'DeviceFirmwareUpdateStatus') {
+    if (startResponse?.type === 'DevFirmwareUpdateStatus') {
       const statusTargets = (startResponse.message.targets ??
         []) as ProtocolV2FirmwareUpdateStatusTarget[];
       if (this.assertProtocolV2TargetStatus(statusTargets, expectedTargetIds)) {
@@ -527,7 +567,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
   private async exitProtocolV2BootloaderToNormal() {
     this.postTipMessage(FirmwareUpdateTipMessage.SwitchFirmwareReconnectDevice);
-    await this.protocolV2Reboot(DeviceRebootType.Normal);
+    await this.protocolV2Reboot(DevRebootType.Normal);
   }
 
   private async waitForProtocolV2FinalFeatures() {
@@ -737,13 +777,13 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     let response: ProtocolV2FirmwareUpdateStartResponse;
     try {
       response = await commands.typedCall(
-        'DeviceFirmwareUpdate',
+        'DevFirmwareUpdate',
         PROTOCOL_V2_FIRMWARE_UPDATE_RESPONSE_TYPES,
         {
           targets,
         },
         {
-          intermediateTypes: ['DeviceFirmwareInstallProgress'],
+          intermediateTypes: ['DevFirmwareInstallProgress'],
           onIntermediateResponse: (response: { message?: { progress?: number } }) => {
             const progress = Number(response.message?.progress);
             if (Number.isFinite(progress)) {
@@ -763,10 +803,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return response;
   }
 
-  private async protocolV2Reboot(rebootType: DeviceRebootType) {
+  private async protocolV2Reboot(rebootType: DevRebootType) {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
     try {
-      const res = await typedCall('DeviceReboot', 'Success', {
+      const res = await typedCall('DevReboot', 'Success', {
         reboot_type: rebootType,
       });
       return res.message;

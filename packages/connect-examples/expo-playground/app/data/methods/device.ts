@@ -154,6 +154,49 @@ const api: UnifiedMethodConfig[] = [
     ],
   },
   {
+    method: 'devGetDeviceInfo',
+    description: 'Protocol V2 current submodule DevGetDeviceInfo',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'Basic',
+        description: 'hw / fw / bt / status with version + specific',
+        parameters: [
+          { name: 'targets.hw', type: 'boolean', label: 'Target: hw', value: true },
+          { name: 'targets.fw', type: 'boolean', label: 'Target: fw', value: true },
+          { name: 'targets.bt', type: 'boolean', label: 'Target: bt', value: true },
+          { name: 'targets.se1', type: 'boolean', label: 'Target: se1', value: false },
+          { name: 'targets.se2', type: 'boolean', label: 'Target: se2', value: false },
+          { name: 'targets.se3', type: 'boolean', label: 'Target: se3', value: false },
+          { name: 'targets.se4', type: 'boolean', label: 'Target: se4', value: false },
+          { name: 'targets.status', type: 'boolean', label: 'Target: status', value: true },
+          { name: 'types.version', type: 'boolean', label: 'Type: version', value: true },
+          { name: 'types.build_id', type: 'boolean', label: 'Type: build_id', value: false },
+          { name: 'types.hash', type: 'boolean', label: 'Type: hash', value: false },
+          { name: 'types.specific', type: 'boolean', label: 'Type: specific', value: true },
+        ],
+      },
+      {
+        title: 'Full',
+        description: 'All targets with all types (incl. SE, build_id, hash)',
+        parameters: [
+          { name: 'targets.hw', type: 'boolean', label: 'Target: hw', value: true },
+          { name: 'targets.fw', type: 'boolean', label: 'Target: fw', value: true },
+          { name: 'targets.bt', type: 'boolean', label: 'Target: bt', value: true },
+          { name: 'targets.se1', type: 'boolean', label: 'Target: se1', value: true },
+          { name: 'targets.se2', type: 'boolean', label: 'Target: se2', value: true },
+          { name: 'targets.se3', type: 'boolean', label: 'Target: se3', value: true },
+          { name: 'targets.se4', type: 'boolean', label: 'Target: se4', value: true },
+          { name: 'targets.status', type: 'boolean', label: 'Target: status', value: true },
+          { name: 'types.version', type: 'boolean', label: 'Type: version', value: true },
+          { name: 'types.build_id', type: 'boolean', label: 'Type: build_id', value: true },
+          { name: 'types.hash', type: 'boolean', label: 'Type: hash', value: true },
+          { name: 'types.specific', type: 'boolean', label: 'Type: specific', value: true },
+        ],
+      },
+    ],
+  },
+  {
     method: 'deviceGetOnboardingStatus',
     description: 'methodDescriptions.deviceGetOnboardingStatus',
     noDeviceIdReq: true,
@@ -162,6 +205,64 @@ const api: UnifiedMethodConfig[] = [
   {
     method: 'deviceReboot',
     description: 'methodDescriptions.deviceReboot',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'Normal reboot',
+        parameters: [
+          {
+            name: 'rebootType',
+            type: 'select',
+            required: true,
+            label: 'Reboot Type',
+            options: [
+              { label: 'Normal', value: '0' },
+              { label: 'Romloader', value: '1' },
+              { label: 'Bootloader', value: '2' },
+            ],
+            value: '0',
+          },
+        ],
+      },
+      {
+        title: 'Reboot to romloader',
+        parameters: [
+          {
+            name: 'rebootType',
+            type: 'select',
+            required: true,
+            label: 'Reboot Type',
+            options: [
+              { label: 'Normal', value: '0' },
+              { label: 'Romloader', value: '1' },
+              { label: 'Bootloader', value: '2' },
+            ],
+            value: '1',
+          },
+        ],
+      },
+      {
+        title: 'Reboot to bootloader',
+        parameters: [
+          {
+            name: 'rebootType',
+            type: 'select',
+            required: true,
+            label: 'Reboot Type',
+            options: [
+              { label: 'Normal', value: '0' },
+              { label: 'Romloader', value: '1' },
+              { label: 'Bootloader', value: '2' },
+            ],
+            value: '2',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'devReboot',
+    description: 'Protocol V2 current submodule DevReboot',
     noDeviceIdReq: true,
     presets: [
       {

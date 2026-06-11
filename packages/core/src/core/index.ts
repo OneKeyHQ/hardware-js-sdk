@@ -434,7 +434,7 @@ const onCallDevice = async (
 
       // 故障批次检测与远端强制升级门禁基于 V1 features/remote config，
       // Pro2(V2) 暂不参与：profile 版的 firmwareStatus 需要 DataManager 支持后再接入。
-      if (device.features) {
+      if (device.features && !device.isProtocolV2()) {
         await DataManager.checkAndReloadData();
 
         // 检测故障固件设备
@@ -553,7 +553,7 @@ const onCallDevice = async (
       method.checkDeviceSupportFeature();
 
       // reconfigure messages
-      if (_deviceList && device.features) {
+      if (_deviceList && device.features && !device.isProtocolV2()) {
         await TransportManager.reconfigure(device.features);
       }
 

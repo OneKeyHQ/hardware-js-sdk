@@ -68,7 +68,11 @@ import type {
 } from '../events';
 import type { PassphrasePromptResponse } from './DeviceCommands';
 import type { Deferred, HardwareConnectProtocol } from '@onekeyfe/hd-shared';
-import type { OneKeyDeviceInfo as DeviceDescriptor, Success } from '@onekeyfe/hd-transport';
+import type {
+  OneKeyDeviceInfo as DeviceDescriptor,
+  ProtocolV2DeviceInfo,
+  Success,
+} from '@onekeyfe/hd-transport';
 import type DeviceConnector from './DeviceConnector';
 import type { DeviceProfile } from '../types/api/getDeviceInfo';
 
@@ -192,22 +196,39 @@ export class Device extends EventEmitter {
   private deviceAcquired = false;
 
   /**
-   * Protocol V1 原生 Features 缓存。
+   * 唯一设备状态缓存。
    *
-   * SDK 内部标准设备模型是 profile；features 只作为 V1 原始状态和
-   * getFeatures() legacy API 的兼容数据使用。Protocol V2 不缓存这里。
+   * V1 直接保存原生 Features；V2 保存由 DevGetDeviceInfo/profile 映射出的
+   * legacy Features 兼容视图。profile 作为结构化视图按需由 features 派生，
+   * 不再单独维护第二份缓存。
    */
   features: Features | undefined = undefined;
 
-  /**
-   * SDK 标准设备模型
-   */
-  profile: DeviceProfile | undefined = undefined;
+  private getFeaturesProfile(): DeviceProfile | undefined {
+    if (!this.features) return undefined;
+    const protocol = this.originalDescriptor.protocolType === 'V2' ? 'V2' : 'V1';
+    return buildProfileFromProtocolV1({
+      protocol,
+      features: this.features,
+      onekeyFeatures: this.features as Parameters<typeof buildProfileFromProtocolV1>[0]['onekeyFeatures'],
+      sources: ['features'],
+      scope: 'verify',
+    });
+  }
+
+  get profile(): DeviceProfile | undefined {
+    return this.getFeaturesProfile();
+  }
+
+  set profile(profile: DeviceProfile | undefined) {
+    this.updateProfile(profile);
+  }
 
   /**
    * 是否需要更新设备信息。
    *
-   * 历史名称保留用于兼容现有调用语义；对 V2 表示 profile 需要刷新。
+   * 历史名称保留用于兼容现有调用语义；对 V2 表示 features 需要由
+   * DevGetDeviceInfo 刷新。
    */
   featuresNeedsReload = false;
 
@@ -273,12 +294,7 @@ export class Device extends EventEmitter {
     const serialNo = this.getCurrentSerialNo();
     const deviceId = this.getCurrentDeviceId() || null;
 
-    // V2 设备不缓存 legacy features；DEVICE.FEATURES 等事件消费方
-    // 仍依赖 features 字段，这里用 profile 生成兼容视图填充。
-    const features =
-      this.isProtocolV2() && this.profile
-        ? fixFeaturesFirmwareVersion(buildProtocolV2GetFeaturesPayload(this.profile))
-        : this.features;
+    const features = this.features;
 
     return {
       /** Android uses Mac address, iOS uses uuid, USB uses uuid  */
@@ -492,14 +508,12 @@ export class Device extends EventEmitter {
   /**
    * 唯一协议判别器。
    *
-   * profile 是连接后探测出的最可信结果，优先于 descriptor 上的 transport 提示；
-   * descriptor.protocolType 兜底（profile 建立前，例如 initialize 之前）。
+   * descriptor.protocolType 是协议探测后的结果；V2 features 由 DevGetDeviceInfo
+   * 映射产生，profile 只是 features 的结构化视图。
    * 全 SDK 的协议分支都必须走这里，不要直接读 originalDescriptor.protocolType
    * 或 profile.protocol。
    */
   getProtocol(): 'V1' | 'V2' {
-    if (this.profile?.protocol === 'V2') return 'V2';
-    if (this.profile?.protocol === 'V1') return 'V1';
     return this.originalDescriptor.protocolType === 'V2' ? 'V2' : 'V1';
   }
 
@@ -807,8 +821,8 @@ export class Device extends EventEmitter {
   /**
    * Device initialization over Protocol V2.
    *
-   * Protocol V2 不走传统 Initialize/GetFeatures，只建立标准 DeviceProfile。
-   * legacy Features 只在 getFeatures() 兼容出口临时生成。
+   * Protocol V2 不走传统 Initialize/GetFeatures；DeviceProfile 作为标准模型，
+   * 同时维护一份由 profile/deviceInfo 适配出的 legacy Features，兼容旧方法内部判断。
    */
   private async _initializeProtocolV2() {
     Log.debug('Initialize device via Protocol V2 profile adapter');
@@ -828,7 +842,8 @@ export class Device extends EventEmitter {
           sources: ['deviceInfo'],
           scope: 'basic',
           fallbackSerialNo: this.originalDescriptor?.path,
-        })
+        }),
+        deviceInfo
       );
       Log.debug('Protocol V2 profile:', profile);
       this.featuresNeedsReload = false;
@@ -858,7 +873,8 @@ export class Device extends EventEmitter {
           sources: ['deviceInfo'],
           scope: 'basic',
           fallbackSerialNo: this.originalDescriptor?.path,
-        })
+        }),
+        deviceInfo
       );
       Log.debug('Protocol V2 profile (status refresh):', profile);
     } catch (error) {
@@ -878,9 +894,10 @@ export class Device extends EventEmitter {
           sources: ['deviceInfo'],
           scope: 'basic',
           fallbackSerialNo: this.originalDescriptor?.path,
-        })
+        }),
+        deviceInfo
       );
-      return fixFeaturesFirmwareVersion(buildProtocolV2GetFeaturesPayload(profile, deviceInfo));
+      return this.features ?? this.updateProtocolV2Features(profile, deviceInfo);
     }
 
     const { message } = await this.commands.typedCall('GetFeatures', 'Features', {});
@@ -914,7 +931,17 @@ export class Device extends EventEmitter {
   }
 
   updateProfile(profile: DeviceProfile | undefined) {
-    this.profile = profile;
+    if (!profile) {
+      this.features = undefined;
+      return;
+    }
+    if (profile.protocol === 'V2') {
+      this.updateProtocolV2Features(profile, profile.raw?.protocolV2DeviceInfo);
+      return;
+    }
+    if (profile.raw?.features) {
+      this.features = fixFeaturesFirmwareVersion(profile.raw.features);
+    }
   }
 
   /**
@@ -923,10 +950,16 @@ export class Device extends EventEmitter {
    * basic 范围的刷新（initialize / getFeatures）拿不到 SE 版本和 verify 数据，
    * 不能整体替换掉 getDeviceInfo(scope:'verify'|'full') 建立的完整 profile。
    */
-  applyProfileUpdate(next: DeviceProfile): DeviceProfile {
+  applyProfileUpdate(next: DeviceProfile, deviceInfo?: ProtocolV2DeviceInfo): DeviceProfile {
     const prev = this.profile;
     if (!prev || prev.protocol !== next.protocol) {
-      this.updateProfile(next);
+      this.updateProfile({
+        ...next,
+        raw: {
+          ...next.raw,
+          ...(deviceInfo ? { protocolV2DeviceInfo: deviceInfo } : {}),
+        },
+      });
       return next;
     }
 
@@ -942,10 +975,22 @@ export class Device extends EventEmitter {
       ...next,
       versions,
       verify: next.verify ?? prev.verify,
-      raw: next.raw ?? prev.raw,
+      raw: {
+        ...prev.raw,
+        ...next.raw,
+        ...(deviceInfo ? { protocolV2DeviceInfo: deviceInfo } : {}),
+      },
     };
     this.updateProfile(merged);
     return merged;
+  }
+
+  private updateProtocolV2Features(profile: DeviceProfile, deviceInfo?: ProtocolV2DeviceInfo) {
+    const features = fixFeaturesFirmwareVersion(
+      buildProtocolV2GetFeaturesPayload(profile, deviceInfo)
+    );
+    this._updateFeatures(features);
+    return features;
   }
 
   /**
