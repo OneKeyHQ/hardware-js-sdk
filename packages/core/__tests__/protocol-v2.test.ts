@@ -842,8 +842,10 @@ describe('Protocol V2 feature adapter', () => {
 
     expect(result).toMatchObject({
       protocol: 'V2',
-      deviceId: '',
-      serialNo: '',
+      // 身份字段不得取自 legacy features（LEGACY-ID / LEGACY-SERIAL）；
+      // hw.serial_no 缺失时回退 descriptor.path（早期工程板无 serial 的 mock 身份）。
+      deviceId: 'usb-path',
+      serialNo: 'usb-path',
       label: null,
       bleName: null,
       status: {
@@ -1121,20 +1123,34 @@ describe('Protocol V2 feature adapter', () => {
     expect(message).not.toHaveProperty('label');
   });
 
-  test('reuses cached Protocol V2 features after the first initialization', async () => {
+  test('refreshes cached Protocol V2 profile with a lightweight status request on later runs', async () => {
     const device = Device.fromDescriptor({
       path: 'usb-path',
       protocolType: 'V2',
     } as any);
-    const typedCall = jest.fn().mockResolvedValueOnce({
-      type: 'DeviceInfo',
-      message: {
-        hw: { serial_no: 'PR2SERIAL' },
-        status: {
-          passphrase_protection: true,
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce({
+        type: 'DeviceInfo',
+        message: {
+          hw: { serial_no: 'PR2SERIAL' },
+          fw: { app: { version: '1.2.3' } },
+          status: {
+            passphrase_protection: true,
+          },
         },
-      },
-    });
+      })
+      // 第二次 run 的轻量 status 刷新：设备端 label / init_states 等可能已变化
+      .mockResolvedValueOnce({
+        type: 'DeviceInfo',
+        message: {
+          hw: { serial_no: 'PR2SERIAL' },
+          status: {
+            passphrase_protection: false,
+            label: 'renamed',
+          },
+        },
+      });
 
     (device as any).commands = { typedCall };
 
@@ -1143,8 +1159,12 @@ describe('Protocol V2 feature adapter', () => {
 
     expect(device.features).toBeUndefined();
     expect(device.profile?.deviceId).toBe('PR2SERIAL');
-    expect(device.profile?.status.passphraseProtection).toBe(true);
-    expect(typedCall).toHaveBeenCalledTimes(1);
+    // status 字段被第二次刷新更新
+    expect(device.profile?.status.passphraseProtection).toBe(false);
+    expect(device.profile?.label).toBe('renamed');
+    // 轻量刷新不含 fw target，已有版本信息按字段级合并保留
+    expect(device.profile?.versions.firmware).toBe('1.2.3');
+    expect(typedCall).toHaveBeenCalledTimes(2);
     expect(typedCall).toHaveBeenNthCalledWith(
       1,
       'DevGetDeviceInfo',
@@ -1153,6 +1173,26 @@ describe('Protocol V2 feature adapter', () => {
         targets: {
           hw: true,
           fw: true,
+          bt: true,
+          status: true,
+        },
+        types: {
+          version: true,
+          specific: true,
+        },
+      },
+      {
+        timeoutMs: PROTOCOL_V2_DEVICE_INFO_TIMEOUT_MS,
+      }
+    );
+    // 第二次为 status-only 轻量请求（hw/bt 仅用于身份字段，避免顶层覆盖清空）
+    expect(typedCall).toHaveBeenNthCalledWith(
+      2,
+      'DevGetDeviceInfo',
+      'DeviceInfo',
+      {
+        targets: {
+          hw: true,
           bt: true,
           status: true,
         },

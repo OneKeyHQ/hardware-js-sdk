@@ -101,6 +101,7 @@ export default class GetOnekeyFeatures extends BaseMethod {
           deviceInfo,
           sources: ['deviceInfo'],
           scope: 'verify',
+          fallbackSerialNo: this.device.originalDescriptor?.path,
         })
       );
       return pickOnekeyFeatures(

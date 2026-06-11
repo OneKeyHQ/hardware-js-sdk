@@ -32,9 +32,9 @@ import { generateInstanceId } from '../utils/tracing';
 // eslint-disable-next-line import/no-cycle
 import { DeviceCommands } from './DeviceCommands';
 import {
+  type DeviceFirmwareRange,
   DeviceModelToTypes,
   DeviceTypeToModels,
-  type DeviceFirmwareRange,
   type Device as DeviceTyped,
   EOneKeyDeviceMode,
   type Features,
@@ -50,7 +50,10 @@ import { DataManager } from '../data-manager';
 import TransportManager from '../data-manager/TransportManager';
 import { toHardened } from '../api/helpers/pathUtils';
 import { existCapability } from '../utils/capabilitieUtils';
-import { requestProtocolV2DeviceInfo } from '../protocols/protocol-v2/features';
+import {
+  PROTOCOL_V2_STATUS_DEVICE_INFO_REQUEST,
+  requestProtocolV2DeviceInfo,
+} from '../protocols/protocol-v2/features';
 import {
   buildProfileFromProtocolV1,
   buildProfileFromProtocolV2,
@@ -270,6 +273,13 @@ export class Device extends EventEmitter {
     const serialNo = this.getCurrentSerialNo();
     const deviceId = this.getCurrentDeviceId() || null;
 
+    // V2 设备不缓存 legacy features；DEVICE.FEATURES 等事件消费方
+    // 仍依赖 features 字段，这里用 profile 生成兼容视图填充。
+    const features =
+      this.isProtocolV2() && this.profile
+        ? fixFeaturesFirmwareVersion(buildProtocolV2GetFeaturesPayload(this.profile))
+        : this.features;
+
     return {
       /** Android uses Mac address, iOS uses uuid, USB uses uuid  */
       connectId: DataManager.isBleConnect(env) ? this.mainId || null : serialNo,
@@ -287,7 +297,7 @@ export class Device extends EventEmitter {
       name: bleName || label || `OneKey ${deviceType?.toUpperCase()}`,
       label: label || 'OneKey',
       mode: this.getMode(),
-      features: this.features,
+      features,
       profile: this.profile,
       sessionId: this.features?.session_id ?? null,
       firmwareVersion: this.getFirmwareVersion(),
@@ -338,6 +348,11 @@ export class Device extends EventEmitter {
     try {
       let acquireResult: unknown;
       if (DataManager.isBleConnect(env)) {
+        // forceCleanRunPromise=true（自 e21b83c6 引入，修复 Pro2 BLE 重连）：
+        // acquire 意味着开启一个全新会话，transport 里残留的上一次 runPromise
+        // 必然属于已死亡的会话（如固件升级重启、探测中断），不清理会让新会话的
+        // 调用被旧 promise 卡死。无法在 Device 层面区分“重连恢复”与普通 acquire，
+        // 因此对 BLE acquire 恒清理是有意为之。
         acquireResult = await this.deviceConnector?.acquire(
           this.originalDescriptor.id,
           undefined,
@@ -607,6 +622,13 @@ export class Device extends EventEmitter {
   }
 
   supportModifyHomescreen(): SupportFeatureType {
+    // Pro2 走独立 1.x 版本线，不能套用 Touch/Pro 的 3.4.0 门槛（恒 false 且未来会误判）。
+    // 依据：firmware-pro2 协议 schema（messages-protocol-v2.json）的 ApplySettings
+    // 包含 homescreen 字段，V2 固件从首个版本即支持修改主屏。
+    if (this.isProtocolV2()) {
+      return { support: true };
+    }
+
     if (this.features) return supportModifyHomescreen(this.features);
 
     const deviceType = this.getCurrentDeviceType();
@@ -728,7 +750,11 @@ export class Device extends EventEmitter {
     if (this.isProtocolV2()) {
       this.passphraseState = options?.passphraseState;
       if (this.profile && !this.featuresNeedsReload && !options?.initSession) {
-        Log.debug('Skip Protocol V2 profile adapter; cached profile is available');
+        // 不能直接信任缓存 profile：设备端 wipe / 完成初始化 / 改 label 后
+        // profile 会永久陈旧。每次 run 做一次轻量 status 刷新（不含 fw/SE，
+        // 单帧请求开销很小），用 applyProfileUpdate 字段级合并，
+        // 不会降级已有的 verify / SE versions 数据。
+        await this._refreshProtocolV2Status();
         return;
       }
       await this._initializeProtocolV2();
@@ -788,16 +814,12 @@ export class Device extends EventEmitter {
     Log.debug('Initialize device via Protocol V2 profile adapter');
 
     try {
-      const deviceInfo = await Promise.race([
-        requestProtocolV2DeviceInfo({
-          commands: this.commands,
-        }),
-        new Promise<never>((_, reject) => {
-          setTimeout(() => {
-            reject(ERRORS.TypedError(HardwareErrorCode.DeviceInitializeFailed));
-          }, 10 * 1000);
-        }),
-      ]);
+      // 超时由 requestProtocolV2DeviceInfo 内部的 typedCall timeoutMs（默认 10s）负责，
+      // 不再额外包一层 Promise.race：外层 race 的 timer 不会清理，
+      // 且 reject 后底层调用仍会残留。
+      const deviceInfo = await requestProtocolV2DeviceInfo({
+        commands: this.commands,
+      });
       // 默认请求不含 SE/hash 数据，scope 如实标注为 basic；
       // 完整数据由 getDeviceInfo(scope:'verify'|'full') 获取。
       const profile = this.applyProfileUpdate(
@@ -805,12 +827,42 @@ export class Device extends EventEmitter {
           deviceInfo,
           sources: ['deviceInfo'],
           scope: 'basic',
+          fallbackSerialNo: this.originalDescriptor?.path,
         })
       );
       Log.debug('Protocol V2 profile:', profile);
       this.featuresNeedsReload = false;
     } catch (error) {
       Log.error('Protocol V2 initialization failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Protocol V2 的轻量状态刷新（每次 run 前调用）。
+   *
+   * 请求 hw + bt + status（不含 fw/SE target）：status 提供 init_states / label /
+   * passphrase_protection 等会在设备端变化的字段；hw/bt 提供 serialNo / bleName，
+   * 避免 applyProfileUpdate 的顶层字段覆盖把已有身份字段清空。
+   * versions 为空时按字段级合并保留旧值，verify 数据不会被降级。
+   */
+  private async _refreshProtocolV2Status() {
+    try {
+      const deviceInfo = await requestProtocolV2DeviceInfo({
+        commands: this.commands,
+        request: PROTOCOL_V2_STATUS_DEVICE_INFO_REQUEST,
+      });
+      const profile = this.applyProfileUpdate(
+        buildProfileFromProtocolV2({
+          deviceInfo,
+          sources: ['deviceInfo'],
+          scope: 'basic',
+          fallbackSerialNo: this.originalDescriptor?.path,
+        })
+      );
+      Log.debug('Protocol V2 profile (status refresh):', profile);
+    } catch (error) {
+      Log.error('Protocol V2 status refresh failed:', error);
       throw error;
     }
   }
@@ -825,6 +877,7 @@ export class Device extends EventEmitter {
           deviceInfo,
           sources: ['deviceInfo'],
           scope: 'basic',
+          fallbackSerialNo: this.originalDescriptor?.path,
         })
       );
       return fixFeaturesFirmwareVersion(buildProtocolV2GetFeaturesPayload(profile, deviceInfo));

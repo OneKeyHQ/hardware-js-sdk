@@ -618,6 +618,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           deviceInfo,
           sources: ['deviceInfo'],
           scope: 'versions',
+          fallbackSerialNo: this.device.originalDescriptor?.path,
         });
       } catch (error) {
         lastError = error;

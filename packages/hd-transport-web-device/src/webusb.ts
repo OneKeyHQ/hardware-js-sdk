@@ -90,6 +90,15 @@ export default class WebUsbTransport {
   /** Per-path USB endpoint / interface numbers (discovered from USB descriptors) */
   private deviceEndpoints: Map<string, DeviceEndpoints> = new Map();
 
+  /**
+   * 早期 Pro2 工程板 USB descriptor 没有烧录 serial number。
+   * 为这类设备生成会话内稳定的 mock path（同一 USBDevice 实例复用同一 path），
+   * 避免设备因为空 serial 被发现流程整体丢弃。重新插拔后实例变化，path 会重新生成。
+   */
+  private mockSerialPaths: WeakMap<USBDevice, string> = new WeakMap();
+
+  private mockSerialCounter = 0;
+
   name = 'WebUsbTransport';
 
   stopped = false;
@@ -175,22 +184,40 @@ export default class WebUsbTransport {
   }
 
   /**
+   * 设备 path：正常设备直接用 USB serial number；
+   * 空 serial（早期工程板）回退到会话内稳定的 mock path。
+   */
+  private getDevicePath(device: USBDevice): string {
+    if (typeof device.serialNumber === 'string' && device.serialNumber.length > 0) {
+      return device.serialNumber;
+    }
+    let path = this.mockSerialPaths.get(device);
+    if (!path) {
+      this.mockSerialCounter += 1;
+      path = `mock-serial:${device.vendorId.toString(16)}:${device.productId.toString(16)}:${
+        this.mockSerialCounter
+      }`;
+      this.mockSerialPaths.set(device, path);
+      this.Log?.debug(`[WebUSB] device has no serial number, using mock path: ${path}`);
+    }
+    return path;
+  }
+
+  /**
    * Get list of connected devices
    */
   async getConnectedDevices() {
     if (!this.usb) return [];
 
     const devices = await this.usb.getDevices();
-    const onekeyDevices = devices.filter(dev => {
-      const isOneKey = ONEKEY_WEBUSB_FILTER.some(
+    const onekeyDevices = devices.filter(dev =>
+      ONEKEY_WEBUSB_FILTER.some(
         desc => dev.vendorId === desc.vendorId && dev.productId === desc.productId
-      );
-      const hasSerialNumber = typeof dev.serialNumber === 'string' && dev.serialNumber.length > 0;
-      return isOneKey && hasSerialNumber;
-    });
+      )
+    );
 
     this.deviceList = onekeyDevices.map(device => {
-      const path = device.serialNumber as string;
+      const path = this.getDevicePath(device);
       const protocolHint = inferProtocolHintFromDeviceName(device.productName);
       if (protocolHint) {
         this.deviceProtocolHints.set(path, protocolHint);
@@ -271,33 +298,27 @@ export default class WebUsbTransport {
     }
 
     if (expectedProtocol === 'V2') {
+      // 免探测路径：调用方显式承诺该设备是 V2（例如固件升级重启后的重连场景，
+      // 上层已经探测过协议并通过 expectedProtocol 传回），这里不再重复探测。
       this.deviceProtocol.set(path, 'V2');
       this.Log.debug(`[WebUsbTransport] detectProtocol: path=${path} -> V2 (expected)`);
       return 'V2';
     }
 
-    if (protocolHint === 'V2') {
-      this.deviceProtocol.set(path, 'V2');
-      this.Log.debug(`[WebUsbTransport] detectProtocol: path=${path} -> V2 (hint)`);
-      return 'V2';
-    }
+    // 项目约束：协议判断必须在连接后主动探测，不能依赖设备名/PID/descriptor。
+    // 设备名 hint（如 "Pro 2"）只用于调整探测顺序：hint=V2 时先探 V2、失败回落 V1，
+    // 不能作为最终结论。
+    const probeOrder: ProtocolType[] =
+      protocolHint === 'V2' || this.deviceProtocol.get(path) === 'V2' ? ['V2', 'V1'] : ['V1', 'V2'];
 
-    if (this.deviceProtocol.get(path) === 'V2') {
-      this.deviceProtocol.set(path, 'V2');
-      this.Log.debug(`[WebUsbTransport] detectProtocol: path=${path} -> V2 (cached)`);
-      return 'V2';
-    }
-
-    if (await this.probeProtocolV1(path)) {
-      this.deviceProtocol.set(path, 'V1');
-      this.Log.debug(`[WebUsbTransport] detectProtocol: path=${path} -> V1`);
-      return 'V1';
-    }
-
-    if (await this.probeProtocolV2(path)) {
-      this.deviceProtocol.set(path, 'V2');
-      this.Log.debug(`[WebUsbTransport] detectProtocol: path=${path} -> V2`);
-      return 'V2';
+    for (const protocol of probeOrder) {
+      const detected =
+        protocol === 'V1' ? await this.probeProtocolV1(path) : await this.probeProtocolV2(path);
+      if (detected) {
+        this.deviceProtocol.set(path, protocol);
+        this.Log.debug(`[WebUsbTransport] detectProtocol: path=${path} -> ${protocol}`);
+        return protocol;
+      }
     }
 
     this.deviceProtocol.delete(path);
