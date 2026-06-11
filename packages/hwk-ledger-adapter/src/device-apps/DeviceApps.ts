@@ -188,6 +188,27 @@ export class DeviceApps {
     if (!appName) throw new Error('DeviceApps.install: appName is required');
     debugLog('[DeviceApps] install:', appName);
 
+    // InstallOrUpdateAppsDeviceAction reads device metadata with a hardcoded
+    // forceUpdate:false, so a warm session reuses the cached app list - stale
+    // after apps were installed/uninstalled outside this flow. Force-refresh
+    // first; the install action then reads the fresh cache.
+    const refreshAction = (this._dmk as unknown as DmkExecuteCapable).executeDeviceAction({
+      sessionId: this._sessionId,
+      deviceAction: new this._ledgerKit.GetDeviceMetadataDeviceAction({
+        input: {
+          useSecureChannel: true,
+          forceUpdate: true,
+          unlockTimeout: options?.unlockTimeout,
+        },
+      }),
+    });
+    await deviceActionToPromise(
+      refreshAction,
+      this.onInteraction,
+      INSTALL_TIMEOUT_MS,
+      this.onRegisterCanceller
+    );
+
     // Use InstallOrUpdateAppsDeviceAction (not InstallAppDeviceAction): it runs
     // UPDATE_DEVICE_METADATA → BUILD_INSTALL_PLAN → CHECK_IF_ENOUGH_MEMORY →
     // INSTALL_APPLICATION, so OOM fails fast (zero bytes written) and the refreshed
@@ -263,6 +284,7 @@ export interface LedgerKitModule {
   ListAppsWithMetadataDeviceAction: new (args: { input: unknown }) => unknown;
   ListAppsDeviceAction: new (args: { input: unknown }) => unknown;
   InstallOrUpdateAppsDeviceAction: new (args: { input: unknown }) => unknown;
+  GetDeviceMetadataDeviceAction: new (args: { input: unknown }) => unknown;
   GetOsVersionCommand: new () => unknown;
   isSuccessCommandResult: (result: unknown) => result is { data: GetOsVersionResponse };
 }
