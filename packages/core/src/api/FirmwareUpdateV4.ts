@@ -18,7 +18,6 @@ import {
   protocolV2FileNameToTargetId,
 } from '../protocols/protocol-v2';
 import { requestProtocolV2DeviceInfo } from '../protocols/protocol-v2/features';
-import { buildProfileFromProtocolV2 } from '../deviceProfile';
 import {
   PROTOCOL_V2_FIRMWARE_UPDATE_RESPONSE_TYPES,
   getProtocolV2UnknownErrorText,
@@ -257,10 +256,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   private isProtocolV2BootloaderMode() {
     if (typeof this.device.isBootloader === 'function') {
       return this.device.isBootloader();
-    }
-    const profile = this.device.profile;
-    if (profile?.status?.mode === 'bootloader' || profile?.status?.bootloaderMode === true) {
-      return true;
     }
     return !!this.device.features?.bootloader_mode;
   }
@@ -571,14 +566,14 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   }
 
   private async waitForProtocolV2FinalFeatures() {
-    const profile = await this.waitForProtocolV2ReconnectAndProfile(
+    const features = await this.waitForProtocolV2ReconnectAndFeatures(
       PROTOCOL_V2_BOOTLOADER_RECONNECT_TIMEOUT
     );
-    this.device.updateProfile?.(profile);
 
-    const bootloaderVersion = profile.versions.bootloader ?? '0.0.0';
-    const bleVersion = profile.versions.ble ?? '0.0.0';
-    const firmwareVersion = profile.versions.firmware ?? '0.0.0';
+    const bootloaderVersion =
+      features.onekey_boot_version ?? features.bootloader_version ?? '0.0.0';
+    const bleVersion = features.onekey_ble_version ?? features.ble_ver ?? '0.0.0';
+    const firmwareVersion = features.onekey_firmware_version ?? '0.0.0';
     if (firmwareVersion === '0.0.0') {
       Log.warn(
         'Protocol V2 firmware update finished but app firmware version is still 0.0.0. This is allowed for Pro2 debug BLE-only update flows.'
@@ -592,7 +587,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     };
   }
 
-  private async waitForProtocolV2ReconnectAndProfile(timeout: number) {
+  private async waitForProtocolV2ReconnectAndFeatures(timeout: number) {
     const startTime = Date.now();
     let lastError: unknown;
 
@@ -605,12 +600,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           // 更新完成判定只需要各 target 版本号；scope 与请求内容保持一致
           request: PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST,
         });
-        return buildProfileFromProtocolV2({
-          deviceInfo,
-          sources: ['deviceInfo'],
-          scope: 'versions',
-          fallbackSerialNo: this.device.originalDescriptor?.path,
-        });
+        return this.device.updateProtocolV2Features(deviceInfo);
       } catch (error) {
         lastError = error;
         Log.log('Protocol V2 normal mode not ready, polling Ping: ', error);

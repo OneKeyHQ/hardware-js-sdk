@@ -67,9 +67,7 @@ export const PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST = {
  * 轻量状态刷新请求（每次 run 前使用）。
  *
  * status 提供 init_states / label / passphrase_protection 等会在设备端变化的字段；
- * hw / bt 提供 serialNo / bleName 等身份字段——applyProfileUpdate 对顶层字段是整体
- * 覆盖语义，缺少 hw/bt 会把已有 profile 的身份字段清空。不含 fw/SE targets，
- * 单帧请求开销很小。
+ * hw / bt 提供 serialNo / bleName 等身份字段；不含 fw/SE targets，单帧请求开销很小。
  */
 export const PROTOCOL_V2_STATUS_DEVICE_INFO_REQUEST = {
   targets: {
@@ -125,8 +123,7 @@ export const PROTOCOL_V2_DEVICE_INFO_TIMEOUT_MS = 10 * 1000;
 /**
  * 临时开关（默认开启）：当前 Pro2 测试固件 / 早期工程板尚未实现 DevGetDeviceInfo，
  * 真实调用只会超时失败。开启时跳过 wire 调用，直接返回 mock DeviceInfo；
- * profile 的身份字段（serialNo/deviceId）由 buildProfileFromProtocolV2 的
- * fallbackSerialNo（transport path）兜底。
+ * DevGetDeviceInfo 尚未返回的字段保持为空，不再用 transport path 兜底成设备身份。
  *
  * 固件实现 DevGetDeviceInfo 后：把默认值改回 false（或直接删除开关与 mock）。
  * 注意：开启期间 FirmwareUpdateV4 的“升级完成版本比对”拿到的也是 mock 版本，
@@ -144,7 +141,7 @@ export const isProtocolV2DeviceInfoMockEnabled = () => protocolV2DeviceInfoMockE
 export const buildMockProtocolV2DeviceInfo = (): ProtocolV2DeviceInfo => ({
   protocol_version: 2,
   hw: {
-    // 留空：profile 身份走 fallbackSerialNo（transport path）
+    // 留空：协议未上报时 SDK 不再用 transport path 伪造身份字段
     serial_no: '',
   },
   fw: {

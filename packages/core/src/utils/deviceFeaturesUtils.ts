@@ -123,15 +123,13 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (
 
   // Attach to pin try to fix internal state
   const deviceId = device.getCurrentDeviceId();
-  if (deviceId) {
-    device.updateInternalState(
-      device.getCurrentPassphraseProtection() ?? false,
-      passphraseState,
-      deviceId,
-      newSession,
-      device.features?.session_id
-    );
-  }
+  device.updateInternalState(
+    device.getCurrentPassphraseProtection() ?? false,
+    passphraseState,
+    deviceId,
+    newSession,
+    device.features?.session_id
+  );
 
   return { passphraseState, newSession, unlockedAttachPin };
 };
@@ -155,8 +153,8 @@ export const getPassphraseState = async (
 }> => {
   const { features, commands } = device;
 
-  // 设备尚未建立任何状态（V1 无 features 且无 profile）时无法判定，保持旧的空返回语义
-  if (!features && !device.profile)
+  // 设备尚未建立任何状态时无法判定，保持旧的空返回语义
+  if (!features)
     return { passphraseState: undefined, newSession: undefined, unlockedAttachPin: undefined };
 
   const firmwareVersion = device.getCurrentFirmwareVersionString() ?? '0.0.0';

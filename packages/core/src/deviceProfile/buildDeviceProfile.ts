@@ -42,12 +42,6 @@ type BuildProtocolV2ProfileParams = {
   sources?: DeviceInfoSource[];
   scope?: GetDeviceInfoParams['scope'];
   includeRaw?: boolean;
-  /**
-   * hw.serial_no 为空时的回退身份（通常传 transport 层的 device path）。
-   * 早期 Pro2 工程板没有烧录 serial_no，空 serialNo 会导致设备无法进入
-   * DevicePool 的 devices 字典，后续 getDevice(connectId) 必然失败。
-   */
-  fallbackSerialNo?: string;
 };
 
 const isMeaningfulVersion = (version?: string | null) => Boolean(version && version !== '0.0.0');
@@ -352,10 +346,8 @@ export function buildProfileFromProtocolV2({
   sources = ['deviceInfo'],
   scope = 'basic',
   includeRaw = false,
-  fallbackSerialNo,
 }: BuildProtocolV2ProfileParams): DeviceProfile {
-  // 早期工程板 hw.serial_no 为空串，回退到调用方提供的 transport path（mock 身份）。
-  const serialNo = deviceInfo?.hw?.serial_no || fallbackSerialNo || '';
+  const serialNo = deviceInfo?.hw?.serial_no || '';
   const label = deviceInfo?.status?.label ?? null;
   const bleName = deviceInfo?.bt?.adv_name ?? null;
   const verify = normalizeV2Verify(deviceInfo);
@@ -365,11 +357,9 @@ export function buildProfileFromProtocolV2({
     sources,
     deviceType: EDeviceType.Pro2,
     firmwareType: EFirmwareType.Universal,
-    // Protocol V2 的 DevGetDeviceInfo 没有 device_id 字段（固件 proto 仅提供 hw.serial_no），
-    // 这里只能回退 serialNo。注意语义差异：V1 的 device_id 随擦除/换种子轮换，serialNo 永不变化。
-    // 固件在 DevStatus 暴露 device_id 后，此处必须改为读取它，否则 wipe 后基于 deviceId 的
-    // session 缓存（deviceSessionCache）不会自然失效。
-    deviceId: serialNo,
+    // Protocol V2 的 DevGetDeviceInfo 没有 device_id 字段；serialNo 与 deviceId
+    // 不是等价语义，这里保持空值，避免把稳定硬件序列号误当会随 wipe 轮换的身份。
+    deviceId: '',
     serialNo,
     label,
     bleName,

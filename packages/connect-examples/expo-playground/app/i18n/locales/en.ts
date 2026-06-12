@@ -327,7 +327,7 @@ export const en = {
       deviceReboot: 'Protocol V2 device reboot',
       getDeviceInfo: 'Get unified device info (supports V1 and V2 protocol)',
       deviceGetDeviceInfo:
-        'Raw Protocol V2 DevGetDeviceInfo (no DeviceProfile wrapping, Pro2 only); pick request targets/types via checkboxes',
+        'Raw Protocol V2 DevGetDeviceInfo (returns DeviceInfo, Pro2 only); pick request targets/types via checkboxes',
       deviceGetOnboardingStatus: 'Protocol V2 onboarding status query',
       deviceFirmwareUpdate: 'Protocol V2 firmware install trigger',
       deviceGetFirmwareUpdateStatus: 'Protocol V2 firmware install status query',

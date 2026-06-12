@@ -3,8 +3,7 @@ import { EDeviceType } from '@onekeyfe/hd-shared';
 import { getProtocolV2SeState, getProtocolV2SeType } from '../protocols/protocol-v2/features';
 
 import type { Features } from '../types';
-import type { DeviceProfile } from '../types/api/getDeviceInfo';
-import type { ProtocolV2DeviceInfo } from '@onekeyfe/hd-transport';
+import type { DevFirmwareImageInfo, ProtocolV2DeviceInfo } from '@onekeyfe/hd-transport';
 
 const parseProtocolV2Version = (version?: string | null): [number, number, number] => {
   if (!version) return [0, 0, 0];
@@ -12,22 +11,71 @@ const parseProtocolV2Version = (version?: string | null): [number, number, numbe
   return [major, minor, patch];
 };
 
+const getImageVersion = (image?: DevFirmwareImageInfo | null) => image?.version ?? null;
+
+const bytesToHex = (value: unknown): string | undefined => {
+  if (!value) return undefined;
+  if (typeof value === 'string') return value;
+  if (value instanceof Uint8Array) {
+    return Array.from(value)
+      .map(byte => byte.toString(16).padStart(2, '0'))
+      .join('');
+  }
+  if (Array.isArray(value)) {
+    return value.map(byte => Number(byte).toString(16).padStart(2, '0')).join('');
+  }
+  return undefined;
+};
+
+const getImageBuildId = (image?: DevFirmwareImageInfo | null) => image?.build_id ?? undefined;
+
+const getImageHash = (image?: DevFirmwareImageInfo | null) => bytesToHex(image?.hash);
+
+const firstValue = <T>(...values: Array<T | null | undefined>) =>
+  values.find(value => value !== undefined && value !== null);
+
+const firstVersion = (...versions: Array<string | null | undefined>) =>
+  versions.find(version => Boolean(version && version !== '0.0.0')) ?? undefined;
+
 /**
- * Protocol V2 的 legacy `Features` 兼容视图。
+ * Protocol V2 的 `Features` 视图。
  *
- * SDK 内部标准模型是 DeviceProfile；该函数只为 getFeatures() 等旧 API
- * 临时合成 Features 形状的数据，不应被内部逻辑消费。
- *
- * 注意：以下字段在 V2 协议中没有等价信息，使用保守占位值——
- * bootloader_mode/firmware_present 恒 false、unlocked 恒 false、
- * capabilities 恒空、pin_protection/safety_checks 等恒 null。
- * 内部判断请使用 device.profile / getCurrent* accessor，而不是这些占位值。
+ * 这是 Device 内部唯一缓存状态。字段只来自 DevGetDeviceInfo 或前一次
+ * features 缓存的同名字段级合并；不存在协议等价语义的字段保持 null/空值，
+ * 不再通过 DeviceProfile 或 transport path 做身份兜底。
  */
-export const buildProtocolV2GetFeaturesPayload = (
-  profile: DeviceProfile,
-  deviceInfo?: ProtocolV2DeviceInfo
+export const buildProtocolV2FeaturesPayload = (
+  deviceInfo?: ProtocolV2DeviceInfo,
+  previous?: Features
 ): Features => {
-  const firmwareVersion = profile.versions.firmware;
+  const firmwareVersion = firstVersion(
+    getImageVersion(deviceInfo?.fw?.app),
+    previous?.onekey_firmware_version
+  );
+  const bootloaderVersion = firstVersion(
+    getImageVersion(deviceInfo?.fw?.boot),
+    previous?.onekey_boot_version,
+    previous?.bootloader_version
+  );
+  const boardVersion = firstVersion(
+    getImageVersion(deviceInfo?.fw?.board),
+    previous?.onekey_board_version
+  );
+  const bleVersion = firstVersion(
+    getImageVersion(deviceInfo?.bt?.app),
+    previous?.onekey_ble_version,
+    previous?.ble_ver
+  );
+  const serialNo =
+    firstValue(deviceInfo?.hw?.serial_no, previous?.serial_no, previous?.onekey_serial_no) ?? '';
+  const label = firstValue(deviceInfo?.status?.label, previous?.label) ?? null;
+  const bleName = firstValue(deviceInfo?.bt?.adv_name, previous?.onekey_ble_name, previous?.ble_name);
+  const initialized = firstValue(deviceInfo?.status?.init_states, previous?.initialized) ?? null;
+  const passphraseProtection =
+    firstValue(deviceInfo?.status?.passphrase_protection, previous?.passphrase_protection) ?? null;
+  const language = firstValue(deviceInfo?.status?.language, previous?.language) ?? null;
+  const backupRequired = firstValue(deviceInfo?.status?.backup_required, previous?.needs_backup) ?? null;
+  const bleEnabled = firstValue(deviceInfo?.status?.bt_enable, previous?.ble_enable);
   const [fwMajor, fwMinor, fwPatch] = parseProtocolV2Version(firmwareVersion);
 
   return {
@@ -35,19 +83,19 @@ export const buildProtocolV2GetFeaturesPayload = (
     major_version: fwMajor,
     minor_version: fwMinor,
     patch_version: fwPatch,
-    bootloader_mode: false,
-    device_id: profile.deviceId,
+    bootloader_mode: previous?.bootloader_mode ?? false,
+    device_id: null,
     pin_protection: null,
-    passphrase_protection: profile.status.passphraseProtection,
-    language: profile.status.language,
-    label: profile.label,
-    initialized: profile.status.initialized ?? false,
+    passphrase_protection: passphraseProtection,
+    language,
+    label,
+    initialized,
     revision: null,
     bootloader_hash: null,
     imported: null,
-    unlocked: false,
+    unlocked: previous?.unlocked ?? null,
     firmware_present: false,
-    needs_backup: profile.status.backupRequired,
+    needs_backup: backupRequired,
     flags: null,
     model: 'pro2',
     fw_major: fwMajor,
@@ -68,56 +116,86 @@ export const buildProtocolV2GetFeaturesPayload = (
     auto_lock_delay_ms: null,
     display_rotation: null,
     experimental_features: null,
-    protocol_version: deviceInfo?.protocol_version ?? null,
+    protocol_version: deviceInfo?.protocol_version ?? previous?.protocol_version ?? null,
     onekey_device_type: EDeviceType.Pro2,
-    onekey_serial_no: profile.serialNo,
-    serial_no: profile.serialNo,
-    ble_enable: profile.status.bleEnabled ?? undefined,
-    onekey_ble_name: profile.bleName ?? undefined,
-    ble_name: profile.bleName ?? undefined,
+    onekey_serial_no: serialNo || undefined,
+    serial_no: serialNo || undefined,
+    ble_enable: bleEnabled ?? undefined,
+    onekey_ble_name: bleName ?? undefined,
+    ble_name: bleName ?? undefined,
     onekey_firmware_version: firmwareVersion ?? undefined,
-    onekey_firmware_build_id: profile.verify?.firmwareBuildId,
-    onekey_firmware_hash: profile.verify?.firmwareHash,
-    onekey_boot_version: profile.versions.bootloader ?? undefined,
-    bootloader_version: profile.versions.bootloader ?? undefined,
-    onekey_boot_build_id: profile.verify?.bootloaderBuildId,
-    onekey_boot_hash: profile.verify?.bootloaderHash,
-    onekey_board_version: profile.versions.board ?? undefined,
-    onekey_board_build_id: profile.verify?.boardBuildId,
-    onekey_board_hash: profile.verify?.boardHash,
-    onekey_ble_version: profile.versions.ble ?? undefined,
-    ble_ver: profile.versions.ble ?? undefined,
-    onekey_ble_build_id: profile.verify?.bleBuildId,
-    onekey_ble_hash: profile.verify?.bleHash,
+    onekey_firmware_build_id:
+      getImageBuildId(deviceInfo?.fw?.app) ?? previous?.onekey_firmware_build_id,
+    onekey_firmware_hash: getImageHash(deviceInfo?.fw?.app) ?? previous?.onekey_firmware_hash,
+    onekey_boot_version: bootloaderVersion,
+    bootloader_version: bootloaderVersion,
+    onekey_boot_build_id: getImageBuildId(deviceInfo?.fw?.boot) ?? previous?.onekey_boot_build_id,
+    onekey_boot_hash: getImageHash(deviceInfo?.fw?.boot) ?? previous?.onekey_boot_hash,
+    onekey_board_version: boardVersion,
+    onekey_board_build_id:
+      getImageBuildId(deviceInfo?.fw?.board) ?? previous?.onekey_board_build_id,
+    onekey_board_hash: getImageHash(deviceInfo?.fw?.board) ?? previous?.onekey_board_hash,
+    onekey_ble_version: bleVersion,
+    ble_ver: bleVersion,
+    onekey_ble_build_id: getImageBuildId(deviceInfo?.bt?.app) ?? previous?.onekey_ble_build_id,
+    onekey_ble_hash: getImageHash(deviceInfo?.bt?.app) ?? previous?.onekey_ble_hash,
     // Pro2 的 SE 类型在 DevGetDeviceInfo 的 se1.type 上报（如 THD89）
-    onekey_se_type: getProtocolV2SeType(deviceInfo?.se1),
-    onekey_se01_version: profile.versions.se01 ?? undefined,
-    onekey_se01_hash: profile.verify?.se01Hash,
-    onekey_se01_build_id: profile.verify?.se01BuildId,
-    onekey_se01_boot_version: profile.versions.se01Boot ?? undefined,
-    onekey_se01_boot_hash: profile.verify?.se01BootHash,
-    onekey_se01_boot_build_id: profile.verify?.se01BootBuildId,
-    onekey_se01_state: getProtocolV2SeState(deviceInfo?.se1),
-    onekey_se02_version: profile.versions.se02 ?? undefined,
-    onekey_se02_hash: profile.verify?.se02Hash,
-    onekey_se02_build_id: profile.verify?.se02BuildId,
-    onekey_se02_boot_version: profile.versions.se02Boot ?? undefined,
-    onekey_se02_boot_hash: profile.verify?.se02BootHash,
-    onekey_se02_boot_build_id: profile.verify?.se02BootBuildId,
-    onekey_se02_state: getProtocolV2SeState(deviceInfo?.se2),
-    onekey_se03_version: profile.versions.se03 ?? undefined,
-    onekey_se03_hash: profile.verify?.se03Hash,
-    onekey_se03_build_id: profile.verify?.se03BuildId,
-    onekey_se03_boot_version: profile.versions.se03Boot ?? undefined,
-    onekey_se03_boot_hash: profile.verify?.se03BootHash,
-    onekey_se03_boot_build_id: profile.verify?.se03BootBuildId,
-    onekey_se03_state: getProtocolV2SeState(deviceInfo?.se3),
-    onekey_se04_version: profile.versions.se04 ?? undefined,
-    onekey_se04_hash: profile.verify?.se04Hash,
-    onekey_se04_build_id: profile.verify?.se04BuildId,
-    onekey_se04_boot_version: profile.versions.se04Boot ?? undefined,
-    onekey_se04_boot_hash: profile.verify?.se04BootHash,
-    onekey_se04_boot_build_id: profile.verify?.se04BootBuildId,
-    onekey_se04_state: getProtocolV2SeState(deviceInfo?.se4),
+    onekey_se_type: getProtocolV2SeType(deviceInfo?.se1) ?? previous?.onekey_se_type,
+    onekey_se01_version: firstVersion(
+      getImageVersion(deviceInfo?.se1?.app),
+      previous?.onekey_se01_version
+    ),
+    onekey_se01_hash: getImageHash(deviceInfo?.se1?.app) ?? previous?.onekey_se01_hash,
+    onekey_se01_build_id: getImageBuildId(deviceInfo?.se1?.app) ?? previous?.onekey_se01_build_id,
+    onekey_se01_boot_version: firstVersion(
+      getImageVersion(deviceInfo?.se1?.boot),
+      previous?.onekey_se01_boot_version
+    ),
+    onekey_se01_boot_hash: getImageHash(deviceInfo?.se1?.boot) ?? previous?.onekey_se01_boot_hash,
+    onekey_se01_boot_build_id:
+      getImageBuildId(deviceInfo?.se1?.boot) ?? previous?.onekey_se01_boot_build_id,
+    onekey_se01_state: getProtocolV2SeState(deviceInfo?.se1) ?? previous?.onekey_se01_state,
+    onekey_se02_version: firstVersion(
+      getImageVersion(deviceInfo?.se2?.app),
+      previous?.onekey_se02_version
+    ),
+    onekey_se02_hash: getImageHash(deviceInfo?.se2?.app) ?? previous?.onekey_se02_hash,
+    onekey_se02_build_id: getImageBuildId(deviceInfo?.se2?.app) ?? previous?.onekey_se02_build_id,
+    onekey_se02_boot_version: firstVersion(
+      getImageVersion(deviceInfo?.se2?.boot),
+      previous?.onekey_se02_boot_version
+    ),
+    onekey_se02_boot_hash: getImageHash(deviceInfo?.se2?.boot) ?? previous?.onekey_se02_boot_hash,
+    onekey_se02_boot_build_id:
+      getImageBuildId(deviceInfo?.se2?.boot) ?? previous?.onekey_se02_boot_build_id,
+    onekey_se02_state: getProtocolV2SeState(deviceInfo?.se2) ?? previous?.onekey_se02_state,
+    onekey_se03_version: firstVersion(
+      getImageVersion(deviceInfo?.se3?.app),
+      previous?.onekey_se03_version
+    ),
+    onekey_se03_hash: getImageHash(deviceInfo?.se3?.app) ?? previous?.onekey_se03_hash,
+    onekey_se03_build_id: getImageBuildId(deviceInfo?.se3?.app) ?? previous?.onekey_se03_build_id,
+    onekey_se03_boot_version: firstVersion(
+      getImageVersion(deviceInfo?.se3?.boot),
+      previous?.onekey_se03_boot_version
+    ),
+    onekey_se03_boot_hash: getImageHash(deviceInfo?.se3?.boot) ?? previous?.onekey_se03_boot_hash,
+    onekey_se03_boot_build_id:
+      getImageBuildId(deviceInfo?.se3?.boot) ?? previous?.onekey_se03_boot_build_id,
+    onekey_se03_state: getProtocolV2SeState(deviceInfo?.se3) ?? previous?.onekey_se03_state,
+    onekey_se04_version: firstVersion(
+      getImageVersion(deviceInfo?.se4?.app),
+      previous?.onekey_se04_version
+    ),
+    onekey_se04_hash: getImageHash(deviceInfo?.se4?.app) ?? previous?.onekey_se04_hash,
+    onekey_se04_build_id: getImageBuildId(deviceInfo?.se4?.app) ?? previous?.onekey_se04_build_id,
+    onekey_se04_boot_version: firstVersion(
+      getImageVersion(deviceInfo?.se4?.boot),
+      previous?.onekey_se04_boot_version
+    ),
+    onekey_se04_boot_hash: getImageHash(deviceInfo?.se4?.boot) ?? previous?.onekey_se04_boot_hash,
+    onekey_se04_boot_build_id:
+      getImageBuildId(deviceInfo?.se4?.boot) ?? previous?.onekey_se04_boot_build_id,
+    onekey_se04_state: getProtocolV2SeState(deviceInfo?.se4) ?? previous?.onekey_se04_state,
   };
 };

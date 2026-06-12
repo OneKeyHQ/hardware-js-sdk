@@ -166,7 +166,7 @@ export class DevicePool extends EventEmitter {
     for (let i = this.connectedPool.length - 1; i >= 0; i--) {
       const descriptor = this.connectedPool[i];
       const device = await this._createDevice(descriptor, initOptions);
-      Log.debug('emit DEVICE.CONNECT: ', device?.profile ?? device?.features);
+      Log.debug('emit DEVICE.CONNECT: ', device?.features);
       this.emitter.emit(DEVICE.CONNECT, device);
       this.connectedPool.splice(i, 1);
     }
@@ -203,7 +203,7 @@ export class DevicePool extends EventEmitter {
         this._addConnectedDeviceToPool(d);
         return;
       }
-      Log.debug('emit DEVICE.CONNECT: ', device.profile ?? device.features);
+      Log.debug('emit DEVICE.CONNECT: ', device.features);
       this.emitter.emit(DEVICE.CONNECT, device);
     });
 
@@ -215,7 +215,7 @@ export class DevicePool extends EventEmitter {
         return;
       }
 
-      Log.debug('emit DEVICE.DISCONNECT: ', device.profile ?? device.features);
+      Log.debug('emit DEVICE.DISCONNECT: ', device.features);
       this.emitter.emit(DEVICE.DISCONNECT, device);
     });
   }

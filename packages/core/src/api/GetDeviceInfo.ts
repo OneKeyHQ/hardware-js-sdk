@@ -109,14 +109,8 @@ export default class GetDeviceInfo extends BaseMethod<GetDeviceInfoParams> {
       sources,
       scope: this.params.scope,
       includeRaw: this.params.includeRaw,
-      fallbackSerialNo: this.device.originalDescriptor?.path,
     });
-    // 缓存走字段级合并：basic 请求不能降级已有的完整 profile；返回值仍按请求 scope 给出
-    if (typeof this.device.applyProfileUpdate === 'function') {
-      this.device.applyProfileUpdate(profile, protocolV2DeviceInfo);
-    } else {
-      this.device.updateProfile?.(profile);
-    }
+    this.device.updateProtocolV2Features(protocolV2DeviceInfo);
     return profile;
   }
 
@@ -146,7 +140,6 @@ export default class GetDeviceInfo extends BaseMethod<GetDeviceInfoParams> {
       scope: this.params.scope,
       includeRaw: this.params.includeRaw,
     });
-    this.device.updateProfile?.(profile);
     return profile;
   }
 }

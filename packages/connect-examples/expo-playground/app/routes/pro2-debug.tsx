@@ -140,7 +140,7 @@ const PRO2_METHOD_WIRE_INFO: Record<string, MethodWireInfo> = {
     txPayload: PRO2_DYNAMIC_PAYLOAD,
     rx: '60601 (DeviceInfo)',
     rxPayload: PRO2_DYNAMIC_RESPONSE,
-    decoded: 'DeviceProfile',
+    decoded: 'DeviceInfo',
   },
   devReboot: {
     tx: '60400 (DevReboot)',

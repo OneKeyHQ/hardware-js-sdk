@@ -51,7 +51,7 @@ import {
 } from '../src/protocols/protocol-v2/features';
 import {
   buildProfileFromProtocolV2,
-  buildProtocolV2GetFeaturesPayload,
+  buildProtocolV2FeaturesPayload,
 } from '../src/deviceProfile';
 import {
   getDeviceType,
@@ -91,44 +91,34 @@ const descriptor = {
  */
 function stubDevice<T extends Record<string, any>>(device: T): T {
   const d = device as any;
-  d.isProtocolV2 ??= () =>
-    d.profile?.protocol === 'V2' || d.originalDescriptor?.protocolType === 'V2';
+  d.isProtocolV2 ??= () => d.originalDescriptor?.protocolType === 'V2';
   d.getProtocol ??= () => (d.isProtocolV2() ? 'V2' : 'V1');
-  d.getCurrentDeviceType ??= () => d.profile?.deviceType ?? getDeviceType(d.features);
-  d.getCurrentFirmwareType ??= () => d.profile?.firmwareType ?? getFirmwareType(d.features);
+  d.getCurrentDeviceType ??= () => getDeviceType(d.features);
+  d.getCurrentFirmwareType ??= () => getFirmwareType(d.features);
   d.getCurrentFirmwareVersionString ??= () =>
-    d.profile?.versions?.firmware ??
-    (d.features ? getDeviceFirmwareVersion(d.features).join('.') : undefined);
-  d.getCurrentBLEFirmwareVersionString ??= () => d.profile?.versions?.ble ?? undefined;
+    d.features ? getDeviceFirmwareVersion(d.features).join('.') : undefined;
+  d.getCurrentBLEFirmwareVersionString ??= () => d.features?.onekey_ble_version;
   d.getCurrentSafetyChecks ??= () => d.features?.safety_checks;
-  d.getCurrentDeviceId ??= () => d.profile?.deviceId || d.features?.device_id || undefined;
-  d.getCurrentSerialNo ??= () => d.profile?.serialNo || '';
+  d.getCurrentDeviceId ??= () => d.features?.device_id || undefined;
+  d.getCurrentSerialNo ??= () => d.features?.serial_no || d.features?.onekey_serial_no || '';
   d.getCurrentPassphraseProtection ??= () =>
-    d.profile ? d.profile.status?.passphraseProtection : d.features?.passphrase_protection;
+    d.features?.passphrase_protection;
   d.getCurrentMethodVersionRange ??= (fn: (model: any) => any) => {
     const deviceType = d.getCurrentDeviceType();
     const range = fn(deviceType);
     if (range) return range;
     return getMethodVersionRange(d.features, fn);
   };
-  d.updateProfile ??= (p: any) => {
-    d.profile = p;
-  };
-  d.applyProfileUpdate ??= (p: any) => {
-    d.profile = p;
-    return p;
+  d.updateProtocolV2Features ??= (deviceInfo?: ProtocolV2DeviceInfo) => {
+    d.features = buildProtocolV2FeaturesPayload(deviceInfo, d.features);
+    return d.features;
   };
   return device;
 }
 
 // 直接复用生产映射函数，避免测试内副本与实现漂移（之前的手抄副本已缺失 se boot 字段）
 function normalizeProtocolV2Features(_descriptor: unknown, deviceInfo?: ProtocolV2DeviceInfo) {
-  const profile = buildProfileFromProtocolV2({
-    deviceInfo,
-    sources: ['deviceInfo'],
-    scope: 'verify',
-  });
-  return buildProtocolV2GetFeaturesPayload(profile, deviceInfo);
+  return buildProtocolV2FeaturesPayload(deviceInfo);
 }
 
 async function requestProtocolV2LegacyFeatures({
@@ -152,15 +142,13 @@ describe('Protocol V2 feature adapter', () => {
       });
       expect(typedCall).not.toHaveBeenCalled();
       expect(deviceInfo).toEqual(buildMockProtocolV2DeviceInfo());
-      // 空 serial_no + fallbackSerialNo：身份字段回退 transport path
       const profile = buildProfileFromProtocolV2({
         deviceInfo,
-        fallbackSerialNo: 'usb-path',
       });
       expect(profile).toMatchObject({
         protocol: 'V2',
-        deviceId: 'usb-path',
-        serialNo: 'usb-path',
+        deviceId: '',
+        serialNo: '',
         status: { initialized: true },
         versions: { firmware: '0.1.0' },
       });
@@ -223,7 +211,7 @@ describe('Protocol V2 feature adapter', () => {
       },
     });
 
-    expect(features.device_id).toBe('PR2SERIAL');
+    expect(features.device_id).toBeNull();
     expect(features.serial_no).toBe('PR2SERIAL');
     expect(features.onekey_serial_no).toBe('PR2SERIAL');
     expect(features.onekey_device_type).toBe('pro2');
@@ -319,6 +307,7 @@ describe('Protocol V2 feature adapter', () => {
       },
     });
     method.device = stubDevice({
+      originalDescriptor: { ...descriptor, protocolType: 'V2' },
       features,
       commands: { typedCall },
       updateInternalState,
@@ -341,12 +330,12 @@ describe('Protocol V2 feature adapter', () => {
     );
   });
 
-  test('prefers DeviceProfile for GetPassphraseState response metadata', async () => {
+  test('uses features for GetPassphraseState response metadata', async () => {
     const features = {
-      device_id: 'legacy-pro-device-id',
-      onekey_device_type: 'PRO',
+      device_id: null,
+      onekey_device_type: 'PRO2',
       onekey_firmware_version: '4.15.0',
-      passphrase_protection: false,
+      passphrase_protection: true,
       session_id: 'feature-session',
       unlocked_attach_pin: true,
     };
@@ -367,38 +356,13 @@ describe('Protocol V2 feature adapter', () => {
       },
     });
     method.device = stubDevice({
+      originalDescriptor: { ...descriptor, protocolType: 'V2' },
       features,
-      profile: {
-        protocol: 'V2',
-        sources: ['deviceInfo'],
-        deviceType: 'pro2',
-        firmwareType: 'universal',
-        deviceId: 'PR2SERIAL',
-        serialNo: 'PR2SERIAL',
-        label: null,
-        bleName: null,
-        status: {
-          mode: 'normal',
-          initialized: true,
-          bootloaderMode: false,
-          unlocked: null,
-          passphraseProtection: true,
-          backupRequired: false,
-          noBackup: null,
-          language: null,
-        },
-        versions: {
-          firmware: '4.15.0',
-          bootloader: null,
-          board: null,
-          ble: null,
-        },
-      },
       commands: { typedCall },
       updateInternalState,
       getFeatures,
       getCurrentDeviceType: () => 'pro2',
-      getCurrentDeviceId: () => 'PR2SERIAL',
+      getCurrentDeviceId: () => undefined,
       getCurrentPassphraseProtection: () => true,
     }) as any;
 
@@ -411,7 +375,7 @@ describe('Protocol V2 feature adapter', () => {
     expect(getFeatures).not.toHaveBeenCalled();
   });
 
-  test('uses DeviceProfile identity for Pro2 passphrase session cache', async () => {
+  test('stores Pro2 passphrase session cache without synthetic device id', async () => {
     const device = Device.fromDescriptor({ ...descriptor, protocolType: 'V2' } as any);
     const typedCall = jest.fn().mockResolvedValue({
       type: 'PassphraseState',
@@ -552,15 +516,15 @@ describe('Protocol V2 feature adapter', () => {
   test('marks fallback features as unavailable when DeviceInfo is missing', () => {
     const features = normalizeProtocolV2Features(descriptor as any);
 
-    expect(features.device_id).toBe('');
-    expect(features.serial_no).toBe('');
-    expect(features.onekey_serial_no).toBe('');
-    expect(features.initialized).toBe(false);
-    expect(features.unlocked).toBe(false);
+    expect(features.device_id).toBeNull();
+    expect(features.serial_no).toBeUndefined();
+    expect(features.onekey_serial_no).toBeUndefined();
+    expect(features.initialized).toBeNull();
+    expect(features.unlocked).toBeNull();
     expect(features.firmware_present).toBe(false);
   });
 
-  test('uses Protocol V2 DeviceInfo serial_no as device_id instead of descriptor id', () => {
+  test('does not use Protocol V2 serial_no as device_id', () => {
     const features = normalizeProtocolV2Features(
       {
         id: 'PR2000000000',
@@ -574,104 +538,48 @@ describe('Protocol V2 feature adapter', () => {
       }
     );
 
-    expect(features.device_id).toBe('PR9999999999');
+    expect(features.device_id).toBeNull();
     expect(features.onekey_serial_no).toBe('PR9999999999');
     expect(features.serial_no).toBe('PR9999999999');
   });
 
-  test('does not expose legacy feature ids when Protocol V2 profile is incomplete', () => {
+  test('uses Protocol V2 features directly when profile is absent', () => {
     const device = Device.fromDescriptor({ ...descriptor, protocolType: 'V2' } as any);
     (device as any).features = {
       ...normalizeProtocolV2Features({ ...descriptor, protocolType: 'V2' } as any),
-      device_id: 'LEGACY-ID',
       serial_no: 'LEGACY-SERIAL',
       label: 'Legacy Label',
       ble_name: 'Legacy BLE',
       passphrase_protection: true,
     };
-    device.updateProfile({
-      protocol: 'V2',
-      sources: ['deviceInfo'],
-      deviceType: 'pro2',
-      firmwareType: 'universal',
-      deviceId: '',
-      serialNo: '',
-      label: null,
-      bleName: null,
-      status: {
-        mode: 'normal',
-        initialized: true,
-        bootloaderMode: false,
-        unlocked: null,
-        passphraseProtection: null,
-        backupRequired: false,
-        noBackup: null,
-        language: null,
-      },
-      versions: {
-        firmware: null,
-        bootloader: null,
-        board: null,
-        ble: null,
-      },
-    });
 
     expect(device.toMessageObject()).toMatchObject({
-      uuid: '',
+      uuid: 'LEGACY-SERIAL',
       deviceId: null,
-      bleName: null,
-      label: 'OneKey Pro2',
+      bleName: 'Legacy BLE',
+      label: 'Legacy Label',
       deviceType: 'pro2',
     });
-    expect(device.getCurrentPassphraseProtection()).toBeNull();
+    expect(device.getCurrentPassphraseProtection()).toBe(true);
     expect(device.hasUsePassphrase()).toBe(true);
-    expect(device.isInitialized()).toBe(true);
-    expect(device.getMode()).toBe('normal');
-    expect(device.getFirmwareVersion()).toBeNull();
   });
 
-  test('keeps Protocol V2 cached profile as identity source when syncing legacy features', () => {
+  test('syncs Protocol V2 cached features without cached profile', () => {
     const cached = Device.fromDescriptor({ ...descriptor, protocolType: 'V2' } as any);
     (cached as any).features = {
       ...normalizeProtocolV2Features({ ...descriptor, protocolType: 'V2' } as any),
-      device_id: 'LEGACY-ID',
+      device_id: null,
       serial_no: 'LEGACY-SERIAL',
       onekey_serial_no: 'LEGACY-SERIAL',
     };
-    cached.updateProfile({
-      protocol: 'V2',
-      sources: ['deviceInfo'],
-      deviceType: 'pro2',
-      firmwareType: 'universal',
-      deviceId: '',
-      serialNo: '',
-      label: null,
-      bleName: null,
-      status: {
-        mode: 'normal',
-        initialized: true,
-        bootloaderMode: false,
-        unlocked: null,
-        passphraseProtection: null,
-        backupRequired: false,
-        noBackup: null,
-        language: null,
-      },
-      versions: {
-        firmware: null,
-        bootloader: null,
-        board: null,
-        ble: null,
-      },
-    });
 
     const current = Device.fromDescriptor({ ...descriptor, protocolType: 'V2' } as any);
     current.updateFromCache(cached);
 
     expect(current.getCurrentDeviceId()).toBeUndefined();
-    expect(current.getCurrentSerialNo()).toBe('');
+    expect(current.getCurrentSerialNo()).toBe('LEGACY-SERIAL');
     expect(current.toMessageObject()).toMatchObject({
-      uuid: '',
+      uuid: 'LEGACY-SERIAL',
       deviceId: null,
     });
   });
@@ -695,7 +603,7 @@ describe('Protocol V2 feature adapter', () => {
       descriptor: descriptor as any,
     });
 
-    expect(features.device_id).toBe('PR2SERIAL');
+    expect(features.device_id).toBeNull();
     expect(features.initialized).toBe(true);
     expect(features.passphrase_protection).toBe(true);
     expect(commands.typedCall).toHaveBeenCalledTimes(1);
@@ -776,7 +684,6 @@ describe('Protocol V2 feature adapter', () => {
       },
       commands: { typedCall },
       _updateFeatures: jest.fn(),
-      updateProfile: jest.fn(),
     });
 
     const result = await method.run();
@@ -801,7 +708,7 @@ describe('Protocol V2 feature adapter', () => {
     expect(result).toMatchObject({
       protocol: 'V2',
       deviceType: 'pro2',
-      deviceId: 'PR2SERIAL',
+      deviceId: '',
       serialNo: 'PR2SERIAL',
       label: 'Raw Pro2',
       bleName: 'Raw Pro2 BLE',
@@ -846,17 +753,16 @@ describe('Protocol V2 feature adapter', () => {
         onekey_ble_version: '2.3.4',
       },
       commands: { typedCall },
-      updateProfile: jest.fn(),
     });
 
     const result = await method.run();
 
     expect(result).toMatchObject({
       protocol: 'V2',
-      // 身份字段不得取自 legacy features（LEGACY-ID / LEGACY-SERIAL）；
-      // hw.serial_no 缺失时回退 descriptor.path（早期工程板无 serial 的 mock 身份）。
-      deviceId: 'usb-path',
-      serialNo: 'usb-path',
+      // 身份字段不得取自 legacy features（LEGACY-ID / LEGACY-SERIAL），
+      // hw.serial_no 缺失时也不回退 descriptor.path。
+      deviceId: '',
+      serialNo: '',
       label: null,
       bleName: null,
       status: {
@@ -948,7 +854,6 @@ describe('Protocol V2 feature adapter', () => {
       originalDescriptor: { ...descriptor, protocolType: 'V2' },
       features: normalizeProtocolV2Features({ ...descriptor, protocolType: 'V2' } as any),
       commands: { typedCall },
-      updateProfile: jest.fn(),
     });
 
     const result = await method.run();
@@ -1134,7 +1039,7 @@ describe('Protocol V2 feature adapter', () => {
     expect(message).not.toHaveProperty('label');
   });
 
-  test('refreshes cached Protocol V2 profile with a lightweight status request on later runs', async () => {
+  test('refreshes cached Protocol V2 features with a lightweight status request on later runs', async () => {
     const device = Device.fromDescriptor({
       path: 'usb-path',
       protocolType: 'V2',
@@ -1169,17 +1074,17 @@ describe('Protocol V2 feature adapter', () => {
     await device.initialize();
 
     expect(device.features).toMatchObject({
-      device_id: 'PR2SERIAL',
+      device_id: null,
       onekey_firmware_version: '1.2.3',
       passphrase_protection: false,
       label: 'renamed',
     });
-    expect(device.profile?.deviceId).toBe('PR2SERIAL');
+    expect((device as any).profile).toBeUndefined();
     // status 字段被第二次刷新更新
-    expect(device.profile?.status.passphraseProtection).toBe(false);
-    expect(device.profile?.label).toBe('renamed');
+    expect(device.features?.passphrase_protection).toBe(false);
+    expect(device.features?.label).toBe('renamed');
     // 轻量刷新不含 fw target，已有版本信息按字段级合并保留
-    expect(device.profile?.versions.firmware).toBe('1.2.3');
+    expect(device.features?.onekey_firmware_version).toBe('1.2.3');
     expect(typedCall).toHaveBeenCalledTimes(2);
     expect(typedCall).toHaveBeenNthCalledWith(
       1,
@@ -1253,7 +1158,7 @@ describe('Protocol V2 feature adapter', () => {
     const features = await device.getFeatures();
 
     expect(device.features).toMatchObject({
-      device_id: 'PR2SERIAL',
+      device_id: null,
       onekey_firmware_version: '1.2.4',
       passphrase_protection: true,
     });
@@ -1319,7 +1224,6 @@ describe('Protocol V2 feature adapter', () => {
     });
     method.init();
     (method as any).device = stubDevice({
-      profile: device.profile,
       features: device.features,
       commands: { typedCall: jest.fn() },
     });
@@ -1359,13 +1263,13 @@ describe('Protocol V2 feature adapter', () => {
     expect(typedCall).not.toHaveBeenCalledWith('GetFeatures', 'Features', {});
     expect(features).toMatchObject({
       onekey_device_type: 'pro2',
-      device_id: 'PR2SERIAL',
+      device_id: null,
       onekey_firmware_version: '1.2.3',
       unlocked: true,
     });
   });
 
-  test('syncs Protocol V2 profile passphrase state after unlock response', async () => {
+  test('syncs Protocol V2 features passphrase state after unlock response', async () => {
     const device = Device.fromDescriptor({ ...descriptor, protocolType: 'V2' } as any);
     (device as any).features = normalizeProtocolV2Features(
       { ...descriptor, protocolType: 'V2' } as any,
@@ -1375,32 +1279,6 @@ describe('Protocol V2 feature adapter', () => {
         status: { passphrase_protection: false },
       }
     );
-    device.updateProfile({
-      protocol: 'V2',
-      sources: ['deviceInfo'],
-      deviceType: 'pro2',
-      firmwareType: 'universal',
-      deviceId: 'PR2SERIAL',
-      serialNo: 'PR2SERIAL',
-      label: null,
-      bleName: null,
-      status: {
-        mode: 'normal',
-        initialized: true,
-        bootloaderMode: false,
-        unlocked: null,
-        passphraseProtection: false,
-        backupRequired: false,
-        noBackup: null,
-        language: null,
-      },
-      versions: {
-        firmware: '4.15.0',
-        bootloader: null,
-        board: null,
-        ble: null,
-      },
-    });
     const typedCall = jest.fn().mockResolvedValue({
       type: 'UnLockDeviceResponse',
       message: {
@@ -1412,7 +1290,7 @@ describe('Protocol V2 feature adapter', () => {
 
     await device.unlockDevice();
 
-    expect(device.profile?.status.passphraseProtection).toBe(true);
+    expect((device as any).profile).toBeUndefined();
     expect(device.features?.passphrase_protection).toBe(true);
   });
 });
