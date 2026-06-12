@@ -26,8 +26,8 @@ export default class GetPassphraseState extends BaseMethod {
     // refresh device info
     return Promise.resolve({
       passphrase_state: isProSeries || passphraseProtection === true ? passphraseState : undefined,
-      session_id: newSession ?? features?.session_id ?? undefined,
-      unlocked_attach_pin: unlockedAttachPin ?? features?.unlocked_attach_pin,
+      session_id: newSession ?? features?.sessionId ?? undefined,
+      unlocked_attach_pin: unlockedAttachPin ?? features?.unlockedAttachPin,
       passphrase_protection: passphraseProtection,
     });
   }

@@ -53,7 +53,7 @@ import {
   PROTOCOL_V2_STATUS_DEVICE_INFO_REQUEST,
   requestProtocolV2DeviceInfo,
 } from '../protocols/protocol-v2/features';
-import { buildProtocolV2FeaturesPayload } from '../deviceProfile';
+import { buildProtocolV1FeaturesPayload, buildProtocolV2FeaturesPayload } from '../deviceProfile';
 
 import type { PROTO } from '../constants';
 import type {
@@ -283,7 +283,7 @@ export class Device extends EventEmitter {
       label: label || 'OneKey',
       mode: this.getMode(),
       features,
-      sessionId: this.features?.session_id ?? null,
+      sessionId: this.features?.sessionId ?? null,
       firmwareVersion: this.getFirmwareVersion(),
       bleFirmwareVersion: this.getBLEFirmwareVersion(),
       unavailableCapabilities: this.unavailableCapabilities,
@@ -494,7 +494,7 @@ export class Device extends EventEmitter {
   }
 
   getCurrentDeviceId() {
-    return this.features?.device_id || undefined;
+    return this.features?.deviceId || undefined;
   }
 
   getCurrentSerialNo() {
@@ -510,7 +510,7 @@ export class Device extends EventEmitter {
   }
 
   getCurrentPassphraseProtection() {
-    return this.features?.passphrase_protection;
+    return this.features?.passphraseProtection;
   }
 
   getCurrentFirmwareType() {
@@ -527,7 +527,7 @@ export class Device extends EventEmitter {
   }
 
   getCurrentSafetyChecks() {
-    return this.features?.safety_checks;
+    return this.features?.safetyChecks;
   }
 
   getCurrentMethodVersionRange(
@@ -632,7 +632,7 @@ export class Device extends EventEmitter {
     Log.debug(
       'getInternalState session param: ',
       `device_id: ${_deviceId}`,
-      `features.device_id: ${this.features?.device_id}`,
+      `features.deviceId: ${this.features?.deviceId}`,
       `passphraseState: ${this.passphraseState}`
     );
 
@@ -694,7 +694,7 @@ export class Device extends EventEmitter {
       'setInternalState session param: ',
       `state: ${state}`,
       `initSession: ${initSession}`,
-      `device_id: ${this.features?.device_id}`,
+      `deviceId: ${this.features?.deviceId}`,
       `passphraseState: ${this.passphraseState}`
     );
 
@@ -841,16 +841,21 @@ export class Device extends EventEmitter {
 
     const { message } = await this.commands.typedCall('GetFeatures', 'Features', {});
     this._updateFeatures(message);
-    return message;
+    return this.features;
   }
 
-  _updateFeatures(feat: Features, initSession?: boolean) {
+  _updateFeatures(protoFeatures: PROTO.Features | Features, initSession?: boolean) {
+    let feat =
+      'protocol' in protoFeatures
+        ? protoFeatures
+        : buildProtocolV1FeaturesPayload(protoFeatures, this.features);
+
     // GetFeatures doesn't return 'session_id'
-    if (this.features && this.features.session_id && !feat.session_id) {
-      feat.session_id = this.features.session_id;
+    if (this.features?.sessionId && !feat.sessionId) {
+      feat.sessionId = this.features.sessionId;
     }
-    if (this.getCurrentDeviceId() && feat.session_id) {
-      this.setInternalState(feat.session_id, initSession);
+    if (this.getCurrentDeviceId() && feat.sessionId) {
+      this.setInternalState(feat.sessionId, initSession);
     }
     feat.unlocked = feat.unlocked ?? true;
 
@@ -1037,7 +1042,7 @@ export class Device extends EventEmitter {
   }
 
   getMode() {
-    if (this.features?.bootloader_mode) {
+    if (this.features?.bootloaderMode) {
       // bootloader mode
       return EOneKeyDeviceMode.bootloader;
     }
@@ -1047,7 +1052,7 @@ export class Device extends EventEmitter {
       return EOneKeyDeviceMode.notInitialized;
     }
 
-    if (this.features?.no_backup) {
+    if (this.features?.noBackup) {
       // backup mode
       return EOneKeyDeviceMode.backupMode;
     }
@@ -1091,7 +1096,7 @@ export class Device extends EventEmitter {
   }
 
   isBootloader() {
-    return this.features && !!this.features.bootloader_mode;
+    return this.features && !!this.features.bootloaderMode;
   }
 
   isInitialized() {
@@ -1099,7 +1104,7 @@ export class Device extends EventEmitter {
   }
 
   isSeedless() {
-    return this.features && !!this.features.no_backup;
+    return this.features && !!this.features.noBackup;
   }
 
   isUnacquired(): boolean {
@@ -1182,9 +1187,9 @@ export class Device extends EventEmitter {
       const res = await this.commands.typedCall('UnLockDevice', 'UnLockDeviceResponse');
       if (this.features) {
         this.features.unlocked = res.message.unlocked == null ? null : res.message.unlocked;
-        this.features.unlocked_attach_pin =
+        this.features.unlockedAttachPin =
           res.message.unlocked_attach_pin == null ? undefined : res.message.unlocked_attach_pin;
-        this.features.passphrase_protection =
+        this.features.passphraseProtection =
           res.message.passphrase_protection == null ? null : res.message.passphrase_protection;
 
         return Promise.resolve(this.features);

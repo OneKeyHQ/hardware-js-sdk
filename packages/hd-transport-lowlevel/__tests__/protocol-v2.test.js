@@ -157,9 +157,7 @@ describe('LowlevelTransport protocol framing', () => {
     const probeResponse = ProtocolV2.encodeFrame(
       schemas,
       'Success',
-      {
-        message: 'probe',
-      },
+      { message: 'ok' },
       { router: PROTOCOL_V2_CHANNEL_BLE_UART }
     );
     const callResponse = ProtocolV2.encodeFrame(
@@ -200,9 +198,7 @@ describe('LowlevelTransport protocol framing', () => {
     const probeResponse = ProtocolV2.encodeFrame(
       schemas,
       'Success',
-      {
-        message: 'probe',
-      },
+      { message: 'ok' },
       { router: PROTOCOL_V2_CHANNEL_BLE_UART }
     );
     const plugin = createPlugin({
@@ -222,9 +218,7 @@ describe('LowlevelTransport protocol framing', () => {
     const probeResponse = ProtocolV2.encodeFrame(
       schemas,
       'Success',
-      {
-        message: 'probe',
-      },
+      { message: 'ok' },
       { router: PROTOCOL_V2_CHANNEL_BLE_UART }
     );
     let staleReceivePending = false;

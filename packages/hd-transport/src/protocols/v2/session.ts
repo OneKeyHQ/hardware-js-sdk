@@ -407,23 +407,23 @@ export async function probeProtocolV2({
   onBeforeProbe?: () => Promise<void> | void;
   onProbeFailed?: (error: unknown) => Promise<void> | void;
 }) {
-  let pingError: unknown;
+  let probeError: unknown;
   try {
     await onBeforeProbe?.();
     const response = await call(
       'Ping',
-      { message: 'probe' },
+      { message: 'protocol-v2-probe' },
       { timeoutMs, expectedTypes: ['Success'] }
     );
     if (response.type === 'Success') {
       return true;
     }
-    pingError = new Error(`unexpected response type ${response.type}`);
+    probeError = new Error(`unexpected response type ${response.type}`);
   } catch (error) {
-    pingError = error;
+    probeError = error;
   }
 
-  logger?.debug?.(`[${logPrefix}] Protocol V2 ping probe failed:`, getErrorMessage(pingError));
-  await onProbeFailed?.(pingError);
+  logger?.debug?.(`[${logPrefix}] Protocol V2 probe failed:`, getErrorMessage(probeError));
+  await onProbeFailed?.(probeError);
   return false;
 }

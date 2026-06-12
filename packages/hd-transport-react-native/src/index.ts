@@ -1680,7 +1680,7 @@ export default class ReactNativeBleTransport {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
     }
 
-    const forceRun = name === 'Initialize' || name === 'Cancel' || name === 'GetProtoVersion';
+    const forceRun = name === 'Initialize' || name === 'Cancel' || name === 'Ping';
     if (this.runPromise) {
       if (!forceRun) {
         throw ERRORS.TypedError(HardwareErrorCode.TransportCallInProgress);

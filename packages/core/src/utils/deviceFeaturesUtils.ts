@@ -128,7 +128,7 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (
     passphraseState,
     deviceId,
     newSession,
-    device.features?.session_id
+    device.features?.sessionId
   );
 
   return { passphraseState, newSession, unlockedAttachPin };
@@ -338,12 +338,8 @@ export const fixFeaturesFirmwareVersion = (features: Features): Features => {
   // fix Touch、Pro device when bootloader version is lower than 2.5.2, the features returned do not have firmware_version error
   const tempFeatures = { ...features };
 
-  if (tempFeatures.onekey_firmware_version && !semver.valid(tempFeatures.onekey_firmware_version)) {
-    tempFeatures.onekey_firmware_version = fixVersion(tempFeatures.onekey_firmware_version);
-  }
-
-  if (tempFeatures.onekey_version && !semver.valid(tempFeatures.onekey_version)) {
-    tempFeatures.onekey_version = fixVersion(tempFeatures.onekey_version);
+  if (tempFeatures.firmwareVersion && !semver.valid(tempFeatures.firmwareVersion)) {
+    tempFeatures.firmwareVersion = fixVersion(tempFeatures.firmwareVersion);
   }
 
   return tempFeatures;

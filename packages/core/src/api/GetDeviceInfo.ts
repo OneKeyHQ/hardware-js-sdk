@@ -57,7 +57,7 @@ function shouldReadOnekeyFeatures(params: GetDeviceInfoParams) {
 }
 
 function supportOnekeyFeatures(features?: Features) {
-  if (!features || features.bootloader_mode) return false;
+  if (!features || features.bootloaderMode) return false;
 
   const deviceType = getDeviceType(features);
   return ![
@@ -121,21 +121,21 @@ export default class GetDeviceInfo extends BaseMethod<GetDeviceInfoParams> {
 
     const sources: DeviceInfoSource[] = ['features'];
     const { features } = this.device;
-    let onekeyFeatures: OnekeyFeatures | undefined;
+    let protocolV1OneKeyFeatures: OnekeyFeatures | undefined;
 
     if (shouldReadOnekeyFeatures(this.params) && supportOnekeyFeatures(features)) {
       const { message } = await this.device.commands.typedCall(
         'OnekeyGetFeatures',
         'OnekeyFeatures'
       );
-      onekeyFeatures = normalizeOnekeyFeatures(message);
-      sources.push('onekeyFeatures');
+      protocolV1OneKeyFeatures = normalizeOnekeyFeatures(message);
+      sources.push('protocolV1OneKeyFeatures');
     }
 
     const profile = buildProfileFromProtocolV1({
       protocol: 'V1',
       features,
-      onekeyFeatures,
+      protocolV1OneKeyFeatures,
       sources,
       scope: this.params.scope,
       includeRaw: this.params.includeRaw,

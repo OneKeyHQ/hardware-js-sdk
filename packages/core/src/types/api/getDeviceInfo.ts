@@ -6,7 +6,7 @@ import type { ProtocolType, ProtocolV2DeviceInfo } from '@onekeyfe/hd-transport'
 // 协议类型单源：从 hd-transport 的 ProtocolType 派生，只额外允许 'unknown'。
 export type DeviceInfoProtocol = ProtocolType | 'unknown';
 
-export type DeviceInfoSource = 'features' | 'onekeyFeatures' | 'deviceInfo';
+export type DeviceInfoSource = 'features' | 'protocolV1OneKeyFeatures' | 'deviceInfo';
 
 export type DeviceInfoScope = 'basic' | 'versions' | 'verify' | 'full';
 
@@ -74,7 +74,7 @@ export type DeviceProfileVerify = {
 
 export type DeviceProfileRaw = {
   features?: Features;
-  onekeyFeatures?: OnekeyFeatures;
+  protocolV1OneKeyFeatures?: OnekeyFeatures;
   protocolV2DeviceInfo?: ProtocolV2DeviceInfo;
 };
 

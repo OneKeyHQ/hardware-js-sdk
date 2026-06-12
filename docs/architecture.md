@@ -58,14 +58,14 @@ WebUSB、Electron BLE、React Native BLE 和 lowlevel BLE 只负责各自的物�
 
 ## Protocol V2 Device Profile
 
-`packages/core/src/protocols/protocol-v2/features.ts` 负责读取 Protocol V2 设备信息，`packages/core/src/deviceProfile` 负责生成 SDK 标准 `DeviceProfile`。legacy `Features` 只保留给 `getFeatures()`、事件输出和旧逻辑兼容：
+`packages/core/src/protocols/protocol-v2/features.ts` 负责读取 Protocol V2 设备信息，`packages/core/src/deviceProfile` 负责生成 SDK 标准 `DeviceProfile` 和结构化 `Features`：
 
-| 协议 | 数据来源                  | 标准输出 | 兼容输出 |
-| ---- | ------------------------- | -------- | -------- |
-| V1   | `Initialize -> Features`  | `DeviceProfile` | 原生 `Features` |
-| V2   | `Ping + DevGetDeviceInfo` | `DeviceProfile` | 由 profile 同步的 legacy `Features` |
+| 协议 | 数据来源                  | 标准输出        | features 输出                                 |
+| ---- | ------------------------- | --------------- | --------------------------------------------- |
+| V1   | `Initialize -> Features`  | `DeviceProfile` | 由 V1 原始消息构建的结构化 `Features`         |
+| V2   | `Ping + DevGetDeviceInfo` | `DeviceProfile` | 由 `DevGetDeviceInfo` 构建的结构化 `Features` |
 
-这样 SDK 内部判断优先使用 `DeviceProfile`，同时保持 `Device.toMessageObject()`、事件输出和历史上层逻辑对 `Features` 的兼容。
+这样 SDK 内部和事件输出都使用统一 features 结构；协议原始消息只保留在 `features.raw` 中用于必要的 V1 兼容。
 
 ## 自动协议探测
 
@@ -112,7 +112,7 @@ V1 设备仍可在 `Initialize` 后通过 `TransportManager.reconfigure(features
 - V1：发送 `Initialize`，使用真实 `Features`
 - V2：发送 `Ping` 验证链路，再用 `DevGetDeviceInfo` 生成标准 `DeviceProfile`
 
-Protocol V2 当前没有传统 `GetFeatures`。为了保证事件和旧 API 仍可工作，SDK 会从 `DeviceProfile` 同步一份 legacy `Features` 视图；设备身份以 `DeviceProfile.serialNo/deviceId` 为准。
+Protocol V2 当前没有传统 `GetFeatures`。为了保证事件和 API 输出一致，SDK 会从 `DevGetDeviceInfo` 构建结构化 `Features`；设备身份以 `serialNo/deviceId` 的语义区分为准。
 
 ## Protocol V2 文件和固件更新链路
 
@@ -132,14 +132,14 @@ flowchart TD
 
 ## 包职责速查
 
-| 包                                   | 职责                                                 |
-| ------------------------------------ | ---------------------------------------------------- |
-| `packages/core`                      | SDK API、Device 生命周期、固件更新流程、事件输出     |
+| 包                                   | 职责                                                           |
+| ------------------------------------ | -------------------------------------------------------------- |
+| `packages/core`                      | SDK API、Device 生命周期、固件更新流程、事件输出               |
 | `packages/hd-transport`              | protobuf 加载、V1/V2 encode/decode、Protocol Session、类型定义 |
-| `packages/hd-transport-web-device`   | WebUSB 和 Electron BLE transport                     |
-| `packages/hd-transport-react-native` | React Native BLE transport                           |
-| `packages/hd-common-connect-sdk`     | 根据 env 选择 transport，向桌面/Web 示例暴露统一入口 |
-| `submodules/firmware-pro2`           | Pro2 protobuf schema 来源                            |
+| `packages/hd-transport-web-device`   | WebUSB 和 Electron BLE transport                               |
+| `packages/hd-transport-react-native` | React Native BLE transport                                     |
+| `packages/hd-common-connect-sdk`     | 根据 env 选择 transport，向桌面/Web 示例暴露统一入口           |
+| `submodules/firmware-pro2`           | Pro2 protobuf schema 来源                                      |
 
 ## 设计原则
 

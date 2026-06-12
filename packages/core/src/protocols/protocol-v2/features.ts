@@ -27,7 +27,7 @@ const normalizeEnumValue = <T extends Record<string | number, string | number>>(
 
 /**
  * DevSEInfo.state → 可读标签。SDK 内唯一的 SE 状态映射实现，
- * deviceProfile 与 legacy Features 兼容视图都从这里取。
+ * DeviceProfile 与标准 Features 构建都从这里取。
  */
 export const getProtocolV2SeState = (se?: DevSEInfo): ProtocolV2SeStateLabel | null => {
   const label = normalizeEnumValue(DevSEState, se?.state);
@@ -44,8 +44,8 @@ export const getProtocolV2SeState = (se?: DevSEInfo): ProtocolV2SeStateLabel | n
 };
 
 /**
- * DevSEInfo.type → 可读标签（如 'THD89'）。legacy Features 兼容视图的
- * onekey_se_type 字段从这里取。
+ * DevSEInfo.type → 可读标签（如 'THD89'）。DeviceProfile / Features
+ * 的 SE 类型归一化从这里取。
  */
 export const getProtocolV2SeType = (se?: DevSEInfo): string | null =>
   normalizeEnumValue(DevSeType, se?.type);

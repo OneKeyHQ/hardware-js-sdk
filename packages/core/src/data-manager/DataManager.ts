@@ -114,11 +114,11 @@ export default class DataManager {
 
     const deviceFirmwareType = getFirmwareType(features);
     const deviceFirmwareVersion = getDeviceFirmwareVersion(features);
-    if (features.firmware_present === false) {
+    if (features.firmwarePresent === false) {
       return 'none';
     }
 
-    if (DeviceModelToTypes.model_mini.includes(deviceType) && features.bootloader_mode) {
+    if (DeviceModelToTypes.model_mini.includes(deviceType) && features.bootloaderMode) {
       return 'unknown';
     }
 
@@ -264,8 +264,8 @@ export default class DataManager {
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
 
     if (
-      features.firmware_present === false ||
-      (DeviceModelToTypes.model_classic.includes(deviceType) && features.bootloader_mode)
+      features.firmwarePresent === false ||
+      (DeviceModelToTypes.model_classic.includes(deviceType) && features.bootloaderMode)
     ) {
       // Always return least changelog
       return getReleaseChangelog(targetDeviceConfigList, '0.0.0');

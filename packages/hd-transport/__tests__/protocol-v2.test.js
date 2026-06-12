@@ -483,7 +483,7 @@ describe('Protocol V2 framing and session', () => {
     });
   });
 
-  test('probeProtocolV2 accepts Ping success as a normal V2 probe response', async () => {
+  test('probeProtocolV2 accepts Success as a normal V2 probe response', async () => {
     await expect(
       probeProtocolV2({
         call: () => Promise.resolve({ type: 'Success', message: {} }),
@@ -729,7 +729,7 @@ describe('Protocol V2 framing and session', () => {
   });
 
   test('probeProtocolV2 only uses Ping for acquire probing', async () => {
-    const call = jest.fn().mockRejectedValue(new Error('ping timeout'));
+    const call = jest.fn().mockRejectedValue(new Error('Ping timeout'));
     const onProbeFailed = jest.fn();
 
     await expect(
@@ -742,7 +742,7 @@ describe('Protocol V2 framing and session', () => {
     expect(call).toHaveBeenNthCalledWith(
       1,
       'Ping',
-      { message: 'probe' },
+      { message: 'protocol-v2-probe' },
       {
         timeoutMs: 1,
         expectedTypes: ['Success'],

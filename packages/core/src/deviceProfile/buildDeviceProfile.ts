@@ -1,5 +1,4 @@
 import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
-import { OneKeyDeviceType, OneKeySEState, OneKeySeType } from '@onekeyfe/hd-transport';
 
 import {
   getDeviceBLEFirmwareVersion,
@@ -31,7 +30,7 @@ import type { DevFirmwareImageInfo, ProtocolV2DeviceInfo } from '@onekeyfe/hd-tr
 type BuildProtocolV1ProfileParams = {
   protocol?: DeviceInfoProtocol;
   features?: Features;
-  onekeyFeatures?: OnekeyFeatures;
+  protocolV1OneKeyFeatures?: OnekeyFeatures;
   sources?: DeviceInfoSource[];
   scope?: GetDeviceInfoParams['scope'];
   includeRaw?: boolean;
@@ -46,7 +45,7 @@ type BuildProtocolV2ProfileParams = {
 
 const isMeaningfulVersion = (version?: string | null) => Boolean(version && version !== '0.0.0');
 
-const firstVersion = (...versions: Array<string | null | undefined>) =>
+const firstMeaningfulVersion = (...versions: Array<string | null | undefined>) =>
   versions.find(isMeaningfulVersion) ?? null;
 
 const versionArrayToString = (version?: Array<number | string | null> | null) => {
@@ -80,7 +79,7 @@ const shouldIncludeVerify = (scope?: GetDeviceInfoParams['scope']) =>
 
 const getDeviceMode = (features?: Features): DeviceInfoStatus['mode'] => {
   if (!features) return 'unknown';
-  if (features.bootloader_mode === true) return 'bootloader';
+  if (features.bootloaderMode === true) return 'bootloader';
   if (features.initialized === false) return 'notInitialized';
   if (features.initialized === true) return 'normal';
   return 'unknown';
@@ -95,74 +94,85 @@ const getProtocolV2Mode = (deviceInfo?: ProtocolV2DeviceInfo): DeviceInfoStatus[
 
 const normalizeV1Versions = (
   features?: Features,
-  onekeyFeatures?: OnekeyFeatures
+  protocolV1OneKeyFeatures?: OnekeyFeatures
 ): DeviceProfileVersions => ({
-  firmware: firstVersion(
-    onekeyFeatures?.onekey_firmware_version,
+  firmware: firstMeaningfulVersion(
+    protocolV1OneKeyFeatures?.onekey_firmware_version,
     versionArrayToString(getDeviceFirmwareVersion(features))
   ),
-  bootloader: firstVersion(
-    onekeyFeatures?.onekey_boot_version,
+  bootloader: firstMeaningfulVersion(
+    protocolV1OneKeyFeatures?.onekey_boot_version,
     versionArrayToString(getDeviceBootloaderVersion(features))
   ),
-  board: firstVersion(
-    onekeyFeatures?.onekey_board_version,
+  board: firstMeaningfulVersion(
+    protocolV1OneKeyFeatures?.onekey_board_version,
     versionArrayToString(features ? getDeviceBoardloaderVersion(features) : undefined)
   ),
-  ble: firstVersion(
-    onekeyFeatures?.onekey_ble_version,
-    features?.onekey_ble_version,
-    features?.ble_ver,
+  ble: firstMeaningfulVersion(
+    protocolV1OneKeyFeatures?.onekey_ble_version,
+    features?.bleVersion,
     versionArrayToString(features ? getDeviceBLEFirmwareVersion(features) : undefined)
   ),
-  se01: firstVersion(onekeyFeatures?.onekey_se01_version, features?.onekey_se01_version),
-  se02: firstVersion(onekeyFeatures?.onekey_se02_version, features?.onekey_se02_version),
-  se03: firstVersion(onekeyFeatures?.onekey_se03_version, features?.onekey_se03_version),
-  se04: firstVersion(onekeyFeatures?.onekey_se04_version, features?.onekey_se04_version),
-  se01Boot: firstVersion(
-    onekeyFeatures?.onekey_se01_boot_version,
-    features?.onekey_se01_boot_version
+  se01: firstMeaningfulVersion(
+    protocolV1OneKeyFeatures?.onekey_se01_version,
+    features?.se01Version
   ),
-  se02Boot: firstVersion(
-    onekeyFeatures?.onekey_se02_boot_version,
-    features?.onekey_se02_boot_version
+  se02: firstMeaningfulVersion(
+    protocolV1OneKeyFeatures?.onekey_se02_version,
+    features?.se02Version
   ),
-  se03Boot: firstVersion(
-    onekeyFeatures?.onekey_se03_boot_version,
-    features?.onekey_se03_boot_version
+  se03: firstMeaningfulVersion(
+    protocolV1OneKeyFeatures?.onekey_se03_version,
+    features?.se03Version
   ),
-  se04Boot: firstVersion(
-    onekeyFeatures?.onekey_se04_boot_version,
-    features?.onekey_se04_boot_version
+  se04: firstMeaningfulVersion(
+    protocolV1OneKeyFeatures?.onekey_se04_version,
+    features?.se04Version
+  ),
+  se01Boot: firstMeaningfulVersion(
+    protocolV1OneKeyFeatures?.onekey_se01_boot_version,
+    features?.se01BootVersion
+  ),
+  se02Boot: firstMeaningfulVersion(
+    protocolV1OneKeyFeatures?.onekey_se02_boot_version,
+    features?.se02BootVersion
+  ),
+  se03Boot: firstMeaningfulVersion(
+    protocolV1OneKeyFeatures?.onekey_se03_boot_version,
+    features?.se03BootVersion
+  ),
+  se04Boot: firstMeaningfulVersion(
+    protocolV1OneKeyFeatures?.onekey_se04_boot_version,
+    features?.se04BootVersion
   ),
 });
 
 const normalizeV2Versions = (deviceInfo?: ProtocolV2DeviceInfo): DeviceProfileVersions => ({
-  firmware: firstVersion(getImageVersion(deviceInfo?.fw?.app)),
-  bootloader: firstVersion(getImageVersion(deviceInfo?.fw?.boot)),
-  board: firstVersion(getImageVersion(deviceInfo?.fw?.board)),
-  ble: firstVersion(getImageVersion(deviceInfo?.bt?.app)),
-  se01: firstVersion(getImageVersion(deviceInfo?.se1?.app)),
-  se02: firstVersion(getImageVersion(deviceInfo?.se2?.app)),
-  se03: firstVersion(getImageVersion(deviceInfo?.se3?.app)),
-  se04: firstVersion(getImageVersion(deviceInfo?.se4?.app)),
-  se01Boot: firstVersion(getImageVersion(deviceInfo?.se1?.boot)),
-  se02Boot: firstVersion(getImageVersion(deviceInfo?.se2?.boot)),
-  se03Boot: firstVersion(getImageVersion(deviceInfo?.se3?.boot)),
-  se04Boot: firstVersion(getImageVersion(deviceInfo?.se4?.boot)),
+  firmware: firstMeaningfulVersion(getImageVersion(deviceInfo?.fw?.app)),
+  bootloader: firstMeaningfulVersion(getImageVersion(deviceInfo?.fw?.boot)),
+  board: firstMeaningfulVersion(getImageVersion(deviceInfo?.fw?.board)),
+  ble: firstMeaningfulVersion(getImageVersion(deviceInfo?.bt?.app)),
+  se01: firstMeaningfulVersion(getImageVersion(deviceInfo?.se1?.app)),
+  se02: firstMeaningfulVersion(getImageVersion(deviceInfo?.se2?.app)),
+  se03: firstMeaningfulVersion(getImageVersion(deviceInfo?.se3?.app)),
+  se04: firstMeaningfulVersion(getImageVersion(deviceInfo?.se4?.app)),
+  se01Boot: firstMeaningfulVersion(getImageVersion(deviceInfo?.se1?.boot)),
+  se02Boot: firstMeaningfulVersion(getImageVersion(deviceInfo?.se2?.boot)),
+  se03Boot: firstMeaningfulVersion(getImageVersion(deviceInfo?.se3?.boot)),
+  se04Boot: firstMeaningfulVersion(getImageVersion(deviceInfo?.se4?.boot)),
 });
 
 // V2 状态由 normalizeV2Status 处理，这里只服务 buildProfileFromProtocolV1 的 V1 路径。
 const normalizeV1Status = (features?: Features): DeviceInfoStatus => ({
   mode: getDeviceMode(features),
   initialized: features?.initialized ?? null,
-  bootloaderMode: features?.bootloader_mode ?? null,
+  bootloaderMode: features?.bootloaderMode ?? null,
   unlocked: features?.unlocked ?? null,
-  passphraseProtection: features?.passphrase_protection ?? null,
-  backupRequired: features?.needs_backup ?? null,
-  noBackup: features?.no_backup ?? null,
+  passphraseProtection: features?.passphraseProtection ?? null,
+  backupRequired: features?.backupRequired ?? null,
+  noBackup: features?.noBackup ?? null,
   language: features?.language ?? null,
-  bleEnabled: features?.ble_enable ?? null,
+  bleEnabled: features?.bleEnabled ?? null,
 });
 
 const normalizeV2Status = (deviceInfo?: ProtocolV2DeviceInfo): DeviceInfoStatus => ({
@@ -179,32 +189,38 @@ const normalizeV2Status = (deviceInfo?: ProtocolV2DeviceInfo): DeviceInfoStatus 
 
 const normalizeV1Verify = (
   features?: Features,
-  onekeyFeatures?: OnekeyFeatures
+  protocolV1OneKeyFeatures?: OnekeyFeatures
 ): DeviceProfileVerify => ({
-  firmwareBuildId: onekeyFeatures?.onekey_firmware_build_id ?? features?.onekey_firmware_build_id,
-  firmwareHash: onekeyFeatures?.onekey_firmware_hash ?? features?.onekey_firmware_hash,
-  bootloaderBuildId: onekeyFeatures?.onekey_boot_build_id ?? features?.onekey_boot_build_id,
-  bootloaderHash: onekeyFeatures?.onekey_boot_hash ?? features?.onekey_boot_hash,
-  boardBuildId: onekeyFeatures?.onekey_board_build_id ?? features?.onekey_board_build_id,
-  boardHash: onekeyFeatures?.onekey_board_hash ?? features?.onekey_board_hash,
-  bleBuildId: onekeyFeatures?.onekey_ble_build_id ?? features?.onekey_ble_build_id,
-  bleHash: onekeyFeatures?.onekey_ble_hash ?? features?.onekey_ble_hash,
-  se01BuildId: onekeyFeatures?.onekey_se01_build_id ?? features?.onekey_se01_build_id,
-  se01Hash: onekeyFeatures?.onekey_se01_hash ?? features?.onekey_se01_hash,
-  se02BuildId: onekeyFeatures?.onekey_se02_build_id ?? features?.onekey_se02_build_id,
-  se02Hash: onekeyFeatures?.onekey_se02_hash ?? features?.onekey_se02_hash,
-  se03BuildId: onekeyFeatures?.onekey_se03_build_id ?? features?.onekey_se03_build_id,
-  se03Hash: onekeyFeatures?.onekey_se03_hash ?? features?.onekey_se03_hash,
-  se04BuildId: onekeyFeatures?.onekey_se04_build_id ?? features?.onekey_se04_build_id,
-  se04Hash: onekeyFeatures?.onekey_se04_hash ?? features?.onekey_se04_hash,
-  se01BootBuildId: onekeyFeatures?.onekey_se01_boot_build_id ?? features?.onekey_se01_boot_build_id,
-  se01BootHash: onekeyFeatures?.onekey_se01_boot_hash ?? features?.onekey_se01_boot_hash,
-  se02BootBuildId: onekeyFeatures?.onekey_se02_boot_build_id ?? features?.onekey_se02_boot_build_id,
-  se02BootHash: onekeyFeatures?.onekey_se02_boot_hash ?? features?.onekey_se02_boot_hash,
-  se03BootBuildId: onekeyFeatures?.onekey_se03_boot_build_id ?? features?.onekey_se03_boot_build_id,
-  se03BootHash: onekeyFeatures?.onekey_se03_boot_hash ?? features?.onekey_se03_boot_hash,
-  se04BootBuildId: onekeyFeatures?.onekey_se04_boot_build_id ?? features?.onekey_se04_boot_build_id,
-  se04BootHash: onekeyFeatures?.onekey_se04_boot_hash ?? features?.onekey_se04_boot_hash,
+  firmwareBuildId:
+    protocolV1OneKeyFeatures?.onekey_firmware_build_id ?? features?.verify?.firmwareBuildId,
+  firmwareHash: protocolV1OneKeyFeatures?.onekey_firmware_hash ?? features?.verify?.firmwareHash,
+  bootloaderBuildId:
+    protocolV1OneKeyFeatures?.onekey_boot_build_id ?? features?.verify?.bootloaderBuildId,
+  bootloaderHash: protocolV1OneKeyFeatures?.onekey_boot_hash ?? features?.verify?.bootloaderHash,
+  boardBuildId: protocolV1OneKeyFeatures?.onekey_board_build_id ?? features?.verify?.boardBuildId,
+  boardHash: protocolV1OneKeyFeatures?.onekey_board_hash ?? features?.verify?.boardHash,
+  bleBuildId: protocolV1OneKeyFeatures?.onekey_ble_build_id ?? features?.verify?.bleBuildId,
+  bleHash: protocolV1OneKeyFeatures?.onekey_ble_hash ?? features?.verify?.bleHash,
+  se01BuildId: protocolV1OneKeyFeatures?.onekey_se01_build_id ?? features?.verify?.se01BuildId,
+  se01Hash: protocolV1OneKeyFeatures?.onekey_se01_hash ?? features?.verify?.se01Hash,
+  se02BuildId: protocolV1OneKeyFeatures?.onekey_se02_build_id ?? features?.verify?.se02BuildId,
+  se02Hash: protocolV1OneKeyFeatures?.onekey_se02_hash ?? features?.verify?.se02Hash,
+  se03BuildId: protocolV1OneKeyFeatures?.onekey_se03_build_id ?? features?.verify?.se03BuildId,
+  se03Hash: protocolV1OneKeyFeatures?.onekey_se03_hash ?? features?.verify?.se03Hash,
+  se04BuildId: protocolV1OneKeyFeatures?.onekey_se04_build_id ?? features?.verify?.se04BuildId,
+  se04Hash: protocolV1OneKeyFeatures?.onekey_se04_hash ?? features?.verify?.se04Hash,
+  se01BootBuildId:
+    protocolV1OneKeyFeatures?.onekey_se01_boot_build_id ?? features?.verify?.se01BootBuildId,
+  se01BootHash: protocolV1OneKeyFeatures?.onekey_se01_boot_hash ?? features?.verify?.se01BootHash,
+  se02BootBuildId:
+    protocolV1OneKeyFeatures?.onekey_se02_boot_build_id ?? features?.verify?.se02BootBuildId,
+  se02BootHash: protocolV1OneKeyFeatures?.onekey_se02_boot_hash ?? features?.verify?.se02BootHash,
+  se03BootBuildId:
+    protocolV1OneKeyFeatures?.onekey_se03_boot_build_id ?? features?.verify?.se03BootBuildId,
+  se03BootHash: protocolV1OneKeyFeatures?.onekey_se03_boot_hash ?? features?.verify?.se03BootHash,
+  se04BootBuildId:
+    protocolV1OneKeyFeatures?.onekey_se04_boot_build_id ?? features?.verify?.se04BootBuildId,
+  se04BootHash: protocolV1OneKeyFeatures?.onekey_se04_boot_hash ?? features?.verify?.se04BootHash,
 });
 
 const normalizeV2Verify = (deviceInfo?: ProtocolV2DeviceInfo): DeviceProfileVerify => ({
@@ -236,105 +252,46 @@ const normalizeV2Verify = (deviceInfo?: ProtocolV2DeviceInfo): DeviceProfileVeri
 
 const normalizeRaw = ({
   features,
-  onekeyFeatures,
+  protocolV1OneKeyFeatures,
   protocolV2DeviceInfo,
 }: {
   features?: Features;
-  onekeyFeatures?: OnekeyFeatures;
+  protocolV1OneKeyFeatures?: OnekeyFeatures;
   protocolV2DeviceInfo?: ProtocolV2DeviceInfo;
 }): DeviceProfileRaw => ({
   ...(features ? { features } : {}),
-  ...(onekeyFeatures ? { onekeyFeatures } : {}),
+  ...(protocolV1OneKeyFeatures ? { protocolV1OneKeyFeatures } : {}),
   ...(protocolV2DeviceInfo ? { protocolV2DeviceInfo } : {}),
 });
-
-/**
- * V1 profile 构建用的 features 合并视图。
- *
- * OnekeyFeatures 与 Features 的同名字段（onekey_device_type / onekey_se_type /
- * onekey_se0X_state）wire 同源：传输层解码会把 proto 枚举输出为名称字符串，与
- * Features 侧的 string 声明一致，仅生成类型分别声明为枚举/字符串，这里按
- * Features 的声明显式归一，避免整体 as Features 断言。
- */
-const mergeV1Features = (
-  features?: Features,
-  onekeyFeatures?: OnekeyFeatures
-): Features | undefined => {
-  if (!features && !onekeyFeatures) return undefined;
-
-  const {
-    onekey_device_type: onekeyDeviceType,
-    onekey_se_type: onekeySeType,
-    onekey_se01_state: onekeySe01State,
-    onekey_se02_state: onekeySe02State,
-    onekey_se03_state: onekeySe03State,
-    onekey_se04_state: onekeySe04State,
-    ...restOnekeyFeatures
-  } = onekeyFeatures ?? {};
-
-  const toEnumName = (
-    enumObject: Record<string | number, string | number>,
-    value: number | string | null | undefined
-  ): string | null | undefined => {
-    if (value == null || typeof value === 'string') return value;
-    const label = enumObject[value];
-    return typeof label === 'string' ? label : String(value);
-  };
-
-  return {
-    // 仅 onekeyFeatures 的场景没有完整 Features 底座（与历史 as Features 行为一致，
-    // 该路径目前没有调用方触达：两处调用都至少携带 features）。
-    ...((features ?? {}) as Features),
-    ...restOnekeyFeatures,
-    ...(onekeyDeviceType !== undefined
-      ? { onekey_device_type: toEnumName(OneKeyDeviceType, onekeyDeviceType) }
-      : {}),
-    ...(onekeySeType !== undefined
-      ? { onekey_se_type: toEnumName(OneKeySeType, onekeySeType) }
-      : {}),
-    ...(onekeySe01State !== undefined
-      ? { onekey_se01_state: toEnumName(OneKeySEState, onekeySe01State) }
-      : {}),
-    ...(onekeySe02State !== undefined
-      ? { onekey_se02_state: toEnumName(OneKeySEState, onekeySe02State) }
-      : {}),
-    ...(onekeySe03State !== undefined
-      ? { onekey_se03_state: toEnumName(OneKeySEState, onekeySe03State) }
-      : {}),
-    ...(onekeySe04State !== undefined
-      ? { onekey_se04_state: toEnumName(OneKeySEState, onekeySe04State) }
-      : {}),
-  };
-};
 
 export function buildProfileFromProtocolV1({
   protocol = 'V1',
   features,
-  onekeyFeatures,
+  protocolV1OneKeyFeatures,
   sources = ['features'],
   scope = 'basic',
   includeRaw = false,
 }: BuildProtocolV1ProfileParams): DeviceProfile {
-  const sourceFeatures = mergeV1Features(features, onekeyFeatures);
-  const verify = normalizeV1Verify(sourceFeatures, onekeyFeatures);
+  const sourceFeatures = features;
+  const verify = normalizeV1Verify(sourceFeatures, protocolV1OneKeyFeatures);
 
   return {
     protocol,
     sources,
     deviceType: getDeviceType(sourceFeatures),
     firmwareType: getFirmwareType(sourceFeatures),
-    deviceId: sourceFeatures?.device_id || (sourceFeatures ? getDeviceUUID(sourceFeatures) : ''),
+    deviceId: sourceFeatures?.deviceId || (sourceFeatures ? getDeviceUUID(sourceFeatures) : ''),
     serialNo: sourceFeatures ? getDeviceUUID(sourceFeatures) : '',
     label: getDeviceLabel(sourceFeatures),
     bleName: getDeviceBleName(sourceFeatures),
     status: normalizeV1Status(sourceFeatures),
-    versions: normalizeV1Versions(sourceFeatures, onekeyFeatures),
+    versions: normalizeV1Versions(sourceFeatures, protocolV1OneKeyFeatures),
     ...(shouldIncludeVerify(scope) ? { verify } : {}),
     ...(includeRaw
       ? {
           raw: normalizeRaw({
             features,
-            onekeyFeatures,
+            protocolV1OneKeyFeatures,
           }),
         }
       : {}),

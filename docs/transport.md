@@ -7,14 +7,14 @@
 
 ## 协议差异
 
-| 项目       | Protocol V1                     | Protocol V2                                          |
-| ---------- | ------------------------------- | ---------------------------------------------------- |
-| 设备       | Classic / Mini / Touch / Pro 等 | Pro2                                                 |
-| 传输       | USB、BLE、Bridge                | WebUSB、Electron BLE、React Native BLE               |
-| 帧头       | `0x3F` 分包，payload 内含 `##`  | `0x5A` 完整帧                                        |
-| message id | big-endian                      | little-endian                                        |
-| 完整性校验 | 无额外 CRC                      | header CRC8 + frame CRC8                             |
-| 初始化     | `Initialize -> Features`        | `Ping {message:'probe'}` 探测并初始化                |
+| 项目       | Protocol V1                     | Protocol V2                                                 |
+| ---------- | ------------------------------- | ----------------------------------------------------------- |
+| 设备       | Classic / Mini / Touch / Pro 等 | Pro2                                                        |
+| 传输       | USB、BLE、Bridge                | WebUSB、Electron BLE、React Native BLE                      |
+| 帧头       | `0x3F` 分包，payload 内含 `##`  | `0x5A` 完整帧                                               |
+| message id | big-endian                      | little-endian                                               |
+| 完整性校验 | 无额外 CRC                      | header CRC8 + frame CRC8                                    |
+| 初始化     | `Initialize -> Features`        | `Ping {message:'probe'}` 探测并初始化                       |
 | schema     | `messages.json`                 | `messages-protocol-v2.json`，必要时可 fallback 到 V1 schema |
 
 ## WebUSB 流程
@@ -118,9 +118,9 @@ transport.configureProtocolV2(messagesProtocolV2);
 
 Protocol V2 encode/decode 的 schema 选择规则：
 
-| 阶段   | 规则                                                  |
-| ------ | ----------------------------------------------------- |
-| encode | 优先在 V2 schema 查找消息名；找不到则回退 V1 schema   |
+| 阶段   | 规则                                                        |
+| ------ | ----------------------------------------------------------- |
+| encode | 优先在 V2 schema 查找消息名；找不到则回退 V1 schema         |
 | decode | `messageTypeId >= 60000` 使用 V2 schema，否则使用 V1 schema |
 
 这样 Protocol V2 系统消息进入 typedCall 类型面，同时不会破坏 V1 业务消息的类型。
@@ -129,20 +129,20 @@ Protocol V2 encode/decode 的 schema 选择规则：
 
 V2 协议公共能力放在 `packages/hd-transport/src/protocol-session.ts`：
 
-| 能力                       | 职责                                                       |
-| -------------------------- | ---------------------------------------------------------- |
-| `ProtocolV2Session`        | 统一执行 V2 encode、写 frame、读 frame、decode、超时和日志 |
-| `ProtocolV2FrameAssembler` | 根据 `0x5A` frame length 重组 USB/BLE 分片，并校验最大长度 |
-| `probeProtocolV1()`        | 默认路径先发送 `Initialize`，成功继续走 V1 初始化           |
+| 能力                       | 职责                                                                                 |
+| -------------------------- | ------------------------------------------------------------------------------------ |
+| `ProtocolV2Session`        | 统一执行 V2 encode、写 frame、读 frame、decode、超时和日志                           |
+| `ProtocolV2FrameAssembler` | 根据 `0x5A` frame length 重组 USB/BLE 分片，并校验最大长度                           |
+| `probeProtocolV1()`        | 默认路径先发送 `Initialize`，成功继续走 V1 初始化                                    |
 | `probeProtocolV2()`        | V1 失败、显式 V2 或缓存 V2 时发送 `Ping {message:'probe'}` / bootloader status probe |
 
 具体 transport 只提供平台相关能力：
 
-| Transport        | 保留职责                                              |
-| ---------------- | ----------------------------------------------------- |
-| WebUSB           | USB 设备授权、endpoint discovery、transferIn/out retry |
-| Electron BLE     | noble 连接、订阅、hex 写入、BLE 错误映射              |
-| React Native BLE | BLE PLX 连接、service/characteristic 发现、base64 写入 |
+| Transport        | 保留职责                                                   |
+| ---------------- | ---------------------------------------------------------- |
+| WebUSB           | USB 设备授权、endpoint discovery、transferIn/out retry     |
+| Electron BLE     | noble 连接、订阅、hex 写入、BLE 错误映射                   |
+| React Native BLE | BLE PLX 连接、service/characteristic 发现、base64 写入     |
 | lowlevel BLE     | 原生桥接 `enumerate/connect/send/receive`，JS 侧重组 V1/V2 |
 
 这个层级让后续新增协议或新增传输方式时只扩展 session/channel 边界，不把协议细节继续散落到每个 transport 实现里。
@@ -165,7 +165,7 @@ flowchart TD
 初始化分支：
 
 - `V1`：执行传统 `Initialize`，写入真实 `Features`，再按 features 重新选择 schema。
-- `V2`：执行 `Ping` 验证链路，通过 `DevGetDeviceInfo` 获取 Protocol V2 设备信息并生成标准 `DeviceProfile`。legacy `Features` 仅作为事件和旧 API 兼容视图同步，设备身份以 `DeviceProfile.serialNo/deviceId` 为准。
+- `V2`：执行 `Ping` 验证链路，通过 `DevGetDeviceInfo` 获取 Protocol V2 设备信息，并生成标准 `DeviceProfile` 与结构化 `Features`。设备身份以 `serialNo/deviceId` 的语义区分为准。
 
 ## 固件更新流程
 

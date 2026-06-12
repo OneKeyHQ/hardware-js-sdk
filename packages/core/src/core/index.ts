@@ -57,16 +57,12 @@ import DeviceConnector from '../device/DeviceConnector';
 import RequestQueue from './RequestQueue';
 import { getSynchronize } from '../utils/getSynchronize';
 
-import type { ConnectSettings, KnownDevice } from '../types';
+import type { ConnectSettings, Features, KnownDevice } from '../types';
 import type { CoreMessage, IFrameCallMessage, UiPromise, UiPromiseResponse } from '../events';
 import type { DeviceEvents, InitOptions, RunOptions } from '../device/Device';
 import type { SdkTracingContext } from '../utils/tracing';
 import type { Deferred } from '@onekeyfe/hd-shared';
-import type {
-  Features,
-  LowlevelTransportSharedPlugin,
-  OneKeyDeviceInfo,
-} from '@onekeyfe/hd-transport';
+import type { LowlevelTransportSharedPlugin, OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
 import type { BaseMethod } from '../api/BaseMethod';
 
 const Log = getLogger(LoggerNames.Core);
@@ -1115,7 +1111,7 @@ const checkPassphraseEnableState = (method: BaseMethod, features?: Features) => 
 
   const passphraseProtection = method.device
     ? method.device.getCurrentPassphraseProtection()
-    : features?.passphrase_protection;
+    : features?.passphraseProtection;
 
   if (passphraseProtection === true) {
     const hasNoPassphraseState =

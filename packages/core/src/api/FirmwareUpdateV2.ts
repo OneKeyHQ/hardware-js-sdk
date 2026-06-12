@@ -15,7 +15,14 @@ import { validateParams } from './helpers/paramsValidator';
 import { DevicePool } from '../device/DevicePool';
 import { getBinary, getInfo, getSysResourceBinary } from './firmware/getBinary';
 import { updateResources, uploadFirmware } from './firmware/uploadFirmware';
-import { LoggerNames, getDeviceFirmwareVersion, getDeviceUUID, getLogger, wait } from '../utils';
+import {
+  LoggerNames,
+  getDeviceBootloaderVersion,
+  getDeviceFirmwareVersion,
+  getDeviceUUID,
+  getLogger,
+  wait,
+} from '../utils';
 import { FirmwareUpdateTipMessage, createUiMessage } from '../events/ui-request';
 import { DeviceModelToTypes } from '../types';
 import { DataManager } from '../data-manager';
@@ -222,7 +229,7 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
     const isBoot183ClassicUpBle =
       this.params.updateType === 'firmware' &&
       deviceType === EDeviceType.Classic &&
-      features.bootloader_version === '1.8.3';
+      getDeviceBootloaderVersion(features).join('.') === '1.8.3';
     return isMini || isBoot183ClassicUpBle;
   }
 

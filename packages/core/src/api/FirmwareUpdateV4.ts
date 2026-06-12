@@ -7,7 +7,14 @@ import {
 
 import { FirmwareUpdateTipMessage, UI_REQUEST } from '../events/ui-request';
 import { validateParams } from './helpers/paramsValidator';
-import { LoggerNames, getFirmwareType, getLogger } from '../utils';
+import {
+  LoggerNames,
+  getDeviceBLEFirmwareVersion,
+  getDeviceBootloaderVersion,
+  getDeviceFirmwareVersion,
+  getFirmwareType,
+  getLogger,
+} from '../utils';
 import { getBinary, getSysResourceBinary } from './firmware/getBinary';
 import { DataManager } from '../data-manager';
 import { FirmwareUpdateBaseMethod } from './firmware/FirmwareUpdateBaseMethod';
@@ -163,8 +170,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   }
 
   private async runProtocolV2() {
-    const legacyFeatures = await this.getProtocolV2LegacyFeatures();
-    const deviceFirmwareType = getFirmwareType(legacyFeatures);
+    const deviceFeatures = await this.getProtocolV2DeviceFeatures();
+    const deviceFirmwareType = getFirmwareType(deviceFeatures);
     const firmwareType = this.params.firmwareType ?? deviceFirmwareType;
 
     let resourceBinary: ArrayBuffer | null = null;
@@ -172,9 +179,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     let bootloaderBinary: ArrayBuffer | null = null;
     try {
       this.postTipMessage(FirmwareUpdateTipMessage.StartDownloadFirmware);
-      resourceBinary = await this.prepareResourceBinary(firmwareType, legacyFeatures);
-      fwBinaryMap = await this.prepareFirmwareAndBleBinary(firmwareType, legacyFeatures);
-      bootloaderBinary = await this.prepareBootloaderBinary(firmwareType, legacyFeatures);
+      resourceBinary = await this.prepareResourceBinary(firmwareType, deviceFeatures);
+      fwBinaryMap = await this.prepareFirmwareAndBleBinary(firmwareType, deviceFeatures);
+      bootloaderBinary = await this.prepareBootloaderBinary(firmwareType, deviceFeatures);
       // 按 DevFirmwareTargetType 拆分的目标二进制（显式 target_id，不走文件名推断）
       fwBinaryMap.push(...this.collectExplicitTargetBinaries());
       this.postTipMessage(FirmwareUpdateTipMessage.FinishDownloadFirmware);
@@ -207,9 +214,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return versions;
   }
 
-  private async getProtocolV2LegacyFeatures() {
+  private async getProtocolV2DeviceFeatures(): Promise<Features> {
     if (typeof this.device.getFeatures === 'function') {
-      return this.device.getFeatures();
+      const features = await this.device.getFeatures();
+      if (features) return features;
     }
     if (this.device.features) {
       return this.device.features;
@@ -257,7 +265,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     if (typeof this.device.isBootloader === 'function') {
       return this.device.isBootloader();
     }
-    return !!this.device.features?.bootloader_mode;
+    return !!this.device.features?.bootloaderMode;
   }
 
   async enterProtocolV2BootloaderMode() {
@@ -309,11 +317,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       'application_p2.bin',
       ProtocolV2FirmwareTargetType.TARGET_MAIN_APP
     );
-    push(
-      this.params.coprocessorBinary,
-      'coprocessor.bin',
-      ProtocolV2FirmwareTargetType.TARGET_BT
-    );
+    push(this.params.coprocessorBinary, 'coprocessor.bin', ProtocolV2FirmwareTargetType.TARGET_BT);
     push(this.params.se01Binary, 'se01.bin', ProtocolV2FirmwareTargetType.TARGET_SE1);
     push(this.params.se02Binary, 'se02.bin', ProtocolV2FirmwareTargetType.TARGET_SE2);
     push(this.params.se03Binary, 'se03.bin', ProtocolV2FirmwareTargetType.TARGET_SE3);
@@ -570,10 +574,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       PROTOCOL_V2_BOOTLOADER_RECONNECT_TIMEOUT
     );
 
-    const bootloaderVersion =
-      features.onekey_boot_version ?? features.bootloader_version ?? '0.0.0';
-    const bleVersion = features.onekey_ble_version ?? features.ble_ver ?? '0.0.0';
-    const firmwareVersion = features.onekey_firmware_version ?? '0.0.0';
+    const bootloaderVersion = getDeviceBootloaderVersion(features).join('.');
+    const bleVersion = getDeviceBLEFirmwareVersion(features).join('.');
+    const firmwareVersion = getDeviceFirmwareVersion(features).join('.');
     if (firmwareVersion === '0.0.0') {
       Log.warn(
         'Protocol V2 firmware update finished but app firmware version is still 0.0.0. This is allowed for Pro2 debug BLE-only update flows.'

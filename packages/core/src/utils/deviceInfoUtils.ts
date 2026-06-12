@@ -14,30 +14,12 @@ export const getDeviceType = (features?: Features): IDeviceType => {
   if (!features || typeof features !== 'object') {
     return EDeviceType.Unknown;
   }
+  if (features.deviceType) {
+    return features.deviceType;
+  }
 
-  // classic1s 3.5.0 pro 4.6.0
-  switch (features.onekey_device_type) {
-    case 'CLASSIC':
-      return EDeviceType.Classic;
-    case 'CLASSIC1S':
-      return EDeviceType.Classic1s;
-    case 'MINI':
-      return EDeviceType.Mini;
-    case 'TOUCH':
-      return EDeviceType.Touch;
-    case 'PRO':
-      return EDeviceType.Pro;
-    case 'PRO2':
-    case 'pro2':
-      return EDeviceType.Pro2;
-    case 'PURE':
-      return EDeviceType.ClassicPure;
-    default:
-      // future And old device onekey_device_type is empty
-      if (!isEmpty(features.onekey_serial_no)) {
-        return EDeviceType.Unknown;
-      }
-    // old device type
+  if (features.model === EDeviceType.Pro2 || features.model === 'pro2') {
+    return EDeviceType.Pro2;
   }
 
   // low version hardware
@@ -45,7 +27,7 @@ export const getDeviceType = (features?: Features): IDeviceType => {
   const serialNo = getDeviceUUID(features);
 
   // not exist serialNo, bootloader mode, model 1 is classic
-  if (isEmpty(serialNo) && features.bootloader_mode === true && features.model === '1') {
+  if (isEmpty(serialNo) && features.bootloaderMode === true && features.model === '1') {
     return EDeviceType.Classic;
   }
 
@@ -59,6 +41,7 @@ export const getDeviceType = (features?: Features): IDeviceType => {
   if (miniFlag.toLowerCase() === 'mi') return EDeviceType.Mini;
   if (miniFlag.toLowerCase() === 'tc') return EDeviceType.Touch;
   if (miniFlag.toLowerCase() === 'pr') return EDeviceType.Pro;
+  if (miniFlag.toLowerCase() === 'p2') return EDeviceType.Pro2;
 
   // unknown device
   return EDeviceType.Unknown;
@@ -89,15 +72,14 @@ export const getDeviceTypeByBleName = (name?: string): IDeviceType => {
  */
 export const getDeviceBleName = (features?: Features): string | null => {
   if (features == null) return null;
-  return features.onekey_ble_name || features.ble_name || null;
+  return features.bleName || null;
 };
 
 /**
  * Get Connected Device UUID by features
  */
 export const getDeviceUUID = (features: Features) => {
-  const serialNo = features.onekey_serial_no || features.onekey_serial || features.serial_no;
-  return serialNo ?? '';
+  return features.serialNo ?? '';
 };
 
 /**
@@ -163,8 +145,8 @@ export const getFirmwareType = (features: Features | undefined) => {
   if (!features) {
     return EFirmwareType.Universal;
   }
-  if (features.fw_vendor === 'OneKey Bitcoin-only') {
-    return EFirmwareType.BitcoinOnly;
+  if (features.firmwareType) {
+    return features.firmwareType;
   }
   // old firmware
   return features?.capabilities?.length > 0 &&

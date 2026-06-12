@@ -28,6 +28,25 @@ const protocolV1Schema = {
 
 const protocolV2Schema = {
   nested: {
+    GetProtoVersion: {
+      fields: {},
+    },
+    ProtoVersion: {
+      fields: {
+        major_version: {
+          type: 'uint32',
+          id: 1,
+        },
+        minor_version: {
+          type: 'uint32',
+          id: 2,
+        },
+        patch_version: {
+          type: 'uint32',
+          id: 3,
+        },
+      },
+    },
     Ping: {
       fields: {
         message: {
@@ -46,6 +65,8 @@ const protocolV2Schema = {
     },
     MessageType: {
       values: {
+        MessageType_GetProtoVersion: 60200,
+        MessageType_ProtoVersion: 60201,
         MessageType_Ping: 60206,
         MessageType_Success: 60207,
       },
@@ -109,13 +130,10 @@ describe('ElectronBleTransport protocol detection', () => {
     const device = { id: 'unknown-pro2-id', name: 'Unknown BLE Device' };
     const nobleBle = createNobleBle(device);
     let notificationHandler: ((deviceId: string, data: string) => void) | undefined;
-    let writeCount = 0;
     const probeResponse = ProtocolV2.encodeFrame(
       schemas,
       'Success',
-      {
-        message: 'probe',
-      },
+      { message: 'ok' },
       { router: PROTOCOL_V2_CHANNEL_BLE_UART }
     );
 
@@ -123,9 +141,10 @@ describe('ElectronBleTransport protocol detection', () => {
       notificationHandler = handler;
       return jest.fn();
     });
+    let writeCount = 0;
     nobleBle.write.mockImplementation(() => {
       writeCount += 1;
-      if (writeCount > 1) {
+      if (writeCount === 2) {
         setTimeout(() => notificationHandler?.(device.id, bytesToHex(probeResponse)), 0);
       }
       return Promise.resolve();
@@ -199,9 +218,7 @@ describe('ElectronBleTransport protocol detection', () => {
     const probeResponse = ProtocolV2.encodeFrame(
       schemas,
       'Success',
-      {
-        message: 'probe',
-      },
+      { message: 'ok' },
       { router: PROTOCOL_V2_CHANNEL_BLE_UART }
     );
 
