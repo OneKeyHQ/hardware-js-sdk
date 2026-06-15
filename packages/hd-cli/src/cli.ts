@@ -100,8 +100,8 @@ program
               const features = await sdk.getFeatures(device.connectId);
               if (features?.success && features.payload) {
                 device.features = features.payload;
-                device.name = features.payload.label || features.payload.ble_name || device.name;
-                const devType = features.payload.onekey_device_type?.toLowerCase();
+                device.name = features.payload.label || features.payload.bleName || device.name;
+                const devType = features.payload.deviceType?.toLowerCase();
                 if (devType) {
                   device.deviceType = devType as IDeviceType;
                 }
@@ -757,8 +757,8 @@ sessionCmd
         skipPassphraseCheck: true,
       });
       const featPayload = featResult?.success ? featResult.payload : undefined;
-      const deviceId = featPayload?.device_id || device.deviceId || '';
-      const sessionId = passphraseSessionId || featPayload?.session_id || '';
+      const deviceId = featPayload?.deviceId || device.deviceId || '';
+      const sessionId = passphraseSessionId || featPayload?.sessionId || '';
 
       // 6. Save to keychain
       if (passphraseState && deviceId && sessionId) {
@@ -914,10 +914,10 @@ async function prepareSession(
     connectId?: string;
     deviceId?: string;
     features?: {
-      device_id?: string;
-      onekey_device_type?: string;
-      session_id?: string;
-      passphrase_protection?: boolean | null;
+      deviceId?: string | null;
+      deviceType?: string;
+      sessionId?: string | null;
+      passphraseProtection?: boolean | null;
       unlocked?: boolean | null;
     };
   };
@@ -929,19 +929,19 @@ async function prepareSession(
   // ── Step 2: Get features if searchDevices didn't populate them ──
   // getFeatures failures here are non-fatal — we fall through to Step 3
   // which will fail with a clearer error if the device is truly unreachable.
-  let deviceId = device.features?.device_id || device.deviceId || '';
+  let deviceId = device.features?.deviceId || device.deviceId || '';
   let deviceType = getDeviceType(device.features as Features | undefined);
   let unlocked = device.features?.unlocked;
-  let passphraseProtection = device.features?.passphrase_protection;
+  let passphraseProtection = device.features?.passphraseProtection;
 
   if (!deviceId || unlocked == null || passphraseProtection == null) {
     try {
       const featResult = await sdk.getFeatures(connectId);
       if (featResult?.success && featResult.payload) {
-        deviceId = featResult.payload.device_id || deviceId;
+        deviceId = featResult.payload.deviceId || deviceId;
         deviceType = getDeviceType(featResult.payload) || deviceType;
         unlocked = featResult.payload.unlocked;
-        passphraseProtection = featResult.payload.passphrase_protection;
+        passphraseProtection = featResult.payload.passphraseProtection;
       }
     } catch {
       /* non-fatal — Step 3 will surface a clear error if device is gone */
@@ -957,9 +957,9 @@ async function prepareSession(
   if (wasLocked) {
     process.stderr.write('[onekey-hw] Device is locked. Unlocking (PIN required)...\n');
     const { payload: feat } = await unlockWithRetry(sdk, connectId);
-    deviceId = feat.device_id || deviceId;
+    deviceId = feat.deviceId || deviceId;
     unlocked = feat.unlocked;
-    passphraseProtection = feat.passphrase_protection;
+    passphraseProtection = feat.passphraseProtection;
   }
 
   if (!globalOpts.deviceId && deviceId) {
@@ -1009,7 +1009,7 @@ async function prepareSession(
         skipPassphraseCheck: true,
       });
       const sessionId =
-        passphraseSessionId || (featAfter?.success ? featAfter.payload?.session_id : undefined);
+        passphraseSessionId || (featAfter?.success ? featAfter.payload?.sessionId : undefined);
       if (sessionId) {
         await saveSessionToKeychain(deviceId, passphraseState, sessionId);
         await preloadSessionFromKeychain(deviceId);
