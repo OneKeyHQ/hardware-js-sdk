@@ -34,6 +34,11 @@ export type ConnectSettings = {
   fetchConfig?: boolean;
   extension?: string;
   configFetcher?: (url: string) => Promise<RemoteConfigResponse | null>;
+  /**
+   * 临时开关：Protocol V2 DevGetDeviceInfo 未稳定前用于 mock 设备信息。
+   * 正式 app 可显式设置为 false 以调用真实 DevGetDeviceInfo；固件稳定后删除。
+   */
+  protocolV2DeviceInfoMockEnabled?: boolean;
 };
 
 export type IVersionArray = [number, number, number];

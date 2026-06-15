@@ -20,6 +20,7 @@ import { PageLayout } from '../components/common/PageLayout';
 import { DeviceNotConnectedState } from '../components/common/DeviceNotConnectedState';
 import {
   callHardwareAPI,
+  hydrateConnectedDeviceInfo,
   searchDevices,
   type HardwareApiMethod,
 } from '../services/hardwareService';
@@ -546,8 +547,8 @@ export default function Pro2SpecialUpdatePage() {
               await new Promise(resolve => setTimeout(resolve, 1000));
               continue;
             }
-            const device = devices[0];
-            setConnectedDevices(devices);
+            const device = await hydrateConnectedDeviceInfo(devices[0]);
+            setConnectedDevices([device, ...devices.slice(1)]);
             setCurrentDevice(device);
             currentDeviceRef.current = device;
             setDeviceFeatures(device.features);

@@ -304,6 +304,7 @@ export function buildProfileFromProtocolV2({
   scope = 'basic',
   includeRaw = false,
 }: BuildProtocolV2ProfileParams): DeviceProfile {
+  const deviceId = deviceInfo?.hw?.device_id || '';
   const serialNo = deviceInfo?.hw?.serial_no || '';
   const label = deviceInfo?.status?.label ?? null;
   const bleName = deviceInfo?.bt?.adv_name ?? null;
@@ -314,9 +315,7 @@ export function buildProfileFromProtocolV2({
     sources,
     deviceType: EDeviceType.Pro2,
     firmwareType: EFirmwareType.Universal,
-    // Protocol V2 的 DevGetDeviceInfo 没有 device_id 字段；serialNo 与 deviceId
-    // 不是等价语义，这里保持空值，避免把稳定硬件序列号误当会随 wipe 轮换的身份。
-    deviceId: '',
+    deviceId,
     serialNo,
     label,
     bleName,

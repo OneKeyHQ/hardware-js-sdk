@@ -1,10 +1,10 @@
 import type { CommonParams, Response } from '../params';
 
 export type GetPassphraseStatePayload = {
-  passphrase_state?: string;
-  session_id?: string;
-  unlocked_attach_pin?: boolean;
-  passphrase_protection?: boolean | null;
+  passphraseState?: string;
+  sessionId?: string;
+  unlockedAttachPin?: boolean;
+  passphraseProtection?: boolean | null;
 };
 
 export type GetPassphraseStateParams = CommonParams & {

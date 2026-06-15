@@ -3,9 +3,8 @@ import { Button } from '../ui/Button';
 import { useTranslation } from 'react-i18next';
 import { Search, AlertTriangle, ArrowRight } from 'lucide-react';
 import { useDeviceStore } from '../../store/deviceStore';
-import { searchDevices } from '../../services/hardwareService';
+import { hydrateConnectedDeviceInfo, searchDevices } from '../../services/hardwareService';
 import { useToast } from '../../hooks/use-toast';
-import { SDKUtils } from '../../utils/hardwareInstance';
 import { isPro2DeviceInfo } from '../../utils/pro2Device';
 import type { DeviceInfo } from '../../types/hardware';
 
@@ -63,24 +62,19 @@ export function DeviceNotConnectedState({
         // 自动连接第一个设备
         if (devices.length > 0) {
           const targetDevice = devices[0];
+          const hydratedDevice = await hydrateConnectedDeviceInfo(targetDevice);
+          const hydratedDevices = [hydratedDevice, ...devices.slice(1)];
 
-          setCurrentDevice(targetDevice);
-
-          // 获取设备特征信息
-          const sdk = await SDKUtils.getInstance();
-          if (targetDevice.features) {
-            setDeviceFeatures(targetDevice.features);
-          } else if (targetDevice.connectId && targetDevice.deviceId) {
-            const featuresResult = await sdk.getFeatures(targetDevice.connectId);
-            if (featuresResult.success && featuresResult.payload) {
-              setDeviceFeatures(featuresResult.payload);
-            }
+          setConnectedDevices(hydratedDevices);
+          setCurrentDevice(hydratedDevice);
+          if (hydratedDevice.features) {
+            setDeviceFeatures(hydratedDevice.features);
           }
 
           toast({
             title: t('device.connected'),
             description: `${t('device.connectedTo')} ${
-              targetDevice.label || targetDevice.deviceType
+              hydratedDevice.label || hydratedDevice.deviceType
             }`,
             variant: 'default',
           });

@@ -97,12 +97,12 @@ function stubDevice<T extends Record<string, any>>(device: T): T {
   d.getCurrentFirmwareType ??= () => getFirmwareType(d.features);
   d.getCurrentFirmwareVersionString ??= () =>
     d.features ? getDeviceFirmwareVersion(d.features).join('.') : undefined;
-  d.getCurrentBLEFirmwareVersionString ??= () => d.features?.onekey_ble_version;
-  d.getCurrentSafetyChecks ??= () => d.features?.safety_checks;
-  d.getCurrentDeviceId ??= () => d.features?.device_id || undefined;
-  d.getCurrentSerialNo ??= () => d.features?.serial_no || d.features?.onekey_serial_no || '';
+  d.getCurrentBLEFirmwareVersionString ??= () => d.features?.bleVersion;
+  d.getCurrentSafetyChecks ??= () => d.features?.safetyChecks;
+  d.getCurrentDeviceId ??= () => d.features?.deviceId || undefined;
+  d.getCurrentSerialNo ??= () => d.features?.serialNo || '';
   d.getCurrentPassphraseProtection ??= () =>
-    d.features?.passphrase_protection;
+    d.features?.passphraseProtection;
   d.getCurrentMethodVersionRange ??= (fn: (model: any) => any) => {
     const deviceType = d.getCurrentDeviceType();
     const range = fn(deviceType);
@@ -162,6 +162,7 @@ describe('Protocol V2 feature adapter', () => {
       protocol_version: 1,
       hw: {
         serial_no: 'PR2SERIAL',
+        device_id: 'PRO2-DEVICE-ID',
       },
       fw: {
         board: {
@@ -211,40 +212,34 @@ describe('Protocol V2 feature adapter', () => {
       },
     });
 
-    expect(features.device_id).toBeNull();
-    expect(features.serial_no).toBe('PR2SERIAL');
-    expect(features.onekey_serial_no).toBe('PR2SERIAL');
-    expect(features.onekey_device_type).toBe('pro2');
-    expect(features.protocol_version).toBe(1);
-    expect(features.major_version).toBe(1);
-    expect(features.minor_version).toBe(2);
-    expect(features.patch_version).toBe(3);
-    expect(features.onekey_firmware_version).toBe('1.2.3');
-    expect(features.onekey_firmware_build_id).toBe('app-build');
-    expect(features.onekey_firmware_hash).toBe('abc123');
-    expect(features.bootloader_version).toBe('0.2.0');
-    expect(features.onekey_boot_build_id).toBe('boot-build');
-    expect(features.onekey_boot_hash).toBe('0a0b');
-    expect(features.onekey_board_hash).toBe('0102ff');
-    expect(features.ble_name).toBe('Pro2 BLE');
-    expect(features.onekey_ble_version).toBe('4.5.6');
-    expect(features.onekey_ble_hash).toBe('0c0d');
-    expect(features.onekey_se01_version).toBe('7.8.9');
-    expect(features.onekey_se01_hash).toBe('0e0f');
-    expect(features.onekey_se01_state).toBe('APP');
-    expect(features.onekey_se02_state).toBe('BOOT');
+    expect(features.deviceId).toBe('PRO2-DEVICE-ID');
+    expect(features.serialNo).toBe('PR2SERIAL');
+    expect(features.deviceType).toBe('pro2');
+    expect(features.protocolVersion).toBe(1);
+    expect(features.firmwareVersion).toBe('1.2.3');
+    expect(features.verify?.firmwareBuildId).toBe('app-build');
+    expect(features.verify?.firmwareHash).toBe('abc123');
+    expect(features.bootloaderVersion).toBe('0.2.0');
+    expect(features.verify?.bootloaderBuildId).toBe('boot-build');
+    expect(features.verify?.bootloaderHash).toBe('0a0b');
+    expect(features.verify?.boardHash).toBe('0102ff');
+    expect(features.bleName).toBe('Pro2 BLE');
+    expect(features.bleVersion).toBe('4.5.6');
+    expect(features.verify?.bleHash).toBe('0c0d');
+    expect(features.se01Version).toBe('7.8.9');
+    expect(features.verify?.se01Hash).toBe('0e0f');
     expect(features.label).toBe('My Pro2');
     expect(features.language).toBe('en-US');
     expect(features.initialized).toBe(false);
-    expect(features.needs_backup).toBe(true);
-    expect(features.passphrase_protection).toBe(true);
-    expect(features.ble_enable).toBe(true);
+    expect(features.backupRequired).toBe(true);
+    expect(features.passphraseProtection).toBe(true);
+    expect(features.bleEnabled).toBe(true);
   });
 
   test('uses GetPassphraseState payloads compatible with Pro series passphrase flow', async () => {
     const features = normalizeProtocolV2Features(descriptor as any);
     // Pro2 版本线独立于 Pro 系列：V2 设备无论固件版本都支持 GetPassphraseState
-    features.onekey_firmware_version = '1.2.3';
+    features.firmwareVersion = '1.2.3';
     const typedCall = jest.fn().mockResolvedValue({
       type: 'PassphraseState',
       message: {
@@ -284,12 +279,12 @@ describe('Protocol V2 feature adapter', () => {
 
   test('returns unified GetPassphraseState object payload for existing Pro devices', async () => {
     const features = {
-      device_id: 'pro-device-id',
-      onekey_device_type: 'PRO',
-      onekey_firmware_version: '4.15.0',
-      passphrase_protection: true,
-      session_id: 'feature-session',
-      unlocked_attach_pin: true,
+      deviceId: 'pro-device-id',
+      deviceType: 'pro',
+      firmwareVersion: '4.15.0',
+      passphraseProtection: true,
+      sessionId: 'feature-session',
+      unlockedAttachPin: true,
     };
     const typedCall = jest.fn().mockResolvedValue({
       type: 'PassphraseState',
@@ -316,10 +311,10 @@ describe('Protocol V2 feature adapter', () => {
     }) as any;
 
     await expect(method.run()).resolves.toEqual({
-      passphrase_state: 'state-pro',
-      session_id: 'session-pro',
-      unlocked_attach_pin: false,
-      passphrase_protection: true,
+      passphraseState: 'state-pro',
+      sessionId: 'session-pro',
+      unlockedAttachPin: false,
+      passphraseProtection: true,
     });
     expect(updateInternalState).toHaveBeenCalledWith(
       true,
@@ -332,12 +327,12 @@ describe('Protocol V2 feature adapter', () => {
 
   test('uses features for GetPassphraseState response metadata', async () => {
     const features = {
-      device_id: null,
-      onekey_device_type: 'PRO2',
-      onekey_firmware_version: '4.15.0',
-      passphrase_protection: true,
-      session_id: 'feature-session',
-      unlocked_attach_pin: true,
+      deviceId: null,
+      deviceType: 'pro2',
+      firmwareVersion: '4.15.0',
+      passphraseProtection: true,
+      sessionId: 'feature-session',
+      unlockedAttachPin: true,
     };
     const typedCall = jest.fn().mockResolvedValue({
       type: 'PassphraseState',
@@ -367,10 +362,10 @@ describe('Protocol V2 feature adapter', () => {
     }) as any;
 
     await expect(method.run()).resolves.toEqual({
-      passphrase_state: 'state-pro2',
-      session_id: 'session-pro2',
-      unlocked_attach_pin: false,
-      passphrase_protection: true,
+      passphraseState: 'state-pro2',
+      sessionId: 'session-pro2',
+      unlockedAttachPin: false,
+      passphraseProtection: true,
     });
     expect(getFeatures).not.toHaveBeenCalled();
   });
@@ -423,8 +418,8 @@ describe('Protocol V2 feature adapter', () => {
         hw: { serial_no: 'PR2SERIAL' },
       }
     );
-    (device as any).features.onekey_firmware_version = '4.15.0';
-    (device as any).features.passphrase_protection = true;
+    (device as any).features.firmwareVersion = '4.15.0';
+    (device as any).features.passphraseProtection = true;
     (device as any).features.unlocked = true;
     (device as any).commands = { typedCall };
 
@@ -434,8 +429,8 @@ describe('Protocol V2 feature adapter', () => {
     });
 
     expect(device.passphraseState).toBeUndefined();
-    expect(device.features?.passphrase_protection).toBe(true);
-    expect(device.features?.session_id).toBeNull();
+    expect(device.features?.passphraseProtection).toBe(true);
+    expect(device.features?.sessionId).toBeNull();
     expect(device.getInternalState()).toBeUndefined();
     device.passphraseState = 'state-auto';
     expect(device.getInternalState()).toBe('session-auto');
@@ -465,7 +460,7 @@ describe('Protocol V2 feature adapter', () => {
         },
       }
     );
-    (device as any).features.onekey_firmware_version = '4.15.0';
+    (device as any).features.firmwareVersion = '4.15.0';
     (device as any).features.unlocked = true;
     (device as any).commands = { typedCall };
 
@@ -476,8 +471,8 @@ describe('Protocol V2 feature adapter', () => {
       newSession: 'main-pin-session',
     });
 
-    expect(device.features?.passphrase_protection).toBe(false);
-    expect(device.features?.session_id).toBeNull();
+    expect(device.features?.passphraseProtection).toBe(false);
+    expect(device.features?.sessionId).toBeNull();
     expect(device.getInternalState()).toBeUndefined();
     expect(typedCall).toHaveBeenLastCalledWith('GetPassphraseState', 'PassphraseState', {
       _only_main_pin: true,
@@ -499,8 +494,8 @@ describe('Protocol V2 feature adapter', () => {
       ...descriptor,
       protocolType: 'V2',
     } as any);
-    (device as any).features.onekey_firmware_version = '4.15.0';
-    (device as any).features.passphrase_protection = true;
+    (device as any).features.firmwareVersion = '4.15.0';
+    (device as any).features.passphraseProtection = true;
     (device as any).commands = { typedCall };
 
     await expect(device.checkPassphraseStateSafety('expected-state', false, true)).resolves.toBe(
@@ -516,15 +511,33 @@ describe('Protocol V2 feature adapter', () => {
   test('marks fallback features as unavailable when DeviceInfo is missing', () => {
     const features = normalizeProtocolV2Features(descriptor as any);
 
-    expect(features.device_id).toBeNull();
-    expect(features.serial_no).toBeUndefined();
-    expect(features.onekey_serial_no).toBeUndefined();
+    expect(features.deviceId).toBeNull();
+    expect(features.serialNo).toBe('');
     expect(features.initialized).toBeNull();
     expect(features.unlocked).toBeNull();
-    expect(features.firmware_present).toBe(false);
+    expect(features.firmwarePresent).toBeNull();
   });
 
-  test('does not use Protocol V2 serial_no as device_id', () => {
+  test('uses Protocol V2 hw.device_id and does not fall back to serial_no', () => {
+    const features = normalizeProtocolV2Features(
+      {
+        id: 'PR2000000000',
+        path: 'PR2000000000',
+        protocolType: 'V2',
+      } as any,
+      {
+        hw: {
+          serial_no: 'PR9999999999',
+          device_id: 'DEVICE-ID-9999',
+        },
+      }
+    );
+
+    expect(features.deviceId).toBe('DEVICE-ID-9999');
+    expect(features.serialNo).toBe('PR9999999999');
+  });
+
+  test('does not use Protocol V2 serial_no as deviceId when hw.device_id is absent', () => {
     const features = normalizeProtocolV2Features(
       {
         id: 'PR2000000000',
@@ -538,19 +551,18 @@ describe('Protocol V2 feature adapter', () => {
       }
     );
 
-    expect(features.device_id).toBeNull();
-    expect(features.onekey_serial_no).toBe('PR9999999999');
-    expect(features.serial_no).toBe('PR9999999999');
+    expect(features.deviceId).toBeNull();
+    expect(features.serialNo).toBe('PR9999999999');
   });
 
   test('uses Protocol V2 features directly when profile is absent', () => {
     const device = Device.fromDescriptor({ ...descriptor, protocolType: 'V2' } as any);
     (device as any).features = {
       ...normalizeProtocolV2Features({ ...descriptor, protocolType: 'V2' } as any),
-      serial_no: 'LEGACY-SERIAL',
+      serialNo: 'LEGACY-SERIAL',
       label: 'Legacy Label',
-      ble_name: 'Legacy BLE',
-      passphrase_protection: true,
+      bleName: 'Legacy BLE',
+      passphraseProtection: true,
     };
 
     expect(device.toMessageObject()).toMatchObject({
@@ -568,9 +580,8 @@ describe('Protocol V2 feature adapter', () => {
     const cached = Device.fromDescriptor({ ...descriptor, protocolType: 'V2' } as any);
     (cached as any).features = {
       ...normalizeProtocolV2Features({ ...descriptor, protocolType: 'V2' } as any),
-      device_id: null,
-      serial_no: 'LEGACY-SERIAL',
-      onekey_serial_no: 'LEGACY-SERIAL',
+      deviceId: null,
+      serialNo: 'LEGACY-SERIAL',
     };
 
     const current = Device.fromDescriptor({ ...descriptor, protocolType: 'V2' } as any);
@@ -603,9 +614,9 @@ describe('Protocol V2 feature adapter', () => {
       descriptor: descriptor as any,
     });
 
-    expect(features.device_id).toBeNull();
+    expect(features.deviceId).toBeNull();
     expect(features.initialized).toBe(true);
-    expect(features.passphrase_protection).toBe(true);
+    expect(features.passphraseProtection).toBe(true);
     expect(commands.typedCall).toHaveBeenCalledTimes(1);
     expect(commands.typedCall).toHaveBeenNthCalledWith(
       1,
@@ -993,7 +1004,7 @@ describe('Protocol V2 feature adapter', () => {
     });
   });
 
-  test('returns Protocol V2 oneKey fields without calling legacy OnekeyGetFeatures', async () => {
+  test('does not call legacy OnekeyGetFeatures for Protocol V2 devices', async () => {
     const method = new GetOnekeyFeatures({
       id: 1,
       payload: {
@@ -1029,13 +1040,7 @@ describe('Protocol V2 feature adapter', () => {
       }),
       expect.anything()
     );
-    expect(message).toMatchObject({
-      onekey_device_type: 'pro2',
-      onekey_firmware_version: '1.2.3',
-      onekey_firmware_build_id: 'app-build',
-      onekey_serial_no: 'PR2SERIAL',
-      onekey_ble_name: 'Pro2 BLE',
-    });
+    expect(message).toEqual({});
     expect(message).not.toHaveProperty('label');
   });
 
@@ -1074,17 +1079,17 @@ describe('Protocol V2 feature adapter', () => {
     await device.initialize();
 
     expect(device.features).toMatchObject({
-      device_id: null,
-      onekey_firmware_version: '1.2.3',
-      passphrase_protection: false,
+      deviceId: null,
+      firmwareVersion: '1.2.3',
+      passphraseProtection: false,
       label: 'renamed',
     });
     expect((device as any).profile).toBeUndefined();
     // status 字段被第二次刷新更新
-    expect(device.features?.passphrase_protection).toBe(false);
+    expect(device.features?.passphraseProtection).toBe(false);
     expect(device.features?.label).toBe('renamed');
     // 轻量刷新不含 fw target，已有版本信息按字段级合并保留
-    expect(device.features?.onekey_firmware_version).toBe('1.2.3');
+    expect(device.features?.firmwareVersion).toBe('1.2.3');
     expect(typedCall).toHaveBeenCalledTimes(2);
     expect(typedCall).toHaveBeenNthCalledWith(
       1,
@@ -1158,15 +1163,15 @@ describe('Protocol V2 feature adapter', () => {
     const features = await device.getFeatures();
 
     expect(device.features).toMatchObject({
-      device_id: null,
-      onekey_firmware_version: '1.2.4',
-      passphrase_protection: true,
+      deviceId: null,
+      firmwareVersion: '1.2.4',
+      passphraseProtection: true,
     });
     expect(features).toMatchObject({
-      onekey_device_type: 'pro2',
-      onekey_serial_no: 'PR2SERIAL',
-      onekey_firmware_version: '1.2.4',
-      passphrase_protection: true,
+      deviceType: 'pro2',
+      serialNo: 'PR2SERIAL',
+      firmwareVersion: '1.2.4',
+      passphraseProtection: true,
     });
     expect(typedCall).toHaveBeenCalledTimes(2);
     expect(typedCall).toHaveBeenNthCalledWith(
@@ -1262,9 +1267,9 @@ describe('Protocol V2 feature adapter', () => {
     expect(typedCall).not.toHaveBeenCalledWith('GetAddress', 'Address', expect.anything());
     expect(typedCall).not.toHaveBeenCalledWith('GetFeatures', 'Features', {});
     expect(features).toMatchObject({
-      onekey_device_type: 'pro2',
-      device_id: null,
-      onekey_firmware_version: '1.2.3',
+      deviceType: 'pro2',
+      deviceId: null,
+      firmwareVersion: '1.2.3',
       unlocked: true,
     });
   });
@@ -1291,7 +1296,7 @@ describe('Protocol V2 feature adapter', () => {
     await device.unlockDevice();
 
     expect((device as any).profile).toBeUndefined();
-    expect(device.features?.passphrase_protection).toBe(true);
+    expect(device.features?.passphraseProtection).toBe(true);
   });
 });
 
@@ -1310,7 +1315,7 @@ describe('API compatibility handling', () => {
     method.init();
     (method as any).device = stubDevice({
       features: {
-        onekey_device_type: 'pro2',
+        deviceType: 'pro2',
       },
       originalDescriptor: {
         protocolType: 'V2',
@@ -1348,7 +1353,7 @@ describe('API compatibility handling', () => {
 
   test('does not mark Pro2 Tron, Solana, TON, SUI and Polkadot methods as unsupported', () => {
     const features = {
-      onekey_device_type: 'pro2',
+      deviceType: 'pro2',
     } as Features;
 
     const tronMethod = new TronGetAddress({
@@ -1499,7 +1504,7 @@ describe('API compatibility handling', () => {
 
   test('allows Pro2 Solana signing methods through Protocol V2 version checks', () => {
     const features = {
-      onekey_device_type: 'pro2',
+      deviceType: 'pro2',
     } as Features;
 
     const solSignMessageMethod = new SolSignMessage({
@@ -1593,7 +1598,7 @@ describe('API compatibility handling', () => {
     method.init();
     (method as any).device = stubDevice({
       features: {
-        onekey_device_type: 'pro2',
+        deviceType: 'pro2',
       },
       originalDescriptor: {
         protocolType: 'V2',
@@ -2467,7 +2472,7 @@ describe('Protocol V2 reboot methods', () => {
     });
   });
 
-  test('sends DeviceReboot from deviceReboot', async () => {
+  test('sends DevReboot from deviceReboot', async () => {
     const typedCall = jest.fn().mockResolvedValue({ message: { message: 'ok' } });
     const method = new DeviceReboot({
       id: 1,
@@ -2481,7 +2486,7 @@ describe('Protocol V2 reboot methods', () => {
 
     await method.run();
 
-    expect(typedCall).toHaveBeenCalledWith('DeviceReboot', 'Success', {
+    expect(typedCall).toHaveBeenCalledWith('DevReboot', 'Success', {
       reboot_type: 2,
     });
   });

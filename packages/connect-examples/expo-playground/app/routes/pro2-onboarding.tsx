@@ -19,7 +19,11 @@ import { Input } from '../components/ui/Input';
 import { Progress } from '../components/ui/Progress';
 import { PageLayout } from '../components/common/PageLayout';
 import CollapsibleJsonViewer from '../components/common/CollapsibleJsonViewer';
-import { callHardwareAPI, searchDevices } from '../services/hardwareService';
+import {
+  callHardwareAPI,
+  hydrateConnectedDeviceInfo,
+  searchDevices,
+} from '../services/hardwareService';
 import { useToast } from '../hooks/use-toast';
 import { useDeviceStore } from '../store/deviceStore';
 import { logHardware } from '../utils/logger';
@@ -570,7 +574,8 @@ export default function Pro2OnboardingPage() {
         return;
       }
 
-      const targetDevice = devices[0];
+      const targetDevice = await hydrateConnectedDeviceInfo(devices[0]);
+      setConnectedDevices([targetDevice, ...devices.slice(1)]);
       setDeviceFeatures(targetDevice.features);
       setCurrentDevice(targetDevice);
 

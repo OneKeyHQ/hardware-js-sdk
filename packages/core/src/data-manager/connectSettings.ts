@@ -27,6 +27,8 @@ const initialSettings: ConnectSettings = {
   env: 'web',
   lazyLoad: false,
   timestamp: new Date().getTime(),
+  // 临时开关：仅用于本地/测试固件兼容；正式链路默认调用真实 DevGetDeviceInfo。
+  protocolV2DeviceInfoMockEnabled: false,
 };
 
 export const getEnv = () => {
@@ -113,6 +115,10 @@ export const parseConnectSettings = (input: Partial<ConnectSettings> = {}) => {
 
   if (input.fetchConfig) {
     settings.fetchConfig = input.fetchConfig;
+  }
+
+  if (typeof input.protocolV2DeviceInfoMockEnabled === 'boolean') {
+    settings.protocolV2DeviceInfoMockEnabled = input.protocolV2DeviceInfoMockEnabled;
   }
 
   return settings;

@@ -6,7 +6,11 @@ import { Card, CardContent } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Progress } from '../components/ui/Progress';
 import { PageLayout } from '../components/common/PageLayout';
-import { callHardwareAPI, searchDevices } from '../services/hardwareService';
+import {
+  callHardwareAPI,
+  hydrateConnectedDeviceInfo,
+  searchDevices,
+} from '../services/hardwareService';
 import { useFirmwareProgress } from '../components/providers/SDKProvider';
 import { useToast } from '../hooks/use-toast';
 import { useDeviceStore } from '../store/deviceStore';
@@ -101,8 +105,8 @@ export default function Pro2UpdatePage() {
       if (!devices.length) {
         throw new Error('No Pro2 device found');
       }
-      const device = devices[0];
-      setConnectedDevices(devices);
+      const device = await hydrateConnectedDeviceInfo(devices[0]);
+      setConnectedDevices([device, ...devices.slice(1)]);
       setCurrentDevice(device);
       setDeviceFeatures(device.features);
       addLog('ok', `Connected ${device.connectId}`);

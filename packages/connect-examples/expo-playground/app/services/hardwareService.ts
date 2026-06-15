@@ -14,7 +14,8 @@ import { useEventTestStore } from '../store/eventTestStore';
 import { methodSupportsCommonParameters } from '../utils/constants';
 import { previewHardwareParams } from './previewHardwareParams';
 import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
-import type { Features } from '@onekeyfe/hd-core';
+import type { Features, IDeviceType } from '@onekeyfe/hd-core';
+import type { DeviceInfo } from '../types/hardware';
 // 使用 hd-core 的标准类型
 export type ApiResponse<T = any> = Success<T> | Unsuccessful;
 export type HardwareApiMethod = keyof CoreApi;
@@ -25,8 +26,8 @@ type PassphraseStateMetadata = {
 };
 
 const getFeaturePassphraseProtection = (features?: Features | null): boolean | undefined => {
-  return typeof features?.passphrase_protection === 'boolean'
-    ? features.passphrase_protection
+  return typeof features?.passphraseProtection === 'boolean'
+    ? features.passphraseProtection
     : undefined;
 };
 
@@ -34,19 +35,12 @@ const extractPassphraseStateMetadata = (payload: unknown): PassphraseStateMetada
   if (typeof payload === 'string') return { passphraseState: payload };
   if (!payload || typeof payload !== 'object') return {};
 
-  const maybeState = (payload as { passphrase_state?: unknown; passphraseState?: unknown })
-    .passphrase_state;
-  const maybeLegacyState = (payload as { passphraseState?: unknown }).passphraseState;
-  const maybePassphraseProtection = (payload as { passphrase_protection?: unknown })
-    .passphrase_protection;
+  const maybeState = (payload as { passphraseState?: unknown }).passphraseState;
+  const maybePassphraseProtection = (payload as { passphraseProtection?: unknown })
+    .passphraseProtection;
 
   return {
-    passphraseState:
-      typeof maybeState === 'string'
-        ? maybeState
-        : typeof maybeLegacyState === 'string'
-        ? maybeLegacyState
-        : undefined,
+    passphraseState: typeof maybeState === 'string' ? maybeState : undefined,
     passphraseProtection:
       typeof maybePassphraseProtection === 'boolean' ? maybePassphraseProtection : undefined,
   };
@@ -68,6 +62,72 @@ const updateCachedDeviceFeatures = (connectId: string, features: Features) => {
     });
   }
 };
+
+const firstNonEmptyString = (...values: unknown[]) =>
+  values.find((value): value is string => typeof value === 'string' && value.length > 0);
+
+const getDeviceTypeFromProfile = (value: unknown): IDeviceType | undefined =>
+  typeof value === 'string' && value.length > 0 ? (value as IDeviceType) : undefined;
+
+export async function hydrateConnectedDeviceInfo(device: DeviceInfo): Promise<DeviceInfo> {
+  if (!device.connectId) return device;
+
+  const sdk = await getSDKInstance();
+  let hydratedDevice = { ...device };
+
+  try {
+    const deviceInfoResult = await sdk.getDeviceInfo(device.connectId, {
+      scope: 'basic',
+      refresh: true,
+    });
+
+    if (deviceInfoResult.success && deviceInfoResult.payload) {
+      const profile = deviceInfoResult.payload as Record<string, unknown>;
+      const serialNo = firstNonEmptyString(profile.serialNo, hydratedDevice.uuid);
+      const deviceId = firstNonEmptyString(profile.deviceId, hydratedDevice.deviceId);
+      const label = firstNonEmptyString(profile.label, hydratedDevice.label);
+      const bleName = firstNonEmptyString(profile.bleName);
+      const deviceType = getDeviceTypeFromProfile(profile.deviceType);
+
+      hydratedDevice = {
+        ...hydratedDevice,
+        ...(serialNo ? { uuid: serialNo } : {}),
+        ...(deviceId ? { deviceId } : {}),
+        ...(deviceType ? { deviceType } : {}),
+        ...(label ? { label } : {}),
+        name: firstNonEmptyString(bleName, label, hydratedDevice.name) ?? hydratedDevice.name,
+      };
+
+      logResponse('Device profile refreshed via getDeviceInfo', {
+        connectId: device.connectId,
+        serialNo,
+        deviceId,
+        label,
+      });
+    } else {
+      logError('getDeviceInfo failed while hydrating connected device', deviceInfoResult.payload);
+    }
+  } catch (error) {
+    logError('getDeviceInfo exception while hydrating connected device', { error });
+  }
+
+  try {
+    const featuresResult = await sdk.getFeatures(device.connectId);
+    if (featuresResult.success && featuresResult.payload) {
+      hydratedDevice = {
+        ...hydratedDevice,
+        features: featuresResult.payload,
+      };
+      updateCachedDeviceFeatures(device.connectId, featuresResult.payload);
+    } else {
+      logError('getFeatures failed while hydrating connected device', featuresResult.payload);
+    }
+  } catch (error) {
+    logError('getFeatures exception while hydrating connected device', { error });
+  }
+
+  return hydratedDevice;
+}
 
 const resolvePassphraseProtection = async (
   sdk: CoreApi,

@@ -118,14 +118,14 @@ export class DevicePool extends EventEmitter {
     for await (const descriptor of descriptorList) {
       const device = await this._createDevice(descriptor, initOptions);
 
-      const uuid = device.getCurrentSerialNo();
-      if (uuid) {
-        if (this.devicesCache[uuid]) {
-          const cache = this.devicesCache[uuid];
+      const connectId = device.getConnectId();
+      if (connectId) {
+        if (this.devicesCache[connectId]) {
+          const cache = this.devicesCache[connectId];
           cache.updateDescriptor(descriptor, true);
         }
-        this.devicesCache[uuid] = device;
-        devices[uuid] = device;
+        this.devicesCache[connectId] = device;
+        devices[connectId] = device;
       }
 
       deviceList.push(device);

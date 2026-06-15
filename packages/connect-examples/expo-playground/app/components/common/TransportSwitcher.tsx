@@ -6,12 +6,16 @@ import { useEventTestStore } from '../../store/eventTestStore';
 import { SDKUtils } from '../../utils/hardwareInstance';
 import { useToast } from '../../hooks/use-toast';
 import { useTransportPersistence } from '../../store/persistenceStore';
-import { switchTransport, searchDevices } from '../../services/hardwareService';
+import {
+  hydrateConnectedDeviceInfo,
+  switchTransport,
+  searchDevices,
+} from '../../services/hardwareService';
 import type { TransportType } from '../../utils/hardwareInstance';
 import { DeviceInfo } from '../../types/hardware';
 import { Button } from '../ui/Button';
 import { Signal, ExternalLink, Info, Usb, Server } from 'lucide-react';
-import { EDeviceType, ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
+import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
 import { UI_RESPONSE } from '@onekeyfe/hd-core';
 
 interface TransportSwitcherProps {
@@ -78,45 +82,10 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
       // 自动选择第一个设备进行连接
       const targetDevice = devices[0];
 
-      // 获取设备特征信息
-      const sdk = await SDKUtils.getInstance();
-      if (targetDevice.connectId && targetDevice.deviceId) {
-        const featuresResult = await sdk.getFeatures(targetDevice.connectId);
-        if (featuresResult.success && featuresResult.payload) {
-          setDeviceFeatures(featuresResult.payload);
-
-          // Protocol V2 的 OneKey 字段已经由 getFeatures 归一化，避免重复跑一次设备初始化。
-          if (featuresResult.payload.onekey_device_type === EDeviceType.Pro2) {
-            const updatedDevice = {
-              ...targetDevice,
-              features: featuresResult.payload,
-              onekeyFeatures: featuresResult.payload as DeviceInfo['onekeyFeatures'],
-            };
-            setCurrentDevice(updatedDevice);
-          } else {
-            const onekeyFeaturesResult = await sdk.getOnekeyFeatures(targetDevice.connectId);
-            if (onekeyFeaturesResult.success && onekeyFeaturesResult.payload) {
-              // 更新设备信息，包含onekeyFeatures
-              const updatedDevice = {
-                ...targetDevice,
-                features: featuresResult.payload,
-                onekeyFeatures: onekeyFeaturesResult.payload,
-              };
-              setCurrentDevice(updatedDevice);
-            } else {
-              // 即使获取onekeyFeatures失败，也设置基本的设备信息
-              const updatedDevice = {
-                ...targetDevice,
-                features: featuresResult.payload,
-              };
-              setCurrentDevice(updatedDevice);
-            }
-          }
-        } else {
-          setCurrentDevice(targetDevice);
-        }
-      } else {
-        setCurrentDevice(targetDevice);
+      const hydratedDevice = await hydrateConnectedDeviceInfo(targetDevice);
+      setCurrentDevice(hydratedDevice);
+      if (hydratedDevice.features) {
+        setDeviceFeatures(hydratedDevice.features);
       }
     } catch (error) {
       console.error('Auto connection error:', error);

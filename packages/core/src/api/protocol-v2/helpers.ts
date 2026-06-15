@@ -1,4 +1,4 @@
-import { DevRebootType, DeviceRebootType } from '@onekeyfe/hd-transport';
+import { DevRebootType } from '@onekeyfe/hd-transport';
 
 import { invalidParameter, validateNonEmptyString } from '../helpers/filesystemValidation';
 
@@ -10,9 +10,7 @@ import type {
 
 export type RebootTypeInput =
   | DevRebootType
-  | DeviceRebootType
   | keyof typeof DevRebootType
-  | keyof typeof DeviceRebootType
   | string
   | number;
 
@@ -54,17 +52,6 @@ const DEV_REBOOT_TYPES: Record<string, DevRebootType> = {
   boardloader: DevRebootType.Boardloader,
   Bootloader: DevRebootType.Bootloader,
   bootloader: DevRebootType.Bootloader,
-};
-
-const DEVICE_REBOOT_TYPES: Record<string, DeviceRebootType> = {
-  Normal: DeviceRebootType.Normal,
-  normal: DeviceRebootType.Normal,
-  Romloader: DeviceRebootType.Romloader,
-  romloader: DeviceRebootType.Romloader,
-  Boardloader: DeviceRebootType.Romloader,
-  boardloader: DeviceRebootType.Romloader,
-  Bootloader: DeviceRebootType.Bootloader,
-  bootloader: DeviceRebootType.Bootloader,
 };
 
 export const PROTOCOL_V2_FIRMWARE_UPDATE_OPTIONS: TransportCallOptions = {
@@ -141,18 +128,6 @@ export function normalizeRebootType(value: RebootTypeInput | undefined): DevRebo
     if (value in DEV_REBOOT_TYPES) return DEV_REBOOT_TYPES[value];
   }
   return DevRebootType.Normal;
-}
-
-export function normalizeDeviceRebootType(
-  value: RebootTypeInput | undefined
-): DeviceRebootType {
-  if (typeof value === 'number') return value;
-  if (typeof value === 'string') {
-    const numeric = Number(value);
-    if (Number.isFinite(numeric)) return numeric;
-    if (value in DEVICE_REBOOT_TYPES) return DEVICE_REBOOT_TYPES[value];
-  }
-  return DeviceRebootType.Normal;
 }
 
 // 当前 firmware-pro2 子模块的 DevFirmwareTargetType 合法值。

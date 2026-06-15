@@ -56,6 +56,7 @@ import TransportManager from '../data-manager/TransportManager';
 import DeviceConnector from '../device/DeviceConnector';
 import RequestQueue from './RequestQueue';
 import { getSynchronize } from '../utils/getSynchronize';
+import { setProtocolV2DeviceInfoMock } from '../protocols/protocol-v2/features';
 
 import type { ConnectSettings, Features, KnownDevice } from '../types';
 import type { CoreMessage, IFrameCallMessage, UiPromise, UiPromiseResponse } from '../events';
@@ -1438,6 +1439,7 @@ export const init = async (
   try {
     try {
       await DataManager.load(settings);
+      setProtocolV2DeviceInfoMock(settings.protocolV2DeviceInfoMockEnabled ?? false);
       initTransport(Transport, plugin);
     } catch {
       Log.error('DataManager.load error');

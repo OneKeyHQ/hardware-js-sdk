@@ -257,7 +257,7 @@ export default function IndexPage() {
                                 {t('common.firmwareVersion')}
                               </span>
                               <span className="text-sm">
-                                {currentDevice.features.onekey_firmware_version}
+                                {currentDevice.features.firmwareVersion}
                               </span>
                             </div>
                             <div className="flex items-center justify-between">
@@ -265,9 +265,7 @@ export default function IndexPage() {
                                 {t('common.bluetoothVersion')}
                               </span>
                               <span className="text-sm">
-                                {currentDevice.features.onekey_ble_version ||
-                                  currentDevice.features.ble_ver ||
-                                  'N/A'}
+                                {currentDevice.features.bleVersion || 'N/A'}
                               </span>
                             </div>
                             <div className="flex items-center justify-between">
@@ -275,7 +273,7 @@ export default function IndexPage() {
                                 {t('common.bootVersion')}
                               </span>
                               <span className="text-sm">
-                                {currentDevice.features.onekey_boot_version || 'N/A'}
+                                {currentDevice.features.bootloaderVersion || 'N/A'}
                               </span>
                             </div>
                           </>

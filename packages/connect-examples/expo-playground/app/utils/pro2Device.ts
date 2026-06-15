@@ -7,7 +7,7 @@ export function isPro2DeviceInfo(device?: DeviceInfo | null): device is DeviceIn
   const model = (device.features?.model ?? '').toLowerCase();
   return (
     device.deviceType === EDeviceType.Pro2 ||
-    device.features?.onekey_device_type === EDeviceType.Pro2 ||
+    device.features?.deviceType === EDeviceType.Pro2 ||
     model === 'pro2'
   );
 }

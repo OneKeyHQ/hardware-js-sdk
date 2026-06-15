@@ -250,6 +250,7 @@ export const buildProtocolV2FeaturesPayload = (
   );
   const boardVersion = firstMeaningfulVersion(getImageVersion(fwBoard), previous?.boardVersion);
   const bleVersion = firstMeaningfulVersion(getImageVersion(bleApplication), previous?.bleVersion);
+  const deviceId = firstValue(info?.hw?.device_id, previous?.deviceId) ?? null;
   const serialNo = firstValue(info?.hw?.serial_no, previous?.serialNo) ?? '';
   const label = firstValue(deviceInfo?.status?.label, previous?.label) ?? null;
   const bleName = firstValue(info?.coprocessor?.bt_adv_name, info?.bt?.adv_name, previous?.bleName);
@@ -268,7 +269,7 @@ export const buildProtocolV2FeaturesPayload = (
     firmwareType: previous?.firmwareType ?? EFirmwareType.Universal,
     model: 'pro2',
     vendor: 'onekey.so',
-    deviceId: null,
+    deviceId,
     serialNo,
     label,
     bleName: bleName ?? null,

@@ -261,13 +261,14 @@ export class Device extends EventEmitter {
     const bleName = this.getCurrentBleName();
     const label = this.getCurrentLabel();
     const serialNo = this.getCurrentSerialNo();
+    const connectId = this.getConnectId();
     const deviceId = this.getCurrentDeviceId() || null;
 
     const features = this.features;
 
     return {
       /** Android uses Mac address, iOS uses uuid, USB uses uuid  */
-      connectId: DataManager.isBleConnect(env) ? this.mainId || null : serialNo,
+      connectId: DataManager.isBleConnect(env) ? this.mainId || null : connectId,
       /** Hardware ID, will not change at any time */
       uuid: serialNo,
       commType: this.originalDescriptor.commType,
@@ -499,6 +500,16 @@ export class Device extends EventEmitter {
 
   getCurrentSerialNo() {
     return this.features ? getDeviceUUID(this.features) : '';
+  }
+
+  getConnectId() {
+    const serialNo = this.getCurrentSerialNo();
+    if (serialNo) return serialNo;
+
+    // connectId 是 SDK 内部连接路由 key；Protocol V2 早期固件/mock
+    // 可能还没有 serial_no，此时用 transport descriptor 兜底，不改变
+    // features.serialNo / deviceId 的业务语义。
+    return this.originalDescriptor.path || this.originalDescriptor.id || '';
   }
 
   getCurrentBleName() {

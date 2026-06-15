@@ -1,6 +1,6 @@
 import { DevSEState, DevSeType } from '@onekeyfe/hd-transport';
 
-import type { DeviceGetDeviceInfo, DevSEInfo, ProtocolV2DeviceInfo } from '@onekeyfe/hd-transport';
+import type { DevGetDeviceInfo, DevSEInfo, ProtocolV2DeviceInfo } from '@onekeyfe/hd-transport';
 import type { DeviceCommands } from '../../device/DeviceCommands';
 
 // 单源类型：直接使用 hd-transport 生成的 ProtocolV2DeviceInfo / DevSEInfo /
@@ -121,15 +121,16 @@ export const PROTOCOL_V2_DEVICE_INFO_REQUEST = PROTOCOL_V2_FULL_DEVICE_INFO_REQU
 export const PROTOCOL_V2_DEVICE_INFO_TIMEOUT_MS = 10 * 1000;
 
 /**
- * 临时开关（默认开启）：当前 Pro2 测试固件 / 早期工程板尚未实现 DevGetDeviceInfo，
- * 真实调用只会超时失败。开启时跳过 wire 调用，直接返回 mock DeviceInfo；
+ * 临时开关（默认关闭）：当前正式链路直接调用 DevGetDeviceInfo。
+ * 仅当 Pro2 测试固件 / 早期工程板尚未实现 DevGetDeviceInfo 时，才显式开启 mock。
+ * 开启时跳过 wire 调用，直接返回 mock DeviceInfo；
  * DevGetDeviceInfo 尚未返回的字段保持为空，不再用 transport path 兜底成设备身份。
  *
- * 固件实现 DevGetDeviceInfo 后：把默认值改回 false（或直接删除开关与 mock）。
+ * 固件实现 DevGetDeviceInfo 稳定后：删除开关与 mock。
  * 注意：开启期间 FirmwareUpdateV4 的“升级完成版本比对”拿到的也是 mock 版本，
  * 不能作为升级成功的依据。
  */
-let protocolV2DeviceInfoMockEnabled = true;
+let protocolV2DeviceInfoMockEnabled = false;
 
 export const setProtocolV2DeviceInfoMock = (enabled: boolean) => {
   protocolV2DeviceInfoMockEnabled = enabled;
@@ -163,9 +164,9 @@ export async function requestProtocolV2DeviceInfo({
 }: {
   commands: DeviceCommands;
   timeoutMs?: number;
-  request?: DeviceGetDeviceInfo;
+  request?: DevGetDeviceInfo;
 }): Promise<ProtocolV2DeviceInfo> {
-  if (protocolV2DeviceInfoMockEnabled) {
+  if (isProtocolV2DeviceInfoMockEnabled()) {
     return buildMockProtocolV2DeviceInfo();
   }
   const { message } = await commands.typedCall('DevGetDeviceInfo', 'DeviceInfo', request, {

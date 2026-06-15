@@ -4452,6 +4452,23 @@ export type TxAckPaymentRequest = {
   signature: string;
 };
 
+// DebugLinkInput
+export type DebugLinkInput = {
+  x?: number;
+  y?: number;
+  duration_ms?: number;
+  x_end?: number;
+  y_end?: number;
+};
+
+// InternalMyAddressRequest
+export type InternalMyAddressRequest = {
+  coin_type: number;
+  chain_id: number;
+  account_index: number;
+  derive_type: number;
+};
+
 // SetBusy
 export type SetBusy = {
   expiry_ms?: number;
@@ -4480,6 +4497,28 @@ export type WriteSEPrivateKey = {
   private_key: string;
 };
 
+export enum WallpaperTarget {
+  Home = 0,
+  Lock = 1,
+}
+
+// SetWallpaper
+export type SetWallpaper = {
+  target: WallpaperTarget;
+  path: string;
+};
+
+// GetWallpaper
+export type GetWallpaper = {
+  target: WallpaperTarget;
+};
+
+// Wallpaper
+export type Wallpaper = {
+  target: WallpaperTarget;
+  path: string;
+};
+
 // UnlockPath
 export type UnlockPath = {
   address_n: number[];
@@ -4498,47 +4537,47 @@ export enum MoneroNetworkType {
   FAKECHAIN = 3,
 }
 
-// TxDetailsAmount
-export type TxDetailsAmount = {
+// ViewAmount
+export type ViewAmount = {
+  is_unlimited: boolean;
   num: string;
-  decimals: number;
-  symbol: string;
 };
 
-// TxDetailsAddress
-export type TxDetailsAddress = {
-  key: number;
-  address: string;
-  owner?: string;
-  icon?: string;
-};
-
-// TxDetailsNetwork
-export type TxDetailsNetwork = {
-  coin_type: number;
-  chain_id?: number;
-};
-
-// TxDetailsGeneral
-export type TxDetailsGeneral = {
+// ViewDetail
+export type ViewDetail = {
   key: number;
   value: string;
   is_overview: boolean;
+  has_icon: boolean;
 };
 
-export enum TxDetailsDisplayType {
-  DISPLAY_TYPE_INFO = 0,
-  DISPLAY_TYPE_SIGN = 1,
+export enum ViewTipType {
+  Default = 0,
+  Highlight = 1,
+  Recommend = 2,
+  Warning = 3,
+  Danger = 4,
 }
 
-// TxDetailsPage
-export type TxDetailsPage = {
+// ViewTip
+export type ViewTip = {
+  type: ViewTipType;
+  text: string;
+};
+
+// ViewSignPage
+export type ViewSignPage = {
   title: string;
-  display_type: TxDetailsDisplayType;
   amount?: UintType;
-  network?: TxDetailsNetwork;
-  address: TxDetailsAddress[];
-  general: TxDetailsGeneral[];
+  general: ViewDetail[];
+  tip?: ViewTip;
+};
+
+// ViewVerifyPage
+export type ViewVerifyPage = {
+  title: string;
+  address: string;
+  path: string;
 };
 
 // GetProtoVersion
@@ -4555,20 +4594,9 @@ export enum DevRebootType {
   Bootloader = 2,
 }
 
-export enum DeviceRebootType {
-  Normal = 0,
-  Romloader = 1,
-  Bootloader = 2,
-}
-
 // DevReboot
 export type DevReboot = {
   reboot_type: DevRebootType;
-};
-
-// DeviceReboot
-export type DeviceReboot = {
-  reboot_type: DeviceRebootType;
 };
 
 export enum DeviceType {
@@ -4602,6 +4630,7 @@ export type DevFirmwareImageInfo = {
 export type DevHardwareInfo = {
   device_type?: DeviceType;
   serial_no?: string;
+  device_id?: string;
   hardware_version?: string;
   hardware_version_raw_adc?: number;
 };
@@ -4665,9 +4694,6 @@ export type DevGetDeviceInfo = {
   types?: DevInfoTypes;
 };
 
-// DeviceGetDeviceInfo
-export type DeviceGetDeviceInfo = DevGetDeviceInfo;
-
 // ProtocolV2DeviceInfo
 export type ProtocolV2DeviceInfo = {
   protocol_version: number;
@@ -4682,30 +4708,13 @@ export type ProtocolV2DeviceInfo = {
 };
 
 export enum DevFirmwareTargetType {
-  TARGET_INVALID = 0,
-  TARGET_ROMLOADER = 1,
-  TARGET_BOOTLOADER = 2,
-  TARGET_APPLICATION_P1 = 3,
-  TARGET_APPLICATION_P2 = 4,
-  TARGET_COPROCESSOR = 5,
-  TARGET_SE01 = 6,
-  TARGET_SE02 = 7,
-  TARGET_SE03 = 8,
-  TARGET_SE04 = 9,
-  TARGET_RESOURCE = 10,
-}
-
-export enum DeviceFirmwareTargetType {
-  TARGET_INVALID = 0,
-  TARGET_ROMLOADER = 1,
-  TARGET_BOOTLOADER = 2,
-  TARGET_APPLICATION_P1 = 3,
-  TARGET_APPLICATION_P2 = 4,
-  TARGET_COPROCESSOR = 5,
-  TARGET_SE01 = 6,
-  TARGET_SE02 = 7,
-  TARGET_SE03 = 8,
-  TARGET_SE04 = 9,
+  TARGET_MAIN_APP = 0,
+  TARGET_MAIN_BOOT = 1,
+  TARGET_BT = 2,
+  TARGET_SE1 = 3,
+  TARGET_SE2 = 4,
+  TARGET_SE3 = 5,
+  TARGET_SE4 = 6,
   TARGET_RESOURCE = 10,
 }
 
@@ -4715,33 +4724,14 @@ export type DevFirmwareTarget = {
   path: string;
 };
 
-// DeviceFirmwareTarget
-export type DeviceFirmwareTarget = {
-  target_id: DeviceFirmwareTargetType;
-  path: string;
-};
-
 // DevFirmwareUpdate
 export type DevFirmwareUpdate = {
   targets: DevFirmwareTarget[];
 };
 
-// DeviceFirmwareUpdate
-export type DeviceFirmwareUpdate = {
-  targets: DeviceFirmwareTarget[];
-  max_concurrent?: number;
-};
-
 // DevFirmwareInstallProgress
 export type DevFirmwareInstallProgress = {
   target_id: DevFirmwareTargetType;
-  progress: number;
-  stage?: string;
-};
-
-// DeviceFirmwareInstallProgress
-export type DeviceFirmwareInstallProgress = {
-  target_id: DeviceFirmwareTargetType;
   progress: number;
   stage?: string;
 };
@@ -4752,26 +4742,12 @@ export type DevFirmwareUpdateStatusEntry = {
   status: number;
 };
 
-// DeviceFirmwareUpdateStatusEntry
-export type DeviceFirmwareUpdateStatusEntry = {
-  target_id: DeviceFirmwareTargetType;
-  status: number;
-};
-
 // DevGetFirmwareUpdateStatus
 export type DevGetFirmwareUpdateStatus = {};
-
-// DeviceGetFirmwareUpdateStatus
-export type DeviceGetFirmwareUpdateStatus = {};
 
 // DevFirmwareUpdateStatus
 export type DevFirmwareUpdateStatus = {
   targets: DevFirmwareUpdateStatusEntry[];
-};
-
-// DeviceFirmwareUpdateStatus
-export type DeviceFirmwareUpdateStatus = {
-  targets: DeviceFirmwareUpdateStatusEntry[];
 };
 
 // FactoryDeviceInfoSettings
@@ -5472,23 +5448,27 @@ export type MessageType = {
   CoinPurchaseMemo: CoinPurchaseMemo;
   PaymentRequestMemo: PaymentRequestMemo;
   TxAckPaymentRequest: TxAckPaymentRequest;
+  DebugLinkInput: DebugLinkInput;
+  InternalMyAddressRequest: InternalMyAddressRequest;
   SetBusy: SetBusy;
   GetFirmwareHash: GetFirmwareHash;
   FirmwareHash: FirmwareHash;
   GetNonce: GetNonce;
   Nonce: Nonce;
   WriteSEPrivateKey: WriteSEPrivateKey;
+  SetWallpaper: SetWallpaper;
+  GetWallpaper: GetWallpaper;
+  Wallpaper: Wallpaper;
   UnlockPath: UnlockPath;
   UnlockedPathRequest: UnlockedPathRequest;
-  TxDetailsAmount: TxDetailsAmount;
-  TxDetailsAddress: TxDetailsAddress;
-  TxDetailsNetwork: TxDetailsNetwork;
-  TxDetailsGeneral: TxDetailsGeneral;
-  TxDetailsPage: TxDetailsPage;
+  ViewAmount: ViewAmount;
+  ViewDetail: ViewDetail;
+  ViewTip: ViewTip;
+  ViewSignPage: ViewSignPage;
+  ViewVerifyPage: ViewVerifyPage;
   GetProtoVersion: GetProtoVersion;
   ProtoVersion: ProtoVersion;
   DevReboot: DevReboot;
-  DeviceReboot: DeviceReboot;
   DevFirmwareImageInfo: DevFirmwareImageInfo;
   DevHardwareInfo: DevHardwareInfo;
   DevMainMcuInfo: DevMainMcuInfo;
@@ -5498,19 +5478,12 @@ export type MessageType = {
   DevInfoTypes: DevInfoTypes;
   DevStatus: DevStatus;
   DevGetDeviceInfo: DevGetDeviceInfo;
-  DeviceGetDeviceInfo: DeviceGetDeviceInfo;
   DevFirmwareTarget: DevFirmwareTarget;
-  DeviceFirmwareTarget: DeviceFirmwareTarget;
   DevFirmwareUpdate: DevFirmwareUpdate;
-  DeviceFirmwareUpdate: DeviceFirmwareUpdate;
   DevFirmwareInstallProgress: DevFirmwareInstallProgress;
-  DeviceFirmwareInstallProgress: DeviceFirmwareInstallProgress;
   DevFirmwareUpdateStatusEntry: DevFirmwareUpdateStatusEntry;
-  DeviceFirmwareUpdateStatusEntry: DeviceFirmwareUpdateStatusEntry;
   DevGetFirmwareUpdateStatus: DevGetFirmwareUpdateStatus;
-  DeviceGetFirmwareUpdateStatus: DeviceGetFirmwareUpdateStatus;
   DevFirmwareUpdateStatus: DevFirmwareUpdateStatus;
-  DeviceFirmwareUpdateStatus: DeviceFirmwareUpdateStatus;
   FactoryDeviceInfoSettings: FactoryDeviceInfoSettings;
   FactoryGetDeviceInfo: FactoryGetDeviceInfo;
   FactoryDeviceInfo: FactoryDeviceInfo;

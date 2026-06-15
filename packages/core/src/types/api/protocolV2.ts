@@ -1,6 +1,5 @@
 import type { CommonParams, Response } from '../params';
 import type {
-  DeviceFirmwareUpdateStatus,
   DevFirmwareUpdateStatus,
   FactoryDeviceInfo,
   OnboardingStatus,
@@ -96,12 +95,12 @@ export declare function deviceGetOnboardingStatus(
 export declare function deviceFirmwareUpdate(
   connectId: string,
   params: CommonParams & DeviceFirmwareUpdateParams
-): Response<Success | DevFirmwareUpdateStatus | DeviceFirmwareUpdateStatus>;
+): Response<Success | DevFirmwareUpdateStatus>;
 
 export declare function deviceGetFirmwareUpdateStatus(
   connectId: string,
   params?: CommonParams
-): Response<DevFirmwareUpdateStatus | DeviceFirmwareUpdateStatus>;
+): Response<DevFirmwareUpdateStatus>;
 
 export declare function devReboot(
   connectId: string,
