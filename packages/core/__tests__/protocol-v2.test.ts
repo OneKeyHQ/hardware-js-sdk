@@ -370,6 +370,57 @@ describe('Protocol V2 feature adapter', () => {
     expect(getFeatures).not.toHaveBeenCalled();
   });
 
+  test('honors initSession when getting Pro2 passphrase state', async () => {
+    const features = {
+      deviceId: 'pro2-device-id',
+      deviceType: 'pro2',
+      firmwareVersion: '9.9.9',
+      passphraseProtection: true,
+      sessionId: 'old-feature-session',
+      unlockedAttachPin: false,
+    };
+    const typedCall = jest.fn().mockResolvedValue({
+      type: 'PassphraseState',
+      message: {
+        passphrase_state: 'state-pro2-new',
+        unlocked_attach_pin: false,
+      },
+    });
+    const clearInternalState = jest.fn();
+    const updateInternalState = jest.fn();
+    const method = new GetPassphraseState({
+      payload: {
+        method: 'getPassphraseState',
+        connectId: 'connect-id',
+        initSession: true,
+      },
+    });
+    method.device = stubDevice({
+      originalDescriptor: { ...descriptor, protocolType: 'V2' },
+      features,
+      commands: { typedCall },
+      clearInternalState,
+      updateInternalState,
+      getCurrentDeviceId: () => 'pro2-device-id',
+      getCurrentPassphraseProtection: () => true,
+    }) as any;
+
+    await expect(method.run()).resolves.toEqual({
+      passphraseState: 'state-pro2-new',
+      sessionId: undefined,
+      unlockedAttachPin: false,
+      passphraseProtection: true,
+    });
+    expect(clearInternalState).toHaveBeenCalledTimes(1);
+    expect(updateInternalState).toHaveBeenCalledWith(
+      true,
+      'state-pro2-new',
+      'pro2-device-id',
+      undefined,
+      null
+    );
+  });
+
   test('stores Pro2 passphrase session cache without synthetic device id', async () => {
     const device = Device.fromDescriptor({ ...descriptor, protocolType: 'V2' } as any);
     const typedCall = jest.fn().mockResolvedValue({

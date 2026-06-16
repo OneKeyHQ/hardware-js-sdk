@@ -15,6 +15,18 @@ const protocolV1Messages = parseConfigure({
         },
       },
     },
+    Failure: {
+      fields: {
+        code: {
+          type: 'uint32',
+          id: 1,
+        },
+        message: {
+          type: 'string',
+          id: 2,
+        },
+      },
+    },
     ButtonRequest: {
       fields: {
         code: {
@@ -32,6 +44,7 @@ const protocolV1Messages = parseConfigure({
     MessageType: {
       values: {
         MessageType_Success: 2,
+        MessageType_Failure: 3,
         MessageType_ButtonRequest: 26,
         MessageType_OnekeyGetFeatures: 10025,
         MessageType_OnekeyFeatures: 10026,
@@ -712,6 +725,26 @@ describe('Protocol V2 framing and session', () => {
     const frame = protocolV2.encodeProtobufFrame(26, new Uint8Array(0));
     const decoded = ProtocolV2.decodeFrame(schemas, frame);
     expect(decoded.type).toBe('ButtonRequest');
+  });
+
+  test('decodes legacy V1 Failure as a Protocol V2 fallback', () => {
+    // Some device-side rejection paths still return legacy Failure(type=3)
+    // inside a Protocol V2 frame. It must surface as a device Failure, not as
+    // a protobuf catalog TypeError.
+    const frame = ProtocolV2.encodeFrame(
+      { ...schemas, protocolV2: schemas.protocolV1 },
+      'Failure',
+      {
+        code: 1,
+        message: 'Action cancelled',
+      }
+    );
+    const decoded = ProtocolV2.decodeFrame(schemas, frame);
+    expect(decoded.type).toBe('Failure');
+    expect(decoded.message).toEqual({
+      code: 1,
+      message: 'Action cancelled',
+    });
   });
 
   test('does not fall back to legacy V1 messages outside the allowlist', () => {

@@ -38,6 +38,7 @@ const resolveProtocolV2EncodeSchema = (name: string, schemas: ProtocolV2Schemas)
 };
 
 const PROTOCOL_V2_LEGACY_DECODE_ALLOWLIST = new Set([
+  'Failure',
   'ButtonRequest',
   'EntropyRequest',
   'PinMatrixRequest',

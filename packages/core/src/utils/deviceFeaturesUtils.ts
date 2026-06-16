@@ -93,11 +93,16 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (
     expectPassphraseState?: string;
     onlyMainPin?: boolean;
     allowCreateAttachPin?: boolean;
+    initSession?: boolean;
   }
 ) => {
   const { features } = device;
   const locked = features?.unlocked === false;
   const deviceType = device.getCurrentDeviceType();
+
+  if (options?.initSession) {
+    device.clearInternalState();
+  }
 
   const { passphraseState, newSession, unlockedAttachPin } = await getPassphraseState(device, {
     ...options,
@@ -128,7 +133,7 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (
     passphraseState,
     deviceId,
     newSession,
-    device.features?.sessionId
+    options?.initSession ? null : device.features?.sessionId
   );
 
   return { passphraseState, newSession, unlockedAttachPin };
@@ -145,6 +150,7 @@ export const getPassphraseState = async (
     expectPassphraseState?: string;
     onlyMainPin?: boolean;
     allowCreateAttachPin?: boolean;
+    initSession?: boolean;
   }
 ): Promise<{
   passphraseState: string | undefined;

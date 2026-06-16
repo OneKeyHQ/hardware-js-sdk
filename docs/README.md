@@ -7,6 +7,7 @@
 | 文档               | 内容                                                                  |
 | ------------------ | --------------------------------------------------------------------- |
 | `architecture.md`  | SDK 分层、TransportManager、Device 生命周期、Protocol V1/V2 职责边界  |
+| `events.md`        | SDK 事件清单、触发时机、接收方式和 UI 响应规则                        |
 | `transport.md`     | WebUSB / Electron BLE 流程、连接后主动协议探测、schema 路由、兼容边界 |
 | `protocol-v2.md`  | Protocol V2 帧格式、protobuf 消息、文件系统、固件更新                 |
 | `pro2-ble-speed-test.md` | Pro2 React Native BLE 传输测速、参数结论和优化方向             |
@@ -15,6 +16,8 @@
 
 ```
 architecture.md
+    ↓
+events.md
     ↓
 transport.md
     ↓

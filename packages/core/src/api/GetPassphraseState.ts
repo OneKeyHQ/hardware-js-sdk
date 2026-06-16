@@ -16,6 +16,7 @@ export default class GetPassphraseState extends BaseMethod {
         expectPassphraseState: this.payload.passphraseState,
         onlyMainPin: this.payload.useEmptyPassphrase,
         allowCreateAttachPin: this.payload.allowCreateAttachPin,
+        initSession: this.payload.initSession,
       });
 
     const { features } = this.device;
@@ -26,7 +27,9 @@ export default class GetPassphraseState extends BaseMethod {
     // refresh device info
     return Promise.resolve({
       passphraseState: isProSeries || passphraseProtection === true ? passphraseState : undefined,
-      sessionId: newSession ?? features?.sessionId ?? undefined,
+      sessionId: this.payload.initSession
+        ? newSession ?? undefined
+        : newSession ?? features?.sessionId ?? undefined,
       unlockedAttachPin: unlockedAttachPin ?? features?.unlockedAttachPin,
       passphraseProtection,
     });

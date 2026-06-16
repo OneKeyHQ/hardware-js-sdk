@@ -30,7 +30,12 @@ export const createMessageFromName = (messages: protobuf.Root, name: string) => 
 export const createMessageFromType = (messages: protobuf.Root, typeId: number) => {
   const MessageType = messages.lookupEnum('MessageType');
 
-  const messageName = MessageType.valuesById[typeId].replace('MessageType_', '');
+  const rawMessageName = MessageType.valuesById[typeId];
+  if (!rawMessageName) {
+    throw new Error(`MessageType id "${typeId}" is not defined in protobuf schema`);
+  }
+
+  const messageName = rawMessageName.replace('MessageType_', '');
 
   const Message = messages.lookupType(messageName);
 

@@ -210,15 +210,26 @@ await HardwareSDK.btcSignTransaction(connectId, deviceId, {
 
 ## 事件处理
 
-SDK 提供三种事件通道：
+SDK 事件分为应用层可直接订阅的事件和内部 bridge 事件。业务侧主要关注 `UI_EVENT`、`DEVICE.*`、`FIRMWARE_EVENT`、`LOG_EVENT`。
 
 | 通道 | 用途 |
 | :--- | :--- |
 | `UI_EVENT` | 用户交互提示（PIN、Passphrase 输入等） |
-| `DEVICE_EVENT` | 设备状态变化（连接、断开、功能更新等） |
+| `DEVICE.CONNECT` / `DEVICE.DISCONNECT` / `DEVICE.FEATURES` / `DEVICE.SUPPORT_FEATURES` | 设备连接状态和能力快照 |
 | `FIRMWARE_EVENT` | 固件升级信息 |
+| `LOG_EVENT` | SDK 日志输出 |
 
-> **重要**：仅对需要输入的 `UI_REQUEST` 调用 `uiResponse`，其他事件仅用于 UI 展示。连接多台设备时，需按设备标识路由事件。
+> **重要**：仅对需要输入的 `UI_REQUEST` 调用 `uiResponse`，其他事件仅用于 UI 展示。连接多台设备时，需按 `device.connectId` / `device.deviceId` 路由事件。
+
+**接收规则**
+
+| 订阅方式 | 收到的数据 | 说明 |
+| --- | --- | --- |
+| `HardwareSDK.on(UI_EVENT, fn)` | 完整 message：`{ event, type, payload }` | 推荐用于统一处理 UI 请求 |
+| `HardwareSDK.on(UI_REQUEST.REQUEST_PIN, fn)` | 只收到 `payload` | 适合只关心某个 UI 请求 |
+| `HardwareSDK.on(DEVICE.CONNECT, fn)` | 只收到 `payload` | 设备事件按具体 `DEVICE.*` 订阅，不订阅 `DEVICE_EVENT` |
+| `HardwareSDK.on(FIRMWARE_EVENT, fn)` | 完整 message | 根据 `message.type` 区分固件事件 |
+| `HardwareSDK.on(LOG_EVENT, fn)` | 完整 message | 调试和日志采集使用 |
 
 **需要 `uiResponse` 的 UI 请求**
 
@@ -226,44 +237,45 @@ SDK 提供三种事件通道：
 | --- | --- | --- |
 | `REQUEST_PIN` | 受保护调用且设备被锁定 | `UI_RESPONSE.RECEIVE_PIN`（盲输或在设备输入） |
 | `REQUEST_PASSPHRASE` | 软件输入隐藏钱包口令 | `UI_RESPONSE.RECEIVE_PASSPHRASE`（`value`、`passphraseOnDevice`、`attachPinOnDevice`、`save`） |
-| `REQUEST_PASSPHRASE_ON_DEVICE` | 设备输入隐藏钱包口令 | `UI_RESPONSE.RECEIVE_PASSPHRASE`（`passphraseOnDevice: true`） |
 | `REQUEST_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE` | Web Bootloader 设备选择 | `UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE`（`deviceId`） |
+| `REQUEST_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE` | Web Device 切换固件后的设备选择 | `UI_RESPONSE.SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE`（`deviceId`） |
 
 **仅展示的 UI 请求（无需响应）**
 
 | UI_REQUEST | 作用 |
 | --- | --- |
 | `REQUEST_BUTTON` | 提示在设备确认 |
+| `REQUEST_PASSPHRASE_ON_DEVICE` | 提示用户正在设备端输入隐藏钱包口令 |
 | `DEVICE_PROGRESS` | 长耗时进度 |
 | `FIRMWARE_PROCESSING` / `FIRMWARE_PROGRESS` / `FIRMWARE_TIP` | 固件升级/处理状态 |
-| `BLUETOOTH_PERMISSION` / `LOCATION_PERMISSION` | BLE 权限提示 |
+| `BLUETOOTH_UNSUPPORTED` / `BLUETOOTH_POWERED_OFF` / `BLUETOOTH_PERMISSION` / `LOCATION_PERMISSION` / `LOCATION_SERVICE_PERMISSION` | BLE 环境和权限提示 |
+| `WEB_DEVICE_PROMPT_ACCESS_PERMISSION` | 浏览器 Web Device 授权提示 |
+| `PREVIOUS_ADDRESS_RESULT` | 批量地址流程的上一条地址结果 |
 | `BOOTLOADER` / `REQUIRE_MODE` / `NOT_INITIALIZE` / `FIRMWARE_NOT_SUPPORTED` | 模式/支持性提示 |
 
 **需要关注的设备/固件事件**
 
 | 通道 | 事件 | 含义 | 建议动作 |
 | --- | --- | --- | --- |
-| `DEVICE_EVENT` | `CONNECT` | 设备接入且可用 | 刷新设备列表，可自动选中 |
-| `DEVICE_EVENT` | `DISCONNECT` | 设备拔出或 BLE 断开 | 标记会话失效，提示重新连接 |
-| `DEVICE_EVENT` | `ACQUIRE` | 传输会话开始 | 阻塞并发请求，标记设备忙 |
-| `DEVICE_EVENT` | `RELEASE` | 传输会话结束 | 允许队列中的下一个请求 |
-| `DEVICE_EVENT` | `CHANGED` | 功能变更（如解锁后） | 重新执行 `getFeatures`，刷新缓存的 `deviceId` |
-| `DEVICE_EVENT` | `USED_ELSEWHERE` | 存在传输冲突 | 提示关闭其他应用/Bridge |
-| `DEVICE_EVENT` | `UNREADABLE` | 权限或驱动异常 | 提示重新授权或检查驱动 |
-| `DEVICE_EVENT` | `BUTTON` | 设备等待确认 | 在 UI 呈现“请在设备确认” |
-| `DEVICE_EVENT` | `PIN` | 设备等待 PIN | 保持 PIN 输入流程 |
-| `DEVICE_EVENT` | `PASSPHRASE` | 设备等待软件口令 | 保持口令输入流程 |
-| `DEVICE_EVENT` | `PASSPHRASE_ON_DEVICE` | 设备等待在机输入口令 | 显示“请在设备输入口令” |
-| `DEVICE_EVENT` | `SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE` | Bootloader 设备选择中 | 保持设备选择界面直至完成 |
-| `DEVICE_EVENT` | `FEATURES` | 能力快照 | 缓存能力信息 |
-| `DEVICE_EVENT` | `SUPPORT_FEATURES` | 支持矩阵快照 | 缓存支持情况 |
+| `DEVICE` | `CONNECT` | 设备接入且可用 | 刷新设备列表，可自动选中 |
+| `DEVICE` | `DISCONNECT` | 设备拔出或 BLE 断开 | 标记会话失效，提示重新连接 |
+| `DEVICE` | `FEATURES` | 能力快照 | 缓存能力信息 |
+| `DEVICE` | `SUPPORT_FEATURES` | 支持矩阵快照 | 缓存支持情况 |
 | `FIRMWARE_EVENT` | `RELEASE_INFO` | 新固件信息 | 在安全时机提示升级 |
 | `FIRMWARE_EVENT` | `BLE_RELEASE_INFO` | 新 BLE 固件信息 | 在安全时机提示升级 |
+
+> `DEVICE.BUTTON`、`DEVICE.PIN`、`DEVICE.PASSPHRASE` 等是 core 内部设备事件。它们会被转换成 `UI_EVENT` 给应用层使用，当前外层 SDK 不会直接转发这些事件。
 
 **事件处理示例**
 
 ```ts
-import HardwareSDK, { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-common-connect-sdk';
+import HardwareSDK, {
+  DEVICE,
+  FIRMWARE_EVENT,
+  UI_EVENT,
+  UI_REQUEST,
+  UI_RESPONSE,
+} from '@onekeyfe/hd-common-connect-sdk';
 
 const handleUiEvent = (msg: any) => {
   switch (msg.type) {
@@ -288,12 +300,23 @@ const handleUiEvent = (msg: any) => {
         })
       );
       return;
+    case UI_REQUEST.REQUEST_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE:
+      showDeviceList((deviceId) =>
+        HardwareSDK.uiResponse({
+          type: UI_RESPONSE.SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE,
+          payload: { deviceId },
+        })
+      );
+      return;
     default:
       console.log('UI event', msg.type, msg.payload);
   }
 };
 
 HardwareSDK.on(UI_EVENT, handleUiEvent);
+HardwareSDK.on(DEVICE.CONNECT, ({ device }) => refreshDevice(device));
+HardwareSDK.on(DEVICE.DISCONNECT, ({ device }) => markDeviceOffline(device));
+HardwareSDK.on(FIRMWARE_EVENT, (msg) => showFirmwareNotice(msg.type, msg.payload));
 ```
 
 ## 安全输入

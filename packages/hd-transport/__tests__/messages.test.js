@@ -70,6 +70,14 @@ describe('messages', () => {
     expect(() => createMessageFromType(messages, 0)).not.toThrow();
   });
 
+  test('createMessageFromType throws a readable error for unknown ids', () => {
+    const messages = parseConfigure(json);
+
+    expect(() => createMessageFromType(messages, 99999)).toThrow(
+      'MessageType id "99999" is not defined in protobuf schema'
+    );
+  });
+
   test('createMessageFromName (wire_type case)', () => {
     const messages = parseConfigure(json);
     const name = 'TxAckInput';
