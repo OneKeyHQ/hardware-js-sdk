@@ -49,7 +49,7 @@ export default class CardanoSignTransaction extends BaseMethod<any> {
   init() {
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
-    this.allowUsePreInitialize = true;
+    this.allowUsePreInitialize = false;
 
     this.hasBundle = !!this.payload?.bundle;
 
