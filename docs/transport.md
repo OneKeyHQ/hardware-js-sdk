@@ -155,6 +155,55 @@ export default class WebUsbTransport {
 }
 ```
 
+### React Native BLE Firmware / OTA Writes
+
+`packages/hd-transport-react-native` 对普通消息和大 payload 的写入路径做了区分。最近这部分的改动主要集中在 `FirmwareUpload` 的 BLE 背压恢复。
+
+#### 哪些消息会走特殊写入路径
+
+| 消息名 | 写入方式 | 目的 |
+| --- | --- | --- |
+| `EmmcFileWrite` | `transport.writeWithRetry()` | 沿用现有分块重试逻辑 |
+| `FirmwareUpload` | `writeWithoutResponse()` + 节流 + 有条件重连 | 减少 OTA 期间的 BLE 队列拥塞 |
+| 其他消息 | 普通 63-byte HID 分包写入 | 保持统一协议路径 |
+
+#### `FirmwareUpload` 的节流参数
+
+| 参数 | iOS | Android | 说明 |
+| --- | --- | --- | --- |
+| `requestMTU` | 256 | 256 | 连接时的首选 MTU；若 MTU 变更失败会回退 |
+| 写入聚合容量 | `IOS_PACKET_LENGTH` | `192` bytes | Android 固件上传会使用更大的 packet capacity |
+| `FIRMWARE_UPLOAD_WRITE_BURST_SIZE` | 4 | 5 | 每写完一组 burst 主动暂停 |
+| `FIRMWARE_UPLOAD_WRITE_PAUSE_MS` | 8ms | 10ms | burst 间隔，给 BLE 队列排空时间 |
+| `FIRMWARE_UPLOAD_WRITE_FLUSH_DELAY_MS` | 24ms | 30ms | 本轮分块写完后的 flush 延迟 |
+| `FIRMWARE_UPLOAD_WRITE_MAX_RETRIES` | 8 | 8 | 单个 chunk 的最大恢复次数 |
+
+#### 重试与重连策略
+
+- 只有以下错误会进入恢复逻辑：
+  - `GATT_CONGESTED` / `status 143`
+  - `DeviceDisconnected`
+  - `CharacteristicNotFound`
+- **拥塞类错误**：按指数退避等待，延迟从 `200ms` 开始，上限 `1200ms`
+- **可重连错误**：固定等待 `2000ms`，然后重建 transport、重新发现 characteristic，并重新挂上 notify / disconnect 订阅
+- 超过 `8` 次恢复后，错误会直接向上抛出，不再静默重试
+
+#### 为什么只对 `FirmwareUpload` 特判
+
+`FirmwareUpload` 的流量特征和普通 APDU 完全不同：
+
+- chunk 连续、持续时间长
+- Android 上更容易触发 BLE 写队列背压
+- 断连后不能只依赖普通的 `writeWithoutResponse()` 失败重试，需要把 characteristic 和订阅一起恢复
+
+因此这里没有把策略做成全局默认值，而是只挂在 `name === 'FirmwareUpload'` 的路径上。
+
+#### 排障建议
+
+- **上传中反复出现 `GATT_CONGESTED`**：先观察是否能在 8 次内恢复；这类错误按设计会自动退避，不需要在上层再包一层立即重试
+- **上传中途断连**：重点检查 reconnect 之后是否重新拿到了 write / notify characteristic，以及 notify 订阅有没有恢复
+- **Android 连接后立刻报 MTU 变更失败**：transport 会把 `connectOptions` 回退为空对象再重连；如果你在上层保存了 transport 状态，不要假设每次连接都成功协商到 MTU 256
+
 ## Session Management
 
 ### Session Lifecycle
@@ -259,16 +308,10 @@ export function receiveOne(messages: Root, data: string) {
 
 ## Summary
 
-OneKey传输层通过分层架构、协议设计和错误恢复机制，成功解决了跨平台硬件钱包通信的复杂性：
+当前传输层文档重点覆盖了三类已在源码中稳定存在的约定：
 
-**核心特性:**
-- **协议设计**: 统一的消息格式和分包机制
-- **会话管理**: 安全隔离的设备会话和自动清理
-- **错误恢复**: 智能重试和指数退避机制
-- **安全保护**: 全面防护常见攻击向量
+- **统一协议格式**：`[##][Type][Length][Payload]` 与 63-byte HID 分包
+- **会话模型**：`enumerate → acquire → configure → call → release`
+- **平台特化恢复逻辑**：例如 React Native BLE 在 `FirmwareUpload` 场景下的节流、退避和重连
 
-**性能指标:**
-- **延迟**: 典型操作亚秒级响应
-- **可靠性**: 高成功率和自动错误恢复
-- **兼容性**: 支持所有OneKey设备型号和固件版本
-- **稳定性**: 成熟的协议栈和传输机制
+如果你在排查跨平台差异，建议优先对照具体 transport 实现，而不要假设所有消息路径都共享同一套写入和恢复策略。
