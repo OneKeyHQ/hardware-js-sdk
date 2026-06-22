@@ -223,9 +223,15 @@ const handlePreWarmSignal = async (
   message: CoreMessage,
   method: BaseMethod
 ): Promise<any> => {
+  const createAckResponse = () => {
+    completeMethodRequestContext(method);
+    method.dispose();
+    return createResponseMessage(method.responseID, true, true);
+  };
+
   // no connectId: can't target a device safely, skip pre-warm (ack only)
   if (!method.connectId) {
-    return createResponseMessage(method.responseID, true, true);
+    return createAckResponse();
   }
 
   const key = method.getPreWarmKey();
@@ -238,12 +244,12 @@ const handlePreWarmSignal = async (
     } catch {
       // pre-warm is best-effort; ignore its failure for the coalesced caller
     }
-    return createResponseMessage(method.responseID, true, true);
+    return createAckResponse();
   }
 
   const doneAt = preWarmDoneAt.get(key);
   if (typeof doneAt === 'number' && Date.now() - doneAt <= method.preWarmTtl) {
-    return createResponseMessage(method.responseID, true, true);
+    return createAckResponse();
   }
 
   const run = onCallDevice(context, message, method);
