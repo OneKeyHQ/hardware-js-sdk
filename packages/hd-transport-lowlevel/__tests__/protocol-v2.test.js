@@ -29,21 +29,25 @@ const protocolV1Schema = {
 
 const protocolV2Schema = {
   nested: {
-    GetProtoVersion: {
+    ProtocolInfoRequest: {
       fields: {},
     },
-    ProtoVersion: {
+    ProtocolInfo: {
       fields: {
-        major_version: {
+        version: {
           type: 'uint32',
           id: 1,
         },
-        minor_version: {
+        supported_messages: {
+          rule: 'repeated',
           type: 'uint32',
           id: 2,
+          options: {
+            packed: false,
+          },
         },
-        patch_version: {
-          type: 'uint32',
+        protobuf_definition: {
+          type: 'string',
           id: 3,
         },
       },
@@ -66,8 +70,8 @@ const protocolV2Schema = {
     },
     MessageType: {
       values: {
-        MessageType_GetProtoVersion: 60200,
-        MessageType_ProtoVersion: 60201,
+        MessageType_ProtocolInfoRequest: 60200,
+        MessageType_ProtocolInfo: 60201,
         MessageType_Ping: 60206,
         MessageType_Success: 60207,
       },
@@ -162,11 +166,11 @@ describe('LowlevelTransport protocol framing', () => {
     );
     const callResponse = ProtocolV2.encodeFrame(
       schemas,
-      'ProtoVersion',
+      'ProtocolInfo',
       {
-        major_version: 2,
-        minor_version: 1,
-        patch_version: 3,
+        version: 1,
+        supported_messages: [60200, 60201, 60206, 60207],
+        protobuf_definition: 'onekey-protocol-v2',
       },
       { router: PROTOCOL_V2_CHANNEL_BLE_UART }
     );
@@ -183,12 +187,12 @@ describe('LowlevelTransport protocol framing', () => {
       uuid: 'pro2-id',
       protocolType: 'V2',
     });
-    await expect(lowlevel.call('pro2-id', 'GetProtoVersion', {})).resolves.toEqual({
-      type: 'ProtoVersion',
+    await expect(lowlevel.call('pro2-id', 'ProtocolInfoRequest', {})).resolves.toEqual({
+      type: 'ProtocolInfo',
       message: {
-        major_version: 2,
-        minor_version: 1,
-        patch_version: 3,
+        version: 1,
+        supported_messages: [60200, 60201, 60206, 60207],
+        protobuf_definition: 'onekey-protocol-v2',
       },
     });
     expect(plugin.send).toHaveBeenCalled();

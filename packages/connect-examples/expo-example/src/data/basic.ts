@@ -50,9 +50,9 @@ const api: PlaygroundProps[] = [
     ],
   },
   {
-    method: 'deviceGetDeviceInfo',
+    method: 'deviceInfoGet',
     description:
-      'Raw Protocol V2 DevGetDeviceInfo (no DeviceProfile wrapping, Pro2 only). Use the checkboxes to pick request targets/types.',
+      'Raw Protocol V2 DeviceInfoGet (no DeviceProfile wrapping, Pro2 only). Use the checkboxes to pick request targets/types.',
     noDeviceIdReq: true,
     checkboxGroups: [
       {
@@ -60,7 +60,7 @@ const api: PlaygroundProps[] = [
         fields: [
           { path: 'targets.hw', label: 'hw' },
           { path: 'targets.fw', label: 'fw' },
-          { path: 'targets.bt', label: 'bt' },
+          { path: 'targets.coprocessor', label: 'coprocessor' },
           { path: 'targets.se1', label: 'se1' },
           { path: 'targets.se2', label: 'se2' },
           { path: 'targets.se3', label: 'se3' },

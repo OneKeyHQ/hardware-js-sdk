@@ -9,7 +9,7 @@
 | 名称                         | 所在层级                                | 含义                                                                                         | 生命周期                                    |
 | ---------------------------- | --------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------- |
 | transport session / `mainId` | transport / Device                      | SDK 与 transport 占用设备的连接句柄。USB 下通常是 bridge/webusb session；BLE 下通常是 uuid。 | acquire 到 release                          |
-| device `session_id`          | 固件/SE + V1 Features / PassphraseState | 设备端 passphrase/seed session 的标识，用于复用已解锁的钱包上下文。                          | 设备端生成，SDK 缓存到 `deviceSessionCache` |
+| device `session_id`          | 固件/SE + V1 Features / Pro2 DeviceSession | 设备端 passphrase/seed session 的标识，用于复用已解锁的钱包上下文。                       | 设备端生成，SDK 缓存到 `deviceSessionCache` |
 | `device_id`                  | V1 Features                             | 当前 seed 对应的身份，换 seed / wipe 后会变化。                                              | 随 seed 变化                                |
 | serialNo / uuid              | 硬件身份                                | 硬件序列号，用于识别物理设备。                                                               | 物理设备稳定                                |
 | Protocol V2 frame `seq`      | hd-transport ProtocolV2Session          | V2 帧级请求序号，解决分片/应答跟踪与日志定位。                                               | 每个 ProtocolV2Session 内递增               |
@@ -77,12 +77,12 @@ Pro2 不走传统 `Initialize/GetFeatures`。`Device.initialize()` 中如果 `is
 1. 写入 `this.passphraseState = options?.passphraseState`。
 2. 如果已有 features 且无需强制新 session，则每次 run 前调用 `_refreshProtocolV2Status()` 做轻量刷新。
 3. 否则调用 `_initializeProtocolV2()`。
-4. `_initializeProtocolV2()` 通过 `requestProtocolV2DeviceInfo()` 发送 `DevGetDeviceInfo`。
+4. `_initializeProtocolV2()` 通过 `requestProtocolV2DeviceInfo()` 发送 `DeviceInfoGet`。
 5. `updateProtocolV2Features()` 使用 `buildProtocolV2FeaturesPayload()` 映射出 SDK 标准 `Features`。
 
-为什么 Pro2 不复用 V1 Initialize：Protocol V2 当前是系统协议能力，设备信息来自 `Ping + DevGetDeviceInfo`，并且文档中已明确 V2 不支持传统 `GetFeatures`。SDK 用 feature builder 统一输出结构化 features，避免业务层直接理解 V2 原始 schema。
+为什么 Pro2 不复用 V1 Initialize：Protocol V2 当前是系统协议能力，设备信息来自 `Ping + DeviceInfoGet`，并且文档中已明确 V2 不支持传统 `GetFeatures`。SDK 用 feature builder 统一输出结构化 features，避免业务层直接理解 V2 原始 schema。
 
-需要注意：当前 `requestProtocolV2DeviceInfo()` 默认 `protocolV2DeviceInfoMockEnabled = true`，早期 Pro2 测试固件未实现 `DevGetDeviceInfo` 时会返回 mock。mock 的 `hw.serial_no` 为空，并且不会伪造 `device_id`。这是为了避免把 transport path 错当成硬件身份或 seed 身份。
+需要注意：当前实现只按 `firmware-pro2` 的 `DeviceInfoGet` 真实响应映射。`device_id` 只来自 `DeviceInfo.status.device_id`，不会用 `hw.serial_no` 或 transport path 兜底。
 
 ## 4. deviceId 与设备身份逻辑
 
@@ -151,7 +151,7 @@ V1 `Features.device_id` 表示当前 seed 身份。它不是物理设备序列�
    在 V1 `Initialize -> Features` 后调用。只有存在 `passphraseState` 或 `initSession=true` 时才写缓存。
 
 2. `updateInternalState(enablePassphrase, passphraseState, deviceId, sessionId, featuresSessionId)`  
-   在 `getPassphraseStateWithRefreshDeviceInfo()` 之后调用。优先使用 `PassphraseState.session_id`，没有则使用 `features.session_id`。
+   在 `getPassphraseStateWithRefreshDeviceInfo()` 之后调用。优先使用固件返回的 `session_id`，没有则使用 `features.session_id`。
 
 3. `preloadSessionCache(deviceId, passphraseState, sessionId)`  
    给 CLI 等短生命周期进程使用，用外部已知 session 预填缓存。
@@ -170,32 +170,27 @@ V1 `Features.device_id` 表示当前 seed 身份。它不是物理设备序列�
 
 ### 6.1 getPassphraseState API
 
-`GetPassphraseState` 方法本身设置 `useDevicePassphraseState=false`，避免调用自己时又触发 passphrase 校验。执行流程：
+SDK 对外 API 仍叫 `getPassphraseState`，方法本身设置 `useDevicePassphraseState=false`，避免调用自己时又触发 passphrase 校验。执行流程：
 
 1. 调 `getPassphraseStateWithRefreshDeviceInfo()`。
 2. 该函数再调底层 `getPassphraseState()`。
-3. 如果设备支持 `GetPassphraseState`，发送：
-   - `passphrase_state`
-   - `_only_main_pin`
-   - `allow_create_attach_pin`
-4. 固件返回：
-   - `passphrase_state`
-   - `session_id`
-   - `unlocked_attach_pin`
-5. 如果设备之前 locked，或 features 显示未开启 passphrase 但现在拿到了 state，会刷新 `getFeatures()`。
-6. 调 `updateInternalState()` 写入 session 缓存。
+3. Protocol V2 / Pro2 发送 `DeviceSessionGet`，如果本地命中缓存则携带 `session_id`。
+4. Pro2 固件返回 `DeviceSession`：`session_id` 和 `btc_test_address`，SDK 将 `btc_test_address` 映射为上层 `passphraseState`。
+5. Pro V1 仍走 `GetPassphraseState -> PassphraseState`，返回 `passphrase_state/session_id/unlocked_attach_pin`。
+6. 如果设备之前 locked，或 features 显示未开启 passphrase 但现在拿到了 state，会刷新设备状态。
+7. 调 `updateInternalState()` 写入 session 缓存。
 
-对 Pro / Pro2，API 返回中即使 `passphrase_protection` 不是 true，也会返回 `passphrase_state`。这是为了支持 Pro 系列的新 passphrase / attach-to-pin 语义，不能简单套用老设备“只有开启 passphrase 才返回 state”的规则。
+对 Pro / Pro2，API 返回中即使 `passphrase_protection` 不是 true，也会返回 `passphraseState`。这是为了支持 Pro 系列的 passphrase / attach-to-pin 语义，不能简单套用 V1 设备“只有开启 passphrase 才返回 state”的规则。
 
 ### 6.2 支持判断
 
-`getPassphraseState()` 判断是否可以直接用固件新 API：
+`getPassphraseState()` 的协议分支：
 
-- Protocol V2 直接认为支持。
+- Protocol V2 使用 `DeviceSessionGet -> DeviceSession`。
 - features capability 包含 `Capability_AttachToPin`。
 - Pro 且固件版本 `>= 4.15.0`。
 
-如果不支持，则退回旧方案：静默调用 Testnet `GetAddress`，用返回地址作为 passphraseState。这个回退只适用于 legacy V1 设备；Pro2 不走这条路径。
+如果 V1 设备不支持新接口，则静默调用 Testnet `GetAddress`，用返回地址作为 passphraseState。这个回退只适用于 V1 设备；Pro2 不走这条路径。
 
 ### 6.3 普通业务调用前的安全检查
 
@@ -218,7 +213,7 @@ V1 `Features.device_id` 表示当前 seed 身份。它不是物理设备序列�
 
 ### 7.1 protobuf 字段
 
-固件 schema 中与 attach-to-pin 相关的字段包括：
+V1 固件 schema 中与 attach-to-pin 相关的字段包括：
 
 - `Initialize.is_contains_attach`
 - `Features.attach_to_pin_user`
@@ -228,6 +223,8 @@ V1 `Features.device_id` 表示当前 seed 身份。它不是物理设备序列�
 - `ButtonRequest_AttachPin`
 - `GetPassphraseState.allow_create_attach_pin`
 - `PassphraseState.unlocked_attach_pin`
+
+Pro2 当前固件不再使用上述 passphrase 消息；状态来自 `DeviceInfo.status.passphrase_enabled`、`attach_to_pin_enabled`、`unlocked_by_attach_to_pin`，session 来自 `DeviceSession.session_id`，passphraseState 来自 `DeviceSession.btc_test_address`。
 
 这些字段形成两个方向：
 
@@ -260,11 +257,11 @@ UI 返回后：
 
 Attach to PIN 的核心风险是：用户表面上没有手动输入 passphrase，但设备端已经根据绑定 PIN 切换到了某个隐藏钱包 passphrase 上下文。
 
-因此 SDK 在获取 `PassphraseState` 后必须用固件返回的真实 `passphrase_state/session_id/unlocked_attach_pin` 修正本地状态：
+因此 SDK 在获取设备 session 后必须用固件返回的真实 `passphraseState/session_id` 修正本地状态；attach PIN 解锁状态由 Pro2 `DeviceInfo.status.unlocked_by_attach_to_pin` 或 V1 `PassphraseState.unlocked_attach_pin` 提供：
 
 ```text
-GetPassphraseState
-  -> PassphraseState(passphrase_state, session_id, unlocked_attach_pin)
+DeviceSessionGet / GetPassphraseState
+  -> DeviceSession(btc_test_address, session_id) / PassphraseState(passphrase_state, session_id)
   -> updateInternalState()
   -> deviceSessionCache[deviceId@passphraseState] = session_id
 ```
@@ -315,11 +312,11 @@ Pro2 子模块里可以看到 SE session 的底层处理：
 App 调 getPassphraseState(connectId)
   -> core 找到 Device
   -> Device.initialize()
-  -> GetPassphraseState
+  -> Pro2: DeviceSessionGet / Pro V1: GetPassphraseState
   -> UI 输入 passphrase 或选择设备输入/attach PIN
-  -> 固件返回 PassphraseState(passphrase_state, session_id, unlocked_attach_pin)
+  -> 固件返回 passphraseState 与 session_id
   -> SDK updateInternalState(deviceId, passphraseState, sessionId)
-  -> App 保存 passphrase_state，后续业务调用携带它
+  -> App 保存 passphraseState，后续业务调用携带它
 ```
 
 后续签名/取地址：
@@ -328,7 +325,7 @@ App 调 getPassphraseState(connectId)
 App 调 evmGetAddress({ passphraseState })
   -> Device.initialize({ passphraseState })
   -> getInternalState() 命中 deviceId@passphraseState
-  -> Initialize({ session_id, passphrase_state, is_contains_attach: true })
+  -> Pro2 后续安全检查使用 DeviceSessionGet({ session_id })
   -> core 再 checkPassphraseStateSafety()
   -> method.run()
 ```
@@ -338,8 +335,8 @@ App 调 evmGetAddress({ passphraseState })
 ```text
 App 调业务方法({ useEmptyPassphrase: true })
   -> checkPassphraseStateSafety()
-  -> GetPassphraseState(_only_main_pin: true)
-  -> 固件返回 unlocked_attach_pin=true
+  -> 获取当前设备 session / 状态
+  -> 发现 unlockedAttachPin=true
   -> SDK 判断 mainWalletUseAttachPin
   -> lockDevice()
   -> clearInternalState()
@@ -352,7 +349,7 @@ App 调业务方法({ useEmptyPassphrase: true })
 
 ```text
 App 调业务方法({ passphraseState: A })
-  -> GetPassphraseState(expectPassphraseState: A)
+  -> 获取当前设备 session / 状态
   -> 固件通过 attach PIN 返回 passphraseState B
   -> SDK 判断 A !== B
   -> lockDevice()
@@ -372,13 +369,13 @@ App 调业务方法({ passphraseState: A })
 
 `session_id` 缓存让同一个 `deviceId@passphraseState` 可以复用设备端已建立的 session。对 CLI、DApp 和移动端来说，这能减少重复 passphrase 输入，尤其是隐藏钱包和 Cardano 派生这类耗时流程。
 
-### 11.3 兼容性：Pro / Touch / 老固件 / Pro2 协议并存
+### 11.3 兼容性：Pro / Touch / V1 设备 / Pro2 协议并存
 
 SDK 需要同时支持：
 
-- 老 V1 设备没有 `GetPassphraseState`，只能用 legacy Testnet `GetAddress` 回退。
+- V1 设备没有 `GetPassphraseState` 时，只能用 Testnet `GetAddress` 回退。
 - Pro V1 新固件支持 Attach to PIN，需要使用 `GetPassphraseState` 和扩展字段。
-- Pro2 V2 不走 `Initialize/GetFeatures`，但仍要向上层暴露兼容 features。
+- Pro2 V2 不走 `Initialize/GetFeatures/GetPassphraseState`，使用 `DeviceInfoGet` 与 `DeviceSessionGet`，但仍要向上层暴露兼容 features。
 
 因此现在的实现是“能力检测 + 协议分支 + features adapter”，而不是只按设备型号硬编码。
 
@@ -398,9 +395,9 @@ Protocol V2 的响应当前主要按类型匹配。如果同一 session 上两�
 ## 12. 当前实现注意点
 
 1. `getInternalState()` 没有 passphraseState 就不会查 session cache，这是当前最重要的安全边界。
-2. Pro2 的 `DevGetDeviceInfo` 当前默认 mock 开启，真实固件接入后需要关闭 `protocolV2DeviceInfoMockEnabled`。
+2. Pro2 的 `DeviceInfoGet` 使用当前固件真实字段，`status.passphrase_enabled` 映射到 SDK `passphrase_protection`。
 3. `DevicePool._sendDisconnectMessage()` 当前用 `this.connectedPool[i]` 取 descriptor，看起来应为 `disconnectPool[i]`，这与本文主线无关，但属于设备断开事件可疑点。
-4. `supportProSeriesAttachPinPassphrase()` 只适用于 V1 Pro，Pro2 通过 `isProtocolV2()` 直接支持。
+4. `supportProSeriesAttachPinPassphrase()` 只适用于 V1 Pro，Pro2 在 `getPassphraseState()` 中直接走 `DeviceSessionGet`。
 5. 业务方法如设置、固件、文件、设备状态类通常会设置 `useDevicePassphraseState=false`，避免无意义触发 passphrase 校验。
 
 ## 13. 关键源码索引
@@ -416,6 +413,6 @@ Protocol V2 的响应当前主要按类型匹配。如果同一 session 上两�
 - Protocol V2 frame 重组：`packages/hd-transport/src/protocols/v2/frame-assembler.ts`
 - Pro2 features adapter：`packages/core/src/protocols/protocol-v2/features.ts`
 - Protocol V2 标准 features 构建：`packages/core/src/deviceProfile/buildDeviceFeatures.ts`
-- 固件 protobuf：`submodules/firmware-pro2/sys/protobuf/onekey_protocol/legacy/messages_management.proto`
-- 固件 passphrase protobuf：`submodules/firmware-pro2/sys/protobuf/onekey_protocol/legacy/messages_passphrase.proto`
+- Pro2 session protobuf：`submodules/firmware-pro2/sys/protobuf/onekey_protocol/latest/messages_device_session.proto`
+- Pro2 status protobuf：`submodules/firmware-pro2/sys/protobuf/onekey_protocol/latest/messages_device_status.proto`
 - 固件 SE session handler：`submodules/firmware-pro2/tasks/task_se_agent/handlers/se_handlers_session.c`

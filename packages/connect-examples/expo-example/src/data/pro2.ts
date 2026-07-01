@@ -2,8 +2,8 @@ import { type PlaygroundProps } from '../components/Playground';
 
 const api: PlaygroundProps[] = [
   {
-    method: 'getProtoVersion',
-    description: 'Get Protocol V2 protobuf version.',
+    method: 'protocolInfoRequest',
+    description: 'Get Protocol V2 protocol information.',
     noDeviceIdReq: true,
   },
   {
@@ -39,12 +39,6 @@ const api: PlaygroundProps[] = [
       },
     ],
   },
-  {
-    method: 'deviceGetOnboardingStatus',
-    description: 'Get Protocol V2 onboarding status.',
-    noDeviceIdReq: true,
-  },
-  {
     method: 'deviceReboot',
     description: 'Reboot Protocol V2 device.',
     noDeviceIdReq: true,
@@ -70,21 +64,22 @@ const api: PlaygroundProps[] = [
     ],
   },
   {
-    method: 'factoryGetDeviceInfo',
+    method: 'deviceFactoryInfoGet',
     description: 'Get factory device information.',
     noDeviceIdReq: true,
   },
   {
-    method: 'factoryDeviceInfoSettings',
+    method: 'deviceFactoryInfoSet',
     description: 'Set factory device information.',
     noDeviceIdReq: true,
     presupposes: [
       {
         title: 'Factory settings',
         value: {
-          serial_no: '',
-          cpu_info: '',
-          pre_firmware: '',
+          version: 1,
+          serial_number: '',
+          burn_in_completed: false,
+          factory_test_completed: false,
         },
       },
     ],
@@ -120,7 +115,7 @@ const api: PlaygroundProps[] = [
     noDeviceIdReq: true,
   },
   {
-    method: 'filesystemFixPermission',
+    method: 'filesystemPermissionFix',
     description: 'Fix Protocol V2 filesystem permission.',
     noDeviceIdReq: true,
   },

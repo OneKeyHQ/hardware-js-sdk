@@ -58,7 +58,7 @@ export interface FirmwareUpdateV3Params {
 }
 
 /**
- * firmwareUpdateV4（Protocol V2）按 DevFirmwareTargetType 拆分的目标二进制。
+ * firmwareUpdateV4（Protocol V2）按 DeviceFirmwareTargetType 拆分的目标二进制。
  * 每个字段对应一个固件升级 target，可单独更新，也可任意组合一次更新。
  */
 export interface FirmwareUpdateV4Params {
@@ -66,34 +66,24 @@ export interface FirmwareUpdateV4Params {
   chunkSize?: number;
   firmwareType?: EFirmwareType;
 
-  /** TARGET_MAIN_BOOT = 1 */
+  /** FW_MGMT_TARGET_ROMLOADER = 1 */
   romloaderBinary?: ArrayBuffer;
-  /** TARGET_MAIN_BOOT = 1 */
+  /** FW_MGMT_TARGET_BOOTLOADER = 2 */
   bootloaderBinary?: ArrayBuffer;
-  /** TARGET_MAIN_APP = 0 */
+  /** FW_MGMT_TARGET_APPLICATION_P1 = 3 */
   applicationP1Binary?: ArrayBuffer;
-  /** TARGET_MAIN_APP = 0 */
+  /** FW_MGMT_TARGET_APPLICATION_P2 = 4 */
   applicationP2Binary?: ArrayBuffer;
-  /** TARGET_BT = 2 */
+  /** FW_MGMT_TARGET_COPROCESSOR = 5 */
   coprocessorBinary?: ArrayBuffer;
-  /** TARGET_SE1-4 = 3-6 */
+  /** FW_MGMT_TARGET_SE01-04 = 6-9 */
   se01Binary?: ArrayBuffer;
   se02Binary?: ArrayBuffer;
   se03Binary?: ArrayBuffer;
   se04Binary?: ArrayBuffer;
-  /** TARGET_RESOURCE = 10（zip 包，解压后逐文件上传） */
+  /** FW_MGMT_TARGET_RESOURCE = 10 */
   resourceBinary?: ArrayBuffer;
   forcedUpdateRes?: boolean;
-
-  /** 按 release 配置自动下载 */
-  firmwareVersion?: number[];
-  bleVersion?: number[];
-  bootloaderVersion?: number[];
-
-  /** legacy 别名：等价 applicationP1Binary */
-  firmwareBinary?: ArrayBuffer;
-  /** legacy 别名：等价 coprocessorBinary */
-  bleBinary?: ArrayBuffer;
 }
 
 export declare function firmwareUpdateV3(

@@ -1,6 +1,6 @@
 import { ERRORS, HardwareError, HardwareErrorCode, wait } from '@onekeyfe/hd-shared';
 import {
-  DevRebootType,
+  DeviceRebootType,
   PROTOCOL_V2_BLE_FILE_CHUNK_SIZE,
   PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE,
 } from '@onekeyfe/hd-transport';
@@ -15,14 +15,13 @@ import {
   getFirmwareType,
   getLogger,
 } from '../utils';
-import { getBinary, getSysResourceBinary } from './firmware/getBinary';
+import { getSysResourceBinary } from './firmware/getBinary';
 import { DataManager } from '../data-manager';
 import { FirmwareUpdateBaseMethod } from './firmware/FirmwareUpdateBaseMethod';
 import { DevicePool } from '../device/DevicePool';
 import {
   PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST,
   ProtocolV2FirmwareTargetType,
-  protocolV2FileNameToTargetId,
 } from '../protocols/protocol-v2';
 import { requestProtocolV2DeviceInfo } from '../protocols/protocol-v2/features';
 import {
@@ -35,7 +34,7 @@ import type { FirmwareUpdateV4Params } from '../types/api/firmwareUpdate';
 import type { EFirmwareType } from '@onekeyfe/hd-shared';
 import type { PROTO } from '../constants';
 import type { TypedResponseMessage } from '../device/DeviceCommands';
-import type { Features } from '../types';
+import type { Features, IFirmwareReleaseInfo, IProtocolV2FirmwareComponent } from '../types';
 
 const Log = getLogger(LoggerNames.Method);
 
@@ -43,22 +42,88 @@ const SESSION_ERROR = 'session not found';
 const PROTOCOL_V2_BOOTLOADER_RECONNECT_TIMEOUT = 60 * 1000;
 const PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT = 5 * 1000;
 const PROTOCOL_V2_INSTALL_TIMEOUT = 5 * 60 * 1000;
-const PROTOCOL_V2_TARGET_STATUS_FINISHED = 0;
+const PROTOCOL_V2_TARGET_STATUS_PENDING = 0;
 const PROTOCOL_V2_TARGET_STATUS_IN_PROGRESS = 1;
-const PROTOCOL_V2_TARGET_STATUS_FAILED = 2;
+const PROTOCOL_V2_TARGET_STATUS_FINISHED = 2;
+const PROTOCOL_V2_TARGET_STATUS_FAILED_MIN = 3;
 const PROTOCOL_V2_CONNECT_PROTOCOL = 'V2';
 const PROTOCOL_V2_FIRMWARE_STAGING_VOLUME = 'vol1:';
 const PROTOCOL_V2_MIN_FILE_CHUNK_SIZE = 64;
 
 type ProtocolV2FirmwareUpdateStatusTarget = {
   target_id: number;
-  status: number;
+  status?: number;
+  payload_version?: number;
+  path?: string;
 };
 
 type ProtocolV2FirmwareUpdateStartResponse =
   | TypedResponseMessage<'Success'>
-  | TypedResponseMessage<'DevFirmwareUpdateStatus'>
+  | TypedResponseMessage<'DeviceFirmwareUpdateStatus'>
   | undefined;
+
+type ProtocolV2TargetBinary = { fileName: string; binary: ArrayBuffer; targetId: number };
+
+type ProtocolV2RemoteComponentTarget = {
+  fileName: string;
+  targetId: number;
+  kind: 'bootloader' | 'firmware' | 'resource';
+};
+
+const PROTOCOL_V2_REMOTE_COMPONENT_TARGETS: Readonly<
+  Record<string, ProtocolV2RemoteComponentTarget>
+> = {
+  ROMLOADER: {
+    fileName: 'romloader.bin',
+    targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_ROMLOADER,
+    kind: 'firmware',
+  },
+  BOOTLOADER: {
+    fileName: 'bootloader.bin',
+    targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_BOOTLOADER,
+    kind: 'bootloader',
+  },
+  APPLICATION_P1: {
+    fileName: 'application_p1.bin',
+    targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P1,
+    kind: 'firmware',
+  },
+  APPLICATION_P2: {
+    fileName: 'application_p2.bin',
+    targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P2,
+    kind: 'firmware',
+  },
+  COPROCESSOR: {
+    fileName: 'coprocessor.bin',
+    targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_COPROCESSOR,
+    kind: 'firmware',
+  },
+  SE01: {
+    fileName: 'se01.bin',
+    targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_SE01,
+    kind: 'firmware',
+  },
+  SE02: {
+    fileName: 'se02.bin',
+    targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_SE02,
+    kind: 'firmware',
+  },
+  SE03: {
+    fileName: 'se03.bin',
+    targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_SE03,
+    kind: 'firmware',
+  },
+  SE04: {
+    fileName: 'se04.bin',
+    targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_SE04,
+    kind: 'firmware',
+  },
+  RESOURCE: {
+    fileName: 'resource.bin',
+    targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_RESOURCE,
+    kind: 'resource',
+  },
+};
 
 const isProtocolV2ReconnectProbeError = (error: unknown) => {
   const message = getProtocolV2UnknownErrorText(error).toLowerCase();
@@ -73,7 +138,7 @@ const isProtocolV2PollingTransientError = (error: unknown) => {
   return (
     isProtocolV2DeviceDisconnectedError(error) ||
     isProtocolV2ReconnectProbeError(error) ||
-    (message.includes('response timeout') && message.includes('devicegetfirmwareupdatestatus')) ||
+    (message.includes('response timeout') && message.includes('devicefirmwareupdatestatusget')) ||
     message.includes('device not found') ||
     message.includes('transportnotfound')
   );
@@ -84,7 +149,7 @@ const isProtocolV2PollingTransientError = (error: unknown) => {
  *
  * It intentionally does not fall back to FirmwareUpdateV3/V1 behavior:
  * - upload uses FilesystemFileWrite
- * - install uses DevFirmwareUpdate
+ * - install uses DeviceFirmwareUpdateRequest
  * - completion reboots to normal, then polls Ping
  */
 export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareUpdateV4Params> {
@@ -97,14 +162,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const { payload } = this;
 
     validateParams(payload, [
-      { name: 'bleVersion', type: 'array' },
-      { name: 'bleBinary', type: 'buffer' },
       { name: 'chunkSize', type: 'number' },
-      { name: 'firmwareVersion', type: 'array' },
-      { name: 'firmwareBinary', type: 'buffer' },
       { name: 'resourceBinary', type: 'buffer' },
       { name: 'forcedUpdateRes', type: 'boolean' },
-      { name: 'bootloaderVersion', type: 'array' },
       { name: 'bootloaderBinary', type: 'buffer' },
       { name: 'romloaderBinary', type: 'buffer' },
       { name: 'applicationP1Binary', type: 'buffer' },
@@ -119,12 +179,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     ]);
 
     this.params = {
-      bleBinary: payload.bleBinary,
       chunkSize: payload.chunkSize,
-      firmwareBinary: payload.firmwareBinary,
       forcedUpdateRes: payload.forcedUpdateRes,
-      bleVersion: payload.bleVersion,
-      bootloaderVersion: payload.bootloaderVersion,
       bootloaderBinary: payload.bootloaderBinary,
       romloaderBinary: payload.romloaderBinary,
       applicationP1Binary: payload.applicationP1Binary,
@@ -134,7 +190,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       se02Binary: payload.se02Binary,
       se03Binary: payload.se03Binary,
       se04Binary: payload.se04Binary,
-      firmwareVersion: payload.firmwareVersion,
       resourceBinary: payload.resourceBinary,
       firmwareType: payload.firmwareType,
       platform: payload.platform,
@@ -175,15 +230,22 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const firmwareType = this.params.firmwareType ?? deviceFirmwareType;
 
     let resourceBinary: ArrayBuffer | null = null;
-    let fwBinaryMap: { fileName: string; binary: ArrayBuffer; targetId?: number }[] = [];
+    let fwBinaryMap: ProtocolV2TargetBinary[] = [];
     let bootloaderBinary: ArrayBuffer | null = null;
     try {
       this.postTipMessage(FirmwareUpdateTipMessage.StartDownloadFirmware);
       resourceBinary = await this.prepareResourceBinary(firmwareType, deviceFeatures);
-      fwBinaryMap = await this.prepareFirmwareAndBleBinary(firmwareType, deviceFeatures);
-      bootloaderBinary = await this.prepareBootloaderBinary(firmwareType, deviceFeatures);
-      // 按 DevFirmwareTargetType 拆分的目标二进制（显式 target_id，不走文件名推断）
-      fwBinaryMap.push(...this.collectExplicitTargetBinaries());
+      fwBinaryMap = this.collectExplicitTargetBinaries();
+      bootloaderBinary = this.prepareBootloaderBinary();
+      if (!this.hasExplicitProtocolV2Payload(fwBinaryMap)) {
+        const remoteBinaries = await this.prepareRemoteProtocolV2Binaries(
+          firmwareType,
+          deviceFeatures
+        );
+        resourceBinary = remoteBinaries.resourceBinary ?? resourceBinary;
+        bootloaderBinary = remoteBinaries.bootloaderBinary;
+        fwBinaryMap = remoteBinaries.fwBinaryMap;
+      }
       this.postTipMessage(FirmwareUpdateTipMessage.FinishDownloadFirmware);
     } catch (err) {
       throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
@@ -195,9 +257,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         'No firmware to update'
       );
     }
-
-    // TODO: 当前 firmware-pro2 子模块的 reboot/bootloader 流程还未稳定，先暂停自动进 bootloader。
-    // await this.enterProtocolV2BootloaderMode();
 
     await this.executeProtocolV2Update({
       resourceBinary,
@@ -243,22 +302,85 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return null;
   }
 
-  private async prepareBootloaderBinary(
-    firmwareType: EFirmwareType,
-    features: Features
-  ): Promise<ArrayBuffer | null> {
-    if (this.params.bootloaderBinary) {
-      return this.params.bootloaderBinary;
+  private prepareBootloaderBinary(): ArrayBuffer | null {
+    return this.params.bootloaderBinary ?? null;
+  }
+
+  private hasExplicitProtocolV2Payload(fwBinaryMap: ProtocolV2TargetBinary[]) {
+    return !!this.params.resourceBinary || !!this.params.bootloaderBinary || fwBinaryMap.length > 0;
+  }
+
+  private getRemoteComponentEntries(release: IFirmwareReleaseInfo) {
+    const components = release.components;
+    if (!components) return [];
+
+    const orderedKeys = [
+      ...(release.installOrder ?? []),
+      ...Object.keys(components).filter(key => !release.installOrder?.includes(key)),
+    ];
+
+    return orderedKeys
+      .map(key => {
+        const component = components[key];
+        return component ? [key, component] as const : undefined;
+      })
+      .filter((entry): entry is readonly [string, IProtocolV2FirmwareComponent] => !!entry);
+  }
+
+  private async downloadRemoteProtocolV2Component(
+    key: string,
+    component: IProtocolV2FirmwareComponent
+  ) {
+    const targetName = component.target?.toUpperCase();
+    const target = PROTOCOL_V2_REMOTE_COMPONENT_TARGETS[targetName];
+    if (!target) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        `Unsupported Protocol V2 firmware component target: ${key}/${component.target}`
+      );
+    }
+    if (!component.url) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        `Missing Protocol V2 firmware component url: ${key}/${component.target}`
+      );
     }
 
-    if (this.params.bootloaderVersion) {
-      const bootResourceUrl = DataManager.getBootloaderResource(features, firmwareType);
-      if (bootResourceUrl) {
-        const bootBinary = (await getSysResourceBinary(bootResourceUrl)).binary;
-        return bootBinary;
+    const { binary } = await getSysResourceBinary(component.url);
+    return {
+      ...target,
+      binary,
+    };
+  }
+
+  private async prepareRemoteProtocolV2Binaries(firmwareType: EFirmwareType, features: Features) {
+    const release = DataManager.getFirmwareLatestRelease(features, firmwareType);
+    const entries = release ? this.getRemoteComponentEntries(release) : [];
+
+    let resourceBinary: ArrayBuffer | null = null;
+    let bootloaderBinary: ArrayBuffer | null = null;
+    const fwBinaryMap: ProtocolV2TargetBinary[] = [];
+
+    for (const [key, component] of entries) {
+      const remoteBinary = await this.downloadRemoteProtocolV2Component(key, component);
+      if (remoteBinary.kind === 'resource') {
+        resourceBinary = remoteBinary.binary;
+      } else if (remoteBinary.kind === 'bootloader') {
+        bootloaderBinary = remoteBinary.binary;
+      } else {
+        fwBinaryMap.push({
+          fileName: remoteBinary.fileName,
+          binary: remoteBinary.binary,
+          targetId: remoteBinary.targetId,
+        });
       }
     }
-    return null;
+
+    return {
+      resourceBinary,
+      bootloaderBinary,
+      fwBinaryMap,
+    };
   }
 
   private isProtocolV2BootloaderMode() {
@@ -275,7 +397,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
     try {
       this.postTipMessage(FirmwareUpdateTipMessage.AutoRebootToBootloader);
-      await this.protocolV2Reboot(DevRebootType.Bootloader);
+      await this.protocolV2Reboot(DeviceRebootType.Bootloader);
       this.postTipMessage(FirmwareUpdateTipMessage.GoToBootloaderSuccess);
       this.checkDeviceToBootloader(this.payload.connectId);
       await this.checkPromise?.promise;
@@ -293,11 +415,11 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   }
 
   /**
-   * 收集按 DevFirmwareTargetType 拆分的显式目标二进制。
+   * 收集按 DeviceFirmwareTargetType 拆分的显式目标二进制。
    * 文件名仅用于 staging 路径展示，target_id 已显式给定。
    */
   private collectExplicitTargetBinaries() {
-    const entries: { fileName: string; binary: ArrayBuffer; targetId: number }[] = [];
+    const entries: ProtocolV2TargetBinary[] = [];
     const push = (binary: ArrayBuffer | undefined, fileName: string, targetId: number) => {
       if (binary) entries.push({ fileName, binary, targetId });
     };
@@ -305,68 +427,28 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     push(
       this.params.romloaderBinary,
       'romloader.bin',
-      ProtocolV2FirmwareTargetType.TARGET_MAIN_BOOT
+      ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_ROMLOADER
     );
     push(
       this.params.applicationP1Binary,
       'application_p1.bin',
-      ProtocolV2FirmwareTargetType.TARGET_MAIN_APP
+      ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P1
     );
     push(
       this.params.applicationP2Binary,
       'application_p2.bin',
-      ProtocolV2FirmwareTargetType.TARGET_MAIN_APP
+      ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P2
     );
-    push(this.params.coprocessorBinary, 'coprocessor.bin', ProtocolV2FirmwareTargetType.TARGET_BT);
-    push(this.params.se01Binary, 'se01.bin', ProtocolV2FirmwareTargetType.TARGET_SE1);
-    push(this.params.se02Binary, 'se02.bin', ProtocolV2FirmwareTargetType.TARGET_SE2);
-    push(this.params.se03Binary, 'se03.bin', ProtocolV2FirmwareTargetType.TARGET_SE3);
-    push(this.params.se04Binary, 'se04.bin', ProtocolV2FirmwareTargetType.TARGET_SE4);
+    push(
+      this.params.coprocessorBinary,
+      'coprocessor.bin',
+      ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_COPROCESSOR
+    );
+    push(this.params.se01Binary, 'se01.bin', ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_SE01);
+    push(this.params.se02Binary, 'se02.bin', ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_SE02);
+    push(this.params.se03Binary, 'se03.bin', ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_SE03);
+    push(this.params.se04Binary, 'se04.bin', ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_SE04);
     return entries;
-  }
-
-  private async prepareFirmwareAndBleBinary(firmwareType: EFirmwareType, features: Features) {
-    const fwBinaryMap: { fileName: string; binary: ArrayBuffer; targetId?: number }[] = [];
-    if (this.params.firmwareBinary) {
-      fwBinaryMap.push({
-        fileName: 'firmware.bin',
-        binary: this.params.firmwareBinary,
-      });
-    } else if (this.params.firmwareVersion) {
-      const firmwareBinary = (
-        await getBinary({
-          features,
-          version: this.params.firmwareVersion,
-          updateType: 'firmware',
-          isUpdateBootloader: false,
-          firmwareType,
-        })
-      ).binary;
-      fwBinaryMap.push({
-        fileName: 'firmware.bin',
-        binary: firmwareBinary,
-      });
-    }
-
-    if (this.params.bleBinary) {
-      fwBinaryMap.push({
-        fileName: 'ble-firmware.bin',
-        binary: this.params.bleBinary,
-      });
-    } else if (this.params.bleVersion) {
-      const bleBinary = await getBinary({
-        features,
-        version: this.params.bleVersion,
-        updateType: 'ble',
-        firmwareType,
-      });
-      fwBinaryMap.push({
-        fileName: 'ble-firmware.bin',
-        binary: bleBinary.binary,
-      });
-    }
-
-    return fwBinaryMap;
   }
 
   private async executeProtocolV2Update({
@@ -375,7 +457,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     bootloaderBinary,
   }: {
     resourceBinary: ArrayBuffer | null;
-    fwBinaryMap: { fileName: string; binary: ArrayBuffer; targetId?: number }[];
+    fwBinaryMap: ProtocolV2TargetBinary[];
     bootloaderBinary: ArrayBuffer | null;
   }) {
     let totalSize = 0;
@@ -399,7 +481,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         totalSize,
       });
       targets.push({
-        target_id: ProtocolV2FirmwareTargetType.TARGET_RESOURCE,
+        target_id: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_RESOURCE,
         path: resourceFilePath,
       });
     }
@@ -413,7 +495,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         totalSize,
       });
       targets.push({
-        target_id: ProtocolV2FirmwareTargetType.TARGET_MAIN_BOOT,
+        target_id: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_BOOTLOADER,
         path: bootloaderPath,
       });
     }
@@ -427,7 +509,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         totalSize,
       });
       targets.push({
-        target_id: fwbinary.targetId ?? protocolV2FileNameToTargetId(fwbinary.fileName),
+        target_id: fwbinary.targetId,
         path: firmwarePath,
       });
     }
@@ -444,8 +526,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   private async queryProtocolV2FirmwareUpdateStatus() {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
     return typedCall(
-      'DevGetFirmwareUpdateStatus',
-      'DevFirmwareUpdateStatus',
+      'DeviceFirmwareUpdateStatusGet',
+      'DeviceFirmwareUpdateStatus',
       {},
       {
         timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
@@ -472,7 +554,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const failedTarget = statusTargets.find(
       target =>
         expectedTargetIds.has(target.target_id) &&
-        target.status === PROTOCOL_V2_TARGET_STATUS_FAILED
+        typeof target.status === 'number' &&
+        target.status >= PROTOCOL_V2_TARGET_STATUS_FAILED_MIN
     );
     if (failedTarget) {
       throw ERRORS.TypedError(
@@ -493,7 +576,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const inProgressTarget = statusTargets.find(
       target =>
         expectedTargetIds.has(target.target_id) &&
-        target.status === PROTOCOL_V2_TARGET_STATUS_IN_PROGRESS
+        (target.status === PROTOCOL_V2_TARGET_STATUS_PENDING ||
+          target.status === PROTOCOL_V2_TARGET_STATUS_IN_PROGRESS)
     );
     if (inProgressTarget) {
       this.postProgressMessage(99, 'installingFirmware');
@@ -510,8 +594,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     if (startResponse?.type === 'Success') {
       return;
     }
-    if (startResponse?.type === 'DevFirmwareUpdateStatus') {
-      const statusTargets = (startResponse.message.targets ??
+    if (startResponse?.type === 'DeviceFirmwareUpdateStatus') {
+      const statusTargets = (startResponse.message.records ??
         []) as ProtocolV2FirmwareUpdateStatusTarget[];
       if (this.assertProtocolV2TargetStatus(statusTargets, expectedTargetIds)) {
         return;
@@ -524,7 +608,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     while (Date.now() - startTime < PROTOCOL_V2_INSTALL_TIMEOUT) {
       try {
         const statusRes = await this.queryProtocolV2FirmwareUpdateStatus();
-        const statusTargets = (statusRes.message.targets ??
+        const statusTargets = (statusRes.message.records ??
           []) as ProtocolV2FirmwareUpdateStatusTarget[];
         if (this.assertProtocolV2TargetStatus(statusTargets, expectedTargetIds)) {
           return;
@@ -566,7 +650,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
   private async exitProtocolV2BootloaderToNormal() {
     this.postTipMessage(FirmwareUpdateTipMessage.SwitchFirmwareReconnectDevice);
-    await this.protocolV2Reboot(DevRebootType.Normal);
+    await this.protocolV2Reboot(DeviceRebootType.Normal);
   }
 
   private async waitForProtocolV2FinalFeatures() {
@@ -770,17 +854,17 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     let response: ProtocolV2FirmwareUpdateStartResponse;
     try {
       response = await commands.typedCall(
-        'DevFirmwareUpdate',
+        'DeviceFirmwareUpdateRequest',
         PROTOCOL_V2_FIRMWARE_UPDATE_RESPONSE_TYPES,
         {
           targets,
         },
         {
-          intermediateTypes: ['DevFirmwareInstallProgress'],
-          onIntermediateResponse: (response: { message?: { progress?: number } }) => {
-            const progress = Number(response.message?.progress);
-            if (Number.isFinite(progress)) {
-              this.postProgressMessage(Math.min(progress, 99), 'installingFirmware');
+          intermediateTypes: ['DeviceFirmwareUpdateStatus'],
+          timeoutMs: PROTOCOL_V2_INSTALL_TIMEOUT,
+          onIntermediateResponse: (response: { type?: string }) => {
+            if (response.type === 'DeviceFirmwareUpdateStatus') {
+              this.postProgressMessage(99, 'installingFirmware');
             }
           },
         }
@@ -796,10 +880,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return response;
   }
 
-  private async protocolV2Reboot(rebootType: DevRebootType) {
+  private async protocolV2Reboot(rebootType: DeviceRebootType) {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
     try {
-      const res = await typedCall('DevReboot', 'Success', {
+      const res = await typedCall('DeviceReboot', 'Success', {
         reboot_type: rebootType,
       });
       return res.message;

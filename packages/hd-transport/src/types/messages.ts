@@ -1193,12 +1193,16 @@ export enum FailureType {
   Failure_WipeCodeMismatch = 13,
   Failure_InvalidSession = 14,
   Failure_FirmwareError = 99,
+  Failure_InvalidMessage = 1,
+  Failure_UndefinedError = 2,
+  Failure_UsageError = 3,
 }
 
 // Failure
 export type Failure = {
   code?: FailureType;
   message?: string;
+  subcode?: number;
 };
 
 export enum Enum_ButtonRequestType {
@@ -2456,6 +2460,28 @@ export type OnekeyFeatures = {
   onekey_se02_boot_build_id?: string;
   onekey_se03_boot_build_id?: string;
   onekey_se04_boot_build_id?: string;
+  onekey_romloader_version?: string;
+  onekey_bootloader_version?: string;
+  onekey_romloader_hash?: string;
+  onekey_bootloader_hash?: string;
+  onekey_romloader_build_id?: string;
+  onekey_bootloader_build_id?: string;
+  onekey_coprocessor_bt_name?: string;
+  onekey_coprocessor_version?: string;
+  onekey_coprocessor_build_id?: string;
+  onekey_coprocessor_hash?: string;
+  onekey_se01_bootloader_version?: string;
+  onekey_se02_bootloader_version?: string;
+  onekey_se03_bootloader_version?: string;
+  onekey_se04_bootloader_version?: string;
+  onekey_se01_bootloader_hash?: string;
+  onekey_se02_bootloader_hash?: string;
+  onekey_se03_bootloader_hash?: string;
+  onekey_se04_bootloader_hash?: string;
+  onekey_se01_bootloader_build_id?: string;
+  onekey_se02_bootloader_build_id?: string;
+  onekey_se03_bootloader_build_id?: string;
+  onekey_se04_bootloader_build_id?: string;
 };
 
 // LockDevice
@@ -2885,8 +2911,6 @@ export type UnLockDeviceResponse = {
 // GetPassphraseState
 export type GetPassphraseState = {
   passphrase_state?: string;
-  _only_main_pin?: boolean;
-  allow_create_attach_pin?: boolean;
 };
 
 // PassphraseState
@@ -4452,21 +4476,19 @@ export type TxAckPaymentRequest = {
   signature: string;
 };
 
-// DebugLinkInput
-export type DebugLinkInput = {
-  x?: number;
-  y?: number;
-  duration_ms?: number;
-  x_end?: number;
-  y_end?: number;
-};
-
 // InternalMyAddressRequest
 export type InternalMyAddressRequest = {
   coin_type: number;
   chain_id: number;
   account_index: number;
   derive_type: number;
+};
+
+// StartSession
+export type StartSession = {
+  session_id?: string;
+  _skip_passphrase?: boolean;
+  derive_cardano?: boolean;
 };
 
 // SetBusy
@@ -4580,23 +4602,171 @@ export type ViewVerifyPage = {
   path: string;
 };
 
-// GetProtoVersion
-export type GetProtoVersion = {};
+// ProtocolInfoRequest
+export type ProtocolInfoRequest = {};
 
-// ProtoVersion
-export type ProtoVersion = {
-  proto_version: number;
+// ProtocolInfo
+export type ProtocolInfo = {
+  version: number;
+  supported_messages: number[];
+  protobuf_definition?: string;
 };
 
-export enum DevRebootType {
+export enum DeviceRebootType {
   Normal = 0,
-  Boardloader = 1,
+  Romloader = 1,
   Bootloader = 2,
 }
 
-// DevReboot
-export type DevReboot = {
-  reboot_type: DevRebootType;
+// DeviceReboot
+export type DeviceReboot = {
+  reboot_type: DeviceRebootType;
+};
+
+// DeviceSettings
+export type DeviceSettings = {
+  label?: string;
+  bt_enable?: boolean;
+  language?: string;
+};
+
+// DeviceSettingsGet
+export type DeviceSettingsGet = {};
+
+// DeviceSettingsSet
+export type DeviceSettingsSet = {
+  settings: DeviceSettings;
+};
+
+// DeviceCertificate
+export type DeviceCertificate = {
+  cert_and_pubkey: string;
+  private_key?: string;
+};
+
+// DeviceCertificateWrite
+export type DeviceCertificateWrite = {
+  cert: DeviceCertificate;
+};
+
+// DeviceCertificateRead
+export type DeviceCertificateRead = {};
+
+// DeviceCertificateSignature
+export type DeviceCertificateSignature = {
+  data: string;
+};
+
+// DeviceCertificateSign
+export type DeviceCertificateSign = {
+  data: string;
+};
+
+export enum DeviceFirmwareTargetType {
+  FW_MGMT_TARGET_INVALID = 0,
+  FW_MGMT_TARGET_ROMLOADER = 1,
+  FW_MGMT_TARGET_BOOTLOADER = 2,
+  FW_MGMT_TARGET_APPLICATION_P1 = 3,
+  FW_MGMT_TARGET_APPLICATION_P2 = 4,
+  FW_MGMT_TARGET_COPROCESSOR = 5,
+  FW_MGMT_TARGET_SE01 = 6,
+  FW_MGMT_TARGET_SE02 = 7,
+  FW_MGMT_TARGET_SE03 = 8,
+  FW_MGMT_TARGET_SE04 = 9,
+  FW_MGMT_TARGET_RESOURCE = 10,
+}
+
+export enum DeviceFirmwareUpdateTaskStatus {
+  FW_MGMT_UPDATER_TASK_STATUS_PENDING = 0,
+  FW_MGMT_UPDATER_TASK_STATUS_IN_PROGRESS = 1,
+  FW_MGMT_UPDATER_TASK_STATUS_FINISHED = 2,
+  FW_MGMT_UPDATER_TASK_STATUS_FAILED_FILE_NOT_FOUND = 3,
+  FW_MGMT_UPDATER_TASK_STATUS_FAILED_FILE_READ = 4,
+  FW_MGMT_UPDATER_TASK_STATUS_FAILED_FILE_WRITE = 5,
+  FW_MGMT_UPDATER_TASK_STATUS_FAILED_VERIFY = 6,
+  FW_MGMT_UPDATER_TASK_STATUS_FAILED_INSTALL = 7,
+  FW_MGMT_UPDATER_TASK_STATUS_FAILED_ABORT = 8,
+  FW_MGMT_UPDATER_TASK_STATUS_FAILED_BUSY = 9,
+  FW_MGMT_UPDATER_TASK_STATUS_FAILED_ENTRY_OUT_OF_BOUNDS = 10,
+}
+
+// DeviceFirmwareTarget
+export type DeviceFirmwareTarget = {
+  target_id: DeviceFirmwareTargetType;
+  path: string;
+};
+
+// DeviceFirmwareUpdateRequest
+export type DeviceFirmwareUpdateRequest = {
+  targets: DeviceFirmwareTarget[];
+};
+
+// DeviceFirmwareUpdateRecord
+export type DeviceFirmwareUpdateRecord = {
+  target_id: DeviceFirmwareTargetType;
+  status?: DeviceFirmwareUpdateTaskStatus;
+  payload_version?: number;
+  path?: string;
+};
+
+// DeviceFirmwareUpdateRecordFields
+export type DeviceFirmwareUpdateRecordFields = {
+  status?: boolean;
+  payload_version?: boolean;
+  path?: boolean;
+};
+
+// DeviceFirmwareUpdateStatusGet
+export type DeviceFirmwareUpdateStatusGet = {
+  fields?: DeviceFirmwareUpdateRecordFields;
+};
+
+// DeviceFirmwareUpdateStatus
+export type DeviceFirmwareUpdateStatus = {
+  records: DeviceFirmwareUpdateRecord[];
+};
+
+export enum DeviceFactoryAck {
+  FACTORY_ACK_SUCCESS = 0,
+  FACTORY_ACK_FAIL = 1,
+}
+
+// DeviceFactoryInfoManufactureTime
+export type DeviceFactoryInfoManufactureTime = {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+};
+
+// DeviceFactoryInfo
+export type DeviceFactoryInfo = {
+  version?: number;
+  serial_number?: string;
+  burn_in_completed?: boolean;
+  factory_test_completed?: boolean;
+  manufacture_time?: DeviceFactoryInfoManufactureTime;
+};
+
+// DeviceFactoryInfoSet
+export type DeviceFactoryInfoSet = {
+  info: DeviceFactoryInfo;
+};
+
+// DeviceFactoryInfoGet
+export type DeviceFactoryInfoGet = {};
+
+// DeviceFactoryPermanentLock
+export type DeviceFactoryPermanentLock = {
+  check_a: string;
+  check_b: string;
+};
+
+// DeviceFactoryTest
+export type DeviceFactoryTest = {
+  burn_in_test: boolean;
 };
 
 export enum DeviceType {
@@ -4606,63 +4776,65 @@ export enum DeviceType {
   TOUCH = 3,
   PRO = 5,
   CLASSIC1S_PURE = 6,
+  PRO2 = 7,
+  NEO = 8,
 }
 
-export enum DevSeType {
+export enum DeviceSeType {
   THD89 = 0,
   SE608A = 1,
 }
 
-export enum DevSEState {
+export enum DeviceSEState {
   BOOT = 0,
   APP_FACTORY = 51,
   APP = 85,
 }
 
-// DevFirmwareImageInfo
-export type DevFirmwareImageInfo = {
+// DeviceFirmwareImageInfo
+export type DeviceFirmwareImageInfo = {
   version?: string;
   build_id?: string;
   hash?: string;
 };
 
-// DevHardwareInfo
-export type DevHardwareInfo = {
-  device_type?: DeviceType;
+// DeviceHardwareInfo
+export type DeviceHardwareInfo = {
+  Device_type?: DeviceType;
   serial_no?: string;
-  device_id?: string;
   hardware_version?: string;
   hardware_version_raw_adc?: number;
 };
 
-// DevMainMcuInfo
-export type DevMainMcuInfo = {
-  board?: DevFirmwareImageInfo;
-  boot?: DevFirmwareImageInfo;
-  app?: DevFirmwareImageInfo;
+// DeviceMainMcuInfo
+export type DeviceMainMcuInfo = {
+  romloader?: DeviceFirmwareImageInfo;
+  bootloader?: DeviceFirmwareImageInfo;
+  application?: DeviceFirmwareImageInfo;
+  application_data?: DeviceFirmwareImageInfo;
 };
 
-// DevBluetoothInfo
-export type DevBluetoothInfo = {
-  boot?: DevFirmwareImageInfo;
-  app?: DevFirmwareImageInfo;
-  adv_name?: string;
-  mac?: string;
+// DeviceCoprocessorInfo
+export type DeviceCoprocessorInfo = {
+  bootloader?: DeviceFirmwareImageInfo;
+  application?: DeviceFirmwareImageInfo;
+  bt_adv_name?: string;
+  bt_mac?: string;
 };
 
-// DevSEInfo
-export type DevSEInfo = {
-  boot?: DevFirmwareImageInfo;
-  app?: DevFirmwareImageInfo;
-  type?: DevSeType;
-  state?: DevSEState;
+// DeviceSEInfo
+export type DeviceSEInfo = {
+  bootloader?: DeviceFirmwareImageInfo;
+  application?: DeviceFirmwareImageInfo;
+  type?: DeviceSeType;
+  state?: DeviceSEState;
 };
 
-// DevInfoTargets
-export type DevInfoTargets = {
+// DeviceInfoTargets
+export type DeviceInfoTargets = {
   hw?: boolean;
   fw?: boolean;
-  bt?: boolean;
+  coprocessor?: boolean;
   se1?: boolean;
   se2?: boolean;
   se3?: boolean;
@@ -4670,108 +4842,57 @@ export type DevInfoTargets = {
   status?: boolean;
 };
 
-// DevInfoTypes
-export type DevInfoTypes = {
+// DeviceInfoTypes
+export type DeviceInfoTypes = {
   version?: boolean;
   build_id?: boolean;
   hash?: boolean;
   specific?: boolean;
 };
 
-// DevStatus
-export type DevStatus = {
-  language?: string;
-  bt_enable?: boolean;
-  init_states?: boolean;
-  backup_required?: boolean;
-  passphrase_protection?: boolean;
-  label?: string;
-};
-
-// DevGetDeviceInfo
-export type DevGetDeviceInfo = {
-  targets?: DevInfoTargets;
-  types?: DevInfoTypes;
+// DeviceInfoGet
+export type DeviceInfoGet = {
+  targets?: DeviceInfoTargets;
+  types?: DeviceInfoTypes;
 };
 
 // ProtocolV2DeviceInfo
 export type ProtocolV2DeviceInfo = {
   protocol_version: number;
-  hw?: DevHardwareInfo;
-  fw?: DevMainMcuInfo;
-  bt?: DevBluetoothInfo;
-  se1?: DevSEInfo;
-  se2?: DevSEInfo;
-  se3?: DevSEInfo;
-  se4?: DevSEInfo;
-  status?: DevStatus;
+  hw?: DeviceHardwareInfo;
+  fw?: DeviceMainMcuInfo;
+  coprocessor?: DeviceCoprocessorInfo;
+  se1?: DeviceSEInfo;
+  se2?: DeviceSEInfo;
+  se3?: DeviceSEInfo;
+  se4?: DeviceSEInfo;
+  status?: DeviceStatus;
 };
 
-export enum DevFirmwareTargetType {
-  TARGET_MAIN_APP = 0,
-  TARGET_MAIN_BOOT = 1,
-  TARGET_BT = 2,
-  TARGET_SE1 = 3,
-  TARGET_SE2 = 4,
-  TARGET_SE3 = 5,
-  TARGET_SE4 = 6,
-  TARGET_RESOURCE = 10,
-}
-
-// DevFirmwareTarget
-export type DevFirmwareTarget = {
-  target_id: DevFirmwareTargetType;
-  path: string;
+// DeviceSessionGet
+export type DeviceSessionGet = {
+  session_id?: string;
 };
 
-// DevFirmwareUpdate
-export type DevFirmwareUpdate = {
-  targets: DevFirmwareTarget[];
+// DeviceSession
+export type DeviceSession = {
+  session_id?: string;
+  btc_test_address?: string;
 };
 
-// DevFirmwareInstallProgress
-export type DevFirmwareInstallProgress = {
-  target_id: DevFirmwareTargetType;
-  progress: number;
-  stage?: string;
+// DeviceStatus
+export type DeviceStatus = {
+  device_id?: string;
+  unlocked?: boolean;
+  init_states?: boolean;
+  backup_required?: boolean;
+  passphrase_enabled?: boolean;
+  attach_to_pin_enabled?: boolean;
+  unlocked_by_attach_to_pin?: boolean;
 };
 
-// DevFirmwareUpdateStatusEntry
-export type DevFirmwareUpdateStatusEntry = {
-  target_id: DevFirmwareTargetType;
-  status: number;
-};
-
-// DevGetFirmwareUpdateStatus
-export type DevGetFirmwareUpdateStatus = {};
-
-// DevFirmwareUpdateStatus
-export type DevFirmwareUpdateStatus = {
-  targets: DevFirmwareUpdateStatusEntry[];
-};
-
-// FactoryDeviceInfoSettings
-export type FactoryDeviceInfoSettings = {
-  serial_no?: string;
-  cpu_info?: string;
-  pre_firmware?: string;
-};
-
-// FactoryGetDeviceInfo
-export type FactoryGetDeviceInfo = {};
-
-// FactoryDeviceInfo
-export type FactoryDeviceInfo = {
-  serial_no?: string;
-  spi_flash_info?: string;
-  se_info?: string;
-  nft_voucher?: string;
-  cpu_info?: string;
-  pre_firmware?: string;
-};
-
-// FilesystemFixPermission
-export type FilesystemFixPermission = {};
+// FilesystemPermissionFix
+export type FilesystemPermissionFix = {};
 
 // FilesystemPathInfo
 export type FilesystemPathInfo = {
@@ -4850,39 +4971,6 @@ export type FilesystemDirRemove = {
 
 // FilesystemFormat
 export type FilesystemFormat = {};
-
-export enum OnboardingStep {
-  ONBOARDING_STEP_UNKNOWN = 0,
-  ONBOARDING_STEP_DEVICE_VERIFICATION = 1,
-  ONBOARDING_STEP_PERSONALIZATION = 2,
-  ONBOARDING_STEP_SETUP = 3,
-  ONBOARDING_STEP_FIRMWARE = 4,
-}
-
-// GetOnboardingStatus
-export type GetOnboardingStatus = {};
-
-export type NewDevice = {
-  seedcard_backup?: boolean;
-};
-
-export type Restore = {
-  mnemonic?: boolean;
-  seedcard?: boolean;
-};
-
-export type Setup = {
-  new_device?: NewDevice;
-  restore?: Restore;
-};
-
-// OnboardingStatus
-export type OnboardingStatus = {
-  step: OnboardingStep;
-  setup?: Setup;
-  detail_code?: number;
-  detail_str?: string;
-};
 
 // custom connect definitions
 export type MessageType = {
@@ -5448,8 +5536,8 @@ export type MessageType = {
   CoinPurchaseMemo: CoinPurchaseMemo;
   PaymentRequestMemo: PaymentRequestMemo;
   TxAckPaymentRequest: TxAckPaymentRequest;
-  DebugLinkInput: DebugLinkInput;
   InternalMyAddressRequest: InternalMyAddressRequest;
+  StartSession: StartSession;
   SetBusy: SetBusy;
   GetFirmwareHash: GetFirmwareHash;
   FirmwareHash: FirmwareHash;
@@ -5466,28 +5554,41 @@ export type MessageType = {
   ViewTip: ViewTip;
   ViewSignPage: ViewSignPage;
   ViewVerifyPage: ViewVerifyPage;
-  GetProtoVersion: GetProtoVersion;
-  ProtoVersion: ProtoVersion;
-  DevReboot: DevReboot;
-  DevFirmwareImageInfo: DevFirmwareImageInfo;
-  DevHardwareInfo: DevHardwareInfo;
-  DevMainMcuInfo: DevMainMcuInfo;
-  DevBluetoothInfo: DevBluetoothInfo;
-  DevSEInfo: DevSEInfo;
-  DevInfoTargets: DevInfoTargets;
-  DevInfoTypes: DevInfoTypes;
-  DevStatus: DevStatus;
-  DevGetDeviceInfo: DevGetDeviceInfo;
-  DevFirmwareTarget: DevFirmwareTarget;
-  DevFirmwareUpdate: DevFirmwareUpdate;
-  DevFirmwareInstallProgress: DevFirmwareInstallProgress;
-  DevFirmwareUpdateStatusEntry: DevFirmwareUpdateStatusEntry;
-  DevGetFirmwareUpdateStatus: DevGetFirmwareUpdateStatus;
-  DevFirmwareUpdateStatus: DevFirmwareUpdateStatus;
-  FactoryDeviceInfoSettings: FactoryDeviceInfoSettings;
-  FactoryGetDeviceInfo: FactoryGetDeviceInfo;
-  FactoryDeviceInfo: FactoryDeviceInfo;
-  FilesystemFixPermission: FilesystemFixPermission;
+  ProtocolInfoRequest: ProtocolInfoRequest;
+  ProtocolInfo: ProtocolInfo;
+  DeviceReboot: DeviceReboot;
+  DeviceSettings: DeviceSettings;
+  DeviceSettingsGet: DeviceSettingsGet;
+  DeviceSettingsSet: DeviceSettingsSet;
+  DeviceCertificate: DeviceCertificate;
+  DeviceCertificateWrite: DeviceCertificateWrite;
+  DeviceCertificateRead: DeviceCertificateRead;
+  DeviceCertificateSignature: DeviceCertificateSignature;
+  DeviceCertificateSign: DeviceCertificateSign;
+  DeviceFirmwareTarget: DeviceFirmwareTarget;
+  DeviceFirmwareUpdateRequest: DeviceFirmwareUpdateRequest;
+  DeviceFirmwareUpdateRecord: DeviceFirmwareUpdateRecord;
+  DeviceFirmwareUpdateRecordFields: DeviceFirmwareUpdateRecordFields;
+  DeviceFirmwareUpdateStatusGet: DeviceFirmwareUpdateStatusGet;
+  DeviceFirmwareUpdateStatus: DeviceFirmwareUpdateStatus;
+  DeviceFactoryInfoManufactureTime: DeviceFactoryInfoManufactureTime;
+  DeviceFactoryInfo: DeviceFactoryInfo;
+  DeviceFactoryInfoSet: DeviceFactoryInfoSet;
+  DeviceFactoryInfoGet: DeviceFactoryInfoGet;
+  DeviceFactoryPermanentLock: DeviceFactoryPermanentLock;
+  DeviceFactoryTest: DeviceFactoryTest;
+  DeviceFirmwareImageInfo: DeviceFirmwareImageInfo;
+  DeviceHardwareInfo: DeviceHardwareInfo;
+  DeviceMainMcuInfo: DeviceMainMcuInfo;
+  DeviceCoprocessorInfo: DeviceCoprocessorInfo;
+  DeviceSEInfo: DeviceSEInfo;
+  DeviceInfoTargets: DeviceInfoTargets;
+  DeviceInfoTypes: DeviceInfoTypes;
+  DeviceInfoGet: DeviceInfoGet;
+  DeviceSessionGet: DeviceSessionGet;
+  DeviceSession: DeviceSession;
+  DeviceStatus: DeviceStatus;
+  FilesystemPermissionFix: FilesystemPermissionFix;
   FilesystemPathInfo: FilesystemPathInfo;
   FilesystemPathInfoQuery: FilesystemPathInfoQuery;
   FilesystemFile: FilesystemFile;
@@ -5499,11 +5600,6 @@ export type MessageType = {
   FilesystemDirMake: FilesystemDirMake;
   FilesystemDirRemove: FilesystemDirRemove;
   FilesystemFormat: FilesystemFormat;
-  GetOnboardingStatus: GetOnboardingStatus;
-  NewDevice: NewDevice;
-  Restore: Restore;
-  Setup: Setup;
-  OnboardingStatus: OnboardingStatus;
 };
 
 export type MessageKey = keyof MessageType;

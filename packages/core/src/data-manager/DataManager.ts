@@ -34,6 +34,7 @@ const Log = getLogger(LoggerNames.Core);
 
 export const FIRMWARE_FIELDS = [
   'firmware',
+  'firmware-v1',
   'firmware-v2',
   'firmware-v8',
   'firmware-btc-v8',
@@ -46,6 +47,7 @@ export type ProtobufMessageSchema = ProtocolV1MessageSchema | 'v2Schema';
 
 const FIRMWARE_FIELD_TYPE_MAP: Readonly<Record<IFirmwareField, EFirmwareType>> = {
   firmware: EFirmwareType.Universal,
+  'firmware-v1': EFirmwareType.Universal,
   'firmware-v2': EFirmwareType.Universal,
   'firmware-v8': EFirmwareType.Universal,
   'firmware-btc-v8': EFirmwareType.BitcoinOnly,
@@ -84,6 +86,10 @@ export default class DataManager {
       ble: [],
     },
     [EDeviceType.Pro]: {
+      firmware: [],
+      ble: [],
+    },
+    [EDeviceType.Pro2]: {
       firmware: [],
       ble: [],
     },
@@ -447,6 +453,7 @@ export default class DataManager {
         [EDeviceType.Mini]: this.enrichFirmwareReleaseInfo(data.mini),
         [EDeviceType.Touch]: this.enrichFirmwareReleaseInfo(data.touch),
         [EDeviceType.Pro]: this.enrichFirmwareReleaseInfo(data.pro),
+        [EDeviceType.Pro2]: this.enrichFirmwareReleaseInfo(data.pro2),
       };
       this.assets = {
         bridge: data.bridge,

@@ -126,36 +126,6 @@ if [ -d "$SRC_PRO2_LATEST" ] && ls "$SRC_PRO2_LATEST"/messages*.proto 1>/dev/nul
             | sed 's/^option /\/\/ option /' \
             | grep -v '    reserved '
 
-        if ! grep -q '^message TonSignData ' "$SRC_PRO2_LEGACY"/messages*.proto; then
-            echo ''
-            echo '// --- TON signData (kept until firmware-pro2 legacy proto exports it) ---'
-            echo 'message TonSignData {'
-            echo '    repeated uint32 address_n = 1;'
-            echo '    required TonSignDataType type = 2;'
-            echo '    required bytes payload = 3;'
-            echo '    optional string schema = 4;'
-            echo '    required string appdomain = 5;'
-            echo '    required uint64 timestamp = 6;'
-            echo '    optional string from_address = 7;'
-            echo '    optional TonWalletVersion wallet_version = 8 [default=V4R2];'
-            echo '    optional uint32 wallet_id = 9 [default=698983191];'
-            echo '    optional TonWorkChain workchain = 10 [default=BASECHAIN];'
-            echo '    optional bool is_bounceable = 11 [default=false];'
-            echo '    optional bool is_testnet_only = 12 [default=false];'
-            echo ''
-            echo '    enum TonSignDataType {'
-            echo '        TEXT = 0;'
-            echo '        BINARY = 1;'
-            echo '        CELL = 2;'
-            echo '    }'
-            echo '}'
-            echo ''
-            echo 'message TonSignedData {'
-            echo '    optional bytes signature = 1;'
-            echo '    optional bytes digest = 2;'
-            echo '}'
-        fi
-
         echo ''
         echo '// --- Protocol V2 system messages ---'
         grep -hv \
@@ -164,83 +134,51 @@ if [ -d "$SRC_PRO2_LATEST" ] && ls "$SRC_PRO2_LATEST"/messages*.proto 1>/dev/nul
             "$SRC_PRO2_LATEST"/messages*.proto \
             | grep -v '    reserved '
 
-        if ! grep -q '^message GetOnboardingStatus ' "$SRC_PRO2_LATEST"/messages*.proto; then
-            echo ''
-            echo '// --- Onboarding status (kept until firmware-pro2 latest proto exports it) ---'
-            echo 'enum OnboardingStep {'
-            echo '    ONBOARDING_STEP_UNKNOWN = 0;'
-            echo '    ONBOARDING_STEP_DEVICE_VERIFICATION = 1;'
-            echo '    ONBOARDING_STEP_PERSONALIZATION = 2;'
-            echo '    ONBOARDING_STEP_SETUP = 3;'
-            echo '    ONBOARDING_STEP_FIRMWARE = 4;'
-            echo '}'
-            echo ''
-            echo 'message GetOnboardingStatus {'
-            echo '}'
-            echo ''
-            echo 'message OnboardingStatus {'
-            echo '    message Setup {'
-            echo '        message NewDevice {'
-            echo '            optional bool seedcard_backup = 1;'
-            echo '        }'
-            echo '        message Restore {'
-            echo '            optional bool mnemonic = 1;'
-            echo '            optional bool seedcard = 2;'
-            echo '        }'
-            echo '        optional NewDevice new_device = 1;'
-            echo '        optional Restore restore = 2;'
-            echo '    }'
-            echo '    required OnboardingStep step = 1;'
-            echo '    optional Setup setup = 2;'
-            echo '    optional uint32 detail_code = 3;'
-            echo '    optional string detail_str = 4;'
-            echo '}'
-        fi
     } > "$TMP_PROTO"
-
-    if ! grep -q 'MessageType_TonSignData' "$TMP_PROTO"; then
-        node - "$TMP_PROTO" <<'NODE'
-const fs = require('fs');
-
-const protoPath = process.argv[2];
-const proto = fs.readFileSync(protoPath, 'utf8');
-const updated = proto.replace(
-  /(    MessageType_TonTxAck\s*=\s*11907[^\n]*;\n)/,
-  `$1    MessageType_TonSignData = 11908 [(wire_in) = true];\n    MessageType_TonSignedData = 11909 [(wire_out) = true];\n`
-);
-
-if (updated === proto) {
-  throw new Error('Unable to insert TON signData MessageType entries into Pro2 schema');
-}
-
-fs.writeFileSync(protoPath, updated);
-NODE
-    fi
-
-    if ! grep -q 'MessageType_GetOnboardingStatus' "$TMP_PROTO"; then
-        node - "$TMP_PROTO" <<'NODE'
-const fs = require('fs');
-
-const protoPath = process.argv[2];
-const proto = fs.readFileSync(protoPath, 'utf8');
-const updated = proto.replace(
-  /(    MessageType_DeviceInfo\s*=\s*60601[^\n]*;\n)/,
-  `$1    MessageType_GetOnboardingStatus = 60602;\n    MessageType_OnboardingStatus = 60603;\n`
-);
-
-if (updated === proto) {
-  throw new Error('Unable to insert onboarding MessageType entries into Pro2 schema');
-}
-
-fs.writeFileSync(protoPath, updated);
-NODE
-    fi
 
     node - "$TMP_PROTO" <<'NODE'
 const fs = require('fs');
 
 const protoPath = process.argv[2];
-const proto = fs.readFileSync(protoPath, 'utf8');
+let proto = fs.readFileSync(protoPath, 'utf8');
+
+const removeTopLevelMessage = (source, name) => {
+  const pattern = new RegExp(`(^|\\n)message\\s+${name}\\s*\\{`, 'm');
+  const match = pattern.exec(source);
+  if (!match) return source;
+
+  const start = match.index + (match[1] ? match[1].length : 0);
+  let index = start;
+  let depth = 0;
+  while (index < source.length) {
+    const char = source[index];
+    if (char === '{') {
+      depth += 1;
+    } else if (char === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        index += 1;
+        while (index < source.length && /\s/.test(source[index])) index += 1;
+        return `${source.slice(0, start)}${source.slice(index)}`;
+      }
+    }
+    index += 1;
+  }
+  throw new Error(`Unterminated message block: ${name}`);
+};
+
+[
+  'Initialize',
+  'GetFeatures',
+  'OnekeyGetFeatures',
+  'Features',
+  'GetPassphraseState',
+  'PassphraseState',
+].forEach(name => {
+  proto = removeTopLevelMessage(proto, name);
+});
+fs.writeFileSync(protoPath, proto);
+
 const messageNames = new Set(
   Array.from(proto.matchAll(/^\s*message\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{/gm)).map(
     match => match[1]
@@ -252,17 +190,21 @@ const messageTypeNames = new Set(
   )
 );
 const requiredMessages = [
+  'DeviceFactoryInfoSet',
+  'DeviceFactoryInfoGet',
+  'DeviceFactoryInfo',
+  'ProtocolInfoRequest',
+  'ProtocolInfo',
   'Ping',
   'Success',
   'Failure',
-  'DevReboot',
-  'DevGetDeviceInfo',
+  'DeviceReboot',
+  'DeviceInfoGet',
   'DeviceInfo',
-  'DevFirmwareUpdate',
-  'DevFirmwareInstallProgress',
-  'DevGetFirmwareUpdateStatus',
-  'DevFirmwareUpdateStatus',
-  'FilesystemFixPermission',
+  'DeviceFirmwareUpdateRequest',
+  'DeviceFirmwareUpdateStatusGet',
+  'DeviceFirmwareUpdateStatus',
+  'FilesystemPermissionFix',
   'FilesystemPathInfo',
   'FilesystemPathInfoQuery',
   'FilesystemFile',
@@ -274,10 +216,6 @@ const requiredMessages = [
   'FilesystemDirMake',
   'FilesystemDirRemove',
   'FilesystemFormat',
-  'TonSignData',
-  'TonSignedData',
-  'GetOnboardingStatus',
-  'OnboardingStatus',
 ];
 const missingMessages = requiredMessages.filter(name => !messageNames.has(name));
 const missingMessageTypes = requiredMessages.filter(name => !messageTypeNames.has(name));
@@ -288,39 +226,11 @@ if (missingMessages.length > 0 || missingMessageTypes.length > 0) {
       ', '
     )}], messageTypes=[${missingMessageTypes.join(
       ', '
-    )}]. Make sure submodules/firmware-pro2 is checked out on branch dev_romloader_split ` +
-      '(origin/dev_romloader_split), which contains the Filesystem*/DevFirmwareUpdate/DevReboot messages.'
+    )}]. Make sure submodules/firmware-pro2 is checked out on branch dev ` +
+      '(origin/dev), which contains the latest Protocol V2 Device*/Filesystem* messages.'
   );
 }
 
-// Provisional wire IDs injected by this script for messages the firmware proto does
-// not export yet (pending firmware confirmation, see
-// docs/protocol-v2-deviceinfo-field-gaps.md). If the firmware submodule starts
-// exporting these MessageType entries itself, the injection above is skipped and the
-// firmware-assigned IDs flow into TMP_PROTO — assert they still match the IDs the SDK
-// was built against, and fail loudly on any drift.
-const expectedInjectedIds = {
-  TonSignData: 11908,
-  TonSignedData: 11909,
-  GetOnboardingStatus: 60602,
-  OnboardingStatus: 60603,
-};
-const actualIds = {};
-for (const match of proto.matchAll(/^\s*MessageType_([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(\d+)/gm)) {
-  actualIds[match[1]] = Number(match[2]);
-}
-const idMismatches = Object.entries(expectedInjectedIds)
-  .filter(([name, id]) => name in actualIds && actualIds[name] !== id)
-  .map(([name, id]) => `${name}: expected ${id}, firmware proto has ${actualIds[name]}`);
-
-if (idMismatches.length > 0) {
-  throw new Error(
-    `Protocol V2 injected MessageType wire IDs conflict with the firmware proto: ${idMismatches.join(
-      '; '
-    )}. Update the injected IDs in protobuf-build.sh and the registry section in ` +
-      'docs/protocol-v2-deviceinfo-field-gaps.md.'
-  );
-}
 NODE
 
     npx pbjs -t json \
@@ -345,8 +255,8 @@ else
     # Unlike the optional Pro1 (legacy) section above, the firmware-pro2 submodule is
     # the only source of the Protocol V2 schema, so a missing checkout is a hard error.
     echo "firmware-pro2 latest protobuf schema not found at $SRC_PRO2_LATEST"
-    echo "The Protocol V2 schema requires firmware-pro2 on branch dev_romloader_split."
+    echo "The Protocol V2 schema requires firmware-pro2 on branch dev."
     echo "Run: git submodule update --init submodules/firmware-pro2"
-    echo "Then: git -C submodules/firmware-pro2 fetch origin dev_romloader_split && git -C submodules/firmware-pro2 checkout origin/dev_romloader_split"
+    echo "Then: git -C submodules/firmware-pro2 fetch origin dev && git -C submodules/firmware-pro2 checkout origin/dev"
     exit 1
 fi

@@ -17,8 +17,6 @@ import { useDeviceStore } from '../store/deviceStore';
 import { isPro2DeviceInfo } from '../utils/pro2Device';
 import type { DeviceInfo } from '../types/hardware';
 
-// firmwareUpdateV4 的扁平 target 列表（DevFirmwareTargetType / FwMgmtTarget_t）
-// 任意组合：选了哪些文件就更新哪些 target，一次 firmwareUpdateV4 调用完成。
 const TARGET_FIELDS = [
   { param: 'romloaderBinary', label: 'Romloader', targetId: 1, accept: '.bin' },
   { param: 'bootloaderBinary', label: 'Bootloader', targetId: 2, accept: '.bin' },
@@ -118,15 +116,6 @@ export default function Pro2UpdatePage() {
   }, [addLog, setConnectedDevices, setCurrentDevice, setDeviceFeatures, setIsConnecting]);
 
   const runUpdate = useCallback(async () => {
-    if (selectedFields.length === 0) {
-      toast({
-        title: 'No target selected',
-        description: 'Choose at least one firmware file before running the update.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
     setIsRunning(true);
     setResult(null);
     resetFirmwareProgress();
@@ -141,12 +130,16 @@ export default function Pro2UpdatePage() {
         params[field.param] = await file.arrayBuffer();
       }
 
-      addLog(
-        'info',
-        `firmwareUpdateV4 targets: ${selectedFields
-          .map(field => `${field.label}(${field.targetId})`)
-          .join(', ')}`
-      );
+      if (selectedFields.length === 0) {
+        addLog('info', 'firmwareUpdateV4 remote config: pro2 firmware-v1 components');
+      } else {
+        addLog(
+          'info',
+          `firmwareUpdateV4 targets: ${selectedFields
+            .map(field => `${field.label}(${field.targetId})`)
+            .join(', ')}`
+        );
+      }
       const response = await callHardwareAPI('firmwareUpdateV4', {
         connectId: device.connectId,
         ...params,
@@ -190,8 +183,8 @@ export default function Pro2UpdatePage() {
           <div>
             <h1 className="text-2xl font-semibold text-foreground">Pro2 Update</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Standard Protocol V2 update via firmwareUpdateV4. Pick any combination of targets —
-              upload and install run in a single call.
+              Standard Protocol V2 update via firmwareUpdateV4. Leave files empty to use remote
+              firmware-v1 components, or pick local targets for a manual update.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -229,7 +222,7 @@ export default function Pro2UpdatePage() {
               <div>
                 <div className="text-base font-semibold text-foreground">Targets</div>
                 <div className="text-sm text-muted-foreground">
-                  All targets are optional — any combination updates in one firmwareUpdateV4 call.
+                  Local files are optional. Empty selection uses the Pro2 remote firmware-v1 package.
                 </div>
               </div>
               <Button size="sm" variant="outline" disabled={isRunning} onClick={resetFiles}>
@@ -280,19 +273,25 @@ export default function Pro2UpdatePage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <Button
-                disabled={isRunning || !sdkInitState.isInitialized || selectedFields.length === 0}
-                onClick={runUpdate}
-              >
-                {isRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-                Run firmwareUpdateV4 ({selectedFields.length}{' '}
-                {selectedFields.length === 1 ? 'target' : 'targets'})
+              <Button disabled={isRunning || !sdkInitState.isInitialized} onClick={runUpdate}>
+                {isRunning ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Play className="h-4 w-4" />
+                )}
+                {selectedFields.length === 0
+                  ? 'Run firmwareUpdateV4 (remote config)'
+                  : `Run firmwareUpdateV4 (${selectedFields.length} ${
+                      selectedFields.length === 1 ? 'target' : 'targets'
+                    })`}
               </Button>
               {selectedFields.length > 0 ? (
                 <span className="text-sm text-muted-foreground">
                   {selectedFields.map(field => field.label).join(' + ')}
                 </span>
-              ) : null}
+              ) : (
+                <span className="text-sm text-muted-foreground">Remote pro2 firmware-v1</span>
+              )}
             </div>
           </CardContent>
         </Card>

@@ -157,6 +157,7 @@ export type Features = {
   sdProtection: boolean | null;
   wipeCodeProtection: boolean | null;
   passphraseAlwaysOnDevice: boolean | null;
+  attachToPinEnabled?: boolean | null;
   safetyChecks: string | null;
   autoLockDelayMs: number | null;
   displayRotation: number | null;

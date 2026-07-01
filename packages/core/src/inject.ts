@@ -151,28 +151,22 @@ export const createCoreApi = (
   deviceRebootToBootloader: connectId => call({ connectId, method: 'deviceRebootToBootloader' }),
 
   // File system & device control API (Protocol V2 only)
-  getProtoVersion: (connectId, params) => call({ ...params, connectId, method: 'getProtoVersion' }),
+  protocolInfoRequest: (connectId, params) =>
+    call({ ...params, connectId, method: 'protocolInfoRequest' }),
   ping: (connectId, params) => call({ ...params, connectId, method: 'ping' }),
   deviceReboot: (connectId, params) => call({ ...params, connectId, method: 'deviceReboot' }),
-  deviceGetDeviceInfo: (connectId, params) =>
-    call({ ...params, connectId, method: 'deviceGetDeviceInfo' }),
-  deviceGetOnboardingStatus: (connectId, params) =>
-    call({ ...params, connectId, method: 'deviceGetOnboardingStatus' }),
+  deviceInfoGet: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceInfoGet' }),
   deviceFirmwareUpdate: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceFirmwareUpdate' }),
   deviceGetFirmwareUpdateStatus: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceGetFirmwareUpdateStatus' }),
-  devReboot: (connectId, params) => call({ ...params, connectId, method: 'devReboot' }),
-  devGetDeviceInfo: (connectId, params) =>
-    call({ ...params, connectId, method: 'devGetDeviceInfo' }),
-  devFirmwareUpdate: (connectId, params) =>
-    call({ ...params, connectId, method: 'devFirmwareUpdate' }),
-  devGetFirmwareUpdateStatus: (connectId, params) =>
-    call({ ...params, connectId, method: 'devGetFirmwareUpdateStatus' }),
-  factoryDeviceInfoSettings: (connectId, params) =>
-    call({ ...params, connectId, method: 'factoryDeviceInfoSettings' }),
-  factoryGetDeviceInfo: connectId => call({ connectId, method: 'factoryGetDeviceInfo' }),
-  filesystemFixPermission: connectId => call({ connectId, method: 'filesystemFixPermission' }),
+  deviceFactoryInfoSet: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceFactoryInfoSet' }),
+  deviceFactoryInfoGet: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceFactoryInfoGet' }),
+  filesystemPermissionFix: (connectId, params) =>
+    call({ ...params, connectId, method: 'filesystemPermissionFix' }),
   fileRead: (connectId, params) => call({ ...params, connectId, method: 'fileRead' }),
   fileWrite: (connectId, params) => call({ ...params, connectId, method: 'fileWrite' }),
   fileDelete: (connectId, params) => call({ ...params, connectId, method: 'fileDelete' }),

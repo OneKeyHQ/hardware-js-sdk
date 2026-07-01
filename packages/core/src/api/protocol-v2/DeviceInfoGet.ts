@@ -3,11 +3,12 @@ import { createDeviceNotSupportMethodError } from '@onekeyfe/hd-shared';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { PROTOCOL_V2_DEVICE_INFO_TIMEOUT_MS } from '../../protocols/protocol-v2';
 import { BaseMethod } from '../BaseMethod';
+import { invalidParameter } from '../helpers/filesystemValidation';
 
-export type DeviceGetDeviceInfoTargets = {
+export type DeviceInfoGetTargets = {
   hw?: boolean;
   fw?: boolean;
-  bt?: boolean;
+  coprocessor?: boolean;
   se1?: boolean;
   se2?: boolean;
   se3?: boolean;
@@ -15,22 +16,22 @@ export type DeviceGetDeviceInfoTargets = {
   status?: boolean;
 };
 
-export type DeviceGetDeviceInfoTypes = {
+export type DeviceInfoGetTypes = {
   version?: boolean;
   build_id?: boolean;
   hash?: boolean;
   specific?: boolean;
 };
 
-export type DeviceGetDeviceInfoParams = {
-  targets?: DeviceGetDeviceInfoTargets;
-  types?: DeviceGetDeviceInfoTypes;
+export type DeviceInfoGetParams = {
+  targets?: DeviceInfoGetTargets;
+  types?: DeviceInfoGetTypes;
 };
 
-const TARGET_KEYS: (keyof DeviceGetDeviceInfoTargets)[] = [
+const TARGET_KEYS: (keyof DeviceInfoGetTargets)[] = [
   'hw',
   'fw',
-  'bt',
+  'coprocessor',
   'se1',
   'se2',
   'se3',
@@ -38,16 +39,16 @@ const TARGET_KEYS: (keyof DeviceGetDeviceInfoTargets)[] = [
   'status',
 ];
 
-const TYPE_KEYS: (keyof DeviceGetDeviceInfoTypes)[] = ['version', 'build_id', 'hash', 'specific'];
+const TYPE_KEYS: (keyof DeviceInfoGetTypes)[] = ['version', 'build_id', 'hash', 'specific'];
 
-const DEFAULT_TARGETS: DeviceGetDeviceInfoTargets = {
+const DEFAULT_TARGETS: DeviceInfoGetTargets = {
   hw: true,
   fw: true,
-  bt: true,
+  coprocessor: true,
   status: true,
 };
 
-const DEFAULT_TYPES: DeviceGetDeviceInfoTypes = {
+const DEFAULT_TYPES: DeviceInfoGetTypes = {
   version: true,
   specific: true,
 };
@@ -69,16 +70,48 @@ function pickBooleanKeys<T extends Record<string, boolean | undefined>>(
   return hasKey ? result : undefined;
 }
 
+function assertKnownKeys(value: unknown, keys: string[], name: string) {
+  if (value == null) return;
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    throw invalidParameter(`Parameter [${name}] must be an object.`);
+  }
+  const allowed = new Set(keys);
+  const unknownKeys = Object.keys(value).filter(key => !allowed.has(key));
+  if (unknownKeys.length > 0) {
+    throw invalidParameter(
+      `Parameter [${name}] contains unsupported key(s): ${unknownKeys.join(', ')}.`
+    );
+  }
+}
+
+function normalizeTargets(value: unknown): DeviceInfoGetTargets | undefined {
+  assertKnownKeys(
+    value,
+    TARGET_KEYS.map(key => String(key)),
+    'targets'
+  );
+  return pickBooleanKeys<DeviceInfoGetTargets>(value, TARGET_KEYS);
+}
+
+function normalizeTypes(value: unknown): DeviceInfoGetTypes | undefined {
+  assertKnownKeys(
+    value,
+    TYPE_KEYS.map(key => String(key)),
+    'types'
+  );
+  return pickBooleanKeys<DeviceInfoGetTypes>(value, TYPE_KEYS);
+}
+
 /**
- * 原生 DevGetDeviceInfo（Protocol V2 only）。
+ * 原生 DeviceInfoGet（Protocol V2 only）。
  *
  * 与 getDeviceInfo 不同：不构建 DeviceProfile、不更新设备缓存，
  * 按调用方给定的 targets/types 原样请求并返回未加工的 DeviceInfo 消息，
  * 用于调试固件字段上报。
  */
-export default class DeviceGetDeviceInfo extends BaseMethod<{
-  targets: DeviceGetDeviceInfoTargets;
-  types: DeviceGetDeviceInfoTypes;
+export default class DeviceInfoGet extends BaseMethod<{
+  targets: DeviceInfoGetTargets;
+  types: DeviceInfoGetTypes;
 }> {
   init() {
     // Protocol V2 (Pro2) 专属方法，core 调度层统一做非 V2 设备守卫
@@ -91,11 +124,8 @@ export default class DeviceGetDeviceInfo extends BaseMethod<{
     this.useDevicePassphraseState = false;
     this.skipForceUpdateCheck = true;
     this.params = {
-      targets:
-        pickBooleanKeys<DeviceGetDeviceInfoTargets>(this.payload.targets, TARGET_KEYS) ??
-        DEFAULT_TARGETS,
-      types:
-        pickBooleanKeys<DeviceGetDeviceInfoTypes>(this.payload.types, TYPE_KEYS) ?? DEFAULT_TYPES,
+      targets: normalizeTargets(this.payload.targets) ?? DEFAULT_TARGETS,
+      types: normalizeTypes(this.payload.types) ?? DEFAULT_TYPES,
     };
   }
 
@@ -105,7 +135,7 @@ export default class DeviceGetDeviceInfo extends BaseMethod<{
     }
 
     const res = await this.device.commands.typedCall(
-      'DevGetDeviceInfo',
+      'DeviceInfoGet',
       'DeviceInfo',
       {
         targets: this.params.targets,

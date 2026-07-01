@@ -1,6 +1,6 @@
 import { BaseMethod } from '../BaseMethod';
 
-export default class FactoryGetDeviceInfo extends BaseMethod {
+export default class ProtocolInfoRequest extends BaseMethod {
   init() {
     // Protocol V2 (Pro2) 专属方法，core 调度层统一做非 V2 设备守卫
     this.requireProtocolV2 = true;
@@ -10,11 +10,7 @@ export default class FactoryGetDeviceInfo extends BaseMethod {
   }
 
   async run() {
-    const res = await this.device.commands.typedCall(
-      'FactoryGetDeviceInfo',
-      'FactoryDeviceInfo',
-      {}
-    );
+    const res = await this.device.commands.typedCall('ProtocolInfoRequest', 'ProtocolInfo', {});
     return Promise.resolve(res.message);
   }
 }

@@ -165,7 +165,7 @@ flowchart TD
 初始化分支：
 
 - `V1`：执行传统 `Initialize`，写入真实 `Features`，再按 features 重新选择 schema。
-- `V2`：执行 `Ping` 验证链路，通过 `DevGetDeviceInfo` 获取 Protocol V2 设备信息，并生成标准 `DeviceProfile` 与结构化 `Features`。设备身份以 `serialNo/deviceId` 的语义区分为准。
+- `V2`：执行 `Ping` 验证链路，通过 `DeviceInfoGet` 获取 Protocol V2 设备信息，并生成标准 `DeviceProfile` 与结构化 `Features`。设备身份以 `serialNo/deviceId` 的语义区分为准。
 
 ## 固件更新流程
 

@@ -55,21 +55,22 @@ const protocolV1Messages = parseConfigure({
 
 const protocolV2Messages = parseConfigure({
   nested: {
-    GetProtoVersion: {
+    ProtocolInfoRequest: {
       fields: {},
     },
-    ProtoVersion: {
+    ProtocolInfo: {
       fields: {
-        major_version: {
+        version: {
           type: 'uint32',
           id: 1,
         },
-        minor_version: {
+        supported_messages: {
           type: 'uint32',
           id: 2,
+          rule: 'repeated',
         },
-        patch_version: {
-          type: 'uint32',
+        protobuf_definition: {
+          type: 'string',
           id: 3,
         },
       },
@@ -90,18 +91,53 @@ const protocolV2Messages = parseConfigure({
         },
       },
     },
-    DevFirmwareUpdate: {
-      fields: {},
-    },
-    DevFirmwareInstallProgress: {
+    DeviceFirmwareTarget: {
       fields: {
         target_id: {
           type: 'uint32',
           id: 1,
         },
-        progress: {
-          type: 'uint32',
+        path: {
+          type: 'string',
           id: 2,
+        },
+      },
+    },
+    DeviceFirmwareUpdateRequest: {
+      fields: {
+        targets: {
+          type: 'DeviceFirmwareTarget',
+          id: 1,
+          rule: 'repeated',
+        },
+      },
+    },
+    DeviceFirmwareUpdateRecord: {
+      fields: {
+        target_id: {
+          type: 'uint32',
+          id: 1,
+        },
+        status: {
+          type: 'uint32',
+          id: 10,
+        },
+        payload_version: {
+          type: 'uint32',
+          id: 20,
+        },
+        path: {
+          type: 'string',
+          id: 30,
+        },
+      },
+    },
+    DeviceFirmwareUpdateStatus: {
+      fields: {
+        records: {
+          type: 'DeviceFirmwareUpdateRecord',
+          id: 1,
+          rule: 'repeated',
         },
       },
     },
@@ -130,13 +166,13 @@ const protocolV2Messages = parseConfigure({
     },
     MessageType: {
       values: {
-        MessageType_GetProtoVersion: 60200,
-        MessageType_ProtoVersion: 60201,
+        MessageType_ProtocolInfoRequest: 60200,
+        MessageType_ProtocolInfo: 60201,
         MessageType_Ping: 60206,
         MessageType_Success: 60207,
         MessageType_FileWrite: 60805,
-        MessageType_DevFirmwareUpdate: 61000,
-        MessageType_DevFirmwareInstallProgress: 61001,
+        MessageType_DeviceFirmwareUpdateRequest: 61000,
+        MessageType_DeviceFirmwareUpdateStatus: 61002,
         MessageType_PartialNested: 62000,
       },
     },
@@ -157,10 +193,10 @@ const rewriteSeq = (frame, seq) => {
 
 describe('Protocol V2 framing and session', () => {
   test('encodes and decodes Protocol V2 protobuf frames', () => {
-    const frame = ProtocolV2.encodeFrame(schemas, 'ProtoVersion', {
-      major_version: 1,
-      minor_version: 2,
-      patch_version: 3,
+    const frame = ProtocolV2.encodeFrame(schemas, 'ProtocolInfo', {
+      version: 1,
+      supported_messages: [60200, 60201],
+      protobuf_definition: 'proto',
     });
 
     const parsed = protocolV2.decodeFrame(frame);
@@ -168,15 +204,15 @@ describe('Protocol V2 framing and session', () => {
 
     const decoded = ProtocolV2.decodeFrame(schemas, frame);
     expect(decoded).toEqual({
-      type: 'ProtoVersion',
-      messageName: 'ProtoVersion',
+      type: 'ProtocolInfo',
+      messageName: 'ProtocolInfo',
       messageTypeId: 60201,
       pbPayload: parsed.pbPayload,
       seq: parsed.seq,
       message: {
-        major_version: 1,
-        minor_version: 2,
-        patch_version: 3,
+        version: 1,
+        supported_messages: [60200, 60201],
+        protobuf_definition: 'proto',
       },
     });
   });
@@ -214,10 +250,9 @@ describe('Protocol V2 framing and session', () => {
   });
 
   test('reassembles split Protocol V2 frames and rejects oversized frames', () => {
-    const frame = ProtocolV2.encodeFrame(schemas, 'ProtoVersion', {
-      major_version: 1,
-      minor_version: 0,
-      patch_version: 0,
+    const frame = ProtocolV2.encodeFrame(schemas, 'ProtocolInfo', {
+      version: 1,
+      supported_messages: [],
     });
     const assembler = new ProtocolV2FrameAssembler();
 
@@ -229,15 +264,13 @@ describe('Protocol V2 framing and session', () => {
   });
 
   test('keeps bytes after the first complete frame for the next read', () => {
-    const first = ProtocolV2.encodeFrame(schemas, 'ProtoVersion', {
-      major_version: 1,
-      minor_version: 0,
-      patch_version: 0,
+    const first = ProtocolV2.encodeFrame(schemas, 'ProtocolInfo', {
+      version: 1,
+      supported_messages: [],
     });
-    const second = ProtocolV2.encodeFrame(schemas, 'ProtoVersion', {
-      major_version: 2,
-      minor_version: 0,
-      patch_version: 0,
+    const second = ProtocolV2.encodeFrame(schemas, 'ProtocolInfo', {
+      version: 2,
+      supported_messages: [],
     });
     const assembler = new ProtocolV2FrameAssembler();
     const combined = new Uint8Array(first.length + second.length);
@@ -250,10 +283,9 @@ describe('Protocol V2 framing and session', () => {
 
   test('session writes one encoded frame and decodes the response frame', async () => {
     const written = [];
-    const response = ProtocolV2.encodeFrame(schemas, 'ProtoVersion', {
-      major_version: 2,
-      minor_version: 0,
-      patch_version: 1,
+    const response = ProtocolV2.encodeFrame(schemas, 'ProtocolInfo', {
+      version: 2,
+      supported_messages: [60206],
     });
     const session = new ProtocolV2Session({
       schemas,
@@ -266,18 +298,18 @@ describe('Protocol V2 framing and session', () => {
         Promise.resolve(rewriteSeq(response, protocolV2.decodeFrame(written[0]).seq)),
     });
 
-    const result = await session.call('GetProtoVersion', {});
+    const result = await session.call('ProtocolInfoRequest', {});
 
     expect(written).toHaveLength(1);
     expect(written[0][4]).toBe(1);
     expect(written[0][5]).toBe(0);
     expect(protocolV2.decodeFrame(written[0]).messageTypeId).toBe(60200);
     expect(result).toEqual({
-      type: 'ProtoVersion',
+      type: 'ProtocolInfo',
       message: {
-        major_version: 2,
-        minor_version: 0,
-        patch_version: 1,
+        version: 2,
+        supported_messages: [60206],
+        protobuf_definition: null,
       },
     });
   });
@@ -307,10 +339,9 @@ describe('Protocol V2 framing and session', () => {
   });
 
   test('session accepts response frames with a device-owned seq', async () => {
-    const response = ProtocolV2.encodeFrame(schemas, 'ProtoVersion', {
-      major_version: 2,
-      minor_version: 0,
-      patch_version: 1,
+    const response = ProtocolV2.encodeFrame(schemas, 'ProtocolInfo', {
+      version: 2,
+      supported_messages: [],
     });
     const logger = {
       debug: jest.fn(),
@@ -323,12 +354,12 @@ describe('Protocol V2 framing and session', () => {
       logger,
     });
 
-    await expect(session.call('GetProtoVersion', {})).resolves.toEqual({
-      type: 'ProtoVersion',
+    await expect(session.call('ProtocolInfoRequest', {})).resolves.toEqual({
+      type: 'ProtocolInfo',
       message: {
-        major_version: 2,
-        minor_version: 0,
-        patch_version: 1,
+        version: 2,
+        supported_messages: [],
+        protobuf_definition: null,
       },
     });
     expect(logger.debug).toHaveBeenCalledWith(expect.stringContaining('seq differs'));
@@ -412,10 +443,9 @@ describe('Protocol V2 framing and session', () => {
     const stale = ProtocolV2.encodeFrame(schemas, 'Success', {
       message: 'stale response',
     });
-    const response = ProtocolV2.encodeFrame(schemas, 'ProtoVersion', {
-      major_version: 2,
-      minor_version: 0,
-      patch_version: 1,
+    const response = ProtocolV2.encodeFrame(schemas, 'ProtocolInfo', {
+      version: 2,
+      supported_messages: [],
     });
     const logger = {
       debug: jest.fn(),
@@ -430,13 +460,13 @@ describe('Protocol V2 framing and session', () => {
     });
 
     await expect(
-      session.call('GetProtoVersion', {}, { expectedTypes: ['ProtoVersion'] })
+      session.call('ProtocolInfoRequest', {}, { expectedTypes: ['ProtocolInfo'] })
     ).resolves.toEqual({
-      type: 'ProtoVersion',
+      type: 'ProtocolInfo',
       message: {
-        major_version: 2,
-        minor_version: 0,
-        patch_version: 1,
+        version: 2,
+        supported_messages: [],
+        protobuf_definition: null,
       },
     });
 
@@ -446,9 +476,8 @@ describe('Protocol V2 framing and session', () => {
 
   test('session consumes intermediate response frames before returning the final response', async () => {
     const written = [];
-    const progress = ProtocolV2.encodeFrame(schemas, 'DevFirmwareInstallProgress', {
-      target_id: 0,
-      progress: 42,
+    const progress = ProtocolV2.encodeFrame(schemas, 'DeviceFirmwareUpdateStatus', {
+      records: [{ target_id: 3, status: 1 }],
     });
     const success = ProtocolV2.encodeFrame(schemas, 'Success', {
       message: 'ok',
@@ -472,20 +501,19 @@ describe('Protocol V2 framing and session', () => {
     });
 
     const result = await session.call(
-      'DevFirmwareUpdate',
-      {},
+      'DeviceFirmwareUpdateRequest',
+      { targets: [{ target_id: 3, path: 'vol1:firmware.bin' }] },
       {
-        intermediateTypes: ['DevFirmwareInstallProgress'],
+        intermediateTypes: ['DeviceFirmwareUpdateStatus'],
         onIntermediateResponse,
       }
     );
 
     expect(readFrame).toHaveBeenCalledTimes(2);
     expect(onIntermediateResponse).toHaveBeenCalledWith({
-      type: 'DevFirmwareInstallProgress',
+      type: 'DeviceFirmwareUpdateStatus',
       message: {
-        target_id: 0,
-        progress: 42,
+        records: [{ target_id: 3, status: 1, payload_version: null, path: null }],
       },
     });
     expect(result).toEqual({
@@ -575,7 +603,7 @@ describe('Protocol V2 framing and session', () => {
     });
 
     await expect(
-      session.call('GetProtoVersion', {}, { timeoutMs: 10, expectedTypes: ['ProtoVersion'] })
+      session.call('ProtocolInfoRequest', {}, { timeoutMs: 10, expectedTypes: ['ProtocolInfo'] })
     ).rejects.toThrow('Protocol V2 response timeout');
 
     // Without cancellation the loop would skip this unexpected Success frame
@@ -700,10 +728,9 @@ describe('Protocol V2 framing and session', () => {
   });
 
   test('assembler drain returns every buffered complete frame', () => {
-    const first = ProtocolV2.encodeFrame(schemas, 'ProtoVersion', {
-      major_version: 1,
-      minor_version: 0,
-      patch_version: 0,
+    const first = ProtocolV2.encodeFrame(schemas, 'ProtocolInfo', {
+      version: 1,
+      supported_messages: [],
     });
     const second = ProtocolV2.encodeFrame(schemas, 'Success', { message: 'ok' });
     const third = ProtocolV2.encodeFrame(schemas, 'Success', { message: 'last' });

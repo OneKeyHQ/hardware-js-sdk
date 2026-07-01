@@ -34,16 +34,29 @@ export type ConnectSettings = {
   fetchConfig?: boolean;
   extension?: string;
   configFetcher?: (url: string) => Promise<RemoteConfigResponse | null>;
-  /**
-   * 临时开关：Protocol V2 DevGetDeviceInfo 未稳定前用于 mock 设备信息。
-   * 正式 app 可显式设置为 false 以调用真实 DevGetDeviceInfo；固件稳定后删除。
-   */
-  protocolV2DeviceInfoMockEnabled?: boolean;
 };
 
 export type IVersionArray = [number, number, number];
 
 export type ILocale = 'zh-CN' | 'en-US';
+
+export type IProtocolV2FirmwareComponentTarget =
+  | 'ROMLOADER'
+  | 'BOOTLOADER'
+  | 'APPLICATION_P1'
+  | 'APPLICATION_P2'
+  | 'COPROCESSOR'
+  | 'SE01'
+  | 'SE02'
+  | 'SE03'
+  | 'SE04'
+  | 'RESOURCE';
+
+export type IProtocolV2FirmwareComponent = {
+  target: IProtocolV2FirmwareComponentTarget;
+  url: string;
+  fingerprint?: string;
+};
 
 /** STM32 firmware config */
 export type IFirmwareReleaseInfo = {
@@ -63,6 +76,9 @@ export type IFirmwareReleaseInfo = {
   bootloaderVersion?: IVersionArray;
   displayBootloaderVersion?: IVersionArray;
   bootloaderRelatedFirmwareVersion?: IVersionArray;
+  upgradeType?: 'payload-package-set' | string;
+  components?: Record<string, IProtocolV2FirmwareComponent>;
+  installOrder?: string[];
   bootloaderChangelog?: {
     [k in ILocale]: string;
   };
@@ -88,43 +104,16 @@ export type IBLEFirmwareReleaseInfo = {
   };
 };
 
-type IKnownDevice = Exclude<IDeviceType, 'unknown' | 'pro2'>;
+type IKnownDevice = Exclude<IDeviceType, 'unknown'>;
 
-/**
- * Device firmware configuration map
- *
- * IMPORTANT: This type is used for firmware update logic.
- * - DO NOT remove existing firmware fields
- * - Only ADD new optional firmware fields for new versions
- * - 'firmware' field is required for backward compatibility
- * - 'ble' field is required for BLE firmware updates
- *
- * @example
- * // When adding firmware-v8:
- * // {
- * //   firmware: IFirmwareReleaseInfo[];
- * //   'firmware-v2'?: IFirmwareReleaseInfo[];
- * //   'firmware-v8'?: IFirmwareReleaseInfo[];
- * //   'firmware-v8'?: IFirmwareReleaseInfo[];      // New
- * //   'firmware-btc-v8'?: IFirmwareReleaseInfo[];
- * //   'firmware-btc-v8'?: IFirmwareReleaseInfo[];  // New
- * //   ble: IBLEFirmwareReleaseInfo[];
- * // }
- */
 export type DeviceTypeMap = {
   [k in IKnownDevice]: {
-    /** Base firmware field (required for backward compatibility) */
     firmware: IFirmwareReleaseInfo[];
-    /** Firmware v2 (Touch/Pro specific) */
+    /** Pro2 Protocol V2 payload package set */
+    'firmware-v1'?: IFirmwareReleaseInfo[];
     'firmware-v2'?: IFirmwareReleaseInfo[];
-    /** Universal firmware v7 */
     'firmware-v8'?: IFirmwareReleaseInfo[];
-    /** Bitcoin-only firmware v7 */
     'firmware-btc-v8'?: IFirmwareReleaseInfo[];
-    // Future firmware versions should be added here as optional fields:
-    // 'firmware-v8'?: IFirmwareReleaseInfo[];
-    // 'firmware-btc-v8'?: IFirmwareReleaseInfo[];
-    /** BLE firmware (required) */
     ble: IBLEFirmwareReleaseInfo[];
   };
 };

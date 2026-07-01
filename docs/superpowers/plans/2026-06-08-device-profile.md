@@ -33,7 +33,7 @@
 - Modify: `packages/core/__tests__/protocol-v2.test.ts`
 
 - [x] Return `DeviceProfile` from `getDeviceInfo`.
-- [x] For Pro2, map internal `DevGetDeviceInfo` directly to `DeviceProfile`.
+- [x] For Pro2, map internal `DeviceInfoGet` directly to `DeviceProfile`.
 - [x] Remove the old unified device info alias and standardize on `DeviceProfile`.
 - [x] Update tests to assert direct V2 fields.
 

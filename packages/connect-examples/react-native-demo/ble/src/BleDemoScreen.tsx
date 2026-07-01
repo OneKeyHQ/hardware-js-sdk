@@ -711,7 +711,7 @@ export const BleDemoScreen = () => {
           return;
         }
         const isImportantLog =
-          /scan candidate|search device|Initializing transports|set transport|searchDevices|ProtocolV2|TX payload|RX payload|DevGet|FirmwareUpdate|Ping|ProtoVersion/i.test(
+          /scan candidate|search device|Initializing transports|set transport|searchDevices|ProtocolV2|TX payload|RX payload|DeviceInfoGet|FirmwareUpdate|Ping|ProtocolInfo/i.test(
             message
           );
         if (!isImportantLog && nowMs - lastSdkLogAtRef.current < 1000) return;
@@ -809,10 +809,10 @@ export const BleDemoScreen = () => {
 
   const pro2MethodGroups = useMemo<Pro2MethodGroup[]>(() => {
     const methods: Record<string, Pro2MethodAction> = {
-      getProtoVersion: {
-        key: 'getProtoVersion',
-        label: 'getProtoVersion',
-        run: (sdk, connectId) => sdk.getProtoVersion(connectId, PROTOCOL_V2_PARAMS),
+      protocolInfoRequest: {
+        key: 'protocolInfoRequest',
+        label: 'protocolInfoRequest',
+        run: (sdk, connectId) => sdk.protocolInfoRequest(connectId, PROTOCOL_V2_PARAMS),
       },
       ping: {
         key: 'ping',
@@ -830,31 +830,27 @@ export const BleDemoScreen = () => {
             includeRaw: true,
           }),
       },
-      deviceGetOnboardingStatus: {
-        key: 'deviceGetOnboardingStatus',
-        label: 'deviceGetOnboardingStatus',
-        run: (sdk, connectId) => sdk.deviceGetOnboardingStatus(connectId, PROTOCOL_V2_PARAMS),
-      },
       deviceRebootNormal: {
         key: 'deviceRebootNormal',
         label: 'deviceReboot(Normal)',
         run: (sdk, connectId) =>
           sdk.deviceReboot(connectId, { ...PROTOCOL_V2_PARAMS, rebootType: 'Normal' }),
       },
-      factoryGetDeviceInfo: {
-        key: 'factoryGetDeviceInfo',
-        label: 'factoryGetDeviceInfo',
-        run: (sdk, connectId) => sdk.factoryGetDeviceInfo(connectId),
+      deviceFactoryInfoGet: {
+        key: 'deviceFactoryInfoGet',
+        label: 'deviceFactoryInfoGet',
+        run: (sdk, connectId) => sdk.deviceFactoryInfoGet(connectId),
       },
-      factoryDeviceInfoSettings: {
-        key: 'factoryDeviceInfoSettings',
-        label: 'factoryDeviceInfoSettings',
+      deviceFactoryInfoSet: {
+        key: 'deviceFactoryInfoSet',
+        label: 'deviceFactoryInfoSet',
         run: (sdk, connectId) =>
-          sdk.factoryDeviceInfoSettings(connectId, {
+          sdk.deviceFactoryInfoSet(connectId, {
             ...PROTOCOL_V2_PARAMS,
-            serialNo: 'RN-DEMO-SERIAL',
-            cpuInfo: 'RN-DEMO-CPU',
-            preFirmware: 'RN-DEMO-FW',
+            version: 1,
+            serial_number: 'RN-DEMO-SERIAL',
+            burn_in_completed: false,
+            factory_test_completed: false,
           }),
       },
       deviceGetFirmwareUpdateStatus: {
@@ -931,10 +927,10 @@ export const BleDemoScreen = () => {
         run: (sdk, connectId) =>
           sdk.filesystemFileDelete(connectId, { ...PROTOCOL_V2_PARAMS, path: PRO2_DEMO_FILE_PATH }),
       },
-      filesystemFixPermission: {
-        key: 'filesystemFixPermission',
-        label: 'filesystemFixPermission',
-        run: (sdk, connectId) => sdk.filesystemFixPermission(connectId),
+      filesystemPermissionFix: {
+        key: 'filesystemPermissionFix',
+        label: 'filesystemPermissionFix',
+        run: (sdk, connectId) => sdk.filesystemPermissionFix(connectId),
       },
       filesystemFormat: {
         key: 'filesystemFormat',
@@ -951,13 +947,12 @@ export const BleDemoScreen = () => {
 
     return [
       buildGroup('device', 'Device / Factory', [
-        'getProtoVersion',
+        'protocolInfoRequest',
         'ping',
         'getDeviceInfo',
-        'deviceGetOnboardingStatus',
         'deviceRebootNormal',
-        'factoryGetDeviceInfo',
-        'factoryDeviceInfoSettings',
+        'deviceFactoryInfoGet',
+        'deviceFactoryInfoSet',
       ]),
       buildGroup('firmware', 'Firmware', ['deviceGetFirmwareUpdateStatus', 'deviceFirmwareUpdate']),
       buildGroup('filesystem', 'Filesystem', [
@@ -968,7 +963,7 @@ export const BleDemoScreen = () => {
         'filesystemFileWrite',
         'filesystemFileRead',
         'filesystemFileDelete',
-        'filesystemFixPermission',
+        'filesystemPermissionFix',
         'filesystemFormat',
       ]),
     ];

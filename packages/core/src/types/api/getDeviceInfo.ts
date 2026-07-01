@@ -24,6 +24,8 @@ export type DeviceInfoStatus = {
   bootloaderMode: boolean | null;
   unlocked: boolean | null;
   passphraseProtection: boolean | null;
+  attachToPinEnabled?: boolean | null;
+  unlockedAttachPin?: boolean | null;
   backupRequired: boolean | null;
   noBackup: boolean | null;
   language: string | null;

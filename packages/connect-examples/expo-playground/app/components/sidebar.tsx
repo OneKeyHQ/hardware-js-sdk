@@ -102,11 +102,6 @@ const navigationItems = [
     icon: UploadCloud,
   },
   {
-    title: 'common.pro2Onboarding',
-    url: '/pro2-onboarding',
-    icon: ListChecks,
-  },
-  {
     title: 'common.methodBatchTest',
     url: '/method-batch-test',
     icon: ListChecks,

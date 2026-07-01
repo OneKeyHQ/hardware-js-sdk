@@ -187,7 +187,7 @@ export class Device extends EventEmitter {
   /**
    * 唯一设备状态缓存。
    *
-   * V1 直接保存原生 Features；V2 保存由 DevGetDeviceInfo 映射出的
+   * V1 直接保存原生 Features；V2 保存由 DeviceInfoGet 映射出的
    * Features 视图。Device 不再保存 profile，结构化 DeviceProfile 只作为
    * getDeviceInfo() 的 API 返回值存在。
    */
@@ -197,7 +197,7 @@ export class Device extends EventEmitter {
    * 是否需要更新设备信息。
    *
    * 历史名称保留用于兼容现有调用语义；对 V2 表示 features 需要由
-   * DevGetDeviceInfo 刷新。
+   * DeviceInfoGet 刷新。
    */
   featuresNeedsReload = false;
 
@@ -477,7 +477,7 @@ export class Device extends EventEmitter {
   /**
    * 唯一协议判别器。
    *
-   * descriptor.protocolType 是协议探测后的结果；V2 features 由 DevGetDeviceInfo
+   * descriptor.protocolType 是协议探测后的结果；V2 features 由 DeviceInfoGet
    * 映射产生。
    * 全 SDK 的协议分支都必须走这里，不要直接读 originalDescriptor.protocolType
    * 或从 features 反推。
@@ -506,9 +506,8 @@ export class Device extends EventEmitter {
     const serialNo = this.getCurrentSerialNo();
     if (serialNo) return serialNo;
 
-    // connectId 是 SDK 内部连接路由 key；Protocol V2 早期固件/mock
-    // 可能还没有 serial_no，此时用 transport descriptor 兜底，不改变
-    // features.serialNo / deviceId 的业务语义。
+    // connectId 是 SDK 内部连接路由 key。这里兜底到 transport descriptor，
+    // 不改变 features.serialNo / deviceId 的业务语义。
     return this.originalDescriptor.path || this.originalDescriptor.id || '';
   }
 
@@ -797,7 +796,7 @@ export class Device extends EventEmitter {
   /**
    * Device initialization over Protocol V2.
    *
-   * Protocol V2 不走传统 Initialize/GetFeatures；直接用 DevGetDeviceInfo
+   * Protocol V2 不走传统 Initialize/GetFeatures；直接用 DeviceInfoGet
    * 生成唯一的 features 状态。
    */
   private async _initializeProtocolV2() {
@@ -824,8 +823,8 @@ export class Device extends EventEmitter {
   /**
    * Protocol V2 的轻量状态刷新（每次 run 前调用）。
    *
-   * 请求 hw + bt + status（不含 fw/SE target）：status 提供 init_states / label /
-   * passphrase_protection 等会在设备端变化的字段；hw/bt 提供 serialNo / bleName。
+   * 请求 hw + coprocessor + status（不含 fw/SE target）：status 提供 init_states / label /
+   * passphrase_enabled 等会在设备端变化的字段；hw/coprocessor 提供 serialNo / bleName。
    * versions 为空时按字段级合并保留旧值，verify 数据不会被降级。
    */
   private async _refreshProtocolV2Status() {

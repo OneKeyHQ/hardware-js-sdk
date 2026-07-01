@@ -28,21 +28,25 @@ const protocolV1Schema = {
 
 const protocolV2Schema = {
   nested: {
-    GetProtoVersion: {
+    ProtocolInfoRequest: {
       fields: {},
     },
-    ProtoVersion: {
+    ProtocolInfo: {
       fields: {
-        major_version: {
+        version: {
           type: 'uint32',
           id: 1,
         },
-        minor_version: {
+        supported_messages: {
+          rule: 'repeated',
           type: 'uint32',
           id: 2,
+          options: {
+            packed: false,
+          },
         },
-        patch_version: {
-          type: 'uint32',
+        protobuf_definition: {
+          type: 'string',
           id: 3,
         },
       },
@@ -65,8 +69,8 @@ const protocolV2Schema = {
     },
     MessageType: {
       values: {
-        MessageType_GetProtoVersion: 60200,
-        MessageType_ProtoVersion: 60201,
+        MessageType_ProtocolInfoRequest: 60200,
+        MessageType_ProtocolInfo: 60201,
         MessageType_Ping: 60206,
         MessageType_Success: 60207,
       },

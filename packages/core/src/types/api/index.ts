@@ -1,18 +1,13 @@
 import type {
   deviceFirmwareUpdate,
-  deviceGetDeviceInfo,
+  deviceFactoryInfoGet,
+  deviceFactoryInfoSet,
+  deviceInfoGet,
   deviceGetFirmwareUpdateStatus,
-  deviceGetOnboardingStatus,
   deviceReboot,
-  devFirmwareUpdate,
-  devGetDeviceInfo,
-  devGetFirmwareUpdateStatus,
-  devReboot,
   dirList,
   dirMake,
   dirRemove,
-  factoryDeviceInfoSettings,
-  factoryGetDeviceInfo,
   fileDelete,
   fileRead,
   fileWrite,
@@ -23,12 +18,12 @@ import type {
   filesystemFileDelete,
   filesystemFileRead,
   filesystemFileWrite,
-  filesystemFixPermission,
+  filesystemPermissionFix,
   filesystemFormat,
   filesystemPathInfoQuery,
-  getProtoVersion,
   pathInfo,
   ping,
+  protocolInfoRequest,
 } from './protocolV2';
 import type { off, on, removeAllListeners } from './event';
 import type { uiResponse } from './uiResponse';
@@ -255,20 +250,15 @@ export type CoreApi = {
   /**
    * File system & device control API (Protocol V2 only)
    */
-  getProtoVersion: typeof getProtoVersion;
+  protocolInfoRequest: typeof protocolInfoRequest;
   ping: typeof ping;
   deviceReboot: typeof deviceReboot;
-  deviceGetDeviceInfo: typeof deviceGetDeviceInfo;
-  deviceGetOnboardingStatus: typeof deviceGetOnboardingStatus;
+  deviceInfoGet: typeof deviceInfoGet;
   deviceFirmwareUpdate: typeof deviceFirmwareUpdate;
   deviceGetFirmwareUpdateStatus: typeof deviceGetFirmwareUpdateStatus;
-  devReboot: typeof devReboot;
-  devGetDeviceInfo: typeof devGetDeviceInfo;
-  devFirmwareUpdate: typeof devFirmwareUpdate;
-  devGetFirmwareUpdateStatus: typeof devGetFirmwareUpdateStatus;
-  factoryDeviceInfoSettings: typeof factoryDeviceInfoSettings;
-  factoryGetDeviceInfo: typeof factoryGetDeviceInfo;
-  filesystemFixPermission: typeof filesystemFixPermission;
+  deviceFactoryInfoSet: typeof deviceFactoryInfoSet;
+  deviceFactoryInfoGet: typeof deviceFactoryInfoGet;
+  filesystemPermissionFix: typeof filesystemPermissionFix;
   fileRead: typeof fileRead;
   fileWrite: typeof fileWrite;
   fileDelete: typeof fileDelete;

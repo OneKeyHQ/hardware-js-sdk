@@ -37,7 +37,6 @@ import ProDebugPage from './routes/pro-debug';
 import Pro2DebugPage from './routes/pro2-debug';
 import Pro2UpdatePage from './routes/pro2-update';
 import Pro2SpecialUpdatePage from './routes/pro2-special-update';
-import Pro2OnboardingPage from './routes/pro2-onboarding';
 import MethodBatchTestPage from './routes/method-batch-test';
 import EventTestPage from './routes/event-test';
 
@@ -172,10 +171,6 @@ const router = createHashRouter(
         {
           path: 'pro2-special-update',
           element: <Pro2SpecialUpdatePage />,
-        },
-        {
-          path: 'pro2-onboarding',
-          element: <Pro2OnboardingPage />,
         },
         {
           path: 'method-batch-test',

@@ -50,7 +50,7 @@ flowchart TD
 
 - `ProtocolV2Session`：负责 V2 encode、frame 写入、frame 读取、decode、超时和统一日志。
 - `ProtocolV2FrameAssembler`：负责 BLE/USB 分片后的 `0x5A` frame 重组和长度校验。
-- `probeProtocolV2()`：公共 V2 probe helper，负责 `GetProtoVersion` / bootloader status 探测和失败回退钩子。
+- `probeProtocolV2()`：公共 V2 probe helper，负责 `ProtocolInfoRequest` / bootloader status 探测和失败回退钩子。
 
 各 transport 的 `detectProtocol()` 会先执行 V1 `Initialize` probe，再按需要调用公共 V2 probe helper；显式 `connectProtocol` 则只验证指定协议。
 
@@ -63,7 +63,7 @@ WebUSB、Electron BLE、React Native BLE 和 lowlevel BLE 只负责各自的物�
 | 协议 | 数据来源                  | 标准输出        | features 输出                                 |
 | ---- | ------------------------- | --------------- | --------------------------------------------- |
 | V1   | `Initialize -> Features`  | `DeviceProfile` | 由 V1 原始消息构建的结构化 `Features`         |
-| V2   | `Ping + DevGetDeviceInfo` | `DeviceProfile` | 由 `DevGetDeviceInfo` 构建的结构化 `Features` |
+| V2   | `Ping + DeviceInfoGet` | `DeviceProfile` | 由 `DeviceInfoGet` 构建的结构化 `Features` |
 
 这样 SDK 内部和事件输出都使用统一 features 结构；协议原始消息只保留在 `features.raw` 中用于必要的 V1 兼容。
 
@@ -78,12 +78,12 @@ flowchart TD
   Connect["connect / subscribe"]
   ProbeV1["Protocol V1 Initialize"]
   V1["Initialize 成功: 标记 Protocol V1"]
-  ProbeV2["Protocol V2 GetProtoVersion / bootloader status"]
+  ProbeV2["Protocol V2 ProtocolInfoRequest / bootloader status"]
   V2["V2 probe 成功: 标记 Protocol V2"]
   FallbackV1["V1/V2 均失败: 保持 Protocol V1"]
   Init["Device.initialize()"]
   InitV1["V1: Initialize -> Features"]
-  InitV2["V2: Ping + DevGetDeviceInfo -> DeviceProfile"]
+  InitV2["V2: Ping + DeviceInfoGet -> DeviceProfile"]
 
   Enumerate --> Acquire --> Connect --> ProbeV1
   ProbeV1 --> V1 --> Init
@@ -110,9 +110,9 @@ V1 设备仍可在 `Initialize` 后通过 `TransportManager.reconfigure(features
 `Device.acquire()` 完成后会从 transport 读取检测到的协议类型，并写回 `originalDescriptor.protocolType`。后续 `Device.initialize()` 基于该字段选择初始化路径：
 
 - V1：发送 `Initialize`，使用真实 `Features`
-- V2：发送 `Ping` 验证链路，再用 `DevGetDeviceInfo` 生成标准 `DeviceProfile`
+- V2：发送 `Ping` 验证链路，再用 `DeviceInfoGet` 生成标准 `DeviceProfile`
 
-Protocol V2 当前没有传统 `GetFeatures`。为了保证事件和 API 输出一致，SDK 会从 `DevGetDeviceInfo` 构建结构化 `Features`；设备身份以 `serialNo/deviceId` 的语义区分为准。
+Protocol V2 当前没有传统 `GetFeatures`。为了保证事件和 API 输出一致，SDK 会从 `DeviceInfoGet` 构建结构化 `Features`；设备身份以 `serialNo/deviceId` 的语义区分为准。
 
 ## Protocol V2 文件和固件更新链路
 

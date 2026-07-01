@@ -1,32 +1,31 @@
 import type { CommonParams, Response } from '../params';
 import type {
-  DevFirmwareUpdateStatus,
-  FactoryDeviceInfo,
-  OnboardingStatus,
-  ProtoVersion,
+  DeviceFirmwareUpdateStatus,
+  DeviceFactoryInfo,
+  ProtocolInfo,
   ProtocolV2DeviceInfo,
   Success,
 } from '@onekeyfe/hd-transport';
 import type {
   DeviceFirmwareUpdateParams,
   DeviceRebootParams,
-  FactoryDeviceInfoSettingsParams,
+  DeviceFactoryInfoSetParams,
 } from '../../api/protocol-v2/helpers';
-import type { DeviceGetDeviceInfoParams } from '../../api/protocol-v2/DeviceGetDeviceInfo';
+import type { DeviceInfoGetParams } from '../../api/protocol-v2/DeviceInfoGet';
 
 // 参数类型单源：以 api/protocol-v2 的实现为准（type-only re-export，无运行时依赖）
 export type {
   DeviceFirmwareTargetInput,
   DeviceFirmwareUpdateParams,
   DeviceRebootParams,
-  FactoryDeviceInfoSettingsParams,
+  DeviceFactoryInfoSetParams,
   RebootTypeInput,
 } from '../../api/protocol-v2/helpers';
 export type {
-  DeviceGetDeviceInfoParams,
-  DeviceGetDeviceInfoTargets,
-  DeviceGetDeviceInfoTypes,
-} from '../../api/protocol-v2/DeviceGetDeviceInfo';
+  DeviceInfoGetParams,
+  DeviceInfoGetTargets,
+  DeviceInfoGetTypes,
+} from '../../api/protocol-v2/DeviceInfoGet';
 
 // ── Shared response shapes (Protocol V2 file system) ────────────────────
 
@@ -67,10 +66,10 @@ export type PathInfoResult = {
 
 // ── Method signatures ─────────────────────────────────────────────────────
 
-export declare function getProtoVersion(
+export declare function protocolInfoRequest(
   connectId: string,
   params?: CommonParams
-): Response<ProtoVersion>;
+): Response<ProtocolInfo>;
 
 export declare function ping(
   connectId: string,
@@ -82,54 +81,35 @@ export declare function deviceReboot(
   params: CommonParams & DeviceRebootParams
 ): Response<Success>;
 
-export declare function deviceGetDeviceInfo(
+export declare function deviceInfoGet(
   connectId: string,
-  params?: CommonParams & DeviceGetDeviceInfoParams
+  params?: CommonParams & DeviceInfoGetParams
 ): Response<ProtocolV2DeviceInfo>;
-
-export declare function deviceGetOnboardingStatus(
-  connectId: string,
-  params?: CommonParams
-): Response<OnboardingStatus>;
 
 export declare function deviceFirmwareUpdate(
   connectId: string,
   params: CommonParams & DeviceFirmwareUpdateParams
-): Response<Success | DevFirmwareUpdateStatus>;
+): Response<Success | DeviceFirmwareUpdateStatus>;
 
 export declare function deviceGetFirmwareUpdateStatus(
   connectId: string,
   params?: CommonParams
-): Response<DevFirmwareUpdateStatus>;
+): Response<DeviceFirmwareUpdateStatus>;
 
-export declare function devReboot(
+export declare function deviceFactoryInfoSet(
   connectId: string,
-  params: CommonParams & DeviceRebootParams
+  params: CommonParams & DeviceFactoryInfoSetParams
 ): Response<Success>;
 
-export declare function devGetDeviceInfo(
-  connectId: string,
-  params?: CommonParams & DeviceGetDeviceInfoParams
-): Response<ProtocolV2DeviceInfo>;
-
-export declare function devFirmwareUpdate(
-  connectId: string,
-  params: CommonParams & DeviceFirmwareUpdateParams
-): Response<Success | DevFirmwareUpdateStatus>;
-
-export declare function devGetFirmwareUpdateStatus(
+export declare function deviceFactoryInfoGet(
   connectId: string,
   params?: CommonParams
-): Response<DevFirmwareUpdateStatus>;
+): Response<DeviceFactoryInfo>;
 
-export declare function factoryDeviceInfoSettings(
+export declare function filesystemPermissionFix(
   connectId: string,
-  params: FactoryDeviceInfoSettingsParams
+  params?: CommonParams
 ): Response<Success>;
-
-export declare function factoryGetDeviceInfo(connectId: string): Response<FactoryDeviceInfo>;
-
-export declare function filesystemFixPermission(connectId: string): Response<Success>;
 
 export declare function fileRead(
   connectId: string,

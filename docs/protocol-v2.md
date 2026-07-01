@@ -6,17 +6,17 @@
 
 Protocol V1 仍服务 Classic / Mini / Touch / Pro 等现有设备。它支持 USB 和 BLE，并依赖 `Initialize -> Features` 建立设备上下文。
 
-Protocol V2 服务 Pro2。Pro2 同样支持 USB 和 BLE，但不走传统 `Initialize/GetFeatures`，而是通过 `GetProtoVersion` 和 `Ping` 建立链路可用性。
+Protocol V2 服务 Pro2。Pro2 同样支持 USB 和 BLE，但不走传统 `Initialize/GetFeatures`，而是通过 `ProtocolInfoRequest` 和 `Ping` 建立链路可用性。
 
 ## 主动协议探测
 
-SDK 不使用 PID、productName 或 descriptor 作为唯一判断依据。支持 Protocol V2 的 transport 会在连接后做主动探测：如果调用方显式传入 `connectProtocol`，就只验证指定协议；否则默认先用 Protocol V1 `Initialize` 验证现有设备，失败后再发送 Protocol V2 `GetProtoVersion` / bootloader status probe。这样现有 V1 设备保持原路径，未知名称或 bootloader 名称不稳定的 Pro2 也能回落到 V2。
+SDK 不使用 PID、productName 或 descriptor 作为唯一判断依据。支持 Protocol V2 的 transport 会在连接后做主动探测：如果调用方显式传入 `connectProtocol`，就只验证指定协议；否则默认先用 Protocol V1 `Initialize` 验证现有设备，失败后再发送 Protocol V2 `ProtocolInfoRequest` / bootloader status probe。这样现有 V1 设备保持原路径，未知名称或 bootloader 名称不稳定的 Pro2 也能回落到 V2。
 
 ```mermaid
 flowchart TD
   Connect["connect / subscribe"]
   ProbeV1["Protocol V1: Initialize"]
-  ProbeV2["Protocol V2: GetProtoVersion / bootloader status"]
+  ProbeV2["Protocol V2: ProtocolInfoRequest / bootloader status"]
   UseV1["Initialize 成功: 使用 Protocol V1"]
   UseV2["V2 probe 成功: 使用 Protocol V2"]
   FallbackV1["V1/V2 均失败: 保持 Protocol V1"]
@@ -89,12 +89,12 @@ Protocol V2 frame 的 payload 格式：
 
 | Message                      | ID    | 方向           | 用途               |
 | ---------------------------- | ----- | -------------- | ------------------ |
-| `GetProtoVersion`            | 60200 | Host -> Device | 协议探测           |
-| `ProtoVersion`               | 60201 | Device -> Host | 协议版本响应       |
+| `ProtocolInfoRequest`        | 60200 | Host -> Device | 协议探测           |
+| `ProtocolInfo`               | 60201 | Device -> Host | 协议信息响应       |
 | `Ping`                       | 60206 | Host -> Device | 链路检查           |
 | `Success`                    | 60207 | Device -> Host | 通用成功响应       |
 | `Failure`                    | 60208 | Device -> Host | 通用失败响应       |
-| `DevGetDeviceInfo`              | 60600 | Host -> Device | 查询 Protocol V2 设备信息 |
+| `DeviceInfoGet`              | 60600 | Host -> Device | 查询 Protocol V2 设备信息 |
 | `DeviceInfo`                 | 60601 | Device -> Host | Protocol V2 设备信息响应  |
 | `DeviceReboot`                  | 60400 | Host -> Device | 设备重启           |
 | `FilesystemPathInfo`         | 60801 | Device -> Host | 文件或目录信息     |
@@ -107,10 +107,9 @@ Protocol V2 frame 的 payload 格式：
 | `FilesystemDirList`          | 60808 | Host -> Device | 列目录             |
 | `FilesystemDirMake`          | 60809 | Host -> Device | 创建目录           |
 | `FilesystemDirRemove`        | 60810 | Host -> Device | 删除目录           |
-| `DeviceFirmwareUpdate`          | 61000 | Host -> Device | 触发固件安装       |
-| `DeviceFirmwareInstallProgress` | 61001 | Device -> Host | 固件安装进度       |
-| `DeviceGetFirmwareUpdateStatus` | 61002 | Host -> Device | 查询更新状态       |
-| `DeviceFirmwareUpdateStatus`    | 61003 | Device -> Host | 更新状态响应       |
+| `DeviceFirmwareUpdateRequest`   | 61000 | Host -> Device | 触发固件安装       |
+| `DeviceFirmwareUpdateStatusGet` | 61001 | Host -> Device | 查询更新状态       |
+| `DeviceFirmwareUpdateStatus`    | 61002 | Device -> Host | 更新状态响应       |
 
 ## WebUSB
 
@@ -122,7 +121,7 @@ flowchart TD
   Select["select configuration"]
   Discover["discover vendor interface and endpoints"]
   Claim["claim interface"]
-  Probe["GetProtoVersion probe"]
+  Probe["ProtocolInfoRequest probe"]
 
   Open --> Select --> Discover --> Claim --> Probe
 ```
@@ -137,7 +136,7 @@ Electron BLE、React Native BLE 和 lowlevel BLE 使用 Router `1`。桌面默�
 flowchart TD
   Connect["BLE connect(uuid)"]
   Subscribe["subscribe notify characteristic"]
-  Probe["GetProtoVersion probe"]
+  Probe["ProtocolInfoRequest probe"]
   Call["call() 按检测结果进入 V1 或 V2 分支"]
 
   Connect --> Subscribe --> Probe --> Call
@@ -154,13 +153,13 @@ Protocol V2 不支持 V1 的 `GetFeatures`。SDK 初始化时使用：
 ```mermaid
 flowchart TD
   Ping["Ping"]
-  DeviceInfo["DevGetDeviceInfo(scope/request)"]
+  DeviceInfo["DeviceInfoGet(scope/request)"]
   Adapter["build DeviceProfile"]
 
   Ping --> DeviceInfo --> Adapter
 ```
 
-`Protocol V2 feature adapter` 会把 `DeviceInfo.hw.serial_no` 写入 `device_id`、`serial_no`、`onekey_serial_no`，并把 `fw.app`、`fw.boot`、`fw.board`、`bt.app`、`se*`、`status` 映射到现有 `Features` 字段。这样上层事件、connectId/uuid、固件判断和业务 API 不需要直接理解 Protocol V2 的原始 schema。
+`Protocol V2 feature adapter` 会把 `DeviceInfo.status.device_id` 写入 `device_id`，把 `DeviceInfo.hw.serial_no` 写入 `serial_no`、`onekey_serial_no`，并把 `fw.application`、`fw.bootloader`、`fw.application_data/romloader`、`coprocessor.application`、`coprocessor.bt_adv_name`、`se*`、`status.passphrase_enabled` 映射到现有 `Features` 字段。这样上层事件、connectId/uuid、固件判断和业务 API 不需要直接理解 Protocol V2 的原始 schema。
 
 ## 文件写入
 
@@ -187,7 +186,7 @@ SDK 上传时第一块使用 `overwrite=true, append=false`，后续块使用 `o
 
 ## 固件更新
 
-Protocol V2 固件更新使用 `DeviceFirmwareUpdate`：
+Protocol V2 固件更新使用 `DeviceFirmwareUpdateRequest`：
 
 ```protobuf
 message DeviceFirmwareTarget {
@@ -195,24 +194,24 @@ message DeviceFirmwareTarget {
   required string path = 2;
 }
 
-message DeviceFirmwareUpdate {
+message DeviceFirmwareUpdateRequest {
   repeated DeviceFirmwareTarget targets = 1;
 }
 ```
 
 target 映射：
 
-| target                 | 含义       |
-| ---------------------- | ---------- |
-| `TARGET_ROMLOADER`     | romloader  |
-| `TARGET_BOOTLOADER`    | bootloader |
-| `TARGET_FIRMWARE_P1`   | 主固件 P1  |
-| `TARGET_FIRMWARE_P2`   | 主固件 P2  |
-| `TARGET_COPROCESSOR`   | 蓝牙/协处理器固件 |
-| `TARGET_SE`            | SE 固件    |
-| `TARGET_RESOURCE`      | 资源包     |
+| target id | enum | 含义 |
+| --------- | ---- | ---- |
+| `1` | `TARGET_ROMLOADER` | romloader |
+| `2` | `TARGET_BOOTLOADER` | bootloader |
+| `3` | `TARGET_APPLICATION_P1` | 主固件 P1 |
+| `4` | `TARGET_APPLICATION_P2` | 主固件 P2 |
+| `5` | `TARGET_COPROCESSOR` | 蓝牙/协处理器固件 |
+| `6`-`9` | `TARGET_SE01`-`TARGET_SE04` | SE 固件 |
+| `10` | `TARGET_RESOURCE` | 资源包 |
 
-SDK 会先把 resource、bootloader、firmware 写入 `vol1:`，再把所有需要安装的路径传入 `DeviceFirmwareUpdate.targets`。
+SDK 会先把 resource、bootloader、firmware 写入设备文件系统，再把所有需要安装的路径传入 `DeviceFirmwareUpdateRequest.targets`。
 
 ## schema 来源
 
@@ -222,7 +221,7 @@ SDK 会先把 resource、bootloader、firmware 写入 `vol1:`，再把所有需�
 | `packages/core/src/data/messages/messages-protocol-v2.json` | 同上，同步到 core 运行时数据                                   |
 | `packages/hd-transport/src/types/messages.ts`        | 由 protobuf 生成脚本输出，包含 Protocol V2 类型联合             |
 
-当前 Pro2 子模块跟随 `origin/dev_romloader_split`，因为该分支包含 romloader split 相关 schema 和 `Filesystem*/DeviceFirmwareUpdate` 消息。
+当前 Pro2 schema 直接来自 `submodules/firmware-pro2` 的 `latest` protobuf；SDK 不再注入临时消息。
 
 ## 实现入口
 

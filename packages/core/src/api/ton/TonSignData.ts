@@ -51,11 +51,7 @@ export default class TonSignData extends BaseMethod<HardwareTonSignData> {
   }
 
   getVersionRange() {
-    return {
-      pro2: {
-        min: '0.0.0',
-      },
-    };
+    return {};
   }
 
   async run() {

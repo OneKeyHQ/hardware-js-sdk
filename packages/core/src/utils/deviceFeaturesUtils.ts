@@ -1,7 +1,11 @@
 import semver from 'semver';
 import { isNaN } from 'lodash';
 import { EDeviceType, type EFirmwareType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import { Enum_Capability, type GetPassphraseState } from '@onekeyfe/hd-transport';
+import {
+  Enum_Capability,
+  type DeviceSessionGet,
+  type GetPassphraseState,
+} from '@onekeyfe/hd-transport';
 
 import { toHardened } from '../api/helpers/pathUtils';
 import { DeviceModelToTypes, DeviceTypeToModels } from '../types';
@@ -17,9 +21,8 @@ import { existCapability } from './capabilitieUtils';
 import type { Device } from '../device/Device';
 import type { Features, IDeviceType, SupportFeatureType } from '../types';
 
-// 生成的 GetPassphraseState 已包含 _only_main_pin / allow_create_attach_pin，
-// 不再需要手动扩展字段。
 type GetPassphraseStateMessage = GetPassphraseState;
+type DeviceSessionGetMessage = DeviceSessionGet;
 
 export const getSupportProtocolV1MessageSchema = (
   features: Features | undefined
@@ -136,11 +139,14 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (
     options?.initSession ? null : device.features?.sessionId
   );
 
-  return { passphraseState, newSession, unlockedAttachPin };
+  return {
+    passphraseState,
+    newSession,
+    unlockedAttachPin: unlockedAttachPin ?? device.features?.unlockedAttachPin,
+  };
 };
 
 // 仅适用于 Protocol V1 的 Pro：Pro2 走独立版本线，不能套用 4.15.0 门槛
-// （Pro2 在 getPassphraseState 中通过 isProtocolV2 直接判定支持）。
 const supportProSeriesAttachPinPassphrase = (deviceType: IDeviceType, firmwareVersion: string) =>
   deviceType === EDeviceType.Pro && semver.gte(firmwareVersion, '4.15.0');
 
@@ -166,14 +172,37 @@ export const getPassphraseState = async (
   const firmwareVersion = device.getCurrentFirmwareVersionString() ?? '0.0.0';
   const deviceType = device.getCurrentDeviceType();
 
+  if (device.isProtocolV2()) {
+    const payload: DeviceSessionGetMessage = {};
+    const cachedSessionId =
+      typeof device.getInternalState === 'function' ? device.getInternalState() : undefined;
+    if (cachedSessionId) {
+      payload.session_id = cachedSessionId;
+    }
+
+    const { message, type } = await commands.typedCall(
+      'DeviceSessionGet',
+      'DeviceSession',
+      payload
+    );
+
+    // @ts-expect-error
+    if (type === 'CallMethodError') {
+      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Get the passphrase state error');
+    }
+
+    return {
+      passphraseState: message.btc_test_address,
+      newSession: message.session_id,
+      unlockedAttachPin: features.unlockedAttachPin ?? undefined,
+    };
+  }
+
   const supportAttachPinCapability = existCapability(
     features,
     Enum_Capability.Capability_AttachToPin
   );
-  // Pro2 (Protocol V2) 协议自带 GetPassphraseState(10028)，固件从首个版本即支持，
-  // 不依赖 Pro 系列的 4.15.0 版本线；V2 也没有 GetAddress Testnet 探测这条 legacy 回退路径。
   const supportGetPassphraseState =
-    device.isProtocolV2() ||
     supportAttachPinCapability ||
     supportProSeriesAttachPinPassphrase(deviceType, firmwareVersion);
 
@@ -282,6 +311,9 @@ export const getFirmwareUpdateField = ({
   if (deviceType === EDeviceType.Pro) {
     return latestFirmwareField;
   }
+  if (deviceType === EDeviceType.Pro2) {
+    return 'firmware-v1';
+  }
   return 'firmware';
 };
 /**
@@ -323,6 +355,10 @@ export const getFirmwareUpdateFieldArray = (
 
   if (deviceType === 'pro') {
     return ['firmware-v8'];
+  }
+
+  if (deviceType === 'pro2') {
+    return ['firmware-v1'];
   }
 
   return ['firmware'];

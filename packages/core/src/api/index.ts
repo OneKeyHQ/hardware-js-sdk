@@ -43,20 +43,15 @@ export { default as firmwareUpdateV4 } from './FirmwareUpdateV4';
 export { default as promptWebDeviceAccess } from './PromptWebDeviceAccess';
 
 // File system & device control API (Protocol V2 only)
-export { default as getProtoVersion } from './protocol-v2/GetProtoVersion';
+export { default as protocolInfoRequest } from './protocol-v2/ProtocolInfoRequest';
 export { default as ping } from './protocol-v2/Ping';
 export { default as deviceReboot } from './protocol-v2/DeviceReboot';
-export { default as deviceGetDeviceInfo } from './protocol-v2/DeviceGetDeviceInfo';
-export { default as deviceGetOnboardingStatus } from './protocol-v2/DeviceGetOnboardingStatus';
+export { default as deviceInfoGet } from './protocol-v2/DeviceInfoGet';
 export { default as deviceFirmwareUpdate } from './protocol-v2/DeviceFirmwareUpdate';
 export { default as deviceGetFirmwareUpdateStatus } from './protocol-v2/DeviceGetFirmwareUpdateStatus';
-export { default as devReboot } from './protocol-v2/DevReboot';
-export { default as devGetDeviceInfo } from './protocol-v2/DeviceGetDeviceInfo';
-export { default as devFirmwareUpdate } from './protocol-v2/DeviceFirmwareUpdate';
-export { default as devGetFirmwareUpdateStatus } from './protocol-v2/DeviceGetFirmwareUpdateStatus';
-export { default as factoryDeviceInfoSettings } from './protocol-v2/FactoryDeviceInfoSettings';
-export { default as factoryGetDeviceInfo } from './protocol-v2/FactoryGetDeviceInfo';
-export { default as filesystemFixPermission } from './protocol-v2/FilesystemFixPermission';
+export { default as deviceFactoryInfoSet } from './protocol-v2/DeviceFactoryInfoSet';
+export { default as deviceFactoryInfoGet } from './protocol-v2/DeviceFactoryInfoGet';
+export { default as filesystemPermissionFix } from './protocol-v2/FilesystemPermissionFix';
 export { default as filesystemFormat } from './protocol-v2/FilesystemFormat';
 export { default as filesystemDiskControl } from './protocol-v2/FilesystemDiskControl';
 export { default as fileRead } from './FileRead';

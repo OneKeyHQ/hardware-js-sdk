@@ -257,10 +257,22 @@ const api: UnifiedMethodConfig[] = [
     method: 'firmwareUpdateV4',
     description: 'methodDescriptions.firmwareUpdateV4',
     noDeviceIdReq: true,
-    // 扁平化：所有 target（FwMgmtTarget_t）平铺，任意组合一次更新
     presets: [
       {
-        title: 'firmwareUpdateV4',
+        title: 'V4 remote config update',
+        parameters: [
+          {
+            name: 'platform',
+            type: 'select',
+            required: true,
+            label: 'Platform',
+            options: [{ label: 'Web', value: 'web' }],
+            value: 'web',
+          },
+        ],
+      },
+      {
+        title: 'V4 local target binaries',
         parameters: [
           {
             name: 'platform',
@@ -283,7 +295,7 @@ const api: UnifiedMethodConfig[] = [
             name: 'bootloaderBinary',
             type: 'file',
             required: false,
-            label: 'Main boot (target 1)',
+            label: 'Bootloader (target 2)',
             accept: '.bin',
             visible: true,
             editable: true,
@@ -292,7 +304,7 @@ const api: UnifiedMethodConfig[] = [
             name: 'applicationP1Binary',
             type: 'file',
             required: false,
-            label: 'Main app (target 0)',
+            label: 'Application P1 (target 3)',
             accept: '.bin',
             visible: true,
             editable: true,
@@ -301,7 +313,7 @@ const api: UnifiedMethodConfig[] = [
             name: 'applicationP2Binary',
             type: 'file',
             required: false,
-            label: 'Main app / second image (target 0)',
+            label: 'Application P2 (target 4)',
             accept: '.bin',
             visible: true,
             editable: true,
@@ -310,7 +322,7 @@ const api: UnifiedMethodConfig[] = [
             name: 'coprocessorBinary',
             type: 'file',
             required: false,
-            label: 'BT (target 2)',
+            label: 'Coprocessor (target 5)',
             accept: '.bin',
             visible: true,
             editable: true,
@@ -386,16 +398,18 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Target',
             options: [
-              { label: 'Main app', value: '0' },
-              { label: 'Main boot', value: '1' },
-              { label: 'BT', value: '2' },
-              { label: 'SE1', value: '3' },
-              { label: 'SE2', value: '4' },
-              { label: 'SE3', value: '5' },
-              { label: 'SE4', value: '6' },
+              { label: 'Romloader', value: '1' },
+              { label: 'Bootloader', value: '2' },
+              { label: 'Application P1', value: '3' },
+              { label: 'Application P2', value: '4' },
+              { label: 'Coprocessor', value: '5' },
+              { label: 'SE01', value: '6' },
+              { label: 'SE02', value: '7' },
+              { label: 'SE03', value: '8' },
+              { label: 'SE04', value: '9' },
               { label: 'Resource', value: '10' },
             ],
-            value: '0',
+            value: '3',
           },
           {
             name: 'path',
@@ -418,62 +432,7 @@ const api: UnifiedMethodConfig[] = [
             description: 'DeviceFirmwareTarget JSON array',
             value: [
               {
-                target_id: 0,
-                path: 'vol0:firmware.bin',
-              },
-            ],
-          },
-        ],
-      },
-    ],
-  },
-  {
-    method: 'devFirmwareUpdate',
-    description: 'Protocol V2 current submodule DevFirmwareUpdate',
-    noDeviceIdReq: true,
-    presets: [
-      {
-        title: 'Install one DevFirmware target',
-        parameters: [
-          {
-            name: 'targetId',
-            type: 'select',
-            required: true,
-            label: 'Target',
-            options: [
-              { label: 'Main app', value: '0' },
-              { label: 'Main boot', value: '1' },
-              { label: 'BT', value: '2' },
-              { label: 'SE1', value: '3' },
-              { label: 'SE2', value: '4' },
-              { label: 'SE3', value: '5' },
-              { label: 'SE4', value: '6' },
-              { label: 'Resource', value: '10' },
-            ],
-            value: '0',
-          },
-          {
-            name: 'path',
-            type: 'string',
-            required: true,
-            label: 'Path',
-            placeholder: 'vol0:firmware.bin',
-            value: 'vol0:firmware.bin',
-          },
-        ],
-      },
-      {
-        title: 'Install multiple DevFirmware targets',
-        parameters: [
-          {
-            name: 'targets',
-            type: 'textarea',
-            required: true,
-            label: 'Targets',
-            description: 'DevFirmwareTarget JSON array',
-            value: [
-              {
-                target_id: 0,
+                target_id: 3,
                 path: 'vol0:firmware.bin',
               },
             ],
@@ -485,12 +444,6 @@ const api: UnifiedMethodConfig[] = [
   {
     method: 'deviceGetFirmwareUpdateStatus',
     description: 'methodDescriptions.deviceGetFirmwareUpdateStatus',
-    noDeviceIdReq: true,
-    presets: [],
-  },
-  {
-    method: 'devGetFirmwareUpdateStatus',
-    description: 'Protocol V2 current submodule DevGetFirmwareUpdateStatus',
     noDeviceIdReq: true,
     presets: [],
   },
@@ -741,8 +694,8 @@ const api: UnifiedMethodConfig[] = [
     ],
   },
   {
-    method: 'filesystemFixPermission',
-    description: 'methodDescriptions.filesystemFixPermission',
+    method: 'filesystemPermissionFix',
+    description: 'methodDescriptions.filesystemPermissionFix',
     noDeviceIdReq: true,
     presets: [],
   },

@@ -25,7 +25,7 @@ import type {
   GetDeviceInfoParams,
 } from '../types/api/getDeviceInfo';
 import type { Features, OnekeyFeatures } from '../types';
-import type { DevFirmwareImageInfo, ProtocolV2DeviceInfo } from '@onekeyfe/hd-transport';
+import type { DeviceFirmwareImageInfo, ProtocolV2DeviceInfo } from '@onekeyfe/hd-transport';
 
 type BuildProtocolV1ProfileParams = {
   protocol?: DeviceInfoProtocol;
@@ -68,11 +68,11 @@ const bytesToHex = (value: unknown): string | undefined => {
   return undefined;
 };
 
-const getImageVersion = (image?: DevFirmwareImageInfo | null) => image?.version ?? null;
+const getImageVersion = (image?: DeviceFirmwareImageInfo | null) => image?.version ?? null;
 
-const getImageBuildId = (image?: DevFirmwareImageInfo | null) => image?.build_id ?? undefined;
+const getImageBuildId = (image?: DeviceFirmwareImageInfo | null) => image?.build_id ?? undefined;
 
-const getImageHash = (image?: DevFirmwareImageInfo | null) => bytesToHex(image?.hash);
+const getImageHash = (image?: DeviceFirmwareImageInfo | null) => bytesToHex(image?.hash);
 
 const shouldIncludeVerify = (scope?: GetDeviceInfoParams['scope']) =>
   scope === 'verify' || scope === 'full';
@@ -147,20 +147,25 @@ const normalizeV1Versions = (
   ),
 });
 
-const normalizeV2Versions = (deviceInfo?: ProtocolV2DeviceInfo): DeviceProfileVersions => ({
-  firmware: firstMeaningfulVersion(getImageVersion(deviceInfo?.fw?.app)),
-  bootloader: firstMeaningfulVersion(getImageVersion(deviceInfo?.fw?.boot)),
-  board: firstMeaningfulVersion(getImageVersion(deviceInfo?.fw?.board)),
-  ble: firstMeaningfulVersion(getImageVersion(deviceInfo?.bt?.app)),
-  se01: firstMeaningfulVersion(getImageVersion(deviceInfo?.se1?.app)),
-  se02: firstMeaningfulVersion(getImageVersion(deviceInfo?.se2?.app)),
-  se03: firstMeaningfulVersion(getImageVersion(deviceInfo?.se3?.app)),
-  se04: firstMeaningfulVersion(getImageVersion(deviceInfo?.se4?.app)),
-  se01Boot: firstMeaningfulVersion(getImageVersion(deviceInfo?.se1?.boot)),
-  se02Boot: firstMeaningfulVersion(getImageVersion(deviceInfo?.se2?.boot)),
-  se03Boot: firstMeaningfulVersion(getImageVersion(deviceInfo?.se3?.boot)),
-  se04Boot: firstMeaningfulVersion(getImageVersion(deviceInfo?.se4?.boot)),
-});
+const normalizeV2Versions = (deviceInfo?: ProtocolV2DeviceInfo): DeviceProfileVersions => {
+  const info = deviceInfo;
+  return {
+    firmware: firstMeaningfulVersion(getImageVersion(info?.fw?.application)),
+    bootloader: firstMeaningfulVersion(getImageVersion(info?.fw?.bootloader)),
+    board: firstMeaningfulVersion(
+      getImageVersion(info?.fw?.application_data ?? info?.fw?.romloader)
+    ),
+    ble: firstMeaningfulVersion(getImageVersion(info?.coprocessor?.application)),
+    se01: firstMeaningfulVersion(getImageVersion(info?.se1?.application)),
+    se02: firstMeaningfulVersion(getImageVersion(info?.se2?.application)),
+    se03: firstMeaningfulVersion(getImageVersion(info?.se3?.application)),
+    se04: firstMeaningfulVersion(getImageVersion(info?.se4?.application)),
+    se01Boot: firstMeaningfulVersion(getImageVersion(info?.se1?.bootloader)),
+    se02Boot: firstMeaningfulVersion(getImageVersion(info?.se2?.bootloader)),
+    se03Boot: firstMeaningfulVersion(getImageVersion(info?.se3?.bootloader)),
+    se04Boot: firstMeaningfulVersion(getImageVersion(info?.se4?.bootloader)),
+  };
+};
 
 // V2 状态由 normalizeV2Status 处理，这里只服务 buildProfileFromProtocolV1 的 V1 路径。
 const normalizeV1Status = (features?: Features): DeviceInfoStatus => ({
@@ -169,23 +174,30 @@ const normalizeV1Status = (features?: Features): DeviceInfoStatus => ({
   bootloaderMode: features?.bootloaderMode ?? null,
   unlocked: features?.unlocked ?? null,
   passphraseProtection: features?.passphraseProtection ?? null,
+  attachToPinEnabled: features?.attachToPinEnabled ?? null,
+  unlockedAttachPin: features?.unlockedAttachPin ?? null,
   backupRequired: features?.backupRequired ?? null,
   noBackup: features?.noBackup ?? null,
   language: features?.language ?? null,
   bleEnabled: features?.bleEnabled ?? null,
 });
 
-const normalizeV2Status = (deviceInfo?: ProtocolV2DeviceInfo): DeviceInfoStatus => ({
-  mode: getProtocolV2Mode(deviceInfo),
-  initialized: deviceInfo?.status?.init_states ?? null,
-  bootloaderMode: false,
-  unlocked: null,
-  passphraseProtection: deviceInfo?.status?.passphrase_protection ?? null,
-  backupRequired: deviceInfo?.status?.backup_required ?? null,
-  noBackup: null,
-  language: deviceInfo?.status?.language ?? null,
-  bleEnabled: deviceInfo?.status?.bt_enable ?? null,
-});
+const normalizeV2Status = (deviceInfo?: ProtocolV2DeviceInfo): DeviceInfoStatus => {
+  const status = deviceInfo?.status;
+  return {
+    mode: getProtocolV2Mode(deviceInfo),
+    initialized: status?.init_states ?? null,
+    bootloaderMode: false,
+    unlocked: status?.unlocked ?? null,
+    passphraseProtection: status?.passphrase_enabled ?? null,
+    attachToPinEnabled: status?.attach_to_pin_enabled ?? null,
+    unlockedAttachPin: status?.unlocked_by_attach_to_pin ?? null,
+    backupRequired: status?.backup_required ?? null,
+    noBackup: null,
+    language: null,
+    bleEnabled: null,
+  };
+};
 
 const normalizeV1Verify = (
   features?: Features,
@@ -223,32 +235,35 @@ const normalizeV1Verify = (
   se04BootHash: protocolV1OneKeyFeatures?.onekey_se04_boot_hash ?? features?.verify?.se04BootHash,
 });
 
-const normalizeV2Verify = (deviceInfo?: ProtocolV2DeviceInfo): DeviceProfileVerify => ({
-  firmwareBuildId: getImageBuildId(deviceInfo?.fw?.app),
-  firmwareHash: getImageHash(deviceInfo?.fw?.app),
-  bootloaderBuildId: getImageBuildId(deviceInfo?.fw?.boot),
-  bootloaderHash: getImageHash(deviceInfo?.fw?.boot),
-  boardBuildId: getImageBuildId(deviceInfo?.fw?.board),
-  boardHash: getImageHash(deviceInfo?.fw?.board),
-  bleBuildId: getImageBuildId(deviceInfo?.bt?.app),
-  bleHash: getImageHash(deviceInfo?.bt?.app),
-  se01BuildId: getImageBuildId(deviceInfo?.se1?.app),
-  se01Hash: getImageHash(deviceInfo?.se1?.app),
-  se02BuildId: getImageBuildId(deviceInfo?.se2?.app),
-  se02Hash: getImageHash(deviceInfo?.se2?.app),
-  se03BuildId: getImageBuildId(deviceInfo?.se3?.app),
-  se03Hash: getImageHash(deviceInfo?.se3?.app),
-  se04BuildId: getImageBuildId(deviceInfo?.se4?.app),
-  se04Hash: getImageHash(deviceInfo?.se4?.app),
-  se01BootBuildId: getImageBuildId(deviceInfo?.se1?.boot),
-  se01BootHash: getImageHash(deviceInfo?.se1?.boot),
-  se02BootBuildId: getImageBuildId(deviceInfo?.se2?.boot),
-  se02BootHash: getImageHash(deviceInfo?.se2?.boot),
-  se03BootBuildId: getImageBuildId(deviceInfo?.se3?.boot),
-  se03BootHash: getImageHash(deviceInfo?.se3?.boot),
-  se04BootBuildId: getImageBuildId(deviceInfo?.se4?.boot),
-  se04BootHash: getImageHash(deviceInfo?.se4?.boot),
-});
+const normalizeV2Verify = (deviceInfo?: ProtocolV2DeviceInfo): DeviceProfileVerify => {
+  const info = deviceInfo;
+  return {
+    firmwareBuildId: getImageBuildId(info?.fw?.application),
+    firmwareHash: getImageHash(info?.fw?.application),
+    bootloaderBuildId: getImageBuildId(info?.fw?.bootloader),
+    bootloaderHash: getImageHash(info?.fw?.bootloader),
+    boardBuildId: getImageBuildId(info?.fw?.application_data ?? info?.fw?.romloader),
+    boardHash: getImageHash(info?.fw?.application_data ?? info?.fw?.romloader),
+    bleBuildId: getImageBuildId(info?.coprocessor?.application),
+    bleHash: getImageHash(info?.coprocessor?.application),
+    se01BuildId: getImageBuildId(info?.se1?.application),
+    se01Hash: getImageHash(info?.se1?.application),
+    se02BuildId: getImageBuildId(info?.se2?.application),
+    se02Hash: getImageHash(info?.se2?.application),
+    se03BuildId: getImageBuildId(info?.se3?.application),
+    se03Hash: getImageHash(info?.se3?.application),
+    se04BuildId: getImageBuildId(info?.se4?.application),
+    se04Hash: getImageHash(info?.se4?.application),
+    se01BootBuildId: getImageBuildId(info?.se1?.bootloader),
+    se01BootHash: getImageHash(info?.se1?.bootloader),
+    se02BootBuildId: getImageBuildId(info?.se2?.bootloader),
+    se02BootHash: getImageHash(info?.se2?.bootloader),
+    se03BootBuildId: getImageBuildId(info?.se3?.bootloader),
+    se03BootHash: getImageHash(info?.se3?.bootloader),
+    se04BootBuildId: getImageBuildId(info?.se4?.bootloader),
+    se04BootHash: getImageHash(info?.se4?.bootloader),
+  };
+};
 
 const normalizeRaw = ({
   features,
@@ -304,10 +319,11 @@ export function buildProfileFromProtocolV2({
   scope = 'basic',
   includeRaw = false,
 }: BuildProtocolV2ProfileParams): DeviceProfile {
-  const deviceId = deviceInfo?.hw?.device_id || '';
+  const info = deviceInfo;
+  const deviceId = info?.status?.device_id || '';
   const serialNo = deviceInfo?.hw?.serial_no || '';
-  const label = deviceInfo?.status?.label ?? null;
-  const bleName = deviceInfo?.bt?.adv_name ?? null;
+  const label = null;
+  const bleName = info?.coprocessor?.bt_adv_name ?? null;
   const verify = normalizeV2Verify(deviceInfo);
 
   return {
