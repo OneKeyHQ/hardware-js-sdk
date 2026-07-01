@@ -21,10 +21,6 @@ import { existCapability } from './capabilitieUtils';
 import type { Device } from '../device/Device';
 import type { Features, IDeviceType, SupportFeatureType } from '../types';
 
-type GetPassphraseStateMessage = GetPassphraseState & {
-  _only_main_pin?: boolean;
-  allow_create_attach_pin?: boolean;
-};
 type DeviceSessionGetMessage = DeviceSessionGet;
 
 export const getSupportProtocolV1MessageSchema = (
@@ -210,7 +206,7 @@ export const getPassphraseState = async (
     supportProSeriesAttachPinPassphrase(deviceType, firmwareVersion);
 
   if (supportGetPassphraseState) {
-    const payload: GetPassphraseStateMessage = options?.onlyMainPin
+    const payload: GetPassphraseState = options?.onlyMainPin
       ? { _only_main_pin: true }
       : { passphrase_state: options?.expectPassphraseState };
     if (options?.allowCreateAttachPin) {

@@ -6999,6 +6999,38 @@
         }
       }
     },
+    "GetPassphraseState": {
+      "fields": {
+        "passphrase_state": {
+          "type": "string",
+          "id": 1
+        },
+        "_only_main_pin": {
+          "type": "bool",
+          "id": 2
+        },
+        "allow_create_attach_pin": {
+          "type": "bool",
+          "id": 3
+        }
+      }
+    },
+    "PassphraseState": {
+      "fields": {
+        "passphrase_state": {
+          "type": "string",
+          "id": 1
+        },
+        "session_id": {
+          "type": "bytes",
+          "id": 2
+        },
+        "unlocked_attach_pin": {
+          "type": "bool",
+          "id": 3
+        }
+      }
+    },
     "UnLockDevice": {
       "fields": {}
     },

@@ -172,8 +172,6 @@ const removeTopLevelMessage = (source, name) => {
   'GetFeatures',
   'OnekeyGetFeatures',
   'Features',
-  'GetPassphraseState',
-  'PassphraseState',
 ].forEach(name => {
   proto = removeTopLevelMessage(proto, name);
 });
