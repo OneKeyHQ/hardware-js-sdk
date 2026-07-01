@@ -39,6 +39,7 @@ const api: PlaygroundProps[] = [
       },
     ],
   },
+  {
     method: 'deviceReboot',
     description: 'Reboot Protocol V2 device.',
     noDeviceIdReq: true,
