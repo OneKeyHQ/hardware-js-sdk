@@ -129,10 +129,12 @@ const PROTOCOL_V2_REMOTE_COMPONENT_TARGETS: Readonly<
   },
 };
 
-const PROTOCOL_V2_TARGET_ID_VALUES = new Map<string, number>(
+// hd-transport 的历史 decode 行为会把单值 enum 输出为枚举名字符串；
+// Protocol V2 沿用这个 SDK 语义，内部比较前再映射回固件协议数值。
+const PROTOCOL_V2_TARGET_ID_BY_DECODED_NAME = new Map<string, number>(
   Object.entries(ProtocolV2FirmwareTargetType).map(([key, value]) => [key, value])
 );
-const PROTOCOL_V2_TARGET_STATUS_VALUES = new Map<string, number>([
+const PROTOCOL_V2_TARGET_STATUS_BY_DECODED_NAME = new Map<string, number>([
   ['FW_MGMT_UPDATER_TASK_STATUS_PENDING', PROTOCOL_V2_TARGET_STATUS_PENDING],
   ['FW_MGMT_UPDATER_TASK_STATUS_IN_PROGRESS', PROTOCOL_V2_TARGET_STATUS_IN_PROGRESS],
   ['FW_MGMT_UPDATER_TASK_STATUS_FINISHED', PROTOCOL_V2_TARGET_STATUS_FINISHED],
@@ -196,7 +198,7 @@ const normalizeProtocolV2TargetId = (targetId: number | string) => {
   if (typeof targetId === 'number') {
     return targetId;
   }
-  return PROTOCOL_V2_TARGET_ID_VALUES.get(targetId);
+  return PROTOCOL_V2_TARGET_ID_BY_DECODED_NAME.get(targetId);
 };
 
 const normalizeProtocolV2TargetStatus = (
@@ -206,7 +208,7 @@ const normalizeProtocolV2TargetStatus = (
     return status;
   }
   if (typeof status === 'string') {
-    return PROTOCOL_V2_TARGET_STATUS_VALUES.get(status);
+    return PROTOCOL_V2_TARGET_STATUS_BY_DECODED_NAME.get(status);
   }
   return undefined;
 };

@@ -2060,7 +2060,7 @@ describe('Protocol V2 firmware update targets', () => {
     expect(typedCall).toHaveBeenCalledTimes(2);
   });
 
-  test('uses dev firmware status semantics for Protocol V2 install polling', () => {
+  test('uses SDK decoded enum names for Protocol V2 install polling', () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {

@@ -12,8 +12,8 @@ export type { DeviceSEInfo as ProtocolV2SEInfo } from '@onekeyfe/hd-transport';
 export type ProtocolV2SeStateLabel = 'BOOT' | 'APP_FACTORY' | 'APP';
 
 /**
- * 传输层解码会把 proto 枚举输出为名称字符串（见 hd-transport 的 messageToJSON），
- * 但生成类型声明为数值枚举；这里统一兼容两种形态。
+ * 传输层沿用历史 decode 语义：单值 proto enum 输出为名称字符串。
+ * 这里按 SDK decode 后的字符串语义处理，同时接受数字枚举，便于低层调用复用。
  */
 const normalizeEnumValue = <T extends Record<string | number, string | number>>(
   enumObject: T,
