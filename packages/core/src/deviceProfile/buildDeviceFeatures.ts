@@ -3,6 +3,7 @@ import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
 import type { Features } from '../types';
 import type { PROTO } from '../constants';
 import type { DeviceFirmwareImageInfo, ProtocolV2DeviceInfo } from '@onekeyfe/hd-transport';
+import { isProtocolV2BootloaderDeviceInfo } from '../protocols/protocol-v2/features';
 
 type ProtocolV1FeaturesCompat = PROTO.Features &
   Partial<PROTO.OnekeyFeatures> & {
@@ -248,6 +249,14 @@ export const buildProtocolV2FeaturesPayload = (
   const unlocked = firstValue(status?.unlocked, previous?.unlocked) ?? null;
   const attachToPinEnabled = status?.attach_to_pin_enabled ?? null;
   const unlockedAttachPin = status?.unlocked_by_attach_to_pin ?? undefined;
+  const bootloaderMode = isProtocolV2BootloaderDeviceInfo(info);
+  const mode = bootloaderMode
+    ? 'bootloader'
+    : initialized === false
+    ? 'notInitialized'
+    : initialized === true
+    ? 'normal'
+    : 'unknown';
 
   return {
     protocol: 'V2',
@@ -261,9 +270,9 @@ export const buildProtocolV2FeaturesPayload = (
     label,
     bleName: bleName ?? null,
     capabilities: [],
-    mode: initialized === false ? 'notInitialized' : initialized === true ? 'normal' : 'unknown',
+    mode,
     initialized,
-    bootloaderMode: false,
+    bootloaderMode,
     unlocked,
     firmwarePresent: previous?.firmwarePresent ?? null,
     passphraseProtection,
@@ -337,17 +346,13 @@ export const buildProtocolV2FeaturesPayload = (
       se03Hash: getImageHash(info?.se3?.application) ?? previous?.verify?.se03Hash,
       se04BuildId: getImageBuildId(info?.se4?.application) ?? previous?.verify?.se04BuildId,
       se04Hash: getImageHash(info?.se4?.application) ?? previous?.verify?.se04Hash,
-      se01BootBuildId:
-        getImageBuildId(info?.se1?.bootloader) ?? previous?.verify?.se01BootBuildId,
+      se01BootBuildId: getImageBuildId(info?.se1?.bootloader) ?? previous?.verify?.se01BootBuildId,
       se01BootHash: getImageHash(info?.se1?.bootloader) ?? previous?.verify?.se01BootHash,
-      se02BootBuildId:
-        getImageBuildId(info?.se2?.bootloader) ?? previous?.verify?.se02BootBuildId,
+      se02BootBuildId: getImageBuildId(info?.se2?.bootloader) ?? previous?.verify?.se02BootBuildId,
       se02BootHash: getImageHash(info?.se2?.bootloader) ?? previous?.verify?.se02BootHash,
-      se03BootBuildId:
-        getImageBuildId(info?.se3?.bootloader) ?? previous?.verify?.se03BootBuildId,
+      se03BootBuildId: getImageBuildId(info?.se3?.bootloader) ?? previous?.verify?.se03BootBuildId,
       se03BootHash: getImageHash(info?.se3?.bootloader) ?? previous?.verify?.se03BootHash,
-      se04BootBuildId:
-        getImageBuildId(info?.se4?.bootloader) ?? previous?.verify?.se04BootBuildId,
+      se04BootBuildId: getImageBuildId(info?.se4?.bootloader) ?? previous?.verify?.se04BootBuildId,
       se04BootHash: getImageHash(info?.se4?.bootloader) ?? previous?.verify?.se04BootHash,
     },
     sessionId: previous?.sessionId ?? null,

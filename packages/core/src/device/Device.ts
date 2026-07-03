@@ -76,6 +76,7 @@ export type InitOptions = {
   passphraseState?: string;
   deriveCardano?: boolean;
   connectProtocol?: HardwareConnectProtocol;
+  protocolV2DeviceInfoTimeoutMs?: number;
 };
 
 export type RunOptions = {
@@ -326,7 +327,10 @@ export class Device extends EventEmitter {
     });
   }
 
-  async acquire(connectProtocol?: HardwareConnectProtocol) {
+  async acquire(
+    connectProtocol?: HardwareConnectProtocol,
+    options?: { throwOnRunPromiseError?: boolean }
+  ) {
     const env = DataManager.getSettings('env');
     const mainIdKey = DataManager.isBleConnect(env) ? 'id' : 'session';
     const expectedProtocol = connectProtocol ?? this.originalDescriptor.protocolType;
@@ -375,6 +379,9 @@ export class Device extends EventEmitter {
 
       this.commands = new DeviceCommands(this, this.mainId ?? '');
     } catch (error) {
+      if (options?.throwOnRunPromiseError) {
+        throw error;
+      }
       if (this.runPromise) {
         this.runPromise.reject(error);
       } else {
@@ -740,13 +747,16 @@ export class Device extends EventEmitter {
     if (this.isProtocolV2()) {
       this.passphraseState = options?.passphraseState;
       if (this.features && !this.featuresNeedsReload && !options?.initSession) {
+        if (this.features.bootloaderMode) {
+          return;
+        }
         // 不能直接信任缓存 features：设备端 wipe / 完成初始化 / 改 label 后
         // features 会永久陈旧。每次 run 做一次轻量 status 刷新（不含 fw/SE），
         // 用字段级合并保留已有版本和 SE 信息。
-        await this._refreshProtocolV2Status();
+        await this._refreshProtocolV2Status(options);
         return;
       }
-      await this._initializeProtocolV2();
+      await this._initializeProtocolV2(options);
       return;
     }
 
@@ -799,7 +809,7 @@ export class Device extends EventEmitter {
    * Protocol V2 不走传统 Initialize/GetFeatures；直接用 DeviceInfoGet
    * 生成唯一的 features 状态。
    */
-  private async _initializeProtocolV2() {
+  private async _initializeProtocolV2(options?: InitOptions) {
     Log.debug('Initialize device via Protocol V2 features adapter');
 
     try {
@@ -808,6 +818,7 @@ export class Device extends EventEmitter {
       // 且 reject 后底层调用仍会残留。
       const deviceInfo = await requestProtocolV2DeviceInfo({
         commands: this.commands,
+        timeoutMs: options?.protocolV2DeviceInfoTimeoutMs,
       });
       // 默认请求不含 SE/hash 数据，scope 如实标注为 basic；
       // 完整数据由 getDeviceInfo(scope:'verify'|'full') 获取。
@@ -827,11 +838,12 @@ export class Device extends EventEmitter {
    * passphrase_enabled 等会在设备端变化的字段；hw/coprocessor 提供 serialNo / bleName。
    * versions 为空时按字段级合并保留旧值，verify 数据不会被降级。
    */
-  private async _refreshProtocolV2Status() {
+  private async _refreshProtocolV2Status(options?: InitOptions) {
     try {
       const deviceInfo = await requestProtocolV2DeviceInfo({
         commands: this.commands,
         request: PROTOCOL_V2_STATUS_DEVICE_INFO_REQUEST,
+        timeoutMs: options?.protocolV2DeviceInfoTimeoutMs,
       });
       const features = this.updateProtocolV2Features(deviceInfo);
       Log.debug('Protocol V2 features (status refresh):', features);

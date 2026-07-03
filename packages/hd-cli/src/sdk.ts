@@ -22,6 +22,7 @@ export interface SDKOptions {
   connectId?: string;
   passphraseState?: string;
   useEmptyPassphrase?: boolean;
+  debug?: boolean;
 }
 
 /**
@@ -183,7 +184,7 @@ function registerEventHandlers(sdk: typeof HardwareSDK): void {
 
 async function initSDK(): Promise<typeof HardwareSDK> {
   const settings: Partial<ConnectSettings> = {
-    debug: false,
+    debug: currentOpts.debug ?? false,
     fetchConfig: true,
     env: 'node-usb',
   };

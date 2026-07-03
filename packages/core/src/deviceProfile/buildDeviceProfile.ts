@@ -26,6 +26,7 @@ import type {
 } from '../types/api/getDeviceInfo';
 import type { Features, OnekeyFeatures } from '../types';
 import type { DeviceFirmwareImageInfo, ProtocolV2DeviceInfo } from '@onekeyfe/hd-transport';
+import { isProtocolV2BootloaderDeviceInfo } from '../protocols/protocol-v2/features';
 
 type BuildProtocolV1ProfileParams = {
   protocol?: DeviceInfoProtocol;
@@ -86,6 +87,7 @@ const getDeviceMode = (features?: Features): DeviceInfoStatus['mode'] => {
 };
 
 const getProtocolV2Mode = (deviceInfo?: ProtocolV2DeviceInfo): DeviceInfoStatus['mode'] => {
+  if (isProtocolV2BootloaderDeviceInfo(deviceInfo)) return 'bootloader';
   const initialized = deviceInfo?.status?.init_states;
   if (initialized === false) return 'notInitialized';
   if (initialized === true) return 'normal';
@@ -184,10 +186,11 @@ const normalizeV1Status = (features?: Features): DeviceInfoStatus => ({
 
 const normalizeV2Status = (deviceInfo?: ProtocolV2DeviceInfo): DeviceInfoStatus => {
   const status = deviceInfo?.status;
+  const bootloaderMode = isProtocolV2BootloaderDeviceInfo(deviceInfo);
   return {
     mode: getProtocolV2Mode(deviceInfo),
     initialized: status?.init_states ?? null,
-    bootloaderMode: false,
+    bootloaderMode,
     unlocked: status?.unlocked ?? null,
     passphraseProtection: status?.passphrase_enabled ?? null,
     attachToPinEnabled: status?.attach_to_pin_enabled ?? null,

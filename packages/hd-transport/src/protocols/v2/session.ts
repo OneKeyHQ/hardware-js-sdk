@@ -229,11 +229,10 @@ export async function withProtocolTimeout<T>(
   }
 }
 
-// Watchdog for the write phase only. Writing a single frame (max 4608 bytes)
-// is a bounded transport operation, unlike the read phase where long-running
-// device operations (firmware install, user confirmation) can legitimately
-// take minutes — so no default timeout is applied to reads.
-export const PROTOCOL_V2_WRITE_WATCHDOG_TIMEOUT_MS = 30000;
+// Write completion is owned by the concrete transport. A Promise.race watchdog
+// here can return while libusb/WebUSB is still flushing a large Protocol V2
+// frame, which desynchronizes later request/response pairs.
+export const PROTOCOL_V2_WRITE_WATCHDOG_TIMEOUT_MS = 0;
 
 export class ProtocolV2Session {
   private readonly options: ProtocolV2SessionOptions;

@@ -50,6 +50,9 @@ export const getProtocolV2SeState = (se?: DeviceSEInfo): ProtocolV2SeStateLabel 
 export const getProtocolV2SeType = (se?: DeviceSEInfo): string | null =>
   normalizeEnumValue(DeviceSeType, se?.type);
 
+export const isProtocolV2BootloaderDeviceInfo = (deviceInfo?: ProtocolV2DeviceInfo | null) =>
+  !!deviceInfo && deviceInfo.status == null;
+
 export const PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST = {
   targets: {
     hw: true,

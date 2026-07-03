@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import { Command } from 'commander';
 
 import { createSDK, disposeSDK } from './sdk';
@@ -80,6 +82,7 @@ program.option(
 );
 program.option('--passphrase-state <state>', 'Passphrase state for hidden wallet access');
 program.option('--use-empty-passphrase', 'Use standard wallet (skip passphrase prompt)');
+program.option('--debug', 'Enable SDK debug logs');
 
 // ============================================================
 // Device Commands
@@ -549,6 +552,29 @@ program
           'BLE firmware update via CLI is not supported. Please use the OneKey App or https://firmware.onekey.so/ to update firmware.',
         code: 'FIRMWARE_UPDATE_NOT_SUPPORTED',
       },
+    })
+  );
+
+program
+  .command('firmware-update-v4-debug')
+  .description('Debug Protocol V2 firmware update through sdk.firmwareUpdateV4')
+  .option('--chunk-size <bytes>', 'Transfer chunk size in bytes')
+  .option('--resource <path>', 'FW_MGMT_TARGET_RESOURCE binary path')
+  .option('--romloader <path>', 'FW_MGMT_TARGET_ROMLOADER binary path')
+  .option('--bootloader <path>', 'FW_MGMT_TARGET_BOOTLOADER binary path')
+  .option('--application-p1 <path>', 'FW_MGMT_TARGET_APPLICATION_P1 binary path')
+  .option('--application-p2 <path>', 'FW_MGMT_TARGET_APPLICATION_P2 binary path')
+  .option('--coprocessor <path>', 'FW_MGMT_TARGET_COPROCESSOR binary path')
+  .option('--se01 <path>', 'FW_MGMT_TARGET_SE01 binary path')
+  .option('--se02 <path>', 'FW_MGMT_TARGET_SE02 binary path')
+  .option('--se03 <path>', 'FW_MGMT_TARGET_SE03 binary path')
+  .option('--se04 <path>', 'FW_MGMT_TARGET_SE04 binary path')
+  .option('--forced-update-res', 'Force resource update')
+  .action(opts =>
+    runCommand({}, async ({ sdk, globalOpts }) => {
+      const params = buildFirmwareUpdateV4DebugParams(opts);
+      const result = await sdk.firmwareUpdateV4(globalOpts.connectId, params);
+      outputResult(globalOpts, result);
     })
   );
 
@@ -1117,6 +1143,64 @@ function safeJsonParse(input: string, label: string): unknown {
     (err as Error & { code?: string }).code = 'INVALID_JSON';
     throw err;
   }
+}
+
+function readBinaryParam(path: string): ArrayBuffer {
+  const buffer = readFileSync(path);
+  return new Uint8Array(buffer).buffer;
+}
+
+function buildFirmwareUpdateV4DebugParams(opts: {
+  chunkSize?: string;
+  resource?: string;
+  romloader?: string;
+  bootloader?: string;
+  applicationP1?: string;
+  applicationP2?: string;
+  coprocessor?: string;
+  se01?: string;
+  se02?: string;
+  se03?: string;
+  se04?: string;
+  forcedUpdateRes?: boolean;
+}) {
+  const params = {
+    platform: 'desktop' as const,
+    connectProtocol: 'V2' as const,
+    chunkSize: opts.chunkSize ? safeParseInt(opts.chunkSize, '--chunk-size') : undefined,
+    forcedUpdateRes: opts.forcedUpdateRes,
+    resourceBinary: opts.resource ? readBinaryParam(opts.resource) : undefined,
+    romloaderBinary: opts.romloader ? readBinaryParam(opts.romloader) : undefined,
+    bootloaderBinary: opts.bootloader ? readBinaryParam(opts.bootloader) : undefined,
+    applicationP1Binary: opts.applicationP1 ? readBinaryParam(opts.applicationP1) : undefined,
+    applicationP2Binary: opts.applicationP2 ? readBinaryParam(opts.applicationP2) : undefined,
+    coprocessorBinary: opts.coprocessor ? readBinaryParam(opts.coprocessor) : undefined,
+    se01Binary: opts.se01 ? readBinaryParam(opts.se01) : undefined,
+    se02Binary: opts.se02 ? readBinaryParam(opts.se02) : undefined,
+    se03Binary: opts.se03 ? readBinaryParam(opts.se03) : undefined,
+    se04Binary: opts.se04 ? readBinaryParam(opts.se04) : undefined,
+  };
+
+  const hasPayload = [
+    params.resourceBinary,
+    params.romloaderBinary,
+    params.bootloaderBinary,
+    params.applicationP1Binary,
+    params.applicationP2Binary,
+    params.coprocessorBinary,
+    params.se01Binary,
+    params.se02Binary,
+    params.se03Binary,
+    params.se04Binary,
+  ].some(Boolean);
+
+  if (!hasPayload) {
+    const err = new Error('firmware-update-v4-debug requires at least one binary path');
+    (err as Error & { code?: string }).code = 'MISSING_FIRMWARE_BINARY';
+    throw err;
+  }
+
+  return params;
 }
 
 /**

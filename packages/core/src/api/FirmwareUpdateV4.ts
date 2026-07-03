@@ -49,10 +49,14 @@ const PROTOCOL_V2_TARGET_STATUS_FAILED_MIN = 3;
 const PROTOCOL_V2_CONNECT_PROTOCOL = 'V2';
 const PROTOCOL_V2_FIRMWARE_STAGING_VOLUME = 'vol1:';
 const PROTOCOL_V2_MIN_FILE_CHUNK_SIZE = 64;
+const PROTOCOL_V2_CONNECT_RETRY_COUNT = 10;
+const PROTOCOL_V2_CONNECT_POLL_INTERVAL = 500;
+const PROTOCOL_V2_CONNECT_SINGLE_TIMEOUT = 75 * 1000;
+const PROTOCOL_V2_DEVICE_INFO_READY_TIMEOUT = 60 * 1000;
 
 type ProtocolV2FirmwareUpdateStatusTarget = {
-  target_id: number;
-  status?: number;
+  target_id: number | string;
+  status?: number | string;
   payload_version?: number;
   path?: string;
 };
@@ -125,6 +129,23 @@ const PROTOCOL_V2_REMOTE_COMPONENT_TARGETS: Readonly<
   },
 };
 
+const PROTOCOL_V2_TARGET_ID_VALUES = new Map<string, number>(
+  Object.entries(ProtocolV2FirmwareTargetType).map(([key, value]) => [key, value])
+);
+const PROTOCOL_V2_TARGET_STATUS_VALUES = new Map<string, number>([
+  ['FW_MGMT_UPDATER_TASK_STATUS_PENDING', PROTOCOL_V2_TARGET_STATUS_PENDING],
+  ['FW_MGMT_UPDATER_TASK_STATUS_IN_PROGRESS', PROTOCOL_V2_TARGET_STATUS_IN_PROGRESS],
+  ['FW_MGMT_UPDATER_TASK_STATUS_FINISHED', PROTOCOL_V2_TARGET_STATUS_FINISHED],
+  ['FW_MGMT_UPDATER_TASK_STATUS_FAILED_FILE_NOT_FOUND', 3],
+  ['FW_MGMT_UPDATER_TASK_STATUS_FAILED_FILE_READ', 4],
+  ['FW_MGMT_UPDATER_TASK_STATUS_FAILED_FILE_WRITE', 5],
+  ['FW_MGMT_UPDATER_TASK_STATUS_FAILED_VERIFY', 6],
+  ['FW_MGMT_UPDATER_TASK_STATUS_FAILED_INSTALL', 7],
+  ['FW_MGMT_UPDATER_TASK_STATUS_FAILED_ABORT', 8],
+  ['FW_MGMT_UPDATER_TASK_STATUS_FAILED_BUSY', 9],
+  ['FW_MGMT_UPDATER_TASK_STATUS_FAILED_ENTRY_OUT_OF_BOUNDS', 10],
+]);
+
 const isProtocolV2ReconnectProbeError = (error: unknown) => {
   const message = getProtocolV2UnknownErrorText(error).toLowerCase();
   return (
@@ -138,10 +159,56 @@ const isProtocolV2PollingTransientError = (error: unknown) => {
   return (
     isProtocolV2DeviceDisconnectedError(error) ||
     isProtocolV2ReconnectProbeError(error) ||
+    message.includes('libusb_transfer_timed_out') ||
     (message.includes('response timeout') && message.includes('devicefirmwareupdatestatusget')) ||
     message.includes('device not found') ||
     message.includes('transportnotfound')
   );
+};
+
+const isProtocolV2StartUpdateTransientError = (error: unknown) => {
+  const message = getProtocolV2UnknownErrorText(error).toLowerCase();
+  return (
+    isProtocolV2DeviceDisconnectedError(error) ||
+    isProtocolV2ReconnectProbeError(error) ||
+    message.includes('libusb_transfer_timed_out') ||
+    (message.includes('response timeout') && message.includes('devicefirmwareupdaterequest'))
+  );
+};
+
+const isProtocolV2TargetStatusFinished = (status: ProtocolV2FirmwareUpdateStatusTarget['status']) =>
+  normalizeProtocolV2TargetStatus(status) === PROTOCOL_V2_TARGET_STATUS_FINISHED;
+
+const isProtocolV2TargetStatusInProgress = (
+  status: ProtocolV2FirmwareUpdateStatusTarget['status']
+) =>
+  normalizeProtocolV2TargetStatus(status) === PROTOCOL_V2_TARGET_STATUS_PENDING ||
+  normalizeProtocolV2TargetStatus(status) === PROTOCOL_V2_TARGET_STATUS_IN_PROGRESS;
+
+const isProtocolV2TargetStatusFailed = (status: ProtocolV2FirmwareUpdateStatusTarget['status']) => {
+  const normalizedStatus = normalizeProtocolV2TargetStatus(status);
+  return (
+    typeof normalizedStatus === 'number' && normalizedStatus >= PROTOCOL_V2_TARGET_STATUS_FAILED_MIN
+  );
+};
+
+const normalizeProtocolV2TargetId = (targetId: number | string) => {
+  if (typeof targetId === 'number') {
+    return targetId;
+  }
+  return PROTOCOL_V2_TARGET_ID_VALUES.get(targetId);
+};
+
+const normalizeProtocolV2TargetStatus = (
+  status: ProtocolV2FirmwareUpdateStatusTarget['status']
+) => {
+  if (typeof status === 'number') {
+    return status;
+  }
+  if (typeof status === 'string') {
+    return PROTOCOL_V2_TARGET_STATUS_VALUES.get(status);
+  }
+  return undefined;
 };
 
 /**
@@ -150,7 +217,7 @@ const isProtocolV2PollingTransientError = (error: unknown) => {
  * It intentionally does not fall back to FirmwareUpdateV3/V1 behavior:
  * - upload uses FilesystemFileWrite
  * - install uses DeviceFirmwareUpdateRequest
- * - completion reboots to normal, then polls Ping
+ * - completion waits for target status to finish, reboots to normal, then polls DeviceInfo
  */
 export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareUpdateV4Params> {
   init() {
@@ -160,6 +227,19 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     this.skipForceUpdateCheck = true;
 
     const { payload } = this;
+
+    if (typeof payload.retryCount !== 'number') {
+      payload.retryCount = PROTOCOL_V2_CONNECT_RETRY_COUNT;
+    }
+    if (typeof payload.pollIntervalTime !== 'number') {
+      payload.pollIntervalTime = PROTOCOL_V2_CONNECT_POLL_INTERVAL;
+    }
+    if (typeof payload.timeout !== 'number') {
+      payload.timeout = PROTOCOL_V2_CONNECT_SINGLE_TIMEOUT;
+    }
+    if (typeof payload.protocolV2DeviceInfoTimeoutMs !== 'number') {
+      payload.protocolV2DeviceInfoTimeoutMs = PROTOCOL_V2_DEVICE_INFO_READY_TIMEOUT;
+    }
 
     validateParams(payload, [
       { name: 'chunkSize', type: 'number' },
@@ -258,6 +338,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       );
     }
 
+    await this.enterProtocolV2BootloaderMode();
+
     await this.executeProtocolV2Update({
       resourceBinary,
       fwBinaryMap,
@@ -274,12 +356,12 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   }
 
   private async getProtocolV2DeviceFeatures(): Promise<Features> {
+    if (this.device.features) {
+      return this.device.features;
+    }
     if (typeof this.device.getFeatures === 'function') {
       const features = await this.device.getFeatures();
       if (features) return features;
-    }
-    if (this.device.features) {
-      return this.device.features;
     }
     throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Device features not available');
   }
@@ -322,7 +404,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return orderedKeys
       .map(key => {
         const component = components[key];
-        return component ? [key, component] as const : undefined;
+        return component ? ([key, component] as const) : undefined;
       })
       .filter((entry): entry is readonly [string, IProtocolV2FirmwareComponent] => !!entry);
   }
@@ -399,11 +481,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       this.postTipMessage(FirmwareUpdateTipMessage.AutoRebootToBootloader);
       await this.protocolV2Reboot(DeviceRebootType.Bootloader);
       this.postTipMessage(FirmwareUpdateTipMessage.GoToBootloaderSuccess);
-      this.checkDeviceToBootloader(this.payload.connectId);
-      await this.checkPromise?.promise;
-      this.checkPromise = null;
-      await wait(1500);
-      await this.device.acquire?.();
+      await wait(1000);
+      await this.waitForProtocolV2BootloaderMode();
       return true;
     } catch (error) {
       if (error instanceof HardwareError) {
@@ -412,6 +491,40 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       Log.log('Protocol V2 auto go to bootloader mode failed: ', error);
       throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateAutoEnterBootFailure);
     }
+  }
+
+  private async waitForProtocolV2BootloaderMode(
+    timeout = PROTOCOL_V2_BOOTLOADER_RECONNECT_TIMEOUT,
+    retryInterval = 1000
+  ) {
+    const startTime = Date.now();
+    let lastError: unknown;
+
+    while (Date.now() - startTime < timeout) {
+      try {
+        await this.reconnectProtocolV2Device();
+        const deviceInfo = await requestProtocolV2DeviceInfo({
+          commands: this.device.getCommands(),
+          timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
+        });
+        const features = this.device.updateProtocolV2Features(deviceInfo);
+        if (features?.bootloaderMode) {
+          return features;
+        }
+        lastError = new Error('Protocol V2 device is reachable but is not in bootloader mode');
+      } catch (error) {
+        lastError = error;
+        Log.log('Protocol V2 bootloader mode not ready, polling reconnect: ', error);
+      }
+      await wait(retryInterval);
+    }
+
+    throw ERRORS.TypedError(
+      HardwareErrorCode.FirmwareUpdateAutoEnterBootFailure,
+      `Protocol V2 bootloader not ready within ${timeout / 1000}s: ${this.normalizeErrorMessage(
+        lastError
+      )}`
+    );
   }
 
   /**
@@ -553,9 +666,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   ) {
     const failedTarget = statusTargets.find(
       target =>
-        expectedTargetIds.has(target.target_id) &&
-        typeof target.status === 'number' &&
-        target.status >= PROTOCOL_V2_TARGET_STATUS_FAILED_MIN
+        expectedTargetIds.has(normalizeProtocolV2TargetId(target.target_id) ?? -1) &&
+        isProtocolV2TargetStatusFailed(target.status)
     );
     if (failedTarget) {
       throw ERRORS.TypedError(
@@ -566,8 +678,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
     const completedTargets = statusTargets.filter(
       target =>
-        expectedTargetIds.has(target.target_id) &&
-        target.status === PROTOCOL_V2_TARGET_STATUS_FINISHED
+        expectedTargetIds.has(normalizeProtocolV2TargetId(target.target_id) ?? -1) &&
+        isProtocolV2TargetStatusFinished(target.status)
     );
     if (completedTargets.length === expectedTargetIds.size && expectedTargetIds.size > 0) {
       return true;
@@ -575,9 +687,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
     const inProgressTarget = statusTargets.find(
       target =>
-        expectedTargetIds.has(target.target_id) &&
-        (target.status === PROTOCOL_V2_TARGET_STATUS_PENDING ||
-          target.status === PROTOCOL_V2_TARGET_STATUS_IN_PROGRESS)
+        expectedTargetIds.has(normalizeProtocolV2TargetId(target.target_id) ?? -1) &&
+        isProtocolV2TargetStatusInProgress(target.status)
     );
     if (inProgressTarget) {
       this.postProgressMessage(99, 'installingFirmware');
@@ -591,9 +702,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     startResponse?: ProtocolV2FirmwareUpdateStartResponse
   ) {
     const expectedTargetIds = new Set(targets.map(target => target.target_id));
-    if (startResponse?.type === 'Success') {
-      return;
-    }
     if (startResponse?.type === 'DeviceFirmwareUpdateStatus') {
       const statusTargets = (startResponse.message.records ??
         []) as ProtocolV2FirmwareUpdateStatusTarget[];
@@ -687,7 +795,14 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           // 更新完成判定只需要各 target 版本号；scope 与请求内容保持一致
           request: PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST,
         });
-        return this.device.updateProtocolV2Features(deviceInfo);
+        const features = this.device.updateProtocolV2Features(deviceInfo);
+        if (features.bootloaderMode || features.mode === 'bootloader') {
+          throw ERRORS.TypedError(
+            HardwareErrorCode.DeviceNotFound,
+            'Protocol V2 device is still in bootloader mode'
+          );
+        }
+        return features;
       } catch (error) {
         lastError = error;
         Log.log('Protocol V2 normal mode not ready, polling Ping: ', error);
@@ -712,15 +827,34 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const deviceDiff = await this.device.deviceConnector?.enumerate();
     const devicesDescriptor = deviceDiff?.descriptors ?? [];
 
+    if (
+      DataManager.isBrowserWebUsb(DataManager.getSettings('env')) &&
+      devicesDescriptor.length === 1
+    ) {
+      this.device.updateDescriptor(
+        {
+          ...devicesDescriptor[0],
+          protocolType: PROTOCOL_V2_CONNECT_PROTOCOL,
+        },
+        true
+      );
+      await this.device.acquire(PROTOCOL_V2_CONNECT_PROTOCOL, { throwOnRunPromiseError: true });
+      this.device.commands.disposed = false;
+      this.device.getCommands().mainId = this.device.mainId ?? '';
+      await this.device.initialize();
+      return;
+    }
+
     const { deviceList } = await DevicePool.getDevices(devicesDescriptor, this.connectId);
     if (deviceList.length !== 1) {
       throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound);
     }
 
     this.device.updateFromCache(deviceList[0]);
-    await this.device.acquire();
+    await this.device.acquire(PROTOCOL_V2_CONNECT_PROTOCOL, { throwOnRunPromiseError: true });
     this.device.commands.disposed = false;
     this.device.getCommands().mainId = this.device.mainId ?? '';
+    await this.device.initialize();
   }
 
   private async protocolV2CommonUpdateProcess({
@@ -870,8 +1004,11 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         }
       );
     } catch (error) {
-      if (isProtocolV2DeviceDisconnectedError(error)) {
-        Log.log('Rebooting device');
+      if (isProtocolV2StartUpdateTransientError(error)) {
+        Log.log(
+          'Protocol V2 firmware update request did not return; continue status polling',
+          error
+        );
       } else {
         throw error;
       }

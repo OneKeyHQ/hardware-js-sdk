@@ -15,6 +15,10 @@ export interface CommonParams {
    */
   timeout?: number;
   /**
+   * Protocol V2 初始化阶段 DeviceInfoGet 超时时间
+   */
+  protocolV2DeviceInfoTimeoutMs?: number;
+  /**
    * passphrase state
    */
   passphraseState?: string;

@@ -44,7 +44,7 @@ const SERIAL_READ_TIMEOUT_MS = 5000;
 /** Packet I/O retry configuration (matches WebUsbTransport) */
 const PACKET_IO_MAX_RETRIES = 3;
 const PACKET_IO_RETRY_DELAY = 300;
-const PROTOCOL_PROBE_TIMEOUT = 1000;
+const PROTOCOL_PROBE_TIMEOUT = 5000;
 
 /**
  * Opened device state — holds the USB device, claimed interface, and endpoints.
@@ -151,32 +151,6 @@ function transferOutOnce(ep: usb.OutEndpoint, data: Buffer): Promise<void> {
       if (err) return reject(err);
       resolve();
     });
-  });
-}
-
-function resetUsbDevice(dev: usb.Device): Promise<void> {
-  return new Promise(resolve => {
-    const reset = (dev as usb.Device & { reset?: (callback: (err?: Error) => void) => void }).reset;
-    if (typeof reset !== 'function') {
-      resolve();
-      return;
-    }
-    reset.call(dev, () => resolve());
-  });
-}
-
-function clearEndpointHalt(ep: usb.InEndpoint | usb.OutEndpoint): Promise<void> {
-  return new Promise(resolve => {
-    const clearHalt = (
-      ep as (usb.InEndpoint | usb.OutEndpoint) & {
-        clearHalt?: (callback: (err?: Error) => void) => void;
-      }
-    ).clearHalt;
-    if (typeof clearHalt !== 'function') {
-      resolve();
-      return;
-    }
-    clearHalt.call(ep, () => resolve());
   });
 }
 
@@ -515,6 +489,11 @@ export default class NodeUsbTransport {
     );
   }
 
+  private isUsbTransferTimeout(error: unknown): boolean {
+    const message = this.getErrorMessage(error).toLowerCase();
+    return message.includes('timeout') || message.includes('timed_out');
+  }
+
   private getDeviceInterface(dev: usb.Device): usb.Interface {
     const { interfaces } = dev;
     if (!interfaces?.length) {
@@ -629,7 +608,8 @@ export default class NodeUsbTransport {
   private async transferInWithRetry(
     path: string,
     openDev: OpenDevice,
-    length: number
+    length: number,
+    options?: { waitIndefinitelyOnTimeout?: boolean }
   ): Promise<Buffer> {
     let lastError: unknown;
     let currentDev = openDev;
@@ -641,6 +621,10 @@ export default class NodeUsbTransport {
         return await transferInOnce(currentDev.epIn, length);
       } catch (error) {
         lastError = error;
+        if (options?.waitIndefinitelyOnTimeout && this.isUsbTransferTimeout(error)) {
+          attempt -= 1;
+          continue;
+        }
         const shouldRetry = attempt < PACKET_IO_MAX_RETRIES && this.isRetryableError(error);
         if (!shouldRetry) {
           throw error;
@@ -680,15 +664,6 @@ export default class NodeUsbTransport {
       dev.open();
       dev.timeout = TRANSFER_TIMEOUT_MS;
 
-      await resetUsbDevice(dev);
-
-      try {
-        dev.open();
-      } catch {
-        // libusb keeps some devices open across reset; continue with the current handle.
-      }
-      dev.timeout = TRANSFER_TIMEOUT_MS;
-
       const iface = this.getDeviceInterface(dev);
 
       // On Linux, detach kernel driver if active
@@ -723,8 +698,6 @@ export default class NodeUsbTransport {
       epIn.timeout = TRANSFER_TIMEOUT_MS;
       epOut.timeout = TRANSFER_TIMEOUT_MS;
 
-      await clearEndpointHalt(epIn);
-      await clearEndpointHalt(epOut);
       await this.drainStaleInput(epIn);
 
       this.openDevices.set(path, { device: dev, iface, epIn, epOut });
@@ -943,7 +916,8 @@ export default class NodeUsbTransport {
       const transferIn = this.transferInWithRetry(
         path,
         this.getOpenDevice(path),
-        PROTOCOL_V2_FRAME_MAX_BYTES
+        PROTOCOL_V2_FRAME_MAX_BYTES,
+        { waitIndefinitelyOnTimeout: !deadline }
       );
       const packet = deadline
         ? await this.withProtocolReadTimeout(

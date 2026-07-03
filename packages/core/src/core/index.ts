@@ -95,6 +95,7 @@ const parseInitOptions = (method?: BaseMethod): InitOptions => ({
   deviceId: method?.payload.deviceId,
   deriveCardano: method && hasDeriveCardano(method),
   connectProtocol: method?.payload.connectProtocol,
+  protocolV2DeviceInfoTimeoutMs: method?.payload.protocolV2DeviceInfoTimeoutMs,
 });
 
 let _core: Core;

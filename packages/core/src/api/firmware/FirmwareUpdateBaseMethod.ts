@@ -138,6 +138,8 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
     // check device goto bootloader mode
     let isFirstCheck = true;
     let checkCount = 0;
+    let hasPromptedWebDevice = false;
+    let isPromptingWebDevice = false;
     // eslint-disable-next-line prefer-const
     let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -158,23 +160,28 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
         if (
           checkCount > 4 &&
           DataManager.isBrowserWebUsb(DataManager.getSettings('env')) &&
-          !this.payload.skipWebDevicePrompt
+          !this.payload.skipWebDevicePrompt &&
+          !hasPromptedWebDevice &&
+          !isPromptingWebDevice
         ) {
-          clearInterval(intervalTimer);
-          clearTimeout(timeoutTimer);
-
+          isPromptingWebDevice = true;
           try {
             this.postTipMessage(FirmwareUpdateTipMessage.SelectDeviceInBootloaderForWebDevice);
             const confirmed = await this._promptDeviceInBootloaderForWebDevice();
+            hasPromptedWebDevice = true;
             if (confirmed) {
               await this._checkDeviceInBootloaderMode(connectId, intervalTimer, timeoutTimer);
             }
           } catch (e) {
+            clearInterval(intervalTimer);
+            clearTimeout(timeoutTimer);
             Log.log(
               'FirmwareUpdateBaseMethod [checkDeviceToBootloader] _promptDeviceInBootloaderForWebDevice failed: ',
               e
             );
             this.checkPromise?.reject(e);
+          } finally {
+            isPromptingWebDevice = false;
           }
           return;
         }

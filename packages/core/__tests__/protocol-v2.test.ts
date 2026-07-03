@@ -47,10 +47,7 @@ import {
   PROTOCOL_V2_DEVICE_INFO_TIMEOUT_MS,
   requestProtocolV2DeviceInfo,
 } from '../src/protocols/protocol-v2/features';
-import {
-  buildProfileFromProtocolV2,
-  buildProtocolV2FeaturesPayload,
-} from '../src/deviceProfile';
+import { buildProfileFromProtocolV2, buildProtocolV2FeaturesPayload } from '../src/deviceProfile';
 import {
   getDeviceType,
   getFirmwareType,
@@ -95,8 +92,7 @@ function stubDevice<T extends Record<string, any>>(device: T): T {
   d.getCurrentSafetyChecks ??= () => d.features?.safetyChecks;
   d.getCurrentDeviceId ??= () => d.features?.deviceId || undefined;
   d.getCurrentSerialNo ??= () => d.features?.serialNo || '';
-  d.getCurrentPassphraseProtection ??= () =>
-    d.features?.passphraseProtection;
+  d.getCurrentPassphraseProtection ??= () => d.features?.passphraseProtection;
   d.getCurrentMethodVersionRange ??= (fn: (model: any) => any) => {
     const deviceType = d.getCurrentDeviceType();
     const range = fn(deviceType);
@@ -114,6 +110,18 @@ function stubDevice<T extends Record<string, any>>(device: T): T {
 function normalizeProtocolV2Features(_descriptor: unknown, deviceInfo?: ProtocolV2DeviceInfo) {
   return buildProtocolV2FeaturesPayload(deviceInfo);
 }
+
+const protocolV2BootloaderDeviceInfo: ProtocolV2DeviceInfo = {
+  protocol_version: 1,
+  hw: {
+    serial_no: 'PR9999999999',
+  },
+  fw: {
+    bootloader: {
+      version: '0.0.1',
+    },
+  },
+};
 
 async function requestProtocolV2Features({
   commands,
@@ -207,6 +215,28 @@ describe('Protocol V2 feature adapter', () => {
     expect(features.attachToPinEnabled).toBe(true);
     expect(features.unlockedAttachPin).toBe(true);
     expect(features.bleEnabled).toBeNull();
+  });
+
+  test('marks Protocol V2 DeviceInfo without status as bootloader mode', () => {
+    const deviceInfo = {
+      protocol_version: 1,
+      hw: {
+        serial_no: 'PR2BOOT',
+      },
+      fw: {
+        bootloader: {
+          version: '0.2.0',
+        },
+      },
+    };
+    const features = normalizeProtocolV2Features(descriptor as any, deviceInfo);
+    const profile = buildProfileFromProtocolV2({ deviceInfo });
+
+    expect(features.mode).toBe('bootloader');
+    expect(features.bootloaderMode).toBe(true);
+    expect(features.initialized).toBeNull();
+    expect(profile.status.mode).toBe('bootloader');
+    expect(profile.status.bootloaderMode).toBe(true);
   });
 
   test('uses DeviceSessionGet for Protocol V2 passphrase sessions', async () => {
@@ -1718,7 +1748,13 @@ describe('Protocol V2 firmware update targets', () => {
       originalDescriptor: { id: 'ble-id', path: 'ble-path', protocolType: 'V2' },
       deviceConnector: { acquire },
       getCommands: () => commands,
-      _updateFeatures: jest.fn(),
+      updateProtocolV2Features: jest.fn(() => ({
+        bootloaderMode: false,
+        mode: 'normal',
+        firmwareVersion: '0.0.0',
+        bootloaderVersion: '0.0.0',
+        bleVersion: '0.0.0',
+      })),
     });
 
     const versions = await (method as any).waitForProtocolV2FinalFeatures();
@@ -1756,7 +1792,7 @@ describe('Protocol V2 firmware update targets', () => {
     });
   });
 
-  test('skips automatic Protocol V2 bootloader entry before upload while boot flow is disabled', async () => {
+  test('enters Protocol V2 bootloader before upload', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -1791,6 +1827,7 @@ describe('Protocol V2 firmware update targets', () => {
 
     await method.run();
 
+    expect((method as any).enterProtocolV2BootloaderMode).toHaveBeenCalledTimes(1);
     expect((method as any).executeProtocolV2Update).toHaveBeenCalledWith({
       resourceBinary: null,
       fwBinaryMap: [
@@ -1802,7 +1839,6 @@ describe('Protocol V2 firmware update targets', () => {
       ],
       bootloaderBinary: null,
     });
-    expect((method as any).enterProtocolV2BootloaderMode).not.toHaveBeenCalled();
   });
 
   test('reboots Protocol V2 normal-mode device to bootloader before transfer', async () => {
@@ -1812,19 +1848,25 @@ describe('Protocol V2 firmware update targets', () => {
         method: 'firmwareUpdateV4',
       },
     });
-    const acquire = jest.fn().mockResolvedValue(undefined);
     (method as any).device = stubDevice({
       originalDescriptor: { id: 'usb-id', path: 'usb-path', protocolType: 'V2' },
       features: { bootloader_mode: false, capabilities: [] },
       isBootloader: () => false,
-      acquire,
     });
     (method as any).protocolV2Reboot = jest.fn().mockResolvedValue({
       message: 'Device rebooted successfully',
     });
-    (method as any).checkDeviceToBootloader = jest.fn(() => {
-      (method as any).checkPromise = { promise: Promise.resolve(true) };
+    (method as any).checkDeviceToBootloader = jest.fn();
+    const typedCall = jest.fn().mockResolvedValue({
+      type: 'DeviceInfo',
+      message: protocolV2BootloaderDeviceInfo,
     });
+    const reconnectProtocolV2Device = jest.fn().mockImplementation(() => {
+      (method as any).device.isBootloader = () => true;
+      return Promise.resolve();
+    });
+    (method as any).reconnectProtocolV2Device = reconnectProtocolV2Device;
+    (method as any).device.getCommands = () => ({ typedCall });
     method.postTipMessage = jest.fn();
 
     await (method as any).enterProtocolV2BootloaderMode();
@@ -1832,11 +1874,44 @@ describe('Protocol V2 firmware update targets', () => {
     expect(method.postTipMessage).toHaveBeenCalledWith('AutoRebootToBootloader');
     expect((method as any).protocolV2Reboot).toHaveBeenCalledWith(DeviceRebootType.Bootloader);
     expect(method.postTipMessage).toHaveBeenCalledWith('GoToBootloaderSuccess');
-    expect((method as any).checkDeviceToBootloader).toHaveBeenCalledWith(undefined);
-    expect(acquire).toHaveBeenCalledTimes(1);
+    expect((method as any).checkDeviceToBootloader).not.toHaveBeenCalled();
+    expect(reconnectProtocolV2Device).toHaveBeenCalledTimes(1);
   });
 
-  test('reboots Protocol V2 firmware flow back to normal before final feature polling', async () => {
+  test('polls until Protocol V2 bootloader descriptor is ready after reboot', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    (method as any).device = stubDevice({
+      originalDescriptor: { id: 'usb-id', path: 'app-path', protocolType: 'V2' },
+      features: { bootloader_mode: false, capabilities: [] },
+      isBootloader: () => false,
+    });
+    const typedCall = jest.fn().mockResolvedValue({
+      type: 'DeviceInfo',
+      message: protocolV2BootloaderDeviceInfo,
+    });
+    const reconnectProtocolV2Device = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('Device not found'))
+      .mockRejectedValueOnce(new Error('Device not found'))
+      .mockImplementation(() => {
+        (method as any).device.isBootloader = () => true;
+        return Promise.resolve();
+      });
+    (method as any).reconnectProtocolV2Device = reconnectProtocolV2Device;
+    (method as any).device.getCommands = () => ({ typedCall });
+
+    await (method as any).waitForProtocolV2BootloaderMode(60 * 1000, 0);
+
+    expect(reconnectProtocolV2Device).toHaveBeenCalledTimes(3);
+    expect(typedCall).toHaveBeenCalledTimes(1);
+  });
+
+  test('reboots Protocol V2 firmware flow back to normal after install status is finished', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -1926,6 +2001,29 @@ describe('Protocol V2 firmware update targets', () => {
     expect(method.postTipMessage).toHaveBeenCalledWith('FirmwareUpdating');
   });
 
+  test('continues Protocol V2 install polling when update request transfer times out', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const typedCall = jest.fn().mockRejectedValue(new Error('LIBUSB_TRANSFER_TIMED_OUT'));
+
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+    });
+    method.postTipMessage = jest.fn();
+
+    await expect(
+      (method as any).protocolV2StartFirmwareUpdate({
+        targets: [{ target_id: 10, path: 'vol1:resource.bin' }],
+      })
+    ).resolves.toBeUndefined();
+
+    expect(method.postTipMessage).toHaveBeenCalledWith('FirmwareUpdating');
+  });
+
   test('continues Protocol V2 install polling through temporary expected V2 probe failures', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
@@ -1974,15 +2072,33 @@ describe('Protocol V2 firmware update targets', () => {
     const expectedTargetIds = new Set([3]);
 
     expect(
+      (method as any).assertProtocolV2TargetStatus([{ target_id: 3, status: 2 }], expectedTargetIds)
+    ).toBe(true);
+    expect(
       (method as any).assertProtocolV2TargetStatus(
-        [{ target_id: 3, status: 2 }],
+        [{ target_id: 3, status: 'FW_MGMT_UPDATER_TASK_STATUS_FINISHED' }],
         expectedTargetIds
+      )
+    ).toBe(true);
+    expect(
+      (method as any).assertProtocolV2TargetStatus(
+        [
+          {
+            target_id: 'FW_MGMT_TARGET_RESOURCE',
+            status: 'FW_MGMT_UPDATER_TASK_STATUS_FINISHED',
+          },
+          { target_id: 'FW_MGMT_TARGET_SE04', status: 'FW_MGMT_UPDATER_TASK_STATUS_FINISHED' },
+        ],
+        new Set([10, 9])
       )
     ).toBe(true);
 
     expect(
+      (method as any).assertProtocolV2TargetStatus([{ target_id: 3, status: 1 }], expectedTargetIds)
+    ).toBe(false);
+    expect(
       (method as any).assertProtocolV2TargetStatus(
-        [{ target_id: 3, status: 1 }],
+        [{ target_id: 3, status: 'FW_MGMT_UPDATER_TASK_STATUS_IN_PROGRESS' }],
         expectedTargetIds
       )
     ).toBe(false);
@@ -1991,6 +2107,16 @@ describe('Protocol V2 firmware update targets', () => {
     try {
       (method as any).assertProtocolV2TargetStatus(
         [{ target_id: 3, status: 3 }],
+        expectedTargetIds
+      );
+      throw new Error('Expected Protocol V2 failed firmware status to throw');
+    } catch (error: any) {
+      expect(error.errorCode).toBe(HardwareErrorCode.FirmwareError);
+    }
+
+    try {
+      (method as any).assertProtocolV2TargetStatus(
+        [{ target_id: 3, status: 'FW_MGMT_UPDATER_TASK_STATUS_FAILED_VERIFY' }],
         expectedTargetIds
       );
       throw new Error('Expected Protocol V2 failed firmware status to throw');
@@ -2129,7 +2255,10 @@ describe('Protocol V2 firmware update targets', () => {
         'se02',
         'se03',
         'se04',
-      ].map((key, index) => [`https://example.com/${key}.pp.bin`, new Uint8Array([index + 1]).buffer])
+      ].map((key, index) => [
+        `https://example.com/${key}.pp.bin`,
+        new Uint8Array([index + 1]).buffer,
+      ])
     );
     const getSysResourceBinarySpy = jest
       .spyOn(firmwareBinaryApi, 'getSysResourceBinary')
@@ -2185,12 +2314,14 @@ describe('Protocol V2 firmware update targets', () => {
         },
       });
 
-    const remoteBinaries = await (method as any).prepareRemoteProtocolV2Binaries(
-      'universal',
-      { deviceType: 'pro2', firmwareVersion: '0.0.0' }
-    );
+    const remoteBinaries = await (method as any).prepareRemoteProtocolV2Binaries('universal', {
+      deviceType: 'pro2',
+      firmwareVersion: '0.0.0',
+    });
 
-    expect(remoteBinaries.bootloaderBinary).toBe(binaries.get('https://example.com/bootloader.pp.bin'));
+    expect(remoteBinaries.bootloaderBinary).toBe(
+      binaries.get('https://example.com/bootloader.pp.bin')
+    );
     expect(remoteBinaries.fwBinaryMap).toEqual([
       { fileName: 'application_p1.bin', binary: expect.anything(), targetId: 3 },
       { fileName: 'application_p2.bin', binary: expect.anything(), targetId: 4 },
@@ -2243,6 +2374,7 @@ describe('Protocol V2 firmware update targets', () => {
     });
     (method as any).prepareResourceBinary = jest.fn().mockResolvedValue(null);
     (method as any).prepareRemoteProtocolV2Binaries = jest.fn().mockResolvedValue(remoteBinaries);
+    (method as any).enterProtocolV2BootloaderMode = jest.fn().mockResolvedValue(true);
     (method as any).executeProtocolV2Update = jest.fn().mockResolvedValue(undefined);
     (method as any).exitProtocolV2BootloaderToNormal = jest.fn().mockResolvedValue(undefined);
     (method as any).waitForProtocolV2FinalFeatures = jest.fn().mockResolvedValue({
@@ -2279,6 +2411,7 @@ describe('Protocol V2 firmware update targets', () => {
     });
     (method as any).prepareResourceBinary = jest.fn().mockResolvedValue(null);
     (method as any).prepareRemoteProtocolV2Binaries = jest.fn();
+    (method as any).enterProtocolV2BootloaderMode = jest.fn().mockResolvedValue(true);
     (method as any).executeProtocolV2Update = jest.fn().mockResolvedValue(undefined);
     (method as any).exitProtocolV2BootloaderToNormal = jest.fn().mockResolvedValue(undefined);
     (method as any).waitForProtocolV2FinalFeatures = jest.fn().mockResolvedValue({
@@ -2332,8 +2465,8 @@ describe('Protocol V2 firmware update targets', () => {
     });
 
     const writePayloads = typedCall.mock.calls.map(call => call[2]);
-    expect(writePayloads.map(payload => payload.file.offset)).toEqual([0, 4096]);
-    expect(writePayloads.map(payload => payload.file.data.byteLength)).toEqual([4096, 1]);
+    expect(writePayloads.map(payload => payload.file.offset)).toEqual([0, 4000]);
+    expect(writePayloads.map(payload => payload.file.data.byteLength)).toEqual([4000, 97]);
     expect(writePayloads.map(payload => payload.overwrite)).toEqual([true, false]);
     expect(writePayloads.every(payload => payload.append === false)).toBe(true);
   });
@@ -2356,6 +2489,14 @@ describe('Protocol V2 firmware update targets', () => {
       }
       if (name === 'DeviceFirmwareUpdateRequest') {
         return Promise.resolve({ type: 'Success', message: { message: 'ok' } });
+      }
+      if (name === 'DeviceFirmwareUpdateStatusGet') {
+        return Promise.resolve({
+          type: 'DeviceFirmwareUpdateStatus',
+          message: {
+            records: [{ target_id: 3, status: 2 }],
+          },
+        });
       }
       return Promise.reject(new Error(`unexpected call ${name}`));
     });
@@ -2822,17 +2963,22 @@ describe('Protocol V2 file write method', () => {
     method.init();
     await method.run();
 
-    expect(typedCall).toHaveBeenCalledWith('FilesystemFileWrite', 'FilesystemFile', {
-      file: {
-        path: 'vol1:test.bin',
-        offset: 1,
-        total_size: 2,
-        data: new Uint8Array([1]),
+    expect(typedCall).toHaveBeenCalledWith(
+      'FilesystemFileWrite',
+      'FilesystemFile',
+      {
+        file: {
+          path: 'vol1:test.bin',
+          offset: 1,
+          total_size: 2,
+          data: new Uint8Array([1]),
+        },
+        overwrite: false,
+        append: false,
+        ui_percentage: 99,
       },
-      overwrite: false,
-      append: false,
-      ui_percentage: 99,
-    }, { timeoutMs: undefined });
+      { timeoutMs: undefined }
+    );
     expect(method.postMessage).toHaveBeenCalledWith({
       event: 'UI_EVENT',
       type: UI_REQUEST.DEVICE_PROGRESS,
@@ -2865,28 +3011,40 @@ describe('Protocol V2 file write method', () => {
     const result = await method.run();
 
     expect(typedCall).toHaveBeenCalledTimes(2);
-    expect(typedCall).toHaveBeenNthCalledWith(1, 'FilesystemFileWrite', 'FilesystemFile', {
-      file: {
-        path: 'vol1:test.bin',
-        offset: 0,
-        total_size: 4097,
-        data: data.slice(0, 4096),
+    expect(typedCall).toHaveBeenNthCalledWith(
+      1,
+      'FilesystemFileWrite',
+      'FilesystemFile',
+      {
+        file: {
+          path: 'vol1:test.bin',
+          offset: 0,
+          total_size: 4097,
+          data: data.slice(0, 4000),
+        },
+        overwrite: true,
+        append: false,
+        ui_percentage: 98,
       },
-      overwrite: true,
-      append: false,
-      ui_percentage: 99,
-    }, { timeoutMs: undefined });
-    expect(typedCall).toHaveBeenNthCalledWith(2, 'FilesystemFileWrite', 'FilesystemFile', {
-      file: {
-        path: 'vol1:test.bin',
-        offset: 4096,
-        total_size: 4097,
-        data: data.slice(4096),
+      { timeoutMs: undefined }
+    );
+    expect(typedCall).toHaveBeenNthCalledWith(
+      2,
+      'FilesystemFileWrite',
+      'FilesystemFile',
+      {
+        file: {
+          path: 'vol1:test.bin',
+          offset: 4000,
+          total_size: 4097,
+          data: data.slice(4000),
+        },
+        overwrite: false,
+        append: false,
+        ui_percentage: 99,
       },
-      overwrite: false,
-      append: false,
-      ui_percentage: 99,
-    }, { timeoutMs: undefined });
+      { timeoutMs: undefined }
+    );
     expect(result).toMatchObject({
       path: 'vol1:test.bin',
       processed_byte: 4097,
@@ -2896,8 +3054,8 @@ describe('Protocol V2 file write method', () => {
       event: 'UI_EVENT',
       type: UI_REQUEST.DEVICE_PROGRESS,
       payload: expect.objectContaining({
-        progress: 99,
-        transferredBytes: 4096,
+        progress: 97,
+        transferredBytes: 4000,
         totalBytes: 4097,
         elapsedMs: expect.any(Number),
       }),
