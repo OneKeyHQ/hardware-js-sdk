@@ -7,7 +7,7 @@ OneKey Hardware SDK 采用三层架构设计：
 ```
 应用层 (DApps)
     ↓
-SDK接口层 (@onekeyfe/core) 
+SDK接口层 (@onekeyfe/hd-core)
     ↓
 传输抽象层 (@onekeyfe/hd-transport)
     ↓
@@ -23,7 +23,7 @@ SDK接口层 (@onekeyfe/core)
 - **`@onekeyfe/hd-transport`** - 传输层抽象
 
 ### 传输层
-- **`@onekeyfe/hd-transport-webusb`** - WebUSB传输（浏览器）
+- **`@onekeyfe/hd-transport-web-device`** - WebUSB / WebHID 传输（浏览器）
 - **`@onekeyfe/hd-transport-usb`** - Node.js USB传输（CLI/服务端，基于 libusb）
 - **`@onekeyfe/hd-transport-http`** - HTTP Bridge传输
 - **`@onekeyfe/hd-transport-lowlevel`** - 低层传输（BLE 插件模式）
@@ -31,6 +31,14 @@ SDK接口层 (@onekeyfe/core)
 ### 平台SDK
 - **`@onekeyfe/hd-web-sdk`** - Web平台SDK
 - **`@onekeyfe/hd-ble-sdk`** - 移动端BLE SDK
+
+### Ledger 适配层（`hwk-*`）
+- **`@onekeyfe/hwk-adapter-core`** - 多厂商硬件适配层的共享类型、事件、错误码与 connector contract
+- **`@onekeyfe/hwk-ledger-adapter`** - Ledger 的统一钱包接口实现，封装设备发现、链方法调用、重试与指纹校验
+- **`@onekeyfe/hwk-ledger-connector-webhid`** - 浏览器 WebHID 连接器
+- **`@onekeyfe/hwk-ledger-connector-ble`** - React Native BLE 连接器
+
+这套 `hwk-*` 栈与 `@onekeyfe/hd-core` 主 SDK 并行存在，主要用于接入 Ledger 等多厂商设备；它不是 `hd-core` 的 transport 插件。宿主应用通常先选择 connector（WebHID 或 BLE），再创建 `LedgerAdapter`，并处理 `ui-request-device-permission`、`ui-request-device-connect`、`ui-request-install-app` 等交互事件。
 
 ### 示例应用
 - **`@onekeyfe/connect-examples`** - 集成示例
@@ -88,7 +96,7 @@ abstract class BaseMethod<Request, Response> {
 ```typescript
 // 根据环境选择传输方式
 switch(env) {
-  case 'webusb': return new WebUsbTransport();       // 浏览器 WebUSB
+  case 'web-device': return new WebUsbTransport();      // 浏览器 WebUSB / WebHID
   case 'node-usb': return new NodeUsbTransport();      // Node.js libusb (CLI)
   case 'lowlevel': return new LowlevelTransport();    // BLE 插件模式
   case 'http': return new HttpTransport();             // HTTP Bridge
@@ -106,10 +114,22 @@ switch(env) {
     │   └── @onekeyfe/hd-transport
     │
     └── 传输层实现
-        ├── @onekeyfe/hd-transport-webusb      (浏览器)
+        ├── @onekeyfe/hd-transport-web-device  (浏览器)
         ├── @onekeyfe/hd-transport-usb          (Node.js CLI)
         ├── @onekeyfe/hd-transport-lowlevel     (BLE 插件)
         └── @onekeyfe/hd-transport-http         (Bridge)
+```
+
+Ledger 适配层（并行架构）：
+
+```text
+宿主应用
+├── @onekeyfe/hwk-ledger-adapter
+│   └── @onekeyfe/hwk-adapter-core
+│
+└── 连接器实现
+    ├── @onekeyfe/hwk-ledger-connector-webhid   (Browser WebHID)
+    └── @onekeyfe/hwk-ledger-connector-ble      (React Native BLE)
 ```
 
 ## 🔧 开发工具

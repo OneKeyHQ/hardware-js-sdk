@@ -6,16 +6,20 @@ Hardware-js-sdk is designed to allow third-party developers to quickly access th
 
 | package                                                                     | description                                                           |
 | --------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| [@onekeyfe/core](./packages/core)                                           | The core process of hardware wallet connection.                       |
+| [@onekeyfe/hd-core](./packages/core)                                        | Core connection flows and chain APIs for OneKey hardware devices.     |
 | [@onekeyfe/hd-web-sdk](./packages/hd-web-sdk)                               | Using the sdk in the web platform.                                    |
 | [@onekeyfe/hd-ble-sdk](./packages/hd-ble-sdk)                               | Using the SDK in BLE communication environment. e.g: iOS / Android    |
-| [@onekeyfe/hd-common-sdk](./packages/hd-common-connect-sdk)                 | Using the SDK in a node or web-usb environment                        |
+| [@onekeyfe/hd-common-connect-sdk](./packages/hd-common-connect-sdk)         | Shared SDK runtime for Node.js and browser transports.                |
 | [@onekeyfe/hd-transport](./packages/hd-transport)                           | Data serialization and deserialization of hardware communication data |
 | [@onekeyfe/hd-transport-http](./packages/hd-transport-http)                 | communication lib for http                                            |
 | [@onekeyfe/hd-transport-react-native](./packages/hd-transport-react-native) | communication lib for React Native                                    |
-| [@onekeyfe/hd-transport-webusb](./packages/hd-transport-webusb)             | communication lib for WebUSB                                          |
+| [@onekeyfe/hd-transport-web-device](./packages/hd-transport-web-device)     | communication lib for WebUSB/WebHID browser environments              |
 | [@onekeyfe/hd-shared](./packages/shared)                                    | Tools, error definitions, constants                                   |
 | [@onekeyfe/hardware-cli](./packages/hd-cli)                                | CLI for AI agent integration (Claude Code, Cursor, etc.)              |
+| [@onekeyfe/hwk-adapter-core](./packages/hwk-adapter-core)                   | Shared types, events, and error contracts for hardware adapters       |
+| [@onekeyfe/hwk-ledger-adapter](./packages/hwk-ledger-adapter)               | Vendor-neutral Ledger adapter with chain methods and retry handling   |
+| [@onekeyfe/hwk-ledger-connector-webhid](./packages/hwk-ledger-connector-webhid) | WebHID connector for Ledger devices in browser environments       |
+| [@onekeyfe/hwk-ledger-connector-ble](./packages/hwk-ledger-connector-ble)   | React Native BLE connector for Ledger devices                         |
 
 ## Documentation
 

@@ -1,6 +1,6 @@
-# `@onekeyfe/hd-transport-webusb`
+# `@onekeyfe/hd-transport-web-device`
 
-`@onekeyfe/hd-transport-webusb` is a library that implements transport communication by WebUSB.
+`@onekeyfe/hd-transport-web-device` is a library that implements browser transport communication over WebUSB/WebHID.
 
 ## What is the purpose
 
