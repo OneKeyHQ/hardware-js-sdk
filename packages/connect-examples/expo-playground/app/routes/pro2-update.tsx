@@ -19,67 +19,12 @@ import type { DeviceInfo } from '../types/hardware';
 
 const TARGET_FIELDS = [
   {
-    param: 'resourceCrate1Binary',
-    label: 'Resource crate 1',
-    targetId: 1,
-    targetName: 'FW_MGMT_TARGET_CRATE',
-    accept: '.crate.okpkg,.okpkg,.bin',
-    formatHint: 'CRATE .okpkg',
-    isResource: true,
-  },
-  {
-    param: 'resourceCrate2Binary',
-    label: 'Resource crate 2',
-    targetId: 1,
-    targetName: 'FW_MGMT_TARGET_CRATE',
-    accept: '.crate.okpkg,.okpkg,.bin',
-    formatHint: 'CRATE .okpkg',
-    isResource: true,
-  },
-  {
-    param: 'resourceCrate3Binary',
-    label: 'Resource crate 3',
-    targetId: 1,
-    targetName: 'FW_MGMT_TARGET_CRATE',
-    accept: '.crate.okpkg,.okpkg,.bin',
-    formatHint: 'CRATE .okpkg',
-    isResource: true,
-  },
-  {
-    param: 'resourceCrate4Binary',
-    label: 'Resource crate 4',
-    targetId: 1,
-    targetName: 'FW_MGMT_TARGET_CRATE',
-    accept: '.crate.okpkg,.okpkg,.bin',
-    formatHint: 'CRATE .okpkg',
-    isResource: true,
-  },
-  {
-    param: 'resourceCrate5Binary',
-    label: 'Resource crate 5',
-    targetId: 1,
-    targetName: 'FW_MGMT_TARGET_CRATE',
-    accept: '.crate.okpkg,.okpkg,.bin',
-    formatHint: 'CRATE .okpkg',
-    isResource: true,
-  },
-  {
-    param: 'resourceCrate6Binary',
-    label: 'Resource crate 6',
-    targetId: 1,
-    targetName: 'FW_MGMT_TARGET_CRATE',
-    accept: '.crate.okpkg,.okpkg,.bin',
-    formatHint: 'CRATE .okpkg',
-    isResource: true,
-  },
-  {
     param: 'bootloaderBinary',
     label: 'Bootloader',
     targetId: 3,
     targetName: 'FW_MGMT_TARGET_BOOTLOADER',
     accept: '.okpkg,.bin',
     formatHint: 'signed OKPP .okpkg',
-    isResource: false,
   },
   {
     param: 'applicationP1Binary',
@@ -88,7 +33,6 @@ const TARGET_FIELDS = [
     targetName: 'FW_MGMT_TARGET_APPLICATION_P1',
     accept: '.okpkg,.bin',
     formatHint: 'signed OKPP .okpkg',
-    isResource: false,
   },
   {
     param: 'applicationP2Binary',
@@ -97,7 +41,6 @@ const TARGET_FIELDS = [
     targetName: 'FW_MGMT_TARGET_APPLICATION_P2',
     accept: '.okpkg,.bin',
     formatHint: 'signed OKPP .okpkg',
-    isResource: false,
   },
   {
     param: 'coprocessorBinary',
@@ -106,7 +49,6 @@ const TARGET_FIELDS = [
     targetName: 'FW_MGMT_TARGET_COPROCESSOR',
     accept: '.okpkg,.bin',
     formatHint: 'signed target package',
-    isResource: false,
   },
   {
     param: 'se01Binary',
@@ -115,7 +57,6 @@ const TARGET_FIELDS = [
     targetName: 'FW_MGMT_TARGET_SE01',
     accept: '.okpkg,.bin',
     formatHint: 'signed target package',
-    isResource: false,
   },
   {
     param: 'se02Binary',
@@ -124,7 +65,6 @@ const TARGET_FIELDS = [
     targetName: 'FW_MGMT_TARGET_SE02',
     accept: '.okpkg,.bin',
     formatHint: 'signed target package',
-    isResource: false,
   },
   {
     param: 'se03Binary',
@@ -133,7 +73,6 @@ const TARGET_FIELDS = [
     targetName: 'FW_MGMT_TARGET_SE03',
     accept: '.okpkg,.bin',
     formatHint: 'signed target package',
-    isResource: false,
   },
   {
     param: 'se04Binary',
@@ -142,9 +81,16 @@ const TARGET_FIELDS = [
     targetName: 'FW_MGMT_TARGET_SE04',
     accept: '.okpkg,.bin',
     formatHint: 'signed target package',
-    isResource: false,
   },
 ] as const;
+
+const RESOURCE_FIELD = {
+  label: 'Resource crates',
+  targetId: 1,
+  targetName: 'FW_MGMT_TARGET_CRATE',
+  accept: '.crate.okpkg,.okpkg',
+  formatHint: 'CRATE .okpkg, supports selecting multiple files',
+} as const;
 
 type TargetParam = (typeof TARGET_FIELDS)[number]['param'];
 
@@ -185,6 +131,7 @@ export default function Pro2UpdatePage() {
   const { toast } = useToast();
 
   const [files, setFiles] = useState<Partial<Record<TargetParam, File>>>({});
+  const [resourceFiles, setResourceFiles] = useState<File[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [isConnectingLocal, setIsConnectingLocal] = useState(false);
   const [logs, setLogs] = useState<UpdateLog[]>([]);
@@ -192,6 +139,7 @@ export default function Pro2UpdatePage() {
   const logIdRef = useRef(0);
 
   const selectedFields = useMemo(() => TARGET_FIELDS.filter(field => files[field.param]), [files]);
+  const selectedPayloadCount = selectedFields.length + resourceFiles.length;
 
   const addLog = useCallback((level: UpdateLog['level'], message: string) => {
     const nextLog = {
@@ -237,31 +185,34 @@ export default function Pro2UpdatePage() {
 
       const params: Record<string, unknown> = { platform: 'web' };
       const resourceBinaries: ArrayBuffer[] = [];
+      for (const [index, file] of resourceFiles.entries()) {
+        addLog(
+          'info',
+          `Loading Resource crate ${index + 1}: ${file.name} (${formatBytes(file.size)})`
+        );
+        resourceBinaries.push(await file.arrayBuffer());
+      }
       for (const field of selectedFields) {
         const file = files[field.param];
         if (!file) continue;
         addLog('info', `Loading ${field.label}: ${file.name} (${formatBytes(file.size)})`);
-        const binary = await file.arrayBuffer();
-        if (field.isResource) {
-          resourceBinaries.push(binary);
-        } else {
-          params[field.param] = binary;
-        }
+        params[field.param] = await file.arrayBuffer();
       }
 
       if (resourceBinaries.length > 0) {
         params.resourceBinaries = resourceBinaries;
       }
 
-      if (selectedFields.length === 0) {
+      if (selectedPayloadCount === 0) {
         addLog('info', 'firmwareUpdateV4 remote config: pro2 firmware-v1 components');
       } else {
-        addLog(
-          'info',
-          `firmwareUpdateV4 targets: ${selectedFields
-            .map(field => `${field.label}(${field.targetId})`)
-            .join(', ')}`
-        );
+        const targetNames = [
+          resourceFiles.length > 0
+            ? `Resource crates(${RESOURCE_FIELD.targetId} x${resourceFiles.length})`
+            : null,
+          ...selectedFields.map(field => `${field.label}(${field.targetId})`),
+        ].filter(Boolean);
+        addLog('info', `firmwareUpdateV4 targets: ${targetNames.join(', ')}`);
       }
       const response = await callHardwareAPI('firmwareUpdateV4', {
         connectId: device.connectId,
@@ -282,10 +233,21 @@ export default function Pro2UpdatePage() {
     } finally {
       setIsRunning(false);
     }
-  }, [addLog, connectDevice, currentDevice, files, resetFirmwareProgress, selectedFields, toast]);
+  }, [
+    addLog,
+    connectDevice,
+    currentDevice,
+    files,
+    resetFirmwareProgress,
+    resourceFiles,
+    selectedFields,
+    selectedPayloadCount,
+    toast,
+  ]);
 
   const resetFiles = useCallback(() => {
     setFiles({});
+    setResourceFiles([]);
     setResult(null);
   }, []);
 
@@ -348,6 +310,50 @@ export default function Pro2UpdatePage() {
             </div>
 
             <div className="grid gap-3 lg:grid-cols-2">
+              <div className="rounded-lg border border-border/60 bg-background/70 p-3 lg:col-span-2">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold text-foreground">
+                      {RESOURCE_FIELD.label}
+                    </div>
+                    <div className="truncate font-mono text-[11px] text-muted-foreground">
+                      target_id = {RESOURCE_FIELD.targetId} · {RESOURCE_FIELD.targetName}
+                    </div>
+                    <div className="mt-1 text-[11px] text-muted-foreground">
+                      {RESOURCE_FIELD.formatHint}
+                    </div>
+                  </div>
+                  {resourceFiles.length > 0 ? (
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
+                  ) : (
+                    <FileUp className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  )}
+                </div>
+                <Input
+                  type="file"
+                  accept={RESOURCE_FIELD.accept}
+                  multiple
+                  disabled={isRunning}
+                  onChange={event => {
+                    setResourceFiles(Array.from(event.currentTarget.files ?? []));
+                  }}
+                />
+                {resourceFiles.length > 0 ? (
+                  <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                    <div>{resourceFiles.length} resource crate files selected</div>
+                    <div className="max-h-24 space-y-1 overflow-auto">
+                      {resourceFiles.map(file => (
+                        <div
+                          key={`${file.name}-${file.size}-${file.lastModified}`}
+                          className="truncate"
+                        >
+                          {file.name} · {formatBytes(file.size)}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
               {TARGET_FIELDS.map(field => {
                 const selectedFile = files[field.param];
                 return (
@@ -398,15 +404,20 @@ export default function Pro2UpdatePage() {
                 ) : (
                   <Play className="h-4 w-4" />
                 )}
-                {selectedFields.length === 0
+                {selectedPayloadCount === 0
                   ? 'Run firmwareUpdateV4 (remote config)'
-                  : `Run firmwareUpdateV4 (${selectedFields.length} ${
-                      selectedFields.length === 1 ? 'target' : 'targets'
+                  : `Run firmwareUpdateV4 (${selectedPayloadCount} ${
+                      selectedPayloadCount === 1 ? 'file' : 'files'
                     })`}
               </Button>
-              {selectedFields.length > 0 ? (
+              {selectedPayloadCount > 0 ? (
                 <span className="text-sm text-muted-foreground">
-                  {selectedFields.map(field => field.label).join(' + ')}
+                  {[
+                    resourceFiles.length > 0 ? `${resourceFiles.length} resource crates` : null,
+                    ...selectedFields.map(field => field.label),
+                  ]
+                    .filter(Boolean)
+                    .join(' + ')}
                 </span>
               ) : (
                 <span className="text-sm text-muted-foreground">Remote pro2 firmware-v1</span>
