@@ -182,16 +182,16 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
     const getConfigByPattern = () => {
       if (/firmware/i.test(paramName)) {
         return {
-          accept: '.bin',
+          accept: field.accept || '.bin',
           title: t('components.firmwareFileUpload.firmwareFile'),
-          description: t('components.firmwareFileUpload.firmwareDesc'),
+          description: field.description || t('components.firmwareFileUpload.firmwareDesc'),
         };
       }
       if (/bootloader/i.test(paramName)) {
         return {
-          accept: '.bin',
+          accept: field.accept || '.bin',
           title: t('components.firmwareFileUpload.bootloaderFile'),
-          description: t('components.firmwareFileUpload.bootloaderDesc'),
+          description: field.description || t('components.firmwareFileUpload.bootloaderDesc'),
         };
       }
       if (/ble/i.test(paramName)) {
@@ -203,9 +203,9 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
       }
       if (/resource/i.test(paramName)) {
         return {
-          accept: '.zip',
+          accept: field.accept || '.zip',
           title: t('components.firmwareFileUpload.resourceFile'),
-          description: t('components.firmwareFileUpload.resourceDesc'),
+          description: field.description || t('components.firmwareFileUpload.resourceDesc'),
         };
       }
       if (/data/i.test(paramName)) {

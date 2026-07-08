@@ -19,32 +19,58 @@ import type { DeviceInfo } from '../types/hardware';
 
 const TARGET_FIELDS = [
   {
-    param: 'resourceBinary',
-    label: 'Resource crate',
+    param: 'resourceImagesBinary',
+    label: 'Resource images crate',
     targetId: 1,
     targetName: 'FW_MGMT_TARGET_CRATE',
-    accept: '.bin',
+    accept: '.crate.okpkg,.okpkg,.bin',
+    formatHint: 'CRATE .okpkg',
+    isResource: true,
+  },
+  {
+    param: 'resourceFontsBinary',
+    label: 'Resource fonts crate',
+    targetId: 1,
+    targetName: 'FW_MGMT_TARGET_CRATE',
+    accept: '.crate.okpkg,.okpkg,.bin',
+    formatHint: 'CRATE .okpkg',
+    isResource: true,
+  },
+  {
+    param: 'resourceTranslationsBinary',
+    label: 'Resource translations crate',
+    targetId: 1,
+    targetName: 'FW_MGMT_TARGET_CRATE',
+    accept: '.crate.okpkg,.okpkg,.bin',
+    formatHint: 'CRATE .okpkg',
+    isResource: true,
   },
   {
     param: 'bootloaderBinary',
     label: 'Bootloader',
     targetId: 3,
     targetName: 'FW_MGMT_TARGET_BOOTLOADER',
-    accept: '.bin',
+    accept: '.okpkg,.bin',
+    formatHint: 'signed OKPP .okpkg',
+    isResource: false,
   },
   {
     param: 'applicationP1Binary',
     label: 'APP P1',
     targetId: 4,
     targetName: 'FW_MGMT_TARGET_APPLICATION_P1',
-    accept: '.bin',
+    accept: '.okpkg,.bin',
+    formatHint: 'signed OKPP .okpkg',
+    isResource: false,
   },
   {
     param: 'applicationP2Binary',
     label: 'APP P2',
     targetId: 5,
     targetName: 'FW_MGMT_TARGET_APPLICATION_P2',
-    accept: '.bin',
+    accept: '.okpkg,.bin',
+    formatHint: 'signed OKPP .okpkg',
+    isResource: false,
   },
   {
     param: 'coprocessorBinary',
@@ -52,6 +78,8 @@ const TARGET_FIELDS = [
     targetId: 6,
     targetName: 'FW_MGMT_TARGET_COPROCESSOR',
     accept: '.bin',
+    formatHint: 'target-specific package',
+    isResource: false,
   },
   {
     param: 'se01Binary',
@@ -59,6 +87,8 @@ const TARGET_FIELDS = [
     targetId: 7,
     targetName: 'FW_MGMT_TARGET_SE01',
     accept: '.bin',
+    formatHint: 'target-specific package',
+    isResource: false,
   },
   {
     param: 'se02Binary',
@@ -66,6 +96,8 @@ const TARGET_FIELDS = [
     targetId: 8,
     targetName: 'FW_MGMT_TARGET_SE02',
     accept: '.bin',
+    formatHint: 'target-specific package',
+    isResource: false,
   },
   {
     param: 'se03Binary',
@@ -73,6 +105,8 @@ const TARGET_FIELDS = [
     targetId: 9,
     targetName: 'FW_MGMT_TARGET_SE03',
     accept: '.bin',
+    formatHint: 'target-specific package',
+    isResource: false,
   },
   {
     param: 'se04Binary',
@@ -80,6 +114,8 @@ const TARGET_FIELDS = [
     targetId: 10,
     targetName: 'FW_MGMT_TARGET_SE04',
     accept: '.bin',
+    formatHint: 'target-specific package',
+    isResource: false,
   },
 ] as const;
 
@@ -173,11 +209,21 @@ export default function Pro2UpdatePage() {
       const device = currentDevice ?? (await connectDevice());
 
       const params: Record<string, unknown> = { platform: 'web' };
+      const resourceBinaries: ArrayBuffer[] = [];
       for (const field of selectedFields) {
         const file = files[field.param];
         if (!file) continue;
         addLog('info', `Loading ${field.label}: ${file.name} (${formatBytes(file.size)})`);
-        params[field.param] = await file.arrayBuffer();
+        const binary = await file.arrayBuffer();
+        if (field.isResource) {
+          resourceBinaries.push(binary);
+        } else {
+          params[field.param] = binary;
+        }
+      }
+
+      if (resourceBinaries.length > 0) {
+        params.resourceBinaries = resourceBinaries;
       }
 
       if (selectedFields.length === 0) {
@@ -287,6 +333,9 @@ export default function Pro2UpdatePage() {
                         <div className="text-sm font-semibold text-foreground">{field.label}</div>
                         <div className="truncate font-mono text-[11px] text-muted-foreground">
                           target_id = {field.targetId} · {field.targetName}
+                        </div>
+                        <div className="mt-1 text-[11px] text-muted-foreground">
+                          {field.formatHint}
                         </div>
                       </div>
                       {selectedFile ? (

@@ -250,13 +250,29 @@ export async function convertFilesToArrayBuffers(
     if (typeof File !== 'undefined' && value instanceof File) {
       try {
         const arrayBuffer = await fileToArrayBuffer(value);
-        result[key] = arrayBuffer;
+        result[key] = key === 'resourceBinaries' ? [arrayBuffer] : arrayBuffer;
 
         console.log(
           `[FileConverter] 📁 文件参数转换: ${key} -> ArrayBuffer (${arrayBuffer.byteLength} bytes)`
         );
       } catch (error) {
         console.error(`[FileConverter] ❌ 文件转换失败: ${key}`, error);
+        delete result[key];
+      }
+    } else if (
+      typeof File !== 'undefined' &&
+      Array.isArray(value) &&
+      value.every(item => item instanceof File)
+    ) {
+      try {
+        const arrayBuffers = await Promise.all(value.map(file => fileToArrayBuffer(file)));
+        result[key] = arrayBuffers;
+
+        console.log(
+          `[FileConverter] 📁 文件数组参数转换: ${key} -> ArrayBuffer[] (${arrayBuffers.length} files)`
+        );
+      } catch (error) {
+        console.error(`[FileConverter] ❌ 文件数组转换失败: ${key}`, error);
         delete result[key];
       }
     }
