@@ -559,7 +559,7 @@ program
   .command('firmware-update-v4-debug')
   .description('Debug Protocol V2 firmware update through sdk.firmwareUpdateV4')
   .option('--chunk-size <bytes>', 'Transfer chunk size in bytes')
-  .option('--resource <path>', 'FW_MGMT_TARGET_RESOURCE binary path')
+  .option('--resource <path>', 'FW_MGMT_TARGET_CRATE resource package path')
   .option('--romloader <path>', 'FW_MGMT_TARGET_ROMLOADER binary path')
   .option('--bootloader <path>', 'FW_MGMT_TARGET_BOOTLOADER binary path')
   .option('--application-p1 <path>', 'FW_MGMT_TARGET_APPLICATION_P1 binary path')

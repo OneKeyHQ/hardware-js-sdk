@@ -122,8 +122,12 @@ module.exports = async (env, argv) => {
   const fallbackHtmlFilename = hasCommit ? '../404.html' : '404.html';
   const staticBasePath = hasCommit ? `./${commitSha}/` : './';
   const isVercel = process.env.VERCEL === '1' || process.env.VERCEL === 'true';
-  const defaultPublicOrigin = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
+  const vercelPublicUrl =
+    process.env.VERCEL_ENV === 'production'
+      ? process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL
+      : process.env.VERCEL_BRANCH_URL || process.env.VERCEL_URL;
+  const defaultPublicOrigin = vercelPublicUrl
+    ? vercelPublicUrl
     : isProduction
       ? 'https://hardware-example.onekeytest.com'
       : '';

@@ -738,6 +738,15 @@ function initDevice(method: BaseMethod) {
 
   if (method.connectId) {
     device = _deviceList.getDevice(method.connectId);
+    if (!device && method.name === 'firmwareUpdateV4' && allDevices.length === 1) {
+      const [singleDevice] = allDevices;
+      if (singleDevice.isBootloader()) {
+        Log.debug(
+          'firmwareUpdateV4 uses the only bootloader device when connectId changed after reboot'
+        );
+        device = singleDevice;
+      }
+    }
   } else if (allDevices.length === 1) {
     [device] = allDevices;
   } else if (allDevices.length > 1) {

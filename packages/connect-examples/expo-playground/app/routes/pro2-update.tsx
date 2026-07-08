@@ -18,16 +18,69 @@ import { isPro2DeviceInfo } from '../utils/pro2Device';
 import type { DeviceInfo } from '../types/hardware';
 
 const TARGET_FIELDS = [
-  { param: 'romloaderBinary', label: 'Romloader', targetId: 1, accept: '.bin' },
-  { param: 'bootloaderBinary', label: 'Bootloader', targetId: 2, accept: '.bin' },
-  { param: 'applicationP1Binary', label: 'APP P1', targetId: 3, accept: '.bin' },
-  { param: 'applicationP2Binary', label: 'APP P2', targetId: 4, accept: '.bin' },
-  { param: 'coprocessorBinary', label: 'Coprocessor', targetId: 5, accept: '.bin' },
-  { param: 'se01Binary', label: 'SE01', targetId: 6, accept: '.bin' },
-  { param: 'se02Binary', label: 'SE02', targetId: 7, accept: '.bin' },
-  { param: 'se03Binary', label: 'SE03', targetId: 8, accept: '.bin' },
-  { param: 'se04Binary', label: 'SE04', targetId: 9, accept: '.bin' },
-  { param: 'resourceBinary', label: 'Resource', targetId: 10, accept: '.bin' },
+  {
+    param: 'resourceBinary',
+    label: 'Resource crate',
+    targetId: 1,
+    targetName: 'FW_MGMT_TARGET_CRATE',
+    accept: '.bin',
+  },
+  {
+    param: 'bootloaderBinary',
+    label: 'Bootloader',
+    targetId: 3,
+    targetName: 'FW_MGMT_TARGET_BOOTLOADER',
+    accept: '.bin',
+  },
+  {
+    param: 'applicationP1Binary',
+    label: 'APP P1',
+    targetId: 4,
+    targetName: 'FW_MGMT_TARGET_APPLICATION_P1',
+    accept: '.bin',
+  },
+  {
+    param: 'applicationP2Binary',
+    label: 'APP P2',
+    targetId: 5,
+    targetName: 'FW_MGMT_TARGET_APPLICATION_P2',
+    accept: '.bin',
+  },
+  {
+    param: 'coprocessorBinary',
+    label: 'Coprocessor',
+    targetId: 6,
+    targetName: 'FW_MGMT_TARGET_COPROCESSOR',
+    accept: '.bin',
+  },
+  {
+    param: 'se01Binary',
+    label: 'SE01',
+    targetId: 7,
+    targetName: 'FW_MGMT_TARGET_SE01',
+    accept: '.bin',
+  },
+  {
+    param: 'se02Binary',
+    label: 'SE02',
+    targetId: 8,
+    targetName: 'FW_MGMT_TARGET_SE02',
+    accept: '.bin',
+  },
+  {
+    param: 'se03Binary',
+    label: 'SE03',
+    targetId: 9,
+    targetName: 'FW_MGMT_TARGET_SE03',
+    accept: '.bin',
+  },
+  {
+    param: 'se04Binary',
+    label: 'SE04',
+    targetId: 10,
+    targetName: 'FW_MGMT_TARGET_SE04',
+    accept: '.bin',
+  },
 ] as const;
 
 type TargetParam = (typeof TARGET_FIELDS)[number]['param'];
@@ -75,10 +128,7 @@ export default function Pro2UpdatePage() {
   const [result, setResult] = useState<UpdateVersionsResult | null>(null);
   const logIdRef = useRef(0);
 
-  const selectedFields = useMemo(
-    () => TARGET_FIELDS.filter(field => files[field.param]),
-    [files]
-  );
+  const selectedFields = useMemo(() => TARGET_FIELDS.filter(field => files[field.param]), [files]);
 
   const addLog = useCallback((level: UpdateLog['level'], message: string) => {
     const nextLog = {
@@ -159,15 +209,7 @@ export default function Pro2UpdatePage() {
     } finally {
       setIsRunning(false);
     }
-  }, [
-    addLog,
-    connectDevice,
-    currentDevice,
-    files,
-    resetFirmwareProgress,
-    selectedFields,
-    toast,
-  ]);
+  }, [addLog, connectDevice, currentDevice, files, resetFirmwareProgress, selectedFields, toast]);
 
   const resetFiles = useCallback(() => {
     setFiles({});
@@ -222,7 +264,8 @@ export default function Pro2UpdatePage() {
               <div>
                 <div className="text-base font-semibold text-foreground">Targets</div>
                 <div className="text-sm text-muted-foreground">
-                  Local files are optional. Empty selection uses the Pro2 remote firmware-v1 package.
+                  Local files are optional. Empty selection uses the Pro2 remote firmware-v1
+                  package.
                 </div>
               </div>
               <Button size="sm" variant="outline" disabled={isRunning} onClick={resetFiles}>
@@ -243,7 +286,7 @@ export default function Pro2UpdatePage() {
                       <div className="min-w-0">
                         <div className="text-sm font-semibold text-foreground">{field.label}</div>
                         <div className="truncate font-mono text-[11px] text-muted-foreground">
-                          target_id = {field.targetId} · {field.param}
+                          target_id = {field.targetId} · {field.targetName}
                         </div>
                       </div>
                       {selectedFile ? (

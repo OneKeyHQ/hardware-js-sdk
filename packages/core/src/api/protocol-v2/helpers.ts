@@ -1,6 +1,7 @@
 import { DeviceRebootType } from '@onekeyfe/hd-transport';
 
 import { invalidParameter, validateNonEmptyString } from '../helpers/filesystemValidation';
+import { ProtocolV2FirmwareTargetType } from '../../protocols/protocol-v2/firmware';
 
 import type {
   DeviceFirmwareTarget,
@@ -132,8 +133,18 @@ export function normalizeRebootType(value: RebootTypeInput | undefined): DeviceR
   return DeviceRebootType.Normal;
 }
 
-// 当前 firmware-pro2 子模块的 DeviceFirmwareTargetType 合法值。
-const VALID_FIRMWARE_TARGET_IDS = new Set<number>([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+// 当前 firmware-pro2 子模块的 DeviceFirmwareTargetType 合法值从生成 enum 派生，
+// 避免协议枚举增减时这里继续保留过期手写编号。
+const VALID_FIRMWARE_TARGET_IDS = new Set<number>(
+  Object.values(ProtocolV2FirmwareTargetType).filter(value => typeof value === 'number') as number[]
+);
+const FIRMWARE_TARGET_ID_BY_NAME = new Map<string, DeviceFirmwareTargetType>(
+  Object.entries(ProtocolV2FirmwareTargetType).flatMap(([key, value]) =>
+    VALID_FIRMWARE_TARGET_IDS.has(value)
+      ? [[key, value as DeviceFirmwareTargetType]]
+      : []
+  )
+);
 
 function normalizeTargetId(
   value: DeviceFirmwareTargetType | string | number | undefined,
@@ -142,7 +153,8 @@ function normalizeTargetId(
   if (value === undefined || value === null) {
     throw invalidParameter(`Missing required parameter: ${name}`);
   }
-  const numeric = typeof value === 'number' ? value : Number(value);
+  const named = typeof value === 'string' ? FIRMWARE_TARGET_ID_BY_NAME.get(value) : undefined;
+  const numeric = named ?? (typeof value === 'number' ? value : Number(value));
   // 校验值域：仅接受 DeviceFirmwareTargetType 中定义的 target id，
   // 不再放行任意非负整数。
   if (Number.isSafeInteger(numeric) && VALID_FIRMWARE_TARGET_IDS.has(numeric)) {

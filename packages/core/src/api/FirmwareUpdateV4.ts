@@ -77,11 +77,6 @@ type ProtocolV2RemoteComponentTarget = {
 const PROTOCOL_V2_REMOTE_COMPONENT_TARGETS: Readonly<
   Record<string, ProtocolV2RemoteComponentTarget>
 > = {
-  ROMLOADER: {
-    fileName: 'romloader.bin',
-    targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_ROMLOADER,
-    kind: 'firmware',
-  },
   BOOTLOADER: {
     fileName: 'bootloader.bin',
     targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_BOOTLOADER,
@@ -124,10 +119,13 @@ const PROTOCOL_V2_REMOTE_COMPONENT_TARGETS: Readonly<
   },
   RESOURCE: {
     fileName: 'resource.bin',
-    targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_RESOURCE,
+    targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_CRATE,
     kind: 'resource',
   },
 };
+
+const PROTOCOL_V2_ROMLOADER_UNSUPPORTED_MESSAGE =
+  'FW_MGMT_TARGET_ROMLOADER is not accepted by the current Pro2 bootloader update request. Flash romloader with the loader-specific flow instead of firmwareUpdateV4.';
 
 // hd-transport 的历史 decode 行为会把单值 enum 输出为枚举名字符串；
 // Protocol V2 沿用这个 SDK 语义，内部比较前再映射回固件协议数值。
@@ -395,7 +393,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   }
 
   private getRemoteComponentEntries(release: IFirmwareReleaseInfo) {
-    const components = release.components;
+    const { components } = release;
     if (!components) return [];
 
     const orderedKeys = [
@@ -416,6 +414,12 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     component: IProtocolV2FirmwareComponent
   ) {
     const targetName = component.target?.toUpperCase();
+    if (targetName === 'ROMLOADER') {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        PROTOCOL_V2_ROMLOADER_UNSUPPORTED_MESSAGE
+      );
+    }
     const target = PROTOCOL_V2_REMOTE_COMPONENT_TARGETS[targetName];
     if (!target) {
       throw ERRORS.TypedError(
@@ -476,6 +480,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
   async enterProtocolV2BootloaderMode() {
     if (this.isProtocolV2BootloaderMode()) {
+      Log.debug('Protocol V2 device is already in bootloader mode, skip reboot to bootloader');
       return false;
     }
 
@@ -539,11 +544,12 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       if (binary) entries.push({ fileName, binary, targetId });
     };
 
-    push(
-      this.params.romloaderBinary,
-      'romloader.bin',
-      ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_ROMLOADER
-    );
+    if (this.params.romloaderBinary) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        PROTOCOL_V2_ROMLOADER_UNSUPPORTED_MESSAGE
+      );
+    }
     push(
       this.params.applicationP1Binary,
       'application_p1.bin',
@@ -596,7 +602,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         totalSize,
       });
       targets.push({
-        target_id: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_RESOURCE,
+        target_id: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_CRATE,
         path: resourceFilePath,
       });
     }
@@ -847,11 +853,19 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       return;
     }
 
-    const { deviceList } = await DevicePool.getDevices(devicesDescriptor, this.connectId);
+    // App 与 bootloader 序列号暂时可能不一致。V4 升级重连阶段只接受唯一枚举设备，
+    // 避免继续按旧 app connectId 查缓存导致反复输出 path mismatch 日志。
+    const { deviceList } = await DevicePool.getDevices(devicesDescriptor, undefined, {
+      connectProtocol: PROTOCOL_V2_CONNECT_PROTOCOL,
+    });
     if (deviceList.length !== 1) {
       throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound);
     }
 
+    Log.debug(
+      'Protocol V2 firmware reconnect using single enumerated device:',
+      deviceList[0].getConnectId()
+    );
     this.device.updateFromCache(deviceList[0]);
     await this.device.acquire(PROTOCOL_V2_CONNECT_PROTOCOL, { throwOnRunPromiseError: true });
     this.device.commands.disposed = false;
