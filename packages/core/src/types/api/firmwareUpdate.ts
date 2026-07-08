@@ -81,8 +81,8 @@ export interface FirmwareUpdateV4Params {
   se02Binary?: ArrayBuffer;
   se03Binary?: ArrayBuffer;
   se04Binary?: ArrayBuffer;
-  /** 资源包通过 FW_MGMT_TARGET_CRATE = 1 安装 */
-  resourceBinary?: ArrayBuffer;
+  /** 资源包通过 FW_MGMT_TARGET_CRATE = 1 安装；每个元素是一个独立 CRATE */
+  resourceBinaries?: ArrayBuffer[];
   forcedUpdateRes?: boolean;
 }
 

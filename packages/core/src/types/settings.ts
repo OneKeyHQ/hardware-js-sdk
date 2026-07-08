@@ -57,6 +57,7 @@ export type IProtocolV2FirmwareComponent = {
   url: string;
   fingerprint?: string;
   version?: IVersionArray;
+  resourceManifest?: IProtocolV2ResourceManifest;
 };
 
 export type IProtocolV2ResourceManifestPackage = {
