@@ -812,11 +812,20 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
   private async prepareRemoteProtocolV2Binaries(firmwareType: EFirmwareType, features: Features) {
     const release = DataManager.getFirmwareLatestRelease(features, firmwareType);
-    const entries = release ? this.getRemoteComponentEntries(release) : [];
 
     const resourceBinaryMap: ProtocolV2TargetBinary[] = [];
     let bootloaderBinary: ArrayBuffer | null = null;
     const fwBinaryMap: ProtocolV2TargetBinary[] = [];
+
+    if (!release) {
+      return {
+        resourceBinaryMap,
+        bootloaderBinary,
+        fwBinaryMap,
+      };
+    }
+
+    const entries = this.getRemoteComponentEntries(release);
 
     for (const [key, component] of entries) {
       const target = this.getRemoteComponentTarget(key, component);
@@ -989,6 +998,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     try {
       for (const resource of resourceBinaryMap) {
         const resourceFilePath = `${PROTOCOL_V2_FIRMWARE_STAGING_VOLUME}${resource.fileName}`;
+        Log.log(
+          `[FirmwareUpdateV4] staging resource via FilesystemFileWrite target=${resource.targetId} path=${resourceFilePath} bytes=${resource.binary.byteLength}`
+        );
         processedSize = await this.protocolV2CommonUpdateProcess({
           payload: resource.binary,
           filePath: resourceFilePath,
@@ -1005,6 +1017,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
       if (bootloaderBinary) {
         const bootloaderPath = `${PROTOCOL_V2_FIRMWARE_STAGING_VOLUME}bootloader.bin`;
+        Log.log(
+          `[FirmwareUpdateV4] staging bootloader via FilesystemFileWrite target=${ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_BOOTLOADER} path=${bootloaderPath} bytes=${bootloaderBinary.byteLength}`
+        );
         processedSize = await this.protocolV2CommonUpdateProcess({
           payload: bootloaderBinary,
           filePath: bootloaderPath,
@@ -1021,6 +1036,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
       for (const fwbinary of fwBinaryMap) {
         const firmwarePath = `${PROTOCOL_V2_FIRMWARE_STAGING_VOLUME}${fwbinary.fileName}`;
+        Log.log(
+          `[FirmwareUpdateV4] staging firmware via FilesystemFileWrite target=${fwbinary.targetId} path=${firmwarePath} bytes=${fwbinary.binary.byteLength}`
+        );
         processedSize = await this.protocolV2CommonUpdateProcess({
           payload: fwbinary.binary,
           filePath: firmwarePath,
@@ -1058,12 +1076,18 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     this.postTipMessage(FirmwareUpdateTipMessage.ConfirmOnDevice);
     for (const resourceTarget of resourceTargets) {
       const resourceTargetsBatch = [resourceTarget];
+      Log.log(
+        `[FirmwareUpdateV4] DeviceFirmwareUpdateRequest resources=${JSON.stringify(
+          resourceTargetsBatch
+        )}`
+      );
       const startResponse = await this.protocolV2StartFirmwareUpdate({
         targets: resourceTargetsBatch,
       });
       await this.waitForProtocolV2FirmwareUpdateComplete(resourceTargetsBatch, startResponse);
     }
     if (targets.length > 0) {
+      Log.log(`[FirmwareUpdateV4] DeviceFirmwareUpdateRequest targets=${JSON.stringify(targets)}`);
       const startResponse = await this.protocolV2StartFirmwareUpdate({ targets });
       await this.waitForProtocolV2FirmwareUpdateComplete(targets, startResponse);
     }

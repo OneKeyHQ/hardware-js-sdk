@@ -201,6 +201,12 @@ export default function Pro2UpdatePage() {
 
       if (resourceBinaries.length > 0) {
         params.resourceBinaries = resourceBinaries;
+        addLog(
+          'info',
+          `Prepared resourceBinaries: ${resourceBinaries.length} files, ${formatBytes(
+            resourceBinaries.reduce((total, binary) => total + binary.byteLength, 0)
+          )}`
+        );
       }
 
       if (selectedPayloadCount === 0) {
