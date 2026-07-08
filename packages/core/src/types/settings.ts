@@ -56,6 +56,24 @@ export type IProtocolV2FirmwareComponent = {
   target: IProtocolV2FirmwareComponentTarget;
   url: string;
   fingerprint?: string;
+  version?: IVersionArray;
+};
+
+export type IProtocolV2ResourceManifestPackage = {
+  name?: string;
+  path: string;
+  type?: string;
+  version?: IVersionArray;
+  sha256?: string;
+  payloadHash?: string;
+  headerHash?: string;
+};
+
+export type IProtocolV2ResourceManifest = {
+  format?: 'okpkg-crate' | string;
+  target?: 'RESOURCE' | string;
+  version?: IVersionArray;
+  packages: IProtocolV2ResourceManifestPackage[];
 };
 
 /** STM32 firmware config */
@@ -79,6 +97,7 @@ export type IFirmwareReleaseInfo = {
   upgradeType?: 'payload-package-set' | string;
   components?: Record<string, IProtocolV2FirmwareComponent>;
   installOrder?: string[];
+  resourceManifest?: IProtocolV2ResourceManifest;
   bootloaderChangelog?: {
     [k in ILocale]: string;
   };

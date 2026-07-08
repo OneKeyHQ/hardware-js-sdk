@@ -34,13 +34,20 @@ import type { FirmwareUpdateV4Params } from '../types/api/firmwareUpdate';
 import type { EFirmwareType } from '@onekeyfe/hd-shared';
 import type { PROTO } from '../constants';
 import type { TypedResponseMessage } from '../device/DeviceCommands';
-import type { Features, IFirmwareReleaseInfo, IProtocolV2FirmwareComponent } from '../types';
+import type {
+  Features,
+  IFirmwareReleaseInfo,
+  IProtocolV2FirmwareComponent,
+  IProtocolV2ResourceManifestPackage,
+  IVersionArray,
+} from '../types';
 
 const Log = getLogger(LoggerNames.Method);
 
 const SESSION_ERROR = 'session not found';
 const PROTOCOL_V2_BOOTLOADER_RECONNECT_TIMEOUT = 60 * 1000;
 const PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT = 5 * 1000;
+const PROTOCOL_V2_START_UPDATE_TIMEOUT = 60 * 1000;
 const PROTOCOL_V2_INSTALL_TIMEOUT = 5 * 60 * 1000;
 const PROTOCOL_V2_TARGET_STATUS_PENDING = 0;
 const PROTOCOL_V2_TARGET_STATUS_IN_PROGRESS = 1;
@@ -53,6 +60,10 @@ const PROTOCOL_V2_CONNECT_RETRY_COUNT = 10;
 const PROTOCOL_V2_CONNECT_POLL_INTERVAL = 500;
 const PROTOCOL_V2_CONNECT_SINGLE_TIMEOUT = 75 * 1000;
 const PROTOCOL_V2_DEVICE_INFO_READY_TIMEOUT = 60 * 1000;
+const PROTOCOL_V2_OKPP_HEADER_SIZE = 0x52a0;
+const PROTOCOL_V2_OKPP_PAYLOAD_HASH_OFFSET = 0x200;
+const PROTOCOL_V2_OKPP_HEADER_HASH_OFFSET = 0x240;
+const PROTOCOL_V2_OKPP_HASH_SIZE = 64;
 
 const getProtocolV2DeviceTransferProgress = (
   bytesBeforeChunk: number,
@@ -69,6 +80,11 @@ const getProtocolV2DeviceTransferProgress = (
     return 100;
   }
   return Math.min(Math.max(Math.ceil((bytesAfterChunk / totalBytes) * 100), 1), 99);
+};
+
+const formatProtocolV2TransferSpeed = (bytes: number, elapsedMs: number) => {
+  const safeElapsedMs = Math.max(elapsedMs, 1);
+  return (bytes / 1024 / (safeElapsedMs / 1000)).toFixed(2);
 };
 
 type ProtocolV2FirmwareUpdateStatusTarget = {
@@ -89,6 +105,13 @@ type ProtocolV2RemoteComponentTarget = {
   fileName: string;
   targetId: number;
   kind: 'bootloader' | 'firmware' | 'resource';
+};
+
+type ProtocolV2OkppHeader = {
+  type: string;
+  version: IVersionArray;
+  payloadHash: string;
+  headerHash: string;
 };
 
 const PROTOCOL_V2_REMOTE_COMPONENT_TARGETS: Readonly<
@@ -226,6 +249,106 @@ const normalizeProtocolV2TargetStatus = (
     return PROTOCOL_V2_TARGET_STATUS_BY_DECODED_NAME.get(status);
   }
   return undefined;
+};
+
+const normalizeProtocolV2Hex = (value?: string) => value?.replace(/^0x/i, '').toLowerCase();
+
+const versionArrayToNumber = (version?: IVersionArray) => {
+  if (!version) return undefined;
+  return version[0] * 0x10000 + version[1] * 0x100 + version[2];
+};
+
+const versionStringToArray = (version?: string | null): IVersionArray | undefined => {
+  if (!version) return undefined;
+  const parts = version.split('.').map(part => Number(part));
+  if (parts.length !== 3 || parts.some(part => !Number.isFinite(part))) return undefined;
+  return parts as IVersionArray;
+};
+
+const compareProtocolV2Versions = (current?: IVersionArray, target?: IVersionArray) => {
+  const currentNumber = versionArrayToNumber(current);
+  const targetNumber = versionArrayToNumber(target);
+  if (currentNumber === undefined || targetNumber === undefined) return undefined;
+  return currentNumber - targetNumber;
+};
+
+const bytesToHex = (bytes: Uint8Array) =>
+  Array.from(bytes)
+    .map(byte => byte.toString(16).padStart(2, '0'))
+    .join('');
+
+const hexToProtocolV2Bytes = (hex: string) => {
+  const normalized = hex.replace(/^0x/i, '');
+  if (!normalized || normalized.length % 2 !== 0 || /[^0-9a-f]/i.test(normalized)) {
+    return new Uint8Array(0);
+  }
+  const bytes = new Uint8Array(normalized.length / 2);
+  for (let i = 0; i < bytes.length; i++) {
+    bytes[i] = Number.parseInt(normalized.slice(i * 2, i * 2 + 2), 16);
+  }
+  return bytes;
+};
+
+const toProtocolV2Bytes = (value: unknown): Uint8Array => {
+  if (value instanceof Uint8Array) return value;
+  if (value instanceof ArrayBuffer) return new Uint8Array(value);
+  if (ArrayBuffer.isView(value)) {
+    return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+  }
+  if (typeof value === 'string') return hexToProtocolV2Bytes(value);
+  return new Uint8Array(0);
+};
+
+const toProtocolV2FiniteNumber = (value: unknown) => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : undefined;
+  }
+  if (value && typeof value === 'object') {
+    const longLike = value as { toNumber?: () => number };
+    if (typeof longLike.toNumber === 'function') {
+      const numeric = longLike.toNumber();
+      return Number.isFinite(numeric) ? numeric : undefined;
+    }
+  }
+  return undefined;
+};
+
+const readProtocolV2Ascii = (bytes: Uint8Array, offset: number, length: number) =>
+  Array.from(bytes.slice(offset, offset + length))
+    .map(byte => String.fromCharCode(byte))
+    .join('');
+
+const parseProtocolV2OkppHeader = (bytes: Uint8Array): ProtocolV2OkppHeader | null => {
+  if (bytes.byteLength < PROTOCOL_V2_OKPP_HEADER_SIZE) return null;
+  if (readProtocolV2Ascii(bytes, 0, 4) !== 'OKPP') return null;
+
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const headerLen = view.getUint32(0x0c, true);
+  if (headerLen !== PROTOCOL_V2_OKPP_HEADER_SIZE) return null;
+
+  const packedVersion = view.getUint32(0x10, true);
+  return {
+    type: readProtocolV2Ascii(bytes, 0x08, 4),
+    version: [
+      Math.floor(packedVersion / 0x10000) % 0x100,
+      Math.floor(packedVersion / 0x100) % 0x100,
+      packedVersion % 0x100,
+    ],
+    payloadHash: bytesToHex(
+      bytes.slice(
+        PROTOCOL_V2_OKPP_PAYLOAD_HASH_OFFSET,
+        PROTOCOL_V2_OKPP_PAYLOAD_HASH_OFFSET + PROTOCOL_V2_OKPP_HASH_SIZE
+      )
+    ),
+    headerHash: bytesToHex(
+      bytes.slice(
+        PROTOCOL_V2_OKPP_HEADER_HASH_OFFSET,
+        PROTOCOL_V2_OKPP_HEADER_HASH_OFFSET + PROTOCOL_V2_OKPP_HASH_SIZE
+      )
+    ),
+  };
 };
 
 /**
@@ -426,10 +549,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       .filter((entry): entry is readonly [string, IProtocolV2FirmwareComponent] => !!entry);
   }
 
-  private async downloadRemoteProtocolV2Component(
-    key: string,
-    component: IProtocolV2FirmwareComponent
-  ) {
+  private getRemoteComponentTarget(key: string, component: IProtocolV2FirmwareComponent) {
     const targetName = component.target?.toUpperCase();
     if (targetName === 'ROMLOADER') {
       throw ERRORS.TypedError(
@@ -444,6 +564,196 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         `Unsupported Protocol V2 firmware component target: ${key}/${component.target}`
       );
     }
+    return target;
+  }
+
+  private getProtocolV2ComponentTargetVersion(
+    release: IFirmwareReleaseInfo,
+    component: IProtocolV2FirmwareComponent,
+    target: ProtocolV2RemoteComponentTarget
+  ) {
+    if (component.version) return component.version;
+    if (target.targetId === ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_BOOTLOADER) {
+      return release.bootloaderVersion;
+    }
+    if (
+      target.targetId === ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P1 ||
+      target.targetId === ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P2
+    ) {
+      return release.version;
+    }
+    return undefined;
+  }
+
+  private getProtocolV2ComponentCurrentVersion(
+    features: Features,
+    target: ProtocolV2RemoteComponentTarget
+  ) {
+    switch (target.targetId) {
+      case ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_BOOTLOADER:
+        return getDeviceBootloaderVersion(features);
+      case ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P1:
+      case ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P2:
+        return getDeviceFirmwareVersion(features);
+      case ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_COPROCESSOR:
+        return getDeviceBLEFirmwareVersion(features);
+      case ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_SE01:
+        return versionStringToArray(features.se01Version);
+      case ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_SE02:
+        return versionStringToArray(features.se02Version);
+      case ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_SE03:
+        return versionStringToArray(features.se03Version);
+      case ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_SE04:
+        return versionStringToArray(features.se04Version);
+      default:
+        return undefined;
+    }
+  }
+
+  private isProtocolV2ComponentVersionSatisfied(
+    release: IFirmwareReleaseInfo,
+    component: IProtocolV2FirmwareComponent,
+    target: ProtocolV2RemoteComponentTarget,
+    features: Features
+  ) {
+    const targetVersion = this.getProtocolV2ComponentTargetVersion(release, component, target);
+    if (!targetVersion) return false;
+
+    const currentVersion = this.getProtocolV2ComponentCurrentVersion(features, target);
+    const compareResult = compareProtocolV2Versions(currentVersion, targetVersion);
+    return compareResult !== undefined && compareResult >= 0;
+  }
+
+  private getProtocolV2ResourceFilePath(path: string) {
+    if (path.startsWith('vol')) return path;
+    if (path.startsWith('/')) return `vol0:${path}`;
+    return `vol0:/${path}`;
+  }
+
+  private async readProtocolV2DeviceFileHeader(path: string) {
+    const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
+    const filePath = this.getProtocolV2ResourceFilePath(path);
+    const pathInfoRes = await typedCall('FilesystemPathInfoQuery', 'FilesystemPathInfo', {
+      path: filePath,
+    });
+    const fileSize = toProtocolV2FiniteNumber(pathInfoRes.message?.size);
+    if (
+      !pathInfoRes.message?.exist ||
+      pathInfoRes.message?.directory ||
+      fileSize === undefined ||
+      fileSize < PROTOCOL_V2_OKPP_HEADER_SIZE
+    ) {
+      return null;
+    }
+
+    const chunkSize = this.getProtocolV2FirmwareChunkSize();
+    const chunks: Uint8Array[] = [];
+    let offset = 0;
+    while (offset < PROTOCOL_V2_OKPP_HEADER_SIZE) {
+      const readLen = Math.min(chunkSize, PROTOCOL_V2_OKPP_HEADER_SIZE - offset);
+      const res = await typedCall('FilesystemFileRead', 'FilesystemFile', {
+        file: {
+          path: filePath,
+          offset,
+          total_size: 0,
+        },
+        chunk_len: readLen,
+        ui_percentage: undefined,
+      });
+      const data = toProtocolV2Bytes(res.message?.data);
+      if (data.byteLength === 0) return null;
+      chunks.push(data);
+      offset += data.byteLength;
+    }
+
+    const headerBytes = new Uint8Array(offset);
+    let cursor = 0;
+    chunks.forEach(chunk => {
+      headerBytes.set(chunk, cursor);
+      cursor += chunk.byteLength;
+    });
+    return parseProtocolV2OkppHeader(headerBytes);
+  }
+
+  private async isProtocolV2ResourcePackageMatched(
+    pkg: IProtocolV2ResourceManifestPackage,
+    manifestVersion?: IVersionArray
+  ) {
+    try {
+      const header = await this.readProtocolV2DeviceFileHeader(pkg.path);
+      if (!header) return false;
+
+      const expectedType = pkg.type ?? 'RESC';
+      const expectedVersion = pkg.version ?? manifestVersion;
+      if (header.type !== expectedType) return false;
+      if (expectedVersion && compareProtocolV2Versions(header.version, expectedVersion) !== 0) {
+        return false;
+      }
+
+      const expectedPayloadHash = normalizeProtocolV2Hex(pkg.payloadHash);
+      if (expectedPayloadHash && header.payloadHash !== expectedPayloadHash) return false;
+
+      const expectedHeaderHash = normalizeProtocolV2Hex(pkg.headerHash);
+      if (expectedHeaderHash && header.headerHash !== expectedHeaderHash) return false;
+
+      return true;
+    } catch (error) {
+      Log.log(`Protocol V2 resource package check failed for ${pkg.path}: `, error);
+      return false;
+    }
+  }
+
+  private async isProtocolV2ResourceManifestSatisfied(release: IFirmwareReleaseInfo) {
+    const manifest = release.resourceManifest;
+    if (!manifest?.packages?.length) return false;
+
+    for (const pkg of manifest.packages) {
+      if (!(await this.isProtocolV2ResourcePackageMatched(pkg, manifest.version))) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private async shouldInstallRemoteProtocolV2Component(
+    release: IFirmwareReleaseInfo,
+    key: string,
+    component: IProtocolV2FirmwareComponent,
+    target: ProtocolV2RemoteComponentTarget,
+    features: Features
+  ) {
+    if (target.kind === 'resource') {
+      if (
+        this.params.forcedUpdateRes ||
+        features.bootloaderMode ||
+        features.mode === 'bootloader'
+      ) {
+        return true;
+      }
+      const resourceMatched = await this.isProtocolV2ResourceManifestSatisfied(release);
+      if (resourceMatched) {
+        Log.log(`[FirmwareUpdateV4] skip Protocol V2 resource component ${key}; manifest matched`);
+      }
+      return !resourceMatched;
+    }
+
+    const versionSatisfied = this.isProtocolV2ComponentVersionSatisfied(
+      release,
+      component,
+      target,
+      features
+    );
+    if (versionSatisfied) {
+      Log.log(`[FirmwareUpdateV4] skip Protocol V2 component ${key}; version is up to date`);
+    }
+    return !versionSatisfied;
+  }
+
+  private async downloadRemoteProtocolV2Component(
+    key: string,
+    component: IProtocolV2FirmwareComponent
+  ) {
+    const target = this.getRemoteComponentTarget(key, component);
     if (!component.url) {
       throw ERRORS.TypedError(
         HardwareErrorCode.RuntimeError,
@@ -467,17 +777,27 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const fwBinaryMap: ProtocolV2TargetBinary[] = [];
 
     for (const [key, component] of entries) {
-      const remoteBinary = await this.downloadRemoteProtocolV2Component(key, component);
-      if (remoteBinary.kind === 'resource') {
-        resourceBinary = remoteBinary.binary;
-      } else if (remoteBinary.kind === 'bootloader') {
-        bootloaderBinary = remoteBinary.binary;
-      } else {
-        fwBinaryMap.push({
-          fileName: remoteBinary.fileName,
-          binary: remoteBinary.binary,
-          targetId: remoteBinary.targetId,
-        });
+      const target = this.getRemoteComponentTarget(key, component);
+      const shouldInstall = await this.shouldInstallRemoteProtocolV2Component(
+        release,
+        key,
+        component,
+        target,
+        features
+      );
+      if (shouldInstall) {
+        const remoteBinary = await this.downloadRemoteProtocolV2Component(key, component);
+        if (remoteBinary.kind === 'resource') {
+          resourceBinary = remoteBinary.binary;
+        } else if (remoteBinary.kind === 'bootloader') {
+          bootloaderBinary = remoteBinary.binary;
+        } else {
+          fwBinaryMap.push({
+            fileName: remoteBinary.fileName,
+            binary: remoteBinary.binary,
+            targetId: remoteBinary.targetId,
+          });
+        }
       }
     }
 
@@ -600,60 +920,93 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   }) {
     let totalSize = 0;
     let processedSize = 0;
+    let transferredSize = 0;
 
     if (resourceBinary) totalSize += resourceBinary.byteLength;
     for (const fwbinary of fwBinaryMap) totalSize += fwbinary.binary.byteLength;
     if (bootloaderBinary) totalSize += bootloaderBinary.byteLength;
 
     this.postTipMessage(FirmwareUpdateTipMessage.StartTransferData);
+    const transferStartTime = Date.now();
+    const transferTransport = this.getProtocolV2FirmwareTransferTransport();
+    const chunkSize = this.getProtocolV2FirmwareChunkSize();
+    const onTransferredBytes = (bytes: number) => {
+      transferredSize = bytes;
+    };
+    Log.log(
+      `[FirmwareUpdateV4] transfer started transport=${transferTransport} total=${totalSize} bytes chunk=${chunkSize} bytes`
+    );
 
     const targets: Array<{ target_id: number; path: string }> = [];
 
-    if (resourceBinary) {
-      // resource 仅支持单文件 .bin：整文件一次上传，target path 指向该文件
-      const resourceFilePath = `${PROTOCOL_V2_FIRMWARE_STAGING_VOLUME}resource.bin`;
-      processedSize = await this.protocolV2CommonUpdateProcess({
-        payload: resourceBinary,
-        filePath: resourceFilePath,
-        processedSize,
-        totalSize,
-      });
-      targets.push({
-        target_id: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_CRATE,
-        path: resourceFilePath,
-      });
-    }
+    try {
+      if (resourceBinary) {
+        // resource 仅支持单文件 .bin：整文件一次上传，target path 指向该文件
+        const resourceFilePath = `${PROTOCOL_V2_FIRMWARE_STAGING_VOLUME}resource.bin`;
+        processedSize = await this.protocolV2CommonUpdateProcess({
+          payload: resourceBinary,
+          filePath: resourceFilePath,
+          processedSize,
+          totalSize,
+          onTransferredBytes,
+        });
+        transferredSize = processedSize;
+        targets.push({
+          target_id: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_CRATE,
+          path: resourceFilePath,
+        });
+      }
 
-    if (bootloaderBinary) {
-      const bootloaderPath = `${PROTOCOL_V2_FIRMWARE_STAGING_VOLUME}bootloader.bin`;
-      processedSize = await this.protocolV2CommonUpdateProcess({
-        payload: bootloaderBinary,
-        filePath: bootloaderPath,
-        processedSize,
-        totalSize,
-      });
-      targets.push({
-        target_id: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_BOOTLOADER,
-        path: bootloaderPath,
-      });
-    }
+      if (bootloaderBinary) {
+        const bootloaderPath = `${PROTOCOL_V2_FIRMWARE_STAGING_VOLUME}bootloader.bin`;
+        processedSize = await this.protocolV2CommonUpdateProcess({
+          payload: bootloaderBinary,
+          filePath: bootloaderPath,
+          processedSize,
+          totalSize,
+          onTransferredBytes,
+        });
+        transferredSize = processedSize;
+        targets.push({
+          target_id: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_BOOTLOADER,
+          path: bootloaderPath,
+        });
+      }
 
-    for (const fwbinary of fwBinaryMap) {
-      const firmwarePath = `${PROTOCOL_V2_FIRMWARE_STAGING_VOLUME}${fwbinary.fileName}`;
-      processedSize = await this.protocolV2CommonUpdateProcess({
-        payload: fwbinary.binary,
-        filePath: firmwarePath,
-        processedSize,
-        totalSize,
-      });
-      targets.push({
-        target_id: fwbinary.targetId,
-        path: firmwarePath,
-      });
-    }
+      for (const fwbinary of fwBinaryMap) {
+        const firmwarePath = `${PROTOCOL_V2_FIRMWARE_STAGING_VOLUME}${fwbinary.fileName}`;
+        processedSize = await this.protocolV2CommonUpdateProcess({
+          payload: fwbinary.binary,
+          filePath: firmwarePath,
+          processedSize,
+          totalSize,
+          onTransferredBytes,
+        });
+        transferredSize = processedSize;
+        targets.push({
+          target_id: fwbinary.targetId,
+          path: firmwarePath,
+        });
+      }
 
-    if (totalSize > 0) {
-      this.postProgressMessage(100, 'transferData');
+      if (totalSize > 0) {
+        this.postProgressMessage(100, 'transferData');
+      }
+
+      const elapsedMs = Date.now() - transferStartTime;
+      Log.log(
+        `[FirmwareUpdateV4] transfer finished transport=${transferTransport} bytes=${totalSize} elapsed=${(
+          elapsedMs / 1000
+        ).toFixed(2)}s speed=${formatProtocolV2TransferSpeed(totalSize, elapsedMs)} KB/s`
+      );
+    } catch (error) {
+      const elapsedMs = Date.now() - transferStartTime;
+      Log.warn(
+        `[FirmwareUpdateV4] transfer failed transport=${transferTransport} bytes=${transferredSize}/${totalSize} elapsed=${(
+          elapsedMs / 1000
+        ).toFixed(2)}s speed=${formatProtocolV2TransferSpeed(transferredSize, elapsedMs)} KB/s`
+      );
+      throw error;
     }
 
     this.postTipMessage(FirmwareUpdateTipMessage.ConfirmOnDevice);
@@ -683,6 +1036,24 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
       }
     );
+  }
+
+  private isProtocolV2NormalModeFeatures(features?: Features | null) {
+    return !!features && !features.bootloaderMode && features.mode !== 'bootloader';
+  }
+
+  private async probeProtocolV2NormalMode() {
+    const deviceInfo = await requestProtocolV2DeviceInfo({
+      commands: this.device.getCommands(),
+      timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
+      request: PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST,
+    });
+    const features = this.device.updateProtocolV2Features(deviceInfo);
+    if (this.isProtocolV2NormalModeFeatures(features)) {
+      Log.log('Protocol V2 firmware install finished; device is back in normal mode');
+      return true;
+    }
+    return false;
   }
 
   private assertProtocolV2TargetStatus(
@@ -755,17 +1126,19 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         if (isProtocolV2PollingTransientError(error)) {
           try {
             await this.reconnectProtocolV2Device();
+            if (await this.probeProtocolV2NormalMode()) {
+              return;
+            }
           } catch (reconnectError) {
             lastError = reconnectError;
             Log.log(
-              'Protocol V2 firmware install reconnect/status polling failed: ',
+              'Protocol V2 firmware install reconnect/normal-mode probe failed: ',
               reconnectError
             );
           }
           try {
             await this.pingProtocolV2Device();
             Log.log('Protocol V2 firmware status unavailable, Ping is ready');
-            return;
           } catch (pingError) {
             lastError = pingError;
             Log.log('Protocol V2 firmware install Ping polling failed: ', pingError);
@@ -783,6 +1156,15 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
   private async exitProtocolV2BootloaderToNormal() {
     this.postTipMessage(FirmwareUpdateTipMessage.SwitchFirmwareReconnectDevice);
+    try {
+      await this.reconnectProtocolV2Device();
+      if (await this.probeProtocolV2NormalMode()) {
+        Log.log('Protocol V2 device is already in normal mode, skip normal reboot');
+        return;
+      }
+    } catch (error) {
+      Log.log('Protocol V2 normal-mode probe before reboot failed: ', error);
+    }
     await this.protocolV2Reboot(DeviceRebootType.Normal);
   }
 
@@ -895,10 +1277,12 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     filePath,
     processedSize,
     totalSize,
+    onTransferredBytes,
   }: PROTO.FirmwareUpload & {
     filePath: string;
     processedSize?: number;
     totalSize?: number;
+    onTransferredBytes?: (transferredBytes: number) => void;
   }) {
     const chunkSize = this.getProtocolV2FirmwareChunkSize();
     let offset = 0;
@@ -940,10 +1324,25 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         );
       }
       offset = nextOffset;
+      onTransferredBytes?.((processedSize ?? 0) + offset);
       this.postProgressMessage(getUploadProgress(offset), 'transferData');
     }
 
     return totalSize !== undefined ? (processedSize ?? 0) + payload.byteLength : 0;
+  }
+
+  private getProtocolV2FirmwareTransferTransport() {
+    const env = DataManager.getSettings('env');
+    if (env && DataManager.isBleConnect(env)) {
+      return 'BLE';
+    }
+    if (
+      env &&
+      (DataManager.isBrowserWebUsb(env) || DataManager.isDesktopWebUsb(env) || env === 'web')
+    ) {
+      return 'WebUSB';
+    }
+    return env ?? 'unknown';
   }
 
   private async fileWriteWithRetry(
@@ -1032,7 +1431,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         },
         {
           intermediateTypes: ['DeviceFirmwareUpdateStatus'],
-          timeoutMs: PROTOCOL_V2_INSTALL_TIMEOUT,
+          timeoutMs: PROTOCOL_V2_START_UPDATE_TIMEOUT,
           onIntermediateResponse: (response: { type?: string }) => {
             if (response.type === 'DeviceFirmwareUpdateStatus') {
               this.postProgressMessage(99, 'installingFirmware');

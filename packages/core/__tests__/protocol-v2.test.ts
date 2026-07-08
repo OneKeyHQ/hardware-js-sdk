@@ -1701,6 +1701,40 @@ describe('API compatibility handling', () => {
 });
 
 describe('Protocol V2 firmware update targets', () => {
+  const OKPP_HEADER_SIZE = 0x52a0;
+
+  const buildOkppHeader = ({
+    type = 'RESC',
+    version = [1, 0, 0],
+    payloadHash = 'ab'.repeat(64),
+    headerHash = 'cd'.repeat(64),
+  }: {
+    type?: string;
+    version?: [number, number, number];
+    payloadHash?: string;
+    headerHash?: string;
+  } = {}) => {
+    const header = new Uint8Array(OKPP_HEADER_SIZE);
+    const view = new DataView(header.buffer);
+    'OKPP'.split('').forEach((char, index) => {
+      header[index] = char.charCodeAt(0);
+    });
+    view.setUint32(0x04, 1, true);
+    type.split('').forEach((char, index) => {
+      header[0x08 + index] = char.charCodeAt(0);
+    });
+    view.setUint32(0x0c, OKPP_HEADER_SIZE, true);
+    view.setUint32(0x10, version[0] * 0x10000 + version[1] * 0x100 + version[2], true);
+    const writeHex = (offset: number, hex: string) => {
+      for (let i = 0; i < hex.length / 2; i++) {
+        header[offset + i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+      }
+    };
+    writeHex(0x200, payloadHash);
+    writeHex(0x240, headerHash);
+    return header;
+  };
+
   test('keeps Protocol V2 firmware updates off the firmwareUpdateV3 path', async () => {
     const method = new FirmwareUpdateV3({
       id: 1,
@@ -2031,19 +2065,31 @@ describe('Protocol V2 firmware update targets', () => {
         method: 'firmwareUpdateV4',
       },
     });
-    const typedCall = jest
-      .fn()
-      .mockRejectedValueOnce(
-        new Error(
-          'Device protocol mismatch: expected V2, but device did not respond to expected protocol'
-        )
-      )
-      .mockResolvedValueOnce({
-        type: 'DeviceFirmwareUpdateStatus',
-        message: {
-          records: [{ target_id: 6, status: 2 }],
-        },
-      });
+    const typedCall = jest.fn().mockImplementation((name: string) => {
+      if (name === 'DeviceFirmwareUpdateStatusGet') {
+        const callCount = typedCall.mock.calls.filter(call => call[0] === name).length;
+        if (callCount === 1) {
+          return Promise.reject(
+            new Error(
+              'Device protocol mismatch: expected V2, but device did not respond to expected protocol'
+            )
+          );
+        }
+        return Promise.resolve({
+          type: 'DeviceFirmwareUpdateStatus',
+          message: {
+            records: [{ target_id: 6, status: 2 }],
+          },
+        });
+      }
+      if (name === 'DeviceInfoGet') {
+        return Promise.reject(new Error('DeviceInfo not ready'));
+      }
+      if (name === 'Ping') {
+        return Promise.resolve({ type: 'Success', message: { message: 'ready' } });
+      }
+      return Promise.reject(new Error(`unexpected call ${name}`));
+    });
     const reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
 
     (method as any).device = stubDevice({
@@ -2057,7 +2103,68 @@ describe('Protocol V2 firmware update targets', () => {
     ]);
 
     expect(reconnectProtocolV2Device).toHaveBeenCalledTimes(1);
-    expect(typedCall).toHaveBeenCalledTimes(2);
+    expect(typedCall.mock.calls.map(call => call[0])).toEqual([
+      'DeviceFirmwareUpdateStatusGet',
+      'DeviceInfoGet',
+      'Ping',
+      'DeviceFirmwareUpdateStatusGet',
+    ]);
+  });
+
+  test('treats Protocol V2 normal mode after reconnect as firmware update complete', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const typedCall = jest.fn().mockImplementation((name: string) => {
+      if (name === 'DeviceFirmwareUpdateStatusGet') {
+        return Promise.reject(new Error('Device disconnected'));
+      }
+      if (name === 'DeviceInfoGet') {
+        return Promise.resolve({
+          type: 'DeviceInfo',
+          message: {
+            hw: { serial_no: 'PR9999999999' },
+            fw: {
+              bootloader: { version: '9.9.9' },
+              application: { version: '9.9.9' },
+            },
+            status: {
+              device_id: 'PRO2-DEVICE-ID',
+              init_states: true,
+            },
+          },
+        });
+      }
+      return Promise.reject(new Error(`unexpected call ${name}`));
+    });
+    const reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
+    const updateProtocolV2Features = jest.fn((deviceInfo: ProtocolV2DeviceInfo) =>
+      normalizeProtocolV2Features({ ...descriptor, protocolType: 'V2' } as any, deviceInfo)
+    );
+
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+      updateProtocolV2Features,
+    });
+    (method as any).reconnectProtocolV2Device = reconnectProtocolV2Device;
+    method.postProgressMessage = jest.fn();
+
+    await expect(
+      (method as any).waitForProtocolV2FirmwareUpdateComplete([
+        { target_id: 3, path: 'vol1:bootloader.bin' },
+        { target_id: 4, path: 'vol1:application_p1.bin' },
+      ])
+    ).resolves.toBeUndefined();
+
+    expect(reconnectProtocolV2Device).toHaveBeenCalledTimes(1);
+    expect(updateProtocolV2Features).toHaveBeenCalledTimes(1);
+    expect(typedCall.mock.calls.map(call => call[0])).toEqual([
+      'DeviceFirmwareUpdateStatusGet',
+      'DeviceInfoGet',
+    ]);
   });
 
   test('uses SDK decoded enum names for Protocol V2 install polling', () => {
@@ -2275,9 +2382,11 @@ describe('Protocol V2 firmware update targets', () => {
     );
     const getSysResourceBinarySpy = jest
       .spyOn(firmwareBinaryApi, 'getSysResourceBinary')
-      .mockImplementation(async url => ({
-        binary: binaries.get(url) ?? new Uint8Array([0]).buffer,
-      }));
+      .mockImplementation(url =>
+        Promise.resolve({
+          binary: binaries.get(url) ?? new Uint8Array([0]).buffer,
+        })
+      );
     const getFirmwareLatestReleaseSpy = jest
       .spyOn(DataManager, 'getFirmwareLatestRelease')
       .mockReturnValue({
@@ -2354,6 +2463,222 @@ describe('Protocol V2 firmware update targets', () => {
       'https://example.com/se03.pp.bin',
       'https://example.com/se04.pp.bin',
     ]);
+
+    getSysResourceBinarySpy.mockRestore();
+    getFirmwareLatestReleaseSpy.mockRestore();
+  });
+
+  test('skips Pro2 resource crate download when resourceManifest matches device OKPP headers', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+      },
+    });
+    method.init();
+
+    const payloadHash = 'ab'.repeat(64);
+    const header = buildOkppHeader({ payloadHash });
+    const typedCall = jest.fn(
+      (name: string, _resType: string, params: { file: { offset: number }; chunk_len: number }) => {
+        if (name === 'FilesystemPathInfoQuery') {
+          return Promise.resolve({
+            type: 'FilesystemPathInfo',
+            message: { exist: true, directory: false, size: header.byteLength },
+          });
+        }
+        if (name === 'FilesystemFileRead') {
+          const { offset } = params.file;
+          const readLen = params.chunk_len;
+          return Promise.resolve({
+            type: 'FilesystemFile',
+            message: { data: header.slice(offset, offset + readLen) },
+          });
+        }
+        return Promise.reject(new Error(`unexpected call ${name}`));
+      }
+    );
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+    });
+
+    const getSysResourceBinarySpy = jest
+      .spyOn(firmwareBinaryApi, 'getSysResourceBinary')
+      .mockResolvedValue({ binary: new Uint8Array([9]).buffer });
+    const getFirmwareLatestReleaseSpy = jest
+      .spyOn(DataManager, 'getFirmwareLatestRelease')
+      .mockReturnValue({
+        required: false,
+        version: [1, 0, 0],
+        url: '',
+        upgradeType: 'payload-package-set',
+        installOrder: ['resource'],
+        components: {
+          resource: {
+            target: 'RESOURCE',
+            url: 'https://example.com/pro2-resource.crate.okpkg',
+          },
+        },
+        resourceManifest: {
+          format: 'okpkg-crate',
+          target: 'RESOURCE',
+          version: [1, 0, 0],
+          packages: [
+            {
+              path: 'resource/images/images.okpkg',
+              type: 'RESC',
+              payloadHash,
+            },
+          ],
+        },
+        fingerprint: '',
+        changelog: {
+          'zh-CN': '',
+          'en-US': '',
+        },
+      });
+
+    const remoteBinaries = await (method as any).prepareRemoteProtocolV2Binaries('universal', {
+      deviceType: 'pro2',
+      firmwareVersion: '1.0.0',
+      capabilities: [],
+    });
+
+    expect(remoteBinaries).toEqual({
+      resourceBinary: null,
+      bootloaderBinary: null,
+      fwBinaryMap: [],
+    });
+    expect(getSysResourceBinarySpy).not.toHaveBeenCalled();
+    expect(typedCall.mock.calls[0][2]).toEqual({
+      path: 'vol0:/resource/images/images.okpkg',
+    });
+
+    getSysResourceBinarySpy.mockRestore();
+    getFirmwareLatestReleaseSpy.mockRestore();
+  });
+
+  test('downloads Pro2 resource crate when resourceManifest package is missing', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+      },
+    });
+    method.init();
+
+    const resourceBinary = new Uint8Array([9]).buffer;
+    const typedCall = jest.fn().mockResolvedValue({
+      type: 'FilesystemPathInfo',
+      message: { exist: false, directory: false, size: 0 },
+    });
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+    });
+
+    const getSysResourceBinarySpy = jest
+      .spyOn(firmwareBinaryApi, 'getSysResourceBinary')
+      .mockResolvedValue({ binary: resourceBinary });
+    const getFirmwareLatestReleaseSpy = jest
+      .spyOn(DataManager, 'getFirmwareLatestRelease')
+      .mockReturnValue({
+        required: false,
+        version: [1, 0, 0],
+        url: '',
+        upgradeType: 'payload-package-set',
+        installOrder: ['resource'],
+        components: {
+          resource: {
+            target: 'RESOURCE',
+            url: 'https://example.com/pro2-resource.crate.okpkg',
+          },
+        },
+        resourceManifest: {
+          format: 'okpkg-crate',
+          target: 'RESOURCE',
+          version: [1, 0, 0],
+          packages: [{ path: 'resource/images/images.okpkg', type: 'RESC' }],
+        },
+        fingerprint: '',
+        changelog: {
+          'zh-CN': '',
+          'en-US': '',
+        },
+      });
+
+    const remoteBinaries = await (method as any).prepareRemoteProtocolV2Binaries('universal', {
+      deviceType: 'pro2',
+      firmwareVersion: '1.0.0',
+      capabilities: [],
+    });
+
+    expect(remoteBinaries.resourceBinary).toBe(resourceBinary);
+    expect(getSysResourceBinarySpy).toHaveBeenCalledWith(
+      'https://example.com/pro2-resource.crate.okpkg'
+    );
+
+    getSysResourceBinarySpy.mockRestore();
+    getFirmwareLatestReleaseSpy.mockRestore();
+  });
+
+  test('skips Pro2 firmware components when configured versions are already installed', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+      },
+    });
+    method.init();
+
+    const getSysResourceBinarySpy = jest
+      .spyOn(firmwareBinaryApi, 'getSysResourceBinary')
+      .mockResolvedValue({ binary: new Uint8Array([1]).buffer });
+    const getFirmwareLatestReleaseSpy = jest
+      .spyOn(DataManager, 'getFirmwareLatestRelease')
+      .mockReturnValue({
+        required: false,
+        version: [1, 0, 0],
+        url: 'https://example.com/applicationP1.pp.bin',
+        bootloaderVersion: [1, 0, 0],
+        upgradeType: 'payload-package-set',
+        installOrder: ['bootloader', 'applicationP1', 'applicationP2'],
+        components: {
+          bootloader: {
+            target: 'BOOTLOADER',
+            url: 'https://example.com/bootloader.pp.bin',
+          },
+          applicationP1: {
+            target: 'APPLICATION_P1',
+            url: 'https://example.com/applicationP1.pp.bin',
+          },
+          applicationP2: {
+            target: 'APPLICATION_P2',
+            url: 'https://example.com/applicationP2.pp.bin',
+          },
+        },
+        fingerprint: '',
+        changelog: {
+          'zh-CN': '',
+          'en-US': '',
+        },
+      });
+
+    const remoteBinaries = await (method as any).prepareRemoteProtocolV2Binaries('universal', {
+      deviceType: 'pro2',
+      firmwareVersion: '1.0.0',
+      bootloaderVersion: '1.0.0',
+      capabilities: [],
+    });
+
+    expect(remoteBinaries).toEqual({
+      resourceBinary: null,
+      bootloaderBinary: null,
+      fwBinaryMap: [],
+    });
+    expect(getSysResourceBinarySpy).not.toHaveBeenCalled();
 
     getSysResourceBinarySpy.mockRestore();
     getFirmwareLatestReleaseSpy.mockRestore();
