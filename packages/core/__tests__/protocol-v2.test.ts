@@ -2516,13 +2516,13 @@ describe('Protocol V2 firmware update targets', () => {
         installOrder: ['resource'],
         components: {
           resource: {
-            target: 'RESOURCE',
+            target: 'CRATE',
             url: 'https://example.com/pro2-resource.crate.okpkg',
           },
         },
         resourceManifest: {
           format: 'okpkg-crate',
-          target: 'RESOURCE',
+          target: 'CRATE',
           version: [1, 0, 0],
           packages: [
             {
@@ -2591,13 +2591,13 @@ describe('Protocol V2 firmware update targets', () => {
         installOrder: ['resource'],
         components: {
           resource: {
-            target: 'RESOURCE',
+            target: 'CRATE',
             url: 'https://example.com/pro2-resource.crate.okpkg',
           },
         },
         resourceManifest: {
           format: 'okpkg-crate',
-          target: 'RESOURCE',
+          target: 'CRATE',
           version: [1, 0, 0],
           packages: [{ path: 'resource/images/images.okpkg', type: 'RESC' }],
         },
@@ -2618,6 +2618,57 @@ describe('Protocol V2 firmware update targets', () => {
     expect(getSysResourceBinarySpy).toHaveBeenCalledWith(
       'https://example.com/pro2-resource.crate.okpkg'
     );
+
+    getSysResourceBinarySpy.mockRestore();
+    getFirmwareLatestReleaseSpy.mockRestore();
+  });
+
+  test('maps Pro2 CRATE remote component to resource binary target', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+      },
+    });
+    method.init();
+
+    const resourceBinary = new Uint8Array([1, 2, 3]).buffer;
+    const getSysResourceBinarySpy = jest
+      .spyOn(firmwareBinaryApi, 'getSysResourceBinary')
+      .mockResolvedValue({ binary: resourceBinary });
+    const getFirmwareLatestReleaseSpy = jest
+      .spyOn(DataManager, 'getFirmwareLatestRelease')
+      .mockReturnValue({
+        required: false,
+        version: [1, 0, 0],
+        url: '',
+        upgradeType: 'payload-package-set',
+        installOrder: ['resource'],
+        components: {
+          resource: {
+            target: 'CRATE',
+            url: 'https://example.com/pro2-resource.crate.okpkg',
+          },
+        },
+        fingerprint: '',
+        changelog: {
+          'zh-CN': '',
+          'en-US': '',
+        },
+      });
+
+    const remoteBinaries = await (method as any).prepareRemoteProtocolV2Binaries('universal', {
+      deviceType: 'pro2',
+      firmwareVersion: '0.0.0',
+      capabilities: [],
+    });
+
+    expect(remoteBinaries).toEqual({
+      resourceBinary,
+      bootloaderBinary: null,
+      fwBinaryMap: [],
+    });
 
     getSysResourceBinarySpy.mockRestore();
     getFirmwareLatestReleaseSpy.mockRestore();

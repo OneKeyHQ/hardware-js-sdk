@@ -50,6 +50,7 @@ export type IProtocolV2FirmwareComponentTarget =
   | 'SE02'
   | 'SE03'
   | 'SE04'
+  | 'CRATE'
   | 'RESOURCE';
 
 export type IProtocolV2FirmwareComponent = {
@@ -71,7 +72,7 @@ export type IProtocolV2ResourceManifestPackage = {
 
 export type IProtocolV2ResourceManifest = {
   format?: 'okpkg-crate' | string;
-  target?: 'RESOURCE' | string;
+  target?: 'CRATE' | 'RESOURCE' | string;
   version?: IVersionArray;
   packages: IProtocolV2ResourceManifestPackage[];
 };
