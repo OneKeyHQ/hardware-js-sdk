@@ -72,8 +72,6 @@ const toBleDescriptor = (
 
 const BLE_PACKET_SIZE = 192;
 const BLE_WRITE_DELAY_MS = 5;
-const BLE_WRITE_MAX_RETRIES = 3;
-const BLE_WRITE_RETRY_DELAY_MS = 300;
 const BLE_RESPONSE_TIMEOUT_MS = 30_000;
 const PROTOCOL_PROBE_TIMEOUT_MS = 1000;
 const PROTOCOL_V2_PROBE_TIMEOUT_MS = 5000;
@@ -496,7 +494,7 @@ export default class ElectronBleTransport {
 
     if (totalBytes <= BLE_PACKET_SIZE) {
       await wait(BLE_WRITE_DELAY_MS);
-      await this.writeWithRetry(uuid, hexData);
+      await this.writeOnce(uuid, hexData);
       return;
     }
 
@@ -505,7 +503,7 @@ export default class ElectronBleTransport {
       const chunkHex = hexData.substring(offset, offset + chunkHexLen);
       offset += chunkHexLen;
 
-      await this.writeWithRetry(uuid, chunkHex);
+      await this.writeOnce(uuid, chunkHex);
 
       if (offset < hexData.length) {
         await wait(BLE_WRITE_DELAY_MS);
@@ -513,32 +511,13 @@ export default class ElectronBleTransport {
     }
   }
 
-  private async writeWithRetry(uuid: string, hexData: string): Promise<void> {
-    let lastError: any;
+  private async writeOnce(uuid: string, hexData: string): Promise<void> {
     const nobleBle = window.desktopApi?.nobleBle;
     if (!nobleBle) {
       throw new Error('Noble BLE API not available');
     }
 
-    for (let attempt = 1; attempt <= BLE_WRITE_MAX_RETRIES; attempt++) {
-      try {
-        await nobleBle.write(uuid, hexData);
-        return;
-      } catch (error) {
-        lastError = error;
-        this.Log?.error(
-          `[Electron BLE] write failed (attempt ${attempt}/${BLE_WRITE_MAX_RETRIES}):`,
-          error
-        );
-        if (attempt < BLE_WRITE_MAX_RETRIES) {
-          await wait(BLE_WRITE_RETRY_DELAY_MS);
-        }
-      }
-    }
-    throw ERRORS.TypedError(
-      HardwareErrorCode.BleWriteCharacteristicError,
-      `BLE write failed after ${BLE_WRITE_MAX_RETRIES} attempts: ${lastError?.message ?? lastError}`
-    );
+    await nobleBle.write(uuid, hexData);
   }
 
   private handleNotification(deviceId: string, hexData: string): void {

@@ -1631,42 +1631,27 @@ export default class ReactNativeBleTransport {
     const shouldThrottle = !!options?.highVolume && writeMode === 'withoutResponse';
     let packetsWritten = 0;
 
-    try {
-      for (let offset = 0; offset < frame.length; offset += packetCapacity) {
-        const chunk = frame.slice(offset, offset + packetCapacity);
-        const base64 = Buffer.from(chunk).toString('base64');
-        if (writeMode === 'withResponse') {
-          await transport.writeCharacteristic.writeWithResponse(base64);
-        } else {
-          await transport.writeCharacteristic.writeWithoutResponse(base64);
-        }
-        packetsWritten += 1;
+    for (let offset = 0; offset < frame.length; offset += packetCapacity) {
+      const chunk = frame.slice(offset, offset + packetCapacity);
+      const base64 = Buffer.from(chunk).toString('base64');
+      if (writeMode === 'withResponse') {
+        await transport.writeCharacteristic.writeWithResponse(base64);
+      } else {
+        await transport.writeCharacteristic.writeWithoutResponse(base64);
+      }
+      packetsWritten += 1;
 
-        if (
-          shouldThrottle &&
-          packetsWritten % tuning.highVolumeWriteBurstSize === 0 &&
-          offset + packetCapacity < frame.length
-        ) {
-          await delay(tuning.highVolumeWritePauseMs);
-        }
+      if (
+        shouldThrottle &&
+        packetsWritten % tuning.highVolumeWriteBurstSize === 0 &&
+        offset + packetCapacity < frame.length
+      ) {
+        await delay(tuning.highVolumeWritePauseMs);
       }
+    }
 
-      if (shouldThrottle) {
-        await delay(tuning.highVolumeWriteFlushDelayMs);
-      }
-    } catch (error) {
-      if (options?.highVolume && !writeWithResponse && packetsWritten === 0) {
-        Log?.debug(
-          '[ReactNativeBleTransport] Protocol V2 high-volume writeWithoutResponse failed before data was sent, fallback to writeWithResponse:',
-          error
-        );
-        await this.writeProtocolV2Frame(transport, frame, {
-          highVolume: true,
-          writeWithResponse: true,
-        });
-        return;
-      }
-      throw error;
+    if (shouldThrottle) {
+      await delay(tuning.highVolumeWriteFlushDelayMs);
     }
   }
 

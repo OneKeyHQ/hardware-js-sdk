@@ -14,6 +14,7 @@ import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
 import { DEVICE, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 
 import { promptPassphraseViaPinentry } from './pinentry';
+import { createNobleBlePlugin } from './transports/nobleBlePlugin';
 
 import type { ConnectSettings } from '@onekeyfe/hd-core';
 import type { PinentryResult } from './pinentry';
@@ -23,6 +24,7 @@ export interface SDKOptions {
   passphraseState?: string;
   useEmptyPassphrase?: boolean;
   debug?: boolean;
+  transport?: 'usb' | 'ble';
 }
 
 /**
@@ -183,12 +185,17 @@ function registerEventHandlers(sdk: typeof HardwareSDK): void {
 // ---------------------------------------------------------------------------
 
 async function initSDK(): Promise<typeof HardwareSDK> {
+  const transport = currentOpts.transport ?? 'usb';
   const settings: Partial<ConnectSettings> = {
     debug: currentOpts.debug ?? false,
     fetchConfig: true,
-    env: 'node-usb',
+    env: transport === 'ble' ? 'lowlevel' : 'node-usb',
   };
-  await HardwareSDK.init(settings);
+  await HardwareSDK.init(
+    settings,
+    undefined,
+    transport === 'ble' ? createNobleBlePlugin() : undefined
+  );
 
   // Defensive: strip any stale listeners (e.g. left over from a previous
   // dispose/init cycle in a long-running process) before wiring ours.

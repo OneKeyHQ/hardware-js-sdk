@@ -571,16 +571,7 @@ export default class WebUsbTransport {
     let lastError: unknown;
     for (let attempt = 1; attempt <= PACKET_IO_MAX_RETRIES; attempt += 1) {
       try {
-        const device = await this.findDevice(path);
-        if (!device.opened) {
-          await this.connect(path, false);
-        }
-        const endpoints = this.deviceEndpoints.get(path);
-        const endpointOut = endpoints?.endpointOut ?? this.endpointId;
-        const transferBuffer = this.toArrayBuffer(
-          packet.buffer.slice(packet.byteOffset, packet.byteOffset + packet.byteLength)
-        );
-        await device.transferOut(endpointOut, transferBuffer);
+        await this.transferOutOnce(path, packet);
         return;
       } catch (error) {
         lastError = error;
@@ -601,6 +592,19 @@ export default class WebUsbTransport {
       }
     }
     throw lastError;
+  }
+
+  private async transferOutOnce(path: string, packet: Uint8Array) {
+    const device = await this.findDevice(path);
+    if (!device.opened) {
+      await this.connect(path, false);
+    }
+    const endpoints = this.deviceEndpoints.get(path);
+    const endpointOut = endpoints?.endpointOut ?? this.endpointId;
+    const transferBuffer = this.toArrayBuffer(
+      packet.buffer.slice(packet.byteOffset, packet.byteOffset + packet.byteLength)
+    );
+    await device.transferOut(endpointOut, transferBuffer);
   }
 
   private async transferInWithRetry(
@@ -835,7 +839,7 @@ export default class WebUsbTransport {
           protocolV2: this.messagesV2,
         },
         router: PROTOCOL_V2_CHANNEL_USB,
-        writeFrame: (frame: Uint8Array) => this.transferOutWithRetry(path, frame),
+        writeFrame: (frame: Uint8Array) => this.transferOutOnce(path, frame),
         readFrame: () => this.receiveProtocolV2Frame(path, this.protocolV2ReadTimeouts.get(path)),
         logger: this.Log,
         logPrefix: 'ProtocolV2 WebUSB',

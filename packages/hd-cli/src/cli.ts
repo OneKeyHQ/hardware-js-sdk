@@ -1,13 +1,8 @@
 import { readFileSync } from 'node:fs';
-
 import { Command } from 'commander';
+import { UI_EVENT, UI_REQUEST, getDeviceType } from '@onekeyfe/hd-core';
+import { EDeviceType } from '@onekeyfe/hd-shared';
 
-import { createSDK, disposeSDK } from './sdk';
-import {
-  clearSessionFromKeychain,
-  preloadSessionFromKeychain,
-  saveSessionToKeychain,
-} from './session';
 import {
   resolveBatchGetAddress,
   resolveGetAddress,
@@ -15,9 +10,13 @@ import {
   resolveSignMessage,
   resolveSignTransaction,
 } from './chains';
+import { createSDK, disposeSDK } from './sdk';
+import {
+  clearSessionFromKeychain,
+  preloadSessionFromKeychain,
+  saveSessionToKeychain,
+} from './session';
 
-import { EDeviceType } from '@onekeyfe/hd-shared';
-import { getDeviceType } from '@onekeyfe/hd-core';
 import type {
   EthereumSignTypedDataMessage,
   EthereumSignTypedDataTypes,
@@ -80,6 +79,7 @@ program.option(
   '--device-id <id>',
   'Persistent device ID from getFeatures (changes when seed changes)'
 );
+program.option('--transport <transport>', 'Transport to use: usb or ble', 'usb');
 program.option('--passphrase-state <state>', 'Passphrase state for hidden wallet access');
 program.option('--use-empty-passphrase', 'Use standard wallet (skip passphrase prompt)');
 program.option('--debug', 'Enable SDK debug logs');
@@ -95,8 +95,8 @@ program
     runCommand({}, async ({ sdk, globalOpts }) => {
       const result = await sdk.searchDevices();
 
-      // Auto-fetch features for each discovered device (doesn't require PIN)
-      if (result?.success && Array.isArray(result.payload)) {
+      // USB 下自动读取 features 成本低；BLE 搜索阶段只做枚举，避免批量连接导致超时。
+      if (globalOpts.transport !== 'ble' && result?.success && Array.isArray(result.payload)) {
         for (const device of result.payload as EnrichedSearchDevice[]) {
           if (device.connectId) {
             try {
@@ -543,14 +543,14 @@ program
 
 program
   .command('firmware-update-ble')
-  .description('BLE firmware update is not supported via CLI')
+  .description('Run Protocol V2 firmware update over BLE')
   .action(() =>
     respondAndExit({
       success: false,
       payload: {
         error:
-          'BLE firmware update via CLI is not supported. Please use the OneKey App or https://firmware.onekey.so/ to update firmware.',
-        code: 'FIRMWARE_UPDATE_NOT_SUPPORTED',
+          'Use `onekey-hw --transport ble firmware-update-v4-debug` for BLE Protocol V2 firmware update debugging.',
+        code: 'USE_FIRMWARE_UPDATE_V4_DEBUG',
       },
     })
   );
@@ -570,10 +570,16 @@ program
   .option('--se03 <path>', 'FW_MGMT_TARGET_SE03 binary path')
   .option('--se04 <path>', 'FW_MGMT_TARGET_SE04 binary path')
   .option('--forced-update-res', 'Force resource update')
+  .option('--retries <count>', 'Retry count for transient Protocol V2 USB probe failures')
   .action(opts =>
     runCommand({}, async ({ sdk, globalOpts }) => {
       const params = buildFirmwareUpdateV4DebugParams(opts);
-      const result = await sdk.firmwareUpdateV4(globalOpts.connectId, params);
+      const result = await runFirmwareUpdateV4DebugWithRetry({
+        sdk,
+        globalOpts,
+        params,
+        retries: opts.retries ? safeParseInt(opts.retries, '--retries') : undefined,
+      });
       outputResult(globalOpts, result);
     })
   );
@@ -1097,6 +1103,9 @@ async function runCommand(
 ): Promise<void> {
   const globalOpts = program.opts();
   try {
+    if (globalOpts.transport !== 'usb' && globalOpts.transport !== 'ble') {
+      throw new Error(`Unsupported transport: ${globalOpts.transport}. Use "usb" or "ble".`);
+    }
     const sdk = await createSDK(globalOpts);
     if (options.needsSession) {
       await prepareSession(sdk, globalOpts);
@@ -1148,6 +1157,311 @@ function safeJsonParse(input: string, label: string): unknown {
 function readBinaryParam(path: string): ArrayBuffer {
   const buffer = readFileSync(path);
   return new Uint8Array(buffer).buffer;
+}
+
+function getFirmwareUpdateV4DebugTotalBytes(
+  params: ReturnType<typeof buildFirmwareUpdateV4DebugParams>
+) {
+  return [
+    params.resourceBinary,
+    params.bootloaderBinary,
+    params.applicationP1Binary,
+    params.applicationP2Binary,
+    params.coprocessorBinary,
+    params.se01Binary,
+    params.se02Binary,
+    params.se03Binary,
+    params.se04Binary,
+  ].reduce((total, binary) => total + (binary?.byteLength ?? 0), 0);
+}
+
+function getFirmwareUpdateV4DebugErrorText(result: unknown) {
+  if (!result || typeof result !== 'object') return '';
+  const payload = (result as { payload?: unknown }).payload;
+  if (!payload || typeof payload !== 'object') return '';
+  const error = (payload as { error?: unknown }).error;
+  return typeof error === 'string' ? error : '';
+}
+
+function isProtocolV2UsbProbeTransientResult(result: unknown) {
+  const error = getFirmwareUpdateV4DebugErrorText(result);
+  return (
+    error.includes('Device protocol mismatch') &&
+    error.includes('expected V2') &&
+    error.includes('did not respond to expected protocol')
+  );
+}
+
+function isSuccessResult(result: unknown) {
+  return (
+    !!result && typeof result === 'object' && (result as { success?: boolean }).success === true
+  );
+}
+
+function getFirmwareDebugPayload(message: unknown) {
+  if (!message || typeof message !== 'object') return undefined;
+  return (message as { payload?: Record<string, unknown> }).payload;
+}
+
+function formatFirmwareDebugProgress(progress: number) {
+  if (!Number.isFinite(progress)) return '0%';
+  return `${Math.min(Math.max(Math.round(progress), 0), 100)}%`;
+}
+
+function formatFirmwareDebugBytes(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '';
+  return `${(bytes / 1024).toFixed(1)} KiB`;
+}
+
+function maybePrintFirmwareDebugProgress({
+  progressType,
+  progress,
+  payload,
+  lastPrintedProgress,
+}: {
+  progressType: string;
+  progress: number;
+  payload: Record<string, unknown>;
+  lastPrintedProgress: number;
+}) {
+  const printableProgress = Math.floor(progress / 10) * 10;
+  if (printableProgress <= lastPrintedProgress && progress < 100) {
+    return lastPrintedProgress;
+  }
+
+  const transferredBytes = Number(payload.transferredBytes);
+  const totalBytes = Number(payload.totalBytes);
+  const rateBytesPerSecond = Number(payload.rateBytesPerSecond);
+  const sizeText =
+    Number.isFinite(transferredBytes) && Number.isFinite(totalBytes) && totalBytes > 0
+      ? ` ${formatFirmwareDebugBytes(transferredBytes)}/${formatFirmwareDebugBytes(totalBytes)}`
+      : '';
+  const speedText =
+    Number.isFinite(rateBytesPerSecond) && rateBytesPerSecond > 0
+      ? ` ${(rateBytesPerSecond / 1024).toFixed(2)} KiB/s`
+      : '';
+
+  process.stderr.write(
+    `[onekey-hw] Firmware ${progressType}: ${formatFirmwareDebugProgress(
+      progress
+    )}${sizeText}${speedText}\n`
+  );
+  return progress >= 100 ? 100 : printableProgress;
+}
+
+function buildFirmwareUpdateV4DebugMetrics({
+  attempt,
+  maxAttempts,
+  totalBytes,
+  totalStartedAt,
+  transferStartedAt,
+  transferEndedAt,
+  installStartedAt,
+  installEndedAt,
+  progressEvents,
+  lastProgress,
+  installProgressEvents,
+  lastInstallProgress,
+  retried,
+}: {
+  attempt: number;
+  maxAttempts: number;
+  totalBytes: number;
+  totalStartedAt: number;
+  transferStartedAt?: number;
+  transferEndedAt?: number;
+  installStartedAt?: number;
+  installEndedAt?: number;
+  progressEvents: number;
+  lastProgress: number;
+  installProgressEvents: number;
+  lastInstallProgress: number;
+  retried: boolean;
+}) {
+  const totalElapsedMs = Date.now() - totalStartedAt;
+  const transferElapsedMs =
+    transferStartedAt !== undefined && transferEndedAt !== undefined
+      ? transferEndedAt - transferStartedAt
+      : undefined;
+  const installElapsedMs =
+    installStartedAt !== undefined && installEndedAt !== undefined
+      ? installEndedAt - installStartedAt
+      : undefined;
+
+  return {
+    attempt,
+    maxAttempts,
+    retried,
+    totalBytes,
+    progressEvents,
+    lastProgress,
+    installProgressEvents,
+    lastInstallProgress,
+    transferSeconds:
+      transferElapsedMs !== undefined ? Number((transferElapsedMs / 1000).toFixed(2)) : null,
+    transferKiBPerSecond:
+      transferElapsedMs !== undefined && transferElapsedMs > 0
+        ? Number((totalBytes / 1024 / (transferElapsedMs / 1000)).toFixed(2))
+        : null,
+    installSeconds:
+      installElapsedMs !== undefined ? Number((installElapsedMs / 1000).toFixed(2)) : null,
+    totalSeconds: Number((totalElapsedMs / 1000).toFixed(2)),
+  };
+}
+
+async function runFirmwareUpdateV4DebugWithRetry({
+  sdk,
+  globalOpts,
+  params,
+  retries,
+}: {
+  sdk: AnySdk;
+  globalOpts: Record<string, any>;
+  params: ReturnType<typeof buildFirmwareUpdateV4DebugParams>;
+  retries?: number;
+}) {
+  const totalBytes = getFirmwareUpdateV4DebugTotalBytes(params);
+  const maxAttempts = Math.max((retries ?? 2) + 1, 1);
+  let currentSdk = sdk;
+  let lastResult: unknown;
+  let retried = false;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    let progressEvents = 0;
+    let lastProgress = -1;
+    let transferStartedAt: number | undefined;
+    let transferEndedAt: number | undefined;
+    let installProgressEvents = 0;
+    let lastInstallProgress = -1;
+    let installStartedAt: number | undefined;
+    let installEndedAt: number | undefined;
+    let lastPrintedTransferProgress = -10;
+    let lastPrintedInstallProgress = -10;
+    const totalStartedAt = Date.now();
+    const connectId =
+      retried && globalOpts.transport === 'usb' && globalOpts.connectId
+        ? undefined
+        : globalOpts.connectId;
+
+    const onUiEvent = (message: unknown) => {
+      if (!message || typeof message !== 'object') return;
+      const messageType = (message as { type?: string }).type;
+      const payload = getFirmwareDebugPayload(message);
+
+      if (messageType === UI_REQUEST.FIRMWARE_TIP) {
+        const tipMessage = (payload?.data as { message?: unknown } | undefined)?.message;
+        if (typeof tipMessage === 'string') {
+          process.stderr.write(`[onekey-hw] Firmware: ${tipMessage}\n`);
+        }
+        return;
+      }
+
+      if (messageType === UI_REQUEST.REQUEST_BUTTON) {
+        const code = typeof payload?.code === 'string' ? ` (${payload.code})` : '';
+        process.stderr.write(
+          `[onekey-hw] Please confirm the firmware update on your device${code}.\n`
+        );
+        return;
+      }
+
+      if (messageType !== UI_REQUEST.FIRMWARE_PROGRESS || !payload) return;
+      const progress = Number(payload.progress);
+      if (!Number.isFinite(progress)) return;
+
+      if (payload.progressType === 'transferData') {
+        progressEvents += 1;
+        lastProgress = Math.max(lastProgress, progress);
+        transferStartedAt ??= Date.now();
+        lastPrintedTransferProgress = maybePrintFirmwareDebugProgress({
+          progressType: 'transfer',
+          progress,
+          payload,
+          lastPrintedProgress: lastPrintedTransferProgress,
+        });
+        if (progress >= 100) {
+          transferEndedAt ??= Date.now();
+        }
+        return;
+      }
+
+      if (payload.progressType === 'installingFirmware') {
+        installProgressEvents += 1;
+        lastInstallProgress = Math.max(lastInstallProgress, progress);
+        installStartedAt ??= Date.now();
+        lastPrintedInstallProgress = maybePrintFirmwareDebugProgress({
+          progressType: 'install',
+          progress,
+          payload,
+          lastPrintedProgress: lastPrintedInstallProgress,
+        });
+        if (progress >= 100) {
+          installEndedAt ??= Date.now();
+        }
+      }
+    };
+
+    currentSdk.on(UI_EVENT, onUiEvent);
+    try {
+      lastResult = await currentSdk.firmwareUpdateV4(connectId, params);
+    } finally {
+      currentSdk.off?.(UI_EVENT, onUiEvent);
+    }
+    if (installStartedAt !== undefined && installEndedAt === undefined) {
+      installEndedAt = Date.now();
+    }
+
+    const debugMetrics = buildFirmwareUpdateV4DebugMetrics({
+      attempt,
+      maxAttempts,
+      totalBytes,
+      totalStartedAt,
+      transferStartedAt,
+      transferEndedAt,
+      installStartedAt,
+      installEndedAt,
+      progressEvents,
+      lastProgress,
+      installProgressEvents,
+      lastInstallProgress,
+      retried,
+    });
+
+    if (lastResult && typeof lastResult === 'object') {
+      const payload = ((lastResult as { payload?: unknown }).payload ?? {}) as Record<
+        string,
+        unknown
+      >;
+      lastResult = {
+        ...(lastResult as Record<string, unknown>),
+        payload: {
+          ...payload,
+          _debug: debugMetrics,
+        },
+      };
+    }
+
+    if (isSuccessResult(lastResult)) {
+      return lastResult;
+    }
+
+    if (
+      attempt >= maxAttempts ||
+      globalOpts.transport !== 'usb' ||
+      !isProtocolV2UsbProbeTransientResult(lastResult)
+    ) {
+      return lastResult;
+    }
+
+    retried = true;
+    process.stderr.write(
+      `[onekey-hw] Protocol V2 USB probe was transient; retrying firmwareUpdateV4 (${attempt}/${maxAttempts})...\n`
+    );
+    await disposeSDK();
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    currentSdk = await createSDK(globalOpts);
+  }
+
+  return lastResult;
 }
 
 function buildFirmwareUpdateV4DebugParams(opts: {
