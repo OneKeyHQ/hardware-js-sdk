@@ -162,11 +162,6 @@ const PROTOCOL_V2_REMOTE_COMPONENT_TARGETS: Readonly<
     targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_CRATE,
     kind: 'resource',
   },
-  RESOURCE: {
-    fileName: 'resource.bin',
-    targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_CRATE,
-    kind: 'resource',
-  },
 };
 
 const PROTOCOL_V2_ROMLOADER_UNSUPPORTED_MESSAGE =
