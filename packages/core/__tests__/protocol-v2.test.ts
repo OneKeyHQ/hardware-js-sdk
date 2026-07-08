@@ -2482,6 +2482,7 @@ describe('Protocol V2 firmware update targets', () => {
     expect(writePayloads.map(payload => payload.file.data.byteLength)).toEqual([4000, 97]);
     expect(writePayloads.map(payload => payload.overwrite)).toEqual([true, false]);
     expect(writePayloads.every(payload => payload.append === false)).toBe(true);
+    expect(writePayloads.map(payload => payload.ui_percentage)).toEqual([0, 100]);
   });
 
   test('continues to DeviceFirmwareUpdate when FilesystemFileWrite returns processed chunk length', async () => {
@@ -2582,6 +2583,7 @@ describe('Protocol V2 firmware update targets', () => {
     const writePayloads = typedCall.mock.calls.map(call => call[2]);
     expect(writePayloads.map(payload => payload.file.offset)).toEqual([0, 1800]);
     expect(writePayloads.map(payload => payload.file.data.byteLength)).toEqual([1800, 1]);
+    expect(writePayloads.map(payload => payload.ui_percentage)).toEqual([0, 100]);
   });
 
   test('consumes Protocol V2 install progress before final update success', async () => {
@@ -3009,7 +3011,7 @@ describe('Protocol V2 file write method', () => {
         },
         overwrite: false,
         append: false,
-        ui_percentage: 99,
+        ui_percentage: 100,
       },
       { timeoutMs: undefined }
     );
@@ -3058,7 +3060,7 @@ describe('Protocol V2 file write method', () => {
         },
         overwrite: true,
         append: false,
-        ui_percentage: 98,
+        ui_percentage: 0,
       },
       { timeoutMs: undefined }
     );
@@ -3075,7 +3077,7 @@ describe('Protocol V2 file write method', () => {
         },
         overwrite: false,
         append: false,
-        ui_percentage: 99,
+        ui_percentage: 100,
       },
       { timeoutMs: undefined }
     );
@@ -3214,7 +3216,7 @@ describe('Protocol V2 file read method', () => {
         total_size: 0,
       },
       chunk_len: 64,
-      ui_percentage: 99,
+      ui_percentage: 0,
     });
     expect(typedCall).toHaveBeenNthCalledWith(3, 'FilesystemFileRead', 'FilesystemFile', {
       file: {
@@ -3223,7 +3225,7 @@ describe('Protocol V2 file read method', () => {
         total_size: 0,
       },
       chunk_len: 1,
-      ui_percentage: 99,
+      ui_percentage: 100,
     });
     expect(result.data.byteLength).toBe(65);
     expect(result.data[0]).toBe(1);

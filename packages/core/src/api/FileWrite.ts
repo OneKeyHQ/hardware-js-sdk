@@ -84,6 +84,19 @@ function getConfirmedProgress(
   return 100;
 }
 
+function getDeviceTransferProgress(bytesBeforeChunk: number, bytesAfterChunk: number, totalBytes: number) {
+  if (!Number.isFinite(totalBytes) || totalBytes <= 0) {
+    return 100;
+  }
+  if (bytesBeforeChunk <= 0 && bytesAfterChunk < totalBytes) {
+    return 0;
+  }
+  if (bytesAfterChunk >= totalBytes) {
+    return 100;
+  }
+  return Math.min(Math.max(Math.ceil((bytesAfterChunk / totalBytes) * 100), 1), 99);
+}
+
 export default class FileWrite extends BaseMethod<FileWriteParams> {
   init() {
     // Protocol V2 (Pro2) 专属方法，core 调度层统一做非 V2 设备守卫
@@ -147,7 +160,7 @@ export default class FileWrite extends BaseMethod<FileWriteParams> {
       const isFirstChunk = chunkIndex === 0;
       const progress =
         this.params.uiPercentage ??
-        Math.min(Math.ceil(((written + chunk.byteLength) / dataLength) * 100), 99);
+        getDeviceTransferProgress(offset, offset + chunk.byteLength, totalSize);
 
       const res = await this.device.commands.typedCall(
         'FilesystemFileWrite',

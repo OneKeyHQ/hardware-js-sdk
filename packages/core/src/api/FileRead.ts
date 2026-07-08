@@ -69,6 +69,19 @@ function toUint8Array(value: unknown): Uint8Array {
   return new Uint8Array(0);
 }
 
+function getDeviceTransferProgress(bytesBeforeChunk: number, bytesAfterChunk: number, totalBytes: number) {
+  if (!Number.isFinite(totalBytes) || totalBytes <= 0) {
+    return 100;
+  }
+  if (bytesBeforeChunk <= 0 && bytesAfterChunk < totalBytes) {
+    return 0;
+  }
+  if (bytesAfterChunk >= totalBytes) {
+    return 100;
+  }
+  return Math.min(Math.max(Math.ceil((bytesAfterChunk / totalBytes) * 100), 1), 99);
+}
+
 export default class FileRead extends BaseMethod<FileReadParams> {
   init() {
     // Protocol V2 (Pro2) 专属方法，core 调度层统一做非 V2 设备守卫
@@ -124,7 +137,7 @@ export default class FileRead extends BaseMethod<FileReadParams> {
       const offset = startOffset + read;
       const progress =
         this.params.uiPercentage ??
-        Math.min(Math.ceil(((read + readLen) / Math.max(totalLength, 1)) * 100), 99);
+        getDeviceTransferProgress(read, read + readLen, totalLength);
       const res = await this.device.commands.typedCall('FilesystemFileRead', 'FilesystemFile', {
         file: {
           path: this.params.path,

@@ -54,6 +54,23 @@ const PROTOCOL_V2_CONNECT_POLL_INTERVAL = 500;
 const PROTOCOL_V2_CONNECT_SINGLE_TIMEOUT = 75 * 1000;
 const PROTOCOL_V2_DEVICE_INFO_READY_TIMEOUT = 60 * 1000;
 
+const getProtocolV2DeviceTransferProgress = (
+  bytesBeforeChunk: number,
+  bytesAfterChunk: number,
+  totalBytes: number
+) => {
+  if (!Number.isFinite(totalBytes) || totalBytes <= 0) {
+    return 100;
+  }
+  if (bytesBeforeChunk <= 0 && bytesAfterChunk < totalBytes) {
+    return 0;
+  }
+  if (bytesAfterChunk >= totalBytes) {
+    return 100;
+  }
+  return Math.min(Math.max(Math.ceil((bytesAfterChunk / totalBytes) * 100), 1), 99);
+};
+
 type ProtocolV2FirmwareUpdateStatusTarget = {
   target_id: number | string;
   status?: number | string;
@@ -897,7 +914,11 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       const chunkLength = chunkEnd - offset;
       const chunk = payload.slice(offset, chunkEnd);
       const overwrite = offset === 0;
-      const progress = getUploadProgress(chunkEnd);
+      const progress = getProtocolV2DeviceTransferProgress(
+        (processedSize ?? 0) + offset,
+        (processedSize ?? 0) + chunkEnd,
+        totalSize ?? payload.byteLength
+      );
 
       const writeRes = await this.fileWriteWithRetry(
         filePath,
