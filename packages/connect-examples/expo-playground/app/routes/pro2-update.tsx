@@ -19,7 +19,7 @@ import type { DeviceInfo } from '../types/hardware';
 
 const TARGET_FIELDS = [
   {
-    param: 'resourceImagesBinary',
+    param: 'resourceCrate1Binary',
     label: 'Resource crate 1',
     targetId: 1,
     targetName: 'FW_MGMT_TARGET_CRATE',
@@ -28,7 +28,7 @@ const TARGET_FIELDS = [
     isResource: true,
   },
   {
-    param: 'resourceFontsBinary',
+    param: 'resourceCrate2Binary',
     label: 'Resource crate 2',
     targetId: 1,
     targetName: 'FW_MGMT_TARGET_CRATE',
@@ -37,8 +37,35 @@ const TARGET_FIELDS = [
     isResource: true,
   },
   {
-    param: 'resourceTranslationsBinary',
+    param: 'resourceCrate3Binary',
     label: 'Resource crate 3',
+    targetId: 1,
+    targetName: 'FW_MGMT_TARGET_CRATE',
+    accept: '.crate.okpkg,.okpkg,.bin',
+    formatHint: 'CRATE .okpkg',
+    isResource: true,
+  },
+  {
+    param: 'resourceCrate4Binary',
+    label: 'Resource crate 4',
+    targetId: 1,
+    targetName: 'FW_MGMT_TARGET_CRATE',
+    accept: '.crate.okpkg,.okpkg,.bin',
+    formatHint: 'CRATE .okpkg',
+    isResource: true,
+  },
+  {
+    param: 'resourceCrate5Binary',
+    label: 'Resource crate 5',
+    targetId: 1,
+    targetName: 'FW_MGMT_TARGET_CRATE',
+    accept: '.crate.okpkg,.okpkg,.bin',
+    formatHint: 'CRATE .okpkg',
+    isResource: true,
+  },
+  {
+    param: 'resourceCrate6Binary',
+    label: 'Resource crate 6',
     targetId: 1,
     targetName: 'FW_MGMT_TARGET_CRATE',
     accept: '.crate.okpkg,.okpkg,.bin',
