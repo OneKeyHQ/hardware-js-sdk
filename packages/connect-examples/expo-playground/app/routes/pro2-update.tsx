@@ -20,7 +20,7 @@ import type { DeviceInfo } from '../types/hardware';
 const TARGET_FIELDS = [
   {
     param: 'resourceImagesBinary',
-    label: 'Resource images crate',
+    label: 'Resource crate 1',
     targetId: 1,
     targetName: 'FW_MGMT_TARGET_CRATE',
     accept: '.crate.okpkg,.okpkg,.bin',
@@ -29,7 +29,7 @@ const TARGET_FIELDS = [
   },
   {
     param: 'resourceFontsBinary',
-    label: 'Resource fonts crate',
+    label: 'Resource crate 2',
     targetId: 1,
     targetName: 'FW_MGMT_TARGET_CRATE',
     accept: '.crate.okpkg,.okpkg,.bin',
@@ -38,7 +38,7 @@ const TARGET_FIELDS = [
   },
   {
     param: 'resourceTranslationsBinary',
-    label: 'Resource translations crate',
+    label: 'Resource crate 3',
     targetId: 1,
     targetName: 'FW_MGMT_TARGET_CRATE',
     accept: '.crate.okpkg,.okpkg,.bin',
@@ -77,8 +77,8 @@ const TARGET_FIELDS = [
     label: 'Coprocessor',
     targetId: 6,
     targetName: 'FW_MGMT_TARGET_COPROCESSOR',
-    accept: '.bin',
-    formatHint: 'target-specific package',
+    accept: '.okpkg,.bin',
+    formatHint: 'signed target package',
     isResource: false,
   },
   {
@@ -86,8 +86,8 @@ const TARGET_FIELDS = [
     label: 'SE01',
     targetId: 7,
     targetName: 'FW_MGMT_TARGET_SE01',
-    accept: '.bin',
-    formatHint: 'target-specific package',
+    accept: '.okpkg,.bin',
+    formatHint: 'signed target package',
     isResource: false,
   },
   {
@@ -95,8 +95,8 @@ const TARGET_FIELDS = [
     label: 'SE02',
     targetId: 8,
     targetName: 'FW_MGMT_TARGET_SE02',
-    accept: '.bin',
-    formatHint: 'target-specific package',
+    accept: '.okpkg,.bin',
+    formatHint: 'signed target package',
     isResource: false,
   },
   {
@@ -104,8 +104,8 @@ const TARGET_FIELDS = [
     label: 'SE03',
     targetId: 9,
     targetName: 'FW_MGMT_TARGET_SE03',
-    accept: '.bin',
-    formatHint: 'target-specific package',
+    accept: '.okpkg,.bin',
+    formatHint: 'signed target package',
     isResource: false,
   },
   {
@@ -113,8 +113,8 @@ const TARGET_FIELDS = [
     label: 'SE04',
     targetId: 10,
     targetName: 'FW_MGMT_TARGET_SE04',
-    accept: '.bin',
-    formatHint: 'target-specific package',
+    accept: '.okpkg,.bin',
+    formatHint: 'signed target package',
     isResource: false,
   },
 ] as const;
