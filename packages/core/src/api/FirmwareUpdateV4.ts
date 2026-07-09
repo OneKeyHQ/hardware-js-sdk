@@ -788,6 +788,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
   private getProtocolV2ResourceComponentFileName(key: string) {
     const safeKey = key.replace(/[^a-z0-9_-]/gi, '_') || 'resource';
+    if (safeKey === 'resource') {
+      return PROTOCOL_V2_REMOTE_COMPONENT_TARGETS.CRATE.fileName;
+    }
     return `resource-${safeKey}.bin`;
   }
 
@@ -1093,38 +1096,13 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
     this.postTipMessage(FirmwareUpdateTipMessage.ConfirmOnDevice);
 
-    const firmwareTargets: Array<{ target_id: number; path: string }> = [];
-    const flushFirmwareTargets = async () => {
-      if (firmwareTargets.length === 0) return;
-      const targets = firmwareTargets.splice(0, firmwareTargets.length);
-      Log.log(`[FirmwareUpdateV4] DeviceFirmwareUpdateRequest targets=${JSON.stringify(targets)}`);
-      const startResponse = await this.protocolV2StartFirmwareUpdate({ targets });
-      await this.waitForProtocolV2FirmwareUpdateComplete(targets, startResponse);
-    };
-
-    for (const item of stagedInstallTargets) {
-      const target = {
-        target_id: item.targetId,
-        path: item.path,
-      };
-      if (item.kind === 'resource') {
-        await flushFirmwareTargets();
-        const resourceTargets = [target];
-        Log.log(
-          `[FirmwareUpdateV4] DeviceFirmwareUpdateRequest resources=${JSON.stringify(
-            resourceTargets
-          )}`
-        );
-        const startResponse = await this.protocolV2StartFirmwareUpdate({
-          targets: resourceTargets,
-        });
-        await this.waitForProtocolV2FirmwareUpdateComplete(resourceTargets, startResponse);
-      } else {
-        firmwareTargets.push(target);
-      }
-    }
-
-    await flushFirmwareTargets();
+    const allTargets = stagedInstallTargets.map(item => ({
+      target_id: item.targetId,
+      path: item.path,
+    }));
+    Log.log(`[FirmwareUpdateV4] DeviceFirmwareUpdateRequest targets=${JSON.stringify(allTargets)}`);
+    const startResponse = await this.protocolV2StartFirmwareUpdate({ targets: allTargets });
+    await this.waitForProtocolV2FirmwareUpdateComplete(allTargets, startResponse);
   }
 
   private getProtocolV2InstallItemStagingPath(item: ProtocolV2InstallItem) {

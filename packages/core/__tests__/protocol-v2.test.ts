@@ -2288,11 +2288,10 @@ describe('Protocol V2 firmware update targets', () => {
       'vol1:se01.bin',
       'vol1:application_p1.bin',
     ]);
-    expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenNthCalledWith(1, {
-      targets: [{ target_id: 1, path: 'vol1:resource.bin' }],
-    });
-    expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenNthCalledWith(2, {
+    expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenCalledTimes(1);
+    expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenCalledWith({
       targets: [
+        { target_id: 1, path: 'vol1:resource.bin' },
         { target_id: 3, path: 'vol1:bootloader.bin' },
         { target_id: 6, path: 'vol1:coprocessor.bin' },
         { target_id: 7, path: 'vol1:se01.bin' },
@@ -2659,7 +2658,7 @@ describe('Protocol V2 firmware update targets', () => {
 
     expect(remoteBinaries.resourceBinaryMap).toEqual([
       {
-        fileName: 'resource-resource.bin',
+        fileName: 'resource.bin',
         binary: resourceBinary,
         targetId: 1,
       },
@@ -2716,7 +2715,7 @@ describe('Protocol V2 firmware update targets', () => {
     expect(remoteBinaries).toEqual({
       resourceBinaryMap: [
         {
-          fileName: 'resource-resource.bin',
+          fileName: 'resource.bin',
           binary: resourceBinary,
           targetId: 1,
         },
@@ -2725,7 +2724,7 @@ describe('Protocol V2 firmware update targets', () => {
       fwBinaryMap: [],
       installItems: [
         {
-          fileName: 'resource-resource.bin',
+          fileName: 'resource.bin',
           binary: resourceBinary,
           targetId: 1,
           kind: 'resource',
@@ -2846,7 +2845,7 @@ describe('Protocol V2 firmware update targets', () => {
     getFirmwareLatestReleaseSpy.mockRestore();
   });
 
-  test('installs multiple Pro2 resource crates as separate update requests', async () => {
+  test('installs merged Pro2 resource crate and firmware targets in one update request', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -2878,78 +2877,7 @@ describe('Protocol V2 firmware update targets', () => {
     await (method as any).executeProtocolV2Update({
       resourceBinaryMap: [
         {
-          fileName: 'resource-images.bin',
-          binary: new Uint8Array([1]).buffer,
-          targetId: 1,
-        },
-        {
-          fileName: 'resource-fonts.bin',
-          binary: new Uint8Array([2]).buffer,
-          targetId: 1,
-        },
-      ],
-      bootloaderBinary: null,
-      fwBinaryMap: [
-        {
-          fileName: 'application_p1.bin',
-          binary: new Uint8Array([3]).buffer,
-          targetId: 4,
-        },
-      ],
-    });
-
-    expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenNthCalledWith(1, {
-      targets: [{ target_id: 1, path: 'vol1:resource-images.bin' }],
-    });
-    expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenNthCalledWith(2, {
-      targets: [{ target_id: 1, path: 'vol1:resource-fonts.bin' }],
-    });
-    expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenNthCalledWith(3, {
-      targets: [{ target_id: 4, path: 'vol1:application_p1.bin' }],
-    });
-    expect(operations).toEqual([
-      'write:vol1:resource-images.bin',
-      'write:vol1:resource-fonts.bin',
-      'write:vol1:application_p1.bin',
-      'install:vol1:resource-images.bin',
-      'install:vol1:resource-fonts.bin',
-      'install:vol1:application_p1.bin',
-    ]);
-  });
-
-  test('installs merged Pro2 resource crate as one CRATE request before firmware targets', async () => {
-    const method = new FirmwareUpdateV4({
-      id: 1,
-      payload: {
-        method: 'firmwareUpdateV4',
-      },
-    });
-
-    const operations: string[] = [];
-    method.postTipMessage = jest.fn();
-    method.postProgressMessage = jest.fn();
-    (method as any).protocolV2CommonUpdateProcess = jest
-      .fn()
-      .mockImplementation(params => {
-        operations.push(`write:${params.filePath}`);
-        return Promise.resolve(
-          Number(params.processedSize ?? 0) + Number(params.payload.byteLength)
-        );
-      });
-    (method as any).protocolV2StartFirmwareUpdate = jest.fn().mockImplementation(({ targets }) => {
-      operations.push(
-        `install:${targets.map((target: { path: string }) => target.path).join(',')}`
-      );
-      return Promise.resolve(undefined);
-    });
-    (method as any).waitForProtocolV2FirmwareUpdateComplete = jest
-      .fn()
-      .mockResolvedValue(undefined);
-
-    await (method as any).executeProtocolV2Update({
-      resourceBinaryMap: [
-        {
-          fileName: 'resource-resource.bin',
+          fileName: 'resource.bin',
           binary: new Uint8Array([1, 2]).buffer,
           targetId: 1,
         },
@@ -2964,17 +2892,17 @@ describe('Protocol V2 firmware update targets', () => {
       ],
     });
 
-    expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenNthCalledWith(1, {
-      targets: [{ target_id: 1, path: 'vol1:resource-resource.bin' }],
-    });
-    expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenNthCalledWith(2, {
-      targets: [{ target_id: 4, path: 'vol1:application_p1.bin' }],
+    expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenCalledTimes(1);
+    expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenCalledWith({
+      targets: [
+        { target_id: 1, path: 'vol1:resource.bin' },
+        { target_id: 4, path: 'vol1:application_p1.bin' },
+      ],
     });
     expect(operations).toEqual([
-      'write:vol1:resource-resource.bin',
+      'write:vol1:resource.bin',
       'write:vol1:application_p1.bin',
-      'install:vol1:resource-resource.bin',
-      'install:vol1:application_p1.bin',
+      'install:vol1:resource.bin,vol1:application_p1.bin',
     ]);
   });
 
