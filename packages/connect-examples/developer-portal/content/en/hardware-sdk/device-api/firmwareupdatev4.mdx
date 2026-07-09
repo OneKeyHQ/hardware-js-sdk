@@ -24,7 +24,7 @@ const res = await HardwareSDK.firmwareUpdateV4(connectId, {
   // firmwareBinary: ArrayBuffer,
   // bleBinary: ArrayBuffer,
   // bootloaderBinary: ArrayBuffer,
-  // resourceBinary: ArrayBuffer,
+  // resourceBinaries: ArrayBuffer[],
 
   // Optional: force updating resource package
   forcedUpdateRes: false,
@@ -42,7 +42,7 @@ const res = await HardwareSDK.firmwareUpdateV4(connectId, {
 - `bleBinary` - optional `ArrayBuffer` custom BLE firmware
 - `bootloaderVersion` - optional `number[]` target Bootloader version
 - `bootloaderBinary` - optional `ArrayBuffer` custom Bootloader
-- `resourceBinary` - optional `ArrayBuffer` resource package binary
+- `resourceBinaries` - optional `ArrayBuffer[]` Protocol V2 resource package binaries
 - `forcedUpdateRes` - optional `boolean` force updating resource package
 
 ### Result

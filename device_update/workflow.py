@@ -22,7 +22,7 @@ step1 - update romloader
   3) check vol0:assets/boot/boot_logo.bin; delete it if it exists
   4) file_write bin/pro2_romloader_v3_msc.bin       -> vol0:romloader.bin   (chunk 1024)
   5) file_write bin/pro2_boot_update_rom_signed.bin -> vol0:update_rom.bin  (chunk 1024)
-  6) firmware_update type=1  path=vol0:update_rom.bin
+  6) firmware_update type=3  path=vol0:update_rom.bin
   7) reboot type=0, then wait 20s
   8) connect device                       (timeout 60s)
   9) reboot type=0, then wait 40s, then enter step2
@@ -42,7 +42,7 @@ step3 - update bluetooth
   1) if device already connected, skip; else connect (timeout 60s)
   2) ping device                          (timeout 60s), then wait 5s
   3) check vol0:bluetooth.bin; if missing, file_write bin/pro2_bluetooth_signed.bin
-  4) firmware_update type=2 path=vol0:bluetooth.bin
+  4) firmware_update type=6 path=vol0:bluetooth.bin
        (do not check result, wait for FirmwareInstallProgress=100%)
   5) wait 5s, then enter step4
 
@@ -53,7 +53,7 @@ step4 - update firmware
   4) ping device                          (timeout 60s), then wait 5s
   5) check vol0:core.bin; if missing, file_write bin/pro2_firmware_signed.bin -> vol0:core.bin
        (failure here EXITS the workflow)
-  6) firmware_update type=1 path=vol0:core.bin
+  6) firmware_update type=4 path=vol0:core.bin
        (do not check result, wait for FirmwareInstallProgress=100%)
   7) wait 10s, then connect device        (timeout 30s)
 """
@@ -908,8 +908,8 @@ def run_step1_once(attempt_no: int) -> bool:
         if not do_file_write(dev, UPDATE_ROM_BIN, "vol0:update_rom.bin", CHUNK_STEP1):
             return False
 
-        substep("1.6", "FirmwareUpdate type=1 path=vol0:update_rom.bin (reply=Success OR progress=100%)")
-        if not do_firmware_update_either(dev, target_id=1, path="vol0:update_rom.bin", timeout_s=120):
+        substep("1.6", "FirmwareUpdate type=3 path=vol0:update_rom.bin (reply=Success OR progress=100%)")
+        if not do_firmware_update_either(dev, target_id=3, path="vol0:update_rom.bin", timeout_s=120):
             return False
 
         substep("1.7", f"Reboot type=0, then wait {STEP1_POST_REBOOT_S}s")
@@ -1094,8 +1094,8 @@ def run_step3_once(attempt_no: int, dev_in: Optional[WebUsbDevice] = None) -> bo
             if not do_file_write(dev, BLUETOOTH_BIN, "vol0:bluetooth.bin", CHUNK_STEP3):
                 return False
 
-        substep("3.4", "FirmwareUpdate type=2 path=vol0:bluetooth.bin (wait progress=100%)")
-        if not do_firmware_update_wait_progress(dev, target_id=2, path="vol0:bluetooth.bin"):
+        substep("3.4", "FirmwareUpdate type=6 path=vol0:bluetooth.bin (wait progress=100%)")
+        if not do_firmware_update_wait_progress(dev, target_id=6, path="vol0:bluetooth.bin"):
             return False
 
         substep("3.5", f"Wait {STEP3_POST_COMPLETE_WAIT_S}s, then enter step4")
@@ -1190,9 +1190,9 @@ def run_step4_once(attempt_no: int) -> bool:
             if not do_file_write(dev, FIRMWARE_BIN, "vol0:core.bin", CHUNK_STEP1):
                 raise WorkflowFatal("Failed to write vol0:core.bin; aborting workflow.")
 
-        substep("4.6", "FirmwareUpdate type=1 path=vol0:core.bin (wait progress=100%, errors ignored)")
+        substep("4.6", "FirmwareUpdate type=4 path=vol0:core.bin (wait progress=100%, errors ignored)")
         do_firmware_update_wait_progress(
-            dev, target_id=1, path="vol0:core.bin", ignore_errors=True,
+            dev, target_id=4, path="vol0:core.bin", ignore_errors=True,
         )
 
         substep("4.7", f"Wait {STEP4_PRE_CONNECT_S}s, then connect device (timeout {STEP4_FINAL_CONNECT_TIMEOUT_S}s)")

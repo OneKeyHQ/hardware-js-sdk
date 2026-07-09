@@ -864,7 +864,7 @@ export const BleDemoScreen = () => {
         run: (sdk, connectId) =>
           sdk.deviceFirmwareUpdate(connectId, {
             ...PROTOCOL_V2_PARAMS,
-            target_id: 5,
+            target_id: 6,
             path: PRO2_FIRMWARE_STAGING_PATH,
           }),
       },
@@ -1221,7 +1221,7 @@ export const BleDemoScreen = () => {
           <Text style={styles.hint}>
             Bundled file: {PRO2_BLE_FIRMWARE_FILE_NAME} ({formatBytes(PRO2_BLE_FIRMWARE_FILE_SIZE)})
           </Text>
-          <Text style={styles.hint}>Target: TARGET_COPROCESSOR (5) · {PRO2_FIRMWARE_STAGING_PATH}</Text>
+          <Text style={styles.hint}>Target: TARGET_COPROCESSOR (6) · {PRO2_FIRMWARE_STAGING_PATH}</Text>
           <Text style={styles.methodGroupTitle}>Speed Profiles</Text>
           <View style={styles.profileGrid}>
             {SPEED_TEST_PROFILES.map(profile => {

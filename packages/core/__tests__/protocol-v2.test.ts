@@ -10,6 +10,7 @@ import FileWrite from '../src/api/FileWrite';
 import DeviceFactoryInfoGet from '../src/api/protocol-v2/DeviceFactoryInfoGet';
 import DeviceFactoryInfoSet from '../src/api/protocol-v2/DeviceFactoryInfoSet';
 import DeviceFirmwareUpdate from '../src/api/protocol-v2/DeviceFirmwareUpdate';
+import DeviceGetFirmwareUpdateStatus from '../src/api/protocol-v2/DeviceGetFirmwareUpdateStatus';
 import DeviceInfoGet from '../src/api/protocol-v2/DeviceInfoGet';
 import DeviceReboot from '../src/api/protocol-v2/DeviceReboot';
 import FilesystemPermissionFix from '../src/api/protocol-v2/FilesystemPermissionFix';
@@ -2590,6 +2591,7 @@ describe('Protocol V2 firmware update targets', () => {
       resourceBinaryMap: [],
       bootloaderBinary: null,
       fwBinaryMap: [],
+      installItems: [],
     });
     expect(getSysResourceBinarySpy).not.toHaveBeenCalled();
     expect(typedCall.mock.calls[0][2]).toEqual({
@@ -2721,6 +2723,14 @@ describe('Protocol V2 firmware update targets', () => {
       ],
       bootloaderBinary: null,
       fwBinaryMap: [],
+      installItems: [
+        {
+          fileName: 'resource-resource.bin',
+          binary: resourceBinary,
+          targetId: 1,
+          kind: 'resource',
+        },
+      ],
     });
 
     getSysResourceBinarySpy.mockRestore();
@@ -2844,14 +2854,23 @@ describe('Protocol V2 firmware update targets', () => {
       },
     });
 
+    const operations: string[] = [];
     method.postTipMessage = jest.fn();
     method.postProgressMessage = jest.fn();
     (method as any).protocolV2CommonUpdateProcess = jest
       .fn()
-      .mockImplementation(params =>
-        Promise.resolve(Number(params.processedSize ?? 0) + Number(params.payload.byteLength))
+      .mockImplementation(params => {
+        operations.push(`write:${params.filePath}`);
+        return Promise.resolve(
+          Number(params.processedSize ?? 0) + Number(params.payload.byteLength)
+        );
+      });
+    (method as any).protocolV2StartFirmwareUpdate = jest.fn().mockImplementation(({ targets }) => {
+      operations.push(
+        `install:${targets.map((target: { path: string }) => target.path).join(',')}`
       );
-    (method as any).protocolV2StartFirmwareUpdate = jest.fn().mockResolvedValue(undefined);
+      return Promise.resolve(undefined);
+    });
     (method as any).waitForProtocolV2FirmwareUpdateComplete = jest
       .fn()
       .mockResolvedValue(undefined);
@@ -2888,6 +2907,14 @@ describe('Protocol V2 firmware update targets', () => {
     expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenNthCalledWith(3, {
       targets: [{ target_id: 4, path: 'vol1:application_p1.bin' }],
     });
+    expect(operations).toEqual([
+      'write:vol1:resource-images.bin',
+      'write:vol1:resource-fonts.bin',
+      'write:vol1:application_p1.bin',
+      'install:vol1:resource-images.bin',
+      'install:vol1:resource-fonts.bin',
+      'install:vol1:application_p1.bin',
+    ]);
   });
 
   test('skips Pro2 firmware components when configured versions are already installed', async () => {
@@ -2944,6 +2971,7 @@ describe('Protocol V2 firmware update targets', () => {
       resourceBinaryMap: [],
       bootloaderBinary: null,
       fwBinaryMap: [],
+      installItems: [],
     });
     expect(getSysResourceBinarySpy).not.toHaveBeenCalled();
 
@@ -3360,6 +3388,44 @@ describe('Protocol V2 firmware update method', () => {
     expect(typedCall.mock.calls[0][2]).toEqual({
       targets: [{ target_id: 1, path: 'vol0:resource.bin' }],
     });
+  });
+
+  test('passes firmware update status fields through to Protocol V2', async () => {
+    const typedCall = jest.fn().mockResolvedValue({
+      message: {
+        records: [{ target_id: 4, status: 2, payload_version: 1, path: 'vol1:application_p1.bin' }],
+      },
+    });
+    const method = new DeviceGetFirmwareUpdateStatus({
+      id: 1,
+      payload: {
+        method: 'deviceGetFirmwareUpdateStatus',
+        fields: {
+          status: true,
+          payload_version: true,
+          path: true,
+        },
+      },
+    });
+    method.init();
+    (method as any).device = stubDevice({
+      commands: { typedCall },
+    });
+
+    await expect(method.run()).resolves.toEqual({
+      records: [{ target_id: 4, status: 2, payload_version: 1, path: 'vol1:application_p1.bin' }],
+    });
+    expect(typedCall).toHaveBeenCalledWith(
+      'DeviceFirmwareUpdateStatusGet',
+      'DeviceFirmwareUpdateStatus',
+      {
+        fields: {
+          status: true,
+          payload_version: true,
+          path: true,
+        },
+      }
+    );
   });
 });
 

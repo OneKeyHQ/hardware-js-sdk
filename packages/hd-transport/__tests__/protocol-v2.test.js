@@ -477,7 +477,7 @@ describe('Protocol V2 framing and session', () => {
   test('session consumes intermediate response frames before returning the final response', async () => {
     const written = [];
     const progress = ProtocolV2.encodeFrame(schemas, 'DeviceFirmwareUpdateStatus', {
-      records: [{ target_id: 3, status: 1 }],
+      records: [{ target_id: 4, status: 1 }],
     });
     const success = ProtocolV2.encodeFrame(schemas, 'Success', {
       message: 'ok',
@@ -502,7 +502,7 @@ describe('Protocol V2 framing and session', () => {
 
     const result = await session.call(
       'DeviceFirmwareUpdateRequest',
-      { targets: [{ target_id: 3, path: 'vol1:firmware.bin' }] },
+      { targets: [{ target_id: 4, path: 'vol1:firmware.bin' }] },
       {
         intermediateTypes: ['DeviceFirmwareUpdateStatus'],
         onIntermediateResponse,
@@ -513,7 +513,7 @@ describe('Protocol V2 framing and session', () => {
     expect(onIntermediateResponse).toHaveBeenCalledWith({
       type: 'DeviceFirmwareUpdateStatus',
       message: {
-        records: [{ target_id: 3, status: 1, payload_version: null, path: null }],
+        records: [{ target_id: 4, status: 1, payload_version: null, path: null }],
       },
     });
     expect(result).toEqual({

@@ -66,22 +66,22 @@ export interface FirmwareUpdateV4Params {
   chunkSize?: number;
   firmwareType?: EFirmwareType;
 
-  /** FW_MGMT_TARGET_ROMLOADER = 1；当前 Pro2 bootloader 不接受通过 firmwareUpdateV4 安装 */
+  /** FW_MGMT_TARGET_ROMLOADER = 2；当前 Pro2 bootloader 不接受通过 firmwareUpdateV4 安装 */
   romloaderBinary?: ArrayBuffer;
-  /** FW_MGMT_TARGET_BOOTLOADER = 2 */
+  /** FW_MGMT_TARGET_BOOTLOADER = 3 */
   bootloaderBinary?: ArrayBuffer;
-  /** FW_MGMT_TARGET_APPLICATION_P1 = 3 */
+  /** FW_MGMT_TARGET_APPLICATION_P1 = 4 */
   applicationP1Binary?: ArrayBuffer;
-  /** FW_MGMT_TARGET_APPLICATION_P2 = 4 */
+  /** FW_MGMT_TARGET_APPLICATION_P2 = 5 */
   applicationP2Binary?: ArrayBuffer;
-  /** FW_MGMT_TARGET_COPROCESSOR = 5 */
+  /** FW_MGMT_TARGET_COPROCESSOR = 6 */
   coprocessorBinary?: ArrayBuffer;
-  /** FW_MGMT_TARGET_SE01-04 = 6-9 */
+  /** FW_MGMT_TARGET_SE01-04 = 7-10 */
   se01Binary?: ArrayBuffer;
   se02Binary?: ArrayBuffer;
   se03Binary?: ArrayBuffer;
   se04Binary?: ArrayBuffer;
-  /** 资源包通过 FW_MGMT_TARGET_RESOURCE = 10 安装；每个元素是一个独立资源包 */
+  /** 资源包通过 FW_MGMT_TARGET_CRATE = 1 安装；每个元素是一个独立资源包 */
   resourceBinaries?: ArrayBuffer[];
   forcedUpdateRes?: boolean;
 }

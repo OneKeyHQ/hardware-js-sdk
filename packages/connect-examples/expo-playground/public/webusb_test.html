@@ -965,8 +965,8 @@
                 TARGET_CRATE: 1,
                 TARGET_ROMLOADER: 2,
                 TARGET_BOOTLOADER: 3,
-                TARGET_FIRMWARE_P1: 4,
-                TARGET_FIRMWARE_P2: 5,
+                TARGET_APPLICATION_P1: 4,
+                TARGET_APPLICATION_P2: 5,
                 TARGET_COPROCESSOR: 6,
                 TARGET_SE01: 7,
                 TARGET_SE02: 8,
@@ -2908,7 +2908,7 @@
             log(`🚀 [FirmwareUpdate] Updating firmware from: ${path}, reboot=${rebootOnSuccess}`, 'info');
 
             try {
-                const targets = [{ targetId: pbEncoder.FirmwareTargetType.TARGET_FIRMWARE_P1, path: path }];
+                const targets = [{ targetId: pbEncoder.FirmwareTargetType.TARGET_APPLICATION_P1, path: path }];
                 const pbPayload = pbEncoder.encodeFirmwareUpdate(targets, rebootOnSuccess);
                 const resp = await sendPbMessage(PB_MSG_TYPE.FirmwareUpdate, pbPayload);
 

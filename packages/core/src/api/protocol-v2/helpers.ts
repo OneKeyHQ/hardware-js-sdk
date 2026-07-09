@@ -5,6 +5,7 @@ import { ProtocolV2FirmwareTargetType } from '../../protocols/protocol-v2/firmwa
 
 import type {
   DeviceFirmwareTarget,
+  DeviceFirmwareUpdateRecordFields,
   DeviceFirmwareTargetType,
   TransportCallOptions,
 } from '@onekeyfe/hd-transport';
@@ -29,6 +30,10 @@ export type DeviceFirmwareUpdateParams = {
   targetId?: DeviceFirmwareTargetType | string | number;
   target_id?: DeviceFirmwareTargetType | string | number;
   path?: string;
+};
+
+export type DeviceFirmwareUpdateStatusGetParams = {
+  fields?: DeviceFirmwareUpdateRecordFields;
 };
 
 export type DeviceFactoryInfoSetParams = {

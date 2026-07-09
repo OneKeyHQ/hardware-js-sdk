@@ -443,7 +443,25 @@ const api: UnifiedMethodConfig[] = [
     method: 'deviceGetFirmwareUpdateStatus',
     description: 'methodDescriptions.deviceGetFirmwareUpdateStatus',
     noDeviceIdReq: true,
-    presets: [],
+    presets: [
+      {
+        title: 'Get firmware update status fields',
+        parameters: [
+          {
+            name: 'fields',
+            type: 'textarea',
+            required: false,
+            label: 'Fields',
+            description: 'DeviceFirmwareUpdateRecordFields JSON object',
+            value: {
+              status: true,
+              payload_version: true,
+              path: true,
+            },
+          },
+        ],
+      },
+    ],
   },
   {
     method: 'filesystemPathInfoQuery',

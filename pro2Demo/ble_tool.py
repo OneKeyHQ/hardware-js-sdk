@@ -132,8 +132,17 @@ _REBOOT_TYPE_NAMES = {0: "Normal", 1: "Boardloader", 2: "BootLoader"}
 
 # FirmwareTargetType
 _FW_TARGET_NAMES = {
-    0: "Main App", 1: "Main Bootloader", 2: "BLE",
-    3: "SE1", 4: "SE2", 5: "SE3", 6: "SE4", 10: "Resource",
+    0: "Invalid",
+    1: "Resource Crate",
+    2: "Romloader",
+    3: "Bootloader",
+    4: "Application P1",
+    5: "Application P2",
+    6: "Coprocessor",
+    7: "SE01",
+    8: "SE02",
+    9: "SE03",
+    10: "SE04",
 }
 
 _proto_seq = 0
@@ -803,7 +812,7 @@ class BLEToolWindow(QMainWindow):
         fwu_target_bar = QHBoxLayout()
         fwu_target_bar.addWidget(QLabel("Target:"))
         self.fwu_target_combo = QComboBox()
-        for tid in (0, 1, 2, 3, 4, 5, 6, 10):
+        for tid in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10):
             self.fwu_target_combo.addItem(f"{_FW_TARGET_NAMES[tid]} ({tid})", tid)
         fwu_target_bar.addWidget(self.fwu_target_combo, 1)
         fwu_lay.addLayout(fwu_target_bar)

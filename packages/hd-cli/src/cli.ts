@@ -1163,7 +1163,7 @@ function getFirmwareUpdateV4DebugTotalBytes(
   params: ReturnType<typeof buildFirmwareUpdateV4DebugParams>
 ) {
   return [
-    params.resourceBinary,
+    ...(params.resourceBinaries ?? []),
     params.bootloaderBinary,
     params.applicationP1Binary,
     params.applicationP2Binary,
@@ -1483,7 +1483,7 @@ function buildFirmwareUpdateV4DebugParams(opts: {
     connectProtocol: 'V2' as const,
     chunkSize: opts.chunkSize ? safeParseInt(opts.chunkSize, '--chunk-size') : undefined,
     forcedUpdateRes: opts.forcedUpdateRes,
-    resourceBinary: opts.resource ? readBinaryParam(opts.resource) : undefined,
+    resourceBinaries: opts.resource ? [readBinaryParam(opts.resource)] : undefined,
     romloaderBinary: opts.romloader ? readBinaryParam(opts.romloader) : undefined,
     bootloaderBinary: opts.bootloader ? readBinaryParam(opts.bootloader) : undefined,
     applicationP1Binary: opts.applicationP1 ? readBinaryParam(opts.applicationP1) : undefined,
@@ -1496,7 +1496,7 @@ function buildFirmwareUpdateV4DebugParams(opts: {
   };
 
   const hasPayload = [
-    params.resourceBinary,
+    params.resourceBinaries,
     params.romloaderBinary,
     params.bootloaderBinary,
     params.applicationP1Binary,

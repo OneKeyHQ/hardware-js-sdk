@@ -93,7 +93,7 @@ const api: PlaygroundProps[] = [
       {
         title: 'Main app',
         value: {
-          targetId: 3,
+          targetId: 4,
           path: 'vol0:firmware.bin',
         },
       },
@@ -102,7 +102,7 @@ const api: PlaygroundProps[] = [
         value: {
           targets: [
             {
-              target_id: 3,
+              target_id: 4,
               path: 'vol0:firmware.bin',
             },
           ],

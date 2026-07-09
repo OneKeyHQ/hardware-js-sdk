@@ -203,13 +203,13 @@ target 映射：
 
 | target id | enum | 含义 |
 | --------- | ---- | ---- |
-| `1` | `TARGET_ROMLOADER` | romloader |
-| `2` | `TARGET_BOOTLOADER` | bootloader |
-| `3` | `TARGET_APPLICATION_P1` | 主固件 P1 |
-| `4` | `TARGET_APPLICATION_P2` | 主固件 P2 |
-| `5` | `TARGET_COPROCESSOR` | 蓝牙/协处理器固件 |
-| `6`-`9` | `TARGET_SE01`-`TARGET_SE04` | SE 固件 |
-| `10` | `TARGET_RESOURCE` | 资源包 |
+| `1` | `TARGET_CRATE` | 资源包 |
+| `2` | `TARGET_ROMLOADER` | romloader |
+| `3` | `TARGET_BOOTLOADER` | bootloader |
+| `4` | `TARGET_APPLICATION_P1` | 主固件 P1 |
+| `5` | `TARGET_APPLICATION_P2` | 主固件 P2 |
+| `6` | `TARGET_COPROCESSOR` | 蓝牙/协处理器固件 |
+| `7`-`10` | `TARGET_SE01`-`TARGET_SE04` | SE 固件 |
 
 SDK 会先把 resource、bootloader、firmware 写入设备文件系统，再把所有需要安装的路径传入 `DeviceFirmwareUpdateRequest.targets`。
 

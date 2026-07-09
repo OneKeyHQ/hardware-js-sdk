@@ -54,7 +54,7 @@ const PROTOCOL_V2_TARGET_STATUS_IN_PROGRESS = 1;
 const PROTOCOL_V2_TARGET_STATUS_FINISHED = 2;
 const PROTOCOL_V2_TARGET_STATUS_FAILED_MIN = 3;
 const PROTOCOL_V2_CONNECT_PROTOCOL = 'V2';
-const PROTOCOL_V2_FIRMWARE_STAGING_VOLUME = 'vol1:/';
+const PROTOCOL_V2_FIRMWARE_STAGING_VOLUME = 'vol1:';
 const PROTOCOL_V2_MIN_FILE_CHUNK_SIZE = 64;
 const PROTOCOL_V2_CONNECT_RETRY_COUNT = 10;
 const PROTOCOL_V2_CONNECT_POLL_INTERVAL = 500;
@@ -100,6 +100,12 @@ type ProtocolV2FirmwareUpdateStartResponse =
   | undefined;
 
 type ProtocolV2TargetBinary = { fileName: string; binary: ArrayBuffer; targetId: number };
+type ProtocolV2InstallItem = ProtocolV2TargetBinary & {
+  kind: ProtocolV2RemoteComponentTarget['kind'];
+};
+type ProtocolV2InstallTarget = ProtocolV2InstallItem & {
+  path: string;
+};
 
 type ProtocolV2RemoteComponentBinary = ProtocolV2RemoteComponentTarget & {
   binary: ArrayBuffer;
@@ -163,12 +169,7 @@ const PROTOCOL_V2_REMOTE_COMPONENT_TARGETS: Readonly<
   },
   CRATE: {
     fileName: 'resource.bin',
-    targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_RESOURCE,
-    kind: 'resource',
-  },
-  RESOURCE: {
-    fileName: 'resource.bin',
-    targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_RESOURCE,
+    targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_CRATE,
     kind: 'resource',
   },
 };
@@ -461,6 +462,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     let resourceBinaryMap: ProtocolV2TargetBinary[] = [];
     let fwBinaryMap: ProtocolV2TargetBinary[] = [];
     let bootloaderBinary: ArrayBuffer | null = null;
+    let installItems: ProtocolV2InstallItem[] | undefined;
     try {
       this.postTipMessage(FirmwareUpdateTipMessage.StartDownloadFirmware);
       resourceBinaryMap = await this.prepareResourceBinaries(firmwareType, deviceFeatures);
@@ -474,6 +476,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         resourceBinaryMap = remoteBinaries.resourceBinaryMap;
         bootloaderBinary = remoteBinaries.bootloaderBinary;
         fwBinaryMap = remoteBinaries.fwBinaryMap;
+        installItems = remoteBinaries.installItems;
       }
       this.postTipMessage(FirmwareUpdateTipMessage.FinishDownloadFirmware);
     } catch (err) {
@@ -493,6 +496,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       resourceBinaryMap,
       fwBinaryMap,
       bootloaderBinary,
+      ...(installItems ? { installItems } : undefined),
     });
 
     await this.exitProtocolV2BootloaderToNormal();
@@ -529,7 +533,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       return this.params.resourceBinaries.map((binary, index) => ({
         fileName: `resource-${index + 1}.bin`,
         binary,
-        targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_RESOURCE,
+        targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_CRATE,
       }));
     }
     const resourceUrl = DataManager.getSysResourcesLatestRelease({
@@ -544,7 +548,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         {
           fileName: 'resource.bin',
           binary: resource,
-          targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_RESOURCE,
+          targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_CRATE,
         },
       ];
     }
@@ -562,6 +566,33 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       !!this.params.bootloaderBinary ||
       fwBinaryMap.length > 0
     );
+  }
+
+  private buildProtocolV2InstallItems({
+    resourceBinaryMap,
+    bootloaderBinary,
+    fwBinaryMap,
+  }: {
+    resourceBinaryMap: ProtocolV2TargetBinary[];
+    bootloaderBinary: ArrayBuffer | null;
+    fwBinaryMap: ProtocolV2TargetBinary[];
+  }): ProtocolV2InstallItem[] {
+    const installItems: ProtocolV2InstallItem[] = resourceBinaryMap.map(resource => ({
+      ...resource,
+      kind: 'resource',
+    }));
+
+    if (bootloaderBinary) {
+      installItems.push({
+        fileName: 'bootloader.bin',
+        binary: bootloaderBinary,
+        targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_BOOTLOADER,
+        kind: 'bootloader',
+      });
+    }
+
+    installItems.push(...fwBinaryMap.map(item => ({ ...item, kind: 'firmware' as const })));
+    return installItems;
   }
 
   private getRemoteComponentEntries(release: IFirmwareReleaseInfo) {
@@ -821,12 +852,14 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const resourceBinaryMap: ProtocolV2TargetBinary[] = [];
     let bootloaderBinary: ArrayBuffer | null = null;
     const fwBinaryMap: ProtocolV2TargetBinary[] = [];
+    const installItems: ProtocolV2InstallItem[] = [];
 
     if (!release) {
       return {
         resourceBinaryMap,
         bootloaderBinary,
         fwBinaryMap,
+        installItems,
       };
     }
 
@@ -844,19 +877,29 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       if (shouldInstall) {
         const remoteBinary = await this.downloadRemoteProtocolV2Component(key, component);
         if (remoteBinary.kind === 'resource') {
-          resourceBinaryMap.push({
+          const binaryEntry = {
             fileName: this.getProtocolV2ResourceComponentFileName(key),
             binary: remoteBinary.binary,
             targetId: remoteBinary.targetId,
-          });
+          };
+          resourceBinaryMap.push(binaryEntry);
+          installItems.push({ ...binaryEntry, kind: remoteBinary.kind });
         } else if (remoteBinary.kind === 'bootloader') {
           bootloaderBinary = remoteBinary.binary;
-        } else {
-          fwBinaryMap.push({
+          installItems.push({
             fileName: remoteBinary.fileName,
             binary: remoteBinary.binary,
             targetId: remoteBinary.targetId,
+            kind: remoteBinary.kind,
           });
+        } else {
+          const binaryEntry = {
+            fileName: remoteBinary.fileName,
+            binary: remoteBinary.binary,
+            targetId: remoteBinary.targetId,
+          };
+          fwBinaryMap.push(binaryEntry);
+          installItems.push({ ...binaryEntry, kind: remoteBinary.kind });
         }
       }
     }
@@ -865,6 +908,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       resourceBinaryMap,
       bootloaderBinary,
       fwBinaryMap,
+      installItems,
     };
   }
 
@@ -973,18 +1017,25 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     resourceBinaryMap,
     fwBinaryMap,
     bootloaderBinary,
+    installItems,
   }: {
-    resourceBinaryMap: ProtocolV2TargetBinary[];
-    fwBinaryMap: ProtocolV2TargetBinary[];
-    bootloaderBinary: ArrayBuffer | null;
+    resourceBinaryMap?: ProtocolV2TargetBinary[];
+    fwBinaryMap?: ProtocolV2TargetBinary[];
+    bootloaderBinary?: ArrayBuffer | null;
+    installItems?: ProtocolV2InstallItem[];
   }) {
+    const orderedInstallItems =
+      installItems ??
+      this.buildProtocolV2InstallItems({
+        resourceBinaryMap: resourceBinaryMap ?? [],
+        bootloaderBinary: bootloaderBinary ?? null,
+        fwBinaryMap: fwBinaryMap ?? [],
+      });
     let totalSize = 0;
     let processedSize = 0;
     let transferredSize = 0;
 
-    for (const resource of resourceBinaryMap) totalSize += resource.binary.byteLength;
-    for (const fwbinary of fwBinaryMap) totalSize += fwbinary.binary.byteLength;
-    if (bootloaderBinary) totalSize += bootloaderBinary.byteLength;
+    for (const item of orderedInstallItems) totalSize += item.binary.byteLength;
 
     this.postTipMessage(FirmwareUpdateTipMessage.StartTransferData);
     const transferStartTime = Date.now();
@@ -997,64 +1048,26 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       `[FirmwareUpdateV4] transfer started transport=${transferTransport} total=${totalSize} bytes chunk=${chunkSize} bytes`
     );
 
-    const resourceTargets: Array<{ target_id: number; path: string }> = [];
-    const targets: Array<{ target_id: number; path: string }> = [];
+    const stagedInstallTargets: ProtocolV2InstallTarget[] = [];
 
     try {
-      for (const resource of resourceBinaryMap) {
-        const resourceFilePath = `${PROTOCOL_V2_FIRMWARE_STAGING_VOLUME}${resource.fileName}`;
+      for (const item of orderedInstallItems) {
+        const filePath = this.getProtocolV2InstallItemStagingPath(item);
         Log.log(
-          `[FirmwareUpdateV4] staging resource via FilesystemFileWrite target=${resource.targetId} path=${resourceFilePath} bytes=${resource.binary.byteLength}`
+          `[FirmwareUpdateV4] staging ${item.kind} via FilesystemFileWrite target=${item.targetId} path=${filePath} source=${item.fileName} bytes=${item.binary.byteLength}`
         );
         processedSize = await this.protocolV2CommonUpdateProcess({
-          payload: resource.binary,
-          filePath: resourceFilePath,
+          payload: item.binary,
+          filePath,
           processedSize,
           totalSize,
           onTransferredBytes,
         });
         transferredSize = processedSize;
-        resourceTargets.push({
-          target_id: resource.targetId,
-          path: resourceFilePath,
-        });
-      }
 
-      if (bootloaderBinary) {
-        const bootloaderPath = `${PROTOCOL_V2_FIRMWARE_STAGING_VOLUME}bootloader.bin`;
-        Log.log(
-          `[FirmwareUpdateV4] staging bootloader via FilesystemFileWrite target=${ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_BOOTLOADER} path=${bootloaderPath} bytes=${bootloaderBinary.byteLength}`
-        );
-        processedSize = await this.protocolV2CommonUpdateProcess({
-          payload: bootloaderBinary,
-          filePath: bootloaderPath,
-          processedSize,
-          totalSize,
-          onTransferredBytes,
-        });
-        transferredSize = processedSize;
-        targets.push({
-          target_id: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_BOOTLOADER,
-          path: bootloaderPath,
-        });
-      }
-
-      for (const fwbinary of fwBinaryMap) {
-        const firmwarePath = `${PROTOCOL_V2_FIRMWARE_STAGING_VOLUME}${fwbinary.fileName}`;
-        Log.log(
-          `[FirmwareUpdateV4] staging firmware via FilesystemFileWrite target=${fwbinary.targetId} path=${firmwarePath} bytes=${fwbinary.binary.byteLength}`
-        );
-        processedSize = await this.protocolV2CommonUpdateProcess({
-          payload: fwbinary.binary,
-          filePath: firmwarePath,
-          processedSize,
-          totalSize,
-          onTransferredBytes,
-        });
-        transferredSize = processedSize;
-        targets.push({
-          target_id: fwbinary.targetId,
-          path: firmwarePath,
+        stagedInstallTargets.push({
+          ...item,
+          path: filePath,
         });
       }
 
@@ -1079,23 +1092,43 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     }
 
     this.postTipMessage(FirmwareUpdateTipMessage.ConfirmOnDevice);
-    for (const resourceTarget of resourceTargets) {
-      const resourceTargetsBatch = [resourceTarget];
-      Log.log(
-        `[FirmwareUpdateV4] DeviceFirmwareUpdateRequest resources=${JSON.stringify(
-          resourceTargetsBatch
-        )}`
-      );
-      const startResponse = await this.protocolV2StartFirmwareUpdate({
-        targets: resourceTargetsBatch,
-      });
-      await this.waitForProtocolV2FirmwareUpdateComplete(resourceTargetsBatch, startResponse);
-    }
-    if (targets.length > 0) {
+
+    const firmwareTargets: Array<{ target_id: number; path: string }> = [];
+    const flushFirmwareTargets = async () => {
+      if (firmwareTargets.length === 0) return;
+      const targets = firmwareTargets.splice(0, firmwareTargets.length);
       Log.log(`[FirmwareUpdateV4] DeviceFirmwareUpdateRequest targets=${JSON.stringify(targets)}`);
       const startResponse = await this.protocolV2StartFirmwareUpdate({ targets });
       await this.waitForProtocolV2FirmwareUpdateComplete(targets, startResponse);
+    };
+
+    for (const item of stagedInstallTargets) {
+      const target = {
+        target_id: item.targetId,
+        path: item.path,
+      };
+      if (item.kind === 'resource') {
+        await flushFirmwareTargets();
+        const resourceTargets = [target];
+        Log.log(
+          `[FirmwareUpdateV4] DeviceFirmwareUpdateRequest resources=${JSON.stringify(
+            resourceTargets
+          )}`
+        );
+        const startResponse = await this.protocolV2StartFirmwareUpdate({
+          targets: resourceTargets,
+        });
+        await this.waitForProtocolV2FirmwareUpdateComplete(resourceTargets, startResponse);
+      } else {
+        firmwareTargets.push(target);
+      }
     }
+
+    await flushFirmwareTargets();
+  }
+
+  private getProtocolV2InstallItemStagingPath(item: ProtocolV2InstallItem) {
+    return `${PROTOCOL_V2_FIRMWARE_STAGING_VOLUME}${item.fileName}`;
   }
 
   private async queryProtocolV2FirmwareUpdateStatus() {

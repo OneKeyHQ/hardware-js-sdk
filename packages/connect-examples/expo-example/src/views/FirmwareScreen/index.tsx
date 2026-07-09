@@ -251,9 +251,11 @@ function FirmwareMultipleFiles({ title, onUpdate, deviceType }: FirmwareMultiple
   const width = media.gtLg ? '48%' : media.gtSm ? '100%' : '100%';
 
   const selectFile = (type: string) => {
-    // source -> .zip
-    // ble & firmware & bootloader -> .bin
-    const fileType = type === 'resource' ? 'application/zip' : 'application/octet-stream';
+    // Pro2 V4 资源使用 CRATE .okpkg；旧 Pro 资源仍使用 .zip。
+    const fileType =
+      type === 'resource' && deviceType !== EDeviceType.Pro2
+        ? 'application/zip'
+        : 'application/octet-stream';
     DocumentPicker.getDocumentAsync({
       type: fileType,
     }).then(res => {
@@ -531,15 +533,22 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
       if (!selectDevice) return { payload: 'need connect device', success: false };
       setShowUpdateDialog(true);
       try {
-        const updateMethod =
-          deviceTypeLowerCase === EDeviceType.Pro2 ? sdk.firmwareUpdateV4 : sdk.firmwareUpdateV3;
-        const res = await updateMethod(selectDevice.connectId, {
-          firmwareBinary,
-          bleBinary,
-          bootloaderBinary,
-          resourceBinary,
-          platform: 'web',
-        });
+        const isProtocolV2Device = deviceTypeLowerCase === EDeviceType.Pro2;
+        const res = isProtocolV2Device
+          ? await sdk.firmwareUpdateV4(selectDevice.connectId, {
+              applicationP1Binary: firmwareBinary,
+              coprocessorBinary: bleBinary,
+              bootloaderBinary,
+              resourceBinaries: resourceBinary ? [resourceBinary] : undefined,
+              platform: 'web',
+            })
+          : await sdk.firmwareUpdateV3(selectDevice.connectId, {
+              firmwareBinary,
+              bleBinary,
+              bootloaderBinary,
+              resourceBinary,
+              platform: 'web',
+            });
         setShowUpdateDialog(false);
         if (res.success) {
           await loadDeviceFeatures();

@@ -8,6 +8,7 @@ import type {
 } from '@onekeyfe/hd-transport';
 import type {
   DeviceFirmwareUpdateParams,
+  DeviceFirmwareUpdateStatusGetParams,
   DeviceRebootParams,
   DeviceFactoryInfoSetParams,
 } from '../../api/protocol-v2/helpers';
@@ -17,6 +18,7 @@ import type { DeviceInfoGetParams } from '../../api/protocol-v2/DeviceInfoGet';
 export type {
   DeviceFirmwareTargetInput,
   DeviceFirmwareUpdateParams,
+  DeviceFirmwareUpdateStatusGetParams,
   DeviceRebootParams,
   DeviceFactoryInfoSetParams,
   RebootTypeInput,
@@ -93,7 +95,7 @@ export declare function deviceFirmwareUpdate(
 
 export declare function deviceGetFirmwareUpdateStatus(
   connectId: string,
-  params?: CommonParams
+  params?: CommonParams & DeviceFirmwareUpdateStatusGetParams
 ): Response<DeviceFirmwareUpdateStatus>;
 
 export declare function deviceFactoryInfoSet(

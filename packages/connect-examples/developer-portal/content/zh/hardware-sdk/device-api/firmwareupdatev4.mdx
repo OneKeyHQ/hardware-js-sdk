@@ -24,7 +24,7 @@ const res = await HardwareSDK.firmwareUpdateV4(connectId, {
   // firmwareBinary: ArrayBuffer,
   // bleBinary: ArrayBuffer,
   // bootloaderBinary: ArrayBuffer,
-  // resourceBinary: ArrayBuffer,
+  // resourceBinaries: ArrayBuffer[],
 
   // 可选：强制更新资源包
   forcedUpdateRes: false,
@@ -42,7 +42,7 @@ const res = await HardwareSDK.firmwareUpdateV4(connectId, {
 - `bleBinary` - 可选 `ArrayBuffer` 自定义蓝牙固件
 - `bootloaderVersion` - 可选 `number[]` 目标引导加载程序版本
 - `bootloaderBinary` - 可选 `ArrayBuffer` 自定义引导加载程序
-- `resourceBinary` - 可选 `ArrayBuffer` 资源包二进制文件
+- `resourceBinaries` - 可选 `ArrayBuffer[]` Protocol V2 资源包二进制文件列表
 - `forcedUpdateRes` - 可选 `boolean` 强制更新资源包
 
 ### 返回结果

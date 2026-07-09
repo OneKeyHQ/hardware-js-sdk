@@ -83,14 +83,17 @@ PB_MSG_NAME = {v: k for k, v in PB_MSG_TYPE.items()}
 
 
 FW_TARGET_NAME = {
-    0: "Main App",
-    1: "Main Bootloader",
-    2: "BLE",
-    3: "SE1",
-    4: "SE2",
-    5: "SE3",
-    6: "SE4",
-    10: "Resource",
+    0: "Invalid",
+    1: "Resource Crate",
+    2: "Romloader",
+    3: "Bootloader",
+    4: "Application P1",
+    5: "Application P2",
+    6: "Coprocessor",
+    7: "SE01",
+    8: "SE02",
+    9: "SE03",
+    10: "SE04",
 }
 
 REBOOT_TYPE_NAME = {0: "Normal", 1: "Boardloader", 2: "BootLoader"}
@@ -957,7 +960,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp = sub.add_parser("fw_update", help="Trigger firmware update from a file already on device")
     sp.add_argument("--target", "-t", type=int, default=0,
-                    help="0=Main App, 1=Main Bootloader, 2=BLE, 3..6=SE1..SE4, 10=Resource")
+                    help="0=Invalid, 1=Resource Crate, 2=Romloader, 3=Bootloader, 4=Application P1, 5=Application P2, 6=Coprocessor, 7..10=SE01..SE04")
     sp.add_argument("--path", "-p", required=True, help="firmware file path on device")
     sp.add_argument("--reboot", action="store_true", help="reboot on success")
     sp.add_argument("--timeout", type=int, default=30, help="response timeout in seconds (default 30)")

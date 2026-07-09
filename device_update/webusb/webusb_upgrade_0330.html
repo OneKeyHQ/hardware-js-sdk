@@ -455,14 +455,16 @@
         <div id="pb-tab-fwupdate" class="tab-content">
             <label>Target Type:</label>
             <select id="fwUpdateTargetType" style="margin-bottom: 10px;">
-                <option value="0">Main App</option>
-                <option value="1">Main Bootloader</option>
-                <option value="2">BLE</option>
-                <option value="3">SE1</option>
-                <option value="4">SE2</option>
-                <option value="5">SE3</option>
-                <option value="6">SE4</option>
-                <option value="10">Resource</option>
+                <option value="1">Resource Crate</option>
+                <option value="2">Romloader</option>
+                <option value="3">Bootloader</option>
+                <option value="4">Application P1</option>
+                <option value="5">Application P2</option>
+                <option value="6">Coprocessor</option>
+                <option value="7">SE01</option>
+                <option value="8">SE02</option>
+                <option value="9">SE03</option>
+                <option value="10">SE04</option>
             </select>
             <label>Firmware file path (on device):</label>
             <input type="text" id="fwUpdatePath" placeholder="vol1:firmware.bin" value="vol1:firmware.bin">
@@ -1120,14 +1122,16 @@
         // Protobuf wire types: 0=varint, 2=length-delimited
         const pbEncoder = {
             FirmwareTargetType: {
-                TARGET_MAIN_APP: 0,
-                TARGET_MAIN_BOOT: 1,
-                TARGET_BLE: 2,
-                TARGET_SE1: 3,
-                TARGET_SE2: 4,
-                TARGET_SE3: 5,
-                TARGET_SE4: 6,
-                TARGET_RESOURCE: 10,
+                TARGET_CRATE: 1,
+                TARGET_ROMLOADER: 2,
+                TARGET_BOOTLOADER: 3,
+                TARGET_APPLICATION_P1: 4,
+                TARGET_APPLICATION_P2: 5,
+                TARGET_COPROCESSOR: 6,
+                TARGET_SE01: 7,
+                TARGET_SE02: 8,
+                TARGET_SE03: 9,
+                TARGET_SE04: 10,
             },
 
             encodeVarint(value) {
@@ -1839,8 +1843,17 @@
         }
 
         const FW_TARGET_NAME = {
-            0: 'Main App', 1: 'Main Bootloader', 2: 'BLE',
-            3: 'SE1', 4: 'SE2', 5: 'SE3', 6: 'SE4', 10: 'Resource'
+            0: 'Invalid',
+            1: 'Resource Crate',
+            2: 'Romloader',
+            3: 'Bootloader',
+            4: 'Application P1',
+            5: 'Application P2',
+            6: 'Coprocessor',
+            7: 'SE01',
+            8: 'SE02',
+            9: 'SE03',
+            10: 'SE04'
         };
 
         async function sendFirmwareUpdate() {
