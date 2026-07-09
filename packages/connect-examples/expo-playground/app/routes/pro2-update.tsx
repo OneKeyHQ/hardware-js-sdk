@@ -85,11 +85,11 @@ const TARGET_FIELDS = [
 ] as const;
 
 const RESOURCE_FIELD = {
-  label: 'Resource crates',
+  label: 'Resource crate',
   targetId: 1,
   targetName: 'FW_MGMT_TARGET_CRATE',
   accept: '.crate.okpkg,.okpkg',
-  formatHint: 'CRATE .okpkg, supports selecting multiple files',
+  formatHint: 'Merged CRATE .okpkg; select one file for normal Pro2 resource update',
 } as const;
 
 type TargetParam = (typeof TARGET_FIELDS)[number]['param'];
@@ -214,7 +214,7 @@ export default function Pro2UpdatePage() {
       } else {
         const targetNames = [
           resourceFiles.length > 0
-            ? `Resource crates(${RESOURCE_FIELD.targetId} x${resourceFiles.length})`
+            ? `Resource crate(${RESOURCE_FIELD.targetId} x${resourceFiles.length})`
             : null,
           ...selectedFields.map(field => `${field.label}(${field.targetId})`),
         ].filter(Boolean);

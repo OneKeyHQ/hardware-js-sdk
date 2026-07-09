@@ -367,7 +367,7 @@ const api: UnifiedMethodConfig[] = [
             type: 'file',
             required: false,
             label: 'Resource crate (target 1)',
-            description: 'Resource CRATE payload package (.crate.okpkg). This field wraps the selected file into resourceBinaries[].',
+            description: 'Merged resource CRATE payload package (.crate.okpkg). This field wraps the selected file into resourceBinaries[].',
             accept: '.crate.okpkg,.okpkg,.bin',
             visible: true,
             editable: true,
