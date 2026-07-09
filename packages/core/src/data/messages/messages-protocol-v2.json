@@ -107,6 +107,8 @@
         "MessageType_FirmwareHash": 89,
         "MessageType_UnlockPath": 93,
         "MessageType_UnlockedPathRequest": 94,
+        "MessageType_UnLockDevice": 10030,
+        "MessageType_UnLockDeviceResponse": 10031,
         "MessageType_SetU2FCounter": 63,
         "MessageType_GetNextU2FCounter": 80,
         "MessageType_NextU2FCounter": 81,
@@ -11405,16 +11407,16 @@
     "DeviceFirmwareTargetType": {
       "values": {
         "FW_MGMT_TARGET_INVALID": 0,
-        "FW_MGMT_TARGET_CRATE": 1,
-        "FW_MGMT_TARGET_ROMLOADER": 2,
-        "FW_MGMT_TARGET_BOOTLOADER": 3,
-        "FW_MGMT_TARGET_APPLICATION_P1": 4,
-        "FW_MGMT_TARGET_APPLICATION_P2": 5,
-        "FW_MGMT_TARGET_COPROCESSOR": 6,
-        "FW_MGMT_TARGET_SE01": 7,
-        "FW_MGMT_TARGET_SE02": 8,
-        "FW_MGMT_TARGET_SE03": 9,
-        "FW_MGMT_TARGET_SE04": 10
+        "FW_MGMT_TARGET_ROMLOADER": 1,
+        "FW_MGMT_TARGET_BOOTLOADER": 2,
+        "FW_MGMT_TARGET_APPLICATION_P1": 3,
+        "FW_MGMT_TARGET_APPLICATION_P2": 4,
+        "FW_MGMT_TARGET_COPROCESSOR": 5,
+        "FW_MGMT_TARGET_SE01": 6,
+        "FW_MGMT_TARGET_SE02": 7,
+        "FW_MGMT_TARGET_SE03": 8,
+        "FW_MGMT_TARGET_SE04": 9,
+        "FW_MGMT_TARGET_RESOURCE": 10
       }
     },
     "DeviceFirmwareUpdateTaskStatus": {

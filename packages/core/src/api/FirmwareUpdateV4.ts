@@ -54,7 +54,7 @@ const PROTOCOL_V2_TARGET_STATUS_IN_PROGRESS = 1;
 const PROTOCOL_V2_TARGET_STATUS_FINISHED = 2;
 const PROTOCOL_V2_TARGET_STATUS_FAILED_MIN = 3;
 const PROTOCOL_V2_CONNECT_PROTOCOL = 'V2';
-const PROTOCOL_V2_FIRMWARE_STAGING_VOLUME = 'vol1:';
+const PROTOCOL_V2_FIRMWARE_STAGING_VOLUME = 'vol1:/';
 const PROTOCOL_V2_MIN_FILE_CHUNK_SIZE = 64;
 const PROTOCOL_V2_CONNECT_RETRY_COUNT = 10;
 const PROTOCOL_V2_CONNECT_POLL_INTERVAL = 500;
@@ -163,7 +163,12 @@ const PROTOCOL_V2_REMOTE_COMPONENT_TARGETS: Readonly<
   },
   CRATE: {
     fileName: 'resource.bin',
-    targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_CRATE,
+    targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_RESOURCE,
+    kind: 'resource',
+  },
+  RESOURCE: {
+    fileName: 'resource.bin',
+    targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_RESOURCE,
     kind: 'resource',
   },
 };
@@ -524,7 +529,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       return this.params.resourceBinaries.map((binary, index) => ({
         fileName: `resource-${index + 1}.bin`,
         binary,
-        targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_CRATE,
+        targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_RESOURCE,
       }));
     }
     const resourceUrl = DataManager.getSysResourcesLatestRelease({
@@ -539,7 +544,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         {
           fileName: 'resource.bin',
           binary: resource,
-          targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_CRATE,
+          targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_RESOURCE,
         },
       ];
     }
