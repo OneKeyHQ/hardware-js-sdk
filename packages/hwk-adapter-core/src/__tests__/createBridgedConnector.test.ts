@@ -32,6 +32,18 @@ function createMockBridge(): IHardwareBridge & {
 }
 
 describe('createBridgedConnector', () => {
+  it('forwards search options to the bridge', async () => {
+    const bridge = createMockBridge();
+    const connector = createBridgedConnector('ledger', 'usb', bridge);
+
+    await connector.searchDevices({ waitForAll: true });
+
+    expect(bridge.searchDevices).toHaveBeenCalledWith({
+      vendor: 'ledger',
+      options: { waitForAll: true },
+    });
+  });
+
   it('forwards events to registered handlers', () => {
     const bridge = createMockBridge();
     const connector = createBridgedConnector('ledger', 'usb', bridge);
@@ -99,5 +111,41 @@ describe('createBridgedConnector', () => {
     connector.on('device-connect', handler);
     connector.off('device-disconnect', handler); // wrong event
     expect(bridge._handlers.size).toBe(1);
+  });
+
+  it('awaits bridged setKnownCredentials before the next hardware call', async () => {
+    const bridge = createMockBridge();
+    let resolveCredentials: (() => void) | undefined;
+    let credentialsLoaded = false;
+    bridge.setKnownCredentials = jest.fn(
+      () =>
+        new Promise<void>(resolve => {
+          resolveCredentials = () => {
+            credentialsLoaded = true;
+            resolve();
+          };
+        })
+    );
+    const connector = createBridgedConnector('trezor', 'usb', bridge);
+
+    let loadCompleted = false;
+    const loadPromise = Promise.resolve(
+      connector.setKnownCredentials?.([{ credential: 'c' }])
+    ).then(() => {
+      loadCompleted = true;
+    });
+
+    expect(credentialsLoaded).toBe(false);
+    await Promise.resolve();
+    expect(loadCompleted).toBe(false);
+
+    resolveCredentials?.();
+    await loadPromise;
+
+    expect(credentialsLoaded).toBe(true);
+    expect(bridge.setKnownCredentials).toHaveBeenCalledWith({
+      vendor: 'trezor',
+      credentials: [{ credential: 'c' }],
+    });
   });
 });

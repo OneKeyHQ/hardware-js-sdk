@@ -14,7 +14,9 @@
     "dev": "rimraf build && cross-env TS_NODE_PROJECT=\"../../tsconfig.webpack.json\" webpack --config ./webpack/dev.webpack.config.ts",
     "build:lib": "rimraf ./dist && tsc --build tsconfig.json",
     "build:iframe": "cross-env TS_NODE_PROJECT=\"../../tsconfig.webpack.json\" webpack --config ./webpack/iframe.webpack.config.ts",
-    "build:sdk": "rimraf build && cross-env TS_NODE_PROJECT=\"../../tsconfig.webpack.json\" webpack --config ./webpack/prod.webpack.config.ts",
+    "build:sdk:normal": "cross-env NODE_OPTIONS=--max-old-space-size=8192 TS_NODE_PROJECT=\"../../tsconfig.webpack.json\" SDK_BUILD_TARGET=normal webpack --config ./webpack/prod.webpack.config.ts",
+    "build:sdk:min": "cross-env NODE_OPTIONS=--max-old-space-size=8192 TS_NODE_PROJECT=\"../../tsconfig.webpack.json\" SDK_BUILD_TARGET=min webpack --config ./webpack/prod.webpack.config.ts",
+    "build:sdk": "rimraf build && yarn build:sdk:normal && yarn build:sdk:min",
     "build": "yarn build:sdk && yarn build:iframe && yarn build:lib",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"

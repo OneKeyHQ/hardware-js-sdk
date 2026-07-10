@@ -8,6 +8,7 @@ module.exports = {
     'no-promise-executor-return': 'off',
     'no-return-await': 'off',
     'no-void': 'off',
+    'no-continue': 'off',
     'import/no-unresolved': ['error', { ignore: ['^@ledgerhq/'] }],
   },
   parserOptions: {

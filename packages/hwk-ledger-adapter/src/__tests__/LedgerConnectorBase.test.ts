@@ -83,6 +83,36 @@ describe('LedgerConnectorBase BLE discovery', () => {
       }),
     ]);
   });
+
+  it('filters out OneKey and Trezor descriptors from Ledger discovery', async () => {
+    const connector = new SearchConnector(
+      [
+        {
+          path: 'ledger-1',
+          name: 'Ledger Nano X',
+          transport: 'RN_BLE',
+          type: 'nanoX',
+        },
+        {
+          path: 'onekey-1',
+          name: 'OneKey Pro 1234',
+          transport: 'RN_BLE',
+          serviceUUIDs: ['00000001-0000-1000-8000-00805f9b34fb'],
+        },
+        {
+          path: 'trezor-1',
+          name: 'Trezor Safe 7',
+          transport: 'RN_BLE',
+          serviceUUIDs: ['8c000001-a59b-4d58-a9ad-073df69fa1b1'],
+        },
+      ],
+      'ble'
+    );
+
+    const devices = await connector.searchDevices();
+
+    expect(devices.map(d => d.connectId)).toEqual(['ledger-1']);
+  });
 });
 
 describe('LedgerConnectorBase USB discovery', () => {

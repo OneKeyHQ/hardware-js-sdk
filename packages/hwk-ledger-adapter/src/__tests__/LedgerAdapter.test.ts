@@ -309,16 +309,15 @@ describe('LedgerAdapter', () => {
       await adapter.evmGetAddress('dev-1', '', {
         path: "m/44'/60'/0'/0/0",
         showOnDevice: true,
+        autoInstallApp: true,
+        passphraseState: 'aabbccdd',
+        useEmptyPassphrase: true,
       });
 
-      expect(connector.call).toHaveBeenCalledWith(
-        'session-abc',
-        'evmGetAddress',
-        expect.objectContaining({
-          path: "m/44'/60'/0'/0/0",
-          showOnDevice: true,
-        })
-      );
+      expect(connector.call).toHaveBeenCalledWith('session-abc', 'evmGetAddress', {
+        path: "m/44'/60'/0'/0/0",
+        showOnDevice: true,
+      });
     });
   });
 
@@ -1616,12 +1615,10 @@ describe('LedgerAdapter', () => {
         });
       });
 
-      const result = await adapter.evmGetAddress(
-        'dev-1',
-        '',
-        { path: "m/44'/60'/0'/0/0" },
-        { autoInstallApp: true }
-      );
+      const result = await adapter.evmGetAddress('dev-1', '', {
+        path: "m/44'/60'/0'/0/0",
+        autoInstallApp: true,
+      });
 
       expect(requestedAppName).toBe('Cardano');
       expect(result.success).toBe(true);
@@ -1639,12 +1636,10 @@ describe('LedgerAdapter', () => {
         });
       });
 
-      const result = await adapter.evmGetAddress(
-        'dev-1',
-        '',
-        { path: "m/44'/60'/0'/0/0" },
-        { autoInstallApp: true }
-      );
+      const result = await adapter.evmGetAddress('dev-1', '', {
+        path: "m/44'/60'/0'/0/0",
+        autoInstallApp: true,
+      });
 
       expect(result.success).toBe(false);
       if (!result.success) {
@@ -1897,6 +1892,8 @@ describe('LedgerAdapter', () => {
       await adapter.connectDevice('dev-1');
 
       const result = await adapter.allNetworkGetAddress('dev-1', '', {
+        passphraseState: 'aabbccdd',
+        useEmptyPassphrase: true,
         bundle: [
           {
             network: 'evm',
@@ -1911,18 +1908,21 @@ describe('LedgerAdapter', () => {
       });
 
       expect(result.success).toBe(true);
-      expect(connector.call).toHaveBeenCalledWith(
-        'session-abc',
-        'evmGetAddress',
-        expect.objectContaining({
-          network: 'evm',
-          methodName: 'evmGetAddress',
-          path: "m/44'/60'/0'/0/0",
-          showOnDevice: true,
-          chainId: 1,
-          customField: 'kept',
-        })
+      const evmCall = connector.call.mock.calls.find(
+        call =>
+          call[1] === 'evmGetAddress' &&
+          (call[2] as { customField?: unknown }).customField === 'kept'
       );
+      expect(evmCall?.[2]).toMatchObject({
+        network: 'evm',
+        methodName: 'evmGetAddress',
+        path: "m/44'/60'/0'/0/0",
+        showOnDevice: true,
+        chainId: 1,
+        customField: 'kept',
+      });
+      expect(evmCall?.[2]).not.toHaveProperty('passphraseState');
+      expect(evmCall?.[2]).not.toHaveProperty('useEmptyPassphrase');
     });
 
     it('allNetworkGetAddress verifies each item with its own chain fingerprint', async () => {
@@ -2027,6 +2027,12 @@ describe('LedgerAdapter', () => {
       if (result.success) {
         expect(result.payload[0].success).toBe(true);
         expect(result.payload[0].payload?.address).toBe('0xBUNDLE');
+        expect(result.payload[0].payload?.deviceIdentity).toEqual({
+          vendor: 'ledger',
+          type: 'chainFingerprint',
+          chain: 'evm',
+          value: expectedFingerprint,
+        });
         expect(result.payload[0].payload?.chainFingerprint).toBe(expectedFingerprint);
         expect(result.payload[0].payload?.chainFingerprintChain).toBe('evm');
       }
@@ -2065,8 +2071,20 @@ describe('LedgerAdapter', () => {
       if (result.success) {
         expect(result.payload).toHaveLength(2);
         expect(result.payload[0].success).toBe(true);
+        expect(result.payload[0].payload?.deviceIdentity).toEqual({
+          vendor: 'ledger',
+          type: 'chainFingerprint',
+          chain: 'evm',
+          value: expectedFingerprint,
+        });
         expect(result.payload[0].payload?.chainFingerprint).toBe(expectedFingerprint);
         expect(result.payload[1].success).toBe(true);
+        expect(result.payload[1].payload?.deviceIdentity).toEqual({
+          vendor: 'ledger',
+          type: 'chainFingerprint',
+          chain: 'evm',
+          value: expectedFingerprint,
+        });
         expect(result.payload[1].payload?.chainFingerprint).toBe(expectedFingerprint);
       }
       expect(methodsCalled()).toEqual([
@@ -2077,19 +2095,19 @@ describe('LedgerAdapter', () => {
       ]);
     });
 
-    it('allNetworkGetAddress adds Ledger coin params for BTC fork networks inside the adapter', async () => {
+    it('allNetworkGetAddress adds Ledger coin params for supported BTC fork networks inside the adapter', async () => {
       connector.callImpl
         .mockResolvedValueOnce({ masterFingerprint: btcFingerprint })
-        .mockResolvedValueOnce({ xpub: 'xpub-doge', path: "m/44'/3'/0'" });
+        .mockResolvedValueOnce({ xpub: 'xpub-ltc', path: "m/84'/2'/0'" });
 
       await adapter.connectDevice('dev-1');
 
       const result = await adapter.allNetworkGetAddress('dev-1', '', {
         bundle: [
           {
-            network: 'doge',
+            network: 'ltc',
             methodName: 'btcGetPublicKey',
-            path: "m/44'/3'/0'",
+            path: "m/84'/2'/0'",
             deviceId: btcFingerprint,
           },
         ],
@@ -2100,12 +2118,43 @@ describe('LedgerAdapter', () => {
         'session-abc',
         'btcGetPublicKey',
         expect.objectContaining({
-          network: 'doge',
+          network: 'ltc',
           methodName: 'btcGetPublicKey',
-          path: "m/44'/3'/0'",
-          coin: 'Dogecoin',
+          path: "m/84'/2'/0'",
+          coin: 'Litecoin',
         })
       );
+    });
+
+    it('allNetworkGetAddress returns item failure for Dogecoin on Ledger without calling connector', async () => {
+      await adapter.connectDevice('dev-1');
+
+      await expect(
+        adapter.allNetworkGetAddress('dev-1', '', {
+          bundle: [
+            {
+              network: 'doge',
+              methodName: 'btcGetPublicKey',
+              path: "m/44'/3'/0'",
+            },
+          ],
+        })
+      ).resolves.toEqual({
+        success: true,
+        payload: [
+          expect.objectContaining({
+            network: 'doge',
+            methodName: 'btcGetPublicKey',
+            path: "m/44'/3'/0'",
+            success: false,
+            payload: {
+              code: HardwareErrorCode.ChainNotSupported,
+              error: 'Ledger allNetwork does not support Dogecoin',
+            },
+          }),
+        ],
+      });
+      expect(connector.call).not.toHaveBeenCalled();
     });
 
     it('allNetworkGetAddress returns item failure for unsupported method without throwing', async () => {
@@ -2256,3 +2305,19 @@ describe('LedgerAdapter', () => {
     });
   });
 });
+
+/**
+ * Type-only: Ledger's public method signature must not accept Trezor's
+ * structured-fields shape — Ledger signs a whole RLP (`serializedTx`).
+ */
+function typeOnlyLedgerEvmSignTxShape(adapter: LedgerAdapter) {
+  void adapter.evmSignTransaction('connect-1', 'device-1', {
+    path: "m/44'/60'/0'/0/0",
+    chainId: 1,
+    // @ts-expect-error Ledger requires serializedTx; structured fields are Trezor-only.
+    nonce: '0x1',
+    // @ts-expect-error Ledger requires serializedTx; structured fields are Trezor-only.
+    gasLimit: '0x5208',
+  });
+}
+void typeOnlyLedgerEvmSignTxShape;

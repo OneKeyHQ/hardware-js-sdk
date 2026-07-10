@@ -44,6 +44,15 @@ export interface DeviceInfo {
 
   /** Device capabilities — varies by vendor, model, and connection type */
   capabilities?: DeviceCapabilities;
+
+  /**
+   * Vendor-specific raw payload from the post-handshake `Features` (Trezor)
+   * or device-info call. Populated by the connector with `{ transport,
+   * descriptor, features }` so the app layer can read fields we haven't
+   * promoted to the typed surface yet. Treat as informational — promote
+   * any consumed field above.
+   */
+  raw?: Record<string, unknown>;
 }
 
 export interface DeviceTarget {

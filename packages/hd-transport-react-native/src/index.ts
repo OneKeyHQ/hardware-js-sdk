@@ -54,6 +54,11 @@ type ResolvedBleCharacteristics = {
   notifyCharacteristic: Characteristic;
 };
 
+const getBleIdentityName = (device?: { name?: string | null } | null): string | null => {
+  const localName = (device as { localName?: string | null } | undefined)?.localName;
+  return device?.name ?? localName ?? null;
+};
+
 const delay = (ms: number) =>
   new Promise<void>(resolve => {
     setTimeout(resolve, ms);
@@ -358,7 +363,7 @@ export default class ReactNativeBleTransport {
       }
 
       blePlxManager.startDeviceScan(
-        null,
+        getBluetoothServiceUuids(),
         {
           scanMode: ScanMode.LowLatency,
         },
@@ -387,7 +392,7 @@ export default class ReactNativeBleTransport {
             return;
           }
 
-          if (isOnekeyDevice(device?.name ?? null, device?.id)) {
+          if (isOnekeyDevice(getBleIdentityName(device), device?.id)) {
             Log?.debug('search device start ======================');
             const { name, localName, id } = device ?? {};
             Log?.debug(
@@ -399,12 +404,19 @@ export default class ReactNativeBleTransport {
         }
       );
 
-      getConnectedDeviceIds(getBluetoothServiceUuids()).then(devices => {
-        for (const device of devices) {
-          Log?.debug('search connected peripheral: ', device.id);
-          addDevice(device as unknown as Device);
+      getConnectedDeviceIds(Platform.OS === 'ios' ? getBluetoothServiceUuids() : []).then(
+        devices => {
+          for (const device of devices) {
+            const { serviceUUIDs } = device as { serviceUUIDs?: string[] };
+            const hasCachedServiceUuid = Boolean(serviceUUIDs?.length);
+            const keepDevice = Platform.OS === 'ios' || hasCachedServiceUuid;
+            if (keepDevice) {
+              Log?.debug('search connected peripheral: ', device.id);
+              addDevice(device as unknown as Device);
+            }
+          }
         }
-      });
+      );
 
       const addDevice = (device: Device) => {
         if (deviceList.every(d => d.id !== device.id)) {

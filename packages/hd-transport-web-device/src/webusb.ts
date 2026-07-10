@@ -1,6 +1,12 @@
 /* eslint-disable no-undef */
 import transport, { LogBlockCommand } from '@onekeyfe/hd-transport';
-import { ERRORS, HardwareErrorCode, ONEKEY_WEBUSB_FILTER, wait } from '@onekeyfe/hd-shared';
+import {
+  ERRORS,
+  HardwareErrorCode,
+  ONEKEY_WEBUSB_FILTER,
+  isKnownTrezorWebUsbDevice,
+  wait,
+} from '@onekeyfe/hd-shared';
 import ByteBuffer from 'bytebuffer';
 
 import type { AcquireInput, OneKeyDeviceInfoBase } from '@onekeyfe/hd-transport';
@@ -111,10 +117,11 @@ export default class WebUsbTransport {
     const devices = await this.usb.getDevices();
     const onekeyDevices = devices.filter(dev => {
       const isOneKey = ONEKEY_WEBUSB_FILTER.some(
-        desc => dev.vendorId === desc.vendorId && dev.productId === desc.productId
+        (desc: { vendorId: number; productId: number }) =>
+          dev.vendorId === desc.vendorId && dev.productId === desc.productId
       );
       const hasSerialNumber = typeof dev.serialNumber === 'string' && dev.serialNumber.length > 0;
-      return isOneKey && hasSerialNumber;
+      return isOneKey && hasSerialNumber && !isKnownTrezorWebUsbDevice(dev);
     });
 
     this.deviceList = onekeyDevices.map(device => ({

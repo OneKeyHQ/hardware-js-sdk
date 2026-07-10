@@ -22,7 +22,7 @@
     "@onekeyfe/hd-core": "1.1.29",
     "@onekeyfe/hd-shared": "1.1.29",
     "@onekeyfe/hd-transport": "1.1.29",
-    "@onekeyfe/react-native-ble-utils": "^0.1.4",
+    "@onekeyfe/react-native-ble-utils": "^0.1.6",
     "react-native-ble-plx": "3.5.1"
   }
 }

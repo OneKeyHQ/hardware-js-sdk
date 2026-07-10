@@ -1,0 +1,66 @@
+{
+  "name": "@onekeyfe/hwk-trezor-transport",
+  "version": "1.1.29",
+  "private": true,
+  "description": "Low-level Trezor transport helpers vendored from Trezor Suite MIT sources",
+  "author": "OneKey",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    },
+    "./hwk": {
+      "import": {
+        "types": "./dist/hwk.d.mts",
+        "default": "./dist/hwk.mjs"
+      },
+      "require": {
+        "types": "./dist/hwk.d.ts",
+        "default": "./dist/hwk.js"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE.md",
+    "README.md",
+    "CHANGELOG.md",
+    "TREZOR_SOURCE.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rimraf dist"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OneKeyHQ/hardware-js-sdk.git",
+    "directory": "packages/hwk-trezor-transport"
+  },
+  "sideEffects": false,
+  "dependencies": {
+    "@onekeyfe/hwk-trezor-protobuf": "1.1.29",
+    "@onekeyfe/hwk-trezor-protocol": "1.1.29",
+    "@onekeyfe/hwk-trezor-type-utils": "1.1.29",
+    "@onekeyfe/hwk-trezor-utils": "1.1.29",
+    "cross-fetch": "^4.1.0",
+    "usb": "^2.17.0"
+  },
+  "devDependencies": {
+    "@types/sharedworker": "^0.0.223",
+    "@types/w3c-web-usb": "^1.0.14",
+    "rimraf": "^5.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "5.1.6"
+  }
+}

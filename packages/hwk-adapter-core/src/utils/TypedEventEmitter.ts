@@ -55,4 +55,9 @@ export class TypedEventEmitter<TMap extends Record<string, any> = Record<string,
   removeAllListeners(): void {
     this._listeners.clear();
   }
+
+  /** Number of listeners registered for `event`. 0 if none. */
+  listenerCount(event: string): number {
+    return this._listeners.get(event)?.size ?? 0;
+  }
 }

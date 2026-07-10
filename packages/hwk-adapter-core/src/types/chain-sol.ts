@@ -1,7 +1,8 @@
+import type { PassphraseStateAware } from './passphrase';
 import type { Response } from './response';
-import type { ICommonCallParams } from './wallet';
+import type { IHardwareCallParams, NullableCallArg } from './wallet';
 
-export interface SolGetAddressParams {
+export interface SolGetAddressParams extends PassphraseStateAware {
   path: string;
   showOnDevice?: boolean;
 }
@@ -12,11 +13,13 @@ export interface SolAddress {
   path: string;
 }
 
-export interface SolSignTxParams {
+export interface SolSignTxParams extends PassphraseStateAware {
   path: string;
   /** Hex-encoded serialized transaction bytes (no 0x prefix) */
   serializedTx: string;
   additionalInfo?: {
+    /** Trezor Solana token definition bytes as a hex string. */
+    encodedToken?: string;
     tokenAccountsInfos?: Array<{
       baseAddress: string;
       tokenProgram: string;
@@ -31,7 +34,7 @@ export interface SolSignedTx {
   signature: string;
 }
 
-export interface SolSignMsgParams {
+export interface SolSignMsgParams extends PassphraseStateAware {
   path: string;
   /** Message bytes as hex string (no 0x prefix) */
   message: string;
@@ -44,23 +47,20 @@ export interface SolSignature {
 
 export interface ISolMethods {
   solGetAddress(
-    connectId: string,
-    deviceId: string,
-    params: SolGetAddressParams,
-    commonParams?: ICommonCallParams
+    connectId?: NullableCallArg<string>,
+    deviceId?: NullableCallArg<string>,
+    params?: NullableCallArg<IHardwareCallParams<SolGetAddressParams>>
   ): Promise<Response<SolAddress>>;
 
   solSignTransaction(
-    connectId: string,
-    deviceId: string,
-    params: SolSignTxParams,
-    commonParams?: ICommonCallParams
+    connectId?: NullableCallArg<string>,
+    deviceId?: NullableCallArg<string>,
+    params?: NullableCallArg<IHardwareCallParams<SolSignTxParams>>
   ): Promise<Response<SolSignedTx>>;
 
   solSignMessage(
-    connectId: string,
-    deviceId: string,
-    params: SolSignMsgParams,
-    commonParams?: ICommonCallParams
+    connectId?: NullableCallArg<string>,
+    deviceId?: NullableCallArg<string>,
+    params?: NullableCallArg<IHardwareCallParams<SolSignMsgParams>>
   ): Promise<Response<SolSignature>>;
 }
