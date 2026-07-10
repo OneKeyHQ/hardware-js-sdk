@@ -17,6 +17,26 @@
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
       }
+    },
+    "./errors": {
+      "import": {
+        "types": "./dist/errors.d.mts",
+        "default": "./dist/errors.mjs"
+      },
+      "require": {
+        "types": "./dist/errors.d.ts",
+        "default": "./dist/errors.js"
+      }
+    },
+    "./ui-events": {
+      "import": {
+        "types": "./dist/ui-events.d.mts",
+        "default": "./dist/ui-events.mjs"
+      },
+      "require": {
+        "types": "./dist/ui-events.d.ts",
+        "default": "./dist/ui-events.js"
+      }
     }
   },
   "files": [

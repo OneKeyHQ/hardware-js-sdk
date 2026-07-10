@@ -1,6 +1,7 @@
 import {
   CHAIN_FINGERPRINT_PATHS,
   DEVICE,
+  DEVICE_CONNECT_RETRY_DELAY_MS,
   DeviceJobQueue,
   EConnectorInteraction,
   HardwareErrorCode,
@@ -56,7 +57,7 @@ import type {
   EvmAddress,
   EvmGetAddressParams,
   EvmSignMsgParams,
-  EvmSignTxParams,
+  EvmSignTxLedgerParams,
   EvmSignTypedDataParams,
   EvmSignature,
   EvmSignedTx,
@@ -64,7 +65,10 @@ import type {
   HardwareEventMap,
   ICommonCallParams,
   IConnector,
+  IHardwareCallParams,
+  IHardwareCommonCallParams,
   IHardwareWallet,
+  NullableCallArg,
   Response,
   SearchDevicesOptions,
   SolAddress,
@@ -99,6 +103,10 @@ type ConnectorCallFingerprint = {
   deviceId: string;
   skipFingerprint: boolean;
 };
+
+type LedgerCallParams<T> = NullableCallArg<IHardwareCallParams<T>>;
+
+type LedgerCommonParams = NullableCallArg<IHardwareCommonCallParams>;
 
 // Fingerprints are deterministic 16-char hashes of fixed testnet paths,
 // not secrets — safe to log.
@@ -458,71 +466,119 @@ export class LedgerAdapter implements IHardwareWallet {
     }
   }
 
+  private static normalizeCallArgs(
+    connectId: NullableCallArg<string>,
+    deviceId: NullableCallArg<string>,
+    params: NullableCallArg<unknown>
+  ): {
+    connectId: string;
+    deviceId: string;
+    params: unknown;
+  } {
+    return {
+      connectId: connectId ?? '',
+      deviceId: deviceId ?? '',
+      params: params ?? {},
+    };
+  }
+
+  private static splitCommonParams(params: unknown): {
+    commonParams: ICommonCallParams;
+    rest: unknown;
+  } {
+    if (params && typeof params === 'object') {
+      const {
+        autoInstallApp,
+        passphraseState: _passphraseState,
+        useEmptyPassphrase: _useEmptyPassphrase,
+        ...rest
+      } = params as Record<string, unknown>;
+      return {
+        commonParams: {
+          autoInstallApp: typeof autoInstallApp === 'boolean' ? autoInstallApp : undefined,
+        },
+        rest,
+      };
+    }
+    return { commonParams: {}, rest: params ?? {} };
+  }
+
+  private callChainWithMergedParams<T>(
+    connectId: NullableCallArg<string>,
+    deviceId: NullableCallArg<string>,
+    chain: ChainForFingerprint,
+    method: string,
+    params: NullableCallArg<unknown>
+  ): Promise<Response<T>> {
+    const normalized = LedgerAdapter.normalizeCallArgs(connectId, deviceId, params);
+    const { commonParams, rest } = LedgerAdapter.splitCommonParams(normalized.params);
+    return this.callChain<T>(
+      normalized.connectId,
+      normalized.deviceId,
+      chain,
+      method,
+      rest,
+      commonParams
+    );
+  }
+
   // ---------------------------------------------------------------------------
   // EVM chain methods
   // ---------------------------------------------------------------------------
 
   evmGetAddress(
-    connectId: string,
-    deviceId: string,
-    params: EvmGetAddressParams,
-    commonParams?: ICommonCallParams
+    connectId?: string | null,
+    deviceId?: string | null,
+    params?: LedgerCallParams<EvmGetAddressParams>
   ) {
-    return this.callChain<EvmAddress>(
+    return this.callChainWithMergedParams<EvmAddress>(
       connectId,
       deviceId,
       'evm',
       'evmGetAddress',
-      params,
-      commonParams
+      params
     );
   }
 
   evmSignTransaction(
-    connectId: string,
-    deviceId: string,
-    params: EvmSignTxParams,
-    commonParams?: ICommonCallParams
+    connectId?: string | null,
+    deviceId?: string | null,
+    params?: LedgerCallParams<EvmSignTxLedgerParams>
   ) {
-    return this.callChain<EvmSignedTx>(
+    return this.callChainWithMergedParams<EvmSignedTx>(
       connectId,
       deviceId,
       'evm',
       'evmSignTransaction',
-      params,
-      commonParams
+      params
     );
   }
 
   evmSignMessage(
-    connectId: string,
-    deviceId: string,
-    params: EvmSignMsgParams,
-    commonParams?: ICommonCallParams
+    connectId?: string | null,
+    deviceId?: string | null,
+    params?: LedgerCallParams<EvmSignMsgParams>
   ) {
-    return this.callChain<EvmSignature>(
+    return this.callChainWithMergedParams<EvmSignature>(
       connectId,
       deviceId,
       'evm',
       'evmSignMessage',
-      params,
-      commonParams
+      params
     );
   }
 
   evmSignTypedData(
-    connectId: string,
-    deviceId: string,
-    params: EvmSignTypedDataParams,
-    commonParams?: ICommonCallParams
+    connectId?: string | null,
+    deviceId?: string | null,
+    params?: LedgerCallParams<EvmSignTypedDataParams>
   ) {
-    return this.callChain<EvmSignature>(
+    return this.callChainWithMergedParams<EvmSignature>(
       connectId,
       deviceId,
       'evm',
       'evmSignTypedData',
-      params,
-      commonParams
+      params
     );
   }
 
@@ -531,93 +587,86 @@ export class LedgerAdapter implements IHardwareWallet {
   // ---------------------------------------------------------------------------
 
   btcGetAddress(
-    connectId: string,
-    deviceId: string,
-    params: BtcGetAddressParams,
-    commonParams?: ICommonCallParams
+    connectId?: string | null,
+    deviceId?: string | null,
+    params?: LedgerCallParams<BtcGetAddressParams>
   ) {
-    return this.callChain<BtcAddress>(
+    return this.callChainWithMergedParams<BtcAddress>(
       connectId,
       deviceId,
       'btc',
       'btcGetAddress',
-      params,
-      commonParams
+      params
     );
   }
 
   btcGetPublicKey(
-    connectId: string,
-    deviceId: string,
-    params: BtcGetPublicKeyParams,
-    commonParams?: ICommonCallParams
+    connectId?: string | null,
+    deviceId?: string | null,
+    params?: LedgerCallParams<BtcGetPublicKeyParams>
   ) {
-    return this.callChain<BtcPublicKey>(
+    return this.callChainWithMergedParams<BtcPublicKey>(
       connectId,
       deviceId,
       'btc',
       'btcGetPublicKey',
-      params,
-      commonParams
+      params
     );
   }
 
   btcSignTransaction(
-    connectId: string,
-    deviceId: string,
-    params: BtcSignTxParams,
-    commonParams?: ICommonCallParams
+    connectId?: string | null,
+    deviceId?: string | null,
+    params?: LedgerCallParams<BtcSignTxParams>
   ) {
-    return this.callChain<BtcSignedTx>(
+    return this.callChainWithMergedParams<BtcSignedTx>(
       connectId,
       deviceId,
       'btc',
       'btcSignTransaction',
-      params,
-      commonParams
+      params
     );
   }
 
   btcSignPsbt(
-    connectId: string,
-    deviceId: string,
-    params: BtcSignPsbtParams,
-    commonParams?: ICommonCallParams
+    connectId?: string | null,
+    deviceId?: string | null,
+    params?: LedgerCallParams<BtcSignPsbtParams>
   ) {
-    return this.callChain<BtcSignedPsbt>(
+    return this.callChainWithMergedParams<BtcSignedPsbt>(
       connectId,
       deviceId,
       'btc',
       'btcSignPsbt',
-      params,
-      commonParams
+      params
     );
   }
 
   btcSignMessage(
-    connectId: string,
-    deviceId: string,
-    params: BtcSignMsgParams,
-    commonParams?: ICommonCallParams
+    connectId?: string | null,
+    deviceId?: string | null,
+    params?: LedgerCallParams<BtcSignMsgParams>
   ) {
-    return this.callChain<BtcSignature>(
+    return this.callChainWithMergedParams<BtcSignature>(
       connectId,
       deviceId,
       'btc',
       'btcSignMessage',
-      params,
-      commonParams
+      params
     );
   }
 
-  btcGetMasterFingerprint(connectId: string, deviceId: string, commonParams?: ICommonCallParams) {
-    return this.callChain<{ masterFingerprint: string }>(
+  btcGetMasterFingerprint(
+    connectId?: string | null,
+    deviceId?: string | null,
+    params?: LedgerCommonParams
+  ) {
+    return this.callChainWithMergedParams<{ masterFingerprint: string }>(
       connectId,
       deviceId,
       'btc',
       'btcGetMasterFingerprint',
-      {},
-      commonParams
+      params
     );
   }
 
@@ -626,50 +675,44 @@ export class LedgerAdapter implements IHardwareWallet {
   // ---------------------------------------------------------------------------
 
   solGetAddress(
-    connectId: string,
-    deviceId: string,
-    params: SolGetAddressParams,
-    commonParams?: ICommonCallParams
+    connectId?: string | null,
+    deviceId?: string | null,
+    params?: LedgerCallParams<SolGetAddressParams>
   ) {
-    return this.callChain<SolAddress>(
+    return this.callChainWithMergedParams<SolAddress>(
       connectId,
       deviceId,
       'sol',
       'solGetAddress',
-      params,
-      commonParams
+      params
     );
   }
 
   solSignTransaction(
-    connectId: string,
-    deviceId: string,
-    params: SolSignTxParams,
-    commonParams?: ICommonCallParams
+    connectId?: string | null,
+    deviceId?: string | null,
+    params?: LedgerCallParams<SolSignTxParams>
   ) {
-    return this.callChain<SolSignedTx>(
+    return this.callChainWithMergedParams<SolSignedTx>(
       connectId,
       deviceId,
       'sol',
       'solSignTransaction',
-      params,
-      commonParams
+      params
     );
   }
 
   solSignMessage(
-    connectId: string,
-    deviceId: string,
-    params: SolSignMsgParams,
-    commonParams?: ICommonCallParams
+    connectId?: string | null,
+    deviceId?: string | null,
+    params?: LedgerCallParams<SolSignMsgParams>
   ) {
-    return this.callChain<SolSignature>(
+    return this.callChainWithMergedParams<SolSignature>(
       connectId,
       deviceId,
       'sol',
       'solSignMessage',
-      params,
-      commonParams
+      params
     );
   }
 
@@ -678,50 +721,44 @@ export class LedgerAdapter implements IHardwareWallet {
   // ---------------------------------------------------------------------------
 
   tronGetAddress(
-    connectId: string,
-    deviceId: string,
-    params: TronGetAddressParams,
-    commonParams?: ICommonCallParams
+    connectId?: string | null,
+    deviceId?: string | null,
+    params?: LedgerCallParams<TronGetAddressParams>
   ) {
-    return this.callChain<TronAddress>(
+    return this.callChainWithMergedParams<TronAddress>(
       connectId,
       deviceId,
       'tron',
       'tronGetAddress',
-      params,
-      commonParams
+      params
     );
   }
 
   tronSignTransaction(
-    connectId: string,
-    deviceId: string,
-    params: TronSignTxParams,
-    commonParams?: ICommonCallParams
+    connectId?: string | null,
+    deviceId?: string | null,
+    params?: LedgerCallParams<TronSignTxParams>
   ) {
-    return this.callChain<TronSignedTx>(
+    return this.callChainWithMergedParams<TronSignedTx>(
       connectId,
       deviceId,
       'tron',
       'tronSignTransaction',
-      params,
-      commonParams
+      params
     );
   }
 
   tronSignMessage(
-    connectId: string,
-    deviceId: string,
-    params: TronSignMsgParams,
-    commonParams?: ICommonCallParams
+    connectId?: string | null,
+    deviceId?: string | null,
+    params?: LedgerCallParams<TronSignMsgParams>
   ) {
-    return this.callChain<TronSignature>(
+    return this.callChainWithMergedParams<TronSignature>(
       connectId,
       deviceId,
       'tron',
       'tronSignMessage',
-      params,
-      commonParams
+      params
     );
   }
 
@@ -1226,7 +1263,7 @@ export class LedgerAdapter implements IHardwareWallet {
       if (devices.length === 0) {
         for (let i = 0; i < 3 && !internalSignal.aborted; i += 1) {
           await new Promise<void>(resolve => {
-            setTimeout(resolve, 1000);
+            setTimeout(resolve, DEVICE_CONNECT_RETRY_DELAY_MS);
           });
           devices = await this.searchDevices();
           if (devices.length > 0) break;

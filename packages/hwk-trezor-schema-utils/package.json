@@ -1,0 +1,56 @@
+{
+  "name": "@onekeyfe/hwk-trezor-schema-utils",
+  "version": "1.1.29",
+  "private": true,
+  "description": "Schema helpers vendored from Trezor Suite MIT sources for HWK Trezor support",
+  "author": "OneKey",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "react-native": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "react-native": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE.md",
+    "README.md",
+    "CHANGELOG.md",
+    "TREZOR_SOURCE.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rimraf dist"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OneKeyHQ/hardware-js-sdk.git",
+    "directory": "packages/hwk-trezor-schema-utils"
+  },
+  "sideEffects": false,
+  "dependencies": {
+    "@onekeyfe/hwk-trezor-type-utils": "1.1.29",
+    "@sinclair/typebox": "^0.34.49",
+    "ts-mixer": "^6.0.4"
+  },
+  "devDependencies": {
+    "rimraf": "^5.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "5.1.6"
+  }
+}

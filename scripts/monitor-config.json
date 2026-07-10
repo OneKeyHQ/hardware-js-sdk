@@ -18,7 +18,15 @@
       "hwk-adapter-core",
       "hwk-ledger-adapter",
       "hwk-ledger-connector-ble",
-      "hwk-ledger-connector-webhid"
+      "hwk-ledger-connector-webhid",
+      "hwk-trezor-protobuf",
+      "hwk-trezor-protocol",
+      "hwk-trezor-core",
+      "hwk-trezor-connector",
+      "hwk-trezor-adapter",
+      "hwk-trezor-connector-webusb",
+      "hwk-trezor-connector-rn-ble",
+      "hwk-trezor-connector-electron-ble"
     ],
     "specialProjects": {
       "hd-web-sdk": ["dist", "build"]

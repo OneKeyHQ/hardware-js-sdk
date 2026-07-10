@@ -10,8 +10,12 @@ export function enrichErrorMessage(code: HardwareErrorCode, originalMessage: str
       return `${originalMessage}. Please re-enter your PIN.`;
     case HardwareErrorCode.PinCancelled:
       return `${originalMessage}. PIN entry was cancelled.`;
+    case HardwareErrorCode.PinMismatch:
+      return `${originalMessage}. The entered PINs do not match. Please try again.`;
     case HardwareErrorCode.DeviceBusy:
       return `${originalMessage}. The device is in use by another application. Close other wallet apps and try again.`;
+    case HardwareErrorCode.DeviceBusyInternal:
+      return `${originalMessage}. The device is busy. Please try again in a moment.`;
     case HardwareErrorCode.DeviceDisconnected:
       return `${originalMessage}. Please reconnect the device and try again.`;
     case HardwareErrorCode.DeviceLocked:

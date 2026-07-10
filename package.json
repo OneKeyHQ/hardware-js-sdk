@@ -12,7 +12,8 @@
       "packages/*",
       "packages/connect-examples/expo-example",
       "packages/connect-examples/electron-example",
-      "packages/connect-examples/expo-playground"
+      "packages/connect-examples/expo-playground",
+      "packages/connect-examples/hwk-demo"
     ],
     "nohoist": [
       "**/electron",
@@ -23,15 +24,15 @@
   },
   "scripts": {
     "bootstrap": "npx patch-package && lerna bootstrap",
-    "build": "lerna run build",
+    "build": "lerna run build --ignore @onekeyfe/hwk-trezor-protobuf --ignore @onekeyfe/hwk-trezor-protocol --ignore @onekeyfe/hwk-trezor-schema-utils --ignore @onekeyfe/hwk-trezor-transport --ignore @onekeyfe/hwk-trezor-type-utils --ignore @onekeyfe/hwk-trezor-utils",
     "clean": "lerna clean --yes",
     "clean-workspace": "yarn clean && lerna run clean",
     "lint": "eslint .",
     "lint:staged": "lint-staged",
-    "test": "lerna run test",
+    "test": "lerna run test --ignore @onekeyfe/hwk-trezor-protobuf --ignore @onekeyfe/hwk-trezor-protocol --ignore @onekeyfe/hwk-trezor-schema-utils --ignore @onekeyfe/hwk-trezor-transport --ignore @onekeyfe/hwk-trezor-type-utils --ignore @onekeyfe/hwk-trezor-utils",
     "setup": "yarn && yarn bootstrap && yarn build",
     "check-versions": "node scripts/check-versions.js",
-    "publish-packages": "yarn check-versions && lerna publish from-package",
+    "publish-packages": "yarn check-versions && lerna publish from-package --ignore @onekeyfe/hwk-trezor-protobuf --ignore @onekeyfe/hwk-trezor-protocol --ignore @onekeyfe/hwk-trezor-schema-utils --ignore @onekeyfe/hwk-trezor-transport --ignore @onekeyfe/hwk-trezor-type-utils --ignore @onekeyfe/hwk-trezor-utils",
     "update-protobuf": "lerna run update:protobuf --scope=@onekeyfe/hd-transport",
     "update-version": "lerna version --no-git-tag-version --force-publish='*'",
     "example": "cd ./packages/connect-examples/expo-example && yarn start",
@@ -73,7 +74,9 @@
     "sha.js": "2.4.12",
     "cipher-base": "1.0.5",
     "fast-xml-parser": "4.5.4",
-    "**/@noble/curves": "1.9.7"
+    "**/@noble/curves": "1.9.7",
+    "typescript": "5.1.6",
+    "dotenv-expand": "11.0.6"
   },
   "devDependencies": {
     "@babel/core": "^7.0.0",

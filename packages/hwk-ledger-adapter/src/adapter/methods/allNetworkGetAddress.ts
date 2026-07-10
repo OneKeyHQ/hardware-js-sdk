@@ -1,4 +1,4 @@
-import { HardwareErrorCode, failure, success } from '@onekeyfe/hwk-adapter-core';
+import { HardwareErrorCode, failure, runAllNetworkGetAddress } from '@onekeyfe/hwk-adapter-core';
 
 import { debugLog } from '../../utils/debugLog';
 
@@ -6,6 +6,7 @@ import type {
   AllNetworkAddressParams,
   AllNetworkAddressResponse,
   AllNetworkGetAddressParams,
+  AllNetworkMethodName,
   BtcAddress,
   BtcPublicKey,
   ChainForFingerprint,
@@ -44,20 +45,14 @@ export type LedgerGetChainFingerprint = (
   chain: ChainForFingerprint
 ) => Promise<Response<string>>;
 
-type LedgerAllNetworkMethod =
-  | 'evmGetAddress'
-  | 'btcGetAddress'
-  | 'btcGetPublicKey'
-  | 'solGetAddress'
-  | 'tronGetAddress';
-
 const LEDGER_BTC_NETWORK_COIN_MAP: Partial<Record<string, string>> = {
   tbtc: 'Testnet',
   bch: 'Bcash',
-  doge: 'Dogecoin',
   ltc: 'Litecoin',
   neurai: 'Neurai',
 };
+
+const LEDGER_UNSUPPORTED_ALLNETWORK_NETWORKS = new Set(['doge', 'dogecoin']);
 
 export function createAllNetworkGetAddress({
   callChain,
@@ -80,51 +75,51 @@ export function createAllNetworkGetAddress({
     const commonParams: ICommonCallParams = {
       autoInstallApp: params.autoInstallApp,
     };
-    const responses: AllNetworkAddressResponse[] = [];
     const chainFingerprints = new Map<ChainForFingerprint, string>();
 
-    for (const item of params.bundle) {
-      const method = getAllNetworkMethod(item);
-      if (!method) {
-        responses.push(buildUnsupportedMethodResponse(item));
-      } else {
-        const chain = getFingerprintChain(method);
+    const result = await runAllNetworkGetAddress({
+      connectId,
+      deviceId: _deviceId,
+      params,
+      normalizeItem: normalizeLedgerAllNetworkItem,
+      buildUnsupportedNetworkResponse: item =>
+        isUnsupportedLedgerAllNetworkNetwork(item)
+          ? buildUnsupportedNetworkResponse(item)
+          : undefined,
+      callItem: async ({ method, chain, item }) => {
         const itemDeviceId = getItemDeviceId(item) ?? chainFingerprints.get(chain) ?? '';
-        const normalizedItem = normalizeLedgerAllNetworkItem(method, item);
-        const response = await callAllNetworkItem(
+        return callAllNetworkMethod(
           callChain,
-          getChainFingerprint,
           connectId,
           itemDeviceId,
-          chain,
           method,
-          normalizedItem,
+          item,
           commonParams,
-          installContext,
-          chainFingerprints
+          installContext
         );
-        if (isTopLevelAllNetworkFailure(response)) {
-          const code = response.payload?.code ?? HardwareErrorCode.DeviceMismatch;
-          const result = failure(
-            code,
-            response.payload?.error ?? 'All-network get-address aborted',
-            response.payload?.params
-          );
-          debugLog('[LedgerAdapter][RES]', {
-            method: 'allNetworkGetAddress',
-            success: false,
-            payload: result,
-          });
-          return result;
-        }
-        responses.push(response);
-      }
-    }
-
-    const result = success(responses);
+      },
+      attachIdentity: async ({ item, chain, payload }) =>
+        attachLedgerIdentity(
+          getChainFingerprint,
+          connectId,
+          item,
+          chain,
+          payload,
+          chainFingerprints
+        ),
+      shouldAbortBundle: isTopLevelAllNetworkFailure,
+      buildTopLevelFailure: response => {
+        const code = response.payload?.code ?? HardwareErrorCode.DeviceMismatch;
+        return failure(
+          code as HardwareErrorCode,
+          response.payload?.error ?? 'All-network get-address aborted',
+          response.payload?.params
+        );
+      },
+    });
     debugLog('[LedgerAdapter][RES]', {
       method: 'allNetworkGetAddress',
-      success: true,
+      success: result.success,
       payload: result,
     });
     return result;
@@ -149,32 +144,25 @@ function getItemDeviceId(item: AllNetworkAddressParams): string | undefined {
   return typeof deviceId === 'string' && deviceId.length > 0 ? deviceId : undefined;
 }
 
-function getAllNetworkMethod(item: AllNetworkAddressParams): LedgerAllNetworkMethod | undefined {
-  switch (item.methodName) {
-    case 'evmGetAddress':
-    case 'btcGetAddress':
-    case 'btcGetPublicKey':
-    case 'solGetAddress':
-    case 'tronGetAddress':
-      return item.methodName;
-    default:
-      return undefined;
-  }
+function isUnsupportedLedgerAllNetworkNetwork(item: AllNetworkAddressParams): boolean {
+  return LEDGER_UNSUPPORTED_ALLNETWORK_NETWORKS.has(item.network.toLowerCase());
 }
 
-function buildUnsupportedMethodResponse(item: AllNetworkAddressParams): AllNetworkAddressResponse {
+function buildUnsupportedNetworkResponse(item: AllNetworkAddressParams): AllNetworkAddressResponse {
   return {
     ...item,
     success: false,
     payload: {
-      code: HardwareErrorCode.InvalidParams,
-      error: `Unsupported allNetwork method: ${String(item.methodName)}`,
+      code: HardwareErrorCode.ChainNotSupported,
+      error: `Ledger allNetwork does not support ${
+        item.network.toLowerCase() === 'doge' ? 'Dogecoin' : item.network
+      }`,
     },
   };
 }
 
 function normalizeLedgerAllNetworkItem(
-  method: LedgerAllNetworkMethod,
+  method: AllNetworkMethodName,
   item: AllNetworkAddressParams
 ): AllNetworkAddressParams {
   if (method !== 'btcGetAddress' && method !== 'btcGetPublicKey') {
@@ -190,35 +178,16 @@ function normalizeLedgerAllNetworkItem(
   return coin ? { ...item, coin } : item;
 }
 
-async function callAllNetworkItem(
-  callChain: LedgerCallChain,
+async function attachLedgerIdentity(
   getChainFingerprint: LedgerGetChainFingerprint,
   connectId: string,
-  deviceId: string,
-  chain: ChainForFingerprint,
-  method: LedgerAllNetworkMethod,
   item: AllNetworkAddressParams,
-  commonParams: ICommonCallParams,
-  installContext: LedgerInstallAppContext,
+  chain: ChainForFingerprint,
+  payload: Record<string, unknown>,
   chainFingerprints: Map<ChainForFingerprint, string>
 ): Promise<AllNetworkAddressResponse> {
-  const response = await callAllNetworkMethod(
-    callChain,
-    connectId,
-    deviceId,
-    method,
-    item,
-    commonParams,
-    installContext
-  );
-
-  if (!response.success) {
-    return { ...item, success: false, payload: response.payload };
-  }
-
-  const payload = response.payload as Record<string, unknown>;
   const fingerprint =
-    deviceId ||
+    getItemDeviceId(item) ||
     chainFingerprints.get(chain) ||
     (await bootstrapChainFingerprint(getChainFingerprint, connectId, chain));
 
@@ -232,6 +201,12 @@ async function callAllNetworkItem(
     success: true,
     payload: {
       ...payload,
+      deviceIdentity: {
+        vendor: 'ledger',
+        type: 'chainFingerprint',
+        chain,
+        value: fingerprint,
+      },
       chainFingerprint: fingerprint,
       chainFingerprintChain: chain,
     },
@@ -261,29 +236,11 @@ function buildFingerprintBootstrapFailure(
   };
 }
 
-function getFingerprintChain(method: LedgerAllNetworkMethod): ChainForFingerprint {
-  switch (method) {
-    case 'evmGetAddress':
-      return 'evm';
-    case 'btcGetAddress':
-    case 'btcGetPublicKey':
-      return 'btc';
-    case 'solGetAddress':
-      return 'sol';
-    case 'tronGetAddress':
-      return 'tron';
-    default:
-      throw Object.assign(new Error(`Unsupported allNetwork method: ${method}`), {
-        code: HardwareErrorCode.InvalidParams,
-      });
-  }
-}
-
 async function callAllNetworkMethod(
   callChain: LedgerCallChain,
   connectId: string,
   deviceId: string,
-  method: LedgerAllNetworkMethod,
+  method: AllNetworkMethodName,
   item: AllNetworkAddressParams,
   commonParams: ICommonCallParams,
   installContext: LedgerInstallAppContext

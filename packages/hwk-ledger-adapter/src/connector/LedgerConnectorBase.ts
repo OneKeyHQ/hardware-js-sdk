@@ -1,6 +1,7 @@
 import {
   EConnectorInteraction,
   HardwareErrorCode,
+  isKnownNonTargetHardwareVendor,
   serializeConnectorError,
 } from '@onekeyfe/hwk-adapter-core';
 
@@ -332,10 +333,12 @@ export class LedgerConnectorBase implements IConnector {
     const dm = await this._getDeviceManager();
 
     const descriptors = await this._discoverDescriptors(dm);
-    const resolvedDescriptors = descriptors.map(d => ({
-      descriptor: d,
-      connectId: this._resolveConnectId(d),
-    }));
+    const resolvedDescriptors = descriptors
+      .filter(d => !isKnownNonTargetHardwareVendor(d, 'ledger'))
+      .map(d => ({
+        descriptor: d,
+        connectId: this._resolveConnectId(d),
+      }));
     const result: ConnectorDevice[] = resolvedDescriptors.map(({ descriptor: d, connectId }) => ({
       connectId,
       deviceId: d.path,

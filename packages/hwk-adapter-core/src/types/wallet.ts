@@ -11,6 +11,7 @@ import type { ChainForFingerprint } from './fingerprint';
 import type { UI_REQUEST, UiResponseEvent } from '../events/ui-request';
 import type { SDK } from '../events/sdk';
 import type { HardwareErrorCode } from './errors';
+import type { AllNetworkMethodName } from '../utils/methodCatalog';
 
 /**
  * Wallet-level `ui-event` variants. Same shape as `ConnectorUiEvent` except
@@ -25,6 +26,33 @@ export type HardwareUiEvent =
     };
 
 export type ChainCapability = 'evm' | 'btc' | 'sol' | 'tron';
+
+export type TrezorDisplayRotation = 'North' | 'East' | 'South' | 'West';
+
+export type TrezorSafetyCheckLevel = 'Strict' | 'PromptAlways' | 'PromptTemporarily';
+
+export type TrezorDeviceSettingsParams = {
+  language?: string;
+  label?: string;
+  use_passphrase?: boolean;
+  homescreen?: string;
+  auto_lock_delay_ms?: number;
+  display_rotation?: TrezorDisplayRotation;
+  passphrase_always_on_device?: boolean;
+  safety_checks?: TrezorSafetyCheckLevel;
+  experimental_features?: boolean;
+  hide_passphrase_from_host?: boolean;
+  haptic_feedback?: boolean;
+  auto_lock_delay_battery_ms?: number;
+};
+
+export type TrezorBrightnessParams = {
+  value?: number;
+};
+
+export type TrezorChangePinParams = {
+  remove?: boolean;
+};
 
 /**
  * Cross-chain / cross-vendor options passed alongside any chain method's
@@ -41,22 +69,41 @@ export interface ICommonCallParams {
   autoInstallApp?: boolean;
 }
 
+export type NullableCallArg<T> = T | null | undefined;
+
+export interface IPassphraseCallParams {
+  passphraseState?: string;
+  useEmptyPassphrase?: boolean;
+}
+
+export type IHardwareCommonCallParams = ICommonCallParams & IPassphraseCallParams;
+
+export type IHardwareCallParams<T> = T & IHardwareCommonCallParams;
+
 export interface AllNetworkAddressParams {
   network: string;
   path: string;
   showOnDevice?: boolean;
-  methodName:
-    | 'evmGetAddress'
-    | 'btcGetAddress'
-    | 'btcGetPublicKey'
-    | 'solGetAddress'
-    | 'tronGetAddress';
+  methodName: AllNetworkMethodName;
   [key: string]: unknown;
 }
 
-export interface AllNetworkGetAddressParams extends ICommonCallParams {
+export interface AllNetworkGetAddressParams extends IHardwareCommonCallParams {
   bundle: AllNetworkAddressParams[];
 }
+
+export type AllNetworkDeviceIdentity =
+  | {
+      vendor: 'ledger';
+      type: 'chainFingerprint';
+      chain: ChainForFingerprint;
+      value: string;
+    }
+  | {
+      vendor: 'trezor';
+      type: 'deviceId';
+      value: string;
+    };
 
 export type AllNetworkAddressResponsePayload = Record<string, unknown> & {
   error?: string;
@@ -64,6 +111,7 @@ export type AllNetworkAddressResponsePayload = Record<string, unknown> & {
   errorCode?: string | number;
   connectId?: string;
   deviceId?: string;
+  deviceIdentity?: AllNetworkDeviceIdentity;
   chainFingerprint?: string;
   chainFingerprintChain?: ChainForFingerprint;
   params?: Record<string, unknown>;
@@ -83,10 +131,22 @@ export interface PassphraseResponse {
 export type DeviceEvent =
   | { type: typeof DEVICE.CONNECT; payload: DeviceInfo }
   | { type: typeof DEVICE.DISCONNECT; payload: { connectId: string } }
-  | { type: typeof DEVICE.CHANGED; payload: DeviceInfo };
+  | { type: typeof DEVICE.CHANGED; payload: DeviceInfo }
+  | {
+      type: typeof DEVICE.FEATURES;
+      device: DeviceInfo & { features: Record<string, unknown> };
+      payload: { device: DeviceInfo & { features: Record<string, unknown> } };
+    }
+  | {
+      type: typeof DEVICE.TREZOR_THP_CREDENTIALS_CHANGED;
+      payload: { connectId: string; deviceId?: string; credentials: Record<string, unknown>[] };
+    };
 
 export type UiRequestEvent =
-  | { type: typeof UI_REQUEST.REQUEST_PIN; payload: { device: DeviceInfo } }
+  | {
+      type: typeof UI_REQUEST.REQUEST_PIN;
+      payload: { device?: DeviceInfo; connectId?: string; type?: string };
+    }
   | { type: typeof UI_REQUEST.REQUEST_PASSPHRASE; payload: { device: DeviceInfo } }
   | { type: typeof UI_REQUEST.REQUEST_PASSPHRASE_ON_DEVICE; payload: { device: DeviceInfo } }
   | { type: typeof UI_REQUEST.REQUEST_BUTTON; payload: { device: DeviceInfo; code?: string } }
@@ -125,6 +185,15 @@ export type UiRequestEvent =
       type: typeof UI_REQUEST.REQUEST_INSTALL_APP;
       payload: { vendor: string; appName: string };
     }
+  | {
+      type: typeof UI_REQUEST.REQUEST_TREZOR_THP_PAIRING;
+      payload: {
+        connectId: string;
+        availableMethods: number[];
+        selectedMethod: number;
+        nfcData?: string;
+      };
+    }
   | { type: typeof UI_REQUEST.CLOSE_UI_WINDOW; payload: Record<string, never> };
 
 export type SdkEvent =
@@ -155,15 +224,29 @@ export interface HardwareEventMap {
   [DEVICE.CONNECT]: { type: typeof DEVICE.CONNECT; payload: DeviceInfo };
   [DEVICE.DISCONNECT]: { type: typeof DEVICE.DISCONNECT; payload: { connectId: string } };
   [DEVICE.CHANGED]: { type: typeof DEVICE.CHANGED; payload: DeviceInfo };
+  [DEVICE.FEATURES]: {
+    type: typeof DEVICE.FEATURES;
+    device: DeviceInfo & { features: Record<string, unknown> };
+    payload: { device: DeviceInfo & { features: Record<string, unknown> } };
+  };
+  [DEVICE.TREZOR_THP_CREDENTIALS_CHANGED]: {
+    type: typeof DEVICE.TREZOR_THP_CREDENTIALS_CHANGED;
+    payload: { connectId: string; deviceId?: string; credentials: Record<string, unknown>[] };
+  };
 
   // UI request events
   [UI_REQUEST.REQUEST_PIN]: {
     type: typeof UI_REQUEST.REQUEST_PIN;
-    payload: { device: DeviceInfo };
+    payload: { device?: DeviceInfo; connectId?: string; type?: string };
   };
   [UI_REQUEST.REQUEST_PASSPHRASE]: {
     type: typeof UI_REQUEST.REQUEST_PASSPHRASE;
-    payload: { device: DeviceInfo };
+    payload: {
+      device?: DeviceInfo;
+      connectId?: string;
+      passphraseState?: string;
+      useEmptyPassphrase?: boolean;
+    };
   };
   [UI_REQUEST.REQUEST_PASSPHRASE_ON_DEVICE]: {
     type: typeof UI_REQUEST.REQUEST_PASSPHRASE_ON_DEVICE;
@@ -209,6 +292,15 @@ export interface HardwareEventMap {
     type: typeof UI_REQUEST.REQUEST_INSTALL_APP;
     payload: { vendor: string; appName: string };
   };
+  [UI_REQUEST.REQUEST_TREZOR_THP_PAIRING]: {
+    type: typeof UI_REQUEST.REQUEST_TREZOR_THP_PAIRING;
+    payload: {
+      connectId: string;
+      availableMethods: number[];
+      selectedMethod: number;
+      nfcData?: string;
+    };
+  };
   [UI_REQUEST.CLOSE_UI_WINDOW]: {
     type: typeof UI_REQUEST.CLOSE_UI_WINDOW;
     payload: Record<string, never>;
@@ -227,11 +319,62 @@ export interface HardwareEventMap {
   [SDK.DEVICE_RECOVERED]: { type: typeof SDK.DEVICE_RECOVERED; payload: { connectId: string } };
 }
 
+export interface IDeviceManagerMethods {
+  getFeatures?(connectId: string): Promise<Response<Record<string, unknown>>>;
+  deviceSettings?(
+    connectId: string,
+    params: TrezorDeviceSettingsParams
+  ): Promise<Response<Record<string, unknown>>>;
+  setBrightness?(
+    connectId: string,
+    params?: TrezorBrightnessParams
+  ): Promise<Response<Record<string, unknown>>>;
+  changePin?(
+    connectId: string,
+    params?: TrezorChangePinParams
+  ): Promise<Response<Record<string, unknown>>>;
+  wipeDevice?(connectId: string): Promise<Response<Record<string, unknown>>>;
+}
+
+export interface IWalletStateMethods {
+  // Passphrase session (optional — Trezor only)
+  /**
+   * Resolve the device's active passphrase wallet identity (`passphraseState`).
+   * Today this is the compressed public key derived at `m/44'/0'/0'`, not the
+   * 4-byte master fingerprint. Two modes:
+   *
+   *  - **Discover** (no `passphraseState`): for a **standard wallet** (passphrase
+   *    protection off) returns `null` — there's one wallet and nothing to pin.
+   *    The SDK may still create a THP app session and derive once so it can
+   *    unlock and re-read fresh Features, but it does not ask for a passphrase.
+   *    For a **passphrase wallet** it creates a fresh session (prompts the user),
+   *    derives its state, and returns it so the host can persist the wallet.
+   *    Mirrors OneKey's null-for-standard convention.
+   *  - **Verify** (`passphraseState` given): align the device to that wallet and
+   *    confirm the derived state matches. Fails with `PassphraseStateMismatch`
+   *    when the entered passphrase yields a different wallet.
+   *
+   * SECURITY: every wallet-bound op that carries a `passphraseState` (getAddress,
+   * sign, …) creates a fresh session, re-derives, and confirms the state before
+   * the chain method runs. Standard wallets should pass `useEmptyPassphrase` so
+   * the host can explicitly create the empty-passphrase session.
+   *
+   * Optional: vendors without host-managed passphrase sessions (Ledger) omit
+   * it. Implemented by `TrezorAdapter`.
+   */
+  getPassphraseState?(
+    connectId: string,
+    passphraseState?: string
+  ): Promise<Response<string | null>>;
+}
+
 export interface IHardwareWallet<TConfig = unknown>
   extends IEvmMethods,
     IBtcMethods,
     ISolMethods,
-    ITronMethods {
+    ITronMethods,
+    IDeviceManagerMethods,
+    IWalletStateMethods {
   readonly vendor: string;
   readonly activeTransport: TransportType | null;
 
@@ -298,4 +441,10 @@ export interface SearchDevicesOptions {
    * should leave this false so an active session can still be reused.
    */
   resetSession?: boolean;
+  /**
+   * Wait for every physical transport behind a fused connector. Use this for
+   * transport binding/pairing UIs that must show BLE candidates even when USB
+   * was discovered first.
+   */
+  waitForAllTransports?: boolean;
 }
