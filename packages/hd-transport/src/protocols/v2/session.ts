@@ -22,6 +22,7 @@ export type ProtocolV2SessionOptions = {
   schemas: ProtocolV2Schemas;
   router: number;
   packetSrc?: number;
+  maxFrameBytes?: number;
   writeFrame: (frame: Uint8Array) => Promise<void>;
   readFrame: () => Promise<Uint8Array>;
   logger?: ProtocolLogger;
@@ -270,6 +271,7 @@ export class ProtocolV2Session {
       schemas,
       router,
       packetSrc = PROTOCOL_V2_PACKET_SRC_COMMAND,
+      maxFrameBytes,
       writeFrame,
       readFrame,
       logger,
@@ -288,6 +290,12 @@ export class ProtocolV2Session {
       context: `tx:${name}`,
     });
     const expectedSeq = frame[6];
+
+    if (maxFrameBytes !== undefined && frame.length > maxFrameBytes) {
+      throw new Error(
+        `Protocol V2 frame too large for transport: ${frame.length} > ${maxFrameBytes}`
+      );
+    }
 
     if (!shouldReduceDebug) {
       logger?.debug?.(
@@ -335,37 +343,45 @@ export class ProtocolV2Session {
             } seq=${rxFrame[6]} headerHex=${frameHeaderDebugHex(rxFrame)}`
           );
         }
-        const decoded = ProtocolV2.decodeFrame(schemas, rxFrame, {
-          logger: shouldReduceDebug ? undefined : logger,
-          logPrefix,
-          context: `rx:${name}`,
-        });
-        if (!shouldReduceDebug && decoded.seq !== expectedSeq) {
-          logger?.debug?.(
-            `[${logPrefix}] seq differs for ${name}: tx=${expectedSeq}, rx=${decoded.seq}`
-          );
+        const isAck = ProtocolV2.isAckFrame(rxFrame);
+        if (isAck) {
+          if (!shouldReduceDebug) {
+            logger?.debug?.(`[${logPrefix}] skip Proto Link ACK seq=${rxFrame[6]}`);
+          }
         }
-        if (!shouldReduceDebug) {
-          logger?.debug?.(
-            `[${logPrefix}] TX name=${name} seq=${expectedSeq} | RX seq=${decoded.seq} messageTypeId=${decoded.messageTypeId} pbPayload=${decoded.pbPayload.length}B`
-          );
-          logger?.debug?.(
-            `[${logPrefix}] RX payload type=${decoded.type} messageTypeId=${decoded.messageTypeId}`,
-            sanitizeProtocolV2DebugPayload(decoded.message)
-          );
-        }
+        if (!isAck) {
+          const decoded = ProtocolV2.decodeFrame(schemas, rxFrame, {
+            logger: shouldReduceDebug ? undefined : logger,
+            logPrefix,
+            context: `rx:${name}`,
+          });
+          if (!shouldReduceDebug && decoded.seq !== expectedSeq) {
+            logger?.debug?.(
+              `[${logPrefix}] seq differs for ${name}: tx=${expectedSeq}, rx=${decoded.seq}`
+            );
+          }
+          if (!shouldReduceDebug) {
+            logger?.debug?.(
+              `[${logPrefix}] TX name=${name} seq=${expectedSeq} | RX seq=${decoded.seq} messageTypeId=${decoded.messageTypeId} pbPayload=${decoded.pbPayload.length}B`
+            );
+            logger?.debug?.(
+              `[${logPrefix}] RX payload type=${decoded.type} messageTypeId=${decoded.messageTypeId}`,
+              sanitizeProtocolV2DebugPayload(decoded.message)
+            );
+          }
 
-        const response = check.call(decoded);
-        if (callOptions.intermediateTypes?.includes(response.type)) {
-          callOptions.onIntermediateResponse?.(response);
-        } else if (isExpectedTerminalResponse(response, callOptions.expectedTypes)) {
-          return response;
-        } else if (!shouldReduceDebug) {
-          logger?.debug?.(
-            `[${logPrefix}] skip unexpected response for ${name}: expected=${callOptions.expectedTypes?.join(
-              '|'
-            )} got=${response.type}`
-          );
+          const response = check.call(decoded);
+          if (callOptions.intermediateTypes?.includes(response.type)) {
+            callOptions.onIntermediateResponse?.(response);
+          } else if (isExpectedTerminalResponse(response, callOptions.expectedTypes)) {
+            return response;
+          } else if (!shouldReduceDebug) {
+            logger?.debug?.(
+              `[${logPrefix}] skip unexpected response for ${name}: expected=${callOptions.expectedTypes?.join(
+                '|'
+              )} got=${response.type}`
+            );
+          }
         }
       }
       // Only reachable after cancellation; the outer promise has already been

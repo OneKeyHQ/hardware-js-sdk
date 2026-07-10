@@ -2,6 +2,7 @@ import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import transport, {
   LogBlockCommand,
   PROTOCOL_V1_MESSAGE_HEADER_SIZE,
+  PROTOCOL_V2_BLE_FRAME_MAX_BYTES,
   PROTOCOL_V2_CHANNEL_BLE_UART,
   ProtocolV2FrameAssembler,
   ProtocolV2Session,
@@ -436,6 +437,7 @@ export default class LowlevelTransport {
         protocolV2: this._messagesV2,
       },
       router: PROTOCOL_V2_CHANNEL_BLE_UART,
+      maxFrameBytes: PROTOCOL_V2_BLE_FRAME_MAX_BYTES,
       writeFrame: (frame: Uint8Array) => this.writeProtocolV2Frame(uuid, frame),
       readFrame: () => this.readProtocolV2Frame(uuid, timeoutMs),
       logger: this.Log,

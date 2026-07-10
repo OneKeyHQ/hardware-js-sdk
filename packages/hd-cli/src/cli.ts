@@ -549,15 +549,15 @@ program
       success: false,
       payload: {
         error:
-          'Use `onekey-hw --transport ble firmware-update-v4-debug` for BLE Protocol V2 firmware update debugging.',
-        code: 'USE_FIRMWARE_UPDATE_V4_DEBUG',
+          'Use `onekey-hw --transport ble firmware-update-v4` for BLE Protocol V2 firmware updates.',
+        code: 'USE_FIRMWARE_UPDATE_V4',
       },
     })
   );
 
 program
-  .command('firmware-update-v4-debug')
-  .description('Debug Protocol V2 firmware update through sdk.firmwareUpdateV4')
+  .command('firmware-update-v4')
+  .description('Run Protocol V2 firmware update through sdk.firmwareUpdateV4')
   .option('--chunk-size <bytes>', 'Transfer chunk size in bytes')
   .option(
     '--resource-bundle <spec...>',
@@ -576,8 +576,8 @@ program
   .option('--retries <count>', 'Retry count for transient Protocol V2 USB probe failures')
   .action(opts =>
     runCommand({}, async ({ sdk, globalOpts }) => {
-      const params = buildFirmwareUpdateV4DebugParams(opts);
-      const result = await runFirmwareUpdateV4DebugWithRetry({
+      const params = buildFirmwareUpdateV4Params(opts);
+      const result = await runFirmwareUpdateV4WithRetry({
         sdk,
         globalOpts,
         params,
@@ -1182,9 +1182,7 @@ function parseResourceBundleParam(spec: string): { binary: ArrayBuffer; devicePa
   };
 }
 
-function getFirmwareUpdateV4DebugTotalBytes(
-  params: ReturnType<typeof buildFirmwareUpdateV4DebugParams>
-) {
+function getFirmwareUpdateV4TotalBytes(params: ReturnType<typeof buildFirmwareUpdateV4Params>) {
   return [
     ...(params.resourceBundleFiles?.map(item => item.binary) ?? []),
     params.bootloaderBinary,
@@ -1198,16 +1196,16 @@ function getFirmwareUpdateV4DebugTotalBytes(
   ].reduce((total, binary) => total + (binary?.byteLength ?? 0), 0);
 }
 
-function getFirmwareUpdateV4DebugErrorText(result: unknown) {
+function getFirmwareUpdateV4ErrorText(result: unknown) {
   if (!result || typeof result !== 'object') return '';
-  const payload = (result as { payload?: unknown }).payload;
+  const { payload } = result as { payload?: unknown };
   if (!payload || typeof payload !== 'object') return '';
-  const error = (payload as { error?: unknown }).error;
+  const { error } = payload as { error?: unknown };
   return typeof error === 'string' ? error : '';
 }
 
 function isProtocolV2UsbProbeTransientResult(result: unknown) {
-  const error = getFirmwareUpdateV4DebugErrorText(result);
+  const error = getFirmwareUpdateV4ErrorText(result);
   return (
     error.includes('Device protocol mismatch') &&
     error.includes('expected V2') &&
@@ -1221,22 +1219,22 @@ function isSuccessResult(result: unknown) {
   );
 }
 
-function getFirmwareDebugPayload(message: unknown) {
+function getFirmwareUpdatePayload(message: unknown) {
   if (!message || typeof message !== 'object') return undefined;
   return (message as { payload?: Record<string, unknown> }).payload;
 }
 
-function formatFirmwareDebugProgress(progress: number) {
+function formatFirmwareProgress(progress: number) {
   if (!Number.isFinite(progress)) return '0%';
   return `${Math.min(Math.max(Math.round(progress), 0), 100)}%`;
 }
 
-function formatFirmwareDebugBytes(bytes: number) {
+function formatFirmwareBytes(bytes: number) {
   if (!Number.isFinite(bytes) || bytes <= 0) return '';
   return `${(bytes / 1024).toFixed(1)} KiB`;
 }
 
-function maybePrintFirmwareDebugProgress({
+function maybePrintFirmwareProgress({
   progressType,
   progress,
   payload,
@@ -1257,7 +1255,7 @@ function maybePrintFirmwareDebugProgress({
   const rateBytesPerSecond = Number(payload.rateBytesPerSecond);
   const sizeText =
     Number.isFinite(transferredBytes) && Number.isFinite(totalBytes) && totalBytes > 0
-      ? ` ${formatFirmwareDebugBytes(transferredBytes)}/${formatFirmwareDebugBytes(totalBytes)}`
+      ? ` ${formatFirmwareBytes(transferredBytes)}/${formatFirmwareBytes(totalBytes)}`
       : '';
   const speedText =
     Number.isFinite(rateBytesPerSecond) && rateBytesPerSecond > 0
@@ -1265,14 +1263,14 @@ function maybePrintFirmwareDebugProgress({
       : '';
 
   process.stderr.write(
-    `[onekey-hw] Firmware ${progressType}: ${formatFirmwareDebugProgress(
+    `[onekey-hw] Firmware ${progressType}: ${formatFirmwareProgress(
       progress
     )}${sizeText}${speedText}\n`
   );
   return progress >= 100 ? 100 : printableProgress;
 }
 
-function buildFirmwareUpdateV4DebugMetrics({
+function buildFirmwareUpdateV4Metrics({
   attempt,
   maxAttempts,
   totalBytes,
@@ -1332,7 +1330,7 @@ function buildFirmwareUpdateV4DebugMetrics({
   };
 }
 
-async function runFirmwareUpdateV4DebugWithRetry({
+async function runFirmwareUpdateV4WithRetry({
   sdk,
   globalOpts,
   params,
@@ -1340,10 +1338,10 @@ async function runFirmwareUpdateV4DebugWithRetry({
 }: {
   sdk: AnySdk;
   globalOpts: Record<string, any>;
-  params: ReturnType<typeof buildFirmwareUpdateV4DebugParams>;
+  params: ReturnType<typeof buildFirmwareUpdateV4Params>;
   retries?: number;
 }) {
-  const totalBytes = getFirmwareUpdateV4DebugTotalBytes(params);
+  const totalBytes = getFirmwareUpdateV4TotalBytes(params);
   const maxAttempts = Math.max((retries ?? 2) + 1, 1);
   let currentSdk = sdk;
   let lastResult: unknown;
@@ -1369,7 +1367,7 @@ async function runFirmwareUpdateV4DebugWithRetry({
     const onUiEvent = (message: unknown) => {
       if (!message || typeof message !== 'object') return;
       const messageType = (message as { type?: string }).type;
-      const payload = getFirmwareDebugPayload(message);
+      const payload = getFirmwareUpdatePayload(message);
 
       if (messageType === UI_REQUEST.FIRMWARE_TIP) {
         const tipMessage = (payload?.data as { message?: unknown } | undefined)?.message;
@@ -1395,7 +1393,7 @@ async function runFirmwareUpdateV4DebugWithRetry({
         progressEvents += 1;
         lastProgress = Math.max(lastProgress, progress);
         transferStartedAt ??= Date.now();
-        lastPrintedTransferProgress = maybePrintFirmwareDebugProgress({
+        lastPrintedTransferProgress = maybePrintFirmwareProgress({
           progressType: 'transfer',
           progress,
           payload,
@@ -1411,7 +1409,7 @@ async function runFirmwareUpdateV4DebugWithRetry({
         installProgressEvents += 1;
         lastInstallProgress = Math.max(lastInstallProgress, progress);
         installStartedAt ??= Date.now();
-        lastPrintedInstallProgress = maybePrintFirmwareDebugProgress({
+        lastPrintedInstallProgress = maybePrintFirmwareProgress({
           progressType: 'install',
           progress,
           payload,
@@ -1433,7 +1431,7 @@ async function runFirmwareUpdateV4DebugWithRetry({
       installEndedAt = Date.now();
     }
 
-    const debugMetrics = buildFirmwareUpdateV4DebugMetrics({
+    const metrics = buildFirmwareUpdateV4Metrics({
       attempt,
       maxAttempts,
       totalBytes,
@@ -1458,7 +1456,7 @@ async function runFirmwareUpdateV4DebugWithRetry({
         ...(lastResult as Record<string, unknown>),
         payload: {
           ...payload,
-          _debug: debugMetrics,
+          metrics,
         },
       };
     }
@@ -1480,14 +1478,16 @@ async function runFirmwareUpdateV4DebugWithRetry({
       `[onekey-hw] Protocol V2 USB probe was transient; retrying firmwareUpdateV4 (${attempt}/${maxAttempts})...\n`
     );
     await disposeSDK();
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    await new Promise(resolve => {
+      setTimeout(resolve, 3000);
+    });
     currentSdk = await createSDK(globalOpts);
   }
 
   return lastResult;
 }
 
-function buildFirmwareUpdateV4DebugParams(opts: {
+function buildFirmwareUpdateV4Params(opts: {
   chunkSize?: string;
   resourceBundle?: string[];
   romloader?: string;
@@ -1532,7 +1532,7 @@ function buildFirmwareUpdateV4DebugParams(opts: {
   ].some(Boolean);
 
   if (!hasPayload) {
-    const err = new Error('firmware-update-v4-debug requires at least one binary path');
+    const err = new Error('firmware-update-v4 requires at least one binary path');
     (err as Error & { code?: string }).code = 'MISSING_FIRMWARE_BINARY';
     throw err;
   }
@@ -1551,4 +1551,8 @@ function safeParseInt(input: string, label: string): number {
   return num;
 }
 
-program.parse();
+export { program };
+
+if (require.main === module) {
+  program.parse();
+}

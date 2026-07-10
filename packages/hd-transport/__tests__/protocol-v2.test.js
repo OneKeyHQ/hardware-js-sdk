@@ -314,6 +314,56 @@ describe('Protocol V2 framing and session', () => {
     });
   });
 
+  test('session skips Proto Link ACK frames before decoding the protobuf response', async () => {
+    const ack = new Uint8Array(8);
+    ack[0] = 0x5a;
+    ack[1] = 8;
+    ack[2] = 0;
+    ack[4] = 1;
+    ack[5] = 1;
+    ack[6] = 1;
+    ack[3] = protocolV2.crc8(ack, 3);
+    ack[7] = protocolV2.crc8(ack, 7);
+
+    const response = ProtocolV2.encodeFrame(schemas, 'Success', {
+      message: 'ok',
+    });
+    const readFrame = jest.fn().mockResolvedValueOnce(ack).mockResolvedValueOnce(response);
+    const session = new ProtocolV2Session({
+      schemas,
+      router: 1,
+      writeFrame: () => Promise.resolve(),
+      readFrame,
+    });
+
+    await expect(session.call('Ping', { message: 'hello' })).resolves.toEqual({
+      type: 'Success',
+      message: {
+        message: 'ok',
+      },
+    });
+    expect(readFrame).toHaveBeenCalledTimes(2);
+  });
+
+  test('session rejects BLE frames above its configured frame limit before writing', async () => {
+    const writeFrame = jest.fn().mockResolvedValue(undefined);
+    const response = ProtocolV2.encodeFrame(schemas, 'Success', {
+      message: 'ok',
+    });
+    const session = new ProtocolV2Session({
+      schemas,
+      router: 1,
+      maxFrameBytes: 2048,
+      writeFrame,
+      readFrame: () => Promise.resolve(response),
+    });
+
+    await expect(session.call('Ping', { message: 'x'.repeat(2048) })).rejects.toThrow(
+      'Protocol V2 frame too large for transport: 2061 > 2048'
+    );
+    expect(writeFrame).not.toHaveBeenCalled();
+  });
+
   test('session starts response timeout after the frame is written', async () => {
     const response = ProtocolV2.encodeFrame(schemas, 'Success', {
       message: 'ok',

@@ -3894,6 +3894,36 @@ describe('Protocol V2 file write method', () => {
 });
 
 describe('Protocol V2 file read method', () => {
+  test('uses a 900-byte chunk limit by default in BLE environments', async () => {
+    const getSettingsSpy = jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native');
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce({ message: { data: new Uint8Array(900) } })
+      .mockResolvedValueOnce({ message: { data: new Uint8Array(1) } });
+    const method = new FileRead({
+      id: 1,
+      payload: {
+        method: 'fileRead',
+        path: 'vol1:test.bin',
+        offset: 0,
+        totalSize: 901,
+      },
+    });
+    (method as any).device = stubDevice({ commands: { typedCall } });
+
+    try {
+      method.init();
+      await method.run();
+    } finally {
+      getSettingsSpy.mockRestore();
+    }
+
+    expect(typedCall).toHaveBeenCalledTimes(2);
+    expect(typedCall.mock.calls[0][2].chunk_len).toBe(900);
+    expect(typedCall.mock.calls[1][2].file.offset).toBe(900);
+    expect(typedCall.mock.calls[1][2].chunk_len).toBe(1);
+  });
+
   test('rejects invalid read and directory parameters before transport call', () => {
     expect(() => {
       const method = new FileRead({

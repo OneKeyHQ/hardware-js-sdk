@@ -12,6 +12,7 @@ import transport, {
   LogBlockCommand,
   type OneKeyDeviceInfoBase,
   PROTOCOL_V1_MESSAGE_HEADER_SIZE,
+  PROTOCOL_V2_BLE_FRAME_MAX_BYTES,
   PROTOCOL_V2_CHANNEL_BLE_UART,
   type ProtocolType,
   ProtocolV2FrameAssembler,
@@ -1715,6 +1716,7 @@ export default class ReactNativeBleTransport {
           protocolV2: this._messagesV2,
         },
         router: PROTOCOL_V2_CHANNEL_BLE_UART,
+        maxFrameBytes: PROTOCOL_V2_BLE_FRAME_MAX_BYTES,
         writeFrame: async (frame: Uint8Array) => {
           await this.writeProtocolV2Frame(transport, frame, {
             highVolume: highVolumeWrite,

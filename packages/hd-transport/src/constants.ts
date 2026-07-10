@@ -29,6 +29,12 @@ export const PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE = 4000;
 /** BLE 下 FilesystemFileWrite 的文件数据分块大小。 */
 export const PROTOCOL_V2_BLE_FILE_CHUNK_SIZE = 1800;
 
+/** BLE 下 FilesystemFileRead 的文件数据分块大小，受 Pro2 UART 1024B TX 缓冲限制。 */
+export const PROTOCOL_V2_BLE_FILE_READ_CHUNK_SIZE = 900;
+
+/** Pro2 BLE/UART 接收 FIFO 必须容纳完整 Proto Link 帧。 */
+export const PROTOCOL_V2_BLE_FRAME_MAX_BYTES = 2048;
+
 /** @deprecated 使用按传输区分的 PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE / PROTOCOL_V2_BLE_FILE_CHUNK_SIZE。 */
 export const PROTOCOL_V2_FILE_CHUNK_SIZE = PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE;
 

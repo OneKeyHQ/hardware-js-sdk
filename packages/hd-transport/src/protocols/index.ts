@@ -6,7 +6,7 @@ import { decodeMessage as decodeV1Message } from './v1/receive';
 import { createMessageFromName, createMessageFromType } from '../serialization/protobuf/messages';
 import { encode as encodeProtobuf } from '../serialization/protobuf/encode';
 import { decode as decodeProtobuf } from '../serialization/protobuf/decode';
-import { decodeFrame as decodeV2Frame, encodeProtobufFrame } from './v2';
+import { decodeFrame as decodeV2Frame, encodeProtobufFrame, isAckFrame } from './v2';
 
 import type { Root } from 'protobufjs/light';
 import type { ProtocolV2DebugLogger } from './v2';
@@ -74,6 +74,8 @@ export const ProtocolV1 = {
 };
 
 export const ProtocolV2 = {
+  isAckFrame,
+
   encodeFrame(
     schemas: ProtocolV2Schemas,
     name: string,

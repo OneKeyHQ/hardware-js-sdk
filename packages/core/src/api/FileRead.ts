@@ -1,5 +1,5 @@
 import {
-  PROTOCOL_V2_BLE_FILE_CHUNK_SIZE,
+  PROTOCOL_V2_BLE_FILE_READ_CHUNK_SIZE,
   PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE,
 } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
@@ -27,7 +27,7 @@ const MIN_FILE_READ_CHUNK_SIZE = 64;
 function getProtocolV2FileReadChunkLimit() {
   const env = DataManager.getSettings('env');
   if (env && DataManager.isBleConnect(env)) {
-    return PROTOCOL_V2_BLE_FILE_CHUNK_SIZE;
+    return PROTOCOL_V2_BLE_FILE_READ_CHUNK_SIZE;
   }
   return PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE;
 }

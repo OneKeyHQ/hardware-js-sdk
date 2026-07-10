@@ -1,4 +1,4 @@
-import { PROTO_HEAD_CRC_SIZE, PROTO_HEAD_SOF } from './constants';
+import { PROTO_DATA_TYPE_ACK, PROTO_HEAD_CRC_SIZE, PROTO_HEAD_SOF } from './constants';
 import { crc8 } from './crc8';
 import { logProtocolV2Debug } from './debug';
 
@@ -13,20 +13,7 @@ export interface ProtoV2Frame {
   seq: number;
 }
 
-/**
- * Parse and validate a Protocol V2 response frame.
- *
- * Validates:
- *   - SOF byte (0x5A)
- *   - Header CRC (bytes 0-2)
- *   - Frame CRC (full frame except last byte)
- *
- * Returns the decoded messageTypeId, raw protobuf payload, and sequence number.
- */
-export function decodeFrame(
-  data: Uint8Array,
-  debugOptions?: ProtocolV2FrameDebugOptions
-): ProtoV2Frame {
+function validateFrame(data: Uint8Array): number {
   if (data.length < PROTO_HEAD_CRC_SIZE) {
     throw new Error(`Protocol V2 frame too short: ${data.length} bytes`);
   }
@@ -43,7 +30,6 @@ export function decodeFrame(
     throw new Error(`Frame truncated: expected ${frameLen} bytes, got ${data.length}`);
   }
 
-  // Verify pre-header CRC (bytes 0-2)
   const expectedHeaderCrc = crc8(data, 3);
   if (data[3] !== expectedHeaderCrc) {
     throw new Error(
@@ -53,7 +39,6 @@ export function decodeFrame(
     );
   }
 
-  // Verify frame CRC (all bytes except last)
   const expectedFrameCrc = crc8(data, frameLen - 1);
   if (data[frameLen - 1] !== expectedFrameCrc) {
     throw new Error(
@@ -62,6 +47,40 @@ export function decodeFrame(
         .padStart(2, '0')}, got 0x${data[frameLen - 1].toString(16).padStart(2, '0')}`
     );
   }
+
+  return frameLen;
+}
+
+export function isAckFrame(data: Uint8Array): boolean {
+  // eslint-disable-next-line no-bitwise
+  if (data.length < 6 || (data[5] & 0x03) !== PROTO_DATA_TYPE_ACK) {
+    return false;
+  }
+
+  const frameLen = validateFrame(data);
+  if (frameLen !== PROTO_HEAD_CRC_SIZE) {
+    throw new Error(`Invalid Protocol V2 ACK frame length: ${frameLen}`);
+  }
+  return true;
+}
+
+/**
+ * Parse and validate a Protocol V2 response frame.
+ *
+ * Validates:
+ *   - SOF byte (0x5A)
+ *   - Header CRC (bytes 0-2)
+ *   - Frame CRC (full frame except last byte)
+ *
+ * Returns the decoded messageTypeId, raw protobuf payload, and sequence number.
+ */
+export function decodeFrame(
+  data: Uint8Array,
+  debugOptions?: ProtocolV2FrameDebugOptions
+): ProtoV2Frame {
+  const frameLen = validateFrame(data);
+  const expectedHeaderCrc = data[3];
+  const expectedFrameCrc = data[frameLen - 1];
 
   const seq = data[6];
   // Payload spans bytes 7 to frameLen-2 (inclusive), excluding final CRC byte
