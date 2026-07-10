@@ -47,14 +47,14 @@ const Log = getLogger(LoggerNames.Method);
 const SESSION_ERROR = 'session not found';
 const PROTOCOL_V2_BOOTLOADER_RECONNECT_TIMEOUT = 60 * 1000;
 const PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT = 5 * 1000;
-const PROTOCOL_V2_START_UPDATE_TIMEOUT = 60 * 1000;
+const PROTOCOL_V2_START_UPDATE_TIMEOUT = 3 * 60 * 1000;
 const PROTOCOL_V2_INSTALL_TIMEOUT = 5 * 60 * 1000;
 const PROTOCOL_V2_TARGET_STATUS_PENDING = 0;
 const PROTOCOL_V2_TARGET_STATUS_IN_PROGRESS = 1;
 const PROTOCOL_V2_TARGET_STATUS_FINISHED = 2;
 const PROTOCOL_V2_TARGET_STATUS_FAILED_MIN = 3;
 const PROTOCOL_V2_CONNECT_PROTOCOL = 'V2';
-const PROTOCOL_V2_FIRMWARE_STAGING_VOLUME = 'vol1:';
+const PROTOCOL_V2_FIRMWARE_STAGING_VOLUME = 'vol0:/';
 const PROTOCOL_V2_MIN_FILE_CHUNK_SIZE = 64;
 const PROTOCOL_V2_CONNECT_RETRY_COUNT = 10;
 const PROTOCOL_V2_CONNECT_POLL_INTERVAL = 500;
@@ -105,6 +105,18 @@ type ProtocolV2InstallItem = ProtocolV2TargetBinary & {
 };
 type ProtocolV2InstallTarget = ProtocolV2InstallItem & {
   path: string;
+};
+
+/** RESC bundle okpkg（FileWrite 直写模式），每个独立同步到 devicePath */
+type ProtocolV2ResourceBundleBinary = {
+  name: string;
+  binary: ArrayBuffer;
+  devicePath: string;
+  /** 远端配置模式下的下载 URL（手动模式不填） */
+  url?: string;
+  version?: IVersionArray;
+  payloadHash?: string;
+  headerHash?: string;
 };
 
 type ProtocolV2RemoteComponentBinary = ProtocolV2RemoteComponentTarget & {
@@ -406,6 +418,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       { name: 'se04Binary', type: 'buffer' },
       { name: 'firmwareType', type: 'string' },
       { name: 'platform', type: 'string' },
+      { name: 'resourceBundleFiles', type: 'array', allowEmpty: true },
     ]);
 
     this.params = {
@@ -421,6 +434,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       se03Binary: payload.se03Binary,
       se04Binary: payload.se04Binary,
       resourceBinaries: payload.resourceBinaries,
+      resourceBundleFiles: payload.resourceBundleFiles,
       firmwareType: payload.firmwareType,
       platform: payload.platform,
     };
@@ -483,7 +497,14 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
     }
 
-    if (resourceBinaryMap.length === 0 && !bootloaderBinary && fwBinaryMap.length === 0) {
+    const resourceBundles = this.prepareProtocolV2ResourceBundles(firmwareType, deviceFeatures);
+
+    if (
+      resourceBinaryMap.length === 0 &&
+      !bootloaderBinary &&
+      fwBinaryMap.length === 0 &&
+      !resourceBundles?.length
+    ) {
       throw ERRORS.TypedError(
         HardwareErrorCode.FirmwareUpdateDownloadFailed,
         'No firmware to update'
@@ -497,6 +518,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       fwBinaryMap,
       bootloaderBinary,
       ...(installItems ? { installItems } : undefined),
+      ...(resourceBundles?.length ? { resourceBundles } : undefined),
     });
 
     await this.exitProtocolV2BootloaderToNormal();
@@ -915,6 +937,147 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     };
   }
 
+  // ============================================================
+  // RESC bundle 直写增量同步（FileRead 比对 + FilesystemFileWrite 直写）
+  // ============================================================
+
+  /**
+   * 准备 RESC bundle 列表。
+   *
+   * 两种模式（同 FirmwareUpdateV3 的 binary vs version 模式）：
+   * - 用户传了 resourceBundleFiles（binary 数组）：直接用，不做版本比对。
+   * - 用户没传：从远端 config.json 的 release.resourceBundles 拉取，
+   *   此时 syncProtocolV2ResourceBundles 会按需下载 + 比对设备已有 header 跳过。
+   */
+  private prepareProtocolV2ResourceBundles(
+    firmwareType: EFirmwareType,
+    features: Features
+  ): ProtocolV2ResourceBundleBinary[] | undefined {
+    // 模式1：用户手动传入 binary，直接安装，不比对
+    if (this.params.resourceBundleFiles?.length) {
+      return this.params.resourceBundleFiles.map(file => ({
+        name: file.devicePath.split('/').pop() ?? file.devicePath,
+        binary: file.binary,
+        devicePath: file.devicePath,
+      }));
+    }
+
+    // 模式2：远端配置模式，后续按需下载 + 比对
+    const release = DataManager.getFirmwareLatestRelease(features, firmwareType);
+    if (!release?.resourceBundles?.length) return undefined;
+
+    return release.resourceBundles.map(bundle => ({
+      name: bundle.name,
+      binary: new ArrayBuffer(0),
+      devicePath: bundle.devicePath,
+      url: bundle.url,
+      version: bundle.version,
+      payloadHash: bundle.payloadHash,
+      headerHash: bundle.headerHash,
+    })) as ProtocolV2ResourceBundleBinary[];
+  }
+
+  /**
+   * 同步 RESC bundles 到设备。
+   *
+   * 手动传入模式（有 binary）：直接 FileWrite 直写，不比对。
+   * 远端配置模式（无 binary，有 url）：按需下载 + FileRead 比对跳过已更新的。
+   */
+  private async syncProtocolV2ResourceBundles(
+    bundles: ProtocolV2ResourceBundleBinary[],
+    firmwareSize: number
+  ): Promise<{ processedSize: number; totalSize: number }> {
+    const transferStartTime = Date.now();
+    const transferTransport = this.getProtocolV2FirmwareTransferTransport();
+
+    const isManualMode = bundles.every(b => b.binary.byteLength > 0);
+    let bundlesToSync = bundles;
+
+    // 远端配置模式：按需下载 + 比对跳过
+    if (!isManualMode) {
+      const filtered: ProtocolV2ResourceBundleBinary[] = [];
+      for (const bundle of bundles) {
+        // 下载 binary
+        if (bundle.binary.byteLength === 0 && bundle.url) {
+          Log.log(`[FirmwareUpdateV4] downloading RESC bundle ${bundle.name} from ${bundle.url}`);
+          const { binary } = await getSysResourceBinary(bundle.url);
+          bundle.binary = binary;
+        }
+        // 比对设备上已有 header
+        const upToDate = await this.isProtocolV2ResourceBundleUpToDate(bundle);
+        if (upToDate) {
+          Log.log(`[FirmwareUpdateV4] skip RESC bundle ${bundle.name}; already up to date`);
+        } else {
+          filtered.push(bundle);
+        }
+      }
+      bundlesToSync = filtered;
+    }
+
+    if (bundlesToSync.length === 0) {
+      Log.log('[FirmwareUpdateV4] all RESC bundles up to date, nothing to sync');
+      return { processedSize: 0, totalSize: firmwareSize };
+    }
+
+    // FileWrite 直写到设备
+    let totalSize = 0;
+    for (const b of bundlesToSync) totalSize += b.binary.byteLength;
+
+    const transferTotalSize = totalSize + firmwareSize;
+    let processedSize = 0;
+    for (const bundle of bundlesToSync) {
+      Log.log(
+        `[FirmwareUpdateV4] syncing RESC bundle ${bundle.name} -> ${bundle.devicePath} bytes=${bundle.binary.byteLength}`
+      );
+      processedSize = await this.protocolV2CommonUpdateProcess({
+        payload: bundle.binary,
+        filePath: bundle.devicePath,
+        processedSize,
+        totalSize: transferTotalSize,
+      });
+    }
+
+    const elapsedMs = Date.now() - transferStartTime;
+    Log.log(
+      `[FirmwareUpdateV4] RESC bundle sync finished transport=${transferTransport} bytes=${totalSize} elapsed=${(
+        elapsedMs / 1000
+      ).toFixed(2)}s speed=${formatProtocolV2TransferSpeed(totalSize, elapsedMs)} KB/s`
+    );
+    return { processedSize, totalSize: transferTotalSize };
+  }
+
+  /**
+   * 比对设备上已有 okpkg 的 OKPP header（仅远端配置模式使用）。
+   */
+  private async isProtocolV2ResourceBundleUpToDate(
+    bundle: ProtocolV2ResourceBundleBinary
+  ): Promise<boolean> {
+    if (this.params.forcedUpdateRes) return false;
+    if (!bundle.version && !bundle.payloadHash) return false;
+
+    try {
+      const header = await this.readProtocolV2DeviceFileHeader(bundle.devicePath);
+      if (!header) return false;
+
+      if (bundle.version) {
+        const cmp = compareProtocolV2Versions(header.version, bundle.version);
+        if (cmp === undefined || cmp !== 0) return false;
+      }
+      if (bundle.payloadHash) {
+        const expected = normalizeProtocolV2Hex(bundle.payloadHash);
+        if (expected && header.payloadHash !== expected) return false;
+      }
+      if (bundle.headerHash) {
+        const expected = normalizeProtocolV2Hex(bundle.headerHash);
+        if (expected && header.headerHash !== expected) return false;
+      }
+      return true;
+    } catch (error) {
+      Log.log(`[FirmwareUpdateV4] RESC bundle ${bundle.name} header check failed: `, error);
+      return false;
+    }
+  }
+
   private isProtocolV2BootloaderMode() {
     if (typeof this.device.isBootloader === 'function') {
       return this.device.isBootloader();
@@ -1021,11 +1184,13 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     fwBinaryMap,
     bootloaderBinary,
     installItems,
+    resourceBundles,
   }: {
     resourceBinaryMap?: ProtocolV2TargetBinary[];
     fwBinaryMap?: ProtocolV2TargetBinary[];
     bootloaderBinary?: ArrayBuffer | null;
     installItems?: ProtocolV2InstallItem[];
+    resourceBundles?: ProtocolV2ResourceBundleBinary[];
   }) {
     const orderedInstallItems =
       installItems ??
@@ -1034,13 +1199,32 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         bootloaderBinary: bootloaderBinary ?? null,
         fwBinaryMap: fwBinaryMap ?? [],
       });
-    let totalSize = 0;
-    let processedSize = 0;
-    let transferredSize = 0;
 
-    for (const item of orderedInstallItems) totalSize += item.binary.byteLength;
+    let firmwareSize = 0;
+    for (const item of orderedInstallItems) firmwareSize += item.binary.byteLength;
 
     this.postTipMessage(FirmwareUpdateTipMessage.StartTransferData);
+
+    let processedSize = 0;
+    let totalSize = firmwareSize;
+    if (resourceBundles?.length) {
+      const resourceTransfer = await this.syncProtocolV2ResourceBundles(
+        resourceBundles,
+        firmwareSize
+      );
+      processedSize = resourceTransfer.processedSize;
+      totalSize = resourceTransfer.totalSize;
+    }
+
+    // 只有 RESC bundle、没有固件 target 时跳过 staging/install 阶段
+    if (orderedInstallItems.length === 0) {
+      Log.log('[FirmwareUpdateV4] no firmware targets to install (RESC bundles only)');
+      if (totalSize > 0) {
+        this.postProgressMessage(100, 'transferData');
+      }
+      return;
+    }
+    let transferredSize = processedSize;
     const transferStartTime = Date.now();
     const transferTransport = this.getProtocolV2FirmwareTransferTransport();
     const chunkSize = this.getProtocolV2FirmwareChunkSize();
@@ -1067,6 +1251,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           onTransferredBytes,
         });
         transferredSize = processedSize;
+        await this.verifyProtocolV2StagedFile(filePath, item.binary.byteLength);
 
         stagedInstallTargets.push({
           ...item,
@@ -1107,6 +1292,19 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
   private getProtocolV2InstallItemStagingPath(item: ProtocolV2InstallItem) {
     return `${PROTOCOL_V2_FIRMWARE_STAGING_VOLUME}${item.fileName}`;
+  }
+
+  private async verifyProtocolV2StagedFile(path: string, expectedSize: number) {
+    const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
+    const response = await typedCall('FilesystemPathInfoQuery', 'FilesystemPathInfo', { path });
+    const actualSize = toProtocolV2FiniteNumber(response.message?.size);
+    if (!response.message?.exist || response.message?.directory || actualSize !== expectedSize) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.EmmcFileWriteFirmwareError,
+        `staged file verification failed: path=${path} exist=${!!response.message
+          ?.exist} expected=${expectedSize} actual=${actualSize ?? 'unknown'}`
+      );
+    }
   }
 
   private async queryProtocolV2FirmwareUpdateStatus() {

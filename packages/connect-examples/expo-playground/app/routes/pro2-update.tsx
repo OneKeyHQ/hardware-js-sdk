@@ -84,13 +84,50 @@ const TARGET_FIELDS = [
   },
 ] as const;
 
-const RESOURCE_FIELD = {
-  label: 'Resource crate',
-  targetId: 1,
-  targetName: 'FW_MGMT_TARGET_CRATE',
-  accept: '.crate.okpkg,.okpkg',
-  formatHint: 'Merged CRATE .okpkg; select one file for normal Pro2 resource update',
-} as const;
+const BUNDLE_SLOTS = [
+  {
+    key: 'images',
+    label: 'Images',
+    devicePath: 'vol0:/bundles/images/images.okpkg',
+    accept: '.okpkg',
+    formatHint: 'RESC bundle .okpkg (images)',
+  },
+  {
+    key: 'animation',
+    label: 'Animation',
+    devicePath: 'vol0:/bundles/images/animation.okpkg',
+    accept: '.okpkg',
+    formatHint: 'RESC bundle .okpkg (animation gifs)',
+  },
+  {
+    key: 'wallpaper',
+    label: 'Wallpaper',
+    devicePath: 'vol0:/bundles/images/wallpaper.okpkg',
+    accept: '.okpkg',
+    formatHint: 'RESC bundle .okpkg (wallpapers)',
+  },
+  {
+    key: 'translations',
+    label: 'Translations',
+    devicePath: 'vol0:/bundles/translations/translations.okpkg',
+    accept: '.okpkg',
+    formatHint: 'RESC bundle .okpkg (i18n)',
+  },
+  {
+    key: 'fonts_roobert',
+    label: 'Fonts Roobert',
+    devicePath: 'vol0:/bundles/font/roobert.okpkg',
+    accept: '.okpkg',
+    formatHint: 'RESC bundle .okpkg (Latin fonts)',
+  },
+  {
+    key: 'fonts_noto',
+    label: 'Fonts Noto',
+    devicePath: 'vol0:/bundles/font/noto.okpkg',
+    accept: '.okpkg',
+    formatHint: 'RESC bundle .okpkg (CJK fonts)',
+  },
+] as const;
 
 type TargetParam = (typeof TARGET_FIELDS)[number]['param'];
 
@@ -131,7 +168,7 @@ export default function Pro2UpdatePage() {
   const { toast } = useToast();
 
   const [files, setFiles] = useState<Partial<Record<TargetParam, File>>>({});
-  const [resourceFiles, setResourceFiles] = useState<File[]>([]);
+  const [bundleFiles, setBundleFiles] = useState<Partial<Record<string, File>>>({});
   const [isRunning, setIsRunning] = useState(false);
   const [isConnectingLocal, setIsConnectingLocal] = useState(false);
   const [logs, setLogs] = useState<UpdateLog[]>([]);
@@ -139,7 +176,8 @@ export default function Pro2UpdatePage() {
   const logIdRef = useRef(0);
 
   const selectedFields = useMemo(() => TARGET_FIELDS.filter(field => files[field.param]), [files]);
-  const selectedPayloadCount = selectedFields.length + resourceFiles.length;
+  const selectedBundleCount = BUNDLE_SLOTS.filter(slot => bundleFiles[slot.key]).length;
+  const selectedPayloadCount = selectedFields.length + selectedBundleCount;
 
   const addLog = useCallback((level: UpdateLog['level'], message: string) => {
     const nextLog = {
@@ -184,13 +222,15 @@ export default function Pro2UpdatePage() {
       const device = currentDevice ?? (await connectDevice());
 
       const params: Record<string, unknown> = { platform: 'web' };
-      const resourceBinaries: ArrayBuffer[] = [];
-      for (const [index, file] of resourceFiles.entries()) {
-        addLog(
-          'info',
-          `Loading Resource crate ${index + 1}: ${file.name} (${formatBytes(file.size)})`
-        );
-        resourceBinaries.push(await file.arrayBuffer());
+      const resourceBundleFiles: Array<{ binary: ArrayBuffer; devicePath: string }> = [];
+      for (const slot of BUNDLE_SLOTS) {
+        const file = bundleFiles[slot.key];
+        if (!file) continue;
+        addLog('info', `Loading RESC bundle ${slot.label}: ${file.name} (${formatBytes(file.size)})`);
+        resourceBundleFiles.push({
+          binary: await file.arrayBuffer(),
+          devicePath: slot.devicePath,
+        });
       }
       for (const field of selectedFields) {
         const file = files[field.param];
@@ -199,12 +239,12 @@ export default function Pro2UpdatePage() {
         params[field.param] = await file.arrayBuffer();
       }
 
-      if (resourceBinaries.length > 0) {
-        params.resourceBinaries = resourceBinaries;
+      if (resourceBundleFiles.length > 0) {
+        params.resourceBundleFiles = resourceBundleFiles;
         addLog(
           'info',
-          `Prepared resourceBinaries: ${resourceBinaries.length} files, ${formatBytes(
-            resourceBinaries.reduce((total, binary) => total + binary.byteLength, 0)
+          `Prepared resourceBundleFiles: ${resourceBundleFiles.length} bundles, ${formatBytes(
+            resourceBundleFiles.reduce((total, item) => total + item.binary.byteLength, 0)
           )}`
         );
       }
@@ -213,9 +253,7 @@ export default function Pro2UpdatePage() {
         addLog('info', 'firmwareUpdateV4 remote config: pro2 firmware-v1 components');
       } else {
         const targetNames = [
-          resourceFiles.length > 0
-            ? `Resource crate(${RESOURCE_FIELD.targetId} x${resourceFiles.length})`
-            : null,
+          selectedBundleCount > 0 ? `RESC bundles(${selectedBundleCount})` : null,
           ...selectedFields.map(field => `${field.label}(${field.targetId})`),
         ].filter(Boolean);
         addLog('info', `firmwareUpdateV4 targets: ${targetNames.join(', ')}`);
@@ -243,9 +281,10 @@ export default function Pro2UpdatePage() {
     addLog,
     connectDevice,
     currentDevice,
+    bundleFiles,
     files,
     resetFirmwareProgress,
-    resourceFiles,
+    selectedBundleCount,
     selectedFields,
     selectedPayloadCount,
     toast,
@@ -253,7 +292,7 @@ export default function Pro2UpdatePage() {
 
   const resetFiles = useCallback(() => {
     setFiles({});
-    setResourceFiles([]);
+    setBundleFiles({});
     setResult(null);
   }, []);
 
@@ -316,49 +355,54 @@ export default function Pro2UpdatePage() {
             </div>
 
             <div className="grid gap-3 lg:grid-cols-2">
-              <div className="rounded-lg border border-border/60 bg-background/70 p-3 lg:col-span-2">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="text-sm font-semibold text-foreground">
-                      {RESOURCE_FIELD.label}
-                    </div>
-                    <div className="truncate font-mono text-[11px] text-muted-foreground">
-                      target_id = {RESOURCE_FIELD.targetId} · {RESOURCE_FIELD.targetName}
-                    </div>
-                    <div className="mt-1 text-[11px] text-muted-foreground">
-                      {RESOURCE_FIELD.formatHint}
-                    </div>
-                  </div>
-                  {resourceFiles.length > 0 ? (
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
-                  ) : (
-                    <FileUp className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  )}
-                </div>
-                <Input
-                  type="file"
-                  accept={RESOURCE_FIELD.accept}
-                  multiple
-                  disabled={isRunning}
-                  onChange={event => {
-                    setResourceFiles(Array.from(event.currentTarget.files ?? []));
-                  }}
-                />
-                {resourceFiles.length > 0 ? (
-                  <div className="mt-2 space-y-1 text-xs text-muted-foreground">
-                    <div>{resourceFiles.length} resource crate files selected</div>
-                    <div className="max-h-24 space-y-1 overflow-auto">
-                      {resourceFiles.map(file => (
-                        <div
-                          key={`${file.name}-${file.size}-${file.lastModified}`}
-                          className="truncate"
-                        >
-                          {file.name} · {formatBytes(file.size)}
+              {BUNDLE_SLOTS.map(slot => {
+                const selectedFile = bundleFiles[slot.key];
+                return (
+                  <div
+                    key={slot.key}
+                    className="rounded-lg border border-border/60 bg-background/70 p-3"
+                  >
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-foreground">
+                          {slot.label}
                         </div>
-                      ))}
+                        <div className="truncate font-mono text-[11px] text-muted-foreground">
+                          {slot.devicePath}
+                        </div>
+                        <div className="mt-1 text-[11px] text-muted-foreground">
+                          {slot.formatHint}
+                        </div>
+                      </div>
+                      {selectedFile ? (
+                        <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
+                      ) : (
+                        <FileUp className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      )}
                     </div>
+                    <Input
+                      type="file"
+                      accept={slot.accept}
+                      disabled={isRunning}
+                      onChange={event => {
+                        const nextFile = event.currentTarget.files?.[0];
+                        if (!nextFile) return;
+                        setBundleFiles(prev => ({ ...prev, [slot.key]: nextFile }));
+                      }}
+                    />
+                    {selectedFile ? (
+                      <div className="mt-2 truncate text-xs text-muted-foreground">
+                        {selectedFile.name} · {formatBytes(selectedFile.size)}
+                      </div>
+                    ) : null}
                   </div>
-                ) : null}
+                );
+              })}
+              <div className="rounded-lg border border-dashed border-border/40 bg-muted/30 p-3 lg:col-span-2">
+                <div className="text-xs text-muted-foreground">
+                  RESC bundles use FilesystemFileWrite to overwrite okpkg files directly at the
+                  device path. SDK skips bundles whose on-device OKPP header already matches.
+                </div>
               </div>
               {TARGET_FIELDS.map(field => {
                 const selectedFile = files[field.param];
@@ -419,7 +463,7 @@ export default function Pro2UpdatePage() {
               {selectedPayloadCount > 0 ? (
                 <span className="text-sm text-muted-foreground">
                   {[
-                    resourceFiles.length > 0 ? `${resourceFiles.length} resource crates` : null,
+                    selectedBundleCount > 0 ? `${selectedBundleCount} RESC bundles` : null,
                     ...selectedFields.map(field => field.label),
                   ]
                     .filter(Boolean)

@@ -84,6 +84,15 @@ export interface FirmwareUpdateV4Params {
   /** 资源包通过 FW_MGMT_TARGET_CRATE = 1 安装；Pro2 正常升级推荐传入单个合并 CRATE，多个元素仅用于调试/兼容 */
   resourceBinaries?: ArrayBuffer[];
   forcedUpdateRes?: boolean;
+  /**
+   * RESC bundle okpkg 列表，通过 FilesystemFileWrite 直写到 devicePath（vol0:/bundles/...）。
+   * 手动传入模式：SDK 直接 FileWrite 安装，不做版本比对。
+   * 与 resourceBinaries（CRATE 全量安装）互斥。
+   */
+  resourceBundleFiles?: Array<{
+    binary: ArrayBuffer;
+    devicePath: string;
+  }>;
 }
 
 export declare function firmwareUpdateV3(

@@ -2248,6 +2248,7 @@ describe('Protocol V2 firmware update targets', () => {
       writtenPaths.push(params.filePath);
       return Number(params.processedSize ?? 0) + Number(params.payload.byteLength);
     });
+    (method as any).verifyProtocolV2StagedFile = jest.fn().mockResolvedValue(undefined);
     (method as any).protocolV2StartFirmwareUpdate = jest.fn().mockResolvedValue(undefined);
     (method as any).waitForProtocolV2FirmwareUpdateComplete = jest
       .fn()
@@ -2282,24 +2283,120 @@ describe('Protocol V2 firmware update targets', () => {
     });
 
     expect(writtenPaths).toEqual([
-      'vol1:resource.bin',
-      'vol1:bootloader.bin',
-      'vol1:coprocessor.bin',
-      'vol1:se01.bin',
-      'vol1:application_p1.bin',
+      'vol0:/resource.bin',
+      'vol0:/bootloader.bin',
+      'vol0:/coprocessor.bin',
+      'vol0:/se01.bin',
+      'vol0:/application_p1.bin',
     ]);
+    expect((method as any).verifyProtocolV2StagedFile).toHaveBeenCalledTimes(5);
+    expect((method as any).verifyProtocolV2StagedFile).toHaveBeenNthCalledWith(
+      3,
+      'vol0:/coprocessor.bin',
+      1
+    );
     expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenCalledTimes(1);
     expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenCalledWith({
       targets: [
-        { target_id: 1, path: 'vol1:resource.bin' },
-        { target_id: 3, path: 'vol1:bootloader.bin' },
-        { target_id: 6, path: 'vol1:coprocessor.bin' },
-        { target_id: 7, path: 'vol1:se01.bin' },
-        { target_id: 4, path: 'vol1:application_p1.bin' },
+        { target_id: 1, path: 'vol0:/resource.bin' },
+        { target_id: 3, path: 'vol0:/bootloader.bin' },
+        { target_id: 6, path: 'vol0:/coprocessor.bin' },
+        { target_id: 7, path: 'vol0:/se01.bin' },
+        { target_id: 4, path: 'vol0:/application_p1.bin' },
       ],
     });
     expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'transferData');
     expect((method as any).waitForProtocolV2FirmwareUpdateComplete).toHaveBeenCalled();
+  });
+
+  test('announces one transfer when syncing resource bundles and staging firmware', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+
+    method.postTipMessage = jest.fn();
+    method.postProgressMessage = jest.fn();
+    (method as any).protocolV2CommonUpdateProcess = jest
+      .fn()
+      .mockImplementation(params =>
+        Promise.resolve(Number(params.processedSize ?? 0) + Number(params.payload.byteLength))
+      );
+    (method as any).verifyProtocolV2StagedFile = jest.fn().mockResolvedValue(undefined);
+    (method as any).protocolV2StartFirmwareUpdate = jest.fn().mockResolvedValue(undefined);
+    (method as any).waitForProtocolV2FirmwareUpdateComplete = jest
+      .fn()
+      .mockResolvedValue(undefined);
+
+    await (method as any).executeProtocolV2Update({
+      resourceBundles: [
+        {
+          name: 'images.okpkg',
+          binary: new Uint8Array([1, 2]).buffer,
+          devicePath: 'vol0:/bundles/images/images.okpkg',
+        },
+      ],
+      resourceBinaryMap: [],
+      bootloaderBinary: null,
+      fwBinaryMap: [
+        {
+          fileName: 'application_p1.bin',
+          binary: new Uint8Array([3]).buffer,
+          targetId: 4,
+        },
+      ],
+    });
+
+    expect(method.postTipMessage).toHaveBeenCalledTimes(2);
+    expect(method.postTipMessage).toHaveBeenNthCalledWith(1, 'StartTransferData');
+    expect(method.postTipMessage).toHaveBeenNthCalledWith(2, 'ConfirmOnDevice');
+    expect((method as any).protocolV2CommonUpdateProcess).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ processedSize: 0, totalSize: 3 })
+    );
+    expect((method as any).protocolV2CommonUpdateProcess).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ processedSize: 2, totalSize: 3 })
+    );
+  });
+
+  test('does not request installation when the staged file size does not match', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+
+    method.postTipMessage = jest.fn();
+    method.postProgressMessage = jest.fn();
+    (method as any).protocolV2CommonUpdateProcess = jest.fn().mockResolvedValue(3);
+    (method as any).device = stubDevice({
+      getCommands: () => ({
+        typedCall: jest.fn().mockResolvedValue({
+          type: 'FilesystemPathInfo',
+          message: { exist: true, directory: false, size: 2 },
+        }),
+      }),
+    });
+    (method as any).protocolV2StartFirmwareUpdate = jest.fn();
+
+    await expect(
+      (method as any).executeProtocolV2Update({
+        resourceBinaryMap: [],
+        bootloaderBinary: null,
+        fwBinaryMap: [
+          {
+            fileName: 'coprocessor.bin',
+            binary: new Uint8Array([1, 2, 3]).buffer,
+            targetId: 6,
+          },
+        ],
+      })
+    ).rejects.toThrow(/staged file verification failed/);
+    expect((method as any).protocolV2StartFirmwareUpdate).not.toHaveBeenCalled();
   });
 
   test('passes explicit per-target binaries through without file name heuristics', async () => {
@@ -2327,6 +2424,7 @@ describe('Protocol V2 firmware update targets', () => {
       .mockImplementation(params =>
         Promise.resolve(Number(params.processedSize ?? 0) + Number(params.payload.byteLength))
       );
+    (method as any).verifyProtocolV2StagedFile = jest.fn().mockResolvedValue(undefined);
     (method as any).protocolV2StartFirmwareUpdate = jest.fn().mockResolvedValue(undefined);
     (method as any).waitForProtocolV2FirmwareUpdateComplete = jest
       .fn()
@@ -2340,8 +2438,8 @@ describe('Protocol V2 firmware update targets', () => {
 
     expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenCalledWith({
       targets: [
-        { target_id: 5, path: 'vol1:application_p2.bin' },
-        { target_id: 10, path: 'vol1:se04.bin' },
+        { target_id: 5, path: 'vol0:/application_p2.bin' },
+        { target_id: 10, path: 'vol0:/se04.bin' },
       ],
     });
   });
@@ -2864,6 +2962,7 @@ describe('Protocol V2 firmware update targets', () => {
           Number(params.processedSize ?? 0) + Number(params.payload.byteLength)
         );
       });
+    (method as any).verifyProtocolV2StagedFile = jest.fn().mockResolvedValue(undefined);
     (method as any).protocolV2StartFirmwareUpdate = jest.fn().mockImplementation(({ targets }) => {
       operations.push(
         `install:${targets.map((target: { path: string }) => target.path).join(',')}`
@@ -2895,14 +2994,14 @@ describe('Protocol V2 firmware update targets', () => {
     expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenCalledTimes(1);
     expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenCalledWith({
       targets: [
-        { target_id: 1, path: 'vol1:resource.bin' },
-        { target_id: 4, path: 'vol1:application_p1.bin' },
+        { target_id: 1, path: 'vol0:/resource.bin' },
+        { target_id: 4, path: 'vol0:/application_p1.bin' },
       ],
     });
     expect(operations).toEqual([
-      'write:vol1:resource.bin',
-      'write:vol1:application_p1.bin',
-      'install:vol1:resource.bin,vol1:application_p1.bin',
+      'write:vol0:/resource.bin',
+      'write:vol0:/application_p1.bin',
+      'install:vol0:/resource.bin,vol0:/application_p1.bin',
     ]);
   });
 
@@ -3110,6 +3209,12 @@ describe('Protocol V2 firmware update targets', () => {
           },
         });
       }
+      if (name === 'FilesystemPathInfoQuery') {
+        return Promise.resolve({
+          type: 'FilesystemPathInfo',
+          message: { exist: true, directory: false, size: 4097 },
+        });
+      }
       if (name === 'DeviceFirmwareUpdateRequest') {
         return Promise.resolve({ type: 'Success', message: { message: 'ok' } });
       }
@@ -3146,9 +3251,11 @@ describe('Protocol V2 firmware update targets', () => {
       'DeviceFirmwareUpdateRequest',
       ['Success', 'DeviceFirmwareUpdateStatus'],
       {
-        targets: [{ target_id: 4, path: 'vol1:firmware.bin' }],
+        targets: [{ target_id: 4, path: 'vol0:/firmware.bin' }],
       },
-      expect.any(Object)
+      expect.objectContaining({
+        timeoutMs: 3 * 60 * 1000,
+      })
     );
   });
 

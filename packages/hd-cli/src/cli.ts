@@ -559,7 +559,10 @@ program
   .command('firmware-update-v4-debug')
   .description('Debug Protocol V2 firmware update through sdk.firmwareUpdateV4')
   .option('--chunk-size <bytes>', 'Transfer chunk size in bytes')
-  .option('--resource <path>', 'FW_MGMT_TARGET_CRATE resource package path')
+  .option(
+    '--resource-bundle <spec...>',
+    'RESC bundle direct-write spec: <localPath>:<devicePath>, e.g. wallpaper.okpkg:vol0:/bundles/images/wallpaper.okpkg'
+  )
   .option('--romloader <path>', 'FW_MGMT_TARGET_ROMLOADER binary path')
   .option('--bootloader <path>', 'FW_MGMT_TARGET_BOOTLOADER binary path')
   .option('--application-p1 <path>', 'FW_MGMT_TARGET_APPLICATION_P1 binary path')
@@ -1159,11 +1162,31 @@ function readBinaryParam(path: string): ArrayBuffer {
   return new Uint8Array(buffer).buffer;
 }
 
+function parseResourceBundleParam(spec: string): { binary: ArrayBuffer; devicePath: string } {
+  const sep = spec.indexOf(':');
+  if (sep <= 0 || sep === spec.length - 1) {
+    throw new Error(
+      `Invalid --resource-bundle value: "${spec}". Expected <localPath>:<devicePath>`
+    );
+  }
+  const localPath = spec.slice(0, sep);
+  const devicePath = spec.slice(sep + 1);
+  if (!devicePath.startsWith('vol')) {
+    throw new Error(
+      `Invalid --resource-bundle device path: "${devicePath}". Expected a vol*:/... path`
+    );
+  }
+  return {
+    binary: readBinaryParam(localPath),
+    devicePath,
+  };
+}
+
 function getFirmwareUpdateV4DebugTotalBytes(
   params: ReturnType<typeof buildFirmwareUpdateV4DebugParams>
 ) {
   return [
-    ...(params.resourceBinaries ?? []),
+    ...(params.resourceBundleFiles?.map(item => item.binary) ?? []),
     params.bootloaderBinary,
     params.applicationP1Binary,
     params.applicationP2Binary,
@@ -1466,7 +1489,7 @@ async function runFirmwareUpdateV4DebugWithRetry({
 
 function buildFirmwareUpdateV4DebugParams(opts: {
   chunkSize?: string;
-  resource?: string;
+  resourceBundle?: string[];
   romloader?: string;
   bootloader?: string;
   applicationP1?: string;
@@ -1483,7 +1506,7 @@ function buildFirmwareUpdateV4DebugParams(opts: {
     connectProtocol: 'V2' as const,
     chunkSize: opts.chunkSize ? safeParseInt(opts.chunkSize, '--chunk-size') : undefined,
     forcedUpdateRes: opts.forcedUpdateRes,
-    resourceBinaries: opts.resource ? [readBinaryParam(opts.resource)] : undefined,
+    resourceBundleFiles: opts.resourceBundle?.map(parseResourceBundleParam),
     romloaderBinary: opts.romloader ? readBinaryParam(opts.romloader) : undefined,
     bootloaderBinary: opts.bootloader ? readBinaryParam(opts.bootloader) : undefined,
     applicationP1Binary: opts.applicationP1 ? readBinaryParam(opts.applicationP1) : undefined,
@@ -1496,7 +1519,7 @@ function buildFirmwareUpdateV4DebugParams(opts: {
   };
 
   const hasPayload = [
-    params.resourceBinaries,
+    params.resourceBundleFiles,
     params.romloaderBinary,
     params.bootloaderBinary,
     params.applicationP1Binary,
