@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events';
 import { TREZOR_BLE_UUIDS } from '@onekeyfe/hwk-trezor-adapter';
 
-import { NobleBleHandler } from '../NobleBleHandler';
+import { NobleBleHandler, type NobleBleHandlerOptions } from '../NobleBleHandler';
 import { initTrezorBleSupport } from '../main';
 import { TREZOR_BLE_CHANNELS } from '../constants';
 
@@ -173,6 +173,56 @@ describe('NobleBleHandler', () => {
     // explicit disconnect() call).
     peripheral.emit('disconnect');
     expect(onDisc).toHaveBeenCalledWith('id-1');
+  });
+
+  // Shared setup: a connected + subscribed handler on the Windows bonding path.
+  async function windowsHandler(overrides: Partial<NobleBleHandlerOptions> = {}) {
+    const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
+    const noble = new FakeNoble([peripheral]);
+    const handler = new NobleBleHandler({
+      nobleFactory: () => noble as any,
+      isWindows: true,
+      ...overrides,
+    });
+    await handler.scan({ durationMs: 0 });
+    await handler.connect('id-1');
+    await handler.subscribe('id-1');
+    return { handler, peripheral };
+  }
+
+  test('Windows: first write establishes the bond, then writes go direct', async () => {
+    const { handler, peripheral } = await windowsHandler({ chunkSize: 100 });
+
+    // A write-with-response that acks proves the bond is up → one call, no retry.
+    await handler.write('id-1', 'ab'.repeat(10));
+    expect(peripheral.writeChar.writeAsync).toHaveBeenCalledTimes(1);
+
+    // Now paired: a 2-chunk follow-up takes the direct path (one call per chunk).
+    peripheral.writeChar.writeAsync.mockClear();
+    await handler.write('id-1', 'cd'.repeat(120));
+    expect(peripheral.writeChar.writeAsync).toHaveBeenCalledTimes(2);
+  });
+
+  test('Windows: user-cancelled pairing (status: 3) aborts without retrying', async () => {
+    const events: string[] = [];
+    const { handler, peripheral } = await windowsHandler({ logger: e => events.push(e.event) });
+    peripheral.writeChar.writeAsync.mockRejectedValue(new Error('GATT write failed, status: 3'));
+
+    await expect(handler.write('id-1', 'abcd')).rejects.toThrow(/status: 3/);
+    expect(peripheral.writeChar.writeAsync).toHaveBeenCalledTimes(1);
+    expect(events).toEqual(expect.arrayContaining(['win.pairing.begin', 'win.pairing.retry']));
+  });
+
+  test('Windows: retries transient write failures until the bond lands', async () => {
+    const { handler, peripheral } = await windowsHandler({ windowsPairingAttemptTimeoutMs: 1 });
+    let attempts = 0;
+    peripheral.writeChar.writeAsync.mockImplementation(async () => {
+      attempts += 1;
+      if (attempts < 3) throw new Error('GATT write not ready, status: 7');
+    });
+
+    await handler.write('id-1', 'abcd');
+    expect(attempts).toBe(3);
   });
 });
 

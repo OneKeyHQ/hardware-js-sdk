@@ -99,6 +99,13 @@ export class TrezorElectronBleTransport {
     try {
       await this._bridge.subscribe(connectId);
     } catch (error) {
+      // DIAGNOSTIC (win.pairing.*): subscribe threw during connect → the
+      // renderer tears the main-side connection down before any write can
+      // trigger pairing. If this fires on Windows, the fix must move earlier.
+      this._log('warn', 'win.pairing.renderer.subscribeFailed', {
+        connectId,
+        error: String(error),
+      });
       // Main process is already connected — tear it down so we don't leak a
       // main-side connection the renderer can no longer address.
       await this._bridge.disconnect(connectId).catch(() => undefined);
@@ -124,7 +131,17 @@ export class TrezorElectronBleTransport {
   async write(connectId: string, data: Uint8Array): Promise<void> {
     if (!this._connected.has(connectId)) throw notConnectedError(connectId);
     const hex = Buffer.from(data).toString('hex');
-    await this._bridge.write(connectId, hex);
+    try {
+      await this._bridge.write(connectId, hex);
+    } catch (error) {
+      // DIAGNOSTIC: renderer-side view of a write failure (the main process
+      // logs the underlying WinRT GATT status under win.pairing.retry).
+      this._log('warn', 'win.pairing.renderer.writeError', {
+        connectId,
+        error: String(error),
+      });
+      throw error;
+    }
   }
 
   async read(connectId: string): Promise<Uint8Array> {

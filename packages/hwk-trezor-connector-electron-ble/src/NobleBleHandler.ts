@@ -140,6 +140,21 @@ const BLE_CONNECT_TIMEOUT_MS = 31_000;
 // Cap on a cleanup disconnectAsync — it hangs on a just-failed connect.
 const BLE_DISCONNECT_TIMEOUT_MS = 2_000;
 
+// --- Windows BLE bonding (pairing) ---
+// noble's WinRT backend never proactively initiates the pairing ceremony on
+// connect — unlike macOS CoreBluetooth / Linux BlueZ, which bond transparently
+// when an encrypted characteristic is first touched. On Windows the bond is
+// only kicked off on-demand by a write to the encrypted write characteristic,
+// which is what pops the OS pairing dialog + the code on the Trezor screen.
+// That write blocks until the user answers and can transiently fail while the
+// bond negotiates, so on Windows we retry it until the link is confirmed.
+// Mirrors OneKey's own hd-transport-electron `attemptWindowsWriteUntilPaired`.
+const WINDOWS_PAIRING_MAX_ATTEMPTS = 15;
+const WINDOWS_PAIRING_ATTEMPT_TIMEOUT_MS = 2_000;
+// `status: 3` = the user cancelled the Windows pairing dialog (or the GATT
+// write was rejected). Abort immediately instead of burning the retry budget.
+const ABORTABLE_WRITE_ERROR_PATTERNS = [/status:\s*3/i];
+
 export interface NobleBleHandlerOptions {
   /** Override for tests; defaults to `require('@stoprocent/noble')`. */
   nobleFactory?: NobleFactory;
@@ -147,6 +162,10 @@ export interface NobleBleHandlerOptions {
   uuids?: typeof TREZOR_BLE_UUIDS;
   /** Override the 244-byte chunk size. */
   chunkSize?: number;
+  /** Force the Windows bonding path on/off (defaults to the host platform). */
+  isWindows?: boolean;
+  /** Delay between Windows bonding write retries (ms). Overridable for tests. */
+  windowsPairingAttemptTimeoutMs?: number;
   logger?: TrezorDebugLogger;
 }
 
@@ -165,6 +184,10 @@ export class NobleBleHandler {
 
   private readonly _chunkSize: number;
 
+  private readonly _isWindows: boolean;
+
+  private readonly _windowsPairingAttemptTimeoutMs: number;
+
   private readonly _logger?: NobleBleHandlerOptions['logger'];
 
   private readonly _discovered = new Map<string, NoblePeripheralLike>();
@@ -173,6 +196,10 @@ export class NobleBleHandler {
   private readonly _lastSeen = new Map<string, number>();
 
   private readonly _connected = new Map<string, DeviceEntry>();
+
+  // Windows-only: devices whose BLE bond is confirmed live. Gates the pairing
+  // retry loop in `write()`; stays empty on macOS/Linux.
+  private readonly _paired = new Set<string>();
 
   private _stateChangeHandler?: (state: string) => void;
 
@@ -192,6 +219,9 @@ export class NobleBleHandler {
     this._factory = options.nobleFactory ?? DEFAULT_NOBLE_FACTORY;
     this._uuids = options.uuids ?? TREZOR_BLE_UUIDS;
     this._chunkSize = options.chunkSize ?? TREZOR_BLE_PACKET_SIZE;
+    this._isWindows = options.isWindows ?? process.platform === 'win32';
+    this._windowsPairingAttemptTimeoutMs =
+      options.windowsPairingAttemptTimeoutMs ?? WINDOWS_PAIRING_ATTEMPT_TIMEOUT_MS;
     this._logger = options.logger;
   }
 
@@ -419,7 +449,19 @@ export class NobleBleHandler {
 
     const wasConnected = peripheral.state === 'connected';
     if (!wasConnected) {
-      await peripheral.connectAsync();
+      try {
+        await peripheral.connectAsync();
+      } catch (error) {
+        // DIAGNOSTIC: isolates a GATT connect failure from a later discovery/
+        // write failure when tracing the Windows pairing flow.
+        this._log('warn', 'win.pairing.connectError', {
+          id,
+          isWindows: this._isWindows,
+          phase: 'connectAsync',
+          error: String(error),
+        });
+        throw error;
+      }
     }
 
     try {
@@ -444,6 +486,14 @@ export class NobleBleHandler {
       this._log('info', 'connect.done', { id, name: peripheral.advertisement.localName });
       return { id, name: peripheral.advertisement.localName };
     } catch (error) {
+      // DIAGNOSTIC: discovery ran over the (encrypted) link — a failure here on
+      // Windows points at a missing bond rather than a plain connect problem.
+      this._log('warn', 'win.pairing.connectError', {
+        id,
+        isWindows: this._isWindows,
+        phase: 'discover',
+        error: String(error),
+      });
       // Discovery failed after we opened the GATT connection — disconnect it
       // (bounded) so we don't leak it. Only if this call connected it.
       if (!wasConnected) await this._safeDisconnect(peripheral);
@@ -471,11 +521,25 @@ export class NobleBleHandler {
     if (!entry.notifyChar) throw new Error(`Trezor BLE notify char missing for ${id}`);
     if (entry.notifyHandler) return;
     const handler = (data: Buffer) => {
+      // First inbound notification proves the BLE bond is live (Windows).
+      this._markPaired(id, 'notification');
       this._onNotification?.(id, data.toString('hex'));
     };
     entry.notifyHandler = handler;
     entry.notifyChar.on('data', handler);
-    await entry.notifyChar.subscribeAsync();
+    try {
+      await entry.notifyChar.subscribeAsync();
+    } catch (error) {
+      // DIAGNOSTIC: on Windows an unpaired device can reject the notify CCCD
+      // write until the bond exists — if this fires, the connect flow tears
+      // down before any write triggers pairing (a distinct failure mode).
+      this._log('warn', 'win.pairing.subscribeError', {
+        id,
+        isWindows: this._isWindows,
+        error: String(error),
+      });
+      throw error;
+    }
   }
 
   async unsubscribe(id: string): Promise<void> {
@@ -504,11 +568,91 @@ export class NobleBleHandler {
       // Matches trezor-suite transport-bluetooth (`Buffer.alloc(chunkSize)`).
       const chunk = Buffer.alloc(this._chunkSize);
       slice.copy(chunk);
-      // OneKey uses writeWithResponse for stability; mirror that.
-      await entry.writeChar.writeAsync(chunk, false);
+      await this._writeChunk(id, chunk);
       if (offset + this._chunkSize < buffer.length) {
         await delay(TREZOR_BLE_WRITE_CHUNK_DELAY_MS);
       }
+    }
+  }
+
+  private _markPaired(id: string, via: 'writeAck' | 'notification'): void {
+    if (!this._isWindows || this._paired.has(id)) return;
+    this._paired.add(id);
+    // DIAGNOSTIC (win.pairing.*): warn level so it always surfaces on the
+    // Windows test regardless of debug config. Remove once pairing is verified.
+    this._log('warn', 'win.pairing.confirmed', { id, via });
+  }
+
+  /**
+   * Write one padded packet. macOS/Linux (and Windows once bonded) write
+   * directly; a first-time Windows write drives the bonding retry loop below.
+   */
+  private async _writeChunk(id: string, chunk: Buffer): Promise<void> {
+    const entry = this._requireEntry(id);
+    if (!entry.writeChar) throw new Error(`Trezor BLE write char missing for ${id}`);
+    if (!this._isWindows || this._paired.has(id)) {
+      // OneKey uses writeWithResponse for stability; mirror that.
+      await entry.writeChar.writeAsync(chunk, false);
+      return;
+    }
+    await this._writeChunkUntilPaired(id, chunk);
+  }
+
+  /**
+   * Windows first-write path: retry the write until the OS bond is established.
+   * A write-with-response that completes proves the bond is up (the link-layer
+   * ACK can't arrive over an unbonded link), so the first successful write ends
+   * the loop. A `status: 3` reject means the user cancelled pairing — abort.
+   */
+  private async _writeChunkUntilPaired(id: string, chunk: Buffer): Promise<void> {
+    // DIAGNOSTIC: marks the moment the Windows bonding attempt begins — this is
+    // the write that should pop the OS pairing dialog + the code on the device.
+    this._log('warn', 'win.pairing.begin', { id, byteLength: chunk.length });
+    for (let attempt = 1; attempt <= WINDOWS_PAIRING_MAX_ATTEMPTS; attempt += 1) {
+      if (!this._connected.has(id)) {
+        throw new Error(`Trezor BLE device disconnected during pairing: ${id}`);
+      }
+      const writeChar = this._connected.get(id)?.writeChar;
+      if (!writeChar) throw new Error(`Trezor BLE write char missing for ${id}`);
+      try {
+        await writeChar.writeAsync(chunk, false);
+        this._markPaired(id, 'writeAck');
+        return;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        // DIAGNOSTIC: the reject message carries the WinRT GATT status (e.g.
+        // `status: 3` = user cancelled) — the key signal if no dialog appears.
+        this._log('warn', 'win.pairing.retry', { id, attempt, error: message });
+        if (ABORTABLE_WRITE_ERROR_PATTERNS.some(p => p.test(message))) {
+          throw error;
+        }
+      }
+      // A notification may have confirmed the bond while the write was failing.
+      if (this._paired.has(id)) return;
+      await delay(this._windowsPairingAttemptTimeoutMs);
+      if (this._paired.has(id)) return;
+      // Re-arm the notify subscription so packets flow once the bond lands.
+      await this._softRefreshSubscription(id);
+    }
+    this._log('warn', 'win.pairing.exhausted', { id, attempts: WINDOWS_PAIRING_MAX_ATTEMPTS });
+    throw new Error(
+      `Trezor BLE pairing not completed after ${WINDOWS_PAIRING_MAX_ATTEMPTS} writes: ${id}`
+    );
+  }
+
+  /**
+   * Unsubscribe + resubscribe the notify characteristic without dropping the
+   * JS `data` listener — nudges noble to redeliver notifications once the
+   * Windows bond completes. No-op until `subscribe()` has run.
+   */
+  private async _softRefreshSubscription(id: string): Promise<void> {
+    const entry = this._connected.get(id);
+    if (!entry?.notifyChar || !entry.notifyHandler) return;
+    try {
+      await entry.notifyChar.unsubscribeAsync();
+      await entry.notifyChar.subscribeAsync();
+    } catch (error) {
+      this._log('warn', 'subscribe.refresh.error', { id, error: String(error) });
     }
   }
 
@@ -527,6 +671,7 @@ export class NobleBleHandler {
     }
     this._discovered.clear();
     this._lastSeen.clear();
+    this._paired.clear();
     this._initialized = false;
   }
 
@@ -537,6 +682,7 @@ export class NobleBleHandler {
       entry.notifyChar.removeListener('data', entry.notifyHandler);
     }
     this._connected.delete(id);
+    this._paired.delete(id);
     if (unexpected) {
       this._log('warn', 'disconnect.unexpected', { id });
       this._onDeviceDisconnected?.(id);
