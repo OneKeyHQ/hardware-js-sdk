@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { DeviceFirmwareTargetType } from '@onekeyfe/hd-transport';
 import { CheckCircle2, FileUp, Loader2, Play, RotateCcw, Search } from 'lucide-react';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -21,64 +22,56 @@ const TARGET_FIELDS = [
   {
     param: 'bootloaderBinary',
     label: 'Bootloader',
-    targetId: 2,
-    targetName: 'FW_MGMT_TARGET_BOOTLOADER',
+    targetId: DeviceFirmwareTargetType.FW_MGMT_TARGET_BOOTLOADER,
     accept: '.okpkg,.bin',
     formatHint: 'signed OKPP .okpkg',
   },
   {
     param: 'applicationP1Binary',
     label: 'APP P1',
-    targetId: 3,
-    targetName: 'FW_MGMT_TARGET_APPLICATION_P1',
+    targetId: DeviceFirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P1,
     accept: '.okpkg,.bin',
     formatHint: 'signed OKPP .okpkg',
   },
   {
     param: 'applicationP2Binary',
     label: 'APP P2',
-    targetId: 4,
-    targetName: 'FW_MGMT_TARGET_APPLICATION_P2',
+    targetId: DeviceFirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P2,
     accept: '.okpkg,.bin',
     formatHint: 'signed OKPP .okpkg',
   },
   {
     param: 'coprocessorBinary',
     label: 'Coprocessor',
-    targetId: 5,
-    targetName: 'FW_MGMT_TARGET_COPROCESSOR',
+    targetId: DeviceFirmwareTargetType.FW_MGMT_TARGET_COPROCESSOR,
     accept: '.okpkg,.bin',
     formatHint: 'signed target package',
   },
   {
     param: 'se01Binary',
     label: 'SE01',
-    targetId: 6,
-    targetName: 'FW_MGMT_TARGET_SE01',
+    targetId: DeviceFirmwareTargetType.FW_MGMT_TARGET_SE01,
     accept: '.okpkg,.bin',
     formatHint: 'signed target package',
   },
   {
     param: 'se02Binary',
     label: 'SE02',
-    targetId: 7,
-    targetName: 'FW_MGMT_TARGET_SE02',
+    targetId: DeviceFirmwareTargetType.FW_MGMT_TARGET_SE02,
     accept: '.okpkg,.bin',
     formatHint: 'signed target package',
   },
   {
     param: 'se03Binary',
     label: 'SE03',
-    targetId: 8,
-    targetName: 'FW_MGMT_TARGET_SE03',
+    targetId: DeviceFirmwareTargetType.FW_MGMT_TARGET_SE03,
     accept: '.okpkg,.bin',
     formatHint: 'signed target package',
   },
   {
     param: 'se04Binary',
     label: 'SE04',
-    targetId: 9,
-    targetName: 'FW_MGMT_TARGET_SE04',
+    targetId: DeviceFirmwareTargetType.FW_MGMT_TARGET_SE04,
     accept: '.okpkg,.bin',
     formatHint: 'signed target package',
   },
@@ -226,7 +219,10 @@ export default function Pro2UpdatePage() {
       for (const slot of BUNDLE_SLOTS) {
         const file = bundleFiles[slot.key];
         if (!file) continue;
-        addLog('info', `Loading RESC bundle ${slot.label}: ${file.name} (${formatBytes(file.size)})`);
+        addLog(
+          'info',
+          `Loading RESC bundle ${slot.label}: ${file.name} (${formatBytes(file.size)})`
+        );
         resourceBundleFiles.push({
           binary: await file.arrayBuffer(),
           devicePath: slot.devicePath,
@@ -364,9 +360,7 @@ export default function Pro2UpdatePage() {
                   >
                     <div className="mb-2 flex items-center justify-between gap-2">
                       <div className="min-w-0">
-                        <div className="text-sm font-semibold text-foreground">
-                          {slot.label}
-                        </div>
+                        <div className="text-sm font-semibold text-foreground">{slot.label}</div>
                         <div className="truncate font-mono text-[11px] text-muted-foreground">
                           {slot.devicePath}
                         </div>
@@ -415,7 +409,7 @@ export default function Pro2UpdatePage() {
                       <div className="min-w-0">
                         <div className="text-sm font-semibold text-foreground">{field.label}</div>
                         <div className="truncate font-mono text-[11px] text-muted-foreground">
-                          target_id = {field.targetId} · {field.targetName}
+                          target_id = {field.targetId} · {DeviceFirmwareTargetType[field.targetId]}
                         </div>
                         <div className="mt-1 text-[11px] text-muted-foreground">
                           {field.formatHint}

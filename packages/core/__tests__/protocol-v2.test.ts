@@ -2050,7 +2050,7 @@ describe('Protocol V2 firmware update targets', () => {
 
     await expect(
       (method as any).protocolV2StartFirmwareUpdate({
-        targets: [{ target_id: 3, path: 'vol1:application_p1.bin' }],
+        targets: [{ target_id: 4, path: 'vol1:application_p1.bin' }],
       })
     ).resolves.toBeUndefined();
 
@@ -2077,7 +2077,7 @@ describe('Protocol V2 firmware update targets', () => {
         return Promise.resolve({
           type: 'DeviceFirmwareUpdateStatus',
           message: {
-            records: [{ target_id: 5, status: 2 }],
+            records: [{ target_id: 6, status: 2 }],
           },
         });
       }
@@ -2098,7 +2098,7 @@ describe('Protocol V2 firmware update targets', () => {
     method.postProgressMessage = jest.fn();
 
     await (method as any).waitForProtocolV2FirmwareUpdateComplete([
-      { target_id: 5, path: 'vol1:ble-firmware.bin' },
+      { target_id: 6, path: 'vol1:ble-firmware.bin' },
     ]);
 
     expect(reconnectProtocolV2Device).toHaveBeenCalledTimes(1);
@@ -2153,8 +2153,8 @@ describe('Protocol V2 firmware update targets', () => {
 
     await expect(
       (method as any).waitForProtocolV2FirmwareUpdateComplete([
-        { target_id: 2, path: 'vol1:bootloader.bin' },
-        { target_id: 3, path: 'vol1:application_p1.bin' },
+        { target_id: 3, path: 'vol1:bootloader.bin' },
+        { target_id: 4, path: 'vol1:application_p1.bin' },
       ])
     ).resolves.toBeUndefined();
 
@@ -2175,14 +2175,14 @@ describe('Protocol V2 firmware update targets', () => {
     });
     method.postProgressMessage = jest.fn();
 
-    const expectedTargetIds = new Set([3]);
+    const expectedTargetIds = new Set([4]);
 
     expect(
-      (method as any).assertProtocolV2TargetStatus([{ target_id: 3, status: 2 }], expectedTargetIds)
+      (method as any).assertProtocolV2TargetStatus([{ target_id: 4, status: 2 }], expectedTargetIds)
     ).toBe(true);
     expect(
       (method as any).assertProtocolV2TargetStatus(
-        [{ target_id: 3, status: 'FW_MGMT_UPDATER_TASK_STATUS_FINISHED' }],
+        [{ target_id: 4, status: 'FW_MGMT_UPDATER_TASK_STATUS_FINISHED' }],
         expectedTargetIds
       )
     ).toBe(true);
@@ -2195,16 +2195,16 @@ describe('Protocol V2 firmware update targets', () => {
           },
           { target_id: 'FW_MGMT_TARGET_SE04', status: 'FW_MGMT_UPDATER_TASK_STATUS_FINISHED' },
         ],
-        new Set([3, 9])
+        new Set([4, 10])
       )
     ).toBe(true);
 
     expect(
-      (method as any).assertProtocolV2TargetStatus([{ target_id: 3, status: 1 }], expectedTargetIds)
+      (method as any).assertProtocolV2TargetStatus([{ target_id: 4, status: 1 }], expectedTargetIds)
     ).toBe(false);
     expect(
       (method as any).assertProtocolV2TargetStatus(
-        [{ target_id: 3, status: 'FW_MGMT_UPDATER_TASK_STATUS_IN_PROGRESS' }],
+        [{ target_id: 4, status: 'FW_MGMT_UPDATER_TASK_STATUS_IN_PROGRESS' }],
         expectedTargetIds
       )
     ).toBe(false);
@@ -2212,7 +2212,7 @@ describe('Protocol V2 firmware update targets', () => {
 
     try {
       (method as any).assertProtocolV2TargetStatus(
-        [{ target_id: 3, status: 3 }],
+        [{ target_id: 4, status: 3 }],
         expectedTargetIds
       );
       throw new Error('Expected Protocol V2 failed firmware status to throw');
@@ -2222,7 +2222,7 @@ describe('Protocol V2 firmware update targets', () => {
 
     try {
       (method as any).assertProtocolV2TargetStatus(
-        [{ target_id: 3, status: 'FW_MGMT_UPDATER_TASK_STATUS_FAILED_VERIFY' }],
+        [{ target_id: 4, status: 'FW_MGMT_UPDATER_TASK_STATUS_FAILED_VERIFY' }],
         expectedTargetIds
       );
       throw new Error('Expected Protocol V2 failed firmware status to throw');
@@ -2258,17 +2258,17 @@ describe('Protocol V2 firmware update targets', () => {
         {
           fileName: 'coprocessor.bin',
           binary: new Uint8Array([6]).buffer,
-          targetId: 5,
+          targetId: 6,
         },
         {
           fileName: 'se01.bin',
           binary: new Uint8Array([7]).buffer,
-          targetId: 6,
+          targetId: 7,
         },
         {
           fileName: 'application_p1.bin',
           binary: new Uint8Array([8]).buffer,
-          targetId: 3,
+          targetId: 4,
         },
       ],
     });
@@ -2288,10 +2288,10 @@ describe('Protocol V2 firmware update targets', () => {
     expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenCalledTimes(1);
     expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenCalledWith({
       targets: [
-        { target_id: 2, path: 'vol0:/bootloader.bin' },
-        { target_id: 5, path: 'vol0:/coprocessor.bin' },
-        { target_id: 6, path: 'vol0:/se01.bin' },
-        { target_id: 3, path: 'vol0:/application_p1.bin' },
+        { target_id: 3, path: 'vol0:/bootloader.bin' },
+        { target_id: 6, path: 'vol0:/coprocessor.bin' },
+        { target_id: 7, path: 'vol0:/se01.bin' },
+        { target_id: 4, path: 'vol0:/application_p1.bin' },
       ],
     });
     expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'transferData');
@@ -2400,8 +2400,8 @@ describe('Protocol V2 firmware update targets', () => {
 
     const explicit = (method as any).collectExplicitTargetBinaries();
     expect(explicit).toEqual([
-      { fileName: 'application_p2.bin', binary: expect.anything(), targetId: 4 },
-      { fileName: 'se04.bin', binary: expect.anything(), targetId: 9 },
+      { fileName: 'application_p2.bin', binary: expect.anything(), targetId: 5 },
+      { fileName: 'se04.bin', binary: expect.anything(), targetId: 10 },
     ]);
 
     method.postTipMessage = jest.fn();
@@ -2424,8 +2424,8 @@ describe('Protocol V2 firmware update targets', () => {
 
     expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenCalledWith({
       targets: [
-        { target_id: 4, path: 'vol0:/application_p2.bin' },
-        { target_id: 9, path: 'vol0:/se04.bin' },
+        { target_id: 5, path: 'vol0:/application_p2.bin' },
+        { target_id: 10, path: 'vol0:/se04.bin' },
       ],
     });
   });
@@ -2536,13 +2536,13 @@ describe('Protocol V2 firmware update targets', () => {
       binaries.get('https://example.com/bootloader.pp.bin')
     );
     expect(remoteBinaries.fwBinaryMap).toEqual([
-      { fileName: 'application_p1.bin', binary: expect.anything(), targetId: 3 },
-      { fileName: 'application_p2.bin', binary: expect.anything(), targetId: 4 },
-      { fileName: 'coprocessor.bin', binary: expect.anything(), targetId: 5 },
-      { fileName: 'se01.bin', binary: expect.anything(), targetId: 6 },
-      { fileName: 'se02.bin', binary: expect.anything(), targetId: 7 },
-      { fileName: 'se03.bin', binary: expect.anything(), targetId: 8 },
-      { fileName: 'se04.bin', binary: expect.anything(), targetId: 9 },
+      { fileName: 'application_p1.bin', binary: expect.anything(), targetId: 4 },
+      { fileName: 'application_p2.bin', binary: expect.anything(), targetId: 5 },
+      { fileName: 'coprocessor.bin', binary: expect.anything(), targetId: 6 },
+      { fileName: 'se01.bin', binary: expect.anything(), targetId: 7 },
+      { fileName: 'se02.bin', binary: expect.anything(), targetId: 8 },
+      { fileName: 'se03.bin', binary: expect.anything(), targetId: 9 },
+      { fileName: 'se04.bin', binary: expect.anything(), targetId: 10 },
     ]);
     expect(getSysResourceBinarySpy.mock.calls.map(call => call[0])).toEqual([
       'https://example.com/bootloader.pp.bin',
@@ -2751,7 +2751,7 @@ describe('Protocol V2 firmware update targets', () => {
     expect((method as any).prepareRemoteProtocolV2Binaries).not.toHaveBeenCalled();
     expect((method as any).executeProtocolV2Update).toHaveBeenCalledWith({
       bootloaderBinary: null,
-      fwBinaryMap: [{ fileName: 'coprocessor.bin', binary: expect.anything(), targetId: 5 }],
+      fwBinaryMap: [{ fileName: 'coprocessor.bin', binary: expect.anything(), targetId: 6 }],
     });
   });
 
@@ -3174,6 +3174,30 @@ describe('Protocol V2 firmware update method', () => {
     expect(typedCall).not.toHaveBeenCalled();
   });
 
+  test.each([0, 2])(
+    'rejects firmware target %s because the Pro2 bootloader cannot install it',
+    async targetId => {
+      const typedCall = jest.fn();
+      const method = new DeviceFirmwareUpdate({
+        id: 1,
+        payload: {
+          method: 'deviceFirmwareUpdate',
+          targetId,
+          path: 'vol0:firmware.bin',
+        },
+      });
+      method.init();
+      (method as any).device = stubDevice({
+        commands: { typedCall },
+      });
+
+      await expect(method.run()).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.CallMethodInvalidParameter,
+      });
+      expect(typedCall).not.toHaveBeenCalled();
+    }
+  );
+
   test('accepts targetId alias inside firmware targets', async () => {
     const typedCall = jest.fn().mockResolvedValue({ message: {} });
     const method = new DeviceFirmwareUpdate({
@@ -3183,8 +3207,8 @@ describe('Protocol V2 firmware update method', () => {
         targets: [
           {
             target_id: undefined,
-            targetId: 4,
-            path: 'vol0:firmware.bin',
+            targetId: 1,
+            path: 'vol0:resource.crate.okpkg',
           },
         ],
       } as any,
@@ -3196,7 +3220,7 @@ describe('Protocol V2 firmware update method', () => {
 
     await method.run();
     expect(typedCall.mock.calls[0][2]).toEqual({
-      targets: [{ target_id: 4, path: 'vol0:firmware.bin' }],
+      targets: [{ target_id: 1, path: 'vol0:resource.crate.okpkg' }],
     });
   });
 
@@ -3217,7 +3241,7 @@ describe('Protocol V2 firmware update method', () => {
 
     await method.run();
     expect(typedCall.mock.calls[0][2]).toEqual({
-      targets: [{ target_id: 3, path: 'vol0:application_p1.bin' }],
+      targets: [{ target_id: 4, path: 'vol0:application_p1.bin' }],
     });
   });
 

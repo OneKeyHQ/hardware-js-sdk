@@ -5,8 +5,8 @@ import { ProtocolV2FirmwareTargetType } from '../../protocols/protocol-v2/firmwa
 
 import type {
   DeviceFirmwareTarget,
-  DeviceFirmwareUpdateRecordFields,
   DeviceFirmwareTargetType,
+  DeviceFirmwareUpdateRecordFields,
   TransportCallOptions,
 } from '@onekeyfe/hd-transport';
 
@@ -138,16 +138,21 @@ export function normalizeRebootType(value: RebootTypeInput | undefined): DeviceR
   return DeviceRebootType.Normal;
 }
 
-// 当前 firmware-pro2 子模块的 DeviceFirmwareTargetType 合法值从生成 enum 派生，
-// 避免协议枚举增减时这里继续保留过期手写编号。
-const VALID_FIRMWARE_TARGET_IDS = new Set<number>(
-  Object.values(ProtocolV2FirmwareTargetType).filter(value => typeof value === 'number') as number[]
-);
+// 与 firmware-pro2 的 proto_target_to_firmware_target 安装白名单保持一致。
+const INSTALLABLE_FIRMWARE_TARGET_IDS = new Set<number>([
+  ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_CRATE,
+  ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_BOOTLOADER,
+  ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P1,
+  ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P2,
+  ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_COPROCESSOR,
+  ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_SE01,
+  ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_SE02,
+  ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_SE03,
+  ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_SE04,
+]);
 const FIRMWARE_TARGET_ID_BY_NAME = new Map<string, DeviceFirmwareTargetType>(
   Object.entries(ProtocolV2FirmwareTargetType).flatMap(([key, value]) =>
-    VALID_FIRMWARE_TARGET_IDS.has(value)
-      ? [[key, value as DeviceFirmwareTargetType]]
-      : []
+    INSTALLABLE_FIRMWARE_TARGET_IDS.has(value) ? [[key, value as DeviceFirmwareTargetType]] : []
   )
 );
 
@@ -160,14 +165,12 @@ function normalizeTargetId(
   }
   const named = typeof value === 'string' ? FIRMWARE_TARGET_ID_BY_NAME.get(value) : undefined;
   const numeric = named ?? (typeof value === 'number' ? value : Number(value));
-  // 校验值域：仅接受 DeviceFirmwareTargetType 中定义的 target id，
-  // 不再放行任意非负整数。
-  if (Number.isSafeInteger(numeric) && VALID_FIRMWARE_TARGET_IDS.has(numeric)) {
+  if (Number.isSafeInteger(numeric) && INSTALLABLE_FIRMWARE_TARGET_IDS.has(numeric)) {
     return numeric as DeviceFirmwareTargetType;
   }
   throw invalidParameter(
-    `Parameter [${name}] must be a valid firmware target id (one of ${[
-      ...VALID_FIRMWARE_TARGET_IDS,
+    `Parameter [${name}] must be an installable firmware target id (one of ${[
+      ...INSTALLABLE_FIRMWARE_TARGET_IDS,
     ].join(', ')}).`
   );
 }
