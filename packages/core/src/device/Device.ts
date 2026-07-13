@@ -65,6 +65,7 @@ import type {
 import type { PassphrasePromptResponse } from './DeviceCommands';
 import type { Deferred, HardwareConnectProtocol } from '@onekeyfe/hd-shared';
 import type {
+  DeviceStatus,
   OneKeyDeviceInfo as DeviceDescriptor,
   ProtocolV2DeviceInfo,
   Success,
@@ -882,6 +883,19 @@ export class Device extends EventEmitter {
     this.featuresNeedsReload = false;
     this.emit(DEVICE.FEATURES, this, features);
     return features;
+  }
+
+  updateProtocolV2Status(status: DeviceStatus) {
+    const previousDeviceInfo = this.features?.raw?.protocolV2DeviceInfo;
+    const previousStatus = previousDeviceInfo?.status;
+    return this.updateProtocolV2Features({
+      ...(previousDeviceInfo ?? {}),
+      protocol_version: previousDeviceInfo?.protocol_version ?? this.features?.protocolVersion ?? 2,
+      status: {
+        ...previousStatus,
+        ...status,
+      },
+    });
   }
 
   /**

@@ -14,3 +14,4 @@ export type {
   ProtocolV2SeStateLabel,
 } from './features';
 export * from './firmware';
+export * from './walletSession';

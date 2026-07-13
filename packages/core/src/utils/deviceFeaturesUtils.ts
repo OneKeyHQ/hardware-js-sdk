@@ -1,11 +1,7 @@
 import semver from 'semver';
 import { isNaN } from 'lodash';
 import { EDeviceType, type EFirmwareType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import {
-  Enum_Capability,
-  type DeviceSessionGet,
-  type GetPassphraseState,
-} from '@onekeyfe/hd-transport';
+import { Enum_Capability, type GetPassphraseState } from '@onekeyfe/hd-transport';
 
 import { toHardened } from '../api/helpers/pathUtils';
 import { DeviceModelToTypes, DeviceTypeToModels } from '../types';
@@ -17,11 +13,10 @@ import { PROTOBUF_MESSAGE_CONFIG } from '../data-manager/MessagesConfig';
 import { getDeviceType } from './deviceInfoUtils';
 import { getDeviceFirmwareVersion } from './deviceVersionUtils';
 import { existCapability } from './capabilitieUtils';
+import { getProtocolV2WalletSession } from '../protocols/protocol-v2/walletSession';
 
 import type { Device } from '../device/Device';
 import type { Features, IDeviceType, SupportFeatureType } from '../types';
-
-type DeviceSessionGetMessage = DeviceSessionGet;
 
 export const getSupportProtocolV1MessageSchema = (
   features: Features | undefined
@@ -98,6 +93,20 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (
     initSession?: boolean;
   }
 ) => {
+  if (device.isProtocolV2()) {
+    if (!device.features) {
+      return {
+        passphraseState: undefined,
+        newSession: undefined,
+        unlockedAttachPin: undefined,
+      };
+    }
+
+    return getProtocolV2WalletSession(device, {
+      initSession: options?.initSession,
+    });
+  }
+
   const { features } = device;
   const locked = features?.unlocked === false;
   const deviceType = device.getCurrentDeviceType();
@@ -172,29 +181,9 @@ export const getPassphraseState = async (
   const deviceType = device.getCurrentDeviceType();
 
   if (device.isProtocolV2()) {
-    const payload: DeviceSessionGetMessage = {};
-    const cachedSessionId =
-      typeof device.getInternalState === 'function' ? device.getInternalState() : undefined;
-    if (cachedSessionId) {
-      payload.session_id = cachedSessionId;
-    }
-
-    const { message, type } = await commands.typedCall(
-      'DeviceSessionGet',
-      'DeviceSession',
-      payload
-    );
-
-    // @ts-expect-error
-    if (type === 'CallMethodError') {
-      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Get the passphrase state error');
-    }
-
-    return {
-      passphraseState: message.btc_test_address,
-      newSession: message.session_id,
-      unlockedAttachPin: features.unlockedAttachPin ?? undefined,
-    };
+    return getProtocolV2WalletSession(device, {
+      initSession: options?.initSession,
+    });
   }
 
   const supportAttachPinCapability = existCapability(
@@ -202,8 +191,7 @@ export const getPassphraseState = async (
     Enum_Capability.Capability_AttachToPin
   );
   const supportGetPassphraseState =
-    supportAttachPinCapability ||
-    supportProSeriesAttachPinPassphrase(deviceType, firmwareVersion);
+    supportAttachPinCapability || supportProSeriesAttachPinPassphrase(deviceType, firmwareVersion);
 
   if (supportGetPassphraseState) {
     const payload: GetPassphraseState = options?.onlyMainPin
