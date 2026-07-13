@@ -12,6 +12,7 @@ import { PROTOCOL_V2_SYS_MESSAGE_THRESHOLD, ProtocolV1, ProtocolV2 } from './pro
 import * as protocolV2Codec from './protocols/v2';
 import {
   ProtocolV2FrameAssembler,
+  ProtocolV2SequenceCursor,
   ProtocolV2Session,
   bytesToHex,
   concatUint8Arrays,
@@ -58,6 +59,7 @@ export default {
   ProtocolV2,
   PROTOCOL_V2_SYS_MESSAGE_THRESHOLD,
   ProtocolV2FrameAssembler,
+  ProtocolV2SequenceCursor,
   ProtocolV2Session,
   bytesToHex,
   concatUint8Arrays,

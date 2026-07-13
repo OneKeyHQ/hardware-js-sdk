@@ -1,8 +1,12 @@
 const { ProtocolV2 } = require('../src/protocols');
 const { parseConfigure } = require('../src/serialization/protobuf/messages');
-const sessionModule = require('../src/protocols/v2/session');
-
-const { ProtocolV2FrameAssembler, ProtocolV2Session, probeProtocolV2 } = sessionModule;
+const {
+  ProtocolV2FrameAssembler,
+  ProtocolV2SequenceCursor,
+  ProtocolV2Session,
+  hexToBytes,
+  probeProtocolV2,
+} = require('../src/protocols/v2/session');
 const protocolV2 = require('../src/protocols/v2');
 
 const protocolV1Messages = parseConfigure({
@@ -752,6 +756,61 @@ describe('Protocol V2 framing and session', () => {
     expect(written.map(frame => frame[6])).toEqual([1, 2, 1]);
   });
 
+  test('session reuses an injected sequence cursor across recreated sessions', async () => {
+    const written = [];
+    const cursor = new ProtocolV2SequenceCursor();
+    const makeSession = () =>
+      new ProtocolV2Session({
+        schemas,
+        router: 1,
+        sequenceCursor: cursor,
+        writeFrame: frame => {
+          written.push(frame);
+          return Promise.resolve();
+        },
+        readFrame: () => {
+          const [frame] = written.slice(-1);
+          const { seq } = protocolV2.decodeFrame(frame);
+          return Promise.resolve(
+            rewriteSeq(ProtocolV2.encodeFrame(schemas, 'Success', { message: 'ok' }), seq)
+          );
+        },
+      });
+
+    await makeSession().call('Ping', { message: '1' });
+    await makeSession().call('Ping', { message: '2' });
+
+    expect(written.map(frame => frame[6])).toEqual([1, 2]);
+  });
+
+  test('session passes per-call context to frame IO callbacks', async () => {
+    const writeContexts = [];
+    const readContexts = [];
+    const response = ProtocolV2.encodeFrame(schemas, 'Success', { message: 'ok' });
+    const session = new ProtocolV2Session({
+      schemas,
+      router: 1,
+      generation: 7,
+      writeFrame: (_frame, context) => {
+        writeContexts.push(context);
+        return Promise.resolve();
+      },
+      readFrame: context => {
+        readContexts.push(context);
+        return Promise.resolve(response);
+      },
+    });
+
+    await session.call('Ping', { message: 'ping' }, { timeoutMs: 123 });
+    await session.call('FileWrite', {}, { timeoutMs: 456 });
+
+    expect(writeContexts).toEqual([
+      { messageName: 'Ping', timeoutMs: 123, highVolume: false, generation: 7 },
+      { messageName: 'FileWrite', timeoutMs: 456, highVolume: true, generation: 7 },
+    ]);
+    expect(readContexts).toEqual(writeContexts);
+  });
+
   test('assembler throws and resets on frames with an impossible length field', () => {
     const assembler = new ProtocolV2FrameAssembler();
     // expectedLen = 0 < 8-byte minimum: without the guard this poisons the
@@ -831,7 +890,6 @@ describe('Protocol V2 framing and session', () => {
   });
 
   test('hexToBytes converts valid hex and rejects malformed input', () => {
-    const { hexToBytes } = sessionModule;
     expect(hexToBytes('5a0102')).toEqual(new Uint8Array([0x5a, 0x01, 0x02]));
     expect(hexToBytes('')).toEqual(new Uint8Array(0));
     expect(() => hexToBytes('abc')).toThrow('Invalid hex string: odd length');

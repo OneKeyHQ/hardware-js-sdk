@@ -1,6 +1,6 @@
 import { PROTOCOL_V2_PACKET_SRC_COMMAND } from '../../constants';
 import { ProtocolV2FrameAssembler, concatUint8Arrays } from './frame-assembler';
-import { nextProtoSeq } from './encode';
+import { ProtocolV2SequenceCursor } from './sequence-cursor';
 import { ProtocolV2 } from '..';
 import * as check from '../../utils/highlevel-checks';
 import { LogBlockCommand } from '../../utils/logBlockCommand';
@@ -13,6 +13,13 @@ export type ProtocolV2Schemas = {
   protocolV2: Root;
 };
 
+export type ProtocolV2CallContext = {
+  messageName: string;
+  timeoutMs?: number;
+  highVolume: boolean;
+  generation: number;
+};
+
 type ProtocolLogger = {
   debug?: (...args: any[]) => void;
   error?: (...args: any[]) => void;
@@ -23,11 +30,13 @@ export type ProtocolV2SessionOptions = {
   router: number;
   packetSrc?: number;
   maxFrameBytes?: number;
-  writeFrame: (frame: Uint8Array) => Promise<void>;
-  readFrame: () => Promise<Uint8Array>;
+  writeFrame: (frame: Uint8Array, context: ProtocolV2CallContext) => Promise<void>;
+  readFrame: (context: ProtocolV2CallContext) => Promise<Uint8Array>;
   logger?: ProtocolLogger;
   logPrefix?: string;
   createTimeoutError?: (name: string, timeoutMs: number) => Error;
+  sequenceCursor?: ProtocolV2SequenceCursor;
+  generation?: number;
 };
 
 export type ProtocolV2CallOptions = {
@@ -38,6 +47,7 @@ export type ProtocolV2CallOptions = {
 };
 
 export { concatUint8Arrays, ProtocolV2FrameAssembler };
+export { ProtocolV2SequenceCursor };
 
 export function hexToBytes(hex: string): Uint8Array {
   const clean = hex.replace(/\s+/g, '');
@@ -238,15 +248,15 @@ export const PROTOCOL_V2_WRITE_WATCHDOG_TIMEOUT_MS = 0;
 export class ProtocolV2Session {
   private readonly options: ProtocolV2SessionOptions;
 
+  private readonly sequenceCursor: ProtocolV2SequenceCursor;
+
   // Serializes call() invocations: responses are matched only by type, so two
   // in-flight calls on the same session would steal each other's responses.
   private pendingCall: Promise<unknown> = Promise.resolve();
 
-  // Per-session sequence counter (1-255, wraps skipping 0).
-  private protoSeq = 0;
-
   constructor(options: ProtocolV2SessionOptions) {
     this.options = options;
+    this.sequenceCursor = options.sequenceCursor ?? new ProtocolV2SequenceCursor();
   }
 
   call(
@@ -277,14 +287,21 @@ export class ProtocolV2Session {
       logger,
       logPrefix = 'ProtocolV2',
       createTimeoutError,
+      generation = 0,
     } = this.options;
 
     const shouldReduceDebug = shouldReduceProtocolV2Debug(name);
-    this.protoSeq = nextProtoSeq(this.protoSeq);
+    const callContext: ProtocolV2CallContext = {
+      messageName: name,
+      timeoutMs: callOptions.timeoutMs,
+      highVolume: shouldReduceDebug,
+      generation,
+    };
+    const protoSeq = this.sequenceCursor.next();
     const frame = ProtocolV2.encodeFrame(schemas, name, data, {
       packetSrc,
       router,
-      seq: this.protoSeq,
+      seq: protoSeq,
       logger: shouldReduceDebug ? undefined : logger,
       logPrefix,
       context: `tx:${name}`,
@@ -312,7 +329,7 @@ export class ProtocolV2Session {
     // Lenient watchdog on the write phase only — see
     // PROTOCOL_V2_WRITE_WATCHDOG_TIMEOUT_MS for the rationale.
     await withProtocolTimeout(
-      writeFrame(frame),
+      writeFrame(frame, callContext),
       PROTOCOL_V2_WRITE_WATCHDOG_TIMEOUT_MS,
       () =>
         new Error(
@@ -331,7 +348,7 @@ export class ProtocolV2Session {
       // terminal response. Consume those frames here so callers still see a
       // request/terminal-response shaped API.
       while (!cancellation.cancelled) {
-        const rxFrame = await readFrame();
+        const rxFrame = await readFrame(callContext);
         if (cancellation.cancelled) {
           // Timed out while waiting: drop the late frame and stop reading.
           break;
