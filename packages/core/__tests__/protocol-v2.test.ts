@@ -269,10 +269,16 @@ describe('Protocol V2 feature adapter', () => {
     });
     expect(typedCall).toHaveBeenLastCalledWith('DeviceSessionGet', 'DeviceSession', {});
 
-    await getPassphraseState(device, {
-      expectPassphraseState: 'state-2',
-      allowCreateAttachPin: true,
-    });
+    await expect(
+      getPassphraseState(device, {
+        expectPassphraseState: 'state-2',
+        allowCreateAttachPin: true,
+      })
+    ).rejects.toEqual(
+      expect.objectContaining({
+        errorCode: HardwareErrorCode.DeviceCheckPassphraseStateError,
+      })
+    );
     expect(typedCall).toHaveBeenLastCalledWith('DeviceSessionGet', 'DeviceSession', {});
 
     await getPassphraseState(device, {
@@ -432,6 +438,41 @@ describe('Protocol V2 feature adapter', () => {
     };
 
     await expect(getProtocolV2WalletSession(device)).rejects.toThrow('Failure_InvalidSession');
+    expect(device.getInternalState()).toBeUndefined();
+  });
+
+  test('rejects a mismatched Pro2 wallet state and clears the selected cache entry', async () => {
+    const device = Device.fromDescriptor({
+      id: 'cache-device-mismatch',
+      path: 'cache-path-mismatch',
+      protocolType: 'V2',
+    } as any);
+    (device as any).features = normalizeProtocolV2Features(
+      { ...descriptor, protocolType: 'V2' } as any,
+      {
+        status: {
+          device_id: 'stable-device-mismatch',
+          unlocked: true,
+          passphrase_enabled: true,
+        },
+      }
+    );
+    device.passphraseState = 'state-a';
+    preloadSessionCache('stable-device-mismatch', 'state-a', 'session-a');
+    (device as any).commands = {
+      typedCall: jest.fn().mockResolvedValue({
+        type: 'DeviceSession',
+        message: { session_id: 'session-b', btc_test_address: 'state-b' },
+      }),
+    };
+
+    await expect(
+      getPassphraseStateWithRefreshDeviceInfo(device, { expectPassphraseState: 'state-a' })
+    ).rejects.toEqual(
+      expect.objectContaining({
+        errorCode: HardwareErrorCode.DeviceCheckPassphraseStateError,
+      })
+    );
     expect(device.getInternalState()).toBeUndefined();
   });
 
@@ -768,8 +809,12 @@ describe('Protocol V2 feature adapter', () => {
     (device as any).features.passphraseProtection = true;
     (device as any).commands = { typedCall };
 
-    await expect(device.checkPassphraseStateSafety('expected-state', false, true)).resolves.toBe(
-      false
+    await expect(
+      device.checkPassphraseStateSafety('expected-state', false, true)
+    ).rejects.toEqual(
+      expect.objectContaining({
+        errorCode: HardwareErrorCode.DeviceCheckPassphraseStateError,
+      })
     );
 
     expect(device.getInternalState()).toBeUndefined();

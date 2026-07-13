@@ -29,7 +29,7 @@ export async function refreshProtocolV2DeviceStatus(device: Device) {
 
 export async function getProtocolV2WalletSession(
   device: Device,
-  options?: { initSession?: boolean }
+  options?: { initSession?: boolean; expectedPassphraseState?: string }
 ) {
   if (device.features?.unlocked === false) {
     throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Device is locked');
@@ -48,6 +48,14 @@ export async function getProtocolV2WalletSession(
       'DeviceSession',
       cachedSessionId ? { session_id: cachedSessionId } : {}
     );
+
+    if (
+      options?.expectedPassphraseState &&
+      options.expectedPassphraseState !== message.btc_test_address
+    ) {
+      device.clearInternalState();
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError);
+    }
 
     if (message.btc_test_address && device.getCurrentPassphraseProtection() !== true) {
       await refreshProtocolV2DeviceStatus(device);
