@@ -1,0 +1,127 @@
+import { ProtocolV2SequenceCursor } from './sequence-cursor';
+import { ProtocolV2Session, getErrorMessage } from './session';
+
+import type { MessageFromOneKey, TransportCallOptions } from '../../types';
+import type { ProtocolV2CallContext, ProtocolV2Schemas, ProtocolV2SessionOptions } from './session';
+
+export type ProtocolV2LinkErrorClassification = 'link-fatal' | 'recoverable';
+
+export interface ProtocolV2LinkAdapter {
+  router: number;
+  maxFrameBytes?: number;
+  generation: number;
+  prepareCall(context: ProtocolV2CallContext): Promise<void> | void;
+  writeFrame(frame: Uint8Array, context: ProtocolV2CallContext): Promise<void>;
+  readFrame(context: ProtocolV2CallContext): Promise<Uint8Array>;
+  reset(reason: string): Promise<void> | void;
+  logger?: ProtocolV2SessionOptions['logger'];
+  logPrefix?: string;
+  createTimeoutError?: ProtocolV2SessionOptions['createTimeoutError'];
+}
+
+export type ProtocolV2LinkManagerOptions<Key> = {
+  getSchemas: () => ProtocolV2Schemas;
+  classifyError: (error: unknown) => ProtocolV2LinkErrorClassification;
+  onLinkInvalidated?: (key: Key, reason: string) => Promise<void> | void;
+};
+
+type ProtocolV2Link = {
+  adapter: ProtocolV2LinkAdapter;
+  session: ProtocolV2Session;
+};
+
+export class ProtocolV2LinkManager<Key> {
+  private readonly links = new Map<Key, ProtocolV2Link>();
+
+  private readonly sequences = new Map<Key, ProtocolV2SequenceCursor>();
+
+  private readonly callQueues = new Map<Key, Promise<unknown>>();
+
+  private readonly options: ProtocolV2LinkManagerOptions<Key>;
+
+  constructor(options: ProtocolV2LinkManagerOptions<Key>) {
+    this.options = options;
+  }
+
+  call(
+    key: Key,
+    createAdapter: () => ProtocolV2LinkAdapter,
+    name: string,
+    data: Record<string, unknown>,
+    options?: TransportCallOptions
+  ): Promise<MessageFromOneKey> {
+    const run = () => this.executeCall(key, createAdapter, name, data, options);
+    const previous = this.callQueues.get(key) ?? Promise.resolve();
+    const result = previous.then(run, run);
+    this.callQueues.set(
+      key,
+      result.catch(() => undefined)
+    );
+    return result;
+  }
+
+  async invalidateLink(key: Key, reason: string): Promise<void> {
+    const link = this.links.get(key);
+    if (!link) return;
+
+    this.links.delete(key);
+    await link.adapter.reset(reason);
+    await this.options.onLinkInvalidated?.(key, reason);
+  }
+
+  async invalidateAllLinks(reason: string): Promise<void> {
+    await Promise.all(Array.from(this.links.keys(), key => this.invalidateLink(key, reason)));
+  }
+
+  async dispose(reason: string): Promise<void> {
+    await this.invalidateAllLinks(reason);
+    this.sequences.clear();
+    this.callQueues.clear();
+  }
+
+  private getOrCreateLink(key: Key, createAdapter: () => ProtocolV2LinkAdapter): ProtocolV2Link {
+    const existing = this.links.get(key);
+    if (existing) return existing;
+
+    const adapter = createAdapter();
+    let sequenceCursor = this.sequences.get(key);
+    if (!sequenceCursor) {
+      sequenceCursor = new ProtocolV2SequenceCursor();
+      this.sequences.set(key, sequenceCursor);
+    }
+    const session = new ProtocolV2Session({
+      schemas: this.options.getSchemas(),
+      router: adapter.router,
+      maxFrameBytes: adapter.maxFrameBytes,
+      generation: adapter.generation,
+      sequenceCursor,
+      prepareCall: context => adapter.prepareCall(context),
+      writeFrame: (frame, context) => adapter.writeFrame(frame, context),
+      readFrame: context => adapter.readFrame(context),
+      logger: adapter.logger,
+      logPrefix: adapter.logPrefix,
+      createTimeoutError: adapter.createTimeoutError,
+    });
+    const link = { adapter, session };
+    this.links.set(key, link);
+    return link;
+  }
+
+  private async executeCall(
+    key: Key,
+    createAdapter: () => ProtocolV2LinkAdapter,
+    name: string,
+    data: Record<string, unknown>,
+    options?: TransportCallOptions
+  ): Promise<MessageFromOneKey> {
+    try {
+      return await this.getOrCreateLink(key, createAdapter).session.call(name, data, options);
+    } catch (error) {
+      if (this.options.classifyError(error) === 'link-fatal') {
+        const errorMessage = getErrorMessage(error) || 'unknown error';
+        await this.invalidateLink(key, `Protocol V2 link-fatal error: ${errorMessage}`);
+      }
+      throw error;
+    }
+  }
+}

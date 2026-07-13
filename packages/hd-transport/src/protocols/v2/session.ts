@@ -30,6 +30,7 @@ export type ProtocolV2SessionOptions = {
   router: number;
   packetSrc?: number;
   maxFrameBytes?: number;
+  prepareCall?: (context: ProtocolV2CallContext) => Promise<void> | void;
   writeFrame: (frame: Uint8Array, context: ProtocolV2CallContext) => Promise<void>;
   readFrame: (context: ProtocolV2CallContext) => Promise<Uint8Array>;
   logger?: ProtocolLogger;
@@ -282,6 +283,7 @@ export class ProtocolV2Session {
       router,
       packetSrc = PROTOCOL_V2_PACKET_SRC_COMMAND,
       maxFrameBytes,
+      prepareCall,
       writeFrame,
       readFrame,
       logger,
@@ -297,6 +299,7 @@ export class ProtocolV2Session {
       highVolume: shouldReduceDebug,
       generation,
     };
+    await prepareCall?.(callContext);
     const protoSeq = this.sequenceCursor.next();
     const frame = ProtocolV2.encodeFrame(schemas, name, data, {
       packetSrc,
