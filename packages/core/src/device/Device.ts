@@ -31,6 +31,7 @@ import {
 import { generateInstanceId } from '../utils/tracing';
 // eslint-disable-next-line import/no-cycle
 import { DeviceCommands } from './DeviceCommands';
+import { deviceWalletSessionStore } from './DeviceWalletSessionStore';
 import {
   type DeviceFirmwareRange,
   DeviceModelToTypes,
@@ -119,8 +120,6 @@ export interface Device {
   emit<K extends keyof DeviceEvents>(type: K, ...args: DeviceEvents[K]): boolean;
 }
 
-const deviceSessionCache: Record<string, string> = {};
-
 /**
  * Pre-populate the device session cache with a known session ID.
  *
@@ -138,8 +137,7 @@ export function preloadSessionCache(
   passphraseState: string,
   sessionId: string
 ): void {
-  const key = `${deviceId}@${passphraseState}`;
-  deviceSessionCache[key] = sessionId;
+  deviceWalletSessionStore.set(deviceId, passphraseState, sessionId);
 }
 
 export class Device extends EventEmitter {
@@ -628,13 +626,6 @@ export class Device extends EventEmitter {
     };
   }
 
-  private generateStateKey(deviceId: string, passphraseState?: string) {
-    if (passphraseState) {
-      return `${deviceId}@${passphraseState}`;
-    }
-    return deviceId;
-  }
-
   private getSessionCacheDeviceKey(_deviceId?: string) {
     const deviceId = _deviceId || this.getCurrentDeviceId();
     if (deviceId) return deviceId;
@@ -645,7 +636,6 @@ export class Device extends EventEmitter {
   }
 
   getInternalState(_deviceId?: string) {
-    Log.debug('getInternalState session cache: ', deviceSessionCache);
     Log.debug(
       'getInternalState session param: ',
       `device_id: ${_deviceId}`,
@@ -663,8 +653,7 @@ export class Device extends EventEmitter {
     // downstream call carries it and hits the primary lookup below.
     if (!this.passphraseState) return undefined;
 
-    const usePassKey = this.generateStateKey(deviceId, this.passphraseState);
-    return deviceSessionCache[usePassKey];
+    return deviceWalletSessionStore.get(deviceId, this.passphraseState);
   }
 
   // attach to pin to fix internal state
@@ -680,36 +669,26 @@ export class Device extends EventEmitter {
       `device_id: ${deviceId}`,
       `enablePassphrase: ${enablePassphrase}`,
       `passphraseState: ${passphraseState}`,
-      `sessionId: ${sessionId}`,
-      `featuresSessionId: ${featuresSessionId}`
+      `hasSessionId: ${Boolean(sessionId)}`,
+      `hasFeaturesSessionId: ${Boolean(featuresSessionId)}`
     );
 
     const cacheDeviceKey = this.getSessionCacheDeviceKey(deviceId);
     if (!cacheDeviceKey) return;
 
     if (enablePassphrase) {
-      // update the sessionId
-      if (sessionId) {
-        deviceSessionCache[this.generateStateKey(cacheDeviceKey, passphraseState)] = sessionId;
-      } else if (featuresSessionId) {
-        deviceSessionCache[this.generateStateKey(cacheDeviceKey, passphraseState)] =
-          featuresSessionId;
-      }
+      const walletSessionId =
+        sessionId || featuresSessionId || deviceWalletSessionStore.getPending(cacheDeviceKey);
+      deviceWalletSessionStore.set(cacheDeviceKey, passphraseState, walletSessionId ?? undefined);
     }
 
-    // delete the old sessionId
-    const oldKey = `${cacheDeviceKey}`;
-    if (deviceSessionCache[oldKey]) {
-      delete deviceSessionCache[oldKey];
-    }
-
-    Log.debug('updateInternalState session cache: ', deviceSessionCache);
+    deviceWalletSessionStore.deletePending(cacheDeviceKey);
   }
 
   private setInternalState(state: string, initSession?: boolean) {
     Log.debug(
       'setInternalState session param: ',
-      `state: ${state}`,
+      `hasState: ${Boolean(state)}`,
       `initSession: ${initSession}`,
       `deviceId: ${this.features?.deviceId}`,
       `passphraseState: ${this.passphraseState}`
@@ -720,12 +699,11 @@ export class Device extends EventEmitter {
     const deviceId = this.getSessionCacheDeviceKey();
     if (!deviceId) return;
 
-    const key = this.generateStateKey(deviceId, this.passphraseState);
-
-    if (state) {
-      deviceSessionCache[key] = state;
+    if (this.passphraseState) {
+      deviceWalletSessionStore.set(deviceId, this.passphraseState, state);
+    } else if (initSession) {
+      deviceWalletSessionStore.setPending(deviceId, state);
     }
-    Log.debug('setInternalState done session cache: ', deviceSessionCache);
   }
 
   clearInternalState(_deviceId?: string) {
@@ -733,12 +711,10 @@ export class Device extends EventEmitter {
 
     const deviceId = this.getSessionCacheDeviceKey(_deviceId);
     if (!deviceId) return;
-    const key = `${deviceId}`;
-    delete deviceSessionCache[key];
+    deviceWalletSessionStore.deletePending(deviceId);
 
     if (this.passphraseState) {
-      const usePassKey = this.generateStateKey(deviceId, this.passphraseState);
-      delete deviceSessionCache[usePassKey];
+      deviceWalletSessionStore.delete(deviceId, this.passphraseState);
     }
   }
 
@@ -867,6 +843,7 @@ export class Device extends EventEmitter {
   }
 
   _updateFeatures(protoFeatures: PROTO.Features | Features, initSession?: boolean) {
+    const previousCacheDeviceKey = this.getSessionCacheDeviceKey();
     let feat =
       'protocol' in protoFeatures
         ? protoFeatures
@@ -876,23 +853,32 @@ export class Device extends EventEmitter {
     if (this.features?.sessionId && !feat.sessionId) {
       feat.sessionId = this.features.sessionId;
     }
-    if (this.getCurrentDeviceId() && feat.sessionId) {
-      this.setInternalState(feat.sessionId, initSession);
-    }
     feat.unlocked = feat.unlocked ?? true;
 
     feat = fixFeaturesFirmwareVersion(feat);
 
     this.features = feat;
+    const nextCacheDeviceKey = this.getSessionCacheDeviceKey();
+    if (previousCacheDeviceKey && nextCacheDeviceKey) {
+      deviceWalletSessionStore.migrateDeviceKey(previousCacheDeviceKey, nextCacheDeviceKey);
+    }
+    if (feat.deviceId && feat.sessionId) {
+      this.setInternalState(feat.sessionId, initSession);
+    }
     this.featuresNeedsReload = false;
     this.emit(DEVICE.FEATURES, this, feat);
   }
 
   updateProtocolV2Features(deviceInfo?: ProtocolV2DeviceInfo) {
+    const previousCacheDeviceKey = this.getSessionCacheDeviceKey();
     const features = fixFeaturesFirmwareVersion(
       buildProtocolV2FeaturesPayload(deviceInfo, this.features)
     );
     this.features = features;
+    const nextCacheDeviceKey = this.getSessionCacheDeviceKey();
+    if (previousCacheDeviceKey && nextCacheDeviceKey) {
+      deviceWalletSessionStore.migrateDeviceKey(previousCacheDeviceKey, nextCacheDeviceKey);
+    }
     this.featuresNeedsReload = false;
     this.emit(DEVICE.FEATURES, this, features);
     return features;
