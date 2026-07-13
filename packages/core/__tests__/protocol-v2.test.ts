@@ -13,6 +13,7 @@ import DeviceFirmwareUpdate from '../src/api/protocol-v2/DeviceFirmwareUpdate';
 import DeviceGetFirmwareUpdateStatus from '../src/api/protocol-v2/DeviceGetFirmwareUpdateStatus';
 import DeviceInfoGet from '../src/api/protocol-v2/DeviceInfoGet';
 import DeviceReboot from '../src/api/protocol-v2/DeviceReboot';
+import FilesystemFormat from '../src/api/protocol-v2/FilesystemFormat';
 import FilesystemPermissionFix from '../src/api/protocol-v2/FilesystemPermissionFix';
 import ProtocolInfoRequest from '../src/api/protocol-v2/ProtocolInfoRequest';
 import EVMSignTypedData from '../src/api/evm/EVMSignTypedData';
@@ -3370,6 +3371,23 @@ describe('Protocol V2 current low-level methods', () => {
     await method.run();
 
     expect(typedCall).toHaveBeenCalledWith('FilesystemPermissionFix', 'Success', {});
+  });
+
+  test('sends required FilesystemFormat partition flags', async () => {
+    const typedCall = jest.fn().mockResolvedValue({ message: {} });
+    const method = new FilesystemFormat({
+      id: 1,
+      payload: { method: 'filesystemFormat' },
+    });
+    method.init();
+    (method as any).device = stubDevice({ commands: { typedCall } });
+
+    await method.run();
+
+    expect(typedCall).toHaveBeenCalledWith('FilesystemFormat', 'Success', {
+      data: true,
+      user: true,
+    });
   });
 });
 

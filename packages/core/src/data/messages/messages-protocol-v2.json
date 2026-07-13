@@ -195,6 +195,7 @@
         "MessageType_EthereumGnosisSafeTxAck": 20118,
         "MessageType_EthereumGnosisSafeTxRequest": 20119,
         "MessageType_EthereumSignTxEIP7702OneKey": 20120,
+        "MessageType_EthereumSignTypedDataQR": 20121,
         "MessageType_NEMGetAddress": 67,
         "MessageType_NEMAddress": 68,
         "MessageType_NEMSignTx": 69,
@@ -476,6 +477,12 @@
         "MessageType_Wallpaper": 60432,
         "MessageType_DeviceInfoGet": 60600,
         "MessageType_DeviceInfo": 60601,
+        "MessageType_DeviceStatusGet": 60602,
+        "MessageType_DeviceStatus": 60603,
+        "MessageType_DevGetOnboardingStatus": 60604,
+        "MessageType_DevOnboardingStatus": 60605,
+        "MessageType_DeviceSessionGet": 60606,
+        "MessageType_DeviceSession": 60607,
         "MessageType_FilesystemPermissionFix": 60800,
         "MessageType_FilesystemPathInfo": 60801,
         "MessageType_FilesystemPathInfoQuery": 60802,
@@ -490,7 +497,8 @@
         "MessageType_FilesystemFormat": 60811,
         "MessageType_DeviceFirmwareUpdateRequest": 61000,
         "MessageType_DeviceFirmwareUpdateStatusGet": 61001,
-        "MessageType_DeviceFirmwareUpdateStatus": 61002
+        "MessageType_DeviceFirmwareUpdateStatus": 61002,
+        "MessageType_PortfolioUpdate": 61200
       },
       "reserved": [
         [90, 92],
@@ -5390,6 +5398,37 @@
           "rule": "required",
           "type": "string",
           "id": 12
+        }
+      }
+    },
+    "EthereumSignTypedDataQR": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "json_data": {
+          "type": "bytes",
+          "id": 2
+        },
+        "chain_id": {
+          "type": "uint64",
+          "id": 3
+        },
+        "metamask_v4_compat": {
+          "type": "bool",
+          "id": 4,
+          "options": {
+            "default": true
+          }
+        },
+        "request_id": {
+          "type": "bytes",
+          "id": 5
         }
       }
     },
@@ -11118,6 +11157,26 @@
         }
       }
     },
+    "ViewRawData": {
+      "fields": {
+        "initial_data": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        },
+        "placeholder": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        }
+      }
+    },
+    "ViewSignLayout": {
+      "values": {
+        "LayoutDefault": 0,
+        "LayoutSafeTxCreate": 1
+      }
+    },
     "ViewSignPage": {
       "fields": {
         "title": {
@@ -11137,6 +11196,24 @@
         "tip": {
           "type": "ViewTip",
           "id": 4
+        },
+        "raw_data": {
+          "type": "ViewRawData",
+          "id": 5
+        },
+        "slide_to_confirm": {
+          "type": "bool",
+          "id": 6,
+          "options": {
+            "default": true
+          }
+        },
+        "layout": {
+          "type": "ViewSignLayout",
+          "id": 7,
+          "options": {
+            "default": "LayoutDefault"
+          }
         }
       }
     },
@@ -11890,6 +11967,46 @@
         }
       }
     },
+    "DeviceStatusGet": {
+      "fields": {}
+    },
+    "DevOnboardingStage": {
+      "values": {
+        "DEV_ONBOARDING_STAGE_UNKNOWN": 0,
+        "DEV_ONBOARDING_STAGE_SAFETY_CHECK": 1,
+        "DEV_ONBOARDING_STAGE_PERSONALIZATION": 2,
+        "DEV_ONBOARDING_STAGE_SELECT_SETUP_METHOD": 3,
+        "DEV_ONBOARDING_STAGE_NEW_DEVICE": 4,
+        "DEV_ONBOARDING_STAGE_SELECT_RESTORE_METHOD": 5,
+        "DEV_ONBOARDING_STAGE_RESTORE_MNEMONIC": 6,
+        "DEV_ONBOARDING_STAGE_RESTORE_SEEDCARD": 7,
+        "DEV_ONBOARDING_STAGE_WALLET_READY": 8,
+        "DEV_ONBOARDING_STAGE_SEEDCARD_BACKUP_PROMPT": 9,
+        "DEV_ONBOARDING_STAGE_SELECT_SEEDCARD_BACKUP_METHOD": 10,
+        "DEV_ONBOARDING_STAGE_SEEDCARD_BACKUP": 11,
+        "DEV_ONBOARDING_STAGE_DONE": 12
+      }
+    },
+    "DevGetOnboardingStatus": {
+      "fields": {}
+    },
+    "DevOnboardingStatus": {
+      "fields": {
+        "stage": {
+          "rule": "required",
+          "type": "DevOnboardingStage",
+          "id": 1
+        },
+        "status_code": {
+          "type": "uint32",
+          "id": 2
+        },
+        "detail_code": {
+          "type": "uint32",
+          "id": 3
+        }
+      }
+    },
     "FilesystemPermissionFix": {
       "fields": {}
     },
@@ -12103,6 +12220,20 @@
       }
     },
     "FilesystemFormat": {
+      "fields": {
+        "data": {
+          "rule": "required",
+          "type": "bool",
+          "id": 1
+        },
+        "user": {
+          "rule": "required",
+          "type": "bool",
+          "id": 2
+        }
+      }
+    },
+    "PortfolioUpdate": {
       "fields": {}
     },
     "google": {

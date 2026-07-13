@@ -5,6 +5,7 @@ const {
 } = require('../src/serialization/protobuf/messages');
 const v1Messages = require('../messages.json');
 const v2Messages = require('../messages-protocol-v2.json');
+const coreV2Messages = require('../../core/src/data/messages/messages-protocol-v2.json');
 
 // const json = require('./data/messages.json');
 
@@ -82,6 +83,28 @@ describe('messages', () => {
       FW_MGMT_TARGET_SE03: 9,
       FW_MGMT_TARGET_SE04: 10,
     });
+  });
+
+  test('Protocol V2 device status and session messages match firmware-pro2', () => {
+    expect(v2Messages.nested.MessageType.values).toMatchObject({
+      MessageType_DeviceStatusGet: 60602,
+      MessageType_DeviceStatus: 60603,
+      MessageType_DeviceSessionGet: 60606,
+      MessageType_DeviceSession: 60607,
+    });
+    expect(v2Messages.nested.DeviceStatusGet).toEqual({ fields: {} });
+    expect(v2Messages.nested.DeviceSessionGet.fields.session_id).toMatchObject({
+      id: 1,
+      type: 'bytes',
+    });
+    expect(v2Messages.nested.DeviceSession.fields).toMatchObject({
+      session_id: { id: 1, type: 'bytes' },
+      btc_test_address: { id: 2, type: 'string' },
+    });
+  });
+
+  test('Protocol V2 transport and core schemas stay identical', () => {
+    expect(coreV2Messages).toEqual(v2Messages);
   });
 
   test('createMessageFromName (common case)', () => {

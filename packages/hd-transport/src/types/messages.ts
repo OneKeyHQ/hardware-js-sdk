@@ -4478,6 +4478,15 @@ export type TxAckPaymentRequest = {
   signature: string;
 };
 
+// EthereumSignTypedDataQR
+export type EthereumSignTypedDataQR = {
+  address_n: number[];
+  json_data?: string;
+  chain_id?: number;
+  metamask_v4_compat?: boolean;
+  request_id?: string;
+};
+
 // InternalMyAddressRequest
 export type InternalMyAddressRequest = {
   coin_type: number;
@@ -4589,12 +4598,26 @@ export type ViewTip = {
   text: string;
 };
 
+// ViewRawData
+export type ViewRawData = {
+  initial_data: string;
+  placeholder: number;
+};
+
+export enum ViewSignLayout {
+  LayoutDefault = 0,
+  LayoutSafeTxCreate = 1,
+}
+
 // ViewSignPage
 export type ViewSignPage = {
   title: string;
   amount?: UintType;
   general: ViewDetail[];
   tip?: ViewTip;
+  raw_data?: ViewRawData;
+  slide_to_confirm?: boolean;
+  layout?: ViewSignLayout;
 };
 
 // ViewVerifyPage
@@ -4893,6 +4916,35 @@ export type DeviceStatus = {
   unlocked_by_attach_to_pin?: boolean;
 };
 
+// DeviceStatusGet
+export type DeviceStatusGet = {};
+
+export enum DevOnboardingStage {
+  DEV_ONBOARDING_STAGE_UNKNOWN = 0,
+  DEV_ONBOARDING_STAGE_SAFETY_CHECK = 1,
+  DEV_ONBOARDING_STAGE_PERSONALIZATION = 2,
+  DEV_ONBOARDING_STAGE_SELECT_SETUP_METHOD = 3,
+  DEV_ONBOARDING_STAGE_NEW_DEVICE = 4,
+  DEV_ONBOARDING_STAGE_SELECT_RESTORE_METHOD = 5,
+  DEV_ONBOARDING_STAGE_RESTORE_MNEMONIC = 6,
+  DEV_ONBOARDING_STAGE_RESTORE_SEEDCARD = 7,
+  DEV_ONBOARDING_STAGE_WALLET_READY = 8,
+  DEV_ONBOARDING_STAGE_SEEDCARD_BACKUP_PROMPT = 9,
+  DEV_ONBOARDING_STAGE_SELECT_SEEDCARD_BACKUP_METHOD = 10,
+  DEV_ONBOARDING_STAGE_SEEDCARD_BACKUP = 11,
+  DEV_ONBOARDING_STAGE_DONE = 12,
+}
+
+// DevGetOnboardingStatus
+export type DevGetOnboardingStatus = {};
+
+// DevOnboardingStatus
+export type DevOnboardingStatus = {
+  stage: DevOnboardingStage;
+  status_code?: number;
+  detail_code?: number;
+};
+
 // FilesystemPermissionFix
 export type FilesystemPermissionFix = {};
 
@@ -4972,7 +5024,13 @@ export type FilesystemDirRemove = {
 };
 
 // FilesystemFormat
-export type FilesystemFormat = {};
+export type FilesystemFormat = {
+  data: boolean;
+  user: boolean;
+};
+
+// PortfolioUpdate
+export type PortfolioUpdate = {};
 
 // custom connect definitions
 export type MessageType = {
@@ -5538,6 +5596,7 @@ export type MessageType = {
   CoinPurchaseMemo: CoinPurchaseMemo;
   PaymentRequestMemo: PaymentRequestMemo;
   TxAckPaymentRequest: TxAckPaymentRequest;
+  EthereumSignTypedDataQR: EthereumSignTypedDataQR;
   InternalMyAddressRequest: InternalMyAddressRequest;
   StartSession: StartSession;
   SetBusy: SetBusy;
@@ -5554,6 +5613,7 @@ export type MessageType = {
   ViewAmount: ViewAmount;
   ViewDetail: ViewDetail;
   ViewTip: ViewTip;
+  ViewRawData: ViewRawData;
   ViewSignPage: ViewSignPage;
   ViewVerifyPage: ViewVerifyPage;
   ProtocolInfoRequest: ProtocolInfoRequest;
@@ -5590,6 +5650,9 @@ export type MessageType = {
   DeviceSessionGet: DeviceSessionGet;
   DeviceSession: DeviceSession;
   DeviceStatus: DeviceStatus;
+  DeviceStatusGet: DeviceStatusGet;
+  DevGetOnboardingStatus: DevGetOnboardingStatus;
+  DevOnboardingStatus: DevOnboardingStatus;
   FilesystemPermissionFix: FilesystemPermissionFix;
   FilesystemPathInfo: FilesystemPathInfo;
   FilesystemPathInfoQuery: FilesystemPathInfoQuery;
@@ -5602,6 +5665,7 @@ export type MessageType = {
   FilesystemDirMake: FilesystemDirMake;
   FilesystemDirRemove: FilesystemDirRemove;
   FilesystemFormat: FilesystemFormat;
+  PortfolioUpdate: PortfolioUpdate;
 };
 
 export type MessageKey = keyof MessageType;

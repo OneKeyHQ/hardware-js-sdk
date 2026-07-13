@@ -10,7 +10,10 @@ export default class FilesystemFormat extends BaseMethod {
   }
 
   async run() {
-    const res = await this.device.commands.typedCall('FilesystemFormat', 'Success', {});
+    const res = await this.device.commands.typedCall('FilesystemFormat', 'Success', {
+      data: true,
+      user: true,
+    });
     return Promise.resolve(res.message);
   }
 }

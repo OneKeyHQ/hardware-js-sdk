@@ -199,6 +199,12 @@ const requiredMessages = [
   'DeviceReboot',
   'DeviceInfoGet',
   'DeviceInfo',
+  'DeviceStatusGet',
+  'DeviceStatus',
+  'DevGetOnboardingStatus',
+  'DevOnboardingStatus',
+  'DeviceSessionGet',
+  'DeviceSession',
   'DeviceFirmwareUpdateRequest',
   'DeviceFirmwareUpdateStatusGet',
   'DeviceFirmwareUpdateStatus',
@@ -214,6 +220,7 @@ const requiredMessages = [
   'FilesystemDirMake',
   'FilesystemDirRemove',
   'FilesystemFormat',
+  'PortfolioUpdate',
 ];
 const missingMessages = requiredMessages.filter(name => !messageNames.has(name));
 const missingMessageTypes = requiredMessages.filter(name => !messageTypeNames.has(name));
