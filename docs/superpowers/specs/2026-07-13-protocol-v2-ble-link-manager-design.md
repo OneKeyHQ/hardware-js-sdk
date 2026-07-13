@@ -566,7 +566,7 @@ WebUSB 已经按设备 path 复用 `ProtocolV2Session`，连续调用不会重�
 
 ### 状态
 
-已接受。
+已被 `2026-07-13-protocol-v2-usb-transport-base-design.md` 中的 ADR-004 取代。
 
 ### 决策
 
@@ -576,4 +576,4 @@ WebUSB 与 Node USB 保留现有按 path 缓存 Session 的实现，只验证共
 
 - 避免扩大稳定 USB 固件升级路径的回归面。
 - BLE 获得统一实现，USB 保持现状。
-- 后续可按真实需求单独迁移 WebUSB。
+- 该决策仅约束当时的 BLE 修复范围；后续 USB 统一迁移由 ADR-004 负责。
