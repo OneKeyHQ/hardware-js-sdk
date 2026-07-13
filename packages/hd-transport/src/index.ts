@@ -11,6 +11,7 @@ import {
 import { PROTOCOL_V2_SYS_MESSAGE_THRESHOLD, ProtocolV1, ProtocolV2 } from './protocols';
 import * as protocolV2Codec from './protocols/v2';
 import { ProtocolV2LinkManager } from './protocols/v2/link-manager';
+import { ProtocolV2UsbTransportBase } from './protocols/v2/usb-transport-base';
 import {
   ProtocolV2FrameAssembler,
   ProtocolV2SequenceCursor,
@@ -52,6 +53,7 @@ export * as protocolV1 from './protocols/v1';
 export * as protocolV2 from './protocols/v2';
 export * from './protocols/v2/session';
 export * from './protocols/v2/link-manager';
+export * from './protocols/v2/usb-transport-base';
 
 export default {
   check,
@@ -64,6 +66,7 @@ export default {
   ProtocolV2LinkManager,
   ProtocolV2SequenceCursor,
   ProtocolV2Session,
+  ProtocolV2UsbTransportBase,
   bytesToHex,
   concatUint8Arrays,
   createMessageFromName,
