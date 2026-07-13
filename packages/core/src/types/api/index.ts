@@ -3,6 +3,8 @@ import type {
   deviceFactoryInfoGet,
   deviceFactoryInfoSet,
   deviceInfoGet,
+  deviceSessionGet,
+  deviceStatusGet,
   deviceGetFirmwareUpdateStatus,
   deviceReboot,
   dirList,
@@ -257,6 +259,8 @@ export type CoreApi = {
   ping: typeof ping;
   deviceReboot: typeof deviceReboot;
   deviceInfoGet: typeof deviceInfoGet;
+  deviceStatusGet: typeof deviceStatusGet;
+  deviceSessionGet: typeof deviceSessionGet;
   deviceFirmwareUpdate: typeof deviceFirmwareUpdate;
   deviceGetFirmwareUpdateStatus: typeof deviceGetFirmwareUpdateStatus;
   deviceFactoryInfoSet: typeof deviceFactoryInfoSet;

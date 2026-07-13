@@ -157,6 +157,9 @@ export const createCoreApi = (
   ping: (connectId, params) => call({ ...params, connectId, method: 'ping' }),
   deviceReboot: (connectId, params) => call({ ...params, connectId, method: 'deviceReboot' }),
   deviceInfoGet: (connectId, params) => call({ ...params, connectId, method: 'deviceInfoGet' }),
+  deviceStatusGet: (connectId, params) => call({ ...params, connectId, method: 'deviceStatusGet' }),
+  deviceSessionGet: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceSessionGet' }),
   deviceFirmwareUpdate: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceFirmwareUpdate' }),
   deviceGetFirmwareUpdateStatus: (connectId, params) =>

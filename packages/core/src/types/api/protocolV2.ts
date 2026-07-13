@@ -2,6 +2,8 @@ import type { CommonParams, Response } from '../params';
 import type {
   DeviceFirmwareUpdateStatus,
   DeviceFactoryInfo,
+  DeviceSession,
+  DeviceStatus,
   ProtocolInfo,
   ProtocolV2DeviceInfo,
   Success,
@@ -13,6 +15,7 @@ import type {
   DeviceFactoryInfoSetParams,
 } from '../../api/protocol-v2/helpers';
 import type { DeviceInfoGetParams } from '../../api/protocol-v2/DeviceInfoGet';
+import type { DeviceSessionGetParams } from '../../api/protocol-v2/DeviceSessionGet';
 
 // 参数类型单源：以 api/protocol-v2 的实现为准（type-only re-export，无运行时依赖）
 export type {
@@ -28,6 +31,7 @@ export type {
   DeviceInfoGetTargets,
   DeviceInfoGetTypes,
 } from '../../api/protocol-v2/DeviceInfoGet';
+export type { DeviceSessionGetParams } from '../../api/protocol-v2/DeviceSessionGet';
 
 // ── Shared response shapes (Protocol V2 file system) ────────────────────
 
@@ -87,6 +91,16 @@ export declare function deviceInfoGet(
   connectId: string,
   params?: CommonParams & DeviceInfoGetParams
 ): Response<ProtocolV2DeviceInfo>;
+
+export declare function deviceStatusGet(
+  connectId: string,
+  params?: CommonParams
+): Response<DeviceStatus>;
+
+export declare function deviceSessionGet(
+  connectId: string,
+  params?: CommonParams & DeviceSessionGetParams
+): Response<DeviceSession>;
 
 export declare function deviceFirmwareUpdate(
   connectId: string,

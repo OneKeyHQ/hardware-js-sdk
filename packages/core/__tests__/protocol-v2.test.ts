@@ -13,6 +13,8 @@ import DeviceFirmwareUpdate from '../src/api/protocol-v2/DeviceFirmwareUpdate';
 import DeviceGetFirmwareUpdateStatus from '../src/api/protocol-v2/DeviceGetFirmwareUpdateStatus';
 import DeviceInfoGet from '../src/api/protocol-v2/DeviceInfoGet';
 import DeviceReboot from '../src/api/protocol-v2/DeviceReboot';
+import DeviceSessionGet from '../src/api/protocol-v2/DeviceSessionGet';
+import DeviceStatusGet from '../src/api/protocol-v2/DeviceStatusGet';
 import FilesystemFormat from '../src/api/protocol-v2/FilesystemFormat';
 import FilesystemPermissionFix from '../src/api/protocol-v2/FilesystemPermissionFix';
 import ProtocolInfoRequest from '../src/api/protocol-v2/ProtocolInfoRequest';
@@ -43,6 +45,7 @@ import StellarGetAddress from '../src/api/stellar/StellarGetAddress';
 import BenfenSignMessage from '../src/api/benfen/BenfenSignMessage';
 import { getBitcoinForkVersionRange } from '../src/api/btc/helpers/versionLimit';
 import { DataManager } from '../src/data-manager';
+import { createCoreApi } from '../src/inject';
 import { Device } from '../src/device/Device';
 import { UI_REQUEST } from '../src/events/ui-request';
 import {
@@ -271,6 +274,76 @@ describe('Protocol V2 feature adapter', () => {
       onlyMainPin: true,
     });
     expect(typedCall).toHaveBeenLastCalledWith('DeviceSessionGet', 'DeviceSession', {});
+  });
+
+  test('deviceStatusGet returns raw DeviceStatus without updating features', async () => {
+    const typedCall = jest.fn().mockResolvedValue({
+      type: 'DeviceStatus',
+      message: { device_id: 'device-1', unlocked: true },
+    });
+    const updateProtocolV2Features = jest.fn();
+    const method = new DeviceStatusGet({
+      payload: { method: 'deviceStatusGet', connectId: 'connect-id' },
+    });
+    method.init();
+    method.device = stubDevice({
+      originalDescriptor: { ...descriptor, protocolType: 'V2' },
+      commands: { typedCall },
+      updateProtocolV2Features,
+    }) as any;
+
+    await expect(method.run()).resolves.toEqual({ device_id: 'device-1', unlocked: true });
+    expect(typedCall).toHaveBeenCalledWith('DeviceStatusGet', 'DeviceStatus', {});
+    expect(updateProtocolV2Features).not.toHaveBeenCalled();
+  });
+
+  test('deviceSessionGet maps sessionId and does not mutate wallet cache', async () => {
+    const typedCall = jest.fn().mockResolvedValue({
+      type: 'DeviceSession',
+      message: { session_id: 'new-session', btc_test_address: 'state-a' },
+    });
+    const updateInternalState = jest.fn();
+    const method = new DeviceSessionGet({
+      payload: {
+        method: 'deviceSessionGet',
+        connectId: 'connect-id',
+        sessionId: 'cached-session',
+      },
+    });
+    method.init();
+    method.device = stubDevice({
+      originalDescriptor: { ...descriptor, protocolType: 'V2' },
+      commands: { typedCall },
+      updateInternalState,
+    }) as any;
+
+    await expect(method.run()).resolves.toEqual({
+      session_id: 'new-session',
+      btc_test_address: 'state-a',
+    });
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
+      session_id: 'cached-session',
+    });
+    expect(updateInternalState).not.toHaveBeenCalled();
+  });
+
+  test('routes raw status and session methods through CoreApi', async () => {
+    const call = jest.fn().mockResolvedValue({ success: true, payload: {} });
+    const api = createCoreApi(call as any);
+
+    await api.deviceStatusGet('connect-id', { retryCount: 1 });
+    await api.deviceSessionGet('connect-id', { sessionId: 'cached-session' });
+
+    expect(call).toHaveBeenNthCalledWith(1, {
+      method: 'deviceStatusGet',
+      connectId: 'connect-id',
+      retryCount: 1,
+    });
+    expect(call).toHaveBeenNthCalledWith(2, {
+      method: 'deviceSessionGet',
+      connectId: 'connect-id',
+      sessionId: 'cached-session',
+    });
   });
 
   test('returns unified GetPassphraseState object payload for existing Pro devices', async () => {
