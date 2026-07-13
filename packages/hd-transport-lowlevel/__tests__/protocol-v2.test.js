@@ -252,6 +252,38 @@ describe('LowlevelTransport protocol framing', () => {
     expect(sentSeqs).toEqual([1, 2]);
   });
 
+  test('reuses the active generation when Core acquires the same BLE connection again', async () => {
+    const probeResponse = ProtocolV2.encodeFrame(
+      schemas,
+      'Success',
+      { message: 'ok' },
+      { router: PROTOCOL_V2_CHANNEL_BLE_UART }
+    );
+    const plugin = createPlugin({
+      devices: [{ id: 'repeated-acquire-id', name: 'OneKey Pro 2', commType: 'ble' }],
+      responses: [bytesToHex(probeResponse), bytesToHex(probeResponse)],
+    });
+    const lowlevel = configureTransport(plugin);
+
+    await expect(
+      lowlevel.acquire({ uuid: 'repeated-acquire-id', expectedProtocol: 'V2' })
+    ).resolves.toEqual({
+      uuid: 'repeated-acquire-id',
+      protocolType: 'V2',
+    });
+    await expect(
+      lowlevel.acquire({ uuid: 'repeated-acquire-id', expectedProtocol: 'V2' })
+    ).resolves.toEqual({
+      uuid: 'repeated-acquire-id',
+      protocolType: 'V2',
+    });
+
+    const sentSeqs = plugin.send.mock.calls.map(([, hex]) =>
+      Number.parseInt(hex.slice(12, 14), 16)
+    );
+    expect(sentSeqs).toEqual([1, 2]);
+  });
+
   test('resets the lowlevel connection before probing Protocol V2 after a V1 timeout', async () => {
     const probeResponse = ProtocolV2.encodeFrame(
       schemas,

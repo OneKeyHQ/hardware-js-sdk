@@ -62,6 +62,8 @@ export default class LowlevelTransport {
 
   private protocolV2Generations: Map<string, number> = new Map();
 
+  private connectedDevices: Set<string> = new Set();
+
   private protocolV2Links = new ProtocolV2LinkManager<string>({
     getSchemas: () => {
       if (!this._messages || !this._messagesV2) {
@@ -86,6 +88,8 @@ export default class LowlevelTransport {
             `[LowlevelTransport] disconnect tainted Protocol V2 link failed: ${uuid}`,
             error
           );
+        } finally {
+          this.connectedDevices.delete(uuid);
         }
       }
     },
@@ -131,10 +135,15 @@ export default class LowlevelTransport {
   }
 
   async acquire(input: LowLevelAcquireInput) {
+    const alreadyConnected = this.connectedDevices.has(input.uuid);
     try {
       await this.plugin.connect(input.uuid);
-      this.advanceProtocolV2Generation(input.uuid);
+      if (!alreadyConnected) {
+        this.connectedDevices.add(input.uuid);
+        this.advanceProtocolV2Generation(input.uuid);
+      }
     } catch (error) {
+      this.connectedDevices.delete(input.uuid);
       this.Log.debug('lowlelvel transport connect error: ', error);
       throw ERRORS.TypedError(
         HardwareErrorCode.LowlevelTrasnportConnectError,
@@ -158,6 +167,7 @@ export default class LowlevelTransport {
     try {
       await this.protocolV2Links.invalidateLink(uuid, 'Lowlevel transport released');
       await this.plugin.disconnect(uuid);
+      this.connectedDevices.delete(uuid);
       this.deviceProtocol.delete(uuid);
       // 设备名称推断出的协议提示不依赖当前连接，保留它可以让快速重连
       // 直接执行 Protocol V2 探测，避免先发送一次无意义的 V1 Initialize。
@@ -336,6 +346,7 @@ export default class LowlevelTransport {
     this.protocolV2Assemblers.get(uuid)?.reset();
 
     try {
+      this.connectedDevices.delete(uuid);
       await this.plugin.disconnect(uuid);
     } catch (error) {
       this.Log?.debug(
@@ -346,6 +357,7 @@ export default class LowlevelTransport {
 
     try {
       await this.plugin.connect(uuid);
+      this.connectedDevices.add(uuid);
       this.advanceProtocolV2Generation(uuid);
     } catch (error) {
       this.Log?.debug(
