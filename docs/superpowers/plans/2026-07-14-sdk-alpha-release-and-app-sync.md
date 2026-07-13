@@ -149,7 +149,7 @@ Expected: hardware SDK 相关旧版本无残留，lockfile 解析到 `1.2.0-alph
 Run:
 
 ```bash
-yarn lint:package-json
+yarn _packageVersions
 git diff --check
 ```
 
@@ -165,11 +165,11 @@ Run:
 
 ```bash
 git push origin feat/pro2-usb-ble
-gh workflow run release-desktop-all.yml --ref feat/pro2-usb-ble -f source_ref_name=feat/pro2-usb-ble -f notify_release=false -f upload_mas_to_testflight=false -f upload_snap_to_store=false
+gh workflow run release-desktop-all.yml --ref feat/pro2-usb-ble -f source_ref_name=feat/pro2-usb-ble
 gh run list --workflow release-desktop-all.yml --branch feat/pro2-usb-ble --limit 1
 ```
 
-Expected: 新 workflow run 使用 app-monorepo 的 `feat/pro2-usb-ble` 提交，Desktop macOS、Windows、Linux 作业开始执行；本次验证构建不上传 MAS TestFlight 或 Snap Store。
+Expected: 新 workflow run 使用 app-monorepo 的 `feat/pro2-usb-ble` 提交，Desktop macOS、Windows、Linux 作业开始执行；发布行为使用 workflow 当前默认值。
 
 - [ ] **Step 4: 确认 workflow 已进入执行状态**
 
