@@ -1,4 +1,12 @@
+import ClearSessionCache from '../src/api/ClearSessionCache';
 import { DeviceWalletSessionStore } from '../src/device/DeviceWalletSessionStore';
+import { deviceWalletSessionStore } from '../src/device/DeviceWalletSessionStore';
+import { createCoreApi } from '../src/inject';
+
+jest.mock('../src/data/config', () => ({
+  getSDKVersion: jest.fn(() => '1.0.0'),
+  DEFAULT_DOMAIN: 'https://jssdk.onekey.so/1.0.0/',
+}));
 
 describe('DeviceWalletSessionStore', () => {
   test('requires passphraseState for wallet session lookup', () => {
@@ -57,5 +65,65 @@ describe('DeviceWalletSessionStore', () => {
 
     store.clear();
     expect(store.get('device-2', 'hidden-a')).toBeUndefined();
+  });
+});
+
+describe('ClearSessionCache', () => {
+  beforeEach(() => {
+    deviceWalletSessionStore.clear();
+  });
+
+  test('clears one wallet without using a device', async () => {
+    deviceWalletSessionStore.set('device-1', 'hidden-a', 'session-a');
+    deviceWalletSessionStore.set('device-1', 'hidden-b', 'session-b');
+    const method = new ClearSessionCache({
+      payload: {
+        method: 'clearSessionCache',
+        deviceId: 'device-1',
+        passphraseState: 'hidden-a',
+      },
+    });
+
+    method.init();
+
+    expect(method.useDevice).toBe(false);
+    await expect(method.run()).resolves.toEqual({ cleared: true });
+    expect(deviceWalletSessionStore.get('device-1', 'hidden-a')).toBeUndefined();
+    expect(deviceWalletSessionStore.get('device-1', 'hidden-b')).toBe('session-b');
+  });
+
+  test('clears one device or the full runtime store', async () => {
+    deviceWalletSessionStore.set('device-1', 'hidden-a', 'session-a');
+    deviceWalletSessionStore.set('device-2', 'hidden-a', 'session-b');
+
+    const clearDevice = new ClearSessionCache({
+      payload: { method: 'clearSessionCache', deviceId: 'device-1' },
+    });
+    clearDevice.init();
+    await clearDevice.run();
+
+    expect(deviceWalletSessionStore.get('device-1', 'hidden-a')).toBeUndefined();
+    expect(deviceWalletSessionStore.get('device-2', 'hidden-a')).toBe('session-b');
+
+    const clearAll = new ClearSessionCache({
+      payload: { method: 'clearSessionCache' },
+    });
+    clearAll.init();
+    await clearAll.run();
+
+    expect(deviceWalletSessionStore.get('device-2', 'hidden-a')).toBeUndefined();
+  });
+
+  test('routes cache clearing through the active CoreApi call channel', async () => {
+    const call = jest.fn().mockResolvedValue({ success: true, payload: { cleared: true } });
+    const api = createCoreApi(call as any);
+
+    await api.clearSessionCache({ deviceId: 'device-1', passphraseState: 'hidden-a' });
+
+    expect(call).toHaveBeenCalledWith({
+      method: 'clearSessionCache',
+      deviceId: 'device-1',
+      passphraseState: 'hidden-a',
+    });
   });
 });

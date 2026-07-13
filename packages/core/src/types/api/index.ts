@@ -31,6 +31,7 @@ import type { init, updateSettings } from './init';
 import type { testInitializeDeviceDuration } from './testInitializeDeviceDuration';
 import type { preInitialize } from './preInitialize';
 import type { getLogs } from './getLogs';
+import type { clearSessionCache } from './sessionCache';
 import type { checkBridgeStatus } from './checkBridgeStatus';
 import type { checkBridgeRelease } from './checkBridgeRelease';
 import type { checkBootloaderRelease } from './checkBootloaderRelease';
@@ -177,6 +178,7 @@ export type {
   DeviceProfileVersions,
 } from './getDeviceInfo';
 export type { GetPassphraseStateParams, GetPassphraseStatePayload } from './getPassphraseState';
+export type { ClearSessionCacheParams, ClearSessionCachePayload } from './sessionCache';
 
 export type CoreApi = {
   /**
@@ -194,6 +196,7 @@ export type CoreApi = {
   updateSettings: typeof updateSettings;
   switchTransport: (env: ConnectSettings['env']) => Promise<{ success: boolean }>;
   getLogs: typeof getLogs;
+  clearSessionCache: typeof clearSessionCache;
 
   /**
    * Test function

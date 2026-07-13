@@ -7,6 +7,7 @@ export { default as getDeviceInfo } from './GetDeviceInfo';
 export { default as getOnekeyFeatures } from './GetOnekeyFeatures';
 export { default as getPassphraseState } from './GetPassphraseState';
 export { default as getLogs } from './GetLogs';
+export { default as clearSessionCache } from './ClearSessionCache';
 export { default as checkFirmwareRelease } from './CheckFirmwareRelease';
 export { default as checkBLEFirmwareRelease } from './CheckBLEFirmwareRelease';
 export { default as checkBridgeStatus } from './CheckBridgeStatus';

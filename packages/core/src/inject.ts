@@ -100,6 +100,7 @@ export const createCoreApi = (
   | 'switchTransport'
 > => ({
   getLogs: () => call({ method: 'getLogs' }),
+  clearSessionCache: params => call({ ...params, method: 'clearSessionCache' }),
   /**
    * 搜索设备
    */
@@ -155,8 +156,7 @@ export const createCoreApi = (
     call({ ...params, connectId, method: 'protocolInfoRequest' }),
   ping: (connectId, params) => call({ ...params, connectId, method: 'ping' }),
   deviceReboot: (connectId, params) => call({ ...params, connectId, method: 'deviceReboot' }),
-  deviceInfoGet: (connectId, params) =>
-    call({ ...params, connectId, method: 'deviceInfoGet' }),
+  deviceInfoGet: (connectId, params) => call({ ...params, connectId, method: 'deviceInfoGet' }),
   deviceFirmwareUpdate: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceFirmwareUpdate' }),
   deviceGetFirmwareUpdateStatus: (connectId, params) =>
