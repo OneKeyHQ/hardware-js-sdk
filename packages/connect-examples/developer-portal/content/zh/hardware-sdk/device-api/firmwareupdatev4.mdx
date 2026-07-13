@@ -14,17 +14,23 @@ Protocol V2 设备的新固件更新流程。该方法独立于 `firmwareUpdateV
 ```typescript
 const res = await HardwareSDK.firmwareUpdateV4(connectId, {
   platform: 'desktop', // 'native' | 'desktop' | 'ext' | 'web' | 'web-embed'
-
-  // 方式 A：指定版本号（可选择任意子集）
-  firmwareVersion: [1, 0, 0],
-  bleVersion: [1, 0, 0],
-  bootloaderVersion: [1, 0, 0],
-
-  // 方式 B：自定义二进制文件（按需使用）
-  // firmwareBinary: ArrayBuffer,
-  // bleBinary: ArrayBuffer,
+  // 显式固件目标（均为可选）
+  // applicationP1Binary: ArrayBuffer,
+  // applicationP2Binary: ArrayBuffer,
+  // coprocessorBinary: ArrayBuffer,
   // bootloaderBinary: ArrayBuffer,
-  // resourceBinaries: ArrayBuffer[],
+  // se01Binary: ArrayBuffer,
+  // se02Binary: ArrayBuffer,
+  // se03Binary: ArrayBuffer,
+  // se04Binary: ArrayBuffer,
+
+  // RESC 资源包直接写入指定设备路径
+  resourceBundleFiles: [
+    {
+      binary: imagesBundle,
+      devicePath: 'vol0:/resource/images/images.okpkg',
+    },
+  ],
 
   // 可选：强制更新资源包
   forcedUpdateRes: false,
@@ -36,14 +42,14 @@ const res = await HardwareSDK.firmwareUpdateV4(connectId, {
 [可选通用参数](/zh/hardware-sdk/core-api-guide#common-params)
 
 - `platform` - 必需 `"native" | "desktop" | "ext" | "web" | "web-embed"` 执行环境
-- `firmwareVersion` - 可选 `number[]` 目标主固件版本
-- `firmwareBinary` - 可选 `ArrayBuffer` 自定义主固件
-- `bleVersion` - 可选 `number[]` 目标蓝牙固件版本
-- `bleBinary` - 可选 `ArrayBuffer` 自定义蓝牙固件
-- `bootloaderVersion` - 可选 `number[]` 目标引导加载程序版本
-- `bootloaderBinary` - 可选 `ArrayBuffer` 自定义引导加载程序
-- `resourceBinaries` - 可选 `ArrayBuffer[]` Protocol V2 资源包二进制文件列表
-- `forcedUpdateRes` - 可选 `boolean` 强制更新资源包
+- `applicationP1Binary` / `applicationP2Binary` - 可选的签名应用固件包
+- `coprocessorBinary` - 可选的签名协处理器固件包
+- `bootloaderBinary` - 可选的签名 Bootloader 固件包
+- `se01Binary` ... `se04Binary` - 可选的签名安全芯片固件包
+- `resourceBundleFiles` - 可选 `{ binary: ArrayBuffer; devicePath: string }[]`，将 RESC 资源包直接写入指定设备路径
+- `forcedUpdateRes` - 可选 `boolean`，跳过远端资源 bundle 的版本/哈希匹配
+
+仅传入 `resourceBundleFiles` 时，SDK 不会下载远端整机固件，也不会发送固件安装请求。
 
 ### 返回结果
 

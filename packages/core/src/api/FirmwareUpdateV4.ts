@@ -38,7 +38,6 @@ import type {
   Features,
   IFirmwareReleaseInfo,
   IProtocolV2FirmwareComponent,
-  IProtocolV2ResourceManifestPackage,
   IVersionArray,
 } from '../types';
 
@@ -60,6 +59,7 @@ const PROTOCOL_V2_CONNECT_RETRY_COUNT = 10;
 const PROTOCOL_V2_CONNECT_POLL_INTERVAL = 500;
 const PROTOCOL_V2_CONNECT_SINGLE_TIMEOUT = 75 * 1000;
 const PROTOCOL_V2_DEVICE_INFO_READY_TIMEOUT = 60 * 1000;
+const PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT = 3;
 const PROTOCOL_V2_OKPP_HEADER_SIZE = 0x52a0;
 const PROTOCOL_V2_OKPP_PAYLOAD_HASH_OFFSET = 0x200;
 const PROTOCOL_V2_OKPP_HEADER_HASH_OFFSET = 0x240;
@@ -107,6 +107,13 @@ type ProtocolV2InstallTarget = ProtocolV2InstallItem & {
   path: string;
 };
 
+type ProtocolV2FileTransferParams = PROTO.FirmwareUpload & {
+  filePath: string;
+  processedSize?: number;
+  totalSize?: number;
+  onTransferredBytes?: (transferredBytes: number) => void;
+};
+
 /** RESC bundle okpkg（FileWrite 直写模式），每个独立同步到 devicePath */
 type ProtocolV2ResourceBundleBinary = {
   name: string;
@@ -126,7 +133,7 @@ type ProtocolV2RemoteComponentBinary = ProtocolV2RemoteComponentTarget & {
 type ProtocolV2RemoteComponentTarget = {
   fileName: string;
   targetId: number;
-  kind: 'bootloader' | 'firmware' | 'resource';
+  kind: 'bootloader' | 'firmware';
 };
 
 type ProtocolV2OkppHeader = {
@@ -178,11 +185,6 @@ const PROTOCOL_V2_REMOTE_COMPONENT_TARGETS: Readonly<
     fileName: 'se04.bin',
     targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_SE04,
     kind: 'firmware',
-  },
-  CRATE: {
-    fileName: 'resource.bin',
-    targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_CRATE,
-    kind: 'resource',
   },
 };
 
@@ -405,7 +407,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
     validateParams(payload, [
       { name: 'chunkSize', type: 'number' },
-      { name: 'resourceBinaries', type: 'array', allowEmpty: true },
       { name: 'forcedUpdateRes', type: 'boolean' },
       { name: 'bootloaderBinary', type: 'buffer' },
       { name: 'romloaderBinary', type: 'buffer' },
@@ -433,7 +434,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       se02Binary: payload.se02Binary,
       se03Binary: payload.se03Binary,
       se04Binary: payload.se04Binary,
-      resourceBinaries: payload.resourceBinaries,
       resourceBundleFiles: payload.resourceBundleFiles,
       firmwareType: payload.firmwareType,
       platform: payload.platform,
@@ -473,13 +473,11 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const deviceFirmwareType = getFirmwareType(deviceFeatures);
     const firmwareType = this.params.firmwareType ?? deviceFirmwareType;
 
-    let resourceBinaryMap: ProtocolV2TargetBinary[] = [];
     let fwBinaryMap: ProtocolV2TargetBinary[] = [];
     let bootloaderBinary: ArrayBuffer | null = null;
     let installItems: ProtocolV2InstallItem[] | undefined;
     try {
       this.postTipMessage(FirmwareUpdateTipMessage.StartDownloadFirmware);
-      resourceBinaryMap = await this.prepareResourceBinaries(firmwareType, deviceFeatures);
       fwBinaryMap = this.collectExplicitTargetBinaries();
       bootloaderBinary = this.prepareBootloaderBinary();
       if (!this.hasExplicitProtocolV2Payload(fwBinaryMap)) {
@@ -487,7 +485,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           firmwareType,
           deviceFeatures
         );
-        resourceBinaryMap = remoteBinaries.resourceBinaryMap;
         bootloaderBinary = remoteBinaries.bootloaderBinary;
         fwBinaryMap = remoteBinaries.fwBinaryMap;
         installItems = remoteBinaries.installItems;
@@ -499,12 +496,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
     const resourceBundles = this.prepareProtocolV2ResourceBundles(firmwareType, deviceFeatures);
 
-    if (
-      resourceBinaryMap.length === 0 &&
-      !bootloaderBinary &&
-      fwBinaryMap.length === 0 &&
-      !resourceBundles?.length
-    ) {
+    if (!bootloaderBinary && fwBinaryMap.length === 0 && !resourceBundles?.length) {
       throw ERRORS.TypedError(
         HardwareErrorCode.FirmwareUpdateDownloadFailed,
         'No firmware to update'
@@ -514,7 +506,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     await this.enterProtocolV2BootloaderMode();
 
     await this.executeProtocolV2Update({
-      resourceBinaryMap,
       fwBinaryMap,
       bootloaderBinary,
       ...(installItems ? { installItems } : undefined),
@@ -541,68 +532,26 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Device features not available');
   }
 
-  private async prepareResourceBinaries(firmwareType: EFirmwareType, features: Features) {
-    if (this.params.resourceBinaries?.length) {
-      this.params.resourceBinaries.forEach((binary, index) => {
-        if (!(binary instanceof ArrayBuffer)) {
-          throw ERRORS.TypedError(
-            HardwareErrorCode.CallMethodInvalidParameter,
-            `Parameter [resourceBinaries.${index}] is of type invalid and should be [buffer].`
-          );
-        }
-      });
-
-      return this.params.resourceBinaries.map((binary, index) => ({
-        fileName: `resource-${index + 1}.bin`,
-        binary,
-        targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_CRATE,
-      }));
-    }
-    const resourceUrl = DataManager.getSysResourcesLatestRelease({
-      features,
-      forcedUpdateRes: this.params.forcedUpdateRes,
-      firmwareType,
-    });
-
-    if (resourceUrl) {
-      const resource = (await getSysResourceBinary(resourceUrl)).binary;
-      return [
-        {
-          fileName: 'resource.bin',
-          binary: resource,
-          targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_CRATE,
-        },
-      ];
-    }
-    Log.warn('No resource url found');
-    return [];
-  }
-
   private prepareBootloaderBinary(): ArrayBuffer | null {
     return this.params.bootloaderBinary ?? null;
   }
 
   private hasExplicitProtocolV2Payload(fwBinaryMap: ProtocolV2TargetBinary[]) {
     return (
-      !!this.params.resourceBinaries?.length ||
+      !!this.params.resourceBundleFiles?.length ||
       !!this.params.bootloaderBinary ||
       fwBinaryMap.length > 0
     );
   }
 
   private buildProtocolV2InstallItems({
-    resourceBinaryMap,
     bootloaderBinary,
     fwBinaryMap,
   }: {
-    resourceBinaryMap: ProtocolV2TargetBinary[];
     bootloaderBinary: ArrayBuffer | null;
     fwBinaryMap: ProtocolV2TargetBinary[];
   }): ProtocolV2InstallItem[] {
-    const installItems: ProtocolV2InstallItem[] = resourceBinaryMap.map(resource => ({
-      ...resource,
-      kind: 'resource',
-    }));
+    const installItems: ProtocolV2InstallItem[] = [];
 
     if (bootloaderBinary) {
       installItems.push({
@@ -760,86 +709,13 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return parseProtocolV2OkppHeader(headerBytes);
   }
 
-  private async isProtocolV2ResourcePackageMatched(
-    pkg: IProtocolV2ResourceManifestPackage,
-    manifestVersion?: IVersionArray
-  ) {
-    try {
-      const header = await this.readProtocolV2DeviceFileHeader(pkg.path);
-      if (!header) return false;
-
-      const expectedType = pkg.type ?? 'RESC';
-      const expectedVersion = pkg.version ?? manifestVersion;
-      if (header.type !== expectedType) return false;
-      if (expectedVersion && compareProtocolV2Versions(header.version, expectedVersion) !== 0) {
-        return false;
-      }
-
-      const expectedPayloadHash = normalizeProtocolV2Hex(pkg.payloadHash);
-      if (expectedPayloadHash && header.payloadHash !== expectedPayloadHash) return false;
-
-      const expectedHeaderHash = normalizeProtocolV2Hex(pkg.headerHash);
-      if (expectedHeaderHash && header.headerHash !== expectedHeaderHash) return false;
-
-      return true;
-    } catch (error) {
-      Log.log(`Protocol V2 resource package check failed for ${pkg.path}: `, error);
-      return false;
-    }
-  }
-
-  private async isProtocolV2ResourceManifestSatisfied(
-    manifest: IFirmwareReleaseInfo['resourceManifest']
-  ) {
-    if (!manifest?.packages?.length) return false;
-
-    for (const pkg of manifest.packages) {
-      if (!(await this.isProtocolV2ResourcePackageMatched(pkg, manifest.version))) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  private getProtocolV2ResourceManifest(
-    release: IFirmwareReleaseInfo,
-    component: IProtocolV2FirmwareComponent
-  ) {
-    return component.resourceManifest ?? release.resourceManifest;
-  }
-
-  private getProtocolV2ResourceComponentFileName(key: string) {
-    const safeKey = key.replace(/[^a-z0-9_-]/gi, '_') || 'resource';
-    if (safeKey === 'resource') {
-      return PROTOCOL_V2_REMOTE_COMPONENT_TARGETS.CRATE.fileName;
-    }
-    return `resource-${safeKey}.bin`;
-  }
-
-  private async shouldInstallRemoteProtocolV2Component(
+  private shouldInstallRemoteProtocolV2Component(
     release: IFirmwareReleaseInfo,
     key: string,
     component: IProtocolV2FirmwareComponent,
     target: ProtocolV2RemoteComponentTarget,
     features: Features
   ) {
-    if (target.kind === 'resource') {
-      if (
-        this.params.forcedUpdateRes ||
-        features.bootloaderMode ||
-        features.mode === 'bootloader'
-      ) {
-        return true;
-      }
-      const resourceMatched = await this.isProtocolV2ResourceManifestSatisfied(
-        this.getProtocolV2ResourceManifest(release, component)
-      );
-      if (resourceMatched) {
-        Log.log(`[FirmwareUpdateV4] skip Protocol V2 resource component ${key}; manifest matched`);
-      }
-      return !resourceMatched;
-    }
-
     const versionSatisfied = this.isProtocolV2ComponentVersionSatisfied(
       release,
       component,
@@ -874,14 +750,12 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   private async prepareRemoteProtocolV2Binaries(firmwareType: EFirmwareType, features: Features) {
     const release = DataManager.getFirmwareLatestRelease(features, firmwareType);
 
-    const resourceBinaryMap: ProtocolV2TargetBinary[] = [];
     let bootloaderBinary: ArrayBuffer | null = null;
     const fwBinaryMap: ProtocolV2TargetBinary[] = [];
     const installItems: ProtocolV2InstallItem[] = [];
 
     if (!release) {
       return {
-        resourceBinaryMap,
         bootloaderBinary,
         fwBinaryMap,
         installItems,
@@ -892,7 +766,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
     for (const [key, component] of entries) {
       const target = this.getRemoteComponentTarget(key, component);
-      const shouldInstall = await this.shouldInstallRemoteProtocolV2Component(
+      const shouldInstall = this.shouldInstallRemoteProtocolV2Component(
         release,
         key,
         component,
@@ -901,15 +775,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       );
       if (shouldInstall) {
         const remoteBinary = await this.downloadRemoteProtocolV2Component(key, component);
-        if (remoteBinary.kind === 'resource') {
-          const binaryEntry = {
-            fileName: this.getProtocolV2ResourceComponentFileName(key),
-            binary: remoteBinary.binary,
-            targetId: remoteBinary.targetId,
-          };
-          resourceBinaryMap.push(binaryEntry);
-          installItems.push({ ...binaryEntry, kind: remoteBinary.kind });
-        } else if (remoteBinary.kind === 'bootloader') {
+        if (remoteBinary.kind === 'bootloader') {
           bootloaderBinary = remoteBinary.binary;
           installItems.push({
             fileName: remoteBinary.fileName,
@@ -930,7 +796,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     }
 
     return {
-      resourceBinaryMap,
       bootloaderBinary,
       fwBinaryMap,
       installItems,
@@ -1180,13 +1045,11 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   }
 
   private async executeProtocolV2Update({
-    resourceBinaryMap,
     fwBinaryMap,
     bootloaderBinary,
     installItems,
     resourceBundles,
   }: {
-    resourceBinaryMap?: ProtocolV2TargetBinary[];
     fwBinaryMap?: ProtocolV2TargetBinary[];
     bootloaderBinary?: ArrayBuffer | null;
     installItems?: ProtocolV2InstallItem[];
@@ -1195,7 +1058,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const orderedInstallItems =
       installItems ??
       this.buildProtocolV2InstallItems({
-        resourceBinaryMap: resourceBinaryMap ?? [],
         bootloaderBinary: bootloaderBinary ?? null,
         fwBinaryMap: fwBinaryMap ?? [],
       });
@@ -1565,18 +1427,37 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     await this.device.initialize();
   }
 
-  private async protocolV2CommonUpdateProcess({
+  private async protocolV2CommonUpdateProcess(params: ProtocolV2FileTransferParams) {
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT; attempt += 1) {
+      try {
+        return await this.protocolV2WriteWholeFile(params);
+      } catch (error) {
+        lastError = error;
+        Log.error(
+          `Protocol V2 file transfer failed path=${params.filePath} attempt=${attempt}/${PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT}; restarting from offset 0`,
+          error
+        );
+        if (attempt === PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT) {
+          break;
+        }
+        await this.recoverProtocolV2FileTransfer();
+      }
+    }
+
+    throw ERRORS.TypedError(
+      HardwareErrorCode.EmmcFileWriteFirmwareError,
+      `transfer data error: ${getProtocolV2UnknownErrorText(lastError)}`
+    );
+  }
+
+  private async protocolV2WriteWholeFile({
     payload,
     filePath,
     processedSize,
     totalSize,
     onTransferredBytes,
-  }: PROTO.FirmwareUpload & {
-    filePath: string;
-    processedSize?: number;
-    totalSize?: number;
-    onTransferredBytes?: (transferredBytes: number) => void;
-  }) {
+  }: ProtocolV2FileTransferParams) {
     const chunkSize = this.getProtocolV2FirmwareChunkSize();
     let offset = 0;
     const getUploadProgress = (fileOffset: number) => {
@@ -1597,7 +1478,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         totalSize ?? payload.byteLength
       );
 
-      const writeRes = await this.fileWriteWithRetry(
+      const writeRes = await this.fileWriteChunk(
         filePath,
         payload.byteLength,
         offset,
@@ -1638,7 +1519,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return env ?? 'unknown';
   }
 
-  private async fileWriteWithRetry(
+  private async fileWriteChunk(
     filePath: string,
     totalFileSize: number,
     offset: number,
@@ -1646,57 +1527,37 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     overwrite: boolean,
     progress: number | null
   ): Promise<TypedResponseMessage<'FilesystemFile'>> {
-    const writeFunc = async () => {
-      const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
-      const writeRes = await typedCall('FilesystemFileWrite', 'FilesystemFile', {
-        file: {
-          path: filePath,
-          offset,
-          total_size: totalFileSize,
-          data: chunk,
-        },
-        overwrite,
-        append: false,
-        ui_percentage: progress ?? undefined,
-      });
-      if (writeRes.type !== 'FilesystemFile') {
-        if ((writeRes as any).type === 'CallMethodError') {
-          if (((writeRes as any).message.error ?? '').indexOf(SESSION_ERROR) > -1) {
-            throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, SESSION_ERROR);
-          }
+    const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
+    const writeRes = await typedCall('FilesystemFileWrite', 'FilesystemFile', {
+      file: {
+        path: filePath,
+        offset,
+        total_size: totalFileSize,
+        data: chunk,
+      },
+      overwrite,
+      append: false,
+      ui_percentage: progress ?? undefined,
+    });
+    if (writeRes.type !== 'FilesystemFile') {
+      if ((writeRes as any).type === 'CallMethodError') {
+        if (((writeRes as any).message.error ?? '').indexOf(SESSION_ERROR) > -1) {
+          throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, SESSION_ERROR);
         }
-        throw ERRORS.TypedError(
-          HardwareErrorCode.EmmcFileWriteFirmwareError,
-          'transfer data error'
-        );
       }
-      return writeRes;
-    };
-
-    let retryCount = 10;
-    while (retryCount > 0) {
-      try {
-        const result = await writeFunc();
-        return result;
-      } catch (error) {
-        Log.error(`fileWrite error: `, error);
-        retryCount--;
-        if (retryCount === 0) {
-          throw ERRORS.TypedError(
-            HardwareErrorCode.EmmcFileWriteFirmwareError,
-            'transfer data error'
-          );
-        }
-        const env = DataManager.getSettings('env');
-        if (DataManager.isBleConnect(env)) {
-          await wait(3000);
-          await this.acquireProtocolV2BleDevice();
-          await this.device.initialize();
-        }
-        await wait(2000);
-      }
+      throw ERRORS.TypedError(HardwareErrorCode.EmmcFileWriteFirmwareError, 'transfer data error');
     }
-    throw ERRORS.TypedError(HardwareErrorCode.EmmcFileWriteFirmwareError, 'transfer data error');
+    return writeRes;
+  }
+
+  private async recoverProtocolV2FileTransfer() {
+    const env = DataManager.getSettings('env');
+    if (DataManager.isBleConnect(env)) {
+      await wait(3000);
+      await this.acquireProtocolV2BleDevice();
+      await this.device.initialize();
+    }
+    await wait(2000);
   }
 
   private async acquireProtocolV2BleDevice() {

@@ -49,32 +49,13 @@ export type IProtocolV2FirmwareComponentTarget =
   | 'SE01'
   | 'SE02'
   | 'SE03'
-  | 'SE04'
-  | 'CRATE';
+  | 'SE04';
 
 export type IProtocolV2FirmwareComponent = {
   target: IProtocolV2FirmwareComponentTarget;
   url: string;
   fingerprint?: string;
   version?: IVersionArray;
-  resourceManifest?: IProtocolV2ResourceManifest;
-};
-
-export type IProtocolV2ResourceManifestPackage = {
-  name?: string;
-  path: string;
-  type?: string;
-  version?: IVersionArray;
-  sha256?: string;
-  payloadHash?: string;
-  headerHash?: string;
-};
-
-export type IProtocolV2ResourceManifest = {
-  format?: 'okpkg-crate' | string;
-  target?: 'CRATE' | string;
-  version?: IVersionArray;
-  packages: IProtocolV2ResourceManifestPackage[];
 };
 
 /** Pro2 RESC bundle okpkg 描述，用于 FileWrite 直写方式增量同步资源 */
@@ -114,7 +95,6 @@ export type IFirmwareReleaseInfo = {
   upgradeType?: 'payload-package-set' | string;
   components?: Record<string, IProtocolV2FirmwareComponent>;
   installOrder?: string[];
-  resourceManifest?: IProtocolV2ResourceManifest;
   /** Pro2 RESC bundle 列表（FileWrite 直写增量同步模式） */
   resourceBundles?: IProtocolV2ResourceBundle[];
   bootloaderChangelog?: {

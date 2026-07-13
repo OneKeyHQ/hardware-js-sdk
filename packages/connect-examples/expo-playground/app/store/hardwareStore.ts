@@ -250,7 +250,7 @@ export async function convertFilesToArrayBuffers(
     if (typeof File !== 'undefined' && value instanceof File) {
       try {
         const arrayBuffer = await fileToArrayBuffer(value);
-        result[key] = key === 'resourceBinaries' ? [arrayBuffer] : arrayBuffer;
+        result[key] = arrayBuffer;
 
         console.log(
           `[FileConverter] 📁 文件参数转换: ${key} -> ArrayBuffer (${arrayBuffer.byteLength} bytes)`

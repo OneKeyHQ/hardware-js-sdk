@@ -21,7 +21,7 @@ const TARGET_FIELDS = [
   {
     param: 'bootloaderBinary',
     label: 'Bootloader',
-    targetId: 3,
+    targetId: 2,
     targetName: 'FW_MGMT_TARGET_BOOTLOADER',
     accept: '.okpkg,.bin',
     formatHint: 'signed OKPP .okpkg',
@@ -29,7 +29,7 @@ const TARGET_FIELDS = [
   {
     param: 'applicationP1Binary',
     label: 'APP P1',
-    targetId: 4,
+    targetId: 3,
     targetName: 'FW_MGMT_TARGET_APPLICATION_P1',
     accept: '.okpkg,.bin',
     formatHint: 'signed OKPP .okpkg',
@@ -37,7 +37,7 @@ const TARGET_FIELDS = [
   {
     param: 'applicationP2Binary',
     label: 'APP P2',
-    targetId: 5,
+    targetId: 4,
     targetName: 'FW_MGMT_TARGET_APPLICATION_P2',
     accept: '.okpkg,.bin',
     formatHint: 'signed OKPP .okpkg',
@@ -45,7 +45,7 @@ const TARGET_FIELDS = [
   {
     param: 'coprocessorBinary',
     label: 'Coprocessor',
-    targetId: 6,
+    targetId: 5,
     targetName: 'FW_MGMT_TARGET_COPROCESSOR',
     accept: '.okpkg,.bin',
     formatHint: 'signed target package',
@@ -53,7 +53,7 @@ const TARGET_FIELDS = [
   {
     param: 'se01Binary',
     label: 'SE01',
-    targetId: 7,
+    targetId: 6,
     targetName: 'FW_MGMT_TARGET_SE01',
     accept: '.okpkg,.bin',
     formatHint: 'signed target package',
@@ -61,7 +61,7 @@ const TARGET_FIELDS = [
   {
     param: 'se02Binary',
     label: 'SE02',
-    targetId: 8,
+    targetId: 7,
     targetName: 'FW_MGMT_TARGET_SE02',
     accept: '.okpkg,.bin',
     formatHint: 'signed target package',
@@ -69,7 +69,7 @@ const TARGET_FIELDS = [
   {
     param: 'se03Binary',
     label: 'SE03',
-    targetId: 9,
+    targetId: 8,
     targetName: 'FW_MGMT_TARGET_SE03',
     accept: '.okpkg,.bin',
     formatHint: 'signed target package',
@@ -77,7 +77,7 @@ const TARGET_FIELDS = [
   {
     param: 'se04Binary',
     label: 'SE04',
-    targetId: 10,
+    targetId: 9,
     targetName: 'FW_MGMT_TARGET_SE04',
     accept: '.okpkg,.bin',
     formatHint: 'signed target package',

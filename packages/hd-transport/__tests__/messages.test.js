@@ -57,7 +57,32 @@ const json = {
   },
 };
 
+const v1Messages = require('../messages.json');
+const v2Messages = require('../messages-protocol-v2.json');
+
 describe('messages', () => {
+  test('V1 GetPassphraseState includes attach-to-pin request flags', () => {
+    const fields = v1Messages.nested.GetPassphraseState.fields;
+
+    expect(fields._only_main_pin).toMatchObject({ id: 2, type: 'bool' });
+    expect(fields.allow_create_attach_pin).toMatchObject({ id: 3, type: 'bool' });
+  });
+
+  test('Protocol V2 firmware targets exclude CRATE and use the firmware enum order', () => {
+    expect(v2Messages.nested.DeviceFirmwareTargetType.values).toEqual({
+      FW_MGMT_TARGET_INVALID: 0,
+      FW_MGMT_TARGET_ROMLOADER: 1,
+      FW_MGMT_TARGET_BOOTLOADER: 2,
+      FW_MGMT_TARGET_APPLICATION_P1: 3,
+      FW_MGMT_TARGET_APPLICATION_P2: 4,
+      FW_MGMT_TARGET_COPROCESSOR: 5,
+      FW_MGMT_TARGET_SE01: 6,
+      FW_MGMT_TARGET_SE02: 7,
+      FW_MGMT_TARGET_SE03: 8,
+      FW_MGMT_TARGET_SE04: 9,
+    });
+  });
+
   test('createMessageFromName (common case)', () => {
     const messages = parseConfigure(json);
     const name = 'Initialize';

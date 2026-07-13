@@ -66,28 +66,25 @@ export interface FirmwareUpdateV4Params {
   chunkSize?: number;
   firmwareType?: EFirmwareType;
 
-  /** FW_MGMT_TARGET_ROMLOADER = 2；当前 Pro2 bootloader 不接受通过 firmwareUpdateV4 安装 */
+  /** FW_MGMT_TARGET_ROMLOADER = 1；当前 Pro2 bootloader 不接受通过 firmwareUpdateV4 安装 */
   romloaderBinary?: ArrayBuffer;
-  /** FW_MGMT_TARGET_BOOTLOADER = 3 */
+  /** FW_MGMT_TARGET_BOOTLOADER = 2 */
   bootloaderBinary?: ArrayBuffer;
-  /** FW_MGMT_TARGET_APPLICATION_P1 = 4 */
+  /** FW_MGMT_TARGET_APPLICATION_P1 = 3 */
   applicationP1Binary?: ArrayBuffer;
-  /** FW_MGMT_TARGET_APPLICATION_P2 = 5 */
+  /** FW_MGMT_TARGET_APPLICATION_P2 = 4 */
   applicationP2Binary?: ArrayBuffer;
-  /** FW_MGMT_TARGET_COPROCESSOR = 6 */
+  /** FW_MGMT_TARGET_COPROCESSOR = 5 */
   coprocessorBinary?: ArrayBuffer;
-  /** FW_MGMT_TARGET_SE01-04 = 7-10 */
+  /** FW_MGMT_TARGET_SE01-04 = 6-9 */
   se01Binary?: ArrayBuffer;
   se02Binary?: ArrayBuffer;
   se03Binary?: ArrayBuffer;
   se04Binary?: ArrayBuffer;
-  /** 资源包通过 FW_MGMT_TARGET_CRATE = 1 安装；Pro2 正常升级推荐传入单个合并 CRATE，多个元素仅用于调试/兼容 */
-  resourceBinaries?: ArrayBuffer[];
   forcedUpdateRes?: boolean;
   /**
    * RESC bundle okpkg 列表，通过 FilesystemFileWrite 直写到 devicePath（vol0:/bundles/...）。
    * 手动传入模式：SDK 直接 FileWrite 安装，不做版本比对。
-   * 与 resourceBinaries（CRATE 全量安装）互斥。
    */
   resourceBundleFiles?: Array<{
     binary: ArrayBuffer;

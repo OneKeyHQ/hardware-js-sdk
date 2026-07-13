@@ -251,7 +251,7 @@ function FirmwareMultipleFiles({ title, onUpdate, deviceType }: FirmwareMultiple
   const width = media.gtLg ? '48%' : media.gtSm ? '100%' : '100%';
 
   const selectFile = (type: string) => {
-    // Pro2 V4 资源使用 CRATE .okpkg；旧 Pro 资源仍使用 .zip。
+    // 该入口只服务旧 Pro/Touch 的 V3 资源 zip；Pro2 资源使用独立 bundle 同步页面。
     const fileType =
       type === 'resource' && deviceType !== EDeviceType.Pro2
         ? 'application/zip'
@@ -539,7 +539,6 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
               applicationP1Binary: firmwareBinary,
               coprocessorBinary: bleBinary,
               bootloaderBinary,
-              resourceBinaries: resourceBinary ? [resourceBinary] : undefined,
               platform: 'web',
             })
           : await sdk.firmwareUpdateV3(selectDevice.connectId, {

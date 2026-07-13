@@ -14,17 +14,23 @@ New firmware update flow for Protocol V2 devices. This method is independent fro
 ```typescript
 const res = await HardwareSDK.firmwareUpdateV4(connectId, {
   platform: 'desktop', // 'native' | 'desktop' | 'ext' | 'web' | 'web-embed'
-
-  // Option A: specify versions (pick any subset)
-  firmwareVersion: [1, 0, 0],
-  bleVersion: [1, 0, 0],
-  bootloaderVersion: [1, 0, 0],
-
-  // Option B: custom binaries (as needed)
-  // firmwareBinary: ArrayBuffer,
-  // bleBinary: ArrayBuffer,
+  // Explicit firmware targets (all optional)
+  // applicationP1Binary: ArrayBuffer,
+  // applicationP2Binary: ArrayBuffer,
+  // coprocessorBinary: ArrayBuffer,
   // bootloaderBinary: ArrayBuffer,
-  // resourceBinaries: ArrayBuffer[],
+  // se01Binary: ArrayBuffer,
+  // se02Binary: ArrayBuffer,
+  // se03Binary: ArrayBuffer,
+  // se04Binary: ArrayBuffer,
+
+  // RESC packages are written directly to their device paths.
+  resourceBundleFiles: [
+    {
+      binary: imagesBundle,
+      devicePath: 'vol0:/resource/images/images.okpkg',
+    },
+  ],
 
   // Optional: force updating resource package
   forcedUpdateRes: false,
@@ -36,14 +42,14 @@ const res = await HardwareSDK.firmwareUpdateV4(connectId, {
 [Optional common params](/en/hardware-sdk/core-api-guide#common-params)
 
 - `platform` - required `"native" | "desktop" | "ext" | "web" | "web-embed"` execution environment
-- `firmwareVersion` - optional `number[]` target main firmware version
-- `firmwareBinary` - optional `ArrayBuffer` custom main firmware
-- `bleVersion` - optional `number[]` target BLE firmware version
-- `bleBinary` - optional `ArrayBuffer` custom BLE firmware
-- `bootloaderVersion` - optional `number[]` target Bootloader version
-- `bootloaderBinary` - optional `ArrayBuffer` custom Bootloader
-- `resourceBinaries` - optional `ArrayBuffer[]` Protocol V2 resource package binaries
-- `forcedUpdateRes` - optional `boolean` force updating resource package
+- `applicationP1Binary` / `applicationP2Binary` - optional signed application payload packages
+- `coprocessorBinary` - optional signed coprocessor payload package
+- `bootloaderBinary` - optional signed Bootloader payload package
+- `se01Binary` ... `se04Binary` - optional signed secure-element payload packages
+- `resourceBundleFiles` - optional `{ binary: ArrayBuffer; devicePath: string }[]` RESC packages written directly to the specified device paths
+- `forcedUpdateRes` - optional `boolean`; bypass remote resource-bundle version/hash checks
+
+When only `resourceBundleFiles` is provided, the SDK does not download remote firmware components and does not send a firmware installation request.
 
 ### Result
 
