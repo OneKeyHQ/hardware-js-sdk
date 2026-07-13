@@ -28,6 +28,17 @@ type CharacteristicPair = {
   notify: Characteristic;
 };
 
+type NoblePendingReceiver = {
+  resolve: (data: string) => void;
+  reject: (error: Error) => void;
+};
+
+type NobleNotificationState = {
+  generation: number;
+  queue: string[];
+  pendingReceivers: Set<NoblePendingReceiver>;
+};
+
 const ONEKEY_SERVICE_UUIDS = [ONEKEY_SERVICE_UUID];
 const PRO2_ADVERTISEMENT_SERVICE_UUID_KEYS = new Set(['fffd']);
 const NORMALIZED_WRITE_UUID = '0002';
@@ -41,6 +52,7 @@ const BLUETOOTH_INIT_TIMEOUT = 10_000;
 const DEVICE_SCAN_TIMEOUT = 8_000;
 const CONNECTION_TIMEOUT = 8_000;
 const SERVICE_DISCOVERY_TIMEOUT = 10_000;
+const BLE_CLEANUP_TIMEOUT = 100;
 const BLE_PACKET_SIZE = 192;
 const BLE_WRITE_DELAY = 5;
 const BLE_ENCRYPTION_ERROR_PATTERNS = [/encryption is insufficient/i, /insufficient encryption/i];
@@ -50,8 +62,8 @@ let nobleReadyPromise: Promise<void> | null = null;
 const discoveredDevices = new Map<string, Peripheral>();
 const connectedDevices = new Map<string, Peripheral>();
 const deviceCharacteristics = new Map<string, CharacteristicPair>();
-const notificationQueue: string[] = [];
-const pendingReceivers: Array<(data: string) => void> = [];
+const notificationStates = new Map<string, NobleNotificationState>();
+const notificationGenerations = new Map<string, number>();
 
 function getBleUuidKey(uuid?: string | null) {
   const normalized = (uuid ?? '').replace(/-/g, '').toLowerCase();
@@ -78,14 +90,65 @@ function isOneKeyPeripheral(peripheral: Peripheral) {
   return isOnekeyDevice(deviceName, peripheral.id) || hasOneKeyAdvertisementService(peripheral);
 }
 
-function enqueueNotification(data: Buffer) {
+function enqueueNotification(deviceId: string, generation: number, data: Buffer) {
+  const state = notificationStates.get(deviceId);
+  if (!state || state.generation !== generation) return;
+
   const hex = data.toString('hex');
-  const receiver = pendingReceivers.shift();
+  const [receiver] = state.pendingReceivers;
   if (receiver) {
-    receiver(hex);
+    state.pendingReceivers.delete(receiver);
+    receiver.resolve(hex);
     return;
   }
-  notificationQueue.push(hex);
+  state.queue.push(hex);
+}
+
+function createNotificationState(deviceId: string) {
+  const existing = notificationStates.get(deviceId);
+  if (existing) {
+    const error = new Error(`BLE notification state replaced for ${deviceId}`);
+    existing.pendingReceivers.forEach(receiver => receiver.reject(error));
+  }
+
+  const generation = (notificationGenerations.get(deviceId) ?? 0) + 1;
+  notificationGenerations.set(deviceId, generation);
+  const state: NobleNotificationState = {
+    generation,
+    queue: [],
+    pendingReceivers: new Set(),
+  };
+  notificationStates.set(deviceId, state);
+  return state;
+}
+
+function clearNotificationState(deviceId: string, reason: string) {
+  const state = notificationStates.get(deviceId);
+  if (!state) return;
+
+  notificationStates.delete(deviceId);
+  const error = new Error(reason);
+  state.pendingReceivers.forEach(receiver => receiver.reject(error));
+  state.pendingReceivers.clear();
+  state.queue.length = 0;
+}
+
+function waitForNobleCleanup(registerCallback: (callback: () => void) => void) {
+  return new Promise<void>(resolve => {
+    let completed = false;
+    const complete = () => {
+      if (completed) return;
+      completed = true;
+      clearTimeout(timeout);
+      resolve();
+    };
+    const timeout = setTimeout(complete, BLE_CLEANUP_TIMEOUT);
+    try {
+      registerCallback(complete);
+    } catch {
+      complete();
+    }
+  });
 }
 
 async function initializeNoble() {
@@ -270,10 +333,12 @@ async function discoverCharacteristics(peripheral: Peripheral): Promise<Characte
   };
 }
 
-function subscribeNotifications(deviceId: string, notifyCharacteristic: Characteristic) {
-  return new Promise<void>(resolve => {
-    notifyCharacteristic.unsubscribe(() => resolve());
-  })
+function subscribeNotifications(
+  deviceId: string,
+  generation: number,
+  notifyCharacteristic: Characteristic
+) {
+  return waitForNobleCleanup(callback => notifyCharacteristic.unsubscribe(callback))
     .then(
       () =>
         new Promise<void>((resolve, reject) => {
@@ -303,7 +368,7 @@ function subscribeNotifications(deviceId: string, notifyCharacteristic: Characte
     )
     .then(() => {
       notifyCharacteristic.removeAllListeners('data');
-      notifyCharacteristic.on('data', enqueueNotification);
+      notifyCharacteristic.on('data', data => enqueueNotification(deviceId, generation, data));
     })
     .catch(error => {
       notifyCharacteristic.removeAllListeners('data');
@@ -329,23 +394,18 @@ function writeCharacteristic(characteristic: Characteristic, buffer: Buffer) {
 async function disconnectDevice(uuid: string) {
   const peripheral = connectedDevices.get(uuid);
   const characteristics = deviceCharacteristics.get(uuid);
+  clearNotificationState(uuid, `BLE device disconnected: ${uuid}`);
   if (characteristics) {
     characteristics.notify.removeAllListeners('data');
-    await new Promise<void>(resolve => {
-      characteristics.notify.unsubscribe(() => resolve());
-    });
+    await waitForNobleCleanup(callback => characteristics.notify.unsubscribe(callback));
   }
 
   connectedDevices.delete(uuid);
   deviceCharacteristics.delete(uuid);
-  notificationQueue.length = 0;
-  pendingReceivers.splice(0).forEach(resolve => resolve(''));
 
   if (!peripheral || peripheral.state === 'disconnected') return;
 
-  await new Promise<void>(resolve => {
-    peripheral.disconnect(() => resolve());
-  });
+  await waitForNobleCleanup(callback => peripheral.disconnect(callback));
 }
 
 export function createNobleBlePlugin(): LowlevelTransportSharedPlugin {
@@ -376,7 +436,13 @@ export function createNobleBlePlugin(): LowlevelTransportSharedPlugin {
 
       await connectPeripheral(peripheral);
       const characteristics = await discoverCharacteristics(peripheral);
-      await subscribeNotifications(uuid, characteristics.notify);
+      const notificationState = createNotificationState(uuid);
+      try {
+        await subscribeNotifications(uuid, notificationState.generation, characteristics.notify);
+      } catch (error) {
+        clearNotificationState(uuid, `BLE notification subscription failed: ${uuid}`);
+        throw error;
+      }
       connectedDevices.set(uuid, peripheral);
       deviceCharacteristics.set(uuid, characteristics);
     },
@@ -404,11 +470,28 @@ export function createNobleBlePlugin(): LowlevelTransportSharedPlugin {
       }
     },
 
-    async receive() {
-      const queued = notificationQueue.shift();
+    async receive(uuid?: string) {
+      const resolvedUuid =
+        uuid ??
+        (notificationStates.size === 1 ? notificationStates.keys().next().value : undefined);
+      if (!resolvedUuid) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.RuntimeError,
+          'BLE receive requires a device UUID when multiple devices are connected'
+        );
+      }
+
+      const state = notificationStates.get(resolvedUuid);
+      if (!state) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.TransportNotFound,
+          `BLE notification state not found: ${resolvedUuid}`
+        );
+      }
+      const queued = state.queue.shift();
       if (queued !== undefined) return queued;
-      return new Promise<string>(resolve => {
-        pendingReceivers.push(resolve);
+      return new Promise<string>((resolve, reject) => {
+        state.pendingReceivers.add({ resolve, reject });
       });
     },
   };
