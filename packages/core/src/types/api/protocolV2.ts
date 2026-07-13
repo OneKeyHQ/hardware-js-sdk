@@ -1,7 +1,7 @@
 import type { CommonParams, Response } from '../params';
 import type {
-  DeviceFirmwareUpdateStatus,
   DeviceFactoryInfo,
+  DeviceFirmwareUpdateStatus,
   DeviceSession,
   DeviceStatus,
   ProtocolInfo,
@@ -9,10 +9,10 @@ import type {
   Success,
 } from '@onekeyfe/hd-transport';
 import type {
+  DeviceFactoryInfoSetParams,
   DeviceFirmwareUpdateParams,
   DeviceFirmwareUpdateStatusGetParams,
   DeviceRebootParams,
-  DeviceFactoryInfoSetParams,
 } from '../../api/protocol-v2/helpers';
 import type { DeviceInfoGetParams } from '../../api/protocol-v2/DeviceInfoGet';
 import type { DeviceSessionGetParams } from '../../api/protocol-v2/DeviceSessionGet';

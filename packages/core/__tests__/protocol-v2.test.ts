@@ -809,9 +809,7 @@ describe('Protocol V2 feature adapter', () => {
     (device as any).features.passphraseProtection = true;
     (device as any).commands = { typedCall };
 
-    await expect(
-      device.checkPassphraseStateSafety('expected-state', false, true)
-    ).rejects.toEqual(
+    await expect(device.checkPassphraseStateSafety('expected-state', false, true)).rejects.toEqual(
       expect.objectContaining({
         errorCode: HardwareErrorCode.DeviceCheckPassphraseStateError,
       })
@@ -1576,7 +1574,7 @@ describe('Protocol V2 feature adapter', () => {
       path: 'usb-path',
       protocolType: 'V2',
     } as any);
-    const typedCall = jest.fn().mockImplementation(async requestType => {
+    const typedCall = jest.fn().mockImplementation(requestType => {
       if (requestType === 'UnLockDevice') {
         return {
           type: 'UnLockDeviceResponse',
@@ -1635,7 +1633,7 @@ describe('Protocol V2 feature adapter', () => {
         status: { passphrase_enabled: false },
       }
     );
-    const typedCall = jest.fn().mockImplementation(async requestType => {
+    const typedCall = jest.fn().mockImplementation(requestType => {
       if (requestType === 'UnLockDevice') {
         return {
           type: 'UnLockDeviceResponse',

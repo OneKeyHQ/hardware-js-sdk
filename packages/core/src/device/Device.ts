@@ -8,8 +8,8 @@ import {
   ERROR_CODES_REQUIRE_RELEASE,
   HardwareError,
   HardwareErrorCode,
-  createDeviceNotSupportMethodError,
   createDeferred,
+  createDeviceNotSupportMethodError,
 } from '@onekeyfe/hd-shared';
 
 import {
@@ -67,8 +67,8 @@ import type {
 import type { PassphrasePromptResponse } from './DeviceCommands';
 import type { Deferred, HardwareConnectProtocol } from '@onekeyfe/hd-shared';
 import type {
-  DeviceStatus,
   OneKeyDeviceInfo as DeviceDescriptor,
+  DeviceStatus,
   ProtocolV2DeviceInfo,
   Success,
 } from '@onekeyfe/hd-transport';
@@ -266,7 +266,7 @@ export class Device extends EventEmitter {
     const connectId = this.getConnectId();
     const deviceId = this.getCurrentDeviceId() || null;
 
-    const features = this.features;
+    const { features } = this;
 
     return {
       /** Android uses Mac address, iOS uses uuid, USB uses uuid  */

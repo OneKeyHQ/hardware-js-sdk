@@ -14,7 +14,7 @@ export default class ClearSessionCache extends BaseMethod<ClearSessionCacheParam
     };
   }
 
-  async run() {
+  run() {
     const { deviceId, passphraseState } = this.params;
     if (!deviceId) {
       deviceWalletSessionStore.clear();
@@ -23,6 +23,6 @@ export default class ClearSessionCache extends BaseMethod<ClearSessionCacheParam
     } else {
       deviceWalletSessionStore.delete(deviceId, passphraseState);
     }
-    return { cleared: true as const };
+    return Promise.resolve({ cleared: true as const });
   }
 }

@@ -1,6 +1,8 @@
 import ClearSessionCache from '../src/api/ClearSessionCache';
-import { DeviceWalletSessionStore } from '../src/device/DeviceWalletSessionStore';
-import { deviceWalletSessionStore } from '../src/device/DeviceWalletSessionStore';
+import {
+  DeviceWalletSessionStore,
+  deviceWalletSessionStore,
+} from '../src/device/DeviceWalletSessionStore';
 import { createCoreApi } from '../src/inject';
 
 jest.mock('../src/data/config', () => ({
