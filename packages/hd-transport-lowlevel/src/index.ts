@@ -5,7 +5,7 @@ import transport, {
   PROTOCOL_V2_BLE_FRAME_MAX_BYTES,
   PROTOCOL_V2_CHANNEL_BLE_UART,
   ProtocolV2FrameAssembler,
-  ProtocolV2Session,
+  ProtocolV2LinkManager,
   bytesToHex,
   concatUint8Arrays,
   hexToBytes,
@@ -60,6 +60,37 @@ export default class LowlevelTransport {
 
   private protocolV2Assemblers: Map<string, ProtocolV2FrameAssembler> = new Map();
 
+  private protocolV2Generations: Map<string, number> = new Map();
+
+  private protocolV2Links = new ProtocolV2LinkManager<string>({
+    getSchemas: () => {
+      if (!this._messages || !this._messagesV2) {
+        throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
+      }
+      return {
+        protocolV1: this._messages,
+        protocolV2: this._messagesV2,
+      };
+    },
+    classifyError: () => 'link-fatal',
+    onLinkInvalidated: async (uuid, reason) => {
+      this.protocolV2Assemblers.get(uuid)?.reset();
+      this.Log?.debug(`[LowlevelTransport] Protocol V2 link invalidated: ${uuid}`, reason);
+      if (reason.startsWith('Protocol V2 link-fatal error:')) {
+        this.deviceProtocol.delete(uuid);
+        this.advanceProtocolV2Generation(uuid);
+        try {
+          await this.plugin.disconnect(uuid);
+        } catch (error) {
+          this.Log?.debug(
+            `[LowlevelTransport] disconnect tainted Protocol V2 link failed: ${uuid}`,
+            error
+          );
+        }
+      }
+    },
+  });
+
   getProtocolType(path: string): ProtocolType | undefined {
     return this.deviceProtocol.get(path);
   }
@@ -79,6 +110,9 @@ export default class LowlevelTransport {
 
   configureProtocolV2(signedData: any) {
     this._messagesV2 = parseConfigure(signedData);
+    this.protocolV2Links
+      .invalidateAllLinks('Protocol V2 schema reconfigured')
+      .catch(error => this.Log?.debug('Protocol V2 schema link cleanup failed:', error));
   }
 
   listen() {
@@ -99,6 +133,7 @@ export default class LowlevelTransport {
   async acquire(input: LowLevelAcquireInput) {
     try {
       await this.plugin.connect(input.uuid);
+      this.advanceProtocolV2Generation(input.uuid);
     } catch (error) {
       this.Log.debug('lowlelvel transport connect error: ', error);
       throw ERRORS.TypedError(
@@ -121,9 +156,11 @@ export default class LowlevelTransport {
 
   async release(uuid: string) {
     try {
+      await this.protocolV2Links.invalidateLink(uuid, 'Lowlevel transport released');
       await this.plugin.disconnect(uuid);
       this.deviceProtocol.delete(uuid);
-      this.deviceProtocolHints.delete(uuid);
+      // 设备名称推断出的协议提示不依赖当前连接，保留它可以让快速重连
+      // 直接执行 Protocol V2 探测，避免先发送一次无意义的 V1 Initialize。
       this.protocolV2Assemblers.delete(uuid);
       return true;
     } catch (error) {
@@ -196,7 +233,7 @@ export default class LowlevelTransport {
     }
 
     try {
-      const response = await this.readProtocolV1Message(options?.timeoutMs);
+      const response = await this.readProtocolV1Message(uuid, options?.timeoutMs);
       this.Log.debug('receive data: ', response);
       const jsonData = ProtocolV1.decodeMessage(messages, response);
       return check.call(jsonData);
@@ -292,6 +329,10 @@ export default class LowlevelTransport {
   }
 
   private async resetConnectionAfterProbe(uuid: string, protocol: ProtocolType) {
+    await this.protocolV2Links.invalidateLink(
+      uuid,
+      `Reset connection after Protocol ${protocol} probe`
+    );
     this.protocolV2Assemblers.get(uuid)?.reset();
 
     try {
@@ -305,6 +346,7 @@ export default class LowlevelTransport {
 
     try {
       await this.plugin.connect(uuid);
+      this.advanceProtocolV2Generation(uuid);
     } catch (error) {
       this.Log?.debug(
         `[LowlevelTransport] reconnect after Protocol ${protocol} probe failed:`,
@@ -362,8 +404,8 @@ export default class LowlevelTransport {
     }
   }
 
-  private async receiveHex(timeoutMs: number | undefined, commandName: string) {
-    const response = await withProtocolTimeout(this.plugin.receive(), timeoutMs, () =>
+  private async receiveHex(uuid: string, timeoutMs: number | undefined, commandName: string) {
+    const response = await withProtocolTimeout(this.plugin.receive(uuid), timeoutMs, () =>
       this.createProtocolTimeoutError(commandName, timeoutMs ?? 0)
     );
     if (typeof response !== 'string') {
@@ -372,8 +414,8 @@ export default class LowlevelTransport {
     return response;
   }
 
-  private async readProtocolV1Message(timeoutMs?: number) {
-    const first = await this.receiveHex(timeoutMs, 'ProtocolV1');
+  private async readProtocolV1Message(uuid: string, timeoutMs?: number) {
+    const first = await this.receiveHex(uuid, timeoutMs, 'ProtocolV1');
     const firstData = hexToBytes(first);
     if (!isProtocolV1TransportChunk(firstData)) {
       return first;
@@ -384,14 +426,14 @@ export default class LowlevelTransport {
     const expectedLength = PROTOCOL_V1_MESSAGE_HEADER_SIZE + payloadLength;
 
     while (buffer.length < expectedLength) {
-      const next = await this.receiveHex(timeoutMs, 'ProtocolV1');
+      const next = await this.receiveHex(uuid, timeoutMs, 'ProtocolV1');
       buffer = concatUint8Arrays([buffer, hexToBytes(next)]);
     }
 
     return bytesToHex(buffer.slice(0, expectedLength));
   }
 
-  private async readProtocolV2Frame(uuid: string, timeoutMs?: number) {
+  private async readProtocolV2Frame(uuid: string, timeoutMs?: number, commandName = 'ProtocolV2') {
     let assembler = this.protocolV2Assemblers.get(uuid);
     if (!assembler) {
       assembler = new ProtocolV2FrameAssembler();
@@ -403,7 +445,7 @@ export default class LowlevelTransport {
 
     let frame: Uint8Array | undefined;
     while (!frame) {
-      const response = await this.receiveHex(timeoutMs, 'ProtocolV2');
+      const response = await this.receiveHex(uuid, timeoutMs, commandName);
       const chunk = hexToBytes(response);
       if (chunk.length > 0) {
         frame = assembler.push(chunk);
@@ -430,32 +472,62 @@ export default class LowlevelTransport {
     }
 
     const timeoutMs = options?.timeoutMs ?? LOWLEVEL_PROTOCOL_TIMEOUT_MS;
-    this.protocolV2Assemblers.get(uuid)?.reset();
-    const session = new ProtocolV2Session({
-      schemas: {
-        protocolV1: this._messages,
-        protocolV2: this._messagesV2,
-      },
-      router: PROTOCOL_V2_CHANNEL_BLE_UART,
-      maxFrameBytes: PROTOCOL_V2_BLE_FRAME_MAX_BYTES,
-      writeFrame: (frame: Uint8Array) => this.writeProtocolV2Frame(uuid, frame),
-      readFrame: () => this.readProtocolV2Frame(uuid, timeoutMs),
-      logger: this.Log,
-      logPrefix: 'ProtocolV2 Lowlevel-BLE',
-      createTimeoutError: (_messageName: string, timeout: number) =>
-        this.createProtocolTimeoutError(name, timeout),
-    });
 
     try {
-      return await session.call(name, data, {
-        ...options,
-        timeoutMs,
-      });
+      return await this.protocolV2Links.call(
+        uuid,
+        () => this.createProtocolV2Adapter(uuid),
+        name,
+        data,
+        {
+          ...options,
+          timeoutMs,
+        }
+      );
     } catch (e) {
-      this.protocolV2Assemblers.get(uuid)?.reset();
       this.Log.error('lowlevel Protocol V2 call error: ', e);
       throw e;
     }
+  }
+
+  private createProtocolV2Adapter(uuid: string) {
+    const generation = this.protocolV2Generations.get(uuid) ?? 0;
+    const assertCurrentGeneration = () => {
+      if (this.protocolV2Generations.get(uuid) !== generation) {
+        throw new Error(`Protocol V2 connection generation changed for ${uuid}`);
+      }
+    };
+
+    return {
+      router: PROTOCOL_V2_CHANNEL_BLE_UART,
+      maxFrameBytes: PROTOCOL_V2_BLE_FRAME_MAX_BYTES,
+      generation,
+      prepareCall: () => {
+        assertCurrentGeneration();
+        this.protocolV2Assemblers.get(uuid)?.reset();
+      },
+      writeFrame: (frame: Uint8Array) => {
+        assertCurrentGeneration();
+        return this.writeProtocolV2Frame(uuid, frame);
+      },
+      readFrame: (context: { messageName: string; timeoutMs?: number }) => {
+        assertCurrentGeneration();
+        return this.readProtocolV2Frame(uuid, context.timeoutMs, context.messageName);
+      },
+      reset: () => {
+        this.protocolV2Assemblers.get(uuid)?.reset();
+      },
+      logger: this.Log,
+      logPrefix: 'ProtocolV2 Lowlevel-BLE',
+      createTimeoutError: (messageName: string, timeout: number) =>
+        this.createProtocolTimeoutError(messageName, timeout),
+    };
+  }
+
+  private advanceProtocolV2Generation(uuid: string) {
+    const nextGeneration = (this.protocolV2Generations.get(uuid) ?? 0) + 1;
+    this.protocolV2Generations.set(uuid, nextGeneration);
+    return nextGeneration;
   }
 
   cancel() {

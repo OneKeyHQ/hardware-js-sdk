@@ -196,6 +196,10 @@ describe('LowlevelTransport protocol framing', () => {
       },
     });
     expect(plugin.send).toHaveBeenCalled();
+    const sentSeqs = plugin.send.mock.calls.map(([, hex]) =>
+      Number.parseInt(hex.slice(12, 14), 16)
+    );
+    expect(sentSeqs).toEqual([1, 2]);
   });
 
   test('falls back to Protocol V2 probe for unnamed Protocol V2 devices', async () => {
@@ -216,6 +220,36 @@ describe('LowlevelTransport protocol framing', () => {
       protocolType: 'V2',
     });
     expect(lowlevel.getProtocolType('unknown-pro2-id')).toBe('V2');
+  });
+
+  test('retains the Protocol V2 hint and sequence cursor across release and reacquire', async () => {
+    const probeResponse = ProtocolV2.encodeFrame(
+      schemas,
+      'Success',
+      { message: 'ok' },
+      { router: PROTOCOL_V2_CHANNEL_BLE_UART }
+    );
+    const plugin = createPlugin({
+      devices: [{ id: 'reconnect-pro2-id', name: 'OneKey Pro 2', commType: 'ble' }],
+      responses: [bytesToHex(probeResponse), bytesToHex(probeResponse)],
+    });
+    const lowlevel = configureTransport(plugin);
+
+    await lowlevel.enumerate();
+    await expect(lowlevel.acquire({ uuid: 'reconnect-pro2-id' })).resolves.toEqual({
+      uuid: 'reconnect-pro2-id',
+      protocolType: 'V2',
+    });
+    await lowlevel.release('reconnect-pro2-id');
+    await expect(lowlevel.acquire({ uuid: 'reconnect-pro2-id' })).resolves.toEqual({
+      uuid: 'reconnect-pro2-id',
+      protocolType: 'V2',
+    });
+
+    const sentSeqs = plugin.send.mock.calls.map(([, hex]) =>
+      Number.parseInt(hex.slice(12, 14), 16)
+    );
+    expect(sentSeqs).toEqual([1, 2]);
   });
 
   test('resets the lowlevel connection before probing Protocol V2 after a V1 timeout', async () => {
@@ -254,6 +288,30 @@ describe('LowlevelTransport protocol framing', () => {
     });
     expect(plugin.disconnect).toHaveBeenCalledWith('slow-v2-id');
     expect(plugin.connect).toHaveBeenCalledTimes(2);
+  });
+
+  test('disconnects a tainted Protocol V2 link after a response timeout', async () => {
+    const probeResponse = ProtocolV2.encodeFrame(
+      schemas,
+      'Success',
+      { message: 'ok' },
+      { router: PROTOCOL_V2_CHANNEL_BLE_UART }
+    );
+    const plugin = createPlugin({
+      devices: [{ id: 'timeout-v2-id', name: 'OneKey Pro 2', commType: 'ble' }],
+      responses: [bytesToHex(probeResponse)],
+    });
+    plugin.receive.mockImplementationOnce(() => Promise.resolve(bytesToHex(probeResponse)));
+    plugin.receive.mockImplementation(() => new Promise(() => {}));
+    const lowlevel = configureTransport(plugin);
+
+    await lowlevel.acquire({ uuid: 'timeout-v2-id', expectedProtocol: 'V2' });
+    plugin.disconnect.mockClear();
+    await expect(
+      lowlevel.call('timeout-v2-id', 'Ping', { message: 'timeout' }, { timeoutMs: 10 })
+    ).rejects.toThrow('Lowlevel response timeout after 10ms for Ping');
+
+    expect(plugin.disconnect).toHaveBeenCalledWith('timeout-v2-id');
   });
 
   test('verifies expected Protocol V1 instead of trusting the requested protocol', async () => {

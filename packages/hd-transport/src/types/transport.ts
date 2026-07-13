@@ -106,7 +106,7 @@ export type LowLevelDevice = OneKeyDeviceInfoBase & { id: string; name: string }
 export type LowlevelTransportSharedPlugin = {
   enumerate: () => Promise<LowLevelDevice[]>;
   send: (uuid: string, data: string) => Promise<void>;
-  receive: () => Promise<string>;
+  receive: (uuid?: string) => Promise<string>;
   connect: (uuid: string) => Promise<void>;
   disconnect: (uuid: string) => Promise<void>;
 
