@@ -8,6 +8,7 @@ import {
   ERROR_CODES_REQUIRE_RELEASE,
   HardwareError,
   HardwareErrorCode,
+  createDeviceNotSupportMethodError,
   createDeferred,
 } from '@onekeyfe/hd-shared';
 
@@ -54,6 +55,7 @@ import {
   PROTOCOL_V2_STATUS_DEVICE_INFO_REQUEST,
   requestProtocolV2DeviceInfo,
 } from '../protocols/protocol-v2/features';
+import { refreshProtocolV2DeviceStatus } from '../protocols/protocol-v2/walletSession';
 import { buildProtocolV1FeaturesPayload, buildProtocolV2FeaturesPayload } from '../deviceProfile';
 
 import type { PROTO } from '../constants';
@@ -1178,8 +1180,7 @@ export class Device extends EventEmitter {
   }
 
   supportUnlockVersionRange(): DeviceFirmwareRange {
-    // 仅适用于 Protocol V1 的 Pro 系列；Pro2 走独立版本线，
-    // 且 Protocol V2 固件从首个版本即支持 UnLockDevice（见 unlockDevice 的 isProtocolV2 短路）。
+    // 仅适用于 Protocol V1 的 Pro 系列；Pro2 走独立的 Protocol V2 解锁流程。
     return {
       pro: {
         min: '4.15.0',
@@ -1188,6 +1189,23 @@ export class Device extends EventEmitter {
   }
 
   async unlockDevice() {
+    if (this.isProtocolV2()) {
+      try {
+        await this.commands.typedCall('UnLockDevice', 'UnLockDeviceResponse');
+      } catch (error) {
+        const errorText =
+          error instanceof Error
+            ? `${error.name} ${error.message}`
+            : String((error as { message?: unknown } | null)?.message ?? error ?? '');
+        if (errorText.includes('Failure_UnexpectedMessage')) {
+          throw createDeviceNotSupportMethodError('deviceUnlock', this.getCurrentFirmwareType());
+        }
+        throw error;
+      }
+
+      return refreshProtocolV2DeviceStatus(this);
+    }
+
     const firmwareVersion = this.getCurrentFirmwareVersionString() ?? '0.0.0';
     const versionRange = this.getCurrentMethodVersionRange(
       type => this.supportUnlockVersionRange()[type]
@@ -1197,9 +1215,7 @@ export class Device extends EventEmitter {
       this.features,
       Enum_Capability.Capability_AttachToPin
     );
-    // Pro2 (Protocol V2) 版本线独立于 Pro 系列，固件从首个版本即支持 UnLockDevice
     const supportUnlock =
-      this.isProtocolV2() ||
       supportAttachPinCapability ||
       (versionRange &&
         semver.valid(firmwareVersion) &&
@@ -1219,14 +1235,6 @@ export class Device extends EventEmitter {
 
       const features = await this.getFeatures();
       return Promise.resolve(features);
-    }
-
-    // legacy 解锁探测仅适用于 Protocol V1 老固件；V2 固件必然支持 UnLockDevice
-    if (this.isProtocolV2()) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.RuntimeError,
-        'unlock device error: device firmware does not support UnLockDevice'
-      );
     }
 
     const { type } = await this.commands.typedCall('GetAddress', 'Address', {

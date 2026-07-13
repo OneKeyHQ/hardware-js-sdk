@@ -1531,9 +1531,24 @@ describe('Protocol V2 feature adapter', () => {
       path: 'usb-path',
       protocolType: 'V2',
     } as any);
-    const typedCall = jest.fn().mockResolvedValue({
-      type: 'UnLockDeviceResponse',
-      message: { unlocked: true, passphrase_protection: true },
+    const typedCall = jest.fn().mockImplementation(async requestType => {
+      if (requestType === 'UnLockDevice') {
+        return {
+          type: 'UnLockDeviceResponse',
+          message: { unlocked: false, passphrase_protection: false },
+        };
+      }
+      if (requestType === 'DeviceStatusGet') {
+        return {
+          type: 'DeviceStatus',
+          message: {
+            device_id: 'PRO2-DEVICE-ID',
+            unlocked: true,
+            passphrase_enabled: true,
+          },
+        };
+      }
+      throw new Error(`Unexpected request: ${requestType}`);
     });
 
     (device as any).commands = { typedCall };
@@ -1550,18 +1565,22 @@ describe('Protocol V2 feature adapter', () => {
 
     const features = await device.unlockDevice();
 
-    expect(typedCall).toHaveBeenCalledWith('UnLockDevice', 'UnLockDeviceResponse');
+    expect(typedCall.mock.calls).toEqual([
+      ['UnLockDevice', 'UnLockDeviceResponse'],
+      ['DeviceStatusGet', 'DeviceStatus', {}],
+    ]);
     expect(typedCall).not.toHaveBeenCalledWith('GetAddress', 'Address', expect.anything());
     expect(typedCall).not.toHaveBeenCalledWith('GetFeatures', 'Features', {});
     expect(features).toMatchObject({
       deviceType: 'pro2',
-      deviceId: null,
+      deviceId: 'PRO2-DEVICE-ID',
       firmwareVersion: '1.2.3',
       unlocked: true,
+      passphraseProtection: true,
     });
   });
 
-  test('syncs Protocol V2 features passphrase state after unlock response', async () => {
+  test('syncs Protocol V2 features passphrase state from DeviceStatusGet after unlock', async () => {
     const device = Device.fromDescriptor({ ...descriptor, protocolType: 'V2' } as any);
     (device as any).features = normalizeProtocolV2Features(
       { ...descriptor, protocolType: 'V2' } as any,
@@ -1571,6 +1590,74 @@ describe('Protocol V2 feature adapter', () => {
         status: { passphrase_enabled: false },
       }
     );
+    const typedCall = jest.fn().mockImplementation(async requestType => {
+      if (requestType === 'UnLockDevice') {
+        return {
+          type: 'UnLockDeviceResponse',
+          message: {
+            unlocked: false,
+            unlocked_attach_pin: false,
+            passphrase_protection: false,
+          },
+        };
+      }
+      if (requestType === 'DeviceStatusGet') {
+        return {
+          type: 'DeviceStatus',
+          message: {
+            unlocked: true,
+            unlocked_by_attach_to_pin: true,
+            passphrase_enabled: true,
+          },
+        };
+      }
+      throw new Error(`Unexpected request: ${requestType}`);
+    });
+    (device as any).commands = { typedCall };
+
+    await device.unlockDevice();
+
+    expect((device as any).profile).toBeUndefined();
+    expect(device.features?.passphraseProtection).toBe(true);
+    expect(device.features?.unlockedAttachPin).toBe(true);
+  });
+
+  test('maps unsupported Protocol V2 UnLockDevice to DeviceNotSupportMethod', async () => {
+    const device = Device.fromDescriptor({ ...descriptor, protocolType: 'V2' } as any);
+    (device as any).features = normalizeProtocolV2Features(
+      { ...descriptor, protocolType: 'V2' } as any,
+      {
+        fw: { application: { version: '1.2.3' } },
+        status: { unlocked: false },
+      }
+    );
+    const typedCall = jest
+      .fn()
+      .mockRejectedValue(new Error('Failure_UnexpectedMessage,Unknown message'));
+    (device as any).commands = { typedCall };
+
+    await expect(device.unlockDevice()).rejects.toEqual(
+      expect.objectContaining({
+        errorCode: HardwareErrorCode.DeviceNotSupportMethod,
+      })
+    );
+    expect(typedCall).toHaveBeenCalledTimes(1);
+    expect(typedCall).not.toHaveBeenCalledWith(
+      'DeviceSessionGet',
+      'DeviceSession',
+      expect.anything()
+    );
+  });
+
+  test('keeps Protocol V1 unlock response handling unchanged', async () => {
+    const device = Device.fromDescriptor({ path: 'v1-path', protocolType: 'V1' } as any);
+    (device as any).features = {
+      deviceType: 'pro',
+      firmwareVersion: '4.15.0',
+      capabilities: [],
+      unlocked: false,
+      passphraseProtection: false,
+    } as Features;
     const typedCall = jest.fn().mockResolvedValue({
       type: 'UnLockDeviceResponse',
       message: {
@@ -1581,11 +1668,12 @@ describe('Protocol V2 feature adapter', () => {
     });
     (device as any).commands = { typedCall };
 
-    await device.unlockDevice();
-
-    expect((device as any).profile).toBeUndefined();
-    expect(device.features?.passphraseProtection).toBe(true);
-    expect(device.features?.unlockedAttachPin).toBe(true);
+    await expect(device.unlockDevice()).resolves.toMatchObject({
+      unlocked: true,
+      unlockedAttachPin: true,
+      passphraseProtection: true,
+    });
+    expect(typedCall.mock.calls).toEqual([['UnLockDevice', 'UnLockDeviceResponse']]);
   });
 });
 
