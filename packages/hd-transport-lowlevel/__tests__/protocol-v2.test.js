@@ -271,17 +271,36 @@ describe('LowlevelTransport protocol framing', () => {
       uuid: 'repeated-acquire-id',
       protocolType: 'V2',
     });
+    await lowlevel.call('repeated-acquire-id', 'Ping', { message: 'first-acquire' });
     await expect(
       lowlevel.acquire({ uuid: 'repeated-acquire-id', expectedProtocol: 'V2' })
     ).resolves.toEqual({
       uuid: 'repeated-acquire-id',
       protocolType: 'V2',
     });
+    await lowlevel.call('repeated-acquire-id', 'Ping', { message: 'second-acquire' });
 
     const sentSeqs = plugin.send.mock.calls.map(([, hex]) =>
       Number.parseInt(hex.slice(12, 14), 16)
     );
     expect(sentSeqs).toEqual([1, 2]);
+  });
+
+  test('trusts explicit Protocol V2 during bootloader reconnect without probing Ping', async () => {
+    const plugin = createPlugin({
+      devices: [{ id: 'bootloader-v2-id', name: 'OneKey Pro 2', commType: 'ble' }],
+      responses: [],
+    });
+    const lowlevel = configureTransport(plugin);
+
+    await expect(
+      lowlevel.acquire({ uuid: 'bootloader-v2-id', expectedProtocol: 'V2' })
+    ).resolves.toEqual({
+      uuid: 'bootloader-v2-id',
+      protocolType: 'V2',
+    });
+    expect(plugin.send).not.toHaveBeenCalled();
+    expect(plugin.receive).not.toHaveBeenCalled();
   });
 
   test('resets the lowlevel connection before probing Protocol V2 after a V1 timeout', async () => {
@@ -323,17 +342,10 @@ describe('LowlevelTransport protocol framing', () => {
   });
 
   test('disconnects a tainted Protocol V2 link after a response timeout', async () => {
-    const probeResponse = ProtocolV2.encodeFrame(
-      schemas,
-      'Success',
-      { message: 'ok' },
-      { router: PROTOCOL_V2_CHANNEL_BLE_UART }
-    );
     const plugin = createPlugin({
       devices: [{ id: 'timeout-v2-id', name: 'OneKey Pro 2', commType: 'ble' }],
-      responses: [bytesToHex(probeResponse)],
+      responses: [],
     });
-    plugin.receive.mockImplementationOnce(() => Promise.resolve(bytesToHex(probeResponse)));
     plugin.receive.mockImplementation(() => new Promise(() => {}));
     const lowlevel = configureTransport(plugin);
 

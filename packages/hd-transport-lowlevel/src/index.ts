@@ -290,12 +290,12 @@ export default class LowlevelTransport {
     protocolHint?: ProtocolType
   ): Promise<ProtocolType> {
     if (expectedProtocol === 'V2') {
-      if (await this.probeProtocolV2(uuid)) {
-        this.deviceProtocol.set(uuid, 'V2');
-        this.Log?.debug(`[LowlevelTransport] detectProtocol: uuid=${uuid} -> V2 (expected)`);
-        return 'V2';
-      }
-      throw this.createProtocolMismatchError(expectedProtocol);
+      // 固件升级重启后的 bootloader 不保证响应 Ping。上层显式传入 V2
+      // 表示协议已经在重启前确认，这里与 RN/Electron BLE 保持一致，
+      // 直接建立 V2 Link，首个业务命令负责验证链路是否可用。
+      this.deviceProtocol.set(uuid, 'V2');
+      this.Log?.debug(`[LowlevelTransport] detectProtocol: uuid=${uuid} -> V2 (expected)`);
+      return 'V2';
     }
 
     if (expectedProtocol === 'V1') {
