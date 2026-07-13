@@ -103,6 +103,19 @@ describe('messages', () => {
     });
   });
 
+  test('Protocol V2 temporarily restores unlock ids without restoring old passphrase ids', () => {
+    expect(v2Messages.nested.MessageType.values).toMatchObject({
+      MessageType_UnLockDevice: 10030,
+      MessageType_UnLockDeviceResponse: 10031,
+    });
+    expect(v2Messages.nested.MessageType.values).not.toHaveProperty(
+      'MessageType_GetPassphraseState'
+    );
+    expect(v2Messages.nested.MessageType.values).not.toHaveProperty('MessageType_PassphraseState');
+    expect(v2Messages.nested.UnLockDevice).toBeDefined();
+    expect(v2Messages.nested.UnLockDeviceResponse).toBeDefined();
+  });
+
   test('Protocol V2 transport and core schemas stay identical', () => {
     expect(coreV2Messages).toEqual(v2Messages);
   });

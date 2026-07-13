@@ -453,6 +453,8 @@
         "MessageType_UiviewConfirmTxRequest": 30202,
         "MessageType_UiviewConfirmSignMessageRequest": 30203,
         "MessageType_UiviewResponse": 30204,
+        "MessageType_UnLockDevice": 10030,
+        "MessageType_UnLockDeviceResponse": 10031,
         "MessageType_DeviceFactoryInfoSet": 60000,
         "MessageType_DeviceFactoryInfoGet": 60001,
         "MessageType_DeviceFactoryInfo": 60002,
