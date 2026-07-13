@@ -1,4 +1,5 @@
 import transport, { PROTOCOL_V2_CHANNEL_BLE_UART, bytesToHex } from '@onekeyfe/hd-transport';
+import { HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import ElectronBleTransport from '../src/electron-ble-transport';
 
@@ -245,6 +246,95 @@ describe('ElectronBleTransport protocol detection', () => {
       );
       expect(nobleBle.write).toHaveBeenCalledTimes(1);
       expect(transport.getProtocolType(device.id)).toBe('V2');
+      await expect(transport.call(device.id, 'Ping', { message: 'after-probe' })).resolves.toEqual({
+        type: 'Success',
+        message: { message: 'ok' },
+      });
+      const sentSeqs = nobleBle.write.mock.calls.map(([, hex]) =>
+        Number.parseInt(hex.slice(12, 14), 16)
+      );
+      expect(sentSeqs).toEqual([1, 2]);
+    } finally {
+      await transport.release(device.id);
+    }
+  });
+
+  test('rejects the active Protocol V2 reader when pairing is rejected', async () => {
+    const device = { id: 'pairing-rejected-pro2-id', name: 'OneKey Pro 2' };
+    const nobleBle = createNobleBle(device);
+    let notificationHandler: ((deviceId: string, data: string) => void) | undefined;
+    let pairingRejected = false;
+    const probeResponse = ProtocolV2.encodeFrame(
+      schemas,
+      'Success',
+      { message: 'ok' },
+      { router: PROTOCOL_V2_CHANNEL_BLE_UART }
+    );
+
+    nobleBle.onNotification.mockImplementation(handler => {
+      notificationHandler = handler;
+      return jest.fn();
+    });
+    nobleBle.write.mockImplementation(() => {
+      setTimeout(
+        () =>
+          notificationHandler?.(
+            device.id,
+            pairingRejected ? 'PAIRING_REJECTED' : bytesToHex(probeResponse)
+          ),
+        0
+      );
+      return Promise.resolve();
+    });
+    const transport = configureTransport(nobleBle);
+
+    try {
+      await transport.acquire({ uuid: device.id });
+      pairingRejected = true;
+
+      await expect(
+        transport.call(device.id, 'Ping', { message: 'pairing' }, { timeoutMs: 50 })
+      ).rejects.toMatchObject({ errorCode: HardwareErrorCode.BleDeviceBondedCanceled });
+    } finally {
+      await transport.release(device.id);
+    }
+  });
+
+  test('rebuilds the active link when Core acquires the same device again', async () => {
+    const device = { id: 'repeated-acquire-pro2-id', name: 'OneKey Pro 2' };
+    const nobleBle = createNobleBle(device);
+    let notificationHandler: ((deviceId: string, data: string) => void) | undefined;
+    const response = ProtocolV2.encodeFrame(
+      schemas,
+      'Success',
+      { message: 'ok' },
+      { router: PROTOCOL_V2_CHANNEL_BLE_UART }
+    );
+
+    nobleBle.onNotification.mockImplementation(handler => {
+      notificationHandler = handler;
+      return jest.fn();
+    });
+    nobleBle.write.mockImplementation(() => {
+      setTimeout(() => notificationHandler?.(device.id, bytesToHex(response)), 0);
+      return Promise.resolve();
+    });
+    const transport = configureTransport(nobleBle);
+
+    try {
+      await transport.acquire({ uuid: device.id });
+      await transport.acquire({ uuid: device.id, expectedProtocol: 'V2' });
+      await expect(
+        transport.call(device.id, 'Ping', { message: 'after-reacquire' })
+      ).resolves.toEqual({
+        type: 'Success',
+        message: { message: 'ok' },
+      });
+
+      const sentSeqs = nobleBle.write.mock.calls.map(([, hex]) =>
+        Number.parseInt(hex.slice(12, 14), 16)
+      );
+      expect(sentSeqs).toEqual([1, 2]);
     } finally {
       await transport.release(device.id);
     }

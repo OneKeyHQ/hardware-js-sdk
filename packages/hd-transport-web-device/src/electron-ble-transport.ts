@@ -3,7 +3,7 @@ import transport, {
   PROTOCOL_V1_MESSAGE_HEADER_SIZE,
   PROTOCOL_V2_CHANNEL_BLE_UART,
   ProtocolV2FrameAssembler,
-  ProtocolV2Session,
+  ProtocolV2LinkManager,
   bytesToHex,
   hexToBytes,
   probeProtocolV2 as probeProtocolV2Helper,
@@ -111,9 +111,28 @@ export default class ElectronBleTransport {
 
   private v2FramePromises: Map<string, Deferred<Uint8Array>> = new Map();
 
-  private activeProtocolV2Call: { uuid: string; token: number } | null = null;
+  private protocolV2Links = new ProtocolV2LinkManager<string>({
+    getSchemas: () => {
+      if (!this._messages || !this._messagesV2) {
+        throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
+      }
+      return {
+        protocolV1: this._messages,
+        protocolV2: this._messagesV2,
+      };
+    },
+    classifyError: () => 'link-fatal',
+    onLinkInvalidated: async (uuid, reason) => {
+      this.v2Assemblers.get(uuid)?.reset();
+      this.rejectProtocolV2Frames(uuid, new Error(reason));
+      this.Log?.debug('[Electron BLE] Protocol V2 link invalidated:', uuid, reason);
+      if (reason.startsWith('Protocol V2 link-fatal error:')) {
+        await this.release(uuid);
+      }
+    },
+  });
 
-  private nextProtocolV2CallToken = 1;
+  private activeProtocolV2Call: { uuid: string; token: number } | null = null;
 
   private notificationCleanups: Map<string, () => void> = new Map();
 
@@ -155,6 +174,9 @@ export default class ElectronBleTransport {
   }
 
   private cleanupDeviceState(deviceId: string): void {
+    this.protocolV2Links
+      .invalidateLink(deviceId, 'Electron BLE device state cleaned')
+      .catch(error => this.Log?.debug('[Electron BLE] link cleanup failed:', error));
     this.connectedDevices.delete(deviceId);
     this.deviceProtocol.delete(deviceId);
     // Keep deviceProtocolHints — it's inferred from device name (e.g. "Pro 2" → V2)
@@ -201,6 +223,9 @@ export default class ElectronBleTransport {
 
   configureProtocolV2(signedData: any) {
     this._messagesV2 = parseConfigure(signedData);
+    this.protocolV2Links
+      .invalidateAllLinks('Protocol V2 schema reconfigured')
+      .catch(error => this.Log?.debug('[Electron BLE] schema link cleanup failed:', error));
     this.Log?.debug('[Electron BLE] Protocol V2 schema configured');
   }
 
@@ -234,6 +259,10 @@ export default class ElectronBleTransport {
 
     if (!uuid) {
       throw ERRORS.TypedError(HardwareErrorCode.BleRequiredUUID);
+    }
+
+    if (this.connectedDevices.has(uuid)) {
+      await this.release(uuid);
     }
 
     if (forceCleanRunPromise && this.runPromise) {
@@ -318,6 +347,7 @@ export default class ElectronBleTransport {
 
   async release(id: string) {
     try {
+      await this.protocolV2Links.invalidateLink(id, 'Electron BLE transport released');
       if (this.connectedDevices.has(id)) {
         if (window.desktopApi?.nobleBle) {
           await window.desktopApi.nobleBle.unsubscribe(id);
@@ -415,6 +445,10 @@ export default class ElectronBleTransport {
   }
 
   private async resetProbeStateAfterProtocolProbe(uuid: string, protocol: ProtocolType) {
+    await this.protocolV2Links.invalidateLink(
+      uuid,
+      `Reset notify state after Protocol ${protocol} probe`
+    );
     this.v1Buffers.set(uuid, { buffer: [], bufferLength: 0 });
     this.v2Assemblers.get(uuid)?.reset();
     this.resetProtocolV2Frames(uuid);
@@ -523,10 +557,11 @@ export default class ElectronBleTransport {
   private handleNotification(deviceId: string, hexData: string): void {
     if (hexData === 'PAIRING_REJECTED') {
       this.Log?.debug('[Electron BLE] Pairing rejection detected for device:', deviceId);
-      if (this.runPromise) {
-        const error = ERRORS.TypedError(HardwareErrorCode.BleDeviceBondedCanceled);
+      const error = ERRORS.TypedError(HardwareErrorCode.BleDeviceBondedCanceled);
+      if (this.deviceProtocol.get(deviceId) === 'V2') {
+        this.rejectProtocolV2Frames(deviceId, error);
+      } else if (this.runPromise) {
         this.runPromise.reject(error);
-        this.rejectAllProtocolV2Frames(error);
       }
       return;
     }
@@ -545,12 +580,6 @@ export default class ElectronBleTransport {
 
   private handleProtocolV2Notification(deviceId: string, hexData: string): void {
     try {
-      if (!this.runPromise || this.activeProtocolV2Call?.uuid !== deviceId) {
-        this.v2Assemblers.get(deviceId)?.reset();
-        this.resetProtocolV2Frames(deviceId);
-        return;
-      }
-
       const bytes = hexToBytes(hexData);
       if (bytes.length === 0) return;
 
@@ -562,11 +591,8 @@ export default class ElectronBleTransport {
       }
     } catch (error) {
       this.Log?.error('[Electron BLE] Protocol V2 notification error:', error);
-      if (this.runPromise) {
-        const notifyError = ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError);
-        this.runPromise.reject(notifyError);
-        this.rejectAllProtocolV2Frames(notifyError);
-      }
+      const notifyError = ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError);
+      this.rejectProtocolV2Frames(deviceId, notifyError);
     }
   }
 
@@ -602,8 +628,13 @@ export default class ElectronBleTransport {
     this.v2FramePromises.delete(uuid);
   }
 
-  private isActiveProtocolV2Call(uuid: string, token: number) {
-    return this.activeProtocolV2Call?.uuid === uuid && this.activeProtocolV2Call.token === token;
+  private rejectProtocolV2Frames(uuid: string, error: Error) {
+    this.v2FrameQueues.delete(uuid);
+    const framePromise = this.v2FramePromises.get(uuid);
+    if (framePromise) {
+      this.v2FramePromises.delete(uuid);
+      framePromise.reject(error);
+    }
   }
 
   private async readProtocolV2Frame(uuid: string) {
@@ -755,77 +786,65 @@ export default class ElectronBleTransport {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
     }
 
-    const forceRun = name === 'Initialize' || name === 'Cancel' || name === 'Ping';
-    if (this.runPromise) {
-      if (!forceRun) {
-        throw ERRORS.TypedError(HardwareErrorCode.TransportCallInProgress);
-      }
-      const error = ERRORS.TypedError(HardwareErrorCode.BleForceCleanRunPromise);
-      this.runPromise.reject(error);
-      this.rejectAllProtocolV2Frames(error);
-      this.runPromise = null;
-      this.activeProtocolV2Call = null;
-    }
-
-    const runPromise = createDeferred<Uint8Array | string>();
-    runPromise.promise.catch(() => undefined);
-    this.runPromise = runPromise;
-    const callToken = this.nextProtocolV2CallToken++;
-    this.activeProtocolV2Call = { uuid, token: callToken };
-    this.v2Assemblers.get(uuid)?.reset();
-    this.resetProtocolV2Frames(uuid);
-    let completed = false;
     const callOptions = {
       ...options,
       timeoutMs: options?.timeoutMs ?? BLE_RESPONSE_TIMEOUT_MS,
     };
 
     try {
-      const session = new ProtocolV2Session({
-        schemas: {
-          protocolV1: this._messages,
-          protocolV2: this._messagesV2,
-        },
-        router: PROTOCOL_V2_CHANNEL_BLE_UART,
-        writeFrame: (frame: Uint8Array) => this.writeWithChunking(uuid, bytesToHex(frame)),
-        readFrame: async () => {
-          const rxFrame = await this.readProtocolV2Frame(uuid);
-          if (!(rxFrame instanceof Uint8Array)) {
-            throw new Error('Response is not Uint8Array');
-          }
-          return rxFrame;
-        },
-        logger: this.Log,
-        logPrefix: 'ProtocolV2 BLE',
-        createTimeoutError: (_messageName: string, timeout: number) =>
-          ERRORS.TypedError(
-            HardwareErrorCode.BleTimeoutError,
-            `BLE response timeout after ${timeout}ms for ${name}`
-          ),
-      });
-
-      const result = await session.call(name, data, callOptions);
-      completed = true;
-      return result;
+      return await this.protocolV2Links.call(
+        uuid,
+        () => this.createProtocolV2Adapter(uuid),
+        name,
+        data,
+        callOptions
+      );
     } catch (e) {
-      if (this.isActiveProtocolV2Call(uuid, callToken)) {
-        this.v2Assemblers.get(uuid)?.reset();
-        this.resetProtocolV2Frames(uuid);
-      }
       this.Log?.error('[Electron BLE] Protocol V2 call error:', e);
       throw e;
-    } finally {
-      if (this.isActiveProtocolV2Call(uuid, callToken)) {
-        if (!completed) {
-          this.v2Assemblers.get(uuid)?.reset();
-        }
-        this.resetProtocolV2Frames(uuid);
-        this.activeProtocolV2Call = null;
-      }
-      if (this.runPromise === runPromise) {
-        this.runPromise = null;
-      }
     }
+  }
+
+  private createProtocolV2Adapter(uuid: string) {
+    const generation = this.notificationTokens.get(uuid) ?? 0;
+    const assertCurrentGeneration = () => {
+      if (this.notificationTokens.get(uuid) !== generation) {
+        throw new Error(`Protocol V2 notification generation changed for ${uuid}`);
+      }
+    };
+
+    return {
+      router: PROTOCOL_V2_CHANNEL_BLE_UART,
+      generation,
+      prepareCall: () => {
+        assertCurrentGeneration();
+        this.v2Assemblers.get(uuid)?.reset();
+        this.resetProtocolV2Frames(uuid);
+      },
+      writeFrame: (frame: Uint8Array) => {
+        assertCurrentGeneration();
+        return this.writeWithChunking(uuid, bytesToHex(frame));
+      },
+      readFrame: async () => {
+        assertCurrentGeneration();
+        const rxFrame = await this.readProtocolV2Frame(uuid);
+        if (!(rxFrame instanceof Uint8Array)) {
+          throw new Error('Response is not Uint8Array');
+        }
+        return rxFrame;
+      },
+      reset: (reason: string) => {
+        this.v2Assemblers.get(uuid)?.reset();
+        this.rejectProtocolV2Frames(uuid, new Error(reason));
+      },
+      logger: this.Log,
+      logPrefix: 'ProtocolV2 BLE',
+      createTimeoutError: (messageName: string, timeout: number) =>
+        ERRORS.TypedError(
+          HardwareErrorCode.BleTimeoutError,
+          `BLE response timeout after ${timeout}ms for ${messageName}`
+        ),
+    };
   }
 
   private processProtocolV1Notification(deviceId: string, hexData: string): PacketProcessResult {
