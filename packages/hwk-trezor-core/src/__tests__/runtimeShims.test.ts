@@ -8,6 +8,24 @@ import {
 } from '../runtime/crypto';
 
 describe('runtime shims', () => {
+  test('preserves an existing global Buffer implementation', () => {
+    const globalScope = globalThis as typeof globalThis & {
+      Buffer?: typeof Buffer;
+    };
+    const originalBuffer = globalScope.Buffer;
+    const existingBuffer = function ExistingBuffer() {} as unknown as typeof Buffer;
+
+    globalScope.Buffer = existingBuffer;
+
+    try {
+      installBufferRuntime();
+
+      expect(globalScope.Buffer).toBe(existingBuffer);
+    } finally {
+      globalScope.Buffer = originalBuffer;
+    }
+  });
+
   test('Buffer.subarray returns a Buffer-compatible view', () => {
     const bytes = Buffer.from([0x12, 0x34, 0x56]);
     const view = bytes.subarray(0, 2);

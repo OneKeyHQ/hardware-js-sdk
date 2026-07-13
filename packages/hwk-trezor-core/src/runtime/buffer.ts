@@ -18,7 +18,9 @@ export const toRuntimeBuffer = (bytes: Buffer | Uint8Array | ArrayBuffer): Buffe
 };
 
 export const installBufferRuntime = () => {
-  globalScope.Buffer = RuntimeBuffer;
+  if (typeof globalScope.Buffer === 'undefined') {
+    globalScope.Buffer = RuntimeBuffer;
+  }
 
   RuntimeBuffer.prototype.subarray = function subarray(start?: number, end?: number) {
     return toBufferView(uint8ArraySubarray.call(this, start, end));
