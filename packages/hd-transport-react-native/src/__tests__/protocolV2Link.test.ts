@@ -218,4 +218,20 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     expect(writeSpy.mock.calls.map(([, , options]) => options?.highVolume)).toEqual([false, true]);
     await transport.release(uuid, true);
   });
+
+  test('rejects an active Protocol V2 reader when disconnect resets the link', async () => {
+    const harness = createHarness();
+    const { transport, uuid, sentSeqs } = harness;
+    await transport.acquire({ uuid });
+    harness.setShouldRespond(false);
+
+    const call = transport.call(uuid, 'Ping', { message: 'disconnect' }, { timeoutMs: 50 });
+    while (sentSeqs.length < 2) {
+      await Promise.resolve();
+    }
+
+    const rejection = expect(call).rejects.toThrow('React Native BLE transport disconnected');
+    await transport.disconnect(uuid);
+    await rejection;
+  });
 });

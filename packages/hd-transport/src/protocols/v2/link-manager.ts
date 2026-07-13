@@ -28,6 +28,9 @@ export type ProtocolV2LinkManagerOptions<Key> = {
 type ProtocolV2Link = {
   adapter: ProtocolV2LinkAdapter;
   session: ProtocolV2Session;
+  state: {
+    invalidatedReason?: string;
+  };
 };
 
 export class ProtocolV2LinkManager<Key> {
@@ -53,10 +56,14 @@ export class ProtocolV2LinkManager<Key> {
     const run = () => this.executeCall(key, createAdapter, name, data, options);
     const previous = this.callQueues.get(key) ?? Promise.resolve();
     const result = previous.then(run, run);
-    this.callQueues.set(
-      key,
-      result.catch(() => undefined)
-    );
+    const queue = result.catch(() => undefined);
+    this.callQueues.set(key, queue);
+    result
+      .then(
+        () => this.clearSettledCallQueue(key, queue),
+        () => this.clearSettledCallQueue(key, queue)
+      )
+      .catch(() => undefined);
     return result;
   }
 
@@ -65,6 +72,7 @@ export class ProtocolV2LinkManager<Key> {
     if (!link) return;
 
     this.links.delete(key);
+    link.state.invalidatedReason = reason;
     await link.adapter.reset(reason);
     await this.options.onLinkInvalidated?.(key, reason);
   }
@@ -84,6 +92,12 @@ export class ProtocolV2LinkManager<Key> {
     if (existing) return existing;
 
     const adapter = createAdapter();
+    const state: ProtocolV2Link['state'] = {};
+    const assertLinkActive = () => {
+      if (state.invalidatedReason) {
+        throw new Error(state.invalidatedReason);
+      }
+    };
     let sequenceCursor = this.sequences.get(key);
     if (!sequenceCursor) {
       sequenceCursor = new ProtocolV2SequenceCursor();
@@ -95,14 +109,27 @@ export class ProtocolV2LinkManager<Key> {
       maxFrameBytes: adapter.maxFrameBytes,
       generation: adapter.generation,
       sequenceCursor,
-      prepareCall: context => adapter.prepareCall(context),
-      writeFrame: (frame, context) => adapter.writeFrame(frame, context),
-      readFrame: context => adapter.readFrame(context),
+      prepareCall: async context => {
+        assertLinkActive();
+        await adapter.prepareCall(context);
+        assertLinkActive();
+      },
+      writeFrame: async (frame, context) => {
+        assertLinkActive();
+        await adapter.writeFrame(frame, context);
+        assertLinkActive();
+      },
+      readFrame: async context => {
+        assertLinkActive();
+        const frame = await adapter.readFrame(context);
+        assertLinkActive();
+        return frame;
+      },
       logger: adapter.logger,
       logPrefix: adapter.logPrefix,
       createTimeoutError: adapter.createTimeoutError,
     });
-    const link = { adapter, session };
+    const link = { adapter, session, state };
     this.links.set(key, link);
     return link;
   }
@@ -122,6 +149,12 @@ export class ProtocolV2LinkManager<Key> {
         await this.invalidateLink(key, `Protocol V2 link-fatal error: ${errorMessage}`);
       }
       throw error;
+    }
+  }
+
+  private clearSettledCallQueue(key: Key, queue: Promise<unknown>) {
+    if (this.callQueues.get(key) === queue) {
+      this.callQueues.delete(key);
     }
   }
 }

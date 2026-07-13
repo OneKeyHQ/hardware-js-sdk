@@ -132,8 +132,6 @@ export default class ElectronBleTransport {
     },
   });
 
-  private activeProtocolV2Call: { uuid: string; token: number } | null = null;
-
   private notificationCleanups: Map<string, () => void> = new Map();
 
   private disconnectCleanups: Map<string, () => void> = new Map();
@@ -184,9 +182,6 @@ export default class ElectronBleTransport {
     this.v1Buffers.delete(deviceId);
     this.v2Assemblers.delete(deviceId);
     this.resetProtocolV2Frames(deviceId);
-    if (this.activeProtocolV2Call?.uuid === deviceId) {
-      this.activeProtocolV2Call = null;
-    }
     this.notificationTokens.delete(deviceId);
 
     const notifyCleanup = this.notificationCleanups.get(deviceId);
@@ -270,7 +265,6 @@ export default class ElectronBleTransport {
       this.runPromise.reject(error);
       this.rejectAllProtocolV2Frames(error);
       this.runPromise = null;
-      this.activeProtocolV2Call = null;
     }
 
     try {
@@ -452,9 +446,6 @@ export default class ElectronBleTransport {
     this.v1Buffers.set(uuid, { buffer: [], bufferLength: 0 });
     this.v2Assemblers.get(uuid)?.reset();
     this.resetProtocolV2Frames(uuid);
-    if (this.activeProtocolV2Call?.uuid === uuid) {
-      this.activeProtocolV2Call = null;
-    }
     if (this.runPromise) {
       const error = ERRORS.TypedError(HardwareErrorCode.BleForceCleanRunPromise);
       this.runPromise.reject(error);

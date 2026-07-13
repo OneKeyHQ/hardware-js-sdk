@@ -275,4 +275,52 @@ describe('ProtocolV2LinkManager', () => {
     expect(adapter.reset).not.toHaveBeenCalled();
     expect(sentSeqs).toEqual([1, 2]);
   });
+
+  test('removes a settled per-device call queue', async () => {
+    const sentSeqs = [];
+    const { createAdapter } = createAdapterFactory(sentSeqs);
+    const manager = new ProtocolV2LinkManager({
+      getSchemas: () => schemas,
+      classifyError: () => 'recoverable',
+    });
+
+    await manager.call('device-a', createAdapter, 'Ping', { message: 'done' });
+
+    expect(manager.callQueues.size).toBe(0);
+  });
+
+  test('stops an in-flight call before reading when its link is invalidated during write', async () => {
+    let releaseWrite;
+    let markWriteStarted;
+    const writeStarted = new Promise(resolve => {
+      markWriteStarted = resolve;
+    });
+    const writeBlocked = new Promise(resolve => {
+      releaseWrite = resolve;
+    });
+    const success = ProtocolV2.encodeFrame(schemas, 'Success', { message: 'ok' });
+    const adapter = {
+      router: 1,
+      generation: 1,
+      prepareCall: jest.fn(),
+      writeFrame: jest.fn(async () => {
+        markWriteStarted();
+        await writeBlocked;
+      }),
+      readFrame: jest.fn(() => Promise.resolve(success)),
+      reset: jest.fn(),
+    };
+    const manager = new ProtocolV2LinkManager({
+      getSchemas: () => schemas,
+      classifyError: () => 'recoverable',
+    });
+
+    const call = manager.call('device-a', () => adapter, 'Ping', { message: 'pending' });
+    await writeStarted;
+    await manager.invalidateLink('device-a', 'device disconnected');
+    releaseWrite();
+
+    await expect(call).rejects.toThrow('device disconnected');
+    expect(adapter.readFrame).not.toHaveBeenCalled();
+  });
 });

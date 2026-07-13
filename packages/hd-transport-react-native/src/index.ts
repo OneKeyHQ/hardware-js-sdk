@@ -319,8 +319,6 @@ export default class ReactNativeBleTransport {
     },
   });
 
-  private activeProtocolV2Call: { uuid: string; token: number } | null = null;
-
   private monitorTokens: Map<string, number> = new Map();
 
   private nextMonitorToken = 1;
@@ -709,7 +707,6 @@ export default class ReactNativeBleTransport {
       this.runPromise.reject(error);
       this.rejectAllProtocolV2Frames(error);
       this.runPromise = null;
-      this.activeProtocolV2Call = null;
       Log?.debug('Force clean Bluetooth run promise, forceCleanRunPromise: ', forceCleanRunPromise);
     }
 
@@ -999,7 +996,6 @@ export default class ReactNativeBleTransport {
       this.runPromise.reject(error);
       this.runPromise = null;
       this.rejectAllProtocolV2Frames(error);
-      this.activeProtocolV2Call = null;
     } else {
       this.resetProtocolV2Frames(uuid);
     }
@@ -1007,9 +1003,6 @@ export default class ReactNativeBleTransport {
     if (Platform.OS === 'android' && !onclose && transport) {
       this.protocolV2Assemblers.get(uuid)?.reset();
       this.resetProtocolV2Frames(uuid);
-      if (this.activeProtocolV2Call?.uuid === uuid) {
-        this.activeProtocolV2Call = null;
-      }
       return Promise.resolve(true);
     }
 
@@ -1329,6 +1322,7 @@ export default class ReactNativeBleTransport {
 
   async disconnect(session: string) {
     Log?.debug('transport-react-native transport resetSession: ', session);
+    await this.protocolV2Links.invalidateLink(session, 'React Native BLE transport disconnected');
     const transport = transportCache[session];
 
     // Clean up disconnect subscription first to prevent onDisconnected callback
@@ -1390,9 +1384,6 @@ export default class ReactNativeBleTransport {
     this.deviceProtocolHints.delete(session);
     this.protocolV2Assemblers.delete(session);
     this.resetProtocolV2Frames(session);
-    if (this.activeProtocolV2Call?.uuid === session) {
-      this.activeProtocolV2Call = null;
-    }
 
     // emit the disconnect event
     try {
@@ -1499,9 +1490,6 @@ export default class ReactNativeBleTransport {
     );
     this.protocolV2Assemblers.get(uuid)?.reset();
     this.resetProtocolV2Frames(uuid);
-    if (this.activeProtocolV2Call?.uuid === uuid) {
-      this.activeProtocolV2Call = null;
-    }
     if (this.runPromise) {
       const error = ERRORS.TypedError(HardwareErrorCode.BleForceCleanRunPromise);
       this.runPromise.reject(error);
