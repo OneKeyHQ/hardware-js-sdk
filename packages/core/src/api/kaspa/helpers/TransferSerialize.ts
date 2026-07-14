@@ -76,7 +76,7 @@ function getSigOpCountsHash(transaction: KaspaSignTransactionParams, sighashType
 function hashTxOut(hashWriter: HashWriter, output: KaspaSignOutputParams) {
   hashWriter.writeUInt64LE(output.satoshis);
   hashWriter.writeUInt16LE(0); // TODO: USE REAL SCRIPT VERSION
-  hashWriter.writeVarBytes(Buffer.from(output.script, 'hex'));
+  hashWriter.writeVarBytes(Buffer.from(output.script ?? '', 'hex'));
 }
 
 function getOutputsHash(
@@ -126,7 +126,7 @@ export function serialize(transaction: KaspaSignTransactionParams, inputNumber: 
   const input = transaction.inputs[inputNumber];
   hashOutpoint(hashWriter, input);
   hashWriter.writeUInt16LE(0); // TODO: USE REAL SCRIPT VERSION
-  hashWriter.writeVarBytes(Buffer.from(input.output.script, 'hex'));
+  hashWriter.writeVarBytes(Buffer.from(input.output.script!, 'hex'));
   hashWriter.writeUInt64LE(input.output.satoshis);
   hashWriter.writeUInt64LE(input.sequenceNumber);
   hashWriter.writeUInt8(transaction.sigOpCount ?? 1); // sigOpCount
