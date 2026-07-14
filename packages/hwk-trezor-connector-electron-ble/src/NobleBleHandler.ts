@@ -1,4 +1,9 @@
-import { TREZOR_BLE_PACKET_SIZE, TREZOR_BLE_UUIDS } from '@onekeyfe/hwk-trezor-adapter';
+import {
+  TREZOR_BLE_PACKET_SIZE,
+  TREZOR_BLE_UUIDS,
+  isTrezorBleServiceUuid,
+  isTrezorSafe7BleName,
+} from '@onekeyfe/hwk-trezor-adapter';
 import {
   type TrezorDebugLogLevel,
   type TrezorDebugLogger,
@@ -27,6 +32,14 @@ export interface NobleLike {
   removeListener(event: string, handler: (...args: any[]) => void): NobleLike;
   startScanningAsync(serviceUuids: string[], allowDuplicates: boolean): Promise<void>;
   stopScanningAsync(): Promise<void>;
+  /**
+   * Connect by id/address with NO scan. Both native backends support this and
+   * emit a `discover` for the peripheral as a side effect: Windows synthesizes
+   * one for an unknown address (`BLEManager::Connect`, lib/win/src/ble_manager.cc)
+   * and macOS resolves it via `retrievePeripheralsWithIdentifiers`
+   * (lib/mac/src/ble_manager.mm). Optional so a stub noble can omit it.
+   */
+  connectAsync?(idOrAddress: string): Promise<NoblePeripheralLike | undefined>;
   reset?(): Promise<void>;
 }
 
@@ -94,6 +107,17 @@ interface DeviceEntry {
 }
 
 const normalizeUuid = (uuid: string): string => uuid.replace(/-/g, '').toLowerCase();
+
+/**
+ * Is this advertisement a Trezor? Stands in for the service-UUID scan filter,
+ * which we cannot use (see `scan`). Matches the name carried in the ADV packet,
+ * or the service UUID once a scan response has merged into the peripheral.
+ */
+const isTrezorPeripheral = (p: NoblePeripheralLike): boolean => {
+  const adv = p.advertisement ?? {};
+  if (isTrezorSafe7BleName(adv.localName)) return true;
+  return (adv.serviceUuids ?? []).some(uuid => isTrezorBleServiceUuid(uuid));
+};
 
 /**
  * Map a noble peripheral to the serializable info we ship over IPC. Buffers
@@ -231,13 +255,25 @@ export class NobleBleHandler {
     };
   }
 
-  /** Lazy-start a continuous scan and return the current snapshot immediately. */
+  /**
+   * Lazy-start a continuous scan and return the current snapshot immediately.
+   *
+   * Scans UNFILTERED and filters for Trezor in `_snapshot()` instead. A
+   * service-UUID filter cannot be used here: noble's Windows backend applies it
+   * per RECEIVED PACKET (`BLEManager::OnScanResult`, lib/win/src/ble_manager.cc),
+   * and a Safe 7's ADV packet carries only its name — the service UUID lives in
+   * the scan response, which arrives as a separate, irregularly-timed event. So
+   * a filtered scan drops every ADV packet and the device appears to be
+   * undiscoverable for minutes at a time while it is plainly on air. (OneKey's
+   * own devices do advertise their service UUID, which is why the same filter is
+   * safe in `hd-transport-electron` and was copied here by mistake.)
+   */
   async scan(options?: {
     serviceUuids?: string[];
     durationMs?: number;
   }): Promise<TrezorBleDeviceInfo[]> {
     await this.init();
-    const serviceUuids = options?.serviceUuids ?? [this._uuids.service];
+    const serviceUuids = options?.serviceUuids ?? [];
     if (!this._scanning) {
       this._scanning = true;
       // allowDuplicates=true keeps advertisements flowing so we can age out gone devices.
@@ -249,10 +285,33 @@ export class NobleBleHandler {
       }
     }
     this._armIdleStop();
-    return this._snapshot();
+    const devices = this._snapshot();
+    // raw vs kept. An empty result now has two very different causes and the log
+    // must say which: raw=0 means nothing is on air at all (radio, or the device
+    // simply is not advertising); raw>0 with kept=0 means WE are dropping it —
+    // the Trezor name/uuid filter is wrong. Without this the two look identical.
+    if (devices.length === 0) {
+      this._log('warn', 'scan.empty', {
+        raw: this._discovered.size,
+        kept: 0,
+        rawNames: [...this._discovered.values()]
+          .map(p => p.advertisement?.localName)
+          .filter(Boolean),
+      });
+    }
+    return devices;
   }
 
-  /** Current in-range devices, dropping any that aged past the liveness TTL. */
+  /**
+   * Current in-range Trezor devices, dropping any that aged past the liveness
+   * TTL. The Trezor test replaces the service-UUID scan filter we cannot use
+   * (see `scan`): it matches the name from the ADV packet, or the service UUID
+   * once a scan response has merged into the same peripheral.
+   *
+   * Note the TTL only prunes what the CALLER sees. `_discovered` is a cache, not
+   * the source of truth for reachability — a device missing from here can still
+   * be connected to by id (`_directConnect`).
+   */
   private _snapshot(): TrezorBleDeviceInfo[] {
     const now = Date.now();
     const result: TrezorBleDeviceInfo[] = [];
@@ -262,6 +321,7 @@ export class NobleBleHandler {
         this._lastSeen.delete(id);
         continue;
       }
+      if (!isTrezorPeripheral(peripheral)) continue;
       result.push(peripheralToInfo(peripheral));
     }
     return result;
@@ -338,11 +398,14 @@ export class NobleBleHandler {
 
   /**
    * Scan for a specific peripheral id and resolve THE MOMENT it's discovered,
-   * stopping the scan immediately (don't wait out the full window). This is the
-   * fast reconnect path for a stored connectId. noble can't connect by id
-   * without a scan (its JS peripheral objects only exist after a `discover`
-   * event), but the device advertises continuously so an early-exit scan is
-   * usually sub-second. Returns undefined on timeout.
+   * stopping the scan immediately (don't wait out the full window). The fast
+   * reconnect path for a stored connectId when the device IS advertising.
+   *
+   * This used to be the only reconnect path, on two assumptions that are both
+   * false: that noble cannot connect by id without a scan (it can — see
+   * `_directConnect`), and that "the device advertises continuously" (a bonded
+   * Safe 7 does not — it holds the link and goes silent). Callers must fall
+   * back to `_directConnect` when this returns undefined.
    */
   private async _scanUntilFound(
     id: string,
@@ -368,8 +431,72 @@ export class NobleBleHandler {
       };
       const timer = setTimeout(() => finish(this._discovered.get(id)), timeoutMs);
       noble.on('discover', onDiscover);
-      void noble.startScanningAsync([this._uuids.service], false);
+      // Unfiltered, for the same reason as `scan()` — a service-UUID filter
+      // drops the Safe 7's ADV packets outright on Windows.
+      void noble.startScanningAsync([], false);
     });
+  }
+
+  /**
+   * Connect by id with no scan and no advertisement.
+   *
+   * This is the ONLY path that reaches a device which is bonded but silent. A
+   * Trezor Safe 7 stops advertising once it holds a link and waits for the host
+   * (its screen says "wait connection"), so after OS pairing no amount of
+   * scanning will ever rediscover it — and `_scanUntilFound` alone therefore
+   * dead-ends with "device not found" on a device that is sitting right there,
+   * bonded and reachable.
+   *
+   * noble supports this: `noble.connectAsync(id)` needs no prior `discover`,
+   * because both native backends materialize the peripheral themselves (Windows
+   * synthesizes one for an unknown address, macOS retrieves it by identifier)
+   * and then emit a `discover`, which our own handler turns back into a
+   * `_discovered` entry. OneKey's own noble handler calls this "direct
+   * connection mode"; Trezor Suite's equivalent is asking the adapter for its
+   * peripheral list instead of keeping a cache.
+   *
+   * Returns undefined (not throw) so the caller reports the normal
+   * "device not found" rather than a confusing noble-internal error.
+   */
+  private async _directConnect(id: string): Promise<NoblePeripheralLike | undefined> {
+    const noble = this._requireNoble();
+    if (typeof noble.connectAsync !== 'function') {
+      // An old/stub noble. Say so explicitly — otherwise this is indistinguishable
+      // in the log from "the device wasn't there", which is a different problem.
+      this._log('warn', 'connect.direct.unavailable', { id });
+      return undefined;
+    }
+    // warn, not info: this call is the load-bearing assumption of the whole fix —
+    // that noble can still reach a bonded device which has STOPPED ADVERTISING.
+    // It has never been proven against real hardware, so it must always be in the
+    // log, not only when debug logging happens to be on.
+    this._log('warn', 'connect.direct.start', { id });
+    const startedAt = Date.now();
+    try {
+      // Bounded by the overall connect timeout in `connect()` — noble itself has
+      // none, and the macOS backend silently never resolves when it cannot
+      // retrieve the peripheral.
+      const peripheral = await noble.connectAsync(id);
+      const resolved = peripheral ?? this._discovered.get(id);
+      this._log('warn', 'connect.direct.done', {
+        id,
+        elapsedMs: Date.now() - startedAt,
+        found: Boolean(resolved),
+        // The one field that says whether the fix actually worked: an open link,
+        // or merely an object. Anything other than 'connected' is a failure that
+        // would otherwise surface later as a confusing service-discovery error.
+        state: resolved?.state,
+        fromNoble: Boolean(peripheral),
+      });
+      return resolved;
+    } catch (error) {
+      this._log('warn', 'connect.direct.error', {
+        id,
+        elapsedMs: Date.now() - startedAt,
+        error: String(error),
+      });
+      return undefined;
+    }
   }
 
   // noble's disconnectAsync hangs on a peripheral whose connect just failed (it
@@ -411,13 +538,53 @@ export class NobleBleHandler {
     // Stop scanning (keep the cache) and let the radio settle before connecting.
     await this._pauseScan();
     await delay(BLE_CONNECT_SETTLE_MS);
+    // Which of the three routes got us a peripheral is THE diagnostic for this
+    // whole area: a cache hit means the happy path; a scan hit means the device
+    // was still advertising; `direct` means it had gone silent and only
+    // connect-by-id could reach it; `none` means we are back to the old dead end.
+    let route: 'cache' | 'scan' | 'direct' | 'none' = 'cache';
     let peripheral = this._discovered.get(id);
     if (!peripheral) {
+      route = 'scan';
       peripheral = await this._scanUntilFound(id, TREZOR_BLE_SCAN_DURATION_MS);
     }
-    if (!peripheral) throw new Error(`Trezor BLE device not found: ${id}`);
+    if (!peripheral) {
+      route = 'direct';
+    }
+    if (!peripheral) {
+      // Last resort, and the only path that works for a bonded-but-silent
+      // device. See _directConnect.
+      //
+      // Deliberately AFTER the scan, even though that costs the full scan window
+      // on this path: macOS's noble backend never resolves connect-by-id for a
+      // peripheral CoreBluetooth cannot retrieve (it drops the failure on the
+      // floor — `NobleMac::Connect`, lib/mac/src/noble_mac.mm), so trying it
+      // first would risk hanging where a scan would simply have found the device.
+      peripheral = await this._directConnect(id);
+    }
+    if (!peripheral) {
+      // Every route exhausted. Log what we could see, so "device not found" is
+      // never again a dead end with nothing behind it: `discoveredCount` says
+      // whether the scan saw ANY BLE traffic (0 = radio/scan problem) and
+      // `trezorCount` whether the name/uuid filter is rejecting our own device.
+      this._log('warn', 'connect.notFound', {
+        id,
+        route: 'none',
+        discoveredCount: this._discovered.size,
+        trezorCount: [...this._discovered.values()].filter(isTrezorPeripheral).length,
+        knownIds: [...this._discovered.keys()],
+      });
+      throw new Error(`Trezor BLE device not found: ${id}`);
+    }
 
     const wasConnected = peripheral.state === 'connected';
+    // The single line that explains any BLE connect after the fact.
+    this._log('warn', 'connect.route', {
+      id,
+      route,
+      wasConnected,
+      name: peripheral.advertisement?.localName,
+    });
     if (!wasConnected) {
       await peripheral.connectAsync();
     }
