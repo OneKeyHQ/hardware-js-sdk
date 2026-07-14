@@ -181,6 +181,14 @@ export declare function pathInfo(
 
 export declare const filesystemFileRead: typeof fileRead;
 export declare const filesystemFileWrite: typeof fileWrite;
+
+export declare function uploadPortfolio(
+  connectId: string,
+  params: {
+    packageBytes: ArrayBuffer | Uint8Array | Blob;
+    timeoutMs?: number | string;
+  }
+): Response<FileInfo & { portfolioUpdated: true }>;
 export declare const filesystemFileDelete: typeof fileDelete;
 export declare const filesystemDirList: typeof dirList;
 export declare const filesystemDirMake: typeof dirMake;

@@ -26,6 +26,7 @@ import type {
   pathInfo,
   ping,
   protocolInfoRequest,
+  uploadPortfolio,
 } from './protocolV2';
 import type { off, on, removeAllListeners } from './event';
 import type { uiResponse } from './uiResponse';
@@ -275,6 +276,7 @@ export type CoreApi = {
   pathInfo: typeof pathInfo;
   filesystemFileRead: typeof filesystemFileRead;
   filesystemFileWrite: typeof filesystemFileWrite;
+  uploadPortfolio: typeof uploadPortfolio;
   filesystemFileDelete: typeof filesystemFileDelete;
   filesystemDirList: typeof filesystemDirList;
   filesystemDirMake: typeof filesystemDirMake;

@@ -7,6 +7,7 @@ import DnxSignTransaction from '../src/api/dynex/DnxSignTransaction';
 import DirList from '../src/api/DirList';
 import FileRead from '../src/api/FileRead';
 import FileWrite from '../src/api/FileWrite';
+import UploadPortfolio from '../src/api/UploadPortfolio';
 import DeviceFactoryInfoGet from '../src/api/protocol-v2/DeviceFactoryInfoGet';
 import DeviceFactoryInfoSet from '../src/api/protocol-v2/DeviceFactoryInfoSet';
 import DeviceFirmwareUpdate from '../src/api/protocol-v2/DeviceFirmwareUpdate';
@@ -79,6 +80,69 @@ jest.mock('../src/data/config', () => ({
   getSDKVersion: jest.fn(() => '1.0.0'),
   DEFAULT_DOMAIN: 'https://jssdk.onekey.so/1.0.0/',
 }));
+
+describe('UploadPortfolio', () => {
+  test('stages the complete package before applying PortfolioUpdate', async () => {
+    const packageBytes = new Uint8Array([1, 2, 3]);
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce({ message: { processed_byte: 3 } })
+      .mockResolvedValueOnce({ message: { message: 'Portfolio updated' } });
+    const method = new UploadPortfolio({
+      id: 1,
+      payload: {
+        method: 'uploadPortfolio',
+        packageBytes,
+      },
+    });
+    (method as any).device = stubDevice({ commands: { typedCall } });
+    method.postMessage = jest.fn();
+
+    method.init();
+    const result = await method.run();
+
+    expect(typedCall).toHaveBeenNthCalledWith(
+      1,
+      'FilesystemFileWrite',
+      'FilesystemFile',
+      {
+        file: {
+          path: 'vol1:/portfolio/portfolio.pfol.pending',
+          offset: 0,
+          total_size: 3,
+          data: packageBytes,
+        },
+        overwrite: true,
+        append: false,
+        ui_percentage: 100,
+      },
+      { timeoutMs: undefined }
+    );
+    expect(typedCall).toHaveBeenNthCalledWith(2, 'PortfolioUpdate', 'Success', {});
+    expect(result).toMatchObject({
+      path: 'vol1:/portfolio/portfolio.pfol.pending',
+      processed_byte: 3,
+      portfolioUpdated: true,
+    });
+  });
+
+  test('does not apply PortfolioUpdate when staging fails', async () => {
+    const typedCall = jest.fn().mockRejectedValue(new Error('write failed'));
+    const method = new UploadPortfolio({
+      id: 1,
+      payload: {
+        method: 'uploadPortfolio',
+        packageBytes: new Uint8Array([1]),
+      },
+    });
+    (method as any).device = stubDevice({ commands: { typedCall } });
+
+    method.init();
+
+    await expect(method.run()).rejects.toThrow('write failed');
+    expect(typedCall).toHaveBeenCalledTimes(1);
+  });
+});
 
 const descriptor = {
   id: 'ble-id',

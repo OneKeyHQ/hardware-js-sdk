@@ -1,0 +1,92 @@
+{
+  "v": 1,
+  "ts": 1783735200,
+  "currency": "usd",
+  "currencySymbol": "$",
+  "account": {
+    "label": "Account #1",
+    "addressMasked": "0x12...ab"
+  },
+  "totalFiat": "70581.74",
+  "tokenCount": 6,
+  "tokens": [
+    {
+      "symbol": "BTC",
+      "name": "Bitcoin",
+      "contractAddress": "",
+      "iconName": "BTC",
+      "isNative": true,
+      "isAllNetworks": false,
+      "balance": "0.41308",
+      "fiatValue": "27112.10",
+      "price": 65631.11,
+      "change24h": 2.38,
+      "networkId": "btc--0"
+    },
+    {
+      "symbol": "ETH",
+      "name": "Ethereum",
+      "contractAddress": "",
+      "iconName": "ETH",
+      "isNative": true,
+      "isAllNetworks": false,
+      "balance": "4.20492",
+      "fiatValue": "14720.64",
+      "price": 3500.82,
+      "change24h": -1.23,
+      "networkId": "evm--1"
+    },
+    {
+      "symbol": "SOL",
+      "name": "Solana",
+      "contractAddress": "",
+      "iconName": "SOL",
+      "isNative": true,
+      "isAllNetworks": false,
+      "balance": "93.5061",
+      "fiatValue": "14808.43",
+      "price": 158.37,
+      "change24h": 4.12,
+      "networkId": "sol--101"
+    },
+    {
+      "symbol": "USDC",
+      "name": "USD Coin",
+      "contractAddress": "0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      "iconName": "USDC",
+      "isNative": false,
+      "isAllNetworks": true,
+      "balance": "5721.33",
+      "fiatValue": "5721.33",
+      "price": 1.0,
+      "change24h": 0.01,
+      "networkId": "evm--1"
+    },
+    {
+      "symbol": "USDT",
+      "name": "Tether USD",
+      "contractAddress": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+      "iconName": "USDT",
+      "isNative": false,
+      "isAllNetworks": true,
+      "balance": "4260.73",
+      "fiatValue": "4260.73",
+      "price": 1.0,
+      "change24h": -0.01,
+      "networkId": "evm--1"
+    },
+    {
+      "symbol": "XRP",
+      "name": "XRP",
+      "contractAddress": "",
+      "iconName": "XRP",
+      "isNative": true,
+      "isAllNetworks": false,
+      "balance": "7782.9273",
+      "fiatValue": "3958.51",
+      "price": 0.5086,
+      "change24h": 1.76,
+      "networkId": "xrp--0"
+    }
+  ]
+}

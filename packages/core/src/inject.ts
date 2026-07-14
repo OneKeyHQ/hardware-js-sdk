@@ -181,6 +181,7 @@ export const createCoreApi = (
     call({ ...params, connectId, method: 'filesystemFileRead' }),
   filesystemFileWrite: (connectId, params) =>
     call({ ...params, connectId, method: 'filesystemFileWrite' }),
+  uploadPortfolio: (connectId, params) => call({ ...params, connectId, method: 'uploadPortfolio' }),
   filesystemFileDelete: (connectId, params) =>
     call({ ...params, connectId, method: 'filesystemFileDelete' }),
   filesystemDirList: (connectId, params) =>

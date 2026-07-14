@@ -66,6 +66,7 @@ export { default as dirRemove } from './DirRemove';
 export { default as pathInfo } from './PathInfo';
 export { default as filesystemFileRead } from './FileRead';
 export { default as filesystemFileWrite } from './FileWrite';
+export { default as uploadPortfolio } from './UploadPortfolio';
 export { default as filesystemFileDelete } from './FileDelete';
 export { default as filesystemDirList } from './DirList';
 export { default as filesystemDirMake } from './DirMake';

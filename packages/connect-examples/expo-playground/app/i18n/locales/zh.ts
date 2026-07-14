@@ -31,6 +31,7 @@ export const zh = {
       proDebug: 'Pro 调试',
       pro2Debug: 'Pro2 调试',
       pro2Update: 'Pro2 升级',
+      pro2Portfolio: 'Pro2 Portfolio 调试',
       pro2SpecialUpdate: 'Pro2 特殊升级',
       methodBatchTest: '链方法批量测试',
       eventTest: '事件测试',

@@ -30,6 +30,7 @@ import {
   Usb,
   UploadCloud,
   Radio,
+  WalletCards,
 } from 'lucide-react';
 import { getDeviceLabel } from '@onekeyfe/hd-core';
 import packageJson from '../../package.json';
@@ -95,6 +96,11 @@ const navigationItems = [
     title: 'common.pro2Update',
     url: '/pro2-update',
     icon: ListChecks,
+  },
+  {
+    title: 'common.pro2Portfolio',
+    url: '/pro2-portfolio',
+    icon: WalletCards,
   },
   {
     title: 'common.pro2SpecialUpdate',
