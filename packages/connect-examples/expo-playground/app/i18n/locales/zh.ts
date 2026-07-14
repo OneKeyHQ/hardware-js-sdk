@@ -310,12 +310,14 @@ export const zh = {
       filecoinSignTransaction: '使用 Filecoin 私钥签名交易',
       firmwareUpdateV2: '兼容所有设备',
       firmwareUpdateV3: 'OneKey Pro 旧固件升级流程',
-      firmwareUpdateV4: 'Protocol V2 固件升级，按 DeviceFirmwareTargetType 拆分：资源 crate、romloader、bootloader、application P1/P2、协处理器与 SE01-04 目标',
+      firmwareUpdateV4:
+        'Protocol V2 固件升级：支持 bootloader、application P1/P2、协处理器与 SE01-04；资源包单独写入，不支持 romloader',
       protocolInfoRequest: 'Protocol V2 查询协议信息',
       ping: 'Protocol V2 设备连通性测试',
       deviceReboot: 'Protocol V2 设备重启',
       getDeviceInfo: '获取统一设备信息（支持 V1 和 V2 协议）',
-      deviceInfoGet: '原生 Protocol V2 DeviceInfoGet（返回 DeviceInfo，仅 Pro2）；用复选框选择请求的 targets/types',
+      deviceInfoGet:
+        '原生 Protocol V2 DeviceInfoGet（返回 DeviceInfo，仅 Pro2）；用复选框选择请求的 targets/types',
       deviceFirmwareUpdate: 'Protocol V2 触发固件安装',
       deviceGetFirmwareUpdateStatus: 'Protocol V2 查询固件安装状态',
       deviceFactoryInfoSet: 'Protocol V2 工厂模式写入设备信息',

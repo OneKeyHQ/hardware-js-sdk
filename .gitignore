@@ -1,6 +1,9 @@
 node_modules
 .yarn
 .DS_Store
+.wrangler
+__pycache__/
+*.py[cod]
 
 .idea
 *.sublime-project
