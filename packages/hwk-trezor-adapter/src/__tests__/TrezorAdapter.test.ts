@@ -1423,3 +1423,50 @@ function typeOnlyTrezorEvmSignTxShape(adapter: TrezorAdapter) {
   });
 }
 void typeOnlyTrezorEvmSignTxShape;
+
+describe('TrezorAdapter._sanitizeForLog', () => {
+  const sanitize = (value: unknown) =>
+    (TrezorAdapter as unknown as { _sanitizeForLog(v: unknown): unknown })._sanitizeForLog(
+      value
+    ) as Record<string, unknown>;
+
+  it('redacts secrets: red-line (pin/passphrase/THP keys) + seed-level', () => {
+    const out = sanitize({
+      pin: '1234',
+      passphrase: 'secret',
+      passphraseState: 'st',
+      credential: 'c',
+      host_static_key: 'hk',
+      trezor_static_public_key: 'tk',
+      entropy: 'deadbeef',
+      mnemonic: 'abandon abandon',
+      seed: 'seedhex',
+      word: 'abandon',
+      words: ['abandon'],
+      privateKey: 'pk',
+    });
+    for (const key of Object.keys(out)) {
+      expect(out[key]).toBe('[redacted]');
+    }
+  });
+
+  it('keeps transaction data so a failed sign can still be reproduced', () => {
+    const tx = {
+      to: '0xabc',
+      value: '0x16345785d8a0000',
+      data: '0xdeadbeef',
+      address: 'bc1qexample',
+      path: "m/84'/0'/0'/0/0",
+      chainId: 1,
+      message: 'hello',
+    };
+    expect(sanitize({ ...tx })).toEqual(tx);
+  });
+
+  it('redacts nested secrets while keeping sibling tx fields', () => {
+    const out = sanitize({ params: { mnemonic: 'x', value: '0x1' } });
+    const params = out.params as Record<string, unknown>;
+    expect(params.mnemonic).toBe('[redacted]');
+    expect(params.value).toBe('0x1');
+  });
+});

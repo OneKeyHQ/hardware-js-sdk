@@ -254,14 +254,24 @@ export class TrezorAdapter implements IHardwareWallet {
     if (Array.isArray(value)) {
       return value.map(item => TrezorAdapter._sanitizeForLog(item));
     }
+    // Redact secrets that never help reproduce a bug but are catastrophic if
+    // leaked. Transaction data (value/to/data/outputs/signatures/addresses) is
+    // intentionally kept so a failed sign can still be replayed from the log.
     const sensitiveKeys = new Set([
       'credential',
       'credentials',
+      'entropy',
       'host_static_key',
+      'mnemonic',
+      'mnemonics',
       'passphrase',
       'passphraseState',
       'pin',
+      'privateKey',
+      'seed',
       'trezor_static_public_key',
+      'word',
+      'words',
     ]);
     return Object.fromEntries(
       Object.entries(value as Record<string, unknown>).map(([key, item]) => [
