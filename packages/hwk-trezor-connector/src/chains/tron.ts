@@ -175,10 +175,24 @@ export async function tronSignMessage(
 }
 
 /** Map the structured contract onto its Trezor protobuf message + payload. */
-function buildContractMessage(
+export function buildContractMessage(
   contract: TronContract,
   ownerAddress: string
 ): { messageName: string; value: Record<string, unknown> } {
+  // Reject conflicting contracts instead of silently signing the first match.
+  const contractCount = [
+    contract.transferContract,
+    contract.triggerSmartContract,
+    contract.freezeBalanceV2Contract,
+    contract.unfreezeBalanceV2Contract,
+    contract.voteWitnessContract,
+    contract.withdrawExpireUnfreezeContract,
+  ].filter(Boolean).length;
+  if (contractCount > 1) {
+    throw createInvalidParamsError(
+      'tronSignTransaction: contract must specify exactly one contract type'
+    );
+  }
   if (contract.transferContract) {
     const c = contract.transferContract;
     return {
