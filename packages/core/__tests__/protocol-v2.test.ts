@@ -1569,15 +1569,15 @@ describe('Protocol V2 feature adapter', () => {
     await expect(method.run()).resolves.toEqual({ address: '0x0', signature: '0x1' });
   });
 
-  test('unlocks Protocol V2 devices via UnLockDevice regardless of Pro-series version gates', async () => {
+  test('unlocks Protocol V2 devices via DeviceSessionAskPin regardless of Pro-series version gates', async () => {
     const device = Device.fromDescriptor({
       path: 'usb-path',
       protocolType: 'V2',
     } as any);
     const typedCall = jest.fn().mockImplementation(requestType => {
-      if (requestType === 'UnLockDevice') {
+      if (requestType === 'DeviceSessionAskPin') {
         return {
-          type: 'UnLockDeviceResponse',
+          type: 'DeviceSessionPinResult',
           message: { unlocked: false, passphrase_protection: false },
         };
       }
@@ -1596,7 +1596,7 @@ describe('Protocol V2 feature adapter', () => {
 
     (device as any).commands = { typedCall };
     // Pro2 版本线独立于 Pro（这里是 1.2.3，不满足 Pro 系列 4.15.0 门槛），
-    // Protocol V2 固件从首个版本即支持 UnLockDevice，不走 GetAddress 探测回退。
+    // Protocol V2 走独立的设备端 PIN 解锁流程，不走 Pro 系列版本门槛或 GetAddress 探测回退。
     (device as any).features = normalizeProtocolV2Features(
       { ...descriptor, protocolType: 'V2' } as any,
       {
@@ -1609,7 +1609,7 @@ describe('Protocol V2 feature adapter', () => {
     const features = await device.unlockDevice();
 
     expect(typedCall.mock.calls).toEqual([
-      ['UnLockDevice', 'UnLockDeviceResponse'],
+      ['DeviceSessionAskPin', 'DeviceSessionPinResult'],
       ['DeviceStatusGet', 'DeviceStatus', {}],
     ]);
     expect(typedCall).not.toHaveBeenCalledWith('GetAddress', 'Address', expect.anything());
@@ -1634,9 +1634,9 @@ describe('Protocol V2 feature adapter', () => {
       }
     );
     const typedCall = jest.fn().mockImplementation(requestType => {
-      if (requestType === 'UnLockDevice') {
+      if (requestType === 'DeviceSessionAskPin') {
         return {
-          type: 'UnLockDeviceResponse',
+          type: 'DeviceSessionPinResult',
           message: {
             unlocked: false,
             unlocked_attach_pin: false,
@@ -1665,7 +1665,7 @@ describe('Protocol V2 feature adapter', () => {
     expect(device.features?.unlockedAttachPin).toBe(true);
   });
 
-  test('maps unsupported Protocol V2 UnLockDevice to DeviceNotSupportMethod', async () => {
+  test('maps unsupported Protocol V2 DeviceSessionAskPin to DeviceNotSupportMethod', async () => {
     const device = Device.fromDescriptor({ ...descriptor, protocolType: 'V2' } as any);
     (device as any).features = normalizeProtocolV2Features(
       { ...descriptor, protocolType: 'V2' } as any,
@@ -1685,6 +1685,7 @@ describe('Protocol V2 feature adapter', () => {
       })
     );
     expect(typedCall).toHaveBeenCalledTimes(1);
+    expect(typedCall.mock.calls).toEqual([['DeviceSessionAskPin', 'DeviceSessionPinResult']]);
     expect(typedCall).not.toHaveBeenCalledWith(
       'DeviceSessionGet',
       'DeviceSession',

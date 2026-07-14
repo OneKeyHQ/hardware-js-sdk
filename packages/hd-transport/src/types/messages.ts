@@ -4905,6 +4905,16 @@ export type DeviceSession = {
   btc_test_address?: string;
 };
 
+// DeviceSessionAskPin
+export type DeviceSessionAskPin = {};
+
+// DeviceSessionPinResult
+export type DeviceSessionPinResult = {
+  unlocked?: boolean;
+  unlocked_attach_pin?: boolean;
+  passphrase_protection?: boolean;
+};
+
 // DeviceStatus
 export type DeviceStatus = {
   device_id?: string;
@@ -5649,6 +5659,8 @@ export type MessageType = {
   DeviceInfoGet: DeviceInfoGet;
   DeviceSessionGet: DeviceSessionGet;
   DeviceSession: DeviceSession;
+  DeviceSessionAskPin: DeviceSessionAskPin;
+  DeviceSessionPinResult: DeviceSessionPinResult;
   DeviceStatus: DeviceStatus;
   DeviceStatusGet: DeviceStatusGet;
   DevGetOnboardingStatus: DevGetOnboardingStatus;

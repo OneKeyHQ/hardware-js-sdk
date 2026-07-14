@@ -91,6 +91,8 @@ describe('messages', () => {
       MessageType_DeviceStatus: 60603,
       MessageType_DeviceSessionGet: 60606,
       MessageType_DeviceSession: 60607,
+      MessageType_DeviceSessionAskPin: 60608,
+      MessageType_DeviceSessionPinResult: 60609,
     });
     expect(v2Messages.nested.DeviceStatusGet).toEqual({ fields: {} });
     expect(v2Messages.nested.DeviceSessionGet.fields.session_id).toMatchObject({
@@ -101,19 +103,23 @@ describe('messages', () => {
       session_id: { id: 1, type: 'bytes' },
       btc_test_address: { id: 2, type: 'string' },
     });
+    expect(v2Messages.nested.DeviceSessionAskPin).toEqual({ fields: {} });
+    expect(v2Messages.nested.DeviceSessionPinResult.fields).toMatchObject({
+      unlocked: { id: 1, type: 'bool' },
+      unlocked_attach_pin: { id: 2, type: 'bool' },
+      passphrase_protection: { id: 3, type: 'bool' },
+    });
   });
 
-  test('Protocol V2 temporarily restores unlock ids without restoring old passphrase ids', () => {
-    expect(v2Messages.nested.MessageType.values).toMatchObject({
-      MessageType_UnLockDevice: 10030,
-      MessageType_UnLockDeviceResponse: 10031,
-    });
+  test('Protocol V2 does not restore retired unlock or passphrase ids', () => {
+    expect(v2Messages.nested.MessageType.values).not.toHaveProperty('MessageType_UnLockDevice');
+    expect(v2Messages.nested.MessageType.values).not.toHaveProperty(
+      'MessageType_UnLockDeviceResponse'
+    );
     expect(v2Messages.nested.MessageType.values).not.toHaveProperty(
       'MessageType_GetPassphraseState'
     );
     expect(v2Messages.nested.MessageType.values).not.toHaveProperty('MessageType_PassphraseState');
-    expect(v2Messages.nested.UnLockDevice).toBeDefined();
-    expect(v2Messages.nested.UnLockDeviceResponse).toBeDefined();
   });
 
   test('Protocol V2 transport and core schemas stay identical', () => {

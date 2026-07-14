@@ -1191,7 +1191,7 @@ export class Device extends EventEmitter {
   async unlockDevice() {
     if (this.isProtocolV2()) {
       try {
-        await this.commands.typedCall('UnLockDevice', 'UnLockDeviceResponse');
+        await this.commands.typedCall('DeviceSessionAskPin', 'DeviceSessionPinResult');
       } catch (error) {
         const errorText =
           error instanceof Error

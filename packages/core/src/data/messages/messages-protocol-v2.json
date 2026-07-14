@@ -453,8 +453,6 @@
         "MessageType_UiviewConfirmTxRequest": 30202,
         "MessageType_UiviewConfirmSignMessageRequest": 30203,
         "MessageType_UiviewResponse": 30204,
-        "MessageType_UnLockDevice": 10030,
-        "MessageType_UnLockDeviceResponse": 10031,
         "MessageType_DeviceFactoryInfoSet": 60000,
         "MessageType_DeviceFactoryInfoGet": 60001,
         "MessageType_DeviceFactoryInfo": 60002,
@@ -485,6 +483,8 @@
         "MessageType_DevOnboardingStatus": 60605,
         "MessageType_DeviceSessionGet": 60606,
         "MessageType_DeviceSession": 60607,
+        "MessageType_DeviceSessionAskPin": 60608,
+        "MessageType_DeviceSessionPinResult": 60609,
         "MessageType_FilesystemPermissionFix": 60800,
         "MessageType_FilesystemPathInfo": 60801,
         "MessageType_FilesystemPathInfoQuery": 60802,
@@ -11934,6 +11934,25 @@
         "btc_test_address": {
           "type": "string",
           "id": 2
+        }
+      }
+    },
+    "DeviceSessionAskPin": {
+      "fields": {}
+    },
+    "DeviceSessionPinResult": {
+      "fields": {
+        "unlocked": {
+          "type": "bool",
+          "id": 1
+        },
+        "unlocked_attach_pin": {
+          "type": "bool",
+          "id": 2
+        },
+        "passphrase_protection": {
+          "type": "bool",
+          "id": 3
         }
       }
     },

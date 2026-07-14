@@ -167,37 +167,6 @@ const removeTopLevelMessage = (source, name) => {
   throw new Error(`Unterminated message block: ${name}`);
 };
 
-const restoreTemporaryMessageType = (name, id) => {
-  const activePattern = new RegExp(
-    `^\\s*MessageType_${name}\\s*=\\s*(\\d+)\\b[^;]*;`,
-    'gm'
-  );
-  const activeMatches = Array.from(proto.matchAll(activePattern));
-  if (activeMatches.length > 1) {
-    throw new Error(`Protocol V2 schema defines MessageType_${name} more than once`);
-  }
-  if (activeMatches.length === 1) {
-    if (Number(activeMatches[0][1]) !== id) {
-      throw new Error(
-        `Protocol V2 schema defines MessageType_${name} with id ${activeMatches[0][1]}, expected ${id}`
-      );
-    }
-    return;
-  }
-
-  const commentedPattern = new RegExp(
-    `^(\\s*)//\\s*(MessageType_${name}\\s*=\\s*${id}\\b[^;]*;)`,
-    'gm'
-  );
-  const commentedMatches = Array.from(proto.matchAll(commentedPattern));
-  if (commentedMatches.length !== 1) {
-    throw new Error(
-      `Protocol V2 schema must contain exactly one commented MessageType_${name} = ${id}`
-    );
-  }
-  proto = proto.replace(commentedPattern, '$1$2');
-};
-
 [
   'Initialize',
   'GetFeatures',
@@ -206,11 +175,6 @@ const restoreTemporaryMessageType = (name, id) => {
 ].forEach(name => {
   proto = removeTopLevelMessage(proto, name);
 });
-
-// firmware-pro2 暂时注释了旧的解锁入口，但 SDK/app 仍需使用原协议 ID。
-// 只恢复 UnLockDevice，不恢复已由 DeviceSessionGet 取代的 passphrase 消息 ID。
-restoreTemporaryMessageType('UnLockDevice', 10030);
-restoreTemporaryMessageType('UnLockDeviceResponse', 10031);
 
 fs.writeFileSync(protoPath, proto);
 
@@ -242,8 +206,8 @@ const requiredMessages = [
   'DevOnboardingStatus',
   'DeviceSessionGet',
   'DeviceSession',
-  'UnLockDevice',
-  'UnLockDeviceResponse',
+  'DeviceSessionAskPin',
+  'DeviceSessionPinResult',
   'DeviceFirmwareUpdateRequest',
   'DeviceFirmwareUpdateStatusGet',
   'DeviceFirmwareUpdateStatus',
