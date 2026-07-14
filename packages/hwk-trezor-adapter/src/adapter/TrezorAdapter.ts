@@ -742,14 +742,13 @@ export class TrezorAdapter implements IHardwareWallet {
   }
 
   /**
-   * Returns a stable per-seed identifier suitable for device-match verification.
-   *
-   * Trezor exposes `device_id` in Features — a server-generated UUID written
-   * during `wipe_device` and stable for the life of the seed. Unlike Ledger
-   * (no native id, so a per-chain address is hashed), Trezor's id is global
-   * across chains, so the `chain` argument is accepted for API parity but
-   * ignored. For unsupported chains we still surface the id (since it would
-   * be the same value anyway).
+   * Returns the Trezor `device_id` from Features — a random 12-byte value the
+   * device stores and regenerates on `wipe_device`. It identifies the PHYSICAL
+   * DEVICE, not a seed/wallet: it is shared across passphrase wallets and
+   * changes after wipe/restore, so it suits device-match checks but must NOT be
+   * used as a wallet fingerprint (use `passphraseState` for wallet identity).
+   * Unlike Ledger (which hashes a per-chain address), it is chain-global, so
+   * `chain` is accepted for API parity but ignored.
    */
   async getChainFingerprint(
     connectId: string,
