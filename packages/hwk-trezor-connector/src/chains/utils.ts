@@ -63,6 +63,20 @@ export function readNumber(value: Record<string, unknown>, key: string): number 
   return typeof candidate === 'number' ? candidate : undefined;
 }
 
+// Empty / `0x` prefix / odd length / any case all pass; only non-hex chars fail.
+const HEX_STRING = /^(0x|0X)?[0-9A-Fa-f]*$/;
+
+/**
+ * Reject non-hex before protobuf `Buffer.from(v,'hex')` silently truncates it
+ * (`'zz'` → empty, `'12zz'` → `12`), which would sign different bytes than the
+ * caller intended. Mirrors OneKey hd-core `isHexString`.
+ */
+export function assertHexString(field: string, value: string): void {
+  if (!HEX_STRING.test(value)) {
+    throw createInvalidParamsError(`${field} must be a hex string`);
+  }
+}
+
 /**
  * Normalize hex for Trezor protobuf `bytes`: strip `0x` and even-pad odd
  * nibbles (`Buffer.from('5','hex')` would drop the nibble → wrong number).

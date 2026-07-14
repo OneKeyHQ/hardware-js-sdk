@@ -1,5 +1,6 @@
 import {
   type TrezorChainContext,
+  assertHexString,
   createInvalidParamsError,
   createMethodNotSupportedError,
   parseBip32Path,
@@ -118,6 +119,7 @@ function readSolSignTxParams(params: unknown): SolSignTxParams {
   if (typeof serializedTx !== 'string' || serializedTx.length === 0) {
     throw createInvalidParamsError('solSignTransaction requires serializedTx as a hex string');
   }
+  assertHexString('serializedTx', serializedTx);
   return params as SolSignTxParams;
 }
 
