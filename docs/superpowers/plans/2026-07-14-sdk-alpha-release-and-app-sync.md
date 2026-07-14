@@ -13,6 +13,7 @@
 ### Task 1: 审查 SDK 协议与 Session 实现
 
 **Files:**
+
 - Review: `packages/core/src/device/DeviceWalletSessionStore.ts`
 - Review: `packages/core/src/protocols/protocol-v2/walletSession.ts`
 - Review: `packages/core/src/device/Device.ts`
@@ -33,11 +34,16 @@ git diff c6b63591..HEAD --stat
 rg -n 'MessageType_(GetPassphraseState|PassphraseState|UnLockDevice|UnLockDeviceResponse|DeviceStatusGet|DeviceStatus|DeviceSessionGet|DeviceSession)' packages/hd-transport/messages-protocol-v2.json packages/core/src/data/messages/messages-protocol-v2.json
 ```
 
-Expected: V2 只包含 unlock `10030/10031`、status `60602/60603`、session `60606/60607`；不包含旧 passphrase `10028/10029` ID。
+Expected: V2 包含 status `60602/60603`、session `60606/60607` 和
+`DeviceSessionAskPin/DeviceSessionPinResult(60608/60609)`；不包含旧 unlock
+`10030/10031` 或旧 passphrase `10028/10029` ID。
 
 - [ ] **Step 2: 检查 Session 生命周期和错误边界**
 
-确认缓存严格使用 `deviceKey + passphraseState`，无 passphraseState 时不扫描其他钱包；invalid session 和钱包状态不一致会清理当前缓存；V2 unlock 使用 `UnLockDevice -> DeviceStatusGet`；V1 路径不改变。
+确认缓存严格使用 `deviceKey + passphraseState`，无 passphraseState 时不扫描其他
+钱包；invalid session 会清理当前缓存并无 session 重试一次，钱包状态不一致会清理
+当前缓存；V2 unlock 使用 `DeviceSessionAskPin -> DeviceSessionPinResult` 并直接更新
+Features，不调用 `DeviceStatusGet`；V1 路径不改变。
 
 - [ ] **Step 3: 运行发布前验证**
 
@@ -60,6 +66,7 @@ Expected: 所有相关测试、ESLint 和构建退出码为 0；已知 Core 全�
 ### Task 2: 发布 SDK `1.2.0-alpha.9`
 
 **Files:**
+
 - Modify: `packages/*/package.json`
 - Modify: `packages/connect-examples/expo-example/package.json`
 - Modify: `packages/connect-examples/expo-playground/package.json`
@@ -129,6 +136,7 @@ Expected: workflow 成功，两个关键包均返回 `1.2.0-alpha.9`。
 ### Task 3: 同步 app-monorepo 并触发 Desktop Release All
 
 **Files:**
+
 - Modify: `/Users/caikaisheng/Documents/GitHub/app-monorepo/package.json`
 - Modify: `/Users/caikaisheng/Documents/GitHub/app-monorepo/apps/cli/package.json`
 - Modify: `/Users/caikaisheng/Documents/GitHub/app-monorepo/yarn.lock`

@@ -1,5 +1,10 @@
 # Protocol V2 Wallet Session SDK Implementation Plan
 
+> 本计划记录 2026-07-13 的历史实现过程，其中 `UnLockDevice(10030/10031)` 和
+> unlock 后调用 `DeviceStatusGet` 的步骤已经失效。当前实现以
+> `2026-07-14-protocol-v2-passphrase-session-alignment.md` 为准，请勿继续执行本计划的
+> Task 5/6。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 在不改变 Protocol V1 行为的前提下，为 Pro2 接入共享钱包 Session Store、`DeviceStatusGet/DeviceSessionGet` API、状态刷新和恢复的 `UnLockDevice(10030/10031)` 流程。

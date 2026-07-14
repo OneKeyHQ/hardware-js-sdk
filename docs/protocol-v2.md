@@ -87,29 +87,35 @@ Protocol V2 frame 的 payload 格式：
 
 ## Protocol V2 message 表
 
-| Message                      | ID    | 方向           | 用途               |
-| ---------------------------- | ----- | -------------- | ------------------ |
-| `ProtocolInfoRequest`        | 60200 | Host -> Device | 协议探测           |
-| `ProtocolInfo`               | 60201 | Device -> Host | 协议信息响应       |
-| `Ping`                       | 60206 | Host -> Device | 链路检查           |
-| `Success`                    | 60207 | Device -> Host | 通用成功响应       |
-| `Failure`                    | 60208 | Device -> Host | 通用失败响应       |
-| `DeviceInfoGet`              | 60600 | Host -> Device | 查询 Protocol V2 设备信息 |
-| `DeviceInfo`                 | 60601 | Device -> Host | Protocol V2 设备信息响应  |
-| `DeviceReboot`                  | 60400 | Host -> Device | 设备重启           |
-| `FilesystemPathInfo`         | 60801 | Device -> Host | 文件或目录信息     |
-| `FilesystemPathInfoQuery`    | 60802 | Host -> Device | 查询文件或目录     |
-| `FilesystemFile`             | 60803 | Device -> Host | 文件数据或写入进度 |
-| `FilesystemFileRead`         | 60804 | Host -> Device | 读取文件           |
-| `FilesystemFileWrite`        | 60805 | Host -> Device | 写入文件           |
-| `FilesystemFileDelete`       | 60806 | Host -> Device | 删除文件           |
-| `FilesystemDir`              | 60807 | Device -> Host | 目录列表响应       |
-| `FilesystemDirList`          | 60808 | Host -> Device | 列目录             |
-| `FilesystemDirMake`          | 60809 | Host -> Device | 创建目录           |
-| `FilesystemDirRemove`        | 60810 | Host -> Device | 删除目录           |
-| `DeviceFirmwareUpdateRequest`   | 61000 | Host -> Device | 触发固件安装       |
-| `DeviceFirmwareUpdateStatusGet` | 61001 | Host -> Device | 查询更新状态       |
-| `DeviceFirmwareUpdateStatus`    | 61002 | Device -> Host | 更新状态响应       |
+| Message                         | ID    | 方向           | 用途                        |
+| ------------------------------- | ----- | -------------- | --------------------------- |
+| `ProtocolInfoRequest`           | 60200 | Host -> Device | 协议探测                    |
+| `ProtocolInfo`                  | 60201 | Device -> Host | 协议信息响应                |
+| `Ping`                          | 60206 | Host -> Device | 链路检查                    |
+| `Success`                       | 60207 | Device -> Host | 通用成功响应                |
+| `Failure`                       | 60208 | Device -> Host | 通用失败响应                |
+| `DeviceInfoGet`                 | 60600 | Host -> Device | 查询 Protocol V2 设备信息   |
+| `DeviceInfo`                    | 60601 | Device -> Host | Protocol V2 设备信息响应    |
+| `DeviceStatusGet`               | 60602 | Host -> Device | 查询设备运行状态            |
+| `DeviceStatus`                  | 60603 | Device -> Host | 设备运行状态响应            |
+| `DeviceSessionGet`              | 60606 | Host -> Device | 恢复或创建钱包 session      |
+| `DeviceSession`                 | 60607 | Device -> Host | 返回 session 与钱包地址指纹 |
+| `DeviceSessionAskPin`           | 60608 | Host -> Device | 请求设备端 PIN 解锁         |
+| `DeviceSessionPinResult`        | 60609 | Device -> Host | PIN 解锁状态响应            |
+| `DeviceReboot`                  | 60400 | Host -> Device | 设备重启                    |
+| `FilesystemPathInfo`            | 60801 | Device -> Host | 文件或目录信息              |
+| `FilesystemPathInfoQuery`       | 60802 | Host -> Device | 查询文件或目录              |
+| `FilesystemFile`                | 60803 | Device -> Host | 文件数据或写入进度          |
+| `FilesystemFileRead`            | 60804 | Host -> Device | 读取文件                    |
+| `FilesystemFileWrite`           | 60805 | Host -> Device | 写入文件                    |
+| `FilesystemFileDelete`          | 60806 | Host -> Device | 删除文件                    |
+| `FilesystemDir`                 | 60807 | Device -> Host | 目录列表响应                |
+| `FilesystemDirList`             | 60808 | Host -> Device | 列目录                      |
+| `FilesystemDirMake`             | 60809 | Host -> Device | 创建目录                    |
+| `FilesystemDirRemove`           | 60810 | Host -> Device | 删除目录                    |
+| `DeviceFirmwareUpdateRequest`   | 61000 | Host -> Device | 触发固件安装                |
+| `DeviceFirmwareUpdateStatusGet` | 61001 | Host -> Device | 查询更新状态                |
+| `DeviceFirmwareUpdateStatus`    | 61002 | Device -> Host | 更新状态响应                |
 
 ## WebUSB
 
@@ -161,6 +167,39 @@ flowchart TD
 
 `Protocol V2 feature adapter` 会把 `DeviceInfo.status.device_id` 写入 `device_id`，把 `DeviceInfo.hw.serial_no` 写入 `serial_no`、`onekey_serial_no`，并把 `fw.application`、`fw.bootloader`、`fw.application_data/romloader`、`coprocessor.application`、`coprocessor.bt_adv_name`、`se*`、`status.passphrase_enabled` 映射到现有 `Features` 字段。这样上层事件、connectId/uuid、固件判断和业务 API 不需要直接理解 Protocol V2 的原始 schema。
 
+## PIN 解锁与钱包 Session
+
+Protocol V2 的 PIN 解锁使用：
+
+```text
+DeviceSessionAskPin -> DeviceSessionPinResult
+```
+
+SDK 直接使用响应中的 `unlocked`、`unlocked_attach_pin` 和
+`passphrase_protection` 更新 Features，不跟随调用 `DeviceStatusGet`。
+
+钱包上下文使用：
+
+```text
+DeviceSessionGet(session_id?)
+  -> PassphraseRequest / PassphraseAck（需要选择 passphrase 时）
+  -> DeviceSession(session_id, btc_test_address)
+```
+
+按协议约定，固件使用 Testnet 路径 `m/44'/1'/0'/0/0` 派生 `btc_test_address`，SDK 将它映射为
+`passphraseState`。地址派生会调用 `se_ensure_seed_session(false)`，因此
+`PassphraseRequest/Ack` 在 Pro2 中仍然是有效交互消息，也承载设备输入和选择已有
+Attach-to-PIN 用户的逻辑。
+
+SDK 按 `deviceKey + passphraseState` 缓存 `session_id`。缓存 session 无法打开时，
+缓存 session 无法打开时，协议约定固件返回
+`Failure_ProcessError + subcode 14 + Failure_InvalidSession`，SDK 清理该
+钱包缓存并使用空 session 重试一次。最终返回的 session ID 是 passphrase 上下文
+生效后重新读取的当前 SE session。
+
+本轮不向 V2 host 传递 `allowCreateAttachPin`，也不为 Protocol V2 不支持的旧 API
+增加额外守卫。
+
 ## 文件写入
 
 `FilesystemFileWrite` 的核心字段：
@@ -201,40 +240,40 @@ message DeviceFirmwareUpdateRequest {
 
 target 映射：
 
-| target id | enum | 含义 |
-| --------- | ---- | ---- |
-| `1` | `TARGET_CRATE` | 资源包 |
-| `2` | `TARGET_ROMLOADER` | romloader |
-| `3` | `TARGET_BOOTLOADER` | bootloader |
-| `4` | `TARGET_APPLICATION_P1` | 主固件 P1 |
-| `5` | `TARGET_APPLICATION_P2` | 主固件 P2 |
-| `6` | `TARGET_COPROCESSOR` | 蓝牙/协处理器固件 |
-| `7`-`10` | `TARGET_SE01`-`TARGET_SE04` | SE 固件 |
+| target id | enum                        | 含义              |
+| --------- | --------------------------- | ----------------- |
+| `1`       | `TARGET_CRATE`              | 资源包            |
+| `2`       | `TARGET_ROMLOADER`          | romloader         |
+| `3`       | `TARGET_BOOTLOADER`         | bootloader        |
+| `4`       | `TARGET_APPLICATION_P1`     | 主固件 P1         |
+| `5`       | `TARGET_APPLICATION_P2`     | 主固件 P2         |
+| `6`       | `TARGET_COPROCESSOR`        | 蓝牙/协处理器固件 |
+| `7`-`10`  | `TARGET_SE01`-`TARGET_SE04` | SE 固件           |
 
 SDK 会先把 resource、bootloader、firmware 写入设备文件系统，再把所有需要安装的路径传入 `DeviceFirmwareUpdateRequest.targets`。
 
 ## schema 来源
 
-| 文件                                                 | 来源                                                           |
-| ---------------------------------------------------- | -------------------------------------------------------------- |
+| 文件                                                        | 来源                                                           |
+| ----------------------------------------------------------- | -------------------------------------------------------------- |
 | `packages/hd-transport/messages-protocol-v2.json`           | `submodules/firmware-pro2/sys/protobuf/onekey_protocol/latest` |
 | `packages/core/src/data/messages/messages-protocol-v2.json` | 同上，同步到 core 运行时数据                                   |
-| `packages/hd-transport/src/types/messages.ts`        | 由 protobuf 生成脚本输出，包含 Protocol V2 类型联合             |
+| `packages/hd-transport/src/types/messages.ts`               | 由 protobuf 生成脚本输出，包含 Protocol V2 类型联合            |
 
 当前 Pro2 schema 直接来自 `submodules/firmware-pro2` 的 `latest` protobuf；SDK 不再注入临时消息。
 
 ## 实现入口
 
-| 模块                      | 入口                                                                  |
-| ------------------------- | --------------------------------------------------------------------- |
-| V2 CRC8 / frame encode/decode | `packages/hd-transport/src/protocols/v2/`                         |
-| V1/V2 schema 路由         | `packages/hd-transport/src/serialization/protobuf/`                   |
-| V2 session / frame 组装   | `packages/hd-transport/src/protocols/v2/session.ts`、`frame-assembler.ts` |
-| Protocol V2 feature adapter      | `packages/core/src/protocols/protocol-v2/features.ts`          |
-| WebUSB 自动探测           | `packages/hd-transport-web-device/src/webusb.ts`                      |
-| Electron BLE 自动探测     | `packages/hd-transport-web-device/src/electron-ble-transport.ts`      |
-| React Native BLE 自动探测 | `packages/hd-transport-react-native/src/index.ts`                     |
-| lowlevel BLE 自动探测     | `packages/hd-transport-lowlevel/src/index.ts`                         |
-| env 到 transport 映射     | `packages/hd-common-connect-sdk/src/index.ts`                         |
-| Protocol V2 初始化分支           | `packages/core/src/device/Device.ts`                                  |
-| Protocol V2 固件更新             | `packages/core/src/api/FirmwareUpdateV4.ts`                           |
+| 模块                          | 入口                                                                      |
+| ----------------------------- | ------------------------------------------------------------------------- |
+| V2 CRC8 / frame encode/decode | `packages/hd-transport/src/protocols/v2/`                                 |
+| V1/V2 schema 路由             | `packages/hd-transport/src/serialization/protobuf/`                       |
+| V2 session / frame 组装       | `packages/hd-transport/src/protocols/v2/session.ts`、`frame-assembler.ts` |
+| Protocol V2 feature adapter   | `packages/core/src/protocols/protocol-v2/features.ts`                     |
+| WebUSB 自动探测               | `packages/hd-transport-web-device/src/webusb.ts`                          |
+| Electron BLE 自动探测         | `packages/hd-transport-web-device/src/electron-ble-transport.ts`          |
+| React Native BLE 自动探测     | `packages/hd-transport-react-native/src/index.ts`                         |
+| lowlevel BLE 自动探测         | `packages/hd-transport-lowlevel/src/index.ts`                             |
+| env 到 transport 映射         | `packages/hd-common-connect-sdk/src/index.ts`                             |
+| Protocol V2 初始化分支        | `packages/core/src/device/Device.ts`                                      |
+| Protocol V2 固件更新          | `packages/core/src/api/FirmwareUpdateV4.ts`                               |

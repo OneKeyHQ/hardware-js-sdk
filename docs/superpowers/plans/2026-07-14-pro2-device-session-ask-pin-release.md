@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 将 Pro2 解锁迁移到 firmware-pro2/dev 已实现的 `DeviceSessionAskPin(60608) → DeviceSessionPinResult(60609) → DeviceStatusGet`，发布新的 SDK alpha，并同步 app-monorepo 后触发 Desktop Release。
+**Goal:** 将 Pro2 解锁迁移到 firmware-pro2/dev 已实现的 `DeviceSessionAskPin(60608) → DeviceSessionPinResult(60609)`，发布新的 SDK alpha，并同步 app-monorepo 后触发 Desktop Release。
 
-**Architecture:** Protocol V2 protobuf 完全以 `submodules/firmware-pro2` 的最新 schema 为源，不再临时恢复旧 10030/10031。SDK 仅在 Protocol V2 使用新会话解锁消息，Protocol V1 的 `UnLockDevice` 路径保持不变；app 统一通过 `deviceUnlock`，不再绕过 Pro2。
+**Architecture:** Protocol V2 protobuf 完全以 `submodules/firmware-pro2` 的最新 schema 为源，不再临时恢复旧 10030/10031。SDK 仅在 Protocol V2 使用新会话解锁消息，并直接把 `DeviceSessionPinResult` 合并到 Features，不再额外调用 `DeviceStatusGet`；Protocol V1 的 `UnLockDevice` 路径保持不变。
 
 **Tech Stack:** TypeScript、Jest、protobufjs、Yarn/Lerna、GitHub Actions、npm、app-monorepo Yarn 4。
 
@@ -13,6 +13,7 @@
 ### Task 1: 重新生成 Protocol V2 protobuf
 
 **Files:**
+
 - Modify: `submodules/firmware-pro2`
 - Modify: `packages/hd-transport/scripts/protobuf-build.sh`
 - Modify: `packages/hd-transport/__tests__/messages.test.js`
@@ -59,16 +60,14 @@ Expected: PASS。
 ### Task 2: 迁移 Pro2 deviceUnlock
 
 **Files:**
+
 - Modify: `packages/core/__tests__/protocol-v2.test.ts`
 - Modify: `packages/core/src/device/Device.ts`
 
 - [ ] **Step 1: 将 Protocol V2 解锁测试改为新调用序列**
 
 ```ts
-expect(typedCall.mock.calls).toEqual([
-  ['DeviceSessionAskPin', 'DeviceSessionPinResult'],
-  ['DeviceStatusGet', 'DeviceStatus', {}],
-]);
+expect(typedCall.mock.calls).toEqual([['DeviceSessionAskPin', 'DeviceSessionPinResult']]);
 ```
 
 - [ ] **Step 2: 验证测试先失败**
@@ -80,8 +79,12 @@ Expected: FAIL，实际仍调用 `UnLockDevice`。
 - [ ] **Step 3: 实现 Protocol V2 新解锁路径**
 
 ```ts
-await this.commands.typedCall('DeviceSessionAskPin', 'DeviceSessionPinResult');
-return refreshProtocolV2DeviceStatus(this);
+const { message } = await this.commands.typedCall('DeviceSessionAskPin', 'DeviceSessionPinResult');
+return this.updateProtocolV2Status({
+  unlocked: message.unlocked,
+  unlocked_by_attach_to_pin: message.unlocked_attach_pin,
+  passphrase_enabled: message.passphrase_protection,
+});
 ```
 
 Protocol V1 分支继续调用：
@@ -99,6 +102,7 @@ Expected: PASS，且 V1 回归测试不变。
 ### Task 3: 验证、升级并发布 SDK alpha
 
 **Files:**
+
 - Modify: all SDK package `package.json`
 - Modify: `yarn.lock`（如版本工具产生）
 
@@ -147,6 +151,7 @@ Expected: workflow success；`@onekeyfe/hd-core@1.2.0-alpha.10` 可查询，`nex
 ### Task 4: 同步 app-monorepo 并删除 Pro2 绕过
 
 **Files:**
+
 - Modify: `packages/kit-bg/src/services/ServiceHardware/ServiceHardware.ts`
 - Modify: `packages/kit-bg/src/services/ServiceHardware/ServiceHardware.getCompatibleConnectId.test.ts`
 - Modify: `package.json`
