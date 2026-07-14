@@ -56,6 +56,7 @@ import TransportManager from '../data-manager/TransportManager';
 import DeviceConnector from '../device/DeviceConnector';
 import RequestQueue from './RequestQueue';
 import { getSynchronize } from '../utils/getSynchronize';
+import { runMethodWithUnlockRetry } from '../protocols/protocol-v2/unlockRetry';
 
 import type { ConnectSettings, Features, KnownDevice } from '../types';
 import type { CoreMessage, IFrameCallMessage, UiPromise, UiPromiseResponse } from '../events';
@@ -616,7 +617,7 @@ const onCallDevice = async (
       method.device?.commands?.checkDisposed();
 
       try {
-        const response: object = await method.run();
+        const response: object = await runMethodWithUnlockRetry(method, device);
         messageResponse = createResponseMessage(method.responseID, true, response);
         requestQueue.resolveRequest(method.responseID, messageResponse);
         completeMethodRequestContext(method);
@@ -1341,6 +1342,10 @@ export default class Core extends EventEmitter {
     Log.debug(`[Core] Created SDK instance: ${this.sdkInstanceId}`);
   }
 
+  cancelOperation(operationId: string) {
+    this.requestQueue.abortOperation(operationId);
+  }
+
   private getCoreContext() {
     return {
       sdkInstanceId: this.sdkInstanceId,
@@ -1407,6 +1412,10 @@ export default class Core extends EventEmitter {
       case IFRAME.CANCEL: {
         Log.log('cancel API: ', message);
         cancel(this.getCoreContext(), message.payload.connectId);
+        break;
+      }
+      case IFRAME.CANCEL_OPERATION: {
+        this.cancelOperation(message.payload.operationId);
         break;
       }
       case IFRAME.CALLBACK: {

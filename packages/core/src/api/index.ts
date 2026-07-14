@@ -54,6 +54,10 @@ export { default as deviceFirmwareUpdate } from './protocol-v2/DeviceFirmwareUpd
 export { default as deviceGetFirmwareUpdateStatus } from './protocol-v2/DeviceGetFirmwareUpdateStatus';
 export { default as deviceFactoryInfoSet } from './protocol-v2/DeviceFactoryInfoSet';
 export { default as deviceFactoryInfoGet } from './protocol-v2/DeviceFactoryInfoGet';
+export { default as deviceSettingsGet } from './protocol-v2/DeviceSettingsGet';
+export { default as deviceSettingsSet } from './protocol-v2/DeviceSettingsSet';
+export { default as deviceSettingsPageShow } from './protocol-v2/DeviceSettingsPageShow';
+export { default as deviceUploadWallpaper } from './protocol-v2/DeviceUploadWallpaper';
 export { default as filesystemPermissionFix } from './protocol-v2/FilesystemPermissionFix';
 export { default as filesystemFormat } from './protocol-v2/FilesystemFormat';
 export { default as filesystemDiskControl } from './protocol-v2/FilesystemDiskControl';

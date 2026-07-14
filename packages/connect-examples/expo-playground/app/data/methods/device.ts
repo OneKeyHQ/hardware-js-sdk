@@ -121,7 +121,12 @@ const api: UnifiedMethodConfig[] = [
         parameters: [
           { name: 'targets.hw', type: 'boolean', label: 'Target: hw', value: true },
           { name: 'targets.fw', type: 'boolean', label: 'Target: fw', value: true },
-          { name: 'targets.coprocessor', type: 'boolean', label: 'Target: coprocessor', value: true },
+          {
+            name: 'targets.coprocessor',
+            type: 'boolean',
+            label: 'Target: coprocessor',
+            value: true,
+          },
           { name: 'targets.se1', type: 'boolean', label: 'Target: se1', value: false },
           { name: 'targets.se2', type: 'boolean', label: 'Target: se2', value: false },
           { name: 'targets.se3', type: 'boolean', label: 'Target: se3', value: false },
@@ -139,7 +144,12 @@ const api: UnifiedMethodConfig[] = [
         parameters: [
           { name: 'targets.hw', type: 'boolean', label: 'Target: hw', value: true },
           { name: 'targets.fw', type: 'boolean', label: 'Target: fw', value: true },
-          { name: 'targets.coprocessor', type: 'boolean', label: 'Target: coprocessor', value: true },
+          {
+            name: 'targets.coprocessor',
+            type: 'boolean',
+            label: 'Target: coprocessor',
+            value: true,
+          },
           { name: 'targets.se1', type: 'boolean', label: 'Target: se1', value: true },
           { name: 'targets.se2', type: 'boolean', label: 'Target: se2', value: true },
           { name: 'targets.se3', type: 'boolean', label: 'Target: se3', value: true },
@@ -256,6 +266,169 @@ const api: UnifiedMethodConfig[] = [
         ],
       },
     ],
+  },
+  {
+    method: 'deviceSettingsGet',
+    description: 'Get Protocol V2 device settings',
+    noDeviceIdReq: true,
+    presets: [],
+  },
+  {
+    method: 'deviceSettingsSet',
+    description: 'Set Protocol V2 device settings',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'Display and interaction',
+        parameters: [
+          { name: 'settings.brightness', type: 'number', label: 'Brightness (10-100)', value: 80 },
+          { name: 'settings.animation_enable', type: 'boolean', label: 'Animations', value: true },
+          { name: 'settings.tap_to_wake', type: 'boolean', label: 'Tap to wake', value: true },
+          {
+            name: 'settings.haptic_feedback',
+            type: 'boolean',
+            label: 'Haptic feedback',
+            value: true,
+          },
+        ],
+      },
+      {
+        title: 'Language and label',
+        parameters: [
+          { name: 'settings.label', type: 'string', label: 'Device label', value: 'My OneKey' },
+          {
+            name: 'settings.language',
+            type: 'select',
+            label: 'Language',
+            options: [
+              { label: 'English', value: 'en-Latn-US' },
+              { label: '简体中文', value: 'zh-Hans-CN' },
+              { label: '繁體中文（香港）', value: 'zh-Hant-HK' },
+              { label: '繁體中文（台灣）', value: 'zh-Hant-TW' },
+              { label: '日本語', value: 'ja-Jpan-JP' },
+              { label: '한국어', value: 'ko-Kore-KR' },
+              { label: 'Français', value: 'fr-Latn-FR' },
+              { label: 'Deutsch', value: 'de-Latn-DE' },
+              { label: 'Русский', value: 'ru-Cyrl-RU' },
+              { label: 'Español', value: 'es-Latn-ES' },
+              { label: 'Italiano', value: 'it-Latn-IT' },
+              { label: 'Portuguese (Brazil)', value: 'pt-Latn-BR' },
+              { label: 'Tiếng Việt', value: 'vi-Latn-VN' },
+              { label: 'Türkçe', value: 'tr-Latn-TR' },
+              { label: 'Bahasa Indonesia', value: 'id-Latn-ID' },
+              { label: 'Filipino', value: 'fil-Latn-PH' },
+              { label: 'Українська', value: 'uk-Cyrl-UA' },
+            ],
+            value: 'en-Latn-US',
+          },
+          {
+            name: 'settings.device_name_display_enabled',
+            type: 'boolean',
+            label: 'Show device name',
+            value: true,
+          },
+        ],
+      },
+      {
+        title: 'Timeouts',
+        parameters: [
+          {
+            name: 'settings.autolock_delay_ms',
+            type: 'number',
+            label: 'Auto-lock delay (ms)',
+            value: 60000,
+          },
+          {
+            name: 'settings.autoshutdown_delay_ms',
+            type: 'number',
+            label: 'Auto-shutdown delay (ms)',
+            value: 300000,
+          },
+        ],
+      },
+      {
+        title: 'Security and experimental',
+        parameters: [
+          { name: 'settings.fido_enabled', type: 'boolean', label: 'FIDO enabled', value: true },
+          {
+            name: 'settings.experimental_features',
+            type: 'boolean',
+            label: 'Experimental features',
+            value: false,
+          },
+          { name: 'settings.usb_lock_enable', type: 'boolean', label: 'USB lock', value: false },
+          { name: 'settings.random_keypad', type: 'boolean', label: 'Random keypad', value: true },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'deviceSettingsPageShow',
+    description: 'Open a Protocol V2 settings page on device',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'Reset device',
+        parameters: [
+          {
+            name: 'page',
+            type: 'select',
+            required: true,
+            label: 'Settings page',
+            options: [
+              { label: 'Reset device', value: 'DeviceReset' },
+              { label: 'Change PIN', value: 'DevicePinChange' },
+              { label: 'Passphrase', value: 'DevicePassphrase' },
+              { label: 'Air-gap mode', value: 'DeviceAirgap' },
+            ],
+            value: 'DeviceReset',
+          },
+        ],
+      },
+      {
+        title: 'Change PIN',
+        parameters: [
+          {
+            name: 'page',
+            type: 'string',
+            required: true,
+            label: 'Settings page',
+            value: 'DevicePinChange',
+          },
+        ],
+      },
+      {
+        title: 'Air-gap mode',
+        parameters: [
+          {
+            name: 'page',
+            type: 'string',
+            required: true,
+            label: 'Settings page',
+            value: 'DeviceAirgap',
+          },
+          { name: 'fieldName', type: 'string', label: 'Field name', value: 'airgap_mode' },
+        ],
+      },
+      {
+        title: 'Passphrase',
+        parameters: [
+          {
+            name: 'page',
+            type: 'string',
+            required: true,
+            label: 'Settings page',
+            value: 'DevicePassphrase',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'deviceUploadWallpaper',
+    description: 'Convert RGBA pixels, upload the file, and activate the Pro2 lock wallpaper',
+    noDeviceIdReq: true,
+    presets: [],
   },
 
   // === 设备管理 ===

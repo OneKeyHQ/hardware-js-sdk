@@ -61,10 +61,22 @@ export interface FirmwareUpdateV3Params {
  * firmwareUpdateV4（Protocol V2）按 DeviceFirmwareTargetType 拆分的目标二进制。
  * 除 romloader 外，每个字段对应一个 bootloader 可接受的固件升级 target。
  */
+export type FirmwareUpdateV4Target =
+  | 'boot'
+  | 'app_v1'
+  | 'app_v2'
+  | 'coprocessor'
+  | 'resource'
+  | 'se01'
+  | 'se02'
+  | 'se03'
+  | 'se04';
+
 export interface FirmwareUpdateV4Params {
   platform: IPlatform;
   chunkSize?: number;
   firmwareType?: EFirmwareType;
+  targetsToUpdate?: FirmwareUpdateV4Target[];
 
   /** FW_MGMT_TARGET_ROMLOADER = 2；当前 Pro2 bootloader 不接受通过 firmwareUpdateV4 安装 */
   romloaderBinary?: ArrayBuffer;

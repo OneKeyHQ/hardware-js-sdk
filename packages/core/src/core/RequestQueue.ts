@@ -14,6 +14,8 @@ export type RequestTask = {
 export default class RequestQueue {
   private requestQueue = new Map<number, RequestTask>();
 
+  private operationRequestIds = new Map<string, number>();
+
   private pendingCallbackTasks = new Map<string, Deferred<void>>();
 
   // 生成唯一请求ID
@@ -30,9 +32,19 @@ export default class RequestQueue {
       method.responseID = requestId;
     }
     const abortController = new AbortController();
+    method.abortSignal = abortController.signal;
     const task = { id: requestId, method, abortController };
     this.requestQueue.set(requestId, task);
+    const operationId = method.payload?.operationId;
+    if (typeof operationId === 'string' && operationId) {
+      this.operationRequestIds.set(operationId, requestId);
+    }
     return task;
+  }
+
+  public abortOperation(operationId: string) {
+    const requestId = this.operationRequestIds.get(operationId);
+    return requestId === undefined ? false : this.abortRequest(requestId);
   }
 
   public getTask(requestId: number): RequestTask | undefined {
@@ -105,6 +117,13 @@ export default class RequestQueue {
 
   // 删除请求
   public releaseTask(requestId: number) {
+    const operationId = this.requestQueue.get(requestId)?.method.payload?.operationId;
+    if (
+      typeof operationId === 'string' &&
+      this.operationRequestIds.get(operationId) === requestId
+    ) {
+      this.operationRequestIds.delete(operationId);
+    }
     this.requestQueue.delete(requestId);
   }
 

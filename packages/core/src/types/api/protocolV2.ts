@@ -3,6 +3,7 @@ import type {
   DeviceFactoryInfo,
   DeviceFirmwareUpdateStatus,
   DeviceSession,
+  DeviceSettings,
   DeviceStatus,
   ProtocolInfo,
   ProtocolV2DeviceInfo,
@@ -15,7 +16,12 @@ import type {
   DeviceRebootParams,
 } from '../../api/protocol-v2/helpers';
 import type { DeviceInfoGetParams } from '../../api/protocol-v2/DeviceInfoGet';
-import type { DeviceSessionGetParams } from '../../api/protocol-v2/DeviceSessionGet';
+import type { DeviceSettingsSetParams } from '../../api/protocol-v2/DeviceSettingsSet';
+import type { DeviceSettingsPageShowParams } from '../../api/protocol-v2/DeviceSettingsPageShow';
+import type {
+  DeviceUploadWallpaperParams,
+  DeviceUploadWallpaperResponse,
+} from '../../api/protocol-v2/DeviceUploadWallpaper';
 
 // 参数类型单源：以 api/protocol-v2 的实现为准（type-only re-export，无运行时依赖）
 export type {
@@ -31,7 +37,15 @@ export type {
   DeviceInfoGetTargets,
   DeviceInfoGetTypes,
 } from '../../api/protocol-v2/DeviceInfoGet';
-export type { DeviceSessionGetParams } from '../../api/protocol-v2/DeviceSessionGet';
+export type { DeviceSettingsSetParams } from '../../api/protocol-v2/DeviceSettingsSet';
+export type {
+  DeviceSettingsPageShowParams,
+  SupportedDeviceSettingsPage,
+} from '../../api/protocol-v2/DeviceSettingsPageShow';
+export type {
+  DeviceUploadWallpaperParams,
+  DeviceUploadWallpaperResponse,
+} from '../../api/protocol-v2/DeviceUploadWallpaper';
 
 // ── Shared response shapes (Protocol V2 file system) ────────────────────
 
@@ -99,7 +113,7 @@ export declare function deviceStatusGet(
 
 export declare function deviceSessionGet(
   connectId: string,
-  params?: CommonParams & DeviceSessionGetParams
+  params?: CommonParams
 ): Response<DeviceSession>;
 
 export declare function deviceFirmwareUpdate(
@@ -121,6 +135,26 @@ export declare function deviceFactoryInfoGet(
   connectId: string,
   params?: CommonParams
 ): Response<DeviceFactoryInfo>;
+
+export declare function deviceSettingsGet(
+  connectId: string,
+  params?: CommonParams
+): Response<DeviceSettings>;
+
+export declare function deviceSettingsSet(
+  connectId: string,
+  params: CommonParams & DeviceSettingsSetParams
+): Response<Success>;
+
+export declare function deviceSettingsPageShow(
+  connectId: string,
+  params: CommonParams & DeviceSettingsPageShowParams
+): Response<Success>;
+
+export declare function deviceUploadWallpaper(
+  connectId: string,
+  params: CommonParams & DeviceUploadWallpaperParams
+): Response<DeviceUploadWallpaperResponse>;
 
 export declare function filesystemPermissionFix(
   connectId: string,
@@ -185,6 +219,7 @@ export declare const filesystemFileWrite: typeof fileWrite;
 export declare function uploadPortfolio(
   connectId: string,
   params: {
+    operationId?: string;
     packageBytes: ArrayBuffer | Uint8Array | Blob;
     timeoutMs?: number | string;
   }

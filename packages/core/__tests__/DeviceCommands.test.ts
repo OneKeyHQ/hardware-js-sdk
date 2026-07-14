@@ -16,6 +16,31 @@ const createCommands = () => {
 };
 
 describe('DeviceCommands failure mapping', () => {
+  it('maps Protocol V2 DeviceLocked failure to a structured hardware error', async () => {
+    const commands = createCommands();
+
+    await expect(
+      commands._filterCommonTypes(
+        {
+          type: 'Failure',
+          message: {
+            code: 'Failure_ProcessError',
+            subcode: 9,
+            message: 'Device locked',
+          },
+        } as any,
+        'DeviceSettingsPageShow'
+      )
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.DeviceLocked,
+      params: {
+        failureCode: 'Failure_ProcessError',
+        subcode: 9,
+        firmwareMessage: 'Device locked',
+      },
+    });
+  });
+
   it.each([
     ['ButtonAck', 'Not in Ethereum signing mode'],
     ['PinMatrixAck', 'Not in Conflux signing mode'],

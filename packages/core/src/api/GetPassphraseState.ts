@@ -11,27 +11,18 @@ export default class GetPassphraseState extends BaseMethod {
   }
 
   async run() {
-    const { passphraseState, newSession, unlockedAttachPin } =
-      await getPassphraseStateWithRefreshDeviceInfo(this.device, {
-        expectPassphraseState: this.payload.passphraseState,
-        onlyMainPin: this.payload.useEmptyPassphrase,
-        allowCreateAttachPin: this.payload.allowCreateAttachPin,
-        initSession: this.payload.initSession,
-      });
+    const { passphraseState } = await getPassphraseStateWithRefreshDeviceInfo(this.device, {
+      expectPassphraseState: this.payload.passphraseState,
+      onlyMainPin: this.payload.useEmptyPassphrase,
+      initSession: this.payload.initSession,
+    });
 
-    const { features } = this.device;
-    const passphraseProtection = this.device.getCurrentPassphraseProtection() ?? null;
+    const passphraseProtection = this.device.getCurrentPassphraseProtection();
     const deviceType = this.device.getCurrentDeviceType();
     const isProSeries = deviceType === EDeviceType.Pro || deviceType === EDeviceType.Pro2;
 
-    // refresh device info
-    return Promise.resolve({
-      passphraseState: isProSeries || passphraseProtection === true ? passphraseState : undefined,
-      sessionId: this.payload.initSession
-        ? newSession ?? undefined
-        : newSession ?? features?.sessionId ?? undefined,
-      unlockedAttachPin: unlockedAttachPin ?? features?.unlockedAttachPin,
-      passphraseProtection,
-    });
+    return Promise.resolve(
+      isProSeries || passphraseProtection === true ? passphraseState : undefined
+    );
   }
 }

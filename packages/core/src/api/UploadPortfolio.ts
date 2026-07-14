@@ -2,6 +2,7 @@ import FileWrite from './FileWrite';
 
 export type UploadPortfolioParams = {
   packageBytes: ArrayBuffer | Uint8Array | Blob;
+  operationId?: string;
   timeoutMs?: number | string;
 };
 
@@ -26,6 +27,7 @@ export default class UploadPortfolio extends FileWrite {
 
   async run() {
     const stagedFile = await super.run();
+    this.throwIfAborted();
     await this.device.commands.typedCall('PortfolioUpdate', 'Success', {});
     return {
       ...stagedFile,

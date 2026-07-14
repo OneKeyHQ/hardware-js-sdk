@@ -36,12 +36,14 @@ export interface InjectApi {
   dispose: CoreApi['dispose'];
   uiResponse: CoreApi['uiResponse'];
   cancel: CoreApi['cancel'];
+  cancelOperation: CoreApi['cancelOperation'];
   switchTransport: CoreApi['switchTransport'];
 }
 
 export const inject = ({
   call,
   cancel,
+  cancelOperation,
   dispose,
   eventEmitter,
   init,
@@ -73,6 +75,7 @@ export const inject = ({
     uiResponse,
 
     cancel,
+    cancelOperation,
 
     updateSettings,
 
@@ -96,6 +99,7 @@ export const createCoreApi = (
   | 'dispose'
   | 'uiResponse'
   | 'cancel'
+  | 'cancelOperation'
   | 'updateSettings'
   | 'switchTransport'
 > => ({
@@ -168,6 +172,14 @@ export const createCoreApi = (
     call({ ...params, connectId, method: 'deviceFactoryInfoSet' }),
   deviceFactoryInfoGet: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceFactoryInfoGet' }),
+  deviceSettingsGet: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceSettingsGet' }),
+  deviceSettingsSet: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceSettingsSet' }),
+  deviceSettingsPageShow: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceSettingsPageShow' }),
+  deviceUploadWallpaper: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceUploadWallpaper' }),
   filesystemPermissionFix: (connectId, params) =>
     call({ ...params, connectId, method: 'filesystemPermissionFix' }),
   fileRead: (connectId, params) => call({ ...params, connectId, method: 'fileRead' }),

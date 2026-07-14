@@ -532,8 +532,9 @@ export class DeviceCommands {
 
     this.device.clearCancelableAction();
     if (res.type === 'Failure') {
-      const { code, message } = res.message as {
+      const { code, subcode, message } = res.message as {
         code?: string | FailureType;
+        subcode?: number;
         message?: string;
       };
       let error: HardwareError | null = null;
@@ -577,8 +578,13 @@ export class DeviceCommands {
       }
 
       if (code === 'Failure_ProcessError') {
-        // Handle firmware verification failures
-        if (
+        if (subcode === 9) {
+          error = ERRORS.TypedError(HardwareErrorCode.DeviceLocked, message, {
+            failureCode: code,
+            subcode,
+            firmwareMessage: message,
+          });
+        } else if (
           message?.includes('Bootloader file verify failed') ||
           message?.includes('verify failed')
         ) {

@@ -13,6 +13,7 @@
 ### Task 1: 对齐 firmware-pro2 最新开发基线
 
 **Files:**
+
 - Update submodule checkout: `submodules/firmware-pro2`
 
 - [ ] **Step 1: 确认官方最新提交**
@@ -39,6 +40,7 @@ Expected: 子模块工作区干净，并位于最新 `origin/dev` 基线。
 ### Task 2: Protocol V2 解锁直接消费 PinResult
 
 **Files:**
+
 - Modify: `packages/core/__tests__/protocol-v2.test.ts`
 - Modify: `packages/core/src/device/Device.ts`
 
@@ -48,9 +50,7 @@ Expected: 子模块工作区干净，并位于最新 `origin/dev` 基线。
 `DeviceSessionPinResult`：
 
 ```ts
-expect(typedCall.mock.calls).toEqual([
-  ['DeviceSessionAskPin', 'DeviceSessionPinResult'],
-]);
+expect(typedCall.mock.calls).toEqual([['DeviceSessionAskPin', 'DeviceSessionPinResult']]);
 expect(features).toMatchObject({
   unlocked: true,
   unlockedAttachPin: true,
@@ -79,10 +79,7 @@ Expected: FAIL，原因是 `unlockDevice()` 仍调用 `DeviceStatusGet`。
 `DeviceStatus` 后调用 `updateProtocolV2Status()`：
 
 ```ts
-const { message } = await this.commands.typedCall(
-  'DeviceSessionAskPin',
-  'DeviceSessionPinResult'
-);
+const { message } = await this.commands.typedCall('DeviceSessionAskPin', 'DeviceSessionPinResult');
 const status: DeviceStatus = {};
 if (message.unlocked != null) status.unlocked = message.unlocked;
 if (message.unlocked_attach_pin != null) {
@@ -106,6 +103,7 @@ Expected: Protocol V2 与 Protocol V1 unlock 用例全部 PASS。
 ### Task 3: SDK 对失效缓存 session 自动重试
 
 **Files:**
+
 - Modify: `packages/core/__tests__/protocol-v2.test.ts`
 - Modify: `packages/core/src/protocols/protocol-v2/walletSession.ts`
 
@@ -117,9 +115,7 @@ session 调用成功：
 ```ts
 const typedCall = jest
   .fn()
-  .mockRejectedValueOnce(
-    new Error('Failure_ProcessError,Failure_InvalidSession')
-  )
+  .mockRejectedValueOnce(new Error('Failure_ProcessError,Failure_InvalidSession'))
   .mockResolvedValueOnce({
     type: 'DeviceSession',
     message: { session_id: 'session-b', btc_test_address: 'state-a' },
@@ -159,6 +155,7 @@ Expected: 缓存恢复、无缓存错误和 passphraseState 不匹配用例全�
 ### Task 4: 为固件 DeviceSession 完整流程建立失败契约测试
 
 **Files:**
+
 - Modify: `packages/hd-transport/__tests__/messages.test.js`
 
 - [ ] **Step 1: 加载 firmware-pro2 foreground 源码**
@@ -194,6 +191,7 @@ Expected: FAIL，因为最新固件仍提前返回且不填 `btc_test_address`�
 ### Task 5: 补全 firmware-pro2 DeviceSession 状态机
 
 **Files:**
+
 - Modify: `submodules/firmware-pro2/tasks/task_foreground/foreground_access_flow.c`
 
 - [ ] **Step 1: 增加 InvalidSession 响应**
@@ -252,6 +250,7 @@ Expected: exit 0，无新增编译错误。
 ### Task 6: 更新文档与最终验证
 
 **Files:**
+
 - Modify: `docs/superpowers/specs/2026-07-13-protocol-v2-wallet-session-and-unlock-design.md`
 - Modify: `docs/pro-init-session-passphrase.md`
 - Modify: `docs/protocol-v2.md`
@@ -292,4 +291,3 @@ git -C submodules/firmware-pro2 status --short
 ```
 
 Expected: 无空白错误，只包含本计划目标文件和用户原有改动。
-

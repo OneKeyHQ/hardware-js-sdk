@@ -99,4 +99,3 @@ DeviceSessionAskPin
   `btc_test_address` 和 InvalidSession subcode。
 - 编译 `task_foreground_obj`，验证 nanopb 字段和状态机代码可编译。
 - 现有 Protocol V1 解锁和 passphrase 测试继续通过。
-

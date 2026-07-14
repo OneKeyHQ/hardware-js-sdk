@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 import { Cpu, FileCode2, FolderOpen, Settings, Zap } from 'lucide-react';
 import MethodExecutor from '../components/common/MethodExecutor';
 import { DeviceNotConnectedState } from '../components/common/DeviceNotConnectedState';
@@ -12,6 +12,10 @@ import { device } from '../data/methods/device';
 import { firmware } from '../data/methods/firmware';
 import { isSdkDebugEnabled } from '../utils/hardwareInstance';
 import { logHardware } from '../utils/logger';
+import {
+  preparePro2Wallpaper,
+  type PreparedPro2Wallpaper,
+} from '../utils/pro2WallpaperImage';
 import type { UnifiedMethodConfig } from '../data/types';
 
 const PRO2_METHOD_GROUPS = [
@@ -30,6 +34,17 @@ const PRO2_METHOD_GROUPS = [
     ],
   },
   {
+    id: 'settings',
+    title: 'Settings',
+    icon: Settings,
+    methods: [
+      'deviceSettingsGet',
+      'deviceSettingsSet',
+      'deviceSettingsPageShow',
+      'deviceUploadWallpaper',
+    ],
+  },
+  {
     id: 'firmware',
     title: 'Firmware',
     icon: Zap,
@@ -39,7 +54,15 @@ const PRO2_METHOD_GROUPS = [
     id: 'filesystemAliases',
     title: 'Filesystem Aliases',
     icon: FolderOpen,
-    methods: ['filesystemPathInfoQuery', 'filesystemDirList', 'filesystemDirMake', 'filesystemDirRemove', 'filesystemFileRead', 'filesystemFileWrite', 'filesystemFileDelete'],
+    methods: [
+      'filesystemPathInfoQuery',
+      'filesystemDirList',
+      'filesystemDirMake',
+      'filesystemDirRemove',
+      'filesystemFileRead',
+      'filesystemFileWrite',
+      'filesystemFileDelete',
+    ],
   },
   {
     id: 'filesystemRaw',
@@ -70,6 +93,10 @@ const PRO2_METHOD_LABELS: Record<string, string> = {
   deviceReboot: 'Reboot',
   deviceFactoryInfoGet: 'Factory Info',
   deviceFactoryInfoSet: 'Factory Settings',
+  deviceSettingsGet: 'Settings Get',
+  deviceSettingsSet: 'Settings Set',
+  deviceSettingsPageShow: 'Settings Page',
+  deviceUploadWallpaper: 'Upload Wallpaper',
   deviceFirmwareUpdate: 'FW Update',
   deviceGetFirmwareUpdateStatus: 'FW Status',
   pathInfo: 'Path Info',
@@ -151,6 +178,34 @@ const PRO2_METHOD_WIRE_INFO: Record<string, MethodWireInfo> = {
     rx: '60207 (Success)',
     rxPayload: PRO2_DYNAMIC_RESPONSE,
     decoded: 'Success.message',
+  },
+  deviceSettingsGet: {
+    tx: '60411 (DeviceSettingsGet)',
+    txPayload: PRO2_DYNAMIC_PAYLOAD,
+    rx: '60410 (DeviceSettings)',
+    rxPayload: PRO2_DYNAMIC_RESPONSE,
+    decoded: 'DeviceSettings',
+  },
+  deviceSettingsSet: {
+    tx: '60412 (DeviceSettingsSet)',
+    txPayload: PRO2_DYNAMIC_PAYLOAD,
+    rx: '60207 (Success)',
+    rxPayload: PRO2_DYNAMIC_RESPONSE,
+    decoded: 'Success.message',
+  },
+  deviceSettingsPageShow: {
+    tx: '60413 (DeviceSettingsPageShow)',
+    txPayload: PRO2_DYNAMIC_PAYLOAD,
+    rx: '60207 (Success)',
+    rxPayload: PRO2_DYNAMIC_RESPONSE,
+    decoded: 'Success.message',
+  },
+  deviceUploadWallpaper: {
+    tx: 'FilesystemDirMake + FilesystemFileWrite + SetWallpaper(Lock)',
+    txPayload: 'LVGL v9 RGB565/RGB565A8 .bin -> vol0:/wallpapers/user/',
+    rx: 'Success / FilesystemFile / Success',
+    rxPayload: PRO2_DYNAMIC_RESPONSE,
+    decoded: 'path / size / colorFormat / message',
   },
   deviceFirmwareUpdate: {
     tx: '61000 (DeviceFirmwareUpdateRequest)',
@@ -300,6 +355,10 @@ function getDataSummary(data: unknown) {
 }
 
 function sanitizeRequestParameters(method: string, params: Record<string, unknown>) {
+  if (method === 'deviceUploadWallpaper' && 'rgba' in params) {
+    const { rgba, ...rest } = params;
+    return { ...rest, rgba_size: getDataSummary(rgba).data_size };
+  }
   if (!isFileWriteMethod(method) || !('data' in params)) return params;
   const { data, ...rest } = params;
   return {
@@ -389,6 +448,123 @@ function ProtocolDebugPanel({
 
 function findMethodConfig(methodName: string, methods: UnifiedMethodConfig[]) {
   return methods.find(method => method.method === methodName);
+}
+
+function formatBytes(value: number) {
+  return `${(value / 1024 / 1024).toFixed(2)} MB`;
+}
+
+function Pro2WallpaperUploader({
+  disabled,
+  onUpload,
+}: {
+  disabled: boolean;
+  onUpload: (params: Record<string, unknown>) => Promise<Record<string, unknown>>;
+}) {
+  const [prepared, setPrepared] = useState<PreparedPro2Wallpaper | null>(null);
+  const [fileName, setFileName] = useState('');
+  const [status, setStatus] = useState('');
+  const [error, setError] = useState('');
+  const [uploading, setUploading] = useState(false);
+
+  const handleFileChange = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setError('');
+    setStatus('正在解码并裁剪图片…');
+    try {
+      const next = await preparePro2Wallpaper(file);
+      setPrepared(next);
+      setFileName(file.name.replace(/\.[^.]+$/, '').replace(/[^A-Za-z0-9_-]/g, '-'));
+      setStatus('图片已转换为 604 × 1024 RGBA，等待上传。');
+    } catch (nextError) {
+      setPrepared(null);
+      setStatus('');
+      setError(nextError instanceof Error ? nextError.message : String(nextError));
+    }
+  }, []);
+
+  const handleUpload = useCallback(async () => {
+    if (!prepared) return;
+    setUploading(true);
+    setError('');
+    setStatus('正在编码 LVGL bin、上传文件并应用壁纸…');
+    try {
+      const result = await onUpload({
+        width: prepared.width,
+        height: prepared.height,
+        rgba: prepared.rgba,
+        ...(fileName ? { fileName } : {}),
+      });
+      setStatus(`上传完成：${JSON.stringify(result.data ?? result)}`);
+    } catch (nextError) {
+      setStatus('');
+      setError(nextError instanceof Error ? nextError.message : String(nextError));
+    } finally {
+      setUploading(false);
+    }
+  }, [fileName, onUpload, prepared]);
+
+  return (
+    <Card className="rounded-xl border border-border/60 bg-card shadow-sm">
+      <CardContent className="p-4 space-y-4">
+        <div>
+          <h2 className="text-base font-semibold text-foreground">Pro2 Wallpaper Upload</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            支持 PNG、JPEG/JPG、WebP。图片会按 cover 方式居中裁剪，再转换为 LVGL v9
+            RGB565/RGB565A8。
+          </p>
+        </div>
+
+        <input
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          disabled={disabled || uploading}
+          onChange={handleFileChange}
+          className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-2 file:text-sm file:text-primary-foreground"
+        />
+
+        {prepared ? (
+          <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
+            <img
+              src={prepared.previewUrl}
+              alt="Pro2 wallpaper preview"
+              className="mx-auto max-h-[360px] rounded-xl border border-border object-contain"
+            />
+            <div className="space-y-3 text-sm">
+              <div className="grid grid-cols-2 gap-2 rounded-lg bg-muted/50 p-3">
+                <span className="text-muted-foreground">原始尺寸</span>
+                <span>{prepared.originalWidth} × {prepared.originalHeight}</span>
+                <span className="text-muted-foreground">输入类型</span>
+                <span>{prepared.mimeType}</span>
+                <span className="text-muted-foreground">目标尺寸</span>
+                <span>604 × 1024</span>
+                <span className="text-muted-foreground">编码格式</span>
+                <span>{prepared.hasTransparency ? 'RGB565A8' : 'RGB565'}</span>
+                <span className="text-muted-foreground">预计大小</span>
+                <span>{formatBytes(prepared.estimatedBinSize)}</span>
+              </div>
+              <label className="block space-y-1">
+                <span className="text-muted-foreground">设备文件名（可选）</span>
+                <input
+                  value={fileName}
+                  onChange={event => setFileName(event.target.value)}
+                  className="h-9 w-full rounded-md border border-input bg-background px-3"
+                  placeholder="wallpaper-name"
+                />
+              </label>
+              <Button disabled={disabled || uploading} onClick={handleUpload}>
+                {uploading ? 'Uploading…' : 'Upload and Apply'}
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
+        {status ? <div className="rounded-md bg-muted p-3 text-sm break-all">{status}</div> : null}
+        {error ? <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div> : null}
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function Pro2DebugPage() {
@@ -507,7 +683,9 @@ export default function Pro2DebugPage() {
             </CardContent>
           </Card>
 
-          {selectedMethod ? (
+          {selectedMethod?.method === 'deviceUploadWallpaper' ? (
+            <Pro2WallpaperUploader disabled={!currentDevice} onUpload={handleMethodExecution} />
+          ) : selectedMethod ? (
             <MethodExecutor
               key={selectedMethod.method}
               methodConfig={selectedMethod}

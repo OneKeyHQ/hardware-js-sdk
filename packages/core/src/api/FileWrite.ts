@@ -84,7 +84,11 @@ function getConfirmedProgress(
   return 100;
 }
 
-function getDeviceTransferProgress(bytesBeforeChunk: number, bytesAfterChunk: number, totalBytes: number) {
+function getDeviceTransferProgress(
+  bytesBeforeChunk: number,
+  bytesAfterChunk: number,
+  totalBytes: number
+) {
   if (!Number.isFinite(totalBytes) || totalBytes <= 0) {
     return 100;
   }
@@ -121,6 +125,7 @@ export default class FileWrite extends BaseMethod<FileWriteParams> {
   }
 
   async run() {
+    this.throwIfAborted();
     const data = await dataToUint8Array(this.params.data);
     const dataLength = data.byteLength;
     const offsetValue = Number(this.params.offset ?? 0);
@@ -154,6 +159,7 @@ export default class FileWrite extends BaseMethod<FileWriteParams> {
       this.params.timeoutMs === undefined ? undefined : Number(this.params.timeoutMs);
 
     while (written < dataLength) {
+      this.throwIfAborted();
       const chunkEnd = Math.min(written + chunkSize, dataLength);
       const chunk = data.slice(written, chunkEnd);
       const offset = startOffset + written;
@@ -180,6 +186,8 @@ export default class FileWrite extends BaseMethod<FileWriteParams> {
           timeoutMs,
         }
       );
+
+      this.throwIfAborted();
 
       lastMessage = res.message;
       const processedByte = Number(res.message?.processed_byte);

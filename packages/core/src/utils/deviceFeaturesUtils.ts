@@ -89,7 +89,6 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (
   options?: {
     expectPassphraseState?: string;
     onlyMainPin?: boolean;
-    allowCreateAttachPin?: boolean;
     initSession?: boolean;
   }
 ) => {
@@ -164,7 +163,6 @@ export const getPassphraseState = async (
   options?: {
     expectPassphraseState?: string;
     onlyMainPin?: boolean;
-    allowCreateAttachPin?: boolean;
     initSession?: boolean;
   }
 ): Promise<{
@@ -196,12 +194,9 @@ export const getPassphraseState = async (
     supportAttachPinCapability || supportProSeriesAttachPinPassphrase(deviceType, firmwareVersion);
 
   if (supportGetPassphraseState) {
-    const payload: GetPassphraseState = options?.onlyMainPin
-      ? { _only_main_pin: true }
-      : { passphrase_state: options?.expectPassphraseState };
-    if (options?.allowCreateAttachPin) {
-      payload.allow_create_attach_pin = true;
-    }
+    const payload: GetPassphraseState = {
+      passphrase_state: options?.onlyMainPin ? undefined : options?.expectPassphraseState,
+    };
 
     const { message, type } = await commands.typedCall(
       'GetPassphraseState',

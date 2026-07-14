@@ -119,6 +119,14 @@ const cancel = (connectId?: string) => {
   sendMessage({ event: IFRAME.CANCEL, type: IFRAME.CANCEL, payload: { connectId } });
 };
 
+const cancelOperation = (operationId: string) => {
+  sendMessage({
+    event: IFRAME.CANCEL_OPERATION,
+    type: IFRAME.CANCEL_OPERATION,
+    payload: { operationId },
+  } as CoreMessage);
+};
+
 let prevFrameInstance: Window | null | undefined = null;
 const createJSBridge = (messageEvent: PostMessageEvent) => {
   if (messageEvent.origin !== iframe.origin) {
@@ -290,6 +298,7 @@ const HardwareSDKLowLevel = HardwareLowLevelSdk({
   init,
   call,
   cancel,
+  cancelOperation,
   dispose,
   addHardwareGlobalEventListener,
   uiResponse,
@@ -304,6 +313,7 @@ const HardwareWebSdk = HardwareSdk({
   init,
   call,
   cancel,
+  cancelOperation,
   dispose,
   uiResponse,
   updateSettings,

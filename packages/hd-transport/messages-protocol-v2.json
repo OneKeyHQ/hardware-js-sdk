@@ -467,6 +467,7 @@
         "MessageType_DeviceSettings": 60410,
         "MessageType_DeviceSettingsGet": 60411,
         "MessageType_DeviceSettingsSet": 60412,
+        "MessageType_DeviceSettingsPageShow": 60413,
         "MessageType_DeviceCertificate": 60420,
         "MessageType_DeviceCertificateWrite": 60421,
         "MessageType_DeviceCertificateRead": 60422,
@@ -7045,14 +7046,6 @@
         "passphrase_state": {
           "type": "string",
           "id": 1
-        },
-        "_only_main_pin": {
-          "type": "bool",
-          "id": 2
-        },
-        "allow_create_attach_pin": {
-          "type": "bool",
-          "id": 3
         }
       }
     },
@@ -11394,6 +11387,20 @@
         }
       }
     },
+    "DeviceErrorCode": {
+      "values": {
+        "DeviceError_None": 0,
+        "DeviceError_Busy": 1,
+        "DeviceError_NotInitialized": 2,
+        "DeviceError_ActionCancelled": 3,
+        "DeviceError_PinAlreadyUsed": 4,
+        "DeviceError_PersistFailed": 5,
+        "DeviceError_SeError": 6,
+        "DeviceError_InvalidLanguage": 7,
+        "DeviceError_WallpaperNotUsable": 8,
+        "DeviceError_DeviceLocked": 9
+      }
+    },
     "DeviceRebootType": {
       "values": {
         "Normal": 0,
@@ -11423,6 +11430,62 @@
         "language": {
           "type": "string",
           "id": 3
+        },
+        "wallpaper_path": {
+          "type": "string",
+          "id": 4
+        },
+        "passphrase_enable": {
+          "type": "bool",
+          "id": 6
+        },
+        "brightness": {
+          "type": "uint32",
+          "id": 7
+        },
+        "autolock_delay_ms": {
+          "type": "uint32",
+          "id": 8
+        },
+        "autoshutdown_delay_ms": {
+          "type": "uint32",
+          "id": 9
+        },
+        "animation_enable": {
+          "type": "bool",
+          "id": 10
+        },
+        "tap_to_wake": {
+          "type": "bool",
+          "id": 11
+        },
+        "haptic_feedback": {
+          "type": "bool",
+          "id": 12
+        },
+        "device_name_display_enabled": {
+          "type": "bool",
+          "id": 13
+        },
+        "airgap_mode": {
+          "type": "bool",
+          "id": 14
+        },
+        "fido_enabled": {
+          "type": "bool",
+          "id": 15
+        },
+        "experimental_features": {
+          "type": "bool",
+          "id": 16
+        },
+        "usb_lock_enable": {
+          "type": "bool",
+          "id": 17
+        },
+        "random_keypad": {
+          "type": "bool",
+          "id": 18
         }
       }
     },
@@ -11435,6 +11498,27 @@
           "rule": "required",
           "type": "DeviceSettings",
           "id": 1
+        }
+      }
+    },
+    "DeviceSettingsPage": {
+      "values": {
+        "DeviceReset": 0,
+        "DevicePinChange": 1,
+        "DevicePassphrase": 2,
+        "DeviceAirgap": 3
+      }
+    },
+    "DeviceSettingsPageShow": {
+      "fields": {
+        "page": {
+          "rule": "required",
+          "type": "DeviceSettingsPage",
+          "id": 1
+        },
+        "field_name": {
+          "type": "string",
+          "id": 2
         }
       }
     },

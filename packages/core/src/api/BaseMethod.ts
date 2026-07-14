@@ -1,5 +1,7 @@
 import semver from 'semver';
 import {
+  ERRORS,
+  HardwareErrorCode,
   createDeviceNotSupportMethodError,
   createNeedUpgradeFirmwareHardwareError,
 } from '@onekeyfe/hd-shared';
@@ -19,6 +21,8 @@ import type { DeviceFirmwareRange, KnownDevice } from '../types';
 import type { CoreMessage } from '../events';
 import type { RequestContext } from '../utils/tracing';
 import type { CoreContext } from '../core';
+
+export type UnlockPolicy = 'none' | 'retry-on-locked';
 
 const Log = getLogger(LoggerNames.Method);
 
@@ -48,6 +52,8 @@ const isEvmLedgerLegacyPathWithHighIndex = (path: unknown) => {
 const EVM_LEDGER_LEGACY_METHODS = ['evmGetAddress', 'evmGetPublicKey'];
 
 export abstract class BaseMethod<Params = undefined> {
+  abortSignal?: AbortSignal;
+
   responseID: number;
 
   // @ts-expect-error
@@ -161,6 +167,18 @@ export abstract class BaseMethod<Params = undefined> {
    * @default false
    */
   requireProtocolV2 = false;
+
+  /** Protocol V2 设备锁定时是否允许 Core 自动解锁并重试一次。 */
+  unlockPolicy: UnlockPolicy = 'none';
+
+  protected throwIfAborted() {
+    if (this.abortSignal?.aborted) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.CallQueueActionCancelled,
+        'Hardware operation cancelled'
+      );
+    }
+  }
 
   // @ts-expect-error: strictPropertyInitialization
   postMessage: (message: CoreMessage) => void;

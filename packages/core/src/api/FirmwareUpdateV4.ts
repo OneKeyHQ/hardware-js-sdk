@@ -30,7 +30,7 @@ import {
   isProtocolV2DeviceDisconnectedError,
 } from './protocol-v2/helpers';
 
-import type { FirmwareUpdateV4Params } from '../types/api/firmwareUpdate';
+import type { FirmwareUpdateV4Params, FirmwareUpdateV4Target } from '../types/api/firmwareUpdate';
 import type { EFirmwareType } from '@onekeyfe/hd-shared';
 import type { PROTO } from '../constants';
 import type { TypedResponseMessage } from '../device/DeviceCommands';
@@ -188,6 +188,17 @@ const PROTOCOL_V2_REMOTE_COMPONENT_TARGETS: Readonly<
   },
 };
 
+const PROTOCOL_V2_UPDATE_TARGET_BY_TARGET_ID = new Map<number, FirmwareUpdateV4Target>([
+  [ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_BOOTLOADER, 'boot'],
+  [ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P1, 'app_v1'],
+  [ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P2, 'app_v2'],
+  [ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_COPROCESSOR, 'coprocessor'],
+  [ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_SE01, 'se01'],
+  [ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_SE02, 'se02'],
+  [ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_SE03, 'se03'],
+  [ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_SE04, 'se04'],
+]);
+
 const PROTOCOL_V2_ROMLOADER_UNSUPPORTED_MESSAGE =
   'FW_MGMT_TARGET_ROMLOADER is not accepted by the current Pro2 bootloader update request. Flash romloader with the loader-specific flow instead of firmwareUpdateV4.';
 
@@ -280,13 +291,6 @@ const normalizeProtocolV2Hex = (value?: string) => value?.replace(/^0x/i, '').to
 const versionArrayToNumber = (version?: IVersionArray) => {
   if (!version) return undefined;
   return version[0] * 0x10000 + version[1] * 0x100 + version[2];
-};
-
-const versionStringToArray = (version?: string | null): IVersionArray | undefined => {
-  if (!version) return undefined;
-  const parts = version.split('.').map(part => Number(part));
-  if (parts.length !== 3 || parts.some(part => !Number.isFinite(part))) return undefined;
-  return parts as IVersionArray;
 };
 
 const compareProtocolV2Versions = (current?: IVersionArray, target?: IVersionArray) => {
@@ -418,6 +422,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       { name: 'se03Binary', type: 'buffer' },
       { name: 'se04Binary', type: 'buffer' },
       { name: 'firmwareType', type: 'string' },
+      { name: 'targetsToUpdate', type: 'array', allowEmpty: true },
       { name: 'platform', type: 'string' },
       { name: 'resourceBundleFiles', type: 'array', allowEmpty: true },
     ]);
@@ -436,6 +441,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       se04Binary: payload.se04Binary,
       resourceBundleFiles: payload.resourceBundleFiles,
       firmwareType: payload.firmwareType,
+      targetsToUpdate: payload.targetsToUpdate,
       platform: payload.platform,
     };
   }
@@ -601,63 +607,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return target;
   }
 
-  private getProtocolV2ComponentTargetVersion(
-    release: IFirmwareReleaseInfo,
-    component: IProtocolV2FirmwareComponent,
-    target: ProtocolV2RemoteComponentTarget
-  ) {
-    if (component.version) return component.version;
-    if (target.targetId === ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_BOOTLOADER) {
-      return release.bootloaderVersion;
-    }
-    if (
-      target.targetId === ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P1 ||
-      target.targetId === ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P2
-    ) {
-      return release.version;
-    }
-    return undefined;
-  }
-
-  private getProtocolV2ComponentCurrentVersion(
-    features: Features,
-    target: ProtocolV2RemoteComponentTarget
-  ) {
-    switch (target.targetId) {
-      case ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_BOOTLOADER:
-        return getDeviceBootloaderVersion(features);
-      case ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P1:
-      case ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P2:
-        return getDeviceFirmwareVersion(features);
-      case ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_COPROCESSOR:
-        return getDeviceBLEFirmwareVersion(features);
-      case ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_SE01:
-        return versionStringToArray(features.se01Version);
-      case ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_SE02:
-        return versionStringToArray(features.se02Version);
-      case ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_SE03:
-        return versionStringToArray(features.se03Version);
-      case ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_SE04:
-        return versionStringToArray(features.se04Version);
-      default:
-        return undefined;
-    }
-  }
-
-  private isProtocolV2ComponentVersionSatisfied(
-    release: IFirmwareReleaseInfo,
-    component: IProtocolV2FirmwareComponent,
-    target: ProtocolV2RemoteComponentTarget,
-    features: Features
-  ) {
-    const targetVersion = this.getProtocolV2ComponentTargetVersion(release, component, target);
-    if (!targetVersion) return false;
-
-    const currentVersion = this.getProtocolV2ComponentCurrentVersion(features, target);
-    const compareResult = compareProtocolV2Versions(currentVersion, targetVersion);
-    return compareResult !== undefined && compareResult >= 0;
-  }
-
   private getProtocolV2ResourceFilePath(path: string) {
     if (path.startsWith('vol')) return path;
     if (path.startsWith('/')) return `vol0:${path}`;
@@ -709,25 +658,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return parseProtocolV2OkppHeader(headerBytes);
   }
 
-  private shouldInstallRemoteProtocolV2Component(
-    release: IFirmwareReleaseInfo,
-    key: string,
-    component: IProtocolV2FirmwareComponent,
-    target: ProtocolV2RemoteComponentTarget,
-    features: Features
-  ) {
-    const versionSatisfied = this.isProtocolV2ComponentVersionSatisfied(
-      release,
-      component,
-      target,
-      features
-    );
-    if (versionSatisfied) {
-      Log.log(`[FirmwareUpdateV4] skip Protocol V2 component ${key}; version is up to date`);
-    }
-    return !versionSatisfied;
-  }
-
   private async downloadRemoteProtocolV2Component(
     key: string,
     component: IProtocolV2FirmwareComponent
@@ -763,16 +693,12 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     }
 
     const entries = this.getRemoteComponentEntries(release);
+    const targetsToUpdate = new Set(this.params.targetsToUpdate ?? []);
 
     for (const [key, component] of entries) {
       const target = this.getRemoteComponentTarget(key, component);
-      const shouldInstall = this.shouldInstallRemoteProtocolV2Component(
-        release,
-        key,
-        component,
-        target,
-        features
-      );
+      const updateTarget = PROTOCOL_V2_UPDATE_TARGET_BY_TARGET_ID.get(target.targetId);
+      const shouldInstall = updateTarget ? targetsToUpdate.has(updateTarget) : false;
       if (shouldInstall) {
         const remoteBinary = await this.downloadRemoteProtocolV2Component(key, component);
         if (remoteBinary.kind === 'bootloader') {
@@ -825,6 +751,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         binary: file.binary,
         devicePath: file.devicePath,
       }));
+    }
+
+    if (!this.params.targetsToUpdate?.includes('resource')) {
+      return undefined;
     }
 
     // 模式2：远端配置模式，后续按需下载 + 比对

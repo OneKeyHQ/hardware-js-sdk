@@ -485,6 +485,12 @@ export const HardwareErrorCode = {
   PinMismatch: 828,
 
   /**
+   * Protocol V2 device must be unlocked before the requested operation.
+   * @params: { failureCode?: string; subcode?: number; firmwareMessage?: string }
+   */
+  DeviceLocked: 829,
+
+  /**
    * Lowlevel transport connect error
    */
   LowlevelTrasnportConnectError: 900,
@@ -635,6 +641,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.DeviceSettingsLanguageNotSupport]: 'Language not supported',
   [HardwareErrorCode.TooManyInputs]: 'Too many inputs',
   [HardwareErrorCode.PinMismatch]: 'PIN mismatch',
+  [HardwareErrorCode.DeviceLocked]: 'Device locked',
 
   /**
    * Lowlevel transport

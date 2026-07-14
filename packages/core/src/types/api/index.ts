@@ -6,7 +6,11 @@ import type {
   deviceInfoGet,
   deviceReboot,
   deviceSessionGet,
+  deviceSettingsGet,
+  deviceSettingsPageShow,
+  deviceSettingsSet,
   deviceStatusGet,
+  deviceUploadWallpaper,
   dirList,
   dirMake,
   dirRemove,
@@ -180,7 +184,7 @@ export type {
   DeviceProfileVerify,
   DeviceProfileVersions,
 } from './getDeviceInfo';
-export type { GetPassphraseStateParams, GetPassphraseStatePayload } from './getPassphraseState';
+export type { GetPassphraseStateParams } from './getPassphraseState';
 export type { ClearSessionCacheParams, ClearSessionCachePayload } from './sessionCache';
 
 export type CoreApi = {
@@ -196,6 +200,7 @@ export type CoreApi = {
   call: (params: any) => Promise<any>;
   uiResponse: typeof uiResponse;
   cancel: (connectId?: string) => void;
+  cancelOperation: (operationId: string) => void;
   updateSettings: typeof updateSettings;
   switchTransport: (env: ConnectSettings['env']) => Promise<{ success: boolean }>;
   getLogs: typeof getLogs;
@@ -266,6 +271,10 @@ export type CoreApi = {
   deviceGetFirmwareUpdateStatus: typeof deviceGetFirmwareUpdateStatus;
   deviceFactoryInfoSet: typeof deviceFactoryInfoSet;
   deviceFactoryInfoGet: typeof deviceFactoryInfoGet;
+  deviceSettingsGet: typeof deviceSettingsGet;
+  deviceSettingsSet: typeof deviceSettingsSet;
+  deviceSettingsPageShow: typeof deviceSettingsPageShow;
+  deviceUploadWallpaper: typeof deviceUploadWallpaper;
   filesystemPermissionFix: typeof filesystemPermissionFix;
   fileRead: typeof fileRead;
   fileWrite: typeof fileWrite;

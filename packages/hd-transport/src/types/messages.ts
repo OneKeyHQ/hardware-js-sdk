@@ -4637,6 +4637,19 @@ export type ProtocolInfo = {
   protobuf_definition?: string;
 };
 
+export enum DeviceErrorCode {
+  DeviceError_None = 0,
+  DeviceError_Busy = 1,
+  DeviceError_NotInitialized = 2,
+  DeviceError_ActionCancelled = 3,
+  DeviceError_PinAlreadyUsed = 4,
+  DeviceError_PersistFailed = 5,
+  DeviceError_SeError = 6,
+  DeviceError_InvalidLanguage = 7,
+  DeviceError_WallpaperNotUsable = 8,
+  DeviceError_DeviceLocked = 9,
+}
+
 export enum DeviceRebootType {
   Normal = 0,
   Romloader = 1,
@@ -4653,6 +4666,20 @@ export type DeviceSettings = {
   label?: string;
   bt_enable?: boolean;
   language?: string;
+  wallpaper_path?: string;
+  passphrase_enable?: boolean;
+  brightness?: number;
+  autolock_delay_ms?: number;
+  autoshutdown_delay_ms?: number;
+  animation_enable?: boolean;
+  tap_to_wake?: boolean;
+  haptic_feedback?: boolean;
+  device_name_display_enabled?: boolean;
+  airgap_mode?: boolean;
+  fido_enabled?: boolean;
+  experimental_features?: boolean;
+  usb_lock_enable?: boolean;
+  random_keypad?: boolean;
 };
 
 // DeviceSettingsGet
@@ -4661,6 +4688,19 @@ export type DeviceSettingsGet = {};
 // DeviceSettingsSet
 export type DeviceSettingsSet = {
   settings: DeviceSettings;
+};
+
+export enum DeviceSettingsPage {
+  DeviceReset = 0,
+  DevicePinChange = 1,
+  DevicePassphrase = 2,
+  DeviceAirgap = 3,
+}
+
+// DeviceSettingsPageShow
+export type DeviceSettingsPageShow = {
+  page: DeviceSettingsPage;
+  field_name?: string;
 };
 
 // DeviceCertificate
@@ -5632,6 +5672,7 @@ export type MessageType = {
   DeviceSettings: DeviceSettings;
   DeviceSettingsGet: DeviceSettingsGet;
   DeviceSettingsSet: DeviceSettingsSet;
+  DeviceSettingsPageShow: DeviceSettingsPageShow;
   DeviceCertificate: DeviceCertificate;
   DeviceCertificateWrite: DeviceCertificateWrite;
   DeviceCertificateRead: DeviceCertificateRead;

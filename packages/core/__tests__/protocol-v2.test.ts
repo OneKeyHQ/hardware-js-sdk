@@ -14,6 +14,10 @@ import DeviceFirmwareUpdate from '../src/api/protocol-v2/DeviceFirmwareUpdate';
 import DeviceGetFirmwareUpdateStatus from '../src/api/protocol-v2/DeviceGetFirmwareUpdateStatus';
 import DeviceInfoGet from '../src/api/protocol-v2/DeviceInfoGet';
 import DeviceReboot from '../src/api/protocol-v2/DeviceReboot';
+import DeviceSettingsGet from '../src/api/protocol-v2/DeviceSettingsGet';
+import DeviceSettingsPageShow from '../src/api/protocol-v2/DeviceSettingsPageShow';
+import DeviceSettingsSet from '../src/api/protocol-v2/DeviceSettingsSet';
+import DeviceUploadWallpaper from '../src/api/protocol-v2/DeviceUploadWallpaper';
 import DeviceSessionGet from '../src/api/protocol-v2/DeviceSessionGet';
 import DeviceStatusGet from '../src/api/protocol-v2/DeviceStatusGet';
 import FilesystemFormat from '../src/api/protocol-v2/FilesystemFormat';
@@ -57,6 +61,7 @@ import {
   getProtocolV2WalletSession,
   refreshProtocolV2DeviceStatus,
 } from '../src/protocols/protocol-v2/walletSession';
+import { runMethodWithUnlockRetry } from '../src/protocols/protocol-v2/unlockRetry';
 import { buildProfileFromProtocolV2, buildProtocolV2FeaturesPayload } from '../src/deviceProfile';
 import {
   getDeviceType,
@@ -80,6 +85,63 @@ jest.mock('../src/data/config', () => ({
   getSDKVersion: jest.fn(() => '1.0.0'),
   DEFAULT_DOMAIN: 'https://jssdk.onekey.so/1.0.0/',
 }));
+
+describe('DeviceUploadWallpaper', () => {
+  test('encodes, uploads and applies a Pro2 wallpaper', async () => {
+    const rgba = new Uint8Array(604 * 1024 * 4).fill(255);
+    const typedCall = jest.fn().mockImplementation((request, _response, params) => {
+      if (request === 'FilesystemDirMake') return { message: { message: 'directory ready' } };
+      if (request === 'FilesystemFileWrite') {
+        return { message: { processed_byte: params.file.offset + params.file.data.byteLength } };
+      }
+      if (request === 'SetWallpaper') return { message: { message: 'wallpaper applied' } };
+      throw new Error(`Unexpected request: ${request}`);
+    });
+    const method = new DeviceUploadWallpaper({
+      id: 1,
+      payload: { method: 'deviceUploadWallpaper', width: 604, height: 1024, rgba },
+    });
+    (method as any).device = stubDevice({ commands: { typedCall } });
+
+    method.init();
+    const result = await method.run();
+
+    expect(method.requireProtocolV2).toBe(true);
+    expect(method.unlockPolicy).toBe('retry-on-locked');
+    expect(typedCall).toHaveBeenNthCalledWith(
+      1,
+      'FilesystemDirMake',
+      'Success',
+      { path: 'vol0:/wallpapers/user' }
+    );
+    const fileWriteCall = typedCall.mock.calls.find(call => call[0] === 'FilesystemFileWrite');
+    expect(fileWriteCall?.[2]).toMatchObject({
+      file: { path: expect.stringMatching(/^vol0:\/wallpapers\/user\/wallpaper-[a-f0-9]+\.bin$/) },
+      overwrite: true,
+      append: false,
+    });
+    expect(typedCall).toHaveBeenLastCalledWith('SetWallpaper', 'Success', {
+      target: 1,
+      path: result.path,
+    });
+    expect(result).toMatchObject({ colorFormat: 'RGB565', message: 'wallpaper applied' });
+  });
+
+  test('rejects unsafe filenames before device communication', async () => {
+    const method = new DeviceUploadWallpaper({
+      id: 1,
+      payload: {
+        method: 'deviceUploadWallpaper',
+        width: 604,
+        height: 1024,
+        rgba: new Uint8Array(604 * 1024 * 4),
+        fileName: '../wallpaper.bin',
+      },
+    });
+
+    expect(() => method.init()).toThrow('fileName');
+  });
+});
 
 describe('UploadPortfolio', () => {
   test('stages the complete package before applying PortfolioUpdate', async () => {
@@ -141,6 +203,33 @@ describe('UploadPortfolio', () => {
 
     await expect(method.run()).rejects.toThrow('write failed');
     expect(typedCall).toHaveBeenCalledTimes(1);
+  });
+
+  test('stops after the acknowledged chunk when the operation is aborted', async () => {
+    const packageBytes = new Uint8Array(4001);
+    const abortController = new AbortController();
+    const typedCall = jest.fn().mockImplementationOnce(async () => {
+      abortController.abort();
+      return { message: { processed_byte: 2048 } };
+    });
+    const method = new UploadPortfolio({
+      id: 1,
+      payload: {
+        method: 'uploadPortfolio',
+        packageBytes,
+        operationId: 'portfolio-1',
+      },
+    });
+    method.abortSignal = abortController.signal;
+    (method as any).device = stubDevice({ commands: { typedCall } });
+
+    method.init();
+
+    await expect(method.run()).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.CallQueueActionCancelled,
+    });
+    expect(typedCall).toHaveBeenCalledTimes(1);
+    expect(typedCall).not.toHaveBeenCalledWith('PortfolioUpdate', 'Success', {});
   });
 });
 
@@ -336,7 +425,6 @@ describe('Protocol V2 feature adapter', () => {
     await expect(
       getPassphraseState(device, {
         expectPassphraseState: 'state-2',
-        allowCreateAttachPin: true,
       })
     ).rejects.toEqual(
       expect.objectContaining({
@@ -372,7 +460,7 @@ describe('Protocol V2 feature adapter', () => {
     expect(updateProtocolV2Features).not.toHaveBeenCalled();
   });
 
-  test('deviceSessionGet maps sessionId and does not mutate wallet cache', async () => {
+  test('deviceSessionGet sends an empty request and does not mutate wallet cache', async () => {
     const typedCall = jest.fn().mockResolvedValue({
       type: 'DeviceSession',
       message: { session_id: 'new-session', btc_test_address: 'state-a' },
@@ -382,7 +470,6 @@ describe('Protocol V2 feature adapter', () => {
       payload: {
         method: 'deviceSessionGet',
         connectId: 'connect-id',
-        sessionId: 'cached-session',
       },
     });
     method.init();
@@ -396,9 +483,7 @@ describe('Protocol V2 feature adapter', () => {
       session_id: 'new-session',
       btc_test_address: 'state-a',
     });
-    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
-      session_id: 'cached-session',
-    });
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
     expect(updateInternalState).not.toHaveBeenCalled();
   });
 
@@ -407,7 +492,7 @@ describe('Protocol V2 feature adapter', () => {
     const api = createCoreApi(call as any);
 
     await api.deviceStatusGet('connect-id', { retryCount: 1 });
-    await api.deviceSessionGet('connect-id', { sessionId: 'cached-session' });
+    await api.deviceSessionGet('connect-id', { retryCount: 1 });
 
     expect(call).toHaveBeenNthCalledWith(1, {
       method: 'deviceStatusGet',
@@ -417,7 +502,7 @@ describe('Protocol V2 feature adapter', () => {
     expect(call).toHaveBeenNthCalledWith(2, {
       method: 'deviceSessionGet',
       connectId: 'connect-id',
-      sessionId: 'cached-session',
+      retryCount: 1,
     });
   });
 
@@ -648,7 +733,7 @@ describe('Protocol V2 feature adapter', () => {
     expect(typedCall).toHaveBeenCalledWith('DeviceStatusGet', 'DeviceStatus', {});
   });
 
-  test('returns unified GetPassphraseState object payload for existing Pro devices', async () => {
+  test('returns passphrase state string for existing Pro devices', async () => {
     const features = {
       deviceId: 'pro-device-id',
       deviceType: 'pro',
@@ -681,12 +766,7 @@ describe('Protocol V2 feature adapter', () => {
       getCurrentPassphraseProtection: () => true,
     }) as any;
 
-    await expect(method.run()).resolves.toEqual({
-      passphraseState: 'state-pro',
-      sessionId: 'session-pro',
-      unlockedAttachPin: false,
-      passphraseProtection: true,
-    });
+    await expect(method.run()).resolves.toBe('state-pro');
     expect(updateInternalState).toHaveBeenCalledWith(
       true,
       'state-pro',
@@ -696,7 +776,7 @@ describe('Protocol V2 feature adapter', () => {
     );
   });
 
-  test('uses features for GetPassphraseState response metadata', async () => {
+  test('returns passphrase state string for Pro2 devices', async () => {
     const features = {
       deviceId: null,
       deviceType: 'pro2',
@@ -731,12 +811,7 @@ describe('Protocol V2 feature adapter', () => {
       getCurrentPassphraseProtection: () => true,
     }) as any;
 
-    await expect(method.run()).resolves.toEqual({
-      passphraseState: 'state-pro2',
-      sessionId: 'session-pro2',
-      unlockedAttachPin: true,
-      passphraseProtection: true,
-    });
+    await expect(method.run()).resolves.toBe('state-pro2');
     expect(getFeatures).not.toHaveBeenCalled();
   });
 
@@ -774,12 +849,7 @@ describe('Protocol V2 feature adapter', () => {
       getCurrentPassphraseProtection: () => true,
     }) as any;
 
-    await expect(method.run()).resolves.toEqual({
-      passphraseState: 'state-pro2-new',
-      sessionId: undefined,
-      unlockedAttachPin: false,
-      passphraseProtection: true,
-    });
+    await expect(method.run()).resolves.toBe('state-pro2-new');
     expect(clearInternalState).toHaveBeenCalledTimes(1);
     expect(updateInternalState).toHaveBeenCalledWith(
       true,
@@ -2907,6 +2977,16 @@ describe('Protocol V2 firmware update targets', () => {
       payload: {
         method: 'firmwareUpdateV4',
         platform: 'web',
+        targetsToUpdate: [
+          'boot',
+          'app_v1',
+          'app_v2',
+          'coprocessor',
+          'se01',
+          'se02',
+          'se03',
+          'se04',
+        ],
       },
     });
     method.init();
@@ -3020,6 +3100,7 @@ describe('Protocol V2 firmware update targets', () => {
       payload: {
         method: 'firmwareUpdateV4',
         platform: 'web',
+        targetsToUpdate: ['resource'],
       },
     });
     method.init();
@@ -3069,7 +3150,7 @@ describe('Protocol V2 firmware update targets', () => {
     getFirmwareLatestReleaseSpy.mockRestore();
   });
 
-  test('skips Pro2 firmware components when configured versions are already installed', async () => {
+  test('does not download Pro2 firmware components that App did not select', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -3760,6 +3841,102 @@ describe('Protocol V2 reboot methods', () => {
   });
 });
 
+describe('Protocol V2 protected method execution', () => {
+  const deviceLockedError = () =>
+    Object.assign(new Error('Device locked'), {
+      errorCode: HardwareErrorCode.DeviceLocked,
+    });
+
+  test('unlocks and retries an opted-in Protocol V2 method once', async () => {
+    const calls: string[] = [];
+    const method = {
+      unlockPolicy: 'retry-on-locked',
+      run: jest
+        .fn()
+        .mockImplementationOnce(async () => {
+          calls.push('run-1');
+          throw deviceLockedError();
+        })
+        .mockImplementationOnce(async () => {
+          calls.push('run-2');
+          return { message: 'ok' };
+        }),
+    };
+    const device = {
+      isProtocolV2: () => true,
+      unlockDevice: jest.fn(async () => {
+        calls.push('unlock');
+      }),
+    };
+
+    await expect(runMethodWithUnlockRetry(method as any, device as any)).resolves.toEqual({
+      message: 'ok',
+    });
+    expect(calls).toEqual(['run-1', 'unlock', 'run-2']);
+  });
+
+  test('does not unlock a Protocol V1 device or a method without the policy', async () => {
+    for (const [isProtocolV2, unlockPolicy] of [
+      [false, 'retry-on-locked'],
+      [true, 'none'],
+    ] as const) {
+      const error = deviceLockedError();
+      const method = {
+        unlockPolicy,
+        run: jest.fn(async () => {
+          throw error;
+        }),
+      };
+      const device = {
+        isProtocolV2: () => isProtocolV2,
+        unlockDevice: jest.fn(),
+      };
+
+      await expect(runMethodWithUnlockRetry(method as any, device as any)).rejects.toBe(error);
+      expect(device.unlockDevice).not.toHaveBeenCalled();
+      expect(method.run).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  test('does not retry when unlock fails or when the retry is still locked', async () => {
+    const initialError = deviceLockedError();
+    const unlockError = new Error('PIN cancelled');
+    const unlockFailMethod = {
+      unlockPolicy: 'retry-on-locked',
+      run: jest.fn(async () => {
+        throw initialError;
+      }),
+    };
+    const unlockFailDevice = {
+      isProtocolV2: () => true,
+      unlockDevice: jest.fn(async () => {
+        throw unlockError;
+      }),
+    };
+
+    await expect(
+      runMethodWithUnlockRetry(unlockFailMethod as any, unlockFailDevice as any)
+    ).rejects.toBe(unlockError);
+    expect(unlockFailMethod.run).toHaveBeenCalledTimes(1);
+
+    const retryError = deviceLockedError();
+    const retryFailMethod = {
+      unlockPolicy: 'retry-on-locked',
+      run: jest.fn().mockRejectedValueOnce(initialError).mockRejectedValueOnce(retryError),
+    };
+    const retryFailDevice = {
+      isProtocolV2: () => true,
+      unlockDevice: jest.fn(async () => undefined),
+    };
+
+    await expect(
+      runMethodWithUnlockRetry(retryFailMethod as any, retryFailDevice as any)
+    ).rejects.toBe(retryError);
+    expect(retryFailMethod.run).toHaveBeenCalledTimes(2);
+    expect(retryFailDevice.unlockDevice).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('Protocol V2 current low-level methods', () => {
   test('sends ProtocolInfoRequest from protocolInfoRequest', async () => {
     const typedCall = jest.fn().mockResolvedValue({ message: { version: 1 } });
@@ -3811,6 +3988,106 @@ describe('Protocol V2 current low-level methods', () => {
     await getMethod.run();
 
     expect(typedCall).toHaveBeenLastCalledWith('DeviceFactoryInfoGet', 'DeviceFactoryInfo', {});
+  });
+
+  test('gets Protocol V2 device settings', async () => {
+    const typedCall = jest.fn().mockResolvedValue({ message: { brightness: 80 } });
+    const method = new DeviceSettingsGet({
+      id: 1,
+      payload: { method: 'deviceSettingsGet' },
+    });
+    method.init();
+    (method as any).device = stubDevice({ commands: { typedCall } });
+
+    await expect(method.run()).resolves.toEqual({ brightness: 80 });
+    expect(typedCall).toHaveBeenCalledWith('DeviceSettingsGet', 'DeviceSettings', {});
+  });
+
+  test('sets Protocol V2 device settings without passphrase fields', async () => {
+    const typedCall = jest.fn().mockResolvedValue({ message: { message: 'ok' } });
+    const method = new DeviceSettingsSet({
+      id: 1,
+      payload: {
+        method: 'deviceSettingsSet',
+        settings: {
+          label: 'My Pro 2',
+          brightness: 80,
+          airgap_mode: true,
+          passphrase_enable: true,
+        },
+      },
+    });
+    method.init();
+    (method as any).device = stubDevice({ commands: { typedCall } });
+
+    await method.run();
+
+    expect(typedCall).toHaveBeenCalledWith('DeviceSettingsSet', 'Success', {
+      settings: {
+        label: 'My Pro 2',
+        brightness: 80,
+      },
+    });
+  });
+
+  test('opens non-passphrase Protocol V2 settings pages', async () => {
+    const typedCall = jest.fn().mockResolvedValue({ message: { message: 'ok' } });
+    const method = new DeviceSettingsPageShow({
+      id: 1,
+      payload: {
+        method: 'deviceSettingsPageShow',
+        page: 'DeviceAirgap',
+        fieldName: 'airgap_mode',
+      },
+    });
+    method.init();
+    (method as any).device = stubDevice({ commands: { typedCall } });
+
+    await method.run();
+
+    expect(typedCall).toHaveBeenCalledWith('DeviceSettingsPageShow', 'Success', {
+      page: 3,
+      field_name: 'airgap_mode',
+    });
+  });
+
+  test('opens the Protocol V2 passphrase settings page', async () => {
+    const typedCall = jest.fn().mockResolvedValue({ message: { message: 'ok' } });
+    const method = new DeviceSettingsPageShow({
+      id: 1,
+      payload: {
+        method: 'deviceSettingsPageShow',
+        page: 'DevicePassphrase',
+      },
+    });
+    method.init();
+    (method as any).device = stubDevice({ commands: { typedCall } });
+
+    await method.run();
+
+    expect(typedCall).toHaveBeenCalledWith('DeviceSettingsPageShow', 'Success', {
+      page: 2,
+      field_name: undefined,
+    });
+  });
+
+  test('marks Protocol V2 settings methods for unlock-on-locked retry', () => {
+    const methods = [
+      new DeviceSettingsGet({ id: 1, payload: { method: 'deviceSettingsGet' } }),
+      new DeviceSettingsSet({
+        id: 2,
+        payload: { method: 'deviceSettingsSet', settings: { brightness: 80 } },
+      }),
+      new DeviceSettingsPageShow({
+        id: 3,
+        payload: { method: 'deviceSettingsPageShow', page: 'DevicePassphrase' },
+      }),
+    ];
+
+    methods.forEach(method => {
+      method.init();
+      expect(method.unlockPolicy).toBe('retry-on-locked');
+    });
   });
 
   test('sends FilesystemPermissionFix from filesystemPermissionFix', async () => {
