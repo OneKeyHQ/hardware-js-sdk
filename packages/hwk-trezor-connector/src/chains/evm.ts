@@ -8,6 +8,7 @@ import {
 } from './eip712';
 import {
   type TrezorChainContext,
+  assertHexString,
   createInvalidParamsError,
   createMethodNotSupportedError,
   formatAnyHex,
@@ -72,16 +73,22 @@ export async function evmGetAddress(ctx: TrezorChainContext, params: unknown): P
  * are non-hex and left untouched. Add future EVM param massaging HERE.
  */
 export function normalizeEvmSignTxHexFields(tx: EvmSignTxTrezorParams): EvmSignTxTrezorParams {
-  const hex = (value: string | undefined): string | undefined =>
-    value === undefined ? undefined : (formatAnyHex(value) as string);
+  const hex = (name: string, value: string | undefined): string | undefined => {
+    if (value === undefined) return undefined;
+    assertHexString(name, value);
+    return formatAnyHex(value) as string;
+  };
+  if (tx.data !== undefined) {
+    assertHexString('data', tx.data);
+  }
   return {
     ...tx,
-    value: hex(tx.value),
-    nonce: hex(tx.nonce),
-    gasLimit: hex(tx.gasLimit),
-    gasPrice: hex(tx.gasPrice),
-    maxFeePerGas: hex(tx.maxFeePerGas),
-    maxPriorityFeePerGas: hex(tx.maxPriorityFeePerGas),
+    value: hex('value', tx.value),
+    nonce: hex('nonce', tx.nonce),
+    gasLimit: hex('gasLimit', tx.gasLimit),
+    gasPrice: hex('gasPrice', tx.gasPrice),
+    maxFeePerGas: hex('maxFeePerGas', tx.maxFeePerGas),
+    maxPriorityFeePerGas: hex('maxPriorityFeePerGas', tx.maxPriorityFeePerGas),
     accessList: tx.accessList
       ? (formatAnyHex(tx.accessList) as EvmSignTxTrezorParams['accessList'])
       : tx.accessList,
