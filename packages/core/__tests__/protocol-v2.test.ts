@@ -415,7 +415,7 @@ describe('Protocol V2 feature adapter', () => {
     expect(device.getInternalState()).toBeUndefined();
   });
 
-  test('clears the selected Pro2 cache entry after invalid session rejection', async () => {
+  test('retries without the selected Pro2 cache entry after invalid session rejection', async () => {
     const device = Device.fromDescriptor({
       id: 'cache-device-3',
       path: 'cache-path-3',
@@ -433,12 +433,49 @@ describe('Protocol V2 feature adapter', () => {
     );
     device.passphraseState = 'state-a';
     preloadSessionCache('stable-device-3', 'state-a', 'session-a');
-    (device as any).commands = {
-      typedCall: jest.fn().mockRejectedValue(new Error('Failure_InvalidSession,no error message')),
-    };
+    const typedCall = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('Failure_ProcessError,Failure_InvalidSession'))
+      .mockResolvedValueOnce({
+        type: 'DeviceSession',
+        message: { session_id: 'session-b', btc_test_address: 'state-a' },
+      });
+    (device as any).commands = { typedCall };
+
+    await expect(getProtocolV2WalletSession(device)).resolves.toMatchObject({
+      passphraseState: 'state-a',
+      newSession: 'session-b',
+    });
+    expect(typedCall.mock.calls).toEqual([
+      ['DeviceSessionGet', 'DeviceSession', { session_id: 'session-a' }],
+      ['DeviceSessionGet', 'DeviceSession', {}],
+    ]);
+    expect(device.getInternalState()).toBe('session-b');
+  });
+
+  test('does not retry an invalid Pro2 session when no cached session was sent', async () => {
+    const device = Device.fromDescriptor({
+      id: 'cache-device-no-session',
+      path: 'cache-path-no-session',
+      protocolType: 'V2',
+    } as any);
+    (device as any).features = normalizeProtocolV2Features(
+      { ...descriptor, protocolType: 'V2' } as any,
+      {
+        status: {
+          device_id: 'stable-device-no-session',
+          unlocked: true,
+          passphrase_enabled: true,
+        },
+      }
+    );
+    const typedCall = jest
+      .fn()
+      .mockRejectedValue(new Error('Failure_ProcessError,Failure_InvalidSession'));
+    (device as any).commands = { typedCall };
 
     await expect(getProtocolV2WalletSession(device)).rejects.toThrow('Failure_InvalidSession');
-    expect(device.getInternalState()).toBeUndefined();
+    expect(typedCall.mock.calls).toEqual([['DeviceSessionGet', 'DeviceSession', {}]]);
   });
 
   test('rejects a mismatched Pro2 wallet state and clears the selected cache entry', async () => {
@@ -1578,16 +1615,10 @@ describe('Protocol V2 feature adapter', () => {
       if (requestType === 'DeviceSessionAskPin') {
         return {
           type: 'DeviceSessionPinResult',
-          message: { unlocked: false, passphrase_protection: false },
-        };
-      }
-      if (requestType === 'DeviceStatusGet') {
-        return {
-          type: 'DeviceStatus',
           message: {
-            device_id: 'PRO2-DEVICE-ID',
             unlocked: true,
-            passphrase_enabled: true,
+            unlocked_attach_pin: true,
+            passphrase_protection: true,
           },
         };
       }
@@ -1608,22 +1639,24 @@ describe('Protocol V2 feature adapter', () => {
 
     const features = await device.unlockDevice();
 
-    expect(typedCall.mock.calls).toEqual([
-      ['DeviceSessionAskPin', 'DeviceSessionPinResult'],
-      ['DeviceStatusGet', 'DeviceStatus', {}],
-    ]);
+    expect(typedCall.mock.calls).toEqual([['DeviceSessionAskPin', 'DeviceSessionPinResult']]);
     expect(typedCall).not.toHaveBeenCalledWith('GetAddress', 'Address', expect.anything());
     expect(typedCall).not.toHaveBeenCalledWith('GetFeatures', 'Features', {});
     expect(features).toMatchObject({
       deviceType: 'pro2',
-      deviceId: 'PRO2-DEVICE-ID',
       firmwareVersion: '1.2.3',
       unlocked: true,
+      unlockedAttachPin: true,
       passphraseProtection: true,
+    });
+    expect(features.raw?.protocolV2DeviceInfo?.status).toMatchObject({
+      unlocked: true,
+      unlocked_by_attach_to_pin: true,
+      passphrase_enabled: true,
     });
   });
 
-  test('syncs Protocol V2 features passphrase state from DeviceStatusGet after unlock', async () => {
+  test('syncs Protocol V2 features passphrase state from DeviceSessionPinResult after unlock', async () => {
     const device = Device.fromDescriptor({ ...descriptor, protocolType: 'V2' } as any);
     (device as any).features = normalizeProtocolV2Features(
       { ...descriptor, protocolType: 'V2' } as any,
@@ -1638,19 +1671,9 @@ describe('Protocol V2 feature adapter', () => {
         return {
           type: 'DeviceSessionPinResult',
           message: {
-            unlocked: false,
-            unlocked_attach_pin: false,
-            passphrase_protection: false,
-          },
-        };
-      }
-      if (requestType === 'DeviceStatusGet') {
-        return {
-          type: 'DeviceStatus',
-          message: {
             unlocked: true,
-            unlocked_by_attach_to_pin: true,
-            passphrase_enabled: true,
+            unlocked_attach_pin: true,
+            passphrase_protection: true,
           },
         };
       }
@@ -1660,7 +1683,9 @@ describe('Protocol V2 feature adapter', () => {
 
     await device.unlockDevice();
 
+    expect(typedCall.mock.calls).toEqual([['DeviceSessionAskPin', 'DeviceSessionPinResult']]);
     expect((device as any).profile).toBeUndefined();
+    expect(device.features?.unlocked).toBe(true);
     expect(device.features?.passphraseProtection).toBe(true);
     expect(device.features?.unlockedAttachPin).toBe(true);
   });

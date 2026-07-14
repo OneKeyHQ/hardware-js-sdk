@@ -6,13 +6,13 @@
 
 当前代码里需要区分三类“会话/身份”：
 
-| 名称                         | 所在层级                                | 含义                                                                                         | 生命周期                                    |
-| ---------------------------- | --------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| transport session / `mainId` | transport / Device                      | SDK 与 transport 占用设备的连接句柄。USB 下通常是 bridge/webusb session；BLE 下通常是 uuid。 | acquire 到 release                          |
-| device `session_id`          | 固件/SE + V1 Features / Pro2 DeviceSession | 设备端 passphrase/seed session 的标识，用于复用已解锁的钱包上下文。                       | 设备端生成，SDK 缓存到 `deviceSessionCache` |
-| `device_id`                  | V1 Features                             | 当前 seed 对应的身份，换 seed / wipe 后会变化。                                              | 随 seed 变化                                |
-| serialNo / uuid              | 硬件身份                                | 硬件序列号，用于识别物理设备。                                                               | 物理设备稳定                                |
-| Protocol V2 frame `seq`      | hd-transport ProtocolV2Session          | V2 帧级请求序号，解决分片/应答跟踪与日志定位。                                               | 每个 ProtocolV2Session 内递增               |
+| 名称                         | 所在层级                                   | 含义                                                                                         | 生命周期                                    |
+| ---------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| transport session / `mainId` | transport / Device                         | SDK 与 transport 占用设备的连接句柄。USB 下通常是 bridge/webusb session；BLE 下通常是 uuid。 | acquire 到 release                          |
+| device `session_id`          | 固件/SE + V1 Features / Pro2 DeviceSession | 设备端 passphrase/seed session 的标识，用于复用已解锁的钱包上下文。                          | 设备端生成，SDK 缓存到 `deviceSessionCache` |
+| `device_id`                  | V1 Features                                | 当前 seed 对应的身份，换 seed / wipe 后会变化。                                              | 随 seed 变化                                |
+| serialNo / uuid              | 硬件身份                                   | 硬件序列号，用于识别物理设备。                                                               | 物理设备稳定                                |
+| Protocol V2 frame `seq`      | hd-transport ProtocolV2Session             | V2 帧级请求序号，解决分片/应答跟踪与日志定位。                                               | 每个 ProtocolV2Session 内递增               |
 
 一句话总结：**transport session 解决“和哪台设备通信”，device `session_id` 解决“设备端当前解锁的是哪个 passphrase 上下文”，`device_id` 解决“当前 seed 身份是否匹配”，V2 `seq` 解决“这一帧属于哪个协议调用顺序”。**
 
@@ -175,10 +175,12 @@ SDK 对外 API 仍叫 `getPassphraseState`，方法本身设置 `useDevicePassph
 1. 调 `getPassphraseStateWithRefreshDeviceInfo()`。
 2. 该函数再调底层 `getPassphraseState()`。
 3. Protocol V2 / Pro2 发送 `DeviceSessionGet`，如果本地命中缓存则携带 `session_id`。
-4. Pro2 固件返回 `DeviceSession`：`session_id` 和 `btc_test_address`，SDK 将 `btc_test_address` 映射为上层 `passphraseState`。
-5. Pro V1 仍走 `GetPassphraseState -> PassphraseState`，返回 `passphrase_state/session_id/unlocked_attach_pin`。
-6. 如果设备之前 locked，或 features 显示未开启 passphrase 但现在拿到了 state，会刷新设备状态。
-7. 调 `updateInternalState()` 写入 session 缓存。
+4. 缓存 `session_id` 无法打开时，固件返回 InvalidSession；SDK 清理当前钱包缓存并使用空 payload 重试一次。
+5. Pro2 固件通过 BTC Testnet 地址派生触发完整 passphrase/Attach-to-PIN seed session 流程，完成后重新读取实际 `session_id`。
+6. Pro2 固件返回 `DeviceSession`：`session_id` 和 `btc_test_address`，SDK 将 `btc_test_address` 映射为上层 `passphraseState`。
+7. Pro V1 仍走 `GetPassphraseState -> PassphraseState`，返回 `passphrase_state/session_id/unlocked_attach_pin`。
+8. 如果 features 显示未开启 passphrase 但现在拿到了 state，会按需刷新设备状态。
+9. 调 `updateInternalState()` 写入 session 缓存。
 
 对 Pro / Pro2，API 返回中即使 `passphrase_protection` 不是 true，也会返回 `passphraseState`。这是为了支持 Pro 系列的 passphrase / attach-to-pin 语义，不能简单套用 V1 设备“只有开启 passphrase 才返回 state”的规则。
 
@@ -209,9 +211,250 @@ SDK 对外 API 仍叫 `getPassphraseState`，方法本身设置 `useDevicePassph
 
 这一层的目的不是“多一次校验”，而是防止 UI 或缓存把用户带到错误钱包。硬件钱包里地址派生和签名都是确定性的，一旦 passphrase 上下文错了，返回的地址或签名仍然是合法的，但对应的是另一个钱包。
 
-## 7. Attach to PIN 交互链路
+## 7. Pro1 Passphrase 与 Attach to PIN 行为基线
 
-### 7.1 protobuf 字段
+本节把 OneKey Pro（下文简称 Pro1、Protocol V1）的现有行为作为 Pro2 对齐基线。需要先区分三种凭据：
+
+```text
+设备主 PIN
+├─ 解锁设备访问权限
+└─ 不直接决定进入哪个钱包
+
+Passphrase
+├─ 参与 seed 派生并选择隐藏钱包
+├─ 不同 passphrase 对应不同钱包
+└─ 空 passphrase 对应标准钱包
+
+Attach PIN
+├─ 是绑定到特定 passphrase 的独立 PIN
+├─ 输入后由设备恢复对应隐藏钱包上下文
+└─ 不是设备主 PIN，也不是 passphrase 明文
+```
+
+可以把三者理解为：主 PIN 打开设备大门，passphrase 选择门内的保险箱，Attach PIN 是某个保险箱的快捷钥匙。
+
+### 7.1 主 PIN 解锁与钱包选择是两个阶段
+
+Pro1 先通过 `UnLockDevice -> UnLockDeviceResponse` 完成设备解锁：
+
+```text
+Host                                      Pro1
+  │                                         │
+  │ UnLockDevice                            │
+  ├────────────────────────────────────────>│
+  │                                         │ 设备显示主 PIN 输入
+  │ UnLockDeviceResponse                    │
+  │   unlocked                              │
+  │   unlocked_attach_pin                   │
+  │   passphrase_protection                 │
+  │<────────────────────────────────────────┤
+```
+
+`UnLockDevice` 只确认设备访问权限和解锁类型，不保证隐藏钱包上下文已经建立。解锁后还要调用 `getPassphraseState()`，由 `GetPassphraseState` 触发真正的钱包选择与 seed session 建立。
+
+### 7.2 GetPassphraseState 请求语义
+
+支持原生 Attach to PIN 的 Pro1 使用：
+
+```text
+GetPassphraseState {
+  passphrase_state?: string
+  _only_main_pin?: bool
+  allow_create_attach_pin?: bool
+}
+```
+
+- 普通隐藏钱包请求：发送已知的 `passphrase_state`，首次进入时通常为空。
+- 强制标准钱包：发送 `_only_main_pin=true`，对应上层 `useEmptyPassphrase=true`。
+- 允许创建 Attach PIN：发送 `allow_create_attach_pin=true`，对应上层 `allowCreateAttachPin=true`。该字段只是允许固件进入创建流程，不等于主机直接创建绑定。
+
+Pro1 的 passphrase 输入界面不是由请求参数直接打开，而是固件在建立 seed session 时发送 `PassphraseRequest` 后，由 SDK 和 UI 继续交互。
+
+### 7.3 普通 passphrase 完整流程
+
+```text
+App / CLI                  SDK                         Pro1 Firmware / SE
+    │                       │                                  │
+    │ getPassphraseState    │                                  │
+    ├──────────────────────>│                                  │
+    │                       │ GetPassphraseState               │
+    │                       ├─────────────────────────────────>│
+    │                       │                                  │ 检查 seed session
+    │                       │ PassphraseRequest                │
+    │                       │<─────────────────────────────────┤
+    │ REQUEST_PASSPHRASE    │                                  │
+    │<──────────────────────┤                                  │
+    │                       │                                  │
+    │ 选择输入方式           │                                  │
+    ├──────────────────────>│                                  │
+    │                       │ PassphraseAck                    │
+    │                       ├─────────────────────────────────>│
+    │                       │                                  │ 派生钱包并建立 session
+    │                       │ PassphraseState                  │
+    │                       │<─────────────────────────────────┤
+    │ passphraseState       │                                  │
+    │ sessionId             │                                  │
+    │ unlockedAttachPin     │                                  │
+    │<──────────────────────┤                                  │
+```
+
+`PassphraseRequest` 可携带 `exists_attach_pin_user`，告诉 SDK 当前是否存在可选择的 Attach PIN 用户。SDK 将它转成 `UI_REQUEST.REQUEST_PASSPHRASE.existsAttachPinUser`。
+
+UI 有三种响应方式：
+
+```text
+1. 主机输入 passphrase
+   PassphraseAck { passphrase: "..." }
+
+2. 设备输入 passphrase
+   PassphraseAck { on_device: true }
+   -> ButtonRequest_PassphraseEntry
+   -> 设备显示 passphrase 输入框
+
+3. 使用已有 Attach PIN
+   前提：exists_attach_pin_user=true
+   PassphraseAck { on_device_attach_pin: true }
+   -> ButtonRequest_AttachPin
+   -> 设备显示 Attach PIN 输入框
+```
+
+主机输入的 passphrase 在 SDK 中会先做 NFKD 规范化，再写入 `PassphraseAck.passphrase`。选择设备输入时，主机不传递 passphrase 明文。
+
+### 7.4 标准钱包、隐藏钱包和 Attach PIN 三条路径
+
+标准钱包：
+
+```text
+GetPassphraseState { _only_main_pin: true }
+  -> 建立空 passphrase 的 seed session
+  -> PassphraseState {
+       passphrase_state: MainWalletState,
+       session_id: MainSession,
+       unlocked_attach_pin: false
+     }
+```
+
+普通隐藏钱包：
+
+```text
+GetPassphraseState {}
+  -> PassphraseRequest
+  -> PassphraseAck { passphrase } 或 { on_device: true }
+  -> 建立隐藏钱包 seed session
+  -> PassphraseState {
+       passphrase_state: HiddenWalletState,
+       session_id: HiddenSession,
+       unlocked_attach_pin: false
+     }
+```
+
+使用已有 Attach PIN：
+
+```text
+GetPassphraseState {}
+  -> PassphraseRequest { exists_attach_pin_user: true }
+  -> PassphraseAck { on_device_attach_pin: true }
+  -> ButtonRequest_AttachPin
+  -> 用户在设备输入 Attach PIN
+  -> SE 恢复 Attach PIN 绑定的 passphrase
+  -> PassphraseState {
+       passphrase_state: HiddenWalletState,
+       session_id: HiddenSession,
+       unlocked_attach_pin: true
+     }
+```
+
+### 7.5 创建 Attach PIN
+
+创建和使用已有 Attach PIN 是两条不同流程。创建入口由 host 显式授权：
+
+```text
+getPassphraseState({
+  initSession: true,
+  allowCreateAttachPin: true
+})
+  -> GetPassphraseState { allow_create_attach_pin: true }
+```
+
+概念上的设备流程如下：
+
+```text
+选择或输入目标 passphrase
+          │
+          ▼
+建立并确认目标隐藏钱包
+          │
+          ▼
+设备进入 Attach PIN 创建流程
+          │
+          ▼
+验证设备主 PIN / 用户授权
+          │
+          ▼
+输入并确认新的 Attach PIN
+          │
+          ▼
+SE 安全保存 Attach PIN -> passphrase 的受保护映射
+          │
+          ▼
+返回最终 passphrase_state + session_id
+```
+
+SDK 不保存 Attach PIN 或 passphrase 映射；映射创建、验证、存储和恢复均属于固件与 SE 的安全边界。
+
+### 7.6 PassphraseState 与 session 缓存
+
+Pro1 最终返回：
+
+```text
+PassphraseState {
+  passphrase_state
+  session_id
+  unlocked_attach_pin
+}
+```
+
+- `passphrase_state` 是当前钱包的稳定指纹，不是 passphrase 明文。SDK 的兼容路径使用 BTC Testnet 固定地址作为状态指纹。
+- `session_id` 是设备端 seed/passphrase session 句柄，用于复用已经建立的钱包上下文。
+- `unlocked_attach_pin` 表示当前上下文是否通过 Attach PIN 恢复。
+
+SDK 使用 `deviceId + passphraseState` 隔离不同钱包的 session：
+
+```text
+deviceSessionCache
+└─ deviceId
+   ├─ MainWalletState    -> MainSession
+   ├─ HiddenWalletStateA -> HiddenSessionA
+   └─ HiddenWalletStateB -> HiddenSessionB
+```
+
+没有明确 `passphraseState` 时，SDK 不应扫描或复用任意隐藏钱包 session，避免把主钱包请求路由到错误的隐藏钱包。
+
+### 7.7 Attach PIN 安全校验
+
+Attach PIN 的核心风险是：调用方认为自己正在访问主钱包或隐藏钱包 A，但设备实际通过 Attach PIN 恢复了隐藏钱包 B。SDK 因此会重新获取设备实际状态并比较：
+
+```text
+业务请求
+  -> getPassphraseState
+  -> 获取 actualPassphraseState + unlockedAttachPin
+  -> 与 expectedPassphraseState / useEmptyPassphrase 比较
+
+  ├─ 状态一致
+  │   └─ 继续取地址或签名
+  │
+  ├─ 请求主钱包，但 unlockedAttachPin=true
+  │   └─ lockDevice + clearInternalState + 抛错
+  │
+  └─ 请求隐藏钱包 A，但设备返回隐藏钱包 B
+      └─ lockDevice + clearInternalState + 抛错
+```
+
+这里不能只检查“设备是否已解锁”。错误 passphrase 上下文仍能返回格式合法的地址和签名，但它们属于另一个钱包。
+
+## 8. Attach to PIN 交互链路
+
+### 8.1 protobuf 字段
 
 V1 固件 schema 中与 attach-to-pin 相关的字段包括：
 
@@ -224,14 +467,26 @@ V1 固件 schema 中与 attach-to-pin 相关的字段包括：
 - `GetPassphraseState.allow_create_attach_pin`
 - `PassphraseState.unlocked_attach_pin`
 
-Pro2 当前固件不再使用上述 passphrase 消息；状态来自 `DeviceInfo.status.passphrase_enabled`、`attach_to_pin_enabled`、`unlocked_by_attach_to_pin`，session 来自 `DeviceSession.session_id`，passphraseState 来自 `DeviceSession.btc_test_address`。
+Pro2 不再使用旧的 `GetPassphraseState/PassphraseState` 请求响应，但仍然使用
+`PassphraseRequest/PassphraseAck` 完成 seed session 的 passphrase 选择。Pro2 的
+`DeviceSessionGet` 会触发内部 BTC Testnet 地址派生；`se.derive_key()` 调用
+`se_ensure_seed_session(false)`，再由 `seed_session_manager` 发送
+`PassphraseRequest` 并消费 `PassphraseAck`。最终 session 来自
+`DeviceSession.session_id`，passphraseState 来自 `DeviceSession.btc_test_address`。
+
+Pro2 的状态字段来自 `DeviceInfo.status.passphrase_enabled`、
+`attach_to_pin_enabled`、`unlocked_by_attach_to_pin`，解锁响应则直接来自
+`DeviceSessionPinResult`。`deviceUnlock` 不需要再调用 `DeviceStatusGet`。
 
 这些字段形成两个方向：
 
 1. 固件告诉 SDK：当前是否存在 attach PIN 用户，当前是否通过 attach PIN 解锁。
 2. SDK 告诉固件：用户选择走设备上的 attach PIN 输入，或允许创建 attach PIN。
 
-### 7.2 UI 事件流
+当前 Protocol V2 host 已支持选择已有 Attach-to-PIN 用户，但本轮暂不传递
+`allowCreateAttachPin`；创建 Attach PIN 的 V2 host 字段等待硬件侧后续接口合入。
+
+### 8.2 UI 事件流
 
 设备返回 `PassphraseRequest` 时，`DeviceCommands._filterCommonTypes()` 会读取 `exists_attach_pin_user`，再触发 `_promptPassphrase({ existsAttachPinUser })`。
 
@@ -253,7 +508,7 @@ UI 返回后：
 
 如果固件返回 `ButtonRequest_AttachPin` 或 `ButtonRequest_PinEntry`，core 会转发为 `UI_REQUEST.REQUEST_PIN`。对 Pro/Touch 这类设备，PIN 通常在设备屏幕输入；UI 主要负责展示“请在设备上操作”。
 
-### 7.3 attach PIN 与 session 修复
+### 8.3 attach PIN 与 session 修复
 
 Attach to PIN 的核心风险是：用户表面上没有手动输入 passphrase，但设备端已经根据绑定 PIN 切换到了某个隐藏钱包 passphrase 上下文。
 
@@ -268,9 +523,91 @@ DeviceSessionGet / GetPassphraseState
 
 同时普通业务调用前还会比较调用方传入的 passphraseState 和设备实际返回的 state。如果 attach PIN 解锁到的 hidden wallet 与调用方预期不一致，SDK 会锁设备并清缓存。
 
-## 8. Protocol V2 transport session 与 seq 管理
+## 9. Pro2 对齐差距与 Firmware / SDK 职责边界
 
-### 8.1 ProtocolV2Session 的职责
+### 9.1 总体判断
+
+当前 Pro2 问题不能概括为单纯的 SDK 参数错误。Protocol V2 的 `DeviceSessionGet` 只有可选 `session_id`，没有 V1 的 `_only_main_pin` 或 `allow_create_attach_pin` 字段。首次请求发送空 payload 是正确行为：
+
+```text
+DeviceSessionGet {}
+```
+
+真正的 passphrase 选择应由固件在执行需要 seed 的地址派生时触发：
+
+```text
+DeviceSessionGet
+  -> 请求 BTC Testnet 地址派生
+  -> se_ensure_seed_session(false)
+  -> PassphraseRequest / PassphraseAck
+  -> 得到真实钱包上下文
+  -> 重新读取最终 session_id
+  -> DeviceSession(session_id, btc_test_address)
+```
+
+如果设备只返回 `session_id` 而没有 `btc_test_address`，也没有产生 `PassphraseRequest`，说明设备只完成了 SE session 句柄创建/读取，没有进入 seed/passphrase 钱包上下文。这一缺口主要位于 firmware-pro2。
+
+### 9.2 职责矩阵
+
+| 能力                     | Firmware / SE 职责                                                   | SDK / Host 职责                                                           | 当前判断                                                      |
+| ------------------------ | -------------------------------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| 主 PIN 解锁              | 显示 PIN 页面、验证 PIN、返回真实解锁状态                            | 发送 `DeviceSessionAskPin`，消费 `DeviceSessionPinResult` 并更新 Features | SDK 已完成；真机解锁已通过                                    |
+| 判断 passphrase 是否开启 | 返回 `passphrase_enabled` / `passphrase_protection`                  | 映射到统一 Features，决定是否进入钱包选择流程                             | 双方已具备；真机已读到 `true`                                 |
+| 首次选择隐藏钱包         | 在需要 seed 时发送 `PassphraseRequest`                               | 处理 UI 选择并发送 `PassphraseAck`                                        | SDK 已具备；当前真机未收到固件请求                            |
+| 主机输入 passphrase      | 消费 `PassphraseAck.passphrase` 并派生 seed                          | 安全获取输入、NFKD 规范化、发送 Ack                                       | SDK 已具备；待新固件真机验证                                  |
+| 设备输入 passphrase      | 消费 `on_device=true`，显示设备输入页并派生 seed                     | 发送 `PassphraseAck { on_device: true }`，展示等待提示                    | SDK 已具备；待新固件真机验证                                  |
+| 返回钱包状态             | 派生固定地址并返回 `btc_test_address + session_id`                   | 映射为 `passphraseState + newSession` 并缓存                              | SDK 已完成；当前固件真机缺少地址                              |
+| session 复用             | 打开 host 提供的 session，验证其有效性并返回最终 session             | 按 `deviceId + passphraseState` 缓存并携带 `session_id`                   | 双方代码已实现；待真机验证                                    |
+| InvalidSession 恢复      | 返回 `Failure_ProcessError + subcode=14 + Failure_InvalidSession`    | 仅在携带缓存 session 时清缓存并无 session 重试一次                        | 双方代码已实现；待真机验证                                    |
+| 发现已有 Attach PIN 用户 | 在 `PassphraseRequest` 返回 `exists_attach_pin_user`                 | 将状态转给 UI，提供 Attach PIN 选项                                       | SDK 已支持；固件需真机验证                                    |
+| 使用已有 Attach PIN      | 消费 `on_device_attach_pin=true`，显示 Attach PIN 输入，恢复绑定钱包 | 发送 Ack、等待设备输入、校验最终钱包状态                                  | SDK 已支持；主要待固件验证                                    |
+| 报告 Attach PIN 解锁状态 | 返回 `unlocked_by_attach_to_pin` 或等价最终状态                      | 映射为 `unlockedAttachPin` 并执行钱包安全检查                             | SDK 已支持状态消费；固件需保证全过程一致                      |
+| 创建 Attach PIN          | 定义创建状态机、验证主 PIN、保存 Attach PIN -> passphrase 映射       | 明确授权创建并提供 UI 入口                                                | V2 协议/SDK/固件共同缺口                                      |
+| 强制标准钱包             | 确保空 passphrase 上下文且不误用 Attach PIN                          | 传递明确意图，并校验最终 state                                            | V2 当前缺少等价 `_only_main_pin` 的显式协议语义，需要共同确认 |
+
+### 9.3 Passphrase 当前应修改哪一侧
+
+passphrase 主流程的当前阻塞点在 firmware-pro2：
+
+1. `DeviceSessionGet` 必须等待完整地址派生，不能在只有 session ID 时提前响应。
+2. 地址派生必须经过 `se_ensure_seed_session(false)`，让 seed session manager 有机会发送 `PassphraseRequest`。
+3. 用户选择完成后，固件必须返回最终钱包的 `btc_test_address` 和最终 `session_id`。
+4. SDK 不需要新增“打开 passphrase 弹窗”的请求参数；弹窗由固件的 `PassphraseRequest` 驱动。
+
+SDK 侧已有的必要行为包括：
+
+- 空缓存时发送 `DeviceSessionGet {}`；
+- 有缓存时发送 `DeviceSessionGet { session_id }`；
+- 处理 `PassphraseRequest/PassphraseAck`；
+- 将 `btc_test_address` 映射为 `passphraseState`；
+- 校验期望钱包状态；
+- 缓存 session，并对 InvalidSession 重试一次。
+
+### 9.4 Attach to PIN 当前应修改哪一侧
+
+需要把“使用已有绑定”和“创建新绑定”分开判断：
+
+**使用已有 Attach PIN：主要是固件流程验证。** SDK 已能读取 `exists_attach_pin_user`、发送 `PassphraseAck { on_device_attach_pin: true }`、处理设备 PIN/Button 事件，并消费 `unlockedAttachPin`。固件需要保证：
+
+1. `PassphraseRequest` 正确报告存在 Attach PIN 用户；
+2. 收到 `on_device_attach_pin=true` 后显示 Attach PIN 输入；
+3. 使用绑定 passphrase 建立 seed session；
+4. 返回该隐藏钱包的 `btc_test_address + session_id`；
+5. 最终状态明确标记 `unlocked_by_attach_to_pin=true`。
+
+**创建 Attach PIN：是协议、SDK 和固件的共同需求。** V1 使用 `GetPassphraseState.allow_create_attach_pin`，但当前 V2 `DeviceSessionGet` 没有等价字段。本轮实现明确没有把 `allowCreateAttachPin` 传入 V2 host。因此在编码前需要先确定：
+
+- 是给 `DeviceSessionGet` 增加 `allow_create_attach_pin`；
+- 还是设计独立的 Attach PIN 管理消息；
+- 创建成功、取消、覆盖已有绑定和失败分别如何表达；
+- 创建后是否强制刷新 session 和 `btc_test_address`；
+- 标准钱包是否允许创建绑定，以及 `_only_main_pin` 的 V2 等价语义。
+
+推荐把“使用已有 Attach PIN”作为当前 passphrase 对齐流程的一部分完成；把“创建/删除/管理 Attach PIN”作为独立协议设计，避免把状态管理继续隐式塞进 `DeviceSessionGet`。
+
+## 10. Protocol V2 transport session 与 seq 管理
+
+### 10.1 ProtocolV2Session 的职责
 
 `ProtocolV2Session` 是 V2 通信的统一会话层，职责包括：
 
@@ -283,7 +620,7 @@ DeviceSessionGet / GetPassphraseState
 
 这里的 `seq` 是协议帧序号，不等同于设备 `session_id`。它用于 V2 帧级诊断和顺序控制；设备 wallet/passphrase session 仍由固件消息里的 `session_id` 表达。
 
-### 8.2 transport 中的缓存差异
+### 10.2 transport 中的缓存差异
 
 不同 transport 对 `ProtocolV2Session` 的持有策略不同：
 
@@ -293,7 +630,7 @@ DeviceSessionGet / GetPassphraseState
 
 无论哪种 transport，V2 调用都需要 `ProtocolV2FrameAssembler` 重组完整 `0x5A` frame，并校验 SOF、长度、header CRC。这样平台层不需要理解 protobuf，只负责可靠传输 bytes。
 
-## 9. 固件/SE 侧 session 来源
+## 11. 固件/SE 侧 session 来源
 
 Pro2 子模块里可以看到 SE session 的底层处理：
 
@@ -304,9 +641,9 @@ Pro2 子模块里可以看到 SE session 的底层处理：
 
 这说明 device `session_id` 本质上是安全芯片/固件侧的 seed/passphrase session 句柄。SDK 缓存它的目的不是绕过安全校验，而是在同一 passphraseState 下复用设备已经建立的上下文，减少重复输入 passphrase 或重复初始化成本。
 
-## 10. 典型流程
+## 12. 典型流程
 
-### 10.1 访问隐藏钱包并缓存 session
+### 12.1 访问隐藏钱包并缓存 session
 
 ```text
 App 调 getPassphraseState(connectId)
@@ -330,7 +667,7 @@ App 调 evmGetAddress({ passphraseState })
   -> method.run()
 ```
 
-### 10.2 请求主钱包但设备通过 attach PIN 解锁
+### 12.2 请求主钱包但设备通过 attach PIN 解锁
 
 ```text
 App 调业务方法({ useEmptyPassphrase: true })
@@ -345,7 +682,7 @@ App 调业务方法({ useEmptyPassphrase: true })
 
 这样做是为了避免用户以为自己在主钱包，实际却进入了绑定 PIN 对应的隐藏钱包。
 
-### 10.3 attach PIN 解锁到错误隐藏钱包
+### 12.3 attach PIN 解锁到错误隐藏钱包
 
 ```text
 App 调业务方法({ passphraseState: A })
@@ -359,17 +696,17 @@ App 调业务方法({ passphraseState: A })
 
 这样做是为了避免一个 passphraseState 的业务请求复用另一个 hidden wallet 的 session。
 
-## 11. 为什么要这么设计
+## 13. 为什么要这么设计
 
-### 11.1 安全优先：不能把“连接成功”当成“钱包上下文正确”
+### 13.1 安全优先：不能把“连接成功”当成“钱包上下文正确”
 
 硬件钱包通信里有多个状态：设备是否连接、是否被 SDK acquire、是否已输入 PIN、当前 passphrase 是哪个、当前 seed 是哪个。只要 passphrase 上下文错了，地址和签名仍然能成功返回，但对应的是错误钱包。因此 SDK 必须在业务调用前校验 passphraseState。
 
-### 11.2 用户体验：复用 session，减少重复输入
+### 13.2 用户体验：复用 session，减少重复输入
 
 `session_id` 缓存让同一个 `deviceId@passphraseState` 可以复用设备端已建立的 session。对 CLI、DApp 和移动端来说，这能减少重复 passphrase 输入，尤其是隐藏钱包和 Cardano 派生这类耗时流程。
 
-### 11.3 兼容性：Pro / Touch / V1 设备 / Pro2 协议并存
+### 13.3 兼容性：Pro / Touch / V1 设备 / Pro2 协议并存
 
 SDK 需要同时支持：
 
@@ -379,7 +716,7 @@ SDK 需要同时支持：
 
 因此现在的实现是“能力检测 + 协议分支 + features adapter”，而不是只按设备型号硬编码。
 
-### 11.4 身份隔离：serialNo、deviceId、sessionId 不能混用
+### 13.4 身份隔离：serialNo、deviceId、sessionId 不能混用
 
 serialNo 稳定指向硬件，deviceId 指向 seed，session_id 指向设备端解锁会话。把它们混用会产生两类问题：
 
@@ -388,11 +725,11 @@ serialNo 稳定指向硬件，deviceId 指向 seed，session_id 指向设备端�
 
 所以 Pro2 里即使有 serialNo，也不填充 deviceId；session cache 也优先以 deviceId + passphraseState 作为 key。
 
-### 11.5 并发与可靠性：V2 call 必须串行
+### 13.5 并发与可靠性：V2 call 必须串行
 
 Protocol V2 的响应当前主要按类型匹配。如果同一 session 上两个 call 并发，一个调用可能消费另一个调用的响应。`ProtocolV2Session.pendingCall` 强制串行，是为了保证响应归属确定。
 
-## 12. 当前实现注意点
+## 14. 当前实现注意点
 
 1. `getInternalState()` 没有 passphraseState 就不会查 session cache，这是当前最重要的安全边界。
 2. Pro2 的 `DeviceInfoGet` 使用当前固件真实字段，`status.passphrase_enabled` 映射到 SDK `passphrase_protection`。
@@ -400,7 +737,7 @@ Protocol V2 的响应当前主要按类型匹配。如果同一 session 上两�
 4. `supportProSeriesAttachPinPassphrase()` 只适用于 V1 Pro，Pro2 在 `getPassphraseState()` 中直接走 `DeviceSessionGet`。
 5. 业务方法如设置、固件、文件、设备状态类通常会设置 `useDevicePassphraseState=false`，避免无意义触发 passphrase 校验。
 
-## 13. 关键源码索引
+## 15. 关键源码索引
 
 - Core 调度与 passphrase 校验：`packages/core/src/core/index.ts`
 - Device 生命周期与 session 缓存：`packages/core/src/device/Device.ts`

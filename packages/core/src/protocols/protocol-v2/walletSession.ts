@@ -43,11 +43,20 @@ export async function getProtocolV2WalletSession(
     typeof device.getInternalState === 'function' ? device.getInternalState() : undefined;
 
   try {
-    const { message } = await device.commands.typedCall(
-      'DeviceSessionGet',
-      'DeviceSession',
-      cachedSessionId ? { session_id: cachedSessionId } : {}
-    );
+    const requestDeviceSession = (sessionId?: string) =>
+      device.commands.typedCall(
+        'DeviceSessionGet',
+        'DeviceSession',
+        sessionId ? { session_id: sessionId } : {}
+      );
+
+    const { message } = await requestDeviceSession(cachedSessionId).catch(async error => {
+      if (!cachedSessionId || !isProtocolV2InvalidSessionError(error)) {
+        throw error;
+      }
+      device.clearInternalState();
+      return requestDeviceSession();
+    });
 
     if (
       options?.expectedPassphraseState &&

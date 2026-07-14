@@ -55,7 +55,6 @@ import {
   PROTOCOL_V2_STATUS_DEVICE_INFO_REQUEST,
   requestProtocolV2DeviceInfo,
 } from '../protocols/protocol-v2/features';
-import { refreshProtocolV2DeviceStatus } from '../protocols/protocol-v2/walletSession';
 import { buildProtocolV1FeaturesPayload, buildProtocolV2FeaturesPayload } from '../deviceProfile';
 
 import type { PROTO } from '../constants';
@@ -68,6 +67,7 @@ import type { PassphrasePromptResponse } from './DeviceCommands';
 import type { Deferred, HardwareConnectProtocol } from '@onekeyfe/hd-shared';
 import type {
   OneKeyDeviceInfo as DeviceDescriptor,
+  DeviceSessionPinResult,
   DeviceStatus,
   ProtocolV2DeviceInfo,
   Success,
@@ -1190,8 +1190,12 @@ export class Device extends EventEmitter {
 
   async unlockDevice() {
     if (this.isProtocolV2()) {
+      let pinResult: DeviceSessionPinResult;
       try {
-        await this.commands.typedCall('DeviceSessionAskPin', 'DeviceSessionPinResult');
+        ({ message: pinResult } = await this.commands.typedCall(
+          'DeviceSessionAskPin',
+          'DeviceSessionPinResult'
+        ));
       } catch (error) {
         const errorText =
           error instanceof Error
@@ -1203,7 +1207,17 @@ export class Device extends EventEmitter {
         throw error;
       }
 
-      return refreshProtocolV2DeviceStatus(this);
+      const status: DeviceStatus = {};
+      if (pinResult.unlocked != null) {
+        status.unlocked = pinResult.unlocked;
+      }
+      if (pinResult.unlocked_attach_pin != null) {
+        status.unlocked_by_attach_to_pin = pinResult.unlocked_attach_pin;
+      }
+      if (pinResult.passphrase_protection != null) {
+        status.passphrase_enabled = pinResult.passphrase_protection;
+      }
+      return this.updateProtocolV2Status(status);
     }
 
     const firmwareVersion = this.getCurrentFirmwareVersionString() ?? '0.0.0';
