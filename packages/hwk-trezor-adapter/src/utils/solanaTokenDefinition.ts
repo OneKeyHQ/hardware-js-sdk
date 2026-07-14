@@ -1,3 +1,5 @@
+import { runWithTimeout } from './ethereumDefinitions';
+
 import type { FetchLike } from './ethereumDefinitions';
 
 /**
@@ -31,11 +33,13 @@ export async function fetchSolanaTokenDefinition({
     return undefined;
   }
   try {
-    const response = await fetchImpl(`${baseUrl}/${tokenMint}.dat`);
-    if (response.status !== 200) {
-      return undefined;
-    }
-    return Buffer.from(await response.arrayBuffer()).toString('hex');
+    return await runWithTimeout(async () => {
+      const response = await fetchImpl(`${baseUrl}/${tokenMint}.dat`);
+      if (response.status !== 200) {
+        return undefined;
+      }
+      return Buffer.from(await response.arrayBuffer()).toString('hex');
+    });
   } catch {
     return undefined;
   }
