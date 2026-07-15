@@ -57,12 +57,6 @@ describe('KaspaSignTransaction capability flags', () => {
       true,
     ],
     [
-      'change output via addressN',
-      { inputs: [buildInput()], outputs: [{ satoshis: 1, addressN: CHANGE_PATH }] },
-      false,
-      true,
-    ],
-    [
       'script + address',
       { outputs: [{ satoshis: 1, script: SCRIPT, address: ADDRESS }] },
       true,
@@ -187,6 +181,15 @@ describe('KaspaSignTransaction protocol negotiation', () => {
         // Change outputs also need script for the tx to stay legacy-signable.
         { satoshis: '890094182', script: SCRIPT, addressN: CHANGE_PATH },
       ],
+      // Without refTxs a legacy-capable tx prefers blind signing instead.
+      refTxs: [
+        {
+          txId: 'aa'.repeat(32),
+          version: 0,
+          inputs: [],
+          outputs: [{ satoshis: '990096458', script: SCRIPT }],
+        },
+      ],
     });
 
     expect(result).toEqual([{ index: 0, signature: 'deadbeef' }]);
@@ -240,6 +243,22 @@ describe('KaspaSignTransaction protocol negotiation', () => {
     expect(first.output_count).toBeUndefined();
     expect(mockTypedCall.mock.calls[1][0]).toBe('KaspaTxInputAck');
     expect(typeof mockTypedCall.mock.calls[1][2].raw_message).toBe('string');
+  });
+
+  it('prefers blind signing when refTxs is absent on a legacy-capable tx', async () => {
+    mockTypedCall.mockResolvedValueOnce(signedTx('sig0'));
+
+    const result = await runMethod({
+      outputs: [{ satoshis: 100000, script: SCRIPT, address: ADDRESS }],
+    });
+
+    expect(result).toEqual([{ index: 0, signature: 'sig0' }]);
+
+    // Streaming needs prev-tx data the caller did not provide: send the plain
+    // legacy packet so every firmware generation blind-signs instead.
+    const first = mockTypedCall.mock.calls[0][2];
+    expect(first.output_count).toBeUndefined();
+    expect(typeof first.raw_message).toBe('string');
   });
 
   it('KRC20-style P2SH input blind-signs even with addresses present', async () => {

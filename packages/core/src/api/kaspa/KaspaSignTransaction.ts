@@ -22,11 +22,8 @@ import type {
   TypedCall,
 } from '@onekeyfe/hd-transport';
 
-// Streaming firmware only handles plain P2PK scripts (KASPA_SPEND_P2PK_SCHNORR /
-// ECDSA spends, KASPA_PAYTOADDRESS / KASPA_PAYTOCHANGE outputs). Any other
-// script kind — e.g. the P2SH commit/reveal scripts used by KRC20 — must fall
-// back to the legacy blind-sign flow. An absent script is not a blocker: it
-// simply means the caller went streaming-only for that entry.
+// Streaming only handles plain P2PK scripts; anything else (e.g. KRC20 P2SH)
+// must blind-sign. Absent script means a streaming-only caller.
 const P2PK_SCRIPT = /^(20[0-9a-f]{64}ac|21[0-9a-f]{66}ab)$/i;
 
 const isStreamableScript = (script?: string) => !script || P2PK_SCRIPT.test(script);
@@ -34,8 +31,7 @@ const isStreamableScript = (script?: string) => !script || P2PK_SCRIPT.test(scri
 export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactionParams> {
   hasBundle = false;
 
-  // Which protocols this transaction can be signed with, decided by the params
-  // the caller provided. The device picks the protocol via its first response.
+  // Protocols this tx can be signed with; the device picks via its first response.
   supportsLegacy = false;
 
   supportsStreaming = false;
@@ -119,9 +115,8 @@ export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactio
       useTweak: payload.useTweak,
     };
 
-    // The legacy flow prehashes on the host with payload/gas/subnetworkID
-    // hardcoded to zero (TransferSerialize), so those features rule it out.
-    // subNetworkID counts as zero whatever length/format the caller used.
+    // Legacy prehashes on the host with payload/gas/subnetworkID hardcoded to
+    // zero (TransferSerialize), so those rule it out.
     this.supportsLegacy =
       this.params.outputs.every(output => !!output.script) &&
       this.params.inputs.every(input => !!input.output.script) &&
@@ -129,16 +124,12 @@ export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactio
       Number(this.params.gas ?? 0) === 0 &&
       /^0*$/.test(this.params.subNetworkID ?? '');
 
-    // The streaming protocol carries no sighash-type field (the device always
-    // signs SIGHASH_ALL), so any custom sighash must use the legacy flow.
+    // The streaming protocol has no sighash-type field (device signs SIGHASH_ALL).
     const isDefaultSigHashType =
       this.params.sigHashType === SignatureType.SIGHASH_ALL ||
       // eslint-disable-next-line no-bitwise
       this.params.sigHashType === (SignatureType.SIGHASH_ALL | SignatureType.SIGHASH_FORKID);
 
-    // The streaming flow describes outputs by address (external) or addressN
-    // (change) and only understands P2PK spends; a tx touching any other
-    // script kind (e.g. KRC20 P2SH commit/reveal) blind-signs instead.
     this.supportsStreaming =
       isDefaultSigHashType &&
       this.params.outputs.every(output => !!output.address || !!output.addressN) &&
@@ -176,10 +167,8 @@ export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactio
   }
 
   /**
-   * Legacy sign flow (host computes the sighash):
-   * the initial KaspaSignTx (sent by run()) carries input 0's prehash in
-   * raw_message; the device answers each KaspaTxInputRequest with the next
-   * input's prehash via KaspaTxInputAck until it returns KaspaSignedTx.
+   * Legacy blind-sign flow: run() sent input 0's prehash in raw_message; feed
+   * each next prehash via KaspaTxInputAck until KaspaSignedTx.
    */
   async processTxRequest(
     typedCall: TypedCall,
@@ -225,9 +214,8 @@ export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactio
   }
 
   /**
-   * Answer a previous-transaction request from the streaming flow: the device
-   * verifies input amounts by re-hashing the transactions the inputs spend
-   * from, selected by prev_tx_id and supplied by the caller via refTxs.
+   * Answer a previous-transaction request (selected by prev_tx_id) from
+   * refTxs; the device uses them to verify input amounts.
    */
   async ackPrevRequest(typedCall: TypedCall, request: KaspaTxRequest, requestIndex: number) {
     const prevTxId = (request.prev_tx_id ?? '').toLowerCase();
@@ -303,12 +291,9 @@ export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactio
   }
 
   /**
-   * Streaming sign flow (device computes the sighash):
-   * after the initial KaspaSignTx (sent by run()), the device drives the
-   * exchange via KaspaTxRequest, asking for each input / output / payload
-   * chunk in turn and carrying the signature of completed inputs back to the
-   * host, until FINISHED. Mirrors the BTC TxRequest/TxAck model in
-   * btc/helpers/signtx.ts.
+   * Streaming flow (device computes the sighash): the device drives via
+   * KaspaTxRequest, asking for inputs/outputs/payload chunks and carrying
+   * finished signatures back, until FINISHED. Mirrors BTC signtx.
    */
   async signTxStream(
     typedCall: TypedCall,
@@ -347,9 +332,7 @@ export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactio
 
       const requestIndex = request.request_index ?? 0;
 
-      // prev_tx_id presence turns INPUT/OUTPUT/PAYLOAD requests into
-      // previous-transaction requests, answered from refTxs; answering them
-      // with current-tx data would be silently wrong.
+      // prev_tx_id selects a previous-transaction request; answer from refTxs.
       if (request.prev_tx_id || requestType === 'KASPA_TX_PREV_META') {
         response = await this.ackPrevRequest(typedCall, request, requestIndex);
       } else if (requestType === 'KASPA_TX_INPUT') {
@@ -427,11 +410,14 @@ export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactio
     const { device, params } = this;
     const payloadHex = params.payload ?? '';
 
-    // output_count is the discriminator new firmware uses to pick the
-    // protocol, so streaming metadata is attached only when the tx can
-    // actually be streamed; a legacy-only tx sends the plain legacy packet and
-    // new firmware falls back to its blind-sign path instead of erroring.
-    const streamingFields = this.supportsStreaming
+    // output_count is the protocol discriminator: attach streaming fields only
+    // when the tx can stream. Streaming verification needs refTxs, so without
+    // them prefer blind signing when available; a streaming-only tx still
+    // streams and fails clearly if the device requests previous txs.
+    const hasRefTxs = (params.refTxs?.length ?? 0) > 0;
+    const streamingReady = this.supportsStreaming && (hasRefTxs || !this.supportsLegacy);
+
+    const streamingFields = streamingReady
       ? {
           output_count: params.outputs.length,
           version: params.version,
@@ -442,16 +428,13 @@ export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactio
         }
       : {};
 
-    // Legacy firmware requires raw_message (host-computed prehash of input 0);
-    // it is only computable, and only correct, when the tx is legacy-signable.
+    // raw_message (input 0's prehash) is only computable/correct when legacy-signable.
     const legacyFields = this.supportsLegacy
       ? { raw_message: bytesToHex(serialize(params, 0).raw) }
       : {};
 
-    // First packet carries the union of what the tx supports: legacy firmware
-    // reads raw_message and skips unknown streaming fields; new firmware
-    // streams when output_count is present, blind-signs otherwise. The device
-    // declares the chosen protocol by the type of its first response.
+    // Legacy firmware reads raw_message and skips unknown streaming fields;
+    // new firmware streams iff output_count is present.
     let response;
     try {
       response = await device.commands.typedCall(
@@ -468,11 +451,8 @@ export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactio
         }
       );
     } catch (error) {
-      // Without raw_message (omitted when the tx needs streaming-only
-      // features) legacy firmware fails to decode KaspaSignTx and reports
-      // Failure_DataError, which DeviceCommands surfaces as a generic
-      // RuntimeError; surface that as an actionable upgrade error. Matching
-      // on the failure code keeps unrelated device errors intact.
+      // Old firmware cannot decode a packet without raw_message
+      // (Failure_DataError); map it to an actionable upgrade error.
       if (
         !this.supportsLegacy &&
         error instanceof HardwareError &&
@@ -499,8 +479,7 @@ export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactio
       return this.signTxStream(typedCall, response);
     }
 
-    // Mirror safety net: a device answering with the legacy protocol against
-    // a streaming-only packet has no prehash material to sign.
+    // Legacy answer to a streaming-only packet: no prehash material exists.
     if (!this.supportsLegacy) {
       throw ERRORS.TypedError(
         HardwareErrorCode.RuntimeError,
