@@ -6160,6 +6160,33 @@
         "PromptTemporarily": 2
       }
     },
+    "Initialize": {
+      "fields": {
+        "session_id": {
+          "type": "bytes",
+          "id": 1
+        },
+        "_skip_passphrase": {
+          "type": "bool",
+          "id": 2,
+          "options": {
+            "deprecated": true
+          }
+        },
+        "derive_cardano": {
+          "type": "bool",
+          "id": 3
+        },
+        "passphrase_state": {
+          "type": "string",
+          "id": 8000
+        },
+        "is_contains_attach": {
+          "type": "bool",
+          "id": 8001
+        }
+      }
+    },
     "StartSession": {
       "fields": {
         "session_id": {
@@ -6182,6 +6209,12 @@
     "EndSession": {
       "fields": {}
     },
+    "GetFeatures": {
+      "fields": {}
+    },
+    "OnekeyGetFeatures": {
+      "fields": {}
+    },
     "OneKeyDeviceType": {
       "values": {
         "CLASSIC": 0,
@@ -6201,6 +6234,388 @@
       "values": {
         "BOOT": 0,
         "APP": 1
+      }
+    },
+    "Features": {
+      "fields": {
+        "vendor": {
+          "type": "string",
+          "id": 1
+        },
+        "major_version": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        },
+        "minor_version": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 3
+        },
+        "patch_version": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 4
+        },
+        "bootloader_mode": {
+          "type": "bool",
+          "id": 5
+        },
+        "device_id": {
+          "type": "string",
+          "id": 6
+        },
+        "pin_protection": {
+          "type": "bool",
+          "id": 7
+        },
+        "passphrase_protection": {
+          "type": "bool",
+          "id": 8
+        },
+        "language": {
+          "type": "string",
+          "id": 9
+        },
+        "label": {
+          "type": "string",
+          "id": 10
+        },
+        "initialized": {
+          "type": "bool",
+          "id": 12
+        },
+        "revision": {
+          "type": "bytes",
+          "id": 13
+        },
+        "bootloader_hash": {
+          "type": "bytes",
+          "id": 14
+        },
+        "imported": {
+          "type": "bool",
+          "id": 15
+        },
+        "unlocked": {
+          "type": "bool",
+          "id": 16
+        },
+        "_passphrase_cached": {
+          "type": "bool",
+          "id": 17,
+          "options": {
+            "deprecated": true
+          }
+        },
+        "firmware_present": {
+          "type": "bool",
+          "id": 18
+        },
+        "needs_backup": {
+          "type": "bool",
+          "id": 19
+        },
+        "flags": {
+          "type": "uint32",
+          "id": 20
+        },
+        "model": {
+          "type": "string",
+          "id": 21
+        },
+        "fw_major": {
+          "type": "uint32",
+          "id": 22
+        },
+        "fw_minor": {
+          "type": "uint32",
+          "id": 23
+        },
+        "fw_patch": {
+          "type": "uint32",
+          "id": 24
+        },
+        "fw_vendor": {
+          "type": "string",
+          "id": 25
+        },
+        "unfinished_backup": {
+          "type": "bool",
+          "id": 27
+        },
+        "no_backup": {
+          "type": "bool",
+          "id": 28
+        },
+        "recovery_mode": {
+          "type": "bool",
+          "id": 29
+        },
+        "capabilities": {
+          "rule": "repeated",
+          "type": "Capability",
+          "id": 30,
+          "options": {
+            "packed": false
+          }
+        },
+        "backup_type": {
+          "type": "BackupType",
+          "id": 31
+        },
+        "sd_card_present": {
+          "type": "bool",
+          "id": 32
+        },
+        "sd_protection": {
+          "type": "bool",
+          "id": 33
+        },
+        "wipe_code_protection": {
+          "type": "bool",
+          "id": 34
+        },
+        "session_id": {
+          "type": "bytes",
+          "id": 35
+        },
+        "passphrase_always_on_device": {
+          "type": "bool",
+          "id": 36
+        },
+        "safety_checks": {
+          "type": "SafetyCheckLevel",
+          "id": 37
+        },
+        "auto_lock_delay_ms": {
+          "type": "uint32",
+          "id": 38
+        },
+        "display_rotation": {
+          "type": "uint32",
+          "id": 39
+        },
+        "experimental_features": {
+          "type": "bool",
+          "id": 40
+        },
+        "offset": {
+          "type": "uint32",
+          "id": 500
+        },
+        "coprocessor_bt_name": {
+          "type": "string",
+          "id": 501
+        },
+        "coprocessor_version": {
+          "type": "string",
+          "id": 502
+        },
+        "coprocessor_bt_enable": {
+          "type": "bool",
+          "id": 503
+        },
+        "se_enable": {
+          "type": "bool",
+          "id": 504
+        },
+        "se_ver": {
+          "type": "string",
+          "id": 506
+        },
+        "backup_only": {
+          "type": "bool",
+          "id": 507
+        },
+        "onekey_version": {
+          "type": "string",
+          "id": 508
+        },
+        "onekey_serial": {
+          "type": "string",
+          "id": 509
+        },
+        "bootloader_version": {
+          "type": "string",
+          "id": 510
+        },
+        "serial_no": {
+          "type": "string",
+          "id": 511
+        },
+        "spi_flash": {
+          "type": "string",
+          "id": 512
+        },
+        "initstates": {
+          "type": "uint32",
+          "id": 513
+        },
+        "NFT_voucher": {
+          "type": "bytes",
+          "id": 514
+        },
+        "cpu_info": {
+          "type": "string",
+          "id": 515
+        },
+        "pre_firmware": {
+          "type": "string",
+          "id": 516
+        },
+        "coin_switch": {
+          "type": "uint32",
+          "id": 517
+        },
+        "build_id": {
+          "type": "bytes",
+          "id": 518
+        },
+        "romloader_version": {
+          "type": "string",
+          "id": 519
+        },
+        "busy": {
+          "type": "bool",
+          "id": 41
+        },
+        "onekey_device_type": {
+          "type": "OneKeyDeviceType",
+          "id": 600
+        },
+        "onekey_se_type": {
+          "type": "OneKeySeType",
+          "id": 601
+        },
+        "onekey_romloader_version": {
+          "type": "string",
+          "id": 602
+        },
+        "onekey_romloader_hash": {
+          "type": "bytes",
+          "id": 603
+        },
+        "onekey_bootloader_version": {
+          "type": "string",
+          "id": 604
+        },
+        "onekey_bootloader_hash": {
+          "type": "bytes",
+          "id": 605
+        },
+        "onekey_se01_version": {
+          "type": "string",
+          "id": 606
+        },
+        "onekey_se01_hash": {
+          "type": "bytes",
+          "id": 607
+        },
+        "onekey_se01_build_id": {
+          "type": "string",
+          "id": 608
+        },
+        "onekey_firmware_version": {
+          "type": "string",
+          "id": 609
+        },
+        "onekey_firmware_hash": {
+          "type": "bytes",
+          "id": 610
+        },
+        "onekey_firmware_build_id": {
+          "type": "string",
+          "id": 611
+        },
+        "onekey_serial_no": {
+          "type": "string",
+          "id": 612
+        },
+        "onekey_bootloader_build_id": {
+          "type": "string",
+          "id": 613
+        },
+        "onekey_coprocessor_bt_name": {
+          "type": "string",
+          "id": 614
+        },
+        "onekey_coprocessor_version": {
+          "type": "string",
+          "id": 615
+        },
+        "onekey_coprocessor_build_id": {
+          "type": "string",
+          "id": 616
+        },
+        "onekey_coprocessor_hash": {
+          "type": "bytes",
+          "id": 617
+        },
+        "onekey_se02_version": {
+          "type": "string",
+          "id": 618
+        },
+        "onekey_se03_version": {
+          "type": "string",
+          "id": 619
+        },
+        "onekey_se04_version": {
+          "type": "string",
+          "id": 620
+        },
+        "onekey_se01_state": {
+          "type": "OneKeySEState",
+          "id": 621
+        },
+        "onekey_se02_state": {
+          "type": "OneKeySEState",
+          "id": 622
+        },
+        "onekey_se03_state": {
+          "type": "OneKeySEState",
+          "id": 623
+        },
+        "onekey_se04_state": {
+          "type": "OneKeySEState",
+          "id": 624
+        },
+        "attach_to_pin_user": {
+          "type": "bool",
+          "id": 625
+        },
+        "unlocked_attach_pin": {
+          "type": "bool",
+          "id": 626
+        }
+      },
+      "nested": {
+        "Capability": {
+          "options": {
+            "(has_bitcoin_only_values)": true
+          },
+          "values": {
+            "Capability_Bitcoin": 1,
+            "Capability_Bitcoin_like": 2,
+            "Capability_Binance": 3,
+            "Capability_Cardano": 4,
+            "Capability_Crypto": 5,
+            "Capability_EOS": 6,
+            "Capability_Ethereum": 7,
+            "Capability_Lisk": 8,
+            "Capability_Monero": 9,
+            "Capability_NEM": 10,
+            "Capability_Ripple": 11,
+            "Capability_Stellar": 12,
+            "Capability_Tezos": 13,
+            "Capability_U2F": 14,
+            "Capability_Shamir": 15,
+            "Capability_ShamirGroups": 16,
+            "Capability_PassphraseEntry": 17,
+            "Capability_AttachToPin": 18,
+            "Capability_EthereumTypedData": 1000
+          }
+        }
       }
     },
     "OnekeyFeatures": {

@@ -62,11 +62,12 @@ const json = {
 };
 
 describe('messages', () => {
-  test('V1 GetPassphraseState includes attach-to-pin request flags', () => {
+  test('V1 GetPassphraseState matches the current firmware schema', () => {
     const { fields } = v1Messages.nested.GetPassphraseState;
 
-    expect(fields._only_main_pin).toMatchObject({ id: 2, type: 'bool' });
-    expect(fields.allow_create_attach_pin).toMatchObject({ id: 3, type: 'bool' });
+    expect(fields.passphrase_state).toMatchObject({ id: 1, type: 'string' });
+    expect(fields).not.toHaveProperty('_only_main_pin');
+    expect(fields).not.toHaveProperty('allow_create_attach_pin');
   });
 
   test('Protocol V2 firmware targets match the current firmware-pro2 enum', () => {
