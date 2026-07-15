@@ -2412,6 +2412,19 @@ export type Features = {
   onekey_se04_state?: string | null;
   attach_to_pin_user?: boolean;
   unlocked_attach_pin?: boolean;
+  coprocessor_bt_name?: string;
+  coprocessor_version?: string;
+  coprocessor_bt_enable?: boolean;
+  romloader_version?: string;
+  onekey_romloader_version?: string;
+  onekey_romloader_hash?: string;
+  onekey_bootloader_version?: string;
+  onekey_bootloader_hash?: string;
+  onekey_bootloader_build_id?: string;
+  onekey_coprocessor_bt_name?: string;
+  onekey_coprocessor_version?: string;
+  onekey_coprocessor_build_id?: string;
+  onekey_coprocessor_hash?: string;
 };
 
 // OnekeyFeatures
@@ -2911,8 +2924,6 @@ export type UnLockDeviceResponse = {
 // GetPassphraseState
 export type GetPassphraseState = {
   passphrase_state?: string;
-  _only_main_pin?: boolean;
-  allow_create_attach_pin?: boolean;
 };
 
 // PassphraseState
@@ -4607,6 +4618,9 @@ export type ViewRawData = {
 export enum ViewSignLayout {
   LayoutDefault = 0,
   LayoutSafeTxCreate = 1,
+  LayoutFinalConfirm = 2,
+  Layout7702 = 3,
+  LayoutFlat = 4,
 }
 
 // ViewSignPage
@@ -4948,12 +4962,9 @@ export type DeviceSession = {
 // DeviceSessionAskPin
 export type DeviceSessionAskPin = {};
 
-// DeviceSessionPinResult
-export type DeviceSessionPinResult = {
-  unlocked?: boolean;
-  unlocked_attach_pin?: boolean;
-  passphrase_protection?: boolean;
-};
+export enum DeviceSessionAskPin_FailureSubCodes {
+  UserCancel = 1,
+}
 
 // DeviceStatus
 export type DeviceStatus = {
@@ -5701,7 +5712,6 @@ export type MessageType = {
   DeviceSessionGet: DeviceSessionGet;
   DeviceSession: DeviceSession;
   DeviceSessionAskPin: DeviceSessionAskPin;
-  DeviceSessionPinResult: DeviceSessionPinResult;
   DeviceStatus: DeviceStatus;
   DeviceStatusGet: DeviceStatusGet;
   DevGetOnboardingStatus: DevGetOnboardingStatus;

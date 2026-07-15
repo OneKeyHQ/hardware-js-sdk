@@ -3,7 +3,7 @@ const {
   createMessageFromType,
   parseConfigure,
 } = require('../src/serialization/protobuf/messages');
-const v1Messages = require('../messages.json');
+const v1Messages = require('../../core/src/data/messages/messages.json');
 const v2Messages = require('../messages-protocol-v2.json');
 const coreV2Messages = require('../../core/src/data/messages/messages-protocol-v2.json');
 
@@ -62,11 +62,12 @@ const json = {
 };
 
 describe('messages', () => {
-  test('V1 GetPassphraseState includes attach-to-pin request flags', () => {
+  test('V1 GetPassphraseState matches the current firmware schema', () => {
     const { fields } = v1Messages.nested.GetPassphraseState;
 
-    expect(fields._only_main_pin).toMatchObject({ id: 2, type: 'bool' });
-    expect(fields.allow_create_attach_pin).toMatchObject({ id: 3, type: 'bool' });
+    expect(fields.passphrase_state).toMatchObject({ id: 1, type: 'string' });
+    expect(fields).not.toHaveProperty('_only_main_pin');
+    expect(fields).not.toHaveProperty('allow_create_attach_pin');
   });
 
   test('Protocol V2 firmware targets match the current firmware-pro2 enum', () => {
@@ -92,7 +93,6 @@ describe('messages', () => {
       MessageType_DeviceSessionGet: 60606,
       MessageType_DeviceSession: 60607,
       MessageType_DeviceSessionAskPin: 60608,
-      MessageType_DeviceSessionPinResult: 60609,
     });
     expect(v2Messages.nested.DeviceStatusGet).toEqual({ fields: {} });
     expect(v2Messages.nested.DeviceSessionGet.fields.session_id).toMatchObject({
@@ -104,11 +104,12 @@ describe('messages', () => {
       btc_test_address: { id: 2, type: 'string' },
     });
     expect(v2Messages.nested.DeviceSessionAskPin).toEqual({ fields: {} });
-    expect(v2Messages.nested.DeviceSessionPinResult.fields).toMatchObject({
-      unlocked: { id: 1, type: 'bool' },
-      unlocked_attach_pin: { id: 2, type: 'bool' },
-      passphrase_protection: { id: 3, type: 'bool' },
+    expect(v2Messages.nested.DeviceSessionAskPin_FailureSubCodes.values).toEqual({
+      UserCancel: 1,
     });
+    expect(v2Messages.nested.MessageType.values).not.toHaveProperty(
+      'MessageType_DeviceSessionPinResult'
+    );
   });
 
   test('Protocol V2 does not restore retired unlock or passphrase ids', () => {
