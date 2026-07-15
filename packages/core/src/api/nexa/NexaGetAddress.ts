@@ -4,7 +4,7 @@ import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
 
 import type { NexaGetAddress as HardwareNexaGetAddress } from '@onekeyfe/hd-transport';
-import type { NexaGetAddressParams } from '../../types';
+import type { DeviceFirmwareRange, NexaGetAddressParams } from '../../types';
 
 export default class NexaGetAddress extends BaseMethod<HardwareNexaGetAddress[]> {
   hasBundle = false;
@@ -43,8 +43,12 @@ export default class NexaGetAddress extends BaseMethod<HardwareNexaGetAddress[]>
     });
   }
 
-  getVersionRange() {
+  getVersionRange(): DeviceFirmwareRange {
     return {
+      pro2: {
+        min: '0.0.0',
+        unsupported: true,
+      },
       model_mini: {
         min: '3.2.0',
       },

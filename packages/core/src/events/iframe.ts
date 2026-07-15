@@ -8,6 +8,7 @@ export const IFRAME = {
   INIT_BRIDGE: 'iframe-init-bridge',
   CALL: 'iframe-call',
   CANCEL: 'iframe-cancel',
+  CANCEL_OPERATION: 'iframe-cancel-operation',
   SWITCH_TRANSPORT: 'iframe-switch-transport',
   CALLBACK: 'iframe-callback',
 } as const;

@@ -7,15 +7,7 @@ export interface SoftRefreshParams {
   subscriptionOperations: Map<string, 'subscribing' | 'unsubscribing' | 'idle'>;
   subscribedDevices: Map<string, boolean>;
   pairedDevices: Set<string>;
-  notificationCallbacks: Map<string, (hex: string) => void>;
-  processNotificationData: (
-    deviceId: string,
-    data: Buffer
-  ) => {
-    isComplete: boolean;
-    completePacket?: string;
-    error?: string;
-  };
+  onNotificationData: (deviceId: string, data: Buffer) => void;
   logger: Logger | null;
 }
 
@@ -26,8 +18,7 @@ export async function softRefreshSubscription(params: SoftRefreshParams): Promis
     subscriptionOperations,
     subscribedDevices,
     pairedDevices,
-    notificationCallbacks,
-    processNotificationData,
+    onNotificationData,
     logger,
   } = params;
 
@@ -60,15 +51,7 @@ export async function softRefreshSubscription(params: SoftRefreshParams): Promis
       logger?.info('[BLE-OPS] Device paired successfully', { deviceId });
     }
 
-    const result = processNotificationData(deviceId, data);
-    if (result.error) {
-      logger?.error('[BLE-OPS] Packet processing error:', result.error);
-      return;
-    }
-    if (result.isComplete && result.completePacket) {
-      const appCb = notificationCallbacks.get(deviceId);
-      if (appCb) appCb(result.completePacket);
-    }
+    onNotificationData(deviceId, data);
   });
 
   subscribedDevices.set(deviceId, true);

@@ -19,7 +19,6 @@ import {
 } from './helper/auxiliaryData';
 import { gatherWitnessPaths } from './helper/witnesses';
 import { validatePath } from '../helpers/pathUtils';
-import { getDeviceFirmwareVersion, getMethodVersionRange } from '../../utils';
 
 import type { DeviceFirmwareRange } from '../../types';
 import type { CollateralInputWithPath, Path } from './helper/cardanoInputs';
@@ -240,10 +239,9 @@ export default class CardanoSignTransaction extends BaseMethod<any> {
       return;
     }
 
-    const firmwareVersion = getDeviceFirmwareVersion(this.device.features)?.join('.');
+    const firmwareVersion = this.device.getCurrentFirmwareVersionString() ?? '0.0.0';
 
-    const versionRange = getMethodVersionRange(
-      this.device.features,
+    const versionRange = this.device.getCurrentMethodVersionRange(
       type => this.supportConwayVersionRange()[type]
     );
 

@@ -14,7 +14,7 @@ import { uploadFirmware } from './firmware/uploadFirmware';
 import { createUiMessage } from '../events';
 import { DeviceModelToTypes, type KnownDevice } from '../types';
 import { isEnteredManuallyBoot } from './firmware/bootloaderHelper';
-import { LoggerNames, getDeviceType, getDeviceUUID, getLogger, wait } from '../utils';
+import { LoggerNames, getDeviceUUID, getLogger, wait } from '../utils';
 import { DataManager } from '../data-manager';
 import { DevicePool } from '../device/DevicePool';
 
@@ -92,7 +92,7 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
               true
             );
             await this.device.initialize();
-            if (this.device.features?.bootloader_mode) {
+            if (this.device.isBootloader()) {
               clearInterval(intervalTimer);
               this.checkPromise?.resolve(true);
             }
@@ -105,7 +105,7 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
           const devicesDescriptor = deviceDiff?.descriptors ?? [];
           const { deviceList } = await DevicePool.getDevices(devicesDescriptor, connectId);
 
-          if (deviceList.length === 1 && deviceList[0]?.features?.bootloader_mode) {
+          if (deviceList.length === 1 && deviceList[0]?.isBootloader()) {
             // should update current device from cache
             // because device was reboot and had some new requests
             this.device.updateFromCache(deviceList[0]);
@@ -131,9 +131,17 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
   async run() {
     const { device, params } = this;
     const { features, commands } = device;
-    const deviceType = getDeviceType(features);
+    const deviceType = device.getCurrentDeviceType();
 
-    if (!features?.bootloader_mode && features) {
+    // Protocol V2 (Pro2) 固件升级走 DeviceFirmwareUpdate 流程，禁止进入 legacy 入口
+    if (device.isProtocolV2()) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        'Protocol V2 firmware update must use firmwareUpdateV4'
+      );
+    }
+
+    if (!device.isBootloader() && features) {
       const uuid = getDeviceUUID(features);
       // should go to bootloader mode manually
       if (isEnteredManuallyBoot(features, params.updateType)) {

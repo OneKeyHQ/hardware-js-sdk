@@ -14,27 +14,12 @@ export const getDeviceType = (features?: Features): IDeviceType => {
   if (!features || typeof features !== 'object') {
     return EDeviceType.Unknown;
   }
+  if (features.deviceType) {
+    return features.deviceType;
+  }
 
-  // classic1s 3.5.0 pro 4.6.0
-  switch (features.onekey_device_type) {
-    case 'CLASSIC':
-      return EDeviceType.Classic;
-    case 'CLASSIC1S':
-      return EDeviceType.Classic1s;
-    case 'MINI':
-      return EDeviceType.Mini;
-    case 'TOUCH':
-      return EDeviceType.Touch;
-    case 'PRO':
-      return EDeviceType.Pro;
-    case 'PURE':
-      return EDeviceType.ClassicPure;
-    default:
-      // future And old device onekey_device_type is empty
-      if (!isEmpty(features.onekey_serial_no)) {
-        return EDeviceType.Unknown;
-      }
-    // old device type
+  if (features.model === EDeviceType.Pro2 || features.model === 'pro2') {
+    return EDeviceType.Pro2;
   }
 
   // low version hardware
@@ -42,7 +27,7 @@ export const getDeviceType = (features?: Features): IDeviceType => {
   const serialNo = getDeviceUUID(features);
 
   // not exist serialNo, bootloader mode, model 1 is classic
-  if (isEmpty(serialNo) && features.bootloader_mode === true && features.model === '1') {
+  if (isEmpty(serialNo) && features.bootloaderMode === true && features.model === '1') {
     return EDeviceType.Classic;
   }
 
@@ -56,6 +41,7 @@ export const getDeviceType = (features?: Features): IDeviceType => {
   if (miniFlag.toLowerCase() === 'mi') return EDeviceType.Mini;
   if (miniFlag.toLowerCase() === 'tc') return EDeviceType.Touch;
   if (miniFlag.toLowerCase() === 'pr') return EDeviceType.Pro;
+  if (miniFlag.toLowerCase() === 'p2') return EDeviceType.Pro2;
 
   // unknown device
   return EDeviceType.Unknown;
@@ -68,13 +54,14 @@ export const getDeviceType = (features?: Features): IDeviceType => {
 export const getDeviceTypeByBleName = (name?: string): IDeviceType => {
   if (!name) return EDeviceType.Unknown;
 
-  if (name.startsWith('BixinKey')) return EDeviceType.Classic;
-  if (name.startsWith('K')) return EDeviceType.Classic;
+  if (/^BixinKey/i.test(name)) return EDeviceType.Classic;
+  if (/^K/i.test(name)) return EDeviceType.Classic;
 
-  if (name.startsWith('T')) return EDeviceType.Touch;
-  if (name.startsWith('Touch')) return EDeviceType.Touch;
+  if (/^T/i.test(name)) return EDeviceType.Touch;
+  if (/^Touch/i.test(name)) return EDeviceType.Touch;
 
-  if (name.startsWith('Pro')) return EDeviceType.Pro;
+  if (/\bPro\s*2\b/i.test(name) || /^Pro2/i.test(name)) return EDeviceType.Pro2;
+  if (/\bPro\b/i.test(name) || /^Pro/i.test(name)) return EDeviceType.Pro;
 
   return EDeviceType.Unknown;
 };
@@ -85,16 +72,13 @@ export const getDeviceTypeByBleName = (name?: string): IDeviceType => {
  */
 export const getDeviceBleName = (features?: Features): string | null => {
   if (features == null) return null;
-  return features.onekey_ble_name || features.ble_name || null;
+  return features.bleName || null;
 };
 
 /**
  * Get Connected Device UUID by features
  */
-export const getDeviceUUID = (features: Features) => {
-  const serialNo = features.onekey_serial_no || features.onekey_serial || features.serial_no;
-  return serialNo ?? '';
-};
+export const getDeviceUUID = (features: Features) => features.serialNo ?? '';
 
 /**
  * Get Connected Device label by features
@@ -128,8 +112,8 @@ export const getMethodVersionRange = (
   getVersionRange: (deviceModel: IDeviceType | IDeviceModel) => IVersionRange | undefined
 ): IVersionRange | undefined => {
   const deviceType = getDeviceType(features);
-  let versionRange: IVersionRange | undefined = getVersionRange(deviceType);
 
+  const versionRange = getVersionRange(deviceType);
   if (versionRange) {
     return versionRange;
   }
@@ -142,22 +126,25 @@ export const getMethodVersionRange = (
   ];
   for (const model of modelFallbacks) {
     if (DeviceModelToTypes[model].includes(deviceType)) {
-      versionRange = getVersionRange(model);
+      const versionRange = getVersionRange(model);
       if (versionRange) {
         return versionRange;
       }
     }
   }
 
-  return versionRange;
+  return undefined;
 };
+
+export const isMethodVersionRangeUnsupported = (versionRange?: IVersionRange): boolean =>
+  versionRange?.unsupported === true;
 
 export const getFirmwareType = (features: Features | undefined) => {
   if (!features) {
     return EFirmwareType.Universal;
   }
-  if (features.fw_vendor === 'OneKey Bitcoin-only') {
-    return EFirmwareType.BitcoinOnly;
+  if (features.firmwareType) {
+    return features.firmwareType;
   }
   // old firmware
   return features?.capabilities?.length > 0 &&

@@ -1,17 +1,62 @@
+import semver from 'semver';
 import {
+  EDeviceType,
   HardwareErrorCode,
   TypedError,
   createDeviceNotSupportMethodError,
 } from '@onekeyfe/hd-shared';
 
-import { supportBatchPublicKey } from '../../utils/deviceFeaturesUtils';
 import { isEqualBip44CoinType } from './pathUtils';
 import { splitArray } from '../../utils/arrayUtils';
-import { getDeviceType, getFirmwareType } from '../../utils';
 import { DeviceModelToTypes } from '../../types';
 
 import type { EcdsaPublicKeys, Path } from '@onekeyfe/hd-transport';
 import type { Device } from '../../device/Device';
+
+/**
+ * Protocol-agnostic version of `supportBatchPublicKey` (utils/deviceFeaturesUtils):
+ * derives device type and firmware version through Device accessors so that
+ * Protocol V2 devices (features === undefined, profile set) resolve correctly.
+ */
+export function supportBatchPublicKeyByDevice(
+  device: Device,
+  options?: {
+    includeNode?: boolean;
+  }
+): boolean {
+  const currentVersion = device.getCurrentFirmwareVersionString() ?? '0.0.0';
+  const deviceType = device.getCurrentDeviceType();
+
+  // Pro2 (Protocol V2) 版本线独立于 Pro 系列，固件从首个版本即支持 batch / include_node，
+  // 不能套用下面 Pro 系列的 4.x 门槛。
+  if (device.isProtocolV2() || deviceType === EDeviceType.Pro2) {
+    return true;
+  }
+
+  // btc batch get public key
+  if (!!options?.includeNode && deviceType === EDeviceType.Pro) {
+    return semver.gte(currentVersion, '4.14.0');
+  }
+  if (!!options?.includeNode && deviceType === EDeviceType.Touch) {
+    return semver.gte(currentVersion, '4.11.0');
+  }
+  if (!!options?.includeNode && DeviceModelToTypes.model_classic1s.includes(deviceType)) {
+    return semver.gte(currentVersion, '3.12.0');
+  }
+  if (!!options?.includeNode && DeviceModelToTypes.model_mini.includes(deviceType)) {
+    return semver.gte(currentVersion, '3.10.0');
+  }
+  if (options?.includeNode) {
+    return false;
+  }
+
+  // support batch get public key
+  if (deviceType === EDeviceType.Touch || deviceType === EDeviceType.Pro) {
+    return semver.gte(currentVersion, '3.1.0');
+  }
+
+  return semver.gte(currentVersion, '2.6.0');
+}
 
 export async function batchGetPublickeys(
   device: Device,
@@ -28,9 +73,9 @@ export async function batchGetPublickeys(
     throw TypedError(HardwareErrorCode.ForbiddenKeyPath, 'Path length must be greater than 3');
   }
 
-  const supportsBatchPublicKey = supportBatchPublicKey(device.features, options);
+  const supportsBatchPublicKey = supportBatchPublicKeyByDevice(device, options);
   if (!supportsBatchPublicKey) {
-    throw createDeviceNotSupportMethodError('BatchGetPublickeys', getFirmwareType(device.features));
+    throw createDeviceNotSupportMethodError('BatchGetPublickeys', device.getCurrentFirmwareType());
   }
 
   const existsPathNotEqualCoinType = paths.find(p => !isEqualBip44CoinType(p.address_n, coinType));
@@ -39,7 +84,7 @@ export async function batchGetPublickeys(
   }
 
   let batchSize = 10;
-  const deviceType = getDeviceType(device.features);
+  const deviceType = device.getCurrentDeviceType();
   if (DeviceModelToTypes.model_mini.includes(deviceType)) {
     batchSize = 10;
   } else if (DeviceModelToTypes.model_touch.includes(deviceType)) {
@@ -60,7 +105,7 @@ export async function batchGetPublickeys(
     if (res.type !== 'EcdsaPublicKeys') {
       throw createDeviceNotSupportMethodError(
         'BatchGetPublickeys',
-        getFirmwareType(device.features)
+        device.getCurrentFirmwareType()
       );
     } else {
       result.root_fingerprint = res.message.root_fingerprint;

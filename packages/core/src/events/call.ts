@@ -53,6 +53,12 @@ export interface IFrameCancelMessage {
   payload: { connectId?: string };
 }
 
+export interface IFrameCancelOperationMessage {
+  event: typeof IFRAME.CANCEL_OPERATION;
+  type: typeof IFRAME.CANCEL_OPERATION;
+  payload: { operationId: string };
+}
+
 export interface IFrameSwitchTransportMessage {
   event: typeof IFRAME.SWITCH_TRANSPORT;
   type: typeof IFRAME.SWITCH_TRANSPORT;

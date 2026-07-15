@@ -3,7 +3,7 @@ import EventEmitter from 'events';
 // eslint-disable-next-line import/no-cycle
 import { Device } from './Device';
 import { DEVICE } from '../events';
-import { LoggerNames, getDeviceUUID, getLogger } from '../utils';
+import { LoggerNames, getLogger } from '../utils';
 
 import type { InitOptions } from './Device';
 import type { OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
@@ -118,14 +118,14 @@ export class DevicePool extends EventEmitter {
     for await (const descriptor of descriptorList) {
       const device = await this._createDevice(descriptor, initOptions);
 
-      if (device.features) {
-        const uuid = getDeviceUUID(device.features);
-        if (this.devicesCache[uuid]) {
-          const cache = this.devicesCache[uuid];
+      const connectId = device.getConnectId();
+      if (connectId) {
+        if (this.devicesCache[connectId]) {
+          const cache = this.devicesCache[connectId];
           cache.updateDescriptor(descriptor, true);
         }
-        this.devicesCache[uuid] = device;
-        devices[uuid] = device;
+        this.devicesCache[connectId] = device;
+        devices[connectId] = device;
       }
 
       deviceList.push(device);
@@ -150,7 +150,7 @@ export class DevicePool extends EventEmitter {
     if (!device) {
       device = Device.fromDescriptor(descriptor);
       device.deviceConnector = this.connector;
-      await device.connect();
+      await device.connect(initOptions?.connectProtocol);
       await device.initialize(initOptions);
       await device.release();
     }

@@ -3,9 +3,11 @@ export { default as preInitialize } from './device/PreInitialize';
 
 export { default as searchDevices } from './SearchDevices';
 export { default as getFeatures } from './GetFeatures';
+export { default as getDeviceInfo } from './GetDeviceInfo';
 export { default as getOnekeyFeatures } from './GetOnekeyFeatures';
 export { default as getPassphraseState } from './GetPassphraseState';
 export { default as getLogs } from './GetLogs';
+export { default as clearSessionCache } from './ClearSessionCache';
 export { default as checkFirmwareRelease } from './CheckFirmwareRelease';
 export { default as checkBLEFirmwareRelease } from './CheckBLEFirmwareRelease';
 export { default as checkBridgeStatus } from './CheckBridgeStatus';
@@ -38,7 +40,42 @@ export { default as getNextU2FCounter } from './u2f/GetNextU2FCounter';
 export { default as firmwareUpdate } from './FirmwareUpdate';
 export { default as firmwareUpdateV2 } from './FirmwareUpdateV2';
 export { default as firmwareUpdateV3 } from './FirmwareUpdateV3';
+export { default as firmwareUpdateV4 } from './FirmwareUpdateV4';
 export { default as promptWebDeviceAccess } from './PromptWebDeviceAccess';
+
+// File system & device control API (Protocol V2 only)
+export { default as protocolInfoRequest } from './protocol-v2/ProtocolInfoRequest';
+export { default as ping } from './protocol-v2/Ping';
+export { default as deviceReboot } from './protocol-v2/DeviceReboot';
+export { default as deviceInfoGet } from './protocol-v2/DeviceInfoGet';
+export { default as deviceStatusGet } from './protocol-v2/DeviceStatusGet';
+export { default as deviceGetOnboardingStatus } from './protocol-v2/DeviceGetOnboardingStatus';
+export { default as deviceSessionGet } from './protocol-v2/DeviceSessionGet';
+export { default as deviceFirmwareUpdate } from './protocol-v2/DeviceFirmwareUpdate';
+export { default as deviceGetFirmwareUpdateStatus } from './protocol-v2/DeviceGetFirmwareUpdateStatus';
+export { default as deviceFactoryInfoSet } from './protocol-v2/DeviceFactoryInfoSet';
+export { default as deviceFactoryInfoGet } from './protocol-v2/DeviceFactoryInfoGet';
+export { default as deviceSettingsGet } from './protocol-v2/DeviceSettingsGet';
+export { default as deviceSettingsSet } from './protocol-v2/DeviceSettingsSet';
+export { default as deviceSettingsPageShow } from './protocol-v2/DeviceSettingsPageShow';
+export { default as deviceUploadWallpaper } from './protocol-v2/DeviceUploadWallpaper';
+export { default as filesystemPermissionFix } from './protocol-v2/FilesystemPermissionFix';
+export { default as filesystemFormat } from './protocol-v2/FilesystemFormat';
+export { default as fileRead } from './FileRead';
+export { default as fileWrite } from './FileWrite';
+export { default as fileDelete } from './FileDelete';
+export { default as dirList } from './DirList';
+export { default as dirMake } from './DirMake';
+export { default as dirRemove } from './DirRemove';
+export { default as pathInfo } from './PathInfo';
+export { default as filesystemFileRead } from './FileRead';
+export { default as filesystemFileWrite } from './FileWrite';
+export { default as uploadPortfolio } from './UploadPortfolio';
+export { default as filesystemFileDelete } from './FileDelete';
+export { default as filesystemDirList } from './DirList';
+export { default as filesystemDirMake } from './DirMake';
+export { default as filesystemDirRemove } from './DirRemove';
+export { default as filesystemPathInfoQuery } from './PathInfo';
 
 export { default as cipherKeyValue } from './CipherKeyValue';
 

@@ -41,6 +41,7 @@ export declare function firmwareUpdateV2(
 export interface FirmwareUpdateV3Params {
   bleVersion?: number[];
   bleBinary?: ArrayBuffer;
+  chunkSize?: number;
 
   firmwareVersion?: number[];
   firmwareBinary?: ArrayBuffer;
@@ -56,9 +57,65 @@ export interface FirmwareUpdateV3Params {
   platform: IPlatform;
 }
 
+/**
+ * firmwareUpdateV4（Protocol V2）按 DeviceFirmwareTargetType 拆分的目标二进制。
+ * 除 romloader 外，每个字段对应一个 bootloader 可接受的固件升级 target。
+ */
+export type FirmwareUpdateV4Target =
+  | 'boot'
+  | 'app_v1'
+  | 'app_v2'
+  | 'coprocessor'
+  | 'resource'
+  | 'se01'
+  | 'se02'
+  | 'se03'
+  | 'se04';
+
+export interface FirmwareUpdateV4Params {
+  platform: IPlatform;
+  chunkSize?: number;
+  firmwareType?: EFirmwareType;
+  targetsToUpdate?: FirmwareUpdateV4Target[];
+
+  /** FW_MGMT_TARGET_ROMLOADER = 2；当前 Pro2 bootloader 不接受通过 firmwareUpdateV4 安装 */
+  romloaderBinary?: ArrayBuffer;
+  /** FW_MGMT_TARGET_BOOTLOADER = 3 */
+  bootloaderBinary?: ArrayBuffer;
+  /** FW_MGMT_TARGET_APPLICATION_P1 = 4 */
+  applicationP1Binary?: ArrayBuffer;
+  /** FW_MGMT_TARGET_APPLICATION_P2 = 5 */
+  applicationP2Binary?: ArrayBuffer;
+  /** FW_MGMT_TARGET_COPROCESSOR = 6 */
+  coprocessorBinary?: ArrayBuffer;
+  /** FW_MGMT_TARGET_SE01-04 = 7-10 */
+  se01Binary?: ArrayBuffer;
+  se02Binary?: ArrayBuffer;
+  se03Binary?: ArrayBuffer;
+  se04Binary?: ArrayBuffer;
+  forcedUpdateRes?: boolean;
+  /**
+   * RESC bundle okpkg 列表，通过 FilesystemFileWrite 直写到 devicePath（vol0:/bundles/...）。
+   * 手动传入模式：SDK 直接 FileWrite 安装，不做版本比对。
+   */
+  resourceBundleFiles?: Array<{
+    binary: ArrayBuffer;
+    devicePath: string;
+  }>;
+}
+
 export declare function firmwareUpdateV3(
   connectId: string | undefined,
   params: Params<FirmwareUpdateV3Params>
+): Response<{
+  bleVersion: string;
+  firmwareVersion: string;
+  bootloaderVersion: string;
+}>;
+
+export declare function firmwareUpdateV4(
+  connectId: string | undefined,
+  params: Params<FirmwareUpdateV4Params>
 ): Response<{
   bleVersion: string;
   firmwareVersion: string;

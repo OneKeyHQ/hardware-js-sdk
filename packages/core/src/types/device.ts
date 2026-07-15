@@ -1,8 +1,8 @@
-import { EDeviceType } from '@onekeyfe/hd-shared';
+import { EDeviceType, type EFirmwareType } from '@onekeyfe/hd-shared';
 
 import type { IVersionArray } from './settings';
 import type { PROTO } from '../constants';
-import type { OneKeyDeviceCommType } from '@onekeyfe/hd-transport';
+import type { OneKeyDeviceCommType, ProtocolV2DeviceInfo } from '@onekeyfe/hd-transport';
 
 export type DeviceStatus = 'available' | 'occupied' | 'used';
 
@@ -33,7 +33,8 @@ export type KnownDevice = {
   name: string;
   error?: typeof undefined;
   mode: EOneKeyDeviceMode;
-  features: PROTO.Features;
+  features?: Features;
+  sessionId?: string | null;
   unavailableCapabilities: UnavailableCapabilities;
   bleFirmwareVersion: IVersionArray | null;
   firmwareVersion: IVersionArray | null;
@@ -85,7 +86,102 @@ export type SearchDevice = {
 
 export type Device = KnownDevice;
 
-export type Features = PROTO.Features;
+export type DeviceFeaturesProtocol = 'V1' | 'V2' | 'unknown';
+
+export type DeviceFeaturesMode =
+  | 'normal'
+  | 'bootloader'
+  | 'romloader'
+  | 'notInitialized'
+  | 'backupMode'
+  | 'unknown';
+
+export type DeviceFeaturesVerify = {
+  firmwareBuildId?: string;
+  firmwareHash?: string;
+  bootloaderBuildId?: string;
+  bootloaderHash?: string;
+  boardBuildId?: string;
+  boardHash?: string;
+  bleBuildId?: string;
+  bleHash?: string;
+  se01BuildId?: string;
+  se01Hash?: string;
+  se02BuildId?: string;
+  se02Hash?: string;
+  se03BuildId?: string;
+  se03Hash?: string;
+  se04BuildId?: string;
+  se04Hash?: string;
+  se01BootBuildId?: string;
+  se01BootHash?: string;
+  se02BootBuildId?: string;
+  se02BootHash?: string;
+  se03BootBuildId?: string;
+  se03BootHash?: string;
+  se04BootBuildId?: string;
+  se04BootHash?: string;
+};
+
+export type DeviceFeaturesRaw = {
+  protocolV1Features?: PROTO.Features;
+  protocolV1OneKeyFeatures?: OnekeyFeatures;
+  protocolV2DeviceInfo?: ProtocolV2DeviceInfo;
+};
+
+export type Features = {
+  protocol: DeviceFeaturesProtocol;
+  protocolVersion?: number | null;
+  deviceType: IDeviceType;
+  firmwareType: EFirmwareType;
+  model: string | null;
+  vendor: string | null;
+  deviceId: string | null;
+  serialNo: string;
+  label: string | null;
+  bleName: string | null;
+  capabilities: Array<number | string>;
+  mode: DeviceFeaturesMode;
+  initialized: boolean | null;
+  bootloaderMode: boolean | null;
+  unlocked: boolean | null;
+  firmwarePresent: boolean | null;
+  passphraseProtection: boolean | null;
+  pinProtection: boolean | null;
+  backupRequired: boolean | null;
+  noBackup: boolean | null;
+  unfinishedBackup: boolean | null;
+  recoveryMode: boolean | null;
+  language: string | null;
+  bleEnabled: boolean | null;
+  sdCardPresent: boolean | null;
+  sdProtection: boolean | null;
+  wipeCodeProtection: boolean | null;
+  passphraseAlwaysOnDevice: boolean | null;
+  attachToPinEnabled?: boolean | null;
+  safetyChecks: string | null;
+  autoLockDelayMs: number | null;
+  displayRotation: number | null;
+  experimentalFeatures: boolean | null;
+  firmwareVersion: string | null;
+  bootloaderVersion: string | null;
+  boardVersion: string | null;
+  bleVersion: string | null;
+  se01Version?: string | null;
+  se02Version?: string | null;
+  se03Version?: string | null;
+  se04Version?: string | null;
+  se01BootVersion?: string | null;
+  se02BootVersion?: string | null;
+  se03BootVersion?: string | null;
+  se04BootVersion?: string | null;
+  seVersion?: string | null;
+  verify?: DeviceFeaturesVerify;
+  sessionId: string | null;
+  passphraseState?: string;
+  unlockedAttachPin?: boolean;
+  raw?: DeviceFeaturesRaw;
+};
 
 export type OnekeyFeatures = PROTO.OnekeyFeatures;
 
@@ -96,7 +192,8 @@ export type IDeviceType =
   | EDeviceType.ClassicPure
   | EDeviceType.Mini
   | EDeviceType.Touch
-  | EDeviceType.Pro;
+  | EDeviceType.Pro
+  | EDeviceType.Pro2;
 
 /**
  * model_classic: 'classic' | 'classic1s' | 'classicpure'
@@ -124,6 +221,7 @@ export const DeviceTypeToModels: { [deviceType in IDeviceType]: IDeviceModel[] }
   [EDeviceType.Mini]: ['model_mini'],
   [EDeviceType.Touch]: ['model_touch'],
   [EDeviceType.Pro]: ['model_touch'],
+  [EDeviceType.Pro2]: [],
   [EDeviceType.Unknown]: [],
 };
 
@@ -136,6 +234,7 @@ export type ITransportStatus = 'valid' | 'outdated';
 export type IVersionRange = {
   min: string;
   max?: string;
+  unsupported?: boolean;
 };
 
 export type DeviceFirmwareRange = {

@@ -1,8 +1,6 @@
 import semver from 'semver';
 import { EDeviceType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
-import { getDeviceFirmwareVersion, getDeviceType } from '../../../utils';
-
 import type { Device } from '../../../device/Device';
 import type { MessageResponse, TypedCall } from '@onekeyfe/hd-transport';
 
@@ -24,10 +22,10 @@ export const signTypedHash = async ({
   | MessageResponse<'EthereumTypedDataSignature'>
   | MessageResponse<'EthereumTypedDataSignatureOneKey'>
 > => {
-  const deviceType = getDeviceType(device.features);
+  const deviceType = device.getCurrentDeviceType();
   if (deviceType === EDeviceType.Touch || deviceType === EDeviceType.Pro) {
     // Touch Pro Sign NestedArrays
-    const currentVersion = getDeviceFirmwareVersion(device.features).join('.');
+    const currentVersion = device.getCurrentFirmwareVersionString() ?? '0.0.0';
     const supportNestedArraysSignVersion = '4.2.0';
 
     // 4.2.0 is the first version that supports nested arrays in signTypedData
@@ -40,11 +38,13 @@ export const signTypedHash = async ({
     }
   }
 
-  return typedCall('EthereumSignTypedHash', 'EthereumTypedDataSignature', {
+  // legacy EthereumSignTypedHash 的生成类型没有 chain_id 字段，但旧固件按 OneKey 扩展
+  // 接受该字段；通过预先声明的对象（非 fresh literal）携带额外字段，保持原有运行时行为。
+  const message = {
     address_n: addressN,
     domain_separator_hash: domainHash ?? '',
     message_hash: messageHash,
-    // @ts-ignore
     chain_id: chainId,
-  });
+  };
+  return typedCall('EthereumSignTypedHash', 'EthereumTypedDataSignature', message);
 };

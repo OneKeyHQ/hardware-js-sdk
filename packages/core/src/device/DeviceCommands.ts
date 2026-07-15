@@ -2,7 +2,7 @@ import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import TransportManager from '../data-manager/TransportManager';
 import DataManager from '../data-manager/DataManager';
-import { LoggerNames, getDeviceType, getLogger, patchFeatures } from '../utils';
+import { LoggerNames, getLogger, patchFeatures } from '../utils';
 import { DEVICE, type PassphraseRequestPayload } from '../events';
 import { DeviceModelToTypes } from '../types';
 import {
@@ -12,7 +12,12 @@ import {
 } from '../utils/tracing';
 
 import type { Device } from './Device';
-import type { FailureType, Messages, Transport } from '@onekeyfe/hd-transport';
+import type {
+  FailureType,
+  Messages,
+  Transport,
+  TransportCallOptions,
+} from '@onekeyfe/hd-transport';
 
 export type PassphrasePromptResponse = {
   passphrase?: string;
@@ -22,15 +27,132 @@ export type PassphrasePromptResponse = {
 };
 
 type MessageType = Messages.MessageType;
-type MessageKey = keyof MessageType;
+type MessageKey = Extract<keyof MessageType, string>;
 export type TypedResponseMessage<T extends MessageKey> = {
   type: T;
   message: MessageType[T];
 };
 type TypedCallResponseMap = {
-  [K in keyof MessageType]: TypedResponseMessage<K>;
+  [K in MessageKey]: TypedResponseMessage<K>;
 };
-export type DefaultMessageResponse = TypedCallResponseMap[keyof MessageType];
+export type DefaultMessageResponse = TypedCallResponseMap[MessageKey];
+
+const MAX_DEBUG_ARRAY_ITEMS = 20;
+const MAX_DEBUG_OBJECT_KEYS = 40;
+const MAX_DEBUG_STRING_LENGTH = 512;
+const MAX_DEBUG_DEPTH = 4;
+const HIGH_VOLUME_DEBUG_CALLS = new Set([
+  'FilesystemFileRead',
+  'FilesystemFileWrite',
+  'FileRead',
+  'FileWrite',
+  'EmmcFileRead',
+  'EmmcFileWrite',
+  'FirmwareUpload',
+  'ResourceAck',
+]);
+
+function shouldReduceDebugForCall(type: string) {
+  return HIGH_VOLUME_DEBUG_CALLS.has(type);
+}
+
+function getBinaryByteLength(value: unknown): number | undefined {
+  if (value instanceof ArrayBuffer) {
+    return value.byteLength;
+  }
+
+  if (ArrayBuffer.isView(value)) {
+    return value.byteLength;
+  }
+
+  if (typeof Blob !== 'undefined' && value instanceof Blob) {
+    return value.size;
+  }
+
+  return undefined;
+}
+
+function summarizeRedactedData(value: unknown): string {
+  const byteLength = getBinaryByteLength(value);
+  if (byteLength !== undefined) {
+    return `[redacted data: ${byteLength} bytes]`;
+  }
+
+  if (typeof value === 'string') {
+    return `[redacted data: string length=${value.length}]`;
+  }
+
+  if (Array.isArray(value)) {
+    return `[redacted data: array length=${value.length}]`;
+  }
+
+  if (value && typeof value === 'object') {
+    return `[redacted data: object keys=${Object.keys(value).length}]`;
+  }
+
+  return `[redacted data: ${typeof value}]`;
+}
+
+function sanitizeDebugPayload(value: unknown, key = '', depth = 0): unknown {
+  if (key === 'data' && value !== null && value !== undefined) {
+    return summarizeRedactedData(value);
+  }
+
+  const byteLength = getBinaryByteLength(value);
+  if (byteLength !== undefined) {
+    return `[binary: ${byteLength} bytes]`;
+  }
+
+  if (typeof value === 'string') {
+    return value.length > MAX_DEBUG_STRING_LENGTH
+      ? `${value.slice(0, MAX_DEBUG_STRING_LENGTH)}... (len=${value.length})`
+      : value;
+  }
+
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+
+  if (depth >= MAX_DEBUG_DEPTH) {
+    return Array.isArray(value)
+      ? `[array length=${value.length}]`
+      : `[object keys=${Object.keys(value).length}]`;
+  }
+
+  if (Array.isArray(value)) {
+    const items = value
+      .slice(0, MAX_DEBUG_ARRAY_ITEMS)
+      .map(item => sanitizeDebugPayload(item, key, depth + 1));
+    if (value.length > MAX_DEBUG_ARRAY_ITEMS) {
+      items.push(`... (${value.length - MAX_DEBUG_ARRAY_ITEMS} more)`);
+    }
+    return items;
+  }
+
+  const entries = Object.entries(value).slice(0, MAX_DEBUG_OBJECT_KEYS);
+  const sanitized: Record<string, unknown> = {};
+  entries.forEach(([entryKey, entryValue]) => {
+    sanitized[entryKey] = sanitizeDebugPayload(entryValue, entryKey, depth + 1);
+  });
+  if (Object.keys(value).length > MAX_DEBUG_OBJECT_KEYS) {
+    sanitized.__truncated__ = `${Object.keys(value).length - MAX_DEBUG_OBJECT_KEYS} more keys`;
+  }
+  return sanitized;
+}
+
+/**
+ * 交互式 Ack（ButtonAck / PinMatrixAck / PassphraseAck 等）不应继承原调用的
+ * timeoutMs：设备在等待用户操作（确认、输入 PIN/passphrase），思考时间不可预估，
+ * 沿用业务调用的超时会把用户操作截断。仅保留 expectedTypes / intermediateTypes
+ * 等与响应类型相关的选项。
+ */
+const stripInteractiveAckTimeout = (
+  options?: TransportCallOptions
+): TransportCallOptions | undefined => {
+  if (!options) return options;
+  const { timeoutMs: _timeoutMs, ...rest } = options;
+  return rest;
+};
 
 const assertType = (res: DefaultMessageResponse, resType: string | string[]) => {
   const splitResTypes = Array.isArray(resType) ? resType : resType.split('|');
@@ -224,17 +346,21 @@ export class DeviceCommands {
   // Sends an async message to the opened device.
   async call(
     type: MessageKey,
-    msg: DefaultMessageResponse['message'] = {}
+    msg?: DefaultMessageResponse['message'],
+    options?: TransportCallOptions
   ): Promise<DefaultMessageResponse> {
-    Log.debug('[DeviceCommands] [call] Sending', type);
+    const shouldReduceDebug = shouldReduceDebugForCall(type);
+    if (!shouldReduceDebug) {
+      Log.debug('[DeviceCommands] [call] Sending', type);
+    }
 
     try {
-      const promise = this.transport.call(this.mainId, type, msg) as any;
+      const promise = this.transport.call(this.mainId, type, msg ?? {}, options) as any;
       this.callPromise = promise;
       const res = await promise;
       if (res.type === 'Failure') {
         LogCore.debug('[DeviceCommands] [call] Received', res.type, res.message);
-      } else {
+      } else if (!shouldReduceDebug) {
         LogCore.debug('[DeviceCommands] [call] Received', res.type);
       }
       return res;
@@ -283,19 +409,22 @@ export class DeviceCommands {
   typedCall<T extends MessageKey, R extends MessageKey[]>(
     type: T,
     resType: R,
-    msg?: MessageType[T]
+    msg?: MessageType[T],
+    options?: TransportCallOptions
   ): Promise<TypedCallResponseMap[R[number]]>;
 
   typedCall<T extends MessageKey, R extends MessageKey>(
     type: T,
     resType: R,
-    msg?: MessageType[T]
+    msg?: MessageType[T],
+    options?: TransportCallOptions
   ): Promise<TypedResponseMessage<R>>;
 
   async typedCall(
     type: MessageKey,
     resType: MessageKey | MessageKey[],
-    msg?: DefaultMessageResponse['message']
+    msg?: DefaultMessageResponse['message'],
+    options?: TransportCallOptions
   ) {
     if (this.disposed) {
       throw ERRORS.TypedError(
@@ -312,16 +441,28 @@ export class DeviceCommands {
         'PassphraseAck',
         'Cancel',
         'BixinPinInputOnDevice',
+        'FilesystemFileRead',
+        'FilesystemFileWrite',
+        'FileRead',
+        'FileWrite',
+        'EmmcFileRead',
+        'EmmcFileWrite',
+        'FirmwareUpload',
+        'ResourceAck',
       ] as any;
       if (!skipTypes.includes(type) && msg) {
         // Use debug channel to avoid noise escalation
-        Log.debug('[DeviceCommands] [typedCall] Sending payload', type, msg);
+        Log.debug('[DeviceCommands] [typedCall] Sending payload', type, sanitizeDebugPayload(msg));
       }
     } catch (e) {
       // ignore logging errors
     }
 
-    const response = await this._commonCall(type, msg);
+    const expectedTypes = Array.isArray(resType) ? resType : resType.split('|');
+    const response = await this._commonCall(type, msg, {
+      ...options,
+      expectedTypes: options?.expectedTypes ?? expectedTypes,
+    });
     try {
       assertType(response, resType);
     } catch (error) {
@@ -334,6 +475,12 @@ export class DeviceCommands {
       // throw bridge network error
       if (error instanceof HardwareError) {
         if (error.errorCode === HardwareErrorCode.ResponseUnexpectTypeError) {
+          Log.debug('[DeviceCommands] [typedCall] Unexpected response type', {
+            request: type,
+            expected: resType,
+            received: response.type,
+            response: sanitizeDebugPayload(response.message),
+          });
           // Do not intercept CallMethodError
           // Do not intercept “assertType: Response of unexpected type” error
           // Blocking the above two messages will not know what the specific error message is, and the specific error should be handled by the subsequent business logic.
@@ -347,7 +494,7 @@ export class DeviceCommands {
           if (error.message.indexOf('BridgeDeviceDisconnected') > -1) {
             throw ERRORS.TypedError(HardwareErrorCode.BridgeDeviceDisconnected);
           }
-          throw ERRORS.TypedError(HardwareErrorCode.ResponseUnexpectTypeError);
+          throw error;
         }
       } else {
         // throw error anyway, next call should be resolved properly// throw error anyway, next call should be resolved properly
@@ -357,20 +504,27 @@ export class DeviceCommands {
     return response;
   }
 
-  async _commonCall(type: MessageKey, msg?: DefaultMessageResponse['message']) {
-    const resp = await this.call(type, msg);
-    return this._filterCommonTypes(resp, type);
+  async _commonCall(
+    type: MessageKey,
+    msg?: DefaultMessageResponse['message'],
+    options?: TransportCallOptions
+  ) {
+    const resp = await this.call(type, msg, options);
+    return this._filterCommonTypes(resp, type, options);
   }
 
   _filterCommonTypes(
     res: DefaultMessageResponse,
-    callType: MessageKey
+    callType: MessageKey,
+    options?: TransportCallOptions
   ): Promise<DefaultMessageResponse> {
     try {
-      if (DataManager.getSettings('env') === 'react-native') {
-        Log.debug('_filterCommonTypes: ', JSON.stringify(res));
+      if (shouldReduceDebugForCall(callType)) {
+        // 高频文件写入每个 chunk 都会经过这里，避免 debug log 反向拖慢传输。
+      } else if (DataManager.getSettings('env') === 'react-native') {
+        Log.debug('_filterCommonTypes: ', JSON.stringify(sanitizeDebugPayload(res)));
       } else {
-        Log.debug('_filterCommonTypes: ', res);
+        Log.debug('_filterCommonTypes: ', sanitizeDebugPayload(res));
       }
     } catch (error) {
       // ignore
@@ -378,8 +532,9 @@ export class DeviceCommands {
 
     this.device.clearCancelableAction();
     if (res.type === 'Failure') {
-      const { code, message } = res.message as {
+      const { code, subcode, message } = res.message as {
         code?: string | FailureType;
+        subcode?: number;
         message?: string;
       };
       let error: HardwareError | null = null;
@@ -423,8 +578,13 @@ export class DeviceCommands {
       }
 
       if (code === 'Failure_ProcessError') {
-        // Handle firmware verification failures
-        if (
+        if (subcode === 9) {
+          error = ERRORS.TypedError(HardwareErrorCode.DeviceLocked, message, {
+            failureCode: code,
+            subcode,
+            firmwareMessage: message,
+          });
+        } else if (
           message?.includes('Bootloader file verify failed') ||
           message?.includes('verify failed')
         ) {
@@ -461,7 +621,7 @@ export class DeviceCommands {
     }
 
     if (res.type === 'ButtonRequest') {
-      const deviceType = getDeviceType(this.device.features);
+      const deviceType = this.device.getCurrentDeviceType();
       if (DeviceModelToTypes.model_mini.includes(deviceType)) {
         this.device.setCancelableAction(() => this.cancelDeviceOnOneKeyDevice());
       } else {
@@ -472,7 +632,7 @@ export class DeviceCommands {
       } else {
         this.device.emit(DEVICE.BUTTON, this.device, res.message);
       }
-      return this._commonCall('ButtonAck', {});
+      return this._commonCall('ButtonAck', {}, stripInteractiveAckTimeout(options));
     }
 
     if (res.type === 'EntropyRequest') {
@@ -485,11 +645,15 @@ export class DeviceCommands {
           if (pin === '@@ONEKEY_INPUT_PIN_IN_DEVICE') {
             // only classic\1s\mini\pure
             this.device.setCancelableAction(() => this.cancelDeviceOnOneKeyDevice());
-            return this._commonCall('BixinPinInputOnDevice').finally(() => {
+            return this._commonCall(
+              'BixinPinInputOnDevice',
+              {},
+              stripInteractiveAckTimeout(options)
+            ).finally(() => {
               this.device.clearCancelableAction();
             });
           }
-          return this._commonCall('PinMatrixAck', { pin });
+          return this._commonCall('PinMatrixAck', { pin }, stripInteractiveAckTimeout(options));
         },
         error => Promise.reject(error)
       );
@@ -504,12 +668,20 @@ export class DeviceCommands {
 
         // Attach PIN on device
         if (attachPinOnDevice && existsAttachPinUser) {
-          return this._commonCall('PassphraseAck', { on_device_attach_pin: true });
+          return this._commonCall(
+            'PassphraseAck',
+            { on_device_attach_pin: true },
+            stripInteractiveAckTimeout(options)
+          );
         }
 
         return !passphraseOnDevice
-          ? this._commonCall('PassphraseAck', { passphrase })
-          : this._commonCall('PassphraseAck', { on_device: true });
+          ? this._commonCall('PassphraseAck', { passphrase }, stripInteractiveAckTimeout(options))
+          : this._commonCall(
+              'PassphraseAck',
+              { on_device: true },
+              stripInteractiveAckTimeout(options)
+            );
       });
     }
 

@@ -8,8 +8,6 @@ export default class DeviceLock extends BaseMethod<LockDevice> {
   }
 
   async run() {
-    const res = await this.device.commands.typedCall('LockDevice', 'Success');
-
-    return Promise.resolve(res.message);
+    return this.device.lockDevice();
   }
 }

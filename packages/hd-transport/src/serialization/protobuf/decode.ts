@@ -40,6 +40,13 @@ function messageToJSON(Message: Message<Record<string, unknown>>, fields: Type['
     // @ts-ignore
     const value = message[key];
 
+    if (value == null) {
+      if (field.optional) {
+        res[key] = null;
+      }
+      return;
+    }
+
     /* istanbul ignore else  */
     if (field.repeated) {
       /* istanbul ignore else  */

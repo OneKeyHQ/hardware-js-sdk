@@ -5,7 +5,7 @@ import { UI_REQUEST } from '../../constants/ui-request';
 import { BaseMethod } from '../BaseMethod';
 import { getSysResourceBinary } from '../firmware/getBinary';
 import { updateResources } from '../firmware/uploadFirmware';
-import { getDeviceFirmwareVersion, getDeviceType, getFirmwareType } from '../../utils';
+import { getDeviceFirmwareVersion, getFirmwareType } from '../../utils';
 import { createUiMessage } from '../../events/ui-request';
 import { DataManager } from '../../data-manager';
 
@@ -36,7 +36,7 @@ export default class DeviceFullyUploadResource extends BaseMethod {
   isSupportResourceUpdate(features: Features, updateType: string) {
     if (updateType !== 'firmware') return false;
 
-    const deviceType = getDeviceType(features);
+    const deviceType = this.device.getCurrentDeviceType();
     const isTouchMode = deviceType === EDeviceType.Touch || deviceType === EDeviceType.Pro;
     const currentVersion = getDeviceFirmwareVersion(features).join('.');
 
@@ -52,7 +52,7 @@ export default class DeviceFullyUploadResource extends BaseMethod {
     const deviceFirmwareType = getFirmwareType(features);
     const firmwareType = payload.firmwareType ?? deviceFirmwareType;
 
-    if (!features?.bootloader_mode && features) {
+    if (!device.isBootloader() && features) {
       // check & upgrade firmware resource
       if (features) {
         let { binary } = this.payload;
