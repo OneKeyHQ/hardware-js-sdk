@@ -162,6 +162,8 @@ export const createCoreApi = (
   deviceReboot: (connectId, params) => call({ ...params, connectId, method: 'deviceReboot' }),
   deviceInfoGet: (connectId, params) => call({ ...params, connectId, method: 'deviceInfoGet' }),
   deviceStatusGet: (connectId, params) => call({ ...params, connectId, method: 'deviceStatusGet' }),
+  deviceGetOnboardingStatus: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceGetOnboardingStatus' }),
   deviceSessionGet: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceSessionGet' }),
   deviceFirmwareUpdate: (connectId, params) =>

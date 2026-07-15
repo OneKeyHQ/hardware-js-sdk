@@ -2,6 +2,7 @@ import type { CommonParams, Response } from '../params';
 import type {
   DeviceFactoryInfo,
   DeviceFirmwareUpdateStatus,
+  DevOnboardingStatus,
   DeviceSession,
   DeviceSettings,
   DeviceStatus,
@@ -110,6 +111,11 @@ export declare function deviceStatusGet(
   connectId: string,
   params?: CommonParams
 ): Response<DeviceStatus>;
+
+export declare function deviceGetOnboardingStatus(
+  connectId: string,
+  params?: CommonParams
+): Response<DevOnboardingStatus>;
 
 export declare function deviceSessionGet(
   connectId: string,

@@ -12,6 +12,7 @@ import DeviceFactoryInfoGet from '../src/api/protocol-v2/DeviceFactoryInfoGet';
 import DeviceFactoryInfoSet from '../src/api/protocol-v2/DeviceFactoryInfoSet';
 import DeviceFirmwareUpdate from '../src/api/protocol-v2/DeviceFirmwareUpdate';
 import DeviceGetFirmwareUpdateStatus from '../src/api/protocol-v2/DeviceGetFirmwareUpdateStatus';
+import DeviceGetOnboardingStatus from '../src/api/protocol-v2/DeviceGetOnboardingStatus';
 import DeviceInfoGet from '../src/api/protocol-v2/DeviceInfoGet';
 import DeviceReboot from '../src/api/protocol-v2/DeviceReboot';
 import DeviceSettingsGet from '../src/api/protocol-v2/DeviceSettingsGet';
@@ -484,6 +485,36 @@ describe('Protocol V2 feature adapter', () => {
     expect(updateProtocolV2Features).not.toHaveBeenCalled();
   });
 
+  test('deviceGetOnboardingStatus returns the real Protocol V2 onboarding stage', async () => {
+    const typedCall = jest.fn().mockResolvedValue({
+      type: 'DevOnboardingStatus',
+      message: { stage: 2, status_code: 3, detail_code: 4 },
+    });
+    const method = new DeviceGetOnboardingStatus({
+      payload: {
+        method: 'deviceGetOnboardingStatus',
+        connectId: 'connect-id',
+      },
+    });
+    method.init();
+    method.device = stubDevice({
+      originalDescriptor: { ...descriptor, protocolType: 'V2' },
+      commands: { typedCall },
+    }) as any;
+
+    await expect(method.run()).resolves.toEqual({
+      stage: 2,
+      status_code: 3,
+      detail_code: 4,
+    });
+    expect(typedCall).toHaveBeenCalledWith(
+      'DevGetOnboardingStatus',
+      'DevOnboardingStatus',
+      {}
+    );
+    expect(method.requireProtocolV2).toBe(true);
+  });
+
   test('deviceSessionGet sends an empty request and does not mutate wallet cache', async () => {
     const typedCall = jest.fn().mockResolvedValue({
       type: 'DeviceSession',
@@ -516,6 +547,7 @@ describe('Protocol V2 feature adapter', () => {
     const api = createCoreApi(call as any);
 
     await api.deviceStatusGet('connect-id', { retryCount: 1 });
+    await api.deviceGetOnboardingStatus('connect-id', { retryCount: 1 });
     await api.deviceSessionGet('connect-id', { retryCount: 1 });
 
     expect(call).toHaveBeenNthCalledWith(1, {
@@ -524,6 +556,11 @@ describe('Protocol V2 feature adapter', () => {
       retryCount: 1,
     });
     expect(call).toHaveBeenNthCalledWith(2, {
+      method: 'deviceGetOnboardingStatus',
+      connectId: 'connect-id',
+      retryCount: 1,
+    });
+    expect(call).toHaveBeenNthCalledWith(3, {
       method: 'deviceSessionGet',
       connectId: 'connect-id',
       retryCount: 1,
