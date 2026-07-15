@@ -881,6 +881,31 @@ input[type="search"]::placeholder,
   text-transform: uppercase;
 }
 
+.agent-wallet-disclaimer {
+  margin: 0 0 var(--space-6);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  border-left: 4px solid #f59e0b;
+  border-radius: var(--radius-lg);
+  background: rgba(245, 158, 11, 0.1);
+  color: #d4d4d8;
+}
+
+.agent-wallet-disclaimer strong {
+  display: block;
+  margin-bottom: var(--space-1);
+  color: #fbbf24;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.agent-wallet-disclaimer p {
+  margin: 0;
+  color: inherit;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
 /* Ensure main footer stays visible */
 .nextra-content + footer,
 main ~ footer {

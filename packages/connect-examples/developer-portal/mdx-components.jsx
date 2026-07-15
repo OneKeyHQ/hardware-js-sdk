@@ -1,4 +1,5 @@
 import { useMDXComponents as getDocsMDXComponents } from 'nextra-theme-docs'
+import { AgentWalletDisclaimer } from './components/AgentWalletBetaTitle.js'
 import MdxImage from './components/MdxImage.jsx'
 
 const docsComponents = getDocsMDXComponents()
@@ -15,6 +16,20 @@ export function useMDXComponents(components) {
       if (isLanding) {
         return <>{props.children}</>
       }
+
+      const agentWalletMatch = filePath.match(/content\/(en|zh)\/agent-wallet\//)
+      if (agentWalletMatch) {
+        return docsWrapper({
+          ...props,
+          children: (
+            <>
+              <AgentWalletDisclaimer locale={agentWalletMatch[1]} />
+              {props.children}
+            </>
+          ),
+        })
+      }
+
       return docsWrapper(props)
     },
     ...components,
