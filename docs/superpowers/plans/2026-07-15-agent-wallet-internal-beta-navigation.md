@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 恢复 Agent Wallet 的顶层导航归属，修复进入该目录后其他导航上下文消失的问题，并为中英文入口增加醒目的内测徽标。
+**Goal:** 恢复 Agent Wallet 的顶层导航归属，修复进入该目录后其他导航上下文消失的问题，并为中英文顶部导航、面包屑和移动目录增加醒目的内测徽标。
 
 **Architecture:** 继续使用 Nextra 的顶层 `_meta.js` 页面地图，不改动通用 Layout。新增一个无状态 React 标题组件生成“Agent Wallet + 状态徽标”，由中英文元数据复用；使用 Node 内置测试直接加载真实元数据并渲染标题，浏览器回归负责验证 Nextra 最终布局。
 
@@ -257,7 +257,7 @@ Expected: 服务在 `http://127.0.0.1:3001` Ready，无编译错误。
 Expected:
 
 - 顶部导航出现 `Agent Wallet` 和 `Private Beta`。
-- 左侧 Agent Wallet 分组显示同一徽标。
+- 当前页面面包屑显示同一徽标。
 - Hardware Integration、dApp Integration、Offline Signing 仍存在。
 - Wallet Skills 活动态正确，九个子页面链接均存在。
 - 文档宽度无横向溢出。
@@ -274,7 +274,7 @@ http://127.0.0.1:3001/en/agent-wallet/wallet-skills/ @ 608x460
 
 Expected:
 
-- 中文入口和侧边栏显示 `内测`。
+- 中文顶部导航、面包屑和移动目录显示 `内测`。
 - 短视口侧边栏内容仍可滚动，底部语言栏不遮挡菜单。
 - 移动端桌面侧边栏隐藏，菜单按钮可打开包含 Agent Wallet 徽标的移动导航。
 
