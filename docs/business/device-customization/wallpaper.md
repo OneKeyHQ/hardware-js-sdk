@@ -48,7 +48,7 @@ deviceUploadWallpaper(connectId, {
 3. 创建 `vol0:/wallpapers/user`；目录已存在时按成功处理。
 4. 使用 `FilesystemFileWrite` 分片上传，第一片设置 `overwrite=true`。
 5. 优先根据固件返回的 `processed_byte` 推进 offset；返回值无法推进时才使用本地 chunk 长度。
-6. 上传完成后调用 `SetWallpaper`，传入 `WallpaperTarget.Lock` 和文件路径。
+6. 上传完成后调用 `DeviceSettingsSet`，将 `settings.wallpaper_path` 设置为上传路径。
 
 默认 chunk 大小按 BLE 或 WebUSB 环境选择。调用方提供的 `chunkSize` 不得超过当前传输上限，最终值不得小于 64 字节。文件写请求不使用普通业务调用的默认短超时。
 
@@ -56,10 +56,12 @@ deviceUploadWallpaper(connectId, {
 
 当前流程没有事务式回滚。上传中断可能留下不完整文件，同名文件会从首片开始覆盖；激活失败也不会自动删除已上传文件。应用应把上传结果与壁纸激活结果作为一次完整操作展示，并允许用户重新上传。
 
-空壁纸路径用于恢复设备内置默认壁纸，具体行为以固件 `SetWallpaper` 定义为准。
+通过 `deviceSettingsSet({ settings: { wallpaper_path: '' } })` 可恢复设备内置默认壁纸。
 
 ## 关键代码
 
 - `packages/core/src/api/protocol-v2/DeviceUploadWallpaper.ts`
 - `packages/core/src/utils/pro2Wallpaper.ts`
 - `packages/core/src/api/FileWrite.ts`
+- `packages/core/src/api/helpers/protocolV2FileWrite.ts`
+- `packages/core/src/api/protocol-v2/DeviceSettingsSet.ts`
