@@ -5,19 +5,21 @@
 ### 0.1 什么是 Attach to PIN
 
 **🔑 核心理解：**
+
 ```
 Attach to PIN = 将密码短语(Passphrase)绑定到特定PIN码
 目标：简化隐藏钱包的访问流程，提升用户体验
 ```
 
-| 传统模式 | Attach to PIN 模式 |
-|---------|-------------------|
-| 输入主PIN → 输入密码短语 | 输入绑定PIN → 自动应用密码短语 |
-| 每次都需要手动输入密码短语 | 一次绑定，后续自动应用 |
-| 密码短语容易输错或遗忘 | PIN码更简单，不易出错 |
-| 适合技术用户 | 适合普通用户 |
+| 传统模式                   | Attach to PIN 模式              |
+| -------------------------- | ------------------------------- |
+| 输入主 PIN → 输入密码短语  | 输入绑定 PIN → 自动应用密码短语 |
+| 每次都需要手动输入密码短语 | 一次绑定，后续自动应用          |
+| 密码短语容易输错或遗忘     | PIN 码更简单，不易出错          |
+| 适合技术用户               | 适合普通用户                    |
 
 **💡 形象比喻：**
+
 ```
 传统模式 = 每次开门都要输入复杂密码
 Attach to PIN = 设置简单门禁卡，刷卡即可进入特定房间
@@ -26,14 +28,16 @@ Attach to PIN = 设置简单门禁卡，刷卡即可进入特定房间
 ### 0.2 安全模型
 
 **安全边界：**
-- **主PIN**: 保护设备基础访问权限
-- **绑定PIN**: 保护特定密码短语的访问权限
+
+- **主 PIN**: 保护设备基础访问权限
+- **绑定 PIN**: 保护特定密码短语的访问权限
 - **密码短语**: 实际的密钥推导参数，存储在安全芯片中
 
 **威胁模型：**
-- ✅ 防护：设备丢失、PIN码泄露
+
+- ✅ 防护：设备丢失、PIN 码泄露
 - ✅ 防护：密码短语遗忘、输入错误
-- ⚠️ 风险：绑定PIN与主PIN相同时的安全降级
+- ⚠️ 风险：绑定 PIN 与主 PIN 相同时的安全降级
 
 ## 1. Attach to PIN 核心原理
 
@@ -63,33 +67,34 @@ Attach to PIN = 设置简单门禁卡，刷卡即可进入特定房间
 
 **关键模块：**
 
-| 组件 | 功能 | 实现位置 | 安全等级 |
-|------|------|----------|----------|
-| **SE THD89** | 安全芯片存储 | `trezor.crypto.se_thd89` | 🔴 最高 |
-| **PIN 验证** | 多重PIN验证 | `apps.common.request_pin` | 🟡 高 |
-| **密码短语管理** | 加密存储映射 | `apps.common.passphrase` | 🟡 高 |
-| **UI 交互** | 用户界面流程 | `trezor.ui.layouts.lvgl` | 🟢 中 |
+| 组件             | 功能          | 实现位置                  | 安全等级 |
+| ---------------- | ------------- | ------------------------- | -------- |
+| **SE THD89**     | 安全芯片存储  | `trezor.crypto.se_thd89`  | 🔴 最高  |
+| **PIN 验证**     | 多重 PIN 验证 | `apps.common.request_pin` | 🟡 高    |
+| **密码短语管理** | 加密存储映射  | `apps.common.passphrase`  | 🟡 高    |
+| **UI 交互**      | 用户界面流程  | `trezor.ui.layouts.lvgl`  | 🟢 中    |
 
 ### 1.3 存储机制
 
 **安全芯片存储结构：**
+
 ```typescript
 interface AttachToPinStorage {
   // 主PIN验证后的加密存储
   encryptedMappings: {
     [bindingPinHash: string]: {
-      encryptedPassphrase: Buffer;  // AES加密的密码短语
-      salt: Buffer;                 // 随机盐值
-      iterations: number;           // PBKDF2迭代次数
-      timestamp: number;            // 创建时间戳
-    }
+      encryptedPassphrase: Buffer; // AES加密的密码短语
+      salt: Buffer; // 随机盐值
+      iterations: number; // PBKDF2迭代次数
+      timestamp: number; // 创建时间戳
+    };
   };
 
   // 元数据
   metadata: {
-    version: number;                // 存储格式版本
-    maxEntries: number;             // 最大绑定数量
-    currentCount: number;           // 当前绑定数量
+    version: number; // 存储格式版本
+    maxEntries: number; // 最大绑定数量
+    currentCount: number; // 当前绑定数量
   };
 }
 ```
@@ -169,15 +174,15 @@ interface CoreApi {
 
 ```typescript
 interface GetPassphraseStateParams {
-  initSession?: boolean;        // 初始化新会话
+  initSession?: boolean; // 初始化新会话
   useEmptyPassphrase?: boolean; // 使用空密码短语
-  onlyMainPin?: boolean;        // 仅使用主PIN
+  onlyMainPin?: boolean; // 仅使用主PIN
 }
 
 interface GetPassphraseStateResponse {
-  passphraseState: string | undefined;      // 密码短语状态标识
-  newSession: string | undefined;           // 新会话ID
-  unlockedAttachPin: boolean | undefined;   // 是否通过绑定PIN解锁
+  passphraseState: string | undefined; // 密码短语状态标识
+  newSession: string | undefined; // 新会话ID
+  unlockedAttachPin: boolean | undefined; // 是否通过绑定PIN解锁
 }
 ```
 
@@ -208,8 +213,10 @@ function hasAttachToPinCapability(features: Features): boolean {
   const deviceType = getDeviceType(features);
   const version = getDeviceFirmwareVersion(features).join('.');
 
-  return (deviceType === EDeviceType.Pro && semver.gte(version, '4.15.0')) ||
-         (deviceType === EDeviceType.Touch && semver.gte(version, '4.11.0'));
+  return (
+    (deviceType === EDeviceType.Pro && semver.gte(version, '4.15.0')) ||
+    (deviceType === EDeviceType.Touch && semver.gte(version, '4.11.0'))
+  );
 }
 
 // 检测原生 API 支持
@@ -250,7 +257,7 @@ interface UiRequestPassphrase {
   type: 'ui-request_passphrase';
   payload: {
     device: Device;
-    existsAttachPinUser?: boolean;  // 关键：是否存在绑定PIN用户
+    existsAttachPinUser?: boolean; // 关键：是否存在绑定PIN用户
   };
 }
 ```
@@ -289,11 +296,11 @@ graph TD
 
 **关键验证步骤：**
 
-1. **主PIN验证**: 确保用户有权限进行绑定操作
-2. **绑定PIN检查**: 防止与主PIN冲突，确保最小长度
+1. **主 PIN 验证**: 确保用户有权限进行绑定操作
+2. **绑定 PIN 检查**: 防止与主 PIN 冲突，确保最小长度
 3. **存在性检查**: 避免意外覆盖现有绑定
 4. **密码短语确认**: 双重输入确认，防止输入错误
-5. **安全存储**: 使用SE芯片加密存储映射关系
+5. **安全存储**: 使用 SE 芯片加密存储映射关系
 
 ### 3.2 使用流程
 
@@ -379,14 +386,14 @@ graph TD
 
 **潜在威胁与防护：**
 
-| 威胁类型 | 攻击场景 | 防护机制 | 风险等级 |
-|---------|----------|----------|----------|
-| **设备丢失** | 物理设备被盗 | PIN码保护 + 硬件加密 | 🟡 中等 |
-| **PIN泄露** | 主PIN被观察到 | 绑定PIN独立验证 | 🟡 中等 |
-| **暴力破解** | 尝试所有PIN组合 | 失败次数限制 + 设备锁定 | 🟢 低 |
-| **侧信道攻击** | 功耗/时序分析 | 安全芯片硬件防护 | 🟢 低 |
-| **固件篡改** | 恶意固件植入 | 安全启动 + 签名验证 | 🟢 低 |
-| **社会工程** | 诱骗用户操作 | 明确的UI提示 + 确认流程 | 🟡 中等 |
+| 威胁类型       | 攻击场景          | 防护机制                  | 风险等级 |
+| -------------- | ----------------- | ------------------------- | -------- |
+| **设备丢失**   | 物理设备被盗      | PIN 码保护 + 硬件加密     | 🟡 中等  |
+| **PIN 泄露**   | 主 PIN 被观察到   | 绑定 PIN 独立验证         | 🟡 中等  |
+| **暴力破解**   | 尝试所有 PIN 组合 | 失败次数限制 + 设备锁定   | 🟢 低    |
+| **侧信道攻击** | 功耗/时序分析     | 安全芯片硬件防护          | 🟢 低    |
+| **固件篡改**   | 恶意固件植入      | 安全启动 + 签名验证       | 🟢 低    |
+| **社会工程**   | 诱骗用户操作      | 明确的 UI 提示 + 确认流程 | 🟡 中等  |
 
 ### 4.3 最佳安全实践
 
@@ -396,31 +403,31 @@ graph TD
 const SECURITY_RECOMMENDATIONS = {
   // PIN码设置
   mainPin: {
-    minLength: 6,           // 最小长度
-    complexity: 'medium',   // 复杂度要求
-    avoidPatterns: true     // 避免简单模式
+    minLength: 6, // 最小长度
+    complexity: 'medium', // 复杂度要求
+    avoidPatterns: true, // 避免简单模式
   },
 
   // 绑定PIN设置
   bindingPin: {
-    minLength: 4,           // 最小长度（固件限制）
+    minLength: 4, // 最小长度（固件限制）
     differentFromMain: true, // 必须与主PIN不同
-    maxBindings: 10         // 最大绑定数量
+    maxBindings: 10, // 最大绑定数量
   },
 
   // 密码短语设置
   passphrase: {
-    minLength: 1,           // 最小长度
-    maxLength: 50,          // 最大长度
-    encoding: 'utf8',       // 字符编码
-    backup: 'required'      // 必须备份
-  }
+    minLength: 1, // 最小长度
+    maxLength: 50, // 最大长度
+    encoding: 'utf8', // 字符编码
+    backup: 'required', // 必须备份
+  },
 };
 ```
 
 **安全检查清单：**
 
-- ✅ 主PIN与绑定PIN不相同
+- ✅ 主 PIN 与绑定 PIN 不相同
 - ✅ 密码短语已安全备份
 - ✅ 定期检查绑定列表
 - ✅ 及时删除不需要的绑定
@@ -433,15 +440,15 @@ const SECURITY_RECOMMENDATIONS = {
 
 **固件错误码：**
 
-| 错误码 | 错误名称 | 描述 | 解决方案 |
-|--------|----------|------|----------|
-| `PIN_INVALID` | PIN码错误 | 输入的PIN码不正确 | 重新输入正确PIN |
-| `PIN_USED` | PIN码已使用 | 绑定PIN与主PIN相同 | 使用不同的绑定PIN |
-| `STORAGE_FULL` | 存储空间满 | 达到最大绑定数量 | 删除不需要的绑定 |
-| `PASSPHRASE_TOO_LONG` | 密码短语过长 | 超过50字符限制 | 缩短密码短语长度 |
-| `SE_ERROR` | 安全芯片错误 | 硬件存储失败 | 重启设备或联系支持 |
+| 错误码                | 错误名称     | 描述                   | 解决方案           |
+| --------------------- | ------------ | ---------------------- | ------------------ |
+| `PIN_INVALID`         | PIN 码错误   | 输入的 PIN 码不正确    | 重新输入正确 PIN   |
+| `PIN_USED`            | PIN 码已使用 | 绑定 PIN 与主 PIN 相同 | 使用不同的绑定 PIN |
+| `STORAGE_FULL`        | 存储空间满   | 达到最大绑定数量       | 删除不需要的绑定   |
+| `PASSPHRASE_TOO_LONG` | 密码短语过长 | 超过 50 字符限制       | 缩短密码短语长度   |
+| `SE_ERROR`            | 安全芯片错误 | 硬件存储失败           | 重启设备或联系支持 |
 
-**SDK错误码：**
+**SDK 错误码：**
 
 ```typescript
 enum AttachToPinErrorCode {
@@ -449,7 +456,7 @@ enum AttachToPinErrorCode {
   DEVICE_NOT_UNLOCKED = 'DEVICE_NOT_UNLOCKED',
   PASSPHRASE_STATE_ERROR = 'PASSPHRASE_STATE_ERROR',
   NETWORK_ERROR = 'NETWORK_ERROR',
-  USER_CANCELLED = 'USER_CANCELLED'
+  USER_CANCELLED = 'USER_CANCELLED',
 }
 ```
 
@@ -458,6 +465,7 @@ enum AttachToPinErrorCode {
 **常见问题解决：**
 
 1. **设备不支持 Attach to PIN**
+
    ```typescript
    // 检查设备兼容性
    if (!hasAttachToPinCapability(device.features)) {
@@ -466,6 +474,7 @@ enum AttachToPinErrorCode {
    ```
 
 2. **获取密码短语状态失败**
+
    ```typescript
    // 重试机制
    const maxRetries = 3;
@@ -500,15 +509,17 @@ enum AttachToPinErrorCode {
 **初始化步骤：**
 
 1. **SDK 初始化**
+
    ```typescript
    const sdk = await HardwareSDK.init({
      debug: false,
      connectSrc: 'https://jssdk.onekey.so/',
-     env: 'web'
+     env: 'web',
    });
    ```
 
 2. **设备连接**
+
    ```typescript
    const devices = await sdk.searchDevices();
    const connectId = devices.payload[0].connectId;
@@ -526,7 +537,7 @@ enum AttachToPinErrorCode {
 
 ```typescript
 // 监听UI事件
-sdk.on(UI_EVENT, (message) => {
+sdk.on(UI_EVENT, message => {
   switch (message.type) {
     case UI_REQUEST.REQUEST_PIN:
       // 处理PIN请求（主PIN或绑定PIN）
@@ -545,7 +556,7 @@ sdk.on(UI_EVENT, (message) => {
 function submitPin(pin: string) {
   sdk.uiResponse({
     type: UI_RESPONSE.RECEIVE_PIN,
-    payload: pin
+    payload: pin,
   });
 }
 
@@ -555,8 +566,8 @@ function submitPassphrase(passphrase: string, useDevice: boolean = false) {
     type: UI_RESPONSE.RECEIVE_PASSPHRASE,
     payload: {
       value: passphrase,
-      passphraseOnDevice: useDevice
-    }
+      passphraseOnDevice: useDevice,
+    },
   });
 }
 ```
@@ -569,7 +580,7 @@ function submitPassphrase(passphrase: string, useDevice: boolean = false) {
 // 获取密码短语状态
 async function getWalletState(connectId: string) {
   const result = await sdk.getPassphraseState(connectId, {
-    initSession: true
+    initSession: true,
   });
 
   if (result.success) {
@@ -593,18 +604,21 @@ async function getWalletState(connectId: string) {
 **关键要点：**
 
 1. **错误处理**
+
    - 实现重试机制处理网络和设备错误
    - 区分可重试错误和致命错误
    - 提供用户友好的错误提示
 
 2. **会话管理**
+
    - 缓存设备连接状态
    - 实现会话超时和自动重连
    - 正确处理设备锁定状态
 
 3. **用户体验**
+
    - 检测设备兼容性并给出相应提示
-   - 在密码短语请求时提供绑定PIN选项
+   - 在密码短语请求时提供绑定 PIN 选项
    - 实现加载状态和进度指示
 
 4. **安全考虑**
@@ -619,6 +633,7 @@ async function getWalletState(connectId: string) {
 **问题：设备不支持 Attach to PIN**
 
 **解决方案：**
+
 - 检查设备型号和固件版本
 - 对于不支持的设备，使用传统密码短语模式
 - 提供用户友好的提示信息
@@ -641,6 +656,7 @@ async function checkCompatibility(connectId: string) {
 **问题：密码短语状态不一致**
 
 **解决方案：**
+
 - 强制刷新设备状态
 - 验证地址一致性
 - 重新初始化会话
@@ -661,9 +677,10 @@ async function validateState(connectId: string, expectedState: string) {
 
 ### 7.3 事件处理问题
 
-**问题：UI事件响应超时**
+**问题：UI 事件响应超时**
 
 **解决方案：**
+
 - 实现事件队列管理
 - 设置合理的超时时间
 - 提供取消机制
@@ -690,22 +707,23 @@ class EventManager {
 **关键优化策略：**
 
 1. **连接复用**
+
    - 避免频繁建立设备连接
    - 实现连接池管理
 
 2. **智能缓存**
+
    - 缓存设备特性信息
    - 缓存密码短语状态（短期）
 
 3. **批量操作**
-   - 合并相似的API调用
+
+   - 合并相似的 API 调用
    - 并行处理独立操作
 
 4. **错误恢复**
    - 实现自动重试机制
    - 区分可重试和致命错误
-
-
 
 ## 8. 技术总结与最佳实践
 
@@ -714,10 +732,10 @@ class EventManager {
 **🎯 关键发现：**
 
 1. **安全芯片存储**: SE THD89 提供硬件级安全保护，确保绑定关系的安全性
-2. **多重PIN验证**: 主PIN + 绑定PIN 的双重验证机制，平衡安全性与易用性
+2. **多重 PIN 验证**: 主 PIN + 绑定 PIN 的双重验证机制，平衡安全性与易用性
 3. **会话状态管理**: 临时会话与持久状态的平衡，支持多设备场景
 4. **向后兼容**: 与传统密码短语模式的无缝兼容，保证用户体验连续性
-5. **事件驱动架构**: 基于UI事件的异步交互模式，提供灵活的集成方式
+5. **事件驱动架构**: 基于 UI 事件的异步交互模式，提供灵活的集成方式
 
 ### 8.2 SDK 集成最佳实践
 
@@ -726,7 +744,7 @@ class EventManager {
 1. **分层架构**: 将设备管理、会话管理、状态管理分离
 2. **错误边界**: 实现完善的错误处理和恢复机制
 3. **缓存策略**: 合理使用缓存减少不必要的设备通信
-4. **事件解耦**: 使用事件系统解耦UI与业务逻辑
+4. **事件解耦**: 使用事件系统解耦 UI 与业务逻辑
 5. **性能优化**: 实现请求去重、批处理等优化策略
 
 **代码质量保证：**
@@ -742,11 +760,7 @@ interface AttachToPinConfig {
 
 // 错误处理
 class AttachToPinError extends Error {
-  constructor(
-    message: string,
-    public code: string,
-    public context?: any
-  ) {
+  constructor(message: string, public code: string, public context?: any) {
     super(message);
     this.name = 'AttachToPinError';
   }
@@ -773,10 +787,10 @@ class Logger {
 **🎯 关键发现：**
 
 1. **安全芯片存储**: SE THD89 提供硬件级安全保护，确保绑定关系的安全性
-2. **多重PIN验证**: 主PIN + 绑定PIN 的双重验证机制，平衡安全性与易用性
+2. **多重 PIN 验证**: 主 PIN + 绑定 PIN 的双重验证机制，平衡安全性与易用性
 3. **会话状态管理**: 临时会话与持久状态的平衡，支持多设备场景
 4. **向后兼容**: 与传统密码短语模式的无缝兼容，保证用户体验连续性
-5. **事件驱动架构**: 基于UI事件的异步交互模式，提供灵活的集成方式
+5. **事件驱动架构**: 基于 UI 事件的异步交互模式，提供灵活的集成方式
 
 ### 9.2 SDK 集成最佳实践
 
@@ -785,7 +799,7 @@ class Logger {
 1. **分层架构**: 将设备管理、会话管理、状态管理分离
 2. **错误边界**: 实现完善的错误处理和恢复机制
 3. **缓存策略**: 合理使用缓存减少不必要的设备通信
-4. **事件解耦**: 使用事件系统解耦UI与业务逻辑
+4. **事件解耦**: 使用事件系统解耦 UI 与业务逻辑
 5. **性能优化**: 实现请求去重、批处理等优化策略
 
 **代码质量保证：**
@@ -801,11 +815,7 @@ interface AttachToPinConfig {
 
 // 错误处理
 class AttachToPinError extends Error {
-  constructor(
-    message: string,
-    public code: string,
-    public context?: any
-  ) {
+  constructor(message: string, public code: string, public context?: any) {
     super(message);
     this.name = 'AttachToPinError';
   }
@@ -827,30 +837,30 @@ class Logger {
 
 ### 8.3 兼容性矩阵
 
-| 设备型号 | 固件版本 | Attach to PIN 支持 | GetPassphraseState API | 推荐使用场景 |
-|---------|----------|-------------------|----------------------|-------------|
-| **OneKey Pro** | 4.15.0+ | ✅ 完全支持 | ✅ 原生支持 | 🌟 主要推荐 |
-| **OneKey Touch** | 4.11.0+ | ✅ 完全支持 | ✅ 原生支持 | 🌟 主要推荐 |
-| **OneKey Classic** | 所有版本 | ❌ 不支持 | ✅ 地址模拟 | ⚠️ 传统模式 |
-| **OneKey Mini** | 所有版本 | ❌ 不支持 | ✅ 地址模拟 | ⚠️ 传统模式 |
+| 设备型号           | 固件版本 | Attach to PIN 支持 | GetPassphraseState API | 推荐使用场景 |
+| ------------------ | -------- | ------------------ | ---------------------- | ------------ |
+| **OneKey Pro**     | 4.15.0+  | ✅ 完全支持        | ✅ 原生支持            | 🌟 主要推荐  |
+| **OneKey Touch**   | 4.11.0+  | ✅ 完全支持        | ✅ 原生支持            | 🌟 主要推荐  |
+| **OneKey Classic** | 所有版本 | ❌ 不支持          | ✅ 地址模拟            | ⚠️ 传统模式  |
+| **OneKey Mini**    | 所有版本 | ❌ 不支持          | ✅ 地址模拟            | ⚠️ 传统模式  |
 
 ### 8.4 性能特征与优化
 
 **关键性能指标：**
 
-| 操作 | 平均耗时 | 内存占用 | 存储空间 | 优化建议 |
-|------|----------|----------|----------|----------|
-| **SDK初始化** | 1-2秒 | ~2MB | 0 | 懒加载、预加载 |
-| **设备连接** | 2-5秒 | ~1MB | 0 | 连接池、重用 |
-| **绑定创建** | 2-3秒 | ~1KB | ~256B/绑定 | 批量操作 |
-| **状态获取** | 500ms | ~512B | 0 | 缓存、去重 |
-| **地址获取** | 1-2秒 | ~256B | 0 | 批量、并行 |
+| 操作           | 平均耗时 | 内存占用 | 存储空间   | 优化建议       |
+| -------------- | -------- | -------- | ---------- | -------------- |
+| **SDK 初始化** | 1-2 秒   | ~2MB     | 0          | 懒加载、预加载 |
+| **设备连接**   | 2-5 秒   | ~1MB     | 0          | 连接池、重用   |
+| **绑定创建**   | 2-3 秒   | ~1KB     | ~256B/绑定 | 批量操作       |
+| **状态获取**   | 500ms    | ~512B    | 0          | 缓存、去重     |
+| **地址获取**   | 1-2 秒   | ~256B    | 0          | 批量、并行     |
 
 **性能优化策略：**
 
 1. **连接复用**: 避免频繁建立设备连接
 2. **智能缓存**: 缓存设备特性和状态信息
-3. **批量操作**: 合并相似的API调用
+3. **批量操作**: 合并相似的 API 调用
 4. **并行处理**: 并行执行独立的操作
 5. **懒加载**: 按需加载功能模块
 
@@ -860,11 +870,11 @@ class Logger {
 
 1. **生物识别集成**: 指纹 + Attach to PIN 的组合认证
 2. **多设备同步**: 跨设备的绑定关系同步机制
-3. **智能合约集成**: 链上身份与PIN绑定的结合
+3. **智能合约集成**: 链上身份与 PIN 绑定的结合
 4. **量子安全**: 后量子密码学算法的预研与应用
-5. **AI辅助**: 智能风险评估和安全建议
+5. **AI 辅助**: 智能风险评估和安全建议
 
-**API演进计划：**
+**API 演进计划：**
 
 - **v2.0**: 支持批量绑定操作
 - **v2.1**: 增加生物识别支持
@@ -873,8 +883,28 @@ class Logger {
 
 ---
 
+## 10. Pro2 解锁与 Attach-to-PIN 边界
+
+Pro2 / Protocol V2 将三个容易混淆的状态分开表达：
+
+| 状态                        | 来源                     | 含义                             |
+| --------------------------- | ------------------------ | -------------------------------- |
+| `attach_to_pin_enabled`     | `DeviceStatus`           | 设备是否已经配置 Attach-to-PIN   |
+| `unlocked_by_attach_to_pin` | `DeviceStatus`           | 当前设备是否由 Attach PIN 解锁   |
+| `unlocked_attach_pin`       | `DeviceSessionPinResult` | 本次 PIN 解锁是否命中 Attach PIN |
+
+Core 将相关结果归一化为 `features.unlockedAttachPin`。该字段只描述解锁来源，不能替代 `passphraseState` 对具体钱包身份的一致性校验。
+
+Pro2 PIN 始终在设备端输入：SDK 调用 `DeviceSessionAskPin`，固件返回 `DeviceSessionPinResult`；成功后 SDK 再调用 `DeviceStatusGet` 刷新动态状态。该流程不会触发软件 PIN 输入事件。
+
+需要已解锁设备的 Protocol V2 方法可以声明 `unlockPolicy = 'retry-on-locked'`。只有首次错误被标准化为 `HardwareErrorCode.DeviceLocked` 时，Core 才执行一次 `device.unlockDevice()` 并重试原方法；第二次失败直接抛出，不循环解锁。
+
+固件 `Failure_ProcessError` 且 `subcode=9` 会映射为 `DeviceLocked`。调用方不应通过错误文本判断锁定状态。
+
 **📚 相关文档：**
+
 - [SLIP39 技术详解](./slip39.md)
-- [设备架构说明](./architecture.md)
-- [传输层协议](./transport.md)
+- [设备架构说明](../../architecture/overview.md)
+- [传输层协议](../../protocol/transport.md)
+- [Passphrase 与钱包 Session](../session/pro-passphrase-session.md)
 - [SDK API 参考](https://developer.onekey.so/connect-to-hardware/hardware-sdk/api)

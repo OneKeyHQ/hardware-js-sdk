@@ -16,6 +16,17 @@
 
 一句话总结：**transport session 解决“和哪台设备通信”，device `session_id` 解决“设备端当前解锁的是哪个 passphrase 上下文”，`device_id` 解决“当前 seed 身份是否匹配”，V2 `seq` 解决“这一帧属于哪个协议调用顺序”。**
 
+### 当前公共契约
+
+以下规则代表当前 SDK 对外行为；本文后续保留的调查过程和历史问题记录只用于解释设计背景：
+
+- Protocol V1 通过 `GetPassphraseState` 获取钱包标识；不支持时可以回退到固定测试网地址。
+- Pro2 / Protocol V2 通过内部钱包会话流程调用 `DeviceSessionGet`，并把 `btc_test_address` 归一化为公共概念 `passphraseState`。
+- 公开 `getPassphraseState()` 返回 `string | undefined`，不会返回 session ID、Attach PIN 解锁结果或保护状态对象。
+- 缓存 session 无效时，SDK 识别 `Failure_InvalidSession`，清理缓存后不带 session 重试一次。
+- `initSession=true`、钱包标识不匹配、设备切换或断开，以及显式 `clearSessionCache` 都会使缓存失效。
+- 调用方提供预期 `passphraseState` 时，设备返回的钱包标识必须一致，否则 SDK 清缓存并抛出钱包状态校验错误。
+
 ## 2. 子模块职责
 
 | 子模块                            | 关键文件                                                     | 职责                                                                                                 |

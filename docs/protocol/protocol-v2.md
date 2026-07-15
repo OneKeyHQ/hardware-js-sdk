@@ -83,7 +83,29 @@ Protocol V2 frame 的 payload 格式：
 - `messageTypeId >= 60000`：使用 `messages-protocol-v2.json`
 - `messageTypeId < 60000`：使用 `messages.json`
 
-发送时优先在 Protocol V2 schema 里查找消息名，找不到再回退 V1 schema。
+Protocol V2 请求编码必须从 `v2Schema` 查找消息，不能因为名称缺失而静默回退到 Protocol V1 schema。解码仅对少量跨协议沿用的历史交互消息允许回退，例如 `ButtonRequest`、`PassphraseRequest` 和已废弃的 passphrase state 消息。
+
+## Schema 与命名边界
+
+SDK 同时维护三个不同用途的 protobuf schema：
+
+| 名称              | 含义                            | 数据来源                    |
+| ----------------- | ------------------------------- | --------------------------- |
+| `v1CurrentSchema` | 当前 Protocol V1 schema         | `messages.json`             |
+| `v1LegacySchema`  | 旧设备使用的 Protocol V1 schema | `messages_legacy_v1.json`   |
+| `v2Schema`        | Pro2 Protocol V2 schema         | `messages-protocol-v2.json` |
+
+Protocol V2 系统消息使用 60000 以上的消息 ID。公共 SDK 方法使用小驼峰命名，例如 `deviceInfoGet`、`deviceStatusGet`；protobuf 消息保留固件名称，例如 `DeviceInfoGet`、`DeviceStatusGet`。文件 API 可以保留兼容别名，但别名必须指向同一实现。
+
+协议标识统一使用 `'V1' | 'V2'`。已知 Pro2 重连时应显式携带 `V2`，避免重新依赖设备名称或 descriptor 猜测协议。
+
+## Link 与序列号生命周期
+
+- sequence 范围为 1-255，按连接会话维护并跳过 0。
+- USB 和 BLE 通过共享 link 管理连接 generation、帧组装器和未完成请求。
+- 重连后旧 generation、assembler 和 pending call 必须失效，避免旧通知污染新会话。
+- `typedCall` 将预期响应类型传递给 transport，降低异步响应被错误调用消费的风险。
+- 同一 Protocol V2 link 上的业务 call 保持串行；断连后不自动重放非幂等业务请求。
 
 ## Protocol V2 message 表
 
@@ -260,7 +282,7 @@ SDK 会先把 resource、bootloader、firmware 写入设备文件系统，再把
 | `packages/core/src/data/messages/messages-protocol-v2.json` | 同上，同步到 core 运行时数据                                   |
 | `packages/hd-transport/src/types/messages.ts`               | 由 protobuf 生成脚本输出，包含 Protocol V2 类型联合            |
 
-当前 Pro2 schema 直接来自 `submodules/firmware-pro2` 的 `latest` protobuf；SDK 不再注入临时消息。
+当前 Pro2 schema 直接来自 `submodules/firmware-pro2` 的 `latest` protobuf；SDK 不再注入临时消息。固件 proto、transport JSON 和 core JSON 必须来自同一版本，消息 ID、字段名或 enum 任一侧不一致都可能造成运行时 unexpected response 或字段缺失。
 
 ## 实现入口
 

@@ -13,7 +13,7 @@ Hardware-js-sdk is designed to allow third-party developers to quickly access th
 | [@onekeyfe/hd-transport](./packages/hd-transport)                           | Data serialization and deserialization of hardware communication data |
 | [@onekeyfe/hd-transport-http](./packages/hd-transport-http)                 | communication lib for http                                            |
 | [@onekeyfe/hd-transport-react-native](./packages/hd-transport-react-native) | communication lib for React Native                                    |
-| [@onekeyfe/hd-transport-webusb](./packages/hd-transport-webusb)             | communication lib for WebUSB                                          |
+| [@onekeyfe/hd-transport-web-device](./packages/hd-transport-web-device)     | communication lib for WebUSB and Electron BLE                         |
 | [@onekeyfe/hd-shared](./packages/shared)                                    | Tools, error definitions, constants                                   |
 | [@onekeyfe/hardware-cli](./packages/hd-cli)                                 | CLI for AI agent integration (Claude Code, Cursor, etc.)              |
 
@@ -25,9 +25,9 @@ Local engineering docs:
 
 - [CLAUDE.md](./CLAUDE.md) - Claude / agent workflow entry
 - [docs/README.md](./docs/README.md) - local documentation index
-- [docs/architecture.md](./docs/architecture.md) - SDK architecture and protocol ownership
-- [docs/transport.md](./docs/transport.md) - transport flow and Protocol V1/V2 detection
-- [docs/protocol-v2.md](./docs/protocol-v2.md) - Protocol V2 details
+- [docs/architecture/overview.md](./docs/architecture/overview.md) - SDK architecture and protocol ownership
+- [docs/protocol/transport.md](./docs/protocol/transport.md) - transport flow and Protocol V1/V2 detection
+- [docs/protocol/protocol-v2.md](./docs/protocol/protocol-v2.md) - Protocol V2 details
 
 ## hardware-js-sdk development
 

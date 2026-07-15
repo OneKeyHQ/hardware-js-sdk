@@ -1,5 +1,7 @@
 # Pro 2 当前分支变更对齐
 
+> **历史状态：** 本目录是 `feat/pro2-usb-ble` 在特定时间点的分支快照，不再作为当前 SDK 规范。当前行为请参考 [Protocol V2](../../protocol/protocol-v2.md)、[Passphrase 与钱包 Session](../../device/session/pro-passphrase-session.md)、[设备设置](../../business/device-settings.md)、[壁纸上传](../../business/device-customization/wallpaper.md) 和 [Pro2 固件升级](../../business/firmware-update/pro2.md)。
+
 ## 1. 文档范围
 
 - 当前分支：`feat/pro2-usb-ble`
@@ -12,15 +14,15 @@
 
 ## 2. 功能文档索引
 
-| 文档 | 主题 | 核心结论 |
-| --- | --- | --- |
-| [01-protocol-v2-and-naming.md](./01-protocol-v2-and-naming.md) | Protocol V2 与命名 | V1/V2 schema、消息名、传输协议和 Pro2 判定已显式分层 |
+| 文档                                                                         | 主题                  | 核心结论                                                       |
+| ---------------------------------------------------------------------------- | --------------------- | -------------------------------------------------------------- |
+| [01-protocol-v2-and-naming.md](./01-protocol-v2-and-naming.md)               | Protocol V2 与命名    | V1/V2 schema、消息名、传输协议和 Pro2 判定已显式分层           |
 | [02-passphrase-and-wallet-session.md](./02-passphrase-and-wallet-session.md) | Passphrase 与钱包会话 | Pro2 不再复用 V1 `GetPassphraseState`，改走 `DeviceSessionGet` |
-| [03-attach-to-pin-and-unlock.md](./03-attach-to-pin-and-unlock.md) | Attach-to-PIN 与解锁 | 解锁结果与会话状态拆开；V2 方法支持锁定后自动解锁并重试一次 |
-| [04-device-settings.md](./04-device-settings.md) | DeviceSettings | 新增 V2 设置读取、写入和设备端设置页跳转接口 |
-| [05-wallpaper-upload.md](./05-wallpaper-upload.md) | 壁纸上传 | RGBA 编码、文件系统分片上传、设置壁纸路径形成完整链路 |
-| [06-firmware-update.md](./06-firmware-update.md) | 固件升级 | `firmwareUpdateV4` 按 Pro2 target 分阶段上传、安装、轮询和重连 |
-| [08-alignment-checklist.md](./08-alignment-checklist.md) | 对齐清单 | 按固件、Core、SDK 调用方和测试逐项验收 |
+| [03-attach-to-pin-and-unlock.md](./03-attach-to-pin-and-unlock.md)           | Attach-to-PIN 与解锁  | 解锁结果与会话状态拆开；V2 方法支持锁定后自动解锁并重试一次    |
+| [04-device-settings.md](./04-device-settings.md)                             | DeviceSettings        | 新增 V2 设置读取、写入和设备端设置页跳转接口                   |
+| [05-wallpaper-upload.md](./05-wallpaper-upload.md)                           | 壁纸上传              | RGBA 编码、文件系统分片上传、设置壁纸路径形成完整链路          |
+| [06-firmware-update.md](./06-firmware-update.md)                             | 固件升级              | `firmwareUpdateV4` 按 Pro2 target 分阶段上传、安装、轮询和重连 |
+| [08-alignment-checklist.md](./08-alignment-checklist.md)                     | 对齐清单              | 按固件、Core、SDK 调用方和测试逐项验收                         |
 
 ## 3. 总体架构变化
 
