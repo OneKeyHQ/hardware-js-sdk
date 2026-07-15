@@ -1,4 +1,4 @@
-# Protocol V2 的 Core 适配
+# SDK Core 运行时与 Protocol V2 适配
 
 > - 文档状态：当前 Core 映射
 > - 最后核验：2026-07-15
@@ -6,7 +6,7 @@
 
 本页描述“协议消息如何进入 SDK 公共能力”，不重复壁纸、设备设置、固件升级等完整用户流程。
 
-Pro 2 的字段迁移、拆分和 Feature 缺口见 [Pro 2 字段迁移与职责拆分](./pro2-field-migration/README.md)。传输帧、协议探测和 USB/BLE 实现见 [传输协议文档](../../protocol/README.md)。
+Pro2 的字段迁移、拆分和 Feature 缺口见 [Pro2 字段迁移](./pro2-field-migration.md)。传输帧、协议探测和 USB/BLE 实现见 [Protocol V1/V2 传输协议](../protocol/protocol-v1-v2.md)。
 
 ## 适配层级
 
@@ -37,7 +37,7 @@ V2 不支持传统 `GetFeatures`。Core 在初始化时发送默认范围的 `De
 - V2 PIN 解锁使用 `DeviceSessionAskPin -> DeviceSessionPinResult`，Core 将 `unlocked`、`unlocked_attach_pin`、`passphrase_protection` 合并回标准 Features。
 - 受保护方法是否允许单次解锁后重试，由方法显式声明；Transport 不重放业务请求。
 
-详见 [Attach-to-PIN](../../device/security/attach-to-pin.md) 和 [ADR-004](../../architecture/decisions/004-protected-method-unlock-retry.md)。
+详见 [钱包 Session 与设备安全](../device/wallet-session-and-security.md) 和 [SDK 关键架构决策](../architecture/decisions.md#受保护方法的单次解锁重试)。
 
 ## 钱包 Session
 
@@ -53,7 +53,7 @@ DeviceSessionGet(session_id?)
 
 原始公共方法 `deviceSessionGet` 当前发送空参数，适合协议调试；它不替代内部钱包 Session 管理。
 
-详见 [Passphrase 与钱包 Session](../../device/session/pro-passphrase-session.md) 和 [ADR-003](../../architecture/decisions/003-wallet-session-ownership.md)。
+详见 [钱包 Session 与设备安全](../device/wallet-session-and-security.md) 和 [SDK 关键架构决策](../architecture/decisions.md#钱包-session-所有权与缓存键)。
 
 ## 文件能力
 
@@ -77,12 +77,11 @@ DeviceSessionGet(session_id?)
 
 “功能拆分”应记录在本适配页和对应业务文档，不能写进帧格式或 Transport 文档。
 
-完整流程见 [Pro2 固件升级](../../business/firmware-update/pro2.md)。
+完整流程见 [Pro2 设备管理](../business/pro2-device-management.md)。
 
 ## 其他 Protocol V2 专属能力
 
 Core 还提供设备设置、设置页、壁纸、工厂信息、重启和文件系统维护等 V2 专属方法。它们统一通过 `requireProtocolV2` 做设备守卫；面向用户的行为分别记录在：
 
-- [设备设置](../../business/device-settings.md)
-- [壁纸上传](../../business/device-customization/wallpaper.md)
-- [设备方法支持矩阵](../../device/capabilities/method-support.md)
+- [Pro2 设备管理](../business/pro2-device-management.md)
+- [设备能力矩阵](../device/capabilities.md)

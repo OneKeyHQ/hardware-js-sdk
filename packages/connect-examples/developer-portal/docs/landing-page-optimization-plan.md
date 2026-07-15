@@ -41,7 +41,7 @@
   - 路径：`/Users/caikaisheng/Documents/GitHub/portal/packages/shared/locales/zh_CN/onekey-pro-new.json`
   - 相关字段：`title__1_wallet_100_plus_chains_30000_plus_coins`，`content__access_100_plus_blockchains_from_one_dashboard`，`content__supports_bitcoin_ethereum_usdt_solana_xrp_and_30000_plus_other_coins`
 - **支持 80+ 区块链（硬件 SDK 能力）**
-  - 路径：`/Users/caikaisheng/Documents/GitHub/hardware-js-sdk/docs/business/chains/overview.md`
+  - 路径：`/Users/caikaisheng/Documents/GitHub/hardware-js-sdk/docs/business/chains-overview.md`
   - 相关字段：`OneKey硬件钱包通过统一的密码学原语支持80+区块链`
 - **每年拦截超过 100 万起诈骗**（安全可信背书，可用于信任模块）
   - 路径：`/Users/caikaisheng/Documents/GitHub/portal/packages/shared/locales/zh_CN/onekey-pro-new.json`

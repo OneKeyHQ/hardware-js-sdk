@@ -7,9 +7,9 @@
 
 本文说明 OneKey `hd-*` SDK 对 App 暴露的公共事件：事件由谁生成、哪些事件会暂停调用、应用如何回传结果，以及设备、固件和运行环境通知如何分发。
 
-这些公共事件不都来自硬件。设备协议层直接返回的 `ButtonRequest`、`PinMatrixRequest`、`PassphraseRequest` 等消息见 [硬件协议交互消息](./event-business-flows.md)。三层事件模型见 [SDK 事件文档](./README.md)。
+这些公共事件不都来自硬件。维护事件时必须先区分设备协议中间消息、`hd-*` SDK 公共事件和 `hwk-*` Adapter 公共事件。
 
-新的 `hwk-*` Adapter 使用另一套事件名、类型和等待机制，不能与本文中的常量混用。对应说明见 [`hwk-*` Adapter 公共事件](./hwk-adapter-events.md)。
+新的 `hwk-*` Adapter 使用另一套事件名、类型和等待机制，不能与本文中的常量混用。
 
 ## 先按事件来源区分
 
@@ -171,7 +171,7 @@ HardwareSDK.uiResponse({
 
 ## 不需要回传的设备交互
 
-本节两个公开 Event 都由硬件 `ButtonRequest` 转换而来。完整 Button code 和分支见 [硬件协议交互消息](./event-business-flows.md#buttonrequest)。
+本节两个公开 Event 都由硬件 `ButtonRequest` 转换而来。Button code 的事实来源是 protobuf Schema 与 Core 的消息处理分支。
 
 ### `REQUEST_BUTTON`
 
@@ -311,3 +311,34 @@ SELECT_DEVICE_* -> 当前对应设备选择等待
 5. 固件升级同时监听过程事件，不只等待 API 最终返回。
 6. 将环境权限事件与设备 protobuf 交互分开处理。
 7. 不把 `UI_REQUEST` 中的设备模式常量误当作实际事件。
+
+## 设备协议中间消息
+
+设备可能在最终响应前返回需要 SDK 消费或确认的中间消息。它们不是 App 直接监听的公共事件。
+
+| 中间消息                          | Core 行为                                | 可能产生的公共事件             |
+| --------------------------------- | ---------------------------------------- | ------------------------------ |
+| `ButtonRequest`                   | 根据 code 发送 Ack 或等待用户操作        | `REQUEST_BUTTON`、设备交互提示 |
+| `PinMatrixRequest`                | 创建 PIN 请求并等待 App 回传             | PIN 类 `UI_REQUEST`            |
+| `PassphraseRequest`               | 选择设备输入、App 输入或 Attach PIN 路径 | Passphrase 类 `UI_REQUEST`     |
+| `DeviceFirmwareUpdateStatus`      | 更新升级阶段和进度                       | 固件升级进度事件               |
+| `EntropyRequest` 等未完整支持消息 | 显式返回不支持或进入受控兼容分支         | 不应伪装为已支持事件           |
+
+设备消息的枚举和值以 protobuf 为准，转换行为以 Core handler 为准；只有通过 `HardwareSDK.on()` 暴露的结果才属于 `hd-*` 公共事件。
+
+## `hwk-*` Adapter 事件边界
+
+多厂商 Adapter 的事件契约独立于 `hd-*`：
+
+- 设备事件：连接、断开和状态变化。
+- `UI_REQUEST`：等待 App 回传的类型化请求。
+- `ui-event`：不需要回传的交互阶段通知。
+- SDK 状态事件：初始化、权限或 Connector 状态。
+
+Adapter 在 emit 等待型请求前必须先注册 `UiRequestRegistry`，按请求类型匹配响应，并在超时、取消、任务结束和设备断开时清理。Job Queue 负责业务任务串行化，不能用事件等待机制代替任务队列。
+
+## 主要实现来源
+
+- `packages/core/src/events/` 与各 Core method 的消息处理逻辑
+- `packages/hd-common-connect-sdk/` 的公共事件转发
+- `packages/hwk-*` 中的 Adapter 事件类型、`UiRequestRegistry` 和 Job Queue

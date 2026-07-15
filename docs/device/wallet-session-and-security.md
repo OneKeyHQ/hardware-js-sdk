@@ -1,4 +1,4 @@
-# Pro 初始化、Passphrase、Session 与 Attach to PIN 逻辑梳理
+# 钱包 Session、Passphrase 与 Attach-to-PIN
 
 ## 1. 范围与核心结论
 
@@ -643,7 +643,7 @@ SDK 侧已有的必要行为包括：
 - Transport dispose 才清除 Cursor 和全部 Link 状态。
 - USB 使用 generation 隔离旧 endpoint 回调；BLE adapter 负责 notification、receiver 和原生订阅清理。
 
-所有 Transport 都使用 `ProtocolV2FrameAssembler` 重组完整 `0x5A` frame，并校验 SOF、长度和 CRC。平台层不理解 protobuf，只负责可靠传输 bytes。完整生命周期见 [ADR-001](../../architecture/decisions/001-protocol-v2-link-lifecycle.md) 和 [ADR-002](../../architecture/decisions/002-protocol-v2-transport-boundaries.md)。
+所有 Transport 都使用 `ProtocolV2FrameAssembler` 重组完整 `0x5A` frame，并校验 SOF、长度和 CRC。平台层不理解 protobuf，只负责可靠传输 bytes。完整生命周期见 [SDK 关键架构决策](../architecture/decisions.md) 和 [Protocol V1/V2 传输协议](../protocol/protocol-v1-v2.md)。
 
 ## 11. 固件/SE 侧 session 来源
 

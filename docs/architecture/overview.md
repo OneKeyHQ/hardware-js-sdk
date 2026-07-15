@@ -58,7 +58,7 @@ flowchart TD
 
 WebUSB、Electron BLE、React Native BLE 和 lowlevel BLE 只负责各自的物理连接、读写、订阅/桥接和平台错误映射，不再各自复制 V2 协议会话逻辑。
 
-长期设计理由记录在 [ADR-001：Protocol V2 Link 生命周期](./decisions/001-protocol-v2-link-lifecycle.md) 和 [ADR-002：Protocol V2 Transport 边界](./decisions/002-protocol-v2-transport-boundaries.md)。
+长期有效的设计约束集中记录在 [SDK 关键架构决策](./decisions.md)。
 
 ## Protocol V2 Device Profile
 
@@ -154,4 +154,4 @@ flowchart TD
 - V1 schema 兼容逻辑和 V2 schema 路由逻辑分离，避免为了新协议改动现有设备的初始化路径。
 - Device 层通过 Protocol V2 feature adapter 暴露统一 `Features`，业务方法不直接消费 Protocol V2 原始 `DeviceInfo`。
 
-传输协议细节按主题拆分在 [传输协议文档](../protocol/README.md)；Core 的 Protocol V2 字段和 API 适配见 [SDK Protocol V2 适配](../sdk/protocol-v2/README.md)。
+传输协议细节见 [Protocol V1/V2 传输协议](../protocol/protocol-v1-v2.md)；Core 的运行时和字段适配见 [SDK Core 运行时](../sdk/core-runtime.md) 与 [Pro2 字段迁移](../sdk/pro2-field-migration.md)。

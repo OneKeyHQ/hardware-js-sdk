@@ -1,4 +1,4 @@
-# OneKey SDK: EVM 集成技术详解
+# OneKey SDK：EVM 与 EIP-7702
 
 ## 1. 核心概念
 
@@ -166,6 +166,40 @@ EIP-712 结构化数据签名的统一入口。SDK 内部根据设备能力与�
 注意：`evmSignMessageEIP712` 已标记为 deprecated，但为了兼容现有调用仍然公开导出。新接入应统一使用 `evmSignTypedData`；迁移完成前不要声称旧方法已经从 SDK 删除。
 
 ## 6. 最佳实践与安全
+
+## 7. EIP-7702 维护要点
+
+EIP-7702 使用 Type 4 交易，在普通 EIP-1559 字段基础上增加 `authorizationList`。SDK 维护时需要同时检查公共输入类型、Core 到 protobuf 的字段转换、固件 Schema 和设备确认界面。
+
+### Authorization 结构
+
+每条授权至少包含：
+
+- `chainId`：授权适用的链；`0` 表示可跨链使用，需要调用方明确评估风险。
+- `address`：被授权的 delegation 目标地址。
+- `nonce`：授权账户 nonce。
+- `yParity`、`r`、`s`：授权签名结果。
+
+授权签名可以由设备生成，也可以由调用方提供。调用方提供外部签名时，SDK 只能验证结构和编码，不能替代业务层确认签名来源可信。
+
+### 当前兼容边界
+
+- 固件和 SDK 对 authorization 数量、chain ID、nonce 范围及地址编码可能存在版本约束。
+- 使用前必须经过方法的 firmware range 检查，不能只依据 EVM 基础交易是否可用。
+- Delegator 白名单、calldata 解析和设备确认属于安全边界，新增合约模式时需要同步评审。
+- Classic 等旧机型不能从普通 EVM 支持状态推断 EIP-7702 支持。
+
+### 字段映射检查
+
+修改 EIP-7702 时至少核对：
+
+1. 公共 TypeScript 类型是否保留大整数与 hex 的精度。
+2. Core 是否按 protobuf 预期转换 `authorizationList`。
+3. V1 legacy/current Schema 与对应固件版本是否匹配。
+4. 设备端是否展示 chain、delegator 和授权账户等关键确认信息。
+5. 测试是否同时覆盖设备生成授权和外部授权签名。
+
+关键实现以 `packages/core/src/api/evm/`、EVM protobuf Schema 和 firmware range 配置为准。
 
 1.  **优先使用现代标准:**
 

@@ -6,15 +6,15 @@
 
 按任务类型选择入口：
 
-| 任务                                    | 首选文档                                                                  |
-| --------------------------------------- | ------------------------------------------------------------------------- |
-| 了解整体架构                            | `docs/architecture/overview.md`                                           |
-| 调试 WebUSB / BLE / TransportManager    | `docs/protocol/transport.md`                                              |
-| 处理 Pro2 / Protocol V2 / firmware-pro2 | `docs/protocol/protocol-v2.md`                                            |
-| 链集成、签名、地址派生                  | `docs/business/chains/overview.md`、`docs/business/chains/evm.md`         |
-| SLIP39、PIN、设备安全状态               | `docs/device/security/slip39.md`、`docs/device/security/attach-to-pin.md` |
-| Passphrase 与钱包 Session               | `docs/device/session/pro-passphrase-session.md`                           |
-| 设备方法支持矩阵                        | `docs/device/capabilities/method-support.md`                              |
+| 任务                                    | 首选文档                                                              |
+| --------------------------------------- | --------------------------------------------------------------------- |
+| 了解整体架构                            | `docs/architecture/overview.md`                                       |
+| 调试 WebUSB / BLE / TransportManager    | `docs/protocol/protocol-v1-v2.md`                                     |
+| 处理 Pro2 / Protocol V2 / firmware-pro2 | `docs/sdk/pro2-field-migration.md`、`docs/sdk/core-runtime.md`        |
+| 链集成、签名、地址派生                  | `docs/business/chains-overview.md`、`docs/business/evm.md`            |
+| SLIP39、PIN、设备安全状态               | `docs/device/slip39.md`、`docs/device/wallet-session-and-security.md` |
+| Passphrase 与钱包 Session               | `docs/device/wallet-session-and-security.md`                          |
+| 设备方法支持矩阵                        | `docs/device/capabilities.md`                                         |
 
 完整目录见 `docs/README.md`。
 

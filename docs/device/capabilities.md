@@ -1,4 +1,4 @@
-# OneKey 硬件设备方法支持列表
+# OneKey 硬件设备能力矩阵
 
 > - 文档状态：易变测试基线
 > - 最后真机核验：2026-02-28
@@ -141,3 +141,22 @@ packages/connect-examples/expo-example/src/testTools/deviceCompatibility/plugins
 ├── touch.ts
 └── mini.ts
 ```
+
+## 链与固件版本边界
+
+方法测试矩阵回答“当前测试是否接受该方法失败”，链能力还需要结合固件版本门槛判断。维护时以以下来源为准：
+
+- 最新固件版本：`data.onekey.so/config.json` 对应的 release 配置。
+- 方法最低版本：Core method 的 firmware range 和功能判断。
+- 机型特殊覆盖：上述兼容性测试插件的 `expected` 配置。
+- Pro2：Protocol V2 Schema、Core 方法守卫和真机测试，不能从 OneKey Pro 推断。
+
+常见需要单独核验的能力包括 EIP-7702、BTC PSBT、Solana 消息签名与 Versioned Transaction、Tron 消息签名、Cardano Conway、TON、Neo、Alephium 和部分特殊网络。不要在文档中长期复制远端“最新版本”数字；发布变化后它们会迅速失真。
+
+判断某个设备是否支持一条链时，按以下顺序排查：
+
+1. SDK 是否存在对应公共方法和 protobuf 消息。
+2. 方法是否声明机型或最低固件版本限制。
+3. 兼容性插件是否存在 `expected=false` 特殊覆盖。
+4. 设备实际固件是否达到版本要求。
+5. 对 Pro2 执行 Protocol V2 真机测试。
