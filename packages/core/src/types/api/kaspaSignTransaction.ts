@@ -30,6 +30,32 @@ export type KaspaSignOutputParams = {
   scriptVersion?: number;
 };
 
+// Referenced (previous) transactions for the streaming protocol's input
+// verification: the device may ask for the transactions the inputs spend from
+// (selected by prev_tx_id) to verify input amounts on-device.
+export type KaspaRefTransactionInput = {
+  prevTxId: string;
+  outputIndex: number;
+  sequenceNumber: number | string;
+};
+
+export type KaspaRefTransactionOutput = {
+  satoshis: number | string;
+  scriptVersion?: number;
+  script: string;
+};
+
+export type KaspaRefTransaction = {
+  txId: string;
+  version: number;
+  inputs: KaspaRefTransactionInput[];
+  outputs: KaspaRefTransactionOutput[];
+  lockTime?: number | string;
+  subNetworkID?: string;
+  gas?: number | string;
+  payload?: string;
+};
+
 export type KaspaSignTransactionParams = {
   version: number;
   inputs: KaspaSignInputParams[];
@@ -41,6 +67,9 @@ export type KaspaSignTransactionParams = {
   // Optional transaction payload (hex), streamed to the device in chunks.
   payload?: string;
   gas?: number | string;
+  // Previous transactions referenced by the inputs, required only when the
+  // device requests them for on-device input-amount verification.
+  refTxs?: KaspaRefTransaction[];
   scheme?: string;
   prefix?: string;
   useTweak?: boolean; // default is true

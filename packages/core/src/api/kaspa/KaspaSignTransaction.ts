@@ -17,6 +17,7 @@ import type {
 } from '../../types';
 import type {
   KaspaInputScriptType,
+  KaspaTxRequest,
   KaspaTxRequestSignature,
   TypedCall,
 } from '@onekeyfe/hd-transport';
@@ -56,6 +57,7 @@ export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactio
       { name: 'sigOpCount', type: 'number' },
       { name: 'subNetworkID', type: 'string' },
       { name: 'payload', type: 'hexString' },
+      { name: 'refTxs', type: 'array', allowEmpty: true },
       { name: 'useTweak', type: 'boolean' },
     ]);
 
@@ -75,6 +77,17 @@ export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactio
         path: addressN,
         sigOpCount: input.sigOpCount ?? 1, // input.script.getSignatureOperationsCount()) //sigOpCount
       };
+    });
+
+    payload.refTxs?.forEach(refTx => {
+      validateParams(refTx, [
+        { name: 'txId', type: 'string', required: true },
+        { name: 'version', type: 'number', required: true },
+        // Coinbase transactions legitimately have zero inputs.
+        { name: 'inputs', type: 'array', required: true, allowEmpty: true },
+        { name: 'outputs', type: 'array', required: true, allowEmpty: true },
+        { name: 'payload', type: 'hexString' },
+      ]);
     });
 
     const outputs: KaspaSignOutputParams[] = payload.outputs.map(output => {
@@ -212,6 +225,84 @@ export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactio
   }
 
   /**
+   * Answer a previous-transaction request from the streaming flow: the device
+   * verifies input amounts by re-hashing the transactions the inputs spend
+   * from, selected by prev_tx_id and supplied by the caller via refTxs.
+   */
+  async ackPrevRequest(typedCall: TypedCall, request: KaspaTxRequest, requestIndex: number) {
+    const prevTxId = (request.prev_tx_id ?? '').toLowerCase();
+    const refTx = (this.params.refTxs ?? []).find(tx => tx.txId.toLowerCase() === prevTxId);
+    if (!refTx) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.CallMethodInvalidParameter,
+        `KaspaSignTransaction: device requested previous transaction ${
+          prevTxId || '(unknown)'
+        }; provide it via refTxs`
+      );
+    }
+
+    const requestType = request.request_type;
+
+    if (requestType === 'KASPA_TX_PREV_META') {
+      return typedCall('KaspaTxAckPrevMeta', 'KaspaTxRequest', {
+        version: refTx.version,
+        input_count: refTx.inputs.length,
+        output_count: refTx.outputs.length,
+        lock_time: (refTx.lockTime ?? 0) as number,
+        subnetwork_id: refTx.subNetworkID ?? bytesToHex(zeroSubnetworkID()),
+        gas: (refTx.gas ?? 0) as number,
+        payload_length: (refTx.payload ?? '').length / 2,
+      });
+    }
+
+    if (requestType === 'KASPA_TX_INPUT') {
+      const input = refTx.inputs[requestIndex];
+      if (!input) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.RuntimeError,
+          `KaspaSignTransaction: device requested input ${requestIndex} of previous tx out of range`
+        );
+      }
+      return typedCall('KaspaTxAckPrevInput', 'KaspaTxRequest', {
+        previous_outpoint: {
+          tx_id: input.prevTxId,
+          index: input.outputIndex,
+        },
+        sequence: input.sequenceNumber as number,
+      });
+    }
+
+    if (requestType === 'KASPA_TX_OUTPUT') {
+      const output = refTx.outputs[requestIndex];
+      if (!output) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.RuntimeError,
+          `KaspaSignTransaction: device requested output ${requestIndex} of previous tx out of range`
+        );
+      }
+      return typedCall('KaspaTxAckPrevOutput', 'KaspaTxRequest', {
+        amount: output.satoshis,
+        script_version: output.scriptVersion ?? 0,
+        script_public_key: output.script,
+      });
+    }
+
+    if (requestType === 'KASPA_TX_PAYLOAD') {
+      const payloadHex = refTx.payload ?? '';
+      const payloadLength = payloadHex.length / 2;
+      const length = request.request_payload_length ?? payloadLength - requestIndex;
+      return typedCall('KaspaTxAckPayloadChunk', 'KaspaTxRequest', {
+        payload_chunk: payloadHex.substring(requestIndex * 2, (requestIndex + length) * 2),
+      });
+    }
+
+    throw ERRORS.TypedError(
+      HardwareErrorCode.RuntimeError,
+      `KaspaSignTransaction: unknown previous-tx request type ${requestType ?? 'undefined'}`
+    );
+  }
+
+  /**
    * Streaming sign flow (device computes the sighash):
    * after the initial KaspaSignTx (sent by run()), the device drives the
    * exchange via KaspaTxRequest, asking for each input / output / payload
@@ -256,7 +347,12 @@ export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactio
 
       const requestIndex = request.request_index ?? 0;
 
-      if (requestType === 'KASPA_TX_INPUT') {
+      // prev_tx_id presence turns INPUT/OUTPUT/PAYLOAD requests into
+      // previous-transaction requests, answered from refTxs; answering them
+      // with current-tx data would be silently wrong.
+      if (request.prev_tx_id || requestType === 'KASPA_TX_PREV_META') {
+        response = await this.ackPrevRequest(typedCall, request, requestIndex);
+      } else if (requestType === 'KASPA_TX_INPUT') {
         const input = params.inputs[requestIndex];
         if (!input) {
           throw ERRORS.TypedError(

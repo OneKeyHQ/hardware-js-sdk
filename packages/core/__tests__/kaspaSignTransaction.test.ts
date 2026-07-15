@@ -129,6 +129,12 @@ describe('KaspaSignTransaction capability flags', () => {
     expect([method.supportsLegacy, method.supportsStreaming]).toEqual([legacy, streaming]);
   });
 
+  it('rejects malformed refTxs entries at init', () => {
+    expect(() =>
+      createMethod({ refTxs: [{ version: 0, inputs: [], outputs: [] }] }).init()
+    ).toThrow('txId');
+  });
+
   it('throws when neither protocol fits', () => {
     expect(() => createMethod({ outputs: [{ satoshis: 1 }] }).init()).toThrow(
       'outputs require either address/addressN'
@@ -364,6 +370,70 @@ describe('KaspaSignTransaction protocol negotiation', () => {
     await expect(runMethod(superset)).rejects.toMatchObject({
       errorCode: HardwareErrorCode.RuntimeError,
     });
+
+    // Previous-transaction request without the matching refTxs entry: must
+    // fail clearly, never answered with current-tx data.
+    mockTypedCall.mockResolvedValueOnce(
+      txRequest({ request_type: 'KASPA_TX_INPUT', request_index: 0, prev_tx_id: 'bb'.repeat(32) })
+    );
+    await expect(runMethod(superset)).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.CallMethodInvalidParameter,
+    });
+  });
+
+  it('answers previous-transaction requests from refTxs', async () => {
+    const PREV_ID = 'bb'.repeat(32);
+    mockTypedCall
+      .mockResolvedValueOnce(txRequest({ request_type: 'KASPA_TX_PREV_META', prev_tx_id: PREV_ID }))
+      .mockResolvedValueOnce(
+        txRequest({ request_type: 'KASPA_TX_OUTPUT', request_index: 0, prev_tx_id: PREV_ID })
+      )
+      .mockResolvedValueOnce(
+        txRequest({ request_type: 'KASPA_TX_INPUT', request_index: 0, prev_tx_id: PREV_ID })
+      )
+      .mockResolvedValueOnce(txRequest({ request_type: 'KASPA_TX_INPUT', request_index: 0 }))
+      .mockResolvedValueOnce(
+        txRequest({
+          request_type: 'KASPA_TX_FINISHED',
+          signature: { signature_index: 0, signature: 'sig0' },
+        })
+      );
+
+    const result = await runMethod({
+      outputs: [{ satoshis: 100000, script: SCRIPT, address: ADDRESS }],
+      refTxs: [
+        {
+          txId: PREV_ID,
+          version: 0,
+          inputs: [{ prevTxId: 'cc'.repeat(32), outputIndex: 2, sequenceNumber: 0 }],
+          outputs: [{ satoshis: '200000', script: SCRIPT }],
+        },
+      ],
+    });
+
+    expect(result).toEqual([{ index: 0, signature: 'sig0' }]);
+
+    expect(mockTypedCall.mock.calls[1][0]).toBe('KaspaTxAckPrevMeta');
+    expect(mockTypedCall.mock.calls[1][2]).toMatchObject({
+      version: 0,
+      input_count: 1,
+      output_count: 1,
+      lock_time: 0,
+      payload_length: 0,
+    });
+    expect(mockTypedCall.mock.calls[2][0]).toBe('KaspaTxAckPrevOutput');
+    expect(mockTypedCall.mock.calls[2][2]).toMatchObject({
+      amount: '200000',
+      script_version: 0,
+      script_public_key: SCRIPT,
+    });
+    expect(mockTypedCall.mock.calls[3][0]).toBe('KaspaTxAckPrevInput');
+    expect(mockTypedCall.mock.calls[3][2]).toMatchObject({
+      previous_outpoint: { tx_id: 'cc'.repeat(32), index: 2 },
+      sequence: 0,
+    });
+    // Back to the current transaction after the previous one is streamed.
+    expect(mockTypedCall.mock.calls[4][0]).toBe('KaspaTxAckInput');
   });
 });
 
