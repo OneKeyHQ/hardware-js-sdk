@@ -42,7 +42,7 @@ flowchart TD
 | 协议        | 设备范围                                | 传输方式            | 主要能力                                                    |
 | ----------- | --------------------------------------- | ------------------- | ----------------------------------------------------------- |
 | Protocol V1 | Classic / Mini / Touch / Pro 等现有设备 | USB、BLE、Bridge 等 | 钱包业务能力，`Initialize -> Features` 握手，签名和地址派生 |
-| Protocol V2 | Pro2                                    | USB、BLE            | 系统能力，文件系统、固件更新、设备重启、协议探测            |
+| Protocol V2 | Pro2                                    | USB、BLE            | 设备信息、钱包 Session、文件系统、设置、固件更新和协议探测  |
 
 协议选择是传输层内部职责。外部调用方不需要显式选择 V1 或 V2，也不应该依赖 PID、设备名或 USB descriptor 来判断协议。
 
@@ -50,20 +50,24 @@ flowchart TD
 
 - `ProtocolV2Session`：负责 V2 encode、frame 写入、frame 读取、decode、超时和统一日志。
 - `ProtocolV2FrameAssembler`：负责 BLE/USB 分片后的 `0x5A` frame 重组和长度校验。
-- `probeProtocolV2()`：公共 V2 probe helper，负责 `ProtocolInfoRequest` / bootloader status 探测和失败回退钩子。
+- `ProtocolV2LinkManager`：按设备复用 Session、串行调用，并在致命错误后使 Link 失效。
+- `ProtocolV2SequenceCursor`：让普通断开和重连后的帧序号继续递增，Transport dispose 时再清除。
+- `probeProtocolV2()`：公共 V2 probe helper，发送 `Ping { message: 'protocol-v2-probe' }` 并执行失败清理钩子。
 
 各 transport 的 `detectProtocol()` 根据 hint 和连接缓存选择 V1/V2 probe 顺序。显式 `connectProtocol='V1'` 会验证 V1；显式 `connectProtocol='V2'` 用于上层已经确认协议的重连路径，直接记录 V2 并跳过重复探测。
 
 WebUSB、Electron BLE、React Native BLE 和 lowlevel BLE 只负责各自的物理连接、读写、订阅/桥接和平台错误映射，不再各自复制 V2 协议会话逻辑。
 
+长期设计理由记录在 [ADR-001：Protocol V2 Link 生命周期](./decisions/001-protocol-v2-link-lifecycle.md) 和 [ADR-002：Protocol V2 Transport 边界](./decisions/002-protocol-v2-transport-boundaries.md)。
+
 ## Protocol V2 Device Profile
 
-`packages/core/src/protocols/protocol-v2/features.ts` 负责读取 Protocol V2 设备信息，`packages/core/src/deviceProfile` 负责生成 SDK 标准 `DeviceProfile` 和结构化 `Features`：
+`packages/core/src/protocols/protocol-v2/features.ts` 负责读取 Protocol V2 设备信息，`packages/core/src/deviceProfile` 分别负责标准 `Features` 与 `DeviceProfile` 的构建：
 
-| 协议 | 数据来源                 | 标准输出        | features 输出                              |
-| ---- | ------------------------ | --------------- | ------------------------------------------ |
-| V1   | `Initialize -> Features` | `DeviceProfile` | 由 V1 原始消息构建的结构化 `Features`      |
-| V2   | `Ping + DeviceInfoGet`   | `DeviceProfile` | 由 `DeviceInfoGet` 构建的结构化 `Features` |
+| 协议 | 数据来源                       | 标准输出                                   | features 输出                                    |
+| ---- | ------------------------------ | ------------------------------------------ | ------------------------------------------------ |
+| V1   | `Initialize -> Features`       | `DeviceProfile`                            | 由 V1 原始消息构建的结构化 `Features`            |
+| V2   | `Ping` probe + `DeviceInfoGet` | `getDeviceInfo` 按范围构建 `DeviceProfile` | 初始化时由 `DeviceInfoGet` 构建结构化 `Features` |
 
 这样 SDK 内部和事件输出都使用统一 features 结构；协议原始消息只保留在 `features.raw` 中用于必要的 V1 兼容。
 
@@ -78,12 +82,12 @@ flowchart TD
   Connect["connect / subscribe"]
   ProbeV1["Protocol V1 Initialize"]
   V1["Initialize 成功: 标记 Protocol V1"]
-  ProbeV2["Protocol V2 ProtocolInfoRequest / bootloader status"]
+  ProbeV2["Protocol V2 Ping probe"]
   V2["V2 probe 成功: 标记 Protocol V2"]
   DetectionError["V1/V2 均失败: 抛出协议探测错误"]
   Init["Device.initialize()"]
   InitV1["V1: Initialize -> Features"]
-  InitV2["V2: Ping + DeviceInfoGet -> DeviceProfile"]
+  InitV2["V2: DeviceInfoGet -> Features"]
 
   Enumerate --> Acquire --> Connect --> ProbeV1
   ProbeV1 --> V1 --> Init
@@ -110,9 +114,9 @@ V1 设备仍可在 `Initialize` 后通过 `TransportManager.reconfigure(features
 `Device.acquire()` 完成后会从 transport 读取检测到的协议类型，并写回 `originalDescriptor.protocolType`。后续 `Device.initialize()` 基于该字段选择初始化路径：
 
 - V1：发送 `Initialize`，使用真实 `Features`
-- V2：发送 `Ping` 验证链路，再用 `DeviceInfoGet` 生成标准 `DeviceProfile`
+- V2：Transport acquire 已用 `Ping` probe 确认链路；初始化再用 `DeviceInfoGet` 生成标准 `Features`
 
-Protocol V2 当前没有传统 `GetFeatures`。为了保证事件和 API 输出一致，SDK 会从 `DeviceInfoGet` 构建结构化 `Features`；设备身份以 `serialNo/deviceId` 的语义区分为准。
+Protocol V2 当前没有传统 `GetFeatures`。为了保证事件和 API 输出一致，SDK 会从 `DeviceInfoGet` 构建结构化 `Features`；`getDeviceInfo` 另行构建 `DeviceProfile`。设备身份以 `serialNo/deviceId` 的语义区分为准。
 
 ## Protocol V2 文件和固件更新链路
 
@@ -149,3 +153,5 @@ flowchart TD
 - Electron BLE 默认入口是 `desktop-web-ble`，不再提供按设备型号拆分的 env alias。
 - V1 schema 兼容逻辑和 V2 schema 路由逻辑分离，避免为了新协议改动现有设备的初始化路径。
 - Device 层通过 Protocol V2 feature adapter 暴露统一 `Features`，业务方法不直接消费 Protocol V2 原始 `DeviceInfo`。
+
+传输协议细节按主题拆分在 [传输协议文档](../protocol/README.md)；Core 的 Protocol V2 字段和 API 适配见 [SDK Protocol V2 适配](../sdk/protocol-v2/README.md)。

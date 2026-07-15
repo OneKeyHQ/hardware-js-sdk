@@ -1,9 +1,6 @@
 import { PROTO_DATA_TYPE_PACKET, PROTO_HEAD_CRC_SIZE, PROTO_HEAD_SOF } from './constants';
 import { crc8 } from './crc8';
-import { logProtocolV2Debug } from './debug';
 import { PROTOCOL_V2_FRAME_MAX_BYTES } from '../../constants';
-
-import type { ProtocolV2FrameDebugOptions } from './debug';
 
 // Default sequence number when callers do not manage one themselves.
 // Stateful per-session sequencing lives in ProtocolV2Session (session.ts),
@@ -35,7 +32,6 @@ export function encodeFrame(
   payload: Uint8Array | null,
   packetSrc?: number,
   router?: number,
-  debugOptions?: ProtocolV2FrameDebugOptions,
   seq?: number
 ): Uint8Array {
   const resolvedPacketSrc = packetSrc ?? 0;
@@ -69,17 +65,6 @@ export function encodeFrame(
   // CRC8 over entire frame except last byte
   frame[frameLen - 1] = crc8(frame, frameLen - 1);
 
-  logProtocolV2Debug(debugOptions, 'encode raw frame', {
-    frameLen,
-    payloadLen,
-    packetSrc: resolvedPacketSrc,
-    router: frame[4],
-    attr: frame[5],
-    seq: frame[6],
-    headerCrc: frame[3],
-    frameCrc: frame[frameLen - 1],
-  });
-
   return frame;
 }
 
@@ -95,22 +80,11 @@ export function encodeProtobufFrame(
   pbPayload: Uint8Array,
   packetSrc?: number,
   router?: number,
-  debugOptions?: ProtocolV2FrameDebugOptions,
   seq?: number
 ): Uint8Array {
   const payload = new Uint8Array(2 + pbPayload.length);
   payload[0] = messageTypeId % 256;
   payload[1] = Math.floor(messageTypeId / 256) % 256;
   payload.set(pbPayload, 2);
-  return encodeFrame(
-    payload,
-    packetSrc,
-    router,
-    {
-      ...debugOptions,
-      messageTypeId,
-      pbPayloadLength: pbPayload.length,
-    },
-    seq
-  );
+  return encodeFrame(payload, packetSrc, router, seq);
 }

@@ -1,6 +1,11 @@
 # Pro2 BLE 传输测速记录
 
-本文记录 React Native Demo 在 iOS 真机上针对 OneKey Pro2 BLE 传输速率的两轮调试结果，并给出当前结论。测试目标是区分三类瓶颈：
+> - 文档状态：历史性能基线，不代表所有固件与手机组合
+> - 测试日期：2026-05-11
+> - 适用范围：当日 OneKey Pro2、iOS 真机、React Native Demo 与 `react-native-ble-plx` 组合
+> - 维护要求：BLE 固件、SDK pacing、chunk 大小或文件写入 ACK 模型变化后重新测试。
+
+本文记录 React Native Demo 在 iOS 真机上针对 OneKey Pro2 BLE 传输速率的两轮调试结果，并给出当时结论。测试目标是区分三类瓶颈：
 
 - BLE GATT 写入本身的上行能力。
 - React Native / `react-native-ble-plx` 写入队列能力。
@@ -19,12 +24,12 @@
 
 这一轮通过 RN Demo 的 Pro2 BLE 固件升级入口测试不同 transport pacing 参数。测试结果如下：
 
-| Profile | 结果 |
-| --- | ---: |
+| Profile                 |        结果 |
+| ----------------------- | ----------: |
 | `withResponse baseline` | `2.00 KB/s` |
-| `default` | `8.0 KB/s` |
-| `faster pacing` | `9.0 KB/s` |
-| `aggressive` | `9.64 KB/s` |
+| `default`               |  `8.0 KB/s` |
+| `faster pacing`         |  `9.0 KB/s` |
+| `aggressive`            | `9.64 KB/s` |
 
 ### 第一轮结论
 
@@ -48,14 +53,14 @@
 
 测试参数和结果：
 
-| requestMTU | Size | chunk | Raw write 结果 | Ping RTT 结果 |
-| ---: | ---: | ---: | ---: | --- |
-| `256` | `64 KB` | `20B` | `6.0 KB/s` | `iters=40` 时 `no ack within 3s` |
-| `256` | `64 KB` | `128B` | `21 KB/s` | 未记录 |
-| `256` | `64 KB` | `182B` | `25 KB/s` | 未记录 |
-| `256` | `64 KB` | `253B` | 无回复 | 未记录 |
-| `256` | `64 KB` | `244B` | `34.4 KB/s` | 未记录 |
-| `512` | `64 KB` | `509B` | 无回复，卡在 writing | 未记录 |
+| requestMTU |    Size |  chunk |       Raw write 结果 | Ping RTT 结果                    |
+| ---------: | ------: | -----: | -------------------: | -------------------------------- |
+|      `256` | `64 KB` |  `20B` |           `6.0 KB/s` | `iters=40` 时 `no ack within 3s` |
+|      `256` | `64 KB` | `128B` |            `21 KB/s` | 未记录                           |
+|      `256` | `64 KB` | `182B` |            `25 KB/s` | 未记录                           |
+|      `256` | `64 KB` | `253B` |               无回复 | 未记录                           |
+|      `256` | `64 KB` | `244B` |          `34.4 KB/s` | 未记录                           |
+|      `512` | `64 KB` | `509B` | 无回复，卡在 writing | 未记录                           |
 
 ### 第二轮结论
 
@@ -99,13 +104,9 @@ writeWithResponse 作为提速方案
 
 目前更值得关注的是协议层 ACK 粒度，而不是继续微调 pacing。
 
-如果要继续提升 `firmwareUpdateV4` 的 BLE 升级速率，需要优先验证设备端是否支持更大的 `FilesystemFileWrite` 单块大小，例如：
+如果要继续提升 `firmwareUpdateV4` 的 BLE 升级速率，应先在当前 BLE V2 完整帧上限 `2048B` 内测量 protobuf 和帧头开销，再判断 `1800B` 是否还有小幅上调空间。不能直接测试 `2400B`、`3072B` 或 `4096B`：这些数据块加上 protobuf 和 V2 帧开销后必然超过当前 Transport 的 `2048B` 限制。
 
-```text
-1800B -> 2400B -> 3072B -> 4096B
-```
-
-如果设备端能稳定处理更大的单次 `FilesystemFileWrite`，吞吐会比继续调整 `burst/pause/flush` 更明显。原因是 ACK 次数会减少，串行等待成本被摊薄。
+如果未来要显著增大单次文件块，必须由固件接收缓冲、Protocol V2 BLE 最大帧和各 BLE Transport 的限制共同升级；只修改 `chunkSize` 不会绕过帧上限。
 
 如果 raw write 维持在 `34 KB/s` 左右，即使放大 `FilesystemFileWrite` chunk，RN BLE 链路上限也会限制最终速度，很难接近 WebUSB 或 desktop BLE 的量级。
 

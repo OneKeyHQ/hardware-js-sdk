@@ -117,12 +117,6 @@ function isOneKeyPeripheral(peripheral: Peripheral) {
  * renderer-side transport. Packet reassembly is handled by ElectronBleTransport.
  */
 function emitRawNotification(deviceId: string, data: Buffer): void {
-  logger?.info('[NobleBLE] Raw notification', {
-    deviceId,
-    dataLength: data.length,
-    firstBytes: data.subarray(0, 8).toString('hex'),
-  });
-
   const appCb = notificationCallbacks.get(deviceId);
   if (appCb) appCb(data.toString('hex'));
 }
@@ -551,12 +545,6 @@ async function transmitHexDataToDevice(deviceId: string, hexData: string): Promi
   }
 
   const toBuffer = Buffer.from(hexData, 'hex');
-  logger?.info('[NobleBLE] Writing data:', {
-    deviceId,
-    dataLength: toBuffer.length,
-    firstBytes: toBuffer.subarray(0, 8).toString('hex'),
-  });
-
   const doGetWriteCharacteristic = () => deviceCharacteristics.get(deviceId)?.write;
 
   if (!IS_WINDOWS || pairedDevices.has(deviceId)) {
@@ -618,9 +606,6 @@ async function transmitHexDataToDevice(deviceId: string, hexData: string): Promi
 
 // Handle discovered device (for general enumeration only)
 function handleDeviceDiscovered(peripheral: Peripheral): void {
-  const deviceName = peripheral.advertisement?.localName || 'Unknown Device';
-  const serviceUuids = peripheral.advertisement?.serviceUuids || [];
-
   // Only process OneKey candidates for general discovery. Avoid logging every
   // ambient BLE peripheral; it makes Pro2 debugging hard to read.
   if (!isOneKeyPeripheral(peripheral)) {
@@ -630,10 +615,10 @@ function handleDeviceDiscovered(peripheral: Peripheral): void {
   const isNewDevice = !discoveredDevices.has(peripheral.id);
   discoveredDevices.set(peripheral.id, peripheral);
   if (isNewDevice) {
-    logger?.info('[NobleBLE] Discovered OneKey BLE device:', {
-      name: deviceName,
-      id: peripheral.id,
-      serviceUUIDs: serviceUuids,
+    logger?.debug('[NobleBLE] OneKey BLE device discovered', {
+      deviceId: peripheral.id,
+      name: peripheral.advertisement?.localName || 'Unknown Device',
+      serviceUUIDs: peripheral.advertisement?.serviceUuids || [],
     });
   }
 }
@@ -910,15 +895,14 @@ async function discoverServicesAndCharacteristics(
       });
     });
 
-    // Log all discovered services
-    logger?.info(
-      '[NobleBLE] All services:',
-      services?.map(s => s.uuid)
-    );
-
     if (!services || services.length === 0) {
       throw ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, 'No services found');
     }
+
+    logger?.debug('[NobleBLE] services discovered', {
+      deviceId: peripheral.id,
+      serviceUUIDs: services.map(service => service.uuid),
+    });
 
     // Find OneKey service — Noble may expose 128-bit UUIDs as short UUID keys.
     let service = services.find(s => NORMALIZED_ONEKEY_SERVICE_UUIDS.has(getBleUuidKey(s.uuid)));
@@ -933,8 +917,10 @@ async function discoverServicesAndCharacteristics(
       throw ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound);
     }
     const selectedService = service;
-    logger?.info('[NobleBLE] Using service:', selectedService.uuid);
-
+    logger?.debug('[NobleBLE] service selected', {
+      deviceId: peripheral.id,
+      serviceUuid: selectedService.uuid,
+    });
     // Step 2: Discover ALL characteristics (no filter)
     const characteristics = await new Promise<Characteristic[]>((resolve, reject) => {
       selectedService.discoverCharacteristics([], (error, chars) => {
@@ -948,11 +934,6 @@ async function discoverServicesAndCharacteristics(
     });
 
     // Step 3: Find required characteristics
-    logger?.info('[NobleBLE] Discovered characteristics:', {
-      count: characteristics?.length || 0,
-      uuids: characteristics?.map(c => c.uuid) || [],
-    });
-
     let writeCharacteristic: Characteristic | null = null;
     let notifyCharacteristic: Characteristic | null = null;
 
@@ -967,11 +948,6 @@ async function discoverServicesAndCharacteristics(
       }
     }
 
-    logger?.info('[NobleBLE] Characteristic discovery result:', {
-      writeFound: !!writeCharacteristic,
-      notifyFound: !!notifyCharacteristic,
-    });
-
     if (!writeCharacteristic || !notifyCharacteristic) {
       logger?.error(
         '[NobleBLE] Missing characteristics - write:',
@@ -984,6 +960,13 @@ async function discoverServicesAndCharacteristics(
         'Required characteristics not found'
       );
     }
+
+    logger?.debug('[NobleBLE] characteristics selected', {
+      deviceId: peripheral.id,
+      serviceUuid: selectedService.uuid,
+      writeUuid: writeCharacteristic.uuid,
+      notifyUuid: notifyCharacteristic.uuid,
+    });
 
     return { write: writeCharacteristic, notify: notifyCharacteristic };
   })();
@@ -1516,29 +1499,25 @@ async function subscribeNotifications(
 
 // Setup IPC handlers
 export function setupNobleBleHandlers(webContents: WebContents): void {
-  // Use console.log for initial logging as electron-log might not be available yet.
-  console.log('[NobleBLE] Attempting to set up Noble BLE handlers.');
   try {
-    console.log('[NobleBLE] NOBLE_VERSION_771');
-
     // @ts-ignore – electron-log is only available at runtime
     // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
     logger = require('electron-log') as Logger;
-    console.log('[NobleBLE] electron-log loaded successfully.');
 
     // @ts-ignore – electron is only available at runtime
     // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
     const { ipcMain } = require('electron');
-    console.log('[NobleBLE] electron.ipcMain loaded successfully.');
 
     safeLog(logger, 'info', 'Setting up Noble BLE IPC handlers');
 
     // Handle enumerate request
-    console.log(`[NobleBLE] Registering handler for: ${EOneKeyBleMessageKeys.NOBLE_BLE_ENUMERATE}`);
     ipcMain.handle(EOneKeyBleMessageKeys.NOBLE_BLE_ENUMERATE, async () => {
       try {
         const devices = await enumerateDevices();
-        safeLog(logger, 'info', 'Enumeration completed, devices:', devices);
+        safeLog(logger, 'debug', 'Enumeration completed', {
+          count: devices.length,
+          devices: devices.map(device => ({ id: device.id, name: device.name })),
+        });
         return devices;
       } catch (error) {
         safeLog(logger, 'error', 'Enumeration failed:', error);
@@ -1583,7 +1562,6 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
     ipcMain.handle(
       EOneKeyBleMessageKeys.NOBLE_BLE_WRITE,
       async (_event: IpcMainInvokeEvent, deviceId: string, hexData: string) => {
-        logger?.info('[NobleBLE] IPC WRITE', { deviceId, len: hexData.length });
         await transmitHexDataToDevice(deviceId, hexData);
       }
     );

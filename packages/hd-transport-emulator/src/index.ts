@@ -1,4 +1,4 @@
-import transport, { LogBlockCommand } from '@onekeyfe/hd-transport';
+import transport from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { request as http } from './http';
@@ -124,11 +124,7 @@ export default class EmulatorTransport {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
     }
     const messages = this._messages;
-    if (LogBlockCommand.has(name)) {
-      this.Log.debug('call-', ' name: ', name);
-    } else {
-      this.Log.debug('call-', ' name: ', name, ' data: ', data);
-    }
+    this.Log.debug('transport call', { name, protocol: 'V1' });
 
     const o = ProtocolV1.encodeEnvelope(messages, name, data);
     const outData = o.toString('hex');

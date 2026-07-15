@@ -1,5 +1,4 @@
 import transport, {
-  LogBlockCommand,
   PROTOCOL_V1_MESSAGE_HEADER_SIZE,
   PROTOCOL_V2_CHANNEL_BLE_UART,
   ProtocolV2FrameAssembler,
@@ -17,21 +16,12 @@ import {
   wait,
 } from '@onekeyfe/hd-shared';
 
+import { createTransportCallLog, shouldSuppressHighVolumeCallLog } from './transportLog';
+
 import type { Deferred } from '@onekeyfe/hd-shared';
 import type { DesktopAPI } from '@onekeyfe/hd-transport-electron';
 import type { OneKeyDeviceInfo, ProtocolType, TransportCallOptions } from '@onekeyfe/hd-transport';
 import type EventEmitter from 'events';
-
-const FILE_WRITE_LOG_BLOCK_PATTERN = /(?:^|[^a-z])(?:raw)?(?:filesystem|emmc)?filewrite$/i;
-
-function shouldSuppressHighVolumeCallLog(name: string) {
-  const normalized = name.replace(/[_\s-]/g, '');
-  return FILE_WRITE_LOG_BLOCK_PATTERN.test(normalized);
-}
-
-function isLogBlockCommand(name: string) {
-  return (LogBlockCommand as Set<string> | undefined)?.has?.(name) ?? false;
-}
 
 const { parseConfigure, ProtocolV1, check } = transport;
 
@@ -221,7 +211,6 @@ export default class ElectronBleTransport {
     this.protocolV2Links
       .invalidateAllLinks('Protocol V2 schema reconfigured')
       .catch(error => this.Log?.debug('[Electron BLE] schema link cleanup failed:', error));
-    this.Log?.debug('[Electron BLE] Protocol V2 schema configured');
   }
 
   async listen() {
@@ -682,12 +671,8 @@ export default class ElectronBleTransport {
         `Device protocol has not been detected for ${uuid}`
       );
     }
-    if (shouldSuppressHighVolumeCallLog(name)) {
-      // 高频文件写入不要逐包发 debug 事件，否则调试日志会反向拖慢传输。
-    } else if (isLogBlockCommand(name)) {
-      this.Log?.debug('[Electron BLE] call', 'name:', name, 'protocol:', protocol);
-    } else {
-      this.Log?.debug('[Electron BLE] call', 'name:', name, 'data:', data, 'protocol:', protocol);
+    if (!shouldSuppressHighVolumeCallLog(name)) {
+      this.Log?.debug('transport call', createTransportCallLog(name, protocol));
     }
 
     if (protocol === 'V2') {

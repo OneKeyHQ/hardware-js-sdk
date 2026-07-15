@@ -1,910 +1,237 @@
-# OneKey Attach to PIN 技术详解
+# OneKey Attach-to-PIN 技术说明
 
-## 0. 核心概念说明
+> - 文档状态：当前 SDK 与 Protocol V1/V2 行为
+> - 最后代码核验：2026-07-15
+> - 事实来源：Core 公共类型、`Device`、`DeviceCommands`、`deviceFeaturesUtils` 与 firmware-pro2 Device Session protobuf
+> - 维护要求：Attach PIN 管理协议、Passphrase Session 或公共 API 返回类型变化后同步更新。
 
-### 0.1 什么是 Attach to PIN
+## 1. 能力边界
 
-**🔑 核心理解：**
+Attach-to-PIN 将一个设备端 PIN 与特定 passphrase 钱包上下文关联。用户输入该 PIN 后，设备可以恢复对应隐藏钱包，而无需再次输入完整 passphrase。
 
-```
-Attach to PIN = 将密码短语(Passphrase)绑定到特定PIN码
-目标：简化隐藏钱包的访问流程，提升用户体验
-```
+必须区分三件事：
 
-| 传统模式                   | Attach to PIN 模式              |
-| -------------------------- | ------------------------------- |
-| 输入主 PIN → 输入密码短语  | 输入绑定 PIN → 自动应用密码短语 |
-| 每次都需要手动输入密码短语 | 一次绑定，后续自动应用          |
-| 密码短语容易输错或遗忘     | PIN 码更简单，不易出错          |
-| 适合技术用户               | 适合普通用户                    |
+| 状态                 | 含义                                                  |
+| -------------------- | ----------------------------------------------------- |
+| 设备已解锁           | 主 PIN 或 Attach PIN 已通过，允许访问受保护能力。     |
+| 通过 Attach PIN 解锁 | 当前解锁来源是 Attach PIN。                           |
+| 当前钱包身份         | 当前 seed/passphrase 上下文对应的 `passphraseState`。 |
 
-**💡 形象比喻：**
+“设备已解锁”不代表当前钱包就是调用方期望的钱包。SDK 仍必须比较实际 `passphraseState`，避免对错误隐藏钱包取地址或签名。
 
-```
-传统模式 = 每次开门都要输入复杂密码
-Attach to PIN = 设置简单门禁卡，刷卡即可进入特定房间
-```
+## 2. 公共 SDK API
 
-### 0.2 安全模型
+### `getFeatures`
 
-**安全边界：**
-
-- **主 PIN**: 保护设备基础访问权限
-- **绑定 PIN**: 保护特定密码短语的访问权限
-- **密码短语**: 实际的密钥推导参数，存储在安全芯片中
-
-**威胁模型：**
-
-- ✅ 防护：设备丢失、PIN 码泄露
-- ✅ 防护：密码短语遗忘、输入错误
-- ⚠️ 风险：绑定 PIN 与主 PIN 相同时的安全降级
-
-## 1. Attach to PIN 核心原理
-
-### 1.1 技术架构
-
-**系统架构图：**
-
-```
-┌─────────────────────────────────────────────┐
-│           应用层：钱包 App                    │
-├─────────────────────────────────────────────┤
-│      业务层：地址生成、交易签名、账户管理      │
-├─────────────────────────────────────────────┤
-│    密钥推导层：BIP32 HD 钱包 + Passphrase    │ ← 统一汇聚点
-├─────────────────────────────────────────────┤
-│   Attach to PIN 层：PIN-Passphrase 映射     │ ← 核心创新
-├─────────────────────────────────────────────┤
-│      安全存储层：SE 安全芯片 + 加密存储        │ ← 关键保护
-├─────────────────────────────────────────────┤
-│      硬件抽象层：OneKey 固件接口              │
-├─────────────────────────────────────────────┤
-│    密码学层：AES + PBKDF2 + ECDSA + SHA256   │ ← 底层算法
-└─────────────────────────────────────────────┘
+```ts
+getFeatures(connectId?: string, params?: CommonParams): Response<Features>;
 ```
 
-### 1.2 核心组件
+返回标准化 Features。当前结构化字段使用 camelCase，例如：
 
-**关键模块：**
-
-| 组件             | 功能          | 实现位置                  | 安全等级 |
-| ---------------- | ------------- | ------------------------- | -------- |
-| **SE THD89**     | 安全芯片存储  | `trezor.crypto.se_thd89`  | 🔴 最高  |
-| **PIN 验证**     | 多重 PIN 验证 | `apps.common.request_pin` | 🟡 高    |
-| **密码短语管理** | 加密存储映射  | `apps.common.passphrase`  | 🟡 高    |
-| **UI 交互**      | 用户界面流程  | `trezor.ui.layouts.lvgl`  | 🟢 中    |
-
-### 1.3 存储机制
-
-**安全芯片存储结构：**
-
-```typescript
-interface AttachToPinStorage {
-  // 主PIN验证后的加密存储
-  encryptedMappings: {
-    [bindingPinHash: string]: {
-      encryptedPassphrase: Buffer; // AES加密的密码短语
-      salt: Buffer; // 随机盐值
-      iterations: number; // PBKDF2迭代次数
-      timestamp: number; // 创建时间戳
-    };
-  };
-
-  // 元数据
-  metadata: {
-    version: number; // 存储格式版本
-    maxEntries: number; // 最大绑定数量
-    currentCount: number; // 当前绑定数量
-  };
-}
+```ts
+features.passphraseProtection;
+features.attachToPinEnabled;
+features.unlockedAttachPin;
+features.sessionId;
 ```
 
-## 2. 核心 API 接口
+V1 原始 protobuf 字段可能保留在 `features.raw`，应用不应继续把公共 Features 当成原始 snake_case protobuf。
 
-### 2.1 固件端 API
+### `getPassphraseState`
 
-**主要接口：**
-
-```python
-# 核心存储接口
-se_thd89.save_pin_passphrase(
-    main_pin: str,           # 主PIN码
-    binding_pin: str,        # 绑定PIN码
-    passphrase: str          # 密码短语内容
-) -> Tuple[bool, bool]       # (保存成功, 需要锁定设备)
-
-se_thd89.get_pin_passphrase(
-    main_pin: str,           # 主PIN码
-    binding_pin: str         # 绑定PIN码
-) -> Tuple[bool, str]        # (获取成功, 密码短语内容)
-
-se_thd89.remove_pin_passphrase(
-    main_pin: str,           # 主PIN码
-    binding_pin: str         # 绑定PIN码
-) -> bool                    # 删除成功
-
-se_thd89.list_pin_passphrase(
-    main_pin: str            # 主PIN码
-) -> List[str]               # 绑定PIN列表
+```ts
+getPassphraseState(
+  connectId?: string,
+  params?: CommonParams
+): Response<string | undefined>;
 ```
 
-**PIN 验证接口：**
-
-```python
-# 多重PIN验证
-config.check_pin(
-    pin: str,                # PIN码
-    salt: bytes,             # 盐值
-    pin_type: PinType        # PIN类型
-) -> Tuple[bool, PinResult]  # (验证成功, PIN类型结果)
-
-# PIN类型枚举
-class PinType:
-    USER_CHECK = 1           # 主PIN验证
-    PASSPHRASE_PIN_CHECK = 2 # 绑定PIN验证
-    USER_AND_PASSPHRASE_PIN = 3  # 混合验证
-```
-
-### 2.2 SDK 端 API
-
-#### 2.2.1 核心 API 接口
-
-**主要方法：**
-
-```typescript
-interface CoreApi {
-  // 设备管理
-  getFeatures(connectId: string): Promise<Response<Features>>;
-
-  // Attach to PIN 核心方法
-  getPassphraseState(
-    connectId: string,
-    params?: GetPassphraseStateParams
-  ): Promise<Response<GetPassphraseStateResponse>>;
-
-  // 事件管理
-  on(event: string, listener: Function): void;
-  uiResponse(response: UiResponseEvent): void;
-}
-```
-
-#### 2.2.2 关键类型定义
-
-**GetPassphraseState 接口：**
-
-```typescript
-interface GetPassphraseStateParams {
-  initSession?: boolean; // 初始化新会话
-  useEmptyPassphrase?: boolean; // 使用空密码短语
-  onlyMainPin?: boolean; // 仅使用主PIN
-}
-
-interface GetPassphraseStateResponse {
-  passphraseState: string | undefined; // 密码短语状态标识
-  newSession: string | undefined; // 新会话ID
-  unlockedAttachPin: boolean | undefined; // 是否通过绑定PIN解锁
-}
-```
-
-**设备特性：**
-
-```typescript
-interface Features {
-  device_id: string;
-  model: string;
-  major_version: number;
-  minor_version: number;
-  patch_version: number;
-  pin_protection: boolean;
-  passphrase_protection: boolean;
-  unlocked: boolean;
-  session_id: string;
-  // ... 其他属性
-}
-```
-
-#### 2.2.3 设备兼容性检测
-
-**兼容性检测函数：**
-
-```typescript
-// 检测 Attach to PIN 支持
-function hasAttachToPinCapability(features: Features): boolean {
-  const deviceType = getDeviceType(features);
-  const version = getDeviceFirmwareVersion(features).join('.');
-
-  return (
-    (deviceType === EDeviceType.Pro && semver.gte(version, '4.15.0')) ||
-    (deviceType === EDeviceType.Touch && semver.gte(version, '4.11.0'))
-  );
-}
-
-// 检测原生 API 支持
-function hasNativePassphraseStateAPI(features: Features): boolean {
-  const deviceType = getDeviceType(features);
-  const version = getDeviceFirmwareVersion(features).join('.');
-
-  return deviceType === EDeviceType.Pro && semver.gte(version, '4.15.0');
-}
-```
-
-#### 2.2.4 事件系统
-
-**事件类型：**
-
-```typescript
-// 事件常量
-const UI_REQUEST = {
-  REQUEST_PIN: 'ui-request_pin',
-  REQUEST_PASSPHRASE: 'ui-request_passphrase',
-} as const;
-
-const UI_RESPONSE = {
-  RECEIVE_PIN: 'ui-receive_pin',
-  RECEIVE_PASSPHRASE: 'ui-receive_passphrase',
-} as const;
-
-// 事件消息
-interface UiRequestPin {
-  type: 'ui-request_pin';
-  payload: {
-    device: Device;
-    type: 'ButtonRequest_PinEntry' | 'ButtonRequest_AttachPin';
-  };
-}
-
-interface UiRequestPassphrase {
-  type: 'ui-request_passphrase';
-  payload: {
-    device: Device;
-    existsAttachPinUser?: boolean; // 关键：是否存在绑定PIN用户
-  };
-}
-```
-
-## 3. 核心流程详解
-
-### 3.1 绑定流程
-
-**完整绑定流程图：**
-
-```mermaid
-graph TD
-    A[用户发起绑定] --> B[验证主PIN]
-    B --> C{主PIN正确?}
-    C -->|否| D[显示错误，重试]
-    C -->|是| E[输入绑定PIN]
-    E --> F{绑定PIN验证}
-    F -->|与主PIN相同| G[显示警告，重新输入]
-    F -->|长度不足| H[显示错误，重新输入]
-    F -->|格式正确| I[检查是否已存在]
-    I -->|已存在| J[显示覆盖确认]
-    I -->|不存在| K[输入密码短语]
-    J -->|确认覆盖| K
-    J -->|取消| E
-    K --> L[确认密码短语]
-    L --> M[调用SE芯片存储]
-    M --> N{存储成功?}
-    N -->|是| O[显示成功，可能锁定设备]
-    N -->|否| P[显示失败，重试]
-
-    D --> B
-    G --> E
-    H --> E
-    P --> K
-```
-
-**关键验证步骤：**
-
-1. **主 PIN 验证**: 确保用户有权限进行绑定操作
-2. **绑定 PIN 检查**: 防止与主 PIN 冲突，确保最小长度
-3. **存在性检查**: 避免意外覆盖现有绑定
-4. **密码短语确认**: 双重输入确认，防止输入错误
-5. **安全存储**: 使用 SE 芯片加密存储映射关系
-
-### 3.2 使用流程
-
-**密码短语状态获取流程：**
-
-```mermaid
-graph TD
-    A[SDK调用getPassphraseState] --> B[检查设备类型]
-    B --> C{支持Attach to PIN?}
-    C -->|否| D[使用传统地址获取]
-    C -->|是| E[调用GetPassphraseState命令]
-    E --> F[固件处理请求]
-    F --> G{设备已解锁?}
-    G -->|否| H[请求PIN解锁]
-    G -->|是| I[检查绑定PIN状态]
-    H --> I
-    I --> J{存在绑定PIN?}
-    J -->|否| K[返回主钱包状态]
-    J -->|是| L[返回绑定状态信息]
-
-    D --> M[返回地址作为状态]
-    K --> N[passphraseState: address]
-    L --> O[passphraseState: address + unlockedAttachPin: true]
-
-    M --> P[SDK处理响应]
-    N --> P
-    O --> P
-    P --> Q[返回给应用层]
-```
-
-### 3.3 解绑流程
-
-**解绑操作流程：**
-
-```mermaid
-graph TD
-    A[用户选择解绑] --> B[验证主PIN]
-    B --> C{主PIN正确?}
-    C -->|否| D[显示错误，重试]
-    C -->|是| E[显示绑定列表]
-    E --> F[用户选择目标绑定]
-    F --> G[确认解绑操作]
-    G --> H{用户确认?}
-    H -->|否| I[取消操作]
-    H -->|是| J[调用SE芯片删除]
-    J --> K{删除成功?}
-    K -->|是| L[显示成功消息]
-    K -->|否| M[显示失败，重试]
-
-    D --> B
-    M --> G
-```
-
-## 4. 安全机制详解
-
-### 4.1 多层安全防护
-
-**安全层级：**
-
-```
-第1层：设备物理安全
-├── 安全芯片 SE THD89
-├── 防篡改硬件设计
-└── 安全启动验证
-
-第2层：PIN码验证
-├── 主PIN：设备基础访问
-├── 绑定PIN：特定密码短语访问
-└── 防暴力破解机制
-
-第3层：密码学保护
-├── AES-256 加密存储
-├── PBKDF2 密钥推导
-└── 随机盐值防彩虹表
-
-第4层：会话管理
-├── 临时会话状态
-├── 自动超时锁定
-└── 状态隔离保护
-```
-
-### 4.2 威胁模型分析
-
-**潜在威胁与防护：**
-
-| 威胁类型       | 攻击场景          | 防护机制                  | 风险等级 |
-| -------------- | ----------------- | ------------------------- | -------- |
-| **设备丢失**   | 物理设备被盗      | PIN 码保护 + 硬件加密     | 🟡 中等  |
-| **PIN 泄露**   | 主 PIN 被观察到   | 绑定 PIN 独立验证         | 🟡 中等  |
-| **暴力破解**   | 尝试所有 PIN 组合 | 失败次数限制 + 设备锁定   | 🟢 低    |
-| **侧信道攻击** | 功耗/时序分析     | 安全芯片硬件防护          | 🟢 低    |
-| **固件篡改**   | 恶意固件植入      | 安全启动 + 签名验证       | 🟢 低    |
-| **社会工程**   | 诱骗用户操作      | 明确的 UI 提示 + 确认流程 | 🟡 中等  |
-
-### 4.3 最佳安全实践
-
-**推荐配置：**
-
-```typescript
-const SECURITY_RECOMMENDATIONS = {
-  // PIN码设置
-  mainPin: {
-    minLength: 6, // 最小长度
-    complexity: 'medium', // 复杂度要求
-    avoidPatterns: true, // 避免简单模式
-  },
-
-  // 绑定PIN设置
-  bindingPin: {
-    minLength: 4, // 最小长度（固件限制）
-    differentFromMain: true, // 必须与主PIN不同
-    maxBindings: 10, // 最大绑定数量
-  },
-
-  // 密码短语设置
-  passphrase: {
-    minLength: 1, // 最小长度
-    maxLength: 50, // 最大长度
-    encoding: 'utf8', // 字符编码
-    backup: 'required', // 必须备份
-  },
-};
-```
-
-**安全检查清单：**
-
-- ✅ 主 PIN 与绑定 PIN 不相同
-- ✅ 密码短语已安全备份
-- ✅ 定期检查绑定列表
-- ✅ 及时删除不需要的绑定
-- ✅ 避免在不安全环境下操作
-- ✅ 定期更新设备固件
-
-## 5. 错误处理与故障排除
-
-### 5.1 常见错误码
-
-**固件错误码：**
-
-| 错误码                | 错误名称     | 描述                   | 解决方案           |
-| --------------------- | ------------ | ---------------------- | ------------------ |
-| `PIN_INVALID`         | PIN 码错误   | 输入的 PIN 码不正确    | 重新输入正确 PIN   |
-| `PIN_USED`            | PIN 码已使用 | 绑定 PIN 与主 PIN 相同 | 使用不同的绑定 PIN |
-| `STORAGE_FULL`        | 存储空间满   | 达到最大绑定数量       | 删除不需要的绑定   |
-| `PASSPHRASE_TOO_LONG` | 密码短语过长 | 超过 50 字符限制       | 缩短密码短语长度   |
-| `SE_ERROR`            | 安全芯片错误 | 硬件存储失败           | 重启设备或联系支持 |
-
-**SDK 错误码：**
-
-```typescript
-enum AttachToPinErrorCode {
-  DEVICE_NOT_SUPPORTED = 'DEVICE_NOT_SUPPORTED',
-  DEVICE_NOT_UNLOCKED = 'DEVICE_NOT_UNLOCKED',
-  PASSPHRASE_STATE_ERROR = 'PASSPHRASE_STATE_ERROR',
-  NETWORK_ERROR = 'NETWORK_ERROR',
-  USER_CANCELLED = 'USER_CANCELLED',
-}
-```
-
-### 5.2 故障排除指南
-
-**常见问题解决：**
-
-1. **设备不支持 Attach to PIN**
-
-   ```typescript
-   // 检查设备兼容性
-   if (!hasAttachToPinCapability(device.features)) {
-     throw new Error('Device does not support Attach to PIN');
-   }
-   ```
-
-2. **获取密码短语状态失败**
-
-   ```typescript
-   // 重试机制
-   const maxRetries = 3;
-   for (let i = 0; i < maxRetries; i++) {
-     try {
-       const result = await sdk.getPassphraseState(connectId, params);
-       if (result.success) return result;
-     } catch (error) {
-       if (i === maxRetries - 1) throw error;
-       await delay(1000 * (i + 1)); // 指数退避
-     }
-   }
-   ```
-
-3. **会话状态不一致**
-   ```typescript
-   // 强制刷新设备状态
-   await device.getFeatures();
-   device.updateInternalState(
-     features.passphrase_protection,
-     passphraseState,
-     features.device_id,
-     newSession,
-     features.session_id
-   );
-   ```
-
-## 6. SDK 集成指南
-
-### 6.1 基础集成流程
-
-**初始化步骤：**
-
-1. **SDK 初始化**
-
-   ```typescript
-   const sdk = await HardwareSDK.init({
-     debug: false,
-     connectSrc: 'https://jssdk.onekey.so/',
-     env: 'web',
-   });
-   ```
-
-2. **设备连接**
-
-   ```typescript
-   const devices = await sdk.searchDevices();
-   const connectId = devices.payload[0].connectId;
-   ```
-
-3. **兼容性检测**
-   ```typescript
-   const features = await sdk.getFeatures(connectId);
-   const supported = hasAttachToPinCapability(features.payload);
-   ```
-
-### 6.2 事件处理机制
-
-**核心事件流程：**
-
-```typescript
-// 监听UI事件
-sdk.on(UI_EVENT, message => {
-  switch (message.type) {
-    case UI_REQUEST.REQUEST_PIN:
-      // 处理PIN请求（主PIN或绑定PIN）
-      handlePinRequest(message.payload);
-      break;
-
-    case UI_REQUEST.REQUEST_PASSPHRASE:
-      // 处理密码短语请求
-      // message.payload.existsAttachPinUser 指示是否可使用绑定PIN
-      handlePassphraseRequest(message.payload);
-      break;
-  }
+公开 API 只返回 `passphraseState`：
+
+```ts
+const response = await HardwareSDK.getPassphraseState(connectId, {
+  initSession: true,
 });
 
-// 响应PIN请求
-function submitPin(pin: string) {
-  sdk.uiResponse({
-    type: UI_RESPONSE.RECEIVE_PIN,
-    payload: pin,
-  });
-}
-
-// 响应密码短语请求
-function submitPassphrase(passphrase: string, useDevice: boolean = false) {
-  sdk.uiResponse({
-    type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-    payload: {
-      value: passphrase,
-      passphraseOnDevice: useDevice,
-    },
-  });
+if (response.success) {
+  const passphraseState = response.payload;
 }
 ```
 
-### 6.3 密码短语状态管理
+它不会公开返回：
 
-**状态获取流程：**
+- 设备 `session_id`。
+- `newSession`。
+- `unlockedAttachPin` 对象字段。
 
-```typescript
-// 获取密码短语状态
-async function getWalletState(connectId: string) {
-  const result = await sdk.getPassphraseState(connectId, {
-    initSession: true,
-  });
+这些数据由 Device 内部钱包 Session 流程消费和缓存。应用后续调用只需保存并传回 `passphraseState`。
 
-  if (result.success) {
-    const { passphraseState, unlockedAttachPin } = result.payload;
+## 3. UI 事件
 
-    if (unlockedAttachPin) {
-      console.log('使用绑定PIN解锁的隐藏钱包');
-    } else if (passphraseState) {
-      console.log('普通隐藏钱包');
-    } else {
-      console.log('主钱包');
-    }
+Attach-to-PIN 复用现有 PIN 和 Passphrase UI 事件：
 
-    return result.payload;
+```ts
+HardwareSDK.on(UI_EVENT, message => {
+  if (message.type === UI_REQUEST.REQUEST_PIN) {
+    // 展示 PIN 输入或“请在设备上输入 PIN”提示。
   }
-}
+
+  if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
+    const canUseAttachPin = message.payload.existsAttachPinUser === true;
+    // 根据 canUseAttachPin 决定是否展示“使用 Attach PIN”入口。
+  }
+});
 ```
 
-### 6.4 集成最佳实践
+选择已有 Attach PIN 钱包时：
 
-**关键要点：**
-
-1. **错误处理**
-
-   - 实现重试机制处理网络和设备错误
-   - 区分可重试错误和致命错误
-   - 提供用户友好的错误提示
-
-2. **会话管理**
-
-   - 缓存设备连接状态
-   - 实现会话超时和自动重连
-   - 正确处理设备锁定状态
-
-3. **用户体验**
-
-   - 检测设备兼容性并给出相应提示
-   - 在密码短语请求时提供绑定 PIN 选项
-   - 实现加载状态和进度指示
-
-4. **安全考虑**
-   - 不在客户端存储敏感信息
-   - 正确处理密码短语状态验证
-   - 实现适当的超时和清理机制
-
-## 7. 常见问题与解决方案
-
-### 7.1 设备兼容性问题
-
-**问题：设备不支持 Attach to PIN**
-
-**解决方案：**
-
-- 检查设备型号和固件版本
-- 对于不支持的设备，使用传统密码短语模式
-- 提供用户友好的提示信息
-
-```typescript
-// 兼容性检查示例
-async function checkCompatibility(connectId: string) {
-  const features = await sdk.getFeatures(connectId);
-  const supported = hasAttachToPinCapability(features.payload);
-
-  if (!supported) {
-    console.warn('设备不支持 Attach to PIN，将使用传统模式');
-    // 回退到传统密码短语处理
-  }
-}
+```ts
+HardwareSDK.uiResponse({
+  type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+  payload: {
+    value: '',
+    attachPinOnDevice: true,
+    save: false,
+  },
+});
 ```
 
-### 7.2 状态同步问题
+只有设备返回的 `PassphraseRequest.exists_attach_pin_user` 为真时，Core 才会把该选择转换为：
 
-**问题：密码短语状态不一致**
-
-**解决方案：**
-
-- 强制刷新设备状态
-- 验证地址一致性
-- 重新初始化会话
-
-```typescript
-// 状态验证示例
-async function validateState(connectId: string, expectedState: string) {
-  const currentState = await sdk.getPassphraseState(connectId);
-
-  if (currentState.passphraseState !== expectedState) {
-    // 强制刷新
-    await sdk.getFeatures(connectId);
-    // 重新获取状态
-    return await sdk.getPassphraseState(connectId, { initSession: true });
-  }
-}
+```text
+PassphraseAck { on_device_attach_pin: true }
 ```
 
-### 7.3 事件处理问题
+普通 Button 确认由 Core 自动发送 `ButtonAck`；应用只展示提示，不应调用 `uiResponse()`。
 
-**问题：UI 事件响应超时**
+## 4. Protocol V1 流程
 
-**解决方案：**
+V1 设备可能使用以下字段和消息：
 
-- 实现事件队列管理
-- 设置合理的超时时间
-- 提供取消机制
+- `Initialize.is_contains_attach`
+- `Features.attach_to_pin_user`
+- `Features.unlocked_attach_pin`
+- `PassphraseRequest.exists_attach_pin_user`
+- `PassphraseAck.on_device_attach_pin`
+- `GetPassphraseState.allow_create_attach_pin`
+- `PassphraseState.passphrase_state`
+- `PassphraseState.session_id`
+- `PassphraseState.unlocked_attach_pin`
 
-```typescript
-// 事件超时处理示例
-class EventManager {
-  private pendingRequests = new Map();
+当前 Core 的 V1 分支：
 
-  async handlePinRequest(connectId: string): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('PIN input timeout'));
-      }, 60000);
+1. 对支持 `Capability_AttachToPin` 的设备调用 `GetPassphraseState`。
+2. V1 Pro 固件 `>= 4.15.0` 也走该原生消息。
+3. 其他 V1 设备回退到固定 Bitcoin Testnet 地址派生，将地址作为 `passphraseState`。
+4. 内部读取 `session_id` 和 `unlocked_attach_pin`，但公开 API 仍只返回 `passphraseState`。
 
-      this.pendingRequests.set(connectId, { resolve, reject, timeout });
-    });
-  }
-}
+能力应优先通过固件 capability 判断，不要仅复制设备型号和固件版本硬编码到应用层。
+
+## 5. Pro2 / Protocol V2 流程
+
+Pro2 不使用传统 `GetPassphraseState -> PassphraseState`。相关职责拆分为：
+
+| 消息/字段                                     | 职责                                     |
+| --------------------------------------------- | ---------------------------------------- |
+| `DeviceInfo.status.attach_to_pin_enabled`     | 设备是否配置过 Attach-to-PIN。           |
+| `DeviceInfo.status.unlocked_by_attach_to_pin` | 当前设备是否由 Attach PIN 解锁。         |
+| `DeviceSessionAskPin`                         | 请求设备显示 PIN 输入流程。              |
+| `DeviceSessionPinResult.unlocked_attach_pin`  | 本次 PIN 解锁是否命中 Attach PIN。       |
+| `DeviceSessionGet(session_id?)`               | 创建或恢复当前 seed/passphrase Session。 |
+| `DeviceSession.btc_test_address`              | 归一化为 SDK `passphraseState`。         |
+
+Pro2 PIN 始终在设备端输入：
+
+```text
+DeviceSessionAskPin
+  -> 设备显示 PIN 页面
+  -> DeviceSessionPinResult
+  -> Core 更新 unlocked/passphrase/Attach PIN 状态
 ```
 
-### 7.4 性能优化建议
+该流程不会请求应用提交软件 PIN。
 
-**关键优化策略：**
+钱包 Session 流程为：
 
-1. **连接复用**
-
-   - 避免频繁建立设备连接
-   - 实现连接池管理
-
-2. **智能缓存**
-
-   - 缓存设备特性信息
-   - 缓存密码短语状态（短期）
-
-3. **批量操作**
-
-   - 合并相似的 API 调用
-   - 并行处理独立操作
-
-4. **错误恢复**
-   - 实现自动重试机制
-   - 区分可重试和致命错误
-
-## 8. 技术总结与最佳实践
-
-### 8.1 核心技术洞察
-
-**🎯 关键发现：**
-
-1. **安全芯片存储**: SE THD89 提供硬件级安全保护，确保绑定关系的安全性
-2. **多重 PIN 验证**: 主 PIN + 绑定 PIN 的双重验证机制，平衡安全性与易用性
-3. **会话状态管理**: 临时会话与持久状态的平衡，支持多设备场景
-4. **向后兼容**: 与传统密码短语模式的无缝兼容，保证用户体验连续性
-5. **事件驱动架构**: 基于 UI 事件的异步交互模式，提供灵活的集成方式
-
-### 8.2 SDK 集成最佳实践
-
-**架构设计原则：**
-
-1. **分层架构**: 将设备管理、会话管理、状态管理分离
-2. **错误边界**: 实现完善的错误处理和恢复机制
-3. **缓存策略**: 合理使用缓存减少不必要的设备通信
-4. **事件解耦**: 使用事件系统解耦 UI 与业务逻辑
-5. **性能优化**: 实现请求去重、批处理等优化策略
-
-**代码质量保证：**
-
-```typescript
-// 类型安全
-interface AttachToPinConfig {
-  maxRetries: number;
-  timeout: number;
-  cacheEnabled: boolean;
-  debugMode: boolean;
-}
-
-// 错误处理
-class AttachToPinError extends Error {
-  constructor(message: string, public code: string, public context?: any) {
-    super(message);
-    this.name = 'AttachToPinError';
-  }
-}
-
-// 日志记录
-class Logger {
-  static debug(message: string, data?: any): void {
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`[AttachToPin] ${message}`, data);
-    }
-  }
-
-  static error(message: string, error?: Error): void {
-    console.error(`[AttachToPin] ${message}`, error);
-  }
-}
+```text
+DeviceSessionGet(session_id?)
+  -> 必要时 PassphraseRequest / PassphraseAck
+  -> DeviceSession(session_id, btc_test_address)
+  -> Core 缓存 session_id
+  -> 对外返回 btc_test_address 作为 passphraseState
 ```
 
-## 9. 技术总结与最佳实践
+缓存 session 无效时，Core 只在请求确实携带缓存 session 的情况下处理 `Failure_InvalidSession`：清理缓存，并使用空 session 重试一次。
 
-### 9.1 核心技术洞察
+## 6. 钱包身份安全检查
 
-**🎯 关键发现：**
+普通地址或签名方法携带 `passphraseState` 时，Core 会获取设备当前实际状态并比较：
 
-1. **安全芯片存储**: SE THD89 提供硬件级安全保护，确保绑定关系的安全性
-2. **多重 PIN 验证**: 主 PIN + 绑定 PIN 的双重验证机制，平衡安全性与易用性
-3. **会话状态管理**: 临时会话与持久状态的平衡，支持多设备场景
-4. **向后兼容**: 与传统密码短语模式的无缝兼容，保证用户体验连续性
-5. **事件驱动架构**: 基于 UI 事件的异步交互模式，提供灵活的集成方式
-
-### 9.2 SDK 集成最佳实践
-
-**架构设计原则：**
-
-1. **分层架构**: 将设备管理、会话管理、状态管理分离
-2. **错误边界**: 实现完善的错误处理和恢复机制
-3. **缓存策略**: 合理使用缓存减少不必要的设备通信
-4. **事件解耦**: 使用事件系统解耦 UI 与业务逻辑
-5. **性能优化**: 实现请求去重、批处理等优化策略
-
-**代码质量保证：**
-
-```typescript
-// 类型安全
-interface AttachToPinConfig {
-  maxRetries: number;
-  timeout: number;
-  cacheEnabled: boolean;
-  debugMode: boolean;
-}
-
-// 错误处理
-class AttachToPinError extends Error {
-  constructor(message: string, public code: string, public context?: any) {
-    super(message);
-    this.name = 'AttachToPinError';
-  }
-}
-
-// 日志记录
-class Logger {
-  static debug(message: string, data?: any): void {
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`[AttachToPin] ${message}`, data);
-    }
-  }
-
-  static error(message: string, error?: Error): void {
-    console.error(`[AttachToPin] ${message}`, error);
-  }
-}
+```text
+expected passphraseState
+  vs
+actual passphraseState from device
 ```
 
-### 8.3 兼容性矩阵
+下列情况必须停止业务调用：
 
-| 设备型号           | 固件版本 | Attach to PIN 支持 | GetPassphraseState API | 推荐使用场景 |
-| ------------------ | -------- | ------------------ | ---------------------- | ------------ |
-| **OneKey Pro**     | 4.15.0+  | ✅ 完全支持        | ✅ 原生支持            | 🌟 主要推荐  |
-| **OneKey Touch**   | 4.11.0+  | ✅ 完全支持        | ✅ 原生支持            | 🌟 主要推荐  |
-| **OneKey Classic** | 所有版本 | ❌ 不支持          | ✅ 地址模拟            | ⚠️ 传统模式  |
-| **OneKey Mini**    | 所有版本 | ❌ 不支持          | ✅ 地址模拟            | ⚠️ 传统模式  |
+1. 调用方请求标准钱包，但设备实际通过 Attach PIN 进入隐藏钱包。
+2. 调用方请求隐藏钱包 A，但 Attach PIN 解锁后设备返回隐藏钱包 B。
+3. 缓存 session 打开的实际钱包与调用方预期不一致。
 
-### 8.4 性能特征与优化
+当前处理会锁定设备、清理对应钱包 Session 缓存，并返回钱包状态校验错误。不能为了减少一次交互而跳过该检查。
 
-**关键性能指标：**
+## 7. Session 缓存边界
 
-| 操作           | 平均耗时 | 内存占用 | 存储空间   | 优化建议       |
-| -------------- | -------- | -------- | ---------- | -------------- |
-| **SDK 初始化** | 1-2 秒   | ~2MB     | 0          | 懒加载、预加载 |
-| **设备连接**   | 2-5 秒   | ~1MB     | 0          | 连接池、重用   |
-| **绑定创建**   | 2-3 秒   | ~1KB     | ~256B/绑定 | 批量操作       |
-| **状态获取**   | 500ms    | ~512B    | 0          | 缓存、去重     |
-| **地址获取**   | 1-2 秒   | ~256B    | 0          | 批量、并行     |
+内部 `DeviceWalletSessionStore` 使用：
 
-**性能优化策略：**
+```text
+deviceKey
+└─ passphraseState -> sessionId
+```
 
-1. **连接复用**: 避免频繁建立设备连接
-2. **智能缓存**: 缓存设备特性和状态信息
-3. **批量操作**: 合并相似的 API 调用
-4. **并行处理**: 并行执行独立的操作
-5. **懒加载**: 按需加载功能模块
+其中：
 
-### 8.5 未来发展方向
+- `deviceId` 表示 seed 身份，不等于物理序列号。
+- `passphraseState` 表示钱包上下文。
+- `sessionId` 是设备端 Session 句柄。
 
-**技术演进路线：**
+没有 `passphraseState` 时，SDK 不应任意扫描并复用某个隐藏钱包 session。设备断开、身份变化、`initSession=true`、状态校验失败或显式清理都会使相关缓存失效。
 
-1. **生物识别集成**: 指纹 + Attach to PIN 的组合认证
-2. **多设备同步**: 跨设备的绑定关系同步机制
-3. **智能合约集成**: 链上身份与 PIN 绑定的结合
-4. **量子安全**: 后量子密码学算法的预研与应用
-5. **AI 辅助**: 智能风险评估和安全建议
+CLI 的 `preloadSessionCache(deviceId, passphraseState, sessionId)` 只适用于 CLI 已经从自身安全存储恢复这三个值的场景。公开 `getPassphraseState()` 不会提供 session ID。
 
-**API 演进计划：**
+## 8. 创建和管理 Attach PIN
 
-- **v2.0**: 支持批量绑定操作
-- **v2.1**: 增加生物识别支持
-- **v3.0**: 量子安全算法升级
-- **v3.1**: 跨设备同步功能
+“使用已有 Attach PIN”与“创建、删除或覆盖 Attach PIN”是不同能力。
 
----
+- V1 存在 `GetPassphraseState.allow_create_attach_pin` 等历史语义。
+- 当前 V2 `DeviceSessionGet` 没有等价的创建字段。
+- 当前 V2 host 已支持选择已有 Attach PIN 用户。
+- 创建、删除、覆盖和列举 Attach PIN 仍需要独立的协议与产品交互定义。
 
-## 10. Pro2 解锁与 Attach-to-PIN 边界
+在 V2 协议明确之前，应用不应通过普通 `DeviceSettingsSet` 或自行拼接未定义字段尝试管理 Attach PIN。
 
-Pro2 / Protocol V2 将三个容易混淆的状态分开表达：
+## 9. 错误处理
 
-| 状态                        | 来源                     | 含义                             |
-| --------------------------- | ------------------------ | -------------------------------- |
-| `attach_to_pin_enabled`     | `DeviceStatus`           | 设备是否已经配置 Attach-to-PIN   |
-| `unlocked_by_attach_to_pin` | `DeviceStatus`           | 当前设备是否由 Attach PIN 解锁   |
-| `unlocked_attach_pin`       | `DeviceSessionPinResult` | 本次 PIN 解锁是否命中 Attach PIN |
+应用应按 SDK 返回的 `HardwareErrorCode` 和结构化错误处理，不要依赖英文错误文本，也不要自行定义一套并不存在于公共 API 的 `AttachToPinErrorCode`。
 
-Core 将相关结果归一化为 `features.unlockedAttachPin`。该字段只描述解锁来源，不能替代 `passphraseState` 对具体钱包身份的一致性校验。
+建议区分：
 
-Pro2 PIN 始终在设备端输入：SDK 调用 `DeviceSessionAskPin`，固件返回 `DeviceSessionPinResult`；成功后 SDK 再调用 `DeviceStatusGet` 刷新动态状态。该流程不会触发软件 PIN 输入事件。
+- 用户取消：结束当前流程并关闭 UI。
+- 设备锁定：仅由声明了 `retry-on-locked` 的 V2 方法自动解锁并重试一次。
+- Session 无效：由内部钱包 Session 流程清缓存后重试一次。
+- 钱包状态不匹配：锁设备并要求用户重新选择正确钱包，不自动重试签名。
+- Transport 断开：先重新连接和初始化，不复用无法验证的钱包状态。
 
-需要已解锁设备的 Protocol V2 方法可以声明 `unlockPolicy = 'retry-on-locked'`。只有首次错误被标准化为 `HardwareErrorCode.DeviceLocked` 时，Core 才执行一次 `device.unlockDevice()` 并重试原方法；第二次失败直接抛出，不循环解锁。
+## 10. 关键源码
 
-固件 `Failure_ProcessError` 且 `subcode=9` 会映射为 `DeviceLocked`。调用方不应通过错误文本判断锁定状态。
-
-**📚 相关文档：**
-
-- [SLIP39 技术详解](./slip39.md)
-- [设备架构说明](../../architecture/overview.md)
-- [传输层协议](../../protocol/transport.md)
-- [Passphrase 与钱包 Session](../session/pro-passphrase-session.md)
-- [SDK API 参考](https://developer.onekey.so/connect-to-hardware/hardware-sdk/api)
+- 公共 API 类型：`packages/core/src/types/api/getPassphraseState.ts`
+- API 实现：`packages/core/src/api/GetPassphraseState.ts`
+- V1/V2 状态获取：`packages/core/src/utils/deviceFeaturesUtils.ts`
+- Device 解锁与状态检查：`packages/core/src/device/Device.ts`
+- PIN/Passphrase 交互：`packages/core/src/device/DeviceCommands.ts`
+- V2 钱包 Session：`packages/core/src/protocols/protocol-v2/walletSession.ts`
+- Session 缓存：`packages/core/src/device/DeviceWalletSessionStore.ts`
+- V2 Session protobuf：`submodules/firmware-pro2/sys/protobuf/onekey_protocol/latest/messages_device_session.proto`
+- Passphrase 与 Session 深入说明：[Pro / Pro2 Passphrase 与钱包 Session](../session/pro-passphrase-session.md)

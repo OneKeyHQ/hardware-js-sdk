@@ -1,6 +1,5 @@
 /* eslint-disable no-undef */
 import transport, {
-  LogBlockCommand,
   PROTOCOL_V1_CHUNK_PAYLOAD_SIZE,
   PROTOCOL_V1_MESSAGE_HEADER_SIZE,
   PROTOCOL_V1_REPORT_ID,
@@ -13,6 +12,8 @@ import transport, {
 } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode, ONEKEY_WEBUSB_FILTER, wait } from '@onekeyfe/hd-shared';
 import ByteBuffer from 'bytebuffer';
+
+import { createTransportCallLog, shouldSuppressHighVolumeCallLog } from './transportLog';
 
 import type {
   AcquireInput,
@@ -33,22 +34,6 @@ const HEADER_LENGTH = PROTOCOL_V1_MESSAGE_HEADER_SIZE;
 const PACKET_IO_MAX_RETRIES = 3;
 const PACKET_IO_RETRY_DELAY = 300;
 const PROTOCOL_PROBE_TIMEOUT = 1000;
-const WEBUSB_FILE_WRITE_LOG_BLOCK_PATTERN = /(?:^|[^a-z])(?:raw)?(?:filesystem|emmc)?filewrite$/i;
-
-function shouldSuppressWebUsbCallLog(name: string) {
-  const normalized = name.replace(/[_\s-]/g, '');
-  return WEBUSB_FILE_WRITE_LOG_BLOCK_PATTERN.test(normalized);
-}
-
-function isLogBlockCommand(name: string) {
-  return (LogBlockCommand as Set<string> | undefined)?.has?.(name) ?? false;
-}
-
-function shouldBlockWebUsbCallDataLog(name: string) {
-  const normalized = name.replace(/[_\s-]/g, '');
-  return isLogBlockCommand(name) || WEBUSB_FILE_WRITE_LOG_BLOCK_PATTERN.test(normalized);
-}
-
 function inferProtocolHintFromDeviceName(name?: string | null): ProtocolType | undefined {
   return /\bpro\s*2\b/i.test(name ?? '') ? 'V2' : undefined;
 }
@@ -159,7 +144,6 @@ export default class WebUsbTransport {
     this.messagesV2 = parseConfigure(signedData);
     this.protocolV2Sessions.clear();
     this.protocolV2ReadTimeouts.clear();
-    this.Log?.debug('[WebUsbTransport] Protocol V2 schema configured');
   }
 
   /**
@@ -238,14 +222,6 @@ export default class WebUsbTransport {
       };
     });
 
-    // Debug: log all discovered devices. Protocol is detected after acquire via wire probe.
-    for (const dev of onekeyDevices) {
-      this.Log.debug(
-        `[WebUSB] Device: name="${dev.productName}" serial="${dev.serialNumber}" ` +
-          `VID=0x${dev.vendorId.toString(16)} PID=0x${dev.productId.toString(16)}`
-      );
-    }
-
     return this.deviceList;
   }
 
@@ -300,7 +276,6 @@ export default class WebUsbTransport {
     if (expectedProtocol === 'V1') {
       if (await this.probeProtocolV1(path)) {
         this.deviceProtocol.set(path, 'V1');
-        this.Log.debug(`[WebUsbTransport] detectProtocol: path=${path} -> V1 (expected)`);
         return 'V1';
       }
       throw this.createProtocolMismatchError(expectedProtocol);
@@ -310,7 +285,6 @@ export default class WebUsbTransport {
       // 免探测路径：调用方显式承诺该设备是 V2（例如固件升级重启后的重连场景，
       // 上层已经探测过协议并通过 expectedProtocol 传回），这里不再重复探测。
       this.deviceProtocol.set(path, 'V2');
-      this.Log.debug(`[WebUsbTransport] detectProtocol: path=${path} -> V2 (expected)`);
       return 'V2';
     }
 
@@ -325,7 +299,6 @@ export default class WebUsbTransport {
         protocol === 'V1' ? await this.probeProtocolV1(path) : await this.probeProtocolV2(path);
       if (detected) {
         this.deviceProtocol.set(path, protocol);
-        this.Log.debug(`[WebUsbTransport] detectProtocol: path=${path} -> ${protocol}`);
         return protocol;
       }
     }
@@ -414,13 +387,6 @@ export default class WebUsbTransport {
    */
   async connectToDevice(path: string, first: boolean) {
     let device: USBDevice = await this.findDevice(path);
-    this.Log.debug(
-      '[WebUsbTransport] connecting to device:',
-      device.productName,
-      'PID:',
-      device.productId
-    );
-
     if (!device.opened) {
       await device.open();
     }
@@ -676,13 +642,12 @@ export default class WebUsbTransport {
   }
 
   private async withProtocolReadTimeout<T>(
-    path: string,
+    _path: string,
     promise: Promise<T>,
     timeoutMs: number,
     protocol: ProtocolType,
     onTimeout?: () => void
   ): Promise<T> {
-    void path;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let timedOut = false;
     const waitForeverAfterTimeout = () => new Promise<never>(() => {});
@@ -699,7 +664,7 @@ export default class WebUsbTransport {
       return await Promise.race([
         guardedPromise,
         new Promise<never>((_, reject) => {
-          timer = setTimeout(async () => {
+          timer = setTimeout(() => {
             timedOut = true;
             onTimeout?.();
             reject(new Error(`Protocol ${protocol} read timeout after ${timeoutMs}ms`));
@@ -719,8 +684,7 @@ export default class WebUsbTransport {
     try {
       await this.callProtocolV1(path, 'Initialize', {}, { timeoutMs: PROTOCOL_PROBE_TIMEOUT });
       return true;
-    } catch (error) {
-      this.Log.debug('[WebUsbTransport] Protocol V1 Initialize probe failed:', error);
+    } catch (_error) {
       return false;
     }
   }
@@ -765,12 +729,8 @@ export default class WebUsbTransport {
       );
     }
 
-    if (shouldSuppressWebUsbCallLog(name)) {
-      // 高频文件写入不要逐包发 debug 事件，否则浏览器侧会被日志处理拖慢。
-    } else if (shouldBlockWebUsbCallDataLog(name)) {
-      this.Log.debug('call-', ' name: ', name, ' protocol: ', protocol);
-    } else {
-      this.Log.debug('call-', ' name: ', name, ' data: ', data, ' protocol: ', protocol);
+    if (!shouldSuppressHighVolumeCallLog(name)) {
+      this.Log.debug('transport call', createTransportCallLog(name, protocol));
     }
 
     if (protocol === 'V2') {

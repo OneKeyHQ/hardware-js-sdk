@@ -1,7 +1,6 @@
 import ByteBuffer from 'bytebuffer';
 import * as usb from 'usb';
 import transport, {
-  LogBlockCommand,
   PROTOCOL_V1_CHUNK_PAYLOAD_SIZE,
   PROTOCOL_V1_MESSAGE_HEADER_SIZE,
   PROTOCOL_V1_REPORT_ID,
@@ -12,6 +11,8 @@ import transport, {
   probeProtocolV2 as probeProtocolV2Helper,
 } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode, ONEKEY_WEBUSB_FILTER, wait } from '@onekeyfe/hd-shared';
+
+import { createTransportCallLog, shouldSuppressHighVolumeCallLog } from './transportLog';
 
 import type EventEmitter from 'events';
 import type {
@@ -244,7 +245,6 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
     this.invalidateAllProtocolV2UsbLinks('Protocol V2 schema reconfigured').catch(error =>
       this.Log?.debug('[NodeUsbTransport] schema link cleanup failed:', error)
     );
-    this.Log?.debug('[NodeUsbTransport] Protocol V2 schema configured');
   }
 
   listen() {
@@ -401,18 +401,8 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
         `Device protocol has not been detected for ${path}`
       );
     }
-    if (LogBlockCommand.has(name)) {
-      this.Log?.debug('NodeUsbTransport call-', ' name: ', name, ' protocol: ', protocol);
-    } else {
-      this.Log?.debug(
-        'NodeUsbTransport call-',
-        ' name: ',
-        name,
-        ' data: ',
-        data,
-        ' protocol: ',
-        protocol
-      );
+    if (!shouldSuppressHighVolumeCallLog(name)) {
+      this.Log?.debug('transport call', createTransportCallLog(name, protocol));
     }
 
     if (protocol === 'V2') {
@@ -449,7 +439,6 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
   }
 
   cancel() {
-    this.Log?.debug('NodeUsbTransport cancel');
     this.cancelled = true;
   }
 
@@ -757,7 +746,6 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
     if (expectedProtocol === 'V1') {
       if (await this.probeProtocolV1(path)) {
         this.deviceProtocol.set(path, 'V1');
-        this.Log?.debug(`[NodeUsbTransport] detectProtocol: path=${path} -> V1 (expected)`);
         return 'V1';
       }
       throw this.createProtocolMismatchError(expectedProtocol);
@@ -766,7 +754,6 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
     if (expectedProtocol === 'V2') {
       if (await this.probeProtocolV2(path)) {
         this.deviceProtocol.set(path, 'V2');
-        this.Log?.debug(`[NodeUsbTransport] detectProtocol: path=${path} -> V2 (expected)`);
         return 'V2';
       }
       throw this.createProtocolMismatchError(expectedProtocol);
@@ -774,19 +761,16 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
 
     if (this.deviceProtocol.get(path) === 'V2' && (await this.probeProtocolV2(path))) {
       this.deviceProtocol.set(path, 'V2');
-      this.Log?.debug(`[NodeUsbTransport] detectProtocol: path=${path} -> V2 (cached)`);
       return 'V2';
     }
 
     if (await this.probeProtocolV1(path)) {
       this.deviceProtocol.set(path, 'V1');
-      this.Log?.debug(`[NodeUsbTransport] detectProtocol: path=${path} -> V1`);
       return 'V1';
     }
 
     if (await this.probeProtocolV2(path)) {
       this.deviceProtocol.set(path, 'V2');
-      this.Log?.debug(`[NodeUsbTransport] detectProtocol: path=${path} -> V2`);
       return 'V2';
     }
 
@@ -857,8 +841,7 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
     try {
       await this.callProtocolV1(path, 'Initialize', {}, { timeoutMs: PROTOCOL_PROBE_TIMEOUT });
       return true;
-    } catch (error) {
-      this.Log?.debug('[NodeUsbTransport] Protocol V1 Initialize probe failed:', error);
+    } catch (_error) {
       return false;
     }
   }

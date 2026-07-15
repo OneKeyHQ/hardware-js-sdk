@@ -91,6 +91,7 @@ export type DeviceFeaturesProtocol = 'V1' | 'V2' | 'unknown';
 export type DeviceFeaturesMode =
   | 'normal'
   | 'bootloader'
+  | 'romloader'
   | 'notInitialized'
   | 'backupMode'
   | 'unknown';

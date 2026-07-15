@@ -39,6 +39,7 @@ const createPeripheral = (id: string) => {
       connect: jest.fn(callback => callback()),
       disconnect: jest.fn(callback => callback()),
     },
+    write,
     notify,
   };
 };
@@ -109,5 +110,34 @@ describe('Noble BLE plugin notification routing', () => {
     ]);
 
     expect(result).toBe('completed');
+  });
+
+  test('uses withoutResponse for normal and high-volume writes', async () => {
+    const device = createPeripheral('device-a');
+    const noble = new EventEmitter() as EventEmitter & {
+      state: string;
+      startScanning: jest.Mock;
+      stopScanning: jest.Mock;
+    };
+    noble.state = 'poweredOn';
+    noble.startScanning = jest.fn((_services, _duplicates, callback) => {
+      callback?.();
+      noble.emit('discover', device.peripheral);
+    });
+    noble.stopScanning = jest.fn(callback => callback?.());
+    jest.doMock('@stoprocent/noble', () => noble);
+
+    const { createNobleBlePlugin } = await import('../transports/nobleBlePlugin');
+    const plugin = createNobleBlePlugin();
+    await plugin.init();
+    await plugin.connect('device-a');
+
+    await plugin.send('device-a', 'aa');
+    await plugin.send('device-a', 'bb');
+
+    expect(device.write.write.mock.calls.map(([, withoutResponse]) => withoutResponse)).toEqual([
+      true,
+      true,
+    ]);
   });
 });

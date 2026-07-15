@@ -392,7 +392,7 @@ describe('Protocol V2 framing and session', () => {
     });
   });
 
-  test('session accepts response frames with a device-owned seq', async () => {
+  test('session accepts response frames with a device-owned seq without logging frame details', async () => {
     const response = ProtocolV2.encodeFrame(schemas, 'ProtocolInfo', {
       version: 2,
       supported_messages: [],
@@ -416,10 +416,10 @@ describe('Protocol V2 framing and session', () => {
         protobuf_definition: null,
       },
     });
-    expect(logger.debug).toHaveBeenCalledWith(expect.stringContaining('seq differs'));
+    expect(logger.debug).not.toHaveBeenCalled();
   });
 
-  test('session logs decoded transmit and receive payloads', async () => {
+  test('session does not log transmit or receive payload details', async () => {
     const response = ProtocolV2.encodeFrame(schemas, 'Success', {
       message: 'accepted',
     });
@@ -442,30 +442,7 @@ describe('Protocol V2 framing and session', () => {
       },
     });
 
-    expect(logger.debug).toHaveBeenCalledWith('[ProtocolV2 Test] TX payload name=Ping', {
-      message: 'hello',
-    });
-    expect(logger.debug).toHaveBeenCalledWith(
-      '[ProtocolV2 Test] encode raw frame',
-      expect.objectContaining({
-        context: 'tx:Ping',
-        messageTypeId: 60206,
-        router: 1,
-      })
-    );
-    expect(logger.debug).toHaveBeenCalledWith(
-      '[ProtocolV2 Test] decode raw frame',
-      expect.objectContaining({
-        context: 'rx:Ping',
-        messageTypeId: 60207,
-      })
-    );
-    expect(logger.debug).toHaveBeenCalledWith(
-      '[ProtocolV2 Test] RX payload type=Success messageTypeId=60207',
-      {
-        message: 'accepted',
-      }
-    );
+    expect(logger.debug).not.toHaveBeenCalled();
   });
 
   test('session suppresses debug logs for file transfer calls', async () => {

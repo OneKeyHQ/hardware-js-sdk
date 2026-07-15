@@ -17,62 +17,63 @@ import { useToast } from '../hooks/use-toast';
 import { useDeviceStore } from '../store/deviceStore';
 import { isPro2DeviceInfo } from '../utils/pro2Device';
 import type { DeviceInfo } from '../types/hardware';
+import { PRO2_FIRMWARE_FILE_ACCEPT } from '../constants/firmwareFiles';
 
 const TARGET_FIELDS = [
   {
     param: 'bootloaderBinary',
     label: 'Bootloader',
     targetId: DeviceFirmwareTargetType.FW_MGMT_TARGET_BOOTLOADER,
-    accept: '.okpkg,.bin',
+    accept: PRO2_FIRMWARE_FILE_ACCEPT,
     formatHint: 'signed OKPP .okpkg',
   },
   {
     param: 'applicationP1Binary',
     label: 'APP P1',
     targetId: DeviceFirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P1,
-    accept: '.okpkg,.bin',
+    accept: PRO2_FIRMWARE_FILE_ACCEPT,
     formatHint: 'signed OKPP .okpkg',
   },
   {
     param: 'applicationP2Binary',
     label: 'APP P2',
     targetId: DeviceFirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P2,
-    accept: '.okpkg,.bin',
+    accept: PRO2_FIRMWARE_FILE_ACCEPT,
     formatHint: 'signed OKPP .okpkg',
   },
   {
     param: 'coprocessorBinary',
     label: 'Coprocessor',
     targetId: DeviceFirmwareTargetType.FW_MGMT_TARGET_COPROCESSOR,
-    accept: '.okpkg,.bin',
+    accept: PRO2_FIRMWARE_FILE_ACCEPT,
     formatHint: 'signed target package',
   },
   {
     param: 'se01Binary',
     label: 'SE01',
     targetId: DeviceFirmwareTargetType.FW_MGMT_TARGET_SE01,
-    accept: '.okpkg,.bin',
+    accept: PRO2_FIRMWARE_FILE_ACCEPT,
     formatHint: 'signed target package',
   },
   {
     param: 'se02Binary',
     label: 'SE02',
     targetId: DeviceFirmwareTargetType.FW_MGMT_TARGET_SE02,
-    accept: '.okpkg,.bin',
+    accept: PRO2_FIRMWARE_FILE_ACCEPT,
     formatHint: 'signed target package',
   },
   {
     param: 'se03Binary',
     label: 'SE03',
     targetId: DeviceFirmwareTargetType.FW_MGMT_TARGET_SE03,
-    accept: '.okpkg,.bin',
+    accept: PRO2_FIRMWARE_FILE_ACCEPT,
     formatHint: 'signed target package',
   },
   {
     param: 'se04Binary',
     label: 'SE04',
     targetId: DeviceFirmwareTargetType.FW_MGMT_TARGET_SE04,
-    accept: '.okpkg,.bin',
+    accept: PRO2_FIRMWARE_FILE_ACCEPT,
     formatHint: 'signed target package',
   },
 ] as const;

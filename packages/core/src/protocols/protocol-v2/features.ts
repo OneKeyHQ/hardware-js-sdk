@@ -50,8 +50,26 @@ export const getProtocolV2SeState = (se?: DeviceSEInfo): ProtocolV2SeStateLabel 
 export const getProtocolV2SeType = (se?: DeviceSEInfo): string | null =>
   normalizeEnumValue(DeviceSeType, se?.type);
 
+/**
+ * 兼容尚未提供显式 runtime mode 的 Protocol V2 固件。
+ *
+ * 当前 romloader 只上报 hw、fw.romloader 和 fw.bootloader；bootloader
+ * 还会上报 application/application_data、coprocessor 或 SE 信息。
+ */
+export const isProtocolV2RomloaderDeviceInfo = (deviceInfo?: ProtocolV2DeviceInfo | null) =>
+  !!deviceInfo &&
+  deviceInfo.status == null &&
+  deviceInfo.fw?.romloader != null &&
+  deviceInfo.fw?.application == null &&
+  deviceInfo.fw?.application_data == null &&
+  deviceInfo.coprocessor == null &&
+  deviceInfo.se1 == null &&
+  deviceInfo.se2 == null &&
+  deviceInfo.se3 == null &&
+  deviceInfo.se4 == null;
+
 export const isProtocolV2BootloaderDeviceInfo = (deviceInfo?: ProtocolV2DeviceInfo | null) =>
-  !!deviceInfo && deviceInfo.status == null;
+  !!deviceInfo && deviceInfo.status == null && !isProtocolV2RomloaderDeviceInfo(deviceInfo);
 
 export const PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST = {
   targets: {

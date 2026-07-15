@@ -16,7 +16,7 @@
 
 ## 可读取设置
 
-当前 `DeviceSettings` 包含设备名称、蓝牙、语言、壁纸路径、亮度、自动锁定、自动关机、动画、抬起唤醒、震动、设备名展示、FIDO、实验功能、USB 锁定、随机键盘，以及 passphrase 和 airgap 状态。
+当前 `DeviceSettings` 包含设备名称、蓝牙、语言、壁纸路径、亮度、自动锁定、自动关机、动画、轻触唤醒、震动、设备名展示、FIDO、实验功能、USB 锁定、随机键盘，以及 passphrase 和 airgap 状态。
 
 具体字段以当前 Protocol V2 protobuf 和生成的 TypeScript 类型为准，应用不应假设旧固件一定返回所有字段。
 

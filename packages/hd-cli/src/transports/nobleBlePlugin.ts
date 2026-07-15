@@ -379,9 +379,13 @@ function subscribeNotifications(
     });
 }
 
-function writeCharacteristic(characteristic: Characteristic, buffer: Buffer) {
+function writeCharacteristic(
+  characteristic: Characteristic,
+  buffer: Buffer,
+  withoutResponse: boolean
+) {
   return new Promise<void>((resolve, reject) => {
-    characteristic.write(buffer, true, (error?: Error) => {
+    characteristic.write(buffer, withoutResponse, (error?: Error) => {
       if (error) {
         reject(error);
         return;
@@ -463,7 +467,7 @@ export function createNobleBlePlugin(): LowlevelTransportSharedPlugin {
       const buffer = Buffer.from(data, 'hex');
       for (let offset = 0; offset < buffer.length; offset += BLE_PACKET_SIZE) {
         const chunk = buffer.subarray(offset, Math.min(offset + BLE_PACKET_SIZE, buffer.length));
-        await writeCharacteristic(characteristics.write, chunk);
+        await writeCharacteristic(characteristics.write, chunk, true);
         if (offset + BLE_PACKET_SIZE < buffer.length) {
           await wait(BLE_WRITE_DELAY);
         }

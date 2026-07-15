@@ -23,11 +23,7 @@ import transport, {
 import { ERRORS, HardwareErrorCode, createDeferred, isOnekeyDevice } from '@onekeyfe/hd-shared';
 
 import { getConnectedDeviceIds, onDeviceBondState, pairDevice } from './BleManager';
-import {
-  hasWritableCapability,
-  resolveBleWriteMode,
-  resolveProtocolV2PacketCapacity,
-} from './bleStrategy';
+import { hasWritableCapability, resolveProtocolV2PacketCapacity } from './bleStrategy';
 import { subscribeBleOn } from './subscribeBleOn';
 import {
   ANDROID_PACKET_LENGTH,
@@ -41,6 +37,7 @@ import { isHeaderChunk } from './utils/validateNotify';
 import BleTransport from './BleTransport';
 import timer from './utils/timer';
 import { bleLogger, setBleLogger } from './logger';
+import { createTransportCallLog } from './transportLog';
 
 import type { Deferred } from '@onekeyfe/hd-shared';
 import type { Characteristic, Device, Subscription } from 'react-native-ble-plx';
@@ -112,17 +109,9 @@ const PROTOCOL_V2_PROBE_TIMEOUT_MS = 10_000;
 const DEVICE_SCAN_TIMEOUT_MS = 8000;
 const IOS_NOTIFY_READY_DELAY_MS = 150;
 const ANDROID_NOTIFY_READY_DELAY_MS = 300;
-const HIGH_VOLUME_WRITE_BURST_SIZE = Platform.OS === 'ios' ? 4 : 6;
-const HIGH_VOLUME_WRITE_PAUSE_MS = Platform.OS === 'ios' ? 6 : 2;
-const HIGH_VOLUME_WRITE_FLUSH_DELAY_MS = Platform.OS === 'ios' ? 20 : 8;
-
 export type ProtocolV2BleTuning = {
   iosPacketLength?: number;
   androidPacketLength?: number;
-  highVolumeWriteBurstSize?: number;
-  highVolumeWritePauseMs?: number;
-  highVolumeWriteFlushDelayMs?: number;
-  highVolumeWriteWithResponse?: boolean;
 };
 
 type ResolvedProtocolV2BleTuning = Required<ProtocolV2BleTuning>;
@@ -130,10 +119,6 @@ type ResolvedProtocolV2BleTuning = Required<ProtocolV2BleTuning>;
 const DEFAULT_PROTOCOL_V2_BLE_TUNING: ResolvedProtocolV2BleTuning = {
   iosPacketLength: IOS_PACKET_LENGTH,
   androidPacketLength: ANDROID_PACKET_LENGTH,
-  highVolumeWriteBurstSize: HIGH_VOLUME_WRITE_BURST_SIZE,
-  highVolumeWritePauseMs: HIGH_VOLUME_WRITE_PAUSE_MS,
-  highVolumeWriteFlushDelayMs: HIGH_VOLUME_WRITE_FLUSH_DELAY_MS,
-  highVolumeWriteWithResponse: false,
 };
 
 let protocolV2BleTuning: ResolvedProtocolV2BleTuning = { ...DEFAULT_PROTOCOL_V2_BLE_TUNING };
@@ -154,27 +139,13 @@ export function configureProtocolV2BleTuning(tuning: ProtocolV2BleTuning = {}) {
       tuning.androidPacketLength,
       protocolV2BleTuning.androidPacketLength
     ),
-    highVolumeWriteBurstSize: normalizePositiveInteger(
-      tuning.highVolumeWriteBurstSize,
-      protocolV2BleTuning.highVolumeWriteBurstSize
-    ),
-    highVolumeWritePauseMs: normalizePositiveInteger(
-      tuning.highVolumeWritePauseMs,
-      protocolV2BleTuning.highVolumeWritePauseMs
-    ),
-    highVolumeWriteFlushDelayMs: normalizePositiveInteger(
-      tuning.highVolumeWriteFlushDelayMs,
-      protocolV2BleTuning.highVolumeWriteFlushDelayMs
-    ),
-    highVolumeWriteWithResponse:
-      tuning.highVolumeWriteWithResponse ?? protocolV2BleTuning.highVolumeWriteWithResponse,
   };
-  Log?.debug('[ReactNativeBleTransport] Protocol V2 BLE tuning configured:', protocolV2BleTuning);
+  Log?.debug('[ReactNativeBleTransport] BLE tuning configured', protocolV2BleTuning);
 }
 
 export function resetProtocolV2BleTuning() {
   protocolV2BleTuning = { ...DEFAULT_PROTOCOL_V2_BLE_TUNING };
-  Log?.debug('[ReactNativeBleTransport] Protocol V2 BLE tuning reset:', protocolV2BleTuning);
+  Log?.debug('[ReactNativeBleTransport] BLE tuning reset', protocolV2BleTuning);
 }
 
 export function getProtocolV2BleTuning() {
@@ -223,9 +194,10 @@ const requestAndroidMtu = async (device: Device) => {
 
   try {
     const mtuDevice = await device.requestMTU(ANDROID_REQUEST_MTU);
-    Log?.debug('[ReactNativeBleTransport] Android MTU requested:', {
+    Log?.debug('[ReactNativeBleTransport] MTU configured', {
+      deviceId: device.id,
       requested: ANDROID_REQUEST_MTU,
-      mtu: mtuDevice.mtu,
+      actual: mtuDevice.mtu,
     });
     return mtuDevice;
   } catch (error) {
@@ -343,7 +315,6 @@ export default class ReactNativeBleTransport {
     this.protocolV2Links
       .invalidateAllLinks('Protocol V2 schema reconfigured')
       .catch(error => Log?.debug('Protocol V2 schema link cleanup failed:', error));
-    Log?.debug('[ReactNativeBleTransport] Protocol V2 schema configured');
   }
 
   listen() {
@@ -581,7 +552,6 @@ export default class ReactNativeBleTransport {
         },
         (error, device) => {
           if (error) {
-            Log?.debug('ble scan manager: ', blePlxManager);
             Log?.debug('ble scan error: ', error);
             if (
               [BleErrorCode.BluetoothPoweredOff, BleErrorCode.BluetoothInUnknownState].includes(
@@ -609,29 +579,8 @@ export default class ReactNativeBleTransport {
             isOnekeyDevice(device?.name ?? null, device?.id) ||
             isOnekeyDevice(device?.localName ?? null, device?.id) ||
             hasKnownOneKeyService(device);
-          const shouldTraceCandidate =
-            !!displayName && /onekey|bixinkey|pro\s*2|pro\b|touch|^k\d|^t\d/i.test(displayName);
-
-          if (shouldTraceCandidate) {
-            Log?.debug('[ReactNativeBleTransport] scan candidate', {
-              name: device?.name,
-              localName: device?.localName,
-              id: device?.id,
-              serviceUUIDs: device?.serviceUUIDs,
-              accepted: isOneKey,
-            });
-          }
-
           if (isOneKey) {
-            Log?.debug('search device start ======================');
-            const { name, localName, id, serviceUUIDs } = device ?? {};
-            Log?.debug(
-              `device name: ${name ?? ''}\nlocalName: ${localName ?? ''}\nid: ${
-                id ?? ''
-              }\nserviceUUIDs: ${(serviceUUIDs ?? []).join(',')}`
-            );
             addDevice(device as unknown as Device);
-            Log?.debug('search device end ======================\n');
           } else if (displayName && /\bpro\s*2\b/i.test(displayName)) {
             Log?.debug('[ReactNativeBleTransport] Pro2-like BLE device was not accepted:', {
               name: device?.name,
@@ -645,7 +594,6 @@ export default class ReactNativeBleTransport {
 
       getConnectedDeviceIds(getBluetoothServiceUuids()).then(devices => {
         for (const device of devices) {
-          Log?.debug('search connected peripheral: ', device.id);
           addDevice(device as unknown as Device);
         }
       });
@@ -662,6 +610,12 @@ export default class ReactNativeBleTransport {
             name: displayName,
             commType: 'ble',
           } as IOneKeyDevice);
+          Log?.debug('[ReactNativeBleTransport] OneKey BLE device discovered', {
+            deviceId: device.id,
+            name: displayName,
+            serviceUUIDs: device.serviceUUIDs,
+            protocolHint,
+          });
         }
       };
 
@@ -1075,33 +1029,13 @@ export default class ReactNativeBleTransport {
         `Device protocol has not been detected for ${uuid}`
       );
     }
-    // Upload resources on low-end phones may OOM
-    if (name === 'ResourceUpdate' || name === 'ResourceAck') {
-      Log?.debug('transport-react-native', 'call-', ' name: ', name, ' data: ', {
-        file_name: data?.file_name,
-        hash: data?.hash,
-      });
-    } else if (LogBlockCommand.has(name)) {
-      Log?.debug('transport-react-native', 'call-', ' name: ', name, ' protocol: ', protocol);
-    } else {
-      Log?.debug(
-        'transport-react-native',
-        'call-',
-        ' name: ',
-        name,
-        ' data: ',
-        data,
-        ' protocol: ',
-        protocol
-      );
-    }
+    Log?.debug('transport call', createTransportCallLog(name, protocol, data));
 
     if (protocol === 'V2') {
       return this.callProtocolV2(uuid, name, data, options);
     }
 
     const forceRun = name === 'Initialize' || name === 'Cancel';
-    Log?.debug('transport-react-native call this.runPromise', this.runPromise);
     if (this.runPromise && !forceRun) {
       throw ERRORS.TypedError(HardwareErrorCode.TransportCallInProgress);
     }
@@ -1199,14 +1133,13 @@ export default class ReactNativeBleTransport {
         }
       );
     } else if (name === 'FirmwareUpload') {
-      Log?.debug('[ReactNativeBleTransport] FirmwareUpload write uses throttled BLE packets:', {
+      Log?.debug('[ReactNativeBleTransport] Firmware upload transport configured', {
         packetCapacity: FIRMWARE_UPLOAD_WRITE_PACKET_CAPACITY,
         burstSize: FIRMWARE_UPLOAD_WRITE_BURST_SIZE,
         pauseMs: FIRMWARE_UPLOAD_WRITE_PAUSE_MS,
         flushDelayMs: FIRMWARE_UPLOAD_WRITE_FLUSH_DELAY_MS,
         maxRetries: FIRMWARE_UPLOAD_WRITE_MAX_RETRIES,
       });
-
       await writeFirmwareUploadChunkedData(
         buffers,
         async data => {
@@ -1260,7 +1193,6 @@ export default class ReactNativeBleTransport {
       for (const o of buffers) {
         const outData = o.toString('base64');
         // Upload resources on low-end phones may OOM
-        // this.Log.debug('send hex strting: ', o.toString('hex'));
         try {
           await transport.writeCharacteristic.writeWithoutResponse(outData);
         } catch (e) {
@@ -1298,7 +1230,6 @@ export default class ReactNativeBleTransport {
         throw new Error('Returning data is not string.');
       }
 
-      Log?.debug('receive data: ', response);
       const jsonData = ProtocolV1.decodeMessage(messages, response);
       return check.call(jsonData);
     } catch (e) {
@@ -1321,7 +1252,6 @@ export default class ReactNativeBleTransport {
   }
 
   async disconnect(session: string) {
-    Log?.debug('transport-react-native transport resetSession: ', session);
     await this.protocolV2Links.invalidateLink(session, 'React Native BLE transport disconnected');
     const transport = transportCache[session];
 
@@ -1443,7 +1373,11 @@ export default class ReactNativeBleTransport {
     if (expectedProtocol === 'V1') {
       if (await this.probeProtocolV1(uuid)) {
         this.deviceProtocol.set(uuid, 'V1');
-        Log?.debug(`[ReactNativeBleTransport] detectProtocol: uuid=${uuid} -> V1 (expected)`);
+        Log?.debug('[ReactNativeBleTransport] protocol detected', {
+          deviceId: uuid,
+          protocol: 'V1',
+          source: 'expected',
+        });
         return 'V1';
       }
       throw this.createProtocolMismatchError(expectedProtocol);
@@ -1453,7 +1387,11 @@ export default class ReactNativeBleTransport {
       // 免探测路径：调用方显式承诺该设备是 V2（例如固件升级重启后的重连场景，
       // 上层已经探测过协议并通过 expectedProtocol 传回），这里不再重复探测。
       this.deviceProtocol.set(uuid, 'V2');
-      Log?.debug(`[ReactNativeBleTransport] detectProtocol: uuid=${uuid} -> V2 (expected)`);
+      Log?.debug('[ReactNativeBleTransport] protocol detected', {
+        deviceId: uuid,
+        protocol: 'V2',
+        source: 'expected',
+      });
       return 'V2';
     }
 
@@ -1473,7 +1411,11 @@ export default class ReactNativeBleTransport {
         protocol === 'V1' ? await this.probeProtocolV1(uuid) : await this.probeProtocolV2(uuid);
       if (detected) {
         this.deviceProtocol.set(uuid, protocol);
-        Log?.debug(`[ReactNativeBleTransport] detectProtocol: uuid=${uuid} -> ${protocol}`);
+        Log?.debug('[ReactNativeBleTransport] protocol detected', {
+          deviceId: uuid,
+          protocol,
+          source: 'probe',
+        });
         return protocol;
       }
     }
@@ -1659,11 +1601,7 @@ export default class ReactNativeBleTransport {
     }
   }
 
-  private async writeProtocolV2Frame(
-    transport: BleTransport,
-    frame: Uint8Array,
-    options?: { highVolume?: boolean; writeWithResponse?: boolean }
-  ) {
+  private async writeProtocolV2Frame(transport: BleTransport, frame: Uint8Array) {
     const tuning = getProtocolV2BleTuning();
     const packetCapacity = resolveProtocolV2PacketCapacity({
       platform: Platform.OS,
@@ -1671,36 +1609,10 @@ export default class ReactNativeBleTransport {
       androidPacketLength: tuning.androidPacketLength,
       mtu: Platform.OS === 'android' ? transport.mtuSize : undefined,
     });
-    const writeWithResponse =
-      !!options?.writeWithResponse || (!!options?.highVolume && tuning.highVolumeWriteWithResponse);
-    const writeMode = resolveBleWriteMode(
-      transport.writeCharacteristic,
-      writeWithResponse ? 'withResponse' : 'withoutResponse'
-    );
-    const shouldThrottle = !!options?.highVolume && writeMode === 'withoutResponse';
-    let packetsWritten = 0;
-
     for (let offset = 0; offset < frame.length; offset += packetCapacity) {
       const chunk = frame.slice(offset, offset + packetCapacity);
       const base64 = Buffer.from(chunk).toString('base64');
-      if (writeMode === 'withResponse') {
-        await transport.writeCharacteristic.writeWithResponse(base64);
-      } else {
-        await transport.writeCharacteristic.writeWithoutResponse(base64);
-      }
-      packetsWritten += 1;
-
-      if (
-        shouldThrottle &&
-        packetsWritten % tuning.highVolumeWriteBurstSize === 0 &&
-        offset + packetCapacity < frame.length
-      ) {
-        await delay(tuning.highVolumeWritePauseMs);
-      }
-    }
-
-    if (shouldThrottle) {
-      await delay(tuning.highVolumeWriteFlushDelayMs);
+      await transport.writeCharacteristic.writeWithoutResponse(base64);
     }
   }
 
@@ -1722,18 +1634,11 @@ export default class ReactNativeBleTransport {
 
     if (highVolumeWrite) {
       const tuning = getProtocolV2BleTuning();
-      Log?.debug(
-        '[ReactNativeBleTransport] Protocol V2 high-volume write uses throttled writeWithoutResponse:',
+      Log?.debug('[ReactNativeBleTransport] Protocol V2 high-volume write configured', {
         name,
-        {
-          packetCapacity:
-            Platform.OS === 'ios' ? tuning.iosPacketLength : tuning.androidPacketLength,
-          burstSize: tuning.highVolumeWriteBurstSize,
-          pauseMs: tuning.highVolumeWritePauseMs,
-          flushDelayMs: tuning.highVolumeWriteFlushDelayMs,
-          writeWithResponse: tuning.highVolumeWriteWithResponse,
-        }
-      );
+        writeMode: 'withoutResponse',
+        packetCapacity: Platform.OS === 'ios' ? tuning.iosPacketLength : tuning.androidPacketLength,
+      });
     }
 
     try {
@@ -1767,12 +1672,10 @@ export default class ReactNativeBleTransport {
         this.protocolV2Assemblers.get(uuid)?.reset();
         this.resetProtocolV2Frames(uuid);
       },
-      writeFrame: async (frame: Uint8Array, context: { highVolume: boolean }) => {
+      writeFrame: async (frame: Uint8Array) => {
         assertCurrentGeneration();
         const currentTransport = this.getCachedTransport(uuid);
-        await this.writeProtocolV2Frame(currentTransport, frame, {
-          highVolume: context.highVolume,
-        });
+        await this.writeProtocolV2Frame(currentTransport, frame);
       },
       readFrame: async () => {
         assertCurrentGeneration();

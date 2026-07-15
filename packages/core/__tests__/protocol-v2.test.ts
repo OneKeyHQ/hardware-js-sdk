@@ -93,7 +93,8 @@ describe('DeviceUploadWallpaper', () => {
     const typedCall = jest.fn().mockImplementation((request, _response, params) => {
       if (request === 'FilesystemDirMake') return { message: { message: 'directory ready' } };
       if (request === 'FilesystemFileWrite') {
-        return { message: { processed_byte: params.file.offset + params.file.data.byteLength } };
+        const file = params.file as { data: Uint8Array; offset: number };
+        return { message: { processed_byte: file.offset + file.data.byteLength } };
       }
       if (request === 'DeviceSettingsSet') {
         return { message: { message: 'wallpaper applied' } };
@@ -111,12 +112,9 @@ describe('DeviceUploadWallpaper', () => {
 
     expect(method.requireProtocolV2).toBe(true);
     expect(method.unlockPolicy).toBe('retry-on-locked');
-    expect(typedCall).toHaveBeenNthCalledWith(
-      1,
-      'FilesystemDirMake',
-      'Success',
-      { path: 'vol0:/wallpapers/user' }
-    );
+    expect(typedCall).toHaveBeenNthCalledWith(1, 'FilesystemDirMake', 'Success', {
+      path: 'vol0:/wallpapers/user',
+    });
     const fileWriteCall = typedCall.mock.calls.find(call => call[0] === 'FilesystemFileWrite');
     expect(fileWriteCall?.[2]).toMatchObject({
       file: { path: expect.stringMatching(/^vol0:\/wallpapers\/user\/wallpaper-[a-f0-9]+\.bin$/) },
@@ -152,7 +150,7 @@ describe('DeviceUploadWallpaper', () => {
     expect(typedCall.mock.calls.some(call => call[0] === 'DeviceSettingsSet')).toBe(false);
   });
 
-  test('rejects unsafe filenames before device communication', async () => {
+  test('rejects unsafe filenames before device communication', () => {
     const method = new DeviceUploadWallpaper({
       id: 1,
       payload: {
@@ -233,9 +231,9 @@ describe('UploadPortfolio', () => {
   test('stops after the acknowledged chunk when the operation is aborted', async () => {
     const packageBytes = new Uint8Array(4001);
     const abortController = new AbortController();
-    const typedCall = jest.fn().mockImplementationOnce(async () => {
+    const typedCall = jest.fn().mockImplementationOnce(() => {
       abortController.abort();
-      return { message: { processed_byte: 2048 } };
+      return Promise.resolve({ message: { processed_byte: 2048 } });
     });
     const method = new UploadPortfolio({
       id: 1,
@@ -329,9 +327,15 @@ describe('Protocol V2 feature adapter', () => {
         serial_no: 'PR2SERIAL',
       },
       fw: {
-        application_data: {
+        romloader: {
           version: '0.1.0',
+          build_id: 'rom-build',
           hash: [1, 2, 255],
+        },
+        application_data: {
+          version: '9.8.7',
+          build_id: 'app-data-build',
+          hash: [9, 8, 7],
         },
         bootloader: {
           version: '0.2.0',
@@ -387,6 +391,8 @@ describe('Protocol V2 feature adapter', () => {
     expect(features.bootloaderVersion).toBe('0.2.0');
     expect(features.verify?.bootloaderBuildId).toBe('boot-build');
     expect(features.verify?.bootloaderHash).toBe('0a0b');
+    expect(features.boardVersion).toBe('0.1.0');
+    expect(features.verify?.boardBuildId).toBe('rom-build');
     expect(features.verify?.boardHash).toBe('0102ff');
     expect(features.bleName).toBe('Pro2 BLE');
     expect(features.bleVersion).toBe('4.5.6');
@@ -424,6 +430,32 @@ describe('Protocol V2 feature adapter', () => {
     expect(features.initialized).toBeNull();
     expect(profile.status.mode).toBe('bootloader');
     expect(profile.status.bootloaderMode).toBe(true);
+  });
+
+  test('marks current romloader-shaped Protocol V2 DeviceInfo as romloader mode', () => {
+    const deviceInfo = {
+      protocol_version: 1,
+      hw: {
+        serial_no: 'PR2ROM',
+      },
+      fw: {
+        romloader: {
+          version: '1.0.0',
+        },
+        bootloader: {
+          version: '2.0.0',
+        },
+      },
+    };
+    const features = normalizeProtocolV2Features(descriptor as any, deviceInfo);
+    const profile = buildProfileFromProtocolV2({ deviceInfo });
+
+    expect(features.mode).toBe('romloader');
+    expect(features.bootloaderMode).toBe(false);
+    expect(features.boardVersion).toBe('1.0.0');
+    expect(profile.status.mode).toBe('romloader');
+    expect(profile.status.bootloaderMode).toBe(false);
+    expect(profile.versions.board).toBe('1.0.0');
   });
 
   test('uses DeviceSessionGet for Protocol V2 passphrase sessions', async () => {
@@ -507,11 +539,7 @@ describe('Protocol V2 feature adapter', () => {
       status_code: 3,
       detail_code: 4,
     });
-    expect(typedCall).toHaveBeenCalledWith(
-      'DevGetOnboardingStatus',
-      'DevOnboardingStatus',
-      {}
-    );
+    expect(typedCall).toHaveBeenCalledWith('DevGetOnboardingStatus', 'DevOnboardingStatus', {});
     expect(method.requireProtocolV2).toBe(true);
   });
 
@@ -3914,19 +3942,20 @@ describe('Protocol V2 protected method execution', () => {
       unlockPolicy: 'retry-on-locked',
       run: jest
         .fn()
-        .mockImplementationOnce(async () => {
+        .mockImplementationOnce(() => {
           calls.push('run-1');
-          throw deviceLockedError();
+          return Promise.reject(deviceLockedError());
         })
-        .mockImplementationOnce(async () => {
+        .mockImplementationOnce(() => {
           calls.push('run-2');
-          return { message: 'ok' };
+          return Promise.resolve({ message: 'ok' });
         }),
     };
     const device = {
       isProtocolV2: () => true,
-      unlockDevice: jest.fn(async () => {
+      unlockDevice: jest.fn(() => {
         calls.push('unlock');
+        return Promise.resolve();
       }),
     };
 
@@ -3944,9 +3973,7 @@ describe('Protocol V2 protected method execution', () => {
       const error = deviceLockedError();
       const method = {
         unlockPolicy,
-        run: jest.fn(async () => {
-          throw error;
-        }),
+        run: jest.fn().mockRejectedValue(error),
       };
       const device = {
         isProtocolV2: () => isProtocolV2,
@@ -3964,15 +3991,11 @@ describe('Protocol V2 protected method execution', () => {
     const unlockError = new Error('PIN cancelled');
     const unlockFailMethod = {
       unlockPolicy: 'retry-on-locked',
-      run: jest.fn(async () => {
-        throw initialError;
-      }),
+      run: jest.fn().mockRejectedValue(initialError),
     };
     const unlockFailDevice = {
       isProtocolV2: () => true,
-      unlockDevice: jest.fn(async () => {
-        throw unlockError;
-      }),
+      unlockDevice: jest.fn().mockRejectedValue(unlockError),
     };
 
     await expect(
@@ -3987,7 +4010,7 @@ describe('Protocol V2 protected method execution', () => {
     };
     const retryFailDevice = {
       isProtocolV2: () => true,
-      unlockDevice: jest.fn(async () => undefined),
+      unlockDevice: jest.fn().mockResolvedValue(undefined),
     };
 
     await expect(

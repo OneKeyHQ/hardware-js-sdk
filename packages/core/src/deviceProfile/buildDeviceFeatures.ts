@@ -1,9 +1,13 @@
 import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
 
-import type { Features } from '../types';
-import type { PROTO } from '../constants';
+import {
+  isProtocolV2BootloaderDeviceInfo,
+  isProtocolV2RomloaderDeviceInfo,
+} from '../protocols/protocol-v2/features';
+
 import type { DeviceFirmwareImageInfo, ProtocolV2DeviceInfo } from '@onekeyfe/hd-transport';
-import { isProtocolV2BootloaderDeviceInfo } from '../protocols/protocol-v2/features';
+import type { PROTO } from '../constants';
+import type { DeviceFeaturesMode, Features } from '../types';
 
 type ProtocolV1FeaturesCompat = PROTO.Features &
   Partial<PROTO.OnekeyFeatures> & {
@@ -204,7 +208,7 @@ export const buildProtocolV1FeaturesPayload = (
     },
     sessionId,
     raw: {
-      protocolV1Features: protocolV1Features,
+      protocolV1Features,
     },
   };
 };
@@ -223,7 +227,7 @@ export const buildProtocolV2FeaturesPayload = (
   const info = deviceInfo;
   const fwApplication = info?.fw?.application;
   const fwBootloader = info?.fw?.bootloader;
-  const fwBoard = firstValue(info?.fw?.application_data, info?.fw?.romloader);
+  const fwBoard = info?.fw?.romloader;
   const bleApplication = info?.coprocessor?.application;
   const status = info?.status;
 
@@ -249,14 +253,18 @@ export const buildProtocolV2FeaturesPayload = (
   const unlocked = firstValue(status?.unlocked, previous?.unlocked) ?? null;
   const attachToPinEnabled = status?.attach_to_pin_enabled ?? null;
   const unlockedAttachPin = status?.unlocked_by_attach_to_pin ?? undefined;
+  const romloaderMode = isProtocolV2RomloaderDeviceInfo(info);
   const bootloaderMode = isProtocolV2BootloaderDeviceInfo(info);
-  const mode = bootloaderMode
-    ? 'bootloader'
-    : initialized === false
-    ? 'notInitialized'
-    : initialized === true
-    ? 'normal'
-    : 'unknown';
+  let mode: DeviceFeaturesMode = 'unknown';
+  if (romloaderMode) {
+    mode = 'romloader';
+  } else if (bootloaderMode) {
+    mode = 'bootloader';
+  } else if (initialized === false) {
+    mode = 'notInitialized';
+  } else if (initialized === true) {
+    mode = 'normal';
+  }
 
   return {
     protocol: 'V2',

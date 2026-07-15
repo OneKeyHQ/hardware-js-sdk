@@ -7,33 +7,8 @@ export type BleWriteCapability = {
   isWritableWithoutResponse?: boolean | null;
 };
 
-export type BleWriteMode = 'withResponse' | 'withoutResponse';
-
 export function hasWritableCapability(characteristic: BleWriteCapability) {
   return !!(characteristic.isWritableWithResponse || characteristic.isWritableWithoutResponse);
-}
-
-export function resolveBleWriteMode(
-  characteristic: BleWriteCapability,
-  preferredMode: BleWriteMode = 'withoutResponse'
-): BleWriteMode {
-  if (preferredMode === 'withoutResponse' && characteristic.isWritableWithoutResponse) {
-    return 'withoutResponse';
-  }
-
-  if (preferredMode === 'withResponse' && characteristic.isWritableWithResponse) {
-    return 'withResponse';
-  }
-
-  if (characteristic.isWritableWithoutResponse) {
-    return 'withoutResponse';
-  }
-
-  if (characteristic.isWritableWithResponse) {
-    return 'withResponse';
-  }
-
-  return preferredMode;
 }
 
 export function resolveProtocolV2PacketCapacity({

@@ -4,6 +4,8 @@ export {
   PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST,
   PROTOCOL_V2_STATUS_DEVICE_INFO_REQUEST,
   PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST,
+  isProtocolV2BootloaderDeviceInfo,
+  isProtocolV2RomloaderDeviceInfo,
   getProtocolV2SeState,
   getProtocolV2SeType,
 } from './features';

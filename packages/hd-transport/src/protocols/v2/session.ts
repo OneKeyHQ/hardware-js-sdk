@@ -71,15 +71,6 @@ export function bytesToHex(bytes: Uint8Array): string {
     .join('');
 }
 
-// Frame header bytes worth logging: SOF, len lo/hi, header CRC, router, attr, seq.
-// The rest of the frame is protobuf payload and may contain sensitive fields
-// (mnemonic words via WordAck, PINs, seeds via LoadDevice, ...), so raw frame
-// hex logs must never include it.
-const PROTOCOL_V2_DEBUG_HEADER_BYTES = 7;
-const PROTOCOL_V2_DEBUG_ARRAY_ITEMS_LIMIT = 20;
-const PROTOCOL_V2_DEBUG_OBJECT_KEYS_LIMIT = 40;
-const PROTOCOL_V2_DEBUG_STRING_LIMIT = 512;
-const PROTOCOL_V2_DEBUG_DEPTH_LIMIT = 4;
 const HIGH_VOLUME_PROTOCOL_V2_CALLS = new Set([
   ...LogBlockCommand,
   'FilesystemFileRead',
@@ -89,102 +80,6 @@ const HIGH_VOLUME_PROTOCOL_V2_CALLS = new Set([
 
 function shouldReduceProtocolV2Debug(name: string) {
   return HIGH_VOLUME_PROTOCOL_V2_CALLS.has(name);
-}
-
-function frameHeaderDebugHex(frame: Uint8Array): string {
-  // Only the frame header is dumped as hex; the payload is logged separately
-  // in sanitized/structured form (sanitizeProtocolV2DebugPayload).
-  return bytesToHex(frame.slice(0, PROTOCOL_V2_DEBUG_HEADER_BYTES));
-}
-
-function getBinaryByteLength(value: unknown): number | undefined {
-  if (value instanceof ArrayBuffer) {
-    return value.byteLength;
-  }
-
-  if (ArrayBuffer.isView(value)) {
-    return value.byteLength;
-  }
-
-  if (typeof Blob !== 'undefined' && value instanceof Blob) {
-    return value.size;
-  }
-
-  return undefined;
-}
-
-function summarizeRedactedData(value: unknown): string {
-  const byteLength = getBinaryByteLength(value);
-  if (byteLength !== undefined) {
-    return `[redacted data: ${byteLength} bytes]`;
-  }
-
-  if (typeof value === 'string') {
-    return `[redacted data: string length=${value.length}]`;
-  }
-
-  if (Array.isArray(value)) {
-    return `[redacted data: array length=${value.length}]`;
-  }
-
-  if (value && typeof value === 'object') {
-    return `[redacted data: object keys=${Object.keys(value).length}]`;
-  }
-
-  return `[redacted data: ${typeof value}]`;
-}
-
-function sanitizeProtocolV2DebugPayload(value: unknown, key = '', depth = 0): unknown {
-  if (/^(data|payload)$/i.test(key) && value !== null && value !== undefined) {
-    return summarizeRedactedData(value);
-  }
-
-  if (/(passphrase|pin|mnemonic|seed|private)/i.test(key)) {
-    return '[redacted sensitive value]';
-  }
-
-  const byteLength = getBinaryByteLength(value);
-  if (byteLength !== undefined) {
-    return `[binary: ${byteLength} bytes]`;
-  }
-
-  if (typeof value === 'string') {
-    return value.length > PROTOCOL_V2_DEBUG_STRING_LIMIT
-      ? `${value.slice(0, PROTOCOL_V2_DEBUG_STRING_LIMIT)}... (len=${value.length})`
-      : value;
-  }
-
-  if (!value || typeof value !== 'object') {
-    return value;
-  }
-
-  if (depth >= PROTOCOL_V2_DEBUG_DEPTH_LIMIT) {
-    return Array.isArray(value)
-      ? `[array length=${value.length}]`
-      : `[object keys=${Object.keys(value).length}]`;
-  }
-
-  if (Array.isArray(value)) {
-    const items = value
-      .slice(0, PROTOCOL_V2_DEBUG_ARRAY_ITEMS_LIMIT)
-      .map(item => sanitizeProtocolV2DebugPayload(item, key, depth + 1));
-    if (value.length > PROTOCOL_V2_DEBUG_ARRAY_ITEMS_LIMIT) {
-      items.push(`... (${value.length - PROTOCOL_V2_DEBUG_ARRAY_ITEMS_LIMIT} more)`);
-    }
-    return items;
-  }
-
-  const entries = Object.entries(value).slice(0, PROTOCOL_V2_DEBUG_OBJECT_KEYS_LIMIT);
-  const sanitized: Record<string, unknown> = {};
-  entries.forEach(([entryKey, entryValue]) => {
-    sanitized[entryKey] = sanitizeProtocolV2DebugPayload(entryValue, entryKey, depth + 1);
-  });
-  if (Object.keys(value).length > PROTOCOL_V2_DEBUG_OBJECT_KEYS_LIMIT) {
-    sanitized.__truncated__ = `${
-      Object.keys(value).length - PROTOCOL_V2_DEBUG_OBJECT_KEYS_LIMIT
-    } more keys`;
-  }
-  return sanitized;
 }
 
 const COMMON_TERMINAL_RESPONSE_TYPES = new Set([
@@ -305,27 +200,11 @@ export class ProtocolV2Session {
       packetSrc,
       router,
       seq: protoSeq,
-      logger: shouldReduceDebug ? undefined : logger,
-      logPrefix,
-      context: `tx:${name}`,
     });
-    const expectedSeq = frame[6];
 
     if (maxFrameBytes !== undefined && frame.length > maxFrameBytes) {
       throw new Error(
         `Protocol V2 frame too large for transport: ${frame.length} > ${maxFrameBytes}`
-      );
-    }
-
-    if (!shouldReduceDebug) {
-      logger?.debug?.(
-        `[${logPrefix}] TX payload name=${name}`,
-        sanitizeProtocolV2DebugPayload(data)
-      );
-      logger?.debug?.(
-        `[${logPrefix}] TX frame name=${name} len=${frame.length} router=${frame[4]} attr=${
-          frame[5]
-        } seq=${expectedSeq} headerHex=${frameHeaderDebugHex(frame)}`
       );
     }
 
@@ -356,39 +235,9 @@ export class ProtocolV2Session {
           // Timed out while waiting: drop the late frame and stop reading.
           break;
         }
-        if (!shouldReduceDebug) {
-          logger?.debug?.(
-            `[${logPrefix}] RX frame len=${rxFrame.length} router=${rxFrame[4]} attr=${
-              rxFrame[5]
-            } seq=${rxFrame[6]} headerHex=${frameHeaderDebugHex(rxFrame)}`
-          );
-        }
         const isAck = ProtocolV2.isAckFrame(rxFrame);
-        if (isAck) {
-          if (!shouldReduceDebug) {
-            logger?.debug?.(`[${logPrefix}] skip Proto Link ACK seq=${rxFrame[6]}`);
-          }
-        }
         if (!isAck) {
-          const decoded = ProtocolV2.decodeFrame(schemas, rxFrame, {
-            logger: shouldReduceDebug ? undefined : logger,
-            logPrefix,
-            context: `rx:${name}`,
-          });
-          if (!shouldReduceDebug && decoded.seq !== expectedSeq) {
-            logger?.debug?.(
-              `[${logPrefix}] seq differs for ${name}: tx=${expectedSeq}, rx=${decoded.seq}`
-            );
-          }
-          if (!shouldReduceDebug) {
-            logger?.debug?.(
-              `[${logPrefix}] TX name=${name} seq=${expectedSeq} | RX seq=${decoded.seq} messageTypeId=${decoded.messageTypeId} pbPayload=${decoded.pbPayload.length}B`
-            );
-            logger?.debug?.(
-              `[${logPrefix}] RX payload type=${decoded.type} messageTypeId=${decoded.messageTypeId}`,
-              sanitizeProtocolV2DebugPayload(decoded.message)
-            );
-          }
+          const decoded = ProtocolV2.decodeFrame(schemas, rxFrame);
 
           const response = check.call(decoded);
           if (callOptions.intermediateTypes?.includes(response.type)) {

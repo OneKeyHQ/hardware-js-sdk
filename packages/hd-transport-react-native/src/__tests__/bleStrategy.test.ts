@@ -1,8 +1,4 @@
-import {
-  hasWritableCapability,
-  resolveBleWriteMode,
-  resolveProtocolV2PacketCapacity,
-} from '../bleStrategy';
+import { hasWritableCapability, resolveProtocolV2PacketCapacity } from '../bleStrategy';
 
 describe('React Native BLE strategy', () => {
   test('accepts writeWithoutResponse-only characteristics', () => {
@@ -12,7 +8,6 @@ describe('React Native BLE strategy', () => {
     };
 
     expect(hasWritableCapability(characteristic)).toBe(true);
-    expect(resolveBleWriteMode(characteristic)).toBe('withoutResponse');
   });
 
   test('falls back to Android default ATT payload when MTU is unavailable', () => {

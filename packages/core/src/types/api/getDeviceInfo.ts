@@ -16,7 +16,7 @@ export type GetDeviceInfoParams = {
   includeRaw?: boolean;
 };
 
-export type DeviceInfoMode = 'normal' | 'bootloader' | 'notInitialized' | 'unknown';
+export type DeviceInfoMode = 'normal' | 'bootloader' | 'romloader' | 'notInitialized' | 'unknown';
 
 export type DeviceInfoStatus = {
   mode: DeviceInfoMode;

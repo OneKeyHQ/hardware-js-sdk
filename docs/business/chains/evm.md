@@ -10,33 +10,31 @@ OneKey 硬件钱包对 EVM (以太坊虚拟机) 兼容链的支持，建立在�
 - **标准路径:** `m/44'/60'/0'/0/index`
 - **地址格式:** `EIP-55` (混合大小写校验和)
 
-## 2. SDK Versioning and Protocol Management
+## 2. SDK 版本与 Protocol V1 Schema 管理
 
-OneKey SDK is designed to provide a seamless developer experience by abstracting away the complexities of different hardware firmware versions. It achieves this through an automatic protocol detection mechanism.
+SDK 会根据设备 Features 选择 Protocol V1 schema，调用方不需要自行选择 protobuf 方言。
 
-### 3.1 Protocol V1 Schema Dialects: `v1LegacySchema` vs `v1CurrentSchema`
+### 2.1 Protocol V1 Schema：`v1LegacySchema` 与 `v1CurrentSchema`
 
-The SDK internally manages two primary protocol "dialects" for communicating with the device:
+SDK 内部维护两套 Protocol V1 schema：
 
-- **`v1LegacySchema` (Trezor-compatible schema):** Used for older generations of OneKey firmware. This schema is compatible with the message format originally defined by Trezor.
-- **`v1CurrentSchema` (Native OneKey Protocol V1 schema):** Used for modern Protocol V1 firmware. This is a more feature-rich, native schema that supports newer EIPs and optimizations, such as EIP-7702.
+- **`v1LegacySchema`：** Trezor-compatible 历史 schema。
+- **`v1CurrentSchema`：** 当前 OneKey Protocol V1 schema，包含 EIP-7702 等扩展消息。
 
-### 3.2 Automatic Protocol Switching
+### 2.2 自动切换
 
-The SDK automatically determines which protocol to use at runtime.
+EVM 方法通过 `TransportManager.getProtocolV1MessageSchema()` 读取当前选择：
 
-- **Detection:** When a method like `EVMSignTransaction` is called, it uses `TransportManager.getProtocolV1MessageSchema()` to query the Protocol V1 message schema selected from the connected device features.
-- **Switching Logic:**
-  - If the device returns `'v1LegacySchema'`, the SDK invokes the signing logic with a compatibility flag (`supportTrezor: true`), instructing it to format messages for the legacy schema.
-  - Otherwise, it defaults to using the native `v1CurrentSchema` schema.
+- `v1LegacySchema` 使用 legacy 兼容实现。
+- `v1CurrentSchema` 使用当前 OneKey 实现。
 
-This ensures that developers can write a single piece of code that works across all generations of OneKey hardware without needing to worry about the underlying communication differences.
+这里描述的是 Protocol V1 内部 schema 选择，不等同于 Transport 对 Protocol V1/V2 的连接探测。
 
 ## 3. 交易类型 (Transaction Types)
 
 OneKey SDK 支持多种 EVM 交易类型，能够自动检测并处理，确保最佳的网络兼容性和费用效益。
 
-### 2.1 Legacy (Type 0)
+### 3.1 Legacy (Type 0)
 
 最基础的交易类型，至今仍被广泛支持。
 
@@ -44,7 +42,7 @@ OneKey SDK 支持多种 EVM 交易类型，能够自动检测并处理，确保�
 - **优点:** 兼容所有 EVM 链。
 - **缺点:** 采用简单的“最高价拍卖”Gas 机制，可能导致费用过高或交易确认缓慢。
 
-### 2.2 EIP-1559 (Type 2)
+### 3.2 EIP-1559 (Type 2)
 
 引入了更复杂的 Gas 市场机制，旨在提高费用预测的准确性和网络效率。
 
@@ -56,7 +54,7 @@ OneKey SDK 支持多种 EVM 交易类型，能够自动检测并处理，确保�
   - **效率提升:** 允许用户仅支付市场价，而非盲目出价。
 - **SDK 实现:** 通过 `hasEIP1559Features` 函数检测 `maxFeePerGas` 和 `maxPriorityFeePerGas` 字段来自动识别。
 
-### 2.3 EIP-7702 (Type 4)
+### 3.3 EIP-7702 (Type 4)
 
 **EIP-7702** 是一项前瞻性的 EIP，旨在通过引入 **`authorizationList`** 来改进智能合约钱包的用户体验。它允许外部拥有账户 (EOA) 为合约账户单次交易授权，从而模拟智能合约钱包的部分功能，如批量处理交易。
 
@@ -69,30 +67,30 @@ OneKey SDK 支持多种 EVM 交易类型，能够自动检测并处理，确保�
 
 ### 交易类型对比
 
-| 特性 | Legacy (Type 0) | EIP-1559 (Type 2) | EIP-7702 (Type 4) |
-| :--- | :--- | :--- | :--- |
-| **Gas 机制** | `gasPrice` (单一拍卖) | `maxFeePerGas` + `maxPriorityFeePerGas` | 同 EIP-1559 |
-| **核心目的** | 基础交易 | 优化 Gas 市场 | 增强 EOA 账户能力 |
-| **主要优点** | 兼容性强 | 费用可预测、高效 | 模拟智能合约钱包、简化授权 |
-| **SDK 支持** | ✅ | ✅ | ✅ |
+| 特性         | Legacy (Type 0)       | EIP-1559 (Type 2)                       | EIP-7702 (Type 4)          |
+| :----------- | :-------------------- | :-------------------------------------- | :------------------------- |
+| **Gas 机制** | `gasPrice` (单一拍卖) | `maxFeePerGas` + `maxPriorityFeePerGas` | 同 EIP-1559                |
+| **核心目的** | 基础交易              | 优化 Gas 市场                           | 增强 EOA 账户能力          |
+| **主要优点** | 兼容性强              | 费用可预测、高效                        | 模拟智能合约钱包、简化授权 |
+| **SDK 支持** | ✅                    | ✅                                      | ✅                         |
 
 ## 4. 签名方法 (Signing Methods)
 
 除了交易签名，OneKey SDK 还支持多种数据签名标准，以满足不同的 DApp 交互需求。
 
-### 3.1 交易签名 (`EVMSignTransaction`)
+### 4.1 交易签名 (`EVMSignTransaction`)
 
-核心功能，用于对上述所有类型的交易进行签名，生成可广播的裸交易 (`rawTx`)。
+核心功能，用于对上述交易生成 `v/r/s` 签名结果；交易序列化与广播由调用方完成。
 
-### 3.2 消息签名 (`EVMSignMessage`)
+### 4.2 消息签名 (`EVMSignMessage`)
 
 遵循 `personal_sign` 规范，用于对任意 UTF-8 或十六进制字符串进行签名。
 
 - **过程:** 消息会添加 `\x19Ethereum Signed Message:\n` 前缀后再进行哈希和签名。
 - **优点:** 比 `eth_sign` 更安全，因为前缀可以防止签名恶意交易。
-- **缺点:** 用户在设备上只能看到消息哈希，无法直观理解签名内容。
+- **显示边界:** 设备显示内容取决于消息格式和固件实现，应用不能假设所有设备都只显示哈希或都能完整显示原文。
 
-### 3.3 结构化数据签名（EIP-712）
+### 4.3 结构化数据签名（EIP-712）
 
 EIP-712 结构化数据签名在 SDK 中通过两条路径实现：
 
@@ -103,12 +101,12 @@ EIP-712 结构化数据签名在 SDK 中通过两条路径实现：
 
 ### 签名方法对比
 
-| 方法 | `EVMSignMessage` (`personal_sign`) | `EVMSignTypedData` |
-| :--- | :--- | :--- |
-| **显示内容** | 消息哈希（不直观） | 结构化数据（清晰可读）或哈希盲签 |
-| **安全性** | 中等 | 高（解析）/ 中（盲签） |
-| **用户体验** | 一般 | 优（解析）/ 一般（盲签） |
-| **应用场景** | 简单身份验证 | 复杂 DApp 授权、链下操作 |
+| 方法         | `EVMSignMessage` (`personal_sign`) | `EVMSignTypedData`               |
+| :----------- | :--------------------------------- | :------------------------------- |
+| **显示内容** | 消息哈希（不直观）                 | 结构化数据（清晰可读）或哈希盲签 |
+| **安全性**   | 中等                               | 高（解析）/ 中（盲签）           |
+| **用户体验** | 一般                               | 优（解析）/ 一般（盲签）         |
+| **应用场景** | 简单身份验证                       | 复杂 DApp 授权、链下操作         |
 
 ## 5. 核心 API 实现分析
 
@@ -131,7 +129,6 @@ EIP-712 结构化数据签名在 SDK 中通过两条路径实现：
   - **参数验证:** 验证 `path` 和 `messageHex` 的有效性，并支持可选的 `chainId` 参数。
   - **协议切换:** 同样使用 `TransportManager.getProtocolV1MessageSchema()` 来选择 `legacyV1` 或 `latest` 实现。
   - **设备交互:** 将格式化后的参数（地址路径、消息、链 ID）通过 `typedCall` 发送到设备进行签名。
-
 
 ### 5.3 `EVMSignTransaction`
 
@@ -166,17 +163,21 @@ EIP-712 结构化数据签名的统一入口。SDK 内部根据设备能力与�
   - 若数据包含嵌套数组或数据量过大 → 哈希盲签
   - 固件要求：嵌套数组签名能力需固件 ≥ 4.2.0；更大数据阈值在固件 ≥ 4.4.0 生效（从 1KB 提升到 1.5KB）
 
-注意：`EVMSignMessageEIP712` 已废弃，不再对外提供方法。请统一使用 `evmSignTypedData`。
+注意：`evmSignMessageEIP712` 已标记为 deprecated，但为了兼容现有调用仍然公开导出。新接入应统一使用 `evmSignTypedData`；迁移完成前不要声称旧方法已经从 SDK 删除。
+
 ## 6. 最佳实践与安全
 
 1.  **优先使用现代标准:**
+
     - **交易:** 优先构造 **EIP-1559** 交易，以获得更好的费用控制。
     - **签名:** 优先使用 **EIP-712** 进行数据签名，为用户提供最高的安全性。
 
 2.  **路径管理:**
+
     - 始终遵循 `BIP-44` 标准路径 (`m/44'/60'/0'/0/index`)，确保钱包兼容性。
 
 3.  **参数格式:**
+
     - 所有数值型参数 (如 `value`, `gasLimit`) 均应以十六进制字符串 (`0x...`) 格式提供。
 
 4.  **固件兼容性:**

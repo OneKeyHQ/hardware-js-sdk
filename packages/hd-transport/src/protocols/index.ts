@@ -9,7 +9,6 @@ import { decode as decodeProtobuf } from '../serialization/protobuf/decode';
 import { decodeFrame as decodeV2Frame, encodeProtobufFrame, isAckFrame } from './v2';
 
 import type { Root } from 'protobufjs/light';
-import type { ProtocolV2DebugLogger } from './v2';
 
 export const PROTOCOL_V2_SYS_MESSAGE_THRESHOLD = 60000;
 
@@ -23,9 +22,6 @@ type ProtocolV2FrameOptions = {
   router?: number;
   /** Sequence number (1-255). Managed per-session by ProtocolV2Session. */
   seq?: number;
-  logger?: ProtocolV2DebugLogger;
-  logPrefix?: string;
-  context?: string;
 };
 
 const resolveProtocolV2EncodeSchema = (name: string, schemas: ProtocolV2Schemas) => {
@@ -89,51 +85,20 @@ export const ProtocolV2 = {
     const rawPbBuffer = pbBuffer.toBuffer() as unknown as ArrayBuffer;
     const pbBytes = new Uint8Array(rawPbBuffer);
 
-    options.logger?.debug?.(`[${options.logPrefix ?? 'ProtocolV2'}] encode protobuf`, {
-      context: options.context ?? `encode:${name}`,
-      messageName: name,
-      messageTypeId,
-      pbPayloadLength: pbBytes.length,
-      packetSrc: options.packetSrc ?? 0,
-      router: options.router ?? 0,
-    });
-
     return encodeProtobufFrame(
       messageTypeId,
       pbBytes,
       options.packetSrc,
       options.router,
-      {
-        logger: options.logger,
-        logPrefix: options.logPrefix,
-        context: options.context ?? `encode:${name}`,
-        messageName: name,
-      },
       options.seq
     );
   },
 
-  decodeFrame(
-    schemas: ProtocolV2Schemas,
-    frame: Uint8Array,
-    options: Pick<ProtocolV2FrameOptions, 'logger' | 'logPrefix' | 'context'> = {}
-  ) {
-    const { messageTypeId, pbPayload, seq } = decodeV2Frame(frame, {
-      logger: options.logger,
-      logPrefix: options.logPrefix,
-      context: options.context ?? 'decode',
-    });
+  decodeFrame(schemas: ProtocolV2Schemas, frame: Uint8Array) {
+    const { messageTypeId, pbPayload, seq } = decodeV2Frame(frame);
     const { Message, messageName } = createProtocolV2MessageFromType(messageTypeId, schemas);
     const rxByteBuffer = ByteBuffer.wrap(Buffer.from(pbPayload) as unknown as ArrayBuffer);
     const message = decodeProtobuf(Message, rxByteBuffer);
-
-    options.logger?.debug?.(`[${options.logPrefix ?? 'ProtocolV2'}] decode protobuf`, {
-      context: options.context ?? `decode:${messageName}`,
-      messageName,
-      messageTypeId,
-      pbPayloadLength: pbPayload.length,
-      seq,
-    });
 
     return {
       message,

@@ -1,4 +1,5 @@
 import type { UnifiedMethodConfig, DeviceMethodCategory } from '../types';
+import { PRO2_FIRMWARE_FILE_ACCEPT } from '../../constants/firmwareFiles';
 
 const api: UnifiedMethodConfig[] = [
   {
@@ -289,7 +290,7 @@ const api: UnifiedMethodConfig[] = [
             label: 'Bootloader (target 3)',
             description:
               'Signed bootloader payload package (.okpkg). A .bin file is accepted only if it is an OKPP package renamed as .bin.',
-            accept: '.okpkg,.bin',
+            accept: PRO2_FIRMWARE_FILE_ACCEPT,
             visible: true,
             editable: true,
           },
@@ -300,7 +301,7 @@ const api: UnifiedMethodConfig[] = [
             label: 'Application P1 (target 4)',
             description:
               'Signed application P1 payload package (.okpkg). A .bin file is accepted only if it is an OKPP package renamed as .bin.',
-            accept: '.okpkg,.bin',
+            accept: PRO2_FIRMWARE_FILE_ACCEPT,
             visible: true,
             editable: true,
           },
@@ -311,7 +312,7 @@ const api: UnifiedMethodConfig[] = [
             label: 'Application P2 (target 5)',
             description:
               'Signed application P2 payload package (.okpkg). A .bin file is accepted only if it is an OKPP package renamed as .bin.',
-            accept: '.okpkg,.bin',
+            accept: PRO2_FIRMWARE_FILE_ACCEPT,
             visible: true,
             editable: true,
           },
@@ -322,7 +323,7 @@ const api: UnifiedMethodConfig[] = [
             label: 'Coprocessor (target 6)',
             description:
               'Signed target payload package (.okpkg). A .bin file is accepted only if it is a signed package renamed as .bin.',
-            accept: '.okpkg,.bin',
+            accept: PRO2_FIRMWARE_FILE_ACCEPT,
             visible: true,
             editable: true,
           },
@@ -333,7 +334,7 @@ const api: UnifiedMethodConfig[] = [
             label: 'SE01 (target 7)',
             description:
               'Signed SE01 payload package (.okpkg). A .bin file is accepted only if it is a signed package renamed as .bin.',
-            accept: '.okpkg,.bin',
+            accept: PRO2_FIRMWARE_FILE_ACCEPT,
             visible: true,
             editable: true,
           },
@@ -344,7 +345,7 @@ const api: UnifiedMethodConfig[] = [
             label: 'SE02 (target 8)',
             description:
               'Signed SE02 payload package (.okpkg). A .bin file is accepted only if it is a signed package renamed as .bin.',
-            accept: '.okpkg,.bin',
+            accept: PRO2_FIRMWARE_FILE_ACCEPT,
             visible: true,
             editable: true,
           },
@@ -355,7 +356,7 @@ const api: UnifiedMethodConfig[] = [
             label: 'SE03 (target 9)',
             description:
               'Signed SE03 payload package (.okpkg). A .bin file is accepted only if it is a signed package renamed as .bin.',
-            accept: '.okpkg,.bin',
+            accept: PRO2_FIRMWARE_FILE_ACCEPT,
             visible: true,
             editable: true,
           },
@@ -366,7 +367,7 @@ const api: UnifiedMethodConfig[] = [
             label: 'SE04 (target 10)',
             description:
               'Signed SE04 payload package (.okpkg). A .bin file is accepted only if it is a signed package renamed as .bin.',
-            accept: '.okpkg,.bin',
+            accept: PRO2_FIRMWARE_FILE_ACCEPT,
             visible: true,
             editable: true,
           },

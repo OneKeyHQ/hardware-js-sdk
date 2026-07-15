@@ -107,28 +107,27 @@ const createHarness = () => {
       return { remove: jest.fn() };
     }),
   };
+  const handleWrite = (base64: string) => {
+    const frame = Buffer.from(base64, 'base64');
+    sentSeqs.push(frame[6]);
+    if (shouldRespond) {
+      const response = ProtocolV2.encodeFrame(
+        schemas,
+        'Success',
+        { message: 'ok' },
+        { router: PROTOCOL_V2_CHANNEL_BLE_UART }
+      );
+      notifyCallback?.(null, { value: Buffer.from(response).toString('base64') });
+    }
+    return Promise.resolve();
+  };
   const writeCharacteristic = {
     uuid: '0002',
     deviceID: uuid,
     isWritableWithResponse: true,
     isWritableWithoutResponse: true,
-    writeWithResponse: jest.fn((base64: string) => {
-      const frame = Buffer.from(base64, 'base64');
-      sentSeqs.push(frame[6]);
-      if (shouldRespond) {
-        const response = ProtocolV2.encodeFrame(
-          schemas,
-          'Success',
-          { message: 'ok' },
-          { router: PROTOCOL_V2_CHANNEL_BLE_UART }
-        );
-        notifyCallback?.(null, { value: Buffer.from(response).toString('base64') });
-      }
-      return Promise.resolve();
-    }),
-    writeWithoutResponse: jest.fn(async (base64: string) => {
-      await writeCharacteristic.writeWithResponse(base64);
-    }),
+    writeWithResponse: jest.fn(handleWrite),
+    writeWithoutResponse: jest.fn(handleWrite),
   };
   const device = {
     id: uuid,
@@ -156,6 +155,7 @@ const createHarness = () => {
     transport,
     uuid,
     sentSeqs,
+    writeCharacteristic,
     setShouldRespond(value: boolean) {
       shouldRespond = value;
     },
@@ -208,14 +208,20 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     await transport.release(uuid, true);
   });
 
-  test('passes high-volume context to the persistent link adapter', async () => {
-    const { transport, uuid } = createHarness();
-    const writeSpy = jest.spyOn(transport as any, 'writeProtocolV2Frame');
+  test('uses withoutResponse for normal and high-volume calls', async () => {
+    const { transport, uuid, writeCharacteristic } = createHarness();
 
     await transport.acquire({ uuid });
-    await transport.call(uuid, 'FileWrite', {});
+    expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalledTimes(1);
+    expect(writeCharacteristic.writeWithResponse).not.toHaveBeenCalled();
 
-    expect(writeSpy.mock.calls.map(([, , options]) => options?.highVolume)).toEqual([false, true]);
+    await transport.call(uuid, 'Ping', { message: 'normal' });
+    expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalledTimes(2);
+    expect(writeCharacteristic.writeWithResponse).not.toHaveBeenCalled();
+
+    await transport.call(uuid, 'FileWrite', {});
+    expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalledTimes(3);
+    expect(writeCharacteristic.writeWithResponse).not.toHaveBeenCalled();
     await transport.release(uuid, true);
   });
 

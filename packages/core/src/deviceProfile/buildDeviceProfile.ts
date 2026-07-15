@@ -13,6 +13,10 @@ import {
   getDeviceUUID,
   getFirmwareType,
 } from '../utils/deviceInfoUtils';
+import {
+  isProtocolV2BootloaderDeviceInfo,
+  isProtocolV2RomloaderDeviceInfo,
+} from '../protocols/protocol-v2/features';
 
 import type {
   DeviceInfoProtocol,
@@ -26,7 +30,6 @@ import type {
 } from '../types/api/getDeviceInfo';
 import type { Features, OnekeyFeatures } from '../types';
 import type { DeviceFirmwareImageInfo, ProtocolV2DeviceInfo } from '@onekeyfe/hd-transport';
-import { isProtocolV2BootloaderDeviceInfo } from '../protocols/protocol-v2/features';
 
 type BuildProtocolV1ProfileParams = {
   protocol?: DeviceInfoProtocol;
@@ -87,6 +90,7 @@ const getDeviceMode = (features?: Features): DeviceInfoStatus['mode'] => {
 };
 
 const getProtocolV2Mode = (deviceInfo?: ProtocolV2DeviceInfo): DeviceInfoStatus['mode'] => {
+  if (isProtocolV2RomloaderDeviceInfo(deviceInfo)) return 'romloader';
   if (isProtocolV2BootloaderDeviceInfo(deviceInfo)) return 'bootloader';
   const initialized = deviceInfo?.status?.init_states;
   if (initialized === false) return 'notInitialized';
@@ -154,9 +158,7 @@ const normalizeV2Versions = (deviceInfo?: ProtocolV2DeviceInfo): DeviceProfileVe
   return {
     firmware: firstMeaningfulVersion(getImageVersion(info?.fw?.application)),
     bootloader: firstMeaningfulVersion(getImageVersion(info?.fw?.bootloader)),
-    board: firstMeaningfulVersion(
-      getImageVersion(info?.fw?.application_data ?? info?.fw?.romloader)
-    ),
+    board: firstMeaningfulVersion(getImageVersion(info?.fw?.romloader)),
     ble: firstMeaningfulVersion(getImageVersion(info?.coprocessor?.application)),
     se01: firstMeaningfulVersion(getImageVersion(info?.se1?.application)),
     se02: firstMeaningfulVersion(getImageVersion(info?.se2?.application)),
@@ -245,8 +247,8 @@ const normalizeV2Verify = (deviceInfo?: ProtocolV2DeviceInfo): DeviceProfileVeri
     firmwareHash: getImageHash(info?.fw?.application),
     bootloaderBuildId: getImageBuildId(info?.fw?.bootloader),
     bootloaderHash: getImageHash(info?.fw?.bootloader),
-    boardBuildId: getImageBuildId(info?.fw?.application_data ?? info?.fw?.romloader),
-    boardHash: getImageHash(info?.fw?.application_data ?? info?.fw?.romloader),
+    boardBuildId: getImageBuildId(info?.fw?.romloader),
+    boardHash: getImageHash(info?.fw?.romloader),
     bleBuildId: getImageBuildId(info?.coprocessor?.application),
     bleHash: getImageHash(info?.coprocessor?.application),
     se01BuildId: getImageBuildId(info?.se1?.application),

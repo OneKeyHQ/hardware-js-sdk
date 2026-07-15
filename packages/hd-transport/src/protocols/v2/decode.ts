@@ -1,8 +1,5 @@
 import { PROTO_DATA_TYPE_ACK, PROTO_HEAD_CRC_SIZE, PROTO_HEAD_SOF } from './constants';
 import { crc8 } from './crc8';
-import { logProtocolV2Debug } from './debug';
-
-import type { ProtocolV2FrameDebugOptions } from './debug';
 
 export interface ProtoV2Frame {
   /** Little-endian message type ID */
@@ -74,13 +71,8 @@ export function isAckFrame(data: Uint8Array): boolean {
  *
  * Returns the decoded messageTypeId, raw protobuf payload, and sequence number.
  */
-export function decodeFrame(
-  data: Uint8Array,
-  debugOptions?: ProtocolV2FrameDebugOptions
-): ProtoV2Frame {
+export function decodeFrame(data: Uint8Array): ProtoV2Frame {
   const frameLen = validateFrame(data);
-  const expectedHeaderCrc = data[3];
-  const expectedFrameCrc = data[frameLen - 1];
 
   const seq = data[6];
   // Payload spans bytes 7 to frameLen-2 (inclusive), excluding final CRC byte
@@ -92,20 +84,6 @@ export function decodeFrame(
 
   const messageTypeId = payloadData[0] + payloadData[1] * 256;
   const pbPayload = payloadData.slice(2);
-
-  logProtocolV2Debug(debugOptions, 'decode raw frame', {
-    frameLen,
-    dataLength: data.length,
-    router: data[4],
-    attr: data[5],
-    seq,
-    headerCrc: data[3],
-    expectedHeaderCrc,
-    frameCrc: data[frameLen - 1],
-    expectedFrameCrc,
-    messageTypeId,
-    pbPayloadLength: pbPayload.length,
-  });
 
   return { messageTypeId, pbPayload, seq };
 }

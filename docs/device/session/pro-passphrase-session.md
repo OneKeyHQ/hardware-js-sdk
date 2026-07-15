@@ -4,15 +4,15 @@
 
 本文梳理当前 SDK 中 Pro / Pro2 设备初始化、passphrase、session_id、deviceId 以及 Attach to PIN 相关逻辑。重点关注硬件层上下游如何协同管理 session，而不是单个 API 的参数说明。
 
-当前代码里需要区分三类“会话/身份”：
+当前代码里需要区分五类“会话/身份”：
 
-| 名称                         | 所在层级                                   | 含义                                                                                         | 生命周期                                    |
-| ---------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| transport session / `mainId` | transport / Device                         | SDK 与 transport 占用设备的连接句柄。USB 下通常是 bridge/webusb session；BLE 下通常是 uuid。 | acquire 到 release                          |
-| device `session_id`          | 固件/SE + V1 Features / Pro2 DeviceSession | 设备端 passphrase/seed session 的标识，用于复用已解锁的钱包上下文。                          | 设备端生成，SDK 缓存到 `deviceSessionCache` |
-| `device_id`                  | V1 Features                                | 当前 seed 对应的身份，换 seed / wipe 后会变化。                                              | 随 seed 变化                                |
-| serialNo / uuid              | 硬件身份                                   | 硬件序列号，用于识别物理设备。                                                               | 物理设备稳定                                |
-| Protocol V2 frame `seq`      | hd-transport ProtocolV2Session             | V2 帧级请求序号，解决分片/应答跟踪与日志定位。                                               | 每个 ProtocolV2Session 内递增               |
+| 名称                         | 所在层级                                   | 含义                                                                                         | 生命周期                                          |
+| ---------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| transport session / `mainId` | transport / Device                         | SDK 与 transport 占用设备的连接句柄。USB 下通常是 bridge/webusb session；BLE 下通常是 uuid。 | acquire 到 release                                |
+| device `session_id`          | 固件/SE + V1 Features / Pro2 DeviceSession | 设备端 passphrase/seed session 的标识，用于复用已解锁的钱包上下文。                          | 设备端生成，SDK 缓存到 `DeviceWalletSessionStore` |
+| `device_id`                  | V1 Features                                | 当前 seed 对应的身份，换 seed / wipe 后会变化。                                              | 随 seed 变化                                      |
+| serialNo / uuid              | 硬件身份                                   | 硬件序列号，用于识别物理设备。                                                               | 物理设备稳定                                      |
+| Protocol V2 frame `seq`      | hd-transport ProtocolV2Session             | V2 帧级请求序号，解决分片/应答跟踪与日志定位。                                               | 每个 Transport/设备 key 的 Cursor 内递增          |
 
 一句话总结：**transport session 解决“和哪台设备通信”，device `session_id` 解决“设备端当前解锁的是哪个 passphrase 上下文”，`device_id` 解决“当前 seed 身份是否匹配”，V2 `seq` 解决“这一帧属于哪个协议调用顺序”。**
 
@@ -102,7 +102,7 @@ Pro2 不走传统 `Initialize/GetFeatures`。`Device.initialize()` 中如果 `is
 V1 `Features.device_id` 表示当前 seed 身份。它不是物理设备序列号，换 seed / wipe 后会变。因此它适合用于：
 
 - 校验 API 请求指定的 `deviceId` 是否仍然匹配当前 seed。
-- 作为 `deviceSessionCache` 的主 key，避免不同 seed 的 session 混用。
+- 作为 `DeviceWalletSessionStore` 的设备 key，避免不同 seed 的 session 混用。
 
 `BaseMethod.checkDeviceId` 打开时，core 会调用 `device.checkDeviceId(method.deviceId)`。不一致时抛 `DeviceCheckDeviceIdError`。
 
@@ -130,20 +130,22 @@ V1 `Features.device_id` 表示当前 seed 身份。它不是物理设备序列�
 
 ### 5.1 缓存位置与 key
 
-`Device.ts` 中维护了模块级 `deviceSessionCache: Record<string, string>`。缓存 key 由 `generateStateKey(deviceId, passphraseState)` 生成：
+`DeviceWalletSessionStore` 使用两级 Map 保存钱包 Session：
 
 ```text
-有 passphraseState: `${deviceId}@${passphraseState}`
-无 passphraseState: `${deviceId}`
+deviceKey
+└─ passphraseState -> sessionId
 ```
 
-但当前 `getInternalState()` 有一个重要安全不变量：
+`deviceKey` 优先使用 seed 身份 `deviceId`，设备身份尚未建立时可以使用当前物理设备缓存键；身份从临时键迁移到正式 `deviceId` 时，Store 会迁移已有 Session。
+
+当前 `getInternalState()` 有一个重要安全不变量：
 
 ```text
 没有 this.passphraseState 时，不查 session 缓存。
 ```
 
-也就是说，虽然 `generateStateKey()` 保留了无 passphraseState 的 key 形式，实际读取缓存时必须带 passphraseState。
+也就是说，实际读取钱包 Session 时必须带 `passphraseState`。Store 可以暂存刚由设备返回、但尚未绑定钱包标识的 pending Session；pending 状态只用于同一次初始化链路，不能作为任意钱包的查询结果。
 
 ### 5.2 为什么必须带 passphraseState
 
@@ -152,7 +154,7 @@ V1 `Features.device_id` 表示当前 seed 身份。它不是物理设备序列�
 1. 用户要访问主钱包或空 passphrase，却被路由到某个隐藏钱包 session。
 2. 同一 deviceId 下存在多个隐藏钱包，SDK 可能复用到错误的 passphrase session。
 
-因此现在的策略是：**passphraseState 是 device session 复用的必要条件**。CLI 短生命周期场景如果要复用 session，需要先通过 `getPassphraseState()` 拿到 passphraseState 和 session_id，再用 `preloadSessionCache(deviceId, passphraseState, sessionId)` 预热缓存，并确保后续调用携带同一个 passphraseState。
+因此现在的策略是：**passphraseState 是 device session 复用的必要条件**。公开 `getPassphraseState()` 只返回 `passphraseState`，不会暴露 `session_id`。CLI 短生命周期场景如果要跨进程复用 session，必须从 CLI 自己的受控持久化中同时恢复 `deviceId + passphraseState + sessionId`，再用 `preloadSessionCache(deviceId, passphraseState, sessionId)` 预热缓存，并确保后续调用携带同一个 passphraseState。
 
 ### 5.3 写缓存的入口
 
@@ -167,7 +169,7 @@ V1 `Features.device_id` 表示当前 seed 身份。它不是物理设备序列�
 3. `preloadSessionCache(deviceId, passphraseState, sessionId)`  
    给 CLI 等短生命周期进程使用，用外部已知 session 预填缓存。
 
-`updateInternalState()` 还会删除旧的 `${deviceId}` 无 passphrase key。这是 attach-to-pin 修复逻辑的一部分：避免历史无 passphrase session 继续影响新路径。
+`updateInternalState()` 会把设备返回的最终 Session 绑定到真实 `passphraseState`，并删除当前设备的 pending Session，避免未绑定状态继续影响后续请求。
 
 ### 5.4 清缓存的入口
 
@@ -432,7 +434,7 @@ PassphraseState {
 SDK 使用 `deviceId + passphraseState` 隔离不同钱包的 session：
 
 ```text
-deviceSessionCache
+DeviceWalletSessionStore
 └─ deviceId
    ├─ MainWalletState    -> MainSession
    ├─ HiddenWalletStateA -> HiddenSessionA
@@ -529,7 +531,7 @@ Attach to PIN 的核心风险是：用户表面上没有手动输入 passphrase�
 DeviceSessionGet / GetPassphraseState
   -> DeviceSession(btc_test_address, session_id) / PassphraseState(passphrase_state, session_id)
   -> updateInternalState()
-  -> deviceSessionCache[deviceId@passphraseState] = session_id
+  -> DeviceWalletSessionStore.set(deviceId, passphraseState, session_id)
 ```
 
 同时普通业务调用前还会比较调用方传入的 passphraseState 和设备实际返回的 state。如果 attach PIN 解锁到的 hidden wallet 与调用方预期不一致，SDK 会锁设备并清缓存。
@@ -631,15 +633,17 @@ SDK 侧已有的必要行为包括：
 
 这里的 `seq` 是协议帧序号，不等同于设备 `session_id`。它用于 V2 帧级诊断和顺序控制；设备 wallet/passphrase session 仍由固件消息里的 `session_id` 表达。
 
-### 10.2 transport 中的缓存差异
+### 10.2 transport 中的 Link 管理
 
-不同 transport 对 `ProtocolV2Session` 的持有策略不同：
+当前 USB、WebUSB 和 BLE Transport 都通过 `ProtocolV2LinkManager` 按设备 key 管理 V2 Link：
 
-- WebUSB / NodeUSB：按 path 缓存 `protocolV2Sessions`，这样同一设备路径上的 seq 可以跨 API 调用递增。
-- React Native BLE：每次 V2 call 创建 session，但外层通过 `activeProtocolV2Call` 和 assembler 缓存保证同一 uuid 同时只有一个活跃 V2 调用。
-- lowlevel BLE：每次 call 创建 session，并在调用前 reset assembler；适合原生插件只负责传 chunk 的模型。
+- 同一设备的调用进入串行队列，避免两个请求互相消费响应。
+- Link 内复用 `ProtocolV2Session`、frame assembler 和平台 adapter。
+- `ProtocolV2SequenceCursor` 在普通 Link 失效、release 和 reconnect 后继续保留。
+- Transport dispose 才清除 Cursor 和全部 Link 状态。
+- USB 使用 generation 隔离旧 endpoint 回调；BLE adapter 负责 notification、receiver 和原生订阅清理。
 
-无论哪种 transport，V2 调用都需要 `ProtocolV2FrameAssembler` 重组完整 `0x5A` frame，并校验 SOF、长度、header CRC。这样平台层不需要理解 protobuf，只负责可靠传输 bytes。
+所有 Transport 都使用 `ProtocolV2FrameAssembler` 重组完整 `0x5A` frame，并校验 SOF、长度和 CRC。平台层不理解 protobuf，只负责可靠传输 bytes。完整生命周期见 [ADR-001](../../architecture/decisions/001-protocol-v2-link-lifecycle.md) 和 [ADR-002](../../architecture/decisions/002-protocol-v2-transport-boundaries.md)。
 
 ## 11. 固件/SE 侧 session 来源
 
@@ -744,9 +748,8 @@ Protocol V2 的响应当前主要按类型匹配。如果同一 session 上两�
 
 1. `getInternalState()` 没有 passphraseState 就不会查 session cache，这是当前最重要的安全边界。
 2. Pro2 的 `DeviceInfoGet` 使用当前固件真实字段，`status.passphrase_enabled` 映射到 SDK `passphrase_protection`。
-3. `DevicePool._sendDisconnectMessage()` 当前用 `this.connectedPool[i]` 取 descriptor，看起来应为 `disconnectPool[i]`，这与本文主线无关，但属于设备断开事件可疑点。
-4. `supportProSeriesAttachPinPassphrase()` 只适用于 V1 Pro，Pro2 在 `getPassphraseState()` 中直接走 `DeviceSessionGet`。
-5. 业务方法如设置、固件、文件、设备状态类通常会设置 `useDevicePassphraseState=false`，避免无意义触发 passphrase 校验。
+3. `supportProSeriesAttachPinPassphrase()` 只适用于 V1 Pro，Pro2 在 `getPassphraseState()` 中直接走 `DeviceSessionGet`。
+4. 业务方法如设置、固件、文件、设备状态类通常会设置 `useDevicePassphraseState=false`，避免无意义触发 passphrase 校验。
 
 ## 15. 关键源码索引
 

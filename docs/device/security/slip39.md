@@ -1,453 +1,158 @@
-# OneKey SLIP39 技术详解
+# OneKey SLIP-39 技术说明
 
-## 0. 核心概念说明
+> - 文档状态：当前仓库实现说明
+> - 最后代码核验：2026-07-15
+> - 事实来源：`submodules/firmware/core/src/trezor/crypto/slip39.py`、对应测试向量与 Protocol 消息类型
+> - 维护要求：升级 SLIP-39 实现或引入 extendable backup 新格式后重新核验。
 
-### 0.1 EMS vs Master Secret - 关键区别
+## 1. 核心概念
 
-**🔑 核心理解：**
-```
-设备初始化：熵源 → EMS (原始密钥材料，固定存储)
-使用时计算：EMS + passphrase + 参数 → Master Secret (最终密钥)
-```
+SLIP-39 使用 Shamir Secret Sharing 将一个秘密拆分为多份助记词，并允许通过阈值数量的份额恢复。它解决的是备份的单点丢失问题，不改变后续 BIP-32 钱包派生的基本模型。
 
-| 概念 | EMS | Master Secret |
-|------|-----|---------------|
-| **本质** | 原始密钥材料 | 处理后的最终密钥 |
-| **生成时机** | 设备初始化时 | 每次使用时动态计算 |
-| **是否固定** | 固定不变 | 受参数影响而变化 |
-| **passphrase影响** | 无影响 | 直接决定结果 |
-| **存储位置** | 设备/分片中 | 临时计算，不存储 |
-| **用途** | 中间存储 | BIP32密钥推导输入 |
+当前实现需要区分两个值：
 
-**💡 形象比喻：**
-```
-EMS = 保险箱中的原始文档（固定）
-Master Secret = 用不同密码解锁后看到的内容（可变）
+| 名称                           | 含义                                                                  |
+| ------------------------------ | --------------------------------------------------------------------- |
+| Encrypted Master Secret（EMS） | 被 SLIP-39 分片、编码到助记词中的加密主秘密。                         |
+| Master Secret                  | 使用 passphrase 对 EMS 解密后的结果，可作为 BIP-32 等密钥派生的输入。 |
 
-相同保险箱 + 不同密码 = 不同内容
-相同EMS + 不同passphrase = 不同Master Secret
-```
+```text
+Master Secret + passphrase
+  -> SLIP-39 Feistel 加密
+  -> EMS
+  -> Shamir 分片
+  -> 多份 SLIP-39 助记词
 
-## 1. SLIP39 核心原理
-
-### 1.1 什么是 SLIP39
-
-SLIP39 是基于 **Shamir 秘密分享算法** 的助记词标准，解决 BIP39 单点故障问题：
-
-```
-BIP39: 12/24个词 → 丢失 = 资产丢失
-SLIP39: N个分片，任意M个 → 部分丢失仍可恢复
+多份助记词
+  -> Shamir 恢复 EMS
+  -> 使用同一 passphrase 解密
+  -> Master Secret
 ```
 
-### 1.2 SLIP39 的两种类型
+因此：
 
-**SLIP39 Basic (单组模式):**
-```
-配置: 1个组，M-of-N分片
-示例: 3-of-5 (5个分片，任意3个可恢复)
-用途: 个人用户，简单易用
-```
+- 助记词份额恢复的是 EMS，不是已经应用 passphrase 的最终钱包秘密。
+- 同一组份额使用不同 passphrase，会得到不同 Master Secret 和不同钱包。
+- passphrase 不会被编码进助记词，也不能从助记词验证其是否正确。
 
-**SLIP39 Advanced (多组模式):**
-```
-配置: 多个组，每组有独立的M-of-N配置
-示例: 2-of-3组，每组2-of-3分片
-用途: 企业用户，复杂安全需求
-```
+## 2. Basic 与 Advanced
 
-### 1.3 OneKey/Trezor 的实现策略
+SLIP-39 支持两级阈值：
 
-| 功能 | OneKey | Trezor | 说明 |
-|------|--------|--------|------|
-| **生成 SLIP39 Basic** | ✅ | ✅ | 主要功能 |
-| **生成 SLIP39 Advanced** | ❌ | ❌ | 用户体验复杂 |
-| **恢复 SLIP39 Basic** | ✅ | ✅ | 完全支持 |
-| **恢复 SLIP39 Advanced** | ✅ | ✅ | 兼容性支持 |
-
-## 2. SLIP39 技术架构
-
-### 2.1 系统架构图
-
-```
-┌─────────────────────────────────────────────┐
-│           应用层：钱包 App                    │
-├─────────────────────────────────────────────┤
-│         业务层：交易、签名、地址生成           │
-├─────────────────────────────────────────────┤
-│      密钥推导层：BIP32 HD 钱包               │ ← 统一汇聚点
-├─────────────────────────────────────────────┤
-│    备份处理层：BIP39 单词 | SLIP39 分片      │ ← 差异化处理
-├─────────────────────────────────────────────┤
-│      硬件抽象层：OneKey/Trezor 兼容接口       │
-├─────────────────────────────────────────────┤
-│  密码学层：Shamir + Feistel + PBKDF2 + ECDSA │ ← 核心算法
-└─────────────────────────────────────────────┘
+```text
+group threshold
+└─ 每个 group 内还有 member threshold
 ```
 
-### 2.2 核心技术栈
+- Basic：通常只有一个 group，只使用组内 `M-of-N` 阈值。
+- Advanced：包含多个 group；先满足 group threshold，再分别满足入选 group 的 member threshold。
 
-**标准 SLIP39 vs Trezor/OneKey 实现：**
+例如：
 
-| 组件 | 标准 SLIP39 | Trezor/OneKey | 差异说明 |
-|------|------------|---------------|----------|
-| **Shamir 分片** | ✅ | ✅ | 完全一致 |
-| **Feistel 网络** | ❌ | ✅ 4轮 | **Trezor 独创增强** |
-| **PBKDF2 迭代** | 2,500 | 5,000 | **更高安全性** |
-| **Salt 生成** | 简单 | 复杂 | **关键差异点** |
-
-### 2.3 Feistel 网络详解
-
-**什么是 Feistel 网络？**
-
-Feistel 网络是一种对称加密结构，Trezor 用它来增强 passphrase 的安全性：
-
-```
-🔐 Feistel 4轮加密过程
-
-输入：主密钥分成左右两半 [L₀|R₀]
-     ↓
-第1轮：L₁ = R₀, R₁ = L₀ ⊕ F(R₀, passphrase, round=1)
-     ↓
-第2轮：L₂ = R₁, R₂ = L₁ ⊕ F(R₁, passphrase, round=2)
-     ↓
-第3轮：L₃ = R₂, R₃ = L₂ ⊕ F(R₂, passphrase, round=3)
-     ↓
-第4轮：L₄ = R₃, R₄ = L₃ ⊕ F(R₃, passphrase, round=4)
-     ↓
-输出：加密后的主密钥 [L₄|R₄]
-
-其中 F() = PBKDF2-HMAC-SHA256(passphrase + round + salt + data)
+```text
+2-of-3 groups
+├─ Group A: 2-of-3
+├─ Group B: 1-of-1
+└─ Group C: 3-of-5
 ```
 
-**为什么使用 Feistel 网络？**
-1. **安全增强**: 即使 passphrase 简单，也有额外保护
-2. **对称设计**: 加密和解密使用相同算法
-3. **硬件友好**: 实现简单，适合硬件钱包
-4. **标准兼容**：SLIP39 标准没有规定 passphrase 如何处理
+恢复时需要满足任意两个 group 的内部阈值。不能把“2-of-3 groups”误解为从全部助记词中任取两份。
 
-## 3. EMS vs Master Secret 概念详解
+## 3. Feistel 与 PBKDF2
 
-### 3.1 核心概念区分
+四轮 Feistel 加密是当前仓库所实现 SLIP-39 passphrase 处理的一部分，不是 OneKey 私自添加、会破坏标准兼容性的增强算法。
 
-**EMS (Encrypted Master Secret) - 原始密钥材料：**
-```
-设备初始化时生成：
-熵源 → EMS (32字节原始数据)
-特点：
-- 从熵源直接生成，固定不变
-- 通过SLIP39分片保护和恢复
-- 与passphrase无关
-- 所有同源分片恢复出相同的EMS
-```
+当前实现常量为：
 
-**Master Secret - 最终密钥：**
-```
-使用时动态计算：
-EMS + passphrase + SLIP39参数 → Master Secret
-特点：
-- 从EMS动态派生
-- 受passphrase和SLIP39参数影响
-- 用于BIP32等密钥推导的输入
-- 不同参数产生完全不同结果
+| 参数                         |      当前值 |
+| ---------------------------- | ----------: |
+| `_ROUND_COUNT`               |         `4` |
+| `_BASE_ITERATION_COUNT`      |     `10000` |
+| `DEFAULT_ITERATION_EXPONENT` |         `1` |
+| `_CUSTOMIZATION_STRING`      | `b"shamir"` |
+
+每一轮的 PBKDF2 次数为：
+
+```text
+(10000 << iteration_exponent) / 4
 ```
 
-### 3.2 标准 SLIP39 vs OneKey 流程对比
+因此默认 `iteration_exponent = 1` 时：
 
-**标准参数配置：**
-```typescript
-const STANDARD_SLIP39 = {
-  iterationExponent: 0,        // 2500 次 PBKDF2
-  extendableBackupFlag: 0,     // 非扩展模式
-  salt: "shamir" + identifier  // 固定 salt 前缀
-};
+- 四轮合计 20000 次。
+- 每轮 5000 次。
+
+不能把“每轮 5000 次”写成整个算法只执行 5000 次，也不能把 Feistel 与 PBKDF2 描述为两套互斥方案。
+
+## 4. Identifier、salt 与元数据
+
+当前随仓库实现使用：
+
+- 15 位随机 identifier。
+- 5 位 iteration exponent。
+- salt 为 `b"shamir" + identifier.to_bytes(...)`。
+- RS1024 checksum 同样使用 `b"shamir"` customization string。
+
+当前 `Share` 解析结构包含：
+
+```text
+identifier
+iteration_exponent
+group_index
+group_threshold
+group_count
+member_index
+member_threshold
+share_value
 ```
 
-**标准 SLIP39 实现：**
-```
-1. 设备初始化：熵源 → EMS (直接存储)
-2. 分片恢复：SLIP39分片 → EMS
-3. 密钥推导：EMS + 简单PBKDF2(passphrase, 2500次) → Master Secret
-```
+本文所对应的实现没有通过“第三个词固定为 academic”来判定格式或兼容性。助记词中的单个词只是位编码结果；identifier、阈值、索引、迭代指数和 checksum 必须整体解析。
 
-**OneKey/Trezor 增强实现：**
-```
-1. 设备初始化：熵源 → EMS (直接存储)
-2. 分片恢复：SLIP39分片 → EMS  
-3. 密钥推导：EMS + Feistel网络4轮(passphrase, 5000次) → Master Secret
+以下判断方式是错误的：
+
+```ts
+share.split(' ')[2] === 'academic';
 ```
 
-**关键差异：都是先有EMS，后通过不同算法计算Master Secret**
+它既不能验证 checksum，也不能证明所有份额属于同一组，更不能证明 iteration exponent 或阈值配置一致。
 
-**OneKey 增强配置：**
-```typescript
-const ONEKEY_ENHANCED = {
-  iterationExponent: 1,        // 5000 次 PBKDF2
-  extendableBackupFlag: 1,     // 可扩展模式
-  salt: [],                    // 空 salt
-  feistelRounds: 4            // 4轮 Feistel 加密
-};
-```
+## 5. 恢复校验
 
-### 3.3 关键差异对比
+恢复前至少要验证：
 
-| 差异点 | 标准 SLIP39 | OneKey/Trezor | 影响 |
-|--------|------------|---------------|------|
-| **Passphrase 处理** | 简单 PBKDF2 | Feistel 4轮加密 | 🔴 地址完全不同 |
-| **PBKDF2 强度** | 2,500 次 | 5,000 次 | 🔴 地址完全不同 |
-| **Salt 生成** | "shamir" + id | 空数组 | 🔴 地址完全不同 |
-| **安全性** | 标准 | 增强 | ✅ OneKey 更安全 |
+1. 所有助记词长度和 RS1024 checksum 有效。
+2. 所有份额使用相同 identifier 和 iteration exponent。
+3. `group_threshold`、`group_count` 在所有份额中一致。
+4. 每个 group 内的 member threshold 一致。
+5. 提供的 group 数量正好满足 group threshold。
+6. 每个入选 group 的 member 数量正好满足该组阈值。
+7. 恢复后使用正确 passphrase 解密 EMS。
 
-**为什么 OneKey 选择增强实现？**
-1. **安全考虑**: Feistel 网络提供更强的 passphrase 保护
-2. **硬件优化**: 对称设计更适合硬件实现
-3. **生态统一**: 与 Trezor 保持完全一致
+份额阈值满足只能证明 EMS 可以恢复，不能证明 passphrase 正确。错误 passphrase 仍会产生格式合法但完全不同的钱包。
 
-### 3.4 兼容性影响
+## 6. 与 SDK 的边界
 
-```
-场景分析：
-标准工具生成 → OneKey 恢复 + passphrase
-结果：地址不匹配（因为处理流程不同）
+Hardware JS SDK 负责把 Reset/Recovery 等请求发送给设备，并处理设备端的词语输入、确认和状态消息。应用层不应：
 
-OneKey 生成 → 标准工具恢复 + passphrase
-结果：地址不匹配（因为处理流程不同）
+- 自行实现一套与固件不同的 SLIP-39 加解密再假设地址兼容。
+- 根据某个固定词判断助记词来源。
+- 在日志、遥测或错误上报中记录完整份额、EMS、Master Secret 或 passphrase。
+- 把 SLIP-39 份额当作可以独立使用的普通 BIP-39 助记词。
 
-OneKey ↔ Trezor
-结果：完全兼容（相同的增强流程）
-```
+如果应用需要离线验证或迁移 SLIP-39，应使用经过测试向量验证、与目标格式版本一致的实现，并至少覆盖：
 
-## 4. SLIP39 核心参数详解
+- Basic 与 Advanced 阈值恢复。
+- 错误 checksum。
+- 不同 identifier 混用。
+- 不同 iteration exponent 混用。
+- 不足或超出阈值的份额集合。
+- 空 passphrase、非空 passphrase 和 Unicode 规范化。
 
-### 4.1 影响地址生成的关键参数
+## 7. 当前实现索引
 
-**🔐 全局参数（必须保持一致）：**
-
-| 参数 | 英文名 | OneKey值 | 作用 | 影响范围 |
-|------|--------|----------|------|----------|
-| **迭代指数** | `iterationExponent` | 1 | PBKDF2 强度 | 🔴 影响所有地址 |
-| **扩展标志** | `extendableBackupFlag` | 1 | 支持添加分片 | 🔴 影响所有地址 |
-| **标识符** | `identifier` | 随机 | 分片组标识 | 🔴 影响所有地址 |
-
-**📊 分组参数（仅影响恢复逻辑）：**
-
-| 参数 | 英文名 | OneKey值 | 作用 | 影响范围 |
-|------|--------|----------|------|----------|
-| **组阈值** | `groupThreshold` | 1 | 需要几个组 | 🟡 仅恢复验证 |
-| **组数量** | `groupCount` | 1 | 总组数 | 🟡 仅恢复验证 |
-| **成员阈值** | `memberThreshold` | 用户配置 | 组内分片数 | 🟡 仅恢复验证 |
-
-### 4.2 OneKey 默认配置
-
-```typescript
-const ONEKEY_SLIP39_CONFIG = {
-  // 🔴 影响地址的全局参数
-  iterationExponent: 1,        // PBKDF2 迭代 = 2^1 * 2500 = 5000次
-  extendableBackupFlag: 1,     // 可扩展备份模式
-
-  // 🟡 仅影响恢复的分组参数
-  groupThreshold: 1,           // SLIP39 Basic: 只需1个组
-  groupCount: 1,               // SLIP39 Basic: 只有1个组
-  memberThreshold: 3,          // 用户可配置: 2-5
-  memberCount: 4               // 用户可配置: 3-7
-};
-```
-
-### 4.3 参数影响机制详解
-
-**迭代指数的安全等级：**
-
-| 迭代指数 | PBKDF2 轮数 | 破解难度 | 适用场景 |
-|---------|------------|---------|----------|
-| 0 | 2,500 | 较低 | 测试环境 |
-| 1 | 5,000 | 标准 | OneKey/Trezor 默认 |
-| 2 | 10,000 | 较高 | 企业用户 |
-| 3 | 20,000 | 很高 | 超高安全需求 |
-
-**扩展标志的影响：**
-
-```typescript
-// extendableBackupFlag = 1 (OneKey/Trezor 默认)
-Salt = [] // 空数组
-
-// extendableBackupFlag = 0 (第三方工具可能使用)
-Salt = "shamir" + identifier // 非空数组
-
-// 结果：不同的 Salt → 不同的 Master Secret → 不同的地址
-```
-## 5. Passphrase 处理机制详解
-
-### 5.1 OneKey/Trezor 的 Passphrase 处理流程
-
-**正确的流程理解：EMS → Master Secret**
-
-```typescript
-// 第一步：从 SLIP39 分片恢复 EMS
-// 注意：这里恢复的是原始的EMS，不受passphrase影响
-const ems = Slip39.recoverSecret(shares); // 恢复固定的EMS
-
-// 第二步：使用 EMS + passphrase 计算最终 Master Secret
-// 这是OneKey固件中slip39.decrypt()函数的实现
-function calculateMasterSecret(ems: Buffer, passphrase: string): Buffer {
-  const salt = getSalt(identifier, extendableBackupFlag);
-
-  // Feistel 网络 4轮加密
-  let left = ems.slice(0, 16);  // 前16字节
-  let right = ems.slice(16);    // 后16字节
-
-  for (let round = 1; round <= 4; round++) {
-    const roundKey = pbkdf2(
-      passphrase + round.toString(),
-      salt.concat(right),
-      2500 * Math.pow(2, iterationExponent)
-    );
-
-    const newLeft = right;
-    const newRight = xor(left, roundKey.slice(0, 16));
-
-    left = newLeft;
-    right = newRight;
-  }
-
-  return Buffer.concat([left, right]);
-}
-```
-
-### 5.2 关键技术细节
-
-**Salt 生成机制（核心差异点）：**
-
-```typescript
-function getSalt(identifier: number[], extendableBackupFlag: number): number[] {
-  if (extendableBackupFlag) {
-    return []; // OneKey/Trezor: 空 salt
-  }
-  const salt = stringToBytes('shamir');
-  return salt.concat(identifier); // 第三方工具: 'shamir' + identifier
-}
-```
-
-**Master Secret 计算公式：**
-```
-Master Secret = Feistel4Rounds(EMS, passphrase, salt, iterations)
-
-其中：
-- EMS: 设备初始化时生成的原始密钥材料（固定不变）
-- passphrase: 用户设置的密码短语（影响最终结果）
-- salt: 基于 extendableBackupFlag 和 identifier 计算
-- iterations: 2500 * 2^iterationExponent
-
-关键理解：
-✅ 相同EMS + 相同参数 = 相同Master Secret
-✅ 相同EMS + 不同passphrase = 不同Master Secret  
-✅ 相同EMS + 不同SLIP39参数 = 不同Master Secret
-```
-
-### 5.3 兼容性问题的根本原因
-
-**相同 EMS，不同 Master Secret：**
-
-```
-测试案例：
-OneKey 助记词: boring withdraw academic acid...
-第三方助记词: reward husband acrobat easy...
-
-结果分析：
-✅ EMS 完全相同: 902226b2470fe02a36a0f1120eeecfee
-✅ 无 passphrase 时，Master Secret 相同
-❌ 有 passphrase 时，Master Secret 完全不同！
-
-原因：
-OneKey → extendableBackupFlag=1 → Salt=[] → Master Secret A
-第三方 → extendableBackupFlag=0 → Salt="shamir"+id → Master Secret B
-```
-
-### 5.4 "Academic" 词的技术作用
-
-**助记词编码结构：**
-
-```
-SLIP39 助记词结构：
-[词1] [词2] [标识词] [配置词] [数据词...] [校验词...]
-  ↓     ↓      ↓        ↓
-identifier  "academic"  配置信息
-(2词编码)   (标准标识)  (参数编码)
-```
-
-**不同实现的编码差异：**
-
-| 助记词来源 | 第3位词汇 | extendableBackupFlag | Salt 生成 |
-|-----------|----------|---------------------|-----------|
-| OneKey/Trezor | "academic" | 1 | `[]` |
-| 第三方工具 | 其他词汇 | 0 | `"shamir" + identifier` |
-
-**为什么第3位词汇如此重要？**
-- 编码了 SLIP39 的配置信息
-- 影响 `extendableBackupFlag` 参数
-- 直接决定 Salt 的计算方式
-- 最终影响 Master Secret 和所有地址
-
-## 6. 兼容性检测与风险防范
-
-### 6.1 核心检测方法
-
-**🎯 一行代码检测兼容性：**
-
-```typescript
-function isOneKeyCompatible(shares: string[]): boolean {
-  return shares.every(share => share.split(' ')[2] === 'academic');
-}
-```
-## 7. 开发者快速参考
-
-### 7.1 核心 API 配置
-
-**必须配置的参数：**
-```typescript
-const ONEKEY_SLIP39_CONFIG = {
-  iterationExponent: 1,        // 与 OneKey 硬件一致
-  extendableBackupFlag: 1,     // 与 OneKey 硬件一致
-  groupThreshold: 1,           // SLIP39 Basic
-  groupCount: 1               // SLIP39 Basic
-};
-```
-
-### 7.2 常见问题 FAQ
-
-**Q: 为什么相同的 SLIP39 助记词在不同平台生成不同地址？**
-A: 参数配置不一致，确保 `iterationExponent=1` 和 `extendableBackupFlag=1`。
-
-**Q: 如何判断助记词是否为 OneKey 标准？**
-A: 检查第3个词是否为 "academic"。
-
-**Q: 第三方工具生成的 SLIP39 能在 OneKey 使用吗？**
-A: 可以恢复，但使用 passphrase 时可能地址不匹配。
-
-### 7.3 最佳实践
-
-**✅ 推荐：**
-- 使用 OneKey 硬件生成 SLIP39 助记词
-- 在 SDK 中集成兼容性检测
-- 对第三方助记词给出明确警告
-
-**❌ 避免：**
-- 直接使用第三方助记词 + passphrase
-- 忽略兼容性检查
-- 使用错误的参数配置
-
-## 8. 技术总结
-
-### 8.1 核心技术洞察
-
-**🎯 关键发现：**
-1. **Salt 生成机制**: `Salt = extendableBackupFlag ? [] : "shamir" + identifier`
-2. **"Academic" 标识符**: 第3位词汇标识 OneKey/Trezor 标准实现
-3. **Feistel 网络**: 4轮加密增强 passphrase 安全性
-4. **兼容性关键**: 相同的参数配置确保相同的 Salt 计算
-
-### 8.2 兼容性矩阵
-
-| 场景 | OneKey ↔ Trezor | OneKey ↔ 第三方 | 风险等级 |
-|------|----------------|----------------|---------|
-| 无 Passphrase | ✅ 完全兼容 | ✅ 可以恢复 | 🟢 低风险 |
-| 有 Passphrase | ✅ 完全兼容 | ❌ 地址不匹配 | 🔴 高风险 |
----
+- SLIP-39 高层实现：`submodules/firmware/core/src/trezor/crypto/slip39.py`
+- C 扩展与词表：`submodules/firmware/crypto/slip39.c`
+- 单元测试：`submodules/firmware/core/tests/test_trezor.crypto.slip39.py`
+- 测试向量：`submodules/firmware/core/tests/slip39_vectors.py`
+- 设备恢复测试：`submodules/firmware/tests/device_tests/test_msg_recoverydevice_slip39_basic.py`
+- Advanced 恢复测试：`submodules/firmware/tests/device_tests/test_msg_recoverydevice_slip39_advanced.py`

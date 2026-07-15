@@ -1,6 +1,5 @@
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import transport, {
-  LogBlockCommand,
   PROTOCOL_V1_MESSAGE_HEADER_SIZE,
   PROTOCOL_V2_BLE_FRAME_MAX_BYTES,
   PROTOCOL_V2_CHANNEL_BLE_UART,
@@ -196,20 +195,7 @@ export default class LowlevelTransport {
         `Device protocol has not been detected for ${uuid}`
       );
     }
-    if (LogBlockCommand.has(name)) {
-      this.Log.debug('lowlevel-transport', 'call-', ' name: ', name, ' protocol: ', protocol);
-    } else {
-      this.Log.debug(
-        'lowlevel-transport',
-        'call-',
-        ' name: ',
-        name,
-        ' data: ',
-        data,
-        ' protocol: ',
-        protocol
-      );
-    }
+    this.Log.debug('transport call', { name, protocol });
 
     if (protocol === 'V2') {
       return this.callProtocolV2(uuid, name, data, options);
@@ -232,8 +218,6 @@ export default class LowlevelTransport {
     const buffers = ProtocolV1.encodeTransportPackets(messages, name, data);
     for (const o of buffers) {
       const outData = o.toString('hex');
-      // Upload resources on low-end phones may OOM
-      this.Log.debug('send hex strting: ', outData);
       try {
         await this.plugin.send(uuid, outData);
       } catch (e) {
@@ -244,7 +228,6 @@ export default class LowlevelTransport {
 
     try {
       const response = await this.readProtocolV1Message(uuid, options?.timeoutMs);
-      this.Log.debug('receive data: ', response);
       const jsonData = ProtocolV1.decodeMessage(messages, response);
       return check.call(jsonData);
     } catch (e) {
