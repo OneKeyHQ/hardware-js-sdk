@@ -1138,7 +1138,7 @@ export class Device extends EventEmitter {
     // both allow and require cases might generate single unexpected mode
     if (!this.isUnacquired()) {
       // allow cases
-      if (this.isBootloader() && !allow.includes(UI_REQUEST.BOOTLOADER)) {
+      if (this.isBootloader() && !this.isProtocolV2() && !allow.includes(UI_REQUEST.BOOTLOADER)) {
         return UI_REQUEST.BOOTLOADER;
       }
       if (!this.isInitialized() && !allow.includes(UI_REQUEST.NOT_INITIALIZE)) {
