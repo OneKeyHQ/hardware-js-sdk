@@ -19,6 +19,10 @@ const optionalJsonFiles = ['../messages-protocol-v2.json'];
 const OPTIONAL_DUPLICATE_TYPE_ALIASES = {
   DeviceInfo: 'ProtocolV2DeviceInfo',
 };
+const OPTIONAL_NESTED_TYPE_ALIASES = [
+  { parent: 'Failure', name: 'FailureType', alias: 'ProtocolV2FailureType' },
+  { parent: 'Features', name: 'Capability', alias: 'ProtocolV2Capability' },
+];
 const messageTypeAliases = {};
 const skipMessageTypeKeys = new Set(Object.values(OPTIONAL_DUPLICATE_TYPE_ALIASES));
 
@@ -59,6 +63,7 @@ const ENUM_KEYS = [
   'ButtonRequestType',
   'PinMatrixRequestType',
   'WordRequestType',
+  'ProtocolV2Capability',
 ];
 
 const parseEnumTypescript = (itemName, item) => {
@@ -317,6 +322,10 @@ optionalJsonFiles.forEach(jsonFile => {
   const jsonPath = path.join(__dirname, jsonFile);
   if (!fs.existsSync(jsonPath)) return;
   const optionalJson = readJson(jsonPath);
+  OPTIONAL_NESTED_TYPE_ALIASES.forEach(({ parent, name, alias }) => {
+    const definition = optionalJson.nested[parent]?.nested?.[name];
+    if (definition) optionalJson.nested[alias] = definition;
+  });
   optionalJsons.push(optionalJson);
   Object.keys(optionalJson.nested).forEach(e => {
     if (!json.nested[e]) return; // V2-only type, parsed after the V1 pass below

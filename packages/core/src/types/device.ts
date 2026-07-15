@@ -129,7 +129,7 @@ export type DeviceFeaturesRaw = {
   protocolV2DeviceInfo?: ProtocolV2DeviceInfo;
 };
 
-export type Features = {
+export type NormalizedFeatures = {
   protocol: DeviceFeaturesProtocol;
   protocolVersion?: number | null;
   deviceType: IDeviceType;
@@ -182,6 +182,10 @@ export type Features = {
   unlockedAttachPin?: boolean;
   raw?: DeviceFeaturesRaw;
 };
+
+export type Features = NormalizedFeatures &
+  Partial<Omit<PROTO.Features, keyof NormalizedFeatures>> &
+  Partial<Omit<PROTO.OnekeyFeatures, keyof NormalizedFeatures | keyof PROTO.Features>>;
 
 export type OnekeyFeatures = PROTO.OnekeyFeatures;
 

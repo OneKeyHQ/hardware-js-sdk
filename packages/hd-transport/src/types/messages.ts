@@ -2924,6 +2924,8 @@ export type UnLockDeviceResponse = {
 // GetPassphraseState
 export type GetPassphraseState = {
   passphrase_state?: string;
+  _only_main_pin?: boolean;
+  allow_create_attach_pin?: boolean;
 };
 
 // PassphraseState
@@ -5092,6 +5094,37 @@ export type FilesystemFormat = {
 
 // PortfolioUpdate
 export type PortfolioUpdate = {};
+
+export enum ProtocolV2FailureType {
+  Failure_InvalidMessage = 1,
+  Failure_UndefinedError = 2,
+  Failure_UsageError = 3,
+  Failure_DataError = 4,
+  Failure_ProcessError = 5,
+}
+
+export enum Enum_ProtocolV2Capability {
+  Capability_Bitcoin = 1,
+  Capability_Bitcoin_like = 2,
+  Capability_Binance = 3,
+  Capability_Cardano = 4,
+  Capability_Crypto = 5,
+  Capability_EOS = 6,
+  Capability_Ethereum = 7,
+  Capability_Lisk = 8,
+  Capability_Monero = 9,
+  Capability_NEM = 10,
+  Capability_Ripple = 11,
+  Capability_Stellar = 12,
+  Capability_Tezos = 13,
+  Capability_U2F = 14,
+  Capability_Shamir = 15,
+  Capability_ShamirGroups = 16,
+  Capability_PassphraseEntry = 17,
+  Capability_AttachToPin = 18,
+  Capability_EthereumTypedData = 1000,
+}
+export type ProtocolV2Capability = keyof typeof Enum_ProtocolV2Capability;
 
 // custom connect definitions
 export type MessageType = {

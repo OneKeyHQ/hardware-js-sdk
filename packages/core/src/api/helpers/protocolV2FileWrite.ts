@@ -129,17 +129,21 @@ export async function writeProtocolV2File(options: ProtocolV2FileWriteOptions) {
     );
     options.throwIfAborted?.();
     lastMessage = response.message;
-    const processedByte = Number(response.message?.processed_byte);
-    written =
-      Number.isFinite(processedByte) && processedByte > offset
-        ? processedByte - startOffset
-        : written + chunk.byteLength;
-    if (written > dataLength) {
+    const rawProcessedByte = response.message?.processed_byte;
+    const processedByte = Number(rawProcessedByte);
+    if (
+      rawProcessedByte !== undefined &&
+      (!Number.isFinite(processedByte) ||
+        processedByte <= offset ||
+        processedByte > offset + chunk.byteLength)
+    ) {
       throw ERRORS.TypedError(
         HardwareErrorCode.RuntimeError,
         `FilesystemFileWrite invalid processed_byte ${processedByte}`
       );
     }
+    written =
+      rawProcessedByte === undefined ? written + chunk.byteLength : processedByte - startOffset;
     chunks += 1;
     const elapsedMs = Date.now() - startTime;
     const transferredBytes = Math.min(written, dataLength);

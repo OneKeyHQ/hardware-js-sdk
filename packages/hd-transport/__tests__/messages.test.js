@@ -6,6 +6,7 @@ const {
 const v1Messages = require('../../core/src/data/messages/messages.json');
 const v2Messages = require('../messages-protocol-v2.json');
 const coreV2Messages = require('../../core/src/data/messages/messages-protocol-v2.json');
+const generatedTypes = require('../src/types/messages');
 
 // const json = require('./data/messages.json');
 
@@ -83,6 +84,16 @@ describe('messages', () => {
       FW_MGMT_TARGET_SE02: 8,
       FW_MGMT_TARGET_SE03: 9,
       FW_MGMT_TARGET_SE04: 10,
+    });
+  });
+
+  test('Protocol V2 conflicting enums keep their own wire values', () => {
+    expect(generatedTypes.ProtocolV2FailureType).toMatchObject({
+      Failure_DataError: 4,
+      Failure_ProcessError: 5,
+    });
+    expect(generatedTypes.Enum_ProtocolV2Capability).toMatchObject({
+      Capability_AttachToPin: 18,
     });
   });
 

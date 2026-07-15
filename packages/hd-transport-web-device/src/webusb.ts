@@ -813,6 +813,17 @@ export default class WebUsbTransport {
     this.protocolV2Assemblers.get(path)?.reset();
     try {
       return await session.call(name, data, options);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+      if (message.includes('protocol v2 read timeout') || message.includes('response timeout')) {
+        try {
+          await this.resetConnectionAfterProbe(path);
+        } catch (resetError) {
+          this.Log.debug('[WebUsbTransport] Protocol V2 timeout reset failed:', resetError);
+        }
+      }
+      throw error;
     } finally {
       this.protocolV2ReadTimeouts.delete(path);
     }
@@ -920,6 +931,8 @@ export default class WebUsbTransport {
     this.deviceProtocolHints.delete(path);
     this.protocolV2Assemblers.get(path)?.reset();
     this.protocolV2Assemblers.delete(path);
+    this.protocolV2Sessions.delete(path);
+    this.protocolV2ReadTimeouts.delete(path);
     this.deviceEndpoints.delete(path);
   }
 
