@@ -27,7 +27,7 @@ import ProtocolInfoRequest from '../src/api/protocol-v2/ProtocolInfoRequest';
 import EVMSignTypedData from '../src/api/evm/EVMSignTypedData';
 import EVMSignMessageEIP712 from '../src/api/evm/EVMSignMessageEIP712';
 import FirmwareUpdateV3 from '../src/api/FirmwareUpdateV3';
-import FirmwareUpdateV4 from '../src/api/FirmwareUpdateV4';
+import FirmwareUpdateV4, { assertProtocolV2ReconnectIdentity } from '../src/api/FirmwareUpdateV4';
 import GetDeviceInfo from '../src/api/GetDeviceInfo';
 import GetPassphraseState from '../src/api/GetPassphraseState';
 import GetOnekeyFeatures from '../src/api/GetOnekeyFeatures';
@@ -63,7 +63,11 @@ import {
   refreshProtocolV2DeviceStatus,
 } from '../src/protocols/protocol-v2/walletSession';
 import { runMethodWithUnlockRetry } from '../src/protocols/protocol-v2/unlockRetry';
-import { buildProfileFromProtocolV2, buildProtocolV2FeaturesPayload } from '../src/deviceProfile';
+import {
+  buildProfileFromProtocolV2,
+  buildProtocolV1FeaturesPayload,
+  buildProtocolV2FeaturesPayload,
+} from '../src/deviceProfile';
 import {
   getDeviceType,
   getFirmwareType,
@@ -320,6 +324,38 @@ async function requestProtocolV2Features({
 }
 
 describe('Protocol V2 feature adapter', () => {
+  test('keeps legacy snake_case feature fields for existing SDK consumers', () => {
+    const protocolV1 = buildProtocolV1FeaturesPayload({
+      device_id: 'v1-device',
+      session_id: 'v1-session',
+      ble_name: 'Classic BLE',
+      passphrase_protection: true,
+      unlocked: true,
+    } as any);
+    const protocolV2 = buildProtocolV2FeaturesPayload({
+      hw: { serial_no: 'P2-001' },
+      coprocessor: { bt_adv_name: 'Pro 2 BLE' },
+      status: {
+        device_id: 'v2-device',
+        unlocked: true,
+        passphrase_enabled: true,
+      },
+    } as any);
+
+    expect(protocolV1).toMatchObject({
+      device_id: 'v1-device',
+      session_id: 'v1-session',
+      ble_name: 'Classic BLE',
+      passphrase_protection: true,
+    });
+    expect(protocolV2).toMatchObject({
+      device_id: 'v2-device',
+      ble_name: 'Pro 2 BLE',
+      onekey_device_type: 'PRO2',
+      passphrase_protection: true,
+    });
+  });
+
   test('normalizes Protocol V2 DeviceInfo into existing Features fields', () => {
     const features = normalizeProtocolV2Features(descriptor as any, {
       protocol_version: 1,
@@ -1629,7 +1665,7 @@ describe('Protocol V2 feature adapter', () => {
       }),
       expect.anything()
     );
-    expect(message).toEqual({});
+    expect(message).toEqual({ onekey_device_type: 'PRO2' });
     expect(message).not.toHaveProperty('label');
   });
 
@@ -3572,7 +3608,7 @@ describe('Protocol V2 firmware update targets', () => {
     expect(writeOffsets).toEqual([0, 4000, 0, 4000, 8000]);
   });
 
-  test('continues to DeviceFirmwareUpdate when FilesystemFileWrite returns processed chunk length', async () => {
+  test('rejects a chunk-relative processed_byte during firmware staging', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -3588,23 +3624,6 @@ describe('Protocol V2 firmware update targets', () => {
           },
         });
       }
-      if (name === 'FilesystemPathInfoQuery') {
-        return Promise.resolve({
-          type: 'FilesystemPathInfo',
-          message: { exist: true, directory: false, size: 4097 },
-        });
-      }
-      if (name === 'DeviceFirmwareUpdateRequest') {
-        return Promise.resolve({ type: 'Success', message: { message: 'ok' } });
-      }
-      if (name === 'DeviceFirmwareUpdateStatusGet') {
-        return Promise.resolve({
-          type: 'DeviceFirmwareUpdateStatus',
-          message: {
-            records: [{ target_id: 4, status: 2 }],
-          },
-        });
-      }
       return Promise.reject(new Error(`unexpected call ${name}`));
     });
 
@@ -3614,27 +3633,15 @@ describe('Protocol V2 firmware update targets', () => {
     method.postProgressMessage = jest.fn();
     method.postTipMessage = jest.fn();
 
-    await (method as any).executeProtocolV2Update({
-      bootloaderBinary: null,
-      fwBinaryMap: [
-        {
-          fileName: 'firmware.bin',
-          binary: new Uint8Array(4097).buffer,
-          targetId: 4,
-        },
-      ],
-    });
-
-    expect(typedCall).toHaveBeenCalledWith(
-      'DeviceFirmwareUpdateRequest',
-      ['Success', 'DeviceFirmwareUpdateStatus'],
-      {
-        targets: [{ target_id: 4, path: 'vol0:/firmware.bin' }],
-      },
-      expect.objectContaining({
-        timeoutMs: 3 * 60 * 1000,
+    await expect(
+      (method as any).protocolV2WriteWholeFile({
+        payload: new Uint8Array(4097).buffer,
+        filePath: 'vol0:/firmware.bin',
+        processedSize: 0,
+        totalSize: 4097,
       })
-    );
+    ).rejects.toMatchObject({ errorCode: HardwareErrorCode.EmmcFileWriteFirmwareError });
+    expect(typedCall).toHaveBeenCalledTimes(2);
   });
 
   test('caps native BLE firmware upload chunks below the WebUSB limit', async () => {
@@ -3796,6 +3803,26 @@ describe('Protocol V2 firmware update method', () => {
     });
   });
 
+  test('does not report a generic USB transfer failure as a started firmware update', async () => {
+    const method = new DeviceFirmwareUpdate({
+      id: 1,
+      payload: {
+        method: 'deviceFirmwareUpdate',
+        targetId: 4,
+        path: 'vol0:firmware.bin',
+      },
+    });
+    method.init();
+    const error = new Error(
+      "Failed to execute 'transferOut' on 'USBDevice': A transfer error has occurred"
+    );
+    (method as any).device = stubDevice({
+      commands: { typedCall: jest.fn().mockRejectedValue(error) },
+    });
+
+    await expect(method.run()).rejects.toBe(error);
+  });
+
   test('rejects missing or invalid firmware targets before transport call', async () => {
     const typedCall = jest.fn();
     const method = new DeviceFirmwareUpdate({
@@ -3924,6 +3951,20 @@ describe('Protocol V2 firmware update method', () => {
         },
       }
     );
+  });
+});
+
+describe('Protocol V2 firmware reconnect identity', () => {
+  test('rejects a different device before firmware transfer resumes', () => {
+    expect(() => assertProtocolV2ReconnectIdentity('expected-device', 'other-device')).toThrow(
+      'identity mismatch'
+    );
+    expect(() => assertProtocolV2ReconnectIdentity('expected-device', undefined)).toThrow(
+      'identity unavailable'
+    );
+    expect(() =>
+      assertProtocolV2ReconnectIdentity('expected-device', 'expected-device')
+    ).not.toThrow();
   });
 });
 
@@ -4346,7 +4387,7 @@ describe('Protocol V2 file write method', () => {
   });
 
   test('uses demo-aligned overwrite and append defaults', async () => {
-    const typedCall = jest.fn().mockResolvedValue({ message: { processed_byte: 1 } });
+    const typedCall = jest.fn().mockResolvedValue({ message: { processed_byte: 2 } });
     const method = new FileWrite({
       id: 1,
       payload: {

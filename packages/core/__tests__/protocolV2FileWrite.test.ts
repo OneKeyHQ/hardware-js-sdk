@@ -52,4 +52,16 @@ describe('writeProtocolV2File', () => {
       })
     ).rejects.toMatchObject({ errorCode: HardwareErrorCode.RuntimeError });
   });
+
+  test('设备返回未前进的绝对 processed_byte 时立即失败', async () => {
+    const typedCall = jest.fn().mockResolvedValue({ message: { processed_byte: 0 } });
+
+    await expect(
+      writeProtocolV2File({
+        commands: { typedCall } as any,
+        path: 'vol0:/wallpapers/user/test.bin',
+        data: new Uint8Array([1, 2, 3]),
+      })
+    ).rejects.toMatchObject({ errorCode: HardwareErrorCode.RuntimeError });
+  });
 });

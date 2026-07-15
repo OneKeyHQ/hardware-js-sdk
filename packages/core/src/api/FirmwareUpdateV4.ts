@@ -379,6 +379,25 @@ const parseProtocolV2OkppHeader = (bytes: Uint8Array): ProtocolV2OkppHeader | nu
   };
 };
 
+export const assertProtocolV2ReconnectIdentity = (
+  expectedDeviceId?: string,
+  actualDeviceId?: string
+) => {
+  if (!expectedDeviceId) return;
+  if (!actualDeviceId) {
+    throw ERRORS.TypedError(
+      HardwareErrorCode.DeviceNotFound,
+      'Protocol V2 reconnect identity unavailable'
+    );
+  }
+  if (actualDeviceId !== expectedDeviceId) {
+    throw ERRORS.TypedError(
+      HardwareErrorCode.DeviceNotFound,
+      `Protocol V2 reconnect identity mismatch: expected ${expectedDeviceId}, received ${actualDeviceId}`
+    );
+  }
+};
+
 /**
  * FirmwareUpdateV4 is the complete Protocol V2 firmware update flow.
  *
@@ -388,6 +407,8 @@ const parseProtocolV2OkppHeader = (bytes: Uint8Array): ProtocolV2OkppHeader | nu
  * - completion waits for target status to finish, reboots to normal, then polls DeviceInfo
  */
 export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareUpdateV4Params> {
+  private protocolV2ExpectedDeviceId?: string;
+
   init() {
     this.allowDeviceMode = [UI_REQUEST.BOOTLOADER, UI_REQUEST.NOT_INITIALIZE];
     this.requireDeviceMode = [];
@@ -476,6 +497,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
   private async runProtocolV2() {
     const deviceFeatures = await this.getProtocolV2DeviceFeatures();
+    this.protocolV2ExpectedDeviceId = deviceFeatures.deviceId ?? undefined;
     const deviceFirmwareType = getFirmwareType(deviceFeatures);
     const firmwareType = this.params.firmwareType ?? deviceFirmwareType;
 
@@ -917,6 +939,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
         });
         const features = this.device.updateProtocolV2Features(deviceInfo);
+        assertProtocolV2ReconnectIdentity(
+          this.protocolV2ExpectedDeviceId,
+          features.deviceId ?? undefined
+        );
         if (features?.bootloaderMode) {
           return features;
         }
@@ -1134,6 +1160,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       request: PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST,
     });
     const features = this.device.updateProtocolV2Features(deviceInfo);
+    assertProtocolV2ReconnectIdentity(
+      this.protocolV2ExpectedDeviceId,
+      features.deviceId ?? undefined
+    );
     if (this.isProtocolV2NormalModeFeatures(features)) {
       Log.log('Protocol V2 firmware install finished; device is back in normal mode');
       return true;
@@ -1288,6 +1318,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           request: PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST,
         });
         const features = this.device.updateProtocolV2Features(deviceInfo);
+        assertProtocolV2ReconnectIdentity(
+          this.protocolV2ExpectedDeviceId,
+          features.deviceId ?? undefined
+        );
         if (features.bootloaderMode || features.mode === 'bootloader') {
           throw ERRORS.TypedError(
             HardwareErrorCode.DeviceNotFound,
@@ -1334,6 +1368,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       this.device.commands.disposed = false;
       this.device.getCommands().mainId = this.device.mainId ?? '';
       await this.device.initialize();
+      assertProtocolV2ReconnectIdentity(
+        this.protocolV2ExpectedDeviceId,
+        this.device.getCurrentDeviceId()
+      );
       return;
     }
 
@@ -1355,6 +1393,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     this.device.commands.disposed = false;
     this.device.getCommands().mainId = this.device.mainId ?? '';
     await this.device.initialize();
+    assertProtocolV2ReconnectIdentity(
+      this.protocolV2ExpectedDeviceId,
+      this.device.getCurrentDeviceId()
+    );
   }
 
   private async protocolV2CommonUpdateProcess(params: ProtocolV2FileTransferParams) {
@@ -1416,12 +1458,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         overwrite,
         progress
       );
-      const processedByte = Number(writeRes.message.processed_byte);
-      const nextOffset =
-        Number.isFinite(processedByte) && processedByte > offset
-          ? processedByte
-          : offset + chunkLength;
-      if (nextOffset <= offset || nextOffset > payload.byteLength) {
+      const rawProcessedByte = writeRes.message.processed_byte;
+      const processedByte = Number(rawProcessedByte);
+      const nextOffset = rawProcessedByte === undefined ? offset + chunkLength : processedByte;
+      if (!Number.isFinite(nextOffset) || nextOffset <= offset || nextOffset > chunkEnd) {
         throw ERRORS.TypedError(
           HardwareErrorCode.EmmcFileWriteFirmwareError,
           `invalid processed_byte ${writeRes.message.processed_byte} for offset ${offset}`

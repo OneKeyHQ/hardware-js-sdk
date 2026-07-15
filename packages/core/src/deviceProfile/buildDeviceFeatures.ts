@@ -135,6 +135,7 @@ export const buildProtocolV1FeaturesPayload = (
   const sessionId = features.session_id ?? previous?.sessionId ?? null;
 
   return {
+    ...features,
     protocol: 'V1',
     protocolVersion: features.protocol_version ?? previous?.protocolVersion ?? 1,
     deviceType,
@@ -207,6 +208,7 @@ export const buildProtocolV1FeaturesPayload = (
       se04BootHash: features.onekey_se04_boot_hash,
     },
     sessionId,
+    session_id: sessionId ?? undefined,
     raw: {
       protocolV1Features,
     },
@@ -364,6 +366,12 @@ export const buildProtocolV2FeaturesPayload = (
       se04BootHash: getImageHash(info?.se4?.bootloader) ?? previous?.verify?.se04BootHash,
     },
     sessionId: previous?.sessionId ?? null,
+    device_id: deviceId ?? undefined,
+    session_id: previous?.sessionId ?? undefined,
+    ble_name: bleName ?? undefined,
+    onekey_device_type: 'PRO2',
+    passphrase_protection: passphraseProtection ?? undefined,
+    bootloader_mode: bootloaderMode,
     passphraseState: previous?.passphraseState,
     unlockedAttachPin,
     raw: {
