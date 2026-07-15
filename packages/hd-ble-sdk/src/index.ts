@@ -50,6 +50,10 @@ const cancel = (connectId?: string) => {
   _core.handleMessage({ event: IFRAME.CANCEL, type: IFRAME.CANCEL, payload: { connectId } });
 };
 
+const cancelOperation = (operationId: string) => {
+  _core?.cancelOperation(operationId);
+};
+
 function handleMessage(message: CoreMessage) {
   const { event, type } = message;
   if (!_core) {
@@ -179,6 +183,7 @@ const HardwareBleSdk = HardwareSdk({
   init,
   call,
   cancel,
+  cancelOperation,
   dispose,
   uiResponse,
   updateSettings,

@@ -17,11 +17,8 @@ import {
 import {
   LoggerNames,
   enableLog,
-  getDeviceBLEFirmwareVersion,
-  getDeviceFirmwareVersion,
-  getFirmwareType,
   getLogger,
-  getMethodVersionRange,
+  isMethodVersionRangeUnsupported,
   setLoggerPostMessage,
   wait,
 } from '../utils';
@@ -29,7 +26,6 @@ import {
   findDefectiveBatchDevice,
   getDefectiveDeviceInfo,
 } from '../utils/findDefectiveBatchDevice';
-import { supportNewPassphrase } from '../utils/deviceFeaturesUtils';
 import {
   cleanupSdkInstance,
   completeRequestContext,
@@ -60,17 +56,14 @@ import TransportManager from '../data-manager/TransportManager';
 import DeviceConnector from '../device/DeviceConnector';
 import RequestQueue from './RequestQueue';
 import { getSynchronize } from '../utils/getSynchronize';
+import { runMethodWithUnlockRetry } from '../protocols/protocol-v2/unlockRetry';
 
-import type { ConnectSettings, KnownDevice } from '../types';
+import type { ConnectSettings, Features, KnownDevice } from '../types';
 import type { CoreMessage, IFrameCallMessage, UiPromise, UiPromiseResponse } from '../events';
 import type { DeviceEvents, InitOptions, RunOptions } from '../device/Device';
 import type { SdkTracingContext } from '../utils/tracing';
 import type { Deferred } from '@onekeyfe/hd-shared';
-import type {
-  Features,
-  LowlevelTransportSharedPlugin,
-  OneKeyDeviceInfo,
-} from '@onekeyfe/hd-transport';
+import type { LowlevelTransportSharedPlugin, OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
 import type { BaseMethod } from '../api/BaseMethod';
 
 const Log = getLogger(LoggerNames.Core);
@@ -102,6 +95,8 @@ const parseInitOptions = (method?: BaseMethod): InitOptions => ({
   passphraseState: method?.payload.passphraseState,
   deviceId: method?.payload.deviceId,
   deriveCardano: method && hasDeriveCardano(method),
+  connectProtocol: method?.payload.connectProtocol,
+  protocolV2DeviceInfoTimeoutMs: method?.payload.protocolV2DeviceInfoTimeoutMs,
 });
 
 let _core: Core;
@@ -229,9 +224,15 @@ const handlePreWarmSignal = async (
   message: CoreMessage,
   method: BaseMethod
 ): Promise<any> => {
+  const createAckResponse = () => {
+    completeMethodRequestContext(method);
+    method.dispose();
+    return createResponseMessage(method.responseID, true, true);
+  };
+
   // no connectId: can't target a device safely, skip pre-warm (ack only)
   if (!method.connectId) {
-    return createResponseMessage(method.responseID, true, true);
+    return createAckResponse();
   }
 
   const key = method.getPreWarmKey();
@@ -244,12 +245,12 @@ const handlePreWarmSignal = async (
     } catch {
       // pre-warm is best-effort; ignore its failure for the coalesced caller
     }
-    return createResponseMessage(method.responseID, true, true);
+    return createAckResponse();
   }
 
   const doneAt = preWarmDoneAt.get(key);
   if (typeof doneAt === 'number' && Date.now() - doneAt <= method.preWarmTtl) {
-    return createResponseMessage(method.responseID, true, true);
+    return createAckResponse();
   }
 
   const run = onCallDevice(context, message, method);
@@ -420,13 +421,24 @@ const onCallDevice = async (
     await waitForPendingPromise(getPrePendingCallPromise, setPrePendingCallPromise);
 
     const inner = async (): Promise<void> => {
+      // Protocol V2 专属方法统一守卫：协议在 acquire/initialize 后已确定，
+      // 非 V2 设备直接抛出明确的 NotSupport 错误（见 BaseMethod.requireProtocolV2）。
+      if (method.requireProtocolV2 && !device.isProtocolV2()) {
+        throw createDeviceNotSupportMethodError(method.name, device.getCurrentFirmwareType());
+      }
+
       // check firmware version
-      const versionRange = getMethodVersionRange(
-        device.features,
+      const versionRange = device.getCurrentMethodVersionRange(
         type => method.getVersionRange()[type]
       );
+      const currentFirmwareVersion = device.getCurrentFirmwareVersionString() ?? '0.0.0';
+      const currentBleVersion = device.getCurrentBLEFirmwareVersionString() ?? '0.0.0';
+      const deviceFirmwareType = device.getCurrentFirmwareType();
+      let newVersionStatus: ReturnType<typeof DataManager.getFirmwareStatus> | undefined;
 
-      if (device.features) {
+      // 故障批次检测与远端强制升级门禁基于 V1 features/remote config，
+      // Pro2(V2) 暂不参与：profile 版的 firmwareStatus 需要 DataManager 支持后再接入。
+      if (device.features && !device.isProtocolV2()) {
         await DataManager.checkAndReloadData();
 
         // 检测故障固件设备
@@ -443,12 +455,9 @@ const onCallDevice = async (
           }
         }
 
-        const deviceFirmwareType = getFirmwareType(device.features);
-        const newVersionStatus = DataManager.getFirmwareStatus(device.features, deviceFirmwareType);
+        newVersionStatus = DataManager.getFirmwareStatus(device.features, deviceFirmwareType);
         const bleVersionStatus = DataManager.getBLEFirmwareStatus(device.features);
 
-        const currentFirmwareVersion = getDeviceFirmwareVersion(device.features).join('.');
-        const currentBleVersion = getDeviceBLEFirmwareVersion(device.features).join('.');
         if (
           (newVersionStatus === 'required' || bleVersionStatus === 'required') &&
           method.skipForceUpdateCheck === false
@@ -474,42 +483,43 @@ const onCallDevice = async (
             currentVersions
           );
         }
+      }
 
-        if (versionRange) {
-          if (
-            semver.valid(versionRange.min) &&
-            semver.lt(currentFirmwareVersion, versionRange.min)
-          ) {
-            if (newVersionStatus === 'none' || newVersionStatus === 'valid') {
-              throw createNewFirmwareUnReleaseHardwareError({
-                currentVersion: currentFirmwareVersion,
-                requireVersion: versionRange.min,
-                methodName: method.name,
-                firmwareType: getFirmwareType(device.features),
-              });
-            }
+      if (isMethodVersionRangeUnsupported(versionRange)) {
+        throw createDeviceNotSupportMethodError(method.name, deviceFirmwareType);
+      }
 
-            return Promise.reject(
-              createNeedUpgradeFirmwareHardwareError({
-                currentVersion: currentFirmwareVersion,
-                requireVersion: versionRange.min,
-                methodName: method.name,
-                firmwareType: getFirmwareType(device.features),
-              })
-            );
+      if (versionRange) {
+        if (semver.valid(versionRange.min) && semver.lt(currentFirmwareVersion, versionRange.min)) {
+          if (newVersionStatus === 'none' || newVersionStatus === 'valid') {
+            throw createNewFirmwareUnReleaseHardwareError({
+              currentVersion: currentFirmwareVersion,
+              requireVersion: versionRange.min,
+              methodName: method.name,
+              firmwareType: deviceFirmwareType,
+            });
           }
-          if (
-            versionRange.max &&
-            semver.valid(versionRange.max) &&
-            semver.gte(currentFirmwareVersion, versionRange.max)
-          ) {
-            return Promise.reject(
-              createDeprecatedHardwareError(currentFirmwareVersion, versionRange.max, method.name)
-            );
-          }
-        } else if (method.strictCheckDeviceSupport) {
-          throw createDeviceNotSupportMethodError(method.name, getFirmwareType(device.features));
+
+          return Promise.reject(
+            createNeedUpgradeFirmwareHardwareError({
+              currentVersion: currentFirmwareVersion,
+              requireVersion: versionRange.min,
+              methodName: method.name,
+              firmwareType: deviceFirmwareType,
+            })
+          );
         }
+        if (
+          versionRange.max &&
+          semver.valid(versionRange.max) &&
+          semver.gte(currentFirmwareVersion, versionRange.max)
+        ) {
+          return Promise.reject(
+            createDeprecatedHardwareError(currentFirmwareVersion, versionRange.max, method.name)
+          );
+        }
+      } else if (method.strictCheckDeviceSupport) {
+        throw createDeviceNotSupportMethodError(method.name, deviceFirmwareType);
       }
 
       // check call method mode
@@ -547,16 +557,16 @@ const onCallDevice = async (
       method.checkDeviceSupportFeature();
 
       // reconfigure messages
-      if (_deviceList) {
+      if (_deviceList && device.features && !device.isProtocolV2()) {
         await TransportManager.reconfigure(device.features);
       }
 
       // Check to see if it is safe to use Passphrase
       checkPassphraseEnableState(method, device.features);
 
-      if (device.hasUsePassphrase() && method.useDevicePassphraseState) {
+      if (shouldCheckPassphraseState(method, device)) {
         // check version
-        const support = supportNewPassphrase(device.features);
+        const support = device.supportNewPassphrase();
         if (!support.support) {
           return Promise.reject(
             ERRORS.TypedError(
@@ -607,7 +617,7 @@ const onCallDevice = async (
       method.device?.commands?.checkDisposed();
 
       try {
-        const response: object = await method.run();
+        const response: object = await runMethodWithUnlockRetry(method, device);
         messageResponse = createResponseMessage(method.responseID, true, response);
         requestQueue.resolveRequest(method.responseID, messageResponse);
         completeMethodRequestContext(method);
@@ -723,17 +733,27 @@ function initDevice(method: BaseMethod) {
   let device: Device | typeof undefined;
   const allDevices = _deviceList.allDevices();
 
-  if (method.payload?.detectBootloaderDevice && allDevices.some(d => d.features?.bootloader_mode)) {
+  if (method.payload?.detectBootloaderDevice && allDevices.some(d => d.isBootloader())) {
     throw ERRORS.TypedError(HardwareErrorCode.DeviceDetectInBootloaderMode);
   }
 
   if (method.connectId) {
     device = _deviceList.getDevice(method.connectId);
+    if (!device && method.name === 'firmwareUpdateV4' && allDevices.length === 1) {
+      const [singleDevice] = allDevices;
+      if (singleDevice.isBootloader()) {
+        Log.debug(
+          'firmwareUpdateV4 uses the only bootloader device when connectId changed after reboot'
+        );
+        device = singleDevice;
+      }
+    }
   } else if (allDevices.length === 1) {
     [device] = allDevices;
   } else if (allDevices.length > 1) {
     throw ERRORS.TypedError(
       [
+        'firmwareUpdateV4',
         'firmwareUpdateV3',
         'firmwareUpdateV2',
         'checkFirmwareRelease',
@@ -796,8 +816,8 @@ function canSkipInitialize(method: BaseMethod, device: Device): boolean {
   if (!method.connectId) reasons.push('connectId.missing');
   // passphrase state must match the pre-initialize
   if (!device.isPreInitializeMetaMatch(method.payload)) reasons.push('meta.mismatch');
-  // device must have been initialized before (has features)
-  if (!device.features) reasons.push('features.missing');
+  // device must have been initialized before.
+  if (device.isUnacquired()) reasons.push('deviceInfo.missing');
   // within pre-initialize TTL
   if (!device.isPreInitializedValid(PRE_INITIALIZE_TTL_MS)) reasons.push('ttl.expired');
 
@@ -813,13 +833,23 @@ function canSkipInitialize(method: BaseMethod, device: Device): boolean {
   return true;
 }
 
+function isRetryableBleProtocolV2ProbeError(method: BaseMethod, error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return (
+    method.payload.connectProtocol === 'V2' &&
+    message.includes('Device protocol mismatch') &&
+    message.includes('expected V2') &&
+    message.includes('did not respond to expected protocol')
+  );
+}
+
 /**
  * If the Bluetooth connection times out, retry up to 6 times
  * @param retryCount - Current retry count (default 0)
  */
 async function connectDeviceForBle(method: BaseMethod, device: Device, retryCount = 0) {
   try {
-    await device.acquire();
+    await device.acquire(method.payload.connectProtocol);
     if (method.payload?.onlyConnectBleDevice) {
       return;
     }
@@ -832,7 +862,12 @@ async function connectDeviceForBle(method: BaseMethod, device: Device, retryCoun
       });
     }
   } catch (err) {
-    if (err.errorCode === HardwareErrorCode.BleTimeoutError && retryCount < 6) {
+    if (
+      (err.errorCode === HardwareErrorCode.BleTimeoutError ||
+        err.errorCode === HardwareErrorCode.BleConnectedError ||
+        isRetryableBleProtocolV2ProbeError(method, err)) &&
+      retryCount < 6
+    ) {
       const nextRetry = retryCount + 1;
       Log.debug(`Bluetooth connect timeout and will retry, retry count: ${nextRetry}`);
       await wait(3000);
@@ -1091,7 +1126,11 @@ export const cancel = (context: CoreContext, connectId?: string) => {
 const checkPassphraseEnableState = (method: BaseMethod, features?: Features) => {
   if (!method.useDevicePassphraseState) return;
 
-  if (features?.passphrase_protection === true) {
+  const passphraseProtection = method.device
+    ? method.device.getCurrentPassphraseProtection()
+    : features?.passphraseProtection;
+
+  if (passphraseProtection === true) {
     const hasNoPassphraseState =
       method.payload.passphraseState == null || method.payload.passphraseState === '';
     const shouldRequirePassphrase =
@@ -1103,10 +1142,16 @@ const checkPassphraseEnableState = (method: BaseMethod, features?: Features) => 
     }
   }
 
-  if (features?.passphrase_protection === false && method.payload.passphraseState) {
+  if (passphraseProtection === false && method.payload.passphraseState) {
     DevicePool.clearDeviceCache(method.payload.connectId);
     throw ERRORS.TypedError(HardwareErrorCode.DeviceNotOpenedPassphrase);
   }
+};
+
+const shouldCheckPassphraseState = (method: BaseMethod, device: Device) => {
+  if (!method.useDevicePassphraseState) return false;
+
+  return device.hasUsePassphrase();
 };
 
 const cleanup = () => {
@@ -1297,6 +1342,10 @@ export default class Core extends EventEmitter {
     Log.debug(`[Core] Created SDK instance: ${this.sdkInstanceId}`);
   }
 
+  cancelOperation(operationId: string) {
+    this.requestQueue.abortOperation(operationId);
+  }
+
   private getCoreContext() {
     return {
       sdkInstanceId: this.sdkInstanceId,
@@ -1363,6 +1412,10 @@ export default class Core extends EventEmitter {
       case IFRAME.CANCEL: {
         Log.log('cancel API: ', message);
         cancel(this.getCoreContext(), message.payload.connectId);
+        break;
+      }
+      case IFRAME.CANCEL_OPERATION: {
+        this.cancelOperation(message.payload.operationId);
         break;
       }
       case IFRAME.CALLBACK: {

@@ -12,7 +12,7 @@ import { validateParams } from '../helpers/paramsValidator';
 import { PROTO } from '../../constants';
 import { findMethod } from '../utils';
 import { DEVICE, IFRAME, createUiMessage } from '../../events';
-import { getDeviceFirmwareVersion, getFirmwareType, getMethodVersionRange } from '../../utils';
+import { isMethodVersionRangeUnsupported } from '../../utils';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { onDeviceButtonHandler } from '../../core';
 import {
@@ -463,11 +463,12 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
  * @param method BaseMethod
  */
 function preCheckDeviceSupport(device: Device, method: BaseMethod) {
-  const versionRange = getMethodVersionRange(
-    device.features,
-    type => method.getVersionRange()[type]
-  );
-  const currentVersion = getDeviceFirmwareVersion(device.features).join('.');
+  const versionRange = device.getCurrentMethodVersionRange(type => method.getVersionRange()[type]);
+  const currentVersion = device.getCurrentFirmwareVersionString() ?? '0.0.0';
+
+  if (isMethodVersionRangeUnsupported(versionRange)) {
+    throw ERRORS.createDeviceNotSupportMethodError(method.name, device.getCurrentFirmwareType());
+  }
 
   if (
     versionRange &&
@@ -478,10 +479,10 @@ function preCheckDeviceSupport(device: Device, method: BaseMethod) {
       currentVersion,
       requireVersion: versionRange.min,
       methodName: method.name,
-      firmwareType: getFirmwareType(device.features),
+      firmwareType: device.getCurrentFirmwareType(),
     });
   } else if (method.strictCheckDeviceSupport && !versionRange) {
-    throw ERRORS.createDeviceNotSupportMethodError(method.name, getFirmwareType(device.features));
+    throw ERRORS.createDeviceNotSupportMethodError(method.name, device.getCurrentFirmwareType());
   }
 }
 
@@ -503,11 +504,18 @@ function handleSkippableHardwareError(
     e.message?.includes('Failure_UnexpectedMessage') ||
     e.message?.includes('Failure_UnknownMessage')
   ) {
-    const versionRange = getMethodVersionRange(
-      device.features,
+    const versionRange = device.getCurrentMethodVersionRange(
       type => method.getVersionRange()[type]
     );
-    const currentVersion = getDeviceFirmwareVersion(device.features).join('.');
+    const currentVersion = device.getCurrentFirmwareVersionString() ?? '0.0.0';
+
+    if (isMethodVersionRangeUnsupported(versionRange)) {
+      error = ERRORS.createDeviceNotSupportMethodError(
+        method.name,
+        device.getCurrentFirmwareType()
+      );
+      return error;
+    }
 
     if (
       versionRange &&
@@ -518,12 +526,12 @@ function handleSkippableHardwareError(
         currentVersion,
         requireVersion: versionRange.min,
         methodName: method.name,
-        firmwareType: getFirmwareType(device.features),
+        firmwareType: device.getCurrentFirmwareType(),
       });
     } else {
       error = ERRORS.createDeviceNotSupportMethodError(
         method.name,
-        getFirmwareType(device.features)
+        device.getCurrentFirmwareType()
       );
     }
   } else if (

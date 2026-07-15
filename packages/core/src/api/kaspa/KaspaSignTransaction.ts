@@ -2,7 +2,6 @@ import { bytesToHex } from '@noble/hashes/utils';
 import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { UI_REQUEST } from '../../constants/ui-request';
-import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { serialize, zeroSubnetworkID } from './helpers/TransferSerialize';
@@ -198,15 +197,14 @@ export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactio
 
       const response = await typedCall(
         'KaspaTxInputAck',
-        // @ts-expect-error
         ['KaspaTxInputRequest', 'KaspaSignedTx'],
         {
-          address_n: input.path,
+          // params.inputs 的 path 可能是字符串或已解析数组，统一归一为 address_n 数组
+          address_n: validatePath(input.path, 3),
           raw_message: bytesToHex(rawMessage),
         }
       );
 
-      // @ts-expect-error
       return this.processTxRequest(typedCall, response, nextIndex, signature);
     }
 

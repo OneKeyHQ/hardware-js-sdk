@@ -1,23 +1,17 @@
 import semver from 'semver';
 import {
+  ERRORS,
+  HardwareErrorCode,
   createDeviceNotSupportMethodError,
   createNeedUpgradeFirmwareHardwareError,
 } from '@onekeyfe/hd-shared';
 
-import { supportInputPinOnSoftware, supportModifyHomescreen } from '../utils/deviceFeaturesUtils';
 import { createDeviceMessage } from '../events/device';
 import { UI_REQUEST } from '../constants/ui-request';
 import { DEVICE, FIRMWARE, createFirmwareMessage, createUiMessage } from '../events';
 import { getHDPath, toHardened } from './helpers/pathUtils';
 import { getBleFirmwareReleaseInfo, getFirmwareReleaseInfo } from './firmware/releaseHelper';
-import {
-  LoggerNames,
-  getDeviceFirmwareVersion,
-  getDeviceType,
-  getFirmwareType,
-  getLogger,
-  getMethodVersionRange,
-} from '../utils';
+import { LoggerNames, getFirmwareType, getLogger, isMethodVersionRangeUnsupported } from '../utils';
 import { generateInstanceId } from '../utils/tracing';
 import { DeviceModelToTypes } from '../types';
 
@@ -27,6 +21,8 @@ import type { DeviceFirmwareRange, KnownDevice } from '../types';
 import type { CoreMessage } from '../events';
 import type { RequestContext } from '../utils/tracing';
 import type { CoreContext } from '../core';
+
+export type UnlockPolicy = 'none' | 'retry-on-locked';
 
 const Log = getLogger(LoggerNames.Method);
 
@@ -56,6 +52,8 @@ const isEvmLedgerLegacyPathWithHighIndex = (path: unknown) => {
 const EVM_LEDGER_LEGACY_METHODS = ['evmGetAddress', 'evmGetPublicKey'];
 
 export abstract class BaseMethod<Params = undefined> {
+  abortSignal?: AbortSignal;
+
   responseID: number;
 
   // @ts-expect-error
@@ -162,6 +160,26 @@ export abstract class BaseMethod<Params = undefined> {
    */
   strictCheckDeviceSupport = false;
 
+  /**
+   * 方法是否仅支持 Protocol V2 设备（Pro2）。
+   * core 调度在设备协议确定（acquire + initialize）后统一守卫，
+   * 非 V2 设备直接抛出 NotSupport 错误，方法内部不必重复判断。
+   * @default false
+   */
+  requireProtocolV2 = false;
+
+  /** Protocol V2 设备锁定时是否允许 Core 自动解锁并重试一次。 */
+  unlockPolicy: UnlockPolicy = 'none';
+
+  protected throwIfAborted() {
+    if (this.abortSignal?.aborted) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.CallQueueActionCancelled,
+        'Hardware operation cancelled'
+      );
+    }
+  }
+
   // @ts-expect-error: strictPropertyInitialization
   postMessage: (message: CoreMessage) => void;
 
@@ -225,7 +243,10 @@ export abstract class BaseMethod<Params = undefined> {
   }
 
   checkFirmwareRelease() {
-    if (!this.device || !this.device.features) return;
+    // 固件 release 元数据（DataManager remote config）目前只覆盖 Protocol V1 设备；
+    // Pro2 的更新流程由 firmwareUpdateV4 自行管理，这里显式跳过而不是依赖 features 为空。
+    if (!this.device || this.device.isProtocolV2()) return;
+    if (!this.device.features) return;
     const firmwareType = getFirmwareType(this.device.features);
     const releaseInfo = getFirmwareReleaseInfo(this.device.features, firmwareType);
     this.postMessage(
@@ -244,9 +265,9 @@ export abstract class BaseMethod<Params = undefined> {
   }
 
   checkDeviceSupportFeature() {
-    if (!this.device || !this.device.features) return;
-    const inputPinOnSoftware = supportInputPinOnSoftware(this.device.features);
-    const modifyHomescreen = supportModifyHomescreen(this.device.features);
+    if (!this.device || this.device.isUnacquired()) return;
+    const inputPinOnSoftware = this.device.supportInputPinOnSoftware();
+    const modifyHomescreen = this.device.supportModifyHomescreen();
 
     this.postMessage(
       createDeviceMessage(DEVICE.SUPPORT_FEATURES, {
@@ -268,15 +289,16 @@ export abstract class BaseMethod<Params = undefined> {
       return;
     }
 
-    const firmwareVersion = getDeviceFirmwareVersion(this.device.features)?.join('.');
-    const versionRange = getMethodVersionRange(
-      this.device.features,
-      type => getVersionRange()[type]
-    );
+    const firmwareVersion = this.device.getCurrentFirmwareVersionString() ?? '0.0.0';
+    const versionRange = this.device.getCurrentMethodVersionRange(type => getVersionRange()[type]);
+
+    if (isMethodVersionRangeUnsupported(versionRange)) {
+      throw createDeviceNotSupportMethodError(this.name, this.device.getCurrentFirmwareType());
+    }
 
     if (!versionRange) {
       if (options?.strictCheckDeviceSupport) {
-        throw createDeviceNotSupportMethodError(this.name, getFirmwareType(this.device.features));
+        throw createDeviceNotSupportMethodError(this.name, this.device.getCurrentFirmwareType());
       }
       // Equipment that does not need to be repaired
       return;
@@ -287,7 +309,7 @@ export abstract class BaseMethod<Params = undefined> {
         currentVersion: firmwareVersion,
         requireVersion: versionRange.min,
         methodName: this.name,
-        firmwareType: getFirmwareType(this.device.features),
+        firmwareType: this.device.getCurrentFirmwareType(),
       });
     }
   }
@@ -297,7 +319,7 @@ export abstract class BaseMethod<Params = undefined> {
       return false;
     }
 
-    const deviceType = getDeviceType(this.device.features);
+    const deviceType = this.device.getCurrentDeviceType();
     if (!DeviceModelToTypes.model_touch.includes(deviceType)) {
       return false;
     }
@@ -329,7 +351,7 @@ export abstract class BaseMethod<Params = undefined> {
     if (this.shouldPromptSafetyCheckForEvmLedgerLegacyPath()) {
       checkFlag = true;
     }
-    if (checkFlag && this.device.features?.safety_checks === 'Strict') {
+    if (checkFlag && this.device.getCurrentSafetyChecks() === 'Strict') {
       Log.debug('will change safety_checks level');
       await this.device.commands.typedCall('ApplySettings', 'Success', {
         safety_checks: 'PromptTemporarily',

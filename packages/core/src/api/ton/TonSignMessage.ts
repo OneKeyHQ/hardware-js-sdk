@@ -7,7 +7,6 @@ import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { DeviceModelToTypes } from '../../types';
-import { getDeviceFirmwareVersion, getDeviceType, getMethodVersionRange } from '../../utils';
 import { formatAnyHex, stripHexStartZeroes } from '../helpers/hexUtils';
 import { cutString } from '../helpers/stringUtils';
 
@@ -86,6 +85,9 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
 
   getVersionRange() {
     return {
+      pro2: {
+        min: '0.0.0',
+      },
       model_touch: {
         min: '4.10.0',
       },
@@ -107,9 +109,8 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
   }
 
   checkSupportJettonAmountBytes() {
-    const firmwareVersion = getDeviceFirmwareVersion(this.device.features)?.join('.');
-    const versionRange = getMethodVersionRange(
-      this.device.features,
+    const firmwareVersion = this.device.getCurrentFirmwareVersionString() ?? '0.0.0';
+    const versionRange = this.device.getCurrentMethodVersionRange(
       type => this.getSupportJettonAmountBytesVersionRange()[type]
     );
 
@@ -167,7 +168,7 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
     data: string
   ): Promise<TonTxAck | TonSignedMessageResponse> => {
     if (!request.init_data_length) {
-      const deviceType = getDeviceType(this.device.features);
+      const deviceType = this.device.getCurrentDeviceType();
       const hasClassic = DeviceModelToTypes.model_classic1s.includes(deviceType);
       // use signing_message_repr sign, not exists signning_message, skip validate
       const hasSigningMessageRepr = request.signning_message == null;

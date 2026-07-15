@@ -5,7 +5,7 @@ import type { Features } from '../types';
 /**
  * 检测故障固件设备
  * 检测规则：
- * - 序列号范围：21032200001 到 21032201500 (从 onekey_serial 字段提取)
+ * - 序列号范围：21032200001 到 21032201500
  * - SE版本为 1.1.0.2
  *
  * 对齐之前版本的检测逻辑
@@ -13,13 +13,13 @@ import type { Features } from '../types';
 export const findDefectiveBatchDevice = (features: Features) => {
   if (!features) return;
 
-  const { onekey_serial: onekeySerial, se_ver: seVer } = features;
-  if (!onekeySerial) return;
+  const { serialNo, seVersion } = features;
+  if (!serialNo) return;
 
-  const versionNum = +onekeySerial.slice(5);
+  const versionNum = +serialNo.slice(5);
   if (Number.isNaN(versionNum)) return;
 
-  return versionNum >= 21032200001 && versionNum <= 21032201500 && seVer === '1.1.0.2';
+  return versionNum >= 21032200001 && versionNum <= 21032201500 && seVersion === '1.1.0.2';
 };
 
 /**
@@ -29,7 +29,7 @@ export const getDefectiveDeviceInfo = (features: Features) => {
   if (!findDefectiveBatchDevice(features)) return null;
   const serialNo = getDeviceUUID(features);
   const deviceType = getDeviceType(features);
-  const seVersion = features.se_ver;
+  const { seVersion } = features;
 
   return {
     serialNo,

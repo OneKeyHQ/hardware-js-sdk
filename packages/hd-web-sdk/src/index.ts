@@ -13,6 +13,7 @@ import HardwareSdk, {
   createErrorMessage,
   enableLog,
   executeCallback,
+  getLogBlockLabel,
   getLogger,
   parseConnectSettings,
   parseMessage,
@@ -118,6 +119,14 @@ const cancel = (connectId?: string) => {
   sendMessage({ event: IFRAME.CANCEL, type: IFRAME.CANCEL, payload: { connectId } });
 };
 
+const cancelOperation = (operationId: string) => {
+  sendMessage({
+    event: IFRAME.CANCEL_OPERATION,
+    type: IFRAME.CANCEL_OPERATION,
+    payload: { operationId },
+  } as CoreMessage);
+};
+
 let prevFrameInstance: Window | null | undefined = null;
 const createJSBridge = (messageEvent: PostMessageEvent) => {
   if (messageEvent.origin !== iframe.origin) {
@@ -135,9 +144,12 @@ const createJSBridge = (messageEvent: PostMessageEvent) => {
 
       receiveHandler: async messageEvent => {
         const message = parseMessage(messageEvent);
+        const blockLog = getLogBlockLabel(message);
         if (message.event !== 'LOG_EVENT') {
           if (['DEVICE_EVENT', 'FIRMWARE_EVENT'].includes(message.event)) {
             // Log.debug('Host Bridge Receive message: ', message);
+          } else if (blockLog) {
+            Log.debug('Host Bridge Receive message: ', blockLog);
           } else {
             Log.debug('Host Bridge Receive message: ', message);
           }
@@ -146,6 +158,8 @@ const createJSBridge = (messageEvent: PostMessageEvent) => {
         if (message.event !== 'LOG_EVENT') {
           if (['DEVICE_EVENT', 'FIRMWARE_EVENT'].includes(message.event)) {
             // Log.debug('Host Bridge response: ', message);
+          } else if (blockLog) {
+            Log.debug('Host Bridge response: ', blockLog);
           } else {
             Log.debug('Host Bridge response: ', message);
           }
@@ -184,7 +198,8 @@ const init = async (settings: Partial<ConnectSettings>) => {
 };
 
 const call = async (params: any) => {
-  Log.debug('call : ', params);
+  const blockLog = getLogBlockLabel(params);
+  Log.debug('call : ', blockLog ?? params);
   /**
    * Try to recreate iframe if it's initialize failed
    */
@@ -283,6 +298,7 @@ const HardwareSDKLowLevel = HardwareLowLevelSdk({
   init,
   call,
   cancel,
+  cancelOperation,
   dispose,
   addHardwareGlobalEventListener,
   uiResponse,
@@ -297,6 +313,7 @@ const HardwareWebSdk = HardwareSdk({
   init,
   call,
   cancel,
+  cancelOperation,
   dispose,
   uiResponse,
   updateSettings,

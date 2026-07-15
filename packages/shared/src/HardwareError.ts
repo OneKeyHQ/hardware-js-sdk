@@ -490,6 +490,12 @@ export const HardwareErrorCode = {
   KaspaPrevTxIdMismatch: 829,
 
   /**
+   * Protocol V2 device must be unlocked before the requested operation.
+   * @params: { failureCode?: string; subcode?: number; firmwareMessage?: string }
+   */
+  DeviceLocked: 830,
+
+  /**
    * Lowlevel transport connect error
    */
   LowlevelTrasnportConnectError: 900,
@@ -641,6 +647,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.TooManyInputs]: 'Too many inputs',
   [HardwareErrorCode.PinMismatch]: 'PIN mismatch',
   [HardwareErrorCode.KaspaPrevTxIdMismatch]: 'Kaspa previous transaction id mismatch',
+  [HardwareErrorCode.DeviceLocked]: 'Device locked',
 
   /**
    * Lowlevel transport

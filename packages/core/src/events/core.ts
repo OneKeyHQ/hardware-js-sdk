@@ -5,6 +5,7 @@ import type {
   IFrameCallMessage,
   IFrameCallbackMessage,
   IFrameCancelMessage,
+  IFrameCancelOperationMessage,
   IFrameSwitchTransportMessage,
 } from './call';
 import type { DeviceEventMessage } from './device';
@@ -23,6 +24,7 @@ export type CoreMessage = {
   | IFrameEventMessage
   | IFrameCallMessage
   | IFrameCancelMessage
+  | IFrameCancelOperationMessage
   | IFrameSwitchTransportMessage
   | IFrameCallbackMessage
   | UiResponseMessage

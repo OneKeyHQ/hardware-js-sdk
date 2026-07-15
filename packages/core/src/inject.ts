@@ -36,12 +36,14 @@ export interface InjectApi {
   dispose: CoreApi['dispose'];
   uiResponse: CoreApi['uiResponse'];
   cancel: CoreApi['cancel'];
+  cancelOperation: CoreApi['cancelOperation'];
   switchTransport: CoreApi['switchTransport'];
 }
 
 export const inject = ({
   call,
   cancel,
+  cancelOperation,
   dispose,
   eventEmitter,
   init,
@@ -73,6 +75,7 @@ export const inject = ({
     uiResponse,
 
     cancel,
+    cancelOperation,
 
     updateSettings,
 
@@ -96,19 +99,22 @@ export const createCoreApi = (
   | 'dispose'
   | 'uiResponse'
   | 'cancel'
+  | 'cancelOperation'
   | 'updateSettings'
   | 'switchTransport'
 > => ({
   getLogs: () => call({ method: 'getLogs' }),
+  clearSessionCache: params => call({ ...params, method: 'clearSessionCache' }),
   /**
    * 搜索设备
    */
-  searchDevices: () => call({ method: 'searchDevices' }),
+  searchDevices: params => call({ ...params, method: 'searchDevices' }),
 
   /**
    * 获取设备信息
    */
   getFeatures: (connectId, params) => call({ ...params, connectId, method: 'getFeatures' }),
+  getDeviceInfo: (connectId, params) => call({ ...params, connectId, method: 'getDeviceInfo' }),
   getOnekeyFeatures: (connectId, params) =>
     call({ ...params, connectId, method: 'getOnekeyFeatures' }),
 
@@ -148,6 +154,59 @@ export const createCoreApi = (
   deviceFlags: (connectId, params) => call({ ...params, connectId, method: 'deviceFlags' }),
   deviceRebootToBoardloader: connectId => call({ connectId, method: 'deviceRebootToBoardloader' }),
   deviceRebootToBootloader: connectId => call({ connectId, method: 'deviceRebootToBootloader' }),
+
+  // File system & device control API (Protocol V2 only)
+  protocolInfoRequest: (connectId, params) =>
+    call({ ...params, connectId, method: 'protocolInfoRequest' }),
+  ping: (connectId, params) => call({ ...params, connectId, method: 'ping' }),
+  deviceReboot: (connectId, params) => call({ ...params, connectId, method: 'deviceReboot' }),
+  deviceInfoGet: (connectId, params) => call({ ...params, connectId, method: 'deviceInfoGet' }),
+  deviceStatusGet: (connectId, params) => call({ ...params, connectId, method: 'deviceStatusGet' }),
+  deviceGetOnboardingStatus: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceGetOnboardingStatus' }),
+  deviceSessionGet: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceSessionGet' }),
+  deviceFirmwareUpdate: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceFirmwareUpdate' }),
+  deviceGetFirmwareUpdateStatus: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceGetFirmwareUpdateStatus' }),
+  deviceFactoryInfoSet: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceFactoryInfoSet' }),
+  deviceFactoryInfoGet: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceFactoryInfoGet' }),
+  deviceSettingsGet: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceSettingsGet' }),
+  deviceSettingsSet: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceSettingsSet' }),
+  deviceSettingsPageShow: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceSettingsPageShow' }),
+  deviceUploadWallpaper: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceUploadWallpaper' }),
+  filesystemPermissionFix: (connectId, params) =>
+    call({ ...params, connectId, method: 'filesystemPermissionFix' }),
+  fileRead: (connectId, params) => call({ ...params, connectId, method: 'fileRead' }),
+  fileWrite: (connectId, params) => call({ ...params, connectId, method: 'fileWrite' }),
+  fileDelete: (connectId, params) => call({ ...params, connectId, method: 'fileDelete' }),
+  dirList: (connectId, params) => call({ ...params, connectId, method: 'dirList' }),
+  dirMake: (connectId, params) => call({ ...params, connectId, method: 'dirMake' }),
+  dirRemove: (connectId, params) => call({ ...params, connectId, method: 'dirRemove' }),
+  pathInfo: (connectId, params) => call({ ...params, connectId, method: 'pathInfo' }),
+  filesystemFileRead: (connectId, params) =>
+    call({ ...params, connectId, method: 'filesystemFileRead' }),
+  filesystemFileWrite: (connectId, params) =>
+    call({ ...params, connectId, method: 'filesystemFileWrite' }),
+  uploadPortfolio: (connectId, params) => call({ ...params, connectId, method: 'uploadPortfolio' }),
+  filesystemFileDelete: (connectId, params) =>
+    call({ ...params, connectId, method: 'filesystemFileDelete' }),
+  filesystemDirList: (connectId, params) =>
+    call({ ...params, connectId, method: 'filesystemDirList' }),
+  filesystemDirMake: (connectId, params) =>
+    call({ ...params, connectId, method: 'filesystemDirMake' }),
+  filesystemDirRemove: (connectId, params) =>
+    call({ ...params, connectId, method: 'filesystemDirRemove' }),
+  filesystemPathInfoQuery: (connectId, params) =>
+    call({ ...params, connectId, method: 'filesystemPathInfoQuery' }),
+  filesystemFormat: connectId => call({ connectId, method: 'filesystemFormat' }),
   deviceRecovery: (connectId, params) => call({ ...params, connectId, method: 'deviceRecovery' }),
   deviceReset: (connectId, params) => call({ ...params, connectId, method: 'deviceReset' }),
   deviceSettings: (connectId, params) => call({ ...params, connectId, method: 'deviceSettings' }),
@@ -260,6 +319,8 @@ export const createCoreApi = (
     call({ ...params, connectId, method: 'firmwareUpdateV2' }),
   firmwareUpdateV3: (connectId, params) =>
     call({ ...params, connectId, method: 'firmwareUpdateV3' }),
+  firmwareUpdateV4: (connectId, params) =>
+    call({ ...params, connectId, method: 'firmwareUpdateV4' }),
   promptWebDeviceAccess: params => call({ ...params, method: 'promptWebDeviceAccess' }),
 
   tronGetAddress: (connectId, deviceId, params) =>

@@ -13,6 +13,7 @@ import HardwareSdk, {
   createUiMessage,
   enableLog,
   executeCallback,
+  getLogBlockLabel,
   getLogger,
   initCore,
   parseConnectSettings,
@@ -38,7 +39,9 @@ const eventEmitter = new EventEmitter();
 const Log = getLogger(LoggerNames.HdCommonConnectSdk);
 
 const getTransport = async (env: ConnectSettings['env']) => {
-  if (env === 'desktop-web-ble') return ElectronBleTransport;
+  if (env === 'desktop-web-ble') {
+    return ElectronBleTransport;
+  }
   if (env === 'webusb' || env === 'desktop-webusb') return WebUsbTransport;
   if (env === 'lowlevel') return LowlevelTransport;
   if (env === 'node-usb') {
@@ -76,14 +79,19 @@ const cancel = (connectId?: string) => {
   _core.handleMessage({ event: IFRAME.CANCEL, type: IFRAME.CANCEL, payload: { connectId } });
 };
 
+const cancelOperation = (operationId: string) => {
+  _core?.cancelOperation(operationId);
+};
+
 function handleMessage(message: CoreMessage) {
   const { event } = message;
   if (!_core) {
     return;
   }
 
+  const blockLog = getLogBlockLabel(message);
   if (event !== LOG_EVENT) {
-    Log.debug('hd-common-connect-sdk handleMessage', message);
+    Log.debug('hd-common-connect-sdk handleMessage', blockLog ?? message);
   }
   switch (event) {
     case UI_EVENT:
@@ -157,7 +165,8 @@ const init = async (
 };
 
 const call = async (params: any) => {
-  Log.debug('call: ', params);
+  const blockLog = getLogBlockLabel(params);
+  Log.debug('call: ', blockLog ?? params);
 
   try {
     const response = await postMessage({ event: IFRAME.CALL, type: IFRAME.CALL, payload: params });
@@ -194,6 +203,7 @@ const HardwareCommonConnectSdk = HardwareSdk({
   init,
   call,
   cancel,
+  cancelOperation,
   dispose,
   uiResponse,
   updateSettings,

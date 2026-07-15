@@ -1,4 +1,4 @@
-import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { EDeviceType } from '@onekeyfe/hd-shared';
 
 import { UI_REQUEST } from '../constants/ui-request';
 import { getPassphraseStateWithRefreshDeviceInfo } from '../utils/deviceFeaturesUtils';
@@ -11,18 +11,18 @@ export default class GetPassphraseState extends BaseMethod {
   }
 
   async run() {
-    if (!this.device.features)
-      return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceInitializeFailed));
+    const { passphraseState } = await getPassphraseStateWithRefreshDeviceInfo(this.device, {
+      expectPassphraseState: this.payload.passphraseState,
+      onlyMainPin: this.payload.useEmptyPassphrase,
+      initSession: this.payload.initSession,
+    });
 
-    const { passphraseState } = await getPassphraseStateWithRefreshDeviceInfo(this.device);
+    const passphraseProtection = this.device.getCurrentPassphraseProtection();
+    const deviceType = this.device.getCurrentDeviceType();
+    const isProSeries = deviceType === EDeviceType.Pro || deviceType === EDeviceType.Pro2;
 
-    const { features } = this.device;
-
-    // refresh device info
-    if (features && features.passphrase_protection === true) {
-      return Promise.resolve(passphraseState);
-    }
-
-    return Promise.resolve(undefined);
+    return Promise.resolve(
+      isProSeries || passphraseProtection === true ? passphraseState : undefined
+    );
   }
 }

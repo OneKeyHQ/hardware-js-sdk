@@ -8,11 +8,12 @@ import {
 
 import { FirmwareUpdateTipMessage, UI_REQUEST, createUiMessage } from '../../events/ui-request';
 import { DevicePool } from '../../device/DevicePool';
-import { LoggerNames, getDeviceType, getDeviceUUID, getLogger, wait } from '../../utils';
+import { LoggerNames, getDeviceUUID, getLogger, wait } from '../../utils';
 import { DeviceModelToTypes } from '../../types';
 import { DataManager } from '../../data-manager';
 import { BaseMethod } from '../BaseMethod';
 import { DEVICE } from '../../events';
+import { createFirmwareProgressThrottle } from './progressThrottle';
 
 import type {
   IFirmwareUpdateProgressType,
@@ -39,6 +40,8 @@ const isDeviceDisconnectedError = (error: unknown) => {
 
 export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
   checkPromise: Deferred<any> | null = null;
+
+  private shouldPostFirmwareProgress = createFirmwareProgressThrottle();
 
   init(): void {}
 
@@ -83,6 +86,10 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
    * @param progress Post the percentage of the progress
    */
   postProgressMessage = (progress: number, progressType: IFirmwareUpdateProgressType) => {
+    if (!this.shouldPostFirmwareProgress(progress, progressType)) {
+      return;
+    }
+
     this.postMessage(
       createUiMessage(UI_REQUEST.FIRMWARE_PROGRESS, {
         device: this.device.toMessageObject() as KnownDevice,
@@ -138,12 +145,14 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
     // check device goto bootloader mode
     let isFirstCheck = true;
     let checkCount = 0;
+    let hasPromptedWebDevice = false;
+    let isPromptingWebDevice = false;
     // eslint-disable-next-line prefer-const
     let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
 
     const isTouchOrProDevice =
-      getDeviceType(this?.device?.features) === EDeviceType.Touch ||
-      getDeviceType(this?.device?.features) === EDeviceType.Pro;
+      this?.device?.getCurrentDeviceType() === EDeviceType.Touch ||
+      this?.device?.getCurrentDeviceType() === EDeviceType.Pro;
 
     const intervalTimer: ReturnType<typeof setInterval> | undefined = setInterval(
       async () => {
@@ -158,23 +167,28 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
         if (
           checkCount > 4 &&
           DataManager.isBrowserWebUsb(DataManager.getSettings('env')) &&
-          !this.payload.skipWebDevicePrompt
+          !this.payload.skipWebDevicePrompt &&
+          !hasPromptedWebDevice &&
+          !isPromptingWebDevice
         ) {
-          clearInterval(intervalTimer);
-          clearTimeout(timeoutTimer);
-
+          isPromptingWebDevice = true;
           try {
             this.postTipMessage(FirmwareUpdateTipMessage.SelectDeviceInBootloaderForWebDevice);
             const confirmed = await this._promptDeviceInBootloaderForWebDevice();
+            hasPromptedWebDevice = true;
             if (confirmed) {
               await this._checkDeviceInBootloaderMode(connectId, intervalTimer, timeoutTimer);
             }
           } catch (e) {
+            clearInterval(intervalTimer);
+            clearTimeout(timeoutTimer);
             Log.log(
               'FirmwareUpdateBaseMethod [checkDeviceToBootloader] _promptDeviceInBootloaderForWebDevice failed: ',
               e
             );
             this.checkPromise?.reject(e);
+          } finally {
+            isPromptingWebDevice = false;
           }
           return;
         }
@@ -187,7 +201,7 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
               true
             );
             await this.device.initialize();
-            if (this.device.features?.bootloader_mode) {
+            if (this.device.isBootloader()) {
               clearInterval(intervalTimer);
               this.checkPromise?.resolve(true);
             }
@@ -220,7 +234,7 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
     const devicesDescriptor = deviceDiff?.descriptors ?? [];
     const { deviceList } = await DevicePool.getDevices(devicesDescriptor, connectId);
 
-    if (deviceList.length === 1 && deviceList[0]?.features?.bootloader_mode) {
+    if (deviceList.length === 1 && deviceList[0]?.isBootloader()) {
       // should update current device from cache
       // because device was reboot and had some new requests
       this.device.updateFromCache(deviceList[0]);
@@ -236,9 +250,9 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
 
   async enterBootloaderMode() {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
-    if (this.device.features && !this.device.features.bootloader_mode) {
+    if (this.device.features && !this.device.isBootloader()) {
       const uuid = getDeviceUUID(this.device.features);
-      const deviceType = getDeviceType(this.device.features);
+      const deviceType = this.device.getCurrentDeviceType();
       // auto go to bootloader mode
       try {
         this.postTipMessage(FirmwareUpdateTipMessage.AutoRebootToBootloader);
@@ -436,7 +450,7 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
           const deviceDiff = await this.device.deviceConnector?.enumerate();
           const devicesDescriptor = deviceDiff?.descriptors ?? [];
           const { deviceList } = await DevicePool.getDevices(devicesDescriptor, undefined);
-          if (deviceList.length === 1 && deviceList[0]?.features?.bootloader_mode) {
+          if (deviceList.length === 1 && deviceList[0]?.isBootloader()) {
             this.device.updateFromCache(deviceList[0]);
             await this.device.acquire();
             this.device.getCommands().mainId = this.device.mainId ?? '';

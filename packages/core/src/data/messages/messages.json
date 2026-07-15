@@ -8062,6 +8062,14 @@
         "passphrase_state": {
           "type": "string",
           "id": 1
+        },
+        "_only_main_pin": {
+          "type": "bool",
+          "id": 2
+        },
+        "allow_create_attach_pin": {
+          "type": "bool",
+          "id": 3
         }
       }
     },

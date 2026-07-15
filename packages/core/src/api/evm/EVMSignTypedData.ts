@@ -9,7 +9,6 @@ import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex, parseChainId, stripHexStartZeroes } from '../helpers/hexUtils';
-import { getDeviceFirmwareVersion, getDeviceType } from '../../utils';
 import { existCapability } from '../../utils/capabilitieUtils';
 import {
   DeviceModelToTypes,
@@ -26,10 +25,19 @@ import { encodeData, getFieldType, parseArrayType } from '../helpers/typeNameUti
 import type {
   EthereumTypedDataSignature,
   EthereumTypedDataStructAck,
+  EthereumTypedDataStructAckOneKey,
   MessageKey,
   MessageResponse,
   TypedCall,
 } from '@onekeyfe/hd-transport';
+
+/**
+ * EthereumTypedDataStructAckOneKey 与 EthereumTypedDataStructAck 的字段结构与
+ * 枚举数值完全一致（生成产物的 OneKey/Trezor 双份消息），仅枚举名义类型不同；
+ * 这里做无运行时成本的名义转换，避免在调用点散落 any。
+ */
+const toOneKeyStructAck = (ack: EthereumTypedDataStructAck): EthereumTypedDataStructAckOneKey =>
+  ack as unknown as EthereumTypedDataStructAckOneKey;
 
 export type EVMSignTypedDataParams = {
   addressN: number[];
@@ -130,7 +138,6 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
       if (supportTrezor) {
         response = await typedCall(
           'EthereumTypedDataStructAck',
-          // @ts-ignore
           [
             'EthereumTypedDataStructRequest',
             'EthereumTypedDataValueRequest',
@@ -141,13 +148,12 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
       } else {
         response = await typedCall(
           'EthereumTypedDataStructAckOneKey',
-          // @ts-ignore
           [
             'EthereumTypedDataStructRequestOneKey',
             'EthereumTypedDataValueRequestOneKey',
             'EthereumTypedDataSignatureOneKey',
           ],
-          dataStruckAck
+          toOneKeyStructAck(dataStruckAck)
         );
       }
     }
@@ -183,7 +189,7 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
         } else if (typeof memberData === 'object' && memberData !== null) {
           const memberTypeDefinition = types[memberTypeName][index];
           memberTypeName = memberTypeDefinition.type;
-          memberData = memberData[memberTypeDefinition.name];
+          memberData = (memberData as Record<string, unknown>)[memberTypeDefinition.name];
         } else {
           // TODO
         }
@@ -220,6 +226,15 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
 
     if (response.type === 'EthereumGnosisSafeTxRequest') {
       const { data } = this.params;
+      const verifyingContract = data.domain?.verifyingContract;
+      // EthereumGnosisSafeTxAck.verifyingContract 在 proto 中是 required 字段，
+      // Gnosis Safe 签名缺少 verifyingContract 没有意义，这里给出明确的参数错误。
+      if (!verifyingContract) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.CallMethodInvalidParameter,
+          'EIP712Domain.verifyingContract is required for Gnosis Safe transaction'
+        );
+      }
       const param = {
         to: data.message.to,
         value: formatAnyHex(new BigNumber(data.message.value).toString(16)),
@@ -232,11 +247,10 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
         refundReceiver: data.message.refundReceiver,
         nonce: formatAnyHex(new BigNumber(data.message.nonce).toString(16)),
         chain_id: parseChainId(data.domain.chainId),
-        verifyingContract: data.domain.verifyingContract,
+        verifyingContract,
       };
       response = await typedCall(
         'EthereumGnosisSafeTxAck',
-        // @ts-ignore
         ['EthereumTypedDataSignature', 'EthereumTypedDataSignatureOneKey'],
         param
       );
@@ -262,8 +276,8 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
 
     let supportTrezor = false;
     let response: MessageResponse<MessageKey>;
-    switch (TransportManager.getMessageVersion()) {
-      case 'v1':
+    switch (TransportManager.getProtocolV1MessageSchema()) {
+      case 'v1LegacySchema':
         supportTrezor = true;
         response = await signTypedDataLegacyV1({
           typedCall: this.device.commands.typedCall.bind(this.device.commands),
@@ -274,7 +288,7 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
         });
         break;
 
-      case 'latest':
+      case 'v1CurrentSchema':
       default:
         supportTrezor = false;
         response = await signTypedData({
@@ -310,8 +324,8 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
   }) {
     if (!domainHash) throw ERRORS.TypedError('Runtime', 'domainHash is required');
 
-    switch (TransportManager.getMessageVersion()) {
-      case 'v1':
+    switch (TransportManager.getProtocolV1MessageSchema()) {
+      case 'v1LegacySchema':
         return signTypedHashLegacyV1({
           typedCall,
           addressN,
@@ -321,7 +335,7 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
           device: this.device,
         });
 
-      case 'latest':
+      case 'v1CurrentSchema':
       default:
         return signTypedHash({
           typedCall,
@@ -348,8 +362,8 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
 
     let biggerLimit = 1024; // 1k
 
-    const currentVersion = getDeviceFirmwareVersion(this.device.features).join('.');
-    const currentDeviceType = getDeviceType(this.device.features);
+    const currentVersion = this.device.getCurrentFirmwareVersionString() ?? '0.0.0';
+    const currentDeviceType = this.device.getCurrentDeviceType();
     const supportBiggerDataVersion = '4.4.0';
 
     const supportBiggerData =
@@ -532,9 +546,9 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
   }
 
   supportSignTyped() {
-    const deviceType = getDeviceType(this.device.features);
+    const deviceType = this.device.getCurrentDeviceType();
     if (DeviceModelToTypes.model_mini.includes(deviceType)) {
-      const currentVersion = getDeviceFirmwareVersion(this.device.features).join('.');
+      const currentVersion = this.device.getCurrentFirmwareVersionString() ?? '0.0.0';
       const supportSignTypedVersion = '2.2.0';
 
       if (semver.lt(currentVersion, supportSignTypedVersion)) {
@@ -564,7 +578,7 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
     // For Classic / Mini:
     // - If parsed typed-data capability is missing, keep using blind-sign.
     // - For Mini with parsed capability, add extra format checks before parsed signing.
-    const deviceType = getDeviceType(this.device.features);
+    const deviceType = this.device.getCurrentDeviceType();
     if (
       DeviceModelToTypes.model_mini.includes(deviceType) &&
       (!supportEip712OnClassic || this.hasClassicFamilyTypedDataFormatViolations(this.params.data))

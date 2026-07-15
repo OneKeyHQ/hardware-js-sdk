@@ -52,6 +52,8 @@ export const topLevelInject = () => {
 
     cancel: (connectId?: string) => lowLevelApi?.cancel(connectId),
 
+    cancelOperation: (operationId: string) => lowLevelApi?.cancelOperation(operationId),
+
     updateSettings: settings => lowLevelApi?.updateSettings(settings) ?? Promise.resolve(false),
 
     switchTransport: (env: ConnectSettings['env']) =>

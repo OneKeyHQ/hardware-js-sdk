@@ -32,6 +32,10 @@ export default class LnurlAuth1 extends BaseMethod<ILnurlAuth> {
       model_touch: {
         min: '4.8.0',
       },
+      pro2: {
+        min: '0.0.0',
+        unsupported: true,
+      },
     };
   }
 

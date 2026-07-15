@@ -12,7 +12,7 @@ export const getFirmwareReleaseInfo = (features: Features, firmwareType: EFirmwa
   const firmwareStatus = DataManager.getFirmwareStatus(features, firmwareType);
   const changelog = DataManager.getFirmwareChangelog(features, firmwareType);
   const release = DataManager.getFirmwareLatestRelease(features, firmwareType);
-  const bootloaderMode = !!features.bootloader_mode;
+  const bootloaderMode = !!features.bootloaderMode;
   return {
     status: firmwareStatus,
     changelog,
@@ -25,7 +25,7 @@ export const getBleFirmwareReleaseInfo = (features: Features) => {
   const firmwareStatus = DataManager.getBLEFirmwareStatus(features);
   const changelog = DataManager.getBleFirmwareChangelog(features);
   const release = DataManager.getBleFirmwareLatestRelease(features);
-  const bootloaderMode = !!features.bootloader_mode;
+  const bootloaderMode = !!features.bootloaderMode;
   return {
     status: firmwareStatus,
     changelog,
@@ -52,7 +52,7 @@ export const getBootloaderReleaseInfo = ({
       Object.prototype.hasOwnProperty.call(item, 'en-US')
   );
 
-  const bootloaderMode = !!features.bootloader_mode;
+  const bootloaderMode = !!features.bootloaderMode;
 
   let shouldUpdate = false;
 

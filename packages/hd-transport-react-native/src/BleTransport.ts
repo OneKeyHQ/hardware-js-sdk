@@ -1,10 +1,11 @@
 import { BleErrorCode } from 'react-native-ble-plx';
-import { LoggerNames, getLogger, wait } from '@onekeyfe/hd-core';
+import { wait } from '@onekeyfe/hd-shared';
+
+import { bleLogger } from './logger';
 
 import type { Characteristic, Device, Subscription } from 'react-native-ble-plx';
-// import { wait } from '@onekeyfe/hd-core/src/utils';
 
-const Log = getLogger(LoggerNames.HdBleTransport);
+const Log = bleLogger;
 
 export default class BleTransport {
   id: string;
@@ -13,7 +14,7 @@ export default class BleTransport {
 
   device: Device;
 
-  mtuSize = 20;
+  mtuSize = 23;
 
   writeCharacteristic: Characteristic;
 
@@ -22,6 +23,10 @@ export default class BleTransport {
   notifySubscription?: Subscription;
 
   disconnectSubscription?: Subscription;
+
+  notifyTransactionId?: string;
+
+  monitorToken?: number;
 
   static MAX_RETRIES = 5;
 
@@ -36,7 +41,6 @@ export default class BleTransport {
     this.device = device;
     this.writeCharacteristic = writeCharacteristic;
     this.notifyCharacteristic = notifyCharacteristic;
-    console.log(`BleTransport(${String(this.id)}) new instance`);
   }
 
   /**

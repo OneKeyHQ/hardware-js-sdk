@@ -14,9 +14,12 @@ export default class GetFeatures extends BaseMethod {
     this.skipForceUpdateCheck = true;
   }
 
-  run() {
-    if (this.payload?.detectBootloaderDevice && this.device.features?.bootloader_mode) {
+  async run() {
+    if (this.payload?.detectBootloaderDevice && this.device.isBootloader()) {
       return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceDetectInBootloaderMode));
+    }
+    if (this.device.isProtocolV2()) {
+      return this.device.getFeatures();
     }
     return Promise.resolve(this.device.features);
   }

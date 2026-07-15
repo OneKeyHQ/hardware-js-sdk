@@ -6,7 +6,7 @@ import { validateParams } from '../helpers/paramsValidator';
 
 import type { TypedResponseMessage } from '../../device/DeviceCommands';
 import type { TypedCall } from '@onekeyfe/hd-transport';
-import type { NexaSignTransactionParams, NexaSignature } from '../../types';
+import type { DeviceFirmwareRange, NexaSignTransactionParams, NexaSignature } from '../../types';
 
 export default class NexaSignTransaction extends BaseMethod<NexaSignTransactionParams> {
   hasBundle = false;
@@ -27,8 +27,12 @@ export default class NexaSignTransaction extends BaseMethod<NexaSignTransactionP
     this.params = payload;
   }
 
-  getVersionRange() {
+  getVersionRange(): DeviceFirmwareRange {
     return {
+      pro2: {
+        min: '0.0.0',
+        unsupported: true,
+      },
       model_mini: {
         min: '3.2.0',
       },
@@ -68,17 +72,12 @@ export default class NexaSignTransaction extends BaseMethod<NexaSignTransactionP
 
       const nextIndex = res.message.request_index;
       const input = this.params.inputs[nextIndex];
-      const response = await typedCall(
-        'NexaTxInputAck',
-        // @ts-expect-error
-        ['NexaTxInputRequest', 'NexaSignedTx'],
-        {
-          address_n: input.path,
-          raw_message: input.message,
-        }
-      );
+      const response = await typedCall('NexaTxInputAck', ['NexaTxInputRequest', 'NexaSignedTx'], {
+        // path 为字符串形式，归一为 address_n 数组（与 run() 中首个 input 的处理一致）
+        address_n: validatePath(input.path, 3),
+        raw_message: input.message,
+      });
 
-      // @ts-expect-error
       return this.processTxRequest(typedCall, response, nextIndex, signatures);
     }
 
