@@ -7,15 +7,15 @@
 
 ## 协议差异
 
-| 项目       | Protocol V1                     | Protocol V2                                                 |
-| ---------- | ------------------------------- | ----------------------------------------------------------- |
-| 设备       | Classic / Mini / Touch / Pro 等 | Pro2                                                        |
-| 传输       | USB、BLE、Bridge                | WebUSB、Electron BLE、React Native BLE                      |
-| 帧头       | `0x3F` 分包，payload 内含 `##`  | `0x5A` 完整帧                                               |
-| message id | big-endian                      | little-endian                                               |
-| 完整性校验 | 无额外 CRC                      | header CRC8 + frame CRC8                                    |
-| 初始化     | `Initialize -> Features`        | `Ping {message:'probe'}` 探测并初始化                       |
-| schema     | `messages.json`                 | `messages-protocol-v2.json`，必要时可 fallback 到 V1 schema |
+| 项目       | Protocol V1                     | Protocol V2                                                                    |
+| ---------- | ------------------------------- | ------------------------------------------------------------------------------ |
+| 设备       | Classic / Mini / Touch / Pro 等 | Pro2                                                                           |
+| 传输       | USB、BLE、Bridge                | WebUSB、Electron BLE、React Native BLE                                         |
+| 帧头       | `0x3F` 分包，payload 内含 `##`  | `0x5A` 完整帧                                                                  |
+| message id | big-endian                      | little-endian                                                                  |
+| 完整性校验 | 无额外 CRC                      | header CRC8 + frame CRC8                                                       |
+| 初始化     | `Initialize -> Features`        | `Ping {message:'probe'}` 探测并初始化                                          |
+| schema     | `messages.json`                 | 编码使用 `messages-protocol-v2.json`；仅白名单历史响应可在解码时回退 V1 schema |
 
 ## WebUSB 流程
 
@@ -33,7 +33,7 @@ flowchart TD
   V1["Initialize 成功: V1"]
   ProbeV2["probeProtocolV2(Ping / bootloader status)"]
   V2["V2 probe 成功: V2"]
-  FallbackV1["V1/V2 均失败: V1"]
+  DetectionError["V1/V2 均失败: 协议探测错误"]
   Call["call(path, name, data)"]
   CallV1["V1: ProtocolV1.encode/decode"]
   CallV2["V2: ProtocolV2.encode/decode"]
@@ -42,7 +42,7 @@ flowchart TD
   ProbeV1 --> V1 --> Call
   ProbeV1 --> ProbeV2
   ProbeV2 --> V2 --> Call
-  ProbeV2 --> FallbackV1 --> Call
+  ProbeV2 --> DetectionError
   Call --> CallV1
   Call --> CallV2
 ```
@@ -62,7 +62,7 @@ flowchart TD
   V1["Initialize 成功: V1"]
   ProbeV2["probeProtocolV2(Ping / bootloader status)"]
   V2["V2 probe 成功: V2"]
-  FallbackV1["V1/V2 均失败: V1"]
+  DetectionError["V1/V2 均失败: 协议探测错误"]
   Call["call(uuid, name, data)"]
   CallV1["V1: legacy BLE chunk reassembly"]
   CallV2["V2: 0x5A frame reassembly"]
@@ -71,7 +71,7 @@ flowchart TD
   ProbeV1 --> V1 --> Call
   ProbeV1 --> ProbeV2
   ProbeV2 --> V2 --> Call
-  ProbeV2 --> FallbackV1 --> Call
+  ProbeV2 --> DetectionError
   Call --> CallV1
   Call --> CallV2
 ```
@@ -91,7 +91,7 @@ flowchart TD
   V1["Initialize 成功: V1"]
   ProbeV2["probeProtocolV2(Ping / bootloader status)"]
   V2["V2 probe 成功: V2"]
-  FallbackV1["V1/V2 均失败: V1"]
+  DetectionError["V1/V2 均失败: 协议探测错误"]
   Call["call(uuid, name, data)"]
   CallV1["V1: legacy BLE chunk reassembly"]
   CallV2["V2: BLE UART router + 0x5A frame reassembly"]
@@ -100,7 +100,7 @@ flowchart TD
   ProbeV1 --> V1 --> Call
   ProbeV1 --> ProbeV2
   ProbeV2 --> V2 --> Call
-  ProbeV2 --> FallbackV1 --> Call
+  ProbeV2 --> DetectionError
   Call --> CallV1
   Call --> CallV2
 ```
@@ -118,12 +118,12 @@ transport.configureProtocolV2(messagesProtocolV2);
 
 Protocol V2 encode/decode 的 schema 选择规则：
 
-| 阶段   | 规则                                                        |
-| ------ | ----------------------------------------------------------- |
-| encode | 优先在 V2 schema 查找消息名；找不到则回退 V1 schema         |
-| decode | `messageTypeId >= 60000` 使用 V2 schema，否则使用 V1 schema |
+| 阶段   | 规则                                                                                    |
+| ------ | --------------------------------------------------------------------------------------- |
+| encode | Protocol V2 请求必须从 V2 schema 查找，缺失时直接报错，不静默回退 V1 schema             |
+| decode | `messageTypeId >= 60000` 使用 V2 schema；低 ID 仅对白名单历史交互消息允许使用 V1 schema |
 
-这样 Protocol V2 系统消息进入 typedCall 类型面，同时不会破坏 V1 业务消息的类型。
+这样可以防止 V2 消息名或 schema 不同步时被错误编码为 V1 payload，同时保留 `ButtonRequest`、`PassphraseRequest` 等有限的历史交互兼容。
 
 ## Protocol Session 层
 

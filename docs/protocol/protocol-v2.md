@@ -10,7 +10,7 @@ Protocol V2 服务 Pro2。Pro2 同样支持 USB 和 BLE，但不走传统 `Initi
 
 ## 主动协议探测
 
-SDK 不使用 PID、productName 或 descriptor 作为唯一判断依据。支持 Protocol V2 的 transport 会在连接后做主动探测：如果调用方显式传入 `connectProtocol`，就只验证指定协议；否则默认先用 Protocol V1 `Initialize` 验证现有设备，失败后再发送 Protocol V2 `ProtocolInfoRequest` / bootloader status probe。这样现有 V1 设备保持原路径，未知名称或 bootloader 名称不稳定的 Pro2 也能回落到 V2。
+SDK 不使用 PID、productName 或 descriptor 作为最终判断依据。普通连接会根据 protocol hint 和连接缓存决定探测顺序，并实际发送 Protocol V1 `Initialize` 或 Protocol V2 `ProtocolInfoRequest` / bootloader status probe。没有 V2 hint 时默认先验证 V1，失败后再验证 V2；两种协议都没有响应时抛出协议探测错误，不会把未知设备静默标记为 V1。
 
 ```mermaid
 flowchart TD
@@ -19,16 +19,16 @@ flowchart TD
   ProbeV2["Protocol V2: ProtocolInfoRequest / bootloader status"]
   UseV1["Initialize 成功: 使用 Protocol V1"]
   UseV2["V2 probe 成功: 使用 Protocol V2"]
-  FallbackV1["V1/V2 均失败: 保持 Protocol V1"]
+  DetectionError["V1/V2 均失败: 抛出协议探测错误"]
 
   Connect --> ProbeV1
   ProbeV1 --> UseV1
   ProbeV1 --> ProbeV2
   ProbeV2 --> UseV2
-  ProbeV2 --> FallbackV1
+  ProbeV2 --> DetectionError
 ```
 
-当显式要求 `V2` 时，SDK 会直接 probe V2；当枚举或缓存已经标记为 `V2` 时，也会优先验证 V2。WebUSB 在 V2 probe 失败后会重置连接，避免失败帧影响后续调用；BLE 探测失败后清空 V2 接收缓存，并继续使用 V1 BLE 分包逻辑。
+`connectProtocol='V1'` 会实际发送 V1 probe 并在不匹配时抛错。`connectProtocol='V2'` 用于固件升级重启等上层已经确认协议的重连路径，transport 会信任该提示并跳过重复探测。普通连接如果带有 V2 hint，或连接缓存已经标记为 V2，会优先验证 V2；V2 probe 失败后 WebUSB 会重置连接，BLE 会清空 link、订阅和接收缓存，再继续验证 V1。
 
 ## 帧格式
 
@@ -52,7 +52,7 @@ Protocol V2 使用 `0x5A` 起始字节和两段 CRC8。
 | `Payload`   | protobuf message type + protobuf bytes |
 | `CRC`       | 对除最后 CRC 外的整帧计算 CRC8         |
 
-当前 SDK 使用的最大 V2 frame 长度是 `4608` bytes，文件写入 chunk size 是 `4096` bytes。
+当前 SDK 使用的最大 V2 frame 长度是 `4608` bytes。文件写入按传输设置分片上限：WebUSB 为 `4000` bytes，BLE 为 `1800` bytes；分片还要为 protobuf 字段和 V2 frame header 预留空间。
 
 ### CRC8 说明
 

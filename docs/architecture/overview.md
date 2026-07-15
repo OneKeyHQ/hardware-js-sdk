@@ -52,7 +52,7 @@ flowchart TD
 - `ProtocolV2FrameAssembler`：负责 BLE/USB 分片后的 `0x5A` frame 重组和长度校验。
 - `probeProtocolV2()`：公共 V2 probe helper，负责 `ProtocolInfoRequest` / bootloader status 探测和失败回退钩子。
 
-各 transport 的 `detectProtocol()` 会先执行 V1 `Initialize` probe，再按需要调用公共 V2 probe helper；显式 `connectProtocol` 则只验证指定协议。
+各 transport 的 `detectProtocol()` 根据 hint 和连接缓存选择 V1/V2 probe 顺序。显式 `connectProtocol='V1'` 会验证 V1；显式 `connectProtocol='V2'` 用于上层已经确认协议的重连路径，直接记录 V2 并跳过重复探测。
 
 WebUSB、Electron BLE、React Native BLE 和 lowlevel BLE 只负责各自的物理连接、读写、订阅/桥接和平台错误映射，不再各自复制 V2 协议会话逻辑。
 
@@ -60,16 +60,16 @@ WebUSB、Electron BLE、React Native BLE 和 lowlevel BLE 只负责各自的物�
 
 `packages/core/src/protocols/protocol-v2/features.ts` 负责读取 Protocol V2 设备信息，`packages/core/src/deviceProfile` 负责生成 SDK 标准 `DeviceProfile` 和结构化 `Features`：
 
-| 协议 | 数据来源                  | 标准输出        | features 输出                                 |
-| ---- | ------------------------- | --------------- | --------------------------------------------- |
-| V1   | `Initialize -> Features`  | `DeviceProfile` | 由 V1 原始消息构建的结构化 `Features`         |
-| V2   | `Ping + DeviceInfoGet` | `DeviceProfile` | 由 `DeviceInfoGet` 构建的结构化 `Features` |
+| 协议 | 数据来源                 | 标准输出        | features 输出                              |
+| ---- | ------------------------ | --------------- | ------------------------------------------ |
+| V1   | `Initialize -> Features` | `DeviceProfile` | 由 V1 原始消息构建的结构化 `Features`      |
+| V2   | `Ping + DeviceInfoGet`   | `DeviceProfile` | 由 `DeviceInfoGet` 构建的结构化 `Features` |
 
 这样 SDK 内部和事件输出都使用统一 features 结构；协议原始消息只保留在 `features.raw` 中用于必要的 V1 兼容。
 
 ## 自动协议探测
 
-支持 Protocol V2 的传输实现会在 `acquire()` 后主动探测协议。默认路径先验证 V1，V1 失败后再 probe V2；如果调用方显式传入 `connectProtocol`，则只验证指定协议：
+支持 Protocol V2 的传输实现会在 `acquire()` 后主动探测协议。没有 V2 hint 时默认先验证 V1，V1 失败后再 probe V2；有 V2 hint 或 V2 连接缓存时会先验证 V2。显式 `connectProtocol='V1'` 会验证 V1，显式 `connectProtocol='V2'` 则信任上层已经确认的协议，用于固件升级重启后的重连：
 
 ```mermaid
 flowchart TD
@@ -80,7 +80,7 @@ flowchart TD
   V1["Initialize 成功: 标记 Protocol V1"]
   ProbeV2["Protocol V2 ProtocolInfoRequest / bootloader status"]
   V2["V2 probe 成功: 标记 Protocol V2"]
-  FallbackV1["V1/V2 均失败: 保持 Protocol V1"]
+  DetectionError["V1/V2 均失败: 抛出协议探测错误"]
   Init["Device.initialize()"]
   InitV1["V1: Initialize -> Features"]
   InitV2["V2: Ping + DeviceInfoGet -> DeviceProfile"]
@@ -89,12 +89,12 @@ flowchart TD
   ProbeV1 --> V1 --> Init
   ProbeV1 --> ProbeV2
   ProbeV2 --> V2 --> Init
-  ProbeV2 --> FallbackV1 --> Init
+  ProbeV2 --> DetectionError
   Init --> InitV1
   Init --> InitV2
 ```
 
-这样可以解决共享 PID 或 descriptor 不稳定带来的误判问题，并保持现有 V1 设备零回归。
+这样可以解决共享 PID 或 descriptor 不稳定带来的误判问题，并避免把没有响应的未知设备错误归类为 V1。
 
 ## TransportManager 职责
 
