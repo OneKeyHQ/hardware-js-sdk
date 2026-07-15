@@ -94,7 +94,9 @@ describe('DeviceUploadWallpaper', () => {
       if (request === 'FilesystemFileWrite') {
         return { message: { processed_byte: params.file.offset + params.file.data.byteLength } };
       }
-      if (request === 'SetWallpaper') return { message: { message: 'wallpaper applied' } };
+      if (request === 'DeviceSettingsSet') {
+        return { message: { message: 'wallpaper applied' } };
+      }
       throw new Error(`Unexpected request: ${request}`);
     });
     const method = new DeviceUploadWallpaper({
@@ -120,11 +122,33 @@ describe('DeviceUploadWallpaper', () => {
       overwrite: true,
       append: false,
     });
-    expect(typedCall).toHaveBeenLastCalledWith('SetWallpaper', 'Success', {
-      target: 1,
-      path: result.path,
+    expect(typedCall).toHaveBeenLastCalledWith('DeviceSettingsSet', 'Success', {
+      settings: { wallpaper_path: result.path },
     });
+    expect(typedCall.mock.calls.some(call => call[0] === 'SetWallpaper')).toBe(false);
     expect(result).toMatchObject({ colorFormat: 'RGB565', message: 'wallpaper applied' });
+  });
+
+  test('文件上传失败时不修改 wallpaper_path', async () => {
+    const typedCall = jest.fn().mockImplementation(request => {
+      if (request === 'FilesystemDirMake') return { message: {} };
+      if (request === 'FilesystemFileWrite') throw new Error('write failed');
+      return { message: {} };
+    });
+    const method = new DeviceUploadWallpaper({
+      id: 1,
+      payload: {
+        method: 'deviceUploadWallpaper',
+        width: 604,
+        height: 1024,
+        rgba: new Uint8Array(604 * 1024 * 4),
+      },
+    });
+    (method as any).device = stubDevice({ commands: { typedCall } });
+    method.init();
+
+    await expect(method.run()).rejects.toThrow('write failed');
+    expect(typedCall.mock.calls.some(call => call[0] === 'DeviceSettingsSet')).toBe(false);
   });
 
   test('rejects unsafe filenames before device communication', async () => {

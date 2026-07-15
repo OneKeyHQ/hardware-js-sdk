@@ -1,14 +1,9 @@
 import { blake2s } from '@noble/hashes/blake2s';
 import { bytesToHex } from '@noble/hashes/utils';
-import {
-  PROTOCOL_V2_BLE_FILE_CHUNK_SIZE,
-  PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE,
-  WallpaperTarget,
-} from '@onekeyfe/hd-transport';
 
 import { BaseMethod } from '../BaseMethod';
 import { invalidParameter } from '../helpers/filesystemValidation';
-import { DataManager } from '../../data-manager';
+import { writeProtocolV2File } from '../helpers/protocolV2FileWrite';
 import {
   encodePro2Wallpaper,
   PRO2_WALLPAPER_HEIGHT,
@@ -33,13 +28,6 @@ export type DeviceUploadWallpaperResponse = {
 
 const WALLPAPER_DIRECTORY = 'vol0:/wallpapers/user';
 const SAFE_FILE_NAME = /^[A-Za-z0-9_-]+(?:\.bin)?$/;
-
-function getDefaultChunkSize(): number {
-  const env = DataManager.getSettings('env');
-  return env && DataManager.isBleConnect(env)
-    ? PROTOCOL_V2_BLE_FILE_CHUNK_SIZE
-    : PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE;
-}
 
 function normalizeFileName(fileName: string | undefined, data: Uint8Array): string {
   if (fileName !== undefined && (!fileName || !SAFE_FILE_NAME.test(fileName))) {
@@ -105,39 +93,16 @@ export default class DeviceUploadWallpaper extends BaseMethod<DeviceUploadWallpa
     const encoded = this.encoded;
     if (!encoded) throw invalidParameter('Wallpaper data has not been initialized.');
 
-    const maxChunkSize = getDefaultChunkSize();
-    const requestedChunkSize = this.params.chunkSize ?? maxChunkSize;
-    const chunkSize = Math.min(Math.max(64, Math.floor(requestedChunkSize)), maxChunkSize);
-    let offset = 0;
-    while (offset < encoded.data.byteLength) {
-      const chunk = encoded.data.slice(offset, Math.min(offset + chunkSize, encoded.data.byteLength));
-      const response = await this.device.commands.typedCall(
-        'FilesystemFileWrite',
-        'FilesystemFile',
-        {
-          file: {
-            path: this.path,
-            offset,
-            total_size: encoded.data.byteLength,
-            data: chunk,
-          },
-          overwrite: offset === 0,
-          append: false,
-          ui_percentage: Math.min(
-            Math.ceil(((offset + chunk.byteLength) / encoded.data.byteLength) * 100),
-            100
-          ),
-        },
-        { timeoutMs: undefined }
-      );
-      const processedByte = Number(response.message?.processed_byte);
-      offset = Number.isFinite(processedByte) && processedByte > offset
-        ? processedByte
-        : offset + chunk.byteLength;
-      if (offset > encoded.data.byteLength) {
-        throw invalidParameter(`Invalid processed_byte returned by device: ${processedByte}.`);
-      }
-    }
+    await writeProtocolV2File({
+      commands: this.device.commands,
+      path: this.path,
+      data: encoded.data,
+      totalSize: encoded.data.byteLength,
+      chunkSize: this.params.chunkSize,
+      overwrite: true,
+      append: false,
+      throwIfAborted: () => this.throwIfAborted(),
+    });
     this.uploaded = true;
   }
 
@@ -146,9 +111,8 @@ export default class DeviceUploadWallpaper extends BaseMethod<DeviceUploadWallpa
     if (!encoded) throw invalidParameter('Wallpaper data has not been initialized.');
     await this.ensureDirectory();
     await this.upload();
-    const response = await this.device.commands.typedCall('SetWallpaper', 'Success', {
-      target: WallpaperTarget.Lock,
-      path: this.path,
+    const response = await this.device.commands.typedCall('DeviceSettingsSet', 'Success', {
+      settings: { wallpaper_path: this.path },
     });
     return {
       path: this.path,
