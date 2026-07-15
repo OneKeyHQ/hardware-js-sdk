@@ -26,8 +26,8 @@ Local engineering docs:
 - [CLAUDE.md](./CLAUDE.md) - Claude / agent workflow entry
 - [docs/README.md](./docs/README.md) - local documentation index
 - [docs/architecture/overview.md](./docs/architecture/overview.md) - SDK architecture and protocol ownership
-- [docs/protocol/transport.md](./docs/protocol/transport.md) - transport flow and Protocol V1/V2 detection
-- [docs/protocol/protocol-v2.md](./docs/protocol/protocol-v2.md) - Protocol V2 details
+- [docs/protocol/protocol-v1-v2.md](./docs/protocol/protocol-v1-v2.md) - Protocol V1/V2 detection, framing, Link, USB and BLE
+- [docs/sdk/pro2-field-migration.md](./docs/sdk/pro2-field-migration.md) - Pro2 Protocol V2 field migration and SDK normalization
 
 ## hardware-js-sdk development
 
