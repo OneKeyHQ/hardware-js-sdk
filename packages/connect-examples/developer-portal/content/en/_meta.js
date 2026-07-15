@@ -1,3 +1,5 @@
+import { AgentWalletBetaTitle } from '../../components/AgentWalletBetaTitle.js'
+
 export default {
   index: {
     title: 'Home',
@@ -14,7 +16,7 @@ export default {
     },
   },
   'agent-wallet': {
-    title: 'Agent Wallet',
+    title: AgentWalletBetaTitle({ betaLabel: 'Private Beta' }),
     type: 'menu',
     items: {
       landing: { title: 'Landing', href: '/en/agent-wallet/' },

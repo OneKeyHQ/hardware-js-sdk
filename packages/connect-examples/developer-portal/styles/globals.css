@@ -857,6 +857,30 @@ input[type="search"]::placeholder,
 
 /* Use Nextra's built-in theme and language toggles */
 
+.agent-wallet-beta-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.agent-wallet-beta-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 1px 6px;
+  border: 1px solid rgba(251, 191, 36, 0.55);
+  border-radius: 9999px;
+  background: rgba(245, 158, 11, 0.18);
+  color: #fbbf24;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 14px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 /* Ensure main footer stays visible */
 .nextra-content + footer,
 main ~ footer {
