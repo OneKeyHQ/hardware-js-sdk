@@ -63,7 +63,10 @@ function messageToJSON(Message: Message<Record<string, unknown>>, fields: Type['
     }
     // message type
     else if (field.resolvedType!.fields) {
-      res[key] = messageToJSON(value, field.resolvedType!.fields);
+      // [compatibility]: absent optional sub-messages are not own properties
+      // of the decoded instance, so value is undefined here; decode them to
+      // null, matching the optional primitive-field convention above.
+      res[key] = value == null ? null : messageToJSON(value, (field.resolvedType as Type).fields);
     } else {
       throw new Error(`case not handled: ${key}`);
     }

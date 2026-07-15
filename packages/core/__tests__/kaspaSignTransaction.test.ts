@@ -486,4 +486,27 @@ describe('KaspaSignTransaction wire encoding', () => {
     expect(streamingIds).toContain(7); // output_count — the protocol discriminator
     expect(streamingIds).not.toContain(2); // no raw_message
   });
+
+  it('decodes enum fields to string names via the real transport decoder', () => {
+    // signTxStream compares request_type against string literals
+    // ('KASPA_TX_OUTPUT', ...); pin the decoder behavior that guarantees it.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
+    const { decode } = require('../../hd-transport/src/serialization/protobuf/decode');
+    // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
+    const ByteBuffer = require('bytebuffer');
+
+    const root = protobuf.Root.fromJSON(messagesJson);
+    const KaspaTxRequest = root.lookupType('KaspaTxRequest');
+
+    // Enums travel as numbers on the wire (KASPA_TX_OUTPUT = 1).
+    const encoded = KaspaTxRequest.encode(
+      KaspaTxRequest.fromObject({ request_type: 1, request_index: 0 })
+    ).finish();
+
+    const message = decode(KaspaTxRequest, ByteBuffer.wrap(Buffer.from(encoded)));
+    expect(message.request_type).toBe('KASPA_TX_OUTPUT');
+    // Absent optional sub-message must decode to null, not crash the decoder
+    // (the device's first request legitimately carries no signature).
+    expect(message.signature).toBeNull();
+  });
 });
