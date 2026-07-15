@@ -21,7 +21,6 @@ import type {
   filesystemDirList,
   filesystemDirMake,
   filesystemDirRemove,
-  filesystemDiskControl,
   filesystemFileDelete,
   filesystemFileRead,
   filesystemFileWrite,
@@ -294,7 +293,6 @@ export type CoreApi = {
   filesystemDirRemove: typeof filesystemDirRemove;
   filesystemPathInfoQuery: typeof filesystemPathInfoQuery;
   filesystemFormat: typeof filesystemFormat;
-  filesystemDiskControl: typeof filesystemDiskControl;
 
   /**
    * All network function

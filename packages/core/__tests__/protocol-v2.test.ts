@@ -1837,11 +1837,17 @@ describe('Protocol V2 feature adapter', () => {
     const typedCall = jest.fn().mockImplementation(requestType => {
       if (requestType === 'DeviceSessionAskPin') {
         return {
-          type: 'DeviceSessionPinResult',
+          type: 'Success',
+          message: { message: 'ok' },
+        };
+      }
+      if (requestType === 'DeviceStatusGet') {
+        return {
+          type: 'DeviceStatus',
           message: {
             unlocked: true,
-            unlocked_attach_pin: true,
-            passphrase_protection: true,
+            unlocked_by_attach_to_pin: true,
+            passphrase_enabled: true,
           },
         };
       }
@@ -1862,7 +1868,10 @@ describe('Protocol V2 feature adapter', () => {
 
     const features = await device.unlockDevice();
 
-    expect(typedCall.mock.calls).toEqual([['DeviceSessionAskPin', 'DeviceSessionPinResult']]);
+    expect(typedCall.mock.calls).toEqual([
+      ['DeviceSessionAskPin', 'Success'],
+      ['DeviceStatusGet', 'DeviceStatus', {}],
+    ]);
     expect(typedCall).not.toHaveBeenCalledWith('GetAddress', 'Address', expect.anything());
     expect(typedCall).not.toHaveBeenCalledWith('GetFeatures', 'Features', {});
     expect(features).toMatchObject({
@@ -1879,7 +1888,7 @@ describe('Protocol V2 feature adapter', () => {
     });
   });
 
-  test('syncs Protocol V2 features passphrase state from DeviceSessionPinResult after unlock', async () => {
+  test('syncs Protocol V2 features passphrase state from DeviceStatus after unlock', async () => {
     const device = Device.fromDescriptor({ ...descriptor, protocolType: 'V2' } as any);
     (device as any).features = normalizeProtocolV2Features(
       { ...descriptor, protocolType: 'V2' } as any,
@@ -1892,11 +1901,17 @@ describe('Protocol V2 feature adapter', () => {
     const typedCall = jest.fn().mockImplementation(requestType => {
       if (requestType === 'DeviceSessionAskPin') {
         return {
-          type: 'DeviceSessionPinResult',
+          type: 'Success',
+          message: { message: 'ok' },
+        };
+      }
+      if (requestType === 'DeviceStatusGet') {
+        return {
+          type: 'DeviceStatus',
           message: {
             unlocked: true,
-            unlocked_attach_pin: true,
-            passphrase_protection: true,
+            unlocked_by_attach_to_pin: true,
+            passphrase_enabled: true,
           },
         };
       }
@@ -1906,7 +1921,10 @@ describe('Protocol V2 feature adapter', () => {
 
     await device.unlockDevice();
 
-    expect(typedCall.mock.calls).toEqual([['DeviceSessionAskPin', 'DeviceSessionPinResult']]);
+    expect(typedCall.mock.calls).toEqual([
+      ['DeviceSessionAskPin', 'Success'],
+      ['DeviceStatusGet', 'DeviceStatus', {}],
+    ]);
     expect((device as any).profile).toBeUndefined();
     expect(device.features?.unlocked).toBe(true);
     expect(device.features?.passphraseProtection).toBe(true);
@@ -1933,7 +1951,7 @@ describe('Protocol V2 feature adapter', () => {
       })
     );
     expect(typedCall).toHaveBeenCalledTimes(1);
-    expect(typedCall.mock.calls).toEqual([['DeviceSessionAskPin', 'DeviceSessionPinResult']]);
+    expect(typedCall.mock.calls).toEqual([['DeviceSessionAskPin', 'Success']]);
     expect(typedCall).not.toHaveBeenCalledWith(
       'DeviceSessionGet',
       'DeviceSession',

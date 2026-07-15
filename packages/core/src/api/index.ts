@@ -61,7 +61,6 @@ export { default as deviceSettingsPageShow } from './protocol-v2/DeviceSettingsP
 export { default as deviceUploadWallpaper } from './protocol-v2/DeviceUploadWallpaper';
 export { default as filesystemPermissionFix } from './protocol-v2/FilesystemPermissionFix';
 export { default as filesystemFormat } from './protocol-v2/FilesystemFormat';
-export { default as filesystemDiskControl } from './protocol-v2/FilesystemDiskControl';
 export { default as fileRead } from './FileRead';
 export { default as fileWrite } from './FileWrite';
 export { default as fileDelete } from './FileDelete';

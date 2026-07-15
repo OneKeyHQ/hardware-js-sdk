@@ -237,9 +237,3 @@ export declare const filesystemDirRemove: typeof dirRemove;
 export declare const filesystemPathInfoQuery: typeof pathInfo;
 
 export declare function filesystemFormat(connectId: string): Response<Success>;
-
-export declare function filesystemDiskControl(
-  connectId: string,
-  // enable 收紧为 boolean | 0 | 1（兼容历史的 '0' / '1' 字符串输入，内部归一化为 0/1）
-  params: CommonParams & { enable: boolean | 0 | 1; timeoutMs?: number | string }
-): Response<Success>;

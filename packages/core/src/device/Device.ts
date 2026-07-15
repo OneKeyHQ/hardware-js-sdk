@@ -67,7 +67,6 @@ import type { PassphrasePromptResponse } from './DeviceCommands';
 import type { Deferred, HardwareConnectProtocol } from '@onekeyfe/hd-shared';
 import type {
   OneKeyDeviceInfo as DeviceDescriptor,
-  DeviceSessionPinResult,
   DeviceStatus,
   ProtocolV2DeviceInfo,
   Success,
@@ -1190,12 +1189,8 @@ export class Device extends EventEmitter {
 
   async unlockDevice() {
     if (this.isProtocolV2()) {
-      let pinResult: DeviceSessionPinResult;
       try {
-        ({ message: pinResult } = await this.commands.typedCall(
-          'DeviceSessionAskPin',
-          'DeviceSessionPinResult'
-        ));
+        await this.commands.typedCall('DeviceSessionAskPin', 'Success');
       } catch (error) {
         const errorText =
           error instanceof Error
@@ -1207,16 +1202,11 @@ export class Device extends EventEmitter {
         throw error;
       }
 
-      const status: DeviceStatus = {};
-      if (pinResult.unlocked != null) {
-        status.unlocked = pinResult.unlocked;
-      }
-      if (pinResult.unlocked_attach_pin != null) {
-        status.unlocked_by_attach_to_pin = pinResult.unlocked_attach_pin;
-      }
-      if (pinResult.passphrase_protection != null) {
-        status.passphrase_enabled = pinResult.passphrase_protection;
-      }
+      const { message: status } = await this.commands.typedCall(
+        'DeviceStatusGet',
+        'DeviceStatus',
+        {}
+      );
       return this.updateProtocolV2Status(status);
     }
 
