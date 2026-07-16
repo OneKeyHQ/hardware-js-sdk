@@ -1,3 +1,5 @@
+import { AgentWalletBetaTitle } from '../../components/AgentWalletBetaTitle.js'
+
 export default {
   index: {
     title: '首页',
@@ -14,8 +16,35 @@ export default {
     },
   },
   'agent-wallet': {
-    title: 'Agent Wallet',
-    display: 'hidden',
+    title: AgentWalletBetaTitle({ betaLabel: '内测' }),
+    type: 'menu',
+    items: {
+      landing: { title: '首页', href: '/zh/agent-wallet/' },
+      overview: { title: '概览', href: '/zh/agent-wallet/overview' },
+      quickstart: { title: '快速开始', href: '/zh/agent-wallet/quickstart' },
+      capabilities: {
+        title: '能力地图',
+        href: '/zh/agent-wallet/capabilities',
+      },
+      'wallet-skills': {
+        title: 'Wallet Skills',
+        href: '/zh/agent-wallet/wallet-skills',
+      },
+      recipes: { title: '场景示例', href: '/zh/agent-wallet/recipes' },
+      'wallet-session': {
+        title: 'Agent Wallet 会话',
+        href: '/zh/agent-wallet/wallet-session',
+      },
+      'keyless-binding': {
+        title: 'Keyless 绑定',
+        href: '/zh/agent-wallet/keyless-binding',
+      },
+      'hardware-control': {
+        title: '硬件控制',
+        href: '/zh/agent-wallet/hardware-control',
+      },
+      safety: { title: '安全规则', href: '/zh/agent-wallet/safety' },
+    },
   },
   // 导航菜单及下拉项
   'hardware-sdk': {
