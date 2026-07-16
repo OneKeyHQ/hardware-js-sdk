@@ -578,7 +578,9 @@ export class DeviceCommands {
       }
 
       if (code === 'Failure_ProcessError') {
-        if (subcode === 9) {
+        const isLegacyProtocolV2LockedFailure =
+          this.device.isProtocolV2() && /^device (?:is )?locked$/i.test(message?.trim() ?? '');
+        if (subcode === 9 || isLegacyProtocolV2LockedFailure) {
           error = ERRORS.TypedError(HardwareErrorCode.DeviceLocked, message, {
             failureCode: code,
             subcode,

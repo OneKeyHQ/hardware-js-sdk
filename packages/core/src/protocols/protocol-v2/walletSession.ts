@@ -1,5 +1,7 @@
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
+import { isDeviceLockedError } from './lockedError';
+
 import type { Device } from '../../device/Device';
 
 const getErrorText = (error: unknown) => {
@@ -31,15 +33,11 @@ export async function getProtocolV2WalletSession(
   device: Device,
   options?: { initSession?: boolean; expectedPassphraseState?: string }
 ) {
-  if (device.features?.unlocked === false) {
-    throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Device is locked');
-  }
-
   if (options?.initSession) {
     device.clearInternalState();
   }
 
-  const cachedSessionId =
+  let sessionId =
     typeof device.getInternalState === 'function' ? device.getInternalState() : undefined;
 
   try {
@@ -50,13 +48,30 @@ export async function getProtocolV2WalletSession(
         sessionId ? { session_id: sessionId } : {}
       );
 
-    const { message } = await requestDeviceSession(cachedSessionId).catch(async error => {
-      if (!cachedSessionId || !isProtocolV2InvalidSessionError(error)) {
+    const requestWalletSession = async () => {
+      try {
+        return await requestDeviceSession(sessionId);
+      } catch (error) {
+        if (!sessionId || !isProtocolV2InvalidSessionError(error)) {
+          throw error;
+        }
+        device.clearInternalState();
+        sessionId = undefined;
+        return requestDeviceSession();
+      }
+    };
+
+    let response;
+    try {
+      response = await requestWalletSession();
+    } catch (error) {
+      if (!isDeviceLockedError(error)) {
         throw error;
       }
-      device.clearInternalState();
-      return requestDeviceSession();
-    });
+      await device.unlockDevice();
+      response = await requestWalletSession();
+    }
+    const { message } = response;
 
     if (
       options?.expectedPassphraseState &&

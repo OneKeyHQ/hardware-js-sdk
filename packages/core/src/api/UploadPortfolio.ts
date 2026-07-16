@@ -6,7 +6,7 @@ export type UploadPortfolioParams = {
   timeoutMs?: number | string;
 };
 
-const PORTFOLIO_PENDING_PATH = 'vol1:/portfolio/portfolio.pfol.pending';
+const PORTFOLIO_PENDING_PATH = 'vol1:/portfolio/portfolio.okpkg.pending';
 const PORTFOLIO_CHUNK_SIZE = 2048;
 
 export default class UploadPortfolio extends FileWrite {
@@ -20,9 +20,11 @@ export default class UploadPortfolio extends FileWrite {
       chunkSize: PORTFOLIO_CHUNK_SIZE,
       overwrite: true,
       append: false,
+      emitProgress: false,
       timeoutMs,
     };
     super.init();
+    this.unlockPolicy = 'retry-on-locked';
   }
 
   async run() {

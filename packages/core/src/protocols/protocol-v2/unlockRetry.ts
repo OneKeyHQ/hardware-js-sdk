@@ -1,6 +1,5 @@
-import { HardwareErrorCode } from '@onekeyfe/hd-shared';
-
 import { LoggerNames, getLogger } from '../../utils';
+import { isDeviceLockedError } from './lockedError';
 
 import type { BaseMethod } from '../../api/BaseMethod';
 import type { Device } from '../../device/Device';
@@ -9,15 +8,6 @@ const Log = getLogger(LoggerNames.Core);
 
 type RunnableMethod = Pick<BaseMethod, 'run' | 'unlockPolicy'> & { name?: string };
 type UnlockableDevice = Pick<Device, 'isProtocolV2' | 'unlockDevice'>;
-
-function isDeviceLockedError(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'errorCode' in error &&
-    error.errorCode === HardwareErrorCode.DeviceLocked
-  );
-}
 
 export async function runMethodWithUnlockRetry(method: RunnableMethod, device: UnlockableDevice) {
   try {

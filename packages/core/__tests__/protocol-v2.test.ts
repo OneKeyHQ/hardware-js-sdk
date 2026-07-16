@@ -205,13 +205,14 @@ describe('UploadPortfolio', () => {
     method.init();
     const result = await method.run();
 
+    expect(method.unlockPolicy).toBe('retry-on-locked');
     expect(typedCall).toHaveBeenNthCalledWith(
       1,
       'FilesystemFileWrite',
       'FilesystemFile',
       {
         file: {
-          path: 'vol1:/portfolio/portfolio.pfol.pending',
+          path: 'vol1:/portfolio/portfolio.okpkg.pending',
           offset: 0,
           total_size: 3,
           data: packageBytes,
@@ -223,8 +224,9 @@ describe('UploadPortfolio', () => {
       { timeoutMs: undefined }
     );
     expect(typedCall).toHaveBeenNthCalledWith(2, 'PortfolioUpdate', 'Success', {});
+    expect(method.postMessage).not.toHaveBeenCalled();
     expect(result).toMatchObject({
-      path: 'vol1:/portfolio/portfolio.pfol.pending',
+      path: 'vol1:/portfolio/portfolio.okpkg.pending',
       processed_byte: 3,
       portfolioUpdated: true,
     });
@@ -802,7 +804,7 @@ describe('Protocol V2 feature adapter', () => {
     expect(device.getInternalState()).toBeUndefined();
   });
 
-  test('rejects DeviceSessionGet while cached Pro2 status is locked', async () => {
+  test('unlocks and retries DeviceSessionGet when the Pro2 wallet session is locked', async () => {
     const device = Device.fromDescriptor({
       id: 'cache-device-4',
       path: 'cache-path-4',
@@ -812,11 +814,23 @@ describe('Protocol V2 feature adapter', () => {
       { ...descriptor, protocolType: 'V2' } as any,
       { status: { device_id: 'stable-device-4', unlocked: false } }
     );
-    const typedCall = jest.fn();
+    const lockedError = Object.assign(new Error('Device is locked'), {
+      errorCode: HardwareErrorCode.DeviceLocked,
+    });
+    const typedCall = jest
+      .fn()
+      .mockRejectedValueOnce(lockedError)
+      .mockResolvedValueOnce({
+        message: { session_id: 'session-after-unlock', btc_test_address: '' },
+      });
     (device as any).commands = { typedCall };
+    const unlockDevice = jest.spyOn(device, 'unlockDevice').mockResolvedValue(undefined as any);
 
-    await expect(getProtocolV2WalletSession(device)).rejects.toThrow('Device is locked');
-    expect(typedCall).not.toHaveBeenCalled();
+    await expect(getProtocolV2WalletSession(device)).resolves.toMatchObject({
+      newSession: 'session-after-unlock',
+    });
+    expect(unlockDevice).toHaveBeenCalledTimes(1);
+    expect(typedCall).toHaveBeenCalledTimes(2);
   });
 
   test('does not request a Pro2 wallet session before features are initialized', async () => {

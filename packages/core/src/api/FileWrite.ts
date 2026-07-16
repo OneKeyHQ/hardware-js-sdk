@@ -18,6 +18,7 @@ export type FileWriteParams = {
   chunkLen?: number;
   overwrite?: boolean;
   append?: boolean;
+  emitProgress?: boolean;
   uiPercentage?: number;
   timeoutMs?: number | string;
 };
@@ -40,6 +41,7 @@ export default class FileWrite extends BaseMethod<FileWriteParams> {
       chunkLen: validateOptionalNonNegativeInteger(this.payload.chunkLen, 'chunkLen'),
       overwrite: this.payload.overwrite ?? offset === 0,
       append: this.payload.append ?? false,
+      emitProgress: this.payload.emitProgress ?? true,
       uiPercentage: validateOptionalPercentage(this.payload.uiPercentage, 'uiPercentage'),
       timeoutMs: validateOptionalNonNegativeInteger(this.payload.timeoutMs, 'timeoutMs'),
     };
@@ -60,7 +62,7 @@ export default class FileWrite extends BaseMethod<FileWriteParams> {
       timeoutMs: this.params.timeoutMs === undefined ? undefined : Number(this.params.timeoutMs),
       throwIfAborted: () => this.throwIfAborted(),
       onProgress: payload => {
-        if (typeof this.postMessage === 'function') {
+        if (this.params.emitProgress && typeof this.postMessage === 'function') {
           this.postMessage(createUiMessage(UI_REQUEST.DEVICE_PROGRESS, payload));
         }
       },

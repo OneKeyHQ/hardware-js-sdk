@@ -11,6 +11,7 @@ const createCommands = () => {
   const commands = Object.create(DeviceCommands.prototype) as DeviceCommands;
   commands.device = {
     clearCancelableAction: jest.fn(),
+    isProtocolV2: jest.fn(() => true),
   } as any;
   return commands;
 };
@@ -38,6 +39,52 @@ describe('DeviceCommands failure mapping', () => {
         subcode: 9,
         firmwareMessage: 'Device locked',
       },
+    });
+  });
+
+  it.each(['Device locked', 'Device is locked'])(
+    'maps legacy Protocol V2 locked message "%s" without a subcode',
+    async message => {
+      const commands = createCommands();
+
+      await expect(
+        commands._filterCommonTypes(
+          {
+            type: 'Failure',
+            message: {
+              code: 'Failure_ProcessError',
+              message,
+            },
+          } as any,
+          'PortfolioUpdate'
+        )
+      ).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.DeviceLocked,
+        params: {
+          failureCode: 'Failure_ProcessError',
+          firmwareMessage: message,
+        },
+      });
+    }
+  );
+
+  it('does not use the legacy locked-message fallback for Protocol V1', async () => {
+    const commands = createCommands();
+    (commands.device.isProtocolV2 as jest.Mock).mockReturnValue(false);
+
+    await expect(
+      commands._filterCommonTypes(
+        {
+          type: 'Failure',
+          message: {
+            code: 'Failure_ProcessError',
+            message: 'Device is locked',
+          },
+        } as any,
+        'ApplySettings'
+      )
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.RuntimeError,
     });
   });
 
