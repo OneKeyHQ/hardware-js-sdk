@@ -15,7 +15,6 @@ import { DEVICE, IFRAME, createUiMessage } from '../../events';
 import { isMethodVersionRangeUnsupported } from '../../utils';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { onDeviceButtonHandler } from '../../core';
-import { shouldRegisterHardwareUiEvents } from '../../core/deviceEventRegistration';
 import {
   completeRequestContext,
   createRequestContext,
@@ -365,13 +364,11 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
         });
       }
 
-      if (shouldRegisterHardwareUiEvents(this.device)) {
-        // pro pin event
-        this.device.on(DEVICE.BUTTON, buttonListener);
-        // classic pin event
-        this.device.on(DEVICE.PIN, onSignalAbort);
-        this.device.on(DEVICE.PASSPHRASE, onSignalAbort);
-      }
+      // pro pin event
+      this.device.on(DEVICE.BUTTON, buttonListener);
+      // classic pin event
+      this.device.on(DEVICE.PIN, onSignalAbort);
+      this.device.on(DEVICE.PASSPHRASE, onSignalAbort);
 
       preCheckDeviceSupport(this.device, method);
       if (this.temporarySafetyCheckPrompted) {
@@ -425,11 +422,9 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
         );
       }
     } finally {
-      if (shouldRegisterHardwareUiEvents(this.device)) {
-        this.device.off(DEVICE.BUTTON, buttonListener);
-        this.device.off(DEVICE.PIN, onSignalAbort);
-        this.device.off(DEVICE.PASSPHRASE, onSignalAbort);
-      }
+      this.device.off(DEVICE.BUTTON, buttonListener);
+      this.device.off(DEVICE.PIN, onSignalAbort);
+      this.device.off(DEVICE.PASSPHRASE, onSignalAbort);
     }
 
     return result;

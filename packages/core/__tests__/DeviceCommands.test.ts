@@ -1,6 +1,7 @@
 import { HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { DeviceCommands } from '../src/device/DeviceCommands';
+import { DEVICE } from '../src/events';
 
 jest.mock('../src/data/config', () => ({
   getSDKVersion: jest.fn(() => '1.0.0'),
@@ -166,6 +167,82 @@ describe('DeviceCommands failure mapping', () => {
     ).rejects.toMatchObject({
       errorCode: HardwareErrorCode.RuntimeError,
       message: 'Failure_UnexpectedMessage,Not in Reset mode',
+    });
+  });
+});
+
+describe('DeviceCommands Protocol V2 interactive response compatibility', () => {
+  it('still auto-acks ButtonRequest when no hardware UI listener is registered', async () => {
+    const commands = createCommands();
+    commands.device = {
+      ...commands.device,
+      getCurrentDeviceType: jest.fn(() => 'pro2'),
+      setCancelableAction: jest.fn(),
+      emit: jest.fn(),
+      listenerCount: jest.fn(() => 0),
+    } as any;
+    commands._commonCall = jest.fn().mockResolvedValue({
+      type: 'Success',
+      message: {},
+    }) as any;
+
+    await expect(
+      commands._filterCommonTypes(
+        {
+          type: 'ButtonRequest',
+          message: { code: 'ButtonRequest_PinEntry' },
+        } as any,
+        'GetAddress'
+      )
+    ).resolves.toMatchObject({ type: 'Success' });
+
+    expect(commands.device.emit).toHaveBeenCalledWith(
+      DEVICE.BUTTON,
+      commands.device,
+      expect.objectContaining({ code: 'ButtonRequest_PinEntry' })
+    );
+    expect(commands._commonCall).toHaveBeenCalledWith('ButtonAck', {}, undefined);
+  });
+
+  it('rejects PassphraseRequest when the Pro2 UI listener is not registered', async () => {
+    const commands = createCommands();
+    commands.device = {
+      ...commands.device,
+      listenerCount: jest.fn(() => 0),
+    } as any;
+
+    await expect(
+      commands._filterCommonTypes(
+        {
+          type: 'PassphraseRequest',
+          message: { exists_attach_pin_user: true },
+        } as any,
+        'GetAddress'
+      )
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.RuntimeError,
+      message: '_promptPassphrase: Passphrase callback not configured',
+    });
+  });
+
+  it('rejects PinMatrixRequest when the Pro2 UI listener is not registered', async () => {
+    const commands = createCommands();
+    commands.device = {
+      ...commands.device,
+      instanceId: 'pro2-test-device',
+      listenerCount: jest.fn(() => 0),
+    } as any;
+
+    await expect(
+      commands._filterCommonTypes(
+        {
+          type: 'PinMatrixRequest',
+          message: { type: 'PinMatrixRequestType_Current' },
+        } as any,
+        'GetAddress'
+      )
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.RuntimeError,
     });
   });
 });
