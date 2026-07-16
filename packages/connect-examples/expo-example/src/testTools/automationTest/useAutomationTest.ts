@@ -118,7 +118,7 @@ const CONFIRM_ACTION_STEP_DELAY_MS = 1000;
 const POST_SEQUENCE_SETTLE_MS = 3000;
 /** Extra settle time between device preparation (import/create) and the first SDK call. */
 const PRE_SDK_SETTLE_MS = 3000;
-const SDK_CASE_DELAY_MS = 80;
+const SDK_CASE_DELAY_MS = 300;
 const DEVICE_FLOW_ONLY_SUITES: TestSuiteType[] = ['deviceFlow'];
 type DeviceUiAction = 'confirm' | 'slide';
 
@@ -1463,10 +1463,16 @@ export function useAutomationTest() {
         featuresAfter = await fetchDeviceFeatures(sdk, connectId);
       }
 
-      const forceUseEmptyPassphrase = featuresAfter?.passphrase_protection === true;
+      // Treat an unknown state (features fetch failed) as still-enabled: forcing
+      // useEmptyPassphrase on a passphrase-off device is a harmless no-op, while
+      // skipping it on a passphrase-on device fails every main-wallet call with
+      // DeviceOpenedPassphrase (a prior deviceFlow suite leaves passphrase on).
+      const forceUseEmptyPassphrase = featuresAfter?.passphrase_protection !== false;
       if (forceUseEmptyPassphrase) {
         addLog(
-          `[${suiteLabel}] passphrase_protection is still enabled; forcing useEmptyPassphrase for main-wallet SDK calls`
+          `[${suiteLabel}] passphrase_protection is ${
+            featuresAfter ? 'still enabled' : 'unknown'
+          }; forcing useEmptyPassphrase for main-wallet SDK calls`
         );
       }
 
