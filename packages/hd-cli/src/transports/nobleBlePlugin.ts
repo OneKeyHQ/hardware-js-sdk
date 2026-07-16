@@ -3,7 +3,6 @@ import {
   HardwareErrorCode,
   ONEKEY_SERVICE_UUID,
   isOnekeyDevice,
-  wait,
 } from '@onekeyfe/hd-shared';
 
 import type { LowLevelDevice, LowlevelTransportSharedPlugin } from '@onekeyfe/hd-transport';
@@ -54,7 +53,6 @@ const CONNECTION_TIMEOUT = 8_000;
 const SERVICE_DISCOVERY_TIMEOUT = 10_000;
 const BLE_CLEANUP_TIMEOUT = 100;
 const BLE_PACKET_SIZE = 192;
-const BLE_WRITE_DELAY = 5;
 const BLE_ENCRYPTION_ERROR_PATTERNS = [/encryption is insufficient/i, /insufficient encryption/i];
 
 let noble: NobleModule | null = null;
@@ -468,9 +466,6 @@ export function createNobleBlePlugin(): LowlevelTransportSharedPlugin {
       for (let offset = 0; offset < buffer.length; offset += BLE_PACKET_SIZE) {
         const chunk = buffer.subarray(offset, Math.min(offset + BLE_PACKET_SIZE, buffer.length));
         await writeCharacteristic(characteristics.write, chunk, true);
-        if (offset + BLE_PACKET_SIZE < buffer.length) {
-          await wait(BLE_WRITE_DELAY);
-        }
       }
     },
 

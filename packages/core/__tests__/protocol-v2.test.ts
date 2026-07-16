@@ -110,6 +110,7 @@ describe('DeviceUploadWallpaper', () => {
       payload: { method: 'deviceUploadWallpaper', width: 604, height: 1024, rgba },
     });
     (method as any).device = stubDevice({ commands: { typedCall } });
+    method.postMessage = jest.fn();
 
     method.init();
     const result = await method.run();
@@ -130,6 +131,20 @@ describe('DeviceUploadWallpaper', () => {
     });
     expect(typedCall.mock.calls.some(call => call[0] === 'SetWallpaper')).toBe(false);
     expect(result).toMatchObject({ colorFormat: 'RGB565', message: 'wallpaper applied' });
+    const fileWriteCallCount = typedCall.mock.calls.filter(
+      call => call[0] === 'FilesystemFileWrite'
+    ).length;
+    expect(method.postMessage).toHaveBeenCalledTimes(fileWriteCallCount);
+    expect(method.postMessage).toHaveBeenLastCalledWith({
+      event: 'UI_EVENT',
+      type: UI_REQUEST.DEVICE_PROGRESS,
+      payload: expect.objectContaining({
+        progress: 100,
+        transferredBytes: result.size,
+        totalBytes: result.size,
+        elapsedMs: expect.any(Number),
+      }),
+    });
   });
 
   test('文件上传失败时不修改 wallpaper_path', async () => {

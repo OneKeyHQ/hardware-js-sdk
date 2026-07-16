@@ -4,11 +4,12 @@ import { bytesToHex } from '@noble/hashes/utils';
 import { BaseMethod } from '../BaseMethod';
 import { invalidParameter } from '../helpers/filesystemValidation';
 import { writeProtocolV2File } from '../helpers/protocolV2FileWrite';
+import { UI_REQUEST, createUiMessage } from '../../events/ui-request';
 import {
-  encodePro2Wallpaper,
   PRO2_WALLPAPER_HEIGHT,
   PRO2_WALLPAPER_WIDTH,
   type Pro2WallpaperColorFormat,
+  encodePro2Wallpaper,
 } from '../../utils/pro2Wallpaper';
 
 export type DeviceUploadWallpaperParams = {
@@ -90,7 +91,7 @@ export default class DeviceUploadWallpaper extends BaseMethod<DeviceUploadWallpa
 
   private async upload() {
     if (this.uploaded) return;
-    const encoded = this.encoded;
+    const { encoded } = this;
     if (!encoded) throw invalidParameter('Wallpaper data has not been initialized.');
 
     await writeProtocolV2File({
@@ -102,12 +103,17 @@ export default class DeviceUploadWallpaper extends BaseMethod<DeviceUploadWallpa
       overwrite: true,
       append: false,
       throwIfAborted: () => this.throwIfAborted(),
+      onProgress: payload => {
+        if (typeof this.postMessage === 'function') {
+          this.postMessage(createUiMessage(UI_REQUEST.DEVICE_PROGRESS, payload));
+        }
+      },
     });
     this.uploaded = true;
   }
 
   async run(): Promise<DeviceUploadWallpaperResponse> {
-    const encoded = this.encoded;
+    const { encoded } = this;
     if (!encoded) throw invalidParameter('Wallpaper data has not been initialized.');
     await this.ensureDirectory();
     await this.upload();

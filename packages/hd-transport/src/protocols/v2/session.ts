@@ -201,11 +201,22 @@ export class ProtocolV2Session {
       router,
       seq: protoSeq,
     });
+    const txMetadata = ProtocolV2.inspectFrame(schemas, frame);
 
     if (maxFrameBytes !== undefined && frame.length > maxFrameBytes) {
       throw new Error(
         `Protocol V2 frame too large for transport: ${frame.length} > ${maxFrameBytes}`
       );
+    }
+
+    if (!shouldReduceDebug) {
+      logger?.debug?.(`[${logPrefix}] TX`, {
+        method: name,
+        type: name,
+        typeId: txMetadata.messageTypeId,
+        seq: txMetadata.seq,
+        bytes: frame.length,
+      });
     }
 
     // Lenient watchdog on the write phase only — see
@@ -237,6 +248,18 @@ export class ProtocolV2Session {
         }
         const isAck = ProtocolV2.isAckFrame(rxFrame);
         if (!isAck) {
+          const rxMetadata = ProtocolV2.inspectFrame(schemas, rxFrame);
+
+          if (!shouldReduceDebug) {
+            logger?.debug?.(`[${logPrefix}] RX`, {
+              method: name,
+              type: rxMetadata.type,
+              typeId: rxMetadata.messageTypeId,
+              seq: rxMetadata.seq,
+              bytes: rxFrame.length,
+            });
+          }
+
           const decoded = ProtocolV2.decodeFrame(schemas, rxFrame);
 
           const response = check.call(decoded);

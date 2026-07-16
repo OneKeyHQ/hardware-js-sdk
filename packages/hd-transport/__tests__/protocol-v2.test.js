@@ -95,6 +95,22 @@ const protocolV2Messages = parseConfigure({
         },
       },
     },
+    Failure: {
+      fields: {
+        code: {
+          type: 'uint32',
+          id: 1,
+        },
+        subcode: {
+          type: 'uint32',
+          id: 2,
+        },
+        message: {
+          type: 'string',
+          id: 3,
+        },
+      },
+    },
     DeviceFirmwareTarget: {
       fields: {
         target_id: {
@@ -174,6 +190,7 @@ const protocolV2Messages = parseConfigure({
         MessageType_ProtocolInfo: 60201,
         MessageType_Ping: 60206,
         MessageType_Success: 60207,
+        MessageType_Failure: 60208,
         MessageType_FileWrite: 60805,
         MessageType_DeviceFirmwareUpdateRequest: 61000,
         MessageType_DeviceFirmwareUpdateStatus: 61002,
@@ -318,6 +335,76 @@ describe('Protocol V2 framing and session', () => {
     });
   });
 
+  test('session logs Protocol V2 TX and RX frame metadata without payloads', async () => {
+    const written = [];
+    const logger = { debug: jest.fn() };
+    const response = ProtocolV2.encodeFrame(schemas, 'ProtocolInfo', {
+      version: 2,
+      supported_messages: [60206],
+      protobuf_definition: 'sensitive-schema',
+    });
+    const session = new ProtocolV2Session({
+      schemas,
+      router: 1,
+      logger,
+      logPrefix: 'ProtocolV2 Test',
+      writeFrame: frame => {
+        written.push(frame);
+        return Promise.resolve();
+      },
+      readFrame: () =>
+        Promise.resolve(rewriteSeq(response, protocolV2.decodeFrame(written[0]).seq)),
+    });
+
+    await session.call('ProtocolInfoRequest', {});
+
+    const tx = protocolV2.decodeFrame(written[0]);
+    const rx = protocolV2.decodeFrame(rewriteSeq(response, tx.seq));
+    expect(logger.debug).toHaveBeenCalledWith('[ProtocolV2 Test] TX', {
+      method: 'ProtocolInfoRequest',
+      type: 'ProtocolInfoRequest',
+      typeId: tx.messageTypeId,
+      seq: tx.seq,
+      bytes: written[0].length,
+    });
+    expect(logger.debug).toHaveBeenCalledWith('[ProtocolV2 Test] RX', {
+      method: 'ProtocolInfoRequest',
+      type: 'ProtocolInfo',
+      typeId: rx.messageTypeId,
+      seq: rx.seq,
+      bytes: response.length,
+    });
+    expect(JSON.stringify(logger.debug.mock.calls)).not.toContain('sensitive-schema');
+    expect(JSON.stringify(logger.debug.mock.calls)).not.toContain('supported_messages');
+  });
+
+  test('session logs RX frame metadata before protobuf payload decoding fails', async () => {
+    const logger = { debug: jest.fn() };
+    const response = protocolV2.encodeProtobufFrame(
+      60208,
+      hexToBytes('0801121648616e646c6572206e6f742072656769737465726564')
+    );
+    const session = new ProtocolV2Session({
+      schemas,
+      router: 1,
+      logger,
+      logPrefix: 'ProtocolV2 Test',
+      writeFrame: () => Promise.resolve(),
+      readFrame: () => Promise.resolve(response),
+    });
+
+    await expect(session.call('Ping', { message: 'hello' })).rejects.toThrow();
+
+    const rx = protocolV2.decodeFrame(response);
+    expect(logger.debug).toHaveBeenCalledWith('[ProtocolV2 Test] RX', {
+      method: 'Ping',
+      type: 'Failure',
+      typeId: rx.messageTypeId,
+      seq: rx.seq,
+      bytes: response.length,
+    });
+  });
+
   test('session skips Proto Link ACK frames before decoding the protobuf response', async () => {
     const ack = new Uint8Array(8);
     ack[0] = 0x5a;
@@ -392,7 +479,7 @@ describe('Protocol V2 framing and session', () => {
     });
   });
 
-  test('session accepts response frames with a device-owned seq without logging frame details', async () => {
+  test('session logs a device-owned response seq without rejecting the frame', async () => {
     const response = ProtocolV2.encodeFrame(schemas, 'ProtocolInfo', {
       version: 2,
       supported_messages: [],
@@ -416,7 +503,13 @@ describe('Protocol V2 framing and session', () => {
         protobuf_definition: null,
       },
     });
-    expect(logger.debug).not.toHaveBeenCalled();
+    expect(logger.debug).toHaveBeenCalledWith('[ProtocolV2] RX', {
+      method: 'ProtocolInfoRequest',
+      type: 'ProtocolInfo',
+      typeId: 60201,
+      seq: 200,
+      bytes: response.length,
+    });
   });
 
   test('session does not log transmit or receive payload details', async () => {
@@ -442,7 +535,10 @@ describe('Protocol V2 framing and session', () => {
       },
     });
 
-    expect(logger.debug).not.toHaveBeenCalled();
+    expect(logger.debug).toHaveBeenCalledTimes(2);
+    const logs = JSON.stringify(logger.debug.mock.calls);
+    expect(logs).not.toContain('hello');
+    expect(logs).not.toContain('accepted');
   });
 
   test('session suppresses debug logs for file transfer calls', async () => {
