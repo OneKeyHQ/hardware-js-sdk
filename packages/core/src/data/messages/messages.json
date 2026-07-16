@@ -6082,7 +6082,6 @@
           }
         },
         "raw_message": {
-          "rule": "required",
           "type": "bytes",
           "id": 2
         },
@@ -6112,6 +6111,42 @@
           "id": 6,
           "options": {
             "default": true
+          }
+        },
+        "output_count": {
+          "type": "uint32",
+          "id": 7
+        },
+        "version": {
+          "type": "uint32",
+          "id": 8,
+          "options": {
+            "default": 0
+          }
+        },
+        "lock_time": {
+          "type": "uint64",
+          "id": 9,
+          "options": {
+            "default": 0
+          }
+        },
+        "subnetwork_id": {
+          "type": "bytes",
+          "id": 10
+        },
+        "gas": {
+          "type": "uint64",
+          "id": 11,
+          "options": {
+            "default": 0
+          }
+        },
+        "payload_length": {
+          "type": "uint32",
+          "id": 12,
+          "options": {
+            "default": 0
           }
         }
       }
@@ -6143,6 +6178,249 @@
           "rule": "required",
           "type": "bytes",
           "id": 2
+        }
+      }
+    },
+    "KaspaOutpoint": {
+      "fields": {
+        "tx_id": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        },
+        "index": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        }
+      }
+    },
+    "KaspaInputScriptType": {
+      "values": {
+        "KASPA_SPEND_P2PK_SCHNORR": 0,
+        "KASPA_SPEND_P2PK_ECDSA": 1
+      }
+    },
+    "KaspaOutputScriptType": {
+      "values": {
+        "KASPA_PAYTOADDRESS": 0,
+        "KASPA_PAYTOCHANGE": 1
+      }
+    },
+    "KaspaRequestType": {
+      "values": {
+        "KASPA_TX_INPUT": 0,
+        "KASPA_TX_OUTPUT": 1,
+        "KASPA_TX_PAYLOAD": 2,
+        "KASPA_TX_FINISHED": 3,
+        "KASPA_TX_PREV_META": 4
+      }
+    },
+    "KaspaTxRequestSignature": {
+      "fields": {
+        "signature_index": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
+        },
+        "signature": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "KaspaTxRequest": {
+      "fields": {
+        "request_type": {
+          "rule": "required",
+          "type": "KaspaRequestType",
+          "id": 1
+        },
+        "request_index": {
+          "type": "uint32",
+          "id": 2
+        },
+        "signature": {
+          "type": "KaspaTxRequestSignature",
+          "id": 3
+        },
+        "request_payload_length": {
+          "type": "uint32",
+          "id": 4
+        },
+        "prev_tx_id": {
+          "type": "bytes",
+          "id": 5
+        }
+      }
+    },
+    "KaspaTxAckInput": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "previous_outpoint": {
+          "rule": "required",
+          "type": "KaspaOutpoint",
+          "id": 2
+        },
+        "amount": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 3
+        },
+        "sequence": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 4
+        },
+        "sig_op_count": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 5
+        },
+        "script_type": {
+          "type": "KaspaInputScriptType",
+          "id": 6,
+          "options": {
+            "default": "KASPA_SPEND_P2PK_SCHNORR"
+          }
+        },
+        "use_tweak": {
+          "type": "bool",
+          "id": 9,
+          "options": {
+            "default": true
+          }
+        }
+      }
+    },
+    "KaspaTxAckOutput": {
+      "fields": {
+        "script_type": {
+          "type": "KaspaOutputScriptType",
+          "id": 1,
+          "options": {
+            "default": "KASPA_PAYTOADDRESS"
+          }
+        },
+        "amount": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 2
+        },
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 3,
+          "options": {
+            "packed": false
+          }
+        },
+        "address": {
+          "type": "string",
+          "id": 4
+        },
+        "scheme": {
+          "type": "string",
+          "id": 7,
+          "options": {
+            "default": "schnorr"
+          }
+        },
+        "use_tweak": {
+          "type": "bool",
+          "id": 8,
+          "options": {
+            "default": true
+          }
+        }
+      }
+    },
+    "KaspaTxAckPayloadChunk": {
+      "fields": {
+        "payload_chunk": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "KaspaTxAckPrevMeta": {
+      "fields": {
+        "version": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
+        },
+        "input_count": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        },
+        "output_count": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 3
+        },
+        "lock_time": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 4
+        },
+        "subnetwork_id": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 5
+        },
+        "gas": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 6
+        },
+        "payload_length": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 7
+        }
+      }
+    },
+    "KaspaTxAckPrevInput": {
+      "fields": {
+        "previous_outpoint": {
+          "rule": "required",
+          "type": "KaspaOutpoint",
+          "id": 1
+        },
+        "sequence": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 2
+        }
+      }
+    },
+    "KaspaTxAckPrevOutput": {
+      "fields": {
+        "amount": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 1
+        },
+        "script_version": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        },
+        "script_public_key": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 3
         }
       }
     },
@@ -12559,6 +12837,13 @@
         "MessageType_KaspaSignedTx": 11303,
         "MessageType_KaspaTxInputRequest": 11304,
         "MessageType_KaspaTxInputAck": 11305,
+        "MessageType_KaspaTxRequest": 11306,
+        "MessageType_KaspaTxAckInput": 11307,
+        "MessageType_KaspaTxAckOutput": 11308,
+        "MessageType_KaspaTxAckPayloadChunk": 11309,
+        "MessageType_KaspaTxAckPrevMeta": 11310,
+        "MessageType_KaspaTxAckPrevInput": 11311,
+        "MessageType_KaspaTxAckPrevOutput": 11312,
         "MessageType_NexaGetAddress": 11400,
         "MessageType_NexaAddress": 11401,
         "MessageType_NexaSignTx": 11402,

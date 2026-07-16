@@ -2189,11 +2189,17 @@ export type KaspaAddress = {
 // KaspaSignTx
 export type KaspaSignTx = {
   address_n: number[];
-  raw_message: string;
+  raw_message?: string;
   scheme?: string;
   prefix?: string;
   input_count?: number;
   use_tweak?: boolean;
+  output_count?: number;
+  version?: number;
+  lock_time?: number;
+  subnetwork_id?: string;
+  gas?: number;
+  payload_length?: number;
 };
 
 // KaspaTxInputRequest
@@ -2206,6 +2212,98 @@ export type KaspaTxInputRequest = {
 export type KaspaTxInputAck = {
   address_n: number[];
   raw_message: string;
+};
+
+// KaspaOutpoint
+export type KaspaOutpoint = {
+  tx_id: string;
+  index: number;
+};
+
+export enum Enum_KaspaInputScriptType {
+  KASPA_SPEND_P2PK_SCHNORR = 0,
+  KASPA_SPEND_P2PK_ECDSA = 1,
+}
+export type KaspaInputScriptType = keyof typeof Enum_KaspaInputScriptType;
+
+export enum Enum_KaspaOutputScriptType {
+  KASPA_PAYTOADDRESS = 0,
+  KASPA_PAYTOCHANGE = 1,
+}
+export type KaspaOutputScriptType = keyof typeof Enum_KaspaOutputScriptType;
+
+export enum Enum_KaspaRequestType {
+  KASPA_TX_INPUT = 0,
+  KASPA_TX_OUTPUT = 1,
+  KASPA_TX_PAYLOAD = 2,
+  KASPA_TX_FINISHED = 3,
+  KASPA_TX_PREV_META = 4,
+}
+export type KaspaRequestType = keyof typeof Enum_KaspaRequestType;
+
+// KaspaTxRequestSignature
+export type KaspaTxRequestSignature = {
+  signature_index: number;
+  signature: string;
+};
+
+// KaspaTxRequest
+export type KaspaTxRequest = {
+  request_type: KaspaRequestType;
+  request_index?: number;
+  signature?: KaspaTxRequestSignature;
+  request_payload_length?: number;
+  prev_tx_id?: string;
+};
+
+// KaspaTxAckInput
+export type KaspaTxAckInput = {
+  address_n: number[];
+  previous_outpoint: KaspaOutpoint;
+  amount: UintType;
+  sequence: number;
+  sig_op_count: number;
+  script_type?: KaspaInputScriptType;
+  use_tweak?: boolean;
+};
+
+// KaspaTxAckOutput
+export type KaspaTxAckOutput = {
+  script_type?: KaspaOutputScriptType;
+  amount: UintType;
+  address_n: number[];
+  address?: string;
+  scheme?: string;
+  use_tweak?: boolean;
+};
+
+// KaspaTxAckPayloadChunk
+export type KaspaTxAckPayloadChunk = {
+  payload_chunk: string;
+};
+
+// KaspaTxAckPrevMeta
+export type KaspaTxAckPrevMeta = {
+  version: number;
+  input_count: number;
+  output_count: number;
+  lock_time: number;
+  subnetwork_id: string;
+  gas: number;
+  payload_length: number;
+};
+
+// KaspaTxAckPrevInput
+export type KaspaTxAckPrevInput = {
+  previous_outpoint: KaspaOutpoint;
+  sequence: number;
+};
+
+// KaspaTxAckPrevOutput
+export type KaspaTxAckPrevOutput = {
+  amount: UintType;
+  script_version: number;
+  script_public_key: string;
 };
 
 // KaspaSignedTx
@@ -4667,6 +4765,15 @@ export type MessageType = {
   KaspaSignTx: KaspaSignTx;
   KaspaTxInputRequest: KaspaTxInputRequest;
   KaspaTxInputAck: KaspaTxInputAck;
+  KaspaOutpoint: KaspaOutpoint;
+  KaspaTxRequestSignature: KaspaTxRequestSignature;
+  KaspaTxRequest: KaspaTxRequest;
+  KaspaTxAckInput: KaspaTxAckInput;
+  KaspaTxAckOutput: KaspaTxAckOutput;
+  KaspaTxAckPayloadChunk: KaspaTxAckPayloadChunk;
+  KaspaTxAckPrevMeta: KaspaTxAckPrevMeta;
+  KaspaTxAckPrevInput: KaspaTxAckPrevInput;
+  KaspaTxAckPrevOutput: KaspaTxAckPrevOutput;
   KaspaSignedTx: KaspaSignedTx;
   LnurlAuth: LnurlAuth;
   LnurlAuthResp: LnurlAuthResp;
