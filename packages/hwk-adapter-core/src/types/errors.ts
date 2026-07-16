@@ -45,6 +45,15 @@ export enum HardwareErrorCode {
   ChainNotSupported = 10108,
   /** Current operation supports only one connected device. */
   DeviceOneDeviceOnly = 10109,
+  /**
+   * The device rejected the requested derivation path (Trezor Failure_DataError
+   * "Forbidden key path") — the path is non-standard or its index is outside the
+   * range the device's safety checks allow. Distinct from ChainNotSupported
+   * (whole chain) and MethodNotSupported (the operation/method itself).
+   */
+  DevicePathForbidden = 10110,
+  /** Busy with our own in-flight request (queue guard / firmware Failure_Busy), not another app — wait and retry, don't close other apps. */
+  DeviceBusyInternal = 10111,
 
   // --- 10200s Firmware ---
   FirmwareTooOld = 10200,
@@ -68,11 +77,63 @@ export enum HardwareErrorCode {
    * (generic) and from DeviceLocked (Secure Element actually locked).
    */
   BlePairingTimeout = 10304,
+  /** Remote network failure reaching a vendor's servers (HTTP/WS). Distinct from TransportError (local USB/BLE link). */
+  NetworkError = 10305,
+  /**
+   * Host-managed pairing handshake failed (Trezor THP). The device rejected the
+   * pairing exchange — e.g. CodeEntry: the user mistyped the code shown on the
+   * device, so the CPace tag didn't match ("Unexpected Code Entry Tag").
+   * Recoverable: the user re-pairs and re-enters the code. Distinct from
+   * BlePairingTimeout (BLE SMP bonding window) and UserRejected (on-device
+   * reject button).
+   */
+  ThpPairingFailed = 10306,
+  /**
+   * The OS-level BLE bond is stale/invalid, so the device rejected link
+   * encryption: Android GATT_INSUF_AUTHENTICATION (status 5) or iOS "Peer
+   * removed pairing information". Happens after the device is wiped/re-flashed
+   * or unpaired elsewhere while the host still holds an old bond. The SDK cannot
+   * remove an OS bond — the user must forget the device in system Bluetooth
+   * settings and re-pair. Distinct from BlePairingTimeout (SMP window) and
+   * ThpPairingFailed (THP code mismatch).
+   */
+  BleBondInvalid = 10307,
+  /**
+   * A stored THP pairing credential was rejected by the device during the
+   * handshake (device returned completion `state=0`), so the autoconnect session
+   * could not be established. The SDK discards the stale credential; recovery is
+   * a fresh pairing. Distinct from ThpPairingFailed (user mistyped the code
+   * during an *active* pairing) and BleBondInvalid (OS-level BLE bond).
+   */
+  ThpPairingRequired = 10308,
+  /**
+   * Generic BLE connect failure where the OS dropped the specific reason. On
+   * macOS the noble native binding hardcodes "connection failed" (and a connect
+   * timeout) and discards the CoreBluetooth NSError, so the SDK cannot tell a
+   * stale bond from an out-of-range / unresponsive device. Surfaced as a
+   * generic "couldn't connect — check the device, re-pair if paired before".
+   * Distinct from BleBondInvalid (a *known* stale-bond signal, iOS/Android only)
+   * and BlePairingTimeout (the SMP bonding window).
+   */
+  BleConnectFailed = 10309,
 
   // --- 10400s PIN / Passphrase ---
   PinInvalid = 10400,
   PinCancelled = 10401,
   PassphraseRejected = 10402,
+  /**
+   * The passphrase entered produced a different wallet (`passphraseState`) than
+   * the one the caller asked to operate on. Trezor-only: the host pins a wallet
+   * by its derived state and the SDK refuses to sign with a mismatched
+   * passphrase session. Surfaced by TrezorAdapter.getPassphraseState.
+   */
+  PassphraseStateMismatch = 10403,
+  /**
+   * The two new-PIN entries did not match during set/change PIN. Only host-input
+   * models (Trezor Model One matrix) surface this; on-device-input models show
+   * the mismatch on the device and never return it.
+   */
+  PinMismatch = 10404,
 
   // --- 10500s App lifecycle ---
   /** Chain app NOT INSTALLED on device. User must install via Ledger Live. */
@@ -135,4 +196,43 @@ export const ORPHAN_ELIGIBLE_ERROR_CODES: number[] = [
   HardwareErrorCode.TransportError,
   HardwareErrorCode.DevicePermissionDenied,
   HardwareErrorCode.BlePairingTimeout,
+  HardwareErrorCode.ThpPairingFailed,
+  HardwareErrorCode.ThpPairingRequired,
+  HardwareErrorCode.BleBondInvalid,
+  HardwareErrorCode.BleConnectFailed,
 ];
+
+// ---------------------------------------------------------------------------
+// Standard throwable for HWK adapters
+// ---------------------------------------------------------------------------
+
+export interface IHwkErrorPayload {
+  code: HardwareErrorCode;
+  message: string;
+  appName?: string;
+  _tag?: string;
+  params?: Record<string, unknown>;
+}
+
+export type HwkError = Error & {
+  code: HardwareErrorCode;
+  appName?: string;
+  _tag?: string;
+  params?: Record<string, unknown>;
+};
+
+/**
+ * Canonical throwable for HWK adapters. Plain Error + canonical extra fields,
+ * shape-compatible with `rehydrateConnectorError` so locally-thrown and
+ * cross-boundary errors are indistinguishable to downstream classifiers
+ * (`err.code` / `err._tag` / `err.appName`). Do NOT mutate caught errors
+ * with `Object.assign` — construct a fresh one via this factory.
+ */
+export function createHwkError(payload: IHwkErrorPayload): HwkError {
+  return Object.assign(new Error(payload.message), {
+    code: payload.code,
+    ...(payload._tag !== undefined && { _tag: payload._tag }),
+    ...(payload.appName !== undefined && { appName: payload.appName }),
+    ...(payload.params !== undefined && { params: payload.params }),
+  });
+}

@@ -148,7 +148,49 @@ describe('AppManager', () => {
       );
     });
 
-    it('throws AppNotInstalled when OpenAppCommand fails without a status code', async () => {
+    it('throws AppNotInstalled when OpenAppCommand fails with 0x6807 (unknown application)', async () => {
+      dmk.sendCommand.mockImplementation(async (params: { command: unknown }) => {
+        if (params.command instanceof GetAppAndVersionCommand) {
+          return appResult('BOLOS');
+        }
+        return {
+          error: {
+            _tag: 'OpenAppCommandError',
+            errorCode: '6807',
+            message: 'Unknown application name',
+          },
+        };
+      });
+
+      await expect(appManager.ensureAppOpen('session-1', 'Tron')).rejects.toMatchObject({
+        code: HardwareErrorCode.AppNotInstalled,
+        errorCode: '6807',
+        appName: 'Tron',
+      });
+    });
+
+    it('throws UserRejected when the user refuses the open-app prompt (0x5501)', async () => {
+      dmk.sendCommand.mockImplementation(async (params: { command: unknown }) => {
+        if (params.command instanceof GetAppAndVersionCommand) {
+          return appResult('BOLOS');
+        }
+        return {
+          error: {
+            _tag: 'ActionRefusedError',
+            errorCode: '5501',
+            message: 'Action refused on device.',
+          },
+        };
+      });
+
+      await expect(appManager.ensureAppOpen('session-1', 'Tron')).rejects.toMatchObject({
+        code: HardwareErrorCode.UserRejected,
+        errorCode: '5501',
+        appName: 'Tron',
+      });
+    });
+
+    it('does not default to AppNotInstalled when OpenAppCommand fails without an error code', async () => {
       dmk.sendCommand.mockImplementation(async (params: { command: unknown }) => {
         if (params.command instanceof GetAppAndVersionCommand) {
           return appResult('BOLOS');
@@ -157,7 +199,7 @@ describe('AppManager', () => {
       });
 
       await expect(appManager.ensureAppOpen('session-1', 'Tron')).rejects.toMatchObject({
-        code: HardwareErrorCode.AppNotInstalled,
+        code: undefined,
         appName: 'Tron',
       });
     });

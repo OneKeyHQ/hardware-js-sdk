@@ -1,6 +1,7 @@
 import {
   CHAIN_FINGERPRINT_PATHS,
   DEVICE,
+  DEVICE_CONNECT_RETRY_DELAY_MS,
   DeviceJobQueue,
   EConnectorInteraction,
   HardwareErrorCode,
@@ -8,6 +9,7 @@ import {
   UI_REQUEST,
   UI_REQUEST_PREEMPTED_TAG,
   UiRequestRegistry,
+  createHwkError,
   deriveDeviceFingerprint,
   failure,
   rehydrateConnectorError,
@@ -27,9 +29,11 @@ import {
   ledgerFailure,
   mapLedgerError,
 } from '../errors';
+import { createAllNetworkGetAddress } from './methods/allNetworkGetAddress';
 import { isLedgerBleConnectionType } from '../utils/ledgerDmkTransport';
 import { debugError, debugLog } from '../utils/debugLog';
 
+import type { LedgerInstallAppContext } from './methods/allNetworkGetAddress';
 import type { AppMetadata, FirmwareVersion, LedgerDeviceInfo } from '../device-apps/DeviceApps';
 import type {
   BtcAddress,
@@ -53,7 +57,7 @@ import type {
   EvmAddress,
   EvmGetAddressParams,
   EvmSignMsgParams,
-  EvmSignTxParams,
+  EvmSignTxLedgerParams,
   EvmSignTypedDataParams,
   EvmSignature,
   EvmSignedTx,
@@ -61,7 +65,10 @@ import type {
   HardwareEventMap,
   ICommonCallParams,
   IConnector,
+  IHardwareCallParams,
+  IHardwareCommonCallParams,
   IHardwareWallet,
+  NullableCallArg,
   Response,
   SearchDevicesOptions,
   SolAddress,
@@ -96,6 +103,10 @@ type ConnectorCallFingerprint = {
   deviceId: string;
   skipFingerprint: boolean;
 };
+
+type LedgerCallParams<T> = NullableCallArg<IHardwareCallParams<T>>;
+
+type LedgerCommonParams = NullableCallArg<IHardwareCommonCallParams>;
 
 // Fingerprints are deterministic 16-char hashes of fixed testnet paths,
 // not secrets — safe to log.
@@ -213,37 +224,49 @@ export class LedgerAdapter implements IHardwareWallet {
   // ---------------------------------------------------------------------------
 
   async searchDevices(options?: SearchDevicesOptions): Promise<DeviceInfo[]> {
-    if (options?.resetSession) {
-      this._doConnectAbortController?.abort();
-      this._sessions.clear();
-      this._connectingPromise = null;
-      this._doConnectAbortController = null;
-      this._btcHighIndexConfirmedThisSession = false;
-    }
-
-    await this._ensureDevicePermission();
-
-    const devices = await this.connector.searchDevices();
-
-    // Replace cache with this round's raw result. DMK paths used as connectId
-    // on USB are ephemeral — incremental writes leave stale entries.
-    this._discoveredDevices.clear();
-    for (const d of devices) {
-      if (d.connectId) {
-        this._discoveredDevices.set(d.connectId, this.connectorDeviceToDeviceInfo(d));
+    debugLog('[LedgerAdapter][REQ]', { method: 'searchDevices', params: options });
+    try {
+      if (options?.resetSession) {
+        this._doConnectAbortController?.abort();
+        this._sessions.clear();
+        this._connectingPromise = null;
+        this._doConnectAbortController = null;
+        this._btcHighIndexConfirmedThisSession = false;
       }
-    }
 
-    if (this._discoveredDevices.size === 0) {
       await this._ensureDevicePermission();
-    }
 
-    debugLog(
-      `[LedgerAdapter] searchDevices() return count=${this._discoveredDevices.size} ids=[${[
-        ...this._discoveredDevices.keys(),
-      ].join(',')}]`
-    );
-    return Array.from(this._discoveredDevices.values());
+      const devices = await this.connector.searchDevices();
+
+      // Replace cache with this round's raw result. DMK paths used as connectId
+      // on USB are ephemeral — incremental writes leave stale entries.
+      this._discoveredDevices.clear();
+      for (const d of devices) {
+        if (d.connectId) {
+          this._discoveredDevices.set(d.connectId, this.connectorDeviceToDeviceInfo(d));
+        }
+      }
+
+      if (this._discoveredDevices.size === 0) {
+        await this._ensureDevicePermission();
+      }
+
+      const result = Array.from(this._discoveredDevices.values());
+      debugLog('[LedgerAdapter][RES]', {
+        method: 'searchDevices',
+        success: true,
+        payload: result,
+      });
+      return result;
+    } catch (err) {
+      const e = err as Record<string, unknown> | null | undefined;
+      debugLog('[LedgerAdapter][RES]', {
+        method: 'searchDevices',
+        success: false,
+        error: { message: e?.message, _tag: e?._tag, code: e?.code ?? e?.errorCode },
+      });
+      throw err;
+    }
   }
 
   // USB single-session invariant: evict all sessions, best-effort (see connectDevice).
@@ -278,6 +301,14 @@ export class LedgerAdapter implements IHardwareWallet {
   // populated by the runtime (Hermes/RN). Set in cancel(), cleared shortly.
   private _lastCancelReason: Error | undefined;
 
+  // Throttle AppInstallProgress by progress delta — DMK streams much faster
+  // than UIs need. Final frame (progress >= 1) always passes.
+  private static readonly APP_INSTALL_PROGRESS_MIN_DELTA = 0.05;
+
+  private _installProgressLastEmittedValue = -Infinity;
+
+  private _installProgressLastKey: string | undefined;
+
   private static _createDeviceBusyError(method: string): Error {
     return Object.assign(new Error(`Ledger device is busy while calling ${method}`), {
       code: HardwareErrorCode.DeviceBusy,
@@ -285,6 +316,7 @@ export class LedgerAdapter implements IHardwareWallet {
   }
 
   async connectDevice(connectId: string): Promise<Response<string>> {
+    debugLog('[LedgerAdapter][REQ]', { method: 'connectDevice', connectId, params: { connectId } });
     try {
       if (isLedgerBleConnectionType(this.connector.connectionType) && !connectId) {
         throw Object.assign(new Error('Ledger BLE connectId is required.'), {
@@ -307,42 +339,98 @@ export class LedgerAdapter implements IHardwareWallet {
         this._discoveredDevices.set(connectId, session.deviceInfo);
       }
 
-      return success(connectId);
+      const result = success(connectId);
+      debugLog('[LedgerAdapter][RES]', { method: 'connectDevice', success: true, payload: result });
+      return result;
     } catch (err) {
-      return this.errorToFailure(err);
+      const failureResult = this.errorToFailure<string>(err);
+      debugLog('[LedgerAdapter][RES]', {
+        method: 'connectDevice',
+        success: false,
+        payload: failureResult,
+      });
+      return failureResult;
     }
   }
 
   async disconnectDevice(connectId: string): Promise<void> {
-    const sessionId = this._sessions.get(connectId);
-    if (sessionId) {
-      await this.connector.disconnect(sessionId);
-      this._sessions.delete(connectId);
+    debugLog('[LedgerAdapter][REQ]', {
+      method: 'disconnectDevice',
+      connectId,
+      params: { connectId },
+    });
+    try {
+      const sessionId = this._sessions.get(connectId);
+      if (sessionId) {
+        await this.connector.disconnect(sessionId);
+        this._sessions.delete(connectId);
+      }
+      debugLog('[LedgerAdapter][RES]', { method: 'disconnectDevice', success: true });
+    } catch (err) {
+      const e = err as Record<string, unknown> | null | undefined;
+      debugLog('[LedgerAdapter][RES]', {
+        method: 'disconnectDevice',
+        success: false,
+        error: { message: e?.message, _tag: e?._tag, code: e?.code ?? e?.errorCode },
+      });
+      throw err;
     }
   }
 
   async getDeviceInfo(connectId: string, deviceId: string): Promise<Response<DeviceInfo>> {
-    await this._ensureDevicePermission(connectId, deviceId);
+    debugLog('[LedgerAdapter][REQ]', {
+      method: 'getDeviceInfo',
+      connectId,
+      params: { connectId, deviceId },
+    });
+    try {
+      await this._ensureDevicePermission(connectId, deviceId);
 
-    // Look up the device in the cache populated by event handlers / searchDevices.
-    // Try connectId first (the USB path), then fall back to scanning by deviceId.
-    const cached =
-      this._discoveredDevices.get(connectId) ??
-      Array.from(this._discoveredDevices.values()).find(d => d.deviceId === deviceId);
+      // Look up the device in the cache populated by event handlers / searchDevices.
+      // Try connectId first (the USB path), then fall back to scanning by deviceId.
+      const cached =
+        this._discoveredDevices.get(connectId) ??
+        Array.from(this._discoveredDevices.values()).find(d => d.deviceId === deviceId);
 
-    if (cached) {
-      return success(cached);
+      if (cached) {
+        const result = success(cached);
+        debugLog('[LedgerAdapter][RES]', {
+          method: 'getDeviceInfo',
+          success: true,
+          payload: result,
+        });
+        return result;
+      }
+
+      const notFound = failure(
+        HardwareErrorCode.DeviceNotFound,
+        'Device not found in cache. Call searchDevices() or wait for a device-connected event first.'
+      );
+      debugLog('[LedgerAdapter][RES]', {
+        method: 'getDeviceInfo',
+        success: false,
+        payload: notFound,
+      });
+      return notFound;
+    } catch (err) {
+      const e = err as Record<string, unknown> | null | undefined;
+      debugLog('[LedgerAdapter][RES]', {
+        method: 'getDeviceInfo',
+        success: false,
+        error: { message: e?.message, _tag: e?._tag, code: e?.code ?? e?.errorCode },
+      });
+      throw err;
     }
-
-    return failure(
-      HardwareErrorCode.DeviceNotFound,
-      'Device not found in cache. Call searchDevices() or wait for a device-connected event first.'
-    );
   }
 
   getSupportedChains(): ChainCapability[] {
     return ['evm', 'btc', 'sol', 'tron'];
   }
+
+  allNetworkGetAddress = createAllNetworkGetAddress({
+    callChain: this.callChain.bind(this),
+    getChainFingerprint: (connectId, chain) => this.getChainFingerprint(connectId, '', chain),
+  });
 
   // ---------------------------------------------------------------------------
   // Chain call helper
@@ -355,7 +443,8 @@ export class LedgerAdapter implements IHardwareWallet {
     method: string,
     params: unknown,
     commonParams?: ICommonCallParams,
-    skipFingerprint = false
+    skipFingerprint = false,
+    installContext?: LedgerInstallAppContext
   ): Promise<Response<T>> {
     try {
       const result = await this.connectorCall(
@@ -368,7 +457,8 @@ export class LedgerAdapter implements IHardwareWallet {
           skipFingerprint,
         },
         undefined,
-        commonParams
+        commonParams,
+        installContext
       );
       return success(result as T);
     } catch (err) {
@@ -376,71 +466,119 @@ export class LedgerAdapter implements IHardwareWallet {
     }
   }
 
+  private static normalizeCallArgs(
+    connectId: NullableCallArg<string>,
+    deviceId: NullableCallArg<string>,
+    params: NullableCallArg<unknown>
+  ): {
+    connectId: string;
+    deviceId: string;
+    params: unknown;
+  } {
+    return {
+      connectId: connectId ?? '',
+      deviceId: deviceId ?? '',
+      params: params ?? {},
+    };
+  }
+
+  private static splitCommonParams(params: unknown): {
+    commonParams: ICommonCallParams;
+    rest: unknown;
+  } {
+    if (params && typeof params === 'object') {
+      const {
+        autoInstallApp,
+        passphraseState: _passphraseState,
+        useEmptyPassphrase: _useEmptyPassphrase,
+        ...rest
+      } = params as Record<string, unknown>;
+      return {
+        commonParams: {
+          autoInstallApp: typeof autoInstallApp === 'boolean' ? autoInstallApp : undefined,
+        },
+        rest,
+      };
+    }
+    return { commonParams: {}, rest: params ?? {} };
+  }
+
+  private callChainWithMergedParams<T>(
+    connectId: NullableCallArg<string>,
+    deviceId: NullableCallArg<string>,
+    chain: ChainForFingerprint,
+    method: string,
+    params: NullableCallArg<unknown>
+  ): Promise<Response<T>> {
+    const normalized = LedgerAdapter.normalizeCallArgs(connectId, deviceId, params);
+    const { commonParams, rest } = LedgerAdapter.splitCommonParams(normalized.params);
+    return this.callChain<T>(
+      normalized.connectId,
+      normalized.deviceId,
+      chain,
+      method,
+      rest,
+      commonParams
+    );
+  }
+
   // ---------------------------------------------------------------------------
   // EVM chain methods
   // ---------------------------------------------------------------------------
 
   evmGetAddress(
-    connectId: string,
-    deviceId: string,
-    params: EvmGetAddressParams,
-    commonParams?: ICommonCallParams
+    connectId?: string | null,
+    deviceId?: string | null,
+    params?: LedgerCallParams<EvmGetAddressParams>
   ) {
-    return this.callChain<EvmAddress>(
+    return this.callChainWithMergedParams<EvmAddress>(
       connectId,
       deviceId,
       'evm',
       'evmGetAddress',
-      params,
-      commonParams
+      params
     );
   }
 
   evmSignTransaction(
-    connectId: string,
-    deviceId: string,
-    params: EvmSignTxParams,
-    commonParams?: ICommonCallParams
+    connectId?: string | null,
+    deviceId?: string | null,
+    params?: LedgerCallParams<EvmSignTxLedgerParams>
   ) {
-    return this.callChain<EvmSignedTx>(
+    return this.callChainWithMergedParams<EvmSignedTx>(
       connectId,
       deviceId,
       'evm',
       'evmSignTransaction',
-      params,
-      commonParams
+      params
     );
   }
 
   evmSignMessage(
-    connectId: string,
-    deviceId: string,
-    params: EvmSignMsgParams,
-    commonParams?: ICommonCallParams
+    connectId?: string | null,
+    deviceId?: string | null,
+    params?: LedgerCallParams<EvmSignMsgParams>
   ) {
-    return this.callChain<EvmSignature>(
+    return this.callChainWithMergedParams<EvmSignature>(
       connectId,
       deviceId,
       'evm',
       'evmSignMessage',
-      params,
-      commonParams
+      params
     );
   }
 
   evmSignTypedData(
-    connectId: string,
-    deviceId: string,
-    params: EvmSignTypedDataParams,
-    commonParams?: ICommonCallParams
+    connectId?: string | null,
+    deviceId?: string | null,
+    params?: LedgerCallParams<EvmSignTypedDataParams>
   ) {
-    return this.callChain<EvmSignature>(
+    return this.callChainWithMergedParams<EvmSignature>(
       connectId,
       deviceId,
       'evm',
       'evmSignTypedData',
-      params,
-      commonParams
+      params
     );
   }
 
@@ -449,93 +587,86 @@ export class LedgerAdapter implements IHardwareWallet {
   // ---------------------------------------------------------------------------
 
   btcGetAddress(
-    connectId: string,
-    deviceId: string,
-    params: BtcGetAddressParams,
-    commonParams?: ICommonCallParams
+    connectId?: string | null,
+    deviceId?: string | null,
+    params?: LedgerCallParams<BtcGetAddressParams>
   ) {
-    return this.callChain<BtcAddress>(
+    return this.callChainWithMergedParams<BtcAddress>(
       connectId,
       deviceId,
       'btc',
       'btcGetAddress',
-      params,
-      commonParams
+      params
     );
   }
 
   btcGetPublicKey(
-    connectId: string,
-    deviceId: string,
-    params: BtcGetPublicKeyParams,
-    commonParams?: ICommonCallParams
+    connectId?: string | null,
+    deviceId?: string | null,
+    params?: LedgerCallParams<BtcGetPublicKeyParams>
   ) {
-    return this.callChain<BtcPublicKey>(
+    return this.callChainWithMergedParams<BtcPublicKey>(
       connectId,
       deviceId,
       'btc',
       'btcGetPublicKey',
-      params,
-      commonParams
+      params
     );
   }
 
   btcSignTransaction(
-    connectId: string,
-    deviceId: string,
-    params: BtcSignTxParams,
-    commonParams?: ICommonCallParams
+    connectId?: string | null,
+    deviceId?: string | null,
+    params?: LedgerCallParams<BtcSignTxParams>
   ) {
-    return this.callChain<BtcSignedTx>(
+    return this.callChainWithMergedParams<BtcSignedTx>(
       connectId,
       deviceId,
       'btc',
       'btcSignTransaction',
-      params,
-      commonParams
+      params
     );
   }
 
   btcSignPsbt(
-    connectId: string,
-    deviceId: string,
-    params: BtcSignPsbtParams,
-    commonParams?: ICommonCallParams
+    connectId?: string | null,
+    deviceId?: string | null,
+    params?: LedgerCallParams<BtcSignPsbtParams>
   ) {
-    return this.callChain<BtcSignedPsbt>(
+    return this.callChainWithMergedParams<BtcSignedPsbt>(
       connectId,
       deviceId,
       'btc',
       'btcSignPsbt',
-      params,
-      commonParams
+      params
     );
   }
 
   btcSignMessage(
-    connectId: string,
-    deviceId: string,
-    params: BtcSignMsgParams,
-    commonParams?: ICommonCallParams
+    connectId?: string | null,
+    deviceId?: string | null,
+    params?: LedgerCallParams<BtcSignMsgParams>
   ) {
-    return this.callChain<BtcSignature>(
+    return this.callChainWithMergedParams<BtcSignature>(
       connectId,
       deviceId,
       'btc',
       'btcSignMessage',
-      params,
-      commonParams
+      params
     );
   }
 
-  btcGetMasterFingerprint(connectId: string, deviceId: string, commonParams?: ICommonCallParams) {
-    return this.callChain<{ masterFingerprint: string }>(
+  btcGetMasterFingerprint(
+    connectId?: string | null,
+    deviceId?: string | null,
+    params?: LedgerCommonParams
+  ) {
+    return this.callChainWithMergedParams<{ masterFingerprint: string }>(
       connectId,
       deviceId,
       'btc',
       'btcGetMasterFingerprint',
-      {},
-      commonParams
+      params
     );
   }
 
@@ -544,50 +675,44 @@ export class LedgerAdapter implements IHardwareWallet {
   // ---------------------------------------------------------------------------
 
   solGetAddress(
-    connectId: string,
-    deviceId: string,
-    params: SolGetAddressParams,
-    commonParams?: ICommonCallParams
+    connectId?: string | null,
+    deviceId?: string | null,
+    params?: LedgerCallParams<SolGetAddressParams>
   ) {
-    return this.callChain<SolAddress>(
+    return this.callChainWithMergedParams<SolAddress>(
       connectId,
       deviceId,
       'sol',
       'solGetAddress',
-      params,
-      commonParams
+      params
     );
   }
 
   solSignTransaction(
-    connectId: string,
-    deviceId: string,
-    params: SolSignTxParams,
-    commonParams?: ICommonCallParams
+    connectId?: string | null,
+    deviceId?: string | null,
+    params?: LedgerCallParams<SolSignTxParams>
   ) {
-    return this.callChain<SolSignedTx>(
+    return this.callChainWithMergedParams<SolSignedTx>(
       connectId,
       deviceId,
       'sol',
       'solSignTransaction',
-      params,
-      commonParams
+      params
     );
   }
 
   solSignMessage(
-    connectId: string,
-    deviceId: string,
-    params: SolSignMsgParams,
-    commonParams?: ICommonCallParams
+    connectId?: string | null,
+    deviceId?: string | null,
+    params?: LedgerCallParams<SolSignMsgParams>
   ) {
-    return this.callChain<SolSignature>(
+    return this.callChainWithMergedParams<SolSignature>(
       connectId,
       deviceId,
       'sol',
       'solSignMessage',
-      params,
-      commonParams
+      params
     );
   }
 
@@ -596,50 +721,44 @@ export class LedgerAdapter implements IHardwareWallet {
   // ---------------------------------------------------------------------------
 
   tronGetAddress(
-    connectId: string,
-    deviceId: string,
-    params: TronGetAddressParams,
-    commonParams?: ICommonCallParams
+    connectId?: string | null,
+    deviceId?: string | null,
+    params?: LedgerCallParams<TronGetAddressParams>
   ) {
-    return this.callChain<TronAddress>(
+    return this.callChainWithMergedParams<TronAddress>(
       connectId,
       deviceId,
       'tron',
       'tronGetAddress',
-      params,
-      commonParams
+      params
     );
   }
 
   tronSignTransaction(
-    connectId: string,
-    deviceId: string,
-    params: TronSignTxParams,
-    commonParams?: ICommonCallParams
+    connectId?: string | null,
+    deviceId?: string | null,
+    params?: LedgerCallParams<TronSignTxParams>
   ) {
-    return this.callChain<TronSignedTx>(
+    return this.callChainWithMergedParams<TronSignedTx>(
       connectId,
       deviceId,
       'tron',
       'tronSignTransaction',
-      params,
-      commonParams
+      params
     );
   }
 
   tronSignMessage(
-    connectId: string,
-    deviceId: string,
-    params: TronSignMsgParams,
-    commonParams?: ICommonCallParams
+    connectId?: string | null,
+    deviceId?: string | null,
+    params?: LedgerCallParams<TronSignMsgParams>
   ) {
-    return this.callChain<TronSignature>(
+    return this.callChainWithMergedParams<TronSignature>(
       connectId,
       deviceId,
       'tron',
       'tronSignMessage',
-      params,
-      commonParams
+      params
     );
   }
 
@@ -666,6 +785,16 @@ export class LedgerAdapter implements IHardwareWallet {
     try {
       const result = await this.connectorCall(connectId, 'listInstalledApps', {});
       return success(result as AppMetadata[]);
+    } catch (err) {
+      return this.errorToFailure(err);
+    }
+  }
+
+  // Offline app-presence + unlock probe. No manager-api catalog (unlike listInstalledApps).
+  async listInstalledNames(connectId: string): Promise<Response<string[]>> {
+    try {
+      const result = await this.connectorCall(connectId, 'listInstalledNames', {});
+      return success(result as string[]);
     } catch (err) {
       return this.errorToFailure(err);
     }
@@ -1134,7 +1263,7 @@ export class LedgerAdapter implements IHardwareWallet {
       if (devices.length === 0) {
         for (let i = 0; i < 3 && !internalSignal.aborted; i += 1) {
           await new Promise<void>(resolve => {
-            setTimeout(resolve, 1000);
+            setTimeout(resolve, DEVICE_CONNECT_RETRY_DELAY_MS);
           });
           devices = await this.searchDevices();
           if (devices.length > 0) break;
@@ -1316,31 +1445,53 @@ export class LedgerAdapter implements IHardwareWallet {
     params: unknown,
     fingerprint?: ConnectorCallFingerprint,
     permissionDeviceId?: string,
-    commonParams?: ICommonCallParams
+    commonParams?: ICommonCallParams,
+    installContext?: LedgerInstallAppContext
   ): Promise<unknown> {
-    debugLog('[LedgerAdapter] connectorCall:', method, 'connectId:', connectId || '(empty)');
+    // [REQ] / [RES] are the canonical request/response trace for any operation
+    // that hits the device — chain methods, installApp, list*, firmware, etc.
+    // Diagnostic / recovery debugLog lines below are NOT a duplicate: they log
+    // what the SDK decides to do about an error, not the response itself.
+    debugLog('[LedgerAdapter][REQ]', { method, connectId: connectId || '(empty)', params });
 
     // Queue is global serial; deviceId is just a label for inspection / cancellation.
     const queueKey = connectId || '__ledger_default__';
 
-    return this._jobQueue.enqueue(
-      queueKey,
-      async signal =>
-        this._runConnectorCall(
-          connectId,
-          method,
-          params,
-          signal,
-          fingerprint,
-          permissionDeviceId,
-          commonParams
-        ),
-      {
-        label: method,
-        rejectIfBusy: true,
-        busyError: LedgerAdapter._createDeviceBusyError(method),
-      }
-    );
+    try {
+      const result = await this._jobQueue.enqueue(
+        queueKey,
+        async signal =>
+          this._runConnectorCall(
+            connectId,
+            method,
+            params,
+            signal,
+            fingerprint,
+            permissionDeviceId,
+            commonParams,
+            installContext
+          ),
+        {
+          label: method,
+          rejectIfBusy: true,
+          busyError: LedgerAdapter._createDeviceBusyError(method),
+        }
+      );
+      debugLog('[LedgerAdapter][RES]', { method, success: true, payload: result });
+      return result;
+    } catch (err) {
+      const e = err as Record<string, unknown> | null | undefined;
+      debugLog('[LedgerAdapter][RES]', {
+        method,
+        success: false,
+        error: {
+          message: e?.message,
+          _tag: e?._tag,
+          code: e?.code ?? e?.errorCode,
+        },
+      });
+      throw err;
+    }
   }
 
   /**
@@ -1389,7 +1540,8 @@ export class LedgerAdapter implements IHardwareWallet {
     signal: AbortSignal,
     fingerprint?: ConnectorCallFingerprint,
     permissionDeviceId?: string,
-    commonParams?: ICommonCallParams
+    commonParams?: ICommonCallParams,
+    installContext?: LedgerInstallAppContext
   ): Promise<unknown> {
     LedgerAdapter._throwIfAborted(signal);
     await this._ensureDevicePermission(
@@ -1479,10 +1631,31 @@ export class LedgerAdapter implements IHardwareWallet {
         isAppNotInstalledError(err) ||
         (err as { code?: number })?.code === HardwareErrorCode.AppNotInstalled;
       if (autoInstallApp && isAppMissing) {
+        if (installContext?.deviceOutOfMemoryError) {
+          throw installContext.deviceOutOfMemoryError;
+        }
         const appName = (err as { appName?: string })?.appName ?? mapLedgerError(err).appName;
         if (appName) {
+          // Loop guard: if installApp already resolved once this bundle but
+          // the app is STILL missing, DMK is lying about success. Don't
+          // re-prompt — surface a clear failure so the bundle moves on.
+          if (installContext?.installAttemptedAppNames?.has(appName)) {
+            throw createHwkError({
+              code: HardwareErrorCode.AppNotInstalled,
+              message: `${appName} install reported success but the app is still missing on device`,
+              _tag: ERROR_TAG.AppInstallVerifyFailed,
+              appName,
+            });
+          }
           const confirmed = await this._waitForInstallAppConfirm(appName);
-          if (!confirmed) throw err;
+          if (!confirmed) {
+            throw createHwkError({
+              code: HardwareErrorCode.UserAborted,
+              message: `User declined to install ${appName}`,
+              _tag: ERROR_TAG.UserAborted,
+              appName,
+            });
+          }
           // Emit progress 0 immediately so the confirm dialog morphs into the
           // "installing" view with no blank gap — DMK's setup (go-to-dashboard,
           // metadata, build plan, secure channel) can take several seconds
@@ -1491,7 +1664,21 @@ export class LedgerAdapter implements IHardwareWallet {
             type: EConnectorInteraction.AppInstallProgress,
             payload: { connectId: resolvedConnectId, appName, progress: 0 },
           });
-          await this._callConnector(sessionId, 'installApp', { appName }, signal);
+          try {
+            await this._callConnector(sessionId, 'installApp', { appName }, signal);
+          } catch (installErr) {
+            if (mapLedgerError(installErr).code === HardwareErrorCode.DeviceOutOfMemory) {
+              if (installContext) {
+                installContext.deviceOutOfMemoryError = installErr as Error;
+              }
+            }
+            throw installErr;
+          }
+          if (installContext) {
+            installContext.installAttemptedAppNames =
+              installContext.installAttemptedAppNames ?? new Set();
+            installContext.installAttemptedAppNames.add(appName);
+          }
           // Close the install UI before retrying so the retried operation's own
           // device prompts (e.g. confirm-on-device) render normally instead of
           // being absorbed by the install dialog.
@@ -1499,7 +1686,16 @@ export class LedgerAdapter implements IHardwareWallet {
             type: UI_REQUEST.CLOSE_UI_WINDOW,
             payload: {},
           });
-          return await this._callConnector(sessionId, method, effectiveParams, signal);
+          return await this._runConnectorCall(
+            resolvedConnectId,
+            method,
+            effectiveParams,
+            signal,
+            fingerprint,
+            permissionDeviceId,
+            commonParams,
+            installContext
+          );
         }
       }
 
@@ -1991,12 +2187,26 @@ export class LedgerAdapter implements IHardwareWallet {
         );
         return;
       }
+      const { appName, progress } = event.payload;
+      const key = `${connectId}:${appName}`;
+      // Reset baseline on app/device switch — and after the prior stream
+      // finished — so the next install of the same app emits intermediate
+      // frames instead of staying stuck at the final 1.0 baseline.
+      if (this._installProgressLastKey !== key || this._installProgressLastEmittedValue >= 1) {
+        this._installProgressLastEmittedValue = -Infinity;
+        this._installProgressLastKey = key;
+      }
+      const delta = progress - this._installProgressLastEmittedValue;
+      if (delta < LedgerAdapter.APP_INSTALL_PROGRESS_MIN_DELTA && progress < 1) {
+        return;
+      }
+      this._installProgressLastEmittedValue = progress;
       this.emitter.emit('ui-event', {
         type: EConnectorInteraction.AppInstallProgress,
         payload: {
           connectId,
-          appName: event.payload.appName,
-          progress: event.payload.progress,
+          appName,
+          progress,
         },
       });
       return;

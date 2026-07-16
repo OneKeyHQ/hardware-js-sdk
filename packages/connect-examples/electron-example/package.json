@@ -1,8 +1,8 @@
 {
-  "name": "onekey-electron-demo",
-  "productName": "OneKey Electron Demo",
-  "executableName": "onekey-electron-demo",
-  "version": "1.2.0-alpha.12",
+  "name": "hardware-example",
+  "productName": "HardwareExample",
+  "executableName": "onekey-hardware-example",
+  "version": "1.2.0-alpha.13",
   "author": "OneKey",
   "description": "End-to-end encrypted workspaces for teams",
   "main": "dist/index.js",
@@ -22,7 +22,7 @@
     "ts:check": "yarn tsc --noEmit"
   },
   "dependencies": {
-    "@onekeyfe/hd-transport-electron": "1.2.0-alpha.12",
+    "@onekeyfe/hd-transport-electron": "1.2.0-alpha.13",
     "@stoprocent/noble": "2.3.16",
     "debug": "4.3.4",
     "electron-is-dev": "^3.0.1",

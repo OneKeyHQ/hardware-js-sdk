@@ -77,6 +77,8 @@ local.properties
 # Expo / RN example prebuild outputs (ignore generated native folders under examples)
 packages/connect-examples/react-native-demo/android
 packages/connect-examples/react-native-demo/ios
+packages/connect-examples/hwk-demo/android
+packages/connect-examples/hwk-demo/ios
 packages/connect-examples/expo-example/android
 packages/connect-examples/expo-example/ios
 packages/connect-examples/expo-example/web-build

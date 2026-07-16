@@ -9,6 +9,7 @@ describe('event constants', () => {
     expect(DEVICE.CONNECT).toBe('device-connect');
     expect(DEVICE.DISCONNECT).toBe('device-disconnect');
     expect(DEVICE.CHANGED).toBe('device-changed');
+    expect(DEVICE.FEATURES).toBe('features');
   });
 
   it('should export UI_EVENT string', () => {
@@ -24,14 +25,16 @@ describe('event constants', () => {
     expect(UI_REQUEST.REQUEST_QR_SCAN).toBe('ui-request-qr-scan');
     expect(UI_REQUEST.REQUEST_DEVICE_PERMISSION).toBe('ui-request-device-permission');
     expect(UI_REQUEST.REQUEST_SELECT_DEVICE).toBe('ui-request-select-device');
+    expect(UI_REQUEST.REQUEST_TREZOR_THP_PAIRING).toBe('ui-request-trezor-thp-pairing');
   });
 
   it('should export UI_RESPONSE object with correct event names', () => {
     expect(UI_RESPONSE.RECEIVE_PIN).toBe('receive-pin');
     expect(UI_RESPONSE.RECEIVE_PASSPHRASE).toBe('receive-passphrase');
-    expect(UI_RESPONSE.RECEIVE_PASSPHRASE_ON_DEVICE).toBe('receive-passphrase-on-device');
+    expect('RECEIVE_PASSPHRASE_ON_DEVICE' in UI_RESPONSE).toBe(false);
     expect(UI_RESPONSE.RECEIVE_QR_RESPONSE).toBe('receive-qr-response');
     expect(UI_RESPONSE.RECEIVE_SELECT_DEVICE).toBe('receive-select-device');
+    expect(UI_RESPONSE.RECEIVE_TREZOR_THP_PAIRING).toBe('receive-trezor-thp-pairing');
     expect(UI_RESPONSE.CANCEL).toBe('cancel');
   });
 

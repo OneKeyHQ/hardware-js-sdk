@@ -1,3 +1,5 @@
+import { AgentWalletBetaTitle } from '../../components/AgentWalletBetaTitle.js'
+
 export default {
   index: {
     title: '首页',
@@ -13,9 +15,8 @@ export default {
       copyPage: false,
     },
   },
-  /*
   'agent-wallet': {
-    title: 'Agent Wallet',
+    title: AgentWalletBetaTitle({ betaLabel: '内测' }),
     type: 'menu',
     items: {
       landing: { title: '首页', href: '/zh/agent-wallet/' },
@@ -45,7 +46,6 @@ export default {
       safety: { title: '安全规则', href: '/zh/agent-wallet/safety' },
     },
   },
-  */
   // 导航菜单及下拉项
   'hardware-sdk': {
     title: '硬件接入',

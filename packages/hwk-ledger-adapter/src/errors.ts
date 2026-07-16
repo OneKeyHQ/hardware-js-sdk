@@ -69,6 +69,20 @@ const APP_NOT_INSTALLED_CODES = new Set(['6807', '26631']);
  * caused by a blind-sign fallback from a generic malformed transaction.
  */
 const STEP_BLIND_SIGN_TRANSACTION_FALLBACK = 'signer.eth.steps.blindSignTransactionFallback';
+const STEP_DETECT_BLIND_SIGNING = 'signer.eth.steps.detectBlindSigning';
+const BLIND_SIGNING_STEPS = new Set([
+  STEP_BLIND_SIGN_TRANSACTION_FALLBACK,
+  STEP_DETECT_BLIND_SIGNING,
+]);
+
+function normalizeApduHex(value: unknown): string | null {
+  if (typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 0xffff) {
+    return value.toString(16).padStart(4, '0');
+  }
+  if (typeof value !== 'string') return null;
+  const raw = value.toLowerCase().replace(/^0x/, '');
+  return /^[0-9a-f]{1,4}$/i.test(raw) ? raw.padStart(4, '0') : null;
+}
 
 /**
  * Read the Ledger Ethereum App APDU error code from a DMK error object.
@@ -77,33 +91,32 @@ const STEP_BLIND_SIGN_TRANSACTION_FALLBACK = 'signer.eth.steps.blindSignTransact
 function getEthAppErrorCode(err: unknown): string | null {
   if (!err || typeof err !== 'object') return null;
   const e = err as Record<string, unknown>;
-  if (e._tag === ERROR_TAG.EthAppCommand && typeof e.errorCode === 'string') {
-    return e.errorCode.toLowerCase();
+  if (e._tag === ERROR_TAG.EthAppCommand) {
+    const code =
+      normalizeApduHex(e.errorCode) ?? normalizeApduHex(e.statusCode) ?? normalizeApduHex(e.code);
+    if (code) return code;
   }
   const orig = e.originalError as Record<string, unknown> | undefined;
-  if (orig?._tag === ERROR_TAG.EthAppCommand && typeof orig.errorCode === 'string') {
-    return orig.errorCode.toLowerCase();
+  if (orig?._tag === ERROR_TAG.EthAppCommand) {
+    return (
+      normalizeApduHex(orig.errorCode) ??
+      normalizeApduHex(orig.statusCode) ??
+      normalizeApduHex(orig.code)
+    );
   }
   return null;
 }
 
 /**
  * Extract an APDU status word in lowercase hex. Handles DMK's hex-string
- * `errorCode`, legacy TransportStatusError's numeric `statusCode`, and
- * recurses through `originalError` for wrapped errors.
+ * `errorCode`, numeric `statusCode`, and recurses through
+ * `originalError` for wrapped errors.
  */
 function extractApduHex(err: unknown): string | null {
   if (!err || typeof err !== 'object') return null;
   const e = err as Record<string, unknown>;
-  if (typeof e.errorCode === 'string' && /^[0-9a-f]+$/i.test(e.errorCode)) {
-    return e.errorCode.toLowerCase();
-  }
-  if (typeof e.statusCode === 'number' && Number.isFinite(e.statusCode)) {
-    return e.statusCode.toString(16).padStart(4, '0');
-  }
-  if (typeof e.statusCode === 'string' && /^[0-9a-f]+$/i.test(e.statusCode)) {
-    return e.statusCode.toLowerCase();
-  }
+  const direct = normalizeApduHex(e.errorCode) ?? normalizeApduHex(e.statusCode);
+  if (direct) return direct;
   if (e.originalError != null) {
     const nested = extractApduHex(e.originalError);
     if (nested) return nested;
@@ -177,12 +190,18 @@ function classifyEthAppError(err: unknown): HardwareErrorCode | null {
   if (!ethCode) return null;
 
   // 0x6a80 is a broad "Invalid data" APDU. Only report blind-signing
-  // guidance when DMK actually entered the blind-sign fallback branch.
+  // guidance when DMK actually entered the blind-signing flow.
   if (ethCode === '6a80') {
-    return hasBlindSignFallbackStep(err) ? HardwareErrorCode.EvmBlindSigningRequired : null;
+    return hasBlindSigningStep(err) ? HardwareErrorCode.EvmBlindSigningRequired : null;
   }
 
   return mapEthAppErrorCode(ethCode);
+}
+
+function classifyBlindSigningDetectionError(err: unknown): HardwareErrorCode | null {
+  if (!hasBlindSigningStep(err)) return null;
+  if (hasInvalidArgumentCode(err)) return HardwareErrorCode.EvmBlindSigningRequired;
+  return null;
 }
 
 // Centralized `_tag` constants — single source of truth for both writes and
@@ -196,6 +215,10 @@ export const ERROR_TAG = {
   UserAborted: 'UserAborted',
   DeviceAppStuck: 'DeviceAppStuck', // chain app wedged (APDU 0x6901)
   DeviceTransportStuck: 'DeviceTransportStuck', // DMK transport queue wedged
+  // installApp resolved success but the app is still missing on device —
+  // DMK quirk. Surfaced as a distinct tag so callers can tell it apart from
+  // the original DMK-thrown AppNotInstalled.
+  AppInstallVerifyFailed: 'AppInstallVerifyFailedError',
 
   // DMK-reuse (DMK throws same string; we synthesize too)
   DeviceLocked: 'DeviceLockedError',
@@ -224,6 +247,10 @@ export const ERROR_TAG = {
   // outcome when the user doesn't confirm pairing on the device, or the
   // existing bond is invalid. Observed in production after ~30s.
   PairingRefused: 'PairingRefusedError',
+  // DMK remote-network failures (manager-api HTTP / secure-channel WS).
+  WebSocketConnection: 'WebSocketConnectionError',
+  HttpFetch: 'FetchError',
+  InvalidFirmwareMetadataResponse: 'InvalidGetFirmwareMetadataResponseError',
 } as const;
 
 export type SdkErrorTag = (typeof ERROR_TAG)[keyof typeof ERROR_TAG];
@@ -343,21 +370,35 @@ function hasStatusCode(err: unknown, codeSet: Set<string>): boolean {
   return false;
 }
 
-function hasBlindSignFallbackStep(err: unknown): boolean {
+function hasDeviceActionStep(err: unknown, step: string): boolean {
   if (!err || typeof err !== 'object') return false;
   const e = err as Record<string, unknown>;
 
-  if (e._lastStep === STEP_BLIND_SIGN_TRANSACTION_FALLBACK) return true;
+  if (e._lastStep === step) return true;
 
-  if (
-    Array.isArray(e._deviceActionSteps) &&
-    e._deviceActionSteps.includes(STEP_BLIND_SIGN_TRANSACTION_FALLBACK)
-  ) {
+  if (Array.isArray(e._deviceActionSteps) && e._deviceActionSteps.includes(step)) {
     return true;
   }
 
-  if (e.originalError != null && hasBlindSignFallbackStep(e.originalError)) return true;
-  if (e.error != null && e._tag && hasBlindSignFallbackStep(e.error)) return true;
+  if (e.originalError != null && hasDeviceActionStep(e.originalError, step)) return true;
+  if (e.error != null && e._tag && hasDeviceActionStep(e.error, step)) return true;
+  return false;
+}
+
+function hasBlindSigningStep(err: unknown): boolean {
+  for (const step of BLIND_SIGNING_STEPS) {
+    if (hasDeviceActionStep(err, step)) return true;
+  }
+  return false;
+}
+
+function hasInvalidArgumentCode(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as Record<string, unknown>;
+  if (e.code === 'INVALID_ARGUMENT') return true;
+  if (typeof e.message === 'string' && e.message.includes('code=INVALID_ARGUMENT')) return true;
+  if (e.originalError != null && hasInvalidArgumentCode(e.originalError)) return true;
+  if (e.error != null && e._tag && hasInvalidArgumentCode(e.error)) return true;
   return false;
 }
 
@@ -391,6 +432,13 @@ export function isUserRejectedError(err: unknown): boolean {
   return false;
 }
 
+/** Check for SDK-level user abort (declined install prompt, cancelled UI flow). */
+export function isUserAbortedError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as Record<string, unknown>;
+  return e._tag === ERROR_TAG.UserAborted;
+}
+
 /** Check for wrong app open on the device. */
 export function isWrongAppError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;
@@ -421,6 +469,22 @@ export function isOutOfMemoryError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;
   const e = err as Record<string, unknown>;
   return e._tag === 'OutOfMemoryDAError';
+}
+
+/** Remote network failure reaching Ledger's servers (HTTP or WS). Crawls the error chain. */
+const NETWORK_ERROR_TAGS = new Set<string>([
+  ERROR_TAG.WebSocketConnection,
+  ERROR_TAG.HttpFetch,
+  ERROR_TAG.InvalidFirmwareMetadataResponse,
+]);
+export function isNetworkError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as Record<string, unknown>;
+  const tag = e._tag;
+  if (typeof tag === 'string' && NETWORK_ERROR_TAGS.has(tag)) return true;
+  if (e.originalError != null && isNetworkError(e.originalError)) return true;
+  if (e.error != null && isNetworkError(e.error)) return true;
+  return false;
 }
 
 /** Check for device disconnected errors. */
@@ -520,6 +584,11 @@ export function mapLedgerError(
     code = HardwareErrorCode.DeviceBusy;
   } else if (isBlePairingFailureError(err)) {
     code = HardwareErrorCode.BlePairingTimeout;
+  } else if (isUserAbortedError(err)) {
+    // SDK-level abort (e.g. user declined the install prompt). Distinct from
+    // on-device UserRejected — surface UserAborted so callers can tell apart
+    // "I closed the dialog" from "I pressed reject on the device".
+    code = HardwareErrorCode.UserAborted;
   } else if (isUserRejectedError(err)) {
     // User rejection (0x6985) must win over EthAppError mapping — a user-cancelled
     // blind-sign is not a "please enable Blind signing" situation.
@@ -530,12 +599,15 @@ export function mapLedgerError(
     code = HardwareErrorCode.AppNotInstalled;
   } else if (isOutOfMemoryError(err)) {
     code = HardwareErrorCode.DeviceOutOfMemory;
+  } else if (isNetworkError(err)) {
+    // Must precede isDeviceDisconnectedError — its message-substring match can trip on network errors.
+    code = HardwareErrorCode.NetworkError;
   } else if (isDeviceDisconnectedError(err)) {
     code = HardwareErrorCode.DeviceDisconnected;
   } else if (isTimeoutError(err)) {
     code = HardwareErrorCode.OperationTimeout;
   } else {
-    const ethMapped = classifyEthAppError(err);
+    const ethMapped = classifyEthAppError(err) ?? classifyBlindSigningDetectionError(err);
 
     // Solana / Tron / BTC APDU codes — disjoint from EVM's table, single-pass lookup.
     const apduHex = ethMapped ? null : extractApduHex(err);

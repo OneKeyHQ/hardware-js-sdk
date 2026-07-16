@@ -160,15 +160,35 @@ export class AppManager {
       command: new OpenAppCommand({ appName }),
     });
     if (!isSuccessCommandResult(result)) {
-      const { statusCode } = result as Record<string, unknown>;
-      const hasStatusCode = statusCode != null && statusCode !== '';
-      debugLog('[AppManager] openApp failed:', appName, 'statusCode:', statusCode);
+      // DMK error CommandResults carry the APDU status in result.error.errorCode
+      // (there is no top-level statusCode): 0x6807 = app not installed,
+      // 0x5501 = user refused the "Open app?" prompt on device.
+      const dmkErr = result.error;
+      const errorCode =
+        'errorCode' in dmkErr && dmkErr.errorCode != null ? String(dmkErr.errorCode) : '';
+      const message =
+        'message' in dmkErr && typeof dmkErr.message === 'string' ? dmkErr.message : '';
+      debugLog(
+        '[AppManager] openApp failed:',
+        appName,
+        'errorCode:',
+        errorCode,
+        'tag:',
+        dmkErr._tag
+      );
+      let code: HardwareErrorCode | undefined;
+      if (errorCode === '6807' || /unknown application/i.test(message)) {
+        code = HardwareErrorCode.AppNotInstalled;
+      } else if (errorCode === '5501' || dmkErr._tag === 'ActionRefusedError') {
+        code = HardwareErrorCode.UserRejected;
+      }
       throw Object.assign(new Error(`Failed to open "${appName}"`), {
         _tag: ERROR_TAG.OpenAppCommand,
-        code: hasStatusCode ? undefined : HardwareErrorCode.AppNotInstalled,
-        errorCode: String(statusCode ?? ''),
-        statusCode,
+        code,
+        errorCode,
+        statusCode: errorCode,
         appName,
+        originalError: dmkErr,
       });
     }
   }

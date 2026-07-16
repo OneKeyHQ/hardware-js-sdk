@@ -1,0 +1,81 @@
+{
+  "name": "@onekeyfe/hwk-trezor-connector-electron-ble",
+  "version": "1.2.0-alpha.13",
+  "description": "IConnector implementation for Trezor hardware wallets via Electron BLE (noble in main process)",
+  "author": "OneKey",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    },
+    "./main": {
+      "import": {
+        "types": "./dist/main.d.mts",
+        "default": "./dist/main.mjs"
+      },
+      "require": {
+        "types": "./dist/main.d.ts",
+        "default": "./dist/main.js"
+      }
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rimraf dist",
+    "test": "jest"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OneKeyHQ/hardware-js-sdk.git",
+    "directory": "packages/hwk-trezor-connector-electron-ble"
+  },
+  "keywords": [
+    "trezor",
+    "electron",
+    "ble",
+    "bluetooth",
+    "hardware-wallet",
+    "onekey",
+    "connector"
+  ],
+  "dependencies": {
+    "@onekeyfe/hwk-adapter-core": "1.2.0-alpha.13",
+    "@onekeyfe/hwk-trezor-adapter": "1.2.0-alpha.13",
+    "@onekeyfe/hwk-trezor-connector": "1.2.0-alpha.13",
+    "buffer": "^6.0.3"
+  },
+  "peerDependencies": {
+    "@stoprocent/noble": "*",
+    "electron": "*"
+  },
+  "peerDependenciesMeta": {
+    "@stoprocent/noble": {
+      "optional": true
+    },
+    "electron": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "rimraf": "^5.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "5.1.6"
+  }
+}

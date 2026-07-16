@@ -1,10 +1,12 @@
+import type { PassphraseStateAware } from './passphrase';
 import type { Response } from './response';
-import type { ICommonCallParams } from './wallet';
+import type { IHardwareCallParams, NullableCallArg } from './wallet';
 
-export interface EvmGetAddressParams {
+export interface EvmGetAddressParams extends PassphraseStateAware {
   path: string;
   showOnDevice?: boolean;
   chainId?: number;
+  ethereumDefinitions?: EvmEthereumDefinitions;
 }
 
 export interface EvmAddress {
@@ -14,25 +16,85 @@ export interface EvmAddress {
   publicKey?: string;
 }
 
-export interface EvmSignTxParams {
+interface EvmSignTxBaseParams extends PassphraseStateAware {
   path: string;
-  /**
-   * RLP-serialized transaction hex (0x-prefixed or plain).
-   * When provided, the connector uses this directly instead of individual fields.
-   * Required for Ledger; Trezor may use individual fields instead.
-   */
-  serializedTx?: string;
+  chainId?: number;
+}
+
+/** Ledger shape: the whole RLP-serialized tx (0x-prefixed or plain hex); structured fields forbidden. */
+export interface EvmSignTxLedgerParams extends EvmSignTxBaseParams {
+  serializedTx: string;
+  to?: never;
+  value?: never;
+  nonce?: never;
+  gasLimit?: never;
+  gasPrice?: never;
+  txType?: never;
+  maxFeePerGas?: never;
+  maxPriorityFeePerGas?: never;
+  accessList?: never;
+  data?: never;
+  paymentRequest?: never;
+  ethereumDefinitions?: never;
+}
+
+/** Trezor shape: structured EthereumSignTx protobuf fields; serializedTx forbidden. */
+export interface EvmSignTxTrezorParams extends EvmSignTxBaseParams {
+  serializedTx?: never;
   /** Contract address or recipient. Optional for contract deployment transactions. */
   to?: string;
   value?: string;
-  chainId?: number;
   nonce?: string;
   gasLimit?: string;
   gasPrice?: string;
+  txType?: number;
   maxFeePerGas?: string;
   maxPriorityFeePerGas?: string;
   accessList?: Array<{ address: string; storageKeys: string[] }>;
   data?: string;
+  paymentRequest?: EvmPaymentRequest;
+  ethereumDefinitions?: EvmEthereumDefinitions;
+}
+
+/** Mutually exclusive vendor shapes; each adapter narrows to its own. */
+export type EvmSignTxParams = EvmSignTxLedgerParams | EvmSignTxTrezorParams;
+
+export interface EvmEthereumDefinitions {
+  /** Trezor Ethereum network definition bytes as a hex string. */
+  encodedNetwork?: string;
+  /** Trezor Ethereum token definition bytes as a hex string. */
+  encodedToken?: string;
+}
+
+export interface EvmPaymentRequestMemo {
+  textMemo?: {
+    text: string;
+  };
+  textDetailsMemo?: {
+    title: string;
+    text: string;
+  };
+  refundMemo?: {
+    address: string;
+    addressN?: number[];
+    mac: string;
+  };
+  coinPurchaseMemo?: {
+    coinType: number;
+    amount: string;
+    address: string;
+    addressN?: number[];
+    mac: string;
+  };
+}
+
+export interface EvmPaymentRequest {
+  nonce?: string;
+  recipientName: string;
+  memos?: EvmPaymentRequestMemo[];
+  /** Decimal string in subunits; SDK encodes it as SLIP-24 uint256 LE hex. */
+  amount?: string;
+  signature: string;
 }
 
 export interface EvmSignedTx {
@@ -45,18 +107,22 @@ export interface EvmSignedTx {
   serializedTx?: string;
 }
 
-export interface EvmSignMsgParams {
+export interface EvmSignMsgParams extends PassphraseStateAware {
   path: string;
   message: string;
+  chainId?: number;
   hex?: boolean;
+  ethereumDefinitions?: EvmEthereumDefinitions;
 }
 
 export type EvmSignTypedDataParams = EvmSignTypedDataFull | EvmSignTypedDataHash;
 
-export interface EvmSignTypedDataFull {
+export interface EvmSignTypedDataFull extends PassphraseStateAware {
   path: string;
+  chainId?: number;
   /** Defaults to `'full'` when omitted. */
   mode?: 'full';
+  ethereumDefinitions?: EvmEthereumDefinitions;
   data: {
     domain: EIP712Domain;
     types: Record<string, Array<{ name: string; type: string }>>;
@@ -64,13 +130,23 @@ export interface EvmSignTypedDataFull {
     message: Record<string, unknown>;
   };
   metamaskV4Compat?: boolean;
+  showMessageHash?: boolean;
+  /**
+   * Optional host-computed hashes. Core Trezor models still use full typed-data
+   * signing for display, while Trezor One can fall back to typed-hash signing
+   * when firmware cannot compute the hashes itself.
+   */
+  domainSeparatorHash?: string;
+  messageHash?: string;
 }
 
-export interface EvmSignTypedDataHash {
+export interface EvmSignTypedDataHash extends PassphraseStateAware {
   path: string;
+  chainId?: number;
   mode: 'hash';
   domainSeparatorHash: string;
   messageHash: string;
+  ethereumDefinitions?: EvmEthereumDefinitions;
 }
 
 export interface EIP712Domain {
@@ -90,30 +166,26 @@ export interface EvmSignature {
 
 export interface IEvmMethods {
   evmGetAddress(
-    connectId: string,
-    deviceId: string,
-    params: EvmGetAddressParams,
-    commonParams?: ICommonCallParams
+    connectId?: NullableCallArg<string>,
+    deviceId?: NullableCallArg<string>,
+    params?: NullableCallArg<IHardwareCallParams<EvmGetAddressParams>>
   ): Promise<Response<EvmAddress>>;
 
   evmSignTransaction(
-    connectId: string,
-    deviceId: string,
-    params: EvmSignTxParams,
-    commonParams?: ICommonCallParams
+    connectId?: NullableCallArg<string>,
+    deviceId?: NullableCallArg<string>,
+    params?: NullableCallArg<IHardwareCallParams<EvmSignTxParams>>
   ): Promise<Response<EvmSignedTx>>;
 
   evmSignMessage(
-    connectId: string,
-    deviceId: string,
-    params: EvmSignMsgParams,
-    commonParams?: ICommonCallParams
+    connectId?: NullableCallArg<string>,
+    deviceId?: NullableCallArg<string>,
+    params?: NullableCallArg<IHardwareCallParams<EvmSignMsgParams>>
   ): Promise<Response<EvmSignature>>;
 
   evmSignTypedData(
-    connectId: string,
-    deviceId: string,
-    params: EvmSignTypedDataParams,
-    commonParams?: ICommonCallParams
+    connectId?: NullableCallArg<string>,
+    deviceId?: NullableCallArg<string>,
+    params?: NullableCallArg<IHardwareCallParams<EvmSignTypedDataParams>>
   ): Promise<Response<EvmSignature>>;
 }

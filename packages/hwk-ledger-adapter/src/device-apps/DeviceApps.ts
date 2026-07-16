@@ -97,6 +97,25 @@ export class DeviceApps {
     return result.filter((a): a is DmkApplication => a !== null).map(applicationToMetadata);
   }
 
+  /** Installed app names via ListApps APDU. Offline (no manager-api), but still requires unlock + dashboard. */
+  async listInstalledNames(options?: { unlockTimeout?: number }): Promise<string[]> {
+    const action = (this._dmk as unknown as DmkExecuteCapable).executeDeviceAction({
+      sessionId: this._sessionId,
+      deviceAction: new this._ledgerKit.ListAppsDeviceAction({
+        input: { unlockTimeout: options?.unlockTimeout },
+      }),
+    });
+    const result = await deviceActionToPromise<Array<{ appName?: string } | null>>(
+      action,
+      this.onInteraction,
+      undefined,
+      this.onRegisterCanceller
+    );
+    return result
+      .map(entry => entry?.appName)
+      .filter((name): name is string => typeof name === 'string' && name.length > 0);
+  }
+
   // Catalog lookup via custom device action — DMK has no typed wrapper for this.
   async listAvailable(): Promise<AppMetadata[]> {
     const customAction = new ListAvailableAppsDeviceAction({
@@ -168,6 +187,27 @@ export class DeviceApps {
   ): Promise<void> {
     if (!appName) throw new Error('DeviceApps.install: appName is required');
     debugLog('[DeviceApps] install:', appName);
+
+    // InstallOrUpdateAppsDeviceAction reads device metadata with a hardcoded
+    // forceUpdate:false, so a warm session reuses the cached app list - stale
+    // after apps were installed/uninstalled outside this flow. Force-refresh
+    // first; the install action then reads the fresh cache.
+    const refreshAction = (this._dmk as unknown as DmkExecuteCapable).executeDeviceAction({
+      sessionId: this._sessionId,
+      deviceAction: new this._ledgerKit.GetDeviceMetadataDeviceAction({
+        input: {
+          useSecureChannel: true,
+          forceUpdate: true,
+          unlockTimeout: options?.unlockTimeout,
+        },
+      }),
+    });
+    await deviceActionToPromise(
+      refreshAction,
+      this.onInteraction,
+      INSTALL_TIMEOUT_MS,
+      this.onRegisterCanceller
+    );
 
     // Use InstallOrUpdateAppsDeviceAction (not InstallAppDeviceAction): it runs
     // UPDATE_DEVICE_METADATA → BUILD_INSTALL_PLAN → CHECK_IF_ENOUGH_MEMORY →
@@ -242,7 +282,9 @@ function applicationToMetadata(app: DmkApplication): AppMetadata {
 // Loosened DMK surface (we receive the module via dynamic importLedgerKit).
 export interface LedgerKitModule {
   ListAppsWithMetadataDeviceAction: new (args: { input: unknown }) => unknown;
+  ListAppsDeviceAction: new (args: { input: unknown }) => unknown;
   InstallOrUpdateAppsDeviceAction: new (args: { input: unknown }) => unknown;
+  GetDeviceMetadataDeviceAction: new (args: { input: unknown }) => unknown;
   GetOsVersionCommand: new () => unknown;
   isSuccessCommandResult: (result: unknown) => result is { data: GetOsVersionResponse };
 }

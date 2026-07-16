@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hd-transport",
-  "version": "1.2.0-alpha.12",
+  "version": "1.2.0-alpha.13",
   "description": "Transport layer abstractions and utilities for OneKey hardware SDK.",
   "author": "OneKey",
   "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
@@ -16,7 +16,7 @@
     "test": "jest",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "update-protobuf": "./scripts/protobuf-build.sh"
+    "update:protobuf": "./scripts/protobuf-build.sh"
   },
   "devDependencies": {
     "@types/bytebuffer": "^5.0.42",

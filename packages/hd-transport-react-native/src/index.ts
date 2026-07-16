@@ -545,7 +545,7 @@ export default class ReactNativeBleTransport {
       }
 
       blePlxManager.startDeviceScan(
-        null,
+        getBluetoothServiceUuids(),
         {
           allowDuplicates: true,
           scanMode: ScanMode.LowLatency,
@@ -592,11 +592,19 @@ export default class ReactNativeBleTransport {
         }
       );
 
-      getConnectedDeviceIds(getBluetoothServiceUuids()).then(devices => {
-        for (const device of devices) {
-          addDevice(device as unknown as Device);
+      getConnectedDeviceIds(Platform.OS === 'ios' ? getBluetoothServiceUuids() : []).then(
+        devices => {
+          for (const device of devices) {
+            const { serviceUUIDs } = device as { serviceUUIDs?: string[] };
+            const hasCachedServiceUuid = Boolean(serviceUUIDs?.length);
+            const keepDevice = Platform.OS === 'ios' || hasCachedServiceUuid;
+            if (keepDevice) {
+              Log?.debug('search connected peripheral: ', device.id);
+              addDevice(device as unknown as Device);
+            }
+          }
         }
-      });
+      );
 
       const addDevice = (device: Device) => {
         if (deviceList.every(d => d.id !== device.id)) {

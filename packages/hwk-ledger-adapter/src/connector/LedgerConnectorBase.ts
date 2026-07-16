@@ -1,6 +1,7 @@
 import {
   EConnectorInteraction,
   HardwareErrorCode,
+  isKnownNonTargetHardwareVendor,
   serializeConnectorError,
 } from '@onekeyfe/hwk-adapter-core';
 
@@ -332,10 +333,12 @@ export class LedgerConnectorBase implements IConnector {
     const dm = await this._getDeviceManager();
 
     const descriptors = await this._discoverDescriptors(dm);
-    const resolvedDescriptors = descriptors.map(d => ({
-      descriptor: d,
-      connectId: this._resolveConnectId(d),
-    }));
+    const resolvedDescriptors = descriptors
+      .filter(d => !isKnownNonTargetHardwareVendor(d, 'ledger'))
+      .map(d => ({
+        descriptor: d,
+        connectId: this._resolveConnectId(d),
+      }));
     const result: ConnectorDevice[] = resolvedDescriptors.map(({ descriptor: d, connectId }) => ({
       connectId,
       deviceId: d.path,
@@ -793,6 +796,17 @@ export class LedgerConnectorBase implements IConnector {
         const apps = await _getDeviceApps(ctx, sessionId);
         try {
           return await apps.listInstalled(params as ListInstalledAppsCallParams);
+        } catch (err) {
+          ctx.invalidateSession(sessionId);
+          throw ctx.wrapError(err);
+        } finally {
+          ctx.clearCanceller(sessionId);
+        }
+      }
+      case 'listInstalledNames': {
+        const apps = await _getDeviceApps(ctx, sessionId);
+        try {
+          return await apps.listInstalledNames(params as ListInstalledAppsCallParams);
         } catch (err) {
           ctx.invalidateSession(sessionId);
           throw ctx.wrapError(err);

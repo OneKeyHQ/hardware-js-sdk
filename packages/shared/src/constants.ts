@@ -17,6 +17,24 @@ export const ONEKEY_WEBUSB_FILTER = [
   // { vendorId: 0x1209, productId: 0x4f50 }, // Touch Board
 ];
 
+type WebUsbIdentityDescriptor = {
+  vendorId?: number;
+  productId?: number;
+  manufacturerName?: string | null;
+};
+
+const TREZOR_WEBUSB_MANUFACTURER_NAMES = new Set(['trezor', 'trezor company', 'satoshilabs']);
+
+export const isKnownTrezorWebUsbDevice = (descriptor: WebUsbIdentityDescriptor): boolean => {
+  const isSharedWebUsbId = ONEKEY_WEBUSB_FILTER.some(
+    filter => descriptor.vendorId === filter.vendorId && descriptor.productId === filter.productId
+  );
+  if (!isSharedWebUsbId) return false;
+
+  const manufacturerName = descriptor.manufacturerName?.trim().toLowerCase();
+  return manufacturerName != null && TREZOR_WEBUSB_MANUFACTURER_NAMES.has(manufacturerName);
+};
+
 /**
  * Error codes that require device release after occurrence
  * These errors indicate the device is in an invalid state and needs to be released
@@ -97,16 +115,42 @@ export const isHeaderChunk = (chunk: Buffer | Uint8Array): boolean => {
   return false;
 };
 
+const isKnownNonOneKeyDeviceName = (normalizedName: string): boolean =>
+  normalizedName.startsWith('trezor') ||
+  normalizedName.startsWith('ledger') ||
+  normalizedName.startsWith('nano ') ||
+  normalizedName.startsWith('stax') ||
+  normalizedName.startsWith('flex');
+
+const ONEKEY_EXACT_SHORT_NAMES = new Set(['s8']);
+
+const isOneKeyShortName = (normalizedName: string): boolean => {
+  if (ONEKEY_EXACT_SHORT_NAMES.has(normalizedName)) return true;
+  if (normalizedName.length !== 5) return false;
+  const firstChar = normalizedName[0];
+  return (firstChar === 'k' || firstChar === 't') && /^\d{4}$/.test(normalizedName.slice(1));
+};
+
 export const isOnekeyDevice = (name: string | null, id?: string): boolean => {
+  const normalizedName = name?.trim().toLowerCase() ?? '';
+  if (isKnownNonOneKeyDeviceName(normalizedName)) {
+    return false;
+  }
+
   if (id?.startsWith?.('MI')) {
     return true;
   }
 
-  // 过滤 BixinKeyxxx 和 Kxxxx 和 Txxxx 和 Pro2
-  // i 忽略大小写模式
-  const re = /(BixinKey\d{10})|(K\d{4})|(T\d{4})|(Touch\s\w{4})|(Pro\s\w{4})|(Pro\s*2)/i;
-  if (name && re.exec(name)) {
+  if (!name) {
+    return false;
+  }
+  if (normalizedName.startsWith('onekey') || normalizedName.startsWith('bixinkey')) return true;
+  if (
+    normalizedName.startsWith('touch ') ||
+    normalizedName.startsWith('pro ') ||
+    normalizedName.startsWith('pro2 ')
+  ) {
     return true;
   }
-  return false;
+  return isOneKeyShortName(normalizedName);
 };

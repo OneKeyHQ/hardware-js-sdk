@@ -14,6 +14,7 @@ import type { ConnectorContext } from './types';
 export interface BtcGetAddressCallParams {
   /** Account-level derivation path (3 levels, e.g. "m/86'/0'/0'") */
   path: string;
+  coin?: string;
   showOnDevice?: boolean;
   /** Address index within the account (default: 0) */
   addressIndex?: number;
@@ -23,6 +24,7 @@ export interface BtcGetAddressCallParams {
 
 export interface BtcGetPublicKeyCallParams {
   path: string;
+  coin?: string;
   showOnDevice?: boolean;
 }
 

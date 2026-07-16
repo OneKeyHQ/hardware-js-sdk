@@ -10,7 +10,13 @@ import transport, {
   ProtocolV2Session,
   probeProtocolV2 as probeProtocolV2Helper,
 } from '@onekeyfe/hd-transport';
-import { ERRORS, HardwareErrorCode, ONEKEY_WEBUSB_FILTER, wait } from '@onekeyfe/hd-shared';
+import {
+  ERRORS,
+  HardwareErrorCode,
+  ONEKEY_WEBUSB_FILTER,
+  isKnownTrezorWebUsbDevice,
+  wait,
+} from '@onekeyfe/hd-shared';
 import ByteBuffer from 'bytebuffer';
 
 import { createTransportCallLog, shouldSuppressHighVolumeCallLog } from './transportLog';
@@ -202,11 +208,13 @@ export default class WebUsbTransport {
     if (!this.usb) return [];
 
     const devices = await this.usb.getDevices();
-    const onekeyDevices = devices.filter(dev =>
-      ONEKEY_WEBUSB_FILTER.some(
-        desc => dev.vendorId === desc.vendorId && dev.productId === desc.productId
-      )
-    );
+    const onekeyDevices = devices.filter(dev => {
+      const isOneKey = ONEKEY_WEBUSB_FILTER.some(
+        (desc: { vendorId: number; productId: number }) =>
+          dev.vendorId === desc.vendorId && dev.productId === desc.productId
+      );
+      return isOneKey && !isKnownTrezorWebUsbDevice(dev);
+    });
 
     this.deviceList = onekeyDevices.map(device => {
       const path = this.getDevicePath(device);

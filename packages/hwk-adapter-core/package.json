@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hwk-adapter-core",
-  "version": "1.2.0-alpha.12",
+  "version": "1.2.0-alpha.13",
   "description": "Shared types and utilities for OneKey hardware wallet kit",
   "author": "OneKey",
   "license": "MIT",
@@ -16,6 +16,26 @@
       "require": {
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
+      }
+    },
+    "./errors": {
+      "import": {
+        "types": "./dist/errors.d.mts",
+        "default": "./dist/errors.mjs"
+      },
+      "require": {
+        "types": "./dist/errors.d.ts",
+        "default": "./dist/errors.js"
+      }
+    },
+    "./ui-events": {
+      "import": {
+        "types": "./dist/ui-events.d.mts",
+        "default": "./dist/ui-events.mjs"
+      },
+      "require": {
+        "types": "./dist/ui-events.d.ts",
+        "default": "./dist/ui-events.js"
       }
     }
   },

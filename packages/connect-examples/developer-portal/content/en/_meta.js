@@ -1,3 +1,5 @@
+import { AgentWalletBetaTitle } from '../../components/AgentWalletBetaTitle.js'
+
 export default {
   index: {
     title: 'Home',
@@ -13,9 +15,8 @@ export default {
       copyPage: false,
     },
   },
-  /*
   'agent-wallet': {
-    title: 'Agent Wallet',
+    title: AgentWalletBetaTitle({ betaLabel: 'Private Beta' }),
     type: 'menu',
     items: {
       landing: { title: 'Landing', href: '/en/agent-wallet/' },
@@ -45,7 +46,6 @@ export default {
       safety: { title: 'Safety Rules', href: '/en/agent-wallet/safety' },
     },
   },
-  */
   // Navigation menus with dropdown items
   'hardware-sdk': {
     title: 'Hardware Integration',
