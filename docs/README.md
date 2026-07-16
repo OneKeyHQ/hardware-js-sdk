@@ -18,6 +18,7 @@
 3. [Pro2 字段迁移](./sdk/pro2-field-migration.md)
 4. [钱包 Session 与设备安全](./device/wallet-session-and-security.md)
 5. [Pro2 设备管理](./business/pro2-device-management.md)
+6. [Pro2 资源更新架构设计](./design/pro2-resource-update/README.md)
 
 ### 排查事件和 UI 交互
 
@@ -48,9 +49,10 @@
 | 业务 | [多链集成概览](./business/chains-overview.md)                      | 链分类、派生路径和签名能力                      |
 | 业务 | [EVM 与 EIP-7702](./business/evm.md)                               | EVM API、交易类型和 EIP-7702 安全边界           |
 | 业务 | [Pro2 设备管理](./business/pro2-device-management.md)              | 设置、壁纸上传和多组件固件升级                  |
+| 设计 | [Pro2 资源更新架构设计](./design/pro2-resource-update/README.md)   | 资源 Manifest、设备规划、增量传输和原子回滚     |
 | 测试 | [Pro2 BLE 性能](./testing/pro2-ble-performance.md)                 | 真机测速、参数结论和优化方向                    |
 
-加上本索引，`docs/` 共维护 14 篇 Markdown。
+加上本索引，`docs/` 共维护 17 篇 Markdown。
 
 ## 文档边界
 
