@@ -55,6 +55,7 @@ import {
 import TransportManager from '../data-manager/TransportManager';
 import DeviceConnector from '../device/DeviceConnector';
 import RequestQueue from './RequestQueue';
+import { registerHardwareUiEventListeners } from './deviceEventRegistration';
 import { getSynchronize } from '../utils/getSynchronize';
 import { runMethodWithUnlockRetry } from '../protocols/protocol-v2/unlockRetry';
 
@@ -395,13 +396,14 @@ const onCallDevice = async (
     );
   }
 
-  device.on(DEVICE.PIN, onDevicePinHandler);
-  device.on(DEVICE.BUTTON, onDeviceButtonHandler);
-  device.on(
-    DEVICE.PASSPHRASE,
-    message.payload.useEmptyPassphrase ? onEmptyPassphraseHandler : onDevicePassphraseHandler
-  );
-  device.on(DEVICE.PASSPHRASE_ON_DEVICE, onEnterPassphraseOnDeviceHandler);
+  registerHardwareUiEventListeners(device, {
+    pin: onDevicePinHandler,
+    button: onDeviceButtonHandler,
+    passphrase: message.payload.useEmptyPassphrase
+      ? onEmptyPassphraseHandler
+      : onDevicePassphraseHandler,
+    passphraseOnDevice: onEnterPassphraseOnDeviceHandler,
+  });
   device.on(DEVICE.FEATURES, onDeviceFeaturesHandler);
   device.on(
     DEVICE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE,
