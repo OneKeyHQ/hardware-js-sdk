@@ -454,6 +454,66 @@ describe('KaspaSignTransaction protocol negotiation', () => {
     // Back to the current transaction after the previous one is streamed.
     expect(mockTypedCall.mock.calls[4][0]).toBe('KaspaTxAckInput');
   });
+
+  describe('previous-transaction id mismatch', () => {
+    const PREV_ID = 'aa'.repeat(32);
+    const withRefTxs = {
+      outputs: [{ satoshis: 100000, script: SCRIPT, address: ADDRESS }],
+      refTxs: [
+        {
+          txId: PREV_ID,
+          version: 0,
+          inputs: [],
+          outputs: [{ satoshis: '200000', script: SCRIPT }],
+        },
+      ],
+    };
+
+    const streamThenReject = (error: unknown) =>
+      mockTypedCall
+        .mockResolvedValueOnce(
+          txRequest({ request_type: 'KASPA_TX_PREV_META', prev_tx_id: PREV_ID })
+        )
+        .mockRejectedValueOnce(error);
+
+    it('surfaces the device rejection under its own error code', async () => {
+      streamThenReject(
+        ERRORS.TypedError(
+          HardwareErrorCode.RuntimeError,
+          'Failure_ProcessError,Kaspa previous transaction id mismatch'
+        )
+      );
+
+      await expect(runMethod(withRefTxs)).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.KaspaPrevTxIdMismatch,
+      });
+      // Never silently re-signs without refTxs.
+      expect(mockTypedCall).toHaveBeenCalledTimes(2);
+    });
+
+    it('leaves an unrelated device error untouched', async () => {
+      streamThenReject(
+        ERRORS.TypedError(
+          HardwareErrorCode.RuntimeError,
+          'Failure_ProcessError,some other device error'
+        )
+      );
+
+      await expect(runMethod(withRefTxs)).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.RuntimeError,
+      });
+      expect(mockTypedCall).toHaveBeenCalledTimes(2);
+    });
+
+    it('leaves user cancellation untouched', async () => {
+      streamThenReject(ERRORS.TypedError(HardwareErrorCode.ActionCancelled));
+
+      await expect(runMethod(withRefTxs)).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.ActionCancelled,
+      });
+      expect(mockTypedCall).toHaveBeenCalledTimes(2);
+    });
+  });
 });
 
 describe('KaspaSignTransaction wire encoding', () => {
