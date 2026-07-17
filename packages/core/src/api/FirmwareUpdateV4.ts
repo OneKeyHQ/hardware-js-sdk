@@ -381,10 +381,12 @@ const parseProtocolV2OkppHeader = (bytes: Uint8Array): ProtocolV2OkppHeader | nu
 
 export const assertProtocolV2ReconnectIdentity = (
   expectedDeviceId?: string,
-  actualDeviceId?: string
+  actualDeviceId?: string,
+  options: { allowMissingActual?: boolean } = {}
 ) => {
   if (!expectedDeviceId) return;
   if (!actualDeviceId) {
+    if (options.allowMissingActual) return;
     throw ERRORS.TypedError(
       HardwareErrorCode.DeviceNotFound,
       'Protocol V2 reconnect identity unavailable'
@@ -941,7 +943,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         const features = this.device.updateProtocolV2Features(deviceInfo);
         assertProtocolV2ReconnectIdentity(
           this.protocolV2ExpectedDeviceId,
-          features.deviceId ?? undefined
+          features.deviceId ?? undefined,
+          { allowMissingActual: !!features.bootloaderMode }
         );
         if (features?.bootloaderMode) {
           return features;
@@ -1370,7 +1373,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       await this.device.initialize();
       assertProtocolV2ReconnectIdentity(
         this.protocolV2ExpectedDeviceId,
-        this.device.getCurrentDeviceId()
+        this.device.getCurrentDeviceId(),
+        { allowMissingActual: this.isProtocolV2BootloaderMode() }
       );
       return;
     }
@@ -1395,7 +1399,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     await this.device.initialize();
     assertProtocolV2ReconnectIdentity(
       this.protocolV2ExpectedDeviceId,
-      this.device.getCurrentDeviceId()
+      this.device.getCurrentDeviceId(),
+      { allowMissingActual: this.isProtocolV2BootloaderMode() }
     );
   }
 

@@ -10,6 +10,7 @@ import {
   resolveSignMessage,
   resolveSignTransaction,
 } from './chains';
+import { selectSearchDevice } from './deviceSelection';
 import { createSDK, disposeSDK } from './sdk';
 import {
   clearSessionFromKeychain,
@@ -144,6 +145,94 @@ program
       }
       const result = await sdk.getFeatures(connectId || '');
       outputResult(globalOpts, result);
+    })
+  );
+
+program
+  .command('upload-wallpaper')
+  .description('Upload and activate a Pro2 wallpaper')
+  .requiredOption('--rgba <path>', '604x1024 raw RGBA file')
+  .option('--file-name <name>', 'Device wallpaper file name', 'wallpaper-cli')
+  .option('--chunk-size <bytes>', 'Transfer chunk size in bytes')
+  .action(opts =>
+    runCommand({}, async ({ sdk, globalOpts, params }) => {
+      const rgba = readBinaryParam(opts.rgba);
+      const expectedBytes = 604 * 1024 * 4;
+      if (rgba.byteLength !== expectedBytes) {
+        throw new Error(
+          `Invalid RGBA size: expected ${expectedBytes} bytes, received ${rgba.byteLength}`
+        );
+      }
+
+      let transferStartedAt: number | undefined;
+      let transferEndedAt: number | undefined;
+      let lastProgress = -1;
+      let lastPrintedProgress = -10;
+      let progressTotalBytes = 0;
+      let transferredBytes = 0;
+      const totalStartedAt = Date.now();
+      const onUiEvent = (message: unknown) => {
+        if (!message || typeof message !== 'object') return;
+        const event = message as {
+          type?: string;
+          payload?: {
+            progress?: number;
+            transferredBytes?: number;
+            totalBytes?: number;
+            rateBytesPerSecond?: number;
+          };
+        };
+        if (event.type !== UI_REQUEST.DEVICE_PROGRESS || !event.payload) return;
+        const progress = Number(event.payload.progress);
+        if (!Number.isFinite(progress)) return;
+        transferStartedAt ??= Date.now();
+        lastProgress = Math.max(lastProgress, progress);
+        const totalBytes = Number(event.payload.totalBytes);
+        if (Number.isFinite(totalBytes) && totalBytes > 0) progressTotalBytes = totalBytes;
+        const confirmedBytes = Number(event.payload.transferredBytes);
+        if (Number.isFinite(confirmedBytes) && confirmedBytes >= 0) {
+          transferredBytes = Math.max(transferredBytes, confirmedBytes);
+        }
+        const printableProgress = Math.floor(progress / 10) * 10;
+        if (printableProgress > lastPrintedProgress || progress >= 100) {
+          const rate = Number(event.payload.rateBytesPerSecond);
+          const rateText =
+            Number.isFinite(rate) && rate > 0 ? ` ${(rate / 1024).toFixed(2)} KiB/s` : '';
+          process.stderr.write(
+            `[onekey-hw] Wallpaper transfer: ${Math.round(progress)}%${rateText}\n`
+          );
+          lastPrintedProgress = progress >= 100 ? 100 : printableProgress;
+        }
+        if (progress >= 100) transferEndedAt ??= Date.now();
+      };
+
+      sdk.on(UI_EVENT, onUiEvent);
+      let result: any;
+      try {
+        result = await sdk.deviceUploadWallpaper(globalOpts.connectId, {
+          ...params,
+          width: 604,
+          height: 1024,
+          rgba,
+          fileName: opts.fileName,
+          chunkSize: opts.chunkSize ? safeParseInt(opts.chunkSize, '--chunk-size') : undefined,
+        });
+      } finally {
+        sdk.off?.(UI_EVENT, onUiEvent);
+      }
+
+      const endedAt = transferEndedAt ?? Date.now();
+      const totalBytes = Number(result?.payload?.size) || progressTotalBytes;
+      outputResult(globalOpts, {
+        ...result,
+        metrics: buildWallpaperUploadMetrics({
+          totalBytes,
+          transferredBytes: result?.success ? totalBytes : transferredBytes,
+          startedAt: transferStartedAt ?? totalStartedAt,
+          endedAt,
+          lastProgress,
+        }),
+      });
     })
   );
 
@@ -540,6 +629,38 @@ program
       },
     })
   );
+
+program
+  .command('firmware-update-legacy')
+  .description('Update Classic/Pure firmware through the legacy protocol')
+  .requiredOption('--binary <path>', 'Local firmware binary path')
+  .option('--device-name <name>', 'BLE advertising name, for example K1514')
+  .option('--update-type <type>', 'Firmware component: firmware or ble', 'firmware')
+  .option('--no-reboot', 'Do not reboot the device after a successful update')
+  .action(opts =>
+    runCommand({}, async ({ sdk, globalOpts }) => {
+      if (opts.updateType !== 'firmware' && opts.updateType !== 'ble') {
+        throw new Error(`Unsupported --update-type: ${opts.updateType}. Use "firmware" or "ble".`);
+      }
+
+      const connectId = await resolveLegacyFirmwareConnectId(
+        sdk,
+        globalOpts.connectId,
+        opts.deviceName
+      );
+      const result = await sdk.firmwareUpdate(connectId, {
+        binary: readBinaryParam(opts.binary),
+        updateType: opts.updateType,
+        rebootOnSuccess: opts.reboot,
+        timeout: getLegacyFirmwareConnectTimeout(globalOpts.transport),
+      });
+      outputResult(globalOpts, result);
+    })
+  );
+
+export function getLegacyFirmwareConnectTimeout(transport: 'usb' | 'ble') {
+  return transport === 'usb' ? 90_000 : undefined;
+}
 
 program
   .command('firmware-update-ble')
@@ -945,7 +1066,26 @@ async function prepareSession(
     return undefined;
   }
 
-  const device = searchResult.payload[0] as {
+  const device = selectSearchDevice(
+    searchResult.payload as Array<{
+      connectId?: string;
+      deviceId?: string;
+      features?: {
+        deviceId?: string | null;
+        deviceType?: string;
+        sessionId?: string | null;
+        passphraseProtection?: boolean | null;
+        unlocked?: boolean | null;
+      };
+    }>,
+    globalOpts.connectId
+  );
+
+  if (!device) {
+    throw new Error(`未找到指定的 BLE 设备: ${globalOpts.connectId}`);
+  }
+
+  const selectedDevice = device as {
     connectId?: string;
     deviceId?: string;
     features?: {
@@ -956,7 +1096,7 @@ async function prepareSession(
       unlocked?: boolean | null;
     };
   };
-  const connectId = device.connectId || globalOpts.connectId || '';
+  const connectId = selectedDevice.connectId || globalOpts.connectId || '';
   if (!globalOpts.connectId && connectId) {
     globalOpts.connectId = connectId;
   }
@@ -964,10 +1104,10 @@ async function prepareSession(
   // ── Step 2: Get features if searchDevices didn't populate them ──
   // getFeatures failures here are non-fatal — we fall through to Step 3
   // which will fail with a clearer error if the device is truly unreachable.
-  let deviceId = device.features?.deviceId || device.deviceId || '';
-  let deviceType = getDeviceType(device.features as Features | undefined);
-  let unlocked = device.features?.unlocked;
-  let passphraseProtection = device.features?.passphraseProtection;
+  let deviceId = selectedDevice.features?.deviceId || selectedDevice.deviceId || '';
+  let deviceType = getDeviceType(selectedDevice.features as Features | undefined);
+  let unlocked = selectedDevice.features?.unlocked;
+  let passphraseProtection = selectedDevice.features?.passphraseProtection;
 
   if (!deviceId || unlocked == null || passphraseProtection == null) {
     try {
@@ -1162,6 +1302,42 @@ function readBinaryParam(path: string): ArrayBuffer {
   return new Uint8Array(buffer).buffer;
 }
 
+async function resolveLegacyFirmwareConnectId(
+  sdk: AnySdk,
+  explicitConnectId?: string,
+  deviceName?: string
+): Promise<string> {
+  if (explicitConnectId && !deviceName) return explicitConnectId;
+
+  const searchResult = await sdk.searchDevices();
+  if (!searchResult?.success || !Array.isArray(searchResult.payload)) {
+    throw new Error('Unable to scan BLE devices');
+  }
+
+  const devices = searchResult.payload as EnrichedSearchDevice[];
+  const normalizedName = deviceName?.trim().toLowerCase();
+  const matches = normalizedName
+    ? devices.filter(device => device.name?.trim().toLowerCase() === normalizedName)
+    : devices.filter(device => device.deviceType?.toLowerCase() === 'classic');
+
+  if (matches.length === 0) {
+    throw new Error(
+      normalizedName ? `BLE device not found by name: ${deviceName}` : 'No Classic/Pure BLE device found'
+    );
+  }
+  if (matches.length > 1) {
+    throw new Error(
+      normalizedName
+        ? `Multiple BLE devices found by name: ${deviceName}`
+        : 'Multiple Classic/Pure BLE devices found; specify --device-name'
+    );
+  }
+
+  const connectId = matches[0].connectId;
+  if (!connectId) throw new Error(`BLE device has no connect ID: ${matches[0].name}`);
+  return connectId;
+}
+
 function parseResourceBundleParam(spec: string): { binary: ArrayBuffer; devicePath: string } {
   const sep = spec.indexOf(':');
   if (sep <= 0 || sep === spec.length - 1) {
@@ -1232,6 +1408,32 @@ function formatFirmwareProgress(progress: number) {
 function formatFirmwareBytes(bytes: number) {
   if (!Number.isFinite(bytes) || bytes <= 0) return '';
   return `${(bytes / 1024).toFixed(1)} KiB`;
+}
+
+export function buildWallpaperUploadMetrics({
+  totalBytes,
+  transferredBytes,
+  startedAt,
+  endedAt,
+  lastProgress,
+}: {
+  totalBytes: number;
+  transferredBytes: number;
+  startedAt: number;
+  endedAt: number;
+  lastProgress: number;
+}) {
+  const elapsedMs = Math.max(endedAt - startedAt, 0);
+  return {
+    totalBytes,
+    transferredBytes,
+    totalSeconds: Number((elapsedMs / 1000).toFixed(2)),
+    transferKiBPerSecond:
+      elapsedMs > 0
+        ? Number((transferredBytes / 1024 / (elapsedMs / 1000)).toFixed(2))
+        : null,
+    lastProgress,
+  };
 }
 
 function maybePrintFirmwareProgress({

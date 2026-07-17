@@ -168,8 +168,8 @@ export abstract class BaseMethod<Params = undefined> {
    */
   requireProtocolV2 = false;
 
-  /** Protocol V2 设备锁定时是否允许 Core 自动解锁并重试一次。 */
-  unlockPolicy: UnlockPolicy = 'none';
+  /** Protocol V2 业务方法锁定时默认由 Core 自动解锁并重试一次。 */
+  unlockPolicy: UnlockPolicy = 'retry-on-locked';
 
   protected throwIfAborted() {
     if (this.abortSignal?.aborted) {

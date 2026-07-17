@@ -30,6 +30,17 @@ export const getSupportProtocolV1MessageSchema = (
   const currentDeviceVersion = getDeviceFirmwareVersion(features).join('.');
   const deviceType = getDeviceType(features);
 
+  if (
+    features.bootloaderMode === true &&
+    features.firmwarePresent === false &&
+    DeviceModelToTypes.model_mini.includes(deviceType)
+  ) {
+    return {
+      messages: DataManager.messages.v1CurrentSchema,
+      protocolV1MessageSchema: 'v1CurrentSchema',
+    };
+  }
+
   const deviceVersionConfigs =
     PROTOBUF_MESSAGE_CONFIG[deviceType] ||
     (DeviceTypeToModels[deviceType] &&

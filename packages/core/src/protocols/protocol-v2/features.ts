@@ -1,6 +1,11 @@
 import { DeviceSEState, DeviceSeType } from '@onekeyfe/hd-transport';
 
-import type { DeviceInfoGet, DeviceSEInfo, ProtocolV2DeviceInfo } from '@onekeyfe/hd-transport';
+import type {
+  DeviceInfoGet,
+  DeviceSEInfo,
+  DeviceStatus,
+  ProtocolV2DeviceInfo,
+} from '@onekeyfe/hd-transport';
 import type { DeviceCommands } from '../../device/DeviceCommands';
 
 // 单源类型：直接使用 hd-transport 生成的 ProtocolV2DeviceInfo / DeviceSEInfo /
@@ -56,9 +61,12 @@ export const getProtocolV2SeType = (se?: DeviceSEInfo): string | null =>
  * 当前 romloader 只上报 hw、fw.romloader 和 fw.bootloader；bootloader
  * 还会上报 application/application_data、coprocessor 或 SE 信息。
  */
-export const isProtocolV2RomloaderDeviceInfo = (deviceInfo?: ProtocolV2DeviceInfo | null) =>
+export const isProtocolV2RomloaderDeviceInfo = (
+  deviceInfo?: ProtocolV2DeviceInfo | null,
+  deviceStatus?: DeviceStatus | null
+) =>
   !!deviceInfo &&
-  deviceInfo.status == null &&
+  deviceStatus == null &&
   deviceInfo.fw?.romloader != null &&
   deviceInfo.fw?.application == null &&
   deviceInfo.fw?.application_data == null &&
@@ -68,15 +76,19 @@ export const isProtocolV2RomloaderDeviceInfo = (deviceInfo?: ProtocolV2DeviceInf
   deviceInfo.se3 == null &&
   deviceInfo.se4 == null;
 
-export const isProtocolV2BootloaderDeviceInfo = (deviceInfo?: ProtocolV2DeviceInfo | null) =>
-  !!deviceInfo && deviceInfo.status == null && !isProtocolV2RomloaderDeviceInfo(deviceInfo);
+export const isProtocolV2BootloaderDeviceInfo = (
+  deviceInfo?: ProtocolV2DeviceInfo | null,
+  deviceStatus?: DeviceStatus | null
+) =>
+  !!deviceInfo &&
+  deviceStatus == null &&
+  !isProtocolV2RomloaderDeviceInfo(deviceInfo, deviceStatus);
 
 export const PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST = {
   targets: {
     hw: true,
     fw: true,
     coprocessor: true,
-    status: true,
   },
   types: {
     version: true,
@@ -90,18 +102,6 @@ export const PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST = {
  * status 提供 init_states / passphrase_enabled 等会在设备端变化的字段；
  * hw / coprocessor 提供 serialNo / bleName 等身份字段；不含 fw/SE targets，单帧请求开销很小。
  */
-export const PROTOCOL_V2_STATUS_DEVICE_INFO_REQUEST = {
-  targets: {
-    hw: true,
-    coprocessor: true,
-    status: true,
-  },
-  types: {
-    version: true,
-    specific: true,
-  },
-};
-
 export const PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST = {
   targets: {
     hw: true,
@@ -111,7 +111,6 @@ export const PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST = {
     se2: true,
     se3: true,
     se4: true,
-    status: true,
   },
   types: {
     version: true,
@@ -128,7 +127,6 @@ export const PROTOCOL_V2_FULL_DEVICE_INFO_REQUEST = {
     se2: true,
     se3: true,
     se4: true,
-    status: true,
   },
   types: {
     version: true,
@@ -156,4 +154,13 @@ export async function requestProtocolV2DeviceInfo({
   // 'DeviceInfo' 在生成类型里是 V1 DeviceInfo | ProtocolV2DeviceInfo 的合并；
   // DeviceInfoGet 是 V2-only 消息，这里收窄到 V2 形态。
   return message as ProtocolV2DeviceInfo;
+}
+
+export async function requestProtocolV2DeviceStatus({
+  commands,
+}: {
+  commands: DeviceCommands;
+}): Promise<DeviceStatus> {
+  const { message } = await commands.typedCall('DeviceStatusGet', 'DeviceStatus', {});
+  return message;
 }

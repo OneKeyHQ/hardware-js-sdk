@@ -27,6 +27,30 @@ const PROTOCOL_PROBE_TIMEOUT_MS = 1000;
 const PROTOCOL_V2_PROBE_TIMEOUT_MS = 5000;
 const LOWLEVEL_PROTOCOL_TIMEOUT_MS = 30_000;
 const LOWLEVEL_PROTOCOL_V2_PACKET_LENGTH = 64;
+const FIRMWARE_UPLOAD_LOG_PERCENT_STEP = 5;
+const FIRMWARE_UPLOAD_LOG_INTERVAL_MS = 10_000;
+
+export function shouldLogFirmwareUploadProgress({
+  percent,
+  lastLoggedPercent,
+  now,
+  lastLoggedAt,
+}: {
+  percent: number;
+  lastLoggedPercent: number;
+  now: number;
+  lastLoggedAt: number;
+}) {
+  return (
+    percent === 100 ||
+    percent - lastLoggedPercent >= FIRMWARE_UPLOAD_LOG_PERCENT_STEP ||
+    now - lastLoggedAt >= FIRMWARE_UPLOAD_LOG_INTERVAL_MS
+  );
+}
+
+export function getProtocolV1SendOptions(name: string) {
+  return name === 'FirmwareUpload' ? { withoutResponse: false } : undefined;
+}
 
 function inferProtocolHintFromDeviceName(name?: string | null): ProtocolType | undefined {
   return /\bpro\s*2\b/i.test(name ?? '') ? 'V2' : undefined;
@@ -216,10 +240,41 @@ export default class LowlevelTransport {
 
     const messages = this._messages;
     const buffers = ProtocolV1.encodeTransportPackets(messages, name, data);
-    for (const o of buffers) {
+    const isFirmwareUpload = name === 'FirmwareUpload';
+    const uploadStartedAt = Date.now();
+    const totalBytes = buffers.reduce((sum, buffer) => sum + buffer.limit, 0);
+    let sentBytes = 0;
+    let lastLoggedPercent = 0;
+    let lastLoggedAt = uploadStartedAt;
+
+    for (const [index, o] of buffers.entries()) {
       const outData = o.toString('hex');
       try {
-        await this.plugin.send(uuid, outData);
+        await this.plugin.send(uuid, outData, getProtocolV1SendOptions(name));
+        sentBytes += o.limit;
+
+        if (isFirmwareUpload) {
+          const now = Date.now();
+          const percent = Math.floor(((index + 1) / buffers.length) * 100);
+          if (
+            shouldLogFirmwareUploadProgress({
+              percent,
+              lastLoggedPercent,
+              now,
+              lastLoggedAt,
+            })
+          ) {
+            const elapsedSeconds = Math.max((now - uploadStartedAt) / 1000, 0.001);
+            const kibPerSecond = sentBytes / 1024 / elapsedSeconds;
+            this.Log?.debug(
+              `[LowlevelTransport] FirmwareUpload progress: ${percent}% ` +
+                `(${index + 1}/${buffers.length} packets, ${sentBytes}/${totalBytes} bytes, ` +
+                `${elapsedSeconds.toFixed(1)}s, ${kibPerSecond.toFixed(1)} KiB/s)`
+            );
+            lastLoggedPercent = percent;
+            lastLoggedAt = now;
+          }
+        }
       } catch (e) {
         this.Log.debug('lowlevel transport send error: ', e);
         throw ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError, e.reason);

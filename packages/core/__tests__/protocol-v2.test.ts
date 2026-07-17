@@ -15,6 +15,9 @@ import DeviceGetFirmwareUpdateStatus from '../src/api/protocol-v2/DeviceGetFirmw
 import DeviceGetOnboardingStatus from '../src/api/protocol-v2/DeviceGetOnboardingStatus';
 import DeviceInfoGet from '../src/api/protocol-v2/DeviceInfoGet';
 import DeviceReboot from '../src/api/protocol-v2/DeviceReboot';
+import DeviceCancel from '../src/api/device/DeviceCancel';
+import DeviceLock from '../src/api/device/DeviceLock';
+import DeviceUnlock from '../src/api/device/DeviceUnlock';
 import DeviceSettingsGet from '../src/api/protocol-v2/DeviceSettingsGet';
 import DeviceSettingsPageShow from '../src/api/protocol-v2/DeviceSettingsPageShow';
 import DeviceSettingsSet from '../src/api/protocol-v2/DeviceSettingsSet';
@@ -53,16 +56,19 @@ import { getBitcoinForkVersionRange } from '../src/api/btc/helpers/versionLimit'
 import { DataManager } from '../src/data-manager';
 import { createCoreApi } from '../src/inject';
 import { Device, preloadSessionCache } from '../src/device/Device';
+import { DevicePool } from '../src/device/DevicePool';
 import { UI_REQUEST } from '../src/events/ui-request';
 import {
   PROTOCOL_V2_DEVICE_INFO_TIMEOUT_MS,
   requestProtocolV2DeviceInfo,
+  requestProtocolV2DeviceStatus,
 } from '../src/protocols/protocol-v2/features';
 import {
   getProtocolV2WalletSession,
   refreshProtocolV2DeviceStatus,
 } from '../src/protocols/protocol-v2/walletSession';
 import { runMethodWithUnlockRetry } from '../src/protocols/protocol-v2/unlockRetry';
+import { BaseMethod } from '../src/api/BaseMethod';
 import {
   buildProfileFromProtocolV2,
   buildProtocolV1FeaturesPayload,
@@ -84,6 +90,7 @@ import {
 
 import type { DeviceCommands } from '../src/device/DeviceCommands';
 import type { Features } from '../src/types';
+import type { DeviceStatus } from '@onekeyfe/hd-transport';
 import type { ProtocolV2DeviceInfo } from '../src/protocols/protocol-v2/features';
 
 jest.mock('../src/data/config', () => ({
@@ -305,8 +312,23 @@ function stubDevice<T extends Record<string, any>>(device: T): T {
     if (range) return range;
     return getMethodVersionRange(d.features, fn);
   };
-  d.updateProtocolV2Features ??= (deviceInfo?: ProtocolV2DeviceInfo) => {
-    d.features = buildProtocolV2FeaturesPayload(deviceInfo, d.features);
+  d.updateProtocolV2Features ??= (
+    deviceInfo?: ProtocolV2DeviceInfo,
+    deviceStatus?: DeviceStatus
+  ) => {
+    d.features = buildProtocolV2FeaturesPayload({
+      deviceInfo,
+      deviceStatus: deviceStatus ?? deviceInfo?.status,
+      previous: d.features,
+    });
+    return d.features;
+  };
+  d.updateProtocolV2Status ??= (deviceStatus: DeviceStatus) => {
+    d.features = buildProtocolV2FeaturesPayload({
+      deviceInfo: d.features?.raw?.protocolV2DeviceInfo,
+      deviceStatus,
+      previous: d.features,
+    });
     return d.features;
   };
   return device;
@@ -314,7 +336,10 @@ function stubDevice<T extends Record<string, any>>(device: T): T {
 
 // 直接复用生产映射函数，避免测试内副本与实现漂移（之前的手抄副本已缺失 se boot 字段）
 function normalizeProtocolV2Features(_descriptor: unknown, deviceInfo?: ProtocolV2DeviceInfo) {
-  return buildProtocolV2FeaturesPayload(deviceInfo);
+  return buildProtocolV2FeaturesPayload({
+    deviceInfo,
+    deviceStatus: deviceInfo?.status,
+  });
 }
 
 const protocolV2BootloaderDeviceInfo: ProtocolV2DeviceInfo = {
@@ -337,10 +362,48 @@ async function requestProtocolV2Features({
   descriptor?: unknown;
 }) {
   const deviceInfo = await requestProtocolV2DeviceInfo({ commands });
-  return normalizeProtocolV2Features(inputDescriptor ?? descriptor, deviceInfo);
+  const deviceStatus = await requestProtocolV2DeviceStatus({ commands });
+  return buildProtocolV2FeaturesPayload({ deviceInfo, deviceStatus });
 }
 
 describe('Protocol V2 feature adapter', () => {
+  test('builds dynamic features from DeviceStatus when DeviceInfo has no nested status', () => {
+    const deviceInfo: ProtocolV2DeviceInfo = {
+      protocol_version: 1,
+      hw: { serial_no: 'P2-STATIC' },
+      fw: { application: { version: '1.0.0' } },
+      coprocessor: { bt_adv_name: 'Pro2 STATIC' },
+    };
+    const deviceStatus: DeviceStatus = {
+      device_id: 'P2-DYNAMIC',
+      unlocked: true,
+      init_states: true,
+      backup_required: false,
+      passphrase_enabled: true,
+      attach_to_pin_enabled: true,
+      unlocked_by_attach_to_pin: true,
+    };
+
+    const features = buildProtocolV2FeaturesPayload({
+      deviceInfo,
+      deviceStatus,
+    });
+
+    expect(features).toMatchObject({
+      deviceId: 'P2-DYNAMIC',
+      serialNo: 'P2-STATIC',
+      bleName: 'Pro2 STATIC',
+      initialized: true,
+      unlocked: true,
+      passphraseProtection: true,
+      attachToPinEnabled: true,
+      unlockedAttachPin: true,
+    });
+    expect(features.raw?.protocolV2DeviceInfo).toEqual(deviceInfo);
+    expect(features.raw?.protocolV2DeviceStatus).toEqual(deviceStatus);
+    expect(features.raw?.protocolV2DeviceInfo?.status).toBeUndefined();
+  });
+
   test('keeps legacy snake_case feature fields for existing SDK consumers', () => {
     const protocolV1 = buildProtocolV1FeaturesPayload({
       device_id: 'v1-device',
@@ -350,14 +413,16 @@ describe('Protocol V2 feature adapter', () => {
       unlocked: true,
     } as any);
     const protocolV2 = buildProtocolV2FeaturesPayload({
-      hw: { serial_no: 'P2-001' },
-      coprocessor: { bt_adv_name: 'Pro 2 BLE' },
-      status: {
+      deviceInfo: {
+        hw: { serial_no: 'P2-001' },
+        coprocessor: { bt_adv_name: 'Pro 2 BLE' },
+      },
+      deviceStatus: {
         device_id: 'v2-device',
         unlocked: true,
         passphrase_enabled: true,
       },
-    } as any);
+    });
 
     expect(protocolV1).toMatchObject({
       device_id: 'v1-device',
@@ -549,12 +614,12 @@ describe('Protocol V2 feature adapter', () => {
     expect(typedCall).toHaveBeenLastCalledWith('DeviceSessionGet', 'DeviceSession', {});
   });
 
-  test('deviceStatusGet returns raw DeviceStatus without updating features', async () => {
+  test('deviceStatusGet returns raw DeviceStatus and updates dynamic features', async () => {
     const typedCall = jest.fn().mockResolvedValue({
       type: 'DeviceStatus',
       message: { device_id: 'device-1', unlocked: true },
     });
-    const updateProtocolV2Features = jest.fn();
+    const updateProtocolV2Status = jest.fn();
     const method = new DeviceStatusGet({
       payload: { method: 'deviceStatusGet', connectId: 'connect-id' },
     });
@@ -562,12 +627,15 @@ describe('Protocol V2 feature adapter', () => {
     method.device = stubDevice({
       originalDescriptor: { ...descriptor, protocolType: 'V2' },
       commands: { typedCall },
-      updateProtocolV2Features,
+      updateProtocolV2Status,
     }) as any;
 
     await expect(method.run()).resolves.toEqual({ device_id: 'device-1', unlocked: true });
     expect(typedCall).toHaveBeenCalledWith('DeviceStatusGet', 'DeviceStatus', {});
-    expect(updateProtocolV2Features).not.toHaveBeenCalled();
+    expect(updateProtocolV2Status).toHaveBeenCalledWith({
+      device_id: 'device-1',
+      unlocked: true,
+    });
   });
 
   test('deviceGetOnboardingStatus returns the real Protocol V2 onboarding stage', async () => {
@@ -1235,17 +1303,22 @@ describe('Protocol V2 feature adapter', () => {
 
   test('initializes Protocol V2 features from lightweight DeviceInfoGet', async () => {
     const commands = {
-      typedCall: jest.fn().mockResolvedValueOnce({
-        type: 'DeviceInfo',
-        message: {
-          hw: { serial_no: 'PR2SERIAL' },
-          status: {
+      typedCall: jest
+        .fn()
+        .mockResolvedValueOnce({
+          type: 'DeviceInfo',
+          message: {
+            hw: { serial_no: 'PR2SERIAL' },
+          },
+        })
+        .mockResolvedValueOnce({
+          type: 'DeviceStatus',
+          message: {
             device_id: 'PRO2-STATUS-ID',
             init_states: true,
             passphrase_enabled: true,
           },
-        },
-      }),
+        }),
     };
 
     const features = await requestProtocolV2Features({
@@ -1256,7 +1329,7 @@ describe('Protocol V2 feature adapter', () => {
     expect(features.deviceId).toBe('PRO2-STATUS-ID');
     expect(features.initialized).toBe(true);
     expect(features.passphraseProtection).toBe(true);
-    expect(commands.typedCall).toHaveBeenCalledTimes(1);
+    expect(commands.typedCall).toHaveBeenCalledTimes(2);
     expect(commands.typedCall).toHaveBeenNthCalledWith(
       1,
       'DeviceInfoGet',
@@ -1266,7 +1339,6 @@ describe('Protocol V2 feature adapter', () => {
           hw: true,
           fw: true,
           coprocessor: true,
-          status: true,
         },
         types: {
           version: true,
@@ -1274,6 +1346,12 @@ describe('Protocol V2 feature adapter', () => {
         },
       },
       { timeoutMs: PROTOCOL_V2_DEVICE_INFO_TIMEOUT_MS }
+    );
+    expect(commands.typedCall).toHaveBeenNthCalledWith(
+      2,
+      'DeviceStatusGet',
+      'DeviceStatus',
+      {}
     );
   });
 
@@ -1291,9 +1369,11 @@ describe('Protocol V2 feature adapter', () => {
   });
 
   test('refreshes Protocol V2 basic device info with the lightweight request', async () => {
-    const typedCall = jest.fn().mockResolvedValueOnce({
-      type: 'DeviceInfo',
-      message: {
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce({
+        type: 'DeviceInfo',
+        message: {
         hw: { serial_no: 'PR2SERIAL' },
         fw: {
           application: {
@@ -1306,14 +1386,17 @@ describe('Protocol V2 feature adapter', () => {
           },
           bt_adv_name: 'Raw Pro2 BLE',
         },
-        status: {
+        },
+      })
+      .mockResolvedValueOnce({
+        type: 'DeviceStatus',
+        message: {
           device_id: 'PRO2-BASIC-ID',
           unlocked_by_attach_to_pin: true,
           init_states: true,
           passphrase_enabled: true,
         },
-      },
-    });
+      });
     const method = new GetDeviceInfo({
       id: 1,
       payload: {
@@ -1347,7 +1430,6 @@ describe('Protocol V2 feature adapter', () => {
           hw: true,
           fw: true,
           coprocessor: true,
-          status: true,
         },
         types: {
           version: true,
@@ -1429,13 +1511,16 @@ describe('Protocol V2 feature adapter', () => {
   });
 
   test('reads full Protocol V2 device info only for verify scope', async () => {
-    const typedCall = jest.fn().mockResolvedValueOnce({
-      type: 'DeviceInfo',
-      message: {
-        hw: { serial_no: 'PR2SERIAL' },
-        status: { init_states: true },
-      },
-    });
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce({
+        type: 'DeviceInfo',
+        message: { hw: { serial_no: 'PR2SERIAL' } },
+      })
+      .mockResolvedValueOnce({
+        type: 'DeviceStatus',
+        message: { init_states: true },
+      });
     const method = new GetDeviceInfo({
       id: 1,
       payload: {
@@ -1465,7 +1550,6 @@ describe('Protocol V2 feature adapter', () => {
           se2: true,
           se3: true,
           se4: true,
-          status: true,
         },
         types: {
           version: true,
@@ -1479,9 +1563,11 @@ describe('Protocol V2 feature adapter', () => {
   });
 
   test('reads Protocol V2 SE version fields for versions scope', async () => {
-    const typedCall = jest.fn().mockResolvedValueOnce({
-      type: 'DeviceInfo',
-      message: {
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce({
+        type: 'DeviceInfo',
+        message: {
         hw: { serial_no: 'PR2SERIAL' },
         se1: {
           application: { version: '1.0.1' },
@@ -1491,9 +1577,12 @@ describe('Protocol V2 feature adapter', () => {
           application: { version: '2.0.1' },
           bootloader: { version: '2.0.0' },
         },
-        status: { init_states: true },
-      },
-    });
+        },
+      })
+      .mockResolvedValueOnce({
+        type: 'DeviceStatus',
+        message: { init_states: true },
+      });
     const method = new GetDeviceInfo({
       id: 1,
       payload: {
@@ -1522,7 +1611,6 @@ describe('Protocol V2 feature adapter', () => {
           se2: true,
           se3: true,
           se4: true,
-          status: true,
         },
         types: {
           version: true,
@@ -1710,21 +1798,21 @@ describe('Protocol V2 feature adapter', () => {
         message: {
           hw: { serial_no: 'PR2SERIAL' },
           fw: { application: { version: '1.2.3' } },
-          status: {
-            device_id: 'PRO2-REFRESH-ID',
-            passphrase_enabled: true,
-          },
         },
       })
-      // 第二次 run 的轻量 status 刷新：设备端 label / init_states 等可能已变化
       .mockResolvedValueOnce({
-        type: 'DeviceInfo',
+        type: 'DeviceStatus',
         message: {
-          hw: { serial_no: 'PR2SERIAL' },
-          status: {
-            device_id: 'PRO2-REFRESH-ID',
-            passphrase_enabled: false,
-          },
+          device_id: 'PRO2-REFRESH-ID',
+          passphrase_enabled: true,
+        },
+      })
+      // 第二次 run 只刷新独立 DeviceStatus
+      .mockResolvedValueOnce({
+        type: 'DeviceStatus',
+        message: {
+          device_id: 'PRO2-REFRESH-ID',
+          passphrase_enabled: false,
         },
       });
 
@@ -1745,7 +1833,7 @@ describe('Protocol V2 feature adapter', () => {
     expect(device.features?.label).toBeNull();
     // 轻量刷新不含 fw target，已有版本信息按字段级合并保留
     expect(device.features?.firmwareVersion).toBe('1.2.3');
-    expect(typedCall).toHaveBeenCalledTimes(2);
+    expect(typedCall).toHaveBeenCalledTimes(3);
     expect(typedCall).toHaveBeenNthCalledWith(
       1,
       'DeviceInfoGet',
@@ -1755,7 +1843,6 @@ describe('Protocol V2 feature adapter', () => {
           hw: true,
           fw: true,
           coprocessor: true,
-          status: true,
         },
         types: {
           version: true,
@@ -1766,25 +1853,13 @@ describe('Protocol V2 feature adapter', () => {
         timeoutMs: PROTOCOL_V2_DEVICE_INFO_TIMEOUT_MS,
       }
     );
-    // 第二次为 status-only 轻量请求（hw/coprocessor 仅用于身份字段，避免顶层覆盖清空）
+    expect(typedCall).toHaveBeenNthCalledWith(2, 'DeviceStatusGet', 'DeviceStatus', {});
+    // 第二次 initialize 只刷新独立状态，不再读取 DeviceInfo
     expect(typedCall).toHaveBeenNthCalledWith(
-      2,
-      'DeviceInfoGet',
-      'DeviceInfo',
-      {
-        targets: {
-          hw: true,
-          coprocessor: true,
-          status: true,
-        },
-        types: {
-          version: true,
-          specific: true,
-        },
-      },
-      {
-        timeoutMs: PROTOCOL_V2_DEVICE_INFO_TIMEOUT_MS,
-      }
+      3,
+      'DeviceStatusGet',
+      'DeviceStatus',
+      {}
     );
   });
 
@@ -1800,16 +1875,22 @@ describe('Protocol V2 feature adapter', () => {
         message: {
           hw: { serial_no: 'PR2SERIAL' },
           fw: { application: { version: '1.2.3' } },
-          status: { init_states: true },
         },
+      })
+      .mockResolvedValueOnce({
+        type: 'DeviceStatus',
+        message: { init_states: true },
       })
       .mockResolvedValueOnce({
         type: 'DeviceInfo',
         message: {
           hw: { serial_no: 'PR2SERIAL' },
           fw: { application: { version: '1.2.4' } },
-          status: { init_states: true, passphrase_enabled: true },
         },
+      })
+      .mockResolvedValueOnce({
+        type: 'DeviceStatus',
+        message: { init_states: true, passphrase_enabled: true },
       });
 
     (device as any).commands = { typedCall };
@@ -1828,9 +1909,9 @@ describe('Protocol V2 feature adapter', () => {
       firmwareVersion: '1.2.4',
       passphraseProtection: true,
     });
-    expect(typedCall).toHaveBeenCalledTimes(2);
+    expect(typedCall).toHaveBeenCalledTimes(4);
     expect(typedCall).toHaveBeenNthCalledWith(
-      2,
+      3,
       'DeviceInfoGet',
       'DeviceInfo',
       {
@@ -1838,7 +1919,6 @@ describe('Protocol V2 feature adapter', () => {
           hw: true,
           fw: true,
           coprocessor: true,
-          status: true,
         },
         types: {
           version: true,
@@ -1934,7 +2014,7 @@ describe('Protocol V2 feature adapter', () => {
     const features = await device.unlockDevice();
 
     expect(typedCall.mock.calls).toEqual([
-      ['DeviceSessionAskPin', 'Success'],
+      ['DeviceSessionAskPin', 'Success', undefined, { timeoutMs: 120_000 }],
       ['DeviceStatusGet', 'DeviceStatus', {}],
     ]);
     expect(typedCall).not.toHaveBeenCalledWith('GetAddress', 'Address', expect.anything());
@@ -1946,7 +2026,7 @@ describe('Protocol V2 feature adapter', () => {
       unlockedAttachPin: true,
       passphraseProtection: true,
     });
-    expect(features.raw?.protocolV2DeviceInfo?.status).toMatchObject({
+    expect(features.raw?.protocolV2DeviceStatus).toMatchObject({
       unlocked: true,
       unlocked_by_attach_to_pin: true,
       passphrase_enabled: true,
@@ -1987,7 +2067,7 @@ describe('Protocol V2 feature adapter', () => {
     await device.unlockDevice();
 
     expect(typedCall.mock.calls).toEqual([
-      ['DeviceSessionAskPin', 'Success'],
+      ['DeviceSessionAskPin', 'Success', undefined, { timeoutMs: 120_000 }],
       ['DeviceStatusGet', 'DeviceStatus', {}],
     ]);
     expect((device as any).profile).toBeUndefined();
@@ -2016,7 +2096,9 @@ describe('Protocol V2 feature adapter', () => {
       })
     );
     expect(typedCall).toHaveBeenCalledTimes(1);
-    expect(typedCall.mock.calls).toEqual([['DeviceSessionAskPin', 'Success']]);
+    expect(typedCall.mock.calls).toEqual([
+      ['DeviceSessionAskPin', 'Success', undefined, { timeoutMs: 120_000 }],
+    ]);
     expect(typedCall).not.toHaveBeenCalledWith(
       'DeviceSessionGet',
       'DeviceSession',
@@ -2506,7 +2588,6 @@ describe('Protocol V2 firmware update targets', () => {
           se2: true,
           se3: true,
           se4: true,
-          status: true,
         },
         types: {
           version: true,
@@ -2634,6 +2715,7 @@ describe('Protocol V2 firmware update targets', () => {
       });
     (method as any).reconnectProtocolV2Device = reconnectProtocolV2Device;
     (method as any).device.getCommands = () => ({ typedCall });
+    (method as any).protocolV2ExpectedDeviceId = '8693920D7CA90CEC4A88353D';
 
     await (method as any).waitForProtocolV2BootloaderMode(60 * 1000, 0);
 
@@ -3995,6 +4077,67 @@ describe('Protocol V2 firmware reconnect identity', () => {
       assertProtocolV2ReconnectIdentity('expected-device', 'expected-device')
     ).not.toThrow();
   });
+
+  test('allows bootloader reconnect without wallet device id after USB identity is selected', () => {
+    expect(() =>
+      assertProtocolV2ReconnectIdentity('expected-device', undefined, {
+        allowMissingActual: true,
+      })
+    ).not.toThrow();
+    expect(() =>
+      assertProtocolV2ReconnectIdentity('expected-device', 'other-device', {
+        allowMissingActual: true,
+      })
+    ).toThrow('identity mismatch');
+  });
+});
+
+describe('Protocol V2 explicit USB device selection', () => {
+  beforeEach(() => {
+    DevicePool.resetState();
+    jest.restoreAllMocks();
+  });
+
+  test('only initializes the descriptor matching an explicit connectId', async () => {
+    const zeroDescriptor = {
+      path: '000000000000000000000000',
+      id: '000000000000000000000000',
+    } as any;
+    const pro2Descriptor = {
+      path: 'PR9999999999',
+      id: 'PR9999999999',
+    } as any;
+    const pro2Device = {
+      getConnectId: () => 'PR9999999999',
+      originalDescriptor: pro2Descriptor,
+      updateDescriptor: jest.fn(),
+    } as any;
+    const zeroDevice = {
+      getConnectId: () => '000000000000000000000000',
+      originalDescriptor: zeroDescriptor,
+      updateDescriptor: jest.fn(),
+    } as any;
+
+    const createDevice = jest
+      .spyOn(DevicePool as any, '_createDevice')
+      .mockImplementation((descriptor: { path: string }) =>
+        Promise.resolve(descriptor.path === pro2Descriptor.path ? pro2Device : zeroDevice)
+      );
+    const checkDevicePool = jest
+      .spyOn(DevicePool as any, '_checkDevicePool')
+      .mockResolvedValue(undefined);
+
+    const result = await DevicePool.getDevices(
+      [zeroDescriptor, pro2Descriptor],
+      'PR9999999999'
+    );
+
+    expect(createDevice).toHaveBeenCalledTimes(1);
+    expect(createDevice).toHaveBeenCalledWith(pro2Descriptor, undefined);
+    expect(checkDevicePool).toHaveBeenCalledWith(undefined, 'PR9999999999');
+    expect(result.deviceList).toEqual([pro2Device]);
+    expect(result.devices).toEqual({ PR9999999999: pro2Device });
+  });
 });
 
 describe('Protocol V2 reboot methods', () => {
@@ -4023,6 +4166,37 @@ describe('Protocol V2 protected method execution', () => {
     Object.assign(new Error('Device locked'), {
       errorCode: HardwareErrorCode.DeviceLocked,
     });
+
+  test('uses locked retry by default for SDK business methods', () => {
+    class TestBusinessMethod extends BaseMethod {
+      init() {}
+
+      async run() {
+        return {};
+      }
+    }
+
+    const method = new TestBusinessMethod({
+      id: 1,
+      payload: { method: 'testBusinessMethod' },
+    } as any);
+
+    expect(method.unlockPolicy).toBe('retry-on-locked');
+  });
+
+  test.each([
+    ['deviceLock', DeviceLock],
+    ['deviceUnlock', DeviceUnlock],
+    ['deviceCancel', DeviceCancel],
+  ])('does not auto-retry the %s control method', (_name, MethodClass) => {
+    const method = new MethodClass({
+      id: 1,
+      payload: { method: _name },
+    } as any);
+    method.init();
+
+    expect(method.unlockPolicy).toBe('none');
+  });
 
   test('unlocks and retries an opted-in Protocol V2 method once', async () => {
     const calls: string[] = [];
@@ -4364,7 +4538,7 @@ describe('Protocol V2 raw device info method', () => {
       'DeviceInfoGet',
       'DeviceInfo',
       {
-        targets: { hw: true, fw: true, coprocessor: true, status: true },
+        targets: { hw: true, fw: true, coprocessor: true },
         types: { version: true, specific: true },
       },
       { timeoutMs: PROTOCOL_V2_DEVICE_INFO_TIMEOUT_MS }

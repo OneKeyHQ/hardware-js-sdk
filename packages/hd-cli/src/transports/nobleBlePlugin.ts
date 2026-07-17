@@ -453,7 +453,7 @@ export function createNobleBlePlugin(): LowlevelTransportSharedPlugin {
       await disconnectDevice(uuid);
     },
 
-    async send(uuid: string, data: string) {
+    async send(uuid: string, data: string, options?: { withoutResponse?: boolean }) {
       const characteristics = deviceCharacteristics.get(uuid);
       if (!characteristics) {
         throw ERRORS.TypedError(
@@ -463,9 +463,10 @@ export function createNobleBlePlugin(): LowlevelTransportSharedPlugin {
       }
 
       const buffer = Buffer.from(data, 'hex');
+      const withoutResponse = options?.withoutResponse ?? true;
       for (let offset = 0; offset < buffer.length; offset += BLE_PACKET_SIZE) {
         const chunk = buffer.subarray(offset, Math.min(offset + BLE_PACKET_SIZE, buffer.length));
-        await writeCharacteristic(characteristics.write, chunk, true);
+        await writeCharacteristic(characteristics.write, chunk, withoutResponse);
       }
     },
 

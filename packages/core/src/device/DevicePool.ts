@@ -108,14 +108,19 @@ export class DevicePool extends EventEmitter {
           device.updateDescriptor(exist, true);
           devices[connectId] = device;
           deviceList.push(device);
-          await this._checkDevicePool(initOptions);
+          await this._checkDevicePool(initOptions, connectId);
           return { devices, deviceList };
         }
         Log.debug('found device in cache, but path is different: ', connectId);
       }
     }
 
-    for await (const descriptor of descriptorList) {
+    const matchedDescriptor = connectId
+      ? descriptorList.find(descriptor => descriptor.path === connectId)
+      : undefined;
+    const descriptorsToInitialize = matchedDescriptor ? [matchedDescriptor] : descriptorList;
+
+    for await (const descriptor of descriptorsToInitialize) {
       const device = await this._createDevice(descriptor, initOptions);
 
       const connectId = device.getConnectId();
@@ -133,7 +138,7 @@ export class DevicePool extends EventEmitter {
     // Log.debug('get devices result : ', devices, deviceList);
     // console.log('device poll -> connected: ', this.connectedPool);
     // console.log('device poll -> disconnected: ', this.disconnectPool);
-    await this._checkDevicePool(initOptions);
+    await this._checkDevicePool(initOptions, matchedDescriptor ? connectId : undefined);
     return { devices, deviceList };
   }
 
@@ -157,14 +162,17 @@ export class DevicePool extends EventEmitter {
     return device;
   }
 
-  static async _checkDevicePool(initOptions?: InitOptions) {
-    await this._sendConnectMessage(initOptions);
+  static async _checkDevicePool(initOptions?: InitOptions, connectId?: string) {
+    await this._sendConnectMessage(initOptions, connectId);
     this._sendDisconnectMessage();
   }
 
-  static async _sendConnectMessage(initOptions?: InitOptions) {
+  static async _sendConnectMessage(initOptions?: InitOptions, connectId?: string) {
     for (let i = this.connectedPool.length - 1; i >= 0; i--) {
       const descriptor = this.connectedPool[i];
+      if (connectId && descriptor.path !== connectId) {
+        continue;
+      }
       const device = await this._createDevice(descriptor, initOptions);
       Log.debug('emit DEVICE.CONNECT: ', device?.features);
       this.emitter.emit(DEVICE.CONNECT, device);

@@ -2,7 +2,11 @@ import { EDeviceType, type EFirmwareType } from '@onekeyfe/hd-shared';
 
 import type { IVersionArray } from './settings';
 import type { PROTO } from '../constants';
-import type { OneKeyDeviceCommType, ProtocolV2DeviceInfo } from '@onekeyfe/hd-transport';
+import type {
+  DeviceStatus as ProtocolV2DeviceStatus,
+  OneKeyDeviceCommType,
+  ProtocolV2DeviceInfo,
+} from '@onekeyfe/hd-transport';
 
 export type DeviceStatus = 'available' | 'occupied' | 'used';
 
@@ -127,6 +131,7 @@ export type DeviceFeaturesRaw = {
   protocolV1Features?: PROTO.Features;
   protocolV1OneKeyFeatures?: OnekeyFeatures;
   protocolV2DeviceInfo?: ProtocolV2DeviceInfo;
+  protocolV2DeviceStatus?: ProtocolV2DeviceStatus;
 };
 
 export type NormalizedFeatures = {

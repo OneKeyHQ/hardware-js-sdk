@@ -123,6 +123,32 @@ describe('messages', () => {
     );
   });
 
+  test('Protocol V2 onboarding status matches the current firmware-pro2 schema', () => {
+    expect(v2Messages.nested.DevOnboardingStep.values).toMatchObject({
+      DEV_ONBOARDING_STEP_UNKNOWN: 0,
+      DEV_ONBOARDING_STEP_CHECKING: 1,
+      DEV_ONBOARDING_STEP_PERSONALIZATION: 2,
+      DEV_ONBOARDING_STEP_PIN: 3,
+      DEV_ONBOARDING_STEP_SETUP: 4,
+      DEV_ONBOARDING_STEP_DONE: 5,
+    });
+    expect(v2Messages.nested.DevOnboardingPhase.values).toBeDefined();
+    expect(v2Messages.nested.DevOnboardingSetupKind.values).toBeDefined();
+    expect(v2Messages.nested.DevOnboardingSetupMethod.values).toBeDefined();
+    expect(v2Messages.nested.DevOnboardingSetupStatus.fields).toMatchObject({
+      kind: { id: 1, type: 'DevOnboardingSetupKind' },
+      method: { id: 2, type: 'DevOnboardingSetupMethod' },
+    });
+    expect(v2Messages.nested.DevOnboardingStatus.fields).toMatchObject({
+      step: { id: 1, type: 'DevOnboardingStep' },
+      phase: { id: 2, type: 'DevOnboardingPhase' },
+      setup: { id: 3, type: 'DevOnboardingSetupStatus' },
+      pin_set: { id: 4, type: 'bool' },
+      wallet_initialized: { id: 5, type: 'bool' },
+    });
+    expect(v2Messages.nested).not.toHaveProperty('DevOnboardingStage');
+  });
+
   test('Protocol V2 does not restore retired unlock or passphrase ids', () => {
     expect(v2Messages.nested.MessageType.values).not.toHaveProperty('MessageType_UnLockDevice');
     expect(v2Messages.nested.MessageType.values).not.toHaveProperty(

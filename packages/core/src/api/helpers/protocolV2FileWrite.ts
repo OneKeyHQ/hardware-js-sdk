@@ -30,11 +30,22 @@ export type ProtocolV2FileWriteOptions = {
   append?: boolean;
   uiPercentage?: number;
   timeoutMs?: number;
+  maxChunkRetries?: number;
   throwIfAborted?: () => void;
   onProgress?: (progress: ProtocolV2FileWriteProgress) => void;
 };
 
 const MIN_FILE_CHUNK_SIZE = 64;
+
+function isRetryableFileWriteTimeout(error: unknown) {
+  if (!error || typeof error !== 'object') return false;
+  const candidate = error as { errorCode?: number; code?: number; message?: string };
+  const code = candidate.errorCode ?? candidate.code;
+  return (
+    code === HardwareErrorCode.BleTimeoutError ||
+    /Lowlevel response timeout/i.test(candidate.message ?? '')
+  );
+}
 
 function getProtocolV2FileChunkLimit() {
   const env = DataManager.getSettings('env');
@@ -116,17 +127,30 @@ export async function writeProtocolV2File(options: ProtocolV2FileWriteOptions) {
     const progress =
       options.uiPercentage ??
       getDeviceTransferProgress(offset, offset + chunk.byteLength, totalSize);
-    const response = await options.commands.typedCall(
-      'FilesystemFileWrite',
-      'FilesystemFile',
-      {
-        file: { path: options.path, offset, total_size: totalSize, data: chunk },
-        overwrite: chunks === 0 ? options.overwrite ?? false : false,
-        append: options.append ?? false,
-        ui_percentage: progress,
-      },
-      { timeoutMs: options.timeoutMs }
-    );
+    const request = {
+      file: { path: options.path, offset, total_size: totalSize, data: chunk },
+      overwrite: chunks === 0 ? options.overwrite ?? false : false,
+      append: options.append ?? false,
+      ui_percentage: progress,
+    };
+    const maxChunkRetries = Math.max(Math.floor(options.maxChunkRetries ?? 0), 0);
+    let retryCount = 0;
+    let response;
+    while (true) {
+      try {
+        response = await options.commands.typedCall(
+          'FilesystemFileWrite',
+          'FilesystemFile',
+          request,
+          { timeoutMs: options.timeoutMs }
+        );
+        break;
+      } catch (error) {
+        if (retryCount >= maxChunkRetries || !isRetryableFileWriteTimeout(error)) throw error;
+        retryCount += 1;
+        options.throwIfAborted?.();
+      }
+    }
     options.throwIfAborted?.();
     lastMessage = response.message;
     const rawProcessedByte = response.message?.processed_byte;

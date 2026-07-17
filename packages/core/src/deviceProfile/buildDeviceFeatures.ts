@@ -5,7 +5,11 @@ import {
   isProtocolV2RomloaderDeviceInfo,
 } from '../protocols/protocol-v2/features';
 
-import type { DeviceFirmwareImageInfo, ProtocolV2DeviceInfo } from '@onekeyfe/hd-transport';
+import type {
+  DeviceFirmwareImageInfo,
+  DeviceStatus,
+  ProtocolV2DeviceInfo,
+} from '@onekeyfe/hd-transport';
 import type { PROTO } from '../constants';
 import type { DeviceFeaturesMode, Features } from '../types';
 
@@ -222,16 +226,21 @@ export const buildProtocolV1FeaturesPayload = (
  * 缓存的同名字段级合并；不存在协议等价语义的字段保持 null/空值，不再通过
  * DeviceProfile 或 transport path 做身份兜底。
  */
-export const buildProtocolV2FeaturesPayload = (
-  deviceInfo?: ProtocolV2DeviceInfo,
-  previous?: Features
-): Features => {
+export const buildProtocolV2FeaturesPayload = ({
+  deviceInfo,
+  deviceStatus,
+  previous,
+}: {
+  deviceInfo?: ProtocolV2DeviceInfo;
+  deviceStatus?: DeviceStatus;
+  previous?: Features;
+}): Features => {
   const info = deviceInfo;
   const fwApplication = info?.fw?.application;
   const fwBootloader = info?.fw?.bootloader;
   const fwBoard = info?.fw?.romloader;
   const bleApplication = info?.coprocessor?.application;
-  const status = info?.status;
+  const status = deviceStatus;
 
   const firmwareVersion = firstMeaningfulVersion(
     getImageVersion(fwApplication),
@@ -255,8 +264,8 @@ export const buildProtocolV2FeaturesPayload = (
   const unlocked = firstValue(status?.unlocked, previous?.unlocked) ?? null;
   const attachToPinEnabled = status?.attach_to_pin_enabled ?? null;
   const unlockedAttachPin = status?.unlocked_by_attach_to_pin ?? undefined;
-  const romloaderMode = isProtocolV2RomloaderDeviceInfo(info);
-  const bootloaderMode = isProtocolV2BootloaderDeviceInfo(info);
+  const romloaderMode = isProtocolV2RomloaderDeviceInfo(info, status);
+  const bootloaderMode = isProtocolV2BootloaderDeviceInfo(info, status);
   let mode: DeviceFeaturesMode = 'unknown';
   if (romloaderMode) {
     mode = 'romloader';
@@ -376,6 +385,7 @@ export const buildProtocolV2FeaturesPayload = (
     unlockedAttachPin,
     raw: {
       protocolV2DeviceInfo: deviceInfo,
+      protocolV2DeviceStatus: deviceStatus,
     },
   };
 };

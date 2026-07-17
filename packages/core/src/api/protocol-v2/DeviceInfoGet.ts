@@ -45,7 +45,6 @@ const DEFAULT_TARGETS: DeviceInfoGetTargets = {
   hw: true,
   fw: true,
   coprocessor: true,
-  status: true,
 };
 
 const DEFAULT_TYPES: DeviceInfoGetTypes = {

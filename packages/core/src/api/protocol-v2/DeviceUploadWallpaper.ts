@@ -100,6 +100,7 @@ export default class DeviceUploadWallpaper extends BaseMethod<DeviceUploadWallpa
       data: encoded.data,
       totalSize: encoded.data.byteLength,
       chunkSize: this.params.chunkSize,
+      maxChunkRetries: 3,
       overwrite: true,
       append: false,
       throwIfAborted: () => this.throwIfAborted(),

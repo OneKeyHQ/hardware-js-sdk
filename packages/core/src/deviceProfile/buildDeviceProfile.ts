@@ -29,7 +29,11 @@ import type {
   GetDeviceInfoParams,
 } from '../types/api/getDeviceInfo';
 import type { Features, OnekeyFeatures } from '../types';
-import type { DeviceFirmwareImageInfo, ProtocolV2DeviceInfo } from '@onekeyfe/hd-transport';
+import type {
+  DeviceFirmwareImageInfo,
+  DeviceStatus,
+  ProtocolV2DeviceInfo,
+} from '@onekeyfe/hd-transport';
 
 type BuildProtocolV1ProfileParams = {
   protocol?: DeviceInfoProtocol;
@@ -42,6 +46,7 @@ type BuildProtocolV1ProfileParams = {
 
 type BuildProtocolV2ProfileParams = {
   deviceInfo?: ProtocolV2DeviceInfo;
+  deviceStatus?: DeviceStatus;
   sources?: DeviceInfoSource[];
   scope?: GetDeviceInfoParams['scope'];
   includeRaw?: boolean;
@@ -89,10 +94,13 @@ const getDeviceMode = (features?: Features): DeviceInfoStatus['mode'] => {
   return 'unknown';
 };
 
-const getProtocolV2Mode = (deviceInfo?: ProtocolV2DeviceInfo): DeviceInfoStatus['mode'] => {
-  if (isProtocolV2RomloaderDeviceInfo(deviceInfo)) return 'romloader';
-  if (isProtocolV2BootloaderDeviceInfo(deviceInfo)) return 'bootloader';
-  const initialized = deviceInfo?.status?.init_states;
+const getProtocolV2Mode = (
+  deviceInfo?: ProtocolV2DeviceInfo,
+  deviceStatus?: DeviceStatus
+): DeviceInfoStatus['mode'] => {
+  if (isProtocolV2RomloaderDeviceInfo(deviceInfo, deviceStatus)) return 'romloader';
+  if (isProtocolV2BootloaderDeviceInfo(deviceInfo, deviceStatus)) return 'bootloader';
+  const initialized = deviceStatus?.init_states;
   if (initialized === false) return 'notInitialized';
   if (initialized === true) return 'normal';
   return 'unknown';
@@ -186,11 +194,14 @@ const normalizeV1Status = (features?: Features): DeviceInfoStatus => ({
   bleEnabled: features?.bleEnabled ?? null,
 });
 
-const normalizeV2Status = (deviceInfo?: ProtocolV2DeviceInfo): DeviceInfoStatus => {
-  const status = deviceInfo?.status;
-  const bootloaderMode = isProtocolV2BootloaderDeviceInfo(deviceInfo);
+const normalizeV2Status = (
+  deviceInfo?: ProtocolV2DeviceInfo,
+  deviceStatus?: DeviceStatus
+): DeviceInfoStatus => {
+  const status = deviceStatus;
+  const bootloaderMode = isProtocolV2BootloaderDeviceInfo(deviceInfo, deviceStatus);
   return {
-    mode: getProtocolV2Mode(deviceInfo),
+    mode: getProtocolV2Mode(deviceInfo, deviceStatus),
     initialized: status?.init_states ?? null,
     bootloaderMode,
     unlocked: status?.unlocked ?? null,
@@ -274,14 +285,17 @@ const normalizeRaw = ({
   features,
   protocolV1OneKeyFeatures,
   protocolV2DeviceInfo,
+  protocolV2DeviceStatus,
 }: {
   features?: Features;
   protocolV1OneKeyFeatures?: OnekeyFeatures;
   protocolV2DeviceInfo?: ProtocolV2DeviceInfo;
+  protocolV2DeviceStatus?: DeviceStatus;
 }): DeviceProfileRaw => ({
   ...(features ? { features } : {}),
   ...(protocolV1OneKeyFeatures ? { protocolV1OneKeyFeatures } : {}),
   ...(protocolV2DeviceInfo ? { protocolV2DeviceInfo } : {}),
+  ...(protocolV2DeviceStatus ? { protocolV2DeviceStatus } : {}),
 });
 
 export function buildProfileFromProtocolV1({
@@ -320,12 +334,13 @@ export function buildProfileFromProtocolV1({
 
 export function buildProfileFromProtocolV2({
   deviceInfo,
+  deviceStatus,
   sources = ['deviceInfo'],
   scope = 'basic',
   includeRaw = false,
 }: BuildProtocolV2ProfileParams): DeviceProfile {
   const info = deviceInfo;
-  const deviceId = info?.status?.device_id || '';
+  const deviceId = deviceStatus?.device_id || '';
   const serialNo = deviceInfo?.hw?.serial_no || '';
   const label = null;
   const bleName = info?.coprocessor?.bt_adv_name ?? null;
@@ -340,13 +355,14 @@ export function buildProfileFromProtocolV2({
     serialNo,
     label,
     bleName,
-    status: normalizeV2Status(deviceInfo),
+    status: normalizeV2Status(deviceInfo, deviceStatus),
     versions: normalizeV2Versions(deviceInfo),
     ...(shouldIncludeVerify(scope) ? { verify } : {}),
     ...(includeRaw
       ? {
           raw: normalizeRaw({
             protocolV2DeviceInfo: deviceInfo,
+            protocolV2DeviceStatus: deviceStatus,
           }),
         }
       : {}),

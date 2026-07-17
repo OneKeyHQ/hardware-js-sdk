@@ -5,6 +5,8 @@ import { findMethod } from '../src/api/utils';
 import { getDeviceType, getFirmwareType, getMethodVersionRange } from '../src/utils';
 import { getDeviceFirmwareVersion } from '../src/utils/deviceVersionUtils';
 
+import { EDeviceType } from '@onekeyfe/hd-shared';
+
 jest.mock('../src/data/config', () => ({
   getSDKVersion: jest.fn(() => '1.0.0'),
   DEFAULT_DOMAIN: 'https://jssdk.onekey.so/1.0.0/',
@@ -18,6 +20,7 @@ const createDevice = (onekeyDeviceType: string) => {
   const typedCall = jest.fn();
   const features = {
     onekey_device_type: onekeyDeviceType,
+    deviceType: onekeyDeviceType.toLowerCase() as EDeviceType,
     safety_checks: 'Strict',
   };
   return {

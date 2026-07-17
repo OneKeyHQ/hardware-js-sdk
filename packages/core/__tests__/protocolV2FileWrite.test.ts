@@ -64,4 +64,29 @@ describe('writeProtocolV2File', () => {
       })
     ).rejects.toMatchObject({ errorCode: HardwareErrorCode.RuntimeError });
   });
+
+  test('BLE 响应超时时原偏移重试且不重复上报进度', async () => {
+    const timeoutError = Object.assign(new Error('Lowlevel response timeout'), {
+      errorCode: HardwareErrorCode.BleTimeoutError,
+    });
+    const typedCall = jest
+      .fn()
+      .mockRejectedValueOnce(timeoutError)
+      .mockResolvedValueOnce({ message: { processed_byte: 3 } });
+    const onProgress = jest.fn();
+
+    await expect(
+      writeProtocolV2File({
+        commands: { typedCall } as any,
+        path: 'vol0:/wallpapers/user/test.bin',
+        data: new Uint8Array([1, 2, 3]),
+        maxChunkRetries: 2,
+        onProgress,
+      })
+    ).resolves.toMatchObject({ processed_byte: 3, chunks: 1 });
+
+    expect(typedCall).toHaveBeenCalledTimes(2);
+    expect(typedCall.mock.calls[1][2]).toEqual(typedCall.mock.calls[0][2]);
+    expect(onProgress).toHaveBeenCalledTimes(1);
+  });
 });

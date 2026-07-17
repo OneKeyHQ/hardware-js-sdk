@@ -9,6 +9,7 @@ export default class DeviceStatusGet extends BaseMethod {
 
   async run() {
     const { message } = await this.device.commands.typedCall('DeviceStatusGet', 'DeviceStatus', {});
+    this.device.updateProtocolV2Status(message);
     return message;
   }
 }

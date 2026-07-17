@@ -52,8 +52,8 @@ import TransportManager from '../data-manager/TransportManager';
 import { toHardened } from '../api/helpers/pathUtils';
 import { existCapability } from '../utils/capabilitieUtils';
 import {
-  PROTOCOL_V2_STATUS_DEVICE_INFO_REQUEST,
   requestProtocolV2DeviceInfo,
+  requestProtocolV2DeviceStatus,
 } from '../protocols/protocol-v2/features';
 import { buildProtocolV1FeaturesPayload, buildProtocolV2FeaturesPayload } from '../deviceProfile';
 
@@ -731,7 +731,7 @@ export class Device extends EventEmitter {
         // 不能直接信任缓存 features：设备端 wipe / 完成初始化 / 改 label 后
         // features 会永久陈旧。每次 run 做一次轻量 status 刷新（不含 fw/SE），
         // 用字段级合并保留已有版本和 SE 信息。
-        await this._refreshProtocolV2Status(options);
+        await this._refreshProtocolV2Status();
         return;
       }
       await this._initializeProtocolV2(options);
@@ -798,9 +798,15 @@ export class Device extends EventEmitter {
         commands: this.commands,
         timeoutMs: options?.protocolV2DeviceInfoTimeoutMs,
       });
+      const deviceStatus = await requestProtocolV2DeviceStatus({
+        commands: this.commands,
+      }).catch(error => {
+        Log.debug('Protocol V2 status unavailable during initialization:', error);
+        return undefined;
+      });
       // 默认请求不含 SE/hash 数据，scope 如实标注为 basic；
       // 完整数据由 getDeviceInfo(scope:'verify'|'full') 获取。
-      const features = this.updateProtocolV2Features(deviceInfo);
+      const features = this.updateProtocolV2Features(deviceInfo, deviceStatus);
       Log.debug('Protocol V2 features:', features);
       this.featuresNeedsReload = false;
     } catch (error) {
@@ -816,14 +822,12 @@ export class Device extends EventEmitter {
    * passphrase_enabled 等会在设备端变化的字段；hw/coprocessor 提供 serialNo / bleName。
    * versions 为空时按字段级合并保留旧值，verify 数据不会被降级。
    */
-  private async _refreshProtocolV2Status(options?: InitOptions) {
+  private async _refreshProtocolV2Status() {
     try {
-      const deviceInfo = await requestProtocolV2DeviceInfo({
+      const deviceStatus = await requestProtocolV2DeviceStatus({
         commands: this.commands,
-        request: PROTOCOL_V2_STATUS_DEVICE_INFO_REQUEST,
-        timeoutMs: options?.protocolV2DeviceInfoTimeoutMs,
       });
-      const features = this.updateProtocolV2Features(deviceInfo);
+      const features = this.updateProtocolV2Status(deviceStatus);
       Log.debug('Protocol V2 features (status refresh):', features);
     } catch (error) {
       Log.error('Protocol V2 status refresh failed:', error);
@@ -836,7 +840,10 @@ export class Device extends EventEmitter {
       const deviceInfo = await requestProtocolV2DeviceInfo({
         commands: this.commands,
       });
-      return this.updateProtocolV2Features(deviceInfo);
+      const deviceStatus = await requestProtocolV2DeviceStatus({
+        commands: this.commands,
+      }).catch(() => undefined);
+      return this.updateProtocolV2Features(deviceInfo, deviceStatus);
     }
 
     const { message } = await this.commands.typedCall('GetFeatures', 'Features', {});
@@ -871,10 +878,14 @@ export class Device extends EventEmitter {
     this.emit(DEVICE.FEATURES, this, feat);
   }
 
-  updateProtocolV2Features(deviceInfo?: ProtocolV2DeviceInfo) {
+  updateProtocolV2Features(deviceInfo?: ProtocolV2DeviceInfo, deviceStatus?: DeviceStatus) {
     const previousCacheDeviceKey = this.getSessionCacheDeviceKey();
     const features = fixFeaturesFirmwareVersion(
-      buildProtocolV2FeaturesPayload(deviceInfo, this.features)
+      buildProtocolV2FeaturesPayload({
+        deviceInfo,
+        deviceStatus: deviceStatus ?? this.features?.raw?.protocolV2DeviceStatus,
+        previous: this.features,
+      })
     );
     this.features = features;
     const nextCacheDeviceKey = this.getSessionCacheDeviceKey();
@@ -888,14 +899,10 @@ export class Device extends EventEmitter {
 
   updateProtocolV2Status(status: DeviceStatus) {
     const previousDeviceInfo = this.features?.raw?.protocolV2DeviceInfo;
-    const previousStatus = previousDeviceInfo?.status;
-    return this.updateProtocolV2Features({
-      ...(previousDeviceInfo ?? {}),
-      protocol_version: previousDeviceInfo?.protocol_version ?? this.features?.protocolVersion ?? 2,
-      status: {
-        ...previousStatus,
-        ...status,
-      },
+    const previousStatus = this.features?.raw?.protocolV2DeviceStatus;
+    return this.updateProtocolV2Features(previousDeviceInfo, {
+      ...previousStatus,
+      ...status,
     });
   }
 
@@ -1190,7 +1197,9 @@ export class Device extends EventEmitter {
   async unlockDevice() {
     if (this.isProtocolV2()) {
       try {
-        await this.commands.typedCall('DeviceSessionAskPin', 'Success');
+        await this.commands.typedCall('DeviceSessionAskPin', 'Success', undefined, {
+          timeoutMs: 120_000,
+        });
       } catch (error) {
         const errorText =
           error instanceof Error
