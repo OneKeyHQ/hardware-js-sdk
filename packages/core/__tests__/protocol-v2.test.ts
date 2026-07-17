@@ -638,10 +638,16 @@ describe('Protocol V2 feature adapter', () => {
     });
   });
 
-  test('deviceGetOnboardingStatus returns the real Protocol V2 onboarding stage', async () => {
+  test('deviceGetOnboardingStatus returns the current Protocol V2 onboarding status', async () => {
     const typedCall = jest.fn().mockResolvedValue({
       type: 'DevOnboardingStatus',
-      message: { stage: 2, status_code: 3, detail_code: 4 },
+      message: {
+        step: 4,
+        phase: 4,
+        setup: { kind: 1, method: 0 },
+        pin_set: true,
+        wallet_initialized: false,
+      },
     });
     const method = new DeviceGetOnboardingStatus({
       payload: {
@@ -656,9 +662,11 @@ describe('Protocol V2 feature adapter', () => {
     }) as any;
 
     await expect(method.run()).resolves.toEqual({
-      stage: 2,
-      status_code: 3,
-      detail_code: 4,
+      step: 4,
+      phase: 4,
+      setup: { kind: 1, method: 0 },
+      pin_set: true,
+      wallet_initialized: false,
     });
     expect(typedCall).toHaveBeenCalledWith('DevGetOnboardingStatus', 'DevOnboardingStatus', {});
     expect(method.requireProtocolV2).toBe(true);
@@ -1347,12 +1355,7 @@ describe('Protocol V2 feature adapter', () => {
       },
       { timeoutMs: PROTOCOL_V2_DEVICE_INFO_TIMEOUT_MS }
     );
-    expect(commands.typedCall).toHaveBeenNthCalledWith(
-      2,
-      'DeviceStatusGet',
-      'DeviceStatus',
-      {}
-    );
+    expect(commands.typedCall).toHaveBeenNthCalledWith(2, 'DeviceStatusGet', 'DeviceStatus', {});
   });
 
   test('fails initialization when Protocol V2 DeviceInfoGet fails', async () => {
@@ -1374,18 +1377,18 @@ describe('Protocol V2 feature adapter', () => {
       .mockResolvedValueOnce({
         type: 'DeviceInfo',
         message: {
-        hw: { serial_no: 'PR2SERIAL' },
-        fw: {
-          application: {
-            version: '5.6.7',
+          hw: { serial_no: 'PR2SERIAL' },
+          fw: {
+            application: {
+              version: '5.6.7',
+            },
           },
-        },
-        coprocessor: {
-          application: {
-            version: '8.9.10',
+          coprocessor: {
+            application: {
+              version: '8.9.10',
+            },
+            bt_adv_name: 'Raw Pro2 BLE',
           },
-          bt_adv_name: 'Raw Pro2 BLE',
-        },
         },
       })
       .mockResolvedValueOnce({
@@ -1568,15 +1571,15 @@ describe('Protocol V2 feature adapter', () => {
       .mockResolvedValueOnce({
         type: 'DeviceInfo',
         message: {
-        hw: { serial_no: 'PR2SERIAL' },
-        se1: {
-          application: { version: '1.0.1' },
-          bootloader: { version: '1.0.0' },
-        },
-        se2: {
-          application: { version: '2.0.1' },
-          bootloader: { version: '2.0.0' },
-        },
+          hw: { serial_no: 'PR2SERIAL' },
+          se1: {
+            application: { version: '1.0.1' },
+            bootloader: { version: '1.0.0' },
+          },
+          se2: {
+            application: { version: '2.0.1' },
+            bootloader: { version: '2.0.0' },
+          },
         },
       })
       .mockResolvedValueOnce({
@@ -1855,12 +1858,7 @@ describe('Protocol V2 feature adapter', () => {
     );
     expect(typedCall).toHaveBeenNthCalledWith(2, 'DeviceStatusGet', 'DeviceStatus', {});
     // 第二次 initialize 只刷新独立状态，不再读取 DeviceInfo
-    expect(typedCall).toHaveBeenNthCalledWith(
-      3,
-      'DeviceStatusGet',
-      'DeviceStatus',
-      {}
-    );
+    expect(typedCall).toHaveBeenNthCalledWith(3, 'DeviceStatusGet', 'DeviceStatus', {});
   });
 
   test('refreshes Protocol V2 features without falling back to V1 GetFeatures', async () => {
@@ -4127,10 +4125,7 @@ describe('Protocol V2 explicit USB device selection', () => {
       .spyOn(DevicePool as any, '_checkDevicePool')
       .mockResolvedValue(undefined);
 
-    const result = await DevicePool.getDevices(
-      [zeroDescriptor, pro2Descriptor],
-      'PR9999999999'
-    );
+    const result = await DevicePool.getDevices([zeroDescriptor, pro2Descriptor], 'PR9999999999');
 
     expect(createDevice).toHaveBeenCalledTimes(1);
     expect(createDevice).toHaveBeenCalledWith(pro2Descriptor, undefined);
