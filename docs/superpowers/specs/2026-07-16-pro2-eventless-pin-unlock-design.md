@@ -1,72 +1,95 @@
-# Pro2 PIN 与自动解锁无 Event 设计
+# Pro2 PIN 与自动解锁无固件中间 Event 设计
 
-## 变更表
+## 一页结论
 
-| 原字段/流程 | 原作用 | 修改后 | 修改原因 |
-| --- | --- | --- | --- |
-| `ButtonRequest_PinEntry` | 通知 App 即将进入 PIN 输入阶段 | 删除 | Pro2 业务先返回统一 `DeviceLocked`，不通过 Event 启动解锁 |
-| `ButtonAck` | 允许固件继续显示 PIN 页面 | 删除 | `DeviceSessionAskPin` 直接打开设备 PIN 页面 |
-| `PinMatrixRequest` | 请求 App 提供 PIN，或切换到设备输入 | 删除 | Pro2 PIN 只在设备输入 |
-| `PinMatrixAck` | 将 App PIN 或设备输入选择回传给固件 | 删除 | Host 不再参与 PIN 输入 |
-| `REQUEST_PIN` | App 展示 PIN 输入或设备操作提示 | Pro2 不再由 Event 触发 | App 根据解锁 API 生命周期主动展示等待状态 |
-| 业务内部隐式解锁 | 业务请求暂停并等待 Host ACK | `DeviceLocked -> DeviceSessionAskPin -> retry once` | 解锁成为明确、可复用的 SDK 流程 |
-
-## 原流程
+PIN 仍然只在设备输入。变化是 `REQUEST_PIN` 不再由 firmware 的 `PinMatrixRequest` 触发，而由 SDK
+在捕获 `DeviceLocked` 后合成，用于通知 App 展示“请在设备上解锁”。
 
 ```text
-业务请求
-  -> ButtonRequest_PinEntry 或 PinMatrixRequest
-  -> SDK/App 展示 PIN UI
-  -> PinMatrixAck / ButtonAck
-  -> 设备或 App 输入 PIN
-  -> 原业务继续
+原 Pro / V1
+  PinMatrixRequest -> SDK REQUEST_PIN -> App uiResponse -> PinMatrixAck
+
+Pro2 / V2
+  业务返回 DeviceLocked
+    -> SDK emit REQUEST_PIN（非阻塞提示）
+    -> SDK DeviceSessionAskPin
+    -> 解锁成功后内部重试原方法一次
 ```
 
-原流程把业务调用、PIN UI 和 ACK 状态机绑定在一起。不同方法可能各自实现一套 PIN 前置逻辑。
+Pro2 的 `REQUEST_PIN` 不等待 `RECEIVE_PIN`；App 不显示软件 PIN 输入框，也不负责重试业务请求。
 
-## Pro2 目标流程
+## 新旧映射
 
-```text
-业务请求
-  -> Failure(DeviceLocked)
-  -> SDK 调用 DeviceSessionAskPin
-  -> 固件直接显示设备 PIN/指纹页面
-  -> Success 或 UserCancel
-  -> SDK 原业务只重试一次
+| 原字段/流程                     | Pro2 处理                              | App 影响                                    |
+| ------------------------------- | -------------------------------------- | ------------------------------------------- |
+| `ButtonRequest_PinEntry`        | firmware 删除                          | 不再作为 Event 来源                         |
+| `ButtonAck`                     | firmware/SDK 删除                      | App 无感知                                  |
+| `PinMatrixRequest/PinMatrixAck` | firmware/SDK 删除                      | App 不输入或回传 PIN                        |
+| `REQUEST_PIN`                   | SDK 合成为非阻塞设备提示               | 继续复用现有 PIN/设备等待 UI，但隐藏输入框  |
+| 业务内部解锁                    | `DeviceLocked -> AskPin -> retry once` | 原 API Promise 保持 pending，App 不重发请求 |
+
+## 时序
+
+```mermaid
+sequenceDiagram
+    participant App
+    participant SDK
+    participant Device as Pro2 Firmware
+
+    App->>SDK: 地址/签名/设置等业务调用
+    SDK->>Device: 原业务请求
+    Device-->>SDK: Failure(DeviceLocked)
+    SDK-->>App: REQUEST_PIN(source=unlock-coordinator, deviceOnly=true)
+    SDK->>Device: DeviceSessionAskPin
+    Device->>Device: 显示 PIN/指纹页面
+    alt 解锁成功
+        Device-->>SDK: Success
+        SDK->>Device: 原业务请求仅重试一次
+        Device-->>SDK: 最终业务结果
+        SDK-->>App: CLOSE_UI_WINDOW + 原 API 结果
+    else 用户取消或解锁失败
+        Device-->>SDK: UserCancelled / PinError
+        SDK-->>App: CLOSE_UI_WINDOW + 原 API 失败
+    end
 ```
-
-`DeviceSessionAskPin` 是唯一的 Host 主动解锁入口。设备页面由固件直接创建，不发送任何 PIN 或
-Button Event。
 
 ## SDK 职责
 
-1. 将固件统一 locked subcode 映射为 `HardwareErrorCode.DeviceLocked`。
-2. 只有声明 `unlockPolicy='retry-on-locked'` 的方法才自动解锁。
-3. 同一业务调用最多自动解锁并重试一次，防止死循环。
-4. 解锁成功后调用 `DeviceStatusGet`，刷新 `unlocked`、Passphrase 和 Attach PIN 状态。
-5. 用户取消、PIN 错误、次数耗尽时不重试业务。
-6. 多个并发调用只能共享一个串行解锁任务，不能同时打开多个 PIN 页面。
+1. 将 firmware 的统一 locked subcode 映射为 `HardwareErrorCode.DeviceLocked`。
+2. 只有声明 `unlockPolicy='retry-on-locked'` 的方法才进入自动解锁。
+3. 在调用 `DeviceSessionAskPin` 前发出非阻塞 `REQUEST_PIN`；payload 至少包含设备、
+   `source=unlock-coordinator`、`deviceOnly=true` 和 `reason`。
+4. 不为 Pro2 创建 `RECEIVE_PIN` 等待项，不接受 App PIN 明文或“切换为设备输入”的响应。
+5. 解锁成功后刷新 `DeviceStatus`，并只重试原 `method.run()` 一次。
+6. 用户取消、PIN 错误、次数耗尽或第二次仍 locked 时，不再重试。
+7. 多个并发调用共享同一设备的串行解锁任务，不能打开多个 PIN 页面。
+8. 任意退出路径都幂等关闭 UI，并清理解锁协调状态。
 
 ## firmware-pro2 职责
 
-1. 需要解锁的业务在 locked 时直接返回统一 `DeviceLocked`。
-2. `DeviceSessionAskPin` 直接显示本地 PIN/指纹页面。
-3. 成功时完成 FG 解锁状态、锁屏、活动计时器和 SE 状态同步后返回 `Success`。
-4. 用户取消返回稳定 subcode，不返回普通字符串错误代替协议状态。
-5. 不发送 `ButtonRequest_PinEntry`、`PinMatrixRequest`。
+1. 需要解锁的业务必须在产生副作用前返回 `DeviceLocked`。
+2. `DeviceSessionAskPin` 直接显示设备 PIN/指纹页面。
+3. 成功时完成安全状态、活动计时器和 SE 状态同步后返回 `Success`。
+4. 用户取消、PIN 错误和次数耗尽返回稳定 subcode。
+5. 不发送 `ButtonRequest_PinEntry`、`PinMatrixRequest`，也不等待 ACK。
+
+“副作用前返回 locked”是 SDK 安全重试的前提。如果 firmware 可能先执行部分写入再返回 locked，SDK
+重试会造成重复操作，相关方法不得启用自动重试。
 
 ## 产品行为
 
-- App 在调用 SDK 前或收到 SDK 解锁阶段通知时展示“请在设备上解锁”。
-- App 不显示 Pro2 PIN 输入框。
-- 解锁完成后等待原业务最终结果。
-- 取消后关闭等待页并返回可操作状态。
+- 用户仍会看到与原流程一致的“请在设备上解锁”提示。
+- 用户始终在 Pro2 上输入 PIN 或使用指纹，App 不出现 PIN 键盘。
+- 解锁完成后原操作自动继续，不需要用户再次点击地址、签名或设置操作。
+- 取消后关闭等待页，原操作以取消结束。
 
 ## 验收项
 
-- locked 地址、签名、设置和 Session 请求都能走统一自动解锁。
-- 不产生 `ButtonRequest_PinEntry/PinMatrixRequest`。
+- locked 地址、签名、设置和 Session 请求使用同一自动解锁路径。
+- App 收到一次可识别来源的 `REQUEST_PIN`，但无需 `uiResponse()`。
+- firmware 不产生 `ButtonRequest_PinEntry/PinMatrixRequest`。
 - SDK 不发送 `ButtonAck/PinMatrixAck`。
 - PIN 取消后原业务不重试。
-- 连续返回 `DeviceLocked` 时最多只解锁一次。
+- 连续返回 `DeviceLocked` 时最多解锁并重试一次。
+- 非幂等方法只有在“locked 发生于副作用前”的契约成立时才允许重试。
 - USB/BLE 和多设备场景不串设备。

@@ -1,45 +1,68 @@
-# Pro2 无硬件交互 Event 设计索引
+# Pro2 无固件中间 Event 设计索引
 
-## 目标
+## 一页结论
 
-Pro2 的目标模型是：SDK 发起明确业务请求，设备在本机完成 PIN、Passphrase、确认和恢复等交互，
-最后只返回成功或失败。App 不再依赖硬件中间 Event 推进产品页面。
+“无 Event”只描述硬件协议层：Pro2 firmware 不再向 Host 发送 PIN、Passphrase、Button 等 UI
+中间消息，也不等待 Host ACK 后再继续设备状态机。
+
+SDK 与 App 之间仍然保留 Event，作为稳定的产品交互契约：
+
+```text
+Protocol V1
+  firmware UI message -> SDK 转换 Event -> App -> uiResponse -> SDK Ack -> firmware
+
+Protocol V2 / Pro2
+  SDK 根据业务状态合成 Event -> App -> 可选 uiResponse
+  SDK 将选择转换为显式业务命令；firmware 只返回最终结果
+```
+
+因此，App 的硬件交互容器、等待页和 `uiResponse()` 机制可以继续复用。变化主要集中在 SDK
+协调层和 firmware 协议状态机，而不是把交互责任整体推给 App。
 
 ## 文档索引
 
-| 模块 | 设计文档 | 主要替换内容 |
-| --- | --- | --- |
-| Passphrase / Attach-to-PIN | [Passphrase 与 Attach-to-PIN](2026-07-16-pro2-eventless-wallet-session-design.md) | `PassphraseRequest/Ack`、`ButtonRequest_PassphraseEntry/AttachPin` |
-| PIN / 解锁 | [PIN 与自动解锁](2026-07-16-pro2-eventless-pin-unlock-design.md) | `ButtonRequest_PinEntry`、`PinMatrixRequest/Ack` |
-| 地址 / 公钥确认 | [地址与公钥确认](2026-07-16-pro2-eventless-address-public-key-design.md) | `ButtonRequest_Address/PublicKey` |
-| 交易 / 消息签名 | [签名确认](2026-07-16-pro2-eventless-signing-design.md) | `ButtonRequest_SignTx/ConfirmOutput/Warning` 等 |
-| 设备管理 | [设备管理](2026-07-16-pro2-eventless-device-management-design.md) | Reset、Wipe、设置页和危险操作确认 |
-| Onboarding / 恢复 | [Onboarding 与恢复](2026-07-16-pro2-eventless-onboarding-recovery-design.md) | `EntropyRequest`、`WordRequest`、Onboarding 阶段推进 |
-| 取消 / 超时 / 断连 | [交互生命周期](2026-07-16-pro2-eventless-cancel-lifecycle-design.md) | `Cancel`、Busy、超时、断连清理 |
-| 保留边界 | [非 UI Event 边界](2026-07-16-pro2-eventless-boundaries-design.md) | 进度、Transport、数据分片 Request/Ack |
+| 模块                       | 设计文档                                                                          | SDK → App Event 形态              | firmware 变化                                                               |
+| -------------------------- | --------------------------------------------------------------------------------- | --------------------------------- | --------------------------------------------------------------------------- |
+| Passphrase / Attach-to-PIN | [Passphrase 与 Attach-to-PIN](2026-07-16-pro2-eventless-wallet-session-design.md) | 阻塞选择 Event；等待 `uiResponse` | 删除 Passphrase/Button Request/Ack，改用 `DeviceSessionOpen(select/resume)` |
+| PIN / 解锁                 | [PIN 与自动解锁](2026-07-16-pro2-eventless-pin-unlock-design.md)                  | 非阻塞“请在设备解锁”Event         | 删除 PIN/Button Request/Ack，改用 `DeviceSessionAskPin`                     |
+| 地址 / 公钥确认            | [地址与公钥确认](2026-07-16-pro2-eventless-address-public-key-design.md)          | 非阻塞确认提示 Event              | 请求到达后直接显示确认页                                                    |
+| 交易 / 消息签名            | [签名确认](2026-07-16-pro2-eventless-signing-design.md)                           | 非阻塞通用签名提示 Event          | 页面步骤全部在设备完成                                                      |
+| 设备管理                   | [设备管理](2026-07-16-pro2-eventless-device-management-design.md)                 | 非阻塞设备操作提示 Event          | 显式页面命令或最终操作响应                                                  |
+| Onboarding / 恢复          | [Onboarding 与恢复](2026-07-16-pro2-eventless-onboarding-recovery-design.md)      | 可选阶段通知；查询为事实来源      | 不发送敏感数据和页面阶段 Event                                              |
+| 取消 / 超时 / 断连         | [交互生命周期](2026-07-16-pro2-eventless-cancel-lifecycle-design.md)              | Event UI 仍可作为取消入口         | `Cancel` 直接取消当前设备请求                                               |
+| 保留边界                   | [无固件中间 Event 边界](2026-07-16-pro2-eventless-boundaries-design.md)           | 保留 SDK、Transport 和进度 Event  | 保留业务数据握手与最终响应                                                  |
 
-## 总体判断规则
+## Event 分类与统一规则
 
-| 消息或事件 | Pro2 处理 |
-| --- | --- |
-| 请求过程中的 PIN、Passphrase、Button UI 中间响应 | 删除 |
-| 设备本地页面 | 保留，由业务命令直接触发 |
-| 最终业务响应或 Failure | 保留 |
-| 交易数据分片 Request/Ack | 保留，它们是业务协议握手 |
-| 文件、固件和资源进度 | 保留，它们由 SDK 或状态查询生成 |
-| USB/BLE 连接、断开和 notification | 保留，它们是 Transport 生命周期 |
-| App 主动产生的 processing/checking UI | 保留 |
+| 类别                 | 示例                                        | SDK 是否 emit         | App 是否响应       | SDK 后续动作                     |
+| -------------------- | ------------------------------------------- | --------------------- | ------------------ | -------------------------------- |
+| 阻塞选择 Event       | 隐藏钱包选择 Passphrase / Hidden Wallet PIN | 是                    | 是，`uiResponse()` | 转成 `DeviceSessionOpen(select)` |
+| 非阻塞设备提示 Event | 解锁、地址确认、签名、设备管理              | 是                    | 否                 | 等待设备最终结果                 |
+| 状态/阶段通知        | Onboarding、进度、升级提示                  | 可选或保留            | 否                 | 查询或方法结果仍是事实来源       |
+| 敏感数据交换         | PIN、Passphrase、助记词、熵                 | 不通过 App Event 传输 | 不适用             | 只在设备端处理                   |
+| 业务数据握手         | 签名分片 Request/Ack                        | 不转换为通用 UI Event | SDK 内部响应       | 继续业务协议                     |
 
 ## SDK 总入口
 
-Pro2 不注册以下设备交互监听：
+Protocol V2 不再消费设备返回的 `PinMatrixRequest`、`PassphraseRequest`、`ButtonRequest`，也不发送
+对应 ACK；收到这些消息应按协议回归错误结束调用。
 
-- `DEVICE.PIN`
-- `DEVICE.BUTTON`
-- `DEVICE.PASSPHRASE`
-- `DEVICE.PASSPHRASE_ON_DEVICE`
+但这不等于删除 Core 的公共 UI Event 能力。Protocol V2 由方法层或协调器主动发出：
 
-`DeviceCommands._filterCommonTypes()` 收到 Pro2 的 `PinMatrixRequest`、`PassphraseRequest` 或
-`ButtonRequest` 时，应报告协议错误，不能继续自动 ACK。
+- `REQUEST_PASSPHRASE`：阻塞选择 Event。
+- `REQUEST_PIN`：非阻塞设备解锁提示。
+- `REQUEST_BUTTON`：地址、公钥、签名和设备管理的非阻塞提示。
+- `REQUEST_PASSPHRASE_ON_DEVICE`：可选的设备输入阶段提示。
+- `CLOSE_UI_WINDOW/CLOSE_UI_PIN_WINDOW`：统一、幂等关闭 UI。
 
-原 Pro 保留原来的 Event 与 ACK 流程。
+原 Pro / Protocol V1 保留现有“固件消息 → Event → ACK”流程。App 可以监听同一组公共 Event，SDK
+根据协议版本决定 Event 来源和后续动作。
+
+## 最终验收原则
+
+- firmware 不发送 UI 中间消息，不等待 Host UI ACK。
+- App 仍通过 SDK Event 展示一致的硬件交互体验。
+- 阻塞 Event 的响应只驱动显式业务命令，不伪造 firmware ACK。
+- 非阻塞 Event 不能创建无意义的 `uiResponse` 等待项。
+- 调用成功、失败、取消、超时或断连时，SDK 都清理 Event 等待并关闭 UI。
+- PIN、Passphrase、助记词和熵不进入 Host 日志或 App 状态。
