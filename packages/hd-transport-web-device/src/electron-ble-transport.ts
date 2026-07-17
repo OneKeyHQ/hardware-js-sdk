@@ -14,6 +14,17 @@ import type { DesktopAPI } from '@onekeyfe/hd-transport-electron';
 
 const { parseConfigure, buildBuffers, receiveOne, check } = transport;
 
+// BLE debug trace (renderer side). Same "[BLE-TRACE]" filter keyword as the
+// main-process events forwarded via the preload — one console filter shows the
+// full timeline across the renderer/main process boundary.
+const bleTrace = (event: string, data?: Record<string, unknown>): void => {
+  // eslint-disable-next-line no-console
+  console.log(
+    `[BLE-TRACE] ${new Date().toISOString().slice(11, 23)} sdk-transport ${event}`,
+    data ?? ''
+  );
+};
+
 // Noble BLE specific API interface
 declare global {
   interface Window {
@@ -142,10 +153,14 @@ export default class ElectronBleTransport {
         throw new Error('Noble BLE API not available');
       }
 
+      const startedAt = Date.now();
+      bleTrace('enumerate.start');
       const devices = await window.desktopApi.nobleBle.enumerate();
+      bleTrace('enumerate.done', { found: devices.length, elapsedMs: Date.now() - startedAt });
       return devices;
     } catch (error) {
       this.Log?.error('[Transport] Noble BLE enumerate failed:', error);
+      bleTrace('enumerate.error', { error: String(error) });
       this.handleBluetoothError(error);
     }
   }
@@ -162,6 +177,12 @@ export default class ElectronBleTransport {
       this.runPromise.reject(ERRORS.TypedError(HardwareErrorCode.BleForceCleanRunPromise));
     }
 
+    // `step` pins down exactly where a failed acquire died — getDevice (device
+    // unknown to the main process), connect (GATT link), or subscribe (the
+    // encryption-gated characteristic, where a broken OS bond typically fails).
+    let step = 'getDevice';
+    const startedAt = Date.now();
+    bleTrace('acquire.start', { uuid });
     try {
       if (!window.desktopApi?.nobleBle) {
         throw new Error('Noble BLE API not available');
@@ -169,14 +190,23 @@ export default class ElectronBleTransport {
 
       // Check if device is available
       const device = await window.desktopApi.nobleBle.getDevice(uuid);
+      bleTrace('acquire.getDevice', {
+        uuid,
+        found: Boolean(device),
+        // Main-process DeviceInfo carries `state`; the renderer-facing type is narrower.
+        state: (device as { state?: string } | null)?.state,
+        elapsedMs: Date.now() - startedAt,
+      });
       if (!device) {
         throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound, `Device ${uuid} not found`);
       }
 
       // Connect to device
+      step = 'connect';
       try {
         await window.desktopApi.nobleBle.connect(uuid);
         this.connectedDevices.add(uuid);
+        bleTrace('acquire.connect.done', { uuid, elapsedMs: Date.now() - startedAt });
       } catch (error) {
         this.handleBluetoothError(error);
       }
@@ -185,7 +215,9 @@ export default class ElectronBleTransport {
       this.dataBuffers.set(uuid, { buffer: [], bufferLength: 0 });
 
       // Subscribe to notifications
+      step = 'subscribe';
       await window.desktopApi.nobleBle.subscribe(uuid);
+      bleTrace('acquire.subscribe.done', { uuid, elapsedMs: Date.now() - startedAt });
 
       // Set up notification listener
       const cleanup = window.desktopApi.nobleBle.onNotification(
@@ -201,6 +233,7 @@ export default class ElectronBleTransport {
       const disconnectCleanup = window.desktopApi.nobleBle.onDeviceDisconnected(
         (disconnectedDevice: any) => {
           if (disconnectedDevice.id === uuid) {
+            bleTrace('event.device-disconnect', { uuid });
             this.cleanupDeviceState(uuid);
 
             // Trigger disconnect event
@@ -221,32 +254,58 @@ export default class ElectronBleTransport {
         connectId: device.id,
       });
 
+      bleTrace('acquire.done', { uuid, elapsedMs: Date.now() - startedAt });
       return { uuid, path: uuid };
     } catch (error) {
       this.Log?.error('[Transport] Noble BLE acquire failed:', error);
+      bleTrace('acquire.error', {
+        uuid,
+        step,
+        elapsedMs: Date.now() - startedAt,
+        error: String(error),
+      });
       throw error;
     }
   }
 
   async release(id: string) {
+    // Logical release only — the physical link and its GATT subscription stay
+    // up so the next acquire reuses them (a few ms) instead of paying a full
+    // reconnect (~2.5s) plus a macOS pairing prompt on every call. The main
+    // process arms a per-device idle timer and physically disconnects after
+    // BLE_IDLE_DISCONNECT_MS without traffic, so an unused device is freed for
+    // other hosts (e.g. the phone app). Hard teardown lives in `disconnect()`,
+    // which the SDK's error-recovery path calls via DeviceConnector.
+    bleTrace('release.start', {
+      id,
+      wasConnected: this.connectedDevices.has(id),
+      mode: 'keep-alive',
+    });
+    // Renderer-side listeners must still be removed: the next acquire registers
+    // fresh ones, and leftovers would double-process every notification packet.
+    this.cleanupDeviceState(id);
+    bleTrace('release.done', { id });
+    return Promise.resolve();
+  }
+
+  /**
+   * Hard teardown: physically disconnect the BLE link. This is the SDK's
+   * error-recovery path (DeviceConnector.disconnect on
+   * ERROR_CODES_REQUIRE_DISCONNECT) — a wedged device is reset by dropping the
+   * link. Normal end-of-call release() deliberately does NOT come here.
+   */
+  async disconnect(id: string) {
+    bleTrace('disconnect.start', { id });
     try {
-      if (this.connectedDevices.has(id)) {
-        // Unsubscribe from notifications
-        if (window.desktopApi?.nobleBle) {
-          await window.desktopApi.nobleBle.unsubscribe(id);
-        }
-
-        // Disconnect device
-        if (window.desktopApi?.nobleBle) {
-          await window.desktopApi.nobleBle.disconnect(id);
-        }
-
-        // Clean up all device state
-        this.cleanupDeviceState(id);
+      if (window.desktopApi?.nobleBle) {
+        await window.desktopApi.nobleBle.unsubscribe(id);
+        await window.desktopApi.nobleBle.disconnect(id);
       }
+      bleTrace('disconnect.done', { id });
     } catch (error) {
-      this.Log?.error('[Transport] Noble BLE release failed:', error);
-      // Clean up local state even if release fails
+      this.Log?.error('[Transport] Noble BLE disconnect failed:', error);
+      bleTrace('disconnect.error', { id, error: String(error) });
+    } finally {
       this.cleanupDeviceState(id);
     }
   }
@@ -256,6 +315,7 @@ export default class ElectronBleTransport {
     // Check for pairing rejection
     if (hexData === 'PAIRING_REJECTED') {
       this.Log?.debug('[Transport] Pairing rejection detected for device:', deviceId);
+      bleTrace('event.pairing-rejected', { deviceId });
       if (this.runPromise) {
         this.runPromise.reject(ERRORS.TypedError(HardwareErrorCode.BleDeviceBondedCanceled));
       }
