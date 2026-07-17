@@ -129,6 +129,21 @@ flowchart LR
 - SDK 可以在统一协调层适配 V1/V2；App 继续保存 `passphraseState` 和使用 `useEmptyPassphrase`。
 - 隐藏钱包 Session 失效需要一次明确的 App 交互；这是避免错误钱包和意外设备 UI 的必要成本。
 
+### 与原流程的语义等价性
+
+新流程保持原 Pro/V1 的产品结果，但把交互触发点从“固件先发 Event”移动到“App 先表达意图”：
+
+| 原流程语义                                                                                | 新流程                                                               | 等价性要求                                                                        |
+| ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| 标准钱包：明确使用空 Passphrase 上下文                                                    | `DeviceSessionOpen(select STANDARD)`                                 | 不显示 Passphrase/Attach PIN 页面，返回标准钱包的 `session_id + btc_test_address` |
+| 隐藏钱包：`PassphraseRequest -> PassphraseAck(on_device)`                                 | `DeviceSessionOpen(select HIDDEN, PASSPHRASE)`                       | Passphrase 仍只在设备输入，最终钱包标识保持一致                                   |
+| Attach PIN：`PassphraseAck(on_device_attach_pin) -> ButtonRequest_AttachPin -> ButtonAck` | `DeviceSessionOpen(select HIDDEN, ATTACH_PIN)`                       | 使用同一绑定恢复同一 Passphrase，返回相同 `btc_test_address`                      |
+| 已有 Session 复用：`Initialize/DeviceSessionGet(session_id)`                              | `DeviceSessionOpen(resume session_id)`                               | 无设备钱包 UI，只恢复并校验已有钱包上下文                                         |
+| Session 失效后重新选择钱包                                                                | `WalletSessionRequired -> App 明确选择 -> DeviceSessionOpen(select)` | 最终仍由用户重新进入钱包，只是不再由普通业务请求内部静默触发                      |
+
+因此 `select` 对应原来的“建立/切换钱包上下文”，`resume` 对应原来的“复用已建立上下文”。二者不能
+在固件或 SDK 内部自动互相降级。
+
 新流程不再出现：
 
 - `PassphraseRequest`
@@ -453,6 +468,12 @@ DeviceSession.btc_test_address == SDK 内部 walletState
 - 进入已有隐藏钱包时，SDK 校验返回值与预期 `passphraseState` 相同。
 - 标准钱包不新增 App 数据库字段；SDK 在标准钱包缓存槽中同时保存 `session_id` 和
   `btc_test_address`，后续 `resume` 时必须校验二者对应的钱包标识。
+- 每次 `select` 成功后，SDK 必须重新读取 `DeviceStatus`：
+  - `select HIDDEN, ATTACH_PIN` 后 `unlocked_by_attach_to_pin=true`。
+  - `select STANDARD` 或 `select HIDDEN, PASSPHRASE` 后 `unlocked_by_attach_to_pin=false`。
+  - App 创建隐藏钱包时使用刷新后的值计算现有 `isAttachPinMode`。
+- `resume` 不重新定义用户本次选择的进入方式，也不依赖 `unlocked_by_attach_to_pin` 判断钱包身份；
+  钱包身份始终以返回的 `btc_test_address` 校验。
 - 同一隐藏钱包通过 Passphrase 和对应 Attach PIN 进入时，必须返回相同的 `btc_test_address`。
 - 不同 Passphrase 必须返回不同的 `btc_test_address`。
 - 校验失败时禁止继续获取地址、公钥或签名。
@@ -595,16 +616,19 @@ App/Keyring 发起地址、公钥或签名请求(passphraseState=A)
    `WalletSessionRequired`，标准钱包按明确的 `useEmptyPassphrase` 意图重新 select。
 6. 保持隐藏钱包 `btc_test_address -> passphraseState` 映射；标准钱包的地址标识只保存在 SDK
    `STANDARD` 缓存槽中。
-7. Pro2 不注册 `DEVICE.PASSPHRASE` 和 `DEVICE.PASSPHRASE_ON_DEVICE`。
-8. Pro2 收到 `PassphraseRequest`、`ButtonRequest_PassphraseEntry` 或
+7. 每次 `select` 成功后刷新 `DeviceStatus`，更新 `unlockedAttachPin`；`resume` 的钱包身份只根据
+   `btc_test_address` 校验。
+8. Pro2 不注册 `DEVICE.PASSPHRASE` 和 `DEVICE.PASSPHRASE_ON_DEVICE`。
+9. Pro2 收到 `PassphraseRequest`、`ButtonRequest_PassphraseEntry` 或
    `ButtonRequest_AttachPin` 时按协议错误处理，不自动 ACK。
-9. 统一处理取消、`InvalidSession`、`WalletSessionRequired`、钱包不匹配和设备断连。
-10. 在 `hd-shared` 增加稳定的 `WalletSessionRequired` 错误码；app-monorepo 将它映射为非 Toast 的
+10. 统一处理取消、`InvalidSession`、`WalletSessionRequired`、钱包不匹配和设备断连。
+11. 在 `hd-shared` 增加稳定的 `WalletSessionRequired` 错误码；app-monorepo 将它映射为非 Toast 的
     可恢复硬件错误，由统一硬件 UI 流程消费。
 
 ### SDK 公共 API 兼容
 
 Protocol V1 的 `getPassphraseState()`、`Initialize`、`useEmptyPassphrase` 和 Event UI 行为完全不变。
+下表描述的是 SDK 层钱包意图等价关系，不要求修改或统一 V1 protobuf 字段。
 
 为支持 SDK 与 app-monorepo 分阶段升级，Pro2 暂时保留 `getPassphraseState()` 兼容包装：
 
@@ -619,11 +643,11 @@ Protocol V1 的 `getPassphraseState()`、`Initialize`、`useEmptyPassphrase` 和
 
 协议适配矩阵：
 
-| SDK 钱包意图 | Protocol V1                                         | Protocol V2 / Pro2                         |
-| ------------ | --------------------------------------------------- | ------------------------------------------ |
-| 打开标准钱包 | `GetPassphraseState/Initialize` 的 main-wallet 语义 | `DeviceSessionOpen(select STANDARD)`       |
-| 打开隐藏钱包 | `PassphraseRequest -> PassphraseAck` Event 流程     | `DeviceSessionOpen(select HIDDEN, access)` |
-| 恢复已有钱包 | `Initialize(session_id, passphraseState)`           | `DeviceSessionOpen(resume session_id)`     |
+| SDK 钱包意图 | Protocol V1                                      | Protocol V2 / Pro2                         |
+| ------------ | ------------------------------------------------ | ------------------------------------------ |
+| 打开标准钱包 | 现有 `useEmptyPassphrase` / main-wallet 固件分支 | `DeviceSessionOpen(select STANDARD)`       |
+| 打开隐藏钱包 | `PassphraseRequest -> PassphraseAck` Event 流程  | `DeviceSessionOpen(select HIDDEN, access)` |
+| 恢复已有钱包 | `Initialize(session_id, passphraseState)`        | `DeviceSessionOpen(resume session_id)`     |
 
 ### Session 缓存生命周期
 
@@ -642,28 +666,33 @@ CLI 等受控短生命周期场景可以继续成对持久化 `passphraseState +
 
 1. 在 `DeviceStatus` 中正确填充 `attach_to_pin_enabled`。
 2. 删除 `DeviceSessionGet` handler，实现 `DeviceSessionOpen` 的 `resume/select` 分支。
-3. `resume` 只打开指定 Session、派生并返回钱包标识；不得创建 Session 或显示钱包选择 UI。
+3. `resume` 必须先验证并打开指定 Session，再在该 Session 的 seed 上下文中派生并返回
+   `btc_test_address`；不得在打开 Session 之前使用当前钱包派生地址，也不得创建 Session 或显示
+   钱包选择 UI。
 4. `select` 将 STANDARD、HIDDEN+PASSPHRASE、HIDDEN+ATTACH_PIN 映射到三条设备本地状态机。
 5. 删除 `seed_session_send_passphrase_request()`。
 6. 删除 `PassphraseAck` 解析和等待状态。
 7. 删除 `ButtonRequest_PassphraseEntry/AttachPin` 发送与 `ButtonAck` 等待状态。
 8. `resume/select` 成功后都返回 `session_id + btc_test_address`。
-9. 用户取消 select 时返回最终 `UserCancelled`。
-10. 没有 Attach PIN 绑定时返回 `AttachPinUnavailable`。
-11. 临时 Passphrase、PIN 和 seed 数据在成功、失败、取消、超时后都必须清零。
+9. `select` 完成后同步更新 `unlocked_by_attach_to_pin`：仅 Attach PIN 路径为 true。
+10. `resume` 找不到、无法打开或已失效的 Session 时返回稳定的 `InvalidSession` 协议错误码，不使用
+    可变错误文本表达该状态。
+11. 用户取消 select 时返回最终 `UserCancelled`。
+12. 没有 Attach PIN 绑定时返回 `AttachPinUnavailable`。
+13. 临时 Passphrase、PIN 和 seed 数据在成功、失败、取消、超时后都必须清零。
 
 ## 错误处理
 
-| 错误                    | SDK/App 行为                                                                                            |
-| ----------------------- | ------------------------------------------------------------------------------------------------------- |
-| `UserCancelled`         | 关闭等待 UI，返回上一步，不自动重试                                                                     |
-| `InvalidSession`        | SDK 清理对应缓存；标准钱包可按 `useEmptyPassphrase` 重新 select，隐藏钱包转换为 `WalletSessionRequired` |
-| `WalletSessionRequired` | SDK 层错误，不由固件返回；app-monorepo 统一硬件层让用户选择进入方式，成功后原业务最多重试一次           |
-| `AttachPinUnavailable`  | 刷新 DeviceStatus，隐藏或禁用 Hidden Wallet PIN 入口                                                    |
-| `PassphraseDisabled`    | 提示在设备设置中开启 Passphrase                                                                         |
-| `WalletMismatch`        | 清缓存并终止业务                                                                                        |
-| `Busy`                  | 不并发打开第二个设备交互页面                                                                            |
-| `DeviceDisconnected`    | 清理等待状态，不将请求切换到其他设备                                                                    |
+| 错误                    | SDK/App 行为                                                                                        |
+| ----------------------- | --------------------------------------------------------------------------------------------------- |
+| `UserCancelled`         | 关闭等待 UI，返回上一步，不自动重试                                                                 |
+| `InvalidSession`        | 固件稳定协议错误码；SDK 清理对应缓存，标准钱包可重新 select，隐藏钱包转换为 `WalletSessionRequired` |
+| `WalletSessionRequired` | SDK 层错误，不由固件返回；app-monorepo 统一硬件层让用户选择进入方式，成功后原业务最多重试一次       |
+| `AttachPinUnavailable`  | 刷新 DeviceStatus，隐藏或禁用 Hidden Wallet PIN 入口                                                |
+| `PassphraseDisabled`    | 提示在设备设置中开启 Passphrase                                                                     |
+| `WalletMismatch`        | 清缓存并终止业务                                                                                    |
+| `Busy`                  | 不并发打开第二个设备交互页面                                                                        |
+| `DeviceDisconnected`    | 清理等待状态，不将请求切换到其他设备                                                                |
 
 SDK 主动取消继续使用通用 `Cancel`。只有 `DeviceSessionOpen(select)` 会拥有 Passphrase/Attach PIN
 页面；固件收到 Cancel 后关闭页面、清理临时状态，并让原调用以 `UserCancelled` 结束。
@@ -677,6 +706,7 @@ SDK 主动取消继续使用通用 `Cancel`。只有 `DeviceSessionOpen(select)`
 - 至少存在一个绑定时字段为 true。
 - 创建或删除绑定后重新查询能立即得到新值。
 - `unlocked_by_attach_to_pin` 与 `attach_to_pin_enabled` 语义不混用。
+- Attach PIN select 成功后 `unlocked_by_attach_to_pin=true`；其他 select 成功后为 false。
 
 ### Passphrase
 
@@ -697,6 +727,7 @@ SDK 主动取消继续使用通用 `Cancel`。只有 `DeviceSessionOpen(select)`
 - 标准钱包、隐藏钱包都返回非空 `session_id + btc_test_address`。
 - `resume` 必须携带合法 session_id，空 payload 被拒绝。
 - `resume` 不产生 Passphrase/Attach PIN 页面，也不创建新 Session。
+- 无效 Session 返回稳定 `InvalidSession` 错误码，SDK 不解析错误字符串判断。
 - 隐藏钱包恢复时校验 `btc_test_address == passphraseState`。
 - 标准钱包恢复时校验 `btc_test_address == SDK STANDARD 缓存中的 walletState`。
 - 隐藏钱包 session 失效时，普通业务调用返回 `WalletSessionRequired`，不自动 select。
