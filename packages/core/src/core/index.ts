@@ -814,12 +814,26 @@ function canSkipInitialize(method: BaseMethod, device: Device): boolean {
 }
 
 /**
+ * BLE debug trace, desktop only. Same "[BLE-TRACE]" console filter keyword as
+ * the transport/main-process events so one filter shows the whole timeline.
+ * Gated on env to keep react-native consoles quiet.
+ */
+function bleTrace(event: string, data?: Record<string, unknown>) {
+  if (DataManager.getSettings('env') !== 'desktop-web-ble') return;
+  // eslint-disable-next-line no-console
+  console.log(`[BLE-TRACE] ${new Date().toISOString().slice(11, 23)} hd-core ${event}`, data ?? '');
+}
+
+/**
  * If the Bluetooth connection times out, retry up to 6 times
  * @param retryCount - Current retry count (default 0)
  */
 async function connectDeviceForBle(method: BaseMethod, device: Device, retryCount = 0) {
+  const startedAt = Date.now();
+  bleTrace('connectForBle.start', { method: method.name, connectId: method.connectId, retryCount });
   try {
     await device.acquire();
+    bleTrace('connectForBle.acquire.done', { elapsedMs: Date.now() - startedAt });
     if (method.payload?.onlyConnectBleDevice) {
       return;
     }
@@ -830,8 +844,18 @@ async function connectDeviceForBle(method: BaseMethod, device: Device, retryCoun
       device.markPreInitialized({
         passphraseState: initOptions.passphraseState,
       });
+      bleTrace('connectForBle.initialize.done', { elapsedMs: Date.now() - startedAt });
+    } else {
+      bleTrace('connectForBle.initialize.skipped', { elapsedMs: Date.now() - startedAt });
     }
   } catch (err) {
+    bleTrace('connectForBle.error', {
+      method: method.name,
+      retryCount,
+      elapsedMs: Date.now() - startedAt,
+      errorCode: err.errorCode,
+      error: String(err.message ?? err),
+    });
     if (err.errorCode === HardwareErrorCode.BleTimeoutError && retryCount < 6) {
       const nextRetry = retryCount + 1;
       Log.debug(`Bluetooth connect timeout and will retry, retry count: ${nextRetry}`);
@@ -948,6 +972,11 @@ const ensureConnected = async (
         }
       } catch (error) {
         Log.debug('device error: ', error);
+        bleTrace('ensureConnected.try.error', {
+          tryCount,
+          errorCode: error.errorCode,
+          error: String(error.message ?? error),
+        });
         if ([HardwareErrorCode.BleCharacteristicNotifyChangeFailure].includes(error.errorCode)) {
           postMessage(createUiMessage(UI_REQUEST.BLUETOOTH_CHARACTERISTIC_NOTIFY_CHANGE_FAILURE));
         }

@@ -72,6 +72,17 @@ const parseRunOptions = (options?: RunOptions): RunOptions => {
 
 const Log = getLogger(LoggerNames.Device);
 
+/**
+ * BLE debug trace, desktop only. Same "[BLE-TRACE]" console filter keyword as
+ * the transport/main-process events so one filter shows the whole timeline.
+ * Gated on env to keep react-native consoles quiet.
+ */
+function deviceBleTrace(event: string, data?: Record<string, unknown>) {
+  if (DataManager.getSettings('env') !== 'desktop-web-ble') return;
+  // eslint-disable-next-line no-console
+  console.log(`[BLE-TRACE] ${new Date().toISOString().slice(11, 23)} hd-core ${event}`, data ?? '');
+}
+
 export interface DeviceEvents {
   [DEVICE.PIN]: [Device, PROTO.PinMatrixRequestType | undefined, (err: any, pin: string) => void];
   [DEVICE.PASSPHRASE_ON_DEVICE]: [Device, ((response: any) => void)?];
@@ -298,6 +309,7 @@ export class Device extends EventEmitter {
   async acquire() {
     const env = DataManager.getSettings('env');
     const mainIdKey = DataManager.isBleConnect(env) ? 'id' : 'session';
+    deviceBleTrace('device.acquire.start', { id: this.originalDescriptor?.id });
     try {
       if (DataManager.isBleConnect(env)) {
         const res = await this.deviceConnector?.acquire(this.originalDescriptor.id);
@@ -333,6 +345,13 @@ export class Device extends EventEmitter {
       (this.isUsedHere() && !this.keepSession && this.mainId) ||
       (this.mainId && DataManager.isBleConnect(env))
     ) {
+      // The BLE OR-clause above releases even under keepSession — this trace
+      // marks every physical-disconnect decision so link churn is visible.
+      deviceBleTrace('device.release', {
+        mainId: this.mainId,
+        keepSession: this.keepSession,
+        bleUnconditional: Boolean(this.mainId && DataManager.isBleConnect(env)),
+      });
       // wait for callback tasks to complete before releasing device
       if (this.pendingCallbackPromise) {
         try {

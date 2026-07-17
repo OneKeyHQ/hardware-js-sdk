@@ -279,6 +279,10 @@ export class NobleBleHandler {
       // allowDuplicates=true keeps advertisements flowing so we can age out gone devices.
       try {
         await this._requireNoble().startScanningAsync(serviceUuids, true);
+        // warn, not info: this scan runs UNFILTERED on a noble instance shared
+        // with the OneKey handler, so it must always be visible in the log to
+        // correlate with any slow/failed connect happening on the same adapter.
+        this._log('warn', 'scan.start', { serviceUuids, allowDuplicates: true });
       } catch (error) {
         this._scanning = false;
         this._log('warn', 'scan.start.error', { error: String(error) });
@@ -330,7 +334,7 @@ export class NobleBleHandler {
   private _armIdleStop(): void {
     this._clearIdleStop();
     this._idleStopTimer = setTimeout(() => {
-      void this._stopContinuousScan();
+      void this._stopContinuousScan('idle-timeout');
     }, TREZOR_BLE_SCAN_IDLE_STOP_MS);
   }
 
@@ -342,22 +346,25 @@ export class NobleBleHandler {
   }
 
   /** Stop scanning but keep the discovered cache (used before connect). */
-  private async _pauseScan(): Promise<void> {
+  private async _pauseScan(reason: string): Promise<void> {
     this._clearIdleStop();
     if (!this._scanning) return;
     this._scanning = false;
+    // Same rationale as scan.start: stop/start transitions on the shared noble
+    // instance are the timeline the OneKey handler's log must be matched against.
+    this._log('warn', 'scan.stop', { reason });
     await this._noble?.stopScanningAsync().catch(() => undefined);
   }
 
   /** Stop scanning and forget discovered devices (idle timeout / teardown). */
-  private async _stopContinuousScan(): Promise<void> {
-    await this._pauseScan();
+  private async _stopContinuousScan(reason: string): Promise<void> {
+    await this._pauseScan(reason);
     this._discovered.clear();
     this._lastSeen.clear();
   }
 
   async stopScan(): Promise<void> {
-    await this._stopContinuousScan();
+    await this._stopContinuousScan('stopScan');
   }
 
   /**
@@ -536,7 +543,7 @@ export class NobleBleHandler {
   private async _connectInner(id: string): Promise<{ id: string; name?: string }> {
     await this.init();
     // Stop scanning (keep the cache) and let the radio settle before connecting.
-    await this._pauseScan();
+    await this._pauseScan('connect');
     await delay(BLE_CONNECT_SETTLE_MS);
     // Which of the three routes got us a peripheral is THE diagnostic for this
     // whole area: a cache hit means the happy path; a scan hit means the device
