@@ -485,6 +485,11 @@ export const HardwareErrorCode = {
   PinMismatch: 828,
 
   /**
+   * Device refused to sign: refTxs don't match the spent input's outpoint
+   */
+  KaspaPrevTxIdMismatch: 829,
+
+  /**
    * Lowlevel transport connect error
    */
   LowlevelTrasnportConnectError: 900,
@@ -635,6 +640,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.DeviceSettingsLanguageNotSupport]: 'Language not supported',
   [HardwareErrorCode.TooManyInputs]: 'Too many inputs',
   [HardwareErrorCode.PinMismatch]: 'PIN mismatch',
+  [HardwareErrorCode.KaspaPrevTxIdMismatch]: 'Kaspa previous transaction id mismatch',
 
   /**
    * Lowlevel transport
