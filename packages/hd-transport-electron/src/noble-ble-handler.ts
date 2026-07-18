@@ -90,6 +90,16 @@ const CONNECTION_TIMEOUT = 3000; // 3 seconds for device connection
 // default: past that the next operation needs a PIN anyway, so holding the
 // link longer buys nothing.
 const BLE_IDLE_DISCONNECT_MS = 60_000;
+// Bound on a cleanup disconnect — noble's disconnect callback can hang on a
+// wedged peripheral; never let recovery paths wait on it forever.
+const BLE_DISCONNECT_TIMEOUT_MS = 2000;
+// Backstop while a request is OUTSTANDING (write sent, response not complete).
+// "Idle" means no outstanding request — a user reading a confirm screen for
+// minutes must NOT be disconnected — so the 60s clock only runs between
+// requests. This long backstop covers the truly wedged case (device never
+// answers, upper layers never cancel) so a dead call can't hold the link
+// forever.
+const BLE_BUSY_BACKSTOP_MS = 10 * 60_000;
 const SERVICE_DISCOVERY_TIMEOUT = 10000; // 10 seconds for service discovery
 
 // Write-related constants
@@ -311,9 +321,10 @@ function updateBluetoothState(state: string): void {
 }
 
 // ===== Keep-alive idle disconnect =====
-// One timer per connected device, re-armed on every operation that touches the
-// link (connect, write, subscribe/unsubscribe). Owned by the main process on
-// purpose: a renderer reload must not orphan a held link.
+// One timer per connected device. Semantics: the 60s idle countdown runs only
+// while NO request is outstanding — a write CLEARS it (and arms a long busy
+// backstop instead); the arrival of a COMPLETE response re-arms it. Owned by
+// the main process on purpose: a renderer reload must not orphan a held link.
 const idleDisconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 function clearIdleDisconnect(deviceId: string): void {
@@ -324,20 +335,51 @@ function clearIdleDisconnect(deviceId: string): void {
   }
 }
 
-function armIdleDisconnect(deviceId: string): void {
+function armIdleDisconnect(
+  deviceId: string,
+  ms: number = BLE_IDLE_DISCONNECT_MS,
+  reason: 'idle' | 'busy-backstop' = 'idle'
+): void {
   clearIdleDisconnect(deviceId);
   idleDisconnectTimers.set(
     deviceId,
     setTimeout(() => {
       idleDisconnectTimers.delete(deviceId);
       if (!connectedDevices.has(deviceId)) return;
-      logger?.info('[NobleBLE] Idle timeout, disconnecting device:', deviceId);
-      bleTrace('idle.disconnect', { deviceId, idleMs: BLE_IDLE_DISCONNECT_MS });
-      void disconnectDevice(deviceId).catch(error => {
-        logger?.error('[NobleBLE] Idle disconnect failed:', error);
-      });
-    }, BLE_IDLE_DISCONNECT_MS)
+      logger?.info('[NobleBLE] Keep-alive timeout, disconnecting device:', deviceId, reason);
+      bleTrace('idle.disconnect', { deviceId, afterMs: ms, reason });
+      const peripheral = connectedDevices.get(deviceId);
+      const deviceName = peripheral?.advertisement?.localName || 'Unknown Device';
+      disconnectDevice(deviceId)
+        .then(() => {
+          // Tell every renderer the link is gone. Normally nobody listens (the
+          // logical release already dropped the listener), but on the busy
+          // backstop a call is still in flight and its transport must reject
+          // rather than hang on a silently-dead link.
+          broadcastToAllWebContents(EOneKeyBleMessageKeys.BLE_DEVICE_DISCONNECTED, {
+            id: deviceId,
+            name: deviceName,
+          });
+        })
+        .catch(error => {
+          logger?.error('[NobleBLE] Keep-alive disconnect failed:', error);
+        });
+    }, ms)
   );
+}
+
+function broadcastToAllWebContents(channel: string, payload: unknown): void {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
+    const { webContents: electronWebContents } = require('electron') as {
+      webContents: { getAllWebContents(): WebContents[] };
+    };
+    for (const wc of electronWebContents.getAllWebContents()) {
+      if (!wc.isDestroyed()) wc.send(channel, payload);
+    }
+  } catch (error) {
+    logger?.error('[NobleBLE] broadcast failed:', { channel, error: String(error) });
+  }
 }
 
 // ===== BLE debug trace (renderer console) =====
@@ -348,22 +390,16 @@ function armIdleDisconnect(deviceId: string): void {
 const BLE_TRACE_CHANNEL = '$onekey-ble-trace';
 
 function bleTrace(event: string, data?: Record<string, unknown>): void {
-  try {
-    // Broadcast to every webContents rather than the one captured at init:
-    // the preload (and its console printer) runs in the main window, the tray
-    // AND embedded webviews, and the console a developer actually watches is
-    // not necessarily `browserWindow.webContents`.
-    // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
-    const { webContents: electronWebContents } = require('electron') as {
-      webContents: { getAllWebContents(): WebContents[] };
-    };
-    const payload = { src: 'onekey-ble', ts: Date.now(), event, data };
-    for (const wc of electronWebContents.getAllWebContents()) {
-      if (!wc.isDestroyed()) wc.send(BLE_TRACE_CHANNEL, payload);
-    }
-  } catch {
-    // Tracing must never break the BLE flow.
-  }
+  // Broadcast to every webContents rather than one captured at init: the
+  // preload (and its console printer) runs in the main window, the tray AND
+  // embedded webviews, and the console a developer actually watches is not
+  // necessarily `browserWindow.webContents`.
+  broadcastToAllWebContents(BLE_TRACE_CHANNEL, {
+    src: 'onekey-ble',
+    ts: Date.now(),
+    event,
+    data,
+  });
 }
 
 // Initialize Noble
@@ -698,7 +734,11 @@ async function transmitHexDataToDevice(deviceId: string, hexData: string): Promi
       `Device ${deviceId} not connected or characteristics not available`
     );
   }
-  armIdleDisconnect(deviceId);
+  // A request is now OUTSTANDING: stop the idle countdown entirely (the user
+  // may take minutes on the device's confirm screen — that is not "idle") and
+  // arm the long backstop instead so a device that never answers can't hold
+  // the link forever. The complete-response handler re-arms the 60s idle clock.
+  armIdleDisconnect(deviceId, BLE_BUSY_BACKSTOP_MS, 'busy-backstop');
 
   const toBuffer = Buffer.from(hexData, 'hex');
   logger?.info('[NobleBLE] Writing data:', {
@@ -1199,6 +1239,23 @@ async function freshScanAndDiscover(
     deviceId
   );
 
+  // The device does not advertise while WE hold a link to it — scanning with
+  // the old (possibly wedged) connection still up would just time out. Drop it
+  // first, bounded, so the device goes back on air.
+  const stalePeripheral = connectedDevices.get(deviceId) ?? discoveredDevices.get(deviceId);
+  if (stalePeripheral && stalePeripheral.state === 'connected') {
+    bleTrace('gatt.freshScan.predisconnect', { deviceId });
+    stalePeripheral.removeAllListeners('disconnect');
+    await new Promise<void>(resolve => {
+      const timer = setTimeout(resolve, BLE_DISCONNECT_TIMEOUT_MS);
+      stalePeripheral.disconnect(() => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
+    connectedDevices.delete(deviceId);
+  }
+
   const freshPeripheral = await performTargetedScan(deviceId);
   if (!freshPeripheral) {
     // Deep cleanup: fresh scan found no device, reset to initial state
@@ -1341,15 +1398,16 @@ async function setupConnectionAndDiscoverServices(
     bleTrace('gatt.discovery.direct.skip', { deviceId, state: peripheral.state });
   }
 
-  // Fallback: force reconnect to clear a stale GATT cache, then full retry ladder.
-  bleTrace('gatt.forceReconnect.start', { deviceId });
-  await forceReconnectPeripheral(peripheral, deviceId);
-  bleTrace('gatt.forceReconnect.done', { deviceId, elapsedMs: Date.now() - startedAt });
-  // forceReconnectPeripheral strips listeners — re-attach.
-  setupDisconnectListener(peripheral, deviceId, webContents);
-
-  // Discover services and characteristics with retry
+  // Fallback: force reconnect to clear a stale GATT cache, then full retry
+  // ladder. A failure of the force-reconnect ITSELF must also escalate to the
+  // fresh scan — not propagate out of the ladder.
   try {
+    bleTrace('gatt.forceReconnect.start', { deviceId });
+    await forceReconnectPeripheral(peripheral, deviceId);
+    bleTrace('gatt.forceReconnect.done', { deviceId, elapsedMs: Date.now() - startedAt });
+    // forceReconnectPeripheral strips listeners — re-attach.
+    setupDisconnectListener(peripheral, deviceId, webContents);
+
     const result = await discoverServicesAndCharacteristicsWithRetry(peripheral, deviceId);
     bleTrace('gatt.discovery.done', {
       deviceId,
@@ -1493,7 +1551,13 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
   return new Promise((resolve, reject) => {
     const connectStartedAt = Date.now();
     bleTrace('connect.link.start', { deviceId });
+    // Once the timeout has rejected, the noble callback may STILL fire with a
+    // successful late connection. Without this guard that link would be
+    // registered but ownerless — the IPC handler already failed, so nothing
+    // arms its idle timer and it blocks the device until window teardown.
+    let timedOut = false;
     const timeout = setTimeout(() => {
+      timedOut = true;
       bleTrace('connect.link.timeout', { deviceId, elapsedMs: Date.now() - connectStartedAt });
       reject(ERRORS.TypedError(HardwareErrorCode.BleConnectedError, 'Connection timeout'));
     }, CONNECTION_TIMEOUT);
@@ -1502,6 +1566,15 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
     const connectedPeripheral = peripheral as Peripheral;
     connectedPeripheral.connect(async (error: Error | undefined) => {
       clearTimeout(timeout);
+
+      if (timedOut) {
+        if (!error && connectedPeripheral.state === 'connected') {
+          bleTrace('connect.link.late', { deviceId, elapsedMs: Date.now() - connectStartedAt });
+          logger?.info('[NobleBLE] Late connection after timeout, disconnecting:', deviceId);
+          connectedPeripheral.disconnect(() => {});
+        }
+        return;
+      }
 
       if (error) {
         logger?.error('[NobleBLE] Connection failed:', error);
@@ -1622,7 +1695,10 @@ async function subscribeNotifications(
   const { notify: notifyCharacteristic } = characteristics;
 
   logger?.info('[NobleBLE] Subscribing to notifications for device:', deviceId);
-  bleTrace('subscribe.start', { deviceId, opState: subscriptionOperations.get(deviceId) ?? 'idle' });
+  bleTrace('subscribe.start', {
+    deviceId,
+    opState: subscriptionOperations.get(deviceId) ?? 'idle',
+  });
 
   // 🔒 CRITICAL: Check operation state FIRST to prevent race conditions
   const opState = subscriptionOperations.get(deviceId);
@@ -1730,6 +1806,9 @@ async function subscribeNotifications(
         return;
       }
       if (result.isComplete && result.completePacket) {
+        // Response complete — no request outstanding anymore. Swap the busy
+        // backstop for the normal 60s idle countdown.
+        armIdleDisconnect(deviceId);
         const appCb = notificationCallbacks.get(deviceId);
         if (appCb) appCb(result.completePacket);
       }
@@ -1806,6 +1885,9 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
           totalConnectedDevices: connectedDevices.size,
         });
         bleTrace('ipc.connect', { deviceId });
+        // A previously-armed idle timer must not fire mid-connect (a cold
+        // connect with OS pairing can take ~30s).
+        clearIdleDisconnect(deviceId);
         await connectDevice(deviceId, webContents);
         armIdleDisconnect(deviceId);
       }

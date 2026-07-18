@@ -234,6 +234,11 @@ export default class ElectronBleTransport {
         (disconnectedDevice: any) => {
           if (disconnectedDevice.id === uuid) {
             bleTrace('event.device-disconnect', { uuid });
+            // A call may be blocked on runPromise waiting for a response that
+            // can never arrive over a dead link — fail it instead of hanging.
+            if (this.runPromise) {
+              this.runPromise.reject(ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected));
+            }
             this.cleanupDeviceState(uuid);
 
             // Trigger disconnect event
@@ -264,6 +269,15 @@ export default class ElectronBleTransport {
         elapsedMs: Date.now() - startedAt,
         error: String(error),
       });
+      if (step === 'subscribe') {
+        // Subscribe failure on the encryption-gated characteristic is the
+        // broken-bond signature. The link itself is up, so a plain retry would
+        // reuse the same broken link and fail identically forever. Tear it
+        // down so the next attempt cold-connects (and macOS re-negotiates the
+        // bond, surfacing a pairing prompt the user can act on).
+        bleTrace('acquire.subscribe.teardown', { uuid });
+        await this.disconnect(uuid);
+      }
       throw error;
     }
   }
@@ -296,11 +310,17 @@ export default class ElectronBleTransport {
    */
   async disconnect(id: string) {
     bleTrace('disconnect.start', { id });
+    // Each step is independent best-effort: a failed unsubscribe (e.g. the
+    // device is already gone) must NOT prevent the physical disconnect — this
+    // method is the error-recovery "reset the wedged link" path, so the
+    // disconnect attempt is the one part that must always run.
     try {
-      if (window.desktopApi?.nobleBle) {
-        await window.desktopApi.nobleBle.unsubscribe(id);
-        await window.desktopApi.nobleBle.disconnect(id);
-      }
+      await window.desktopApi?.nobleBle?.unsubscribe(id);
+    } catch (error) {
+      bleTrace('disconnect.unsubscribe.error', { id, error: String(error) });
+    }
+    try {
+      await window.desktopApi?.nobleBle?.disconnect(id);
       bleTrace('disconnect.done', { id });
     } catch (error) {
       this.Log?.error('[Transport] Noble BLE disconnect failed:', error);
