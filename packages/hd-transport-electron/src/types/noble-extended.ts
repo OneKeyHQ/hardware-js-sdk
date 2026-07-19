@@ -31,6 +31,15 @@ export interface NobleModule {
   on(event: 'stateChange', listener: (state: string) => void): void;
   on(event: 'discover', listener: (peripheral: Peripheral) => void): void;
   on(event: 'scanStart' | 'scanStop', listener: () => void): void;
+  /**
+   * Connect by id/address with NO scan. Both native backends support this and
+   * emit a `discover` for the peripheral as a side effect (Windows synthesizes
+   * one for an unknown address; macOS resolves via
+   * retrievePeripheralsWithIdentifiers). Optional so an old noble can omit it.
+   * CAUTION: on macOS this never resolves for an id CoreBluetooth cannot
+   * retrieve — callers must time-box it.
+   */
+  connectAsync?(idOrAddress: string): Promise<Peripheral | undefined>;
   removeListener(event: 'stateChange', listener: (state: string) => void): void;
   removeListener(event: 'discover', listener: (peripheral: Peripheral) => void): void;
 }

@@ -1503,6 +1503,71 @@ async function setupConnectionAndDiscoverServices(
   }
 }
 
+// Direct connect-by-id timeout. Kept short: the fallback (targeted scan,
+// 1.5s window) is cheap, so a stuck retrieval must not stall the connect flow.
+const DIRECT_CONNECT_TIMEOUT_MS = 2000;
+
+/**
+ * Bounded connect-by-id with no scan. Returns the connected peripheral, or
+ * undefined so the caller falls back to the targeted scan. Never throws.
+ * A LATE success after the timeout is disconnected unless the scan path has
+ * already claimed the device (same orphan-link hazard as a late connect).
+ */
+async function tryDirectConnectById(deviceId: string): Promise<Peripheral | undefined> {
+  if (!noble || typeof noble.connectAsync !== 'function') return undefined;
+  const startedAt = Date.now();
+  bleTrace('connect.direct.start', { deviceId });
+  try {
+    // Hold the ORIGINAL promise: the late-orphan guard must attach to this
+    // pending connect, not issue a second connect request.
+    const directPromise = noble.connectAsync(deviceId);
+    const raced = await Promise.race([
+      directPromise,
+      new Promise<'timeout'>(resolve => {
+        setTimeout(() => resolve('timeout'), DIRECT_CONNECT_TIMEOUT_MS);
+      }),
+    ]);
+    if (raced === 'timeout') {
+      bleTrace('connect.direct.timeout', { deviceId, elapsedMs: Date.now() - startedAt });
+      // If the pending connect completes later, drop it unless someone claimed it.
+      directPromise
+        .then(late => {
+          const latePeripheral = late ?? discoveredDevices.get(deviceId);
+          if (
+            latePeripheral &&
+            latePeripheral.state === 'connected' &&
+            !connectedDevices.has(deviceId)
+          ) {
+            bleTrace('connect.direct.late', { deviceId });
+            latePeripheral.removeAllListeners('disconnect');
+            latePeripheral.disconnect(() => {});
+          }
+        })
+        .catch(() => {});
+      return undefined;
+    }
+    // Backends emit a `discover` for the peripheral as a side effect, so the
+    // cache may hold it even when connectAsync resolves without a value.
+    const peripheral = raced ?? discoveredDevices.get(deviceId);
+    bleTrace('connect.direct.done', {
+      deviceId,
+      elapsedMs: Date.now() - startedAt,
+      found: Boolean(peripheral),
+      state: peripheral?.state,
+    });
+    if (!peripheral || peripheral.state !== 'connected') return undefined;
+    discoveredDevices.set(deviceId, peripheral);
+    return peripheral;
+  } catch (error) {
+    bleTrace('connect.direct.error', {
+      deviceId,
+      elapsedMs: Date.now() - startedAt,
+      error: String(error),
+    });
+    return undefined;
+  }
+}
+
 // Connect to device - supports both discovered and direct connection modes
 async function connectDevice(deviceId: string, webContents: WebContents): Promise<void> {
   logger?.info('[NobleBLE] Connect device request:', {
@@ -1534,9 +1599,16 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
       throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Noble not available');
     }
 
+    // First: bounded connect-by-id with NO scan (proven in the Trezor
+    // connector, commit 93034545). Saves the ~650ms targeted scan for a device
+    // CoreBluetooth already knows, and reaches a device that is not currently
+    // advertising. Time-boxed because noble/mac silently never resolves for an
+    // id CB cannot retrieve; on timeout we fall through to the scan.
+    peripheral = await tryDirectConnectById(deviceId);
+
     // Perform a targeted scan to find the specific device
     try {
-      const foundPeripheral = await performTargetedScan(deviceId);
+      const foundPeripheral = peripheral ?? (await performTargetedScan(deviceId));
       if (!foundPeripheral) {
         throw ERRORS.TypedError(
           HardwareErrorCode.DeviceNotFound,
