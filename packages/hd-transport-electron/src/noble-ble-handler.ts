@@ -1506,6 +1506,12 @@ async function setupConnectionAndDiscoverServices(
 // Direct connect-by-id timeout. Kept short: the fallback (targeted scan,
 // 1.5s window) is cheap, so a stuck retrieval must not stall the connect flow.
 const DIRECT_CONNECT_TIMEOUT_MS = 2000;
+// After a direct-connect timeout (device off / out of range), skip the direct
+// attempt for this long. ensureConnected retries the whole connect up to 5
+// times with backoff — without the cooldown every retry would re-pay the 2s
+// timeout against a device that is simply not there.
+const DIRECT_CONNECT_COOLDOWN_MS = 15_000;
+const directConnectCooldownUntil = new Map<string, number>();
 
 /**
  * Bounded connect-by-id with no scan. Returns the connected peripheral, or
@@ -1515,6 +1521,10 @@ const DIRECT_CONNECT_TIMEOUT_MS = 2000;
  */
 async function tryDirectConnectById(deviceId: string): Promise<Peripheral | undefined> {
   if (!noble || typeof noble.connectAsync !== 'function') return undefined;
+  if ((directConnectCooldownUntil.get(deviceId) ?? 0) > Date.now()) {
+    bleTrace('connect.direct.cooldown', { deviceId });
+    return undefined;
+  }
   const startedAt = Date.now();
   bleTrace('connect.direct.start', { deviceId });
   try {
@@ -1528,6 +1538,7 @@ async function tryDirectConnectById(deviceId: string): Promise<Peripheral | unde
       }),
     ]);
     if (raced === 'timeout') {
+      directConnectCooldownUntil.set(deviceId, Date.now() + DIRECT_CONNECT_COOLDOWN_MS);
       bleTrace('connect.direct.timeout', { deviceId, elapsedMs: Date.now() - startedAt });
       // If the pending connect completes later, drop it unless someone claimed it.
       directPromise
