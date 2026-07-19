@@ -1046,7 +1046,8 @@ function getDevice(deviceId: string): DeviceInfo | null {
  * - No manual flags needed - Promise semantics handle completion
  */
 async function discoverServicesAndCharacteristics(
-  peripheral: Peripheral
+  peripheral: Peripheral,
+  options?: { unfiltered?: boolean }
 ): Promise<CharacteristicPair> {
   // Cleanup resources - will be set up and cleaned in try/finally
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -1080,9 +1081,14 @@ async function discoverServicesAndCharacteristics(
 
   // Main discovery logic as async function
   const discoveryPromise = (async (): Promise<CharacteristicPair> => {
-    // Step 1: Discover services (promisified)
+    // Step 1: Discover services (promisified). In unfiltered mode we discover
+    // everything and pick the OneKey service in JS — field data (Classic,
+    // 2026-07-19) showed the UUID-filtered query returning empty on a link
+    // where an unfiltered probe saw 5 services, so the filter itself is under
+    // suspicion (same failure family as the Windows scan-filter issue).
+    const serviceFilter = options?.unfiltered ? [] : ONEKEY_SERVICE_UUIDS;
     const services = await new Promise<Service[]>((resolve, reject) => {
-      peripheral.discoverServices(ONEKEY_SERVICE_UUIDS, (error, svc) => {
+      peripheral.discoverServices(serviceFilter, (error, svc) => {
         if (error) {
           logger?.error('[NobleBLE] Service discovery failed:', error);
           reject(ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, error.message));
@@ -1096,22 +1102,58 @@ async function discoverServicesAndCharacteristics(
       throw ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, 'No OneKey services found');
     }
 
-    const service = services[0];
+    let service: Service;
+    if (options?.unfiltered) {
+      // Compare on the 16-bit key: our constants are Bluetooth-base-UUID long
+      // forms (0000XXXX-0000-1000-8000-00805f9b34fb) while noble on macOS
+      // reports base-UUID services in SHORT form ('0001') — a naive full-string
+      // compare misses them (field-confirmed on Classic, 2026-07-19: the
+      // OneKey service was present as '0001' in the unfiltered set).
+      const uuid16 = (uuid: string): string => {
+        const stripped = (uuid ?? '').replace(/-/g, '').toLowerCase();
+        return stripped.length >= 8 ? stripped.substring(4, 8) : stripped;
+      };
+      const wanted = ONEKEY_SERVICE_UUIDS.map(uuid16);
+      const match = services.find(svc => wanted.includes(uuid16(svc.uuid)));
+      if (!match) {
+        // Carry the full UUID list in the error so the trace shows exactly
+        // what the device exposed — the datum that decides filter-bug vs
+        // service-hidden.
+        throw ERRORS.TypedError(
+          HardwareErrorCode.BleServiceNotFound,
+          `No OneKey service in unfiltered set: ${services.map(svc => svc.uuid).join('|')}`
+        );
+      }
+      service = match;
+    } else {
+      [service] = services;
+    }
     logger?.info('[NobleBLE] Found service:', service.uuid);
+    // Always record the full service list AND the exact uuid string of the
+    // pick — across modes and platforms this shows which uuid FORM (short
+    // '0001' vs long base form) each noble backend reports, the datum behind
+    // the filtered-query mismatch.
+    bleTrace('gatt.discovery.services', {
+      mode: options?.unfiltered ? 'unfiltered' : 'filtered',
+      uuids: services.map(svc => svc.uuid).join('|'),
+      picked: service.uuid,
+    });
 
-    // Step 2: Discover characteristics (promisified)
+    // Step 2: Discover characteristics (promisified). In unfiltered mode skip
+    // the UUID filter here too — same short-vs-long form mismatch risk as the
+    // service filter; the JS matcher below already handles both forms.
+    const characteristicFilter = options?.unfiltered
+      ? []
+      : [ONEKEY_WRITE_CHARACTERISTIC_UUID, ONEKEY_NOTIFY_CHARACTERISTIC_UUID];
     const characteristics = await new Promise<Characteristic[]>((resolve, reject) => {
-      service.discoverCharacteristics(
-        [ONEKEY_WRITE_CHARACTERISTIC_UUID, ONEKEY_NOTIFY_CHARACTERISTIC_UUID],
-        (error, chars) => {
-          if (error) {
-            logger?.error('[NobleBLE] Characteristic discovery failed:', error);
-            reject(ERRORS.TypedError(HardwareErrorCode.BleCharacteristicNotFound, error.message));
-          } else {
-            resolve(chars);
-          }
+      service.discoverCharacteristics(characteristicFilter, (error, chars) => {
+        if (error) {
+          logger?.error('[NobleBLE] Characteristic discovery failed:', error);
+          reject(ERRORS.TypedError(HardwareErrorCode.BleCharacteristicNotFound, error.message));
+        } else {
+          resolve(chars);
         }
-      );
+      });
     });
 
     // Step 3: Find required characteristics
@@ -1137,6 +1179,11 @@ async function discoverServicesAndCharacteristics(
     logger?.info('[NobleBLE] Characteristic discovery result:', {
       writeFound: !!writeCharacteristic,
       notifyFound: !!notifyCharacteristic,
+    });
+    bleTrace('gatt.discovery.chars', {
+      uuids: (characteristics ?? []).map(char => char.uuid).join('|'),
+      write: writeCharacteristic?.uuid,
+      notify: notifyCharacteristic?.uuid,
     });
 
     if (!writeCharacteristic || !notifyCharacteristic) {
@@ -1384,24 +1431,32 @@ async function setupConnectionAndDiscoverServices(
     // the force-reconnect route succeeded only because of its internal 500ms
     // stabilize wait. Retrying on the SAME link after the settle avoids the
     // second physical connect (and its extra pairing prompt) entirely.
-    for (const settleMs of [0, 500]) {
-      if (settleMs > 0) {
-        await wait(settleMs);
-        bleTrace('gatt.discovery.direct.retry', { deviceId, settleMs });
+    // Attempt 1: the normal UUID-filtered query. Attempt 2: UNFILTERED
+    // discovery with the OneKey service picked in JS — on the Classic the
+    // filtered query returned empty while an unfiltered probe saw 5 services,
+    // so the unfiltered route is both the diagnostic (its failure message
+    // carries the full UUID list) and, if the filter is the bug, the fix.
+    // eslint-disable-next-line no-restricted-syntax
+    for (const attempt of ['filtered', 'unfiltered'] as const) {
+      if (attempt === 'unfiltered') {
+        bleTrace('gatt.discovery.direct.retry', { deviceId, mode: attempt });
       }
       try {
         // eslint-disable-next-line no-await-in-loop
-        const result = await discoverServicesAndCharacteristics(peripheral);
+        const result = await discoverServicesAndCharacteristics(peripheral, {
+          unfiltered: attempt === 'unfiltered',
+        });
         connectedDevices.set(deviceId, peripheral);
         bleTrace('gatt.discovery.done', {
           deviceId,
           elapsedMs: Date.now() - startedAt,
-          route: settleMs > 0 ? 'direct-settled' : 'direct',
+          route: `direct-${attempt}`,
         });
         return result;
       } catch (directError) {
         bleTrace('gatt.discovery.direct.miss', {
           deviceId,
+          mode: attempt,
           elapsedMs: Date.now() - startedAt,
           error: String(directError),
         });
