@@ -1378,21 +1378,35 @@ async function setupConnectionAndDiscoverServices(
   // every connect (~1.3s extra + a second macOS pairing prompt); it is now the
   // FALLBACK for the one case it actually fixes — a discovery failure.
   if (peripheral.state === 'connected') {
-    try {
-      const result = await discoverServicesAndCharacteristics(peripheral);
-      connectedDevices.set(deviceId, peripheral);
-      bleTrace('gatt.discovery.done', {
-        deviceId,
-        elapsedMs: Date.now() - startedAt,
-        route: 'direct',
-      });
-      return result;
-    } catch (directError) {
-      bleTrace('gatt.discovery.direct.miss', {
-        deviceId,
-        elapsedMs: Date.now() - startedAt,
-        error: String(directError),
-      });
+    // Two direct attempts: immediate, then once more after a settle delay.
+    // Field data (Classic, 2026-07-19): discovery ~115ms after link-up returns
+    // "No OneKey services found" — the GATT/encryption isn't ready yet — while
+    // the force-reconnect route succeeded only because of its internal 500ms
+    // stabilize wait. Retrying on the SAME link after the settle avoids the
+    // second physical connect (and its extra pairing prompt) entirely.
+    for (const settleMs of [0, 500]) {
+      if (settleMs > 0) {
+        await wait(settleMs);
+        bleTrace('gatt.discovery.direct.retry', { deviceId, settleMs });
+      }
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const result = await discoverServicesAndCharacteristics(peripheral);
+        connectedDevices.set(deviceId, peripheral);
+        bleTrace('gatt.discovery.done', {
+          deviceId,
+          elapsedMs: Date.now() - startedAt,
+          route: settleMs > 0 ? 'direct-settled' : 'direct',
+        });
+        return result;
+      } catch (directError) {
+        bleTrace('gatt.discovery.direct.miss', {
+          deviceId,
+          elapsedMs: Date.now() - startedAt,
+          error: String(directError),
+        });
+      }
+      if (peripheral.state !== 'connected') break;
     }
   } else {
     bleTrace('gatt.discovery.direct.skip', { deviceId, state: peripheral.state });
