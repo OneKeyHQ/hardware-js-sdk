@@ -1431,13 +1431,18 @@ async function setupConnectionAndDiscoverServices(
     // the force-reconnect route succeeded only because of its internal 500ms
     // stabilize wait. Retrying on the SAME link after the settle avoids the
     // second physical connect (and its extra pairing prompt) entirely.
-    // Attempt 1: the normal UUID-filtered query. Attempt 2: UNFILTERED
-    // discovery with the OneKey service picked in JS — on the Classic the
-    // filtered query returned empty while an unfiltered probe saw 5 services,
-    // so the unfiltered route is both the diagnostic (its failure message
-    // carries the full UUID list) and, if the filter is the bug, the fix.
+    // Filtered query first where it can win; UNFILTERED discovery with 16-bit
+    // key JS matching as the reliable route. On macOS the filtered query
+    // always misses (noble/mac reports base-UUIDs short-form, field-confirmed
+    // on Classic 2026-07-19) — skip it there and save ~100ms per cold connect.
+    // Other platforms keep the filtered attempt until their uuid form is
+    // field-confirmed via the gatt.discovery.services trace.
+    const discoveryAttempts =
+      process.platform === 'darwin'
+        ? (['unfiltered'] as const)
+        : (['filtered', 'unfiltered'] as const);
     // eslint-disable-next-line no-restricted-syntax
-    for (const attempt of ['filtered', 'unfiltered'] as const) {
+    for (const attempt of discoveryAttempts) {
       if (attempt === 'unfiltered') {
         bleTrace('gatt.discovery.direct.retry', { deviceId, mode: attempt });
       }
