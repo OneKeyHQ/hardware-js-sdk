@@ -68,22 +68,25 @@ export function MultisigExecutionPanel({
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 px-5 py-3.5">
           <div className="min-w-[220px] flex-1">
             <div className="flex items-center gap-2">
-              <Usb className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-sm font-semibold">设备交互</h2>
+              <Usb className="h-3.5 w-3.5 text-muted-foreground" />
+              <h2 className="text-xs font-semibold">设备交互</h2>
             </div>
-            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
               {testCase.localOnly ? '该用例只运行本地参数校验。' : '执行前请确认设备屏幕内容与下方摘要一致。'}
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <Badge variant="secondary" className={`border px-2.5 py-1 ${readiness.className}`}>
+            <Badge
+              variant="secondary"
+              className={`border px-2 py-0.5 text-[11px] ${readiness.className}`}
+            >
               {readiness.label}
             </Badge>
             <Button
               size="sm"
               disabled={actionDisabled}
               onClick={onExecute}
-              className="h-9 px-4 text-sm disabled:border disabled:border-border disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
+              className="h-8 px-3 text-xs disabled:border disabled:border-border disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
             >
               {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
               {running ? '等待确认…' : testCase.localOnly ? '本地校验' : '执行测试'}
@@ -105,9 +108,9 @@ export function MultisigExecutionPanel({
           <div className="grid grid-cols-2 gap-x-8 gap-y-4">
             {summary.map(item => (
               <div key={item.label} className="min-w-0">
-                <div className="text-xs font-medium text-muted-foreground">{item.label}</div>
+                <div className="text-[11px] font-medium text-muted-foreground">{item.label}</div>
                 <div
-                  className="mt-1 truncate font-mono text-sm font-medium text-foreground"
+                  className="mt-0.5 truncate font-mono text-xs text-foreground"
                   title={item.value}
                 >
                   {item.value}
@@ -117,8 +120,8 @@ export function MultisigExecutionPanel({
           </div>
 
           <div className="mt-4 border-t border-border/70 pt-3">
-            <div className="mb-2 text-xs font-medium text-foreground">设备核对项</div>
-            <ul className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted-foreground">
+            <div className="mb-2 text-[11px] font-medium text-foreground">设备核对项</div>
+            <ul className="flex flex-wrap gap-x-5 gap-y-2 text-[11px] text-muted-foreground">
               {testCase.expectedDeviceChecks.map(item => (
                 <li key={item} className="flex items-center gap-2">
                   <Circle className="h-3 w-3 shrink-0 text-muted-foreground/60" />
@@ -133,8 +136,10 @@ export function MultisigExecutionPanel({
       <div className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-background">
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border/70 px-5 py-4">
           <div>
-            <h2 className="text-sm font-semibold">结果与错误</h2>
-            <p className="text-xs text-muted-foreground">页面不会广播任何交易。</p>
+            <h2 className="text-xs font-semibold">结果与错误</h2>
+            <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
+              页面不会广播任何交易。
+            </p>
           </div>
           {state.durationMs !== undefined ? (
             <Badge variant="info" className="gap-1">
@@ -146,12 +151,12 @@ export function MultisigExecutionPanel({
 
         <div className="min-h-0 flex-1 p-4">
           {state.status === 'idle' ? (
-            <div className="flex h-full min-h-32 items-center justify-center rounded-md border border-dashed border-border/70 px-6 text-center text-sm text-muted-foreground">
+            <div className="flex h-full min-h-32 items-center justify-center rounded-md border border-dashed border-border/70 px-6 text-center text-xs text-muted-foreground">
               执行后将在这里显示地址、签名或已签交易。
             </div>
           ) : null}
           {state.status === 'running' ? (
-            <div className="flex h-full min-h-32 items-center justify-center gap-2 rounded-md border border-primary bg-primary px-6 text-center text-sm font-medium text-primary-foreground">
+            <div className="flex h-full min-h-32 items-center justify-center gap-2 rounded-md border border-primary bg-primary px-6 text-center text-xs font-medium text-primary-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
               请在设备上核对并确认，可能需要先解锁设备。
             </div>
