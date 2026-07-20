@@ -7,6 +7,7 @@ export type HardwareUiEventHandlers = {
   button: (...event: DeviceEvents[typeof DEVICE.BUTTON]) => void;
   passphrase: (...event: DeviceEvents[typeof DEVICE.PASSPHRASE]) => void;
   passphraseOnDevice: (...event: DeviceEvents[typeof DEVICE.PASSPHRASE_ON_DEVICE]) => void;
+  attachPinOnDevice: (...event: DeviceEvents[typeof DEVICE.ATTACH_PIN_ON_DEVICE]) => void;
 };
 
 export function registerHardwareUiEventListeners(
@@ -17,5 +18,6 @@ export function registerHardwareUiEventListeners(
   device.on(DEVICE.BUTTON, handlers.button);
   device.on(DEVICE.PASSPHRASE, handlers.passphrase);
   device.on(DEVICE.PASSPHRASE_ON_DEVICE, handlers.passphraseOnDevice);
+  device.on(DEVICE.ATTACH_PIN_ON_DEVICE, handlers.attachPinOnDevice);
   return true;
 }

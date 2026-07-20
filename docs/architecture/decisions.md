@@ -41,8 +41,9 @@ Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类�
 - 应用持有稳定的钱包标识 `passphraseState`；SDK 只在运行期持有设备 `session_id`。
 - V1/V2 共用 `DeviceWalletSessionStore`，缓存键为 `deviceKey + passphraseState`。
 - 没有 `passphraseState` 时不得扫描或复用其他钱包的 Session。
-- V2 使用 `DeviceSessionGet` 恢复或创建 Session，并把 `btc_test_address` 归一化为 `passphraseState`。
-- `Failure_InvalidSession` 只清除当前钱包缓存，并且最多进行一次无 Session 重试。
+- V2 使用 `DeviceSessionOpen(resume/select)` 恢复或显式选择钱包，并把 `btc_test_address` 归一化为 `passphraseState`。
+- 标准钱包每次显式 `select STANDARD`，不读取或写入隐藏钱包 Session Store。
+- `Failure_InvalidSession` 只清除当前隐藏钱包缓存，并在同一次调用中进入 SDK 钱包选择协调流程。
 - 返回的钱包标识与调用方预期不一致时，必须清理缓存并抛出安全错误。
 - `session_id` 不作为公共钱包身份，也不要求应用持久化。
 

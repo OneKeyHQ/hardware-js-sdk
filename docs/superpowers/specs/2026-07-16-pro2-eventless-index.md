@@ -19,6 +19,13 @@ Protocol V2 / Pro2
 因此，App 的硬件交互容器、等待页和 `uiResponse()` 机制可以继续复用。变化主要集中在 SDK
 协调层和 firmware 协议状态机，而不是把交互责任整体推给 App。
 
+`DeviceSessionOpen` 也不是 `PassphraseAck` 或 `ButtonRequest` 的简单改名。它把原来的
+`PassphraseRequest -> PassphraseAck -> ButtonRequest/ButtonAck -> DeviceSession` 多轮状态机收敛为
+一个主动命令，并额外提供标准钱包选择与指定 Session 恢复能力。
+
+隐藏钱包 Session 继续按 `deviceKey + passphraseState` 缓存；标准钱包不增加特殊缓存 key，由
+`useEmptyPassphrase=true` 在每次业务调用前显式执行 `select STANDARD`。
+
 ## 文档索引
 
 | 模块                       | 设计文档                                                                          | SDK → App Event 形态              | firmware 变化                                                               |
@@ -39,7 +46,8 @@ Protocol V2 / Pro2
 | 阻塞选择 Event       | 隐藏钱包选择 Passphrase / Hidden Wallet PIN | 是                    | 是，`uiResponse()` | 转成 `DeviceSessionOpen(select)` |
 | 非阻塞设备提示 Event | 解锁、地址确认、签名、设备管理              | 是                    | 否                 | 等待设备最终结果                 |
 | 状态/阶段通知        | Onboarding、进度、升级提示                  | 可选或保留            | 否                 | 查询或方法结果仍是事实来源       |
-| 敏感数据交换         | PIN、Passphrase、助记词、熵                 | 不通过 App Event 传输 | 不适用             | 只在设备端处理                   |
+| 敏感数据交换         | PIN、助记词、熵；设备输入 Passphrase        | 不通过 App Event 传输 | 不适用             | 只在设备端处理                   |
+| Host Passphrase      | App 输入的普通 Passphrase                   | 通过既有阻塞 Event    | `uiResponse()`     | 只用于当前 Session 打开请求      |
 | 业务数据握手         | 签名分片 Request/Ack                        | 不转换为通用 UI Event | SDK 内部响应       | 继续业务协议                     |
 
 ## SDK 总入口
@@ -52,7 +60,8 @@ Protocol V2 不再消费设备返回的 `PinMatrixRequest`、`PassphraseRequest`
 - `REQUEST_PASSPHRASE`：阻塞选择 Event。
 - `REQUEST_PIN`：非阻塞设备解锁提示。
 - `REQUEST_BUTTON`：地址、公钥、签名和设备管理的非阻塞提示。
-- `REQUEST_PASSPHRASE_ON_DEVICE`：可选的设备输入阶段提示。
+- `REQUEST_PASSPHRASE_ON_DEVICE`：用户选择设备 Passphrase 后必须发送的非阻塞阶段提示，用于兼容
+  当前 App 等待页面。
 - `CLOSE_UI_WINDOW/CLOSE_UI_PIN_WINDOW`：统一、幂等关闭 UI。
 
 原 Pro / Protocol V1 保留现有“固件消息 → Event → ACK”流程。App 可以监听同一组公共 Event，SDK
@@ -65,4 +74,5 @@ Protocol V2 不再消费设备返回的 `PinMatrixRequest`、`PassphraseRequest`
 - 阻塞 Event 的响应只驱动显式业务命令，不伪造 firmware ACK。
 - 非阻塞 Event 不能创建无意义的 `uiResponse` 等待项。
 - 调用成功、失败、取消、超时或断连时，SDK 都清理 Event 等待并关闭 UI。
-- PIN、Passphrase、助记词和熵不进入 Host 日志或 App 状态。
+- PIN、助记词和熵不进入 Host；Passphrase 不进入日志或持久化 App 状态，App 输入模式只在当前
+  `uiResponse()` 与 Session 打开请求中短暂存在。

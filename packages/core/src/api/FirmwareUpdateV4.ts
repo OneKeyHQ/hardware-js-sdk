@@ -236,6 +236,7 @@ const isProtocolV2PollingTransientError = (error: unknown) => {
     isProtocolV2ReconnectProbeError(error) ||
     message.includes('libusb_transfer_timed_out') ||
     (message.includes('response timeout') && message.includes('devicefirmwareupdatestatusget')) ||
+    message.includes('device not acquired') ||
     message.includes('device not found') ||
     message.includes('transportnotfound')
   );
@@ -1370,7 +1371,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       await this.device.acquire(PROTOCOL_V2_CONNECT_PROTOCOL, { throwOnRunPromiseError: true });
       this.device.commands.disposed = false;
       this.device.getCommands().mainId = this.device.mainId ?? '';
-      await this.device.initialize();
       assertProtocolV2ReconnectIdentity(
         this.protocolV2ExpectedDeviceId,
         this.device.getCurrentDeviceId(),
@@ -1396,7 +1396,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     await this.device.acquire(PROTOCOL_V2_CONNECT_PROTOCOL, { throwOnRunPromiseError: true });
     this.device.commands.disposed = false;
     this.device.getCommands().mainId = this.device.mainId ?? '';
-    await this.device.initialize();
     assertProtocolV2ReconnectIdentity(
       this.protocolV2ExpectedDeviceId,
       this.device.getCurrentDeviceId(),

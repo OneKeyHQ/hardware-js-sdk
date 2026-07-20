@@ -663,7 +663,7 @@ export class DeviceCommands {
 
     if (res.type === 'PassphraseRequest') {
       const existsAttachPinUser = res.message.exists_attach_pin_user;
-      return this._promptPassphrase({
+      return this.promptPassphrase({
         existsAttachPinUser,
       }).then(response => {
         const { passphrase, passphraseOnDevice, attachPinOnDevice } = response;
@@ -761,10 +761,27 @@ export class DeviceCommands {
     });
   }
 
-  _promptPassphrase(options: PassphraseRequestPayload) {
+  promptPassphrase(
+    options: PassphraseRequestPayload,
+    promptOptions: { cancelDeviceOnReject?: boolean } = {}
+  ) {
     return new Promise<PassphrasePromptResponse>((resolve, reject) => {
-      const cancelAndReject = (_error?: Error) =>
-        cancelDeviceInPrompt(this.device, false)
+      const cancelAndReject = (_error?: Error) => {
+        const rejectWithCancelledError = () => {
+          reject(
+            ERRORS.TypedError(
+              HardwareErrorCode.CallQueueActionCancelled,
+              `${DEVICE.PASSPHRASE} canceled`
+            )
+          );
+        };
+
+        if (promptOptions.cancelDeviceOnReject === false) {
+          rejectWithCancelledError();
+          return Promise.resolve();
+        }
+
+        return cancelDeviceInPrompt(this.device, false)
           .then(onCancel => {
             const error = ERRORS.TypedError(
               HardwareErrorCode.CallQueueActionCancelled,
@@ -781,6 +798,7 @@ export class DeviceCommands {
           .catch(error => {
             reject(error);
           });
+      };
 
       if (this.device.listenerCount(DEVICE.PASSPHRASE) > 0) {
         this.device.setCancelableAction(cancelAndReject);

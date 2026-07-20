@@ -4948,9 +4948,44 @@ export type ProtocolV2DeviceInfo = {
   status?: DeviceStatus;
 };
 
-// DeviceSessionGet
-export type DeviceSessionGet = {
-  session_id?: string;
+export enum DeviceWalletType {
+  DEVICE_WALLET_TYPE_STANDARD = 0,
+  DEVICE_WALLET_TYPE_HIDDEN = 1,
+}
+
+// DeviceSessionResume
+export type DeviceSessionResume = {
+  session_id: string;
+};
+
+// DeviceHostPassphrase
+export type DeviceHostPassphrase = {
+  passphrase: string;
+};
+
+// DevicePassphraseOnDevice
+export type DevicePassphraseOnDevice = {};
+
+// DeviceAttachPinOnDevice
+export type DeviceAttachPinOnDevice = {};
+
+// DeviceHiddenWalletSelect
+export type DeviceHiddenWalletSelect = {
+  host_passphrase?: DeviceHostPassphrase;
+  passphrase_on_device?: DevicePassphraseOnDevice;
+  attach_pin_on_device?: DeviceAttachPinOnDevice;
+};
+
+// DeviceWalletSelect
+export type DeviceWalletSelect = {
+  wallet_type: DeviceWalletType;
+  hidden_wallet?: DeviceHiddenWalletSelect;
+};
+
+// DeviceSessionOpen
+export type DeviceSessionOpen = {
+  resume?: DeviceSessionResume;
+  select?: DeviceWalletSelect;
 };
 
 // DeviceSession
@@ -5771,7 +5806,13 @@ export type MessageType = {
   DeviceInfoTargets: DeviceInfoTargets;
   DeviceInfoTypes: DeviceInfoTypes;
   DeviceInfoGet: DeviceInfoGet;
-  DeviceSessionGet: DeviceSessionGet;
+  DeviceSessionResume: DeviceSessionResume;
+  DeviceHostPassphrase: DeviceHostPassphrase;
+  DevicePassphraseOnDevice: DevicePassphraseOnDevice;
+  DeviceAttachPinOnDevice: DeviceAttachPinOnDevice;
+  DeviceHiddenWalletSelect: DeviceHiddenWalletSelect;
+  DeviceWalletSelect: DeviceWalletSelect;
+  DeviceSessionOpen: DeviceSessionOpen;
   DeviceSession: DeviceSession;
   DeviceSessionAskPin: DeviceSessionAskPin;
   DeviceStatus: DeviceStatus;

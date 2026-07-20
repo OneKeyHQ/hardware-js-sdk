@@ -96,7 +96,8 @@ const Log = getLogger(LoggerNames.Device);
 
 export interface DeviceEvents {
   [DEVICE.PIN]: [Device, PROTO.PinMatrixRequestType | undefined, (err: any, pin: string) => void];
-  [DEVICE.PASSPHRASE_ON_DEVICE]: [Device, ((response: any) => void)?];
+  [DEVICE.PASSPHRASE_ON_DEVICE]: [Device, PassphraseRequestPayload?];
+  [DEVICE.ATTACH_PIN_ON_DEVICE]: [Device, PassphraseRequestPayload?];
   [DEVICE.BUTTON]: [Device, DeviceButtonRequestPayload];
   [DEVICE.FEATURES]: [Device, DeviceFeaturesPayload];
   [DEVICE.PASSPHRASE]: [

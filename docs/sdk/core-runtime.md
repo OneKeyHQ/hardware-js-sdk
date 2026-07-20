@@ -41,17 +41,19 @@ V2 不支持传统 `GetFeatures`。Core 在初始化时发送默认范围的 `De
 
 ## 钱包 Session
 
-内部钱包 Session 流程会把缓存的 `session_id` 传给 `DeviceSessionGet`：
+内部钱包 Session 流程通过 `DeviceSessionOpen` 显式区分恢复与选择：
 
 ```text
-DeviceSessionGet(session_id?)
-  -> PassphraseRequest / PassphraseAck（需要时）
+隐藏钱包缓存命中 -> DeviceSessionOpen(resume session_id)
+标准钱包         -> DeviceSessionOpen(select STANDARD)
+隐藏钱包选择     -> SDK REQUEST_PASSPHRASE / uiResponse
+                 -> DeviceSessionOpen(select HIDDEN, access)
   -> DeviceSession(session_id, btc_test_address)
 ```
 
-缓存 session 返回 `Failure_InvalidSession` 时，Core 清理当前钱包缓存并用空 session 重试一次。`btc_test_address` 被映射为 `passphraseState`，用于确认打开的是预期钱包上下文。
+缓存 session 返回 `Failure_InvalidSession` 时，Core 只清理当前隐藏钱包缓存，再在原业务调用内请求 App 选择进入方式。`btc_test_address` 被映射为 `passphraseState`，用于确认打开的是预期钱包上下文。
 
-原始公共方法 `deviceSessionGet` 当前发送空参数，适合协议调试；它不替代内部钱包 Session 管理。
+原始公共方法 `deviceSessionOpen` 要求显式传入 `resume` 或 `select`，适合协议调试；它不替代内部钱包 Session 管理。
 
 详见 [钱包 Session 与设备安全](../device/wallet-session-and-security.md) 和 [SDK 关键架构决策](../architecture/decisions.md#钱包-session-所有权与缓存键)。
 

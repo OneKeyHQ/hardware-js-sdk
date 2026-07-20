@@ -50,7 +50,7 @@ export { default as deviceReboot } from './protocol-v2/DeviceReboot';
 export { default as deviceInfoGet } from './protocol-v2/DeviceInfoGet';
 export { default as deviceStatusGet } from './protocol-v2/DeviceStatusGet';
 export { default as deviceGetOnboardingStatus } from './protocol-v2/DeviceGetOnboardingStatus';
-export { default as deviceSessionGet } from './protocol-v2/DeviceSessionGet';
+export { default as deviceSessionOpen } from './protocol-v2/DeviceSessionOpen';
 export { default as deviceFirmwareUpdate } from './protocol-v2/DeviceFirmwareUpdate';
 export { default as deviceGetFirmwareUpdateStatus } from './protocol-v2/DeviceGetFirmwareUpdateStatus';
 export { default as deviceFactoryInfoSet } from './protocol-v2/DeviceFactoryInfoSet';

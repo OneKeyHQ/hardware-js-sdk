@@ -482,7 +482,7 @@
         "MessageType_DeviceStatus": 60603,
         "MessageType_DevGetOnboardingStatus": 60604,
         "MessageType_DevOnboardingStatus": 60605,
-        "MessageType_DeviceSessionGet": 60606,
+        "MessageType_DeviceSessionOpen": 60606,
         "MessageType_DeviceSession": 60607,
         "MessageType_DeviceSessionAskPin": 60608,
         "MessageType_FilesystemPermissionFix": 60800,
@@ -12418,11 +12418,84 @@
         }
       }
     },
-    "DeviceSessionGet": {
+    "DeviceWalletType": {
+      "values": {
+        "DEVICE_WALLET_TYPE_STANDARD": 0,
+        "DEVICE_WALLET_TYPE_HIDDEN": 1
+      }
+    },
+    "DeviceSessionResume": {
       "fields": {
         "session_id": {
+          "rule": "required",
           "type": "bytes",
           "id": 1
+        }
+      }
+    },
+    "DeviceHostPassphrase": {
+      "fields": {
+        "passphrase": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "DevicePassphraseOnDevice": {
+      "fields": {}
+    },
+    "DeviceAttachPinOnDevice": {
+      "fields": {}
+    },
+    "DeviceHiddenWalletSelect": {
+      "oneofs": {
+        "access": {
+          "oneof": ["host_passphrase", "passphrase_on_device", "attach_pin_on_device"]
+        }
+      },
+      "fields": {
+        "host_passphrase": {
+          "type": "DeviceHostPassphrase",
+          "id": 1
+        },
+        "passphrase_on_device": {
+          "type": "DevicePassphraseOnDevice",
+          "id": 2
+        },
+        "attach_pin_on_device": {
+          "type": "DeviceAttachPinOnDevice",
+          "id": 3
+        }
+      }
+    },
+    "DeviceWalletSelect": {
+      "fields": {
+        "wallet_type": {
+          "rule": "required",
+          "type": "DeviceWalletType",
+          "id": 1
+        },
+        "hidden_wallet": {
+          "type": "DeviceHiddenWalletSelect",
+          "id": 2
+        }
+      }
+    },
+    "DeviceSessionOpen": {
+      "oneofs": {
+        "mode": {
+          "oneof": ["resume", "select"]
+        }
+      },
+      "fields": {
+        "resume": {
+          "type": "DeviceSessionResume",
+          "id": 1
+        },
+        "select": {
+          "type": "DeviceWalletSelect",
+          "id": 2
         }
       }
     },

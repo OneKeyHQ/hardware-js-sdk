@@ -1,8 +1,11 @@
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import type { DeviceSessionOpen } from '@onekeyfe/hd-transport';
 
+import { DEVICE, type PassphraseRequestPayload } from '../../events';
 import { isDeviceLockedError } from './lockedError';
 
 import type { Device } from '../../device/Device';
+import type { PassphrasePromptResponse } from '../../device/DeviceCommands';
 
 const getErrorText = (error: unknown) => {
   if (error instanceof Error) return `${error.name} ${error.message}`;
@@ -29,54 +32,136 @@ export async function refreshProtocolV2DeviceStatus(device: Device) {
   return device.updateProtocolV2Status(status);
 }
 
+const openDeviceSession = async (device: Device, request: DeviceSessionOpen) => {
+  try {
+    return await device.commands.typedCall('DeviceSessionOpen', 'DeviceSession', request);
+  } catch (error) {
+    if (!isDeviceLockedError(error)) {
+      throw error;
+    }
+    await device.unlockDevice();
+    return device.commands.typedCall('DeviceSessionOpen', 'DeviceSession', request);
+  }
+};
+
+const createHiddenWalletRequest = (
+  response: PassphrasePromptResponse
+): {
+  request: DeviceSessionOpen;
+  deviceEvent?: typeof DEVICE.PASSPHRASE_ON_DEVICE | typeof DEVICE.ATTACH_PIN_ON_DEVICE;
+} => {
+  if (response.attachPinOnDevice) {
+    return {
+      request: {
+        select: {
+          wallet_type: 1,
+          hidden_wallet: { attach_pin_on_device: {} },
+        },
+      },
+      deviceEvent: DEVICE.ATTACH_PIN_ON_DEVICE,
+    };
+  }
+
+  if (response.passphraseOnDevice) {
+    return {
+      request: {
+        select: {
+          wallet_type: 1,
+          hidden_wallet: { passphrase_on_device: {} },
+        },
+      },
+      deviceEvent: DEVICE.PASSPHRASE_ON_DEVICE,
+    };
+  }
+
+  return {
+    request: {
+      select: {
+        wallet_type: 1,
+        hidden_wallet: {
+          host_passphrase: { passphrase: response.passphrase ?? '' },
+        },
+      },
+    },
+  };
+};
+
+const openSelectedHiddenWallet = async (
+  device: Device,
+  promptPayload: PassphraseRequestPayload
+) => {
+  const response = await device.commands.promptPassphrase(promptPayload, {
+    cancelDeviceOnReject: false,
+  });
+  const { request, deviceEvent } = createHiddenWalletRequest(response);
+
+  if (deviceEvent) {
+    device.emit(deviceEvent, device, promptPayload);
+  }
+
+  return openDeviceSession(device, request);
+};
+
 export async function getProtocolV2WalletSession(
   device: Device,
-  options?: { initSession?: boolean; expectedPassphraseState?: string }
+  options?: {
+    initSession?: boolean;
+    expectedPassphraseState?: string;
+    onlyMainPin?: boolean;
+  }
 ) {
   if (options?.initSession) {
     device.clearInternalState();
   }
 
-  let sessionId =
-    typeof device.getInternalState === 'function' ? device.getInternalState() : undefined;
+  const expectedPassphraseState = options?.expectedPassphraseState ?? device.passphraseState;
 
   try {
-    const requestDeviceSession = (sessionId?: string) =>
-      device.commands.typedCall(
-        'DeviceSessionGet',
-        'DeviceSession',
-        sessionId ? { session_id: sessionId } : {}
-      );
+    if (options?.onlyMainPin || device.getCurrentPassphraseProtection() === false) {
+      const { message } = await openDeviceSession(device, {
+        select: {
+          wallet_type: 0,
+        },
+      });
 
-    const requestWalletSession = async () => {
+      return {
+        passphraseState: message.btc_test_address,
+        newSession: message.session_id,
+        unlockedAttachPin: false,
+      };
+    }
+
+    const cachedSessionId =
+      typeof device.getInternalState === 'function' ? device.getInternalState() : undefined;
+    let response;
+    let recoveryFailed = false;
+
+    if (cachedSessionId && expectedPassphraseState) {
       try {
-        return await requestDeviceSession(sessionId);
+        response = await openDeviceSession(device, {
+          resume: { session_id: cachedSessionId },
+        });
       } catch (error) {
-        if (!sessionId || !isProtocolV2InvalidSessionError(error)) {
+        if (!isProtocolV2InvalidSessionError(error)) {
           throw error;
         }
         device.clearInternalState();
-        sessionId = undefined;
-        return requestDeviceSession();
+        recoveryFailed = true;
       }
-    };
-
-    let response;
-    try {
-      response = await requestWalletSession();
-    } catch (error) {
-      if (!isDeviceLockedError(error)) {
-        throw error;
-      }
-      await device.unlockDevice();
-      response = await requestWalletSession();
     }
-    const { message } = response;
 
-    if (
-      options?.expectedPassphraseState &&
-      options.expectedPassphraseState !== message.btc_test_address
-    ) {
+    if (!response) {
+      const promptPayload: PassphraseRequestPayload = {
+        source: 'wallet-session-coordinator',
+        reason: recoveryFailed ? 'session-recovery' : 'open-wallet',
+        expectedPassphraseState,
+        existsAttachPinUser: device.features?.attachToPinEnabled === true,
+      };
+      response = await openSelectedHiddenWallet(device, promptPayload);
+    }
+
+    const { message } = response;
+    if (expectedPassphraseState && expectedPassphraseState !== message.btc_test_address) {
       device.clearInternalState();
       throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError);
     }
@@ -86,7 +171,7 @@ export async function getProtocolV2WalletSession(
     }
 
     device.updateInternalState(
-      (device.getCurrentPassphraseProtection() ?? false) || Boolean(message.btc_test_address),
+      true,
       message.btc_test_address,
       device.getCurrentDeviceId(),
       message.session_id,

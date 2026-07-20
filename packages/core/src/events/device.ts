@@ -23,6 +23,7 @@ export const DEVICE = {
   PIN: 'pin',
   PASSPHRASE: 'passphrase',
   PASSPHRASE_ON_DEVICE: 'passphrase_on_device',
+  ATTACH_PIN_ON_DEVICE: 'attach_pin_on_device',
   WORD: 'word',
   SUPPORT_FEATURES: 'support_features',
   SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE: 'select_device_in_bootloader_for_web_device',
@@ -47,6 +48,9 @@ export interface DeviceButtonRequestPayload extends Omit<PROTO.ButtonRequest, 'c
 
 export type PassphraseRequestPayload = {
   existsAttachPinUser?: boolean;
+  source?: 'wallet-session-coordinator';
+  reason?: 'open-wallet' | 'session-recovery';
+  expectedPassphraseState?: string;
 };
 
 export interface DeviceButtonRequest {

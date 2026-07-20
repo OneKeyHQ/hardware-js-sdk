@@ -76,6 +76,8 @@ export type UiRequestDeviceAction = {
   payload: {
     device: Device;
     type?: PROTO.PinMatrixRequestType | 'ButtonRequest_PinEntry' | 'ButtonRequest_AttachPin';
+    source?: 'wallet-session-coordinator';
+    reason?: 'open-wallet' | 'session-recovery';
   };
 };
 
@@ -90,6 +92,9 @@ export interface UiRequestPassphrase {
     device: Device;
     passphraseState?: string;
     existsAttachPinUser?: boolean;
+    source?: 'wallet-session-coordinator';
+    reason?: 'open-wallet' | 'session-recovery';
+    expectedPassphraseState?: string;
   };
 }
 
@@ -98,6 +103,8 @@ export interface UiRequestPassphraseOnDevice {
   payload: {
     device: Device;
     passphraseState?: string;
+    source?: 'wallet-session-coordinator';
+    reason?: 'open-wallet' | 'session-recovery';
   };
 }
 

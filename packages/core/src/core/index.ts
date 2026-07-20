@@ -403,6 +403,7 @@ const onCallDevice = async (
       ? onEmptyPassphraseHandler
       : onDevicePassphraseHandler,
     passphraseOnDevice: onEnterPassphraseOnDeviceHandler,
+    attachPinOnDevice: onEnterAttachPinOnDeviceHandler,
   });
   device.on(DEVICE.FEATURES, onDeviceFeaturesHandler);
   device.on(
@@ -1235,6 +1236,9 @@ const onDevicePassphraseHandler = async (
       device: device.toMessageObject() as KnownDevice,
       passphraseState: device.passphraseState,
       existsAttachPinUser: requestPayload.existsAttachPinUser,
+      source: requestPayload.source,
+      reason: requestPayload.reason,
+      expectedPassphraseState: requestPayload.expectedPassphraseState,
     })
   );
   // wait for passphrase
@@ -1256,12 +1260,27 @@ const onEmptyPassphraseHandler = (...[_, , callback]: DeviceEvents['passphrase']
 };
 
 const onEnterPassphraseOnDeviceHandler = (
-  ...[device]: [...DeviceEvents['passphrase_on_device']]
+  ...[device, requestPayload]: [...DeviceEvents['passphrase_on_device']]
 ) => {
   postMessage(
     createUiMessage(UI_REQUEST.REQUEST_PASSPHRASE_ON_DEVICE, {
       device: device.toMessageObject() as KnownDevice,
       passphraseState: device.passphraseState,
+      source: requestPayload?.source,
+      reason: requestPayload?.reason,
+    })
+  );
+};
+
+const onEnterAttachPinOnDeviceHandler = (
+  ...[device, requestPayload]: [...DeviceEvents['attach_pin_on_device']]
+) => {
+  postMessage(
+    createUiMessage(UI_REQUEST.REQUEST_PIN, {
+      device: device.toMessageObject() as KnownDevice,
+      type: 'ButtonRequest_AttachPin',
+      source: requestPayload?.source,
+      reason: requestPayload?.reason,
     })
   );
 };

@@ -42,7 +42,7 @@ Protocol V2 因此按字段用途、变化频率和安全边界进行拆分。
 | 设备基本信息       | `DeviceInfoGet -> DeviceInfo`                           | 型号、序列号、主控、蓝牙芯片、SE 芯片及版本   | 初始化或 `getDeviceInfo`               |
 | 设备实时状态       | `DeviceStatusGet -> DeviceStatus`                       | 初始化、解锁、备份、Passphrase、Attach-to-PIN | 初始化时随 DeviceInfo 获取，或单独刷新 |
 | 用户设置           | `DeviceSettingsGet/Set/PageShow`                        | label、语言、蓝牙、亮度、锁屏、振动等         | 设置专用 API                           |
-| 钱包会话           | `DeviceSessionGet -> DeviceSession`                     | `session_id`、钱包标识                        | Core 内部钱包 Session 管理             |
+| 钱包会话           | `DeviceSessionOpen -> DeviceSession`                    | 显式选择/恢复、`session_id`、钱包标识         | Core 内部钱包 Session 管理             |
 | PIN 解锁结果       | `DeviceSessionAskPin -> DeviceSessionPinResult`         | 解锁结果及安全状态                            | 受保护方法的解锁流程                   |
 | 设备操作与固件管理 | `DeviceReboot`、`DeviceCertificate*`、`DeviceFirmware*` | 重启、证书、固件安装                          | 对应专用 API 和升级流程                |
 | 生产制造信息       | `DeviceFactoryInfo*`、`DeviceFactoryTest` 等            | 生产时间、工厂测试、永久锁                    | 生产制造专用 API                       |
@@ -268,25 +268,25 @@ label、语言、蓝牙开关、自动锁屏和振动反馈都属于用户配置
 钱包会话通过以下消息建立或恢复：
 
 ```text
-DeviceSessionGet(session_id?) -> DeviceSession
+DeviceSessionOpen(resume/select) -> DeviceSession
 ```
 
 ### 8.1 字段说明
 
-| Protocol V2 字段   | 含义                             | SDK 当前处理                 |
-| ------------------ | -------------------------------- | ---------------------------- |
-| 请求 `session_id`  | 尝试恢复之前的钱包 Session       | Core 内部传入缓存值          |
-| 响应 `session_id`  | 当前钱包 Session ID              | 保存到当前钱包缓存           |
-| `btc_test_address` | 用于确认当前钱包上下文的稳定标识 | 映射为内部 `passphraseState` |
+| Protocol V2 字段    | 含义                             | SDK 当前处理                 |
+| ------------------- | -------------------------------- | ---------------------------- |
+| `resume.session_id` | 尝试恢复之前的隐藏钱包 Session   | Core 内部传入当前钱包缓存值  |
+| `select`            | 显式选择标准或隐藏钱包进入方式   | Core 协调 App UI 后构造      |
+| 响应 `session_id`   | 当前钱包 Session ID              | 保存到当前钱包缓存           |
+| `btc_test_address`  | 用于确认当前钱包上下文的稳定标识 | 映射为内部 `passphraseState` |
 
 这里的 `btc_test_address` 用于确认当前打开的是不是预期钱包，不用于用户资产地址展示。
 
 ### 8.2 Session 恢复流程
 
 ```text
-读取缓存 session_id
-    -> DeviceSessionGet(session_id?)
-    -> 必要时进行 PassphraseRequest / PassphraseAck
+读取当前隐藏钱包缓存 session_id
+    -> DeviceSessionOpen(resume session_id)
     -> 返回 DeviceSession
     -> 校验 btc_test_address 是否符合预期钱包
 ```
@@ -295,10 +295,10 @@ DeviceSessionGet(session_id?) -> DeviceSession
 
 1. 设备返回 `Failure_InvalidSession`。
 2. Core 清除当前钱包的 Session 缓存。
-3. Core 使用空 Session 再尝试一次。
-4. 不允许无限重试。
+3. Core 发出兼容的 `REQUEST_PASSPHRASE`，等待 App 返回 Host Passphrase、设备 Passphrase 或 Attach PIN 选择。
+4. Core 发送 `DeviceSessionOpen(select)`，在同一次原业务调用中继续执行。
 
-公开的 `deviceSessionGet` 当前发送空请求，主要用于协议调试；它不替代 Core 内部的 Session 恢复和钱包标识校验。
+标准钱包不读取 Session Store，每次显式发送 `select STANDARD`。公开的 `deviceSessionOpen` 主要用于协议调试；它不替代 Core 内部的 Session 恢复和钱包标识校验。
 
 ## 9. PIN 解锁结果
 

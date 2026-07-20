@@ -4,6 +4,7 @@ import type {
   DeviceFirmwareUpdateStatus,
   DevOnboardingStatus,
   DeviceSession,
+  DeviceSessionOpen,
   DeviceSettings,
   DeviceStatus,
   ProtocolInfo,
@@ -117,9 +118,9 @@ export declare function deviceGetOnboardingStatus(
   params?: CommonParams
 ): Response<DevOnboardingStatus>;
 
-export declare function deviceSessionGet(
+export declare function deviceSessionOpen(
   connectId: string,
-  params?: CommonParams
+  params: CommonParams & DeviceSessionOpen
 ): Response<DeviceSession>;
 
 export declare function deviceFirmwareUpdate(

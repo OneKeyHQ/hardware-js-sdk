@@ -115,6 +115,7 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (
     return getProtocolV2WalletSession(device, {
       initSession: options?.initSession,
       expectedPassphraseState: options?.expectPassphraseState,
+      onlyMainPin: options?.onlyMainPin,
     });
   }
 
@@ -194,6 +195,7 @@ export const getPassphraseState = async (
     return getProtocolV2WalletSession(device, {
       initSession: options?.initSession,
       expectedPassphraseState: options?.expectPassphraseState,
+      onlyMainPin: options?.onlyMainPin,
     });
   }
 
