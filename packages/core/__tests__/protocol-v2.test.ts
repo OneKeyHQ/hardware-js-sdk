@@ -3044,7 +3044,7 @@ describe('Protocol V2 firmware update targets', () => {
     expect(method.postTipMessage).toHaveBeenCalledWith('FirmwareUpdating');
   });
 
-  test('continues Protocol V2 install polling through temporary expected V2 probe failures', async () => {
+  test('retries final device readiness through temporary Protocol V2 probe failures', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -3052,7 +3052,7 @@ describe('Protocol V2 firmware update targets', () => {
       },
     });
     const typedCall = jest.fn().mockImplementation((name: string) => {
-      if (name === 'DeviceFirmwareUpdateStatusGet') {
+      if (name === 'DeviceStatusGet') {
         const callCount = typedCall.mock.calls.filter(call => call[0] === name).length;
         if (callCount === 1) {
           return Promise.reject(
@@ -3062,24 +3062,28 @@ describe('Protocol V2 firmware update targets', () => {
           );
         }
         return Promise.resolve({
-          type: 'DeviceFirmwareUpdateStatus',
-          message: {
-            records: [{ target_id: 6, status: 2 }],
-          },
+          type: 'DeviceStatus',
+          message: { device_id: 'PRO2-DEVICE-ID', init_states: true },
         });
       }
       if (name === 'DeviceInfoGet') {
-        return Promise.reject(new Error('DeviceInfo not ready'));
-      }
-      if (name === 'Ping') {
-        return Promise.resolve({ type: 'Success', message: { message: 'ready' } });
+        return Promise.resolve({
+          type: 'DeviceInfo',
+          message: { hw: { serial_no: 'PR9999999999' } },
+        });
       }
       return Promise.reject(new Error(`unexpected call ${name}`));
     });
     const reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
+    const updateProtocolV2Features = jest.fn(() => ({
+      deviceId: 'PRO2-DEVICE-ID',
+      bootloaderMode: false,
+      mode: 'normal',
+    }));
 
     (method as any).device = stubDevice({
       getCommands: () => ({ typedCall }),
+      updateProtocolV2Features,
     });
     (method as any).reconnectProtocolV2Device = reconnectProtocolV2Device;
     method.postProgressMessage = jest.fn();
@@ -3088,16 +3092,15 @@ describe('Protocol V2 firmware update targets', () => {
       { target_id: 6, path: 'vol1:ble-firmware.bin' },
     ]);
 
-    expect(reconnectProtocolV2Device).toHaveBeenCalledTimes(1);
+    expect(reconnectProtocolV2Device).toHaveBeenCalledTimes(2);
     expect(typedCall.mock.calls.map(call => call[0])).toEqual([
-      'DeviceFirmwareUpdateStatusGet',
+      'DeviceStatusGet',
+      'DeviceStatusGet',
       'DeviceInfoGet',
-      'Ping',
-      'DeviceFirmwareUpdateStatusGet',
     ]);
   });
 
-  test('reconnects Protocol V2 install polling after the USB handle is no longer acquired', async () => {
+  test('retries final device readiness after the USB handle is no longer acquired', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -3105,30 +3108,34 @@ describe('Protocol V2 firmware update targets', () => {
       },
     });
     const typedCall = jest.fn().mockImplementation((name: string) => {
-      if (name === 'DeviceFirmwareUpdateStatusGet') {
+      if (name === 'DeviceStatusGet') {
         const callCount = typedCall.mock.calls.filter(call => call[0] === name).length;
         if (callCount === 1) {
           return Promise.reject(new Error('Device not acquired: PR9999999999'));
         }
         return Promise.resolve({
-          type: 'DeviceFirmwareUpdateStatus',
-          message: {
-            records: [{ target_id: 3, status: 2 }],
-          },
+          type: 'DeviceStatus',
+          message: { device_id: 'PRO2-DEVICE-ID', init_states: true },
         });
       }
       if (name === 'DeviceInfoGet') {
-        return Promise.reject(new Error('DeviceInfo not ready'));
-      }
-      if (name === 'Ping') {
-        return Promise.resolve({ type: 'Success', message: { message: 'ready' } });
+        return Promise.resolve({
+          type: 'DeviceInfo',
+          message: { hw: { serial_no: 'PR9999999999' } },
+        });
       }
       return Promise.reject(new Error(`unexpected call ${name}`));
     });
     const reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
+    const updateProtocolV2Features = jest.fn(() => ({
+      deviceId: 'PRO2-DEVICE-ID',
+      bootloaderMode: false,
+      mode: 'normal',
+    }));
 
     (method as any).device = stubDevice({
       getCommands: () => ({ typedCall }),
+      updateProtocolV2Features,
     });
     (method as any).reconnectProtocolV2Device = reconnectProtocolV2Device;
     method.postProgressMessage = jest.fn();
@@ -3137,10 +3144,15 @@ describe('Protocol V2 firmware update targets', () => {
       { target_id: 3, path: 'vol0:/bootloader.bin' },
     ]);
 
-    expect(reconnectProtocolV2Device).toHaveBeenCalledTimes(1);
+    expect(reconnectProtocolV2Device).toHaveBeenCalledTimes(2);
+    expect(typedCall.mock.calls.map(call => call[0])).toEqual([
+      'DeviceStatusGet',
+      'DeviceStatusGet',
+      'DeviceInfoGet',
+    ]);
   });
 
-  test('treats Protocol V2 normal mode after reconnect as firmware update complete', async () => {
+  test('treats DeviceStatusGet and DeviceInfoGet readiness as firmware update complete', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -3148,8 +3160,14 @@ describe('Protocol V2 firmware update targets', () => {
       },
     });
     const typedCall = jest.fn().mockImplementation((name: string) => {
-      if (name === 'DeviceFirmwareUpdateStatusGet') {
-        return Promise.reject(new Error('Device disconnected'));
+      if (name === 'DeviceStatusGet') {
+        return Promise.resolve({
+          type: 'DeviceStatus',
+          message: {
+            device_id: 'PRO2-DEVICE-ID',
+            init_states: true,
+          },
+        });
       }
       if (name === 'DeviceInfoGet') {
         return Promise.resolve({
@@ -3160,19 +3178,17 @@ describe('Protocol V2 firmware update targets', () => {
               bootloader: { version: '9.9.9' },
               application: { version: '9.9.9' },
             },
-            status: {
-              device_id: 'PRO2-DEVICE-ID',
-              init_states: true,
-            },
           },
         });
       }
       return Promise.reject(new Error(`unexpected call ${name}`));
     });
     const reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
-    const updateProtocolV2Features = jest.fn((deviceInfo: ProtocolV2DeviceInfo) =>
-      normalizeProtocolV2Features({ ...descriptor, protocolType: 'V2' } as any, deviceInfo)
-    );
+    const updateProtocolV2Features = jest.fn(() => ({
+      deviceId: 'PRO2-DEVICE-ID',
+      bootloaderMode: false,
+      mode: 'normal',
+    }));
 
     (method as any).device = stubDevice({
       getCommands: () => ({ typedCall }),
@@ -3182,18 +3198,35 @@ describe('Protocol V2 firmware update targets', () => {
     method.postProgressMessage = jest.fn();
 
     await expect(
-      (method as any).waitForProtocolV2FirmwareUpdateComplete([
-        { target_id: 3, path: 'vol1:bootloader.bin' },
-        { target_id: 4, path: 'vol1:application_p1.bin' },
-      ])
+      (method as any).waitForProtocolV2FirmwareUpdateComplete(
+        [
+          { target_id: 3, path: 'vol1:bootloader.bin' },
+          { target_id: 4, path: 'vol1:application_p1.bin' },
+        ],
+        {
+          type: 'DeviceFirmwareUpdateStatus',
+          message: {
+            records: [
+              { target_id: 3, status: 2 },
+              { target_id: 4, status: 2 },
+            ],
+          },
+        }
+      )
     ).resolves.toBeUndefined();
 
     expect(reconnectProtocolV2Device).toHaveBeenCalledTimes(1);
     expect(updateProtocolV2Features).toHaveBeenCalledTimes(1);
-    expect(typedCall.mock.calls.map(call => call[0])).toEqual([
+    expect(updateProtocolV2Features).toHaveBeenCalledWith(
+      expect.objectContaining({ hw: { serial_no: 'PR9999999999' } }),
+      expect.objectContaining({ device_id: 'PRO2-DEVICE-ID' })
+    );
+    expect(typedCall.mock.calls.map(call => call[0])).toEqual(['DeviceStatusGet', 'DeviceInfoGet']);
+    expect(typedCall).not.toHaveBeenCalledWith(
       'DeviceFirmwareUpdateStatusGet',
-      'DeviceInfoGet',
-    ]);
+      expect.anything(),
+      expect.anything()
+    );
   });
 
   test('uses SDK decoded enum names for Protocol V2 install polling', () => {

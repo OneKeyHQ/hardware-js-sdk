@@ -229,19 +229,6 @@ const isProtocolV2ReconnectProbeError = (error: unknown) => {
   );
 };
 
-const isProtocolV2PollingTransientError = (error: unknown) => {
-  const message = getProtocolV2UnknownErrorText(error).toLowerCase();
-  return (
-    isProtocolV2DeviceDisconnectedError(error) ||
-    isProtocolV2ReconnectProbeError(error) ||
-    message.includes('libusb_transfer_timed_out') ||
-    (message.includes('response timeout') && message.includes('devicefirmwareupdatestatusget')) ||
-    message.includes('device not acquired') ||
-    message.includes('device not found') ||
-    message.includes('transportnotfound')
-  );
-};
-
 const isProtocolV2StartUpdateTransientError = (error: unknown) => {
   const message = getProtocolV2UnknownErrorText(error).toLowerCase();
   return (
@@ -1131,41 +1118,24 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     }
   }
 
-  private async queryProtocolV2FirmwareUpdateStatus() {
-    const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
-    return typedCall(
-      'DeviceFirmwareUpdateStatusGet',
-      'DeviceFirmwareUpdateStatus',
-      {},
-      {
-        timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
-      }
-    );
-  }
-
-  private async pingProtocolV2Device() {
-    const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
-    await typedCall(
-      'Ping',
-      'Success',
-      { message: 'firmware-update' },
-      {
-        timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
-      }
-    );
-  }
-
   private isProtocolV2NormalModeFeatures(features?: Features | null) {
     return !!features && !features.bootloaderMode && features.mode !== 'bootloader';
   }
 
   private async probeProtocolV2NormalMode() {
+    const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
+    const { message: deviceStatus } = await typedCall(
+      'DeviceStatusGet',
+      'DeviceStatus',
+      {},
+      { timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT }
+    );
     const deviceInfo = await requestProtocolV2DeviceInfo({
       commands: this.device.getCommands(),
       timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
       request: PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST,
     });
-    const features = this.device.updateProtocolV2Features(deviceInfo);
+    const features = this.device.updateProtocolV2Features(deviceInfo, deviceStatus);
     assertProtocolV2ReconnectIdentity(
       this.protocolV2ExpectedDeviceId,
       features.deviceId ?? undefined
@@ -1222,9 +1192,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     if (startResponse?.type === 'DeviceFirmwareUpdateStatus') {
       const statusTargets = (startResponse.message.records ??
         []) as ProtocolV2FirmwareUpdateStatusTarget[];
-      if (this.assertProtocolV2TargetStatus(statusTargets, expectedTargetIds)) {
-        return;
-      }
+      // 仅消费安装请求自身返回的状态，用于尽早报告明确失败和安装中进度。
+      // 后续完成判定不再主动轮询 DeviceFirmwareUpdateStatusGet。
+      this.assertProtocolV2TargetStatus(statusTargets, expectedTargetIds);
     }
 
     const startTime = Date.now();
@@ -1232,39 +1202,17 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
     while (Date.now() - startTime < PROTOCOL_V2_INSTALL_TIMEOUT) {
       try {
-        const statusRes = await this.queryProtocolV2FirmwareUpdateStatus();
-        const statusTargets = (statusRes.message.records ??
-          []) as ProtocolV2FirmwareUpdateStatusTarget[];
-        if (this.assertProtocolV2TargetStatus(statusTargets, expectedTargetIds)) {
+        await this.reconnectProtocolV2Device();
+        if (await this.probeProtocolV2NormalMode()) {
           return;
         }
+        lastError = new Error('Protocol V2 device is reachable but is not in normal mode');
       } catch (error) {
         lastError = error;
         if (error instanceof HardwareError && error.errorCode === HardwareErrorCode.FirmwareError) {
           throw error;
         }
-        Log.log('Protocol V2 firmware install status polling failed: ', error);
-        if (isProtocolV2PollingTransientError(error)) {
-          try {
-            await this.reconnectProtocolV2Device();
-            if (await this.probeProtocolV2NormalMode()) {
-              return;
-            }
-          } catch (reconnectError) {
-            lastError = reconnectError;
-            Log.log(
-              'Protocol V2 firmware install reconnect/normal-mode probe failed: ',
-              reconnectError
-            );
-          }
-          try {
-            await this.pingProtocolV2Device();
-            Log.log('Protocol V2 firmware status unavailable, Ping is ready');
-          } catch (pingError) {
-            lastError = pingError;
-            Log.log('Protocol V2 firmware install Ping polling failed: ', pingError);
-          }
-        }
+        Log.log('Protocol V2 firmware install device readiness probe failed: ', error);
       }
       await wait(1000);
     }
