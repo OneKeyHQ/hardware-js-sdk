@@ -1582,6 +1582,49 @@ async function tryDirectConnectById(deviceId: string): Promise<Peripheral | unde
   }
 }
 
+/**
+ * Forensic probes (ONEKEY_BLE_DIAG=1 only), run AFTER subscribe succeeds —
+ * i.e. after the encrypted characteristic has been touched, so link
+ * encryption is established. The decisive readout for WHY the filtered
+ * discovery fails on a fresh link:
+ *  - filtered probe fails pre-encryption (the cold-connect miss) but succeeds
+ *    here -> the device answers targeted ATT queries only when encrypted;
+ *  - fails here too -> the targeted query is never answered by this firmware;
+ *  - elapsedMs classifies the answer source: <~20ms = CB cache, more = air.
+ * The unfiltered probe right after calibrates cache-answer latency on this
+ * link. Fire-and-forget; must never disturb the call path.
+ */
+function runDiagProbes(deviceId: string): void {
+  if (process.env.ONEKEY_BLE_DIAG !== '1') return;
+  const peripheral = connectedDevices.get(deviceId);
+  if (!peripheral || peripheral.state !== 'connected') return;
+
+  const probe = (label: string, filter: string[]) =>
+    new Promise<void>(resolve => {
+      const startedAt = Date.now();
+      const timer = setTimeout(() => {
+        bleTrace(`gatt.diag.${label}`, { deviceId, result: 'timeout', elapsedMs: 3000 });
+        resolve();
+      }, 3000);
+      peripheral.discoverServices(filter, (error, services) => {
+        clearTimeout(timer);
+        bleTrace(`gatt.diag.${label}`, {
+          deviceId,
+          elapsedMs: Date.now() - startedAt,
+          error: error ? String(error) : undefined,
+          uuids: (services ?? []).map(svc => svc.uuid).join('|') || '<empty>',
+        });
+        resolve();
+      });
+    });
+
+  probe('filteredProbe', ONEKEY_SERVICE_UUIDS)
+    .then(() => probe('unfilteredProbe', []))
+    .catch(() => {
+      // forensics must never break the flow
+    });
+}
+
 // Connect to device - supports both discovered and direct connection modes
 async function connectDevice(deviceId: string, webContents: WebContents): Promise<void> {
   logger?.info('[NobleBLE] Connect device request:', {
@@ -1979,6 +2022,8 @@ async function subscribeNotifications(
     await rebuildAppSubscription(deviceId, notifyCharacteristic);
     subscribedDevices.set(deviceId, true);
     bleTrace('subscribe.done', { deviceId });
+    // Encryption is established now (the encrypted characteristic answered).
+    runDiagProbes(deviceId);
   } catch (error) {
     // A subscribe failure on the encryption-gated notify characteristic is the
     // classic broken-bond signature — must always be visible in the trace.
