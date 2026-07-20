@@ -12,7 +12,13 @@
 - `deviceChangePin`：Protocol V1 保持 `ChangePin`；Protocol V2 路由到
   `DeviceSettingsPageShow(DevicePinChange)`。
 - `deviceSettingsPageShow`：在打开 Pro2 设置页前发出统一的设备操作提示。
+- `deviceWipe`：Protocol V1 保持 `WipeDevice`；Protocol V2 路由到
+  `DeviceSettingsPageShow(DeviceReset)`，成功表示擦除确认页已打开。
 - 公共 Event payload：增加稳定的来源、原因、设备输入约束和完成语义。
+
+`uploadPortfolio` 是明确的无 UI Event 例外：文件分片不发送进度 Event，`PortfolioUpdate` 也不需要
+设备确认提示。即使设备锁定后由 SDK 自动调用 `DeviceSessionAskPin`，该方法仍禁止合成
+`REQUEST_PIN/REQUEST_BUTTON`，最终结果只以 firmware 的 `Success/Failure` 为准。
 
 地址、公钥、签名和其他危险设备管理操作不在首批迁移范围，但必须能直接复用本设计的协调器和元数据。
 
@@ -25,6 +31,7 @@
 5. PIN、指纹、设备 Passphrase 和新旧 PIN 始终只在设备上输入。
 6. 页面导航命令的成功表示 `page-accepted`，不表示用户已经完成设置。
 7. Event 的打开、阶段切换、去重和关闭由协调器统一负责，业务方法不直接拼装 Event payload。
+8. 后台数据同步方法可以声明 `protocolV2UiMode='none'`，关闭包括自动解锁提示在内的全部合成 Event。
 
 ## 方案
 

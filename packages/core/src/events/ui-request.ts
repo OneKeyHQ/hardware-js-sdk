@@ -49,6 +49,23 @@ export const UI_REQUEST = {
   NOT_USE_ONEKEY_DEVICE: 'ui-device_please_use_onekey_device',
 } as const;
 
+export type ProtocolV2UiEventSource =
+  | 'unlock-coordinator'
+  | 'wallet-session-coordinator'
+  | 'method-lifecycle';
+
+export type ProtocolV2UiCompletion = 'page-accepted' | 'operation-completed';
+
+export type ProtocolV2UiEventMetadata = {
+  source?: ProtocolV2UiEventSource;
+  reason?: string;
+  deviceOnly?: boolean;
+  completion?: ProtocolV2UiCompletion;
+  method?: string;
+  page?: string | number;
+  operation?: string;
+};
+
 export interface UiRequestWithoutPayload {
   type:
     | typeof UI_REQUEST.CLOSE_UI_WINDOW
@@ -73,17 +90,15 @@ export interface UiRequestFirmwareProgressing {
 
 export type UiRequestDeviceAction = {
   type: typeof UI_REQUEST.REQUEST_PIN;
-  payload: {
+  payload: ProtocolV2UiEventMetadata & {
     device: Device;
     type?: PROTO.PinMatrixRequestType | 'ButtonRequest_PinEntry' | 'ButtonRequest_AttachPin';
-    source?: 'wallet-session-coordinator';
-    reason?: 'open-wallet' | 'session-recovery';
   };
 };
 
 export interface UiRequestButton {
   type: typeof UI_REQUEST.REQUEST_BUTTON;
-  payload: DeviceButtonRequest['payload'];
+  payload: DeviceButtonRequest['payload'] & ProtocolV2UiEventMetadata;
 }
 
 export interface UiRequestPassphrase {

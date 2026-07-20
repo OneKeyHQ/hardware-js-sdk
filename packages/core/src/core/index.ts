@@ -58,6 +58,10 @@ import RequestQueue from './RequestQueue';
 import { registerHardwareUiEventListeners } from './deviceEventRegistration';
 import { getSynchronize } from '../utils/getSynchronize';
 import { runMethodWithUnlockRetry } from '../protocols/protocol-v2/unlockRetry';
+import {
+  ProtocolV2UiInteractionCoordinator,
+  isProtocolV2UiEnabled,
+} from '../protocols/protocol-v2/uiInteraction';
 
 import type { ConnectSettings, Features, KnownDevice } from '../types';
 import type { CoreMessage, IFrameCallMessage, UiPromise, UiPromiseResponse } from '../events';
@@ -410,6 +414,8 @@ const onCallDevice = async (
     DEVICE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE,
     onSelectDeviceInBootloaderForWebDeviceHandler
   );
+
+  const protocolV2UiCoordinator = new ProtocolV2UiInteractionCoordinator(device, postMessage);
   device.on(
     DEVICE.SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE,
     onSelectDeviceForSwitchFirmwareWebDeviceHandler
@@ -620,7 +626,11 @@ const onCallDevice = async (
       method.device?.commands?.checkDisposed();
 
       try {
-        const response: object = await runMethodWithUnlockRetry(method, device);
+        const response: object = await runMethodWithUnlockRetry(
+          method,
+          device,
+          protocolV2UiCoordinator
+        );
         messageResponse = createResponseMessage(method.responseID, true, response);
         requestQueue.resolveRequest(method.responseID, messageResponse);
         completeMethodRequestContext(method);
@@ -637,6 +647,8 @@ const onCallDevice = async (
         ) {
           throw error;
         }
+      } finally {
+        protocolV2UiCoordinator.close();
       }
     };
     Log.debug('Call API - Device Run: ', device.mainId);
@@ -690,7 +702,9 @@ const onCallDevice = async (
 
     requestQueue.releaseTask(method.responseID);
 
-    closePopup();
+    if (isProtocolV2UiEnabled(method)) {
+      closePopup();
+    }
 
     cleanup();
 

@@ -8,6 +8,9 @@ title: deviceChangePin
 
 修改设备的 PIN 码。
 
+在 Pro2 上，该 API 打开设备端修改 PIN 页面，新旧 PIN 均在设备上输入。API 成功只表示页面已经打开，
+不表示用户已完成 PIN 修改。
+
 ```typescript
 const result = await HardwareSDK.deviceChangePin(connectId, params);
 ```
@@ -17,6 +20,8 @@ const result = await HardwareSDK.deviceChangePin(connectId, params);
 [**可选通用参数**](/zh/hardware-sdk/core-api-guide#common-params)
 
 * `remove` - _可选_ `boolean` 请求移除 PIN 码。
+
+> Pro2 当前仅支持 `remove: false`。`remove: true` 会返回参数不支持错误。
 
 ## 示例
 
@@ -36,6 +41,20 @@ HardwareSDK.deviceChangePin(connectId, {
     }
 }
 ```
+
+Pro2 调用期间会收到非阻塞 `UI_REQUEST.REQUEST_BUTTON`：
+
+```typescript
+{
+  source: 'method-lifecycle',
+  reason: 'change-pin',
+  completion: 'page-accepted',
+  deviceOnly: true
+}
+```
+
+应用只需提示用户前往设备操作，不调用 `uiResponse()`。收到 API Success 后可提示“设备页面已打开”，
+不能显示“PIN 修改成功”。
 
 错误
 

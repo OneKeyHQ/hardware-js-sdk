@@ -25,6 +25,8 @@ export default class UploadPortfolio extends FileWrite {
     };
     super.init();
     this.unlockPolicy = 'retry-on-locked';
+    // Portfolio 是后台数据写入与应用流程，设备不需要用户确认；包括自动解锁阶段在内均不合成 UI Event。
+    this.protocolV2UiMode = 'none';
   }
 
   async run() {

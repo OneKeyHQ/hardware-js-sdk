@@ -25,11 +25,32 @@
 
 三个方法显式声明 `retry-on-locked`。只有收到结构化 `DeviceLocked` 时才解锁并重试一次，第二次失败不会循环重试。
 
+页面打开前，SDK 统一发送非阻塞 `REQUEST_BUTTON`，payload 包含
+`source='method-lifecycle'`、`reason='settings-page'`、`completion='page-accepted'` 和具体 `page`。
+App 只展示“请在设备上操作”，不调用 `uiResponse()`。API `Success` 只表示页面已经打开。
+
+公共 `deviceChangePin(remove=false)` 在 Pro2 上复用 `DevicePinChange` 页面并发送
+`reason='change-pin'`；返回成功后不能向用户宣称 PIN 已修改完成。Pro2 当前不支持通过该 API
+执行 `remove=true`。
+
+公共 `deviceWipe()` 在 Pro2 上复用 `DeviceReset` 擦除确认页并发送
+`reason='device-management'`、`operation='wipe-device'`。返回成功同样只表示擦除页面已打开，用户是否
+最终执行擦除由设备页面决定。Protocol V1 仍使用原 `WipeDevice` 最终操作流程。
+
 主要实现：
 
 - `packages/core/src/api/protocol-v2/DeviceSettingsGet.ts`
 - `packages/core/src/api/protocol-v2/DeviceSettingsSet.ts`
 - `packages/core/src/api/protocol-v2/DeviceSettingsPageShow.ts`
+
+## Portfolio 更新
+
+`uploadPortfolio` 是后台文件同步与应用流程，不需要设备确认：
+
+- 文件写入固定关闭分片进度 Event。
+- SDK 不生成 `REQUEST_PIN` 或 `REQUEST_BUTTON`，包括自动解锁阶段。
+- firmware 直接校验 pending package、更新 Portfolio 数据并返回最终 `Success/Failure`。
+- App 以 `PortfolioUpdate` 最终响应为准，不等待设备页面。
 
 ## 壁纸上传
 

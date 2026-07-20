@@ -26,7 +26,7 @@ const SUPPORTED_PAGES = new Set<number>([
 function normalizePage(value: DeviceSettingsPageShowParams['page']): SupportedDeviceSettingsPage {
   const page = typeof value === 'string' ? DeviceSettingsPage[value] : value;
   if (page !== undefined && SUPPORTED_PAGES.has(page)) {
-    return page as SupportedDeviceSettingsPage;
+    return page;
   }
   throw invalidParameter(
     'Parameter [page] must be DeviceReset, DevicePinChange, DevicePassphrase, or DeviceAirgap.'
@@ -45,6 +45,14 @@ export default class DeviceSettingsPageShow extends BaseMethod<{
     this.params = {
       page: normalizePage(this.payload.page),
       field_name: this.payload.field_name ?? this.payload.fieldName,
+    };
+    this.protocolV2UiInteraction = {
+      request: 'button',
+      source: 'method-lifecycle',
+      reason: 'settings-page',
+      completion: 'page-accepted',
+      deviceOnly: true,
+      page: this.params.page,
     };
   }
 

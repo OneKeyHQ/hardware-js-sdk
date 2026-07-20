@@ -154,6 +154,10 @@ Event 必须在取消、超时、断连和方法结束时清理。
 以下 `RECEIVE_PIN` 只适用于 Protocol V1。Protocol V2/Pro2 的 `REQUEST_PIN` 是 SDK 在
 `DeviceLocked` 后合成的非阻塞“请在设备解锁”提示，不接受 PIN 响应。
 
+该提示由统一交互协调器生成，payload 包含 `source='unlock-coordinator'`、
+`reason='device-locked'`、`deviceOnly=true` 和触发方法名。设备解锁后 SDK 在原调用内最多重试一次，
+App 不重发业务请求。声明 `protocolV2UiMode='none'` 的后台方法不会生成该提示。
+
 软件输入：
 
 ```ts
@@ -243,6 +247,12 @@ V1 设备返回 `ButtonRequest` 后，Core 会：
 
 V2 中，地址/公钥、签名和设备管理方法在进入设备交互前直接 emit `REQUEST_BUTTON`，不发送
 `ButtonAck`。应用在两个协议版本下都只需展示“请在设备上确认”，不要调用 `uiResponse()`。
+
+Pro2 设置页 Event 还会携带 `source='method-lifecycle'`、`reason`、`completion` 和 `page`。
+`completion='page-accepted'` 表示 API 成功只证明设备页面已打开，不代表用户已经完成或确认设置。
+
+`uploadPortfolio` 不属于设备确认流程：SDK 不为它生成 `REQUEST_BUTTON/REQUEST_PIN`，文件写入也关闭
+`DEVICE_PROGRESS`。其成功与失败只以最终 `PortfolioUpdate` 响应为准。
 
 ### `REQUEST_PASSPHRASE_ON_DEVICE`
 

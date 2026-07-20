@@ -1,5 +1,5 @@
 import { HardwareErrorCode } from '@onekeyfe/hd-shared';
-import { DeviceRebootType } from '@onekeyfe/hd-transport';
+import { DeviceRebootType, DeviceSettingsPage } from '@onekeyfe/hd-transport';
 
 import * as firmwareBinaryApi from '../src/api/firmware/getBinary';
 import DnxGetAddress from '../src/api/dynex/DnxGetAddress';
@@ -16,8 +16,10 @@ import DeviceGetOnboardingStatus from '../src/api/protocol-v2/DeviceGetOnboardin
 import DeviceInfoGet from '../src/api/protocol-v2/DeviceInfoGet';
 import DeviceReboot from '../src/api/protocol-v2/DeviceReboot';
 import DeviceCancel from '../src/api/device/DeviceCancel';
+import DeviceChangePin from '../src/api/device/DeviceChangePin';
 import DeviceLock from '../src/api/device/DeviceLock';
 import DeviceUnlock from '../src/api/device/DeviceUnlock';
+import DeviceWipe from '../src/api/device/DeviceWipe';
 import DeviceSettingsGet from '../src/api/protocol-v2/DeviceSettingsGet';
 import DeviceSettingsPageShow from '../src/api/protocol-v2/DeviceSettingsPageShow';
 import DeviceSettingsSet from '../src/api/protocol-v2/DeviceSettingsSet';
@@ -214,6 +216,9 @@ describe('UploadPortfolio', () => {
     const result = await method.run();
 
     expect(method.unlockPolicy).toBe('retry-on-locked');
+    expect(method.protocolV2UiMode).toBe('none');
+    expect(method.protocolV2UiInteraction).toBeUndefined();
+    expect(method.payload.emitProgress).toBe(false);
     expect(typedCall).toHaveBeenNthCalledWith(
       1,
       'FilesystemFileWrite',
@@ -4482,7 +4487,9 @@ describe('Protocol V2 protected method execution', () => {
   test('unlocks and retries an opted-in Protocol V2 method once', async () => {
     const calls: string[] = [];
     const method = {
+      name: 'testBusinessMethod',
       unlockPolicy: 'retry-on-locked',
+      protocolV2UiInteraction: { reason: 'settings-page' },
       run: jest
         .fn()
         .mockImplementationOnce(() => {
@@ -4501,11 +4508,23 @@ describe('Protocol V2 protected method execution', () => {
         return Promise.resolve();
       }),
     };
+    const uiCoordinator = {
+      enterMethodInteraction: jest.fn(() => calls.push('method-prompt')),
+      enterUnlockInteraction: jest.fn(() => calls.push('unlock-prompt')),
+      resumeMethodInteraction: jest.fn(() => calls.push('method-prompt')),
+    };
 
-    await expect(runMethodWithUnlockRetry(method as any, device as any)).resolves.toEqual({
-      message: 'ok',
-    });
-    expect(calls).toEqual(['run-1', 'unlock', 'run-2']);
+    await expect(
+      runMethodWithUnlockRetry(method as any, device as any, uiCoordinator as any)
+    ).resolves.toEqual({ message: 'ok' });
+    expect(calls).toEqual([
+      'method-prompt',
+      'run-1',
+      'unlock-prompt',
+      'unlock',
+      'method-prompt',
+      'run-2',
+    ]);
   });
 
   test('does not unlock a Protocol V1 device or a method without the policy', async () => {
@@ -4529,6 +4548,35 @@ describe('Protocol V2 protected method execution', () => {
     }
   });
 
+  test('keeps auto unlock but suppresses all synthesized UI for eventless methods', async () => {
+    const method = {
+      name: 'uploadPortfolio',
+      unlockPolicy: 'retry-on-locked',
+      protocolV2UiMode: 'none',
+      run: jest
+        .fn()
+        .mockRejectedValueOnce(deviceLockedError())
+        .mockResolvedValueOnce({ message: 'ok' }),
+    };
+    const device = {
+      isProtocolV2: () => true,
+      unlockDevice: jest.fn().mockResolvedValue(undefined),
+    };
+    const uiCoordinator = {
+      enterMethodInteraction: jest.fn(),
+      enterUnlockInteraction: jest.fn(),
+      resumeMethodInteraction: jest.fn(),
+    };
+
+    await expect(
+      runMethodWithUnlockRetry(method as any, device as any, uiCoordinator as any)
+    ).resolves.toEqual({ message: 'ok' });
+    expect(device.unlockDevice).toHaveBeenCalledTimes(1);
+    expect(uiCoordinator.enterMethodInteraction).not.toHaveBeenCalled();
+    expect(uiCoordinator.enterUnlockInteraction).not.toHaveBeenCalled();
+    expect(uiCoordinator.resumeMethodInteraction).not.toHaveBeenCalled();
+  });
+
   test('does not retry when unlock fails or when the retry is still locked', async () => {
     const initialError = deviceLockedError();
     const unlockError = new Error('PIN cancelled');
@@ -4540,11 +4588,22 @@ describe('Protocol V2 protected method execution', () => {
       isProtocolV2: () => true,
       unlockDevice: jest.fn().mockRejectedValue(unlockError),
     };
+    const unlockFailCoordinator = {
+      enterMethodInteraction: jest.fn(),
+      enterUnlockInteraction: jest.fn(),
+      resumeMethodInteraction: jest.fn(),
+    };
 
     await expect(
-      runMethodWithUnlockRetry(unlockFailMethod as any, unlockFailDevice as any)
+      runMethodWithUnlockRetry(
+        unlockFailMethod as any,
+        unlockFailDevice as any,
+        unlockFailCoordinator as any
+      )
     ).rejects.toBe(unlockError);
     expect(unlockFailMethod.run).toHaveBeenCalledTimes(1);
+    expect(unlockFailCoordinator.enterUnlockInteraction).toHaveBeenCalledTimes(1);
+    expect(unlockFailCoordinator.resumeMethodInteraction).not.toHaveBeenCalled();
 
     const retryError = deviceLockedError();
     const retryFailMethod = {
@@ -4555,16 +4614,121 @@ describe('Protocol V2 protected method execution', () => {
       isProtocolV2: () => true,
       unlockDevice: jest.fn().mockResolvedValue(undefined),
     };
+    const retryFailCoordinator = {
+      enterMethodInteraction: jest.fn(),
+      enterUnlockInteraction: jest.fn(),
+      resumeMethodInteraction: jest.fn(),
+    };
 
     await expect(
-      runMethodWithUnlockRetry(retryFailMethod as any, retryFailDevice as any)
+      runMethodWithUnlockRetry(
+        retryFailMethod as any,
+        retryFailDevice as any,
+        retryFailCoordinator as any
+      )
     ).rejects.toBe(retryError);
     expect(retryFailMethod.run).toHaveBeenCalledTimes(2);
     expect(retryFailDevice.unlockDevice).toHaveBeenCalledTimes(1);
+    expect(retryFailCoordinator.enterUnlockInteraction).toHaveBeenCalledTimes(1);
+    expect(retryFailCoordinator.resumeMethodInteraction).toHaveBeenCalledTimes(1);
   });
 });
 
 describe('Protocol V2 current low-level methods', () => {
+  test('routes device wipe to the Pro2 reset page with page-accepted semantics', async () => {
+    const v1TypedCall = jest.fn().mockResolvedValue({ message: { message: 'wiped' } });
+    const v1Method = new DeviceWipe({ id: 1, payload: { method: 'deviceWipe' } });
+    v1Method.init();
+    (v1Method as any).device = stubDevice({
+      isProtocolV2: () => false,
+      commands: { typedCall: v1TypedCall },
+    });
+
+    await v1Method.run();
+    expect(v1TypedCall).toHaveBeenCalledWith('WipeDevice', 'Success');
+
+    const v2TypedCall = jest.fn().mockResolvedValue({ message: { message: 'accepted' } });
+    const v2Method = new DeviceWipe({ id: 2, payload: { method: 'deviceWipe' } });
+    v2Method.init();
+    (v2Method as any).device = stubDevice({
+      isProtocolV2: () => true,
+      commands: { typedCall: v2TypedCall },
+    });
+
+    await expect(v2Method.run()).resolves.toEqual({ message: 'accepted' });
+    expect(v2TypedCall).toHaveBeenCalledWith('DeviceSettingsPageShow', 'Success', {
+      page: DeviceSettingsPage.DeviceReset,
+    });
+    expect(v2Method.protocolV2UiInteraction).toEqual({
+      request: 'button',
+      source: 'method-lifecycle',
+      reason: 'device-management',
+      completion: 'page-accepted',
+      deviceOnly: true,
+      page: DeviceSettingsPage.DeviceReset,
+      operation: 'wipe-device',
+    });
+  });
+
+  test('routes Change PIN by protocol and declares a page-accepted interaction for Pro2', async () => {
+    const v1TypedCall = jest.fn().mockResolvedValue({ message: { message: 'ok' } });
+    const v1Method = new DeviceChangePin({
+      id: 1,
+      payload: { method: 'deviceChangePin', remove: false },
+    });
+    v1Method.init();
+    (v1Method as any).device = stubDevice({
+      isProtocolV2: () => false,
+      commands: { typedCall: v1TypedCall },
+    });
+
+    await v1Method.run();
+
+    expect(v1TypedCall).toHaveBeenCalledWith('ChangePin', 'Success', { remove: false });
+
+    const v2TypedCall = jest.fn().mockResolvedValue({ message: { message: 'accepted' } });
+    const v2Method = new DeviceChangePin({
+      id: 2,
+      payload: { method: 'deviceChangePin', remove: false },
+    });
+    v2Method.init();
+    (v2Method as any).device = stubDevice({
+      isProtocolV2: () => true,
+      commands: { typedCall: v2TypedCall },
+    });
+
+    await expect(v2Method.run()).resolves.toEqual({ message: 'accepted' });
+    expect(v2TypedCall).toHaveBeenCalledWith('DeviceSettingsPageShow', 'Success', {
+      page: DeviceSettingsPage.DevicePinChange,
+    });
+    expect(v2Method.protocolV2UiInteraction).toEqual({
+      request: 'button',
+      source: 'method-lifecycle',
+      reason: 'change-pin',
+      completion: 'page-accepted',
+      deviceOnly: true,
+      page: DeviceSettingsPage.DevicePinChange,
+    });
+  });
+
+  test('rejects removing a PIN through the Pro2 page-only Change PIN flow', async () => {
+    const typedCall = jest.fn();
+    const method = new DeviceChangePin({
+      id: 1,
+      payload: { method: 'deviceChangePin', remove: true },
+    });
+    method.init();
+    (method as any).device = stubDevice({
+      isProtocolV2: () => true,
+      commands: { typedCall },
+    });
+
+    await expect(method.run()).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.CallMethodInvalidParameter,
+    });
+    expect(typedCall).not.toHaveBeenCalled();
+  });
+
   test('sends ProtocolInfoRequest from protocolInfoRequest', async () => {
     const typedCall = jest.fn().mockResolvedValue({ message: { version: 1 } });
     const method = new ProtocolInfoRequest({
@@ -4675,6 +4839,14 @@ describe('Protocol V2 current low-level methods', () => {
     expect(typedCall).toHaveBeenCalledWith('DeviceSettingsPageShow', 'Success', {
       page: 3,
       field_name: 'airgap_mode',
+    });
+    expect(method.protocolV2UiInteraction).toEqual({
+      request: 'button',
+      source: 'method-lifecycle',
+      reason: 'settings-page',
+      completion: 'page-accepted',
+      deviceOnly: true,
+      page: DeviceSettingsPage.DeviceAirgap,
     });
   });
 

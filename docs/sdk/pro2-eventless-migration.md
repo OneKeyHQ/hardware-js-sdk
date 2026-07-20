@@ -152,6 +152,8 @@ requestId/connectId 关联，并在取消、超时、断连和方法结束时清
 - Pro2 `REQUEST_PIN` 是非阻塞设备提示。
 - 非幂等方法只有在 firmware 保证 locked 发生于副作用前时才能启用自动重试。
 - 同一设备并发调用共享串行解锁任务。
+- `uploadPortfolio` 通过 `protocolV2UiMode='none'` 明确关闭自动解锁提示；它可以继续走内部解锁与重试，
+  但不会产生 `REQUEST_PIN/REQUEST_BUTTON`。
 
 ## 地址、公钥、签名和设备管理
 
@@ -160,8 +162,15 @@ requestId/connectId 关联，并在取消、超时、断连和方法结束时清
 - 地址/公钥：仅 `showOnOneKey=true` 时发送。
 - 签名：进入设备签名交互时发送一次通用提示，不逐页复刻输出/费用/风险 Button code。
 - 设备管理：根据页面导航或危险操作发送；明确区分“页面已接受”和“操作已完成”。
+- Change PIN：公共 `deviceChangePin(remove=false)` 在 Pro2 上路由到
+  `DeviceSettingsPageShow(DevicePinChange)`，成功表示页面已接受；`remove=true` 当前不支持。
+- Wipe：公共 `deviceWipe()` 在 Pro2 上路由到 `DeviceSettingsPageShow(DeviceReset)`，成功表示擦除确认页
+  已打开；V1 仍保留 `WipeDevice` 最终操作语义。
 
 App 继续展示现有设备确认 UI，不调用 `uiResponse()`。成功、失败、取消、超时和断连时统一关闭。
+
+Portfolio 是例外：firmware 的 `PortfolioUpdate` 直接校验并应用数据后返回最终结果，不打开确认页面；
+SDK 不合成交互 Event，也不发送文件分片进度 Event。
 
 ## Onboarding 安全边界
 
