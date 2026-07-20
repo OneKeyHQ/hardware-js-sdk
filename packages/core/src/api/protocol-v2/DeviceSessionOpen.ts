@@ -53,9 +53,10 @@ const normalizeParams = (payload: Record<string, unknown>): DeviceSessionOpenPar
   if (!isRecord(payload.select)) {
     throw invalidParameter('Parameter [select] must be a hidden-wallet selection object.');
   }
+  const { select } = payload;
   const accessKeys = ['host_passphrase', 'passphrase_on_device', 'attach_pin_on_device'] as const;
-  const selected = accessKeys.filter(key => payload.select?.[key] !== undefined);
-  const unknown = Object.keys(payload.select).filter(
+  const selected = accessKeys.filter(key => select[key] !== undefined);
+  const unknown = Object.keys(select).filter(
     key => !accessKeys.includes(key as (typeof accessKeys)[number])
   );
   if (unknown.length > 0 || selected.length !== 1) {
@@ -63,7 +64,7 @@ const normalizeParams = (payload: Record<string, unknown>): DeviceSessionOpenPar
   }
 
   if (selected[0] === 'host_passphrase') {
-    const host = payload.select.host_passphrase;
+    const host = select.host_passphrase;
     if (!isRecord(host) || typeof host.passphrase !== 'string') {
       throw invalidParameter('Parameter [select.host_passphrase.passphrase] is required.');
     }
@@ -74,7 +75,10 @@ const normalizeParams = (payload: Record<string, unknown>): DeviceSessionOpenPar
     return { select: { host_passphrase: { passphrase } } };
   }
 
-  return { select: { [selected[0]]: {} } } as DeviceSessionOpenParams;
+  if (selected[0] === 'passphrase_on_device') {
+    return { select: { passphrase_on_device: {} } };
+  }
+  return { select: { attach_pin_on_device: {} } };
 };
 
 export default class DeviceSessionOpen extends BaseMethod<DeviceSessionOpenParams> {

@@ -539,7 +539,7 @@ Protocol V2 采用“Host 显式选择、Firmware 本地完成设备交互”的
 
 | 能力                | Firmware / SE 职责                                           | SDK / Host 职责                                                         |
 | ------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------- |
-| 标准钱包            | 保持默认空 Passphrase seed 上下文                             | 不调用 `DeviceSessionOpen`，不访问隐藏钱包缓存                          |
+| 标准钱包            | 保持默认空 Passphrase seed 上下文                            | 不调用 `DeviceSessionOpen`，不访问隐藏钱包缓存                          |
 | Host Passphrase     | 使用请求携带的 Passphrase 建立隐藏钱包 Session               | 通过既有 UI Event 获取输入、NFKD 规范化、发送 `host_passphrase`         |
 | 设备 Passphrase     | 直接显示设备 Passphrase 页面并建立 Session                   | 先补发等待设备 Event，再发送 `passphrase_on_device`                     |
 | 使用已有 Attach PIN | 直接显示 Attach PIN 页面，恢复绑定 Passphrase 并建立 Session | 根据 `attach_to_pin_enabled` 展示入口，发送 `attach_pin_on_device`      |

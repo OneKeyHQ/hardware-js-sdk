@@ -20,7 +20,7 @@
 - 生成：`packages/hd-transport/src/types/messages.ts`
 - 测试：`packages/core/__tests__/protocol-v2.test.ts`
 
-1. 先增加类型/序列化测试，验证 `DeviceSessionOpen` 只支持隐藏钱包的 `resume`、Host Passphrase、设备 Passphrase和 Attach PIN 选择，协议类型中不存在 `STANDARD`、`wallet_type` 和 `hidden_wallet` 包装层。
+1. 先增加类型/序列化测试，验证 `DeviceSessionOpen` 只支持隐藏钱包的 `resume`、Host Passphrase、设备 Passphrase 和 Attach PIN 选择，协议类型中不存在 `STANDARD`、`wallet_type` 和 `hidden_wallet` 包装层。
 2. 运行单测，确认因消息类型尚不存在而失败。
 3. 在 Pro2 proto 中以消息号 `60606` 替换 `DeviceSessionGet`，定义互斥的 `resume` / `select` 载荷；`select` 直接包含三种隐藏钱包 access，保留 `DeviceSession` 返回结构。
 4. 运行 `yarn workspace @onekeyfe/hd-transport update:protobuf` 生成 SDK 两份 schema 和 TypeScript 类型。
