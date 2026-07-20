@@ -141,17 +141,17 @@ export function MultisigParameterEditor({
 
     return (
       <div key={id} className={className}>
-        <Label htmlFor={id} className="mb-1.5 block text-xs text-muted-foreground">
+        <Label htmlFor={id} className="mb-1 block text-[11px] text-muted-foreground">
           {field.label}
         </Label>
         {field.type === 'select' ? (
           <Select value={String(value ?? '')} disabled={disabled} onValueChange={handleValue}>
-            <SelectTrigger id={id}>
+          <SelectTrigger id={id} className="h-8 px-2.5 text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {field.options?.map(option => (
-                <SelectItem key={option} value={option}>
+                <SelectItem key={option} value={option} className="text-xs">
                   {option}
                 </SelectItem>
               ))}
@@ -163,7 +163,7 @@ export function MultisigParameterEditor({
             value={String(value ?? '')}
             disabled={disabled}
             onChange={event => handleValue(event.target.value)}
-            className="min-h-24 font-mono text-xs"
+            className="min-h-20 px-2.5 py-2 font-mono text-xs"
           />
         ) : (
           <Input
@@ -172,7 +172,7 @@ export function MultisigParameterEditor({
             value={String(value ?? '')}
             disabled={disabled}
             onChange={event => handleValue(event.target.value)}
-            className="font-mono text-xs"
+            className="h-8 px-2.5 font-mono text-xs"
           />
         )}
       </div>
@@ -181,16 +181,22 @@ export function MultisigParameterEditor({
 
   return (
     <section className="flex min-h-0 flex-1 flex-col border-b border-border bg-background">
-      <div className="flex shrink-0 flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-4">
+      <div className="flex shrink-0 flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3">
         <div className="min-w-0 flex-1">
           {testCase.builtIn ? (
             <>
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="truncate text-lg font-semibold">{testCase.title}</h1>
-                <Badge variant="outline">只读基准</Badge>
-                {dirty ? <Badge variant="warning">已修改</Badge> : null}
+                <h1 className="truncate text-base font-semibold">{testCase.title}</h1>
+                <Badge variant="outline" className="px-2 py-0.5 text-[10px]">
+                  只读基准
+                </Badge>
+                {dirty ? (
+                  <Badge variant="warning" className="px-2 py-0.5 text-[10px]">
+                    已修改
+                  </Badge>
+                ) : null}
               </div>
-              <p className="mt-1 text-sm text-muted-foreground">{testCase.description}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{testCase.description}</p>
             </>
           ) : (
             <div className="max-w-xl">
@@ -231,32 +237,39 @@ export function MultisigParameterEditor({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 space-y-4 overflow-visible px-5 py-4 lg:overflow-y-auto">
+      <div className="min-h-0 flex-1 space-y-3 overflow-visible px-4 py-3 lg:overflow-y-auto">
         <div>
-          <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="mb-2.5 flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-sm font-semibold">快捷字段</h2>
-              <p className="text-xs text-muted-foreground">常用字段会同步到完整 SDK 请求参数。</p>
+              <h2 className="text-xs font-semibold">快捷字段</h2>
+              <p className="text-[11px] text-muted-foreground">
+                常用字段会同步到完整 SDK 请求参数。
+              </p>
             </div>
             <Button
               type="button"
               size="sm"
               variant={advancedOpen ? 'secondary' : 'ghost'}
               onClick={() => setAdvancedOpen(value => !value)}
+              className="h-7 px-3 text-[11px]"
             >
               <Braces className="h-4 w-4" />
               高级 JSON
             </Button>
           </div>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">{quickFields.map(renderField)}</div>
+          <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
+            {quickFields.map(renderField)}
+          </div>
         </div>
 
         {advancedOpen ? (
           <div className="border-t border-border pt-4">
             <div className="mb-2 flex items-center justify-between">
               <div>
-                <h2 className="text-sm font-semibold">完整请求参数</h2>
-                <p className="text-xs text-muted-foreground">JSON 合法并通过方法校验后才会应用。</p>
+                <h2 className="text-xs font-semibold">完整请求参数</h2>
+                <p className="text-[11px] text-muted-foreground">
+                  JSON 合法并通过方法校验后才会应用。
+                </p>
               </div>
               <Button
                 size="sm"

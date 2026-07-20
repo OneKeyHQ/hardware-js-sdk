@@ -63,9 +63,9 @@ export function MultisigExecutionPanel({
       };
 
   return (
-    <section className="grid shrink-0 grid-cols-1 gap-px bg-border lg:h-[clamp(300px,32vh,360px)] xl:grid-cols-[minmax(380px,0.48fr)_minmax(0,0.52fr)]">
+    <section className="grid shrink-0 grid-cols-1 gap-px bg-border lg:h-[clamp(280px,30vh,330px)] xl:grid-cols-[minmax(360px,0.48fr)_minmax(0,0.52fr)]">
       <div className="flex min-h-0 flex-col overflow-hidden bg-card">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 px-5 py-3.5">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 px-4 py-3">
           <div className="min-w-[220px] flex-1">
             <div className="flex items-center gap-2">
               <Usb className="h-3.5 w-3.5 text-muted-foreground" />
@@ -94,7 +94,7 @@ export function MultisigExecutionPanel({
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
           {testCase.testMnemonicOnly ? (
             <Alert variant="warning" className="mb-4 py-2.5">
               <ShieldAlert className="h-4 w-4" />
@@ -105,7 +105,7 @@ export function MultisigExecutionPanel({
             </Alert>
           ) : null}
 
-          <div className="grid grid-cols-2 gap-x-8 gap-y-4">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-3">
             {summary.map(item => (
               <div key={item.label} className="min-w-0">
                 <div className="text-[11px] font-medium text-muted-foreground">{item.label}</div>
@@ -134,7 +134,7 @@ export function MultisigExecutionPanel({
       </div>
 
       <div className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-background">
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border/70 px-5 py-4">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border/70 px-4 py-3">
           <div>
             <h2 className="text-xs font-semibold">结果与错误</h2>
             <p className="mt-1 text-[11px] leading-4 text-muted-foreground">

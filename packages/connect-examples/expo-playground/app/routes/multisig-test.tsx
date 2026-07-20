@@ -165,7 +165,7 @@ export default function MultisigTestPage() {
         <Breadcrumb items={[{ label: 'Multisig Test', icon: ShieldCheck }]} />
       </div>
       <DeviceNotConnectedState className="mx-4 mt-3 shrink-0 shadow-none" />
-      <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-[minmax(260px,0.27fr)_minmax(0,1fr)] lg:overflow-hidden">
+      <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-[280px_minmax(0,1fr)] lg:overflow-hidden xl:grid-cols-[300px_minmax(0,1fr)]">
         <MultisigCaseLibrary
           cases={allCases}
           selectedId={selectedCase.id}
