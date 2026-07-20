@@ -6,7 +6,6 @@ import type {
   ValidationResult,
 } from '../../features/multisig/types';
 import { Alert, AlertDescription, AlertTitle } from '../ui/Alert';
-import { DeviceNotConnectedState } from '../common/DeviceNotConnectedState';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 
@@ -63,10 +62,6 @@ export function MultisigExecutionPanel({
         </div>
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
-          {!canExecute && !testCase.localOnly ? (
-            <DeviceNotConnectedState className="border-border bg-background shadow-none" />
-          ) : null}
-
           {testCase.testMnemonicOnly ? (
             <Alert variant="warning" className="py-2.5">
               <ShieldAlert className="h-4 w-4" />

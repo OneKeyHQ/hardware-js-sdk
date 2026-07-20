@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ShieldCheck } from 'lucide-react';
 
+import { DeviceNotConnectedState } from '../components/common/DeviceNotConnectedState';
 import { MultisigCaseLibrary } from '../components/multisig/MultisigCaseLibrary';
 import {
   MultisigExecutionPanel,
@@ -163,6 +164,7 @@ export default function MultisigTestPage() {
       <div className="border-b border-border px-4 py-3">
         <Breadcrumb items={[{ label: 'Multisig Test', icon: ShieldCheck }]} />
       </div>
+      <DeviceNotConnectedState className="mx-4 mt-3 shrink-0 shadow-none" />
       <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-[minmax(260px,0.27fr)_minmax(0,1fr)] lg:overflow-hidden">
         <MultisigCaseLibrary
           cases={allCases}
