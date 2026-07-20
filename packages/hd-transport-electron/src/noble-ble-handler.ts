@@ -1437,8 +1437,11 @@ async function setupConnectionAndDiscoverServices(
     // on Classic 2026-07-19) — skip it there and save ~100ms per cold connect.
     // Other platforms keep the filtered attempt until their uuid form is
     // field-confirmed via the gatt.discovery.services trace.
+    // ONEKEY_BLE_DIAG=1 re-enables the filtered attempt on macOS as a probe:
+    // its per-combination success/failure (route field + direct.miss traces) is
+    // the readout for the device-model / BLE-firmware / CB-cache test matrix.
     const discoveryAttempts =
-      process.platform === 'darwin'
+      process.platform === 'darwin' && process.env.ONEKEY_BLE_DIAG !== '1'
         ? (['unfiltered'] as const)
         : (['filtered', 'unfiltered'] as const);
     // eslint-disable-next-line no-restricted-syntax
