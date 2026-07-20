@@ -210,6 +210,7 @@ const TYPE_PATCH = {
   'TonSignMessage.ext_ton_amount': UINT_TYPE,
   'TonSignData.timestamp': UINT_TYPE,
   'TonSignProof.expire_at': UINT_TYPE,
+  'TonSignData.timestamp': UINT_TYPE,
 };
 
 const DEFINITION_PATCH = {

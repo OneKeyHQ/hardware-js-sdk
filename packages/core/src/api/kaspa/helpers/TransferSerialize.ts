@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+
 import { SignatureType } from './SignatureType';
 import { HashWriter } from './HashWriter';
 
@@ -76,6 +78,12 @@ function getSigOpCountsHash(transaction: KaspaSignTransactionParams, sighashType
 function hashTxOut(hashWriter: HashWriter, output: KaspaSignOutputParams) {
   hashWriter.writeUInt64LE(output.satoshis);
   hashWriter.writeUInt16LE(0); // TODO: USE REAL SCRIPT VERSION
+  if (output.script === undefined) {
+    throw ERRORS.TypedError(
+      HardwareErrorCode.CallMethodInvalidParameter,
+      'Kaspa legacy sighash requires output.script'
+    );
+  }
   hashWriter.writeVarBytes(Buffer.from(output.script, 'hex'));
 }
 
@@ -126,6 +134,12 @@ export function serialize(transaction: KaspaSignTransactionParams, inputNumber: 
   const input = transaction.inputs[inputNumber];
   hashOutpoint(hashWriter, input);
   hashWriter.writeUInt16LE(0); // TODO: USE REAL SCRIPT VERSION
+  if (input.output.script === undefined) {
+    throw ERRORS.TypedError(
+      HardwareErrorCode.CallMethodInvalidParameter,
+      'Kaspa legacy sighash requires input.output.script'
+    );
+  }
   hashWriter.writeVarBytes(Buffer.from(input.output.script, 'hex'));
   hashWriter.writeUInt64LE(input.output.satoshis);
   hashWriter.writeUInt64LE(input.sequenceNumber);

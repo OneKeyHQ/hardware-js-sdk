@@ -6,6 +6,7 @@ const handlers = {
   button: jest.fn(),
   passphrase: jest.fn(),
   passphraseOnDevice: jest.fn(),
+  attachPinOnDevice: jest.fn(),
 };
 
 const createDevice = (protocolV2: boolean) => ({
@@ -23,6 +24,7 @@ describe('hardware UI event registration', () => {
       DEVICE.BUTTON,
       DEVICE.PASSPHRASE,
       DEVICE.PASSPHRASE_ON_DEVICE,
+      DEVICE.ATTACH_PIN_ON_DEVICE,
     ]);
   });
 
@@ -35,6 +37,7 @@ describe('hardware UI event registration', () => {
       DEVICE.BUTTON,
       DEVICE.PASSPHRASE,
       DEVICE.PASSPHRASE_ON_DEVICE,
+      DEVICE.ATTACH_PIN_ON_DEVICE,
     ]);
   });
 });
