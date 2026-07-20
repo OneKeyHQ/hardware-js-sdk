@@ -189,19 +189,7 @@ const createHarness = () => {
 };
 
 describe('NodeUsbTransport Protocol V2 link lifecycle', () => {
-  test('trusts explicit Protocol V2 during bootloader reconnect without probing Ping', async () => {
-    const harness = createHarness();
-    const { transport, path, epOut } = harness;
-
-    await transport.enumerate();
-    await transport.acquire({ path, expectedProtocol: 'V2' });
-
-    expect(epOut.transfer).not.toHaveBeenCalled();
-    expect(transport.getProtocolType(path)).toBe('V2');
-    await transport.release(path);
-  });
-
-  test('keeps seq across calls and reacquire without probing explicit V2', async () => {
+  test('keeps seq across probe, call and reacquire', async () => {
     const harness = createHarness();
     const { transport, path, sentSeqs } = harness;
 
@@ -211,7 +199,7 @@ describe('NodeUsbTransport Protocol V2 link lifecycle', () => {
     await harness.acquire();
     await transport.call(path, 'Ping', { message: 'second' });
 
-    expect(sentSeqs).toEqual([1, 2]);
+    expect(sentSeqs).toEqual([1, 2, 3, 4]);
     await transport.release(path);
   });
 
@@ -266,7 +254,7 @@ describe('NodeUsbTransport Protocol V2 link lifecycle', () => {
     await harness.acquire();
     await transport.call(path, 'Ping', { message: 'after-timeout' });
 
-    expect(sentSeqs).toEqual([1, 2]);
+    expect(sentSeqs).toEqual([1, 2, 3, 4]);
     await transport.release(path);
   });
 });

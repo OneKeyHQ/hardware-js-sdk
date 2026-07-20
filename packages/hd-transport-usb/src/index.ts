@@ -743,19 +743,18 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
     path: string,
     expectedProtocol?: ProtocolType
   ): Promise<ProtocolType> {
-    if (expectedProtocol === 'V2') {
-      // 固件升级重启后的 bootloader 不保证响应 Ping。上层显式传入 V2
-      // 表示协议已在重启前确认；直接建立 V2 链路，由首个业务命令验证
-      // bootloader 是否已经完成 USB 初始化。
-      this.deviceProtocol.set(path, 'V2');
-      this.Log?.debug(`[NodeUsbTransport] detectProtocol: path=${path} -> V2 (expected)`);
-      return 'V2';
-    }
-
     if (expectedProtocol === 'V1') {
       if (await this.probeProtocolV1(path)) {
         this.deviceProtocol.set(path, 'V1');
         return 'V1';
+      }
+      throw this.createProtocolMismatchError(expectedProtocol);
+    }
+
+    if (expectedProtocol === 'V2') {
+      if (await this.probeProtocolV2(path)) {
+        this.deviceProtocol.set(path, 'V2');
+        return 'V2';
       }
       throw this.createProtocolMismatchError(expectedProtocol);
     }
