@@ -11,7 +11,7 @@ export default class DeviceWipe extends BaseMethod<WipeDevice> {
       request: 'button',
       source: 'method-lifecycle',
       reason: 'device-management',
-      completion: 'page-accepted',
+      completion: 'operation-completed',
       deviceOnly: true,
       page: DeviceSettingsPage.DeviceReset,
       operation: 'wipe-device',

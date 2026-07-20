@@ -700,8 +700,8 @@ describe('Protocol V2 feature adapter', () => {
   test.each([
     {
       name: 'Host Passphrase',
-      response: { passphrase: 'hidden secret' },
-      select: { host_passphrase: { passphrase: 'hidden secret' } },
+      response: { passphrase: 'hidden\u00e9 secret' },
+      select: { host_passphrase: { passphrase: 'hidden\u0065\u0301 secret' } },
       event: undefined,
     },
     {
@@ -4600,6 +4600,40 @@ describe('Protocol V2 protected method execution', () => {
     ]);
   });
 
+  test('unlocks before showing the method interaction when cached status is locked', async () => {
+    const calls: string[] = [];
+    const method = {
+      name: 'deviceSettingsPageShow',
+      unlockPolicy: 'retry-on-locked',
+      protocolV2UiInteraction: { reason: 'settings-page' },
+      run: jest.fn(() => {
+        calls.push('run');
+        return Promise.resolve({ message: 'ok' });
+      }),
+    };
+    const device = {
+      features: { unlocked: false },
+      isProtocolV2: () => true,
+      unlockDevice: jest.fn(() => {
+        calls.push('unlock');
+        return Promise.resolve();
+      }),
+    };
+    const uiCoordinator = {
+      enterMethodInteraction: jest.fn(() => calls.push('method-prompt')),
+      enterUnlockInteraction: jest.fn(() => calls.push('unlock-prompt')),
+      resumeMethodInteraction: jest.fn(() => calls.push('method-prompt')),
+    };
+
+    await expect(
+      runMethodWithUnlockRetry(method as any, device as any, uiCoordinator as any)
+    ).resolves.toEqual({ message: 'ok' });
+    expect(calls).toEqual(['unlock-prompt', 'unlock', 'method-prompt', 'run']);
+    expect(method.run).toHaveBeenCalledTimes(1);
+    expect(uiCoordinator.enterMethodInteraction).toHaveBeenCalledTimes(1);
+    expect(uiCoordinator.resumeMethodInteraction).not.toHaveBeenCalled();
+  });
+
   test('infers a signing interaction before running a Protocol V2 business method', async () => {
     const method = {
       name: 'evmSignMessage',
@@ -4738,7 +4772,7 @@ describe('Protocol V2 protected method execution', () => {
 });
 
 describe('Protocol V2 current low-level methods', () => {
-  test('routes device wipe to the Pro2 reset page with page-accepted semantics', async () => {
+  test('routes device wipe to the Pro2 reset page until the operation completes', async () => {
     const v1TypedCall = jest.fn().mockResolvedValue({ message: { message: 'wiped' } });
     const v1Method = new DeviceWipe({ id: 1, payload: { method: 'deviceWipe' } });
     v1Method.init();
@@ -4766,14 +4800,14 @@ describe('Protocol V2 current low-level methods', () => {
       request: 'button',
       source: 'method-lifecycle',
       reason: 'device-management',
-      completion: 'page-accepted',
+      completion: 'operation-completed',
       deviceOnly: true,
       page: DeviceSettingsPage.DeviceReset,
       operation: 'wipe-device',
     });
   });
 
-  test('routes Change PIN by protocol and declares a page-accepted interaction for Pro2', async () => {
+  test('routes Change PIN by protocol and waits for the Pro2 operation result', async () => {
     const v1TypedCall = jest.fn().mockResolvedValue({ message: { message: 'ok' } });
     const v1Method = new DeviceChangePin({
       id: 1,
@@ -4808,7 +4842,7 @@ describe('Protocol V2 current low-level methods', () => {
       request: 'button',
       source: 'method-lifecycle',
       reason: 'change-pin',
-      completion: 'page-accepted',
+      completion: 'operation-completed',
       deviceOnly: true,
       page: DeviceSettingsPage.DevicePinChange,
     });
@@ -4985,7 +5019,7 @@ describe('Protocol V2 current low-level methods', () => {
       request: 'button',
       source: 'method-lifecycle',
       reason: 'settings-page',
-      completion: 'page-accepted',
+      completion: 'operation-completed',
       deviceOnly: true,
       page: DeviceSettingsPage.DeviceAirgap,
     });

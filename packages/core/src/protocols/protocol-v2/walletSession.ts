@@ -22,6 +22,17 @@ const getErrorText = (error: unknown) => {
 export const isProtocolV2InvalidSessionError = (error: unknown) =>
   getErrorText(error).toLowerCase().includes('failure_invalidsession');
 
+const normalizeHostPassphrase = (passphrase: string | undefined) => {
+  const normalized = (passphrase ?? '').normalize('NFKD');
+  if (!normalized || normalized.includes('\0') || normalized.length > 50) {
+    throw ERRORS.TypedError(
+      HardwareErrorCode.CallMethodInvalidParameter,
+      'Invalid hidden wallet passphrase.'
+    );
+  }
+  return normalized;
+};
+
 export async function requestProtocolV2DeviceStatus(device: Device) {
   const { message } = await device.commands.typedCall('DeviceStatusGet', 'DeviceStatus', {});
   return message;
@@ -75,7 +86,7 @@ const createHiddenWalletRequest = (
   return {
     request: {
       select: {
-        host_passphrase: { passphrase: response.passphrase ?? '' },
+        host_passphrase: { passphrase: normalizeHostPassphrase(response.passphrase) },
       },
     },
   };

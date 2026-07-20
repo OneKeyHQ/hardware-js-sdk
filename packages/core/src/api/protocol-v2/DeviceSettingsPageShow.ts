@@ -50,7 +50,7 @@ export default class DeviceSettingsPageShow extends BaseMethod<{
       request: 'button',
       source: 'method-lifecycle',
       reason: 'settings-page',
-      completion: 'page-accepted',
+      completion: 'operation-completed',
       deviceOnly: true,
       page: this.params.page,
     };

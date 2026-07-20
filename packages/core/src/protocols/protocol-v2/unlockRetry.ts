@@ -12,7 +12,7 @@ type RunnableMethod = Pick<
   BaseMethod,
   'run' | 'unlockPolicy' | 'protocolV2UiInteraction' | 'protocolV2UiMode' | 'params' | 'payload'
 > & { name?: string };
-type UnlockableDevice = Pick<Device, 'isProtocolV2' | 'unlockDevice'>;
+type UnlockableDevice = Pick<Device, 'isProtocolV2' | 'unlockDevice' | 'features'>;
 type UiInteractionCoordinator = Pick<
   ProtocolV2UiInteractionCoordinator,
   'enterMethodInteraction' | 'enterUnlockInteraction' | 'resumeMethodInteraction'
@@ -24,6 +24,23 @@ export async function runMethodWithUnlockRetry(
   uiCoordinator?: UiInteractionCoordinator
 ) {
   const shouldEmitUi = isProtocolV2UiEnabled(method);
+  const shouldUnlockBeforeRun =
+    device.isProtocolV2() &&
+    method.unlockPolicy === 'retry-on-locked' &&
+    device.features?.unlocked === false;
+
+  if (shouldUnlockBeforeRun) {
+    if (shouldEmitUi) {
+      uiCoordinator?.enterUnlockInteraction(method.name);
+    }
+    await device.unlockDevice();
+    Log.debug('Protocol V2 pre-unlock completed', { method: method.name });
+    if (shouldEmitUi) {
+      uiCoordinator?.enterMethodInteraction(resolveProtocolV2UiInteraction(method));
+    }
+    return method.run();
+  }
+
   if (shouldEmitUi) {
     uiCoordinator?.enterMethodInteraction(resolveProtocolV2UiInteraction(method));
   }

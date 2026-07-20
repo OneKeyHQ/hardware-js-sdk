@@ -20,7 +20,7 @@ export default class DeviceChangePin extends BaseMethod<ChangePin> {
       request: 'button',
       source: 'method-lifecycle',
       reason: 'change-pin',
-      completion: 'page-accepted',
+      completion: 'operation-completed',
       deviceOnly: true,
       page: DeviceSettingsPage.DevicePinChange,
     };
