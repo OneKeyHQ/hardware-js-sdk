@@ -236,6 +236,7 @@ const isProtocolV2PollingTransientError = (error: unknown) => {
     isProtocolV2ReconnectProbeError(error) ||
     message.includes('libusb_transfer_timed_out') ||
     (message.includes('response timeout') && message.includes('devicefirmwareupdatestatusget')) ||
+    message.includes('device not acquired') ||
     message.includes('device not found') ||
     message.includes('transportnotfound')
   );
@@ -940,7 +941,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           commands: this.device.getCommands(),
           timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
         });
-        const features = this.device.updateProtocolV2Features(deviceInfo);
+        // 重启进入 bootloader 后，旧的普通模式 DeviceStatus 已失效。
+        // 此阶段只以新的 DeviceInfo 为准，避免继续请求或复用 DeviceStatus。
+        const features = this.device.updateProtocolV2Features(deviceInfo, null);
         assertProtocolV2ReconnectIdentity(
           this.protocolV2ExpectedDeviceId,
           features.deviceId ?? undefined,
@@ -1370,7 +1373,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       await this.device.acquire(PROTOCOL_V2_CONNECT_PROTOCOL, { throwOnRunPromiseError: true });
       this.device.commands.disposed = false;
       this.device.getCommands().mainId = this.device.mainId ?? '';
-      await this.device.initialize();
       assertProtocolV2ReconnectIdentity(
         this.protocolV2ExpectedDeviceId,
         this.device.getCurrentDeviceId(),
@@ -1396,7 +1398,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     await this.device.acquire(PROTOCOL_V2_CONNECT_PROTOCOL, { throwOnRunPromiseError: true });
     this.device.commands.disposed = false;
     this.device.getCommands().mainId = this.device.mainId ?? '';
-    await this.device.initialize();
     assertProtocolV2ReconnectIdentity(
       this.protocolV2ExpectedDeviceId,
       this.device.getCurrentDeviceId(),

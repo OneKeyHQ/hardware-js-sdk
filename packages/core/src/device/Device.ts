@@ -879,12 +879,19 @@ export class Device extends EventEmitter {
     this.emit(DEVICE.FEATURES, this, feat);
   }
 
-  updateProtocolV2Features(deviceInfo?: ProtocolV2DeviceInfo, deviceStatus?: DeviceStatus) {
+  updateProtocolV2Features(
+    deviceInfo?: ProtocolV2DeviceInfo,
+    deviceStatus?: DeviceStatus | null
+  ) {
     const previousCacheDeviceKey = this.getSessionCacheDeviceKey();
+    const resolvedDeviceStatus =
+      deviceStatus === undefined
+        ? this.features?.raw?.protocolV2DeviceStatus
+        : deviceStatus ?? undefined;
     const features = fixFeaturesFirmwareVersion(
       buildProtocolV2FeaturesPayload({
         deviceInfo,
-        deviceStatus: deviceStatus ?? this.features?.raw?.protocolV2DeviceStatus,
+        deviceStatus: resolvedDeviceStatus,
         previous: this.features,
       })
     );

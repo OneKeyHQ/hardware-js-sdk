@@ -1076,6 +1076,32 @@ describe('Protocol V2 feature adapter', () => {
     expect(typedCall).toHaveBeenCalledWith('DeviceStatusGet', 'DeviceStatus', {});
   });
 
+  test('drops stale normal status when firmware reconnect supplies bootloader DeviceInfo', () => {
+    const device = Device.fromDescriptor({
+      id: 'firmware-reconnect-device',
+      path: 'firmware-reconnect-path',
+      protocolType: 'V2',
+    } as any);
+    (device as any).features = buildProtocolV2FeaturesPayload({
+      deviceInfo: {
+        protocol_version: 1,
+        hw: { serial_no: 'PR9999999999' },
+        fw: { application: { version: '1.0.0' } },
+      },
+      deviceStatus: {
+        device_id: 'firmware-reconnect-id',
+        init_states: true,
+        unlocked: false,
+      } as any,
+    });
+
+    (device as any).updateProtocolV2Features(protocolV2BootloaderDeviceInfo, null);
+
+    expect(device.features?.mode).toBe('bootloader');
+    expect(device.features?.bootloaderMode).toBe(true);
+    expect(device.features?.raw?.protocolV2DeviceStatus).toBeUndefined();
+  });
+
   test('returns passphrase state string for existing Pro devices', async () => {
     const features = {
       deviceId: 'pro-device-id',
