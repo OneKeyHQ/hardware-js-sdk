@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
-import { Cpu, FileCode2, FolderOpen, Settings, Zap } from 'lucide-react';
+import { Cpu, FileCode2, FolderOpen, LockKeyhole, Settings, Zap } from 'lucide-react';
 import MethodExecutor from '../components/common/MethodExecutor';
 import { DeviceNotConnectedState } from '../components/common/DeviceNotConnectedState';
 import { PageLayout } from '../components/common/PageLayout';
@@ -31,6 +31,20 @@ const PRO2_METHOD_GROUPS = [
       'deviceReboot',
       'deviceFactoryInfoGet',
       'deviceFactoryInfoSet',
+    ],
+  },
+  {
+    id: 'wallet',
+    title: 'Wallet / State',
+    icon: LockKeyhole,
+    methods: [
+      'deviceUnlock',
+      'deviceLock',
+      'deviceStatusGet',
+      'deviceGetOnboardingStatus',
+      'getPassphraseState',
+      'deviceSessionOpen',
+      'deviceCancel',
     ],
   },
   {
@@ -97,6 +111,13 @@ const PRO2_METHOD_LABELS: Record<string, string> = {
   deviceSettingsSet: 'Settings Set',
   deviceSettingsPageShow: 'Settings Page',
   deviceUploadWallpaper: 'Upload Wallpaper',
+  deviceUnlock: 'Unlock',
+  deviceLock: 'Lock',
+  deviceStatusGet: 'Device Status',
+  deviceGetOnboardingStatus: 'Onboarding Status',
+  getPassphraseState: 'Wallet State',
+  deviceSessionOpen: 'Wallet Session',
+  deviceCancel: 'Cancel',
   deviceFirmwareUpdate: 'FW Update',
   deviceGetFirmwareUpdateStatus: 'FW Status',
   pathInfo: 'Path Info',
@@ -175,6 +196,55 @@ const PRO2_METHOD_WIRE_INFO: Record<string, MethodWireInfo> = {
   deviceFactoryInfoSet: {
     tx: '60000 (DeviceFactoryInfoSet)',
     txPayload: PRO2_DYNAMIC_PAYLOAD,
+    rx: '60207 (Success)',
+    rxPayload: PRO2_DYNAMIC_RESPONSE,
+    decoded: 'Success.message',
+  },
+  deviceUnlock: {
+    tx: '60608 (DeviceSessionAskPin) + 60602 (DeviceStatusGet)',
+    txPayload: 'PIN entry on device + empty status request',
+    rx: '60207 (Success) + 60603 (DeviceStatus)',
+    rxPayload: PRO2_DYNAMIC_RESPONSE,
+    decoded: 'Features with refreshed unlocked/passphrase status',
+  },
+  deviceLock: {
+    tx: '24 (LockDevice)',
+    txPayload: 'empty request',
+    rx: '60207 (Success)',
+    rxPayload: PRO2_DYNAMIC_RESPONSE,
+    decoded: 'Success.message',
+  },
+  deviceStatusGet: {
+    tx: '60602 (DeviceStatusGet)',
+    txPayload: 'ba ec',
+    rx: '60603 (DeviceStatus)',
+    rxPayload: PRO2_DYNAMIC_RESPONSE,
+    decoded: 'DeviceStatus + cached Features update',
+  },
+  deviceGetOnboardingStatus: {
+    tx: '60604 (DevGetOnboardingStatus)',
+    txPayload: 'bc ec',
+    rx: '60605 (DevOnboardingStatus)',
+    rxPayload: PRO2_DYNAMIC_RESPONSE,
+    decoded: 'DevOnboardingStatus',
+  },
+  getPassphraseState: {
+    tx: '60606 (DeviceSessionOpen), optionally 60608 (DeviceSessionAskPin)',
+    txPayload: 'wallet selection/resume coordinated by hd-core',
+    rx: '60607 (DeviceSession), optionally 60603 (DeviceStatus)',
+    rxPayload: PRO2_DYNAMIC_RESPONSE,
+    decoded: 'passphraseState',
+  },
+  deviceSessionOpen: {
+    tx: '60606 (DeviceSessionOpen)',
+    txPayload: PRO2_DYNAMIC_PAYLOAD,
+    rx: '60607 (DeviceSession)',
+    rxPayload: PRO2_DYNAMIC_RESPONSE,
+    decoded: 'session_id / btc_test_address',
+  },
+  deviceCancel: {
+    tx: '20 (Cancel)',
+    txPayload: 'empty request',
     rx: '60207 (Success)',
     rxPayload: PRO2_DYNAMIC_RESPONSE,
     decoded: 'Success.message',

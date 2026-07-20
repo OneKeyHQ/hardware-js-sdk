@@ -19,10 +19,13 @@ export default class GetPassphraseState extends BaseMethod {
 
     const passphraseProtection = this.device.getCurrentPassphraseProtection();
     const deviceType = this.device.getCurrentDeviceType();
-    const isProSeries = deviceType === EDeviceType.Pro || deviceType === EDeviceType.Pro2;
+
+    if (deviceType === EDeviceType.Pro2) {
+      return Promise.resolve(passphraseProtection === true ? passphraseState : undefined);
+    }
 
     return Promise.resolve(
-      isProSeries || passphraseProtection === true ? passphraseState : undefined
+      deviceType === EDeviceType.Pro || passphraseProtection === true ? passphraseState : undefined
     );
   }
 }

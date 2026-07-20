@@ -20,6 +20,7 @@ import { Breadcrumb } from '../components/ui/Breadcrumb';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { device } from '../data/methods/device';
+import { getDeviceMethodSection } from '../data/methods/deviceCategories';
 import { firmware } from '../data/methods/firmware';
 import { useHardwareMethodExecution } from '../hooks/useHardwareMethodExecution';
 import { useDeviceStore } from '../store/deviceStore';
@@ -31,16 +32,6 @@ interface MethodCategory {
   icon: React.ComponentType<{ className?: string }>;
   methods: UnifiedMethodConfig[];
 }
-
-const PROTOCOL_V2_FILE_SYSTEM_METHODS = new Set([
-  'pathinfo',
-  'dirlist',
-  'dirmake',
-  'dirremove',
-  'fileread',
-  'filewrite',
-  'filedelete',
-]);
 
 const DeviceMethodsIndexPage: React.FC = () => {
   const navigate = useNavigate();
@@ -63,35 +54,13 @@ const DeviceMethodsIndexPage: React.FC = () => {
     const advancedMethods: UnifiedMethodConfig[] = [];
 
     allMethods.forEach(method => {
-      const methodName = method.method.toLowerCase();
+      const section = getDeviceMethodSection(method.method);
 
-      if (
-        [
-          'searchdevices',
-          'getfeatures',
-          'getonekeyfeatures',
-          'getpassphrasestate',
-          'protocolinforequest',
-          'ping',
-          'devicegetdeviceinfo',
-          'cancel',
-          'devicesupportfeatures',
-          'getlogs',
-        ].includes(methodName)
-      ) {
+      if (section === 'basic') {
         basicMethods.push(method);
-      } else if (
-        methodName.includes('firmware') ||
-        methodName.includes('bootloader') ||
-        methodName.includes('check') ||
-        methodName.includes('bridge') ||
-        methodName.includes('reboot') ||
-        PROTOCOL_V2_FILE_SYSTEM_METHODS.has(methodName)
-      ) {
+      } else if (section === 'firmware') {
         firmwareMethods.push(method);
-      } else if (
-        ['devicesettings', 'devicechangepin', 'devicelock', 'devicecancel'].includes(methodName)
-      ) {
+      } else if (section === 'device') {
         deviceMethods.push(method);
       } else {
         advancedMethods.push(method);

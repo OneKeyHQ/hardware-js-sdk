@@ -101,15 +101,23 @@ describe('messages', () => {
     expect(v2Messages.nested.MessageType.values).toMatchObject({
       MessageType_DeviceStatusGet: 60602,
       MessageType_DeviceStatus: 60603,
-      MessageType_DeviceSessionGet: 60606,
+      MessageType_DeviceSessionOpen: 60606,
       MessageType_DeviceSession: 60607,
       MessageType_DeviceSessionAskPin: 60608,
     });
     expect(v2Messages.nested.DeviceStatusGet).toEqual({ fields: {} });
-    expect(v2Messages.nested.DeviceSessionGet.fields.session_id).toMatchObject({
+    expect(v2Messages.nested.DeviceSessionResume.fields.session_id).toMatchObject({
       id: 1,
       type: 'bytes',
     });
+    expect(v2Messages.nested.DeviceWalletSelect.oneofs.access.oneof).toEqual([
+      'host_passphrase',
+      'passphrase_on_device',
+      'attach_pin_on_device',
+    ]);
+    expect(v2Messages.nested.DeviceSessionOpen.oneofs.mode.oneof).toEqual(['resume', 'select']);
+    expect(v2Messages.nested).not.toHaveProperty('DeviceWalletType');
+    expect(v2Messages.nested).not.toHaveProperty('DeviceHiddenWalletSelect');
     expect(v2Messages.nested.DeviceSession.fields).toMatchObject({
       session_id: { id: 1, type: 'bytes' },
       btc_test_address: { id: 2, type: 'string' },
@@ -121,6 +129,7 @@ describe('messages', () => {
     expect(v2Messages.nested.MessageType.values).not.toHaveProperty(
       'MessageType_DeviceSessionPinResult'
     );
+    expect(v2Messages.nested.MessageType.values).not.toHaveProperty('MessageType_DeviceSessionGet');
   });
 
   test('Protocol V2 onboarding status matches the current firmware-pro2 schema', () => {

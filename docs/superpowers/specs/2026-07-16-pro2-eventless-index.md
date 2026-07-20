@@ -21,10 +21,10 @@ Protocol V2 / Pro2
 
 `DeviceSessionOpen` 也不是 `PassphraseAck` 或 `ButtonRequest` 的简单改名。它把原来的
 `PassphraseRequest -> PassphraseAck -> ButtonRequest/ButtonAck -> DeviceSession` 多轮状态机收敛为
-一个主动命令，并额外提供标准钱包选择与指定 Session 恢复能力。
+一个主动命令，并提供隐藏钱包选择与指定 Session 恢复能力。
 
-隐藏钱包 Session 继续按 `deviceKey + passphraseState` 缓存；标准钱包不增加特殊缓存 key，由
-`useEmptyPassphrase=true` 在每次业务调用前显式执行 `select STANDARD`。
+隐藏钱包 Session 继续按 `deviceKey + passphraseState` 缓存；标准钱包不增加特殊缓存 key，
+`useEmptyPassphrase=true` 直接沿用设备默认空 Passphrase 上下文，不调用 `DeviceSessionOpen`。
 
 ## 文档索引
 

@@ -13,6 +13,8 @@ const JSON_PARAMETER_NAMES = [
   'payload',
   'targets',
   'types',
+  'select',
+  'resume',
   'firmwareVersion',
   'bleVersion',
   'bootloaderVersion',

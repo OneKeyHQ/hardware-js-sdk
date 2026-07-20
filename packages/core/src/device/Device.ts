@@ -729,10 +729,8 @@ export class Device extends EventEmitter {
         if (this.features.bootloaderMode) {
           return;
         }
-        // 不能直接信任缓存 features：设备端 wipe / 完成初始化 / 改 label 后
-        // features 会永久陈旧。每次 run 做一次轻量 status 刷新（不含 fw/SE），
-        // 用字段级合并保留已有版本和 SE 信息。
-        await this._refreshProtocolV2Status();
+        // 普通业务调用复用缓存。动态状态由显式 getFeatures/deviceStatusGet、
+        // 解锁流程和设备事件刷新，避免每个 SDK 方法都额外轮询 DeviceStatus。
         return;
       }
       await this._initializeProtocolV2(options);
@@ -816,26 +814,6 @@ export class Device extends EventEmitter {
     }
   }
 
-  /**
-   * Protocol V2 的轻量状态刷新（每次 run 前调用）。
-   *
-   * 请求 hw + coprocessor + status（不含 fw/SE target）：status 提供 init_states / label /
-   * passphrase_enabled 等会在设备端变化的字段；hw/coprocessor 提供 serialNo / bleName。
-   * versions 为空时按字段级合并保留旧值，verify 数据不会被降级。
-   */
-  private async _refreshProtocolV2Status() {
-    try {
-      const deviceStatus = await requestProtocolV2DeviceStatus({
-        commands: this.commands,
-      });
-      const features = this.updateProtocolV2Status(deviceStatus);
-      Log.debug('Protocol V2 features (status refresh):', features);
-    } catch (error) {
-      Log.error('Protocol V2 status refresh failed:', error);
-      throw error;
-    }
-  }
-
   async getFeatures() {
     if (this.isProtocolV2()) {
       const deviceInfo = await requestProtocolV2DeviceInfo({
@@ -879,10 +857,7 @@ export class Device extends EventEmitter {
     this.emit(DEVICE.FEATURES, this, feat);
   }
 
-  updateProtocolV2Features(
-    deviceInfo?: ProtocolV2DeviceInfo,
-    deviceStatus?: DeviceStatus | null
-  ) {
+  updateProtocolV2Features(deviceInfo?: ProtocolV2DeviceInfo, deviceStatus?: DeviceStatus | null) {
     const previousCacheDeviceKey = this.getSessionCacheDeviceKey();
     const resolvedDeviceStatus =
       deviceStatus === undefined

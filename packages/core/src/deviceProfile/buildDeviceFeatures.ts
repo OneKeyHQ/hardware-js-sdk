@@ -257,7 +257,9 @@ export const buildProtocolV2FeaturesPayload = ({
   const label = previous?.label ?? null;
   const bleName = firstValue(info?.coprocessor?.bt_adv_name, previous?.bleName);
   const initialized = firstValue(status?.init_states, previous?.initialized) ?? null;
-  const passphraseProtection = status?.passphrase_enabled ?? null;
+  // Pro2 在锁定状态下返回的 passphrase_enabled 不是最终钱包状态。
+  // 只有完成 PIN 解锁后的 DeviceStatus 才能作为 passphrase 开关真值来源。
+  const passphraseProtection = status?.unlocked === true ? status.passphrase_enabled ?? null : null;
   const language = previous?.language ?? null;
   const backupRequired = firstValue(status?.backup_required, previous?.backupRequired) ?? null;
   const bleEnabled = previous?.bleEnabled;

@@ -1,9 +1,9 @@
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import type { DeviceSessionOpen } from '@onekeyfe/hd-transport';
 
 import { DEVICE, type PassphraseRequestPayload } from '../../events';
 import { isDeviceLockedError } from './lockedError';
 
+import type { DeviceSessionOpen } from '@onekeyfe/hd-transport';
 import type { Device } from '../../device/Device';
 import type { PassphrasePromptResponse } from '../../device/DeviceCommands';
 
@@ -54,8 +54,7 @@ const createHiddenWalletRequest = (
     return {
       request: {
         select: {
-          wallet_type: 1,
-          hidden_wallet: { attach_pin_on_device: {} },
+          attach_pin_on_device: {},
         },
       },
       deviceEvent: DEVICE.ATTACH_PIN_ON_DEVICE,
@@ -66,8 +65,7 @@ const createHiddenWalletRequest = (
     return {
       request: {
         select: {
-          wallet_type: 1,
-          hidden_wallet: { passphrase_on_device: {} },
+          passphrase_on_device: {},
         },
       },
       deviceEvent: DEVICE.PASSPHRASE_ON_DEVICE,
@@ -77,10 +75,7 @@ const createHiddenWalletRequest = (
   return {
     request: {
       select: {
-        wallet_type: 1,
-        hidden_wallet: {
-          host_passphrase: { passphrase: response.passphrase ?? '' },
-        },
+        host_passphrase: { passphrase: response.passphrase ?? '' },
       },
     },
   };
@@ -117,16 +112,16 @@ export async function getProtocolV2WalletSession(
   const expectedPassphraseState = options?.expectedPassphraseState ?? device.passphraseState;
 
   try {
-    if (options?.onlyMainPin || device.getCurrentPassphraseProtection() === false) {
-      const { message } = await openDeviceSession(device, {
-        select: {
-          wallet_type: 0,
-        },
-      });
+    // 锁屏时的 passphrase_enabled 不可信。先完成 PIN 解锁，unlockDevice 会立即
+    // 获取并合并一份新的 DeviceStatus，之后再决定打开主钱包还是隐藏钱包。
+    if (device.features?.unlocked === false) {
+      await device.unlockDevice();
+    }
 
+    if (options?.onlyMainPin || device.getCurrentPassphraseProtection() === false) {
       return {
-        passphraseState: message.btc_test_address,
-        newSession: message.session_id,
+        passphraseState: undefined,
+        newSession: undefined,
         unlockedAttachPin: false,
       };
     }

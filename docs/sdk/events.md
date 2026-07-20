@@ -131,7 +131,7 @@ V2 不伪造硬件 `ButtonRequest/PinMatrixRequest/PassphraseRequest`。阻塞 E
 - V1 `PassphraseAck` 是对 firmware 中间请求的回复。
 - V2 `DeviceSessionOpen(select)` 是 SDK 主动发起并返回最终 Session 的完整命令。
 - 两者仅在 Host Passphrase、设备 Passphrase、Attach PIN 三种选择参数上存在一一映射。
-- V2 的 `select STANDARD` 与 `resume session_id` 没有对应的 `PassphraseAck` 语义。
+- V2 的 `resume session_id` 没有对应的 `PassphraseAck` 语义；标准钱包不调用 `DeviceSessionOpen`。
 - `ButtonRequest/ButtonAck` 在 V2 被删除，不能解释成 `DeviceSessionOpen` 的旧名称。
 
 ## 必须回传的 UI 请求

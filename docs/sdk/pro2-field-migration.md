@@ -298,7 +298,7 @@ DeviceSessionOpen(resume/select) -> DeviceSession
 3. Core 发出兼容的 `REQUEST_PASSPHRASE`，等待 App 返回 Host Passphrase、设备 Passphrase 或 Attach PIN 选择。
 4. Core 发送 `DeviceSessionOpen(select)`，在同一次原业务调用中继续执行。
 
-标准钱包不读取 Session Store，每次显式发送 `select STANDARD`。公开的 `deviceSessionOpen` 主要用于协议调试；它不替代 Core 内部的 Session 恢复和钱包标识校验。
+标准钱包不读取 Session Store，也不调用 `DeviceSessionOpen`。公开的 `deviceSessionOpen` 只用于隐藏钱包选择或恢复，主要服务协议调试；它不替代 Core 内部的 Session 恢复和钱包标识校验。
 
 ## 9. PIN 解锁结果
 

@@ -4,7 +4,7 @@
 
 **目标：** 将 Pro2 的钱包会话入口从固件中间消息驱动迁移为 Host/SDK 主动发送 `DeviceSessionOpen`，同时保持 App 现有 Passphrase、设备输入 Passphrase、Attach PIN 等 UI 交互基本不变。
 
-**架构原则：** SDK 内部增加钱包会话协调器，负责恢复隐藏钱包会话、请求用户选择、发送最终设备命令及补发第二阶段 UI 事件。标准钱包每次显式选择，不引入 `STANDARD_WALLET_KEY`；隐藏钱包缓存仍严格使用 `deviceKey + passphraseState`。App 继续消费既有 UI 事件，仅增强可选来源元数据。
+**架构原则：** SDK 内部增加钱包会话协调器，负责恢复隐藏钱包会话、请求用户选择、发送最终设备命令及补发第二阶段 UI 事件。标准钱包直接沿用设备默认空 Passphrase 上下文，不调用 `DeviceSessionOpen`，也不引入 `STANDARD_WALLET_KEY`；隐藏钱包缓存仍严格使用 `deviceKey + passphraseState`。App 继续消费既有 UI 事件，仅增强可选来源元数据。
 
 **技术栈：** TypeScript、Jest、protobufjs JSON schema、Yarn workspace、React Native/OneKey App monorepo。
 
@@ -20,9 +20,9 @@
 - 生成：`packages/hd-transport/src/types/messages.ts`
 - 测试：`packages/core/__tests__/protocol-v2.test.ts`
 
-1. 先增加类型/序列化测试，验证 `DeviceSessionOpen` 支持 `resume`、`STANDARD`、Host Passphrase、设备 Passphrase 和 Attach PIN 选择。
+1. 先增加类型/序列化测试，验证 `DeviceSessionOpen` 只支持隐藏钱包的 `resume`、Host Passphrase、设备 Passphrase和 Attach PIN 选择，协议类型中不存在 `STANDARD`、`wallet_type` 和 `hidden_wallet` 包装层。
 2. 运行单测，确认因消息类型尚不存在而失败。
-3. 在 Pro2 proto 中以消息号 `60606` 替换 `DeviceSessionGet`，定义互斥的 `resume` / `select` 载荷；保留 `DeviceSession` 返回结构。
+3. 在 Pro2 proto 中以消息号 `60606` 替换 `DeviceSessionGet`，定义互斥的 `resume` / `select` 载荷；`select` 直接包含三种隐藏钱包 access，保留 `DeviceSession` 返回结构。
 4. 运行 `yarn workspace @onekeyfe/hd-transport update:protobuf` 生成 SDK 两份 schema 和 TypeScript 类型。
 5. 重新运行协议单测并执行 `git diff --check`。
 
@@ -34,7 +34,7 @@
 - 修改：`packages/core/src/protocols/protocol-v2/walletSession.ts`
 - 测试：`packages/core/__tests__/protocol-v2.test.ts`
 
-1. 先写失败测试：`onlyMainPin/useEmptyPassphrase=true` 必须走 `STANDARD`，不能恢复隐藏钱包缓存。
+1. 先写失败测试：`onlyMainPin/useEmptyPassphrase=true` 必须直接返回标准钱包上下文，不发送 `DeviceSessionOpen`、不恢复隐藏钱包缓存，也不写入隐藏钱包 Session Store。
 2. 先写失败测试：带 `expectedPassphraseState` 时只允许恢复该隐藏钱包对应的缓存。
 3. 将 `onlyMainPin` 从两处兼容入口完整传入钱包会话协调器。
 4. 运行聚焦单测，确认参数路由正确。
@@ -53,9 +53,9 @@
 - 测试：`packages/core/__tests__/protocol-v2.test.ts`
 - 测试：`packages/core/__tests__/DeviceCommands.test.ts`
 
-1. 先写失败测试：标准钱包直接发送 `DeviceSessionOpen(select STANDARD)`，且不读写隐藏钱包缓存。
+1. 先写失败测试：标准钱包不发送 `DeviceSessionOpen`，且不读写隐藏钱包缓存；`getPassphraseState({ useEmptyPassphrase:true })` 保持成功返回形状但不生成隐藏钱包 `passphraseState`。
 2. 先写失败测试：隐藏钱包命中缓存时发送 `DeviceSessionOpen(resume)`；失效时仅删除当前钱包缓存，再请求用户选择。
-3. 先写失败测试：Host Passphrase 发送 `HOST_PASSPHRASE`；设备输入发送 `DEVICE_PASSPHRASE` 并补发 `REQUEST_PASSPHRASE_ON_DEVICE`；Attach PIN 发送 `ATTACH_PIN` 并补发兼容的 `REQUEST_PIN/ButtonRequest_AttachPin`。
+3. 先写失败测试：Host Passphrase 直接发送 `select.host_passphrase`；设备输入发送 `select.passphrase_on_device` 并补发 `REQUEST_PASSPHRASE_ON_DEVICE`；Attach PIN 发送 `select.attach_pin_on_device` 并补发兼容的 `REQUEST_PIN/ButtonRequest_AttachPin`，请求中不得出现 `wallet_type/hidden_wallet`。
 4. 将 `_promptPassphrase` 提炼为可供协调器调用的内部方法，并支持“取消 UI 等待但不向设备发送旧协议 Cancel”的模式；旧 Protocol V1 行为保持不变。
 5. 在 `PassphraseRequestPayload` 和 UI 请求载荷中增加可选 `source`、`reason`、`expectedPassphraseState`，同时保留 `passphraseState`、`existsAttachPinUser` 等旧字段。
 6. 实现 `DeviceSessionOpen` 的恢复、选择、状态校验、锁定后解锁重试和定向缓存失效逻辑。
@@ -72,7 +72,7 @@
 - 修改：相关 Core API 类型和导出文件（按编译错误精确定位）
 - 测试：`packages/core/__tests__/protocol-v2.test.ts`
 
-1. 先写失败测试：Core API 暴露 `deviceSessionOpen`，且原有业务入口 `getPassphraseState` 继续返回相同结果形状。
+1. 先写失败测试：Core API 暴露仅用于隐藏钱包的 `deviceSessionOpen`，且原有业务入口 `getPassphraseState` 的标准钱包路径继续成功但返回 `undefined` passphraseState。
 2. 用 `DeviceSessionOpen` 替换仅用于调试的 `DeviceSessionGet` API，避免公开层继续暴露已经删除的固件请求。
 3. 不新增 `STANDARD_WALLET_KEY`，也不放宽 `DeviceWalletSessionStore` 对缺少 `passphraseState` 的拒绝规则。
 4. 运行 Core API 路由测试、类型检查及 Store 测试。

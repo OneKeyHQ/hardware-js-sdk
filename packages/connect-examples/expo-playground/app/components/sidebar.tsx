@@ -29,8 +29,6 @@ import {
   ListChecks,
   Usb,
   UploadCloud,
-  Radio,
-  WalletCards,
   ShieldCheck,
 } from 'lucide-react';
 import { getDeviceLabel } from '@onekeyfe/hd-core';
@@ -84,11 +82,6 @@ const navigationItems = [
     icon: FileText,
   },
   {
-    title: 'common.proDebug',
-    url: '/pro-debug',
-    icon: Usb,
-  },
-  {
     title: 'common.pro2Debug',
     url: '/pro2-debug',
     icon: Usb,
@@ -99,11 +92,6 @@ const navigationItems = [
     icon: ListChecks,
   },
   {
-    title: 'common.pro2Portfolio',
-    url: '/pro2-portfolio',
-    icon: WalletCards,
-  },
-  {
     title: 'common.pro2SpecialUpdate',
     url: '/pro2-special-update',
     icon: UploadCloud,
@@ -112,11 +100,6 @@ const navigationItems = [
     title: 'common.methodBatchTest',
     url: '/method-batch-test',
     icon: ListChecks,
-  },
-  {
-    title: 'common.eventTest',
-    url: '/event-test',
-    icon: Radio,
   },
   {
     title: 'common.multisigTest',

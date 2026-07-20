@@ -10,7 +10,6 @@ import {
 } from '../utils/hardwareInstance';
 import { useHardwareStore } from '../store/hardwareStore';
 import { useDeviceStore } from '../store/deviceStore';
-import { useEventTestStore } from '../store/eventTestStore';
 import { methodSupportsCommonParameters } from '../utils/constants';
 import { previewHardwareParams } from './previewHardwareParams';
 import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
@@ -72,22 +71,28 @@ const getDeviceTypeFromProfile = (value: unknown): IDeviceType | undefined =>
 export async function hydrateConnectedDeviceInfo(device: DeviceInfo): Promise<DeviceInfo> {
   if (!device.connectId) return device;
 
+  // WebUSB 搜索结果已经由 DevicePool 初始化并携带完整 features，直接复用即可。
+  // BLE 扫描为避免配对不会读取 features，因此仅在缺失时补一次。
+  if (device.features) {
+    updateCachedDeviceFeatures(device.connectId, device.features);
+    return device;
+  }
+
   const sdk = await getSDKInstance();
   let hydratedDevice = { ...device };
 
   try {
-    const deviceInfoResult = await sdk.getDeviceInfo(device.connectId, {
-      scope: 'basic',
-      refresh: true,
-    });
+    // getFeatures 已能同时完成设备信息与动态状态初始化。连接阶段不再连续调用
+    // getDeviceInfo + getFeatures，避免 Protocol V2 重复读取 DeviceInfo/DeviceStatus。
+    const featuresResult = await sdk.getFeatures(device.connectId);
 
-    if (deviceInfoResult.success && deviceInfoResult.payload) {
-      const profile = deviceInfoResult.payload as Record<string, unknown>;
-      const serialNo = firstNonEmptyString(profile.serialNo, hydratedDevice.uuid);
-      const deviceId = firstNonEmptyString(profile.deviceId, hydratedDevice.deviceId);
-      const label = firstNonEmptyString(profile.label, hydratedDevice.label);
-      const bleName = firstNonEmptyString(profile.bleName);
-      const deviceType = getDeviceTypeFromProfile(profile.deviceType);
+    if (featuresResult.success && featuresResult.payload) {
+      const features = featuresResult.payload;
+      const serialNo = firstNonEmptyString(features.serialNo, hydratedDevice.uuid);
+      const deviceId = firstNonEmptyString(features.deviceId, hydratedDevice.deviceId);
+      const label = firstNonEmptyString(features.label, hydratedDevice.label);
+      const bleName = firstNonEmptyString(features.bleName);
+      const deviceType = getDeviceTypeFromProfile(features.deviceType);
 
       hydratedDevice = {
         ...hydratedDevice,
@@ -96,29 +101,16 @@ export async function hydrateConnectedDeviceInfo(device: DeviceInfo): Promise<De
         ...(deviceType ? { deviceType } : {}),
         ...(label ? { label } : {}),
         name: firstNonEmptyString(bleName, label, hydratedDevice.name) ?? hydratedDevice.name,
+        features,
       };
+      updateCachedDeviceFeatures(device.connectId, features);
 
-      logResponse('Device profile refreshed via getDeviceInfo', {
+      logResponse('Connected device hydrated via getFeatures', {
         connectId: device.connectId,
         serialNo,
         deviceId,
         label,
       });
-    } else {
-      logError('getDeviceInfo failed while hydrating connected device', deviceInfoResult.payload);
-    }
-  } catch (error) {
-    logError('getDeviceInfo exception while hydrating connected device', { error });
-  }
-
-  try {
-    const featuresResult = await sdk.getFeatures(device.connectId);
-    if (featuresResult.success && featuresResult.payload) {
-      hydratedDevice = {
-        ...hydratedDevice,
-        features: featuresResult.payload,
-      };
-      updateCachedDeviceFeatures(device.connectId, featuresResult.payload);
     } else {
       logError('getFeatures failed while hydrating connected device', featuresResult.payload);
     }
@@ -140,7 +132,9 @@ const resolvePassphraseProtection = async (
       : undefined;
   const cachedPassphraseProtection = getFeaturePassphraseProtection(cachedFeatures);
 
-  if (cachedPassphraseProtection !== undefined) {
+  // 已有缓存但值为 null/unknown 时，通常表示 Pro2 尚未解锁；不要为了猜测该值
+  // 再发起一轮 getFeatures，钱包会话流程会在解锁后刷新真实状态。
+  if (cachedFeatures) {
     return cachedPassphraseProtection;
   }
 
@@ -176,11 +170,6 @@ const preparePassphraseParams = async (
     return;
   }
 
-  if (passphraseProtection !== true) {
-    logInfo('Device passphrase protection is unknown. Skipping automatic passphraseState fetch.');
-    return;
-  }
-
   if (
     params.passphraseState !== '' &&
     params.passphraseState !== undefined &&
@@ -191,7 +180,7 @@ const preparePassphraseParams = async (
   }
 
   logInfo(
-    `PassphraseState is empty in params for method: ${method}, attempting to fetch from device.`
+    `PassphraseState is empty in params for method: ${method}, attempting to open the wallet session.`
   );
 
   try {
@@ -298,11 +287,6 @@ export async function submitPin(pin: string | null): Promise<void> {
       type: UI_RESPONSE.RECEIVE_PIN,
       payload: pin || '@@ONEKEY_INPUT_PIN_IN_DEVICE',
     };
-    useEventTestStore.getState().recordEvent({
-      source: 'UI_EVENT',
-      type: response.type,
-      payload: response.payload,
-    });
     sdkInstance.uiResponse(response);
     logResponse('PIN response submitted successfully');
   } catch (error) {
@@ -329,11 +313,6 @@ export async function submitPassphrase(
         save: save,
       },
     };
-    useEventTestStore.getState().recordEvent({
-      source: 'UI_EVENT',
-      type: response.type,
-      payload: response.payload,
-    });
     sdkInstance.uiResponse(response);
     logResponse('Passphrase response submitted successfully');
   } catch (error) {

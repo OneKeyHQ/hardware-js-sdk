@@ -36,8 +36,7 @@ SDK 内部根据协议版本选择 Event 来源和后续动作。
 
 - `PassphraseAck` 是对 firmware `PassphraseRequest` 的中间回复，只表达 Host Passphrase、设备
   Passphrase 或 Attach PIN 三种隐藏钱包进入方式。
-- `DeviceSessionOpen(select)` 主动执行钱包选择并返回最终 Session；它承接上述三种参数语义，同时
-  还支持 `select STANDARD`。
+- `DeviceSessionOpen(select)` 主动执行隐藏钱包选择并返回最终 Session；它承接上述三种参数语义。
 - `DeviceSessionOpen(resume)` 承接原 `Initialize/DeviceSessionGet(session_id)` 的 Session 恢复语义，
   这不是 `PassphraseAck` 原有能力。
 - `ButtonRequest/ButtonAck` 不改名；它们从 V2 firmware 状态机中删除，设备页面由 select 命令内部
@@ -47,7 +46,6 @@ SDK 内部根据协议版本选择 Event 来源和后续动作。
 PassphraseAck(passphrase)                -> select HOST_PASSPHRASE
 PassphraseAck(on_device)                 -> select DEVICE_PASSPHRASE
 PassphraseAck(on_device_attach_pin)      -> select ATTACH_PIN
-无 PassphraseAck 等价能力                -> select STANDARD
 Initialize/DeviceSessionGet(session_id)  -> resume session_id
 ```
 
@@ -193,7 +191,7 @@ Cancel 必须绑定当前设备和 Transport source；断连时清理请求、UI
 ## firmware-pro2 实施清单
 
 - 实现 `DeviceSessionOpen(select/resume)`，成功返回非空 `session_id + btc_test_address`。
-- `select` 明确支持 STANDARD、HOST_PASSPHRASE、DEVICE_PASSPHRASE 和 ATTACH_PIN。
+- `select` 明确支持 HOST_PASSPHRASE、DEVICE_PASSPHRASE 和 ATTACH_PIN。
 - 删除 seed session 中 Passphrase/Button Host ACK 状态。
 - `DeviceSessionAskPin` 直接显示设备 PIN/指纹页面。
 - 地址、公钥、签名、设置和危险操作直接显示本地 UI。
@@ -208,8 +206,8 @@ Cancel 必须绑定当前设备和 Transport source；断连时清理请求、UI
 - 增加并统一使用钱包 Session coordinator。
 - `passphraseState` 非空时优先表示隐藏钱包；`useEmptyPassphrase=true` 表示标准钱包。
 - Host Passphrase、设备 Passphrase、Attach PIN 分别映射到对应 `DeviceSessionOpen(select)` 分支。
-- `DeviceWalletSessionStore` 继续只缓存 `deviceKey + passphraseState`；标准钱包不增加缓存 key，每次显式
-  `select STANDARD`。
+- `DeviceWalletSessionStore` 继续只缓存 `deviceKey + passphraseState`；标准钱包不增加缓存 key，也不调用
+  `DeviceSessionOpen`。
 - 复用公共 UI Event 层，不伪造 Transport protobuf Request。
 - V2 收到 firmware UI 中间消息时报告协议错误。
 - 为合成 Event 增加稳定 `source/reason/device` payload。
@@ -244,7 +242,7 @@ Cancel 必须绑定当前设备和 Transport source；断连时清理请求、UI
 
 ### 钱包与解锁
 
-- 标准钱包每次显式 select STANDARD，不读取或写入隐藏钱包 Session Store。
+- 标准钱包直接使用默认空 Passphrase 上下文，不调用 `DeviceSessionOpen`，也不读取或写入隐藏钱包 Session Store。
 - Host Passphrase、设备 Passphrase、Attach PIN 三种隐藏钱包选择都返回正确钱包标识。
 - 首次隐藏钱包、Session 恢复、Session 失效重选保持原 API 调用不重放。
 - Passphrase 与对应 Attach PIN 返回相同 `btc_test_address`。

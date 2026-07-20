@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import {
   CoreApi,
   DEVICE,
-  FIRMWARE_EVENT,
   LOG_EVENT,
   UiEvent,
   UI_REQUEST,
@@ -11,7 +10,6 @@ import {
 } from '@onekeyfe/hd-core';
 import { useDeviceStore } from '../../store/deviceStore';
 import { useHardwareStore } from '../../store/hardwareStore';
-import { useEventTestStore } from '../../store/eventTestStore';
 
 import { submitPin, submitPassphrase } from '../../services/hardwareService';
 import { EDeviceType } from '@onekeyfe/hd-shared';
@@ -190,12 +188,6 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
       };
 
       sdkInstance.on(LOG_EVENT, (message: { payload?: unknown }) => {
-        useEventTestStore.getState().recordEvent({
-          source: 'LOG_EVENT',
-          type: LOG_EVENT,
-          payload: message.payload,
-        });
-
         if (!sdkDebugEnabled) {
           return;
         }
@@ -238,22 +230,8 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
         }
       });
 
-      sdkInstance.on(FIRMWARE_EVENT, (message: { type?: string; payload?: unknown }) => {
-        useEventTestStore.getState().recordEvent({
-          source: 'FIRMWARE_EVENT',
-          type: message.type ?? FIRMWARE_EVENT,
-          payload: message.payload,
-        });
-      });
-
       // 监听SDK UI事件
       sdkInstance.on('UI_EVENT', (message: UiEvent) => {
-        useEventTestStore.getState().recordEvent({
-          source: 'UI_EVENT',
-          type: message.type,
-          payload: message.payload,
-        });
-
         const latestCurrentDevice = useDeviceStore.getState().currentDevice;
         const isProgressEvent =
           message.type === UI_REQUEST.DEVICE_PROGRESS ||
@@ -376,38 +354,24 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
 
       // 监听设备连接/断开事件
       sdkInstance.on('device-connect', device => {
-        useEventTestStore.getState().recordEvent({
-          source: 'DEVICE_EVENT',
-          type: DEVICE.CONNECT,
-          payload: device,
-        });
         logInfo('device-connect', device);
       });
 
       sdkInstance.on('device-disconnect', device => {
-        useEventTestStore.getState().recordEvent({
-          source: 'DEVICE_EVENT',
-          type: DEVICE.DISCONNECT,
-          payload: device,
-        });
         logInfo('device-disconnect', device);
       });
 
       sdkInstance.on(DEVICE.FEATURES, payload => {
-        useEventTestStore.getState().recordEvent({
-          source: 'DEVICE_EVENT',
-          type: DEVICE.FEATURES,
-          payload,
-        });
+        const deviceState = useDeviceStore.getState();
+        deviceState.setDeviceFeatures(payload);
+        if (deviceState.currentDevice) {
+          deviceState.setCurrentDevice({
+            ...deviceState.currentDevice,
+            features: payload,
+          });
+        }
       });
 
-      sdkInstance.on(DEVICE.SUPPORT_FEATURES, payload => {
-        useEventTestStore.getState().recordEvent({
-          source: 'DEVICE_EVENT',
-          type: DEVICE.SUPPORT_FEATURES,
-          payload,
-        });
-      });
     },
     [setDeviceAction, clearDeviceAction, flushSdkDebugLogs]
   );
@@ -500,11 +464,6 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
             type: webUsbResponseType,
             payload: { deviceId: device?.serialNumber ?? '' },
           };
-          useEventTestStore.getState().recordEvent({
-            source: 'UI_EVENT',
-            type: response.type,
-            payload: response.payload,
-          });
           lastSdkRef.current?.uiResponse(response);
         }}
         onCancel={() => {

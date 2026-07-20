@@ -12418,12 +12418,6 @@
         }
       }
     },
-    "DeviceWalletType": {
-      "values": {
-        "DEVICE_WALLET_TYPE_STANDARD": 0,
-        "DEVICE_WALLET_TYPE_HIDDEN": 1
-      }
-    },
     "DeviceSessionResume": {
       "fields": {
         "session_id": {
@@ -12448,7 +12442,7 @@
     "DeviceAttachPinOnDevice": {
       "fields": {}
     },
-    "DeviceHiddenWalletSelect": {
+    "DeviceWalletSelect": {
       "oneofs": {
         "access": {
           "oneof": ["host_passphrase", "passphrase_on_device", "attach_pin_on_device"]
@@ -12466,19 +12460,6 @@
         "attach_pin_on_device": {
           "type": "DeviceAttachPinOnDevice",
           "id": 3
-        }
-      }
-    },
-    "DeviceWalletSelect": {
-      "fields": {
-        "wallet_type": {
-          "rule": "required",
-          "type": "DeviceWalletType",
-          "id": 1
-        },
-        "hidden_wallet": {
-          "type": "DeviceHiddenWalletSelect",
-          "id": 2
         }
       }
     },

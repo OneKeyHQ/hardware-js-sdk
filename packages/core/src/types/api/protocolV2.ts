@@ -1,10 +1,9 @@
 import type { CommonParams, Response } from '../params';
 import type {
+  DevOnboardingStatus,
   DeviceFactoryInfo,
   DeviceFirmwareUpdateStatus,
-  DevOnboardingStatus,
   DeviceSession,
-  DeviceSessionOpen,
   DeviceSettings,
   DeviceStatus,
   ProtocolInfo,
@@ -18,6 +17,7 @@ import type {
   DeviceRebootParams,
 } from '../../api/protocol-v2/helpers';
 import type { DeviceInfoGetParams } from '../../api/protocol-v2/DeviceInfoGet';
+import type { DeviceSessionOpenParams } from '../../api/protocol-v2/DeviceSessionOpen';
 import type { DeviceSettingsSetParams } from '../../api/protocol-v2/DeviceSettingsSet';
 import type { DeviceSettingsPageShowParams } from '../../api/protocol-v2/DeviceSettingsPageShow';
 import type {
@@ -39,6 +39,7 @@ export type {
   DeviceInfoGetTargets,
   DeviceInfoGetTypes,
 } from '../../api/protocol-v2/DeviceInfoGet';
+export type { DeviceSessionOpenParams } from '../../api/protocol-v2/DeviceSessionOpen';
 export type { DeviceSettingsSetParams } from '../../api/protocol-v2/DeviceSettingsSet';
 export type {
   DeviceSettingsPageShowParams,
@@ -120,7 +121,7 @@ export declare function deviceGetOnboardingStatus(
 
 export declare function deviceSessionOpen(
   connectId: string,
-  params: CommonParams & DeviceSessionOpen
+  params: CommonParams & DeviceSessionOpenParams
 ): Response<DeviceSession>;
 
 export declare function deviceFirmwareUpdate(

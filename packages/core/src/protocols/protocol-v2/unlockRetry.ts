@@ -1,6 +1,6 @@
 import { LoggerNames, getLogger } from '../../utils';
 import { isDeviceLockedError } from './lockedError';
-import { isProtocolV2UiEnabled } from './uiInteraction';
+import { isProtocolV2UiEnabled, resolveProtocolV2UiInteraction } from './uiInteraction';
 
 import type { BaseMethod } from '../../api/BaseMethod';
 import type { Device } from '../../device/Device';
@@ -10,7 +10,7 @@ const Log = getLogger(LoggerNames.Core);
 
 type RunnableMethod = Pick<
   BaseMethod,
-  'run' | 'unlockPolicy' | 'protocolV2UiInteraction' | 'protocolV2UiMode'
+  'run' | 'unlockPolicy' | 'protocolV2UiInteraction' | 'protocolV2UiMode' | 'params' | 'payload'
 > & { name?: string };
 type UnlockableDevice = Pick<Device, 'isProtocolV2' | 'unlockDevice'>;
 type UiInteractionCoordinator = Pick<
@@ -25,7 +25,7 @@ export async function runMethodWithUnlockRetry(
 ) {
   const shouldEmitUi = isProtocolV2UiEnabled(method);
   if (shouldEmitUi) {
-    uiCoordinator?.enterMethodInteraction(method.protocolV2UiInteraction);
+    uiCoordinator?.enterMethodInteraction(resolveProtocolV2UiInteraction(method));
   }
   try {
     return await method.run();

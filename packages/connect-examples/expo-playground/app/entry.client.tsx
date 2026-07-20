@@ -33,13 +33,10 @@ import ChainMethodsIndexPage from './routes/chains.$chainId._index';
 import ChainMethodExecutePage from './routes/chains.$chainId.$methodName';
 import DeviceMethodsIndexPage from './routes/device-methods._index';
 import DeviceMethodExecutePage from './routes/device-methods.$methodName';
-import ProDebugPage from './routes/pro-debug';
 import Pro2DebugPage from './routes/pro2-debug';
 import Pro2UpdatePage from './routes/pro2-update';
-import Pro2PortfolioPage from './routes/pro2-portfolio';
 import Pro2SpecialUpdatePage from './routes/pro2-special-update';
 import MethodBatchTestPage from './routes/method-batch-test';
-import EventTestPage from './routes/event-test';
 import MultisigTestPage from './routes/multisig-test';
 
 // Import styles
@@ -159,10 +156,6 @@ const router = createHashRouter(
         },
 
         {
-          path: 'pro-debug',
-          element: <ProDebugPage />,
-        },
-        {
           path: 'pro2-debug',
           element: <Pro2DebugPage />,
         },
@@ -171,20 +164,12 @@ const router = createHashRouter(
           element: <Pro2UpdatePage />,
         },
         {
-          path: 'pro2-portfolio',
-          element: <Pro2PortfolioPage />,
-        },
-        {
           path: 'pro2-special-update',
           element: <Pro2SpecialUpdatePage />,
         },
         {
           path: 'method-batch-test',
           element: <MethodBatchTestPage />,
-        },
-        {
-          path: 'event-test',
-          element: <EventTestPage />,
         },
         {
           path: 'multisig-test',

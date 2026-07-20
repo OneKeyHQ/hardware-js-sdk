@@ -201,13 +201,9 @@ export class ProtocolV2Session {
       router,
       seq: protoSeq,
     });
+    // 暂停输出 Protocol V2 TX 帧日志，避免传输层产生大量调试信息。
+    /*
     const txMetadata = ProtocolV2.inspectFrame(schemas, frame);
-
-    if (maxFrameBytes !== undefined && frame.length > maxFrameBytes) {
-      throw new Error(
-        `Protocol V2 frame too large for transport: ${frame.length} > ${maxFrameBytes}`
-      );
-    }
 
     if (!shouldReduceDebug) {
       logger?.debug?.(`[${logPrefix}] TX`, {
@@ -217,6 +213,13 @@ export class ProtocolV2Session {
         seq: txMetadata.seq,
         bytes: frame.length,
       });
+    }
+    */
+
+    if (maxFrameBytes !== undefined && frame.length > maxFrameBytes) {
+      throw new Error(
+        `Protocol V2 frame too large for transport: ${frame.length} > ${maxFrameBytes}`
+      );
     }
 
     // Lenient watchdog on the write phase only — see
@@ -248,6 +251,8 @@ export class ProtocolV2Session {
         }
         const isAck = ProtocolV2.isAckFrame(rxFrame);
         if (!isAck) {
+          // 暂停输出 Protocol V2 RX 帧日志，避免传输层产生大量调试信息。
+          /*
           const rxMetadata = ProtocolV2.inspectFrame(schemas, rxFrame);
 
           if (!shouldReduceDebug) {
@@ -259,6 +264,7 @@ export class ProtocolV2Session {
               bytes: rxFrame.length,
             });
           }
+          */
 
           const decoded = ProtocolV2.decodeFrame(schemas, rxFrame);
 

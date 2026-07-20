@@ -28,6 +28,51 @@ const api: UnifiedMethodConfig[] = [
     presets: [],
   },
   {
+    method: 'deviceStatusGet',
+    description: 'methodDescriptions.deviceStatusGet',
+    noDeviceIdReq: true,
+    presets: [],
+  },
+  {
+    method: 'deviceGetOnboardingStatus',
+    description: 'methodDescriptions.deviceGetOnboardingStatus',
+    noDeviceIdReq: true,
+    presets: [],
+  },
+  {
+    method: 'deviceSessionOpen',
+    description: 'methodDescriptions.deviceSessionOpen',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'Open hidden wallet on device',
+        description: 'Ask the device to open a hidden wallet with passphrase input on device.',
+        parameters: [
+          {
+            name: 'select',
+            type: 'textarea',
+            required: true,
+            label: 'Wallet selection',
+            value: { passphrase_on_device: {} },
+          },
+        ],
+      },
+      {
+        title: 'Resume wallet session',
+        description: 'Resume a previously opened wallet session by session ID.',
+        parameters: [
+          {
+            name: 'resume',
+            type: 'textarea',
+            required: true,
+            label: 'Session resume request',
+            value: { session_id: '' },
+          },
+        ],
+      },
+    ],
+  },
+  {
     method: 'protocolInfoRequest',
     description: 'methodDescriptions.protocolInfoRequest',
     noDeviceIdReq: true,
@@ -539,6 +584,12 @@ const api: UnifiedMethodConfig[] = [
   {
     method: 'deviceLock',
     description: 'methodDescriptions.deviceLock',
+    noDeviceIdReq: true,
+    presets: [],
+  },
+  {
+    method: 'deviceUnlock',
+    description: 'methodDescriptions.deviceUnlock',
     noDeviceIdReq: true,
     presets: [],
   },

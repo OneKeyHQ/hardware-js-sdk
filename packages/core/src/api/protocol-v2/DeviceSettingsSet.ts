@@ -11,7 +11,7 @@ export default class DeviceSettingsSet extends BaseMethod<{
   settings: Omit<DeviceSettings, 'passphrase_enable' | 'airgap_mode'>;
 }> {
   init() {
-    const settings = this.payload.settings;
+    const { settings } = this.payload;
     if (!settings || typeof settings !== 'object' || Array.isArray(settings)) {
       throw invalidParameter('Parameter [settings] must be an object.');
     }
@@ -30,6 +30,16 @@ export default class DeviceSettingsSet extends BaseMethod<{
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
     this.params = { settings: supported };
+    if (typeof supported.label === 'string') {
+      this.protocolV2UiInteraction = {
+        request: 'button',
+        source: 'method-lifecycle',
+        reason: 'device-management',
+        completion: 'operation-completed',
+        deviceOnly: true,
+        operation: 'change-label',
+      };
+    }
   }
 
   async run() {

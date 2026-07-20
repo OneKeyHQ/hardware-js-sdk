@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useDeviceStore } from '../../store/deviceStore';
-import { useEventTestStore } from '../../store/eventTestStore';
 import { SDKUtils } from '../../utils/hardwareInstance';
 import { useToast } from '../../hooks/use-toast';
 import { useTransportPersistence } from '../../store/persistenceStore';
@@ -138,11 +137,6 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
         type: UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE,
         payload: { deviceId: device.serialNumber ?? '' },
       };
-      useEventTestStore.getState().recordEvent({
-        source: 'UI_EVENT',
-        type: response.type,
-        payload: response.payload,
-      });
       sdkInstance.uiResponse(response);
 
       const searchResult = await searchDevices();

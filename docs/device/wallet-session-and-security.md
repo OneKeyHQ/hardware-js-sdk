@@ -24,7 +24,7 @@
 - Pro2 / Protocol V2 通过内部钱包会话流程调用 `DeviceSessionOpen(resume/select)`，并把 `btc_test_address` 归一化为公共概念 `passphraseState`。
 - 公开 `getPassphraseState()` 返回 `string | undefined`，不会返回 session ID、Attach PIN 解锁结果或保护状态对象。
 - 缓存 session 无效时，SDK 识别 `Failure_InvalidSession`，只清理当前隐藏钱包缓存，再在原调用内请求 App 重新选择进入方式。
-- 标准钱包不使用 Session Store，每次显式发送 `select STANDARD`；不会引入 `STANDARD_WALLET_KEY`。
+- 标准钱包不使用 Session Store，也不调用 `DeviceSessionOpen`；不会引入 `STANDARD_WALLET_KEY`。
 - `initSession=true`、钱包标识不匹配、设备切换或断开，以及显式 `clearSessionCache` 都会使缓存失效。
 - 调用方提供预期 `passphraseState` 时，设备返回的钱包标识必须一致，否则 SDK 清缓存并抛出钱包状态校验错误。
 
@@ -188,8 +188,8 @@ SDK 对外 API 仍叫 `getPassphraseState`，方法本身设置 `useDevicePassph
 
 1. 调 `getPassphraseStateWithRefreshDeviceInfo()`。
 2. 该函数再调底层 `getPassphraseState()`。
-3. Protocol V2 / Pro2 对标准钱包发送 `DeviceSessionOpen(select STANDARD)`；对隐藏钱包缓存发送 `DeviceSessionOpen(resume session_id)`。
-4. 缓存 `session_id` 无法打开时，固件返回 InvalidSession；SDK 清理当前钱包缓存，通过既有 `REQUEST_PASSPHRASE/uiResponse` 获取进入方式，再发送 `DeviceSessionOpen(select HIDDEN, access)`。
+3. Protocol V2 / Pro2 的标准钱包直接使用设备默认空 Passphrase 上下文；隐藏钱包缓存发送 `DeviceSessionOpen(resume session_id)`。
+4. 缓存 `session_id` 无法打开时，固件返回 InvalidSession；SDK 清理当前钱包缓存，通过既有 `REQUEST_PASSPHRASE/uiResponse` 获取进入方式，再发送 `DeviceSessionOpen(select access)`。
 5. Host Passphrase 由 App 输入并做 NFKD 规范化；设备 Passphrase 和 Attach PIN 只在设备输入，SDK 会合成对应的第二阶段等待 Event。
 6. Pro2 固件返回 `DeviceSession`：`session_id` 和 `btc_test_address`，SDK 将 `btc_test_address` 映射为上层 `passphraseState`。
 7. Pro V1 仍走 `GetPassphraseState -> PassphraseState`，返回 `passphrase_state/session_id/unlocked_attach_pin`。
@@ -539,7 +539,7 @@ Protocol V2 采用“Host 显式选择、Firmware 本地完成设备交互”的
 
 | 能力                | Firmware / SE 职责                                           | SDK / Host 职责                                                         |
 | ------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------- |
-| 标准钱包            | 加载空 Passphrase seed 并返回最终 Session                    | 每次发送 `select STANDARD`，不访问隐藏钱包缓存                          |
+| 标准钱包            | 保持默认空 Passphrase seed 上下文                             | 不调用 `DeviceSessionOpen`，不访问隐藏钱包缓存                          |
 | Host Passphrase     | 使用请求携带的 Passphrase 建立隐藏钱包 Session               | 通过既有 UI Event 获取输入、NFKD 规范化、发送 `host_passphrase`         |
 | 设备 Passphrase     | 直接显示设备 Passphrase 页面并建立 Session                   | 先补发等待设备 Event，再发送 `passphrase_on_device`                     |
 | 使用已有 Attach PIN | 直接显示 Attach PIN 页面，恢复绑定 Passphrase 并建立 Session | 根据 `attach_to_pin_enabled` 展示入口，发送 `attach_pin_on_device`      |
@@ -549,8 +549,7 @@ Protocol V2 采用“Host 显式选择、Firmware 本地完成设备交互”的
 | Attach PIN 绑定管理 | 在设备设置页创建、更新或删除绑定                             | 打开设置页并刷新状态，不把管理动作塞进 `DeviceSessionOpen`              |
 
 `PassphraseAck` 只属于 Protocol V1 的 firmware 中间请求流程。Pro2 的
-`DeviceSessionOpen` 不是简单改名：它同时承载 `select STANDARD`、三种隐藏钱包选择和
-`resume session_id`。
+`DeviceSessionOpen` 不是简单改名：它承载三种隐藏钱包选择和 `resume session_id`；标准钱包不进入该协议流程。
 
 ## 10. Protocol V2 transport session 与 seq 管理
 
