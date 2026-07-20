@@ -34,6 +34,7 @@ export const en = {
       pro2Portfolio: 'Pro2 Portfolio',
       pro2SpecialUpdate: 'Pro2 Special Update',
       methodBatchTest: 'Chain Method Batch Test',
+      multisigTest: 'Multisig Test',
       eventTest: 'Event Test',
       navigation: 'Navigation',
       current: 'Current',

@@ -31,6 +31,7 @@ import {
   UploadCloud,
   Radio,
   WalletCards,
+  ShieldCheck,
 } from 'lucide-react';
 import { getDeviceLabel } from '@onekeyfe/hd-core';
 import packageJson from '../../package.json';
@@ -116,6 +117,11 @@ const navigationItems = [
     title: 'common.eventTest',
     url: '/event-test',
     icon: Radio,
+  },
+  {
+    title: 'common.multisigTest',
+    url: '/multisig-test',
+    icon: ShieldCheck,
   },
 ];
 

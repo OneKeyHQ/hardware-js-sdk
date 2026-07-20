@@ -40,6 +40,7 @@ import Pro2PortfolioPage from './routes/pro2-portfolio';
 import Pro2SpecialUpdatePage from './routes/pro2-special-update';
 import MethodBatchTestPage from './routes/method-batch-test';
 import EventTestPage from './routes/event-test';
+import MultisigTestPage from './routes/multisig-test';
 
 // Import styles
 import './tailwind.css';
@@ -184,6 +185,10 @@ const router = createHashRouter(
         {
           path: 'event-test',
           element: <EventTestPage />,
+        },
+        {
+          path: 'multisig-test',
+          element: <MultisigTestPage />,
         },
       ],
     },
