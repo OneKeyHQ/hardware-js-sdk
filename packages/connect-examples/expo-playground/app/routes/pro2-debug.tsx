@@ -202,7 +202,7 @@ const PRO2_METHOD_WIRE_INFO: Record<string, MethodWireInfo> = {
   },
   deviceUploadWallpaper: {
     tx: 'FilesystemDirMake + FilesystemFileWrite + DeviceSettingsSet(wallpaper_path)',
-    txPayload: 'LVGL v9 RGB565/RGB565A8 .bin -> vol0:/wallpapers/user/',
+    txPayload: 'LVGL v9 RGB565/RGB565A8 .bin -> vol1:/wallpapers/',
     rx: 'Success / FilesystemFile / Success',
     rxPayload: PRO2_DYNAMIC_RESPONSE,
     decoded: 'path / size / colorFormat / message',

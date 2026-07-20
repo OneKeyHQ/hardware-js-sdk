@@ -38,7 +38,7 @@
 1. 校验尺寸、RGBA 长度、文件名和 `chunkSize`。
 2. 完全不透明图片编码为 `RGB565`，存在透明像素时编码为 `RGB565A8`。
 3. 使用 8×8 阈值矩阵进行有序抖动并生成设备二进制格式。
-4. 创建 `vol0:/wallpapers/user`，通过 `FilesystemFileWrite` 分片上传。
+4. 创建 `vol1:/wallpapers`，通过 `FilesystemFileWrite` 分片上传。
 5. 根据设备返回的 `processed_byte` 推进 offset。
 6. 调用 `DeviceSettingsSet` 更新 `wallpaper_path`。
 

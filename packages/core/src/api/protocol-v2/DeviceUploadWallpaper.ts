@@ -27,7 +27,7 @@ export type DeviceUploadWallpaperResponse = {
   message?: string;
 };
 
-const WALLPAPER_DIRECTORY = 'vol0:/wallpapers/user';
+const WALLPAPER_DIRECTORY = 'vol1:/wallpapers';
 const SAFE_FILE_NAME = /^[A-Za-z0-9_-]+(?:\.bin)?$/;
 
 function normalizeFileName(fileName: string | undefined, data: Uint8Array): string {

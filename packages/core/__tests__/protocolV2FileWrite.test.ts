@@ -15,7 +15,7 @@ describe('writeProtocolV2File', () => {
 
     const result = await writeProtocolV2File({
       commands: { typedCall } as any,
-      path: 'vol0:/wallpapers/user/test.bin',
+      path: 'vol1:/wallpapers/test.bin',
       data,
       totalSize: data.byteLength,
       overwrite: true,
@@ -47,7 +47,7 @@ describe('writeProtocolV2File', () => {
     await expect(
       writeProtocolV2File({
         commands: { typedCall } as any,
-        path: 'vol0:/wallpapers/user/test.bin',
+        path: 'vol1:/wallpapers/test.bin',
         data: new Uint8Array([1]),
       })
     ).rejects.toMatchObject({ errorCode: HardwareErrorCode.RuntimeError });
@@ -59,7 +59,7 @@ describe('writeProtocolV2File', () => {
     await expect(
       writeProtocolV2File({
         commands: { typedCall } as any,
-        path: 'vol0:/wallpapers/user/test.bin',
+        path: 'vol1:/wallpapers/test.bin',
         data: new Uint8Array([1, 2, 3]),
       })
     ).rejects.toMatchObject({ errorCode: HardwareErrorCode.RuntimeError });
@@ -78,7 +78,7 @@ describe('writeProtocolV2File', () => {
     await expect(
       writeProtocolV2File({
         commands: { typedCall } as any,
-        path: 'vol0:/wallpapers/user/test.bin',
+        path: 'vol1:/wallpapers/test.bin',
         data: new Uint8Array([1, 2, 3]),
         maxChunkRetries: 2,
         onProgress,

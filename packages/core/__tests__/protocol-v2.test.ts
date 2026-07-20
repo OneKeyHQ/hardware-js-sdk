@@ -126,11 +126,11 @@ describe('DeviceUploadWallpaper', () => {
     expect(method.requireProtocolV2).toBe(true);
     expect(method.unlockPolicy).toBe('retry-on-locked');
     expect(typedCall).toHaveBeenNthCalledWith(1, 'FilesystemDirMake', 'Success', {
-      path: 'vol0:/wallpapers/user',
+      path: 'vol1:/wallpapers',
     });
     const fileWriteCall = typedCall.mock.calls.find(call => call[0] === 'FilesystemFileWrite');
     expect(fileWriteCall?.[2]).toMatchObject({
-      file: { path: expect.stringMatching(/^vol0:\/wallpapers\/user\/wallpaper-[a-f0-9]+\.bin$/) },
+      file: { path: expect.stringMatching(/^vol1:\/wallpapers\/wallpaper-[a-f0-9]+\.bin$/) },
       overwrite: true,
       append: false,
     });
