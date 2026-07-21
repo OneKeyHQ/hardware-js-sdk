@@ -14,7 +14,15 @@ export type DeviceSettingsParams = {
   experimentalFeatures?: boolean;
   autoShutdownDelayMs?: number;
   changeBrightness?: boolean;
+  brightness?: number;
   hapticFeedback?: boolean;
+  bluetoothEnabled?: boolean;
+  animationEnabled?: boolean;
+  tapToWake?: boolean;
+  deviceNameDisplayEnabled?: boolean;
+  fidoEnabled?: boolean;
+  usbLockEnabled?: boolean;
+  randomKeypad?: boolean;
 };
 
 export declare function deviceSettings(
