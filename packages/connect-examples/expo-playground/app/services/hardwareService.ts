@@ -410,8 +410,10 @@ export async function callHardwareAPI(
     const methodFunc = sdk[method] as (...args: any[]) => Promise<ApiResponse>;
     let result: ApiResponse;
 
-    // 根据参数中是否包含 deviceId 来决定调用方式
-    if (deviceId) {
+    // 链方法即使暂时没有解析出 deviceId，也必须保留三参数签名；
+    // 否则 params 会被错放到 deviceId 位置，SDK 收到的实际 payload 将变成 undefined。
+    const hasDeviceIdParameter = Object.prototype.hasOwnProperty.call(params, 'deviceId');
+    if (hasDeviceIdParameter) {
       // 三参数调用：connectId, deviceId, params
       result = await methodFunc(connectId, deviceId, params);
     } else {
