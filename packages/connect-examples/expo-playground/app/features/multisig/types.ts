@@ -24,6 +24,7 @@ export type MultisigTestCase = {
   builtIn: boolean;
   localOnly?: boolean;
   testMnemonicOnly?: boolean;
+  reference?: MultisigFixtureReference;
 };
 
 export type ValidationIssue = {
@@ -39,4 +40,23 @@ export type ValidationResult = {
 export type ExecutionSummaryItem = {
   label: string;
   value: string;
+};
+
+export type MultisigFixtureReference = {
+  broadcastable: false;
+  signerAddresses: readonly string[];
+  expectedSignatures: readonly string[];
+  digest?: string;
+  aggregatedSignatures2Of3?: string;
+  aggregatedSignatures3Of3?: string;
+  accountXpubs?: readonly string[];
+  childPublicKeys?: readonly string[];
+  sighash?: string;
+  scriptPubKey?: string;
+  redeemScript?: string;
+  witnessScript?: string;
+  fundingTxHex?: string;
+  spendingTxHex?: string;
+  prevHash?: string;
+  doubleSignatures?: readonly string[];
 };

@@ -1,4 +1,5 @@
 import { verify } from '@noble/secp256k1';
+import { describe, expect, test } from '@jest/globals';
 import { Transaction } from 'bitcoinjs-lib';
 
 import { generateBtcFixtures } from '../generateBtcFixtures';

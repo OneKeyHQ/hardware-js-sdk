@@ -1,3 +1,5 @@
+import { describe, expect, test } from '@jest/globals';
+
 import { readMultisigMnemonics } from '../readMnemonics';
 
 const MNEMONIC_1 = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
@@ -6,6 +8,7 @@ const MNEMONIC_3 = 'letter advice cage absurd amount doctor acoustic avoid lette
 
 function createEnv(overrides: Record<string, string | undefined> = {}): NodeJS.ProcessEnv {
   return {
+    NODE_ENV: 'development',
     MULTISIG_MNEMONIC_1: MNEMONIC_1,
     MULTISIG_MNEMONIC_2: MNEMONIC_2,
     MULTISIG_MNEMONIC_3: MNEMONIC_3,

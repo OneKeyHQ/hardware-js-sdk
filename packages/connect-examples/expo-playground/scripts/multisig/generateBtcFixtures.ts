@@ -97,7 +97,7 @@ async function createFixture(
     return child.privateKey;
   });
   const { payment, redeemScript, witnessScript } = createPayment(config.id, childPublicKeys);
-  if (!payment.address || !payment.output) {
+  if (!payment.address || !payment.output || !redeemScript) {
     throw new Error(`BTC ${config.title} 地址生成失败`);
   }
 

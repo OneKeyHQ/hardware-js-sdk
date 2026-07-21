@@ -37,6 +37,42 @@ describe('multisig test workbench domain', () => {
     );
   });
 
+  test('loads generated ETH and BTC fixtures into built-in cases', () => {
+    const ids = new Set(BUILT_IN_MULTISIG_CASES.map(item => item.id));
+
+    expect([...ids]).toEqual(
+      expect.arrayContaining([
+          'eth-generated-standard',
+          'eth-generated-delegate-call',
+          'btc-generated-p2sh-address',
+          'btc-generated-p2sh-sign',
+          'btc-generated-p2sh-partial-sign',
+          'btc-generated-p2sh-p2wsh-address',
+          'btc-generated-p2wsh-address',
+      ])
+    );
+  });
+
+  test('generated partial signing cases contain a valid prefilled signature slot', () => {
+    const partialCases = BUILT_IN_MULTISIG_CASES.filter(item =>
+      item.id.startsWith('btc-generated-') && item.id.endsWith('-partial-sign')
+    );
+
+    expect(partialCases).toHaveLength(3);
+    partialCases.forEach(item => {
+      const parameters = item.parameters as {
+        inputs: Array<{ multisig: { signatures: string[] } }>;
+      };
+      expect(parameters.inputs[0].multisig.signatures).toEqual([
+        expect.stringMatching(/^30[0-9a-f]+01$/),
+        '',
+        '',
+      ]);
+      expect(item.reference?.broadcastable).toBe(false);
+      expect(item.reference?.expectedSignatures).toHaveLength(3);
+    });
+  });
+
   test('all positive built-in cases pass local validation', () => {
     const positiveCases = BUILT_IN_MULTISIG_CASES.filter(item => !item.localOnly);
     const failures = positiveCases.flatMap(item =>
@@ -47,7 +83,9 @@ describe('multisig test workbench domain', () => {
   });
 
   test('rejects an invalid bitcoin multisig threshold', () => {
-    const source = BUILT_IN_MULTISIG_CASES.find(item => item.id === 'btc-p2wsh-address');
+    const source = BUILT_IN_MULTISIG_CASES.find(
+      item => item.id === 'btc-generated-p2wsh-address'
+    );
     expect(source).toBeDefined();
 
     const invalid = {

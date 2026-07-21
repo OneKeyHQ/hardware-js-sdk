@@ -1,3 +1,5 @@
+import { describe, expect, test } from '@jest/globals';
+
 import { generateBtcFixtures } from '../generateBtcFixtures';
 import { generateEthFixtures } from '../generateEthFixtures';
 import type { MultisigMnemonics } from '../readMnemonics';
