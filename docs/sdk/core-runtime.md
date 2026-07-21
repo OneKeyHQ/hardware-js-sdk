@@ -1,7 +1,7 @@
 # SDK Core 运行时与 Protocol V2 适配
 
 > - 文档状态：当前 Core 映射
-> - 最后核验：2026-07-15
+> - 最后核验：2026-07-21
 > - 适用范围：`packages/core`
 
 本页描述“协议消息如何进入 SDK 公共能力”，不重复壁纸、设备设置、固件升级等完整用户流程。
@@ -24,18 +24,27 @@ V2 不支持传统 `GetFeatures`。Core 在初始化时发送默认范围的 `De
 
 | 调用                 | 语义                                                                            |
 | -------------------- | ------------------------------------------------------------------------------- |
-| 初始化 adapter       | 请求 hw、fw、coprocessor、status 的基础字段，并更新 Device 内唯一 Features 缓存 |
-| `getDeviceInfo`      | 按 basic/verify/full 范围构建标准 `DeviceProfile`，可刷新缓存                   |
+| 初始化 adapter       | 请求 hw、fw、coprocessor 基础字段，并更新 Device 内唯一 Features 缓存          |
+| `getDeviceInfo`      | 按 basic/verify/full 范围读取静态信息，并投影缓存状态形成 `DeviceProfile`       |
 | 原始 `deviceInfoGet` | 按调用方 targets/types 返回未加工 `DeviceInfo`，不构建 Profile，不更新缓存      |
 
 这三条路径不能在文档中合并成“DeviceInfoGet API”，否则会掩盖缓存和输出差异。
 
 ## 状态与 PIN 解锁
 
-- 轻量运行状态通常由 `DeviceInfoGet` 的 status target 合并进标准 Features。
-- 需要独立状态消息时使用 `DeviceStatusGet`。
-- V2 PIN 解锁使用 `DeviceSessionAskPin -> DeviceSessionPinResult`，Core 将 `unlocked`、`unlocked_attach_pin`、`passphrase_protection` 合并回标准 Features。
+- `DeviceInfoGet` 默认不请求 status target，也不会隐式补发 `DeviceStatusGet`。
+- 需要设备实时状态时，由调用方显式使用 `DeviceStatusGet`；固件升级等专用流程可以按自身状态机显式探测。
+- V2 PIN 解锁使用 `DeviceSessionAskPin -> DeviceSessionPinResult`，Core 只合并响应已经确认的 `unlocked` 等字段，不为了补全状态额外轮询。
 - 受保护方法是否允许单次解锁后重试，由方法显式声明；Transport 不重放业务请求。
+
+## 统一设置与 Features 更新
+
+公共 `deviceSettings` 是 OneKey V1/V2 的协议无关写入入口。Core 根据协议选择
+`ApplySettings` 或 `DeviceSettingsSet`，成功后把已确认参数转换为 camelCase Features patch。
+原始 V2 `DeviceSettingsGet/Set` 仍作为高级接口保留，但同样更新这一份 Features 缓存。
+
+每次实际状态变化都会发送 `DEVICE.FEATURES`。宿主应用应监听该事件并持久化完整
+Features，不需要为 label、language、auto-lock 等字段分别维护手工数据库 patch。
 
 详见 [钱包 Session 与设备安全](../device/wallet-session-and-security.md) 和 [SDK 关键架构决策](../architecture/decisions.md#受保护方法的单次解锁重试)。
 

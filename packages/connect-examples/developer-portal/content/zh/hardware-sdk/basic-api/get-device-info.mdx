@@ -10,6 +10,8 @@ title: 获取设备信息
 
 对于 V1 设备，信息来自 `GetFeatures` 和可选的 `OnekeyGetFeatures`。对于 V2 设备（Pro2），SDK 内部读取 Protocol V2 的 `DevGetDeviceInfo` 消息。结果被归一化为统一的 `DeviceProfile` 结构。
 
+Pro2 的 `DeviceInfoGet` 默认只读取硬件和固件静态信息，不携带 `status: true`，也不会隐式调用 `DeviceStatusGet`。`DeviceProfile.status`、label 和 deviceId 会从 SDK 已确认的 Features 缓存投影；需要最新实时状态时，应显式调用对应状态 API。
+
 ```typescript
 const response = await HardwareSDK.getDeviceInfo(connectId, {
   scope: 'basic',
@@ -133,3 +135,5 @@ if (full.success) {
 | Protocol V2 原始设备信息排查 | `getDeviceInfo(connectId, { scope: 'full', includeRaw: true })` |
 
 > `getFeatures` 仅保留为 legacy 兼容入口。新接入应使用 `getDeviceInfo`，它返回标准 `DeviceProfile` 模型。
+
+设备设置应使用协议无关的 `deviceSettings`。设置成功后 SDK 会更新 Features 并发送 `DEVICE.FEATURES`，接入方无需根据 Pro/Pro2 分别调用 `ApplySettings` 或 `DeviceSettingsSet`。

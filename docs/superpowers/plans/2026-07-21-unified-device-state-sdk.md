@@ -8,6 +8,13 @@
 
 **Tech Stack:** TypeScript、EventEmitter、Jest、Yarn Workspaces、hd-core Protocol V1/V2 adapters
 
+## 实施状态（2026-07-21）
+
+- Task 1–4 已完成：Features 字段级合并、V1/V2 设置归一化、公共 `deviceSettings` 路由、稳定展示名称均已落地。
+- 已补充：普通初始化、Wallet Session 和设置流程不再隐式轮询 `DeviceStatusGet`；轻量 DeviceInfo 刷新按物理设备 serialNo 保留缓存。
+- 已修复：`DeviceProfile` 在不读取 status 时仍从缓存 Features 投影 `deviceId`。
+- Task 5 的运行时与事件文档已更新；Developer Portal 的完整发布说明仍可随 SDK 版本发布继续补充。
+
 ---
 
 ### Task 1: 建立 Features 字段级合并入口

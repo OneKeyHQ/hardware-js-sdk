@@ -150,21 +150,22 @@ SDK 当前使用的典型范围：
 
 | 场景        | 读取内容                                                   | 原因                                |
 | ----------- | ---------------------------------------------------------- | ----------------------------------- |
-| 初始化      | hw、fw、coprocessor、status；version、specific             | 建立基础 Features                   |
-| 轻量刷新    | hw、coprocessor、status；version、specific                 | 刷新状态，不重复读取全部 SE 和 hash |
-| versions    | hw、fw、coprocessor、se1 至 se4、status；version、specific | 展示所有组件版本                    |
+| 初始化      | hw、fw、coprocessor；version、specific                     | 建立静态信息并投影已缓存状态        |
+| 轻量刷新    | hw、fw、coprocessor；version、specific                     | 刷新静态信息，不隐式读取状态        |
+| versions    | hw、fw、coprocessor、se1 至 se4；version、specific         | 展示所有组件版本                    |
 | verify/full | 所有 target；version、build_id、hash、specific             | 设备完整校验                        |
 
 ## 6. 设备实时状态
 
-设备实时状态通过以下两种方式获取：
+协议支持以下两种状态来源，但 SDK 默认流程只使用显式状态消息：
 
 ```text
 DeviceInfoGet(targets.status=true) -> DeviceInfo.status
 DeviceStatusGet -> DeviceStatus
 ```
 
-前者适合初始化时顺带获取状态，后者适合快速刷新。
+`targets.status=true` 保留为原始协议调试能力。普通初始化、`getDeviceInfo`、设置和钱包 Session
+不会默认使用它，也不会隐式调用 `DeviceStatusGet`；需要新鲜运行状态时由调用方明确请求。
 
 ### 6.1 字段映射
 
@@ -260,8 +261,8 @@ label、语言、蓝牙开关、自动锁屏和振动反馈都属于用户配置
 所以：
 
 - `DeviceInfo` 不提供这些字段是设计结果，不是字段遗漏。
-- 当前标准 V2 `Features` 和 `DeviceProfile` 也不会自动合并这些设置。
-- 设备详情页需要展示设置时，应调用 `deviceSettingsGet`。
+- `deviceSettingsGet` 和成功的 `deviceSettings`/`deviceSettingsSet` 会把这些字段归一化合并到标准 `Features`。
+- 设备详情页只消费 Features；需要从设备重新读取设置时，可以显式调用 `deviceSettingsGet` 触发缓存更新。
 
 ## 8. 钱包会话
 
@@ -314,7 +315,7 @@ DeviceSessionAskPin -> DeviceSessionPinResult
 | `unlocked_attach_pin`   | `Features.unlockedAttachPin`    | 是否通过 Attach PIN 解锁     |
 | `passphrase_protection` | `Features.passphraseProtection` | 解锁后确认的 Passphrase 状态 |
 
-PIN 解锁结果是一次操作的返回值，`DeviceStatus` 是之后可以重新读取的设备状态。Core 会先合并解锁结果，并可继续刷新 `DeviceStatus` 进行确认。
+PIN 解锁结果是一次操作的返回值，`DeviceStatus` 是之后可以显式重新读取的设备状态。Core 只合并解锁响应已经确认的字段，不会为了补全状态自动刷新 `DeviceStatus`。
 
 ## 10. 设备操作与固件管理
 
@@ -464,24 +465,24 @@ deviceInfoGet(targets, types)
 
 build ID 和 hash 只在 verify/full 查询中请求，并进入 SDK 的校验信息结构。
 
-## 14. 已有独立来源，但不进入标准 Features 的字段
+## 14. 专用来源及其标准 Features 投影
 
-下面这些字段不是协议缺失，只是 SDK 要求调用专用 API：
+下面这些字段仍由专用消息读写，但跨设备通用设置会投影进标准 Features：
 
-| 内容            | Protocol V2 来源                       | 获取方式               |
+| 内容            | Protocol V2 来源                       | 标准投影/管理方式      |
 | --------------- | -------------------------------------- | ---------------------- |
-| label           | `DeviceSettings.label`                 | `deviceSettingsGet`    |
-| language        | `DeviceSettings.language`              | `deviceSettingsGet`    |
-| 蓝牙开关        | `DeviceSettings.bt_enable`             | `deviceSettingsGet`    |
-| 自动锁屏        | `DeviceSettings.autolock_delay_ms`     | `deviceSettingsGet`    |
-| 自动关机        | `DeviceSettings.autoshutdown_delay_ms` | `deviceSettingsGet`    |
-| 触觉反馈        | `DeviceSettings.haptic_feedback`       | `deviceSettingsGet`    |
+| label           | `DeviceSettings.label`                 | `Features.label`                |
+| language        | `DeviceSettings.language`              | `Features.language`             |
+| 蓝牙开关        | `DeviceSettings.bt_enable`             | `Features.bleEnabled`           |
+| 自动锁屏        | `DeviceSettings.autolock_delay_ms`     | `Features.autoLockDelayMs`      |
+| 自动关机        | `DeviceSettings.autoshutdown_delay_ms` | `Features.autoShutdownDelayMs`  |
+| 触觉反馈        | `DeviceSettings.haptic_feedback`       | `Features.hapticFeedback`       |
 | 钱包 Session ID | `DeviceSession.session_id`             | Core 钱包 Session 管理 |
 | 钱包标识        | `DeviceSession.btc_test_address`       | 内部 `passphraseState` |
 | 固件安装记录    | `DeviceFirmwareUpdateStatus`           | 固件升级 API           |
 | 生产制造信息    | `DeviceFactoryInfo`                    | 生产制造专用 API       |
 
-设备详情页需要这些内容时，应组合调用对应 API，而不是要求 `DeviceInfo` 重复返回。
+设备详情页读取统一 Features，不直接依赖原始 snake_case 设置结构；这些字段仍不应被重复塞回 `DeviceInfo`。
 
 ## 15. 当前缺失的 Feature 字段
 

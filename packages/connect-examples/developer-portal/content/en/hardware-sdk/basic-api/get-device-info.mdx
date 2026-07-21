@@ -10,6 +10,8 @@ Returns a unified view of the device's hardware, firmware, and security state. T
 
 For V1 devices, information is gathered from `GetFeatures` and optionally `OnekeyGetFeatures`. For V2 devices (Pro2), the SDK reads the Protocol V2 `DevGetDeviceInfo` message internally. The result is normalized into a single `DeviceProfile` structure.
 
+For Pro2, `DeviceInfoGet` reads static hardware and firmware information without `status: true` and does not implicitly call `DeviceStatusGet`. `DeviceProfile.status`, label, and deviceId are projected from the SDK's confirmed Features cache. Call an explicit status API only when fresh runtime state is required.
+
 ```typescript
 const response = await HardwareSDK.getDeviceInfo(connectId, {
   scope: 'basic',
@@ -133,3 +135,5 @@ If you were previously using `getFeatures` + `getOnekeyFeatures`, you can now us
 | Protocol V2 raw device info inspection | `getDeviceInfo(connectId, { scope: 'full', includeRaw: true })` |
 
 > `getFeatures` remains available for legacy compatibility only. New integrations should use `getDeviceInfo`, which returns the standard `DeviceProfile` model.
+
+Use the protocol-neutral `deviceSettings` API for device preferences. After a successful update, the SDK patches Features and emits `DEVICE.FEATURES`; integrations do not need separate Pro/Pro2 `ApplySettings` and `DeviceSettingsSet` branches.

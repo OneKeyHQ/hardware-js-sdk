@@ -343,7 +343,7 @@ export function buildProfileFromProtocolV2({
   includeRaw = false,
 }: BuildProtocolV2ProfileParams): DeviceProfile {
   const info = deviceInfo;
-  const deviceId = deviceStatus?.device_id || '';
+  const deviceId = deviceStatus?.device_id ?? features?.deviceId ?? '';
   const serialNo = deviceInfo?.hw?.serial_no || '';
   const label = features?.label ?? null;
   const bleName = info?.coprocessor?.bt_adv_name ?? features?.bleName ?? null;

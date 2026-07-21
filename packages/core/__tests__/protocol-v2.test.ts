@@ -578,6 +578,23 @@ describe('Protocol V2 feature adapter', () => {
     expect(profile.status.bootloaderMode).toBe(true);
   });
 
+  test('projects cached Protocol V2 device id when DeviceInfo does not include status', () => {
+    const deviceInfo = {
+      protocol_version: 1,
+      hw: {
+        serial_no: 'PR2-CACHED-ID',
+      },
+    };
+    const features = {
+      ...normalizeProtocolV2Features(descriptor as any, deviceInfo),
+      deviceId: 'wallet-device-id',
+    };
+
+    const profile = buildProfileFromProtocolV2({ deviceInfo, features });
+
+    expect(profile.deviceId).toBe('wallet-device-id');
+  });
+
   test('marks current romloader-shaped Protocol V2 DeviceInfo as romloader mode', () => {
     const deviceInfo = {
       protocol_version: 1,
