@@ -32,6 +32,10 @@ import {
 import { generateInstanceId } from '../utils/tracing';
 // eslint-disable-next-line import/no-cycle
 import { DeviceCommands } from './DeviceCommands';
+import {
+  mergeDeviceFeaturesPatch,
+  type DeviceFeaturesUpdateSource,
+} from './DeviceFeaturesState';
 import { deviceWalletSessionStore } from './DeviceWalletSessionStore';
 import {
   type DeviceFirmwareRange,
@@ -843,6 +847,24 @@ export class Device extends EventEmitter {
     }
     this.featuresNeedsReload = false;
     this.emit(DEVICE.FEATURES, this, feat);
+  }
+
+  updateFeaturesPatch(patch: Partial<Features>, source: DeviceFeaturesUpdateSource) {
+    if (!this.features) return undefined;
+
+    const features = mergeDeviceFeaturesPatch(this.features, patch);
+    if (features === this.features) return this.features;
+
+    this.features = fixFeaturesFirmwareVersion(features);
+    this.featuresNeedsReload = false;
+    Log.debug('Device features patch committed', {
+      source,
+      keys: Object.keys(patch).filter(
+        key => patch[key as keyof Features] !== undefined
+      ),
+    });
+    this.emit(DEVICE.FEATURES, this, this.features);
+    return this.features;
   }
 
   updateProtocolV2Features(deviceInfo?: ProtocolV2DeviceInfo, deviceStatus?: DeviceStatus | null) {
