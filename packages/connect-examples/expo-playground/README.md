@@ -95,8 +95,37 @@ yarn start
 
 Open `http://localhost:3010` to explore the example.
 
+## 🔐 生成 ETH/BTC 多签测试数据
+
+Multisig Test 的 ETH Safe 与 BTC BIP48 用例由离线脚本生成。脚本只从以下三个环境变量读取测试助记词：
+
+- `MULTISIG_MNEMONIC_1`
+- `MULTISIG_MNEMONIC_2`
+- `MULTISIG_MNEMONIC_3`
+
+运行方式：
+
+```bash
+export MULTISIG_MNEMONIC_1="你的第一个测试助记词"
+export MULTISIG_MNEMONIC_2="你的第二个测试助记词"
+export MULTISIG_MNEMONIC_3="你的第三个测试助记词"
+
+yarn generate:multisig-fixtures
+```
+
+生成结果写入 `app/features/multisig/generatedFixtures.ts`，页面会直接导入该文件，无需手工复制 JSON。相同的三个助记词会生成完全相同的数据。
+
+安全说明：
+
+- 只使用专门用于测试、没有真实资产的助记词。
+- 脚本不会访问 RPC、区块浏览器或广播接口。
+- BTC 引用交易使用虚构 coinbase-like 输入，所有生成数据均标记为不可广播。
+- 助记词、seed、私钥和扩展私钥不会写入生成文件或正常日志。
+- 不要将保存助记词的 `.env` 文件提交到 Git；应提交重新生成后的 `generatedFixtures.ts`。
+- BTC “继续签名”用例默认已经填入 signer 1 的签名，设备应使用 signer 2 对应助记词进行验证。
+
 ## 🔗 Resources
 
 - **Main SDK**: [OneKey Hardware SDK](https://github.com/OneKeyHQ/hardware-js-sdk)
 - **OneKey Bridge**: [Download Bridge App](https://help.onekey.so/hc/zh-cn/articles/9740566472335)
-- **API Documentation**: [Hardware API Reference](https://connect.onekey.so/docs) 
+- **API Documentation**: [Hardware API Reference](https://connect.onekey.so/docs)
