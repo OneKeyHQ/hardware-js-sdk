@@ -1458,6 +1458,9 @@ async function setupConnectionAndDiscoverServices(
       process.platform === 'darwin' && process.env.ONEKEY_BLE_DIAG !== '1'
         ? (['unfiltered'] as const)
         : (['filtered', 'filtered16', 'unfiltered'] as const);
+    // One self-contained conclusion line per cold connect (filter console by
+    // "verdict"): which discovery strategies missed/succeeded on this link.
+    const attemptResults: string[] = [];
     // eslint-disable-next-line no-restricted-syntax
     for (const attempt of discoveryAttempts) {
       if (attempt === 'unfiltered') {
@@ -1470,13 +1473,16 @@ async function setupConnectionAndDiscoverServices(
           shortUuidFilter: attempt === 'filtered16',
         });
         connectedDevices.set(deviceId, peripheral);
-        bleTrace('gatt.discovery.done', {
+        attemptResults.push(`${attempt}=ok`);
+        bleTrace('gatt.discovery.verdict', {
           deviceId,
-          elapsedMs: Date.now() - startedAt,
+          attempts: attemptResults.join(','),
           route: `direct-${attempt}`,
+          elapsedMs: Date.now() - startedAt,
         });
         return result;
       } catch (directError) {
+        attemptResults.push(`${attempt}=miss`);
         bleTrace('gatt.discovery.direct.miss', {
           deviceId,
           mode: attempt,
@@ -1486,6 +1492,12 @@ async function setupConnectionAndDiscoverServices(
       }
       if (peripheral.state !== 'connected') break;
     }
+    bleTrace('gatt.discovery.verdict', {
+      deviceId,
+      attempts: attemptResults.join(','),
+      route: 'escalating-to-force-reconnect',
+      elapsedMs: Date.now() - startedAt,
+    });
   } else {
     bleTrace('gatt.discovery.direct.skip', { deviceId, state: peripheral.state });
   }
