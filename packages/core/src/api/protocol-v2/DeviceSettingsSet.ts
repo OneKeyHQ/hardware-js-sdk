@@ -1,4 +1,5 @@
 import { BaseMethod } from '../BaseMethod';
+import { normalizeDeviceSettingsToFeaturesPatch } from '../../device/DeviceSettingsState';
 import { invalidParameter } from '../helpers/filesystemValidation';
 
 import type { DeviceSettings } from '@onekeyfe/hd-transport';
@@ -44,6 +45,10 @@ export default class DeviceSettingsSet extends BaseMethod<{
 
   async run() {
     const res = await this.device.commands.typedCall('DeviceSettingsSet', 'Success', this.params);
+    this.device.updateFeaturesPatch(
+      normalizeDeviceSettingsToFeaturesPatch(this.params.settings),
+      'device-settings-set'
+    );
     return Promise.resolve(res.message);
   }
 }

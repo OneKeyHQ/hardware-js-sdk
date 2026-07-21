@@ -1,4 +1,5 @@
 import { BaseMethod } from '../BaseMethod';
+import { normalizeDeviceSettingsToFeaturesPatch } from '../../device/DeviceSettingsState';
 
 export default class DeviceSettingsGet extends BaseMethod {
   init() {
@@ -11,6 +12,10 @@ export default class DeviceSettingsGet extends BaseMethod {
 
   async run() {
     const res = await this.device.commands.typedCall('DeviceSettingsGet', 'DeviceSettings', {});
+    this.device.updateFeaturesPatch(
+      normalizeDeviceSettingsToFeaturesPatch(res.message),
+      'device-settings-get'
+    );
     return Promise.resolve(res.message);
   }
 }

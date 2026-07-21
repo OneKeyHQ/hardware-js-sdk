@@ -337,6 +337,13 @@ function stubDevice<T extends Record<string, any>>(device: T): T {
     });
     return d.features;
   };
+  d.updateFeaturesPatch ??= (patch: Record<string, unknown>) => {
+    d.features = {
+      ...d.features,
+      ...Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined)),
+    };
+    return d.features;
+  };
   return device;
 }
 
