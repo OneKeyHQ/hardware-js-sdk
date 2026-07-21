@@ -1472,8 +1472,15 @@ async function setupConnectionAndDiscoverServices(
           unfiltered: attempt === 'unfiltered',
           shortUuidFilter: attempt === 'filtered16',
         });
-        connectedDevices.set(deviceId, peripheral);
         attemptResults.push(`${attempt}=ok`);
+        // The filtered attempts are DIAGNOSTIC PROBES only (they exist to
+        // answer the uuid wire-encoding question); the link is always built
+        // from the unfiltered result so probe outcomes never change behavior.
+        if (attempt !== 'unfiltered') {
+          // eslint-disable-next-line no-continue
+          continue;
+        }
+        connectedDevices.set(deviceId, peripheral);
         bleTrace('gatt.discovery.verdict', {
           deviceId,
           attempts: attemptResults.join(','),

@@ -2,6 +2,7 @@ import semver from 'semver';
 import EventEmitter from 'events';
 import {
   ERRORS,
+  ERROR_CODES_REQUIRE_DISCONNECT,
   ERROR_CODES_REQUIRE_RELEASE,
   HardwareError,
   HardwareErrorCode,
@@ -852,6 +853,20 @@ async function connectDeviceForBle(method: BaseMethod, device: Device, retryCoun
       errorCode: err.errorCode,
       error: String(err.message ?? err),
     });
+    // Hard-teardown errors must physically drop the link HERE too: the
+    // ERROR_CODES_REQUIRE_DISCONNECT handling in Device.run() never sees
+    // failures from this acquire/initialize phase, and with keep-alive a
+    // wedged link would otherwise be reused by every retry, failing
+    // identically forever (field case 2026-07-21: Initialize timing out at
+    // 25s per attempt on a reused link, device held the whole time).
+    if (
+      ERROR_CODES_REQUIRE_DISCONNECT.includes(err.errorCode) &&
+      device.mainId &&
+      device.deviceConnector
+    ) {
+      bleTrace('connectForBle.hardDisconnect', { errorCode: err.errorCode });
+      await device.deviceConnector.disconnect(device.mainId).catch(() => undefined);
+    }
     if (err.errorCode === HardwareErrorCode.BleTimeoutError && retryCount < 6) {
       const nextRetry = retryCount + 1;
       Log.debug(`Bluetooth connect timeout and will retry, retry count: ${nextRetry}`);
