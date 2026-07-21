@@ -47,6 +47,7 @@ type BuildProtocolV1ProfileParams = {
 type BuildProtocolV2ProfileParams = {
   deviceInfo?: ProtocolV2DeviceInfo;
   deviceStatus?: DeviceStatus;
+  features?: Features;
   sources?: DeviceInfoSource[];
   scope?: GetDeviceInfoParams['scope'];
   includeRaw?: boolean;
@@ -196,22 +197,23 @@ const normalizeV1Status = (features?: Features): DeviceInfoStatus => ({
 
 const normalizeV2Status = (
   deviceInfo?: ProtocolV2DeviceInfo,
-  deviceStatus?: DeviceStatus
+  deviceStatus?: DeviceStatus,
+  features?: Features
 ): DeviceInfoStatus => {
   const status = deviceStatus;
   const bootloaderMode = isProtocolV2BootloaderDeviceInfo(deviceInfo, deviceStatus);
   return {
     mode: getProtocolV2Mode(deviceInfo, deviceStatus),
-    initialized: status?.init_states ?? null,
+    initialized: status?.init_states ?? features?.initialized ?? null,
     bootloaderMode,
-    unlocked: status?.unlocked ?? null,
-    passphraseProtection: status?.passphrase_enabled ?? null,
-    attachToPinEnabled: status?.attach_to_pin_enabled ?? null,
-    unlockedAttachPin: status?.unlocked_by_attach_to_pin ?? null,
-    backupRequired: status?.backup_required ?? null,
-    noBackup: null,
-    language: null,
-    bleEnabled: null,
+    unlocked: status?.unlocked ?? features?.unlocked ?? null,
+    passphraseProtection: status?.passphrase_enabled ?? features?.passphraseProtection ?? null,
+    attachToPinEnabled: status?.attach_to_pin_enabled ?? features?.attachToPinEnabled ?? null,
+    unlockedAttachPin: status?.unlocked_by_attach_to_pin ?? features?.unlockedAttachPin ?? null,
+    backupRequired: status?.backup_required ?? features?.backupRequired ?? null,
+    noBackup: features?.noBackup ?? null,
+    language: features?.language ?? null,
+    bleEnabled: features?.bleEnabled ?? null,
   };
 };
 
@@ -335,6 +337,7 @@ export function buildProfileFromProtocolV1({
 export function buildProfileFromProtocolV2({
   deviceInfo,
   deviceStatus,
+  features,
   sources = ['deviceInfo'],
   scope = 'basic',
   includeRaw = false,
@@ -342,8 +345,8 @@ export function buildProfileFromProtocolV2({
   const info = deviceInfo;
   const deviceId = deviceStatus?.device_id || '';
   const serialNo = deviceInfo?.hw?.serial_no || '';
-  const label = null;
-  const bleName = info?.coprocessor?.bt_adv_name ?? null;
+  const label = features?.label ?? null;
+  const bleName = info?.coprocessor?.bt_adv_name ?? features?.bleName ?? null;
   const verify = normalizeV2Verify(deviceInfo);
 
   return {
@@ -355,12 +358,13 @@ export function buildProfileFromProtocolV2({
     serialNo,
     label,
     bleName,
-    status: normalizeV2Status(deviceInfo, deviceStatus),
+    status: normalizeV2Status(deviceInfo, deviceStatus, features),
     versions: normalizeV2Versions(deviceInfo),
     ...(shouldIncludeVerify(scope) ? { verify } : {}),
     ...(includeRaw
       ? {
           raw: normalizeRaw({
+            features,
             protocolV2DeviceInfo: deviceInfo,
             protocolV2DeviceStatus: deviceStatus,
           }),

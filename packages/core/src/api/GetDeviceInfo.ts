@@ -104,13 +104,15 @@ export default class GetDeviceInfo extends BaseMethod<GetDeviceInfoParams> {
       commands: this.device.commands,
       request: resolveProtocolV2DeviceInfoRequest(this.params),
     });
+    const features = this.device.updateProtocolV2Features(protocolV2DeviceInfo, null);
+    sources.push('features');
     const profile = buildProfileFromProtocolV2({
       deviceInfo: protocolV2DeviceInfo,
+      features,
       sources,
       scope: this.params.scope,
       includeRaw: this.params.includeRaw,
     });
-    this.device.updateProtocolV2Features(protocolV2DeviceInfo, null);
     return profile;
   }
 

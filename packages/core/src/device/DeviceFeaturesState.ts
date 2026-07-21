@@ -16,22 +16,18 @@ export type DeviceFeaturesUpdateSource =
  * 返回空值，需要写入缓存。raw 等对象字段由调用方构造完整值后再传入，
  * 这里不做隐式深合并。
  */
-export function mergeDeviceFeaturesPatch(
-  previous: Features,
-  patch: Partial<Features>
-): Features {
+export function mergeDeviceFeaturesPatch(previous: Features, patch: Partial<Features>): Features {
   let next = previous;
 
   for (const [key, value] of Object.entries(patch) as Array<
     [keyof Features, Features[keyof Features] | undefined]
   >) {
-    if (value === undefined || Object.is(previous[key], value)) {
-      continue;
+    if (value !== undefined && !Object.is(previous[key], value)) {
+      if (next === previous) {
+        next = { ...previous };
+      }
+      (next as Record<keyof Features, Features[keyof Features]>)[key] = value;
     }
-    if (next === previous) {
-      next = { ...previous };
-    }
-    (next as Record<keyof Features, Features[keyof Features]>)[key] = value;
   }
 
   return next;

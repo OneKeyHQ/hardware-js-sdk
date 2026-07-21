@@ -8,9 +8,7 @@ function definedEntries<T extends Record<string, unknown>>(value: T): T {
   ) as T;
 }
 
-export function normalizeApplySettingsToFeaturesPatch(
-  settings: ApplySettings
-): Partial<Features> {
+export function normalizeApplySettingsToFeaturesPatch(settings: ApplySettings): Partial<Features> {
   return definedEntries({
     label: settings.label,
     language: settings.language,
@@ -49,9 +47,7 @@ export function normalizeDeviceSettingsToFeaturesPatch(
   });
 }
 
-export function mapCommonSettingsToProtocolV2(
-  settings: DeviceSettingsParams
-): DeviceSettings {
+export function mapCommonSettingsToProtocolV2(settings: DeviceSettingsParams): DeviceSettings {
   return definedEntries({
     label: settings.label,
     bt_enable: settings.bluetoothEnabled,

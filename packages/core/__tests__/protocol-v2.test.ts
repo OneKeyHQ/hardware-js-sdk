@@ -1547,6 +1547,8 @@ describe('Protocol V2 feature adapter', () => {
       uuid: 'CACHED-SERIAL',
       deviceId: null,
       bleName: 'Cached BLE',
+      name: 'Cached BLE',
+      displayName: 'Cached Label',
       label: 'Cached Label',
       deviceType: 'pro2',
     });
@@ -1689,7 +1691,7 @@ describe('Protocol V2 feature adapter', () => {
       deviceType: 'pro2',
       deviceId: '',
       serialNo: 'PR2SERIAL',
-      label: null,
+      label: 'Cached Pro2',
       bleName: 'Raw Pro2 BLE',
       status: {
         initialized: null,
@@ -1703,7 +1705,7 @@ describe('Protocol V2 feature adapter', () => {
     });
   });
 
-  test('does not fill Protocol V2 DeviceProfile from cached V1-shaped fields', async () => {
+  test('does not fill Protocol V2 identity and version fields from cached V1-shaped fields', async () => {
     const typedCall = jest.fn().mockResolvedValueOnce({
       type: 'DeviceInfo',
       message: {
@@ -1743,7 +1745,7 @@ describe('Protocol V2 feature adapter', () => {
       // hw.serial_no 缺失时也不回退 descriptor.path。
       deviceId: '',
       serialNo: '',
-      label: null,
+      label: 'Stale Pro2',
       bleName: null,
       status: {
         passphraseProtection: null,

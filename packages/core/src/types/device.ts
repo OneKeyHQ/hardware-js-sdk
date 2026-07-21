@@ -3,9 +3,9 @@ import { EDeviceType, type EFirmwareType } from '@onekeyfe/hd-shared';
 import type { IVersionArray } from './settings';
 import type { PROTO } from '../constants';
 import type {
-  DeviceStatus as ProtocolV2DeviceStatus,
   OneKeyDeviceCommType,
   ProtocolV2DeviceInfo,
+  DeviceStatus as ProtocolV2DeviceStatus,
 } from '@onekeyfe/hd-transport';
 
 export type DeviceStatus = 'available' | 'occupied' | 'used';
@@ -35,6 +35,8 @@ export type KnownDevice = {
   label: string;
   bleName: string | null;
   name: string;
+  /** 用户可见名称：优先设备标签；name 继续表示连接/发现名称。 */
+  displayName?: string;
   error?: typeof undefined;
   mode: EOneKeyDeviceMode;
   features?: Features;
@@ -55,6 +57,7 @@ export type SearchDevice = {
   deviceId: string | null;
   deviceType: IDeviceType;
   name: string;
+  displayName?: string;
   commType: OneKeyDeviceCommType;
 };
 

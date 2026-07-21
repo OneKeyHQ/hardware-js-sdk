@@ -32,10 +32,7 @@ import {
 import { generateInstanceId } from '../utils/tracing';
 // eslint-disable-next-line import/no-cycle
 import { DeviceCommands } from './DeviceCommands';
-import {
-  mergeDeviceFeaturesPatch,
-  type DeviceFeaturesUpdateSource,
-} from './DeviceFeaturesState';
+import { type DeviceFeaturesUpdateSource, mergeDeviceFeaturesPatch } from './DeviceFeaturesState';
 import { deviceWalletSessionStore } from './DeviceWalletSessionStore';
 import {
   type DeviceFirmwareRange,
@@ -284,6 +281,7 @@ export class Device extends EventEmitter {
       path: this.originalDescriptor?.path,
       bleName,
       name: bleName || label || `OneKey ${deviceType?.toUpperCase()}`,
+      displayName: label || bleName || `OneKey ${deviceType?.toUpperCase()}`,
       label: label || 'OneKey',
       mode: this.getMode(),
       features,
@@ -859,9 +857,7 @@ export class Device extends EventEmitter {
     this.featuresNeedsReload = false;
     Log.debug('Device features patch committed', {
       source,
-      keys: Object.keys(patch).filter(
-        key => patch[key as keyof Features] !== undefined
-      ),
+      keys: Object.keys(patch).filter(key => patch[key as keyof Features] !== undefined),
     });
     this.emit(DEVICE.FEATURES, this, this.features);
     return this.features;
