@@ -27,3 +27,73 @@ export type EthMultisigFixture = {
   reference: EthFixtureReference;
 };
 
+export type BtcScriptType = 'SPENDMULTISIG' | 'SPENDP2SHWITNESS' | 'SPENDWITNESS';
+
+export type BtcMultisigDescriptor = {
+  pubkeys: Array<{ node: string; address_n: number[] }>;
+  signatures: string[];
+  m: number;
+};
+
+export type BtcAddressParameters = {
+  path: string;
+  coin: 'btc';
+  showOnOneKey: true;
+  scriptType: BtcScriptType;
+  multisig: BtcMultisigDescriptor;
+};
+
+export type BtcSignParameters = {
+  coin: 'btc';
+  inputs: Array<{
+    address_n: string;
+    prev_hash: string;
+    prev_index: number;
+    amount: string;
+    script_type: BtcScriptType;
+    multisig: BtcMultisigDescriptor;
+  }>;
+  outputs: Array<{
+    address: string;
+    amount: string;
+    script_type: 'PAYTOADDRESS';
+  }>;
+  refTxs: Array<{
+    hash: string;
+    version: number;
+    inputs: Array<{
+      prev_hash: string;
+      prev_index: number;
+      script_sig: string;
+      sequence: number;
+    }>;
+    bin_outputs: Array<{ amount: number; script_pubkey: string }>;
+    lock_time: number;
+  }>;
+};
+
+export type BtcFixtureReference = PublicFixtureReference & {
+  accountXpubs: string[];
+  childPublicKeys: string[];
+  sighash: string;
+  scriptPubKey: string;
+  redeemScript: string;
+  witnessScript?: string;
+  fundingTxHex: string;
+  spendingTxHex: string;
+  prevHash: string;
+  doubleSignatures: string[];
+};
+
+export type BtcMultisigFixture = {
+  id: 'p2sh' | 'p2sh-p2wsh' | 'p2wsh';
+  title: string;
+  path: string;
+  scriptType: BtcScriptType;
+  address: string;
+  addressParameters: BtcAddressParameters;
+  signParameters: BtcSignParameters;
+  partialSignParameters: BtcSignParameters;
+  expectedDeviceChecks: string[];
+  reference: BtcFixtureReference;
+};
