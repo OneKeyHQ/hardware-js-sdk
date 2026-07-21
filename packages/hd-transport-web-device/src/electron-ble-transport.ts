@@ -18,10 +18,11 @@ const { parseConfigure, buildBuffers, receiveOne, check } = transport;
 // main-process events forwarded via the preload — one console filter shows the
 // full timeline across the renderer/main process boundary.
 const bleTrace = (event: string, data?: Record<string, unknown>): void => {
+  // Fully stringified single line so it can be copied as plain text.
+  const dataText = data ? ` ${JSON.stringify(data)}` : '';
   // eslint-disable-next-line no-console
   console.log(
-    `[BLE-TRACE] ${new Date().toISOString().slice(11, 23)} sdk-transport ${event}`,
-    data ?? ''
+    `[BLE-TRACE] ${new Date().toISOString().slice(11, 23)} sdk-transport ${event}${dataText}`
   );
 };
 
@@ -154,7 +155,6 @@ export default class ElectronBleTransport {
       }
 
       const startedAt = Date.now();
-      bleTrace('enumerate.start');
       const devices = await window.desktopApi.nobleBle.enumerate();
       bleTrace('enumerate.done', { found: devices.length, elapsedMs: Date.now() - startedAt });
       return devices;
@@ -182,7 +182,6 @@ export default class ElectronBleTransport {
     // encryption-gated characteristic, where a broken OS bond typically fails).
     let step = 'getDevice';
     const startedAt = Date.now();
-    bleTrace('acquire.start', { uuid });
     try {
       if (!window.desktopApi?.nobleBle) {
         throw new Error('Noble BLE API not available');
@@ -190,13 +189,6 @@ export default class ElectronBleTransport {
 
       // Check if device is available
       const device = await window.desktopApi.nobleBle.getDevice(uuid);
-      bleTrace('acquire.getDevice', {
-        uuid,
-        found: Boolean(device),
-        // Main-process DeviceInfo carries `state`; the renderer-facing type is narrower.
-        state: (device as { state?: string } | null)?.state,
-        elapsedMs: Date.now() - startedAt,
-      });
       if (!device) {
         throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound, `Device ${uuid} not found`);
       }
@@ -206,7 +198,6 @@ export default class ElectronBleTransport {
       try {
         await window.desktopApi.nobleBle.connect(uuid);
         this.connectedDevices.add(uuid);
-        bleTrace('acquire.connect.done', { uuid, elapsedMs: Date.now() - startedAt });
       } catch (error) {
         this.handleBluetoothError(error);
       }
@@ -217,7 +208,6 @@ export default class ElectronBleTransport {
       // Subscribe to notifications
       step = 'subscribe';
       await window.desktopApi.nobleBle.subscribe(uuid);
-      bleTrace('acquire.subscribe.done', { uuid, elapsedMs: Date.now() - startedAt });
 
       // Set up notification listener
       const cleanup = window.desktopApi.nobleBle.onNotification(
@@ -290,15 +280,14 @@ export default class ElectronBleTransport {
     // BLE_IDLE_DISCONNECT_MS without traffic, so an unused device is freed for
     // other hosts (e.g. the phone app). Hard teardown lives in `disconnect()`,
     // which the SDK's error-recovery path calls via DeviceConnector.
-    bleTrace('release.start', {
+    // Renderer-side listeners must still be removed: the next acquire registers
+    // fresh ones, and leftovers would double-process every notification packet.
+    this.cleanupDeviceState(id);
+    bleTrace('release.done', {
       id,
       wasConnected: this.connectedDevices.has(id),
       mode: 'keep-alive',
     });
-    // Renderer-side listeners must still be removed: the next acquire registers
-    // fresh ones, and leftovers would double-process every notification packet.
-    this.cleanupDeviceState(id);
-    bleTrace('release.done', { id });
     return Promise.resolve();
   }
 

@@ -79,8 +79,9 @@ const Log = getLogger(LoggerNames.Device);
  */
 function deviceBleTrace(event: string, data?: Record<string, unknown>) {
   if (DataManager.getSettings('env') !== 'desktop-web-ble') return;
+  const dataText = data ? ` ${JSON.stringify(data)}` : '';
   // eslint-disable-next-line no-console
-  console.log(`[BLE-TRACE] ${new Date().toISOString().slice(11, 23)} hd-core ${event}`, data ?? '');
+  console.log(`[BLE-TRACE] ${new Date().toISOString().slice(11, 23)} hd-core ${event}${dataText}`);
 }
 
 export interface DeviceEvents {
@@ -309,7 +310,6 @@ export class Device extends EventEmitter {
   async acquire() {
     const env = DataManager.getSettings('env');
     const mainIdKey = DataManager.isBleConnect(env) ? 'id' : 'session';
-    deviceBleTrace('device.acquire.start', { id: this.originalDescriptor?.id });
     try {
       if (DataManager.isBleConnect(env)) {
         const res = await this.deviceConnector?.acquire(this.originalDescriptor.id);

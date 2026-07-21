@@ -472,11 +472,9 @@ async function initializeNoble(): Promise<void> {
     // correlated with a scan someone else left running.
     noble.on('scanStart', () => {
       logger?.info('[NobleBLE] adapter scanStart (global: any handler on this noble instance)');
-      bleTrace('adapter.scanStart');
     });
     noble.on('scanStop', () => {
       logger?.info('[NobleBLE] adapter scanStop (global: any handler on this noble instance)');
-      bleTrace('adapter.scanStop');
     });
 
     logger?.info('[NobleBLE] Noble initialized successfully');
@@ -848,7 +846,6 @@ async function performTargetedScan(targetDeviceId: string): Promise<Peripheral |
   const nobleInstance = noble;
 
   logger?.info('[NobleBLE] Starting targeted scan for device:', targetDeviceId);
-  bleTrace('scan.targeted.start', { deviceId: targetDeviceId });
 
   return new Promise((resolve, reject) => {
     // Local discover listener - only matches target device
@@ -858,7 +855,6 @@ async function performTargetedScan(targetDeviceId: string): Promise<Peripheral |
           id: peripheral.id,
           name: peripheral.advertisement?.localName,
         });
-        bleTrace('scan.targeted.found', { deviceId: targetDeviceId });
         clearTimeout(timeoutId);
         nobleInstance.removeListener('discover', onDiscover);
         nobleInstance.stopScanning();
@@ -907,7 +903,6 @@ async function enumerateDevices(): Promise<DeviceInfo[]> {
   const nobleInstance = noble;
 
   logger?.info('[NobleBLE] Starting device enumeration');
-  bleTrace('scan.enumerate.start');
 
   // Clear previous discoveries
   discoveredDevices.clear();
@@ -1179,11 +1174,6 @@ async function discoverServicesAndCharacteristics(
     logger?.info('[NobleBLE] Characteristic discovery result:', {
       writeFound: !!writeCharacteristic,
       notifyFound: !!notifyCharacteristic,
-    });
-    bleTrace('gatt.discovery.chars', {
-      uuids: (characteristics ?? []).map(char => char.uuid).join('|'),
-      write: writeCharacteristic?.uuid,
-      notify: notifyCharacteristic?.uuid,
     });
 
     if (!writeCharacteristic || !notifyCharacteristic) {
@@ -1898,10 +1888,6 @@ async function subscribeNotifications(
   const { notify: notifyCharacteristic } = characteristics;
 
   logger?.info('[NobleBLE] Subscribing to notifications for device:', deviceId);
-  bleTrace('subscribe.start', {
-    deviceId,
-    opState: subscriptionOperations.get(deviceId) ?? 'idle',
-  });
 
   // 🔒 CRITICAL: Check operation state FIRST to prevent race conditions
   const opState = subscriptionOperations.get(deviceId);
@@ -2021,7 +2007,6 @@ async function subscribeNotifications(
   try {
     await rebuildAppSubscription(deviceId, notifyCharacteristic);
     subscribedDevices.set(deviceId, true);
-    bleTrace('subscribe.done', { deviceId });
     // Encryption is established now (the encrypted characteristic answered).
     runDiagProbes(deviceId);
   } catch (error) {
@@ -2057,7 +2042,6 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
     // Handle enumerate request
     console.log(`[NobleBLE] Registering handler for: ${EOneKeyBleMessageKeys.NOBLE_BLE_ENUMERATE}`);
     ipcMain.handle(EOneKeyBleMessageKeys.NOBLE_BLE_ENUMERATE, async () => {
-      bleTrace('ipc.enumerate');
       try {
         const devices = await enumerateDevices();
         safeLog(logger, 'info', 'Enumeration completed, devices:', devices);
@@ -2089,7 +2073,6 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
           hasCharacteristics: deviceCharacteristics.has(deviceId),
           totalConnectedDevices: connectedDevices.size,
         });
-        bleTrace('ipc.connect', { deviceId });
         // A previously-armed idle timer must not fire mid-connect (a cold
         // connect with OS pairing can take ~30s).
         clearIdleDisconnect(deviceId);

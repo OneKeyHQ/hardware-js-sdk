@@ -820,8 +820,9 @@ function canSkipInitialize(method: BaseMethod, device: Device): boolean {
  */
 function bleTrace(event: string, data?: Record<string, unknown>) {
   if (DataManager.getSettings('env') !== 'desktop-web-ble') return;
+  const dataText = data ? ` ${JSON.stringify(data)}` : '';
   // eslint-disable-next-line no-console
-  console.log(`[BLE-TRACE] ${new Date().toISOString().slice(11, 23)} hd-core ${event}`, data ?? '');
+  console.log(`[BLE-TRACE] ${new Date().toISOString().slice(11, 23)} hd-core ${event}${dataText}`);
 }
 
 /**
@@ -830,10 +831,8 @@ function bleTrace(event: string, data?: Record<string, unknown>) {
  */
 async function connectDeviceForBle(method: BaseMethod, device: Device, retryCount = 0) {
   const startedAt = Date.now();
-  bleTrace('connectForBle.start', { method: method.name, connectId: method.connectId, retryCount });
   try {
     await device.acquire();
-    bleTrace('connectForBle.acquire.done', { elapsedMs: Date.now() - startedAt });
     if (method.payload?.onlyConnectBleDevice) {
       return;
     }
