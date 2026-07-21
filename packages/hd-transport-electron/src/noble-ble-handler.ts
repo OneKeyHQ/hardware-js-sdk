@@ -74,6 +74,13 @@ const devicePacketStates = new Map<string, PacketAssemblyState>();
 const ONEKEY_SERVICE_UUIDS = [ONEKEY_SERVICE_UUID];
 
 // Pre-normalized characteristic identifiers for fast comparison
+// Reduce any uuid form (long base-form with/without dashes, or short) to its
+// 16-bit key for comparisons — noble/mac reports base-UUIDs short-form.
+const uuid16Key = (uuid: string): string => {
+  const stripped = (uuid ?? '').replace(/-/g, '').toLowerCase();
+  return stripped.length >= 8 ? stripped.substring(4, 8) : stripped;
+};
+
 const NORMALIZED_WRITE_UUID = '0002';
 const NORMALIZED_NOTIFY_UUID = '0003';
 
@@ -1050,7 +1057,7 @@ function getDevice(deviceId: string): DeviceInfo | null {
  */
 async function discoverServicesAndCharacteristics(
   peripheral: Peripheral,
-  options?: { unfiltered?: boolean }
+  options?: { unfiltered?: boolean; shortUuidFilter?: boolean }
 ): Promise<CharacteristicPair> {
   // Cleanup resources - will be set up and cleaned in try/finally
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -1089,7 +1096,20 @@ async function discoverServicesAndCharacteristics(
     // 2026-07-19) showed the UUID-filtered query returning empty on a link
     // where an unfiltered probe saw 5 services, so the filter itself is under
     // suspicion (same failure family as the Windows scan-filter issue).
-    const serviceFilter = options?.unfiltered ? [] : ONEKEY_SERVICE_UUIDS;
+    // 'filtered16' passes the 2-byte SHORT form: CBUUID equality is semantic
+    // (long==short, verified experimentally), but the long string keeps a
+    // 16-byte internal representation — the encoding that goes into the
+    // targeted over-the-air ATT query. If short-form filtering succeeds where
+    // long-form fails on the same fresh link, the wire-encoding mismatch
+    // against the device's 2-byte GATT registration is proven end to end.
+    let serviceFilter: string[];
+    if (options?.unfiltered) {
+      serviceFilter = [];
+    } else if (options?.shortUuidFilter) {
+      serviceFilter = ONEKEY_SERVICE_UUIDS.map(uuid16Key);
+    } else {
+      serviceFilter = ONEKEY_SERVICE_UUIDS;
+    }
     const services = await new Promise<Service[]>((resolve, reject) => {
       peripheral.discoverServices(serviceFilter, (error, svc) => {
         if (error) {
@@ -1105,31 +1125,20 @@ async function discoverServicesAndCharacteristics(
       throw ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, 'No OneKey services found');
     }
 
-    let service: Service;
-    if (options?.unfiltered) {
-      // Compare on the 16-bit key: our constants are Bluetooth-base-UUID long
-      // forms (0000XXXX-0000-1000-8000-00805f9b34fb) while noble on macOS
-      // reports base-UUID services in SHORT form ('0001') — a naive full-string
-      // compare misses them (field-confirmed on Classic, 2026-07-19: the
-      // OneKey service was present as '0001' in the unfiltered set).
-      const uuid16 = (uuid: string): string => {
-        const stripped = (uuid ?? '').replace(/-/g, '').toLowerCase();
-        return stripped.length >= 8 ? stripped.substring(4, 8) : stripped;
-      };
-      const wanted = ONEKEY_SERVICE_UUIDS.map(uuid16);
-      const match = services.find(svc => wanted.includes(uuid16(svc.uuid)));
-      if (!match) {
-        // Carry the full UUID list in the error so the trace shows exactly
-        // what the device exposed — the datum that decides filter-bug vs
-        // service-hidden.
-        throw ERRORS.TypedError(
-          HardwareErrorCode.BleServiceNotFound,
-          `No OneKey service in unfiltered set: ${services.map(svc => svc.uuid).join('|')}`
-        );
-      }
-      service = match;
-    } else {
-      [service] = services;
+    // Always pick by 16-bit key: our constants are Bluetooth-base-UUID long
+    // forms while noble on macOS reports base-UUID services in SHORT form
+    // ('0001') — a naive full-string compare misses them (field-confirmed on
+    // Classic, 2026-07-19: the OneKey service was present as '0001').
+    const wanted = ONEKEY_SERVICE_UUIDS.map(uuid16Key);
+    const service = services.find(svc => wanted.includes(uuid16Key(svc.uuid)));
+    if (!service) {
+      // Carry the full UUID list in the error so the trace shows exactly
+      // what the device exposed — the datum that decides filter-bug vs
+      // service-hidden.
+      throw ERRORS.TypedError(
+        HardwareErrorCode.BleServiceNotFound,
+        `No OneKey service in result set: ${services.map(svc => svc.uuid).join('|')}`
+      );
     }
     logger?.info('[NobleBLE] Found service:', service.uuid);
     // Always record the full service list AND the exact uuid string of the
@@ -1137,17 +1146,24 @@ async function discoverServicesAndCharacteristics(
     // '0001' vs long base form) each noble backend reports, the datum behind
     // the filtered-query mismatch.
     bleTraceVerbose('gatt.discovery.services', {
-      mode: options?.unfiltered ? 'unfiltered' : 'filtered',
+      mode: options?.unfiltered ? 'unfiltered' : `filtered:${serviceFilter.join(',')}`,
       uuids: services.map(svc => svc.uuid).join('|'),
       picked: service.uuid,
     });
 
-    // Step 2: Discover characteristics (promisified). In unfiltered mode skip
-    // the UUID filter here too — same short-vs-long form mismatch risk as the
-    // service filter; the JS matcher below already handles both forms.
-    const characteristicFilter = options?.unfiltered
-      ? []
-      : [ONEKEY_WRITE_CHARACTERISTIC_UUID, ONEKEY_NOTIFY_CHARACTERISTIC_UUID];
+    // Step 2: Discover characteristics (promisified). Mirror the service-level
+    // filter strategy — same wire-encoding considerations apply.
+    let characteristicFilter: string[];
+    if (options?.unfiltered) {
+      characteristicFilter = [];
+    } else if (options?.shortUuidFilter) {
+      characteristicFilter = [
+        ONEKEY_WRITE_CHARACTERISTIC_UUID,
+        ONEKEY_NOTIFY_CHARACTERISTIC_UUID,
+      ].map(uuid16Key);
+    } else {
+      characteristicFilter = [ONEKEY_WRITE_CHARACTERISTIC_UUID, ONEKEY_NOTIFY_CHARACTERISTIC_UUID];
+    }
     const characteristics = await new Promise<Characteristic[]>((resolve, reject) => {
       service.discoverCharacteristics(characteristicFilter, (error, chars) => {
         if (error) {
@@ -1441,7 +1457,7 @@ async function setupConnectionAndDiscoverServices(
     const discoveryAttempts =
       process.platform === 'darwin' && process.env.ONEKEY_BLE_DIAG !== '1'
         ? (['unfiltered'] as const)
-        : (['filtered', 'unfiltered'] as const);
+        : (['filtered', 'filtered16', 'unfiltered'] as const);
     // eslint-disable-next-line no-restricted-syntax
     for (const attempt of discoveryAttempts) {
       if (attempt === 'unfiltered') {
@@ -1451,6 +1467,7 @@ async function setupConnectionAndDiscoverServices(
         // eslint-disable-next-line no-await-in-loop
         const result = await discoverServicesAndCharacteristics(peripheral, {
           unfiltered: attempt === 'unfiltered',
+          shortUuidFilter: attempt === 'filtered16',
         });
         connectedDevices.set(deviceId, peripheral);
         bleTrace('gatt.discovery.done', {
