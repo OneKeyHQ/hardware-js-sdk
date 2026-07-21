@@ -843,9 +843,6 @@ async function connectDeviceForBle(method: BaseMethod, device: Device, retryCoun
       device.markPreInitialized({
         passphraseState: initOptions.passphraseState,
       });
-      bleTrace('connectForBle.initialize.done', { elapsedMs: Date.now() - startedAt });
-    } else {
-      bleTrace('connectForBle.initialize.skipped', { elapsedMs: Date.now() - startedAt });
     }
   } catch (err) {
     bleTrace('connectForBle.error', {

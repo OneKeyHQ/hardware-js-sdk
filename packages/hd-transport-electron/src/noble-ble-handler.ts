@@ -236,7 +236,7 @@ function setupPersistentStateListener(): void {
 
   persistentStateListener = (state: string) => {
     logger?.info('[NobleBLE] Persistent state change:', state);
-    bleTrace('adapter.state', { state });
+    bleTraceVerbose('adapter.state', { state });
 
     // Update global state
     updateBluetoothState(state);
@@ -402,6 +402,14 @@ function bleTrace(event: string, data?: Record<string, unknown>): void {
   });
 }
 
+// Verbose tier: healthy-path timeline lines, emitted only in diagnostic mode
+// (ONEKEY_BLE_DIAG=1). Default output stays quiet — errors, timeouts,
+// fallback-route events and the two cold-connect anchor lines only.
+function bleTraceVerbose(event: string, data?: Record<string, unknown>): void {
+  if (process.env.ONEKEY_BLE_DIAG !== '1') return;
+  bleTrace(event, data);
+}
+
 // Initialize Noble
 async function initializeNoble(): Promise<void> {
   if (noble) return;
@@ -530,7 +538,7 @@ function cleanupDevice(
     sendDisconnectEvent,
     cancelOperations,
   });
-  bleTrace('cleanup', { deviceId, reason, cleanupConnection });
+  bleTraceVerbose('cleanup', { deviceId, reason, cleanupConnection });
   clearIdleDisconnect(deviceId);
 
   // Get device info before cleanup
@@ -942,7 +950,7 @@ async function enumerateDevices(): Promise<DeviceInfo[]> {
     const timeoutId = setTimeout(() => {
       cleanup();
       logger?.info('[NobleBLE] Scan completed, found devices:', devices.length);
-      bleTrace('scan.enumerate.done', { found: devices.length });
+      bleTraceVerbose('scan.enumerate.done', { found: devices.length });
       resolve(devices);
     }, DEVICE_SCAN_TIMEOUT);
 
@@ -1128,7 +1136,7 @@ async function discoverServicesAndCharacteristics(
     // pick — across modes and platforms this shows which uuid FORM (short
     // '0001' vs long base form) each noble backend reports, the datum behind
     // the filtered-query mismatch.
-    bleTrace('gatt.discovery.services', {
+    bleTraceVerbose('gatt.discovery.services', {
       mode: options?.unfiltered ? 'unfiltered' : 'filtered',
       uuids: services.map(svc => svc.uuid).join('|'),
       picked: service.uuid,
@@ -1437,7 +1445,7 @@ async function setupConnectionAndDiscoverServices(
     // eslint-disable-next-line no-restricted-syntax
     for (const attempt of discoveryAttempts) {
       if (attempt === 'unfiltered') {
-        bleTrace('gatt.discovery.direct.retry', { deviceId, mode: attempt });
+        bleTraceVerbose('gatt.discovery.direct.retry', { deviceId, mode: attempt });
       }
       try {
         // eslint-disable-next-line no-await-in-loop
@@ -1515,11 +1523,11 @@ const directConnectCooldownUntil = new Map<string, number>();
 async function tryDirectConnectById(deviceId: string): Promise<Peripheral | undefined> {
   if (!noble || typeof noble.connectAsync !== 'function') return undefined;
   if ((directConnectCooldownUntil.get(deviceId) ?? 0) > Date.now()) {
-    bleTrace('connect.direct.cooldown', { deviceId });
+    bleTraceVerbose('connect.direct.cooldown', { deviceId });
     return undefined;
   }
   const startedAt = Date.now();
-  bleTrace('connect.direct.start', { deviceId });
+  bleTraceVerbose('connect.direct.start', { deviceId });
   try {
     // Hold the ORIGINAL promise: the late-orphan guard must attach to this
     // pending connect, not issue a second connect request.
@@ -1553,7 +1561,7 @@ async function tryDirectConnectById(deviceId: string): Promise<Peripheral | unde
     // Backends emit a `discover` for the peripheral as a side effect, so the
     // cache may hold it even when connectAsync resolves without a value.
     const peripheral = raced ?? discoveredDevices.get(deviceId);
-    bleTrace('connect.direct.done', {
+    bleTraceVerbose('connect.direct.done', {
       deviceId,
       elapsedMs: Date.now() - startedAt,
       found: Boolean(peripheral),
@@ -1625,7 +1633,7 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
     totalDiscovered: discoveredDevices.size,
     totalConnected: connectedDevices.size,
   });
-  bleTrace('connect.request', {
+  bleTraceVerbose('connect.request', {
     deviceId,
     hasDiscovered: discoveredDevices.has(deviceId),
     hasConnected: connectedDevices.has(deviceId),
@@ -1679,7 +1687,7 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
   // Check if device is already connected
   if (peripheral.state === 'connected') {
     logger?.info('[NobleBLE] Device already connected, skipping connection step');
-    bleTrace('connect.reuse', { deviceId });
+    bleTraceVerbose('connect.reuse', { deviceId });
 
     // If already connected but not in our connected devices map, add it
     if (!connectedDevices.has(deviceId)) {
@@ -1743,7 +1751,7 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
 
   return new Promise((resolve, reject) => {
     const connectStartedAt = Date.now();
-    bleTrace('connect.link.start', { deviceId });
+    bleTraceVerbose('connect.link.start', { deviceId });
     // Once the timeout has rejected, the noble callback may STILL fire with a
     // successful late connection. Without this guard that link would be
     // registered but ownerless — the IPC handler already failed, so nothing
@@ -1781,7 +1789,7 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
       }
 
       logger?.info('[NobleBLE] Connected to device:', deviceId);
-      bleTrace('connect.link.done', { deviceId, elapsedMs: Date.now() - connectStartedAt });
+      bleTraceVerbose('connect.link.done', { deviceId, elapsedMs: Date.now() - connectStartedAt });
       connectedDevices.set(deviceId, connectedPeripheral);
 
       // Setup connection and discover services

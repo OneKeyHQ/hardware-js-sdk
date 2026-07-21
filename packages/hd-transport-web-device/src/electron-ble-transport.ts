@@ -154,9 +154,7 @@ export default class ElectronBleTransport {
         throw new Error('Noble BLE API not available');
       }
 
-      const startedAt = Date.now();
       const devices = await window.desktopApi.nobleBle.enumerate();
-      bleTrace('enumerate.done', { found: devices.length, elapsedMs: Date.now() - startedAt });
       return devices;
     } catch (error) {
       this.Log?.error('[Transport] Noble BLE enumerate failed:', error);
@@ -249,7 +247,6 @@ export default class ElectronBleTransport {
         connectId: device.id,
       });
 
-      bleTrace('acquire.done', { uuid, elapsedMs: Date.now() - startedAt });
       return { uuid, path: uuid };
     } catch (error) {
       this.Log?.error('[Transport] Noble BLE acquire failed:', error);
@@ -283,11 +280,6 @@ export default class ElectronBleTransport {
     // Renderer-side listeners must still be removed: the next acquire registers
     // fresh ones, and leftovers would double-process every notification packet.
     this.cleanupDeviceState(id);
-    bleTrace('release.done', {
-      id,
-      wasConnected: this.connectedDevices.has(id),
-      mode: 'keep-alive',
-    });
     return Promise.resolve();
   }
 
