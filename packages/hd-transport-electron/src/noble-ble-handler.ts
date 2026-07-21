@@ -9,9 +9,7 @@ import {
   EOneKeyBleMessageKeys,
   ERRORS,
   HardwareErrorCode,
-  ONEKEY_NOTIFY_CHARACTERISTIC_UUID,
   ONEKEY_SERVICE_UUID,
-  ONEKEY_WRITE_CHARACTERISTIC_UUID,
   isHeaderChunk,
   isOnekeyDevice,
   wait,
@@ -235,7 +233,6 @@ function setupPersistentStateListener(): void {
 
   persistentStateListener = (state: string) => {
     logger?.info('[NobleBLE] Persistent state change:', state);
-    bleTraceVerbose('adapter.state', { state });
 
     // Update global state
     updateBluetoothState(state);
@@ -345,7 +342,6 @@ function armIdleDisconnect(
       idleDisconnectTimers.delete(deviceId);
       if (!connectedDevices.has(deviceId)) return;
       logger?.info('[NobleBLE] Keep-alive timeout, disconnecting device:', deviceId, reason);
-      bleTrace('idle.disconnect', { deviceId, afterMs: ms, reason });
       const peripheral = connectedDevices.get(deviceId);
       const deviceName = peripheral?.advertisement?.localName || 'Unknown Device';
       disconnectDevice(deviceId)
@@ -376,30 +372,6 @@ function broadcastToAllWebContents(channel: string, payload: unknown): void {
   } catch (error) {
     logger?.error('[NobleBLE] broadcast failed:', { channel, error: String(error) });
   }
-}
-
-// ===== BLE debug trace (renderer console, filter keyword "[BLE-TRACE]") =====
-// Channel string shared by value with the Trezor connector and the app preload.
-const BLE_TRACE_CHANNEL = '$onekey-ble-trace';
-
-function bleTrace(event: string, data?: Record<string, unknown>): void {
-  // Mirror into electron-log: in production builds console.* is stripped, so
-  // the main log file is the only reliable channel (e.g. field Windows tests).
-  logger?.info(`[BLE-TRACE] ${event}`, data ?? '');
-  // Broadcast to every webContents — the console a developer watches is not
-  // necessarily `browserWindow.webContents` (tray/webviews share the preload).
-  broadcastToAllWebContents(BLE_TRACE_CHANNEL, {
-    src: 'onekey-ble',
-    ts: Date.now(),
-    event,
-    data,
-  });
-}
-
-// Healthy-path timeline lines, emitted only with ONEKEY_BLE_DIAG=1.
-function bleTraceVerbose(event: string, data?: Record<string, unknown>): void {
-  if (process.env.ONEKEY_BLE_DIAG !== '1') return;
-  bleTrace(event, data);
 }
 
 // Initialize Noble
@@ -465,18 +437,6 @@ async function initializeNoble(): Promise<void> {
       handleDeviceDiscovered(peripheral);
     });
 
-    // The noble module is a process-wide singleton shared with any other BLE
-    // handler in this main process (e.g. the Trezor electron-ble connector), so
-    // these events report the ADAPTER's true scan state no matter who started
-    // or stopped the scan — the one signal that lets a slow/failed connect be
-    // correlated with a scan someone else left running.
-    noble.on('scanStart', () => {
-      logger?.info('[NobleBLE] adapter scanStart (global: any handler on this noble instance)');
-    });
-    noble.on('scanStop', () => {
-      logger?.info('[NobleBLE] adapter scanStop (global: any handler on this noble instance)');
-    });
-
     logger?.info('[NobleBLE] Noble initialized successfully');
   } catch (error) {
     logger?.error('[NobleBLE] Failed to initialize Noble:', error);
@@ -530,7 +490,6 @@ function cleanupDevice(
     sendDisconnectEvent,
     cancelOperations,
   });
-  bleTraceVerbose('cleanup', { deviceId, reason, cleanupConnection });
   clearIdleDisconnect(deviceId);
 
   // Get device info before cleanup
@@ -574,7 +533,6 @@ function handleDeviceDisconnect(deviceId: string, webContents: WebContents): voi
     hasCharacteristics: deviceCharacteristics.has(deviceId),
     stackTrace: new Error().stack?.split('\n').slice(1, 5),
   });
-  bleTrace('disconnect.detected', { deviceId });
 
   cleanupDevice(deviceId, webContents, {
     cleanupConnection: true,
@@ -610,7 +568,6 @@ async function writeCharacteristicWithAck(
     writeCharacteristic.write(buffer, true, (error?: Error) => {
       if (error) {
         logger?.error('[NobleBLE] Write failed', { deviceId, error: String(error) });
-        bleTrace('write.error', { deviceId, error: String(error) });
         reject(error);
         return;
       }
@@ -866,7 +823,6 @@ async function performTargetedScan(targetDeviceId: string): Promise<Peripheral |
       nobleInstance.removeListener('discover', onDiscover);
       nobleInstance.stopScanning();
       logger?.info('[NobleBLE] Targeted scan timeout for device:', targetDeviceId);
-      bleTrace('scan.targeted.timeout', { deviceId: targetDeviceId });
       resolve(null);
     }, FAST_SCAN_TIMEOUT);
 
@@ -940,7 +896,6 @@ async function enumerateDevices(): Promise<DeviceInfo[]> {
     const timeoutId = setTimeout(() => {
       cleanup();
       logger?.info('[NobleBLE] Scan completed, found devices:', devices.length);
-      bleTraceVerbose('scan.enumerate.done', { found: devices.length });
       resolve(devices);
     }, DEVICE_SCAN_TIMEOUT);
 
@@ -1039,8 +994,7 @@ function getDevice(deviceId: string): DeviceInfo | null {
  * - No manual flags needed - Promise semantics handle completion
  */
 async function discoverServicesAndCharacteristics(
-  peripheral: Peripheral,
-  options?: { unfiltered?: boolean; shortUuidFilter?: boolean }
+  peripheral: Peripheral
 ): Promise<CharacteristicPair> {
   // Cleanup resources - will be set up and cleaned in try/finally
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -1079,19 +1033,8 @@ async function discoverServicesAndCharacteristics(
     // 2026-07-19) showed the UUID-filtered query returning empty on a link
     // where an unfiltered probe saw 5 services, so the filter itself is under
     // suspicion (same failure family as the Windows scan-filter issue).
-    // 'filtered16' passes the 2-byte short form: CBUUID equality is semantic
-    // but representations differ, and only the 2-byte wire encoding is
-    // answered by the device's targeted ATT query.
-    let serviceFilter: string[];
-    if (options?.unfiltered) {
-      serviceFilter = [];
-    } else if (options?.shortUuidFilter) {
-      serviceFilter = ONEKEY_SERVICE_UUIDS.map(uuid16Key);
-    } else {
-      serviceFilter = ONEKEY_SERVICE_UUIDS;
-    }
     const services = await new Promise<Service[]>((resolve, reject) => {
-      peripheral.discoverServices(serviceFilter, (error, svc) => {
+      peripheral.discoverServices([], (error, svc) => {
         if (error) {
           logger?.error('[NobleBLE] Service discovery failed:', error);
           reject(ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, error.message));
@@ -1117,27 +1060,9 @@ async function discoverServicesAndCharacteristics(
       );
     }
     logger?.info('[NobleBLE] Found service:', service.uuid);
-    // Records which uuid FORM each noble backend reports per platform.
-    bleTraceVerbose('gatt.discovery.services', {
-      mode: options?.unfiltered ? 'unfiltered' : `filtered:${serviceFilter.join(',')}`,
-      uuids: services.map(svc => svc.uuid).join('|'),
-      picked: service.uuid,
-    });
 
-    // Step 2: discover characteristics; mirror the service filter strategy.
-    let characteristicFilter: string[];
-    if (options?.unfiltered) {
-      characteristicFilter = [];
-    } else if (options?.shortUuidFilter) {
-      characteristicFilter = [
-        ONEKEY_WRITE_CHARACTERISTIC_UUID,
-        ONEKEY_NOTIFY_CHARACTERISTIC_UUID,
-      ].map(uuid16Key);
-    } else {
-      characteristicFilter = [ONEKEY_WRITE_CHARACTERISTIC_UUID, ONEKEY_NOTIFY_CHARACTERISTIC_UUID];
-    }
     const characteristics = await new Promise<Characteristic[]>((resolve, reject) => {
-      service.discoverCharacteristics(characteristicFilter, (error, chars) => {
+      service.discoverCharacteristics([], (error, chars) => {
         if (error) {
           logger?.error('[NobleBLE] Characteristic discovery failed:', error);
           reject(ERRORS.TypedError(HardwareErrorCode.BleCharacteristicNotFound, error.message));
@@ -1247,22 +1172,6 @@ async function forceReconnectPeripheral(peripheral: Peripheral, deviceId: string
   // NOTE: Caller MUST call setupDisconnectListener() after this function returns
 }
 
-// Last resort: Fresh scan to get completely new peripheral object and discover services
-async function freshScanAndDiscoverTraced(
-  deviceId: string,
-  webContents: WebContents
-): Promise<CharacteristicPair> {
-  bleTrace('gatt.freshScan.start', { deviceId });
-  try {
-    const result = await freshScanAndDiscover(deviceId, webContents);
-    bleTrace('gatt.freshScan.done', { deviceId });
-    return result;
-  } catch (error) {
-    bleTrace('gatt.freshScan.error', { deviceId, error: String(error) });
-    throw error;
-  }
-}
-
 async function freshScanAndDiscover(
   deviceId: string,
   webContents: WebContents
@@ -1276,7 +1185,6 @@ async function freshScanAndDiscover(
   // first (bounded) so it goes back on air before we scan.
   const stalePeripheral = connectedDevices.get(deviceId) ?? discoveredDevices.get(deviceId);
   if (stalePeripheral && stalePeripheral.state === 'connected') {
-    bleTrace('gatt.freshScan.predisconnect', { deviceId });
     stalePeripheral.removeAllListeners('disconnect');
     await new Promise<void>(resolve => {
       const timer = setTimeout(resolve, BLE_DISCONNECT_TIMEOUT_MS);
@@ -1401,95 +1309,37 @@ async function setupConnectionAndDiscoverServices(
   deviceId: string,
   webContents: WebContents
 ): Promise<CharacteristicPair> {
-  const startedAt = Date.now();
   setupDisconnectListener(peripheral, deviceId, webContents);
 
-  // Optimistic direct discovery first; the old unconditional force-reconnect
-  // ("clear GATT cache") doubled every connect and is now the fallback only.
+  // Optimistic direct discovery first; the force-reconnect fallback below only
+  // runs if it fails. Discovery is UNFILTERED with 16-bit-key matching in JS:
+  // the device answers only the 2-byte-encoded targeted query, so a uuid-
+  // filtered discovery is unreliable (macOS CoreBluetooth sends the 128-bit
+  // base form and misses). See uuid16Key.
   if (peripheral.state === 'connected') {
-    // Unfiltered discovery + JS matching is the reliable route: the device's
-    // ATT server only answers 2-byte-encoded targeted queries, so the
-    // long-form filtered query misses. With ONEKEY_BLE_DIAG=1 the filtered
-    // variants run as probes (uuid wire-encoding experiment readout).
-    const discoveryAttempts =
-      process.platform === 'darwin' && process.env.ONEKEY_BLE_DIAG !== '1'
-        ? (['unfiltered'] as const)
-        : (['filtered', 'filtered16', 'unfiltered'] as const);
-    // One conclusion line per cold connect (filter console by "verdict").
-    const attemptResults: string[] = [];
-    // eslint-disable-next-line no-restricted-syntax
-    for (const attempt of discoveryAttempts) {
-      if (attempt === 'unfiltered') {
-        bleTraceVerbose('gatt.discovery.direct.retry', { deviceId, mode: attempt });
-      }
-      try {
-        // eslint-disable-next-line no-await-in-loop
-        const result = await discoverServicesAndCharacteristics(peripheral, {
-          unfiltered: attempt === 'unfiltered',
-          shortUuidFilter: attempt === 'filtered16',
-        });
-        attemptResults.push(`${attempt}=ok`);
-        // Filtered attempts are probes only; the link is always built from
-        // the unfiltered result.
-        if (attempt !== 'unfiltered') {
-          // eslint-disable-next-line no-continue
-          continue;
-        }
-        connectedDevices.set(deviceId, peripheral);
-        bleTrace('gatt.discovery.verdict', {
-          deviceId,
-          attempts: attemptResults.join(','),
-          route: `direct-${attempt}`,
-          elapsedMs: Date.now() - startedAt,
-        });
-        return result;
-      } catch (directError) {
-        attemptResults.push(`${attempt}=miss`);
-        bleTrace('gatt.discovery.direct.miss', {
-          deviceId,
-          mode: attempt,
-          elapsedMs: Date.now() - startedAt,
-          error: String(directError),
-        });
-      }
-      if (peripheral.state !== 'connected') break;
+    try {
+      const result = await discoverServicesAndCharacteristics(peripheral);
+      connectedDevices.set(deviceId, peripheral);
+      return result;
+    } catch (directError) {
+      logger?.info('[NobleBLE] Direct discovery miss, escalating:', String(directError));
     }
-    bleTrace('gatt.discovery.verdict', {
-      deviceId,
-      attempts: attemptResults.join(','),
-      route: 'escalating-to-force-reconnect',
-      elapsedMs: Date.now() - startedAt,
-    });
-  } else {
-    bleTrace('gatt.discovery.direct.skip', { deviceId, state: peripheral.state });
   }
 
   // Fallback ladder; a force-reconnect failure must also escalate to the
   // fresh scan instead of propagating out.
   try {
-    bleTrace('gatt.forceReconnect.start', { deviceId });
     await forceReconnectPeripheral(peripheral, deviceId);
-    bleTrace('gatt.forceReconnect.done', { deviceId, elapsedMs: Date.now() - startedAt });
     // forceReconnectPeripheral strips listeners — re-attach.
     setupDisconnectListener(peripheral, deviceId, webContents);
 
     const result = await discoverServicesAndCharacteristicsWithRetry(peripheral, deviceId);
-    bleTrace('gatt.discovery.done', {
-      deviceId,
-      elapsedMs: Date.now() - startedAt,
-      route: 'force-reconnect',
-    });
     return result;
   } catch (error) {
     // Last resort: fresh scan to get new peripheral object
     logger?.error('[NobleBLE] Service discovery failed, attempting fresh scan...', error);
     // Broken-OS-bond signature lands here.
-    bleTrace('gatt.discovery.error', {
-      deviceId,
-      elapsedMs: Date.now() - startedAt,
-      error: String(error),
-    });
-    return freshScanAndDiscoverTraced(deviceId, webContents);
+    return freshScanAndDiscover(deviceId, webContents);
   }
 }
 
@@ -1507,11 +1357,8 @@ const directConnectCooldownUntil = new Map<string, number>();
 async function tryDirectConnectById(deviceId: string): Promise<Peripheral | undefined> {
   if (!noble || typeof noble.connectAsync !== 'function') return undefined;
   if ((directConnectCooldownUntil.get(deviceId) ?? 0) > Date.now()) {
-    bleTraceVerbose('connect.direct.cooldown', { deviceId });
     return undefined;
   }
-  const startedAt = Date.now();
-  bleTraceVerbose('connect.direct.start', { deviceId });
   try {
     // The late-orphan guard must attach to THIS pending connect.
     const directPromise = noble.connectAsync(deviceId);
@@ -1523,7 +1370,6 @@ async function tryDirectConnectById(deviceId: string): Promise<Peripheral | unde
     ]);
     if (raced === 'timeout') {
       directConnectCooldownUntil.set(deviceId, Date.now() + DIRECT_CONNECT_COOLDOWN_MS);
-      bleTrace('connect.direct.timeout', { deviceId, elapsedMs: Date.now() - startedAt });
       // If the pending connect completes later, drop it unless someone claimed it.
       directPromise
         .then(late => {
@@ -1533,7 +1379,6 @@ async function tryDirectConnectById(deviceId: string): Promise<Peripheral | unde
             latePeripheral.state === 'connected' &&
             !connectedDevices.has(deviceId)
           ) {
-            bleTrace('connect.direct.late', { deviceId });
             latePeripheral.removeAllListeners('disconnect');
             latePeripheral.disconnect(() => {});
           }
@@ -1544,21 +1389,10 @@ async function tryDirectConnectById(deviceId: string): Promise<Peripheral | unde
     // Backends emit a `discover` for the peripheral as a side effect, so the
     // cache may hold it even when connectAsync resolves without a value.
     const peripheral = raced ?? discoveredDevices.get(deviceId);
-    bleTraceVerbose('connect.direct.done', {
-      deviceId,
-      elapsedMs: Date.now() - startedAt,
-      found: Boolean(peripheral),
-      state: peripheral?.state,
-    });
     if (!peripheral || peripheral.state !== 'connected') return undefined;
     discoveredDevices.set(deviceId, peripheral);
     return peripheral;
   } catch (error) {
-    bleTrace('connect.direct.error', {
-      deviceId,
-      elapsedMs: Date.now() - startedAt,
-      error: String(error),
-    });
     return undefined;
   }
 }
@@ -1572,11 +1406,6 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
     hasCharacteristics: deviceCharacteristics.has(deviceId),
     totalDiscovered: discoveredDevices.size,
     totalConnected: connectedDevices.size,
-  });
-  bleTraceVerbose('connect.request', {
-    deviceId,
-    hasDiscovered: discoveredDevices.has(deviceId),
-    hasConnected: connectedDevices.has(deviceId),
   });
 
   let peripheral = discoveredDevices.get(deviceId);
@@ -1624,7 +1453,6 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
   // Check if device is already connected
   if (peripheral.state === 'connected') {
     logger?.info('[NobleBLE] Device already connected, skipping connection step');
-    bleTraceVerbose('connect.reuse', { deviceId });
 
     // If already connected but not in our connected devices map, add it
     if (!connectedDevices.has(deviceId)) {
@@ -1687,14 +1515,11 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
   }
 
   return new Promise((resolve, reject) => {
-    const connectStartedAt = Date.now();
-    bleTraceVerbose('connect.link.start', { deviceId });
     // After the timeout rejects, a late successful connect would be an
     // ownerless link with no idle timer — detect and drop it.
     let timedOut = false;
     const timeout = setTimeout(() => {
       timedOut = true;
-      bleTrace('connect.link.timeout', { deviceId, elapsedMs: Date.now() - connectStartedAt });
       reject(ERRORS.TypedError(HardwareErrorCode.BleConnectedError, 'Connection timeout'));
     }, CONNECTION_TIMEOUT);
 
@@ -1705,7 +1530,6 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
 
       if (timedOut) {
         if (!error && connectedPeripheral.state === 'connected') {
-          bleTrace('connect.link.late', { deviceId, elapsedMs: Date.now() - connectStartedAt });
           logger?.info('[NobleBLE] Late connection after timeout, disconnecting:', deviceId);
           connectedPeripheral.disconnect(() => {});
         }
@@ -1714,17 +1538,11 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
 
       if (error) {
         logger?.error('[NobleBLE] Connection failed:', error);
-        bleTrace('connect.link.error', {
-          deviceId,
-          elapsedMs: Date.now() - connectStartedAt,
-          error: error.message,
-        });
         reject(ERRORS.TypedError(HardwareErrorCode.BleConnectedError, error.message));
         return;
       }
 
       logger?.info('[NobleBLE] Connected to device:', deviceId);
-      bleTraceVerbose('connect.link.done', { deviceId, elapsedMs: Date.now() - connectStartedAt });
       connectedDevices.set(deviceId, connectedPeripheral);
 
       // Setup connection and discover services
@@ -1736,11 +1554,9 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
         );
         deviceCharacteristics.set(deviceId, characteristics);
         logger?.info('[NobleBLE] Device ready for communication:', deviceId);
-        bleTrace('connect.ready', { deviceId, elapsedMs: Date.now() - connectStartedAt });
         resolve();
       } catch (setupError) {
         logger?.error('[NobleBLE] Connection setup failed:', setupError);
-        bleTrace('connect.setup.error', { deviceId, error: String(setupError) });
         connectedPeripheral.disconnect(() => {
           reject(setupError);
         });
@@ -1949,11 +1765,6 @@ async function subscribeNotifications(
   try {
     await rebuildAppSubscription(deviceId, notifyCharacteristic);
     subscribedDevices.set(deviceId, true);
-  } catch (error) {
-    // A subscribe failure on the encryption-gated notify characteristic is the
-    // classic broken-bond signature — must always be visible in the trace.
-    bleTrace('subscribe.error', { deviceId, error: String(error) });
-    throw error;
   } finally {
     // 🔒 CRITICAL: Always clear operation state (even on error)
     subscriptionOperations.set(deviceId, 'idle');

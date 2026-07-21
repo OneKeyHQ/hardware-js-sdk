@@ -815,23 +815,10 @@ function canSkipInitialize(method: BaseMethod, device: Device): boolean {
 }
 
 /**
- * BLE debug trace, desktop only. Same "[BLE-TRACE]" console filter keyword as
- * the transport/main-process events so one filter shows the whole timeline.
- * Gated on env to keep react-native consoles quiet.
- */
-function bleTrace(event: string, data?: Record<string, unknown>) {
-  if (DataManager.getSettings('env') !== 'desktop-web-ble') return;
-  const dataText = data ? ` ${JSON.stringify(data)}` : '';
-  // eslint-disable-next-line no-console
-  console.log(`[BLE-TRACE] ${new Date().toISOString().slice(11, 23)} hd-core ${event}${dataText}`);
-}
-
-/**
  * If the Bluetooth connection times out, retry up to 6 times
  * @param retryCount - Current retry count (default 0)
  */
 async function connectDeviceForBle(method: BaseMethod, device: Device, retryCount = 0) {
-  const startedAt = Date.now();
   try {
     await device.acquire();
     if (method.payload?.onlyConnectBleDevice) {
@@ -846,25 +833,14 @@ async function connectDeviceForBle(method: BaseMethod, device: Device, retryCoun
       });
     }
   } catch (err) {
-    bleTrace('connectForBle.error', {
-      method: method.name,
-      retryCount,
-      elapsedMs: Date.now() - startedAt,
-      errorCode: err.errorCode,
-      error: String(err.message ?? err),
-    });
-    // Hard-teardown errors must physically drop the link HERE too: the
-    // ERROR_CODES_REQUIRE_DISCONNECT handling in Device.run() never sees
-    // failures from this acquire/initialize phase, and with keep-alive a
-    // wedged link would otherwise be reused by every retry, failing
-    // identically forever (field case 2026-07-21: Initialize timing out at
-    // 25s per attempt on a reused link, device held the whole time).
+    // Device.run()'s REQUIRE_DISCONNECT handling never sees acquire/initialize
+    // failures — drop the wedged link here so retries cold-connect instead of
+    // reusing it forever.
     if (
       ERROR_CODES_REQUIRE_DISCONNECT.includes(err.errorCode) &&
       device.mainId &&
       device.deviceConnector
     ) {
-      bleTrace('connectForBle.hardDisconnect', { errorCode: err.errorCode });
       await device.deviceConnector.disconnect(device.mainId).catch(() => undefined);
     }
     if (err.errorCode === HardwareErrorCode.BleTimeoutError && retryCount < 6) {
@@ -983,11 +959,6 @@ const ensureConnected = async (
         }
       } catch (error) {
         Log.debug('device error: ', error);
-        bleTrace('ensureConnected.try.error', {
-          tryCount,
-          errorCode: error.errorCode,
-          error: String(error.message ?? error),
-        });
         if ([HardwareErrorCode.BleCharacteristicNotifyChangeFailure].includes(error.errorCode)) {
           postMessage(createUiMessage(UI_REQUEST.BLUETOOTH_CHARACTERISTIC_NOTIFY_CHANGE_FAILURE));
         }

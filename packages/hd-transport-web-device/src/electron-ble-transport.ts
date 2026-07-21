@@ -14,16 +14,6 @@ import type { DesktopAPI } from '@onekeyfe/hd-transport-electron';
 
 const { parseConfigure, buildBuffers, receiveOne, check } = transport;
 
-// BLE debug trace, renderer side (console filter keyword "[BLE-TRACE]").
-const bleTrace = (event: string, data?: Record<string, unknown>): void => {
-  // Single stringified line so it can be copied as plain text.
-  const dataText = data ? ` ${JSON.stringify(data)}` : '';
-  // eslint-disable-next-line no-console
-  console.log(
-    `[BLE-TRACE] ${new Date().toISOString().slice(11, 23)} sdk-transport ${event}${dataText}`
-  );
-};
-
 // Noble BLE specific API interface
 declare global {
   interface Window {
@@ -156,7 +146,6 @@ export default class ElectronBleTransport {
       return devices;
     } catch (error) {
       this.Log?.error('[Transport] Noble BLE enumerate failed:', error);
-      bleTrace('enumerate.error', { error: String(error) });
       this.handleBluetoothError(error);
     }
   }
@@ -176,7 +165,6 @@ export default class ElectronBleTransport {
     // `step` pins down where a failed acquire died (subscribe = the
     // encryption-gated characteristic, the broken-OS-bond signature).
     let step = 'getDevice';
-    const startedAt = Date.now();
     try {
       if (!window.desktopApi?.nobleBle) {
         throw new Error('Noble BLE API not available');
@@ -218,7 +206,6 @@ export default class ElectronBleTransport {
       const disconnectCleanup = window.desktopApi.nobleBle.onDeviceDisconnected(
         (disconnectedDevice: any) => {
           if (disconnectedDevice.id === uuid) {
-            bleTrace('event.device-disconnect', { uuid });
             // Fail a call blocked on a dead link instead of hanging.
             if (this.runPromise) {
               this.runPromise.reject(ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected));
@@ -246,16 +233,9 @@ export default class ElectronBleTransport {
       return { uuid, path: uuid };
     } catch (error) {
       this.Log?.error('[Transport] Noble BLE acquire failed:', error);
-      bleTrace('acquire.error', {
-        uuid,
-        step,
-        elapsedMs: Date.now() - startedAt,
-        error: String(error),
-      });
       if (step === 'subscribe') {
         // Broken-bond signature: tear the link down so the next attempt
         // cold-connects and macOS can re-negotiate the bond.
-        bleTrace('acquire.subscribe.teardown', { uuid });
         await this.disconnect(uuid);
       }
       throw error;
@@ -276,26 +256,23 @@ export default class ElectronBleTransport {
    * .disconnect); normal release() deliberately does not come here.
    */
   async disconnect(id: string) {
-    bleTrace('disconnect.start', { id });
     // Independent best-effort steps, each time-boxed: on a wedged link the
     // underlying noble callbacks can simply never fire, and this is the
     // error-RECOVERY path — it must never hang the retry ladder.
-    const bounded = async (label: string, ms: number, run: () => Promise<unknown> | undefined) => {
+    const bounded = async (ms: number, run: () => Promise<unknown> | undefined) => {
       try {
-        const raced = await Promise.race([
+        await Promise.race([
           Promise.resolve(run()),
-          new Promise<'timeout'>(resolve => {
-            setTimeout(() => resolve('timeout'), ms);
+          new Promise<void>(resolve => {
+            setTimeout(resolve, ms);
           }),
         ]);
-        if (raced === 'timeout') bleTrace(`disconnect.${label}.timeout`, { id, ms });
-      } catch (error) {
-        bleTrace(`disconnect.${label}.error`, { id, error: String(error) });
+      } catch {
+        // ignore — recovery path, best effort
       }
     };
-    await bounded('unsubscribe', 2000, () => window.desktopApi?.nobleBle?.unsubscribe(id));
-    await bounded('disconnect', 3000, () => window.desktopApi?.nobleBle?.disconnect(id));
-    bleTrace('disconnect.done', { id });
+    await bounded(2000, () => window.desktopApi?.nobleBle?.unsubscribe(id));
+    await bounded(3000, () => window.desktopApi?.nobleBle?.disconnect(id));
     this.cleanupDeviceState(id);
   }
 
@@ -304,7 +281,6 @@ export default class ElectronBleTransport {
     // Check for pairing rejection
     if (hexData === 'PAIRING_REJECTED') {
       this.Log?.debug('[Transport] Pairing rejection detected for device:', deviceId);
-      bleTrace('event.pairing-rejected', { deviceId });
       if (this.runPromise) {
         this.runPromise.reject(ERRORS.TypedError(HardwareErrorCode.BleDeviceBondedCanceled));
       }

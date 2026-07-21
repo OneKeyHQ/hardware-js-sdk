@@ -279,9 +279,8 @@ export class NobleBleHandler {
       // allowDuplicates=true keeps advertisements flowing so we can age out gone devices.
       try {
         await this._requireNoble().startScanningAsync(serviceUuids, true);
-        // warn, not info: this scan runs UNFILTERED on a noble instance shared
-        // with the OneKey handler, so it must always be visible in the log to
-        // correlate with any slow/failed connect happening on the same adapter.
+        // warn: unfiltered scan on the noble instance shared with the OneKey
+        // handler — must always be visible for cross-correlation.
         this._log('warn', 'scan.start', { serviceUuids, allowDuplicates: true });
       } catch (error) {
         this._scanning = false;
@@ -350,8 +349,6 @@ export class NobleBleHandler {
     this._clearIdleStop();
     if (!this._scanning) return;
     this._scanning = false;
-    // Same rationale as scan.start: stop/start transitions on the shared noble
-    // instance are the timeline the OneKey handler's log must be matched against.
     this._log('warn', 'scan.stop', { reason });
     await this._noble?.stopScanningAsync().catch(() => undefined);
   }

@@ -54,50 +54,12 @@ const DEFAULT_IPC_MAIN: () => IpcMainLike = () => {
  *
  * Returns a disposer the caller should invoke on app quit.
  */
-// Debug trace channel: same string as `hd-transport-electron`'s
-// BLE_TRACE_CHANNEL and the app preload's listener. Entries forwarded here have
-// already passed `filterTrezorDebugLogEntry` (sensitive fields redacted), so
-// they are safe to surface in the renderer DevTools console.
-const BLE_TRACE_CHANNEL = '$onekey-ble-trace';
-
 export function initTrezorBleSupport(
   webContents: WebContentsLike,
   options: InitTrezorBleSupportOptions = {}
 ): TrezorBleSupportHandle {
   const ipcMain = options.ipcMain ?? DEFAULT_IPC_MAIN();
-  const baseLogger = options.logger;
-  const handler = new NobleBleHandler({
-    ...options,
-    logger: entry => {
-      baseLogger?.(entry);
-      try {
-        // Broadcast to every webContents, not the one captured at init: the
-        // preload's console printer runs in the main window, the tray and
-        // embedded webviews, and the console a developer watches is not
-        // necessarily the init-time `webContents`.
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const { webContents: electronWebContents } = require('electron') as {
-          webContents: {
-            getAllWebContents(): Array<{
-              isDestroyed(): boolean;
-              send(channel: string, ...args: unknown[]): void;
-            }>;
-          };
-        };
-        const payload = {
-          src: 'trezor-ble',
-          ts: Date.now(),
-          event: entry.event,
-          data: entry.data,
-        };
-        for (const wc of electronWebContents.getAllWebContents()) {
-          if (!wc.isDestroyed()) wc.send(BLE_TRACE_CHANNEL, payload);
-        }
-      } catch {
-        // Tracing must never break the BLE flow.
-      }
-    },
-  });
+  const handler = new NobleBleHandler(options);
 
   handler.setNotificationListener((id, hexData) => {
     webContents.send(TREZOR_BLE_CHANNELS.notification, id, hexData);

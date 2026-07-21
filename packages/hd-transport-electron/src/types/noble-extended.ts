@@ -30,7 +30,6 @@ export interface NobleModule {
   stopScanning(callback?: () => void): void;
   on(event: 'stateChange', listener: (state: string) => void): void;
   on(event: 'discover', listener: (peripheral: Peripheral) => void): void;
-  on(event: 'scanStart' | 'scanStop', listener: () => void): void;
   /**
    * Connect by id/address with NO scan. Both native backends support this and
    * emit a `discover` for the peripheral as a side effect (Windows synthesizes
