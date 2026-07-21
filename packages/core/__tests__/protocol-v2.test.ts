@@ -671,6 +671,47 @@ describe('Protocol V2 feature adapter', () => {
         host_passphrase: { passphrase: 'hidden-wallet-with-disabled-flag' },
       },
     });
+    expect(typedCall.mock.calls.map(call => call[0])).not.toContain('DeviceStatusGet');
+  });
+
+  test('preserves cached settings only while Protocol V2 physical identity stays the same', () => {
+    const previous = {
+      ...normalizeProtocolV2Features(descriptor as any, {
+        hw: { serial_no: 'PR2-SAME' },
+      }),
+      deviceId: 'wallet-device-id',
+      label: 'Renamed Pro 2',
+      autoLockDelayMs: 60_000,
+      experimentalFeatures: true,
+      passphraseProtection: true,
+      attachToPinEnabled: true,
+    };
+
+    const refreshed = buildProtocolV2FeaturesPayload({
+      deviceInfo: { hw: { serial_no: 'PR2-SAME' } },
+      previous,
+    });
+    expect(refreshed).toMatchObject({
+      deviceId: 'wallet-device-id',
+      label: 'Renamed Pro 2',
+      autoLockDelayMs: 60_000,
+      experimentalFeatures: true,
+      passphraseProtection: true,
+      attachToPinEnabled: true,
+    });
+
+    const replacedDevice = buildProtocolV2FeaturesPayload({
+      deviceInfo: { hw: { serial_no: 'PR2-OTHER' } },
+      previous,
+    });
+    expect(replacedDevice).toMatchObject({
+      deviceId: null,
+      label: null,
+      autoLockDelayMs: null,
+      experimentalFeatures: null,
+      passphraseProtection: null,
+      attachToPinEnabled: null,
+    });
   });
 
   test('unlocks before opening a Protocol V2 wallet session regardless of passphrase flag', async () => {

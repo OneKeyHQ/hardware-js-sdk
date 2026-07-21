@@ -252,31 +252,39 @@ export const buildProtocolV2FeaturesPayload = ({
   const fwBoard = info?.fw?.romloader;
   const bleApplication = info?.coprocessor?.application;
   const status = deviceStatus;
+  const incomingSerialNo = info?.hw?.serial_no;
+  const samePhysicalDevice =
+    !incomingSerialNo || !previous?.serialNo || incomingSerialNo === previous.serialNo;
+  const cached = samePhysicalDevice ? previous : undefined;
 
   const firmwareVersion = firstMeaningfulVersion(
     getImageVersion(fwApplication),
-    previous?.firmwareVersion
+    cached?.firmwareVersion
   );
   const bootloaderVersion = firstMeaningfulVersion(
     getImageVersion(fwBootloader),
-    previous?.bootloaderVersion
+    cached?.bootloaderVersion
   );
-  const boardVersion = firstMeaningfulVersion(getImageVersion(fwBoard), previous?.boardVersion);
-  const bleVersion = firstMeaningfulVersion(getImageVersion(bleApplication), previous?.bleVersion);
-  const deviceId = status?.device_id ?? null;
-  const serialNo = firstValue(info?.hw?.serial_no, previous?.serialNo) ?? '';
-  const label = previous?.label ?? null;
-  const bleName = firstValue(info?.coprocessor?.bt_adv_name, previous?.bleName);
-  const initialized = firstValue(status?.init_states, previous?.initialized) ?? null;
+  const boardVersion = firstMeaningfulVersion(getImageVersion(fwBoard), cached?.boardVersion);
+  const bleVersion = firstMeaningfulVersion(getImageVersion(bleApplication), cached?.bleVersion);
+  const deviceId = status?.device_id ?? cached?.deviceId ?? null;
+  const serialNo = firstValue(incomingSerialNo, cached?.serialNo) ?? '';
+  const label = cached?.label ?? null;
+  const bleName = firstValue(info?.coprocessor?.bt_adv_name, cached?.bleName);
+  const initialized = firstValue(status?.init_states, cached?.initialized) ?? null;
   // Pro2 在锁定状态下返回的 passphrase_enabled 不是最终钱包状态。
   // 只有完成 PIN 解锁后的 DeviceStatus 才能作为 passphrase 开关真值来源。
-  const passphraseProtection = status?.unlocked === true ? status.passphrase_enabled ?? null : null;
-  const language = previous?.language ?? null;
-  const backupRequired = firstValue(status?.backup_required, previous?.backupRequired) ?? null;
-  const bleEnabled = previous?.bleEnabled;
-  const unlocked = firstValue(status?.unlocked, previous?.unlocked) ?? null;
-  const attachToPinEnabled = status?.attach_to_pin_enabled ?? null;
-  const unlockedAttachPin = status?.unlocked_by_attach_to_pin ?? undefined;
+  let passphraseProtection = cached?.passphraseProtection ?? null;
+  if (status) {
+    passphraseProtection = status.unlocked === true ? status.passphrase_enabled ?? null : null;
+  }
+  const language = cached?.language ?? null;
+  const backupRequired = firstValue(status?.backup_required, cached?.backupRequired) ?? null;
+  const bleEnabled = cached?.bleEnabled;
+  const unlocked = firstValue(status?.unlocked, cached?.unlocked) ?? null;
+  const attachToPinEnabled = status?.attach_to_pin_enabled ?? cached?.attachToPinEnabled ?? null;
+  const unlockedAttachPin =
+    status?.unlocked_by_attach_to_pin ?? cached?.unlockedAttachPin ?? undefined;
   const romloaderMode = isProtocolV2RomloaderDeviceInfo(info, status);
   const bootloaderMode = isProtocolV2BootloaderDeviceInfo(info, status);
   let mode: DeviceFeaturesMode = 'unknown';
@@ -292,9 +300,9 @@ export const buildProtocolV2FeaturesPayload = ({
 
   return {
     protocol: 'V2',
-    protocolVersion: deviceInfo?.protocol_version ?? previous?.protocolVersion ?? null,
+    protocolVersion: deviceInfo?.protocol_version ?? cached?.protocolVersion ?? null,
     deviceType: EDeviceType.Pro2,
-    firmwareType: previous?.firmwareType ?? EFirmwareType.Universal,
+    firmwareType: cached?.firmwareType ?? EFirmwareType.Universal,
     model: 'pro2',
     vendor: 'onekey.so',
     deviceId,
@@ -306,7 +314,7 @@ export const buildProtocolV2FeaturesPayload = ({
     initialized,
     bootloaderMode,
     unlocked,
-    firmwarePresent: previous?.firmwarePresent ?? null,
+    firmwarePresent: cached?.firmwarePresent ?? null,
     passphraseProtection,
     pinProtection: null,
     backupRequired,
@@ -321,91 +329,91 @@ export const buildProtocolV2FeaturesPayload = ({
     passphraseAlwaysOnDevice: null,
     attachToPinEnabled,
     safetyChecks: null,
-    autoLockDelayMs: null,
-    autoShutdownDelayMs: previous?.autoShutdownDelayMs ?? null,
+    autoLockDelayMs: cached?.autoLockDelayMs ?? null,
+    autoShutdownDelayMs: cached?.autoShutdownDelayMs ?? null,
     displayRotation: null,
-    experimentalFeatures: null,
-    wallpaperPath: previous?.wallpaperPath ?? null,
-    brightness: previous?.brightness ?? null,
-    animationEnabled: previous?.animationEnabled ?? null,
-    tapToWake: previous?.tapToWake ?? null,
-    hapticFeedback: previous?.hapticFeedback ?? null,
-    deviceNameDisplayEnabled: previous?.deviceNameDisplayEnabled ?? null,
-    airgapMode: previous?.airgapMode ?? null,
-    fidoEnabled: previous?.fidoEnabled ?? null,
-    usbLockEnabled: previous?.usbLockEnabled ?? null,
-    randomKeypad: previous?.randomKeypad ?? null,
+    experimentalFeatures: cached?.experimentalFeatures ?? null,
+    wallpaperPath: cached?.wallpaperPath ?? null,
+    brightness: cached?.brightness ?? null,
+    animationEnabled: cached?.animationEnabled ?? null,
+    tapToWake: cached?.tapToWake ?? null,
+    hapticFeedback: cached?.hapticFeedback ?? null,
+    deviceNameDisplayEnabled: cached?.deviceNameDisplayEnabled ?? null,
+    airgapMode: cached?.airgapMode ?? null,
+    fidoEnabled: cached?.fidoEnabled ?? null,
+    usbLockEnabled: cached?.usbLockEnabled ?? null,
+    randomKeypad: cached?.randomKeypad ?? null,
     firmwareVersion,
     bootloaderVersion,
     boardVersion,
     bleVersion,
     se01Version: firstMeaningfulVersion(
       getImageVersion(info?.se1?.application),
-      previous?.se01Version
+      cached?.se01Version
     ),
     se02Version: firstMeaningfulVersion(
       getImageVersion(info?.se2?.application),
-      previous?.se02Version
+      cached?.se02Version
     ),
     se03Version: firstMeaningfulVersion(
       getImageVersion(info?.se3?.application),
-      previous?.se03Version
+      cached?.se03Version
     ),
     se04Version: firstMeaningfulVersion(
       getImageVersion(info?.se4?.application),
-      previous?.se04Version
+      cached?.se04Version
     ),
     se01BootVersion: firstMeaningfulVersion(
       getImageVersion(info?.se1?.bootloader),
-      previous?.se01BootVersion
+      cached?.se01BootVersion
     ),
     se02BootVersion: firstMeaningfulVersion(
       getImageVersion(info?.se2?.bootloader),
-      previous?.se02BootVersion
+      cached?.se02BootVersion
     ),
     se03BootVersion: firstMeaningfulVersion(
       getImageVersion(info?.se3?.bootloader),
-      previous?.se03BootVersion
+      cached?.se03BootVersion
     ),
     se04BootVersion: firstMeaningfulVersion(
       getImageVersion(info?.se4?.bootloader),
-      previous?.se04BootVersion
+      cached?.se04BootVersion
     ),
-    seVersion: previous?.seVersion ?? null,
+    seVersion: cached?.seVersion ?? null,
     verify: {
-      firmwareBuildId: getImageBuildId(fwApplication) ?? previous?.verify?.firmwareBuildId,
-      firmwareHash: getImageHash(fwApplication) ?? previous?.verify?.firmwareHash,
-      bootloaderBuildId: getImageBuildId(fwBootloader) ?? previous?.verify?.bootloaderBuildId,
-      bootloaderHash: getImageHash(fwBootloader) ?? previous?.verify?.bootloaderHash,
-      boardBuildId: getImageBuildId(fwBoard) ?? previous?.verify?.boardBuildId,
-      boardHash: getImageHash(fwBoard) ?? previous?.verify?.boardHash,
-      bleBuildId: getImageBuildId(bleApplication) ?? previous?.verify?.bleBuildId,
-      bleHash: getImageHash(bleApplication) ?? previous?.verify?.bleHash,
-      se01BuildId: getImageBuildId(info?.se1?.application) ?? previous?.verify?.se01BuildId,
-      se01Hash: getImageHash(info?.se1?.application) ?? previous?.verify?.se01Hash,
-      se02BuildId: getImageBuildId(info?.se2?.application) ?? previous?.verify?.se02BuildId,
-      se02Hash: getImageHash(info?.se2?.application) ?? previous?.verify?.se02Hash,
-      se03BuildId: getImageBuildId(info?.se3?.application) ?? previous?.verify?.se03BuildId,
-      se03Hash: getImageHash(info?.se3?.application) ?? previous?.verify?.se03Hash,
-      se04BuildId: getImageBuildId(info?.se4?.application) ?? previous?.verify?.se04BuildId,
-      se04Hash: getImageHash(info?.se4?.application) ?? previous?.verify?.se04Hash,
-      se01BootBuildId: getImageBuildId(info?.se1?.bootloader) ?? previous?.verify?.se01BootBuildId,
-      se01BootHash: getImageHash(info?.se1?.bootloader) ?? previous?.verify?.se01BootHash,
-      se02BootBuildId: getImageBuildId(info?.se2?.bootloader) ?? previous?.verify?.se02BootBuildId,
-      se02BootHash: getImageHash(info?.se2?.bootloader) ?? previous?.verify?.se02BootHash,
-      se03BootBuildId: getImageBuildId(info?.se3?.bootloader) ?? previous?.verify?.se03BootBuildId,
-      se03BootHash: getImageHash(info?.se3?.bootloader) ?? previous?.verify?.se03BootHash,
-      se04BootBuildId: getImageBuildId(info?.se4?.bootloader) ?? previous?.verify?.se04BootBuildId,
-      se04BootHash: getImageHash(info?.se4?.bootloader) ?? previous?.verify?.se04BootHash,
+      firmwareBuildId: getImageBuildId(fwApplication) ?? cached?.verify?.firmwareBuildId,
+      firmwareHash: getImageHash(fwApplication) ?? cached?.verify?.firmwareHash,
+      bootloaderBuildId: getImageBuildId(fwBootloader) ?? cached?.verify?.bootloaderBuildId,
+      bootloaderHash: getImageHash(fwBootloader) ?? cached?.verify?.bootloaderHash,
+      boardBuildId: getImageBuildId(fwBoard) ?? cached?.verify?.boardBuildId,
+      boardHash: getImageHash(fwBoard) ?? cached?.verify?.boardHash,
+      bleBuildId: getImageBuildId(bleApplication) ?? cached?.verify?.bleBuildId,
+      bleHash: getImageHash(bleApplication) ?? cached?.verify?.bleHash,
+      se01BuildId: getImageBuildId(info?.se1?.application) ?? cached?.verify?.se01BuildId,
+      se01Hash: getImageHash(info?.se1?.application) ?? cached?.verify?.se01Hash,
+      se02BuildId: getImageBuildId(info?.se2?.application) ?? cached?.verify?.se02BuildId,
+      se02Hash: getImageHash(info?.se2?.application) ?? cached?.verify?.se02Hash,
+      se03BuildId: getImageBuildId(info?.se3?.application) ?? cached?.verify?.se03BuildId,
+      se03Hash: getImageHash(info?.se3?.application) ?? cached?.verify?.se03Hash,
+      se04BuildId: getImageBuildId(info?.se4?.application) ?? cached?.verify?.se04BuildId,
+      se04Hash: getImageHash(info?.se4?.application) ?? cached?.verify?.se04Hash,
+      se01BootBuildId: getImageBuildId(info?.se1?.bootloader) ?? cached?.verify?.se01BootBuildId,
+      se01BootHash: getImageHash(info?.se1?.bootloader) ?? cached?.verify?.se01BootHash,
+      se02BootBuildId: getImageBuildId(info?.se2?.bootloader) ?? cached?.verify?.se02BootBuildId,
+      se02BootHash: getImageHash(info?.se2?.bootloader) ?? cached?.verify?.se02BootHash,
+      se03BootBuildId: getImageBuildId(info?.se3?.bootloader) ?? cached?.verify?.se03BootBuildId,
+      se03BootHash: getImageHash(info?.se3?.bootloader) ?? cached?.verify?.se03BootHash,
+      se04BootBuildId: getImageBuildId(info?.se4?.bootloader) ?? cached?.verify?.se04BootBuildId,
+      se04BootHash: getImageHash(info?.se4?.bootloader) ?? cached?.verify?.se04BootHash,
     },
-    sessionId: previous?.sessionId ?? null,
+    sessionId: cached?.sessionId ?? null,
     device_id: deviceId ?? undefined,
-    session_id: previous?.sessionId ?? undefined,
+    session_id: cached?.sessionId ?? undefined,
     ble_name: bleName ?? undefined,
     onekey_device_type: 'PRO2',
     passphrase_protection: passphraseProtection ?? undefined,
     bootloader_mode: bootloaderMode,
-    passphraseState: previous?.passphraseState,
+    passphraseState: cached?.passphraseState,
     unlockedAttachPin,
     raw: {
       protocolV2DeviceInfo: deviceInfo,

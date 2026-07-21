@@ -123,8 +123,8 @@ export async function getProtocolV2WalletSession(
   const expectedPassphraseState = options?.expectedPassphraseState ?? device.passphraseState;
 
   try {
-    // 锁屏时的 passphrase_enabled 不可信。先完成 PIN 解锁，unlockDevice 会立即
-    // 获取并合并一份新的 DeviceStatus，之后再决定打开主钱包还是隐藏钱包。
+    // 锁屏时先完成 PIN 解锁；解锁成功只更新已确认的 unlocked 字段，
+    // 不为了补全状态隐式轮询 DeviceStatus。
     if (device.features?.unlocked === false) {
       await device.unlockDevice();
     }
@@ -174,16 +174,12 @@ export async function getProtocolV2WalletSession(
       throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError);
     }
 
-    if (message.btc_test_address && device.getCurrentPassphraseProtection() !== true) {
-      await refreshProtocolV2DeviceStatus(device);
-    }
-
     device.updateInternalState(
       true,
       message.btc_test_address,
       device.getCurrentDeviceId(),
       message.session_id,
-      options?.initSession ? null : device.features?.sessionId
+      options?.initSession ? null : device.features?.sessionId ?? null
     );
 
     return {
