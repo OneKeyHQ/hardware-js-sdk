@@ -2276,16 +2276,6 @@ describe('Protocol V2 feature adapter', () => {
           message: { message: 'ok' },
         };
       }
-      if (requestType === 'DeviceStatusGet') {
-        return {
-          type: 'DeviceStatus',
-          message: {
-            unlocked: true,
-            unlocked_by_attach_to_pin: true,
-            passphrase_enabled: true,
-          },
-        };
-      }
       throw new Error(`Unexpected request: ${requestType}`);
     });
 
@@ -2305,7 +2295,6 @@ describe('Protocol V2 feature adapter', () => {
 
     expect(typedCall.mock.calls).toEqual([
       ['DeviceSessionAskPin', 'Success', undefined, { timeoutMs: 120_000 }],
-      ['DeviceStatusGet', 'DeviceStatus', {}],
     ]);
     expect(typedCall).not.toHaveBeenCalledWith('GetAddress', 'Address', expect.anything());
     expect(typedCall).not.toHaveBeenCalledWith('GetFeatures', 'Features', {});
@@ -2313,17 +2302,10 @@ describe('Protocol V2 feature adapter', () => {
       deviceType: 'pro2',
       firmwareVersion: '1.2.3',
       unlocked: true,
-      unlockedAttachPin: true,
-      passphraseProtection: true,
-    });
-    expect(features.raw?.protocolV2DeviceStatus).toMatchObject({
-      unlocked: true,
-      unlocked_by_attach_to_pin: true,
-      passphrase_enabled: true,
     });
   });
 
-  test('syncs Protocol V2 features passphrase state from DeviceStatus after unlock', async () => {
+  test('preserves cached Protocol V2 passphrase state without polling status after unlock', async () => {
     const device = Device.fromDescriptor({ ...descriptor, protocolType: 'V2' } as any);
     (device as any).features = normalizeProtocolV2Features(
       { ...descriptor, protocolType: 'V2' } as any,
@@ -2340,16 +2322,6 @@ describe('Protocol V2 feature adapter', () => {
           message: { message: 'ok' },
         };
       }
-      if (requestType === 'DeviceStatusGet') {
-        return {
-          type: 'DeviceStatus',
-          message: {
-            unlocked: true,
-            unlocked_by_attach_to_pin: true,
-            passphrase_enabled: true,
-          },
-        };
-      }
       throw new Error(`Unexpected request: ${requestType}`);
     });
     (device as any).commands = { typedCall };
@@ -2358,12 +2330,11 @@ describe('Protocol V2 feature adapter', () => {
 
     expect(typedCall.mock.calls).toEqual([
       ['DeviceSessionAskPin', 'Success', undefined, { timeoutMs: 120_000 }],
-      ['DeviceStatusGet', 'DeviceStatus', {}],
     ]);
     expect((device as any).profile).toBeUndefined();
     expect(device.features?.unlocked).toBe(true);
-    expect(device.features?.passphraseProtection).toBe(true);
-    expect(device.features?.unlockedAttachPin).toBe(true);
+    expect(device.features?.passphraseProtection).toBeNull();
+    expect(device.features?.unlockedAttachPin).toBeUndefined();
   });
 
   test('maps unsupported Protocol V2 DeviceSessionAskPin to DeviceNotSupportMethod', async () => {

@@ -1200,12 +1200,7 @@ export class Device extends EventEmitter {
         throw error;
       }
 
-      const { message: status } = await this.commands.typedCall(
-        'DeviceStatusGet',
-        'DeviceStatus',
-        {}
-      );
-      return this.updateProtocolV2Status(status);
+      return this.updateFeaturesPatch({ unlocked: true }, 'unlock');
     }
 
     const firmwareVersion = this.getCurrentFirmwareVersionString() ?? '0.0.0';
