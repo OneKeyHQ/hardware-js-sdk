@@ -7,10 +7,7 @@ import {
   PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST,
   PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST,
 } from '../protocols/protocol-v2';
-import {
-  requestProtocolV2DeviceInfo,
-  requestProtocolV2DeviceStatus,
-} from '../protocols/protocol-v2/features';
+import { requestProtocolV2DeviceInfo } from '../protocols/protocol-v2/features';
 import { buildProfileFromProtocolV1, buildProfileFromProtocolV2 } from '../deviceProfile';
 import { getDeviceType } from '../utils';
 import { fixVersion } from '../utils/deviceFeaturesUtils';
@@ -107,17 +104,13 @@ export default class GetDeviceInfo extends BaseMethod<GetDeviceInfoParams> {
       commands: this.device.commands,
       request: resolveProtocolV2DeviceInfoRequest(this.params),
     });
-    const protocolV2DeviceStatus = await requestProtocolV2DeviceStatus({
-      commands: this.device.commands,
-    }).catch(() => undefined);
     const profile = buildProfileFromProtocolV2({
       deviceInfo: protocolV2DeviceInfo,
-      deviceStatus: protocolV2DeviceStatus,
       sources,
       scope: this.params.scope,
       includeRaw: this.params.includeRaw,
     });
-    this.device.updateProtocolV2Features(protocolV2DeviceInfo, protocolV2DeviceStatus);
+    this.device.updateProtocolV2Features(protocolV2DeviceInfo, null);
     return profile;
   }
 

@@ -82,7 +82,12 @@ export const isProtocolV2BootloaderDeviceInfo = (
 ) =>
   !!deviceInfo &&
   deviceStatus == null &&
-  !isProtocolV2RomloaderDeviceInfo(deviceInfo, deviceStatus);
+  !isProtocolV2RomloaderDeviceInfo(deviceInfo, deviceStatus) &&
+  ((deviceInfo.fw?.application == null && deviceInfo.fw?.application_data == null) ||
+    deviceInfo.se1 != null ||
+    deviceInfo.se2 != null ||
+    deviceInfo.se3 != null ||
+    deviceInfo.se4 != null);
 
 export const PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST = {
   targets: {
@@ -97,10 +102,8 @@ export const PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST = {
 };
 
 /**
- * 轻量状态刷新请求（每次 run 前使用）。
- *
- * status 提供 init_states / passphrase_enabled 等会在设备端变化的字段；
- * hw / coprocessor 提供 serialNo / bleName 等身份字段；不含 fw/SE targets，单帧请求开销很小。
+ * 固件升级完成后的版本探测请求。
+ * 仅读取硬件与各固件组件信息，不隐式请求 DeviceStatus。
  */
 export const PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST = {
   targets: {

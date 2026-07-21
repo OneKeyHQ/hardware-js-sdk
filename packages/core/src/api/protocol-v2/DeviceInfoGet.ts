@@ -13,7 +13,6 @@ export type DeviceInfoGetTargets = {
   se2?: boolean;
   se3?: boolean;
   se4?: boolean;
-  status?: boolean;
 };
 
 export type DeviceInfoGetTypes = {
@@ -36,7 +35,6 @@ const TARGET_KEYS: (keyof DeviceInfoGetTargets)[] = [
   'se2',
   'se3',
   'se4',
-  'status',
 ];
 
 const TYPE_KEYS: (keyof DeviceInfoGetTypes)[] = ['version', 'build_id', 'hash', 'specific'];

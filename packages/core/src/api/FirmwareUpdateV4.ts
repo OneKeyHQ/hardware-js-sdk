@@ -22,6 +22,7 @@ import { DevicePool } from '../device/DevicePool';
 import {
   PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST,
   ProtocolV2FirmwareTargetType,
+  isProtocolV2BootloaderDeviceInfo,
 } from '../protocols/protocol-v2';
 import { requestProtocolV2DeviceInfo } from '../protocols/protocol-v2/features';
 import {
@@ -1124,17 +1125,20 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
   private async probeProtocolV2NormalMode() {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
+    const deviceInfo = await requestProtocolV2DeviceInfo({
+      commands: this.device.getCommands(),
+      timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
+    });
+    if (isProtocolV2BootloaderDeviceInfo(deviceInfo, null)) {
+      this.device.updateProtocolV2Features(deviceInfo, null);
+      return false;
+    }
     const { message: deviceStatus } = await typedCall(
       'DeviceStatusGet',
       'DeviceStatus',
       {},
       { timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT }
     );
-    const deviceInfo = await requestProtocolV2DeviceInfo({
-      commands: this.device.getCommands(),
-      timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
-      request: PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST,
-    });
     const features = this.device.updateProtocolV2Features(deviceInfo, deviceStatus);
     assertProtocolV2ReconnectIdentity(
       this.protocolV2ExpectedDeviceId,

@@ -51,10 +51,7 @@ import { DataManager } from '../data-manager';
 import TransportManager from '../data-manager/TransportManager';
 import { toHardened } from '../api/helpers/pathUtils';
 import { existCapability } from '../utils/capabilitieUtils';
-import {
-  requestProtocolV2DeviceInfo,
-  requestProtocolV2DeviceStatus,
-} from '../protocols/protocol-v2/features';
+import { requestProtocolV2DeviceInfo } from '../protocols/protocol-v2/features';
 import { buildProtocolV1FeaturesPayload, buildProtocolV2FeaturesPayload } from '../deviceProfile';
 
 import type { PROTO } from '../constants';
@@ -797,15 +794,9 @@ export class Device extends EventEmitter {
         commands: this.commands,
         timeoutMs: options?.protocolV2DeviceInfoTimeoutMs,
       });
-      const deviceStatus = await requestProtocolV2DeviceStatus({
-        commands: this.commands,
-      }).catch(error => {
-        Log.debug('Protocol V2 status unavailable during initialization:', error);
-        return undefined;
-      });
       // 默认请求不含 SE/hash 数据，scope 如实标注为 basic；
       // 完整数据由 getDeviceInfo(scope:'verify'|'full') 获取。
-      const features = this.updateProtocolV2Features(deviceInfo, deviceStatus);
+      const features = this.updateProtocolV2Features(deviceInfo, null);
       Log.debug('Protocol V2 features:', features);
       this.featuresNeedsReload = false;
     } catch (error) {
@@ -819,10 +810,7 @@ export class Device extends EventEmitter {
       const deviceInfo = await requestProtocolV2DeviceInfo({
         commands: this.commands,
       });
-      const deviceStatus = await requestProtocolV2DeviceStatus({
-        commands: this.commands,
-      }).catch(() => undefined);
-      return this.updateProtocolV2Features(deviceInfo, deviceStatus);
+      return this.updateProtocolV2Features(deviceInfo, null);
     }
 
     const { message } = await this.commands.typedCall('GetFeatures', 'Features', {});
