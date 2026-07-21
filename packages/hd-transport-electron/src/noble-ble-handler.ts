@@ -90,22 +90,14 @@ const DEVICE_SCAN_TIMEOUT = 5000; // 5 seconds for device scanning
 const FAST_SCAN_TIMEOUT = 1500; // 1.5 seconds for fast targeted scanning
 const DEVICE_CHECK_INTERVAL = 500; // 500ms interval for periodic device checks
 const CONNECTION_TIMEOUT = 3000; // 3 seconds for device connection
-// Keep-alive idle window. The renderer's release() no longer disconnects, so
-// this timer is what physically frees an unused device for other hosts (the
-// phone app — a BLE peripheral serves one central at a time, and it does not
-// advertise while connected). 60s aligns with the device's own auto-lock
-// default: past that the next operation needs a PIN anyway, so holding the
-// link longer buys nothing.
+// Idle window before a kept-alive link is dropped so other hosts (phone) can
+// connect; matches the device's 60s auto-lock default.
 const BLE_IDLE_DISCONNECT_MS = 60_000;
-// Bound on a cleanup disconnect — noble's disconnect callback can hang on a
-// wedged peripheral; never let recovery paths wait on it forever.
+// noble's disconnect callback can hang on a wedged peripheral — bound it.
 const BLE_DISCONNECT_TIMEOUT_MS = 2000;
-// Backstop while a request is OUTSTANDING (write sent, response not complete).
-// "Idle" means no outstanding request — a user reading a confirm screen for
-// minutes must NOT be disconnected — so the 60s clock only runs between
-// requests. This long backstop covers the truly wedged case (device never
-// answers, upper layers never cancel) so a dead call can't hold the link
-// forever.
+// Backstop while a request is outstanding: the idle clock must not run while
+// the user is on the device's confirm screen, but a dead call must not hold
+// the link forever either.
 const BLE_BUSY_BACKSTOP_MS = 10 * 60_000;
 const SERVICE_DISCOVERY_TIMEOUT = 10000; // 10 seconds for service discovery
 
@@ -328,10 +320,9 @@ function updateBluetoothState(state: string): void {
 }
 
 // ===== Keep-alive idle disconnect =====
-// One timer per connected device. Semantics: the 60s idle countdown runs only
-// while NO request is outstanding — a write CLEARS it (and arms a long busy
-// backstop instead); the arrival of a COMPLETE response re-arms it. Owned by
-// the main process on purpose: a renderer reload must not orphan a held link.
+// One timer per device: a write swaps it for the busy backstop, a complete
+// response re-arms the 60s idle clock. Lives in the main process so a renderer
+// reload cannot orphan a held link.
 const idleDisconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 function clearIdleDisconnect(deviceId: string): void {
@@ -359,10 +350,8 @@ function armIdleDisconnect(
       const deviceName = peripheral?.advertisement?.localName || 'Unknown Device';
       disconnectDevice(deviceId)
         .then(() => {
-          // Tell every renderer the link is gone. Normally nobody listens (the
-          // logical release already dropped the listener), but on the busy
-          // backstop a call is still in flight and its transport must reject
-          // rather than hang on a silently-dead link.
+          // Notify renderers: on the busy backstop a call is still in flight
+          // and must reject instead of hanging on a dead link.
           broadcastToAllWebContents(EOneKeyBleMessageKeys.BLE_DEVICE_DISCONNECTED, {
             id: deviceId,
             name: deviceName,
@@ -389,18 +378,13 @@ function broadcastToAllWebContents(channel: string, payload: unknown): void {
   }
 }
 
-// ===== BLE debug trace (renderer console) =====
-// Forwards key BLE lifecycle events to the renderer so they show up in the
-// window's DevTools console under a single filterable "[BLE-TRACE]" keyword
-// (the preload prints them). The channel string is shared by value with the
-// Trezor electron-ble connector and the app preload — keep them in sync.
+// ===== BLE debug trace (renderer console, filter keyword "[BLE-TRACE]") =====
+// Channel string shared by value with the Trezor connector and the app preload.
 const BLE_TRACE_CHANNEL = '$onekey-ble-trace';
 
 function bleTrace(event: string, data?: Record<string, unknown>): void {
-  // Broadcast to every webContents rather than one captured at init: the
-  // preload (and its console printer) runs in the main window, the tray AND
-  // embedded webviews, and the console a developer actually watches is not
-  // necessarily `browserWindow.webContents`.
+  // Broadcast to every webContents — the console a developer watches is not
+  // necessarily `browserWindow.webContents` (tray/webviews share the preload).
   broadcastToAllWebContents(BLE_TRACE_CHANNEL, {
     src: 'onekey-ble',
     ts: Date.now(),
@@ -409,9 +393,7 @@ function bleTrace(event: string, data?: Record<string, unknown>): void {
   });
 }
 
-// Verbose tier: healthy-path timeline lines, emitted only in diagnostic mode
-// (ONEKEY_BLE_DIAG=1). Default output stays quiet — errors, timeouts,
-// fallback-route events and the two cold-connect anchor lines only.
+// Healthy-path timeline lines, emitted only with ONEKEY_BLE_DIAG=1.
 function bleTraceVerbose(event: string, data?: Record<string, unknown>): void {
   if (process.env.ONEKEY_BLE_DIAG !== '1') return;
   bleTrace(event, data);
@@ -747,10 +729,8 @@ async function transmitHexDataToDevice(deviceId: string, hexData: string): Promi
       `Device ${deviceId} not connected or characteristics not available`
     );
   }
-  // A request is now OUTSTANDING: stop the idle countdown entirely (the user
-  // may take minutes on the device's confirm screen — that is not "idle") and
-  // arm the long backstop instead so a device that never answers can't hold
-  // the link forever. The complete-response handler re-arms the 60s idle clock.
+  // Request outstanding: swap the idle clock for the busy backstop; the
+  // complete-response handler re-arms the 60s idle clock.
   armIdleDisconnect(deviceId, BLE_BUSY_BACKSTOP_MS, 'busy-backstop');
 
   const toBuffer = Buffer.from(hexData, 'hex');
@@ -1096,12 +1076,9 @@ async function discoverServicesAndCharacteristics(
     // 2026-07-19) showed the UUID-filtered query returning empty on a link
     // where an unfiltered probe saw 5 services, so the filter itself is under
     // suspicion (same failure family as the Windows scan-filter issue).
-    // 'filtered16' passes the 2-byte SHORT form: CBUUID equality is semantic
-    // (long==short, verified experimentally), but the long string keeps a
-    // 16-byte internal representation — the encoding that goes into the
-    // targeted over-the-air ATT query. If short-form filtering succeeds where
-    // long-form fails on the same fresh link, the wire-encoding mismatch
-    // against the device's 2-byte GATT registration is proven end to end.
+    // 'filtered16' passes the 2-byte short form: CBUUID equality is semantic
+    // but representations differ, and only the 2-byte wire encoding is
+    // answered by the device's targeted ATT query.
     let serviceFilter: string[];
     if (options?.unfiltered) {
       serviceFilter = [];
@@ -1125,34 +1102,26 @@ async function discoverServicesAndCharacteristics(
       throw ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, 'No OneKey services found');
     }
 
-    // Always pick by 16-bit key: our constants are Bluetooth-base-UUID long
-    // forms while noble on macOS reports base-UUID services in SHORT form
-    // ('0001') — a naive full-string compare misses them (field-confirmed on
-    // Classic, 2026-07-19: the OneKey service was present as '0001').
+    // Pick by 16-bit key: constants are long base-forms, noble/mac reports
+    // base-UUID services short-form ('0001').
     const wanted = ONEKEY_SERVICE_UUIDS.map(uuid16Key);
     const service = services.find(svc => wanted.includes(uuid16Key(svc.uuid)));
     if (!service) {
-      // Carry the full UUID list in the error so the trace shows exactly
-      // what the device exposed — the datum that decides filter-bug vs
-      // service-hidden.
+      // Carry the uuid list so the trace shows what the device exposed.
       throw ERRORS.TypedError(
         HardwareErrorCode.BleServiceNotFound,
         `No OneKey service in result set: ${services.map(svc => svc.uuid).join('|')}`
       );
     }
     logger?.info('[NobleBLE] Found service:', service.uuid);
-    // Always record the full service list AND the exact uuid string of the
-    // pick — across modes and platforms this shows which uuid FORM (short
-    // '0001' vs long base form) each noble backend reports, the datum behind
-    // the filtered-query mismatch.
+    // Records which uuid FORM each noble backend reports per platform.
     bleTraceVerbose('gatt.discovery.services', {
       mode: options?.unfiltered ? 'unfiltered' : `filtered:${serviceFilter.join(',')}`,
       uuids: services.map(svc => svc.uuid).join('|'),
       picked: service.uuid,
     });
 
-    // Step 2: Discover characteristics (promisified). Mirror the service-level
-    // filter strategy — same wire-encoding considerations apply.
+    // Step 2: discover characteristics; mirror the service filter strategy.
     let characteristicFilter: string[];
     if (options?.unfiltered) {
       characteristicFilter = [];
@@ -1300,9 +1269,8 @@ async function freshScanAndDiscover(
     deviceId
   );
 
-  // The device does not advertise while WE hold a link to it — scanning with
-  // the old (possibly wedged) connection still up would just time out. Drop it
-  // first, bounded, so the device goes back on air.
+  // The device does not advertise while we hold a link — drop the old one
+  // first (bounded) so it goes back on air before we scan.
   const stalePeripheral = connectedDevices.get(deviceId) ?? discoveredDevices.get(deviceId);
   if (stalePeripheral && stalePeripheral.state === 'connected') {
     bleTrace('gatt.freshScan.predisconnect', { deviceId });
@@ -1433,33 +1401,18 @@ async function setupConnectionAndDiscoverServices(
   const startedAt = Date.now();
   setupDisconnectListener(peripheral, deviceId, webContents);
 
-  // Optimistic path first: the link at this point was either just established
-  // or is a healthy kept-alive one, so its GATT cache has no reason to be
-  // stale. The old unconditional force-reconnect ("clear GATT cache") doubled
-  // every connect (~1.3s extra + a second macOS pairing prompt); it is now the
-  // FALLBACK for the one case it actually fixes — a discovery failure.
+  // Optimistic direct discovery first; the old unconditional force-reconnect
+  // ("clear GATT cache") doubled every connect and is now the fallback only.
   if (peripheral.state === 'connected') {
-    // Two direct attempts: immediate, then once more after a settle delay.
-    // Field data (Classic, 2026-07-19): discovery ~115ms after link-up returns
-    // "No OneKey services found" — the GATT/encryption isn't ready yet — while
-    // the force-reconnect route succeeded only because of its internal 500ms
-    // stabilize wait. Retrying on the SAME link after the settle avoids the
-    // second physical connect (and its extra pairing prompt) entirely.
-    // Filtered query first where it can win; UNFILTERED discovery with 16-bit
-    // key JS matching as the reliable route. On macOS the filtered query
-    // always misses (noble/mac reports base-UUIDs short-form, field-confirmed
-    // on Classic 2026-07-19) — skip it there and save ~100ms per cold connect.
-    // Other platforms keep the filtered attempt until their uuid form is
-    // field-confirmed via the gatt.discovery.services trace.
-    // ONEKEY_BLE_DIAG=1 re-enables the filtered attempt on macOS as a probe:
-    // its per-combination success/failure (route field + direct.miss traces) is
-    // the readout for the device-model / BLE-firmware / CB-cache test matrix.
+    // Unfiltered discovery + JS matching is the reliable route: the device's
+    // ATT server only answers 2-byte-encoded targeted queries, so the
+    // long-form filtered query misses. With ONEKEY_BLE_DIAG=1 the filtered
+    // variants run as probes (uuid wire-encoding experiment readout).
     const discoveryAttempts =
       process.platform === 'darwin' && process.env.ONEKEY_BLE_DIAG !== '1'
         ? (['unfiltered'] as const)
         : (['filtered', 'filtered16', 'unfiltered'] as const);
-    // One self-contained conclusion line per cold connect (filter console by
-    // "verdict"): which discovery strategies missed/succeeded on this link.
+    // One conclusion line per cold connect (filter console by "verdict").
     const attemptResults: string[] = [];
     // eslint-disable-next-line no-restricted-syntax
     for (const attempt of discoveryAttempts) {
@@ -1473,9 +1426,8 @@ async function setupConnectionAndDiscoverServices(
           shortUuidFilter: attempt === 'filtered16',
         });
         attemptResults.push(`${attempt}=ok`);
-        // The filtered attempts are DIAGNOSTIC PROBES only (they exist to
-        // answer the uuid wire-encoding question); the link is always built
-        // from the unfiltered result so probe outcomes never change behavior.
+        // Filtered attempts are probes only; the link is always built from
+        // the unfiltered result.
         if (attempt !== 'unfiltered') {
           // eslint-disable-next-line no-continue
           continue;
@@ -1509,9 +1461,8 @@ async function setupConnectionAndDiscoverServices(
     bleTrace('gatt.discovery.direct.skip', { deviceId, state: peripheral.state });
   }
 
-  // Fallback: force reconnect to clear a stale GATT cache, then full retry
-  // ladder. A failure of the force-reconnect ITSELF must also escalate to the
-  // fresh scan — not propagate out of the ladder.
+  // Fallback ladder; a force-reconnect failure must also escalate to the
+  // fresh scan instead of propagating out.
   try {
     bleTrace('gatt.forceReconnect.start', { deviceId });
     await forceReconnectPeripheral(peripheral, deviceId);
@@ -1529,8 +1480,7 @@ async function setupConnectionAndDiscoverServices(
   } catch (error) {
     // Last resort: fresh scan to get new peripheral object
     logger?.error('[NobleBLE] Service discovery failed, attempting fresh scan...', error);
-    // The encryption-gated GATT fails HERE when the OS bond is broken — this
-    // trace is the signature of a "device can never connect" state.
+    // Broken-OS-bond signature lands here.
     bleTrace('gatt.discovery.error', {
       deviceId,
       elapsedMs: Date.now() - startedAt,
@@ -1540,21 +1490,16 @@ async function setupConnectionAndDiscoverServices(
   }
 }
 
-// Direct connect-by-id timeout. Kept short: the fallback (targeted scan,
-// 1.5s window) is cheap, so a stuck retrieval must not stall the connect flow.
+// noble/mac never resolves connect-by-id for an unretrievable peripheral —
+// time-box it, and after a timeout skip direct for a while so the retry
+// ladder doesn't re-pay the 2s against an absent device.
 const DIRECT_CONNECT_TIMEOUT_MS = 2000;
-// After a direct-connect timeout (device off / out of range), skip the direct
-// attempt for this long. ensureConnected retries the whole connect up to 5
-// times with backoff — without the cooldown every retry would re-pay the 2s
-// timeout against a device that is simply not there.
 const DIRECT_CONNECT_COOLDOWN_MS = 15_000;
 const directConnectCooldownUntil = new Map<string, number>();
 
 /**
- * Bounded connect-by-id with no scan. Returns the connected peripheral, or
- * undefined so the caller falls back to the targeted scan. Never throws.
- * A LATE success after the timeout is disconnected unless the scan path has
- * already claimed the device (same orphan-link hazard as a late connect).
+ * Bounded connect-by-id with no scan; undefined -> caller falls back to the
+ * targeted scan. A late success after the timeout is dropped unless claimed.
  */
 async function tryDirectConnectById(deviceId: string): Promise<Peripheral | undefined> {
   if (!noble || typeof noble.connectAsync !== 'function') return undefined;
@@ -1565,8 +1510,7 @@ async function tryDirectConnectById(deviceId: string): Promise<Peripheral | unde
   const startedAt = Date.now();
   bleTraceVerbose('connect.direct.start', { deviceId });
   try {
-    // Hold the ORIGINAL promise: the late-orphan guard must attach to this
-    // pending connect, not issue a second connect request.
+    // The late-orphan guard must attach to THIS pending connect.
     const directPromise = noble.connectAsync(deviceId);
     const raced = await Promise.race([
       directPromise,
@@ -1616,49 +1560,6 @@ async function tryDirectConnectById(deviceId: string): Promise<Peripheral | unde
   }
 }
 
-/**
- * Forensic probes (ONEKEY_BLE_DIAG=1 only), run AFTER subscribe succeeds —
- * i.e. after the encrypted characteristic has been touched, so link
- * encryption is established. The decisive readout for WHY the filtered
- * discovery fails on a fresh link:
- *  - filtered probe fails pre-encryption (the cold-connect miss) but succeeds
- *    here -> the device answers targeted ATT queries only when encrypted;
- *  - fails here too -> the targeted query is never answered by this firmware;
- *  - elapsedMs classifies the answer source: <~20ms = CB cache, more = air.
- * The unfiltered probe right after calibrates cache-answer latency on this
- * link. Fire-and-forget; must never disturb the call path.
- */
-function runDiagProbes(deviceId: string): void {
-  if (process.env.ONEKEY_BLE_DIAG !== '1') return;
-  const peripheral = connectedDevices.get(deviceId);
-  if (!peripheral || peripheral.state !== 'connected') return;
-
-  const probe = (label: string, filter: string[]) =>
-    new Promise<void>(resolve => {
-      const startedAt = Date.now();
-      const timer = setTimeout(() => {
-        bleTrace(`gatt.diag.${label}`, { deviceId, result: 'timeout', elapsedMs: 3000 });
-        resolve();
-      }, 3000);
-      peripheral.discoverServices(filter, (error, services) => {
-        clearTimeout(timer);
-        bleTrace(`gatt.diag.${label}`, {
-          deviceId,
-          elapsedMs: Date.now() - startedAt,
-          error: error ? String(error) : undefined,
-          uuids: (services ?? []).map(svc => svc.uuid).join('|') || '<empty>',
-        });
-        resolve();
-      });
-    });
-
-  probe('filteredProbe', ONEKEY_SERVICE_UUIDS)
-    .then(() => probe('unfilteredProbe', []))
-    .catch(() => {
-      // forensics must never break the flow
-    });
-}
-
 // Connect to device - supports both discovered and direct connection modes
 async function connectDevice(deviceId: string, webContents: WebContents): Promise<void> {
   logger?.info('[NobleBLE] Connect device request:', {
@@ -1690,11 +1591,8 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
       throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Noble not available');
     }
 
-    // First: bounded connect-by-id with NO scan (proven in the Trezor
-    // connector, commit 93034545). Saves the ~650ms targeted scan for a device
-    // CoreBluetooth already knows, and reaches a device that is not currently
-    // advertising. Time-boxed because noble/mac silently never resolves for an
-    // id CB cannot retrieve; on timeout we fall through to the scan.
+    // Bounded connect-by-id first: skips the ~650ms targeted scan and reaches
+    // a device that is not advertising; falls through to the scan on timeout.
     peripheral = await tryDirectConnectById(deviceId);
 
     // Perform a targeted scan to find the specific device
@@ -1788,10 +1686,8 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
   return new Promise((resolve, reject) => {
     const connectStartedAt = Date.now();
     bleTraceVerbose('connect.link.start', { deviceId });
-    // Once the timeout has rejected, the noble callback may STILL fire with a
-    // successful late connection. Without this guard that link would be
-    // registered but ownerless — the IPC handler already failed, so nothing
-    // arms its idle timer and it blocks the device until window teardown.
+    // After the timeout rejects, a late successful connect would be an
+    // ownerless link with no idle timer — detect and drop it.
     let timedOut = false;
     const timeout = setTimeout(() => {
       timedOut = true;
@@ -2039,8 +1935,7 @@ async function subscribeNotifications(
         return;
       }
       if (result.isComplete && result.completePacket) {
-        // Response complete — no request outstanding anymore. Swap the busy
-        // backstop for the normal 60s idle countdown.
+        // Response complete — back to the 60s idle countdown.
         armIdleDisconnect(deviceId);
         const appCb = notificationCallbacks.get(deviceId);
         if (appCb) appCb(result.completePacket);
@@ -2051,8 +1946,6 @@ async function subscribeNotifications(
   try {
     await rebuildAppSubscription(deviceId, notifyCharacteristic);
     subscribedDevices.set(deviceId, true);
-    // Encryption is established now (the encrypted characteristic answered).
-    runDiagProbes(deviceId);
   } catch (error) {
     // A subscribe failure on the encryption-gated notify characteristic is the
     // classic broken-bond signature — must always be visible in the trace.
@@ -2117,8 +2010,7 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
           hasCharacteristics: deviceCharacteristics.has(deviceId),
           totalConnectedDevices: connectedDevices.size,
         });
-        // A previously-armed idle timer must not fire mid-connect (a cold
-        // connect with OS pairing can take ~30s).
+        // An armed idle timer must not fire mid-connect (pairing can take ~30s).
         clearIdleDisconnect(deviceId);
         await connectDevice(deviceId, webContents);
         armIdleDisconnect(deviceId);
@@ -2205,10 +2097,8 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
     webContents.on('destroyed', () => {
       safeLog(logger, 'info', 'Cleaning up Noble BLE handlers');
 
-      // 1. Clean up all connected devices (unified cleanup, avoid duplicates).
-      // Physically disconnect too: with keep-alive release the link outlives
-      // calls, and the main process can outlive this window (tray) — a held
-      // link with no renderer would block the device for every other host.
+      // Physically disconnect too: the main process can outlive this window
+      // (tray) and a held link would block the device for every other host.
       const deviceIds = Array.from(connectedDevices.keys());
       deviceIds.forEach(deviceId => {
         const peripheral = connectedDevices.get(deviceId);

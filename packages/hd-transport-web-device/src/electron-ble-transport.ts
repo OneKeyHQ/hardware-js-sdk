@@ -14,11 +14,9 @@ import type { DesktopAPI } from '@onekeyfe/hd-transport-electron';
 
 const { parseConfigure, buildBuffers, receiveOne, check } = transport;
 
-// BLE debug trace (renderer side). Same "[BLE-TRACE]" filter keyword as the
-// main-process events forwarded via the preload — one console filter shows the
-// full timeline across the renderer/main process boundary.
+// BLE debug trace, renderer side (console filter keyword "[BLE-TRACE]").
 const bleTrace = (event: string, data?: Record<string, unknown>): void => {
-  // Fully stringified single line so it can be copied as plain text.
+  // Single stringified line so it can be copied as plain text.
   const dataText = data ? ` ${JSON.stringify(data)}` : '';
   // eslint-disable-next-line no-console
   console.log(
@@ -175,9 +173,8 @@ export default class ElectronBleTransport {
       this.runPromise.reject(ERRORS.TypedError(HardwareErrorCode.BleForceCleanRunPromise));
     }
 
-    // `step` pins down exactly where a failed acquire died — getDevice (device
-    // unknown to the main process), connect (GATT link), or subscribe (the
-    // encryption-gated characteristic, where a broken OS bond typically fails).
+    // `step` pins down where a failed acquire died (subscribe = the
+    // encryption-gated characteristic, the broken-OS-bond signature).
     let step = 'getDevice';
     const startedAt = Date.now();
     try {
@@ -222,8 +219,7 @@ export default class ElectronBleTransport {
         (disconnectedDevice: any) => {
           if (disconnectedDevice.id === uuid) {
             bleTrace('event.device-disconnect', { uuid });
-            // A call may be blocked on runPromise waiting for a response that
-            // can never arrive over a dead link — fail it instead of hanging.
+            // Fail a call blocked on a dead link instead of hanging.
             if (this.runPromise) {
               this.runPromise.reject(ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected));
             }
@@ -257,11 +253,8 @@ export default class ElectronBleTransport {
         error: String(error),
       });
       if (step === 'subscribe') {
-        // Subscribe failure on the encryption-gated characteristic is the
-        // broken-bond signature. The link itself is up, so a plain retry would
-        // reuse the same broken link and fail identically forever. Tear it
-        // down so the next attempt cold-connects (and macOS re-negotiates the
-        // bond, surfacing a pairing prompt the user can act on).
+        // Broken-bond signature: tear the link down so the next attempt
+        // cold-connects and macOS can re-negotiate the bond.
         bleTrace('acquire.subscribe.teardown', { uuid });
         await this.disconnect(uuid);
       }
@@ -270,45 +263,40 @@ export default class ElectronBleTransport {
   }
 
   async release(id: string) {
-    // Logical release only — the physical link and its GATT subscription stay
-    // up so the next acquire reuses them (a few ms) instead of paying a full
-    // reconnect (~2.5s) plus a macOS pairing prompt on every call. The main
-    // process arms a per-device idle timer and physically disconnects after
-    // BLE_IDLE_DISCONNECT_MS without traffic, so an unused device is freed for
-    // other hosts (e.g. the phone app). Hard teardown lives in `disconnect()`,
-    // which the SDK's error-recovery path calls via DeviceConnector.
-    // Renderer-side listeners must still be removed: the next acquire registers
-    // fresh ones, and leftovers would double-process every notification packet.
+    // Logical release only — the link and subscription stay up for reuse; the
+    // main process idle timer does the physical disconnect. Hard teardown is
+    // `disconnect()`. Renderer listeners must still go, or the next acquire's
+    // fresh listeners would double-process every packet.
     this.cleanupDeviceState(id);
     return Promise.resolve();
   }
 
   /**
-   * Hard teardown: physically disconnect the BLE link. This is the SDK's
-   * error-recovery path (DeviceConnector.disconnect on
-   * ERROR_CODES_REQUIRE_DISCONNECT) — a wedged device is reset by dropping the
-   * link. Normal end-of-call release() deliberately does NOT come here.
+   * Hard teardown for the SDK's error-recovery path (DeviceConnector
+   * .disconnect); normal release() deliberately does not come here.
    */
   async disconnect(id: string) {
     bleTrace('disconnect.start', { id });
-    // Each step is independent best-effort: a failed unsubscribe (e.g. the
-    // device is already gone) must NOT prevent the physical disconnect — this
-    // method is the error-recovery "reset the wedged link" path, so the
-    // disconnect attempt is the one part that must always run.
-    try {
-      await window.desktopApi?.nobleBle?.unsubscribe(id);
-    } catch (error) {
-      bleTrace('disconnect.unsubscribe.error', { id, error: String(error) });
-    }
-    try {
-      await window.desktopApi?.nobleBle?.disconnect(id);
-      bleTrace('disconnect.done', { id });
-    } catch (error) {
-      this.Log?.error('[Transport] Noble BLE disconnect failed:', error);
-      bleTrace('disconnect.error', { id, error: String(error) });
-    } finally {
-      this.cleanupDeviceState(id);
-    }
+    // Independent best-effort steps, each time-boxed: on a wedged link the
+    // underlying noble callbacks can simply never fire, and this is the
+    // error-RECOVERY path — it must never hang the retry ladder.
+    const bounded = async (label: string, ms: number, run: () => Promise<unknown> | undefined) => {
+      try {
+        const raced = await Promise.race([
+          Promise.resolve(run()),
+          new Promise<'timeout'>(resolve => {
+            setTimeout(() => resolve('timeout'), ms);
+          }),
+        ]);
+        if (raced === 'timeout') bleTrace(`disconnect.${label}.timeout`, { id, ms });
+      } catch (error) {
+        bleTrace(`disconnect.${label}.error`, { id, error: String(error) });
+      }
+    };
+    await bounded('unsubscribe', 2000, () => window.desktopApi?.nobleBle?.unsubscribe(id));
+    await bounded('disconnect', 3000, () => window.desktopApi?.nobleBle?.disconnect(id));
+    bleTrace('disconnect.done', { id });
+    this.cleanupDeviceState(id);
   }
 
   // Handle notification data from Noble BLE
