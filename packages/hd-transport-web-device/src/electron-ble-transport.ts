@@ -248,7 +248,14 @@ export default class ElectronBleTransport {
     // `disconnect()`. Renderer listeners must still go, or the next acquire's
     // fresh listeners would double-process every packet.
     this.cleanupDeviceState(id);
-    return Promise.resolve();
+    // Signal logical end-of-operation so the main process starts its 60s idle
+    // countdown (during a run it holds the long busy backstop instead). Best-
+    // effort: the idle/backstop timer still bounds the link if this never lands.
+    try {
+      await window.desktopApi?.nobleBle?.release?.(id);
+    } catch {
+      // ignore — timers in the main process still bound the link
+    }
   }
 
   /**

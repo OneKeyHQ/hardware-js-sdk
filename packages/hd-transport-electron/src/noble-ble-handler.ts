@@ -1236,9 +1236,17 @@ async function freshScanAndDiscover(
   // Wait for connection to stabilize (fresh peripheral doesn't need GATT cache clearing)
   await wait(500);
 
-  // Attempt service discovery with fresh peripheral
+  // Attempt service discovery with fresh peripheral. On failure the fresh
+  // peripheral is already physically connected and registered in
+  // connectedDevices with no idle timer armed — keep-alive release() is
+  // logical-only and would never drop it — so tear it down before rethrowing.
   logger?.info('[NobleBLE] Attempting service discovery with fresh peripheral');
-  return discoverServicesAndCharacteristics(freshPeripheral);
+  try {
+    return await discoverServicesAndCharacteristics(freshPeripheral);
+  } catch (error) {
+    await disconnectDevice(deviceId).catch(() => undefined);
+    throw error;
+  }
 }
 
 // Enhanced service discovery with p-retry for robust BLE connection
@@ -1576,7 +1584,13 @@ async function disconnectDevice(deviceId: string): Promise<void> {
     // Remove disconnect listener to avoid triggering handleDeviceDisconnect
     peripheral.removeAllListeners('disconnect');
 
-    peripheral.disconnect(() => {
+    // Time-box the disconnect: on a wedged peripheral CoreBluetooth may never
+    // invoke the callback, and callers (e.g. the idle/backstop timer) rely on
+    // this resolving so cleanup + the renderer-facing disconnect broadcast run.
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
       // Clean up device state using unified function
       cleanupDevice(deviceId, undefined, {
         cleanupConnection: true,
@@ -1585,6 +1599,11 @@ async function disconnectDevice(deviceId: string): Promise<void> {
         reason: 'manual-disconnect',
       });
       resolve();
+    };
+    const timer = setTimeout(finish, BLE_DISCONNECT_TIMEOUT_MS);
+    peripheral.disconnect(() => {
+      clearTimeout(timer);
+      finish();
     });
   });
 }
@@ -1754,8 +1773,11 @@ async function subscribeNotifications(
         return;
       }
       if (result.isComplete && result.completePacket) {
-        // Response complete — back to the 60s idle countdown.
-        armIdleDisconnect(deviceId);
+        // A complete response does NOT mean the operation is over — the run
+        // may continue (further request/response, or an on-device prompt whose
+        // Ack the host writes after slow human input). Do NOT re-arm the 60s
+        // idle clock here; that starts only on logical release. The busy
+        // backstop remains the in-flight ceiling.
         const appCb = notificationCallbacks.get(deviceId);
         if (appCb) appCb(result.completePacket);
       }
@@ -1827,7 +1849,12 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
         // An armed idle timer must not fire mid-connect (pairing can take ~30s).
         clearIdleDisconnect(deviceId);
         await connectDevice(deviceId, webContents);
-        armIdleDisconnect(deviceId);
+        // A logical operation is now in flight (acquire). Arm the long busy
+        // backstop, NOT the 60s idle clock — the 60s countdown starts only when
+        // the renderer signals logical release (NOBLE_BLE_RELEASE). This keeps
+        // the link up across slow on-device prompts (PIN/passphrase) that have
+        // no outstanding write.
+        armIdleDisconnect(deviceId, BLE_BUSY_BACKSTOP_MS, 'busy-backstop');
       }
     );
 
@@ -1836,6 +1863,16 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
       EOneKeyBleMessageKeys.NOBLE_BLE_DISCONNECT,
       async (_event: IpcMainInvokeEvent, deviceId: string) => {
         await disconnectDevice(deviceId);
+      }
+    );
+
+    // Handle logical release: the operation is done, start the 60s idle
+    // countdown so an unused device is freed for other hosts. The physical
+    // link is kept (reused by the next call) unless the countdown elapses.
+    ipcMain.handle(
+      EOneKeyBleMessageKeys.NOBLE_BLE_RELEASE,
+      (_event: IpcMainInvokeEvent, deviceId: string) => {
+        if (connectedDevices.has(deviceId)) armIdleDisconnect(deviceId);
       }
     );
 
@@ -1856,7 +1893,8 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
           // Send data back to renderer process
           webContents.send(EOneKeyBleMessageKeys.NOBLE_BLE_NOTIFICATION, deviceId, data);
         });
-        armIdleDisconnect(deviceId);
+        // Still acquiring (in flight) — busy backstop, not the 60s idle clock.
+        armIdleDisconnect(deviceId, BLE_BUSY_BACKSTOP_MS, 'busy-backstop');
       }
     );
 

@@ -78,6 +78,9 @@ export enum EOneKeyBleMessageKeys {
   NOBLE_BLE_STOP_SCAN = '$onekey-noble-ble-stop-scan',
   NOBLE_BLE_GET_DEVICE = '$onekey-noble-ble-get-device',
   NOBLE_BLE_CONNECT = '$onekey-noble-ble-connect',
+  // Logical end-of-operation from the renderer (keep-alive): the physical link
+  // stays up but the main process starts its idle-disconnect countdown.
+  NOBLE_BLE_RELEASE = '$onekey-noble-ble-release',
   NOBLE_BLE_DISCONNECT = '$onekey-noble-ble-disconnect',
   NOBLE_BLE_WRITE = '$onekey-noble-ble-write',
   NOBLE_BLE_SUBSCRIBE = '$onekey-noble-ble-subscribe',

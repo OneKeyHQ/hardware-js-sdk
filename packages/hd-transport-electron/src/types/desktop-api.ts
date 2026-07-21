@@ -8,6 +8,8 @@ export interface NobleBleAPI {
   enumerate: () => Promise<{ id: string; name: string }[]>;
   getDevice: (uuid: string) => Promise<{ id: string; name: string } | null>;
   connect: (uuid: string) => Promise<void>;
+  /** Logical end-of-operation (keep-alive): starts the idle-disconnect countdown. */
+  release?: (uuid: string) => Promise<void>;
   disconnect: (uuid: string) => Promise<void>;
   subscribe: (uuid: string) => Promise<void>;
   unsubscribe: (uuid: string) => Promise<void>;
