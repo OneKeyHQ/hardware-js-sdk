@@ -383,6 +383,9 @@ function broadcastToAllWebContents(channel: string, payload: unknown): void {
 const BLE_TRACE_CHANNEL = '$onekey-ble-trace';
 
 function bleTrace(event: string, data?: Record<string, unknown>): void {
+  // Mirror into electron-log: in production builds console.* is stripped, so
+  // the main log file is the only reliable channel (e.g. field Windows tests).
+  logger?.info(`[BLE-TRACE] ${event}`, data ?? '');
   // Broadcast to every webContents — the console a developer watches is not
   // necessarily `browserWindow.webContents` (tray/webviews share the preload).
   broadcastToAllWebContents(BLE_TRACE_CHANNEL, {
