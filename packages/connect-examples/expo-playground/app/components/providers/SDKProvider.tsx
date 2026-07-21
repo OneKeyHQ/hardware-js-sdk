@@ -9,7 +9,6 @@ import {
   UI_RESPONSE,
 } from '@onekeyfe/hd-core';
 import { useDeviceStore } from '../../store/deviceStore';
-import { useHardwareStore } from '../../store/hardwareStore';
 
 import { submitPin, submitPassphrase } from '../../services/hardwareService';
 import { EDeviceType } from '@onekeyfe/hd-shared';
@@ -17,6 +16,7 @@ import GlobalDialogManager from '../global/GlobalDialogManager';
 import WebUsbAuthorizeDialog from '../global/WebUsbAuthorizeDialog';
 import { logData, logInfo, logError, logHardware } from '../../utils/logger';
 import { SDKUtils, isSdkDebugEnabled } from '../../utils/hardwareInstance';
+import { PLAYGROUND_MOCK_PASSPHRASE } from '../../utils/passphraseMock';
 import { create } from 'zustand';
 
 // 声明全局弹窗管理器类型
@@ -270,14 +270,9 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
             break;
 
           case 'ui-request_passphrase': {
-            const hardwareState = useHardwareStore.getState();
-            const shouldAutoSubmit = hardwareState.commonParameters.useEmptyPassphrase;
-
-            if (shouldAutoSubmit) {
-              submitPassphrase('', false, false).catch(console.error);
-            } else {
-              window.globalDialogManager?.showPassphraseDialog();
-            }
+            // 临时联调策略：统一进入固定的 mock 隐藏钱包，不弹窗、不走标准钱包。
+            logInfo('expo-playground 使用临时 mock 隐藏钱包 Passphrase');
+            submitPassphrase(PLAYGROUND_MOCK_PASSPHRASE, false, true).catch(console.error);
             break;
           }
 

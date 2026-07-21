@@ -12,6 +12,7 @@ import { useHardwareStore } from '../store/hardwareStore';
 import { useDeviceStore } from '../store/deviceStore';
 import { methodSupportsCommonParameters } from '../utils/constants';
 import { previewHardwareParams } from './previewHardwareParams';
+import { PLAYGROUND_MOCK_HIDDEN_WALLET } from '../utils/passphraseMock';
 import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
 import type { Features, IDeviceType } from '@onekeyfe/hd-core';
 import type { DeviceInfo } from '../types/hardware';
@@ -154,6 +155,14 @@ const preparePassphraseParams = async (
   connectId: string
 ) => {
   if (!methodSupportsCommonParameters(method)) return;
+
+  if (PLAYGROUND_MOCK_HIDDEN_WALLET) {
+    // 临时联调策略：即使页面参数选择了 useEmptyPassphrase，也不允许走标准钱包。
+    params.useEmptyPassphrase = false;
+    if (useHardwareStore.getState().commonParameters.useEmptyPassphrase) {
+      useHardwareStore.getState().setCommonParameter('useEmptyPassphrase', false);
+    }
+  }
 
   if (params.useEmptyPassphrase === true) {
     clearPassphraseState(params);
