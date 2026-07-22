@@ -1,7 +1,19 @@
-import { AlertTriangle, Circle, Clock3, Loader2, Play, ShieldAlert, Usb } from 'lucide-react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Circle,
+  Clock3,
+  Info,
+  Loader2,
+  Play,
+  ShieldAlert,
+  Usb,
+  XCircle,
+} from 'lucide-react';
 
 import type {
   ExecutionSummaryItem,
+  MultisigHardwareVerification,
   MultisigTestCase,
   ValidationResult,
 } from '../../features/multisig/types';
@@ -14,6 +26,7 @@ export type MultisigExecutionState = {
   result?: unknown;
   error?: string;
   durationMs?: number;
+  verification?: MultisigHardwareVerification;
 };
 
 interface MultisigExecutionPanelProps {
@@ -102,7 +115,11 @@ export function MultisigExecutionPanel({
             <ShieldAlert className="h-4 w-4" />
             <AlertTitle>测试助记词限定</AlertTitle>
             <AlertDescription>
-              此 BTC fixture 对应固件默认测试助记词，仅用于测试设备或模拟器，不可广播交易。
+              当前用例必须在载入{' '}
+              <span className="font-mono font-medium">
+                {testCase.hardwareExpectation?.signerEnvKey ?? '对应测试助记词'}
+              </span>{' '}
+              的测试设备或模拟器上执行，不可广播交易。
             </AlertDescription>
           </Alert>
         ) : null}
@@ -177,9 +194,42 @@ export function MultisigExecutionPanel({
             </div>
           ) : null}
           {state.status === 'success' ? (
-            <pre className="h-full min-h-0 overflow-auto whitespace-pre-wrap break-all rounded-md border border-border/70 bg-muted/30 p-4 font-mono text-xs leading-5">
-              {JSON.stringify(state.result, null, 2)}
-            </pre>
+            <div className="flex h-full min-h-0 flex-col gap-2 overflow-y-auto">
+              {state.verification?.status === 'passed' ? (
+                <div className="rounded-md border border-green-300 bg-green-50 px-3 py-2 text-green-800 dark:border-green-900 dark:bg-green-950/35 dark:text-green-200">
+                  <div className="flex items-center gap-2 text-xs font-semibold">
+                    <CheckCircle2 className="h-4 w-4" />
+                    硬件校验通过
+                  </div>
+                  <div className="mt-1 text-[11px]">
+                    {state.verification.checks.map(item => item.label).join('、')}均与离线 fixture 一致。
+                  </div>
+                </div>
+              ) : null}
+              {state.verification?.status === 'failed' ? (
+                <div className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-red-800 dark:border-red-900 dark:bg-red-950/35 dark:text-red-200">
+                  <div className="flex items-center gap-2 text-xs font-semibold">
+                    <XCircle className="h-4 w-4" />
+                    硬件校验失败
+                  </div>
+                  <div className="mt-1 text-[11px]">{state.verification.message}</div>
+                </div>
+              ) : null}
+              {state.verification?.status === 'unavailable' || !state.verification ? (
+                <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-muted-foreground">
+                  <div className="flex items-center gap-2 text-xs font-semibold">
+                    <Info className="h-4 w-4" />
+                    未自动校验
+                  </div>
+                  <div className="mt-1 text-[11px]">
+                    {state.verification?.message ?? '当前执行结果没有配置离线期望值。'}
+                  </div>
+                </div>
+              ) : null}
+              <pre className="min-h-28 flex-1 overflow-auto whitespace-pre-wrap break-all rounded-md border border-border/70 bg-muted/30 p-4 font-mono text-xs leading-5">
+                {JSON.stringify(state.result, null, 2)}
+              </pre>
+            </div>
           ) : null}
         </div>
       </div>

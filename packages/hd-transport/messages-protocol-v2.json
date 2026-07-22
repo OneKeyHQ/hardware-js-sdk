@@ -11586,7 +11586,8 @@
         "LayoutSafeTxCreate": 1,
         "LayoutFinalConfirm": 2,
         "Layout7702": 3,
-        "LayoutFlat": 4
+        "LayoutFlat": 4,
+        "LayoutEthApprove": 5
       }
     },
     "ViewSignPage": {
@@ -11645,6 +11646,18 @@
           "rule": "required",
           "type": "string",
           "id": 3
+        },
+        "network": {
+          "type": "string",
+          "id": 4
+        },
+        "derive_type": {
+          "type": "string",
+          "id": 5
+        },
+        "value_key": {
+          "type": "uint32",
+          "id": 6
         }
       }
     },
@@ -11852,10 +11865,6 @@
           "type": "string",
           "id": 4
         },
-        "passphrase_enable": {
-          "type": "bool",
-          "id": 6
-        },
         "brightness": {
           "type": "uint32",
           "id": 7
@@ -11888,14 +11897,6 @@
           "type": "bool",
           "id": 14
         },
-        "fido_enabled": {
-          "type": "bool",
-          "id": 15
-        },
-        "experimental_features": {
-          "type": "bool",
-          "id": 16
-        },
         "usb_lock_enable": {
           "type": "bool",
           "id": 17
@@ -11903,6 +11904,14 @@
         "random_keypad": {
           "type": "bool",
           "id": 18
+        },
+        "passphrase_enable": {
+          "type": "bool",
+          "id": 100
+        },
+        "fido_enabled": {
+          "type": "bool",
+          "id": 101
         }
       }
     },

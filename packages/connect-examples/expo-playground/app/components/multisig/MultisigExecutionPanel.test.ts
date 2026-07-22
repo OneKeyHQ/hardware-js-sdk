@@ -20,4 +20,11 @@ describe('MultisigExecutionPanel 布局', () => {
       'xl:grid-cols-[minmax(360px,0.48fr)_minmax(0,0.52fr)]'
     );
   });
+
+  test('展示当前 signer 的环境变量和三种自动校验状态', () => {
+    expect(source).toContain('testCase.hardwareExpectation?.signerEnvKey');
+    expect(source).toContain('硬件校验通过');
+    expect(source).toContain('硬件校验失败');
+    expect(source).toContain('未自动校验');
+  });
 });
