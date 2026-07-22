@@ -169,13 +169,18 @@ async function createFixture(
     publicKey => payments.p2pkh({ pubkey: publicKey, network: networks.bitcoin }).address ?? ''
   );
   const prefilledSignerIndexes = [1, 0, 0] as const;
+  const signerEnvKeys = [
+    'MULTISIG_MNEMONIC_1',
+    'MULTISIG_MNEMONIC_2',
+    'MULTISIG_MNEMONIC_3',
+  ] as const;
   const signerScenarios = ([0, 1, 2] as const).map(signerIndex => {
     const prefilledSignerIndex = prefilledSignerIndexes[signerIndex];
     const continueSignatures = ['', '', ''];
     continueSignatures[prefilledSignerIndex] = expectedSignatures[prefilledSignerIndex];
     return {
       signerIndex,
-      signerEnvKey: `MULTISIG_MNEMONIC_${signerIndex + 1}` as const,
+      signerEnvKey: signerEnvKeys[signerIndex],
       signerAddress: signerAddresses[signerIndex],
       expectedSignature: expectedSignatures[signerIndex],
       prefilledSignerIndex,

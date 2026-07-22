@@ -57,6 +57,7 @@ describe('verifyMultisigHardwareResult', () => {
     });
 
     expect(result.status).toBe('failed');
+    if (result.status !== 'failed') throw new Error('预期硬件校验失败');
     expect(result.message).toContain('不一致');
   });
 
