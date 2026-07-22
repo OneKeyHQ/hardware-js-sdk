@@ -1542,9 +1542,13 @@ describe('Protocol V2 feature adapter', () => {
         hw: { serial_no: 'PR2SERIAL' },
       }
     );
-    (device as any).features.firmwareVersion = '4.15.0';
-    (device as any).features.passphraseProtection = true;
-    (device as any).features.unlocked = true;
+    device.updateState(
+      {
+        versions: { firmware: '4.15.0' },
+        status: { passphraseProtection: true, unlocked: true },
+      },
+      'compatibility'
+    );
     (device as any).commands = {
       typedCall,
       promptPassphrase: jest.fn().mockResolvedValue({ passphrase: 'state-auto-secret' }),

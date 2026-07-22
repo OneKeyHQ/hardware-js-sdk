@@ -50,7 +50,15 @@ export const mapFeaturesToState = (features: Features): DeviceStatePatch => ({
     bleName: features.bleName,
   },
   status: {
-    mode: features.mode,
+    mode:
+      features.mode ??
+      (features.bootloaderMode === true
+        ? 'bootloader'
+        : features.initialized === false
+        ? 'notInitialized'
+        : features.initialized === true
+        ? 'normal'
+        : undefined),
     initialized: features.initialized,
     unlocked: features.unlocked,
     firmwarePresent: features.firmwarePresent,
@@ -204,6 +212,9 @@ export const mapApplySettingsToState = (settings: ApplySettings): DeviceStatePat
 };
 
 export const mapDeviceSettingsToState = (settings: DeviceSettings): DeviceStatePatch => {
+  const settingsWithExperimental = settings as DeviceSettings & {
+    experimental_features?: boolean;
+  };
   const identity = definedEntries({ label: settings.label });
   const status = definedEntries({ passphraseProtection: settings.passphrase_enable });
   const stateSettings = definedEntries({
@@ -219,7 +230,7 @@ export const mapDeviceSettingsToState = (settings: DeviceSettings): DeviceStateP
     deviceNameDisplayEnabled: settings.device_name_display_enabled,
     airgapMode: settings.airgap_mode,
     fidoEnabled: settings.fido_enabled,
-    experimentalFeatures: settings.experimental_features,
+    experimentalFeatures: settingsWithExperimental.experimental_features,
     usbLockEnabled: settings.usb_lock_enable,
     randomKeypad: settings.random_keypad,
   });

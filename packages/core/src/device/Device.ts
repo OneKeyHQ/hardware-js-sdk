@@ -32,13 +32,19 @@ import {
 import { generateInstanceId } from '../utils/tracing';
 // eslint-disable-next-line import/no-cycle
 import { DeviceCommands } from './DeviceCommands';
-import { type DeviceFeaturesUpdateSource, mergeDeviceFeaturesPatch } from './DeviceFeaturesState';
+import { mergeDeviceFeaturesPatch } from './DeviceFeaturesState';
+import { mapFeaturesToState } from './DeviceStateMapper';
+import { projectFeatures } from './DeviceStateProjector';
+import { DeviceStateStore } from './DeviceStateStore';
 import { deviceWalletSessionStore } from './DeviceWalletSessionStore';
 import {
   type DeviceFirmwareRange,
   DeviceModelToTypes,
   DeviceTypeToModels,
   type Device as DeviceTyped,
+  type DeviceStateEvent,
+  type DeviceStatePatch,
+  type DeviceStateUpdateSource,
   EOneKeyDeviceMode,
   type Features,
   type IDeviceModel,
@@ -98,6 +104,7 @@ export interface DeviceEvents {
   [DEVICE.ATTACH_PIN_ON_DEVICE]: [Device, PassphraseRequestPayload?];
   [DEVICE.BUTTON]: [Device, DeviceButtonRequestPayload];
   [DEVICE.FEATURES]: [Device, DeviceFeaturesPayload];
+  [DEVICE.STATE]: [Device, DeviceStateEvent];
   [DEVICE.PASSPHRASE]: [
     Device,
     PassphraseRequestPayload,
@@ -184,22 +191,23 @@ export class Device extends EventEmitter {
    */
   private deviceAcquired = false;
 
-  /**
-   * 唯一设备状态缓存。
-   *
-   * V1 直接保存原生 Features；V2 保存由 DeviceInfoGet 映射出的
-   * Features 视图。Device 不再保存 profile，结构化 DeviceProfile 只作为
-   * getDeviceInfo() 的 API 返回值存在。
-   */
-  features: Features | undefined = undefined;
+  /** 唯一设备状态缓存。旧 Features 仅通过 getter/setter 做兼容投影。 */
+  private stateStore = new DeviceStateStore();
 
-  /**
-   * 是否需要更新设备信息。
-   *
-   * 历史名称保留用于兼容现有调用语义；对 V2 表示 features 需要由
-   * DeviceInfoGet 刷新。
-   */
-  featuresNeedsReload = false;
+  get state() {
+    return this.stateStore.getState();
+  }
+
+  get features(): Features | undefined {
+    return this.state ? projectFeatures(this.state) : undefined;
+  }
+
+  set features(features: Features | undefined) {
+    this.stateStore = new DeviceStateStore();
+    if (features) {
+      this.stateStore.update(mapFeaturesToState(features), 'compatibility');
+    }
+  }
 
   runPromise?: Deferred<void> | null;
 
@@ -264,7 +272,7 @@ export class Device extends EventEmitter {
     const connectId = this.getConnectId();
     const deviceId = this.getCurrentDeviceId() || null;
 
-    const { features } = this;
+    const { features, state } = this;
 
     return {
       /** Android uses Mac address, iOS uses uuid, USB uses uuid  */
@@ -285,6 +293,7 @@ export class Device extends EventEmitter {
       label: label || 'OneKey',
       mode: this.getMode(),
       features,
+      state,
       sessionId: this.features?.sessionId ?? null,
       firmwareVersion: this.getFirmwareVersion(),
       bleFirmwareVersion: this.getBLEFirmwareVersion(),
@@ -724,8 +733,8 @@ export class Device extends EventEmitter {
     // Protocol V2 不支持传统 Initialize，直接使用协议专用初始化流程。
     if (this.isProtocolV2()) {
       this.passphraseState = options?.passphraseState;
-      if (this.features && !this.featuresNeedsReload && !options?.initSession) {
-        if (this.features.bootloaderMode) {
+      if (this.state && !options?.initSession) {
+        if (this.features?.bootloaderMode) {
           return;
         }
         // 普通业务调用复用缓存。动态状态由显式 getFeatures/deviceStatusGet、
@@ -800,7 +809,6 @@ export class Device extends EventEmitter {
       // 完整数据由 getDeviceInfo(scope:'verify'|'full') 获取。
       const features = this.updateProtocolV2Features(deviceInfo, null);
       Log.debug('Protocol V2 features:', features);
-      this.featuresNeedsReload = false;
     } catch (error) {
       Log.error('Protocol V2 initialization failed:', error);
       throw error;
@@ -835,7 +843,7 @@ export class Device extends EventEmitter {
 
     feat = fixFeaturesFirmwareVersion(feat);
 
-    this.features = feat;
+    this.updateState(mapFeaturesToState(feat), 'initialize');
     const nextCacheDeviceKey = this.getSessionCacheDeviceKey();
     if (previousCacheDeviceKey && nextCacheDeviceKey) {
       deviceWalletSessionStore.migrateDeviceKey(previousCacheDeviceKey, nextCacheDeviceKey);
@@ -843,23 +851,37 @@ export class Device extends EventEmitter {
     if (feat.deviceId && feat.sessionId) {
       this.setInternalState(feat.sessionId, initSession);
     }
-    this.featuresNeedsReload = false;
-    this.emit(DEVICE.FEATURES, this, feat);
   }
 
-  updateFeaturesPatch(patch: Partial<Features>, source: DeviceFeaturesUpdateSource) {
-    if (!this.features) return undefined;
+  updateState(patch: DeviceStatePatch, source: DeviceStateUpdateSource) {
+    const result = this.stateStore.update(patch, source);
+    if (result.changedKeys.length === 0) return result.state;
 
-    const features = mergeDeviceFeaturesPatch(this.features, patch);
-    if (features === this.features) return this.features;
-
-    this.features = fixFeaturesFirmwareVersion(features);
-    this.featuresNeedsReload = false;
-    Log.debug('Device features patch committed', {
+    const event: DeviceStateEvent = {
+      connectId: this.getConnectId() ?? null,
+      state: result.state,
+      revision: result.revision,
       source,
-      keys: Object.keys(patch).filter(key => patch[key as keyof Features] !== undefined),
+      changedKeys: result.changedKeys,
+    };
+    Log.debug('Device state patch committed', {
+      source,
+      keys: result.changedKeys,
     });
-    this.emit(DEVICE.FEATURES, this, this.features);
+    this.emit(DEVICE.STATE, this, event);
+    this.emit(DEVICE.FEATURES, this, projectFeatures(result.state));
+    return result.state;
+  }
+
+  updateFeaturesPatch(patch: Partial<Features>, source: DeviceStateUpdateSource) {
+    const currentFeatures = this.features;
+    if (!currentFeatures) return undefined;
+
+    const features = mergeDeviceFeaturesPatch(currentFeatures, patch);
+    if (features === currentFeatures) return currentFeatures;
+
+    const normalized = fixFeaturesFirmwareVersion(features);
+    this.updateState(mapFeaturesToState(normalized), source);
     return this.features;
   }
 
@@ -876,14 +898,12 @@ export class Device extends EventEmitter {
         previous: this.features,
       })
     );
-    this.features = features;
+    this.updateState(mapFeaturesToState(features), 'device-info');
     const nextCacheDeviceKey = this.getSessionCacheDeviceKey();
     if (previousCacheDeviceKey && nextCacheDeviceKey) {
       deviceWalletSessionStore.migrateDeviceKey(previousCacheDeviceKey, nextCacheDeviceKey);
     }
-    this.featuresNeedsReload = false;
-    this.emit(DEVICE.FEATURES, this, features);
-    return features;
+    return this.features as Features;
   }
 
   updateProtocolV2Status(status: DeviceStatus) {
@@ -1221,11 +1241,22 @@ export class Device extends EventEmitter {
     if (supportUnlock) {
       const res = await this.commands.typedCall('UnLockDevice', 'UnLockDeviceResponse');
       if (this.features) {
-        this.features.unlocked = res.message.unlocked == null ? null : res.message.unlocked;
-        this.features.unlockedAttachPin =
-          res.message.unlocked_attach_pin == null ? undefined : res.message.unlocked_attach_pin;
-        this.features.passphraseProtection =
-          res.message.passphrase_protection == null ? null : res.message.passphrase_protection;
+        this.updateState(
+          {
+            status: {
+              unlocked: res.message.unlocked == null ? null : res.message.unlocked,
+              unlockedAttachPin:
+                res.message.unlocked_attach_pin == null
+                  ? null
+                  : res.message.unlocked_attach_pin,
+              passphraseProtection:
+                res.message.passphrase_protection == null
+                  ? null
+                  : res.message.passphrase_protection,
+            },
+          },
+          'unlock'
+        );
 
         return Promise.resolve(this.features);
       }

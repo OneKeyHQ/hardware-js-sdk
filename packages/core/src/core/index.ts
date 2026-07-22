@@ -410,6 +410,7 @@ const onCallDevice = async (
     attachPinOnDevice: onEnterAttachPinOnDeviceHandler,
   });
   device.on(DEVICE.FEATURES, onDeviceFeaturesHandler);
+  device.on(DEVICE.STATE, onDeviceStateHandler);
   device.on(
     DEVICE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE,
     onSelectDeviceInBootloaderForWebDeviceHandler
@@ -1238,6 +1239,10 @@ export const onDeviceButtonHandler = (...[device, request]: [...DeviceEvents['bu
 
 const onDeviceFeaturesHandler = (...[_, features]: [...DeviceEvents['features']]) => {
   postMessage(createDeviceMessage(DEVICE.FEATURES, { ...features }));
+};
+
+const onDeviceStateHandler = (...[_, stateEvent]: [...DeviceEvents['state']]) => {
+  postMessage(createDeviceMessage(DEVICE.STATE, stateEvent));
 };
 
 const onDevicePassphraseHandler = async (

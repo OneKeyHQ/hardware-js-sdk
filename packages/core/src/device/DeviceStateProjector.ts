@@ -87,7 +87,7 @@ export const projectFeatures = (state: DeviceState): Features => {
     ble_name: state.identity.bleName ?? undefined,
     passphrase_protection: state.status.passphraseProtection ?? undefined,
     bootloader_mode: getBootloaderMode(state),
-  };
+  } as unknown as Features;
 };
 
 const getSources = (state: DeviceState): DeviceInfoSource[] => {
