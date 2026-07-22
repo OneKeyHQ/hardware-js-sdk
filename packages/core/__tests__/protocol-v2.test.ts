@@ -2815,6 +2815,29 @@ describe('Protocol V2 firmware update targets', () => {
     expect(reconnectProtocolV2Device).toHaveBeenCalledTimes(1);
   });
 
+  test('keeps Protocol V2 romloader active before firmware transfer', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    (method as any).device = stubDevice({
+      originalDescriptor: { id: 'usb-id', path: 'romloader-path', protocolType: 'V2' },
+      features: { mode: 'romloader', bootloaderMode: false, capabilities: [] },
+      isBootloader: () => false,
+    });
+    (method as any).protocolV2Reboot = jest
+      .fn()
+      .mockRejectedValue(new Error('romloader rejected Bootloader reboot type'));
+    method.postTipMessage = jest.fn();
+
+    await expect((method as any).enterProtocolV2BootloaderMode()).resolves.toBe(false);
+
+    expect((method as any).protocolV2Reboot).not.toHaveBeenCalled();
+    expect(method.postTipMessage).not.toHaveBeenCalledWith('AutoRebootToBootloader');
+  });
+
   test('polls until Protocol V2 bootloader descriptor is ready after reboot', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
