@@ -1,87 +1,95 @@
-import type { DeviceFeaturesRaw, DeviceState, Features } from '../types';
+import type { DeviceFeaturesRaw, DeviceState, DeviceStateSession, Features } from '../types';
 
-type StoredDeviceState = DeviceState & { raw?: DeviceFeaturesRaw };
+type StoredDeviceState = DeviceState & {
+  raw?: DeviceFeaturesRaw;
+  session?: DeviceStateSession;
+};
 
 const getBootloaderMode = (state: StoredDeviceState) =>
   state.status.mode === 'bootloader' || state.status.mode === 'romloader';
 
 export const projectFeatures = (state: StoredDeviceState): Features => {
-  const rawFeatures = state.raw?.protocolV1Features ?? {};
-  const rawOneKeyFeatures = state.raw?.protocolV1OneKeyFeatures ?? {};
-  const sessionId = state.session?.sessionId ?? null;
+  const snapshot = structuredClone(state);
+  const rawFeatures = snapshot.raw?.protocolV1Features ?? {};
+  const rawOneKeyFeatures = snapshot.raw?.protocolV1OneKeyFeatures ?? {};
+  const sessionId = snapshot.session?.sessionId ?? null;
+  const bootloaderMode =
+    snapshot.protocol === 'V1'
+      ? (rawFeatures as { bootloader_mode?: boolean | null }).bootloader_mode ?? null
+      : getBootloaderMode(snapshot);
 
   return {
     ...rawFeatures,
     ...rawOneKeyFeatures,
-    protocol: state.protocol,
+    protocol: snapshot.protocol,
     protocolVersion:
-      state.raw?.protocolV2DeviceInfo?.protocol_version ??
+      snapshot.raw?.protocolV2DeviceInfo?.protocol_version ??
       (rawFeatures as { protocol_version?: number | null }).protocol_version ??
-      null,
-    deviceType: state.identity.deviceType,
-    firmwareType: state.identity.firmwareType,
-    model: state.identity.model,
-    vendor: state.identity.vendor,
-    deviceId: state.identity.deviceId,
-    serialNo: state.identity.serialNo,
-    label: state.identity.label,
-    bleName: state.identity.bleName,
-    capabilities: state.capabilities,
-    mode: state.status.mode,
-    initialized: state.status.initialized,
-    bootloaderMode: getBootloaderMode(state),
-    unlocked: state.status.unlocked,
-    firmwarePresent: state.status.firmwarePresent,
-    passphraseProtection: state.status.passphraseProtection,
-    pinProtection: state.status.pinProtection,
-    backupRequired: state.status.backupRequired,
-    noBackup: state.status.noBackup,
-    unfinishedBackup: state.status.unfinishedBackup,
-    recoveryMode: state.status.recoveryMode,
-    attachToPinEnabled: state.status.attachToPinEnabled,
-    unlockedAttachPin: state.status.unlockedAttachPin ?? undefined,
-    language: state.settings.language,
-    bleEnabled: state.settings.bleEnabled,
-    sdCardPresent: state.settings.sdCardPresent,
-    sdProtection: state.settings.sdProtection,
-    wipeCodeProtection: state.settings.wipeCodeProtection,
-    passphraseAlwaysOnDevice: state.settings.passphraseAlwaysOnDevice,
-    safetyChecks: state.settings.safetyChecks,
-    autoLockDelayMs: state.settings.autoLockDelayMs,
-    autoShutdownDelayMs: state.settings.autoShutdownDelayMs,
-    displayRotation: state.settings.displayRotation,
-    experimentalFeatures: state.settings.experimentalFeatures,
-    wallpaperPath: state.settings.wallpaperPath,
-    brightness: state.settings.brightness,
-    animationEnabled: state.settings.animationEnabled,
-    tapToWake: state.settings.tapToWake,
-    hapticFeedback: state.settings.hapticFeedback,
-    deviceNameDisplayEnabled: state.settings.deviceNameDisplayEnabled,
-    airgapMode: state.settings.airgapMode,
-    fidoEnabled: state.settings.fidoEnabled,
-    usbLockEnabled: state.settings.usbLockEnabled,
-    randomKeypad: state.settings.randomKeypad,
-    firmwareVersion: state.versions.firmware,
-    bootloaderVersion: state.versions.bootloader,
-    boardVersion: state.versions.board,
-    bleVersion: state.versions.ble,
-    se01Version: state.versions.se01,
-    se02Version: state.versions.se02,
-    se03Version: state.versions.se03,
-    se04Version: state.versions.se04,
-    se01BootVersion: state.versions.se01Boot,
-    se02BootVersion: state.versions.se02Boot,
-    se03BootVersion: state.versions.se03Boot,
-    se04BootVersion: state.versions.se04Boot,
-    seVersion: null,
-    verify: state.verification,
+      (snapshot.protocol === 'V1' ? 1 : null),
+    deviceType: snapshot.identity.deviceType,
+    firmwareType: snapshot.identity.firmwareType,
+    model: snapshot.identity.model,
+    vendor: snapshot.identity.vendor,
+    deviceId: snapshot.identity.deviceId,
+    serialNo: snapshot.identity.serialNo,
+    label: snapshot.identity.label,
+    bleName: snapshot.identity.bleName,
+    capabilities: snapshot.capabilities,
+    mode: snapshot.status.mode,
+    initialized: snapshot.status.initialized,
+    bootloaderMode,
+    unlocked: snapshot.status.unlocked,
+    firmwarePresent: snapshot.status.firmwarePresent,
+    passphraseProtection: snapshot.status.passphraseProtection,
+    pinProtection: snapshot.status.pinProtection,
+    backupRequired: snapshot.status.backupRequired,
+    noBackup: snapshot.status.noBackup,
+    unfinishedBackup: snapshot.status.unfinishedBackup,
+    recoveryMode: snapshot.status.recoveryMode,
+    attachToPinEnabled: snapshot.status.attachToPinEnabled,
+    unlockedAttachPin: snapshot.status.unlockedAttachPin ?? undefined,
+    language: snapshot.settings.language,
+    bleEnabled: snapshot.settings.bleEnabled,
+    sdCardPresent: snapshot.settings.sdCardPresent,
+    sdProtection: snapshot.settings.sdProtection,
+    wipeCodeProtection: snapshot.settings.wipeCodeProtection,
+    passphraseAlwaysOnDevice: snapshot.settings.passphraseAlwaysOnDevice,
+    safetyChecks: snapshot.settings.safetyChecks,
+    autoLockDelayMs: snapshot.settings.autoLockDelayMs,
+    autoShutdownDelayMs: snapshot.settings.autoShutdownDelayMs,
+    displayRotation: snapshot.settings.displayRotation,
+    experimentalFeatures: snapshot.settings.experimentalFeatures,
+    wallpaperPath: snapshot.settings.wallpaperPath,
+    brightness: snapshot.settings.brightness,
+    animationEnabled: snapshot.settings.animationEnabled,
+    tapToWake: snapshot.settings.tapToWake,
+    hapticFeedback: snapshot.settings.hapticFeedback,
+    deviceNameDisplayEnabled: snapshot.settings.deviceNameDisplayEnabled,
+    airgapMode: snapshot.settings.airgapMode,
+    fidoEnabled: snapshot.settings.fidoEnabled,
+    usbLockEnabled: snapshot.settings.usbLockEnabled,
+    randomKeypad: snapshot.settings.randomKeypad,
+    firmwareVersion: snapshot.versions.firmware,
+    bootloaderVersion: snapshot.versions.bootloader,
+    boardVersion: snapshot.versions.board,
+    bleVersion: snapshot.versions.ble,
+    se01Version: snapshot.versions.se01,
+    se02Version: snapshot.versions.se02,
+    se03Version: snapshot.versions.se03,
+    se04Version: snapshot.versions.se04,
+    se01BootVersion: snapshot.versions.se01Boot,
+    se02BootVersion: snapshot.versions.se02Boot,
+    se03BootVersion: snapshot.versions.se03Boot,
+    se04BootVersion: snapshot.versions.se04Boot,
+    seVersion: snapshot.versions.se ?? null,
+    verify: snapshot.verification,
     sessionId,
-    passphraseState: state.session?.passphraseState,
-    raw: state.raw,
-    device_id: state.identity.deviceId ?? undefined,
+    passphraseState: snapshot.session?.passphraseState,
+    raw: snapshot.raw,
+    device_id: snapshot.identity.deviceId ?? undefined,
     session_id: sessionId ?? undefined,
-    ble_name: state.identity.bleName ?? undefined,
-    passphrase_protection: state.status.passphraseProtection ?? undefined,
-    bootloader_mode: getBootloaderMode(state),
+    ble_name: snapshot.identity.bleName ?? undefined,
+    passphrase_protection: snapshot.status.passphraseProtection ?? undefined,
+    bootloader_mode: bootloaderMode,
   } as unknown as Features;
 };

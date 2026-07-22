@@ -3,6 +3,8 @@ import {
   DeviceWalletSessionStore,
   deviceWalletSessionStore,
 } from '../src/device/DeviceWalletSessionStore';
+import { Device } from '../src/device/Device';
+import { DevicePool } from '../src/device/DevicePool';
 import { createCoreApi } from '../src/inject';
 
 jest.mock('../src/data/config', () => ({
@@ -73,6 +75,50 @@ describe('DeviceWalletSessionStore', () => {
 describe('ClearSessionCache', () => {
   beforeEach(() => {
     deviceWalletSessionStore.clear();
+    DevicePool.devicesCache = {};
+  });
+
+  afterEach(() => {
+    DevicePool.devicesCache = {};
+  });
+
+  test('clears matching sessions from both runtime stores', async () => {
+    const matchingDevice = Device.fromDescriptor({ id: 'one', path: 'one' } as never);
+    matchingDevice.updateState(
+      {
+        protocol: 'V1',
+        identity: { deviceId: 'device-1' },
+        session: { sessionId: 'session-a', passphraseState: 'hidden-a' },
+      },
+      'initialize'
+    );
+    const otherDevice = Device.fromDescriptor({ id: 'two', path: 'two' } as never);
+    otherDevice.updateState(
+      {
+        protocol: 'V1',
+        identity: { deviceId: 'device-2' },
+        session: { sessionId: 'session-b', passphraseState: 'hidden-a' },
+      },
+      'initialize'
+    );
+    DevicePool.devicesCache = { one: matchingDevice, two: otherDevice };
+    deviceWalletSessionStore.set('device-1', 'hidden-a', 'session-a');
+
+    const method = new ClearSessionCache({
+      payload: {
+        method: 'clearSessionCache',
+        deviceId: 'device-1',
+        passphraseState: 'hidden-a',
+      },
+    });
+    method.init();
+    await method.run();
+
+    expect((matchingDevice.state as any)?.session).toBeUndefined();
+    expect((otherDevice.state as any)?.session).toEqual({
+      sessionId: 'session-b',
+      passphraseState: 'hidden-a',
+    });
   });
 
   test('clears one wallet without using a device', async () => {

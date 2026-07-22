@@ -87,7 +87,7 @@ WebUSB、Electron BLE、React Native BLE 和 lowlevel BLE 只负责各自的物�
 - `identity.displayName` 是派生展示值，优先级为 `label -> bleName -> 稳定产品名`。
 - V1 原始 `model` 只用于协议兼容，不作为产品展示名。
 - Protocol V2 的 SE 镜像存在与否不决定主控运行模式；应用镜像存在时保持 normal 或已确认的 onboarding mode。
-- `raw` 按协议来源键字段级合并，只供 SDK 内部兼容逻辑使用；公共 `getDeviceState()` 不暴露 raw。
+- `raw` 按协议来源键字段级合并，只供 SDK 内部兼容逻辑使用；钱包 session 也只用于 Core 运行时恢复。公共 `getDeviceState()` 和 `DEVICE.STATE` 均不暴露二者。
 
 ## 自动协议探测
 

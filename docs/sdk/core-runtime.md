@@ -34,6 +34,8 @@ V2 不支持传统 `GetFeatures`。Core 在初始化时发送默认范围的 `De
 
 - `DeviceInfoGet` 默认不请求 status target，也不会隐式补发 `DeviceStatusGet`。
 - 需要设备实时状态时，由调用方显式使用 `refreshDeviceState({ scope: 'runtime' })`；固件升级等专用流程可以按自身状态机显式探测。
+- bootloader / romloader 模式不会发送 `DeviceStatusGet`。
+- 公共 `DeviceState` 与 `DEVICE.STATE` 不包含协议 raw 数据或钱包 `session_id`；两者只在 Core 内部用于 V1 兼容和会话恢复。
 - V2 PIN 解锁使用 `DeviceSessionAskPin -> DeviceSessionPinResult`，Core 只合并响应已经确认的 `unlocked` 等字段，不为了补全状态额外轮询。
 - 受保护方法是否允许单次解锁后重试，由方法显式声明；Transport 不重放业务请求。
 

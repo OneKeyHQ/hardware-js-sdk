@@ -5,10 +5,14 @@ import type {
   DeviceState,
   DeviceStateIdentity,
   DeviceStatePatch,
+  DeviceStateSession,
   DeviceStateUpdateSource,
 } from '../types';
 
-type StoredDeviceState = DeviceState & { raw?: DeviceFeaturesRaw };
+type StoredDeviceState = DeviceState & {
+  raw?: DeviceFeaturesRaw;
+  session?: DeviceStateSession;
+};
 
 export type DeviceStateUpdateResult = {
   state: StoredDeviceState;
@@ -228,5 +232,6 @@ export class DeviceStateStore {
 export const createPublicDeviceState = (state: StoredDeviceState): DeviceState => {
   const snapshot = structuredClone(state);
   delete snapshot.raw;
+  delete snapshot.session;
   return snapshot;
 };

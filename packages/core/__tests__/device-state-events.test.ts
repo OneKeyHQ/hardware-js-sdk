@@ -1,5 +1,6 @@
 import { Device } from '../src/device/Device';
 import { DEVICE } from '../src/events';
+import { EOneKeyDeviceMode } from '../src/types';
 
 jest.mock('../src/data/config', () => ({
   getSDKVersion: jest.fn(() => '1.0.0'),
@@ -22,6 +23,7 @@ describe('Device state events', () => {
       {
         protocol: 'V2',
         identity: { label: 'Renamed', bleName: 'Pro2 1234' },
+        session: { sessionId: 'private-session', passphraseState: 'private-state' },
         raw: {
           protocolV2DeviceInfo: { protocol_version: 2 },
         },
@@ -40,7 +42,49 @@ describe('Device state events', () => {
     );
     expect(onFeatures).not.toHaveBeenCalled();
     expect(onState.mock.calls[0][1].state).not.toHaveProperty('raw');
+    expect(onState.mock.calls[0][1].state).not.toHaveProperty('session');
     expect(device.state?.raw?.protocolV2DeviceInfo).toEqual({ protocol_version: 2 });
+  });
+
+  test.each([
+    ['normal', null, EOneKeyDeviceMode.normal],
+    ['notInitialized', false, EOneKeyDeviceMode.notInitialized],
+    ['backupMode', true, EOneKeyDeviceMode.backupMode],
+    ['bootloader', null, EOneKeyDeviceMode.bootloader],
+    ['romloader', null, EOneKeyDeviceMode.bootloader],
+  ] as const)(
+    'uses canonical %s mode even when initialized is %s',
+    (mode, initialized, expected) => {
+      const device = Device.fromDescriptor({
+        id: 'mode',
+        path: 'mode',
+        protocolType: 'V2',
+      } as never);
+      device.updateState({ protocol: 'V2', status: { mode, initialized } }, 'initialize');
+
+      expect(device.getMode()).toBe(expected);
+    }
+  );
+
+  test('commits lock success to canonical state and emits one state event', async () => {
+    const device = Device.fromDescriptor({ id: 'pro2', path: 'pro2', protocolType: 'V2' } as never);
+    (device as any).commands = {
+      typedCall: jest.fn().mockResolvedValue({ message: { message: 'locked' } }),
+    };
+    device.updateState(
+      { protocol: 'V2', status: { mode: 'normal', initialized: true, unlocked: true } },
+      'initialize'
+    );
+    const onState = jest.fn();
+    device.on(DEVICE.STATE, onState);
+
+    await device.lockDevice();
+
+    expect(device.state?.status.unlocked).toBe(false);
+    expect(onState).toHaveBeenCalledWith(
+      device,
+      expect.objectContaining({ source: 'lock', changedKeys: ['status.unlocked'] })
+    );
   });
 
   test('continues emitting projected Features events for Protocol V1', () => {

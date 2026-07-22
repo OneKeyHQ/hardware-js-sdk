@@ -43,4 +43,50 @@ describe('DeviceStateProjector', () => {
       firmwareVersion: '5.0.0',
     });
   });
+
+  test.each([
+    [EDeviceType.Classic1s],
+    [EDeviceType.ClassicPure],
+    [EDeviceType.Touch],
+    [EDeviceType.Pro],
+  ] as const)('preserves Protocol V1 compatibility defaults for %s', deviceType => {
+    const state = createEmptyDeviceState({ deviceType });
+    state.protocol = 'V1';
+    state.versions.se = '1.1.0.2';
+    state.raw = {
+      protocolV1Features: {
+        onekey_device_type: deviceType,
+        initialized: true,
+      } as never,
+    };
+
+    const features = projectFeatures(state);
+
+    expect(features).toMatchObject({
+      protocolVersion: 1,
+      label: null,
+      bootloaderMode: null,
+      bootloader_mode: null,
+      seVersion: '1.1.0.2',
+    });
+  });
+
+  test('returns an isolated compatibility snapshot', () => {
+    const state = createEmptyDeviceState({ deviceType: EDeviceType.Pro });
+    state.protocol = 'V1';
+    state.capabilities = [1];
+    state.verification = { firmwareBuildId: 'build-1' };
+    state.raw = {
+      protocolV1Features: { label: 'Original' } as never,
+    };
+
+    const features = projectFeatures(state);
+    features.capabilities.push(2);
+    if (features.verify) features.verify.firmwareBuildId = 'mutated';
+    if (features.raw?.protocolV1Features) features.raw.protocolV1Features.label = 'Mutated';
+
+    expect(state.capabilities).toEqual([1]);
+    expect(state.verification?.firmwareBuildId).toBe('build-1');
+    expect(state.raw.protocolV1Features?.label).toBe('Original');
+  });
 });

@@ -1975,6 +1975,37 @@ describe('Protocol V2 feature adapter', () => {
     );
   });
 
+  test('does not probe DeviceStatusGet while firmware device is still in romloader mode', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const typedCall = jest.fn().mockImplementation((request: string) => {
+      if (request === 'DeviceStatusGet') {
+        throw new Error('romloader must not receive DeviceStatusGet');
+      }
+      return Promise.resolve({
+        type: 'DeviceInfo',
+        message: {
+          hw: { serial_no: 'PR2ROM' },
+          fw: {
+            romloader: { version: '0.1.0' },
+            bootloader: { version: '0.2.0' },
+          },
+        },
+      });
+    });
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+      updateProtocolV2Features: jest.fn(),
+    });
+
+    await expect((method as any).probeProtocolV2NormalMode()).resolves.toBe(false);
+    expect(typedCall).toHaveBeenCalledTimes(1);
+  });
+
   test('refreshes Protocol V2 features without falling back to V1 GetFeatures', async () => {
     const device = Device.fromDescriptor({
       path: 'usb-path',

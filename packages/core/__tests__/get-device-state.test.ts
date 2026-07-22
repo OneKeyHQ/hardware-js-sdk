@@ -28,6 +28,21 @@ const createV1Device = (typedCall: jest.Mock) => {
 };
 
 describe('getDeviceState', () => {
+  test('does not expose the internal wallet session', async () => {
+    const device = createV2Device(jest.fn());
+    device.updateState(
+      {
+        protocol: 'V2',
+        session: { sessionId: 'private-session', passphraseState: 'private-state' },
+      },
+      'initialize'
+    );
+
+    const state = await device.getDeviceState();
+
+    expect(state).not.toHaveProperty('session');
+  });
+
   test('hydrates Protocol V2 without status target or DeviceStatusGet by default', async () => {
     const typedCall = jest.fn().mockResolvedValue({
       message: {
@@ -212,10 +227,7 @@ describe('getDeviceState', () => {
       includeRaw: true,
     });
 
-    expect(typedCall.mock.calls.map(call => call[0])).toEqual([
-      'GetFeatures',
-      'OnekeyGetFeatures',
-    ]);
+    expect(typedCall.mock.calls.map(call => call[0])).toEqual(['GetFeatures', 'OnekeyGetFeatures']);
     expect(state.versions.firmware).toBe('4.10.1');
     expect(state.versions.se01Boot).toBe('1.0.0');
     expect(state.verification).toMatchObject({

@@ -54,7 +54,7 @@ Protocol V2 protobuf
     ├── DeviceInfo ─────────────────> DeviceState identity / versions / verification
     ├── DeviceStatus ───────────────> DeviceState status
     ├── DeviceSettings ─────────────> DeviceState identity / settings
-    ├── DeviceSession ──────────────> DeviceState session（仅内存）
+    ├── DeviceSession ──────────────> Core 钱包 Session 缓存（不进入公共 DeviceState）
     ├── DeviceFirmware ─────────────> 固件升级流程
     └── DeviceFactory ──────────────> 生产制造专用 API
 ```
@@ -427,7 +427,7 @@ DeviceInfoGet
 ```text
 getDeviceState()
     -> 读取缓存；没有缓存时只执行最小初始化
-    -> 返回完整 DeviceState（不含 raw）
+    -> 返回完整 DeviceState（不含 raw 和钱包 session）
 
 refreshDeviceState({ scope })
     -> 按 basic / firmware / settings / runtime 业务范围刷新

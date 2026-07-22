@@ -953,6 +953,14 @@ export class Device extends EventEmitter {
     return result.state;
   }
 
+  clearCachedSession(deviceId?: string, passphraseState?: string) {
+    const current = this.state;
+    if (!current?.session) return false;
+    if (deviceId && current.identity.deviceId !== deviceId) return false;
+    if (passphraseState && current.session.passphraseState !== passphraseState) return false;
+    return this.stateStore.clearSession('session-clear') !== undefined;
+  }
+
   updateFeaturesPatch(patch: Partial<Features>, source: DeviceStateUpdateSource) {
     const currentFeatures = this.features;
     if (!currentFeatures) return undefined;
@@ -1158,22 +1166,23 @@ export class Device extends EventEmitter {
   }
 
   getMode() {
-    if (this.features?.bootloaderMode) {
-      // bootloader mode
-      return EOneKeyDeviceMode.bootloader;
+    switch (this.state?.status.mode) {
+      case 'bootloader':
+      case 'romloader':
+        return EOneKeyDeviceMode.bootloader;
+      case 'notInitialized':
+        return EOneKeyDeviceMode.notInitialized;
+      case 'backupMode':
+        return EOneKeyDeviceMode.backupMode;
+      case 'normal':
+        return EOneKeyDeviceMode.normal;
+      default:
+        break;
     }
 
-    if (!this.features?.initialized) {
-      // not initialized
-      return EOneKeyDeviceMode.notInitialized;
-    }
-
-    if (this.features?.noBackup) {
-      // backup mode
-      return EOneKeyDeviceMode.backupMode;
-    }
-
-    // normal mode
+    if (this.features?.bootloaderMode) return EOneKeyDeviceMode.bootloader;
+    if (this.features?.initialized === false) return EOneKeyDeviceMode.notInitialized;
+    if (this.features?.noBackup) return EOneKeyDeviceMode.backupMode;
     return EOneKeyDeviceMode.normal;
   }
 
@@ -1268,6 +1277,7 @@ export class Device extends EventEmitter {
 
   async lockDevice(): Promise<Success> {
     const res = await this.commands.typedCall('LockDevice', 'Success', {});
+    this.updateState({ status: { unlocked: false } }, 'lock');
     return res.message;
   }
 

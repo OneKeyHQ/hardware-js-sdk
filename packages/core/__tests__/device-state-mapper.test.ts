@@ -23,6 +23,7 @@ describe('DeviceStateMapper', () => {
       major_version: 4,
       minor_version: 10,
       patch_version: 1,
+      se_ver: '1.1.0.2',
     } as PROTO.Features);
 
     expect(patch).toMatchObject({
@@ -34,7 +35,7 @@ describe('DeviceStateMapper', () => {
       },
       status: { mode: 'normal', initialized: true, unlocked: true },
       settings: { language: 'en-US' },
-      versions: { firmware: '4.10.1' },
+      versions: { firmware: '4.10.1', se: '1.1.0.2' },
     });
   });
 
@@ -133,6 +134,31 @@ describe('DeviceStateMapper', () => {
       se01BootBuildId: 'se-boot',
       se01BootHash: '0304',
     });
+  });
+
+  test.each([
+    [
+      'bootloader',
+      {
+        hw: { serial_no: 'SERIAL-BOOT' },
+        fw: { bootloader: { version: '2.0.0' } },
+      },
+    ],
+    [
+      'romloader',
+      {
+        hw: { serial_no: 'SERIAL-ROM' },
+        fw: {
+          romloader: { version: '1.0.0' },
+          bootloader: { version: '2.0.0' },
+        },
+      },
+    ],
+  ] as const)('clears stale device identity in Protocol V2 %s mode', (mode, info) => {
+    const patch = mapProtocolV2DeviceInfoToState(info as ProtocolV2DeviceInfo);
+
+    expect(patch.status?.mode).toBe(mode);
+    expect(patch.identity).toMatchObject({ deviceId: null });
   });
 
   test('maps Protocol V2 status separately and ignores locked passphrase value', () => {

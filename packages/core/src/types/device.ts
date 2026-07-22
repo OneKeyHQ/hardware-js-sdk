@@ -153,8 +153,10 @@ export type DeviceStateUpdateSource =
   | 'device-status'
   | 'apply-settings'
   | 'change-pin'
+  | 'lock'
   | 'unlock'
   | 'passphrase'
+  | 'session-clear'
   | 'firmware-update'
   | 'transport-reconnect'
   | 'compatibility';
@@ -215,6 +217,8 @@ export type DeviceStateVersions = {
   bootloader: string | null;
   board: string | null;
   ble: string | null;
+  /** Protocol V1 legacy secure-element firmware version (`se_ver`). */
+  se?: string | null;
   se01?: string | null;
   se02?: string | null;
   se03?: string | null;
@@ -241,7 +245,6 @@ export type DeviceState = {
   versions: DeviceStateVersions;
   capabilities: Array<number | string>;
   verification?: Partial<DeviceFeaturesVerify>;
-  session?: DeviceStateSession;
 };
 
 export type DeviceStatePatch = {

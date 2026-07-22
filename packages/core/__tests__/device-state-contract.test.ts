@@ -21,3 +21,7 @@ describe('DeviceState contract', () => {
 // raw 仅供 SDK 内部兼容投影使用，不属于公共 DeviceState。
 // @ts-expect-error raw 不应成为外部接入者需要理解的字段
 type RemovedPublicRaw = DeviceState['raw'];
+
+// session 属于 SDK 运行时内部缓存，不应通过公共状态或事件暴露。
+// @ts-expect-error session 不属于公共 DeviceState
+type RemovedPublicSession = DeviceState['session'];

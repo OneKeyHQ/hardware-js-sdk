@@ -35,7 +35,7 @@
 | `packages/core/src/core`          | `core/index.ts`                                              | API 调度、请求队列、初始化参数组装、passphrase 安全检查、UI 事件转发。                               |
 | `packages/core/src/device`        | `Device.ts`、`DeviceCommands.ts`、`DevicePool.ts`            | 设备 acquire/release、V1/V2 初始化分支、session 缓存、设备缓存、PIN/passphrase/Button 中间消息处理。 |
 | `packages/core/src/utils`         | `deviceFeaturesUtils.ts`                                     | 获取 passphraseState，维护 V1 兼容 Features，并把固件返回的 session_id 写入 SDK 内部缓存。           |
-| `packages/core/src/deviceProfile` | `buildDeviceFeatures.ts`                                     | 协议消息的内部兼容投影；设备公共状态统一由 `device/DeviceStateMapper.ts` 写入 `DeviceState`。          |
+| `packages/core/src/deviceProfile` | `buildDeviceFeatures.ts`                                     | 协议消息的内部兼容投影；设备公共状态统一由 `device/DeviceStateMapper.ts` 写入 `DeviceState`。        |
 | `packages/hd-transport`           | `protocols/v2/session.ts`、`encode.ts`、`frame-assembler.ts` | Protocol V2 encode/decode、帧重组、seq 管理、调用串行化和超时控制。                                  |
 | `packages/hd-transport-*`         | WebUSB、NodeUSB、RN BLE、lowlevel BLE transport              | 平台连接、读写、协议探测、按设备缓存或创建 ProtocolV2Session。                                       |
 | `submodules/firmware-pro2`        | protobuf、SE session handler                                 | Pro2 schema 来源，以及 SE session 新建/打开/查询等固件侧基础能力。                                   |
@@ -87,14 +87,14 @@ Pro 当前仍走 Protocol V1 初始化，入口在 `Device.initialize()`：
 Pro2 不走传统 `Initialize/GetFeatures`。`Device.initialize()` 中如果 `isProtocolV2()` 为 true，会走专用分支：
 
 1. 写入 `this.passphraseState = options?.passphraseState`。
-2. 如果已有 features 且无需强制新 session，则每次 run 前调用 `_refreshProtocolV2Status()` 做轻量刷新。
+2. 如果已有 `DeviceState` 且无需强制新 session，则复用缓存；普通业务调用不默认读取运行状态。
 3. 否则调用 `_initializeProtocolV2()`。
 4. `_initializeProtocolV2()` 通过 `requestProtocolV2DeviceInfo()` 发送 `DeviceInfoGet`。
-5. `updateProtocolV2Features()` 使用 `buildProtocolV2FeaturesPayload()` 映射出 SDK 标准 `Features`。
+5. `DeviceStateMapper` 将响应合并进统一 `DeviceState`；V2 不对外构造第二套 `Features`。
 
-为什么 Pro2 不复用 V1 Initialize：Protocol V2 当前是系统协议能力，设备信息来自 `Ping + DeviceInfoGet`，并且文档中已明确 V2 不支持传统 `GetFeatures`。SDK 用 feature builder 统一输出结构化 features，避免业务层直接理解 V2 原始 schema。
+为什么 Pro2 不复用 V1 Initialize：Protocol V2 当前是系统协议能力，设备信息来自 `Ping + DeviceInfoGet`，并且文档中已明确 V2 不支持传统 `GetFeatures`。SDK 统一输出 `DeviceState`，避免业务层直接理解 V2 原始 schema。
 
-需要注意：当前实现只按 `firmware-pro2` 的 `DeviceInfoGet` 真实响应映射。`device_id` 只来自 `DeviceInfo.status.device_id`，不会用 `hw.serial_no` 或 transport path 兜底。
+需要注意：当前实现只按 `firmware-pro2` 的真实响应映射。`device_id` 只来自显式 `DeviceStatusGet`，不会用 `hw.serial_no` 或 transport path 兜底；默认初始化不会发送 `DeviceStatusGet`。
 
 ## 4. deviceId 与设备身份逻辑
 

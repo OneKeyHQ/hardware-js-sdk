@@ -112,6 +112,7 @@ export const mapFeaturesToState = (features: Features): DeviceStatePatch => ({
     bootloader: features.bootloaderVersion,
     board: features.boardVersion,
     ble: features.bleVersion,
+    se: features.seVersion,
     se01: features.se01Version,
     se02: features.se02Version,
     se03: features.se03Version,
@@ -214,6 +215,7 @@ export const mapProtocolV2DeviceInfoToState = (
       vendor: 'onekey.so',
       serialNo: info.hw?.serial_no,
       bleName: info.coprocessor?.bt_adv_name,
+      deviceId: loader ? null : undefined,
     }),
     status: loader
       ? {

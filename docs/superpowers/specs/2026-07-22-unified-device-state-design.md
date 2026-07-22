@@ -133,7 +133,6 @@ export type DeviceState = {
 
   capabilities: Array<number | string>;
   verification?: DeviceVerification;
-  session?: DeviceSessionState;
 };
 ```
 
@@ -141,7 +140,7 @@ export type DeviceState = {
 
 - 各 section 始终存在，尚未读取或协议不支持的值使用 `null`，避免调用方判断整段对象是否存在。
 - `raw` 只存在于 SDK 内部 Store 快照，用于调试和 V1 兼容投影；公共类型、返回值和事件均不包含它。
-- `session` 是易失状态，不写入 App 的长期数据库。
+- 钱包 `session` 是 Core 内部易失缓存，不属于公共 `DeviceState`，也不写入 App 的长期数据库或事件。
 - `revision` 在同一设备实例中单调递增，用于丢弃乱序事件。
 - `updatedAt` 表示 SDK 接受最后一次状态变更的时间，不代表设备端所有字段都在该时刻读取。
 
@@ -306,7 +305,7 @@ App 监听 `DEVICE.STATE` 后按以下顺序处理：
 
 ### 11.3 数据库迁移
 
-- 增加 `deviceState` 字段并存储去除 `session` 后的公共状态；`raw` 在 SDK 边界已被移除。
+- 增加 `deviceState` 字段并直接存储公共状态；钱包 `session` 与 `raw` 已在 SDK 边界移除。
 - 数据库升级时，将已有 `features` JSON 转换为 `DeviceState`。
 - 迁移完成后不再双写 `features`。
 - 运行时代码不得优先读取旧字段；旧字段只允许出现在一次性数据库迁移器中。
@@ -403,4 +402,4 @@ SDK 暂时保留的老协议兼容面：
 7. Protocol V1 的 `firmware` scope 由 SDK 内部聚合 `GetFeatures + OnekeyGetFeatures`；App 不感知不同设备的固件字段来源。
 8. `identity.label` 只保存真实用户 label，`identity.bleName` 保存连接名称，`identity.displayName` 按 `label -> bleName -> 稳定产品名` 派生。
 9. Protocol V2 的 SE application/bootloader 不参与主控 mode 推导；版本刷新不得覆盖已经确认的 onboarding mode。
-10. `raw` 按协议来源键合并，只供 SDK 内部 V1 兼容投影和诊断使用，公共类型、`getDeviceState()` 返回值与 `DEVICE.STATE` 事件均不暴露 raw。
+10. `raw` 按协议来源键合并，只供 SDK 内部 V1 兼容投影和诊断使用；钱包 session 也只在 Core 内部保存。公共类型、`getDeviceState()` 返回值与 `DEVICE.STATE` 事件均不暴露二者。

@@ -22,7 +22,7 @@ import { DevicePool } from '../device/DevicePool';
 import {
   PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST,
   ProtocolV2FirmwareTargetType,
-  isProtocolV2BootloaderDeviceInfo,
+  isProtocolV2LoaderDeviceInfo,
 } from '../protocols/protocol-v2';
 import { requestProtocolV2DeviceInfo } from '../protocols/protocol-v2/features';
 import {
@@ -1129,7 +1129,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       commands: this.device.getCommands(),
       timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
     });
-    if (isProtocolV2BootloaderDeviceInfo(deviceInfo, null)) {
+    if (isProtocolV2LoaderDeviceInfo(deviceInfo, null)) {
       this.device.updateProtocolV2Features(deviceInfo, null);
       return false;
     }

@@ -88,6 +88,13 @@ export const isProtocolV2BootloaderDeviceInfo = (
   deviceInfo.fw?.application == null &&
   deviceInfo.fw?.application_data == null;
 
+export const isProtocolV2LoaderDeviceInfo = (
+  deviceInfo?: ProtocolV2DeviceInfo | null,
+  deviceStatus?: DeviceStatus | null
+) =>
+  isProtocolV2RomloaderDeviceInfo(deviceInfo, deviceStatus) ||
+  isProtocolV2BootloaderDeviceInfo(deviceInfo, deviceStatus);
+
 export const PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST = {
   targets: {
     hw: true,
