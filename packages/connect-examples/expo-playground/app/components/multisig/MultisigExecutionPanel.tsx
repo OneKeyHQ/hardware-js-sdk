@@ -76,7 +76,7 @@ export function MultisigExecutionPanel({
       };
 
   return (
-    <section className="flex shrink-0 flex-col bg-background lg:h-[clamp(340px,38vh,420px)]">
+    <section className="flex min-h-[360px] flex-1 flex-col bg-background lg:min-h-[380px]">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-card px-4 py-3">
         <div className="min-w-[240px] flex-1">
           <div className="flex items-center gap-2">
@@ -179,8 +179,8 @@ export function MultisigExecutionPanel({
             </div>
           ) : null}
           {state.status === 'running' ? (
-            <div className="flex h-full min-h-28 items-center justify-center gap-2 rounded-md border border-primary bg-primary px-6 text-center text-xs font-medium text-primary-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
+            <div className="flex h-full min-h-28 items-center justify-center gap-2 rounded-md border border-primary/20 bg-primary/5 px-6 text-center text-xs font-medium text-foreground">
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
               请在设备上核对并确认，可能需要先解锁设备。
             </div>
           ) : null}
