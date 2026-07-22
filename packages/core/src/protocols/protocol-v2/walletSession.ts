@@ -129,9 +129,9 @@ export async function getProtocolV2WalletSession(
       await device.unlockDevice();
     }
 
-    // Protocol V2 始终通过 DeviceSession 选择隐藏钱包；passphrase_enabled
-    // 不是是否允许打开钱包 Session 的开关。只有调用方明确选择主钱包时才跳过。
-    if (options?.onlyMainPin) {
+    // 标准钱包不需要 DeviceSession。锁屏时先解锁刷新状态，
+    // 确认未开启 passphrase 后不得再生成或传递隐藏钱包 passphraseState。
+    if (options?.onlyMainPin || device.getCurrentPassphraseProtection() === false) {
       return {
         passphraseState: undefined,
         newSession: undefined,
