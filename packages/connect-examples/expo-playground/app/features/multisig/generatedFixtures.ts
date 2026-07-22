@@ -226,21 +226,39 @@ export const GENERATED_MULTISIG_FIXTURES = {
         "multisig": {
           "pubkeys": [
             {
-              "node": "xpub6DpFgSNFWXCnjD9yDh1YoSFbWmDEmA29Gp1GauaNEbQUc5rvPAECvxqxRHb3239g9D9DNmk3y8vVe7K93RfS4tZAyCQTEjyRC1aHcNyDWNk",
+              "node": {
+                "depth": 4,
+                "fingerprint": 643428168,
+                "child_num": 2147483648,
+                "chain_code": "b31244e5bcdacf4ebbd44d5d1068d88d38886a6ad24ff5fffcbed44fd09ef5d9",
+                "public_key": "02e68e18a8ecf52287b3fd0de2fef6546c56b92a45cda64a2675cf923c5b3702d1"
+              },
               "address_n": [
                 0,
                 0
               ]
             },
             {
-              "node": "xpub6DhD3vKCogoPyy7NhHnvDeMUafsWpVokXVo9PGAGbuN1SMpMuWz8hvx5p9VGbJ3Q7PCAw5DTiwbVdFiaLfSvxxvHKgVDm24nDQKBcNyz7nv",
+              "node": {
+                "depth": 4,
+                "fingerprint": 366162743,
+                "child_num": 2147483648,
+                "chain_code": "3f53bff9b0e3064d86e99f6cd021fc1474626a808a5cd856d1ad5515730181b6",
+                "public_key": "0259266d4f895c9914f3eeff52db716273782f619d4243d63b026b85202024084e"
+              },
               "address_n": [
                 0,
                 0
               ]
             },
             {
-              "node": "xpub6F9Qm2hmXhoSwh9CGn5eNKtaP4TjaSddXQTi4nao2cumxRTcbaHtwK3FewV4DZZuCAp3nZRLiurihDgBcLAX3HMePmi7yhKgx91NftyEv6Y",
+              "node": {
+                "depth": 4,
+                "fingerprint": 3679881372,
+                "child_num": 2147483648,
+                "chain_code": "fba6ed603da367e06b595888926d4923f3702ffcc33aed390f102bfc380d3a3f",
+                "public_key": "03e5c56d800f644e094215ab12111f47bd6cee65be6d52f7f67246c1f747d783d2"
+              },
               "address_n": [
                 0,
                 0
@@ -259,7 +277,14 @@ export const GENERATED_MULTISIG_FIXTURES = {
         "coin": "btc",
         "inputs": [
           {
-            "address_n": "m/48'/0'/0'/0'/0/0",
+            "address_n": [
+              2147483696,
+              2147483648,
+              2147483648,
+              2147483648,
+              0,
+              0
+            ],
             "prev_hash": "bdeb4882a1cc6a8dd507b1e219550e17fde2f76dff15fc40829219e2cb712280",
             "prev_index": 0,
             "amount": "200000",
@@ -267,21 +292,39 @@ export const GENERATED_MULTISIG_FIXTURES = {
             "multisig": {
               "pubkeys": [
                 {
-                  "node": "xpub6DpFgSNFWXCnjD9yDh1YoSFbWmDEmA29Gp1GauaNEbQUc5rvPAECvxqxRHb3239g9D9DNmk3y8vVe7K93RfS4tZAyCQTEjyRC1aHcNyDWNk",
+                  "node": {
+                    "depth": 4,
+                    "fingerprint": 643428168,
+                    "child_num": 2147483648,
+                    "chain_code": "b31244e5bcdacf4ebbd44d5d1068d88d38886a6ad24ff5fffcbed44fd09ef5d9",
+                    "public_key": "02e68e18a8ecf52287b3fd0de2fef6546c56b92a45cda64a2675cf923c5b3702d1"
+                  },
                   "address_n": [
                     0,
                     0
                   ]
                 },
                 {
-                  "node": "xpub6DhD3vKCogoPyy7NhHnvDeMUafsWpVokXVo9PGAGbuN1SMpMuWz8hvx5p9VGbJ3Q7PCAw5DTiwbVdFiaLfSvxxvHKgVDm24nDQKBcNyz7nv",
+                  "node": {
+                    "depth": 4,
+                    "fingerprint": 366162743,
+                    "child_num": 2147483648,
+                    "chain_code": "3f53bff9b0e3064d86e99f6cd021fc1474626a808a5cd856d1ad5515730181b6",
+                    "public_key": "0259266d4f895c9914f3eeff52db716273782f619d4243d63b026b85202024084e"
+                  },
                   "address_n": [
                     0,
                     0
                   ]
                 },
                 {
-                  "node": "xpub6F9Qm2hmXhoSwh9CGn5eNKtaP4TjaSddXQTi4nao2cumxRTcbaHtwK3FewV4DZZuCAp3nZRLiurihDgBcLAX3HMePmi7yhKgx91NftyEv6Y",
+                  "node": {
+                    "depth": 4,
+                    "fingerprint": 3679881372,
+                    "child_num": 2147483648,
+                    "chain_code": "fba6ed603da367e06b595888926d4923f3702ffcc33aed390f102bfc380d3a3f",
+                    "public_key": "03e5c56d800f644e094215ab12111f47bd6cee65be6d52f7f67246c1f747d783d2"
+                  },
                   "address_n": [
                     0,
                     0
@@ -330,7 +373,14 @@ export const GENERATED_MULTISIG_FIXTURES = {
         "coin": "btc",
         "inputs": [
           {
-            "address_n": "m/48'/0'/0'/0'/0/0",
+            "address_n": [
+              2147483696,
+              2147483648,
+              2147483648,
+              2147483648,
+              0,
+              0
+            ],
             "prev_hash": "bdeb4882a1cc6a8dd507b1e219550e17fde2f76dff15fc40829219e2cb712280",
             "prev_index": 0,
             "amount": "200000",
@@ -338,21 +388,39 @@ export const GENERATED_MULTISIG_FIXTURES = {
             "multisig": {
               "pubkeys": [
                 {
-                  "node": "xpub6DpFgSNFWXCnjD9yDh1YoSFbWmDEmA29Gp1GauaNEbQUc5rvPAECvxqxRHb3239g9D9DNmk3y8vVe7K93RfS4tZAyCQTEjyRC1aHcNyDWNk",
+                  "node": {
+                    "depth": 4,
+                    "fingerprint": 643428168,
+                    "child_num": 2147483648,
+                    "chain_code": "b31244e5bcdacf4ebbd44d5d1068d88d38886a6ad24ff5fffcbed44fd09ef5d9",
+                    "public_key": "02e68e18a8ecf52287b3fd0de2fef6546c56b92a45cda64a2675cf923c5b3702d1"
+                  },
                   "address_n": [
                     0,
                     0
                   ]
                 },
                 {
-                  "node": "xpub6DhD3vKCogoPyy7NhHnvDeMUafsWpVokXVo9PGAGbuN1SMpMuWz8hvx5p9VGbJ3Q7PCAw5DTiwbVdFiaLfSvxxvHKgVDm24nDQKBcNyz7nv",
+                  "node": {
+                    "depth": 4,
+                    "fingerprint": 366162743,
+                    "child_num": 2147483648,
+                    "chain_code": "3f53bff9b0e3064d86e99f6cd021fc1474626a808a5cd856d1ad5515730181b6",
+                    "public_key": "0259266d4f895c9914f3eeff52db716273782f619d4243d63b026b85202024084e"
+                  },
                   "address_n": [
                     0,
                     0
                   ]
                 },
                 {
-                  "node": "xpub6F9Qm2hmXhoSwh9CGn5eNKtaP4TjaSddXQTi4nao2cumxRTcbaHtwK3FewV4DZZuCAp3nZRLiurihDgBcLAX3HMePmi7yhKgx91NftyEv6Y",
+                  "node": {
+                    "depth": 4,
+                    "fingerprint": 3679881372,
+                    "child_num": 2147483648,
+                    "chain_code": "fba6ed603da367e06b595888926d4923f3702ffcc33aed390f102bfc380d3a3f",
+                    "public_key": "03e5c56d800f644e094215ab12111f47bd6cee65be6d52f7f67246c1f747d783d2"
+                  },
                   "address_n": [
                     0,
                     0
@@ -408,7 +476,14 @@ export const GENERATED_MULTISIG_FIXTURES = {
             "coin": "btc",
             "inputs": [
               {
-                "address_n": "m/48'/0'/0'/0'/0/0",
+                "address_n": [
+                  2147483696,
+                  2147483648,
+                  2147483648,
+                  2147483648,
+                  0,
+                  0
+                ],
                 "prev_hash": "bdeb4882a1cc6a8dd507b1e219550e17fde2f76dff15fc40829219e2cb712280",
                 "prev_index": 0,
                 "amount": "200000",
@@ -416,21 +491,39 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 "multisig": {
                   "pubkeys": [
                     {
-                      "node": "xpub6DpFgSNFWXCnjD9yDh1YoSFbWmDEmA29Gp1GauaNEbQUc5rvPAECvxqxRHb3239g9D9DNmk3y8vVe7K93RfS4tZAyCQTEjyRC1aHcNyDWNk",
+                      "node": {
+                        "depth": 4,
+                        "fingerprint": 643428168,
+                        "child_num": 2147483648,
+                        "chain_code": "b31244e5bcdacf4ebbd44d5d1068d88d38886a6ad24ff5fffcbed44fd09ef5d9",
+                        "public_key": "02e68e18a8ecf52287b3fd0de2fef6546c56b92a45cda64a2675cf923c5b3702d1"
+                      },
                       "address_n": [
                         0,
                         0
                       ]
                     },
                     {
-                      "node": "xpub6DhD3vKCogoPyy7NhHnvDeMUafsWpVokXVo9PGAGbuN1SMpMuWz8hvx5p9VGbJ3Q7PCAw5DTiwbVdFiaLfSvxxvHKgVDm24nDQKBcNyz7nv",
+                      "node": {
+                        "depth": 4,
+                        "fingerprint": 366162743,
+                        "child_num": 2147483648,
+                        "chain_code": "3f53bff9b0e3064d86e99f6cd021fc1474626a808a5cd856d1ad5515730181b6",
+                        "public_key": "0259266d4f895c9914f3eeff52db716273782f619d4243d63b026b85202024084e"
+                      },
                       "address_n": [
                         0,
                         0
                       ]
                     },
                     {
-                      "node": "xpub6F9Qm2hmXhoSwh9CGn5eNKtaP4TjaSddXQTi4nao2cumxRTcbaHtwK3FewV4DZZuCAp3nZRLiurihDgBcLAX3HMePmi7yhKgx91NftyEv6Y",
+                      "node": {
+                        "depth": 4,
+                        "fingerprint": 3679881372,
+                        "child_num": 2147483648,
+                        "chain_code": "fba6ed603da367e06b595888926d4923f3702ffcc33aed390f102bfc380d3a3f",
+                        "public_key": "03e5c56d800f644e094215ab12111f47bd6cee65be6d52f7f67246c1f747d783d2"
+                      },
                       "address_n": [
                         0,
                         0
@@ -479,7 +572,14 @@ export const GENERATED_MULTISIG_FIXTURES = {
             "coin": "btc",
             "inputs": [
               {
-                "address_n": "m/48'/0'/0'/0'/0/0",
+                "address_n": [
+                  2147483696,
+                  2147483648,
+                  2147483648,
+                  2147483648,
+                  0,
+                  0
+                ],
                 "prev_hash": "bdeb4882a1cc6a8dd507b1e219550e17fde2f76dff15fc40829219e2cb712280",
                 "prev_index": 0,
                 "amount": "200000",
@@ -487,21 +587,39 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 "multisig": {
                   "pubkeys": [
                     {
-                      "node": "xpub6DpFgSNFWXCnjD9yDh1YoSFbWmDEmA29Gp1GauaNEbQUc5rvPAECvxqxRHb3239g9D9DNmk3y8vVe7K93RfS4tZAyCQTEjyRC1aHcNyDWNk",
+                      "node": {
+                        "depth": 4,
+                        "fingerprint": 643428168,
+                        "child_num": 2147483648,
+                        "chain_code": "b31244e5bcdacf4ebbd44d5d1068d88d38886a6ad24ff5fffcbed44fd09ef5d9",
+                        "public_key": "02e68e18a8ecf52287b3fd0de2fef6546c56b92a45cda64a2675cf923c5b3702d1"
+                      },
                       "address_n": [
                         0,
                         0
                       ]
                     },
                     {
-                      "node": "xpub6DhD3vKCogoPyy7NhHnvDeMUafsWpVokXVo9PGAGbuN1SMpMuWz8hvx5p9VGbJ3Q7PCAw5DTiwbVdFiaLfSvxxvHKgVDm24nDQKBcNyz7nv",
+                      "node": {
+                        "depth": 4,
+                        "fingerprint": 366162743,
+                        "child_num": 2147483648,
+                        "chain_code": "3f53bff9b0e3064d86e99f6cd021fc1474626a808a5cd856d1ad5515730181b6",
+                        "public_key": "0259266d4f895c9914f3eeff52db716273782f619d4243d63b026b85202024084e"
+                      },
                       "address_n": [
                         0,
                         0
                       ]
                     },
                     {
-                      "node": "xpub6F9Qm2hmXhoSwh9CGn5eNKtaP4TjaSddXQTi4nao2cumxRTcbaHtwK3FewV4DZZuCAp3nZRLiurihDgBcLAX3HMePmi7yhKgx91NftyEv6Y",
+                      "node": {
+                        "depth": 4,
+                        "fingerprint": 3679881372,
+                        "child_num": 2147483648,
+                        "chain_code": "fba6ed603da367e06b595888926d4923f3702ffcc33aed390f102bfc380d3a3f",
+                        "public_key": "03e5c56d800f644e094215ab12111f47bd6cee65be6d52f7f67246c1f747d783d2"
+                      },
                       "address_n": [
                         0,
                         0
@@ -511,304 +629,6 @@ export const GENERATED_MULTISIG_FIXTURES = {
                   "signatures": [
                     "",
                     "304402202627df914fe672edfecd0917e66c726aacb21ea0b3258c7ead1d32a801301b8202201b9578cca5e2efc0b515981319f8840daf407e6c34ccb96269694d88175249d901",
-                    ""
-                  ],
-                  "m": 2
-                }
-              }
-            ],
-            "outputs": [
-              {
-                "address": "1BitcoinEaterAddressDontSendf59kuE",
-                "amount": "190000",
-                "script_type": "PAYTOADDRESS"
-              }
-            ],
-            "refTxs": [
-              {
-                "hash": "bdeb4882a1cc6a8dd507b1e219550e17fde2f76dff15fc40829219e2cb712280",
-                "version": 2,
-                "inputs": [
-                  {
-                    "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
-                    "prev_index": 4294967295,
-                    "script_sig": "6f66666c696e652d6d756c74697369672d70327368",
-                    "sequence": 4294967295
-                  }
-                ],
-                "bin_outputs": [
-                  {
-                    "amount": 200000,
-                    "script_pubkey": "a914f345c1d72368680b03db19a107a0defb9560fb0d87"
-                  }
-                ],
-                "lock_time": 0
-              }
-            ]
-          }
-        },
-        {
-          "signerIndex": 1,
-          "signerEnvKey": "MULTISIG_MNEMONIC_2",
-          "signerAddress": "1DHWpRvGsZVXHvYSZ8HTSdEwPVwRHT8K5b",
-          "expectedSignature": "304402202627df914fe672edfecd0917e66c726aacb21ea0b3258c7ead1d32a801301b8202201b9578cca5e2efc0b515981319f8840daf407e6c34ccb96269694d88175249d901",
-          "prefilledSignerIndex": 0,
-          "firstSignParameters": {
-            "coin": "btc",
-            "inputs": [
-              {
-                "address_n": "m/48'/0'/0'/0'/0/0",
-                "prev_hash": "bdeb4882a1cc6a8dd507b1e219550e17fde2f76dff15fc40829219e2cb712280",
-                "prev_index": 0,
-                "amount": "200000",
-                "script_type": "SPENDMULTISIG",
-                "multisig": {
-                  "pubkeys": [
-                    {
-                      "node": "xpub6DpFgSNFWXCnjD9yDh1YoSFbWmDEmA29Gp1GauaNEbQUc5rvPAECvxqxRHb3239g9D9DNmk3y8vVe7K93RfS4tZAyCQTEjyRC1aHcNyDWNk",
-                      "address_n": [
-                        0,
-                        0
-                      ]
-                    },
-                    {
-                      "node": "xpub6DhD3vKCogoPyy7NhHnvDeMUafsWpVokXVo9PGAGbuN1SMpMuWz8hvx5p9VGbJ3Q7PCAw5DTiwbVdFiaLfSvxxvHKgVDm24nDQKBcNyz7nv",
-                      "address_n": [
-                        0,
-                        0
-                      ]
-                    },
-                    {
-                      "node": "xpub6F9Qm2hmXhoSwh9CGn5eNKtaP4TjaSddXQTi4nao2cumxRTcbaHtwK3FewV4DZZuCAp3nZRLiurihDgBcLAX3HMePmi7yhKgx91NftyEv6Y",
-                      "address_n": [
-                        0,
-                        0
-                      ]
-                    }
-                  ],
-                  "signatures": [
-                    "",
-                    "",
-                    ""
-                  ],
-                  "m": 2
-                }
-              }
-            ],
-            "outputs": [
-              {
-                "address": "1BitcoinEaterAddressDontSendf59kuE",
-                "amount": "190000",
-                "script_type": "PAYTOADDRESS"
-              }
-            ],
-            "refTxs": [
-              {
-                "hash": "bdeb4882a1cc6a8dd507b1e219550e17fde2f76dff15fc40829219e2cb712280",
-                "version": 2,
-                "inputs": [
-                  {
-                    "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
-                    "prev_index": 4294967295,
-                    "script_sig": "6f66666c696e652d6d756c74697369672d70327368",
-                    "sequence": 4294967295
-                  }
-                ],
-                "bin_outputs": [
-                  {
-                    "amount": 200000,
-                    "script_pubkey": "a914f345c1d72368680b03db19a107a0defb9560fb0d87"
-                  }
-                ],
-                "lock_time": 0
-              }
-            ]
-          },
-          "continueSignParameters": {
-            "coin": "btc",
-            "inputs": [
-              {
-                "address_n": "m/48'/0'/0'/0'/0/0",
-                "prev_hash": "bdeb4882a1cc6a8dd507b1e219550e17fde2f76dff15fc40829219e2cb712280",
-                "prev_index": 0,
-                "amount": "200000",
-                "script_type": "SPENDMULTISIG",
-                "multisig": {
-                  "pubkeys": [
-                    {
-                      "node": "xpub6DpFgSNFWXCnjD9yDh1YoSFbWmDEmA29Gp1GauaNEbQUc5rvPAECvxqxRHb3239g9D9DNmk3y8vVe7K93RfS4tZAyCQTEjyRC1aHcNyDWNk",
-                      "address_n": [
-                        0,
-                        0
-                      ]
-                    },
-                    {
-                      "node": "xpub6DhD3vKCogoPyy7NhHnvDeMUafsWpVokXVo9PGAGbuN1SMpMuWz8hvx5p9VGbJ3Q7PCAw5DTiwbVdFiaLfSvxxvHKgVDm24nDQKBcNyz7nv",
-                      "address_n": [
-                        0,
-                        0
-                      ]
-                    },
-                    {
-                      "node": "xpub6F9Qm2hmXhoSwh9CGn5eNKtaP4TjaSddXQTi4nao2cumxRTcbaHtwK3FewV4DZZuCAp3nZRLiurihDgBcLAX3HMePmi7yhKgx91NftyEv6Y",
-                      "address_n": [
-                        0,
-                        0
-                      ]
-                    }
-                  ],
-                  "signatures": [
-                    "3045022100e4437b7cc66b5342d24c50e1d3f0b9213aa6a8eb5b7a495ff2a16d257c45524d022060b873c66eda37531cae41d797969c7224acbfde48c498c5f5a59d9b1cbca3c601",
-                    "",
-                    ""
-                  ],
-                  "m": 2
-                }
-              }
-            ],
-            "outputs": [
-              {
-                "address": "1BitcoinEaterAddressDontSendf59kuE",
-                "amount": "190000",
-                "script_type": "PAYTOADDRESS"
-              }
-            ],
-            "refTxs": [
-              {
-                "hash": "bdeb4882a1cc6a8dd507b1e219550e17fde2f76dff15fc40829219e2cb712280",
-                "version": 2,
-                "inputs": [
-                  {
-                    "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
-                    "prev_index": 4294967295,
-                    "script_sig": "6f66666c696e652d6d756c74697369672d70327368",
-                    "sequence": 4294967295
-                  }
-                ],
-                "bin_outputs": [
-                  {
-                    "amount": 200000,
-                    "script_pubkey": "a914f345c1d72368680b03db19a107a0defb9560fb0d87"
-                  }
-                ],
-                "lock_time": 0
-              }
-            ]
-          }
-        },
-        {
-          "signerIndex": 2,
-          "signerEnvKey": "MULTISIG_MNEMONIC_3",
-          "signerAddress": "1M7zKgW79oPRnLB9B9Wjx4Kf4vfeHyJ5bR",
-          "expectedSignature": "3044022055f8a79a84e8df17b3ec4e459e2f9cd3f6e06bb7fde37f4e1a6b1292c14157c502207bfd3d6d12541f405f949a34a2e6e36915e5398d07107352fc1d20688ae35eb501",
-          "prefilledSignerIndex": 0,
-          "firstSignParameters": {
-            "coin": "btc",
-            "inputs": [
-              {
-                "address_n": "m/48'/0'/0'/0'/0/0",
-                "prev_hash": "bdeb4882a1cc6a8dd507b1e219550e17fde2f76dff15fc40829219e2cb712280",
-                "prev_index": 0,
-                "amount": "200000",
-                "script_type": "SPENDMULTISIG",
-                "multisig": {
-                  "pubkeys": [
-                    {
-                      "node": "xpub6DpFgSNFWXCnjD9yDh1YoSFbWmDEmA29Gp1GauaNEbQUc5rvPAECvxqxRHb3239g9D9DNmk3y8vVe7K93RfS4tZAyCQTEjyRC1aHcNyDWNk",
-                      "address_n": [
-                        0,
-                        0
-                      ]
-                    },
-                    {
-                      "node": "xpub6DhD3vKCogoPyy7NhHnvDeMUafsWpVokXVo9PGAGbuN1SMpMuWz8hvx5p9VGbJ3Q7PCAw5DTiwbVdFiaLfSvxxvHKgVDm24nDQKBcNyz7nv",
-                      "address_n": [
-                        0,
-                        0
-                      ]
-                    },
-                    {
-                      "node": "xpub6F9Qm2hmXhoSwh9CGn5eNKtaP4TjaSddXQTi4nao2cumxRTcbaHtwK3FewV4DZZuCAp3nZRLiurihDgBcLAX3HMePmi7yhKgx91NftyEv6Y",
-                      "address_n": [
-                        0,
-                        0
-                      ]
-                    }
-                  ],
-                  "signatures": [
-                    "",
-                    "",
-                    ""
-                  ],
-                  "m": 2
-                }
-              }
-            ],
-            "outputs": [
-              {
-                "address": "1BitcoinEaterAddressDontSendf59kuE",
-                "amount": "190000",
-                "script_type": "PAYTOADDRESS"
-              }
-            ],
-            "refTxs": [
-              {
-                "hash": "bdeb4882a1cc6a8dd507b1e219550e17fde2f76dff15fc40829219e2cb712280",
-                "version": 2,
-                "inputs": [
-                  {
-                    "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
-                    "prev_index": 4294967295,
-                    "script_sig": "6f66666c696e652d6d756c74697369672d70327368",
-                    "sequence": 4294967295
-                  }
-                ],
-                "bin_outputs": [
-                  {
-                    "amount": 200000,
-                    "script_pubkey": "a914f345c1d72368680b03db19a107a0defb9560fb0d87"
-                  }
-                ],
-                "lock_time": 0
-              }
-            ]
-          },
-          "continueSignParameters": {
-            "coin": "btc",
-            "inputs": [
-              {
-                "address_n": "m/48'/0'/0'/0'/0/0",
-                "prev_hash": "bdeb4882a1cc6a8dd507b1e219550e17fde2f76dff15fc40829219e2cb712280",
-                "prev_index": 0,
-                "amount": "200000",
-                "script_type": "SPENDMULTISIG",
-                "multisig": {
-                  "pubkeys": [
-                    {
-                      "node": "xpub6DpFgSNFWXCnjD9yDh1YoSFbWmDEmA29Gp1GauaNEbQUc5rvPAECvxqxRHb3239g9D9DNmk3y8vVe7K93RfS4tZAyCQTEjyRC1aHcNyDWNk",
-                      "address_n": [
-                        0,
-                        0
-                      ]
-                    },
-                    {
-                      "node": "xpub6DhD3vKCogoPyy7NhHnvDeMUafsWpVokXVo9PGAGbuN1SMpMuWz8hvx5p9VGbJ3Q7PCAw5DTiwbVdFiaLfSvxxvHKgVDm24nDQKBcNyz7nv",
-                      "address_n": [
-                        0,
-                        0
-                      ]
-                    },
-                    {
-                      "node": "xpub6F9Qm2hmXhoSwh9CGn5eNKtaP4TjaSddXQTi4nao2cumxRTcbaHtwK3FewV4DZZuCAp3nZRLiurihDgBcLAX3HMePmi7yhKgx91NftyEv6Y",
-                      "address_n": [
-                        0,
-                        0
-                      ]
-                    }
-                  ],
-                  "signatures": [
-                    "3045022100e4437b7cc66b5342d24c50e1d3f0b9213aa6a8eb5b7a495ff2a16d257c45524d022060b873c66eda37531cae41d797969c7224acbfde48c498c5f5a59d9b1cbca3c601",
-                    "",
                     ""
                   ],
                   "m": 2
@@ -902,21 +722,39 @@ export const GENERATED_MULTISIG_FIXTURES = {
         "multisig": {
           "pubkeys": [
             {
-              "node": "xpub6DpFgSNFWXCnkq2qJQwa1TNdav4M7grAvN73Ui8HhX43xaapqQ4u2Ci7agEhA8b7JL2cwK2rUtJJrJENtKXvBNSpLMrmRVu95AGdZQSnsgS",
+              "node": {
+                "depth": 4,
+                "fingerprint": 643428168,
+                "child_num": 2147483649,
+                "chain_code": "55a49b43ca88fec05bafbd2633ebe95ffaf1cf1f9825912c5743f71bc6416fa6",
+                "public_key": "02aa0c9b67bc9e5953218eeb8131d4eeb4b4e257524ba650951935cd3a6743bd79"
+              },
               "address_n": [
                 0,
                 0
               ]
             },
             {
-              "node": "xpub6DhD3vKCogoQ48ra51MgxJiUTLYKWhZh6RxaXvVT2gDrQQiXeVDuyA65X3fSPLJfR5t7neTK5cMWHm36Z2qnwAXivQZ2vhN3WM2CytmRVFp",
+              "node": {
+                "depth": 4,
+                "fingerprint": 366162743,
+                "child_num": 2147483649,
+                "chain_code": "e1f81c38b91f60dd0cf395c737d858bfc124cdc7e206573566f8269e0e926411",
+                "public_key": "03859a1075eb0453dd39d00de0df5991b78aba63cfc416f08a68eb7f12970b1bcd"
+              },
               "address_n": [
                 0,
                 0
               ]
             },
             {
-              "node": "xpub6F9Qm2hmXhoSyRpBpwDQ22zw1Gya5w9YC1y8edxmXaM7zceMhDSALAHC3kpwjgFSSYTWcrf7yurs6eywsGxLYrhGNGfTqzXymr7jdokHYdt",
+              "node": {
+                "depth": 4,
+                "fingerprint": 3679881372,
+                "child_num": 2147483649,
+                "chain_code": "a9fdd38acf62de102f8ed58e828ed3649cc648759b659253a78f1dbd464c999a",
+                "public_key": "02bb9d44fc50eff11ced5e3544ede62d54601bd9dad64d7f69ab1a33301eb3a3de"
+              },
               "address_n": [
                 0,
                 0
@@ -935,7 +773,14 @@ export const GENERATED_MULTISIG_FIXTURES = {
         "coin": "btc",
         "inputs": [
           {
-            "address_n": "m/48'/0'/0'/1'/0/0",
+            "address_n": [
+              2147483696,
+              2147483648,
+              2147483648,
+              2147483649,
+              0,
+              0
+            ],
             "prev_hash": "25b342e6dc0dbfd5c0cb54b52aa5f0b3588f2b36cde8faed75316c286d4071da",
             "prev_index": 0,
             "amount": "200000",
@@ -943,21 +788,39 @@ export const GENERATED_MULTISIG_FIXTURES = {
             "multisig": {
               "pubkeys": [
                 {
-                  "node": "xpub6DpFgSNFWXCnkq2qJQwa1TNdav4M7grAvN73Ui8HhX43xaapqQ4u2Ci7agEhA8b7JL2cwK2rUtJJrJENtKXvBNSpLMrmRVu95AGdZQSnsgS",
+                  "node": {
+                    "depth": 4,
+                    "fingerprint": 643428168,
+                    "child_num": 2147483649,
+                    "chain_code": "55a49b43ca88fec05bafbd2633ebe95ffaf1cf1f9825912c5743f71bc6416fa6",
+                    "public_key": "02aa0c9b67bc9e5953218eeb8131d4eeb4b4e257524ba650951935cd3a6743bd79"
+                  },
                   "address_n": [
                     0,
                     0
                   ]
                 },
                 {
-                  "node": "xpub6DhD3vKCogoQ48ra51MgxJiUTLYKWhZh6RxaXvVT2gDrQQiXeVDuyA65X3fSPLJfR5t7neTK5cMWHm36Z2qnwAXivQZ2vhN3WM2CytmRVFp",
+                  "node": {
+                    "depth": 4,
+                    "fingerprint": 366162743,
+                    "child_num": 2147483649,
+                    "chain_code": "e1f81c38b91f60dd0cf395c737d858bfc124cdc7e206573566f8269e0e926411",
+                    "public_key": "03859a1075eb0453dd39d00de0df5991b78aba63cfc416f08a68eb7f12970b1bcd"
+                  },
                   "address_n": [
                     0,
                     0
                   ]
                 },
                 {
-                  "node": "xpub6F9Qm2hmXhoSyRpBpwDQ22zw1Gya5w9YC1y8edxmXaM7zceMhDSALAHC3kpwjgFSSYTWcrf7yurs6eywsGxLYrhGNGfTqzXymr7jdokHYdt",
+                  "node": {
+                    "depth": 4,
+                    "fingerprint": 3679881372,
+                    "child_num": 2147483649,
+                    "chain_code": "a9fdd38acf62de102f8ed58e828ed3649cc648759b659253a78f1dbd464c999a",
+                    "public_key": "02bb9d44fc50eff11ced5e3544ede62d54601bd9dad64d7f69ab1a33301eb3a3de"
+                  },
                   "address_n": [
                     0,
                     0
@@ -1006,7 +869,14 @@ export const GENERATED_MULTISIG_FIXTURES = {
         "coin": "btc",
         "inputs": [
           {
-            "address_n": "m/48'/0'/0'/1'/0/0",
+            "address_n": [
+              2147483696,
+              2147483648,
+              2147483648,
+              2147483649,
+              0,
+              0
+            ],
             "prev_hash": "25b342e6dc0dbfd5c0cb54b52aa5f0b3588f2b36cde8faed75316c286d4071da",
             "prev_index": 0,
             "amount": "200000",
@@ -1014,21 +884,39 @@ export const GENERATED_MULTISIG_FIXTURES = {
             "multisig": {
               "pubkeys": [
                 {
-                  "node": "xpub6DpFgSNFWXCnkq2qJQwa1TNdav4M7grAvN73Ui8HhX43xaapqQ4u2Ci7agEhA8b7JL2cwK2rUtJJrJENtKXvBNSpLMrmRVu95AGdZQSnsgS",
+                  "node": {
+                    "depth": 4,
+                    "fingerprint": 643428168,
+                    "child_num": 2147483649,
+                    "chain_code": "55a49b43ca88fec05bafbd2633ebe95ffaf1cf1f9825912c5743f71bc6416fa6",
+                    "public_key": "02aa0c9b67bc9e5953218eeb8131d4eeb4b4e257524ba650951935cd3a6743bd79"
+                  },
                   "address_n": [
                     0,
                     0
                   ]
                 },
                 {
-                  "node": "xpub6DhD3vKCogoQ48ra51MgxJiUTLYKWhZh6RxaXvVT2gDrQQiXeVDuyA65X3fSPLJfR5t7neTK5cMWHm36Z2qnwAXivQZ2vhN3WM2CytmRVFp",
+                  "node": {
+                    "depth": 4,
+                    "fingerprint": 366162743,
+                    "child_num": 2147483649,
+                    "chain_code": "e1f81c38b91f60dd0cf395c737d858bfc124cdc7e206573566f8269e0e926411",
+                    "public_key": "03859a1075eb0453dd39d00de0df5991b78aba63cfc416f08a68eb7f12970b1bcd"
+                  },
                   "address_n": [
                     0,
                     0
                   ]
                 },
                 {
-                  "node": "xpub6F9Qm2hmXhoSyRpBpwDQ22zw1Gya5w9YC1y8edxmXaM7zceMhDSALAHC3kpwjgFSSYTWcrf7yurs6eywsGxLYrhGNGfTqzXymr7jdokHYdt",
+                  "node": {
+                    "depth": 4,
+                    "fingerprint": 3679881372,
+                    "child_num": 2147483649,
+                    "chain_code": "a9fdd38acf62de102f8ed58e828ed3649cc648759b659253a78f1dbd464c999a",
+                    "public_key": "02bb9d44fc50eff11ced5e3544ede62d54601bd9dad64d7f69ab1a33301eb3a3de"
+                  },
                   "address_n": [
                     0,
                     0
@@ -1084,7 +972,14 @@ export const GENERATED_MULTISIG_FIXTURES = {
             "coin": "btc",
             "inputs": [
               {
-                "address_n": "m/48'/0'/0'/1'/0/0",
+                "address_n": [
+                  2147483696,
+                  2147483648,
+                  2147483648,
+                  2147483649,
+                  0,
+                  0
+                ],
                 "prev_hash": "25b342e6dc0dbfd5c0cb54b52aa5f0b3588f2b36cde8faed75316c286d4071da",
                 "prev_index": 0,
                 "amount": "200000",
@@ -1092,21 +987,39 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 "multisig": {
                   "pubkeys": [
                     {
-                      "node": "xpub6DpFgSNFWXCnkq2qJQwa1TNdav4M7grAvN73Ui8HhX43xaapqQ4u2Ci7agEhA8b7JL2cwK2rUtJJrJENtKXvBNSpLMrmRVu95AGdZQSnsgS",
+                      "node": {
+                        "depth": 4,
+                        "fingerprint": 643428168,
+                        "child_num": 2147483649,
+                        "chain_code": "55a49b43ca88fec05bafbd2633ebe95ffaf1cf1f9825912c5743f71bc6416fa6",
+                        "public_key": "02aa0c9b67bc9e5953218eeb8131d4eeb4b4e257524ba650951935cd3a6743bd79"
+                      },
                       "address_n": [
                         0,
                         0
                       ]
                     },
                     {
-                      "node": "xpub6DhD3vKCogoQ48ra51MgxJiUTLYKWhZh6RxaXvVT2gDrQQiXeVDuyA65X3fSPLJfR5t7neTK5cMWHm36Z2qnwAXivQZ2vhN3WM2CytmRVFp",
+                      "node": {
+                        "depth": 4,
+                        "fingerprint": 366162743,
+                        "child_num": 2147483649,
+                        "chain_code": "e1f81c38b91f60dd0cf395c737d858bfc124cdc7e206573566f8269e0e926411",
+                        "public_key": "03859a1075eb0453dd39d00de0df5991b78aba63cfc416f08a68eb7f12970b1bcd"
+                      },
                       "address_n": [
                         0,
                         0
                       ]
                     },
                     {
-                      "node": "xpub6F9Qm2hmXhoSyRpBpwDQ22zw1Gya5w9YC1y8edxmXaM7zceMhDSALAHC3kpwjgFSSYTWcrf7yurs6eywsGxLYrhGNGfTqzXymr7jdokHYdt",
+                      "node": {
+                        "depth": 4,
+                        "fingerprint": 3679881372,
+                        "child_num": 2147483649,
+                        "chain_code": "a9fdd38acf62de102f8ed58e828ed3649cc648759b659253a78f1dbd464c999a",
+                        "public_key": "02bb9d44fc50eff11ced5e3544ede62d54601bd9dad64d7f69ab1a33301eb3a3de"
+                      },
                       "address_n": [
                         0,
                         0
@@ -1155,7 +1068,14 @@ export const GENERATED_MULTISIG_FIXTURES = {
             "coin": "btc",
             "inputs": [
               {
-                "address_n": "m/48'/0'/0'/1'/0/0",
+                "address_n": [
+                  2147483696,
+                  2147483648,
+                  2147483648,
+                  2147483649,
+                  0,
+                  0
+                ],
                 "prev_hash": "25b342e6dc0dbfd5c0cb54b52aa5f0b3588f2b36cde8faed75316c286d4071da",
                 "prev_index": 0,
                 "amount": "200000",
@@ -1163,21 +1083,39 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 "multisig": {
                   "pubkeys": [
                     {
-                      "node": "xpub6DpFgSNFWXCnkq2qJQwa1TNdav4M7grAvN73Ui8HhX43xaapqQ4u2Ci7agEhA8b7JL2cwK2rUtJJrJENtKXvBNSpLMrmRVu95AGdZQSnsgS",
+                      "node": {
+                        "depth": 4,
+                        "fingerprint": 643428168,
+                        "child_num": 2147483649,
+                        "chain_code": "55a49b43ca88fec05bafbd2633ebe95ffaf1cf1f9825912c5743f71bc6416fa6",
+                        "public_key": "02aa0c9b67bc9e5953218eeb8131d4eeb4b4e257524ba650951935cd3a6743bd79"
+                      },
                       "address_n": [
                         0,
                         0
                       ]
                     },
                     {
-                      "node": "xpub6DhD3vKCogoQ48ra51MgxJiUTLYKWhZh6RxaXvVT2gDrQQiXeVDuyA65X3fSPLJfR5t7neTK5cMWHm36Z2qnwAXivQZ2vhN3WM2CytmRVFp",
+                      "node": {
+                        "depth": 4,
+                        "fingerprint": 366162743,
+                        "child_num": 2147483649,
+                        "chain_code": "e1f81c38b91f60dd0cf395c737d858bfc124cdc7e206573566f8269e0e926411",
+                        "public_key": "03859a1075eb0453dd39d00de0df5991b78aba63cfc416f08a68eb7f12970b1bcd"
+                      },
                       "address_n": [
                         0,
                         0
                       ]
                     },
                     {
-                      "node": "xpub6F9Qm2hmXhoSyRpBpwDQ22zw1Gya5w9YC1y8edxmXaM7zceMhDSALAHC3kpwjgFSSYTWcrf7yurs6eywsGxLYrhGNGfTqzXymr7jdokHYdt",
+                      "node": {
+                        "depth": 4,
+                        "fingerprint": 3679881372,
+                        "child_num": 2147483649,
+                        "chain_code": "a9fdd38acf62de102f8ed58e828ed3649cc648759b659253a78f1dbd464c999a",
+                        "public_key": "02bb9d44fc50eff11ced5e3544ede62d54601bd9dad64d7f69ab1a33301eb3a3de"
+                      },
                       "address_n": [
                         0,
                         0
@@ -1187,304 +1125,6 @@ export const GENERATED_MULTISIG_FIXTURES = {
                   "signatures": [
                     "",
                     "30440220727947fc48d5b77066c7435c094ba961cbc8687b53554840474f43dfecd43fff02200e5297485c8588e8431f363d76b254a6fc2b3c58bb0433a4740f9d63d0decc0c01",
-                    ""
-                  ],
-                  "m": 2
-                }
-              }
-            ],
-            "outputs": [
-              {
-                "address": "1BitcoinEaterAddressDontSendf59kuE",
-                "amount": "190000",
-                "script_type": "PAYTOADDRESS"
-              }
-            ],
-            "refTxs": [
-              {
-                "hash": "25b342e6dc0dbfd5c0cb54b52aa5f0b3588f2b36cde8faed75316c286d4071da",
-                "version": 2,
-                "inputs": [
-                  {
-                    "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
-                    "prev_index": 4294967295,
-                    "script_sig": "6f66666c696e652d6d756c74697369672d703273682d7032777368",
-                    "sequence": 4294967295
-                  }
-                ],
-                "bin_outputs": [
-                  {
-                    "amount": 200000,
-                    "script_pubkey": "a91436a3130e592829dfe0aa45c9f4c924b0d875d01a87"
-                  }
-                ],
-                "lock_time": 0
-              }
-            ]
-          }
-        },
-        {
-          "signerIndex": 1,
-          "signerEnvKey": "MULTISIG_MNEMONIC_2",
-          "signerAddress": "1NvkdBRcTgAzAdw6nF8M1B1Yy2okftwPUH",
-          "expectedSignature": "30440220727947fc48d5b77066c7435c094ba961cbc8687b53554840474f43dfecd43fff02200e5297485c8588e8431f363d76b254a6fc2b3c58bb0433a4740f9d63d0decc0c01",
-          "prefilledSignerIndex": 0,
-          "firstSignParameters": {
-            "coin": "btc",
-            "inputs": [
-              {
-                "address_n": "m/48'/0'/0'/1'/0/0",
-                "prev_hash": "25b342e6dc0dbfd5c0cb54b52aa5f0b3588f2b36cde8faed75316c286d4071da",
-                "prev_index": 0,
-                "amount": "200000",
-                "script_type": "SPENDP2SHWITNESS",
-                "multisig": {
-                  "pubkeys": [
-                    {
-                      "node": "xpub6DpFgSNFWXCnkq2qJQwa1TNdav4M7grAvN73Ui8HhX43xaapqQ4u2Ci7agEhA8b7JL2cwK2rUtJJrJENtKXvBNSpLMrmRVu95AGdZQSnsgS",
-                      "address_n": [
-                        0,
-                        0
-                      ]
-                    },
-                    {
-                      "node": "xpub6DhD3vKCogoQ48ra51MgxJiUTLYKWhZh6RxaXvVT2gDrQQiXeVDuyA65X3fSPLJfR5t7neTK5cMWHm36Z2qnwAXivQZ2vhN3WM2CytmRVFp",
-                      "address_n": [
-                        0,
-                        0
-                      ]
-                    },
-                    {
-                      "node": "xpub6F9Qm2hmXhoSyRpBpwDQ22zw1Gya5w9YC1y8edxmXaM7zceMhDSALAHC3kpwjgFSSYTWcrf7yurs6eywsGxLYrhGNGfTqzXymr7jdokHYdt",
-                      "address_n": [
-                        0,
-                        0
-                      ]
-                    }
-                  ],
-                  "signatures": [
-                    "",
-                    "",
-                    ""
-                  ],
-                  "m": 2
-                }
-              }
-            ],
-            "outputs": [
-              {
-                "address": "1BitcoinEaterAddressDontSendf59kuE",
-                "amount": "190000",
-                "script_type": "PAYTOADDRESS"
-              }
-            ],
-            "refTxs": [
-              {
-                "hash": "25b342e6dc0dbfd5c0cb54b52aa5f0b3588f2b36cde8faed75316c286d4071da",
-                "version": 2,
-                "inputs": [
-                  {
-                    "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
-                    "prev_index": 4294967295,
-                    "script_sig": "6f66666c696e652d6d756c74697369672d703273682d7032777368",
-                    "sequence": 4294967295
-                  }
-                ],
-                "bin_outputs": [
-                  {
-                    "amount": 200000,
-                    "script_pubkey": "a91436a3130e592829dfe0aa45c9f4c924b0d875d01a87"
-                  }
-                ],
-                "lock_time": 0
-              }
-            ]
-          },
-          "continueSignParameters": {
-            "coin": "btc",
-            "inputs": [
-              {
-                "address_n": "m/48'/0'/0'/1'/0/0",
-                "prev_hash": "25b342e6dc0dbfd5c0cb54b52aa5f0b3588f2b36cde8faed75316c286d4071da",
-                "prev_index": 0,
-                "amount": "200000",
-                "script_type": "SPENDP2SHWITNESS",
-                "multisig": {
-                  "pubkeys": [
-                    {
-                      "node": "xpub6DpFgSNFWXCnkq2qJQwa1TNdav4M7grAvN73Ui8HhX43xaapqQ4u2Ci7agEhA8b7JL2cwK2rUtJJrJENtKXvBNSpLMrmRVu95AGdZQSnsgS",
-                      "address_n": [
-                        0,
-                        0
-                      ]
-                    },
-                    {
-                      "node": "xpub6DhD3vKCogoQ48ra51MgxJiUTLYKWhZh6RxaXvVT2gDrQQiXeVDuyA65X3fSPLJfR5t7neTK5cMWHm36Z2qnwAXivQZ2vhN3WM2CytmRVFp",
-                      "address_n": [
-                        0,
-                        0
-                      ]
-                    },
-                    {
-                      "node": "xpub6F9Qm2hmXhoSyRpBpwDQ22zw1Gya5w9YC1y8edxmXaM7zceMhDSALAHC3kpwjgFSSYTWcrf7yurs6eywsGxLYrhGNGfTqzXymr7jdokHYdt",
-                      "address_n": [
-                        0,
-                        0
-                      ]
-                    }
-                  ],
-                  "signatures": [
-                    "304402207103ac87e9129e9d01884367191728f3cfb7c908baad30b44c0d6b21baa80b220220697df386e1b8b1b37cf9428c391296aa3c26409a5a858d563498e724f700181101",
-                    "",
-                    ""
-                  ],
-                  "m": 2
-                }
-              }
-            ],
-            "outputs": [
-              {
-                "address": "1BitcoinEaterAddressDontSendf59kuE",
-                "amount": "190000",
-                "script_type": "PAYTOADDRESS"
-              }
-            ],
-            "refTxs": [
-              {
-                "hash": "25b342e6dc0dbfd5c0cb54b52aa5f0b3588f2b36cde8faed75316c286d4071da",
-                "version": 2,
-                "inputs": [
-                  {
-                    "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
-                    "prev_index": 4294967295,
-                    "script_sig": "6f66666c696e652d6d756c74697369672d703273682d7032777368",
-                    "sequence": 4294967295
-                  }
-                ],
-                "bin_outputs": [
-                  {
-                    "amount": 200000,
-                    "script_pubkey": "a91436a3130e592829dfe0aa45c9f4c924b0d875d01a87"
-                  }
-                ],
-                "lock_time": 0
-              }
-            ]
-          }
-        },
-        {
-          "signerIndex": 2,
-          "signerEnvKey": "MULTISIG_MNEMONIC_3",
-          "signerAddress": "14jgk24j8hjtDq61EaMRjrLpseQy687iR8",
-          "expectedSignature": "304402205830b183abbcb9b04443a4bd2da5c7363f818e6f0f9a144c821b208490a7151502200ae891cec4b72505bd52f2febab4427bbe159a3f8e504224277a28577b0dafb901",
-          "prefilledSignerIndex": 0,
-          "firstSignParameters": {
-            "coin": "btc",
-            "inputs": [
-              {
-                "address_n": "m/48'/0'/0'/1'/0/0",
-                "prev_hash": "25b342e6dc0dbfd5c0cb54b52aa5f0b3588f2b36cde8faed75316c286d4071da",
-                "prev_index": 0,
-                "amount": "200000",
-                "script_type": "SPENDP2SHWITNESS",
-                "multisig": {
-                  "pubkeys": [
-                    {
-                      "node": "xpub6DpFgSNFWXCnkq2qJQwa1TNdav4M7grAvN73Ui8HhX43xaapqQ4u2Ci7agEhA8b7JL2cwK2rUtJJrJENtKXvBNSpLMrmRVu95AGdZQSnsgS",
-                      "address_n": [
-                        0,
-                        0
-                      ]
-                    },
-                    {
-                      "node": "xpub6DhD3vKCogoQ48ra51MgxJiUTLYKWhZh6RxaXvVT2gDrQQiXeVDuyA65X3fSPLJfR5t7neTK5cMWHm36Z2qnwAXivQZ2vhN3WM2CytmRVFp",
-                      "address_n": [
-                        0,
-                        0
-                      ]
-                    },
-                    {
-                      "node": "xpub6F9Qm2hmXhoSyRpBpwDQ22zw1Gya5w9YC1y8edxmXaM7zceMhDSALAHC3kpwjgFSSYTWcrf7yurs6eywsGxLYrhGNGfTqzXymr7jdokHYdt",
-                      "address_n": [
-                        0,
-                        0
-                      ]
-                    }
-                  ],
-                  "signatures": [
-                    "",
-                    "",
-                    ""
-                  ],
-                  "m": 2
-                }
-              }
-            ],
-            "outputs": [
-              {
-                "address": "1BitcoinEaterAddressDontSendf59kuE",
-                "amount": "190000",
-                "script_type": "PAYTOADDRESS"
-              }
-            ],
-            "refTxs": [
-              {
-                "hash": "25b342e6dc0dbfd5c0cb54b52aa5f0b3588f2b36cde8faed75316c286d4071da",
-                "version": 2,
-                "inputs": [
-                  {
-                    "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
-                    "prev_index": 4294967295,
-                    "script_sig": "6f66666c696e652d6d756c74697369672d703273682d7032777368",
-                    "sequence": 4294967295
-                  }
-                ],
-                "bin_outputs": [
-                  {
-                    "amount": 200000,
-                    "script_pubkey": "a91436a3130e592829dfe0aa45c9f4c924b0d875d01a87"
-                  }
-                ],
-                "lock_time": 0
-              }
-            ]
-          },
-          "continueSignParameters": {
-            "coin": "btc",
-            "inputs": [
-              {
-                "address_n": "m/48'/0'/0'/1'/0/0",
-                "prev_hash": "25b342e6dc0dbfd5c0cb54b52aa5f0b3588f2b36cde8faed75316c286d4071da",
-                "prev_index": 0,
-                "amount": "200000",
-                "script_type": "SPENDP2SHWITNESS",
-                "multisig": {
-                  "pubkeys": [
-                    {
-                      "node": "xpub6DpFgSNFWXCnkq2qJQwa1TNdav4M7grAvN73Ui8HhX43xaapqQ4u2Ci7agEhA8b7JL2cwK2rUtJJrJENtKXvBNSpLMrmRVu95AGdZQSnsgS",
-                      "address_n": [
-                        0,
-                        0
-                      ]
-                    },
-                    {
-                      "node": "xpub6DhD3vKCogoQ48ra51MgxJiUTLYKWhZh6RxaXvVT2gDrQQiXeVDuyA65X3fSPLJfR5t7neTK5cMWHm36Z2qnwAXivQZ2vhN3WM2CytmRVFp",
-                      "address_n": [
-                        0,
-                        0
-                      ]
-                    },
-                    {
-                      "node": "xpub6F9Qm2hmXhoSyRpBpwDQ22zw1Gya5w9YC1y8edxmXaM7zceMhDSALAHC3kpwjgFSSYTWcrf7yurs6eywsGxLYrhGNGfTqzXymr7jdokHYdt",
-                      "address_n": [
-                        0,
-                        0
-                      ]
-                    }
-                  ],
-                  "signatures": [
-                    "304402207103ac87e9129e9d01884367191728f3cfb7c908baad30b44c0d6b21baa80b220220697df386e1b8b1b37cf9428c391296aa3c26409a5a858d563498e724f700181101",
-                    "",
                     ""
                   ],
                   "m": 2
@@ -1579,21 +1219,39 @@ export const GENERATED_MULTISIG_FIXTURES = {
         "multisig": {
           "pubkeys": [
             {
-              "node": "xpub6DpFgSNFWXCnokam8hNgmouiu3ZXkDynKU1Y5pDazGkya2dPcHqesnFwUDvwhRemK9ekTpFsH6xjduqz8wc8REQWWBgx8RfGSUN7f3mWzf6",
+              "node": {
+                "depth": 4,
+                "fingerprint": 643428168,
+                "child_num": 2147483650,
+                "chain_code": "7b432e7f25cb8e861f1461835b4e2cce25628d8bf34e3ac011b65219c3cb8341",
+                "public_key": "02bed20bf5907215841abcb078342505adf118a3243adfb54f3e283d3ee82f1e13"
+              },
               "address_n": [
                 0,
                 0
               ]
             },
             {
-              "node": "xpub6DhD3vKCogoQ57x4mnaQFcCzbBgmYFcspSQR2BsaGRRxYNPD3rk5zFB8cfzFbis4uCFyqTXF7vXhsoA5cJuvuv2ozyNsF2fGKNGnnmNUhkp",
+              "node": {
+                "depth": 4,
+                "fingerprint": 366162743,
+                "child_num": 2147483650,
+                "chain_code": "44d7d6f681bf30caa24a547c84b09a62fec67b4957577b24b24461b002a17dce",
+                "public_key": "02f288075a5c2a4a80a00087fa500c5a7e51c43a215187b553fcf9d41acfccf2af"
+              },
               "address_n": [
                 0,
                 0
               ]
             },
             {
-              "node": "xpub6F9Qm2hmXhoT1MBLpk8mP8ku8Bh2Bq2cD2Wj3eEZbJp7fZa4QGmH8o2fvjmVctv8MU4kkTHakniGvKZ69cUJa9LAbx8GhpMJH7LAktoSHU2",
+              "node": {
+                "depth": 4,
+                "fingerprint": 3679881372,
+                "child_num": 2147483650,
+                "chain_code": "6ad8ffd7ad06a31751a9efc5d79a69a4f159ccc847377c637679d4917e0b5e96",
+                "public_key": "0347761357bca80a8190980592a812cb168e1273264ede1776e6bfd15db3dae25b"
+              },
               "address_n": [
                 0,
                 0
@@ -1612,7 +1270,14 @@ export const GENERATED_MULTISIG_FIXTURES = {
         "coin": "btc",
         "inputs": [
           {
-            "address_n": "m/48'/0'/0'/2'/0/0",
+            "address_n": [
+              2147483696,
+              2147483648,
+              2147483648,
+              2147483650,
+              0,
+              0
+            ],
             "prev_hash": "1897a428a4a4b3de56a6b594341523928c838cef591d40dded3cb14a3d86cf19",
             "prev_index": 0,
             "amount": "200000",
@@ -1620,21 +1285,39 @@ export const GENERATED_MULTISIG_FIXTURES = {
             "multisig": {
               "pubkeys": [
                 {
-                  "node": "xpub6DpFgSNFWXCnokam8hNgmouiu3ZXkDynKU1Y5pDazGkya2dPcHqesnFwUDvwhRemK9ekTpFsH6xjduqz8wc8REQWWBgx8RfGSUN7f3mWzf6",
+                  "node": {
+                    "depth": 4,
+                    "fingerprint": 643428168,
+                    "child_num": 2147483650,
+                    "chain_code": "7b432e7f25cb8e861f1461835b4e2cce25628d8bf34e3ac011b65219c3cb8341",
+                    "public_key": "02bed20bf5907215841abcb078342505adf118a3243adfb54f3e283d3ee82f1e13"
+                  },
                   "address_n": [
                     0,
                     0
                   ]
                 },
                 {
-                  "node": "xpub6DhD3vKCogoQ57x4mnaQFcCzbBgmYFcspSQR2BsaGRRxYNPD3rk5zFB8cfzFbis4uCFyqTXF7vXhsoA5cJuvuv2ozyNsF2fGKNGnnmNUhkp",
+                  "node": {
+                    "depth": 4,
+                    "fingerprint": 366162743,
+                    "child_num": 2147483650,
+                    "chain_code": "44d7d6f681bf30caa24a547c84b09a62fec67b4957577b24b24461b002a17dce",
+                    "public_key": "02f288075a5c2a4a80a00087fa500c5a7e51c43a215187b553fcf9d41acfccf2af"
+                  },
                   "address_n": [
                     0,
                     0
                   ]
                 },
                 {
-                  "node": "xpub6F9Qm2hmXhoT1MBLpk8mP8ku8Bh2Bq2cD2Wj3eEZbJp7fZa4QGmH8o2fvjmVctv8MU4kkTHakniGvKZ69cUJa9LAbx8GhpMJH7LAktoSHU2",
+                  "node": {
+                    "depth": 4,
+                    "fingerprint": 3679881372,
+                    "child_num": 2147483650,
+                    "chain_code": "6ad8ffd7ad06a31751a9efc5d79a69a4f159ccc847377c637679d4917e0b5e96",
+                    "public_key": "0347761357bca80a8190980592a812cb168e1273264ede1776e6bfd15db3dae25b"
+                  },
                   "address_n": [
                     0,
                     0
@@ -1683,7 +1366,14 @@ export const GENERATED_MULTISIG_FIXTURES = {
         "coin": "btc",
         "inputs": [
           {
-            "address_n": "m/48'/0'/0'/2'/0/0",
+            "address_n": [
+              2147483696,
+              2147483648,
+              2147483648,
+              2147483650,
+              0,
+              0
+            ],
             "prev_hash": "1897a428a4a4b3de56a6b594341523928c838cef591d40dded3cb14a3d86cf19",
             "prev_index": 0,
             "amount": "200000",
@@ -1691,21 +1381,39 @@ export const GENERATED_MULTISIG_FIXTURES = {
             "multisig": {
               "pubkeys": [
                 {
-                  "node": "xpub6DpFgSNFWXCnokam8hNgmouiu3ZXkDynKU1Y5pDazGkya2dPcHqesnFwUDvwhRemK9ekTpFsH6xjduqz8wc8REQWWBgx8RfGSUN7f3mWzf6",
+                  "node": {
+                    "depth": 4,
+                    "fingerprint": 643428168,
+                    "child_num": 2147483650,
+                    "chain_code": "7b432e7f25cb8e861f1461835b4e2cce25628d8bf34e3ac011b65219c3cb8341",
+                    "public_key": "02bed20bf5907215841abcb078342505adf118a3243adfb54f3e283d3ee82f1e13"
+                  },
                   "address_n": [
                     0,
                     0
                   ]
                 },
                 {
-                  "node": "xpub6DhD3vKCogoQ57x4mnaQFcCzbBgmYFcspSQR2BsaGRRxYNPD3rk5zFB8cfzFbis4uCFyqTXF7vXhsoA5cJuvuv2ozyNsF2fGKNGnnmNUhkp",
+                  "node": {
+                    "depth": 4,
+                    "fingerprint": 366162743,
+                    "child_num": 2147483650,
+                    "chain_code": "44d7d6f681bf30caa24a547c84b09a62fec67b4957577b24b24461b002a17dce",
+                    "public_key": "02f288075a5c2a4a80a00087fa500c5a7e51c43a215187b553fcf9d41acfccf2af"
+                  },
                   "address_n": [
                     0,
                     0
                   ]
                 },
                 {
-                  "node": "xpub6F9Qm2hmXhoT1MBLpk8mP8ku8Bh2Bq2cD2Wj3eEZbJp7fZa4QGmH8o2fvjmVctv8MU4kkTHakniGvKZ69cUJa9LAbx8GhpMJH7LAktoSHU2",
+                  "node": {
+                    "depth": 4,
+                    "fingerprint": 3679881372,
+                    "child_num": 2147483650,
+                    "chain_code": "6ad8ffd7ad06a31751a9efc5d79a69a4f159ccc847377c637679d4917e0b5e96",
+                    "public_key": "0347761357bca80a8190980592a812cb168e1273264ede1776e6bfd15db3dae25b"
+                  },
                   "address_n": [
                     0,
                     0
@@ -1761,7 +1469,14 @@ export const GENERATED_MULTISIG_FIXTURES = {
             "coin": "btc",
             "inputs": [
               {
-                "address_n": "m/48'/0'/0'/2'/0/0",
+                "address_n": [
+                  2147483696,
+                  2147483648,
+                  2147483648,
+                  2147483650,
+                  0,
+                  0
+                ],
                 "prev_hash": "1897a428a4a4b3de56a6b594341523928c838cef591d40dded3cb14a3d86cf19",
                 "prev_index": 0,
                 "amount": "200000",
@@ -1769,21 +1484,39 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 "multisig": {
                   "pubkeys": [
                     {
-                      "node": "xpub6DpFgSNFWXCnokam8hNgmouiu3ZXkDynKU1Y5pDazGkya2dPcHqesnFwUDvwhRemK9ekTpFsH6xjduqz8wc8REQWWBgx8RfGSUN7f3mWzf6",
+                      "node": {
+                        "depth": 4,
+                        "fingerprint": 643428168,
+                        "child_num": 2147483650,
+                        "chain_code": "7b432e7f25cb8e861f1461835b4e2cce25628d8bf34e3ac011b65219c3cb8341",
+                        "public_key": "02bed20bf5907215841abcb078342505adf118a3243adfb54f3e283d3ee82f1e13"
+                      },
                       "address_n": [
                         0,
                         0
                       ]
                     },
                     {
-                      "node": "xpub6DhD3vKCogoQ57x4mnaQFcCzbBgmYFcspSQR2BsaGRRxYNPD3rk5zFB8cfzFbis4uCFyqTXF7vXhsoA5cJuvuv2ozyNsF2fGKNGnnmNUhkp",
+                      "node": {
+                        "depth": 4,
+                        "fingerprint": 366162743,
+                        "child_num": 2147483650,
+                        "chain_code": "44d7d6f681bf30caa24a547c84b09a62fec67b4957577b24b24461b002a17dce",
+                        "public_key": "02f288075a5c2a4a80a00087fa500c5a7e51c43a215187b553fcf9d41acfccf2af"
+                      },
                       "address_n": [
                         0,
                         0
                       ]
                     },
                     {
-                      "node": "xpub6F9Qm2hmXhoT1MBLpk8mP8ku8Bh2Bq2cD2Wj3eEZbJp7fZa4QGmH8o2fvjmVctv8MU4kkTHakniGvKZ69cUJa9LAbx8GhpMJH7LAktoSHU2",
+                      "node": {
+                        "depth": 4,
+                        "fingerprint": 3679881372,
+                        "child_num": 2147483650,
+                        "chain_code": "6ad8ffd7ad06a31751a9efc5d79a69a4f159ccc847377c637679d4917e0b5e96",
+                        "public_key": "0347761357bca80a8190980592a812cb168e1273264ede1776e6bfd15db3dae25b"
+                      },
                       "address_n": [
                         0,
                         0
@@ -1832,7 +1565,14 @@ export const GENERATED_MULTISIG_FIXTURES = {
             "coin": "btc",
             "inputs": [
               {
-                "address_n": "m/48'/0'/0'/2'/0/0",
+                "address_n": [
+                  2147483696,
+                  2147483648,
+                  2147483648,
+                  2147483650,
+                  0,
+                  0
+                ],
                 "prev_hash": "1897a428a4a4b3de56a6b594341523928c838cef591d40dded3cb14a3d86cf19",
                 "prev_index": 0,
                 "amount": "200000",
@@ -1840,21 +1580,39 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 "multisig": {
                   "pubkeys": [
                     {
-                      "node": "xpub6DpFgSNFWXCnokam8hNgmouiu3ZXkDynKU1Y5pDazGkya2dPcHqesnFwUDvwhRemK9ekTpFsH6xjduqz8wc8REQWWBgx8RfGSUN7f3mWzf6",
+                      "node": {
+                        "depth": 4,
+                        "fingerprint": 643428168,
+                        "child_num": 2147483650,
+                        "chain_code": "7b432e7f25cb8e861f1461835b4e2cce25628d8bf34e3ac011b65219c3cb8341",
+                        "public_key": "02bed20bf5907215841abcb078342505adf118a3243adfb54f3e283d3ee82f1e13"
+                      },
                       "address_n": [
                         0,
                         0
                       ]
                     },
                     {
-                      "node": "xpub6DhD3vKCogoQ57x4mnaQFcCzbBgmYFcspSQR2BsaGRRxYNPD3rk5zFB8cfzFbis4uCFyqTXF7vXhsoA5cJuvuv2ozyNsF2fGKNGnnmNUhkp",
+                      "node": {
+                        "depth": 4,
+                        "fingerprint": 366162743,
+                        "child_num": 2147483650,
+                        "chain_code": "44d7d6f681bf30caa24a547c84b09a62fec67b4957577b24b24461b002a17dce",
+                        "public_key": "02f288075a5c2a4a80a00087fa500c5a7e51c43a215187b553fcf9d41acfccf2af"
+                      },
                       "address_n": [
                         0,
                         0
                       ]
                     },
                     {
-                      "node": "xpub6F9Qm2hmXhoT1MBLpk8mP8ku8Bh2Bq2cD2Wj3eEZbJp7fZa4QGmH8o2fvjmVctv8MU4kkTHakniGvKZ69cUJa9LAbx8GhpMJH7LAktoSHU2",
+                      "node": {
+                        "depth": 4,
+                        "fingerprint": 3679881372,
+                        "child_num": 2147483650,
+                        "chain_code": "6ad8ffd7ad06a31751a9efc5d79a69a4f159ccc847377c637679d4917e0b5e96",
+                        "public_key": "0347761357bca80a8190980592a812cb168e1273264ede1776e6bfd15db3dae25b"
+                      },
                       "address_n": [
                         0,
                         0
@@ -1864,304 +1622,6 @@ export const GENERATED_MULTISIG_FIXTURES = {
                   "signatures": [
                     "",
                     "304402201638a414bf8b864f7970de7e2806e88c31186c97ffed5e67bc4f52c1a684e88d022074de8423205fe09a68fc973d0847b994839e22055c6d137a38afa3c6fff1692301",
-                    ""
-                  ],
-                  "m": 2
-                }
-              }
-            ],
-            "outputs": [
-              {
-                "address": "1BitcoinEaterAddressDontSendf59kuE",
-                "amount": "190000",
-                "script_type": "PAYTOADDRESS"
-              }
-            ],
-            "refTxs": [
-              {
-                "hash": "1897a428a4a4b3de56a6b594341523928c838cef591d40dded3cb14a3d86cf19",
-                "version": 2,
-                "inputs": [
-                  {
-                    "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
-                    "prev_index": 4294967295,
-                    "script_sig": "6f66666c696e652d6d756c74697369672d7032777368",
-                    "sequence": 4294967295
-                  }
-                ],
-                "bin_outputs": [
-                  {
-                    "amount": 200000,
-                    "script_pubkey": "0020b539cc4159fcd12e1564b72a06f8d1dc11141c65ba615c00b95109d2641066ab"
-                  }
-                ],
-                "lock_time": 0
-              }
-            ]
-          }
-        },
-        {
-          "signerIndex": 1,
-          "signerEnvKey": "MULTISIG_MNEMONIC_2",
-          "signerAddress": "1Bvx5N5Fyayf2iFJ21HwpAsqSJi8exRpyt",
-          "expectedSignature": "304402201638a414bf8b864f7970de7e2806e88c31186c97ffed5e67bc4f52c1a684e88d022074de8423205fe09a68fc973d0847b994839e22055c6d137a38afa3c6fff1692301",
-          "prefilledSignerIndex": 0,
-          "firstSignParameters": {
-            "coin": "btc",
-            "inputs": [
-              {
-                "address_n": "m/48'/0'/0'/2'/0/0",
-                "prev_hash": "1897a428a4a4b3de56a6b594341523928c838cef591d40dded3cb14a3d86cf19",
-                "prev_index": 0,
-                "amount": "200000",
-                "script_type": "SPENDWITNESS",
-                "multisig": {
-                  "pubkeys": [
-                    {
-                      "node": "xpub6DpFgSNFWXCnokam8hNgmouiu3ZXkDynKU1Y5pDazGkya2dPcHqesnFwUDvwhRemK9ekTpFsH6xjduqz8wc8REQWWBgx8RfGSUN7f3mWzf6",
-                      "address_n": [
-                        0,
-                        0
-                      ]
-                    },
-                    {
-                      "node": "xpub6DhD3vKCogoQ57x4mnaQFcCzbBgmYFcspSQR2BsaGRRxYNPD3rk5zFB8cfzFbis4uCFyqTXF7vXhsoA5cJuvuv2ozyNsF2fGKNGnnmNUhkp",
-                      "address_n": [
-                        0,
-                        0
-                      ]
-                    },
-                    {
-                      "node": "xpub6F9Qm2hmXhoT1MBLpk8mP8ku8Bh2Bq2cD2Wj3eEZbJp7fZa4QGmH8o2fvjmVctv8MU4kkTHakniGvKZ69cUJa9LAbx8GhpMJH7LAktoSHU2",
-                      "address_n": [
-                        0,
-                        0
-                      ]
-                    }
-                  ],
-                  "signatures": [
-                    "",
-                    "",
-                    ""
-                  ],
-                  "m": 2
-                }
-              }
-            ],
-            "outputs": [
-              {
-                "address": "1BitcoinEaterAddressDontSendf59kuE",
-                "amount": "190000",
-                "script_type": "PAYTOADDRESS"
-              }
-            ],
-            "refTxs": [
-              {
-                "hash": "1897a428a4a4b3de56a6b594341523928c838cef591d40dded3cb14a3d86cf19",
-                "version": 2,
-                "inputs": [
-                  {
-                    "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
-                    "prev_index": 4294967295,
-                    "script_sig": "6f66666c696e652d6d756c74697369672d7032777368",
-                    "sequence": 4294967295
-                  }
-                ],
-                "bin_outputs": [
-                  {
-                    "amount": 200000,
-                    "script_pubkey": "0020b539cc4159fcd12e1564b72a06f8d1dc11141c65ba615c00b95109d2641066ab"
-                  }
-                ],
-                "lock_time": 0
-              }
-            ]
-          },
-          "continueSignParameters": {
-            "coin": "btc",
-            "inputs": [
-              {
-                "address_n": "m/48'/0'/0'/2'/0/0",
-                "prev_hash": "1897a428a4a4b3de56a6b594341523928c838cef591d40dded3cb14a3d86cf19",
-                "prev_index": 0,
-                "amount": "200000",
-                "script_type": "SPENDWITNESS",
-                "multisig": {
-                  "pubkeys": [
-                    {
-                      "node": "xpub6DpFgSNFWXCnokam8hNgmouiu3ZXkDynKU1Y5pDazGkya2dPcHqesnFwUDvwhRemK9ekTpFsH6xjduqz8wc8REQWWBgx8RfGSUN7f3mWzf6",
-                      "address_n": [
-                        0,
-                        0
-                      ]
-                    },
-                    {
-                      "node": "xpub6DhD3vKCogoQ57x4mnaQFcCzbBgmYFcspSQR2BsaGRRxYNPD3rk5zFB8cfzFbis4uCFyqTXF7vXhsoA5cJuvuv2ozyNsF2fGKNGnnmNUhkp",
-                      "address_n": [
-                        0,
-                        0
-                      ]
-                    },
-                    {
-                      "node": "xpub6F9Qm2hmXhoT1MBLpk8mP8ku8Bh2Bq2cD2Wj3eEZbJp7fZa4QGmH8o2fvjmVctv8MU4kkTHakniGvKZ69cUJa9LAbx8GhpMJH7LAktoSHU2",
-                      "address_n": [
-                        0,
-                        0
-                      ]
-                    }
-                  ],
-                  "signatures": [
-                    "3045022100ba32087c1a650360b87bbfcac1189bcadb055f1848a99039f192b309d8768cd10220197c17652286b649297311a5b536bf4e345a0fcfe92f7ba1db1c33d9495a245601",
-                    "",
-                    ""
-                  ],
-                  "m": 2
-                }
-              }
-            ],
-            "outputs": [
-              {
-                "address": "1BitcoinEaterAddressDontSendf59kuE",
-                "amount": "190000",
-                "script_type": "PAYTOADDRESS"
-              }
-            ],
-            "refTxs": [
-              {
-                "hash": "1897a428a4a4b3de56a6b594341523928c838cef591d40dded3cb14a3d86cf19",
-                "version": 2,
-                "inputs": [
-                  {
-                    "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
-                    "prev_index": 4294967295,
-                    "script_sig": "6f66666c696e652d6d756c74697369672d7032777368",
-                    "sequence": 4294967295
-                  }
-                ],
-                "bin_outputs": [
-                  {
-                    "amount": 200000,
-                    "script_pubkey": "0020b539cc4159fcd12e1564b72a06f8d1dc11141c65ba615c00b95109d2641066ab"
-                  }
-                ],
-                "lock_time": 0
-              }
-            ]
-          }
-        },
-        {
-          "signerIndex": 2,
-          "signerEnvKey": "MULTISIG_MNEMONIC_3",
-          "signerAddress": "1PgbkE8cFZghFrZ2E5e7QtoqQmsq9Cxqv6",
-          "expectedSignature": "3045022100dcecfb09ec4336b404f505a1699d1ce1999231ab6f1fc302978ac38799dae07f02206716c637c1534c5820ab8e0602056943b7f9016e3567d911a7575bb818682b2b01",
-          "prefilledSignerIndex": 0,
-          "firstSignParameters": {
-            "coin": "btc",
-            "inputs": [
-              {
-                "address_n": "m/48'/0'/0'/2'/0/0",
-                "prev_hash": "1897a428a4a4b3de56a6b594341523928c838cef591d40dded3cb14a3d86cf19",
-                "prev_index": 0,
-                "amount": "200000",
-                "script_type": "SPENDWITNESS",
-                "multisig": {
-                  "pubkeys": [
-                    {
-                      "node": "xpub6DpFgSNFWXCnokam8hNgmouiu3ZXkDynKU1Y5pDazGkya2dPcHqesnFwUDvwhRemK9ekTpFsH6xjduqz8wc8REQWWBgx8RfGSUN7f3mWzf6",
-                      "address_n": [
-                        0,
-                        0
-                      ]
-                    },
-                    {
-                      "node": "xpub6DhD3vKCogoQ57x4mnaQFcCzbBgmYFcspSQR2BsaGRRxYNPD3rk5zFB8cfzFbis4uCFyqTXF7vXhsoA5cJuvuv2ozyNsF2fGKNGnnmNUhkp",
-                      "address_n": [
-                        0,
-                        0
-                      ]
-                    },
-                    {
-                      "node": "xpub6F9Qm2hmXhoT1MBLpk8mP8ku8Bh2Bq2cD2Wj3eEZbJp7fZa4QGmH8o2fvjmVctv8MU4kkTHakniGvKZ69cUJa9LAbx8GhpMJH7LAktoSHU2",
-                      "address_n": [
-                        0,
-                        0
-                      ]
-                    }
-                  ],
-                  "signatures": [
-                    "",
-                    "",
-                    ""
-                  ],
-                  "m": 2
-                }
-              }
-            ],
-            "outputs": [
-              {
-                "address": "1BitcoinEaterAddressDontSendf59kuE",
-                "amount": "190000",
-                "script_type": "PAYTOADDRESS"
-              }
-            ],
-            "refTxs": [
-              {
-                "hash": "1897a428a4a4b3de56a6b594341523928c838cef591d40dded3cb14a3d86cf19",
-                "version": 2,
-                "inputs": [
-                  {
-                    "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
-                    "prev_index": 4294967295,
-                    "script_sig": "6f66666c696e652d6d756c74697369672d7032777368",
-                    "sequence": 4294967295
-                  }
-                ],
-                "bin_outputs": [
-                  {
-                    "amount": 200000,
-                    "script_pubkey": "0020b539cc4159fcd12e1564b72a06f8d1dc11141c65ba615c00b95109d2641066ab"
-                  }
-                ],
-                "lock_time": 0
-              }
-            ]
-          },
-          "continueSignParameters": {
-            "coin": "btc",
-            "inputs": [
-              {
-                "address_n": "m/48'/0'/0'/2'/0/0",
-                "prev_hash": "1897a428a4a4b3de56a6b594341523928c838cef591d40dded3cb14a3d86cf19",
-                "prev_index": 0,
-                "amount": "200000",
-                "script_type": "SPENDWITNESS",
-                "multisig": {
-                  "pubkeys": [
-                    {
-                      "node": "xpub6DpFgSNFWXCnokam8hNgmouiu3ZXkDynKU1Y5pDazGkya2dPcHqesnFwUDvwhRemK9ekTpFsH6xjduqz8wc8REQWWBgx8RfGSUN7f3mWzf6",
-                      "address_n": [
-                        0,
-                        0
-                      ]
-                    },
-                    {
-                      "node": "xpub6DhD3vKCogoQ57x4mnaQFcCzbBgmYFcspSQR2BsaGRRxYNPD3rk5zFB8cfzFbis4uCFyqTXF7vXhsoA5cJuvuv2ozyNsF2fGKNGnnmNUhkp",
-                      "address_n": [
-                        0,
-                        0
-                      ]
-                    },
-                    {
-                      "node": "xpub6F9Qm2hmXhoT1MBLpk8mP8ku8Bh2Bq2cD2Wj3eEZbJp7fZa4QGmH8o2fvjmVctv8MU4kkTHakniGvKZ69cUJa9LAbx8GhpMJH7LAktoSHU2",
-                      "address_n": [
-                        0,
-                        0
-                      ]
-                    }
-                  ],
-                  "signatures": [
-                    "3045022100ba32087c1a650360b87bbfcac1189bcadb055f1848a99039f192b309d8768cd10220197c17652286b649297311a5b536bf4e345a0fcfe92f7ba1db1c33d9495a245601",
-                    "",
                     ""
                   ],
                   "m": 2

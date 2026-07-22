@@ -1,6 +1,7 @@
 import { sign } from '@noble/secp256k1';
 import { HDKey } from '@scure/bip32';
 import { mnemonicToSeedSync } from '@scure/bip39';
+import { getHDPath } from '@onekeyfe/hd-core';
 import { address as bitcoinAddress, networks, payments, Transaction } from 'bitcoinjs-lib';
 
 import type { MultisigMnemonics } from './readMnemonics';
@@ -120,15 +121,28 @@ async function createFixture(
     })
   );
   const accountXpubs = accounts.map(account => account.publicExtendedKey);
+  const accountNodes = accounts.map((account, index) => {
+    if (!account.chainCode || !account.publicKey) {
+      throw new Error(`BTC ${config.title} signer ${index + 1} HDNode 派生失败`);
+    }
+    return {
+      depth: account.depth,
+      fingerprint: account.parentFingerprint,
+      child_num: account.index,
+      chain_code: Buffer.from(account.chainCode).toString('hex'),
+      public_key: Buffer.from(account.publicKey).toString('hex'),
+    };
+  });
   const emptySignatures = ['', '', ''];
   const partialSignatures = [expectedSignatures[0], '', ''];
   const doubleSignatures = [expectedSignatures[0], expectedSignatures[1], ''];
   const baseMultisig: BtcMultisigDescriptor = {
-    pubkeys: accountXpubs.map(node => ({ node, address_n: [0, 0] })),
+    pubkeys: accountNodes.map(node => ({ node, address_n: [0, 0] })),
     signatures: emptySignatures,
     m: 2,
   };
   const path = `${config.accountPath}/0/0`;
+  const addressN = getHDPath(path);
   const refTx = {
     hash: prevHash,
     version: fundingTx.version,
@@ -148,7 +162,7 @@ async function createFixture(
     coin: 'btc' as const,
     inputs: [
       {
-        address_n: path,
+        address_n: [...addressN],
         prev_hash: prevHash,
         prev_index: 0,
         amount: String(FUNDING_AMOUNT),
@@ -168,26 +182,21 @@ async function createFixture(
   const signerAddresses = childPublicKeys.map(
     publicKey => payments.p2pkh({ pubkey: publicKey, network: networks.bitcoin }).address ?? ''
   );
-  const prefilledSignerIndexes = [1, 0, 0] as const;
-  const signerEnvKeys = [
-    'MULTISIG_MNEMONIC_1',
-    'MULTISIG_MNEMONIC_2',
-    'MULTISIG_MNEMONIC_3',
-  ] as const;
-  const signerScenarios = ([0, 1, 2] as const).map(signerIndex => {
-    const prefilledSignerIndex = prefilledSignerIndexes[signerIndex];
-    const continueSignatures = ['', '', ''];
-    continueSignatures[prefilledSignerIndex] = expectedSignatures[prefilledSignerIndex];
-    return {
+  const signerIndex = 0 as const;
+  const prefilledSignerIndex = 1 as const;
+  const continueSignatures = ['', '', ''];
+  continueSignatures[prefilledSignerIndex] = expectedSignatures[prefilledSignerIndex];
+  const signerScenarios = [
+    {
       signerIndex,
-      signerEnvKey: signerEnvKeys[signerIndex],
+      signerEnvKey: 'MULTISIG_MNEMONIC_1' as const,
       signerAddress: signerAddresses[signerIndex],
       expectedSignature: expectedSignatures[signerIndex],
       prefilledSignerIndex,
       firstSignParameters: buildSignParameters(emptySignatures),
       continueSignParameters: buildSignParameters(continueSignatures),
-    };
-  });
+    },
+  ];
 
   return {
     id: config.id,

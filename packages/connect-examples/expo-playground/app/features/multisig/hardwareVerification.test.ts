@@ -11,7 +11,7 @@ function getCase(id: string) {
 
 describe('verifyMultisigHardwareResult', () => {
   test('校验 ETH signer 地址和 EIP-712 签名', () => {
-    const testCase = getCase('eth-generated-standard-signer-3');
+    const testCase = getCase('eth-generated-standard-signer-1');
     const expectation = testCase.hardwareExpectation!;
 
     const result = verifyMultisigHardwareResult(testCase, {
@@ -27,7 +27,7 @@ describe('verifyMultisigHardwareResult', () => {
   });
 
   test('校验 BTC 多签地址', () => {
-    const testCase = getCase('btc-generated-p2wsh-address-signer-2');
+    const testCase = getCase('btc-generated-p2wsh-address-signer-1');
 
     expect(
       verifyMultisigHardwareResult(testCase, {
@@ -50,7 +50,7 @@ describe('verifyMultisigHardwareResult', () => {
   });
 
   test('SDK 成功但签名不匹配时返回硬件校验失败', () => {
-    const testCase = getCase('btc-generated-p2sh-continue-signer-3');
+    const testCase = getCase('btc-generated-p2sh-continue-signer-1');
     const result = verifyMultisigHardwareResult(testCase, {
       success: true,
       data: { signatures: ['304402200001'] },

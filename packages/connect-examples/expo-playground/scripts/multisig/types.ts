@@ -29,8 +29,16 @@ export type EthMultisigFixture = {
 
 export type BtcScriptType = 'SPENDMULTISIG' | 'SPENDP2SHWITNESS' | 'SPENDWITNESS';
 
+export type BtcHdNode = {
+  depth: number;
+  fingerprint: number;
+  child_num: number;
+  chain_code: string;
+  public_key: string;
+};
+
 export type BtcMultisigDescriptor = {
-  pubkeys: Array<{ node: string; address_n: number[] }>;
+  pubkeys: Array<{ node: BtcHdNode; address_n: number[] }>;
   signatures: string[];
   m: number;
 };
@@ -46,7 +54,7 @@ export type BtcAddressParameters = {
 export type BtcSignParameters = {
   coin: 'btc';
   inputs: Array<{
-    address_n: string;
+    address_n: number[];
     prev_hash: string;
     prev_index: number;
     amount: string;

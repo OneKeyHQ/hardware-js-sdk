@@ -109,31 +109,29 @@ function cloneGenerated<T>(value: T): T {
 function generatedEthCases(
   fixture: (typeof GENERATED_MULTISIG_FIXTURES.eth)[number]
 ): MultisigTestCase[] {
-  return fixture.reference.signerAddresses.map((signerAddress, signerIndex) => ({
-    id: `eth-generated-${fixture.id}-signer-${signerIndex + 1}`,
-    title: `${fixture.title} · Signer ${signerIndex + 1}`,
+  const signerIndex = 0 as const;
+  return [{
+    id: `eth-generated-${fixture.id}-signer-1`,
+    title: `${fixture.title} · Signer 1`,
     description: fixture.description,
     chain: 'eth',
     source: 'regression',
     method: 'evmSignTypedData',
     parameters: cloneGenerated(fixture.parameters),
     expectedDeviceChecks: [
-      `Signer ${signerIndex + 1}`,
+      'Signer 1',
       ...fixture.expectedDeviceChecks,
     ],
     builtIn: true,
     testMnemonicOnly: true,
     reference: cloneGenerated(fixture.reference),
     hardwareExpectation: {
-      signerIndex: signerIndex as 0 | 1 | 2,
-      signerEnvKey: `MULTISIG_MNEMONIC_${signerIndex + 1}` as
-        | 'MULTISIG_MNEMONIC_1'
-        | 'MULTISIG_MNEMONIC_2'
-        | 'MULTISIG_MNEMONIC_3',
-      signerAddress,
+      signerIndex,
+      signerEnvKey: 'MULTISIG_MNEMONIC_1',
+      signerAddress: fixture.reference.signerAddresses[signerIndex],
       expectedSignature: fixture.reference.expectedSignatures[signerIndex],
     },
-  }));
+  }];
 }
 
 function btcAddressCase(

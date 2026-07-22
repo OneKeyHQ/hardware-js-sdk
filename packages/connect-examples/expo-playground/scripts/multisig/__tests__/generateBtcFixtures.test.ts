@@ -1,7 +1,9 @@
 import { verify } from '@noble/secp256k1';
 import { describe, expect, test } from '@jest/globals';
+import HardwareTransport from '@onekeyfe/hd-transport';
 import { Transaction } from 'bitcoinjs-lib';
 
+import MessagesJSON from '../../../../../core/src/data/messages/messages.json';
 import { generateBtcFixtures } from '../generateBtcFixtures';
 import type { MultisigMnemonics } from '../readMnemonics';
 
@@ -74,26 +76,54 @@ describe('generateBtcFixtures', () => {
     });
   });
 
-  test('为三个硬件 signer 生成首次签名和继续签名场景', async () => {
+  test('生成的多签节点可以被设备 protobuf schema 编码', async () => {
+    const fixtures = await generateBtcFixtures(TEST_MNEMONICS);
+    const messages = HardwareTransport.parseConfigure(MessagesJSON);
+    const { Message: getAddressMessage } = HardwareTransport.createMessageFromName(
+      messages,
+      'GetAddress'
+    );
+    const { Message: txAckInputMessage } = HardwareTransport.createMessageFromName(
+      messages,
+      'TxAckInput'
+    );
+
+    fixtures.forEach(fixture => {
+      expect(() =>
+        HardwareTransport.encodeProtobuf(getAddressMessage, {
+          address_n: fixture.signParameters.inputs[0].address_n,
+          coin_name: 'Bitcoin',
+          show_display: true,
+          script_type: fixture.scriptType,
+          multisig: fixture.addressParameters.multisig,
+        })
+      ).not.toThrow();
+      expect(() =>
+        HardwareTransport.encodeProtobuf(txAckInputMessage, {
+          tx: { input: fixture.signParameters.inputs[0] },
+        })
+      ).not.toThrow();
+    });
+  });
+
+  test('只为 signer 1 生成首次签名和继续签名场景', async () => {
     const fixtures = await generateBtcFixtures(TEST_MNEMONICS);
 
     fixtures.forEach(fixture => {
-      expect(fixture.signerScenarios).toHaveLength(3);
-      fixture.signerScenarios.forEach((scenario, signerIndex) => {
-        expect(scenario.signerIndex).toBe(signerIndex);
-        expect(scenario.signerEnvKey).toBe(`MULTISIG_MNEMONIC_${signerIndex + 1}`);
-        expect(scenario.expectedSignature).toBe(
-          fixture.reference.expectedSignatures[signerIndex]
-        );
+      expect(fixture.signerScenarios).toHaveLength(1);
+      fixture.signerScenarios.forEach(scenario => {
+        expect(scenario.signerIndex).toBe(0);
+        expect(scenario.signerEnvKey).toBe('MULTISIG_MNEMONIC_1');
+        expect(scenario.expectedSignature).toBe(fixture.reference.expectedSignatures[0]);
         expect(
           scenario.firstSignParameters.inputs[0].multisig.signatures
         ).toEqual(['', '', '']);
 
         const continueSignatures =
           scenario.continueSignParameters.inputs[0].multisig.signatures;
-        expect(continueSignatures[signerIndex]).toBe('');
+        expect(continueSignatures[0]).toBe('');
         expect(continueSignatures.filter(Boolean)).toHaveLength(1);
-        expect(scenario.prefilledSignerIndex).not.toBe(signerIndex);
+        expect(scenario.prefilledSignerIndex).not.toBe(0);
         expect(continueSignatures[scenario.prefilledSignerIndex]).toBe(
           fixture.reference.expectedSignatures[scenario.prefilledSignerIndex]
         );
