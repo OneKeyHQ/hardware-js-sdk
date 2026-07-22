@@ -74,9 +74,37 @@ describe('generateBtcFixtures', () => {
     });
   });
 
+  test('为三个硬件 signer 生成首次签名和继续签名场景', async () => {
+    const fixtures = await generateBtcFixtures(TEST_MNEMONICS);
+
+    fixtures.forEach(fixture => {
+      expect(fixture.signerScenarios).toHaveLength(3);
+      fixture.signerScenarios.forEach((scenario, signerIndex) => {
+        expect(scenario.signerIndex).toBe(signerIndex);
+        expect(scenario.signerEnvKey).toBe(`MULTISIG_MNEMONIC_${signerIndex + 1}`);
+        expect(scenario.expectedSignature).toBe(
+          fixture.reference.expectedSignatures[signerIndex]
+        );
+        expect(
+          scenario.firstSignParameters.inputs[0].multisig.signatures
+        ).toEqual(['', '', '']);
+
+        const continueSignatures =
+          scenario.continueSignParameters.inputs[0].multisig.signatures;
+        expect(continueSignatures[signerIndex]).toBe('');
+        expect(continueSignatures.filter(Boolean)).toHaveLength(1);
+        expect(scenario.prefilledSignerIndex).not.toBe(signerIndex);
+        expect(continueSignatures[scenario.prefilledSignerIndex]).toBe(
+          fixture.reference.expectedSignatures[scenario.prefilledSignerIndex]
+        );
+      });
+    });
+  });
+
   test('公开 fixture 不包含扩展私钥或 seed', async () => {
     const serialized = JSON.stringify(await generateBtcFixtures(TEST_MNEMONICS));
 
-    expect(serialized).not.toMatch(/mnemonic|privateKey|private_key|xprv|seed/i);
+    TEST_MNEMONICS.forEach(mnemonic => expect(serialized).not.toContain(mnemonic));
+    expect(serialized).not.toMatch(/privateKey|private_key|xprv|"seed"/i);
   });
 });

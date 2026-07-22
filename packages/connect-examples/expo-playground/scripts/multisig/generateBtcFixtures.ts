@@ -165,6 +165,24 @@ async function createFixture(
     ],
     refTxs: [refTx],
   });
+  const signerAddresses = childPublicKeys.map(
+    publicKey => payments.p2pkh({ pubkey: publicKey, network: networks.bitcoin }).address ?? ''
+  );
+  const prefilledSignerIndexes = [1, 0, 0] as const;
+  const signerScenarios = ([0, 1, 2] as const).map(signerIndex => {
+    const prefilledSignerIndex = prefilledSignerIndexes[signerIndex];
+    const continueSignatures = ['', '', ''];
+    continueSignatures[prefilledSignerIndex] = expectedSignatures[prefilledSignerIndex];
+    return {
+      signerIndex,
+      signerEnvKey: `MULTISIG_MNEMONIC_${signerIndex + 1}` as const,
+      signerAddress: signerAddresses[signerIndex],
+      expectedSignature: expectedSignatures[signerIndex],
+      prefilledSignerIndex,
+      firstSignParameters: buildSignParameters(emptySignatures),
+      continueSignParameters: buildSignParameters(continueSignatures),
+    };
+  });
 
   return {
     id: config.id,
@@ -181,6 +199,7 @@ async function createFixture(
     },
     signParameters: buildSignParameters(emptySignatures),
     partialSignParameters: buildSignParameters(partialSignatures),
+    signerScenarios,
     expectedDeviceChecks: [
       'Bitcoin 网络',
       config.title,
@@ -190,9 +209,7 @@ async function createFixture(
     ],
     reference: {
       broadcastable: false,
-      signerAddresses: childPublicKeys.map(
-        publicKey => payments.p2pkh({ pubkey: publicKey, network: networks.bitcoin }).address ?? ''
-      ),
+      signerAddresses,
       expectedSignatures,
       accountXpubs,
       childPublicKeys: childPublicKeys.map(publicKey => publicKey.toString('hex')),

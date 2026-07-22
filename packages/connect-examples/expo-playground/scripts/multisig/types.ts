@@ -94,6 +94,17 @@ export type BtcMultisigFixture = {
   addressParameters: BtcAddressParameters;
   signParameters: BtcSignParameters;
   partialSignParameters: BtcSignParameters;
+  signerScenarios: BtcSignerScenario[];
   expectedDeviceChecks: string[];
   reference: BtcFixtureReference;
+};
+
+export type BtcSignerScenario = {
+  signerIndex: 0 | 1 | 2;
+  signerEnvKey: `MULTISIG_MNEMONIC_${1 | 2 | 3}`;
+  signerAddress: string;
+  expectedSignature: string;
+  prefilledSignerIndex: 0 | 1 | 2;
+  firstSignParameters: BtcSignParameters;
+  continueSignParameters: BtcSignParameters;
 };
