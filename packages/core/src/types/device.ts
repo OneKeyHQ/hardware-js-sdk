@@ -40,6 +40,8 @@ export type KnownDevice = {
   error?: typeof undefined;
   mode: EOneKeyDeviceMode;
   features?: Features;
+  /** SDK 统一设备状态快照。features 仅作为旧 API 兼容投影保留。 */
+  state?: DeviceState;
   sessionId?: string | null;
   unavailableCapabilities: UnavailableCapabilities;
   bleFirmwareVersion: IVersionArray | null;
@@ -135,6 +137,133 @@ export type DeviceFeaturesRaw = {
   protocolV1OneKeyFeatures?: OnekeyFeatures;
   protocolV2DeviceInfo?: ProtocolV2DeviceInfo;
   protocolV2DeviceStatus?: ProtocolV2DeviceStatus;
+};
+
+export type DeviceStateProtocol = DeviceFeaturesProtocol;
+export type DeviceStateMode = DeviceFeaturesMode;
+export type DeviceStateSection =
+  | 'identity'
+  | 'status'
+  | 'settings'
+  | 'versions'
+  | 'verification';
+
+export type DeviceStateUpdateSource =
+  | 'initialize'
+  | 'device-info'
+  | 'device-status'
+  | 'apply-settings'
+  | 'change-pin'
+  | 'unlock'
+  | 'passphrase'
+  | 'firmware-update'
+  | 'transport-reconnect'
+  | 'compatibility';
+
+export type DeviceStateIdentity = {
+  deviceType: IDeviceType;
+  firmwareType: EFirmwareType;
+  model: string | null;
+  vendor: string | null;
+  deviceId: string | null;
+  serialNo: string;
+  label: string | null;
+  bleName: string | null;
+  displayName: string;
+};
+
+export type DeviceStateStatus = {
+  mode: DeviceStateMode;
+  initialized: boolean | null;
+  unlocked: boolean | null;
+  firmwarePresent: boolean | null;
+  backupRequired: boolean | null;
+  noBackup: boolean | null;
+  unfinishedBackup: boolean | null;
+  recoveryMode: boolean | null;
+  passphraseProtection: boolean | null;
+  pinProtection: boolean | null;
+  attachToPinEnabled: boolean | null;
+  unlockedAttachPin: boolean | null;
+};
+
+export type DeviceStateSettings = {
+  language: string | null;
+  bleEnabled: boolean | null;
+  sdCardPresent: boolean | null;
+  sdProtection: boolean | null;
+  wipeCodeProtection: boolean | null;
+  passphraseAlwaysOnDevice: boolean | null;
+  safetyChecks: string | null;
+  autoLockDelayMs: number | null;
+  autoShutdownDelayMs: number | null;
+  displayRotation: number | null;
+  experimentalFeatures: boolean | null;
+  wallpaperPath: string | null;
+  brightness: number | null;
+  animationEnabled: boolean | null;
+  tapToWake: boolean | null;
+  hapticFeedback: boolean | null;
+  deviceNameDisplayEnabled: boolean | null;
+  airgapMode: boolean | null;
+  fidoEnabled: boolean | null;
+  usbLockEnabled: boolean | null;
+  randomKeypad: boolean | null;
+};
+
+export type DeviceStateVersions = {
+  firmware: string | null;
+  bootloader: string | null;
+  board: string | null;
+  ble: string | null;
+  se01?: string | null;
+  se02?: string | null;
+  se03?: string | null;
+  se04?: string | null;
+  se01Boot?: string | null;
+  se02Boot?: string | null;
+  se03Boot?: string | null;
+  se04Boot?: string | null;
+};
+
+export type DeviceStateSession = {
+  sessionId: string | null;
+  passphraseState?: string;
+};
+
+export type DeviceState = {
+  schemaVersion: 1;
+  revision: number;
+  updatedAt: number;
+  protocol: DeviceStateProtocol;
+  identity: DeviceStateIdentity;
+  status: DeviceStateStatus;
+  settings: DeviceStateSettings;
+  versions: DeviceStateVersions;
+  capabilities: Array<number | string>;
+  verification?: DeviceFeaturesVerify;
+  session?: DeviceStateSession;
+  raw?: DeviceFeaturesRaw;
+};
+
+export type DeviceStatePatch = {
+  protocol?: DeviceStateProtocol;
+  identity?: Partial<DeviceStateIdentity>;
+  status?: Partial<DeviceStateStatus>;
+  settings?: Partial<DeviceStateSettings>;
+  versions?: Partial<DeviceStateVersions>;
+  capabilities?: Array<number | string>;
+  verification?: DeviceFeaturesVerify;
+  session?: Partial<DeviceStateSession> | null;
+  raw?: DeviceFeaturesRaw;
+};
+
+export type DeviceStateEvent = {
+  connectId: string | null;
+  state: DeviceState;
+  revision: number;
+  source: DeviceStateUpdateSource;
+  changedKeys: string[];
 };
 
 export type NormalizedFeatures = {

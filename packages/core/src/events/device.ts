@@ -1,6 +1,11 @@
 import type { MessageFactoryFn } from './utils';
 import type { PROTO } from '../constants';
-import type { KnownDevice as Device, Features, SupportFeatures } from '../types/device';
+import type {
+  KnownDevice as Device,
+  DeviceStateEvent,
+  Features,
+  SupportFeatures,
+} from '../types/device';
 
 export const DEVICE_EVENT = 'DEVICE_EVENT';
 export const DEVICE = {
@@ -30,6 +35,7 @@ export const DEVICE = {
   SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE: 'select_device_for_switch_firmware_web_device',
 
   FEATURES: 'features',
+  STATE: 'state',
 } as const;
 
 export interface DeviceConnnectRequest {
@@ -65,6 +71,11 @@ export interface DeviceSendFeatures {
   payload: DeviceFeaturesPayload;
 }
 
+export interface DeviceSendState {
+  type: typeof DEVICE.STATE;
+  payload: DeviceStateEvent;
+}
+
 export type DeviceSupportFeaturesPayload = SupportFeatures & { device: Device | null };
 export interface DeviceSendSupportFeatures {
   type: typeof DEVICE.SUPPORT_FEATURES;
@@ -73,6 +84,7 @@ export interface DeviceSendSupportFeatures {
 
 export type DeviceEvent =
   | DeviceButtonRequest
+  | DeviceSendState
   | DeviceSendFeatures
   | DeviceSendSupportFeatures
   | DeviceDisconnnectRequest

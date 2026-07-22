@@ -47,6 +47,7 @@ import type { checkFirmwareTypeAvailable } from './checkFirmwareTypeAvailable';
 import type { searchDevices } from './searchDevices';
 import type { getFeatures } from './getFeatures';
 import type { getDeviceInfo } from './getDeviceInfo';
+import type { getDeviceState } from './getDeviceState';
 import type { getOnekeyFeatures } from './getOnekeyFeatures';
 import type { getPassphraseState } from './getPassphraseState';
 import type { checkFirmwareRelease } from './checkFirmwareRelease';
@@ -184,6 +185,7 @@ export type {
   DeviceProfileVerify,
   DeviceProfileVersions,
 } from './getDeviceInfo';
+export type { GetDeviceStateParams } from './getDeviceState';
 export type { GetPassphraseStateParams } from './getPassphraseState';
 export type { ClearSessionCacheParams, ClearSessionCachePayload } from './sessionCache';
 
@@ -228,6 +230,7 @@ export type CoreApi = {
   promptWebDeviceAccess: typeof promptWebDeviceAccess;
   getFeatures: typeof getFeatures;
   getDeviceInfo: typeof getDeviceInfo;
+  getDeviceState: typeof getDeviceState;
   getOnekeyFeatures: typeof getOnekeyFeatures;
   getPassphraseState: typeof getPassphraseState;
   deviceBackup: typeof deviceBackup;
