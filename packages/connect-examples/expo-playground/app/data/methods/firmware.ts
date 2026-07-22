@@ -966,29 +966,6 @@ const api: UnifiedMethodConfig[] = [
     noDeviceIdReq: true,
     presets: [],
   },
-  {
-    method: 'filesystemDiskControl',
-    description: 'methodDescriptions.filesystemDiskControl',
-    noDeviceIdReq: true,
-    presets: [
-      {
-        title: 'FilesystemDiskControl',
-        parameters: [
-          {
-            name: 'enable',
-            type: 'select',
-            required: true,
-            label: 'MSC',
-            options: [
-              { label: 'Disable MSC', value: '0' },
-              { label: 'Enable MSC', value: '1' },
-            ],
-            value: '1',
-          },
-        ],
-      },
-    ],
-  },
   // === 固件信息检查 ===
   {
     method: 'checkFirmwareRelease',

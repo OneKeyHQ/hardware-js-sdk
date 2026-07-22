@@ -12,10 +12,7 @@ import { device } from '../data/methods/device';
 import { firmware } from '../data/methods/firmware';
 import { isSdkDebugEnabled } from '../utils/hardwareInstance';
 import { logHardware } from '../utils/logger';
-import {
-  preparePro2Wallpaper,
-  type PreparedPro2Wallpaper,
-} from '../utils/pro2WallpaperImage';
+import { preparePro2Wallpaper, type PreparedPro2Wallpaper } from '../utils/pro2WallpaperImage';
 import type { UnifiedMethodConfig } from '../data/types';
 
 const PRO2_METHOD_GROUPS = [
@@ -49,11 +46,7 @@ const PRO2_METHOD_GROUPS = [
     id: 'settings',
     title: 'Settings',
     icon: Settings,
-    methods: [
-      'deviceSettingsSet',
-      'deviceSettingsPageShow',
-      'deviceUploadWallpaper',
-    ],
+    methods: ['deviceSettingsSet', 'deviceSettingsPageShow', 'deviceUploadWallpaper'],
   },
   {
     id: 'firmware',
@@ -82,7 +75,6 @@ const PRO2_METHOD_GROUPS = [
     methods: [
       'filesystemPermissionFix',
       'filesystemFormat',
-      'filesystemDiskControl',
       'filesystemPathInfoQuery',
       'filesystemDirList',
       'filesystemDirMake',
@@ -123,7 +115,6 @@ const PRO2_METHOD_LABELS: Record<string, string> = {
   fileDelete: 'File Delete',
   filesystemPermissionFix: 'Fix Permission',
   filesystemFormat: 'Format',
-  filesystemDiskControl: 'Disk Control',
   filesystemPathInfoQuery: 'Raw Path Info',
   filesystemDirList: 'Raw Dir List',
   filesystemDirMake: 'Raw Dir Make',
@@ -160,11 +151,12 @@ const PRO2_METHOD_WIRE_INFO: Record<string, MethodWireInfo> = {
     decoded: 'Success: "Hello from WebUSB!"',
   },
   getDeviceState: {
-    tx: '60600 (DeviceInfoGet)',
-    txPayload: PRO2_DYNAMIC_PAYLOAD,
-    rx: '60601 (DeviceInfo)',
+    tx: 'Cached state: no transport request',
+    txPayload:
+      'identity/versions/verification: DeviceInfoGet; settings: DeviceSettingsGet; status: DeviceStatusGet (normal mode only)',
+    rx: 'Response depends on explicitly refreshed sections',
     rxPayload: PRO2_DYNAMIC_RESPONSE,
-    decoded: 'DeviceState',
+    decoded: 'Canonical DeviceState snapshot',
   },
   deviceReboot: {
     tx: '60400 (DeviceReboot)',
@@ -201,13 +193,6 @@ const PRO2_METHOD_WIRE_INFO: Record<string, MethodWireInfo> = {
     rxPayload: PRO2_DYNAMIC_RESPONSE,
     decoded: 'Success.message',
   },
-  deviceStatusGet: {
-    tx: '60602 (DeviceStatusGet)',
-    txPayload: 'ba ec',
-    rx: '60603 (DeviceStatus)',
-    rxPayload: PRO2_DYNAMIC_RESPONSE,
-    decoded: 'DeviceStatus + cached Features update',
-  },
   deviceGetOnboardingStatus: {
     tx: '60604 (DevGetOnboardingStatus)',
     txPayload: 'bc ec',
@@ -235,13 +220,6 @@ const PRO2_METHOD_WIRE_INFO: Record<string, MethodWireInfo> = {
     rx: '60207 (Success)',
     rxPayload: PRO2_DYNAMIC_RESPONSE,
     decoded: 'Success.message',
-  },
-  deviceSettingsGet: {
-    tx: '60411 (DeviceSettingsGet)',
-    txPayload: PRO2_DYNAMIC_PAYLOAD,
-    rx: '60410 (DeviceSettings)',
-    rxPayload: PRO2_DYNAMIC_RESPONSE,
-    decoded: 'DeviceSettings',
   },
   deviceSettingsSet: {
     tx: '60412 (DeviceSettingsSet)',
@@ -591,7 +569,9 @@ function Pro2WallpaperUploader({
             <div className="space-y-3 text-sm">
               <div className="grid grid-cols-2 gap-2 rounded-lg bg-muted/50 p-3">
                 <span className="text-muted-foreground">原始尺寸</span>
-                <span>{prepared.originalWidth} × {prepared.originalHeight}</span>
+                <span>
+                  {prepared.originalWidth} × {prepared.originalHeight}
+                </span>
                 <span className="text-muted-foreground">输入类型</span>
                 <span>{prepared.mimeType}</span>
                 <span className="text-muted-foreground">目标尺寸</span>
@@ -618,7 +598,9 @@ function Pro2WallpaperUploader({
         ) : null}
 
         {status ? <div className="rounded-md bg-muted p-3 text-sm break-all">{status}</div> : null}
-        {error ? <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div> : null}
+        {error ? (
+          <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
+        ) : null}
       </CardContent>
     </Card>
   );

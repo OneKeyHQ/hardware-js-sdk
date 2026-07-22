@@ -6,7 +6,8 @@ import type { UnifiedLogEntry } from '../components/common/UnifiedLogger';
 
 import { isClassicModelDevice, isTouchModelDevice } from '../utils/deviceTypeUtils';
 import { summarizeJsonValue } from '../utils/jsonPreview';
-import type { IDeviceType, Features } from '@onekeyfe/hd-core';
+import { parseDeviceVersionTuple } from '../services/deviceStateSelectors';
+import type { DeviceState as HardwareDeviceState, Features, IDeviceType } from '@onekeyfe/hd-core';
 import {
   UiEvent,
   getDeviceFirmwareVersion,
@@ -71,6 +72,7 @@ interface DeviceState {
   connectedDevices: DeviceInfo[];
   currentDevice: DeviceInfo | null;
   deviceFeatures: Features | undefined;
+  deviceState: HardwareDeviceState | undefined;
   isConnecting: boolean;
 
   // Device action state for lottie animations
@@ -328,6 +330,7 @@ export const useDeviceStore = create<DeviceState>()(
       connectedDevices: [],
       currentDevice: null,
       deviceFeatures: undefined,
+      deviceState: undefined,
       isConnecting: false,
       logs: [],
       deviceAction: {
@@ -343,7 +346,8 @@ export const useDeviceStore = create<DeviceState>()(
 
       // Actions
       setConnectedDevices: (devices: DeviceInfo[]) => set({ connectedDevices: devices }),
-      setCurrentDevice: (device: DeviceInfo | null) => set({ currentDevice: device }),
+      setCurrentDevice: (device: DeviceInfo | null) =>
+        set({ currentDevice: device, deviceState: device?.deviceState }),
       setDeviceFeatures: (features: Features | undefined) => set({ deviceFeatures: features }),
       setIsConnecting: (isConnecting: boolean) => set({ isConnecting }),
 
@@ -493,23 +497,35 @@ export const useDeviceStore = create<DeviceState>()(
       },
       getCurrentDeviceFirmwareVersion: () => {
         const state = get();
-        return getDeviceFirmwareVersion(state.deviceFeatures);
+        return (
+          parseDeviceVersionTuple(state.deviceState?.versions.firmware) ||
+          getDeviceFirmwareVersion(state.deviceFeatures)
+        );
       },
       getCurrentDeviceBLEVersion: () => {
         const state = get();
-        return getDeviceBLEFirmwareVersion(state.deviceFeatures as Features);
+        return (
+          parseDeviceVersionTuple(state.deviceState?.versions.ble) ||
+          getDeviceBLEFirmwareVersion(state.deviceFeatures as Features)
+        );
       },
       getCurrentDeviceBootloaderVersion: () => {
         const state = get();
-        return getDeviceBootloaderVersion(state.deviceFeatures);
+        return (
+          parseDeviceVersionTuple(state.deviceState?.versions.bootloader) ||
+          getDeviceBootloaderVersion(state.deviceFeatures)
+        );
       },
       getCurrentDeviceLabel: () => {
         const state = get();
-        return getDeviceLabel(state.deviceFeatures);
+        return state.deviceState?.identity.displayName || getDeviceLabel(state.deviceFeatures);
       },
       getCurrentDeviceUUID: () => {
         const state = get();
-        return state.deviceFeatures ? getDeviceUUID(state.deviceFeatures) : null;
+        return (
+          state.deviceState?.identity.serialNo ||
+          (state.deviceFeatures ? getDeviceUUID(state.deviceFeatures) : null)
+        );
       },
     }),
     {

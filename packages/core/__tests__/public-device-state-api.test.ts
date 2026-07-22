@@ -1,5 +1,6 @@
 import * as publicMethods from '../src/api';
 import GetFeatures from '../src/api/GetFeatures';
+import GetOnekeyFeatures from '../src/api/GetOnekeyFeatures';
 import DeviceInfoGet from '../src/api/protocol-v2/DeviceInfoGet';
 import DeviceSettingsGet from '../src/api/protocol-v2/DeviceSettingsGet';
 import DeviceStatusGet from '../src/api/protocol-v2/DeviceStatusGet';
@@ -19,6 +20,7 @@ describe('public device state API boundary', () => {
 
     expect(api.getDeviceState).toBeInstanceOf(Function);
     expect(api.getFeatures).toBeInstanceOf(Function);
+    expect(api.getOnekeyFeatures).toBeInstanceOf(Function);
     expect(api).not.toHaveProperty('getDeviceInfo');
     expect(api).not.toHaveProperty('deviceInfoGet');
     expect(api).not.toHaveProperty('deviceStatusGet');
@@ -77,6 +79,22 @@ describe('public device state API boundary', () => {
       errorCode: expect.any(Number),
     });
     expect(getDeviceState).not.toHaveBeenCalled();
+  });
+
+  test('rejects getOnekeyFeatures for Protocol V2 devices', async () => {
+    const typedCall = jest.fn();
+    const method = new GetOnekeyFeatures({ id: 1, payload: { method: 'getOnekeyFeatures' } });
+    method.init();
+    (method as any).device = {
+      commands: { typedCall },
+      getCurrentFirmwareType: () => 'universal',
+      isProtocolV2: () => true,
+    };
+
+    await expect(method.run()).rejects.toMatchObject({
+      errorCode: expect.any(Number),
+    });
+    expect(typedCall).not.toHaveBeenCalled();
   });
 });
 

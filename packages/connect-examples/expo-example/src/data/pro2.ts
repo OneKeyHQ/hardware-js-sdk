@@ -25,15 +25,25 @@ const api: PlaygroundProps[] = [
     noDeviceIdReq: true,
     presupposes: [
       {
-        title: 'Versions and verification',
+        title: 'Cached state',
+        value: {},
+      },
+      {
+        title: 'Identity and versions',
         value: {
-          refresh: ['identity', 'versions', 'verification'],
+          refresh: ['identity', 'versions'],
         },
       },
       {
-        title: 'Versions',
+        title: 'Settings',
         value: {
-          refresh: ['identity', 'versions'],
+          refresh: ['settings'],
+        },
+      },
+      {
+        title: 'Runtime status',
+        value: {
+          refresh: ['status'],
         },
       },
     ],

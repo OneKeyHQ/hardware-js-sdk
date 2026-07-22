@@ -5,14 +5,76 @@ import {
   getDeviceUUID,
 } from '@onekeyfe/hd-core';
 
-import type { Features, OnekeyFeatures } from '@onekeyfe/hd-transport';
+import type {
+  Features as CoreFeatures,
+  OnekeyFeatures as CoreOnekeyFeatures,
+  DeviceState,
+} from '@onekeyfe/hd-core';
+import type {
+  Features as TransportFeatures,
+  OnekeyFeatures as TransportOnekeyFeatures,
+} from '@onekeyfe/hd-transport';
 
-export const getReleaseUrl = ({ features }: { features?: Features }) => {
-  const deviceType = getDeviceType(features)?.toUpperCase() || 'UNKNOWN';
+type LegacyFeatures = CoreFeatures | TransportFeatures;
+type LegacyOnekeyFeatures = CoreOnekeyFeatures | TransportOnekeyFeatures;
+
+const formatVersion = (version?: string | null, buildId?: string | null) =>
+  [version, buildId].filter(Boolean).join('-') || 'unknown';
+
+export function getFirmwareDeviceStateSummary(state?: DeviceState) {
+  const deviceType = state?.identity.deviceType?.toUpperCase() || 'UNKNOWN';
+  const serialNumber = state?.identity.serialNo || 'unknown';
+  const bleVersion = formatVersion(state?.versions.ble, state?.verification?.bleBuildId);
+  const bootloaderVersion = formatVersion(
+    state?.versions.bootloader,
+    state?.verification?.bootloaderBuildId
+  );
+  const boardloaderVersion = formatVersion(
+    state?.versions.board,
+    state?.verification?.boardBuildId
+  );
+  const firmwareVersion = formatVersion(
+    state?.versions.firmware,
+    state?.verification?.firmwareBuildId
+  );
+
+  let releaseBase: string | undefined;
+  if (deviceType === 'PRO2') {
+    releaseBase = 'https://github.com/OneKeyHQ/firmware-pro2/releases/tag';
+  } else if (deviceType === 'PRO') {
+    releaseBase = 'https://github.com/OneKeyHQ/firmware-pro/releases/tag';
+  }
+
+  return {
+    deviceType,
+    serialNumber,
+    bleVersion,
+    bootloaderVersion,
+    boardloaderVersion,
+    firmwareVersion,
+    bootUrl:
+      releaseBase && state?.versions.bootloader
+        ? `${releaseBase}/bootloader-v${state.versions.bootloader}`
+        : '',
+    firmwareUrl:
+      releaseBase && state?.versions.firmware ? `${releaseBase}/v${state.versions.firmware}` : '',
+    bleUrl: '',
+  };
+}
+
+export function getDeviceStateMode(state?: DeviceState) {
+  return state?.status.mode === 'bootloader'
+    ? 'label__device_bootloader_statue'
+    : 'label__device_firmware_status';
+}
+
+export const getReleaseUrl = ({ features }: { features?: LegacyFeatures }) => {
+  const coreFeatures = features as CoreFeatures | undefined;
+  const deviceType = getDeviceType(coreFeatures)?.toUpperCase() || 'UNKNOWN';
   // const { firmwareUrl, bleVersion } = getFirmwareDeviceSummary(features, onekeyFeatures);
   // classic 类型（包括classci 1s, mini, classic），不需要更新bootloader
-  const firmwareVersion = getDeviceFirmwareVersion(features).join('.');
-  const bootloaderVersion = `${getDeviceBootloaderVersion(features)?.join('.')}`;
+  const firmwareVersion = getDeviceFirmwareVersion(coreFeatures).join('.');
+  const bootloaderVersion = `${getDeviceBootloaderVersion(coreFeatures)?.join('.')}`;
   switch (deviceType) {
     case 'CLASSIC1S':
       return {
@@ -46,18 +108,19 @@ export const getReleaseUrl = ({ features }: { features?: Features }) => {
 };
 
 export function getFirmwareDeviceSummary(
-  features: Features | undefined,
-  onekeyFeatures: OnekeyFeatures | undefined
+  features: LegacyFeatures | undefined,
+  onekeyFeatures: LegacyOnekeyFeatures | undefined
 ) {
-  const deviceType = getDeviceType(features)?.toUpperCase() || 'UNKNOWN';
-  const serialNumber = features && getDeviceUUID(features);
+  const coreFeatures = features as CoreFeatures | undefined;
+  const deviceType = getDeviceType(coreFeatures)?.toUpperCase() || 'UNKNOWN';
+  const serialNumber = coreFeatures && getDeviceUUID(coreFeatures);
 
   const bleBuildId = onekeyFeatures?.onekey_ble_build_id || features?.onekey_ble_build_id;
   const bleVersion = `${features?.ble_ver}-${bleBuildId}`;
 
   const bootloaderBuildId = onekeyFeatures?.onekey_boot_build_id || features?.onekey_boot_build_id;
   const bootloaderVersion =
-    features && `${getDeviceBootloaderVersion(features)?.join('.')}-${bootloaderBuildId}`;
+    coreFeatures && `${getDeviceBootloaderVersion(coreFeatures)?.join('.')}-${bootloaderBuildId}`;
 
   const boardloaderVersion =
     features && `${features?.onekey_board_version}-${onekeyFeatures?.onekey_board_build_id}`;
@@ -65,7 +128,7 @@ export function getFirmwareDeviceSummary(
   const firmwareBuildId =
     onekeyFeatures?.onekey_firmware_build_id || features?.onekey_firmware_build_id;
   const firmwareVersion =
-    features && `${getDeviceFirmwareVersion(features)?.join('.')}-${firmwareBuildId}`;
+    coreFeatures && `${getDeviceFirmwareVersion(coreFeatures)?.join('.')}-${firmwareBuildId}`;
 
   const {
     onekey_firmware_url: firmwareUrl,
@@ -89,8 +152,8 @@ export function getFirmwareDeviceSummary(
 }
 
 export function getDeviceInfo(
-  features: Features | undefined,
-  onekeyFeatures: OnekeyFeatures | undefined
+  features: LegacyFeatures | undefined,
+  onekeyFeatures: LegacyOnekeyFeatures | undefined
 ) {
   const {
     deviceType,

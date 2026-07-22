@@ -16,12 +16,6 @@ const api: UnifiedMethodConfig[] = [
     presets: [],
   },
   {
-    method: 'getOnekeyFeatures',
-    description: 'methodDescriptions.getOnekeyFeatures',
-    noDeviceIdReq: true,
-    presets: [],
-  },
-  {
     method: 'getPassphraseState',
     description: 'methodDescriptions.getPassphraseState',
     noDeviceIdReq: true,
@@ -102,14 +96,39 @@ const api: UnifiedMethodConfig[] = [
         parameters: [],
       },
       {
-        title: 'Refresh versions and verification',
+        title: 'Refresh identity and versions',
         parameters: [
           {
             name: 'refresh',
             type: 'textarea',
             required: false,
             label: 'Sections',
-            value: ['identity', 'versions', 'verification'],
+            value: ['identity', 'versions'],
+          },
+        ],
+      },
+      {
+        title: 'Refresh settings',
+        parameters: [
+          {
+            name: 'refresh',
+            type: 'textarea',
+            required: false,
+            label: 'Sections',
+            value: ['settings'],
+          },
+        ],
+      },
+      {
+        title: 'Refresh runtime status',
+        description: 'Explicitly reads runtime status while the device is in normal mode.',
+        parameters: [
+          {
+            name: 'refresh',
+            type: 'textarea',
+            required: false,
+            label: 'Sections',
+            value: ['status'],
           },
         ],
       },

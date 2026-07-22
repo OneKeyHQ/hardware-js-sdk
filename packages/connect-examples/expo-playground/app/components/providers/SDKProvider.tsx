@@ -1,16 +1,10 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  CoreApi,
-  DEVICE,
-  LOG_EVENT,
-  UiEvent,
-  UI_REQUEST,
-  UI_RESPONSE,
-} from '@onekeyfe/hd-core';
+import { CoreApi, DEVICE, LOG_EVENT, UiEvent, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { useDeviceStore } from '../../store/deviceStore';
 
 import { submitPin, submitPassphrase } from '../../services/hardwareService';
+import { applyDeviceStateToDevice } from '../../services/deviceStateAdapter';
 import { EDeviceType } from '@onekeyfe/hd-shared';
 import GlobalDialogManager from '../global/GlobalDialogManager';
 import WebUsbAuthorizeDialog from '../global/WebUsbAuthorizeDialog';
@@ -357,6 +351,7 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
       });
 
       sdkInstance.on(DEVICE.FEATURES, payload => {
+        // Protocol V1 compatibility event. Protocol V2 uses DEVICE.STATE below.
         const deviceState = useDeviceStore.getState();
         deviceState.setDeviceFeatures(payload);
         if (deviceState.currentDevice) {
@@ -367,6 +362,23 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
         }
       });
 
+      sdkInstance.on(DEVICE.STATE, event => {
+        const store = useDeviceStore.getState();
+        const currentDevice = store.currentDevice;
+        if (!currentDevice) return;
+        const matchesDevice =
+          currentDevice.connectId === event.connectId ||
+          Boolean(
+            event.state.identity.serialNo && currentDevice.uuid === event.state.identity.serialNo
+          ) ||
+          Boolean(
+            event.state.identity.deviceId &&
+              currentDevice.deviceId === event.state.identity.deviceId
+          );
+        if (matchesDevice) {
+          store.setCurrentDevice(applyDeviceStateToDevice(currentDevice, event.state));
+        }
+      });
     },
     [setDeviceAction, clearDeviceAction, flushSdkDebugLogs]
   );

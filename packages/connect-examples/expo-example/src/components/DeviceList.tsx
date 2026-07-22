@@ -14,9 +14,11 @@ import { getItem, setItem } from '../utils/storeUtil';
 import { connectionTypeAtom } from '../atoms/deviceConnectAtoms';
 import { deviceActionsAtom, deviceListAtom, selectDeviceAtom } from '../atoms/deviceAtoms';
 import { useCommonParams } from '../provider/CommonParamsProvider';
+import { applyDeviceStateToExampleDevice } from '../utils/deviceStateAdapter';
 
 import type { ConnectionType } from '../atoms/deviceConnectAtoms';
 import type { ForwardedRef } from 'react';
+import type { DeviceState } from '@onekeyfe/hd-core';
 import type { Features } from '@onekeyfe/hd-transport';
 import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
 
@@ -24,6 +26,7 @@ export type Device = {
   connectId: string;
   name: string;
   features?: Features;
+  deviceState?: DeviceState;
   deviceType?: string;
   protocolType?: HardwareConnectProtocol;
   id?: string;
@@ -143,18 +146,14 @@ function DeviceListFC(
 
       setDeviceActions({ type: 'select', payload: device });
 
-      const featuresRes = await sdk.getFeatures(device.connectId, {
+      const stateRes = await sdk.getDeviceState(device.connectId, {
         connectProtocol: commonParams.connectProtocol,
       });
-      if (!featuresRes.success || !featuresRes.payload) return;
+      if (!stateRes.success || !stateRes.payload) return;
 
       setDeviceActions({
         type: 'select',
-        payload: {
-          ...device,
-          features: featuresRes.payload,
-          deviceType: featuresRes.payload.onekey_device_type ?? device.deviceType,
-        },
+        payload: applyDeviceStateToExampleDevice(device, stateRes.payload),
       });
     },
     [commonParams.connectProtocol, sdk, setDeviceActions]

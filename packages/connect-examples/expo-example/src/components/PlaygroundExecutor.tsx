@@ -38,7 +38,7 @@ const PlaygroundExecutor: React.FC<PlaygroundExecutorProps> = ({
       if (!sdk) return intl.formatMessage({ id: 'tip__sdk_not_ready' });
 
       const connectId = selectedDevice?.connectId ?? '';
-      // @ts-expect-error
+      // @ts-expect-error legacy transport Features do not expose normalized deviceId
       const deviceId = selectedDevice?.features?.deviceId ?? '';
       const { method } = methodPayload;
       // setIsLoading(true);

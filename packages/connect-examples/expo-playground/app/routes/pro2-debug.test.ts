@@ -6,7 +6,6 @@ import { describe, expect, test } from '@jest/globals';
 const WALLET_METHODS = [
   'deviceUnlock',
   'deviceLock',
-  'deviceStatusGet',
   'deviceGetOnboardingStatus',
   'getPassphraseState',
   'deviceSessionOpen',
@@ -28,5 +27,18 @@ describe('Pro2 Debug 钱包与状态方法', () => {
 
   test.each(WALLET_METHODS)('为 %s 展示协议请求和响应信息', method => {
     expect(source).toContain(`${method}: {`);
+  });
+
+  test('不把原始状态和设置读取命令暴露为公共调试 API', () => {
+    expect(source).not.toContain('deviceInfoGet: {');
+    expect(source).not.toContain('deviceStatusGet: {');
+    expect(source).not.toContain('deviceSettingsGet: {');
+  });
+
+  test('统一状态说明区分缓存读取和显式 section 刷新', () => {
+    expect(source).toContain('Cached state: no transport request');
+    expect(source).toContain('identity/versions/verification: DeviceInfoGet');
+    expect(source).toContain('settings: DeviceSettingsGet');
+    expect(source).toContain('status: DeviceStatusGet (normal mode only)');
   });
 });

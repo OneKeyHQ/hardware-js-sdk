@@ -1,25 +1,18 @@
 import { useCallback } from 'react';
-import {
-  getDeviceBLEFirmwareVersion,
-  getDeviceBootloaderVersion,
-  getDeviceFirmwareVersion,
-} from '@onekeyfe/hd-core';
 import { useDeviceStore } from '../store/deviceStore';
 import { callHardwareAPI } from '../services/hardwareService';
+import { applyDeviceStateToDevice } from '../services/deviceStateAdapter';
+import {
+  getFirmwareVersionsFromDeviceState,
+  type FirmwareVersionInfo,
+} from '../services/deviceStateSelectors';
 import { SDKUtils } from '../utils/hardwareInstance';
 import { resolveLazyParameterValues } from '../utils/parameterUtils';
 import type { UnifiedMethodConfig } from '~/data/types';
 import type { DeviceInfo } from '../types/hardware';
-import type { Features } from '@onekeyfe/hd-core';
 
 interface UseHardwareMethodExecutionOptions {
   requireDevice?: boolean;
-}
-
-interface FirmwareVersionInfo {
-  bootloaderVersion?: string;
-  firmwareVersion?: string;
-  bleVersion?: string;
 }
 
 const FIRMWARE_UPDATE_METHODS = new Set([
@@ -121,53 +114,26 @@ function getFirmwareVersionsFromPayload(payload: unknown): FirmwareVersionInfo |
   return hasFirmwareVersionInfo(versions) ? versions : undefined;
 }
 
-function getFirmwareVersionsFromFeatures(features?: Features): FirmwareVersionInfo | undefined {
-  if (!features) return undefined;
-
-  const versions = {
-    bootloaderVersion: getDeviceBootloaderVersion(features)?.join('.'),
-    firmwareVersion: getDeviceFirmwareVersion(features)?.join('.'),
-    bleVersion: getDeviceBLEFirmwareVersion(features)?.join('.'),
-  };
-
-  return hasFirmwareVersionInfo(versions) ? versions : undefined;
-}
-
 export function useHardwareMethodExecution({
   requireDevice = true,
 }: UseHardwareMethodExecutionOptions = {}) {
-  const { currentDevice, setCurrentDevice, setDeviceFeatures } = useDeviceStore();
+  const { currentDevice, setCurrentDevice } = useDeviceStore();
 
   const refreshCurrentDeviceInfo = useCallback(async (): Promise<DeviceInfo | null> => {
     if (!currentDevice?.connectId) return currentDevice;
 
     const sdk = await SDKUtils.getInstance();
-    const featuresResult = await sdk.getFeatures(currentDevice.connectId);
-    if (!featuresResult.success || !featuresResult.payload) {
+    const stateResult = await sdk.getDeviceState(currentDevice.connectId);
+    if (!stateResult.success || !stateResult.payload) {
       return currentDevice;
     }
 
-    let onekeyFeatures = currentDevice.onekeyFeatures;
-    try {
-      const onekeyFeaturesResult = await sdk.getOnekeyFeatures(currentDevice.connectId);
-      if (onekeyFeaturesResult.success && onekeyFeaturesResult.payload) {
-        onekeyFeatures = onekeyFeaturesResult.payload;
-      }
-    } catch (error) {
-      console.warn('刷新 OneKey features 失败:', error);
-    }
+    const updatedDevice = applyDeviceStateToDevice(currentDevice, stateResult.payload);
 
-    const updatedDevice = {
-      ...currentDevice,
-      features: featuresResult.payload,
-      onekeyFeatures,
-    };
-
-    setDeviceFeatures(featuresResult.payload);
     setCurrentDevice(updatedDevice);
 
     return updatedDevice;
-  }, [currentDevice, setCurrentDevice, setDeviceFeatures]);
+  }, [currentDevice, setCurrentDevice]);
 
   const executeMethod = useCallback(
     async (
@@ -196,7 +162,10 @@ export function useHardwareMethodExecution({
           : params;
 
       const resolvedExecutionParams = resolveLazyParameterValues(executionParams);
-      const normalizedParams = normalizeProtocolV2FileParams(methodConfig.method, resolvedExecutionParams);
+      const normalizedParams = normalizeProtocolV2FileParams(
+        methodConfig.method,
+        resolvedExecutionParams
+      );
 
       // 调用硬件 API
       const result = await callHardwareAPI(methodConfig.method, normalizedParams);
@@ -210,7 +179,7 @@ export function useHardwareMethodExecution({
           try {
             const refreshedDevice = await refreshCurrentDeviceInfo();
             firmwareVersions =
-              firmwareVersions ?? getFirmwareVersionsFromFeatures(refreshedDevice?.features);
+              firmwareVersions ?? getFirmwareVersionsFromDeviceState(refreshedDevice?.deviceState);
           } catch (error) {
             console.warn('固件更新完成后刷新设备信息失败:', error);
           }

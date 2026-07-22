@@ -499,10 +499,7 @@ export default function Pro2SpecialUpdatePage() {
 
   const requestAssetsDirectory = useCallback(
     async () =>
-      requestDirectory(
-        'Select assets source',
-        'Pick the device_update/assets directory.'
-      ),
+      requestDirectory('Select assets source', 'Pick the device_update/assets directory.'),
     [requestDirectory]
   );
 
@@ -650,7 +647,10 @@ export default function Pro2SpecialUpdatePage() {
         if (!isRebootLikelyStartedError(message)) {
           throw error;
         }
-        addLog('warn', `${label}: reboot response unavailable, treating as reboot started: ${message}`);
+        addLog(
+          'warn',
+          `${label}: reboot response unavailable, treating as reboot started: ${message}`
+        );
       }
     },
     [addLog, callApi]
@@ -740,7 +740,10 @@ export default function Pro2SpecialUpdatePage() {
   const uploadAssetsOverWebUsb = useCallback(
     async (connectId: string, source: AssetSource) => {
       const assetFiles = await getAssetFiles(source);
-      const totalBytes = assetFiles.reduce((sum, item) => sum + item.size, 0);
+      let totalBytes = 0;
+      for (const item of assetFiles) {
+        totalBytes += item.size;
+      }
 
       if (assetFiles.length === 0) {
         throw new Error('Assets directory is empty.');

@@ -17,11 +17,9 @@ export function getDeviceMethodSection(method: string): DeviceMethodSection {
     [
       'searchdevices',
       'getfeatures',
+      'getdevicestate',
       'getonekeyfeatures',
       'getpassphrasestate',
-      'getdeviceinfo',
-      'deviceinfoget',
-      'devicestatusget',
       'devicegetonboardingstatus',
       'protocolinforequest',
       'ping',
@@ -47,7 +45,6 @@ export function getDeviceMethodSection(method: string): DeviceMethodSection {
   if (
     [
       'devicesettings',
-      'devicesettingsget',
       'devicesettingsset',
       'devicesettingspageshow',
       'devicechangepin',

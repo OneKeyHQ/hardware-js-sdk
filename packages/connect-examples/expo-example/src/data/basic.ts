@@ -8,16 +8,6 @@ const api: PlaygroundProps[] = [
     noDeviceIdReq: true,
   },
   {
-    method: 'getFeatures',
-    description: 'Get features of a device',
-    noDeviceIdReq: true,
-  },
-  {
-    method: 'getOnekeyFeatures',
-    description: 'Get onekey features of a device(For Pro)',
-    noDeviceIdReq: true,
-  },
-  {
     method: 'getDeviceState',
     description: 'Get canonical device state (supports V1 and V2 protocol)',
     noDeviceIdReq: true,
@@ -45,6 +35,11 @@ const api: PlaygroundProps[] = [
         },
       },
     ],
+  },
+  {
+    method: 'getFeatures',
+    description: 'Get legacy Features (Protocol V1 compatibility only)',
+    noDeviceIdReq: true,
   },
   {
     method: 'getPassphraseState',

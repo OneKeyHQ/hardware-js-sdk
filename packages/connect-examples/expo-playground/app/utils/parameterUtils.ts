@@ -157,7 +157,7 @@ export function resolveLazyParameterValues(
  * 展开点分参数名为嵌套对象。
  *
  * 例如 { 'targets.hw': true, 'types.hash': false } → { targets: { hw: true }, types: { hash: false } }。
- * 不含 '.' 的 key 原样保留，用于 deviceInfoGet 等需要嵌套布尔参数的方法。
+ * 不含 '.' 的 key 原样保留，用于需要嵌套布尔参数的高级方法。
  */
 export function unflattenParameters(data: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
@@ -170,7 +170,11 @@ export function unflattenParameters(data: Record<string, unknown>): Record<strin
     let cursor = result;
     for (let i = 0; i < segments.length - 1; i += 1) {
       const segment = segments[i];
-      if (!cursor[segment] || typeof cursor[segment] !== 'object' || Array.isArray(cursor[segment])) {
+      if (
+        !cursor[segment] ||
+        typeof cursor[segment] !== 'object' ||
+        Array.isArray(cursor[segment])
+      ) {
         cursor[segment] = {};
       }
       cursor = cursor[segment] as Record<string, unknown>;

@@ -12,16 +12,19 @@ A complete web application example demonstrating OneKey Hardware SDK integration
 ## 🚀 What You Can Learn
 
 ### 1. **Connection Methods**
+
 - **WebUSB**: Direct browser-to-device connection
 - **JSBridge**: Connection via OneKey Bridge desktop app
 - **Hardware Emulator**: Docker-based device simulation for testing
 
 ### 2. **Blockchain Integration**
+
 - Bitcoin, Ethereum, Solana, and 20+ other networks
 - Address generation, transaction signing, message signing
 - Multi-chain wallet functionality
 
 ### 3. **Modern Implementation**
+
 - React + TypeScript architecture
 - Proper error handling and user feedback
 - State management patterns
@@ -32,6 +35,7 @@ A complete web application example demonstrating OneKey Hardware SDK integration
 The example includes hardware emulator support for development without physical devices.
 
 ### Quick Setup
+
 ```bash
 # 1. Clone emulator repository
 git clone https://github.com/Johnwanzi/onekey-docker.git
@@ -39,7 +43,7 @@ git clone https://github.com/Johnwanzi/onekey-docker.git
 # 2. Start OneKey Pro emulator
 bash build-emu.sh pro-emu
 
-# 3. Start OneKey Classic 1s emulator  
+# 3. Start OneKey Classic 1s emulator
 bash build-emu.sh 1s-emu
 
 # 4. Access via browser
@@ -47,6 +51,7 @@ bash build-emu.sh 1s-emu
 ```
 
 ### Connect to Example
+
 1. Open the example application
 2. Select "Emulator" transport method
 3. Click connect - automatically detects running emulators
@@ -67,7 +72,7 @@ import { CoreApi } from '@onekeyfe/hd-core';
 const sdk = new CoreApi({
   env: 'web',
   debug: true,
-  connectSrc: 'https://connect.onekey.so/'
+  connectSrc: 'https://connect.onekey.so/',
 });
 
 // Switch connection method
@@ -76,12 +81,29 @@ await sdk.switchTransport('webusb'); // or 'emulator'
 // Find devices
 const devices = await sdk.searchDevices();
 
+// Read the canonical V1/V2 device snapshot
+const state = await sdk.getDeviceState(connectId);
+
+// Refresh only the section the screen actually needs
+const versions = await sdk.getDeviceState(connectId, {
+  refresh: ['identity', 'versions'],
+});
+
 // Get address example
 const result = await sdk.evmGetAddress({
   path: "m/44'/60'/0'/0/0",
-  showOnOneKey: true
+  showOnOneKey: true,
 });
 ```
+
+`getDeviceState()` is the normal device-information API for both Protocol V1 and
+Protocol V2 devices. Cached reads do not implicitly query runtime status. Use an
+explicit `refresh: ['status']` only when fresh normal-mode status is required.
+
+`getFeatures()` and `getOnekeyFeatures()` remain available only for Protocol V1
+compatibility and for tests that intentionally verify the legacy feature
+messages. New integrations should not use either method as a Pro2 information
+API.
 
 ## 📚 Getting Started
 
@@ -89,7 +111,7 @@ const result = await sdk.evmGetAddress({
 # Clone and setup
 git clone https://github.com/OneKeyHQ/hardware-js-sdk.git
 cd hardware-js-sdk/packages/connect-examples/expo-playground
-yarn 
+yarn
 yarn start
 ```
 

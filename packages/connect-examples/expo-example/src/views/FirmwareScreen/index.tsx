@@ -3,7 +3,7 @@ import { Checkbox, type CheckedState, H5, Label, Stack, Text, XStack } from 'tam
 import { Check as CheckIcon } from '@tamagui/lucide-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
-import { type Features, type OnekeyFeatures, getFirmwareType } from '@onekeyfe/hd-core';
+import { type DeviceState, type Features, type OnekeyFeatures } from '@onekeyfe/hd-core';
 import { Platform } from 'react-native';
 import { useIntl } from 'react-intl';
 import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
@@ -19,8 +19,8 @@ import { MessageBox } from './MessageBox';
 import { FirmwareUpdateEvent } from './FirmwareUpdateEvent';
 import { DeviceFieldContext } from './DeviceFieldContext';
 import { DeviceInfoFieldGroup, DeviceSeFieldGroup } from './DeviceFieldGroup';
-import { ExportDeviceInfo, formatCurrentTime, getDeviceMode } from './ExportDeviceInfo';
-import { getFirmwareDeviceSummary } from '../../utils/deviceUtils';
+import { ExportDeviceInfo, formatCurrentTime } from './ExportDeviceInfo';
+import { getDeviceStateMode, getFirmwareDeviceStateSummary } from '../../utils/deviceUtils';
 import { HardwareInputPinDialogProvider } from '../../provider/HardwareInputPinProvider';
 import { useMedia } from '../../provider/MediaProvider';
 import { selectDeviceAtom } from '../../atoms/deviceAtoms';
@@ -427,6 +427,7 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
   const intl = useIntl();
   const { sdk } = useContext(HardwareSDKContext);
   const selectDevice = useAtomValue(selectDeviceAtom);
+  const [deviceState, setDeviceState] = useState<DeviceState | undefined>(undefined);
   const [features, setFeatures] = useState<Features | undefined>(undefined);
   const [onekeyFeatures, setOnekeyFeatures] = useState<OnekeyFeatures | undefined>(undefined);
   const [connecting, setConnecting] = useState<boolean>(false);
@@ -441,29 +442,12 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
     bootloaderVersion,
     boardloaderVersion,
     firmwareVersion,
-  } = getFirmwareDeviceSummary(features, onekeyFeatures);
+  } = getFirmwareDeviceStateSummary(deviceState);
   const deviceTypeLowerCase = deviceType.toLowerCase();
-
-  const loadOnekeyFeatures = useCallback(async () => {
-    if (!sdk || !selectDevice?.connectId) return undefined;
-
-    try {
-      console.log('loadOnekeyFeatures: Starting to load OneKey features...');
-      const res = await sdk.getOnekeyFeatures(selectDevice.connectId);
-      console.log('loadOnekeyFeatures: Result:', res);
-
-      if (res.success) {
-        return res.payload;
-      }
-      return undefined;
-    } catch (error) {
-      console.error('loadOnekeyFeatures: Error:', error);
-      return undefined;
-    }
-  }, [sdk, selectDevice?.connectId]);
 
   const loadDeviceFeatures = useCallback(async () => {
     if (selectDevice?.connectId == null) {
+      setDeviceState(undefined);
       setFeatures(undefined);
       setOnekeyFeatures(undefined);
       return undefined;
@@ -474,29 +458,36 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
     }
 
     setConnecting(true);
+    setDeviceState(undefined);
     setFeatures(undefined);
     setOnekeyFeatures(undefined);
     setError(undefined);
 
     try {
-      console.log('Loading device features for:', selectDevice.connectId);
-
-      const featuresRes = await sdk.getFeatures(selectDevice.connectId);
-      console.log('getFeatures result:', featuresRes);
-
-      if (featuresRes.success) {
-        const fetchedFeatures = featuresRes.payload;
-        console.log('Features loaded successfully, now loading OneKey features...');
-        const fetchedOnekeyFeatures = await loadOnekeyFeatures();
-
-        setFeatures(fetchedFeatures);
-        setOnekeyFeatures(fetchedOnekeyFeatures);
-        return fetchedFeatures;
+      const stateRes = await sdk.getDeviceState(selectDevice.connectId, {
+        refresh: ['identity', 'versions', 'verification'],
+      });
+      if (!stateRes.success) {
+        setError(stateRes.payload.error);
+        return undefined;
       }
 
-      console.error('Failed to get features:', featuresRes.payload.error);
-      setError(featuresRes.payload.error);
-      return undefined;
+      const nextState = stateRes.payload;
+      setDeviceState(nextState);
+
+      // 旧 Features 消息只在 V1 的高级信息面板中保留。
+      if (nextState.protocol === 'V1') {
+        const featuresRes = await sdk.getFeatures(selectDevice.connectId);
+        if (featuresRes.success) {
+          setFeatures(featuresRes.payload);
+        }
+        const onekeyFeaturesRes = await sdk.getOnekeyFeatures(selectDevice.connectId);
+        if (onekeyFeaturesRes.success) {
+          setOnekeyFeatures(onekeyFeaturesRes.payload);
+        }
+      }
+
+      return nextState;
     } catch (error) {
       console.error('Exception in loadDeviceFeatures:', error);
       setError(error instanceof Error ? error.message : String(error));
@@ -504,14 +495,16 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
     } finally {
       setConnecting(false);
     }
-  }, [loadOnekeyFeatures, sdk, selectDevice?.connectId]);
+  }, [sdk, selectDevice?.connectId]);
 
   useEffect(() => {
     loadDeviceFeatures();
   }, [loadDeviceFeatures]);
 
   const disconnectDevice = useCallback(() => {
+    setDeviceState(undefined);
     setFeatures(undefined);
+    setOnekeyFeatures(undefined);
     onDisconnectDevice?.();
   }, [onDisconnectDevice]);
 
@@ -529,7 +522,7 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
     }) => {
       if (!sdk)
         return { payload: intl.formatMessage({ id: 'tip__sdk_not_ready' }), success: false };
-      if (!features) return { payload: 'features is not ready', success: false };
+      if (!deviceState) return { payload: 'device state is not ready', success: false };
       if (!selectDevice) return { payload: 'need connect device', success: false };
       setShowUpdateDialog(true);
       try {
@@ -564,7 +557,7 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
     },
     [
       deviceTypeLowerCase,
-      features,
+      deviceState,
       intl,
       loadDeviceFeatures,
       sdk,
@@ -585,7 +578,7 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
     }) => {
       if (!sdk)
         return { payload: intl.formatMessage({ id: 'tip__sdk_not_ready' }), success: false };
-      if (!features) return { payload: 'features is not ready', success: false };
+      if (!deviceState) return { payload: 'device state is not ready', success: false };
       if (!selectDevice)
         return {
           payload: intl.formatMessage({ id: 'tip__need_connect_device_first' }),
@@ -692,12 +685,12 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
         };
       }
     },
-    [deviceTypeLowerCase, features, intl, loadDeviceFeatures, sdk, selectDevice]
+    [deviceState, deviceTypeLowerCase, intl, loadDeviceFeatures, sdk, selectDevice]
   );
 
   const rebootBoardModel = useCallback(async () => {
     if (!sdk) return;
-    if (!features) return;
+    if (!deviceState) return;
     if (!selectDevice) return;
 
     const res = await sdk.deviceRebootToBoardloader(selectDevice.connectId);
@@ -710,7 +703,7 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
     return {
       success: true,
     };
-  }, [features, sdk, selectDevice]);
+  }, [deviceState, sdk, selectDevice]);
 
   const deviceFieldProviderValue = useMemo(
     () => ({
@@ -736,7 +729,7 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
             />
           )}
           {!!error && <MessageBox message={error} />}
-          {features && !onekeyFeatures && (
+          {deviceState?.protocol === 'V1' && features && !onekeyFeatures && (
             <MessageBox message="OneKey Features not available. Try clicking 'Refresh OneKey Features' button." />
           )}
           {selectDevice && selectDevice.state === 'disconnected' && (
@@ -746,7 +739,7 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
           )}
         </Stack>
 
-        {features && (
+        {deviceState && (
           <Stack>
             <PanelView title={intl.formatMessage({ id: 'title__device_info' })}>
               <Button variant="primary" size="large" onPress={disconnectDevice}>
@@ -788,14 +781,14 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
                 <DeviceField
                   field={intl.formatMessage({ id: 'label__device_device_statue' })}
                   value={intl.formatMessage({
-                    id: getDeviceMode(features),
+                    id: getDeviceStateMode(deviceState),
                   })}
                 />
                 <DeviceField
                   field={intl.formatMessage({ id: 'label__device_firmware_type' })}
                   value={intl.formatMessage({
                     id:
-                      getFirmwareType(features) === EFirmwareType.BitcoinOnly
+                      deviceState.identity.firmwareType === EFirmwareType.BitcoinOnly
                         ? 'label__device_firmware_type_bitcoin_only'
                         : 'label__device_firmware_type_universal',
                   })}
@@ -803,27 +796,29 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
               </Stack>
             </PanelView>
 
-            <DeviceFieldContext.Provider value={deviceFieldProviderValue}>
-              <PanelView title={intl.formatMessage({ id: 'title__device_advanced_info' })}>
-                <XStack padding="$2" alignItems="center" gap="$8">
-                  <Text color="$text" fontSize={18} fontWeight="bold">
-                    {intl.formatMessage({ id: 'label__device_info_update_time' })}:
-                    {formatCurrentTime(Date.now())}
+            {features ? (
+              <DeviceFieldContext.Provider value={deviceFieldProviderValue}>
+                <PanelView title={intl.formatMessage({ id: 'title__device_advanced_info' })}>
+                  <XStack padding="$2" alignItems="center" gap="$8">
+                    <Text color="$text" fontSize={18} fontWeight="bold">
+                      {intl.formatMessage({ id: 'label__device_info_update_time' })}:
+                      {formatCurrentTime(Date.now())}
+                    </Text>
+                    <Button variant="primary" size="medium" onPress={onReconnectDevice}>
+                      {intl.formatMessage({ id: 'label__device_info_refresh' })}
+                    </Button>
+                    <ExportDeviceInfo />
+                  </XStack>
+
+                  <DeviceInfoFieldGroup />
+
+                  <Text padding={8} fontWeight="bold">
+                    {intl.formatMessage({ id: 'label__device_se_info' })}
                   </Text>
-                  <Button variant="primary" size="medium" onPress={onReconnectDevice}>
-                    {intl.formatMessage({ id: 'label__device_info_refresh' })}
-                  </Button>
-                  <ExportDeviceInfo />
-                </XStack>
-
-                <DeviceInfoFieldGroup />
-
-                <Text padding={8} fontWeight="bold">
-                  {intl.formatMessage({ id: 'label__device_se_info' })}
-                </Text>
-                <DeviceSeFieldGroup />
-              </PanelView>
-            </DeviceFieldContext.Provider>
+                  <DeviceSeFieldGroup />
+                </PanelView>
+              </DeviceFieldContext.Provider>
+            ) : null}
 
             <PanelView title={intl.formatMessage({ id: 'title__device_firmware_update' })}>
               <XStack flexWrap="wrap" gap="$2">

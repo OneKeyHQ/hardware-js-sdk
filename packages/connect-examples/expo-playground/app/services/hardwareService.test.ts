@@ -1,13 +1,26 @@
 import { afterEach, describe, expect, jest, test } from '@jest/globals';
 
-const mockEvmGetAddress = jest.fn().mockResolvedValue({
-  success: true,
-  payload: { address: '0x1234' },
+const mockEvmGetAddress = jest.fn(async (...args: unknown[]) => {
+  void args;
+  return {
+    success: true,
+    payload: { address: '0x1234' },
+  };
 });
+const mockGetDeviceState = jest.fn(async () => ({
+  success: true,
+  payload: {
+    identity: {},
+    status: { passphraseProtection: false },
+    settings: {},
+    versions: {},
+  },
+}));
 
 jest.mock('../utils/hardwareInstance', () => ({
   getCurrentSDKInstance: async () => ({
     evmGetAddress: mockEvmGetAddress,
+    getDeviceState: mockGetDeviceState,
   }),
   clearSDKInstanceCache: () => undefined,
   TransportManager: {
@@ -31,6 +44,7 @@ jest.mock('../store/deviceStore', () => {
       features: { passphraseProtection: false },
     },
     deviceFeatures: { passphraseProtection: false },
+    deviceState: undefined,
     setDeviceFeatures: () => undefined,
     setCurrentDevice: () => undefined,
   });

@@ -71,7 +71,10 @@ import {
 } from '../src/protocols/protocol-v2/walletSession';
 import { runMethodWithUnlockRetry } from '../src/protocols/protocol-v2/unlockRetry';
 import { BaseMethod } from '../src/api/BaseMethod';
-import { buildProtocolV1FeaturesPayload, buildProtocolV2FeaturesPayload } from '../src/deviceProfile';
+import {
+  buildProtocolV1FeaturesPayload,
+  buildProtocolV2FeaturesPayload,
+} from '../src/deviceProfile';
 import {
   getDeviceType,
   getFirmwareType,
@@ -1871,44 +1874,24 @@ describe('Protocol V2 feature adapter', () => {
     });
   });
 
-  test('does not call V1 OnekeyGetFeatures for Protocol V2 devices', async () => {
+  test('rejects legacy getOnekeyFeatures for Protocol V2 devices', async () => {
     const method = new GetOnekeyFeatures({
       id: 1,
       payload: {
         method: 'getOnekeyFeatures',
       },
     });
-    const typedCall = jest.fn().mockResolvedValue({
-      type: 'DeviceInfo',
-      message: {
-        protocol_version: 1,
-        hw: { serial_no: 'PR2SERIAL' },
-        fw: { application: { version: '1.2.3', build_id: 'app-build' } },
-        coprocessor: { bt_adv_name: 'Pro2 BLE' },
-        status: { init_states: true },
-      },
-    });
+    const typedCall = jest.fn();
 
     (method as any).device = stubDevice({
       originalDescriptor: { protocolType: 'V2' },
       commands: { typedCall },
     });
 
-    const message = await method.run();
-
-    // V2 走 DeviceInfoGet 完整请求（含 SE 与 hash/build_id），而不是 V1 OnekeyGetFeatures
-    expect(typedCall).toHaveBeenCalledTimes(1);
-    expect(typedCall).toHaveBeenCalledWith(
-      'DeviceInfoGet',
-      'DeviceInfo',
-      expect.objectContaining({
-        targets: expect.objectContaining({ se1: true, se2: true, se3: true, se4: true }),
-        types: expect.objectContaining({ build_id: true, hash: true }),
-      }),
-      expect.anything()
-    );
-    expect(message).toEqual({ onekey_device_type: 'PRO2' });
-    expect(message).not.toHaveProperty('label');
+    await expect(method.run()).rejects.toMatchObject({
+      errorCode: expect.any(Number),
+    });
+    expect(typedCall).not.toHaveBeenCalled();
   });
 
   test('initializes and reuses Protocol V2 features from DeviceInfo only', async () => {

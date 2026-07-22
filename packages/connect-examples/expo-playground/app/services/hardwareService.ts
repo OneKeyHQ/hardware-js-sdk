@@ -14,8 +14,10 @@ import { methodSupportsCommonParameters } from '../utils/constants';
 import { previewHardwareParams } from './previewHardwareParams';
 import { PLAYGROUND_MOCK_HIDDEN_WALLET } from '../utils/passphraseMock';
 import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
-import type { Features, IDeviceType } from '@onekeyfe/hd-core';
 import type { DeviceInfo } from '../types/hardware';
+import { applyDeviceStateToDevice } from './deviceStateAdapter';
+import { getPassphraseProtectionFromDeviceState } from './deviceStateSelectors';
+import type { DeviceState } from '@onekeyfe/hd-core';
 // 使用 hd-core 的标准类型
 export type ApiResponse<T = any> = Success<T> | Unsuccessful;
 export type HardwareApiMethod = keyof CoreApi;
@@ -23,12 +25,6 @@ export type HardwareApiMethod = keyof CoreApi;
 type PassphraseStateMetadata = {
   passphraseState?: string;
   passphraseProtection?: boolean | null;
-};
-
-const getFeaturePassphraseProtection = (features?: Features | null): boolean | undefined => {
-  return typeof features?.passphraseProtection === 'boolean'
-    ? features.passphraseProtection
-    : undefined;
 };
 
 const extractPassphraseStateMetadata = (payload: unknown): PassphraseStateMetadata => {
@@ -51,74 +47,41 @@ const clearPassphraseState = (params: Record<string, unknown>) => {
   useHardwareStore.getState().setCommonParameter('passphraseState', '');
 };
 
-const updateCachedDeviceFeatures = (connectId: string, features: Features) => {
-  const deviceState = useDeviceStore.getState();
-  deviceState.setDeviceFeatures(features);
-
-  if (deviceState.currentDevice?.connectId === connectId) {
-    deviceState.setCurrentDevice({
-      ...deviceState.currentDevice,
-      features,
-    });
+const updateCachedDeviceState = (connectId: string, state: DeviceState) => {
+  const store = useDeviceStore.getState();
+  if (store.currentDevice?.connectId === connectId) {
+    store.setCurrentDevice(applyDeviceStateToDevice(store.currentDevice, state));
   }
 };
-
-const firstNonEmptyString = (...values: unknown[]) =>
-  values.find((value): value is string => typeof value === 'string' && value.length > 0);
-
-const getDeviceTypeFromProfile = (value: unknown): IDeviceType | undefined =>
-  typeof value === 'string' && value.length > 0 ? (value as IDeviceType) : undefined;
 
 export async function hydrateConnectedDeviceInfo(device: DeviceInfo): Promise<DeviceInfo> {
   if (!device.connectId) return device;
 
-  // WebUSB 搜索结果已经由 DevicePool 初始化并携带完整 features，直接复用即可。
-  // BLE 扫描为避免配对不会读取 features，因此仅在缺失时补一次。
-  if (device.features) {
-    updateCachedDeviceFeatures(device.connectId, device.features);
-    return device;
-  }
-
   const sdk = await getSDKInstance();
-  let hydratedDevice = { ...device };
 
   try {
-    // 旧 Playground 暂时通过 getFeatures 适配展示结构；正式业务统一使用 getDeviceState。
-    const featuresResult = await sdk.getFeatures(device.connectId);
+    const stateResult = await sdk.getDeviceState(device.connectId);
 
-    if (featuresResult.success && featuresResult.payload) {
-      const features = featuresResult.payload;
-      const serialNo = firstNonEmptyString(features.serialNo, hydratedDevice.uuid);
-      const deviceId = firstNonEmptyString(features.deviceId, hydratedDevice.deviceId);
-      const label = firstNonEmptyString(features.label, hydratedDevice.label);
-      const bleName = firstNonEmptyString(features.bleName);
-      const deviceType = getDeviceTypeFromProfile(features.deviceType);
+    if (stateResult.success && stateResult.payload) {
+      const state = stateResult.payload;
+      const hydratedDevice = applyDeviceStateToDevice(device, state);
+      updateCachedDeviceState(device.connectId, state);
 
-      hydratedDevice = {
-        ...hydratedDevice,
-        ...(serialNo ? { uuid: serialNo } : {}),
-        ...(deviceId ? { deviceId } : {}),
-        ...(deviceType ? { deviceType } : {}),
-        ...(label ? { label } : {}),
-        name: firstNonEmptyString(bleName, label, hydratedDevice.name) ?? hydratedDevice.name,
-        features,
-      };
-      updateCachedDeviceFeatures(device.connectId, features);
-
-      logResponse('Connected device hydrated via getFeatures', {
+      logResponse('Connected device hydrated via getDeviceState', {
         connectId: device.connectId,
-        serialNo,
-        deviceId,
-        label,
+        serialNo: state.identity.serialNo,
+        deviceId: state.identity.deviceId,
+        displayName: state.identity.displayName,
       });
+      return hydratedDevice;
     } else {
-      logError('getFeatures failed while hydrating connected device', featuresResult.payload);
+      logError('getDeviceState failed while hydrating connected device', stateResult.payload);
     }
   } catch (error) {
-    logError('getFeatures exception while hydrating connected device', { error });
+    logError('getDeviceState exception while hydrating connected device', { error });
   }
 
-  return hydratedDevice;
+  return device;
 }
 
 const resolvePassphraseProtection = async (
@@ -126,25 +89,22 @@ const resolvePassphraseProtection = async (
   connectId: string
 ): Promise<boolean | undefined> => {
   const deviceState = useDeviceStore.getState();
-  const cachedFeatures =
+  const cachedState =
     deviceState.currentDevice?.connectId === connectId
-      ? deviceState.currentDevice.features ?? deviceState.deviceFeatures
+      ? deviceState.currentDevice.deviceState
       : undefined;
-  const cachedPassphraseProtection = getFeaturePassphraseProtection(cachedFeatures);
 
-  // 已有缓存但值为 null/unknown 时，通常表示 Pro2 尚未解锁；不要为了猜测该值
-  // 再发起一轮 getFeatures，钱包会话流程会在解锁后刷新真实状态。
-  if (cachedFeatures) {
-    return cachedPassphraseProtection;
+  if (cachedState) {
+    return getPassphraseProtectionFromDeviceState(cachedState);
   }
 
-  const featuresResult = await sdk.getFeatures(connectId);
-  if (!featuresResult.success || !featuresResult.payload) {
+  const stateResult = await sdk.getDeviceState(connectId);
+  if (!stateResult.success || !stateResult.payload) {
     return undefined;
   }
 
-  updateCachedDeviceFeatures(connectId, featuresResult.payload);
-  return getFeaturePassphraseProtection(featuresResult.payload);
+  updateCachedDeviceState(connectId, stateResult.payload);
+  return getPassphraseProtectionFromDeviceState(stateResult.payload);
 };
 
 const preparePassphraseParams = async (
