@@ -68,7 +68,7 @@ test('exports the unified device state event contract', () => {
 
 - [ ] **Step 2: 运行测试并确认失败**
 
-Run: `yarn workspace @onekeyfe/hd-core test device-state-contract.test.ts --runInBand`  
+Run: `yarn workspace @onekeyfe/hd-core test device-state-contract.test.ts --runInBand`
 Expected: FAIL，提示 `DEVICE.STATE`、`DeviceState` 或 `DeviceStateEvent` 不存在。
 
 - [ ] **Step 3: 添加完整状态和查询类型**
@@ -95,7 +95,7 @@ STATE: 'state',
 
 - [ ] **Step 4: 运行测试并确认通过**
 
-Run: `yarn workspace @onekeyfe/hd-core test device-state-contract.test.ts --runInBand`  
+Run: `yarn workspace @onekeyfe/hd-core test device-state-contract.test.ts --runInBand`
 Expected: PASS。
 
 - [ ] **Step 5: 提交**
@@ -133,7 +133,7 @@ test('merges patches, ignores undefined and recomputes displayName', () => {
 
 - [ ] **Step 2: 运行测试并确认失败**
 
-Run: `yarn workspace @onekeyfe/hd-core test device-state-store.test.ts --runInBand`  
+Run: `yarn workspace @onekeyfe/hd-core test device-state-store.test.ts --runInBand`
 Expected: FAIL，模块不存在。
 
 - [ ] **Step 3: 实现 Store**
@@ -154,7 +154,7 @@ export class DeviceStateStore {
 
 - [ ] **Step 4: 运行 Store 测试**
 
-Run: `yarn workspace @onekeyfe/hd-core test device-state-store.test.ts --runInBand`  
+Run: `yarn workspace @onekeyfe/hd-core test device-state-store.test.ts --runInBand`
 Expected: PASS。
 
 - [ ] **Step 5: 提交**
@@ -186,7 +186,7 @@ test('maps Protocol V2 DeviceInfo without requiring status targets', () => {
 
 - [ ] **Step 2: 运行并确认失败**
 
-Run: `yarn workspace @onekeyfe/hd-core test device-state-mapper.test.ts --runInBand`  
+Run: `yarn workspace @onekeyfe/hd-core test device-state-mapper.test.ts --runInBand`
 Expected: FAIL，Mapper 导出不存在。
 
 - [ ] **Step 3: 实现纯 Mapper**
@@ -205,7 +205,7 @@ Mapper 不读取 Device、不发送命令、不发送事件。
 
 - [ ] **Step 4: 运行 Mapper 测试**
 
-Run: `yarn workspace @onekeyfe/hd-core test device-state-mapper.test.ts --runInBand`  
+Run: `yarn workspace @onekeyfe/hd-core test device-state-mapper.test.ts --runInBand`
 Expected: PASS。
 
 - [ ] **Step 5: 提交**
@@ -234,7 +234,7 @@ test('projects legacy Features from the canonical snapshot', () => {
 
 - [ ] **Step 2: 运行并确认失败**
 
-Run: `yarn workspace @onekeyfe/hd-core test device-state-projector.test.ts --runInBand`  
+Run: `yarn workspace @onekeyfe/hd-core test device-state-projector.test.ts --runInBand`
 Expected: FAIL，Projector 不存在。
 
 - [ ] **Step 3: 实现纯 Projector**
@@ -247,7 +247,7 @@ projectFeatures(state: DeviceState): Features
 
 - [ ] **Step 4: 运行投影测试**
 
-Run: `yarn workspace @onekeyfe/hd-core test device-state-projector.test.ts --runInBand`  
+Run: `yarn workspace @onekeyfe/hd-core test device-state-projector.test.ts --runInBand`
 Expected: PASS。
 
 - [ ] **Step 5: 提交**
@@ -284,7 +284,7 @@ test('emits a full STATE snapshot and a projected legacy FEATURES event', () => 
 
 - [ ] **Step 2: 运行并确认失败**
 
-Run: `yarn workspace @onekeyfe/hd-core test device-state-events.test.ts --runInBand`  
+Run: `yarn workspace @onekeyfe/hd-core test device-state-events.test.ts --runInBand`
 Expected: FAIL，`updateState` 不存在。
 
 - [ ] **Step 3: 改造 Device**
@@ -301,7 +301,7 @@ updateState(patch, source) { /* store.update + STATE + legacy projection */ }
 
 - [ ] **Step 4: 运行事件与既有设备测试**
 
-Run: `yarn workspace @onekeyfe/hd-core test device-state-events.test.ts device-features-state.test.ts --runInBand`  
+Run: `yarn workspace @onekeyfe/hd-core test device-state-events.test.ts device-features-state.test.ts --runInBand`
 Expected: 新测试 PASS；旧测试迁移为状态测试后 PASS。
 
 - [ ] **Step 5: 提交**
@@ -343,7 +343,7 @@ test('does not call DeviceStatusGet during default Protocol V2 state hydration',
 
 - [ ] **Step 3: 运行并确认失败**
 
-Run: `yarn workspace @onekeyfe/hd-core test get-device-state.test.ts --runInBand`  
+Run: `yarn workspace @onekeyfe/hd-core test get-device-state.test.ts --runInBand`
 Expected: FAIL，新方法不存在。
 
 - [ ] **Step 4: 实现查询与刷新策略**
@@ -352,7 +352,7 @@ Expected: FAIL，新方法不存在。
 
 - [ ] **Step 5: 运行测试**
 
-Run: `yarn workspace @onekeyfe/hd-core test get-device-state.test.ts protocol-v2.test.ts --runInBand`  
+Run: `yarn workspace @onekeyfe/hd-core test get-device-state.test.ts protocol-v2.test.ts --runInBand`
 Expected: PASS。
 
 - [ ] **Step 6: 提交**
@@ -384,7 +384,7 @@ expect(updateState).toHaveBeenCalledWith(
 
 - [ ] **Step 2: 运行并确认失败**
 
-Run: `yarn workspace @onekeyfe/hd-core test device-settings.test.ts --runInBand`  
+Run: `yarn workspace @onekeyfe/hd-core test device-settings.test.ts --runInBand`
 Expected: FAIL，生产代码仍调用旧 patch 方法。
 
 - [ ] **Step 3: 迁移所有状态写入点**
@@ -393,12 +393,12 @@ Expected: FAIL，生产代码仍调用旧 patch 方法。
 
 - [ ] **Step 4: 删除旧合并器并确认无引用**
 
-Run: `rg -n "updateFeaturesPatch|DeviceFeaturesState|DeviceSettingsState|featuresNeedsReload" packages/core/src`  
+Run: `rg -n "updateFeaturesPatch|DeviceFeaturesState|DeviceSettingsState|featuresNeedsReload" packages/core/src`
 Expected: 无业务代码命中。
 
 - [ ] **Step 5: 运行相关测试**
 
-Run: `yarn workspace @onekeyfe/hd-core test device-settings.test.ts device-state-store.test.ts protocol-v2.test.ts --runInBand`  
+Run: `yarn workspace @onekeyfe/hd-core test device-settings.test.ts device-state-store.test.ts protocol-v2.test.ts --runInBand`
 Expected: PASS。
 
 - [ ] **Step 6: 提交**
@@ -430,7 +430,7 @@ git commit -m "refactor(core): route device mutations through state"
 
 - [ ] **Step 2: 运行并确认失败**
 
-Run: `yarn workspace @onekeyfe/hd-core test public-device-state-api.test.ts --runInBand`  
+Run: `yarn workspace @onekeyfe/hd-core test public-device-state-api.test.ts --runInBand`
 Expected: FAIL，临时 Pro2 查询仍由公共 API 导出。
 
 - [ ] **Step 3: 改造兼容 API、收回原始查询并删除 status target 用法**
@@ -439,12 +439,12 @@ Expected: FAIL，临时 Pro2 查询仍由公共 API 导出。
 
 - [ ] **Step 4: 全仓搜索确认**
 
-Run: `rg -n "targets:\s*\{[^}]*status|status:\s*true" packages/core packages/connect-examples/expo-example/src/data/basic.ts`  
+Run: `rg -n "targets:\s*\{[^}]*status|status:\s*true" packages/core packages/connect-examples/expo-example/src/data/basic.ts`
 Expected: 无业务构造命中。
 
 - [ ] **Step 5: 运行兼容测试**
 
-Run: `yarn workspace @onekeyfe/hd-core test public-device-state-api.test.ts get-device-state.test.ts protocol-v2.test.ts --runInBand`  
+Run: `yarn workspace @onekeyfe/hd-core test public-device-state-api.test.ts get-device-state.test.ts protocol-v2.test.ts --runInBand`
 Expected: PASS。
 
 - [ ] **Step 6: 提交**
@@ -461,22 +461,22 @@ git commit -m "refactor(core): expose only canonical device state queries"
 
 - [ ] **Step 1: 运行 core 全量测试**
 
-Run: `yarn workspace @onekeyfe/hd-core test --runInBand`  
+Run: `yarn workspace @onekeyfe/hd-core test --runInBand`
 Expected: 全部 PASS。
 
 - [ ] **Step 2: 运行 lint**
 
-Run: `yarn workspace @onekeyfe/hd-core lint`  
+Run: `yarn workspace @onekeyfe/hd-core lint`
 Expected: exit 0。
 
 - [ ] **Step 3: 构建 SDK**
 
-Run: `yarn workspace @onekeyfe/hd-core build`  
+Run: `yarn workspace @onekeyfe/hd-core build`
 Expected: exit 0，只允许已有非阻塞 warning。
 
 - [ ] **Step 4: 检查架构验收条件**
 
-Run: `rg -n "device\.features|featuresNeedsReload|updateFeaturesPatch|targets:\s*\{[^}]*status|status:\s*true" packages/core/src`  
+Run: `rg -n "device\.features|featuresNeedsReload|updateFeaturesPatch|targets:\s*\{[^}]*status|status:\s*true" packages/core/src`
 Expected: 无运行时旧状态容器或默认 status target 命中。
 
 - [ ] **Step 5: 提交验证修复**

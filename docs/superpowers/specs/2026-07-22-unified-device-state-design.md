@@ -1,7 +1,7 @@
 # 统一设备状态架构设计
 
-日期：2026-07-22  
-涉及仓库：`hardware-js-sdk`、`app-monorepo`  
+日期：2026-07-22
+涉及仓库：`hardware-js-sdk`、`app-monorepo`
 实施分支：两个仓库的 `codex/unified-device-state`
 
 ## 1. 背景

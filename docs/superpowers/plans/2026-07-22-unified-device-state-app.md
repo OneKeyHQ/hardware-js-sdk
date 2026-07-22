@@ -52,7 +52,7 @@ test('uses label-first display name from DeviceState', () => {
 
 - [ ] **Step 2: 运行并确认失败**
 
-Run: `yarn jest packages/shared/src/utils/deviceUtils.test.ts --runInBand`  
+Run: `yarn jest packages/shared/src/utils/deviceUtils.test.ts --runInBand`
 Expected: FAIL，新 selector 参数不存在。
 
 - [ ] **Step 3: 替换主类型并添加 selector**
@@ -66,7 +66,7 @@ export type IOneKeyPersistedDeviceState = Omit<DeviceState, 'session' | 'raw'>;
 
 - [ ] **Step 4: 运行测试**
 
-Run: `yarn jest packages/shared/src/utils/deviceUtils.test.ts --runInBand`  
+Run: `yarn jest packages/shared/src/utils/deviceUtils.test.ts --runInBand`
 Expected: PASS。
 
 - [ ] **Step 5: 提交**
@@ -101,7 +101,7 @@ test('converts legacy features once and persists only deviceState updates', asyn
 
 - [ ] **Step 2: 运行并确认失败**
 
-Run: `yarn jest packages/kit-bg/src/dbs/local/LocalDbBase.deviceState.test.ts --runInBand`  
+Run: `yarn jest packages/kit-bg/src/dbs/local/LocalDbBase.deviceState.test.ts --runInBand`
 Expected: FAIL，schema/方法不存在。
 
 - [ ] **Step 3: 修改 schema 和 DB 类型**
@@ -125,7 +125,7 @@ updateDeviceState({ deviceState }: { deviceState: DeviceState }): Promise<void>
 
 - [ ] **Step 5: 运行数据库测试**
 
-Run: `yarn jest packages/kit-bg/src/dbs/local/LocalDbBase.deviceState.test.ts --runInBand`  
+Run: `yarn jest packages/kit-bg/src/dbs/local/LocalDbBase.deviceState.test.ts --runInBand`
 Expected: PASS。
 
 - [ ] **Step 6: 提交**
@@ -159,7 +159,7 @@ test('persists and broadcasts SDK device state snapshots', async () => {
 
 - [ ] **Step 2: 运行并确认失败**
 
-Run: `yarn jest packages/kit-bg/src/services/ServiceHardware/ServiceHardware.pro2DeviceManagement.test.ts --runInBand`  
+Run: `yarn jest packages/kit-bg/src/services/ServiceHardware/ServiceHardware.pro2DeviceManagement.test.ts --runInBand`
 Expected: FAIL，仍监听 `DEVICE.FEATURES`。
 
 - [ ] **Step 3: 接入新事件和 revision 保护**
@@ -168,7 +168,7 @@ Expected: FAIL，仍监听 `DEVICE.FEATURES`。
 
 - [ ] **Step 4: 运行事件测试**
 
-Run: `yarn jest packages/kit-bg/src/services/ServiceHardware/ServiceHardware.pro2DeviceManagement.test.ts --runInBand`  
+Run: `yarn jest packages/kit-bg/src/services/ServiceHardware/ServiceHardware.pro2DeviceManagement.test.ts --runInBand`
 Expected: PASS。
 
 - [ ] **Step 5: 提交**
@@ -198,7 +198,7 @@ test('hydrates OneKey devices through getDeviceState without implicit status ref
 
 - [ ] **Step 2: 运行并确认失败**
 
-Run: `yarn jest packages/kit-bg/src/services/ServiceHardware/ServiceHardware.pro2DeviceManagement.test.ts --runInBand`  
+Run: `yarn jest packages/kit-bg/src/services/ServiceHardware/ServiceHardware.pro2DeviceManagement.test.ts --runInBand`
 Expected: FAIL，新服务方法不存在。
 
 - [ ] **Step 3: 实现统一查询**
@@ -207,12 +207,12 @@ Expected: FAIL，新服务方法不存在。
 
 - [ ] **Step 4: 搜索确认主业务不再调用旧查询**
 
-Run: `rg -n "serviceHardware\.(getFeatures|getDeviceInfo)|hardwareSDK\?\.(getFeatures|getDeviceInfo)" packages/kit-bg packages/kit apps/cli`  
+Run: `rg -n "serviceHardware\.(getFeatures|getDeviceInfo)|hardwareSDK\?\.(getFeatures|getDeviceInfo)" packages/kit-bg packages/kit apps/cli`
 Expected: OneKey 主业务无命中；第三方适配器和数据库迁移器中的旧 `Features` 读取可保留，`getDeviceInfo` 不保留包装。
 
 - [ ] **Step 5: 运行相关测试**
 
-Run: `yarn jest packages/kit-bg/src/services/ServiceHardware/ServiceHardware.pro2DeviceManagement.test.ts packages/kit-bg/src/services/ServiceHardware/ServiceHardware.preInitializeDeviceForSign.test.ts --runInBand`  
+Run: `yarn jest packages/kit-bg/src/services/ServiceHardware/ServiceHardware.pro2DeviceManagement.test.ts packages/kit-bg/src/services/ServiceHardware/ServiceHardware.preInitializeDeviceForSign.test.ts --runInBand`
 Expected: PASS。
 
 - [ ] **Step 6: 提交**
@@ -245,7 +245,7 @@ test('uses the DEVICE.STATE label immediately after rename', () => {
 
 - [ ] **Step 2: 运行并确认失败**
 
-Run: `yarn jest packages/kit/src/states/jotai/contexts/deviceDetails/pro2DeviceManagement.test.ts --runInBand`  
+Run: `yarn jest packages/kit/src/states/jotai/contexts/deviceDetails/pro2DeviceManagement.test.ts --runInBand`
 Expected: FAIL，selector 仍读取 `features`。
 
 - [ ] **Step 3: 迁移设置和详情 selector**
@@ -260,7 +260,7 @@ const { identity, status, settings, versions } = deviceState;
 
 - [ ] **Step 4: 运行设置与详情测试**
 
-Run: `yarn jest packages/kit-bg/src/services/ServiceHardware/DeviceSettingsManager.pro2.test.ts packages/kit/src/states/jotai/contexts/deviceDetails/pro2DeviceManagement.test.ts --runInBand`  
+Run: `yarn jest packages/kit-bg/src/services/ServiceHardware/DeviceSettingsManager.pro2.test.ts packages/kit/src/states/jotai/contexts/deviceDetails/pro2DeviceManagement.test.ts --runInBand`
 Expected: PASS。
 
 - [ ] **Step 5: 提交**
@@ -290,7 +290,7 @@ test('does not request status refresh while firmware device is in bootloader mod
 
 - [ ] **Step 2: 运行并确认失败**
 
-Run: `yarn jest packages/kit-bg/src/services/ServiceFirmwareUpdate --runInBand`  
+Run: `yarn jest packages/kit-bg/src/services/ServiceFirmwareUpdate --runInBand`
 Expected: FAIL，流程仍依赖旧 features 查询或测试 API 不匹配。
 
 - [ ] **Step 3: 使用统一 section**
@@ -299,7 +299,7 @@ Expected: FAIL，流程仍依赖旧 features 查询或测试 API 不匹配。
 
 - [ ] **Step 4: 运行固件测试**
 
-Run: `yarn jest packages/kit-bg/src/services/ServiceFirmwareUpdate --runInBand`  
+Run: `yarn jest packages/kit-bg/src/services/ServiceFirmwareUpdate --runInBand`
 Expected: PASS。
 
 - [ ] **Step 5: 提交**
@@ -317,7 +317,7 @@ git commit -m "refactor(firmware): consume unified device state"
 
 - [ ] **Step 1: 搜索旧模型消费点**
 
-Run: `rg -n "IOneKeyDeviceFeatures|DeviceProfile|featuresInfo|HardwareFeaturesUpdate" packages/kit-bg packages/kit packages/shared apps/cli`  
+Run: `rg -n "IOneKeyDeviceFeatures|DeviceProfile|featuresInfo|HardwareFeaturesUpdate" packages/kit-bg packages/kit packages/shared apps/cli`
 Expected: 列出剩余迁移点。
 
 - [ ] **Step 2: 逐点替换为 DeviceState section**
@@ -326,12 +326,12 @@ OneKey 业务类型改为 `IOneKeyDeviceState`；`featuresInfo` 改为 `deviceSt
 
 - [ ] **Step 3: 删除旧 DB 双写和精确 patch**
 
-Run: `rg -n "updateDevice\(\{\s*features|preciseUpdateFields|HardwareFeaturesUpdate" packages/kit-bg/src/services/ServiceHardware packages/kit-bg/src/dbs/local`  
+Run: `rg -n "updateDevice\(\{\s*features|preciseUpdateFields|HardwareFeaturesUpdate" packages/kit-bg/src/services/ServiceHardware packages/kit-bg/src/dbs/local`
 Expected: OneKey 主路径无命中。
 
 - [ ] **Step 4: 运行受影响测试集**
 
-Run: `yarn jest packages/shared/src/utils/deviceUtils.test.ts packages/kit-bg/src/services/ServiceHardware packages/kit/src/states/jotai/contexts/deviceDetails --runInBand`  
+Run: `yarn jest packages/shared/src/utils/deviceUtils.test.ts packages/kit-bg/src/services/ServiceHardware packages/kit/src/states/jotai/contexts/deviceDetails --runInBand`
 Expected: PASS。
 
 - [ ] **Step 5: 提交**
@@ -349,24 +349,24 @@ git commit -m "refactor(hardware): remove legacy OneKey feature state"
 
 - [ ] **Step 1: 运行相关 Jest 测试**
 
-Run: `yarn jest packages/shared/src/utils/deviceUtils.test.ts packages/kit-bg/src/dbs/local/LocalDbBase.deviceState.test.ts packages/kit-bg/src/services/ServiceHardware packages/kit/src/states/jotai/contexts/deviceDetails --runInBand`  
+Run: `yarn jest packages/shared/src/utils/deviceUtils.test.ts packages/kit-bg/src/dbs/local/LocalDbBase.deviceState.test.ts packages/kit-bg/src/services/ServiceHardware packages/kit/src/states/jotai/contexts/deviceDetails --runInBand`
 Expected: PASS。
 
 - [ ] **Step 2: 运行完整 TypeScript**
 
-Run: `yarn tsc:only`  
+Run: `yarn tsc:only`
 Expected: exit 0。
 
 - [ ] **Step 3: 运行 oxlint 和格式检查**
 
-Run: `yarn oxlint`  
-Expected: exit 0。  
-Run: `yarn format:check`  
+Run: `yarn oxlint`
+Expected: exit 0。
+Run: `yarn format:check`
 Expected: exit 0。
 
 - [ ] **Step 4: 检查架构验收条件**
 
-Run: `rg -n "IOneKeyDeviceFeatures|DeviceProfile|HardwareFeaturesUpdate|featuresInfo" packages/kit-bg packages/kit packages/shared apps/cli`  
+Run: `rg -n "IOneKeyDeviceFeatures|DeviceProfile|HardwareFeaturesUpdate|featuresInfo" packages/kit-bg packages/kit packages/shared apps/cli`
 Expected: 仅第三方适配器、数据库迁移器或明确兼容边界命中。
 
 - [ ] **Step 5: 升级 SDK 依赖**
