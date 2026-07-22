@@ -285,4 +285,11 @@ export const BUILT_IN_MULTISIG_CASES: MultisigTestCase[] = [
     localOnly: true,
     hardwareExpectation: undefined,
   },
-];
+].map(testCase => ({
+  ...testCase,
+  parameters: {
+    ...testCase.parameters,
+    // 基准向量由测试助记词的标准钱包生成，避免误入隐藏钱包导致地址和签名变化。
+    useEmptyPassphrase: true,
+  },
+}));

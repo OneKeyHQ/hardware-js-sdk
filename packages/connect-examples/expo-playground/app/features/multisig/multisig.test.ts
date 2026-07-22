@@ -83,6 +83,14 @@ describe('multisig test workbench domain', () => {
     expect(failures).toEqual([]);
   });
 
+  test('硬件多签基准用例默认使用测试助记词的标准钱包', () => {
+    const hardwareCases = BUILT_IN_MULTISIG_CASES.filter(item => !item.localOnly);
+
+    hardwareCases.forEach(item => {
+      expect(item.parameters.useEmptyPassphrase).toBe(true);
+    });
+  });
+
   test('rejects an invalid bitcoin multisig threshold', () => {
     const source = BUILT_IN_MULTISIG_CASES.find(
       item => item.id === 'btc-generated-p2wsh-address-signer-1'
