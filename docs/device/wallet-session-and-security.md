@@ -34,8 +34,8 @@
 | --------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
 | `packages/core/src/core`          | `core/index.ts`                                              | API 调度、请求队列、初始化参数组装、passphrase 安全检查、UI 事件转发。                               |
 | `packages/core/src/device`        | `Device.ts`、`DeviceCommands.ts`、`DevicePool.ts`            | 设备 acquire/release、V1/V2 初始化分支、session 缓存、设备缓存、PIN/passphrase/Button 中间消息处理。 |
-| `packages/core/src/utils`         | `deviceFeaturesUtils.ts`                                     | 获取 passphraseState，刷新 features，并把固件返回的 session_id 写入 SDK 内部缓存。                   |
-| `packages/core/src/deviceProfile` | `buildDeviceFeatures.ts`、`buildDeviceProfile.ts`            | Pro2 / Protocol V2 设备信息归一化，生成 SDK 标准 `Features` 和 `DeviceProfile`。                     |
+| `packages/core/src/utils`         | `deviceFeaturesUtils.ts`                                     | 获取 passphraseState，维护 V1 兼容 Features，并把固件返回的 session_id 写入 SDK 内部缓存。           |
+| `packages/core/src/deviceProfile` | `buildDeviceFeatures.ts`                                     | 协议消息的内部兼容投影；设备公共状态统一由 `device/DeviceStateMapper.ts` 写入 `DeviceState`。          |
 | `packages/hd-transport`           | `protocols/v2/session.ts`、`encode.ts`、`frame-assembler.ts` | Protocol V2 encode/decode、帧重组、seq 管理、调用串行化和超时控制。                                  |
 | `packages/hd-transport-*`         | WebUSB、NodeUSB、RN BLE、lowlevel BLE transport              | 平台连接、读写、协议探测、按设备缓存或创建 ProtocolV2Session。                                       |
 | `submodules/firmware-pro2`        | protobuf、SE session handler                                 | Pro2 schema 来源，以及 SE session 新建/打开/查询等固件侧基础能力。                                   |
