@@ -145,7 +145,8 @@ yarn generate:multisig-fixtures
 - BTC 引用交易使用虚构 coinbase-like 输入，所有生成数据均标记为不可广播。
 - 助记词、seed、私钥和扩展私钥不会写入生成文件或正常日志。
 - 不要将保存助记词的 `.env` 文件提交到 Git；应提交重新生成后的 `generatedFixtures.ts`。
-- BTC “继续签名”用例默认已经填入 signer 1 的签名，设备应使用 signer 2 对应助记词进行验证。
+- 页面仅生成 signer 1 的硬件执行用例，设备或模拟器应载入 `MULTISIG_MNEMONIC_1`。
+- BTC “继续签名”用例预填 signer 2 的离线签名，再由 signer 1 设备完成第二个签名。
 
 ## 🔗 Resources
 

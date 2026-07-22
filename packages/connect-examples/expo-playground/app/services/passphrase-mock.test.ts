@@ -18,10 +18,12 @@ describe('expo-playground 临时隐藏钱包 mock 模式', () => {
     expect(source).not.toContain('window.globalDialogManager?.showPassphraseDialog();');
   });
 
-  test('执行参数强制禁用标准钱包空 passphrase 模式', () => {
+  test('Pro2 联调 mock 不覆盖显式的标准钱包选择', () => {
     const source = readPlaygroundSource('services/hardwareService.ts');
 
     expect(source).toContain('params.useEmptyPassphrase = false;');
     expect(source).toContain('PLAYGROUND_MOCK_HIDDEN_WALLET');
+    expect(source).toContain('currentDevice.deviceType === EDeviceType.Pro2');
+    expect(source).toContain('params.useEmptyPassphrase !== true');
   });
 });

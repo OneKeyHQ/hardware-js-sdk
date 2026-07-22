@@ -180,7 +180,7 @@ export function MultisigParameterEditor({
   };
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col border-b border-border bg-background">
+    <section className="flex min-h-0 flex-col border-b border-border bg-background lg:max-h-[46vh] lg:flex-none">
       <div className="flex shrink-0 flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3">
         <div className="min-w-0 flex-1">
           {testCase.builtIn ? (
@@ -237,7 +237,7 @@ export function MultisigParameterEditor({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 space-y-3 overflow-visible px-4 py-3 lg:overflow-y-auto">
+      <div className="min-h-0 flex-auto space-y-3 overflow-visible px-4 py-3 lg:overflow-y-auto">
         <div>
           <div className="mb-2.5 flex items-center justify-between gap-3">
             <div>
@@ -257,7 +257,7 @@ export function MultisigParameterEditor({
               高级 JSON
             </Button>
           </div>
-          <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-x-3 gap-y-2 md:grid-cols-2 xl:grid-cols-4">
             {quickFields.map(renderField)}
           </div>
         </div>

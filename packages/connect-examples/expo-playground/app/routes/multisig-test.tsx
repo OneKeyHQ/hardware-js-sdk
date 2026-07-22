@@ -13,12 +13,7 @@ import { BUILT_IN_MULTISIG_CASES } from '../features/multisig/cases';
 import { applyJsonDraft, cloneAsCustomCase, setByPath } from '../features/multisig/editor';
 import { verifyMultisigHardwareResult } from '../features/multisig/hardwareVerification';
 import { loadCustomCases, saveCustomCases } from '../features/multisig/storage';
-import type {
-  MultisigCaseSource,
-  MultisigChain,
-  MultisigTestCase,
-  ValidationIssue,
-} from '../features/multisig/types';
+import type { MultisigChain, MultisigTestCase, ValidationIssue } from '../features/multisig/types';
 import { buildExecutionSummary, validateMultisigCase } from '../features/multisig/validation';
 import { useHardwareMethodExecution } from '../hooks/useHardwareMethodExecution';
 import { signerMethodsRegistry } from '../hooks/useMethodsRegistry';
@@ -35,7 +30,6 @@ function getInitialCustomCases() {
 export default function MultisigTestPage() {
   const [customCases, setCustomCases] = useState<MultisigTestCase[]>(getInitialCustomCases);
   const [chain, setChain] = useState<MultisigChain>('eth');
-  const [source, setSource] = useState<MultisigCaseSource | 'all'>('all');
   const [selectedId, setSelectedId] = useState(BUILT_IN_MULTISIG_CASES[0].id);
   const [parameters, setParameters] = useState<Record<string, unknown>>(() =>
     cloneParameters(BUILT_IN_MULTISIG_CASES[0].parameters)
@@ -87,7 +81,6 @@ export default function MultisigTestPage() {
     if (dirty && !window.confirm('当前参数尚未保存，确定切换链吗？')) return;
     const firstCase = allCases.find(item => item.chain === nextChain);
     setChain(nextChain);
-    setSource('all');
     if (firstCase) resetFromCase(firstCase);
   };
 
@@ -172,10 +165,8 @@ export default function MultisigTestPage() {
           cases={allCases}
           selectedId={selectedCase.id}
           chain={chain}
-          source={source}
           disabled={running}
           onChainChange={handleChainChange}
-          onSourceChange={setSource}
           onSelect={handleSelect}
         />
         <main className="flex min-h-[720px] flex-col lg:min-h-0 lg:overflow-hidden">

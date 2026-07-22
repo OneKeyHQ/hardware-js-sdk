@@ -23,9 +23,15 @@ function addIssue(issues: ValidationIssue[], path: string, message: string) {
   issues.push({ path, message });
 }
 
-function validatePath(issues: ValidationIssue[], path: unknown) {
-  if (typeof path !== 'string' || !BIP32_PATH_RE.test(path)) {
-    addIssue(issues, 'path', '派生路径格式无效');
+function validatePath(issues: ValidationIssue[], path: unknown, issuePath = 'path') {
+  const validStringPath = typeof path === 'string' && BIP32_PATH_RE.test(path);
+  const validArrayPath =
+    Array.isArray(path) &&
+    path.length > 0 &&
+    path.every(item => Number.isInteger(item) && item >= 0 && item <= 0xffffffff);
+
+  if (!validStringPath && !validArrayPath) {
+    addIssue(issues, issuePath, '派生路径格式无效');
   }
 }
 
@@ -121,7 +127,7 @@ function validateBtc(testCase: MultisigTestCase, issues: ValidationIssue[]) {
       addIssue(issues, `inputs[${index}]`, '输入格式无效');
       return;
     }
-    validatePath(issues, record.address_n);
+    validatePath(issues, record.address_n, `inputs[${index}].address_n`);
     if (!['SPENDMULTISIG', 'SPENDP2SHWITNESS', 'SPENDWITNESS'].includes(String(record.script_type))) {
       addIssue(issues, `inputs[${index}].script_type`, '不支持的 BTC 多签脚本类型');
     }

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { UI_RESPONSE, Success, Unsuccessful, CoreApi } from '@onekeyfe/hd-core';
 import { logError, logRequest, logResponse, logInfo } from '../utils/logger';
-import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
+import { EDeviceType, ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
 import {
   getCurrentSDKInstance,
   clearSDKInstanceCache,
@@ -115,8 +115,16 @@ const preparePassphraseParams = async (
 ) => {
   if (!methodSupportsCommonParameters(method)) return;
 
-  if (PLAYGROUND_MOCK_HIDDEN_WALLET) {
-    // 临时联调策略：即使页面参数选择了 useEmptyPassphrase，也不允许走标准钱包。
+  const currentDevice = useDeviceStore.getState().currentDevice;
+  const usePro2MockHiddenWallet =
+    PLAYGROUND_MOCK_HIDDEN_WALLET &&
+    currentDevice?.connectId === connectId &&
+    currentDevice.deviceType === EDeviceType.Pro2 &&
+    params.useEmptyPassphrase !== true;
+
+  if (usePro2MockHiddenWallet) {
+    // 临时联调策略只为未指定钱包模式的 Pro2 调用提供默认值，
+    // 不覆盖调用方明确选择的标准钱包。
     params.useEmptyPassphrase = false;
     if (useHardwareStore.getState().commonParameters.useEmptyPassphrase) {
       useHardwareStore.getState().setCommonParameter('useEmptyPassphrase', false);

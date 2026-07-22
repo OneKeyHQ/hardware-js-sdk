@@ -16,6 +16,7 @@ const mockGetDeviceState = jest.fn(async () => ({
     versions: {},
   },
 }));
+let mockDeviceType = 'pro';
 
 jest.mock('../utils/hardwareInstance', () => ({
   getCurrentSDKInstance: async () => ({
@@ -41,6 +42,7 @@ jest.mock('../store/deviceStore', () => {
   useDeviceStore.getState = () => ({
     currentDevice: {
       connectId: 'connect-id',
+      deviceType: mockDeviceType,
       features: { passphraseProtection: false },
     },
     deviceFeatures: { passphraseProtection: false },
@@ -80,6 +82,7 @@ const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
 
 afterEach(() => {
   mockEvmGetAddress.mockClear();
+  mockDeviceType = 'pro';
   if (originalWindow) {
     Object.defineProperty(globalThis, 'window', originalWindow);
   } else {
@@ -110,6 +113,45 @@ describe('callHardwareAPI', () => {
     expect(mockEvmGetAddress).toHaveBeenCalledWith('connect-id', undefined, params);
     expect(mockEvmGetAddress.mock.calls[0]?.[2]).toMatchObject({
       path: "m/44'/60'/0'/0/0",
+    });
+  });
+
+  test('OneKey Pro 的标准钱包调用不被 Pro2 隐藏钱包 mock 覆盖', async () => {
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: {},
+    });
+    const params = {
+      connectId: 'connect-id',
+      deviceId: 'device-id',
+      path: "m/48'/0'/0'/0'/0/0",
+      useEmptyPassphrase: true,
+    };
+
+    await callHardwareAPI('evmGetAddress', params);
+
+    expect(mockEvmGetAddress.mock.calls[0]?.[2]).toMatchObject({
+      useEmptyPassphrase: true,
+    });
+  });
+
+  test('Pro2 显式选择标准钱包时不被临时隐藏钱包 mock 覆盖', async () => {
+    mockDeviceType = 'pro2';
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: {},
+    });
+    const params = {
+      connectId: 'connect-id',
+      deviceId: 'device-id',
+      path: "m/48'/0'/0'/0'/0/0",
+      useEmptyPassphrase: true,
+    };
+
+    await callHardwareAPI('evmGetAddress', params);
+
+    expect(mockEvmGetAddress.mock.calls[0]?.[2]).toMatchObject({
+      useEmptyPassphrase: true,
     });
   });
 });

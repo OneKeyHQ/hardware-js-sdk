@@ -8,8 +8,7 @@ import type {
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 
-const SOURCE_LABELS: Record<MultisigCaseSource | 'all', string> = {
-  all: '全部来源',
+const SOURCE_LABELS: Record<MultisigCaseSource, string> = {
   'firmware-capability': 'Firmware',
   'existing-example': 'Example',
   regression: 'Regression',
@@ -20,10 +19,8 @@ interface MultisigCaseLibraryProps {
   cases: MultisigTestCase[];
   selectedId: string;
   chain: MultisigChain;
-  source: MultisigCaseSource | 'all';
   disabled?: boolean;
   onChainChange: (chain: MultisigChain) => void;
-  onSourceChange: (source: MultisigCaseSource | 'all') => void;
   onSelect: (testCase: MultisigTestCase) => void;
 }
 
@@ -31,15 +28,11 @@ export function MultisigCaseLibrary({
   cases,
   selectedId,
   chain,
-  source,
   disabled,
   onChainChange,
-  onSourceChange,
   onSelect,
 }: MultisigCaseLibraryProps) {
-  const visibleCases = cases.filter(
-    item => item.chain === chain && (source === 'all' || item.source === source)
-  );
+  const visibleCases = cases.filter(item => item.chain === chain);
   const builtInCases = visibleCases.filter(item => item.builtIn);
   const customCases = visibleCases.filter(item => !item.builtIn);
 
@@ -115,23 +108,6 @@ export function MultisigCaseLibrary({
             </Button>
           ))}
         </div>
-        <div className="flex flex-wrap gap-1.5">
-          {(Object.keys(SOURCE_LABELS) as Array<MultisigCaseSource | 'all'>).map(item => (
-            <button
-              key={item}
-              type="button"
-              disabled={disabled}
-              onClick={() => onSourceChange(item)}
-              className={`rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors ${
-                source === item
-                  ? 'border-primary/50 bg-primary/10 text-foreground'
-                  : 'border-border bg-background text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {SOURCE_LABELS[item]}
-            </button>
-          ))}
-        </div>
       </div>
 
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-2.5 py-2.5">
@@ -151,7 +127,7 @@ export function MultisigCaseLibrary({
         ) : null}
         {visibleCases.length === 0 ? (
           <div className="rounded-xl border border-dashed border-border p-5 text-center text-xs text-muted-foreground">
-            当前筛选条件下没有用例。
+            当前链暂无用例。
           </div>
         ) : null}
       </div>

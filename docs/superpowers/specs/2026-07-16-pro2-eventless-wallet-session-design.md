@@ -133,6 +133,7 @@ flowchart TD
 - `resume` 不得创建 Session、选择钱包或打开 Passphrase/Attach PIN 页面。
 - 隐藏钱包 `resume` 失败后，SDK 只能在获得 App `uiResponse` 的明确选择后执行 `select`。
 - 标准钱包不进入 Session 协调；`useEmptyPassphrase=true` 已明确表达使用默认空 Passphrase 上下文。
+- 解锁后确认 `passphrase_enabled=false` 时同样使用标准钱包，不调用 `DeviceSessionOpen`，不生成 `passphraseState`。
 - 有 UI Event 通道时，Session 恢复在原业务调用内完成，不重放地址、公钥或签名请求。
 - CLI/headless 或明确禁用交互时，SDK 才返回 `WalletSessionRequired`。
 - 钱包身份始终通过 `btc_test_address` 校验，不能只相信本地缓存或设备当前页面。
@@ -441,7 +442,7 @@ Protocol V1 行为完全不变。Pro2 继续保留 `getPassphraseState()` 兼容
 | 旧调用                                               | Pro2 映射                                            |
 | ---------------------------------------------------- | ---------------------------------------------------- |
 | `getPassphraseState({ useEmptyPassphrase: true })`   | 直接进入标准钱包路径，不生成或缓存隐藏钱包 state    |
-| `getPassphraseState()` 或 `useEmptyPassphrase:false` | SDK UI Event -> 用户选择 -> select                   |
+| `getPassphraseState()` 或 `useEmptyPassphrase:false` | 解锁后未开启 Passphrase 则返回标准钱包；已开启则 SDK UI Event -> 用户选择 -> select |
 | `getPassphraseState({ initSession:true, ... })`      | 不复用隐藏钱包缓存，但不改变上述钱包意图与参数优先级 |
 
 因此现有 App 可以继续使用现有 Event UI，同时获得 Pro2 Attach PIN 选择能力。
@@ -562,6 +563,7 @@ DeviceSettingsPageShow(DevicePassphrase)
 ### 标准钱包
 
 - `useEmptyPassphrase=true` 不调用 `DeviceSessionOpen`，不读取或写入 `DeviceWalletSessionStore`。
+- `passphrase_enabled=false` 不返回 `btc_test_address/passphraseState`，不读取或写入隐藏钱包 Session。
 - 标准钱包调用不能扫描、认领或复用任何隐藏钱包 Session。
 - 标准钱包直接使用默认空 Passphrase 上下文继续地址、公钥或签名操作。
 

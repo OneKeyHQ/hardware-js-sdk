@@ -37,7 +37,7 @@ describe('multisig test workbench domain', () => {
     );
   });
 
-  test('loads a complete three-signer ETH and BTC hardware matrix', () => {
+  test('只加载 signer 1 的 ETH 和 BTC 硬件用例', () => {
     const ethCases = BUILT_IN_MULTISIG_CASES.filter(item =>
       item.id.startsWith('eth-generated-')
     );
@@ -45,11 +45,12 @@ describe('multisig test workbench domain', () => {
       item.id.startsWith('btc-generated-')
     );
 
-    expect(ethCases).toHaveLength(6);
-    expect(btcCases).toHaveLength(27);
+    expect(ethCases).toHaveLength(2);
+    expect(btcCases).toHaveLength(9);
     [...ethCases, ...btcCases].forEach(item => {
-      expect(item.hardwareExpectation?.signerEnvKey).toMatch(/^MULTISIG_MNEMONIC_[123]$/);
-      expect(item.title).toMatch(/Signer [123]/);
+      expect(item.hardwareExpectation?.signerIndex).toBe(0);
+      expect(item.hardwareExpectation?.signerEnvKey).toBe('MULTISIG_MNEMONIC_1');
+      expect(item.title).toContain('Signer 1');
     });
   });
 
@@ -58,7 +59,7 @@ describe('multisig test workbench domain', () => {
       item.id.startsWith('btc-generated-') && item.id.includes('-continue-')
     );
 
-    expect(partialCases).toHaveLength(9);
+    expect(partialCases).toHaveLength(3);
     partialCases.forEach(item => {
       const parameters = item.parameters as {
         inputs: Array<{ multisig: { signatures: string[] } }>;
@@ -80,6 +81,14 @@ describe('multisig test workbench domain', () => {
     );
 
     expect(failures).toEqual([]);
+  });
+
+  test('硬件多签基准用例默认使用测试助记词的标准钱包', () => {
+    const hardwareCases = BUILT_IN_MULTISIG_CASES.filter(item => !item.localOnly);
+
+    hardwareCases.forEach(item => {
+      expect(item.parameters.useEmptyPassphrase).toBe(true);
+    });
   });
 
   test('rejects an invalid bitcoin multisig threshold', () => {
