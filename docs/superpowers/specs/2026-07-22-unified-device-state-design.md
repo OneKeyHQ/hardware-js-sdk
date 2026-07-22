@@ -134,14 +134,13 @@ export type DeviceState = {
   capabilities: Array<number | string>;
   verification?: DeviceVerification;
   session?: DeviceSessionState;
-  raw?: DeviceRawState;
 };
 ```
 
 字段要求：
 
 - 各 section 始终存在，尚未读取或协议不支持的值使用 `null`，避免调用方判断整段对象是否存在。
-- `raw` 仅用于调试和底层兼容，App 业务不得依赖。
+- `raw` 只存在于 SDK 内部 Store 快照，用于调试和 V1 兼容投影；公共类型、返回值和事件均不包含它。
 - `session` 是易失状态，不写入 App 的长期数据库。
 - `revision` 在同一设备实例中单调递增，用于丢弃乱序事件。
 - `updatedAt` 表示 SDK 接受最后一次状态变更的时间，不代表设备端所有字段都在该时刻读取。
@@ -176,19 +175,20 @@ Projector 必须是纯函数。SDK 测试需要验证旧投影与新状态的字
 
 ## 7. 查询 API
 
-新增：
+公共读取和刷新接口：
 
 ```ts
-getDeviceState(
-  connectId?: string,
-  params?: CommonParams & {
-    refresh?: Array<'identity' | 'status' | 'settings' | 'versions' | 'verification'>;
-    includeRaw?: boolean;
+getDeviceState(connectId?: string, params?: CommonParams): Response<DeviceState>;
+
+refreshDeviceState(
+  connectId: string,
+  params: CommonParams & {
+    scope: 'basic' | 'firmware' | 'settings' | 'runtime';
   },
 ): Response<DeviceState>;
 ```
 
-默认 `refresh` 为空：
+`getDeviceState()`：
 
 - 已有缓存时直接返回。
 - 没有缓存时执行最小初始化。
@@ -196,10 +196,10 @@ getDeviceState(
 - Protocol V2 使用不带 `targets.status` 的 `DeviceInfoGet` 获取基础信息。
 - 不发送额外的 `DeviceStatusGet`。
 
-当 `refresh` 包含 `status` 时：
+`refreshDeviceState({ scope: 'runtime' })`：
 
 - 仅 Protocol V2 normal 模式允许调用 `DeviceStatusGet`。
-- bootloader、romloader 模式直接返回已有状态，未读取字段保持 `null`。
+- bootloader、romloader 模式直接返回不支持错误，不发送状态命令。
 - Protocol V1 按其原生能力刷新，但不得额外构造 Protocol V2 状态命令。
 
 当多个区域需要刷新时，由协议 Mapper 合并能共用的命令，避免重复读取。
@@ -306,7 +306,7 @@ App 监听 `DEVICE.STATE` 后按以下顺序处理：
 
 ### 11.3 数据库迁移
 
-- 增加 `deviceState` 字段并存储去除 `session/raw` 后的状态。
+- 增加 `deviceState` 字段并存储去除 `session` 后的公共状态；`raw` 在 SDK 边界已被移除。
 - 数据库升级时，将已有 `features` JSON 转换为 `DeviceState`。
 - 迁移完成后不再双写 `features`。
 - 运行时代码不得优先读取旧字段；旧字段只允许出现在一次性数据库迁移器中。
@@ -400,3 +400,7 @@ SDK 暂时保留的老协议兼容面：
 4. Protocol V1 的 `getFeatures()` 保留“访问设备并获得新快照”的兼容语义；App 的 `getFeaturesWithoutCache()` 也必须触发真实刷新。
 5. 未读取 `DeviceStatusGet` 时，`null` 表示未知，UI 不得把未知状态转换成明确的 `false` 并标记为已确认。
 6. 显式请求刷新某个 section 时，SDK 不得静默把读取失败伪装成刷新成功；调用方可以选择跳过不可读取的 section，或处理明确错误。
+7. Protocol V1 的 `firmware` scope 由 SDK 内部聚合 `GetFeatures + OnekeyGetFeatures`；App 不感知不同设备的固件字段来源。
+8. `identity.label` 只保存真实用户 label，`identity.bleName` 保存连接名称，`identity.displayName` 按 `label -> bleName -> 稳定产品名` 派生。
+9. Protocol V2 的 SE application/bootloader 不参与主控 mode 推导；版本刷新不得覆盖已经确认的 onboarding mode。
+10. `raw` 按协议来源键合并，只供 SDK 内部 V1 兼容投影和诊断使用，公共类型、`getDeviceState()` 返回值与 `DEVICE.STATE` 事件均不暴露 raw。

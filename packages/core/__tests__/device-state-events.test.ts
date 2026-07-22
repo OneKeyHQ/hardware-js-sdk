@@ -22,6 +22,9 @@ describe('Device state events', () => {
       {
         protocol: 'V2',
         identity: { label: 'Renamed', bleName: 'Pro2 1234' },
+        raw: {
+          protocolV2DeviceInfo: { protocol_version: 2 },
+        },
       },
       'apply-settings'
     );
@@ -36,6 +39,8 @@ describe('Device state events', () => {
       })
     );
     expect(onFeatures).not.toHaveBeenCalled();
+    expect(onState.mock.calls[0][1].state).not.toHaveProperty('raw');
+    expect(device.state?.raw?.protocolV2DeviceInfo).toEqual({ protocol_version: 2 });
   });
 
   test('continues emitting projected Features events for Protocol V1', () => {

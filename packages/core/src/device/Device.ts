@@ -36,11 +36,12 @@ import { mergeDeviceFeaturesPatch } from './DeviceFeaturesState';
 import {
   mapDeviceSettingsToState,
   mapFeaturesToState,
+  mapProtocolV1OnekeyFeaturesToState,
   mapProtocolV2DeviceInfoToState,
   mapProtocolV2DeviceStatusToState,
 } from './DeviceStateMapper';
 import { projectFeatures } from './DeviceStateProjector';
-import { DeviceStateStore } from './DeviceStateStore';
+import { DeviceStateStore, createPublicDeviceState } from './DeviceStateStore';
 import { deviceWalletSessionStore } from './DeviceWalletSessionStore';
 import {
   type DeviceFirmwareRange,
@@ -70,7 +71,7 @@ import {
   requestProtocolV2DeviceInfo,
   requestProtocolV2DeviceStatus,
 } from '../protocols/protocol-v2/features';
-import { buildProtocolV1FeaturesPayload, buildProtocolV2FeaturesPayload } from '../deviceProfile';
+import { buildProtocolV1FeaturesPayload } from '../deviceProfile';
 
 import type { PROTO } from '../constants';
 import type { DeviceStateReadOptions } from '../types/api/getDeviceState';
@@ -284,7 +285,8 @@ export class Device extends EventEmitter {
     const connectId = this.getConnectId();
     const deviceId = this.getCurrentDeviceId() || null;
 
-    const { features, state } = this;
+    const { features } = this;
+    const state = this.state ? createPublicDeviceState(this.state) : undefined;
 
     return {
       /** Android uses Mac address, iOS uses uuid, USB uses uuid  */
@@ -864,6 +866,11 @@ export class Device extends EventEmitter {
       await this.getFeatures();
     }
 
+    if (!this.isProtocolV2() && refresh.has('verification')) {
+      const { message } = await this.commands.typedCall('OnekeyGetFeatures', 'OnekeyFeatures');
+      this.updateState(mapProtocolV1OnekeyFeaturesToState(message), 'device-info');
+    }
+
     if (this.isProtocolV2()) {
       const refreshDeviceInfo =
         refresh.has('identity') || refresh.has('versions') || refresh.has('verification');
@@ -872,7 +879,10 @@ export class Device extends EventEmitter {
           commands: this.commands,
           request: getProtocolV2DeviceInfoRequest(),
         });
-        this.updateState(mapProtocolV2DeviceInfoToState(deviceInfo), 'device-info');
+        this.updateState(
+          mapProtocolV2DeviceInfoToState(deviceInfo, this.state?.status.mode),
+          'device-info'
+        );
       }
 
       if (refresh.has('settings') && this.state?.status.mode === 'normal') {
@@ -893,9 +903,7 @@ export class Device extends EventEmitter {
     if (!this.state) {
       throw ERRORS.TypedError(HardwareErrorCode.DeviceInitializeFailed);
     }
-    const state = structuredClone(this.state);
-    if (!params.includeRaw) delete state.raw;
-    return state;
+    return params.includeRaw ? structuredClone(this.state) : createPublicDeviceState(this.state);
   }
 
   _updateFeatures(protoFeatures: PROTO.Features | Features, initSession?: boolean) {
@@ -929,7 +937,7 @@ export class Device extends EventEmitter {
 
     const event: DeviceStateEvent = {
       connectId: this.getConnectId() ?? null,
-      state: result.state,
+      state: createPublicDeviceState(result.state),
       revision: result.revision,
       source,
       changedKeys: result.changedKeys,
@@ -959,18 +967,15 @@ export class Device extends EventEmitter {
 
   updateProtocolV2Features(deviceInfo?: ProtocolV2DeviceInfo, deviceStatus?: DeviceStatus | null) {
     const previousCacheDeviceKey = this.getSessionCacheDeviceKey();
-    const resolvedDeviceStatus =
-      deviceStatus === undefined
-        ? this.features?.raw?.protocolV2DeviceStatus
-        : deviceStatus ?? undefined;
-    const features = fixFeaturesFirmwareVersion(
-      buildProtocolV2FeaturesPayload({
-        deviceInfo,
-        deviceStatus: resolvedDeviceStatus,
-        previous: this.features,
-      })
-    );
-    this.updateState(mapFeaturesToState(features), 'device-info');
+    if (deviceStatus) {
+      this.updateState(mapProtocolV2DeviceStatusToState(deviceStatus), 'device-status');
+    }
+    if (deviceInfo) {
+      this.updateState(
+        mapProtocolV2DeviceInfoToState(deviceInfo, this.state?.status.mode),
+        'device-info'
+      );
+    }
     const nextCacheDeviceKey = this.getSessionCacheDeviceKey();
     if (previousCacheDeviceKey && nextCacheDeviceKey) {
       deviceWalletSessionStore.migrateDeviceKey(previousCacheDeviceKey, nextCacheDeviceKey);
@@ -979,8 +984,8 @@ export class Device extends EventEmitter {
   }
 
   updateProtocolV2Status(status: DeviceStatus) {
-    const previousDeviceInfo = this.features?.raw?.protocolV2DeviceInfo;
-    const previousStatus = this.features?.raw?.protocolV2DeviceStatus;
+    const previousDeviceInfo = this.state?.raw?.protocolV2DeviceInfo;
+    const previousStatus = this.state?.raw?.protocolV2DeviceStatus;
     return this.updateProtocolV2Features(previousDeviceInfo, {
       ...previousStatus,
       ...status,

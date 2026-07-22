@@ -139,14 +139,13 @@ export type DeviceFeaturesRaw = {
   protocolV2DeviceStatus?: ProtocolV2DeviceStatus;
 };
 
+export type DeviceFeaturesRawPatch = {
+  [Key in keyof DeviceFeaturesRaw]?: DeviceFeaturesRaw[Key] | null;
+};
+
 export type DeviceStateProtocol = DeviceFeaturesProtocol;
 export type DeviceStateMode = DeviceFeaturesMode;
-export type DeviceStateSection =
-  | 'identity'
-  | 'status'
-  | 'settings'
-  | 'versions'
-  | 'verification';
+export type DeviceStateSection = 'identity' | 'status' | 'settings' | 'versions' | 'verification';
 
 export type DeviceStateUpdateSource =
   | 'initialize'
@@ -241,9 +240,8 @@ export type DeviceState = {
   settings: DeviceStateSettings;
   versions: DeviceStateVersions;
   capabilities: Array<number | string>;
-  verification?: DeviceFeaturesVerify;
+  verification?: Partial<DeviceFeaturesVerify>;
   session?: DeviceStateSession;
-  raw?: DeviceFeaturesRaw;
 };
 
 export type DeviceStatePatch = {
@@ -255,7 +253,7 @@ export type DeviceStatePatch = {
   capabilities?: Array<number | string>;
   verification?: DeviceFeaturesVerify;
   session?: Partial<DeviceStateSession> | null;
-  raw?: DeviceFeaturesRaw;
+  raw?: DeviceFeaturesRawPatch;
 };
 
 export type DeviceStateEvent = {

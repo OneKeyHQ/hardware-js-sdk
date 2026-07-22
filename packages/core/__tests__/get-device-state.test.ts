@@ -17,6 +17,16 @@ const createV2Device = (typedCall: jest.Mock) => {
   return device;
 };
 
+const createV1Device = (typedCall: jest.Mock) => {
+  const device = Device.fromDescriptor({
+    id: 'pro',
+    path: 'pro',
+    protocolType: 'V1',
+  } as never);
+  (device as any).commands = { typedCall };
+  return device;
+};
+
 describe('getDeviceState', () => {
   test('hydrates Protocol V2 without status target or DeviceStatusGet by default', async () => {
     const typedCall = jest.fn().mockResolvedValue({
@@ -64,6 +74,31 @@ describe('getDeviceState', () => {
       }),
       expect.anything()
     );
+  });
+
+  test('does not overwrite confirmed notInitialized mode during a versions refresh', async () => {
+    const typedCall = jest.fn().mockResolvedValue({
+      message: {
+        protocol_version: 2,
+        hw: { serial_no: 'SERIAL-1' },
+        fw: { application: { version: '5.0.0' } },
+        se1: { application: { version: '1.0.0' } },
+      },
+    });
+    const device = createV2Device(typedCall);
+    device.updateState(
+      {
+        protocol: 'V2',
+        status: { mode: 'notInitialized', initialized: false },
+      },
+      'device-status'
+    );
+
+    const state = await device.getDeviceState({ refreshSections: ['versions'] });
+
+    expect(state.status.mode).toBe('notInitialized');
+    expect(state.status.initialized).toBe(false);
+    expect(state.versions.se01).toBe('1.0.0');
   });
 
   test.each(['bootloader', 'romloader'] as const)(
@@ -142,5 +177,55 @@ describe('getDeviceState', () => {
 
     expect(state.identity.label).toBe('Persisted label');
     expect(state.settings.language).toBe('en-US');
+  });
+
+  test('aggregates OnekeyGetFeatures into a Protocol V1 firmware refresh', async () => {
+    const typedCall = jest.fn().mockImplementation(async (requestType: string) => {
+      if (requestType === 'GetFeatures') {
+        return {
+          message: {
+            onekey_device_type: 'PRO',
+            label: 'Pro Wallet',
+            initialized: true,
+            onekey_firmware_version: '4.10.0',
+            onekey_firmware_build_id: 'firmware-build',
+          },
+        };
+      }
+      if (requestType === 'OnekeyGetFeatures') {
+        return {
+          message: {
+            onekey_firmware_version: '4.10.1',
+            onekey_board_build_id: 'board-build',
+            onekey_se01_boot_version: '1.0.0',
+            onekey_se01_boot_build_id: 'se-boot-build',
+            onekey_se01_boot_hash: 'abcd',
+          },
+        };
+      }
+      throw new Error(`Unexpected request: ${requestType}`);
+    });
+    const device = createV1Device(typedCall);
+
+    const state = await device.getDeviceState({
+      refreshSections: ['identity', 'versions', 'verification'],
+      includeRaw: true,
+    });
+
+    expect(typedCall.mock.calls.map(call => call[0])).toEqual([
+      'GetFeatures',
+      'OnekeyGetFeatures',
+    ]);
+    expect(state.versions.firmware).toBe('4.10.1');
+    expect(state.versions.se01Boot).toBe('1.0.0');
+    expect(state.verification).toMatchObject({
+      firmwareBuildId: 'firmware-build',
+      boardBuildId: 'board-build',
+      se01BootBuildId: 'se-boot-build',
+      se01BootHash: 'abcd',
+    });
+    expect(state.raw?.protocolV1OneKeyFeatures).toMatchObject({
+      onekey_board_build_id: 'board-build',
+    });
   });
 });

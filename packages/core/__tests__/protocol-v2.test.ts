@@ -1261,6 +1261,8 @@ describe('Protocol V2 feature adapter', () => {
 
     expect(device.features?.mode).toBe('bootloader');
     expect(device.features?.bootloaderMode).toBe(true);
+    expect(device.features?.initialized).toBeNull();
+    expect(device.features?.unlocked).toBeNull();
     expect(device.features?.raw?.protocolV2DeviceStatus).toBeUndefined();
   });
 

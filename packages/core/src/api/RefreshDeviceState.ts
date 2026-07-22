@@ -36,10 +36,11 @@ export default class RefreshDeviceState extends BaseMethod<RefreshDeviceStatePar
 
   async run() {
     const requiresNormalMode = this.params.scope === 'runtime' || this.params.scope === 'settings';
-    if (requiresNormalMode && !this.device.state) {
+    const requiresProtocolV2NormalMode = requiresNormalMode && this.device.isProtocolV2();
+    if (requiresProtocolV2NormalMode && !this.device.state) {
       await this.device.getDeviceState();
     }
-    if (requiresNormalMode && this.device.state?.status.mode !== 'normal') {
+    if (requiresProtocolV2NormalMode && this.device.state?.status.mode !== 'normal') {
       throw createDeviceNotSupportMethodError(
         `${this.name}:${this.params.scope}`,
         this.device.getCurrentFirmwareType()

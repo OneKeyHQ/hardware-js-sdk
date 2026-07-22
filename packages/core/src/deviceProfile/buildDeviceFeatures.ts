@@ -1,4 +1,5 @@
 import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
+import { Enum_Capability } from '@onekeyfe/hd-transport';
 
 import {
   isProtocolV2BootloaderDeviceInfo,
@@ -96,20 +97,19 @@ const getProtocolV1FirmwareType = (
   features: ProtocolV1FeaturesCompat
 ): Features['firmwareType'] => {
   if (features.fw_vendor === 'OneKey Bitcoin-only') return EFirmwareType.BitcoinOnly;
+  const capabilities = features.capabilities as unknown as Array<number | string> | undefined;
+  if (
+    capabilities?.length &&
+    !capabilities.includes(Enum_Capability.Capability_Bitcoin_like) &&
+    !capabilities.includes('Capability_Bitcoin_like')
+  ) {
+    return EFirmwareType.BitcoinOnly;
+  }
   return EFirmwareType.Universal;
 };
 
-const getProtocolV1Label = (
-  features: ProtocolV1FeaturesCompat,
-  deviceType: Features['deviceType'],
-  bleName: string | null
-) => {
-  if (features.label) return features.label;
-  if (bleName) return bleName;
-  if (deviceType === EDeviceType.Unknown) return null;
-  if (deviceType === EDeviceType.ClassicPure) return 'OneKey Classic 1S';
-  return `OneKey ${deviceType.charAt(0).toUpperCase()}${deviceType.slice(1)}`;
-};
+const getProtocolV1Label = (features: ProtocolV1FeaturesCompat) =>
+  typeof features.label === 'string' && features.label.length > 0 ? features.label : null;
 
 export const buildProtocolV1FeaturesPayload = (
   protocolV1Features: PROTO.Features,
@@ -148,7 +148,7 @@ export const buildProtocolV1FeaturesPayload = (
     vendor: features.vendor ?? null,
     deviceId: features.device_id ?? null,
     serialNo,
-    label: getProtocolV1Label(features, deviceType, bleName),
+    label: getProtocolV1Label(features),
     bleName,
     capabilities: features.capabilities ?? [],
     mode: getProtocolV1Mode(features),
@@ -168,6 +168,8 @@ export const buildProtocolV1FeaturesPayload = (
     sdProtection: features.sd_protection ?? null,
     wipeCodeProtection: features.wipe_code_protection ?? null,
     passphraseAlwaysOnDevice: features.passphrase_always_on_device ?? null,
+    attachToPinEnabled: features.attach_to_pin_user ?? previous?.attachToPinEnabled ?? null,
+    unlockedAttachPin: features.unlocked_attach_pin ?? previous?.unlockedAttachPin ?? undefined,
     safetyChecks: features.safety_checks ?? null,
     autoLockDelayMs: features.auto_lock_delay_ms ?? null,
     autoShutdownDelayMs: features.auto_shutdown_delay_ms ?? null,
@@ -296,6 +298,12 @@ export const buildProtocolV2FeaturesPayload = ({
     mode = 'notInitialized';
   } else if (initialized === true) {
     mode = 'normal';
+  } else if (cached?.mode === 'notInitialized' || cached?.mode === 'backupMode') {
+    mode = cached.mode;
+  } else if (info) {
+    mode = 'normal';
+  } else if (cached?.mode) {
+    mode = cached.mode;
   }
 
   return {

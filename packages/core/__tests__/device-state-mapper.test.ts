@@ -1,4 +1,4 @@
-import { EDeviceType } from '@onekeyfe/hd-shared';
+import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
 
 import {
   mapApplySettingsToState,
@@ -38,6 +38,53 @@ describe('DeviceStateMapper', () => {
     });
   });
 
+  test.each([
+    ['CLASSIC1S', EDeviceType.Classic1s],
+    ['TOUCH', EDeviceType.Touch],
+    ['PRO', EDeviceType.Pro],
+  ] as const)(
+    'keeps the real label separate from display fallbacks for Protocol V1 %s',
+    (onekeyDeviceType, expectedDeviceType) => {
+      const patch = mapProtocolV1FeaturesToState({
+        onekey_device_type: onekeyDeviceType,
+        onekey_ble_name: `${onekeyDeviceType} BLE`,
+        initialized: true,
+      } as PROTO.Features);
+
+      expect(patch.identity).toMatchObject({
+        deviceType: expectedDeviceType,
+        label: null,
+        bleName: `${onekeyDeviceType} BLE`,
+      });
+    }
+  );
+
+  test('normalizes legacy Bitcoin-only and Attach PIN fields from Protocol V1', () => {
+    const patch = mapProtocolV1FeaturesToState({
+      onekey_device_type: 'PRO',
+      capabilities: [1],
+      attach_to_pin_user: true,
+      unlocked_attach_pin: true,
+      initialized: true,
+    } as PROTO.Features);
+
+    expect(patch.identity?.firmwareType).toBe(EFirmwareType.BitcoinOnly);
+    expect(patch.status).toMatchObject({
+      attachToPinEnabled: true,
+      unlockedAttachPin: true,
+    });
+  });
+
+  test('keeps Protocol V1 universal firmware when the decoded Bitcoin-like capability is present', () => {
+    const patch = mapProtocolV1FeaturesToState({
+      onekey_device_type: 'CLASSIC1S',
+      capabilities: ['Capability_Bitcoin_like'],
+      initialized: true,
+    } as PROTO.Features);
+
+    expect(patch.identity?.firmwareType).toBe(EFirmwareType.Universal);
+  });
+
   test('maps Protocol V2 DeviceInfo without inventing runtime status', () => {
     const patch = mapProtocolV2DeviceInfoToState({
       protocol_version: 2,
@@ -63,6 +110,29 @@ describe('DeviceStateMapper', () => {
       ble: '1.2.3',
     });
     expect(patch.status?.unlocked).toBeUndefined();
+  });
+
+  test('keeps normal mode when Protocol V2 application and SE versions are returned together', () => {
+    const patch = mapProtocolV2DeviceInfoToState({
+      protocol_version: 2,
+      hw: { serial_no: 'SERIAL-NORMAL' },
+      fw: {
+        application: { version: '5.0.0' },
+        bootloader: { version: '2.0.0' },
+      },
+      se1: {
+        application: { version: '1.0.0', build_id: 'se-app', hash: [0x01, 0x02] },
+        bootloader: { version: '0.1.0', build_id: 'se-boot', hash: [0x03, 0x04] },
+      },
+    } as ProtocolV2DeviceInfo);
+
+    expect(patch.status?.mode).toBe('normal');
+    expect(patch.verification).toMatchObject({
+      se01BuildId: 'se-app',
+      se01Hash: '0102',
+      se01BootBuildId: 'se-boot',
+      se01BootHash: '0304',
+    });
   });
 
   test('maps Protocol V2 status separately and ignores locked passphrase value', () => {

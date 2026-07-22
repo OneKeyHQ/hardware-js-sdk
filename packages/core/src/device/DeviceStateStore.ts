@@ -1,28 +1,41 @@
 import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
 
 import type {
+  DeviceFeaturesRaw,
   DeviceState,
   DeviceStateIdentity,
   DeviceStatePatch,
   DeviceStateUpdateSource,
 } from '../types';
 
+type StoredDeviceState = DeviceState & { raw?: DeviceFeaturesRaw };
+
 export type DeviceStateUpdateResult = {
-  state: DeviceState;
+  state: StoredDeviceState;
   revision: number;
   source: DeviceStateUpdateSource;
   changedKeys: string[];
 };
 
+const PRODUCT_DISPLAY_NAMES: Partial<Record<DeviceStateIdentity['deviceType'], string>> = {
+  [EDeviceType.Classic]: 'OneKey Classic',
+  [EDeviceType.Classic1s]: 'OneKey Classic 1S',
+  [EDeviceType.ClassicPure]: 'OneKey Classic 1S Pure',
+  [EDeviceType.Mini]: 'OneKey Mini',
+  [EDeviceType.Touch]: 'OneKey Touch',
+  [EDeviceType.Pro]: 'OneKey Pro',
+  [EDeviceType.Pro2]: 'OneKey Pro 2',
+};
+
 const getModelDisplayName = (deviceType: DeviceStateIdentity['deviceType']) =>
-  deviceType === EDeviceType.Unknown ? 'OneKey' : `OneKey ${deviceType.toUpperCase()}`;
+  PRODUCT_DISPLAY_NAMES[deviceType] ?? 'OneKey';
 
 const getDisplayName = (identity: DeviceStateIdentity) =>
   identity.label || identity.bleName || getModelDisplayName(identity.deviceType);
 
 export function createEmptyDeviceState(
   identity: Partial<DeviceStateIdentity> = {}
-): DeviceState {
+): StoredDeviceState {
   const normalizedIdentity: DeviceStateIdentity = {
     deviceType: EDeviceType.Unknown,
     firmwareType: EFirmwareType.Universal,
@@ -99,18 +112,17 @@ const applySectionPatch = <T extends object>(
   changedKeys: string[]
 ) => {
   for (const [key, value] of Object.entries(patch) as [keyof T, T[keyof T] | undefined][]) {
-    if (value === undefined || isEqual(target[key], value)) {
-      continue;
+    if (value !== undefined && !isEqual(target[key], value)) {
+      target[key] = value;
+      changedKeys.push(`${prefix}.${String(key)}`);
     }
-    target[key] = value;
-    changedKeys.push(`${prefix}.${String(key)}`);
   }
 };
 
 export class DeviceStateStore {
-  private state: DeviceState | undefined;
+  private state: StoredDeviceState | undefined;
 
-  constructor(initial?: DeviceState) {
+  constructor(initial?: StoredDeviceState) {
     this.state = initial ? structuredClone(initial) : undefined;
   }
 
@@ -118,7 +130,7 @@ export class DeviceStateStore {
     return this.state;
   }
 
-  replace(state: DeviceState, source: DeviceStateUpdateSource): DeviceStateUpdateResult {
+  replace(state: StoredDeviceState, source: DeviceStateUpdateSource): DeviceStateUpdateResult {
     const revision = (this.state?.revision ?? 0) + 1;
     this.state = {
       ...structuredClone(state),
@@ -150,13 +162,29 @@ export class DeviceStateStore {
       next.capabilities = structuredClone(patch.capabilities);
       changedKeys.push('capabilities');
     }
-    if (patch.verification !== undefined && !isEqual(next.verification, patch.verification)) {
-      next.verification = structuredClone(patch.verification);
-      changedKeys.push('verification');
+    if (patch.verification !== undefined) {
+      const mergedVerification = {
+        ...structuredClone(next.verification ?? {}),
+        ...structuredClone(patch.verification),
+      };
+      if (!isEqual(next.verification, mergedVerification)) {
+        next.verification = mergedVerification;
+        changedKeys.push('verification');
+      }
     }
-    if (patch.raw !== undefined && !isEqual(next.raw, patch.raw)) {
-      next.raw = structuredClone(patch.raw);
-      changedKeys.push('raw');
+    if (patch.raw !== undefined) {
+      const mergedRaw = structuredClone(next.raw ?? {});
+      for (const [key, value] of Object.entries(patch.raw)) {
+        if (value === null) {
+          delete mergedRaw[key as keyof typeof mergedRaw];
+        } else if (value !== undefined) {
+          mergedRaw[key as keyof typeof mergedRaw] = structuredClone(value) as never;
+        }
+      }
+      if (!isEqual(next.raw, mergedRaw)) {
+        next.raw = mergedRaw;
+        changedKeys.push('raw');
+      }
     }
     if (patch.session === null) {
       if (next.session !== undefined) {
@@ -196,3 +224,9 @@ export class DeviceStateStore {
     return this.update({ session: null }, source);
   }
 }
+
+export const createPublicDeviceState = (state: StoredDeviceState): DeviceState => {
+  const snapshot = structuredClone(state);
+  delete snapshot.raw;
+  return snapshot;
+};

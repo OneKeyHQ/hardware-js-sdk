@@ -1,9 +1,11 @@
-import type { DeviceState, Features } from '../types';
+import type { DeviceFeaturesRaw, DeviceState, Features } from '../types';
 
-const getBootloaderMode = (state: DeviceState) =>
+type StoredDeviceState = DeviceState & { raw?: DeviceFeaturesRaw };
+
+const getBootloaderMode = (state: StoredDeviceState) =>
   state.status.mode === 'bootloader' || state.status.mode === 'romloader';
 
-export const projectFeatures = (state: DeviceState): Features => {
+export const projectFeatures = (state: StoredDeviceState): Features => {
   const rawFeatures = state.raw?.protocolV1Features ?? {};
   const rawOneKeyFeatures = state.raw?.protocolV1OneKeyFeatures ?? {};
   const sessionId = state.session?.sessionId ?? null;

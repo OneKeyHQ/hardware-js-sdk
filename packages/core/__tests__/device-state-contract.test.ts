@@ -17,3 +17,7 @@ describe('DeviceState contract', () => {
     expect(event.state).toBe(state);
   });
 });
+
+// raw 仅供 SDK 内部兼容投影使用，不属于公共 DeviceState。
+// @ts-expect-error raw 不应成为外部接入者需要理解的字段
+type RemovedPublicRaw = DeviceState['raw'];

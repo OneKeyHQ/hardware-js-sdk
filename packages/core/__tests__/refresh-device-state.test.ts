@@ -41,6 +41,7 @@ describe('device state read and refresh operations', () => {
     method.init();
     (method as any).device = {
       state: { status: { mode: 'normal' } },
+      isProtocolV2: () => false,
       getDeviceState,
     };
 
@@ -60,6 +61,7 @@ describe('device state read and refresh operations', () => {
       method.init();
       (method as any).device = {
         state: { status: { mode } },
+        isProtocolV2: () => true,
         getCurrentFirmwareType: () => 'universal',
         getDeviceState,
       };
@@ -88,6 +90,7 @@ describe('device state read and refresh operations', () => {
       get state() {
         return state;
       },
+      isProtocolV2: () => true,
       getCurrentFirmwareType: () => 'universal',
       getDeviceState,
     };
@@ -98,6 +101,24 @@ describe('device state read and refresh operations', () => {
     expect(getDeviceState).toHaveBeenNthCalledWith(2, {
       refreshSections: ['status'],
     });
+  });
+
+  test('allows Protocol V1 runtime refresh in bootloader mode', async () => {
+    const getDeviceState = jest.fn().mockResolvedValue({ revision: 2 });
+    const method = new RefreshDeviceState({
+      id: 1,
+      payload: { method: 'refreshDeviceState', scope: 'runtime' },
+    });
+    method.init();
+    (method as any).device = {
+      state: { status: { mode: 'bootloader' } },
+      isProtocolV2: () => false,
+      getDeviceState,
+    };
+
+    await method.run();
+
+    expect(getDeviceState).toHaveBeenCalledWith({ refreshSections: ['status'] });
   });
 
   test('rejects an unknown runtime scope', () => {

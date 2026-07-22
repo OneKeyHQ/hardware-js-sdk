@@ -70,7 +70,11 @@ export const supportInputPinOnSoftware = (features: Features): SupportFeatureTyp
   if (!features) return { support: false };
 
   const deviceType = getDeviceType(features);
-  if (deviceType === EDeviceType.Touch || deviceType === EDeviceType.Pro) {
+  if (
+    deviceType === EDeviceType.Touch ||
+    deviceType === EDeviceType.Pro ||
+    deviceType === EDeviceType.Pro2
+  ) {
     return { support: false };
   }
 

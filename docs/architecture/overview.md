@@ -71,6 +71,24 @@ WebUSB、Electron BLE、React Native BLE 和 lowlevel BLE 只负责各自的物�
 
 `getDeviceState()` 和 `DEVICE.STATE` 共享同一份完整快照。`getDeviceState()` 只读取缓存或执行最小初始化；调用方只有显式调用 `refreshDeviceState({ scope: 'runtime' })` 时才会发送 `DeviceStatusGet`。
 
+公共刷新范围按业务语义定义，调用方不需要理解底层协议命令：
+
+| scope      | V1 数据来源                       | V2 数据来源                                  |
+| ---------- | --------------------------------- | -------------------------------------------- |
+| `basic`    | `GetFeatures`                     | `DeviceInfoGet` 基础 target                  |
+| `firmware` | `GetFeatures + OnekeyGetFeatures` | `DeviceInfoGet` 全组件 version/build ID/hash |
+| `settings` | `GetFeatures`                     | `DeviceSettingsGet`                          |
+| `runtime`  | `GetFeatures`                     | normal 模式下显式 `DeviceStatusGet`          |
+
+统一字段遵循以下语义：
+
+- `identity.label` 只保存用户设置的真实 label，不使用 BLE 名称或型号兜底。
+- `identity.bleName` 只保存广播/连接名称。
+- `identity.displayName` 是派生展示值，优先级为 `label -> bleName -> 稳定产品名`。
+- V1 原始 `model` 只用于协议兼容，不作为产品展示名。
+- Protocol V2 的 SE 镜像存在与否不决定主控运行模式；应用镜像存在时保持 normal 或已确认的 onboarding mode。
+- `raw` 按协议来源键字段级合并，只供 SDK 内部兼容逻辑使用；公共 `getDeviceState()` 不暴露 raw。
+
 ## 自动协议探测
 
 支持 Protocol V2 的传输实现会在 `acquire()` 后主动探测协议。没有 V2 hint 时默认先验证 V1，V1 失败后再 probe V2；有 V2 hint 或 V2 连接缓存时会先验证 V2。显式 `connectProtocol='V1'` 会验证 V1，显式 `connectProtocol='V2'` 则信任上层已经确认的协议，用于固件升级重启后的重连：
@@ -152,6 +170,6 @@ flowchart TD
 - 协议探测、V2 frame 重组和 V2 call 路由应复用 Protocol Session 层，避免在具体 transport 中重复实现。
 - Electron BLE 默认入口是 `desktop-web-ble`，不再提供按设备型号拆分的 env alias。
 - V1 schema 兼容逻辑和 V2 schema 路由逻辑分离，避免为了新协议改动现有设备的初始化路径。
-- Device 层通过 Protocol V2 feature adapter 暴露统一 `Features`，业务方法不直接消费 Protocol V2 原始 `DeviceInfo`。
+- Device 层通过 Protocol Mapper 暴露统一 `DeviceState`；`Features` 只保留给 Protocol V1 兼容，业务方法不直接消费 Protocol V2 原始 `DeviceInfo`。
 
 传输协议细节见 [Protocol V1/V2 传输协议](../protocol/protocol-v1-v2.md)；Core 的运行时和字段适配见 [SDK Core 运行时](../sdk/core-runtime.md) 与 [Pro2 字段迁移](../sdk/pro2-field-migration.md)。

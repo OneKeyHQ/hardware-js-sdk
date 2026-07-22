@@ -52,4 +52,54 @@ describe('DeviceStateStore', () => {
     expect(result?.state.identity.label).toBe('Kept');
     expect(result?.state.session).toBeUndefined();
   });
+
+  test('merges raw protocol sources instead of replacing the previous source', () => {
+    const store = new DeviceStateStore(createEmptyDeviceState());
+    const deviceInfo = { protocol_version: 2, hw: { serial_no: 'SERIAL-1' } };
+    const deviceStatus = { device_id: 'DEVICE-1', unlocked: true };
+
+    store.update({ raw: { protocolV2DeviceInfo: deviceInfo } }, 'device-info');
+    const result = store.update({ raw: { protocolV2DeviceStatus: deviceStatus } }, 'device-status');
+
+    expect(result.state.raw).toEqual({
+      protocolV2DeviceInfo: deviceInfo,
+      protocolV2DeviceStatus: deviceStatus,
+    });
+  });
+
+  test('removes only the explicitly cleared raw protocol source', () => {
+    const store = new DeviceStateStore(createEmptyDeviceState());
+    const deviceInfo = { protocol_version: 2, hw: { serial_no: 'SERIAL-1' } };
+    const deviceStatus = { device_id: 'DEVICE-1', unlocked: true };
+
+    store.update(
+      {
+        raw: {
+          protocolV2DeviceInfo: deviceInfo,
+          protocolV2DeviceStatus: deviceStatus,
+        },
+      },
+      'initialize'
+    );
+    const result = store.update({ raw: { protocolV2DeviceStatus: null } }, 'device-info');
+
+    expect(result.state.raw).toEqual({
+      protocolV2DeviceInfo: deviceInfo,
+    });
+  });
+
+  test.each([
+    [EDeviceType.Classic1s, 'OneKey Classic 1S'],
+    [EDeviceType.ClassicPure, 'OneKey Classic 1S Pure'],
+    [EDeviceType.Touch, 'OneKey Touch'],
+    [EDeviceType.Pro, 'OneKey Pro'],
+    [EDeviceType.Pro2, 'OneKey Pro 2'],
+  ] as const)(
+    'uses the product display name for %s when label and BLE name are absent',
+    (type, name) => {
+      const state = createEmptyDeviceState({ deviceType: type });
+
+      expect(state.identity.displayName).toBe(name);
+    }
+  );
 });

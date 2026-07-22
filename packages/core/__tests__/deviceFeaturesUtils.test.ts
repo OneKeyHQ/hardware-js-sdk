@@ -1,7 +1,10 @@
 import { EDeviceType } from '@onekeyfe/hd-shared';
 
 import DataManager from '../src/data-manager/DataManager';
-import { getSupportProtocolV1MessageSchema } from '../src/utils/deviceFeaturesUtils';
+import {
+  getSupportProtocolV1MessageSchema,
+  supportInputPinOnSoftware,
+} from '../src/utils/deviceFeaturesUtils';
 
 import type { Features } from '../src/types';
 
@@ -23,5 +26,14 @@ describe('getSupportProtocolV1MessageSchema', () => {
 
     expect(result.protocolV1MessageSchema).toBe('v1CurrentSchema');
     expect(result.messages).toBe(DataManager.messages.v1CurrentSchema);
+  });
+
+  test('Pro2 never supports entering PIN in software', () => {
+    const features = {
+      deviceType: EDeviceType.Pro2,
+      firmwareVersion: '9.9.9',
+    } as Features;
+
+    expect(supportInputPinOnSoftware(features)).toEqual({ support: false });
   });
 });
