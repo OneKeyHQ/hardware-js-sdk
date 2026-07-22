@@ -1,9 +1,3 @@
-import type {
-  DeviceInfoSource,
-  DeviceProfile,
-  DeviceProfileRaw,
-  GetDeviceInfoParams,
-} from '../types/api/getDeviceInfo';
 import type { DeviceState, Features } from '../types';
 
 const getBootloaderMode = (state: DeviceState) =>
@@ -88,56 +82,4 @@ export const projectFeatures = (state: DeviceState): Features => {
     passphrase_protection: state.status.passphraseProtection ?? undefined,
     bootloader_mode: getBootloaderMode(state),
   } as unknown as Features;
-};
-
-const getSources = (state: DeviceState): DeviceInfoSource[] => {
-  const sources: DeviceInfoSource[] = [];
-  if (state.raw?.protocolV1Features) sources.push('features');
-  if (state.raw?.protocolV1OneKeyFeatures) sources.push('protocolV1OneKeyFeatures');
-  if (state.raw?.protocolV2DeviceInfo) sources.push('deviceInfo');
-  if (sources.length === 0) {
-    sources.push(state.protocol === 'V2' ? 'deviceInfo' : 'features');
-  }
-  return sources;
-};
-
-const getRaw = (state: DeviceState): DeviceProfileRaw => ({
-  features: projectFeatures(state),
-  protocolV1Features: state.raw?.protocolV1Features,
-  protocolV1OneKeyFeatures: state.raw?.protocolV1OneKeyFeatures,
-  protocolV2DeviceInfo: state.raw?.protocolV2DeviceInfo,
-  protocolV2DeviceStatus: state.raw?.protocolV2DeviceStatus,
-});
-
-export const projectDeviceProfile = (
-  state: DeviceState,
-  params: GetDeviceInfoParams = {}
-): DeviceProfile => {
-  const includeVerify = params.scope === 'verify' || params.scope === 'full';
-  return {
-    protocol: state.protocol,
-    sources: getSources(state),
-    deviceType: state.identity.deviceType,
-    firmwareType: state.identity.firmwareType,
-    deviceId: state.identity.deviceId ?? '',
-    serialNo: state.identity.serialNo,
-    label: state.identity.label,
-    bleName: state.identity.bleName,
-    status: {
-      mode: state.status.mode,
-      initialized: state.status.initialized,
-      bootloaderMode: getBootloaderMode(state),
-      unlocked: state.status.unlocked,
-      passphraseProtection: state.status.passphraseProtection,
-      attachToPinEnabled: state.status.attachToPinEnabled,
-      unlockedAttachPin: state.status.unlockedAttachPin,
-      backupRequired: state.status.backupRequired,
-      noBackup: state.status.noBackup,
-      language: state.settings.language,
-      bleEnabled: state.settings.bleEnabled,
-    },
-    versions: { ...state.versions },
-    ...(includeVerify ? { verify: state.verification ?? {} } : {}),
-    ...(params.includeRaw ? { raw: getRaw(state) } : {}),
-  };
 };

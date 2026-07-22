@@ -749,7 +749,7 @@ export class Device extends EventEmitter {
         if (this.features?.bootloaderMode) {
           return;
         }
-        // 普通业务调用复用缓存。动态状态由显式 getFeatures/deviceStatusGet、
+        // 普通业务调用复用缓存。动态状态由显式 getDeviceState refresh、
         // 解锁流程和设备事件刷新，避免每个 SDK 方法都额外轮询 DeviceStatus。
         return;
       }
@@ -818,7 +818,7 @@ export class Device extends EventEmitter {
         timeoutMs: options?.protocolV2DeviceInfoTimeoutMs,
       });
       // 默认请求不含 SE/hash 数据，scope 如实标注为 basic；
-      // 完整数据由 getDeviceInfo(scope:'verify'|'full') 获取。
+      // 完整版本与校验数据由 getDeviceState(refresh) 显式获取。
       const features = this.updateProtocolV2Features(deviceInfo, null);
       Log.debug('Protocol V2 features:', features);
     } catch (error) {

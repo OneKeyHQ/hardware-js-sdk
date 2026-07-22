@@ -83,8 +83,7 @@ export async function hydrateConnectedDeviceInfo(device: DeviceInfo): Promise<De
   let hydratedDevice = { ...device };
 
   try {
-    // getFeatures 已能同时完成设备信息与动态状态初始化。连接阶段不再连续调用
-    // getDeviceInfo + getFeatures，避免 Protocol V2 重复读取 DeviceInfo/DeviceStatus。
+    // 旧 Playground 暂时通过 getFeatures 适配展示结构；正式业务统一使用 getDeviceState。
     const featuresResult = await sdk.getFeatures(device.connectId);
 
     if (featuresResult.success && featuresResult.payload) {

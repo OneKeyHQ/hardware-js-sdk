@@ -9,7 +9,7 @@ title: firmwareUpdateV4
 Protocol V2 设备的新固件更新流程。该方法独立于 `firmwareUpdateV3`，会使用 Protocol V2 的重启、文件系统写入、安装触发和状态查询消息完成完整升级。
 
 - 设备：Protocol V2 设备
-- 流程：`DeviceReboot` -> `FilesystemFileWrite` -> `DeviceFirmwareUpdate` -> `DeviceGetFirmwareUpdateStatus` -> `getDeviceInfo`
+- 流程：`DeviceReboot` -> `FilesystemFileWrite` -> `DeviceFirmwareUpdate` -> `DeviceGetFirmwareUpdateStatus` -> SDK 内部状态刷新
 
 ```typescript
 const res = await HardwareSDK.firmwareUpdateV4(connectId, {

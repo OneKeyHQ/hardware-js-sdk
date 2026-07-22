@@ -1,6 +1,7 @@
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { UI_REQUEST } from '../constants/ui-request';
+import { projectFeatures } from '../device/DeviceStateProjector';
 import { BaseMethod } from './BaseMethod';
 
 export default class GetFeatures extends BaseMethod {
@@ -18,9 +19,7 @@ export default class GetFeatures extends BaseMethod {
     if (this.payload?.detectBootloaderDevice && this.device.isBootloader()) {
       return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceDetectInBootloaderMode));
     }
-    if (this.device.isProtocolV2()) {
-      return this.device.getFeatures();
-    }
-    return Promise.resolve(this.device.features);
+    const state = await this.device.getDeviceState({ includeRaw: true });
+    return projectFeatures(state);
   }
 }

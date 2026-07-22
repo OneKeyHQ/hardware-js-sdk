@@ -4,10 +4,7 @@ import type {
   DeviceFactoryInfo,
   DeviceFirmwareUpdateStatus,
   DeviceSession,
-  DeviceSettings,
-  DeviceStatus,
   ProtocolInfo,
-  ProtocolV2DeviceInfo,
   Success,
 } from '@onekeyfe/hd-transport';
 import type {
@@ -16,7 +13,6 @@ import type {
   DeviceFirmwareUpdateStatusGetParams,
   DeviceRebootParams,
 } from '../../api/protocol-v2/helpers';
-import type { DeviceInfoGetParams } from '../../api/protocol-v2/DeviceInfoGet';
 import type { DeviceSessionOpenParams } from '../../api/protocol-v2/DeviceSessionOpen';
 import type { DeviceSettingsSetParams } from '../../api/protocol-v2/DeviceSettingsSet';
 import type { DeviceSettingsPageShowParams } from '../../api/protocol-v2/DeviceSettingsPageShow';
@@ -34,11 +30,6 @@ export type {
   DeviceFactoryInfoSetParams,
   RebootTypeInput,
 } from '../../api/protocol-v2/helpers';
-export type {
-  DeviceInfoGetParams,
-  DeviceInfoGetTargets,
-  DeviceInfoGetTypes,
-} from '../../api/protocol-v2/DeviceInfoGet';
 export type { DeviceSessionOpenParams } from '../../api/protocol-v2/DeviceSessionOpen';
 export type { DeviceSettingsSetParams } from '../../api/protocol-v2/DeviceSettingsSet';
 export type {
@@ -104,16 +95,6 @@ export declare function deviceReboot(
   params: CommonParams & DeviceRebootParams
 ): Response<Success>;
 
-export declare function deviceInfoGet(
-  connectId: string,
-  params?: CommonParams & DeviceInfoGetParams
-): Response<ProtocolV2DeviceInfo>;
-
-export declare function deviceStatusGet(
-  connectId: string,
-  params?: CommonParams
-): Response<DeviceStatus>;
-
 export declare function deviceGetOnboardingStatus(
   connectId: string,
   params?: CommonParams
@@ -143,11 +124,6 @@ export declare function deviceFactoryInfoGet(
   connectId: string,
   params?: CommonParams
 ): Response<DeviceFactoryInfo>;
-
-export declare function deviceSettingsGet(
-  connectId: string,
-  params?: CommonParams
-): Response<DeviceSettings>;
 
 export declare function deviceSettingsSet(
   connectId: string,

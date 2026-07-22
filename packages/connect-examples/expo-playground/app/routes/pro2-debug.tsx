@@ -26,8 +26,7 @@ const PRO2_METHOD_GROUPS = [
     methods: [
       'protocolInfoRequest',
       'ping',
-      'getDeviceInfo',
-      'deviceInfoGet',
+      'getDeviceState',
       'deviceReboot',
       'deviceFactoryInfoGet',
       'deviceFactoryInfoSet',
@@ -40,7 +39,6 @@ const PRO2_METHOD_GROUPS = [
     methods: [
       'deviceUnlock',
       'deviceLock',
-      'deviceStatusGet',
       'deviceGetOnboardingStatus',
       'getPassphraseState',
       'deviceSessionOpen',
@@ -52,7 +50,6 @@ const PRO2_METHOD_GROUPS = [
     title: 'Settings',
     icon: Settings,
     methods: [
-      'deviceSettingsGet',
       'deviceSettingsSet',
       'deviceSettingsPageShow',
       'deviceUploadWallpaper',
@@ -102,18 +99,15 @@ const DEFAULT_SELECTED_METHOD = 'filesystemDirList';
 const PRO2_METHOD_LABELS: Record<string, string> = {
   protocolInfoRequest: 'Protocol Info',
   ping: 'Ping',
-  getDeviceInfo: 'Device Info',
-  deviceInfoGet: 'Raw Device Info',
+  getDeviceState: 'Device State',
   deviceReboot: 'Reboot',
   deviceFactoryInfoGet: 'Factory Info',
   deviceFactoryInfoSet: 'Factory Settings',
-  deviceSettingsGet: 'Settings Get',
   deviceSettingsSet: 'Settings Set',
   deviceSettingsPageShow: 'Settings Page',
   deviceUploadWallpaper: 'Upload Wallpaper',
   deviceUnlock: 'Unlock',
   deviceLock: 'Lock',
-  deviceStatusGet: 'Device Status',
   deviceGetOnboardingStatus: 'Onboarding Status',
   getPassphraseState: 'Wallet State',
   deviceSessionOpen: 'Wallet Session',
@@ -165,19 +159,12 @@ const PRO2_METHOD_WIRE_INFO: Record<string, MethodWireInfo> = {
     rxPayload: '2f eb 0a 12 48 65 6c 6c 6f 20 66 72 6f 6d 20 57 65 62 55 53 42 21',
     decoded: 'Success: "Hello from WebUSB!"',
   },
-  getDeviceInfo: {
+  getDeviceState: {
     tx: '60600 (DeviceInfoGet)',
     txPayload: PRO2_DYNAMIC_PAYLOAD,
     rx: '60601 (DeviceInfo)',
     rxPayload: PRO2_DYNAMIC_RESPONSE,
-    decoded: 'DeviceProfile',
-  },
-  deviceInfoGet: {
-    tx: '60600 (DeviceInfoGet)',
-    txPayload: PRO2_DYNAMIC_PAYLOAD,
-    rx: '60601 (DeviceInfo)',
-    rxPayload: PRO2_DYNAMIC_RESPONSE,
-    decoded: 'DeviceInfo',
+    decoded: 'DeviceState',
   },
   deviceReboot: {
     tx: '60400 (DeviceReboot)',
@@ -410,7 +397,7 @@ function isFileWriteMethod(method: string) {
 }
 
 function isCurrentSubmoduleMethod(method: string) {
-  return method.startsWith('dev') || method === 'getDeviceInfo';
+  return method.startsWith('dev') || method === 'getDeviceState';
 }
 
 function getDataSummary(data: unknown) {

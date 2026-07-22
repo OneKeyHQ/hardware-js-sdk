@@ -298,7 +298,6 @@ export const en = {
       deviceChangePin: 'Change pin of a device',
       deviceLock: 'Lock device',
       deviceUnlock: 'Unlock the device with PIN entry on the device',
-      deviceStatusGet: 'Read raw Protocol V2 dynamic device status',
       deviceGetOnboardingStatus: 'Read Protocol V2 onboarding progress',
       deviceSessionOpen: 'Open or resume a Protocol V2 wallet session (advanced debugging)',
       deviceRebootToBoardloader: 'Reboot to boardloader mode(pro & touch only)',
@@ -327,9 +326,7 @@ export const en = {
       protocolInfoRequest: 'Protocol V2 protocol information query',
       ping: 'Protocol V2 device liveness test',
       deviceReboot: 'Protocol V2 device reboot',
-      getDeviceInfo: 'Get unified device info (supports V1 and V2 protocol)',
-      deviceInfoGet:
-        'Raw Protocol V2 DeviceInfoGet (returns DeviceInfo, Pro2 only); pick request targets/types via checkboxes',
+      getDeviceState: 'Get canonical device state (supports V1 and V2 protocol)',
       deviceFirmwareUpdate: 'Protocol V2 firmware install trigger',
       deviceGetFirmwareUpdateStatus: 'Protocol V2 firmware install status query',
       deviceFactoryInfoSet: 'Protocol V2 factory-mode device information write',

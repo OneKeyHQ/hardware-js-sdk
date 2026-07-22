@@ -20,21 +20,20 @@ const api: PlaygroundProps[] = [
     ],
   },
   {
-    method: 'getDeviceInfo',
-    description: 'Get standard device profile information.',
+    method: 'getDeviceState',
+    description: 'Get canonical device state.',
     noDeviceIdReq: true,
     presupposes: [
       {
-        title: 'All info',
+        title: 'Versions and verification',
         value: {
-          scope: 'full',
-          includeRaw: true,
+          refresh: ['identity', 'versions', 'verification'],
         },
       },
       {
         title: 'Versions',
         value: {
-          scope: 'versions',
+          refresh: ['identity', 'versions'],
         },
       },
     ],

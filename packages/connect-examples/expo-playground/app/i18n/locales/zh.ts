@@ -289,7 +289,6 @@ export const zh = {
       deviceChangePin: '更改设备 PIN 码',
       deviceLock: '锁定设备',
       deviceUnlock: '通过设备端 PIN 解锁设备',
-      deviceStatusGet: '读取 Protocol V2 原始动态设备状态',
       deviceGetOnboardingStatus: '读取 Protocol V2 初始化流程状态',
       deviceSessionOpen: '底层打开或恢复 Protocol V2 钱包会话（高级调试）',
       deviceRebootToBoardloader: '重启到引导模式（仅限 Pro 和 Touch 设备）',
@@ -318,9 +317,7 @@ export const zh = {
       protocolInfoRequest: 'Protocol V2 查询协议信息',
       ping: 'Protocol V2 设备连通性测试',
       deviceReboot: 'Protocol V2 设备重启',
-      getDeviceInfo: '获取统一设备信息（支持 V1 和 V2 协议）',
-      deviceInfoGet:
-        '原生 Protocol V2 DeviceInfoGet（返回 DeviceInfo，仅 Pro2）；用复选框选择请求的 targets/types',
+      getDeviceState: '获取统一设备状态（支持 V1 和 V2 协议）',
       deviceFirmwareUpdate: 'Protocol V2 触发固件安装',
       deviceGetFirmwareUpdateStatus: 'Protocol V2 查询固件安装状态',
       deviceFactoryInfoSet: 'Protocol V2 工厂模式写入设备信息',

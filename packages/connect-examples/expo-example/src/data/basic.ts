@@ -18,101 +18,30 @@ const api: PlaygroundProps[] = [
     noDeviceIdReq: true,
   },
   {
-    method: 'getDeviceInfo',
-    description: 'Get unified device info (supports V1 and V2 protocol)',
+    method: 'getDeviceState',
+    description: 'Get canonical device state (supports V1 and V2 protocol)',
     noDeviceIdReq: true,
     presupposes: [
       {
-        title: 'Basic',
+        title: 'Cached state',
+        value: {},
+      },
+      {
+        title: 'Refresh versions',
         value: {
-          scope: 'basic',
+          refresh: ['identity', 'versions'],
         },
       },
       {
-        title: 'Versions',
+        title: 'Refresh verification',
         value: {
-          scope: 'versions',
+          refresh: ['identity', 'versions', 'verification'],
         },
       },
       {
-        title: 'Verify',
+        title: 'Explicit status refresh',
         value: {
-          scope: 'verify',
-        },
-      },
-      {
-        title: 'Full (with raw)',
-        value: {
-          scope: 'full',
-          includeRaw: true,
-        },
-      },
-    ],
-  },
-  {
-    method: 'deviceInfoGet',
-    description:
-      'Raw Protocol V2 DeviceInfoGet (no DeviceProfile wrapping, Pro2 only). Use the checkboxes to pick request targets/types.',
-    noDeviceIdReq: true,
-    checkboxGroups: [
-      {
-        title: 'Targets',
-        fields: [
-          { path: 'targets.hw', label: 'hw' },
-          { path: 'targets.fw', label: 'fw' },
-          { path: 'targets.coprocessor', label: 'coprocessor' },
-          { path: 'targets.se1', label: 'se1' },
-          { path: 'targets.se2', label: 'se2' },
-          { path: 'targets.se3', label: 'se3' },
-          { path: 'targets.se4', label: 'se4' },
-          { path: 'targets.status', label: 'status' },
-        ],
-      },
-      {
-        title: 'Types',
-        fields: [
-          { path: 'types.version', label: 'version' },
-          { path: 'types.build_id', label: 'build_id' },
-          { path: 'types.hash', label: 'hash' },
-          { path: 'types.specific', label: 'specific' },
-        ],
-      },
-    ],
-    presupposes: [
-      {
-        title: 'Basic',
-        value: {
-          targets: {
-            hw: true,
-            fw: true,
-            bt: true,
-            status: true,
-          },
-          types: {
-            version: true,
-            specific: true,
-          },
-        },
-      },
-      {
-        title: 'Full',
-        value: {
-          targets: {
-            hw: true,
-            fw: true,
-            bt: true,
-            se1: true,
-            se2: true,
-            se3: true,
-            se4: true,
-            status: true,
-          },
-          types: {
-            version: true,
-            build_id: true,
-            hash: true,
-            specific: true,
-          },
+          refresh: ['status'],
         },
       },
     ],

@@ -114,7 +114,6 @@ export const createCoreApi = (
    * 获取设备信息
    */
   getFeatures: (connectId, params) => call({ ...params, connectId, method: 'getFeatures' }),
-  getDeviceInfo: (connectId, params) => call({ ...params, connectId, method: 'getDeviceInfo' }),
   getDeviceState: (connectId, params) => call({ ...params, connectId, method: 'getDeviceState' }),
   getOnekeyFeatures: (connectId, params) =>
     call({ ...params, connectId, method: 'getOnekeyFeatures' }),
@@ -161,8 +160,6 @@ export const createCoreApi = (
     call({ ...params, connectId, method: 'protocolInfoRequest' }),
   ping: (connectId, params) => call({ ...params, connectId, method: 'ping' }),
   deviceReboot: (connectId, params) => call({ ...params, connectId, method: 'deviceReboot' }),
-  deviceInfoGet: (connectId, params) => call({ ...params, connectId, method: 'deviceInfoGet' }),
-  deviceStatusGet: (connectId, params) => call({ ...params, connectId, method: 'deviceStatusGet' }),
   deviceGetOnboardingStatus: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceGetOnboardingStatus' }),
   deviceSessionOpen: (connectId, params) =>
@@ -175,8 +172,6 @@ export const createCoreApi = (
     call({ ...params, connectId, method: 'deviceFactoryInfoSet' }),
   deviceFactoryInfoGet: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceFactoryInfoGet' }),
-  deviceSettingsGet: (connectId, params) =>
-    call({ ...params, connectId, method: 'deviceSettingsGet' }),
   deviceSettingsSet: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceSettingsSet' }),
   deviceSettingsPageShow: (connectId, params) =>

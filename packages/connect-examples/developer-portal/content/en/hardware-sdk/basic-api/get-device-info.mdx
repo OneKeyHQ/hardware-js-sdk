@@ -1,139 +1,56 @@
 ---
-title: Get Device Info
+title: Get Device State
 ---
 
-# Get Device Info
+# Get Device State
 
-## Get unified device information
-
-Returns a unified view of the device's hardware, firmware, and security state. This API automatically handles the difference between Protocol V1 (Classic, Mini, Touch, Pro) and Protocol V2 (Pro2) devices — you don't need to know which protocol the device uses.
-
-For V1 devices, information is gathered from `GetFeatures` and optionally `OnekeyGetFeatures`. For V2 devices (Pro2), the SDK reads the Protocol V2 `DevGetDeviceInfo` message internally. The result is normalized into a single `DeviceProfile` structure.
-
-For Pro2, `DeviceInfoGet` reads static hardware and firmware information without `status: true` and does not implicitly call `DeviceStatusGet`. `DeviceProfile.status`, label, and deviceId are projected from the SDK's confirmed Features cache. Call an explicit status API only when fresh runtime state is required.
+`getDeviceState` is the canonical device information API for Protocol V1 and Protocol V2 devices. Integrations consume the same `DeviceState` shape for Pro, Pro2, Classic, Mini, and Touch devices; protocol-specific messages remain inside the SDK.
 
 ```typescript
-const response = await HardwareSDK.getDeviceInfo(connectId, {
-  scope: 'basic',
+const response = await HardwareSDK.getDeviceState(connectId);
+```
+
+The default call returns the current snapshot and performs only the minimum initialization when no snapshot exists. For Pro2, initialization reads `DeviceInfoGet` without a status target and does not call `DeviceStatusGet`.
+
+## Explicit refresh
+
+Pass only the sections that must be refreshed:
+
+```typescript
+const versions = await HardwareSDK.getDeviceState(connectId, {
+  refresh: ['identity', 'versions'],
+});
+
+const runtimeStatus = await HardwareSDK.getDeviceState(connectId, {
+  refresh: ['status'],
 });
 ```
 
-### Params
+`status` refresh is explicit. Bootloader and romloader devices do not receive `DeviceStatusGet`; unavailable fields remain `null`.
 
-[**Optional common params**](/en/hardware-sdk/core-api-guide#common-params)
+## State sections
 
-| Name | Type | Required | Description |
-|------|------|----------|-------------|
-| `scope` | `'basic' \| 'versions' \| 'verify' \| 'full'` | No | Controls how much information to retrieve. Defaults to `'basic'`. |
-| `refresh` | `boolean` | No | When `true`, forces a fresh read from the device instead of using cached data. |
-| `includeRaw` | `boolean` | No | When `true`, includes the raw protocol-specific response in `payload.raw`. |
+The returned snapshot contains:
 
-#### Scope levels
+- `identity`: device type, IDs, serial number, label, BLE name, and `displayName`.
+- `status`: mode, initialization, lock, backup, PIN, and passphrase state.
+- `settings`: language, display, security, BLE, and Pro2 preferences.
+- `versions`: firmware, bootloader, board, BLE, and secure-element versions.
+- `verification`: build IDs and hashes when explicitly refreshed.
+- `session`: volatile session data.
+- `raw`: optional protocol diagnostics; application business logic should not depend on it.
 
-| Scope | What it includes |
-|-------|-----------------|
-| `basic` | Device type, firmware type, IDs, serial number, label, BLE name, status (mode, initialized, locked, passphrase protection, backup, language). |
-| `versions` | Everything in `basic` + firmware/bootloader/board/BLE/SE version numbers. For V1 devices, this calls `OnekeyGetFeatures` to get detailed versions. |
-| `verify` | Everything in `versions` + build IDs and hashes for each firmware component. For V2 devices, this triggers a fresh internal `DevGetDeviceInfo` read. |
-| `full` | All available information (same as `verify` with the most complete data). |
+Visible device names should use `state.identity.displayName`, whose priority is `label`, then `bleName`, then the model display name.
 
-### Example
+## Events
+
+Subscribe to `DEVICE.STATE` for updates. Settings and rename operations update the SDK snapshot first and then emit the full state, so callers do not need an extra read after a successful mutation.
 
 ```typescript
-// Basic device info
-const basic = await HardwareSDK.getDeviceInfo(connectId);
-
-// Full info with raw protocol data
-const full = await HardwareSDK.getDeviceInfo(connectId, {
-  scope: 'full',
-  includeRaw: true,
+HardwareSDK.on(DEVICE.STATE, ({ state, revision }) => {
+  renderDevice(state.identity.displayName);
+  persistIfNewer(state, revision);
 });
-
-if (full.success) {
-  const { protocol, deviceType, versions, status, verify } = full.payload;
-  console.log(`Protocol: ${protocol}`);        // 'V1' or 'V2'
-  console.log(`Device: ${deviceType}`);         // e.g. 'pro', 'pro2', 'classic1s'
-  console.log(`FW: ${versions.firmware}`);
-  console.log(`Initialized: ${status.initialized}`);
-}
 ```
 
-### Result
-
-```typescript
-{
-    success: true,
-    payload: {
-        protocol: 'V1' | 'V2' | 'unknown',     // which protocol the device uses
-        sources: string[],                        // data sources used (e.g. ['features', 'deviceInfo'])
-        deviceType: string,                       // device model (e.g. 'pro', 'pro2', 'classic1s', 'mini', 'touch')
-        firmwareType: string,                     // firmware type
-        deviceId: string,                         // device identifier (seed-derived)
-        serialNo: string,                         // hardware serial number
-        label: string | null,                     // user-set device label
-        bleName: string | null,                   // BLE advertising name
-        status: {
-            mode: 'normal' | 'bootloader' | 'notInitialized' | 'unknown',
-            initialized: boolean | null,
-            bootloaderMode: boolean | null,
-            unlocked: boolean | null,
-            passphraseProtection: boolean | null,
-            backupRequired: boolean | null,
-            language: string | null,
-            bleEnabled: boolean | null,
-        },
-        versions: {                               // included when scope >= 'versions'
-            firmware: string | null,
-            bootloader: string | null,
-            board: string | null,
-            ble: string | null,
-            se01: string | null,
-            se02: string | null,
-            se03: string | null,
-            se04: string | null,
-            se01Boot: string | null,
-            se02Boot: string | null,
-            se03Boot: string | null,
-            se04Boot: string | null,
-        },
-        verify: {                                 // included when scope >= 'verify'
-            firmwareBuildId: string | undefined,
-            firmwareHash: string | undefined,
-            bootloaderBuildId: string | undefined,
-            bootloaderHash: string | undefined,
-            // ... buildId and hash for each component (board, ble, se01-se04, se01Boot-se04Boot)
-        },
-        raw: {                                    // included when includeRaw is true
-            features: object | undefined,         // V1 Features
-            onekeyFeatures: object | undefined,   // V1 OnekeyFeatures
-            protocolV2DeviceInfo: object | undefined,  // V2 DeviceInfo
-        },
-    }
-}
-```
-
-### Error
-
-```typescript
-{
-    success: false,
-    payload: {
-        error: string, // error message
-        code: number // error code
-    }
-}
-```
-
-### Migration from getFeatures
-
-If you were previously using `getFeatures` + `getOnekeyFeatures`, you can now use `getDeviceInfo` as a single, protocol-agnostic replacement:
-
-| Before | After |
-|--------|-------|
-| `getFeatures` for basic device state | `getDeviceInfo(connectId, { scope: 'basic' })` |
-| `getFeatures` + `getOnekeyFeatures` for versions | `getDeviceInfo(connectId, { scope: 'versions' })` |
-| Protocol V2 raw device info inspection | `getDeviceInfo(connectId, { scope: 'full', includeRaw: true })` |
-
-> `getFeatures` remains available for legacy compatibility only. New integrations should use `getDeviceInfo`, which returns the standard `DeviceProfile` model.
-
-Use the protocol-neutral `deviceSettings` API for device preferences. After a successful update, the SDK patches Features and emits `DEVICE.FEATURES`; integrations do not need separate Pro/Pro2 `ApplySettings` and `DeviceSettingsSet` branches.
+`getFeatures` and `DEVICE.FEATURES` remain only for Protocol V1 compatibility. `getDeviceInfo`, `deviceInfoGet`, `deviceStatusGet`, and `deviceSettingsGet` are not public APIs.

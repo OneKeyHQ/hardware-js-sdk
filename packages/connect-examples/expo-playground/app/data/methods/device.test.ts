@@ -5,11 +5,11 @@ import { getDeviceMethodSection } from './deviceCategories';
 import { parseParameterValue } from '../../utils/parameterUtils';
 
 describe('Pro2 设备方法配置', () => {
-  test('公开解锁、状态、初始化状态和钱包会话方法', () => {
+  test('公开统一状态、解锁、初始化状态和钱包会话方法', () => {
     const methods = new Set(device.api.map(item => item.method));
 
     expect(methods.has('deviceUnlock')).toBe(true);
-    expect(methods.has('deviceStatusGet')).toBe(true);
+    expect(methods.has('getDeviceState')).toBe(true);
     expect(methods.has('deviceGetOnboardingStatus')).toBe(true);
     expect(methods.has('deviceSessionOpen')).toBe(true);
   });
@@ -23,7 +23,7 @@ describe('Pro2 设备方法配置', () => {
     ]);
   });
 
-  test.each(['getDeviceInfo', 'deviceInfoGet', 'deviceStatusGet', 'deviceGetOnboardingStatus'])(
+  test.each(['getDeviceState', 'deviceGetOnboardingStatus'])(
     '将 %s 归入基础信息区',
     method => {
       expect(getDeviceMethodSection(method)).toBe('basic');
@@ -32,7 +32,6 @@ describe('Pro2 设备方法配置', () => {
 
   test.each([
     'deviceSettings',
-    'deviceSettingsGet',
     'deviceSettingsSet',
     'deviceSettingsPageShow',
     'deviceChangePin',

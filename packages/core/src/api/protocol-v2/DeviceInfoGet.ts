@@ -102,9 +102,8 @@ function normalizeTypes(value: unknown): DeviceInfoGetTypes | undefined {
 /**
  * 原生 DeviceInfoGet（Protocol V2 only）。
  *
- * 与 getDeviceInfo 不同：不构建 DeviceProfile、不更新设备缓存，
- * 按调用方给定的 targets/types 原样请求并返回未加工的 DeviceInfo 消息，
- * 用于调试固件字段上报。
+ * SDK 内部按需构造 targets/types，并返回未加工的 DeviceInfo 消息。
+ * 该 command 不属于公共 CoreApi；业务接入统一使用 getDeviceState。
  */
 export default class DeviceInfoGet extends BaseMethod<{
   targets: DeviceInfoGetTargets;

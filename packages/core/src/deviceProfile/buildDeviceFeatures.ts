@@ -235,7 +235,7 @@ export const buildProtocolV1FeaturesPayload = (
  *
  * 这是 Device 内部唯一缓存状态。字段只来自 DeviceInfoGet 或前一次 features
  * 缓存的同名字段级合并；不存在协议等价语义的字段保持 null/空值，不再通过
- * DeviceProfile 或 transport path 做身份兜底。
+ * 统一 DeviceState 或 transport path 做身份兜底。
  */
 export const buildProtocolV2FeaturesPayload = ({
   deviceInfo,
