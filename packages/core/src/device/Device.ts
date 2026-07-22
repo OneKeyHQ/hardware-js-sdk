@@ -33,7 +33,12 @@ import { generateInstanceId } from '../utils/tracing';
 // eslint-disable-next-line import/no-cycle
 import { DeviceCommands } from './DeviceCommands';
 import { mergeDeviceFeaturesPatch } from './DeviceFeaturesState';
-import { mapFeaturesToState } from './DeviceStateMapper';
+import {
+  mapDeviceSettingsToState,
+  mapFeaturesToState,
+  mapProtocolV2DeviceInfoToState,
+  mapProtocolV2DeviceStatusToState,
+} from './DeviceStateMapper';
 import { projectFeatures } from './DeviceStateProjector';
 import { DeviceStateStore } from './DeviceStateStore';
 import { deviceWalletSessionStore } from './DeviceWalletSessionStore';
@@ -58,10 +63,17 @@ import { DataManager } from '../data-manager';
 import TransportManager from '../data-manager/TransportManager';
 import { toHardened } from '../api/helpers/pathUtils';
 import { existCapability } from '../utils/capabilitieUtils';
-import { requestProtocolV2DeviceInfo } from '../protocols/protocol-v2/features';
+import {
+  PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST,
+  PROTOCOL_V2_FULL_DEVICE_INFO_REQUEST,
+  PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST,
+  requestProtocolV2DeviceInfo,
+  requestProtocolV2DeviceStatus,
+} from '../protocols/protocol-v2/features';
 import { buildProtocolV1FeaturesPayload, buildProtocolV2FeaturesPayload } from '../deviceProfile';
 
 import type { PROTO } from '../constants';
+import type { GetDeviceStateParams } from '../types/api/getDeviceState';
 import type {
   DeviceButtonRequestPayload,
   DeviceFeaturesPayload,
@@ -826,6 +838,61 @@ export class Device extends EventEmitter {
     const { message } = await this.commands.typedCall('GetFeatures', 'Features', {});
     this._updateFeatures(message);
     return this.features;
+  }
+
+  async getDeviceState(params: GetDeviceStateParams = {}) {
+    const refresh = new Set(params.refresh ?? []);
+
+    if (!this.state) {
+      if (this.isProtocolV2()) {
+        const deviceInfo = await requestProtocolV2DeviceInfo({
+          commands: this.commands,
+          request: PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST,
+        });
+        this.updateState(mapProtocolV2DeviceInfoToState(deviceInfo), 'device-info');
+      } else {
+        await this.getFeatures();
+      }
+    } else if (!this.isProtocolV2() && refresh.size > 0) {
+      await this.getFeatures();
+    }
+
+    if (this.isProtocolV2()) {
+      const refreshDeviceInfo =
+        refresh.has('identity') ||
+        refresh.has('versions') ||
+        refresh.has('verification');
+      if (refreshDeviceInfo) {
+        const request = refresh.has('verification')
+          ? PROTOCOL_V2_FULL_DEVICE_INFO_REQUEST
+          : refresh.has('versions')
+          ? PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST
+          : PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST;
+        const deviceInfo = await requestProtocolV2DeviceInfo({ commands: this.commands, request });
+        this.updateState(mapProtocolV2DeviceInfoToState(deviceInfo), 'device-info');
+      }
+
+      if (refresh.has('settings') && this.state?.status.mode === 'normal') {
+        const { message } = await this.commands.typedCall(
+          'DeviceSettingsGet',
+          'DeviceSettings',
+          {}
+        );
+        this.updateState(mapDeviceSettingsToState(message), 'apply-settings');
+      }
+
+      if (refresh.has('status') && this.state?.status.mode === 'normal') {
+        const status = await requestProtocolV2DeviceStatus({ commands: this.commands });
+        this.updateState(mapProtocolV2DeviceStatusToState(status), 'device-status');
+      }
+    }
+
+    if (!this.state) {
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceInitializeFailed);
+    }
+    const state = structuredClone(this.state);
+    if (!params.includeRaw) delete state.raw;
+    return state;
   }
 
   _updateFeatures(protoFeatures: PROTO.Features | Features, initSession?: boolean) {
