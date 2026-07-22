@@ -4,10 +4,10 @@ import { BaseMethod } from '../BaseMethod';
 import { invalidParameter } from '../helpers/filesystemValidation';
 import { validateParams } from '../helpers/paramsValidator';
 import {
+  mapApplySettingsToState,
   mapCommonSettingsToProtocolV2,
-  normalizeApplySettingsToFeaturesPatch,
-  normalizeDeviceSettingsToFeaturesPatch,
-} from '../../device/DeviceSettingsState';
+  mapDeviceSettingsToState,
+} from '../../device/DeviceStateMapper';
 import { LANGUAGE_LABELS } from '../../utils/deviceSettings';
 
 import type { ApplySettings } from '@onekeyfe/hd-transport';
@@ -83,20 +83,14 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
         const res = await this.device.commands.typedCall('DeviceSettingsSet', 'Success', {
           settings,
         });
-        this.device.updateFeaturesPatch(
-          normalizeDeviceSettingsToFeaturesPatch(settings),
-          'device-settings-set'
-        );
+        this.device.updateState(mapDeviceSettingsToState(settings), 'apply-settings');
         return res.message;
       }
 
       const res = await this.device.commands.typedCall('ApplySettings', 'Success', {
         ...this.params,
       });
-      this.device.updateFeaturesPatch(
-        normalizeApplySettingsToFeaturesPatch(this.params),
-        'apply-settings'
-      );
+      this.device.updateState(mapApplySettingsToState(this.params), 'apply-settings');
       return res.message;
     } catch (error) {
       if (error.message?.toLowerCase().includes('no setting provided')) {

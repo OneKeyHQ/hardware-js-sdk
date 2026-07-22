@@ -8,6 +8,7 @@ import {
 
 import type { PROTO } from '../constants';
 import type { DeviceStatePatch, Features } from '../types';
+import type { DeviceSettingsParams } from '../types/api/deviceSettings';
 import type {
   ApplySettings,
   DeviceFirmwareImageInfo,
@@ -130,7 +131,7 @@ export const mapProtocolV2DeviceInfoToState = (
     ? { mode: 'romloader' as const }
     : bootloader
     ? { mode: 'bootloader' as const }
-    : undefined;
+    : { mode: 'normal' as const };
 
   return {
     protocol: 'V2',
@@ -142,7 +143,7 @@ export const mapProtocolV2DeviceInfoToState = (
       serialNo: info.hw?.serial_no,
       bleName: info.coprocessor?.bt_adv_name,
     }),
-    ...(status ? { status } : {}),
+    status,
     versions: definedEntries({
       firmware: imageVersion(info.fw?.application),
       bootloader: imageVersion(info.fw?.bootloader),
@@ -240,3 +241,22 @@ export const mapDeviceSettingsToState = (settings: DeviceSettings): DeviceStateP
     ...(Object.keys(stateSettings).length ? { settings: stateSettings } : {}),
   };
 };
+
+export const mapCommonSettingsToProtocolV2 = (
+  settings: DeviceSettingsParams
+): DeviceSettings =>
+  definedEntries({
+    label: settings.label,
+    bt_enable: settings.bluetoothEnabled,
+    language: settings.language,
+    brightness: settings.brightness,
+    autolock_delay_ms: settings.autoLockDelayMs,
+    autoshutdown_delay_ms: settings.autoShutdownDelayMs,
+    animation_enable: settings.animationEnabled,
+    tap_to_wake: settings.tapToWake,
+    haptic_feedback: settings.hapticFeedback,
+    device_name_display_enabled: settings.deviceNameDisplayEnabled,
+    fido_enabled: settings.fidoEnabled,
+    usb_lock_enable: settings.usbLockEnabled,
+    random_keypad: settings.randomKeypad,
+  });

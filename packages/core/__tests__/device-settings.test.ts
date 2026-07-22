@@ -15,22 +15,22 @@ const features = {
 
 function createDevice({ protocol }: { protocol: 'V1' | 'V2' }) {
   const typedCall = jest.fn().mockResolvedValue({ message: { message: 'Success' } });
-  const updateFeaturesPatch = jest.fn();
+  const updateState = jest.fn();
   return {
     device: {
       features,
       isProtocolV2: () => protocol === 'V2',
       commands: { typedCall },
-      updateFeaturesPatch,
+      updateState,
     },
     typedCall,
-    updateFeaturesPatch,
+    updateState,
   };
 }
 
 describe('DeviceSettings protocol routing', () => {
   it('uses ApplySettings and commits the confirmed patch for Protocol V1', async () => {
-    const { device, typedCall, updateFeaturesPatch } = createDevice({ protocol: 'V1' });
+    const { device, typedCall, updateState } = createDevice({ protocol: 'V1' });
     const method = new DeviceSettings({
       id: 1,
       payload: {
@@ -57,14 +57,17 @@ describe('DeviceSettings protocol routing', () => {
       auto_shutdown_delay_ms: undefined,
       haptic_feedback: undefined,
     });
-    expect(updateFeaturesPatch).toHaveBeenCalledWith(
-      expect.objectContaining({ label: 'Shared Label', language: 'ja-JP' }),
+    expect(updateState).toHaveBeenCalledWith(
+      {
+        identity: { label: 'Shared Label' },
+        settings: { language: 'ja-JP' },
+      },
       'apply-settings'
     );
   });
 
   it('uses DeviceSettingsSet and commits the confirmed patch for Protocol V2', async () => {
-    const { device, typedCall, updateFeaturesPatch } = createDevice({ protocol: 'V2' });
+    const { device, typedCall, updateState } = createDevice({ protocol: 'V2' });
     const method = new DeviceSettings({
       id: 2,
       payload: {
@@ -87,14 +90,16 @@ describe('DeviceSettings protocol routing', () => {
         haptic_feedback: true,
       },
     });
-    expect(updateFeaturesPatch).toHaveBeenCalledWith(
-      expect.objectContaining({
-        label: 'Shared Label',
-        language: 'ja-JP',
-        autoLockDelayMs: 60_000,
-        hapticFeedback: true,
-      }),
-      'device-settings-set'
+    expect(updateState).toHaveBeenCalledWith(
+      {
+        identity: { label: 'Shared Label' },
+        settings: {
+          language: 'ja-JP',
+          autoLockDelayMs: 60_000,
+          hapticFeedback: true,
+        },
+      },
+      'apply-settings'
     );
     expect(typedCall.mock.calls.map(call => call[0])).not.toEqual(
       expect.arrayContaining(['DeviceInfoGet', 'DeviceStatusGet', 'DeviceSettingsGet'])
