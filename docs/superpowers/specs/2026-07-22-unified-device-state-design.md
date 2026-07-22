@@ -391,3 +391,12 @@ SDK 暂时保留的老协议兼容面：
 - Protocol V1 旧 SDK API 从新状态即时投影。
 - Pro2 信息、状态和设置读取仅在 SDK 内部存在，外部接入无需理解协议命令。
 - App 数据库只持久化一份设备状态。
+
+## 17. 事件消费与兼容语义补充
+
+1. `DEVICE.STATE` payload 是 App 内存态的即时真值。设备详情页必须直接用事件中的完整 state 更新 snapshot，不能先回读数据库再覆盖事件状态。
+2. 依赖数据库重新查询的消费者只能在对应状态持久化完成后收到通知；持久化失败时仍发送事件，但不得让失败阻断 SDK 命令结果。
+3. 同一物理设备的持久化队列优先使用 serialNo，其次 deviceId，最后才使用可能随传输变化的 connectId。
+4. Protocol V1 的 `getFeatures()` 保留“访问设备并获得新快照”的兼容语义；App 的 `getFeaturesWithoutCache()` 也必须触发真实刷新。
+5. 未读取 `DeviceStatusGet` 时，`null` 表示未知，UI 不得把未知状态转换成明确的 `false` 并标记为已确认。
+6. 显式请求刷新某个 section 时，SDK 不得静默把读取失败伪装成刷新成功；调用方可以选择跳过不可读取的 section，或处理明确错误。
