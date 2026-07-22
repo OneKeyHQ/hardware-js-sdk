@@ -605,6 +605,7 @@ export const en = {
         deviceConnected: 'WebUSB device connected successfully',
         noDeviceSelected: 'No device selected',
         notSupported: 'WebUSB is not supported in this browser',
+        deviceUnavailable: 'The device did not respond. Reconnect it, unlock it, and try again.',
       },
       jsbridge: {
         description: 'Stable compatibility',
@@ -634,6 +635,7 @@ export const en = {
       startEmulator: 'Start emulator',
       sdkInitializing: 'Initializing...',
       sdkInitError: 'SDK initialization failed',
+      sdkInitDescription: 'Reload the page and try again.',
     },
     sdk: {
       browserRequired: 'Browser environment required',

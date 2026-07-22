@@ -75,10 +75,17 @@ export async function hydrateConnectedDeviceInfo(device: DeviceInfo): Promise<De
       });
       return hydratedDevice;
     } else {
-      logError('getDeviceState failed while hydrating connected device', stateResult.payload);
+      const failurePayload = stateResult.payload as { code?: string | number };
+      logInfo('Connected device state is temporarily unavailable', {
+        connectId: device.connectId,
+        code: failurePayload.code,
+      });
     }
   } catch (error) {
-    logError('getDeviceState exception while hydrating connected device', { error });
+    logInfo('Connected device state hydration was skipped', {
+      connectId: device.connectId,
+      errorType: error instanceof Error ? error.name : typeof error,
+    });
   }
 
   return device;

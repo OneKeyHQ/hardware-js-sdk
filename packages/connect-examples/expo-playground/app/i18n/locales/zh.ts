@@ -591,6 +591,7 @@ export const zh = {
         deviceConnected: 'WebUSB设备连接成功',
         noDeviceSelected: '未选择设备',
         notSupported: '此浏览器不支持WebUSB',
+        deviceUnavailable: '设备未响应，请重新连接并解锁设备后重试',
       },
       jsbridge: {
         description: '稳定兼容',
@@ -619,6 +620,7 @@ export const zh = {
       startEmulator: '启动模拟器',
       sdkInitializing: '初始化...',
       sdkInitError: 'SDK初始化失败',
+      sdkInitDescription: '请刷新页面后重试',
     },
     sdk: {
       browserRequired: '需要浏览器环境',

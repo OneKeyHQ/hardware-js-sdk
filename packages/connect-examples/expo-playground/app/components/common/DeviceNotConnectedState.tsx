@@ -86,19 +86,16 @@ export function DeviceNotConnectedState({
           });
         }
       } else {
-        const errorMessage = searchResult.payload?.error || t('transport.searchDeviceFailed');
         toast({
           title: t('transport.searchFailed'),
-          description: errorMessage,
+          description: t('transport.searchDeviceFailed'),
           variant: 'warning',
         });
       }
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : t('transport.unknownConnectionError');
+    } catch {
       toast({
         title: t('transport.connectionTip'),
-        description: errorMessage,
+        description: t('transport.unknownConnectionError'),
         variant: 'warning',
       });
     } finally {
