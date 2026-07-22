@@ -11,6 +11,7 @@ import { MultisigParameterEditor } from '../components/multisig/MultisigParamete
 import { Breadcrumb } from '../components/ui/Breadcrumb';
 import { BUILT_IN_MULTISIG_CASES } from '../features/multisig/cases';
 import { applyJsonDraft, cloneAsCustomCase, setByPath } from '../features/multisig/editor';
+import { verifyMultisigHardwareResult } from '../features/multisig/hardwareVerification';
 import { loadCustomCases, saveCustomCases } from '../features/multisig/storage';
 import type {
   MultisigCaseSource,
@@ -148,6 +149,7 @@ export default function MultisigTestPage() {
       setExecution({
         status: 'success',
         result,
+        verification: verifyMultisigHardwareResult(currentCase, result),
         durationMs: Math.round(performance.now() - startedAt),
       });
     } catch (error) {
