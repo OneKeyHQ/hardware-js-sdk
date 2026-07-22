@@ -37,6 +37,29 @@ export type MultisigHardwareExpectation = {
   prefilledSignerIndex?: 0 | 1 | 2;
 };
 
+export type MultisigVerificationCheck = {
+  label: string;
+  passed: boolean;
+  expected?: string;
+  actual?: string;
+};
+
+export type MultisigHardwareVerification =
+  | {
+      status: 'passed';
+      checks: MultisigVerificationCheck[];
+    }
+  | {
+      status: 'failed';
+      checks: MultisigVerificationCheck[];
+      message: string;
+    }
+  | {
+      status: 'unavailable';
+      checks: MultisigVerificationCheck[];
+      message: string;
+    };
+
 export type ValidationIssue = {
   path: string;
   message: string;
