@@ -165,8 +165,7 @@ DeviceStatusGet -> DeviceStatus
 
 `DeviceInfoGet.targets.status` 是即将从底层协议删除的历史字段，SDK 业务流程不再构造或公开它。
 普通初始化、信息读取、设置和钱包 Session 不会隐式调用 `DeviceStatusGet`；需要新鲜运行状态时，
-公共调用方必须显式使用 `getDeviceState({ refresh: ['status'] })`。bootloader/romloader 模式不会发送
-`DeviceStatusGet`。
+公共调用方必须显式使用 `refreshDeviceState({ scope: 'runtime' })`。bootloader/romloader 模式会返回不支持错误，不会发送 `DeviceStatusGet`。
 
 ### 6.1 字段映射
 

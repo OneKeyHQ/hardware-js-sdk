@@ -73,7 +73,7 @@ import {
 import { buildProtocolV1FeaturesPayload, buildProtocolV2FeaturesPayload } from '../deviceProfile';
 
 import type { PROTO } from '../constants';
-import type { GetDeviceStateParams } from '../types/api/getDeviceState';
+import type { DeviceStateReadOptions } from '../types/api/getDeviceState';
 import type {
   DeviceButtonRequestPayload,
   DeviceFeaturesPayload,
@@ -818,7 +818,7 @@ export class Device extends EventEmitter {
         timeoutMs: options?.protocolV2DeviceInfoTimeoutMs,
       });
       // 默认请求不含 SE/hash 数据，scope 如实标注为 basic；
-      // 完整版本与校验数据由 getDeviceState(refresh) 显式获取。
+      // 完整版本与校验数据由公共 refreshDeviceState(firmware) 显式获取。
       const features = this.updateProtocolV2Features(deviceInfo, null);
       Log.debug('Protocol V2 features:', features);
     } catch (error) {
@@ -840,16 +840,23 @@ export class Device extends EventEmitter {
     return this.features;
   }
 
-  async getDeviceState(params: GetDeviceStateParams = {}) {
-    const refresh = new Set(params.refresh ?? []);
+  async getDeviceState(params: DeviceStateReadOptions = {}) {
+    const refresh = new Set(params.refreshSections ?? []);
+    const getProtocolV2DeviceInfoRequest = () => {
+      if (refresh.has('verification')) return PROTOCOL_V2_FULL_DEVICE_INFO_REQUEST;
+      if (refresh.has('versions')) return PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST;
+      return PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST;
+    };
+    let initializedWithDeviceInfo = false;
 
     if (!this.state) {
       if (this.isProtocolV2()) {
         const deviceInfo = await requestProtocolV2DeviceInfo({
           commands: this.commands,
-          request: PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST,
+          request: getProtocolV2DeviceInfoRequest(),
         });
         this.updateState(mapProtocolV2DeviceInfoToState(deviceInfo), 'device-info');
+        initializedWithDeviceInfo = true;
       } else {
         await this.getFeatures();
       }
@@ -860,14 +867,11 @@ export class Device extends EventEmitter {
     if (this.isProtocolV2()) {
       const refreshDeviceInfo =
         refresh.has('identity') || refresh.has('versions') || refresh.has('verification');
-      if (refreshDeviceInfo) {
-        let request = PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST;
-        if (refresh.has('verification')) {
-          request = PROTOCOL_V2_FULL_DEVICE_INFO_REQUEST;
-        } else if (refresh.has('versions')) {
-          request = PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST;
-        }
-        const deviceInfo = await requestProtocolV2DeviceInfo({ commands: this.commands, request });
+      if (refreshDeviceInfo && !initializedWithDeviceInfo) {
+        const deviceInfo = await requestProtocolV2DeviceInfo({
+          commands: this.commands,
+          request: getProtocolV2DeviceInfoRequest(),
+        });
         this.updateState(mapProtocolV2DeviceInfoToState(deviceInfo), 'device-info');
       }
 

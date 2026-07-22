@@ -18,6 +18,7 @@ export function getDeviceMethodSection(method: string): DeviceMethodSection {
       'searchdevices',
       'getfeatures',
       'getdevicestate',
+      'refreshdevicestate',
       'getonekeyfeatures',
       'getpassphrasestate',
       'devicegetonboardingstatus',

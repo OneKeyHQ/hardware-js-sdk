@@ -15,10 +15,11 @@ jest.mock('../src/data/config', () => ({
 }));
 
 describe('public device state API boundary', () => {
-  test('exposes only the canonical state query and Protocol V1 compatibility query', () => {
+  test('exposes cached reads and explicit refresh as separate canonical state operations', () => {
     const api = createCoreApi(jest.fn() as CoreApi['call']) as Record<string, unknown>;
 
     expect(api.getDeviceState).toBeInstanceOf(Function);
+    expect(api.refreshDeviceState).toBeInstanceOf(Function);
     expect(api.getFeatures).toBeInstanceOf(Function);
     expect(api.getOnekeyFeatures).toBeInstanceOf(Function);
     expect(api).not.toHaveProperty('getDeviceInfo');
@@ -30,6 +31,34 @@ describe('public device state API boundary', () => {
     expect(publicMethods).not.toHaveProperty('deviceInfoGet');
     expect(publicMethods).not.toHaveProperty('deviceStatusGet');
     expect(publicMethods).not.toHaveProperty('deviceSettingsGet');
+  });
+
+  test('does not forward refresh controls through the public getDeviceState query', async () => {
+    const call = jest.fn().mockResolvedValue({ success: true, payload: {} });
+    const api = createCoreApi(call as CoreApi['call']) as CoreApi;
+
+    await (api.getDeviceState as any)('device-1', {
+      refresh: ['status'],
+      includeRaw: true,
+    });
+
+    expect(call).toHaveBeenCalledWith({
+      connectId: 'device-1',
+      method: 'getDeviceState',
+    });
+  });
+
+  test('forwards a semantic scope through refreshDeviceState', async () => {
+    const call = jest.fn().mockResolvedValue({ success: true, payload: {} });
+    const api = createCoreApi(call as CoreApi['call']) as CoreApi;
+
+    await api.refreshDeviceState('device-1', { scope: 'firmware' });
+
+    expect(call).toHaveBeenCalledWith({
+      connectId: 'device-1',
+      method: 'refreshDeviceState',
+      scope: 'firmware',
+    });
   });
 
   test('keeps Protocol V2 command implementations available inside the SDK', () => {
@@ -59,7 +88,7 @@ describe('public device state API boundary', () => {
       label: 'Unified',
     });
     expect(getDeviceState).toHaveBeenCalledWith({
-      refresh: ['identity'],
+      refreshSections: ['identity'],
       includeRaw: true,
     });
   });

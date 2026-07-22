@@ -41,6 +41,31 @@ describe('getDeviceState', () => {
     );
   });
 
+  test('uses a single full DeviceInfoGet when firmware refresh initializes the state', async () => {
+    const typedCall = jest.fn().mockResolvedValue({
+      message: {
+        protocol_version: 2,
+        hw: { serial_no: 'SERIAL-1' },
+        fw: { application: { version: '5.0.0', hash: 'HASH-1' } },
+      },
+    });
+    const device = createV2Device(typedCall);
+
+    await device.getDeviceState({
+      refreshSections: ['identity', 'versions', 'verification'],
+    });
+
+    expect(typedCall).toHaveBeenCalledTimes(1);
+    expect(typedCall).toHaveBeenCalledWith(
+      'DeviceInfoGet',
+      'DeviceInfo',
+      expect.objectContaining({
+        types: expect.objectContaining({ hash: true, build_id: true }),
+      }),
+      expect.anything()
+    );
+  });
+
   test.each(['bootloader', 'romloader'] as const)(
     'does not call DeviceStatusGet in %s mode',
     async mode => {
@@ -48,7 +73,7 @@ describe('getDeviceState', () => {
       const device = createV2Device(typedCall);
       device.updateState({ protocol: 'V2', status: { mode } }, 'initialize');
 
-      const state = await device.getDeviceState({ refresh: ['status'] });
+      const state = await device.getDeviceState({ refreshSections: ['status'] });
 
       expect(state.status.mode).toBe(mode);
       expect(typedCall).not.toHaveBeenCalled();
@@ -62,7 +87,7 @@ describe('getDeviceState', () => {
     const device = createV2Device(typedCall);
     device.updateState({ protocol: 'V2', status: { mode: 'normal' } }, 'initialize');
 
-    const state = await device.getDeviceState({ refresh: ['status'] });
+    const state = await device.getDeviceState({ refreshSections: ['status'] });
 
     expect(typedCall).toHaveBeenCalledWith('DeviceStatusGet', 'DeviceStatus', {});
     expect(state.status.unlocked).toBe(true);
@@ -80,7 +105,7 @@ describe('getDeviceState', () => {
     const device = createV2Device(typedCall);
     device.updateState({ protocol: 'V2', status: { mode: 'normal' } }, 'initialize');
 
-    const state = await device.getDeviceState({ refresh: ['settings'] });
+    const state = await device.getDeviceState({ refreshSections: ['settings'] });
 
     expect(typedCall).toHaveBeenCalledWith('DeviceSettingsGet', 'DeviceSettings', {});
     expect(typedCall).not.toHaveBeenCalledWith(
@@ -110,7 +135,7 @@ describe('getDeviceState', () => {
       'initialize'
     );
 
-    await expect(device.getDeviceState({ refresh: ['settings'] })).rejects.toMatchObject({
+    await expect(device.getDeviceState({ refreshSections: ['settings'] })).rejects.toMatchObject({
       errorCode: HardwareErrorCode.DeviceLocked,
     });
     const state = await device.getDeviceState();

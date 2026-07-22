@@ -35,10 +35,11 @@ describe('Pro2 Debug 钱包与状态方法', () => {
     expect(source).not.toContain('deviceSettingsGet: {');
   });
 
-  test('统一状态说明区分缓存读取和显式 section 刷新', () => {
+  test('统一状态说明区分缓存读取和业务 scope 刷新', () => {
     expect(source).toContain('Cached state: no transport request');
-    expect(source).toContain('identity/versions/verification: DeviceInfoGet');
+    expect(source).toContain('basic: versions DeviceInfoGet');
+    expect(source).toContain('firmware: full DeviceInfoGet');
     expect(source).toContain('settings: DeviceSettingsGet');
-    expect(source).toContain('status: DeviceStatusGet (normal mode only)');
+    expect(source).toContain('runtime: DeviceStatusGet (normal mode only)');
   });
 });

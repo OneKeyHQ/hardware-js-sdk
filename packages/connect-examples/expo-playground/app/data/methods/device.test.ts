@@ -12,6 +12,7 @@ describe('Pro2 设备方法配置', () => {
 
     expect(methods.has('deviceUnlock')).toBe(true);
     expect(methods.has('getDeviceState')).toBe(true);
+    expect(methods.has('refreshDeviceState')).toBe(true);
     expect(methods.has('deviceGetOnboardingStatus')).toBe(true);
     expect(methods.has('deviceSessionOpen')).toBe(true);
   });
@@ -25,20 +26,16 @@ describe('Pro2 设备方法配置', () => {
     ]);
   });
 
-  test('统一状态方法覆盖缓存与所有显式刷新场景', () => {
-    const method = device.api.find(item => item.method === 'getDeviceState');
+  test('读取方法只展示缓存，刷新方法使用业务 scope', () => {
+    const getMethod = device.api.find(item => item.method === 'getDeviceState');
+    const refreshMethod = device.api.find(item => item.method === 'refreshDeviceState');
 
-    expect(method?.presets.map(item => item.title)).toEqual([
-      'Cached state',
-      'Refresh identity and versions',
-      'Refresh settings',
-      'Refresh runtime status',
-    ]);
-    expect(method?.presets.map(item => item.parameters[0]?.value)).toEqual([
-      undefined,
-      ['identity', 'versions'],
-      ['settings'],
-      ['status'],
+    expect(getMethod?.presets.map(item => item.title)).toEqual(['Cached state']);
+    expect(refreshMethod?.presets.map(item => item.parameters[0]?.value)).toEqual([
+      'basic',
+      'firmware',
+      'settings',
+      'runtime',
     ]);
   });
 
@@ -55,9 +52,12 @@ describe('Pro2 设备方法配置', () => {
     );
   });
 
-  test.each(['getDeviceState', 'deviceGetOnboardingStatus'])('将 %s 归入基础信息区', method => {
-    expect(getDeviceMethodSection(method)).toBe('basic');
-  });
+  test.each(['getDeviceState', 'refreshDeviceState', 'deviceGetOnboardingStatus'])(
+    '将 %s 归入基础信息区',
+    method => {
+      expect(getDeviceMethodSection(method)).toBe('basic');
+    }
+  );
 
   test.each([
     'deviceSettings',

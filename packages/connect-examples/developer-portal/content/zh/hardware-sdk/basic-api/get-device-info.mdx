@@ -14,19 +14,19 @@ const response = await HardwareSDK.getDeviceState(connectId);
 
 ## 显式刷新
 
-只传入确实需要刷新的 section：
+需要主动与硬件同步时，传入业务语义 scope：
 
 ```typescript
-const versions = await HardwareSDK.getDeviceState(connectId, {
-  refresh: ['identity', 'versions'],
+const versions = await HardwareSDK.refreshDeviceState(connectId, {
+  scope: 'firmware',
 });
 
-const runtimeStatus = await HardwareSDK.getDeviceState(connectId, {
-  refresh: ['status'],
+const runtimeStatus = await HardwareSDK.refreshDeviceState(connectId, {
+  scope: 'runtime',
 });
 ```
 
-动态状态必须显式刷新。bootloader 和 romloader 模式不会收到 `DeviceStatusGet`，协议无法确认的字段保持 `null`。
+可用 scope 为 `basic`、`firmware`、`settings` 和 `runtime`。bootloader/romloader 模式显式刷新 `runtime` 或 `settings` 时会返回不支持错误，不会静默返回旧字段。
 
 ## 状态分区
 
@@ -38,7 +38,7 @@ const runtimeStatus = await HardwareSDK.getDeviceState(connectId, {
 - `versions`：固件、bootloader、主板、蓝牙和安全芯片版本。
 - `verification`：显式刷新后获得的 build ID 和哈希。
 - `session`：不持久化的会话状态。
-- `raw`：可选协议诊断数据；业务代码不应依赖。
+- `raw`：SDK 内部协议诊断数据，只用于 Protocol V1 兼容投影；公共 `getDeviceState` 不会暴露。
 
 界面展示名称统一使用 `state.identity.displayName`，优先级为 `label`、`bleName`、设备型号名称。
 

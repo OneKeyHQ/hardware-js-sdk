@@ -22,17 +22,18 @@ flowchart TD
 
 V2 不支持传统 `GetFeatures`。Core 在初始化时发送默认范围的 `DeviceInfoGet`，并把结果映射进 Device 内唯一的 `DeviceState`。外部无需理解 `DeviceProfile` 或 V2 原始消息。
 
-| 调用             | 语义                                                                     |
-| ---------------- | ------------------------------------------------------------------------ |
-| 初始化 adapter   | 请求 hw、fw、coprocessor 基础字段，并更新 Device 内唯一 DeviceState 缓存 |
-| `getDeviceState` | 返回 V1/V2 统一的 `DeviceState`；仅按显式 `refresh` 读取对应区域         |
+| 调用                 | 语义                                                                     |
+| -------------------- | ------------------------------------------------------------------------ |
+| 初始化 adapter       | 请求 hw、fw、coprocessor 基础字段，并更新 Device 内唯一 DeviceState 缓存 |
+| `getDeviceState`     | 返回 V1/V2 统一的当前 `DeviceState` 快照                                 |
+| `refreshDeviceState` | 按 `basic/firmware/settings/runtime` 业务 scope 主动同步并返回同一快照   |
 
 `getDeviceInfo`、原始 `deviceInfoGet/deviceStatusGet/deviceSettingsGet` 不属于公共 API；底层命令只供 SDK 内部流程使用。
 
 ## 状态与 PIN 解锁
 
 - `DeviceInfoGet` 默认不请求 status target，也不会隐式补发 `DeviceStatusGet`。
-- 需要设备实时状态时，由调用方显式使用 `getDeviceState({ refresh: ['status'] })`；固件升级等专用流程可以按自身状态机显式探测。
+- 需要设备实时状态时，由调用方显式使用 `refreshDeviceState({ scope: 'runtime' })`；固件升级等专用流程可以按自身状态机显式探测。
 - V2 PIN 解锁使用 `DeviceSessionAskPin -> DeviceSessionPinResult`，Core 只合并响应已经确认的 `unlocked` 等字段，不为了补全状态额外轮询。
 - 受保护方法是否允许单次解锁后重试，由方法显式声明；Transport 不重放业务请求。
 

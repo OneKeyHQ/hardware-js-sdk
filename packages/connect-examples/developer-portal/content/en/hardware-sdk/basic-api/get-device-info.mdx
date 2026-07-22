@@ -14,19 +14,19 @@ The default call returns the current snapshot and performs only the minimum init
 
 ## Explicit refresh
 
-Pass only the sections that must be refreshed:
+Use a semantic business scope when hardware synchronization is required:
 
 ```typescript
-const versions = await HardwareSDK.getDeviceState(connectId, {
-  refresh: ['identity', 'versions'],
+const versions = await HardwareSDK.refreshDeviceState(connectId, {
+  scope: 'firmware',
 });
 
-const runtimeStatus = await HardwareSDK.getDeviceState(connectId, {
-  refresh: ['status'],
+const runtimeStatus = await HardwareSDK.refreshDeviceState(connectId, {
+  scope: 'runtime',
 });
 ```
 
-`status` refresh is explicit. Bootloader and romloader devices do not receive `DeviceStatusGet`; unavailable fields remain `null`.
+Available scopes are `basic`, `firmware`, `settings`, and `runtime`. A `runtime` or `settings` refresh in bootloader/romloader mode returns an unsupported-operation error instead of silently returning stale fields.
 
 ## State sections
 
@@ -38,7 +38,7 @@ The returned snapshot contains:
 - `versions`: firmware, bootloader, board, BLE, and secure-element versions.
 - `verification`: build IDs and hashes when explicitly refreshed.
 - `session`: volatile session data.
-- `raw`: optional protocol diagnostics; application business logic should not depend on it.
+- `raw`: SDK-internal protocol diagnostics used by the Protocol V1 compatibility projector; public `getDeviceState` does not expose it.
 
 Visible device names should use `state.identity.displayName`, whose priority is `label`, then `bleName`, then the model display name.
 

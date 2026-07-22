@@ -114,7 +114,12 @@ export const createCoreApi = (
    * 获取设备信息
    */
   getFeatures: (connectId, params) => call({ ...params, connectId, method: 'getFeatures' }),
-  getDeviceState: (connectId, params) => call({ ...params, connectId, method: 'getDeviceState' }),
+  getDeviceState: (connectId, params) => {
+    const { refresh: _refresh, includeRaw: _includeRaw, ...commonParams } = (params ?? {}) as any;
+    return call({ ...commonParams, connectId, method: 'getDeviceState' });
+  },
+  refreshDeviceState: (connectId, params) =>
+    call({ ...params, connectId, method: 'refreshDeviceState' }),
   getOnekeyFeatures: (connectId, params) =>
     call({ ...params, connectId, method: 'getOnekeyFeatures' }),
 

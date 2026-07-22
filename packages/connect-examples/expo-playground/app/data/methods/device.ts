@@ -95,15 +95,36 @@ const api: UnifiedMethodConfig[] = [
         title: 'Cached state',
         parameters: [],
       },
+    ],
+  },
+  {
+    method: 'refreshDeviceState',
+    description: 'methodDescriptions.refreshDeviceState',
+    noDeviceIdReq: true,
+    presets: [
       {
-        title: 'Refresh identity and versions',
+        title: 'Refresh basic device information',
         parameters: [
           {
-            name: 'refresh',
-            type: 'textarea',
-            required: false,
-            label: 'Sections',
-            value: ['identity', 'versions'],
+            name: 'scope',
+            type: 'select',
+            required: true,
+            label: 'Scope',
+            value: 'basic',
+            options: [{ label: 'Basic', value: 'basic' }],
+          },
+        ],
+      },
+      {
+        title: 'Refresh firmware metadata',
+        parameters: [
+          {
+            name: 'scope',
+            type: 'select',
+            required: true,
+            label: 'Scope',
+            value: 'firmware',
+            options: [{ label: 'Firmware', value: 'firmware' }],
           },
         ],
       },
@@ -111,11 +132,12 @@ const api: UnifiedMethodConfig[] = [
         title: 'Refresh settings',
         parameters: [
           {
-            name: 'refresh',
-            type: 'textarea',
-            required: false,
-            label: 'Sections',
-            value: ['settings'],
+            name: 'scope',
+            type: 'select',
+            required: true,
+            label: 'Scope',
+            value: 'settings',
+            options: [{ label: 'Settings', value: 'settings' }],
           },
         ],
       },
@@ -124,11 +146,12 @@ const api: UnifiedMethodConfig[] = [
         description: 'Explicitly reads runtime status while the device is in normal mode.',
         parameters: [
           {
-            name: 'refresh',
-            type: 'textarea',
-            required: false,
-            label: 'Sections',
-            value: ['status'],
+            name: 'scope',
+            type: 'select',
+            required: true,
+            label: 'Scope',
+            value: 'runtime',
+            options: [{ label: 'Runtime', value: 'runtime' }],
           },
         ],
       },

@@ -69,7 +69,7 @@ WebUSB、Electron BLE、React Native BLE 和 lowlevel BLE 只负责各自的物�
 | V1   | `Initialize -> Features`       | `DeviceState` | `getFeatures()` 投影（仅 V1） |
 | V2   | `Ping` probe + `DeviceInfoGet` | `DeviceState` | 不支持 `getFeatures()`        |
 
-`getDeviceState()` 和 `DEVICE.STATE` 共享同一份完整快照。默认读取不刷新动态状态；调用方只有显式请求 `refresh: ['status']` 时才会发送 `DeviceStatusGet`。
+`getDeviceState()` 和 `DEVICE.STATE` 共享同一份完整快照。`getDeviceState()` 只读取缓存或执行最小初始化；调用方只有显式调用 `refreshDeviceState({ scope: 'runtime' })` 时才会发送 `DeviceStatusGet`。
 
 ## 自动协议探测
 

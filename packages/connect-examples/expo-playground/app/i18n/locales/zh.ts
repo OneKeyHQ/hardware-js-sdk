@@ -318,6 +318,7 @@ export const zh = {
       ping: 'Protocol V2 设备连通性测试',
       deviceReboot: 'Protocol V2 设备重启',
       getDeviceState: '获取统一设备状态（支持 V1 和 V2 协议）',
+      refreshDeviceState: '按业务范围刷新统一设备状态',
       deviceFirmwareUpdate: 'Protocol V2 触发固件安装',
       deviceGetFirmwareUpdateStatus: 'Protocol V2 查询固件安装状态',
       deviceFactoryInfoSet: 'Protocol V2 工厂模式写入设备信息',

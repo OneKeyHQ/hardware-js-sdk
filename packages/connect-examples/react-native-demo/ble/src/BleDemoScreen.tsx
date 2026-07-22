@@ -820,13 +820,13 @@ export const BleDemoScreen = () => {
         run: (sdk, connectId) =>
           sdk.ping(connectId, { ...PROTOCOL_V2_PARAMS, message: 'rn-pro2-demo' }),
       },
-      getDeviceState: {
-        key: 'getDeviceState',
-        label: 'getDeviceState',
+      refreshDeviceState: {
+        key: 'refreshDeviceState',
+        label: 'refreshDeviceState(firmware)',
         run: (sdk, connectId) =>
-          sdk.getDeviceState(connectId, {
+          sdk.refreshDeviceState(connectId, {
             ...PROTOCOL_V2_PARAMS,
-            refresh: ['identity', 'versions', 'verification'],
+            scope: 'firmware',
           }),
       },
       deviceRebootNormal: {
@@ -948,7 +948,7 @@ export const BleDemoScreen = () => {
       buildGroup('device', 'Device / Factory', [
         'protocolInfoRequest',
         'ping',
-        'getDeviceState',
+        'refreshDeviceState',
         'deviceRebootNormal',
         'deviceFactoryInfoGet',
         'deviceFactoryInfoSet',
@@ -1220,7 +1220,9 @@ export const BleDemoScreen = () => {
           <Text style={styles.hint}>
             Bundled file: {PRO2_BLE_FIRMWARE_FILE_NAME} ({formatBytes(PRO2_BLE_FIRMWARE_FILE_SIZE)})
           </Text>
-          <Text style={styles.hint}>Target: TARGET_COPROCESSOR (6) · {PRO2_FIRMWARE_STAGING_PATH}</Text>
+          <Text style={styles.hint}>
+            Target: TARGET_COPROCESSOR (6) · {PRO2_FIRMWARE_STAGING_PATH}
+          </Text>
           <Text style={styles.methodGroupTitle}>Speed Profiles</Text>
           <View style={styles.profileGrid}>
             {SPEED_TEST_PROFILES.map(profile => {

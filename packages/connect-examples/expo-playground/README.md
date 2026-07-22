@@ -84,9 +84,9 @@ const devices = await sdk.searchDevices();
 // Read the canonical V1/V2 device snapshot
 const state = await sdk.getDeviceState(connectId);
 
-// Refresh only the section the screen actually needs
-const versions = await sdk.getDeviceState(connectId, {
-  refresh: ['identity', 'versions'],
+// Explicitly synchronize the firmware metadata needed by this screen
+const versions = await sdk.refreshDeviceState(connectId, {
+  scope: 'firmware',
 });
 
 // Get address example
@@ -97,8 +97,9 @@ const result = await sdk.evmGetAddress({
 ```
 
 `getDeviceState()` is the normal device-information API for both Protocol V1 and
-Protocol V2 devices. Cached reads do not implicitly query runtime status. Use an
-explicit `refresh: ['status']` only when fresh normal-mode status is required.
+Protocol V2 devices. Cached reads do not implicitly query runtime status. Use
+`refreshDeviceState({ scope: 'runtime' })` only when fresh normal-mode status is
+required.
 
 `getFeatures()` and `getOnekeyFeatures()` remain available only for Protocol V1
 compatibility and for tests that intentionally verify the legacy feature

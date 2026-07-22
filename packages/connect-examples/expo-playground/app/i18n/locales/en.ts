@@ -327,6 +327,7 @@ export const en = {
       ping: 'Protocol V2 device liveness test',
       deviceReboot: 'Protocol V2 device reboot',
       getDeviceState: 'Get canonical device state (supports V1 and V2 protocol)',
+      refreshDeviceState: 'Refresh canonical device state by business scope',
       deviceFirmwareUpdate: 'Protocol V2 firmware install trigger',
       deviceGetFirmwareUpdateStatus: 'Protocol V2 firmware install status query',
       deviceFactoryInfoSet: 'Protocol V2 factory-mode device information write',

@@ -1,9 +1,7 @@
 import { UI_REQUEST } from '../constants/ui-request';
 import { BaseMethod } from './BaseMethod';
 
-import type { GetDeviceStateParams } from '../types/api/getDeviceState';
-
-export default class GetDeviceState extends BaseMethod<GetDeviceStateParams> {
+export default class GetDeviceState extends BaseMethod {
   init() {
     this.allowDeviceMode = [
       ...this.allowDeviceMode,
@@ -12,13 +10,9 @@ export default class GetDeviceState extends BaseMethod<GetDeviceStateParams> {
     ];
     this.useDevicePassphraseState = false;
     this.skipForceUpdateCheck = true;
-    this.params = {
-      refresh: Array.isArray(this.payload.refresh) ? this.payload.refresh : [],
-      includeRaw: this.payload.includeRaw === true,
-    };
   }
 
   async run() {
-    return this.device.getDeviceState(this.params);
+    return this.device.getDeviceState();
   }
 }

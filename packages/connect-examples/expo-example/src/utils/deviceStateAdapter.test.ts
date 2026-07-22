@@ -32,23 +32,27 @@ describe('Expo Example canonical device state', () => {
 
   test('presents getDeviceState before the V1 compatibility API', () => {
     const stateIndex = basicMethods.findIndex(item => item.method === 'getDeviceState');
+    const refreshIndex = basicMethods.findIndex(item => item.method === 'refreshDeviceState');
     const featuresIndex = basicMethods.findIndex(item => item.method === 'getFeatures');
     const features = basicMethods[featuresIndex];
 
     expect(stateIndex).toBeGreaterThanOrEqual(0);
+    expect(refreshIndex).toBeGreaterThan(stateIndex);
     expect(stateIndex).toBeLessThan(featuresIndex);
     expect(features.description).toContain('Protocol V1 compatibility only');
     expect(basicMethods.some(item => item.method === 'getOnekeyFeatures')).toBe(false);
   });
 
-  test('provides cached and explicit Pro2 refresh examples', () => {
+  test('provides cached reads and semantic Pro2 refresh scopes', () => {
     const stateMethod = pro2Methods.find(item => item.method === 'getDeviceState');
+    const refreshMethod = pro2Methods.find(item => item.method === 'refreshDeviceState');
 
-    expect(stateMethod?.presupposes?.map(item => item.title)).toEqual([
-      'Cached state',
-      'Identity and versions',
-      'Settings',
-      'Runtime status',
+    expect(stateMethod?.presupposes?.map(item => item.title)).toEqual(['Cached state']);
+    expect(refreshMethod?.presupposes?.map(item => item.value.scope)).toEqual([
+      'basic',
+      'firmware',
+      'settings',
+      'runtime',
     ]);
   });
 
@@ -63,7 +67,7 @@ describe('Expo Example canonical device state', () => {
     } as never);
 
     expect(source).toContain("nextState.protocol === 'V1'");
-    expect(source).toContain("refresh: ['identity', 'versions', 'verification']");
+    expect(source).toContain("scope: 'firmware'");
     expect(summary).toMatchObject({
       deviceType: 'PRO2',
       serialNumber: 'SERIAL',

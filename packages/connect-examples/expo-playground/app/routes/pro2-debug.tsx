@@ -24,6 +24,7 @@ const PRO2_METHOD_GROUPS = [
       'protocolInfoRequest',
       'ping',
       'getDeviceState',
+      'refreshDeviceState',
       'deviceReboot',
       'deviceFactoryInfoGet',
       'deviceFactoryInfoSet',
@@ -92,6 +93,7 @@ const PRO2_METHOD_LABELS: Record<string, string> = {
   protocolInfoRequest: 'Protocol Info',
   ping: 'Ping',
   getDeviceState: 'Device State',
+  refreshDeviceState: 'Refresh Device State',
   deviceReboot: 'Reboot',
   deviceFactoryInfoGet: 'Factory Info',
   deviceFactoryInfoSet: 'Factory Settings',
@@ -152,9 +154,16 @@ const PRO2_METHOD_WIRE_INFO: Record<string, MethodWireInfo> = {
   },
   getDeviceState: {
     tx: 'Cached state: no transport request',
+    txPayload: 'No explicit refresh scope',
+    rx: 'Current canonical DeviceState snapshot',
+    rxPayload: PRO2_DYNAMIC_RESPONSE,
+    decoded: 'Canonical DeviceState snapshot',
+  },
+  refreshDeviceState: {
+    tx: 'Explicit hardware synchronization',
     txPayload:
-      'identity/versions/verification: DeviceInfoGet; settings: DeviceSettingsGet; status: DeviceStatusGet (normal mode only)',
-    rx: 'Response depends on explicitly refreshed sections',
+      'basic: versions DeviceInfoGet; firmware: full DeviceInfoGet; settings: DeviceSettingsGet; runtime: DeviceStatusGet (normal mode only)',
+    rx: 'Updated canonical DeviceState snapshot',
     rxPayload: PRO2_DYNAMIC_RESPONSE,
     decoded: 'Canonical DeviceState snapshot',
   },
@@ -375,7 +384,7 @@ function isFileWriteMethod(method: string) {
 }
 
 function isCurrentSubmoduleMethod(method: string) {
-  return method.startsWith('dev') || method === 'getDeviceState';
+  return method.startsWith('dev') || method === 'getDeviceState' || method === 'refreshDeviceState';
 }
 
 function getDataSummary(data: unknown) {

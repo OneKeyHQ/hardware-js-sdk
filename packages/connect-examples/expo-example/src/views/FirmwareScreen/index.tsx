@@ -464,8 +464,8 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
     setError(undefined);
 
     try {
-      const stateRes = await sdk.getDeviceState(selectDevice.connectId, {
-        refresh: ['identity', 'versions', 'verification'],
+      const stateRes = await sdk.refreshDeviceState(selectDevice.connectId, {
+        scope: 'firmware',
       });
       if (!stateRes.success) {
         setError(stateRes.payload.error);

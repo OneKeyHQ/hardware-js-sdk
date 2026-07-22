@@ -44,6 +44,7 @@ import type { checkFirmwareTypeAvailable } from './checkFirmwareTypeAvailable';
 import type { searchDevices } from './searchDevices';
 import type { getFeatures } from './getFeatures';
 import type { getDeviceState } from './getDeviceState';
+import type { refreshDeviceState } from './refreshDeviceState';
 import type { getOnekeyFeatures } from './getOnekeyFeatures';
 import type { getPassphraseState } from './getPassphraseState';
 import type { checkFirmwareRelease } from './checkFirmwareRelease';
@@ -169,7 +170,7 @@ import type { neoSignTransaction } from './neoSignTransaction';
 import type { ConnectSettings } from '../settings';
 
 export * from './export';
-export type { GetDeviceStateParams } from './getDeviceState';
+export type { DeviceStateRefreshScope, RefreshDeviceStateParams } from './refreshDeviceState';
 export type { GetPassphraseStateParams } from './getPassphraseState';
 export type { ClearSessionCacheParams, ClearSessionCachePayload } from './sessionCache';
 
@@ -214,6 +215,7 @@ export type CoreApi = {
   promptWebDeviceAccess: typeof promptWebDeviceAccess;
   getFeatures: typeof getFeatures;
   getDeviceState: typeof getDeviceState;
+  refreshDeviceState: typeof refreshDeviceState;
   getOnekeyFeatures: typeof getOnekeyFeatures;
   getPassphraseState: typeof getPassphraseState;
   deviceBackup: typeof deviceBackup;
