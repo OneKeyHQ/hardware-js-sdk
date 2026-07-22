@@ -5,11 +5,7 @@ import { getHDPath } from '@onekeyfe/hd-core';
 import { address as bitcoinAddress, networks, payments, Transaction } from 'bitcoinjs-lib';
 
 import type { MultisigMnemonics } from './readMnemonics';
-import type {
-  BtcMultisigDescriptor,
-  BtcMultisigFixture,
-  BtcScriptType,
-} from './types';
+import type { BtcMultisigDescriptor, BtcMultisigFixture, BtcScriptType } from './types';
 
 const FUNDING_AMOUNT = 200000;
 const OUTPUT_AMOUNT = 190000;
@@ -160,11 +156,14 @@ async function createFixture(
   };
   const buildSignParameters = (signatures: string[]) => ({
     coin: 'btc' as const,
+    version: spendingTx.version,
+    locktime: spendingTx.locktime,
     inputs: [
       {
         address_n: [...addressN],
         prev_hash: prevHash,
         prev_index: 0,
+        sequence: spendingTx.ins[0].sequence,
         amount: String(FUNDING_AMOUNT),
         script_type: config.scriptType,
         multisig: cloneMultisig(baseMultisig, signatures),

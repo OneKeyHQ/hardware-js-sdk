@@ -1,3 +1,5 @@
+import { verify } from '@noble/secp256k1';
+
 import type {
   MultisigHardwareVerification,
   MultisigTestCase,
@@ -12,9 +14,20 @@ function normalizeHex(value: string): string {
   return value.replace(/^0x/i, '').toLowerCase();
 }
 
-function stripSighashAll(value: string): string {
+function extractDerSignature(value: string): string | undefined {
   const normalized = normalizeHex(value);
-  return normalized.endsWith('01') ? normalized.slice(0, -2) : normalized;
+  if (!/^[0-9a-f]+$/.test(normalized) || normalized.length < 4 || normalized.length % 2 !== 0) {
+    return undefined;
+  }
+  if (!normalized.startsWith('30')) return undefined;
+
+  const payloadLength = Number.parseInt(normalized.slice(2, 4), 16);
+  const derLength = (payloadLength + 2) * 2;
+  if (normalized.length === derLength) return normalized;
+  if (normalized.length === derLength + 2 && normalized.slice(derLength) === '01') {
+    return normalized.slice(0, derLength);
+  }
+  return undefined;
 }
 
 function summarize(value: string): string {
@@ -70,11 +83,17 @@ export function verifyMultisigHardwareResult(
       return unavailable('SDK 返回中缺少 ETH 地址或签名。');
     }
     return complete([
-      check('Signer 地址', expectation.signerAddress, data.address, (expected, actual) =>
-        expected.toLowerCase() === actual.toLowerCase()
+      check(
+        'Signer 地址',
+        expectation.signerAddress,
+        data.address,
+        (expected, actual) => expected.toLowerCase() === actual.toLowerCase()
       ),
-      check('EIP-712 签名', expectation.expectedSignature, data.signature, (expected, actual) =>
-        normalizeHex(expected) === normalizeHex(actual)
+      check(
+        'EIP-712 签名',
+        expectation.expectedSignature,
+        data.signature,
+        (expected, actual) => normalizeHex(expected) === normalizeHex(actual)
       ),
     ]);
   }
@@ -84,21 +103,42 @@ export function verifyMultisigHardwareResult(
       return unavailable('SDK 返回中缺少 BTC 多签地址。');
     }
     return complete([
-      check('BTC 多签地址', expectation.expectedAddress, data.address, (expected, actual) =>
-        expected === actual
+      check(
+        'BTC 多签地址',
+        expectation.expectedAddress,
+        data.address,
+        (expected, actual) => expected === actual
       ),
     ]);
   }
 
   if (testCase.method === 'btcSignTransaction') {
     const signature = Array.isArray(data.signatures) ? data.signatures[0] : undefined;
-    if (typeof signature !== 'string' || !expectation.expectedSignature) {
+    const sighash = testCase.reference?.sighash;
+    const publicKey = testCase.reference?.childPublicKeys?.[expectation.signerIndex];
+    if (typeof signature !== 'string') {
       return unavailable('SDK 返回中缺少 BTC 输入签名。');
     }
+    if (!sighash || !publicKey) {
+      return unavailable('当前 BTC 用例缺少 sighash 或 signer 子公钥，无法自动验签。');
+    }
+
+    const derSignature = extractDerSignature(signature);
+    let passed = false;
+    if (derSignature) {
+      try {
+        passed = verify(derSignature, normalizeHex(sighash), normalizeHex(publicKey));
+      } catch {
+        passed = false;
+      }
+    }
     return complete([
-      check('BTC 输入签名', expectation.expectedSignature, signature, (expected, actual) =>
-        stripSighashAll(expected) === stripSighashAll(actual)
-      ),
+      {
+        label: 'BTC 输入签名',
+        passed,
+        expected: `Signer ${expectation.signerIndex + 1} 公钥验签通过`,
+        actual: summarize(signature),
+      },
     ]);
   }
 

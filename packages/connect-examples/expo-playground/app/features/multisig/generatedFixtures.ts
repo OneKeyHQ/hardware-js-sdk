@@ -275,6 +275,8 @@ export const GENERATED_MULTISIG_FIXTURES = {
       },
       "signParameters": {
         "coin": "btc",
+        "version": 2,
+        "locktime": 0,
         "inputs": [
           {
             "address_n": [
@@ -287,6 +289,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
             ],
             "prev_hash": "bdeb4882a1cc6a8dd507b1e219550e17fde2f76dff15fc40829219e2cb712280",
             "prev_index": 0,
+            "sequence": 4294967293,
             "amount": "200000",
             "script_type": "SPENDMULTISIG",
             "multisig": {
@@ -371,6 +374,8 @@ export const GENERATED_MULTISIG_FIXTURES = {
       },
       "partialSignParameters": {
         "coin": "btc",
+        "version": 2,
+        "locktime": 0,
         "inputs": [
           {
             "address_n": [
@@ -383,6 +388,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
             ],
             "prev_hash": "bdeb4882a1cc6a8dd507b1e219550e17fde2f76dff15fc40829219e2cb712280",
             "prev_index": 0,
+            "sequence": 4294967293,
             "amount": "200000",
             "script_type": "SPENDMULTISIG",
             "multisig": {
@@ -474,6 +480,8 @@ export const GENERATED_MULTISIG_FIXTURES = {
           "prefilledSignerIndex": 1,
           "firstSignParameters": {
             "coin": "btc",
+            "version": 2,
+            "locktime": 0,
             "inputs": [
               {
                 "address_n": [
@@ -486,6 +494,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 ],
                 "prev_hash": "bdeb4882a1cc6a8dd507b1e219550e17fde2f76dff15fc40829219e2cb712280",
                 "prev_index": 0,
+                "sequence": 4294967293,
                 "amount": "200000",
                 "script_type": "SPENDMULTISIG",
                 "multisig": {
@@ -570,6 +579,8 @@ export const GENERATED_MULTISIG_FIXTURES = {
           },
           "continueSignParameters": {
             "coin": "btc",
+            "version": 2,
+            "locktime": 0,
             "inputs": [
               {
                 "address_n": [
@@ -582,6 +593,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 ],
                 "prev_hash": "bdeb4882a1cc6a8dd507b1e219550e17fde2f76dff15fc40829219e2cb712280",
                 "prev_index": 0,
+                "sequence": 4294967293,
                 "amount": "200000",
                 "script_type": "SPENDMULTISIG",
                 "multisig": {
@@ -771,6 +783,8 @@ export const GENERATED_MULTISIG_FIXTURES = {
       },
       "signParameters": {
         "coin": "btc",
+        "version": 2,
+        "locktime": 0,
         "inputs": [
           {
             "address_n": [
@@ -783,6 +797,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
             ],
             "prev_hash": "25b342e6dc0dbfd5c0cb54b52aa5f0b3588f2b36cde8faed75316c286d4071da",
             "prev_index": 0,
+            "sequence": 4294967293,
             "amount": "200000",
             "script_type": "SPENDP2SHWITNESS",
             "multisig": {
@@ -867,6 +882,8 @@ export const GENERATED_MULTISIG_FIXTURES = {
       },
       "partialSignParameters": {
         "coin": "btc",
+        "version": 2,
+        "locktime": 0,
         "inputs": [
           {
             "address_n": [
@@ -879,6 +896,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
             ],
             "prev_hash": "25b342e6dc0dbfd5c0cb54b52aa5f0b3588f2b36cde8faed75316c286d4071da",
             "prev_index": 0,
+            "sequence": 4294967293,
             "amount": "200000",
             "script_type": "SPENDP2SHWITNESS",
             "multisig": {
@@ -970,6 +988,8 @@ export const GENERATED_MULTISIG_FIXTURES = {
           "prefilledSignerIndex": 1,
           "firstSignParameters": {
             "coin": "btc",
+            "version": 2,
+            "locktime": 0,
             "inputs": [
               {
                 "address_n": [
@@ -982,6 +1002,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 ],
                 "prev_hash": "25b342e6dc0dbfd5c0cb54b52aa5f0b3588f2b36cde8faed75316c286d4071da",
                 "prev_index": 0,
+                "sequence": 4294967293,
                 "amount": "200000",
                 "script_type": "SPENDP2SHWITNESS",
                 "multisig": {
@@ -1066,6 +1087,8 @@ export const GENERATED_MULTISIG_FIXTURES = {
           },
           "continueSignParameters": {
             "coin": "btc",
+            "version": 2,
+            "locktime": 0,
             "inputs": [
               {
                 "address_n": [
@@ -1078,6 +1101,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 ],
                 "prev_hash": "25b342e6dc0dbfd5c0cb54b52aa5f0b3588f2b36cde8faed75316c286d4071da",
                 "prev_index": 0,
+                "sequence": 4294967293,
                 "amount": "200000",
                 "script_type": "SPENDP2SHWITNESS",
                 "multisig": {
@@ -1268,6 +1292,8 @@ export const GENERATED_MULTISIG_FIXTURES = {
       },
       "signParameters": {
         "coin": "btc",
+        "version": 2,
+        "locktime": 0,
         "inputs": [
           {
             "address_n": [
@@ -1280,6 +1306,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
             ],
             "prev_hash": "1897a428a4a4b3de56a6b594341523928c838cef591d40dded3cb14a3d86cf19",
             "prev_index": 0,
+            "sequence": 4294967293,
             "amount": "200000",
             "script_type": "SPENDWITNESS",
             "multisig": {
@@ -1364,6 +1391,8 @@ export const GENERATED_MULTISIG_FIXTURES = {
       },
       "partialSignParameters": {
         "coin": "btc",
+        "version": 2,
+        "locktime": 0,
         "inputs": [
           {
             "address_n": [
@@ -1376,6 +1405,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
             ],
             "prev_hash": "1897a428a4a4b3de56a6b594341523928c838cef591d40dded3cb14a3d86cf19",
             "prev_index": 0,
+            "sequence": 4294967293,
             "amount": "200000",
             "script_type": "SPENDWITNESS",
             "multisig": {
@@ -1467,6 +1497,8 @@ export const GENERATED_MULTISIG_FIXTURES = {
           "prefilledSignerIndex": 1,
           "firstSignParameters": {
             "coin": "btc",
+            "version": 2,
+            "locktime": 0,
             "inputs": [
               {
                 "address_n": [
@@ -1479,6 +1511,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 ],
                 "prev_hash": "1897a428a4a4b3de56a6b594341523928c838cef591d40dded3cb14a3d86cf19",
                 "prev_index": 0,
+                "sequence": 4294967293,
                 "amount": "200000",
                 "script_type": "SPENDWITNESS",
                 "multisig": {
@@ -1563,6 +1596,8 @@ export const GENERATED_MULTISIG_FIXTURES = {
           },
           "continueSignParameters": {
             "coin": "btc",
+            "version": 2,
+            "locktime": 0,
             "inputs": [
               {
                 "address_n": [
@@ -1575,6 +1610,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 ],
                 "prev_hash": "1897a428a4a4b3de56a6b594341523928c838cef591d40dded3cb14a3d86cf19",
                 "prev_index": 0,
+                "sequence": 4294967293,
                 "amount": "200000",
                 "script_type": "SPENDWITNESS",
                 "multisig": {

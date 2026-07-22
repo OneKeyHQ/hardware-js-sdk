@@ -1,7 +1,7 @@
 import { verify } from '@noble/secp256k1';
 import { describe, expect, test } from '@jest/globals';
 import HardwareTransport from '@onekeyfe/hd-transport';
-import { Transaction } from 'bitcoinjs-lib';
+import { address as bitcoinAddress, networks, Transaction } from 'bitcoinjs-lib';
 
 import MessagesJSON from '../../../../../core/src/data/messages/messages.json';
 import { generateBtcFixtures } from '../generateBtcFixtures';
@@ -39,6 +39,50 @@ describe('generateBtcFixtures', () => {
     });
   });
 
+  test('硬件签名参数可重建离线 spending transaction 的 sighash', async () => {
+    const fixtures = await generateBtcFixtures(TEST_MNEMONICS);
+
+    fixtures.forEach(fixture => {
+      const spendingTx = Transaction.fromHex(fixture.reference.spendingTxHex);
+      expect(fixture.signParameters).toMatchObject({
+        version: spendingTx.version,
+        locktime: spendingTx.locktime,
+        inputs: [{ sequence: spendingTx.ins[0].sequence }],
+      });
+
+      const parameters = fixture.signParameters;
+      const input = parameters.inputs[0];
+      const output = parameters.outputs[0];
+      const hardwareTx = new Transaction();
+      hardwareTx.version = parameters.version;
+      hardwareTx.locktime = parameters.locktime;
+      hardwareTx.addInput(
+        Buffer.from(input.prev_hash, 'hex').reverse(),
+        input.prev_index,
+        input.sequence
+      );
+      hardwareTx.addOutput(
+        bitcoinAddress.toOutputScript(output.address, networks.bitcoin),
+        Number(output.amount)
+      );
+      const signingScript = Buffer.from(
+        fixture.reference.witnessScript ?? fixture.reference.redeemScript,
+        'hex'
+      );
+      const hardwareSighash =
+        fixture.id === 'p2sh'
+          ? hardwareTx.hashForSignature(0, signingScript, Transaction.SIGHASH_ALL)
+          : hardwareTx.hashForWitnessV0(
+              0,
+              signingScript,
+              Number(input.amount),
+              Transaction.SIGHASH_ALL
+            );
+
+      expect(hardwareSighash.toString('hex')).toBe(fixture.reference.sighash);
+    });
+  });
+
   test('三个签名均可由对应子公钥验证', async () => {
     const fixtures = await generateBtcFixtures(TEST_MNEMONICS);
 
@@ -46,11 +90,7 @@ describe('generateBtcFixtures', () => {
       fixture.reference.expectedSignatures.forEach((signature, index) => {
         const derSignature = signature.slice(0, -2);
         expect(
-          verify(
-            derSignature,
-            fixture.reference.sighash,
-            fixture.reference.childPublicKeys[index]
-          )
+          verify(derSignature, fixture.reference.sighash, fixture.reference.childPublicKeys[index])
         ).toBe(true);
       });
     });
@@ -115,12 +155,9 @@ describe('generateBtcFixtures', () => {
         expect(scenario.signerIndex).toBe(0);
         expect(scenario.signerEnvKey).toBe('MULTISIG_MNEMONIC_1');
         expect(scenario.expectedSignature).toBe(fixture.reference.expectedSignatures[0]);
-        expect(
-          scenario.firstSignParameters.inputs[0].multisig.signatures
-        ).toEqual(['', '', '']);
+        expect(scenario.firstSignParameters.inputs[0].multisig.signatures).toEqual(['', '', '']);
 
-        const continueSignatures =
-          scenario.continueSignParameters.inputs[0].multisig.signatures;
+        const continueSignatures = scenario.continueSignParameters.inputs[0].multisig.signatures;
         expect(continueSignatures[0]).toBe('');
         expect(continueSignatures.filter(Boolean)).toHaveLength(1);
         expect(scenario.prefilledSignerIndex).not.toBe(0);

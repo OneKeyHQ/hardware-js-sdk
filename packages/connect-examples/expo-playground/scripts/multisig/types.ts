@@ -53,10 +53,13 @@ export type BtcAddressParameters = {
 
 export type BtcSignParameters = {
   coin: 'btc';
+  version: number;
+  locktime: number;
   inputs: Array<{
     address_n: number[];
     prev_hash: string;
     prev_index: number;
+    sequence: number;
     amount: string;
     script_type: BtcScriptType;
     multisig: BtcMultisigDescriptor;
