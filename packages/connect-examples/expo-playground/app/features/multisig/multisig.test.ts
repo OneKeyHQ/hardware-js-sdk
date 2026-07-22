@@ -37,37 +37,37 @@ describe('multisig test workbench domain', () => {
     );
   });
 
-  test('loads generated ETH and BTC fixtures into built-in cases', () => {
-    const ids = new Set(BUILT_IN_MULTISIG_CASES.map(item => item.id));
-
-    expect([...ids]).toEqual(
-      expect.arrayContaining([
-          'eth-generated-standard',
-          'eth-generated-delegate-call',
-          'btc-generated-p2sh-address',
-          'btc-generated-p2sh-sign',
-          'btc-generated-p2sh-partial-sign',
-          'btc-generated-p2sh-p2wsh-address',
-          'btc-generated-p2wsh-address',
-      ])
+  test('loads a complete three-signer ETH and BTC hardware matrix', () => {
+    const ethCases = BUILT_IN_MULTISIG_CASES.filter(item =>
+      item.id.startsWith('eth-generated-')
     );
+    const btcCases = BUILT_IN_MULTISIG_CASES.filter(item =>
+      item.id.startsWith('btc-generated-')
+    );
+
+    expect(ethCases).toHaveLength(6);
+    expect(btcCases).toHaveLength(27);
+    [...ethCases, ...btcCases].forEach(item => {
+      expect(item.hardwareExpectation?.signerEnvKey).toMatch(/^MULTISIG_MNEMONIC_[123]$/);
+      expect(item.title).toMatch(/Signer [123]/);
+    });
   });
 
-  test('generated partial signing cases contain a valid prefilled signature slot', () => {
+  test('generated continuation cases prefill another signer and keep the current slot empty', () => {
     const partialCases = BUILT_IN_MULTISIG_CASES.filter(item =>
-      item.id.startsWith('btc-generated-') && item.id.endsWith('-partial-sign')
+      item.id.startsWith('btc-generated-') && item.id.includes('-continue-')
     );
 
-    expect(partialCases).toHaveLength(3);
+    expect(partialCases).toHaveLength(9);
     partialCases.forEach(item => {
       const parameters = item.parameters as {
         inputs: Array<{ multisig: { signatures: string[] } }>;
       };
-      expect(parameters.inputs[0].multisig.signatures).toEqual([
-        expect.stringMatching(/^30[0-9a-f]+01$/),
-        '',
-        '',
-      ]);
+      const signatures = parameters.inputs[0].multisig.signatures;
+      const signerIndex = item.hardwareExpectation!.signerIndex;
+      expect(signatures[signerIndex]).toBe('');
+      expect(signatures.filter(Boolean)).toHaveLength(1);
+      expect(item.hardwareExpectation?.prefilledSignerIndex).not.toBe(signerIndex);
       expect(item.reference?.broadcastable).toBe(false);
       expect(item.reference?.expectedSignatures).toHaveLength(3);
     });
@@ -84,7 +84,7 @@ describe('multisig test workbench domain', () => {
 
   test('rejects an invalid bitcoin multisig threshold', () => {
     const source = BUILT_IN_MULTISIG_CASES.find(
-      item => item.id === 'btc-generated-p2wsh-address'
+      item => item.id === 'btc-generated-p2wsh-address-signer-1'
     );
     expect(source).toBeDefined();
 

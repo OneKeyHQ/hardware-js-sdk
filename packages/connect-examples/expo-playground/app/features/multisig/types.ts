@@ -25,6 +25,16 @@ export type MultisigTestCase = {
   localOnly?: boolean;
   testMnemonicOnly?: boolean;
   reference?: MultisigFixtureReference;
+  hardwareExpectation?: MultisigHardwareExpectation;
+};
+
+export type MultisigHardwareExpectation = {
+  signerIndex: 0 | 1 | 2;
+  signerEnvKey: `MULTISIG_MNEMONIC_${1 | 2 | 3}`;
+  signerAddress: string;
+  expectedSignature?: string;
+  expectedAddress?: string;
+  prefilledSignerIndex?: 0 | 1 | 2;
 };
 
 export type ValidationIssue = {

@@ -100,60 +100,112 @@ function ethCase(
 }
 
 type GeneratedBtcFixture = (typeof GENERATED_MULTISIG_FIXTURES.btc)[number];
+type GeneratedBtcScenario = GeneratedBtcFixture['signerScenarios'][number];
 
 function cloneGenerated<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-function generatedEthCase(
+function generatedEthCases(
   fixture: (typeof GENERATED_MULTISIG_FIXTURES.eth)[number]
-): MultisigTestCase {
-  return {
-    id: `eth-generated-${fixture.id}`,
-    title: fixture.title,
+): MultisigTestCase[] {
+  return fixture.reference.signerAddresses.map((signerAddress, signerIndex) => ({
+    id: `eth-generated-${fixture.id}-signer-${signerIndex + 1}`,
+    title: `${fixture.title} · Signer ${signerIndex + 1}`,
     description: fixture.description,
     chain: 'eth',
     source: 'regression',
     method: 'evmSignTypedData',
     parameters: cloneGenerated(fixture.parameters),
-    expectedDeviceChecks: [...fixture.expectedDeviceChecks],
+    expectedDeviceChecks: [
+      `Signer ${signerIndex + 1}`,
+      ...fixture.expectedDeviceChecks,
+    ],
     builtIn: true,
     testMnemonicOnly: true,
     reference: cloneGenerated(fixture.reference),
-  };
+    hardwareExpectation: {
+      signerIndex: signerIndex as 0 | 1 | 2,
+      signerEnvKey: `MULTISIG_MNEMONIC_${signerIndex + 1}` as
+        | 'MULTISIG_MNEMONIC_1'
+        | 'MULTISIG_MNEMONIC_2'
+        | 'MULTISIG_MNEMONIC_3',
+      signerAddress,
+      expectedSignature: fixture.reference.expectedSignatures[signerIndex],
+    },
+  }));
 }
 
-function btcAddressCase(fixture: GeneratedBtcFixture): MultisigTestCase {
+function btcAddressCase(
+  fixture: GeneratedBtcFixture,
+  scenario: GeneratedBtcScenario
+): MultisigTestCase {
   return {
-    id: `btc-generated-${fixture.id}-address`,
-    title: `${fixture.title} 2-of-3 地址`,
+    id: `btc-generated-${fixture.id}-address-signer-${scenario.signerIndex + 1}`,
+    title: `${fixture.title} 2-of-3 地址 · Signer ${scenario.signerIndex + 1}`,
     description: '由三个环境变量助记词生成的离线 BIP48 多签地址。',
     chain: 'btc',
     source: 'firmware-capability',
     method: 'btcGetAddress',
     parameters: cloneGenerated(fixture.addressParameters),
-    expectedDeviceChecks: ['Bitcoin 网络', fixture.title, '2 / 3 阈值', '设备显示地址'],
+    expectedDeviceChecks: [
+      `Signer ${scenario.signerIndex + 1}`,
+      'Bitcoin 网络',
+      fixture.title,
+      '2 / 3 阈值',
+      '设备显示地址',
+    ],
     builtIn: true,
     testMnemonicOnly: true,
     reference: cloneGenerated(fixture.reference),
+    hardwareExpectation: {
+      signerIndex: scenario.signerIndex,
+      signerEnvKey: scenario.signerEnvKey,
+      signerAddress: scenario.signerAddress,
+      expectedAddress: fixture.address,
+    },
   };
 }
 
-function btcSignCase(fixture: GeneratedBtcFixture, partial = false): MultisigTestCase {
+function btcSignCase(
+  fixture: GeneratedBtcFixture,
+  scenario: GeneratedBtcScenario,
+  mode: 'first' | 'continue'
+): MultisigTestCase {
+  const continuing = mode === 'continue';
   return {
-    id: `btc-generated-${fixture.id}-${partial ? 'partial-' : ''}sign`,
-    title: `${fixture.title} 2-of-3 ${partial ? '继续签名' : '交易签名'}`,
-    description: partial
-      ? '携带 signer 1 的合法签名，由 signer 2 设备继续签名；不可广播。'
+    id: `btc-generated-${fixture.id}-${mode}-signer-${scenario.signerIndex + 1}`,
+    title: `${fixture.title} 2-of-3 ${continuing ? '继续签名' : '首次签名'} · Signer ${
+      scenario.signerIndex + 1
+    }`,
+    description: continuing
+      ? `携带 signer ${scenario.prefilledSignerIndex + 1} 的合法签名，由 signer ${
+          scenario.signerIndex + 1
+        } 设备继续签名；不可广播。`
       : '花费离线虚构 funding transaction 的确定性多签测试交易。',
     chain: 'btc',
     source: 'regression',
     method: 'btcSignTransaction',
-    parameters: cloneGenerated(partial ? fixture.partialSignParameters : fixture.signParameters),
-    expectedDeviceChecks: ['Bitcoin 网络', fixture.title, '发送 190000 sats', '手续费 10000 sats'],
+    parameters: cloneGenerated(
+      continuing ? scenario.continueSignParameters : scenario.firstSignParameters
+    ),
+    expectedDeviceChecks: [
+      `Signer ${scenario.signerIndex + 1}`,
+      'Bitcoin 网络',
+      fixture.title,
+      '发送 190000 sats',
+      '手续费 10000 sats',
+    ],
     builtIn: true,
     testMnemonicOnly: true,
     reference: cloneGenerated(fixture.reference),
+    hardwareExpectation: {
+      signerIndex: scenario.signerIndex,
+      signerEnvKey: scenario.signerEnvKey,
+      signerAddress: scenario.signerAddress,
+      expectedSignature: scenario.expectedSignature,
+      ...(continuing ? { prefilledSignerIndex: scenario.prefilledSignerIndex } : {}),
+    },
   };
 }
 
@@ -161,7 +213,7 @@ const erc20TransferData =
   '0xa9059cbb0000000000000000000000005618207d27d78f09f61a5d92190d58c453feb4b700000000000000000000000000000000000000000000000000000000000f4240';
 
 export const BUILT_IN_MULTISIG_CASES: MultisigTestCase[] = [
-  ...GENERATED_MULTISIG_FIXTURES.eth.map(generatedEthCase),
+  ...GENERATED_MULTISIG_FIXTURES.eth.flatMap(generatedEthCases),
   ethCase('eth-safe-decimal-chain', 'Safe EIP-712 十进制 Chain ID', 'existing-example', safeTypedData('311', '0')),
   {
     id: 'eth-safe-calldata',
@@ -207,11 +259,20 @@ export const BUILT_IN_MULTISIG_CASES: MultisigTestCase[] = [
     expectedDeviceChecks: ['Ethereum', 'Safe 合约地址', '非空内部 calldata', '交易手续费'],
     builtIn: true,
   },
-  ...GENERATED_MULTISIG_FIXTURES.btc.map(btcAddressCase),
-  ...GENERATED_MULTISIG_FIXTURES.btc.map(fixture => btcSignCase(fixture)),
-  ...GENERATED_MULTISIG_FIXTURES.btc.map(fixture => btcSignCase(fixture, true)),
+  ...GENERATED_MULTISIG_FIXTURES.btc.flatMap(fixture =>
+    fixture.signerScenarios.map(scenario => btcAddressCase(fixture, scenario))
+  ),
+  ...GENERATED_MULTISIG_FIXTURES.btc.flatMap(fixture =>
+    fixture.signerScenarios.map(scenario => btcSignCase(fixture, scenario, 'first'))
+  ),
+  ...GENERATED_MULTISIG_FIXTURES.btc.flatMap(fixture =>
+    fixture.signerScenarios.map(scenario => btcSignCase(fixture, scenario, 'continue'))
+  ),
   {
-    ...btcAddressCase(GENERATED_MULTISIG_FIXTURES.btc[2]),
+    ...btcAddressCase(
+      GENERATED_MULTISIG_FIXTURES.btc[2],
+      GENERATED_MULTISIG_FIXTURES.btc[2].signerScenarios[0]
+    ),
     id: 'btc-invalid-threshold',
     title: 'BTC 无效 4-of-3 阈值',
     description: '本地校验负向用例，不发送到设备。',
@@ -224,5 +285,6 @@ export const BUILT_IN_MULTISIG_CASES: MultisigTestCase[] = [
     },
     source: 'regression',
     localOnly: true,
+    hardwareExpectation: undefined,
   },
 ];

@@ -155,12 +155,29 @@ function truncate(value: unknown, length = 28): string {
 
 export function buildExecutionSummary(testCase: MultisigTestCase): ExecutionSummaryItem[] {
   const params = testCase.parameters;
+  const signerItems: ExecutionSummaryItem[] = testCase.hardwareExpectation
+    ? [
+        {
+          label: '当前 Signer',
+          value: `Signer ${testCase.hardwareExpectation.signerIndex + 1}`,
+        },
+        { label: '设备助记词', value: testCase.hardwareExpectation.signerEnvKey },
+        ...(testCase.hardwareExpectation.prefilledSignerIndex !== undefined
+          ? [
+              {
+                label: '预填签名',
+                value: `Signer ${testCase.hardwareExpectation.prefilledSignerIndex + 1}`,
+              },
+            ]
+          : []),
+      ]
+    : [];
   if (testCase.chain === 'eth') {
     if (testCase.method === 'evmSignTypedData') {
       const data = asRecord(params.data);
       const domain = asRecord(data?.domain);
       const message = asRecord(data?.message);
-      return [
+      return [...signerItems,
         { label: '方法', value: testCase.method },
         { label: 'Safe', value: truncate(domain?.verifyingContract) },
         { label: '目标', value: truncate(message?.to) },
@@ -168,7 +185,7 @@ export function buildExecutionSummary(testCase: MultisigTestCase): ExecutionSumm
       ];
     }
     const transaction = asRecord(params.transaction);
-    return [
+    return [...signerItems,
       { label: '方法', value: testCase.method },
       { label: '合约', value: truncate(transaction?.to) },
       { label: 'Chain ID', value: String(transaction?.chainId ?? '-') },
@@ -178,7 +195,7 @@ export function buildExecutionSummary(testCase: MultisigTestCase): ExecutionSumm
 
   if (testCase.method === 'btcGetAddress') {
     const multisig = asRecord(params.multisig);
-    return [
+    return [...signerItems,
       { label: '方法', value: testCase.method },
       { label: '脚本', value: String(params.scriptType) },
       { label: '阈值', value: `${multisig?.m ?? '-'} / ${asArray(multisig?.pubkeys).length}` },
@@ -188,7 +205,7 @@ export function buildExecutionSummary(testCase: MultisigTestCase): ExecutionSumm
 
   const firstInput = asRecord(asArray(params.inputs)[0]);
   const multisig = asRecord(firstInput?.multisig);
-  return [
+  return [...signerItems,
     { label: '方法', value: testCase.method },
     { label: '脚本', value: String(firstInput?.script_type ?? '-') },
     { label: '阈值', value: `${multisig?.m ?? '-'} / ${asArray(multisig?.pubkeys).length}` },
