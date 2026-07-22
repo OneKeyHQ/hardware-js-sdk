@@ -30,7 +30,6 @@ import {
   supportModifyHomescreen,
 } from '../utils/deviceFeaturesUtils';
 import { generateInstanceId } from '../utils/tracing';
-import { isDeviceLockedError } from '../protocols/protocol-v2/lockedError';
 // eslint-disable-next-line import/no-cycle
 import { DeviceCommands } from './DeviceCommands';
 import { mergeDeviceFeaturesPatch } from './DeviceFeaturesState';
@@ -873,18 +872,12 @@ export class Device extends EventEmitter {
       }
 
       if (refresh.has('settings') && this.state?.status.mode === 'normal') {
-        try {
-          const { message } = await this.commands.typedCall(
-            'DeviceSettingsGet',
-            'DeviceSettings',
-            {}
-          );
-          this.updateState(mapDeviceSettingsToState(message), 'apply-settings');
-        } catch (error) {
-          if (!isDeviceLockedError(error)) {
-            throw error;
-          }
-        }
+        const { message } = await this.commands.typedCall(
+          'DeviceSettingsGet',
+          'DeviceSettings',
+          {}
+        );
+        this.updateState(mapDeviceSettingsToState(message), 'apply-settings');
       }
 
       if (refresh.has('status') && this.state?.status.mode === 'normal') {

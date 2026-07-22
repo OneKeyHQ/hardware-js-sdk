@@ -93,7 +93,7 @@ describe('getDeviceState', () => {
     expect(state.settings.brightness).toBe(70);
   });
 
-  test('keeps the cached state when settings are unavailable on a locked device', async () => {
+  test('rejects an explicit settings refresh without mutating cached state', async () => {
     const typedCall = jest.fn().mockRejectedValue(
       Object.assign(new Error('Device locked'), {
         errorCode: HardwareErrorCode.DeviceLocked,
@@ -110,7 +110,10 @@ describe('getDeviceState', () => {
       'initialize'
     );
 
-    const state = await device.getDeviceState({ refresh: ['settings'] });
+    await expect(device.getDeviceState({ refresh: ['settings'] })).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.DeviceLocked,
+    });
+    const state = await device.getDeviceState();
 
     expect(state.identity.label).toBe('Persisted label');
     expect(state.settings.language).toBe('en-US');

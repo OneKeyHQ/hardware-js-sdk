@@ -56,7 +56,10 @@ describe('public device state API boundary', () => {
       deviceId: 'device-1',
       label: 'Unified',
     });
-    expect(getDeviceState).toHaveBeenCalledWith({ includeRaw: true });
+    expect(getDeviceState).toHaveBeenCalledWith({
+      refresh: ['identity'],
+      includeRaw: true,
+    });
   });
 
   test('rejects getFeatures for Protocol V2 devices', async () => {

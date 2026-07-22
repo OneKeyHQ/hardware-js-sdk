@@ -22,7 +22,10 @@ export default class GetFeatures extends BaseMethod {
     if (this.device.isProtocolV2()) {
       throw createDeviceNotSupportMethodError(this.name, this.device.getCurrentFirmwareType());
     }
-    const state = await this.device.getDeviceState({ includeRaw: true });
+    const state = await this.device.getDeviceState({
+      refresh: ['identity'],
+      includeRaw: true,
+    });
     return projectFeatures(state);
   }
 }

@@ -89,7 +89,7 @@ Protocol V1 继续使用 `firmwareUpdate` 至 `firmwareUpdateV3`；Pro2 使用 `
 6. 将目标文件分片写入 `vol0:/`，再使用 PathInfo 校验大小。
 7. 一次发送包含全部待安装文件的 `DeviceFirmwareUpdateRequest`。
 8. 轮询安装状态，允许安装阶段断连、超时和重连探测。
-9. 回到 normal mode 后刷新 DeviceInfo/Features。
+9. 回到 normal mode 后显式刷新 `DeviceState` 的 identity/versions。
 
 可靠性约束：
 
@@ -99,7 +99,7 @@ Protocol V1 继续使用 `firmwareUpdate` 至 `firmwareUpdateV3`；Pro2 使用 `
 - Transport 不自动重发安装请求；重试由高层流程依据阶段和幂等性决定。
 - release 配置、SDK target 类型和固件枚举必须同步发布。
 
-`firmwareUpdateV4` 为兼容旧接口仍返回 BLE、application 和 bootloader 三类版本。需要 SE、P1/P2 或 coprocessor 版本时，应重新调用 `getDeviceInfo`。
+`firmwareUpdateV4` 为兼容旧接口仍返回 BLE、application 和 bootloader 三类版本。需要 SE、P1/P2 或 coprocessor 版本时，应调用 `getDeviceState({ refresh: ['versions'] })`。
 
 主要实现：
 

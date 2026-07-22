@@ -143,29 +143,30 @@ Pro 2 最多提供 `se1` 至 `se4` 四组安全芯片信息。每组可以包含
 
 `DeviceInfoGet` 不是每次都返回全部内容。请求由两组参数控制：
 
-- `targets`：要读取哪些组件，例如 `hw`、`fw`、`coprocessor`、`se1` 至 `se4`、`status`。
+- `targets`：要读取哪些静态组件，例如 `hw`、`fw`、`coprocessor`、`se1` 至 `se4`。
 - `types`：镜像信息需要包含 `version`、`build_id`、`hash` 还是组件特有信息 `specific`。
 
 SDK 当前使用的典型范围：
 
-| 场景        | 读取内容                                                   | 原因                                |
-| ----------- | ---------------------------------------------------------- | ----------------------------------- |
-| 初始化      | hw、fw、coprocessor；version、specific                     | 建立静态信息并投影已缓存状态        |
-| 轻量刷新    | hw、fw、coprocessor；version、specific                     | 刷新静态信息，不隐式读取状态        |
-| versions    | hw、fw、coprocessor、se1 至 se4；version、specific         | 展示所有组件版本                    |
-| verify/full | 所有 target；version、build_id、hash、specific             | 设备完整校验                        |
+| 场景        | 读取内容                                           | 原因                         |
+| ----------- | -------------------------------------------------- | ---------------------------- |
+| 初始化      | hw、fw、coprocessor；version、specific             | 建立静态信息并投影已缓存状态 |
+| 轻量刷新    | hw、fw、coprocessor；version、specific             | 刷新静态信息，不隐式读取状态 |
+| versions    | hw、fw、coprocessor、se1 至 se4；version、specific | 展示所有组件版本             |
+| verify/full | 所有 target；version、build_id、hash、specific     | 设备完整校验                 |
 
 ## 6. 设备实时状态
 
-协议支持以下两种状态来源，但 SDK 默认流程只使用显式状态消息：
+运行状态由独立的 `DeviceStatusGet` 提供：
 
 ```text
-DeviceInfoGet(targets.status=true) -> DeviceInfo.status
 DeviceStatusGet -> DeviceStatus
 ```
 
-`targets.status=true` 保留为原始协议调试能力。普通初始化、`getDeviceInfo`、设置和钱包 Session
-不会默认使用它，也不会隐式调用 `DeviceStatusGet`；需要新鲜运行状态时由调用方明确请求。
+`DeviceInfoGet.targets.status` 是即将从底层协议删除的历史字段，SDK 业务流程不再构造或公开它。
+普通初始化、信息读取、设置和钱包 Session 不会隐式调用 `DeviceStatusGet`；需要新鲜运行状态时，
+公共调用方必须显式使用 `getDeviceState({ refresh: ['status'] })`。bootloader/romloader 模式不会发送
+`DeviceStatusGet`。
 
 ### 6.1 字段映射
 
@@ -408,41 +409,40 @@ DeviceFactoryInfoSet -> Success
 
 ## 12. SDK 如何转换字段
 
-SDK 存在三条不同的设备信息路径。
+SDK 对外只有一条统一设备状态路径。
 
 ### 12.1 初始化设备
 
 ```text
 DeviceInfoGet
-    -> buildProtocolV2FeaturesPayload
-    -> Device 内部标准 Features 缓存
+    -> Protocol V2 Mapper
+    -> DeviceStateStore
 ```
 
-用途：建立基础设备身份、版本和实时状态。
+用途：建立基础设备身份和版本快照，不隐式读取实时状态。
 
-### 12.2 获取标准设备详情
+### 12.2 获取统一设备状态
 
 ```text
-getDeviceInfo(scope)
-    -> 按 scope 请求 DeviceInfo
-    -> buildDeviceProfile
-    -> 返回 DeviceProfile
+getDeviceState({ refresh })
+    -> 按显式 section 刷新
+    -> 合并到 DeviceStateStore
+    -> 返回完整 DeviceState
 ```
 
-用途：设备详情、版本展示和固件校验。
+用途：设备详情、版本展示、设置页和运行状态读取。Protocol V1/V2 返回相同结构。
 
-### 12.3 获取原始 Protocol V2 数据
+### 12.3 SDK 内部原始命令
 
 ```text
-deviceInfoGet(targets, types)
-    -> 返回原始 DeviceInfo
+DeviceInfoGet / DeviceStatusGet / DeviceSettingsGet
+    -> Mapper
+    -> DeviceStateStore
 ```
 
-用途：协议调试和专用查询。该方法不构建 Profile，也不更新标准 Features 缓存。
+这些命令仅供 SDK 内部流程使用，不属于公共 API。外部接入方不需要选择原始命令、请求范围或缓存策略。
 
-三条路径虽然最终都可能调用 `DeviceInfoGet`，但请求范围、返回结构和缓存副作用不同，不能合并理解成同一个 API。
-
-## 13. 进入标准 Features 和 DeviceProfile 的字段
+## 13. 进入统一 DeviceState 的字段
 
 | Protocol V2 来源                   | 标准 SDK 字段                      |
 | ---------------------------------- | ---------------------------------- |
@@ -469,18 +469,18 @@ build ID 和 hash 只在 verify/full 查询中请求，并进入 SDK 的校验�
 
 下面这些字段仍由专用消息读写，但跨设备通用设置会投影进标准 Features：
 
-| 内容            | Protocol V2 来源                       | 标准投影/管理方式      |
-| --------------- | -------------------------------------- | ---------------------- |
-| label           | `DeviceSettings.label`                 | `Features.label`                |
-| language        | `DeviceSettings.language`              | `Features.language`             |
-| 蓝牙开关        | `DeviceSettings.bt_enable`             | `Features.bleEnabled`           |
-| 自动锁屏        | `DeviceSettings.autolock_delay_ms`     | `Features.autoLockDelayMs`      |
-| 自动关机        | `DeviceSettings.autoshutdown_delay_ms` | `Features.autoShutdownDelayMs`  |
-| 触觉反馈        | `DeviceSettings.haptic_feedback`       | `Features.hapticFeedback`       |
-| 钱包 Session ID | `DeviceSession.session_id`             | Core 钱包 Session 管理 |
-| 钱包标识        | `DeviceSession.btc_test_address`       | 内部 `passphraseState` |
-| 固件安装记录    | `DeviceFirmwareUpdateStatus`           | 固件升级 API           |
-| 生产制造信息    | `DeviceFactoryInfo`                    | 生产制造专用 API       |
+| 内容            | Protocol V2 来源                       | 标准投影/管理方式              |
+| --------------- | -------------------------------------- | ------------------------------ |
+| label           | `DeviceSettings.label`                 | `Features.label`               |
+| language        | `DeviceSettings.language`              | `Features.language`            |
+| 蓝牙开关        | `DeviceSettings.bt_enable`             | `Features.bleEnabled`          |
+| 自动锁屏        | `DeviceSettings.autolock_delay_ms`     | `Features.autoLockDelayMs`     |
+| 自动关机        | `DeviceSettings.autoshutdown_delay_ms` | `Features.autoShutdownDelayMs` |
+| 触觉反馈        | `DeviceSettings.haptic_feedback`       | `Features.hapticFeedback`      |
+| 钱包 Session ID | `DeviceSession.session_id`             | Core 钱包 Session 管理         |
+| 钱包标识        | `DeviceSession.btc_test_address`       | 内部 `passphraseState`         |
+| 固件安装记录    | `DeviceFirmwareUpdateStatus`           | 固件升级 API                   |
+| 生产制造信息    | `DeviceFactoryInfo`                    | 生产制造专用 API               |
 
 设备详情页读取统一 Features，不直接依赖原始 snake_case 设置结构；这些字段仍不应被重复塞回 `DeviceInfo`。
 
