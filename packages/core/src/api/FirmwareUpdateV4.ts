@@ -894,8 +894,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   }
 
   async enterProtocolV2BootloaderMode() {
-    if (this.isProtocolV2BootloaderMode()) {
-      Log.debug('Protocol V2 device is already in bootloader mode, skip reboot to bootloader');
+    // romloader 本身就是升级链路的首段执行环境，能够接收更新请求并把待处理目标交给 bootloader。
+    // 它不接受 DeviceRebootType.Bootloader，因此这里必须直接复用当前连接。
+    if (this.isProtocolV2BootloaderMode() || this.device.features?.mode === 'romloader') {
+      Log.debug('Protocol V2 device is already in loader mode, skip reboot to bootloader');
       return false;
     }
 
