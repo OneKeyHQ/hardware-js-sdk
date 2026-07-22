@@ -78,13 +78,7 @@ export type DeviceState = {
   };
 
   status: {
-    mode:
-      | 'normal'
-      | 'bootloader'
-      | 'romloader'
-      | 'notInitialized'
-      | 'backupMode'
-      | 'unknown';
+    mode: 'normal' | 'bootloader' | 'romloader' | 'notInitialized' | 'backupMode' | 'unknown';
     initialized: boolean | null;
     unlocked: boolean | null;
     firmwarePresent: boolean | null;
@@ -248,7 +242,7 @@ type DeviceStateEvent = {
 
 设置命令成功后，SDK 必须先更新状态，再发送 `DEVICE.STATE`。App 不需要通过 `getDeviceState()` 回读确认。
 
-兼容事件 `DEVICE.FEATURES` 从同一次状态快照即时投影。它不能反过来修改状态，也不能拥有独立发送路径。
+Protocol V1 兼容事件 `DEVICE.FEATURES` 从同一次状态快照即时投影。它不能反过来修改状态，也不能拥有独立发送路径；Protocol V2 不发送该事件。
 
 ## 9. 名称语义
 
@@ -327,9 +321,9 @@ SDK 暂时保留的老协议兼容面：
 
 兼容实现规则：
 
-- `getFeatures()` 先调用统一的 `getDeviceState()` 刷新/读取逻辑，再通过 Projector 返回旧结构。
+- Protocol V1 的 `getFeatures()` 调用统一的 `getDeviceState()` 刷新/读取逻辑，再通过 Projector 返回旧结构。
 - 旧参数转换为对应的 `refresh` 区域，不允许维护独立查询策略。
-- 旧事件由 `DEVICE.STATE` 同步投影产生。
+- 旧事件仅在 Protocol V1 下由 `DEVICE.STATE` 同步投影产生。
 - 文档把 `getFeatures()` 标记为 Protocol V1 compatibility/deprecated；新接入统一使用 `getDeviceState()`。
 
 `DeviceProfile/getDeviceInfo` 以及 Pro2 原始读取方法本次直接从公共 API 删除，但底层 command class 继续作为内部实现存在。
@@ -354,7 +348,7 @@ SDK 暂时保留的老协议兼容面：
 - 默认 `getDeviceState()` 不调用 `DeviceStatusGet`。
 - bootloader/romloader 即使显式请求普通信息也不调用状态命令。
 - 所有业务 `DeviceInfoGet` 不包含 `targets.status`。
-- `getFeatures/DEVICE.FEATURES` 与新状态投影一致。
+- V1 `getFeatures/DEVICE.FEATURES` 与新状态投影一致，V2 明确拒绝 `getFeatures` 且不发送兼容事件。
 - 公共 API 不包含 `getDeviceInfo/deviceInfoGet/deviceStatusGet/deviceSettingsGet`。
 - USB/BLE 重连保留已确认身份和设置，同时清理 session 易失字段。
 

@@ -36,7 +36,7 @@ describe('public device state API boundary', () => {
     expect(DeviceSettingsGet).toBeDefined();
   });
 
-  test('projects getFeatures from the canonical state for legacy compatibility', async () => {
+  test('projects getFeatures from the canonical state for Protocol V1 compatibility', async () => {
     const state = createEmptyDeviceState({
       deviceId: 'device-1',
       serialNo: 'SERIAL-1',
@@ -45,13 +45,35 @@ describe('public device state API boundary', () => {
     const getDeviceState = jest.fn().mockResolvedValue(state);
     const method = new GetFeatures({ id: 1, payload: { method: 'getFeatures' } });
     method.init();
-    (method as any).device = { getDeviceState, isBootloader: () => false };
+    (method as any).device = {
+      getDeviceState,
+      getCurrentFirmwareType: () => 'universal',
+      isBootloader: () => false,
+      isProtocolV2: () => false,
+    };
 
     await expect(method.run()).resolves.toMatchObject({
       deviceId: 'device-1',
       label: 'Unified',
     });
     expect(getDeviceState).toHaveBeenCalledWith({ includeRaw: true });
+  });
+
+  test('rejects getFeatures for Protocol V2 devices', async () => {
+    const getDeviceState = jest.fn();
+    const method = new GetFeatures({ id: 1, payload: { method: 'getFeatures' } });
+    method.init();
+    (method as any).device = {
+      getDeviceState,
+      getCurrentFirmwareType: () => 'universal',
+      isBootloader: () => false,
+      isProtocolV2: () => true,
+    };
+
+    await expect(method.run()).rejects.toMatchObject({
+      errorCode: expect.any(Number),
+    });
+    expect(getDeviceState).not.toHaveBeenCalled();
   });
 });
 

@@ -7,7 +7,7 @@ jest.mock('../src/data/config', () => ({
 }));
 
 describe('Device state events', () => {
-  test('emits one canonical state snapshot and a projected legacy Features event', () => {
+  test('emits only the canonical state event for Protocol V2', () => {
     const device = Device.fromDescriptor({
       id: 'pro2',
       path: 'pro2',
@@ -35,10 +35,23 @@ describe('Device state events', () => {
         source: 'apply-settings',
       })
     );
-    expect(onFeatures).toHaveBeenCalledWith(
-      device,
-      expect.objectContaining({ label: 'Renamed', bleName: 'Pro2 1234' })
+    expect(onFeatures).not.toHaveBeenCalled();
+  });
+
+  test('continues emitting projected Features events for Protocol V1', () => {
+    const device = Device.fromDescriptor({ id: 'legacy', path: 'legacy' } as never);
+    const onFeatures = jest.fn();
+    device.on(DEVICE.FEATURES, onFeatures);
+
+    device.updateState(
+      {
+        protocol: 'V1',
+        identity: { label: 'Legacy' },
+      },
+      'apply-settings'
     );
+
+    expect(onFeatures).toHaveBeenCalledWith(device, expect.objectContaining({ label: 'Legacy' }));
   });
 
   test('keeps Features assignment as an import-only compatibility projection', () => {

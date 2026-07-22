@@ -30,6 +30,7 @@ import {
   supportModifyHomescreen,
 } from '../utils/deviceFeaturesUtils';
 import { generateInstanceId } from '../utils/tracing';
+import { isDeviceLockedError } from '../protocols/protocol-v2/lockedError';
 // eslint-disable-next-line import/no-cycle
 import { DeviceCommands } from './DeviceCommands';
 import { mergeDeviceFeaturesPatch } from './DeviceFeaturesState';
@@ -45,11 +46,11 @@ import { deviceWalletSessionStore } from './DeviceWalletSessionStore';
 import {
   type DeviceFirmwareRange,
   DeviceModelToTypes,
-  DeviceTypeToModels,
-  type Device as DeviceTyped,
   type DeviceStateEvent,
   type DeviceStatePatch,
   type DeviceStateUpdateSource,
+  DeviceTypeToModels,
+  type Device as DeviceTyped,
   EOneKeyDeviceMode,
   type Features,
   type IDeviceModel,
@@ -859,26 +860,31 @@ export class Device extends EventEmitter {
 
     if (this.isProtocolV2()) {
       const refreshDeviceInfo =
-        refresh.has('identity') ||
-        refresh.has('versions') ||
-        refresh.has('verification');
+        refresh.has('identity') || refresh.has('versions') || refresh.has('verification');
       if (refreshDeviceInfo) {
-        const request = refresh.has('verification')
-          ? PROTOCOL_V2_FULL_DEVICE_INFO_REQUEST
-          : refresh.has('versions')
-          ? PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST
-          : PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST;
+        let request = PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST;
+        if (refresh.has('verification')) {
+          request = PROTOCOL_V2_FULL_DEVICE_INFO_REQUEST;
+        } else if (refresh.has('versions')) {
+          request = PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST;
+        }
         const deviceInfo = await requestProtocolV2DeviceInfo({ commands: this.commands, request });
         this.updateState(mapProtocolV2DeviceInfoToState(deviceInfo), 'device-info');
       }
 
       if (refresh.has('settings') && this.state?.status.mode === 'normal') {
-        const { message } = await this.commands.typedCall(
-          'DeviceSettingsGet',
-          'DeviceSettings',
-          {}
-        );
-        this.updateState(mapDeviceSettingsToState(message), 'apply-settings');
+        try {
+          const { message } = await this.commands.typedCall(
+            'DeviceSettingsGet',
+            'DeviceSettings',
+            {}
+          );
+          this.updateState(mapDeviceSettingsToState(message), 'apply-settings');
+        } catch (error) {
+          if (!isDeviceLockedError(error)) {
+            throw error;
+          }
+        }
       }
 
       if (refresh.has('status') && this.state?.status.mode === 'normal') {
@@ -936,7 +942,9 @@ export class Device extends EventEmitter {
       keys: result.changedKeys,
     });
     this.emit(DEVICE.STATE, this, event);
-    this.emit(DEVICE.FEATURES, this, projectFeatures(result.state));
+    if (result.state.protocol === 'V1') {
+      this.emit(DEVICE.FEATURES, this, projectFeatures(result.state));
+    }
     return result.state;
   }
 
@@ -1313,9 +1321,7 @@ export class Device extends EventEmitter {
             status: {
               unlocked: res.message.unlocked == null ? null : res.message.unlocked,
               unlockedAttachPin:
-                res.message.unlocked_attach_pin == null
-                  ? null
-                  : res.message.unlocked_attach_pin,
+                res.message.unlocked_attach_pin == null ? null : res.message.unlocked_attach_pin,
               passphraseProtection:
                 res.message.passphrase_protection == null
                   ? null

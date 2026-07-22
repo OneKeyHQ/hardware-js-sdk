@@ -65,7 +65,7 @@ HardwareSDK.on(DEVICE.CONNECT, ({ device }) => {
 });
 ```
 
-`DEVICE_EVENT` 不会像 `UI_EVENT` 一样作为公共聚合监听被外层 SDK 转发。当前外层只转发 `DEVICE.CONNECT`、`DEVICE.DISCONNECT`、`DEVICE.FEATURES` 和 `DEVICE.SUPPORT_FEATURES`。
+`DEVICE_EVENT` 不会像 `UI_EVENT` 一样作为公共聚合监听被外层 SDK 转发。当前外层转发 `DEVICE.CONNECT`、`DEVICE.DISCONNECT`、`DEVICE.STATE`、Protocol V1 的 `DEVICE.FEATURES` 和 `DEVICE.SUPPORT_FEATURES`。
 
 ## 一次调用的事件生命周期
 
@@ -312,14 +312,16 @@ HardwareSDK.on(FIRMWARE_EVENT, message => {
 | ------------------------- | -------------------------- | ---------------------------------------- | -------------------------------------------------- |
 | `DEVICE.CONNECT`          | Transport / DevicePool     | DevicePool 枚举或初始化出设备            | `{ device }`                                       |
 | `DEVICE.DISCONNECT`       | Transport / DevicePool     | USB 拔出、BLE 断开或 DevicePool 移除设备 | `{ device }`                                       |
-| `DEVICE.FEATURES`         | 设备响应或已确认设置 patch | Device 的标准 Features 实际发生变化      | `Features`                                         |
+| `DEVICE.STATE`            | 设备响应或已确认设置 patch | DeviceState 实际发生变化                 | `DeviceStateEvent`                                 |
+| `DEVICE.FEATURES`         | Protocol V1 兼容投影       | V1 DeviceState 实际发生变化              | `Features`                                         |
 | `DEVICE.SUPPORT_FEATURES` | SDK 能力计算               | BaseMethod 运行前计算附加能力            | `{ inputPinOnSoftware, modifyHomescreen, device }` |
 
 `SUPPORT_FEATURES` 不是硬件主动推送。它是 SDK 根据设备型号和 Features 计算出的业务辅助信息。
 
-`DEVICE.FEATURES` 是统一状态变更通知。它既可能来自 `GetFeatures`、`DeviceInfoGet`、
-`DeviceStatusGet`、`DeviceSettingsGet` 等读取，也可能来自设置成功后的 confirmed patch 或
-解锁结果。宿主只消费完整 `Features`，不需要识别 V1/V2 原始消息；相同 patch 不会重复发送。
+`DEVICE.STATE` 是 V1/V2 的统一状态变更通知。它可能来自设备读取、设置成功后的 confirmed patch
+或解锁结果；相同 patch 不会重复发送。新接入只消费完整 `DeviceState`，无需识别底层协议。
+
+`DEVICE.FEATURES` 仅用于 Protocol V1 兼容。Protocol V2 不发送该事件，也不支持 `getFeatures()`。
 
 ## 运行环境和授权通知
 

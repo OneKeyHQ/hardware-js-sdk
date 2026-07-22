@@ -1,3 +1,5 @@
+import { HardwareErrorCode } from '@onekeyfe/hd-shared';
+
 import { Device } from '../src/device/Device';
 
 jest.mock('../src/data/config', () => ({
@@ -32,7 +34,11 @@ describe('getDeviceState', () => {
     expect(typedCall).toHaveBeenCalledTimes(1);
     expect(typedCall.mock.calls[0][0]).toBe('DeviceInfoGet');
     expect(typedCall.mock.calls[0][2]?.targets?.status).not.toBe(true);
-    expect(typedCall).not.toHaveBeenCalledWith('DeviceStatusGet', expect.anything(), expect.anything());
+    expect(typedCall).not.toHaveBeenCalledWith(
+      'DeviceStatusGet',
+      expect.anything(),
+      expect.anything()
+    );
   });
 
   test.each(['bootloader', 'romloader'] as const)(
@@ -61,5 +67,52 @@ describe('getDeviceState', () => {
     expect(typedCall).toHaveBeenCalledWith('DeviceStatusGet', 'DeviceStatus', {});
     expect(state.status.unlocked).toBe(true);
     expect(state.identity.deviceId).toBe('device-1');
+  });
+
+  test('refreshes Protocol V2 settings without requesting status', async () => {
+    const typedCall = jest.fn().mockResolvedValue({
+      message: {
+        label: 'Renamed Pro 2',
+        language: 'ja-JP',
+        brightness: 70,
+      },
+    });
+    const device = createV2Device(typedCall);
+    device.updateState({ protocol: 'V2', status: { mode: 'normal' } }, 'initialize');
+
+    const state = await device.getDeviceState({ refresh: ['settings'] });
+
+    expect(typedCall).toHaveBeenCalledWith('DeviceSettingsGet', 'DeviceSettings', {});
+    expect(typedCall).not.toHaveBeenCalledWith(
+      'DeviceStatusGet',
+      expect.anything(),
+      expect.anything()
+    );
+    expect(state.identity.label).toBe('Renamed Pro 2');
+    expect(state.settings.language).toBe('ja-JP');
+    expect(state.settings.brightness).toBe(70);
+  });
+
+  test('keeps the cached state when settings are unavailable on a locked device', async () => {
+    const typedCall = jest.fn().mockRejectedValue(
+      Object.assign(new Error('Device locked'), {
+        errorCode: HardwareErrorCode.DeviceLocked,
+      })
+    );
+    const device = createV2Device(typedCall);
+    device.updateState(
+      {
+        protocol: 'V2',
+        identity: { label: 'Persisted label' },
+        status: { mode: 'normal', unlocked: false },
+        settings: { language: 'en-US' },
+      },
+      'initialize'
+    );
+
+    const state = await device.getDeviceState({ refresh: ['settings'] });
+
+    expect(state.identity.label).toBe('Persisted label');
+    expect(state.settings.language).toBe('en-US');
   });
 });

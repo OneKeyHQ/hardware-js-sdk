@@ -1,4 +1,4 @@
-import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareErrorCode, createDeviceNotSupportMethodError } from '@onekeyfe/hd-shared';
 
 import { UI_REQUEST } from '../constants/ui-request';
 import { projectFeatures } from '../device/DeviceStateProjector';
@@ -18,6 +18,9 @@ export default class GetFeatures extends BaseMethod {
   async run() {
     if (this.payload?.detectBootloaderDevice && this.device.isBootloader()) {
       return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceDetectInBootloaderMode));
+    }
+    if (this.device.isProtocolV2()) {
+      throw createDeviceNotSupportMethodError(this.name, this.device.getCurrentFirmwareType());
     }
     const state = await this.device.getDeviceState({ includeRaw: true });
     return projectFeatures(state);
