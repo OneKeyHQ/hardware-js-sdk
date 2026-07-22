@@ -5189,9 +5189,19 @@ describe('Protocol V2 current low-level methods', () => {
     });
   });
 
-  test('marks Protocol V2 settings methods for unlock-on-locked retry', () => {
+  test('does not unlock before reading Protocol V2 device settings', () => {
+    const method = new DeviceSettingsGet({
+      id: 1,
+      payload: { method: 'deviceSettingsGet' },
+    });
+
+    method.init();
+
+    expect(method.unlockPolicy).toBe('none');
+  });
+
+  test('marks Protocol V2 settings mutations for unlock-on-locked retry', () => {
     const methods = [
-      new DeviceSettingsGet({ id: 1, payload: { method: 'deviceSettingsGet' } }),
       new DeviceSettingsSet({
         id: 2,
         payload: { method: 'deviceSettingsSet', settings: { brightness: 80 } },

@@ -392,15 +392,9 @@ const api: UnifiedMethodConfig[] = [
         ],
       },
       {
-        title: 'Security and experimental',
+        title: 'Security',
         parameters: [
           { name: 'settings.fido_enabled', type: 'boolean', label: 'FIDO enabled', value: true },
-          {
-            name: 'settings.experimental_features',
-            type: 'boolean',
-            label: 'Experimental features',
-            value: false,
-          },
           { name: 'settings.usb_lock_enable', type: 'boolean', label: 'USB lock', value: false },
           { name: 'settings.random_keypad', type: 'boolean', label: 'Random keypad', value: true },
         ],

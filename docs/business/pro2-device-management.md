@@ -6,13 +6,13 @@
 
 | SDK 方法                 | protobuf                 | 返回值           | 解锁策略             |
 | ------------------------ | ------------------------ | ---------------- | -------------------- |
-| `deviceSettingsGet`      | `DeviceSettingsGet`      | `DeviceSettings` | 锁定后解锁并重试一次 |
+| `deviceSettingsGet`      | `DeviceSettingsGet`      | `DeviceSettings` | 不解锁，直接读取     |
 | `deviceSettingsSet`      | `DeviceSettingsSet`      | `Success`        | 锁定后解锁并重试一次 |
 | `deviceSettingsPageShow` | `DeviceSettingsPageShow` | `Success`        | 锁定后解锁并重试一次 |
 
 这些接口只支持 Protocol V2，不会自动回退到 V1 的 `deviceSettings`。
 
-`DeviceSettings` 包含设备名称、蓝牙、语言、壁纸路径、亮度、自动锁定、自动关机、动画、轻触唤醒、震动、FIDO、实验功能、USB 锁定、随机键盘以及安全模式状态。字段以当前 protobuf 和生成类型为准，旧固件可能不返回新增字段。
+`DeviceSettings` 的公开字段包含设备名称、蓝牙、语言、壁纸路径、亮度、自动锁定、自动关机、动画、轻触唤醒、震动、USB 锁定、随机键盘以及安全模式状态，锁定时也可以读取。`passphrase_enable` 与 `fido_enabled` 是私有字段，仅在设备解锁时返回。字段以当前 protobuf 和生成类型为准。
 
 `deviceSettingsSet` 支持部分更新，但 SDK 会移除 `passphrase_enable` 与 `airgap_mode`。这两类安全模式必须通过 `deviceSettingsPageShow` 打开设备页面，由用户在设备端确认。
 
@@ -23,7 +23,7 @@
 - `DevicePassphrase`
 - `DeviceAirgap`
 
-三个方法显式声明 `retry-on-locked`。只有收到结构化 `DeviceLocked` 时才解锁并重试一次，第二次失败不会循环重试。
+`deviceSettingsGet` 显式声明 `unlockPolicy='none'`，不会因为缓存状态或设备响应触发自动解锁。`deviceSettingsSet` 与 `deviceSettingsPageShow` 仍声明 `retry-on-locked`；只有收到结构化 `DeviceLocked` 时才解锁并重试一次，第二次失败不会循环重试。
 
 页面打开前，SDK 统一发送非阻塞 `REQUEST_BUTTON`，payload 包含
 `source='method-lifecycle'`、`reason='settings-page'`、`completion='page-accepted'` 和具体 `page`。

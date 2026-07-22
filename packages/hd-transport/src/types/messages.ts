@@ -4719,6 +4719,7 @@ export enum ViewSignLayout {
   LayoutFinalConfirm = 2,
   Layout7702 = 3,
   LayoutFlat = 4,
+  LayoutEthApprove = 5,
 }
 
 // ViewSignPage
@@ -4737,6 +4738,9 @@ export type ViewVerifyPage = {
   title: string;
   address: string;
   path: string;
+  network?: string;
+  derive_type?: string;
+  value_key?: number;
 };
 
 // ProtocolInfoRequest
@@ -4779,7 +4783,6 @@ export type DeviceSettings = {
   bt_enable?: boolean;
   language?: string;
   wallpaper_path?: string;
-  passphrase_enable?: boolean;
   brightness?: number;
   autolock_delay_ms?: number;
   autoshutdown_delay_ms?: number;
@@ -4788,10 +4791,10 @@ export type DeviceSettings = {
   haptic_feedback?: boolean;
   device_name_display_enabled?: boolean;
   airgap_mode?: boolean;
-  fido_enabled?: boolean;
-  experimental_features?: boolean;
   usb_lock_enable?: boolean;
   random_keypad?: boolean;
+  passphrase_enable?: boolean;
+  fido_enabled?: boolean;
 };
 
 // DeviceSettingsGet

@@ -50,7 +50,7 @@ test('marks Protocol V2 settings mutations for unlock-on-locked retry', () => {
 
 - [ ] **Step 2: 运行测试并确认失败**
 
-Run: `yarn workspace @onekeyfe/core test protocol-v2.test.ts --runInBand`
+Run: `yarn workspace @onekeyfe/hd-core test protocol-v2.test.ts --runInBand`
 
 Expected: `DeviceSettingsGet.unlockPolicy` 实际为 `retry-on-locked`，新断言失败。
 
@@ -64,7 +64,7 @@ this.unlockPolicy = 'none';
 
 - [ ] **Step 4: 运行测试并确认通过**
 
-Run: `yarn workspace @onekeyfe/core test protocol-v2.test.ts --runInBand`
+Run: `yarn workspace @onekeyfe/hd-core test protocol-v2.test.ts --runInBand`
 
 Expected: 相关测试全部通过。
 
@@ -92,13 +92,13 @@ Expected: 命令退出码为 0，并更新两份 Protocol V2 JSON 与 TypeScript
 
 Run: `rg -n 'experimental_features|"passphrase_enable"|"fido_enabled"' packages/hd-transport/messages-protocol-v2.json packages/core/src/data/messages/messages-protocol-v2.json packages/hd-transport/src/types/messages.ts`
 
-Expected: 不存在 `experimental_features`；`passphrase_enable` 与 `fido_enabled` 仍存在并为可选字段，JSON 字段编号分别为 100 和 101。
+Expected: `DeviceSettings` 中不存在 `experimental_features`；`passphrase_enable` 与 `fido_enabled` 仍存在并为可选字段，JSON 字段编号分别为 100 和 101。
 
 - [ ] **Step 4: 运行传输层构建和 SDK 测试**
 
 Run: `yarn workspace @onekeyfe/hd-transport build`
 
-Run: `yarn workspace @onekeyfe/core test protocol-v2.test.ts --runInBand`
+Run: `yarn workspace @onekeyfe/hd-core test protocol-v2.test.ts --runInBand`
 
 Expected: 两条命令均退出码为 0。
 
@@ -107,6 +107,7 @@ Expected: 两条命令均退出码为 0。
 **Files:**
 - Modify: `../app-monorepo/packages/kit-bg/src/services/ServiceHardware/ServiceHardware.pro2DeviceManagement.test.ts`
 - Modify: `../app-monorepo/packages/kit-bg/src/services/ServiceHardware/ServiceHardware.ts`
+- Modify: `../app-monorepo/packages/kit/src/states/jotai/contexts/deviceDetails/actions.ts`
 - Modify: `../app-monorepo/packages/kit/src/states/jotai/contexts/deviceDetails/pro2DeviceManagement.ts`
 
 - [ ] **Step 1: 修改锁定状态测试预期**
@@ -120,13 +121,13 @@ settings: {
 },
 ```
 
-并断言：
+并断言锁定状态也读取一次设置：
 
 ```ts
 expect(deviceSettingsGet).toHaveBeenCalledTimes(1);
 ```
 
-第二次解锁快照完成后累计调用次数应为 2。
+第二次解锁快照完成后累计调用次数应为 2。删除 `shouldRefreshDeviceSettingsAfterUpdate` 的独立测试，因为更新后的设置统一刷新，不再存在锁定状态分支。
 
 - [ ] **Step 2: 运行 App 定向测试并确认失败**
 
@@ -146,7 +147,7 @@ const settings = await convertDeviceResponse(() =>
 );
 ```
 
-快照始终返回 `settings`；同时将 `pro2DeviceManagement.ts` 中“读取设置仍需解锁”的注释改为“公开设置可在锁定状态读取”。
+快照始终返回 `settings`；同时将 `pro2DeviceManagement.ts` 中“读取设置仍需解锁”的注释改为“公开设置可在锁定状态读取”。删除 `shouldRefreshDeviceSettingsAfterUpdate`，并将 `refreshAfterDeviceSettingUpdate` 改为直接调用 `refresh`。
 
 - [ ] **Step 4: 运行 App 相关测试**
 
@@ -169,13 +170,13 @@ Expected: 两个仓库均无空白错误。
 
 - [ ] **Step 2: 运行 SDK 类型/构建验证**
 
-Run: `yarn workspace @onekeyfe/hd-transport build && yarn workspace @onekeyfe/core build`
+Run: `yarn workspace @onekeyfe/hd-transport build && yarn workspace @onekeyfe/hd-core build`
 
 Expected: 命令退出码为 0。
 
 - [ ] **Step 3: 运行最终定向测试**
 
-Run: `yarn workspace @onekeyfe/core test protocol-v2.test.ts --runInBand`
+Run: `yarn workspace @onekeyfe/hd-core test protocol-v2.test.ts --runInBand`
 
 Run in App: `yarn jest packages/kit-bg/src/services/ServiceHardware/ServiceHardware.pro2DeviceManagement.test.ts packages/kit/src/states/jotai/contexts/deviceDetails/pro2DeviceManagement.test.ts --runInBand`
 
@@ -188,4 +189,3 @@ Run: `git status --short && git diff --stat && git -C submodules/firmware-pro2 s
 Run in App: `git status --short && git diff --stat`
 
 Expected: 仅包含本计划文件、协议生成物、子模块指针、SDK/App 行为与测试变更；用户原有 multisig 与 session protobuf 修改仍在。
-
