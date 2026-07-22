@@ -1,5 +1,6 @@
 import type { CommonParams, Response } from '../params';
 import type { Features, IDeviceType, OnekeyFeatures } from '../device';
+import type { PROTO } from '../../constants';
 import type { EFirmwareType } from '@onekeyfe/hd-shared';
 import type {
   DeviceStatus,
@@ -20,7 +21,13 @@ export type GetDeviceInfoParams = {
   includeRaw?: boolean;
 };
 
-export type DeviceInfoMode = 'normal' | 'bootloader' | 'romloader' | 'notInitialized' | 'unknown';
+export type DeviceInfoMode =
+  | 'normal'
+  | 'bootloader'
+  | 'romloader'
+  | 'notInitialized'
+  | 'backupMode'
+  | 'unknown';
 
 export type DeviceInfoStatus = {
   mode: DeviceInfoMode;
@@ -80,6 +87,7 @@ export type DeviceProfileVerify = {
 
 export type DeviceProfileRaw = {
   features?: Features;
+  protocolV1Features?: PROTO.Features;
   protocolV1OneKeyFeatures?: OnekeyFeatures;
   protocolV2DeviceInfo?: ProtocolV2DeviceInfo;
   protocolV2DeviceStatus?: DeviceStatus;
