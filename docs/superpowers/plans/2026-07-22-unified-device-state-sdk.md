@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 将 hardware-js-sdk 的设备运行时状态完整迁移到唯一 `DeviceState`，并以无状态投影保留旧 `Features`、`DeviceProfile` API 兼容性。
+**Goal:** 将 hardware-js-sdk 的设备运行时状态完整迁移到唯一 `DeviceState`，只以无状态投影保留 Protocol V1 `Features` 兼容性，并把 Pro2 原始读取接口收回 SDK 内部。
 
-**Architecture:** `DeviceStateStore` 是唯一缓存与合并入口，Protocol V1/V2 Mapper 只负责协议数据转换，Projector 只负责旧 API 投影。`getDeviceState()` 和 `DEVICE.STATE` 共享同一完整快照；默认读取不发送 `DeviceStatusGet`，boot/rom 模式禁止发送该命令。
+**Architecture:** `DeviceStateStore` 是唯一缓存与合并入口，Protocol V1/V2 Mapper 只负责协议数据转换，Projector 只负责老协议 `Features` 投影。`getDeviceState()` 和 `DEVICE.STATE` 共享同一完整快照；`DeviceInfoGet/DeviceStatusGet/DeviceSettingsGet` 仅供 SDK 内部使用；默认读取不发送 `DeviceStatusGet`，boot/rom 模式禁止发送该命令。
 
 **Tech Stack:** TypeScript、Jest、EventEmitter、OneKey Protocol V1/V2、Yarn/Lerna
 
@@ -14,7 +14,7 @@
 
 - Create: `packages/core/src/device/DeviceStateStore.ts` — 唯一状态合并、revision、派生字段。
 - Create: `packages/core/src/device/DeviceStateMapper.ts` — V1/V2 协议响应到统一 patch。
-- Create: `packages/core/src/device/DeviceStateProjector.ts` — `Features`、`DeviceProfile` 兼容投影。
+- Create: `packages/core/src/device/DeviceStateProjector.ts` — Protocol V1 `Features` 兼容投影。
 - Create: `packages/core/src/types/api/getDeviceState.ts` — 新查询 API 类型。
 - Create: `packages/core/src/api/GetDeviceState.ts` — 新 API 方法。
 - Create: `packages/core/__tests__/device-state-store.test.ts` — Store 单元测试。
@@ -26,7 +26,8 @@
 - Modify: `packages/core/src/events/device.ts` — 在现有 `DEVICE` 常量中添加 `STATE`。
 - Modify: `packages/core/src/device/Device.ts` — 用 Store 替换 `features` 状态缓存。
 - Modify: `packages/core/src/api/GetFeatures.ts` — 改为新状态投影。
-- Modify: `packages/core/src/api/GetDeviceInfo.ts` — 改为新状态投影。
+- Delete: `packages/core/src/api/GetDeviceInfo.ts` — 删除重复的公共结构化查询。
+- Delete: `packages/core/src/types/api/getDeviceInfo.ts` — 删除 `DeviceProfile` 公共模型。
 - Modify: `packages/core/src/api/device/DeviceSettings.ts` — 设置成功后提交状态 patch。
 - Modify: `packages/core/src/api/protocol-v2/DeviceSettingsGet.ts` — 设置读取提交状态 patch。
 - Modify: `packages/core/src/api/protocol-v2/DeviceSettingsSet.ts` — 设置成功提交状态 patch。
@@ -214,7 +215,7 @@ git add packages/core/src/device/DeviceStateMapper.ts packages/core/src/protocol
 git commit -m "feat(core): normalize protocol data into device state"
 ```
 
-### Task 4: 实现旧 API 无状态 Projector
+### Task 4: 实现老协议 Features 无状态 Projector
 
 **Files:**
 - Create: `packages/core/src/device/DeviceStateProjector.ts`
@@ -223,14 +224,11 @@ git commit -m "feat(core): normalize protocol data into device state"
 - [ ] **Step 1: 写失败测试**
 
 ```ts
-test('projects legacy Features and DeviceProfile from one snapshot', () => {
+test('projects legacy Features from the canonical snapshot', () => {
   const state = createDeviceStateFixture();
   const features = projectFeatures(state);
-  const profile = projectDeviceProfile(state, { includeRaw: false });
   expect(features.label).toBe(state.identity.label);
   expect(features.unlocked).toBe(state.status.unlocked);
-  expect(profile.status.unlocked).toBe(state.status.unlocked);
-  expect(profile.versions.firmware).toBe(state.versions.firmware);
 });
 ```
 
@@ -243,7 +241,6 @@ Expected: FAIL，Projector 不存在。
 
 ```ts
 projectFeatures(state: DeviceState): Features
-projectDeviceProfile(state: DeviceState, params?: GetDeviceInfoParams): DeviceProfile
 ```
 
 旧 snake_case 原始字段只从 `state.raw` 合并；标准字段始终以统一 section 为准。
@@ -411,29 +408,34 @@ git add packages/core/src packages/core/__tests__
 git commit -m "refactor(core): route device mutations through state"
 ```
 
-### Task 8: 将旧查询 API 改为兼容投影并清理 status target
+### Task 8: 收口公共 API 并清理 status target
 
 **Files:**
 - Modify: `packages/core/src/api/GetFeatures.ts`
-- Modify: `packages/core/src/api/GetDeviceInfo.ts`
+- Delete: `packages/core/src/api/GetDeviceInfo.ts`
+- Delete: `packages/core/src/types/api/getDeviceInfo.ts`
+- Modify: `packages/core/src/api/index.ts`
+- Modify: `packages/core/src/types/api/index.ts`
+- Modify: `packages/core/src/types/api/protocolV2.ts`
+- Modify: `packages/core/src/inject.ts`
 - Modify: `packages/core/src/protocols/protocol-v2/features.ts`
 - Modify: `packages/connect-examples/expo-example/src/data/basic.ts`
 - Modify: `packages/connect-examples/developer-portal/content/en/hardware-sdk/basic-api/get-device-info.mdx`
 - Test: `packages/core/__tests__/get-device-state.test.ts`
 - Test: `packages/core/__tests__/protocol-v2.test.ts`
 
-- [ ] **Step 1: 写失败兼容测试**
+- [ ] **Step 1: 写失败公共边界测试**
 
-断言 `getFeatures()` 与 `getDeviceInfo()` 返回同一状态投影，并且调用它们不会额外执行 `DeviceStatusGet`。
+断言 `getFeatures()` 从统一状态投影；公共 API 不包含 `getDeviceInfo/deviceInfoGet/deviceStatusGet/deviceSettingsGet`；内部状态刷新仍可调用对应 command class。
 
 - [ ] **Step 2: 运行并确认失败**
 
-Run: `yarn workspace @onekeyfe/hd-core test get-device-state.test.ts --runInBand`  
-Expected: FAIL，旧方法仍有独立路径。
+Run: `yarn workspace @onekeyfe/hd-core test public-device-state-api.test.ts --runInBand`  
+Expected: FAIL，临时 Pro2 查询仍由公共 API 导出。
 
-- [ ] **Step 3: 改造旧 API 并删除 status target 用法**
+- [ ] **Step 3: 改造兼容 API、收回原始查询并删除 status target 用法**
 
-旧 API 先复用 `Device` 的状态读取，再调用 Projector。删除业务与示例中的 `status: true`；原始协议调试如必须保留字段选择，默认值也必须为 false 且不得进入业务 API。
+`getFeatures()` 复用 `Device` 状态读取后投影。删除 `getDeviceInfo/DeviceProfile` 公共模型，并从 `CoreApi`、`inject()`、公共 API 导出中删除 `deviceInfoGet/deviceStatusGet/deviceSettingsGet`。底层 command class 和协议响应类型保留在内部目录，供 SDK 流程直接调用。删除业务与示例中的 `status: true`。
 
 - [ ] **Step 4: 全仓搜索确认**
 
@@ -442,14 +444,14 @@ Expected: 无业务构造命中。
 
 - [ ] **Step 5: 运行兼容测试**
 
-Run: `yarn workspace @onekeyfe/hd-core test get-device-state.test.ts protocol-v2.test.ts --runInBand`  
+Run: `yarn workspace @onekeyfe/hd-core test public-device-state-api.test.ts get-device-state.test.ts protocol-v2.test.ts --runInBand`  
 Expected: PASS。
 
 - [ ] **Step 6: 提交**
 
 ```bash
 git add packages/core packages/connect-examples/expo-example packages/connect-examples/developer-portal
-git commit -m "refactor(core): serve legacy APIs from device state"
+git commit -m "refactor(core): expose only canonical device state queries"
 ```
 
 ### Task 9: SDK 全量验证

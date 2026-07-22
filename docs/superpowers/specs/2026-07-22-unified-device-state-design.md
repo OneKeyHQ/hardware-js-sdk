@@ -14,7 +14,7 @@
 - 设备设置成功后，SDK 虽然可以发送 `DEVICE.FEATURES`，但 App 的数据库、状态容器和页面刷新链路并不统一。
 - Pro2 的部分读取路径曾默认携带 `DeviceInfoGet.targets.status = true` 或隐式调用 `DeviceStatusGet`，导致 bootloader 模式和普通信息查询承担不必要的动态状态读取风险。
 
-本次迁移不采用运行时双轨或渐进式内部模型。SDK 和 App 一次性迁移到唯一的 `DeviceState`。旧 SDK 公共 API 暂时保留，但只能从 `DeviceState` 即时投影，不允许保存第二份旧状态。
+本次迁移不采用运行时双轨或渐进式内部模型。SDK 和 App 一次性迁移到唯一的 `DeviceState`。只有 Protocol V1 必需的旧 `Features` 接口继续兼容；临时增加的 Pro2 信息、状态和设置读取接口收回 SDK 内部，不再形成第二套公共模型。
 
 ## 2. 目标
 
@@ -24,12 +24,12 @@
 4. App 不再理解协议差异，也不再同时维护 feature/profile/settings 多套对象。
 5. 默认信息读取不调用 `DeviceStatusGet`，不携带 `targets.status = true`。
 6. 设置和名称修改成功后，由 SDK 立即更新状态并发送事件，App 无需再次查询设备。
-7. 保留旧公共 API 的源代码兼容性，但不保留旧状态存储。
+7. 只兼容老协议必需的 `getFeatures()`/`DEVICE.FEATURES`，不继续公开 Pro2 临时查询接口。
 
 ## 3. 非目标
 
 1. 本次不修改底层 protobuf 协议定义；只停止上层使用即将删除的 `targets.status`。
-2. 本次不要求第三方接入立即改用新 API。
+2. 本次不保证曾直接调用 Pro2 临时原始查询接口的第三方代码无修改升级；正式业务接口统一迁移到 `getDeviceState()`。
 3. 本次不统一 Ledger、Trezor 等第三方硬件自身的底层协议模型；适配器只需在统一钱包接口边界投影状态。
 4. 本次不通过周期轮询保证状态新鲜度；动态状态刷新必须由明确操作或设备事件驱动。
 
@@ -53,7 +53,7 @@ Protocol V1 的 `Features/OnekeyFeatures` 与 Protocol V2 的 `DeviceInfo/Device
 
 ### 4.5 兼容层无状态
 
-`getFeatures()`、`getDeviceInfo()` 和 `DEVICE.FEATURES` 只调用投影函数，不拥有缓存、刷新策略或合并逻辑。
+`getFeatures()` 和 `DEVICE.FEATURES` 只服务 Protocol V1 兼容，并从 `DeviceState` 即时投影，不拥有缓存、刷新策略或合并逻辑。`getDeviceInfo()`、`deviceInfoGet()`、`deviceStatusGet()` 和 `deviceSettingsGet()` 不再属于公共 API。
 
 ## 5. 统一数据模型
 
@@ -176,7 +176,6 @@ export type DeviceState = {
 ### 6.3 兼容 Projector
 
 - `projectFeatures(state)`：生成旧的扁平 `Features`。
-- `projectDeviceProfile(state, options)`：生成旧的 `DeviceProfile`。
 - `projectKnownDevice(state, descriptor)`：生成设备列表消息。
 
 Projector 必须是纯函数。SDK 测试需要验证旧投影与新状态的字段一致性。
@@ -210,6 +209,13 @@ getDeviceState(
 - Protocol V1 按其原生能力刷新，但不得额外构造 Protocol V2 状态命令。
 
 当多个区域需要刷新时，由协议 Mapper 合并能共用的命令，避免重复读取。
+
+公共 API 边界：
+
+- 正式设备状态查询只暴露 `getDeviceState()`。
+- `getFeatures()` 仅作为 Protocol V1 兼容入口。
+- `DeviceInfoGet`、`DeviceStatusGet`、`DeviceSettingsGet` 的 command class 和协议类型保留在 SDK 内部，供 `Device`、固件和设置流程调用。
+- 不在 `CoreApi`、`inject()` 或公共 `api/index.ts` 中暴露 `getDeviceInfo()`、`deviceInfoGet()`、`deviceStatusGet()`、`deviceSettingsGet()`。
 
 ## 8. 事件模型
 
@@ -285,9 +291,9 @@ ApplySettings(label)
 App 一次性执行：
 
 - `IOneKeyDeviceFeatures` 替换为 SDK `DeviceState` 或必要的 section 类型。
-- `DeviceProfile` 消费点替换为 `DeviceState`。
+- `DeviceProfile` 消费点替换为 `DeviceState`，并删除该公共类型。
 - `ServiceHardware.getFeatures/getDeviceInfo` 的内部调用替换为 `getDeviceState`。
-- 新增 `ServiceHardware.getDeviceState`，旧方法只在确有 App 内兼容需要时保留薄包装，并标记禁止新增调用。
+- 新增 `ServiceHardware.getDeviceState`，OneKey 业务不保留 `getDeviceInfo` 薄包装。
 - Pro/Pro2 设置管理器只读取 `state.settings`。
 - 固件检测只读取 `state.identity`、`state.status` 和 `state.versions`。
 
@@ -313,22 +319,20 @@ App 监听 `DEVICE.STATE` 后按以下顺序处理：
 
 ## 12. 兼容策略
 
-SDK 暂时保留：
+SDK 暂时保留的老协议兼容面：
 
 - `Features` 类型。
-- `DeviceProfile` 类型。
 - `getFeatures()`。
-- `getDeviceInfo()`。
 - `DEVICE.FEATURES`。
 
 兼容实现规则：
 
-- 旧查询先调用统一的 `getDeviceState()` 刷新/读取逻辑，再通过 Projector 返回旧结构。
+- `getFeatures()` 先调用统一的 `getDeviceState()` 刷新/读取逻辑，再通过 Projector 返回旧结构。
 - 旧参数转换为对应的 `refresh` 区域，不允许维护独立查询策略。
 - 旧事件由 `DEVICE.STATE` 同步投影产生。
-- 文档把旧接口标记为 deprecated，但本次不强制第三方迁移。
+- 文档把 `getFeatures()` 标记为 Protocol V1 compatibility/deprecated；新接入统一使用 `getDeviceState()`。
 
-后续 major 版本删除兼容 API 时，只删除 Projector 和导出，不影响内部架构。
+`DeviceProfile/getDeviceInfo` 以及 Pro2 原始读取方法本次直接从公共 API 删除，但底层 command class 继续作为内部实现存在。
 
 ## 13. 错误处理
 
@@ -350,7 +354,8 @@ SDK 暂时保留：
 - 默认 `getDeviceState()` 不调用 `DeviceStatusGet`。
 - bootloader/romloader 即使显式请求普通信息也不调用状态命令。
 - 所有业务 `DeviceInfoGet` 不包含 `targets.status`。
-- `getFeatures/getDeviceInfo/DEVICE.FEATURES` 与新状态投影一致。
+- `getFeatures/DEVICE.FEATURES` 与新状态投影一致。
+- 公共 API 不包含 `getDeviceInfo/deviceInfoGet/deviceStatusGet/deviceSettingsGet`。
 - USB/BLE 重连保留已确认身份和设置，同时清理 session 易失字段。
 
 ### 14.2 App
@@ -374,7 +379,7 @@ SDK 暂时保留：
 1. SDK 定义 `DeviceState`、Store、Mapper 和 Projector，并以测试固定行为。
 2. SDK 将 `Device` 内部缓存、查询和事件迁移到唯一状态。
 3. SDK 接入设置、解锁、passphrase、固件等状态变化来源。
-4. SDK 增加新 API/事件并把旧 API 改为兼容投影。
+4. SDK 增加新 API/事件，仅为 Protocol V1 保留 `Features` 兼容投影，并收回 Pro2 原始查询接口。
 5. App 接入 SDK 新版本和 `DEVICE.STATE`。
 6. App 迁移服务、数据库、状态容器、设置和设备详情页面。
 7. 删除 App 内部旧 Features/Profile 运行时路径和重复设置快照。
@@ -389,6 +394,6 @@ SDK 暂时保留：
 - bootloader/romloader 流程不调用 `DeviceStatusGet`。
 - 业务代码不再构造 `targets.status = true`。
 - 新 API 与新事件结构一致。
-- 旧 SDK API 从新状态即时投影，且现有第三方调用不立即失效。
+- Protocol V1 旧 SDK API 从新状态即时投影。
+- Pro2 信息、状态和设置读取仅在 SDK 内部存在，外部接入无需理解协议命令。
 - App 数据库只持久化一份设备状态。
-

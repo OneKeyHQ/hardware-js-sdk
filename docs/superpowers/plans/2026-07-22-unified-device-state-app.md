@@ -192,7 +192,7 @@ test('hydrates OneKey devices through getDeviceState without implicit status ref
   await service.getDeviceState({ connectId: 'pro2' });
   expect(hardwareSDK.getDeviceState).toHaveBeenCalledWith('pro2', undefined);
   expect(hardwareSDK.getFeatures).not.toHaveBeenCalled();
-  expect(hardwareSDK.getDeviceInfo).not.toHaveBeenCalled();
+  expect(hardwareSDK).not.toHaveProperty('getDeviceInfo');
 });
 ```
 
@@ -208,7 +208,7 @@ Expected: FAIL，新服务方法不存在。
 - [ ] **Step 4: 搜索确认主业务不再调用旧查询**
 
 Run: `rg -n "serviceHardware\.(getFeatures|getDeviceInfo)|hardwareSDK\?\.(getFeatures|getDeviceInfo)" packages/kit-bg packages/kit apps/cli`  
-Expected: OneKey 主业务无命中；兼容包装、第三方适配器和明确 legacy 测试可保留。
+Expected: OneKey 主业务无命中；第三方适配器和数据库迁移器中的旧 `Features` 读取可保留，`getDeviceInfo` 不保留包装。
 
 - [ ] **Step 5: 运行相关测试**
 
@@ -379,4 +379,3 @@ SDK 版本发布后更新 `@onekeyfe/hd-core` 及相关 SDK 包版本和 lockfil
 git add package.json yarn.lock packages apps
 git commit -m "test(hardware): verify unified device state migration"
 ```
-
