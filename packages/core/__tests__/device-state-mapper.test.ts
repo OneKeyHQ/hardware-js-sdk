@@ -175,9 +175,9 @@ describe('DeviceStateMapper', () => {
       mode: 'normal',
       initialized: true,
       unlocked: false,
-      passphraseProtection: null,
       backupRequired: true,
     });
+    expect(locked.status).not.toHaveProperty('passphraseProtection');
   });
 
   test('maps common settings into identity, status and settings sections', () => {

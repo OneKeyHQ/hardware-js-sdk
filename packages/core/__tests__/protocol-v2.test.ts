@@ -394,6 +394,26 @@ describe('Protocol V2 feature adapter', () => {
     expect(features.passphrase_protection).toBeUndefined();
   });
 
+  test('preserves the last trusted passphrase setting while the device is locked', () => {
+    const features = buildProtocolV2FeaturesPayload({
+      deviceInfo: {
+        hw: { serial_no: 'P2-LOCKED' },
+      },
+      deviceStatus: {
+        unlocked: false,
+        passphrase_enabled: false,
+      },
+      previous: {
+        ...buildProtocolV2FeaturesPayload({
+          deviceInfo: { hw: { serial_no: 'P2-LOCKED' } },
+        }),
+        passphraseProtection: true,
+      },
+    });
+
+    expect(features.passphraseProtection).toBe(true);
+  });
+
   test('builds dynamic features from DeviceStatus when DeviceInfo has no nested status', () => {
     const deviceInfo: ProtocolV2DeviceInfo = {
       protocol_version: 1,

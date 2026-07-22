@@ -286,7 +286,7 @@ export const mapProtocolV2DeviceStatusToState = (status: DeviceStatus): DeviceSt
     mode: getProtocolV2StatusMode(status.init_states),
     initialized: status.init_states,
     unlocked: status.unlocked,
-    passphraseProtection: status.unlocked === true ? status.passphrase_enabled ?? null : null,
+    passphraseProtection: status.unlocked === true ? status.passphrase_enabled ?? null : undefined,
     backupRequired: status.backup_required,
     attachToPinEnabled: status.attach_to_pin_enabled,
     unlockedAttachPin: status.unlocked_by_attach_to_pin,

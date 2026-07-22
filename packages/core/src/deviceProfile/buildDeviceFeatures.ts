@@ -277,8 +277,8 @@ export const buildProtocolV2FeaturesPayload = ({
   // Pro2 在锁定状态下返回的 passphrase_enabled 不是最终钱包状态。
   // 只有完成 PIN 解锁后的 DeviceStatus 才能作为 passphrase 开关真值来源。
   let passphraseProtection = cached?.passphraseProtection ?? null;
-  if (status) {
-    passphraseProtection = status.unlocked === true ? status.passphrase_enabled ?? null : null;
+  if (status?.unlocked === true) {
+    passphraseProtection = status.passphrase_enabled ?? null;
   }
   const language = cached?.language ?? null;
   const backupRequired = firstValue(status?.backup_required, cached?.backupRequired) ?? null;
