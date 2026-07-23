@@ -286,6 +286,34 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
 
     this.checkVersionForCopyTouchResource(features, firmwareType);
 
+    let binary;
+
+    try {
+      if (params.binary) {
+        binary = this.params.binary;
+      } else {
+        if (!device.features) {
+          throw ERRORS.TypedError(
+            HardwareErrorCode.RuntimeError,
+            'no features found for this device'
+          );
+        }
+        this.postTipMessage('DownloadFirmware');
+
+        const firmware = await getBinary({
+          features: device.features,
+          version: params.version,
+          updateType: params.updateType,
+          isUpdateBootloader: params.isUpdateBootloader,
+          firmwareType,
+        });
+        binary = firmware.binary;
+        this.postTipMessage('DownloadFirmwareSuccess');
+      }
+    } catch (err) {
+      throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
+    }
+
     if (!features?.bootloader_mode && features) {
       const uuid = getDeviceUUID(features);
       // should go to bootloader mode manually
@@ -355,34 +383,6 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
           ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateAutoEnterBootFailure)
         );
       }
-    }
-
-    let binary;
-
-    try {
-      if (params.binary) {
-        binary = this.params.binary;
-      } else {
-        if (!device.features) {
-          throw ERRORS.TypedError(
-            HardwareErrorCode.RuntimeError,
-            'no features found for this device'
-          );
-        }
-        this.postTipMessage('DownloadFirmware');
-
-        const firmware = await getBinary({
-          features: device.features,
-          version: params.version,
-          updateType: params.updateType,
-          isUpdateBootloader: params.isUpdateBootloader,
-          firmwareType,
-        });
-        binary = firmware.binary;
-        this.postTipMessage('DownloadFirmwareSuccess');
-      }
-    } catch (err) {
-      throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
     }
 
     // check if the device commands has been disposed
