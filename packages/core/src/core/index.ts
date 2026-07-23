@@ -1371,6 +1371,8 @@ export default class Core extends EventEmitter {
 
   private requestQueue = new RequestQueue();
 
+  private disposePromise?: Promise<void>;
+
   // background task
   private prePendingCallPromise: Promise<void> | undefined;
 
@@ -1470,14 +1472,44 @@ export default class Core extends EventEmitter {
     return Promise.resolve(message);
   }
 
-  dispose() {
+  dispose(): Promise<void> {
+    if (!this.disposePromise) {
+      this.disposePromise = this.disposeResources();
+    }
+    return this.disposePromise;
+  }
+
+  private async disposeResources(): Promise<void> {
+    Log.debug(`[Core] Disposing SDK instance: ${this.sdkInstanceId}`);
+    pollingManager.stopAll();
+    this.requestQueue.abortAllRequests();
+    cleanup();
+
+    _connector?.stop();
+    let transportCleanup: Promise<void>;
+    try {
+      transportCleanup = Promise.resolve(TransportManager.getTransport()?.stop()).catch(error => {
+        Log.warn('[Core] Transport cleanup failed:', error);
+      });
+    } catch (error) {
+      Log.warn('[Core] Transport cleanup failed:', error);
+      transportCleanup = Promise.resolve();
+    }
+
+    // 保持旧的同步 dispose 语义：即使调用方尚未 await，内存状态和监听器也立即清理。
     _deviceList = undefined;
     _connector = undefined;
+    DevicePool.resetState();
     deviceCacheMap.clear();
     preWarmInflight.clear();
     preWarmDoneAt.clear();
-    Log.debug(`[Core] Disposing SDK instance: ${this.sdkInstanceId}`);
+    preConnectCache = { passphraseState: undefined };
+    this.prePendingCallPromise = undefined;
+    this.removeAllListeners();
     cleanupSdkInstance(this.sdkInstanceId);
+
+    // Transport（特别是 Node USB）可能需要异步释放原生句柄。
+    await transportCleanup;
   }
 }
 

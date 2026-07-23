@@ -251,10 +251,24 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
     // empty — could add hotplug events via usb.on('attach'/'detach')
   }
 
-  stop() {
-    this.disposeProtocolV2UsbLinks('Node USB transport stopped').catch(error =>
-      this.Log?.debug('[NodeUsbTransport] stop link cleanup failed:', error)
-    );
+  async stop(): Promise<void> {
+    this.cancelled = true;
+
+    try {
+      await this.disposeProtocolV2UsbLinks('Node USB transport stopped');
+    } catch (error) {
+      this.Log?.debug('[NodeUsbTransport] stop link cleanup failed:', error);
+    }
+
+    // Reconnect may already be in flight when dispose starts. Wait for it to
+    // settle, then close every remaining handle so it cannot reopen USB after
+    // the first cleanup pass.
+    await Promise.allSettled(this.reconnectLocks.values());
+    await Promise.all(Array.from(this.openDevices.keys(), path => this.closeOpenDevice(path)));
+
+    this.reconnectLocks.clear();
+    this.deviceProtocol.clear();
+    this.serialToBusId.clear();
   }
 
   /**

@@ -231,7 +231,7 @@ export async function disposeSDK(): Promise<void> {
   if (!sdkReadyPromise) return;
   try {
     const sdk = await sdkReadyPromise;
-    sdk.dispose();
+    await Promise.resolve(sdk.dispose());
   } catch {
     // ignore errors during cleanup
   } finally {

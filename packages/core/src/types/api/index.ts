@@ -182,7 +182,7 @@ export type CoreApi = {
   off: typeof off;
   emit: (event: string, ...args: any[]) => void;
   removeAllListeners: typeof removeAllListeners;
-  dispose: () => void;
+  dispose: () => void | Promise<void>;
   call: (params: any) => Promise<any>;
   uiResponse: typeof uiResponse;
   cancel: (connectId?: string) => void;

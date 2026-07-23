@@ -189,6 +189,21 @@ const createHarness = () => {
 };
 
 describe('NodeUsbTransport Protocol V2 link lifecycle', () => {
+  test('stop releases an acquired USB interface even before a Protocol V2 call', async () => {
+    const harness = createHarness();
+    const { transport, path, device, iface } = harness;
+    await transport.enumerate();
+    await transport.acquire({ path, expectedProtocol: 'V2' });
+    device.close.mockClear();
+    iface.release.mockClear();
+
+    await transport.stop();
+
+    expect(iface.release).toHaveBeenCalledTimes(1);
+    expect(device.close).toHaveBeenCalledTimes(1);
+    expect(transport.getProtocolType(path)).toBeUndefined();
+  });
+
   test('trusts explicit Protocol V2 during bootloader reconnect without probing Ping', async () => {
     const harness = createHarness();
     const { transport, path, epOut } = harness;

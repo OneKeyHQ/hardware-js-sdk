@@ -60,10 +60,15 @@ let _settings = parseConnectSettings();
 let _messageID = 0;
 export const messagePromises: { [key: number]: Deferred<any> } = {};
 
-const dispose = () => {
+const dispose = async () => {
+  const core = _core;
+  _core = undefined;
   eventEmitter.removeAllListeners();
-  _core?.dispose?.();
+  Object.keys(messagePromises).forEach(key => {
+    delete messagePromises[Number(key)];
+  });
   _settings = parseConnectSettings();
+  await core?.dispose?.();
 };
 
 const uiResponse = (response: UiResponseEvent) => {
