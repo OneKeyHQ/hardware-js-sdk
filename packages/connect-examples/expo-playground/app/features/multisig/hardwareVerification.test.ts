@@ -48,8 +48,9 @@ describe('verifyMultisigHardwareResult', () => {
     expect(testCases).toHaveLength(5);
     for (const testCase of testCases) {
       const transaction = testCase.parameters.transaction as Record<string, unknown>;
+      const transactionType = 'maxFeePerGas' in transaction ? 2 : 0;
       const signedTransaction = Transaction.from(
-        await wallet.signTransaction(transaction)
+        await wallet.signTransaction({ ...transaction, type: transactionType })
       );
       const signature = signedTransaction.signature;
       if (!signature) throw new Error('测试交易缺少签名');
@@ -82,6 +83,27 @@ describe('verifyMultisigHardwareResult', () => {
         expect.objectContaining({ label: 'Signer 地址', passed: true }),
       ]);
     }
+  });
+
+  test('接受真机返回的 legacy EIP-155 Safe 签名', () => {
+    const testCase = getCase('eth-safe-calldata');
+    const result = verifyMultisigHardwareResult(testCase, {
+      success: true,
+      data: {
+        v: '0x25',
+        r: '0x5ae82004abbaaf7236d7ba3b60ef72bf7ed46cc2d98efae41d0cdcd0bd18ce55',
+        s: '0x72ba16aa4bbaa44bb197de79a569483b8f70c4a4b1f7d977a84494a3b06b8521',
+      },
+    });
+
+    expect(result.status).toBe('passed');
+    expect(result.checks).toEqual([
+      expect.objectContaining({
+        label: 'Signer 地址',
+        actual: '0x5618207d27D7…c453feB4b7',
+        passed: true,
+      }),
+    ]);
   });
 
   test('所有 BTC 签名用例均兼容 SDK 省略 SIGHASH_ALL 后缀', () => {

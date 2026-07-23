@@ -117,8 +117,11 @@ export function verifyMultisigHardwareResult(
         r: data.r,
         s: data.s,
       });
+      const transactionType =
+        transaction.maxFeePerGas && transaction.maxPriorityFeePerGas ? 2 : 0;
       recoveredAddress =
-        Transaction.from({ ...transaction, signature }).from ?? recoveredAddress;
+        Transaction.from({ ...transaction, type: transactionType, signature }).from ??
+        recoveredAddress;
     } catch {
       // 保留不可恢复结果，由统一校验结果展示为失败。
     }
