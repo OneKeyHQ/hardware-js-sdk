@@ -23,6 +23,7 @@
     "start": "node dist/cli.js",
     "search": "node dist/cli.js search",
     "get-features": "node dist/cli.js get-features",
+    "get-state": "node dist/cli.js get-state",
     "get-address": "node dist/cli.js get-address",
     "ping": "node dist/cli.js ping",
     "lint": "eslint .",

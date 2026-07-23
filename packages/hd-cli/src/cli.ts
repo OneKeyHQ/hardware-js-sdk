@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { Command } from 'commander';
 import { UI_EVENT, UI_REQUEST, getDeviceType } from '@onekeyfe/hd-core';
 import { EDeviceType } from '@onekeyfe/hd-shared';
@@ -11,6 +12,7 @@ import {
   resolveSignTransaction,
 } from './chains';
 import { selectSearchDevice } from './deviceSelection';
+import { getCanonicalDeviceState, getCompatibleFeatures } from './deviceStateCommands';
 import { createSDK, disposeSDK } from './sdk';
 import {
   clearSessionFromKeychain,
@@ -19,10 +21,10 @@ import {
 } from './session';
 
 import type {
+  DeviceStateScope,
   EthereumSignTypedDataMessage,
   EthereumSignTypedDataTypes,
   Features,
-  IDeviceType,
   SearchDevice,
 } from '@onekeyfe/hd-core';
 
@@ -65,11 +67,14 @@ function extractPassphraseSession(payload: unknown): {
 }
 
 const program = new Command();
+const { version: cliVersion } = JSON.parse(
+  readFileSync(resolve(__dirname, '../package.json'), 'utf8')
+) as { version: string };
 
 program
   .name('onekey-hw')
   .description('OneKey hardware wallet CLI for AI agent integration')
-  .version('1.1.26-alpha.1');
+  .version(cliVersion);
 
 // ============================================================
 // Global Options
@@ -95,28 +100,6 @@ program
   .action(() =>
     runCommand({}, async ({ sdk, globalOpts }) => {
       const result = await sdk.searchDevices();
-
-      // USB 下自动读取 features 成本低；BLE 搜索阶段只做枚举，避免批量连接导致超时。
-      if (globalOpts.transport !== 'ble' && result?.success && Array.isArray(result.payload)) {
-        for (const device of result.payload as EnrichedSearchDevice[]) {
-          if (device.connectId) {
-            try {
-              const features = await sdk.getFeatures(device.connectId);
-              if (features?.success && features.payload) {
-                device.features = features.payload;
-                device.name = features.payload.label || features.payload.bleName || device.name;
-                const devType = features.payload.deviceType?.toLowerCase();
-                if (devType) {
-                  device.deviceType = devType as IDeviceType;
-                }
-              }
-            } catch {
-              // Features fetch failed — device may need PIN, continue with basic info
-            }
-          }
-        }
-      }
-
       outputResult(globalOpts, result);
     })
   );
@@ -126,24 +109,28 @@ program
   .description('Get device features (firmware, unlock state, passphrase protection, etc.)')
   .action(() =>
     runCommand({}, async ({ sdk, globalOpts }) => {
-      // Resolve connectId: explicit flag wins, else pick the first attached device
-      let { connectId } = globalOpts as { connectId?: string };
-      if (!connectId) {
-        const searchResult = await sdk.searchDevices();
-        if (
-          !searchResult?.success ||
-          !Array.isArray(searchResult.payload) ||
-          searchResult.payload.length === 0
-        ) {
-          outputResult(globalOpts, {
-            success: false,
-            payload: { error: 'No device found', code: 'NO_DEVICE' },
-          });
-          return;
-        }
-        connectId = (searchResult.payload[0] as EnrichedSearchDevice).connectId ?? undefined;
+      const result = await getCompatibleFeatures(sdk, globalOpts.connectId);
+      outputResult(globalOpts, result);
+    })
+  );
+
+program
+  .command('get-state')
+  .description('Get canonical device state for Protocol V1 and Protocol V2 devices')
+  .option('--scope <scope>', 'State refresh scope: runtime, settings, or firmware', 'runtime')
+  .action((opts: { scope: string }) =>
+    runCommand({}, async ({ sdk, globalOpts }) => {
+      const supportedScopes: DeviceStateScope[] = ['runtime', 'settings', 'firmware'];
+      if (!supportedScopes.includes(opts.scope as DeviceStateScope)) {
+        const error = new Error(`Unsupported device state scope: ${opts.scope}`);
+        (error as Error & { code?: string }).code = 'INVALID_DEVICE_STATE_SCOPE';
+        throw error;
       }
-      const result = await sdk.getFeatures(connectId || '');
+      const result = await getCanonicalDeviceState(
+        sdk,
+        globalOpts.connectId,
+        opts.scope as DeviceStateScope
+      );
       outputResult(globalOpts, result);
     })
   );
