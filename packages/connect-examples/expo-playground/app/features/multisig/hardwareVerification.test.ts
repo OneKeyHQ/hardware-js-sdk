@@ -38,13 +38,13 @@ describe('verifyMultisigHardwareResult', () => {
     ).toBe('passed');
   });
 
-  test('六个 BTC 签名用例均兼容 SDK 省略 SIGHASH_ALL 后缀', () => {
+  test('所有 BTC 签名用例均兼容 SDK 省略 SIGHASH_ALL 后缀', () => {
     const testCases = BUILT_IN_MULTISIG_CASES.filter(
       testCase =>
         testCase.id.startsWith('btc-generated-') && testCase.method === 'btcSignTransaction'
     );
 
-    expect(testCases).toHaveLength(6);
+    expect(testCases).toHaveLength(8);
     testCases.forEach(testCase => {
       const expected = testCase.hardwareExpectation?.expectedSignature ?? '';
       expect(

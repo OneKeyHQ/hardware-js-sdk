@@ -138,10 +138,13 @@ function btcAddressCase(
   fixture: GeneratedBtcFixture,
   scenario: GeneratedBtcScenario
 ): MultisigTestCase {
+  const threshold =
+    `${fixture.addressParameters.multisig.m}-of-` +
+    fixture.addressParameters.multisig.pubkeys.length;
   return {
     id: `btc-generated-${fixture.id}-address-signer-${scenario.signerIndex + 1}`,
-    title: `${fixture.title} 2-of-3 地址 · Signer ${scenario.signerIndex + 1}`,
-    description: '由三个环境变量助记词生成的离线 BIP48 多签地址。',
+    title: `${fixture.title} ${threshold} 地址 · Signer ${scenario.signerIndex + 1}`,
+    description: '由环境变量测试助记词生成的离线 BIP48 多签地址。',
     chain: 'btc',
     source: 'firmware-capability',
     method: 'btcGetAddress',
@@ -150,7 +153,9 @@ function btcAddressCase(
       `Signer ${scenario.signerIndex + 1}`,
       'Bitcoin 网络',
       fixture.title,
-      '2 / 3 阈值',
+      `${fixture.addressParameters.multisig.m} / ${
+        fixture.addressParameters.multisig.pubkeys.length
+      } 阈值`,
       '设备显示地址',
     ],
     builtIn: true,
@@ -171,9 +176,11 @@ function btcSignCase(
   mode: 'first' | 'continue'
 ): MultisigTestCase {
   const continuing = mode === 'continue';
+  const multisig = scenario.firstSignParameters.inputs[0].multisig;
+  const threshold = `${multisig.m}-of-${multisig.pubkeys.length}`;
   return {
     id: `btc-generated-${fixture.id}-${mode}-signer-${scenario.signerIndex + 1}`,
-    title: `${fixture.title} 2-of-3 ${continuing ? '继续签名' : '首次签名'} · Signer ${
+    title: `${fixture.title} ${threshold} ${continuing ? '继续签名' : '首次签名'} · Signer ${
       scenario.signerIndex + 1
     }`,
     description: continuing
@@ -210,7 +217,7 @@ function btcSignCase(
 const erc20TransferData =
   '0xa9059cbb0000000000000000000000005618207d27d78f09f61a5d92190d58c453feb4b700000000000000000000000000000000000000000000000000000000000f4240';
 
-export const BUILT_IN_MULTISIG_CASES: MultisigTestCase[] = [
+const BUILT_IN_MULTISIG_BASE_CASES: MultisigTestCase[] = [
   ...GENERATED_MULTISIG_FIXTURES.eth.flatMap(generatedEthCases),
   ethCase('eth-safe-decimal-chain', 'Safe EIP-712 十进制 Chain ID', 'existing-example', safeTypedData('311', '0')),
   {
@@ -285,7 +292,10 @@ export const BUILT_IN_MULTISIG_CASES: MultisigTestCase[] = [
     localOnly: true,
     hardwareExpectation: undefined,
   },
-].map(testCase => ({
+];
+
+export const BUILT_IN_MULTISIG_CASES: MultisigTestCase[] =
+  BUILT_IN_MULTISIG_BASE_CASES.map(testCase => ({
   ...testCase,
   parameters: {
     ...testCase.parameters,

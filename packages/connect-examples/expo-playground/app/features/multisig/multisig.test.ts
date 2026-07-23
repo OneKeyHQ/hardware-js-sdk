@@ -46,7 +46,7 @@ describe('multisig test workbench domain', () => {
     );
 
     expect(ethCases).toHaveLength(2);
-    expect(btcCases).toHaveLength(9);
+    expect(btcCases).toHaveLength(12);
     [...ethCases, ...btcCases].forEach(item => {
       expect(item.hardwareExpectation?.signerIndex).toBe(0);
       expect(item.hardwareExpectation?.signerEnvKey).toBe('MULTISIG_MNEMONIC_1');
@@ -54,12 +54,36 @@ describe('multisig test workbench domain', () => {
     });
   });
 
+  test('包含 Signer 1 的 P2WSH 2-of-2 非零地址索引用例', () => {
+    const addressCase = BUILT_IN_MULTISIG_CASES.find(
+      item => item.id === 'btc-generated-p2wsh-2of2-index2-address-signer-1'
+    );
+
+    expect(addressCase).toBeDefined();
+    expect(addressCase).toMatchObject({
+      title: 'P2WSH · Index 2 2-of-2 地址 · Signer 1',
+      method: 'btcGetAddress',
+      hardwareExpectation: {
+        signerIndex: 0,
+        signerEnvKey: 'MULTISIG_MNEMONIC_1',
+      },
+      parameters: {
+        path: "m/48'/0'/0'/2'/0/2",
+        scriptType: 'SPENDWITNESS',
+        multisig: { m: 2, signatures: ['', ''] },
+      },
+    });
+    expect(
+      (addressCase?.parameters.multisig as { pubkeys: unknown[] }).pubkeys
+    ).toHaveLength(2);
+  });
+
   test('generated continuation cases prefill another signer and keep the current slot empty', () => {
     const partialCases = BUILT_IN_MULTISIG_CASES.filter(item =>
       item.id.startsWith('btc-generated-') && item.id.includes('-continue-')
     );
 
-    expect(partialCases).toHaveLength(3);
+    expect(partialCases).toHaveLength(4);
     partialCases.forEach(item => {
       const parameters = item.parameters as {
         inputs: Array<{ multisig: { signatures: string[] } }>;
@@ -70,7 +94,9 @@ describe('multisig test workbench domain', () => {
       expect(signatures.filter(Boolean)).toHaveLength(1);
       expect(item.hardwareExpectation?.prefilledSignerIndex).not.toBe(signerIndex);
       expect(item.reference?.broadcastable).toBe(false);
-      expect(item.reference?.expectedSignatures).toHaveLength(3);
+      expect(item.reference?.expectedSignatures).toHaveLength(
+        parameters.inputs[0].multisig.signatures.length
+      );
     });
   });
 

@@ -16,15 +16,46 @@ const BTC_CONFIGS: Array<{
   title: string;
   accountPath: string;
   scriptType: BtcScriptType;
+  signerCount: 2 | 3;
+  threshold: 2;
+  childPath: readonly [number, number];
 }> = [
-  { id: 'p2sh', title: 'P2SH', accountPath: "m/48'/0'/0'/0'", scriptType: 'SPENDMULTISIG' },
+  {
+    id: 'p2sh',
+    title: 'P2SH',
+    accountPath: "m/48'/0'/0'/0'",
+    scriptType: 'SPENDMULTISIG',
+    signerCount: 3,
+    threshold: 2,
+    childPath: [0, 0],
+  },
   {
     id: 'p2sh-p2wsh',
     title: 'P2SH-P2WSH',
     accountPath: "m/48'/0'/0'/1'",
     scriptType: 'SPENDP2SHWITNESS',
+    signerCount: 3,
+    threshold: 2,
+    childPath: [0, 0],
   },
-  { id: 'p2wsh', title: 'P2WSH', accountPath: "m/48'/0'/0'/2'", scriptType: 'SPENDWITNESS' },
+  {
+    id: 'p2wsh',
+    title: 'P2WSH',
+    accountPath: "m/48'/0'/0'/2'",
+    scriptType: 'SPENDWITNESS',
+    signerCount: 3,
+    threshold: 2,
+    childPath: [0, 0],
+  },
+  {
+    id: 'p2wsh-2of2-index2',
+    title: 'P2WSH · Index 2',
+    accountPath: "m/48'/0'/0'/2'",
+    scriptType: 'SPENDWITNESS',
+    signerCount: 2,
+    threshold: 2,
+    childPath: [0, 2],
+  },
 ];
 
 function cloneMultisig(multisig: BtcMultisigDescriptor, signatures: string[]) {
@@ -35,17 +66,25 @@ function cloneMultisig(multisig: BtcMultisigDescriptor, signatures: string[]) {
   };
 }
 
-function createPayment(id: BtcMultisigFixture['id'], childPublicKeys: Buffer[]) {
-  const p2ms = payments.p2ms({ m: 2, pubkeys: childPublicKeys, network: networks.bitcoin });
-  if (!p2ms.output) throw new Error(`BTC ${id} 无法生成 multisig script`);
+function createPayment(
+  scriptType: BtcScriptType,
+  threshold: number,
+  childPublicKeys: Buffer[]
+) {
+  const p2ms = payments.p2ms({
+    m: threshold,
+    pubkeys: childPublicKeys,
+    network: networks.bitcoin,
+  });
+  if (!p2ms.output) throw new Error(`BTC ${scriptType} 无法生成 multisig script`);
 
-  if (id === 'p2sh') {
+  if (scriptType === 'SPENDMULTISIG') {
     const payment = payments.p2sh({ redeem: p2ms, network: networks.bitcoin });
     return { payment, redeemScript: p2ms.output, witnessScript: undefined };
   }
 
   const p2wsh = payments.p2wsh({ redeem: p2ms, network: networks.bitcoin });
-  if (id === 'p2sh-p2wsh') {
+  if (scriptType === 'SPENDP2SHWITNESS') {
     const payment = payments.p2sh({ redeem: p2wsh, network: networks.bitcoin });
     return { payment, redeemScript: p2wsh.output, witnessScript: p2ms.output };
   }
@@ -81,10 +120,12 @@ async function createFixture(
   mnemonics: MultisigMnemonics,
   config: (typeof BTC_CONFIGS)[number]
 ): Promise<BtcMultisigFixture> {
-  const accounts = mnemonics.map(mnemonic =>
+  const accounts = mnemonics.slice(0, config.signerCount).map(mnemonic =>
     HDKey.fromMasterSeed(mnemonicToSeedSync(mnemonic)).derive(config.accountPath)
   );
-  const children = accounts.map(account => account.deriveChild(0).deriveChild(0));
+  const children = accounts.map(account =>
+    config.childPath.reduce((node, index) => node.deriveChild(index), account)
+  );
   const childPublicKeys = children.map((child, index) => {
     if (!child.publicKey) throw new Error(`BTC ${config.title} signer ${index + 1} 公钥派生失败`);
     return Buffer.from(child.publicKey);
@@ -93,7 +134,11 @@ async function createFixture(
     if (!child.privateKey) throw new Error(`BTC ${config.title} signer ${index + 1} 私钥派生失败`);
     return child.privateKey;
   });
-  const { payment, redeemScript, witnessScript } = createPayment(config.id, childPublicKeys);
+  const { payment, redeemScript, witnessScript } = createPayment(
+    config.scriptType,
+    config.threshold,
+    childPublicKeys
+  );
   if (!payment.address || !payment.output || !redeemScript) {
     throw new Error(`BTC ${config.title} 地址生成失败`);
   }
@@ -102,7 +147,7 @@ async function createFixture(
   const prevHash = fundingTx.getId();
   const spendingTx = createSpendingTransaction(prevHash);
   const sighash =
-    config.id === 'p2sh'
+    config.scriptType === 'SPENDMULTISIG'
       ? spendingTx.hashForSignature(0, redeemScript, Transaction.SIGHASH_ALL)
       : spendingTx.hashForWitnessV0(
           0,
@@ -129,15 +174,18 @@ async function createFixture(
       public_key: Buffer.from(account.publicKey).toString('hex'),
     };
   });
-  const emptySignatures = ['', '', ''];
-  const partialSignatures = [expectedSignatures[0], '', ''];
-  const doubleSignatures = [expectedSignatures[0], expectedSignatures[1], ''];
+  const emptySignatures = Array.from({ length: config.signerCount }, () => '');
+  const partialSignatures = [...emptySignatures];
+  partialSignatures[0] = expectedSignatures[0];
+  const doubleSignatures = [...emptySignatures];
+  doubleSignatures[0] = expectedSignatures[0];
+  doubleSignatures[1] = expectedSignatures[1];
   const baseMultisig: BtcMultisigDescriptor = {
-    pubkeys: accountNodes.map(node => ({ node, address_n: [0, 0] })),
+    pubkeys: accountNodes.map(node => ({ node, address_n: [...config.childPath] })),
     signatures: emptySignatures,
-    m: 2,
+    m: config.threshold,
   };
-  const path = `${config.accountPath}/0/0`;
+  const path = `${config.accountPath}/${config.childPath.join('/')}`;
   const addressN = getHDPath(path);
   const refTx = {
     hash: prevHash,
@@ -183,7 +231,7 @@ async function createFixture(
   );
   const signerIndex = 0 as const;
   const prefilledSignerIndex = 1 as const;
-  const continueSignatures = ['', '', ''];
+  const continueSignatures = [...emptySignatures];
   continueSignatures[prefilledSignerIndex] = expectedSignatures[prefilledSignerIndex];
   const signerScenarios = [
     {
@@ -216,7 +264,7 @@ async function createFixture(
     expectedDeviceChecks: [
       'Bitcoin 网络',
       config.title,
-      '2 / 3 阈值',
+      `${config.threshold} / ${config.signerCount} 阈值`,
       `发送 ${OUTPUT_AMOUNT} sats`,
       `手续费 ${FUNDING_AMOUNT - OUTPUT_AMOUNT} sats`,
     ],

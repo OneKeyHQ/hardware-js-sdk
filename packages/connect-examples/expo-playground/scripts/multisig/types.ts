@@ -97,7 +97,7 @@ export type BtcFixtureReference = PublicFixtureReference & {
 };
 
 export type BtcMultisigFixture = {
-  id: 'p2sh' | 'p2sh-p2wsh' | 'p2wsh';
+  id: 'p2sh' | 'p2sh-p2wsh' | 'p2wsh' | 'p2wsh-2of2-index2';
   title: string;
   path: string;
   scriptType: BtcScriptType;
