@@ -136,7 +136,8 @@ export async function writeProtocolV2File(options: ProtocolV2FileWriteOptions) {
     const maxChunkRetries = Math.max(Math.floor(options.maxChunkRetries ?? 0), 0);
     let retryCount = 0;
     let response;
-    while (true) {
+    let isWritePending = true;
+    while (isWritePending) {
       try {
         response = await options.commands.typedCall(
           'FilesystemFileWrite',
@@ -144,7 +145,7 @@ export async function writeProtocolV2File(options: ProtocolV2FileWriteOptions) {
           request,
           { timeoutMs: options.timeoutMs }
         );
-        break;
+        isWritePending = false;
       } catch (error) {
         if (retryCount >= maxChunkRetries || !isRetryableFileWriteTimeout(error)) throw error;
         retryCount += 1;

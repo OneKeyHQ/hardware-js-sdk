@@ -648,7 +648,6 @@ describe('Protocol V2 feature adapter', () => {
     expect(features.mode).toBe('bootloader');
     expect(features.bootloaderMode).toBe(true);
     expect(features.initialized).toBeNull();
-
   });
 
   test('keeps normal mode when DeviceStatusGet succeeds even if application metadata is absent', () => {
@@ -4229,11 +4228,12 @@ describe('Protocol V2 firmware update targets', () => {
       },
     });
     let resolveRequest: ((value: unknown) => void) | undefined;
-    const typedCall = jest.fn().mockImplementation(() => {
-      return new Promise(resolve => {
-        resolveRequest = resolve;
-      });
-    });
+    const typedCall = jest.fn().mockImplementation(
+      () =>
+        new Promise(resolve => {
+          resolveRequest = resolve;
+        })
+    );
 
     (method as any).device = stubDevice({
       getCommands: () => ({ typedCall }),

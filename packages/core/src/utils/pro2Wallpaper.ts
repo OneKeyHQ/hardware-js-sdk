@@ -1,5 +1,8 @@
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
+// RGB565 像素打包和抖动索引必须使用位运算。
+/* eslint-disable no-bitwise */
+
 export const PRO2_WALLPAPER_WIDTH = 604;
 export const PRO2_WALLPAPER_HEIGHT = 1024;
 
@@ -9,19 +12,16 @@ const COLOR_FORMAT_RGB565 = 0x12;
 const COLOR_FORMAT_RGB565A8 = 0x14;
 
 const RED_THRESHOLD = [
-  1, 7, 3, 5, 0, 8, 2, 6, 7, 1, 5, 3, 8, 0, 6, 2, 3, 5, 0, 8, 2, 6, 1, 7, 5, 3, 8,
-  0, 6, 2, 7, 1, 0, 8, 2, 6, 1, 7, 3, 5, 8, 0, 6, 2, 7, 1, 5, 3, 2, 6, 1, 7, 3, 5, 0,
-  8, 6, 2, 7, 1, 5, 3, 8, 0,
+  1, 7, 3, 5, 0, 8, 2, 6, 7, 1, 5, 3, 8, 0, 6, 2, 3, 5, 0, 8, 2, 6, 1, 7, 5, 3, 8, 0, 6, 2, 7, 1, 0,
+  8, 2, 6, 1, 7, 3, 5, 8, 0, 6, 2, 7, 1, 5, 3, 2, 6, 1, 7, 3, 5, 0, 8, 6, 2, 7, 1, 5, 3, 8, 0,
 ];
 const GREEN_THRESHOLD = [
-  1, 3, 2, 2, 3, 1, 2, 2, 2, 2, 0, 4, 2, 2, 4, 0, 3, 1, 2, 2, 1, 3, 2, 2, 2, 2, 4,
-  0, 2, 2, 0, 4, 1, 3, 2, 2, 3, 1, 2, 2, 2, 2, 0, 4, 2, 2, 4, 0, 3, 1, 2, 2, 1, 3, 2,
-  2, 2, 2, 4, 0, 2, 2, 0, 4,
+  1, 3, 2, 2, 3, 1, 2, 2, 2, 2, 0, 4, 2, 2, 4, 0, 3, 1, 2, 2, 1, 3, 2, 2, 2, 2, 4, 0, 2, 2, 0, 4, 1,
+  3, 2, 2, 3, 1, 2, 2, 2, 2, 0, 4, 2, 2, 4, 0, 3, 1, 2, 2, 1, 3, 2, 2, 2, 2, 4, 0, 2, 2, 0, 4,
 ];
 const BLUE_THRESHOLD = [
-  5, 3, 8, 0, 6, 2, 7, 1, 3, 5, 0, 8, 2, 6, 1, 7, 8, 0, 6, 2, 7, 1, 5, 3, 0, 8, 2,
-  6, 1, 7, 3, 5, 6, 2, 7, 1, 5, 3, 8, 0, 2, 6, 1, 7, 3, 5, 0, 8, 7, 1, 5, 3, 8, 0, 6,
-  2, 1, 7, 3, 5, 0, 8, 2, 6,
+  5, 3, 8, 0, 6, 2, 7, 1, 3, 5, 0, 8, 2, 6, 1, 7, 8, 0, 6, 2, 7, 1, 5, 3, 0, 8, 2, 6, 1, 7, 3, 5, 6,
+  2, 7, 1, 5, 3, 8, 0, 2, 6, 1, 7, 3, 5, 0, 8, 7, 1, 5, 3, 8, 0, 6, 2, 1, 7, 3, 5, 0, 8, 2, 6,
 ];
 
 function invalidParameter(message: string): Error {
@@ -86,10 +86,8 @@ export function encodePro2Wallpaper(options: {
       const sourceOffset = (y * width + x) * 4;
       const thresholdIndex = ((y & 7) << 3) + (x & 7);
       let red = Math.min(rgba[sourceOffset] + RED_THRESHOLD[thresholdIndex], 0xff) & 0xf8;
-      let green =
-        Math.min(rgba[sourceOffset + 1] + GREEN_THRESHOLD[thresholdIndex], 0xff) & 0xfc;
-      let blue =
-        Math.min(rgba[sourceOffset + 2] + BLUE_THRESHOLD[thresholdIndex], 0xff) & 0xf8;
+      let green = Math.min(rgba[sourceOffset + 1] + GREEN_THRESHOLD[thresholdIndex], 0xff) & 0xfc;
+      let blue = Math.min(rgba[sourceOffset + 2] + BLUE_THRESHOLD[thresholdIndex], 0xff) & 0xf8;
       if (!hasTransparency) {
         const alpha = rgba[sourceOffset + 3];
         red = (red * alpha) >> 8;

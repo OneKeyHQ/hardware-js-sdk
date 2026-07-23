@@ -48,7 +48,7 @@ export default class DeviceFirmwareUpdate extends BaseMethod<DeviceFirmwareUpdat
           },
         }
       );
-      return Promise.resolve(res.message);
+      return res.message;
     } catch (error) {
       if (isProtocolV2DeviceDisconnectedError(error)) {
         return Promise.resolve({

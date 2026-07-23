@@ -23,8 +23,8 @@ describe('WebUsbTransport Protocol V2 timeout recovery', () => {
     webusb.messagesV2 = transport.parseConfigure(schema);
     webusb.protocolV2Assemblers.set(path, new ProtocolV2FrameAssembler());
     webusb.transferOutOnce = jest.fn().mockResolvedValue(undefined);
-    webusb.receiveProtocolV2Frame = jest.fn(() => new Promise(() => undefined));
-    webusb.resetConnectionAfterProbe = jest.fn().mockImplementation(async () => {
+    webusb.receiveProtocolV2Frame = jest.fn(() => new Promise(() => {}));
+    webusb.resetConnectionAfterProbe = jest.fn().mockImplementation(() => {
       webusb.protocolV2Sessions.delete(path);
       webusb.protocolV2ReadTimeouts.delete(path);
       webusb.protocolV2Assemblers.get(path)?.reset();

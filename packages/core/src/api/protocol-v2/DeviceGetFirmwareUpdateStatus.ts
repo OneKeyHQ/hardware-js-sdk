@@ -24,11 +24,12 @@ function normalizeStatusFields(
   const normalized: DeviceFirmwareUpdateRecordFields = {};
   for (const field of DEVICE_FIRMWARE_UPDATE_STATUS_FIELDS) {
     const value = fields[field];
-    if (value === undefined) continue;
-    if (typeof value !== 'boolean') {
-      throw invalidParameter(`Parameter [fields.${field}] must be a boolean.`);
+    if (value !== undefined) {
+      if (typeof value !== 'boolean') {
+        throw invalidParameter(`Parameter [fields.${field}] must be a boolean.`);
+      }
+      normalized[field] = value;
     }
-    normalized[field] = value;
   }
   return normalized;
 }

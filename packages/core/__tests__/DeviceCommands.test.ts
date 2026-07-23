@@ -216,12 +216,14 @@ describe('DeviceCommands Protocol V2 interactive response compatibility', () => 
       )
     ).resolves.toMatchObject({ type: 'Success' });
 
-    expect(commands.device.emit).toHaveBeenCalledWith(
+    const emit = (commands.device as any).emit as jest.Mock;
+    expect(emit).toHaveBeenCalledWith(
       DEVICE.BUTTON,
       commands.device,
       expect.objectContaining({ code: 'ButtonRequest_PinEntry' })
     );
-    expect(commands._commonCall).toHaveBeenCalledWith('ButtonAck', {}, undefined);
+    const commonCall = (commands as any)._commonCall as jest.Mock;
+    expect(commonCall).toHaveBeenCalledWith('ButtonAck', {}, undefined);
   });
 
   it('rejects PassphraseRequest when the Pro2 UI listener is not registered', async () => {
