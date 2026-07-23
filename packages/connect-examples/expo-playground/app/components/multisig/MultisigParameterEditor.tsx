@@ -185,7 +185,7 @@ export function MultisigParameterEditor({
   };
 
   return (
-    <section className="flex min-h-0 flex-col border-b border-border bg-background lg:max-h-[46vh] lg:flex-none">
+    <section className="flex min-h-0 flex-col border-b border-border bg-background lg:max-h-[42vh] lg:flex-none">
       <div className="flex shrink-0 flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3">
         <div className="min-w-0 flex-1">
           {testCase.builtIn ? (
@@ -243,39 +243,39 @@ export function MultisigParameterEditor({
       </div>
 
       <div className="min-h-0 flex-auto space-y-3 overflow-visible px-4 py-3 lg:overflow-y-auto">
-        <div>
-          <div className="mb-2.5 flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-xs font-semibold">快捷字段</h2>
-              <p className="text-[11px] text-muted-foreground">
-                常用字段会同步到完整 SDK 请求参数。
-              </p>
-            </div>
-            <Button
-              type="button"
-              size="sm"
-              variant={advancedOpen ? 'secondary' : 'ghost'}
-              onClick={() => setAdvancedOpen(value => !value)}
-              className="h-7 px-3 text-[11px]"
-            >
-              <Braces className="h-4 w-4" />
-              高级 JSON
-            </Button>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-xs font-semibold">
+              {advancedOpen ? '完整请求参数' : '快捷字段'}
+            </h2>
+            <p className="text-[11px] text-muted-foreground">
+              {advancedOpen
+                ? 'JSON 合法并通过方法校验后才会应用。'
+                : '常用字段会同步到完整 SDK 请求参数。'}
+            </p>
           </div>
-          <div className="grid grid-cols-1 gap-x-3 gap-y-2 md:grid-cols-2 xl:grid-cols-4">
-            {quickFields.map(renderField)}
-          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant={advancedOpen ? 'secondary' : 'ghost'}
+            onClick={() => setAdvancedOpen(value => !value)}
+            className="h-7 px-3 text-[11px]"
+          >
+            <Braces className="h-4 w-4" />
+            {advancedOpen ? '快捷字段' : '高级 JSON'}
+          </Button>
         </div>
 
-        {advancedOpen ? (
-          <div className="border-t border-border pt-4">
-            <div className="mb-2 flex items-center justify-between">
-              <div>
-                <h2 className="text-xs font-semibold">完整请求参数</h2>
-                <p className="text-[11px] text-muted-foreground">
-                  JSON 合法并通过方法校验后才会应用。
-                </p>
-              </div>
+        {!advancedOpen ? (
+          <div
+            data-section="quick-fields"
+            className="grid grid-cols-1 gap-x-3 gap-y-2 md:grid-cols-2 xl:grid-cols-4"
+          >
+            {quickFields.map(renderField)}
+          </div>
+        ) : (
+          <div data-section="json-editor">
+            <div className="mb-2 flex justify-end">
               <Button
                 size="sm"
                 variant="outline"
@@ -292,11 +292,11 @@ export function MultisigParameterEditor({
               value={jsonDraft}
               disabled={disabled}
               onChange={event => setJsonDraft(event.target.value)}
-              className="min-h-72 font-mono text-xs leading-5"
+              className="min-h-56 font-mono text-xs leading-5"
               spellCheck={false}
             />
           </div>
-        ) : null}
+        )}
 
         {[...jsonIssues, ...validationIssues].length > 0 ? (
           <Alert variant="warning">

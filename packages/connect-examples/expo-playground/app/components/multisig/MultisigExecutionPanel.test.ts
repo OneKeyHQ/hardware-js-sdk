@@ -35,10 +35,23 @@ describe('MultisigExecutionPanel 布局', () => {
     );
   });
 
-  test('宽屏压缩快捷字段高度并把剩余高度留给结果区', () => {
-    expect(parameterEditorSource).toContain('lg:max-h-[46vh] lg:flex-none');
+  test('宽屏限制参数区高度并把剩余空间留给结果区', () => {
+    expect(parameterEditorSource).toContain('lg:max-h-[42vh] lg:flex-none');
     expect(parameterEditorSource).toContain('xl:grid-cols-4');
     expect(source).not.toContain('lg:h-[clamp(340px,38vh,420px)]');
+  });
+
+  test('快捷字段与高级 JSON 使用互斥视图，避免重复内容同时占高', () => {
+    expect(parameterEditorSource).toContain('data-section="quick-fields"');
+    expect(parameterEditorSource).toContain('data-section="json-editor"');
+    expect(parameterEditorSource).toContain("advancedOpen ? '快捷字段' : '高级 JSON'");
+  });
+
+  test('次要核对信息和原始响应默认折叠，按需展开', () => {
+    expect(source).toContain('<details');
+    expect(source).toContain('展开设备核对项');
+    expect(source).toContain('查看原始响应');
+    expect(source).toContain('收起原始响应');
   });
 
   test('用例库不再展示来源筛选', () => {
