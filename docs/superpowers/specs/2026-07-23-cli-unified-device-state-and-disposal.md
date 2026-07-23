@@ -16,9 +16,9 @@
 
 ### 状态命令
 
-新增 `get-state`，通过公共 `sdk.getDeviceState(connectId, { scope })` 读取状态。`scope` 支持 `runtime`、`settings` 和 `firmware`，默认 `runtime`。
+新增 `get-state`。`scope` 支持 `runtime`、`settings` 和 `firmware`，默认 `runtime`。设备搜索已经刷新动态状态，因此 `runtime` 直接复用同一次搜索的 canonical state；`settings` 和 `firmware` 再通过公共 `sdk.getDeviceState(connectId, { scope })` 读取对应扩展字段，避免默认流程重复请求 status。
 
-设备选择统一复用一次搜索结果：显式指定 `--connect-id` 时按连接 ID 匹配；未指定时选择首个设备。搜索结果本身已经包含 SDK 生成的 `state` 与兼容 `features`，CLI 不再在 `search` 后对每台 USB 设备额外调用 `getFeatures()`。
+设备选择统一复用一次搜索结果：显式指定 `--connect-id` 时按连接 ID 匹配；未指定时选择首个设备。搜索结果本身已经包含 SDK 生成的 `state` 与兼容 `features`，同时负责把 V1 的用户态序列号 connectId 映射到当前进程的底层 USB 设备缓存。CLI 不再在 `search` 后对每台 USB 设备额外调用 `getFeatures()`。
 
 ### 旧命令兼容
 
@@ -37,7 +37,9 @@ Commander 的版本号运行时从 `packages/hd-cli/package.json` 读取。发�
 
 `Core.dispose()` 负责停止当前 Connector、停止全部轮询、停止 Transport，并重置 DevicePool；common-connect 随后解除 Core 事件监听并清空 `_core`。清理方法保持幂等。
 
-Transport 的 `stop()` 允许返回 Promise，以便 Node USB 在停止时等待 Protocol V2 link 和已打开 USB 句柄完成关闭。CLI 的 `disposeSDK()` 对同步与异步实现均使用 `await Promise.resolve(sdk.dispose())`。
+Transport 的 `stop()` 允许返回 Promise，以便 Node USB 在停止时取消仍在等待响应的原生 `Transfer`，再等待 Protocol V2 link 和已打开 USB 句柄完成关闭。CLI 的 `disposeSDK()` 对同步与异步实现均使用 `await Promise.resolve(sdk.dispose())`。
+
+CLI 等待 dispose 完成后让 Node 自然退出，不再用 `process.exit()` 掩盖残留句柄。连接失败的技术细节只进入 SDK logger，stdout 始终保留给结构化 JSON 响应。
 
 ## 兼容性
 

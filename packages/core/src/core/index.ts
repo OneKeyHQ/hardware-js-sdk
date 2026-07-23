@@ -105,7 +105,7 @@ const parseInitOptions = (method?: BaseMethod): InitOptions => ({
   protocolV2DeviceInfoTimeoutMs: method?.payload.protocolV2DeviceInfoTimeoutMs,
 });
 
-let _core: Core;
+let _core: Core | undefined;
 let _deviceList: DeviceList | undefined;
 let _connector: DeviceConnector | undefined;
 let _uiPromises: UiPromise<UiPromiseResponse['type']>[] = []; // Waiting for ui response
@@ -364,7 +364,7 @@ const onCallDevice = async (
     );
   } catch (e) {
     preWarmCallbackTask?.resolve();
-    console.log('ensureConnected error: ', e);
+    Log.debug('ensureConnected error: ', e);
 
     completeMethodRequestContext(method, e);
 
@@ -1488,7 +1488,7 @@ export default class Core extends EventEmitter {
     _connector?.stop();
     let transportCleanup: Promise<void>;
     try {
-      transportCleanup = Promise.resolve(TransportManager.getTransport()?.stop()).catch(error => {
+      transportCleanup = Promise.resolve(TransportManager.getTransport()?.stop?.()).catch(error => {
         Log.warn('[Core] Transport cleanup failed:', error);
       });
     } catch (error) {
@@ -1507,6 +1507,7 @@ export default class Core extends EventEmitter {
     this.prePendingCallPromise = undefined;
     this.removeAllListeners();
     cleanupSdkInstance(this.sdkInstanceId);
+    if (_core === this) _core = undefined;
 
     // Transport（特别是 Node USB）可能需要异步释放原生句柄。
     await transportCleanup;
@@ -1514,8 +1515,9 @@ export default class Core extends EventEmitter {
 }
 
 export const initCore = () => {
-  _core = new Core();
-  return _core;
+  const core = new Core();
+  _core = core;
+  return core;
 };
 
 export const initConnector = () => {

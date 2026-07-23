@@ -847,7 +847,7 @@ sessionCmd
         });
         return;
       }
-      const device = searchResult.payload[0] as EnrichedSearchDevice;
+      const device: EnrichedSearchDevice = searchResult.payload[0];
       const connectId = device.connectId || globalOpts.connectId;
 
       // 2. Unlock if locked — getPassphraseState below talks to a live
@@ -1194,8 +1194,8 @@ function outputResult(_globalOpts: Record<string, any>, result: unknown): void {
   ) {
     process.exitCode = 1;
   }
-  // No process.exit here — runCommand() below handles dispose + exit so SDK
-  // async cleanup (USB release, event listener teardown) finishes first.
+  // No process.exit here — runCommand() waits for SDK cleanup, then lets Node
+  // exit naturally so leaked USB handles remain observable.
 }
 
 /**
@@ -1207,7 +1207,7 @@ function outputResult(_globalOpts: Record<string, any>, result: unknown): void {
  *   3. run the handler (which calls outputResult on success)
  *   4. report uncaught errors as a structured failure result
  *   5. dispose SDK
- *   6. drain event loop and process.exit with the right code
+ *   6. let Node exit naturally after all SDK resources are released
  *
  * This fixes three previous bugs:
  *   - Most signing commands skipped prepareSession, so keychain sessions
@@ -1259,9 +1259,7 @@ async function runCommand(
     // promise reference. Idempotent, safe to call even if init failed.
     await disposeSDK();
   }
-  // SDK event listeners can keep the event loop alive after dispose.
-  // setImmediate lets any trailing stdout/stderr writes flush first.
-  setImmediate(() => process.exit(process.exitCode ?? 0));
+  // disposeSDK 已等待 Transport 释放；让 Node 自然退出，使未来的资源泄漏可以被发现。
 }
 
 /** For commands that don't touch the SDK at all (e.g. firmware-update stubs). */
@@ -1309,7 +1307,9 @@ async function resolveLegacyFirmwareConnectId(
 
   if (matches.length === 0) {
     throw new Error(
-      normalizedName ? `BLE device not found by name: ${deviceName}` : 'No Classic/Pure BLE device found'
+      normalizedName
+        ? `BLE device not found by name: ${deviceName}`
+        : 'No Classic/Pure BLE device found'
     );
   }
   if (matches.length > 1) {
@@ -1320,8 +1320,8 @@ async function resolveLegacyFirmwareConnectId(
     );
   }
 
-  const connectId = matches[0].connectId;
-  if (!connectId) throw new Error(`BLE device has no connect ID: ${matches[0].name}`);
+  const [{ connectId, name }] = matches;
+  if (!connectId) throw new Error(`BLE device has no connect ID: ${name}`);
   return connectId;
 }
 
@@ -1416,9 +1416,7 @@ export function buildWallpaperUploadMetrics({
     transferredBytes,
     totalSeconds: Number((elapsedMs / 1000).toFixed(2)),
     transferKiBPerSecond:
-      elapsedMs > 0
-        ? Number((transferredBytes / 1024 / (elapsedMs / 1000)).toFixed(2))
-        : null,
+      elapsedMs > 0 ? Number((transferredBytes / 1024 / (elapsedMs / 1000)).toFixed(2)) : null,
     lastProgress,
   };
 }

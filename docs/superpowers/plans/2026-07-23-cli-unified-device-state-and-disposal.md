@@ -17,7 +17,7 @@
 - Create: `packages/hd-cli/src/__tests__/device-state-commands.test.ts`
 - Modify: `packages/hd-cli/src/cli.ts`
 
-- [ ] **Step 1: 编写 V1/V2 分流和状态 scope 的失败测试**
+- [x] **Step 1: 编写 V1/V2 分流和状态 scope 的失败测试**
 
 ```ts
 test('Protocol V2 不调用 getFeatures', async () => {
@@ -33,13 +33,13 @@ test('get-state 将 firmware scope 传给 SDK', async () => {
 });
 ```
 
-- [ ] **Step 2: 运行测试并确认失败**
+- [x] **Step 2: 运行测试并确认失败**
 
 Run: `yarn workspace @onekeyfe/hardware-cli test device-state-commands.test.ts --runInBand`
 
 Expected: FAIL，提示 `deviceStateCommands` 或导出函数不存在。
 
-- [ ] **Step 3: 实现设备解析、V1/V2 分流和 get-state 命令**
+- [x] **Step 3: 实现设备解析、V1/V2 分流和 get-state 命令**
 
 ```ts
 export async function getCanonicalDeviceState(sdk, connectId, scope) {
@@ -55,7 +55,7 @@ export async function getCompatibleFeatures(sdk, connectId) {
 }
 ```
 
-- [ ] **Step 4: 运行 CLI 定向测试**
+- [x] **Step 4: 运行 CLI 定向测试**
 
 Run: `yarn workspace @onekeyfe/hardware-cli test device-state-commands.test.ts --runInBand`
 
@@ -67,7 +67,7 @@ Expected: PASS。
 - Modify: `packages/hd-cli/src/cli.ts`
 - Create: `packages/hd-cli/src/__tests__/cli-version.test.ts`
 
-- [ ] **Step 1: 编写 Commander 版本与 package.json 一致的失败测试**
+- [x] **Step 1: 编写 Commander 版本与 package.json 一致的失败测试**
 
 ```ts
 import packageJson from '../../package.json';
@@ -78,20 +78,20 @@ test('使用 package.json 版本', () => {
 });
 ```
 
-- [ ] **Step 2: 运行测试并确认硬编码版本导致失败**
+- [x] **Step 2: 运行测试并确认硬编码版本导致失败**
 
 Run: `yarn workspace @onekeyfe/hardware-cli test cli-version.test.ts --runInBand`
 
 Expected: FAIL，实际值为 `1.1.26-alpha.1`。
 
-- [ ] **Step 3: 从发布包 manifest 读取版本**
+- [x] **Step 3: 从发布包 manifest 读取版本**
 
 ```ts
 const { version: cliVersion } = require('../package.json') as { version: string };
 program.version(cliVersion);
 ```
 
-- [ ] **Step 4: 运行版本测试与构建**
+- [x] **Step 4: 运行版本测试与构建**
 
 Run: `yarn workspace @onekeyfe/hardware-cli test cli-version.test.ts --runInBand && yarn workspace @onekeyfe/hardware-cli build`
 
@@ -106,9 +106,9 @@ Expected: PASS，构建成功，`node packages/hd-cli/dist/cli.js --version` 输
 - Modify: `packages/hd-common-connect-sdk/src/index.ts`
 - Modify: `packages/hd-cli/src/sdk.ts`
 - Create: `packages/core/__tests__/core-dispose.test.ts`
-- Create: `packages/hd-transport-usb/src/__tests__/dispose.test.ts`
+- Modify: `packages/hd-transport-usb/__tests__/protocol-v2-link.test.ts`
 
-- [ ] **Step 1: 编写 Core 和 Node USB 清理的失败测试**
+- [x] **Step 1: 编写 Core 和 Node USB 清理的失败测试**
 
 ```ts
 test('Core.dispose 停止连接与 Transport 并重置设备池', async () => {
@@ -124,13 +124,13 @@ test('NodeUsbTransport.stop 关闭全部打开设备', async () => {
 });
 ```
 
-- [ ] **Step 2: 运行测试并确认资源未被释放**
+- [x] **Step 2: 运行测试并确认资源未被释放**
 
 Run: `yarn workspace @onekeyfe/hd-core test core-dispose.test.ts --runInBand`
 
 Expected: FAIL，stop/reset mock 未调用。
 
-- [ ] **Step 3: 在资源所有者层实现幂等清理**
+- [x] **Step 3: 在资源所有者层实现幂等清理**
 
 ```ts
 async dispose() {
@@ -143,7 +143,7 @@ async dispose() {
 
 Node USB 的 `stop()` 同时取消调用、dispose Protocol V2 links、关闭 `openDevices`，common-connect 清空 `_core`。
 
-- [ ] **Step 4: 运行生命周期测试和相关构建**
+- [x] **Step 4: 运行生命周期测试和相关构建**
 
 Run: `yarn workspace @onekeyfe/hd-core test core-dispose.test.ts --runInBand && yarn workspace @onekeyfe/hd-transport-usb build && yarn workspace @onekeyfe/hd-common-connect-sdk build`
 
@@ -154,19 +154,19 @@ Expected: PASS，所有包构建成功。
 **Files:**
 - Modify: `docs/superpowers/plans/2026-07-23-cli-unified-device-state-and-disposal.md`
 
-- [ ] **Step 1: 运行定向测试、lint 和构建**
+- [x] **Step 1: 运行定向测试、lint 和构建**
 
 Run: `yarn workspace @onekeyfe/hardware-cli test --runInBand && yarn workspace @onekeyfe/hd-core test public-device-state-api.test.ts get-device-state.test.ts core-dispose.test.ts --runInBand && yarn workspace @onekeyfe/hardware-cli build`
 
 Expected: PASS。
 
-- [ ] **Step 2: 使用当前 Pro2 执行真实设备测试**
+- [x] **Step 2: 使用当前连接设备执行真实设备测试**
 
 Run: `node packages/hd-cli/dist/cli.js search && node packages/hd-cli/dist/cli.js get-state --connect-id <serial> && node packages/hd-cli/dist/cli.js get-state --connect-id <serial> --scope firmware && node packages/hd-cli/dist/cli.js get-features --connect-id <serial>`
 
-Expected: 均成功；Pro2 的 `get-features` 不再返回 415；每个 CLI 进程在输出后立即退出。
+Expected: Pro2 的 `get-features` 不再返回 415；每个 CLI 进程在 dispose 后自然退出。实际连接设备经协议响应确认为 Pro/V1，并完成 V1 状态字段与自然退出验证；当前没有可枚举的 Pro2/V2，V2 行为由单元测试覆盖。
 
-- [ ] **Step 3: 检查工作区变更并提交**
+- [x] **Step 3: 检查工作区变更并提交**
 
 Run: `git diff --check && git status --short`
 

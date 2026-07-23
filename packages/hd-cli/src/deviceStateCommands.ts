@@ -1,9 +1,4 @@
-import type {
-  CoreApi,
-  DeviceStateScope,
-  KnownDevice,
-  SearchDevice,
-} from '@onekeyfe/hd-core';
+import type { CoreApi, DeviceStateScope, KnownDevice, SearchDevice } from '@onekeyfe/hd-core';
 
 type DeviceStateSdk = Pick<CoreApi, 'searchDevices' | 'getDeviceState' | 'getFeatures'>;
 
@@ -29,20 +24,22 @@ const resolveSearchDevice = async (sdk: DeviceStateSdk, connectId?: string) => {
 };
 
 /**
- * 新 CLI 的统一状态入口。显式 connectId 不额外搜索；未指定设备时才自动选择第一台。
+ * 新 CLI 的统一状态入口。先通过搜索把用户态 connectId 映射到当前进程的设备缓存，
+ * 避免 V1 设备的序列号 connectId 与底层 USB path 不一致时直接读取失败。
  */
 export const getCanonicalDeviceState = async (
   sdk: DeviceStateSdk,
   connectId: string | undefined,
   scope: DeviceStateScope
 ) => {
-  let resolvedConnectId = connectId;
-  if (!resolvedConnectId) {
-    const deviceResult = await resolveSearchDevice(sdk);
-    if (!deviceResult.success) return deviceResult;
-    resolvedConnectId = deviceResult.payload.connectId ?? undefined;
+  const deviceResult = await resolveSearchDevice(sdk, connectId);
+  if (!deviceResult.success) return deviceResult;
+
+  if (scope === 'runtime' && deviceResult.payload.state) {
+    return { success: true as const, payload: deviceResult.payload.state };
   }
 
+  const resolvedConnectId = deviceResult.payload.connectId ?? undefined;
   if (!resolvedConnectId) return createDeviceNotFoundResult();
   return sdk.getDeviceState(resolvedConnectId, { scope });
 };

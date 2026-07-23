@@ -1,7 +1,4 @@
-import {
-  getCanonicalDeviceState,
-  getCompatibleFeatures,
-} from '../deviceStateCommands';
+import { getCanonicalDeviceState, getCompatibleFeatures } from '../deviceStateCommands';
 
 const createSdkMock = () => ({
   searchDevices: jest.fn(),
@@ -52,9 +49,7 @@ describe('设备状态 CLI 兼容层', () => {
     });
     sdk.getFeatures.mockResolvedValue(response);
 
-    await expect(getCompatibleFeatures(sdk as never, 'classic-connect-id')).resolves.toBe(
-      response
-    );
+    await expect(getCompatibleFeatures(sdk as never, 'classic-connect-id')).resolves.toBe(response);
     expect(sdk.getFeatures).toHaveBeenCalledWith('classic-connect-id');
   });
 
@@ -91,6 +86,10 @@ describe('设备状态 CLI 兼容层', () => {
   test('get-state 将 firmware scope 传给 SDK', async () => {
     const sdk = createSdkMock();
     const response = { success: true, payload: { protocol: 'V2' } };
+    sdk.searchDevices.mockResolvedValue({
+      success: true,
+      payload: [{ connectId: 'pro2-connect-id', state: { protocol: 'V2' } }],
+    });
     sdk.getDeviceState.mockResolvedValue(response);
 
     await expect(
@@ -99,23 +98,21 @@ describe('设备状态 CLI 兼容层', () => {
     expect(sdk.getDeviceState).toHaveBeenCalledWith('pro2-connect-id', {
       scope: 'firmware',
     });
-    expect(sdk.searchDevices).not.toHaveBeenCalled();
+    expect(sdk.searchDevices).toHaveBeenCalledTimes(1);
   });
 
   test('get-state 未指定 connectId 时搜索并选择第一台设备', async () => {
     const sdk = createSdkMock();
-    const response = { success: true, payload: { protocol: 'V2' } };
+    const state = { protocol: 'V2', revision: 2 };
     sdk.searchDevices.mockResolvedValue({
       success: true,
-      payload: [{ connectId: 'pro2-connect-id', state: { protocol: 'V2' } }],
+      payload: [{ connectId: 'pro2-connect-id', state }],
     });
-    sdk.getDeviceState.mockResolvedValue(response);
 
-    await expect(getCanonicalDeviceState(sdk as never, undefined, 'runtime')).resolves.toBe(
-      response
-    );
-    expect(sdk.getDeviceState).toHaveBeenCalledWith('pro2-connect-id', {
-      scope: 'runtime',
+    await expect(getCanonicalDeviceState(sdk as never, undefined, 'runtime')).resolves.toEqual({
+      success: true,
+      payload: state,
     });
+    expect(sdk.getDeviceState).not.toHaveBeenCalled();
   });
 });
