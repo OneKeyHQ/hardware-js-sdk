@@ -7,6 +7,9 @@ import type { EthMultisigFixture } from './types';
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 const SAFE_ADDRESS = '0x673f21761c5400531a37554a602fe0407addd0dd';
 const SAFE_TARGET = '0x5618207d27d78f09f61a5d92190d58c453feb4b7';
+const SAFE_TOKEN = '0xdac17f958d2ee523a2206206994597c13d831ec7';
+const ERC20_TRANSFER_DATA =
+  '0xa9059cbb0000000000000000000000005618207d27d78f09f61a5d92190d58c453feb4b700000000000000000000000000000000000000000000000000000000000f4240';
 
 const SAFE_TYPES = {
   SafeTx: [
@@ -27,22 +30,25 @@ const SAFE_TYPES = {
   ],
 };
 
-function buildSafeData(operation: '0' | '1') {
+function buildSafeData(
+  operation: '0' | '1',
+  overrides: Partial<{ to: string; value: string; data: string; nonce: string }> = {}
+) {
   return {
     types: SAFE_TYPES,
     domain: { chainId: '0x1', verifyingContract: SAFE_ADDRESS },
     primaryType: 'SafeTx',
     message: {
-      to: SAFE_TARGET,
-      value: '10000000000000',
-      data: '0x',
+      to: overrides.to ?? SAFE_TARGET,
+      value: overrides.value ?? '10000000000000',
+      data: overrides.data ?? '0x',
       operation,
       safeTxGas: '0',
       baseGas: '0',
       gasPrice: '0',
       gasToken: ZERO_ADDRESS,
       refundReceiver: ZERO_ADDRESS,
-      nonce: '0',
+      nonce: overrides.nonce ?? '0',
     },
   };
 }
@@ -54,10 +60,11 @@ function aggregateSignatures(signatures: string[]): string {
 async function createFixture(
   mnemonics: MultisigMnemonics,
   id: EthMultisigFixture['id'],
-  operation: '0' | '1'
+  operation: '0' | '1',
+  overrides?: Partial<{ to: string; value: string; data: string; nonce: string }>
 ): Promise<EthMultisigFixture> {
   const signers = deriveEthSigners(mnemonics);
-  const data = buildSafeData(operation);
+  const data = buildSafeData(operation, overrides);
   const messageTypes = { SafeTx: SAFE_TYPES.SafeTx };
   const digest = TypedDataEncoder.hash(data.domain, messageTypes, data.message);
   const expectedSignatures = await Promise.all(
@@ -70,11 +77,18 @@ async function createFixture(
 
   return {
     id,
-    title: id === 'standard' ? 'Safe EIP-712 三签标准交易' : 'Safe EIP-712 三签 DelegateCall 风险',
+    title:
+      id === 'standard'
+        ? 'Safe EIP-712 三签标准交易'
+        : id === 'delegate-call'
+          ? 'Safe EIP-712 三签 DelegateCall 风险'
+          : 'Safe EIP-712 ERC20 Transfer',
     description:
       id === 'standard'
         ? '由三个环境变量助记词生成的离线 Safe EIP-712 测试向量。'
-        : '由三个环境变量助记词生成的离线 DelegateCall 风险测试向量。',
+        : id === 'delegate-call'
+          ? '由三个环境变量助记词生成的离线 DelegateCall 风险测试向量。'
+          : '由三个环境变量助记词生成的离线 Safe ERC20 transfer 测试向量。',
     parameters: { path: ETH_DERIVATION_PATH, data },
     expectedDeviceChecks: ['Safe 地址', '目标地址', '金额', 'operation 与 nonce'],
     reference: {
@@ -94,5 +108,11 @@ export async function generateEthFixtures(
   return Promise.all([
     createFixture(mnemonics, 'standard', '0'),
     createFixture(mnemonics, 'delegate-call', '1'),
+    createFixture(mnemonics, 'erc20-transfer', '0', {
+      to: SAFE_TOKEN,
+      value: '0',
+      data: ERC20_TRANSFER_DATA,
+      nonce: '1',
+    }),
   ]);
 }

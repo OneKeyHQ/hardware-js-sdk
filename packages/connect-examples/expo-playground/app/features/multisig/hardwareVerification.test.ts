@@ -1,5 +1,6 @@
 import { getPublicKey, sign } from '@noble/secp256k1';
 import { describe, expect, test } from '@jest/globals';
+import { Transaction, Wallet } from 'ethers';
 
 import { BUILT_IN_MULTISIG_CASES } from './cases';
 import { verifyMultisigHardwareResult } from './hardwareVerification';
@@ -36,6 +37,51 @@ describe('verifyMultisigHardwareResult', () => {
         data: { address: testCase.hardwareExpectation?.expectedAddress },
       }).status
     ).toBe('passed');
+  });
+
+  test('从所有 EVM 交易签名恢复并校验 Signer 1 地址', async () => {
+    const wallet = new Wallet(`0x${'01'.padStart(64, '0')}`);
+    const testCases = BUILT_IN_MULTISIG_CASES.filter(
+      testCase => testCase.method === 'evmSignTransaction'
+    );
+
+    expect(testCases).toHaveLength(5);
+    for (const testCase of testCases) {
+      const transaction = testCase.parameters.transaction as Record<string, unknown>;
+      const signedTransaction = Transaction.from(
+        await wallet.signTransaction(transaction)
+      );
+      const signature = signedTransaction.signature;
+      if (!signature) throw new Error('测试交易缺少签名');
+      const sdkV =
+        'maxFeePerGas' in transaction
+          ? signature.yParity
+          : signature.networkV ?? signature.v;
+
+      const result = verifyMultisigHardwareResult(
+        {
+          ...testCase,
+          hardwareExpectation: {
+            signerIndex: 0,
+            signerEnvKey: 'MULTISIG_MNEMONIC_1',
+            signerAddress: wallet.address,
+          },
+        },
+        {
+          success: true,
+          data: {
+            v: `0x${BigInt(sdkV).toString(16)}`,
+            r: signature.r,
+            s: signature.s,
+          },
+        }
+      );
+
+      expect(result.status).toBe('passed');
+      expect(result.checks).toEqual([
+        expect.objectContaining({ label: 'Signer 地址', passed: true }),
+      ]);
+    }
   });
 
   test('所有 BTC 签名用例均兼容 SDK 省略 SIGHASH_ALL 后缀', () => {

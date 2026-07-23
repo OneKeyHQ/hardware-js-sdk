@@ -1,6 +1,7 @@
 import { describe, expect, test } from '@jest/globals';
 
 import { BUILT_IN_MULTISIG_CASES } from './cases';
+import { GENERATED_MULTISIG_FIXTURES } from './generatedFixtures';
 import { applyJsonDraft, cloneAsCustomCase, setByPath } from './editor';
 import { loadCustomCases, saveCustomCases } from './storage';
 import { validateMultisigCase } from './validation';
@@ -45,13 +46,63 @@ describe('multisig test workbench domain', () => {
       item.id.startsWith('btc-generated-')
     );
 
-    expect(ethCases).toHaveLength(2);
+    expect(ethCases).toHaveLength(3);
     expect(btcCases).toHaveLength(12);
     [...ethCases, ...btcCases].forEach(item => {
       expect(item.hardwareExpectation?.signerIndex).toBe(0);
       expect(item.hardwareExpectation?.signerEnvKey).toBe('MULTISIG_MNEMONIC_1');
       expect(item.title).toContain('Signer 1');
     });
+  });
+
+  test('提交的 fixture 固定为真机预置的 Signer 1 身份', () => {
+    const signer1Addresses = GENERATED_MULTISIG_FIXTURES.eth.map(
+      fixture => fixture.reference.signerAddresses[0]
+    );
+
+    expect(new Set(signer1Addresses)).toEqual(
+      new Set(['0x5618207d27D78F09f61A5D92190d58c453feB4b7'])
+    );
+  });
+
+  test('覆盖 Safe 的 ERC20、EIP-1559、approveHash 和 DelegateCall 用例', () => {
+    const expectedIds = [
+      'eth-generated-erc20-transfer-signer-1',
+      'eth-safe-calldata-eip1559',
+      'eth-safe-approve-hash',
+      'eth-safe-calldata-delegate-call',
+    ];
+
+    expectedIds.forEach(id => {
+      const testCase = BUILT_IN_MULTISIG_CASES.find(item => item.id === id);
+      expect(testCase).toBeDefined();
+      expect(testCase?.hardwareExpectation).toMatchObject({
+        signerIndex: 0,
+        signerEnvKey: 'MULTISIG_MNEMONIC_1',
+      });
+      expect(testCase?.title).toContain('Signer 1');
+    });
+
+    const eip1559 = BUILT_IN_MULTISIG_CASES.find(
+      item => item.id === 'eth-safe-calldata-eip1559'
+    )?.parameters.transaction as Record<string, unknown>;
+    expect(eip1559).toMatchObject({
+      maxFeePerGas: '0x77359400',
+      maxPriorityFeePerGas: '0x3b9aca00',
+    });
+    expect(eip1559.gasPrice).toBeUndefined();
+
+    const approveHash = BUILT_IN_MULTISIG_CASES.find(
+      item => item.id === 'eth-safe-approve-hash'
+    )?.parameters.transaction as { data: string };
+    expect(approveHash.data).toMatch(/^0xd4d9bdcd[0-9a-f]{64}$/);
+
+    const delegateCall = BUILT_IN_MULTISIG_CASES.find(
+      item => item.id === 'eth-safe-calldata-delegate-call'
+    )?.parameters.transaction as { data: string };
+    expect(delegateCall.data.slice(10 + 3 * 64, 10 + 4 * 64)).toBe(
+      '1'.padStart(64, '0')
+    );
   });
 
   test('包含 Signer 1 的 P2WSH 2-of-2 非零地址索引用例', () => {
@@ -66,6 +117,8 @@ describe('multisig test workbench domain', () => {
       hardwareExpectation: {
         signerIndex: 0,
         signerEnvKey: 'MULTISIG_MNEMONIC_1',
+        signerAddress: '15czspQVjfNWgQab4RwXaCtXgfG6tfqwug',
+        expectedAddress: 'bc1qyjgph6g5ta9r5qv04lmaqxwxfn3ynesvdsy84uwme66l5u7za3tqnrfq4l',
       },
       parameters: {
         path: "m/48'/0'/0'/2'/0/2",

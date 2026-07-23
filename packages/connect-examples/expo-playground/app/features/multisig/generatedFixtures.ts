@@ -94,17 +94,17 @@ export const GENERATED_MULTISIG_FIXTURES = {
         "broadcastable": false,
         "digest": "0x3967ec90437ee9540ac2bf7e47546986487b2d7c1b31ca81d2e085a59deb5165",
         "signerAddresses": [
-          "0x9858EfFD232B4033E47d90003D41EC34EcaEda94",
-          "0x58A57ed9d8d624cBD12e2C467D34787555bB1b25",
-          "0x3061750d3dF69ef7B8d4407CB7f3F879Fd9d2398"
+          "0x5618207d27D78F09f61A5D92190d58c453feB4b7",
+          "0x30be964E2b0ab050fB9358BED3d31bdF2C4f391E",
+          "0x55F453190B934d38b622e1C6e3CE165017034177"
         ],
         "expectedSignatures": [
-          "0x4763549468898de6cbd64af634b6cb811d684fe4f328d58b121984e5cd878c5c5d8c80afd80d700461f267a72ffc63b7c5b7e443de606485fef5cd6dbd280eb41c",
-          "0x1e18f52d6a84cf9741aab94db48b98d43fa87033b3616feebacac780e91641262ed4f6fe9dfd48699404f49fa7fc22abcc74632a962e1db0fac6dbb63a1b78141c",
-          "0x565ccf4e458d4690780e21bf5b0bbf1221c364bed0195544f3ecccca465efb925fba86bd2e1ae67808a5f064b45093cdd984ebf7991304a05f520fa198d8af411c"
+          "0x24217cc62f4935f0c906adf523180d0b4fc820a5e547fc9b311bb8f7e8f9613f2a6c608f39a878d35528429224091628fcc21cd0960ae529d7957e5d4d7caef91b",
+          "0x70bf44396a5380549cbbdbfe20aed82be66fecbbbb9035c622abf82a89af158c593901c7fcfd1083f8f7e3a49b5ebf863261e62d4246d47c7e33288dee6698fd1c",
+          "0x162a200c27fa26fac41901e9c4111109397b7aa2b4f594da8127eeb6318926493e91362e183a7d00d003e74d1ef7658e7763414610643172e72f45c754cc36f91c"
         ],
-        "aggregatedSignatures2Of3": "0x565ccf4e458d4690780e21bf5b0bbf1221c364bed0195544f3ecccca465efb925fba86bd2e1ae67808a5f064b45093cdd984ebf7991304a05f520fa198d8af411c1e18f52d6a84cf9741aab94db48b98d43fa87033b3616feebacac780e91641262ed4f6fe9dfd48699404f49fa7fc22abcc74632a962e1db0fac6dbb63a1b78141c",
-        "aggregatedSignatures3Of3": "0x565ccf4e458d4690780e21bf5b0bbf1221c364bed0195544f3ecccca465efb925fba86bd2e1ae67808a5f064b45093cdd984ebf7991304a05f520fa198d8af411c1e18f52d6a84cf9741aab94db48b98d43fa87033b3616feebacac780e91641262ed4f6fe9dfd48699404f49fa7fc22abcc74632a962e1db0fac6dbb63a1b78141c4763549468898de6cbd64af634b6cb811d684fe4f328d58b121984e5cd878c5c5d8c80afd80d700461f267a72ffc63b7c5b7e443de606485fef5cd6dbd280eb41c"
+        "aggregatedSignatures2Of3": "0x70bf44396a5380549cbbdbfe20aed82be66fecbbbb9035c622abf82a89af158c593901c7fcfd1083f8f7e3a49b5ebf863261e62d4246d47c7e33288dee6698fd1c162a200c27fa26fac41901e9c4111109397b7aa2b4f594da8127eeb6318926493e91362e183a7d00d003e74d1ef7658e7763414610643172e72f45c754cc36f91c",
+        "aggregatedSignatures3Of3": "0x70bf44396a5380549cbbdbfe20aed82be66fecbbbb9035c622abf82a89af158c593901c7fcfd1083f8f7e3a49b5ebf863261e62d4246d47c7e33288dee6698fd1c162a200c27fa26fac41901e9c4111109397b7aa2b4f594da8127eeb6318926493e91362e183a7d00d003e74d1ef7658e7763414610643172e72f45c754cc36f91c24217cc62f4935f0c906adf523180d0b4fc820a5e547fc9b311bb8f7e8f9613f2a6c608f39a878d35528429224091628fcc21cd0960ae529d7957e5d4d7caef91b"
       }
     },
     {
@@ -197,17 +197,120 @@ export const GENERATED_MULTISIG_FIXTURES = {
         "broadcastable": false,
         "digest": "0x12911c58eea24da886c866acca164117f3751c85335ed5c90d0ce30d60a54a52",
         "signerAddresses": [
-          "0x9858EfFD232B4033E47d90003D41EC34EcaEda94",
-          "0x58A57ed9d8d624cBD12e2C467D34787555bB1b25",
-          "0x3061750d3dF69ef7B8d4407CB7f3F879Fd9d2398"
+          "0x5618207d27D78F09f61A5D92190d58c453feB4b7",
+          "0x30be964E2b0ab050fB9358BED3d31bdF2C4f391E",
+          "0x55F453190B934d38b622e1C6e3CE165017034177"
         ],
         "expectedSignatures": [
-          "0x156e07ea2b1d916b4739b8b8f3f647b7c28180837bbf68ef100d3415b7a5659a44c6cb3c4e0dae7b13d57d889037888f6222e775205d63dd174fc1f2085fd6ce1b",
-          "0x94db19f6c787399035cfc3b7642a58739cd3d83ad4850c468b1e6b42c323fdf720165d714d2c851f4bc949d282ec4dcc07b2c55cc3563f814a5ff1e9ec8c5b7f1c",
-          "0xbc9dccd68f9d40d643c2d0a0a7e917fe5ee9d620c8a201a4f18fdc7facc0beb8305f3e08eeb677950162eb5b5921c0afaa16391df5e78949a40b14c9dd0ec92b1b"
+          "0x5ec0bf0dd7e022b6570d1395f6a0ecfbe4b3fd77cf62c92536e17b312269196628466d8a385f89b180fd52a8092d65e7acaaf7957428f69e71161433be4f6fe81b",
+          "0xb383c6d68d89f98df33167c4c847cf13588f5b29f40bdddcd4cac345aa00bb0b1953b77cc6145380b0ebed8d9537a23c40e44fcce10e306278f98ff07678ebbf1b",
+          "0x8e345f9f441f8578ab552dfd4d32d9f0ee0afa08fe277818dfccd6522134d2a6582bfa98515c9c65f4e3ed1268da6c0bdd5d3655e3ed15a6054ff33978162aae1c"
         ],
-        "aggregatedSignatures2Of3": "0xbc9dccd68f9d40d643c2d0a0a7e917fe5ee9d620c8a201a4f18fdc7facc0beb8305f3e08eeb677950162eb5b5921c0afaa16391df5e78949a40b14c9dd0ec92b1b94db19f6c787399035cfc3b7642a58739cd3d83ad4850c468b1e6b42c323fdf720165d714d2c851f4bc949d282ec4dcc07b2c55cc3563f814a5ff1e9ec8c5b7f1c",
-        "aggregatedSignatures3Of3": "0xbc9dccd68f9d40d643c2d0a0a7e917fe5ee9d620c8a201a4f18fdc7facc0beb8305f3e08eeb677950162eb5b5921c0afaa16391df5e78949a40b14c9dd0ec92b1b94db19f6c787399035cfc3b7642a58739cd3d83ad4850c468b1e6b42c323fdf720165d714d2c851f4bc949d282ec4dcc07b2c55cc3563f814a5ff1e9ec8c5b7f1c156e07ea2b1d916b4739b8b8f3f647b7c28180837bbf68ef100d3415b7a5659a44c6cb3c4e0dae7b13d57d889037888f6222e775205d63dd174fc1f2085fd6ce1b"
+        "aggregatedSignatures2Of3": "0xb383c6d68d89f98df33167c4c847cf13588f5b29f40bdddcd4cac345aa00bb0b1953b77cc6145380b0ebed8d9537a23c40e44fcce10e306278f98ff07678ebbf1b8e345f9f441f8578ab552dfd4d32d9f0ee0afa08fe277818dfccd6522134d2a6582bfa98515c9c65f4e3ed1268da6c0bdd5d3655e3ed15a6054ff33978162aae1c",
+        "aggregatedSignatures3Of3": "0xb383c6d68d89f98df33167c4c847cf13588f5b29f40bdddcd4cac345aa00bb0b1953b77cc6145380b0ebed8d9537a23c40e44fcce10e306278f98ff07678ebbf1b8e345f9f441f8578ab552dfd4d32d9f0ee0afa08fe277818dfccd6522134d2a6582bfa98515c9c65f4e3ed1268da6c0bdd5d3655e3ed15a6054ff33978162aae1c5ec0bf0dd7e022b6570d1395f6a0ecfbe4b3fd77cf62c92536e17b312269196628466d8a385f89b180fd52a8092d65e7acaaf7957428f69e71161433be4f6fe81b"
+      }
+    },
+    {
+      "id": "erc20-transfer",
+      "title": "Safe EIP-712 ERC20 Transfer",
+      "description": "由三个环境变量助记词生成的离线 Safe ERC20 transfer 测试向量。",
+      "parameters": {
+        "path": "m/44'/60'/0'/0/0",
+        "data": {
+          "types": {
+            "SafeTx": [
+              {
+                "name": "to",
+                "type": "address"
+              },
+              {
+                "name": "value",
+                "type": "uint256"
+              },
+              {
+                "name": "data",
+                "type": "bytes"
+              },
+              {
+                "name": "operation",
+                "type": "uint8"
+              },
+              {
+                "name": "safeTxGas",
+                "type": "uint256"
+              },
+              {
+                "name": "baseGas",
+                "type": "uint256"
+              },
+              {
+                "name": "gasPrice",
+                "type": "uint256"
+              },
+              {
+                "name": "gasToken",
+                "type": "address"
+              },
+              {
+                "name": "refundReceiver",
+                "type": "address"
+              },
+              {
+                "name": "nonce",
+                "type": "uint256"
+              }
+            ],
+            "EIP712Domain": [
+              {
+                "name": "chainId",
+                "type": "uint256"
+              },
+              {
+                "name": "verifyingContract",
+                "type": "address"
+              }
+            ]
+          },
+          "domain": {
+            "chainId": "0x1",
+            "verifyingContract": "0x673f21761c5400531a37554a602fe0407addd0dd"
+          },
+          "primaryType": "SafeTx",
+          "message": {
+            "to": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "value": "0",
+            "data": "0xa9059cbb0000000000000000000000005618207d27d78f09f61a5d92190d58c453feb4b700000000000000000000000000000000000000000000000000000000000f4240",
+            "operation": "0",
+            "safeTxGas": "0",
+            "baseGas": "0",
+            "gasPrice": "0",
+            "gasToken": "0x0000000000000000000000000000000000000000",
+            "refundReceiver": "0x0000000000000000000000000000000000000000",
+            "nonce": "1"
+          }
+        }
+      },
+      "expectedDeviceChecks": [
+        "Safe 地址",
+        "目标地址",
+        "金额",
+        "operation 与 nonce"
+      ],
+      "reference": {
+        "broadcastable": false,
+        "digest": "0xad23663a4dd03667a78308742c2796dee85bdd48ac1e5b4e12281f86af2515ba",
+        "signerAddresses": [
+          "0x5618207d27D78F09f61A5D92190d58c453feB4b7",
+          "0x30be964E2b0ab050fB9358BED3d31bdF2C4f391E",
+          "0x55F453190B934d38b622e1C6e3CE165017034177"
+        ],
+        "expectedSignatures": [
+          "0x69753cb590a5e1667231b6dbc47c4911c0337fac9a90a8e49b81a37df5055e29409804bf13c81d4862ba074ba622679dff0891013aa93fc819f3b71088c597f71b",
+          "0x450425f862cd7b516b408f0a94e6848ff98c138927dcf1fc950e98bc795a757a48f3f2d2bd073136f2497d75e27a804ce305403c4e7e0c5bb1347fc906ad37ce1b",
+          "0x7d6525ec1655cbbd53704400b7b46d98101b5d9cd9a1942d67a3653b723a39bb33884fb6a828e3094e97dd3ee6603377e7874ea9b7c240c5c46cef07fda056dd1b"
+        ],
+        "aggregatedSignatures2Of3": "0x450425f862cd7b516b408f0a94e6848ff98c138927dcf1fc950e98bc795a757a48f3f2d2bd073136f2497d75e27a804ce305403c4e7e0c5bb1347fc906ad37ce1b7d6525ec1655cbbd53704400b7b46d98101b5d9cd9a1942d67a3653b723a39bb33884fb6a828e3094e97dd3ee6603377e7874ea9b7c240c5c46cef07fda056dd1b",
+        "aggregatedSignatures3Of3": "0x450425f862cd7b516b408f0a94e6848ff98c138927dcf1fc950e98bc795a757a48f3f2d2bd073136f2497d75e27a804ce305403c4e7e0c5bb1347fc906ad37ce1b7d6525ec1655cbbd53704400b7b46d98101b5d9cd9a1942d67a3653b723a39bb33884fb6a828e3094e97dd3ee6603377e7874ea9b7c240c5c46cef07fda056dd1b69753cb590a5e1667231b6dbc47c4911c0337fac9a90a8e49b81a37df5055e29409804bf13c81d4862ba074ba622679dff0891013aa93fc819f3b71088c597f71b"
       }
     }
   ],
@@ -217,7 +320,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
       "title": "P2SH",
       "path": "m/48'/0'/0'/0'/0/0",
       "scriptType": "SPENDMULTISIG",
-      "address": "3FTNvfjxMQchDMdhT3ELE7nHyRdWhd1yMu",
+      "address": "3PsKgyPTAp9uik25v1ntqGUtAb76jS5z7t",
       "addressParameters": {
         "path": "m/48'/0'/0'/0'/0/0",
         "coin": "btc",
@@ -228,10 +331,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
             {
               "node": {
                 "depth": 4,
-                "fingerprint": 485660438,
+                "fingerprint": 643428168,
                 "child_num": 2147483648,
-                "chain_code": "fa4ffc4b061bb96607a57d6fb29e9a8fd094cb53658e46fbdbde54de5365d086",
-                "public_key": "03ed683f47e82e1bb7928acce54f669c54d9b406cc1a832a6fb9b45058283630fb"
+                "chain_code": "b31244e5bcdacf4ebbd44d5d1068d88d38886a6ad24ff5fffcbed44fd09ef5d9",
+                "public_key": "02e68e18a8ecf52287b3fd0de2fef6546c56b92a45cda64a2675cf923c5b3702d1"
               },
               "address_n": [
                 0,
@@ -241,10 +344,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
             {
               "node": {
                 "depth": 4,
-                "fingerprint": 4292461849,
+                "fingerprint": 366162743,
                 "child_num": 2147483648,
-                "chain_code": "df377130b6c8fda3f4da0c173956bfd39d1a1484008a9a664241f9edea9dd47b",
-                "public_key": "02d78e64af9b0226de8f0bb4e39042abd2257185194d77e48b66f500d59aece3b2"
+                "chain_code": "3f53bff9b0e3064d86e99f6cd021fc1474626a808a5cd856d1ad5515730181b6",
+                "public_key": "0259266d4f895c9914f3eeff52db716273782f619d4243d63b026b85202024084e"
               },
               "address_n": [
                 0,
@@ -254,10 +357,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
             {
               "node": {
                 "depth": 4,
-                "fingerprint": 563700748,
+                "fingerprint": 3679881372,
                 "child_num": 2147483648,
-                "chain_code": "3400424ec9426d27b8cd655e1428bafef809343a5dbd47e7c2919e0c3a70cb0b",
-                "public_key": "026b1a3a2c75247d64211be5c1f3c6aca74f6ceff578424c1240284a1186d89869"
+                "chain_code": "fba6ed603da367e06b595888926d4923f3702ffcc33aed390f102bfc380d3a3f",
+                "public_key": "03e5c56d800f644e094215ab12111f47bd6cee65be6d52f7f67246c1f747d783d2"
               },
               "address_n": [
                 0,
@@ -287,7 +390,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
               0,
               0
             ],
-            "prev_hash": "2e46ae2c2aa057b244410b7122cfff390624af4800ff6a86c3b5e75f345627e3",
+            "prev_hash": "bdeb4882a1cc6a8dd507b1e219550e17fde2f76dff15fc40829219e2cb712280",
             "prev_index": 0,
             "sequence": 4294967293,
             "amount": "200000",
@@ -297,10 +400,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 {
                   "node": {
                     "depth": 4,
-                    "fingerprint": 485660438,
+                    "fingerprint": 643428168,
                     "child_num": 2147483648,
-                    "chain_code": "fa4ffc4b061bb96607a57d6fb29e9a8fd094cb53658e46fbdbde54de5365d086",
-                    "public_key": "03ed683f47e82e1bb7928acce54f669c54d9b406cc1a832a6fb9b45058283630fb"
+                    "chain_code": "b31244e5bcdacf4ebbd44d5d1068d88d38886a6ad24ff5fffcbed44fd09ef5d9",
+                    "public_key": "02e68e18a8ecf52287b3fd0de2fef6546c56b92a45cda64a2675cf923c5b3702d1"
                   },
                   "address_n": [
                     0,
@@ -310,10 +413,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 {
                   "node": {
                     "depth": 4,
-                    "fingerprint": 4292461849,
+                    "fingerprint": 366162743,
                     "child_num": 2147483648,
-                    "chain_code": "df377130b6c8fda3f4da0c173956bfd39d1a1484008a9a664241f9edea9dd47b",
-                    "public_key": "02d78e64af9b0226de8f0bb4e39042abd2257185194d77e48b66f500d59aece3b2"
+                    "chain_code": "3f53bff9b0e3064d86e99f6cd021fc1474626a808a5cd856d1ad5515730181b6",
+                    "public_key": "0259266d4f895c9914f3eeff52db716273782f619d4243d63b026b85202024084e"
                   },
                   "address_n": [
                     0,
@@ -323,10 +426,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 {
                   "node": {
                     "depth": 4,
-                    "fingerprint": 563700748,
+                    "fingerprint": 3679881372,
                     "child_num": 2147483648,
-                    "chain_code": "3400424ec9426d27b8cd655e1428bafef809343a5dbd47e7c2919e0c3a70cb0b",
-                    "public_key": "026b1a3a2c75247d64211be5c1f3c6aca74f6ceff578424c1240284a1186d89869"
+                    "chain_code": "fba6ed603da367e06b595888926d4923f3702ffcc33aed390f102bfc380d3a3f",
+                    "public_key": "03e5c56d800f644e094215ab12111f47bd6cee65be6d52f7f67246c1f747d783d2"
                   },
                   "address_n": [
                     0,
@@ -352,7 +455,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
         ],
         "refTxs": [
           {
-            "hash": "2e46ae2c2aa057b244410b7122cfff390624af4800ff6a86c3b5e75f345627e3",
+            "hash": "bdeb4882a1cc6a8dd507b1e219550e17fde2f76dff15fc40829219e2cb712280",
             "version": 2,
             "inputs": [
               {
@@ -365,7 +468,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
             "bin_outputs": [
               {
                 "amount": 200000,
-                "script_pubkey": "a91496fd781f12cc667ae77de15bacf4759ae3cd8e6387"
+                "script_pubkey": "a914f345c1d72368680b03db19a107a0defb9560fb0d87"
               }
             ],
             "lock_time": 0
@@ -386,7 +489,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
               0,
               0
             ],
-            "prev_hash": "2e46ae2c2aa057b244410b7122cfff390624af4800ff6a86c3b5e75f345627e3",
+            "prev_hash": "bdeb4882a1cc6a8dd507b1e219550e17fde2f76dff15fc40829219e2cb712280",
             "prev_index": 0,
             "sequence": 4294967293,
             "amount": "200000",
@@ -396,10 +499,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 {
                   "node": {
                     "depth": 4,
-                    "fingerprint": 485660438,
+                    "fingerprint": 643428168,
                     "child_num": 2147483648,
-                    "chain_code": "fa4ffc4b061bb96607a57d6fb29e9a8fd094cb53658e46fbdbde54de5365d086",
-                    "public_key": "03ed683f47e82e1bb7928acce54f669c54d9b406cc1a832a6fb9b45058283630fb"
+                    "chain_code": "b31244e5bcdacf4ebbd44d5d1068d88d38886a6ad24ff5fffcbed44fd09ef5d9",
+                    "public_key": "02e68e18a8ecf52287b3fd0de2fef6546c56b92a45cda64a2675cf923c5b3702d1"
                   },
                   "address_n": [
                     0,
@@ -409,10 +512,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 {
                   "node": {
                     "depth": 4,
-                    "fingerprint": 4292461849,
+                    "fingerprint": 366162743,
                     "child_num": 2147483648,
-                    "chain_code": "df377130b6c8fda3f4da0c173956bfd39d1a1484008a9a664241f9edea9dd47b",
-                    "public_key": "02d78e64af9b0226de8f0bb4e39042abd2257185194d77e48b66f500d59aece3b2"
+                    "chain_code": "3f53bff9b0e3064d86e99f6cd021fc1474626a808a5cd856d1ad5515730181b6",
+                    "public_key": "0259266d4f895c9914f3eeff52db716273782f619d4243d63b026b85202024084e"
                   },
                   "address_n": [
                     0,
@@ -422,10 +525,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 {
                   "node": {
                     "depth": 4,
-                    "fingerprint": 563700748,
+                    "fingerprint": 3679881372,
                     "child_num": 2147483648,
-                    "chain_code": "3400424ec9426d27b8cd655e1428bafef809343a5dbd47e7c2919e0c3a70cb0b",
-                    "public_key": "026b1a3a2c75247d64211be5c1f3c6aca74f6ceff578424c1240284a1186d89869"
+                    "chain_code": "fba6ed603da367e06b595888926d4923f3702ffcc33aed390f102bfc380d3a3f",
+                    "public_key": "03e5c56d800f644e094215ab12111f47bd6cee65be6d52f7f67246c1f747d783d2"
                   },
                   "address_n": [
                     0,
@@ -434,7 +537,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 }
               ],
               "signatures": [
-                "304502210094afb2090f06a676ced142fe6d37c8292246940e0c6e4a4cdfb6fbe7eca2295c02203a5914a6e6983748aa8a8239212d496b931d23c357f9293d3ce1f48f6fb74da601",
+                "3045022100e4437b7cc66b5342d24c50e1d3f0b9213aa6a8eb5b7a495ff2a16d257c45524d022060b873c66eda37531cae41d797969c7224acbfde48c498c5f5a59d9b1cbca3c601",
                 "",
                 ""
               ],
@@ -451,7 +554,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
         ],
         "refTxs": [
           {
-            "hash": "2e46ae2c2aa057b244410b7122cfff390624af4800ff6a86c3b5e75f345627e3",
+            "hash": "bdeb4882a1cc6a8dd507b1e219550e17fde2f76dff15fc40829219e2cb712280",
             "version": 2,
             "inputs": [
               {
@@ -464,7 +567,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
             "bin_outputs": [
               {
                 "amount": 200000,
-                "script_pubkey": "a91496fd781f12cc667ae77de15bacf4759ae3cd8e6387"
+                "script_pubkey": "a914f345c1d72368680b03db19a107a0defb9560fb0d87"
               }
             ],
             "lock_time": 0
@@ -475,8 +578,8 @@ export const GENERATED_MULTISIG_FIXTURES = {
         {
           "signerIndex": 0,
           "signerEnvKey": "MULTISIG_MNEMONIC_1",
-          "signerAddress": "1AG9SFUXpNKMEdTxdvT5moKz3NjrSihYE8",
-          "expectedSignature": "304502210094afb2090f06a676ced142fe6d37c8292246940e0c6e4a4cdfb6fbe7eca2295c02203a5914a6e6983748aa8a8239212d496b931d23c357f9293d3ce1f48f6fb74da601",
+          "signerAddress": "1ANeBQ73RZCH3yzFVEBXHF3ScKzdTukVGa",
+          "expectedSignature": "3045022100e4437b7cc66b5342d24c50e1d3f0b9213aa6a8eb5b7a495ff2a16d257c45524d022060b873c66eda37531cae41d797969c7224acbfde48c498c5f5a59d9b1cbca3c601",
           "prefilledSignerIndex": 1,
           "firstSignParameters": {
             "coin": "btc",
@@ -492,7 +595,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
                   0,
                   0
                 ],
-                "prev_hash": "2e46ae2c2aa057b244410b7122cfff390624af4800ff6a86c3b5e75f345627e3",
+                "prev_hash": "bdeb4882a1cc6a8dd507b1e219550e17fde2f76dff15fc40829219e2cb712280",
                 "prev_index": 0,
                 "sequence": 4294967293,
                 "amount": "200000",
@@ -502,10 +605,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                     {
                       "node": {
                         "depth": 4,
-                        "fingerprint": 485660438,
+                        "fingerprint": 643428168,
                         "child_num": 2147483648,
-                        "chain_code": "fa4ffc4b061bb96607a57d6fb29e9a8fd094cb53658e46fbdbde54de5365d086",
-                        "public_key": "03ed683f47e82e1bb7928acce54f669c54d9b406cc1a832a6fb9b45058283630fb"
+                        "chain_code": "b31244e5bcdacf4ebbd44d5d1068d88d38886a6ad24ff5fffcbed44fd09ef5d9",
+                        "public_key": "02e68e18a8ecf52287b3fd0de2fef6546c56b92a45cda64a2675cf923c5b3702d1"
                       },
                       "address_n": [
                         0,
@@ -515,10 +618,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                     {
                       "node": {
                         "depth": 4,
-                        "fingerprint": 4292461849,
+                        "fingerprint": 366162743,
                         "child_num": 2147483648,
-                        "chain_code": "df377130b6c8fda3f4da0c173956bfd39d1a1484008a9a664241f9edea9dd47b",
-                        "public_key": "02d78e64af9b0226de8f0bb4e39042abd2257185194d77e48b66f500d59aece3b2"
+                        "chain_code": "3f53bff9b0e3064d86e99f6cd021fc1474626a808a5cd856d1ad5515730181b6",
+                        "public_key": "0259266d4f895c9914f3eeff52db716273782f619d4243d63b026b85202024084e"
                       },
                       "address_n": [
                         0,
@@ -528,10 +631,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                     {
                       "node": {
                         "depth": 4,
-                        "fingerprint": 563700748,
+                        "fingerprint": 3679881372,
                         "child_num": 2147483648,
-                        "chain_code": "3400424ec9426d27b8cd655e1428bafef809343a5dbd47e7c2919e0c3a70cb0b",
-                        "public_key": "026b1a3a2c75247d64211be5c1f3c6aca74f6ceff578424c1240284a1186d89869"
+                        "chain_code": "fba6ed603da367e06b595888926d4923f3702ffcc33aed390f102bfc380d3a3f",
+                        "public_key": "03e5c56d800f644e094215ab12111f47bd6cee65be6d52f7f67246c1f747d783d2"
                       },
                       "address_n": [
                         0,
@@ -557,7 +660,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
             ],
             "refTxs": [
               {
-                "hash": "2e46ae2c2aa057b244410b7122cfff390624af4800ff6a86c3b5e75f345627e3",
+                "hash": "bdeb4882a1cc6a8dd507b1e219550e17fde2f76dff15fc40829219e2cb712280",
                 "version": 2,
                 "inputs": [
                   {
@@ -570,7 +673,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 "bin_outputs": [
                   {
                     "amount": 200000,
-                    "script_pubkey": "a91496fd781f12cc667ae77de15bacf4759ae3cd8e6387"
+                    "script_pubkey": "a914f345c1d72368680b03db19a107a0defb9560fb0d87"
                   }
                 ],
                 "lock_time": 0
@@ -591,7 +694,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
                   0,
                   0
                 ],
-                "prev_hash": "2e46ae2c2aa057b244410b7122cfff390624af4800ff6a86c3b5e75f345627e3",
+                "prev_hash": "bdeb4882a1cc6a8dd507b1e219550e17fde2f76dff15fc40829219e2cb712280",
                 "prev_index": 0,
                 "sequence": 4294967293,
                 "amount": "200000",
@@ -601,10 +704,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                     {
                       "node": {
                         "depth": 4,
-                        "fingerprint": 485660438,
+                        "fingerprint": 643428168,
                         "child_num": 2147483648,
-                        "chain_code": "fa4ffc4b061bb96607a57d6fb29e9a8fd094cb53658e46fbdbde54de5365d086",
-                        "public_key": "03ed683f47e82e1bb7928acce54f669c54d9b406cc1a832a6fb9b45058283630fb"
+                        "chain_code": "b31244e5bcdacf4ebbd44d5d1068d88d38886a6ad24ff5fffcbed44fd09ef5d9",
+                        "public_key": "02e68e18a8ecf52287b3fd0de2fef6546c56b92a45cda64a2675cf923c5b3702d1"
                       },
                       "address_n": [
                         0,
@@ -614,10 +717,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                     {
                       "node": {
                         "depth": 4,
-                        "fingerprint": 4292461849,
+                        "fingerprint": 366162743,
                         "child_num": 2147483648,
-                        "chain_code": "df377130b6c8fda3f4da0c173956bfd39d1a1484008a9a664241f9edea9dd47b",
-                        "public_key": "02d78e64af9b0226de8f0bb4e39042abd2257185194d77e48b66f500d59aece3b2"
+                        "chain_code": "3f53bff9b0e3064d86e99f6cd021fc1474626a808a5cd856d1ad5515730181b6",
+                        "public_key": "0259266d4f895c9914f3eeff52db716273782f619d4243d63b026b85202024084e"
                       },
                       "address_n": [
                         0,
@@ -627,10 +730,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                     {
                       "node": {
                         "depth": 4,
-                        "fingerprint": 563700748,
+                        "fingerprint": 3679881372,
                         "child_num": 2147483648,
-                        "chain_code": "3400424ec9426d27b8cd655e1428bafef809343a5dbd47e7c2919e0c3a70cb0b",
-                        "public_key": "026b1a3a2c75247d64211be5c1f3c6aca74f6ceff578424c1240284a1186d89869"
+                        "chain_code": "fba6ed603da367e06b595888926d4923f3702ffcc33aed390f102bfc380d3a3f",
+                        "public_key": "03e5c56d800f644e094215ab12111f47bd6cee65be6d52f7f67246c1f747d783d2"
                       },
                       "address_n": [
                         0,
@@ -640,7 +743,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
                   ],
                   "signatures": [
                     "",
-                    "30450221009f3d3785ee6db97865cafd256d7c41274142254f9f0490d457780ca65c6fda610220555babb48e3855d3f9c42b27ae3bf6eb55fd70511aa2143285cd305448d4ae3a01",
+                    "304402202627df914fe672edfecd0917e66c726aacb21ea0b3258c7ead1d32a801301b8202201b9578cca5e2efc0b515981319f8840daf407e6c34ccb96269694d88175249d901",
                     ""
                   ],
                   "m": 2
@@ -656,7 +759,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
             ],
             "refTxs": [
               {
-                "hash": "2e46ae2c2aa057b244410b7122cfff390624af4800ff6a86c3b5e75f345627e3",
+                "hash": "bdeb4882a1cc6a8dd507b1e219550e17fde2f76dff15fc40829219e2cb712280",
                 "version": 2,
                 "inputs": [
                   {
@@ -669,7 +772,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 "bin_outputs": [
                   {
                     "amount": 200000,
-                    "script_pubkey": "a91496fd781f12cc667ae77de15bacf4759ae3cd8e6387"
+                    "script_pubkey": "a914f345c1d72368680b03db19a107a0defb9560fb0d87"
                   }
                 ],
                 "lock_time": 0
@@ -688,34 +791,34 @@ export const GENERATED_MULTISIG_FIXTURES = {
       "reference": {
         "broadcastable": false,
         "signerAddresses": [
-          "1AG9SFUXpNKMEdTxdvT5moKz3NjrSihYE8",
-          "1HpKzRDSHhSgjvuDbr2pjBUczZ4dMaSfrZ",
-          "1NPSoGeyGzcWrDtcH6LggG4FnmmJ6TfUSA"
+          "1ANeBQ73RZCH3yzFVEBXHF3ScKzdTukVGa",
+          "1DHWpRvGsZVXHvYSZ8HTSdEwPVwRHT8K5b",
+          "1M7zKgW79oPRnLB9B9Wjx4Kf4vfeHyJ5bR"
         ],
         "expectedSignatures": [
-          "304502210094afb2090f06a676ced142fe6d37c8292246940e0c6e4a4cdfb6fbe7eca2295c02203a5914a6e6983748aa8a8239212d496b931d23c357f9293d3ce1f48f6fb74da601",
-          "30450221009f3d3785ee6db97865cafd256d7c41274142254f9f0490d457780ca65c6fda610220555babb48e3855d3f9c42b27ae3bf6eb55fd70511aa2143285cd305448d4ae3a01",
-          "30440220231061595ed465518e1a1b6dfcb597def644461f2d8cc3545794410fbeb5dcbb02205597251e91864ba41b695c78f74858aaa51fb494942f3df037b32c940cedfe7301"
+          "3045022100e4437b7cc66b5342d24c50e1d3f0b9213aa6a8eb5b7a495ff2a16d257c45524d022060b873c66eda37531cae41d797969c7224acbfde48c498c5f5a59d9b1cbca3c601",
+          "304402202627df914fe672edfecd0917e66c726aacb21ea0b3258c7ead1d32a801301b8202201b9578cca5e2efc0b515981319f8840daf407e6c34ccb96269694d88175249d901",
+          "3044022055f8a79a84e8df17b3ec4e459e2f9cd3f6e06bb7fde37f4e1a6b1292c14157c502207bfd3d6d12541f405f949a34a2e6e36915e5398d07107352fc1d20688ae35eb501"
         ],
         "accountXpubs": [
-          "xpub6DkFAXWQ2dHxkZU4qtXWMUGXJ71JvpUUBua4KZsYe8gK7iVx8AKiiMYbdHaiSqjuTfJgnfegvcxFniuxBvLSTrGmaFCGQ2rD9bN4f246pcb",
-          "xpub6FQya7zGhR92g3JoPPmWWh3bxv6D2Q9dHsm9quWR9vTAD2Vhup52AKWwDvx4834RqC3VxjQPZ6L6RuBeHxBc7goUeecdWVDEm2xPQ9QTxhp",
-          "xpub6DnEBNkSJKBYL2LdAjVb3qK8rYs4t7H6gfJHhW4P25nzAsRBrwuyiCqw3uTURVXPuh3Cm7Q4o1bqVzkh8R77nosvUkUSaQd8MfoQYEZrPv3"
+          "xpub6DpFgSNFWXCnjD9yDh1YoSFbWmDEmA29Gp1GauaNEbQUc5rvPAECvxqxRHb3239g9D9DNmk3y8vVe7K93RfS4tZAyCQTEjyRC1aHcNyDWNk",
+          "xpub6DhD3vKCogoPyy7NhHnvDeMUafsWpVokXVo9PGAGbuN1SMpMuWz8hvx5p9VGbJ3Q7PCAw5DTiwbVdFiaLfSvxxvHKgVDm24nDQKBcNyz7nv",
+          "xpub6F9Qm2hmXhoSwh9CGn5eNKtaP4TjaSddXQTi4nao2cumxRTcbaHtwK3FewV4DZZuCAp3nZRLiurihDgBcLAX3HMePmi7yhKgx91NftyEv6Y"
         ],
         "childPublicKeys": [
-          "026f3858ff885756a5ec7a346506de086ff68dfa034ee049f494640c681a3e2b30",
-          "03de25babf2d8ca6ff319f8c641bc7fbcff451900a2ee16ee63f57827bc42aede0",
-          "026fc785df5e278eef7df89add527023e9fff166fb8e9353241e60adf3e55bdd68"
+          "03e9d4cb98d222846ccca9c515f83970de83a15cc3360e03d8fb8ff75c062cc772",
+          "0351a93ab1e787fb9d9fd02f3bf9209b01326c5fd52d203652cf95d5fddf856330",
+          "03bc38a82130537fe661ad74af59116b5b7523d177e9a2dab1226550985ca68fe2"
         ],
-        "sighash": "e3bf78ba2ceea08ebf698f3a27d4100b04773f7ab0bf6bcb6cf02d34d44fd6cb",
-        "scriptPubKey": "a91496fd781f12cc667ae77de15bacf4759ae3cd8e6387",
-        "redeemScript": "5221026f3858ff885756a5ec7a346506de086ff68dfa034ee049f494640c681a3e2b302103de25babf2d8ca6ff319f8c641bc7fbcff451900a2ee16ee63f57827bc42aede021026fc785df5e278eef7df89add527023e9fff166fb8e9353241e60adf3e55bdd6853ae",
-        "fundingTxHex": "02000000010000000000000000000000000000000000000000000000000000000000000000ffffffff156f66666c696e652d6d756c74697369672d70327368ffffffff01400d03000000000017a91496fd781f12cc667ae77de15bacf4759ae3cd8e638700000000",
-        "spendingTxHex": "0200000001e32756345fe7b5c3866aff0048af240639ffcf22710b4144b257a02a2cae462e0000000000fdffffff0130e60200000000001976a914759d6677091e973b9e9d99f19c68fbf43e3f05f988ac00000000",
-        "prevHash": "2e46ae2c2aa057b244410b7122cfff390624af4800ff6a86c3b5e75f345627e3",
+        "sighash": "80106fe8a785c1479d1eca3c6eb58d8876f2db0ecf5ad879ccc518153cfbcff7",
+        "scriptPubKey": "a914f345c1d72368680b03db19a107a0defb9560fb0d87",
+        "redeemScript": "522103e9d4cb98d222846ccca9c515f83970de83a15cc3360e03d8fb8ff75c062cc772210351a93ab1e787fb9d9fd02f3bf9209b01326c5fd52d203652cf95d5fddf8563302103bc38a82130537fe661ad74af59116b5b7523d177e9a2dab1226550985ca68fe253ae",
+        "fundingTxHex": "02000000010000000000000000000000000000000000000000000000000000000000000000ffffffff156f66666c696e652d6d756c74697369672d70327368ffffffff01400d03000000000017a914f345c1d72368680b03db19a107a0defb9560fb0d8700000000",
+        "spendingTxHex": "0200000001802271cbe219928240fc15ff6df7e2fd170e5519e2b107d58d6acca18248ebbd0000000000fdffffff0130e60200000000001976a914759d6677091e973b9e9d99f19c68fbf43e3f05f988ac00000000",
+        "prevHash": "bdeb4882a1cc6a8dd507b1e219550e17fde2f76dff15fc40829219e2cb712280",
         "doubleSignatures": [
-          "304502210094afb2090f06a676ced142fe6d37c8292246940e0c6e4a4cdfb6fbe7eca2295c02203a5914a6e6983748aa8a8239212d496b931d23c357f9293d3ce1f48f6fb74da601",
-          "30450221009f3d3785ee6db97865cafd256d7c41274142254f9f0490d457780ca65c6fda610220555babb48e3855d3f9c42b27ae3bf6eb55fd70511aa2143285cd305448d4ae3a01",
+          "3045022100e4437b7cc66b5342d24c50e1d3f0b9213aa6a8eb5b7a495ff2a16d257c45524d022060b873c66eda37531cae41d797969c7224acbfde48c498c5f5a59d9b1cbca3c601",
+          "304402202627df914fe672edfecd0917e66c726aacb21ea0b3258c7ead1d32a801301b8202201b9578cca5e2efc0b515981319f8840daf407e6c34ccb96269694d88175249d901",
           ""
         ]
       }
@@ -725,7 +828,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
       "title": "P2SH-P2WSH",
       "path": "m/48'/0'/0'/1'/0/0",
       "scriptType": "SPENDP2SHWITNESS",
-      "address": "39rxzBe1hQhcEHXCSo14jjvB9ELzNArnLU",
+      "address": "36fumWiYVDbQhDzrmDZgZwb6pssKfNpXti",
       "addressParameters": {
         "path": "m/48'/0'/0'/1'/0/0",
         "coin": "btc",
@@ -736,10 +839,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
             {
               "node": {
                 "depth": 4,
-                "fingerprint": 485660438,
+                "fingerprint": 643428168,
                 "child_num": 2147483649,
-                "chain_code": "ae2afa5bbcc9c85c2c9aefb0a89f27614878b1dfc7ac7c38d8614c64ffbfce70",
-                "public_key": "036da4c96b78e8ad5cc3556bb464e1ad05132cccb0098eda9337d3f882241796aa"
+                "chain_code": "55a49b43ca88fec05bafbd2633ebe95ffaf1cf1f9825912c5743f71bc6416fa6",
+                "public_key": "02aa0c9b67bc9e5953218eeb8131d4eeb4b4e257524ba650951935cd3a6743bd79"
               },
               "address_n": [
                 0,
@@ -749,10 +852,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
             {
               "node": {
                 "depth": 4,
-                "fingerprint": 4292461849,
+                "fingerprint": 366162743,
                 "child_num": 2147483649,
-                "chain_code": "22fe077654ceafd58939e23a4b6c266fc4bab410cc9027ae23b9c1740025c00b",
-                "public_key": "020e8855e16553919fc530b896f4c525338d0893fb93c4b8c4c2ba12158bc429ca"
+                "chain_code": "e1f81c38b91f60dd0cf395c737d858bfc124cdc7e206573566f8269e0e926411",
+                "public_key": "03859a1075eb0453dd39d00de0df5991b78aba63cfc416f08a68eb7f12970b1bcd"
               },
               "address_n": [
                 0,
@@ -762,10 +865,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
             {
               "node": {
                 "depth": 4,
-                "fingerprint": 563700748,
+                "fingerprint": 3679881372,
                 "child_num": 2147483649,
-                "chain_code": "b4c22019a8f2be95b79d7234810327003d397e8d9da7b94dd61bec394cc3e9f4",
-                "public_key": "02d118626e733c06eb82cb575e524149ca517eab59e9cdb044a78032c64b001737"
+                "chain_code": "a9fdd38acf62de102f8ed58e828ed3649cc648759b659253a78f1dbd464c999a",
+                "public_key": "02bb9d44fc50eff11ced5e3544ede62d54601bd9dad64d7f69ab1a33301eb3a3de"
               },
               "address_n": [
                 0,
@@ -795,7 +898,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
               0,
               0
             ],
-            "prev_hash": "73d553667d32812dbc8e5b08314eee3615d7769d61e823d12d34f0c2fcd4a89f",
+            "prev_hash": "25b342e6dc0dbfd5c0cb54b52aa5f0b3588f2b36cde8faed75316c286d4071da",
             "prev_index": 0,
             "sequence": 4294967293,
             "amount": "200000",
@@ -805,10 +908,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 {
                   "node": {
                     "depth": 4,
-                    "fingerprint": 485660438,
+                    "fingerprint": 643428168,
                     "child_num": 2147483649,
-                    "chain_code": "ae2afa5bbcc9c85c2c9aefb0a89f27614878b1dfc7ac7c38d8614c64ffbfce70",
-                    "public_key": "036da4c96b78e8ad5cc3556bb464e1ad05132cccb0098eda9337d3f882241796aa"
+                    "chain_code": "55a49b43ca88fec05bafbd2633ebe95ffaf1cf1f9825912c5743f71bc6416fa6",
+                    "public_key": "02aa0c9b67bc9e5953218eeb8131d4eeb4b4e257524ba650951935cd3a6743bd79"
                   },
                   "address_n": [
                     0,
@@ -818,10 +921,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 {
                   "node": {
                     "depth": 4,
-                    "fingerprint": 4292461849,
+                    "fingerprint": 366162743,
                     "child_num": 2147483649,
-                    "chain_code": "22fe077654ceafd58939e23a4b6c266fc4bab410cc9027ae23b9c1740025c00b",
-                    "public_key": "020e8855e16553919fc530b896f4c525338d0893fb93c4b8c4c2ba12158bc429ca"
+                    "chain_code": "e1f81c38b91f60dd0cf395c737d858bfc124cdc7e206573566f8269e0e926411",
+                    "public_key": "03859a1075eb0453dd39d00de0df5991b78aba63cfc416f08a68eb7f12970b1bcd"
                   },
                   "address_n": [
                     0,
@@ -831,10 +934,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 {
                   "node": {
                     "depth": 4,
-                    "fingerprint": 563700748,
+                    "fingerprint": 3679881372,
                     "child_num": 2147483649,
-                    "chain_code": "b4c22019a8f2be95b79d7234810327003d397e8d9da7b94dd61bec394cc3e9f4",
-                    "public_key": "02d118626e733c06eb82cb575e524149ca517eab59e9cdb044a78032c64b001737"
+                    "chain_code": "a9fdd38acf62de102f8ed58e828ed3649cc648759b659253a78f1dbd464c999a",
+                    "public_key": "02bb9d44fc50eff11ced5e3544ede62d54601bd9dad64d7f69ab1a33301eb3a3de"
                   },
                   "address_n": [
                     0,
@@ -860,7 +963,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
         ],
         "refTxs": [
           {
-            "hash": "73d553667d32812dbc8e5b08314eee3615d7769d61e823d12d34f0c2fcd4a89f",
+            "hash": "25b342e6dc0dbfd5c0cb54b52aa5f0b3588f2b36cde8faed75316c286d4071da",
             "version": 2,
             "inputs": [
               {
@@ -873,7 +976,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
             "bin_outputs": [
               {
                 "amount": 200000,
-                "script_pubkey": "a91459a2b6c9519bb4b8b6fdadfbaaa79b4d875fcfeb87"
+                "script_pubkey": "a91436a3130e592829dfe0aa45c9f4c924b0d875d01a87"
               }
             ],
             "lock_time": 0
@@ -894,7 +997,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
               0,
               0
             ],
-            "prev_hash": "73d553667d32812dbc8e5b08314eee3615d7769d61e823d12d34f0c2fcd4a89f",
+            "prev_hash": "25b342e6dc0dbfd5c0cb54b52aa5f0b3588f2b36cde8faed75316c286d4071da",
             "prev_index": 0,
             "sequence": 4294967293,
             "amount": "200000",
@@ -904,10 +1007,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 {
                   "node": {
                     "depth": 4,
-                    "fingerprint": 485660438,
+                    "fingerprint": 643428168,
                     "child_num": 2147483649,
-                    "chain_code": "ae2afa5bbcc9c85c2c9aefb0a89f27614878b1dfc7ac7c38d8614c64ffbfce70",
-                    "public_key": "036da4c96b78e8ad5cc3556bb464e1ad05132cccb0098eda9337d3f882241796aa"
+                    "chain_code": "55a49b43ca88fec05bafbd2633ebe95ffaf1cf1f9825912c5743f71bc6416fa6",
+                    "public_key": "02aa0c9b67bc9e5953218eeb8131d4eeb4b4e257524ba650951935cd3a6743bd79"
                   },
                   "address_n": [
                     0,
@@ -917,10 +1020,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 {
                   "node": {
                     "depth": 4,
-                    "fingerprint": 4292461849,
+                    "fingerprint": 366162743,
                     "child_num": 2147483649,
-                    "chain_code": "22fe077654ceafd58939e23a4b6c266fc4bab410cc9027ae23b9c1740025c00b",
-                    "public_key": "020e8855e16553919fc530b896f4c525338d0893fb93c4b8c4c2ba12158bc429ca"
+                    "chain_code": "e1f81c38b91f60dd0cf395c737d858bfc124cdc7e206573566f8269e0e926411",
+                    "public_key": "03859a1075eb0453dd39d00de0df5991b78aba63cfc416f08a68eb7f12970b1bcd"
                   },
                   "address_n": [
                     0,
@@ -930,10 +1033,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 {
                   "node": {
                     "depth": 4,
-                    "fingerprint": 563700748,
+                    "fingerprint": 3679881372,
                     "child_num": 2147483649,
-                    "chain_code": "b4c22019a8f2be95b79d7234810327003d397e8d9da7b94dd61bec394cc3e9f4",
-                    "public_key": "02d118626e733c06eb82cb575e524149ca517eab59e9cdb044a78032c64b001737"
+                    "chain_code": "a9fdd38acf62de102f8ed58e828ed3649cc648759b659253a78f1dbd464c999a",
+                    "public_key": "02bb9d44fc50eff11ced5e3544ede62d54601bd9dad64d7f69ab1a33301eb3a3de"
                   },
                   "address_n": [
                     0,
@@ -942,7 +1045,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 }
               ],
               "signatures": [
-                "3045022100bff9a6719eaa383d8f6215aa0b8e5d0fc942de29afb9cd2237eea2a2276f8e5602205990f57681b2ada8469609e0917709dc899c21d805b57cb0425946ae63d5e8cd01",
+                "304402207103ac87e9129e9d01884367191728f3cfb7c908baad30b44c0d6b21baa80b220220697df386e1b8b1b37cf9428c391296aa3c26409a5a858d563498e724f700181101",
                 "",
                 ""
               ],
@@ -959,7 +1062,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
         ],
         "refTxs": [
           {
-            "hash": "73d553667d32812dbc8e5b08314eee3615d7769d61e823d12d34f0c2fcd4a89f",
+            "hash": "25b342e6dc0dbfd5c0cb54b52aa5f0b3588f2b36cde8faed75316c286d4071da",
             "version": 2,
             "inputs": [
               {
@@ -972,7 +1075,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
             "bin_outputs": [
               {
                 "amount": 200000,
-                "script_pubkey": "a91459a2b6c9519bb4b8b6fdadfbaaa79b4d875fcfeb87"
+                "script_pubkey": "a91436a3130e592829dfe0aa45c9f4c924b0d875d01a87"
               }
             ],
             "lock_time": 0
@@ -983,8 +1086,8 @@ export const GENERATED_MULTISIG_FIXTURES = {
         {
           "signerIndex": 0,
           "signerEnvKey": "MULTISIG_MNEMONIC_1",
-          "signerAddress": "1F95bxppEcefBxwiGcke3fTPVcTSVguQsJ",
-          "expectedSignature": "3045022100bff9a6719eaa383d8f6215aa0b8e5d0fc942de29afb9cd2237eea2a2276f8e5602205990f57681b2ada8469609e0917709dc899c21d805b57cb0425946ae63d5e8cd01",
+          "signerAddress": "13qfQe71Qu5vknpor2KUvU4GQiM5yqdUqF",
+          "expectedSignature": "304402207103ac87e9129e9d01884367191728f3cfb7c908baad30b44c0d6b21baa80b220220697df386e1b8b1b37cf9428c391296aa3c26409a5a858d563498e724f700181101",
           "prefilledSignerIndex": 1,
           "firstSignParameters": {
             "coin": "btc",
@@ -1000,7 +1103,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
                   0,
                   0
                 ],
-                "prev_hash": "73d553667d32812dbc8e5b08314eee3615d7769d61e823d12d34f0c2fcd4a89f",
+                "prev_hash": "25b342e6dc0dbfd5c0cb54b52aa5f0b3588f2b36cde8faed75316c286d4071da",
                 "prev_index": 0,
                 "sequence": 4294967293,
                 "amount": "200000",
@@ -1010,10 +1113,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                     {
                       "node": {
                         "depth": 4,
-                        "fingerprint": 485660438,
+                        "fingerprint": 643428168,
                         "child_num": 2147483649,
-                        "chain_code": "ae2afa5bbcc9c85c2c9aefb0a89f27614878b1dfc7ac7c38d8614c64ffbfce70",
-                        "public_key": "036da4c96b78e8ad5cc3556bb464e1ad05132cccb0098eda9337d3f882241796aa"
+                        "chain_code": "55a49b43ca88fec05bafbd2633ebe95ffaf1cf1f9825912c5743f71bc6416fa6",
+                        "public_key": "02aa0c9b67bc9e5953218eeb8131d4eeb4b4e257524ba650951935cd3a6743bd79"
                       },
                       "address_n": [
                         0,
@@ -1023,10 +1126,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                     {
                       "node": {
                         "depth": 4,
-                        "fingerprint": 4292461849,
+                        "fingerprint": 366162743,
                         "child_num": 2147483649,
-                        "chain_code": "22fe077654ceafd58939e23a4b6c266fc4bab410cc9027ae23b9c1740025c00b",
-                        "public_key": "020e8855e16553919fc530b896f4c525338d0893fb93c4b8c4c2ba12158bc429ca"
+                        "chain_code": "e1f81c38b91f60dd0cf395c737d858bfc124cdc7e206573566f8269e0e926411",
+                        "public_key": "03859a1075eb0453dd39d00de0df5991b78aba63cfc416f08a68eb7f12970b1bcd"
                       },
                       "address_n": [
                         0,
@@ -1036,10 +1139,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                     {
                       "node": {
                         "depth": 4,
-                        "fingerprint": 563700748,
+                        "fingerprint": 3679881372,
                         "child_num": 2147483649,
-                        "chain_code": "b4c22019a8f2be95b79d7234810327003d397e8d9da7b94dd61bec394cc3e9f4",
-                        "public_key": "02d118626e733c06eb82cb575e524149ca517eab59e9cdb044a78032c64b001737"
+                        "chain_code": "a9fdd38acf62de102f8ed58e828ed3649cc648759b659253a78f1dbd464c999a",
+                        "public_key": "02bb9d44fc50eff11ced5e3544ede62d54601bd9dad64d7f69ab1a33301eb3a3de"
                       },
                       "address_n": [
                         0,
@@ -1065,7 +1168,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
             ],
             "refTxs": [
               {
-                "hash": "73d553667d32812dbc8e5b08314eee3615d7769d61e823d12d34f0c2fcd4a89f",
+                "hash": "25b342e6dc0dbfd5c0cb54b52aa5f0b3588f2b36cde8faed75316c286d4071da",
                 "version": 2,
                 "inputs": [
                   {
@@ -1078,7 +1181,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 "bin_outputs": [
                   {
                     "amount": 200000,
-                    "script_pubkey": "a91459a2b6c9519bb4b8b6fdadfbaaa79b4d875fcfeb87"
+                    "script_pubkey": "a91436a3130e592829dfe0aa45c9f4c924b0d875d01a87"
                   }
                 ],
                 "lock_time": 0
@@ -1099,7 +1202,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
                   0,
                   0
                 ],
-                "prev_hash": "73d553667d32812dbc8e5b08314eee3615d7769d61e823d12d34f0c2fcd4a89f",
+                "prev_hash": "25b342e6dc0dbfd5c0cb54b52aa5f0b3588f2b36cde8faed75316c286d4071da",
                 "prev_index": 0,
                 "sequence": 4294967293,
                 "amount": "200000",
@@ -1109,10 +1212,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                     {
                       "node": {
                         "depth": 4,
-                        "fingerprint": 485660438,
+                        "fingerprint": 643428168,
                         "child_num": 2147483649,
-                        "chain_code": "ae2afa5bbcc9c85c2c9aefb0a89f27614878b1dfc7ac7c38d8614c64ffbfce70",
-                        "public_key": "036da4c96b78e8ad5cc3556bb464e1ad05132cccb0098eda9337d3f882241796aa"
+                        "chain_code": "55a49b43ca88fec05bafbd2633ebe95ffaf1cf1f9825912c5743f71bc6416fa6",
+                        "public_key": "02aa0c9b67bc9e5953218eeb8131d4eeb4b4e257524ba650951935cd3a6743bd79"
                       },
                       "address_n": [
                         0,
@@ -1122,10 +1225,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                     {
                       "node": {
                         "depth": 4,
-                        "fingerprint": 4292461849,
+                        "fingerprint": 366162743,
                         "child_num": 2147483649,
-                        "chain_code": "22fe077654ceafd58939e23a4b6c266fc4bab410cc9027ae23b9c1740025c00b",
-                        "public_key": "020e8855e16553919fc530b896f4c525338d0893fb93c4b8c4c2ba12158bc429ca"
+                        "chain_code": "e1f81c38b91f60dd0cf395c737d858bfc124cdc7e206573566f8269e0e926411",
+                        "public_key": "03859a1075eb0453dd39d00de0df5991b78aba63cfc416f08a68eb7f12970b1bcd"
                       },
                       "address_n": [
                         0,
@@ -1135,10 +1238,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                     {
                       "node": {
                         "depth": 4,
-                        "fingerprint": 563700748,
+                        "fingerprint": 3679881372,
                         "child_num": 2147483649,
-                        "chain_code": "b4c22019a8f2be95b79d7234810327003d397e8d9da7b94dd61bec394cc3e9f4",
-                        "public_key": "02d118626e733c06eb82cb575e524149ca517eab59e9cdb044a78032c64b001737"
+                        "chain_code": "a9fdd38acf62de102f8ed58e828ed3649cc648759b659253a78f1dbd464c999a",
+                        "public_key": "02bb9d44fc50eff11ced5e3544ede62d54601bd9dad64d7f69ab1a33301eb3a3de"
                       },
                       "address_n": [
                         0,
@@ -1148,7 +1251,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
                   ],
                   "signatures": [
                     "",
-                    "3044022000c1c32d7a38486cabd32469d7c8bc71cb16ec29978645607b7777c0a8e356200220583d042212d8624b36a316761a08df9291f17a05ffb018d9209fb6bef83b18cf01",
+                    "30440220727947fc48d5b77066c7435c094ba961cbc8687b53554840474f43dfecd43fff02200e5297485c8588e8431f363d76b254a6fc2b3c58bb0433a4740f9d63d0decc0c01",
                     ""
                   ],
                   "m": 2
@@ -1164,7 +1267,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
             ],
             "refTxs": [
               {
-                "hash": "73d553667d32812dbc8e5b08314eee3615d7769d61e823d12d34f0c2fcd4a89f",
+                "hash": "25b342e6dc0dbfd5c0cb54b52aa5f0b3588f2b36cde8faed75316c286d4071da",
                 "version": 2,
                 "inputs": [
                   {
@@ -1177,7 +1280,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 "bin_outputs": [
                   {
                     "amount": 200000,
-                    "script_pubkey": "a91459a2b6c9519bb4b8b6fdadfbaaa79b4d875fcfeb87"
+                    "script_pubkey": "a91436a3130e592829dfe0aa45c9f4c924b0d875d01a87"
                   }
                 ],
                 "lock_time": 0
@@ -1196,35 +1299,35 @@ export const GENERATED_MULTISIG_FIXTURES = {
       "reference": {
         "broadcastable": false,
         "signerAddresses": [
-          "1F95bxppEcefBxwiGcke3fTPVcTSVguQsJ",
-          "1Fjwx7LEHNzsDswPFuBm6yQjbzFdxTZgj8",
-          "13hbqRBHbrYfnfenueSLQmeAbvYiS3WMsX"
+          "13qfQe71Qu5vknpor2KUvU4GQiM5yqdUqF",
+          "1NvkdBRcTgAzAdw6nF8M1B1Yy2okftwPUH",
+          "14jgk24j8hjtDq61EaMRjrLpseQy687iR8"
         ],
         "expectedSignatures": [
-          "3045022100bff9a6719eaa383d8f6215aa0b8e5d0fc942de29afb9cd2237eea2a2276f8e5602205990f57681b2ada8469609e0917709dc899c21d805b57cb0425946ae63d5e8cd01",
-          "3044022000c1c32d7a38486cabd32469d7c8bc71cb16ec29978645607b7777c0a8e356200220583d042212d8624b36a316761a08df9291f17a05ffb018d9209fb6bef83b18cf01",
-          "3045022100a0d1774efd6a9f925dd665975aa07feec6fbb142c6e3edadf0230f4206cd083402206a7046e09e6df903676460b8b5ed7d812f56a8da16605bd42f19746740d12ea701"
+          "304402207103ac87e9129e9d01884367191728f3cfb7c908baad30b44c0d6b21baa80b220220697df386e1b8b1b37cf9428c391296aa3c26409a5a858d563498e724f700181101",
+          "30440220727947fc48d5b77066c7435c094ba961cbc8687b53554840474f43dfecd43fff02200e5297485c8588e8431f363d76b254a6fc2b3c58bb0433a4740f9d63d0decc0c01",
+          "304402205830b183abbcb9b04443a4bd2da5c7363f818e6f0f9a144c821b208490a7151502200ae891cec4b72505bd52f2febab4427bbe159a3f8e504224277a28577b0dafb901"
         ],
         "accountXpubs": [
-          "xpub6DkFAXWQ2dHxnMKoSBogHrw1rgNJKR4umdbnNVNTYeCGcduxWnNUHgGptqEQWPKRmeW4Zn4FHSbLMBKEWYaMDYu47Ytg6DdFnPNt8hwn5mE",
-          "xpub6FQya7zGhR92giSkXpPgPHpq85nUnqabbbNuJiae1zndR3B6Nq2QCoSWBkdLF7bkifSYSNvyTfhg4KBvKyJ94HXuEaeWZsabMnTyJiPz21N",
-          "xpub6DnEBNkSJKBYPrWx37y4g5aeMWTdvqzpRqjkVZcif1qn76MbLC6ppoPJywRy99vFMYJCdVRbfpqaDHEvvkHan99G3UVVpFsXepeVXn79dHm"
+          "xpub6DpFgSNFWXCnkq2qJQwa1TNdav4M7grAvN73Ui8HhX43xaapqQ4u2Ci7agEhA8b7JL2cwK2rUtJJrJENtKXvBNSpLMrmRVu95AGdZQSnsgS",
+          "xpub6DhD3vKCogoQ48ra51MgxJiUTLYKWhZh6RxaXvVT2gDrQQiXeVDuyA65X3fSPLJfR5t7neTK5cMWHm36Z2qnwAXivQZ2vhN3WM2CytmRVFp",
+          "xpub6F9Qm2hmXhoSyRpBpwDQ22zw1Gya5w9YC1y8edxmXaM7zceMhDSALAHC3kpwjgFSSYTWcrf7yurs6eywsGxLYrhGNGfTqzXymr7jdokHYdt"
         ],
         "childPublicKeys": [
-          "03abe5ccc0a6ddf20e02e27ca4829a4bcf288849f5d137db19559dd2ab23236dbe",
-          "03e08f6cdd489c655b3e60bd22cdad3567f803f58840aa4f7c3195504e6c8adc55",
-          "02967c1f3fa6b5da09ed01af82f8ec826df1bf2e7a113d087063a96f1a7e1b2e19"
+          "024acfbd4a607484ec3094d784fb55850213848e8be10985ad8763b4ed6e0971a5",
+          "035e66718a1898a5e81ddfca6a230925aa3ee74f08c173cf0fc2c7166cb0d0e573",
+          "038ee6cf0286908ea5d3713ac7172070fc8b9c7fa9099018db0ddc521c5de0d835"
         ],
-        "sighash": "53b7e17d935115db953e23de8d4c1a70a102a79b5f9972434e29fb7b6bf0a011",
-        "scriptPubKey": "a91459a2b6c9519bb4b8b6fdadfbaaa79b4d875fcfeb87",
-        "redeemScript": "0020222b22eb9777e7a90624682fb5c16f6d63aebb83081e7b754a2fe59142f16a81",
-        "witnessScript": "522103abe5ccc0a6ddf20e02e27ca4829a4bcf288849f5d137db19559dd2ab23236dbe2103e08f6cdd489c655b3e60bd22cdad3567f803f58840aa4f7c3195504e6c8adc552102967c1f3fa6b5da09ed01af82f8ec826df1bf2e7a113d087063a96f1a7e1b2e1953ae",
-        "fundingTxHex": "02000000010000000000000000000000000000000000000000000000000000000000000000ffffffff1b6f66666c696e652d6d756c74697369672d703273682d7032777368ffffffff01400d03000000000017a91459a2b6c9519bb4b8b6fdadfbaaa79b4d875fcfeb8700000000",
-        "spendingTxHex": "02000000019fa8d4fcc2f0342dd123e8619d76d71536ee4e31085b8ebc2d81327d6653d5730000000000fdffffff0130e60200000000001976a914759d6677091e973b9e9d99f19c68fbf43e3f05f988ac00000000",
-        "prevHash": "73d553667d32812dbc8e5b08314eee3615d7769d61e823d12d34f0c2fcd4a89f",
+        "sighash": "b02092d59b63b1feeb39ac00dd6991e21e611386bf3df9aebd94b5e08304ab84",
+        "scriptPubKey": "a91436a3130e592829dfe0aa45c9f4c924b0d875d01a87",
+        "redeemScript": "002015a924fee7ddc4c7be559e70881036c7c1214a449519f72e2a3d4a34817aed67",
+        "witnessScript": "5221024acfbd4a607484ec3094d784fb55850213848e8be10985ad8763b4ed6e0971a521035e66718a1898a5e81ddfca6a230925aa3ee74f08c173cf0fc2c7166cb0d0e57321038ee6cf0286908ea5d3713ac7172070fc8b9c7fa9099018db0ddc521c5de0d83553ae",
+        "fundingTxHex": "02000000010000000000000000000000000000000000000000000000000000000000000000ffffffff1b6f66666c696e652d6d756c74697369672d703273682d7032777368ffffffff01400d03000000000017a91436a3130e592829dfe0aa45c9f4c924b0d875d01a8700000000",
+        "spendingTxHex": "0200000001da71406d286c3175edfae8cd362b8f58b3f0a52ab554cbc0d5bf0ddce642b3250000000000fdffffff0130e60200000000001976a914759d6677091e973b9e9d99f19c68fbf43e3f05f988ac00000000",
+        "prevHash": "25b342e6dc0dbfd5c0cb54b52aa5f0b3588f2b36cde8faed75316c286d4071da",
         "doubleSignatures": [
-          "3045022100bff9a6719eaa383d8f6215aa0b8e5d0fc942de29afb9cd2237eea2a2276f8e5602205990f57681b2ada8469609e0917709dc899c21d805b57cb0425946ae63d5e8cd01",
-          "3044022000c1c32d7a38486cabd32469d7c8bc71cb16ec29978645607b7777c0a8e356200220583d042212d8624b36a316761a08df9291f17a05ffb018d9209fb6bef83b18cf01",
+          "304402207103ac87e9129e9d01884367191728f3cfb7c908baad30b44c0d6b21baa80b220220697df386e1b8b1b37cf9428c391296aa3c26409a5a858d563498e724f700181101",
+          "30440220727947fc48d5b77066c7435c094ba961cbc8687b53554840474f43dfecd43fff02200e5297485c8588e8431f363d76b254a6fc2b3c58bb0433a4740f9d63d0decc0c01",
           ""
         ]
       }
@@ -1234,7 +1337,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
       "title": "P2WSH",
       "path": "m/48'/0'/0'/2'/0/0",
       "scriptType": "SPENDWITNESS",
-      "address": "bc1qp38kn2cpud9u5z8px3ga9vtuwdp3n0cc6xly6td45u5g6nsgcl9sagut92",
+      "address": "bc1qk5uucs2elngju9tyku4qd7x3msg3g8r9hfs4cq9e2yyayeqsv64suskh6u",
       "addressParameters": {
         "path": "m/48'/0'/0'/2'/0/0",
         "coin": "btc",
@@ -1245,10 +1348,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
             {
               "node": {
                 "depth": 4,
-                "fingerprint": 485660438,
+                "fingerprint": 643428168,
                 "child_num": 2147483650,
-                "chain_code": "bba0c7ca160a870efeb940ab90d0f4284fea1b5e0d2117677e823fc37e2d5763",
-                "public_key": "021a3bf5fbf737d0f36993fd46dc4913093beb532d654fe0dfd98bd27585dc9f29"
+                "chain_code": "7b432e7f25cb8e861f1461835b4e2cce25628d8bf34e3ac011b65219c3cb8341",
+                "public_key": "02bed20bf5907215841abcb078342505adf118a3243adfb54f3e283d3ee82f1e13"
               },
               "address_n": [
                 0,
@@ -1258,10 +1361,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
             {
               "node": {
                 "depth": 4,
-                "fingerprint": 4292461849,
+                "fingerprint": 366162743,
                 "child_num": 2147483650,
-                "chain_code": "a732876f758546f2e3aa40a0ba12c5ea24ee18f9086e854e573bea1e219d172f",
-                "public_key": "0339710356a496726c84692621b2b6e3645dd35bc0026c587f16411897990a1e1f"
+                "chain_code": "44d7d6f681bf30caa24a547c84b09a62fec67b4957577b24b24461b002a17dce",
+                "public_key": "02f288075a5c2a4a80a00087fa500c5a7e51c43a215187b553fcf9d41acfccf2af"
               },
               "address_n": [
                 0,
@@ -1271,10 +1374,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
             {
               "node": {
                 "depth": 4,
-                "fingerprint": 563700748,
+                "fingerprint": 3679881372,
                 "child_num": 2147483650,
-                "chain_code": "11285ffd1f2e45b8da2eb32d2c791eaa7d7653307ec72639013c1cba72c7f637",
-                "public_key": "0351796ed0144642a9b1432b992f7c2a5e232638f998bfce6c3e8c4a83398aba4a"
+                "chain_code": "6ad8ffd7ad06a31751a9efc5d79a69a4f159ccc847377c637679d4917e0b5e96",
+                "public_key": "0347761357bca80a8190980592a812cb168e1273264ede1776e6bfd15db3dae25b"
               },
               "address_n": [
                 0,
@@ -1304,7 +1407,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
               0,
               0
             ],
-            "prev_hash": "ae4fd90d8046ba01abc4b846dc5227c28b045500fb8bda8145ef53896276929b",
+            "prev_hash": "1897a428a4a4b3de56a6b594341523928c838cef591d40dded3cb14a3d86cf19",
             "prev_index": 0,
             "sequence": 4294967293,
             "amount": "200000",
@@ -1314,10 +1417,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 {
                   "node": {
                     "depth": 4,
-                    "fingerprint": 485660438,
+                    "fingerprint": 643428168,
                     "child_num": 2147483650,
-                    "chain_code": "bba0c7ca160a870efeb940ab90d0f4284fea1b5e0d2117677e823fc37e2d5763",
-                    "public_key": "021a3bf5fbf737d0f36993fd46dc4913093beb532d654fe0dfd98bd27585dc9f29"
+                    "chain_code": "7b432e7f25cb8e861f1461835b4e2cce25628d8bf34e3ac011b65219c3cb8341",
+                    "public_key": "02bed20bf5907215841abcb078342505adf118a3243adfb54f3e283d3ee82f1e13"
                   },
                   "address_n": [
                     0,
@@ -1327,10 +1430,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 {
                   "node": {
                     "depth": 4,
-                    "fingerprint": 4292461849,
+                    "fingerprint": 366162743,
                     "child_num": 2147483650,
-                    "chain_code": "a732876f758546f2e3aa40a0ba12c5ea24ee18f9086e854e573bea1e219d172f",
-                    "public_key": "0339710356a496726c84692621b2b6e3645dd35bc0026c587f16411897990a1e1f"
+                    "chain_code": "44d7d6f681bf30caa24a547c84b09a62fec67b4957577b24b24461b002a17dce",
+                    "public_key": "02f288075a5c2a4a80a00087fa500c5a7e51c43a215187b553fcf9d41acfccf2af"
                   },
                   "address_n": [
                     0,
@@ -1340,10 +1443,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 {
                   "node": {
                     "depth": 4,
-                    "fingerprint": 563700748,
+                    "fingerprint": 3679881372,
                     "child_num": 2147483650,
-                    "chain_code": "11285ffd1f2e45b8da2eb32d2c791eaa7d7653307ec72639013c1cba72c7f637",
-                    "public_key": "0351796ed0144642a9b1432b992f7c2a5e232638f998bfce6c3e8c4a83398aba4a"
+                    "chain_code": "6ad8ffd7ad06a31751a9efc5d79a69a4f159ccc847377c637679d4917e0b5e96",
+                    "public_key": "0347761357bca80a8190980592a812cb168e1273264ede1776e6bfd15db3dae25b"
                   },
                   "address_n": [
                     0,
@@ -1369,7 +1472,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
         ],
         "refTxs": [
           {
-            "hash": "ae4fd90d8046ba01abc4b846dc5227c28b045500fb8bda8145ef53896276929b",
+            "hash": "1897a428a4a4b3de56a6b594341523928c838cef591d40dded3cb14a3d86cf19",
             "version": 2,
             "inputs": [
               {
@@ -1382,7 +1485,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
             "bin_outputs": [
               {
                 "amount": 200000,
-                "script_pubkey": "00200c4f69ab01e34bca08e13451d2b17c734319bf18d1be4d2db5a7288d4e08c7cb"
+                "script_pubkey": "0020b539cc4159fcd12e1564b72a06f8d1dc11141c65ba615c00b95109d2641066ab"
               }
             ],
             "lock_time": 0
@@ -1403,7 +1506,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
               0,
               0
             ],
-            "prev_hash": "ae4fd90d8046ba01abc4b846dc5227c28b045500fb8bda8145ef53896276929b",
+            "prev_hash": "1897a428a4a4b3de56a6b594341523928c838cef591d40dded3cb14a3d86cf19",
             "prev_index": 0,
             "sequence": 4294967293,
             "amount": "200000",
@@ -1413,10 +1516,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 {
                   "node": {
                     "depth": 4,
-                    "fingerprint": 485660438,
+                    "fingerprint": 643428168,
                     "child_num": 2147483650,
-                    "chain_code": "bba0c7ca160a870efeb940ab90d0f4284fea1b5e0d2117677e823fc37e2d5763",
-                    "public_key": "021a3bf5fbf737d0f36993fd46dc4913093beb532d654fe0dfd98bd27585dc9f29"
+                    "chain_code": "7b432e7f25cb8e861f1461835b4e2cce25628d8bf34e3ac011b65219c3cb8341",
+                    "public_key": "02bed20bf5907215841abcb078342505adf118a3243adfb54f3e283d3ee82f1e13"
                   },
                   "address_n": [
                     0,
@@ -1426,10 +1529,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 {
                   "node": {
                     "depth": 4,
-                    "fingerprint": 4292461849,
+                    "fingerprint": 366162743,
                     "child_num": 2147483650,
-                    "chain_code": "a732876f758546f2e3aa40a0ba12c5ea24ee18f9086e854e573bea1e219d172f",
-                    "public_key": "0339710356a496726c84692621b2b6e3645dd35bc0026c587f16411897990a1e1f"
+                    "chain_code": "44d7d6f681bf30caa24a547c84b09a62fec67b4957577b24b24461b002a17dce",
+                    "public_key": "02f288075a5c2a4a80a00087fa500c5a7e51c43a215187b553fcf9d41acfccf2af"
                   },
                   "address_n": [
                     0,
@@ -1439,10 +1542,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 {
                   "node": {
                     "depth": 4,
-                    "fingerprint": 563700748,
+                    "fingerprint": 3679881372,
                     "child_num": 2147483650,
-                    "chain_code": "11285ffd1f2e45b8da2eb32d2c791eaa7d7653307ec72639013c1cba72c7f637",
-                    "public_key": "0351796ed0144642a9b1432b992f7c2a5e232638f998bfce6c3e8c4a83398aba4a"
+                    "chain_code": "6ad8ffd7ad06a31751a9efc5d79a69a4f159ccc847377c637679d4917e0b5e96",
+                    "public_key": "0347761357bca80a8190980592a812cb168e1273264ede1776e6bfd15db3dae25b"
                   },
                   "address_n": [
                     0,
@@ -1451,7 +1554,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 }
               ],
               "signatures": [
-                "3045022100f0fa4ee5d462fa9f95ec6faf8bc9be85673bbdede4c4bf5b6301ad0f27ea3f0102202d24a4df617acf082434b3e25f4588beb072137fd2ec0377fa891d9b1b30157401",
+                "3045022100ba32087c1a650360b87bbfcac1189bcadb055f1848a99039f192b309d8768cd10220197c17652286b649297311a5b536bf4e345a0fcfe92f7ba1db1c33d9495a245601",
                 "",
                 ""
               ],
@@ -1468,7 +1571,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
         ],
         "refTxs": [
           {
-            "hash": "ae4fd90d8046ba01abc4b846dc5227c28b045500fb8bda8145ef53896276929b",
+            "hash": "1897a428a4a4b3de56a6b594341523928c838cef591d40dded3cb14a3d86cf19",
             "version": 2,
             "inputs": [
               {
@@ -1481,7 +1584,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
             "bin_outputs": [
               {
                 "amount": 200000,
-                "script_pubkey": "00200c4f69ab01e34bca08e13451d2b17c734319bf18d1be4d2db5a7288d4e08c7cb"
+                "script_pubkey": "0020b539cc4159fcd12e1564b72a06f8d1dc11141c65ba615c00b95109d2641066ab"
               }
             ],
             "lock_time": 0
@@ -1492,8 +1595,8 @@ export const GENERATED_MULTISIG_FIXTURES = {
         {
           "signerIndex": 0,
           "signerEnvKey": "MULTISIG_MNEMONIC_1",
-          "signerAddress": "19UR2SuvBxrYgTodozcD7hhxwekkskMQGc",
-          "expectedSignature": "3045022100f0fa4ee5d462fa9f95ec6faf8bc9be85673bbdede4c4bf5b6301ad0f27ea3f0102202d24a4df617acf082434b3e25f4588beb072137fd2ec0377fa891d9b1b30157401",
+          "signerAddress": "1AAddbBESPN4dRXJRj2DANq1yanaW15aMG",
+          "expectedSignature": "3045022100ba32087c1a650360b87bbfcac1189bcadb055f1848a99039f192b309d8768cd10220197c17652286b649297311a5b536bf4e345a0fcfe92f7ba1db1c33d9495a245601",
           "prefilledSignerIndex": 1,
           "firstSignParameters": {
             "coin": "btc",
@@ -1509,7 +1612,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
                   0,
                   0
                 ],
-                "prev_hash": "ae4fd90d8046ba01abc4b846dc5227c28b045500fb8bda8145ef53896276929b",
+                "prev_hash": "1897a428a4a4b3de56a6b594341523928c838cef591d40dded3cb14a3d86cf19",
                 "prev_index": 0,
                 "sequence": 4294967293,
                 "amount": "200000",
@@ -1519,10 +1622,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                     {
                       "node": {
                         "depth": 4,
-                        "fingerprint": 485660438,
+                        "fingerprint": 643428168,
                         "child_num": 2147483650,
-                        "chain_code": "bba0c7ca160a870efeb940ab90d0f4284fea1b5e0d2117677e823fc37e2d5763",
-                        "public_key": "021a3bf5fbf737d0f36993fd46dc4913093beb532d654fe0dfd98bd27585dc9f29"
+                        "chain_code": "7b432e7f25cb8e861f1461835b4e2cce25628d8bf34e3ac011b65219c3cb8341",
+                        "public_key": "02bed20bf5907215841abcb078342505adf118a3243adfb54f3e283d3ee82f1e13"
                       },
                       "address_n": [
                         0,
@@ -1532,10 +1635,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                     {
                       "node": {
                         "depth": 4,
-                        "fingerprint": 4292461849,
+                        "fingerprint": 366162743,
                         "child_num": 2147483650,
-                        "chain_code": "a732876f758546f2e3aa40a0ba12c5ea24ee18f9086e854e573bea1e219d172f",
-                        "public_key": "0339710356a496726c84692621b2b6e3645dd35bc0026c587f16411897990a1e1f"
+                        "chain_code": "44d7d6f681bf30caa24a547c84b09a62fec67b4957577b24b24461b002a17dce",
+                        "public_key": "02f288075a5c2a4a80a00087fa500c5a7e51c43a215187b553fcf9d41acfccf2af"
                       },
                       "address_n": [
                         0,
@@ -1545,10 +1648,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                     {
                       "node": {
                         "depth": 4,
-                        "fingerprint": 563700748,
+                        "fingerprint": 3679881372,
                         "child_num": 2147483650,
-                        "chain_code": "11285ffd1f2e45b8da2eb32d2c791eaa7d7653307ec72639013c1cba72c7f637",
-                        "public_key": "0351796ed0144642a9b1432b992f7c2a5e232638f998bfce6c3e8c4a83398aba4a"
+                        "chain_code": "6ad8ffd7ad06a31751a9efc5d79a69a4f159ccc847377c637679d4917e0b5e96",
+                        "public_key": "0347761357bca80a8190980592a812cb168e1273264ede1776e6bfd15db3dae25b"
                       },
                       "address_n": [
                         0,
@@ -1574,7 +1677,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
             ],
             "refTxs": [
               {
-                "hash": "ae4fd90d8046ba01abc4b846dc5227c28b045500fb8bda8145ef53896276929b",
+                "hash": "1897a428a4a4b3de56a6b594341523928c838cef591d40dded3cb14a3d86cf19",
                 "version": 2,
                 "inputs": [
                   {
@@ -1587,7 +1690,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 "bin_outputs": [
                   {
                     "amount": 200000,
-                    "script_pubkey": "00200c4f69ab01e34bca08e13451d2b17c734319bf18d1be4d2db5a7288d4e08c7cb"
+                    "script_pubkey": "0020b539cc4159fcd12e1564b72a06f8d1dc11141c65ba615c00b95109d2641066ab"
                   }
                 ],
                 "lock_time": 0
@@ -1608,7 +1711,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
                   0,
                   0
                 ],
-                "prev_hash": "ae4fd90d8046ba01abc4b846dc5227c28b045500fb8bda8145ef53896276929b",
+                "prev_hash": "1897a428a4a4b3de56a6b594341523928c838cef591d40dded3cb14a3d86cf19",
                 "prev_index": 0,
                 "sequence": 4294967293,
                 "amount": "200000",
@@ -1618,10 +1721,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                     {
                       "node": {
                         "depth": 4,
-                        "fingerprint": 485660438,
+                        "fingerprint": 643428168,
                         "child_num": 2147483650,
-                        "chain_code": "bba0c7ca160a870efeb940ab90d0f4284fea1b5e0d2117677e823fc37e2d5763",
-                        "public_key": "021a3bf5fbf737d0f36993fd46dc4913093beb532d654fe0dfd98bd27585dc9f29"
+                        "chain_code": "7b432e7f25cb8e861f1461835b4e2cce25628d8bf34e3ac011b65219c3cb8341",
+                        "public_key": "02bed20bf5907215841abcb078342505adf118a3243adfb54f3e283d3ee82f1e13"
                       },
                       "address_n": [
                         0,
@@ -1631,10 +1734,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                     {
                       "node": {
                         "depth": 4,
-                        "fingerprint": 4292461849,
+                        "fingerprint": 366162743,
                         "child_num": 2147483650,
-                        "chain_code": "a732876f758546f2e3aa40a0ba12c5ea24ee18f9086e854e573bea1e219d172f",
-                        "public_key": "0339710356a496726c84692621b2b6e3645dd35bc0026c587f16411897990a1e1f"
+                        "chain_code": "44d7d6f681bf30caa24a547c84b09a62fec67b4957577b24b24461b002a17dce",
+                        "public_key": "02f288075a5c2a4a80a00087fa500c5a7e51c43a215187b553fcf9d41acfccf2af"
                       },
                       "address_n": [
                         0,
@@ -1644,10 +1747,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                     {
                       "node": {
                         "depth": 4,
-                        "fingerprint": 563700748,
+                        "fingerprint": 3679881372,
                         "child_num": 2147483650,
-                        "chain_code": "11285ffd1f2e45b8da2eb32d2c791eaa7d7653307ec72639013c1cba72c7f637",
-                        "public_key": "0351796ed0144642a9b1432b992f7c2a5e232638f998bfce6c3e8c4a83398aba4a"
+                        "chain_code": "6ad8ffd7ad06a31751a9efc5d79a69a4f159ccc847377c637679d4917e0b5e96",
+                        "public_key": "0347761357bca80a8190980592a812cb168e1273264ede1776e6bfd15db3dae25b"
                       },
                       "address_n": [
                         0,
@@ -1657,7 +1760,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
                   ],
                   "signatures": [
                     "",
-                    "3045022100a5e094cb0dea0aaaf0d3c535ae7d9c5bd534b8a94f59325ea55e395bb34bfb6c022046d6abd668111aca857ae25f907793b9125c66850584d3df4ec1071989dc515701",
+                    "304402201638a414bf8b864f7970de7e2806e88c31186c97ffed5e67bc4f52c1a684e88d022074de8423205fe09a68fc973d0847b994839e22055c6d137a38afa3c6fff1692301",
                     ""
                   ],
                   "m": 2
@@ -1673,7 +1776,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
             ],
             "refTxs": [
               {
-                "hash": "ae4fd90d8046ba01abc4b846dc5227c28b045500fb8bda8145ef53896276929b",
+                "hash": "1897a428a4a4b3de56a6b594341523928c838cef591d40dded3cb14a3d86cf19",
                 "version": 2,
                 "inputs": [
                   {
@@ -1686,7 +1789,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 "bin_outputs": [
                   {
                     "amount": 200000,
-                    "script_pubkey": "00200c4f69ab01e34bca08e13451d2b17c734319bf18d1be4d2db5a7288d4e08c7cb"
+                    "script_pubkey": "0020b539cc4159fcd12e1564b72a06f8d1dc11141c65ba615c00b95109d2641066ab"
                   }
                 ],
                 "lock_time": 0
@@ -1705,35 +1808,35 @@ export const GENERATED_MULTISIG_FIXTURES = {
       "reference": {
         "broadcastable": false,
         "signerAddresses": [
-          "19UR2SuvBxrYgTodozcD7hhxwekkskMQGc",
-          "16reYF5jLgD85wjHSk3Pp8VLiyRcHdKnh1",
-          "1KV3YCyrD7mHTP4DBwm1iVRQuJjwb72XMK"
+          "1AAddbBESPN4dRXJRj2DANq1yanaW15aMG",
+          "1Bvx5N5Fyayf2iFJ21HwpAsqSJi8exRpyt",
+          "1PgbkE8cFZghFrZ2E5e7QtoqQmsq9Cxqv6"
         ],
         "expectedSignatures": [
-          "3045022100f0fa4ee5d462fa9f95ec6faf8bc9be85673bbdede4c4bf5b6301ad0f27ea3f0102202d24a4df617acf082434b3e25f4588beb072137fd2ec0377fa891d9b1b30157401",
-          "3045022100a5e094cb0dea0aaaf0d3c535ae7d9c5bd534b8a94f59325ea55e395bb34bfb6c022046d6abd668111aca857ae25f907793b9125c66850584d3df4ec1071989dc515701",
-          "3045022100928e693fd64235cb799e13d7a091bce78f135009494be46e7489d559aa731b3f022006883d81fb751cee2451ba50fb718c6049d92d57ecc2a8fe3f5df24d29969f8501"
+          "3045022100ba32087c1a650360b87bbfcac1189bcadb055f1848a99039f192b309d8768cd10220197c17652286b649297311a5b536bf4e345a0fcfe92f7ba1db1c33d9495a245601",
+          "304402201638a414bf8b864f7970de7e2806e88c31186c97ffed5e67bc4f52c1a684e88d022074de8423205fe09a68fc973d0847b994839e22055c6d137a38afa3c6fff1692301",
+          "3045022100dcecfb09ec4336b404f505a1699d1ce1999231ab6f1fc302978ac38799dae07f02206716c637c1534c5820ab8e0602056943b7f9016e3567d911a7575bb818682b2b01"
         ],
         "accountXpubs": [
-          "xpub6DkFAXWQ2dHxq2vatrt9qyA3bXYU4ToWQwCHbf5XB2mSTexcHZCeKS1VZYcPoBd5X8yVcbXFHJR9R8UCVpt82VX1VhR28mCyxUFL4r6KFrf",
-          "xpub6FQya7zGhR92kacYsNnjreouvnHJMpXYsUXnW6NJJAJRCKsa26TzDy4LdnGhEurr3d6y1J8PJ7EEMKQp74XTqYvmGJNogYXSKDszYHtF8mX",
-          "xpub6DnEBNkSJKBYQmsbhS1sP9cNdtU5c9PLFGCjTJmxicxc13WB8zNNGQazabQpyFAGW5bV9tMko4uBxDxjUKL6dSAcx1tEbgEHtgSqyRsekh6"
+          "xpub6DpFgSNFWXCnokam8hNgmouiu3ZXkDynKU1Y5pDazGkya2dPcHqesnFwUDvwhRemK9ekTpFsH6xjduqz8wc8REQWWBgx8RfGSUN7f3mWzf6",
+          "xpub6DhD3vKCogoQ57x4mnaQFcCzbBgmYFcspSQR2BsaGRRxYNPD3rk5zFB8cfzFbis4uCFyqTXF7vXhsoA5cJuvuv2ozyNsF2fGKNGnnmNUhkp",
+          "xpub6F9Qm2hmXhoT1MBLpk8mP8ku8Bh2Bq2cD2Wj3eEZbJp7fZa4QGmH8o2fvjmVctv8MU4kkTHakniGvKZ69cUJa9LAbx8GhpMJH7LAktoSHU2"
         ],
         "childPublicKeys": [
-          "03dc1953c2756c7c58d4f48ca1bbba767f414fd236bf4d662b67721ac626c514e0",
-          "028e818df63d6f2dce9308d7455fd4c85cbb39d703608b8fbed647d75e262322d8",
-          "03229cb34fe3eb1af43b6dd2a2e1b31681039b71d9303ded36b3128ef359e379bd"
+          "03b55face2b4ac27f309805c4981bbce4cc029d63cac4477e117f9ef1bddb3e8d1",
+          "03242265037fee8f18cca525c319b0e001ca08010d7b2a7f7e9da5ff35bcf9b3b1",
+          "02fcc70d03ca38f1bd4199a52c23e5c60dbfe74c4ed45f73be34d3f56b5a213452"
         ],
-        "sighash": "542c8491fec4f8ca1d0e32e584bd6a0d69c49d0da520f4ac88f04c2a9a4f00b4",
-        "scriptPubKey": "00200c4f69ab01e34bca08e13451d2b17c734319bf18d1be4d2db5a7288d4e08c7cb",
-        "redeemScript": "522103dc1953c2756c7c58d4f48ca1bbba767f414fd236bf4d662b67721ac626c514e021028e818df63d6f2dce9308d7455fd4c85cbb39d703608b8fbed647d75e262322d82103229cb34fe3eb1af43b6dd2a2e1b31681039b71d9303ded36b3128ef359e379bd53ae",
-        "witnessScript": "522103dc1953c2756c7c58d4f48ca1bbba767f414fd236bf4d662b67721ac626c514e021028e818df63d6f2dce9308d7455fd4c85cbb39d703608b8fbed647d75e262322d82103229cb34fe3eb1af43b6dd2a2e1b31681039b71d9303ded36b3128ef359e379bd53ae",
-        "fundingTxHex": "02000000010000000000000000000000000000000000000000000000000000000000000000ffffffff166f66666c696e652d6d756c74697369672d7032777368ffffffff01400d0300000000002200200c4f69ab01e34bca08e13451d2b17c734319bf18d1be4d2db5a7288d4e08c7cb00000000",
-        "spendingTxHex": "02000000019b9276628953ef4581da8bfb0055048bc22752dc46b8c4ab01ba46800dd94fae0000000000fdffffff0130e60200000000001976a914759d6677091e973b9e9d99f19c68fbf43e3f05f988ac00000000",
-        "prevHash": "ae4fd90d8046ba01abc4b846dc5227c28b045500fb8bda8145ef53896276929b",
+        "sighash": "ad486c5f53375026613fa8c295b8f6fc41c59eaf5c100e02916c5ac33a738039",
+        "scriptPubKey": "0020b539cc4159fcd12e1564b72a06f8d1dc11141c65ba615c00b95109d2641066ab",
+        "redeemScript": "522103b55face2b4ac27f309805c4981bbce4cc029d63cac4477e117f9ef1bddb3e8d12103242265037fee8f18cca525c319b0e001ca08010d7b2a7f7e9da5ff35bcf9b3b12102fcc70d03ca38f1bd4199a52c23e5c60dbfe74c4ed45f73be34d3f56b5a21345253ae",
+        "witnessScript": "522103b55face2b4ac27f309805c4981bbce4cc029d63cac4477e117f9ef1bddb3e8d12103242265037fee8f18cca525c319b0e001ca08010d7b2a7f7e9da5ff35bcf9b3b12102fcc70d03ca38f1bd4199a52c23e5c60dbfe74c4ed45f73be34d3f56b5a21345253ae",
+        "fundingTxHex": "02000000010000000000000000000000000000000000000000000000000000000000000000ffffffff166f66666c696e652d6d756c74697369672d7032777368ffffffff01400d030000000000220020b539cc4159fcd12e1564b72a06f8d1dc11141c65ba615c00b95109d2641066ab00000000",
+        "spendingTxHex": "020000000119cf863d4ab13ceddd401d59ef8c838c9223153494b5a656deb3a4a428a497180000000000fdffffff0130e60200000000001976a914759d6677091e973b9e9d99f19c68fbf43e3f05f988ac00000000",
+        "prevHash": "1897a428a4a4b3de56a6b594341523928c838cef591d40dded3cb14a3d86cf19",
         "doubleSignatures": [
-          "3045022100f0fa4ee5d462fa9f95ec6faf8bc9be85673bbdede4c4bf5b6301ad0f27ea3f0102202d24a4df617acf082434b3e25f4588beb072137fd2ec0377fa891d9b1b30157401",
-          "3045022100a5e094cb0dea0aaaf0d3c535ae7d9c5bd534b8a94f59325ea55e395bb34bfb6c022046d6abd668111aca857ae25f907793b9125c66850584d3df4ec1071989dc515701",
+          "3045022100ba32087c1a650360b87bbfcac1189bcadb055f1848a99039f192b309d8768cd10220197c17652286b649297311a5b536bf4e345a0fcfe92f7ba1db1c33d9495a245601",
+          "304402201638a414bf8b864f7970de7e2806e88c31186c97ffed5e67bc4f52c1a684e88d022074de8423205fe09a68fc973d0847b994839e22055c6d137a38afa3c6fff1692301",
           ""
         ]
       }
@@ -1743,7 +1846,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
       "title": "P2WSH · Index 2",
       "path": "m/48'/0'/0'/2'/0/2",
       "scriptType": "SPENDWITNESS",
-      "address": "bc1qtyd5e5qmqaz2kd97tmgvsh0qmwcug2653ptd3naydefn3jyjaktqgu6av6",
+      "address": "bc1qyjgph6g5ta9r5qv04lmaqxwxfn3ynesvdsy84uwme66l5u7za3tqnrfq4l",
       "addressParameters": {
         "path": "m/48'/0'/0'/2'/0/2",
         "coin": "btc",
@@ -1754,10 +1857,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
             {
               "node": {
                 "depth": 4,
-                "fingerprint": 485660438,
+                "fingerprint": 643428168,
                 "child_num": 2147483650,
-                "chain_code": "bba0c7ca160a870efeb940ab90d0f4284fea1b5e0d2117677e823fc37e2d5763",
-                "public_key": "021a3bf5fbf737d0f36993fd46dc4913093beb532d654fe0dfd98bd27585dc9f29"
+                "chain_code": "7b432e7f25cb8e861f1461835b4e2cce25628d8bf34e3ac011b65219c3cb8341",
+                "public_key": "02bed20bf5907215841abcb078342505adf118a3243adfb54f3e283d3ee82f1e13"
               },
               "address_n": [
                 0,
@@ -1767,10 +1870,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
             {
               "node": {
                 "depth": 4,
-                "fingerprint": 4292461849,
+                "fingerprint": 366162743,
                 "child_num": 2147483650,
-                "chain_code": "a732876f758546f2e3aa40a0ba12c5ea24ee18f9086e854e573bea1e219d172f",
-                "public_key": "0339710356a496726c84692621b2b6e3645dd35bc0026c587f16411897990a1e1f"
+                "chain_code": "44d7d6f681bf30caa24a547c84b09a62fec67b4957577b24b24461b002a17dce",
+                "public_key": "02f288075a5c2a4a80a00087fa500c5a7e51c43a215187b553fcf9d41acfccf2af"
               },
               "address_n": [
                 0,
@@ -1799,7 +1902,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
               0,
               2
             ],
-            "prev_hash": "b3e46a5c34b3e1defde6ee27653e4d167216daf1d333a7153c124f31bfba2464",
+            "prev_hash": "bb42439cd6fab05722c769cbbbfc0ef64564ad14b43473702c48177ea1c3902c",
             "prev_index": 0,
             "sequence": 4294967293,
             "amount": "200000",
@@ -1809,10 +1912,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 {
                   "node": {
                     "depth": 4,
-                    "fingerprint": 485660438,
+                    "fingerprint": 643428168,
                     "child_num": 2147483650,
-                    "chain_code": "bba0c7ca160a870efeb940ab90d0f4284fea1b5e0d2117677e823fc37e2d5763",
-                    "public_key": "021a3bf5fbf737d0f36993fd46dc4913093beb532d654fe0dfd98bd27585dc9f29"
+                    "chain_code": "7b432e7f25cb8e861f1461835b4e2cce25628d8bf34e3ac011b65219c3cb8341",
+                    "public_key": "02bed20bf5907215841abcb078342505adf118a3243adfb54f3e283d3ee82f1e13"
                   },
                   "address_n": [
                     0,
@@ -1822,10 +1925,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 {
                   "node": {
                     "depth": 4,
-                    "fingerprint": 4292461849,
+                    "fingerprint": 366162743,
                     "child_num": 2147483650,
-                    "chain_code": "a732876f758546f2e3aa40a0ba12c5ea24ee18f9086e854e573bea1e219d172f",
-                    "public_key": "0339710356a496726c84692621b2b6e3645dd35bc0026c587f16411897990a1e1f"
+                    "chain_code": "44d7d6f681bf30caa24a547c84b09a62fec67b4957577b24b24461b002a17dce",
+                    "public_key": "02f288075a5c2a4a80a00087fa500c5a7e51c43a215187b553fcf9d41acfccf2af"
                   },
                   "address_n": [
                     0,
@@ -1850,7 +1953,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
         ],
         "refTxs": [
           {
-            "hash": "b3e46a5c34b3e1defde6ee27653e4d167216daf1d333a7153c124f31bfba2464",
+            "hash": "bb42439cd6fab05722c769cbbbfc0ef64564ad14b43473702c48177ea1c3902c",
             "version": 2,
             "inputs": [
               {
@@ -1863,7 +1966,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
             "bin_outputs": [
               {
                 "amount": 200000,
-                "script_pubkey": "0020591b4cd01b0744ab34be5ed0c85de0dbb1c42b548856d8cfa46e5338c892ed96"
+                "script_pubkey": "002024901be9145f4a3a018faff7d019c64ce249e60c6c087af1dbceb5fa73c2ec56"
               }
             ],
             "lock_time": 0
@@ -1884,7 +1987,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
               0,
               2
             ],
-            "prev_hash": "b3e46a5c34b3e1defde6ee27653e4d167216daf1d333a7153c124f31bfba2464",
+            "prev_hash": "bb42439cd6fab05722c769cbbbfc0ef64564ad14b43473702c48177ea1c3902c",
             "prev_index": 0,
             "sequence": 4294967293,
             "amount": "200000",
@@ -1894,10 +1997,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 {
                   "node": {
                     "depth": 4,
-                    "fingerprint": 485660438,
+                    "fingerprint": 643428168,
                     "child_num": 2147483650,
-                    "chain_code": "bba0c7ca160a870efeb940ab90d0f4284fea1b5e0d2117677e823fc37e2d5763",
-                    "public_key": "021a3bf5fbf737d0f36993fd46dc4913093beb532d654fe0dfd98bd27585dc9f29"
+                    "chain_code": "7b432e7f25cb8e861f1461835b4e2cce25628d8bf34e3ac011b65219c3cb8341",
+                    "public_key": "02bed20bf5907215841abcb078342505adf118a3243adfb54f3e283d3ee82f1e13"
                   },
                   "address_n": [
                     0,
@@ -1907,10 +2010,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 {
                   "node": {
                     "depth": 4,
-                    "fingerprint": 4292461849,
+                    "fingerprint": 366162743,
                     "child_num": 2147483650,
-                    "chain_code": "a732876f758546f2e3aa40a0ba12c5ea24ee18f9086e854e573bea1e219d172f",
-                    "public_key": "0339710356a496726c84692621b2b6e3645dd35bc0026c587f16411897990a1e1f"
+                    "chain_code": "44d7d6f681bf30caa24a547c84b09a62fec67b4957577b24b24461b002a17dce",
+                    "public_key": "02f288075a5c2a4a80a00087fa500c5a7e51c43a215187b553fcf9d41acfccf2af"
                   },
                   "address_n": [
                     0,
@@ -1919,7 +2022,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 }
               ],
               "signatures": [
-                "3045022100fda71cd82052c962d7ca4171c8a89d405c044715729d32a2b8481ab3c320d75b022076ca9c1e1cf8b72678ffe6ca84c402d894ba19472ec6a3582c8261c56d0d132301",
+                "30440220595a47597288e42cb4dc6c4d3ac6a8e41ee31af5c1a9da9af4159cd27089c0ac02203d51b78a80853aa9fd82474d4f8af78aff1ee905bb80e06afca877a76b09c80601",
                 ""
               ],
               "m": 2
@@ -1935,7 +2038,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
         ],
         "refTxs": [
           {
-            "hash": "b3e46a5c34b3e1defde6ee27653e4d167216daf1d333a7153c124f31bfba2464",
+            "hash": "bb42439cd6fab05722c769cbbbfc0ef64564ad14b43473702c48177ea1c3902c",
             "version": 2,
             "inputs": [
               {
@@ -1948,7 +2051,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
             "bin_outputs": [
               {
                 "amount": 200000,
-                "script_pubkey": "0020591b4cd01b0744ab34be5ed0c85de0dbb1c42b548856d8cfa46e5338c892ed96"
+                "script_pubkey": "002024901be9145f4a3a018faff7d019c64ce249e60c6c087af1dbceb5fa73c2ec56"
               }
             ],
             "lock_time": 0
@@ -1959,8 +2062,8 @@ export const GENERATED_MULTISIG_FIXTURES = {
         {
           "signerIndex": 0,
           "signerEnvKey": "MULTISIG_MNEMONIC_1",
-          "signerAddress": "1SdwPX5RJj8WqZKN1MavuscC6ASKZefcg",
-          "expectedSignature": "3045022100fda71cd82052c962d7ca4171c8a89d405c044715729d32a2b8481ab3c320d75b022076ca9c1e1cf8b72678ffe6ca84c402d894ba19472ec6a3582c8261c56d0d132301",
+          "signerAddress": "15czspQVjfNWgQab4RwXaCtXgfG6tfqwug",
+          "expectedSignature": "30440220595a47597288e42cb4dc6c4d3ac6a8e41ee31af5c1a9da9af4159cd27089c0ac02203d51b78a80853aa9fd82474d4f8af78aff1ee905bb80e06afca877a76b09c80601",
           "prefilledSignerIndex": 1,
           "firstSignParameters": {
             "coin": "btc",
@@ -1976,7 +2079,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
                   0,
                   2
                 ],
-                "prev_hash": "b3e46a5c34b3e1defde6ee27653e4d167216daf1d333a7153c124f31bfba2464",
+                "prev_hash": "bb42439cd6fab05722c769cbbbfc0ef64564ad14b43473702c48177ea1c3902c",
                 "prev_index": 0,
                 "sequence": 4294967293,
                 "amount": "200000",
@@ -1986,10 +2089,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                     {
                       "node": {
                         "depth": 4,
-                        "fingerprint": 485660438,
+                        "fingerprint": 643428168,
                         "child_num": 2147483650,
-                        "chain_code": "bba0c7ca160a870efeb940ab90d0f4284fea1b5e0d2117677e823fc37e2d5763",
-                        "public_key": "021a3bf5fbf737d0f36993fd46dc4913093beb532d654fe0dfd98bd27585dc9f29"
+                        "chain_code": "7b432e7f25cb8e861f1461835b4e2cce25628d8bf34e3ac011b65219c3cb8341",
+                        "public_key": "02bed20bf5907215841abcb078342505adf118a3243adfb54f3e283d3ee82f1e13"
                       },
                       "address_n": [
                         0,
@@ -1999,10 +2102,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                     {
                       "node": {
                         "depth": 4,
-                        "fingerprint": 4292461849,
+                        "fingerprint": 366162743,
                         "child_num": 2147483650,
-                        "chain_code": "a732876f758546f2e3aa40a0ba12c5ea24ee18f9086e854e573bea1e219d172f",
-                        "public_key": "0339710356a496726c84692621b2b6e3645dd35bc0026c587f16411897990a1e1f"
+                        "chain_code": "44d7d6f681bf30caa24a547c84b09a62fec67b4957577b24b24461b002a17dce",
+                        "public_key": "02f288075a5c2a4a80a00087fa500c5a7e51c43a215187b553fcf9d41acfccf2af"
                       },
                       "address_n": [
                         0,
@@ -2027,7 +2130,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
             ],
             "refTxs": [
               {
-                "hash": "b3e46a5c34b3e1defde6ee27653e4d167216daf1d333a7153c124f31bfba2464",
+                "hash": "bb42439cd6fab05722c769cbbbfc0ef64564ad14b43473702c48177ea1c3902c",
                 "version": 2,
                 "inputs": [
                   {
@@ -2040,7 +2143,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 "bin_outputs": [
                   {
                     "amount": 200000,
-                    "script_pubkey": "0020591b4cd01b0744ab34be5ed0c85de0dbb1c42b548856d8cfa46e5338c892ed96"
+                    "script_pubkey": "002024901be9145f4a3a018faff7d019c64ce249e60c6c087af1dbceb5fa73c2ec56"
                   }
                 ],
                 "lock_time": 0
@@ -2061,7 +2164,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
                   0,
                   2
                 ],
-                "prev_hash": "b3e46a5c34b3e1defde6ee27653e4d167216daf1d333a7153c124f31bfba2464",
+                "prev_hash": "bb42439cd6fab05722c769cbbbfc0ef64564ad14b43473702c48177ea1c3902c",
                 "prev_index": 0,
                 "sequence": 4294967293,
                 "amount": "200000",
@@ -2071,10 +2174,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                     {
                       "node": {
                         "depth": 4,
-                        "fingerprint": 485660438,
+                        "fingerprint": 643428168,
                         "child_num": 2147483650,
-                        "chain_code": "bba0c7ca160a870efeb940ab90d0f4284fea1b5e0d2117677e823fc37e2d5763",
-                        "public_key": "021a3bf5fbf737d0f36993fd46dc4913093beb532d654fe0dfd98bd27585dc9f29"
+                        "chain_code": "7b432e7f25cb8e861f1461835b4e2cce25628d8bf34e3ac011b65219c3cb8341",
+                        "public_key": "02bed20bf5907215841abcb078342505adf118a3243adfb54f3e283d3ee82f1e13"
                       },
                       "address_n": [
                         0,
@@ -2084,10 +2187,10 @@ export const GENERATED_MULTISIG_FIXTURES = {
                     {
                       "node": {
                         "depth": 4,
-                        "fingerprint": 4292461849,
+                        "fingerprint": 366162743,
                         "child_num": 2147483650,
-                        "chain_code": "a732876f758546f2e3aa40a0ba12c5ea24ee18f9086e854e573bea1e219d172f",
-                        "public_key": "0339710356a496726c84692621b2b6e3645dd35bc0026c587f16411897990a1e1f"
+                        "chain_code": "44d7d6f681bf30caa24a547c84b09a62fec67b4957577b24b24461b002a17dce",
+                        "public_key": "02f288075a5c2a4a80a00087fa500c5a7e51c43a215187b553fcf9d41acfccf2af"
                       },
                       "address_n": [
                         0,
@@ -2097,7 +2200,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
                   ],
                   "signatures": [
                     "",
-                    "3045022100cbcb5bf0e4192916a0b9614941064572cb1d8a27cacc42238744a29be5cc0db0022027e592337528df9f7aa79252de9c5620a7840740ffc870e37e6736205865300901"
+                    "3044022032078684e5b9fd26e6983e2989f51a218c55ad81338abc2e8211608521bdc74602203662ca80d4d5f05d69bf97c0eed037294d83fca9ba345b05ba811f817827796c01"
                   ],
                   "m": 2
                 }
@@ -2112,7 +2215,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
             ],
             "refTxs": [
               {
-                "hash": "b3e46a5c34b3e1defde6ee27653e4d167216daf1d333a7153c124f31bfba2464",
+                "hash": "bb42439cd6fab05722c769cbbbfc0ef64564ad14b43473702c48177ea1c3902c",
                 "version": 2,
                 "inputs": [
                   {
@@ -2125,7 +2228,7 @@ export const GENERATED_MULTISIG_FIXTURES = {
                 "bin_outputs": [
                   {
                     "amount": 200000,
-                    "script_pubkey": "0020591b4cd01b0744ab34be5ed0c85de0dbb1c42b548856d8cfa46e5338c892ed96"
+                    "script_pubkey": "002024901be9145f4a3a018faff7d019c64ce249e60c6c087af1dbceb5fa73c2ec56"
                   }
                 ],
                 "lock_time": 0
@@ -2144,31 +2247,31 @@ export const GENERATED_MULTISIG_FIXTURES = {
       "reference": {
         "broadcastable": false,
         "signerAddresses": [
-          "1SdwPX5RJj8WqZKN1MavuscC6ASKZefcg",
-          "1fGqTXE3F8HvWV2atoGYYShGUP6SYT6Xr"
+          "15czspQVjfNWgQab4RwXaCtXgfG6tfqwug",
+          "15QdTtkYz68CuQeabWmjMTuY9dhmG651oi"
         ],
         "expectedSignatures": [
-          "3045022100fda71cd82052c962d7ca4171c8a89d405c044715729d32a2b8481ab3c320d75b022076ca9c1e1cf8b72678ffe6ca84c402d894ba19472ec6a3582c8261c56d0d132301",
-          "3045022100cbcb5bf0e4192916a0b9614941064572cb1d8a27cacc42238744a29be5cc0db0022027e592337528df9f7aa79252de9c5620a7840740ffc870e37e6736205865300901"
+          "30440220595a47597288e42cb4dc6c4d3ac6a8e41ee31af5c1a9da9af4159cd27089c0ac02203d51b78a80853aa9fd82474d4f8af78aff1ee905bb80e06afca877a76b09c80601",
+          "3044022032078684e5b9fd26e6983e2989f51a218c55ad81338abc2e8211608521bdc74602203662ca80d4d5f05d69bf97c0eed037294d83fca9ba345b05ba811f817827796c01"
         ],
         "accountXpubs": [
-          "xpub6DkFAXWQ2dHxq2vatrt9qyA3bXYU4ToWQwCHbf5XB2mSTexcHZCeKS1VZYcPoBd5X8yVcbXFHJR9R8UCVpt82VX1VhR28mCyxUFL4r6KFrf",
-          "xpub6FQya7zGhR92kacYsNnjreouvnHJMpXYsUXnW6NJJAJRCKsa26TzDy4LdnGhEurr3d6y1J8PJ7EEMKQp74XTqYvmGJNogYXSKDszYHtF8mX"
+          "xpub6DpFgSNFWXCnokam8hNgmouiu3ZXkDynKU1Y5pDazGkya2dPcHqesnFwUDvwhRemK9ekTpFsH6xjduqz8wc8REQWWBgx8RfGSUN7f3mWzf6",
+          "xpub6DhD3vKCogoQ57x4mnaQFcCzbBgmYFcspSQR2BsaGRRxYNPD3rk5zFB8cfzFbis4uCFyqTXF7vXhsoA5cJuvuv2ozyNsF2fGKNGnnmNUhkp"
         ],
         "childPublicKeys": [
-          "0355d900c9e1f67dbc8ac5c30379d906b16770a199d28ea12fb606c5eba9905a6a",
-          "025db741e91e2f6155cc5c11bdeedb56a89de1ffaf51fd9a5d879cd7db7df16810"
+          "03f2a4124ead69235b3913e70e12156970b972ba08c626c5de6345f7adcef2b79a",
+          "026b3528a93369e13ddd84ac955e0d4bba3bf37070e88b157adc717d053f112b85"
         ],
-        "sighash": "458b553e720487fd57bca56133315a7e199f71b209e77c9986d15c426b21949c",
-        "scriptPubKey": "0020591b4cd01b0744ab34be5ed0c85de0dbb1c42b548856d8cfa46e5338c892ed96",
-        "redeemScript": "52210355d900c9e1f67dbc8ac5c30379d906b16770a199d28ea12fb606c5eba9905a6a21025db741e91e2f6155cc5c11bdeedb56a89de1ffaf51fd9a5d879cd7db7df1681052ae",
-        "witnessScript": "52210355d900c9e1f67dbc8ac5c30379d906b16770a199d28ea12fb606c5eba9905a6a21025db741e91e2f6155cc5c11bdeedb56a89de1ffaf51fd9a5d879cd7db7df1681052ae",
-        "fundingTxHex": "02000000010000000000000000000000000000000000000000000000000000000000000000ffffffff226f66666c696e652d6d756c74697369672d70327773682d326f66322d696e64657832ffffffff01400d030000000000220020591b4cd01b0744ab34be5ed0c85de0dbb1c42b548856d8cfa46e5338c892ed9600000000",
-        "spendingTxHex": "02000000016424babf314f123c15a733d3f1da1672164d3e6527eee6fddee1b3345c6ae4b30000000000fdffffff0130e60200000000001976a914759d6677091e973b9e9d99f19c68fbf43e3f05f988ac00000000",
-        "prevHash": "b3e46a5c34b3e1defde6ee27653e4d167216daf1d333a7153c124f31bfba2464",
+        "sighash": "2274f01f7bd9c1935555b2ff76af5931105d31f0632db6030c117f82a43626bf",
+        "scriptPubKey": "002024901be9145f4a3a018faff7d019c64ce249e60c6c087af1dbceb5fa73c2ec56",
+        "redeemScript": "522103f2a4124ead69235b3913e70e12156970b972ba08c626c5de6345f7adcef2b79a21026b3528a93369e13ddd84ac955e0d4bba3bf37070e88b157adc717d053f112b8552ae",
+        "witnessScript": "522103f2a4124ead69235b3913e70e12156970b972ba08c626c5de6345f7adcef2b79a21026b3528a93369e13ddd84ac955e0d4bba3bf37070e88b157adc717d053f112b8552ae",
+        "fundingTxHex": "02000000010000000000000000000000000000000000000000000000000000000000000000ffffffff226f66666c696e652d6d756c74697369672d70327773682d326f66322d696e64657832ffffffff01400d03000000000022002024901be9145f4a3a018faff7d019c64ce249e60c6c087af1dbceb5fa73c2ec5600000000",
+        "spendingTxHex": "02000000012c90c3a17e17482c707334b414ad6445f60efcbbcb69c72257b0fad69c4342bb0000000000fdffffff0130e60200000000001976a914759d6677091e973b9e9d99f19c68fbf43e3f05f988ac00000000",
+        "prevHash": "bb42439cd6fab05722c769cbbbfc0ef64564ad14b43473702c48177ea1c3902c",
         "doubleSignatures": [
-          "3045022100fda71cd82052c962d7ca4171c8a89d405c044715729d32a2b8481ab3c320d75b022076ca9c1e1cf8b72678ffe6ca84c402d894ba19472ec6a3582c8261c56d0d132301",
-          "3045022100cbcb5bf0e4192916a0b9614941064572cb1d8a27cacc42238744a29be5cc0db0022027e592337528df9f7aa79252de9c5620a7840740ffc870e37e6736205865300901"
+          "30440220595a47597288e42cb4dc6c4d3ac6a8e41ee31af5c1a9da9af4159cd27089c0ac02203d51b78a80853aa9fd82474d4f8af78aff1ee905bb80e06afca877a76b09c80601",
+          "3044022032078684e5b9fd26e6983e2989f51a218c55ad81338abc2e8211608521bdc74602203662ca80d4d5f05d69bf97c0eed037294d83fca9ba345b05ba811f817827796c01"
         ]
       }
     }

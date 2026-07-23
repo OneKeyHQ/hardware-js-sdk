@@ -1,6 +1,9 @@
 import { describe, expect, test } from '@jest/globals';
 
-import { readMultisigMnemonics } from '../readMnemonics';
+import {
+  mergeMultisigMnemonicEnv,
+  readMultisigMnemonics,
+} from '../readMnemonics';
 
 const MNEMONIC_1 = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
 const MNEMONIC_2 = 'legal winner thank year wave sausage worth useful legal winner thank yellow';
@@ -17,6 +20,23 @@ function createEnv(overrides: Record<string, string | undefined> = {}): NodeJS.P
 }
 
 describe('readMultisigMnemonics', () => {
+  test('读取 scripts/.env 的空格分隔助记词且不覆盖显式环境变量', () => {
+    const merged = mergeMultisigMnemonicEnv(
+      [
+        `MULTISIG_MNEMONIC_1=${MNEMONIC_1}`,
+        `MULTISIG_MNEMONIC_2=${MNEMONIC_2}`,
+        `MULTISIG_MNEMONIC_3=${MNEMONIC_3}`,
+      ].join('\n'),
+      { MULTISIG_MNEMONIC_1: MNEMONIC_3 }
+    );
+
+    expect(merged).toMatchObject({
+      MULTISIG_MNEMONIC_1: MNEMONIC_3,
+      MULTISIG_MNEMONIC_2: MNEMONIC_2,
+      MULTISIG_MNEMONIC_3: MNEMONIC_3,
+    });
+  });
+
   test('读取并规范化三个环境变量中的助记词', () => {
     const env = createEnv({
       MULTISIG_MNEMONIC_1: `  ${MNEMONIC_1.toUpperCase()}  `,

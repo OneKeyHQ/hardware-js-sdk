@@ -11,7 +11,7 @@ export type EthFixtureReference = PublicFixtureReference & {
 };
 
 export type EthMultisigFixture = {
-  id: 'standard' | 'delegate-call';
+  id: 'standard' | 'delegate-call' | 'erc20-transfer';
   title: string;
   description: string;
   parameters: {

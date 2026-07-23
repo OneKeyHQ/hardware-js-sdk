@@ -8,12 +8,41 @@ export const MULTISIG_MNEMONIC_ENV_KEYS = [
 ] as const;
 
 export type MultisigMnemonics = [string, string, string];
+type MultisigEnvironment = Record<string, string | undefined>;
+
+export function mergeMultisigMnemonicEnv(
+  content: string,
+  env: MultisigEnvironment
+): MultisigEnvironment {
+  const merged: MultisigEnvironment = {};
+  const allowedKeys = new Set<string>(MULTISIG_MNEMONIC_ENV_KEYS);
+
+  content.split(/\r?\n/).forEach(line => {
+    const match = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
+    if (!match || !allowedKeys.has(match[1])) return;
+
+    let value = match[2].trim();
+    if (
+      value.length >= 2 &&
+      ((value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'")))
+    ) {
+      value = value.slice(1, -1);
+    }
+    merged[match[1]] = value;
+  });
+
+  Object.entries(env).forEach(([key, value]) => {
+    if (value !== undefined) merged[key] = value;
+  });
+  return merged;
+}
 
 function normalizeMnemonic(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
-export function readMultisigMnemonics(env: NodeJS.ProcessEnv): MultisigMnemonics {
+export function readMultisigMnemonics(env: MultisigEnvironment): MultisigMnemonics {
   const mnemonics = MULTISIG_MNEMONIC_ENV_KEYS.map((key, index) => {
     const value = env[key];
     if (!value?.trim()) {

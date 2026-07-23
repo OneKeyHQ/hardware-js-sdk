@@ -11,12 +11,29 @@ const TEST_MNEMONICS: MultisigMnemonics = [
 ];
 
 describe('generateEthFixtures', () => {
-  test('生成两个确定性的 Safe EIP-712 用例', async () => {
+  test('生成三个确定性的 Safe EIP-712 用例', async () => {
     const first = await generateEthFixtures(TEST_MNEMONICS);
     const second = await generateEthFixtures(TEST_MNEMONICS);
 
     expect(first).toEqual(second);
-    expect(first.map(item => item.id)).toEqual(['standard', 'delegate-call']);
+    expect(first.map(item => item.id)).toEqual([
+      'standard',
+      'delegate-call',
+      'erc20-transfer',
+    ]);
+  });
+
+  test('ERC20 用例编码 transfer calldata', async () => {
+    const fixtures = await generateEthFixtures(TEST_MNEMONICS);
+    const fixture = fixtures.find(item => item.id === 'erc20-transfer');
+
+    expect(fixture).toBeDefined();
+    expect(fixture?.parameters.data.message).toMatchObject({
+      value: '0',
+      operation: '0',
+      nonce: '1',
+    });
+    expect(fixture?.parameters.data.message.data).toMatch(/^0xa9059cbb[0-9a-f]+$/);
   });
 
   test('每个签名都能恢复到对应 owner', async () => {
