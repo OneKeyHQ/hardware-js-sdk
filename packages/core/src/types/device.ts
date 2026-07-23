@@ -2,7 +2,11 @@ import { EDeviceType, type EFirmwareType } from '@onekeyfe/hd-shared';
 
 import type { IVersionArray } from './settings';
 import type { PROTO } from '../constants';
-import type { OneKeyDeviceCommType, ProtocolV2DeviceInfo } from '@onekeyfe/hd-transport';
+import type {
+  OneKeyDeviceCommType,
+  ProtocolV2DeviceInfo,
+  DeviceStatus as ProtocolV2DeviceStatus,
+} from '@onekeyfe/hd-transport';
 
 export type DeviceStatus = 'available' | 'occupied' | 'used';
 
@@ -31,9 +35,13 @@ export type KnownDevice = {
   label: string;
   bleName: string | null;
   name: string;
+  /** 用户可见名称：优先设备标签；name 继续表示连接/发现名称。 */
+  displayName?: string;
   error?: typeof undefined;
   mode: EOneKeyDeviceMode;
   features?: Features;
+  /** SDK 统一设备状态快照。features 仅作为旧 API 兼容投影保留。 */
+  state?: DeviceState;
   sessionId?: string | null;
   unavailableCapabilities: UnavailableCapabilities;
   bleFirmwareVersion: IVersionArray | null;
@@ -51,6 +59,7 @@ export type SearchDevice = {
   deviceId: string | null;
   deviceType: IDeviceType;
   name: string;
+  displayName?: string;
   commType: OneKeyDeviceCommType;
 };
 
@@ -127,6 +136,138 @@ export type DeviceFeaturesRaw = {
   protocolV1Features?: PROTO.Features;
   protocolV1OneKeyFeatures?: OnekeyFeatures;
   protocolV2DeviceInfo?: ProtocolV2DeviceInfo;
+  protocolV2DeviceStatus?: ProtocolV2DeviceStatus;
+};
+
+export type DeviceFeaturesRawPatch = {
+  [Key in keyof DeviceFeaturesRaw]?: DeviceFeaturesRaw[Key] | null;
+};
+
+export type DeviceStateProtocol = DeviceFeaturesProtocol;
+export type DeviceStateMode = DeviceFeaturesMode;
+export type DeviceStateSection = 'identity' | 'status' | 'settings' | 'versions' | 'verification';
+
+export type DeviceStateUpdateSource =
+  | 'initialize'
+  | 'device-info'
+  | 'device-status'
+  | 'apply-settings'
+  | 'change-pin'
+  | 'lock'
+  | 'unlock'
+  | 'passphrase'
+  | 'session-clear'
+  | 'firmware-update'
+  | 'transport-reconnect'
+  | 'compatibility';
+
+export type DeviceStateIdentity = {
+  deviceType: IDeviceType;
+  firmwareType: EFirmwareType;
+  model: string | null;
+  vendor: string | null;
+  deviceId: string | null;
+  serialNo: string;
+  label: string | null;
+  bleName: string | null;
+  displayName: string;
+};
+
+export type DeviceStateStatus = {
+  mode: DeviceStateMode;
+  initialized: boolean | null;
+  unlocked: boolean | null;
+  firmwarePresent: boolean | null;
+  backupRequired: boolean | null;
+  noBackup: boolean | null;
+  unfinishedBackup: boolean | null;
+  recoveryMode: boolean | null;
+  passphraseProtection: boolean | null;
+  pinProtection: boolean | null;
+  attachToPinEnabled: boolean | null;
+  unlockedAttachPin: boolean | null;
+};
+
+export type DeviceStateSettings = {
+  language: string | null;
+  bleEnabled: boolean | null;
+  sdCardPresent: boolean | null;
+  sdProtection: boolean | null;
+  wipeCodeProtection: boolean | null;
+  passphraseAlwaysOnDevice: boolean | null;
+  safetyChecks: string | null;
+  autoLockDelayMs: number | null;
+  autoShutdownDelayMs: number | null;
+  displayRotation: number | null;
+  experimentalFeatures: boolean | null;
+  wallpaperPath: string | null;
+  brightness: number | null;
+  animationEnabled: boolean | null;
+  tapToWake: boolean | null;
+  hapticFeedback: boolean | null;
+  deviceNameDisplayEnabled: boolean | null;
+  airgapMode: boolean | null;
+  fidoEnabled: boolean | null;
+  usbLockEnabled: boolean | null;
+  randomKeypad: boolean | null;
+};
+
+export type DeviceStateVersions = {
+  firmware: string | null;
+  bootloader: string | null;
+  board: string | null;
+  ble: string | null;
+  /** @deprecated 兼容旧消费者；新代码统一读取 se01。 */
+  se?: string | null;
+  se01?: string | null;
+  se02?: string | null;
+  se03?: string | null;
+  se04?: string | null;
+  se01Boot?: string | null;
+  se02Boot?: string | null;
+  se03Boot?: string | null;
+  se04Boot?: string | null;
+};
+
+export type DeviceStateSession = {
+  sessionId: string | null;
+  passphraseState?: string;
+};
+
+export type DeviceState = {
+  schemaVersion: 1;
+  revision: number;
+  updatedAt: number;
+  protocol: DeviceStateProtocol;
+  /** 设备协议消息中的版本号；与 SDK 的 V1/V2 协议族相互独立。 */
+  protocolVersion: number | null;
+  identity: DeviceStateIdentity;
+  status: DeviceStateStatus;
+  settings: DeviceStateSettings;
+  versions: DeviceStateVersions;
+  capabilities: Array<number | string>;
+  verification?: Partial<DeviceFeaturesVerify>;
+};
+
+export type DeviceStatePatch = {
+  protocol?: DeviceStateProtocol;
+  protocolVersion?: number | null;
+  identity?: Partial<DeviceStateIdentity>;
+  status?: Partial<DeviceStateStatus>;
+  settings?: Partial<DeviceStateSettings>;
+  versions?: Partial<DeviceStateVersions>;
+  capabilities?: Array<number | string>;
+  verification?: DeviceFeaturesVerify;
+  session?: Partial<DeviceStateSession> | null;
+  raw?: DeviceFeaturesRawPatch;
+};
+
+export type DeviceStateEvent = {
+  connectId: string | null;
+  state: DeviceState;
+  revision: number;
+  source: DeviceStateUpdateSource;
+  changedKeys: string[];
 };
 
 export type NormalizedFeatures = {
@@ -161,8 +302,19 @@ export type NormalizedFeatures = {
   attachToPinEnabled?: boolean | null;
   safetyChecks: string | null;
   autoLockDelayMs: number | null;
+  autoShutdownDelayMs: number | null;
   displayRotation: number | null;
   experimentalFeatures: boolean | null;
+  wallpaperPath: string | null;
+  brightness: number | null;
+  animationEnabled: boolean | null;
+  tapToWake: boolean | null;
+  hapticFeedback: boolean | null;
+  deviceNameDisplayEnabled: boolean | null;
+  airgapMode: boolean | null;
+  fidoEnabled: boolean | null;
+  usbLockEnabled: boolean | null;
+  randomKeypad: boolean | null;
   firmwareVersion: string | null;
   bootloaderVersion: string | null;
   boardVersion: string | null;

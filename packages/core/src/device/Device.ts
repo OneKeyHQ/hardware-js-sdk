@@ -1,6 +1,6 @@
 import EventEmitter from 'events';
 import semver from 'semver';
-import { Enum_Capability } from '@onekeyfe/hd-transport';
+import { DeviceRebootType, Enum_Capability } from '@onekeyfe/hd-transport';
 import {
   EDeviceType,
   ERRORS,
@@ -32,10 +32,23 @@ import {
 import { generateInstanceId } from '../utils/tracing';
 // eslint-disable-next-line import/no-cycle
 import { DeviceCommands } from './DeviceCommands';
+import { mergeDeviceFeaturesPatch } from './DeviceFeaturesState';
+import {
+  mapDeviceSettingsToState,
+  mapFeaturesToState,
+  mapProtocolV1OnekeyFeaturesToState,
+  mapProtocolV2DeviceInfoToState,
+  mapProtocolV2DeviceStatusToState,
+} from './DeviceStateMapper';
+import { projectFeatures } from './DeviceStateProjector';
+import { DeviceStateStore, createPublicDeviceState } from './DeviceStateStore';
 import { deviceWalletSessionStore } from './DeviceWalletSessionStore';
 import {
   type DeviceFirmwareRange,
   DeviceModelToTypes,
+  type DeviceStateEvent,
+  type DeviceStatePatch,
+  type DeviceStateUpdateSource,
   DeviceTypeToModels,
   type Device as DeviceTyped,
   EOneKeyDeviceMode,
@@ -52,12 +65,18 @@ import TransportManager from '../data-manager/TransportManager';
 import { toHardened } from '../api/helpers/pathUtils';
 import { existCapability } from '../utils/capabilitieUtils';
 import {
-  PROTOCOL_V2_STATUS_DEVICE_INFO_REQUEST,
+  PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST,
+  PROTOCOL_V2_FULL_DEVICE_INFO_REQUEST,
+  PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST,
+  type ProtocolV2RuntimeMode,
+  getProtocolV2RuntimeMode,
   requestProtocolV2DeviceInfo,
+  requestProtocolV2DeviceStatus,
 } from '../protocols/protocol-v2/features';
-import { buildProtocolV1FeaturesPayload, buildProtocolV2FeaturesPayload } from '../deviceProfile';
+import { buildProtocolV1FeaturesPayload } from '../deviceProfile';
 
 import type { PROTO } from '../constants';
+import type { DeviceStateReadOptions } from '../types/api/getDeviceState';
 import type {
   DeviceButtonRequestPayload,
   DeviceFeaturesPayload,
@@ -80,6 +99,8 @@ export type InitOptions = {
   deriveCardano?: boolean;
   connectProtocol?: HardwareConnectProtocol;
   protocolV2DeviceInfoTimeoutMs?: number;
+  /** 设备发现内部使用：返回列表前刷新 Protocol V2 运行时状态。 */
+  refreshRuntimeState?: boolean;
 };
 
 export type RunOptions = {
@@ -96,9 +117,11 @@ const Log = getLogger(LoggerNames.Device);
 
 export interface DeviceEvents {
   [DEVICE.PIN]: [Device, PROTO.PinMatrixRequestType | undefined, (err: any, pin: string) => void];
-  [DEVICE.PASSPHRASE_ON_DEVICE]: [Device, ((response: any) => void)?];
+  [DEVICE.PASSPHRASE_ON_DEVICE]: [Device, PassphraseRequestPayload?];
+  [DEVICE.ATTACH_PIN_ON_DEVICE]: [Device, PassphraseRequestPayload?];
   [DEVICE.BUTTON]: [Device, DeviceButtonRequestPayload];
   [DEVICE.FEATURES]: [Device, DeviceFeaturesPayload];
+  [DEVICE.STATE]: [Device, DeviceStateEvent];
   [DEVICE.PASSPHRASE]: [
     Device,
     PassphraseRequestPayload,
@@ -185,22 +208,26 @@ export class Device extends EventEmitter {
    */
   private deviceAcquired = false;
 
-  /**
-   * 唯一设备状态缓存。
-   *
-   * V1 直接保存原生 Features；V2 保存由 DeviceInfoGet 映射出的
-   * Features 视图。Device 不再保存 profile，结构化 DeviceProfile 只作为
-   * getDeviceInfo() 的 API 返回值存在。
-   */
-  features: Features | undefined = undefined;
+  /** 唯一设备状态缓存。旧 Features 仅通过 getter/setter 做兼容投影。 */
+  private stateStore = new DeviceStateStore();
 
-  /**
-   * 是否需要更新设备信息。
-   *
-   * 历史名称保留用于兼容现有调用语义；对 V2 表示 features 需要由
-   * DeviceInfoGet 刷新。
-   */
-  featuresNeedsReload = false;
+  /** 物理重连或重启后，下一次初始化必须重新读取 DeviceInfo。 */
+  private protocolV2StateNeedsReload = false;
+
+  get state() {
+    return this.stateStore.getState();
+  }
+
+  get features(): Features | undefined {
+    return this.state ? projectFeatures(this.state) : undefined;
+  }
+
+  set features(features: Features | undefined) {
+    this.stateStore = new DeviceStateStore();
+    if (features) {
+      this.stateStore.update(mapFeaturesToState(features), 'compatibility');
+    }
+  }
 
   runPromise?: Deferred<void> | null;
 
@@ -266,6 +293,7 @@ export class Device extends EventEmitter {
     const deviceId = this.getCurrentDeviceId() || null;
 
     const { features } = this;
+    const state = this.state ? createPublicDeviceState(this.state) : undefined;
 
     return {
       /** Android uses Mac address, iOS uses uuid, USB uses uuid  */
@@ -282,9 +310,11 @@ export class Device extends EventEmitter {
       path: this.originalDescriptor?.path,
       bleName,
       name: bleName || label || `OneKey ${deviceType?.toUpperCase()}`,
+      displayName: label || bleName || `OneKey ${deviceType?.toUpperCase()}`,
       label: label || 'OneKey',
       mode: this.getMode(),
       features,
+      state,
       sessionId: this.features?.sessionId ?? null,
       firmwareVersion: this.getFirmwareVersion(),
       bleFirmwareVersion: this.getBLEFirmwareVersion(),
@@ -724,17 +754,16 @@ export class Device extends EventEmitter {
     // Protocol V2 不支持传统 Initialize，直接使用协议专用初始化流程。
     if (this.isProtocolV2()) {
       this.passphraseState = options?.passphraseState;
-      if (this.features && !this.featuresNeedsReload && !options?.initSession) {
-        if (this.features.bootloaderMode) {
+      if (this.state && !options?.initSession && !this.protocolV2StateNeedsReload) {
+        if (this.features?.bootloaderMode) {
           return;
         }
-        // 不能直接信任缓存 features：设备端 wipe / 完成初始化 / 改 label 后
-        // features 会永久陈旧。每次 run 做一次轻量 status 刷新（不含 fw/SE），
-        // 用字段级合并保留已有版本和 SE 信息。
-        await this._refreshProtocolV2Status(options);
+        // 普通业务调用复用缓存。动态状态由显式 getDeviceState refresh、
+        // 解锁流程和设备事件刷新，避免每个 SDK 方法都额外轮询 DeviceStatus。
         return;
       }
       await this._initializeProtocolV2(options);
+      this.protocolV2StateNeedsReload = false;
       return;
     }
 
@@ -799,34 +828,14 @@ export class Device extends EventEmitter {
         timeoutMs: options?.protocolV2DeviceInfoTimeoutMs,
       });
       // 默认请求不含 SE/hash 数据，scope 如实标注为 basic；
-      // 完整数据由 getDeviceInfo(scope:'verify'|'full') 获取。
-      const features = this.updateProtocolV2Features(deviceInfo);
+      // 完整版本与校验数据由公共 getDeviceState({ scope: 'firmware' }) 显式获取。
+      const features = await this.probeProtocolV2RuntimeState(
+        deviceInfo,
+        options?.protocolV2DeviceInfoTimeoutMs
+      );
       Log.debug('Protocol V2 features:', features);
-      this.featuresNeedsReload = false;
     } catch (error) {
       Log.error('Protocol V2 initialization failed:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Protocol V2 的轻量状态刷新（每次 run 前调用）。
-   *
-   * 请求 hw + coprocessor + status（不含 fw/SE target）：status 提供 init_states / label /
-   * passphrase_enabled 等会在设备端变化的字段；hw/coprocessor 提供 serialNo / bleName。
-   * versions 为空时按字段级合并保留旧值，verify 数据不会被降级。
-   */
-  private async _refreshProtocolV2Status(options?: InitOptions) {
-    try {
-      const deviceInfo = await requestProtocolV2DeviceInfo({
-        commands: this.commands,
-        request: PROTOCOL_V2_STATUS_DEVICE_INFO_REQUEST,
-        timeoutMs: options?.protocolV2DeviceInfoTimeoutMs,
-      });
-      const features = this.updateProtocolV2Features(deviceInfo);
-      Log.debug('Protocol V2 features (status refresh):', features);
-    } catch (error) {
-      Log.error('Protocol V2 status refresh failed:', error);
       throw error;
     }
   }
@@ -836,12 +845,86 @@ export class Device extends EventEmitter {
       const deviceInfo = await requestProtocolV2DeviceInfo({
         commands: this.commands,
       });
-      return this.updateProtocolV2Features(deviceInfo);
+      return this.probeProtocolV2RuntimeState(deviceInfo);
     }
 
     const { message } = await this.commands.typedCall('GetFeatures', 'Features', {});
     this._updateFeatures(message);
     return this.features;
+  }
+
+  async getDeviceState(params: DeviceStateReadOptions = {}) {
+    const refresh = new Set(params.refreshSections ?? []);
+    const getProtocolV2DeviceInfoRequest = () => {
+      if (refresh.has('verification')) return PROTOCOL_V2_FULL_DEVICE_INFO_REQUEST;
+      if (refresh.has('versions')) return PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST;
+      return PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST;
+    };
+    let initializedWithDeviceInfo = false;
+    let refreshedDeviceInfo: ProtocolV2DeviceInfo | undefined;
+
+    if (!this.state) {
+      if (this.isProtocolV2()) {
+        const deviceInfo = await requestProtocolV2DeviceInfo({
+          commands: this.commands,
+          request: getProtocolV2DeviceInfoRequest(),
+        });
+        await this.probeProtocolV2RuntimeState(deviceInfo);
+        refreshedDeviceInfo = deviceInfo;
+        initializedWithDeviceInfo = true;
+      } else {
+        await this.getFeatures();
+      }
+    } else if (!this.isProtocolV2() && refresh.size > 0) {
+      await this.getFeatures();
+    }
+
+    if (!this.isProtocolV2() && refresh.has('verification')) {
+      const { message } = await this.commands.typedCall('OnekeyGetFeatures', 'OnekeyFeatures');
+      this.updateState(mapProtocolV1OnekeyFeaturesToState(message), 'device-info');
+    }
+
+    if (this.isProtocolV2()) {
+      const refreshDeviceInfo =
+        refresh.has('identity') || refresh.has('versions') || refresh.has('verification');
+      if (refreshDeviceInfo && !initializedWithDeviceInfo) {
+        const deviceInfo = await requestProtocolV2DeviceInfo({
+          commands: this.commands,
+          request: getProtocolV2DeviceInfoRequest(),
+        });
+        refreshedDeviceInfo = deviceInfo;
+        if (!refresh.has('status')) {
+          this.updateState(
+            mapProtocolV2DeviceInfoToState(deviceInfo, this.state?.status.mode),
+            'device-info'
+          );
+        }
+      }
+
+      if (refresh.has('status') && !initializedWithDeviceInfo) {
+        const deviceInfo =
+          refreshedDeviceInfo ??
+          (await requestProtocolV2DeviceInfo({
+            commands: this.commands,
+            request: getProtocolV2DeviceInfoRequest(),
+          }));
+        await this.probeProtocolV2RuntimeState(deviceInfo);
+      }
+
+      if (refresh.has('settings') && this.state?.status.mode === 'normal') {
+        const { message } = await this.commands.typedCall(
+          'DeviceSettingsGet',
+          'DeviceSettings',
+          {}
+        );
+        this.updateState(mapDeviceSettingsToState(message), 'apply-settings');
+      }
+    }
+
+    if (!this.state) {
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceInitializeFailed);
+    }
+    return params.includeRaw ? structuredClone(this.state) : createPublicDeviceState(this.state);
   }
 
   _updateFeatures(protoFeatures: PROTO.Features | Features, initSession?: boolean) {
@@ -859,7 +942,7 @@ export class Device extends EventEmitter {
 
     feat = fixFeaturesFirmwareVersion(feat);
 
-    this.features = feat;
+    this.updateState(mapFeaturesToState(feat), 'initialize');
     const nextCacheDeviceKey = this.getSessionCacheDeviceKey();
     if (previousCacheDeviceKey && nextCacheDeviceKey) {
       deviceWalletSessionStore.migrateDeviceKey(previousCacheDeviceKey, nextCacheDeviceKey);
@@ -867,36 +950,156 @@ export class Device extends EventEmitter {
     if (feat.deviceId && feat.sessionId) {
       this.setInternalState(feat.sessionId, initSession);
     }
-    this.featuresNeedsReload = false;
-    this.emit(DEVICE.FEATURES, this, feat);
   }
 
-  updateProtocolV2Features(deviceInfo?: ProtocolV2DeviceInfo) {
+  updateState(patch: DeviceStatePatch, source: DeviceStateUpdateSource) {
+    const result = this.stateStore.update(patch, source);
+    if (result.changedKeys.length === 0) return result.state;
+
+    const event: DeviceStateEvent = {
+      connectId: this.getConnectId() ?? null,
+      state: createPublicDeviceState(result.state),
+      revision: result.revision,
+      source,
+      changedKeys: result.changedKeys,
+    };
+    Log.debug('Device state patch committed', {
+      source,
+      keys: result.changedKeys,
+    });
+    this.emit(DEVICE.STATE, this, event);
+    if (result.state.protocol === 'V1') {
+      this.emit(DEVICE.FEATURES, this, projectFeatures(result.state));
+    }
+    return result.state;
+  }
+
+  clearCachedSession(deviceId?: string, passphraseState?: string) {
+    const current = this.state;
+    if (!current?.session) return false;
+    if (deviceId && current.identity.deviceId !== deviceId) return false;
+    if (passphraseState && current.session.passphraseState !== passphraseState) return false;
+    return this.stateStore.clearSession('session-clear') !== undefined;
+  }
+
+  updateFeaturesPatch(patch: Partial<Features>, source: DeviceStateUpdateSource) {
+    const currentFeatures = this.features;
+    if (!currentFeatures) return undefined;
+
+    const features = mergeDeviceFeaturesPatch(currentFeatures, patch);
+    if (features === currentFeatures) return currentFeatures;
+
+    const normalized = fixFeaturesFirmwareVersion(features);
+    this.updateState(mapFeaturesToState(normalized), source);
+    return this.features;
+  }
+
+  async probeProtocolV2RuntimeState(deviceInfo: ProtocolV2DeviceInfo, timeoutMs?: number) {
+    let deviceStatus: DeviceStatus;
+    try {
+      deviceStatus = await requestProtocolV2DeviceStatus({
+        commands: this.commands,
+        timeoutMs,
+      });
+    } catch (error) {
+      const runtimeMode = getProtocolV2RuntimeMode({
+        deviceInfo,
+        deviceStatusAvailable: false,
+      });
+      Log.debug('Protocol V2 DeviceStatusGet unavailable; use temporary loader fallback', {
+        runtimeMode,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return this.updateProtocolV2Features(deviceInfo, null, runtimeMode);
+    }
+    return this.updateProtocolV2Features(deviceInfo, deviceStatus, 'normal');
+  }
+
+  updateProtocolV2Features(
+    deviceInfo?: ProtocolV2DeviceInfo,
+    deviceStatus?: DeviceStatus | null,
+    runtimeMode?: ProtocolV2RuntimeMode
+  ) {
     const previousCacheDeviceKey = this.getSessionCacheDeviceKey();
-    const features = fixFeaturesFirmwareVersion(
-      buildProtocolV2FeaturesPayload(deviceInfo, this.features)
-    );
-    this.features = features;
+    const resolvedMode =
+      runtimeMode ??
+      (deviceStatus
+        ? getProtocolV2RuntimeMode({ deviceInfo, deviceStatusAvailable: true })
+        : this.state?.status.mode);
+    if (deviceInfo) {
+      this.updateState(mapProtocolV2DeviceInfoToState(deviceInfo, resolvedMode), 'device-info');
+    }
+    if (deviceStatus) {
+      this.updateState(mapProtocolV2DeviceStatusToState(deviceStatus), 'device-status');
+    }
     const nextCacheDeviceKey = this.getSessionCacheDeviceKey();
     if (previousCacheDeviceKey && nextCacheDeviceKey) {
       deviceWalletSessionStore.migrateDeviceKey(previousCacheDeviceKey, nextCacheDeviceKey);
     }
-    this.featuresNeedsReload = false;
-    this.emit(DEVICE.FEATURES, this, features);
-    return features;
+    return this.features as Features;
   }
 
   updateProtocolV2Status(status: DeviceStatus) {
-    const previousDeviceInfo = this.features?.raw?.protocolV2DeviceInfo;
-    const previousStatus = previousDeviceInfo?.status;
-    return this.updateProtocolV2Features({
-      ...(previousDeviceInfo ?? {}),
-      protocol_version: previousDeviceInfo?.protocol_version ?? this.features?.protocolVersion ?? 2,
-      status: {
-        ...previousStatus,
-        ...status,
-      },
+    const previousDeviceInfo = this.state?.raw?.protocolV2DeviceInfo;
+    const previousStatus = this.state?.raw?.protocolV2DeviceStatus;
+    return this.updateProtocolV2Features(previousDeviceInfo, {
+      ...previousStatus,
+      ...status,
     });
+  }
+
+  markTransportDisconnected() {
+    if (!this.isProtocolV2()) return;
+    this.protocolV2StateNeedsReload = true;
+    this.clearPreInitialized();
+    this.clearCachedSession();
+  }
+
+  markProtocolV2Reboot(rebootType: DeviceRebootType) {
+    if (!this.isProtocolV2()) return;
+
+    this.protocolV2StateNeedsReload = true;
+    this.clearPreInitialized();
+    let loaderMode: 'bootloader' | 'romloader' | undefined;
+    if (rebootType === DeviceRebootType.Bootloader) {
+      loaderMode = 'bootloader';
+    } else if (rebootType === DeviceRebootType.Romloader) {
+      loaderMode = 'romloader';
+    }
+    if (loaderMode) {
+      this.updateState(
+        {
+          identity: { deviceId: null },
+          status: {
+            mode: loaderMode,
+            initialized: null,
+            unlocked: null,
+            firmwarePresent: null,
+            backupRequired: null,
+            noBackup: null,
+            unfinishedBackup: null,
+            recoveryMode: null,
+            passphraseProtection: null,
+            pinProtection: null,
+            attachToPinEnabled: null,
+            unlockedAttachPin: null,
+          },
+          session: null,
+          raw: { protocolV2DeviceStatus: null },
+        },
+        'transport-reconnect'
+      );
+      return;
+    }
+
+    this.updateState(
+      {
+        status: { mode: 'normal', unlocked: null },
+        session: null,
+        raw: { protocolV2DeviceStatus: null },
+      },
+      'transport-reconnect'
+    );
   }
 
   /**
@@ -965,6 +1168,7 @@ export class Device extends EventEmitter {
             }
           }
         } catch (error) {
+          await this.release();
           this.runPromise = null;
           if (error instanceof HardwareError) {
             return Promise.reject(error);
@@ -1065,22 +1269,23 @@ export class Device extends EventEmitter {
   }
 
   getMode() {
-    if (this.features?.bootloaderMode) {
-      // bootloader mode
-      return EOneKeyDeviceMode.bootloader;
+    switch (this.state?.status.mode) {
+      case 'bootloader':
+      case 'romloader':
+        return EOneKeyDeviceMode.bootloader;
+      case 'notInitialized':
+        return EOneKeyDeviceMode.notInitialized;
+      case 'backupMode':
+        return EOneKeyDeviceMode.backupMode;
+      case 'normal':
+        return EOneKeyDeviceMode.normal;
+      default:
+        break;
     }
 
-    if (!this.features?.initialized) {
-      // not initialized
-      return EOneKeyDeviceMode.notInitialized;
-    }
-
-    if (this.features?.noBackup) {
-      // backup mode
-      return EOneKeyDeviceMode.backupMode;
-    }
-
-    // normal mode
+    if (this.features?.bootloaderMode) return EOneKeyDeviceMode.bootloader;
+    if (this.features?.initialized === false) return EOneKeyDeviceMode.notInitialized;
+    if (this.features?.noBackup) return EOneKeyDeviceMode.backupMode;
     return EOneKeyDeviceMode.normal;
   }
 
@@ -1175,6 +1380,7 @@ export class Device extends EventEmitter {
 
   async lockDevice(): Promise<Success> {
     const res = await this.commands.typedCall('LockDevice', 'Success', {});
+    this.updateState({ status: { unlocked: false } }, 'lock');
     return res.message;
   }
 
@@ -1190,7 +1396,9 @@ export class Device extends EventEmitter {
   async unlockDevice() {
     if (this.isProtocolV2()) {
       try {
-        await this.commands.typedCall('DeviceSessionAskPin', 'Success');
+        await this.commands.typedCall('DeviceSessionAskPin', 'Success', undefined, {
+          timeoutMs: 120_000,
+        });
       } catch (error) {
         const errorText =
           error instanceof Error
@@ -1202,12 +1410,7 @@ export class Device extends EventEmitter {
         throw error;
       }
 
-      const { message: status } = await this.commands.typedCall(
-        'DeviceStatusGet',
-        'DeviceStatus',
-        {}
-      );
-      return this.updateProtocolV2Status(status);
+      return this.updateFeaturesPatch({ unlocked: true }, 'unlock');
     }
 
     const firmwareVersion = this.getCurrentFirmwareVersionString() ?? '0.0.0';
@@ -1228,11 +1431,20 @@ export class Device extends EventEmitter {
     if (supportUnlock) {
       const res = await this.commands.typedCall('UnLockDevice', 'UnLockDeviceResponse');
       if (this.features) {
-        this.features.unlocked = res.message.unlocked == null ? null : res.message.unlocked;
-        this.features.unlockedAttachPin =
-          res.message.unlocked_attach_pin == null ? undefined : res.message.unlocked_attach_pin;
-        this.features.passphraseProtection =
-          res.message.passphrase_protection == null ? null : res.message.passphrase_protection;
+        this.updateState(
+          {
+            status: {
+              unlocked: res.message.unlocked == null ? null : res.message.unlocked,
+              unlockedAttachPin:
+                res.message.unlocked_attach_pin == null ? null : res.message.unlocked_attach_pin,
+              passphraseProtection:
+                res.message.passphrase_protection == null
+                  ? null
+                  : res.message.passphrase_protection,
+            },
+          },
+          'unlock'
+        );
 
         return Promise.resolve(this.features);
       }

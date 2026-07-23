@@ -468,6 +468,12 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
 
   private isRetryableError(error: unknown): boolean {
     const message = this.getErrorMessage(error).toLowerCase();
+    // cancelActiveTransfers() 用于主动结束已经超时或正在释放的原生请求。
+    // LIBUSB_TRANSFER_CANCELLED 不是瞬态 I/O 错误；若在这里重试，会在刚重建的
+    // USB 接口上再次挂起读取，使协议探测与 release 互相追逐。
+    if (message.includes('cancelled') || message.includes('canceled')) {
+      return false;
+    }
     return (
       message.includes('libusb') ||
       message.includes('transfer') ||
@@ -782,6 +788,10 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
     await this.rotateProtocolV2UsbGeneration(path, 'Node USB protocol probe reset');
 
     try {
+      // 协议探测超时时，底层 IN transfer 仍可能处于 pending。必须在关闭接口前
+      // 取消并等待它结束，否则 libusb 不再回调该 transfer，后续 release()/stop()
+      // 会永久等待 activeTransfers，最终在上层表现为 Polling timeout (809)。
+      await this.cancelActiveTransfers(path);
       await this.closeOpenDevice(path);
     } catch (error) {
       this.Log?.debug('[NodeUsbTransport] close after protocol probe error:', error);

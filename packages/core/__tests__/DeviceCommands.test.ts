@@ -16,6 +16,26 @@ const createCommands = () => {
 };
 
 describe('DeviceCommands failure mapping', () => {
+  it('rejects the Pro2 bootloader DeviceStatusGet unsupported response', async () => {
+    const commands = createCommands();
+
+    await expect(
+      commands._filterCommonTypes(
+        {
+          type: 'Failure',
+          message: {
+            code: 'Failure_InvalidMessage',
+            message: 'Handler not registered',
+          },
+        } as any,
+        'DeviceStatusGet'
+      )
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.RuntimeError,
+      message: 'Failure_InvalidMessage,Handler not registered',
+    });
+  });
+
   it('maps Protocol V2 DeviceLocked failure to a structured hardware error', async () => {
     const commands = createCommands();
 

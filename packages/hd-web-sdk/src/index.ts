@@ -71,7 +71,13 @@ const handleMessage = async (message: CoreMessage) => {
     case DEVICE_EVENT:
       if (
         (
-          [DEVICE.CONNECT, DEVICE.DISCONNECT, DEVICE.FEATURES, DEVICE.SUPPORT_FEATURES] as string[]
+          [
+            DEVICE.CONNECT,
+            DEVICE.DISCONNECT,
+            DEVICE.FEATURES,
+            DEVICE.STATE,
+            DEVICE.SUPPORT_FEATURES,
+          ] as string[]
         ).includes(message.type)
       ) {
         eventEmitter.emit(message.type, message.payload);
@@ -273,6 +279,7 @@ const addHardwareGlobalEventListener = (listener: (message: CoreMessage) => void
     DEVICE.CONNECT,
     DEVICE.DISCONNECT,
     DEVICE.FEATURES,
+    DEVICE.STATE,
     DEVICE.SUPPORT_FEATURES,
     UI_REQUEST.FIRMWARE_PROGRESS,
     UI_REQUEST.FIRMWARE_TIP,

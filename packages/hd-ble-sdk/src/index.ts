@@ -88,7 +88,13 @@ function handleMessage(message: CoreMessage) {
     case DEVICE_EVENT:
       if (
         (
-          [DEVICE.CONNECT, DEVICE.DISCONNECT, DEVICE.FEATURES, DEVICE.SUPPORT_FEATURES] as string[]
+          [
+            DEVICE.CONNECT,
+            DEVICE.DISCONNECT,
+            DEVICE.FEATURES,
+            DEVICE.STATE,
+            DEVICE.SUPPORT_FEATURES,
+          ] as string[]
         ).includes(message.type)
       ) {
         eventEmitter.emit(message.type, message.payload);

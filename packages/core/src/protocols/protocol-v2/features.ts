@@ -1,6 +1,11 @@
 import { DeviceSEState, DeviceSeType } from '@onekeyfe/hd-transport';
 
-import type { DeviceInfoGet, DeviceSEInfo, ProtocolV2DeviceInfo } from '@onekeyfe/hd-transport';
+import type {
+  DeviceInfoGet,
+  DeviceSEInfo,
+  DeviceStatus,
+  ProtocolV2DeviceInfo,
+} from '@onekeyfe/hd-transport';
 import type { DeviceCommands } from '../../device/DeviceCommands';
 
 // 单源类型：直接使用 hd-transport 生成的 ProtocolV2DeviceInfo / DeviceSEInfo /
@@ -27,7 +32,7 @@ const normalizeEnumValue = <T extends Record<string | number, string | number>>(
 
 /**
  * DeviceSEInfo.state → 可读标签。SDK 内唯一的 SE 状态映射实现，
- * DeviceProfile 与标准 Features 构建都从这里取。
+ * DeviceState Mapper 与老协议 Features 兼容投影都从这里取。
  */
 export const getProtocolV2SeState = (se?: DeviceSEInfo): ProtocolV2SeStateLabel | null => {
   const label = normalizeEnumValue(DeviceSEState, se?.state);
@@ -44,39 +49,42 @@ export const getProtocolV2SeState = (se?: DeviceSEInfo): ProtocolV2SeStateLabel 
 };
 
 /**
- * DeviceSEInfo.type → 可读标签（如 'THD89'）。DeviceProfile / Features
+ * DeviceSEInfo.type → 可读标签（如 'THD89'）。DeviceState / Features
  * 的 SE 类型归一化从这里取。
  */
 export const getProtocolV2SeType = (se?: DeviceSEInfo): string | null =>
   normalizeEnumValue(DeviceSeType, se?.type);
 
-/**
- * 兼容尚未提供显式 runtime mode 的 Protocol V2 固件。
- *
- * 当前 romloader 只上报 hw、fw.romloader 和 fw.bootloader；bootloader
- * 还会上报 application/application_data、coprocessor 或 SE 信息。
- */
-export const isProtocolV2RomloaderDeviceInfo = (deviceInfo?: ProtocolV2DeviceInfo | null) =>
-  !!deviceInfo &&
-  deviceInfo.status == null &&
-  deviceInfo.fw?.romloader != null &&
-  deviceInfo.fw?.application == null &&
-  deviceInfo.fw?.application_data == null &&
-  deviceInfo.coprocessor == null &&
-  deviceInfo.se1 == null &&
-  deviceInfo.se2 == null &&
-  deviceInfo.se3 == null &&
-  deviceInfo.se4 == null;
+export type ProtocolV2RuntimeMode = 'normal' | 'bootloader';
 
-export const isProtocolV2BootloaderDeviceInfo = (deviceInfo?: ProtocolV2DeviceInfo | null) =>
-  !!deviceInfo && deviceInfo.status == null && !isProtocolV2RomloaderDeviceInfo(deviceInfo);
+/**
+ * TODO: firmware-pro2 提供 ProtocolInfo.build_fingerprint 后，改为解析运行中的
+ * binary name，删除将 DeviceStatusGet 失败视为 bootloader 的临时判断；romloader
+ * 属于特殊恢复场景，待独立协议和业务流程明确后再接入，不参与当前运行模式识别。
+ *
+ * 当前临时协议只处理两态：DeviceStatusGet 成功即 normal，失败统一视为
+ * bootloader。不再依赖 application/SE/romloader 字段组合推断运行模式。
+ */
+export const getProtocolV2RuntimeMode = ({
+  deviceInfo: _deviceInfo,
+  deviceStatusAvailable,
+}: {
+  deviceInfo?: ProtocolV2DeviceInfo | null;
+  deviceStatusAvailable: boolean;
+}): ProtocolV2RuntimeMode => {
+  if (deviceStatusAvailable) return 'normal';
+  return 'bootloader';
+};
 
 export const PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST = {
   targets: {
     hw: true,
     fw: true,
     coprocessor: true,
-    status: true,
+    se1: true,
+    se2: true,
+    se3: true,
+    se4: true,
   },
   types: {
     version: true,
@@ -85,23 +93,9 @@ export const PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST = {
 };
 
 /**
- * 轻量状态刷新请求（每次 run 前使用）。
- *
- * status 提供 init_states / passphrase_enabled 等会在设备端变化的字段；
- * hw / coprocessor 提供 serialNo / bleName 等身份字段；不含 fw/SE targets，单帧请求开销很小。
+ * 固件升级完成后的版本探测请求。
+ * 仅读取硬件与各固件组件信息，不隐式请求 DeviceStatus。
  */
-export const PROTOCOL_V2_STATUS_DEVICE_INFO_REQUEST = {
-  targets: {
-    hw: true,
-    coprocessor: true,
-    status: true,
-  },
-  types: {
-    version: true,
-    specific: true,
-  },
-};
-
 export const PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST = {
   targets: {
     hw: true,
@@ -111,7 +105,6 @@ export const PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST = {
     se2: true,
     se3: true,
     se4: true,
-    status: true,
   },
   types: {
     version: true,
@@ -128,7 +121,6 @@ export const PROTOCOL_V2_FULL_DEVICE_INFO_REQUEST = {
     se2: true,
     se3: true,
     se4: true,
-    status: true,
   },
   types: {
     version: true,
@@ -156,4 +148,19 @@ export async function requestProtocolV2DeviceInfo({
   // 'DeviceInfo' 在生成类型里是 V1 DeviceInfo | ProtocolV2DeviceInfo 的合并；
   // DeviceInfoGet 是 V2-only 消息，这里收窄到 V2 形态。
   return message as ProtocolV2DeviceInfo;
+}
+
+export async function requestProtocolV2DeviceStatus({
+  commands,
+  timeoutMs,
+}: {
+  commands: DeviceCommands;
+  timeoutMs?: number;
+}): Promise<DeviceStatus> {
+  const response =
+    timeoutMs === undefined
+      ? await commands.typedCall('DeviceStatusGet', 'DeviceStatus', {})
+      : await commands.typedCall('DeviceStatusGet', 'DeviceStatus', {}, { timeoutMs });
+  const { message } = response;
+  return message;
 }
