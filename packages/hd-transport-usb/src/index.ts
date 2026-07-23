@@ -132,31 +132,6 @@ function readSerialNumber(dev: usb.Device, openDevices?: Map<string, OpenDevice>
 }
 
 /**
- * Promisified USB IN transfer (single attempt).
- */
-function transferInOnce(ep: usb.InEndpoint, length: number): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    ep.transfer(length, (err: Error | undefined, data: Buffer | undefined) => {
-      if (err) return reject(err);
-      if (!data || data.length === 0) return reject(new Error('Empty USB transfer'));
-      resolve(data);
-    });
-  });
-}
-
-/**
- * Promisified USB OUT transfer (single attempt).
- */
-function transferOutOnce(ep: usb.OutEndpoint, data: Buffer): Promise<void> {
-  return new Promise((resolve, reject) => {
-    ep.transfer(data, (err: Error | undefined) => {
-      if (err) return reject(err);
-      resolve();
-    });
-  });
-}
-
-/**
  * Skip the 0x3F protocol marker byte from a USB packet.
  */
 function skipReportByte(packet: Buffer): Buffer {
@@ -212,6 +187,15 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
   /** per-path reconnect lock to prevent concurrent reconnects */
   private reconnectLocks = new Map<string, Promise<OpenDevice>>();
 
+  /**
+   * 保留底层 Transfer，确保 release()/stop() 能取消仍在等待设备响应的原生请求。
+   * Endpoint.transfer() 会隐藏 Transfer，进而可能让 CLI 输出结果后仍无法退出。
+   */
+  private activeTransfers = new Map<
+    usb.Transfer,
+    { path: string; settled: Promise<void>; resolveSettled: () => void }
+  >();
+
   /** set to true when cancel() is called; checked by retry loops */
   private cancelled = false;
 
@@ -251,10 +235,27 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
     // empty — could add hotplug events via usb.on('attach'/'detach')
   }
 
-  stop() {
-    this.disposeProtocolV2UsbLinks('Node USB transport stopped').catch(error =>
-      this.Log?.debug('[NodeUsbTransport] stop link cleanup failed:', error)
-    );
+  async stop(): Promise<void> {
+    this.cancelled = true;
+
+    await this.cancelActiveTransfers();
+
+    try {
+      await this.disposeProtocolV2UsbLinks('Node USB transport stopped');
+    } catch (error) {
+      this.Log?.debug('[NodeUsbTransport] stop link cleanup failed:', error);
+    }
+
+    // Reconnect may already be in flight when dispose starts. Wait for it to
+    // settle, then close every remaining handle so it cannot reopen USB after
+    // the first cleanup pass.
+    await Promise.allSettled(this.reconnectLocks.values());
+    await this.cancelActiveTransfers();
+    await Promise.all(Array.from(this.openDevices.keys(), path => this.closeOpenDevice(path)));
+
+    this.reconnectLocks.clear();
+    this.deviceProtocol.clear();
+    this.serialToBusId.clear();
   }
 
   /**
@@ -344,9 +345,91 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
    * Release device — release interface and close.
    */
   async release(path: string, _onclose?: boolean): Promise<void> {
+    await this.cancelActiveTransfers(path);
     await this.invalidateProtocolV2UsbLink(path, 'Node USB transport released');
     await this.closeOpenDevice(path);
     this.deviceProtocol.delete(path);
+  }
+
+  private async cancelActiveTransfers(path?: string): Promise<void> {
+    const transfers = Array.from(this.activeTransfers.entries()).filter(
+      ([, active]) => path === undefined || active.path === path
+    );
+    transfers.forEach(([transfer]) => {
+      try {
+        transfer.cancel();
+      } catch {
+        // Transfer 可能刚好在快照与 cancel() 之间完成。
+      }
+    });
+    await Promise.allSettled(transfers.map(([, active]) => active.settled));
+  }
+
+  private createTrackedTransfer(
+    path: string,
+    endpoint: usb.InEndpoint | usb.OutEndpoint,
+    callback: (error: Error | undefined, buffer: Buffer, actualLength: number) => void
+  ): usb.Transfer {
+    let resolveSettled: () => void = () => undefined;
+    const settled = new Promise<void>(resolve => {
+      resolveSettled = resolve;
+    });
+    const transfer = endpoint.makeTransfer(endpoint.timeout, (error, buffer, actualLength) => {
+      this.activeTransfers.delete(transfer);
+      resolveSettled();
+      callback(error, buffer, actualLength);
+    });
+    this.activeTransfers.set(transfer, { path, settled, resolveSettled });
+    return transfer;
+  }
+
+  private transferInOnce(path: string, ep: usb.InEndpoint, length: number): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      const buffer = Buffer.alloc(length);
+      const transfer = this.createTrackedTransfer(
+        path,
+        ep,
+        (error, _submittedBuffer, actualLength) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+          if (actualLength <= 0) {
+            reject(new Error('Empty USB transfer'));
+            return;
+          }
+          resolve(buffer.subarray(0, actualLength));
+        }
+      );
+      try {
+        transfer.submit(buffer);
+      } catch (error) {
+        const active = this.activeTransfers.get(transfer);
+        this.activeTransfers.delete(transfer);
+        active?.resolveSettled();
+        reject(error);
+      }
+    });
+  }
+
+  private transferOutOnce(path: string, ep: usb.OutEndpoint, data: Buffer): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const transfer = this.createTrackedTransfer(path, ep, error => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve();
+      });
+      try {
+        transfer.submit(data);
+      } catch (error) {
+        const active = this.activeTransfers.get(transfer);
+        this.activeTransfers.delete(transfer);
+        active?.resolveSettled();
+        reject(error);
+      }
+    });
   }
 
   private async closeOpenDevice(path: string): Promise<void> {
@@ -578,7 +661,7 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
           const packet = new Uint8Array(PACKET_SIZE);
           packet[0] = REPORT_ID;
           packet.set(new Uint8Array(buffer), 1);
-          await transferOutOnce(this.getOpenDevice(path).epOut, Buffer.from(packet));
+          await this.transferOutOnce(path, this.getOpenDevice(path).epOut, Buffer.from(packet));
         }
         return; // all chunks sent successfully
       } catch (error) {
@@ -621,7 +704,7 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
         throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromOutside, 'Cancelled');
       }
       try {
-        return await transferInOnce(currentDev.epIn, length);
+        return await this.transferInOnce(path, currentDev.epIn, length);
       } catch (error) {
         lastError = error;
         if (options?.waitIndefinitelyOnTimeout && this.isUsbTransferTimeout(error)) {
@@ -701,7 +784,7 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
       epIn.timeout = TRANSFER_TIMEOUT_MS;
       epOut.timeout = TRANSFER_TIMEOUT_MS;
 
-      await this.drainStaleInput(epIn);
+      await this.drainStaleInput(path, epIn);
 
       this.openDevices.set(path, { device: dev, iface, epIn, epOut });
     } catch (err) {
@@ -714,14 +797,14 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
     }
   }
 
-  private async drainStaleInput(epIn: usb.InEndpoint): Promise<void> {
+  private async drainStaleInput(path: string, epIn: usb.InEndpoint): Promise<void> {
     const originalTimeout = epIn.timeout;
     epIn.timeout = 50;
     try {
       // Drain a small bounded number of packets left by the previous USB session.
       for (let index = 0; index < 16; index += 1) {
         try {
-          await transferInOnce(epIn, PACKET_SIZE);
+          await this.transferInOnce(path, epIn, PACKET_SIZE);
         } catch {
           break;
         }
@@ -749,18 +832,19 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
     path: string,
     expectedProtocol?: ProtocolType
   ): Promise<ProtocolType> {
+    if (expectedProtocol === 'V2') {
+      // 固件升级重启后的 bootloader 不保证响应 Ping。上层显式传入 V2
+      // 表示协议已在重启前确认；直接建立 V2 链路，由首个业务命令验证
+      // bootloader 是否已经完成 USB 初始化。
+      this.deviceProtocol.set(path, 'V2');
+      this.Log?.debug(`[NodeUsbTransport] detectProtocol: path=${path} -> V2 (expected)`);
+      return 'V2';
+    }
+
     if (expectedProtocol === 'V1') {
       if (await this.probeProtocolV1(path)) {
         this.deviceProtocol.set(path, 'V1');
         return 'V1';
-      }
-      throw this.createProtocolMismatchError(expectedProtocol);
-    }
-
-    if (expectedProtocol === 'V2') {
-      if (await this.probeProtocolV2(path)) {
-        this.deviceProtocol.set(path, 'V2');
-        return 'V2';
       }
       throw this.createProtocolMismatchError(expectedProtocol);
     }
@@ -892,7 +976,7 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
     if (this.cancelled) {
       throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromOutside, 'Cancelled');
     }
-    await transferOutOnce(this.getOpenDevice(path).epOut, Buffer.from(frame));
+    await this.transferOutOnce(path, this.getOpenDevice(path).epOut, Buffer.from(frame));
   }
 
   protected async readProtocolV2UsbPacket(
@@ -904,7 +988,8 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
         throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromOutside, 'Cancelled');
       }
       try {
-        const packet = await transferInOnce(
+        const packet = await this.transferInOnce(
+          path,
           this.getOpenDevice(path).epIn,
           PROTOCOL_V2_FRAME_MAX_BYTES
         );
@@ -920,6 +1005,7 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
   }
 
   protected async resetProtocolV2UsbNativeLink(path: string, _reason: string): Promise<void> {
+    await this.cancelActiveTransfers(path);
     await this.closeOpenDevice(path);
   }
 

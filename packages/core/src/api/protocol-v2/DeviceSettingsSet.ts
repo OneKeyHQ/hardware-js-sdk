@@ -1,4 +1,5 @@
 import { BaseMethod } from '../BaseMethod';
+import { mapDeviceSettingsToState } from '../../device/DeviceStateMapper';
 import { invalidParameter } from '../helpers/filesystemValidation';
 
 import type { DeviceSettings } from '@onekeyfe/hd-transport';
@@ -30,10 +31,21 @@ export default class DeviceSettingsSet extends BaseMethod<{
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
     this.params = { settings: supported };
+    if (typeof supported.label === 'string') {
+      this.protocolV2UiInteraction = {
+        request: 'button',
+        source: 'method-lifecycle',
+        reason: 'device-management',
+        completion: 'operation-completed',
+        deviceOnly: true,
+        operation: 'change-label',
+      };
+    }
   }
 
   async run() {
     const res = await this.device.commands.typedCall('DeviceSettingsSet', 'Success', this.params);
+    this.device.updateState(mapDeviceSettingsToState(this.params.settings), 'apply-settings');
     return Promise.resolve(res.message);
   }
 }

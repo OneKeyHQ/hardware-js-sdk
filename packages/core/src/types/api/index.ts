@@ -4,13 +4,10 @@ import type {
   deviceFirmwareUpdate,
   deviceGetFirmwareUpdateStatus,
   deviceGetOnboardingStatus,
-  deviceInfoGet,
   deviceReboot,
-  deviceSessionGet,
-  deviceSettingsGet,
+  deviceSessionOpen,
   deviceSettingsPageShow,
   deviceSettingsSet,
-  deviceStatusGet,
   deviceUploadWallpaper,
   dirList,
   dirMake,
@@ -46,7 +43,7 @@ import type { checkAllFirmwareRelease } from './checkAllFirmwareRelease';
 import type { checkFirmwareTypeAvailable } from './checkFirmwareTypeAvailable';
 import type { searchDevices } from './searchDevices';
 import type { getFeatures } from './getFeatures';
-import type { getDeviceInfo } from './getDeviceInfo';
+import type { getDeviceState } from './getDeviceState';
 import type { getOnekeyFeatures } from './getOnekeyFeatures';
 import type { getPassphraseState } from './getPassphraseState';
 import type { checkFirmwareRelease } from './checkFirmwareRelease';
@@ -172,18 +169,7 @@ import type { neoSignTransaction } from './neoSignTransaction';
 import type { ConnectSettings } from '../settings';
 
 export * from './export';
-export type {
-  DeviceInfoMode,
-  DeviceInfoProtocol,
-  DeviceInfoScope,
-  DeviceInfoSource,
-  DeviceInfoStatus,
-  DeviceProfile,
-  GetDeviceInfoParams,
-  DeviceProfileRaw,
-  DeviceProfileVerify,
-  DeviceProfileVersions,
-} from './getDeviceInfo';
+export type { DeviceStateScope, GetDeviceStateParams } from './getDeviceState';
 export type { GetPassphraseStateParams } from './getPassphraseState';
 export type { ClearSessionCacheParams, ClearSessionCachePayload } from './sessionCache';
 
@@ -196,7 +182,7 @@ export type CoreApi = {
   off: typeof off;
   emit: (event: string, ...args: any[]) => void;
   removeAllListeners: typeof removeAllListeners;
-  dispose: () => void;
+  dispose: () => void | Promise<void>;
   call: (params: any) => Promise<any>;
   uiResponse: typeof uiResponse;
   cancel: (connectId?: string) => void;
@@ -227,7 +213,7 @@ export type CoreApi = {
   searchDevices: typeof searchDevices;
   promptWebDeviceAccess: typeof promptWebDeviceAccess;
   getFeatures: typeof getFeatures;
-  getDeviceInfo: typeof getDeviceInfo;
+  getDeviceState: typeof getDeviceState;
   getOnekeyFeatures: typeof getOnekeyFeatures;
   getPassphraseState: typeof getPassphraseState;
   deviceBackup: typeof deviceBackup;
@@ -264,15 +250,12 @@ export type CoreApi = {
   protocolInfoRequest: typeof protocolInfoRequest;
   ping: typeof ping;
   deviceReboot: typeof deviceReboot;
-  deviceInfoGet: typeof deviceInfoGet;
-  deviceStatusGet: typeof deviceStatusGet;
   deviceGetOnboardingStatus: typeof deviceGetOnboardingStatus;
-  deviceSessionGet: typeof deviceSessionGet;
+  deviceSessionOpen: typeof deviceSessionOpen;
   deviceFirmwareUpdate: typeof deviceFirmwareUpdate;
   deviceGetFirmwareUpdateStatus: typeof deviceGetFirmwareUpdateStatus;
   deviceFactoryInfoSet: typeof deviceFactoryInfoSet;
   deviceFactoryInfoGet: typeof deviceFactoryInfoGet;
-  deviceSettingsGet: typeof deviceSettingsGet;
   deviceSettingsSet: typeof deviceSettingsSet;
   deviceSettingsPageShow: typeof deviceSettingsPageShow;
   deviceUploadWallpaper: typeof deviceUploadWallpaper;

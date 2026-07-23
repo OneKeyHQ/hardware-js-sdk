@@ -1,10 +1,12 @@
 import { BaseMethod } from './BaseMethod';
 import TransportManager from '../data-manager/TransportManager';
 import { DataManager } from '../data-manager';
-import { getDeviceTypeByBleName } from '../utils';
+import { LoggerNames, getDeviceTypeByBleName, getLogger } from '../utils';
 import { DevicePool } from '../device/DevicePool';
 
 import type DeviceConnector from '../device/DeviceConnector';
+
+const Log = getLogger(LoggerNames.DevicePool);
 
 export default class SearchDevices extends BaseMethod {
   connector?: DeviceConnector;
@@ -47,9 +49,28 @@ export default class SearchDevices extends BaseMethod {
       return devices;
     }
 
-    const { deviceList } = await DevicePool.getDevices(devicesDescriptor, undefined, {
-      connectProtocol: this.payload.connectProtocol,
-    });
+    const deviceList = [];
+    for (const descriptor of devicesDescriptor) {
+      try {
+        // 设备发现是尽力而为的操作。浏览器可能保留已经离线、忙碌或尚未就绪的
+        // WebUSB 授权记录，单个描述符初始化失败不应中断其余设备的发现。
+        const result = await DevicePool.getDevices([descriptor], descriptor.path, {
+          connectProtocol: this.payload.connectProtocol,
+          refreshRuntimeState: true,
+        });
+        deviceList.push(...result.deviceList);
+      } catch (error) {
+        const errorCode =
+          error && typeof error === 'object' && 'errorCode' in error
+            ? (error as { errorCode?: unknown }).errorCode
+            : undefined;
+        Log.debug('Skip unavailable device during search', {
+          path: descriptor.path,
+          ...(errorCode !== undefined ? { errorCode } : {}),
+        });
+      }
+    }
+
     return deviceList.map(device => device.toMessageObject());
   }
 }

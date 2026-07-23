@@ -3022,8 +3022,6 @@ export type UnLockDeviceResponse = {
 // GetPassphraseState
 export type GetPassphraseState = {
   passphrase_state?: string;
-  _only_main_pin?: boolean;
-  allow_create_attach_pin?: boolean;
 };
 
 // PassphraseState
@@ -4721,6 +4719,7 @@ export enum ViewSignLayout {
   LayoutFinalConfirm = 2,
   Layout7702 = 3,
   LayoutFlat = 4,
+  LayoutEthApprove = 5,
 }
 
 // ViewSignPage
@@ -4739,6 +4738,9 @@ export type ViewVerifyPage = {
   title: string;
   address: string;
   path: string;
+  network?: string;
+  derive_type?: string;
+  value_key?: number;
 };
 
 // ProtocolInfoRequest
@@ -4781,7 +4783,6 @@ export type DeviceSettings = {
   bt_enable?: boolean;
   language?: string;
   wallpaper_path?: string;
-  passphrase_enable?: boolean;
   brightness?: number;
   autolock_delay_ms?: number;
   autoshutdown_delay_ms?: number;
@@ -4790,10 +4791,10 @@ export type DeviceSettings = {
   haptic_feedback?: boolean;
   device_name_display_enabled?: boolean;
   airgap_mode?: boolean;
-  fido_enabled?: boolean;
-  experimental_features?: boolean;
   usb_lock_enable?: boolean;
   random_keypad?: boolean;
+  passphrase_enable?: boolean;
+  fido_enabled?: boolean;
 };
 
 // DeviceSettingsGet
@@ -5048,9 +5049,33 @@ export type ProtocolV2DeviceInfo = {
   status?: DeviceStatus;
 };
 
-// DeviceSessionGet
-export type DeviceSessionGet = {
-  session_id?: string;
+// DeviceSessionResume
+export type DeviceSessionResume = {
+  session_id: string;
+};
+
+// DeviceHostPassphrase
+export type DeviceHostPassphrase = {
+  passphrase: string;
+};
+
+// DevicePassphraseOnDevice
+export type DevicePassphraseOnDevice = {};
+
+// DeviceAttachPinOnDevice
+export type DeviceAttachPinOnDevice = {};
+
+// DeviceWalletSelect
+export type DeviceWalletSelect = {
+  host_passphrase?: DeviceHostPassphrase;
+  passphrase_on_device?: DevicePassphraseOnDevice;
+  attach_pin_on_device?: DeviceAttachPinOnDevice;
+};
+
+// DeviceSessionOpen
+export type DeviceSessionOpen = {
+  resume?: DeviceSessionResume;
+  select?: DeviceWalletSelect;
 };
 
 // DeviceSession
@@ -5080,30 +5105,61 @@ export type DeviceStatus = {
 // DeviceStatusGet
 export type DeviceStatusGet = {};
 
-export enum DevOnboardingStage {
-  DEV_ONBOARDING_STAGE_UNKNOWN = 0,
-  DEV_ONBOARDING_STAGE_SAFETY_CHECK = 1,
-  DEV_ONBOARDING_STAGE_PERSONALIZATION = 2,
-  DEV_ONBOARDING_STAGE_SELECT_SETUP_METHOD = 3,
-  DEV_ONBOARDING_STAGE_NEW_DEVICE = 4,
-  DEV_ONBOARDING_STAGE_SELECT_RESTORE_METHOD = 5,
-  DEV_ONBOARDING_STAGE_RESTORE_MNEMONIC = 6,
-  DEV_ONBOARDING_STAGE_RESTORE_SEEDCARD = 7,
-  DEV_ONBOARDING_STAGE_WALLET_READY = 8,
-  DEV_ONBOARDING_STAGE_SEEDCARD_BACKUP_PROMPT = 9,
-  DEV_ONBOARDING_STAGE_SELECT_SEEDCARD_BACKUP_METHOD = 10,
-  DEV_ONBOARDING_STAGE_SEEDCARD_BACKUP = 11,
-  DEV_ONBOARDING_STAGE_DONE = 12,
+export enum DevOnboardingStep {
+  DEV_ONBOARDING_STEP_UNKNOWN = 0,
+  DEV_ONBOARDING_STEP_CHECKING = 1,
+  DEV_ONBOARDING_STEP_PERSONALIZATION = 2,
+  DEV_ONBOARDING_STEP_PIN = 3,
+  DEV_ONBOARDING_STEP_SETUP = 4,
+  DEV_ONBOARDING_STEP_DONE = 5,
 }
+
+export enum DevOnboardingPhase {
+  DEV_ONBOARDING_PHASE_UNKNOWN = 0,
+  DEV_ONBOARDING_PHASE_SAFETY_CHECK = 1,
+  DEV_ONBOARDING_PHASE_PIN_SETUP = 2,
+  DEV_ONBOARDING_PHASE_FINGERPRINT_SETUP = 3,
+  DEV_ONBOARDING_PHASE_SETUP_CHOICE = 4,
+  DEV_ONBOARDING_PHASE_WALLET_CREATE_START = 5,
+  DEV_ONBOARDING_PHASE_RECOVERY_PHRASE_VIEW = 6,
+  DEV_ONBOARDING_PHASE_RECOVERY_PHRASE_CONFIRM = 7,
+  DEV_ONBOARDING_PHASE_RESTORE_METHOD_CHOICE = 8,
+  DEV_ONBOARDING_PHASE_RECOVERY_PHRASE_RESTORE = 9,
+  DEV_ONBOARDING_PHASE_SEEDCARD_RESTORE = 10,
+  DEV_ONBOARDING_PHASE_WALLET_READY = 11,
+  DEV_ONBOARDING_PHASE_SEEDCARD_BACKUP_PROMPT = 12,
+  DEV_ONBOARDING_PHASE_SEEDCARD_BACKUP = 13,
+}
+
+export enum DevOnboardingSetupKind {
+  DEV_ONBOARDING_SETUP_KIND_UNKNOWN = 0,
+  DEV_ONBOARDING_SETUP_KIND_CHOICE = 1,
+  DEV_ONBOARDING_SETUP_KIND_CREATE = 2,
+  DEV_ONBOARDING_SETUP_KIND_RESTORE = 3,
+}
+
+export enum DevOnboardingSetupMethod {
+  DEV_ONBOARDING_SETUP_METHOD_UNKNOWN = 0,
+  DEV_ONBOARDING_SETUP_METHOD_RECOVERY_PHRASE = 1,
+  DEV_ONBOARDING_SETUP_METHOD_SEEDCARD = 2,
+}
+
+// DevOnboardingSetupStatus
+export type DevOnboardingSetupStatus = {
+  kind?: DevOnboardingSetupKind;
+  method?: DevOnboardingSetupMethod;
+};
 
 // DevGetOnboardingStatus
 export type DevGetOnboardingStatus = {};
 
 // DevOnboardingStatus
 export type DevOnboardingStatus = {
-  stage: DevOnboardingStage;
-  status_code?: number;
-  detail_code?: number;
+  step?: DevOnboardingStep;
+  phase?: DevOnboardingPhase;
+  setup?: DevOnboardingSetupStatus;
+  pin_set?: boolean;
+  wallet_initialized?: boolean;
 };
 
 // FilesystemPermissionFix
@@ -5849,11 +5905,17 @@ export type MessageType = {
   DeviceInfoTargets: DeviceInfoTargets;
   DeviceInfoTypes: DeviceInfoTypes;
   DeviceInfoGet: DeviceInfoGet;
-  DeviceSessionGet: DeviceSessionGet;
+  DeviceSessionResume: DeviceSessionResume;
+  DeviceHostPassphrase: DeviceHostPassphrase;
+  DevicePassphraseOnDevice: DevicePassphraseOnDevice;
+  DeviceAttachPinOnDevice: DeviceAttachPinOnDevice;
+  DeviceWalletSelect: DeviceWalletSelect;
+  DeviceSessionOpen: DeviceSessionOpen;
   DeviceSession: DeviceSession;
   DeviceSessionAskPin: DeviceSessionAskPin;
   DeviceStatus: DeviceStatus;
   DeviceStatusGet: DeviceStatusGet;
+  DevOnboardingSetupStatus: DevOnboardingSetupStatus;
   DevGetOnboardingStatus: DevGetOnboardingStatus;
   DevOnboardingStatus: DevOnboardingStatus;
   FilesystemPermissionFix: FilesystemPermissionFix;

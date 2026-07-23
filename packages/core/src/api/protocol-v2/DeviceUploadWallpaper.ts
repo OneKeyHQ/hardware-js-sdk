@@ -4,11 +4,12 @@ import { bytesToHex } from '@noble/hashes/utils';
 import { BaseMethod } from '../BaseMethod';
 import { invalidParameter } from '../helpers/filesystemValidation';
 import { writeProtocolV2File } from '../helpers/protocolV2FileWrite';
+import { UI_REQUEST, createUiMessage } from '../../events/ui-request';
 import {
-  encodePro2Wallpaper,
   PRO2_WALLPAPER_HEIGHT,
   PRO2_WALLPAPER_WIDTH,
   type Pro2WallpaperColorFormat,
+  encodePro2Wallpaper,
 } from '../../utils/pro2Wallpaper';
 
 export type DeviceUploadWallpaperParams = {
@@ -26,7 +27,7 @@ export type DeviceUploadWallpaperResponse = {
   message?: string;
 };
 
-const WALLPAPER_DIRECTORY = 'vol0:/wallpapers/user';
+const WALLPAPER_DIRECTORY = 'vol1:/wallpapers';
 const SAFE_FILE_NAME = /^[A-Za-z0-9_-]+(?:\.bin)?$/;
 
 function normalizeFileName(fileName: string | undefined, data: Uint8Array): string {
@@ -99,9 +100,15 @@ export default class DeviceUploadWallpaper extends BaseMethod<DeviceUploadWallpa
       data: encoded.data,
       totalSize: encoded.data.byteLength,
       chunkSize: this.params.chunkSize,
+      maxChunkRetries: 3,
       overwrite: true,
       append: false,
       throwIfAborted: () => this.throwIfAborted(),
+      onProgress: payload => {
+        if (typeof this.postMessage === 'function') {
+          this.postMessage(createUiMessage(UI_REQUEST.DEVICE_PROGRESS, payload));
+        }
+      },
     });
     this.uploaded = true;
   }

@@ -92,7 +92,7 @@ export type Transport = {
 
   // resolves when the transport can be used; rejects when it cannot
   init: ITransportInitFn;
-  stop(): void;
+  stop(): void | Promise<void>;
 
   configured: boolean;
   version: string;
@@ -105,7 +105,7 @@ export type Transport = {
 export type LowLevelDevice = OneKeyDeviceInfoBase & { id: string; name: string };
 export type LowlevelTransportSharedPlugin = {
   enumerate: () => Promise<LowLevelDevice[]>;
-  send: (uuid: string, data: string) => Promise<void>;
+  send: (uuid: string, data: string, options?: { withoutResponse?: boolean }) => Promise<void>;
   receive: (uuid?: string) => Promise<string>;
   connect: (uuid: string) => Promise<void>;
   disconnect: (uuid: string) => Promise<void>;

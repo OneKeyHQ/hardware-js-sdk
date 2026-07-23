@@ -48,12 +48,12 @@ export default class DeviceFirmwareUpdate extends BaseMethod<DeviceFirmwareUpdat
           },
         }
       );
-      return res.message;
+      return Promise.resolve(res.message);
     } catch (error) {
       if (isProtocolV2DeviceDisconnectedError(error)) {
-        return {
+        return Promise.resolve({
           message: 'Device firmware update started',
-        };
+        });
       }
       throw error;
     }

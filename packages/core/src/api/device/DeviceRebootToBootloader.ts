@@ -28,6 +28,7 @@ export default class DeviceRebootToBootloader extends BaseMethod<RebootToBootloa
       const res = await this.device.commands.typedCall('DeviceReboot', 'Success', {
         reboot_type: DeviceRebootType.Bootloader,
       });
+      this.device.markProtocolV2Reboot(DeviceRebootType.Bootloader);
       return Promise.resolve(res.message);
     }
 

@@ -5,7 +5,7 @@ export const LogBlockEvent: Set<string> = new Set([
   UI_RESPONSE.RECEIVE_PASSPHRASE,
 ]);
 
-const LogBlockMethod: Set<string> = new Set(['evmSignTypedData']);
+const LogBlockMethod: Set<string> = new Set(['evmSignTypedData', 'deviceSessionOpen']);
 
 export function getLogBlockLabel(message: unknown): string | undefined {
   if (!message || typeof message !== 'object') return undefined;

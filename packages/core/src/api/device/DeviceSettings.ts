@@ -1,7 +1,13 @@
 import { HardwareErrorCode, TypedError } from '@onekeyfe/hd-shared';
 
 import { BaseMethod } from '../BaseMethod';
+import { invalidParameter } from '../helpers/filesystemValidation';
 import { validateParams } from '../helpers/paramsValidator';
+import {
+  mapApplySettingsToState,
+  mapCommonSettingsToProtocolV2,
+  mapDeviceSettingsToState,
+} from '../../device/DeviceStateMapper';
 import { LANGUAGE_LABELS } from '../../utils/deviceSettings';
 
 import type { ApplySettings } from '@onekeyfe/hd-transport';
@@ -24,7 +30,15 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
       { name: 'experimentalFeatures', type: 'boolean' },
       { name: 'autoShutdownDelayMs', type: 'number' },
       { name: 'changeBrightness', type: 'boolean' },
+      { name: 'brightness', type: 'number' },
       { name: 'hapticFeedback', type: 'boolean' },
+      { name: 'bluetoothEnabled', type: 'boolean' },
+      { name: 'animationEnabled', type: 'boolean' },
+      { name: 'tapToWake', type: 'boolean' },
+      { name: 'deviceNameDisplayEnabled', type: 'boolean' },
+      { name: 'fidoEnabled', type: 'boolean' },
+      { name: 'usbLockEnabled', type: 'boolean' },
+      { name: 'randomKeypad', type: 'boolean' },
     ]);
 
     // init params
@@ -60,9 +74,23 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
 
   async run() {
     try {
+      if (this.device.isProtocolV2()) {
+        const settings = mapCommonSettingsToProtocolV2(this.payload);
+        if (Object.keys(settings).length === 0) {
+          throw invalidParameter('No Protocol V2 compatible setting provided.');
+        }
+
+        const res = await this.device.commands.typedCall('DeviceSettingsSet', 'Success', {
+          settings,
+        });
+        this.device.updateState(mapDeviceSettingsToState(settings), 'apply-settings');
+        return res.message;
+      }
+
       const res = await this.device.commands.typedCall('ApplySettings', 'Success', {
         ...this.params,
       });
+      this.device.updateState(mapApplySettingsToState(this.params), 'apply-settings');
       return res.message;
     } catch (error) {
       if (error.message?.toLowerCase().includes('no setting provided')) {

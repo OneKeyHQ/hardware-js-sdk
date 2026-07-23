@@ -114,7 +114,10 @@ export const createCoreApi = (
    * 获取设备信息
    */
   getFeatures: (connectId, params) => call({ ...params, connectId, method: 'getFeatures' }),
-  getDeviceInfo: (connectId, params) => call({ ...params, connectId, method: 'getDeviceInfo' }),
+  getDeviceState: (connectId, params) => {
+    const { refresh: _refresh, includeRaw: _includeRaw, ...commonParams } = (params ?? {}) as any;
+    return call({ ...commonParams, connectId, method: 'getDeviceState' });
+  },
   getOnekeyFeatures: (connectId, params) =>
     call({ ...params, connectId, method: 'getOnekeyFeatures' }),
 
@@ -160,12 +163,10 @@ export const createCoreApi = (
     call({ ...params, connectId, method: 'protocolInfoRequest' }),
   ping: (connectId, params) => call({ ...params, connectId, method: 'ping' }),
   deviceReboot: (connectId, params) => call({ ...params, connectId, method: 'deviceReboot' }),
-  deviceInfoGet: (connectId, params) => call({ ...params, connectId, method: 'deviceInfoGet' }),
-  deviceStatusGet: (connectId, params) => call({ ...params, connectId, method: 'deviceStatusGet' }),
   deviceGetOnboardingStatus: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceGetOnboardingStatus' }),
-  deviceSessionGet: (connectId, params) =>
-    call({ ...params, connectId, method: 'deviceSessionGet' }),
+  deviceSessionOpen: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceSessionOpen' }),
   deviceFirmwareUpdate: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceFirmwareUpdate' }),
   deviceGetFirmwareUpdateStatus: (connectId, params) =>
@@ -174,8 +175,6 @@ export const createCoreApi = (
     call({ ...params, connectId, method: 'deviceFactoryInfoSet' }),
   deviceFactoryInfoGet: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceFactoryInfoGet' }),
-  deviceSettingsGet: (connectId, params) =>
-    call({ ...params, connectId, method: 'deviceSettingsGet' }),
   deviceSettingsSet: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceSettingsSet' }),
   deviceSettingsPageShow: (connectId, params) =>

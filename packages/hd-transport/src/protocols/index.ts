@@ -72,6 +72,18 @@ export const ProtocolV1 = {
 export const ProtocolV2 = {
   isAckFrame,
 
+  inspectFrame(schemas: ProtocolV2Schemas, frame: Uint8Array) {
+    const { messageTypeId, pbPayload, seq } = decodeV2Frame(frame);
+    const { messageName } = createProtocolV2MessageFromType(messageTypeId, schemas);
+    return {
+      messageName,
+      messageTypeId,
+      pbPayload,
+      seq,
+      type: messageName,
+    };
+  },
+
   encodeFrame(
     schemas: ProtocolV2Schemas,
     name: string,
@@ -95,8 +107,8 @@ export const ProtocolV2 = {
   },
 
   decodeFrame(schemas: ProtocolV2Schemas, frame: Uint8Array) {
-    const { messageTypeId, pbPayload, seq } = decodeV2Frame(frame);
-    const { Message, messageName } = createProtocolV2MessageFromType(messageTypeId, schemas);
+    const { messageTypeId, pbPayload, seq, messageName } = this.inspectFrame(schemas, frame);
+    const { Message } = createProtocolV2MessageFromType(messageTypeId, schemas);
     const rxByteBuffer = ByteBuffer.wrap(Buffer.from(pbPayload) as unknown as ArrayBuffer);
     const message = decodeProtobuf(Message, rxByteBuffer);
 

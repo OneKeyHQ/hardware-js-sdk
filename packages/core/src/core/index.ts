@@ -36,6 +36,7 @@ import {
   updateRequestContext,
 } from '../utils/tracing';
 import { Device } from '../device/Device';
+import { checkLiveDeviceId } from '../device/deviceIdentity';
 import { DeviceList } from '../device/DeviceList';
 import { DevicePool } from '../device/DevicePool';
 import { PollingStateManager } from './PollingStateManager';
@@ -55,8 +56,13 @@ import {
 import TransportManager from '../data-manager/TransportManager';
 import DeviceConnector from '../device/DeviceConnector';
 import RequestQueue from './RequestQueue';
+import { registerHardwareUiEventListeners } from './deviceEventRegistration';
 import { getSynchronize } from '../utils/getSynchronize';
 import { runMethodWithUnlockRetry } from '../protocols/protocol-v2/unlockRetry';
+import {
+  ProtocolV2UiInteractionCoordinator,
+  isProtocolV2UiEnabled,
+} from '../protocols/protocol-v2/uiInteraction';
 
 import type { ConnectSettings, Features, KnownDevice } from '../types';
 import type { CoreMessage, IFrameCallMessage, UiPromise, UiPromiseResponse } from '../events';
@@ -99,7 +105,7 @@ const parseInitOptions = (method?: BaseMethod): InitOptions => ({
   protocolV2DeviceInfoTimeoutMs: method?.payload.protocolV2DeviceInfoTimeoutMs,
 });
 
-let _core: Core;
+let _core: Core | undefined;
 let _deviceList: DeviceList | undefined;
 let _connector: DeviceConnector | undefined;
 let _uiPromises: UiPromise<UiPromiseResponse['type']>[] = []; // Waiting for ui response
@@ -358,7 +364,7 @@ const onCallDevice = async (
     );
   } catch (e) {
     preWarmCallbackTask?.resolve();
-    console.log('ensureConnected error: ', e);
+    Log.debug('ensureConnected error: ', e);
 
     completeMethodRequestContext(method, e);
 
@@ -395,18 +401,23 @@ const onCallDevice = async (
     );
   }
 
-  device.on(DEVICE.PIN, onDevicePinHandler);
-  device.on(DEVICE.BUTTON, onDeviceButtonHandler);
-  device.on(
-    DEVICE.PASSPHRASE,
-    message.payload.useEmptyPassphrase ? onEmptyPassphraseHandler : onDevicePassphraseHandler
-  );
-  device.on(DEVICE.PASSPHRASE_ON_DEVICE, onEnterPassphraseOnDeviceHandler);
+  registerHardwareUiEventListeners(device, {
+    pin: onDevicePinHandler,
+    button: onDeviceButtonHandler,
+    passphrase: message.payload.useEmptyPassphrase
+      ? onEmptyPassphraseHandler
+      : onDevicePassphraseHandler,
+    passphraseOnDevice: onEnterPassphraseOnDeviceHandler,
+    attachPinOnDevice: onEnterAttachPinOnDeviceHandler,
+  });
   device.on(DEVICE.FEATURES, onDeviceFeaturesHandler);
+  device.on(DEVICE.STATE, onDeviceStateHandler);
   device.on(
     DEVICE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE,
     onSelectDeviceInBootloaderForWebDeviceHandler
   );
+
+  const protocolV2UiCoordinator = new ProtocolV2UiInteractionCoordinator(device, postMessage);
   device.on(
     DEVICE.SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE,
     onSelectDeviceForSwitchFirmwareWebDeviceHandler
@@ -540,7 +551,7 @@ const onCallDevice = async (
       }
 
       if (method.deviceId && method.checkDeviceId) {
-        const isSameDeviceID = device.checkDeviceId(method.deviceId);
+        const isSameDeviceID = await checkLiveDeviceId(device, method.deviceId);
         if (!isSameDeviceID) {
           return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError));
         }
@@ -617,7 +628,11 @@ const onCallDevice = async (
       method.device?.commands?.checkDisposed();
 
       try {
-        const response: object = await runMethodWithUnlockRetry(method, device);
+        const response: object = await runMethodWithUnlockRetry(
+          method,
+          device,
+          protocolV2UiCoordinator
+        );
         messageResponse = createResponseMessage(method.responseID, true, response);
         requestQueue.resolveRequest(method.responseID, messageResponse);
         completeMethodRequestContext(method);
@@ -634,6 +649,8 @@ const onCallDevice = async (
         ) {
           throw error;
         }
+      } finally {
+        protocolV2UiCoordinator.close();
       }
     };
     Log.debug('Call API - Device Run: ', device.mainId);
@@ -687,7 +704,9 @@ const onCallDevice = async (
 
     requestQueue.releaseTask(method.responseID);
 
-    closePopup();
+    if (isProtocolV2UiEnabled(method)) {
+      closePopup();
+    }
 
     cleanup();
 
@@ -1223,6 +1242,10 @@ const onDeviceFeaturesHandler = (...[_, features]: [...DeviceEvents['features']]
   postMessage(createDeviceMessage(DEVICE.FEATURES, { ...features }));
 };
 
+const onDeviceStateHandler = (...[_, stateEvent]: [...DeviceEvents['state']]) => {
+  postMessage(createDeviceMessage(DEVICE.STATE, stateEvent));
+};
+
 const onDevicePassphraseHandler = async (
   ...[device, requestPayload, callback]: DeviceEvents['passphrase']
 ) => {
@@ -1233,6 +1256,9 @@ const onDevicePassphraseHandler = async (
       device: device.toMessageObject() as KnownDevice,
       passphraseState: device.passphraseState,
       existsAttachPinUser: requestPayload.existsAttachPinUser,
+      source: requestPayload.source,
+      reason: requestPayload.reason,
+      expectedPassphraseState: requestPayload.expectedPassphraseState,
     })
   );
   // wait for passphrase
@@ -1254,12 +1280,27 @@ const onEmptyPassphraseHandler = (...[_, , callback]: DeviceEvents['passphrase']
 };
 
 const onEnterPassphraseOnDeviceHandler = (
-  ...[device]: [...DeviceEvents['passphrase_on_device']]
+  ...[device, requestPayload]: [...DeviceEvents['passphrase_on_device']]
 ) => {
   postMessage(
     createUiMessage(UI_REQUEST.REQUEST_PASSPHRASE_ON_DEVICE, {
       device: device.toMessageObject() as KnownDevice,
       passphraseState: device.passphraseState,
+      source: requestPayload?.source,
+      reason: requestPayload?.reason,
+    })
+  );
+};
+
+const onEnterAttachPinOnDeviceHandler = (
+  ...[device, requestPayload]: [...DeviceEvents['attach_pin_on_device']]
+) => {
+  postMessage(
+    createUiMessage(UI_REQUEST.REQUEST_PIN, {
+      device: device.toMessageObject() as KnownDevice,
+      type: 'ButtonRequest_AttachPin',
+      source: requestPayload?.source,
+      reason: requestPayload?.reason,
     })
   );
 };
@@ -1329,6 +1370,8 @@ export default class Core extends EventEmitter {
   public readonly sdkInstanceId: string;
 
   private requestQueue = new RequestQueue();
+
+  private disposePromise?: Promise<void>;
 
   // background task
   private prePendingCallPromise: Promise<void> | undefined;
@@ -1429,20 +1472,52 @@ export default class Core extends EventEmitter {
     return Promise.resolve(message);
   }
 
-  dispose() {
+  dispose(): Promise<void> {
+    if (!this.disposePromise) {
+      this.disposePromise = this.disposeResources();
+    }
+    return this.disposePromise;
+  }
+
+  private async disposeResources(): Promise<void> {
+    Log.debug(`[Core] Disposing SDK instance: ${this.sdkInstanceId}`);
+    pollingManager.stopAll();
+    this.requestQueue.abortAllRequests();
+    cleanup();
+
+    _connector?.stop();
+    let transportCleanup: Promise<void>;
+    try {
+      transportCleanup = Promise.resolve(TransportManager.getTransport()?.stop?.()).catch(error => {
+        Log.warn('[Core] Transport cleanup failed:', error);
+      });
+    } catch (error) {
+      Log.warn('[Core] Transport cleanup failed:', error);
+      transportCleanup = Promise.resolve();
+    }
+
+    // 保持旧的同步 dispose 语义：即使调用方尚未 await，内存状态和监听器也立即清理。
     _deviceList = undefined;
     _connector = undefined;
+    DevicePool.resetState();
     deviceCacheMap.clear();
     preWarmInflight.clear();
     preWarmDoneAt.clear();
-    Log.debug(`[Core] Disposing SDK instance: ${this.sdkInstanceId}`);
+    preConnectCache = { passphraseState: undefined };
+    this.prePendingCallPromise = undefined;
+    this.removeAllListeners();
     cleanupSdkInstance(this.sdkInstanceId);
+    if (_core === this) _core = undefined;
+
+    // Transport（特别是 Node USB）可能需要异步释放原生句柄。
+    await transportCleanup;
   }
 }
 
 export const initCore = () => {
-  _core = new Core();
-  return _core;
+  const core = new Core();
+  _core = core;
+  return core;
 };
 
 export const initConnector = () => {

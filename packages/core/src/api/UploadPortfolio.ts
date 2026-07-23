@@ -6,7 +6,7 @@ export type UploadPortfolioParams = {
   timeoutMs?: number | string;
 };
 
-const PORTFOLIO_PENDING_PATH = 'vol1:/portfolio/portfolio.pfol.pending';
+const PORTFOLIO_PENDING_PATH = 'vol1:/portfolio/portfolio.okpkg.pending';
 const PORTFOLIO_CHUNK_SIZE = 2048;
 
 export default class UploadPortfolio extends FileWrite {
@@ -20,9 +20,13 @@ export default class UploadPortfolio extends FileWrite {
       chunkSize: PORTFOLIO_CHUNK_SIZE,
       overwrite: true,
       append: false,
+      emitProgress: false,
       timeoutMs,
     };
     super.init();
+    this.unlockPolicy = 'retry-on-locked';
+    // Portfolio 是后台数据写入与应用流程，设备不需要用户确认；包括自动解锁阶段在内均不合成 UI Event。
+    this.protocolV2UiMode = 'none';
   }
 
   async run() {

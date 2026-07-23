@@ -13,7 +13,6 @@ export type DeviceInfoGetTargets = {
   se2?: boolean;
   se3?: boolean;
   se4?: boolean;
-  status?: boolean;
 };
 
 export type DeviceInfoGetTypes = {
@@ -36,7 +35,6 @@ const TARGET_KEYS: (keyof DeviceInfoGetTargets)[] = [
   'se2',
   'se3',
   'se4',
-  'status',
 ];
 
 const TYPE_KEYS: (keyof DeviceInfoGetTypes)[] = ['version', 'build_id', 'hash', 'specific'];
@@ -45,7 +43,6 @@ const DEFAULT_TARGETS: DeviceInfoGetTargets = {
   hw: true,
   fw: true,
   coprocessor: true,
-  status: true,
 };
 
 const DEFAULT_TYPES: DeviceInfoGetTypes = {
@@ -105,9 +102,8 @@ function normalizeTypes(value: unknown): DeviceInfoGetTypes | undefined {
 /**
  * 原生 DeviceInfoGet（Protocol V2 only）。
  *
- * 与 getDeviceInfo 不同：不构建 DeviceProfile、不更新设备缓存，
- * 按调用方给定的 targets/types 原样请求并返回未加工的 DeviceInfo 消息，
- * 用于调试固件字段上报。
+ * SDK 内部按需构造 targets/types，并返回未加工的 DeviceInfo 消息。
+ * 该 command 不属于公共 CoreApi；业务接入统一使用 getDeviceState。
  */
 export default class DeviceInfoGet extends BaseMethod<{
   targets: DeviceInfoGetTargets;
@@ -116,6 +112,7 @@ export default class DeviceInfoGet extends BaseMethod<{
   init() {
     // Protocol V2 (Pro2) 专属方法，core 调度层统一做非 V2 设备守卫
     this.requireProtocolV2 = true;
+    this.unlockPolicy = 'none';
     this.allowDeviceMode = [
       ...this.allowDeviceMode,
       UI_REQUEST.NOT_INITIALIZE,

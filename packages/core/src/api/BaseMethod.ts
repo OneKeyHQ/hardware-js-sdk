@@ -19,10 +19,12 @@ import type { Device } from '../device/Device';
 import type DeviceConnector from '../device/DeviceConnector';
 import type { DeviceFirmwareRange, KnownDevice } from '../types';
 import type { CoreMessage } from '../events';
+import type { ProtocolV2InteractionDescriptor } from '../protocols/protocol-v2/uiInteraction';
 import type { RequestContext } from '../utils/tracing';
 import type { CoreContext } from '../core';
 
 export type UnlockPolicy = 'none' | 'retry-on-locked';
+export type ProtocolV2UiMode = 'auto' | 'none';
 
 const Log = getLogger(LoggerNames.Method);
 
@@ -168,8 +170,14 @@ export abstract class BaseMethod<Params = undefined> {
    */
   requireProtocolV2 = false;
 
-  /** Protocol V2 设备锁定时是否允许 Core 自动解锁并重试一次。 */
-  unlockPolicy: UnlockPolicy = 'none';
+  /** Protocol V2 业务方法锁定时默认由 Core 自动解锁并重试一次。 */
+  unlockPolicy: UnlockPolicy = 'retry-on-locked';
+
+  /** Protocol V2 由 SDK 合成的非阻塞设备交互提示；未声明时不生成交互 Event。 */
+  protocolV2UiInteraction?: ProtocolV2InteractionDescriptor;
+
+  /** 特殊后台方法可关闭包括自动解锁提示在内的全部 Protocol V2 合成 UI Event。 */
+  protocolV2UiMode: ProtocolV2UiMode = 'auto';
 
   protected throwIfAborted() {
     if (this.abortSignal?.aborted) {

@@ -69,11 +69,7 @@ function toUint8Array(value: unknown): Uint8Array {
   return new Uint8Array(0);
 }
 
-function getDeviceTransferProgress(
-  bytesBeforeChunk: number,
-  bytesAfterChunk: number,
-  totalBytes: number
-) {
+function getDeviceTransferProgress(bytesBeforeChunk: number, bytesAfterChunk: number, totalBytes: number) {
   if (!Number.isFinite(totalBytes) || totalBytes <= 0) {
     return 100;
   }
@@ -140,7 +136,8 @@ export default class FileRead extends BaseMethod<FileReadParams> {
       const readLen = Math.min(chunkSize, totalLength - read);
       const offset = startOffset + read;
       const progress =
-        this.params.uiPercentage ?? getDeviceTransferProgress(read, read + readLen, totalLength);
+        this.params.uiPercentage ??
+        getDeviceTransferProgress(read, read + readLen, totalLength);
       const res = await this.device.commands.typedCall('FilesystemFileRead', 'FilesystemFile', {
         file: {
           path: this.params.path,

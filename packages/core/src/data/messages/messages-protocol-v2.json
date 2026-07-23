@@ -482,7 +482,7 @@
         "MessageType_DeviceStatus": 60603,
         "MessageType_DevGetOnboardingStatus": 60604,
         "MessageType_DevOnboardingStatus": 60605,
-        "MessageType_DeviceSessionGet": 60606,
+        "MessageType_DeviceSessionOpen": 60606,
         "MessageType_DeviceSession": 60607,
         "MessageType_DeviceSessionAskPin": 60608,
         "MessageType_FilesystemPermissionFix": 60800,
@@ -11586,7 +11586,8 @@
         "LayoutSafeTxCreate": 1,
         "LayoutFinalConfirm": 2,
         "Layout7702": 3,
-        "LayoutFlat": 4
+        "LayoutFlat": 4,
+        "LayoutEthApprove": 5
       }
     },
     "ViewSignPage": {
@@ -11645,6 +11646,18 @@
           "rule": "required",
           "type": "string",
           "id": 3
+        },
+        "network": {
+          "type": "string",
+          "id": 4
+        },
+        "derive_type": {
+          "type": "string",
+          "id": 5
+        },
+        "value_key": {
+          "type": "uint32",
+          "id": 6
         }
       }
     },
@@ -11852,10 +11865,6 @@
           "type": "string",
           "id": 4
         },
-        "passphrase_enable": {
-          "type": "bool",
-          "id": 6
-        },
         "brightness": {
           "type": "uint32",
           "id": 7
@@ -11888,14 +11897,6 @@
           "type": "bool",
           "id": 14
         },
-        "fido_enabled": {
-          "type": "bool",
-          "id": 15
-        },
-        "experimental_features": {
-          "type": "bool",
-          "id": 16
-        },
         "usb_lock_enable": {
           "type": "bool",
           "id": 17
@@ -11903,6 +11904,14 @@
         "random_keypad": {
           "type": "bool",
           "id": 18
+        },
+        "passphrase_enable": {
+          "type": "bool",
+          "id": 100
+        },
+        "fido_enabled": {
+          "type": "bool",
+          "id": 101
         }
       }
     },
@@ -12418,11 +12427,65 @@
         }
       }
     },
-    "DeviceSessionGet": {
+    "DeviceSessionResume": {
       "fields": {
         "session_id": {
+          "rule": "required",
           "type": "bytes",
           "id": 1
+        }
+      }
+    },
+    "DeviceHostPassphrase": {
+      "fields": {
+        "passphrase": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "DevicePassphraseOnDevice": {
+      "fields": {}
+    },
+    "DeviceAttachPinOnDevice": {
+      "fields": {}
+    },
+    "DeviceWalletSelect": {
+      "oneofs": {
+        "access": {
+          "oneof": ["host_passphrase", "passphrase_on_device", "attach_pin_on_device"]
+        }
+      },
+      "fields": {
+        "host_passphrase": {
+          "type": "DeviceHostPassphrase",
+          "id": 1
+        },
+        "passphrase_on_device": {
+          "type": "DevicePassphraseOnDevice",
+          "id": 2
+        },
+        "attach_pin_on_device": {
+          "type": "DeviceAttachPinOnDevice",
+          "id": 3
+        }
+      }
+    },
+    "DeviceSessionOpen": {
+      "oneofs": {
+        "mode": {
+          "oneof": ["resume", "select"]
+        }
+      },
+      "fields": {
+        "resume": {
+          "type": "DeviceSessionResume",
+          "id": 1
+        },
+        "select": {
+          "type": "DeviceWalletSelect",
+          "id": 2
         }
       }
     },
@@ -12481,21 +12544,59 @@
     "DeviceStatusGet": {
       "fields": {}
     },
-    "DevOnboardingStage": {
+    "DevOnboardingStep": {
       "values": {
-        "DEV_ONBOARDING_STAGE_UNKNOWN": 0,
-        "DEV_ONBOARDING_STAGE_SAFETY_CHECK": 1,
-        "DEV_ONBOARDING_STAGE_PERSONALIZATION": 2,
-        "DEV_ONBOARDING_STAGE_SELECT_SETUP_METHOD": 3,
-        "DEV_ONBOARDING_STAGE_NEW_DEVICE": 4,
-        "DEV_ONBOARDING_STAGE_SELECT_RESTORE_METHOD": 5,
-        "DEV_ONBOARDING_STAGE_RESTORE_MNEMONIC": 6,
-        "DEV_ONBOARDING_STAGE_RESTORE_SEEDCARD": 7,
-        "DEV_ONBOARDING_STAGE_WALLET_READY": 8,
-        "DEV_ONBOARDING_STAGE_SEEDCARD_BACKUP_PROMPT": 9,
-        "DEV_ONBOARDING_STAGE_SELECT_SEEDCARD_BACKUP_METHOD": 10,
-        "DEV_ONBOARDING_STAGE_SEEDCARD_BACKUP": 11,
-        "DEV_ONBOARDING_STAGE_DONE": 12
+        "DEV_ONBOARDING_STEP_UNKNOWN": 0,
+        "DEV_ONBOARDING_STEP_CHECKING": 1,
+        "DEV_ONBOARDING_STEP_PERSONALIZATION": 2,
+        "DEV_ONBOARDING_STEP_PIN": 3,
+        "DEV_ONBOARDING_STEP_SETUP": 4,
+        "DEV_ONBOARDING_STEP_DONE": 5
+      }
+    },
+    "DevOnboardingPhase": {
+      "values": {
+        "DEV_ONBOARDING_PHASE_UNKNOWN": 0,
+        "DEV_ONBOARDING_PHASE_SAFETY_CHECK": 1,
+        "DEV_ONBOARDING_PHASE_PIN_SETUP": 2,
+        "DEV_ONBOARDING_PHASE_FINGERPRINT_SETUP": 3,
+        "DEV_ONBOARDING_PHASE_SETUP_CHOICE": 4,
+        "DEV_ONBOARDING_PHASE_WALLET_CREATE_START": 5,
+        "DEV_ONBOARDING_PHASE_RECOVERY_PHRASE_VIEW": 6,
+        "DEV_ONBOARDING_PHASE_RECOVERY_PHRASE_CONFIRM": 7,
+        "DEV_ONBOARDING_PHASE_RESTORE_METHOD_CHOICE": 8,
+        "DEV_ONBOARDING_PHASE_RECOVERY_PHRASE_RESTORE": 9,
+        "DEV_ONBOARDING_PHASE_SEEDCARD_RESTORE": 10,
+        "DEV_ONBOARDING_PHASE_WALLET_READY": 11,
+        "DEV_ONBOARDING_PHASE_SEEDCARD_BACKUP_PROMPT": 12,
+        "DEV_ONBOARDING_PHASE_SEEDCARD_BACKUP": 13
+      }
+    },
+    "DevOnboardingSetupKind": {
+      "values": {
+        "DEV_ONBOARDING_SETUP_KIND_UNKNOWN": 0,
+        "DEV_ONBOARDING_SETUP_KIND_CHOICE": 1,
+        "DEV_ONBOARDING_SETUP_KIND_CREATE": 2,
+        "DEV_ONBOARDING_SETUP_KIND_RESTORE": 3
+      }
+    },
+    "DevOnboardingSetupMethod": {
+      "values": {
+        "DEV_ONBOARDING_SETUP_METHOD_UNKNOWN": 0,
+        "DEV_ONBOARDING_SETUP_METHOD_RECOVERY_PHRASE": 1,
+        "DEV_ONBOARDING_SETUP_METHOD_SEEDCARD": 2
+      }
+    },
+    "DevOnboardingSetupStatus": {
+      "fields": {
+        "kind": {
+          "type": "DevOnboardingSetupKind",
+          "id": 1
+        },
+        "method": {
+          "type": "DevOnboardingSetupMethod",
+          "id": 2
+        }
       }
     },
     "DevGetOnboardingStatus": {
@@ -12503,18 +12604,25 @@
     },
     "DevOnboardingStatus": {
       "fields": {
-        "stage": {
-          "rule": "required",
-          "type": "DevOnboardingStage",
+        "step": {
+          "type": "DevOnboardingStep",
           "id": 1
         },
-        "status_code": {
-          "type": "uint32",
+        "phase": {
+          "type": "DevOnboardingPhase",
           "id": 2
         },
-        "detail_code": {
-          "type": "uint32",
+        "setup": {
+          "type": "DevOnboardingSetupStatus",
           "id": 3
+        },
+        "pin_set": {
+          "type": "bool",
+          "id": 4
+        },
+        "wallet_initialized": {
+          "type": "bool",
+          "id": 5
         }
       }
     },

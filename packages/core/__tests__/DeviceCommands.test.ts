@@ -1,6 +1,7 @@
 import { HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { DeviceCommands } from '../src/device/DeviceCommands';
+import { DEVICE } from '../src/events';
 
 jest.mock('../src/data/config', () => ({
   getSDKVersion: jest.fn(() => '1.0.0'),
@@ -11,6 +12,7 @@ const createCommands = () => {
   const commands = Object.create(DeviceCommands.prototype) as DeviceCommands;
   commands.device = {
     clearCancelableAction: jest.fn(),
+    isProtocolV2: jest.fn(() => true),
   } as any;
   return commands;
 };
@@ -58,6 +60,52 @@ describe('DeviceCommands failure mapping', () => {
         subcode: 9,
         firmwareMessage: 'Device locked',
       },
+    });
+  });
+
+  it.each(['Device locked', 'Device is locked'])(
+    'maps legacy Protocol V2 locked message "%s" without a subcode',
+    async message => {
+      const commands = createCommands();
+
+      await expect(
+        commands._filterCommonTypes(
+          {
+            type: 'Failure',
+            message: {
+              code: 'Failure_ProcessError',
+              message,
+            },
+          } as any,
+          'PortfolioUpdate'
+        )
+      ).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.DeviceLocked,
+        params: {
+          failureCode: 'Failure_ProcessError',
+          firmwareMessage: message,
+        },
+      });
+    }
+  );
+
+  it('does not use the legacy locked-message fallback for Protocol V1', async () => {
+    const commands = createCommands();
+    (commands.device.isProtocolV2 as jest.Mock).mockReturnValue(false);
+
+    await expect(
+      commands._filterCommonTypes(
+        {
+          type: 'Failure',
+          message: {
+            code: 'Failure_ProcessError',
+            message: 'Device is locked',
+          },
+        } as any,
+        'ApplySettings'
+      )
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.RuntimeError,
     });
   });
 
@@ -139,6 +187,82 @@ describe('DeviceCommands failure mapping', () => {
     ).rejects.toMatchObject({
       errorCode: HardwareErrorCode.RuntimeError,
       message: 'Failure_UnexpectedMessage,Not in Reset mode',
+    });
+  });
+});
+
+describe('DeviceCommands Protocol V2 interactive response compatibility', () => {
+  it('still auto-acks ButtonRequest when no hardware UI listener is registered', async () => {
+    const commands = createCommands();
+    commands.device = {
+      ...commands.device,
+      getCurrentDeviceType: jest.fn(() => 'pro2'),
+      setCancelableAction: jest.fn(),
+      emit: jest.fn(),
+      listenerCount: jest.fn(() => 0),
+    } as any;
+    commands._commonCall = jest.fn().mockResolvedValue({
+      type: 'Success',
+      message: {},
+    }) as any;
+
+    await expect(
+      commands._filterCommonTypes(
+        {
+          type: 'ButtonRequest',
+          message: { code: 'ButtonRequest_PinEntry' },
+        } as any,
+        'GetAddress'
+      )
+    ).resolves.toMatchObject({ type: 'Success' });
+
+    expect(commands.device.emit).toHaveBeenCalledWith(
+      DEVICE.BUTTON,
+      commands.device,
+      expect.objectContaining({ code: 'ButtonRequest_PinEntry' })
+    );
+    expect(commands._commonCall).toHaveBeenCalledWith('ButtonAck', {}, undefined);
+  });
+
+  it('rejects PassphraseRequest when the Pro2 UI listener is not registered', async () => {
+    const commands = createCommands();
+    commands.device = {
+      ...commands.device,
+      listenerCount: jest.fn(() => 0),
+    } as any;
+
+    await expect(
+      commands._filterCommonTypes(
+        {
+          type: 'PassphraseRequest',
+          message: { exists_attach_pin_user: true },
+        } as any,
+        'GetAddress'
+      )
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.RuntimeError,
+      message: '_promptPassphrase: Passphrase callback not configured',
+    });
+  });
+
+  it('rejects PinMatrixRequest when the Pro2 UI listener is not registered', async () => {
+    const commands = createCommands();
+    commands.device = {
+      ...commands.device,
+      instanceId: 'pro2-test-device',
+      listenerCount: jest.fn(() => 0),
+    } as any;
+
+    await expect(
+      commands._filterCommonTypes(
+        {
+          type: 'PinMatrixRequest',
+          message: { type: 'PinMatrixRequestType_Current' },
+        } as any,
+        'GetAddress'
+      )
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.RuntimeError,
     });
   });
 });

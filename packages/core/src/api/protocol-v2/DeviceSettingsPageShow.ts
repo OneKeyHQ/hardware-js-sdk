@@ -46,6 +46,14 @@ export default class DeviceSettingsPageShow extends BaseMethod<{
       page: normalizePage(this.payload.page),
       field_name: this.payload.field_name ?? this.payload.fieldName,
     };
+    this.protocolV2UiInteraction = {
+      request: 'button',
+      source: 'method-lifecycle',
+      reason: 'settings-page',
+      completion: 'operation-completed',
+      deviceOnly: true,
+      page: this.params.page,
+    };
   }
 
   async run() {

@@ -164,7 +164,9 @@ export function completeRequestContext(responseID: number, error?: Error): void 
     context.status = error ? 'error' : 'success';
     if (error) {
       context.error = error.message;
-      Log.error(
+      // 方法错误已经通过标准 API 响应返回给调用方。请求追踪属于调试信息，
+      // 不应再以 console.error 级别制造第二份面向用户的错误输出。
+      Log.debug(
         `[RequestContext] [completeRequestContext] Error: ${formatRequestContext(context)}`
       );
     }

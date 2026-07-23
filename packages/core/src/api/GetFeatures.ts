@@ -1,10 +1,12 @@
-import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareErrorCode, createDeviceNotSupportMethodError } from '@onekeyfe/hd-shared';
 
 import { UI_REQUEST } from '../constants/ui-request';
+import { projectFeatures } from '../device/DeviceStateProjector';
 import { BaseMethod } from './BaseMethod';
 
 export default class GetFeatures extends BaseMethod {
   init() {
+    this.unlockPolicy = 'none';
     this.allowDeviceMode = [
       ...this.allowDeviceMode,
       UI_REQUEST.NOT_INITIALIZE,
@@ -19,8 +21,11 @@ export default class GetFeatures extends BaseMethod {
       return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceDetectInBootloaderMode));
     }
     if (this.device.isProtocolV2()) {
-      return this.device.getFeatures();
+      throw createDeviceNotSupportMethodError(this.name, this.device.getCurrentFirmwareType());
     }
-    return Promise.resolve(this.device.features);
+    const state = await this.device.getDeviceState({
+      includeRaw: true,
+    });
+    return projectFeatures(state);
   }
 }

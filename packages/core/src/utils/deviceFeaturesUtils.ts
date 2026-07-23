@@ -30,6 +30,17 @@ export const getSupportProtocolV1MessageSchema = (
   const currentDeviceVersion = getDeviceFirmwareVersion(features).join('.');
   const deviceType = getDeviceType(features);
 
+  if (
+    features.bootloaderMode === true &&
+    features.firmwarePresent === false &&
+    DeviceModelToTypes.model_mini.includes(deviceType)
+  ) {
+    return {
+      messages: DataManager.messages.v1CurrentSchema,
+      protocolV1MessageSchema: 'v1CurrentSchema',
+    };
+  }
+
   const deviceVersionConfigs =
     PROTOBUF_MESSAGE_CONFIG[deviceType] ||
     (DeviceTypeToModels[deviceType] &&
@@ -59,7 +70,11 @@ export const supportInputPinOnSoftware = (features: Features): SupportFeatureTyp
   if (!features) return { support: false };
 
   const deviceType = getDeviceType(features);
-  if (deviceType === EDeviceType.Touch || deviceType === EDeviceType.Pro) {
+  if (
+    deviceType === EDeviceType.Touch ||
+    deviceType === EDeviceType.Pro ||
+    deviceType === EDeviceType.Pro2
+  ) {
     return { support: false };
   }
 
@@ -104,6 +119,7 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (
     return getProtocolV2WalletSession(device, {
       initSession: options?.initSession,
       expectedPassphraseState: options?.expectPassphraseState,
+      onlyMainPin: options?.onlyMainPin,
     });
   }
 
@@ -183,6 +199,7 @@ export const getPassphraseState = async (
     return getProtocolV2WalletSession(device, {
       initSession: options?.initSession,
       expectedPassphraseState: options?.expectPassphraseState,
+      onlyMainPin: options?.onlyMainPin,
     });
   }
 

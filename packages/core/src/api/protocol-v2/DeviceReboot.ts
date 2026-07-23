@@ -16,9 +16,11 @@ export default class DeviceReboot extends BaseMethod<DeviceRebootParams> {
   }
 
   async run() {
+    const rebootType = normalizeRebootType(this.params.reboot_type ?? this.params.rebootType);
     const res = await this.device.commands.typedCall('DeviceReboot', 'Success', {
-      reboot_type: normalizeRebootType(this.params.reboot_type ?? this.params.rebootType),
+      reboot_type: rebootType,
     });
+    this.device.markProtocolV2Reboot(rebootType);
     return Promise.resolve(res.message);
   }
 }

@@ -201,6 +201,20 @@ export class ProtocolV2Session {
       router,
       seq: protoSeq,
     });
+    // 暂停输出 Protocol V2 TX 帧日志，避免传输层产生大量调试信息。
+    /*
+    const txMetadata = ProtocolV2.inspectFrame(schemas, frame);
+
+    if (!shouldReduceDebug) {
+      logger?.debug?.(`[${logPrefix}] TX`, {
+        method: name,
+        type: name,
+        typeId: txMetadata.messageTypeId,
+        seq: txMetadata.seq,
+        bytes: frame.length,
+      });
+    }
+    */
 
     if (maxFrameBytes !== undefined && frame.length > maxFrameBytes) {
       throw new Error(
@@ -237,6 +251,21 @@ export class ProtocolV2Session {
         }
         const isAck = ProtocolV2.isAckFrame(rxFrame);
         if (!isAck) {
+          // 暂停输出 Protocol V2 RX 帧日志，避免传输层产生大量调试信息。
+          /*
+          const rxMetadata = ProtocolV2.inspectFrame(schemas, rxFrame);
+
+          if (!shouldReduceDebug) {
+            logger?.debug?.(`[${logPrefix}] RX`, {
+              method: name,
+              type: rxMetadata.type,
+              typeId: rxMetadata.messageTypeId,
+              seq: rxMetadata.seq,
+              bytes: rxFrame.length,
+            });
+          }
+          */
+
           const decoded = ProtocolV2.decodeFrame(schemas, rxFrame);
 
           const response = check.call(decoded);
