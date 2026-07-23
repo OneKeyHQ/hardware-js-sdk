@@ -21,6 +21,53 @@ import type { DeviceState } from '@onekeyfe/hd-core';
 // 使用 hd-core 的标准类型
 export type ApiResponse<T = any> = Success<T> | Unsuccessful;
 export type HardwareApiMethod = keyof CoreApi;
+export type HardwareDebugApiMethod = 'deviceInfoGet' | 'deviceStatusGet' | 'deviceSettingsGet';
+
+function getErrorText(error: unknown): string {
+  if (typeof error === 'string') return error;
+  if (error instanceof Error) return `${error.name} ${error.message}`;
+  if (error && typeof error === 'object') {
+    const value = error as {
+      error?: unknown;
+      message?: unknown;
+      payload?: { error?: unknown };
+    };
+    return [value.error, value.message, value.payload?.error]
+      .filter(item => typeof item === 'string')
+      .join(' ');
+  }
+  return '';
+}
+
+export function getDeviceSearchUserMessage(error: unknown): string {
+  const normalized = getErrorText(error).toLowerCase();
+
+  if (normalized.includes('not supported')) {
+    return 'WebUSB is not supported in this browser.';
+  }
+  if (
+    normalized.includes('permission') ||
+    normalized.includes('securityerror') ||
+    normalized.includes('notallowederror')
+  ) {
+    return 'Device permission is required. Reconnect the device and approve the browser prompt.';
+  }
+  if (
+    normalized.includes('protocol') ||
+    normalized.includes('did not respond') ||
+    normalized.includes('timeout')
+  ) {
+    return 'The device did not respond. Reconnect it, unlock it if needed, and try again.';
+  }
+  if (
+    normalized.includes('notfounderror') ||
+    normalized.includes('no device') ||
+    normalized.includes('not found')
+  ) {
+    return 'No compatible device was selected. Connect a OneKey device and try again.';
+  }
+  return 'Unable to connect to the device. Reconnect it and try again.';
+}
 
 type PassphraseStateMetadata = {
   passphraseState?: string;
@@ -418,6 +465,43 @@ export async function callHardwareAPI(
     } as Unsuccessful;
   }
 }
+
+// 仅供 Pro2 Debug 页面调用 SDK 内部的原生 Protocol V2 查询命令。
+// 这些命令不属于公共 CoreApi，外部业务应统一使用 getDeviceState。
+export async function callHardwareDebugAPI(
+  method: HardwareDebugApiMethod,
+  params: Record<string, unknown>
+): Promise<ApiResponse> {
+  logRequest(`Calling internal hardware debug method: ${method}`, params);
+
+  if (typeof window === 'undefined') {
+    return {
+      success: false,
+      payload: { error: 'Browser environment required' },
+    } as Unsuccessful;
+  }
+
+  try {
+    const sdk = await getSDKInstance();
+    const result = (await sdk.call({ ...params, method })) as ApiResponse;
+
+    if (result.success) {
+      logResponse(`Internal hardware debug method successful: ${method}`, result.payload);
+    } else {
+      logError(`Internal hardware debug method failed: ${method}`, {
+        code: result.payload?.code,
+      });
+    }
+    return result;
+  } catch (error) {
+    const errorType = error instanceof Error ? error.name : typeof error;
+    logError(`Internal hardware debug method exception: ${method}`, { errorType });
+    return {
+      success: false,
+      payload: { error: `Internal debug method ${method} failed` },
+    } as Unsuccessful;
+  }
+}
 // 搜索设备
 export async function searchDevices(params?: {
   connectProtocol?: HardwareConnectProtocol;
@@ -451,10 +535,10 @@ export async function searchDevices(params?: {
           await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
         }
       } catch (e) {
-        const msg = `WebUSB authorization cancelled or failed: ${
-          e instanceof Error ? e.message : String(e)
-        }`;
-        logError(msg);
+        const msg = getDeviceSearchUserMessage(e);
+        logInfo('WebUSB authorization was not completed', {
+          errorType: e instanceof Error ? e.name : typeof e,
+        });
         return {
           success: false,
           payload: { error: msg },
@@ -474,17 +558,22 @@ export async function searchDevices(params?: {
       });
       return response;
     } else {
-      const errorPayload = response.payload as any;
+      const errorPayload = response.payload;
       return {
         success: false,
         payload: {
-          error: errorPayload?.error || 'No devices found',
+          error: getDeviceSearchUserMessage(errorPayload),
         },
       } as Unsuccessful;
     }
   } catch (error) {
-    const errorMsg = `Device search error: ${error}`;
-    logError(errorMsg, { currentTransport, error });
+    const errorMsg = getDeviceSearchUserMessage(error);
+    logInfo('Device search failed', {
+      currentTransport,
+      errorType: error instanceof Error ? error.name : typeof error,
+      errorCode:
+        error && typeof error === 'object' && 'code' in error ? String(error.code) : undefined,
+    });
     return {
       success: false,
       payload: { error: errorMsg },

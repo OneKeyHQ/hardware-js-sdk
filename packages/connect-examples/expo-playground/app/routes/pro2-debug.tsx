@@ -10,6 +10,7 @@ import { useHardwareMethodExecution } from '../hooks/useHardwareMethodExecution'
 import { useDeviceStore } from '../store/deviceStore';
 import { device } from '../data/methods/device';
 import { firmware } from '../data/methods/firmware';
+import { pro2Debug } from '../data/methods/pro2Debug';
 import { isSdkDebugEnabled } from '../utils/hardwareInstance';
 import { logHardware } from '../utils/logger';
 import { preparePro2Wallpaper, type PreparedPro2Wallpaper } from '../utils/pro2WallpaperImage';
@@ -24,7 +25,7 @@ const PRO2_METHOD_GROUPS = [
       'protocolInfoRequest',
       'ping',
       'getDeviceState',
-      'refreshDeviceState',
+      'deviceInfoGet',
       'deviceReboot',
       'deviceFactoryInfoGet',
       'deviceFactoryInfoSet',
@@ -37,6 +38,7 @@ const PRO2_METHOD_GROUPS = [
     methods: [
       'deviceUnlock',
       'deviceLock',
+      'deviceStatusGet',
       'deviceGetOnboardingStatus',
       'getPassphraseState',
       'deviceSessionOpen',
@@ -47,7 +49,12 @@ const PRO2_METHOD_GROUPS = [
     id: 'settings',
     title: 'Settings',
     icon: Settings,
-    methods: ['deviceSettingsSet', 'deviceSettingsPageShow', 'deviceUploadWallpaper'],
+    methods: [
+      'deviceSettingsGet',
+      'deviceSettingsSet',
+      'deviceSettingsPageShow',
+      'deviceUploadWallpaper',
+    ],
   },
   {
     id: 'firmware',
@@ -93,15 +100,17 @@ const PRO2_METHOD_LABELS: Record<string, string> = {
   protocolInfoRequest: 'Protocol Info',
   ping: 'Ping',
   getDeviceState: 'Device State',
-  refreshDeviceState: 'Refresh Device State',
+  deviceInfoGet: 'Raw Device Info',
   deviceReboot: 'Reboot',
   deviceFactoryInfoGet: 'Factory Info',
   deviceFactoryInfoSet: 'Factory Settings',
   deviceSettingsSet: 'Settings Set',
+  deviceSettingsGet: 'Raw Settings',
   deviceSettingsPageShow: 'Settings Page',
   deviceUploadWallpaper: 'Upload Wallpaper',
   deviceUnlock: 'Unlock',
   deviceLock: 'Lock',
+  deviceStatusGet: 'Raw Device Status',
   deviceGetOnboardingStatus: 'Onboarding Status',
   getPassphraseState: 'Wallet State',
   deviceSessionOpen: 'Wallet Session',
@@ -153,19 +162,19 @@ const PRO2_METHOD_WIRE_INFO: Record<string, MethodWireInfo> = {
     decoded: 'Success: "Hello from WebUSB!"',
   },
   getDeviceState: {
-    tx: 'Cached state: no transport request',
-    txPayload: 'No explicit refresh scope',
-    rx: 'Current canonical DeviceState snapshot',
-    rxPayload: PRO2_DYNAMIC_RESPONSE,
-    decoded: 'Canonical DeviceState snapshot',
-  },
-  refreshDeviceState: {
-    tx: 'Explicit hardware synchronization',
+    tx: 'Default: DeviceStatusGet in normal mode',
     txPayload:
-      'basic: versions DeviceInfoGet; firmware: full DeviceInfoGet; settings: DeviceSettingsGet; runtime: DeviceStatusGet (normal mode only)',
+      'settings: DeviceSettingsGet + DeviceStatusGet; firmware: full DeviceInfoGet + DeviceStatusGet; loader mode: DeviceInfoGet only',
     rx: 'Updated canonical DeviceState snapshot',
     rxPayload: PRO2_DYNAMIC_RESPONSE,
     decoded: 'Canonical DeviceState snapshot',
+  },
+  deviceInfoGet: {
+    tx: '60600 (DeviceInfoGet)',
+    txPayload: PRO2_DYNAMIC_PAYLOAD,
+    rx: '60601 (DeviceInfo)',
+    rxPayload: PRO2_DYNAMIC_RESPONSE,
+    decoded: 'Raw DeviceInfo; does not request targets.status',
   },
   deviceReboot: {
     tx: '60400 (DeviceReboot)',
@@ -189,11 +198,11 @@ const PRO2_METHOD_WIRE_INFO: Record<string, MethodWireInfo> = {
     decoded: 'Success.message',
   },
   deviceUnlock: {
-    tx: '60608 (DeviceSessionAskPin) + 60602 (DeviceStatusGet)',
-    txPayload: 'PIN entry on device + empty status request',
-    rx: '60207 (Success) + 60603 (DeviceStatus)',
+    tx: '60608 (DeviceSessionAskPin)',
+    txPayload: 'PIN entry on device',
+    rx: '60207 (Success)',
     rxPayload: PRO2_DYNAMIC_RESPONSE,
-    decoded: 'Features with refreshed unlocked/passphrase status',
+    decoded: 'Success; locally confirms unlocked=true without DeviceStatusGet',
   },
   deviceLock: {
     tx: '24 (LockDevice)',
@@ -201,6 +210,13 @@ const PRO2_METHOD_WIRE_INFO: Record<string, MethodWireInfo> = {
     rx: '60207 (Success)',
     rxPayload: PRO2_DYNAMIC_RESPONSE,
     decoded: 'Success.message',
+  },
+  deviceStatusGet: {
+    tx: '60602 (DeviceStatusGet)',
+    txPayload: 'ba ec',
+    rx: '60603 (DeviceStatus)',
+    rxPayload: PRO2_DYNAMIC_RESPONSE,
+    decoded: 'Raw DeviceStatus + canonical state cache update',
   },
   deviceGetOnboardingStatus: {
     tx: '60604 (DevGetOnboardingStatus)',
@@ -229,6 +245,13 @@ const PRO2_METHOD_WIRE_INFO: Record<string, MethodWireInfo> = {
     rx: '60207 (Success)',
     rxPayload: PRO2_DYNAMIC_RESPONSE,
     decoded: 'Success.message',
+  },
+  deviceSettingsGet: {
+    tx: '60411 (DeviceSettingsGet)',
+    txPayload: 'fb eb',
+    rx: '60410 (DeviceSettings)',
+    rxPayload: PRO2_DYNAMIC_RESPONSE,
+    decoded: 'Raw DeviceSettings + canonical state cache update',
   },
   deviceSettingsSet: {
     tx: '60412 (DeviceSettingsSet)',
@@ -384,7 +407,7 @@ function isFileWriteMethod(method: string) {
 }
 
 function isCurrentSubmoduleMethod(method: string) {
-  return method.startsWith('dev') || method === 'getDeviceState' || method === 'refreshDeviceState';
+  return method.startsWith('dev') || method === 'getDeviceState';
 }
 
 function getDataSummary(data: unknown) {
@@ -399,6 +422,22 @@ function getDataSummary(data: unknown) {
 }
 
 function sanitizeRequestParameters(method: string, params: Record<string, unknown>) {
+  if (method === 'deviceSessionOpen' && params.select && typeof params.select === 'object') {
+    const select = params.select as Record<string, unknown>;
+    if (select.host_passphrase && typeof select.host_passphrase === 'object') {
+      const hostPassphrase = select.host_passphrase as Record<string, unknown>;
+      return {
+        ...params,
+        select: {
+          ...select,
+          host_passphrase: {
+            ...hostPassphrase,
+            passphrase: '[REDACTED]',
+          },
+        },
+      };
+    }
+  }
   if (method === 'deviceUploadWallpaper' && 'rgba' in params) {
     const { rgba, ...rest } = params;
     return { ...rest, rgba_size: getDataSummary(rgba).data_size };
@@ -621,7 +660,7 @@ export default function Pro2DebugPage() {
   const [selectedMethodName, setSelectedMethodName] = useState(DEFAULT_SELECTED_METHOD);
 
   const pro2Methods = useMemo(() => {
-    const allMethods = [...device.api, ...firmware.api];
+    const allMethods = [...device.api, ...firmware.api, ...pro2Debug.api];
     const orderedNames = PRO2_METHOD_GROUPS.flatMap(group => group.methods);
     return orderedNames
       .map(methodName => findMethodConfig(methodName, allMethods))

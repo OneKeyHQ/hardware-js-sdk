@@ -10,10 +10,41 @@ type LogOptions = {
   store?: boolean;
 };
 
+const SENSITIVE_LOG_KEYS = new Set([
+  'mnemonic',
+  'passphrase',
+  'passphrasestate',
+  'password',
+  'pin',
+  'privatekey',
+  'seed',
+]);
+
+function redactSensitiveLogValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(item => redactSensitiveLogValue(item));
+  }
+
+  if (!value || typeof value !== 'object') return value;
+
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) return value;
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).map(([key, item]) => {
+      const normalizedKey = key.replace(/[_-]/g, '').toLowerCase();
+      return [
+        key,
+        SENSITIVE_LOG_KEYS.has(normalizedKey) ? '[REDACTED]' : redactSensitiveLogValue(item),
+      ];
+    })
+  );
+}
+
 function getSafeLogData(data?: logData): logData {
   if (!data) return data;
 
-  const summarized = summarizeJsonValue(data, {
+  const summarized = summarizeJsonValue(redactSensitiveLogValue(data), {
     maxDepth: 6,
     maxArrayItems: 20,
     maxObjectKeys: 50,

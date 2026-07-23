@@ -4469,6 +4469,20 @@ describe('Protocol V2 protected method execution', () => {
     expect(method.unlockPolicy).toBe('none');
   });
 
+  test.each([
+    ['deviceInfoGet', DeviceInfoGet],
+    ['deviceStatusGet', DeviceStatusGet],
+    ['deviceSettingsGet', DeviceSettingsGet],
+  ])('does not auto-unlock the read-only %s method', (_name, MethodClass) => {
+    const method = new MethodClass({
+      id: 1,
+      payload: { method: _name },
+    } as any);
+    method.init();
+
+    expect(method.unlockPolicy).toBe('none');
+  });
+
   test('unlocks and retries an opted-in Protocol V2 method once', async () => {
     const calls: string[] = [];
     const method = {

@@ -820,7 +820,7 @@ export class Device extends EventEmitter {
         timeoutMs: options?.protocolV2DeviceInfoTimeoutMs,
       });
       // 默认请求不含 SE/hash 数据，scope 如实标注为 basic；
-      // 完整版本与校验数据由公共 refreshDeviceState(firmware) 显式获取。
+      // 完整版本与校验数据由公共 getDeviceState({ scope: 'firmware' }) 显式获取。
       const features = this.updateProtocolV2Features(deviceInfo, null);
       Log.debug('Protocol V2 features:', features);
     } catch (error) {

@@ -13,31 +13,16 @@ const api: PlaygroundProps[] = [
     noDeviceIdReq: true,
     presupposes: [
       {
-        title: 'Cached state',
+        title: 'Live runtime status',
         value: {},
       },
-    ],
-  },
-  {
-    method: 'refreshDeviceState',
-    description: 'Refresh canonical device state with explicit hardware I/O',
-    noDeviceIdReq: true,
-    presupposes: [
       {
-        title: 'Basic device information',
-        value: { scope: 'basic' },
-      },
-      {
-        title: 'Firmware metadata',
-        value: { scope: 'firmware' },
-      },
-      {
-        title: 'Settings',
+        title: 'Runtime and settings',
         value: { scope: 'settings' },
       },
       {
-        title: 'Runtime status',
-        value: { scope: 'runtime' },
+        title: 'Runtime and firmware metadata',
+        value: { scope: 'firmware' },
       },
     ],
   },

@@ -118,8 +118,6 @@ export const createCoreApi = (
     const { refresh: _refresh, includeRaw: _includeRaw, ...commonParams } = (params ?? {}) as any;
     return call({ ...commonParams, connectId, method: 'getDeviceState' });
   },
-  refreshDeviceState: (connectId, params) =>
-    call({ ...params, connectId, method: 'refreshDeviceState' }),
   getOnekeyFeatures: (connectId, params) =>
     call({ ...params, connectId, method: 'getOnekeyFeatures' }),
 

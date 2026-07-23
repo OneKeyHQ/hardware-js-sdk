@@ -31,6 +31,19 @@ describe('getLogBlockLabel', () => {
     ).toBe('evmSignTypedData');
   });
 
+  it('blocks deviceSessionOpen params before logging a host passphrase', () => {
+    expect(
+      getLogBlockLabel({
+        method: 'deviceSessionOpen',
+        select: {
+          host_passphrase: {
+            passphrase: 'do-not-log-this',
+          },
+        },
+      })
+    ).toBe('deviceSessionOpen');
+  });
+
   it('keeps existing sensitive UI response blocking', () => {
     expect(getLogBlockLabel({ type: UI_RESPONSE.RECEIVE_PIN })).toBe(UI_RESPONSE.RECEIVE_PIN);
   });

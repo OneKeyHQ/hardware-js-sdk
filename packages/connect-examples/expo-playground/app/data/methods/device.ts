@@ -46,8 +46,35 @@ const api: UnifiedMethodConfig[] = [
         ],
       },
       {
+        title: 'Open hidden wallet with host passphrase',
+        description:
+          'Send a host-entered hidden-wallet passphrase. The Pro2 Debug log redacts this value.',
+        parameters: [
+          {
+            name: 'select',
+            type: 'textarea',
+            required: true,
+            label: 'Host passphrase selection',
+            value: { host_passphrase: { passphrase: '' } },
+          },
+        ],
+      },
+      {
+        title: 'Open hidden wallet with Attach PIN',
+        description: 'Use the hidden wallet attached to the PIN entered on the device.',
+        parameters: [
+          {
+            name: 'select',
+            type: 'textarea',
+            required: true,
+            label: 'Attach PIN selection',
+            value: { attach_pin_on_device: {} },
+          },
+        ],
+      },
+      {
         title: 'Resume wallet session',
-        description: 'Resume a previously opened wallet session by session ID.',
+        description: 'Paste the session_id returned by a previous DeviceSession response.',
         parameters: [
           {
             name: 'resume',
@@ -55,6 +82,20 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Session resume request',
             value: { session_id: '' },
+          },
+        ],
+      },
+      {
+        title: 'Test invalid wallet session',
+        description:
+          'Negative test: verify that firmware rejects an unknown or expired session ID.',
+        parameters: [
+          {
+            name: 'resume',
+            type: 'textarea',
+            required: true,
+            label: 'Invalid session resume request',
+            value: { session_id: 'invalid-session-id' },
           },
         ],
       },
@@ -92,44 +133,11 @@ const api: UnifiedMethodConfig[] = [
     noDeviceIdReq: true,
     presets: [
       {
-        title: 'Cached state',
+        title: 'Live runtime status',
         parameters: [],
       },
-    ],
-  },
-  {
-    method: 'refreshDeviceState',
-    description: 'methodDescriptions.refreshDeviceState',
-    noDeviceIdReq: true,
-    presets: [
       {
-        title: 'Refresh basic device information',
-        parameters: [
-          {
-            name: 'scope',
-            type: 'select',
-            required: true,
-            label: 'Scope',
-            value: 'basic',
-            options: [{ label: 'Basic', value: 'basic' }],
-          },
-        ],
-      },
-      {
-        title: 'Refresh firmware metadata',
-        parameters: [
-          {
-            name: 'scope',
-            type: 'select',
-            required: true,
-            label: 'Scope',
-            value: 'firmware',
-            options: [{ label: 'Firmware', value: 'firmware' }],
-          },
-        ],
-      },
-      {
-        title: 'Refresh settings',
+        title: 'Runtime and settings',
         parameters: [
           {
             name: 'scope',
@@ -142,16 +150,15 @@ const api: UnifiedMethodConfig[] = [
         ],
       },
       {
-        title: 'Refresh runtime status',
-        description: 'Explicitly reads runtime status while the device is in normal mode.',
+        title: 'Runtime and firmware metadata',
         parameters: [
           {
             name: 'scope',
             type: 'select',
             required: true,
             label: 'Scope',
-            value: 'runtime',
-            options: [{ label: 'Runtime', value: 'runtime' }],
+            value: 'firmware',
+            options: [{ label: 'Firmware', value: 'firmware' }],
           },
         ],
       },

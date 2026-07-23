@@ -37,15 +37,15 @@ Protocol V2 因此按字段用途、变化频率和安全边界进行拆分。
 
 可以把旧的集中式设备信息理解成被拆成以下七部分：
 
-| 分类               | Protocol V2 消息                                        | 主要内容                                      | 推荐读取方式                                                     |
-| ------------------ | ------------------------------------------------------- | --------------------------------------------- | ---------------------------------------------------------------- |
-| 设备基本信息       | `DeviceInfoGet -> DeviceInfo`                           | 型号、序列号、主控、蓝牙芯片、SE 芯片及版本   | `getDeviceState()` / `refreshDeviceState({ scope: 'firmware' })` |
-| 设备实时状态       | `DeviceStatusGet -> DeviceStatus`                       | 初始化、解锁、备份、Passphrase、Attach-to-PIN | `refreshDeviceState({ scope: 'runtime' })`                       |
-| 用户设置           | `DeviceSettingsGet/Set/PageShow`                        | label、语言、蓝牙、亮度、锁屏、振动等         | `refreshDeviceState({ scope: 'settings' })` / 高层设置 API       |
-| 钱包会话           | `DeviceSessionOpen -> DeviceSession`                    | 显式选择/恢复、`session_id`、钱包标识         | Core 内部钱包 Session 管理                                       |
-| PIN 解锁结果       | `DeviceSessionAskPin -> DeviceSessionPinResult`         | 解锁结果及安全状态                            | 受保护方法的解锁流程                                             |
-| 设备操作与固件管理 | `DeviceReboot`、`DeviceCertificate*`、`DeviceFirmware*` | 重启、证书、固件安装                          | 对应专用 API 和升级流程                                          |
-| 生产制造信息       | `DeviceFactoryInfo*`、`DeviceFactoryTest` 等            | 生产时间、工厂测试、永久锁                    | 生产制造专用 API                                                 |
+| 分类               | Protocol V2 消息                                        | 主要内容                                      | 推荐读取方式                                       |
+| ------------------ | ------------------------------------------------------- | --------------------------------------------- | -------------------------------------------------- |
+| 设备基本信息       | `DeviceInfoGet -> DeviceInfo`                           | 型号、序列号、主控、蓝牙芯片、SE 芯片及版本   | `getDeviceState({ scope: 'firmware' })`            |
+| 设备实时状态       | `DeviceStatusGet -> DeviceStatus`                       | 初始化、解锁、备份、Passphrase、Attach-to-PIN | `getDeviceState()`                                 |
+| 用户设置           | `DeviceSettingsGet/Set/PageShow`                        | label、语言、蓝牙、亮度、锁屏、振动等         | `getDeviceState({ scope: 'settings' })` / 高层 API |
+| 钱包会话           | `DeviceSessionOpen -> DeviceSession`                    | 显式选择/恢复、`session_id`、钱包标识         | Core 内部钱包 Session 管理                         |
+| PIN 解锁结果       | `DeviceSessionAskPin -> DeviceSessionPinResult`         | 解锁结果及安全状态                            | 受保护方法的解锁流程                               |
+| 设备操作与固件管理 | `DeviceReboot`、`DeviceCertificate*`、`DeviceFirmware*` | 重启、证书、固件安装                          | 对应专用 API 和升级流程                            |
+| 生产制造信息       | `DeviceFactoryInfo*`、`DeviceFactoryTest` 等            | 生产时间、工厂测试、永久锁                    | 生产制造专用 API                                   |
 
 字段流转关系可以简化为：
 
@@ -166,8 +166,8 @@ DeviceStatusGet -> DeviceStatus
 ```
 
 `DeviceInfoGet.targets.status` 是即将从底层协议删除的历史字段，SDK 业务流程不再构造或公开它。
-普通初始化、信息读取、设置和钱包 Session 不会隐式调用 `DeviceStatusGet`；需要新鲜运行状态时，
-公共调用方必须显式使用 `refreshDeviceState({ scope: 'runtime' })`。bootloader/romloader 模式会返回不支持错误，不会发送 `DeviceStatusGet`。
+初始化不会隐式调用 `DeviceStatusGet`；每次公共 `getDeviceState()` 都会在 normal 模式刷新运行状态。
+bootloader/romloader 模式直接返回可用的身份和版本快照，不会发送 `DeviceStatusGet`。
 
 ### 6.1 字段映射
 
@@ -263,7 +263,7 @@ label、语言、蓝牙开关、自动锁屏和振动反馈都属于用户配置
 所以：
 
 - `DeviceInfo` 不提供这些字段是设计结果，不是字段遗漏。
-- `refreshDeviceState({ scope: 'settings' })` 和成功的高层设置操作都会把字段归一化合并到 `DeviceState`。
+- `getDeviceState({ scope: 'settings' })` 和成功的高层设置操作都会把字段归一化合并到 `DeviceState`。
 - 设备详情页只消费 `DeviceState`；外部接入方不直接调用原始 `DeviceSettingsGet`。
 
 ## 8. 钱包会话
@@ -426,11 +426,11 @@ DeviceInfoGet
 
 ```text
 getDeviceState()
-    -> 读取缓存；没有缓存时只执行最小初始化
+    -> normal 模式刷新 DeviceStatus；loader 模式跳过
     -> 返回完整 DeviceState（不含 raw 和钱包 session）
 
-refreshDeviceState({ scope })
-    -> 按 basic / firmware / settings / runtime 业务范围刷新
+getDeviceState({ scope: 'settings' | 'firmware' })
+    -> 在运行状态基础上按业务范围刷新设置或固件信息
     -> 合并到 DeviceStateStore
     -> 返回完整 DeviceState
 ```
@@ -468,7 +468,7 @@ DeviceInfoGet / DeviceStatusGet / DeviceSettingsGet
 | `status.attach_to_pin_enabled`     | `status.attachToPinEnabled`   |
 | `status.unlocked_by_attach_to_pin` | `status.unlockedAttachPin`    |
 
-build ID 和 hash 只在 `refreshDeviceState({ scope: 'firmware' })` 中请求，并进入 `DeviceState.verification`。
+build ID 和 hash 只在 `getDeviceState({ scope: 'firmware' })` 中请求，并进入 `DeviceState.verification`。
 
 ## 14. 专用来源及其 DeviceState 投影
 

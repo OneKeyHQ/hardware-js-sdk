@@ -1,4 +1,4 @@
-import type { HardwareApiMethod } from '~/services/hardwareService';
+import type { HardwareApiMethod, HardwareDebugApiMethod } from '~/services/hardwareService';
 
 // 选项类型定义
 export interface SelectOption {
@@ -84,7 +84,7 @@ export type AllMethodCategory = ChainCategory | DeviceMethodCategory;
 
 // **统一的方法配置类型**
 export interface UnifiedMethodConfig {
-  method: HardwareApiMethod;
+  method: HardwareApiMethod | HardwareDebugApiMethod;
   description?: string;
   category?: MethodCategory;
 
@@ -97,6 +97,7 @@ export interface UnifiedMethodConfig {
   deprecated?: boolean;
   supportedDevices?: string[];
   tags?: string[];
+  debugOnly?: boolean;
 }
 
 // 执行状态

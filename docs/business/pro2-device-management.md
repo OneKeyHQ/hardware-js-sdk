@@ -99,7 +99,7 @@ Protocol V1 继续使用 `firmwareUpdate` 至 `firmwareUpdateV3`；Pro2 使用 `
 - Transport 不自动重发安装请求；重试由高层流程依据阶段和幂等性决定。
 - release 配置、SDK target 类型和固件枚举必须同步发布。
 
-`firmwareUpdateV4` 为兼容旧接口仍返回 BLE、application 和 bootloader 三类版本。需要 SE、P1/P2、hash、build ID 或 coprocessor 版本时，应调用 `refreshDeviceState({ scope: 'firmware' })`。
+`firmwareUpdateV4` 为兼容旧接口仍返回 BLE、application 和 bootloader 三类版本。需要 SE、P1/P2、hash、build ID 或 coprocessor 版本时，应调用 `getDeviceState({ scope: 'firmware' })`。
 
 主要实现：
 

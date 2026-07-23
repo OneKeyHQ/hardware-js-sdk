@@ -16,12 +16,20 @@ const mockGetDeviceState = jest.fn(async () => ({
     versions: {},
   },
 }));
+const mockRawCall = jest.fn(async (...args: unknown[]) => {
+  void args;
+  return {
+    success: true,
+    payload: { device_id: 'device-1', unlocked: true },
+  };
+});
 let mockDeviceType = 'pro';
 
 jest.mock('../utils/hardwareInstance', () => ({
   getCurrentSDKInstance: async () => ({
     evmGetAddress: mockEvmGetAddress,
     getDeviceState: mockGetDeviceState,
+    call: mockRawCall,
   }),
   clearSDKInstanceCache: () => undefined,
   TransportManager: {
@@ -76,12 +84,17 @@ jest.mock('./previewHardwareParams', () => ({
   previewHardwareParams: () => undefined,
 }));
 
-import { callHardwareAPI } from './hardwareService';
+import {
+  callHardwareAPI,
+  callHardwareDebugAPI,
+  getDeviceSearchUserMessage,
+} from './hardwareService';
 
 const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
 
 afterEach(() => {
   mockEvmGetAddress.mockClear();
+  mockRawCall.mockClear();
   mockDeviceType = 'pro';
   if (originalWindow) {
     Object.defineProperty(globalThis, 'window', originalWindow);
@@ -153,5 +166,51 @@ describe('callHardwareAPI', () => {
     expect(mockEvmGetAddress.mock.calls[0]?.[2]).toMatchObject({
       useEmptyPassphrase: true,
     });
+  });
+});
+
+describe('callHardwareDebugAPI', () => {
+  test('通过低层 call 调用 Pro2 原生命令，不要求 CoreApi 暴露快捷方法', async () => {
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: {},
+    });
+
+    const result = await callHardwareDebugAPI('deviceStatusGet', {
+      connectId: 'connect-id',
+    });
+
+    expect(result).toEqual({
+      success: true,
+      payload: { device_id: 'device-1', unlocked: true },
+    });
+    expect(mockRawCall).toHaveBeenCalledWith({
+      method: 'deviceStatusGet',
+      connectId: 'connect-id',
+    });
+  });
+});
+
+describe('getDeviceSearchUserMessage', () => {
+  test('将协议探测异常转换为可操作文案，不暴露内部探测细节', () => {
+    const message = getDeviceSearchUserMessage(
+      new Error(
+        'Unable to detect USB protocol: device did not respond to Protocol V1 Initialize or Protocol V2 Ping'
+      )
+    );
+
+    expect(message).toBe(
+      'The device did not respond. Reconnect it, unlock it if needed, and try again.'
+    );
+    expect(message).not.toContain('Protocol V1');
+    expect(message).not.toContain('Protocol V2');
+  });
+
+  test('将 WebUSB 权限异常转换为授权引导', () => {
+    expect(
+      getDeviceSearchUserMessage(
+        new Error('Web-USB or Web-Bluetooth device not found or needs permission')
+      )
+    ).toBe('Device permission is required. Reconnect the device and approve the browser prompt.');
   });
 });

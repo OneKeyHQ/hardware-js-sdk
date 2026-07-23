@@ -15,6 +15,7 @@ function normalizeOnekeyFirmwareVersion(message: OnekeyFeatures) {
 
 export default class GetOnekeyFeatures extends BaseMethod {
   init() {
+    this.unlockPolicy = 'none';
     this.allowDeviceMode = [
       ...this.allowDeviceMode,
       UI_REQUEST.NOT_INITIALIZE,

@@ -81,11 +81,11 @@ await sdk.switchTransport('webusb'); // or 'emulator'
 // Find devices
 const devices = await sdk.searchDevices();
 
-// Read the canonical V1/V2 device snapshot
+// Read live runtime state through the canonical V1/V2 API
 const state = await sdk.getDeviceState(connectId);
 
-// Explicitly synchronize the firmware metadata needed by this screen
-const versions = await sdk.refreshDeviceState(connectId, {
+// Add the firmware metadata needed by this screen
+const versions = await sdk.getDeviceState(connectId, {
   scope: 'firmware',
 });
 
@@ -96,10 +96,10 @@ const result = await sdk.evmGetAddress({
 });
 ```
 
-`getDeviceState()` is the normal device-information API for both Protocol V1 and
-Protocol V2 devices. Cached reads do not implicitly query runtime status. Use
-`refreshDeviceState({ scope: 'runtime' })` only when fresh normal-mode status is
-required.
+`getDeviceState()` is the single device-information API for Protocol V1 and
+Protocol V2 devices. In normal mode every call synchronizes runtime status.
+Use the optional `settings` or `firmware` scope only when those extra sections
+are needed. Loader modes never receive a runtime-status command.
 
 `getFeatures()` and `getOnekeyFeatures()` remain available only for Protocol V1
 compatibility and for tests that intentionally verify the legacy feature

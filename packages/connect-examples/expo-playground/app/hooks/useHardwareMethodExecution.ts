@@ -1,6 +1,11 @@
 import { useCallback } from 'react';
 import { useDeviceStore } from '../store/deviceStore';
-import { callHardwareAPI } from '../services/hardwareService';
+import {
+  callHardwareAPI,
+  callHardwareDebugAPI,
+  type HardwareApiMethod,
+  type HardwareDebugApiMethod,
+} from '../services/hardwareService';
 import { applyDeviceStateToDevice } from '../services/deviceStateAdapter';
 import {
   getFirmwareVersionsFromDeviceState,
@@ -168,7 +173,12 @@ export function useHardwareMethodExecution({
       );
 
       // 调用硬件 API
-      const result = await callHardwareAPI(methodConfig.method, normalizedParams);
+      const result = methodConfig.debugOnly
+        ? await callHardwareDebugAPI(
+            methodConfig.method as HardwareDebugApiMethod,
+            normalizedParams
+          )
+        : await callHardwareAPI(methodConfig.method as HardwareApiMethod, normalizedParams);
 
       if (result.success) {
         let firmwareVersions = FIRMWARE_UPDATE_METHODS.has(methodConfig.method)

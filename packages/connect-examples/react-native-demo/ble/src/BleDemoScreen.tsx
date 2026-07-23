@@ -820,11 +820,11 @@ export const BleDemoScreen = () => {
         run: (sdk, connectId) =>
           sdk.ping(connectId, { ...PROTOCOL_V2_PARAMS, message: 'rn-pro2-demo' }),
       },
-      refreshDeviceState: {
-        key: 'refreshDeviceState',
-        label: 'refreshDeviceState(firmware)',
+      getDeviceState: {
+        key: 'getDeviceState',
+        label: 'getDeviceState(firmware)',
         run: (sdk, connectId) =>
-          sdk.refreshDeviceState(connectId, {
+          sdk.getDeviceState(connectId, {
             ...PROTOCOL_V2_PARAMS,
             scope: 'firmware',
           }),
@@ -948,7 +948,7 @@ export const BleDemoScreen = () => {
       buildGroup('device', 'Device / Factory', [
         'protocolInfoRequest',
         'ping',
-        'refreshDeviceState',
+        'getDeviceState',
         'deviceRebootNormal',
         'deviceFactoryInfoGet',
         'deviceFactoryInfoSet',

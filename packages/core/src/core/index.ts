@@ -36,6 +36,7 @@ import {
   updateRequestContext,
 } from '../utils/tracing';
 import { Device } from '../device/Device';
+import { checkLiveDeviceId } from '../device/deviceIdentity';
 import { DeviceList } from '../device/DeviceList';
 import { DevicePool } from '../device/DevicePool';
 import { PollingStateManager } from './PollingStateManager';
@@ -550,7 +551,7 @@ const onCallDevice = async (
       }
 
       if (method.deviceId && method.checkDeviceId) {
-        const isSameDeviceID = device.checkDeviceId(method.deviceId);
+        const isSameDeviceID = await checkLiveDeviceId(device, method.deviceId);
         if (!isSameDeviceID) {
           return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError));
         }

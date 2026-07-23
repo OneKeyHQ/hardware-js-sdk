@@ -10,23 +10,23 @@ title: Get Device State
 const response = await HardwareSDK.getDeviceState(connectId);
 ```
 
-The default call returns the current snapshot and performs only the minimum initialization when no snapshot exists. For Pro2, initialization reads `DeviceInfoGet` without a status target and does not call `DeviceStatusGet`.
+In normal mode, every call synchronizes runtime status. For Pro2, the SDK reads `DeviceStatusGet`; for Protocol V1 devices it refreshes the compatible `Features` state. Bootloader and romloader modes never receive `DeviceStatusGet`.
 
-## Explicit refresh
+## Optional scopes
 
-Use a semantic business scope when hardware synchronization is required:
+Use a semantic business scope when a screen also needs settings or firmware metadata:
 
 ```typescript
-const versions = await HardwareSDK.refreshDeviceState(connectId, {
+const versions = await HardwareSDK.getDeviceState(connectId, {
   scope: 'firmware',
 });
 
-const runtimeStatus = await HardwareSDK.refreshDeviceState(connectId, {
-  scope: 'runtime',
+const settings = await HardwareSDK.getDeviceState(connectId, {
+  scope: 'settings',
 });
 ```
 
-Available scopes are `basic`, `firmware`, `settings`, and `runtime`. A `runtime` or `settings` refresh in bootloader/romloader mode returns an unsupported-operation error instead of silently returning stale fields.
+Available scopes are `runtime` (the default), `settings`, and `firmware`. In bootloader/romloader mode, the default and `firmware` scopes return the available `DeviceInfo`; `settings` returns an unsupported-operation error. No scope sends `DeviceStatusGet` to a loader.
 
 ## State sections
 
@@ -37,8 +37,8 @@ The returned snapshot contains:
 - `settings`: language, display, security, BLE, and Pro2 preferences.
 - `versions`: firmware, bootloader, board, BLE, and secure-element versions.
 - `verification`: build IDs and hashes when explicitly refreshed.
-- `session`: volatile session data.
-- `raw`: SDK-internal protocol diagnostics used by the Protocol V1 compatibility projector; public `getDeviceState` does not expose it.
+
+SDK-internal `session` and raw protocol diagnostics are deliberately omitted from the public result.
 
 Visible device names should use `state.identity.displayName`, whose priority is `label`, then `bleName`, then the model display name.
 

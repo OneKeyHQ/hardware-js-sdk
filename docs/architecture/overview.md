@@ -69,16 +69,15 @@ WebUSB、Electron BLE、React Native BLE 和 lowlevel BLE 只负责各自的物�
 | V1   | `Initialize -> Features`       | `DeviceState` | `getFeatures()` 投影（仅 V1） |
 | V2   | `Ping` probe + `DeviceInfoGet` | `DeviceState` | 不支持 `getFeatures()`        |
 
-`getDeviceState()` 和 `DEVICE.STATE` 共享同一份完整快照。`getDeviceState()` 只读取缓存或执行最小初始化；调用方只有显式调用 `refreshDeviceState({ scope: 'runtime' })` 时才会发送 `DeviceStatusGet`。
+`getDeviceState()` 和 `DEVICE.STATE` 共享同一份完整快照。normal 模式下每次公共读取都会刷新 `DeviceStatus`；bootloader/romloader 模式自动跳过该命令。
 
 公共刷新范围按业务语义定义，调用方不需要理解底层协议命令：
 
-| scope      | V1 数据来源                       | V2 数据来源                                  |
-| ---------- | --------------------------------- | -------------------------------------------- |
-| `basic`    | `GetFeatures`                     | `DeviceInfoGet` 基础 target                  |
-| `firmware` | `GetFeatures + OnekeyGetFeatures` | `DeviceInfoGet` 全组件 version/build ID/hash |
-| `settings` | `GetFeatures`                     | `DeviceSettingsGet`                          |
-| `runtime`  | `GetFeatures`                     | normal 模式下显式 `DeviceStatusGet`          |
+| scope      | V1 数据来源                       | V2 数据来源                                                 |
+| ---------- | --------------------------------- | ----------------------------------------------------------- |
+| `runtime`  | `GetFeatures`                     | normal 模式 `DeviceStatusGet`                               |
+| `settings` | `GetFeatures`                     | normal 模式 `DeviceStatusGet + DeviceSettingsGet`           |
+| `firmware` | `GetFeatures + OnekeyGetFeatures` | `DeviceInfoGet` 全组件 version/build ID/hash；normal 加状态 |
 
 统一字段遵循以下语义：
 

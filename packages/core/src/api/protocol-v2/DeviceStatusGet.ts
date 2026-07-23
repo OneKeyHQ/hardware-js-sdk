@@ -3,6 +3,7 @@ import { BaseMethod } from '../BaseMethod';
 export default class DeviceStatusGet extends BaseMethod {
   init() {
     this.requireProtocolV2 = true;
+    this.unlockPolicy = 'none';
     this.useDevicePassphraseState = false;
     this.skipForceUpdateCheck = true;
   }

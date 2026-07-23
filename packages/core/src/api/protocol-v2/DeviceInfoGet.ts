@@ -112,6 +112,7 @@ export default class DeviceInfoGet extends BaseMethod<{
   init() {
     // Protocol V2 (Pro2) 专属方法，core 调度层统一做非 V2 设备守卫
     this.requireProtocolV2 = true;
+    this.unlockPolicy = 'none';
     this.allowDeviceMode = [
       ...this.allowDeviceMode,
       UI_REQUEST.NOT_INITIALIZE,

@@ -10,23 +10,23 @@ title: 获取设备状态
 const response = await HardwareSDK.getDeviceState(connectId);
 ```
 
-默认调用返回当前快照；首次没有快照时只执行最小初始化。Pro2 初始化会在 SDK 内部读取不带 status target 的 `DeviceInfoGet`，不会调用 `DeviceStatusGet`。
+普通模式下，每次调用都会同步运行时状态：Pro2 由 SDK 读取 `DeviceStatusGet`，Protocol V1 设备刷新兼容的 `Features` 状态。bootloader 和 romloader 模式始终不会收到 `DeviceStatusGet`。
 
-## 显式刷新
+## 可选 scope
 
-需要主动与硬件同步时，传入业务语义 scope：
+界面还需要设置或固件元数据时，传入对应的业务语义 scope：
 
 ```typescript
-const versions = await HardwareSDK.refreshDeviceState(connectId, {
+const versions = await HardwareSDK.getDeviceState(connectId, {
   scope: 'firmware',
 });
 
-const runtimeStatus = await HardwareSDK.refreshDeviceState(connectId, {
-  scope: 'runtime',
+const settings = await HardwareSDK.getDeviceState(connectId, {
+  scope: 'settings',
 });
 ```
 
-可用 scope 为 `basic`、`firmware`、`settings` 和 `runtime`。bootloader/romloader 模式显式刷新 `runtime` 或 `settings` 时会返回不支持错误，不会静默返回旧字段。
+可用 scope 为默认的 `runtime`、`settings` 和 `firmware`。bootloader/romloader 模式下，默认与 `firmware` scope 返回可用的 `DeviceInfo`，`settings` 返回不支持错误；任何 scope 都不会向 loader 发送 `DeviceStatusGet`。
 
 ## 状态分区
 
@@ -37,8 +37,8 @@ const runtimeStatus = await HardwareSDK.refreshDeviceState(connectId, {
 - `settings`：语言、显示、安全、蓝牙和 Pro2 设置。
 - `versions`：固件、bootloader、主板、蓝牙和安全芯片版本。
 - `verification`：显式刷新后获得的 build ID 和哈希。
-- `session`：不持久化的会话状态。
-- `raw`：SDK 内部协议诊断数据，只用于 Protocol V1 兼容投影；公共 `getDeviceState` 不会暴露。
+
+SDK 内部的 `session` 与原始协议诊断数据不会出现在公共返回结果中。
 
 界面展示名称统一使用 `state.identity.displayName`，优先级为 `label`、`bleName`、设备型号名称。
 

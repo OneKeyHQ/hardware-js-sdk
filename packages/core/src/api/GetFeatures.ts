@@ -6,6 +6,7 @@ import { BaseMethod } from './BaseMethod';
 
 export default class GetFeatures extends BaseMethod {
   init() {
+    this.unlockPolicy = 'none';
     this.allowDeviceMode = [
       ...this.allowDeviceMode,
       UI_REQUEST.NOT_INITIALIZE,

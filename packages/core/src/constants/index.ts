@@ -5,7 +5,4 @@ export {
   TonSignDataType,
   TonWalletVersion,
 } from '@onekeyfe/hd-transport';
-export type {
-  HDNodeType,
-  Success as DeviceSuccess,
-} from '@onekeyfe/hd-transport';
+export type { HDNodeType, Success as DeviceSuccess } from '@onekeyfe/hd-transport';

@@ -1,7 +1,7 @@
 # SDK Core 运行时与 Protocol V2 适配
 
 > - 文档状态：当前 Core 映射
-> - 最后核验：2026-07-21
+> - 最后核验：2026-07-23
 > - 适用范围：`packages/core`
 
 本页描述“协议消息如何进入 SDK 公共能力”，不重复壁纸、设备设置、固件升级等完整用户流程。
@@ -22,18 +22,19 @@ flowchart TD
 
 V2 不支持传统 `GetFeatures`。Core 在初始化时发送默认范围的 `DeviceInfoGet`，并把结果映射进 Device 内唯一的 `DeviceState`。外部无需理解 `DeviceProfile` 或 V2 原始消息。
 
-| 调用                 | 语义                                                                     |
-| -------------------- | ------------------------------------------------------------------------ |
-| 初始化 adapter       | 请求 hw、fw、coprocessor 基础字段，并更新 Device 内唯一 DeviceState 缓存 |
-| `getDeviceState`     | 返回 V1/V2 统一的当前 `DeviceState` 快照                                 |
-| `refreshDeviceState` | 按 `basic/firmware/settings/runtime` 业务 scope 主动同步并返回同一快照   |
+| 调用                                    | 语义                                                                     |
+| --------------------------------------- | ------------------------------------------------------------------------ |
+| 初始化 adapter                          | 请求 hw、fw、coprocessor 基础字段，并更新 Device 内唯一 DeviceState 缓存 |
+| `getDeviceState()`                      | 默认刷新运行状态并返回 V1/V2 统一的完整 `DeviceState` 快照               |
+| `getDeviceState({ scope: 'settings' })` | 刷新运行状态和设置                                                       |
+| `getDeviceState({ scope: 'firmware' })` | 刷新运行状态、身份、完整版本与校验信息                                   |
 
 `getDeviceInfo`、原始 `deviceInfoGet/deviceStatusGet/deviceSettingsGet` 不属于公共 API；底层命令只供 SDK 内部流程使用。
 
 ## 状态与 PIN 解锁
 
 - `DeviceInfoGet` 默认不请求 status target，也不会隐式补发 `DeviceStatusGet`。
-- 需要设备实时状态时，由调用方显式使用 `refreshDeviceState({ scope: 'runtime' })`；固件升级等专用流程可以按自身状态机显式探测。
+- 每次公共 `getDeviceState()` 读取都会在 normal 模式刷新 `DeviceStatus`，调用方不需要管理缓存刷新参数。
 - bootloader / romloader 模式不会发送 `DeviceStatusGet`。
 - 公共 `DeviceState` 与 `DEVICE.STATE` 不包含协议 raw 数据或钱包 `session_id`；两者只在 Core 内部用于 V1 兼容和会话恢复。
 - V2 PIN 解锁使用 `DeviceSessionAskPin -> DeviceSessionPinResult`，Core 只合并响应已经确认的 `unlocked` 等字段，不为了补全状态额外轮询。
