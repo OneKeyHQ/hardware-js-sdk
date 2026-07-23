@@ -239,6 +239,8 @@ export type DeviceState = {
   revision: number;
   updatedAt: number;
   protocol: DeviceStateProtocol;
+  /** 设备协议消息中的版本号；与 SDK 的 V1/V2 协议族相互独立。 */
+  protocolVersion: number | null;
   identity: DeviceStateIdentity;
   status: DeviceStateStatus;
   settings: DeviceStateSettings;
@@ -249,6 +251,7 @@ export type DeviceState = {
 
 export type DeviceStatePatch = {
   protocol?: DeviceStateProtocol;
+  protocolVersion?: number | null;
   identity?: Partial<DeviceStateIdentity>;
   status?: Partial<DeviceStateStatus>;
   settings?: Partial<DeviceStateSettings>;

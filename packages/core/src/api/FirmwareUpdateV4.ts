@@ -1543,9 +1543,11 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       const res = await typedCall('DeviceReboot', 'Success', {
         reboot_type: rebootType,
       });
+      this.device.markProtocolV2Reboot(rebootType);
       return res.message;
     } catch (error) {
       if (isProtocolV2DeviceDisconnectedError(error) || isProtocolV2ReconnectProbeError(error)) {
+        this.device.markProtocolV2Reboot(rebootType);
         return { message: 'Device rebooted successfully' };
       }
       throw error;

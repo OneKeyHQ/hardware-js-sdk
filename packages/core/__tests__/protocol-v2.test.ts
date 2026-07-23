@@ -300,6 +300,7 @@ const descriptor = {
 function stubDevice<T extends Record<string, any>>(device: T): T {
   const d = device as any;
   d.updateState ??= jest.fn();
+  d.markProtocolV2Reboot ??= jest.fn();
   d.isProtocolV2 ??= () => d.originalDescriptor?.protocolType === 'V2';
   d.getProtocol ??= () => (d.isProtocolV2() ? 'V2' : 'V1');
   d.getCurrentDeviceType ??= () => getDeviceType(d.features);
@@ -4422,13 +4423,15 @@ describe('Protocol V2 reboot methods', () => {
       },
     });
     method.init();
-    (method as any).device = stubDevice({ commands: { typedCall } });
+    const device = stubDevice({ commands: { typedCall } });
+    (method as any).device = device;
 
     await method.run();
 
     expect(typedCall).toHaveBeenCalledWith('DeviceReboot', 'Success', {
       reboot_type: 2,
     });
+    expect(device.markProtocolV2Reboot).toHaveBeenCalledWith(DeviceRebootType.Bootloader);
   });
 });
 

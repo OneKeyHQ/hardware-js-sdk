@@ -181,6 +181,10 @@ bootloader/romloader 模式直接返回可用的身份和版本快照，不会�
 | `attach_to_pin_enabled`     | 是否启用 Attach-to-PIN     | `DeviceState.status.attachToPinEnabled`   |
 | `unlocked_by_attach_to_pin` | 当前是否由 Attach PIN 解锁 | `DeviceState.status.unlockedAttachPin`    |
 
+`DeviceState.protocol` 表示 SDK 协议族（`V1`/`V2`），根级
+`DeviceState.protocolVersion` 则保留设备消息中的 `protocol_version`。两者含义不同，
+例如 Pro 2 可以同时返回 `protocol: 'V2'` 与 `protocolVersion: 1`。
+
 ### 6.2 状态字段可能为空
 
 `passphrase_enabled`、`attach_to_pin_enabled` 和 `unlocked_by_attach_to_pin` 在 protobuf 中属于解锁后可用的私有状态。

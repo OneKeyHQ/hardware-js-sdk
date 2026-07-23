@@ -100,7 +100,6 @@ describe('public device state API boundary', () => {
       label: 'Unified',
     });
     expect(getDeviceState).toHaveBeenCalledWith({
-      refreshSections: ['identity'],
       includeRaw: true,
     });
   });

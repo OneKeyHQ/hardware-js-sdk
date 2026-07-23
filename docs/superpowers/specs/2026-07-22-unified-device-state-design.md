@@ -64,6 +64,8 @@ export type DeviceState = {
   updatedAt: number;
 
   protocol: 'V1' | 'V2' | 'unknown';
+  // 协议消息携带的 schema 版本；不要与 SDK 的 V1/V2 协议族混用。
+  protocolVersion: number | null;
 
   identity: {
     deviceType: IDeviceType;

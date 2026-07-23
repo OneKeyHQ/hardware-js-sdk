@@ -81,13 +81,13 @@ describe('SearchDevices', () => {
       1,
       [unresponsiveDescriptor],
       unresponsiveDescriptor.path,
-      { connectProtocol: undefined }
+      { connectProtocol: undefined, refreshRuntimeState: true }
     );
     expect(mockGetDevices).toHaveBeenNthCalledWith(
       2,
       [availableDescriptor],
       availableDescriptor.path,
-      { connectProtocol: undefined }
+      { connectProtocol: undefined, refreshRuntimeState: true }
     );
   });
 });

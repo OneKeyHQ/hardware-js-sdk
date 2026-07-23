@@ -60,6 +60,24 @@ describe('DeviceStateMapper', () => {
     }
   );
 
+  test.each([
+    ['CLASSIC1S', EDeviceType.Classic1s],
+    ['TOUCH', EDeviceType.Touch],
+    ['PRO', EDeviceType.Pro],
+  ] as const)(
+    'preserves Protocol V1 backup mode semantics for %s',
+    (onekeyDeviceType, expectedDeviceType) => {
+      const patch = mapProtocolV1FeaturesToState({
+        onekey_device_type: onekeyDeviceType,
+        initialized: true,
+        no_backup: true,
+      } as PROTO.Features);
+
+      expect(patch.identity?.deviceType).toBe(expectedDeviceType);
+      expect(patch.status?.mode).toBe('backupMode');
+    }
+  );
+
   test('normalizes legacy Bitcoin-only and Attach PIN fields from Protocol V1', () => {
     const patch = mapProtocolV1FeaturesToState({
       onekey_device_type: 'PRO',
@@ -110,6 +128,7 @@ describe('DeviceStateMapper', () => {
       bootloader: '2.0.0',
       ble: '1.2.3',
     });
+    expect(patch).toMatchObject({ protocolVersion: 2 });
     expect(patch.status?.unlocked).toBeUndefined();
   });
 

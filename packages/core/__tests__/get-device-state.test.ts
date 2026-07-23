@@ -168,6 +168,57 @@ describe('getDeviceState', () => {
     expect(state.settings.brightness).toBe(70);
   });
 
+  test('refreshes Protocol V2 status before settings in a combined read', async () => {
+    const typedCall = jest.fn().mockImplementation((requestType: string) => {
+      if (requestType === 'DeviceStatusGet') {
+        return {
+          message: { init_states: true, unlocked: false, device_id: 'device-1' },
+        };
+      }
+      if (requestType === 'DeviceSettingsGet') {
+        return { message: { label: 'Renamed Pro 2' } };
+      }
+      throw new Error(`Unexpected request: ${requestType}`);
+    });
+    const device = createV2Device(typedCall);
+    device.updateState({ protocol: 'V2', status: { mode: 'normal' } }, 'initialize');
+
+    const state = await device.getDeviceState({ refreshSections: ['status', 'settings'] });
+
+    expect(typedCall.mock.calls.map(call => call[0])).toEqual([
+      'DeviceStatusGet',
+      'DeviceSettingsGet',
+    ]);
+    expect(state.status.unlocked).toBe(false);
+    expect(state.identity.label).toBe('Renamed Pro 2');
+  });
+
+  test('keeps the refreshed status when a following settings read fails', async () => {
+    const typedCall = jest.fn().mockImplementation((requestType: string) => {
+      if (requestType === 'DeviceStatusGet') {
+        return {
+          message: { init_states: true, unlocked: false, device_id: 'device-1' },
+        };
+      }
+      throw Object.assign(new Error('Device locked'), {
+        errorCode: HardwareErrorCode.DeviceLocked,
+      });
+    });
+    const device = createV2Device(typedCall);
+    device.updateState(
+      { protocol: 'V2', status: { mode: 'normal', unlocked: true } },
+      'initialize'
+    );
+
+    await expect(
+      device.getDeviceState({ refreshSections: ['status', 'settings'] })
+    ).rejects.toMatchObject({ errorCode: HardwareErrorCode.DeviceLocked });
+
+    const state = await device.getDeviceState();
+    expect(state.status.unlocked).toBe(false);
+    expect(state.identity.deviceId).toBe('device-1');
+  });
+
   test('rejects an explicit settings refresh without mutating cached state', async () => {
     const typedCall = jest.fn().mockRejectedValue(
       Object.assign(new Error('Device locked'), {
@@ -195,7 +246,7 @@ describe('getDeviceState', () => {
   });
 
   test('aggregates OnekeyGetFeatures into a Protocol V1 firmware refresh', async () => {
-    const typedCall = jest.fn().mockImplementation(async (requestType: string) => {
+    const typedCall = jest.fn().mockImplementation((requestType: string) => {
       if (requestType === 'GetFeatures') {
         return {
           message: {
@@ -239,5 +290,78 @@ describe('getDeviceState', () => {
     expect(state.raw?.protocolV1OneKeyFeatures).toMatchObject({
       onekey_board_build_id: 'board-build',
     });
+  });
+
+  test('does not clear Protocol V1 firmware details during a later runtime refresh', async () => {
+    let getFeaturesCount = 0;
+    const typedCall = jest.fn().mockImplementation((requestType: string) => {
+      if (requestType === 'GetFeatures') {
+        getFeaturesCount += 1;
+        return {
+          message: {
+            onekey_device_type: 'PRO',
+            initialized: true,
+            unlocked: getFeaturesCount === 1,
+            major_version: 4,
+            minor_version: 10,
+            patch_version: 1,
+          },
+        };
+      }
+      if (requestType === 'OnekeyGetFeatures') {
+        return {
+          message: {
+            onekey_se01_boot_version: '1.0.0',
+            onekey_se01_boot_build_id: 'se-boot-build',
+            onekey_se01_boot_hash: 'abcd',
+          },
+        };
+      }
+      throw new Error(`Unexpected request: ${requestType}`);
+    });
+    const device = createV1Device(typedCall);
+
+    await device.getDeviceState({
+      refreshSections: ['identity', 'versions', 'verification'],
+    });
+    const state = await device.getDeviceState({ refreshSections: ['status'] });
+
+    expect(state.status.unlocked).toBe(false);
+    expect(state.versions.se01Boot).toBe('1.0.0');
+    expect(state.verification).toMatchObject({
+      se01BootBuildId: 'se-boot-build',
+      se01BootHash: 'abcd',
+    });
+  });
+
+  test('reloads Protocol V2 DeviceInfo after a physical reconnect', async () => {
+    const typedCall = jest.fn().mockResolvedValue({
+      message: {
+        protocol_version: 1,
+        hw: { serial_no: 'SERIAL-1' },
+        fw: { bootloader: { version: '1.0.0' } },
+      },
+    });
+    const device = createV2Device(typedCall);
+    device.updateState(
+      {
+        protocol: 'V2',
+        identity: { deviceId: 'wallet-1', serialNo: 'SERIAL-1' },
+        status: { mode: 'normal', initialized: true, unlocked: true },
+      },
+      'initialize'
+    );
+
+    device.markTransportDisconnected();
+    await device.initialize();
+
+    expect(typedCall).toHaveBeenCalledWith(
+      'DeviceInfoGet',
+      'DeviceInfo',
+      expect.anything(),
+      expect.anything()
+    );
+    expect(device.state?.status.mode).toBe('bootloader');
+    expect(device.state?.identity.deviceId).toBeNull();
   });
 });

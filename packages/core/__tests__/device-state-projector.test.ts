@@ -14,6 +14,7 @@ describe('DeviceStateProjector', () => {
       bleName: 'Pro2 1234',
     });
     state.protocol = 'V2';
+    state.protocolVersion = 7;
     state.status = {
       ...state.status,
       mode: 'normal',
@@ -37,6 +38,7 @@ describe('DeviceStateProjector', () => {
     const features = projectFeatures(state);
     expect(features).toMatchObject({
       protocol: 'V2',
+      protocolVersion: 7,
       label: 'My Pro2',
       unlocked: true,
       brightness: 80,

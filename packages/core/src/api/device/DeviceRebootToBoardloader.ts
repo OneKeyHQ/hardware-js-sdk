@@ -28,6 +28,7 @@ export default class DeviceRebootToBoardloader extends BaseMethod<RebootToBoardl
       const res = await this.device.commands.typedCall('DeviceReboot', 'Success', {
         reboot_type: DeviceRebootType.Romloader,
       });
+      this.device.markProtocolV2Reboot(DeviceRebootType.Romloader);
       return Promise.resolve(res.message);
     }
 

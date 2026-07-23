@@ -60,6 +60,7 @@ const getProtocolV2StatusMode = (initialized?: boolean | null): DeviceStateMode 
 
 export const mapFeaturesToState = (features: Features): DeviceStatePatch => ({
   protocol: features.protocol,
+  protocolVersion: features.protocolVersion,
   identity: {
     deviceType: features.deviceType,
     firmwareType: features.firmwareType,
@@ -123,7 +124,7 @@ export const mapFeaturesToState = (features: Features): DeviceStatePatch => ({
     se04Boot: features.se04BootVersion,
   },
   capabilities: features.capabilities,
-  verification: features.verify,
+  verification: definedEntries(features.verify ?? {}),
   session: {
     sessionId: features.sessionId,
     passphraseState: features.passphraseState,
@@ -208,6 +209,7 @@ export const mapProtocolV2DeviceInfoToState = (
 
   return {
     protocol: 'V2',
+    protocolVersion: info.protocol_version,
     identity: definedEntries({
       deviceType: EDeviceType.Pro2,
       firmwareType: EFirmwareType.Universal,

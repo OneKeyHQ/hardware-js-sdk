@@ -106,6 +106,7 @@ export class DevicePool extends EventEmitter {
         if (exist) {
           // Log.debug('find existed Device: ', connectId);
           device.updateDescriptor(exist, true);
+          await this._refreshRuntimeState(device, initOptions);
           devices[connectId] = device;
           deviceList.push(device);
           await this._checkDevicePool(initOptions, connectId);
@@ -156,10 +157,34 @@ export class DevicePool extends EventEmitter {
       device = Device.fromDescriptor(descriptor);
       device.deviceConnector = this.connector;
       await device.connect(initOptions?.connectProtocol);
-      await device.initialize(initOptions);
-      await device.release();
+      try {
+        await device.initialize(initOptions);
+        if (initOptions?.refreshRuntimeState && device.isProtocolV2()) {
+          await device.getDeviceState({ refreshSections: ['status'] });
+        }
+      } finally {
+        await device.release();
+      }
     }
     return device;
+  }
+
+  static async _refreshRuntimeState(device: Device, initOptions?: InitOptions) {
+    if (!initOptions?.refreshRuntimeState || !device.isProtocolV2()) return;
+    let refreshError: unknown;
+    await device.run(
+      async () => {
+        try {
+          await device.getDeviceState({ refreshSections: ['status'] });
+        } catch (error) {
+          // Device.run 在回调正常结束后统一 release；随后再把真实读取错误交给调用方。
+          refreshError = error;
+        }
+      },
+      { connectProtocol: initOptions.connectProtocol }
+    );
+    if (refreshError instanceof Error) throw refreshError;
+    if (refreshError) throw new Error(String(refreshError));
   }
 
   static async _checkDevicePool(initOptions?: InitOptions, connectId?: string) {
@@ -170,21 +195,21 @@ export class DevicePool extends EventEmitter {
   static async _sendConnectMessage(initOptions?: InitOptions, connectId?: string) {
     for (let i = this.connectedPool.length - 1; i >= 0; i--) {
       const descriptor = this.connectedPool[i];
-      if (connectId && descriptor.path !== connectId) {
-        continue;
+      if (!connectId || descriptor.path === connectId) {
+        const device = await this._createDevice(descriptor, initOptions);
+        Log.debug('emit DEVICE.CONNECT: ', device?.features);
+        this.emitter.emit(DEVICE.CONNECT, device);
+        this.connectedPool.splice(i, 1);
       }
-      const device = await this._createDevice(descriptor, initOptions);
-      Log.debug('emit DEVICE.CONNECT: ', device?.features);
-      this.emitter.emit(DEVICE.CONNECT, device);
-      this.connectedPool.splice(i, 1);
     }
   }
 
   static _sendDisconnectMessage() {
     for (let i = this.disconnectPool.length - 1; i >= 0; i--) {
-      const descriptor = this.connectedPool[i];
+      const descriptor = this.disconnectPool[i];
       const device = descriptor?.path ? this.getDeviceByPath(descriptor.path) : null;
       if (device) {
+        device.markTransportDisconnected();
         this.emitter.emit(DEVICE.DISCONNECT, device);
       }
       this.disconnectPool.splice(i, 1);
@@ -224,6 +249,7 @@ export class DevicePool extends EventEmitter {
       }
 
       Log.debug('emit DEVICE.DISCONNECT: ', device.features);
+      device.markTransportDisconnected();
       this.emitter.emit(DEVICE.DISCONNECT, device);
     });
   }

@@ -37,6 +37,16 @@ describe('DeviceStateStore', () => {
     expect(second.changedKeys).toEqual([]);
   });
 
+  test('stores the wire protocol version independently from the protocol family', () => {
+    const store = new DeviceStateStore(createEmptyDeviceState());
+
+    const result = store.update({ protocol: 'V2', protocolVersion: 7 }, 'device-info');
+
+    expect(result.state.protocol).toBe('V2');
+    expect(result.state.protocolVersion).toBe(7);
+    expect(result.changedKeys).toContain('protocolVersion');
+  });
+
   test('clears only ephemeral session state', () => {
     const store = new DeviceStateStore(createEmptyDeviceState());
     store.update(

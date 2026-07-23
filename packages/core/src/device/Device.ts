@@ -1,6 +1,6 @@
 import EventEmitter from 'events';
 import semver from 'semver';
-import { Enum_Capability } from '@onekeyfe/hd-transport';
+import { DeviceRebootType, Enum_Capability } from '@onekeyfe/hd-transport';
 import {
   EDeviceType,
   ERRORS,
@@ -97,6 +97,8 @@ export type InitOptions = {
   deriveCardano?: boolean;
   connectProtocol?: HardwareConnectProtocol;
   protocolV2DeviceInfoTimeoutMs?: number;
+  /** 设备发现内部使用：返回列表前刷新 Protocol V2 运行时状态。 */
+  refreshRuntimeState?: boolean;
 };
 
 export type RunOptions = {
@@ -206,6 +208,9 @@ export class Device extends EventEmitter {
 
   /** 唯一设备状态缓存。旧 Features 仅通过 getter/setter 做兼容投影。 */
   private stateStore = new DeviceStateStore();
+
+  /** 物理重连或重启后，下一次初始化必须重新读取 DeviceInfo。 */
+  private protocolV2StateNeedsReload = false;
 
   get state() {
     return this.stateStore.getState();
@@ -747,7 +752,7 @@ export class Device extends EventEmitter {
     // Protocol V2 不支持传统 Initialize，直接使用协议专用初始化流程。
     if (this.isProtocolV2()) {
       this.passphraseState = options?.passphraseState;
-      if (this.state && !options?.initSession) {
+      if (this.state && !options?.initSession && !this.protocolV2StateNeedsReload) {
         if (this.features?.bootloaderMode) {
           return;
         }
@@ -756,6 +761,7 @@ export class Device extends EventEmitter {
         return;
       }
       await this._initializeProtocolV2(options);
+      this.protocolV2StateNeedsReload = false;
       return;
     }
 
@@ -885,6 +891,11 @@ export class Device extends EventEmitter {
         );
       }
 
+      if (refresh.has('status') && this.state?.status.mode === 'normal') {
+        const status = await requestProtocolV2DeviceStatus({ commands: this.commands });
+        this.updateState(mapProtocolV2DeviceStatusToState(status), 'device-status');
+      }
+
       if (refresh.has('settings') && this.state?.status.mode === 'normal') {
         const { message } = await this.commands.typedCall(
           'DeviceSettingsGet',
@@ -892,11 +903,6 @@ export class Device extends EventEmitter {
           {}
         );
         this.updateState(mapDeviceSettingsToState(message), 'apply-settings');
-      }
-
-      if (refresh.has('status') && this.state?.status.mode === 'normal') {
-        const status = await requestProtocolV2DeviceStatus({ commands: this.commands });
-        this.updateState(mapProtocolV2DeviceStatusToState(status), 'device-status');
       }
     }
 
@@ -1000,6 +1006,60 @@ export class Device extends EventEmitter {
     });
   }
 
+  markTransportDisconnected() {
+    if (!this.isProtocolV2()) return;
+    this.protocolV2StateNeedsReload = true;
+    this.clearPreInitialized();
+    this.clearCachedSession();
+  }
+
+  markProtocolV2Reboot(rebootType: DeviceRebootType) {
+    if (!this.isProtocolV2()) return;
+
+    this.protocolV2StateNeedsReload = true;
+    this.clearPreInitialized();
+    let loaderMode: 'bootloader' | 'romloader' | undefined;
+    if (rebootType === DeviceRebootType.Bootloader) {
+      loaderMode = 'bootloader';
+    } else if (rebootType === DeviceRebootType.Romloader) {
+      loaderMode = 'romloader';
+    }
+    if (loaderMode) {
+      this.updateState(
+        {
+          identity: { deviceId: null },
+          status: {
+            mode: loaderMode,
+            initialized: null,
+            unlocked: null,
+            firmwarePresent: null,
+            backupRequired: null,
+            noBackup: null,
+            unfinishedBackup: null,
+            recoveryMode: null,
+            passphraseProtection: null,
+            pinProtection: null,
+            attachToPinEnabled: null,
+            unlockedAttachPin: null,
+          },
+          session: null,
+          raw: { protocolV2DeviceStatus: null },
+        },
+        'transport-reconnect'
+      );
+      return;
+    }
+
+    this.updateState(
+      {
+        status: { mode: 'normal', unlocked: null },
+        session: null,
+        raw: { protocolV2DeviceStatus: null },
+      },
+      'transport-reconnect'
+    );
+  }
+
   /**
    * 暂时只在 acquire 后更新 Session ID
    * 后续看是否有需要依据 listen 返回结果更新
@@ -1066,6 +1126,7 @@ export class Device extends EventEmitter {
             }
           }
         } catch (error) {
+          await this.release();
           this.runPromise = null;
           if (error instanceof HardwareError) {
             return Promise.reject(error);

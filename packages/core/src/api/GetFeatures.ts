@@ -24,7 +24,6 @@ export default class GetFeatures extends BaseMethod {
       throw createDeviceNotSupportMethodError(this.name, this.device.getCurrentFirmwareType());
     }
     const state = await this.device.getDeviceState({
-      refreshSections: ['identity'],
       includeRaw: true,
     });
     return projectFeatures(state);

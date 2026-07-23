@@ -22,10 +22,7 @@ export const projectFeatures = (state: StoredDeviceState): Features => {
     ...rawFeatures,
     ...rawOneKeyFeatures,
     protocol: snapshot.protocol,
-    protocolVersion:
-      snapshot.raw?.protocolV2DeviceInfo?.protocol_version ??
-      (rawFeatures as { protocol_version?: number | null }).protocol_version ??
-      (snapshot.protocol === 'V1' ? 1 : null),
+    protocolVersion: snapshot.protocolVersion ?? (snapshot.protocol === 'V1' ? 1 : null),
     deviceType: snapshot.identity.deviceType,
     firmwareType: snapshot.identity.firmwareType,
     model: snapshot.identity.model,

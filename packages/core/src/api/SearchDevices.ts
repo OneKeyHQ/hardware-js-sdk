@@ -56,6 +56,7 @@ export default class SearchDevices extends BaseMethod {
         // WebUSB 授权记录，单个描述符初始化失败不应中断其余设备的发现。
         const result = await DevicePool.getDevices([descriptor], descriptor.path, {
           connectProtocol: this.payload.connectProtocol,
+          refreshRuntimeState: true,
         });
         deviceList.push(...result.deviceList);
       } catch (error) {

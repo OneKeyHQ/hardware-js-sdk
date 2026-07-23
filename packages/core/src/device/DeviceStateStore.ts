@@ -59,6 +59,7 @@ export function createEmptyDeviceState(
     revision: 0,
     updatedAt: Date.now(),
     protocol: 'unknown',
+    protocolVersion: null,
     identity: normalizedIdentity,
     status: {
       mode: 'unknown',
@@ -156,6 +157,10 @@ export class DeviceStateStore {
     if (patch.protocol !== undefined && patch.protocol !== next.protocol) {
       next.protocol = patch.protocol;
       changedKeys.push('protocol');
+    }
+    if (patch.protocolVersion !== undefined && patch.protocolVersion !== next.protocolVersion) {
+      next.protocolVersion = patch.protocolVersion;
+      changedKeys.push('protocolVersion');
     }
     if (patch.identity) applySectionPatch(next.identity, patch.identity, 'identity', changedKeys);
     if (patch.status) applySectionPatch(next.status, patch.status, 'status', changedKeys);

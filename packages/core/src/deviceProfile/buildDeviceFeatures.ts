@@ -53,8 +53,8 @@ const versionFromParts = (major?: number | null, minor?: number | null, patch?: 
 const getProtocolV1Mode = (features: ProtocolV1FeaturesCompat): Features['mode'] => {
   if (features.bootloader_mode === true) return 'bootloader';
   if (features.initialized === false) return 'notInitialized';
-  if (features.initialized === true) return 'normal';
-  return 'unknown';
+  if (features.no_backup === true) return 'backupMode';
+  return 'normal';
 };
 
 const getProtocolV1DeviceType = (features: ProtocolV1FeaturesCompat): Features['deviceType'] => {
@@ -119,20 +119,27 @@ export const buildProtocolV1FeaturesPayload = (
   const firmwareVersion = firstMeaningfulVersion(
     features.onekey_firmware_version,
     features.onekey_version,
-    versionFromParts(features.major_version, features.minor_version, features.patch_version)
+    versionFromParts(features.major_version, features.minor_version, features.patch_version),
+    previous?.firmwareVersion
   );
   const bootloaderVersion = firstMeaningfulVersion(
     features.onekey_boot_version,
     features.bootloader_version,
     features.bootloader_mode
       ? versionFromParts(features.major_version, features.minor_version, features.patch_version)
-      : null
+      : null,
+    previous?.bootloaderVersion
   );
   const boardVersion = firstMeaningfulVersion(
     features.onekey_board_version,
-    features.boardloader_version
+    features.boardloader_version,
+    previous?.boardVersion
   );
-  const bleVersion = firstMeaningfulVersion(features.onekey_ble_version, features.ble_ver);
+  const bleVersion = firstMeaningfulVersion(
+    features.onekey_ble_version,
+    features.ble_ver,
+    previous?.bleVersion
+  );
   const serialNo = features.onekey_serial_no || features.onekey_serial || features.serial_no || '';
   const bleName = features.onekey_ble_name || features.ble_name || null;
   const deviceType = getProtocolV1DeviceType(features);
@@ -189,40 +196,52 @@ export const buildProtocolV1FeaturesPayload = (
     bootloaderVersion,
     boardVersion,
     bleVersion,
-    se01Version: firstMeaningfulVersion(features.onekey_se01_version),
-    se02Version: firstMeaningfulVersion(features.onekey_se02_version),
-    se03Version: firstMeaningfulVersion(features.onekey_se03_version),
-    se04Version: firstMeaningfulVersion(features.onekey_se04_version),
-    se01BootVersion: firstMeaningfulVersion(features.onekey_se01_boot_version),
-    se02BootVersion: firstMeaningfulVersion(features.onekey_se02_boot_version),
-    se03BootVersion: firstMeaningfulVersion(features.onekey_se03_boot_version),
-    se04BootVersion: firstMeaningfulVersion(features.onekey_se04_boot_version),
-    seVersion: features.se_ver ?? null,
+    se01Version: firstMeaningfulVersion(features.onekey_se01_version, previous?.se01Version),
+    se02Version: firstMeaningfulVersion(features.onekey_se02_version, previous?.se02Version),
+    se03Version: firstMeaningfulVersion(features.onekey_se03_version, previous?.se03Version),
+    se04Version: firstMeaningfulVersion(features.onekey_se04_version, previous?.se04Version),
+    se01BootVersion: firstMeaningfulVersion(
+      features.onekey_se01_boot_version,
+      previous?.se01BootVersion
+    ),
+    se02BootVersion: firstMeaningfulVersion(
+      features.onekey_se02_boot_version,
+      previous?.se02BootVersion
+    ),
+    se03BootVersion: firstMeaningfulVersion(
+      features.onekey_se03_boot_version,
+      previous?.se03BootVersion
+    ),
+    se04BootVersion: firstMeaningfulVersion(
+      features.onekey_se04_boot_version,
+      previous?.se04BootVersion
+    ),
+    seVersion: features.se_ver ?? previous?.seVersion ?? null,
     verify: {
-      firmwareBuildId: features.onekey_firmware_build_id,
-      firmwareHash: features.onekey_firmware_hash,
-      bootloaderBuildId: features.onekey_boot_build_id,
-      bootloaderHash: features.onekey_boot_hash,
-      boardBuildId: features.onekey_board_build_id,
-      boardHash: features.onekey_board_hash,
-      bleBuildId: features.onekey_ble_build_id,
-      bleHash: features.onekey_ble_hash,
-      se01BuildId: features.onekey_se01_build_id,
-      se01Hash: features.onekey_se01_hash,
-      se02BuildId: features.onekey_se02_build_id,
-      se02Hash: features.onekey_se02_hash,
-      se03BuildId: features.onekey_se03_build_id,
-      se03Hash: features.onekey_se03_hash,
-      se04BuildId: features.onekey_se04_build_id,
-      se04Hash: features.onekey_se04_hash,
-      se01BootBuildId: features.onekey_se01_boot_build_id,
-      se01BootHash: features.onekey_se01_boot_hash,
-      se02BootBuildId: features.onekey_se02_boot_build_id,
-      se02BootHash: features.onekey_se02_boot_hash,
-      se03BootBuildId: features.onekey_se03_boot_build_id,
-      se03BootHash: features.onekey_se03_boot_hash,
-      se04BootBuildId: features.onekey_se04_boot_build_id,
-      se04BootHash: features.onekey_se04_boot_hash,
+      firmwareBuildId: features.onekey_firmware_build_id ?? previous?.verify?.firmwareBuildId,
+      firmwareHash: features.onekey_firmware_hash ?? previous?.verify?.firmwareHash,
+      bootloaderBuildId: features.onekey_boot_build_id ?? previous?.verify?.bootloaderBuildId,
+      bootloaderHash: features.onekey_boot_hash ?? previous?.verify?.bootloaderHash,
+      boardBuildId: features.onekey_board_build_id ?? previous?.verify?.boardBuildId,
+      boardHash: features.onekey_board_hash ?? previous?.verify?.boardHash,
+      bleBuildId: features.onekey_ble_build_id ?? previous?.verify?.bleBuildId,
+      bleHash: features.onekey_ble_hash ?? previous?.verify?.bleHash,
+      se01BuildId: features.onekey_se01_build_id ?? previous?.verify?.se01BuildId,
+      se01Hash: features.onekey_se01_hash ?? previous?.verify?.se01Hash,
+      se02BuildId: features.onekey_se02_build_id ?? previous?.verify?.se02BuildId,
+      se02Hash: features.onekey_se02_hash ?? previous?.verify?.se02Hash,
+      se03BuildId: features.onekey_se03_build_id ?? previous?.verify?.se03BuildId,
+      se03Hash: features.onekey_se03_hash ?? previous?.verify?.se03Hash,
+      se04BuildId: features.onekey_se04_build_id ?? previous?.verify?.se04BuildId,
+      se04Hash: features.onekey_se04_hash ?? previous?.verify?.se04Hash,
+      se01BootBuildId: features.onekey_se01_boot_build_id ?? previous?.verify?.se01BootBuildId,
+      se01BootHash: features.onekey_se01_boot_hash ?? previous?.verify?.se01BootHash,
+      se02BootBuildId: features.onekey_se02_boot_build_id ?? previous?.verify?.se02BootBuildId,
+      se02BootHash: features.onekey_se02_boot_hash ?? previous?.verify?.se02BootHash,
+      se03BootBuildId: features.onekey_se03_boot_build_id ?? previous?.verify?.se03BootBuildId,
+      se03BootHash: features.onekey_se03_boot_hash ?? previous?.verify?.se03BootHash,
+      se04BootBuildId: features.onekey_se04_boot_build_id ?? previous?.verify?.se04BootBuildId,
+      se04BootHash: features.onekey_se04_boot_hash ?? previous?.verify?.se04BootHash,
     },
     sessionId,
     session_id: sessionId ?? undefined,
