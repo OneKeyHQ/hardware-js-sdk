@@ -73,11 +73,6 @@ export function MultisigCaseLibrary({
               Test mnemonic
             </Badge>
           ) : null}
-          {testCase.protocolTarget === 'onekey-pro-v1' ? (
-            <Badge variant="secondary" className="px-1.5 py-0 text-[9px]">
-              OneKey Pro V1
-            </Badge>
-          ) : null}
           {testCase.localOnly ? (
             <Badge variant="secondary" className="px-1.5 py-0 text-[9px]">
               Local only

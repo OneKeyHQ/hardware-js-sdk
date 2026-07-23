@@ -95,7 +95,6 @@ function ethCase(
     method: 'evmSignTypedData',
     parameters: { path: ETH_PATH, data },
     expectedDeviceChecks: [
-      'OneKey Pro',
       'Safe 地址',
       '目标地址',
       '金额与 Data',
@@ -104,7 +103,6 @@ function ethCase(
       'Gas Price、Gas Token 与 Refund Receiver',
     ],
     builtIn: true,
-    protocolTarget: 'onekey-pro-v1',
   };
 }
 
@@ -163,7 +161,6 @@ function generatedEthCases(
     ],
     builtIn: true,
     testMnemonicOnly: true,
-    protocolTarget: 'onekey-pro-v1',
     reference: cloneGenerated(fixture.reference),
     hardwareExpectation: {
       signerIndex,
@@ -346,25 +343,6 @@ const BUILT_IN_MULTISIG_BASE_CASES: MultisigTestCase[] = [
   ...GENERATED_MULTISIG_FIXTURES.btc.flatMap(fixture =>
     fixture.signerScenarios.map(scenario => btcSignCase(fixture, scenario, 'continue'))
   ),
-  {
-    ...btcAddressCase(
-      GENERATED_MULTISIG_FIXTURES.btc[2],
-      GENERATED_MULTISIG_FIXTURES.btc[2].signerScenarios[0]
-    ),
-    id: 'btc-invalid-threshold',
-    title: 'BTC 无效 4-of-3 阈值',
-    description: '本地校验负向用例，不发送到设备。',
-    parameters: {
-      ...cloneGenerated(GENERATED_MULTISIG_FIXTURES.btc[2].addressParameters),
-      multisig: {
-        ...cloneGenerated(GENERATED_MULTISIG_FIXTURES.btc[2].addressParameters.multisig),
-        m: 4,
-      },
-    },
-    source: 'regression',
-    localOnly: true,
-    hardwareExpectation: undefined,
-  },
 ];
 
 export const BUILT_IN_MULTISIG_CASES: MultisigTestCase[] =

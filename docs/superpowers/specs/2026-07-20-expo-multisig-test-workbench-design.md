@@ -2,7 +2,7 @@
 
 ## 1. 背景
 
-OneKey Pro 的 Protocol V1 已包含 Bitcoin 多签地址、脚本和交易签名能力，并通过 `EthereumGnosisSafeTxRequest/Ack` 支持 Gnosis Safe EIP-712 交易。Pro2 的 Protocol V2 当前不作为 EVM Safe 多签测试目标。`expo-playground` 已积累 Gnosis Safe EIP-712、EVM 交易和 BTC 交易示例，但当前入口按 SDK 方法分散，缺少一个面向多签回归的集中测试页面。
+OneKey Pro 的 Protocol V1 已包含 Bitcoin 多签地址、脚本和交易签名能力，并通过 `EthereumGnosisSafeTxRequest/Ack` 支持 Gnosis Safe EIP-712 交易。Pro2 调试阶段沿用同一套 Safe Request/Ack 参数结构。`expo-playground` 已积累 Gnosis Safe EIP-712、EVM 交易和 BTC 交易示例，但当前入口按 SDK 方法分散，缺少一个面向多签回归的集中测试页面。
 
 本功能新增独立的“多签测试台”，将固件能力、已有示例和新增回归用例统一整理，并提供快捷字段与完整 JSON 两种参数编辑方式。
 
@@ -36,7 +36,7 @@ Bitcoin 固件代码支持：
 
 OneKey Pro 固件支持标准交易签名和 EIP-712 结构化数据签名。`SafeTx` 会触发 `EthereumGnosisSafeTxRequest`，SDK 再以 `EthereumGnosisSafeTxAck` 发送 Safe 地址、目标、金额、data、operation、gas、nonce 等字段。该协议不包含 BTC 风格的 xpub 列表；Safe 成员使用 owner 地址表达，并作为离线 fixture 参考信息展示。
 
-当前测试以 OneKey Pro Protocol V1 为准，没有随仓库附带完整的 ETH/BTC 上游设备测试向量。因此页面来源标签使用 `Firmware Capability`，说明用例根据固件能力整理；Pro2 暂不执行 Pro Safe 用例。
+当前 Safe 测试参数以 OneKey Pro Protocol V1 的 `EthereumGnosisSafeTxRequest/Ack` 为准，并同时开放给 Pro2 调试使用。仓库没有附带完整的 ETH/BTC 上游设备测试向量，因此页面来源标签使用 `Firmware Capability`，说明用例根据固件能力整理。
 
 ### 4.2 Existing Example
 

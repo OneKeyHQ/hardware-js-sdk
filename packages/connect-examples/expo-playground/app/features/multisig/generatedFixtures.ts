@@ -85,7 +85,6 @@ export const GENERATED_MULTISIG_FIXTURES = {
         }
       },
       "expectedDeviceChecks": [
-        "OneKey Pro",
         "Safe 地址",
         "目标地址",
         "金额与 Data",
@@ -192,7 +191,6 @@ export const GENERATED_MULTISIG_FIXTURES = {
         }
       },
       "expectedDeviceChecks": [
-        "OneKey Pro",
         "Safe 地址",
         "目标地址",
         "金额与 Data",
@@ -299,7 +297,6 @@ export const GENERATED_MULTISIG_FIXTURES = {
         }
       },
       "expectedDeviceChecks": [
-        "OneKey Pro",
         "Safe 地址",
         "目标地址",
         "金额与 Data",

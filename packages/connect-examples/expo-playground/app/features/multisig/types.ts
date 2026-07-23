@@ -24,7 +24,6 @@ export type MultisigTestCase = {
   builtIn: boolean;
   localOnly?: boolean;
   testMnemonicOnly?: boolean;
-  protocolTarget?: 'onekey-pro-v1';
   reference?: MultisigFixtureReference;
   hardwareExpectation?: MultisigHardwareExpectation;
 };

@@ -4,7 +4,6 @@ import { BUILT_IN_MULTISIG_CASES } from './cases';
 import { GENERATED_MULTISIG_FIXTURES } from './generatedFixtures';
 import { applyJsonDraft, cloneAsCustomCase, setByPath } from './editor';
 import { loadCustomCases, saveCustomCases } from './storage';
-import { getMultisigCompatibilityIssue } from './compatibility';
 import { buildExecutionSummary, validateMultisigCase } from './validation';
 
 class MemoryStorage {
@@ -66,13 +65,51 @@ describe('multisig test workbench domain', () => {
     );
   });
 
-  test('Safe EIP-712 用例明确使用 OneKey Pro V1，并展示 2-of-3 owner 参考', () => {
+  test('Safe EIP-712 标准用例对齐 hardware example，并展示 2-of-3 owner 参考', () => {
     const safeCase = BUILT_IN_MULTISIG_CASES.find(
       item => item.id === 'eth-generated-standard-signer-1'
     );
 
     expect(safeCase).toBeDefined();
-    expect(safeCase?.protocolTarget).toBe('onekey-pro-v1');
+    expect(safeCase?.parameters.path).toBe("m/44'/60'/0'/0/0");
+    expect(safeCase?.parameters.data).toEqual({
+      types: {
+        SafeTx: [
+          { name: 'to', type: 'address' },
+          { name: 'value', type: 'uint256' },
+          { name: 'data', type: 'bytes' },
+          { name: 'operation', type: 'uint8' },
+          { name: 'safeTxGas', type: 'uint256' },
+          { name: 'baseGas', type: 'uint256' },
+          { name: 'gasPrice', type: 'uint256' },
+          { name: 'gasToken', type: 'address' },
+          { name: 'refundReceiver', type: 'address' },
+          { name: 'nonce', type: 'uint256' },
+        ],
+        EIP712Domain: [
+          { name: 'chainId', type: 'uint256' },
+          { name: 'verifyingContract', type: 'address' },
+        ],
+      },
+      domain: {
+        chainId: '0x1',
+        verifyingContract: '0x673f21761c5400531a37554a602fe0407addd0dd',
+      },
+      primaryType: 'SafeTx',
+      message: {
+        to: '0x5618207d27d78f09f61a5d92190d58c453feb4b7',
+        value: '10000000000000',
+        data: '0x',
+        operation: '0',
+        safeTxGas: '0',
+        baseGas: '0',
+        gasPrice: '0',
+        gasToken: '0x0000000000000000000000000000000000000000',
+        refundReceiver: '0x0000000000000000000000000000000000000000',
+        nonce: '0',
+      },
+    });
+    expect('protocolTarget' in safeCase!).toBe(false);
     expect(safeCase?.reference?.safeThreshold).toBe(2);
 
     const summary = buildExecutionSummary(safeCase!);
@@ -86,19 +123,8 @@ describe('multisig test workbench domain', () => {
     );
 
     BUILT_IN_MULTISIG_CASES.filter(item => item.method === 'evmSignTypedData').forEach(item => {
-      expect(item.protocolTarget).toBe('onekey-pro-v1');
+      expect('protocolTarget' in item).toBe(false);
     });
-  });
-
-  test('OneKey Pro Safe 用例在 Pro2 上给出明确的不支持提示', () => {
-    const safeCase = BUILT_IN_MULTISIG_CASES.find(
-      item => item.id === 'eth-generated-standard-signer-1'
-    );
-
-    expect(getMultisigCompatibilityIssue(safeCase!, false)).toBeUndefined();
-    expect(getMultisigCompatibilityIssue(safeCase!, true)).toBe(
-      '该 EVM Safe 用例使用 OneKey Pro Protocol V1；Pro2 暂未支持。'
-    );
   });
 
   test('覆盖 Safe 的 ERC20、EIP-1559、approveHash 和 DelegateCall 用例', () => {
@@ -221,6 +247,10 @@ describe('multisig test workbench domain', () => {
       valid: false,
       issues: [{ path: 'multisig.m', message: '签名阈值必须在 1 到公钥数量之间' }],
     });
+  });
+
+  test('不把 BTC 4-of-3 无效阈值作为可选内置用例', () => {
+    expect(BUILT_IN_MULTISIG_CASES.some(item => item.id === 'btc-invalid-threshold')).toBe(false);
   });
 
   test('applies valid JSON without mutating the source parameters', () => {

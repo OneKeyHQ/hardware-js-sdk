@@ -91,7 +91,6 @@ async function createFixture(
           : '由三个环境变量助记词生成的离线 Safe ERC20 transfer 测试向量。',
     parameters: { path: ETH_DERIVATION_PATH, data },
     expectedDeviceChecks: [
-      'OneKey Pro',
       'Safe 地址',
       '目标地址',
       '金额与 Data',
