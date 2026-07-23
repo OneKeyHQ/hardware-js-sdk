@@ -146,12 +146,12 @@ export function MultisigParameterEditor({
 
     return (
       <div key={id} className={className}>
-        <Label htmlFor={id} className="mb-1 block text-[11px] text-muted-foreground">
+        <Label htmlFor={id} className="mb-0.5 block text-[10px] text-muted-foreground">
           {field.label}
         </Label>
         {field.type === 'select' ? (
           <Select value={String(value ?? '')} disabled={disabled} onValueChange={handleValue}>
-          <SelectTrigger id={id} className="h-8 px-2.5 text-xs">
+            <SelectTrigger id={id} className="h-7 px-2 text-[11px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -168,7 +168,7 @@ export function MultisigParameterEditor({
             value={String(value ?? '')}
             disabled={disabled}
             onChange={event => handleValue(event.target.value)}
-            className="min-h-20 px-2.5 py-2 font-mono text-xs"
+            className="min-h-10 h-10 resize-y px-2 py-1.5 font-mono text-[11px] leading-4"
           />
         ) : (
           <Input
@@ -177,7 +177,7 @@ export function MultisigParameterEditor({
             value={String(value ?? '')}
             disabled={disabled}
             onChange={event => handleValue(event.target.value)}
-            className="h-8 px-2.5 font-mono text-xs"
+            className="h-7 px-2 font-mono text-[11px]"
           />
         )}
       </div>
@@ -185,8 +185,8 @@ export function MultisigParameterEditor({
   };
 
   return (
-    <section className="flex min-h-0 flex-col border-b border-border bg-background lg:max-h-[42vh] lg:flex-none">
-      <div className="flex shrink-0 flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3">
+    <section className="flex min-h-0 flex-col border-b border-border bg-background lg:max-h-[36vh] lg:flex-none">
+      <div className="flex shrink-0 flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-2.5">
         <div className="min-w-0 flex-1">
           {testCase.builtIn ? (
             <>
@@ -242,18 +242,11 @@ export function MultisigParameterEditor({
         </div>
       </div>
 
-      <div className="min-h-0 flex-auto space-y-3 overflow-visible px-4 py-3 lg:overflow-y-auto">
+      <div className="min-h-0 flex-auto space-y-2 overflow-visible px-4 py-2 lg:overflow-y-auto">
         <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-xs font-semibold">
-              {advancedOpen ? '完整请求参数' : '快捷字段'}
-            </h2>
-            <p className="text-[11px] text-muted-foreground">
-              {advancedOpen
-                ? 'JSON 合法并通过方法校验后才会应用。'
-                : '常用字段会同步到完整 SDK 请求参数。'}
-            </p>
-          </div>
+          <h2 className="text-[11px] font-semibold">
+            {advancedOpen ? '完整请求参数' : '快捷字段'}
+          </h2>
           <Button
             type="button"
             size="sm"
@@ -269,17 +262,18 @@ export function MultisigParameterEditor({
         {!advancedOpen ? (
           <div
             data-section="quick-fields"
-            className="grid grid-cols-1 gap-x-3 gap-y-2 md:grid-cols-2 xl:grid-cols-4"
+            className="grid grid-cols-1 gap-x-2.5 gap-y-1.5 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-6"
           >
             {quickFields.map(renderField)}
           </div>
         ) : (
           <div data-section="json-editor">
-            <div className="mb-2 flex justify-end">
+            <div className="mb-1.5 flex justify-end">
               <Button
                 size="sm"
                 variant="outline"
                 disabled={disabled}
+                className="h-7 text-[11px]"
                 onClick={() => {
                   const issues = onApplyJson(jsonDraft);
                   setJsonIssues(issues);
@@ -292,7 +286,7 @@ export function MultisigParameterEditor({
               value={jsonDraft}
               disabled={disabled}
               onChange={event => setJsonDraft(event.target.value)}
-              className="min-h-56 font-mono text-xs leading-5"
+              className="min-h-40 font-mono text-xs leading-5"
               spellCheck={false}
             />
           </div>
