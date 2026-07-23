@@ -14,17 +14,51 @@ const TEST_MNEMONICS: MultisigMnemonics = [
 ];
 
 describe('generateBtcFixtures', () => {
-  test('生成三种确定性的 BIP48 2-of-3 fixture', async () => {
+  test('生成三种 2-of-3 fixture 和图片同构的 P2WSH 2-of-2 fixture', async () => {
     const first = await generateBtcFixtures(TEST_MNEMONICS);
     const second = await generateBtcFixtures(TEST_MNEMONICS);
 
     expect(first).toEqual(second);
-    expect(first.map(item => item.id)).toEqual(['p2sh', 'p2sh-p2wsh', 'p2wsh']);
+    expect(first.map(item => item.id)).toEqual([
+      'p2sh',
+      'p2sh-p2wsh',
+      'p2wsh',
+      'p2wsh-2of2-index2',
+    ]);
     expect(first.map(item => item.scriptType)).toEqual([
       'SPENDMULTISIG',
       'SPENDP2SHWITNESS',
       'SPENDWITNESS',
+      'SPENDWITNESS',
     ]);
+  });
+
+  test('P2WSH 2-of-2 fixture 使用 /0/2 且只包含前两个 signer', async () => {
+    const fixtures = await generateBtcFixtures(TEST_MNEMONICS);
+    const fixture = fixtures.find(item => item.id === 'p2wsh-2of2-index2');
+
+    expect(fixture).toBeDefined();
+    expect(fixture).toMatchObject({
+      path: "m/48'/0'/0'/2'/0/2",
+      scriptType: 'SPENDWITNESS',
+      addressParameters: {
+        path: "m/48'/0'/0'/2'/0/2",
+        multisig: { m: 2, signatures: ['', ''] },
+      },
+      signerScenarios: [
+        {
+          signerIndex: 0,
+          signerEnvKey: 'MULTISIG_MNEMONIC_1',
+          prefilledSignerIndex: 1,
+        },
+      ],
+    });
+    expect(fixture?.addressParameters.multisig.pubkeys).toHaveLength(2);
+    fixture?.addressParameters.multisig.pubkeys.forEach(item => {
+      expect(item.address_n).toEqual([0, 2]);
+    });
+    expect(fixture?.reference.accountXpubs).toHaveLength(2);
+    expect(fixture?.reference.childPublicKeys).toHaveLength(2);
   });
 
   test('funding transaction 的 txid 和输出脚本与引用数据一致', async () => {
@@ -83,7 +117,7 @@ describe('generateBtcFixtures', () => {
     });
   });
 
-  test('三个签名均可由对应子公钥验证', async () => {
+  test('每个签名均可由对应子公钥验证', async () => {
     const fixtures = await generateBtcFixtures(TEST_MNEMONICS);
 
     fixtures.forEach(fixture => {
@@ -96,23 +130,25 @@ describe('generateBtcFixtures', () => {
     });
   });
 
-  test('签名槽位与三个 xpub 保持一致', async () => {
+  test('签名槽位与每个 fixture 的 xpub 数量保持一致', async () => {
     const fixtures = await generateBtcFixtures(TEST_MNEMONICS);
 
     fixtures.forEach(fixture => {
-      expect(fixture.addressParameters.multisig.pubkeys).toHaveLength(3);
-      expect(fixture.addressParameters.multisig.signatures).toEqual(['', '', '']);
-      expect(fixture.signParameters.inputs[0].multisig.signatures).toEqual(['', '', '']);
-      expect(fixture.partialSignParameters.inputs[0].multisig.signatures).toEqual([
-        fixture.reference.expectedSignatures[0],
-        '',
-        '',
-      ]);
-      expect(fixture.reference.doubleSignatures).toEqual([
-        fixture.reference.expectedSignatures[0],
-        fixture.reference.expectedSignatures[1],
-        '',
-      ]);
+      const signerCount = fixture.reference.accountXpubs.length;
+      const emptySignatures = Array.from({ length: signerCount }, () => '');
+      const partialSignatures = [...emptySignatures];
+      partialSignatures[0] = fixture.reference.expectedSignatures[0];
+      const doubleSignatures = [...emptySignatures];
+      doubleSignatures[0] = fixture.reference.expectedSignatures[0];
+      doubleSignatures[1] = fixture.reference.expectedSignatures[1];
+
+      expect(fixture.addressParameters.multisig.pubkeys).toHaveLength(signerCount);
+      expect(fixture.addressParameters.multisig.signatures).toEqual(emptySignatures);
+      expect(fixture.signParameters.inputs[0].multisig.signatures).toEqual(emptySignatures);
+      expect(fixture.partialSignParameters.inputs[0].multisig.signatures).toEqual(
+        partialSignatures
+      );
+      expect(fixture.reference.doubleSignatures).toEqual(doubleSignatures);
     });
   });
 
@@ -155,7 +191,9 @@ describe('generateBtcFixtures', () => {
         expect(scenario.signerIndex).toBe(0);
         expect(scenario.signerEnvKey).toBe('MULTISIG_MNEMONIC_1');
         expect(scenario.expectedSignature).toBe(fixture.reference.expectedSignatures[0]);
-        expect(scenario.firstSignParameters.inputs[0].multisig.signatures).toEqual(['', '', '']);
+        expect(scenario.firstSignParameters.inputs[0].multisig.signatures).toEqual(
+          Array.from({ length: fixture.reference.accountXpubs.length }, () => '')
+        );
 
         const continueSignatures = scenario.continueSignParameters.inputs[0].multisig.signatures;
         expect(continueSignatures[0]).toBe('');

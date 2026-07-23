@@ -3,13 +3,28 @@ import { resolve } from 'node:path';
 
 import { generateBtcFixtures } from './multisig/generateBtcFixtures';
 import { generateEthFixtures } from './multisig/generateEthFixtures';
-import { readMultisigMnemonics } from './multisig/readMnemonics';
+import {
+  mergeMultisigMnemonicEnv,
+  readMultisigMnemonics,
+} from './multisig/readMnemonics';
 import { renderMultisigFixtures } from './multisig/renderFixtures';
 
 const OUTPUT_PATH = resolve(
   process.cwd(),
   'app/features/multisig/generatedFixtures.ts'
 );
+const ENV_PATH = resolve(process.cwd(), 'scripts/.env');
+
+async function readFixtureEnv(): Promise<Record<string, string | undefined>> {
+  try {
+    const content = await readFile(ENV_PATH, 'utf8');
+    return mergeMultisigMnemonicEnv(content, process.env);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT') return process.env;
+    throw error;
+  }
+}
 
 async function readExistingOutput(): Promise<string | undefined> {
   try {
@@ -36,7 +51,7 @@ async function writeAtomically(content: string): Promise<boolean> {
 }
 
 async function main(): Promise<void> {
-  const mnemonics = readMultisigMnemonics(process.env);
+  const mnemonics = readMultisigMnemonics(await readFixtureEnv());
   const [eth, btc] = await Promise.all([
     generateEthFixtures(mnemonics),
     generateBtcFixtures(mnemonics),

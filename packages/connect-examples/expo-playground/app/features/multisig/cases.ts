@@ -60,7 +60,7 @@ function bytesSegment(data: string): string {
   return `${word(raw.length / 2)}${padded}`;
 }
 
-function safeExecCalldata(innerData: string): string {
+function safeExecCalldata(innerData: string, operation: '0' | '1' = '0'): string {
   const dataSegment = bytesSegment(innerData);
   const signaturesSegment = bytesSegment('0x');
   const dataOffset = 10 * 32;
@@ -69,7 +69,7 @@ function safeExecCalldata(innerData: string): string {
     addressWord(SAFE_TARGET),
     word(0),
     word(dataOffset),
-    word(0),
+    word(operation),
     word(0),
     word(0),
     word(0),
@@ -94,7 +94,14 @@ function ethCase(
     source,
     method: 'evmSignTypedData',
     parameters: { path: ETH_PATH, data },
-    expectedDeviceChecks: ['Safe 地址', '目标地址', '金额', 'operation 与 nonce'],
+    expectedDeviceChecks: [
+      'Safe 地址',
+      '目标地址',
+      '金额与 Data',
+      'Operation 与 Nonce',
+      'Safe Tx Gas 与 Base Gas',
+      'Gas Price、Gas Token 与 Refund Receiver',
+    ],
     builtIn: true,
   };
 }
@@ -104,6 +111,36 @@ type GeneratedBtcScenario = GeneratedBtcFixture['signerScenarios'][number];
 
 function cloneGenerated<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function evmTransactionCase(
+  id: string,
+  title: string,
+  description: string,
+  transaction: Record<string, unknown>,
+  expectedDeviceChecks: string[]
+): MultisigTestCase {
+  const signerIndex = 0 as const;
+  const signerAddress =
+    GENERATED_MULTISIG_FIXTURES.eth[0].reference.signerAddresses[signerIndex];
+
+  return {
+    id,
+    title: `${title} · Signer 1`,
+    description,
+    chain: 'eth',
+    source: 'regression',
+    method: 'evmSignTransaction',
+    parameters: { path: ETH_PATH, transaction },
+    expectedDeviceChecks: ['Signer 1', ...expectedDeviceChecks],
+    builtIn: true,
+    testMnemonicOnly: true,
+    hardwareExpectation: {
+      signerIndex,
+      signerEnvKey: 'MULTISIG_MNEMONIC_1',
+      signerAddress,
+    },
+  };
 }
 
 function generatedEthCases(
@@ -138,10 +175,13 @@ function btcAddressCase(
   fixture: GeneratedBtcFixture,
   scenario: GeneratedBtcScenario
 ): MultisigTestCase {
+  const threshold =
+    `${fixture.addressParameters.multisig.m}-of-` +
+    fixture.addressParameters.multisig.pubkeys.length;
   return {
     id: `btc-generated-${fixture.id}-address-signer-${scenario.signerIndex + 1}`,
-    title: `${fixture.title} 2-of-3 地址 · Signer ${scenario.signerIndex + 1}`,
-    description: '由三个环境变量助记词生成的离线 BIP48 多签地址。',
+    title: `${fixture.title} ${threshold} 地址 · Signer ${scenario.signerIndex + 1}`,
+    description: '由环境变量测试助记词生成的离线 BIP48 多签地址。',
     chain: 'btc',
     source: 'firmware-capability',
     method: 'btcGetAddress',
@@ -150,7 +190,9 @@ function btcAddressCase(
       `Signer ${scenario.signerIndex + 1}`,
       'Bitcoin 网络',
       fixture.title,
-      '2 / 3 阈值',
+      `${fixture.addressParameters.multisig.m} / ${
+        fixture.addressParameters.multisig.pubkeys.length
+      } 阈值`,
       '设备显示地址',
     ],
     builtIn: true,
@@ -171,9 +213,11 @@ function btcSignCase(
   mode: 'first' | 'continue'
 ): MultisigTestCase {
   const continuing = mode === 'continue';
+  const multisig = scenario.firstSignParameters.inputs[0].multisig;
+  const threshold = `${multisig.m}-of-${multisig.pubkeys.length}`;
   return {
     id: `btc-generated-${fixture.id}-${mode}-signer-${scenario.signerIndex + 1}`,
-    title: `${fixture.title} 2-of-3 ${continuing ? '继续签名' : '首次签名'} · Signer ${
+    title: `${fixture.title} ${threshold} ${continuing ? '继续签名' : '首次签名'} · Signer ${
       scenario.signerIndex + 1
     }`,
     description: continuing
@@ -209,54 +253,87 @@ function btcSignCase(
 
 const erc20TransferData =
   '0xa9059cbb0000000000000000000000005618207d27d78f09f61a5d92190d58c453feb4b700000000000000000000000000000000000000000000000000000000000f4240';
+const safeApproveHashData = `0xd4d9bdcd${'11'.repeat(32)}`;
 
-export const BUILT_IN_MULTISIG_CASES: MultisigTestCase[] = [
+const BUILT_IN_MULTISIG_BASE_CASES: MultisigTestCase[] = [
   ...GENERATED_MULTISIG_FIXTURES.eth.flatMap(generatedEthCases),
   ethCase('eth-safe-decimal-chain', 'Safe EIP-712 十进制 Chain ID', 'existing-example', safeTypedData('311', '0')),
-  {
-    id: 'eth-safe-calldata',
-    title: 'Safe execTransaction Calldata',
-    description: '使用标准 EVM 交易签署 Safe execTransaction calldata。',
-    chain: 'eth',
-    source: 'regression',
-    method: 'evmSignTransaction',
-    parameters: {
-      path: ETH_PATH,
-      transaction: {
-        to: SAFE_ADDRESS,
-        value: '0x0',
-        data: safeExecCalldata('0x'),
-        chainId: 1,
-        nonce: '0x0',
-        gasLimit: '0x30d40',
-        gasPrice: '0x3b9aca00',
-      },
+  evmTransactionCase(
+    'eth-safe-calldata',
+    'Safe execTransaction Calldata',
+    '使用标准 EVM 交易签署 Safe execTransaction calldata。',
+    {
+      to: SAFE_ADDRESS,
+      value: '0x0',
+      data: safeExecCalldata('0x'),
+      chainId: 1,
+      nonce: '0x0',
+      gasLimit: '0x30d40',
+      gasPrice: '0x3b9aca00',
     },
-    expectedDeviceChecks: ['Ethereum', 'Safe 合约地址', 'execTransaction calldata', '交易手续费'],
-    builtIn: true,
-  },
-  {
-    id: 'eth-safe-calldata-contract',
-    title: 'Safe Calldata 内部 ERC20 调用',
-    description: 'Safe execTransaction 内嵌 ERC20 transfer calldata。',
-    chain: 'eth',
-    source: 'regression',
-    method: 'evmSignTransaction',
-    parameters: {
-      path: ETH_PATH,
-      transaction: {
-        to: SAFE_ADDRESS,
-        value: '0x0',
-        data: safeExecCalldata(erc20TransferData),
-        chainId: 1,
-        nonce: '0x1',
-        gasLimit: '0x493e0',
-        gasPrice: '0x3b9aca00',
-      },
+    ['Ethereum', 'Safe 合约地址', 'execTransaction calldata', '交易手续费']
+  ),
+  evmTransactionCase(
+    'eth-safe-calldata-contract',
+    'Safe Calldata 内部 ERC20 调用',
+    'Safe execTransaction 内嵌 ERC20 transfer calldata。',
+    {
+      to: SAFE_ADDRESS,
+      value: '0x0',
+      data: safeExecCalldata(erc20TransferData),
+      chainId: 1,
+      nonce: '0x1',
+      gasLimit: '0x493e0',
+      gasPrice: '0x3b9aca00',
     },
-    expectedDeviceChecks: ['Ethereum', 'Safe 合约地址', '非空内部 calldata', '交易手续费'],
-    builtIn: true,
-  },
+    ['Ethereum', 'Safe 合约地址', '非空内部 calldata', '交易手续费']
+  ),
+  evmTransactionCase(
+    'eth-safe-calldata-eip1559',
+    'Safe execTransaction EIP-1559',
+    '使用 EIP-1559 费用字段签署 Safe execTransaction calldata。',
+    {
+      to: SAFE_ADDRESS,
+      value: '0x0',
+      data: safeExecCalldata(erc20TransferData),
+      chainId: 1,
+      nonce: '0x2',
+      gasLimit: '0x493e0',
+      maxFeePerGas: '0x77359400',
+      maxPriorityFeePerGas: '0x3b9aca00',
+    },
+    ['Ethereum', 'Safe 合约地址', 'EIP-1559 费用', '非空内部 calldata']
+  ),
+  evmTransactionCase(
+    'eth-safe-approve-hash',
+    'Safe approveHash',
+    '签署 Safe approveHash(bytes32) calldata。',
+    {
+      to: SAFE_ADDRESS,
+      value: '0x0',
+      data: safeApproveHashData,
+      chainId: 1,
+      nonce: '0x3',
+      gasLimit: '0x186a0',
+      gasPrice: '0x3b9aca00',
+    },
+    ['Ethereum', 'Safe 合约地址', 'approveHash', '待批准哈希']
+  ),
+  evmTransactionCase(
+    'eth-safe-calldata-delegate-call',
+    'Safe execTransaction DelegateCall',
+    '签署 operation=1 的 Safe execTransaction DelegateCall 风险用例。',
+    {
+      to: SAFE_ADDRESS,
+      value: '0x0',
+      data: safeExecCalldata('0x', '1'),
+      chainId: 1,
+      nonce: '0x4',
+      gasLimit: '0x30d40',
+      gasPrice: '0x3b9aca00',
+    },
+    ['Ethereum', 'Safe 合约地址', 'DelegateCall operation=1', '风险提示']
+  ),
   ...GENERATED_MULTISIG_FIXTURES.btc.flatMap(fixture =>
     fixture.signerScenarios.map(scenario => btcAddressCase(fixture, scenario))
   ),
@@ -266,26 +343,10 @@ export const BUILT_IN_MULTISIG_CASES: MultisigTestCase[] = [
   ...GENERATED_MULTISIG_FIXTURES.btc.flatMap(fixture =>
     fixture.signerScenarios.map(scenario => btcSignCase(fixture, scenario, 'continue'))
   ),
-  {
-    ...btcAddressCase(
-      GENERATED_MULTISIG_FIXTURES.btc[2],
-      GENERATED_MULTISIG_FIXTURES.btc[2].signerScenarios[0]
-    ),
-    id: 'btc-invalid-threshold',
-    title: 'BTC 无效 4-of-3 阈值',
-    description: '本地校验负向用例，不发送到设备。',
-    parameters: {
-      ...cloneGenerated(GENERATED_MULTISIG_FIXTURES.btc[2].addressParameters),
-      multisig: {
-        ...cloneGenerated(GENERATED_MULTISIG_FIXTURES.btc[2].addressParameters.multisig),
-        m: 4,
-      },
-    },
-    source: 'regression',
-    localOnly: true,
-    hardwareExpectation: undefined,
-  },
-].map(testCase => ({
+];
+
+export const BUILT_IN_MULTISIG_CASES: MultisigTestCase[] =
+  BUILT_IN_MULTISIG_BASE_CASES.map(testCase => ({
   ...testCase,
   parameters: {
     ...testCase.parameters,

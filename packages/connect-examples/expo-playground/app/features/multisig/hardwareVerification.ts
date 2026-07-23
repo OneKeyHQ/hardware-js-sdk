@@ -1,4 +1,5 @@
 import { verify } from '@noble/secp256k1';
+import { Signature, Transaction } from 'ethers';
 
 import type {
   MultisigHardwareVerification,
@@ -94,6 +95,43 @@ export function verifyMultisigHardwareResult(
         expectation.expectedSignature,
         data.signature,
         (expected, actual) => normalizeHex(expected) === normalizeHex(actual)
+      ),
+    ]);
+  }
+
+  if (testCase.method === 'evmSignTransaction') {
+    const transaction = testCase.parameters.transaction;
+    if (
+      !isRecord(transaction) ||
+      typeof data.v !== 'string' ||
+      typeof data.r !== 'string' ||
+      typeof data.s !== 'string'
+    ) {
+      return unavailable('SDK 返回中缺少 EVM 交易签名。');
+    }
+
+    let recoveredAddress = '签名无法恢复';
+    try {
+      const signature = Signature.from({
+        v: Number(BigInt(data.v)),
+        r: data.r,
+        s: data.s,
+      });
+      const transactionType =
+        transaction.maxFeePerGas && transaction.maxPriorityFeePerGas ? 2 : 0;
+      recoveredAddress =
+        Transaction.from({ ...transaction, type: transactionType, signature }).from ??
+        recoveredAddress;
+    } catch {
+      // 保留不可恢复结果，由统一校验结果展示为失败。
+    }
+
+    return complete([
+      check(
+        'Signer 地址',
+        expectation.signerAddress,
+        recoveredAddress,
+        (expected, actual) => expected.toLowerCase() === actual.toLowerCase()
       ),
     ]);
   }

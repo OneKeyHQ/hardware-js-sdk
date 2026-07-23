@@ -5,13 +5,14 @@ export type PublicFixtureReference = {
 };
 
 export type EthFixtureReference = PublicFixtureReference & {
+  safeThreshold: number;
   digest: string;
   aggregatedSignatures2Of3: string;
   aggregatedSignatures3Of3: string;
 };
 
 export type EthMultisigFixture = {
-  id: 'standard' | 'delegate-call';
+  id: 'standard' | 'delegate-call' | 'erc20-transfer';
   title: string;
   description: string;
   parameters: {
@@ -97,7 +98,7 @@ export type BtcFixtureReference = PublicFixtureReference & {
 };
 
 export type BtcMultisigFixture = {
-  id: 'p2sh' | 'p2sh-p2wsh' | 'p2wsh';
+  id: 'p2sh' | 'p2sh-p2wsh' | 'p2wsh' | 'p2wsh-2of2-index2';
   title: string;
   path: string;
   scriptType: BtcScriptType;

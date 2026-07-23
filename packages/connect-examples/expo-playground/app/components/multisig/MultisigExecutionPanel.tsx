@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
+  ChevronDown,
   Circle,
   Clock3,
+  Code2,
   Info,
   Loader2,
   Play,
@@ -46,6 +49,7 @@ export function MultisigExecutionPanel({
   state,
   onExecute,
 }: MultisigExecutionPanelProps) {
+  const [rawResponseOpen, setRawResponseOpen] = useState(false);
   const running = state.status === 'running';
   const actionDisabled =
     running || (!testCase.localOnly && (!validation.valid || !canExecute));
@@ -108,25 +112,39 @@ export function MultisigExecutionPanel({
 
       <div
         data-section="execution-summary"
-        className="max-h-[180px] shrink-0 space-y-3 overflow-y-auto border-b border-border/70 bg-card/50 px-4 py-3"
+        className="max-h-[180px] shrink-0 space-y-2 overflow-y-auto border-b border-border/70 bg-card/50 px-4 py-2.5"
       >
         {testCase.testMnemonicOnly ? (
-          <Alert variant="warning" className="py-2">
-            <ShieldAlert className="h-4 w-4" />
-            <AlertTitle>测试助记词限定</AlertTitle>
-            <AlertDescription>
-              当前用例必须在载入{' '}
-              <span className="font-mono font-medium">
-                {testCase.hardwareExpectation?.signerEnvKey ?? '对应测试助记词'}
-              </span>{' '}
-              的测试设备或模拟器上执行，不可广播交易。
-            </AlertDescription>
-          </Alert>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-orange-300/70 bg-orange-50 px-2.5 py-1.5 text-[11px] text-orange-800 dark:border-orange-900/70 dark:bg-orange-950/30 dark:text-orange-200">
+            <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
+            <span className="font-medium">测试设备</span>
+            <span className="font-mono">
+              {testCase.hardwareExpectation?.signerEnvKey ?? '对应测试助记词'}
+            </span>
+            <span className="text-orange-700/80 dark:text-orange-200/70">仅用于测试，不可广播</span>
+          </div>
         ) : null}
 
-        <div className="grid gap-4 xl:grid-cols-[minmax(280px,0.38fr)_minmax(0,0.62fr)]">
-          <div className="min-w-0">
-            <div className="mb-2 text-[11px] font-medium text-foreground">设备核对项</div>
+        <div className="grid min-w-0 grid-cols-2 gap-x-6 gap-y-2 md:grid-cols-4 xl:grid-cols-6">
+          {summary.map(item => (
+            <div key={item.label} className="min-w-0">
+              <div className="text-[10px] font-medium text-muted-foreground">{item.label}</div>
+              <div
+                className="mt-0.5 truncate font-mono text-[11px] text-foreground"
+                title={item.value}
+              >
+                {item.value}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <details className="group text-[11px] text-muted-foreground">
+          <summary className="flex cursor-pointer list-none items-center gap-1.5 py-0.5 font-medium text-foreground/80 hover:text-foreground">
+            <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
+            展开设备核对项
+          </summary>
+          <div className="pt-1.5">
             <ul className="flex flex-wrap gap-x-5 gap-y-1.5 text-[11px] text-muted-foreground">
               {testCase.expectedDeviceChecks.map(item => (
                 <li key={item} className="flex items-center gap-2">
@@ -136,21 +154,7 @@ export function MultisigExecutionPanel({
               ))}
             </ul>
           </div>
-
-          <div className="grid min-w-0 grid-cols-2 gap-x-6 gap-y-2 md:grid-cols-4">
-            {summary.map(item => (
-              <div key={item.label} className="min-w-0">
-                <div className="text-[11px] font-medium text-muted-foreground">{item.label}</div>
-                <div
-                  className="mt-0.5 truncate font-mono text-xs text-foreground"
-                  title={item.value}
-                >
-                  {item.value}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        </details>
       </div>
 
       <div
@@ -226,9 +230,25 @@ export function MultisigExecutionPanel({
                   </div>
                 </div>
               ) : null}
-              <pre className="min-h-28 flex-1 overflow-auto whitespace-pre-wrap break-all rounded-md border border-border/70 bg-muted/30 p-4 font-mono text-xs leading-5">
-                {JSON.stringify(state.result, null, 2)}
-              </pre>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                aria-expanded={rawResponseOpen}
+                onClick={() => setRawResponseOpen(value => !value)}
+                className="h-7 w-fit gap-1.5 px-2 text-[11px] text-muted-foreground"
+              >
+                <Code2 className="h-3.5 w-3.5" />
+                {rawResponseOpen ? '收起原始响应' : '查看原始响应'}
+                <ChevronDown
+                  className={`h-3.5 w-3.5 transition-transform ${rawResponseOpen ? 'rotate-180' : ''}`}
+                />
+              </Button>
+              {rawResponseOpen ? (
+                <pre className="min-h-28 flex-1 overflow-auto whitespace-pre-wrap break-all rounded-md border border-border/70 bg-muted/30 p-3 font-mono text-xs leading-5">
+                  {JSON.stringify(state.result, null, 2)}
+                </pre>
+              ) : null}
             </div>
           ) : null}
         </div>

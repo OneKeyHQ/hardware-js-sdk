@@ -77,6 +77,7 @@ export type ExecutionSummaryItem = {
 
 export type MultisigFixtureReference = {
   broadcastable: false;
+  safeThreshold?: number;
   signerAddresses: readonly string[];
   expectedSignatures: readonly string[];
   digest?: string;

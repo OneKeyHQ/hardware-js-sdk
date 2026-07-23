@@ -183,11 +183,24 @@ export function buildExecutionSummary(testCase: MultisigTestCase): ExecutionSumm
       const data = asRecord(params.data);
       const domain = asRecord(data?.domain);
       const message = asRecord(data?.message);
+      const ownerItems: ExecutionSummaryItem[] = testCase.reference?.safeThreshold
+        ? [
+            {
+              label: 'Safe 阈值',
+              value: `${testCase.reference.safeThreshold} / ${testCase.reference.signerAddresses.length}`,
+            },
+            ...testCase.reference.signerAddresses.map((address, index) => ({
+              label: `Owner #${index + 1}`,
+              value: address,
+            })),
+          ]
+        : [];
       return [...signerItems,
         { label: '方法', value: testCase.method },
         { label: 'Safe', value: truncate(domain?.verifyingContract) },
         { label: '目标', value: truncate(message?.to) },
         { label: '金额', value: String(message?.value ?? '0') },
+        ...ownerItems,
       ];
     }
     const transaction = asRecord(params.transaction);
