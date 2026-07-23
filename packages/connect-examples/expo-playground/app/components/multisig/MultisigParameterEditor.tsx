@@ -44,6 +44,11 @@ function getQuickFields(testCase: MultisigTestCase): QuickField[] {
       { label: 'Nonce', path: ['data', 'message', 'nonce'] },
       { label: 'Operation', path: ['data', 'message', 'operation'], type: 'select', options: ['0', '1'] },
       { label: 'Safe Tx Gas', path: ['data', 'message', 'safeTxGas'] },
+      { label: 'Base Gas', path: ['data', 'message', 'baseGas'] },
+      { label: 'Gas Price', path: ['data', 'message', 'gasPrice'] },
+      { label: 'Gas Token', path: ['data', 'message', 'gasToken'], wide: true },
+      { label: 'Refund Receiver', path: ['data', 'message', 'refundReceiver'], wide: true },
+      { label: 'Data', path: ['data', 'message', 'data'], type: 'textarea', wide: true },
     ];
   }
 

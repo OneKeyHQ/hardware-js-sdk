@@ -64,6 +64,7 @@ describe('generateEthFixtures', () => {
     expect(fixture.reference.aggregatedSignatures3Of3).toBe(
       `0x${sorted.map(item => item.signature.slice(2)).join('')}`
     );
+    expect(fixture.reference.safeThreshold).toBe(2);
   });
 
   test('页面参数不包含私钥材料', async () => {

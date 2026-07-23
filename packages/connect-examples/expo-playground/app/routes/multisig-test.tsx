@@ -10,6 +10,7 @@ import {
 import { MultisigParameterEditor } from '../components/multisig/MultisigParameterEditor';
 import { Breadcrumb } from '../components/ui/Breadcrumb';
 import { BUILT_IN_MULTISIG_CASES } from '../features/multisig/cases';
+import { getMultisigCompatibilityIssue } from '../features/multisig/compatibility';
 import { applyJsonDraft, cloneAsCustomCase, setByPath } from '../features/multisig/editor';
 import { verifyMultisigHardwareResult } from '../features/multisig/hardwareVerification';
 import { loadCustomCases, saveCustomCases } from '../features/multisig/storage';
@@ -17,6 +18,8 @@ import type { MultisigChain, MultisigTestCase, ValidationIssue } from '../featur
 import { buildExecutionSummary, validateMultisigCase } from '../features/multisig/validation';
 import { useHardwareMethodExecution } from '../hooks/useHardwareMethodExecution';
 import { signerMethodsRegistry } from '../hooks/useMethodsRegistry';
+import { useDeviceInfo } from '../hooks/useDeviceInfo';
+import { isPro2DeviceInfo } from '../utils/pro2Device';
 
 function cloneParameters(parameters: Record<string, unknown>): Record<string, unknown> {
   return JSON.parse(JSON.stringify(parameters)) as Record<string, unknown>;
@@ -37,6 +40,7 @@ export default function MultisigTestPage() {
   const [title, setTitle] = useState(BUILT_IN_MULTISIG_CASES[0].title);
   const [execution, setExecution] = useState<MultisigExecutionState>({ status: 'idle' });
   const { executeMethod, canExecute } = useHardwareMethodExecution();
+  const { currentDevice } = useDeviceInfo();
 
   const allCases = useMemo(
     () => [...BUILT_IN_MULTISIG_CASES, ...customCases],
@@ -52,6 +56,10 @@ export default function MultisigTestPage() {
   );
   const validation = useMemo(() => validateMultisigCase(currentCase), [currentCase]);
   const summary = useMemo(() => buildExecutionSummary(currentCase), [currentCase]);
+  const compatibilityIssue = useMemo(
+    () => getMultisigCompatibilityIssue(currentCase, isPro2DeviceInfo(currentDevice)),
+    [currentCase, currentDevice]
+  );
   const dirty = useMemo(
     () =>
       title !== selectedCase.title ||
@@ -113,6 +121,10 @@ export default function MultisigTestPage() {
 
   const handleExecute = async () => {
     const startedAt = performance.now();
+    if (compatibilityIssue) {
+      setExecution({ status: 'error', error: compatibilityIssue });
+      return;
+    }
     const nextValidation = validateMultisigCase(currentCase);
     if (currentCase.localOnly) {
       setExecution({

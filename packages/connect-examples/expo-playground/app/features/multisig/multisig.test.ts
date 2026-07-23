@@ -4,7 +4,8 @@ import { BUILT_IN_MULTISIG_CASES } from './cases';
 import { GENERATED_MULTISIG_FIXTURES } from './generatedFixtures';
 import { applyJsonDraft, cloneAsCustomCase, setByPath } from './editor';
 import { loadCustomCases, saveCustomCases } from './storage';
-import { validateMultisigCase } from './validation';
+import { getMultisigCompatibilityIssue } from './compatibility';
+import { buildExecutionSummary, validateMultisigCase } from './validation';
 
 class MemoryStorage {
   private value: string | null = null;
@@ -62,6 +63,41 @@ describe('multisig test workbench domain', () => {
 
     expect(new Set(signer1Addresses)).toEqual(
       new Set(['0x5618207d27D78F09f61A5D92190d58c453feB4b7'])
+    );
+  });
+
+  test('Safe EIP-712 用例明确使用 OneKey Pro V1，并展示 2-of-3 owner 参考', () => {
+    const safeCase = BUILT_IN_MULTISIG_CASES.find(
+      item => item.id === 'eth-generated-standard-signer-1'
+    );
+
+    expect(safeCase).toBeDefined();
+    expect(safeCase?.protocolTarget).toBe('onekey-pro-v1');
+    expect(safeCase?.reference?.safeThreshold).toBe(2);
+
+    const summary = buildExecutionSummary(safeCase!);
+    expect(summary).toEqual(
+      expect.arrayContaining([
+        { label: 'Safe 阈值', value: '2 / 3' },
+        { label: 'Owner #1', value: '0x5618207d27D78F09f61A5D92190d58c453feB4b7' },
+        { label: 'Owner #2', value: '0x30be964E2b0ab050fB9358BED3d31bdF2C4f391E' },
+        { label: 'Owner #3', value: '0x55F453190B934d38b622e1C6e3CE165017034177' },
+      ])
+    );
+
+    BUILT_IN_MULTISIG_CASES.filter(item => item.method === 'evmSignTypedData').forEach(item => {
+      expect(item.protocolTarget).toBe('onekey-pro-v1');
+    });
+  });
+
+  test('OneKey Pro Safe 用例在 Pro2 上给出明确的不支持提示', () => {
+    const safeCase = BUILT_IN_MULTISIG_CASES.find(
+      item => item.id === 'eth-generated-standard-signer-1'
+    );
+
+    expect(getMultisigCompatibilityIssue(safeCase!, false)).toBeUndefined();
+    expect(getMultisigCompatibilityIssue(safeCase!, true)).toBe(
+      '该 EVM Safe 用例使用 OneKey Pro Protocol V1；Pro2 暂未支持。'
     );
   });
 

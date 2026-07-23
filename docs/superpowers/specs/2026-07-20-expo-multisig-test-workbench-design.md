@@ -2,7 +2,7 @@
 
 ## 1. 背景
 
-`firmware-pro2` 已包含 Bitcoin 多签地址、脚本和交易签名实现，以及 Ethereum EIP-712、普通交易签名实现。`expo-playground` 也已经积累 Gnosis Safe EIP-712、EVM 交易和 BTC 交易示例，但当前入口按 SDK 方法分散，缺少一个面向多签回归的集中测试页面。
+OneKey Pro 的 Protocol V1 已包含 Bitcoin 多签地址、脚本和交易签名能力，并通过 `EthereumGnosisSafeTxRequest/Ack` 支持 Gnosis Safe EIP-712 交易。Pro2 的 Protocol V2 当前不作为 EVM Safe 多签测试目标。`expo-playground` 已积累 Gnosis Safe EIP-712、EVM 交易和 BTC 交易示例，但当前入口按 SDK 方法分散，缺少一个面向多签回归的集中测试页面。
 
 本功能新增独立的“多签测试台”，将固件能力、已有示例和新增回归用例统一整理，并提供快捷字段与完整 JSON 两种参数编辑方式。
 
@@ -21,7 +21,7 @@
 - 不实现多签协调服务、签名人通信或链上提交流程。
 - 不在页面中保存助记词、私钥或其他敏感材料。
 - 不修改用户当前正在编辑的 `pro2-debug.tsx`。
-- 不把 ETH 多签描述成设备原生的独立协议；硬件设备仍执行标准 EVM 交易或 EIP-712 签名。
+- 不把 Safe owner 地址或 BTC xpub 注入并不存在的 EVM 协议字段；Pro 通过 Safe 专用 Request/Ack 握手签署 EIP-712 数据。
 
 ## 4. 现有能力与用例来源
 
@@ -34,9 +34,9 @@ Bitcoin 固件代码支持：
 - 带 `multisig` 的 `SPENDWITNESS`：原生 P2WSH 多签。
 - 多签地址生成、阈值与公钥校验、已有签名槽位、交易输入和找零输出。
 
-Ethereum 固件代码支持标准交易签名和 EIP-712 结构化数据签名。Safe 多签语义由 EIP-712 数据或合约 calldata 表达，而不是一个单独的固件多签消息类型。
+OneKey Pro 固件支持标准交易签名和 EIP-712 结构化数据签名。`SafeTx` 会触发 `EthereumGnosisSafeTxRequest`，SDK 再以 `EthereumGnosisSafeTxAck` 发送 Safe 地址、目标、金额、data、operation、gas、nonce 等字段。该协议不包含 BTC 风格的 xpub 列表；Safe 成员使用 owner 地址表达，并作为离线 fixture 参考信息展示。
 
-当前 `firmware-pro2` 子模块包含上述实现代码，但没有随仓库附带完整的 ETH/BTC 上游设备测试向量。因此页面来源标签使用 `Firmware Capability`，说明用例根据固件能力整理。
+当前测试以 OneKey Pro Protocol V1 为准，没有随仓库附带完整的 ETH/BTC 上游设备测试向量。因此页面来源标签使用 `Firmware Capability`，说明用例根据固件能力整理；Pro2 暂不执行 Pro Safe 用例。
 
 ### 4.2 Existing Example
 
@@ -250,4 +250,3 @@ BTC 快捷字段包括：
 - 无效用例在调用设备前被拦截，并显示字段级错误。
 - 页面能完整展示设备状态、请求摘要、签名结果和错误。
 - 页面不会广播交易，也不会覆盖内置用例或现有 `pro2-debug.tsx` 改动。
-

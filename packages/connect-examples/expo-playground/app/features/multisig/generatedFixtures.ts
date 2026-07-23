@@ -85,13 +85,17 @@ export const GENERATED_MULTISIG_FIXTURES = {
         }
       },
       "expectedDeviceChecks": [
+        "OneKey Pro",
         "Safe 地址",
         "目标地址",
-        "金额",
-        "operation 与 nonce"
+        "金额与 Data",
+        "Operation 与 Nonce",
+        "Safe Tx Gas 与 Base Gas",
+        "Gas Price、Gas Token 与 Refund Receiver"
       ],
       "reference": {
         "broadcastable": false,
+        "safeThreshold": 2,
         "digest": "0x3967ec90437ee9540ac2bf7e47546986487b2d7c1b31ca81d2e085a59deb5165",
         "signerAddresses": [
           "0x5618207d27D78F09f61A5D92190d58c453feB4b7",
@@ -188,13 +192,17 @@ export const GENERATED_MULTISIG_FIXTURES = {
         }
       },
       "expectedDeviceChecks": [
+        "OneKey Pro",
         "Safe 地址",
         "目标地址",
-        "金额",
-        "operation 与 nonce"
+        "金额与 Data",
+        "Operation 与 Nonce",
+        "Safe Tx Gas 与 Base Gas",
+        "Gas Price、Gas Token 与 Refund Receiver"
       ],
       "reference": {
         "broadcastable": false,
+        "safeThreshold": 2,
         "digest": "0x12911c58eea24da886c866acca164117f3751c85335ed5c90d0ce30d60a54a52",
         "signerAddresses": [
           "0x5618207d27D78F09f61A5D92190d58c453feB4b7",
@@ -291,13 +299,17 @@ export const GENERATED_MULTISIG_FIXTURES = {
         }
       },
       "expectedDeviceChecks": [
+        "OneKey Pro",
         "Safe 地址",
         "目标地址",
-        "金额",
-        "operation 与 nonce"
+        "金额与 Data",
+        "Operation 与 Nonce",
+        "Safe Tx Gas 与 Base Gas",
+        "Gas Price、Gas Token 与 Refund Receiver"
       ],
       "reference": {
         "broadcastable": false,
+        "safeThreshold": 2,
         "digest": "0xad23663a4dd03667a78308742c2796dee85bdd48ac1e5b4e12281f86af2515ba",
         "signerAddresses": [
           "0x5618207d27D78F09f61A5D92190d58c453feB4b7",

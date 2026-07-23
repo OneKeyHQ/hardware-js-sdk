@@ -94,8 +94,17 @@ function ethCase(
     source,
     method: 'evmSignTypedData',
     parameters: { path: ETH_PATH, data },
-    expectedDeviceChecks: ['Safe 地址', '目标地址', '金额', 'operation 与 nonce'],
+    expectedDeviceChecks: [
+      'OneKey Pro',
+      'Safe 地址',
+      '目标地址',
+      '金额与 Data',
+      'Operation 与 Nonce',
+      'Safe Tx Gas 与 Base Gas',
+      'Gas Price、Gas Token 与 Refund Receiver',
+    ],
     builtIn: true,
+    protocolTarget: 'onekey-pro-v1',
   };
 }
 
@@ -154,6 +163,7 @@ function generatedEthCases(
     ],
     builtIn: true,
     testMnemonicOnly: true,
+    protocolTarget: 'onekey-pro-v1',
     reference: cloneGenerated(fixture.reference),
     hardwareExpectation: {
       signerIndex,

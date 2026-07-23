@@ -5,6 +5,7 @@ export type PublicFixtureReference = {
 };
 
 export type EthFixtureReference = PublicFixtureReference & {
+  safeThreshold: number;
   digest: string;
   aggregatedSignatures2Of3: string;
   aggregatedSignatures3Of3: string;
