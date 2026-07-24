@@ -103,7 +103,6 @@ const getFirmwareUploadWriteRetryType = (error: unknown): FirmwareUploadWriteRet
 
 const resolveFirmwareUploadRetryDelay = (attempt: number, baseDelayMs = 200, maxDelayMs = 1200) =>
   Math.min(baseDelayMs * 2 ** attempt, maxDelayMs);
-const BLE_RESPONSE_TIMEOUT_MS = 30_000;
 const PROTOCOL_PROBE_TIMEOUT_MS = 1000;
 const PROTOCOL_V2_PROBE_TIMEOUT_MS = 10_000;
 const DEVICE_SCAN_TIMEOUT_MS = 8000;
@@ -1635,7 +1634,12 @@ export default class ReactNativeBleTransport {
 
     const callOptions = {
       ...options,
-      timeoutMs: options?.timeoutMs ?? BLE_RESPONSE_TIMEOUT_MS,
+      // Align with V1 BLE and the USB V2 base transport: only arm a watchdog when the caller
+      // explicitly passes timeoutMs. Interactive acks (ButtonAck/PinMatrixAck/PassphraseAck)
+      // have their timeoutMs removed by DeviceCommands.stripInteractiveAckTimeout, so we must
+      // not fill in a 30s default here — that would hard-cap the time a user spends confirming
+      // a transaction or entering a PIN/passphrase on the device and tear down the BLE link.
+      timeoutMs: options?.timeoutMs,
     };
     const highVolumeWrite = LogBlockCommand.has(name);
 

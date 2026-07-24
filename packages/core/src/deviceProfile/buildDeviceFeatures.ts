@@ -115,7 +115,11 @@ export const buildProtocolV1FeaturesPayload = (
   const firmwareVersion = firstMeaningfulVersion(
     features.onekey_firmware_version,
     features.onekey_version,
-    versionFromParts(features.major_version, features.minor_version, features.patch_version),
+    // In bootloader mode major/minor/patch is the bootloader version, not firmware; avoid
+    // projecting it as firmwareVersion so existing device upgrade flows keep a correct version.
+    features.bootloader_mode
+      ? null
+      : versionFromParts(features.major_version, features.minor_version, features.patch_version),
     previous?.firmwareVersion
   );
   const bootloaderVersion = firstMeaningfulVersion(

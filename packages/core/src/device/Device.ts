@@ -42,6 +42,7 @@ import {
 } from './DeviceStateMapper';
 import { projectFeatures } from './DeviceStateProjector';
 import { DeviceStateStore, createPublicDeviceState } from './DeviceStateStore';
+import { cloneDeviceState } from './cloneDeviceState';
 import { deviceWalletSessionStore } from './DeviceWalletSessionStore';
 import {
   type DeviceFirmwareRange,
@@ -924,7 +925,7 @@ export class Device extends EventEmitter {
     if (!this.state) {
       throw ERRORS.TypedError(HardwareErrorCode.DeviceInitializeFailed);
     }
-    return params.includeRaw ? structuredClone(this.state) : createPublicDeviceState(this.state);
+    return params.includeRaw ? cloneDeviceState(this.state) : createPublicDeviceState(this.state);
   }
 
   _updateFeatures(protoFeatures: PROTO.Features | Features, initSession?: boolean) {

@@ -27,8 +27,8 @@ export function supportBatchPublicKeyByDevice(
   const currentVersion = device.getCurrentFirmwareVersionString() ?? '0.0.0';
   const deviceType = device.getCurrentDeviceType();
 
-  // Pro2 (Protocol V2) 版本线独立于 Pro 系列，固件从首个版本即支持 batch / include_node，
-  // 不能套用下面 Pro 系列的 4.x 门槛。
+  // Pro2 (Protocol V2) follows its own firmware line and has supported batch / include_node
+  // since its first firmware release, so it must not be gated by the Pro-series 4.x thresholds below.
   if (device.isProtocolV2() || deviceType === EDeviceType.Pro2) {
     return true;
   }

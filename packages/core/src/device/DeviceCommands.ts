@@ -98,6 +98,12 @@ function sanitizeDebugPayload(value: unknown, key = '', depth = 0): unknown {
     return summarizeRedactedData(value);
   }
 
+  // passphrase / host_passphrase 等键名承载隐藏钱包明文，统一脱敏做纵深防御，
+  // 避免任何命令（例如 Protocol V2 的 DeviceSessionOpen）意外把明文写入日志。
+  if (key && /passphrase/i.test(key)) {
+    return '[redacted passphrase]';
+  }
+
   const byteLength = getBinaryByteLength(value);
   if (byteLength !== undefined) {
     return `[binary: ${byteLength} bytes]`;
@@ -440,6 +446,7 @@ export class DeviceCommands {
         'PinMatrixAck',
         'PassphraseAck',
         'Cancel',
+        'DeviceSessionOpen',
         'BixinPinInputOnDevice',
         'FilesystemFileRead',
         'FilesystemFileWrite',

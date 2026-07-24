@@ -1,3 +1,5 @@
+import { cloneDeviceState } from './cloneDeviceState';
+
 import type { DeviceFeaturesRaw, DeviceState, DeviceStateSession, Features } from '../types';
 
 type StoredDeviceState = DeviceState & {
@@ -9,7 +11,7 @@ const getBootloaderMode = (state: StoredDeviceState) =>
   state.status.mode === 'bootloader' || state.status.mode === 'romloader';
 
 export const projectFeatures = (state: StoredDeviceState): Features => {
-  const snapshot = structuredClone(state);
+  const snapshot = cloneDeviceState(state);
   const rawFeatures = snapshot.raw?.protocolV1Features ?? {};
   const rawOneKeyFeatures = snapshot.raw?.protocolV1OneKeyFeatures ?? {};
   const sessionId = snapshot.session?.sessionId ?? null;

@@ -1,5 +1,7 @@
 import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
 
+import { cloneDeviceState } from './cloneDeviceState';
+
 import type {
   DeviceFeaturesRaw,
   DeviceState,
@@ -128,7 +130,7 @@ export class DeviceStateStore {
   private state: StoredDeviceState | undefined;
 
   constructor(initial?: StoredDeviceState) {
-    this.state = initial ? structuredClone(initial) : undefined;
+    this.state = initial ? cloneDeviceState(initial) : undefined;
   }
 
   getState() {
@@ -138,7 +140,7 @@ export class DeviceStateStore {
   replace(state: StoredDeviceState, source: DeviceStateUpdateSource): DeviceStateUpdateResult {
     const revision = (this.state?.revision ?? 0) + 1;
     this.state = {
-      ...structuredClone(state),
+      ...cloneDeviceState(state),
       revision,
       updatedAt: Date.now(),
     };
@@ -151,7 +153,7 @@ export class DeviceStateStore {
   }
 
   update(patch: DeviceStatePatch, source: DeviceStateUpdateSource): DeviceStateUpdateResult {
-    const next = structuredClone(this.state ?? createEmptyDeviceState());
+    const next = cloneDeviceState(this.state ?? createEmptyDeviceState());
     const changedKeys: string[] = [];
 
     if (patch.protocol !== undefined && patch.protocol !== next.protocol) {
@@ -168,13 +170,13 @@ export class DeviceStateStore {
     if (patch.versions) applySectionPatch(next.versions, patch.versions, 'versions', changedKeys);
 
     if (patch.capabilities !== undefined && !isEqual(next.capabilities, patch.capabilities)) {
-      next.capabilities = structuredClone(patch.capabilities);
+      next.capabilities = cloneDeviceState(patch.capabilities);
       changedKeys.push('capabilities');
     }
     if (patch.verification !== undefined) {
       const mergedVerification = {
-        ...structuredClone(next.verification ?? {}),
-        ...structuredClone(patch.verification),
+        ...cloneDeviceState(next.verification ?? {}),
+        ...cloneDeviceState(patch.verification),
       };
       if (!isEqual(next.verification, mergedVerification)) {
         next.verification = mergedVerification;
@@ -182,12 +184,12 @@ export class DeviceStateStore {
       }
     }
     if (patch.raw !== undefined) {
-      const mergedRaw = structuredClone(next.raw ?? {});
+      const mergedRaw = cloneDeviceState(next.raw ?? {});
       for (const [key, value] of Object.entries(patch.raw)) {
         if (value === null) {
           delete mergedRaw[key as keyof typeof mergedRaw];
         } else if (value !== undefined) {
-          mergedRaw[key as keyof typeof mergedRaw] = structuredClone(value) as never;
+          mergedRaw[key as keyof typeof mergedRaw] = cloneDeviceState(value) as never;
         }
       }
       if (!isEqual(next.raw, mergedRaw)) {
@@ -235,7 +237,7 @@ export class DeviceStateStore {
 }
 
 export const createPublicDeviceState = (state: StoredDeviceState): DeviceState => {
-  const snapshot = structuredClone(state);
+  const snapshot = cloneDeviceState(state);
   delete snapshot.raw;
   delete snapshot.session;
   return snapshot;

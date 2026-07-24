@@ -62,7 +62,6 @@ const toBleDescriptor = (
 
 const BLE_PACKET_SIZE = 192;
 const BLE_WRITE_DELAY_MS = 5;
-const BLE_RESPONSE_TIMEOUT_MS = 30_000;
 const PROTOCOL_PROBE_TIMEOUT_MS = 1000;
 const PROTOCOL_V2_PROBE_TIMEOUT_MS = 5000;
 
@@ -764,7 +763,11 @@ export default class ElectronBleTransport {
 
     const callOptions = {
       ...options,
-      timeoutMs: options?.timeoutMs ?? BLE_RESPONSE_TIMEOUT_MS,
+      // Align with V1 BLE and the USB V2 base transport: only arm a watchdog when the caller
+      // explicitly passes timeoutMs. Filling a 30s default here would hard-cap interactive
+      // acks (ButtonAck/PinMatrixAck/PassphraseAck) whose timeoutMs is stripped by the SDK and
+      // tear down the desktop BLE link while the user is still operating the device.
+      timeoutMs: options?.timeoutMs,
     };
 
     try {

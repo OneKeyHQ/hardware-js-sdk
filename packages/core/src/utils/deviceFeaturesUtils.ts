@@ -30,11 +30,12 @@ export const getSupportProtocolV1MessageSchema = (
   const currentDeviceVersion = getDeviceFirmwareVersion(features).join('.');
   const deviceType = getDeviceType(features);
 
-  if (
-    features.bootloaderMode === true &&
-    features.firmwarePresent === false &&
-    DeviceModelToTypes.model_mini.includes(deviceType)
-  ) {
+  // In bootloader mode the major/minor/patch fields carry the bootloader version, not the
+  // firmware version; normalizing them would mis-route to the legacy schema (e.g. 2.x < 3.3.0).
+  // The legacy getDeviceFirmwareVersion returned 0.0.0 here and landed on v1CurrentSchema, so
+  // force v1CurrentSchema for every bootloader device, including in-place upgrades on
+  // Classic1s/Touch/Pro where firmware is still present.
+  if (features.bootloaderMode === true) {
     return {
       messages: DataManager.messages.v1CurrentSchema,
       protocolV1MessageSchema: 'v1CurrentSchema',
