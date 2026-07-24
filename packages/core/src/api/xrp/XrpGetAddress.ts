@@ -5,6 +5,8 @@ import { serializedPath, validatePath } from '../helpers/pathUtils';
 
 import type { XrpAddress, XrpGetAddressParams } from '../../types/api/xrpGetAddress';
 
+const XRP_RESPONSE_TIMEOUT_MS = 10_000;
+
 export default class XrpGetAddress extends BaseMethod<
   {
     address_n: number[];
@@ -59,16 +61,26 @@ export default class XrpGetAddress extends BaseMethod<
     for (let i = 0; i < this.params.length; i++) {
       const param = this.params[i];
 
-      const res = await this.device.commands.typedCall('RippleGetAddress', 'RippleAddress', {
-        ...param,
-      });
+      const res = param.show_display
+        ? await this.device.commands.typedCall('RippleGetAddress', 'RippleAddress', {
+            ...param,
+          })
+        : await this.device.commands.typedCall(
+            'RippleGetAddress',
+            'RippleAddress',
+            {
+              ...param,
+            },
+            { timeoutMs: XRP_RESPONSE_TIMEOUT_MS }
+          );
       const publicKey = await this.device.commands.typedCall(
         'BatchGetPublickeys',
         'EcdsaPublicKeys',
         {
           paths: [{ address_n: param.address_n }],
           ecdsa_curve_name: 'secp256k1',
-        }
+        },
+        { timeoutMs: XRP_RESPONSE_TIMEOUT_MS }
       );
 
       const { address } = res.message;

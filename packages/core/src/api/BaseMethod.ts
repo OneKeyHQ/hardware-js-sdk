@@ -25,6 +25,7 @@ import type { CoreContext } from '../core';
 
 export type UnlockPolicy = 'none' | 'retry-on-locked';
 export type ProtocolV2UiMode = 'auto' | 'none';
+export type MethodExecutionPriority = 'normal' | 'background';
 
 const Log = getLogger(LoggerNames.Method);
 
@@ -100,6 +101,9 @@ export abstract class BaseMethod<Params = undefined> {
    * 是否需要使用设备
    */
   useDevice: boolean;
+
+  /** 后台方法不得阻塞用户主动发起的设备交互。 */
+  executionPriority: MethodExecutionPriority = 'normal';
 
   /**
    * 允许的设备模式。当前设备模式在该数组中，则可以允许运行。

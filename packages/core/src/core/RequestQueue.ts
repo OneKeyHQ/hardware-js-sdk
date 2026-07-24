@@ -1,14 +1,27 @@
+import { type Deferred, createDeferred } from '@onekeyfe/hd-shared';
+
 import { LoggerNames, getLogger } from '../utils';
 
-import type { Deferred } from '@onekeyfe/hd-shared';
 import type { BaseMethod } from '../api/BaseMethod';
 
 const Log = getLogger(LoggerNames.Core);
+const OPERATION_PRE_CANCEL_TTL_MS = 30_000;
+const DEFAULT_BACKGROUND_PREEMPT_TIMEOUT_MS = 5_500;
+
 export type RequestTask = {
   id: number;
   method: BaseMethod;
   callPromise?: Deferred<any> | undefined;
   abortController?: AbortController;
+  settled: Deferred<void>;
+};
+
+export type RequestAdmission =
+  | { status: 'reserved'; task: RequestTask }
+  | { status: 'busy'; blockingTask?: RequestTask };
+
+export type RequestAdmissionOptions = {
+  backgroundPreemptTimeoutMs?: number;
 };
 
 export default class RequestQueue {
@@ -16,7 +29,17 @@ export default class RequestQueue {
 
   private operationRequestIds = new Map<string, number>();
 
+  private pendingOperationCancellations = new Map<string, number>();
+
   private pendingCallbackTasks = new Map<string, Deferred<void>>();
+
+  private prunePendingOperationCancellations(now = Date.now()) {
+    this.pendingOperationCancellations.forEach((expiresAt, operationId) => {
+      if (expiresAt <= now) {
+        this.pendingOperationCancellations.delete(operationId);
+      }
+    });
+  }
 
   // 生成唯一请求ID
   public generateRequestId = (method?: BaseMethod) => {
@@ -33,18 +56,77 @@ export default class RequestQueue {
     }
     const abortController = new AbortController();
     method.abortSignal = abortController.signal;
-    const task = { id: requestId, method, abortController };
+    const task = {
+      id: requestId,
+      method,
+      abortController,
+      settled: createDeferred<void>(),
+    };
     this.requestQueue.set(requestId, task);
     const operationId = method.payload?.operationId;
     if (typeof operationId === 'string' && operationId) {
       this.operationRequestIds.set(operationId, requestId);
+      this.prunePendingOperationCancellations();
+      if (this.pendingOperationCancellations.delete(operationId)) {
+        abortController.abort();
+      }
     }
     return task;
   }
 
+  public async admitTask(
+    method: BaseMethod,
+    options: RequestAdmissionOptions = {}
+  ): Promise<RequestAdmission> {
+    const activeTasks = Array.from(this.requestQueue.values()).filter(
+      task => task.method.connectId === method.connectId
+    );
+
+    if (method.executionPriority === 'background') {
+      return activeTasks.length
+        ? { status: 'busy', blockingTask: activeTasks[0] }
+        : { status: 'reserved', task: this.createTask(method) };
+    }
+
+    const backgroundTasks = activeTasks.filter(
+      task => task.method.executionPriority === 'background'
+    );
+    if (!backgroundTasks.length) {
+      return { status: 'reserved', task: this.createTask(method) };
+    }
+
+    backgroundTasks.forEach(task => task.abortController?.abort());
+    const timeoutMs = options.backgroundPreemptTimeoutMs ?? DEFAULT_BACKGROUND_PREEMPT_TIMEOUT_MS;
+    const released = await this.waitForTasksReleased(backgroundTasks, timeoutMs);
+    if (!released) {
+      return { status: 'busy', blockingTask: backgroundTasks[0] };
+    }
+
+    return { status: 'reserved', task: this.createTask(method) };
+  }
+
+  private async waitForTasksReleased(tasks: RequestTask[], timeoutMs: number) {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeoutPromise = new Promise<false>(resolve => {
+      timer = setTimeout(() => resolve(false), timeoutMs);
+    });
+    const releasedPromise = Promise.all(tasks.map(task => task.settled.promise)).then(() => true);
+    const released = await Promise.race([releasedPromise, timeoutPromise]);
+    if (timer) {
+      clearTimeout(timer);
+    }
+    return released;
+  }
+
   public abortOperation(operationId: string) {
     const requestId = this.operationRequestIds.get(operationId);
-    return requestId === undefined ? false : this.abortRequest(requestId);
+    if (requestId !== undefined) {
+      return this.abortRequest(requestId);
+    }
+    const now = Date.now();
+    this.prunePendingOperationCancellations(now);
+    this.pendingOperationCancellations.set(operationId, now + OPERATION_PRE_CANCEL_TTL_MS);
+    return false;
   }
 
   public getTask(requestId: number): RequestTask | undefined {
@@ -89,6 +171,7 @@ export default class RequestQueue {
         count++;
       }
     });
+    this.pendingOperationCancellations.clear();
     return count;
   }
 
@@ -117,13 +200,15 @@ export default class RequestQueue {
 
   // 删除请求
   public releaseTask(requestId: number) {
-    const operationId = this.requestQueue.get(requestId)?.method.payload?.operationId;
+    const task = this.requestQueue.get(requestId);
+    const operationId = task?.method.payload?.operationId;
     if (
       typeof operationId === 'string' &&
       this.operationRequestIds.get(operationId) === requestId
     ) {
       this.operationRequestIds.delete(operationId);
     }
+    task?.settled.resolve();
     this.requestQueue.delete(requestId);
   }
 

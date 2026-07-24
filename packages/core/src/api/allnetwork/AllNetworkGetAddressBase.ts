@@ -352,6 +352,7 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
     };
 
     let result: AllNetworkAddress[];
+    let requestError: Error | undefined;
     try {
       method.init();
       method.setDevice?.(this.device);
@@ -394,10 +395,8 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
           rootFingerprint,
         },
       }));
-      if (method.requestContext) {
-        completeRequestContext(method.requestContext.responseID);
-      }
     } catch (e: any) {
+      requestError = e instanceof Error ? e : new Error(String(e));
       const error = handleSkippableHardwareError(e, this.device, method);
 
       if (error) {
@@ -415,13 +414,10 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
       } else {
         throw e;
       }
-      if (method.requestContext) {
-        completeRequestContext(
-          method.requestContext.responseID,
-          e instanceof Error ? e : new Error(String(e))
-        );
-      }
     } finally {
+      if (method.requestContext) {
+        completeRequestContext(method.requestContext.responseID, requestError);
+      }
       this.device.off(DEVICE.BUTTON, buttonListener);
       this.device.off(DEVICE.PIN, onSignalAbort);
       this.device.off(DEVICE.PASSPHRASE, onSignalAbort);

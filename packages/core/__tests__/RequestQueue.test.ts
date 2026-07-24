@@ -9,8 +9,17 @@ jest.mock('../src/data/config', () => ({
 
 function buildMethod(responseID: number, operationId?: string) {
   return {
+    connectId: 'device-1',
+    executionPriority: 'normal',
     payload: { operationId },
     responseID,
+  } as unknown as BaseMethod;
+}
+
+function buildBackgroundMethod(responseID: number, operationId?: string) {
+  return {
+    ...buildMethod(responseID, operationId),
+    executionPriority: 'background',
   } as unknown as BaseMethod;
 }
 
@@ -30,5 +39,62 @@ describe('RequestQueue operation cancellation', () => {
     queue.createTask(buildMethod(1, 'portfolio-1'));
 
     expect(queue.abortOperation('missing')).toBe(false);
+  });
+
+  test('honors cancellation that arrives before the request is registered', () => {
+    const queue = new RequestQueue();
+
+    expect(queue.abortOperation('portfolio-1')).toBe(false);
+
+    const portfolio = queue.createTask(buildMethod(1, 'portfolio-1'));
+    const userAction = queue.createTask(buildMethod(2, 'user-action'));
+
+    expect(portfolio.abortController?.signal.aborted).toBe(true);
+    expect(userAction.abortController?.signal.aborted).toBe(false);
+  });
+
+  test('expires a cancellation that is never matched', () => {
+    const nowSpy = jest.spyOn(Date, 'now');
+    nowSpy.mockReturnValueOnce(1_000);
+    const queue = new RequestQueue();
+    queue.abortOperation('portfolio-1');
+    nowSpy.mockReturnValue(31_001);
+
+    const portfolio = queue.createTask(buildMethod(1, 'portfolio-1'));
+
+    expect(portfolio.abortController?.signal.aborted).toBe(false);
+    nowSpy.mockRestore();
+  });
+
+  test('rejects a background request while the device has an active user request', async () => {
+    const queue = new RequestQueue();
+    queue.createTask(buildMethod(1, 'user-action'));
+
+    await expect(
+      queue.admitTask(buildBackgroundMethod(2, 'portfolio-1'), {
+        backgroundPreemptTimeoutMs: 100,
+      })
+    ).resolves.toMatchObject({ status: 'busy' });
+    expect(queue.getTask(2)).toBeUndefined();
+  });
+
+  test('aborts and waits for an active background request before admitting a user request', async () => {
+    const queue = new RequestQueue();
+    const portfolio = queue.createTask(buildBackgroundMethod(1, 'portfolio-1'));
+
+    const admission = queue.admitTask(buildMethod(2, 'user-action'), {
+      backgroundPreemptTimeoutMs: 100,
+    });
+    await Promise.resolve();
+
+    expect(portfolio.abortController?.signal.aborted).toBe(true);
+    expect(queue.getTask(2)).toBeUndefined();
+
+    queue.releaseTask(1);
+
+    await expect(admission).resolves.toMatchObject({
+      status: 'reserved',
+      task: { id: 2 },
+    });
   });
 });

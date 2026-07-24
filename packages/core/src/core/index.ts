@@ -149,7 +149,7 @@ export const callAPI = async (context: CoreContext, message: CoreMessage) => {
   }
 
   // find api method
-  let method: BaseMethod;
+  let method!: BaseMethod;
   try {
     method = findMethod(message as IFrameCallMessage);
     method.connector = _connector;
@@ -165,6 +165,10 @@ export const callAPI = async (context: CoreContext, message: CoreMessage) => {
 
     method.init();
   } catch (error) {
+    if (method) {
+      completeMethodRequestContext(method, error);
+      method.dispose();
+    }
     return Promise.reject(error);
   }
 
@@ -191,32 +195,22 @@ export const callAPI = async (context: CoreContext, message: CoreMessage) => {
   //   );
   // }
 
-  const { requestQueue, methodSynchronize } = context;
-  const error = await methodSynchronize(() => {
-    for (const requestId of requestQueue.getRequestTasksId()) {
-      const task = requestQueue.getTask(requestId);
-      Log.debug(
-        'pre request task: ',
-        `task?.id: ${task?.id},
-      task?.method.connectId: ${task?.method.connectId},
-      task?.method.deviceId: ${task?.method.deviceId},
-      task?.method.name: ${task?.method.name}`
-      );
-      // if (task) {
-      //   return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceBusy));
-      // }
-    }
-    return null;
-  });
-
-  if (error) {
-    return createResponseMessage(method.responseID, false, { error });
-  }
-
   // only the pre-warm signal (PreInitialize) forks here; normal methods fall
   // through to onCallDevice below, so the pre-warm dedup/guards never touch them
   if (method.isPreWarmSignal) {
     return handlePreWarmSignal(context, message, method);
+  }
+
+  const { requestQueue, methodSynchronize } = context;
+  const admission = await methodSynchronize(
+    () => requestQueue.admitTask(method),
+    method.connectId ?? method.deviceId ?? 'unknown-device'
+  );
+  if (admission.status === 'busy') {
+    const error = ERRORS.TypedError(HardwareErrorCode.DeviceBusy);
+    completeMethodRequestContext(method, error);
+    method.dispose();
+    return createResponseMessage(method.responseID, false, { error });
   }
 
   return onCallDevice(context, message, method);
@@ -337,7 +331,7 @@ const onCallDevice = async (
 
   await waitForPendingPromise(getPrePendingCallPromise, setPrePendingCallPromise);
 
-  const task = requestQueue.createTask(method);
+  const task = requestQueue.getTask(method.responseID) ?? requestQueue.createTask(method);
 
   // Pre-warm holds the device as a per-connectId callback task so a concurrent
   // real call waits (before ensureConnected) instead of racing its Initialize.
@@ -381,6 +375,9 @@ const onCallDevice = async (
   if (method.payload?.onlyConnectBleDevice) {
     preWarmCallbackTask?.resolve();
     Log.debug('Call API - only connect ble device: ', device?.mainId);
+    requestQueue.releaseTask(method.responseID);
+    completeMethodRequestContext(method);
+    method.dispose();
     return createResponseMessage(method.responseID, true, null);
   }
 
