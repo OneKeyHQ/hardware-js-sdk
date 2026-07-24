@@ -97,4 +97,26 @@ describe('RequestQueue operation cancellation', () => {
       task: { id: 2 },
     });
   });
+
+  test('returns busy when an aborted background request does not release in time', async () => {
+    const queue = new RequestQueue();
+    const portfolio = queue.createTask(buildBackgroundMethod(1, 'portfolio-1'));
+
+    await expect(
+      queue.admitTask(buildMethod(2, 'user-action'), {
+        backgroundPreemptTimeoutMs: 1,
+      })
+    ).resolves.toMatchObject({
+      status: 'busy',
+      blockingTask: { id: 1 },
+    });
+    expect(portfolio.abortController?.signal.aborted).toBe(true);
+    expect(queue.getTask(2)).toBeUndefined();
+
+    queue.releaseTask(1);
+    await expect(queue.admitTask(buildMethod(3, 'user-retry'))).resolves.toMatchObject({
+      status: 'reserved',
+      task: { id: 3 },
+    });
+  });
 });

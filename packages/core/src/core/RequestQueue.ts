@@ -83,9 +83,13 @@ export default class RequestQueue {
     );
 
     if (method.executionPriority === 'background') {
-      return activeTasks.length
-        ? { status: 'busy', blockingTask: activeTasks[0] }
-        : { status: 'reserved', task: this.createTask(method) };
+      if (activeTasks.length) {
+        Log.debug(
+          `Reject background method ${method.name}: device is occupied by ${activeTasks[0].method.name}`
+        );
+        return { status: 'busy', blockingTask: activeTasks[0] };
+      }
+      return { status: 'reserved', task: this.createTask(method) };
     }
 
     const backgroundTasks = activeTasks.filter(
@@ -95,10 +99,14 @@ export default class RequestQueue {
       return { status: 'reserved', task: this.createTask(method) };
     }
 
+    Log.debug(
+      `Preempt ${backgroundTasks.length} background request(s) for user method ${method.name}`
+    );
     backgroundTasks.forEach(task => task.abortController?.abort());
     const timeoutMs = options.backgroundPreemptTimeoutMs ?? DEFAULT_BACKGROUND_PREEMPT_TIMEOUT_MS;
     const released = await this.waitForTasksReleased(backgroundTasks, timeoutMs);
     if (!released) {
+      Log.warn(`Background request cleanup timed out before user method ${method.name}`);
       return { status: 'busy', blockingTask: backgroundTasks[0] };
     }
 

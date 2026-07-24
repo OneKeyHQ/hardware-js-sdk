@@ -208,6 +208,7 @@ export const callAPI = async (context: CoreContext, message: CoreMessage) => {
   );
   if (admission.status === 'busy') {
     const error = ERRORS.TypedError(HardwareErrorCode.DeviceBusy);
+    DevicePool.emitter.removeListener(DEVICE.CONNECT, onDeviceConnectHandler);
     completeMethodRequestContext(method, error);
     method.dispose();
     return createResponseMessage(method.responseID, false, { error });
@@ -225,6 +226,7 @@ const handlePreWarmSignal = async (
   method: BaseMethod
 ): Promise<any> => {
   const createAckResponse = () => {
+    DevicePool.emitter.removeListener(DEVICE.CONNECT, onDeviceConnectHandler);
     completeMethodRequestContext(method);
     method.dispose();
     return createResponseMessage(method.responseID, true, true);
@@ -375,6 +377,7 @@ const onCallDevice = async (
   if (method.payload?.onlyConnectBleDevice) {
     preWarmCallbackTask?.resolve();
     Log.debug('Call API - only connect ble device: ', device?.mainId);
+    DevicePool.emitter.removeListener(DEVICE.CONNECT, onDeviceConnectHandler);
     requestQueue.releaseTask(method.responseID);
     completeMethodRequestContext(method);
     method.dispose();
