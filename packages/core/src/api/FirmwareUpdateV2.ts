@@ -31,6 +31,7 @@ import { DEVICE } from '../events';
 
 import type { Features, KnownDevice } from '../types';
 import type { Device } from '../device/Device';
+import type { FirmwareBinary } from './firmware/getBinary';
 
 type Params = {
   binary?: ArrayBuffer;
@@ -42,6 +43,77 @@ type Params = {
 };
 
 const Log = getLogger(LoggerNames.Method);
+
+const FIRMWARE_DOWNLOAD_REQUEST_OPTIONS = {
+  connectTimeoutMs: 60_000,
+  readTimeoutMs: 60_000,
+  overallTimeoutMs: 180_000,
+  maxRetries: 2,
+  retryDelayMs: 500,
+} as const;
+
+const normalizeFirmwareBinary = (binary: unknown): FirmwareBinary | undefined => {
+  if (typeof binary !== 'object' || binary === null) {
+    return undefined;
+  }
+
+  const isNodeBuffer =
+    typeof Buffer !== 'undefined' &&
+    typeof Buffer.isBuffer === 'function' &&
+    Buffer.isBuffer(binary);
+  if (isNodeBuffer) {
+    return binary.byteLength > 0 ? binary : undefined;
+  }
+
+  if (typeof ArrayBuffer !== 'undefined' && binary instanceof ArrayBuffer) {
+    return binary.byteLength > 0 ? binary : undefined;
+  }
+
+  if (
+    typeof ArrayBuffer !== 'undefined' &&
+    typeof ArrayBuffer.isView === 'function' &&
+    ArrayBuffer.isView(binary)
+  ) {
+    if (binary.byteLength <= 0) {
+      return undefined;
+    }
+    const source = new Uint8Array(binary.buffer, binary.byteOffset, binary.byteLength);
+    const normalized = new Uint8Array(binary.byteLength);
+    normalized.set(source);
+    return normalized.buffer;
+  }
+
+  const customBuffer = binary as {
+    [index: number]: unknown;
+    byteLength?: unknown;
+    constructor?: {
+      isBuffer?: (value: unknown) => boolean;
+    };
+    length?: unknown;
+  };
+  if (
+    typeof customBuffer.constructor?.isBuffer !== 'function' ||
+    !customBuffer.constructor.isBuffer(binary) ||
+    typeof customBuffer.byteLength !== 'number' ||
+    !Number.isSafeInteger(customBuffer.byteLength) ||
+    customBuffer.byteLength <= 0 ||
+    typeof customBuffer.length !== 'number' ||
+    customBuffer.length !== customBuffer.byteLength
+  ) {
+    return undefined;
+  }
+
+  const { byteLength } = customBuffer;
+  const normalized = new Uint8Array(byteLength);
+  for (let index = 0; index < byteLength; index += 1) {
+    const { [index]: byte } = customBuffer;
+    if (typeof byte !== 'number' || !Number.isInteger(byte) || byte < 0 || byte > 255) {
+      return undefined;
+    }
+    normalized[index] = byte;
+  }
+  return normalized.buffer;
+};
 
 export default class FirmwareUpdateV2 extends BaseMethod<Params> {
   checkPromise: Deferred<any> | null = null;
@@ -286,6 +358,48 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
 
     this.checkVersionForCopyTouchResource(features, firmwareType);
 
+    let preparedBinary: FirmwareBinary | undefined;
+    const acquireFirmwareBinary = async (): Promise<FirmwareBinary> => {
+      try {
+        if (preparedBinary) {
+          return preparedBinary;
+        }
+
+        if (params.binary !== undefined) {
+          preparedBinary = normalizeFirmwareBinary(params.binary);
+          if (!preparedBinary) {
+            throw new Error('firmware binary is empty or invalid');
+          }
+          return preparedBinary;
+        }
+
+        if (!device.features) {
+          throw ERRORS.TypedError(
+            HardwareErrorCode.RuntimeError,
+            'no features found for this device'
+          );
+        }
+
+        this.postTipMessage('DownloadFirmware');
+        const firmware = await getBinary({
+          features: device.features,
+          version: params.version,
+          updateType: params.updateType,
+          isUpdateBootloader: params.isUpdateBootloader,
+          firmwareType,
+          requestOptions: FIRMWARE_DOWNLOAD_REQUEST_OPTIONS,
+        });
+        preparedBinary = normalizeFirmwareBinary(firmware.binary);
+        if (!preparedBinary) {
+          throw new Error('downloaded firmware binary is empty or invalid');
+        }
+        this.postTipMessage('DownloadFirmwareSuccess');
+        return preparedBinary;
+      } catch (err) {
+        throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
+      }
+    };
+
     if (!features?.bootloader_mode && features) {
       const uuid = getDeviceUUID(features);
       // should go to bootloader mode manually
@@ -317,6 +431,12 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
       }
 
       // check if the device commands has been disposed
+      this.device?.commands?.checkDisposed();
+
+      // A failed firmware download must leave the device in normal mode.
+      await acquireFirmwareBinary();
+
+      // The request may outlive the current transport command instance.
       this.device?.commands?.checkDisposed();
 
       // auto go to bootloader mode
@@ -357,33 +477,8 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
       }
     }
 
-    let binary;
-
-    try {
-      if (params.binary) {
-        binary = this.params.binary;
-      } else {
-        if (!device.features) {
-          throw ERRORS.TypedError(
-            HardwareErrorCode.RuntimeError,
-            'no features found for this device'
-          );
-        }
-        this.postTipMessage('DownloadFirmware');
-
-        const firmware = await getBinary({
-          features: device.features,
-          version: params.version,
-          updateType: params.updateType,
-          isUpdateBootloader: params.isUpdateBootloader,
-          firmwareType,
-        });
-        binary = firmware.binary;
-        this.postTipMessage('DownloadFirmwareSuccess');
-      }
-    } catch (err) {
-      throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
-    }
+    // Devices already in bootloader mode still acquire through the same helper.
+    const binary = await acquireFirmwareBinary();
 
     // check if the device commands has been disposed
     this.device?.commands?.checkDisposed();
