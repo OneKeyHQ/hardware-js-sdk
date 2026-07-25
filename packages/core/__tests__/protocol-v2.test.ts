@@ -4883,6 +4883,7 @@ describe('Protocol V2 current low-level methods', () => {
     });
 
     await expect(v2Method.run()).resolves.toEqual({ message: 'accepted' });
+    expect(v2Method.unlockPolicy).toBe('retry-on-locked');
     expect(v2TypedCall).toHaveBeenCalledWith('DeviceSettingsPageShow', 'Success', {
       page: DeviceSettingsPage.DeviceReset,
     });
@@ -4925,6 +4926,7 @@ describe('Protocol V2 current low-level methods', () => {
     });
 
     await expect(v2Method.run()).resolves.toEqual({ message: 'accepted' });
+    expect(v2Method.unlockPolicy).toBe('retry-on-locked');
     expect(v2TypedCall).toHaveBeenCalledWith('DeviceSettingsPageShow', 'Success', {
       page: DeviceSettingsPage.DevicePinChange,
     });
@@ -5146,22 +5148,67 @@ describe('Protocol V2 current low-level methods', () => {
     expect(method.unlockPolicy).toBe('none');
   });
 
-  test('marks Protocol V2 settings mutations for unlock-on-locked retry', () => {
-    const methods = [
-      new DeviceSettingsSet({
-        id: 2,
-        payload: { method: 'deviceSettingsSet', settings: { brightness: 80 } },
-      }),
-      new DeviceSettingsPageShow({
-        id: 3,
-        payload: { method: 'deviceSettingsPageShow', page: 'DevicePassphrase' },
-      }),
-    ];
-
-    methods.forEach(method => {
-      method.init();
-      expect(method.unlockPolicy).toBe('retry-on-locked');
+  test.each([
+    ['label', { label: 'My Pro 2' }],
+    ['language', { language: 'ja-JP' }],
+    ['brightness', { brightness: 80 }],
+    ['haptic feedback', { haptic_feedback: true }],
+    [
+      'combined lock-free settings',
+      {
+        label: 'My Pro 2',
+        language: 'ja-JP',
+        brightness: 80,
+        haptic_feedback: true,
+      },
+    ],
+  ])('does not unlock before changing Protocol V2 %s', (_name, settings) => {
+    const method = new DeviceSettingsSet({
+      id: 2,
+      payload: { method: 'deviceSettingsSet', settings },
     });
+
+    method.init();
+
+    expect(method.unlockPolicy).toBe('none');
+  });
+
+  test.each([
+    ['auto lock', { autolock_delay_ms: 60_000 }],
+    ['auto shutdown', { autoshutdown_delay_ms: 120_000 }],
+    ['mixed protected settings', { brightness: 80, autolock_delay_ms: 60_000 }],
+    ['other protected settings', { usb_lock_enable: true }],
+  ])('unlocks before changing Protocol V2 %s', (_name, settings) => {
+    const method = new DeviceSettingsSet({
+      id: 2,
+      payload: { method: 'deviceSettingsSet', settings },
+    });
+
+    method.init();
+
+    expect(method.unlockPolicy).toBe('retry-on-locked');
+  });
+
+  test('unlocks before opening Protocol V2 settings pages', () => {
+    const method = new DeviceSettingsPageShow({
+      id: 3,
+      payload: { method: 'deviceSettingsPageShow', page: 'DevicePassphrase' },
+    });
+
+    method.init();
+
+    expect(method.unlockPolicy).toBe('retry-on-locked');
+  });
+
+  test('keeps firmwareUpdateV4 unlock-before-reboot behavior explicit', () => {
+    const method = new FirmwareUpdateV4({
+      id: 4,
+      payload: { method: 'firmwareUpdateV4' },
+    });
+
+    method.init();
+
+    expect(method.unlockPolicy).toBe('retry-on-locked');
   });
 
   test('sends FilesystemPermissionFix from filesystemPermissionFix', async () => {

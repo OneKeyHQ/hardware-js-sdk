@@ -1,5 +1,6 @@
 import { BaseMethod } from '../BaseMethod';
 import { mapDeviceSettingsToState } from '../../device/DeviceStateMapper';
+import { getProtocolV2SettingsUnlockPolicy } from '../../protocols/protocol-v2/settingsUnlockPolicy';
 import { invalidParameter } from '../helpers/filesystemValidation';
 
 import type { DeviceSettings } from '@onekeyfe/hd-transport';
@@ -27,7 +28,7 @@ export default class DeviceSettingsSet extends BaseMethod<{
     }
 
     this.requireProtocolV2 = true;
-    this.unlockPolicy = 'retry-on-locked';
+    this.unlockPolicy = getProtocolV2SettingsUnlockPolicy(supported);
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
     this.params = { settings: supported };
