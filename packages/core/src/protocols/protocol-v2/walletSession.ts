@@ -113,7 +113,6 @@ export async function getProtocolV2WalletSession(
   options?: {
     initSession?: boolean;
     expectedPassphraseState?: string;
-    explicitSessionId?: string;
     onlyMainPin?: boolean;
     recoverInvalidSession?: boolean;
   }
@@ -143,13 +142,12 @@ export async function getProtocolV2WalletSession(
     }
 
     const cachedSessionId =
-      options?.explicitSessionId ??
-      (typeof device.getInternalState === 'function' ? device.getInternalState() : undefined);
+      typeof device.getInternalState === 'function' ? device.getInternalState() : undefined;
     let response;
     let recoveryFailed = false;
     let resumed = false;
 
-    if (cachedSessionId && (expectedPassphraseState || options?.explicitSessionId)) {
+    if (cachedSessionId && expectedPassphraseState) {
       try {
         response = await openDeviceSession(device, {
           resume: { session_id: cachedSessionId },

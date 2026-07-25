@@ -18,11 +18,6 @@ const requiredString = (value: unknown, name: string) => {
   return value.trim();
 };
 
-const optionalString = (value: unknown, name: string) => {
-  if (value === undefined) return undefined;
-  return requiredString(value, name);
-};
-
 const wasResumed = (session: unknown) =>
   !!session &&
   typeof session === 'object' &&
@@ -40,14 +35,10 @@ const normalizeParams = (payload: Record<string, unknown>): OpenWalletSessionPar
     return {
       mode: 'resume-hidden',
       deviceId: requiredString(payload.deviceId, 'deviceId'),
-      passphraseState: optionalString(payload.passphraseState, 'passphraseState'),
-      sessionId: requiredString(payload.sessionId, 'sessionId'),
+      passphraseState: requiredString(payload.passphraseState, 'passphraseState'),
     };
   }
-  const hasWalletBinding =
-    payload.deviceId !== undefined ||
-    payload.passphraseState !== undefined ||
-    payload.sessionId !== undefined;
+  const hasWalletBinding = payload.deviceId !== undefined || payload.passphraseState !== undefined;
   if (payload.mode === undefined && !hasWalletBinding) {
     return { mode: 'select-hidden' };
   }
@@ -55,8 +46,7 @@ const normalizeParams = (payload: Record<string, unknown>): OpenWalletSessionPar
     return {
       mode: 'resume-hidden',
       deviceId: requiredString(payload.deviceId, 'deviceId'),
-      passphraseState: optionalString(payload.passphraseState, 'passphraseState'),
-      sessionId: requiredString(payload.sessionId, 'sessionId'),
+      passphraseState: requiredString(payload.passphraseState, 'passphraseState'),
     };
   }
   throw invalidParameter(
@@ -103,7 +93,6 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
         walletType: 'standard',
         deviceId: currentDeviceId,
         passphraseState: null,
-        sessionId: session.newSession ?? null,
         resumed: wasResumed(session),
       };
     }
@@ -113,24 +102,25 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
         throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError);
       }
       this.device.passphraseState = this.params.passphraseState;
+      const cachedSessionId = deviceWalletSessionStore.get(
+        this.params.deviceId,
+        this.params.passphraseState
+      );
+      if (!cachedSessionId) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.RuntimeError,
+          'Failure_InvalidSession: no cached wallet session for this passphraseState.'
+        );
+      }
       if (!this.device.isProtocolV2()) {
-        if (this.params.passphraseState) {
-          deviceWalletSessionStore.set(
-            this.params.deviceId,
-            this.params.passphraseState,
-            this.params.sessionId
-          );
-        }
         await this.device.initialize({
           deviceId: this.params.deviceId,
           passphraseState: this.params.passphraseState,
-          sessionId: this.params.sessionId,
         });
       }
       const session = this.device.isProtocolV2()
         ? await getProtocolV2WalletSession(this.device, {
             expectedPassphraseState: this.params.passphraseState,
-            explicitSessionId: this.params.sessionId,
             recoverInvalidSession: false,
           })
         : await getPassphraseStateWithRefreshDeviceInfo(this.device, {
@@ -141,8 +131,7 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
         walletType: 'hidden',
         deviceId: currentDeviceId,
         passphraseState: session.passphraseState ?? null,
-        sessionId: session.newSession ?? null,
-        resumed: wasResumed(session) || session.newSession === this.params.sessionId,
+        resumed: wasResumed(session) || session.newSession === cachedSessionId,
       };
     }
 
@@ -155,7 +144,6 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
       walletType: 'hidden',
       deviceId: currentDeviceId,
       passphraseState: session.passphraseState ?? null,
-      sessionId: session.newSession ?? null,
       resumed: wasResumed(session),
     };
   }

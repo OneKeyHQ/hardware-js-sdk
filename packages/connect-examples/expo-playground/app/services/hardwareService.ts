@@ -84,9 +84,7 @@ export function getDeviceSearchUserMessage(error: unknown): string {
 }
 
 type PassphraseStateMetadata = {
-  deviceId?: string;
   passphraseState?: string;
-  sessionId?: string;
   passphraseProtection?: boolean | null;
 };
 
@@ -95,15 +93,11 @@ const extractPassphraseStateMetadata = (payload: unknown): PassphraseStateMetada
   if (!payload || typeof payload !== 'object') return {};
 
   const maybeState = (payload as { passphraseState?: unknown }).passphraseState;
-  const maybeDeviceId = (payload as { deviceId?: unknown }).deviceId;
-  const maybeSessionId = (payload as { sessionId?: unknown }).sessionId;
   const maybePassphraseProtection = (payload as { passphraseProtection?: unknown })
     .passphraseProtection;
 
   return {
-    deviceId: typeof maybeDeviceId === 'string' ? maybeDeviceId : undefined,
     passphraseState: typeof maybeState === 'string' ? maybeState : undefined,
-    sessionId: typeof maybeSessionId === 'string' ? maybeSessionId : undefined,
     passphraseProtection:
       typeof maybePassphraseProtection === 'boolean' ? maybePassphraseProtection : undefined,
   };
@@ -190,12 +184,7 @@ const preparePassphraseParams = async (
   if (!methodSupportsCommonParameters(method)) return;
 
   if (params.useEmptyPassphrase === true) {
-    const result = await sdk.openWalletSession(connectId, { mode: 'standard' });
-    if (!result.success) {
-      throw new Error(String(result.payload?.error || 'Failed to open the standard wallet.'));
-    }
     clearPassphraseState(params);
-    useHardwareStore.getState().setWalletSession(null);
     return;
   }
 
@@ -205,36 +194,21 @@ const preparePassphraseParams = async (
     if (params.passphraseState) {
       logInfo('Device passphrase protection is disabled. Clearing stale passphraseState.');
     }
-    const result = await sdk.openWalletSession(connectId, { mode: 'standard' });
-    if (!result.success) {
-      throw new Error(String(result.payload?.error || 'Failed to open the standard wallet.'));
-    }
     clearPassphraseState(params);
-    useHardwareStore.getState().setWalletSession(null);
     return;
   }
 
-  logInfo(`Preparing wallet session through openWalletSession for signer method: ${method}.`);
+  if (typeof params.passphraseState === 'string' && params.passphraseState) {
+    logInfo(`Using existing passphraseState for signer method: ${method}.`);
+    return;
+  }
+
+  logInfo(`Selecting a wallet through openWalletSession for signer method: ${method}.`);
 
   try {
-    const cachedSession = useHardwareStore.getState().walletSession;
-    const requestedPassphraseState =
-      typeof params.passphraseState === 'string' && params.passphraseState
-        ? params.passphraseState
-        : undefined;
-    const canResume =
-      cachedSession &&
-      cachedSession.connectId === connectId &&
-      (!requestedPassphraseState ||
-        requestedPassphraseState === cachedSession.passphraseState);
-    const passphraseResult = canResume
-      ? await sdk.openWalletSession(connectId, {
-          mode: 'resume-hidden',
-          deviceId: cachedSession.deviceId,
-          passphraseState: cachedSession.passphraseState,
-          sessionId: cachedSession.sessionId,
-        })
-      : await sdk.openWalletSession(connectId, { mode: 'select-hidden' });
+    const passphraseResult = await sdk.openWalletSession(connectId, {
+      mode: 'select-hidden',
+    });
 
     if (!passphraseResult.success) {
       throw new Error(String(passphraseResult.payload?.error || 'Failed to open wallet session.'));
@@ -246,7 +220,6 @@ const preparePassphraseParams = async (
     if (passphraseMetadata.passphraseProtection === false) {
       logInfo('Device passphrase protection not enabled. Clearing passphraseState.');
       clearPassphraseState(params);
-      useHardwareStore.getState().setWalletSession(null);
       return;
     }
 
@@ -256,26 +229,13 @@ const preparePassphraseParams = async (
       useHardwareStore
         .getState()
         .setCommonParameter('passphraseState', passphraseMetadata.passphraseState);
-      if (
-        passphraseMetadata.deviceId &&
-        passphraseMetadata.sessionId
-      ) {
-        useHardwareStore.getState().setWalletSession({
-          connectId,
-          deviceId: passphraseMetadata.deviceId,
-          passphraseState: passphraseMetadata.passphraseState,
-          sessionId: passphraseMetadata.sessionId,
-        });
-      }
     } else {
       logInfo('Device passphrase protection enabled but no passphraseState was returned.');
       clearPassphraseState(params);
-      useHardwareStore.getState().setWalletSession(null);
     }
   } catch (passphraseError) {
     logError('Failed to open wallet session', { passphraseError });
     clearPassphraseState(params);
-    useHardwareStore.getState().setWalletSession(null);
     throw passphraseError;
   }
 };

@@ -9,13 +9,6 @@ export interface CommonParametersState {
   // passphraseState 只做会话缓存，页面刷新即丢失
 }
 
-export interface WalletSessionState {
-  connectId: string;
-  deviceId: string;
-  passphraseState: string;
-  sessionId: string;
-}
-
 // 完整的硬件状态
 export interface HardwareState {
   // 通用参数状态
@@ -26,14 +19,12 @@ export interface HardwareState {
 
   // 最终执行参数（经过处理的参数，即将发送给SDK）
   executionParameters: Record<string, unknown>;
-  walletSession: WalletSessionState | null;
 
   // Actions
   setCommonParameter: (key: keyof CommonParametersState, value: unknown) => void;
   setCommonParameters: (params: Partial<CommonParametersState>) => void;
   setMethodParameter: (key: string, value: unknown) => void;
   setMethodParameters: (params: Record<string, unknown>) => void;
-  setWalletSession: (session: WalletSessionState | null) => void;
   updateExecutionParameters: () => void; // 根据当前参数计算最终执行参数
   getExecutionParameters: () => Record<string, unknown>; // 获取处理后的执行参数
   resetParameters: () => void;
@@ -52,7 +43,6 @@ export const useHardwareStore = create<HardwareState>()(
     commonParameters: initialCommonParameters,
     methodParameters: {},
     executionParameters: {},
-    walletSession: null,
 
     // 设置单个通用参数
     setCommonParameter: (key, value) => {
@@ -143,7 +133,6 @@ export const useHardwareStore = create<HardwareState>()(
       );
     },
 
-    setWalletSession: session => set({ walletSession: session }, false, 'setWalletSession'),
 
     // 手动更新执行参数
     updateExecutionParameters: () => {
@@ -172,7 +161,6 @@ export const useHardwareStore = create<HardwareState>()(
           commonParameters: initialCommonParameters,
           methodParameters: {},
           executionParameters: {},
-          walletSession: null,
         }),
         false,
         'resetParameters'

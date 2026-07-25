@@ -40,7 +40,6 @@ export type KnownDevice = {
   features?: Features;
   /** Unified SDK device-state snapshot; features remains a legacy projection. */
   state?: DeviceState;
-  sessionId?: string | null;
   unavailableCapabilities: UnavailableCapabilities;
   bleFirmwareVersion: IVersionArray | null;
   firmwareVersion: IVersionArray | null;

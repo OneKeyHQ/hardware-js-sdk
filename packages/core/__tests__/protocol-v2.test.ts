@@ -1748,7 +1748,8 @@ describe('Protocol V2 feature adapter', () => {
       passphraseProtection: true,
     };
 
-    expect(device.toMessageObject()).toMatchObject({
+    const message = device.toMessageObject();
+    expect(message).toMatchObject({
       uuid: 'CACHED-SERIAL',
       deviceId: null,
       bleName: 'Cached BLE',
@@ -1756,6 +1757,7 @@ describe('Protocol V2 feature adapter', () => {
       label: 'Cached Label',
       deviceType: 'pro2',
     });
+    expect(message).not.toHaveProperty('sessionId');
     expect(device.getCurrentPassphraseProtection()).toBe(true);
     expect(device.hasUsePassphrase()).toBe(true);
   });

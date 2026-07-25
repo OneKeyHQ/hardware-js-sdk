@@ -70,7 +70,7 @@ const api: UnifiedMethodConfig[] = [
       {
         title: 'Resume hidden wallet',
         description:
-          'Resume a known hidden wallet with the identifiers returned by an earlier openWalletSession call.',
+          'Resume a known hidden wallet from the SDK-managed session cache.',
         parameters: [
           {
             name: 'mode',
@@ -90,15 +90,8 @@ const api: UnifiedMethodConfig[] = [
           {
             name: 'passphraseState',
             type: 'string',
-            required: false,
-            label: 'Expected Passphrase State (Optional)',
-            value: '',
-          },
-          {
-            name: 'sessionId',
-            type: 'string',
             required: true,
-            label: 'Session ID',
+            label: 'Passphrase State',
             value: '',
           },
         ],
