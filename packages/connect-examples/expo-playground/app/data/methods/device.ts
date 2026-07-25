@@ -23,7 +23,8 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'getPassphraseState',
-    description: 'Open or restore a wallet through the unified Protocol V1/V2 passphrase flow',
+    description:
+      'Open or restore a wallet through the legacy Protocol V1 passphrase flow. Protocol V2 devices must use openWalletSession.',
     noDeviceIdReq: true,
     presets: [
       {
@@ -68,6 +69,78 @@ const api: UnifiedMethodConfig[] = [
             type: 'string',
             required: true,
             label: 'Passphrase State',
+            value: '',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'openWalletSession',
+    description:
+      'Open or resume a wallet session on Protocol V2 devices. This method is not supported by Protocol V1 devices.',
+    noDeviceIdReq: true,
+    supportedDevices: ['Pro2'],
+    presets: [
+      {
+        title: 'Open standard wallet',
+        parameters: [
+          {
+            name: 'mode',
+            type: 'select',
+            required: true,
+            label: 'Wallet Session Mode',
+            value: 'standard',
+            options: [{ label: 'Standard', value: 'standard' }],
+          },
+        ],
+      },
+      {
+        title: 'Select hidden wallet',
+        description: 'Start the Protocol V2 wallet selection flow and open a hidden wallet.',
+        parameters: [
+          {
+            name: 'mode',
+            type: 'select',
+            required: true,
+            label: 'Wallet Session Mode',
+            value: 'select-hidden',
+            options: [{ label: 'Select Hidden', value: 'select-hidden' }],
+          },
+        ],
+      },
+      {
+        title: 'Resume hidden wallet',
+        description:
+          'Resume a known hidden wallet with the identifiers returned by an earlier openWalletSession call.',
+        parameters: [
+          {
+            name: 'mode',
+            type: 'select',
+            required: true,
+            label: 'Wallet Session Mode',
+            value: 'resume-hidden',
+            options: [{ label: 'Resume Hidden', value: 'resume-hidden' }],
+          },
+          {
+            name: 'deviceId',
+            type: 'string',
+            required: true,
+            label: 'Device ID',
+            value: '',
+          },
+          {
+            name: 'passphraseState',
+            type: 'string',
+            required: true,
+            label: 'Passphrase State',
+            value: '',
+          },
+          {
+            name: 'sessionId',
+            type: 'string',
+            required: true,
+            label: 'Session ID',
             value: '',
           },
         ],
@@ -186,7 +259,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'deviceSessionOpen',
-    description: 'Deprecated Protocol V2 raw command. Use getPassphraseState.',
+    description: 'Deprecated Protocol V2 raw command. Use openWalletSession.',
     noDeviceIdReq: true,
     deprecated: true,
     presets: [
