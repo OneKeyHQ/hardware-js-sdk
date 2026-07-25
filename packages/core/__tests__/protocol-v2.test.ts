@@ -234,9 +234,15 @@ describe('UploadPortfolio', () => {
         append: false,
         ui_percentage: 100,
       },
-      { timeoutMs: undefined }
+      { timeoutMs: 5000 }
     );
-    expect(typedCall).toHaveBeenNthCalledWith(2, 'PortfolioUpdate', 'Success', {});
+    expect(typedCall).toHaveBeenNthCalledWith(
+      2,
+      'PortfolioUpdate',
+      'Success',
+      {},
+      { timeoutMs: 5000 }
+    );
     expect(method.postMessage).not.toHaveBeenCalled();
     expect(result).toMatchObject({
       path: 'vol1:/portfolio/portfolio.okpkg.pending',

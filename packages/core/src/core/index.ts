@@ -52,6 +52,7 @@ import {
   createDeviceMessage,
   createResponseMessage,
   createUiMessage,
+  getLogBlockLabel,
 } from '../events';
 import TransportManager from '../data-manager/TransportManager';
 import DeviceConnector from '../device/DeviceConnector';
@@ -1435,10 +1436,17 @@ export default class Core extends EventEmitter {
       }
 
       case IFRAME.CALL: {
-        Log.log(`[${Date.now()}][CALL_API]`, message);
+        const logBlockLabel = getLogBlockLabel(message);
+        Log.log(
+          `[${Date.now()}][CALL_API]`,
+          logBlockLabel ? { method: logBlockLabel, payload: '[REDACTED]' } : message
+        );
         const response = await callAPI(this.getCoreContext(), message);
         const { success, payload } = response;
-        Log.log(`[${Date.now()}][CALL_API_RESPONSE]`, response);
+        Log.log(
+          `[${Date.now()}][CALL_API_RESPONSE]`,
+          logBlockLabel ? { method: logBlockLabel, payload: '[REDACTED]' } : response
+        );
         if (success) {
           return response;
         }

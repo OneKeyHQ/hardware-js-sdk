@@ -34,4 +34,20 @@ describe('getLogBlockLabel', () => {
   it('keeps existing sensitive UI response blocking', () => {
     expect(getLogBlockLabel({ type: UI_RESPONSE.RECEIVE_PIN })).toBe(UI_RESPONSE.RECEIVE_PIN);
   });
+
+  it('blocks deviceSessionOpen secrets in direct and iframe call logging', () => {
+    const payload = {
+      method: 'deviceSessionOpen',
+      host_passphrase: 'hidden-wallet-secret',
+    };
+
+    expect(getLogBlockLabel(payload)).toBe('deviceSessionOpen');
+    expect(
+      getLogBlockLabel({
+        event: 'iframe-call',
+        type: 'iframe-call',
+        payload,
+      })
+    ).toBe('deviceSessionOpen');
+  });
 });
