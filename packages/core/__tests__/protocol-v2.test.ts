@@ -217,6 +217,7 @@ describe('UploadPortfolio', () => {
 
     expect(method.unlockPolicy).toBe('retry-on-locked');
     expect(method.protocolV2UiMode).toBe('none');
+    expect(method.executionPriority).toBe('background');
     expect(method.protocolV2UiInteraction).toBeUndefined();
     expect(method.payload.emitProgress).toBe(false);
     expect(typedCall).toHaveBeenNthCalledWith(
@@ -234,14 +235,14 @@ describe('UploadPortfolio', () => {
         append: false,
         ui_percentage: 100,
       },
-      { timeoutMs: 5000 }
+      { timeoutMs: 5_000 }
     );
     expect(typedCall).toHaveBeenNthCalledWith(
       2,
       'PortfolioUpdate',
       'Success',
       {},
-      { timeoutMs: 5000 }
+      { timeoutMs: 5_000 }
     );
     expect(method.postMessage).not.toHaveBeenCalled();
     expect(result).toMatchObject({
