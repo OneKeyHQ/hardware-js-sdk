@@ -99,7 +99,7 @@ function hasDeriveCardano(method: BaseMethod): boolean {
 
 const parseInitOptions = (method?: BaseMethod): InitOptions => ({
   initSession: method?.payload.initSession,
-  passphraseState: method?.payload.passphraseState,
+  passphraseState: method?.payload.useEmptyPassphrase ? undefined : method?.payload.passphraseState,
   deviceId: method?.payload.deviceId,
   deriveCardano: method && hasDeriveCardano(method),
   connectProtocol: method?.payload.connectProtocol,

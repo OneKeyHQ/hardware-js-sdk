@@ -18,10 +18,22 @@ export type OpenWalletSessionParams =
       deviceId: string;
       passphraseState: string;
       sessionId: string;
+    }
+  | {
+      /**
+       * Compatibility form. `useEmptyPassphrase: true` opens the standard wallet;
+       * otherwise a complete wallet binding resumes a hidden wallet and no binding
+       * starts the hidden-wallet selection flow.
+       */
+      mode?: undefined;
+      useEmptyPassphrase?: boolean;
+      deviceId?: string;
+      passphraseState?: string;
+      sessionId?: string;
     };
 
 export type OpenWalletSessionPayload = {
-  protocol: 'V2';
+  protocol: 'V1' | 'V2';
   walletType: 'standard' | 'hidden';
   deviceId: string;
   passphraseState: string | null;
@@ -29,6 +41,10 @@ export type OpenWalletSessionPayload = {
   resumed: boolean;
 };
 
+/**
+ * Opens the standard, hidden, or Attach-to-PIN wallet flow through a unified
+ * Protocol V1/V2 API.
+ */
 export declare function openWalletSession(
   connectId: string,
   params: CommonParams & OpenWalletSessionParams

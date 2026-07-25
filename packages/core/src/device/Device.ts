@@ -1484,17 +1484,21 @@ export class Device extends EventEmitter {
   ) {
     if (this.isUnacquired()) return false;
 
+    const expectedPassphraseState = useEmptyPassphrase ? undefined : passphraseState;
     const { passphraseState: newPassphraseState, unlockedAttachPin } =
       await getPassphraseStateWithRefreshDeviceInfo(this, {
-        expectPassphraseState: passphraseState,
+        expectPassphraseState: expectedPassphraseState,
         onlyMainPin: useEmptyPassphrase,
       });
 
     // Main wallet and unlock Attach Pin, throw safe error
     const mainWalletUseAttachPin = unlockedAttachPin && useEmptyPassphrase;
     const useErrorAttachPin =
-      unlockedAttachPin && passphraseState && passphraseState !== newPassphraseState;
-    const passphraseStateMismatch = !!passphraseState && passphraseState !== newPassphraseState;
+      unlockedAttachPin &&
+      expectedPassphraseState &&
+      expectedPassphraseState !== newPassphraseState;
+    const passphraseStateMismatch =
+      !!expectedPassphraseState && expectedPassphraseState !== newPassphraseState;
 
     Log.debug('Check passphrase state safety: ', {
       passphraseState,

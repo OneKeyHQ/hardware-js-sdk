@@ -1664,6 +1664,31 @@ describe('Protocol V2 feature adapter', () => {
     });
   });
 
+  test('useEmptyPassphrase ignores a stale hidden-wallet state during Protocol V2 safety check', async () => {
+    const device = Device.fromDescriptor({ ...descriptor, protocolType: 'V2' } as any);
+    const typedCall = jest.fn();
+
+    (device as any).features = normalizeProtocolV2Features(
+      { ...descriptor, protocolType: 'V2' } as any,
+      {
+        status: {
+          device_id: 'main-wallet-device',
+          unlocked: true,
+          passphrase_enabled: true,
+          unlocked_by_attach_to_pin: false,
+        },
+      }
+    );
+    (device as any).features.firmwareVersion = '4.15.0';
+    (device as any).commands = { typedCall };
+    device.passphraseState = 'stale-hidden-state';
+
+    await expect(
+      device.checkPassphraseStateSafety('stale-hidden-state', true, false)
+    ).resolves.toBe(true);
+    expect(typedCall).not.toHaveBeenCalled();
+  });
+
   test('marks fallback features as unavailable when DeviceInfo is missing', () => {
     const features = normalizeProtocolV2Features(descriptor as any);
 

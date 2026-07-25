@@ -26,6 +26,7 @@ const api: UnifiedMethodConfig[] = [
     description:
       'Open or restore a wallet through the legacy Protocol V1 passphrase flow. Protocol V2 devices must use openWalletSession.',
     noDeviceIdReq: true,
+    tags: ['Legacy', 'Protocol V1'],
     presets: [
       {
         title: 'Open standard wallet',
@@ -78,9 +79,8 @@ const api: UnifiedMethodConfig[] = [
   {
     method: 'openWalletSession',
     description:
-      'Open or resume a wallet session on Protocol V2 devices. This method is not supported by Protocol V1 devices.',
+      'Open or resume a standard, hidden, or Attach-to-PIN wallet through the unified Protocol V1/V2 flow.',
     noDeviceIdReq: true,
-    supportedDevices: ['Pro2'],
     presets: [
       {
         title: 'Open standard wallet',

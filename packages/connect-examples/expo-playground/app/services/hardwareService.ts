@@ -418,7 +418,12 @@ export async function callHardwareAPI(
           `PassphraseState is empty in params for method: ${method}, attempting to fetch from device.`
         );
         try {
-          const passphraseResult = await getPassphraseState(connectId as string);
+          const stateResult = await sdk.getDeviceState(connectId as string);
+          const isProtocolV2 =
+            stateResult.success && stateResult.payload?.protocol === 'V2';
+          const passphraseResult = isProtocolV2
+            ? await sdk.openWalletSession(connectId as string, { mode: 'select-hidden' })
+            : await getPassphraseState(connectId as string);
           if (passphraseResult.success && typeof passphraseResult.payload === 'string') {
             logInfo(`Passphrase state obtained from device: ${passphraseResult.payload}`);
             params.passphraseState = passphraseResult.payload;

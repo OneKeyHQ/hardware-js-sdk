@@ -136,7 +136,7 @@ export async function getProtocolV2WalletSession(
       return {
         passphraseState: undefined,
         newSession: undefined,
-        unlockedAttachPin: false,
+        unlockedAttachPin: device.features?.unlockedAttachPin ?? false,
         resumed: false,
       };
     }
