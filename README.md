@@ -21,6 +21,10 @@ Hardware-js-sdk is designed to allow third-party developers to quickly access th
 
 See the full documentation on [developer.onekey.so](https://developer.onekey.so/connect-to-hardware/hardware-sdk).
 
+Repository-local docs for workflows that are easier to verify against source:
+
+- [`@onekeyfe/hardware-cli` usage and troubleshooting](./packages/hd-cli/README.md)
+
 ## hardware-js-sdk development
 
 Before you start make sure you have downloaded and installed NVM, Yarn and git with git lfs.
