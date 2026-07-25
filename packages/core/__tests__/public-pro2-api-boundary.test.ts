@@ -10,6 +10,9 @@ jest.mock('../src/data/config', () => ({
 }));
 
 const internalMethodNames = [
+  'deviceInfoGet',
+  'deviceStatusGet',
+  'deviceSettingsGet',
   'protocolInfoRequest',
   'ping',
   'deviceSessionOpen',
