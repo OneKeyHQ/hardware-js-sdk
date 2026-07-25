@@ -78,7 +78,7 @@ jobs:
           IS_PRERELEASE=${{ needs.get-version.outputs.is_prerelease }}
 
           if [ "$IS_PRERELEASE" = "true" ]; then
-            if ! [[ "$PRERELEASE_DIST_TAG" =~ ^[a-zA-Z][a-zA-Z0-9._-]*$ ]]; then
+            if ! node -e 'const semver = require("semver"); const tag = process.argv[1]; const valid = /^[a-zA-Z][a-zA-Z0-9._-]*$/.test(tag) && tag.toLowerCase() !== "latest" && semver.validRange(tag) === null; process.exit(valid ? 0 : 1);' "$PRERELEASE_DIST_TAG"; then
               echo "❌ Invalid prerelease npm dist-tag: $PRERELEASE_DIST_TAG"
               exit 1
             fi
