@@ -10,11 +10,11 @@ export type DeviceFeaturesUpdateSource =
   | 'cache';
 
 /**
- * 合并设备状态的字段级 patch。
+ * Merge a field-level device-state patch.
  *
- * `undefined` 表示本次响应未提供该字段，不覆盖缓存；`null` 表示设备明确
- * 返回空值，需要写入缓存。raw 等对象字段由调用方构造完整值后再传入，
- * 这里不做隐式深合并。
+ * `undefined` means the response omitted a field and preserves the cache; `null`
+ * means the device explicitly returned an empty value and must be cached. Callers
+ * provide complete object fields such as raw; this function does not deep-merge.
  */
 export function mergeDeviceFeaturesPatch(previous: Features, patch: Partial<Features>): Features {
   let next = previous;

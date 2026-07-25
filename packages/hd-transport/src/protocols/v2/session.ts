@@ -201,7 +201,7 @@ export class ProtocolV2Session {
       router,
       seq: protoSeq,
     });
-    // 暂停输出 Protocol V2 TX 帧日志，避免传输层产生大量调试信息。
+    // Suppress Protocol V2 TX frame logs to avoid excessive transport diagnostics.
     /*
     const txMetadata = ProtocolV2.inspectFrame(schemas, frame);
 
@@ -251,7 +251,7 @@ export class ProtocolV2Session {
         }
         const isAck = ProtocolV2.isAckFrame(rxFrame);
         if (!isAck) {
-          // 暂停输出 Protocol V2 RX 帧日志，避免传输层产生大量调试信息。
+          // Suppress Protocol V2 RX frame logs to avoid excessive transport diagnostics.
           /*
           const rxMetadata = ProtocolV2.inspectFrame(schemas, rxFrame);
 

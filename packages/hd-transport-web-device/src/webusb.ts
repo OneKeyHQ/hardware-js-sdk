@@ -75,22 +75,21 @@ export default class WebUsbTransport {
 
   private deviceProtocolHints: Map<string, ProtocolType> = new Map();
 
-  /** 按设备缓存 Protocol V2 frame assembler，保留同一次读取里多出来的后续 frame。 */
+  /** Per-device Protocol V2 assembler that retains extra frames from one read. */
   private protocolV2Assemblers: Map<string, ProtocolV2FrameAssembler> = new Map();
 
-  /** 按设备缓存 Protocol V2 session，保持 seq 与设备会话一致递增。 */
+  /** Per-device Protocol V2 session that keeps sequence numbers monotonic. */
   private protocolV2Sessions: Map<string, ProtocolV2Session> = new Map();
 
-  /** 当前 Protocol V2 调用的读取超时，由缓存 session 的 readFrame 闭包读取。 */
+  /** Read timeout for the current Protocol V2 call, consumed by cached readFrame. */
   private protocolV2ReadTimeouts: Map<string, number | undefined> = new Map();
 
   /** Per-path USB endpoint / interface numbers (discovered from USB descriptors) */
   private deviceEndpoints: Map<string, DeviceEndpoints> = new Map();
 
   /**
-   * 早期 Pro2 工程板 USB descriptor 没有烧录 serial number。
-   * 为这类设备生成会话内稳定的 mock path（同一 USBDevice 实例复用同一 path），
-   * 避免设备因为空 serial 被发现流程整体丢弃。重新插拔后实例变化，path 会重新生成。
+   * Early Pro2 boards have no USB serial number. Assign a session-stable mock path per
+   * USBDevice instance so discovery retains them; reconnecting creates a new instance/path.
    */
   private mockSerialPaths: WeakMap<USBDevice, string> = new WeakMap();
 
@@ -182,8 +181,7 @@ export default class WebUsbTransport {
   }
 
   /**
-   * 设备 path：正常设备直接用 USB serial number；
-   * 空 serial（早期工程板）回退到会话内稳定的 mock path。
+   * Use the USB serial as the device path, falling back to a session-stable mock path.
    */
   private getDevicePath(device: USBDevice): string {
     if (typeof device.serialNumber === 'string' && device.serialNumber.length > 0) {
@@ -289,15 +287,14 @@ export default class WebUsbTransport {
     }
 
     if (expectedProtocol === 'V2') {
-      // 免探测路径：调用方显式承诺该设备是 V2（例如固件升级重启后的重连场景，
-      // 上层已经探测过协议并通过 expectedProtocol 传回），这里不再重复探测。
+      // Skip probing when the caller explicitly confirms V2, such as reconnect after a
+      // firmware reboot where expectedProtocol carries the previously probed result.
       this.deviceProtocol.set(path, 'V2');
       return 'V2';
     }
 
-    // 项目约束：协议判断必须在连接后主动探测，不能依赖设备名/PID/descriptor。
-    // 设备名 hint（如 "Pro 2"）只用于调整探测顺序：hint=V2 时先探 V2、失败回落 V1，
-    // 不能作为最终结论。
+    // Protocol must be actively probed after connection. Name, PID, and descriptors only
+    // influence probe order; a V2 hint probes V2 first and falls back to V1.
     const probeOrder: ProtocolType[] =
       protocolHint === 'V2' || this.deviceProtocol.get(path) === 'V2' ? ['V2', 'V1'] : ['V1', 'V2'];
 

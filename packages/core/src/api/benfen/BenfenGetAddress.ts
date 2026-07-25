@@ -78,7 +78,7 @@ export default class BenfenGetAddress extends BaseMethod<HardwareBenfenGetAddres
             'BenfenAddress',
             param
           );
-          // proto 里 BenfenAddress.address 是 optional；正常响应必然携带
+          // BenfenAddress.address is optional in proto but always present on success.
           address = addressRes.message.address ?? '';
         } else {
           address = publicKeyToAddress(publicKey);

@@ -15,7 +15,7 @@ export interface CommonParams {
    */
   timeout?: number;
   /**
-   * Protocol V2 初始化阶段 DeviceInfoGet 超时时间
+   * DeviceInfoGet timeout during Protocol V2 initialization.
    */
   protocolV2DeviceInfoTimeoutMs?: number;
   /**

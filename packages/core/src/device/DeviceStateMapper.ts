@@ -109,7 +109,7 @@ export const mapFeaturesToState = (features: Features): DeviceStatePatch => ({
     bootloader: features.bootloaderVersion,
     board: features.boardVersion,
     ble: features.bleVersion,
-    // 老设备只有单个 SE 版本，统一投影到 se01；se 保留为兼容别名。
+    // Legacy devices expose one SE version; project it to se01 and keep se as an alias.
     se: features.seVersion,
     se01: features.se01Version ?? features.seVersion,
     se02: features.se02Version,

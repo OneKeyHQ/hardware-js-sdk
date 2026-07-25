@@ -61,7 +61,7 @@ export abstract class ProtocolV2UsbTransportBase<Key> {
   protected abstract createProtocolV2UsbTimeoutError(name: string, timeoutMs: number): Error;
 
   protected onProtocolV2UsbLinkInvalidated(_key: Key, _reason: string): Promise<void> | void {
-    // 子类按需清理协议缓存或记录平台日志。
+    // Subclasses may clear protocol caches or emit platform-specific diagnostics.
   }
 
   protected async rotateProtocolV2UsbGeneration(key: Key, reason: string): Promise<number> {

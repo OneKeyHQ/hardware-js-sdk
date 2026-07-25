@@ -303,8 +303,8 @@ const descriptor = {
 };
 
 /**
- * 为纯对象 stub 设备补齐 Device 的协议判别与 getCurrent* accessor，
- * 缺省实现与 Device.ts 语义保持一致；已有同名字段（如 jest.fn()）不覆盖。
+ * Add Device protocol and getCurrent* accessors to plain-object stubs.
+ * Defaults match Device.ts and never replace an existing member such as jest.fn().
  */
 function stubDevice<T extends Record<string, any>>(device: T): T {
   const d = device as any;
@@ -2209,8 +2209,8 @@ describe('Protocol V2 feature adapter', () => {
     });
 
     (device as any).commands = { typedCall };
-    // Pro2 版本线独立于 Pro（这里是 1.2.3，不满足 Pro 系列 4.15.0 门槛），
-    // Protocol V2 走独立的设备端 PIN 解锁流程，不走 Pro 系列版本门槛或 GetAddress 探测回退。
+    // Pro2 uses an independent version line and dedicated device-side PIN flow,
+    // without the Pro version threshold or GetAddress probe fallback.
     (device as any).features = normalizeProtocolV2Features(
       { ...descriptor, protocolType: 'V2' } as any,
       {
@@ -2770,7 +2770,7 @@ describe('Protocol V2 firmware update targets', () => {
     const versions = await (method as any).waitForProtocolV2FinalFeatures();
 
     expect(acquire).toHaveBeenCalledWith('ble-id', null, true, 'V2');
-    // 更新完成判定使用 VERSIONS 请求（含 SE targets），scope 与请求内容一致
+    // Completion uses the VERSIONS request, including SE targets, with matching scope.
     expect(typedCall).toHaveBeenNthCalledWith(
       1,
       'DeviceInfoGet',

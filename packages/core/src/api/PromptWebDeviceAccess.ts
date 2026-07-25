@@ -54,9 +54,8 @@ export default class PromptWebDeviceAccess extends BaseMethod {
           const usbDevice = device as USBDevice;
           let path = usbDevice.serialNumber ?? '';
           if (!path) {
-            // 早期 Pro2 工程板 USB descriptor 没有 serial number。
-            // 授权后重新枚举，transport 会为空 serial 设备生成会话内稳定的 mock path，
-            // 这里按 USBDevice 对象身份找回该 path，保证后续 acquire 能匹配。
+            // Early Pro2 boards have no USB serial number. Re-enumeration assigns a
+            // session-stable mock path, which is recovered by USBDevice identity here.
             const diff = await this.connector?.enumerate();
             const matched = diff?.descriptors?.find(d => (d as any).device === usbDevice);
             path = matched?.path ?? '';

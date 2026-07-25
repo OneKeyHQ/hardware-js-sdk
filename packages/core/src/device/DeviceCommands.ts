@@ -98,8 +98,8 @@ function sanitizeDebugPayload(value: unknown, key = '', depth = 0): unknown {
     return summarizeRedactedData(value);
   }
 
-  // passphrase / host_passphrase 等键名承载隐藏钱包明文，统一脱敏做纵深防御，
-  // 避免任何命令（例如 Protocol V2 的 DeviceSessionOpen）意外把明文写入日志。
+  // Redact passphrase-bearing keys as defense in depth so commands such as
+  // Protocol V2 DeviceSessionOpen can never write hidden-wallet secrets to logs.
   if (key && /passphrase/i.test(key)) {
     return '[redacted passphrase]';
   }
@@ -147,10 +147,9 @@ function sanitizeDebugPayload(value: unknown, key = '', depth = 0): unknown {
 }
 
 /**
- * 交互式 Ack（ButtonAck / PinMatrixAck / PassphraseAck 等）不应继承原调用的
- * timeoutMs：设备在等待用户操作（确认、输入 PIN/passphrase），思考时间不可预估，
- * 沿用业务调用的超时会把用户操作截断。仅保留 expectedTypes / intermediateTypes
- * 等与响应类型相关的选项。
+ * Interactive acknowledgements must not inherit timeoutMs from the original call.
+ * User confirmation and PIN/passphrase entry have unbounded think time. Preserve only
+ * response-related options such as expectedTypes and intermediateTypes.
  */
 const stripInteractiveAckTimeout = (
   options?: TransportCallOptions
@@ -527,7 +526,7 @@ export class DeviceCommands {
   ): Promise<DefaultMessageResponse> {
     try {
       if (shouldReduceDebugForCall(callType)) {
-        // 高频文件写入每个 chunk 都会经过这里，避免 debug log 反向拖慢传输。
+        // Avoid debug logging on every high-frequency file-write chunk.
       } else if (DataManager.getSettings('env') === 'react-native') {
         Log.debug('_filterCommonTypes: ', JSON.stringify(sanitizeDebugPayload(res)));
       } else {

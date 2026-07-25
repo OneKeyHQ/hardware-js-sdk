@@ -111,12 +111,12 @@ type ProtocolV2FileTransferParams = PROTO.FirmwareUpload & {
   onTransferredBytes?: (transferredBytes: number) => void;
 };
 
-/** RESC bundle okpkg（FileWrite 直写模式），每个独立同步到 devicePath */
+/** RESC bundle okpkg written independently to devicePath through FileWrite. */
 type ProtocolV2ResourceBundleBinary = {
   name: string;
   binary: ArrayBuffer;
   devicePath: string;
-  /** 远端配置模式下的下载 URL（手动模式不填） */
+  /** Download URL for remote-config mode; omitted in manual mode. */
   url?: string;
   version?: IVersionArray;
   payloadHash?: string;
@@ -199,8 +199,8 @@ const PROTOCOL_V2_UPDATE_TARGET_BY_TARGET_ID = new Map<number, FirmwareUpdateV4T
 const PROTOCOL_V2_ROMLOADER_UNSUPPORTED_MESSAGE =
   'FW_MGMT_TARGET_ROMLOADER is not accepted by the current Pro2 bootloader update request. Flash romloader with the loader-specific flow instead of firmwareUpdateV4.';
 
-// hd-transport 的历史 decode 行为会把单值 enum 输出为枚举名字符串；
-// Protocol V2 沿用这个 SDK 语义，内部比较前再映射回固件协议数值。
+// hd-transport historically decodes scalar enums as enum-name strings.
+// Map them back to firmware protocol values before internal comparisons.
 const PROTOCOL_V2_TARGET_ID_BY_DECODED_NAME = new Map<string, number>(
   Object.entries(ProtocolV2FirmwareTargetType).map(([key, value]) => [key, value])
 );
@@ -738,22 +738,22 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   }
 
   // ============================================================
-  // RESC bundle 直写增量同步（FileRead 比对 + FilesystemFileWrite 直写）
+  // Incremental RESC bundle sync through FileRead and FilesystemFileWrite
   // ============================================================
 
   /**
-   * 准备 RESC bundle 列表。
+   * Prepare the RESC bundle list.
    *
-   * 两种模式（同 FirmwareUpdateV3 的 binary vs version 模式）：
-   * - 用户传了 resourceBundleFiles（binary 数组）：直接用，不做版本比对。
-   * - 用户没传：从远端 config.json 的 release.resourceBundles 拉取，
-   *   此时 syncProtocolV2ResourceBundles 会按需下载 + 比对设备已有 header 跳过。
+   * Two modes, matching FirmwareUpdateV3 binary-versus-version behavior:
+   * - resourceBundleFiles supplied: use binaries directly without version checks.
+   * - Otherwise load release.resourceBundles from remote config.json; synchronization
+   *   downloads on demand and skips bundles whose device header already matches.
    */
   private prepareProtocolV2ResourceBundles(
     firmwareType: EFirmwareType,
     features: Features
   ): ProtocolV2ResourceBundleBinary[] | undefined {
-    // 模式1：用户手动传入 binary，直接安装，不比对
+    // Manual binaries are installed directly without comparison.
     if (this.params.resourceBundleFiles?.length) {
       return this.params.resourceBundleFiles.map(file => ({
         name: file.devicePath.split('/').pop() ?? file.devicePath,
@@ -766,7 +766,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       return undefined;
     }
 
-    // 模式2：远端配置模式，后续按需下载 + 比对
+    // Remote-config bundles are downloaded and compared later.
     const release = DataManager.getFirmwareLatestRelease(features, firmwareType);
     if (!release?.resourceBundles?.length) return undefined;
 
@@ -782,10 +782,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   }
 
   /**
-   * 同步 RESC bundles 到设备。
+   * Synchronize RESC bundles to the device.
    *
-   * 手动传入模式（有 binary）：直接 FileWrite 直写，不比对。
-   * 远端配置模式（无 binary，有 url）：按需下载 + FileRead 比对跳过已更新的。
+   * Manual mode writes supplied binaries directly.
+   * Remote-config mode downloads on demand and skips matching bundles after FileRead.
    */
   private async syncProtocolV2ResourceBundles(
     bundles: ProtocolV2ResourceBundleBinary[],
@@ -797,17 +797,17 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const isManualMode = bundles.every(b => b.binary.byteLength > 0);
     let bundlesToSync = bundles;
 
-    // 远端配置模式：按需下载 + 比对跳过
+    // Download remote-config bundles on demand and skip matching ones.
     if (!isManualMode) {
       const filtered: ProtocolV2ResourceBundleBinary[] = [];
       for (const bundle of bundles) {
-        // 下载 binary
+        // Download the binary.
         if (bundle.binary.byteLength === 0 && bundle.url) {
           Log.log(`[FirmwareUpdateV4] downloading RESC bundle ${bundle.name} from ${bundle.url}`);
           const { binary } = await getSysResourceBinary(bundle.url);
           bundle.binary = binary;
         }
-        // 比对设备上已有 header
+        // Compare the existing device header.
         const upToDate = await this.isProtocolV2ResourceBundleUpToDate(bundle);
         if (upToDate) {
           Log.log(`[FirmwareUpdateV4] skip RESC bundle ${bundle.name}; already up to date`);
@@ -823,7 +823,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       return { processedSize: 0, totalSize: firmwareSize };
     }
 
-    // FileWrite 直写到设备
+    // Write directly to the device through FileWrite.
     let totalSize = 0;
     for (const b of bundlesToSync) totalSize += b.binary.byteLength;
 
@@ -851,7 +851,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   }
 
   /**
-   * 比对设备上已有 okpkg 的 OKPP header（仅远端配置模式使用）。
+   * Compare the existing okpkg OKPP header in remote-config mode.
    */
   private async isProtocolV2ResourceBundleUpToDate(
     bundle: ProtocolV2ResourceBundleBinary
@@ -890,8 +890,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   }
 
   async enterProtocolV2BootloaderMode() {
-    // romloader 本身就是升级链路的首段执行环境，能够接收更新请求并把待处理目标交给 bootloader。
-    // 它不接受 DeviceRebootType.Bootloader，因此这里必须直接复用当前连接。
+    // romloader is the first update environment and forwards targets to bootloader.
+    // It rejects DeviceRebootType.Bootloader, so reuse the current connection.
     if (this.isProtocolV2BootloaderMode() || this.device.features?.mode === 'romloader') {
       Log.debug('Protocol V2 device is already in loader mode, skip reboot to bootloader');
       return false;
@@ -927,8 +927,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           commands: this.device.getCommands(),
           timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
         });
-        // 业务上下文已经明确：这是执行 Bootloader reboot 后的重连探测。
-        // Bootloader 不支持 DeviceStatusGet，不能再走通用运行模式探测。
+        // This is a reconnect probe after a Bootloader reboot. Bootloader does not
+        // support DeviceStatusGet, so the generic runtime-mode probe is invalid here.
         const features = this.device.updateProtocolV2Features(deviceInfo, null, 'bootloader');
         assertProtocolV2ReconnectIdentity(
           this.protocolV2ExpectedDeviceId,
@@ -955,8 +955,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   }
 
   /**
-   * 收集按 DeviceFirmwareTargetType 拆分的显式目标二进制。
-   * 文件名仅用于 staging 路径展示，target_id 已显式给定。
+   * Collect explicit target binaries grouped by DeviceFirmwareTargetType.
+   * Filenames are display-only staging paths because target_id is explicit.
    */
   private collectExplicitTargetBinaries() {
     const entries: ProtocolV2TargetBinary[] = [];
@@ -1026,7 +1026,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       totalSize = resourceTransfer.totalSize;
     }
 
-    // 只有 RESC bundle、没有固件 target 时跳过 staging/install 阶段
+    // Skip staging and installation when the update contains RESC bundles only.
     if (orderedInstallItems.length === 0) {
       Log.log('[FirmwareUpdateV4] no firmware targets to install (RESC bundles only)');
       if (totalSize > 0) {
@@ -1165,8 +1165,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       const completedProgress = Math.floor(
         (completedTargets.length / expectedTargetIds.size) * 100
       );
-      // 协议没有单目标百分比，只能按已完成目标数给出粗粒度进度；
-      // 已开始但尚无目标完成时用 1%，避免 UI 看起来完全没有响应。
+      // The protocol exposes no per-target percentage, so report coarse progress by
+      // completed targets and use 1% once work starts to keep the UI responsive.
       const progress = Math.min(99, Math.max(completedProgress, hasInProgressTarget ? 1 : 0));
       this.postProgressMessage(progress, 'installingFirmware');
     }
@@ -1213,9 +1213,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           ) {
             throw error;
           }
-          // App 固件不注册 DeviceFirmwareUpdateStatusGet；如果安装完成后设备已
-          // 自动重启到 App，这个明确错误本身就是安装阶段已经退出的业务信号。
-          // 这里不调用 DeviceStatusGet，最终 App 就绪校验由后续阶段负责。
+          // App firmware does not register DeviceFirmwareUpdateStatusGet. If the
+          // device already rebooted into App, this endpoint error signals that the
+          // install phase ended; the later phase performs the final readiness check.
           if (isProtocolV2FirmwareStatusEndpointUnavailable(error)) {
             Log.log(
               '[FirmwareUpdateV4] firmware status endpoint unavailable after reboot; continue with normal-mode verification'
@@ -1246,8 +1246,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
   private async exitProtocolV2BootloaderToNormal() {
     await this.reconnectProtocolV2Device();
-    // 当前连接仍可能是 bootloader。不要用 DeviceStatusGet 试探模式；直接请求
-    // Normal reboot。若设备已经自动进入 App，重复的 Normal reboot 也是幂等的。
+    // The connection may still be in bootloader. Request a Normal reboot directly;
+    // repeating it after an automatic App reboot is idempotent.
     await this.protocolV2Reboot(DeviceRebootType.Normal);
   }
 
@@ -1282,7 +1282,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         const deviceInfo = await requestProtocolV2DeviceInfo({
           commands: this.device.getCommands(),
           timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
-          // 更新完成判定只需要各 target 版本号；scope 与请求内容保持一致
+          // Completion needs target versions only; keep scope aligned with the request.
           request: PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST,
         });
         const features = await this.device.probeProtocolV2RuntimeState(
@@ -1301,8 +1301,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         }
         return features;
       } catch (error) {
-        // deviceId 已明确变化时继续轮询没有意义，也会掩盖“升级后身份被重置”的
-        // 固件契约问题；直接返回明确错误。暂时缺失身份仍允许等待设备完全就绪。
+        // A confirmed deviceId change is a firmware contract violation and cannot be
+        // fixed by polling. A temporarily missing identity may still become ready.
         if (this.isProtocolV2ReconnectIdentityMismatch(error)) {
           throw error;
         }
@@ -1346,15 +1346,15 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       assertProtocolV2ReconnectIdentity(
         this.protocolV2ExpectedDeviceId,
         this.device.getCurrentDeviceId(),
-        // acquire 后缓存身份可能尚未恢复；此处只拒绝已存在且不匹配的身份。
-        // 最终身份会在 DeviceInfoGet + DeviceStatusGet 刷新后严格校验。
+        // Cached identity may be absent immediately after acquire. Reject only an
+        // existing mismatch; the final refresh performs strict identity validation.
         { allowMissingActual: true }
       );
       return;
     }
 
-    // App 与 bootloader 序列号暂时可能不一致。V4 升级重连阶段只接受唯一枚举设备，
-    // 避免继续按旧 app connectId 查缓存导致反复输出 path mismatch 日志。
+    // App and bootloader serials may differ temporarily. During V4 reconnect, accept
+    // only a uniquely enumerated device instead of repeatedly using the old App path.
     const { deviceList } = await DevicePool.getDevices(devicesDescriptor, undefined, {
       connectProtocol: PROTOCOL_V2_CONNECT_PROTOCOL,
     });
@@ -1373,15 +1373,15 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     assertProtocolV2ReconnectIdentity(
       this.protocolV2ExpectedDeviceId,
       this.device.getCurrentDeviceId(),
-      // acquire 后缓存身份可能尚未恢复；此处只拒绝已存在且不匹配的身份。
-      // 最终身份会在 DeviceInfoGet + DeviceStatusGet 刷新后严格校验。
+      // Cached identity may be absent immediately after acquire. Reject only an
+      // existing mismatch; the final refresh performs strict identity validation.
       { allowMissingActual: true }
     );
   }
 
   /**
-   * 同一个 USB 会话已成功 acquire 后，轮询只复用当前命令通道。设备重启或枚举
-   * session 变化时 hasDeviceAcquire() 会变为 false，届时才重新 acquire。
+   * After acquiring a USB session, polling reuses its command channel. Reacquire only
+   * after reboot or enumeration changes cause hasDeviceAcquire() to become false.
    */
   private async ensureProtocolV2DeviceAcquired() {
     const commands = this.device.getCommands();
@@ -1549,8 +1549,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       { targets },
       { timeoutMs: PROTOCOL_V2_START_UPDATE_TIMEOUT }
     );
-    // Success 是设备确认并接受安装的 ACK。只有收到 ACK 后才结束确认动画，
-    // 并开始通过 DeviceFirmwareUpdateStatusGet 轮询安装结果。
+    // Success acknowledges that the device accepted installation. End confirmation
+    // and begin status polling only after receiving this ACK.
     this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdating);
     this.postProgressMessage(0, 'installingFirmware');
     return response;

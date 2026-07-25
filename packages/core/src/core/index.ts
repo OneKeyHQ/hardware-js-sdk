@@ -433,8 +433,8 @@ const onCallDevice = async (
     await waitForPendingPromise(getPrePendingCallPromise, setPrePendingCallPromise);
 
     const inner = async (): Promise<void> => {
-      // Protocol V2 专属方法统一守卫：协议在 acquire/initialize 后已确定，
-      // 非 V2 设备直接抛出明确的 NotSupport 错误（见 BaseMethod.requireProtocolV2）。
+      // The protocol is established after acquire/initialize. Reject Protocol V2-only
+      // methods on other devices through BaseMethod.requireProtocolV2.
       if (method.requireProtocolV2 && !device.isProtocolV2()) {
         throw createDeviceNotSupportMethodError(method.name, device.getCurrentFirmwareType());
       }
@@ -448,8 +448,8 @@ const onCallDevice = async (
       const deviceFirmwareType = device.getCurrentFirmwareType();
       let newVersionStatus: ReturnType<typeof DataManager.getFirmwareStatus> | undefined;
 
-      // 故障批次检测与远端强制升级门禁基于 V1 features/remote config，
-      // Pro2(V2) 暂不参与：profile 版的 firmwareStatus 需要 DataManager 支持后再接入。
+      // Defective-batch and forced-update gates depend on V1 features/remote config.
+      // Pro2 joins after DataManager supports its profile firmwareStatus.
       if (device.features && !device.isProtocolV2()) {
         await DataManager.checkAndReloadData();
 
@@ -1504,7 +1504,7 @@ export default class Core extends EventEmitter {
       transportCleanup = Promise.resolve();
     }
 
-    // 保持旧的同步 dispose 语义：即使调用方尚未 await，内存状态和监听器也立即清理。
+    // Preserve synchronous dispose semantics for in-memory state and listeners.
     _deviceList = undefined;
     _connector = undefined;
     DevicePool.resetState();
@@ -1517,7 +1517,7 @@ export default class Core extends EventEmitter {
     cleanupSdkInstance(this.sdkInstanceId);
     if (_core === this) _core = undefined;
 
-    // Transport（特别是 Node USB）可能需要异步释放原生句柄。
+    // Transports, especially Node USB, may release native handles asynchronously.
     await transportCleanup;
   }
 }

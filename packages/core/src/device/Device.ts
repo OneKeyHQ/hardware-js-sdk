@@ -100,7 +100,7 @@ export type InitOptions = {
   deriveCardano?: boolean;
   connectProtocol?: HardwareConnectProtocol;
   protocolV2DeviceInfoTimeoutMs?: number;
-  /** 设备发现内部使用：返回列表前刷新 Protocol V2 运行时状态。 */
+  /** Refresh Protocol V2 runtime state before returning discovery results. */
   refreshRuntimeState?: boolean;
 };
 
@@ -209,10 +209,10 @@ export class Device extends EventEmitter {
    */
   private deviceAcquired = false;
 
-  /** 唯一设备状态缓存。旧 Features 仅通过 getter/setter 做兼容投影。 */
+  /** Canonical device-state cache; legacy Features is a compatibility projection. */
   private stateStore = new DeviceStateStore();
 
-  /** 物理重连或重启后，下一次初始化必须重新读取 DeviceInfo。 */
+  /** Force the next initialization to reload DeviceInfo after reconnect or reboot. */
   private protocolV2StateNeedsReload = false;
 
   get state() {
@@ -368,11 +368,10 @@ export class Device extends EventEmitter {
     try {
       let acquireResult: unknown;
       if (DataManager.isBleConnect(env)) {
-        // forceCleanRunPromise=true（自 e21b83c6 引入，修复 Pro2 BLE 重连）：
-        // acquire 意味着开启一个全新会话，transport 里残留的上一次 runPromise
-        // 必然属于已死亡的会话（如固件升级重启、探测中断），不清理会让新会话的
-        // 调用被旧 promise 卡死。无法在 Device 层面区分“重连恢复”与普通 acquire，
-        // 因此对 BLE acquire 恒清理是有意为之。
+        // acquire starts a new BLE session. Any previous runPromise belongs to a dead
+        // session, such as an interrupted probe or firmware-update reboot, and would
+        // otherwise block the new session. Device cannot distinguish recovery from a
+        // regular acquire, so BLE always clears it intentionally.
         acquireResult = await this.deviceConnector?.acquire(
           this.originalDescriptor.id,
           undefined,
@@ -513,12 +512,11 @@ export class Device extends EventEmitter {
   }
 
   /**
-   * 唯一协议判别器。
+   * Canonical protocol discriminator.
    *
-   * descriptor.protocolType 是协议探测后的结果；V2 features 由 DeviceInfoGet
-   * 映射产生。
-   * 全 SDK 的协议分支都必须走这里，不要直接读 originalDescriptor.protocolType
-   * 或从 features 反推。
+   * descriptor.protocolType is established by active probing; V2 features are mapped
+   * from DeviceInfoGet. All protocol branches must use this method instead of reading
+   * originalDescriptor.protocolType directly or inferring a protocol from features.
    */
   getProtocol(): 'V1' | 'V2' {
     return this.originalDescriptor.protocolType === 'V2' ? 'V2' : 'V1';
@@ -544,8 +542,8 @@ export class Device extends EventEmitter {
     const serialNo = this.getCurrentSerialNo();
     if (serialNo) return serialNo;
 
-    // connectId 是 SDK 内部连接路由 key。这里兜底到 transport descriptor，
-    // 不改变 features.serialNo / deviceId 的业务语义。
+    // connectId is an internal routing key. Falling back to the transport descriptor
+    // does not change the business meaning of features.serialNo or deviceId.
     return this.originalDescriptor.path || this.originalDescriptor.id || '';
   }
 
@@ -639,9 +637,8 @@ export class Device extends EventEmitter {
   }
 
   supportModifyHomescreen(): SupportFeatureType {
-    // Pro2 走独立 1.x 版本线，不能套用 Touch/Pro 的 3.4.0 门槛（恒 false 且未来会误判）。
-    // 依据：firmware-pro2 协议 schema（messages-protocol-v2.json）的 ApplySettings
-    // 包含 homescreen 字段，V2 固件从首个版本即支持修改主屏。
+    // Pro2 has an independent 1.x version line and must not use the Touch/Pro 3.4.0
+    // threshold. ApplySettings includes homescreen from the first V2 firmware version.
     if (this.isProtocolV2()) {
       return { support: true };
     }
@@ -752,15 +749,15 @@ export class Device extends EventEmitter {
   }
 
   async initialize(options?: InitOptions) {
-    // Protocol V2 不支持传统 Initialize，直接使用协议专用初始化流程。
+    // Protocol V2 does not support legacy Initialize; use its dedicated flow.
     if (this.isProtocolV2()) {
       this.passphraseState = options?.passphraseState;
       if (this.state && !options?.initSession && !this.protocolV2StateNeedsReload) {
         if (this.features?.bootloaderMode) {
           return;
         }
-        // 普通业务调用复用缓存。动态状态由显式 getDeviceState refresh、
-        // 解锁流程和设备事件刷新，避免每个 SDK 方法都额外轮询 DeviceStatus。
+        // Normal calls reuse the cache. Explicit getDeviceState refreshes, unlock flow,
+        // and device events update dynamic state without polling on every SDK call.
         return;
       }
       await this._initializeProtocolV2(options);
@@ -814,22 +811,21 @@ export class Device extends EventEmitter {
   /**
    * Device initialization over Protocol V2.
    *
-   * Protocol V2 不走传统 Initialize/GetFeatures；直接用 DeviceInfoGet
-   * 生成唯一的 features 状态。
+   * Protocol V2 bypasses legacy Initialize/GetFeatures and builds its canonical
+   * features state directly from DeviceInfoGet.
    */
   private async _initializeProtocolV2(options?: InitOptions) {
     Log.debug('Initialize device via Protocol V2 features adapter');
 
     try {
-      // 超时由 requestProtocolV2DeviceInfo 内部的 typedCall timeoutMs（默认 10s）负责，
-      // 不再额外包一层 Promise.race：外层 race 的 timer 不会清理，
-      // 且 reject 后底层调用仍会残留。
+      // typedCall applies the request timeout. An outer Promise.race would leak its
+      // timer and leave the underlying call active after rejection.
       const deviceInfo = await requestProtocolV2DeviceInfo({
         commands: this.commands,
         timeoutMs: options?.protocolV2DeviceInfoTimeoutMs,
       });
-      // 默认请求不含 SE/hash 数据，scope 如实标注为 basic；
-      // 完整版本与校验数据由公共 getDeviceState({ scope: 'firmware' }) 显式获取。
+      // The default request excludes SE/hash data and therefore uses basic scope.
+      // Full version and verification data require getDeviceState({ scope: 'firmware' }).
       const features = await this.probeProtocolV2RuntimeState(
         deviceInfo,
         options?.protocolV2DeviceInfoTimeoutMs
@@ -1121,8 +1117,7 @@ export class Device extends EventEmitter {
     }
 
     if (forceUpdate) {
-      // 枚举得到的 descriptor 可能不带 protocolType（如 WebUSB enumerate），
-      // 不能让覆盖丢掉已探测的协议结果。
+      // Enumerated descriptors may omit protocolType, so preserve an actively probed value.
       this.originalDescriptor = {
         ...descriptor,
         protocolType: descriptor.protocolType ?? this.originalDescriptor.protocolType,
@@ -1386,7 +1381,7 @@ export class Device extends EventEmitter {
   }
 
   supportUnlockVersionRange(): DeviceFirmwareRange {
-    // 仅适用于 Protocol V1 的 Pro 系列；Pro2 走独立的 Protocol V2 解锁流程。
+    // This range applies to Protocol V1 Pro devices; Pro2 has a dedicated unlock flow.
     return {
       pro: {
         min: '4.15.0',

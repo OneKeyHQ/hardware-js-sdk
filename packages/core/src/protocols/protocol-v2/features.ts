@@ -8,8 +8,7 @@ import type {
 } from '@onekeyfe/hd-transport';
 import type { DeviceCommands } from '../../device/DeviceCommands';
 
-// 单源类型：直接使用 hd-transport 生成的 ProtocolV2DeviceInfo / DeviceSEInfo /
-// DeviceFirmwareImageInfo（与 firmware-pro2 proto 一致），不再维护手写副本。
+// Use hd-transport generated Protocol V2 types as the single source of truth.
 export type { ProtocolV2DeviceInfo };
 export type { DeviceFirmwareImageInfo as ProtocolV2FirmwareImageInfo } from '@onekeyfe/hd-transport';
 export type { DeviceSEInfo as ProtocolV2SEInfo } from '@onekeyfe/hd-transport';
@@ -17,8 +16,8 @@ export type { DeviceSEInfo as ProtocolV2SEInfo } from '@onekeyfe/hd-transport';
 export type ProtocolV2SeStateLabel = 'BOOT' | 'APP_FACTORY' | 'APP';
 
 /**
- * 传输层沿用历史 decode 语义：单值 proto enum 输出为名称字符串。
- * 这里按 SDK decode 后的字符串语义处理，同时接受数字枚举，便于低层调用复用。
+ * The transport historically decodes scalar proto enums as name strings.
+ * Accept both that SDK representation and numeric enums for low-level callers.
  */
 const normalizeEnumValue = <T extends Record<string | number, string | number>>(
   enumObject: T,
@@ -31,8 +30,8 @@ const normalizeEnumValue = <T extends Record<string | number, string | number>>(
 };
 
 /**
- * DeviceSEInfo.state → 可读标签。SDK 内唯一的 SE 状态映射实现，
- * DeviceState Mapper 与老协议 Features 兼容投影都从这里取。
+ * Map DeviceSEInfo.state to a readable label. This is the SDK's canonical mapping
+ * used by DeviceState and the legacy Features projection.
  */
 export const getProtocolV2SeState = (se?: DeviceSEInfo): ProtocolV2SeStateLabel | null => {
   const label = normalizeEnumValue(DeviceSEState, se?.state);
@@ -49,8 +48,7 @@ export const getProtocolV2SeState = (se?: DeviceSEInfo): ProtocolV2SeStateLabel 
 };
 
 /**
- * DeviceSEInfo.type → 可读标签（如 'THD89'）。DeviceState / Features
- * 的 SE 类型归一化从这里取。
+ * Map DeviceSEInfo.type to a readable label such as `THD89`.
  */
 export const getProtocolV2SeType = (se?: DeviceSEInfo): string | null =>
   normalizeEnumValue(DeviceSeType, se?.type);
@@ -58,12 +56,12 @@ export const getProtocolV2SeType = (se?: DeviceSEInfo): string | null =>
 export type ProtocolV2RuntimeMode = 'normal' | 'bootloader';
 
 /**
- * TODO: firmware-pro2 提供 ProtocolInfo.build_fingerprint 后，改为解析运行中的
- * binary name，删除将 DeviceStatusGet 失败视为 bootloader 的临时判断；romloader
- * 属于特殊恢复场景，待独立协议和业务流程明确后再接入，不参与当前运行模式识别。
+ * TODO: Once firmware-pro2 exposes ProtocolInfo.build_fingerprint, parse the running
+ * binary name and remove the temporary DeviceStatusGet-failure heuristic. romloader
+ * is a separate recovery flow and is excluded until its contract is defined.
  *
- * 当前临时协议只处理两态：DeviceStatusGet 成功即 normal，失败统一视为
- * bootloader。不再依赖 application/SE/romloader 字段组合推断运行模式。
+ * The temporary contract has two states: DeviceStatusGet success means normal and
+ * failure means bootloader. Do not infer mode from application/SE/romloader fields.
  */
 export const getProtocolV2RuntimeMode = ({
   deviceInfo: _deviceInfo,
@@ -93,8 +91,8 @@ export const PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST = {
 };
 
 /**
- * 固件升级完成后的版本探测请求。
- * 仅读取硬件与各固件组件信息，不隐式请求 DeviceStatus。
+ * Version probe used after firmware update completion.
+ * It reads hardware and firmware component data without requesting DeviceStatus.
  */
 export const PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST = {
   targets: {
@@ -145,8 +143,7 @@ export async function requestProtocolV2DeviceInfo({
   const { message } = await commands.typedCall('DeviceInfoGet', 'DeviceInfo', request, {
     timeoutMs,
   });
-  // 'DeviceInfo' 在生成类型里是 V1 DeviceInfo | ProtocolV2DeviceInfo 的合并；
-  // DeviceInfoGet 是 V2-only 消息，这里收窄到 V2 形态。
+  // Generated DeviceInfo is a V1/V2 union; DeviceInfoGet narrows it to the V2 shape.
   return message as ProtocolV2DeviceInfo;
 }
 

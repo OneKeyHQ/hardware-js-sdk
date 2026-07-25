@@ -67,8 +67,8 @@ export default class NervosSignTransaction extends BaseMethod<NervosSignTx> {
     res: TypedResponseMessage<'NervosSignedTx'> | TypedResponseMessage<'NervosTxRequest'>,
     data: Buffer,
     offset = 0
-    // 设备可能在最后一个 NervosTxRequest（无 data_length）里返回签名，
-    // 该消息没有 address 字段，返回类型如实声明为联合类型
+    // The final NervosTxRequest may return a signature without data_length or address,
+    // so the result accurately uses a union type.
   ): Promise<NervosSignedTx | (NervosTxRequest & { path: string })> => {
     if (res.type === 'NervosSignedTx') {
       if (!res?.message?.signature) {

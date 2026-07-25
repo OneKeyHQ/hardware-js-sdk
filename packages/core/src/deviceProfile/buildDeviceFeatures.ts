@@ -252,11 +252,11 @@ export const buildProtocolV1FeaturesPayload = (
 };
 
 /**
- * Protocol V2 的结构化 `Features` 构建器。
+ * Structured Protocol V2 `Features` builder.
  *
- * 这是 Device 内部唯一缓存状态。字段只来自 DeviceInfoGet 或前一次 features
- * 缓存的同名字段级合并；不存在协议等价语义的字段保持 null/空值，不再通过
- * 统一 DeviceState 或 transport path 做身份兜底。
+ * This is the only cached Device state. Fields come from DeviceInfoGet or same-name
+ * values in the previous cache. Fields without protocol-equivalent meaning remain
+ * null or empty and never fall back to DeviceState or a transport path.
  */
 export const buildProtocolV2FeaturesPayload = ({
   deviceInfo,
@@ -295,8 +295,8 @@ export const buildProtocolV2FeaturesPayload = ({
   const label = cached?.label ?? null;
   const bleName = firstValue(info?.coprocessor?.bt_adv_name, cached?.bleName);
   const initialized = firstValue(status?.init_states, cached?.initialized) ?? null;
-  // Pro2 在锁定状态下返回的 passphrase_enabled 不是最终钱包状态。
-  // 只有完成 PIN 解锁后的 DeviceStatus 才能作为 passphrase 开关真值来源。
+  // passphrase_enabled from a locked Pro2 is not authoritative. Only DeviceStatus
+  // after PIN unlock can determine the final passphrase setting.
   let passphraseProtection = cached?.passphraseProtection ?? null;
   if (status?.unlocked === true) {
     passphraseProtection = status.passphrase_enabled ?? null;

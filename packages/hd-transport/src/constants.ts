@@ -1,50 +1,50 @@
 // ---- Protocol V1 (Pro1 / Touch / Mini / Classic) ----
 
-/** Protocol V1 USB report 标记，ASCII '?'。 */
+/** Protocol V1 USB report marker, ASCII `?`. */
 export const PROTOCOL_V1_REPORT_ID = 0x3f;
 
-/** Protocol V1 envelope 头部标记，ASCII '#'。 */
+/** Protocol V1 envelope marker, ASCII `#`. */
 export const PROTOCOL_V1_HEADER_BYTE = 0x23;
 
-/** Protocol V1 单个 chunk 去掉 report 标记后的可用 payload 长度。 */
+/** Protocol V1 payload bytes per chunk after the report marker. */
 export const PROTOCOL_V1_CHUNK_PAYLOAD_SIZE = 63;
 
-/** Protocol V1 USB packet 长度：report 标记 + chunk payload。 */
+/** Protocol V1 USB packet length: report marker plus chunk payload. */
 export const PROTOCOL_V1_USB_PACKET_SIZE = PROTOCOL_V1_CHUNK_PAYLOAD_SIZE + 1;
 
-/** Protocol V1 message metadata：message type 2 字节 + payload length 4 字节。 */
+/** Protocol V1 message metadata: two-byte type plus four-byte payload length. */
 export const PROTOCOL_V1_MESSAGE_HEADER_SIZE = 2 + 4;
 
-/** Protocol V1 envelope metadata：## + message type + payload length。 */
+/** Protocol V1 envelope metadata: `##`, message type, and payload length. */
 export const PROTOCOL_V1_ENVELOPE_HEADER_SIZE = 1 + 1 + PROTOCOL_V1_MESSAGE_HEADER_SIZE;
 
 // ---- Protocol V2 (Pro2 USB / BLE transports) ----
 
-/** Protocol V2 单帧最大长度，包含 header、payload 和 CRC；需容纳 4000 数据块及 protobuf 开销。 */
+/** Maximum V2 frame length, including header, 4000-byte payload, protobuf overhead, and CRC. */
 export const PROTOCOL_V2_FRAME_MAX_BYTES = 4608;
 
-/** WebUSB 下 FilesystemFileWrite 的文件数据分块大小。 */
+/** FilesystemFileWrite chunk size over WebUSB. */
 export const PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE = 4000;
 
-/** BLE 下 FilesystemFileWrite 的文件数据分块大小。 */
+/** FilesystemFileWrite chunk size over BLE. */
 export const PROTOCOL_V2_BLE_FILE_CHUNK_SIZE = 1800;
 
-/** BLE 下 FilesystemFileRead 的文件数据分块大小，受 Pro2 UART 1024B TX 缓冲限制。 */
+/** BLE FilesystemFileRead chunk size, limited by the Pro2 1024-byte UART TX buffer. */
 export const PROTOCOL_V2_BLE_FILE_READ_CHUNK_SIZE = 900;
 
-/** Pro2 BLE/UART 接收 FIFO 必须容纳完整 Proto Link 帧。 */
+/** Pro2 BLE/UART RX FIFO must hold a complete Proto Link frame. */
 export const PROTOCOL_V2_BLE_FRAME_MAX_BYTES = 2048;
 
-/** @deprecated 使用按传输区分的 PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE / PROTOCOL_V2_BLE_FILE_CHUNK_SIZE。 */
+/** @deprecated Use the transport-specific WebUSB or BLE file chunk constant. */
 export const PROTOCOL_V2_FILE_CHUNK_SIZE = PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE;
 
 /**
- * Protocol V2 路由 channel。
- * USB 端点直接到主 MCU，不需要 proto-link 路由；BLE 需要经过 BLE 协处理器 UART bridge。
+ * Protocol V2 routing channel. USB reaches the main MCU directly, while BLE routes
+ * through the BLE coprocessor UART bridge.
  */
 export const PROTOCOL_V2_CHANNEL_USB = 0;
 export const PROTOCOL_V2_CHANNEL_BLE_UART = 1;
 export const PROTOCOL_V2_CHANNEL_SOCKET = 2;
 
-/** protobuf 命令流的 packet_src，固件侧会把 0 路由到 protobuf dispatcher。 */
+/** packet_src for protobuf commands; firmware routes zero to the protobuf dispatcher. */
 export const PROTOCOL_V2_PACKET_SRC_COMMAND = 0;

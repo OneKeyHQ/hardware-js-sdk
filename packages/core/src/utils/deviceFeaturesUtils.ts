@@ -171,7 +171,7 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (
   };
 };
 
-// 仅适用于 Protocol V1 的 Pro：Pro2 走独立版本线，不能套用 4.15.0 门槛
+// Applies to Protocol V1 Pro only; Pro2 has an independent version line.
 const supportProSeriesAttachPinPassphrase = (deviceType: IDeviceType, firmwareVersion: string) =>
   deviceType === EDeviceType.Pro && semver.gte(firmwareVersion, '4.15.0');
 
@@ -189,7 +189,7 @@ export const getPassphraseState = async (
 }> => {
   const { features, commands } = device;
 
-  // 设备尚未建立任何状态时无法判定，保持旧的空返回语义
+  // Preserve legacy empty-result semantics until the device has established state.
   if (!features)
     return { passphraseState: undefined, newSession: undefined, unlockedAttachPin: undefined };
 

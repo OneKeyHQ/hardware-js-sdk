@@ -21,7 +21,7 @@ import type {
   DeviceUploadWallpaperResponse,
 } from '../../api/protocol-v2/DeviceUploadWallpaper';
 
-// 参数类型单源：以 api/protocol-v2 的实现为准（type-only re-export，无运行时依赖）
+// Re-export implementation parameter types as the single source of truth.
 export type {
   DeviceFirmwareTargetInput,
   DeviceFirmwareUpdateParams,
@@ -61,7 +61,7 @@ export type DirInfo = {
   child_files?: string;
 };
 
-// proto 中 FilesystemPathInfo 的全部字段均为 required，类型与之保持一致
+// All FilesystemPathInfo proto fields are required; keep this type aligned.
 export type PathInfoResult = {
   exist: boolean;
   size: number;

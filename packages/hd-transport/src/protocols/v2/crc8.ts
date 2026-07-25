@@ -22,7 +22,7 @@ export const CRC8_TABLE = new Uint8Array([
 ]);
 
 /**
- * 计算 data 前 len 个字节的 CRC-8，使用与固件侧一致的初始值。
+ * Compute CRC-8 over the first len bytes using the firmware-compatible initial value.
  */
 export function crc8(data: Uint8Array, len: number): number {
   let crc = CRC8_INIT;

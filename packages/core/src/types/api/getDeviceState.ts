@@ -7,7 +7,7 @@ export type GetDeviceStateParams = CommonParams & {
   scope?: DeviceStateScope;
 };
 
-/** SDK 内部状态读取选项，不属于公共 CoreApi。 */
+/** Internal state-read options, not part of the public CoreApi. */
 export type DeviceStateReadOptions = {
   refreshSections?: DeviceStateSection[];
   includeRaw?: boolean;

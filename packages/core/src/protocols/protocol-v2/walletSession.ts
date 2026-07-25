@@ -123,14 +123,14 @@ export async function getProtocolV2WalletSession(
   const expectedPassphraseState = options?.expectedPassphraseState ?? device.passphraseState;
 
   try {
-    // 锁屏时先完成 PIN 解锁；解锁成功只更新已确认的 unlocked 字段，
-    // 不为了补全状态隐式轮询 DeviceStatus。
+    // Unlock with PIN first. Update only the confirmed unlocked field instead of
+    // polling DeviceStatus implicitly to complete the snapshot.
     if (device.features?.unlocked === false) {
       await device.unlockDevice();
     }
 
-    // 标准钱包不需要 DeviceSession。锁屏时先解锁刷新状态，
-    // 确认未开启 passphrase 后不得再生成或传递隐藏钱包 passphraseState。
+    // A standard wallet needs no DeviceSession. After unlock confirms passphrase is
+    // disabled, do not create or forward a hidden-wallet passphraseState.
     if (options?.onlyMainPin || device.getCurrentPassphraseProtection() === false) {
       return {
         passphraseState: undefined,

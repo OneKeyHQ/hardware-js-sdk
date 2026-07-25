@@ -21,8 +21,8 @@ export default class GetPassphraseState extends BaseMethod {
     const deviceType = this.device.getCurrentDeviceType();
 
     if (deviceType === EDeviceType.Pro2) {
-      // Protocol V2 的钱包身份由 DeviceSession 返回的 btc_test_address 决定，
-      // 不依赖固件 passphrase_enabled 状态。
+      // Protocol V2 wallet identity comes from DeviceSession.btc_test_address,
+      // independent of the firmware passphrase_enabled flag.
       return Promise.resolve(passphraseState);
     }
 

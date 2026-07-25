@@ -200,7 +200,7 @@ export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactio
         'KaspaTxInputAck',
         ['KaspaTxInputRequest', 'KaspaSignedTx'],
         {
-          // params.inputs 的 path 可能是字符串或已解析数组，统一归一为 address_n 数组
+          // Normalize params.inputs paths from either strings or parsed arrays to address_n.
           address_n: validatePath(input.path, 3),
           raw_message: bytesToHex(rawMessage),
         }

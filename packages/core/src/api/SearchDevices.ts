@@ -52,8 +52,8 @@ export default class SearchDevices extends BaseMethod {
     const deviceList = [];
     for (const descriptor of devicesDescriptor) {
       try {
-        // 设备发现是尽力而为的操作。浏览器可能保留已经离线、忙碌或尚未就绪的
-        // WebUSB 授权记录，单个描述符初始化失败不应中断其余设备的发现。
+        // Discovery is best effort. Browsers may retain WebUSB grants for devices that
+        // are offline, busy, or not ready, so one descriptor must not abort the scan.
         const result = await DevicePool.getDevices([descriptor], descriptor.path, {
           connectProtocol: this.payload.connectProtocol,
           refreshRuntimeState: true,

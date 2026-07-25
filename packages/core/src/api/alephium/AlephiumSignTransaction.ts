@@ -63,8 +63,8 @@ export default class AlephiumSignTransaction extends BaseMethod<HardwareAlephium
     data: Buffer,
     scriptOpt?: Buffer,
     dataOffset = 0
-    // 设备可能在最后一个 AlephiumTxRequest（无 data_length）里返回签名，
-    // 该消息没有 address 字段，返回类型如实声明为联合类型
+    // The final AlephiumTxRequest may return a signature without data_length or address,
+    // so the result accurately uses a union type.
   ): Promise<AlephiumSignedTx | AlephiumTxRequest> => {
     const responseType = res.type;
     if (res.type === 'AlephiumSignedTx') {

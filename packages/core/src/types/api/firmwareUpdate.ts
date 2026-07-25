@@ -58,8 +58,8 @@ export interface FirmwareUpdateV3Params {
 }
 
 /**
- * firmwareUpdateV4（Protocol V2）按 DeviceFirmwareTargetType 拆分的目标二进制。
- * 除 romloader 外，每个字段对应一个 bootloader 可接受的固件升级 target。
+ * firmwareUpdateV4 target binaries grouped by DeviceFirmwareTargetType.
+ * Except for romloader, each field maps to a target accepted by bootloader.
  */
 export type FirmwareUpdateV4Target =
   | 'boot'
@@ -78,7 +78,7 @@ export interface FirmwareUpdateV4Params {
   firmwareType?: EFirmwareType;
   targetsToUpdate?: FirmwareUpdateV4Target[];
 
-  /** FW_MGMT_TARGET_ROMLOADER = 2；当前 Pro2 bootloader 不接受通过 firmwareUpdateV4 安装 */
+  /** FW_MGMT_TARGET_ROMLOADER = 2; Pro2 cannot install it through firmwareUpdateV4. */
   romloaderBinary?: ArrayBuffer;
   /** FW_MGMT_TARGET_BOOTLOADER = 3 */
   bootloaderBinary?: ArrayBuffer;
@@ -95,8 +95,8 @@ export interface FirmwareUpdateV4Params {
   se04Binary?: ArrayBuffer;
   forcedUpdateRes?: boolean;
   /**
-   * RESC bundle okpkg 列表，通过 FilesystemFileWrite 直写到 devicePath（vol0:/bundles/...）。
-   * 手动传入模式：SDK 直接 FileWrite 安装，不做版本比对。
+   * RESC bundle okpkg files written directly to devicePath through FilesystemFileWrite.
+   * Manual mode installs them without version comparison.
    */
   resourceBundleFiles?: Array<{
     binary: ArrayBuffer;

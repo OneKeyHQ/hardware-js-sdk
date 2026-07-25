@@ -188,8 +188,8 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
   private reconnectLocks = new Map<string, Promise<OpenDevice>>();
 
   /**
-   * 保留底层 Transfer，确保 release()/stop() 能取消仍在等待设备响应的原生请求。
-   * Endpoint.transfer() 会隐藏 Transfer，进而可能让 CLI 输出结果后仍无法退出。
+   * Retain the low-level Transfer so release()/stop() can cancel native pending reads.
+   * Endpoint.transfer() hides it and may keep the CLI alive after output completes.
    */
   private activeTransfers = new Map<
     usb.Transfer,
@@ -359,7 +359,7 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
       try {
         transfer.cancel();
       } catch {
-        // Transfer 可能刚好在快照与 cancel() 之间完成。
+        // A transfer may finish between the snapshot and cancel().
       }
     });
     await Promise.allSettled(transfers.map(([, active]) => active.settled));
@@ -551,9 +551,9 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
 
   private isRetryableError(error: unknown): boolean {
     const message = this.getErrorMessage(error).toLowerCase();
-    // cancelActiveTransfers() 用于主动结束已经超时或正在释放的原生请求。
-    // LIBUSB_TRANSFER_CANCELLED 不是瞬态 I/O 错误；若在这里重试，会在刚重建的
-    // USB 接口上再次挂起读取，使协议探测与 release 互相追逐。
+    // cancelActiveTransfers() terminates timed-out or releasing native requests.
+    // LIBUSB_TRANSFER_CANCELLED is not transient. Retrying would start another pending
+    // read on the rebuilt interface and race protocol probing against release.
     if (message.includes('cancelled') || message.includes('canceled')) {
       return false;
     }
@@ -833,9 +833,9 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
     expectedProtocol?: ProtocolType
   ): Promise<ProtocolType> {
     if (expectedProtocol === 'V2') {
-      // 固件升级重启后的 bootloader 不保证响应 Ping。上层显式传入 V2
-      // 表示协议已在重启前确认；直接建立 V2 链路，由首个业务命令验证
-      // bootloader 是否已经完成 USB 初始化。
+      // Bootloader may not answer Ping after an update reboot. An explicit V2 hint means
+      // the protocol was confirmed earlier; establish the link and let the first command
+      // verify that USB initialization completed.
       this.deviceProtocol.set(path, 'V2');
       this.Log?.debug(`[NodeUsbTransport] detectProtocol: path=${path} -> V2 (expected)`);
       return 'V2';
@@ -872,9 +872,9 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
     await this.rotateProtocolV2UsbGeneration(path, 'Node USB protocol probe reset');
 
     try {
-      // 协议探测超时时，底层 IN transfer 仍可能处于 pending。必须在关闭接口前
-      // 取消并等待它结束，否则 libusb 不再回调该 transfer，后续 release()/stop()
-      // 会永久等待 activeTransfers，最终在上层表现为 Polling timeout (809)。
+      // A timed-out probe may leave an IN transfer pending. Cancel and await it before
+      // closing the interface, or libusb may never callback and release()/stop() will
+      // wait forever, surfacing as Polling timeout (809).
       await this.cancelActiveTransfers(path);
       await this.closeOpenDevice(path);
     } catch (error) {

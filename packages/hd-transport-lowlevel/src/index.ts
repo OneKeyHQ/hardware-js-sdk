@@ -168,8 +168,8 @@ export default class LowlevelTransport {
       await this.plugin.disconnect(uuid);
       this.connectedDevices.delete(uuid);
       this.deviceProtocol.delete(uuid);
-      // 设备名称推断出的协议提示不依赖当前连接，保留它可以让快速重连
-      // 直接执行 Protocol V2 探测，避免先发送一次无意义的 V1 Initialize。
+      // A name-derived protocol hint survives disconnect and lets fast reconnect probe
+      // Protocol V2 first without sending a redundant V1 Initialize.
       this.protocolV2Assemblers.delete(uuid);
       return true;
     } catch (error) {
@@ -273,9 +273,9 @@ export default class LowlevelTransport {
     protocolHint?: ProtocolType
   ): Promise<ProtocolType> {
     if (expectedProtocol === 'V2') {
-      // 固件升级重启后的 bootloader 不保证响应 Ping。上层显式传入 V2
-      // 表示协议已经在重启前确认，这里与 RN/Electron BLE 保持一致，
-      // 直接建立 V2 Link，首个业务命令负责验证链路是否可用。
+      // Bootloader may not answer Ping after an update reboot. An explicit V2 hint means
+      // the protocol was already confirmed, so establish the link and let the first
+      // business command validate it, matching RN and Electron BLE.
       this.deviceProtocol.set(uuid, 'V2');
       this.Log?.debug(`[LowlevelTransport] detectProtocol: uuid=${uuid} -> V2 (expected)`);
       return 'V2';

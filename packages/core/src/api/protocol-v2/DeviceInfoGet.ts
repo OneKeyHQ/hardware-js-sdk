@@ -100,17 +100,17 @@ function normalizeTypes(value: unknown): DeviceInfoGetTypes | undefined {
 }
 
 /**
- * 原生 DeviceInfoGet（Protocol V2 only）。
+ * Raw DeviceInfoGet command for Protocol V2 only.
  *
- * SDK 内部按需构造 targets/types，并返回未加工的 DeviceInfo 消息。
- * 该 command 不属于公共 CoreApi；业务接入统一使用 getDeviceState。
+ * The SDK builds targets/types on demand and returns the raw DeviceInfo message.
+ * This command is internal; integrations should use getDeviceState.
  */
 export default class DeviceInfoGet extends BaseMethod<{
   targets: DeviceInfoGetTargets;
   types: DeviceInfoGetTypes;
 }> {
   init() {
-    // Protocol V2 (Pro2) 专属方法，core 调度层统一做非 V2 设备守卫
+    // Protocol V2 (Pro2) only; Core rejects non-V2 devices.
     this.requireProtocolV2 = true;
     this.unlockPolicy = 'none';
     this.allowDeviceMode = [

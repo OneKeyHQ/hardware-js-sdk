@@ -27,7 +27,7 @@ const createDevice = (onekeyDeviceType: string) => {
       commands: {
         typedCall,
       },
-      // BaseMethod 通过 Device accessor 读取设备状态，stub 复用真实工具函数保持映射一致
+      // BaseMethod reads state through Device accessors; reuse production mappers in the stub.
       isProtocolV2: () => false,
       getCurrentDeviceType: () => getDeviceType(features as any),
       getCurrentSafetyChecks: () => features.safety_checks,

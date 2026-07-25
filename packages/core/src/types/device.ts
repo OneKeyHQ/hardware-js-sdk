@@ -35,12 +35,12 @@ export type KnownDevice = {
   label: string;
   bleName: string | null;
   name: string;
-  /** 用户可见名称：优先设备标签；name 继续表示连接/发现名称。 */
+  /** User-facing name; prefers the device label while name remains the discovery name. */
   displayName?: string;
   error?: typeof undefined;
   mode: EOneKeyDeviceMode;
   features?: Features;
-  /** SDK 统一设备状态快照。features 仅作为旧 API 兼容投影保留。 */
+  /** Unified SDK device-state snapshot; features remains a legacy projection. */
   state?: DeviceState;
   sessionId?: string | null;
   unavailableCapabilities: UnavailableCapabilities;
@@ -217,7 +217,7 @@ export type DeviceStateVersions = {
   bootloader: string | null;
   board: string | null;
   ble: string | null;
-  /** @deprecated 兼容旧消费者；新代码统一读取 se01。 */
+  /** @deprecated Kept for legacy consumers; new code should read se01. */
   se?: string | null;
   se01?: string | null;
   se02?: string | null;
@@ -239,7 +239,7 @@ export type DeviceState = {
   revision: number;
   updatedAt: number;
   protocol: DeviceStateProtocol;
-  /** 设备协议消息中的版本号；与 SDK 的 V1/V2 协议族相互独立。 */
+  /** Device-message protocol version, independent of the SDK V1/V2 protocol family. */
   protocolVersion: number | null;
   identity: DeviceStateIdentity;
   status: DeviceStateStatus;

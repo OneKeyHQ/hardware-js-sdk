@@ -102,7 +102,7 @@ export abstract class BaseMethod<Params = undefined> {
    */
   useDevice: boolean;
 
-  /** 后台方法不得阻塞用户主动发起的设备交互。 */
+  /** Background methods must not block user-initiated device interactions. */
   executionPriority: MethodExecutionPriority = 'normal';
 
   /**
@@ -167,20 +167,20 @@ export abstract class BaseMethod<Params = undefined> {
   strictCheckDeviceSupport = false;
 
   /**
-   * 方法是否仅支持 Protocol V2 设备（Pro2）。
-   * core 调度在设备协议确定（acquire + initialize）后统一守卫，
-   * 非 V2 设备直接抛出 NotSupport 错误，方法内部不必重复判断。
+   * Whether this method supports Protocol V2 devices (Pro2) only.
+   * Core enforces this after the protocol is established during acquire and initialize,
+   * so implementations do not need to repeat the check.
    * @default false
    */
   requireProtocolV2 = false;
 
-  /** Protocol V2 业务方法锁定时默认由 Core 自动解锁并重试一次。 */
+  /** Core unlocks and retries Protocol V2 business methods once when the device is locked. */
   unlockPolicy: UnlockPolicy = 'retry-on-locked';
 
-  /** Protocol V2 由 SDK 合成的非阻塞设备交互提示；未声明时不生成交互 Event。 */
+  /** Non-blocking Protocol V2 interaction synthesized by the SDK. */
   protocolV2UiInteraction?: ProtocolV2InteractionDescriptor;
 
-  /** 特殊后台方法可关闭包括自动解锁提示在内的全部 Protocol V2 合成 UI Event。 */
+  /** Special background methods may suppress all synthesized Protocol V2 UI events. */
   protocolV2UiMode: ProtocolV2UiMode = 'auto';
 
   protected throwIfAborted() {
@@ -255,8 +255,8 @@ export abstract class BaseMethod<Params = undefined> {
   }
 
   checkFirmwareRelease() {
-    // 固件 release 元数据（DataManager remote config）目前只覆盖 Protocol V1 设备；
-    // Pro2 的更新流程由 firmwareUpdateV4 自行管理，这里显式跳过而不是依赖 features 为空。
+    // DataManager release metadata currently covers Protocol V1 devices only.
+    // firmwareUpdateV4 manages Pro2 updates, so skip them explicitly.
     if (!this.device || this.device.isProtocolV2()) return;
     if (!this.device.features) return;
     const firmwareType = getFirmwareType(this.device.features);

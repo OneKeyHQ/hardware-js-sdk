@@ -32,9 +32,8 @@ import type {
 } from '@onekeyfe/hd-transport';
 
 /**
- * EthereumTypedDataStructAckOneKey 与 EthereumTypedDataStructAck 的字段结构与
- * 枚举数值完全一致（生成产物的 OneKey/Trezor 双份消息），仅枚举名义类型不同；
- * 这里做无运行时成本的名义转换，避免在调用点散落 any。
+ * EthereumTypedDataStructAckOneKey and EthereumTypedDataStructAck have identical
+ * fields and enum values. This zero-cost nominal conversion avoids scattered `any`.
  */
 const toOneKeyStructAck = (ack: EthereumTypedDataStructAck): EthereumTypedDataStructAckOneKey =>
   ack as unknown as EthereumTypedDataStructAckOneKey;
@@ -227,8 +226,7 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
     if (response.type === 'EthereumGnosisSafeTxRequest') {
       const { data } = this.params;
       const verifyingContract = data.domain?.verifyingContract;
-      // EthereumGnosisSafeTxAck.verifyingContract 在 proto 中是 required 字段，
-      // Gnosis Safe 签名缺少 verifyingContract 没有意义，这里给出明确的参数错误。
+      // verifyingContract is required by proto and essential to a Gnosis Safe signature.
       if (!verifyingContract) {
         throw ERRORS.TypedError(
           HardwareErrorCode.CallMethodInvalidParameter,

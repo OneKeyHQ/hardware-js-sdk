@@ -5,7 +5,7 @@ import type { Features } from '../types';
 /**
  * 检测故障固件设备
  * 检测规则：
- * - 序列号范围：21032200001 到 21032201500
+ * - Serial number range: 21032200001 through 21032201500
  * - SE版本为 1.1.0.2
  *
  * 对齐之前版本的检测逻辑

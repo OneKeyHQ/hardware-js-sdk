@@ -1,5 +1,5 @@
 /**
- * 当前 firmware-pro2 子模块的 DeviceFirmwareTargetType。
+ * DeviceFirmwareTargetType from the current firmware-pro2 submodule.
  */
 export const ProtocolV2FirmwareTargetType = {
   FW_MGMT_TARGET_INVALID: 0,

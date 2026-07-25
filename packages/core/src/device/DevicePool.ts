@@ -177,7 +177,7 @@ export class DevicePool extends EventEmitter {
         try {
           await this._refreshProtocolV2DiscoveryState(device);
         } catch (error) {
-          // Device.run 在回调正常结束后统一 release；随后再把真实读取错误交给调用方。
+          // Device.run releases after the callback; then propagate the actual read error.
           refreshError = error;
         }
       },
@@ -188,9 +188,9 @@ export class DevicePool extends EventEmitter {
   }
 
   /**
-   * 设备列表需要实时模式和真实设备名称。status 读取失败仍按连接错误处理；settings
-   * 只用于补齐 label，读取失败时保留设备并使用已有显示名。loader 模式会由
-   * Device.getDeviceState 自动跳过不支持的 status/settings 命令。
+   * Device lists require live mode and name data. A status failure remains a connection
+   * error; settings only supplies a label, so its failure retains the existing name.
+   * Device.getDeviceState skips unsupported status/settings calls in loader mode.
    */
   static async _refreshProtocolV2DiscoveryState(device: Device) {
     await device.getDeviceState({ refreshSections: ['status'] });

@@ -58,19 +58,19 @@ export type IProtocolV2FirmwareComponent = {
   version?: IVersionArray;
 };
 
-/** Pro2 RESC bundle okpkg 描述，用于 FileWrite 直写方式增量同步资源 */
+/** Pro2 RESC bundle okpkg descriptor for incremental FileWrite synchronization. */
 export type IProtocolV2ResourceBundle = {
-  /** bundle 名称，如 images / animation / translations / fonts_roobert */
+  /** Bundle name, such as images, animation, translations, or fonts_roobert. */
   name: string;
-  /** 下载 URL */
+  /** Download URL. */
   url: string;
-  /** 设备上的目标路径，如 vol0:/bundles/images/images.okpkg */
+  /** Device target path, such as vol0:/bundles/images/images.okpkg. */
   devicePath: string;
-  /** okpkg container 的 payload_version（用于 FileRead 比对跳过） */
+  /** okpkg payload_version used to skip matching content after FileRead. */
   version?: IVersionArray;
-  /** okpkg container 的 payload_hash（SHA3-512，用于 FileRead 比对） */
+  /** okpkg payload_hash used for SHA3-512 comparison after FileRead. */
   payloadHash?: string;
-  /** okpkg container 的 header_hash（SHA3-512，用于 FileRead 比对） */
+  /** okpkg header_hash used for SHA3-512 comparison after FileRead. */
   headerHash?: string;
 };
 
@@ -95,7 +95,7 @@ export type IFirmwareReleaseInfo = {
   upgradeType?: 'payload-package-set' | string;
   components?: Record<string, IProtocolV2FirmwareComponent>;
   installOrder?: string[];
-  /** Pro2 RESC bundle 列表（FileWrite 直写增量同步模式） */
+  /** Pro2 RESC bundles for incremental direct FileWrite synchronization. */
   resourceBundles?: IProtocolV2ResourceBundle[];
   bootloaderChangelog?: {
     [k in ILocale]: string;

@@ -78,7 +78,7 @@ export default class BTCGetPublicKey extends BaseMethod<GetPublicKey[]> {
       }
 
       for (const param of this.params) {
-        // init() 必然设置 coin_name；生成类型里该字段为 optional，这里兜底空串
+        // init() sets coin_name; keep an empty fallback for the generated optional type.
         const versionBytes = getVersionBytes(param.coin_name ?? '', param.script_type);
         if (!versionBytes) {
           throw new Error(

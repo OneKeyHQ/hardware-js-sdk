@@ -88,8 +88,9 @@ const hasCipherConfirmation = (value: unknown): boolean => {
 };
 
 /**
- * Protocol V2 不再依赖固件 ButtonRequest，因此在统一层根据业务方法生成兼容 UI Event。
- * 显式声明始终优先；地址和公钥只在设备实际展示时提示，签名统一提示一次。
+ * Protocol V2 no longer relies on firmware ButtonRequest, so the SDK synthesizes
+ * compatible UI events. Explicit descriptors win; address/public-key prompts appear
+ * only when displayed, while signing emits one prompt.
  */
 export const resolveProtocolV2UiInteraction = (
   method: ProtocolV2InteractionMethod
@@ -106,7 +107,7 @@ export const resolveProtocolV2UiInteraction = (
     const payloadDisplay = getDisplayState(method.payload);
     const display = paramsDisplay.seen ? paramsDisplay : payloadDisplay;
 
-    // 地址接口通常默认在设备展示；公钥接口存在默认静默读取，优先依赖归一化参数。
+    // Address methods usually display by default; public-key methods may be silent.
     const shouldDisplay = display.seen ? display.enabled : isAddress;
     if (!shouldDisplay) return undefined;
 
