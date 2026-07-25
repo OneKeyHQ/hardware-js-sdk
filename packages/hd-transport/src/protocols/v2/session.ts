@@ -38,6 +38,7 @@ export type ProtocolV2SessionOptions = {
   createTimeoutError?: (name: string, timeoutMs: number) => Error;
   sequenceCursor?: ProtocolV2SequenceCursor;
   generation?: number;
+  writeTimeoutMs?: number;
 };
 
 export type ProtocolV2CallOptions = {
@@ -136,10 +137,10 @@ export async function withProtocolTimeout<T>(
   }
 }
 
-// Write completion is owned by the concrete transport. A Promise.race watchdog
-// here can return while libusb/WebUSB is still flushing a large Protocol V2
-// frame, which desynchronizes later request/response pairs.
-export const PROTOCOL_V2_WRITE_WATCHDOG_TIMEOUT_MS = 0;
+// A transport write must never keep the serialized device queue pending forever.
+// Callers must classify a timeout as link-fatal and reset the physical adapter so
+// the losing Promise cannot continue on the next connection generation.
+export const PROTOCOL_V2_WRITE_WATCHDOG_TIMEOUT_MS = 30_000;
 
 export class ProtocolV2Session {
   private readonly options: ProtocolV2SessionOptions;
@@ -185,6 +186,7 @@ export class ProtocolV2Session {
       logPrefix = 'ProtocolV2',
       createTimeoutError,
       generation = 0,
+      writeTimeoutMs = PROTOCOL_V2_WRITE_WATCHDOG_TIMEOUT_MS,
     } = this.options;
 
     const shouldReduceDebug = shouldReduceProtocolV2Debug(name);
@@ -222,15 +224,10 @@ export class ProtocolV2Session {
       );
     }
 
-    // Lenient watchdog on the write phase only — see
-    // PROTOCOL_V2_WRITE_WATCHDOG_TIMEOUT_MS for the rationale.
     await withProtocolTimeout(
       writeFrame(frame, callContext),
-      PROTOCOL_V2_WRITE_WATCHDOG_TIMEOUT_MS,
-      () =>
-        new Error(
-          `Protocol V2 write timeout after ${PROTOCOL_V2_WRITE_WATCHDOG_TIMEOUT_MS}ms for ${name}`
-        )
+      writeTimeoutMs,
+      () => new Error(`Protocol V2 write timeout after ${writeTimeoutMs}ms for ${name}`)
     );
 
     // Cancellation flag for the read loop: when the response timeout fires,

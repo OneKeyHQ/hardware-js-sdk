@@ -1,9 +1,9 @@
 import { BaseMethod } from './BaseMethod';
 import {
-  validateNonEmptyString,
   validateNonNegativeInteger,
   validateOptionalNonNegativeInteger,
   validateOptionalPercentage,
+  validateProtocolV2FilesystemPath,
   validateRequiredData,
 } from './helpers/filesystemValidation';
 import { writeProtocolV2File } from './helpers/protocolV2FileWrite';
@@ -30,7 +30,7 @@ export default class FileWrite extends BaseMethod<FileWriteParams> {
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
     validateRequiredData(this.payload.data, 'data');
-    const path = validateNonEmptyString(this.payload.path, 'path');
+    const path = validateProtocolV2FilesystemPath(this.payload.path, 'path');
     const offset = validateNonNegativeInteger(this.payload.offset, 'offset', 0);
     this.params = {
       path,

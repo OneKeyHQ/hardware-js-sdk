@@ -20,21 +20,6 @@ import type { DeviceState } from '@onekeyfe/hd-core';
 // 使用 hd-core 的标准类型
 export type ApiResponse<T = any> = Success<T> | Unsuccessful;
 export type HardwareApiMethod = keyof CoreApi;
-export type HardwareDebugApiMethod =
-  | 'deviceInfoGet'
-  | 'deviceStatusGet'
-  | 'deviceSettingsGet'
-  | 'protocolInfoRequest'
-  | 'ping'
-  | 'deviceSessionOpen'
-  | 'deviceFirmwareUpdate'
-  | 'deviceGetFirmwareUpdateStatus'
-  | 'deviceFactoryInfoSet'
-  | 'deviceFactoryInfoGet'
-  | 'deviceSettingsSet'
-  | 'deviceSettingsPageShow'
-  | 'filesystemPermissionFix'
-  | 'filesystemFormat';
 export type HardwareApiCallMode = 'params' | 'connectId-params' | 'connectId-deviceId-params';
 
 function getErrorText(error: unknown): string {
@@ -224,7 +209,9 @@ const preparePassphraseParams = async (
     }
 
     if (passphraseMetadata.passphraseState) {
-      logInfo(`Passphrase state obtained from device: ${passphraseMetadata.passphraseState}`);
+      logInfo('Passphrase state obtained from device', {
+        hasPassphraseState: true,
+      });
       params.passphraseState = passphraseMetadata.passphraseState;
       useHardwareStore
         .getState()
@@ -478,42 +465,6 @@ export async function callHardwareAPI(
   }
 }
 
-// 仅供 Pro2 Debug 页面调用 SDK 内部的原生 Protocol V2 命令。
-// 这些命令不属于公共 CoreApi，外部业务应使用对应的语义化接口。
-export async function callHardwareDebugAPI(
-  method: HardwareDebugApiMethod,
-  params: Record<string, unknown>
-): Promise<ApiResponse> {
-  logRequest(`Calling internal hardware debug method: ${method}`, params);
-
-  if (typeof window === 'undefined') {
-    return {
-      success: false,
-      payload: { error: 'Browser environment required' },
-    } as Unsuccessful;
-  }
-
-  try {
-    const sdk = await getSDKInstance();
-    const result = (await sdk.call({ ...params, method })) as ApiResponse;
-
-    if (result.success) {
-      logResponse(`Internal hardware debug method successful: ${method}`, result.payload);
-    } else {
-      logError(`Internal hardware debug method failed: ${method}`, {
-        code: result.payload?.code,
-      });
-    }
-    return result;
-  } catch (error) {
-    const errorType = error instanceof Error ? error.name : typeof error;
-    logError(`Internal hardware debug method exception: ${method}`, { errorType });
-    return {
-      success: false,
-      payload: { error: `Internal debug method ${method} failed` },
-    } as Unsuccessful;
-  }
-}
 // 搜索设备
 export async function searchDevices(params?: {
   connectProtocol?: HardwareConnectProtocol;

@@ -17,6 +17,7 @@ export interface ProtocolV2LinkAdapter {
   logger?: ProtocolV2SessionOptions['logger'];
   logPrefix?: string;
   createTimeoutError?: ProtocolV2SessionOptions['createTimeoutError'];
+  writeTimeoutMs?: number;
 }
 
 export type ProtocolV2LinkManagerOptions<Key> = {
@@ -128,6 +129,7 @@ export class ProtocolV2LinkManager<Key> {
       logger: adapter.logger,
       logPrefix: adapter.logPrefix,
       createTimeoutError: adapter.createTimeoutError,
+      writeTimeoutMs: adapter.writeTimeoutMs,
     });
     const link = { adapter, session, state };
     this.links.set(key, link);

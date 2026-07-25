@@ -4,7 +4,10 @@ import type {
   DeviceFactoryInfo,
   DeviceFirmwareUpdateStatus,
   DeviceSession,
+  DeviceSettings,
+  DeviceStatus,
   ProtocolInfo,
+  ProtocolV2DeviceInfo,
   Success,
 } from '@onekeyfe/hd-transport';
 import type {
@@ -14,6 +17,7 @@ import type {
   DeviceRebootParams,
 } from '../../api/protocol-v2/helpers';
 import type { DeviceSessionOpenParams } from '../../api/protocol-v2/DeviceSessionOpen';
+import type { DeviceInfoGetParams } from '../../api/protocol-v2/DeviceInfoGet';
 import type { DeviceSettingsSetParams } from '../../api/protocol-v2/DeviceSettingsSet';
 import type { DeviceSettingsPageShowParams } from '../../api/protocol-v2/DeviceSettingsPageShow';
 import type {
@@ -31,6 +35,11 @@ export type {
   RebootTypeInput,
 } from '../../api/protocol-v2/helpers';
 export type { DeviceSessionOpenParams } from '../../api/protocol-v2/DeviceSessionOpen';
+export type {
+  DeviceInfoGetParams,
+  DeviceInfoGetTargets,
+  DeviceInfoGetTypes,
+} from '../../api/protocol-v2/DeviceInfoGet';
 export type { DeviceSettingsSetParams } from '../../api/protocol-v2/DeviceSettingsSet';
 export type {
   DeviceSettingsPageShowParams,
@@ -80,6 +89,25 @@ export type PathInfoResult = {
 
 // ── Method signatures ─────────────────────────────────────────────────────
 
+/** @deprecated Development-only raw Protocol V2 command. Use `getDeviceState`. */
+export declare function deviceInfoGet(
+  connectId: string,
+  params?: CommonParams & DeviceInfoGetParams
+): Response<ProtocolV2DeviceInfo>;
+
+/** @deprecated Development-only raw Protocol V2 command. Use `getDeviceState`. */
+export declare function deviceStatusGet(
+  connectId: string,
+  params?: CommonParams
+): Response<DeviceStatus>;
+
+/** @deprecated Development-only raw Protocol V2 command. Use `getDeviceState`. */
+export declare function deviceSettingsGet(
+  connectId: string,
+  params?: CommonParams
+): Response<DeviceSettings>;
+
+/** @deprecated Development-only raw Protocol V2 command. */
 export declare function protocolInfoRequest(
   connectId: string,
   params?: CommonParams

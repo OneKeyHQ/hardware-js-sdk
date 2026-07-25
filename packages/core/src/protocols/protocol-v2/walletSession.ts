@@ -124,8 +124,8 @@ export async function getProtocolV2WalletSession(
   const expectedPassphraseState = options?.expectedPassphraseState ?? device.passphraseState;
 
   try {
-    // Unlock with PIN first. Update only the confirmed unlocked field instead of
-    // polling DeviceStatus implicitly to complete the snapshot.
+    // Unlock with PIN first. The unlock flow refreshes DeviceStatus so wallet
+    // selection uses confirmed passphrase and attach-to-PIN state.
     if (device.features?.unlocked === false) {
       await device.unlockDevice();
     }

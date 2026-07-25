@@ -2,6 +2,7 @@ import { DeviceSettingsPage } from '@onekeyfe/hd-transport';
 
 import { BaseMethod } from '../BaseMethod';
 import { invalidParameter } from '../helpers/filesystemValidation';
+import { getProtocolV2SettingsBehavior } from '../../protocols/protocol-v2/settingsUnlockPolicy';
 
 export type SupportedDeviceSettingsPage = DeviceSettingsPage;
 
@@ -39,21 +40,18 @@ export default class DeviceSettingsPageShow extends BaseMethod<{
 }> {
   init() {
     this.requireProtocolV2 = true;
-    this.unlockPolicy = 'retry-on-locked';
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
     this.params = {
       page: normalizePage(this.payload.page),
       field_name: this.payload.field_name ?? this.payload.fieldName,
     };
-    this.protocolV2UiInteraction = {
-      request: 'button',
-      source: 'method-lifecycle',
-      reason: 'settings-page',
-      completion: 'operation-completed',
-      deviceOnly: true,
+    const behavior = getProtocolV2SettingsBehavior({
+      kind: 'page',
       page: this.params.page,
-    };
+    });
+    this.unlockPolicy = behavior.unlockPolicy;
+    this.protocolV2UiInteraction = behavior.uiInteraction;
   }
 
   async run() {
@@ -62,6 +60,11 @@ export default class DeviceSettingsPageShow extends BaseMethod<{
       'Success',
       this.params
     );
+    if (this.params.page === DeviceSettingsPage.DevicePassphrase) {
+      await this.device.getDeviceState({ refreshSections: ['status'] });
+    } else if (this.params.page === DeviceSettingsPage.DeviceAirgap) {
+      await this.device.getDeviceState({ refreshSections: ['settings'] });
+    }
     return Promise.resolve(res.message);
   }
 }

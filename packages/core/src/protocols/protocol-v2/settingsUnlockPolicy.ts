@@ -1,4 +1,4 @@
-import type { DeviceSettings } from '@onekeyfe/hd-transport';
+import type { DeviceSettings, DeviceSettingsPage } from '@onekeyfe/hd-transport';
 import type { UnlockPolicy } from '../../api/BaseMethod';
 import type { ProtocolV2InteractionDescriptor } from './uiInteraction';
 
@@ -14,22 +14,48 @@ export const getProtocolV2SettingsUnlockPolicy = (settings: DeviceSettings): Unl
     ? 'none'
     : 'retry-on-locked';
 
+export type ProtocolV2SettingsOperation =
+  | {
+      kind: 'direct';
+      settings: DeviceSettings;
+    }
+  | {
+      kind: 'page';
+      page: DeviceSettingsPage;
+    };
+
 export const getProtocolV2SettingsBehavior = (
-  settings: DeviceSettings
+  operation: ProtocolV2SettingsOperation
 ): {
   unlockPolicy: UnlockPolicy;
   uiInteraction?: ProtocolV2InteractionDescriptor;
-} => ({
-  unlockPolicy: getProtocolV2SettingsUnlockPolicy(settings),
-  uiInteraction:
-    typeof settings.label === 'string'
-      ? {
-          request: 'button',
-          source: 'method-lifecycle',
-          reason: 'device-management',
-          completion: 'operation-completed',
-          deviceOnly: true,
-          operation: 'change-label',
-        }
-      : undefined,
-});
+} => {
+  if (operation.kind === 'page') {
+    return {
+      unlockPolicy: 'retry-on-locked',
+      uiInteraction: {
+        request: 'button',
+        source: 'method-lifecycle',
+        reason: 'settings-page',
+        completion: 'operation-completed',
+        deviceOnly: true,
+        page: operation.page,
+      },
+    };
+  }
+
+  return {
+    unlockPolicy: getProtocolV2SettingsUnlockPolicy(operation.settings),
+    uiInteraction:
+      typeof operation.settings.label === 'string'
+        ? {
+            request: 'button',
+            source: 'method-lifecycle',
+            reason: 'device-management',
+            completion: 'operation-completed',
+            deviceOnly: true,
+            operation: 'change-label',
+          }
+        : undefined,
+  };
+};

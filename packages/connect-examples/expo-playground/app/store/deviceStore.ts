@@ -454,8 +454,8 @@ export const useDeviceStore = create<DeviceState>()(
       getCurrentDeviceLabel: () => {
         const state = get();
         return (
-          state.deviceState?.identity.label ||
-          state.deviceState?.identity.bleName ||
+          state.currentDevice?.deviceState?.identity.label ||
+          state.currentDevice?.deviceState?.identity.bleName ||
           state.currentDevice?.name ||
           getDeviceLabel(state.deviceFeatures)
         );

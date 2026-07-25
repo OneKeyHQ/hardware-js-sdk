@@ -28,7 +28,7 @@ export default class DeviceSettingsSet extends BaseMethod<{
     }
 
     this.requireProtocolV2 = true;
-    const behavior = getProtocolV2SettingsBehavior(supported);
+    const behavior = getProtocolV2SettingsBehavior({ kind: 'direct', settings: supported });
     this.unlockPolicy = behavior.unlockPolicy;
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;

@@ -1,7 +1,7 @@
 import { BaseMethod } from './BaseMethod';
 import {
-  validateNonEmptyString,
   validateOptionalNonNegativeInteger,
+  validateProtocolV2FilesystemPath,
 } from './helpers/filesystemValidation';
 
 export type PathInfoParams = {
@@ -16,7 +16,9 @@ export default class PathInfo extends BaseMethod<PathInfoParams> {
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
     this.params = {
-      path: validateNonEmptyString(this.payload.path, 'path'),
+      path: validateProtocolV2FilesystemPath(this.payload.path, 'path', {
+        allowVolumeRoot: true,
+      }),
       timeoutMs: validateOptionalNonNegativeInteger(this.payload.timeoutMs, 'timeoutMs'),
     };
   }

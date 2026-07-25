@@ -1036,7 +1036,7 @@ describe('Protocol V2 feature adapter', () => {
     expect(() => method.init()).toThrow();
   });
 
-  test('routes onboarding through CoreApi without exposing the raw session command', async () => {
+  test('routes onboarding and exposes the development raw session command through CoreApi', async () => {
     const call = jest.fn().mockResolvedValue({ success: true, payload: {} });
     const api = createCoreApi(call as any);
 
@@ -1047,7 +1047,7 @@ describe('Protocol V2 feature adapter', () => {
       connectId: 'connect-id',
       retryCount: 1,
     });
-    expect(api).not.toHaveProperty('deviceSessionOpen');
+    expect(api.deviceSessionOpen).toEqual(expect.any(Function));
   });
 
   test('reuses the cached session id for the selected Pro2 wallet', async () => {
@@ -2235,6 +2235,16 @@ describe('Protocol V2 feature adapter', () => {
           message: { message: 'ok' },
         };
       }
+      if (requestType === 'DeviceStatusGet') {
+        return {
+          type: 'DeviceStatus',
+          message: {
+            init_states: true,
+            unlocked: true,
+            passphrase_enabled: false,
+          },
+        };
+      }
       throw new Error(`Unexpected request: ${requestType}`);
     });
 
@@ -2254,6 +2264,7 @@ describe('Protocol V2 feature adapter', () => {
 
     expect(typedCall.mock.calls).toEqual([
       ['DeviceSessionAskPin', 'Success', undefined, { timeoutMs: 120_000 }],
+      ['DeviceStatusGet', 'DeviceStatus', {}],
     ]);
     expect(typedCall).not.toHaveBeenCalledWith('GetAddress', 'Address', expect.anything());
     expect(typedCall).not.toHaveBeenCalledWith('GetFeatures', 'Features', {});
@@ -2264,7 +2275,7 @@ describe('Protocol V2 feature adapter', () => {
     });
   });
 
-  test('preserves cached Protocol V2 passphrase state without polling status after unlock', async () => {
+  test('refreshes Protocol V2 passphrase and attach-PIN status after unlock', async () => {
     const device = Device.fromDescriptor({ ...descriptor, protocolType: 'V2' } as any);
     (device as any).features = normalizeProtocolV2Features(
       { ...descriptor, protocolType: 'V2' } as any,
@@ -2281,6 +2292,18 @@ describe('Protocol V2 feature adapter', () => {
           message: { message: 'ok' },
         };
       }
+      if (requestType === 'DeviceStatusGet') {
+        return {
+          type: 'DeviceStatus',
+          message: {
+            init_states: true,
+            unlocked: true,
+            passphrase_enabled: true,
+            attach_to_pin_enabled: true,
+            unlocked_by_attach_to_pin: true,
+          },
+        };
+      }
       throw new Error(`Unexpected request: ${requestType}`);
     });
     (device as any).commands = { typedCall };
@@ -2289,11 +2312,12 @@ describe('Protocol V2 feature adapter', () => {
 
     expect(typedCall.mock.calls).toEqual([
       ['DeviceSessionAskPin', 'Success', undefined, { timeoutMs: 120_000 }],
+      ['DeviceStatusGet', 'DeviceStatus', {}],
     ]);
     expect((device as any).profile).toBeUndefined();
     expect(device.features?.unlocked).toBe(true);
-    expect(device.features?.passphraseProtection).toBeNull();
-    expect(device.features?.unlockedAttachPin).toBeUndefined();
+    expect(device.features?.passphraseProtection).toBe(true);
+    expect(device.features?.unlockedAttachPin).toBe(true);
   });
 
   test('maps unsupported Protocol V2 DeviceSessionAskPin to DeviceNotSupportMethod', async () => {
@@ -5130,6 +5154,9 @@ describe('Protocol V2 current low-level methods', () => {
 
   test('opens non-passphrase Protocol V2 settings pages', async () => {
     const typedCall = jest.fn().mockResolvedValue({ message: { message: 'ok' } });
+    const getDeviceState = jest.fn().mockResolvedValue({
+      settings: { airgapMode: true },
+    });
     const method = new DeviceSettingsPageShow({
       id: 1,
       payload: {
@@ -5139,7 +5166,7 @@ describe('Protocol V2 current low-level methods', () => {
       },
     });
     method.init();
-    (method as any).device = stubDevice({ commands: { typedCall } });
+    (method as any).device = stubDevice({ commands: { typedCall }, getDeviceState });
 
     await method.run();
 
@@ -5155,10 +5182,14 @@ describe('Protocol V2 current low-level methods', () => {
       deviceOnly: true,
       page: DeviceSettingsPage.DeviceAirgap,
     });
+    expect(getDeviceState).toHaveBeenCalledWith({ refreshSections: ['settings'] });
   });
 
   test('opens the Protocol V2 passphrase settings page', async () => {
     const typedCall = jest.fn().mockResolvedValue({ message: { message: 'ok' } });
+    const getDeviceState = jest.fn().mockResolvedValue({
+      status: { passphraseProtection: true },
+    });
     const method = new DeviceSettingsPageShow({
       id: 1,
       payload: {
@@ -5167,7 +5198,7 @@ describe('Protocol V2 current low-level methods', () => {
       },
     });
     method.init();
-    (method as any).device = stubDevice({ commands: { typedCall } });
+    (method as any).device = stubDevice({ commands: { typedCall }, getDeviceState });
 
     await method.run();
 
@@ -5175,6 +5206,7 @@ describe('Protocol V2 current low-level methods', () => {
       page: 2,
       field_name: undefined,
     });
+    expect(getDeviceState).toHaveBeenCalledWith({ refreshSections: ['status'] });
   });
 
   test('does not unlock before reading Protocol V2 device settings', () => {

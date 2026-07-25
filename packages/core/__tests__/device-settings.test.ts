@@ -1,3 +1,6 @@
+import { HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { DeviceSettingsPage } from '@onekeyfe/hd-transport';
+
 import DeviceSettings from '../src/api/device/DeviceSettings';
 
 import type { Features } from '../src/types';
@@ -16,15 +19,18 @@ const features = {
 function createDevice({ protocol }: { protocol: 'V1' | 'V2' }) {
   const typedCall = jest.fn().mockResolvedValue({ message: { message: 'Success' } });
   const updateState = jest.fn();
+  const getDeviceState = jest.fn();
   return {
     device: {
       features,
       isProtocolV2: () => protocol === 'V2',
       commands: { typedCall },
       updateState,
+      getDeviceState,
     },
     typedCall,
     updateState,
+    getDeviceState,
   };
 }
 
@@ -141,5 +147,140 @@ describe('DeviceSettings protocol routing', () => {
     expect(typedCall.mock.calls.map(call => call[0])).not.toEqual(
       expect.arrayContaining(['DeviceInfoGet', 'DeviceStatusGet', 'DeviceSettingsGet'])
     );
+  });
+
+  it('uses the Pro2 passphrase page as a device-side toggle and verifies the target state', async () => {
+    const { device, typedCall, getDeviceState } = createDevice({ protocol: 'V2' });
+    getDeviceState
+      .mockResolvedValueOnce({
+        status: { passphraseProtection: false },
+      })
+      .mockResolvedValueOnce({
+        status: { passphraseProtection: true },
+      });
+    const method = new DeviceSettings({
+      id: 3,
+      payload: {
+        method: 'deviceSettings',
+        usePassphrase: true,
+      },
+    });
+    method.init();
+    (method as any).device = device;
+
+    await expect(method.run()).resolves.toEqual({ message: 'Success' });
+    expect(typedCall).toHaveBeenCalledWith('DeviceSettingsPageShow', 'Success', {
+      page: DeviceSettingsPage.DevicePassphrase,
+    });
+    expect(typedCall).not.toHaveBeenCalledWith('DeviceSettingsSet', 'Success', expect.anything());
+    expect(getDeviceState).toHaveBeenNthCalledWith(1, { refreshSections: ['status'] });
+    expect(getDeviceState).toHaveBeenNthCalledWith(2, { refreshSections: ['status'] });
+  });
+
+  it('does not open a Pro2 settings page when the hardware already matches the target', async () => {
+    const { device, typedCall, getDeviceState } = createDevice({ protocol: 'V2' });
+    getDeviceState.mockResolvedValue({
+      settings: { airgapMode: false },
+    });
+    const method = new DeviceSettings({
+      id: 4,
+      payload: {
+        method: 'deviceSettings',
+        airgapMode: false,
+      },
+    });
+    method.init();
+    (method as any).device = device;
+
+    await expect(method.run()).resolves.toEqual({
+      message: 'Settings already match requested value.',
+    });
+    expect(typedCall).not.toHaveBeenCalled();
+    expect(getDeviceState).toHaveBeenCalledWith({ refreshSections: ['settings'] });
+  });
+
+  it('rejects a successful Pro2 page response when the hardware did not reach the target', async () => {
+    const { device, getDeviceState } = createDevice({ protocol: 'V2' });
+    getDeviceState.mockResolvedValue({
+      status: { passphraseProtection: false },
+    });
+    const method = new DeviceSettings({
+      id: 5,
+      payload: {
+        method: 'deviceSettings',
+        usePassphrase: true,
+      },
+    });
+    method.init();
+    (method as any).device = device;
+
+    await expect(method.run()).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.RuntimeError,
+      message: 'Protocol V2 passphrase setting did not reach the requested value.',
+    });
+  });
+
+  it('keeps Protocol V1 passphrase settings on ApplySettings', async () => {
+    const { device, typedCall, getDeviceState } = createDevice({ protocol: 'V1' });
+    const method = new DeviceSettings({
+      id: 6,
+      payload: {
+        method: 'deviceSettings',
+        usePassphrase: true,
+      },
+    });
+    method.init();
+    (method as any).device = device;
+
+    await method.run();
+
+    expect(typedCall).toHaveBeenCalledWith(
+      'ApplySettings',
+      'Success',
+      expect.objectContaining({ use_passphrase: true })
+    );
+    expect(getDeviceState).not.toHaveBeenCalled();
+  });
+
+  it('rejects combining a Pro2 device-side toggle with direct settings', async () => {
+    const { device, typedCall } = createDevice({ protocol: 'V2' });
+    const method = new DeviceSettings({
+      id: 7,
+      payload: {
+        method: 'deviceSettings',
+        usePassphrase: true,
+        label: 'New Label',
+      },
+    });
+    method.init();
+    (method as any).device = device;
+
+    expect(method.unlockPolicy).toBe('none');
+    expect(method.protocolV2UiInteraction).toBeUndefined();
+    await expect(method.run()).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.CallMethodInvalidParameter,
+    });
+    expect(typedCall).not.toHaveBeenCalled();
+  });
+
+  it('rejects two Pro2 device-side toggles without starting an interaction', async () => {
+    const { device, typedCall } = createDevice({ protocol: 'V2' });
+    const method = new DeviceSettings({
+      id: 8,
+      payload: {
+        method: 'deviceSettings',
+        usePassphrase: true,
+        airgapMode: true,
+      },
+    });
+    method.init();
+    (method as any).device = device;
+
+    expect(method.unlockPolicy).toBe('none');
+    expect(method.protocolV2UiInteraction).toBeUndefined();
+    await expect(method.run()).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.CallMethodInvalidParameter,
+    });
+    expect(typedCall).not.toHaveBeenCalled();
   });
 });

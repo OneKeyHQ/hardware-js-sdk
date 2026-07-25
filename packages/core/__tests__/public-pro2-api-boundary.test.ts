@@ -9,7 +9,7 @@ jest.mock('../src/data/config', () => ({
   getSDKVersion: () => '0.0.0-test',
 }));
 
-const internalMethodNames = [
+const developmentMethodNames = [
   'deviceInfoGet',
   'deviceStatusGet',
   'deviceSettingsGet',
@@ -37,7 +37,7 @@ const unpublishedFilesystemAliases = [
 ] as const;
 
 describe('public Pro2 API boundary', () => {
-  test('exposes business methods without raw protocol shortcuts or file aliases', () => {
+  test('exposes development Protocol V2 methods without legacy file aliases', () => {
     const api = createCoreApi(jest.fn() as CoreApi['call']) as Record<string, unknown>;
 
     expect(api.deviceGetOnboardingStatus).toBeInstanceOf(Function);
@@ -45,13 +45,17 @@ describe('public Pro2 API boundary', () => {
     expect(api.fileRead).toBeInstanceOf(Function);
     expect(api.fileWrite).toBeInstanceOf(Function);
 
-    [...internalMethodNames, ...unpublishedFilesystemAliases].forEach(name => {
+    developmentMethodNames.forEach(name => {
+      expect(api).toHaveProperty(name, expect.any(Function));
+      expect(publicMethods).toHaveProperty(name);
+    });
+    unpublishedFilesystemAliases.forEach(name => {
       expect(api).not.toHaveProperty(name);
       expect(publicMethods).not.toHaveProperty(name);
     });
   });
 
-  test.each(internalMethodNames)('keeps %s available to the internal dispatcher', name => {
+  test.each(developmentMethodNames)('keeps %s available to the dispatcher', name => {
     expect(
       findMethod({
         id: 1,

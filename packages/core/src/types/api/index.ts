@@ -1,6 +1,16 @@
 import type {
+  deviceFactoryInfoGet,
+  deviceFactoryInfoSet,
+  deviceFirmwareUpdate,
+  deviceGetFirmwareUpdateStatus,
   deviceGetOnboardingStatus,
+  deviceInfoGet,
   deviceReboot,
+  deviceSessionOpen,
+  deviceSettingsGet,
+  deviceSettingsPageShow,
+  deviceSettingsSet,
+  deviceStatusGet,
   deviceUploadWallpaper,
   dirList,
   dirMake,
@@ -8,7 +18,11 @@ import type {
   fileDelete,
   fileRead,
   fileWrite,
+  filesystemFormat,
+  filesystemPermissionFix,
   pathInfo,
+  ping,
+  protocolInfoRequest,
   uploadPortfolio,
 } from './protocolV2';
 import type { off, on, removeAllListeners } from './event';
@@ -235,6 +249,20 @@ export type CoreApi = {
   deviceReboot: typeof deviceReboot;
   deviceGetOnboardingStatus: typeof deviceGetOnboardingStatus;
   deviceUploadWallpaper: typeof deviceUploadWallpaper;
+  deviceInfoGet: typeof deviceInfoGet;
+  deviceStatusGet: typeof deviceStatusGet;
+  deviceSettingsGet: typeof deviceSettingsGet;
+  protocolInfoRequest: typeof protocolInfoRequest;
+  ping: typeof ping;
+  deviceSessionOpen: typeof deviceSessionOpen;
+  deviceFirmwareUpdate: typeof deviceFirmwareUpdate;
+  deviceGetFirmwareUpdateStatus: typeof deviceGetFirmwareUpdateStatus;
+  deviceFactoryInfoSet: typeof deviceFactoryInfoSet;
+  deviceFactoryInfoGet: typeof deviceFactoryInfoGet;
+  deviceSettingsSet: typeof deviceSettingsSet;
+  deviceSettingsPageShow: typeof deviceSettingsPageShow;
+  filesystemPermissionFix: typeof filesystemPermissionFix;
+  filesystemFormat: typeof filesystemFormat;
   uploadPortfolio: typeof uploadPortfolio;
   fileRead: typeof fileRead;
   fileWrite: typeof fileWrite;

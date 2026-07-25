@@ -48,7 +48,7 @@ const ChainMethodsIndexPage: React.FC = () => {
     }) || [];
 
   return (
-    <ChainBoundary chainId={chainId} checkNotFound={isChainNotFound}>
+    <ChainBoundary checkNotFound={isChainNotFound}>
       {selectedChain && (
         <PageLayout fixedHeight={true}>
           <div className="flex-1 flex flex-col px-4 py-3 min-h-0 h-full">

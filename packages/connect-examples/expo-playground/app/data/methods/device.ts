@@ -537,7 +537,7 @@ const api: UnifiedMethodConfig[] = [
   {
     method: 'deviceSettingsPageShow',
     description:
-      'Deprecated Protocol V2 raw command. Use deviceSettings, deviceChangePin, or deviceWipe.',
+      'Deprecated Protocol V2 raw command. Opens an interactive settings page; Passphrase and Air-gap are toggled on-device after confirmation. Use deviceSettings for target-state semantics.',
     noDeviceIdReq: true,
     deprecated: true,
     presets: [
@@ -646,6 +646,34 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Use Passphrase',
             description: 'Disable passphrase protection',
+            value: false,
+          },
+        ],
+      },
+      {
+        title: 'Enable Air-gap Mode',
+        parameters: [
+          {
+            name: 'airgapMode',
+            type: 'boolean',
+            required: true,
+            label: 'Air-gap Mode',
+            description:
+              'Target state. Pro2 opens the device page, waits for confirmation, and verifies the result.',
+            value: true,
+          },
+        ],
+      },
+      {
+        title: 'Disable Air-gap Mode',
+        parameters: [
+          {
+            name: 'airgapMode',
+            type: 'boolean',
+            required: true,
+            label: 'Air-gap Mode',
+            description:
+              'Target state. Pro2 opens the device page, waits for confirmation, and verifies the result.',
             value: false,
           },
         ],

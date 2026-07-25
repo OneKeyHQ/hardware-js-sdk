@@ -164,6 +164,30 @@ export const createCoreApi = (
     call({ ...params, connectId, method: 'deviceGetOnboardingStatus' }),
   deviceUploadWallpaper: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceUploadWallpaper' }),
+  deviceInfoGet: (connectId, params) => call({ ...params, connectId, method: 'deviceInfoGet' }),
+  deviceStatusGet: (connectId, params) => call({ ...params, connectId, method: 'deviceStatusGet' }),
+  deviceSettingsGet: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceSettingsGet' }),
+  protocolInfoRequest: (connectId, params) =>
+    call({ ...params, connectId, method: 'protocolInfoRequest' }),
+  ping: (connectId, params) => call({ ...params, connectId, method: 'ping' }),
+  deviceSessionOpen: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceSessionOpen' }),
+  deviceFirmwareUpdate: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceFirmwareUpdate' }),
+  deviceGetFirmwareUpdateStatus: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceGetFirmwareUpdateStatus' }),
+  deviceFactoryInfoSet: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceFactoryInfoSet' }),
+  deviceFactoryInfoGet: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceFactoryInfoGet' }),
+  deviceSettingsSet: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceSettingsSet' }),
+  deviceSettingsPageShow: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceSettingsPageShow' }),
+  filesystemPermissionFix: (connectId, params) =>
+    call({ ...params, connectId, method: 'filesystemPermissionFix' }),
+  filesystemFormat: connectId => call({ connectId, method: 'filesystemFormat' }),
   uploadPortfolio: (connectId, params) => call({ ...params, connectId, method: 'uploadPortfolio' }),
   fileRead: (connectId, params) => call({ ...params, connectId, method: 'fileRead' }),
   fileWrite: (connectId, params) => call({ ...params, connectId, method: 'fileWrite' }),

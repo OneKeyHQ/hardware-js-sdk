@@ -126,6 +126,10 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
         : await getPassphraseStateWithRefreshDeviceInfo(this.device, {
             expectPassphraseState: this.params.passphraseState,
           });
+      if (!session.passphraseState) {
+        this.device.clearInternalState();
+        throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError);
+      }
       return {
         protocol,
         walletType: 'hidden',
@@ -139,9 +143,10 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
     const session = this.device.isProtocolV2()
       ? await getProtocolV2WalletSession(this.device, { initSession: true })
       : await getPassphraseStateWithRefreshDeviceInfo(this.device, { initSession: true });
+    const walletType = session.passphraseState ? 'hidden' : 'standard';
     return {
       protocol,
-      walletType: 'hidden',
+      walletType,
       deviceId: currentDeviceId,
       passphraseState: session.passphraseState ?? null,
       resumed: wasResumed(session),

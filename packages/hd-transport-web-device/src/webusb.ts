@@ -6,7 +6,9 @@ import transport, {
   PROTOCOL_V1_USB_PACKET_SIZE,
   PROTOCOL_V2_CHANNEL_USB,
   PROTOCOL_V2_FRAME_MAX_BYTES,
+  PROTOCOL_V2_WRITE_WATCHDOG_TIMEOUT_MS,
   ProtocolV2FrameAssembler,
+  ProtocolV2SequenceCursor,
   ProtocolV2Session,
   probeProtocolV2 as probeProtocolV2Helper,
 } from '@onekeyfe/hd-transport';
@@ -81,8 +83,13 @@ export default class WebUsbTransport {
   /** Per-device Protocol V2 session that keeps sequence numbers monotonic. */
   private protocolV2Sessions: Map<string, ProtocolV2Session> = new Map();
 
+  /** Sequence cursors survive ordinary reconnects and cached session rebuilds. */
+  private protocolV2Sequences: Map<string, ProtocolV2SequenceCursor> = new Map();
+
   /** Read timeout for the current Protocol V2 call, consumed by cached readFrame. */
   private protocolV2ReadTimeouts: Map<string, number | undefined> = new Map();
+
+  private protocolV2WriteTimeoutMs = PROTOCOL_V2_WRITE_WATCHDOG_TIMEOUT_MS;
 
   /** Per-path USB endpoint / interface numbers (discovered from USB descriptors) */
   private deviceEndpoints: Map<string, DeviceEndpoints> = new Map();
@@ -797,12 +804,19 @@ export default class WebUsbTransport {
 
     let session = this.protocolV2Sessions.get(path);
     if (!session) {
+      let sequenceCursor = this.protocolV2Sequences.get(path);
+      if (!sequenceCursor) {
+        sequenceCursor = new ProtocolV2SequenceCursor();
+        this.protocolV2Sequences.set(path, sequenceCursor);
+      }
       session = new ProtocolV2Session({
         schemas: {
           protocolV1: protocolV1Messages,
           protocolV2: this.messagesV2,
         },
         router: PROTOCOL_V2_CHANNEL_USB,
+        sequenceCursor,
+        writeTimeoutMs: this.protocolV2WriteTimeoutMs,
         writeFrame: (frame: Uint8Array) => this.transferOutOnce(path, frame),
         readFrame: () => this.receiveProtocolV2Frame(path, this.protocolV2ReadTimeouts.get(path)),
         logger: this.Log,
@@ -820,7 +834,11 @@ export default class WebUsbTransport {
     } catch (error) {
       const message =
         error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
-      if (message.includes('protocol v2 read timeout') || message.includes('response timeout')) {
+      if (
+        message.includes('protocol v2 read timeout') ||
+        message.includes('protocol v2 write timeout') ||
+        message.includes('response timeout')
+      ) {
         try {
           await this.resetConnectionAfterProbe(path);
         } catch (resetError) {

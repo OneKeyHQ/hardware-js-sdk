@@ -1,5 +1,5 @@
 import { BaseMethod } from './BaseMethod';
-import { validateNonEmptyString } from './helpers/filesystemValidation';
+import { validateProtocolV2FilesystemPath } from './helpers/filesystemValidation';
 
 export type DirRemoveParams = {
   path: string;
@@ -11,7 +11,7 @@ export default class DirRemove extends BaseMethod<DirRemoveParams> {
     this.requireProtocolV2 = true;
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
-    this.params = { path: validateNonEmptyString(this.payload.path, 'path') };
+    this.params = { path: validateProtocolV2FilesystemPath(this.payload.path, 'path') };
   }
 
   async run() {

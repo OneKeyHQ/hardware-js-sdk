@@ -6,10 +6,10 @@ import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { BaseMethod } from './BaseMethod';
 import {
-  validateNonEmptyString,
   validateNonNegativeInteger,
   validateOptionalNonNegativeInteger,
   validateOptionalPercentage,
+  validateProtocolV2FilesystemPath,
 } from './helpers/filesystemValidation';
 import { hexToBytes, isHexString, stripHexPrefix } from './helpers/hexUtils';
 import { DataManager } from '../data-manager';
@@ -92,7 +92,7 @@ export default class FileRead extends BaseMethod<FileReadParams> {
     this.requireProtocolV2 = true;
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
-    const path = validateNonEmptyString(this.payload.path, 'path');
+    const path = validateProtocolV2FilesystemPath(this.payload.path, 'path');
     this.params = {
       path,
       offset: validateNonNegativeInteger(this.payload.offset, 'offset', 0),

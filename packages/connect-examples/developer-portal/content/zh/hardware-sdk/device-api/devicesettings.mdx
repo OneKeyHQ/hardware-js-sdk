@@ -6,7 +6,8 @@ title: deviceSettings
 
 ## 设备设置
 
-建议每次只修改一个属性，因为需要在设备上进行确认。
+建议每次只修改一个属性。对于 Pro2 的 Passphrase 与 Air-gap 设置，参数表示目标状态，
+实际切换发生在设备设置页面，并需要用户在设备上二次确认。
 
 ```typescript
 const result = await HardwareSDK.deviceSettings(connectId, params);
@@ -19,6 +20,7 @@ const result = await HardwareSDK.deviceSettings(connectId, params);
 * `language` - _可选_ `string` 设备语言，[ISO 639-1 代码](https://en.wikipedia.org/wiki/List\_of\_ISO\_639-1\_codes)
 * `label` - _可选_ `string` 设备名称
 * `usePassphrase` - _可选_ `boolean` 是否开启 Passphrase
+* `airgapMode` - _可选_ `boolean` 是否开启 Air-gap 模式（仅 Protocol V2 / Pro2）
 * `homescreen` - _可选_ `string` 通过十六进制字符串修改主屏幕壁纸
 * `autoLockDelayMs` - _可选_ `number` 自动锁定时间（毫秒）
 * `displayRotation` - _可选_ `number` 屏幕旋转角度
@@ -31,11 +33,25 @@ const result = await HardwareSDK.deviceSettings(connectId, params);
 
 * `experimentalFeatures` - _可选_ `boolean` 启用实验性消息类型
 
+## Protocol V1 / V2 行为
+
+* Protocol V1：`usePassphrase` 通过 `ApplySettings` 直接传递目标布尔值，保持原有行为。
+* Protocol V2 / Pro2：固件的 `DeviceSettingsPageShow` 不接收目标布尔值。SDK 会先读取当前状态；
+  已经与目标一致时直接返回，否则打开对应设备页面，由设备执行一次切换并等待用户确认，然后再次读取状态校验结果。
+* Protocol V2 的 `usePassphrase` 或 `airgapMode` 不能与其他直接设置放在同一次调用中，避免设备交互与直接写入产生部分成功。
+
 ## 示例
 
 ```typescript
 HardwareSDK.deviceSettings(connectId, {
     label: 'My OneKey Wallet'
+});
+```
+
+```typescript
+// Pro2：目标是开启 Air-gap；SDK 负责决定是否需要打开设备页面。
+HardwareSDK.deviceSettings(connectId, {
+    airgapMode: true
 });
 ```
 

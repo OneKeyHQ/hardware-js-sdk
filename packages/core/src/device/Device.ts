@@ -693,7 +693,7 @@ export class Device extends EventEmitter {
       'getInternalState session param: ',
       `device_id: ${_deviceId}`,
       `features.deviceId: ${this.features?.deviceId}`,
-      `passphraseState: ${this.passphraseState}`
+      `hasPassphraseState: ${Boolean(this.passphraseState)}`
     );
 
     const deviceId = this.getSessionCacheDeviceKey(_deviceId);
@@ -721,7 +721,7 @@ export class Device extends EventEmitter {
       'updateInternalState session param: ',
       `device_id: ${deviceId}`,
       `enablePassphrase: ${enablePassphrase}`,
-      `passphraseState: ${passphraseState}`,
+      `hasPassphraseState: ${Boolean(passphraseState)}`,
       `hasSessionId: ${Boolean(sessionId)}`,
       `hasFeaturesSessionId: ${Boolean(featuresSessionId)}`
     );
@@ -744,7 +744,7 @@ export class Device extends EventEmitter {
       `hasState: ${Boolean(state)}`,
       `initSession: ${initSession}`,
       `deviceId: ${this.features?.deviceId}`,
-      `passphraseState: ${this.passphraseState}`
+      `hasPassphraseState: ${Boolean(this.passphraseState)}`
     );
 
     if (!this.passphraseState && !initSession) return;
@@ -1433,7 +1433,8 @@ export class Device extends EventEmitter {
         throw error;
       }
 
-      return this.updateFeaturesPatch({ unlocked: true }, 'unlock');
+      const status = await requestProtocolV2DeviceStatus({ commands: this.commands });
+      return this.updateProtocolV2Status(status);
     }
 
     const firmwareVersion = this.getCurrentFirmwareVersionString() ?? '0.0.0';
@@ -1515,8 +1516,10 @@ export class Device extends EventEmitter {
       !!expectedPassphraseState && expectedPassphraseState !== newPassphraseState;
 
     Log.debug('Check passphrase state safety: ', {
-      passphraseState,
-      newPassphraseState,
+      hasExpectedPassphraseState: Boolean(expectedPassphraseState),
+      hasNewPassphraseState: Boolean(newPassphraseState),
+      passphraseStateMatches:
+        Boolean(expectedPassphraseState) && expectedPassphraseState === newPassphraseState,
       unlockedAttachPin,
       useEmptyPassphrase,
     });

@@ -1,7 +1,7 @@
 import { BaseMethod } from './BaseMethod';
 import {
-  validateNonEmptyString,
   validateOptionalNonNegativeInteger,
+  validateProtocolV2FilesystemPath,
 } from './helpers/filesystemValidation';
 
 export type DirListParams = {
@@ -16,7 +16,9 @@ export default class DirList extends BaseMethod<DirListParams> {
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
     this.params = {
-      path: validateNonEmptyString(this.payload.path, 'path'),
+      path: validateProtocolV2FilesystemPath(this.payload.path, 'path', {
+        allowVolumeRoot: true,
+      }),
       depth: validateOptionalNonNegativeInteger(this.payload.depth, 'depth'),
     };
   }

@@ -1,9 +1,18 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CoreApi, UiEvent, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
+import {
+  CoreApi,
+  DEVICE,
+  DeviceStateEvent,
+  Features,
+  UiEvent,
+  UI_REQUEST,
+  UI_RESPONSE,
+} from '@onekeyfe/hd-core';
 import { useDeviceStore } from '../../store/deviceStore';
 
 import { submitPin } from '../../services/hardwareService';
+import { applyDeviceStateToDevice } from '../../services/deviceStateAdapter';
 import { EDeviceType } from '@onekeyfe/hd-shared';
 import GlobalDialogManager from '../global/GlobalDialogManager';
 import WebUsbAuthorizeDialog from '../global/WebUsbAuthorizeDialog';
@@ -57,11 +66,14 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
     | typeof UI_RESPONSE.SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE
   >(UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE);
   const lastSdkRef = useRef<CoreApi | null>(null);
+  const cleanupSdkListenersRef = useRef<(() => void) | null>(null);
 
   const setupSDKEventListeners = useCallback(
     (sdkInstance: CoreApi) => {
+      cleanupSdkListenersRef.current?.();
+
       // 监听SDK UI事件
-      sdkInstance.on('UI_EVENT', (message: UiEvent) => {
+      const handleUiEvent = (message: UiEvent) => {
         const latestCurrentDevice = useDeviceStore.getState().currentDevice;
         logInfo(`收到UI事件: ${message.type}`, message.payload as logData);
 
@@ -85,6 +97,7 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
             if (
               latestCurrentDevice &&
               (latestCurrentDevice.deviceType === EDeviceType.Pro ||
+                latestCurrentDevice.deviceType === EDeviceType.Pro2 ||
                 latestCurrentDevice.deviceType === EDeviceType.Touch)
             ) {
               submitPin('@@ONEKEY_INPUT_PIN_IN_DEVICE').catch(console.error);
@@ -133,16 +146,62 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
           default:
             break;
         }
-      });
+      };
 
       // 监听设备连接/断开事件
-      sdkInstance.on('device-connect', device => {
-        logInfo('device-connect', device);
-      });
+      const handleDeviceConnect = () => {
+        logInfo('device-connect');
+      };
 
-      sdkInstance.on('device-disconnect', device => {
-        logInfo('device-disconnect', device);
-      });
+      const handleDeviceDisconnect = () => {
+        logInfo('device-disconnect');
+      };
+
+      const handleDeviceFeatures = (features: Features) => {
+        const store = useDeviceStore.getState();
+        store.setDeviceFeatures(features);
+        if (store.currentDevice) {
+          store.setCurrentDevice({
+            ...store.currentDevice,
+            features,
+          });
+        }
+      };
+
+      const handleDeviceState = (stateEvent: DeviceStateEvent) => {
+        const store = useDeviceStore.getState();
+        const currentDevice = store.currentDevice;
+        if (!currentDevice) return;
+        const matchesDevice =
+          currentDevice.connectId === stateEvent.connectId ||
+          Boolean(
+            stateEvent.state.identity.serialNo &&
+              currentDevice.uuid === stateEvent.state.identity.serialNo
+          ) ||
+          Boolean(
+            stateEvent.state.identity.deviceId &&
+              currentDevice.deviceId === stateEvent.state.identity.deviceId
+          );
+        if (matchesDevice) {
+          store.setCurrentDevice(applyDeviceStateToDevice(currentDevice, stateEvent.state));
+        }
+      };
+
+      sdkInstance.on('UI_EVENT', handleUiEvent);
+      sdkInstance.on('device-connect', handleDeviceConnect);
+      sdkInstance.on('device-disconnect', handleDeviceDisconnect);
+      sdkInstance.on(DEVICE.FEATURES, handleDeviceFeatures);
+      sdkInstance.on(DEVICE.STATE, handleDeviceState);
+
+      const cleanup = () => {
+        sdkInstance.off('UI_EVENT', handleUiEvent);
+        sdkInstance.off('device-connect', handleDeviceConnect);
+        sdkInstance.off('device-disconnect', handleDeviceDisconnect);
+        sdkInstance.off(DEVICE.FEATURES, handleDeviceFeatures);
+        sdkInstance.off(DEVICE.STATE, handleDeviceState);
+      };
+      cleanupSdkListenersRef.current = cleanup;
+      return cleanup;
     },
     [setDeviceAction, clearDeviceAction]
   );
@@ -206,6 +265,10 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
 
   useEffect(() => {
     handleInitializeSDK();
+    return () => {
+      cleanupSdkListenersRef.current?.();
+      cleanupSdkListenersRef.current = null;
+    };
   }, [handleInitializeSDK]);
 
   return (

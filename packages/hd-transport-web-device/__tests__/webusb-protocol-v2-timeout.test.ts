@@ -37,4 +37,29 @@ describe('WebUsbTransport Protocol V2 timeout recovery', () => {
     expect(webusb.resetConnectionAfterProbe).toHaveBeenCalledWith(path);
     expect(webusb.protocolV2Sessions.has(path)).toBe(false);
   });
+
+  test('resets a stalled write while retaining the device sequence cursor', async () => {
+    const webusb = new WebUsbTransport() as any;
+    const path = 'pro2-webusb';
+    webusb.messages = transport.parseConfigure(schema);
+    webusb.messagesV2 = transport.parseConfigure(schema);
+    webusb.protocolV2WriteTimeoutMs = 10;
+    webusb.protocolV2Assemblers.set(path, new ProtocolV2FrameAssembler());
+    webusb.transferOutOnce = jest.fn(() => new Promise(() => {}));
+    webusb.receiveProtocolV2Frame = jest.fn();
+    webusb.resetConnectionAfterProbe = jest.fn().mockImplementation(() => {
+      webusb.protocolV2Sessions.delete(path);
+      webusb.protocolV2ReadTimeouts.delete(path);
+      webusb.protocolV2Assemblers.get(path)?.reset();
+    });
+
+    await expect(
+      webusb.callProtocolV2(path, 'Ping', { message: 'timeout' }, { timeoutMs: 10 })
+    ).rejects.toThrow('Protocol V2 write timeout after 10ms for Ping');
+
+    expect(webusb.resetConnectionAfterProbe).toHaveBeenCalledWith(path);
+    expect(webusb.protocolV2Sequences.has(path)).toBe(true);
+    expect(webusb.protocolV2Sessions.has(path)).toBe(false);
+    expect(webusb.receiveProtocolV2Frame).not.toHaveBeenCalled();
+  });
 });

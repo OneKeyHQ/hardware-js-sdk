@@ -17,6 +17,7 @@ export type DeviceSettingsParams = {
   brightness?: number;
   hapticFeedback?: boolean;
   bluetoothEnabled?: boolean;
+  airgapMode?: boolean;
   animationEnabled?: boolean;
   tapToWake?: boolean;
   deviceNameDisplayEnabled?: boolean;

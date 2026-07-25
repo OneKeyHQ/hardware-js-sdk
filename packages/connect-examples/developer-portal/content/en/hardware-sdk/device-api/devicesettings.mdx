@@ -6,7 +6,8 @@ title: deviceSettings
 
 ## Device settings
 
-It is recommended to modify only one property when using it, as it needs to be confirmed on the device.
+Modify one property per call. For Pro2 Passphrase and Air-gap settings, the boolean is the target
+state; the actual toggle happens on the device settings page and requires a second confirmation.
 
 ```typescript
 const result = await HardwareSDK.deviceSettings(connectId, params);
@@ -19,6 +20,7 @@ const result = await HardwareSDK.deviceSettings(connectId, params);
 * `language` - _optional_ `string` Device language, [ISO 639-1 codes](https://en.wikipedia.org/wiki/List\_of\_ISO\_639-1\_codes)
 * `label` - _optional_ `string` Device name
 * `usePassphrase` - _optional_ `boolean` Open passphrase or not
+* `airgapMode` - _optional_ `boolean` Enable Air-gap mode (Protocol V2 / Pro2 only)
 * `homescreen` - _optional_ `string` Change homescreen by hex string
 * `autoLockDelayMs` - _optional_ `number` Auto lock time in ms
 * `displayRotation` - _optional_ `number` In degrees from North
@@ -31,11 +33,27 @@ const result = await HardwareSDK.deviceSettings(connectId, params);
 
 * `experimentalFeatures` - _optional_ `boolean` Enable experimental message types
 
+## Protocol V1 / V2 behavior
+
+* Protocol V1 sends the `usePassphrase` target through `ApplySettings`, preserving the existing behavior.
+* Protocol V2 / Pro2 `DeviceSettingsPageShow` does not accept a target boolean. The SDK reads the current
+  state first. If it already matches, the call is a no-op; otherwise the SDK opens the corresponding
+  device page, waits for the on-device toggle and confirmation, then reads the state again to verify it.
+* On Protocol V2, do not combine `usePassphrase` or `airgapMode` with direct settings in one call.
+  This avoids partial success across an interactive device transaction and a direct settings write.
+
 ## Example
 
 ```typescript
 HardwareSDK.deviceSettings(connectId, {
     label: 'My OneKey Wallet'
+});
+```
+
+```typescript
+// Pro2: request the Air-gap target state; the SDK decides whether to open the device page.
+HardwareSDK.deviceSettings(connectId, {
+    airgapMode: true
 });
 ```
 

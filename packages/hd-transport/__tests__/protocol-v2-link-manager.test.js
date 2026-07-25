@@ -158,6 +158,31 @@ describe('ProtocolV2LinkManager', () => {
     expect(sentSeqs).toEqual([1, 2]);
   });
 
+  test('times out a stalled write and resets the link before releasing the call queue', async () => {
+    const adapter = {
+      router: 1,
+      generation: 1,
+      prepareCall: jest.fn(),
+      writeFrame: jest.fn(() => new Promise(() => {})),
+      readFrame: jest.fn(),
+      reset: jest.fn(() => Promise.resolve()),
+      writeTimeoutMs: 10,
+    };
+    const manager = new ProtocolV2LinkManager({
+      getSchemas: () => schemas,
+      classifyError: error =>
+        String(error).includes('write timeout') ? 'link-fatal' : 'recoverable',
+    });
+
+    await expect(
+      manager.call('device-a', () => adapter, 'Ping', { message: 'pending' })
+    ).rejects.toThrow('Protocol V2 write timeout after 10ms for Ping');
+
+    expect(adapter.reset).toHaveBeenCalledWith(expect.stringContaining('write timeout'));
+    expect(adapter.readFrame).not.toHaveBeenCalled();
+    expect(manager.callQueues.size).toBe(0);
+  });
+
   test('invalidates every active link while retaining per-device cursors', async () => {
     const sentSeqs = [];
     const { adapters, createAdapter } = createAdapterFactory(sentSeqs);

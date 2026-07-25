@@ -1,4 +1,5 @@
 import { HardwareErrorCode, TypedError } from '@onekeyfe/hd-shared';
+import { DeviceSettingsPage } from '@onekeyfe/hd-transport';
 
 import { BaseMethod } from '../BaseMethod';
 import { invalidParameter } from '../helpers/filesystemValidation';
@@ -12,6 +13,19 @@ import { getProtocolV2SettingsBehavior } from '../../protocols/protocol-v2/setti
 import { LANGUAGE_LABELS } from '../../utils/deviceSettings';
 
 import type { ApplySettings } from '@onekeyfe/hd-transport';
+import type { DeviceSettingsParams } from '../../types/api/deviceSettings';
+
+const settingsPageForPayload = (
+  payload: DeviceSettingsParams
+): DeviceSettingsPage.DevicePassphrase | DeviceSettingsPage.DeviceAirgap | undefined => {
+  if (payload.usePassphrase !== undefined) {
+    return DeviceSettingsPage.DevicePassphrase;
+  }
+  if (payload.airgapMode !== undefined) {
+    return DeviceSettingsPage.DeviceAirgap;
+  }
+  return undefined;
+};
 
 export default class DeviceSettings extends BaseMethod<ApplySettings> {
   init() {
@@ -34,6 +48,7 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
       { name: 'brightness', type: 'number' },
       { name: 'hapticFeedback', type: 'boolean' },
       { name: 'bluetoothEnabled', type: 'boolean' },
+      { name: 'airgapMode', type: 'boolean' },
       { name: 'animationEnabled', type: 'boolean' },
       { name: 'tapToWake', type: 'boolean' },
       { name: 'deviceNameDisplayEnabled', type: 'boolean' },
@@ -60,7 +75,26 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
         : undefined),
       haptic_feedback: this.payload.hapticFeedback,
     };
-    const behavior = getProtocolV2SettingsBehavior(mapCommonSettingsToProtocolV2(this.payload));
+    const page = settingsPageForPayload(this.payload);
+    const directSettings = mapCommonSettingsToProtocolV2(this.payload);
+    const hasConflictingPages =
+      this.payload.usePassphrase !== undefined && this.payload.airgapMode !== undefined;
+    const combinesPageWithDirectSettings =
+      page !== undefined && Object.keys(directSettings).length > 0;
+    if (hasConflictingPages || combinesPageWithDirectSettings) {
+      // V1 may still accept passphrase plus direct settings. Suppress only the
+      // Protocol V2 pre-run interaction; run() returns the protocol-specific error.
+      this.unlockPolicy = 'none';
+      this.protocolV2UiInteraction = undefined;
+      return;
+    }
+    const behavior =
+      page === undefined
+        ? getProtocolV2SettingsBehavior({
+            kind: 'direct',
+            settings: directSettings,
+          })
+        : getProtocolV2SettingsBehavior({ kind: 'page', page });
     this.unlockPolicy = behavior.unlockPolicy;
     this.protocolV2UiInteraction = behavior.uiInteraction;
   }
@@ -80,6 +114,57 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
     try {
       if (this.device.isProtocolV2()) {
         const settings = mapCommonSettingsToProtocolV2(this.payload);
+        const requestedPassphrase = this.payload.usePassphrase;
+        const requestedAirgap = this.payload.airgapMode;
+        const hasPassphrasePage = requestedPassphrase !== undefined;
+        const hasAirgapPage = requestedAirgap !== undefined;
+
+        if (hasPassphrasePage && hasAirgapPage) {
+          throw invalidParameter(
+            'Protocol V2 passphrase and air-gap settings must be changed in separate calls.'
+          );
+        }
+        if ((hasPassphrasePage || hasAirgapPage) && Object.keys(settings).length > 0) {
+          throw invalidParameter(
+            'Protocol V2 on-device settings must not be combined with direct settings.'
+          );
+        }
+        if (requestedPassphrase !== undefined) {
+          const current = await this.device.getDeviceState({ refreshSections: ['status'] });
+          if (current.status.passphraseProtection === requestedPassphrase) {
+            return { message: 'Settings already match requested value.' };
+          }
+
+          const res = await this.device.commands.typedCall('DeviceSettingsPageShow', 'Success', {
+            page: DeviceSettingsPage.DevicePassphrase,
+          });
+          const updated = await this.device.getDeviceState({ refreshSections: ['status'] });
+          if (updated.status.passphraseProtection !== requestedPassphrase) {
+            throw TypedError(
+              HardwareErrorCode.RuntimeError,
+              'Protocol V2 passphrase setting did not reach the requested value.'
+            );
+          }
+          return res.message;
+        }
+        if (requestedAirgap !== undefined) {
+          const current = await this.device.getDeviceState({ refreshSections: ['settings'] });
+          if (current.settings.airgapMode === requestedAirgap) {
+            return { message: 'Settings already match requested value.' };
+          }
+
+          const res = await this.device.commands.typedCall('DeviceSettingsPageShow', 'Success', {
+            page: DeviceSettingsPage.DeviceAirgap,
+          });
+          const updated = await this.device.getDeviceState({ refreshSections: ['settings'] });
+          if (updated.settings.airgapMode !== requestedAirgap) {
+            throw TypedError(
+              HardwareErrorCode.RuntimeError,
+              'Protocol V2 air-gap setting did not reach the requested value.'
+            );
+          }
+          return res.message;
+        }
         if (Object.keys(settings).length === 0) {
           throw invalidParameter('No Protocol V2 compatible setting provided.');
         }
@@ -89,6 +174,10 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
         });
         this.device.updateState(mapDeviceSettingsToState(settings), 'apply-settings');
         return res.message;
+      }
+
+      if (this.payload.airgapMode !== undefined) {
+        throw invalidParameter('Air-gap settings are not supported by Protocol V1.');
       }
 
       const res = await this.device.commands.typedCall('ApplySettings', 'Success', {
