@@ -9,6 +9,7 @@ export type UploadPortfolioParams = {
 const PORTFOLIO_PENDING_PATH = 'vol1:/portfolio/portfolio.okpkg.pending';
 const PORTFOLIO_CHUNK_SIZE = 2048;
 const PORTFOLIO_RESPONSE_TIMEOUT_MS = 5_000;
+const PORTFOLIO_MAX_ABORT_LATENCY_MS = PORTFOLIO_RESPONSE_TIMEOUT_MS * 2 + 2_000;
 
 export default class UploadPortfolio extends FileWrite {
   init() {
@@ -30,6 +31,7 @@ export default class UploadPortfolio extends FileWrite {
     };
     super.init();
     this.executionPriority = 'background';
+    this.maxAbortLatencyMs = PORTFOLIO_MAX_ABORT_LATENCY_MS;
     this.unlockPolicy = 'retry-on-locked';
     // Portfolio is a background write/apply flow and never synthesizes UI events.
     this.protocolV2UiMode = 'none';

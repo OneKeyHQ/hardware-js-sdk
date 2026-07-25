@@ -105,6 +105,9 @@ export abstract class BaseMethod<Params = undefined> {
   /** Background methods must not block user-initiated device interactions. */
   executionPriority: MethodExecutionPriority = 'normal';
 
+  /** Maximum time a background method may need to observe abort and release the device. */
+  maxAbortLatencyMs?: number;
+
   /**
    * 允许的设备模式。当前设备模式在该数组中，则可以允许运行。
    * eg. NOT_INITIALIZE, BOOTLOADER, SEEDLESS

@@ -90,12 +90,30 @@ describe('RequestQueue operation cancellation', () => {
     expect(portfolio.abortController?.signal.aborted).toBe(true);
     expect(queue.getTask(2)).toBeUndefined();
 
+    portfolio.settled.resolve();
+    await Promise.resolve();
+    expect(queue.getTask(2)).toBeUndefined();
+
     queue.releaseTask(1);
 
     await expect(admission).resolves.toMatchObject({
       status: 'reserved',
       task: { id: 2 },
     });
+  });
+
+  test('uses the background method abort latency when no admission override is provided', async () => {
+    const queue = new RequestQueue();
+    const portfolio = queue.createTask(buildBackgroundMethod(1, 'portfolio-1'));
+    portfolio.method.maxAbortLatencyMs = 12_000;
+    const waitForTasksReleased = jest
+      .spyOn(queue as any, 'waitForTasksReleased')
+      .mockResolvedValue(false);
+
+    await expect(queue.admitTask(buildMethod(2, 'user-action'))).resolves.toMatchObject({
+      status: 'busy',
+    });
+    expect(waitForTasksReleased).toHaveBeenCalledWith([portfolio], 12_000);
   });
 
   test('returns busy when an aborted background request does not release in time', async () => {

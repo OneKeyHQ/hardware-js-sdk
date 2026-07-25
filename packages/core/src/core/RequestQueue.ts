@@ -14,6 +14,7 @@ export type RequestTask = {
   callPromise?: Deferred<any> | undefined;
   abortController?: AbortController;
   settled: Deferred<void>;
+  released: Deferred<void>;
 };
 
 export type RequestAdmission =
@@ -61,6 +62,7 @@ export default class RequestQueue {
       method,
       abortController,
       settled: createDeferred<void>(),
+      released: createDeferred<void>(),
     };
     this.requestQueue.set(requestId, task);
     const operationId = method.payload?.operationId;
@@ -103,7 +105,12 @@ export default class RequestQueue {
       `Preempt ${backgroundTasks.length} background request(s) for user method ${method.name}`
     );
     backgroundTasks.forEach(task => task.abortController?.abort());
-    const timeoutMs = options.backgroundPreemptTimeoutMs ?? DEFAULT_BACKGROUND_PREEMPT_TIMEOUT_MS;
+    const timeoutMs =
+      options.backgroundPreemptTimeoutMs ??
+      Math.max(
+        DEFAULT_BACKGROUND_PREEMPT_TIMEOUT_MS,
+        ...backgroundTasks.map(task => task.method.maxAbortLatencyMs ?? 0)
+      );
     const released = await this.waitForTasksReleased(backgroundTasks, timeoutMs);
     if (!released) {
       Log.warn(`Background request cleanup timed out before user method ${method.name}`);
@@ -118,7 +125,7 @@ export default class RequestQueue {
     const timeoutPromise = new Promise<false>(resolve => {
       timer = setTimeout(() => resolve(false), timeoutMs);
     });
-    const releasedPromise = Promise.all(tasks.map(task => task.settled.promise)).then(() => true);
+    const releasedPromise = Promise.all(tasks.map(task => task.released.promise)).then(() => true);
     const released = await Promise.race([releasedPromise, timeoutPromise]);
     if (timer) {
       clearTimeout(timer);
@@ -193,8 +200,8 @@ export default class RequestQueue {
     const request = this.requestQueue.get(requestId);
     if (request) {
       request.callPromise?.resolve(response);
+      request.settled.resolve();
     }
-    this.releaseTask(requestId);
   }
 
   // 拒绝请求
@@ -202,8 +209,8 @@ export default class RequestQueue {
     const request = this.requestQueue.get(requestId);
     if (request) {
       request.callPromise?.reject(error);
+      request.settled.resolve();
     }
-    this.releaseTask(requestId);
   }
 
   // 删除请求
@@ -217,6 +224,7 @@ export default class RequestQueue {
       this.operationRequestIds.delete(operationId);
     }
     task?.settled.resolve();
+    task?.released.resolve();
     this.requestQueue.delete(requestId);
   }
 

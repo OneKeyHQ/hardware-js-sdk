@@ -5,7 +5,14 @@ export const LogBlockEvent: Set<string> = new Set([
   UI_RESPONSE.RECEIVE_PASSPHRASE,
 ]);
 
-const LogBlockMethod: Set<string> = new Set(['evmSignTypedData', 'deviceSessionOpen']);
+const LogBlockMethod: Set<string> = new Set([
+  'evmSignTypedData',
+  'deviceSessionOpen',
+  'deviceUploadWallpaper',
+  'uploadPortfolio',
+  'fileWrite',
+  'fileRead',
+]);
 
 export function getLogBlockLabel(message: unknown): string | undefined {
   if (!message || typeof message !== 'object') return undefined;

@@ -18,6 +18,7 @@ import DeviceReboot from '../src/api/protocol-v2/DeviceReboot';
 import DeviceCancel from '../src/api/device/DeviceCancel';
 import DeviceChangePin from '../src/api/device/DeviceChangePin';
 import DeviceLock from '../src/api/device/DeviceLock';
+import DeviceSettings from '../src/api/device/DeviceSettings';
 import DeviceUnlock from '../src/api/device/DeviceUnlock';
 import DeviceWipe from '../src/api/device/DeviceWipe';
 import DeviceSettingsGet from '../src/api/protocol-v2/DeviceSettingsGet';
@@ -4652,6 +4653,24 @@ describe('Protocol V2 protected method execution', () => {
     method.init();
 
     expect(method.unlockPolicy).toBe('none');
+  });
+
+  test('uses the same label interaction for the compatible deviceSettings entry point', () => {
+    const method = new DeviceSettings({
+      id: 2,
+      payload: { method: 'deviceSettings', label: 'My Pro 2' },
+    });
+
+    method.init();
+
+    expect(method.protocolV2UiInteraction).toEqual({
+      request: 'button',
+      source: 'method-lifecycle',
+      reason: 'device-management',
+      completion: 'operation-completed',
+      deviceOnly: true,
+      operation: 'change-label',
+    });
   });
 
   test.each([

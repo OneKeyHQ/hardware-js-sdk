@@ -661,8 +661,9 @@ const onCallDevice = async (
       skipInitialize: canSkipInitialize(method, device),
       ...parseInitOptions(method),
     };
-    const deviceRun = () => device.run(inner, runOptions);
-    task.callPromise = createDeferred<any>(deviceRun);
+    const deviceRunPromise = device.run(inner, runOptions);
+    task.callPromise = createDeferred<any>();
+    deviceRunPromise.catch(error => task.callPromise?.reject(error));
 
     try {
       return await task.callPromise.promise;
@@ -670,6 +671,8 @@ const onCallDevice = async (
       Log.debug('Device Run Error: ', e);
       completeMethodRequestContext(method, e);
       return createResponseMessage(method.responseID, false, { error: e });
+    } finally {
+      await deviceRunPromise.catch(() => undefined);
     }
   } catch (error) {
     messageResponse = createResponseMessage(method.responseID, false, { error });

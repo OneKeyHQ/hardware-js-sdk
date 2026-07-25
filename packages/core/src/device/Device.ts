@@ -1154,19 +1154,37 @@ export class Device extends EventEmitter {
 
     options = parseRunOptions(options);
 
-    this.runPromise = createDeferred(this._runInner.bind(this, fn, options));
-    return this.runPromise.promise;
+    const runPromise = createDeferred<void>();
+    this.runPromise = runPromise;
+    this._runInner(fn, options, runPromise).catch(error => {
+      if (this.runPromise === runPromise) {
+        this.runPromise = null;
+      }
+      runPromise.reject(error);
+    });
+    return runPromise.promise;
   }
 
-  async _runInner<T>(fn: (() => Promise<T>) | undefined, options: RunOptions) {
+  async _runInner<T>(
+    fn: (() => Promise<T>) | undefined,
+    options: RunOptions,
+    runPromise: Deferred<void>
+  ) {
+    const clearRunPromise = () => {
+      if (this.runPromise === runPromise) {
+        this.runPromise = null;
+      }
+    };
+
     if (!this.isUsedHere() || this.commands.disposed) {
       const env = DataManager.getSettings('env');
       if (env !== 'react-native') {
         try {
           await this.acquire(options.connectProtocol);
         } catch (error) {
-          this.runPromise = null;
-          return Promise.reject(error);
+          clearRunPromise();
+          runPromise.reject(error);
+          return;
         }
 
         try {
@@ -1177,16 +1195,18 @@ export class Device extends EventEmitter {
           }
         } catch (error) {
           await this.release();
-          this.runPromise = null;
+          clearRunPromise();
           if (error instanceof HardwareError) {
-            return Promise.reject(error);
+            runPromise.reject(error);
+            return;
           }
-          return Promise.reject(
+          runPromise.reject(
             ERRORS.TypedError(
               HardwareErrorCode.DeviceInitializeFailed,
               `Initialize failed: ${error.message as string}, code: ${error.code as string}`
             )
           );
+          return;
         }
       } else if (env === 'react-native') {
         // TODO: implement react-native acquire
@@ -1205,9 +1225,7 @@ export class Device extends EventEmitter {
       try {
         await fn();
       } catch (e) {
-        if (this.runPromise) {
-          this.runPromise.reject(e);
-        }
+        runPromise.reject(e);
 
         if (
           e instanceof HardwareError &&
@@ -1220,7 +1238,7 @@ export class Device extends EventEmitter {
           Log.debug(`error code ${e.errorCode} release device, mainId: ${this.mainId}`);
         }
 
-        this.runPromise = null;
+        clearRunPromise();
         return;
       }
     }
@@ -1234,11 +1252,8 @@ export class Device extends EventEmitter {
       Log.debug('release device, mainId: ', this.mainId);
     }
 
-    if (this.runPromise) {
-      this.runPromise.resolve();
-    }
-
-    this.runPromise = null;
+    runPromise.resolve();
+    clearRunPromise();
   }
 
   async interruptionFromOutside() {

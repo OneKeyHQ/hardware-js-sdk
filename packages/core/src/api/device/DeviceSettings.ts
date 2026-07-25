@@ -8,7 +8,7 @@ import {
   mapCommonSettingsToProtocolV2,
   mapDeviceSettingsToState,
 } from '../../device/DeviceStateMapper';
-import { getProtocolV2SettingsUnlockPolicy } from '../../protocols/protocol-v2/settingsUnlockPolicy';
+import { getProtocolV2SettingsBehavior } from '../../protocols/protocol-v2/settingsUnlockPolicy';
 import { LANGUAGE_LABELS } from '../../utils/deviceSettings';
 
 import type { ApplySettings } from '@onekeyfe/hd-transport';
@@ -60,9 +60,9 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
         : undefined),
       haptic_feedback: this.payload.hapticFeedback,
     };
-    this.unlockPolicy = getProtocolV2SettingsUnlockPolicy(
-      mapCommonSettingsToProtocolV2(this.payload)
-    );
+    const behavior = getProtocolV2SettingsBehavior(mapCommonSettingsToProtocolV2(this.payload));
+    this.unlockPolicy = behavior.unlockPolicy;
+    this.protocolV2UiInteraction = behavior.uiInteraction;
   }
 
   getVersionRange() {

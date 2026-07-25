@@ -50,4 +50,12 @@ describe('getLogBlockLabel', () => {
       })
     ).toBe('deviceSessionOpen');
   });
+
+  it.each(['deviceUploadWallpaper', 'uploadPortfolio', 'fileWrite', 'fileRead'])(
+    'blocks binary payload logging for %s',
+    method => {
+      expect(getLogBlockLabel({ method, data: new Uint8Array(1024) })).toBe(method);
+      expect(getLogBlockLabel({ payload: { method, data: new Uint8Array(1024) } })).toBe(method);
+    }
+  );
 });

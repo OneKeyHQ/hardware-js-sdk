@@ -1,6 +1,6 @@
 import { BaseMethod } from '../BaseMethod';
 import { mapDeviceSettingsToState } from '../../device/DeviceStateMapper';
-import { getProtocolV2SettingsUnlockPolicy } from '../../protocols/protocol-v2/settingsUnlockPolicy';
+import { getProtocolV2SettingsBehavior } from '../../protocols/protocol-v2/settingsUnlockPolicy';
 import { invalidParameter } from '../helpers/filesystemValidation';
 
 import type { DeviceSettings } from '@onekeyfe/hd-transport';
@@ -28,20 +28,12 @@ export default class DeviceSettingsSet extends BaseMethod<{
     }
 
     this.requireProtocolV2 = true;
-    this.unlockPolicy = getProtocolV2SettingsUnlockPolicy(supported);
+    const behavior = getProtocolV2SettingsBehavior(supported);
+    this.unlockPolicy = behavior.unlockPolicy;
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
     this.params = { settings: supported };
-    if (typeof supported.label === 'string') {
-      this.protocolV2UiInteraction = {
-        request: 'button',
-        source: 'method-lifecycle',
-        reason: 'device-management',
-        completion: 'operation-completed',
-        deviceOnly: true,
-        operation: 'change-label',
-      };
-    }
+    this.protocolV2UiInteraction = behavior.uiInteraction;
   }
 
   async run() {
