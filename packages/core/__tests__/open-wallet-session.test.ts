@@ -69,6 +69,45 @@ describe('openWalletSession', () => {
     });
   });
 
+  test('keeps Legacy Protocol V1 getPassphraseState parameterless', async () => {
+    const typedCall = jest.fn().mockResolvedValue({
+      type: 'PassphraseState',
+      message: {
+        passphrase_state: 'current-wallet-state',
+        session_id: 'current-wallet-session',
+        unlocked_attach_pin: false,
+      },
+    });
+    const method = new GetPassphraseState({
+      payload: {
+        method: 'getPassphraseState',
+        connectId: 'connect-id',
+        useEmptyPassphrase: true,
+        initSession: true,
+        passphraseState: 'ignored-wallet-state',
+      },
+    });
+    const device = createDevice({ typedCall });
+    device.isProtocolV2 = () => false;
+    device.features = {
+      ...device.features,
+      deviceId: 'device-1',
+      passphraseProtection: true,
+      unlocked: true,
+      sessionId: null,
+    };
+    device.getCurrentFirmwareVersionString = () => '4.15.0';
+    device.getCurrentDeviceType = () => EDeviceType.Pro;
+    device.getFeatures = jest.fn();
+    method.device = device as any;
+
+    await expect(method.run()).resolves.toBe('current-wallet-state');
+    expect(device.clearInternalState).not.toHaveBeenCalled();
+    expect(typedCall).toHaveBeenCalledWith('GetPassphraseState', 'PassphraseState', {
+      passphrase_state: undefined,
+    });
+  });
+
   test('opens the standard wallet through the Protocol V1 empty-passphrase flow', async () => {
     const typedCall = jest.fn().mockResolvedValue({
       type: 'PassphraseState',
@@ -179,6 +218,7 @@ describe('openWalletSession', () => {
     expect(device.initialize).toHaveBeenCalledWith({
       deviceId: 'device-1',
       passphraseState: 'hidden-state',
+      sessionId: 'known-session',
     });
     expect(typedCall).toHaveBeenCalledWith('GetPassphraseState', 'PassphraseState', {
       passphrase_state: 'hidden-state',
@@ -290,6 +330,93 @@ describe('openWalletSession', () => {
       resume: { session_id: 'known-session' },
     });
     expect(promptPassphrase).not.toHaveBeenCalled();
+  });
+
+  test('resumes a Protocol V2 hidden wallet with deviceId and sessionId only', async () => {
+    const typedCall = jest.fn().mockResolvedValue({
+      message: {
+        btc_test_address: 'hidden-state',
+        session_id: 'renewed-session',
+      },
+    });
+    const promptPassphrase = jest.fn();
+    const method = new OpenWalletSession({
+      payload: {
+        method: 'openWalletSession',
+        connectId: 'connect-id',
+        mode: 'resume-hidden',
+        deviceId: 'device-1',
+        sessionId: 'known-session',
+      },
+    });
+    method.init();
+    method.device = createDevice({ typedCall, promptPassphrase }) as any;
+
+    await expect(method.run()).resolves.toEqual({
+      protocol: 'V2',
+      walletType: 'hidden',
+      deviceId: 'device-1',
+      passphraseState: 'hidden-state',
+      sessionId: 'renewed-session',
+      resumed: true,
+    });
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionOpen', 'DeviceSession', {
+      resume: { session_id: 'known-session' },
+    });
+    expect(deviceWalletSessionStore.get('device-1', 'hidden-state')).toBe('renewed-session');
+    expect(promptPassphrase).not.toHaveBeenCalled();
+  });
+
+  test('resumes a Protocol V1 hidden wallet with deviceId and sessionId only', async () => {
+    const typedCall = jest.fn().mockResolvedValue({
+      type: 'PassphraseState',
+      message: {
+        passphrase_state: 'restored-hidden-state',
+        session_id: 'known-session',
+        unlocked_attach_pin: false,
+      },
+    });
+    const method = new OpenWalletSession({
+      payload: {
+        method: 'openWalletSession',
+        connectId: 'connect-id',
+        mode: 'resume-hidden',
+        deviceId: 'device-1',
+        sessionId: 'known-session',
+      },
+    });
+    method.init();
+    const device = createDevice({ typedCall });
+    device.isProtocolV2 = () => false;
+    device.features = {
+      ...device.features,
+      deviceId: 'device-1',
+      passphraseProtection: true,
+      unlocked: true,
+      sessionId: null,
+    };
+    device.getCurrentFirmwareVersionString = () => '4.15.0';
+    device.getCurrentDeviceType = () => EDeviceType.Pro;
+    device.getFeatures = jest.fn();
+    method.device = device as any;
+
+    await expect(method.run()).resolves.toEqual({
+      protocol: 'V1',
+      walletType: 'hidden',
+      deviceId: 'device-1',
+      passphraseState: 'restored-hidden-state',
+      sessionId: 'known-session',
+      resumed: true,
+    });
+    expect(device.initialize).toHaveBeenCalledWith({
+      deviceId: 'device-1',
+      passphraseState: undefined,
+      sessionId: 'known-session',
+    });
+    expect(typedCall).toHaveBeenCalledWith('GetPassphraseState', 'PassphraseState', {
+      passphrase_state: undefined,
+    });
+    expect(deviceWalletSessionStore.get('device-1', 'restored-hidden-state')).toBe('known-session');
   });
 
   test('does not fall back to wallet selection when an explicit resume is invalid', async () => {

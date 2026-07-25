@@ -1,4 +1,4 @@
-import { EDeviceType, createDeviceNotSupportMethodError } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareErrorCode, createDeviceNotSupportMethodError } from '@onekeyfe/hd-shared';
 
 import { UI_REQUEST } from '../constants/ui-request';
 import { getPassphraseStateWithRefreshDeviceInfo } from '../utils/deviceFeaturesUtils';
@@ -14,18 +14,14 @@ export default class GetPassphraseState extends BaseMethod {
     if (this.device.isProtocolV2()) {
       throw createDeviceNotSupportMethodError(this.name, this.device.getCurrentFirmwareType());
     }
+    if (!this.device.features) {
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceInitializeFailed);
+    }
 
-    const { passphraseState } = await getPassphraseStateWithRefreshDeviceInfo(this.device, {
-      expectPassphraseState: this.payload.passphraseState,
-      onlyMainPin: this.payload.useEmptyPassphrase,
-      initSession: this.payload.initSession,
-    });
+    const { passphraseState } = await getPassphraseStateWithRefreshDeviceInfo(this.device);
 
     const passphraseProtection = this.device.getCurrentPassphraseProtection();
-    const deviceType = this.device.getCurrentDeviceType();
 
-    return Promise.resolve(
-      deviceType === EDeviceType.Pro || passphraseProtection === true ? passphraseState : undefined
-    );
+    return Promise.resolve(passphraseProtection === true ? passphraseState : undefined);
   }
 }

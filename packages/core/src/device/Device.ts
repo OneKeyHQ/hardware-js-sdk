@@ -97,6 +97,8 @@ export type InitOptions = {
   initSession?: boolean;
   deviceId?: string;
   passphraseState?: string;
+  /** Explicit wallet session supplied by a trusted caller for this initialization. */
+  sessionId?: string;
   deriveCardano?: boolean;
   connectProtocol?: HardwareConnectProtocol;
   protocolV2DeviceInfoTimeoutMs?: number;
@@ -797,7 +799,7 @@ export class Device extends EventEmitter {
       this.clearInternalState(options?.deviceId);
     }
 
-    const internalState = this.getInternalState(options?.deviceId);
+    const internalState = options?.sessionId || this.getInternalState(options?.deviceId);
     const payload: any = {};
     if (internalState) {
       payload.session_id = internalState;

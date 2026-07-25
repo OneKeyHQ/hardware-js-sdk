@@ -9,7 +9,8 @@ import {
   TransportManager,
 } from '../utils/hardwareInstance';
 import { useHardwareStore } from '../store/hardwareStore';
-import { METHODS_REQUIRING_PASSPHRASE_CHECK } from '../utils/constants';
+import { useDeviceStore } from '../store/deviceStore';
+import { methodSupportsCommonParameters } from '../utils/constants';
 import { previewHardwareParams } from './previewHardwareParams';
 import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
 import type { DeviceInfo } from '../types/hardware';
@@ -83,7 +84,9 @@ export function getDeviceSearchUserMessage(error: unknown): string {
 }
 
 type PassphraseStateMetadata = {
+  deviceId?: string;
   passphraseState?: string;
+  sessionId?: string;
   passphraseProtection?: boolean | null;
 };
 
@@ -92,11 +95,15 @@ const extractPassphraseStateMetadata = (payload: unknown): PassphraseStateMetada
   if (!payload || typeof payload !== 'object') return {};
 
   const maybeState = (payload as { passphraseState?: unknown }).passphraseState;
+  const maybeDeviceId = (payload as { deviceId?: unknown }).deviceId;
+  const maybeSessionId = (payload as { sessionId?: unknown }).sessionId;
   const maybePassphraseProtection = (payload as { passphraseProtection?: unknown })
     .passphraseProtection;
 
   return {
+    deviceId: typeof maybeDeviceId === 'string' ? maybeDeviceId : undefined,
     passphraseState: typeof maybeState === 'string' ? maybeState : undefined,
+    sessionId: typeof maybeSessionId === 'string' ? maybeSessionId : undefined,
     passphraseProtection:
       typeof maybePassphraseProtection === 'boolean' ? maybePassphraseProtection : undefined,
   };
@@ -183,7 +190,12 @@ const preparePassphraseParams = async (
   if (!methodSupportsCommonParameters(method)) return;
 
   if (params.useEmptyPassphrase === true) {
+    const result = await sdk.openWalletSession(connectId, { mode: 'standard' });
+    if (!result.success) {
+      throw new Error(String(result.payload?.error || 'Failed to open the standard wallet.'));
+    }
     clearPassphraseState(params);
+    useHardwareStore.getState().setWalletSession(null);
     return;
   }
 
@@ -193,25 +205,40 @@ const preparePassphraseParams = async (
     if (params.passphraseState) {
       logInfo('Device passphrase protection is disabled. Clearing stale passphraseState.');
     }
+    const result = await sdk.openWalletSession(connectId, { mode: 'standard' });
+    if (!result.success) {
+      throw new Error(String(result.payload?.error || 'Failed to open the standard wallet.'));
+    }
     clearPassphraseState(params);
+    useHardwareStore.getState().setWalletSession(null);
     return;
   }
 
-  if (
-    params.passphraseState !== '' &&
-    params.passphraseState !== undefined &&
-    params.passphraseState !== null
-  ) {
-    logInfo(`Using existing passphrase state from params: ${params.passphraseState}`);
-    return;
-  }
-
-  logInfo(
-    `PassphraseState is empty in params for method: ${method}, attempting to open the wallet session.`
-  );
+  logInfo(`Preparing wallet session through openWalletSession for signer method: ${method}.`);
 
   try {
-    const passphraseResult = await getPassphraseState(connectId);
+    const cachedSession = useHardwareStore.getState().walletSession;
+    const requestedPassphraseState =
+      typeof params.passphraseState === 'string' && params.passphraseState
+        ? params.passphraseState
+        : undefined;
+    const canResume =
+      cachedSession &&
+      cachedSession.connectId === connectId &&
+      (!requestedPassphraseState ||
+        requestedPassphraseState === cachedSession.passphraseState);
+    const passphraseResult = canResume
+      ? await sdk.openWalletSession(connectId, {
+          mode: 'resume-hidden',
+          deviceId: cachedSession.deviceId,
+          passphraseState: cachedSession.passphraseState,
+          sessionId: cachedSession.sessionId,
+        })
+      : await sdk.openWalletSession(connectId, { mode: 'select-hidden' });
+
+    if (!passphraseResult.success) {
+      throw new Error(String(passphraseResult.payload?.error || 'Failed to open wallet session.'));
+    }
     const passphraseMetadata = passphraseResult.success
       ? extractPassphraseStateMetadata(passphraseResult.payload)
       : {};
@@ -219,6 +246,7 @@ const preparePassphraseParams = async (
     if (passphraseMetadata.passphraseProtection === false) {
       logInfo('Device passphrase protection not enabled. Clearing passphraseState.');
       clearPassphraseState(params);
+      useHardwareStore.getState().setWalletSession(null);
       return;
     }
 
@@ -228,13 +256,27 @@ const preparePassphraseParams = async (
       useHardwareStore
         .getState()
         .setCommonParameter('passphraseState', passphraseMetadata.passphraseState);
+      if (
+        passphraseMetadata.deviceId &&
+        passphraseMetadata.sessionId
+      ) {
+        useHardwareStore.getState().setWalletSession({
+          connectId,
+          deviceId: passphraseMetadata.deviceId,
+          passphraseState: passphraseMetadata.passphraseState,
+          sessionId: passphraseMetadata.sessionId,
+        });
+      }
     } else {
       logInfo('Device passphrase protection enabled but no passphraseState was returned.');
       clearPassphraseState(params);
+      useHardwareStore.getState().setWalletSession(null);
     }
   } catch (passphraseError) {
-    logError('Failed to get passphrase state from device', { passphraseError });
+    logError('Failed to open wallet session', { passphraseError });
     clearPassphraseState(params);
+    useHardwareStore.getState().setWalletSession(null);
+    throw passphraseError;
   }
 };
 
@@ -310,10 +352,11 @@ export async function submitPin(pin: string | null): Promise<void> {
 
   try {
     const sdkInstance = await getSDKInstance();
-    sdkInstance.uiResponse({
+    const response = {
       type: UI_RESPONSE.RECEIVE_PIN,
       payload: pin || '@@ONEKEY_INPUT_PIN_IN_DEVICE',
-    });
+    };
+    sdkInstance.uiResponse(response);
     logResponse('PIN response submitted successfully');
   } catch (error) {
     logError('Failed to submit PIN response', { error });
@@ -331,14 +374,15 @@ export async function submitPassphrase(
 
   try {
     const sdkInstance = await getSDKInstance();
-    sdkInstance.uiResponse({
+    const response = {
       type: UI_RESPONSE.RECEIVE_PASSPHRASE,
       payload: {
         value: passphrase || '',
         passphraseOnDevice: onDevice,
         save: save,
       },
-    });
+    };
+    sdkInstance.uiResponse(response);
     logResponse('Passphrase response submitted successfully');
   } catch (error) {
     logError('Failed to submit passphrase response', { error });
@@ -347,9 +391,7 @@ export async function submitPassphrase(
 }
 
 // 获取设备的passphraseState
-export async function getPassphraseState(
-  connectId: string
-): Promise<ApiResponse<string | undefined>> {
+export async function getPassphraseState(connectId: string): Promise<ApiResponse> {
   if (typeof window === 'undefined') {
     return {
       success: false,
@@ -376,7 +418,8 @@ export async function getPassphraseState(
 // 统一的 SDK 方法调用抽象
 export async function callHardwareAPI(
   method: HardwareApiMethod,
-  params: Record<string, unknown>
+  params: Record<string, unknown>,
+  callMode?: HardwareApiCallMode
 ): Promise<ApiResponse> {
   logRequest(`Calling hardware API method: ${method}`, params);
 
@@ -405,47 +448,8 @@ export async function callHardwareAPI(
 
     const { connectId, deviceId } = params;
 
-    // FOR EXAMPLE APP: 如果参数中没有 passphraseState (或者为空)，则尝试从设备获取
-    // app-monorepo 的逻辑更复杂，这里简化以满足 example 的需求
-    if (connectId && METHODS_REQUIRING_PASSPHRASE_CHECK.includes(method)) {
-      // 只有当 params.passphraseState 是空字符串、undefined 或 null 时才尝试获取
-      if (
-        params.passphraseState === '' ||
-        params.passphraseState === undefined ||
-        params.passphraseState === null
-      ) {
-        logInfo(
-          `PassphraseState is empty in params for method: ${method}, attempting to fetch from device.`
-        );
-        try {
-          const stateResult = await sdk.getDeviceState(connectId as string);
-          const isProtocolV2 =
-            stateResult.success && stateResult.payload?.protocol === 'V2';
-          const passphraseResult = isProtocolV2
-            ? await sdk.openWalletSession(connectId as string, { mode: 'select-hidden' })
-            : await getPassphraseState(connectId as string);
-          if (passphraseResult.success && typeof passphraseResult.payload === 'string') {
-            logInfo(`Passphrase state obtained from device: ${passphraseResult.payload}`);
-            params.passphraseState = passphraseResult.payload;
-            // IMPORTANT: Update the store's commonParameter so the UI reflects the fetched value
-            useHardwareStore
-              .getState()
-              .setCommonParameter('passphraseState', passphraseResult.payload);
-          } else {
-            logInfo('Device passphrase protection not enabled or failed to get state from device.');
-            // Ensure passphraseState is explicitly an empty string if not enabled/fetched
-            params.passphraseState = '';
-            useHardwareStore.getState().setCommonParameter('passphraseState', '');
-          }
-        } catch (passphraseError) {
-          logError('Failed to get passphrase state from device', { passphraseError });
-          // In case of error, ensure it's an empty string to avoid unexpected behavior
-          params.passphraseState = '';
-          useHardwareStore.getState().setCommonParameter('passphraseState', '');
-        }
-      } else {
-        logInfo(`Using existing passphrase state from params: ${params.passphraseState}`);
-      }
+    if (connectId && typeof connectId === 'string') {
+      await preparePassphraseParams(sdk, method, params, connectId);
     }
 
     // 打印最终传入硬件的关键参数（尽量不变形，保持与 hd-core 接口一致）
@@ -467,13 +471,27 @@ export async function callHardwareAPI(
     const methodFunc = sdk[method] as (...args: any[]) => Promise<ApiResponse>;
     let result: ApiResponse;
 
-    // 根据参数中是否包含 deviceId 来决定调用方式
-    if (deviceId) {
+    // Preserve the three-argument signature before deviceId resolves; otherwise params
+    // shifts into the deviceId slot and the SDK receives an undefined payload.
+    const hasDeviceIdParameter = Object.prototype.hasOwnProperty.call(params, 'deviceId');
+    const hasConnectIdParameter = Object.prototype.hasOwnProperty.call(params, 'connectId');
+    const resolvedCallMode =
+      callMode ??
+      (hasDeviceIdParameter
+        ? 'connectId-deviceId-params'
+        : hasConnectIdParameter
+        ? 'connectId-params'
+        : 'params');
+
+    if (resolvedCallMode === 'connectId-deviceId-params') {
       // 三参数调用：connectId, deviceId, params
       result = await methodFunc(connectId, deviceId, params);
-    } else {
+    } else if (resolvedCallMode === 'connectId-params') {
       // 二参数调用：connectId, params
       result = await methodFunc(connectId, params);
+    } else {
+      // Connection-free methods receive params as their first argument.
+      result = await methodFunc(params);
     }
 
     if (result.success) {
@@ -499,8 +517,47 @@ export async function callHardwareAPI(
     } as Unsuccessful;
   }
 }
+
+// 仅供 Pro2 Debug 页面调用 SDK 内部的原生 Protocol V2 命令。
+// 这些命令不属于公共 CoreApi，外部业务应使用对应的语义化接口。
+export async function callHardwareDebugAPI(
+  method: HardwareDebugApiMethod,
+  params: Record<string, unknown>
+): Promise<ApiResponse> {
+  logRequest(`Calling internal hardware debug method: ${method}`, params);
+
+  if (typeof window === 'undefined') {
+    return {
+      success: false,
+      payload: { error: 'Browser environment required' },
+    } as Unsuccessful;
+  }
+
+  try {
+    const sdk = await getSDKInstance();
+    const result = (await sdk.call({ ...params, method })) as ApiResponse;
+
+    if (result.success) {
+      logResponse(`Internal hardware debug method successful: ${method}`, result.payload);
+    } else {
+      logError(`Internal hardware debug method failed: ${method}`, {
+        code: result.payload?.code,
+      });
+    }
+    return result;
+  } catch (error) {
+    const errorType = error instanceof Error ? error.name : typeof error;
+    logError(`Internal hardware debug method exception: ${method}`, { errorType });
+    return {
+      success: false,
+      payload: { error: `Internal debug method ${method} failed` },
+    } as Unsuccessful;
+  }
+}
 // 搜索设备
-export async function searchDevices(): Promise<ApiResponse> {
+export async function searchDevices(params?: {
+  connectProtocol?: HardwareConnectProtocol;
+}): Promise<ApiResponse> {
   logRequest('Searching for devices');
 
   const currentTransport = TransportManager.getCurrentTransport();
@@ -530,10 +587,10 @@ export async function searchDevices(): Promise<ApiResponse> {
           await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
         }
       } catch (e) {
-        const msg = `WebUSB authorization cancelled or failed: ${
-          e instanceof Error ? e.message : String(e)
-        }`;
-        logError(msg);
+        const msg = getDeviceSearchUserMessage(e);
+        logInfo('WebUSB authorization was not completed', {
+          errorType: e instanceof Error ? e.name : typeof e,
+        });
         return {
           success: false,
           payload: { error: msg },
@@ -542,7 +599,7 @@ export async function searchDevices(): Promise<ApiResponse> {
     }
 
     // 对于所有transport类型，使用标准的searchDevices
-    const response = await sdkInstance.searchDevices();
+    const response = await sdkInstance.searchDevices(params);
 
     if (response.success && response.payload) {
       logResponse('Devices found', {
@@ -553,17 +610,22 @@ export async function searchDevices(): Promise<ApiResponse> {
       });
       return response;
     } else {
-      const errorPayload = response.payload as any;
+      const errorPayload = response.payload;
       return {
         success: false,
         payload: {
-          error: errorPayload?.error || 'No devices found',
+          error: getDeviceSearchUserMessage(errorPayload),
         },
       } as Unsuccessful;
     }
   } catch (error) {
-    const errorMsg = `Device search error: ${error}`;
-    logError(errorMsg, { currentTransport, error });
+    const errorMsg = getDeviceSearchUserMessage(error);
+    logInfo('Device search failed', {
+      currentTransport,
+      errorType: error instanceof Error ? error.name : typeof error,
+      errorCode:
+        error && typeof error === 'object' && 'code' in error ? String(error.code) : undefined,
+    });
     return {
       success: false,
       payload: { error: errorMsg },

@@ -16,7 +16,11 @@ export type OpenWalletSessionParams =
   | {
       mode: 'resume-hidden';
       deviceId: string;
-      passphraseState: string;
+      /**
+       * Optional wallet identity assertion. When supplied, both protocols verify
+       * that the resumed wallet matches it.
+       */
+      passphraseState?: string;
       sessionId: string;
     }
   | {

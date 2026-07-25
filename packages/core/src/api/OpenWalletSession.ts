@@ -18,6 +18,11 @@ const requiredString = (value: unknown, name: string) => {
   return value.trim();
 };
 
+const optionalString = (value: unknown, name: string) => {
+  if (value === undefined) return undefined;
+  return requiredString(value, name);
+};
+
 const wasResumed = (session: unknown) =>
   !!session &&
   typeof session === 'object' &&
@@ -35,7 +40,7 @@ const normalizeParams = (payload: Record<string, unknown>): OpenWalletSessionPar
     return {
       mode: 'resume-hidden',
       deviceId: requiredString(payload.deviceId, 'deviceId'),
-      passphraseState: requiredString(payload.passphraseState, 'passphraseState'),
+      passphraseState: optionalString(payload.passphraseState, 'passphraseState'),
       sessionId: requiredString(payload.sessionId, 'sessionId'),
     };
   }
@@ -50,7 +55,7 @@ const normalizeParams = (payload: Record<string, unknown>): OpenWalletSessionPar
     return {
       mode: 'resume-hidden',
       deviceId: requiredString(payload.deviceId, 'deviceId'),
-      passphraseState: requiredString(payload.passphraseState, 'passphraseState'),
+      passphraseState: optionalString(payload.passphraseState, 'passphraseState'),
       sessionId: requiredString(payload.sessionId, 'sessionId'),
     };
   }
@@ -108,20 +113,24 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
         throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError);
       }
       this.device.passphraseState = this.params.passphraseState;
-      deviceWalletSessionStore.set(
-        this.params.deviceId,
-        this.params.passphraseState,
-        this.params.sessionId
-      );
       if (!this.device.isProtocolV2()) {
+        if (this.params.passphraseState) {
+          deviceWalletSessionStore.set(
+            this.params.deviceId,
+            this.params.passphraseState,
+            this.params.sessionId
+          );
+        }
         await this.device.initialize({
           deviceId: this.params.deviceId,
           passphraseState: this.params.passphraseState,
+          sessionId: this.params.sessionId,
         });
       }
       const session = this.device.isProtocolV2()
         ? await getProtocolV2WalletSession(this.device, {
             expectedPassphraseState: this.params.passphraseState,
+            explicitSessionId: this.params.sessionId,
             recoverInvalidSession: false,
           })
         : await getPassphraseStateWithRefreshDeviceInfo(this.device, {

@@ -24,55 +24,13 @@ const api: UnifiedMethodConfig[] = [
   {
     method: 'getPassphraseState',
     description:
-      'Open or restore a wallet through the legacy Protocol V1 passphrase flow. Protocol V2 devices must use openWalletSession.',
+      'Read the current wallet state through the Legacy Protocol V1 compatibility API. New flows must use openWalletSession.',
     noDeviceIdReq: true,
     tags: ['Legacy', 'Protocol V1'],
     presets: [
       {
-        title: 'Open standard wallet',
-        parameters: [
-          {
-            name: 'useEmptyPassphrase',
-            type: 'boolean',
-            required: true,
-            label: 'Use Standard Wallet',
-            value: true,
-          },
-        ],
-      },
-      {
-        title: 'Select hidden wallet',
-        description: 'Use the SDK UI flow to select host, device, or Attach PIN entry.',
-        parameters: [
-          {
-            name: 'initSession',
-            type: 'boolean',
-            required: true,
-            label: 'Start New Session',
-            value: true,
-          },
-          {
-            name: 'useEmptyPassphrase',
-            type: 'boolean',
-            required: true,
-            label: 'Use Standard Wallet',
-            value: false,
-          },
-        ],
-      },
-      {
-        title: 'Resume cached hidden wallet',
-        description:
-          'Resume only when this SDK instance still has the matching device session. Otherwise the wallet selection flow is shown again.',
-        parameters: [
-          {
-            name: 'passphraseState',
-            type: 'string',
-            required: true,
-            label: 'Passphrase State',
-            value: '',
-          },
-        ],
+        title: 'Get current wallet state (Legacy V1)',
+        parameters: [],
       },
     ],
   },
@@ -132,8 +90,8 @@ const api: UnifiedMethodConfig[] = [
           {
             name: 'passphraseState',
             type: 'string',
-            required: true,
-            label: 'Passphrase State',
+            required: false,
+            label: 'Expected Passphrase State (Optional)',
             value: '',
           },
           {
