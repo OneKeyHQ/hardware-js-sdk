@@ -100,6 +100,9 @@ export declare function deviceGetOnboardingStatus(
   params?: CommonParams
 ): Response<DevOnboardingStatus>;
 
+/**
+ * @deprecated Use `openWalletSession` instead of the raw Protocol V2 command.
+ */
 export declare function deviceSessionOpen(
   connectId: string,
   params: CommonParams & DeviceSessionOpenParams

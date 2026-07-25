@@ -114,6 +114,7 @@ export async function getProtocolV2WalletSession(
     initSession?: boolean;
     expectedPassphraseState?: string;
     onlyMainPin?: boolean;
+    recoverInvalidSession?: boolean;
   }
 ) {
   if (options?.initSession) {
@@ -136,6 +137,7 @@ export async function getProtocolV2WalletSession(
         passphraseState: undefined,
         newSession: undefined,
         unlockedAttachPin: false,
+        resumed: false,
       };
     }
 
@@ -143,17 +145,22 @@ export async function getProtocolV2WalletSession(
       typeof device.getInternalState === 'function' ? device.getInternalState() : undefined;
     let response;
     let recoveryFailed = false;
+    let resumed = false;
 
     if (cachedSessionId && expectedPassphraseState) {
       try {
         response = await openDeviceSession(device, {
           resume: { session_id: cachedSessionId },
         });
+        resumed = true;
       } catch (error) {
         if (!isProtocolV2InvalidSessionError(error)) {
           throw error;
         }
         device.clearInternalState();
+        if (options?.recoverInvalidSession === false) {
+          throw error;
+        }
         recoveryFailed = true;
       }
     }
@@ -186,6 +193,7 @@ export async function getProtocolV2WalletSession(
       passphraseState: message.btc_test_address,
       newSession: message.session_id,
       unlockedAttachPin: device.features?.unlockedAttachPin ?? undefined,
+      resumed,
     };
   } catch (error) {
     if (isProtocolV2InvalidSessionError(error)) {

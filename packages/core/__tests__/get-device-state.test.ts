@@ -30,13 +30,7 @@ const createV1Device = (typedCall: jest.Mock) => {
 describe('getDeviceState', () => {
   test('does not expose the internal wallet session', async () => {
     const device = createV2Device(jest.fn());
-    device.updateState(
-      {
-        protocol: 'V2',
-        session: { sessionId: 'private-session', passphraseState: 'private-state' },
-      },
-      'initialize'
-    );
+    device.updateState({ protocol: 'V2' }, 'initialize');
 
     const state = await device.getDeviceState();
 

@@ -3,6 +3,7 @@ import {
   DeviceWalletSessionStore,
   deviceWalletSessionStore,
 } from '../src/device/DeviceWalletSessionStore';
+import { Device } from '../src/device/Device';
 import { createCoreApi } from '../src/inject';
 
 jest.mock('../src/data/config', () => ({
@@ -73,6 +74,65 @@ describe('DeviceWalletSessionStore', () => {
 describe('ClearSessionCache', () => {
   beforeEach(() => {
     deviceWalletSessionStore.clear();
+  });
+
+  test('uses DeviceWalletSessionStore as the only cache source', async () => {
+    deviceWalletSessionStore.set('device-1', 'hidden-a', 'session-a');
+    deviceWalletSessionStore.set('device-2', 'hidden-a', 'session-b');
+
+    const method = new ClearSessionCache({
+      payload: {
+        method: 'clearSessionCache',
+        deviceId: 'device-1',
+        passphraseState: 'hidden-a',
+      },
+    });
+    method.init();
+    await method.run();
+
+    expect(deviceWalletSessionStore.get('device-1', 'hidden-a')).toBeUndefined();
+    expect(deviceWalletSessionStore.get('device-2', 'hidden-a')).toBe('session-b');
+  });
+
+  test('keeps legacy Features session fields as projections of the store', async () => {
+    const device = Device.fromDescriptor({ id: 'one', path: 'one' } as never);
+    device.features = {
+      protocol: 'V1',
+      deviceId: 'device-1',
+      passphraseState: 'hidden-a',
+      sessionId: 'session-a',
+      session_id: 'session-a',
+      raw: {
+        protocolV1Features: {
+          sessionId: 'session-a',
+          session_id: 'session-a',
+        },
+      },
+    } as never;
+
+    expect(device.state).not.toHaveProperty('session');
+    expect(device.features).toMatchObject({
+      sessionId: 'session-a',
+      session_id: 'session-a',
+      passphraseState: 'hidden-a',
+    });
+
+    const method = new ClearSessionCache({
+      payload: {
+        method: 'clearSessionCache',
+        deviceId: 'device-1',
+        passphraseState: 'hidden-a',
+      },
+    });
+    method.init();
+    await method.run();
+
+    expect(device.features?.sessionId).toBeNull();
+    expect(device.features?.session_id).toBeNull();
+    expect(device.state?.raw?.protocolV1Features).toMatchObject({
+      sessionId: 'session-a',
+      session_id: 'session-a',
+    });
   });
 
   test('clears one wallet without using a device', async () => {

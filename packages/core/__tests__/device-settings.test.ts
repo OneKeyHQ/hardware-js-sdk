@@ -73,7 +73,7 @@ describe('DeviceSettings protocol routing', () => {
       payload: {
         method: 'deviceSettings',
         label: 'Shared Label',
-        language: 'ja-JP',
+        language: 'ja',
       },
     });
     method.init();
@@ -82,7 +82,7 @@ describe('DeviceSettings protocol routing', () => {
     await expect(method.run()).resolves.toEqual({ message: 'Success' });
     expect(typedCall).toHaveBeenCalledWith('ApplySettings', 'Success', {
       label: 'Shared Label',
-      language: 'ja-JP',
+      language: 'ja',
       use_passphrase: undefined,
       homescreen: undefined,
       _passphrase_source: undefined,
@@ -97,7 +97,7 @@ describe('DeviceSettings protocol routing', () => {
     expect(updateState).toHaveBeenCalledWith(
       {
         identity: { label: 'Shared Label' },
-        settings: { language: 'ja-JP' },
+        settings: { language: 'ja' },
       },
       'apply-settings'
     );
@@ -110,7 +110,7 @@ describe('DeviceSettings protocol routing', () => {
       payload: {
         method: 'deviceSettings',
         label: 'Shared Label',
-        language: 'ja-JP',
+        language: 'ja',
         autoLockDelayMs: 60_000,
         hapticFeedback: true,
       },
@@ -122,7 +122,7 @@ describe('DeviceSettings protocol routing', () => {
     expect(typedCall).toHaveBeenCalledWith('DeviceSettingsSet', 'Success', {
       settings: {
         label: 'Shared Label',
-        language: 'ja-JP',
+        language: 'ja-Jpan-JP',
         autolock_delay_ms: 60_000,
         haptic_feedback: true,
       },
@@ -131,7 +131,7 @@ describe('DeviceSettings protocol routing', () => {
       {
         identity: { label: 'Shared Label' },
         settings: {
-          language: 'ja-JP',
+          language: 'ja-Jpan-JP',
           autoLockDelayMs: 60_000,
           hapticFeedback: true,
         },

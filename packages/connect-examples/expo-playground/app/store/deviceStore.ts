@@ -453,7 +453,12 @@ export const useDeviceStore = create<DeviceState>()(
       },
       getCurrentDeviceLabel: () => {
         const state = get();
-        return getDeviceLabel(state.deviceFeatures);
+        return (
+          state.deviceState?.identity.label ||
+          state.deviceState?.identity.bleName ||
+          state.currentDevice?.name ||
+          getDeviceLabel(state.deviceFeatures)
+        );
       },
       getCurrentDeviceUUID: () => {
         const state = get();

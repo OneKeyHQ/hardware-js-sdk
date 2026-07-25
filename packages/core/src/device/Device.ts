@@ -220,13 +220,38 @@ export class Device extends EventEmitter {
   }
 
   get features(): Features | undefined {
-    return this.state ? projectFeatures(this.state) : undefined;
+    if (!this.state) return undefined;
+    const features = projectFeatures(this.state);
+    const sessionCacheDeviceKey =
+      this.state.identity.deviceId ||
+      (this.isProtocolV2()
+        ? this.originalDescriptor.path || this.originalDescriptor.id
+        : undefined);
+    const sessionId =
+      sessionCacheDeviceKey && this.passphraseState
+        ? deviceWalletSessionStore.get(sessionCacheDeviceKey, this.passphraseState)
+        : undefined;
+    return sessionId
+      ? {
+          ...features,
+          sessionId,
+          session_id: sessionId,
+          passphraseState: this.passphraseState,
+        }
+      : features;
   }
 
   set features(features: Features | undefined) {
     this.stateStore = new DeviceStateStore();
     if (features) {
       this.stateStore.update(mapFeaturesToState(features), 'compatibility');
+      const { passphraseState } = features;
+      const sessionId = features.sessionId ?? features.session_id;
+      const deviceKey = this.getSessionCacheDeviceKey(features.deviceId ?? undefined);
+      if (passphraseState && sessionId && deviceKey) {
+        this.passphraseState = passphraseState;
+        deviceWalletSessionStore.set(deviceKey, passphraseState, sessionId);
+      }
     }
   }
 
@@ -311,7 +336,6 @@ export class Device extends EventEmitter {
       path: this.originalDescriptor?.path,
       bleName,
       name: bleName || label || `OneKey ${deviceType?.toUpperCase()}`,
-      displayName: label || bleName || `OneKey ${deviceType?.toUpperCase()}`,
       label: label || 'OneKey',
       mode: this.getMode(),
       features,
@@ -971,14 +995,6 @@ export class Device extends EventEmitter {
     return result.state;
   }
 
-  clearCachedSession(deviceId?: string, passphraseState?: string) {
-    const current = this.state;
-    if (!current?.session) return false;
-    if (deviceId && current.identity.deviceId !== deviceId) return false;
-    if (passphraseState && current.session.passphraseState !== passphraseState) return false;
-    return this.stateStore.clearSession('session-clear') !== undefined;
-  }
-
   updateFeaturesPatch(patch: Partial<Features>, source: DeviceStateUpdateSource) {
     const currentFeatures = this.features;
     if (!currentFeatures) return undefined;
@@ -1049,7 +1065,6 @@ export class Device extends EventEmitter {
     if (!this.isProtocolV2()) return;
     this.protocolV2StateNeedsReload = true;
     this.clearPreInitialized();
-    this.clearCachedSession();
   }
 
   markProtocolV2Reboot(rebootType: DeviceRebootType) {
@@ -1081,7 +1096,6 @@ export class Device extends EventEmitter {
             attachToPinEnabled: null,
             unlockedAttachPin: null,
           },
-          session: null,
           raw: { protocolV2DeviceStatus: null },
         },
         'transport-reconnect'
@@ -1092,7 +1106,6 @@ export class Device extends EventEmitter {
     this.updateState(
       {
         status: { mode: 'normal', unlocked: null },
-        session: null,
         raw: { protocolV2DeviceStatus: null },
       },
       'transport-reconnect'

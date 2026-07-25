@@ -11,9 +11,232 @@ import {
 import { useHardwareStore } from '../store/hardwareStore';
 import { METHODS_REQUIRING_PASSPHRASE_CHECK } from '../utils/constants';
 import { previewHardwareParams } from './previewHardwareParams';
+import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
+import type { DeviceInfo } from '../types/hardware';
+import { applyDeviceStateToDevice } from './deviceStateAdapter';
+import { getPassphraseProtectionFromDeviceState } from './deviceStateSelectors';
+import type { DeviceState } from '@onekeyfe/hd-core';
 // 使用 hd-core 的标准类型
 export type ApiResponse<T = any> = Success<T> | Unsuccessful;
 export type HardwareApiMethod = keyof CoreApi;
+export type HardwareDebugApiMethod =
+  | 'deviceInfoGet'
+  | 'deviceStatusGet'
+  | 'deviceSettingsGet'
+  | 'protocolInfoRequest'
+  | 'ping'
+  | 'deviceSessionOpen'
+  | 'deviceFirmwareUpdate'
+  | 'deviceGetFirmwareUpdateStatus'
+  | 'deviceFactoryInfoSet'
+  | 'deviceFactoryInfoGet'
+  | 'deviceSettingsSet'
+  | 'deviceSettingsPageShow'
+  | 'filesystemPermissionFix'
+  | 'filesystemFormat';
+export type HardwareApiCallMode = 'params' | 'connectId-params' | 'connectId-deviceId-params';
+
+function getErrorText(error: unknown): string {
+  if (typeof error === 'string') return error;
+  if (error instanceof Error) return `${error.name} ${error.message}`;
+  if (error && typeof error === 'object') {
+    const value = error as {
+      error?: unknown;
+      message?: unknown;
+      payload?: { error?: unknown };
+    };
+    return [value.error, value.message, value.payload?.error]
+      .filter(item => typeof item === 'string')
+      .join(' ');
+  }
+  return '';
+}
+
+export function getDeviceSearchUserMessage(error: unknown): string {
+  const normalized = getErrorText(error).toLowerCase();
+
+  if (normalized.includes('not supported')) {
+    return 'WebUSB is not supported in this browser.';
+  }
+  if (
+    normalized.includes('permission') ||
+    normalized.includes('securityerror') ||
+    normalized.includes('notallowederror')
+  ) {
+    return 'Device permission is required. Reconnect the device and approve the browser prompt.';
+  }
+  if (
+    normalized.includes('protocol') ||
+    normalized.includes('did not respond') ||
+    normalized.includes('timeout')
+  ) {
+    return 'The device did not respond. Reconnect it, unlock it if needed, and try again.';
+  }
+  if (
+    normalized.includes('notfounderror') ||
+    normalized.includes('no device') ||
+    normalized.includes('not found')
+  ) {
+    return 'No compatible device was selected. Connect a OneKey device and try again.';
+  }
+  return 'Unable to connect to the device. Reconnect it and try again.';
+}
+
+type PassphraseStateMetadata = {
+  passphraseState?: string;
+  passphraseProtection?: boolean | null;
+};
+
+const extractPassphraseStateMetadata = (payload: unknown): PassphraseStateMetadata => {
+  if (typeof payload === 'string') return { passphraseState: payload };
+  if (!payload || typeof payload !== 'object') return {};
+
+  const maybeState = (payload as { passphraseState?: unknown }).passphraseState;
+  const maybePassphraseProtection = (payload as { passphraseProtection?: unknown })
+    .passphraseProtection;
+
+  return {
+    passphraseState: typeof maybeState === 'string' ? maybeState : undefined,
+    passphraseProtection:
+      typeof maybePassphraseProtection === 'boolean' ? maybePassphraseProtection : undefined,
+  };
+};
+
+const clearPassphraseState = (params: Record<string, unknown>) => {
+  delete params.passphraseState;
+  useHardwareStore.getState().setCommonParameter('passphraseState', '');
+};
+
+const updateCachedDeviceState = (connectId: string, state: DeviceState) => {
+  const store = useDeviceStore.getState();
+  if (store.currentDevice?.connectId === connectId) {
+    store.setCurrentDevice(applyDeviceStateToDevice(store.currentDevice, state));
+  }
+};
+
+export async function hydrateConnectedDeviceInfo(device: DeviceInfo): Promise<DeviceInfo> {
+  if (!device.connectId) return device;
+
+  const sdk = await getSDKInstance();
+
+  try {
+    const stateResult = await sdk.getDeviceState(device.connectId);
+
+    if (stateResult.success && stateResult.payload) {
+      const state = stateResult.payload;
+      const hydratedDevice = applyDeviceStateToDevice(device, state);
+      updateCachedDeviceState(device.connectId, state);
+
+      logResponse('Connected device hydrated via getDeviceState', {
+        connectId: device.connectId,
+        serialNo: state.identity.serialNo,
+        deviceId: state.identity.deviceId,
+        name: hydratedDevice.name,
+      });
+      return hydratedDevice;
+    } else {
+      const failurePayload = stateResult.payload as { code?: string | number };
+      logInfo('Connected device state is temporarily unavailable', {
+        connectId: device.connectId,
+        code: failurePayload.code,
+      });
+    }
+  } catch (error) {
+    logInfo('Connected device state hydration was skipped', {
+      connectId: device.connectId,
+      errorType: error instanceof Error ? error.name : typeof error,
+    });
+  }
+
+  return device;
+}
+
+const resolvePassphraseProtection = async (
+  sdk: CoreApi,
+  connectId: string
+): Promise<boolean | undefined> => {
+  const deviceState = useDeviceStore.getState();
+  const cachedState =
+    deviceState.currentDevice?.connectId === connectId
+      ? deviceState.currentDevice.deviceState
+      : undefined;
+
+  if (cachedState) {
+    return getPassphraseProtectionFromDeviceState(cachedState);
+  }
+
+  const stateResult = await sdk.getDeviceState(connectId);
+  if (!stateResult.success || !stateResult.payload) {
+    return undefined;
+  }
+
+  updateCachedDeviceState(connectId, stateResult.payload);
+  return getPassphraseProtectionFromDeviceState(stateResult.payload);
+};
+
+const preparePassphraseParams = async (
+  sdk: CoreApi,
+  method: HardwareApiMethod,
+  params: Record<string, unknown>,
+  connectId: string
+) => {
+  if (!methodSupportsCommonParameters(method)) return;
+
+  if (params.useEmptyPassphrase === true) {
+    clearPassphraseState(params);
+    return;
+  }
+
+  const passphraseProtection = await resolvePassphraseProtection(sdk, connectId);
+
+  if (passphraseProtection === false) {
+    if (params.passphraseState) {
+      logInfo('Device passphrase protection is disabled. Clearing stale passphraseState.');
+    }
+    clearPassphraseState(params);
+    return;
+  }
+
+  if (
+    params.passphraseState !== '' &&
+    params.passphraseState !== undefined &&
+    params.passphraseState !== null
+  ) {
+    logInfo(`Using existing passphrase state from params: ${params.passphraseState}`);
+    return;
+  }
+
+  logInfo(
+    `PassphraseState is empty in params for method: ${method}, attempting to open the wallet session.`
+  );
+
+  try {
+    const passphraseResult = await getPassphraseState(connectId);
+    const passphraseMetadata = passphraseResult.success
+      ? extractPassphraseStateMetadata(passphraseResult.payload)
+      : {};
+
+    if (passphraseMetadata.passphraseProtection === false) {
+      logInfo('Device passphrase protection not enabled. Clearing passphraseState.');
+      clearPassphraseState(params);
+      return;
+    }
+
+    if (passphraseMetadata.passphraseState) {
+      logInfo(`Passphrase state obtained from device: ${passphraseMetadata.passphraseState}`);
+      params.passphraseState = passphraseMetadata.passphraseState;
+      useHardwareStore
+        .getState()
+        .setCommonParameter('passphraseState', passphraseMetadata.passphraseState);
+    } else {
+      logInfo('Device passphrase protection enabled but no passphraseState was returned.');
+      clearPassphraseState(params);
+    }
+  } catch (passphraseError) {
+    logError('Failed to get passphrase state from device', { passphraseError });
+    clearPassphraseState(params);
+  }
+};
 
 // 获取SDK实例的简化函数
 async function getSDKInstance(): Promise<CoreApi> {

@@ -19,19 +19,26 @@ export const LANGUAGE_LABELS = {
 export type LanguageKey = keyof typeof LANGUAGE_LABELS;
 export type LanguageOption = { code: LanguageKey; label: (typeof LANGUAGE_LABELS)[LanguageKey] };
 
+export const PROTOCOL_V2_LANGUAGE_BY_KEY: Record<LanguageKey, string> = {
+  en: 'en-Latn-US',
+  zh_cn: 'zh-Hans-CN',
+  zh_hk: 'zh-Hant-HK',
+  ja: 'ja-Jpan-JP',
+  ko: 'ko-Kore-KR',
+  fr: 'fr-Latn-FR',
+  de: 'de-Latn-DE',
+  ru: 'ru-Cyrl-RU',
+  es: 'es-Latn-ES',
+  it: 'it-Latn-IT',
+  pt_br: 'pt-Latn-BR',
+};
+
+export const mapLanguageToProtocolV2 = (language?: string) =>
+  language ? PROTOCOL_V2_LANGUAGE_BY_KEY[language as LanguageKey] ?? language : undefined;
+
 const PRO2_LANGUAGE_OPTIONS = [
-  { code: 'en-Latn-US', label: 'English' },
-  { code: 'zh-Hans-CN', label: '简体中文' },
-  { code: 'zh-Hant-HK', label: '繁體中文（香港）' },
+  ...Object.entries(LANGUAGE_LABELS).map(([code, label]) => ({ code, label })),
   { code: 'zh-Hant-TW', label: '繁體中文（台灣）' },
-  { code: 'ja-Jpan-JP', label: '日本語' },
-  { code: 'ko-Kore-KR', label: '한국어' },
-  { code: 'fr-Latn-FR', label: 'Français' },
-  { code: 'de-Latn-DE', label: 'Deutsch' },
-  { code: 'ru-Cyrl-RU', label: 'Русский' },
-  { code: 'es-Latn-ES', label: 'Español' },
-  { code: 'it-Latn-IT', label: 'Italiano' },
-  { code: 'pt-Latn-BR', label: 'Portuguese (Brazil)' },
   { code: 'vi-Latn-VN', label: 'Tiếng Việt' },
   { code: 'tr-Latn-TR', label: 'Türkçe' },
   { code: 'id-Latn-ID', label: 'Bahasa Indonesia' },

@@ -4,12 +4,13 @@ import { CoreApi, UiEvent, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { useDeviceStore } from '../../store/deviceStore';
 import { useHardwareStore } from '../../store/hardwareStore';
 
-import { submitPin, submitPassphrase } from '../../services/hardwareService';
+import { submitPin } from '../../services/hardwareService';
+import { applyDeviceStateToDevice } from '../../services/deviceStateAdapter';
 import { EDeviceType } from '@onekeyfe/hd-shared';
 import GlobalDialogManager from '../global/GlobalDialogManager';
 import WebUsbAuthorizeDialog from '../global/WebUsbAuthorizeDialog';
-import { logData, logInfo, logError } from '../../utils/logger';
-import { SDKUtils } from '../../utils/hardwareInstance';
+import { logData, logInfo, logError, logHardware } from '../../utils/logger';
+import { SDKUtils, isSdkDebugEnabled } from '../../utils/hardwareInstance';
 import { create } from 'zustand';
 
 // 声明全局弹窗管理器类型
@@ -95,14 +96,7 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
             break;
 
           case 'ui-request_passphrase': {
-            const hardwareState = useHardwareStore.getState();
-            const shouldAutoSubmit = hardwareState.commonParameters.useEmptyPassphrase;
-
-            if (shouldAutoSubmit) {
-              submitPassphrase('', false, false).catch(console.error);
-            } else {
-              window.globalDialogManager?.showPassphraseDialog();
-            }
+            window.globalDialogManager?.showPassphraseDialog();
             break;
           }
 

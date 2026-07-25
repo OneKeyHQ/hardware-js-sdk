@@ -1,5 +1,4 @@
 import { BaseMethod } from './BaseMethod';
-import { DevicePool } from '../device/DevicePool';
 import { deviceWalletSessionStore } from '../device/DeviceWalletSessionStore';
 
 import type { ClearSessionCacheParams } from '../types/api/sessionCache';
@@ -24,9 +23,6 @@ export default class ClearSessionCache extends BaseMethod<ClearSessionCacheParam
     } else {
       deviceWalletSessionStore.delete(deviceId, passphraseState);
     }
-    Object.values(DevicePool.devicesCache).forEach(device => {
-      device.clearCachedSession(deviceId, passphraseState);
-    });
     return Promise.resolve({ cleared: true as const });
   }
 }

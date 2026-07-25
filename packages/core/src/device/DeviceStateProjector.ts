@@ -1,10 +1,9 @@
 import { cloneDeviceState } from './cloneDeviceState';
 
-import type { DeviceFeaturesRaw, DeviceState, DeviceStateSession, Features } from '../types';
+import type { DeviceFeaturesRaw, DeviceState, Features } from '../types';
 
 type StoredDeviceState = DeviceState & {
   raw?: DeviceFeaturesRaw;
-  session?: DeviceStateSession;
 };
 
 const getBootloaderMode = (state: StoredDeviceState) =>
@@ -13,15 +12,18 @@ const getBootloaderMode = (state: StoredDeviceState) =>
 export const projectFeatures = (state: StoredDeviceState): Features => {
   const snapshot = cloneDeviceState(state);
   const rawFeatures = snapshot.raw?.protocolV1Features ?? {};
+  const publicRawFeatures = { ...rawFeatures } as Record<string, unknown>;
+  delete publicRawFeatures.session_id;
+  delete publicRawFeatures.sessionId;
+  delete publicRawFeatures.passphraseState;
   const rawOneKeyFeatures = snapshot.raw?.protocolV1OneKeyFeatures ?? {};
-  const sessionId = snapshot.session?.sessionId ?? null;
   const bootloaderMode =
     snapshot.protocol === 'V1'
       ? (rawFeatures as { bootloader_mode?: boolean | null }).bootloader_mode ?? null
       : getBootloaderMode(snapshot);
 
   return {
-    ...rawFeatures,
+    ...publicRawFeatures,
     ...rawOneKeyFeatures,
     protocol: snapshot.protocol,
     protocolVersion: snapshot.protocolVersion ?? (snapshot.protocol === 'V1' ? 1 : null),
@@ -82,13 +84,12 @@ export const projectFeatures = (state: StoredDeviceState): Features => {
     se04BootVersion: snapshot.versions.se04Boot,
     seVersion: snapshot.versions.se ?? null,
     verify: snapshot.verification,
-    sessionId,
-    passphraseState: snapshot.session?.passphraseState,
     raw: snapshot.raw,
     device_id: snapshot.identity.deviceId ?? undefined,
-    session_id: sessionId ?? undefined,
     ble_name: snapshot.identity.bleName ?? undefined,
     passphrase_protection: snapshot.status.passphraseProtection ?? undefined,
     bootloader_mode: bootloaderMode,
+    sessionId: null,
+    session_id: null,
   } as unknown as Features;
 };

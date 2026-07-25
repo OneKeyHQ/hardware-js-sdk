@@ -187,6 +187,8 @@ export const createCoreApi = (
     call({ ...params, connectId, method: 'deviceUpdateBootloader' }),
   getPassphraseState: (connectId, params) =>
     call({ ...params, connectId, method: 'getPassphraseState' }),
+  openWalletSession: (connectId, params) =>
+    call({ ...params, connectId, method: 'openWalletSession' }),
   deviceCancel: (connectId, params) => call({ ...params, connectId, method: 'deviceCancel' }),
   deviceLock: (connectId, params) => call({ ...params, connectId, method: 'deviceLock' }),
   deviceUnlock: (connectId, params) =>

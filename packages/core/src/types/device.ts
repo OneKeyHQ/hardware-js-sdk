@@ -35,8 +35,6 @@ export type KnownDevice = {
   label: string;
   bleName: string | null;
   name: string;
-  /** User-facing name; prefers the device label while name remains the discovery name. */
-  displayName?: string;
   error?: typeof undefined;
   mode: EOneKeyDeviceMode;
   features?: Features;
@@ -59,7 +57,6 @@ export type SearchDevice = {
   deviceId: string | null;
   deviceType: IDeviceType;
   name: string;
-  displayName?: string;
   commType: OneKeyDeviceCommType;
 };
 
@@ -170,7 +167,6 @@ export type DeviceStateIdentity = {
   serialNo: string;
   label: string | null;
   bleName: string | null;
-  displayName: string;
 };
 
 export type DeviceStateStatus = {
@@ -229,11 +225,6 @@ export type DeviceStateVersions = {
   se04Boot?: string | null;
 };
 
-export type DeviceStateSession = {
-  sessionId: string | null;
-  passphraseState?: string;
-};
-
 export type DeviceState = {
   schemaVersion: 1;
   revision: number;
@@ -258,7 +249,6 @@ export type DeviceStatePatch = {
   versions?: Partial<DeviceStateVersions>;
   capabilities?: Array<number | string>;
   verification?: DeviceFeaturesVerify;
-  session?: Partial<DeviceStateSession> | null;
   raw?: DeviceFeaturesRawPatch;
 };
 

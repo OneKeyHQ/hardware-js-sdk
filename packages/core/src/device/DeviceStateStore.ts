@@ -7,13 +7,11 @@ import type {
   DeviceState,
   DeviceStateIdentity,
   DeviceStatePatch,
-  DeviceStateSession,
   DeviceStateUpdateSource,
 } from '../types';
 
 type StoredDeviceState = DeviceState & {
   raw?: DeviceFeaturesRaw;
-  session?: DeviceStateSession;
 };
 
 export type DeviceStateUpdateResult = {
@@ -22,22 +20,6 @@ export type DeviceStateUpdateResult = {
   source: DeviceStateUpdateSource;
   changedKeys: string[];
 };
-
-const PRODUCT_DISPLAY_NAMES: Partial<Record<DeviceStateIdentity['deviceType'], string>> = {
-  [EDeviceType.Classic]: 'OneKey Classic',
-  [EDeviceType.Classic1s]: 'OneKey Classic 1S',
-  [EDeviceType.ClassicPure]: 'OneKey Classic 1S Pure',
-  [EDeviceType.Mini]: 'OneKey Mini',
-  [EDeviceType.Touch]: 'OneKey Touch',
-  [EDeviceType.Pro]: 'OneKey Pro',
-  [EDeviceType.Pro2]: 'OneKey Pro 2',
-};
-
-const getModelDisplayName = (deviceType: DeviceStateIdentity['deviceType']) =>
-  PRODUCT_DISPLAY_NAMES[deviceType] ?? 'OneKey';
-
-const getDisplayName = (identity: DeviceStateIdentity) =>
-  identity.label || identity.bleName || getModelDisplayName(identity.deviceType);
 
 export function createEmptyDeviceState(
   identity: Partial<DeviceStateIdentity> = {}
@@ -51,10 +33,8 @@ export function createEmptyDeviceState(
     serialNo: '',
     label: null,
     bleName: null,
-    displayName: '',
     ...identity,
   };
-  normalizedIdentity.displayName = getDisplayName(normalizedIdentity);
 
   return {
     schemaVersion: 1,
@@ -197,23 +177,6 @@ export class DeviceStateStore {
         changedKeys.push('raw');
       }
     }
-    if (patch.session === null) {
-      if (next.session !== undefined) {
-        delete next.session;
-        changedKeys.push('session');
-      }
-    } else if (patch.session) {
-      const session = next.session ?? { sessionId: null };
-      applySectionPatch(session, patch.session, 'session', changedKeys);
-      next.session = session;
-    }
-
-    const displayName = getDisplayName(next.identity);
-    if (displayName !== next.identity.displayName) {
-      next.identity.displayName = displayName;
-      changedKeys.push('identity.displayName');
-    }
-
     if (changedKeys.length > 0) {
       next.revision = (this.state?.revision ?? 0) + 1;
       next.updatedAt = Date.now();
@@ -229,16 +192,10 @@ export class DeviceStateStore {
       changedKeys,
     };
   }
-
-  clearSession(source: DeviceStateUpdateSource) {
-    if (!this.state?.session) return undefined;
-    return this.update({ session: null }, source);
-  }
 }
 
 export const createPublicDeviceState = (state: StoredDeviceState): DeviceState => {
   const snapshot = cloneDeviceState(state);
   delete snapshot.raw;
-  delete snapshot.session;
   return snapshot;
 };

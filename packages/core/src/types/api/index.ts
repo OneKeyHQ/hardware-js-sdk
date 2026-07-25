@@ -28,6 +28,7 @@ import type { getFeatures } from './getFeatures';
 import type { getDeviceState } from './getDeviceState';
 import type { getOnekeyFeatures } from './getOnekeyFeatures';
 import type { getPassphraseState } from './getPassphraseState';
+import type { openWalletSession } from './openWalletSession';
 import type { checkFirmwareRelease } from './checkFirmwareRelease';
 import type { checkBLEFirmwareRelease } from './checkBLEFirmwareRelease';
 import type {
@@ -153,6 +154,7 @@ import type { ConnectSettings } from '../settings';
 export * from './export';
 export type { DeviceStateScope, GetDeviceStateParams } from './getDeviceState';
 export type { GetPassphraseStateParams } from './getPassphraseState';
+export type { OpenWalletSessionParams, OpenWalletSessionPayload } from './openWalletSession';
 export type { ClearSessionCacheParams, ClearSessionCachePayload } from './sessionCache';
 
 export type CoreApi = {
@@ -198,6 +200,7 @@ export type CoreApi = {
   getDeviceState: typeof getDeviceState;
   getOnekeyFeatures: typeof getOnekeyFeatures;
   getPassphraseState: typeof getPassphraseState;
+  openWalletSession: typeof openWalletSession;
   deviceBackup: typeof deviceBackup;
   deviceChangePin: typeof deviceChangePin;
   deviceFlags: typeof deviceFlags;

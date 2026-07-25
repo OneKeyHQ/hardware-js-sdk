@@ -1,7 +1,15 @@
 import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
 
 import { buildProtocolV1FeaturesPayload } from '../deviceProfile/buildDeviceFeatures';
+import { mapLanguageToProtocolV2 } from '../utils/deviceSettings';
 
+import type {
+  ApplySettings,
+  DeviceFirmwareImageInfo,
+  DeviceSettings,
+  DeviceStatus,
+  ProtocolV2DeviceInfo,
+} from '@onekeyfe/hd-transport';
 import type { PROTO } from '../constants';
 import type {
   DeviceFeaturesVerify,
@@ -11,13 +19,6 @@ import type {
   OnekeyFeatures,
 } from '../types';
 import type { DeviceSettingsParams } from '../types/api/deviceSettings';
-import type {
-  ApplySettings,
-  DeviceFirmwareImageInfo,
-  DeviceSettings,
-  DeviceStatus,
-  ProtocolV2DeviceInfo,
-} from '@onekeyfe/hd-transport';
 
 const definedEntries = <T extends Record<string, unknown>>(value: T): T =>
   Object.fromEntries(
@@ -122,10 +123,6 @@ export const mapFeaturesToState = (features: Features): DeviceStatePatch => ({
   },
   capabilities: features.capabilities,
   verification: definedEntries(features.verify ?? {}),
-  session: {
-    sessionId: features.sessionId,
-    passphraseState: features.passphraseState,
-  },
   raw: features.raw,
 });
 
@@ -337,7 +334,7 @@ export const mapCommonSettingsToProtocolV2 = (settings: DeviceSettingsParams): D
   definedEntries({
     label: settings.label,
     bt_enable: settings.bluetoothEnabled,
-    language: settings.language,
+    language: mapLanguageToProtocolV2(settings.language),
     brightness: settings.brightness,
     autolock_delay_ms: settings.autoLockDelayMs,
     autoshutdown_delay_ms: settings.autoShutdownDelayMs,

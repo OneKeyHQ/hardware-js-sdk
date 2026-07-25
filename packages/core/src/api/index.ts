@@ -6,6 +6,7 @@ export { default as getFeatures } from './GetFeatures';
 export { default as getDeviceState } from './GetDeviceState';
 export { default as getOnekeyFeatures } from './GetOnekeyFeatures';
 export { default as getPassphraseState } from './GetPassphraseState';
+export { default as openWalletSession } from './OpenWalletSession';
 export { default as getLogs } from './GetLogs';
 export { default as clearSessionCache } from './ClearSessionCache';
 export { default as checkFirmwareRelease } from './CheckFirmwareRelease';

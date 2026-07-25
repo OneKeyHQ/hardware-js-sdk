@@ -721,6 +721,7 @@ describe('Protocol V2 feature adapter', () => {
       passphraseState: undefined,
       newSession: undefined,
       unlockedAttachPin: false,
+      resumed: false,
     });
     expect(typedCall).not.toHaveBeenCalled();
     expect(device.getInternalState()).toBeUndefined();
@@ -742,6 +743,7 @@ describe('Protocol V2 feature adapter', () => {
       passphraseState: undefined,
       newSession: undefined,
       unlockedAttachPin: false,
+      resumed: false,
     });
 
     expect(promptPassphrase).not.toHaveBeenCalled();
@@ -830,6 +832,7 @@ describe('Protocol V2 feature adapter', () => {
       passphraseState: undefined,
       newSession: undefined,
       unlockedAttachPin: false,
+      resumed: false,
     });
 
     expect(unlockDevice).toHaveBeenCalledTimes(1);
@@ -1384,7 +1387,7 @@ describe('Protocol V2 feature adapter', () => {
     );
   });
 
-  test('returns passphrase state string for Pro2 devices', async () => {
+  test('does not expose getPassphraseState on Pro2 devices', async () => {
     const features = {
       deviceId: null,
       deviceType: 'pro2',
@@ -1422,7 +1425,9 @@ describe('Protocol V2 feature adapter', () => {
       getCurrentPassphraseProtection: () => true,
     }) as any;
 
-    await expect(method.run()).resolves.toBe('state-pro2');
+    await expect(method.run()).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.DeviceNotSupportMethod,
+    });
     expect(getFeatures).not.toHaveBeenCalled();
   });
 
@@ -1455,7 +1460,9 @@ describe('Protocol V2 feature adapter', () => {
       getCurrentPassphraseProtection: () => false,
     }) as any;
 
-    await expect(method.run()).resolves.toBeUndefined();
+    await expect(method.run()).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.DeviceNotSupportMethod,
+    });
     expect(typedCall).not.toHaveBeenCalled();
     expect(updateInternalState).not.toHaveBeenCalled();
   });
@@ -1497,15 +1504,11 @@ describe('Protocol V2 feature adapter', () => {
       getCurrentPassphraseProtection: () => true,
     }) as any;
 
-    await expect(method.run()).resolves.toBe('state-pro2-new');
-    expect(clearInternalState).toHaveBeenCalledTimes(1);
-    expect(updateInternalState).toHaveBeenCalledWith(
-      true,
-      'state-pro2-new',
-      'pro2-device-id',
-      undefined,
-      null
-    );
+    await expect(method.run()).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.DeviceNotSupportMethod,
+    });
+    expect(clearInternalState).not.toHaveBeenCalled();
+    expect(updateInternalState).not.toHaveBeenCalled();
   });
 
   test('stores Pro2 passphrase session cache without synthetic device id', async () => {
@@ -1725,7 +1728,6 @@ describe('Protocol V2 feature adapter', () => {
       deviceId: null,
       bleName: 'Cached BLE',
       name: 'Cached BLE',
-      displayName: 'Cached Label',
       label: 'Cached Label',
       deviceType: 'pro2',
     });
