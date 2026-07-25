@@ -45,7 +45,8 @@ type Params = {
 const Log = getLogger(LoggerNames.Method);
 
 const FIRMWARE_DOWNLOAD_REQUEST_OPTIONS = {
-  timeoutMs: 60_000,
+  connectTimeoutMs: 60_000,
+  readTimeoutMs: 60_000,
   overallTimeoutMs: 180_000,
   maxRetries: 2,
   retryDelayMs: 500,

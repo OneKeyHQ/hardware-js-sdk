@@ -1,15 +1,27 @@
-import axios from 'axios';
+import axios, { type AxiosResponse } from 'axios';
 
 export type HttpRequestOptions = {
+  /** Axios adapter-defined request timeout retained for existing opt-in callers. */
   timeoutMs?: number;
+  /** Deadline for DNS, connection, TLS, redirects, and the first response-body progress. */
+  connectTimeoutMs?: number;
+  /** Maximum idle interval between response-body progress events. */
+  readTimeoutMs?: number;
+  /** Wall-clock deadline across all attempts and retry backoff. */
   overallTimeoutMs?: number;
   maxRetries?: number;
   retryDelayMs?: number;
 };
 
 const MAX_RETRY_COUNT = 3;
+const REQUEST_PHASE_TIMEOUT_CODES = {
+  connect: 'ECONNECTTIMEDOUT',
+  read: 'EREADTIMEDOUT',
+} as const;
 const RETRYABLE_HTTP_STATUSES = new Set([500, 502, 503, 504]);
 const RETRYABLE_NETWORK_ERROR_CODES = new Set([
+  REQUEST_PHASE_TIMEOUT_CODES.connect,
+  REQUEST_PHASE_TIMEOUT_CODES.read,
   'ECONNABORTED',
   'ECONNREFUSED',
   'ECONNRESET',
@@ -32,6 +44,18 @@ const createOverallTimeoutError = (url: string, timeoutMs: number) => {
   const error = new Error(`httpRequest overall timeout: ${url} ${timeoutMs}ms`);
   error.name = 'HttpRequestOverallTimeoutError';
   return error;
+};
+
+const createRequestPhaseTimeoutError = (
+  url: string,
+  phase: keyof typeof REQUEST_PHASE_TIMEOUT_CODES,
+  timeoutMs: number
+) => {
+  const error = new Error(`httpRequest ${phase} timeout: ${url} ${timeoutMs}ms`);
+  error.name = 'HttpRequestPhaseTimeoutError';
+  return Object.assign(error, {
+    code: REQUEST_PHASE_TIMEOUT_CODES[phase],
+  });
 };
 
 const waitForRetry = async (delayMs: number, attempt: number, signal?: AbortSignal) => {
@@ -57,14 +81,26 @@ const waitForRetry = async (delayMs: number, attempt: number, signal?: AbortSign
 };
 
 const isRetryableRequestError = (error: unknown) => {
-  if (axios.isCancel(error) || !axios.isAxiosError(error)) {
+  if (axios.isCancel(error)) {
+    return false;
+  }
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    typeof error.code === 'string' &&
+    RETRYABLE_NETWORK_ERROR_CODES.has(error.code)
+  ) {
+    return true;
+  }
+  if (!axios.isAxiosError(error)) {
     return false;
   }
   const status = error.response?.status;
   if (status !== undefined) {
     return RETRYABLE_HTTP_STATUSES.has(Number(status));
   }
-  return typeof error.code === 'string' && RETRYABLE_NETWORK_ERROR_CODES.has(error.code);
+  return false;
 };
 
 export const httpRequest = async <T = unknown>(
@@ -81,6 +117,14 @@ export const httpRequest = async <T = unknown>(
     Number.isSafeInteger(options.timeoutMs) && Number(options.timeoutMs) > 0
       ? Number(options.timeoutMs)
       : undefined;
+  const connectTimeoutMs =
+    Number.isSafeInteger(options.connectTimeoutMs) && Number(options.connectTimeoutMs) > 0
+      ? Number(options.connectTimeoutMs)
+      : undefined;
+  const readTimeoutMs =
+    Number.isSafeInteger(options.readTimeoutMs) && Number(options.readTimeoutMs) > 0
+      ? Number(options.readTimeoutMs)
+      : undefined;
   const overallTimeoutMs =
     Number.isSafeInteger(options.overallTimeoutMs) && Number(options.overallTimeoutMs) > 0
       ? Number(options.overallTimeoutMs)
@@ -93,13 +137,59 @@ export const httpRequest = async <T = unknown>(
     Number.isSafeInteger(options.retryDelayMs) && Number(options.retryDelayMs) > 0
       ? Number(options.retryDelayMs)
       : 0;
+  const overallTimeoutError = overallTimeoutMs
+    ? createOverallTimeoutError(url, overallTimeoutMs)
+    : undefined;
+  const overallDeadlineAt = overallTimeoutMs ? Date.now() + overallTimeoutMs : undefined;
+  const assertWithinOverallDeadline = () => {
+    if (overallDeadlineAt !== undefined && overallTimeoutError && Date.now() >= overallDeadlineAt) {
+      throw overallTimeoutError;
+    }
+  };
 
   const request = async (attempt: number, signal?: AbortSignal): Promise<T> => {
+    assertWithinOverallDeadline();
     if (signal?.aborted) {
       throw createAbortError();
     }
 
-    let response;
+    let response: AxiosResponse<T> | undefined;
+    let requestError: unknown;
+    let requestFailed = false;
+    let phaseTimeoutError: ReturnType<typeof createRequestPhaseTimeoutError> | undefined;
+    let phaseTimeoutTimer: ReturnType<typeof setTimeout> | undefined;
+    const hasPhaseDeadline = Boolean(connectTimeoutMs || readTimeoutMs);
+    const attemptController = signal || hasPhaseDeadline ? new AbortController() : undefined;
+    let attemptSettled = false;
+    let lastProgressLoaded = 0;
+    const handleParentAbort = () => {
+      attemptController?.abort();
+    };
+    const clearPhaseTimeout = () => {
+      if (phaseTimeoutTimer) {
+        clearTimeout(phaseTimeoutTimer);
+        phaseTimeoutTimer = undefined;
+      }
+    };
+    const armPhaseTimeout = (
+      phase: keyof typeof REQUEST_PHASE_TIMEOUT_CODES,
+      phaseTimeoutMs: number | undefined
+    ) => {
+      clearPhaseTimeout();
+      if (!phaseTimeoutMs || !attemptController) {
+        return;
+      }
+      phaseTimeoutTimer = setTimeout(() => {
+        phaseTimeoutError = createRequestPhaseTimeoutError(url, phase, phaseTimeoutMs);
+        attemptController.abort();
+      }, phaseTimeoutMs);
+    };
+
+    if (signal) {
+      signal.addEventListener('abort', handleParentAbort, { once: true });
+    }
+    armPhaseTimeout('connect', connectTimeoutMs);
+
     try {
       response = await axios.request<T>({
         url,
@@ -107,14 +197,52 @@ export const httpRequest = async <T = unknown>(
         responseType: type === 'binary' ? 'arraybuffer' : 'json',
         headers,
         ...(timeoutMs ? { timeout: timeoutMs } : {}),
-        ...(signal ? { signal } : {}),
+        ...(attemptController ? { signal: attemptController.signal } : {}),
+        ...(hasPhaseDeadline
+          ? {
+              adapter: ['xhr', 'http'],
+              onDownloadProgress: (progressEvent: { loaded: number }) => {
+                if (
+                  attemptSettled ||
+                  attemptController?.signal.aborted ||
+                  !Number.isFinite(progressEvent.loaded) ||
+                  progressEvent.loaded <= lastProgressLoaded
+                ) {
+                  return;
+                }
+                lastProgressLoaded = progressEvent.loaded;
+                armPhaseTimeout('read', readTimeoutMs);
+              },
+            }
+          : {}),
       });
+      if (phaseTimeoutError) {
+        requestFailed = true;
+        requestError = phaseTimeoutError;
+        response = undefined;
+      }
     } catch (error) {
-      if (attempt >= maxRetries || !isRetryableRequestError(error)) {
-        throw error;
+      requestFailed = true;
+      requestError = phaseTimeoutError ?? (signal?.aborted ? createAbortError() : error);
+    } finally {
+      attemptSettled = true;
+      clearPhaseTimeout();
+      signal?.removeEventListener('abort', handleParentAbort);
+    }
+
+    assertWithinOverallDeadline();
+
+    if (requestFailed) {
+      if (attempt >= maxRetries || !isRetryableRequestError(requestError)) {
+        throw requestError;
       }
       await waitForRetry(retryDelayMs, attempt, signal);
+      assertWithinOverallDeadline();
       return request(attempt + 1, signal);
+    }
+
+    if (!response) {
+      throw new Error(`httpRequest completed without a response: ${url}`);
     }
 
     if (+response.status === 200) {
@@ -123,6 +251,7 @@ export const httpRequest = async <T = unknown>(
 
     if (RETRYABLE_HTTP_STATUSES.has(Number(response.status)) && attempt < maxRetries) {
       await waitForRetry(retryDelayMs, attempt, signal);
+      assertWithinOverallDeadline();
       return request(attempt + 1, signal);
     }
 
@@ -139,7 +268,7 @@ export const httpRequest = async <T = unknown>(
   try {
     return await new Promise<T>((resolve, reject) => {
       timeoutTimer = setTimeout(() => {
-        reject(createOverallTimeoutError(url, overallTimeoutMs));
+        reject(overallTimeoutError);
         controller.abort();
       }, overallTimeoutMs);
       requestPromise.then(resolve, reject);

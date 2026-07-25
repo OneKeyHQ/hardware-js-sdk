@@ -23,6 +23,8 @@ describe('networkUtils httpRequest retry bounds', () => {
     expect(requestSpy).toHaveBeenCalledTimes(1);
     expect(requestSpy.mock.calls[0][0]).not.toHaveProperty('timeout');
     expect(requestSpy.mock.calls[0][0]).not.toHaveProperty('signal');
+    expect(requestSpy.mock.calls[0][0]).not.toHaveProperty('adapter');
+    expect(requestSpy.mock.calls[0][0]).not.toHaveProperty('onDownloadProgress');
   });
 
   it('passes the per-attempt timeout and stops after the configured retry count', async () => {
@@ -47,6 +49,144 @@ describe('networkUtils httpRequest retry bounds', () => {
         timeout: 1234,
       })
     );
+  });
+
+  it('retries a connection deadline and stops at the configured attempt bound', async () => {
+    jest.useFakeTimers({ doNotFake: ['performance'] });
+    const requestSpy = jest.spyOn(axios, 'request').mockImplementation(
+      config =>
+        new Promise((_resolve, reject) => {
+          config.signal?.addEventListener(
+            'abort',
+            () => {
+              reject(
+                Object.assign(new Error('canceled'), {
+                  __CANCEL__: true,
+                  code: 'ERR_CANCELED',
+                  isAxiosError: true,
+                })
+              );
+            },
+            { once: true }
+          );
+        })
+    );
+    const requestPromise = httpRequest('https://example.com/firmware.bin', 'binary', {
+      connectTimeoutMs: 1_000,
+      maxRetries: 1,
+      retryDelayMs: 0,
+    });
+    const rejection = expect(requestPromise).rejects.toMatchObject({
+      name: 'HttpRequestPhaseTimeoutError',
+      code: 'ECONNECTTIMEDOUT',
+      message: expect.stringContaining('connect timeout'),
+    });
+
+    await Promise.resolve();
+    jest.advanceTimersByTime(1_000);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(requestSpy).toHaveBeenCalledTimes(2);
+
+    jest.advanceTimersByTime(1_000);
+
+    await rejection;
+    expect(requestSpy).toHaveBeenCalledTimes(2);
+    expect(requestSpy.mock.calls[0][0].adapter).toEqual(['xhr', 'http']);
+  });
+
+  it('restarts the read-idle deadline only when loaded bytes increase', async () => {
+    jest.useFakeTimers({ doNotFake: ['performance'] });
+    let requestConfig: Parameters<typeof axios.request>[0] | undefined;
+    const requestSpy = jest.spyOn(axios, 'request').mockImplementation(
+      config =>
+        new Promise((_resolve, reject) => {
+          requestConfig = config;
+          config.signal?.addEventListener(
+            'abort',
+            () => {
+              reject(
+                Object.assign(new Error('canceled'), {
+                  __CANCEL__: true,
+                  code: 'ERR_CANCELED',
+                  isAxiosError: true,
+                })
+              );
+            },
+            { once: true }
+          );
+        })
+    );
+    const requestPromise = httpRequest('https://example.com/firmware.bin', 'binary', {
+      connectTimeoutMs: 1_000,
+      readTimeoutMs: 2_000,
+    });
+    const rejection = expect(requestPromise).rejects.toMatchObject({
+      name: 'HttpRequestPhaseTimeoutError',
+      code: 'EREADTIMEDOUT',
+      message: expect.stringContaining('read timeout'),
+    });
+
+    await Promise.resolve();
+    jest.advanceTimersByTime(500);
+    requestConfig?.onDownloadProgress?.({
+      bytes: 0,
+      lengthComputable: false,
+      loaded: 0,
+    });
+    jest.advanceTimersByTime(400);
+    requestConfig?.onDownloadProgress?.({
+      bytes: 1,
+      lengthComputable: false,
+      loaded: 1,
+    });
+    jest.advanceTimersByTime(900);
+    requestConfig?.onDownloadProgress?.({
+      bytes: 1,
+      lengthComputable: false,
+      loaded: 2,
+    });
+    jest.advanceTimersByTime(1_900);
+    expect(requestConfig?.signal?.aborted).toBe(false);
+
+    requestConfig?.onDownloadProgress?.({
+      bytes: 0,
+      lengthComputable: false,
+      loaded: 2,
+    });
+    jest.advanceTimersByTime(99);
+    expect(requestConfig?.signal?.aborted).toBe(false);
+
+    jest.advanceTimersByTime(1);
+
+    await rejection;
+    expect(requestSpy).toHaveBeenCalledTimes(1);
+    expect(requestConfig?.signal?.aborted).toBe(true);
+  });
+
+  it('ignores progress callbacks after the attempt has settled', async () => {
+    let requestConfig: Parameters<typeof axios.request>[0] | undefined;
+    jest.spyOn(axios, 'request').mockImplementation(config => {
+      requestConfig = config;
+      return Promise.resolve({
+        status: 200,
+        data: new ArrayBuffer(4),
+      });
+    });
+
+    await httpRequest('https://example.com/firmware.bin', 'binary', {
+      connectTimeoutMs: 1_000,
+      readTimeoutMs: 2_000,
+    });
+
+    const timeoutSpy = jest.spyOn(global, 'setTimeout');
+    requestConfig?.onDownloadProgress?.({
+      bytes: 1,
+      lengthComputable: false,
+      loaded: 1,
+    });
+
+    expect(timeoutSpy).not.toHaveBeenCalled();
   });
 
   it.each(['ECONNRESET', 'ENOTFOUND', 'ERR_NETWORK', 'ETIMEDOUT'])(
@@ -94,7 +234,7 @@ describe('networkUtils httpRequest retry bounds', () => {
     expect(requestSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('enforces an overall deadline independently from the per-attempt timeout', async () => {
+  it('enforces an overall deadline independently from per-attempt phase deadlines', async () => {
     jest.useFakeTimers({ doNotFake: ['performance'] });
     const requestSpy = jest.spyOn(axios, 'request').mockImplementation(
       () =>
@@ -103,7 +243,8 @@ describe('networkUtils httpRequest retry bounds', () => {
         })
     );
     const requestPromise = httpRequest('https://example.com/firmware.bin', 'binary', {
-      timeoutMs: 1_000,
+      connectTimeoutMs: 5_000,
+      readTimeoutMs: 5_000,
       overallTimeoutMs: 2_500,
       maxRetries: 2,
       retryDelayMs: 0,
@@ -138,10 +279,40 @@ describe('networkUtils httpRequest retry bounds', () => {
 
     await Promise.resolve();
     await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
     expect(requestSpy).toHaveBeenCalledTimes(1);
+    expect(jest.getTimerCount()).toBe(2);
     jest.advanceTimersByTime(2_500);
 
     await rejection;
+    expect(requestSpy).toHaveBeenCalledTimes(1);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it('does not start another attempt after an absolute deadline clock jump', async () => {
+    jest
+      .spyOn(Date, 'now')
+      .mockReturnValueOnce(1_000)
+      .mockReturnValueOnce(1_000)
+      .mockReturnValue(4_000);
+    const networkError = Object.assign(new Error('temporarily unreachable'), {
+      code: 'ECONNRESET',
+      isAxiosError: true,
+    });
+    const requestSpy = jest.spyOn(axios, 'request').mockRejectedValue(networkError);
+
+    await expect(
+      httpRequest('https://example.com/firmware.bin', 'binary', {
+        overallTimeoutMs: 2_500,
+        maxRetries: 1,
+        retryDelayMs: 0,
+      })
+    ).rejects.toMatchObject({
+      name: 'HttpRequestOverallTimeoutError',
+      message: expect.stringContaining('2500ms'),
+    });
+
     expect(requestSpy).toHaveBeenCalledTimes(1);
   });
 

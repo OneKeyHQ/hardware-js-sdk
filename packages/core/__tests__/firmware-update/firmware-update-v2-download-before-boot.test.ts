@@ -232,7 +232,8 @@ describe('FirmwareUpdateV2 download-before-reboot safety', () => {
           updateType,
           isUpdateBootloader,
           requestOptions: {
-            timeoutMs: 60_000,
+            connectTimeoutMs: 60_000,
+            readTimeoutMs: 60_000,
             overallTimeoutMs: 180_000,
             maxRetries: 2,
             retryDelayMs: 500,
