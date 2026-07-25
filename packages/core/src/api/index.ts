@@ -43,21 +43,10 @@ export { default as firmwareUpdateV3 } from './FirmwareUpdateV3';
 export { default as firmwareUpdateV4 } from './FirmwareUpdateV4';
 export { default as promptWebDeviceAccess } from './PromptWebDeviceAccess';
 
-// File system & device control API (Protocol V2 only)
-export { default as protocolInfoRequest } from './protocol-v2/ProtocolInfoRequest';
-export { default as ping } from './protocol-v2/Ping';
+// Pro2 business API
 export { default as deviceReboot } from './protocol-v2/DeviceReboot';
 export { default as deviceGetOnboardingStatus } from './protocol-v2/DeviceGetOnboardingStatus';
-export { default as deviceSessionOpen } from './protocol-v2/DeviceSessionOpen';
-export { default as deviceFirmwareUpdate } from './protocol-v2/DeviceFirmwareUpdate';
-export { default as deviceGetFirmwareUpdateStatus } from './protocol-v2/DeviceGetFirmwareUpdateStatus';
-export { default as deviceFactoryInfoSet } from './protocol-v2/DeviceFactoryInfoSet';
-export { default as deviceFactoryInfoGet } from './protocol-v2/DeviceFactoryInfoGet';
-export { default as deviceSettingsSet } from './protocol-v2/DeviceSettingsSet';
-export { default as deviceSettingsPageShow } from './protocol-v2/DeviceSettingsPageShow';
 export { default as deviceUploadWallpaper } from './protocol-v2/DeviceUploadWallpaper';
-export { default as filesystemPermissionFix } from './protocol-v2/FilesystemPermissionFix';
-export { default as filesystemFormat } from './protocol-v2/FilesystemFormat';
 export { default as fileRead } from './FileRead';
 export { default as fileWrite } from './FileWrite';
 export { default as fileDelete } from './FileDelete';
@@ -65,14 +54,7 @@ export { default as dirList } from './DirList';
 export { default as dirMake } from './DirMake';
 export { default as dirRemove } from './DirRemove';
 export { default as pathInfo } from './PathInfo';
-export { default as filesystemFileRead } from './FileRead';
-export { default as filesystemFileWrite } from './FileWrite';
 export { default as uploadPortfolio } from './UploadPortfolio';
-export { default as filesystemFileDelete } from './FileDelete';
-export { default as filesystemDirList } from './DirList';
-export { default as filesystemDirMake } from './DirMake';
-export { default as filesystemDirRemove } from './DirRemove';
-export { default as filesystemPathInfoQuery } from './PathInfo';
 
 export { default as cipherKeyValue } from './CipherKeyValue';
 

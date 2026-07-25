@@ -1032,27 +1032,18 @@ describe('Protocol V2 feature adapter', () => {
     expect(() => method.init()).toThrow();
   });
 
-  test('routes public onboarding and session methods through CoreApi', async () => {
+  test('routes onboarding through CoreApi without exposing the raw session command', async () => {
     const call = jest.fn().mockResolvedValue({ success: true, payload: {} });
     const api = createCoreApi(call as any);
 
     await api.deviceGetOnboardingStatus('connect-id', { retryCount: 1 });
-    await api.deviceSessionOpen('connect-id', {
-      retryCount: 1,
-      select: { passphrase_on_device: {} },
-    });
 
-    expect(call).toHaveBeenNthCalledWith(1, {
+    expect(call).toHaveBeenCalledWith({
       method: 'deviceGetOnboardingStatus',
       connectId: 'connect-id',
       retryCount: 1,
     });
-    expect(call).toHaveBeenNthCalledWith(2, {
-      method: 'deviceSessionOpen',
-      connectId: 'connect-id',
-      retryCount: 1,
-      select: { passphrase_on_device: {} },
-    });
+    expect(api).not.toHaveProperty('deviceSessionOpen');
   });
 
   test('reuses the cached session id for the selected Pro2 wallet', async () => {

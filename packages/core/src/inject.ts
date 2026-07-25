@@ -158,31 +158,13 @@ export const createCoreApi = (
   deviceRebootToBoardloader: connectId => call({ connectId, method: 'deviceRebootToBoardloader' }),
   deviceRebootToBootloader: connectId => call({ connectId, method: 'deviceRebootToBootloader' }),
 
-  // File system & device control API (Protocol V2 only)
-  protocolInfoRequest: (connectId, params) =>
-    call({ ...params, connectId, method: 'protocolInfoRequest' }),
-  ping: (connectId, params) => call({ ...params, connectId, method: 'ping' }),
+  // Pro2 business API
   deviceReboot: (connectId, params) => call({ ...params, connectId, method: 'deviceReboot' }),
   deviceGetOnboardingStatus: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceGetOnboardingStatus' }),
-  deviceSessionOpen: (connectId, params) =>
-    call({ ...params, connectId, method: 'deviceSessionOpen' }),
-  deviceFirmwareUpdate: (connectId, params) =>
-    call({ ...params, connectId, method: 'deviceFirmwareUpdate' }),
-  deviceGetFirmwareUpdateStatus: (connectId, params) =>
-    call({ ...params, connectId, method: 'deviceGetFirmwareUpdateStatus' }),
-  deviceFactoryInfoSet: (connectId, params) =>
-    call({ ...params, connectId, method: 'deviceFactoryInfoSet' }),
-  deviceFactoryInfoGet: (connectId, params) =>
-    call({ ...params, connectId, method: 'deviceFactoryInfoGet' }),
-  deviceSettingsSet: (connectId, params) =>
-    call({ ...params, connectId, method: 'deviceSettingsSet' }),
-  deviceSettingsPageShow: (connectId, params) =>
-    call({ ...params, connectId, method: 'deviceSettingsPageShow' }),
   deviceUploadWallpaper: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceUploadWallpaper' }),
-  filesystemPermissionFix: (connectId, params) =>
-    call({ ...params, connectId, method: 'filesystemPermissionFix' }),
+  uploadPortfolio: (connectId, params) => call({ ...params, connectId, method: 'uploadPortfolio' }),
   fileRead: (connectId, params) => call({ ...params, connectId, method: 'fileRead' }),
   fileWrite: (connectId, params) => call({ ...params, connectId, method: 'fileWrite' }),
   fileDelete: (connectId, params) => call({ ...params, connectId, method: 'fileDelete' }),
@@ -190,22 +172,6 @@ export const createCoreApi = (
   dirMake: (connectId, params) => call({ ...params, connectId, method: 'dirMake' }),
   dirRemove: (connectId, params) => call({ ...params, connectId, method: 'dirRemove' }),
   pathInfo: (connectId, params) => call({ ...params, connectId, method: 'pathInfo' }),
-  filesystemFileRead: (connectId, params) =>
-    call({ ...params, connectId, method: 'filesystemFileRead' }),
-  filesystemFileWrite: (connectId, params) =>
-    call({ ...params, connectId, method: 'filesystemFileWrite' }),
-  uploadPortfolio: (connectId, params) => call({ ...params, connectId, method: 'uploadPortfolio' }),
-  filesystemFileDelete: (connectId, params) =>
-    call({ ...params, connectId, method: 'filesystemFileDelete' }),
-  filesystemDirList: (connectId, params) =>
-    call({ ...params, connectId, method: 'filesystemDirList' }),
-  filesystemDirMake: (connectId, params) =>
-    call({ ...params, connectId, method: 'filesystemDirMake' }),
-  filesystemDirRemove: (connectId, params) =>
-    call({ ...params, connectId, method: 'filesystemDirRemove' }),
-  filesystemPathInfoQuery: (connectId, params) =>
-    call({ ...params, connectId, method: 'filesystemPathInfoQuery' }),
-  filesystemFormat: connectId => call({ connectId, method: 'filesystemFormat' }),
   deviceRecovery: (connectId, params) => call({ ...params, connectId, method: 'deviceRecovery' }),
   deviceReset: (connectId, params) => call({ ...params, connectId, method: 'deviceReset' }),
   deviceSettings: (connectId, params) => call({ ...params, connectId, method: 'deviceSettings' }),

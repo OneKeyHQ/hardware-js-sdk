@@ -197,9 +197,6 @@ export declare function pathInfo(
   params: { path: string; timeoutMs?: number | string }
 ): Response<PathInfoResult>;
 
-export declare const filesystemFileRead: typeof fileRead;
-export declare const filesystemFileWrite: typeof fileWrite;
-
 export declare function uploadPortfolio(
   connectId: string,
   params: {
@@ -208,10 +205,5 @@ export declare function uploadPortfolio(
     timeoutMs?: number | string;
   }
 ): Response<FileInfo & { portfolioUpdated: true }>;
-export declare const filesystemFileDelete: typeof fileDelete;
-export declare const filesystemDirList: typeof dirList;
-export declare const filesystemDirMake: typeof dirMake;
-export declare const filesystemDirRemove: typeof dirRemove;
-export declare const filesystemPathInfoQuery: typeof pathInfo;
 
 export declare function filesystemFormat(connectId: string): Response<Success>;

@@ -1,13 +1,6 @@
 import type {
-  deviceFactoryInfoGet,
-  deviceFactoryInfoSet,
-  deviceFirmwareUpdate,
-  deviceGetFirmwareUpdateStatus,
   deviceGetOnboardingStatus,
   deviceReboot,
-  deviceSessionOpen,
-  deviceSettingsPageShow,
-  deviceSettingsSet,
   deviceUploadWallpaper,
   dirList,
   dirMake,
@@ -15,18 +8,7 @@ import type {
   fileDelete,
   fileRead,
   fileWrite,
-  filesystemDirList,
-  filesystemDirMake,
-  filesystemDirRemove,
-  filesystemFileDelete,
-  filesystemFileRead,
-  filesystemFileWrite,
-  filesystemFormat,
-  filesystemPathInfoQuery,
-  filesystemPermissionFix,
   pathInfo,
-  ping,
-  protocolInfoRequest,
   uploadPortfolio,
 } from './protocolV2';
 import type { off, on, removeAllListeners } from './event';
@@ -245,21 +227,12 @@ export type CoreApi = {
   cipherKeyValue: typeof cipherKeyValue;
 
   /**
-   * File system & device control API (Protocol V2 only)
+   * Pro2 business API
    */
-  protocolInfoRequest: typeof protocolInfoRequest;
-  ping: typeof ping;
   deviceReboot: typeof deviceReboot;
   deviceGetOnboardingStatus: typeof deviceGetOnboardingStatus;
-  deviceSessionOpen: typeof deviceSessionOpen;
-  deviceFirmwareUpdate: typeof deviceFirmwareUpdate;
-  deviceGetFirmwareUpdateStatus: typeof deviceGetFirmwareUpdateStatus;
-  deviceFactoryInfoSet: typeof deviceFactoryInfoSet;
-  deviceFactoryInfoGet: typeof deviceFactoryInfoGet;
-  deviceSettingsSet: typeof deviceSettingsSet;
-  deviceSettingsPageShow: typeof deviceSettingsPageShow;
   deviceUploadWallpaper: typeof deviceUploadWallpaper;
-  filesystemPermissionFix: typeof filesystemPermissionFix;
+  uploadPortfolio: typeof uploadPortfolio;
   fileRead: typeof fileRead;
   fileWrite: typeof fileWrite;
   fileDelete: typeof fileDelete;
@@ -267,15 +240,6 @@ export type CoreApi = {
   dirMake: typeof dirMake;
   dirRemove: typeof dirRemove;
   pathInfo: typeof pathInfo;
-  filesystemFileRead: typeof filesystemFileRead;
-  filesystemFileWrite: typeof filesystemFileWrite;
-  uploadPortfolio: typeof uploadPortfolio;
-  filesystemFileDelete: typeof filesystemFileDelete;
-  filesystemDirList: typeof filesystemDirList;
-  filesystemDirMake: typeof filesystemDirMake;
-  filesystemDirRemove: typeof filesystemDirRemove;
-  filesystemPathInfoQuery: typeof filesystemPathInfoQuery;
-  filesystemFormat: typeof filesystemFormat;
 
   /**
    * All network function
