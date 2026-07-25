@@ -7,8 +7,11 @@ import { findLatestRelease } from '../../utils/release';
 import { getFirmwareUpdateField } from '../../utils/deviceFeaturesUtils';
 
 import type { Features } from '../../types';
+import type { HttpRequestOptions } from '../../utils/networkUtils';
 import type { EFirmwareType } from '@onekeyfe/hd-shared';
 import type { IFirmwareField } from '../../data-manager/DataManager';
+
+export type FirmwareBinary = ArrayBuffer | Buffer;
 
 export interface GetInfoProps {
   features: Features;
@@ -20,6 +23,7 @@ export interface GetInfoProps {
 
 interface GetBinaryProps extends GetInfoProps {
   version?: number[];
+  requestOptions?: HttpRequestOptions;
 }
 
 export const getBinary = async ({
@@ -28,6 +32,7 @@ export const getBinary = async ({
   version,
   isUpdateBootloader,
   firmwareType,
+  requestOptions,
 }: GetBinaryProps) => {
   const releaseInfo = getInfo({
     features,
@@ -55,9 +60,9 @@ export const getBinary = async ({
       : isUpdateBootloader
       ? releaseInfo.bootloaderResource
       : releaseInfo.url;
-  let fw;
+  let fw: FirmwareBinary;
   try {
-    fw = await httpRequest(url, 'binary');
+    fw = await httpRequest(url, 'binary', requestOptions);
   } catch {
     throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Method_FirmwareUpdate_DownloadFailed');
   }
@@ -69,7 +74,7 @@ export const getBinary = async ({
 };
 
 export const getSysResourceBinary = async (url: string) => {
-  let fw;
+  let fw: FirmwareBinary;
   try {
     fw = await httpRequest(url, 'binary');
   } catch {
