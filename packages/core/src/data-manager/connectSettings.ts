@@ -1,10 +1,13 @@
 /* eslint-disable vars-on-top */
 
 import { DEFAULT_DOMAIN, getSDKVersion } from '../data/config';
+import { FirmwareUpdateErrorCode, createFirmwareUpdateError } from '../firmware-update/errors';
 
-import type { ConnectSettings } from '../types';
+import type { ConnectSettings, FirmwareManifestMode } from '../types';
 
 export const DEFAULT_PRIORITY = 2;
+export const DEFAULT_FIRMWARE_MANIFEST_CONFIG_SRC = 'https://data.onekey.so/config.json';
+export const PRE_RELEASE_FIRMWARE_MANIFEST_CONFIG_SRC = 'https://data.onekey.so/pre-config.json';
 
 declare const chrome: any;
 declare global {
@@ -27,6 +30,54 @@ const initialSettings: ConnectSettings = {
   env: 'web',
   lazyLoad: false,
   timestamp: new Date().getTime(),
+};
+
+type FirmwareManifestCompatibilitySettings = Pick<
+  ConnectSettings,
+  'fetchConfig' | 'firmwareManifestMode' | 'preRelease'
+>;
+
+const copyFirmwareManifestMode = (
+  firmwareManifestMode: FirmwareManifestMode
+): FirmwareManifestMode => {
+  if (firmwareManifestMode.kind === 'external-only') {
+    return { kind: 'external-only' };
+  }
+  if (firmwareManifestMode.kind === 'sdk-managed') {
+    if (firmwareManifestMode.configSrc === undefined) {
+      return { kind: 'sdk-managed' };
+    }
+    if (
+      typeof firmwareManifestMode.configSrc === 'string' &&
+      firmwareManifestMode.configSrc.length > 0
+    ) {
+      return {
+        kind: 'sdk-managed',
+        configSrc: firmwareManifestMode.configSrc,
+      };
+    }
+  }
+  throw createFirmwareUpdateError(
+    FirmwareUpdateErrorCode.FirmwareManifestModeMismatch,
+    'Invalid firmware manifest mode'
+  );
+};
+
+export const resolveFirmwareManifestMode = (
+  settings: Partial<FirmwareManifestCompatibilitySettings>
+): FirmwareManifestMode => {
+  if (settings.firmwareManifestMode !== undefined) {
+    return copyFirmwareManifestMode(settings.firmwareManifestMode);
+  }
+  if (settings.fetchConfig === true) {
+    return {
+      kind: 'sdk-managed',
+      configSrc: settings.preRelease
+        ? PRE_RELEASE_FIRMWARE_MANIFEST_CONFIG_SRC
+        : DEFAULT_FIRMWARE_MANIFEST_CONFIG_SRC,
+    };
+  }
+  return { kind: 'sdk-managed' };
 };
 
 export const getEnv = () => {
@@ -111,12 +162,12 @@ export const parseConnectSettings = (input: Partial<ConnectSettings> = {}) => {
     settings.preRelease = input.preRelease;
   }
 
-  if (input.fetchConfig) {
-    settings.fetchConfig = input.fetchConfig;
+  if (input.firmwareManifestMode !== undefined) {
+    settings.firmwareManifestMode = copyFirmwareManifestMode(input.firmwareManifestMode);
   }
 
-  if (input.configFetcher) {
-    settings.configFetcher = input.configFetcher;
+  if (input.fetchConfig) {
+    settings.fetchConfig = input.fetchConfig;
   }
 
   return settings;

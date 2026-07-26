@@ -13,6 +13,7 @@ import { DeviceModelToTypes } from '../../types';
 import { DataManager } from '../../data-manager';
 import { BaseMethod } from '../BaseMethod';
 import { DEVICE } from '../../events';
+import { MemoryByteSource, writeFirmwareByteSource } from '../../firmware-update';
 import { createFirmwareProgressThrottle } from './progressThrottle';
 
 import type {
@@ -24,6 +25,7 @@ import type { RebootType } from '@onekeyfe/hd-transport';
 import type { Deferred } from '@onekeyfe/hd-shared';
 import type { KnownDevice } from '../../types';
 import type { TypedResponseMessage } from '../../device/DeviceCommands';
+import type { FirmwareByteSource } from '../../firmware-update';
 
 const Log = getLogger(LoggerNames.Method);
 const SESSION_ERROR = 'session not found';
@@ -344,47 +346,76 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
     processedSize?: number;
     totalSize?: number;
   }) {
+    const buffer =
+      payload instanceof ArrayBuffer
+        ? payload
+        : new Uint8Array(payload.buffer, payload.byteOffset, payload.byteLength).slice().buffer;
+    const source = new MemoryByteSource(buffer);
+    try {
+      return await this.emmcCommonUpdateFromByteSource({
+        source,
+        filePath,
+        processedSize,
+        totalSize,
+      });
+    } finally {
+      await source.close();
+    }
+  }
+
+  async emmcCommonUpdateFromByteSource({
+    source,
+    filePath,
+    processedSize,
+    totalSize,
+    reportProgress,
+  }: {
+    source: FirmwareByteSource;
+    filePath: string;
+    processedSize?: number;
+    totalSize?: number;
+    reportProgress?: (completed: number, total: number) => void | Promise<void>;
+  }) {
     if (!filePath.startsWith('0:')) {
       throw new Error('filePath must start with 0:');
     }
     const env = DataManager.getSettings('env');
     const perPackageSize = DataManager.isBleConnect(env) ? 16 : 128;
     const chunkSize = 1024 * perPackageSize;
-    const totalChunks = Math.ceil(payload.byteLength / chunkSize);
-    let offset = 0;
-    let currentFileProcessed = 0;
-
-    for (let i = 0; i < totalChunks; i++) {
-      const chunkStart = i * chunkSize;
-      const chunkEnd = Math.min(chunkStart + chunkSize, payload.byteLength);
-      const chunkLength = chunkEnd - chunkStart;
-      const chunk = payload.slice(chunkStart, chunkEnd);
-      const overwrite = i === 0;
-
-      // Calculate progress based on whether we're tracking overall progress or single file progress
-      let progress: number;
-      if (totalSize !== undefined && processedSize !== undefined) {
-        currentFileProcessed = processedSize + chunkEnd;
-        progress = Math.min(Math.ceil((currentFileProcessed / totalSize) * 100), 99);
-      } else {
-        progress = Math.min(Math.ceil(((i + 1) / totalChunks) * 100), 99);
-      }
-
-      const writeRes = await this.emmcFileWriteWithRetry(
-        filePath,
-        chunkLength,
-        offset,
-        chunk,
-        overwrite,
-        progress
-      );
-      // @ts-expect-error
-      offset += writeRes.message.processed_byte;
-      this.postProgressMessage(progress, 'transferData');
-    }
-
-    // Return processed size only if we're tracking overall progress
-    return totalSize !== undefined ? (processedSize ?? 0) + payload.byteLength : 0;
+    const processedBeforeFile = processedSize ?? 0;
+    await writeFirmwareByteSource({
+      source,
+      chunkSize,
+      writeChunk: async ({ data, length, targetOffset, isFirstChunk, completedAfterChunk }) => {
+        const progress =
+          totalSize !== undefined
+            ? Math.min(
+                Math.ceil(((processedBeforeFile + completedAfterChunk) / totalSize) * 100),
+                99
+              )
+            : Math.min(Math.ceil((completedAfterChunk / source.size) * 100), 99);
+        const writeRes = await this.emmcFileWriteWithRetry(
+          filePath,
+          length,
+          targetOffset,
+          data,
+          isFirstChunk,
+          progress
+        );
+        // @ts-expect-error processed_byte exists on the EmmcFile response.
+        const processedByte = writeRes.message.processed_byte;
+        if (typeof processedByte !== 'number') {
+          throw ERRORS.TypedError(
+            HardwareErrorCode.EmmcFileWriteFirmwareError,
+            'device did not report the processed byte count'
+          );
+        }
+        this.postProgressMessage(progress, 'transferData');
+        return processedByte;
+      },
+      reportProgress,
+    });
+    return totalSize !== undefined ? processedBeforeFile + source.size : 0;
   }
 
   async emmcFileWriteWithRetry(

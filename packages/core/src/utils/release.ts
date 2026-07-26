@@ -30,7 +30,7 @@ export const getReleaseChangelog = (
 };
 
 export const findLatestRelease = <T extends { version: IVersionArray }>(
-  releases: T[]
+  releases: readonly T[]
 ): T | undefined => {
   let leastRelease = releases[0];
   releases.forEach(release => {
@@ -39,4 +39,16 @@ export const findLatestRelease = <T extends { version: IVersionArray }>(
     }
   });
   return leastRelease;
+};
+
+export const findLatestSemanticRelease = <T extends { version: string }>(
+  releases: readonly T[]
+): T | undefined => {
+  let latestRelease = releases[0];
+  releases.forEach(release => {
+    if (latestRelease === undefined || semver.gt(release.version, latestRelease.version)) {
+      latestRelease = release;
+    }
+  });
+  return latestRelease;
 };

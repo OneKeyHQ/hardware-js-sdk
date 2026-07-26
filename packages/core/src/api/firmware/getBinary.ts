@@ -5,6 +5,7 @@ import { getDeviceType, httpRequest } from '../../utils';
 import { DataManager } from '../../data-manager';
 import { findLatestRelease } from '../../utils/release';
 import { getFirmwareUpdateField } from '../../utils/deviceFeaturesUtils';
+import { FirmwareUpdateErrorCode, createFirmwareUpdateError } from '../../firmware-update/errors';
 
 import type { Features } from '../../types';
 import type { HttpRequestOptions } from '../../utils/networkUtils';
@@ -26,6 +27,15 @@ interface GetBinaryProps extends GetInfoProps {
   requestOptions?: HttpRequestOptions;
 }
 
+const assertSdkFirmwareArtifactNetworkAllowed = () => {
+  if (DataManager.getFirmwareManifestMode().kind === 'external-only') {
+    throw createFirmwareUpdateError(
+      FirmwareUpdateErrorCode.FirmwareArtifactsNotPrepared,
+      'External-only firmware updates require prepared artifacts'
+    );
+  }
+};
+
 export const getBinary = async ({
   features,
   updateType,
@@ -34,6 +44,7 @@ export const getBinary = async ({
   firmwareType,
   requestOptions,
 }: GetBinaryProps) => {
+  assertSdkFirmwareArtifactNetworkAllowed();
   const releaseInfo = getInfo({
     features,
     updateType,
@@ -74,6 +85,7 @@ export const getBinary = async ({
 };
 
 export const getSysResourceBinary = async (url: string) => {
+  assertSdkFirmwareArtifactNetworkAllowed();
   let fw: FirmwareBinary;
   try {
     fw = await httpRequest(url, 'binary');

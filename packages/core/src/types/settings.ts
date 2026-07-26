@@ -13,6 +13,16 @@ export type transportEnv =
   | 'emulator'
   | 'lowlevel'
   | 'node-usb';
+
+export type FirmwareManifestMode =
+  | {
+      kind: 'sdk-managed';
+      configSrc?: string;
+    }
+  | {
+      kind: 'external-only';
+    };
+
 export type ConnectSettings = {
   connectSrc?: string;
   debug?: boolean;
@@ -31,9 +41,12 @@ export type ConnectSettings = {
   timestamp: number;
   isFrame?: boolean;
   preRelease?: boolean;
+  firmwareManifestMode?: FirmwareManifestMode;
+  /**
+   * @deprecated Use firmwareManifestMode. This alias will be removed after one migration cycle.
+   */
   fetchConfig?: boolean;
   extension?: string;
-  configFetcher?: (url: string) => Promise<RemoteConfigResponse | null>;
 };
 
 export type IVersionArray = [number, number, number];

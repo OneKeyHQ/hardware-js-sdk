@@ -18,12 +18,15 @@ import {
 
 import { getOrigin } from '../utils/urlUtils';
 import { createJsBridge, sendMessage } from '../utils/bridgeUtils';
+import { FirmwareIframeChannel } from '../firmware/FirmwareIframeChannel';
+import { getFirmwareHostChannelTargetOrigin } from '../firmware/FirmwareHostChannelProtocol';
 import JSBridgeConfig from './bridge-config';
 import { isExtensionWhitelisted, isOriginWhitelisted } from '..';
 
 import type { ConnectSettings, Core, IFrameInit, PostMessageEvent } from '@onekeyfe/hd-core';
 
 let _core: Core | undefined;
+let firmwareIframeChannel: FirmwareIframeChannel | undefined;
 const Log = getLogger(LoggerNames.Iframe);
 
 const getTransport = (env: ConnectSettings['env']) => {
@@ -38,12 +41,17 @@ const handleMessage = (event: PostMessageEvent) => {
   // is message from popup or extension
   const whitelist = isOriginWhitelisted(event.origin) || isExtensionWhitelisted(event.origin);
   const isTrustedDomain = event.origin === window.location.origin || !!whitelist;
+  const isFileParent =
+    event.source === window.parent &&
+    event.origin === 'null' &&
+    window.location.protocol === 'file:';
 
   // ignore messages from domain other then parent.window or popup.window or chrome extension
   const eventOrigin = getOrigin(event.origin);
 
   if (
     !isTrustedDomain &&
+    !isFileParent &&
     eventOrigin !== DataManager.getSettings('origin') &&
     eventOrigin !== getOrigin(document.referrer)
   ) {
@@ -53,6 +61,7 @@ const handleMessage = (event: PostMessageEvent) => {
   const message = parseMessage(event);
 
   if (message.type === IFRAME.INIT) {
+    if (event.source !== window.parent) return;
     init(message.payload ?? {});
   }
 };
@@ -66,6 +75,13 @@ export async function init(payload: IFrameInit['payload']) {
   });
   // set origin manually
   settings.origin = !origin || origin === 'null' ? payload.settings.origin : origin;
+  firmwareIframeChannel?.dispose();
+  firmwareIframeChannel = new FirmwareIframeChannel({
+    messageTarget: window,
+    hostWindow: window.parent,
+    expectedOrigin: settings.parentOrigin ?? payload.settings.origin ?? 'null',
+  });
+  firmwareIframeChannel.start();
 
   Log.enabled = !!settings.debug;
 
@@ -74,6 +90,8 @@ export async function init(payload: IFrameInit['payload']) {
     _core = await initCore(settings, Transport);
     _core?.on(CORE_EVENT, messages => sendMessage(messages, false));
   } catch (error) {
+    firmwareIframeChannel.dispose();
+    firmwareIframeChannel = undefined;
     return createErrorMessage(error);
   }
 
@@ -83,7 +101,7 @@ export async function init(payload: IFrameInit['payload']) {
     remoteFrameName: JSBridgeConfig.hostName,
     selfFrameName: JSBridgeConfig.iframeName,
     channel: JSBridgeConfig.channel,
-    targetOrigin: getOrigin(settings.parentOrigin as string),
+    targetOrigin: getFirmwareHostChannelTargetOrigin(settings.parentOrigin as string),
     receiveHandler: async messageEvent => {
       const message = parseMessage(messageEvent);
       const blockLog = getLogBlockLabel(message);
@@ -122,4 +140,7 @@ export const switchCoreTransport = (env: ConnectSettings['env']) => {
   }
 };
 
+window.addEventListener('unload', () => {
+  firmwareIframeChannel?.dispose();
+});
 window.addEventListener('message', handleMessage, false);

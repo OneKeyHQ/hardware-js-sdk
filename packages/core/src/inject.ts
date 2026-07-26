@@ -1,5 +1,7 @@
-import type { Unsuccessful } from './types';
+import { getFirmwareUpdateCapabilities } from './firmware-update';
+
 import type { EventEmitter } from 'events';
+import type { Unsuccessful } from './types';
 import type { CallMethod } from './events';
 import type { CoreApi } from './types/api';
 import type { AllNetworkAddress } from './types/api/allNetworkGetAddress';
@@ -145,6 +147,7 @@ export const createCoreApi = (
   checkAllFirmwareRelease: (connectId, params) =>
     call({ ...params, connectId, method: 'checkAllFirmwareRelease' }),
   checkFirmwareTypeAvailable: params => call({ ...params, method: 'checkFirmwareTypeAvailable' }),
+  getFirmwareUpdateCapabilities,
 
   cipherKeyValue: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'cipherKeyValue' }),

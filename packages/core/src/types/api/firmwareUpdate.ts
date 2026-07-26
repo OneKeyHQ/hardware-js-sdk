@@ -1,5 +1,6 @@
 import type { EFirmwareType } from '@onekeyfe/hd-shared';
 import type { PROTO } from '../../constants';
+import type { FirmwareCheckpoint, FirmwareTarget, PreparedPlan } from '../../firmware-update';
 import type { Params, Response } from '../params';
 
 type IUpdateType = 'firmware' | 'ble';
@@ -37,8 +38,23 @@ export declare function firmwareUpdateV2(
   connectId: string | undefined,
   params: Params<FirmwareUpdateBinaryParams & Platform>
 ): Response<PROTO.Success>;
+export declare function firmwareUpdateV2(
+  connectId: string | undefined,
+  params: Params<
+    {
+      preparedPlan: PreparedPlan;
+      firmwareCheckpoint?: FirmwareCheckpoint;
+      firmwareTransactionId?: string;
+      updateType: IUpdateType;
+    } & Platform
+  >
+): Response<PROTO.Success>;
 
 export interface FirmwareUpdateV3Params {
+  preparedPlan?: PreparedPlan;
+  firmwareCheckpoint?: FirmwareCheckpoint;
+  firmwareTransactionId?: string;
+
   bleVersion?: number[];
   bleBinary?: ArrayBuffer;
   chunkSize?: number;
@@ -73,6 +89,10 @@ export type FirmwareUpdateV4Target =
   | 'se04';
 
 export interface FirmwareUpdateV4Params {
+  preparedPlan?: PreparedPlan;
+  firmwareCheckpoint?: FirmwareCheckpoint;
+  firmwareTransactionId?: string;
+
   platform: IPlatform;
   chunkSize?: number;
   firmwareType?: EFirmwareType;
@@ -104,6 +124,20 @@ export interface FirmwareUpdateV4Params {
   }>;
 }
 
+export interface FirmwareUpdateV4TargetResult {
+  target: FirmwareTarget;
+  version?: string;
+  hash?: string;
+  status: 'verified' | 'installed' | 'unchanged';
+}
+
+export interface FirmwareUpdateV4Result {
+  bleVersion: string;
+  firmwareVersion: string;
+  bootloaderVersion: string;
+  targets: FirmwareUpdateV4TargetResult[];
+}
+
 export declare function firmwareUpdateV3(
   connectId: string | undefined,
   params: Params<FirmwareUpdateV3Params>
@@ -116,8 +150,4 @@ export declare function firmwareUpdateV3(
 export declare function firmwareUpdateV4(
   connectId: string | undefined,
   params: Params<FirmwareUpdateV4Params>
-): Response<{
-  bleVersion: string;
-  firmwareVersion: string;
-  bootloaderVersion: string;
-}>;
+): Response<FirmwareUpdateV4Result>;

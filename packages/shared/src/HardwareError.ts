@@ -295,6 +295,76 @@ export const HardwareErrorCode = {
   DefectiveFirmware: 418,
 
   /**
+   * Firmware manifest mode does not match the requested execution path
+   */
+  FirmwareManifestModeMismatch: 419,
+
+  /**
+   * Firmware manifest does not satisfy the supported schema
+   */
+  FirmwareManifestInvalid: 420,
+
+  /**
+   * Required firmware artifact integrity metadata is missing
+   */
+  FirmwareManifestIntegrityMissing: 421,
+
+  /**
+   * Firmware update plan does not satisfy the supported schema
+   */
+  FirmwarePlanInvalid: 422,
+
+  /**
+   * Firmware update plan content does not match its digest
+   */
+  FirmwarePlanDigestMismatch: 423,
+
+  /**
+   * Firmware artifacts have not all reached the prepared state
+   */
+  FirmwareArtifactsNotPrepared: 424,
+
+  /**
+   * Firmware artifact receipt does not match its plan requirement
+   */
+  FirmwareArtifactReceiptMismatch: 425,
+
+  /**
+   * Firmware artifact reader or reader generation is invalid
+   */
+  FirmwareArtifactReaderInvalid: 426,
+
+  /**
+   * Firmware artifact read is outside the artifact bounds
+   */
+  FirmwareArtifactReadOutOfBounds: 427,
+
+  /**
+   * Firmware artifact read exceeds the protocol limit
+   */
+  FirmwareArtifactReadTooLarge: 428,
+
+  /**
+   * Firmware checkpoint could not be persisted
+   */
+  FirmwareCheckpointRejected: 429,
+
+  /**
+   * Firmware transaction conflicts with an active or persisted transaction
+   */
+  FirmwareTransactionConflict: 430,
+
+  /**
+   * Firmware transaction state conflicts with the current device state
+   */
+  FirmwareDeviceStateConflict: 433,
+
+  /**
+   * Firmware reconciliation status is temporarily or permanently unavailable
+   */
+  FirmwareReconciliationUnavailable: 434,
+
+  /**
    * Netword request error
    */
   NetworkError: 500,
@@ -571,6 +641,21 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.ForbiddenKeyPath]: 'Forbidden key path',
   [HardwareErrorCode.RepeatUnlocking]: 'Repeat unlocking',
   [HardwareErrorCode.DefectiveFirmware]: 'Device firmware is defective, please update immediately',
+  [HardwareErrorCode.FirmwareManifestModeMismatch]: 'Firmware manifest mode mismatch',
+  [HardwareErrorCode.FirmwareManifestInvalid]: 'Firmware manifest is invalid',
+  [HardwareErrorCode.FirmwareManifestIntegrityMissing]:
+    'Firmware manifest integrity metadata is missing',
+  [HardwareErrorCode.FirmwarePlanInvalid]: 'Firmware update plan is invalid',
+  [HardwareErrorCode.FirmwarePlanDigestMismatch]: 'Firmware update plan digest mismatch',
+  [HardwareErrorCode.FirmwareArtifactsNotPrepared]: 'Firmware artifacts are not prepared',
+  [HardwareErrorCode.FirmwareArtifactReceiptMismatch]: 'Firmware artifact receipt mismatch',
+  [HardwareErrorCode.FirmwareArtifactReaderInvalid]: 'Firmware artifact reader is invalid',
+  [HardwareErrorCode.FirmwareArtifactReadOutOfBounds]: 'Firmware artifact read is out of bounds',
+  [HardwareErrorCode.FirmwareArtifactReadTooLarge]: 'Firmware artifact read is too large',
+  [HardwareErrorCode.FirmwareCheckpointRejected]: 'Firmware checkpoint was rejected',
+  [HardwareErrorCode.FirmwareTransactionConflict]: 'Firmware transaction conflict',
+  [HardwareErrorCode.FirmwareDeviceStateConflict]: 'Firmware device state conflict',
+  [HardwareErrorCode.FirmwareReconciliationUnavailable]: 'Firmware reconciliation is unavailable',
 
   /**
    * Network Errors

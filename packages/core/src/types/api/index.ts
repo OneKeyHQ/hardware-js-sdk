@@ -51,6 +51,7 @@ import type {
   firmwareUpdateV3,
   firmwareUpdateV4,
 } from './firmwareUpdate';
+import type { GetFirmwareUpdateCapabilities } from './firmwareUpdateTransaction';
 import type { promptWebDeviceAccess } from './promptWebDeviceAccess';
 import type { deviceReset } from './deviceReset';
 import type { deviceRecovery } from './deviceRecovery';
@@ -237,6 +238,7 @@ export type CoreApi = {
   setU2FCounter: typeof setU2FCounter;
   checkFirmwareRelease: typeof checkFirmwareRelease;
   checkBLEFirmwareRelease: typeof checkBLEFirmwareRelease;
+  getFirmwareUpdateCapabilities: GetFirmwareUpdateCapabilities;
   firmwareUpdate: typeof firmwareUpdate;
   firmwareUpdateV2: typeof firmwareUpdateV2;
   firmwareUpdateV3: typeof firmwareUpdateV3;

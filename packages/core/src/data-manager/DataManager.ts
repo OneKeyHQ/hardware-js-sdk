@@ -17,12 +17,14 @@ import {
 } from '../utils';
 import { DeviceModelToTypes } from '../types';
 import { findLatestRelease, getReleaseChangelog, getReleaseStatus } from '../utils/release';
+import { resolveFirmwareManifestMode } from './connectSettings';
 
 import type {
   AssetsMap,
   ConnectSettings,
   DeviceTypeMap,
   Features,
+  FirmwareManifestMode,
   IDeviceBLEFirmwareStatus,
   IDeviceFirmwareStatus,
   ITransportStatus,
@@ -110,6 +112,8 @@ export default class DataManager {
   };
 
   static lastCheckTimestamp = 0;
+
+  private static firmwareConfigReloadPromise: Promise<void> | null = null;
 
   static getFirmwareStatus = (
     features: Features,
@@ -397,70 +401,50 @@ export default class DataManager {
     return enrichedData;
   }
 
-  static async load(settings: ConnectSettings) {
-    this.settings = settings;
-    if (!settings.fetchConfig) {
+  static async load(settings: ConnectSettings): Promise<void> {
+    const firmwareManifestMode = resolveFirmwareManifestMode(settings);
+    this.settings = {
+      ...settings,
+      firmwareManifestMode,
+    };
+    if (firmwareManifestMode.kind === 'external-only' || !firmwareManifestMode.configSrc) {
       return;
     }
 
-    const url = settings.preRelease
-      ? 'https://data.onekey.so/pre-config.json'
-      : 'https://data.onekey.so/config.json';
-
-    const urlWithCache = `${url}?noCache=${getTimeStamp()}`;
-    let data: RemoteConfigResponse | null = null;
-    let fetchMethod: 'configFetcher' | 'axios' | 'none' = 'none';
-
-    // 1. Try custom configFetcher first (client-side IP direct connection support)
-    if (settings.configFetcher) {
-      Log.debug('[DataConfig] Trying configFetcher (client-side fetcher)...');
-      try {
-        data = await settings.configFetcher(urlWithCache);
-        if (data) {
-          fetchMethod = 'configFetcher';
-          Log.log('[DataConfig] ConfigFetcher success');
-        } else {
-          Log.debug('[DataConfig] ConfigFetcher returned null, will fallback to axios');
-        }
-      } catch (e) {
-        Log.warn('[DataConfig] ConfigFetcher error, will fallback to axios:', e);
-      }
+    const urlWithCache = `${firmwareManifestMode.configSrc}?noCache=${getTimeStamp()}`;
+    Log.debug('[DataConfig] Trying SDK-managed manifest source...');
+    try {
+      const response = await axios.get<RemoteConfigResponse>(urlWithCache, {
+        // The iframe initialization timeout is 10 seconds.
+        timeout: 7000,
+      });
+      this.setRemoteConfig(response.data);
+      Log.log('[DataConfig] SDK-managed manifest fetch success');
+    } catch (error) {
+      Log.warn(
+        '[DataConfig] SDK-managed manifest fetch error; keeping the current SDK snapshot:',
+        error
+      );
     }
+  }
 
-    // 2. Fallback to default axios request
-    if (!data) {
-      Log.debug('[DataConfig] Trying axios (SDK default fetcher)...');
-      try {
-        const response = await axios.get<RemoteConfigResponse>(urlWithCache, {
-          // because of iframe timeout is 10000
-          timeout: 7000,
-        });
-        data = response.data;
-        fetchMethod = 'axios';
-        Log.log('[DataConfig] Axios fetch success');
-      } catch (e) {
-        Log.warn('[DataConfig] Axios fetch error:', e);
-      }
-    }
+  static setRemoteConfig(data: RemoteConfigResponse): void {
+    this.deviceMap = {
+      [EDeviceType.Classic]: this.enrichFirmwareReleaseInfo(data.classic),
+      [EDeviceType.Classic1s]: this.enrichFirmwareReleaseInfo(data.classic1s),
+      [EDeviceType.ClassicPure]: this.enrichFirmwareReleaseInfo(data.classicpure),
+      [EDeviceType.Mini]: this.enrichFirmwareReleaseInfo(data.mini),
+      [EDeviceType.Touch]: this.enrichFirmwareReleaseInfo(data.touch),
+      [EDeviceType.Pro]: this.enrichFirmwareReleaseInfo(data.pro),
+      [EDeviceType.Pro2]: this.enrichFirmwareReleaseInfo(data.pro2),
+    };
+    this.assets = {
+      bridge: data.bridge,
+    };
+  }
 
-    // 3. Apply config if available
-    if (data) {
-      Log.log(`[DataConfig] Config loaded successfully via [${fetchMethod}]`);
-      this.deviceMap = {
-        [EDeviceType.Classic]: this.enrichFirmwareReleaseInfo(data.classic),
-        [EDeviceType.Classic1s]: this.enrichFirmwareReleaseInfo(data.classic1s),
-        [EDeviceType.ClassicPure]: this.enrichFirmwareReleaseInfo(data.classicpure),
-        [EDeviceType.Mini]: this.enrichFirmwareReleaseInfo(data.mini),
-        [EDeviceType.Touch]: this.enrichFirmwareReleaseInfo(data.touch),
-        [EDeviceType.Pro]: this.enrichFirmwareReleaseInfo(data.pro),
-        [EDeviceType.Pro2]: this.enrichFirmwareReleaseInfo(data.pro2),
-      };
-      this.assets = {
-        bridge: data.bridge,
-      };
-    } else {
-      Log.warn('[DataConfig] All fetch methods failed, using built-in default config');
-    }
+  static getFirmwareManifestMode(): FirmwareManifestMode {
+    return resolveFirmwareManifestMode(this.settings ?? {});
   }
 
   static updateEnv(newEnv: ConnectSettings['env']) {
@@ -476,12 +460,26 @@ export default class DataManager {
     }
   }
 
-  static async checkAndReloadData() {
-    if (getTimeStamp() - this.lastCheckTimestamp > 1000 * 60 * 60 * 3) {
-      await this.load(this.settings).then(() => {
-        this.lastCheckTimestamp = getTimeStamp();
-      });
+  static checkAndReloadData(): void {
+    if (
+      getTimeStamp() - this.lastCheckTimestamp <= 1000 * 60 * 60 * 3 ||
+      this.firmwareConfigReloadPromise
+    ) {
+      return;
     }
+    const reloadPromise = this.load(this.settings)
+      .then(() => {
+        this.lastCheckTimestamp = getTimeStamp();
+      })
+      .catch(error => {
+        Log.warn('[DataConfig] Background SDK-managed manifest reload failed:', error);
+      })
+      .finally(() => {
+        if (this.firmwareConfigReloadPromise === reloadPromise) {
+          this.firmwareConfigReloadPromise = null;
+        }
+      });
+    this.firmwareConfigReloadPromise = reloadPromise;
   }
 
   static getProtobufMessages(schema: ProtobufMessageSchema = 'v1CurrentSchema'): JSON {

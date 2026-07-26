@@ -15,6 +15,7 @@ export * from './constants';
 export * from './utils';
 export * from './data-manager';
 export * from './events';
+export * from './firmware-update';
 export * from './types';
 export { whitelist, whitelistExtension } from './data/config';
 export { executeCallback, cleanupCallback };

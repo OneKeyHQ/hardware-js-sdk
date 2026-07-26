@@ -1,5 +1,6 @@
 import { ERRORS, HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
 
+import { getFirmwareHostChannelTargetOrigin } from '../firmware/FirmwareHostChannelProtocol';
 import { getOrigin } from '../utils/urlUtils';
 
 import type { Deferred } from '@onekeyfe/hd-shared';
@@ -53,7 +54,7 @@ export const init = async (settings: any) => {
           settings: { ...settings },
         },
       },
-      origin
+      getFirmwareHostChannelTargetOrigin(origin)
     );
 
     instance.onload = null;

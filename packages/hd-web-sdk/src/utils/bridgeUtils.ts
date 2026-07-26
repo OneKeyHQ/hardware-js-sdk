@@ -12,6 +12,10 @@ let frameBridge: JsBridgeIframe;
 // eslint-disable-next-line import/no-mutable-exports
 let hostBridge: JsBridgeIframe;
 
+let hostBridgeGeneration = 0;
+
+let frameBridgeGeneration = 0;
+
 const Log = getLogger(LoggerNames.SendMessage);
 
 export const resetListenerFlag = () => setPostMessageListenerFlag(false);
@@ -20,10 +24,16 @@ export const createJsBridge = (params: IJsBridgeIframeConfig & { isHost: boolean
   const bridge = new JsBridgeIframe(params);
   if (params.isHost) {
     hostBridge = bridge;
-  } else {
-    frameBridge = bridge;
+    hostBridgeGeneration += 1;
+    return { bridge, generation: hostBridgeGeneration };
   }
+  frameBridge = bridge;
+  frameBridgeGeneration += 1;
+  return { bridge, generation: frameBridgeGeneration };
 };
+
+export const getJsBridgeGeneration = (isHost: boolean) =>
+  isHost ? hostBridgeGeneration : frameBridgeGeneration;
 
 export const sendMessage = async (messages: CoreMessage, isHost = true): Promise<any> => {
   const bridge = isHost ? hostBridge : frameBridge;

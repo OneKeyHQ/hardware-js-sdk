@@ -12,6 +12,8 @@ import {
   getDeviceBLEFirmwareVersion,
   getDeviceBootloaderVersion,
   getDeviceFirmwareVersion,
+  getDeviceType,
+  getDeviceUUID,
   getFirmwareType,
   getLogger,
 } from '../utils';
@@ -20,19 +22,56 @@ import { DataManager } from '../data-manager';
 import { FirmwareUpdateBaseMethod } from './firmware/FirmwareUpdateBaseMethod';
 import { DevicePool } from '../device/DevicePool';
 import {
+  PROTOCOL_V2_FULL_DEVICE_INFO_REQUEST,
   PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST,
   ProtocolV2FirmwareTargetType,
+  getProtocolV2FirmwareTargetDescriptor,
+  getProtocolV2FirmwareTargetDescriptorById,
+  getProtocolV2ResourceBundleNameByPath,
+  normalizeProtocolV2ResourceBundleName,
+  protocolV2PackedVersionToString,
+  resolveProtocolV2FirmwareStagingPath,
+  resolveProtocolV2ResourceBundlePath,
 } from '../protocols/protocol-v2';
 import { requestProtocolV2DeviceInfo } from '../protocols/protocol-v2/features';
 import {
   getProtocolV2UnknownErrorText,
   isProtocolV2DeviceDisconnectedError,
 } from './protocol-v2/helpers';
+import {
+  FirmwareHostBindingRegistry,
+  FirmwareUpdateErrorCode,
+  MemoryByteSource,
+  RecoverableFirmwareExecutor,
+  buildProtocolV2InstallTargets,
+  compileProtocolV2FirmwareEpochs,
+  createFirmwareUpdateError,
+  createProtocolV2MemoryPreparedPlan,
+  firmwareHostBindingRegistry,
+  openFirmwareArtifactByteSource,
+  parseProtocolV2PayloadPackageHeader,
+  reconcileProtocolV2InstallRecords,
+  validatePreparedPlan,
+} from '../firmware-update';
 
-import type { FirmwareUpdateV4Params, FirmwareUpdateV4Target } from '../types/api/firmwareUpdate';
+import type {
+  FirmwareUpdateV4Params,
+  FirmwareUpdateV4Result,
+  FirmwareUpdateV4Target,
+  FirmwareUpdateV4TargetResult,
+} from '../types/api/firmwareUpdate';
 import type { EFirmwareType } from '@onekeyfe/hd-shared';
-import type { PROTO } from '../constants';
 import type { TypedResponseMessage } from '../device/DeviceCommands';
+import type {
+  FirmwareArtifactReceipt,
+  FirmwareByteSource,
+  FirmwareObservedDeviceState,
+  FirmwareTarget,
+  FirmwareUpdateEpoch,
+  PreparedPlan,
+  ProtocolV2FirmwareUpdateRecord,
+  ProtocolV2PreparedArtifactInput,
+} from '../firmware-update';
 import type {
   Features,
   IFirmwareReleaseInfo,
@@ -53,7 +92,6 @@ const PROTOCOL_V2_TARGET_STATUS_IN_PROGRESS = 1;
 const PROTOCOL_V2_TARGET_STATUS_FINISHED = 2;
 const PROTOCOL_V2_TARGET_STATUS_FAILED_MIN = 3;
 const PROTOCOL_V2_CONNECT_PROTOCOL = 'V2';
-const PROTOCOL_V2_FIRMWARE_STAGING_VOLUME = 'vol0:/';
 const PROTOCOL_V2_MIN_FILE_CHUNK_SIZE = 64;
 const PROTOCOL_V2_CONNECT_RETRY_COUNT = 10;
 const PROTOCOL_V2_CONNECT_POLL_INTERVAL = 500;
@@ -82,11 +120,6 @@ const getProtocolV2DeviceTransferProgress = (
   return Math.min(Math.max(Math.ceil((bytesAfterChunk / totalBytes) * 100), 1), 99);
 };
 
-const formatProtocolV2TransferSpeed = (bytes: number, elapsedMs: number) => {
-  const safeElapsedMs = Math.max(elapsedMs, 1);
-  return (bytes / 1024 / (safeElapsedMs / 1000)).toFixed(2);
-};
-
 type ProtocolV2FirmwareUpdateStatusTarget = {
   target_id: number | string;
   status?: number | string;
@@ -96,21 +129,24 @@ type ProtocolV2FirmwareUpdateStatusTarget = {
 
 type ProtocolV2FirmwareUpdateStartResponse = TypedResponseMessage<'Success'>;
 
-type ProtocolV2TargetBinary = { fileName: string; binary: ArrayBuffer; targetId: number };
+type ProtocolV2TargetBinary = {
+  fileName: string;
+  binary: ArrayBuffer;
+  targetId: number;
+  targetVersion?: string;
+};
 type ProtocolV2InstallItem = ProtocolV2TargetBinary & {
   kind: ProtocolV2RemoteComponentTarget['kind'];
-};
-type ProtocolV2InstallTarget = ProtocolV2InstallItem & {
-  path: string;
+  targetVersion?: string;
 };
 
-type ProtocolV2FileTransferParams = PROTO.FirmwareUpload & {
+type ProtocolV2MemoryTransferParams = {
+  payload: ArrayBuffer | Buffer;
   filePath: string;
   processedSize?: number;
   totalSize?: number;
   onTransferredBytes?: (transferredBytes: number) => void;
 };
-
 /** RESC bundle okpkg written independently to devicePath through FileWrite. */
 type ProtocolV2ResourceBundleBinary = {
   name: string;
@@ -125,6 +161,7 @@ type ProtocolV2ResourceBundleBinary = {
 
 type ProtocolV2RemoteComponentBinary = ProtocolV2RemoteComponentTarget & {
   binary: ArrayBuffer;
+  targetVersion?: string;
 };
 
 type ProtocolV2RemoteComponentTarget = {
@@ -138,6 +175,16 @@ type ProtocolV2OkppHeader = {
   version: IVersionArray;
   payloadHash: string;
   headerHash: string;
+};
+
+type ProtocolV2ArtifactSourceFactory = (
+  receipt: FirmwareArtifactReceipt
+) => Promise<FirmwareByteSource>;
+
+type ProtocolV2PreparedExecution = {
+  preparedPlan: PreparedPlan;
+  registry: FirmwareHostBindingRegistry;
+  artifactSourceFactory?: ProtocolV2ArtifactSourceFactory;
 };
 
 const PROTOCOL_V2_REMOTE_COMPONENT_TARGETS: Readonly<
@@ -198,6 +245,10 @@ const PROTOCOL_V2_UPDATE_TARGET_BY_TARGET_ID = new Map<number, FirmwareUpdateV4T
 
 const PROTOCOL_V2_ROMLOADER_UNSUPPORTED_MESSAGE =
   'FW_MGMT_TARGET_ROMLOADER is not accepted by the current Pro2 bootloader update request. Flash romloader with the loader-specific flow instead of firmwareUpdateV4.';
+
+const protocolV2PlanInvalid = (detail: string): never => {
+  throw createFirmwareUpdateError(FirmwareUpdateErrorCode.FirmwarePlanInvalid, detail, { detail });
+};
 
 // hd-transport historically decodes scalar enums as enum-name strings.
 // Map them back to firmware protocol values before internal comparisons.
@@ -271,18 +322,6 @@ const normalizeProtocolV2TargetStatus = (
 };
 
 const normalizeProtocolV2Hex = (value?: string) => value?.replace(/^0x/i, '').toLowerCase();
-
-const versionArrayToNumber = (version?: IVersionArray) => {
-  if (!version) return undefined;
-  return version[0] * 0x10000 + version[1] * 0x100 + version[2];
-};
-
-const compareProtocolV2Versions = (current?: IVersionArray, target?: IVersionArray) => {
-  const currentNumber = versionArrayToNumber(current);
-  const targetNumber = versionArrayToNumber(target);
-  if (currentNumber === undefined || targetNumber === undefined) return undefined;
-  return currentNumber - targetNumber;
-};
 
 const bytesToHex = (bytes: Uint8Array) =>
   Array.from(bytes)
@@ -395,6 +434,16 @@ export const assertProtocolV2ReconnectIdentity = (
 export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareUpdateV4Params> {
   private protocolV2ExpectedDeviceId?: string;
 
+  private protocolV2ActiveEpoch?: FirmwareUpdateEpoch;
+
+  private protocolV2LatestFeatures?: Features;
+
+  private protocolV2LatestStatusRecords: ProtocolV2FirmwareUpdateRecord[] = [];
+
+  private readonly protocolV2InstalledTargets = new Set<FirmwareTarget>();
+
+  private readonly protocolV2ResourceStatuses = new Map<string, 'installed' | 'unchanged'>();
+
   init() {
     this.allowDeviceMode = [UI_REQUEST.BOOTLOADER, UI_REQUEST.NOT_INITIALIZE];
     this.requireDeviceMode = [];
@@ -419,6 +468,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
     validateParams(payload, [
       { name: 'chunkSize', type: 'number' },
+      { name: 'preparedPlan', type: 'object' },
+      { name: 'firmwareCheckpoint', type: 'object' },
+      { name: 'firmwareTransactionId', type: 'string' },
       { name: 'forcedUpdateRes', type: 'boolean' },
       { name: 'bootloaderBinary', type: 'buffer' },
       { name: 'romloaderBinary', type: 'buffer' },
@@ -435,7 +487,41 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       { name: 'resourceBundleFiles', type: 'array', allowEmpty: true },
     ]);
 
+    const legacyArtifactKeys = [
+      'forcedUpdateRes',
+      'bootloaderBinary',
+      'romloaderBinary',
+      'applicationP1Binary',
+      'applicationP2Binary',
+      'coprocessorBinary',
+      'se01Binary',
+      'se02Binary',
+      'se03Binary',
+      'se04Binary',
+      'firmwareType',
+      'targetsToUpdate',
+      'resourceBundleFiles',
+    ] as const;
+    if (
+      payload.preparedPlan &&
+      legacyArtifactKeys.some(key => Object.prototype.hasOwnProperty.call(payload, key))
+    ) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.CallMethodInvalidParameter,
+        'preparedPlan cannot be combined with legacy Protocol V2 firmware inputs'
+      );
+    }
+    if (payload.firmwareCheckpoint && !payload.preparedPlan) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.CallMethodInvalidParameter,
+        'firmwareCheckpoint requires preparedPlan'
+      );
+    }
+
     this.params = {
+      preparedPlan: payload.preparedPlan,
+      firmwareCheckpoint: payload.firmwareCheckpoint,
+      firmwareTransactionId: payload.firmwareTransactionId,
       chunkSize: payload.chunkSize,
       forcedUpdateRes: payload.forcedUpdateRes,
       bootloaderBinary: payload.bootloaderBinary,
@@ -488,52 +574,227 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const deviceFirmwareType = getFirmwareType(deviceFeatures);
     const firmwareType = this.params.firmwareType ?? deviceFirmwareType;
 
-    let fwBinaryMap: ProtocolV2TargetBinary[] = [];
-    let bootloaderBinary: ArrayBuffer | null = null;
-    let installItems: ProtocolV2InstallItem[] | undefined;
+    this.postTipMessage(FirmwareUpdateTipMessage.StartDownloadFirmware);
+    let preparedExecution: ProtocolV2PreparedExecution;
     try {
-      this.postTipMessage(FirmwareUpdateTipMessage.StartDownloadFirmware);
-      fwBinaryMap = this.collectExplicitTargetBinaries();
-      bootloaderBinary = this.prepareBootloaderBinary();
-      if (!this.hasExplicitProtocolV2Payload(fwBinaryMap)) {
-        const remoteBinaries = await this.prepareRemoteProtocolV2Binaries(
-          firmwareType,
-          deviceFeatures
-        );
-        bootloaderBinary = remoteBinaries.bootloaderBinary;
-        fwBinaryMap = remoteBinaries.fwBinaryMap;
-        installItems = remoteBinaries.installItems;
-      }
-      this.postTipMessage(FirmwareUpdateTipMessage.FinishDownloadFirmware);
+      preparedExecution = this.params.preparedPlan
+        ? this.prepareExternalProtocolV2Execution(deviceFeatures)
+        : await this.prepareLegacyProtocolV2Execution(deviceFeatures, firmwareType);
+      await this.preflightProtocolV2Artifacts(preparedExecution);
     } catch (err) {
-      throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
+      if (this.params.preparedPlan) {
+        throw err;
+      }
+      const detail = err instanceof Error ? err.message : err;
+      throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, detail);
     }
+    this.postTipMessage(FirmwareUpdateTipMessage.FinishDownloadFirmware);
 
-    const resourceBundles = this.prepareProtocolV2ResourceBundles(firmwareType, deviceFeatures);
-
-    if (!bootloaderBinary && fwBinaryMap.length === 0 && !resourceBundles?.length) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.FirmwareUpdateDownloadFailed,
-        'No firmware to update'
-      );
-    }
-
-    await this.enterProtocolV2BootloaderMode();
-
-    await this.executeProtocolV2Update({
-      fwBinaryMap,
-      bootloaderBinary,
-      ...(installItems ? { installItems } : undefined),
-      ...(resourceBundles?.length ? { resourceBundles } : undefined),
-    });
-
-    await this.exitProtocolV2BootloaderToNormal();
-
-    const versions = await this.waitForProtocolV2FinalFeatures();
+    const result = await this.executeProtocolV2PreparedPlan(preparedExecution);
     this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdateCompleted);
     DevicePool.resetState();
 
-    return versions;
+    return result;
+  }
+
+  private prepareExternalProtocolV2Execution(features: Features): ProtocolV2PreparedExecution {
+    const preparedPlan = this.validateProtocolV2PreparedPlan(this.params.preparedPlan, features);
+    return {
+      preparedPlan,
+      registry: firmwareHostBindingRegistry,
+    };
+  }
+
+  private async prepareLegacyProtocolV2Execution(
+    features: Features,
+    firmwareType: EFirmwareType
+  ): Promise<ProtocolV2PreparedExecution> {
+    let fwBinaryMap = this.collectExplicitTargetBinaries();
+    let bootloaderBinary = this.prepareBootloaderBinary();
+    let installItems: ProtocolV2InstallItem[] | undefined;
+    if (!this.hasExplicitProtocolV2Payload(fwBinaryMap)) {
+      const remoteBinaries = await this.prepareRemoteProtocolV2Binaries(firmwareType, features);
+      bootloaderBinary = remoteBinaries.bootloaderBinary;
+      fwBinaryMap = remoteBinaries.fwBinaryMap;
+      installItems = remoteBinaries.installItems;
+    }
+
+    const resourceDescriptors = this.prepareProtocolV2ResourceBundles(firmwareType, features);
+    const resourceBundles = resourceDescriptors?.length
+      ? await this.materializeProtocolV2ResourceBundles(resourceDescriptors)
+      : [];
+    const orderedInstallItems =
+      installItems ??
+      this.buildProtocolV2InstallItems({
+        bootloaderBinary,
+        fwBinaryMap,
+      });
+    if (orderedInstallItems.length === 0 && resourceBundles.length === 0) {
+      throw new Error('No firmware to update');
+    }
+
+    const artifacts: ProtocolV2PreparedArtifactInput[] = resourceBundles.map(bundle => ({
+      target: 'resource',
+      logicalName: normalizeProtocolV2ResourceBundleName(bundle.name),
+      binary: bundle.binary,
+    }));
+    orderedInstallItems.forEach(item => {
+      const descriptor = getProtocolV2FirmwareTargetDescriptorById(item.targetId);
+      if (!descriptor) {
+        return protocolV2PlanInvalid(
+          `Unsupported Protocol V2 firmware target id: ${item.targetId}`
+        );
+      }
+      artifacts.push({
+        target: descriptor.target,
+        binary: item.binary,
+        ...(item.targetVersion ? { targetVersion: item.targetVersion } : {}),
+      });
+    });
+
+    const memoryPlan = createProtocolV2MemoryPreparedPlan({
+      device: {
+        identity: getDeviceUUID(features),
+        model: getDeviceType(features),
+        firmwareType,
+      },
+      artifacts,
+    });
+    const registry = this.createMemoryFirmwareRegistry();
+    const artifactSourceFactory: ProtocolV2ArtifactSourceFactory = receipt => {
+      const binary = memoryPlan.binariesByArtifactRef.get(receipt.artifactRef);
+      if (!binary) {
+        return Promise.reject(
+          createFirmwareUpdateError(
+            FirmwareUpdateErrorCode.FirmwareArtifactReaderInvalid,
+            `Protocol V2 memory artifact ${receipt.artifactId} is unavailable`
+          )
+        );
+      }
+      return Promise.resolve(new MemoryByteSource(binary));
+    };
+    return {
+      preparedPlan: this.validateProtocolV2PreparedPlan(memoryPlan.preparedPlan, features),
+      registry,
+      artifactSourceFactory,
+    };
+  }
+
+  private validateProtocolV2PreparedPlan(
+    preparedPlanValue: unknown,
+    features: Features
+  ): PreparedPlan {
+    const preparedPlan = validatePreparedPlan(preparedPlanValue);
+    const identity = getDeviceUUID(features);
+    const model = getDeviceType(features);
+    if (
+      !identity ||
+      preparedPlan.device.identity !== identity ||
+      preparedPlan.device.model !== model
+    ) {
+      throw createFirmwareUpdateError(
+        FirmwareUpdateErrorCode.FirmwareDeviceStateConflict,
+        'Protocol V2 prepared plan belongs to a different device'
+      );
+    }
+
+    const receiptTargets = new Set<FirmwareTarget>();
+    preparedPlan.artifactReceipts.forEach(receipt => {
+      if (receipt.target === 'resource') {
+        if (!receipt.logicalName) {
+          return protocolV2PlanInvalid(
+            `Protocol V2 resource ${receipt.artifactId} has no logical name`
+          );
+        }
+        resolveProtocolV2ResourceBundlePath(receipt.logicalName);
+      } else {
+        getProtocolV2FirmwareTargetDescriptor(receipt.target);
+      }
+      receiptTargets.add(receipt.target);
+    });
+    const expectedStates = new Map(
+      preparedPlan.expectedFinalStates.map(state => [state.target, state])
+    );
+    receiptTargets.forEach(target => {
+      const expected = expectedStates.get(target);
+      if (!expected) {
+        return protocolV2PlanInvalid(`Protocol V2 target ${target} has no expected final state`);
+      }
+      if (target !== 'resource' && !expected.version) {
+        protocolV2PlanInvalid(
+          `Protocol V2 target ${target} requires a version for install recovery`
+        );
+      }
+    });
+
+    const compiledEpochs = compileProtocolV2FirmwareEpochs(
+      preparedPlan.artifactReceipts.map(receipt => ({
+        artifactId: receipt.artifactId,
+        target: receipt.target,
+      }))
+    );
+    if (JSON.stringify(preparedPlan.epochs) !== JSON.stringify(compiledEpochs)) {
+      protocolV2PlanInvalid('Protocol V2 prepared epochs do not match the SDK-owned target table');
+    }
+    return preparedPlan;
+  }
+
+  private createMemoryFirmwareRegistry() {
+    const registry = new FirmwareHostBindingRegistry();
+    const unavailableReader = () =>
+      Promise.reject(
+        createFirmwareUpdateError(
+          FirmwareUpdateErrorCode.FirmwareArtifactReaderInvalid,
+          'Protocol V2 memory execution uses a direct byte source'
+        )
+      );
+    registry.register({
+      artifactReader: {
+        open: unavailableReader,
+        read: unavailableReader,
+        close: () => Promise.resolve(),
+        cancel: () => Promise.resolve(),
+      },
+      checkpointSink: {
+        commit: () => Promise.resolve(),
+      },
+    });
+    return registry;
+  }
+
+  private async preflightProtocolV2Artifacts({
+    preparedPlan,
+    registry,
+    artifactSourceFactory,
+  }: ProtocolV2PreparedExecution) {
+    for (const receipt of preparedPlan.artifactReceipts) {
+      const source = artifactSourceFactory
+        ? await artifactSourceFactory(receipt)
+        : await openFirmwareArtifactByteSource(registry, receipt);
+      try {
+        if (source.size !== receipt.size) {
+          throw createFirmwareUpdateError(
+            FirmwareUpdateErrorCode.FirmwareArtifactReceiptMismatch,
+            `Protocol V2 artifact ${receipt.artifactId} size changed after preparation`
+          );
+        }
+        const header = await this.readProtocolV2SourceHeader(source, receipt.artifactId);
+        const expected = preparedPlan.expectedFinalStates.find(
+          state => state.target === receipt.target
+        );
+        if (
+          receipt.target !== 'resource' &&
+          expected?.version &&
+          header.version !== expected.version
+        ) {
+          protocolV2PlanInvalid(
+            `Protocol V2 ${receipt.target} payload version ${header.version} does not match ${expected.version}`
+          );
+        }
+      } finally {
+        await source.close();
+      }
+    }
   }
 
   private async getProtocolV2DeviceFeatures(): Promise<Features> {
@@ -683,6 +944,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return {
       ...target,
       binary,
+      ...(component.version ? { targetVersion: component.version.join('.') } : {}),
     };
   }
 
@@ -717,12 +979,14 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             binary: remoteBinary.binary,
             targetId: remoteBinary.targetId,
             kind: remoteBinary.kind,
+            ...(remoteBinary.targetVersion ? { targetVersion: remoteBinary.targetVersion } : {}),
           });
         } else {
           const binaryEntry = {
             fileName: remoteBinary.fileName,
             binary: remoteBinary.binary,
             targetId: remoteBinary.targetId,
+            ...(remoteBinary.targetVersion ? { targetVersion: remoteBinary.targetVersion } : {}),
           };
           fwBinaryMap.push(binaryEntry);
           installItems.push({ ...binaryEntry, kind: remoteBinary.kind });
@@ -755,11 +1019,14 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   ): ProtocolV2ResourceBundleBinary[] | undefined {
     // Manual binaries are installed directly without comparison.
     if (this.params.resourceBundleFiles?.length) {
-      return this.params.resourceBundleFiles.map(file => ({
-        name: file.devicePath.split('/').pop() ?? file.devicePath,
-        binary: file.binary,
-        devicePath: file.devicePath,
-      }));
+      return this.params.resourceBundleFiles.map(file => {
+        const name = getProtocolV2ResourceBundleNameByPath(file.devicePath);
+        return {
+          name,
+          binary: file.binary,
+          devicePath: resolveProtocolV2ResourceBundlePath(name),
+        };
+      });
     }
 
     if (!this.params.targetsToUpdate?.includes('resource')) {
@@ -770,116 +1037,42 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const release = DataManager.getFirmwareLatestRelease(features, firmwareType);
     if (!release?.resourceBundles?.length) return undefined;
 
-    return release.resourceBundles.map(bundle => ({
-      name: bundle.name,
-      binary: new ArrayBuffer(0),
-      devicePath: bundle.devicePath,
-      url: bundle.url,
-      version: bundle.version,
-      payloadHash: bundle.payloadHash,
-      headerHash: bundle.headerHash,
-    })) as ProtocolV2ResourceBundleBinary[];
+    return release.resourceBundles.map(bundle => {
+      const name = normalizeProtocolV2ResourceBundleName(bundle.name);
+      return {
+        name,
+        binary: new ArrayBuffer(0),
+        devicePath: resolveProtocolV2ResourceBundlePath(name),
+        url: bundle.url,
+        version: bundle.version,
+        payloadHash: bundle.payloadHash,
+        headerHash: bundle.headerHash,
+      };
+    });
   }
 
-  /**
-   * Synchronize RESC bundles to the device.
-   *
-   * Manual mode writes supplied binaries directly.
-   * Remote-config mode downloads on demand and skips matching bundles after FileRead.
-   */
-  private async syncProtocolV2ResourceBundles(
-    bundles: ProtocolV2ResourceBundleBinary[],
-    firmwareSize: number
-  ): Promise<{ processedSize: number; totalSize: number }> {
-    const transferStartTime = Date.now();
-    const transferTransport = this.getProtocolV2FirmwareTransferTransport();
-
-    const isManualMode = bundles.every(b => b.binary.byteLength > 0);
-    let bundlesToSync = bundles;
-
-    // Download remote-config bundles on demand and skip matching ones.
-    if (!isManualMode) {
-      const filtered: ProtocolV2ResourceBundleBinary[] = [];
-      for (const bundle of bundles) {
-        // Download the binary.
-        if (bundle.binary.byteLength === 0 && bundle.url) {
-          Log.log(`[FirmwareUpdateV4] downloading RESC bundle ${bundle.name} from ${bundle.url}`);
-          const { binary } = await getSysResourceBinary(bundle.url);
-          bundle.binary = binary;
+  private async materializeProtocolV2ResourceBundles(
+    bundles: ProtocolV2ResourceBundleBinary[]
+  ): Promise<ProtocolV2ResourceBundleBinary[]> {
+    const materialized: ProtocolV2ResourceBundleBinary[] = [];
+    for (const bundle of bundles) {
+      let { binary } = bundle;
+      if (binary.byteLength === 0) {
+        if (!bundle.url) {
+          throw new Error(`Protocol V2 resource bundle ${bundle.name} has no local artifact`);
         }
-        // Compare the existing device header.
-        const upToDate = await this.isProtocolV2ResourceBundleUpToDate(bundle);
-        if (upToDate) {
-          Log.log(`[FirmwareUpdateV4] skip RESC bundle ${bundle.name}; already up to date`);
-        } else {
-          filtered.push(bundle);
-        }
+        Log.log(`[FirmwareUpdateV4] downloading RESC bundle ${bundle.name}`);
+        binary = (await getSysResourceBinary(bundle.url)).binary;
       }
-      bundlesToSync = filtered;
-    }
-
-    if (bundlesToSync.length === 0) {
-      Log.log('[FirmwareUpdateV4] all RESC bundles up to date, nothing to sync');
-      return { processedSize: 0, totalSize: firmwareSize };
-    }
-
-    // Write directly to the device through FileWrite.
-    let totalSize = 0;
-    for (const b of bundlesToSync) totalSize += b.binary.byteLength;
-
-    const transferTotalSize = totalSize + firmwareSize;
-    let processedSize = 0;
-    for (const bundle of bundlesToSync) {
-      Log.log(
-        `[FirmwareUpdateV4] syncing RESC bundle ${bundle.name} -> ${bundle.devicePath} bytes=${bundle.binary.byteLength}`
-      );
-      processedSize = await this.protocolV2CommonUpdateProcess({
-        payload: bundle.binary,
-        filePath: bundle.devicePath,
-        processedSize,
-        totalSize: transferTotalSize,
+      if (binary.byteLength === 0) {
+        throw new Error(`Protocol V2 resource bundle ${bundle.name} is empty`);
+      }
+      materialized.push({
+        ...bundle,
+        binary,
       });
     }
-
-    const elapsedMs = Date.now() - transferStartTime;
-    Log.log(
-      `[FirmwareUpdateV4] RESC bundle sync finished transport=${transferTransport} bytes=${totalSize} elapsed=${(
-        elapsedMs / 1000
-      ).toFixed(2)}s speed=${formatProtocolV2TransferSpeed(totalSize, elapsedMs)} KB/s`
-    );
-    return { processedSize, totalSize: transferTotalSize };
-  }
-
-  /**
-   * Compare the existing okpkg OKPP header in remote-config mode.
-   */
-  private async isProtocolV2ResourceBundleUpToDate(
-    bundle: ProtocolV2ResourceBundleBinary
-  ): Promise<boolean> {
-    if (this.params.forcedUpdateRes) return false;
-    if (!bundle.version && !bundle.payloadHash) return false;
-
-    try {
-      const header = await this.readProtocolV2DeviceFileHeader(bundle.devicePath);
-      if (!header) return false;
-
-      if (bundle.version) {
-        const cmp = compareProtocolV2Versions(header.version, bundle.version);
-        if (cmp === undefined || cmp !== 0) return false;
-      }
-      if (bundle.payloadHash) {
-        const expected = normalizeProtocolV2Hex(bundle.payloadHash);
-        if (expected && header.payloadHash !== expected) return false;
-      }
-      if (bundle.headerHash) {
-        const expected = normalizeProtocolV2Hex(bundle.headerHash);
-        if (expected && header.headerHash !== expected) return false;
-      }
-      return true;
-    } catch (error) {
-      Log.log(`[FirmwareUpdateV4] RESC bundle ${bundle.name} header check failed: `, error);
-      return false;
-    }
+    return materialized;
   }
 
   private isProtocolV2BootloaderMode() {
@@ -992,116 +1185,541 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return entries;
   }
 
-  private async executeProtocolV2Update({
-    fwBinaryMap,
-    bootloaderBinary,
-    installItems,
-    resourceBundles,
-  }: {
-    fwBinaryMap?: ProtocolV2TargetBinary[];
-    bootloaderBinary?: ArrayBuffer | null;
-    installItems?: ProtocolV2InstallItem[];
-    resourceBundles?: ProtocolV2ResourceBundleBinary[];
-  }) {
-    const orderedInstallItems =
-      installItems ??
-      this.buildProtocolV2InstallItems({
-        bootloaderBinary: bootloaderBinary ?? null,
-        fwBinaryMap: fwBinaryMap ?? [],
-      });
-
-    let firmwareSize = 0;
-    for (const item of orderedInstallItems) firmwareSize += item.binary.byteLength;
-
-    this.postTipMessage(FirmwareUpdateTipMessage.StartTransferData);
-
-    let processedSize = 0;
-    let totalSize = firmwareSize;
-    if (resourceBundles?.length) {
-      const resourceTransfer = await this.syncProtocolV2ResourceBundles(
-        resourceBundles,
-        firmwareSize
-      );
-      processedSize = resourceTransfer.processedSize;
-      totalSize = resourceTransfer.totalSize;
-    }
-
-    // Skip staging and installation when the update contains RESC bundles only.
-    if (orderedInstallItems.length === 0) {
-      Log.log('[FirmwareUpdateV4] no firmware targets to install (RESC bundles only)');
-      if (totalSize > 0) {
-        this.postProgressMessage(100, 'transferData');
-      }
-      return;
-    }
-    let transferredSize = processedSize;
-    const transferStartTime = Date.now();
-    const transferTransport = this.getProtocolV2FirmwareTransferTransport();
-    const chunkSize = this.getProtocolV2FirmwareChunkSize();
-    const onTransferredBytes = (bytes: number) => {
-      transferredSize = bytes;
-    };
-    Log.log(
-      `[FirmwareUpdateV4] transfer started transport=${transferTransport} total=${totalSize} bytes chunk=${chunkSize} bytes`
+  private async executeProtocolV2PreparedPlan(
+    execution: ProtocolV2PreparedExecution
+  ): Promise<FirmwareUpdateV4Result> {
+    const { preparedPlan, registry, artifactSourceFactory } = execution;
+    this.protocolV2InstalledTargets.clear();
+    this.protocolV2ResourceStatuses.clear();
+    this.protocolV2ActiveEpoch = preparedPlan.epochs.find(
+      epoch => epoch.epochId === this.params.firmwareCheckpoint?.epochId
     );
+    let transferStarted = false;
 
-    const stagedInstallTargets: ProtocolV2InstallTarget[] = [];
+    const executor = new RecoverableFirmwareExecutor({
+      preparedPlan,
+      transactionId:
+        this.params.firmwareTransactionId ??
+        `${preparedPlan.planId}:${preparedPlan.device.identity}`,
+      registry,
+      initialCheckpoint: this.params.firmwareCheckpoint,
+      ...(artifactSourceFactory ? { artifactSourceFactory } : {}),
+      driver: {
+        readDeviceState: () => this.readProtocolV2ObservedState(preparedPlan),
+        requiresLoaderTransition: epoch =>
+          epoch.kind === 'bootloader-install' || epoch.kind === 'component-install',
+        enterLoader: async ({ epoch }) => {
+          this.protocolV2ActiveEpoch = epoch;
+          await this.enterProtocolV2BootloaderMode();
+        },
+        transferArtifact: async ({ epoch, receipt, source, reportProgress }) => {
+          this.protocolV2ActiveEpoch = epoch;
+          if (!transferStarted) {
+            this.postTipMessage(FirmwareUpdateTipMessage.StartTransferData);
+            transferStarted = true;
+          }
+          if (receipt.target === 'resource') {
+            await this.transferProtocolV2ResourceArtifact(receipt, source, reportProgress);
+          } else {
+            await this.transferProtocolV2FirmwareArtifact(receipt, source, reportProgress);
+          }
+        },
+        requestInstall: async ({ epoch }) => {
+          this.protocolV2ActiveEpoch = epoch;
+          const targets = buildProtocolV2InstallTargets(epoch);
+          this.postTipMessage(FirmwareUpdateTipMessage.ConfirmOnDevice);
+          await this.protocolV2StartFirmwareUpdate({ targets });
+          epoch.targetIds.forEach(target => this.protocolV2InstalledTargets.add(target));
+        },
+        waitForInstall: async ({ epoch }) => {
+          this.protocolV2ActiveEpoch = epoch;
+          await this.waitForProtocolV2FirmwareUpdateComplete(buildProtocolV2InstallTargets(epoch));
+        },
+        rebootBetweenEpochs: async ({ epoch }) => {
+          this.protocolV2ActiveEpoch = epoch;
+          if (epoch.kind === 'bootloader-install' || epoch.kind === 'component-install') {
+            await this.exitProtocolV2BootloaderToNormal();
+          }
+        },
+        verifyEpoch: async ({ epoch }) => {
+          this.protocolV2ActiveEpoch = epoch;
+          const observed = await this.readProtocolV2ObservedState(preparedPlan);
+          this.assertProtocolV2ExpectedTargets(preparedPlan, observed, epoch.targetIds);
+        },
+        verifyFinal: async ({ expectedPlan }) => {
+          this.protocolV2ActiveEpoch = expectedPlan.epochs.at(-1);
+          const observed = await this.readProtocolV2ObservedState(expectedPlan);
+          this.assertProtocolV2ExpectedTargets(
+            expectedPlan,
+            observed,
+            expectedPlan.expectedFinalStates
+              .filter(state => state.target !== 'resource')
+              .map(state => state.target)
+          );
+          await this.verifyProtocolV2PreparedResources(execution);
+        },
+      },
+    });
 
-    try {
-      for (const item of orderedInstallItems) {
-        const filePath = this.getProtocolV2InstallItemStagingPath(item);
-        Log.log(
-          `[FirmwareUpdateV4] staging ${item.kind} via FilesystemFileWrite target=${item.targetId} path=${filePath} source=${item.fileName} bytes=${item.binary.byteLength}`
-        );
-        processedSize = await this.protocolV2CommonUpdateProcess({
-          payload: item.binary,
-          filePath,
-          processedSize,
-          totalSize,
-          onTransferredBytes,
-        });
-        transferredSize = processedSize;
-        await this.verifyProtocolV2StagedFile(filePath, item.binary.byteLength);
-
-        stagedInstallTargets.push({
-          ...item,
-          path: filePath,
-        });
-      }
-
-      if (totalSize > 0) {
-        this.postProgressMessage(100, 'transferData');
-      }
-
-      const elapsedMs = Date.now() - transferStartTime;
-      Log.log(
-        `[FirmwareUpdateV4] transfer finished transport=${transferTransport} bytes=${totalSize} elapsed=${(
-          elapsedMs / 1000
-        ).toFixed(2)}s speed=${formatProtocolV2TransferSpeed(totalSize, elapsedMs)} KB/s`
-      );
-    } catch (error) {
-      const elapsedMs = Date.now() - transferStartTime;
-      Log.warn(
-        `[FirmwareUpdateV4] transfer failed transport=${transferTransport} bytes=${transferredSize}/${totalSize} elapsed=${(
-          elapsedMs / 1000
-        ).toFixed(2)}s speed=${formatProtocolV2TransferSpeed(transferredSize, elapsedMs)} KB/s`
-      );
-      throw error;
-    }
-
-    this.postTipMessage(FirmwareUpdateTipMessage.ConfirmOnDevice);
-
-    const allTargets = stagedInstallTargets.map(item => ({
-      target_id: item.targetId,
-      path: item.path,
-    }));
-    Log.log(`[FirmwareUpdateV4] DeviceFirmwareUpdateRequest targets=${JSON.stringify(allTargets)}`);
-    await this.protocolV2StartFirmwareUpdate({ targets: allTargets });
-    await this.waitForProtocolV2FirmwareUpdateComplete(allTargets);
+    await executor.run();
+    const features =
+      this.protocolV2LatestFeatures ??
+      (await this.waitForProtocolV2ReconnectAndFeatures(PROTOCOL_V2_FINAL_RECONNECT_TIMEOUT));
+    return this.buildProtocolV2Result(preparedPlan, features);
   }
 
-  private getProtocolV2InstallItemStagingPath(item: ProtocolV2InstallItem) {
-    return `${PROTOCOL_V2_FIRMWARE_STAGING_VOLUME}${item.fileName}`;
+  private async openProtocolV2ExecutionSource(
+    execution: ProtocolV2PreparedExecution,
+    receipt: FirmwareArtifactReceipt
+  ) {
+    return execution.artifactSourceFactory
+      ? execution.artifactSourceFactory(receipt)
+      : openFirmwareArtifactByteSource(execution.registry, receipt);
+  }
+
+  private async readProtocolV2SourceHeader(source: FirmwareByteSource, artifactId: string) {
+    if (source.size < PROTOCOL_V2_OKPP_HEADER_SIZE) {
+      return protocolV2PlanInvalid(
+        `Protocol V2 artifact ${artifactId} is smaller than its payload header`
+      );
+    }
+    const bytes = await source.readAt(0, PROTOCOL_V2_OKPP_HEADER_SIZE);
+    const header = parseProtocolV2PayloadPackageHeader(new Uint8Array(bytes));
+    if (!header) {
+      return protocolV2PlanInvalid(
+        `Protocol V2 artifact ${artifactId} has an invalid payload header`
+      );
+    }
+    return header;
+  }
+
+  private protocolV2ResourceHeadersMatch(
+    local: ReturnType<typeof parseProtocolV2PayloadPackageHeader>,
+    device: ProtocolV2OkppHeader | null
+  ) {
+    return (
+      !!local &&
+      !!device &&
+      local.version === device.version.join('.') &&
+      local.payloadHash === normalizeProtocolV2Hex(device.payloadHash) &&
+      local.headerHash === normalizeProtocolV2Hex(device.headerHash)
+    );
+  }
+
+  private async transferProtocolV2ResourceArtifact(
+    receipt: FirmwareArtifactReceipt,
+    source: FirmwareByteSource,
+    reportProgress: (completed: number, total: number) => Promise<void>
+  ) {
+    if (!receipt.logicalName) {
+      return protocolV2PlanInvalid(
+        `Protocol V2 resource ${receipt.artifactId} has no logical name`
+      );
+    }
+    const devicePath = resolveProtocolV2ResourceBundlePath(receipt.logicalName);
+    const localHeader = await this.readProtocolV2SourceHeader(source, receipt.artifactId);
+    const currentHeader = await this.readProtocolV2DeviceFileHeader(devicePath);
+    if (
+      !this.params.forcedUpdateRes &&
+      this.protocolV2ResourceHeadersMatch(localHeader, currentHeader)
+    ) {
+      this.protocolV2ResourceStatuses.set(receipt.logicalName, 'unchanged');
+      await reportProgress(source.size, source.size);
+      return;
+    }
+
+    await this.protocolV2StreamUpdateProcess({
+      source,
+      filePath: devicePath,
+      reportProgress,
+    });
+    await this.verifyProtocolV2StagedFile(devicePath, receipt.size);
+    const installedHeader = await this.readProtocolV2DeviceFileHeader(devicePath);
+    if (!this.protocolV2ResourceHeadersMatch(localHeader, installedHeader)) {
+      throw createFirmwareUpdateError(
+        FirmwareUpdateErrorCode.FirmwareDeviceStateConflict,
+        `Protocol V2 resource ${receipt.logicalName} failed device header verification`
+      );
+    }
+    this.protocolV2ResourceStatuses.set(receipt.logicalName, 'installed');
+  }
+
+  private async transferProtocolV2FirmwareArtifact(
+    receipt: FirmwareArtifactReceipt,
+    source: FirmwareByteSource,
+    reportProgress: (completed: number, total: number) => Promise<void>
+  ) {
+    const filePath = resolveProtocolV2FirmwareStagingPath(receipt.target);
+    await this.protocolV2StreamUpdateProcess({
+      source,
+      filePath,
+      reportProgress,
+    });
+    await this.verifyProtocolV2StagedFile(filePath, receipt.size);
+  }
+
+  private async protocolV2StreamUpdateProcess({
+    source,
+    filePath,
+    reportProgress,
+  }: {
+    source: FirmwareByteSource;
+    filePath: string;
+    reportProgress: (completed: number, total: number) => Promise<void>;
+  }) {
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT; attempt += 1) {
+      try {
+        return await this.protocolV2WriteByteSource({
+          source,
+          filePath,
+          reportProgress,
+        });
+      } catch (error) {
+        lastError = error;
+        Log.error(
+          `Protocol V2 streamed transfer failed path=${filePath} attempt=${attempt}/${PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT}`,
+          error
+        );
+        if (attempt < PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT) {
+          await this.recoverProtocolV2FileTransfer();
+        }
+      }
+    }
+    throw ERRORS.TypedError(
+      HardwareErrorCode.EmmcFileWriteFirmwareError,
+      `transfer data error: ${getProtocolV2UnknownErrorText(lastError)}`
+    );
+  }
+
+  async protocolV2CommonUpdateProcess({
+    payload,
+    filePath,
+    processedSize,
+    totalSize,
+    onTransferredBytes,
+  }: ProtocolV2MemoryTransferParams) {
+    const buffer =
+      payload instanceof ArrayBuffer
+        ? payload
+        : payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.byteLength);
+    const source = new MemoryByteSource(buffer);
+    try {
+      await this.protocolV2StreamUpdateProcess({
+        source,
+        filePath,
+        reportProgress: completed => {
+          onTransferredBytes?.((processedSize ?? 0) + completed);
+          return Promise.resolve();
+        },
+      });
+      return totalSize === undefined ? 0 : (processedSize ?? 0) + source.size;
+    } finally {
+      await source.close();
+    }
+  }
+
+  private async protocolV2WriteByteSource({
+    source,
+    filePath,
+    reportProgress,
+  }: {
+    source: FirmwareByteSource;
+    filePath: string;
+    reportProgress: (completed: number, total: number) => Promise<void>;
+  }) {
+    const chunkSize = this.getProtocolV2FirmwareChunkSize();
+    let offset = 0;
+    while (offset < source.size) {
+      const requestedLength = Math.min(chunkSize, source.size - offset);
+      const chunk = await source.readAt(offset, requestedLength);
+      if (chunk.byteLength === 0 || chunk.byteLength > requestedLength) {
+        throw createFirmwareUpdateError(
+          FirmwareUpdateErrorCode.FirmwareArtifactReaderInvalid,
+          `Protocol V2 artifact reader returned ${chunk.byteLength} bytes for ${requestedLength}`
+        );
+      }
+      const chunkEnd = offset + chunk.byteLength;
+      const progress = getProtocolV2DeviceTransferProgress(offset, chunkEnd, source.size);
+      const response = await this.fileWriteChunk(
+        filePath,
+        source.size,
+        offset,
+        chunk,
+        offset === 0,
+        progress
+      );
+      const rawProcessedByte = response.message.processed_byte;
+      const nextOffset =
+        rawProcessedByte === undefined ? chunkEnd : Number(response.message.processed_byte);
+      if (!Number.isFinite(nextOffset) || nextOffset <= offset || nextOffset > chunkEnd) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.EmmcFileWriteFirmwareError,
+          `invalid processed_byte ${response.message.processed_byte} for offset ${offset}`
+        );
+      }
+      offset = nextOffset;
+      await reportProgress(offset, source.size);
+      this.postProgressMessage(
+        Math.min(Math.ceil((offset / source.size) * 100), 100),
+        'transferData'
+      );
+    }
+  }
+
+  private async verifyProtocolV2PreparedResources(execution: ProtocolV2PreparedExecution) {
+    const resourceReceipts = execution.preparedPlan.artifactReceipts.filter(
+      receipt => receipt.target === 'resource'
+    );
+    for (const receipt of resourceReceipts) {
+      if (!receipt.logicalName) {
+        return protocolV2PlanInvalid(
+          `Protocol V2 resource ${receipt.artifactId} has no logical name`
+        );
+      }
+      const source = await this.openProtocolV2ExecutionSource(execution, receipt);
+      try {
+        const localHeader = await this.readProtocolV2SourceHeader(source, receipt.artifactId);
+        const deviceHeader = await this.readProtocolV2DeviceFileHeader(
+          resolveProtocolV2ResourceBundlePath(receipt.logicalName)
+        );
+        if (!this.protocolV2ResourceHeadersMatch(localHeader, deviceHeader)) {
+          throw createFirmwareUpdateError(
+            FirmwareUpdateErrorCode.FirmwareDeviceStateConflict,
+            `Protocol V2 resource ${receipt.logicalName} is not installed`
+          );
+        }
+      } finally {
+        await source.close();
+      }
+    }
+  }
+
+  private async queryProtocolV2FirmwareUpdateRecords() {
+    try {
+      const response = await this.device.getCommands().typedCall(
+        'DeviceFirmwareUpdateStatusGet',
+        'DeviceFirmwareUpdateStatus',
+        {
+          fields: {
+            status: true,
+            payload_version: true,
+            path: true,
+          },
+        },
+        { timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT }
+      );
+      return {
+        statusQuerySupported: true,
+        statusAvailable: true,
+        records: (response.message.records ?? []) as ProtocolV2FirmwareUpdateRecord[],
+      };
+    } catch (error) {
+      if (isProtocolV2FirmwareStatusEndpointUnavailable(error)) {
+        return {
+          statusQuerySupported: false,
+          statusAvailable: false,
+          records: [] as ProtocolV2FirmwareUpdateRecord[],
+        };
+      }
+      throw error;
+    }
+  }
+
+  private getProtocolV2ObservedVersions(features: Features) {
+    const versions: Partial<Record<FirmwareTarget, string>> = {
+      bootloader: getDeviceBootloaderVersion(features).join('.'),
+      coprocessor: getDeviceBLEFirmwareVersion(features).join('.'),
+    };
+    if (features.se01Version) versions.se01 = features.se01Version;
+    if (features.se02Version) versions.se02 = features.se02Version;
+    if (features.se03Version) versions.se03 = features.se03Version;
+    if (features.se04Version) versions.se04 = features.se04Version;
+    return versions;
+  }
+
+  private getProtocolV2ObservedHashes(features: Features) {
+    const hashes: Partial<Record<FirmwareTarget, string>> = {};
+    const assign = (target: FirmwareTarget, value?: string) => {
+      if (value) hashes[target] = normalizeProtocolV2Hex(value);
+    };
+    assign('bootloader', features.verify?.bootloaderHash);
+    assign('p1', features.verify?.firmwareHash);
+    assign('p2', features.verify?.firmwareHash);
+    assign('coprocessor', features.verify?.bleHash);
+    assign('se01', features.verify?.se01Hash);
+    assign('se02', features.verify?.se02Hash);
+    assign('se03', features.verify?.se03Hash);
+    assign('se04', features.verify?.se04Hash);
+    return hashes;
+  }
+
+  private async readProtocolV2ObservedState(
+    preparedPlan: PreparedPlan
+  ): Promise<FirmwareObservedDeviceState> {
+    await this.reconnectProtocolV2Device();
+    const deviceInfo = await requestProtocolV2DeviceInfo({
+      commands: this.device.getCommands(),
+      timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
+      request: PROTOCOL_V2_FULL_DEVICE_INFO_REQUEST,
+    });
+    const features = await this.device.probeProtocolV2RuntimeState(
+      deviceInfo,
+      PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT
+    );
+    this.protocolV2LatestFeatures = features;
+    assertProtocolV2ReconnectIdentity(
+      this.protocolV2ExpectedDeviceId,
+      features.deviceId ?? undefined,
+      { allowMissingActual: !!features.bootloaderMode }
+    );
+
+    const status = await this.queryProtocolV2FirmwareUpdateRecords();
+    this.protocolV2LatestStatusRecords = status.records;
+    const versions = this.getProtocolV2ObservedVersions(features);
+    let pendingInstall = false;
+    if (
+      this.protocolV2ActiveEpoch &&
+      (this.protocolV2ActiveEpoch.kind === 'bootloader-install' ||
+        this.protocolV2ActiveEpoch.kind === 'component-install') &&
+      status.statusAvailable
+    ) {
+      const reconciliation = reconcileProtocolV2InstallRecords({
+        epoch: this.protocolV2ActiveEpoch,
+        records: status.records,
+      });
+      Object.assign(versions, reconciliation.versions);
+      pendingInstall = reconciliation.pendingInstall;
+      if (reconciliation.decision === 'finished') {
+        this.protocolV2ActiveEpoch.targetIds.forEach(target =>
+          this.protocolV2InstalledTargets.add(target)
+        );
+      }
+    } else {
+      const activeRecord = status.records.find(
+        record => !isProtocolV2TargetStatusFinished(record.status)
+      );
+      if (activeRecord) {
+        throw createFirmwareUpdateError(
+          FirmwareUpdateErrorCode.FirmwareTransactionConflict,
+          `Protocol V2 has an active install outside the prepared epoch: ${activeRecord.target_id}`
+        );
+      }
+      preparedPlan.epochs
+        .filter(epoch => epoch.kind === 'bootloader-install' || epoch.kind === 'component-install')
+        .forEach(epoch => {
+          const reconciliation = reconcileProtocolV2InstallRecords({
+            epoch,
+            records: status.records,
+          });
+          Object.assign(versions, reconciliation.versions);
+        });
+    }
+
+    if (!status.statusAvailable && this.protocolV2ActiveEpoch?.kind === 'component-install') {
+      const applicationTargets = this.protocolV2ActiveEpoch.targetIds.filter(
+        target => target === 'p1' || target === 'p2'
+      );
+      if (applicationTargets.length === 1) {
+        versions[applicationTargets[0]] = getDeviceFirmwareVersion(features).join('.');
+      }
+    }
+
+    let mode: FirmwareObservedDeviceState['mode'] = 'normal';
+    if (pendingInstall) {
+      mode = 'installing';
+    } else if (features.bootloaderMode) {
+      mode = 'loader';
+    } else if (features.mode !== 'normal') {
+      mode = 'unknown';
+    }
+    return {
+      identity: getDeviceUUID(features) || preparedPlan.device.identity,
+      model: getDeviceType(features),
+      mode,
+      versions,
+      hashes: this.getProtocolV2ObservedHashes(features),
+      pendingInstall,
+      statusQuerySupported: status.statusQuerySupported,
+      statusAvailable: status.statusAvailable,
+    };
+  }
+
+  private assertProtocolV2ExpectedTargets(
+    preparedPlan: PreparedPlan,
+    observed: FirmwareObservedDeviceState,
+    targets: readonly FirmwareTarget[]
+  ) {
+    const targetSet = new Set(targets);
+    preparedPlan.expectedFinalStates.forEach(expected => {
+      if (!targetSet.has(expected.target)) {
+        return;
+      }
+      const versionMatches =
+        expected.version === undefined || observed.versions[expected.target] === expected.version;
+      if (!versionMatches) {
+        throw createFirmwareUpdateError(
+          FirmwareUpdateErrorCode.FirmwareDeviceStateConflict,
+          `Protocol V2 target ${expected.target} did not reach version ${expected.version}`
+        );
+      }
+    });
+  }
+
+  private buildProtocolV2Result(
+    preparedPlan: PreparedPlan,
+    features: Features
+  ): FirmwareUpdateV4Result {
+    const observedVersions = this.getProtocolV2ObservedVersions(features);
+    const observedHashes = this.getProtocolV2ObservedHashes(features);
+    const finishedVersions: Partial<Record<FirmwareTarget, string>> = {};
+    this.protocolV2LatestStatusRecords.forEach(record => {
+      const targetId = normalizeProtocolV2TargetId(record.target_id);
+      const descriptor =
+        targetId === undefined ? undefined : getProtocolV2FirmwareTargetDescriptorById(targetId);
+      if (
+        descriptor &&
+        isProtocolV2TargetStatusFinished(record.status) &&
+        typeof record.payload_version === 'number'
+      ) {
+        finishedVersions[descriptor.target] = protocolV2PackedVersionToString(
+          record.payload_version
+        );
+      }
+    });
+
+    const targets: FirmwareUpdateV4TargetResult[] = preparedPlan.expectedFinalStates.map(
+      expected => {
+        let status: FirmwareUpdateV4TargetResult['status'] = 'verified';
+        if (expected.target === 'resource') {
+          const resourceStatuses = [...this.protocolV2ResourceStatuses.values()];
+          if (resourceStatuses.some(value => value === 'installed')) {
+            status = 'installed';
+          } else if (resourceStatuses.length > 0) {
+            status = 'unchanged';
+          }
+        } else if (this.protocolV2InstalledTargets.has(expected.target)) {
+          status = 'installed';
+        }
+        const version = finishedVersions[expected.target] ?? observedVersions[expected.target];
+        const hash =
+          observedHashes[expected.target] ??
+          (expected.target === 'resource' ? expected.sha256 : undefined);
+        return {
+          target: expected.target,
+          ...(version ? { version } : {}),
+          ...(hash ? { hash } : {}),
+          status,
+        };
+      }
+    );
+
+    return {
+      bootloaderVersion: getDeviceBootloaderVersion(features).join('.'),
+      bleVersion: getDeviceBLEFirmwareVersion(features).join('.'),
+      firmwareVersion: getDeviceFirmwareVersion(features).join('.'),
+      targets,
+    };
   }
 
   private async verifyProtocolV2StagedFile(path: string, expectedSize: number) {
@@ -1251,27 +1869,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     await this.protocolV2Reboot(DeviceRebootType.Normal);
   }
 
-  private async waitForProtocolV2FinalFeatures() {
-    const features = await this.waitForProtocolV2ReconnectAndFeatures(
-      PROTOCOL_V2_FINAL_RECONNECT_TIMEOUT
-    );
-
-    const bootloaderVersion = getDeviceBootloaderVersion(features).join('.');
-    const bleVersion = getDeviceBLEFirmwareVersion(features).join('.');
-    const firmwareVersion = getDeviceFirmwareVersion(features).join('.');
-    if (firmwareVersion === '0.0.0') {
-      Log.warn(
-        'Protocol V2 firmware update finished but app firmware version is still 0.0.0. This is allowed for Pro2 debug BLE-only update flows.'
-      );
-    }
-
-    return {
-      bootloaderVersion,
-      bleVersion,
-      firmwareVersion,
-    };
-  }
-
   private async waitForProtocolV2ReconnectAndFeatures(timeout: number) {
     const startTime = Date.now();
     let lastError: unknown;
@@ -1395,96 +1992,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
   private isProtocolV2ReconnectIdentityMismatch(error: unknown) {
     return this.normalizeErrorMessage(error).includes('Protocol V2 reconnect identity mismatch');
-  }
-
-  private async protocolV2CommonUpdateProcess(params: ProtocolV2FileTransferParams) {
-    let lastError: unknown;
-    for (let attempt = 1; attempt <= PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT; attempt += 1) {
-      try {
-        return await this.protocolV2WriteWholeFile(params);
-      } catch (error) {
-        lastError = error;
-        Log.error(
-          `Protocol V2 file transfer failed path=${params.filePath} attempt=${attempt}/${PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT}; restarting from offset 0`,
-          error
-        );
-        if (attempt === PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT) {
-          break;
-        }
-        await this.recoverProtocolV2FileTransfer();
-      }
-    }
-
-    throw ERRORS.TypedError(
-      HardwareErrorCode.EmmcFileWriteFirmwareError,
-      `transfer data error: ${getProtocolV2UnknownErrorText(lastError)}`
-    );
-  }
-
-  private async protocolV2WriteWholeFile({
-    payload,
-    filePath,
-    processedSize,
-    totalSize,
-    onTransferredBytes,
-  }: ProtocolV2FileTransferParams) {
-    const chunkSize = this.getProtocolV2FirmwareChunkSize();
-    let offset = 0;
-    const getUploadProgress = (fileOffset: number) => {
-      if (totalSize !== undefined && processedSize !== undefined) {
-        return Math.min(Math.ceil(((processedSize + fileOffset) / totalSize) * 100), 99);
-      }
-      return Math.min(Math.ceil((fileOffset / payload.byteLength) * 100), 99);
-    };
-
-    while (offset < payload.byteLength) {
-      const chunkEnd = Math.min(offset + chunkSize, payload.byteLength);
-      const chunkLength = chunkEnd - offset;
-      const chunk = payload.slice(offset, chunkEnd);
-      const overwrite = offset === 0;
-      const progress = getProtocolV2DeviceTransferProgress(
-        (processedSize ?? 0) + offset,
-        (processedSize ?? 0) + chunkEnd,
-        totalSize ?? payload.byteLength
-      );
-
-      const writeRes = await this.fileWriteChunk(
-        filePath,
-        payload.byteLength,
-        offset,
-        chunk,
-        overwrite,
-        progress
-      );
-      const rawProcessedByte = writeRes.message.processed_byte;
-      const processedByte = Number(rawProcessedByte);
-      const nextOffset = rawProcessedByte === undefined ? offset + chunkLength : processedByte;
-      if (!Number.isFinite(nextOffset) || nextOffset <= offset || nextOffset > chunkEnd) {
-        throw ERRORS.TypedError(
-          HardwareErrorCode.EmmcFileWriteFirmwareError,
-          `invalid processed_byte ${writeRes.message.processed_byte} for offset ${offset}`
-        );
-      }
-      offset = nextOffset;
-      onTransferredBytes?.((processedSize ?? 0) + offset);
-      this.postProgressMessage(getUploadProgress(offset), 'transferData');
-    }
-
-    return totalSize !== undefined ? (processedSize ?? 0) + payload.byteLength : 0;
-  }
-
-  private getProtocolV2FirmwareTransferTransport() {
-    const env = DataManager.getSettings('env');
-    if (env && DataManager.isBleConnect(env)) {
-      return 'BLE';
-    }
-    if (
-      env &&
-      (DataManager.isBrowserWebUsb(env) || DataManager.isDesktopWebUsb(env) || env === 'web')
-    ) {
-      return 'WebUSB';
-    }
-    return env ?? 'unknown';
   }
 
   private async fileWriteChunk(

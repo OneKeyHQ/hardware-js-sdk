@@ -10,6 +10,7 @@ import {
   getDeviceBootloaderVersion,
   getDeviceFirmwareVersion,
   getDeviceType,
+  getDeviceUUID,
   getFirmwareType,
   getLogger,
 } from '../utils';
@@ -18,11 +19,31 @@ import { DataManager } from '../data-manager';
 import { FirmwareUpdateBaseMethod } from './firmware/FirmwareUpdateBaseMethod';
 import { DevicePool } from '../device/DevicePool';
 import { DEVICE } from '../events';
+import {
+  FirmwareHostBindingRegistry,
+  FirmwareUpdateErrorCode,
+  MemoryByteSource,
+  RecoverableFirmwareExecutor,
+  createFirmwareUpdateError,
+  createLegacyV3MemoryPreparedPlan,
+  firmwareHostBindingRegistry,
+  resolveFirmwareArtifactDevicePath,
+  validateFirmwareArchiveEntryId,
+  validateFirmwareLogicalName,
+  validatePreparedPlan,
+} from '../firmware-update';
 import { buildProtocolV1FeaturesPayload } from '../deviceProfile';
 
 import type { FirmwareUpdateV3Params } from '../types/api/firmwareUpdate';
 import type { Deferred, EFirmwareType } from '@onekeyfe/hd-shared';
 import type { TypedResponseMessage } from '../device/DeviceCommands';
+import type {
+  FirmwareArtifactReceipt,
+  FirmwareObservedDeviceState,
+  LegacyV3ResourceEntry,
+  PreparedPlan,
+} from '../firmware-update';
+import type { Features } from '../types';
 
 const Log = getLogger(LoggerNames.Method);
 
@@ -44,6 +65,10 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
 
   private isSwitchFirmware = false;
 
+  private latestObservedFeatures: Features | null = null;
+
+  private installRequested = false;
+
   init() {
     this.allowDeviceMode = [UI_REQUEST.BOOTLOADER, UI_REQUEST.NOT_INITIALIZE];
     this.requireDeviceMode = [];
@@ -61,11 +86,43 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
       { name: 'forcedUpdateRes', type: 'boolean' },
       { name: 'bootloaderVersion', type: 'array' },
       { name: 'bootloaderBinary', type: 'buffer' },
+      { name: 'preparedPlan', type: 'object' },
+      { name: 'firmwareCheckpoint', type: 'object' },
+      { name: 'firmwareTransactionId', type: 'string' },
       { name: 'firmwareType', type: 'string' },
       { name: 'platform', type: 'string' },
     ]);
 
+    const legacyArtifactKeys = [
+      'bleVersion',
+      'bleBinary',
+      'firmwareVersion',
+      'firmwareBinary',
+      'resourceBinary',
+      'forcedUpdateRes',
+      'bootloaderVersion',
+      'bootloaderBinary',
+    ] as const;
+    if (
+      payload.preparedPlan &&
+      legacyArtifactKeys.some(key => Object.prototype.hasOwnProperty.call(payload, key))
+    ) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.CallMethodInvalidParameter,
+        'preparedPlan cannot be combined with legacy firmware inputs'
+      );
+    }
+    if (payload.firmwareCheckpoint && !payload.preparedPlan) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.CallMethodInvalidParameter,
+        'firmwareCheckpoint requires preparedPlan'
+      );
+    }
+
     this.params = {
+      preparedPlan: payload.preparedPlan,
+      firmwareCheckpoint: payload.firmwareCheckpoint,
+      firmwareTransactionId: payload.firmwareTransactionId,
       bleBinary: payload.bleBinary,
       firmwareBinary: payload.firmwareBinary,
       forcedUpdateRes: payload.forcedUpdateRes,
@@ -96,48 +153,220 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
   private async runProtocolV1() {
     const { device } = this;
     const { features } = device;
+    if (!features) {
+      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Device features not available');
+    }
 
     const deviceType = getDeviceType(features);
     const bootloaderCurrVersion = getDeviceBootloaderVersion(features).join('.');
 
     this.validateDeviceAndVersion(deviceType, bootloaderCurrVersion);
 
-    if (!features) {
-      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Device features not available');
-    }
-
     const deviceFirmwareType = getFirmwareType(features);
     const firmwareType = this.params.firmwareType ?? deviceFirmwareType;
     this.isSwitchFirmware = firmwareType !== deviceFirmwareType;
 
-    let resourceBinary: ArrayBuffer | null = null;
-    let fwBinaryMap: { fileName: string; binary: ArrayBuffer }[] = [];
-    let bootloaderBinary: ArrayBuffer | null = null;
-    try {
-      this.postTipMessage(FirmwareUpdateTipMessage.StartDownloadFirmware);
-      resourceBinary = await this.prepareResourceBinary(firmwareType);
-      fwBinaryMap = await this.prepareFirmwareAndBleBinary(firmwareType);
-      bootloaderBinary = await this.prepareBootloaderBinary(firmwareType);
-      this.postTipMessage(FirmwareUpdateTipMessage.FinishDownloadFirmware);
-    } catch (err) {
-      throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
+    let preparedPlan: PreparedPlan;
+    let binariesByArtifactRef: ReadonlyMap<string, ArrayBuffer> | undefined;
+    let registry = firmwareHostBindingRegistry;
+    const isLegacyExecution = !this.params.preparedPlan;
+    if (this.params.preparedPlan) {
+      preparedPlan = validatePreparedPlan(this.params.preparedPlan);
+    } else {
+      try {
+        this.postTipMessage(FirmwareUpdateTipMessage.StartDownloadFirmware);
+        const resourceBinary = await this.prepareResourceBinary(firmwareType);
+        const resourceEntries = resourceBinary
+          ? await this.prepareLegacyResourceEntries(resourceBinary)
+          : [];
+        const fwBinaryMap = await this.prepareFirmwareAndBleBinary(firmwareType);
+        const bootloaderBinary = await this.prepareBootloaderBinary(firmwareType);
+        if (!bootloaderBinary && fwBinaryMap.length === 0) {
+          throw new Error('No firmware to update');
+        }
+        const legacy = createLegacyV3MemoryPreparedPlan({
+          device: {
+            identity: getDeviceUUID(features),
+            model: deviceType,
+            firmwareType,
+          },
+          ...(resourceBinary ? { resourceArchive: resourceBinary, resourceEntries } : {}),
+          ...(bootloaderBinary
+            ? {
+                bootloaderBinary,
+                bootloaderVersion: this.params.bootloaderVersion?.join('.'),
+              }
+            : {}),
+          ...(fwBinaryMap.find(item => item.target === 'firmware')?.binary
+            ? {
+                firmwareBinary: fwBinaryMap.find(item => item.target === 'firmware')?.binary,
+                firmwareVersion: this.params.firmwareVersion?.join('.'),
+              }
+            : {}),
+          ...(fwBinaryMap.find(item => item.target === 'ble')?.binary
+            ? {
+                bleBinary: fwBinaryMap.find(item => item.target === 'ble')?.binary,
+                bleVersion: this.params.bleVersion?.join('.'),
+              }
+            : {}),
+        });
+        preparedPlan = legacy.preparedPlan;
+        binariesByArtifactRef = legacy.binariesByArtifactRef;
+        registry = this.createMemoryFirmwareRegistry();
+        this.postTipMessage(FirmwareUpdateTipMessage.FinishDownloadFirmware);
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : err;
+        throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, detail);
+      }
     }
 
-    if (!bootloaderBinary && fwBinaryMap.length === 0) {
+    const installEpoch = [...preparedPlan.epochs]
+      .reverse()
+      .find(epoch => epoch.kind === 'component-install' || epoch.kind === 'bootloader-install');
+    if (!installEpoch) {
       throw ERRORS.TypedError(
         HardwareErrorCode.FirmwareUpdateDownloadFailed,
-        'No firmware to update'
+        'No installable firmware artifact was prepared'
       );
     }
+    const executableReceipts = preparedPlan.artifactReceipts.filter(receipt =>
+      preparedPlan.epochs.some(epoch => epoch.artifactIds.includes(receipt.artifactId))
+    );
+    const totalSize = executableReceipts.reduce((sum, receipt) => sum + receipt.size, 0);
+    let processedSize = 0;
+    let updatesFolderReady = false;
+    let transferStarted = false;
+    let loaderEntered = Boolean(features.bootloader_mode);
+    let updateResult: Awaited<ReturnType<FirmwareUpdateV3['waitForFirmwareInstall']>> | undefined;
+    this.installRequested =
+      this.params.firmwareCheckpoint?.state === 'INSTALL_REQUESTED' ||
+      this.params.firmwareCheckpoint?.state === 'INSTALLING';
 
-    await this.enterBootloaderMode();
-
-    const updateResult = await this.executeUpdate({
-      resourceBinary,
-      fwBinaryMap,
-      bootloaderBinary,
+    const executor = new RecoverableFirmwareExecutor({
+      preparedPlan,
+      transactionId:
+        this.params.firmwareTransactionId ??
+        `${preparedPlan.planId}:${preparedPlan.device.identity}`,
+      registry,
+      initialCheckpoint: this.params.firmwareCheckpoint,
+      ...(binariesByArtifactRef
+        ? {
+            artifactSourceFactory: (receipt: FirmwareArtifactReceipt) => {
+              const binary = binariesByArtifactRef?.get(receipt.artifactRef);
+              if (!binary) {
+                return Promise.reject(
+                  new Error(`Legacy firmware artifact ${receipt.artifactId} is unavailable`)
+                );
+              }
+              return Promise.resolve(new MemoryByteSource(binary));
+            },
+          }
+        : {}),
+      driver: {
+        readDeviceState: () => Promise.resolve(this.getObservedDeviceState(deviceType)),
+        requiresLoaderTransition: epoch => !loaderEntered && epoch.artifactIds.length > 0,
+        enterLoader: async () => {
+          await this.enterBootloaderMode();
+          loaderEntered = true;
+        },
+        transferArtifact: async ({ receipt, source, reportProgress }) => {
+          if (!transferStarted) {
+            this.postTipMessage(FirmwareUpdateTipMessage.StartTransferData);
+            transferStarted = true;
+          }
+          if ((receipt.target === 'firmware' || receipt.target === 'ble') && !updatesFolderReady) {
+            await this.createUpdatesFolderIfNotExists('0:updates/');
+            updatesFolderReady = true;
+          }
+          const filePath = resolveFirmwareArtifactDevicePath(receipt);
+          processedSize = await this.emmcCommonUpdateFromByteSource({
+            source,
+            filePath,
+            processedSize,
+            totalSize,
+            reportProgress,
+          });
+        },
+        stageEpoch: async ({ epoch }) => {
+          if (isLegacyExecution && epoch.epochId === installEpoch.epochId) {
+            await this.requestFirmwareInstall();
+            updateResult = await this.waitForFirmwareInstall();
+          }
+        },
+        requiresInstall: epoch => !isLegacyExecution && epoch.epochId === installEpoch.epochId,
+        requestInstall: async () => {
+          await this.requestFirmwareInstall();
+        },
+        waitForInstall: async () => {
+          updateResult = await this.waitForFirmwareInstall();
+        },
+        verifyFinal: ({ expectedPlan }) => {
+          const observed = this.getObservedDeviceState(deviceType);
+          const mismatchedState = expectedPlan.expectedFinalStates.find(
+            state =>
+              state.version !== undefined && observed.versions[state.target] !== state.version
+          );
+          if (mismatchedState) {
+            throw createFirmwareUpdateError(
+              FirmwareUpdateErrorCode.FirmwareDeviceStateConflict,
+              `Firmware target ${mismatchedState.target} did not reach version ${mismatchedState.version}`
+            );
+          }
+          return Promise.resolve();
+        },
+      },
     });
-    return updateResult;
+    await executor.run();
+
+    return updateResult ?? this.getCurrentVersionResult();
+  }
+
+  private createMemoryFirmwareRegistry() {
+    const registry = new FirmwareHostBindingRegistry();
+    const unavailableReader = () =>
+      Promise.reject(
+        ERRORS.TypedError(
+          HardwareErrorCode.FirmwareArtifactReaderInvalid,
+          'Memory firmware execution uses a direct byte source'
+        )
+      );
+    registry.register({
+      artifactReader: {
+        open: unavailableReader,
+        read: unavailableReader,
+        close: () => Promise.resolve(),
+        cancel: () => Promise.resolve(),
+      },
+      checkpointSink: {
+        commit: () => Promise.resolve(),
+      },
+    });
+    return registry;
+  }
+
+  private async prepareLegacyResourceEntries(
+    resourceBinary: ArrayBuffer
+  ): Promise<LegacyV3ResourceEntry[]> {
+    const archive = await JSZip.loadAsync(resourceBinary);
+    const logicalNames = new Set<string>();
+    const entries: LegacyV3ResourceEntry[] = [];
+    for (const [entryId, entry] of Object.entries(archive.files)) {
+      if (!entry.dir && !entryId.includes('__MACOSX')) {
+        const safeEntryId = validateFirmwareArchiveEntryId(entryId);
+        const logicalName = validateFirmwareLogicalName(safeEntryId.split('/').at(-1) ?? '');
+        const logicalKey = logicalName.normalize('NFC').toLowerCase();
+        if (logicalNames.has(logicalKey)) {
+          throw new Error(`Legacy resource archive contains colliding entry ${logicalName}`);
+        }
+        logicalNames.add(logicalKey);
+        entries.push({
+          entryId: safeEntryId,
+          logicalName,
+          binary: await entry.async('arraybuffer'),
+        });
+      }
+    }
+    return entries;
   }
 
   private validateDeviceAndVersion(deviceType: EDeviceType, bootloaderVersion: string) {
@@ -195,9 +424,14 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
   }
 
   private async prepareFirmwareAndBleBinary(firmwareType: EFirmwareType) {
-    const fwBinaryMap: { fileName: string; binary: ArrayBuffer }[] = [];
+    const fwBinaryMap: {
+      target: 'firmware' | 'ble';
+      fileName: string;
+      binary: ArrayBuffer;
+    }[] = [];
     if (this.params.firmwareBinary) {
       fwBinaryMap.push({
+        target: 'firmware',
         fileName: 'firmware.bin',
         binary: this.params.firmwareBinary,
       });
@@ -214,6 +448,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
           })
         ).binary;
         fwBinaryMap.push({
+          target: 'firmware',
           fileName: 'firmware.bin',
           binary: firmwareBinary,
         });
@@ -222,6 +457,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
 
     if (this.params.bleBinary) {
       fwBinaryMap.push({
+        target: 'ble',
         fileName: 'ble-firmware.bin',
         binary: this.params.bleBinary,
       });
@@ -235,6 +471,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
           firmwareType,
         });
         fwBinaryMap.push({
+          target: 'ble',
           fileName: 'ble-firmware.bin',
           binary: bleBinary.binary,
         });
@@ -243,83 +480,60 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     return fwBinaryMap;
   }
 
-  private async executeUpdate({
-    resourceBinary,
-    fwBinaryMap,
-    bootloaderBinary,
-  }: {
-    resourceBinary: ArrayBuffer | null;
-    fwBinaryMap: { fileName: string; binary: ArrayBuffer }[];
-    bootloaderBinary: ArrayBuffer | null;
-  }) {
-    let totalSize = 0;
-    let processedSize = 0;
-
-    if (resourceBinary) {
-      totalSize += resourceBinary.byteLength;
+  private getCurrentVersionResult() {
+    const features = this.latestObservedFeatures ?? this.device.features;
+    if (!features) {
+      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Device features not available');
     }
-    for (const fwbinary of fwBinaryMap) {
-      totalSize += fwbinary.binary.byteLength;
+    return {
+      bootloaderVersion: getDeviceBootloaderVersion(features).join('.'),
+      bleVersion: getDeviceBLEFirmwareVersion(features).join('.'),
+      firmwareVersion: getDeviceFirmwareVersion(features).join('.'),
+    };
+  }
+
+  private getObservedDeviceState(deviceType: EDeviceType): FirmwareObservedDeviceState {
+    const features = this.latestObservedFeatures ?? this.device.features;
+    if (!features) {
+      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Device features not available');
     }
-    if (bootloaderBinary) {
-      totalSize += bootloaderBinary.byteLength;
+    const versions = this.getCurrentVersionResult();
+    let mode: FirmwareObservedDeviceState['mode'] = 'normal';
+    if (this.installRequested) {
+      mode = 'installing';
+    } else if (this.device.features?.bootloader_mode) {
+      mode = 'loader';
     }
+    return {
+      identity: getDeviceUUID(features),
+      model: deviceType,
+      mode,
+      versions: {
+        bootloader: versions.bootloaderVersion,
+        ble: versions.bleVersion,
+        firmware: versions.firmwareVersion,
+      },
+      pendingInstall: this.installRequested,
+      statusQuerySupported: true,
+      statusAvailable: true,
+    };
+  }
 
-    this.postTipMessage(FirmwareUpdateTipMessage.StartTransferData);
-
-    // Process resource zip contents
-    if (resourceBinary) {
-      const file = await JSZip.loadAsync(resourceBinary);
-      const files = Object.entries(file.files);
-      for (const [fileName, file] of files) {
-        const name = fileName.split('/').pop();
-        if (!file.dir && fileName.indexOf('__MACOSX') === -1 && name) {
-          const data = await file.async('arraybuffer');
-          processedSize = await this.emmcCommonUpdateProcess({
-            payload: data,
-            filePath: `0:res/${name}`,
-            processedSize,
-            totalSize,
-          });
-        }
-      }
-    }
-
-    if (bootloaderBinary) {
-      processedSize = await this.emmcCommonUpdateProcess({
-        payload: bootloaderBinary,
-        filePath: `0:boot/bootloader.bin`,
-        processedSize,
-        totalSize,
-      });
-    }
-
-    await this.createUpdatesFolderIfNotExists(`0:updates/`);
-
-    for (const fwbinary of fwBinaryMap) {
-      if (fwbinary) {
-        processedSize = await this.emmcCommonUpdateProcess({
-          payload: fwbinary.binary,
-          filePath: `0:updates/${fwbinary.fileName}`,
-          processedSize,
-          totalSize,
-        });
-      }
-    }
-
-    // trigger firmware update
+  private async requestFirmwareInstall() {
     try {
+      await this.createUpdatesFolderIfNotExists('0:updates/');
       this.postTipMessage(FirmwareUpdateTipMessage.ConfirmOnDevice);
-      await this.startEmmcFirmwareUpdate({ path: '0:updates' });
+      await this.startEmmcFirmwareUpdate({
+        path: '0:updates',
+      });
+      this.installRequested = true;
     } catch (error) {
       Log.error('triggerFirmwareUpdateEmmc error: ', error);
-      // Re-throw errors with specific error codes that should not be ignored
       if (error?.errorCode) {
         const unexpectedError = [
           HardwareErrorCode.ActionCancelled,
           HardwareErrorCode.CallQueueActionCancelled,
           HardwareErrorCode.FirmwareVerificationFailed,
-          // BLE connection errors
           HardwareErrorCode.BleDeviceNotBonded,
           HardwareErrorCode.BleServiceNotFound,
           HardwareErrorCode.BlePoweredOff,
@@ -330,7 +544,6 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
           HardwareErrorCode.BleCharacteristicNotifyError,
           HardwareErrorCode.BleTimeoutError,
           HardwareErrorCode.BleWriteCharacteristicError,
-          // Web device errors
           HardwareErrorCode.WebDeviceNotFoundOrNeedsPermission,
         ];
 
@@ -338,28 +551,25 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
           throw error;
         }
       }
-
-      // Wrap and re-throw all other errors
       throw ERRORS.TypedError(
         HardwareErrorCode.FirmwareError,
         error?.message || 'Firmware update failed'
       );
     }
+  }
 
-    // wait for 1.5s to ensure the device is in update mode
+  private async waitForFirmwareInstall() {
     await wait(1500);
     this.postProcessingMessage('firmware');
     this.postProgressMessage(0, 'installingFirmware');
-    // Add timeout of 5 minutes
     const installStartTime = Date.now();
-    const maxWaitTimeForInstallingFirmware = 5 * 60 * 1000; // 5 minutes in milliseconds
+    const maxWaitTimeForInstallingFirmware = 5 * 60 * 1000;
 
     let getFeaturesTimeoutCount = 0;
     const maxGetFeaturesTimeoutBeforeReauth = 3;
 
     // eslint-disable-next-line no-constant-condition
     while (true) {
-      // Check if timeout exceeded
       if (Date.now() - installStartTime > maxWaitTimeForInstallingFirmware) {
         throw ERRORS.TypedError(
           HardwareErrorCode.RuntimeError,
@@ -388,11 +598,12 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
         ]);
         getFeaturesTimeoutCount = 0;
         const features = buildProtocolV1FeaturesPayload(featuresRes.message, this.device.features);
+        this.latestObservedFeatures = features;
         const bootloaderVersion = getDeviceBootloaderVersion(features).join('.');
         const bleVersion = getDeviceBLEFirmwareVersion(features).join('.');
         const firmwareVersion = getDeviceFirmwareVersion(features).join('.');
-        // Treat update as complete once firmware version becomes non-zero
         if (firmwareVersion !== '0.0.0') {
+          this.installRequested = false;
           this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdateCompleted);
           DevicePool.resetState();
           return {
@@ -401,7 +612,6 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
             firmwareVersion,
           };
         }
-        // Still in update mode; continue polling (e.g., iOS may return firmwareVersion 0.0.0 during switches)
         await wait(1000);
       } catch (error) {
         Log.log('getFeatures error', error);
@@ -414,7 +624,6 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
           shouldReconnect = false;
         } else if (this.isGetFeaturesTimeoutError(error)) {
           getFeaturesTimeoutCount += 1;
-          // Retry transient GetFeatures timeouts to avoid unnecessary WebUSB re-authorization prompts.
           if (getFeaturesTimeoutCount <= maxGetFeaturesTimeoutBeforeReauth) {
             await wait(1000);
             shouldReconnect = false;
@@ -425,15 +634,10 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
 
         if (shouldReconnect) {
           await wait(1000);
-          /**
-           * Needs second reconnect case:
-           * 1. While including 'Ble firmwware' in ble connect type
-           * 2. While including bootloader upgrade
-           */
           const reconnectTimeout =
             this.isBleReconnect() && (this.params.bleBinary || this.params.bleVersion)
-              ? 3 * 60 * 1000 // 3 minutes for BLE reconnect
-              : 60 * 1000; // 1 minute for normal reconnect
+              ? 3 * 60 * 1000
+              : 60 * 1000;
 
           getFeaturesTimeoutCount = 0;
           await this.waitForDeviceReconnect(reconnectTimeout);

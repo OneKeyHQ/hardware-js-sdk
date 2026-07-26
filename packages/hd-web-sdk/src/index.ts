@@ -23,21 +23,38 @@ import HardwareSdk, {
 import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import * as iframe from './iframe/builder';
+import { FirmwareHostChannel } from './firmware/FirmwareHostChannel';
+import {
+  getFirmwareHostChannelTargetOrigin,
+  normalizeFirmwareHostChannelEventOrigin,
+} from './firmware/FirmwareHostChannelProtocol';
 import JSBridgeConfig from './iframe/bridge-config';
-import { createJsBridge, hostBridge, resetListenerFlag, sendMessage } from './utils/bridgeUtils';
+import {
+  createJsBridge,
+  getJsBridgeGeneration,
+  hostBridge,
+  resetListenerFlag,
+  sendMessage,
+} from './utils/bridgeUtils';
 import { getHost } from './utils/urlUtils';
 
 import type {
   ConnectSettings,
   CoreMessage,
+  FirmwareUpdateHostBinding,
   PostMessageEvent,
   UiResponseEvent,
 } from '@onekeyfe/hd-core';
+
+export * from './firmware/FirmwareHostChannel';
+export * from './firmware/FirmwareHostChannelProtocol';
 
 const eventEmitter = new EventEmitter();
 const Log = getLogger(LoggerNames.Connect);
 
 let _settings = parseConnectSettings();
+let firmwareHostChannelBinding: FirmwareUpdateHostBinding | undefined;
+let firmwareHostChannel: FirmwareHostChannel | undefined;
 
 export const isOriginWhitelisted = (origin: string) => {
   const host = getHost(origin);
@@ -55,6 +72,11 @@ const handleMessage = async (message: CoreMessage) => {
     case UI_EVENT:
       if (message.type === IFRAME.INIT_BRIDGE) {
         iframe.initPromise.resolve();
+        if (firmwareHostChannelBinding) {
+          connectFirmwareHostChannel().catch(error => {
+            Log.error('Firmware host channel handshake failed', error);
+          });
+        }
         return Promise.resolve({ success: true, payload: 'JSBridge Handshake Success' });
       }
 
@@ -95,6 +117,62 @@ const handleMessage = async (message: CoreMessage) => {
   }
 };
 
+const createFirmwareHostChannelSessionId = () => {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return `firmware-${Array.from(bytes)
+    .map(value => value.toString(16).padStart(2, '0'))
+    .join('')}`;
+};
+
+const connectFirmwareHostChannel = async () => {
+  const binding = firmwareHostChannelBinding;
+  const targetWindow = iframe.instance?.contentWindow;
+  const generation = getJsBridgeGeneration(true);
+  if (!binding || !targetWindow || !hostBridge || generation <= 0) {
+    throw ERRORS.TypedError(HardwareErrorCode.IFrameNotInitialized);
+  }
+  const previousChannel = firmwareHostChannel;
+  firmwareHostChannel = undefined;
+  await previousChannel?.dispose();
+  if (
+    binding !== firmwareHostChannelBinding ||
+    targetWindow !== iframe.instance?.contentWindow ||
+    generation !== getJsBridgeGeneration(true)
+  ) {
+    throw ERRORS.TypedError(HardwareErrorCode.IFrameNotInitialized);
+  }
+  const channel = new FirmwareHostChannel({
+    binding,
+    targetWindow,
+    targetOrigin: getFirmwareHostChannelTargetOrigin(iframe.origin),
+    sessionId: createFirmwareHostChannelSessionId(),
+    generation,
+  });
+  firmwareHostChannel = channel;
+  try {
+    return await channel.connect();
+  } catch (error) {
+    if (firmwareHostChannel === channel) {
+      firmwareHostChannel = undefined;
+    }
+    await channel.dispose();
+    throw error;
+  }
+};
+
+export const registerFirmwareHostChannelBinding = async (binding: FirmwareUpdateHostBinding) => {
+  firmwareHostChannelBinding = binding;
+  return connectFirmwareHostChannel();
+};
+
+export const unregisterFirmwareHostChannelBinding = async () => {
+  firmwareHostChannelBinding = undefined;
+  const channel = firmwareHostChannel;
+  firmwareHostChannel = undefined;
+  await channel?.dispose();
+};
+
 function checkTrust(settings: ConnectSettings) {
   const hasTrust =
     isOriginWhitelisted(settings.parentOrigin ?? '') ||
@@ -108,6 +186,10 @@ function checkTrust(settings: ConnectSettings) {
 const dispose = () => {
   checkTrust(_settings);
   eventEmitter.removeAllListeners();
+  firmwareHostChannelBinding = undefined;
+  const activeFirmwareHostChannel = firmwareHostChannel;
+  firmwareHostChannel = undefined;
+  activeFirmwareHostChannel?.dispose().catch(() => undefined);
   iframe.dispose();
   _settings = parseConnectSettings();
   window.removeEventListener('message', createJSBridge);
@@ -135,7 +217,11 @@ const cancelOperation = (operationId: string) => {
 
 let prevFrameInstance: Window | null | undefined = null;
 const createJSBridge = (messageEvent: PostMessageEvent) => {
-  if (messageEvent.origin !== iframe.origin) {
+  if (
+    messageEvent.source !== iframe.instance?.contentWindow ||
+    normalizeFirmwareHostChannelEventOrigin(messageEvent.origin) !==
+      normalizeFirmwareHostChannelEventOrigin(iframe.origin)
+  ) {
     return;
   }
   if (!hostBridge || prevFrameInstance !== iframe.instance?.contentWindow) {
@@ -146,7 +232,7 @@ const createJSBridge = (messageEvent: PostMessageEvent) => {
       remoteFrameName: JSBridgeConfig.iframeName,
       selfFrameName: JSBridgeConfig.hostName,
       channel: JSBridgeConfig.channel,
-      targetOrigin: iframe.origin,
+      targetOrigin: getFirmwareHostChannelTargetOrigin(iframe.origin),
 
       receiveHandler: async messageEvent => {
         const message = parseMessage(messageEvent);
@@ -327,4 +413,10 @@ const HardwareWebSdk = HardwareSdk({
   switchTransport,
 });
 
-export default { HardwareSDKLowLevel, HardwareSDKTopLevel, HardwareWebSdk };
+export default {
+  HardwareSDKLowLevel,
+  HardwareSDKTopLevel,
+  HardwareWebSdk,
+  registerFirmwareHostChannelBinding,
+  unregisterFirmwareHostChannelBinding,
+};

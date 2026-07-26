@@ -12,6 +12,7 @@ export type {
 } from './btcSignTransaction';
 
 export type { CipheredKeyValue, CipheredKeyValueParams } from './cipherKeyValue';
+export type { GetFirmwareUpdateCapabilities } from './firmwareUpdateTransaction';
 
 export type { DeviceChangePinParams } from './deviceChangePin';
 export type { DeviceFlagsParams } from './deviceFlags';
@@ -29,6 +30,8 @@ export type {
   FirmwareUpdateBinaryParams,
   FirmwareUpdateV3Params,
   FirmwareUpdateV4Params,
+  FirmwareUpdateV4Result,
+  FirmwareUpdateV4TargetResult,
 } from './firmwareUpdate';
 export type { AllFirmwareRelease } from './checkAllFirmwareRelease';
 

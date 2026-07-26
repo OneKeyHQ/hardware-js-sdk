@@ -451,7 +451,7 @@ const onCallDevice = async (
       // Defective-batch and forced-update gates depend on V1 features/remote config.
       // Pro2 joins after DataManager supports its profile firmwareStatus.
       if (device.features && !device.isProtocolV2()) {
-        await DataManager.checkAndReloadData();
+        DataManager.checkAndReloadData();
 
         // 检测故障固件设备
         if (findDefectiveBatchDevice(device.features)) {

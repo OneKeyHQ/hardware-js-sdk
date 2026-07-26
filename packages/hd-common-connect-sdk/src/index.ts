@@ -13,11 +13,14 @@ import HardwareSdk, {
   createUiMessage,
   enableLog,
   executeCallback,
+  getFirmwareHostBindingGeneration as getCoreFirmwareHostBindingGeneration,
   getLogBlockLabel,
   getLogger,
   initCore,
   parseConnectSettings,
+  registerFirmwareHostBinding as registerCoreFirmwareHostBinding,
   setLoggerPostMessage,
+  unregisterFirmwareHostBinding as unregisterCoreFirmwareHostBinding,
 } from '@onekeyfe/hd-core';
 import { ERRORS, HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
 import HttpTransport from '@onekeyfe/hd-transport-http';
@@ -30,6 +33,7 @@ import type {
   ConnectSettings,
   Core,
   CoreMessage,
+  FirmwareUpdateHostBinding,
   LowLevelCoreApi,
   UiResponseEvent,
 } from '@onekeyfe/hd-core';
@@ -56,6 +60,22 @@ const getTransport = async (env: ConnectSettings['env']) => {
 
 let _core: Core | undefined;
 let _settings = parseConnectSettings();
+let _firmwareHostBindingGeneration: number | undefined;
+
+export const registerFirmwareHostBinding = (binding: FirmwareUpdateHostBinding): number => {
+  const generation = registerCoreFirmwareHostBinding(binding);
+  _firmwareHostBindingGeneration = generation;
+  return generation;
+};
+
+export const unregisterFirmwareHostBinding = (): boolean => {
+  const generation = _firmwareHostBindingGeneration;
+  _firmwareHostBindingGeneration = undefined;
+  return generation === undefined ? false : unregisterCoreFirmwareHostBinding(generation);
+};
+
+export const getFirmwareHostBindingGeneration = (): number =>
+  getCoreFirmwareHostBindingGeneration();
 
 let _messageID = 0;
 export const messagePromises: { [key: number]: Deferred<any> } = {};
@@ -63,6 +83,7 @@ export const messagePromises: { [key: number]: Deferred<any> } = {};
 const dispose = () => {
   eventEmitter.removeAllListeners();
   _core?.dispose?.();
+  unregisterFirmwareHostBinding();
   _settings = parseConnectSettings();
 };
 
@@ -204,16 +225,23 @@ const call = async (params: any) => {
 const updateSettings = () => Promise.resolve(true);
 const switchTransport = () => Promise.resolve({ success: true });
 
-const HardwareCommonConnectSdk = HardwareSdk({
-  eventEmitter,
-  init,
-  call,
-  cancel,
-  cancelOperation,
-  dispose,
-  uiResponse,
-  updateSettings,
-  switchTransport,
-});
+const HardwareCommonConnectSdk = Object.assign(
+  HardwareSdk({
+    eventEmitter,
+    init,
+    call,
+    cancel,
+    cancelOperation,
+    dispose,
+    uiResponse,
+    updateSettings,
+    switchTransport,
+  }),
+  {
+    registerFirmwareHostBinding,
+    unregisterFirmwareHostBinding,
+    getFirmwareHostBindingGeneration,
+  }
+);
 
 export default HardwareCommonConnectSdk;

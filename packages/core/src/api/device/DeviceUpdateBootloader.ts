@@ -5,16 +5,28 @@ import { UI_REQUEST } from '../../constants/ui-request';
 import { FirmwareUpdateTipMessage } from '../../events/ui-request';
 import { FirmwareUpdateBaseMethod } from '../firmware/FirmwareUpdateBaseMethod';
 import { getSysResourceBinary } from '../firmware/getBinary';
-import { updateBootloader } from '../firmware/uploadFirmware';
+import { updateBootloader, updateBootloaderFromByteSource } from '../firmware/uploadFirmware';
 import { DeviceModelToTypes } from '../../types';
 import { DataManager } from '../../data-manager';
-import { checkBootloaderLength } from '../firmware/updateBootloader';
-import { getFirmwareType } from '../../utils';
+import {
+  checkBootloaderByteSourceLength,
+  checkBootloaderLength,
+} from '../firmware/updateBootloader';
+import { getDeviceUUID, getFirmwareType } from '../../utils';
+import {
+  FirmwareUpdateErrorCode,
+  MemoryByteSource,
+  createFirmwareUpdateError,
+  firmwareHostBindingRegistry,
+  openFirmwareArtifactByteSource,
+  validatePreparedPlan,
+} from '../../firmware-update';
 
 import type { DeviceUpdateBootloaderParams } from '../../types/api/deviceUpdateBootloader';
 import type { EFirmwareType } from '@onekeyfe/hd-shared';
 import type { Device } from '../../device/Device';
 import type { Features } from '../../types';
+import type { FirmwareByteSource } from '../../firmware-update';
 
 export default class DeviceUpdateBootloader extends FirmwareUpdateBaseMethod<any> {
   init() {
@@ -25,13 +37,25 @@ export default class DeviceUpdateBootloader extends FirmwareUpdateBaseMethod<any
   }
 
   async updateBootloaderWithEmmcFileWrite(_device: Device, binary: ArrayBuffer) {
+    const source = new MemoryByteSource(binary);
+    try {
+      return await this.updateBootloaderWithEmmcFileWriteFromByteSource(_device, source);
+    } finally {
+      await source.close();
+    }
+  }
+
+  async updateBootloaderWithEmmcFileWriteFromByteSource(
+    _device: Device,
+    source: FirmwareByteSource
+  ) {
     const filePath = '0:boot/bootloader.bin';
 
     this.postTipMessage(FirmwareUpdateTipMessage.StartTransferData);
 
     // Use the more robust emmcCommonUpdateProcess from FirmwareUpdateBaseMethod
-    await this.emmcCommonUpdateProcess({
-      payload: binary,
+    await this.emmcCommonUpdateFromByteSource({
+      source,
       filePath,
     });
 
@@ -97,12 +121,67 @@ export default class DeviceUpdateBootloader extends FirmwareUpdateBaseMethod<any
     const { features } = device;
 
     const payload = this.payload as DeviceUpdateBootloaderParams;
+    if (payload.preparedPlan && Object.prototype.hasOwnProperty.call(payload, 'binary')) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.CallMethodInvalidParameter,
+        'preparedPlan cannot be combined with binary'
+      );
+    }
 
     const deviceType = device.getCurrentDeviceType();
     const deviceFirmwareType = getFirmwareType(features);
     const firmwareType = payload.firmwareType ?? deviceFirmwareType;
 
     if (DeviceModelToTypes.model_touch.includes(deviceType)) {
+      if (payload.preparedPlan) {
+        const preparedPlan = validatePreparedPlan(payload.preparedPlan);
+        if (
+          !features ||
+          preparedPlan.device.identity !== getDeviceUUID(features) ||
+          preparedPlan.device.model !== deviceType
+        ) {
+          throw createFirmwareUpdateError(
+            FirmwareUpdateErrorCode.FirmwareDeviceStateConflict,
+            'Prepared bootloader plan belongs to a different device'
+          );
+        }
+        const bootloaderReceipts = preparedPlan.artifactReceipts.filter(
+          receipt => receipt.target === 'bootloader'
+        );
+        if (bootloaderReceipts.length !== 1) {
+          throw ERRORS.TypedError(
+            HardwareErrorCode.CallMethodInvalidParameter,
+            'preparedPlan must contain exactly one bootloader artifact'
+          );
+        }
+        const receipt = bootloaderReceipts[0];
+        const preflightSource = await openFirmwareArtifactByteSource(
+          firmwareHostBindingRegistry,
+          receipt
+        );
+        await preflightSource.close();
+        const source = await openFirmwareArtifactByteSource(firmwareHostBindingRegistry, receipt);
+        try {
+          if (!(await checkBootloaderByteSourceLength(source))) {
+            throw ERRORS.TypedError(HardwareErrorCode.CheckDownloadFileError);
+          }
+          if (features?.bootloader_mode) {
+            this.postTipMessage(FirmwareUpdateTipMessage.UpdateBootloader);
+            return await this.updateBootloaderWithEmmcFileWriteFromByteSource(device, source);
+          }
+          if (features) {
+            await updateBootloaderFromByteSource(
+              this.device.getCommands().typedCall.bind(this.device.getCommands()),
+              this.postMessage,
+              device,
+              source
+            );
+            return true;
+          }
+        } finally {
+          await source.close();
+        }
+      }
       return this.updateTouchBootloader({ device, features, firmwareType });
     }
 

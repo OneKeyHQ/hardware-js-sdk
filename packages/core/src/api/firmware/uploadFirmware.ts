@@ -9,6 +9,7 @@ import { DeviceModelToTypes } from '../../types';
 import { bytesToHex } from '../helpers/hexUtils';
 import { DataManager } from '../../data-manager';
 import { DevicePool } from '../../device/DevicePool';
+import { MemoryByteSource } from '../../firmware-update/memoryByteSource';
 import { buildProtocolV1FeaturesPayload } from '../../deviceProfile';
 
 import type { KnownDevice } from '../../types';
@@ -17,6 +18,7 @@ import type { PROTO } from '../../constants';
 import type { CoreMessage, IFirmwareUpdateProgressType } from '../../events';
 import type { Success } from '@onekeyfe/hd-transport';
 import type { Device } from '../../device/Device';
+import type { FirmwareByteSource } from '../../firmware-update/byteSource';
 
 const NEW_BOOT_UPRATE_FIRMWARE_VERSION = '2.4.5';
 const SESSION_ERROR = 'session not found';
@@ -88,17 +90,35 @@ export const waitBleInstall = async (updateType: string) => {
   }
 };
 
-export const uploadFirmware = async (
+const toArrayBuffer = (payload: ArrayBuffer | Buffer): ArrayBuffer => {
+  if (payload instanceof ArrayBuffer) {
+    return payload;
+  }
+  const bytes = new Uint8Array(payload.buffer, payload.byteOffset, payload.byteLength);
+  return bytes.slice().buffer;
+};
+
+export const readFirmwareByteSourceFully = async (
+  source: FirmwareByteSource
+): Promise<ArrayBuffer> => {
+  const output = new Uint8Array(source.size);
+  let offset = 0;
+  while (offset < source.size) {
+    const length = Math.min(256 * 1024, source.size - offset);
+    const chunk = new Uint8Array(await source.readAt(offset, length));
+    output.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return output.buffer;
+};
+
+export const uploadFirmwareFromByteSource = async (
   updateType: 'firmware' | 'ble',
   typedCall: TypedCall,
   postMessage: (message: CoreMessage) => void,
   device: Device,
-  {
-    payload,
-    rebootOnSuccess,
-  }: PROTO.FirmwareUpload & {
-    rebootOnSuccess?: boolean;
-  },
+  source: FirmwareByteSource,
+  rebootOnSuccess?: boolean,
   isUpdateBootloader?: boolean
 ) => {
   const deviceType = device.getCurrentDeviceType();
@@ -119,20 +139,20 @@ export const uploadFirmware = async (
       if (supportUpgradeFileHeader) {
         // Extract and validate firmware header (first 1KB)
         const HEADER_SIZE = 1024;
-        if (payload.byteLength < HEADER_SIZE) {
+        if (source.size < HEADER_SIZE) {
           throw ERRORS.TypedError(
             HardwareErrorCode.RuntimeError,
-            `firmware payload too small: ${payload.byteLength} bytes, expected at least ${HEADER_SIZE} bytes`
+            `firmware payload too small: ${source.size} bytes, expected at least ${HEADER_SIZE} bytes`
           );
         }
 
         Log.debug('Uploading firmware header:', {
           size: HEADER_SIZE,
-          totalSize: payload.byteLength,
+          totalSize: source.size,
         });
         postProgressTip(device, 'UploadingFirmwareHeader', postMessage);
 
-        const header = new Uint8Array(payload.slice(0, HEADER_SIZE));
+        const header = new Uint8Array(await source.readAt(0, HEADER_SIZE));
 
         try {
           const headerRes = await typedCall('UpgradeFileHeader', 'Success', {
@@ -169,6 +189,7 @@ export const uploadFirmware = async (
     postProgressMessage(device, 0, 'installingFirmware', postMessage);
     let updateResponse: TypedResponseMessage<'Success'>;
     try {
+      const payload = await readFirmwareByteSourceFully(source);
       updateResponse = await typedCall('FirmwareUpload', 'Success', {
         payload,
       });
@@ -200,9 +221,7 @@ export const uploadFirmware = async (
           updateType,
           postMessage,
           device,
-          {
-            payload,
-          },
+          source,
           rebootOnSuccess
         );
         return response.message;
@@ -211,7 +230,7 @@ export const uploadFirmware = async (
 
     postConfirmationMessage(device);
     postProgressTip(device, 'ConfirmOnDevice', postMessage);
-    const length = payload.byteLength;
+    const length = source.size;
 
     let response = await typedCall('FirmwareErase', ['FirmwareRequest', 'Success'], { length });
     postProgressTip(device, 'FirmwareEraseSuccess', postMessage);
@@ -220,7 +239,7 @@ export const uploadFirmware = async (
       const start = response.message.offset!;
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       const end = response.message.offset! + response.message.length!;
-      const chunk = payload.slice(start, end);
+      const chunk = await source.readAt(start, end - start);
 
       if (start > 0) {
         postProgressMessage(
@@ -249,11 +268,40 @@ export const uploadFirmware = async (
   throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'uploadFirmware: unknown device model');
 };
 
+export const uploadFirmware = async (
+  updateType: 'firmware' | 'ble',
+  typedCall: TypedCall,
+  postMessage: (message: CoreMessage) => void,
+  device: Device,
+  {
+    payload,
+    rebootOnSuccess,
+  }: PROTO.FirmwareUpload & {
+    rebootOnSuccess?: boolean;
+  },
+  isUpdateBootloader?: boolean
+) => {
+  const source = new MemoryByteSource(toArrayBuffer(payload));
+  try {
+    return await uploadFirmwareFromByteSource(
+      updateType,
+      typedCall,
+      postMessage,
+      device,
+      source,
+      rebootOnSuccess,
+      isUpdateBootloader
+    );
+  } finally {
+    await source.close();
+  }
+};
+
 const newTouchUpdateProcess = async (
   updateType: 'firmware' | 'ble',
   postMessage: (message: CoreMessage) => void,
   device: Device,
-  { payload }: PROTO.FirmwareUpload,
+  source: FirmwareByteSource,
   rebootOnSuccess = true
 ) => {
   let typedCall = device.getCommands().typedCall.bind(device.getCommands());
@@ -263,13 +311,13 @@ const newTouchUpdateProcess = async (
   const env = DataManager.getSettings('env');
   const perPackageSize = DataManager.isBleConnect(env) ? 16 : 128;
   const chunkSize = 1024 * perPackageSize;
-  const totalChunks = Math.ceil(payload.byteLength / chunkSize);
+  const totalChunks = Math.ceil(source.size / chunkSize);
   let offset = 0;
   for (let i = 0; i < totalChunks; i++) {
     const chunkStart = i * chunkSize;
-    const chunkEnd = Math.min(chunkStart + chunkSize, payload.byteLength);
+    const chunkEnd = Math.min(chunkStart + chunkSize, source.size);
     const chunkLength = chunkEnd - chunkStart;
-    const chunk = payload.slice(chunkStart, chunkEnd);
+    const chunk = await source.readAt(chunkStart, chunkLength);
     const overwrite = i === 0;
     const progress = Math.round(((i + 1) / totalChunks) * 100);
     const writeRes = await emmcFileWriteWithRetry(
@@ -438,56 +486,71 @@ const emmcFileWriteWithRetry = async (
 
 const INIT_DATA_CHUNK_SIZE = 16 * 1024;
 
-const processResourceRequest = async (
+const processResourceRequestFromByteSource = async (
   typedCall: TypedCall,
   res: TypedResponseMessage<'ResourceRequest'> | TypedResponseMessage<'Success'>,
-  data: ArrayBuffer
+  source: FirmwareByteSource
 ): Promise<Success> => {
-  if (res.type === 'Success') {
-    return res.message;
+  let response = res;
+  while (response.type !== 'Success') {
+    const { offset, data_length: dataLength } = response.message;
+    if (
+      offset === undefined ||
+      dataLength === undefined ||
+      !Number.isSafeInteger(offset) ||
+      !Number.isSafeInteger(dataLength) ||
+      offset < 0 ||
+      offset >= source.size ||
+      dataLength <= 0
+    ) {
+      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'resource request range is invalid');
+    }
+    const length = Math.min(dataLength, source.size - offset);
+    const payload = new Uint8Array(await source.readAt(offset, length));
+    const digest = blake2s(payload);
+    response = await typedCall('ResourceAck', ['ResourceRequest', 'Success'], {
+      data_chunk: bytesToHex(payload),
+      hash: bytesToHex(digest),
+    });
   }
-
-  const { offset, data_length } = res.message;
-
-  if (offset === undefined) {
-    throw new Error('offset is undefined');
-  }
-
-  const payload = new Uint8Array(
-    data.slice(offset, Math.min(offset + data_length, data.byteLength))
-  );
-  const digest = blake2s(payload);
-
-  const resourceAckParams = {
-    data_chunk: bytesToHex(payload),
-    hash: bytesToHex(digest),
-  };
-
-  const response = await typedCall('ResourceAck', ['ResourceRequest', 'Success'], {
-    ...resourceAckParams,
-  });
-  return processResourceRequest(typedCall, response, data);
+  return response.message;
 };
 
-// Fixed size
+export const updateResourceFromByteSource = async (
+  typedCall: TypedCall,
+  fileName: string,
+  source: FirmwareByteSource,
+  onConfirmAfter?: () => void
+) => {
+  if (!Number.isSafeInteger(source.size) || source.size <= 0) {
+    throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'resource payload is empty');
+  }
+  const chunk = new Uint8Array(await source.readAt(0, Math.min(INIT_DATA_CHUNK_SIZE, source.size)));
+  const digest = blake2s(chunk);
+
+  const res = await typedCall('ResourceUpdate', ['ResourceRequest', 'Success'], {
+    file_name: fileName,
+    data_length: source.size,
+    initial_data_chunk: bytesToHex(chunk),
+    hash: bytesToHex(digest),
+  });
+
+  onConfirmAfter?.();
+  return processResourceRequestFromByteSource(typedCall, res, source);
+};
+
 export const updateResource = async (
   typedCall: TypedCall,
   fileName: string,
   data: ArrayBuffer,
   onConfirmAfter?: () => void
 ) => {
-  const chunk = new Uint8Array(data.slice(0, Math.min(INIT_DATA_CHUNK_SIZE, data.byteLength)));
-  const digest = blake2s(chunk);
-
-  const res = await typedCall('ResourceUpdate', ['ResourceRequest', 'Success'], {
-    file_name: fileName,
-    data_length: data.byteLength,
-    initial_data_chunk: bytesToHex(chunk),
-    hash: bytesToHex(digest),
-  });
-
-  onConfirmAfter?.();
-  return processResourceRequest(typedCall, res, data);
+  const source = new MemoryByteSource(data);
+  try {
+    return await updateResourceFromByteSource(typedCall, fileName, source, onConfirmAfter);
+  } finally {
+    await source.close();
+  }
 };
 
 export const updateResources = async (
@@ -520,18 +583,60 @@ export const updateResources = async (
   return true;
 };
 
+export interface FirmwareResourceByteSourceEntry {
+  fileName: string;
+  source: FirmwareByteSource;
+}
+
+export const updateResourcesFromByteSources = async (
+  typedCall: TypedCall,
+  postMessage: (message: CoreMessage) => void,
+  device: Device,
+  entries: readonly FirmwareResourceByteSourceEntry[]
+) => {
+  if (entries.length === 0) {
+    throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'No resource artifacts were prepared');
+  }
+  postProgressTip(device, 'UpdateSysResource', postMessage);
+  for (const [index, entry] of entries.entries()) {
+    await updateResourceFromByteSource(typedCall, entry.fileName, entry.source);
+    postProgressMessage(
+      device,
+      Math.floor(((index + 1) / entries.length) * 100),
+      'installingFirmware',
+      postMessage
+    );
+  }
+  postProgressTip(device, 'UpdateSysResourceSuccess', postMessage);
+  return true;
+};
+
 export const updateBootloader = async (
   typedCall: TypedCall,
   postMessage: (message: CoreMessage) => void,
   device: Device,
-  source: ArrayBuffer
+  data: ArrayBuffer
+) => {
+  const source = new MemoryByteSource(data);
+  try {
+    return await updateBootloaderFromByteSource(typedCall, postMessage, device, source);
+  } finally {
+    await source.close();
+  }
+};
+
+export const updateBootloaderFromByteSource = async (
+  typedCall: TypedCall,
+  postMessage: (message: CoreMessage) => void,
+  device: Device,
+  source: FirmwareByteSource
 ) => {
   postProgressTip(device, 'UpdateBootloader', postMessage);
-  postProgressMessage(device, Math.floor(0), 'installingFirmware', postMessage);
-  await updateResource(typedCall, 'bootloader.bin', source, () => {
+  postProgressMessage(device, 0, 'installingFirmware', postMessage);
+  await updateResourceFromByteSource(typedCall, 'bootloader.bin', source, () => {
     postProcessingMessage('resource', postMessage);
   });
-  postProgressMessage(device, Math.floor(100), 'installingFirmware', postMessage);
+  postProgressMessage(device, 100, 'installingFirmware', postMessage);
   postProgressTip(device, 'UpdateBootloaderSuccess', postMessage);
   return true;
 };
