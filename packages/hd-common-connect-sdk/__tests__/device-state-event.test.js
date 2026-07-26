@@ -1,6 +1,12 @@
 import { CORE_EVENT, DEVICE, DEVICE_EVENT, initCore } from '@onekeyfe/hd-core';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 
-import HardwareCommonConnectSdk from '../src';
+import HardwareCommonConnectSdk, {
+  getFirmwareHostBindingGeneration,
+  registerFirmwareHostBinding,
+  unregisterFirmwareHostBinding,
+} from '../src';
 
 jest.mock('@onekeyfe/hd-core', () => {
   const actual = jest.requireActual('@onekeyfe/hd-core');
@@ -19,6 +25,29 @@ jest.mock('@onekeyfe/hd-core', () => {
 });
 
 describe('hd-common-connect-sdk device state events', () => {
+  test('exposes direct firmware host binding on named and default exports', () => {
+    const binding = {
+      artifactReader: {
+        open: jest.fn(),
+        read: jest.fn(),
+        close: jest.fn(),
+      },
+      checkpointSink: {
+        commit: jest.fn(),
+      },
+    };
+
+    const generation = registerFirmwareHostBinding(binding);
+    const source = readFileSync(resolve(__dirname, '../src/index.ts'), 'utf8');
+    const defaultExport = source.slice(source.lastIndexOf('const HardwareCommonConnectSdk'));
+
+    expect(defaultExport).toContain('registerFirmwareHostBinding');
+    expect(defaultExport).toContain('unregisterFirmwareHostBinding');
+    expect(defaultExport).toContain('getFirmwareHostBindingGeneration');
+    expect(getFirmwareHostBindingGeneration()).toBe(generation);
+    expect(unregisterFirmwareHostBinding()).toBe(true);
+  });
+
   test('forwards Protocol V2 DEVICE.STATE payloads to SDK consumers', async () => {
     let handleCoreMessage;
     const core = {

@@ -2821,7 +2821,7 @@ describe('Protocol V2 firmware update targets', () => {
       })),
     });
 
-    const versions = await (method as any).waitForProtocolV2FinalFeatures();
+    const features = await (method as any).waitForProtocolV2ReconnectAndFeatures(1000);
 
     expect(acquire).toHaveBeenCalledWith('ble-id', null, true, 'V2');
     // Completion uses the VERSIONS request, including SE targets, with matching scope.
@@ -2848,14 +2848,14 @@ describe('Protocol V2 firmware update targets', () => {
     );
     expect(typedCall).toHaveBeenCalledTimes(2);
     expect(typedCall).not.toHaveBeenCalledWith('Initialize', 'Features', {});
-    expect(versions).toEqual({
+    expect(features).toMatchObject({
       bootloaderVersion: '0.0.0',
       bleVersion: '0.0.0',
       firmwareVersion: '0.0.0',
     });
   });
 
-  test('enters Protocol V2 bootloader before upload', async () => {
+  test('prepares Protocol V2 artifacts before invoking the recoverable executor', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -2866,40 +2866,44 @@ describe('Protocol V2 firmware update targets', () => {
 
     (method as any).device = stubDevice({
       originalDescriptor: { id: 'ble-id', path: 'ble-path', protocolType: 'V2' },
-      features: { capabilities: [] },
+      features: {
+        deviceType: 'pro2',
+        serialNo: 'P2-prepared-device',
+        capabilities: [],
+      },
     });
     (method as any).prepareBootloaderBinary = jest.fn().mockReturnValue(null);
     (method as any).collectExplicitTargetBinaries = jest.fn().mockReturnValue([
       {
         fileName: 'coprocessor.bin',
-        binary: new Uint8Array([1, 2, 3]).buffer,
-        targetId: 5,
+        binary: buildOkppHeader({ type: 'FW  ', version: [4, 5, 6] }).buffer,
+        targetId: 6,
       },
     ]);
-    (method as any).executeProtocolV2Update = jest.fn().mockResolvedValue(undefined);
-    (method as any).exitProtocolV2BootloaderToNormal = jest.fn().mockResolvedValue(undefined);
-    (method as any).waitForProtocolV2FinalFeatures = jest.fn().mockResolvedValue({
+    (method as any).executeProtocolV2PreparedPlan = jest.fn().mockResolvedValue({
       bootloaderVersion: '0.2.0',
       bleVersion: '4.5.6',
       firmwareVersion: '1.2.3',
+      targets: [],
     });
-    (method as any).protocolV2Reboot = jest.fn();
-    (method as any).enterProtocolV2BootloaderMode = jest.fn().mockResolvedValue(true);
     method.postTipMessage = jest.fn();
 
     await method.run();
 
-    expect((method as any).enterProtocolV2BootloaderMode).toHaveBeenCalledTimes(1);
-    expect((method as any).executeProtocolV2Update).toHaveBeenCalledWith({
-      fwBinaryMap: [
-        {
-          fileName: 'coprocessor.bin',
-          binary: expect.any(ArrayBuffer),
-          targetId: 5,
-        },
-      ],
-      bootloaderBinary: null,
+    const execution = (method as any).executeProtocolV2PreparedPlan.mock.calls[0][0];
+    expect(execution.preparedPlan.epochs.map(epoch => epoch.kind)).toEqual([
+      'component-install',
+      'final-verify',
+    ]);
+    expect(execution.preparedPlan.artifactReceipts[0]).toMatchObject({
+      target: 'coprocessor',
+      size: OKPP_HEADER_SIZE,
     });
+    expect(method.postTipMessage.mock.calls.map(call => call[0])).toEqual([
+      'StartDownloadFirmware',
+      'FinishDownloadFirmware',
+      'FirmwareUpdateCompleted',
+    ]);
   });
 
   test('reboots Protocol V2 normal-mode device to bootloader before transfer', async () => {
@@ -3206,9 +3210,9 @@ describe('Protocol V2 firmware update targets', () => {
     const typedCall = jest
       .fn()
       .mockRejectedValue(
-        new DOMException(
-          "Failed to execute 'open' on 'USBDevice': The device was disconnected",
-          'NotFoundError'
+        Object.assign(
+          new Error("Failed to execute 'open' on 'USBDevice': The device was disconnected"),
+          { name: 'NotFoundError' }
         )
       );
 
@@ -3484,162 +3488,7 @@ describe('Protocol V2 firmware update targets', () => {
     );
   });
 
-  test('passes bootloader, coprocessor, SE and app files to DeviceFirmwareUpdate targets', async () => {
-    const method = new FirmwareUpdateV4({
-      id: 1,
-      payload: {
-        method: 'firmwareUpdateV4',
-      },
-    });
-
-    const writtenPaths: string[] = [];
-    method.postTipMessage = jest.fn();
-    method.postProgressMessage = jest.fn();
-    (method as any).protocolV2CommonUpdateProcess = jest.fn().mockImplementation(params => {
-      writtenPaths.push(params.filePath);
-      return Number(params.processedSize ?? 0) + Number(params.payload.byteLength);
-    });
-    (method as any).verifyProtocolV2StagedFile = jest.fn().mockResolvedValue(undefined);
-    (method as any).protocolV2StartFirmwareUpdate = jest.fn().mockResolvedValue(undefined);
-    (method as any).waitForProtocolV2FirmwareUpdateComplete = jest
-      .fn()
-      .mockResolvedValue(undefined);
-
-    await (method as any).executeProtocolV2Update({
-      bootloaderBinary: new Uint8Array([4, 5]).buffer,
-      fwBinaryMap: [
-        {
-          fileName: 'coprocessor.bin',
-          binary: new Uint8Array([6]).buffer,
-          targetId: 6,
-        },
-        {
-          fileName: 'se01.bin',
-          binary: new Uint8Array([7]).buffer,
-          targetId: 7,
-        },
-        {
-          fileName: 'application_p1.bin',
-          binary: new Uint8Array([8]).buffer,
-          targetId: 4,
-        },
-      ],
-    });
-
-    expect(writtenPaths).toEqual([
-      'vol0:/bootloader.bin',
-      'vol0:/coprocessor.bin',
-      'vol0:/se01.bin',
-      'vol0:/application_p1.bin',
-    ]);
-    expect((method as any).verifyProtocolV2StagedFile).toHaveBeenCalledTimes(4);
-    expect((method as any).verifyProtocolV2StagedFile).toHaveBeenNthCalledWith(
-      2,
-      'vol0:/coprocessor.bin',
-      1
-    );
-    expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenCalledTimes(1);
-    expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenCalledWith({
-      targets: [
-        { target_id: 3, path: 'vol0:/bootloader.bin' },
-        { target_id: 6, path: 'vol0:/coprocessor.bin' },
-        { target_id: 7, path: 'vol0:/se01.bin' },
-        { target_id: 4, path: 'vol0:/application_p1.bin' },
-      ],
-    });
-    expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'transferData');
-    expect((method as any).waitForProtocolV2FirmwareUpdateComplete).toHaveBeenCalled();
-  });
-
-  test('announces one transfer when syncing resource bundles and staging firmware', async () => {
-    const method = new FirmwareUpdateV4({
-      id: 1,
-      payload: {
-        method: 'firmwareUpdateV4',
-      },
-    });
-
-    method.postTipMessage = jest.fn();
-    method.postProgressMessage = jest.fn();
-    (method as any).protocolV2CommonUpdateProcess = jest
-      .fn()
-      .mockImplementation(params =>
-        Promise.resolve(Number(params.processedSize ?? 0) + Number(params.payload.byteLength))
-      );
-    (method as any).verifyProtocolV2StagedFile = jest.fn().mockResolvedValue(undefined);
-    (method as any).protocolV2StartFirmwareUpdate = jest.fn().mockResolvedValue(undefined);
-    (method as any).waitForProtocolV2FirmwareUpdateComplete = jest
-      .fn()
-      .mockResolvedValue(undefined);
-
-    await (method as any).executeProtocolV2Update({
-      resourceBundles: [
-        {
-          name: 'images.okpkg',
-          binary: new Uint8Array([1, 2]).buffer,
-          devicePath: 'vol0:/bundles/images/images.okpkg',
-        },
-      ],
-      bootloaderBinary: null,
-      fwBinaryMap: [
-        {
-          fileName: 'application_p1.bin',
-          binary: new Uint8Array([3]).buffer,
-          targetId: 3,
-        },
-      ],
-    });
-
-    expect(method.postTipMessage).toHaveBeenCalledTimes(2);
-    expect(method.postTipMessage).toHaveBeenNthCalledWith(1, 'StartTransferData');
-    expect(method.postTipMessage).toHaveBeenNthCalledWith(2, 'ConfirmOnDevice');
-    expect((method as any).protocolV2CommonUpdateProcess).toHaveBeenNthCalledWith(
-      1,
-      expect.objectContaining({ processedSize: 0, totalSize: 3 })
-    );
-    expect((method as any).protocolV2CommonUpdateProcess).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({ processedSize: 2, totalSize: 3 })
-    );
-  });
-
-  test('does not request installation when the staged file size does not match', async () => {
-    const method = new FirmwareUpdateV4({
-      id: 1,
-      payload: {
-        method: 'firmwareUpdateV4',
-      },
-    });
-
-    method.postTipMessage = jest.fn();
-    method.postProgressMessage = jest.fn();
-    (method as any).protocolV2CommonUpdateProcess = jest.fn().mockResolvedValue(3);
-    (method as any).device = stubDevice({
-      getCommands: () => ({
-        typedCall: jest.fn().mockResolvedValue({
-          type: 'FilesystemPathInfo',
-          message: { exist: true, directory: false, size: 2 },
-        }),
-      }),
-    });
-    (method as any).protocolV2StartFirmwareUpdate = jest.fn();
-
-    await expect(
-      (method as any).executeProtocolV2Update({
-        bootloaderBinary: null,
-        fwBinaryMap: [
-          {
-            fileName: 'coprocessor.bin',
-            binary: new Uint8Array([1, 2, 3]).buffer,
-            targetId: 5,
-          },
-        ],
-      })
-    ).rejects.toThrow(/staged file verification failed/);
-    expect((method as any).protocolV2StartFirmwareUpdate).not.toHaveBeenCalled();
-  });
-
-  test('passes explicit per-target binaries through without file name heuristics', async () => {
+  test('passes explicit per-target binaries through without file name heuristics', () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -3656,31 +3505,6 @@ describe('Protocol V2 firmware update targets', () => {
       { fileName: 'application_p2.bin', binary: expect.anything(), targetId: 5 },
       { fileName: 'se04.bin', binary: expect.anything(), targetId: 10 },
     ]);
-
-    method.postTipMessage = jest.fn();
-    method.postProgressMessage = jest.fn();
-    (method as any).protocolV2CommonUpdateProcess = jest
-      .fn()
-      .mockImplementation(params =>
-        Promise.resolve(Number(params.processedSize ?? 0) + Number(params.payload.byteLength))
-      );
-    (method as any).verifyProtocolV2StagedFile = jest.fn().mockResolvedValue(undefined);
-    (method as any).protocolV2StartFirmwareUpdate = jest.fn().mockResolvedValue(undefined);
-    (method as any).waitForProtocolV2FirmwareUpdateComplete = jest
-      .fn()
-      .mockResolvedValue(undefined);
-
-    await (method as any).executeProtocolV2Update({
-      bootloaderBinary: null,
-      fwBinaryMap: explicit,
-    });
-
-    expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenCalledWith({
-      targets: [
-        { target_id: 5, path: 'vol0:/application_p2.bin' },
-        { target_id: 10, path: 'vol0:/se04.bin' },
-      ],
-    });
   });
 
   test('rejects romloaderBinary before sending a Protocol V2 update request', () => {
@@ -3866,7 +3690,7 @@ describe('Protocol V2 firmware update targets', () => {
       {
         name: 'images',
         binary: expect.any(ArrayBuffer),
-        devicePath: 'vol0:/resource/images/images.okpkg',
+        devicePath: 'vol0:/bundles/images/images.okpkg',
         url: 'https://example.com/images.okpkg',
         version: [2, 0, 0],
         payloadHash: 'ab'.repeat(64),
@@ -3950,38 +3774,44 @@ describe('Protocol V2 firmware update targets', () => {
     method.init();
 
     const remoteBinaries = {
-      bootloaderBinary: new Uint8Array([1]).buffer,
+      bootloaderBinary: buildOkppHeader({ type: 'FW  ', version: [1, 0, 0] }).buffer,
       fwBinaryMap: [
         {
           fileName: 'application_p1.bin',
-          binary: new Uint8Array([2]).buffer,
-          targetId: 3,
+          binary: buildOkppHeader({ type: 'FW  ', version: [1, 0, 0] }).buffer,
+          targetId: 4,
         },
       ],
     };
 
     (method as any).device = stubDevice({
       originalDescriptor: { protocolType: 'V2' },
-      features: { deviceType: 'pro2', firmwareVersion: '0.0.0', capabilities: [] },
+      features: {
+        deviceType: 'pro2',
+        serialNo: 'P2-remote-device',
+        firmwareVersion: '0.0.0',
+        capabilities: [],
+      },
     });
     (method as any).prepareRemoteProtocolV2Binaries = jest.fn().mockResolvedValue(remoteBinaries);
-    (method as any).enterProtocolV2BootloaderMode = jest.fn().mockResolvedValue(true);
-    (method as any).executeProtocolV2Update = jest.fn().mockResolvedValue(undefined);
-    (method as any).exitProtocolV2BootloaderToNormal = jest.fn().mockResolvedValue(undefined);
-    (method as any).waitForProtocolV2FinalFeatures = jest.fn().mockResolvedValue({
+    (method as any).executeProtocolV2PreparedPlan = jest.fn().mockResolvedValue({
       bootloaderVersion: '1.0.0',
       bleVersion: '0.0.0',
       firmwareVersion: '1.0.0',
+      targets: [],
     });
     method.postTipMessage = jest.fn();
 
     await method.run();
 
     expect((method as any).prepareRemoteProtocolV2Binaries).toHaveBeenCalledTimes(1);
-    expect((method as any).executeProtocolV2Update).toHaveBeenCalledWith({
-      bootloaderBinary: remoteBinaries.bootloaderBinary,
-      fwBinaryMap: remoteBinaries.fwBinaryMap,
-    });
+    const execution = (method as any).executeProtocolV2PreparedPlan.mock.calls[0][0];
+    expect(execution.preparedPlan.epochs.map(epoch => epoch.kind)).toEqual([
+      'bootloader-install',
+      'bootloader-verify',
+      'component-install',
+      'final-verify',
+    ]);
   });
 
   test('keeps explicit Protocol V2 binaries isolated from remote component auto-fill', async () => {
@@ -3990,37 +3820,41 @@ describe('Protocol V2 firmware update targets', () => {
       payload: {
         method: 'firmwareUpdateV4',
         platform: 'web',
-        coprocessorBinary: new Uint8Array([1]).buffer,
+        coprocessorBinary: buildOkppHeader({ type: 'FW  ', version: [1, 0, 0] }).buffer,
       },
     });
     method.init();
 
     (method as any).device = stubDevice({
       originalDescriptor: { protocolType: 'V2' },
-      features: { deviceType: 'pro2', firmwareVersion: '0.0.0', capabilities: [] },
+      features: {
+        deviceType: 'pro2',
+        serialNo: 'P2-explicit-device',
+        firmwareVersion: '0.0.0',
+        capabilities: [],
+      },
     });
     (method as any).prepareRemoteProtocolV2Binaries = jest.fn();
-    (method as any).enterProtocolV2BootloaderMode = jest.fn().mockResolvedValue(true);
-    (method as any).executeProtocolV2Update = jest.fn().mockResolvedValue(undefined);
-    (method as any).exitProtocolV2BootloaderToNormal = jest.fn().mockResolvedValue(undefined);
-    (method as any).waitForProtocolV2FinalFeatures = jest.fn().mockResolvedValue({
+    (method as any).executeProtocolV2PreparedPlan = jest.fn().mockResolvedValue({
       bootloaderVersion: '1.0.0',
       bleVersion: '0.0.0',
       firmwareVersion: '1.0.0',
+      targets: [],
     });
     method.postTipMessage = jest.fn();
 
     await method.run();
 
     expect((method as any).prepareRemoteProtocolV2Binaries).not.toHaveBeenCalled();
-    expect((method as any).executeProtocolV2Update).toHaveBeenCalledWith({
-      bootloaderBinary: null,
-      fwBinaryMap: [{ fileName: 'coprocessor.bin', binary: expect.anything(), targetId: 6 }],
+    const execution = (method as any).executeProtocolV2PreparedPlan.mock.calls[0][0];
+    expect(execution.preparedPlan.artifactReceipts[0]).toMatchObject({
+      target: 'coprocessor',
+      size: OKPP_HEADER_SIZE,
     });
   });
 
   test('treats manual resource bundles as explicit payload without remote firmware auto-fill', async () => {
-    const resourceBundle = new Uint8Array([1, 2, 3]).buffer;
+    const resourceBundle = buildOkppHeader({ type: 'RESC', version: [1, 2, 3] }).buffer;
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -4029,7 +3863,7 @@ describe('Protocol V2 firmware update targets', () => {
         resourceBundleFiles: [
           {
             binary: resourceBundle,
-            devicePath: 'vol0:/resource/images/images.okpkg',
+            devicePath: 'vol0:/bundles/images/images.okpkg',
           },
         ],
       },
@@ -4038,64 +3872,31 @@ describe('Protocol V2 firmware update targets', () => {
 
     (method as any).device = stubDevice({
       originalDescriptor: { protocolType: 'V2' },
-      features: { deviceType: 'pro2', firmwareVersion: '0.0.0', capabilities: [] },
+      features: {
+        deviceType: 'pro2',
+        serialNo: 'P2-resource-device',
+        firmwareVersion: '0.0.0',
+        capabilities: [],
+      },
     });
     (method as any).prepareRemoteProtocolV2Binaries = jest.fn();
-    (method as any).enterProtocolV2BootloaderMode = jest.fn().mockResolvedValue(true);
-    (method as any).executeProtocolV2Update = jest.fn().mockResolvedValue(undefined);
-    (method as any).exitProtocolV2BootloaderToNormal = jest.fn().mockResolvedValue(undefined);
-    (method as any).waitForProtocolV2FinalFeatures = jest.fn().mockResolvedValue({
+    (method as any).executeProtocolV2PreparedPlan = jest.fn().mockResolvedValue({
       bootloaderVersion: '1.0.0',
       bleVersion: '0.0.0',
       firmwareVersion: '1.0.0',
+      targets: [],
     });
     method.postTipMessage = jest.fn();
 
     await method.run();
 
     expect((method as any).prepareRemoteProtocolV2Binaries).not.toHaveBeenCalled();
-    expect((method as any).executeProtocolV2Update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        resourceBundles: [
-          {
-            name: 'images.okpkg',
-            binary: resourceBundle,
-            devicePath: 'vol0:/resource/images/images.okpkg',
-          },
-        ],
-      })
-    );
-  });
-
-  test('syncs resource bundles without sending a firmware install request', async () => {
-    const method = new FirmwareUpdateV4({
-      id: 1,
-      payload: {
-        method: 'firmwareUpdateV4',
-      },
+    const execution = (method as any).executeProtocolV2PreparedPlan.mock.calls[0][0];
+    expect(execution.preparedPlan.artifactReceipts[0]).toMatchObject({
+      target: 'resource',
+      logicalName: 'images',
+      size: OKPP_HEADER_SIZE,
     });
-
-    method.postTipMessage = jest.fn();
-    method.postProgressMessage = jest.fn();
-    (method as any).protocolV2CommonUpdateProcess = jest.fn().mockResolvedValue(3);
-    (method as any).protocolV2StartFirmwareUpdate = jest.fn();
-    (method as any).waitForProtocolV2FirmwareUpdateComplete = jest.fn();
-
-    await (method as any).executeProtocolV2Update({
-      resourceBundles: [
-        {
-          name: 'images.okpkg',
-          binary: new Uint8Array([1, 2, 3]).buffer,
-          devicePath: 'vol0:/resource/images/images.okpkg',
-        },
-      ],
-      bootloaderBinary: null,
-      fwBinaryMap: [],
-    });
-
-    expect((method as any).protocolV2CommonUpdateProcess).toHaveBeenCalledTimes(1);
-    expect((method as any).protocolV2StartFirmwareUpdate).not.toHaveBeenCalled();
-    expect((method as any).waitForProtocolV2FirmwareUpdateComplete).not.toHaveBeenCalled();
   });
 
   test('uses absolute processed_byte offsets and disables append for firmware file writes', async () => {
@@ -4219,11 +4020,14 @@ describe('Protocol V2 firmware update targets', () => {
     method.postTipMessage = jest.fn();
 
     await expect(
-      (method as any).protocolV2WriteWholeFile({
-        payload: new Uint8Array(4097).buffer,
+      (method as any).protocolV2WriteByteSource({
+        source: {
+          size: 4097,
+          readAt: (offset: number, length: number) =>
+            Promise.resolve(new Uint8Array(Math.min(length, 4097 - offset)).buffer),
+        },
         filePath: 'vol0:/firmware.bin',
-        processedSize: 0,
-        totalSize: 4097,
+        reportProgress: () => Promise.resolve(),
       })
     ).rejects.toMatchObject({ errorCode: HardwareErrorCode.EmmcFileWriteFirmwareError });
     expect(typedCall).toHaveBeenCalledTimes(2);
@@ -4381,9 +4185,9 @@ describe('Protocol V2 firmware update method', () => {
     const typedCall = jest
       .fn()
       .mockRejectedValue(
-        new DOMException(
-          "Failed to execute 'open' on 'USBDevice': The device was disconnected",
-          'NotFoundError'
+        Object.assign(
+          new Error("Failed to execute 'open' on 'USBDevice': The device was disconnected"),
+          { name: 'NotFoundError' }
         )
       );
 

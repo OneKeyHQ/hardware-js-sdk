@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 2,
+  "manifestDigestInput": {
+    "schemaVersion": 2,
+    "catalogEpoch": 12,
+    "source": "app-bundled-catalog",
+    "sourceProjectionDigest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "artifactCatalog": [
+      {
+        "artifactId": "classic1s-firmware-4.0.0",
+        "role": "firmware",
+        "sourceUrls": ["https://firmware.example.com/classic1s/4.0.0.bin"],
+        "expectedSize": 4096,
+        "expectedSha256": "4444444444444444444444444444444444444444444444444444444444444444",
+        "integrity": "catalog-trusted",
+        "container": {
+          "kind": "raw"
+        },
+        "target": "firmware",
+        "targetVersion": "4.0.0",
+        "devicePathRule": {
+          "kind": "none"
+        },
+        "dependsOn": []
+      }
+    ],
+    "releases": [
+      {
+        "releaseId": "classic1s-universal-stable-4.0.0",
+        "deviceModel": "classic1s",
+        "firmwareType": "universal",
+        "channel": "stable",
+        "version": "4.0.0",
+        "required": false,
+        "artifactIds": ["classic1s-firmware-4.0.0"]
+      }
+    ]
+  },
+  "manifestCanonical": "{\"artifactCatalog\":[{\"artifactId\":\"classic1s-firmware-4.0.0\",\"container\":{\"kind\":\"raw\"},\"dependsOn\":[],\"devicePathRule\":{\"kind\":\"none\"},\"expectedSha256\":\"4444444444444444444444444444444444444444444444444444444444444444\",\"expectedSize\":4096,\"integrity\":\"catalog-trusted\",\"role\":\"firmware\",\"sourceUrls\":[\"https://firmware.example.com/classic1s/4.0.0.bin\"],\"target\":\"firmware\",\"targetVersion\":\"4.0.0\"}],\"catalogEpoch\":12,\"releases\":[{\"artifactIds\":[\"classic1s-firmware-4.0.0\"],\"channel\":\"stable\",\"deviceModel\":\"classic1s\",\"firmwareType\":\"universal\",\"releaseId\":\"classic1s-universal-stable-4.0.0\",\"required\":false,\"version\":\"4.0.0\"}],\"schemaVersion\":2,\"source\":\"app-bundled-catalog\",\"sourceProjectionDigest\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\"}",
+  "manifestDigest": "3ee7da7ca73ec5231bb2fe931b651d3569e3d9cf74900f7bada23e5212c56114",
+  "planDigestInput": {
+    "schemaVersion": 2,
+    "planId": "classic1s-universal-stable-4.0.0",
+    "manifestSnapshotDigest": "3ee7da7ca73ec5231bb2fe931b651d3569e3d9cf74900f7bada23e5212c56114",
+    "manifestMode": "external-only",
+    "catalogEpoch": 12,
+    "device": {
+      "identity": "golden-device-identity",
+      "model": "classic1s",
+      "firmwareType": "universal"
+    },
+    "artifacts": [
+      {
+        "artifactId": "classic1s-firmware-4.0.0",
+        "role": "firmware",
+        "sourceUrls": ["https://firmware.example.com/classic1s/4.0.0.bin"],
+        "expectedSize": 4096,
+        "expectedSha256": "4444444444444444444444444444444444444444444444444444444444444444",
+        "integrity": "catalog-trusted",
+        "container": {
+          "kind": "raw"
+        },
+        "target": "firmware",
+        "targetVersion": "4.0.0",
+        "devicePathRule": {
+          "kind": "none"
+        },
+        "dependsOn": []
+      }
+    ],
+    "epochs": [
+      {
+        "epochId": "component-install",
+        "kind": "component-install",
+        "artifactIds": ["classic1s-firmware-4.0.0"],
+        "dependsOn": [],
+        "targetIds": ["firmware"]
+      },
+      {
+        "epochId": "final-verify",
+        "kind": "final-verify",
+        "artifactIds": [],
+        "dependsOn": ["component-install"],
+        "targetIds": ["firmware"]
+      }
+    ],
+    "expectedFinalStates": [
+      {
+        "target": "firmware",
+        "version": "4.0.0",
+        "sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+      }
+    ]
+  },
+  "planCanonical": "{\"artifacts\":[{\"artifactId\":\"classic1s-firmware-4.0.0\",\"container\":{\"kind\":\"raw\"},\"dependsOn\":[],\"devicePathRule\":{\"kind\":\"none\"},\"expectedSha256\":\"4444444444444444444444444444444444444444444444444444444444444444\",\"expectedSize\":4096,\"integrity\":\"catalog-trusted\",\"role\":\"firmware\",\"sourceUrls\":[\"https://firmware.example.com/classic1s/4.0.0.bin\"],\"target\":\"firmware\",\"targetVersion\":\"4.0.0\"}],\"catalogEpoch\":12,\"device\":{\"firmwareType\":\"universal\",\"identity\":\"golden-device-identity\",\"model\":\"classic1s\"},\"epochs\":[{\"artifactIds\":[\"classic1s-firmware-4.0.0\"],\"dependsOn\":[],\"epochId\":\"component-install\",\"kind\":\"component-install\",\"targetIds\":[\"firmware\"]},{\"artifactIds\":[],\"dependsOn\":[\"component-install\"],\"epochId\":\"final-verify\",\"kind\":\"final-verify\",\"targetIds\":[\"firmware\"]}],\"expectedFinalStates\":[{\"sha256\":\"4444444444444444444444444444444444444444444444444444444444444444\",\"target\":\"firmware\",\"version\":\"4.0.0\"}],\"manifestMode\":\"external-only\",\"manifestSnapshotDigest\":\"3ee7da7ca73ec5231bb2fe931b651d3569e3d9cf74900f7bada23e5212c56114\",\"planId\":\"classic1s-universal-stable-4.0.0\",\"schemaVersion\":2}",
+  "planDigest": "bee50d0a2906fa08d3b97258d9e8ff0f6a1410ed2cce1fc97e66f5cd583878cd"
+}

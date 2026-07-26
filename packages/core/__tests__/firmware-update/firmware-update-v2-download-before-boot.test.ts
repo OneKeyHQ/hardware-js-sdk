@@ -2,7 +2,7 @@ import { EDeviceType, EFirmwareType, HardwareErrorCode } from '@onekeyfe/hd-shar
 
 import FirmwareUpdateV2 from '../../src/api/FirmwareUpdateV2';
 import { getBinary } from '../../src/api/firmware/getBinary';
-import { uploadFirmware } from '../../src/api/firmware/uploadFirmware';
+import { uploadFirmwareFromByteSource } from '../../src/api/firmware/uploadFirmware';
 import * as utils from '../../src/utils';
 
 jest.mock('../../src/data/config', () => ({
@@ -17,8 +17,9 @@ jest.mock('../../src/api/firmware/getBinary', () => ({
 }));
 
 jest.mock('../../src/api/firmware/uploadFirmware', () => ({
+  readFirmwareByteSourceFully: jest.fn(),
   updateResources: jest.fn(),
-  uploadFirmware: jest.fn(),
+  uploadFirmwareFromByteSource: jest.fn(),
 }));
 
 jest.mock('../../src/device/DevicePool', () => ({
@@ -29,7 +30,9 @@ jest.mock('../../src/device/DevicePool', () => ({
 }));
 
 const mockGetBinary = getBinary as jest.MockedFunction<typeof getBinary>;
-const mockUploadFirmware = uploadFirmware as jest.MockedFunction<typeof uploadFirmware>;
+const mockUploadFirmwareFromByteSource = uploadFirmwareFromByteSource as jest.MockedFunction<
+  typeof uploadFirmwareFromByteSource
+>;
 
 type DeviceType = 'CLASSIC1S' | 'PURE';
 
@@ -95,6 +98,25 @@ const createMethod = ({
   const typedCall = jest.fn().mockResolvedValue({ type: 'Success' });
   const checkDisposed = jest.fn();
   const acquire = jest.fn().mockResolvedValue(undefined);
+  const currentDeviceType = deviceType === 'PURE' ? EDeviceType.ClassicPure : EDeviceType.Classic1s;
+  const serialNo = deviceType === 'PURE' ? 'CP123456' : 'CL123456';
+  const features = {
+    protocol: 'V1' as const,
+    deviceType: currentDeviceType,
+    firmwareType: EFirmwareType.Universal,
+    serialNo,
+    firmwareVersion: '3.0.0',
+    bootloaderVersion: '2.0.0',
+    bleVersion: '1.0.0',
+    bootloaderMode,
+    onekey_device_type: deviceType,
+    onekey_serial_no: serialNo,
+    bootloader_mode: bootloaderMode,
+    major_version: 3,
+    minor_version: 0,
+    patch_version: 0,
+    capabilities: [],
+  };
   const commands = {
     typedCall,
     checkDisposed,
@@ -102,21 +124,12 @@ const createMethod = ({
   };
 
   method.device = {
-    features: {
-      onekey_device_type: deviceType,
-      onekey_serial_no: deviceType === 'PURE' ? 'CP123456' : 'CL123456',
-      bootloader_mode: bootloaderMode,
-      major_version: 3,
-      minor_version: 0,
-      patch_version: 0,
-      capabilities: [],
-    },
+    features,
     commands,
     getCommands: () => commands,
-    getCurrentDeviceType: () =>
-      deviceType === 'PURE' ? EDeviceType.ClassicPure : EDeviceType.Classic1s,
+    getCurrentDeviceType: () => currentDeviceType,
     getCurrentFirmwareType: () => EFirmwareType.Universal,
-    isBootloader: () => bootloaderMode,
+    isBootloader: () => Boolean(features.bootloaderMode),
     isProtocolV2: () => false,
     acquire,
     toMessageObject: jest.fn(() => ({})),
@@ -172,7 +185,7 @@ describe('FirmwareUpdateV2 download-before-reboot safety', () => {
     expect(mockGetBinary).toHaveBeenCalledTimes(1);
     expectNoFirmwareMutationCalls(typedCall);
     expect(acquire).not.toHaveBeenCalled();
-    expect(mockUploadFirmware).not.toHaveBeenCalled();
+    expect(mockUploadFirmwareFromByteSource).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -213,9 +226,11 @@ describe('FirmwareUpdateV2 download-before-reboot safety', () => {
           binary: firmwareBinary,
         } as Awaited<ReturnType<typeof getBinary>>);
       });
-      mockUploadFirmware.mockImplementation(() => {
+      mockUploadFirmwareFromByteSource.mockImplementation(() => {
         callOrder.push('upload');
-        return Promise.resolve(expectedResponse as Awaited<ReturnType<typeof uploadFirmware>>);
+        return Promise.resolve(
+          expectedResponse as Awaited<ReturnType<typeof uploadFirmwareFromByteSource>>
+        );
       });
       const { method, typedCall } = createMethod({
         updateType,
@@ -245,16 +260,17 @@ describe('FirmwareUpdateV2 download-before-reboot safety', () => {
           },
         })
       );
-      expect(mockUploadFirmware).toHaveBeenCalledWith(
+      expect(mockUploadFirmwareFromByteSource).toHaveBeenCalledWith(
         updateType,
         expect.any(Function),
         expect.any(Function),
         method.device,
-        {
-          payload: firmwareBinary,
-          rebootOnSuccess: true,
-        },
-        isUpdateBootloader
+        expect.objectContaining({
+          size: firmwareBinary.byteLength,
+          supportsCrossProcessResume: false,
+        }),
+        true,
+        Boolean(isUpdateBootloader)
       );
     }
   );
@@ -268,11 +284,11 @@ describe('FirmwareUpdateV2 download-before-reboot safety', () => {
         binary: firmwareBinary,
       } as Awaited<ReturnType<typeof getBinary>>);
     });
-    mockUploadFirmware.mockImplementation(() => {
+    mockUploadFirmwareFromByteSource.mockImplementation(() => {
       callOrder.push('upload');
       return Promise.resolve({
         success: true,
-      } as Awaited<ReturnType<typeof uploadFirmware>>);
+      } as Awaited<ReturnType<typeof uploadFirmwareFromByteSource>>);
     });
     const { method, typedCall, acquire } = createMethod({
       bootloaderMode: true,
@@ -297,9 +313,9 @@ describe('FirmwareUpdateV2 download-before-reboot safety', () => {
           resolveDownload = resolve;
         })
     );
-    mockUploadFirmware.mockResolvedValue({
+    mockUploadFirmwareFromByteSource.mockResolvedValue({
       success: true,
-    } as Awaited<ReturnType<typeof uploadFirmware>>);
+    } as Awaited<ReturnType<typeof uploadFirmwareFromByteSource>>);
     const { method, typedCall } = createMethod();
 
     const runPromise = method.run();
@@ -330,7 +346,7 @@ describe('FirmwareUpdateV2 download-before-reboot safety', () => {
 
     expectNoFirmwareMutationCalls(typedCall);
     expect(acquire).not.toHaveBeenCalled();
-    expect(mockUploadFirmware).not.toHaveBeenCalled();
+    expect(mockUploadFirmwareFromByteSource).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -339,24 +355,25 @@ describe('FirmwareUpdateV2 download-before-reboot safety', () => {
   ])(
     'keeps the non-empty %s binary overload and never downloads it again',
     async (_kind, binary) => {
-      mockUploadFirmware.mockResolvedValue({
+      mockUploadFirmwareFromByteSource.mockResolvedValue({
         success: true,
-      } as Awaited<ReturnType<typeof uploadFirmware>>);
+      } as Awaited<ReturnType<typeof uploadFirmwareFromByteSource>>);
       const { method } = createMethod({ binary });
 
       await method.run();
 
       expect(mockGetBinary).not.toHaveBeenCalled();
-      expect(mockUploadFirmware).toHaveBeenCalledWith(
+      expect(mockUploadFirmwareFromByteSource).toHaveBeenCalledWith(
         'firmware',
         expect.any(Function),
         expect.any(Function),
         method.device,
-        {
-          payload: binary,
-          rebootOnSuccess: true,
-        },
-        undefined
+        expect.objectContaining({
+          size: binary.byteLength,
+          supportsCrossProcessResume: false,
+        }),
+        true,
+        false
       );
     }
   );
@@ -366,17 +383,21 @@ describe('FirmwareUpdateV2 download-before-reboot safety', () => {
     ['DataView', new DataView(new Uint8Array([9, 3, 4, 9]).buffer, 1, 2), [3, 4]],
     ['custom Buffer', createCustomBuffer(4), [1, 2, 3, 4]],
   ])('normalizes a non-empty %s before rebooting', async (_kind, binary, expectedBytes) => {
-    mockUploadFirmware.mockResolvedValue({
-      success: true,
-    } as Awaited<ReturnType<typeof uploadFirmware>>);
+    let uploadedBytes: number[] = [];
+    mockUploadFirmwareFromByteSource.mockImplementation(
+      async (_updateType, _typedCall, _postMessage, _device, source) => {
+        uploadedBytes = Array.from(new Uint8Array(await source.readAt(0, source.size)));
+        return {
+          success: true,
+        } as Awaited<ReturnType<typeof uploadFirmwareFromByteSource>>;
+      }
+    );
     const { method } = createMethod({ binary });
 
     await method.run();
 
     expect(mockGetBinary).not.toHaveBeenCalled();
-    const normalizedBinary = mockUploadFirmware.mock.calls[0][4].payload;
-    expect(normalizedBinary).toBeInstanceOf(ArrayBuffer);
-    expect(Array.from(new Uint8Array(normalizedBinary))).toEqual(expectedBytes);
+    expect(uploadedBytes).toEqual(expectedBytes);
   });
 
   it.each([
@@ -394,6 +415,6 @@ describe('FirmwareUpdateV2 download-before-reboot safety', () => {
     expect(mockGetBinary).not.toHaveBeenCalled();
     expectNoFirmwareMutationCalls(typedCall);
     expect(acquire).not.toHaveBeenCalled();
-    expect(mockUploadFirmware).not.toHaveBeenCalled();
+    expect(mockUploadFirmwareFromByteSource).not.toHaveBeenCalled();
   });
 });
