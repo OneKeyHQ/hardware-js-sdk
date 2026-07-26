@@ -8,7 +8,10 @@ import type { HwkAdapter, HwkAdapterBundle, HwkAdapterDeps, HwkBrand } from './t
 /**
  * Web factory.
  *   Trezor → WebUSB (navigator.usb, requires user-gesture picker)
- *   Ledger → disabled on this MVP build.
+ *   Ledger → disabled on web. The Ledger WebHID connector pulls in
+ *            `@ledgerhq/device-transport-kit-web-hid`, which Metro cannot resolve
+ *            from a workspace package (the "DMK ↔ metro" friction). Test the
+ *            Ledger attestation path on real hardware via app-monorepo instead.
  *
  * Mirror of `connectorFactory.native.ts` — registers the same
  * `REQUEST_DEVICE_PERMISSION` event handler, but on the web side

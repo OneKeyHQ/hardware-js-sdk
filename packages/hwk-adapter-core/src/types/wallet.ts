@@ -334,6 +334,12 @@ export interface IDeviceManagerMethods {
     params?: TrezorChangePinParams
   ): Promise<Response<Record<string, unknown>>>;
   wipeDevice?(connectId: string): Promise<Response<Record<string, unknown>>>;
+  // Sends AuthenticateDevice and returns the raw AuthenticityProof message.
+  // The challenge must be generated host-side and passed in.
+  authenticateDevice?(
+    connectId: string,
+    params: { challenge: string }
+  ): Promise<Response<Record<string, unknown>>>;
 }
 
 export interface IWalletStateMethods {

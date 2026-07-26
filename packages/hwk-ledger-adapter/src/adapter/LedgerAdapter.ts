@@ -129,6 +129,28 @@ function btcAccountIndexFromPath(path: string): number | null {
   return Number.isFinite(accountIndex) ? accountIndex : null;
 }
 
+export type LedgerAttestationResult = {
+  /**
+   * Ledger's official genuine-check verdict (from Ledger's HSM, over the same
+   * secure-channel backend as app install). Only trust `deviceId` when true.
+   */
+  verified: boolean;
+  /**
+   * Stable per-device id = sha3-256 of the device attestation public key (hex),
+   * computed by DMK during the genuine check. Survives wipe/recovery and cannot
+   * be forged from a seed. Backend-verified when `verified` is true.
+   */
+  deviceId?: string;
+  /**
+   * Raw device attestation public key (65-byte uncompressed EC point, hex),
+   * recovered from the GET CERTIFICATE response during the genuine check.
+   * Best-effort: may be undefined if it could not be captured. `deviceId` is
+   * exactly sha3-256 of this key.
+   */
+  attestationPubKey?: string;
+  note: string;
+};
+
 export class LedgerAdapter implements IHardwareWallet {
   readonly vendor = 'ledger' as const;
 
@@ -822,6 +844,48 @@ export class LedgerAdapter implements IHardwareWallet {
     try {
       const result = await this.connectorCall(connectId, 'getDeviceInfo', {});
       return success(result as LedgerDeviceInfo);
+    } catch (err) {
+      return this.errorToFailure(err);
+    }
+  }
+
+  /**
+   * Runs Ledger's official genuine check (DMK GenuineCheckDeviceAction) over the
+   * SAME secure-channel backend as app install
+   * (wss://scriptrunner.api.live.ledger.com/update/genuine). It returns Ledger's
+   * HSM verdict (`verified`) and a stable per-device id = sha3-256 of the device
+   * attestation public key, which DMK reads inside that session. The id survives
+   * wipe/recovery and cannot be forged from a seed.
+   *
+   * Requires network access to Ledger's backend and an on-device
+   * "Allow secure connection" confirmation the first time.
+   */
+  async verifyDeviceAuthenticity(
+    connectId: string
+  ): Promise<Response<LedgerAttestationResult>> {
+    try {
+      const result = (await this.connectorCall(connectId, 'getDeviceGenuineCheck', {})) as {
+        isGenuine: boolean;
+        deviceId?: string;
+        attestationPubKey?: string;
+      };
+      if (!result.deviceId) {
+        // The genuine verdict came back, but DMK did not surface a deviceId
+        // (server did not drive GET CERTIFICATE, or the certificate failed to
+        // parse). Without an id there is nothing to record for accounting.
+        return failure(
+          HardwareErrorCode.UnknownError,
+          `Genuine check completed (isGenuine=${result.isGenuine}) but no deviceId was captured`
+        );
+      }
+      return success({
+        verified: result.isGenuine,
+        deviceId: result.deviceId,
+        attestationPubKey: result.attestationPubKey,
+        note: result.isGenuine
+          ? 'Verified by Ledger genuine-check backend; deviceId = sha3_256(attestation pubkey).'
+          : 'Ledger genuine-check returned NOT genuine — do not trust this device.',
+      });
     } catch (err) {
       return this.errorToFailure(err);
     }
