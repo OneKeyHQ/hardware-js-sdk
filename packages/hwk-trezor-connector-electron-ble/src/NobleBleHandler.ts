@@ -164,6 +164,9 @@ const BLE_CONNECT_TIMEOUT_MS = 31_000;
 // Cap on a cleanup disconnectAsync — it hangs on a just-failed connect.
 const BLE_DISCONNECT_TIMEOUT_MS = 2_000;
 
+/** Floor between noble rebuilds, so a persistent failure can't thrash. */
+const NOBLE_RECOVER_COOLDOWN_MS = 10_000;
+
 export interface NobleBleHandlerOptions {
   /** Override for tests; defaults to `require('@stoprocent/noble')`. */
   nobleFactory?: NobleFactory;
@@ -211,6 +214,8 @@ export class NobleBleHandler {
   private _onDeviceDisconnected?: (id: string) => void;
 
   private _initialized = false;
+
+  private _lastNobleRecoverAt?: number;
 
   constructor(options: NobleBleHandlerOptions = {}) {
     this._factory = options.nobleFactory ?? DEFAULT_NOBLE_FACTORY;
@@ -282,6 +287,7 @@ export class NobleBleHandler {
       } catch (error) {
         this._scanning = false;
         this._log('warn', 'scan.start.error', { error: String(error) });
+        await this._recoverNobleIfStuck(String(error));
       }
     }
     this._armIdleStop();
@@ -325,6 +331,70 @@ export class NobleBleHandler {
       result.push(peripheralToInfo(peripheral));
     }
     return result;
+  }
+
+  /** A noble instance with its own bindings, so a stuck one can be replaced. */
+  private _createFreshNoble(): NobleLike {
+    const candidate = this._factory() as NobleLike & {
+      withBindings?: () => NobleLike;
+    };
+    return typeof candidate.withBindings === 'function'
+      ? candidate.withBindings()
+      : candidate;
+  }
+
+  /**
+   * Rebuild noble when its adapter state is stuck. Re-enumerating the Windows
+   * BLE stack (pairing, or removing the device from OS settings) can catch
+   * noble's RadioWatcher mid-churn: it latches `unsupported` and never
+   * re-evaluates, so every later scan fails until the process restarts. Fresh
+   * bindings restart that watcher, which is the in-process equivalent of the
+   * app restart that is otherwise the only cure.
+   */
+  private async _recoverNobleIfStuck(reason: string): Promise<void> {
+    const state = this._noble?.state;
+    if (state === 'poweredOn' || !this._initialized) return;
+    // Never tear down bindings out from under a live link.
+    if (this._connected.size > 0) {
+      this._log('warn', 'noble.recover.skip', {
+        reason,
+        state,
+        connected: this._connected.size,
+      });
+      return;
+    }
+    const now = Date.now();
+    if (
+      this._lastNobleRecoverAt &&
+      now - this._lastNobleRecoverAt < NOBLE_RECOVER_COOLDOWN_MS
+    ) {
+      return;
+    }
+    this._lastNobleRecoverAt = now;
+    this._log('warn', 'noble.recover.start', { reason, state });
+    try {
+      const previous = this._noble;
+      if (previous && this._discoverHandler) {
+        previous.removeListener('discover', this._discoverHandler);
+      }
+      // The default factory returns noble's module singleton — the very object
+      // that is stuck — so rebuilding needs `withBindings()`, which mints a new
+      // instance (and with it a new RadioWatcher). Injected factories are
+      // assumed to already hand back a fresh instance.
+      const fresh = this._createFreshNoble();
+      this._noble = fresh;
+      if (this._discoverHandler) {
+        fresh.on('discover', this._discoverHandler);
+      }
+      this._scanning = false;
+      this._discovered.clear();
+      this._lastSeen.clear();
+      await this._waitForPoweredOn(TREZOR_BLE_POWER_ON_TIMEOUT_MS);
+      this._log('warn', 'noble.recover.done', { state: this._noble?.state });
+    } catch (error) {
+      // Recovery is best-effort; the caller already reported the scan failure.
+      this._log('warn', 'noble.recover.error', { error: String(error) });
+    }
   }
 
   private _armIdleStop(): void {
