@@ -59,6 +59,69 @@ describe('LedgerConnectorBase error wrapping', () => {
   });
 });
 
+describe('LedgerConnectorBase runtime genuine-check relay', () => {
+  it('rejects relay URLs that do not use secure WebSockets', async () => {
+    const connector = new LedgerConnectorBase(async () => ({}));
+
+    await expect(
+      connector.configure({
+        ledgerGenuineCheckWebSocketUrl: 'https://attestation.onekey.test/session',
+      })
+    ).rejects.toThrow('must use wss');
+  });
+
+  it('passes the short-lived relay base to the DMK builder', async () => {
+    const relayUrl = 'wss://attestation.onekey.test/session/opaque';
+    const dmk = {};
+    const builder = {
+      addTransport: jest.fn(),
+      addConfig: jest.fn(),
+      build: jest.fn(),
+    };
+    builder.addTransport.mockReturnValue(builder);
+    builder.addConfig.mockReturnValue(builder);
+    builder.build.mockReturnValue(dmk);
+    const DeviceManagementKitBuilder = jest.fn(() => builder);
+    const connector = new LedgerConnectorBase(async () => () => ({}));
+    (connector as any)._importLedgerKit = jest.fn().mockResolvedValue({
+      DeviceManagementKitBuilder,
+    });
+
+    await connector.configure({
+      ledgerGenuineCheckWebSocketUrl: relayUrl,
+    });
+    await (connector as any)._getOrCreateDmk();
+
+    expect(builder.addConfig).toHaveBeenCalledWith({
+      webSocketUrl: relayUrl,
+    });
+    expect(builder.build).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears a configured relay URL on lifecycle reset', async () => {
+    const builder = {
+      addTransport: jest.fn(),
+      addConfig: jest.fn(),
+      build: jest.fn().mockReturnValue({}),
+    };
+    builder.addTransport.mockReturnValue(builder);
+    builder.addConfig.mockReturnValue(builder);
+    const connector = new LedgerConnectorBase(async () => () => ({}));
+    (connector as any)._importLedgerKit = jest.fn().mockResolvedValue({
+      DeviceManagementKitBuilder: jest.fn(() => builder),
+    });
+
+    await connector.configure({
+      ledgerGenuineCheckWebSocketUrl:
+        'wss://attestation.onekey.test/session/opaque',
+    });
+    connector.reset();
+    await (connector as any)._getOrCreateDmk();
+
+    expect(builder.addConfig).not.toHaveBeenCalled();
+  });
+});
+
 describe('LedgerConnectorBase BLE discovery', () => {
   it('allows transport ids as BLE connectId even when they are not four-character names', async () => {
     const connector = new SearchConnector(

@@ -175,6 +175,17 @@ export interface ConnectorSearchDevicesOptions {
   waitForAll?: boolean;
 }
 
+export interface ConnectorConfig {
+  /**
+   * Optional OneKey-controlled WebSocket relay base used only for Ledger's
+   * genuine check. DMK appends its `/genuine` path and device query params.
+   *
+   * The value may contain a short-lived opaque relay token, so connectors must
+   * never log it. Passing `undefined` restores Ledger's official default.
+   */
+  ledgerGenuineCheckWebSocketUrl?: string;
+}
+
 export interface IConnector {
   /** Physical connection type this connector uses. Fixed at construction. */
   readonly connectionType: ConnectionType;
@@ -198,6 +209,13 @@ export interface IConnector {
   off<K extends ConnectorEventType>(event: K, handler: (data: ConnectorEventMap[K]) => void): void;
 
   reset(): void;
+
+  /**
+   * Reconfigure vendor-specific transport services before the next connect.
+   * Ledger uses this to rebuild DMK against a short-lived OneKey genuine-check
+   * relay. Vendors without runtime configuration may omit it.
+   */
+  configure?(config: ConnectorConfig): Promise<void> | void;
 
   // Vendor-specific opt-in: warm-load persisted credentials before the first
   // session. Trezor uses this for THP `knownCredentials` (host-stored pairing
@@ -237,6 +255,7 @@ export interface IHardwareBridge {
   cancel(params: { vendor: VendorType; sessionId: string }): Promise<void>;
   uiResponse(params: { vendor: VendorType; response: UiResponseEvent }): void;
   reset(params: { vendor: VendorType }): void;
+  configure?(params: { vendor: VendorType; config: ConnectorConfig }): Promise<void> | void;
 
   /** Register an event handler for connector events forwarded across the bridge. */
   onEvent(
@@ -312,6 +331,7 @@ export function createBridgedConnector(
       if (inner.size === 0) handlerMap.delete(event);
     },
     reset: () => bridge.reset({ vendor }),
+    configure: bridge.configure ? config => bridge.configure?.({ vendor, config }) : undefined,
     setKnownCredentials: bridge.setKnownCredentials
       ? credentials => bridge.setKnownCredentials!({ vendor, credentials })
       : undefined,
@@ -709,6 +729,14 @@ export function createCombinedConnector(connectors: IConnector[]): IConnector {
       sessionOwner.clear();
       forwarders.clear();
     },
+
+    configure: connectors.some(c => c.configure)
+      ? async config => {
+          await Promise.all(connectors.map(child => Promise.resolve(child.configure?.(config))));
+          deviceOwner.clear();
+          sessionOwner.clear();
+        }
+      : undefined,
 
     setKnownCredentials: connectors.some(c => c.setKnownCredentials)
       ? async credentials => {

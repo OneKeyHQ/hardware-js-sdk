@@ -93,6 +93,8 @@ function createMockConnector(): IConnector & {
     }),
 
     reset: jest.fn(),
+
+    configure: jest.fn().mockResolvedValue(undefined),
   };
 
   return connector;
@@ -127,6 +129,72 @@ describe('LedgerAdapter', () => {
 
   it('should have vendor set to "ledger"', () => {
     expect(adapter.vendor).toBe('ledger');
+  });
+
+  it('routes genuine check through a short-lived relay and restores defaults', async () => {
+    const relayUrl = 'wss://attestation.onekey.test/session/opaque-token';
+    connector.callImpl.mockResolvedValueOnce({
+      isGenuine: true,
+      deviceId: 'ab'.repeat(32),
+      attestationPubKey: `04${'cd'.repeat(64)}`,
+    });
+
+    const result = await adapter.verifyDeviceAuthenticity('dev-1', {
+      ledgerGenuineCheckWebSocketUrl: relayUrl,
+    });
+
+    expect(connector.configure).toHaveBeenNthCalledWith(1, {
+      ledgerGenuineCheckWebSocketUrl: relayUrl,
+    });
+    expect(connector.callImpl).toHaveBeenCalledWith('session-abc', 'getDeviceGenuineCheck', {});
+    expect(connector.configure).toHaveBeenNthCalledWith(2, {
+      ledgerGenuineCheckWebSocketUrl: undefined,
+    });
+    expect(result).toMatchObject({
+      success: true,
+      payload: {
+        vendor: 'ledger',
+        verified: true,
+        deviceId: 'ab'.repeat(32),
+      },
+    });
+  });
+
+  it('does not expose attacker-controlled identity fields when Ledger is not genuine', async () => {
+    connector.callImpl.mockResolvedValueOnce({
+      isGenuine: false,
+      deviceId: 'ab'.repeat(32),
+      attestationPubKey: `04${'cd'.repeat(64)}`,
+    });
+
+    const result = await adapter.verifyDeviceAuthenticity('dev-1');
+
+    expect(result).toEqual({
+      success: true,
+      payload: {
+        vendor: 'ledger',
+        verified: false,
+        note: 'Ledger genuine-check returned NOT genuine.',
+      },
+    });
+  });
+
+  it('resets the connector if restoring the official Ledger endpoint fails', async () => {
+    const relayUrl = 'wss://attestation.onekey.test/session/opaque-token';
+    connector.configure
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('offscreen bridge unavailable'));
+    connector.callImpl.mockResolvedValueOnce({
+      isGenuine: true,
+      deviceId: 'ab'.repeat(32),
+    });
+
+    const result = await adapter.verifyDeviceAuthenticity('dev-1', {
+      ledgerGenuineCheckWebSocketUrl: relayUrl,
+    });
+
+    expect(result.success).toBe(true);
+    expect(connector.reset).toHaveBeenCalledTimes(1);
   });
 
   describe('searchDevices', () => {
