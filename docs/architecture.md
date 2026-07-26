@@ -7,7 +7,7 @@ OneKey Hardware SDK 采用三层架构设计：
 ```
 应用层 (DApps)
     ↓
-SDK接口层 (@onekeyfe/core) 
+SDK接口层 (@onekeyfe/hd-core)
     ↓
 传输抽象层 (@onekeyfe/hd-transport)
     ↓
@@ -23,7 +23,7 @@ SDK接口层 (@onekeyfe/core)
 - **`@onekeyfe/hd-transport`** - 传输层抽象
 
 ### 传输层
-- **`@onekeyfe/hd-transport-webusb`** - WebUSB传输（浏览器）
+- **`@onekeyfe/hd-transport-web-device`** - Web 设备传输入口（WebUSB / Electron BLE）
 - **`@onekeyfe/hd-transport-usb`** - Node.js USB传输（CLI/服务端，基于 libusb）
 - **`@onekeyfe/hd-transport-http`** - HTTP Bridge传输
 - **`@onekeyfe/hd-transport-lowlevel`** - 低层传输（BLE 插件模式）
@@ -31,6 +31,12 @@ SDK接口层 (@onekeyfe/core)
 ### 平台SDK
 - **`@onekeyfe/hd-web-sdk`** - Web平台SDK
 - **`@onekeyfe/hd-ble-sdk`** - 移动端BLE SDK
+
+### Ledger 集成（HWK）
+- **`@onekeyfe/hwk-adapter-core`** - Connector 抽象、桥接接口与通用类型
+- **`@onekeyfe/hwk-ledger-adapter`** - Ledger 链适配与 signer 封装
+- **`@onekeyfe/hwk-ledger-connector-webhid`** - 基于 WebHID 的 Ledger `IConnector` 实现
+- **`@onekeyfe/hwk-ledger-connector-ble`** - 基于 React Native BLE 的 Ledger `IConnector` 实现
 
 ### 示例应用
 - **`@onekeyfe/connect-examples`** - 集成示例
@@ -106,11 +112,55 @@ switch(env) {
     │   └── @onekeyfe/hd-transport
     │
     └── 传输层实现
-        ├── @onekeyfe/hd-transport-webusb      (浏览器)
+        ├── @onekeyfe/hd-transport-web-device  (WebUSB / Electron BLE)
         ├── @onekeyfe/hd-transport-usb          (Node.js CLI)
         ├── @onekeyfe/hd-transport-lowlevel     (BLE 插件)
         └── @onekeyfe/hd-transport-http         (Bridge)
 ```
+
+## 🔌 Ledger Connector 接口
+
+HWK 包统一实现 `IConnector` 接口，公共调用面如下：
+
+```typescript
+interface IConnector {
+  searchDevices(): Promise<ConnectorDevice[]>;
+  connect(deviceId?: string): Promise<ConnectorSession>;
+  disconnect(sessionId: string): Promise<void>;
+  call(sessionId: string, method: string, params: unknown): Promise<unknown>;
+  cancel(sessionId: string): Promise<void>;
+  uiResponse(response: UiResponseEvent): void;
+  on(event, handler): void;
+  off(event, handler): void;
+  reset(): void;
+}
+```
+
+典型接入方式：
+
+```typescript
+import { createLedgerWebHidConnector } from '@onekeyfe/hwk-ledger-connector-webhid';
+
+const connector = createLedgerWebHidConnector();
+const [device] = await connector.searchDevices();
+
+if (!device) {
+  throw new Error('No Ledger device found');
+}
+
+const session = await connector.connect(device.deviceId);
+```
+
+已实现的交互事件（`ui-event`）包括：
+- `searching`
+- `confirm-open-app`
+- `unlock-device`
+- `confirm-on-device`
+- `interaction-complete`
+
+使用约束：
+- WebHID Connector 面向浏览器 / 桌面 WebHID 场景。
+- BLE Connector 面向 React Native，包本身声明了 `react-native` peer dependency。
 
 ## 🔧 开发工具
 

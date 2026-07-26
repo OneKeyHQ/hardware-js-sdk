@@ -6,14 +6,14 @@ Hardware-js-sdk is designed to allow third-party developers to quickly access th
 
 | package                                                                     | description                                                           |
 | --------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| [@onekeyfe/core](./packages/core)                                           | The core process of hardware wallet connection.                       |
+| [@onekeyfe/hd-core](./packages/core)                                        | The core process of hardware wallet connection.                       |
 | [@onekeyfe/hd-web-sdk](./packages/hd-web-sdk)                               | Using the sdk in the web platform.                                    |
 | [@onekeyfe/hd-ble-sdk](./packages/hd-ble-sdk)                               | Using the SDK in BLE communication environment. e.g: iOS / Android    |
 | [@onekeyfe/hd-common-sdk](./packages/hd-common-connect-sdk)                 | Using the SDK in a node or web-usb environment                        |
 | [@onekeyfe/hd-transport](./packages/hd-transport)                           | Data serialization and deserialization of hardware communication data |
 | [@onekeyfe/hd-transport-http](./packages/hd-transport-http)                 | communication lib for http                                            |
 | [@onekeyfe/hd-transport-react-native](./packages/hd-transport-react-native) | communication lib for React Native                                    |
-| [@onekeyfe/hd-transport-webusb](./packages/hd-transport-webusb)             | communication lib for WebUSB                                          |
+| [@onekeyfe/hd-transport-web-device](./packages/hd-transport-web-device)     | device transport entrypoints for web runtimes                         |
 | [@onekeyfe/hd-shared](./packages/shared)                                    | Tools, error definitions, constants                                   |
 | [@onekeyfe/hardware-cli](./packages/hd-cli)                                | CLI for AI agent integration (Claude Code, Cursor, etc.)              |
 
@@ -36,6 +36,7 @@ Run a dev build:
 - `yarn dev:ble` (react-native sdk)
 - `yarn dev:core` (core package)
 - `yarn dev:transport-http` (transport-http package)
+- `yarn dev:transport-web-device` (web device transport package)
 - `yarn dev:shared` (shared package)
 
 ### Development with example desktop app (Recommend)

@@ -1,28 +1,19 @@
-# `@onekeyfe/hd-transport-webusb`
+# `@onekeyfe/hd-transport-web-device`
 
-`@onekeyfe/hd-transport-webusb` is a library that implements transport communication by WebUSB.
+`@onekeyfe/hd-transport-web-device` provides device-facing transport entrypoints for web runtimes.
 
-## What is the purpose
+## Exports
 
-- translate JSON payloads to binary messages using protobuf definitions comprehensible to OneKey devices
-- chunking and reading chunked messages according to the [OneKey protocol](./protocol.md)
-- exposing single API for various transport methods:
-  - Http Transport
-  - React Native Transport
-  - WebUSB
-- Create and expose typescript definitions based on protobuf definitions.
+- `WebUsbTransport` - browser transport implemented in `src/webusb.ts`
+- `ElectronBleTransport` - Electron BLE transport implemented in `src/electron-ble-transport.ts`
 
-### The short version
+## Development
 
-In order to be able to use new features of onekey-firmware you need to update protobuf definitions.
+Run the package in watch mode from the repository root:
 
-1. `git submodule update --init --recursive` to initialize git submodules.
-1. `yarn update-submodules` to update firmware submodule
-1. `yarn update:protobuf` to generate new `./messages.json` and `./src/types/messages.ts`
-
-git submodule update --init --recursive to initialize firmware submodule
-yarn update-submodules to update firmware submodule
-yar update:protobuf to generate new ./messages.json and ./src/types/messages.ts
+```bash
+yarn dev:transport-web-device
+```
 
 ## Docs
 
