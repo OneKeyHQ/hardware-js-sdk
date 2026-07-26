@@ -1,8 +1,10 @@
 # OneKey 硬件设备方法支持列表
 
-> 更新日期: 2026-02-28
+> 更新日期: 2026-05-11
 > 说明：测试用例层面不再通过 skip 隐藏结果，统一按真实返回做 expected 覆盖。
 > 说明：`expected = false` 的用例按“任意失败即通过”判定，同时在结果区展示设备实际错误信息。
+> 说明：本页只汇总 `packages/connect-examples/expo-example/src/testTools/deviceCompatibility/plugins/*.ts` 中已经声明的设备差异。未出现在这些 overrides 里的新方法，不代表已经完成全设备验证。
+> 说明：截至当前源码，`tonSignData` 已接入 `packages/core/src/api/ton/TonSignData.ts` 和 `expo-example` playground 示例，但还没有进入 device-compatibility overrides，因此本页暂不把它列为已验证支持矩阵。
 
 ## 设备型号
 

@@ -178,6 +178,56 @@ OneKey硬件钱包通过统一的密码学原语支持80+区块链：
 - **TON (Telegram Open Network):** SLIP-44: 607, 路径: m/44'/607'/0', 地址格式: Base64URL
 - **NEM:** SLIP-44: 43, 路径: m/44'/43'/0'/0'/0', 特殊: 使用Keccak哈希变种
 
+### 3.3 TON 签名接口补充
+
+近期源码新增了 `tonSignData`，用于承接 TON Connect v2 的 `signData` 流程。该方法目前已接入 SDK 公开类型、调用注入层，以及 `expo-example` 的 playground 示例。
+
+#### `tonSignData` 的请求形状
+
+| 字段 | 是否必填 | 说明 |
+|------|----------|------|
+| `path` | 是 | HD 路径。SDK 会做 `validatePath(path, 3)` 校验，现有 TON 示例使用 `m/44'/607'/0'`。 |
+| `type` | 是 | `TonSignDataType` 枚举：`0 = TEXT`、`1 = BINARY`、`2 = CELL`。 |
+| `payload` | 是 | 十六进制字符串。SDK 会在发送到底层协议前做十六进制格式化。 |
+| `appdomain` | 是 | TON Connect 请求来源域名。 |
+| `timestamp` | 是 | 时间戳字段；现有示例使用 Unix 秒级时间戳。 |
+| `schema` | 否 | `CELL` 类型的 TL-B schema。`expo-example` 的 `CELL` 示例会显式传入它。 |
+| `fromAddress` | 否 | 调用方提供的 TON 地址字符串。 |
+| `walletVersion` | 否 | TON wallet version，和 `tonGetAddress` / `tonSignMessage` / `tonSignProof` 复用同一套地址派生参数。 |
+| `walletId` | 否 | wallet id。 |
+| `workchain` | 否 | workchain 标识。 |
+| `isBounceable` | 否 | 地址格式开关。 |
+| `isTestnetOnly` | 否 | 是否使用测试网地址格式。 |
+
+#### 返回值
+
+设备成功响应后，SDK 返回 `TonSignedData`，当前结构包含以下可选字段：
+
+- `signature`
+- `digest`
+
+#### 示例
+
+```typescript
+await HardwareSDK.tonSignData(connectId, deviceId, {
+  path: "m/44'/607'/0'",
+  type: 0, // TonSignDataType.TEXT
+  payload: '48656c6c6f204f6e654b6579',
+  appdomain: 'onekey.so',
+  timestamp: Math.floor(Date.now() / 1000),
+  fromAddress: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
+  walletVersion: 3,
+  isBounceable: false,
+  isTestnetOnly: false,
+});
+```
+
+#### 当前约束
+
+- `tonSignData` 内部调用的是设备协议层的 `TonSignData -> TonSignedData` typed call。
+- 该方法当前把 `strictCheckDeviceSupport` 设为 `false`，原因是支持它的固件最小版本还未在源码中定版；这意味着 SDK 不会像成熟方法那样先按版本矩阵拦截。
+- 如果你要接入 `CELL` 类型，请同时准备 BoC 十六进制 `payload` 和对应 `schema`，并优先参考 `packages/connect-examples/expo-example/src/data/ton.ts` 的现成示例。
+
 ## 4. Substrate系列
 
 ### 4.1 技术规范
