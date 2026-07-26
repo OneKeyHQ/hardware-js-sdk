@@ -149,3 +149,102 @@ packages/connect-examples/expo-example/src/testTools/deviceCompatibility/plugins
 ├── touch.ts
 └── mini.ts
 ```
+
+这些插件会在 `src/testTools/deviceCompatibility/plugins/index.ts` 中统一注册到 `compatibilityManager`。
+
+---
+
+# Overrides 规则模型
+
+当前设备兼容层的核心结构如下：
+
+```ts
+interface DeviceCompatibilityOverride {
+  id: string;
+  methods: string | string[];
+  when?: (context) => boolean;
+  skip?: string;
+  expected?: boolean;
+}
+```
+
+## 字段含义
+
+| 字段 | 说明 |
+|------|------|
+| `methods` | 规则命中的方法名，支持单个字符串或字符串数组 |
+| `when` | 可选附加条件；上下文里可读取 `method / key / path / params / testContext / features / deviceType` |
+| `expected` | 覆盖默认期望值；常见场景是将默认失败改成成功，或将默认成功改成失败 |
+| `skip` | 标记为跳过并返回原因 |
+
+## 匹配规则
+
+- 设备类型通过 `getDeviceType(features)` 判断
+- 每个设备插件内部按 `overrides.find(...)` 顺序匹配
+- **第一个命中的 override 生效**
+
+这意味着：更具体的规则应放在更靠前的位置，避免被更宽泛的规则提前吞掉。
+
+---
+
+# 当前代码路径如何消费这些规则
+
+## 1. Automation Test
+
+`packages/connect-examples/expo-example/src/testTools/automationTest/useAutomationTest.ts`
+
+当前自动化测试会在这些 suites 中读取 `compatibilityManager.getExpectedOverride(...)`：
+
+- `sdkAddressBatch`
+- `sdkPubkeyBatch`
+- `specialPassphrase`
+
+这里的作用不是隐藏失败，而是把“某设备当前预期应该失败/成功”的行为显式体现在结果里。
+
+## 2. Blind Signature / Security Check
+
+`packages/connect-examples/expo-example/src/testTools/securityCheckTest/blindSignature/utils.ts`
+
+这里通过 `getDeviceExpected(...)` 包装 `getExpectedOverride(...)`，把默认预期与设备差异合并成最终断言结果。
+
+例如：
+
+- Classic 对 `evmSignTransaction + authorizationList` 期望失败
+- Classic 1S / Pure 在 `securityChecksDisabled === true` 时，部分 `coinType=60` 用例期望成功
+
+## 3. Hook API（skip 场景）
+
+`src/testTools/deviceCompatibility/DeviceCompatibility.ts` 还暴露了：
+
+- `useDeviceCompatibility(method)`
+- `useBatchDeviceCompatibility(methods, pathsByMethod)`
+- `compatibilityManager.checkMethod(...)`
+
+这些 API 仍支持方法级、路径级 skip 判断，适合需要在 UI 或批量测试入口提前过滤能力的场景。
+
+---
+
+# 维护流程
+
+当设备行为发生变化时，建议按下面顺序更新：
+
+1. 修改对应设备插件里的 override
+2. 保持“更具体的规则在前，更宽泛的规则在后”
+3. 更新本文档中的设备差异说明
+4. 到 expo-example 的相关测试工具里复跑受影响路径，确认结果区展示的是**真实错误**而不是被静默跳过
+
+## 何时改 `expected`
+
+优先用于这两类情况：
+
+- 固件当前稳定返回失败，但测试不应把它记为回归
+- 某些设备在特定参数或 test context 下，实际能力与默认期望不同
+
+## 何时改 `skip`
+
+仅在“执行本身没有意义”时使用，例如：
+
+- 某设备明确不存在该能力
+- 某路径组合在当前设备上不应被调用
+
+如果只是“会失败，但这个失败本身就是当前已知行为”，优先使用 `expected=false`，这样结果页仍会保留真实错误信息。
