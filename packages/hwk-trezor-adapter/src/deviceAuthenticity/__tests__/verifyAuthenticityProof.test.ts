@@ -1,4 +1,4 @@
-import { authenticateDeviceFromProof } from '..';
+import { authenticateDeviceFromProof, getRequiredDeviceAuthenticityLayers } from '..';
 import { prepareDeviceAuthenticityData, verifyAuthenticityProof } from '../verifyAuthenticityProof';
 
 import type { DeviceAuthenticityConfig } from '../types';
@@ -24,8 +24,7 @@ const DEVICE_CERT_TROPIC =
   '308201993082014ba003020102020868b1982dacb2b041300506032b6570304f310b300906035504061302435a311e301c060355040a0c155472657a6f7220436f6d70616e7920732e722e6f2e3120301e06035504030c175472657a6f72204d616e75666163747572696e672043413020170d3235303832393132353934375a180f32303535303832323132353934375a3051311b301906035504030c1254335731205472657a6f72205361666520373121301f06035504051318343732303930323235323232323232323232323232323232310f300d060355042e130654726f706963302a300506032b6570032100c92482676994f4e2dec7eb2bb6a9ce9a8a38d4536c5e16b26646015cd7034593a341303f300e0603551d0f0101ff040403020080300c0603551d130101ff04023000301f0603551d23041830168014cf35aa12a033c044ebc6c3c0c3aefea5ae5e7db4300506032b65700341003b0aa3ccdddfd2a473e3f36059d0da2e54428c8dca5050a5fabf845ca71365d8045cc4d15c4e6e37565cbd66cdb4ba8d7ca113941f596a9bbfc25c069cf91903';
 const SIGNATURE_TROPIC =
   '9d6a7cfc1d9957a7eaa09f58ab385a4722dc621c6a58f0e281305f36c1447206ea6642f4e4ff36207bd57c3719101855e9c9a00a5db60cc84e20181d69f4fa00';
-const T3W1_ROOT_PUB_KEY_TROPIC =
-  'cd318dc8405ae4f4144e3284dcb7b0cb0f0c2195c2ca14a0f6fccd9104e32a4b';
+const T3W1_ROOT_PUB_KEY_TROPIC = 'cd318dc8405ae4f4144e3284dcb7b0cb0f0c2195c2ca14a0f6fccd9104e32a4b';
 const SERIAL_TROPIC = '343732303930323235323232323232323232323232323232';
 
 const CONFIG: DeviceAuthenticityConfig = {
@@ -99,6 +98,11 @@ describe('verifyAuthenticityProof', () => {
 });
 
 describe('authenticateDeviceFromProof', () => {
+  it('keeps T3W1 Tropic requirements independent from root-key configuration', () => {
+    expect(getRequiredDeviceAuthenticityLayers('T3W1')).toEqual(['optiga', 'tropic']);
+    expect(getRequiredDeviceAuthenticityLayers('T2B1')).toEqual(['optiga']);
+  });
+
   it('derives a stable per-device id (sha256 of the device pubkey when no serial)', () => {
     const result = authenticateDeviceFromProof({
       proof: {
@@ -171,7 +175,10 @@ describe('authenticateDeviceFromProof', () => {
   it('requires the Tropic layer on T3W1 (optiga-only proof is rejected)', () => {
     const t3w1Config: DeviceAuthenticityConfig = {
       version: 1,
-      T3W1: { rootPubKeysOptiga: [T2B1_ROOT_PUB_KEY_OPTIGA], rootPubKeysTropic: [T3W1_ROOT_PUB_KEY_TROPIC] },
+      T3W1: {
+        rootPubKeysOptiga: [T2B1_ROOT_PUB_KEY_OPTIGA],
+        rootPubKeysTropic: [T3W1_ROOT_PUB_KEY_TROPIC],
+      },
     };
     const result = authenticateDeviceFromProof({
       // reuse the optiga vector but omit tropic_* → tropic required-but-missing

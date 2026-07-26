@@ -201,7 +201,54 @@ OneKey 侧已有用户账户地址/xpub。对每条导入 `{地址或xpub → �
 ---
 
 ## 8. 未提交 / 未决事项
-- **两个仓库的改动都未 commit**（本会话没提交）。
+- 原始调试工作已分别 checkpoint；生产接入工作在
+  `codex/device-attestation-voucher-proof` 和
+  `codex/third-party-device-onboarding-rewards` 分支继续。
 - 设备 ID：Ledger `attestationPubKey` 字段 + 两台同批次 deviceId 唯一性待真机确认。
 - 分账合规提醒：采集第三方设备 ID 属设备指纹，多辖区算个人数据需披露同意；attestation 只证明"真设备"，不证明"同一个人"。
-- 账户名迁移：范围未定（见 6.4）。
+- Trezor Suite 云端标签仍需要 Dropbox/Google/suite-sync 的产品授权范围；App 会明确返回
+  `cloud_source_requires_authorization`，不会误报成已同步。
+
+---
+
+## 9. 生产接入实现（2026-07-26）
+
+后端协议、安全边界、表结构、幂等事务、Ledger relay 及上线测试门槛已整理到：
+
+- `docs/device-attestation-voucher-backend.md`
+
+SDK：
+
+- `IHardwareWallet.verifyDeviceAuthenticity(connectId, params)` 成为公共类型；
+- Trezor 接受服务端 32-byte challenge，原样调用 `AuthenticateDevice`，返回 raw
+  certificates/signatures 给后端独立验证；
+- Ledger connector 支持单次 `wss://` genuine-check relay base，运行结束恢复 Ledger
+  官方默认；
+- bridged/combined connector 支持运行时 `configure`；
+- Ledger `isGenuine=false` 的结果不再返回 attacker-controlled device identity；
+- reward 客户端不使用 `dangerouslyAllowDebugKeys`。
+
+App：
+
+- 仅 `FinalizeWalletSetup` 识别到真正新增的 Ledger/Trezor wallet 时，在用户点
+  Enter wallet 后运行 post-add flow；
+- Electron main 读取 Ledger Live `app.json`，只向 background 返回
+  Ethereum `name/address` 最小字段；`xpub`、源 account id 与完整账户对象不跨 IPC；
+  支持 `accountNames` tuple 和旧结构，并对 password-encrypted 数据 fail closed；
+- 相同 EVM 地址且所有候选名称一致时，Ledger Live 名称先经用户确认，再调用
+  `setAccountName`；读取、确认和 rename RPC 均有尾超时；
+- 之后显示设备奖励弹窗：服务端 challenge → 物理设备证明 → canonical address
+  signature → 服务端 claim；
+- Trezor claim 上传 raw proof；Ledger claim 只上传后端拥有的 relay session id，不上传
+  客户端 `verified/deviceId` 作为证据；
+- relay URL 只允许当前环境 OneKey attestation origin、固定 path 与单次 token，穿过
+  SW/offscreen bridge 时不会写入 SDK 日志；
+- claim background method 显式重建白名单 DTO，运行时额外字段（包括客户端
+  `verified/deviceId/DSID`）不会透传；
+- 任何名称迁移、厂商服务或 reward API 失败都不阻止钱包创建和进入首页。
+
+服务端上线 gate：
+
+- App 的“新 wallet id”判断只控制 UI，`walletAddAttemptId/walletId` 不证明首次添加；
+- 发券必须由服务端根据可信 creation event，或 OneKey ID + 已验证 DSID + 地址 +
+  campaign 的历史 claim 判定资格；后端未实现前不得开放活动。

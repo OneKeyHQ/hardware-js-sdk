@@ -11,15 +11,12 @@ import {
   runAllNetworkGetAddress,
   success,
 } from '@onekeyfe/hwk-adapter-core';
-
 import { randomBytes } from '@noble/hashes/utils';
 
 import { authenticateDeviceFromProof } from '../deviceAuthenticity';
-
 import { debugLog } from '../utils/debugLog';
 
-import type { AuthenticateDeviceResult, AuthenticityProof } from '../deviceAuthenticity';
-
+import type { AuthenticityProof } from '../deviceAuthenticity';
 import type {
   AllNetworkAddressParams,
   AllNetworkAddressResponse,
@@ -40,6 +37,8 @@ import type {
   ConnectorCallResult,
   ConnectorDevice,
   ConnectorUiEvent,
+  DeviceAuthenticityParams,
+  DeviceAuthenticityResult,
   DeviceEventListener,
   DeviceInfo,
   EvmAddress,
@@ -678,8 +677,21 @@ export class TrezorAdapter implements IHardwareWallet {
    */
   async verifyDeviceAuthenticity(
     connectId: string,
-    params: { dangerouslyAllowDebugKeys?: boolean } = {}
-  ): Promise<Response<AuthenticateDeviceResult>> {
+    params: DeviceAuthenticityParams = {}
+  ): Promise<Response<DeviceAuthenticityResult>> {
+    if (params.challenge && params.dangerouslyAllowDebugKeys) {
+      return failure(
+        HardwareErrorCode.InvalidParams,
+        'Debug attestation roots cannot be used with a server challenge'
+      );
+    }
+    if (params.challenge && !/^[0-9a-fA-F]{64}$/.test(params.challenge)) {
+      return failure(
+        HardwareErrorCode.InvalidParams,
+        'Device authenticity challenge must be exactly 32 bytes encoded as hex'
+      );
+    }
+
     const featuresRes = await this.getFeatures(connectId);
     if (!featuresRes.success) return featuresRes;
 
@@ -688,22 +700,33 @@ export class TrezorAdapter implements IHardwareWallet {
       return failure(HardwareErrorCode.UnknownError, 'Device internal_model unavailable');
     }
 
-    const challenge = Buffer.from(randomBytes(32));
+    const challengeHex =
+      params.challenge?.toLowerCase() ?? Buffer.from(randomBytes(32)).toString('hex');
+    const challenge = Buffer.from(challengeHex, 'hex');
     const proofRes = await this._callDeviceManagerMethod<Record<string, unknown>>(
       'authenticateDevice',
       connectId,
-      { challenge: challenge.toString('hex') }
+      { challenge: challengeHex }
     );
     if (!proofRes.success) return proofRes;
 
-    return success(
-      authenticateDeviceFromProof({
-        proof: proofRes.payload as unknown as AuthenticityProof,
-        challenge,
+    const proof = proofRes.payload as unknown as AuthenticityProof;
+    const verification = authenticateDeviceFromProof({
+      proof,
+      challenge,
+      deviceModel: internalModel,
+      allowDebugKeys: params.dangerouslyAllowDebugKeys,
+    });
+
+    return success({
+      ...verification,
+      vendor: 'trezor' as const,
+      trezorProof: {
+        challenge: challengeHex,
         deviceModel: internalModel,
-        allowDebugKeys: params.dangerouslyAllowDebugKeys,
-      })
-    );
+        proof,
+      },
+    });
   }
 
   deviceSettings(

@@ -3,7 +3,7 @@ import { sha256 } from '@noble/hashes/sha256';
 import { deviceAuthenticityConfig } from './config';
 import { prepareDeviceAuthenticityData, verifyAuthenticityProof } from './verifyAuthenticityProof';
 
-import type { DeviceAuthenticityConfig, VerifyAuthenticityProofResult } from './types';
+import type { DeviceAuthenticityConfig } from './types';
 
 export { deviceAuthenticityConfig } from './config';
 export { prepareDeviceAuthenticityData, verifyAuthenticityProof } from './verifyAuthenticityProof';
@@ -21,12 +21,13 @@ export type AuthenticityProof = {
 
 export type AuthenticateDeviceResult = {
   /**
-   * True only when EVERY required attestation layer for this model verified up
-   * to a trusted Trezor root CA AND the device signed our challenge:
+   * True only when every layer implemented by this verifier and required by
+   * the explicit model policy verified up to a trusted Trezor root CA AND the
+   * device signed our challenge:
    *  - Optiga (all secure-element models), and
-   *  - Tropic + matching serial number (T3W1 and above).
-   * ML-DSA / MCU is NOT checked (needs @noble/post-quantum). Only a `true`
-   * value may be trusted as a genuine, uniquely-identified physical device.
+   *  - Tropic + matching serial number (T3W1).
+   * ML-DSA / MCU is NOT checked (needs @noble/post-quantum). The reward backend
+   * must independently verify raw proof under its own versioned policy.
    */
   verified: boolean;
   /**
@@ -62,29 +63,23 @@ const modelConfigOf = (config: DeviceAuthenticityConfig, deviceModel: string) =>
   return modelConfig && typeof modelConfig !== 'number' ? modelConfig : undefined;
 };
 
-const isTropicExpected = (
-  config: DeviceAuthenticityConfig,
-  deviceModel: string,
-  allowDebugKeys?: boolean,
-): boolean => {
-  const m = modelConfigOf(config, deviceModel);
-  if (!m) return false;
-  return (
-    (m.rootPubKeysTropic?.length ?? 0) > 0 ||
-    (!!allowDebugKeys && (m.debug?.rootPubKeysTropic?.length ?? 0) > 0)
-  );
-};
+export const getRequiredDeviceAuthenticityLayers = (
+  deviceModel: string
+): readonly ('optiga' | 'tropic')[] => (deviceModel === 'T3W1' ? ['optiga', 'tropic'] : ['optiga']);
+
+const isTropicExpected = (deviceModel: string): boolean =>
+  getRequiredDeviceAuthenticityLayers(deviceModel).includes('tropic');
 
 const matchedDebugKey = (
   config: DeviceAuthenticityConfig,
   deviceModel: string,
-  rootPubKey?: string,
+  rootPubKey?: string
 ): boolean => {
   if (!rootPubKey) return false;
   const m = modelConfigOf(config, deviceModel);
   if (!m?.debug) return false;
   return [...(m.debug.rootPubKeysOptiga ?? []), ...(m.debug.rootPubKeysTropic ?? [])].includes(
-    rootPubKey,
+    rootPubKey
   );
 };
 
@@ -112,14 +107,14 @@ export const authenticateDeviceFromProof = ({
     const common = { signedData, deviceModel, config, allowDebugKeys, caPubKeyBlacklist };
 
     // 1) Optiga is required on every attestation-capable model.
-    const { optiga_certificates, optiga_signature } = proof;
-    if (!optiga_signature || !optiga_certificates?.length) {
+    const { optiga_certificates: optigaCertificates, optiga_signature: optigaSignature } = proof;
+    if (!optigaSignature || !optigaCertificates?.length) {
       return { verified: false, error: 'RESPONSE_PAYLOAD_MISSING' };
     }
     const optiga = verifyAuthenticityProof({
       ...common,
-      certificates: optiga_certificates,
-      signature: optiga_signature,
+      certificates: optigaCertificates,
+      signature: optigaSignature,
     });
     if (!optiga.valid) {
       return {
@@ -131,19 +126,19 @@ export const authenticateDeviceFromProof = ({
       };
     }
 
-    // 2) On T3W1+ the Tropic layer is also required, and its serial number must
+    // 2) On T3W1 the Tropic layer is also required, and its serial number must
     // match Optiga's. This defeats a transplanted-Optiga forgery: an attacker
     // moving a genuine Optiga onto a fake board cannot also satisfy Tropic.
     let usedDebugKey = matchedDebugKey(config, deviceModel, optiga.rootPubKey);
-    if (isTropicExpected(config, deviceModel, allowDebugKeys)) {
-      const { tropic_certificates, tropic_signature } = proof;
-      if (!tropic_signature || !tropic_certificates?.length) {
+    if (isTropicExpected(deviceModel)) {
+      const { tropic_certificates: tropicCertificates, tropic_signature: tropicSignature } = proof;
+      if (!tropicSignature || !tropicCertificates?.length) {
         return { verified: false, error: 'RESPONSE_PAYLOAD_MISSING' };
       }
       const tropic = verifyAuthenticityProof({
         ...common,
-        certificates: tropic_certificates,
-        signature: tropic_signature,
+        certificates: tropicCertificates,
+        signature: tropicSignature,
       });
       if (!tropic.valid) {
         return { verified: false, error: tropic.error };
@@ -152,14 +147,13 @@ export const authenticateDeviceFromProof = ({
       if (!serialsPresent || optiga.serialNumber !== tropic.serialNumber) {
         return { verified: false, error: 'SERIAL_NUMBER_MISMATCH' };
       }
-      usedDebugKey =
-        usedDebugKey || matchedDebugKey(config, deviceModel, tropic.rootPubKey);
+      usedDebugKey = usedDebugKey || matchedDebugKey(config, deviceModel, tropic.rootPubKey);
     }
 
     const deviceId =
       optiga.serialNumber ??
       Buffer.from(sha256(Uint8Array.from(Buffer.from(optiga.deviceCertPubKey, 'hex')))).toString(
-        'hex',
+        'hex'
       );
 
     return {
@@ -180,6 +174,3 @@ export const authenticateDeviceFromProof = ({
     };
   }
 };
-
-// re-export for callers that want the low-level result shape
-export type { VerifyAuthenticityProofResult };

@@ -51,6 +51,8 @@ import type {
   ConnectorCallResult,
   ConnectorDevice,
   ConnectorUiEvent,
+  DeviceAuthenticityParams,
+  DeviceAuthenticityResult,
   DeviceEventListener,
   DeviceInfo,
   DevicePermissionResponse,
@@ -861,14 +863,33 @@ export class LedgerAdapter implements IHardwareWallet {
    * "Allow secure connection" confirmation the first time.
    */
   async verifyDeviceAuthenticity(
-    connectId: string
-  ): Promise<Response<LedgerAttestationResult>> {
+    connectId: string,
+    params: DeviceAuthenticityParams = {}
+  ): Promise<Response<DeviceAuthenticityResult>> {
+    const relayUrl = params.ledgerGenuineCheckWebSocketUrl;
     try {
+      if (relayUrl) {
+        if (!this.connector.configure) {
+          return failure(
+            HardwareErrorCode.MethodNotSupported,
+            'This Ledger connector does not support genuine-check relay configuration'
+          );
+        }
+        await this.connector.configure({ ledgerGenuineCheckWebSocketUrl: relayUrl });
+        this.resetState();
+      }
       const result = (await this.connectorCall(connectId, 'getDeviceGenuineCheck', {})) as {
         isGenuine: boolean;
         deviceId?: string;
         attestationPubKey?: string;
       };
+      if (!result.isGenuine) {
+        return success({
+          vendor: 'ledger' as const,
+          verified: false,
+          note: 'Ledger genuine-check returned NOT genuine.',
+        });
+      }
       if (!result.deviceId) {
         // The genuine verdict came back, but DMK did not surface a deviceId
         // (server did not drive GET CERTIFICATE, or the certificate failed to
@@ -879,15 +900,26 @@ export class LedgerAdapter implements IHardwareWallet {
         );
       }
       return success({
+        vendor: 'ledger' as const,
         verified: result.isGenuine,
         deviceId: result.deviceId,
         attestationPubKey: result.attestationPubKey,
-        note: result.isGenuine
-          ? 'Verified by Ledger genuine-check backend; deviceId = sha3_256(attestation pubkey).'
-          : 'Ledger genuine-check returned NOT genuine — do not trust this device.',
+        note: 'Verified by Ledger genuine-check backend; deviceId = sha3_256(attestation pubkey).',
       });
     } catch (err) {
       return this.errorToFailure(err);
+    } finally {
+      if (relayUrl) {
+        try {
+          await this.connector.configure?.({ ledgerGenuineCheckWebSocketUrl: undefined });
+          this.resetState();
+        } catch {
+          // Fail safe: reset() also clears the one-shot relay URL in connectors
+          // that implement runtime relay configuration.
+          this.connector.reset();
+          this.resetState();
+        }
+      }
     }
   }
 

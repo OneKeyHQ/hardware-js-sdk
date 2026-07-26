@@ -4,6 +4,7 @@ import {
   isKnownNonTargetHardwareVendor,
   serializeConnectorError,
 } from '@onekeyfe/hwk-adapter-core';
+import * as sha3 from '@noble/hashes/sha3';
 
 import { LedgerDeviceManager } from '../device/LedgerDeviceManager';
 import { SignerManager } from '../signer/SignerManager';
@@ -35,34 +36,8 @@ import {
   tronSignTransaction,
 } from './chains';
 import { DeviceAppsManager } from '../device-apps/DeviceAppsManager';
-import { sha3_256 } from '@noble/hashes/sha3';
-
 import { collapseSignerInteraction } from './chains/utils';
 import { deviceActionToPromise } from '../signer/deviceActionToPromise';
-
-// GET CERTIFICATE (E0 52) response = length-value fields: a header field followed
-// by the attestation public key field. Mirrors DMK's `extractPublicKey`: skip the
-// first LV field, return the second (65-byte uncompressed EC point).
-function extractCertPubKey(data: Uint8Array): string | null {
-  try {
-    const buf = Buffer.from(data);
-    let offset = 0;
-    if (offset >= buf.length) return null;
-    const headerLen = buf[offset];
-    offset += 1 + headerLen;
-    if (offset >= buf.length) return null;
-    const keyLen = buf[offset];
-    offset += 1;
-    if (keyLen === 0 || offset + keyLen > buf.length) return null;
-    return buf.subarray(offset, offset + keyLen).toString('hex');
-  } catch {
-    return null;
-  }
-}
-
-function sha3HexOf(pubKeyHex: string): string {
-  return Buffer.from(sha3_256(Uint8Array.from(Buffer.from(pubKeyHex, 'hex')))).toString('hex');
-}
 
 import type {
   DeviceApps,
@@ -76,6 +51,7 @@ import type { DeviceManagementKit } from '@ledgerhq/device-management-kit';
 import type {
   ConnectionType,
   ConnectorCallResult,
+  ConnectorConfig,
   ConnectorDevice,
   ConnectorEventMap,
   ConnectorEventType,
@@ -102,6 +78,30 @@ import type {
   TronSignMessageCallParams,
   TronSignTransactionCallParams,
 } from './chains';
+
+// GET CERTIFICATE (E0 52) response = length-value fields: a header field followed
+// by the attestation public key field. Mirrors DMK's `extractPublicKey`: skip the
+// first LV field, return the second (65-byte uncompressed EC point).
+function extractCertPubKey(data: Uint8Array): string | null {
+  try {
+    const buf = Buffer.from(data);
+    let offset = 0;
+    if (offset >= buf.length) return null;
+    const headerLen = buf[offset];
+    offset += 1 + headerLen;
+    if (offset >= buf.length) return null;
+    const keyLen = buf[offset];
+    offset += 1;
+    if (keyLen === 0 || offset + keyLen > buf.length) return null;
+    return buf.subarray(offset, offset + keyLen).toString('hex');
+  } catch {
+    return null;
+  }
+}
+
+function sha3HexOf(pubKeyHex: string): string {
+  return Buffer.from(sha3.sha3_256(Uint8Array.from(Buffer.from(pubKeyHex, 'hex')))).toString('hex');
+}
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -232,6 +232,8 @@ export class LedgerConnectorBase implements IConnector {
   private readonly _providedDmk: DeviceManagementKit | undefined;
 
   private readonly _createTransport: TransportFactory;
+
+  private _ledgerGenuineCheckWebSocketUrl: string | undefined;
 
   public readonly connectionType: ConnectionType;
 
@@ -891,10 +893,7 @@ export class LedgerConnectorBase implements IConnector {
             dmk as unknown as {
               // Loose return: deviceActionToPromise narrows the observable shape.
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              executeDeviceAction(args: {
-                sessionId: string;
-                deviceAction: unknown;
-              }): any;
+              executeDeviceAction(args: { sessionId: string; deviceAction: unknown }): any;
             }
           ).executeDeviceAction({
             sessionId,
@@ -913,13 +912,13 @@ export class LedgerConnectorBase implements IConnector {
             // "Allow secure connection" tap (the idle watchdog does not pause
             // for it, only for unlock-device).
             5 * 60_000,
-            (cancel) => ctx.registerCanceller(sessionId, cancel),
-            (intermediateValue) => {
+            cancel => ctx.registerCanceller(sessionId, cancel),
+            intermediateValue => {
               const iv = intermediateValue as { deviceId?: Uint8Array } | undefined;
               if (iv?.deviceId instanceof Uint8Array && !deviceId) {
                 deviceId = Buffer.from(iv.deviceId).toString('hex');
               }
-            },
+            }
           );
 
           // Best-effort: recover the raw attestation public key that DMK hashed
@@ -927,7 +926,7 @@ export class LedgerConnectorBase implements IConnector {
           // the exact key behind this id (not some other cert seen on the wire).
           const attestationPubKey =
             deviceId && this._capturedGenuineCertPubKeys.length > 0
-              ? this._capturedGenuineCertPubKeys.find((pk) => sha3HexOf(pk) === deviceId)
+              ? this._capturedGenuineCertPubKeys.find(pk => sha3HexOf(pk) === deviceId)
               : undefined;
           this._capturedGenuineCertPubKeys = [];
 
@@ -987,7 +986,33 @@ export class LedgerConnectorBase implements IConnector {
   // ---------------------------------------------------------------------------
 
   reset(): void {
+    // A relay URL is a single-use capability. Any lifecycle reset must restore
+    // the official Ledger default so it cannot bleed into a later operation.
+    this._ledgerGenuineCheckWebSocketUrl = undefined;
     this._resetAll();
+  }
+
+  async configure(config: ConnectorConfig): Promise<void> {
+    const nextUrl = config.ledgerGenuineCheckWebSocketUrl;
+    if (nextUrl) {
+      let parsed: URL;
+      try {
+        parsed = new URL(nextUrl);
+      } catch {
+        throw new Error('Ledger genuine-check relay URL is invalid');
+      }
+      if (parsed.protocol !== 'wss:') {
+        throw new Error('Ledger genuine-check relay URL must use wss');
+      }
+      if (this._providedDmk) {
+        throw new Error('Cannot change Ledger genuine-check relay on a pre-built DMK');
+      }
+    }
+    if (nextUrl === this._ledgerGenuineCheckWebSocketUrl) {
+      return;
+    }
+    this._resetAll();
+    this._ledgerGenuineCheckWebSocketUrl = nextUrl;
   }
 
   // ---------------------------------------------------------------------------
@@ -1009,7 +1034,6 @@ export class LedgerConnectorBase implements IConnector {
   // tap is best-effort and can NEVER disturb the real APDU flow (it always
   // returns the original result, all capture logic is in try/catch).
   private _tapTransportForCert(factory: unknown): unknown {
-    const self = this;
     return (args: unknown) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const transport = (factory as (a: unknown) => any)(args);
@@ -1021,7 +1045,7 @@ export class LedgerConnectorBase implements IConnector {
           try {
             if (either && typeof either.map === 'function') {
               // purify-ts Either: map only touches the Right (connected device).
-              return either.map((device: unknown) => self._tapConnectedDevice(device));
+              return either.map((device: unknown) => this._tapConnectedDevice(device));
             }
           } catch {
             /* fall through, return untouched */
@@ -1035,7 +1059,6 @@ export class LedgerConnectorBase implements IConnector {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private _tapConnectedDevice(device: any): unknown {
-    const self = this;
     const originalSendApdu = device?.sendApdu;
     if (typeof originalSendApdu !== 'function') return device;
     const wrapped = async (apdu: Uint8Array, ...rest: unknown[]) => {
@@ -1051,7 +1074,7 @@ export class LedgerConnectorBase implements IConnector {
           const resp = result.extract() as { statusCode: Uint8Array; data: Uint8Array };
           if (resp && Buffer.from(resp.statusCode).toString('hex') === '9000') {
             const pubKey = extractCertPubKey(resp.data);
-            if (pubKey) self._capturedGenuineCertPubKeys.push(pubKey);
+            if (pubKey) this._capturedGenuineCertPubKeys.push(pubKey);
           }
         }
       } catch {
@@ -1088,9 +1111,11 @@ export class LedgerConnectorBase implements IConnector {
 
     debugLog('[DMK] _getOrCreateDmk: transportFactory type:', typeof transportFactory);
 
-    const dmk: DeviceManagementKit = new DeviceManagementKitBuilder()
-      .addTransport(transportFactory)
-      .build();
+    const builder = new DeviceManagementKitBuilder().addTransport(transportFactory);
+    if (this._ledgerGenuineCheckWebSocketUrl) {
+      builder.addConfig({ webSocketUrl: this._ledgerGenuineCheckWebSocketUrl });
+    }
+    const dmk: DeviceManagementKit = builder.build();
     this._dmk = dmk;
 
     debugLog('[DMK] _getOrCreateDmk: DMK created');
