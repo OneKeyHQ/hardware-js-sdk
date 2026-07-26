@@ -297,12 +297,12 @@ export class NobleBleHandler {
     // simply is not advertising); raw>0 with kept=0 means WE are dropping it —
     // the Trezor name/uuid filter is wrong. Without this the two look identical.
     if (devices.length === 0) {
+      // Counts only: the scan is unfiltered, so naming what it saw would put
+      // bystanders' devices in a log the user hands to support.
       this._log('warn', 'scan.empty', {
         raw: this._discovered.size,
         kept: 0,
-        rawNames: [...this._discovered.values()]
-          .map(p => p.advertisement?.localName)
-          .filter(Boolean),
+        named: [...this._discovered.values()].filter(p => p.advertisement?.localName).length,
       });
     }
     return devices;
@@ -338,9 +338,7 @@ export class NobleBleHandler {
     const candidate = this._factory() as NobleLike & {
       withBindings?: () => NobleLike;
     };
-    return typeof candidate.withBindings === 'function'
-      ? candidate.withBindings()
-      : candidate;
+    return typeof candidate.withBindings === 'function' ? candidate.withBindings() : candidate;
   }
 
   /**
@@ -364,10 +362,7 @@ export class NobleBleHandler {
       return;
     }
     const now = Date.now();
-    if (
-      this._lastNobleRecoverAt &&
-      now - this._lastNobleRecoverAt < NOBLE_RECOVER_COOLDOWN_MS
-    ) {
+    if (this._lastNobleRecoverAt && now - this._lastNobleRecoverAt < NOBLE_RECOVER_COOLDOWN_MS) {
       return;
     }
     this._lastNobleRecoverAt = now;
@@ -637,12 +632,13 @@ export class NobleBleHandler {
       // never again a dead end with nothing behind it: `discoveredCount` says
       // whether the scan saw ANY BLE traffic (0 = radio/scan problem) and
       // `trezorCount` whether the name/uuid filter is rejecting our own device.
+      // Counts only — see scan.empty. The target id is ours to log; the rest of
+      // the unfiltered scan is not.
       this._log('warn', 'connect.notFound', {
         id,
         route: 'none',
         discoveredCount: this._discovered.size,
         trezorCount: [...this._discovered.values()].filter(isTrezorPeripheral).length,
-        knownIds: [...this._discovered.keys()],
       });
       throw new Error(`Trezor BLE device not found: ${id}`);
     }
