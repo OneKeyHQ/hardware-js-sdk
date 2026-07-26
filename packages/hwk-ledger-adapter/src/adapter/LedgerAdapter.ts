@@ -181,6 +181,11 @@ export class LedgerAdapter implements IHardwareWallet {
   // BLE-only parallelism isn't worth the coordination cost.
   private readonly _jobQueue: DeviceJobQueue;
 
+  // Runtime relay configuration mutates connector-wide DMK state. Serialize
+  // the complete configure → genuine check → clear lifecycle so concurrent
+  // callers cannot reset or overwrite each other's one-shot relay.
+  private _deviceAuthenticityQueueTail: Promise<void> = Promise.resolve();
+
   // Shared across concurrent callers — only `cancel()` aborts.
   private _doConnectAbortController: AbortController | null = null;
 
@@ -865,6 +870,23 @@ export class LedgerAdapter implements IHardwareWallet {
   async verifyDeviceAuthenticity(
     connectId: string,
     params: DeviceAuthenticityParams = {}
+  ): Promise<Response<DeviceAuthenticityResult>> {
+    const waitForPrevious = this._deviceAuthenticityQueueTail;
+    let releaseQueue: () => void = () => undefined;
+    this._deviceAuthenticityQueueTail = new Promise<void>(resolve => {
+      releaseQueue = resolve;
+    });
+    await waitForPrevious;
+    try {
+      return await this._verifyDeviceAuthenticityExclusive(connectId, params);
+    } finally {
+      releaseQueue();
+    }
+  }
+
+  private async _verifyDeviceAuthenticityExclusive(
+    connectId: string,
+    params: DeviceAuthenticityParams
   ): Promise<Response<DeviceAuthenticityResult>> {
     const relayUrl = params.ledgerGenuineCheckWebSocketUrl;
     try {

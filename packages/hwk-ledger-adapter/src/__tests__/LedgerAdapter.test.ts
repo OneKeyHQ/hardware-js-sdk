@@ -197,6 +197,61 @@ describe('LedgerAdapter', () => {
     expect(connector.reset).toHaveBeenCalledTimes(1);
   });
 
+  it('serializes complete one-shot Ledger relay lifecycles', async () => {
+    const relayOne = 'wss://attestation.onekey.test/session/relay-one';
+    const relayTwo = 'wss://attestation.onekey.test/session/relay-two';
+    let resolveFirstCheck: (value: { isGenuine: boolean; deviceId: string }) => void = () =>
+      undefined;
+    connector.callImpl
+      .mockReturnValueOnce(
+        new Promise(resolve => {
+          resolveFirstCheck = resolve;
+        })
+      )
+      .mockResolvedValueOnce({
+        isGenuine: true,
+        deviceId: 'bb'.repeat(32),
+      });
+
+    const first = adapter.verifyDeviceAuthenticity('dev-1', {
+      ledgerGenuineCheckWebSocketUrl: relayOne,
+    });
+    await waitForCondition(
+      () =>
+        connector.callImpl.mock.calls.filter(call => call[1] === 'getDeviceGenuineCheck').length ===
+        1
+    );
+    const second = adapter.verifyDeviceAuthenticity('dev-1', {
+      ledgerGenuineCheckWebSocketUrl: relayTwo,
+    });
+    await Promise.resolve();
+
+    expect(connector.configure).toHaveBeenCalledTimes(1);
+    expect(connector.configure).toHaveBeenLastCalledWith({
+      ledgerGenuineCheckWebSocketUrl: relayOne,
+    });
+
+    resolveFirstCheck({
+      isGenuine: true,
+      deviceId: 'aa'.repeat(32),
+    });
+    await expect(first).resolves.toMatchObject({
+      success: true,
+      payload: { deviceId: 'aa'.repeat(32) },
+    });
+    await expect(second).resolves.toMatchObject({
+      success: true,
+      payload: { deviceId: 'bb'.repeat(32) },
+    });
+
+    expect(connector.configure.mock.calls).toEqual([
+      [{ ledgerGenuineCheckWebSocketUrl: relayOne }],
+      [{ ledgerGenuineCheckWebSocketUrl: undefined }],
+      [{ ledgerGenuineCheckWebSocketUrl: relayTwo }],
+      [{ ledgerGenuineCheckWebSocketUrl: undefined }],
+    ]);
+  });
+
   describe('searchDevices', () => {
     it('should return devices from connector', async () => {
       const devices = await adapter.searchDevices();
