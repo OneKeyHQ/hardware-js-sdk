@@ -12,7 +12,13 @@ import {
   success,
 } from '@onekeyfe/hwk-adapter-core';
 
+import { randomBytes } from '@noble/hashes/utils';
+
+import { authenticateDeviceFromProof } from '../deviceAuthenticity';
+
 import { debugLog } from '../utils/debugLog';
+
+import type { AuthenticateDeviceResult, AuthenticityProof } from '../deviceAuthenticity';
 
 import type {
   AllNetworkAddressParams,
@@ -688,6 +694,50 @@ export class TrezorAdapter implements IHardwareWallet {
 
   getFeatures(connectId: string): Promise<Response<Record<string, unknown>>> {
     return this._callDeviceManagerMethod<Record<string, unknown>>('getFeatures', connectId, {});
+  }
+
+  /**
+   * Device authenticity attestation. Sends a host-generated challenge, has the
+   * device sign it with its secure-element key, then verifies the returned
+   * certificate chain up to a trusted Trezor root CA. On success returns a
+   * `deviceId` that uniquely identifies the physical device, survives wipe, and
+   * cannot be forged from a seed. Only trust the result when `verified` is true
+   * (and `usedDebugKey` is false in production).
+   *
+   * Requires a secure-element model (Safe 3 = T2B1/T3B1, Safe 5 = T3T1, T3W1)
+   * and an on-device confirmation. Older models (T1B1, T2T1) will fail.
+   *
+   * `dangerouslyAllowDebugKeys` accepts simulator / development root keys — NEVER
+   * enable it in a production accounting flow, it lets an emulator mint any id.
+   */
+  async verifyDeviceAuthenticity(
+    connectId: string,
+    params: { dangerouslyAllowDebugKeys?: boolean } = {}
+  ): Promise<Response<AuthenticateDeviceResult>> {
+    const featuresRes = await this.getFeatures(connectId);
+    if (!featuresRes.success) return featuresRes;
+
+    const internalModel = (featuresRes.payload as { internal_model?: string }).internal_model;
+    if (!internalModel) {
+      return failure(HardwareErrorCode.UnknownError, 'Device internal_model unavailable');
+    }
+
+    const challenge = Buffer.from(randomBytes(32));
+    const proofRes = await this._callDeviceManagerMethod<Record<string, unknown>>(
+      'authenticateDevice',
+      connectId,
+      { challenge: challenge.toString('hex') }
+    );
+    if (!proofRes.success) return proofRes;
+
+    return success(
+      authenticateDeviceFromProof({
+        proof: proofRes.payload as unknown as AuthenticityProof,
+        challenge,
+        deviceModel: internalModel,
+        allowDebugKeys: params.dangerouslyAllowDebugKeys,
+      })
+    );
   }
 
   deviceSettings(

@@ -437,6 +437,15 @@ export abstract class TrezorConnectorBase implements IConnector {
         );
       case 'wipeDevice':
         return getTrezorResponseMessage(await session.deviceSession.call('WipeDevice', {}));
+      case 'authenticateDevice': {
+        // Device attestation: the device signs the host challenge with its
+        // secure-element (Optiga) key and returns its certificate chain. Requires
+        // an on-device confirmation and a secure-element model (Safe 3/5/T3W1).
+        const p = (params ?? {}) as { challenge: string };
+        return getTrezorResponseMessage(
+          await session.deviceSession.call('AuthenticateDevice', { challenge: p.challenge })
+        );
+      }
       // --- THP application-session control (Trezor-specific, driven by the
       // adapter to align the active passphrase session before a chain call).
       // The connector deals only in session ids; wallet identity belongs to the

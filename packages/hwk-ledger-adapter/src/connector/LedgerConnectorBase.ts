@@ -35,7 +35,34 @@ import {
   tronSignTransaction,
 } from './chains';
 import { DeviceAppsManager } from '../device-apps/DeviceAppsManager';
+import { sha3_256 } from '@noble/hashes/sha3';
+
 import { collapseSignerInteraction } from './chains/utils';
+import { deviceActionToPromise } from '../signer/deviceActionToPromise';
+
+// GET CERTIFICATE (E0 52) response = length-value fields: a header field followed
+// by the attestation public key field. Mirrors DMK's `extractPublicKey`: skip the
+// first LV field, return the second (65-byte uncompressed EC point).
+function extractCertPubKey(data: Uint8Array): string | null {
+  try {
+    const buf = Buffer.from(data);
+    let offset = 0;
+    if (offset >= buf.length) return null;
+    const headerLen = buf[offset];
+    offset += 1 + headerLen;
+    if (offset >= buf.length) return null;
+    const keyLen = buf[offset];
+    offset += 1;
+    if (keyLen === 0 || offset + keyLen > buf.length) return null;
+    return buf.subarray(offset, offset + keyLen).toString('hex');
+  } catch {
+    return null;
+  }
+}
+
+function sha3HexOf(pubKeyHex: string): string {
+  return Buffer.from(sha3_256(Uint8Array.from(Buffer.from(pubKeyHex, 'hex')))).toString('hex');
+}
 
 import type {
   DeviceApps,
@@ -847,6 +874,71 @@ export class LedgerConnectorBase implements IConnector {
           ctx.clearCanceller(sessionId);
         }
       }
+      case 'getDeviceGenuineCheck': {
+        // Ledger official genuine check, over the SAME secure-channel pipeline
+        // as app install (DMK → wss://scriptrunner.api.live.ledger.com/update/genuine).
+        // DMK reads the device attestation certificate inside that session and
+        // emits deviceId = sha3_256(attestation pubkey) in the Pending
+        // intermediateValue (NOT the final output) — captured below. The final
+        // output carries the { isGenuine } verdict from Ledger's HSM.
+        try {
+          // Reset the transport tap so we only match certificates read during
+          // THIS genuine check.
+          this._capturedGenuineCertPubKeys = [];
+          const dmk = await ctx.getOrCreateDmk();
+          const kit = await ctx.importLedgerKit('@ledgerhq/device-management-kit');
+          const action = (
+            dmk as unknown as {
+              // Loose return: deviceActionToPromise narrows the observable shape.
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              executeDeviceAction(args: {
+                sessionId: string;
+                deviceAction: unknown;
+              }): any;
+            }
+          ).executeDeviceAction({
+            sessionId,
+            deviceAction: new kit.GenuineCheckDeviceAction({ input: {} }),
+          });
+
+          let deviceId: string | undefined;
+          const output = await deviceActionToPromise<{ isGenuine: boolean }>(
+            action,
+            (interaction: string) =>
+              ctx.emit('ui-event', {
+                type: collapseSignerInteraction(interaction),
+                payload: { sessionId },
+              }),
+            // Generous timeout: covers websocket round-trips + the on-device
+            // "Allow secure connection" tap (the idle watchdog does not pause
+            // for it, only for unlock-device).
+            5 * 60_000,
+            (cancel) => ctx.registerCanceller(sessionId, cancel),
+            (intermediateValue) => {
+              const iv = intermediateValue as { deviceId?: Uint8Array } | undefined;
+              if (iv?.deviceId instanceof Uint8Array && !deviceId) {
+                deviceId = Buffer.from(iv.deviceId).toString('hex');
+              }
+            },
+          );
+
+          // Best-effort: recover the raw attestation public key that DMK hashed
+          // into deviceId. Match by sha3_256(pubkey) === deviceId so we return
+          // the exact key behind this id (not some other cert seen on the wire).
+          const attestationPubKey =
+            deviceId && this._capturedGenuineCertPubKeys.length > 0
+              ? this._capturedGenuineCertPubKeys.find((pk) => sha3HexOf(pk) === deviceId)
+              : undefined;
+          this._capturedGenuineCertPubKeys = [];
+
+          return { isGenuine: output.isGenuine, deviceId, attestationPubKey };
+        } catch (err) {
+          ctx.invalidateSession(sessionId);
+          throw ctx.wrapError(err);
+        } finally {
+          ctx.clearCanceller(sessionId);
+        }
+      }
       default:
         throw new Error(`LedgerConnector: unknown method "${method}"`);
     }
@@ -907,6 +999,74 @@ export class LedgerConnectorBase implements IConnector {
    * If a DMK was provided via constructor, it is used directly.
    * Otherwise, one is created via the transport factory.
    */
+  // Attestation public keys (hex) seen in GET CERTIFICATE (E0 52) responses on
+  // the transport. Only populated during a genuine check; cleared per call.
+  private _capturedGenuineCertPubKeys: string[] = [];
+
+  // Wrap a TransportFactory so every connected device's `sendApdu` is tapped:
+  // when DMK's genuine-check secure channel reads the device attestation
+  // certificate (E0 52), we capture the raw public key from the response. The
+  // tap is best-effort and can NEVER disturb the real APDU flow (it always
+  // returns the original result, all capture logic is in try/catch).
+  private _tapTransportForCert(factory: unknown): unknown {
+    const self = this;
+    return (args: unknown) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const transport = (factory as (a: unknown) => any)(args);
+      const originalConnect = transport?.connect;
+      if (typeof originalConnect === 'function') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        transport.connect = async (params: unknown): Promise<any> => {
+          const either = await originalConnect.call(transport, params);
+          try {
+            if (either && typeof either.map === 'function') {
+              // purify-ts Either: map only touches the Right (connected device).
+              return either.map((device: unknown) => self._tapConnectedDevice(device));
+            }
+          } catch {
+            /* fall through, return untouched */
+          }
+          return either;
+        };
+      }
+      return transport;
+    };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private _tapConnectedDevice(device: any): unknown {
+    const self = this;
+    const originalSendApdu = device?.sendApdu;
+    if (typeof originalSendApdu !== 'function') return device;
+    const wrapped = async (apdu: Uint8Array, ...rest: unknown[]) => {
+      const result = await originalSendApdu.call(device, apdu, ...rest);
+      try {
+        if (
+          apdu?.[0] === 0xe0 &&
+          apdu?.[1] === 0x52 &&
+          result &&
+          typeof result.isRight === 'function' &&
+          result.isRight()
+        ) {
+          const resp = result.extract() as { statusCode: Uint8Array; data: Uint8Array };
+          if (resp && Buffer.from(resp.statusCode).toString('hex') === '9000') {
+            const pubKey = extractCertPubKey(resp.data);
+            if (pubKey) self._capturedGenuineCertPubKeys.push(pubKey);
+          }
+        }
+      } catch {
+        /* the cert tap must never break the real APDU exchange */
+      }
+      return result;
+    };
+    return new Proxy(device, {
+      get(target, prop, receiver) {
+        if (prop === 'sendApdu') return wrapped;
+        return Reflect.get(target, prop, receiver);
+      },
+    });
+  }
+
   protected async _getOrCreateDmk(): Promise<DeviceManagementKit> {
     debugLog(
       '[DMK] _getOrCreateDmk called, _dmk exists:',
@@ -924,7 +1084,7 @@ export class LedgerConnectorBase implements IConnector {
     const { DeviceManagementKitBuilder } = await this._importLedgerKit(
       '@ledgerhq/device-management-kit'
     );
-    const transportFactory = await this._createTransport();
+    const transportFactory = this._tapTransportForCert(await this._createTransport());
 
     debugLog('[DMK] _getOrCreateDmk: transportFactory type:', typeof transportFactory);
 
