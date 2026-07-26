@@ -112,6 +112,62 @@ switch(env) {
         └── @onekeyfe/hd-transport-http         (Bridge)
 ```
 
+## 🤖 AI Agent 集成架构
+
+`@onekeyfe/hardware-cli` 是面向 AI coding assistants 的公开接口，命令入口为 `onekey-hw`。
+它把 Agent Skills、Claude Code 插件和通用 CLI 调用统一映射到同一套硬件 SDK 能力。
+
+```
+AI Agent / Skill / Plugin
+    ↓
+onekey-hw CLI (@onekeyfe/hardware-cli)
+    ↓
+@onekeyfe/hd-common-connect-sdk + @onekeyfe/hd-core
+    ↓
+@onekeyfe/hd-transport-usb
+    ↓
+OneKey 硬件设备
+```
+
+### 设计意图
+
+- 为 AI agents 提供稳定的命令行边界，避免直接拼装底层 SDK 调用
+- 通过 `skills/*/SKILL.md` 固化工作流、参数约束和安全规则
+- 将设备搜索、地址获取、交易签名、固件检查、安全设置统一为结构化 JSON 输出
+
+### 典型工作流
+
+1. 安装 CLI 或 Claude Code 插件
+2. 运行 `onekey-hw search` 搜索设备并获取 `connectId`
+3. 使用 `get-address`、`sign-transaction`、`sign-message` 等命令执行操作
+4. 用户在设备上输入 PIN、确认地址或签名
+5. CLI 返回 JSON 结果，供 Agent 或上层应用继续处理
+
+```bash
+# 搜索设备
+onekey-hw search
+
+# 获取 EVM 地址
+onekey-hw get-address --chain evm --use-empty-passphrase
+
+# 签名消息
+onekey-hw sign-message --chain evm --message "hello" --use-empty-passphrase
+```
+
+### 约束与边界
+
+- CLI 使用 `libusb` 直接访问 USB 设备，不依赖外部 bridge daemon
+- 涉及设备交互的命令会阻塞，直到用户在设备上完成 PIN 或确认操作
+- 所有签名类命令都需要设备上的物理确认，Agent 只能发起请求，不能绕过确认
+- 固件升级不在 CLI 中执行，只支持检查；实际升级需要使用 OneKey App 或 `firmware.onekey.so`
+- 技能文件按能力拆分为 `device`、`signing`、`firmware`、`security` 四类
+
+### 相关文档
+
+- CLI 使用说明：`packages/hd-cli/README.md`
+- Agent Skills 定义：`packages/hd-cli/skills/*/SKILL.md`
+- Developer Portal：`packages/connect-examples/developer-portal/content/en/hardware-sdk/agent-integration.mdx`
+
 ## 🔧 开发工具
 
 - **Lerna** - Monorepo管理
