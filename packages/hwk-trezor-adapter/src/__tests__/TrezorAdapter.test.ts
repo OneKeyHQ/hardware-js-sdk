@@ -137,6 +137,39 @@ describe('TrezorAdapter', () => {
     }
   });
 
+  it('retries once when an interrupted THP handshake leaves one malformed frame', async () => {
+    const connector = createConnector();
+    (connector.connect as ConnectMock).mockRejectedValueOnce(
+      Object.assign(new Error('Malformed protocol format'), {
+        name: 'TrezorProtocolError',
+        code: 'Malformed protocol format',
+      })
+    );
+    const adapter = new TrezorAdapter(connector);
+
+    await expect(adapter.connectDevice('safe-7')).resolves.toEqual({
+      success: true,
+      payload: 'safe-7',
+    });
+    expect(connector.connect).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry unrelated Trezor protocol errors', async () => {
+    const connector = createConnector();
+    (connector.connect as ConnectMock).mockRejectedValueOnce(
+      Object.assign(new Error('Unexpected protocol version'), {
+        name: 'TrezorProtocolError',
+        code: 'Unexpected protocol version',
+      })
+    );
+    const adapter = new TrezorAdapter(connector);
+
+    const result = await adapter.connectDevice('safe-7');
+
+    expect(result.success).toBe(false);
+    expect(connector.connect).toHaveBeenCalledTimes(1);
+  });
+
   it('emits request and failed response logs with the device error details', async () => {
     const connector = createConnector();
     (connector.call as CallMock)

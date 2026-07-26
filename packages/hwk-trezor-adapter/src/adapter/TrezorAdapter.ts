@@ -454,6 +454,19 @@ export class TrezorAdapter implements IHardwareWallet {
     );
   }
 
+  private static _isRecoverableProtocolResidueError(error: unknown): boolean {
+    const protocolError = error as {
+      name?: unknown;
+      code?: unknown;
+      message?: unknown;
+    };
+    return (
+      protocolError.name === 'TrezorProtocolError' &&
+      protocolError.code === 'Malformed protocol format' &&
+      protocolError.message === 'Malformed protocol format'
+    );
+  }
+
   /**
    * Race a promise against an abort signal. Copied from LedgerAdapter:
    * IConnector.call() can't actually be cancelled at the protocol level, but
@@ -485,8 +498,8 @@ export class TrezorAdapter implements IHardwareWallet {
   }
 
   private async _connectSession(connectId: string, signal?: AbortSignal): Promise<string> {
-    const connectPromise = this._connector.connect(connectId);
-    const session = await (async () => {
+    const connectOnce = async () => {
+      const connectPromise = this._connector.connect(connectId);
       if (!signal) return connectPromise;
       try {
         return await TrezorAdapter._abortable(signal, connectPromise);
@@ -499,7 +512,22 @@ export class TrezorAdapter implements IHardwareWallet {
         );
         throw error;
       }
-    })();
+    };
+    let session;
+    try {
+      session = await connectOnce();
+    } catch (error) {
+      if (signal?.aborted || !TrezorAdapter._isRecoverableProtocolResidueError(error)) {
+        throw error;
+      }
+      // An interrupted THP handshake may leave exactly one v2 frame queued on
+      // the shared USB pipe. The connector intentionally drains it as a loud
+      // v1 malformed-frame failure; retry once now that the residue is gone.
+      debugLog('[TrezorAdapter] retrying connect after draining a stale THP frame', {
+        connectId,
+      });
+      session = await connectOnce();
+    }
     // disconnectDevice() ran mid-connect: tear down the now-unwanted session
     // instead of caching it (else it leaks a limited THP slot).
     if (this._disconnectRequested.delete(connectId)) {
