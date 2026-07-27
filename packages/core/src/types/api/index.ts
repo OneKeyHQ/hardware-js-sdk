@@ -1,9 +1,33 @@
+import type {
+  deviceFactoryInfoGet,
+  deviceFactoryInfoSet,
+  deviceFirmwareUpdate,
+  deviceGetFirmwareUpdateStatus,
+  deviceGetOnboardingStatus,
+  deviceInfoGet,
+  deviceReboot,
+  deviceStatusGet,
+  deviceUploadWallpaper,
+  dirList,
+  dirMake,
+  dirRemove,
+  fileDelete,
+  fileRead,
+  fileWrite,
+  filesystemFormat,
+  filesystemPermissionFix,
+  pathInfo,
+  ping,
+  protocolInfoRequest,
+  uploadPortfolio,
+} from './protocolV2';
 import type { off, on, removeAllListeners } from './event';
 import type { uiResponse } from './uiResponse';
 import type { init, updateSettings } from './init';
 import type { testInitializeDeviceDuration } from './testInitializeDeviceDuration';
 import type { preInitialize } from './preInitialize';
 import type { getLogs } from './getLogs';
+import type { clearSessionCache } from './sessionCache';
 import type { checkBridgeStatus } from './checkBridgeStatus';
 import type { checkBridgeRelease } from './checkBridgeRelease';
 import type { checkBootloaderRelease } from './checkBootloaderRelease';
@@ -11,11 +35,18 @@ import type { checkAllFirmwareRelease } from './checkAllFirmwareRelease';
 import type { checkFirmwareTypeAvailable } from './checkFirmwareTypeAvailable';
 import type { searchDevices } from './searchDevices';
 import type { getFeatures } from './getFeatures';
+import type { getDeviceState } from './getDeviceState';
 import type { getOnekeyFeatures } from './getOnekeyFeatures';
 import type { getPassphraseState } from './getPassphraseState';
+import type { openWalletSession } from './openWalletSession';
 import type { checkFirmwareRelease } from './checkFirmwareRelease';
 import type { checkBLEFirmwareRelease } from './checkBLEFirmwareRelease';
-import type { firmwareUpdate, firmwareUpdateV2, firmwareUpdateV3 } from './firmwareUpdate';
+import type {
+  firmwareUpdate,
+  firmwareUpdateV2,
+  firmwareUpdateV3,
+  firmwareUpdateV4,
+} from './firmwareUpdate';
 import type { promptWebDeviceAccess } from './promptWebDeviceAccess';
 import type { deviceReset } from './deviceReset';
 import type { deviceRecovery } from './deviceRecovery';
@@ -131,6 +162,10 @@ import type { neoSignTransaction } from './neoSignTransaction';
 import type { ConnectSettings } from '../settings';
 
 export * from './export';
+export type { DeviceStateScope, GetDeviceStateParams } from './getDeviceState';
+export type { GetPassphraseStateParams } from './getPassphraseState';
+export type { OpenWalletSessionParams, OpenWalletSessionPayload } from './openWalletSession';
+export type { ClearSessionCacheParams, ClearSessionCachePayload } from './sessionCache';
 
 export type CoreApi = {
   /**
@@ -141,13 +176,14 @@ export type CoreApi = {
   off: typeof off;
   emit: (event: string, ...args: any[]) => void;
   removeAllListeners: typeof removeAllListeners;
-  dispose: () => void;
+  dispose: () => void | Promise<void>;
   call: (params: any) => Promise<any>;
   uiResponse: typeof uiResponse;
   cancel: (connectId?: string) => void;
   updateSettings: typeof updateSettings;
   switchTransport: (env: ConnectSettings['env']) => Promise<{ success: boolean }>;
   getLogs: typeof getLogs;
+  clearSessionCache: typeof clearSessionCache;
 
   /**
    * Test function
@@ -170,8 +206,10 @@ export type CoreApi = {
   searchDevices: typeof searchDevices;
   promptWebDeviceAccess: typeof promptWebDeviceAccess;
   getFeatures: typeof getFeatures;
+  getDeviceState: typeof getDeviceState;
   getOnekeyFeatures: typeof getOnekeyFeatures;
   getPassphraseState: typeof getPassphraseState;
+  openWalletSession: typeof openWalletSession;
   deviceBackup: typeof deviceBackup;
   deviceChangePin: typeof deviceChangePin;
   deviceFlags: typeof deviceFlags;
@@ -197,7 +235,33 @@ export type CoreApi = {
   firmwareUpdate: typeof firmwareUpdate;
   firmwareUpdateV2: typeof firmwareUpdateV2;
   firmwareUpdateV3: typeof firmwareUpdateV3;
+  firmwareUpdateV4: typeof firmwareUpdateV4;
   cipherKeyValue: typeof cipherKeyValue;
+
+  /**
+   * Pro2 business API
+   */
+  deviceReboot: typeof deviceReboot;
+  deviceGetOnboardingStatus: typeof deviceGetOnboardingStatus;
+  deviceUploadWallpaper: typeof deviceUploadWallpaper;
+  deviceInfoGet: typeof deviceInfoGet;
+  deviceStatusGet: typeof deviceStatusGet;
+  protocolInfoRequest: typeof protocolInfoRequest;
+  ping: typeof ping;
+  deviceFirmwareUpdate: typeof deviceFirmwareUpdate;
+  deviceGetFirmwareUpdateStatus: typeof deviceGetFirmwareUpdateStatus;
+  deviceFactoryInfoSet: typeof deviceFactoryInfoSet;
+  deviceFactoryInfoGet: typeof deviceFactoryInfoGet;
+  filesystemPermissionFix: typeof filesystemPermissionFix;
+  filesystemFormat: typeof filesystemFormat;
+  uploadPortfolio: typeof uploadPortfolio;
+  fileRead: typeof fileRead;
+  fileWrite: typeof fileWrite;
+  fileDelete: typeof fileDelete;
+  dirList: typeof dirList;
+  dirMake: typeof dirMake;
+  dirRemove: typeof dirRemove;
+  pathInfo: typeof pathInfo;
 
   /**
    * All network function

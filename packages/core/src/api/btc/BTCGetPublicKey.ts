@@ -78,7 +78,8 @@ export default class BTCGetPublicKey extends BaseMethod<GetPublicKey[]> {
       }
 
       for (const param of this.params) {
-        const versionBytes = getVersionBytes(param.coin_name, param.script_type);
+        // init() sets coin_name; keep an empty fallback for the generated optional type.
+        const versionBytes = getVersionBytes(param.coin_name ?? '', param.script_type);
         if (!versionBytes) {
           throw new Error(
             `Invalid coinName, not support generate xpub for scriptType: ${param.script_type}`
@@ -101,7 +102,7 @@ export default class BTCGetPublicKey extends BaseMethod<GetPublicKey[]> {
 
         const path = serializedPath(param.address_n);
 
-        const xpub = createExtendedPublicKey(node, param.coin_name, param.script_type);
+        const xpub = createExtendedPublicKey(node, param.coin_name ?? '', param.script_type);
 
         const rootFingerprint = res.root_fingerprint;
 

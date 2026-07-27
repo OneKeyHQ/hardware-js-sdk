@@ -5,9 +5,8 @@ import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { supportBatchPublicKey } from '../../utils/deviceFeaturesUtils';
 import { hexToBytes } from '../helpers/hexUtils';
-import { batchGetPublickeys } from '../helpers/batchGetPublickeys';
+import { batchGetPublickeys, supportBatchPublicKeyByDevice } from '../helpers/batchGetPublickeys';
 
 import type { AptosAddress, AptosGetAddressParams } from '../../types';
 import type { AptosGetAddress as HardwareAptosGetAddress } from '@onekeyfe/hd-transport';
@@ -66,7 +65,7 @@ export default class AptosGetAddress extends BaseMethod<HardwareAptosGetAddress[
   }
 
   async run() {
-    const supportsBatchPublicKey = supportBatchPublicKey(this.device?.features);
+    const supportsBatchPublicKey = supportBatchPublicKeyByDevice(this.device);
     let responses: AptosAddress[] = [];
     if (supportsBatchPublicKey) {
       const publicKeyRes = await batchGetPublickeys(this.device, this.params, 'ed25519', 637);

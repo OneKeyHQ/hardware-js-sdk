@@ -29,7 +29,7 @@ export default class TronSignMessage extends BaseMethod<HardwareTronSignMessage>
     if (this.payload.messageType === 'V1' || this.payload.messageType == null) {
       throw createDeviceNotSupportMethodError(
         'TronSignMessage',
-        getFirmwareType(this.device.features)
+        getFirmwareType(this.device?.features)
       );
     }
 
@@ -45,6 +45,9 @@ export default class TronSignMessage extends BaseMethod<HardwareTronSignMessage>
 
   getVersionRange() {
     return {
+      pro2: {
+        min: '0.0.0',
+      },
       model_mini: {
         min: '2.5.0',
       },

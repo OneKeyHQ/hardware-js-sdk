@@ -1,0 +1,65 @@
+---
+title: firmwareUpdateV4
+---
+
+# firmwareUpdateV4
+
+## Protocol V2 固件更新
+
+Protocol V2 设备的新固件更新流程。该方法独立于 `firmwareUpdateV3`，会使用 Protocol V2 的重启、文件系统写入、安装触发和状态查询消息完成完整升级。
+
+- 设备：Protocol V2 设备
+- 流程：`DeviceReboot` -> `FilesystemFileWrite` -> `DeviceFirmwareUpdate` -> `DeviceGetFirmwareUpdateStatus` -> SDK 内部状态刷新
+
+```typescript
+const res = await HardwareSDK.firmwareUpdateV4(connectId, {
+  platform: 'desktop', // 'native' | 'desktop' | 'ext' | 'web' | 'web-embed'
+  // 显式固件目标（均为可选）
+  // applicationP1Binary: ArrayBuffer,
+  // applicationP2Binary: ArrayBuffer,
+  // coprocessorBinary: ArrayBuffer,
+  // bootloaderBinary: ArrayBuffer,
+  // se01Binary: ArrayBuffer,
+  // se02Binary: ArrayBuffer,
+  // se03Binary: ArrayBuffer,
+  // se04Binary: ArrayBuffer,
+
+  // RESC 资源包直接写入指定设备路径
+  resourceBundleFiles: [
+    {
+      binary: imagesBundle,
+      devicePath: 'vol0:/resource/images/images.okpkg',
+    },
+  ],
+
+  // 可选：强制更新资源包
+  forcedUpdateRes: false,
+});
+```
+
+### 参数
+
+[可选通用参数](/zh/hardware-sdk/core-api-guide#common-params)
+
+- `platform` - 必需 `"native" | "desktop" | "ext" | "web" | "web-embed"` 执行环境
+- `applicationP1Binary` / `applicationP2Binary` - 可选的签名应用固件包
+- `coprocessorBinary` - 可选的签名协处理器固件包
+- `bootloaderBinary` - 可选的签名 Bootloader 固件包
+- `se01Binary` ... `se04Binary` - 可选的签名安全芯片固件包
+- `resourceBundleFiles` - 可选 `{ binary: ArrayBuffer; devicePath: string }[]`，将 RESC 资源包直接写入指定设备路径
+- `forcedUpdateRes` - 可选 `boolean`，跳过远端资源 bundle 的版本/哈希匹配
+
+仅传入 `resourceBundleFiles` 时，SDK 不会下载远端整机固件，也不会发送固件安装请求。
+
+### 返回结果
+
+```typescript
+{
+  success: true,
+  payload: {
+    bleVersion: string,
+    firmwareVersion: string,
+    bootloaderVersion: string,
+  }
+}
+```

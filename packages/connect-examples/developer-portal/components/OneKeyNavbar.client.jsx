@@ -78,18 +78,8 @@ const NavbarMenu = ({ menu, children }) => {
           <MenuButton
             id={`onekey-navbar-${menuKey}`}
             data-onekey-menu={menuKey}
-            onPointerDown={(event) => {
-              event.currentTarget.dataset.pointerFocus = 'true'
-            }}
-            onKeyDown={(event) => {
-              delete event.currentTarget.dataset.pointerFocus
-            }}
-            onBlur={(event) => {
-              delete event.currentTarget.dataset.pointerFocus
-            }}
             className={cn(
               classes.link,
-              styles.menuTrigger,
               'x:items-center x:flex x:gap-1.5 x:cursor-pointer x:outline-none'
             )}
             style={{ color: open ? '#ffffff' : '#a1a1aa' }}
@@ -103,7 +93,7 @@ const NavbarMenu = ({ menu, children }) => {
           </MenuButton>
           <MenuItems
             transition
-            className={cn(menuItemsClass, styles.menuSurface)}
+            className={menuItemsClass}
             anchor={menuAnchor}
             style={{
               backgroundColor: '#0B0F14',
@@ -130,7 +120,7 @@ export function OneKeyClientNavbar({ children, className }) {
   }, [])
 
   const navClass = cn(
-    'onekey-primary-nav x:flex x:gap-4 x:overflow-x-auto nextra-scrollbar x:py-1.5 x:max-lg:hidden',
+    'x:flex x:gap-4 x:overflow-x-auto nextra-scrollbar x:py-1.5 x:max-md:hidden',
     className
   )
 
@@ -196,7 +186,7 @@ export function OneKeyClientNavbar({ children, className }) {
       {children}
       <Button
         aria-label="Menu"
-        className={cn('nextra-hamburger x:lg:hidden', menu && 'x:bg-gray-400/20')}
+        className={cn('nextra-hamburger x:md:hidden', menu && 'x:bg-gray-400/20')}
         onClick={() => setMenu((prev) => !prev)}
       >
         <MenuIcon height="24" className={toggleClass} />

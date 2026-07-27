@@ -198,15 +198,13 @@ export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactio
 
       const response = await typedCall(
         'KaspaTxInputAck',
-        // @ts-expect-error
         ['KaspaTxInputRequest', 'KaspaSignedTx'],
         {
-          address_n: input.path,
+          address_n: validatePath(input.path, 3),
           raw_message: bytesToHex(rawMessage),
         }
       );
 
-      // @ts-expect-error
       return this.processTxRequest(typedCall, response, nextIndex, signature);
     }
 

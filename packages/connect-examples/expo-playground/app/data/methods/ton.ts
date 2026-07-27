@@ -294,6 +294,13 @@ const api: UnifiedMethodConfig[] = [
             value: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
           },
           {
+            name: 'jettonWalletAddress',
+            type: 'string',
+            required: true,
+            label: 'Jetton Wallet Address',
+            value: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
+          },
+          {
             name: 'jettonAmount',
             type: 'number',
             required: true,
@@ -380,6 +387,13 @@ const api: UnifiedMethodConfig[] = [
             type: 'string',
             required: true,
             label: 'Jetton Master Address',
+            value: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
+          },
+          {
+            name: 'jettonWalletAddress',
+            type: 'string',
+            required: true,
+            label: 'Jetton Wallet Address',
             value: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
           },
           {
@@ -562,6 +576,170 @@ const api: UnifiedMethodConfig[] = [
             name: 'isTestnetOnly',
             type: 'boolean',
             label: 'Is Testnet Only',
+            value: false,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'tonSignData',
+    description: 'Sign Data (TON Connect signData)',
+    presets: [
+      {
+        title: 'Text',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            value: "m/44'/607'/0'",
+          },
+          {
+            name: 'type',
+            type: 'number',
+            value: 0,
+          },
+          {
+            name: 'payload',
+            type: 'textarea',
+            value: '48656c6c6f204f6e654b6579',
+          },
+          {
+            name: 'appdomain',
+            type: 'string',
+            value: 'onekey.so',
+          },
+          {
+            name: 'timestamp',
+            type: 'number',
+            value: Math.floor(Date.now() / 1000),
+          },
+          {
+            name: 'fromAddress',
+            type: 'string',
+            value: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
+          },
+          {
+            name: 'walletVersion',
+            type: 'number',
+            value: 3,
+          },
+          {
+            name: 'isBounceable',
+            type: 'boolean',
+            value: false,
+          },
+          {
+            name: 'isTestnetOnly',
+            type: 'boolean',
+            value: false,
+          },
+        ],
+      },
+      {
+        title: 'Binary',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            value: "m/44'/607'/0'",
+          },
+          {
+            name: 'type',
+            type: 'number',
+            value: 1,
+          },
+          {
+            name: 'payload',
+            type: 'textarea',
+            value: '00112233445566778899aabbccddeeff',
+          },
+          {
+            name: 'appdomain',
+            type: 'string',
+            value: 'onekey.so',
+          },
+          {
+            name: 'timestamp',
+            type: 'number',
+            value: Math.floor(Date.now() / 1000),
+          },
+          {
+            name: 'fromAddress',
+            type: 'string',
+            value: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
+          },
+          {
+            name: 'walletVersion',
+            type: 'number',
+            value: 3,
+          },
+          {
+            name: 'isBounceable',
+            type: 'boolean',
+            value: false,
+          },
+          {
+            name: 'isTestnetOnly',
+            type: 'boolean',
+            value: false,
+          },
+        ],
+      },
+      {
+        title: 'Cell',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            value: "m/44'/607'/0'",
+          },
+          {
+            name: 'type',
+            type: 'number',
+            value: 2,
+          },
+          {
+            name: 'payload',
+            type: 'textarea',
+            value: 'b5ee9c7241010101000e000018000000004f6e654b65792043656c6c3cc87b8a',
+          },
+          {
+            name: 'schema',
+            type: 'string',
+            value: 'text_comment#00000000 text:string = InternalMsgBody;',
+          },
+          {
+            name: 'appdomain',
+            type: 'string',
+            value: 'onekey.so',
+          },
+          {
+            name: 'timestamp',
+            type: 'number',
+            value: Math.floor(Date.now() / 1000),
+          },
+          {
+            name: 'fromAddress',
+            type: 'string',
+            value: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
+          },
+          {
+            name: 'walletVersion',
+            type: 'number',
+            value: 3,
+          },
+          {
+            name: 'isBounceable',
+            type: 'boolean',
+            value: false,
+          },
+          {
+            name: 'isTestnetOnly',
+            type: 'boolean',
             value: false,
           },
         ],

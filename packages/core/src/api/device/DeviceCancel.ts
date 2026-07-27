@@ -5,6 +5,7 @@ import type { Cancel } from '@onekeyfe/hd-transport';
 export default class DeviceCancel extends BaseMethod<Cancel> {
   init() {
     this.useDevicePassphraseState = false;
+    this.unlockPolicy = 'none';
   }
 
   async run() {

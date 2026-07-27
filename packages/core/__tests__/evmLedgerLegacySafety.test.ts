@@ -2,6 +2,11 @@ import AllNetworkGetAddressBase from '../src/api/allnetwork/AllNetworkGetAddress
 import EvmGetAddress from '../src/api/evm/EVMGetAddress';
 import EVMGetPublicKey from '../src/api/evm/EVMGetPublicKey';
 import { findMethod } from '../src/api/utils';
+import { getDeviceType, getFirmwareType, getMethodVersionRange } from '../src/utils';
+import { getDeviceFirmwareVersion } from '../src/utils/deviceVersionUtils';
+import { Enum_SafetyCheckLevel } from '@onekeyfe/hd-transport';
+
+import type { EDeviceType } from '@onekeyfe/hd-shared';
 
 jest.mock('../src/data/config', () => ({
   getSDKVersion: jest.fn(() => '1.0.0'),
@@ -14,16 +19,26 @@ jest.mock('../src/api/utils', () => ({
 
 const createDevice = (onekeyDeviceType: string) => {
   const typedCall = jest.fn();
+  const features = {
+    onekey_device_type: onekeyDeviceType,
+    deviceType: onekeyDeviceType.toLowerCase() as EDeviceType,
+    safety_checks: Enum_SafetyCheckLevel.Strict,
+  };
   return {
     typedCall,
     device: {
-      features: {
-        onekey_device_type: onekeyDeviceType,
-        safety_checks: 'Strict',
-      },
+      features,
       commands: {
         typedCall,
       },
+      // BaseMethod reads state through Device accessors; reuse production mappers in the stub.
+      isProtocolV2: () => false,
+      getCurrentDeviceType: () => getDeviceType(features as any),
+      getCurrentSafetyChecks: () => features.safety_checks,
+      getCurrentFirmwareType: () => getFirmwareType(features as any),
+      getCurrentFirmwareVersionString: () => getDeviceFirmwareVersion(features as any)?.join('.'),
+      getCurrentMethodVersionRange: (fn: (model: any) => any) =>
+        getMethodVersionRange(features as any, fn),
     },
   };
 };
@@ -54,7 +69,7 @@ describe('EVM Ledger legacy path safety checks', () => {
       await method.checkSafetyLevelOnTestNet();
 
       expect(typedCall).toHaveBeenCalledWith('ApplySettings', 'Success', {
-        safety_checks: 'PromptTemporarily',
+        safety_checks: Enum_SafetyCheckLevel.PromptTemporarily,
       });
     }
   );
@@ -73,7 +88,7 @@ describe('EVM Ledger legacy path safety checks', () => {
     await method.checkSafetyLevelOnTestNet();
 
     expect(typedCall).toHaveBeenCalledWith('ApplySettings', 'Success', {
-      safety_checks: 'PromptTemporarily',
+      safety_checks: Enum_SafetyCheckLevel.PromptTemporarily,
     });
   });
 
@@ -122,7 +137,7 @@ describe('EVM Ledger legacy path safety checks', () => {
     );
 
     expect(typedCall).toHaveBeenCalledWith('ApplySettings', 'Success', {
-      safety_checks: 'PromptTemporarily',
+      safety_checks: Enum_SafetyCheckLevel.PromptTemporarily,
     });
 
     runSpy.mockRestore();
@@ -202,7 +217,7 @@ describe('EVM Ledger legacy path safety checks', () => {
 
     expect(typedCall).toHaveBeenCalledTimes(1);
     expect(typedCall).toHaveBeenCalledWith('ApplySettings', 'Success', {
-      safety_checks: 'PromptTemporarily',
+      safety_checks: Enum_SafetyCheckLevel.PromptTemporarily,
     });
 
     runSpy.mockRestore();

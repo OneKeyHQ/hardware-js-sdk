@@ -41,6 +41,7 @@ export declare function firmwareUpdateV2(
 export interface FirmwareUpdateV3Params {
   bleVersion?: number[];
   bleBinary?: ArrayBuffer;
+  chunkSize?: number;
 
   firmwareVersion?: number[];
   firmwareBinary?: ArrayBuffer;
@@ -56,9 +57,65 @@ export interface FirmwareUpdateV3Params {
   platform: IPlatform;
 }
 
+/**
+ * firmwareUpdateV4 target binaries grouped by DeviceFirmwareTargetType.
+ * Except for romloader, each field maps to a target accepted by bootloader.
+ */
+export type FirmwareUpdateV4Target =
+  | 'boot'
+  | 'app_v1'
+  | 'app_v2'
+  | 'coprocessor'
+  | 'resource'
+  | 'se01'
+  | 'se02'
+  | 'se03'
+  | 'se04';
+
+export interface FirmwareUpdateV4Params {
+  platform: IPlatform;
+  chunkSize?: number;
+  firmwareType?: EFirmwareType;
+  targetsToUpdate?: FirmwareUpdateV4Target[];
+
+  /** FW_MGMT_TARGET_ROMLOADER = 2; Pro2 cannot install it through firmwareUpdateV4. */
+  romloaderBinary?: ArrayBuffer;
+  /** FW_MGMT_TARGET_BOOTLOADER = 3 */
+  bootloaderBinary?: ArrayBuffer;
+  /** FW_MGMT_TARGET_APPLICATION_P1 = 4 */
+  applicationP1Binary?: ArrayBuffer;
+  /** FW_MGMT_TARGET_APPLICATION_P2 = 5 */
+  applicationP2Binary?: ArrayBuffer;
+  /** FW_MGMT_TARGET_COPROCESSOR = 6 */
+  coprocessorBinary?: ArrayBuffer;
+  /** FW_MGMT_TARGET_SE01-04 = 7-10 */
+  se01Binary?: ArrayBuffer;
+  se02Binary?: ArrayBuffer;
+  se03Binary?: ArrayBuffer;
+  se04Binary?: ArrayBuffer;
+  forcedUpdateRes?: boolean;
+  /**
+   * RESC bundle okpkg files written directly to devicePath through FilesystemFileWrite.
+   * Manual mode installs them without version comparison.
+   */
+  resourceBundleFiles?: Array<{
+    binary: ArrayBuffer;
+    devicePath: string;
+  }>;
+}
+
 export declare function firmwareUpdateV3(
   connectId: string | undefined,
   params: Params<FirmwareUpdateV3Params>
+): Response<{
+  bleVersion: string;
+  firmwareVersion: string;
+  bootloaderVersion: string;
+}>;
+
+export declare function firmwareUpdateV4(
+  connectId: string | undefined,
+  params: Params<FirmwareUpdateV4Params>
 ): Response<{
   bleVersion: string;
   firmwareVersion: string;

@@ -1,0 +1,118 @@
+# Pro2 设备管理
+
+本文集中说明 Pro2 / Protocol V2 的设备设置、壁纸上传和固件升级。三类能力都依赖 Core 的 Protocol V2 守卫与文件/状态编排，不属于传输层协议。
+
+## 设备设置
+
+| SDK 方法                 | protobuf                 | 返回值           | 解锁策略             |
+| ------------------------ | ------------------------ | ---------------- | -------------------- |
+| `deviceSettingsGet`      | `DeviceSettingsGet`      | `DeviceSettings` | 不解锁，直接读取     |
+| `deviceSettingsSet`      | `DeviceSettingsSet`      | `Success`        | 按字段决定是否解锁   |
+| `deviceSettingsPageShow` | `DeviceSettingsPageShow` | `Success`        | 锁定后解锁并重试一次 |
+
+这些接口只支持 Protocol V2，不会自动回退到 V1 的 `deviceSettings`。
+
+`DeviceSettings` 的公开字段包含设备名称、蓝牙、语言、壁纸路径、亮度、自动锁定、自动关机、动画、轻触唤醒、震动、USB 锁定、随机键盘以及安全模式状态，锁定时也可以读取。`passphrase_enable` 与 `fido_enabled` 是私有字段，仅在设备解锁时返回。字段以当前 protobuf 和生成类型为准。
+
+`deviceSettingsSet` 支持部分更新，但 SDK 会移除 `passphrase_enable` 与 `airgap_mode`。仅包含 `label`、`language`、`brightness`、`haptic_feedback` 时不解锁直接修改；只要包含其他字段，SDK 就会在锁定时先解锁再执行。修改成功提示及 `autolock_delay_ms`、`autoshutdown_delay_ms` 的页面跳转由设备固件实现。
+
+`passphrase_enable` 与 `airgap_mode` 必须通过 `deviceSettingsPageShow` 打开设备页面，由用户在设备端确认。
+
+设置页当前支持：
+
+- `DeviceReset`
+- `DevicePinChange`
+- `DevicePassphrase`
+- `DeviceAirgap`
+
+`deviceSettingsGet` 显式声明 `unlockPolicy='none'`，不会因为缓存状态或设备响应触发自动解锁。`deviceSettingsSet` 根据字段计算 `none` 或 `retry-on-locked`；`deviceSettingsPageShow` 始终使用 `retry-on-locked`。只有收到结构化 `DeviceLocked` 时才解锁并重试一次，第二次失败不会循环重试。
+
+页面打开前，SDK 统一发送非阻塞 `REQUEST_BUTTON`，payload 包含
+`source='method-lifecycle'`、`reason='settings-page'`、`completion='operation-completed'` 和具体 `page`。
+App 只展示“请在设备上操作”，不调用 `uiResponse()`。API `Success` 表示设备上的最终确认已经完成。
+
+公共 `deviceChangePin(remove=false)` 在 Pro2 上复用 `DevicePinChange` 页面并发送
+`reason='change-pin'`；返回成功表示 PIN 已修改完成。Pro2 当前不支持通过该 API 执行 `remove=true`。
+
+公共 `deviceWipe()` 在 Pro2 上复用 `DeviceReset` 擦除确认页并发送
+`reason='device-management'`、`operation='wipe-device'`。返回成功表示安全芯片擦除已经完成，设备仍会停留在重启提示页等待用户确认。Protocol V1 继续使用原 `WipeDevice` 最终操作流程。
+
+主要实现：
+
+- `packages/core/src/api/protocol-v2/DeviceSettingsGet.ts`
+- `packages/core/src/api/protocol-v2/DeviceSettingsSet.ts`
+- `packages/core/src/api/protocol-v2/DeviceSettingsPageShow.ts`
+
+## Portfolio 更新
+
+`uploadPortfolio` 是后台文件同步与应用流程，不需要设备确认：
+
+- 文件写入固定关闭分片进度 Event。
+- SDK 不生成 `REQUEST_PIN` 或 `REQUEST_BUTTON`，包括自动解锁阶段。
+- firmware 直接校验 pending package、更新 Portfolio 数据并返回最终 `Success/Failure`。
+- App 以 `PortfolioUpdate` 最终响应为准，不等待设备页面。
+
+## 壁纸上传
+
+`deviceUploadWallpaper` 接收 `604 × 1024` 的 RGBA 数据。SDK 负责编码、写入设备文件系统并设置活动壁纸：
+
+1. 校验尺寸、RGBA 长度、文件名和 `chunkSize`。
+2. 完全不透明图片编码为 `RGB565`，存在透明像素时编码为 `RGB565A8`。
+3. 使用 8×8 阈值矩阵进行有序抖动并生成设备二进制格式。
+4. 创建 `vol1:/wallpapers`，通过 `FilesystemFileWrite` 分片上传。
+5. 根据设备返回的 `processed_byte` 推进 offset。
+6. 调用 `DeviceSettingsSet` 更新 `wallpaper_path`。
+
+文件名仅允许字母、数字、下划线、连字符和可选 `.bin`。未提供名称时，SDK 使用编码结果的 BLAKE2s 哈希生成稳定名称。调用方不能借此写入任意路径。
+
+上传没有事务式回滚：中断可能留下不完整文件，激活失败也不会自动删除文件。重新上传同名文件会从首片覆盖；将 `wallpaper_path` 设为空字符串可恢复内置壁纸。
+
+主要实现：
+
+- `packages/core/src/api/protocol-v2/DeviceUploadWallpaper.ts`
+- `packages/core/src/utils/pro2Wallpaper.ts`
+- `packages/core/src/api/helpers/protocolV2FileWrite.ts`
+
+## 固件升级
+
+Protocol V1 继续使用 `firmwareUpdate` 至 `firmwareUpdateV3`；Pro2 使用 `firmwareUpdateV4`。低阶 `deviceFirmwareUpdate` 只负责发送安装目标，不执行完整升级编排。
+
+切换固件类型不新增 `DeviceSettingsPageShow` 页面。`firmwareUpdateV4` 保持 `retry-on-locked`，解锁后发送 `DeviceReboot(Bootloader)`，确认与重启页面由设备固件处理，SDK 随后负责重连和升级编排。
+
+支持的 Pro2 目标包括 bootloader、application P1/P2、coprocessor、SE01 ～ SE04 和 RESC bundle。`romloaderBinary` 虽仍存在于部分兼容类型中，但当前安装请求不接受 `ROMLOADER`，必须走 loader 专用流程。
+
+高层升级流程：
+
+1. 获取组件版本和设备状态。
+2. 根据调用方二进制或远端 release 配置准备目标，并在重启前下载、校验所有远端
+   firmware 与 RESC binary；空文件直接终止升级。
+3. 比较版本和 fingerprint；`forceTargets` 只跳过指定目标的版本判断。
+4. 对 RESC bundle 比较设备 header、版本和 hash。
+5. 必要时重启进入 bootloader，并轮询确认模式。
+6. 将目标文件分片写入 `vol0:/`，再使用 PathInfo 校验大小。
+7. 一次发送包含全部待安装文件的 `DeviceFirmwareUpdateRequest`。
+8. 轮询安装状态，允许安装阶段断连、超时和重连探测。
+9. 回到 normal mode 后显式刷新 `DeviceState` 的 identity/versions。
+
+可靠性约束：
+
+- BLE 与 WebUSB 使用不同默认 chunk，最小值为 64 字节。
+- 文件传输根据 `processed_byte` 恢复进度，总进度按全部目标字节聚合。
+- 安装开始、安装完成和用户交互使用不同超时窗口。
+- Transport 不自动重发安装请求；重试由高层流程依据阶段和幂等性决定。
+- release 配置、SDK target 类型和固件枚举必须同步发布。
+
+`firmwareUpdateV4` 为兼容旧接口仍返回 BLE、application 和 bootloader 三类版本。需要 SE、P1/P2、hash、build ID 或 coprocessor 版本时，应调用 `getDeviceState({ scope: 'firmware' })`。
+
+主要实现：
+
+- `packages/core/src/api/FirmwareUpdateV4.ts`
+- `packages/core/src/protocols/protocol-v2/firmware.ts`
+- `packages/core/src/api/protocol-v2/DeviceFirmwareUpdate.ts`
+
+## 共同维护原则
+
+- 设置、壁纸和升级都属于 Core 业务编排，Transport 只负责单次消息传输。
+- 新增有副作用操作时，必须明确是否允许解锁后重试或断线后重试。
+- 文件路径、chunk 上限和超时策略集中复用 helper，避免各方法自行实现。
+- 公共字段归一化和运行模式判断见 [Pro2 字段迁移](../sdk/pro2-field-migration.md)。

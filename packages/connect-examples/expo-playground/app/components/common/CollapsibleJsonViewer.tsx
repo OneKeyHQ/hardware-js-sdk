@@ -3,16 +3,19 @@ import { ChevronRight, ChevronDown, Copy } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '../ui/Button';
 import { useToast } from '../../hooks/use-toast';
+import { formatJsonPreview, getJsonPreview } from '../../utils/jsonPreview';
 
 interface CollapsibleJsonViewerProps {
   data: unknown;
   maxDepth?: number;
+  maxArrayItems?: number;
   currentDepth?: number;
 }
 
 const CollapsibleJsonViewer: React.FC<CollapsibleJsonViewerProps> = ({
   data,
   maxDepth = 1,
+  maxArrayItems = 80,
   currentDepth = 0,
 }) => {
   const { toast } = useToast();
@@ -20,7 +23,11 @@ const CollapsibleJsonViewer: React.FC<CollapsibleJsonViewerProps> = ({
 
   const copyToClipboard = async (value: unknown) => {
     try {
-      const text = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+      const text = formatJsonPreview(value, {
+        maxDepth: 6,
+        maxArrayItems,
+        maxStringLength: 2000,
+      });
       await navigator.clipboard.writeText(text);
       toast({
         title: t('components.collapsibleJsonViewer.copied'),
@@ -53,10 +60,11 @@ const CollapsibleJsonViewer: React.FC<CollapsibleJsonViewerProps> = ({
     }
 
     if (typeof value === 'string') {
+      const preview = getJsonPreview(value, { maxStringLength: 1200 });
       return (
-        <div className="flex items-start gap-2 group min-w-0">
-          <span className="text-orange-600 dark:text-orange-400 break-words whitespace-pre-wrap min-w-0 flex-1 overflow-hidden">
-            &quot;{value}&quot;
+        <div className="flex items-start gap-2 group min-w-max">
+          <span className="min-w-0 flex-1 whitespace-pre text-orange-600 dark:text-orange-400">
+            &quot;{preview.text}&quot;
           </span>
           <Button
             variant="ghost"
@@ -71,7 +79,14 @@ const CollapsibleJsonViewer: React.FC<CollapsibleJsonViewerProps> = ({
     }
 
     if (Array.isArray(value)) {
-      return <ArrayViewer array={value} currentDepth={currentDepth} maxDepth={maxDepth} />;
+      return (
+        <ArrayViewer
+          array={value}
+          currentDepth={currentDepth}
+          maxDepth={maxDepth}
+          maxArrayItems={maxArrayItems}
+        />
+      );
     }
 
     if (typeof value === 'object') {
@@ -80,6 +95,7 @@ const CollapsibleJsonViewer: React.FC<CollapsibleJsonViewerProps> = ({
           object={value as Record<string, unknown>}
           currentDepth={currentDepth}
           maxDepth={maxDepth}
+          maxArrayItems={maxArrayItems}
         />
       );
     }
@@ -88,7 +104,9 @@ const CollapsibleJsonViewer: React.FC<CollapsibleJsonViewerProps> = ({
   };
 
   return (
-    <div className="font-mono text-sm break-words whitespace-pre-wrap min-w-0 overflow-hidden">{renderValue(data)}</div>
+    <div className="min-w-max whitespace-pre font-mono text-xs leading-6">
+      {renderValue(data)}
+    </div>
   );
 };
 
@@ -96,7 +114,8 @@ const ObjectViewer: React.FC<{
   object: Record<string, unknown>;
   currentDepth: number;
   maxDepth: number;
-}> = ({ object, currentDepth, maxDepth }) => {
+  maxArrayItems: number;
+}> = ({ object, currentDepth, maxDepth, maxArrayItems }) => {
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { t } = useTranslation();
@@ -113,7 +132,13 @@ const ObjectViewer: React.FC<{
 
   const copyObject = async () => {
     try {
-      await navigator.clipboard.writeText(JSON.stringify(object, null, 2));
+      await navigator.clipboard.writeText(
+        formatJsonPreview(object, {
+          maxDepth: 6,
+          maxArrayItems,
+          maxStringLength: 2000,
+        })
+      );
       toast({
         title: t('components.collapsibleJsonViewer.copied'),
         description: t('components.collapsibleJsonViewer.objectCopied'),
@@ -134,7 +159,7 @@ const ObjectViewer: React.FC<{
   }
 
   return (
-    <div className="group">
+    <div className="group min-w-max">
       <div className="flex items-center gap-2">
         <span className="text-gray-600 dark:text-gray-400">{'{'}</span>
         <Button
@@ -146,7 +171,7 @@ const ObjectViewer: React.FC<{
           <Copy className="h-3 w-3" />
         </Button>
       </div>
-      <div className="ml-4 border-l border-gray-200 dark:border-gray-700 pl-4">
+      <div className="ml-4 border-l border-gray-200 pl-4 dark:border-gray-700">
         {keys.map((key, index) => {
           const value = object[key];
           const isExpandable =
@@ -161,7 +186,7 @@ const ObjectViewer: React.FC<{
 
           return (
             <div key={key} className="py-1">
-              <div className="flex items-start gap-2 min-w-0">
+              <div className="flex items-start gap-2">
                 {shouldShowExpander ? (
                   <Button
                     variant="ghost"
@@ -178,12 +203,12 @@ const ObjectViewer: React.FC<{
                 ) : (
                   <div className="w-5" />
                 )}
-                <span className="text-purple-600 dark:text-purple-400 font-medium">
+                <span className="font-medium text-purple-600 dark:text-purple-400">
                   &quot;{key}&quot;
                 </span>
                 <span className="text-gray-600 dark:text-gray-400">:</span>
                 {(!shouldShowExpander || (!isExpanded && !shouldAutoExpand)) && (
-                  <div className="flex-1 inline-flex items-start min-w-0">
+                  <div className="inline-flex items-start">
                     {isExpandable ? (
                       <span className="text-gray-500 italic">{'{ ... }'}</span>
                     ) : isArrayExpandable ? (
@@ -191,11 +216,12 @@ const ObjectViewer: React.FC<{
                         [{(value as unknown[]).length} items]
                       </span>
                     ) : (
-                      <div className="min-w-0 flex-1">
+                      <div className="min-w-max">
                         <CollapsibleJsonViewer
                           data={value}
                           currentDepth={currentDepth + 1}
                           maxDepth={maxDepth}
+                          maxArrayItems={maxArrayItems}
                         />
                       </div>
                     )}
@@ -211,6 +237,7 @@ const ObjectViewer: React.FC<{
                     data={value}
                     currentDepth={currentDepth + 1}
                     maxDepth={maxDepth}
+                    maxArrayItems={maxArrayItems}
                   />
                   {index < keys.length - 1 && (
                     <span className="text-gray-600 dark:text-gray-400">,</span>
@@ -230,14 +257,21 @@ const ArrayViewer: React.FC<{
   array: unknown[];
   currentDepth: number;
   maxDepth: number;
-}> = ({ array, currentDepth, maxDepth }) => {
+  maxArrayItems: number;
+}> = ({ array, currentDepth, maxDepth, maxArrayItems }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const { toast } = useToast();
   const { t } = useTranslation();
 
   const copyArray = async () => {
     try {
-      await navigator.clipboard.writeText(JSON.stringify(array, null, 2));
+      await navigator.clipboard.writeText(
+        formatJsonPreview(array, {
+          maxDepth: 6,
+          maxArrayItems,
+          maxStringLength: 2000,
+        })
+      );
       toast({
         title: t('components.collapsibleJsonViewer.copied'),
         description: t('components.collapsibleJsonViewer.arrayCopied'),
@@ -255,8 +289,11 @@ const ArrayViewer: React.FC<{
     return <span className="text-gray-500">[]</span>;
   }
 
+  const visibleItems = isExpanded ? array.slice(0, maxArrayItems) : [];
+  const hiddenItemCount = Math.max(array.length - visibleItems.length, 0);
+
   return (
-    <div className="group">
+    <div className="group min-w-max">
       <div className="flex items-center gap-2">
         <Button
           variant="ghost"
@@ -283,23 +320,29 @@ const ArrayViewer: React.FC<{
       </div>
       {isExpanded && (
         <div className="ml-4 border-l border-gray-200 dark:border-gray-700 pl-4">
-          {array.map((item, index) => (
+          {visibleItems.map((item, index) => (
             <div key={index} className="py-1">
               <div className="flex items-start gap-2">
-                <span className="text-gray-500 text-xs">{index}:</span>
-                <div className="flex-1 inline-flex items-start">
+                <span className="text-xs text-gray-500">{index}:</span>
+                <div className="inline-flex items-start">
                   <CollapsibleJsonViewer
                     data={item}
                     currentDepth={currentDepth + 1}
                     maxDepth={maxDepth}
+                    maxArrayItems={maxArrayItems}
                   />
-                  {index < array.length - 1 && (
+                  {index < visibleItems.length - 1 && (
                     <span className="text-gray-600 dark:text-gray-400">,</span>
                   )}
                 </div>
               </div>
             </div>
           ))}
+          {hiddenItemCount > 0 && (
+            <div className="py-1 text-gray-500 italic">
+              ... ({hiddenItemCount} {t('components.collapsibleJsonViewer.items')})
+            </div>
+          )}
         </div>
       )}
       <span className="text-gray-600 dark:text-gray-400">]</span>

@@ -16,6 +16,7 @@ declare global {
       NODE_ENV: 'development' | 'production';
       COMMIT_SHA?: string;
       BUILD_TIME?: string;
+      PUSH_TIMESTAMP?: string;
     }
   }
 }

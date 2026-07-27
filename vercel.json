@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "name": "onekey-hardware-playground",
+  "installCommand": "yarn install",
+  "buildCommand": "yarn build:vercel",
+  "outputDirectory": "packages/connect-examples/expo-playground/dist",
+  "rewrites": [
+    { "source": "/expo-example", "destination": "/expo-example/index.html" },
+    { "source": "/expo-example/(.*)", "destination": "/expo-example/index.html" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

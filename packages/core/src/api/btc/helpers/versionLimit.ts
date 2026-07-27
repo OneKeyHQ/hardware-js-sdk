@@ -1,3 +1,5 @@
+import type { DeviceFirmwareRange } from '../../../types';
+
 function isCoinNameInList(coinName: string, coinNames: (string | undefined)[]) {
   for (let i = 0; i < coinNames.length; i++) {
     const coin_name = coinNames[i];
@@ -8,9 +10,13 @@ function isCoinNameInList(coinName: string, coinNames: (string | undefined)[]) {
   return false;
 }
 
-export function getBitcoinForkVersionRange(params: (string | undefined)[]) {
+export function getBitcoinForkVersionRange(params: (string | undefined)[]): DeviceFirmwareRange {
   if (isCoinNameInList('Neurai', params)) {
     return {
+      pro2: {
+        min: '0.0.0',
+        unsupported: true,
+      },
       model_mini: {
         min: '3.7.0',
       },
