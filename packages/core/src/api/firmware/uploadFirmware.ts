@@ -3,19 +3,13 @@ import { blake2s } from '@noble/hashes/blake2s';
 import JSZip from 'jszip';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
-import { getDeviceFirmwareVersion } from '../../utils/deviceVersionUtils';
-import {
-  LoggerNames,
-  getDeviceBootloaderVersion,
-  getDeviceType,
-  getLogger,
-  wait,
-} from '../../utils';
+import { LoggerNames, getDeviceBootloaderVersion, getLogger, wait } from '../../utils';
 import { DEVICE, UI_REQUEST, createUiMessage } from '../../events';
 import { DeviceModelToTypes } from '../../types';
 import { bytesToHex } from '../helpers/hexUtils';
 import { DataManager } from '../../data-manager';
 import { DevicePool } from '../../device/DevicePool';
+import { buildProtocolV1FeaturesPayload } from '../../deviceProfile';
 
 import type { KnownDevice } from '../../types';
 import type { TypedCall, TypedResponseMessage } from '../../device/DeviceCommands';
@@ -41,7 +35,7 @@ const isDeviceDisconnectedError = (error: unknown) => {
 
 const postConfirmationMessage = (device: Device) => {
   // only if firmware is already installed. fresh device does not require button confirmation
-  if (device.features?.firmware_present) {
+  if (device.features?.firmwarePresent) {
     device.emit(DEVICE.BUTTON, device, { code: 'ButtonRequest_FirmwareUpdate' });
   }
 };
@@ -107,7 +101,7 @@ export const uploadFirmware = async (
   },
   isUpdateBootloader?: boolean
 ) => {
-  const deviceType = getDeviceType(device.features);
+  const deviceType = device.getCurrentDeviceType();
   if (DeviceModelToTypes.model_mini.includes(deviceType)) {
     postConfirmationMessage(device);
     postProgressTip(device, 'ConfirmOnDevice', postMessage);
@@ -116,7 +110,9 @@ export const uploadFirmware = async (
 
     if (isFirmware && !isUpdateBootloader) {
       const newFeatures = await typedCall('GetFeatures', 'Features', {});
-      const deviceBootloaderVersion = getDeviceBootloaderVersion(newFeatures.message).join('.');
+      const deviceBootloaderVersion = getDeviceBootloaderVersion(
+        buildProtocolV1FeaturesPayload(newFeatures.message, device.features)
+      ).join('.');
       const supportUpgradeFileHeader = semver.gte(deviceBootloaderVersion, '2.1.0');
       Log.debug('supportUpgradeFileHeader:', supportUpgradeFileHeader);
 
@@ -429,7 +425,7 @@ const emmcFileWriteWithRetry = async (
         const deviceDiff = await device.deviceConnector?.enumerate();
         const devicesDescriptor = deviceDiff?.descriptors ?? [];
         const { deviceList } = await DevicePool.getDevices(devicesDescriptor, undefined);
-        if (deviceList.length === 1 && deviceList[0]?.features?.bootloader_mode) {
+        if (deviceList.length === 1 && deviceList[0]?.isBootloader()) {
           device.updateFromCache(deviceList[0]);
           await device.acquire();
           device.getCommands().mainId = device.mainId ?? '';

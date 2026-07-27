@@ -1,8 +1,9 @@
+/* eslint-disable import/order */
 const ProtoBuf = require('protobufjs/light');
 const ByteBuffer = require('bytebuffer');
 
 const { decode } = require('../src/serialization/protobuf/decode');
-const { decode: decodeProtocol } = require('../src/serialization/protocol/decode');
+const { decodeEnvelope } = require('../src/protocols/v1/decode');
 
 // Reuse the messages.json already committed alongside @onekeyfe/hd-core
 // (runtime data for DataManager). hd-transport's own messages.json is
@@ -61,7 +62,7 @@ describe('Fix messages decode', () => {
       test('decode', () => {
         // deserialize
         const encoded = ByteBuffer.fromHex(f.encodeMessage);
-        const { buffer } = decodeProtocol(encoded);
+        const { buffer } = decodeEnvelope(encoded);
         const decoded = decode(Message, buffer);
 
         // filter null values

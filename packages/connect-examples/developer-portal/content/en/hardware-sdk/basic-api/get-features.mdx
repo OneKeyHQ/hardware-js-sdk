@@ -6,13 +6,19 @@ title: Get Features
 
 ## Get device features
 
-Get all attributes of the device.
+`getFeatures()` is retained only for Protocol V1 compatibility. It accesses the
+device and returns the legacy `Features` shape. Protocol V2 devices, including
+Pro 2, do not support this API.
+
+New integrations and applications supporting both Pro and Pro 2 should use
+[`getDeviceState()`](/en/hardware-sdk/basic-api/get-device-info). The SDK keeps
+protocol messages such as `DeviceInfoGet` and `DeviceStatusGet` internal.
 
 ```typescript
 const response = await HardwareSDK.getFeatures(connectId);
 ```
 
-> If the screen is displaying other content, you can also call this method to return to the home page.
+> This compatibility call may return a Protocol V1 device to its home screen. Do not use it to refresh Protocol V2 state.
 
 ### Params
 

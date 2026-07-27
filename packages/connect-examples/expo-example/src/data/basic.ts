@@ -8,13 +8,27 @@ const api: PlaygroundProps[] = [
     noDeviceIdReq: true,
   },
   {
-    method: 'getFeatures',
-    description: 'Get features of a device',
+    method: 'getDeviceState',
+    description: 'Get canonical device state (supports V1 and V2 protocol)',
     noDeviceIdReq: true,
+    presupposes: [
+      {
+        title: 'Live runtime status',
+        value: {},
+      },
+      {
+        title: 'Runtime and settings',
+        value: { scope: 'settings' },
+      },
+      {
+        title: 'Runtime and firmware metadata',
+        value: { scope: 'firmware' },
+      },
+    ],
   },
   {
-    method: 'getOnekeyFeatures',
-    description: 'Get onekey features of a device(For Pro)',
+    method: 'getFeatures',
+    description: 'Get legacy Features (Protocol V1 compatibility only)',
     noDeviceIdReq: true,
   },
   {

@@ -3,9 +3,12 @@ export { default as preInitialize } from './device/PreInitialize';
 
 export { default as searchDevices } from './SearchDevices';
 export { default as getFeatures } from './GetFeatures';
+export { default as getDeviceState } from './GetDeviceState';
 export { default as getOnekeyFeatures } from './GetOnekeyFeatures';
 export { default as getPassphraseState } from './GetPassphraseState';
+export { default as openWalletSession } from './OpenWalletSession';
 export { default as getLogs } from './GetLogs';
+export { default as clearSessionCache } from './ClearSessionCache';
 export { default as checkFirmwareRelease } from './CheckFirmwareRelease';
 export { default as checkBLEFirmwareRelease } from './CheckBLEFirmwareRelease';
 export { default as checkBridgeStatus } from './CheckBridgeStatus';
@@ -38,7 +41,32 @@ export { default as getNextU2FCounter } from './u2f/GetNextU2FCounter';
 export { default as firmwareUpdate } from './FirmwareUpdate';
 export { default as firmwareUpdateV2 } from './FirmwareUpdateV2';
 export { default as firmwareUpdateV3 } from './FirmwareUpdateV3';
+export { default as firmwareUpdateV4 } from './FirmwareUpdateV4';
 export { default as promptWebDeviceAccess } from './PromptWebDeviceAccess';
+
+// Pro2 business API
+export { default as deviceReboot } from './protocol-v2/DeviceReboot';
+export { default as deviceGetOnboardingStatus } from './protocol-v2/DeviceGetOnboardingStatus';
+export { default as deviceUploadWallpaper } from './protocol-v2/DeviceUploadWallpaper';
+// Protocol V2 development APIs. These remain public while Pro2 integration is in development.
+export { default as deviceInfoGet } from './protocol-v2/DeviceInfoGet';
+export { default as deviceStatusGet } from './protocol-v2/DeviceStatusGet';
+export { default as protocolInfoRequest } from './protocol-v2/ProtocolInfoRequest';
+export { default as ping } from './protocol-v2/Ping';
+export { default as deviceFirmwareUpdate } from './protocol-v2/DeviceFirmwareUpdate';
+export { default as deviceGetFirmwareUpdateStatus } from './protocol-v2/DeviceGetFirmwareUpdateStatus';
+export { default as deviceFactoryInfoSet } from './protocol-v2/DeviceFactoryInfoSet';
+export { default as deviceFactoryInfoGet } from './protocol-v2/DeviceFactoryInfoGet';
+export { default as filesystemPermissionFix } from './protocol-v2/FilesystemPermissionFix';
+export { default as filesystemFormat } from './protocol-v2/FilesystemFormat';
+export { default as fileRead } from './FileRead';
+export { default as fileWrite } from './FileWrite';
+export { default as fileDelete } from './FileDelete';
+export { default as dirList } from './DirList';
+export { default as dirMake } from './DirMake';
+export { default as dirRemove } from './DirRemove';
+export { default as pathInfo } from './PathInfo';
+export { default as uploadPortfolio } from './UploadPortfolio';
 
 export { default as cipherKeyValue } from './CipherKeyValue';
 

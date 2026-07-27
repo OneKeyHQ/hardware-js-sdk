@@ -1,3 +1,5 @@
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+
 import { safeThrowError } from '../constants';
 import { DataManager } from '../data-manager';
 import TransportManager from '../data-manager/TransportManager';
@@ -6,6 +8,7 @@ import { resolveAfter } from '../utils/promiseUtils';
 import { LoggerNames, getLogger } from '../utils';
 
 import type { DeviceDescriptorDiff } from './DevicePool';
+import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
 import type { OneKeyDeviceInfo as DeviceDescriptor, Transport } from '@onekeyfe/hd-transport';
 
 const Log = getLogger(LoggerNames.DeviceConnector);
@@ -75,15 +78,37 @@ export default class DeviceConnector {
     this.listening = false;
   }
 
-  async acquire(path: string, session?: string | null, forceCleanRunPromise?: boolean) {
-    Log.debug('acquire', path, session);
+  async acquire(
+    path: string,
+    session?: string | null,
+    forceCleanRunPromise?: boolean,
+    connectProtocol?: HardwareConnectProtocol
+  ) {
+    Log.debug('acquire', path, session, connectProtocol);
     const env = DataManager.getSettings('env');
     try {
       let res;
       if (DataManager.isBleConnect(env)) {
-        res = await this.transport.acquire({ uuid: path, forceCleanRunPromise });
+        res = await this.transport.acquire({
+          uuid: path,
+          forceCleanRunPromise,
+          expectedProtocol: connectProtocol,
+        });
       } else {
-        res = await this.transport.acquire({ path, previous: session ?? null });
+        res = await this.transport.acquire({
+          path,
+          previous: session ?? null,
+          expectedProtocol: connectProtocol,
+        });
+      }
+      if (connectProtocol) {
+        const detectedProtocol = this.transport.getProtocolType(path);
+        if (detectedProtocol !== connectProtocol) {
+          throw ERRORS.TypedError(
+            HardwareErrorCode.RuntimeError,
+            `Device protocol mismatch: expected ${connectProtocol}, detected ${detectedProtocol}`
+          );
+        }
       }
       return res;
     } catch (error) {

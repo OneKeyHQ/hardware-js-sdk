@@ -51,9 +51,18 @@ export default class PromptWebDeviceAccess extends BaseMethod {
         }
 
         if (isWebUsbEnv) {
+          const usbDevice = device as USBDevice;
+          let path = usbDevice.serialNumber ?? '';
+          if (!path) {
+            // Early Pro2 boards have no USB serial number. Re-enumeration assigns a
+            // session-stable mock path, which is recovered by USBDevice identity here.
+            const diff = await this.connector?.enumerate();
+            const matched = diff?.descriptors?.find(d => (d as any).device === usbDevice);
+            path = matched?.path ?? '';
+          }
           devicesDescriptor = [
             {
-              path: (device as USBDevice).serialNumber ?? '',
+              path,
               device,
               debug: true,
             },

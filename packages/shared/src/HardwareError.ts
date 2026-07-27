@@ -485,9 +485,21 @@ export const HardwareErrorCode = {
   PinMismatch: 828,
 
   /**
+   * Protocol V2 device must be unlocked before the requested operation.
+   * @params: { failureCode?: string; subcode?: number; firmwareMessage?: string }
+   */
+  DeviceLocked: 829,
+
+  /**
    * Device refused to sign: refTxs don't match the spent input's outpoint
    */
-  KaspaPrevTxIdMismatch: 829,
+  KaspaPrevTxIdMismatch: 830,
+
+  /**
+   * The cached wallet session is invalid or has expired.
+   * @params: { failureCode?: string; subcode?: number; firmwareMessage?: string }
+   */
+  WalletSessionInvalid: 831,
 
   /**
    * Lowlevel transport connect error
@@ -640,7 +652,9 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.DeviceSettingsLanguageNotSupport]: 'Language not supported',
   [HardwareErrorCode.TooManyInputs]: 'Too many inputs',
   [HardwareErrorCode.PinMismatch]: 'PIN mismatch',
+  [HardwareErrorCode.DeviceLocked]: 'Device locked',
   [HardwareErrorCode.KaspaPrevTxIdMismatch]: 'Kaspa previous transaction id mismatch',
+  [HardwareErrorCode.WalletSessionInvalid]: 'Wallet session is invalid or expired',
 
   /**
    * Lowlevel transport

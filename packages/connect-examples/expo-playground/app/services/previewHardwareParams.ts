@@ -1,5 +1,6 @@
 import { getHDPath, getScriptType } from '@onekeyfe/hd-core';
 import { logHardware, logError } from '../utils/logger';
+import { getJsonPreview } from '../utils/jsonPreview';
 
 // 预览并记录即将传给硬件的关键参数（不改变原始 params）
 export function previewHardwareParams(method: string, params: Record<string, unknown>) {
@@ -43,9 +44,15 @@ export function previewHardwareParams(method: string, params: Record<string, unk
       const s = msg.replace(/^0x/i, '');
       preview.message = s.length > 64 ? `${s.slice(0, 64)}... (len=${s.length})` : s;
     } else if (typeof msg === 'object' && msg) {
+      const messagePreview = getJsonPreview(msg, {
+        maxDepth: 4,
+        maxArrayItems: 8,
+        maxStringLength: 256,
+      });
       preview.message_summary = {
         keys: Object.keys(msg).slice(0, 10),
-        size: JSON.stringify(msg).length,
+        size: messagePreview.text.length,
+        truncated: messagePreview.truncated,
       };
     }
 
@@ -55,22 +62,39 @@ export function previewHardwareParams(method: string, params: Record<string, unk
       const s = tx.replace(/^0x/i, '');
       preview.rawTx = s.length > 64 ? `${s.slice(0, 64)}... (len=${s.length})` : s;
     } else if (typeof tx === 'object' && tx) {
+      const txPreview = getJsonPreview(tx, {
+        maxDepth: 4,
+        maxArrayItems: 8,
+        maxStringLength: 256,
+      });
       preview.tx_summary = {
         keys: Object.keys(tx).slice(0, 15),
-        size: JSON.stringify(tx).length,
+        size: txPreview.text.length,
+        truncated: txPreview.truncated,
       };
     }
 
     // 其他通用易读字段（如果存在）
-    ['to','value','gas','gasPrice','maxFeePerGas','maxPriorityFeePerGas','nonce','type',
-     'message_version','message_format','application_domain','pubkey','public_key']
-      .forEach(k => {
-        if (p[k] !== undefined) preview[k] = p[k];
-      });
+    [
+      'to',
+      'value',
+      'gas',
+      'gasPrice',
+      'maxFeePerGas',
+      'maxPriorityFeePerGas',
+      'nonce',
+      'type',
+      'message_version',
+      'message_format',
+      'application_domain',
+      'pubkey',
+      'public_key',
+    ].forEach(k => {
+      if (p[k] !== undefined) preview[k] = p[k];
+    });
 
     logHardware(`Preview hardware params for ${method}`, preview);
   } catch (e) {
     logError('Failed to preview hardware params', { error: e });
   }
 }
-

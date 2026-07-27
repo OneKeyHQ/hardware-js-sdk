@@ -1,0 +1,6 @@
+interface:
+  display_name: 'Hardware SDK Release'
+  short_description: 'Version, build, package, and release workflow'
+  default_prompt: 'Use $hardware-release to prepare an authorized Hardware SDK release.'
+policy:
+  allow_implicit_invocation: false

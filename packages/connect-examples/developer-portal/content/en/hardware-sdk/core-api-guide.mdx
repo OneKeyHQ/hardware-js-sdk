@@ -226,6 +226,15 @@ HardwareSDK.uiResponse({
 - Channels: `UI_EVENT` (prompts), `DEVICE_EVENT` (connection/capability changes), `FIRMWARE_EVENT` (upgrade info). Subscribe once near app start; clean up on exit.
 - Only call `uiResponse` for input requests; use other notifications to drive UI hints; route per device when multiple devices are connected.
 
+For every transport, including React Native BLE and `lowlevel`,
+`DEVICE.CONNECT` and `DEVICE.DISCONNECT` expose a serializable `KnownDevice` snapshot as
+`payload.device`, not the SDK's live internal `Device` instance. Use `connectId` for subsequent
+SDK calls and transport routing, and `serialNo` for physical-device identity; `uuid` remains only
+as a deprecated compatibility alias. Do not call `device.run()`, `acquire()`, `release()`, or
+`commands`, and do not retain the event object expecting in-place updates. Subscribe to
+`DEVICE.STATE` for later state changes; Protocol V1 compatibility code may also use
+`DEVICE.FEATURES`.
+
 **UI requests that require `uiResponse`**
 
 | UI_REQUEST | When it fires | Respond with |

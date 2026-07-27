@@ -6,4 +6,5 @@ export enum EDeviceType {
   Mini = 'mini',
   Touch = 'touch',
   Pro = 'pro',
+  Pro2 = 'pro2',
 }

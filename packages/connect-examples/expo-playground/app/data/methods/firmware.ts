@@ -1,4 +1,6 @@
 import type { UnifiedMethodConfig, DeviceMethodCategory } from '../types';
+import type { HardwareApiMethod } from '../../services/hardwareService';
+import { PRO2_FIRMWARE_FILE_ACCEPT } from '../../constants/firmwareFiles';
 
 const api: UnifiedMethodConfig[] = [
   {
@@ -110,7 +112,7 @@ const api: UnifiedMethodConfig[] = [
     noDeviceIdReq: true,
     presets: [
       {
-        title: 'Update multiple firmware',
+        title: 'V3 full update by release versions',
         parameters: [
           {
             name: 'platform',
@@ -119,24 +121,83 @@ const api: UnifiedMethodConfig[] = [
             label: 'Platform',
             options: [
               { label: 'Web', value: 'web' },
-              // { label: 'Desktop', value: 'desktop' },
-              // { label: 'Mobile', value: 'mobile' },
+              { label: 'Desktop', value: 'desktop' },
+              { label: 'Native', value: 'native' },
             ],
             value: 'web',
+          },
+          {
+            name: 'firmwareVersion',
+            type: 'textarea',
+            required: false,
+            label: 'Firmware Version',
+            description: 'Target version array, for example [4, 10, 0].',
+            placeholder: '[4, 10, 0]',
+            visible: true,
+            editable: true,
+          },
+          {
+            name: 'bleVersion',
+            type: 'textarea',
+            required: false,
+            label: 'BLE Version',
+            description: 'Target BLE version array, for example [4, 10, 0].',
+            placeholder: '[4, 10, 0]',
+            visible: true,
+            editable: true,
+          },
+          {
+            name: 'bootloaderVersion',
+            type: 'textarea',
+            required: false,
+            label: 'Bootloader Version',
+            description: 'Target bootloader version array, for example [2, 8, 0].',
+            placeholder: '[2, 8, 0]',
+            visible: true,
+            editable: true,
+          },
+          {
+            name: 'firmwareType',
+            type: 'select',
+            required: false,
+            label: 'Firmware Type',
+            options: [
+              { label: 'Universal', value: 'universal' },
+              { label: 'Bitcoin Only', value: 'bitcoinonly' },
+            ],
+            visible: true,
+            editable: true,
           },
           {
             name: 'forcedUpdateRes',
             type: 'boolean',
             required: false,
             label: 'Force Update Resources',
-            value: true,
+            value: false,
+          },
+        ],
+      },
+      {
+        title: 'V3 full update by local binaries',
+        parameters: [
+          {
+            name: 'platform',
+            type: 'select',
+            required: true,
+            label: 'Platform',
+            options: [
+              { label: 'Web', value: 'web' },
+              { label: 'Desktop', value: 'desktop' },
+              { label: 'Native', value: 'native' },
+            ],
+            value: 'web',
           },
           {
             name: 'firmwareBinary',
             type: 'file',
             required: false,
             label: 'Firmware Binary',
-            description: 'Upload firmware binary file (.bin)',
+            description: 'Upload Pro firmware binary file (.bin).',
             accept: '.bin',
             visible: true,
             editable: true,
@@ -146,7 +207,7 @@ const api: UnifiedMethodConfig[] = [
             type: 'file',
             required: false,
             label: 'BLE Binary',
-            description: 'Upload BLE firmware binary file (.bin)',
+            description: 'Upload Pro BLE firmware binary file (.bin).',
             accept: '.bin',
             visible: true,
             editable: true,
@@ -156,7 +217,7 @@ const api: UnifiedMethodConfig[] = [
             type: 'file',
             required: false,
             label: 'Bootloader Binary',
-            description: 'Upload bootloader binary file (.bin)',
+            description: 'Upload Pro bootloader binary file (.bin).',
             accept: '.bin',
             visible: true,
             editable: true,
@@ -166,16 +227,783 @@ const api: UnifiedMethodConfig[] = [
             type: 'file',
             required: false,
             label: 'Resource Binary',
-            description: 'Upload resource binary file (.zip)',
+            description: 'Upload Pro resource archive (.zip).',
             accept: '.zip',
             visible: true,
             editable: true,
+          },
+          {
+            name: 'firmwareType',
+            type: 'select',
+            required: false,
+            label: 'Firmware Type',
+            options: [
+              { label: 'Universal', value: 'universal' },
+              { label: 'Bitcoin Only', value: 'bitcoinonly' },
+            ],
+            visible: true,
+            editable: true,
+          },
+          {
+            name: 'forcedUpdateRes',
+            type: 'boolean',
+            required: false,
+            label: 'Force Update Resources',
+            value: false,
           },
         ],
       },
     ],
   },
+  {
+    method: 'firmwareUpdateV4',
+    description: 'methodDescriptions.firmwareUpdateV4',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'V4 remote config update',
+        parameters: [
+          {
+            name: 'platform',
+            type: 'select',
+            required: true,
+            label: 'Platform',
+            options: [{ label: 'Web', value: 'web' }],
+            value: 'web',
+          },
+        ],
+      },
+      {
+        title: 'V4 local target binaries',
+        parameters: [
+          {
+            name: 'platform',
+            type: 'select',
+            required: true,
+            label: 'Platform',
+            options: [{ label: 'Web', value: 'web' }],
+            value: 'web',
+          },
+          {
+            name: 'bootloaderBinary',
+            type: 'file',
+            required: false,
+            label: 'Bootloader (target 3)',
+            description:
+              'Signed bootloader payload package (.okpkg). A .bin file is accepted only if it is an OKPP package renamed as .bin.',
+            accept: PRO2_FIRMWARE_FILE_ACCEPT,
+            visible: true,
+            editable: true,
+          },
+          {
+            name: 'applicationP1Binary',
+            type: 'file',
+            required: false,
+            label: 'Application P1 (target 4)',
+            description:
+              'Signed application P1 payload package (.okpkg). A .bin file is accepted only if it is an OKPP package renamed as .bin.',
+            accept: PRO2_FIRMWARE_FILE_ACCEPT,
+            visible: true,
+            editable: true,
+          },
+          {
+            name: 'applicationP2Binary',
+            type: 'file',
+            required: false,
+            label: 'Application P2 (target 5)',
+            description:
+              'Signed application P2 payload package (.okpkg). A .bin file is accepted only if it is an OKPP package renamed as .bin.',
+            accept: PRO2_FIRMWARE_FILE_ACCEPT,
+            visible: true,
+            editable: true,
+          },
+          {
+            name: 'coprocessorBinary',
+            type: 'file',
+            required: false,
+            label: 'Coprocessor (target 6)',
+            description:
+              'Signed target payload package (.okpkg). A .bin file is accepted only if it is a signed package renamed as .bin.',
+            accept: PRO2_FIRMWARE_FILE_ACCEPT,
+            visible: true,
+            editable: true,
+          },
+          {
+            name: 'se01Binary',
+            type: 'file',
+            required: false,
+            label: 'SE01 (target 7)',
+            description:
+              'Signed SE01 payload package (.okpkg). A .bin file is accepted only if it is a signed package renamed as .bin.',
+            accept: PRO2_FIRMWARE_FILE_ACCEPT,
+            visible: true,
+            editable: true,
+          },
+          {
+            name: 'se02Binary',
+            type: 'file',
+            required: false,
+            label: 'SE02 (target 8)',
+            description:
+              'Signed SE02 payload package (.okpkg). A .bin file is accepted only if it is a signed package renamed as .bin.',
+            accept: PRO2_FIRMWARE_FILE_ACCEPT,
+            visible: true,
+            editable: true,
+          },
+          {
+            name: 'se03Binary',
+            type: 'file',
+            required: false,
+            label: 'SE03 (target 9)',
+            description:
+              'Signed SE03 payload package (.okpkg). A .bin file is accepted only if it is a signed package renamed as .bin.',
+            accept: PRO2_FIRMWARE_FILE_ACCEPT,
+            visible: true,
+            editable: true,
+          },
+          {
+            name: 'se04Binary',
+            type: 'file',
+            required: false,
+            label: 'SE04 (target 10)',
+            description:
+              'Signed SE04 payload package (.okpkg). A .bin file is accepted only if it is a signed package renamed as .bin.',
+            accept: PRO2_FIRMWARE_FILE_ACCEPT,
+            visible: true,
+            editable: true,
+          },
+          {
+            name: 'forcedUpdateRes',
+            type: 'boolean',
+            required: false,
+            label: 'Force Update Resources',
+            value: false,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'deviceFirmwareUpdate',
+    description: 'methodDescriptions.deviceFirmwareUpdate',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'Install one Protocol V2 target',
+        parameters: [
+          {
+            name: 'targetId',
+            type: 'select',
+            required: true,
+            label: 'Target',
+            options: [
+              { label: 'Resource crate', value: '1' },
+              { label: 'Bootloader', value: '3' },
+              { label: 'Application P1', value: '4' },
+              { label: 'Application P2', value: '5' },
+              { label: 'Coprocessor', value: '6' },
+              { label: 'SE01', value: '7' },
+              { label: 'SE02', value: '8' },
+              { label: 'SE03', value: '9' },
+              { label: 'SE04', value: '10' },
+            ],
+            value: '4',
+          },
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Path',
+            placeholder: 'vol0:firmware.bin',
+            value: 'vol0:firmware.bin',
+          },
+        ],
+      },
+      {
+        title: 'Install multiple Protocol V2 targets',
+        parameters: [
+          {
+            name: 'targets',
+            type: 'textarea',
+            required: true,
+            label: 'Targets',
+            description: 'DeviceFirmwareTarget JSON array',
+            value: [
+              {
+                target_id: 4,
+                path: 'vol0:firmware.bin',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'deviceGetFirmwareUpdateStatus',
+    description: 'methodDescriptions.deviceGetFirmwareUpdateStatus',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'Get firmware update status fields',
+        parameters: [
+          {
+            name: 'fields',
+            type: 'textarea',
+            required: false,
+            label: 'Fields',
+            description: 'DeviceFirmwareUpdateRecordFields JSON object',
+            value: {
+              status: true,
+              payload_version: true,
+              path: true,
+            },
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'filesystemPathInfoQuery',
+    description: 'methodDescriptions.pathInfo',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'Protocol V2 path info',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Path',
+            placeholder: 'vol0:test.bin',
+            value: 'vol0:test.bin',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'filesystemDirList',
+    description: 'methodDescriptions.dirList',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'Protocol V2 list directory',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Path',
+            placeholder: 'vol0:',
+            value: 'vol0:',
+          },
+          {
+            name: 'depth',
+            type: 'number',
+            required: false,
+            label: 'Depth',
+            description: 'Recursive depth. 0 means unlimited.',
+            value: 0,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'filesystemDirMake',
+    description: 'methodDescriptions.dirMake',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'Protocol V2 make directory',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Path',
+            placeholder: 'vol0:updates',
+            value: 'vol0:updates',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'filesystemDirRemove',
+    description: 'methodDescriptions.dirRemove',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'Protocol V2 remove directory',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Path',
+            placeholder: 'vol0:updates',
+            value: 'vol0:updates',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'filesystemFileRead',
+    description: 'methodDescriptions.fileRead',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'Protocol V2 read file',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Path',
+            placeholder: 'vol0:test.bin',
+            value: 'vol0:test.bin',
+          },
+          {
+            name: 'offset',
+            type: 'number',
+            required: false,
+            label: 'Start Offset',
+            visible: true,
+            value: 0,
+          },
+          {
+            name: 'totalSize',
+            type: 'number',
+            required: false,
+            label: 'Read Length',
+            description: '0 reads from the start offset to the end of the file.',
+            visible: true,
+            value: 0,
+          },
+          {
+            name: 'chunkLen',
+            type: 'number',
+            required: false,
+            label: 'Chunk Length',
+            validation: {
+              min: 64,
+              max: 4096,
+            },
+            visible: true,
+            value: 4096,
+          },
+          {
+            name: 'uiPercentage',
+            type: 'number',
+            required: false,
+            label: 'UI Percentage',
+            visible: true,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'filesystemFileWrite',
+    description: 'methodDescriptions.fileWrite',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'Protocol V2 upload file',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Path',
+            placeholder: 'vol0:test.bin',
+            value: 'vol0:test.bin',
+          },
+          {
+            name: 'offset',
+            type: 'number',
+            required: false,
+            label: 'Offset',
+            visible: true,
+            value: 0,
+          },
+          {
+            name: 'totalSize',
+            type: 'number',
+            required: false,
+            label: 'Total Size',
+            description: 'Auto-filled from selected file size.',
+            visible: true,
+            value: 0,
+          },
+          {
+            name: 'chunkSize',
+            type: 'number',
+            required: false,
+            label: 'Chunk Size',
+            description: 'Upload chunk size. WebUSB maximum is 4096 bytes.',
+            validation: {
+              min: 64,
+              max: 4096,
+            },
+            value: 4096,
+          },
+          {
+            name: 'data',
+            type: 'file',
+            required: true,
+            label: 'File Data',
+            description: 'Select a full file. SDK splits it into Protocol V2 chunks automatically.',
+            accept: '.bin,.txt,.json',
+            visible: true,
+            editable: true,
+          },
+          {
+            name: 'overwrite',
+            type: 'boolean',
+            required: false,
+            label: 'Overwrite',
+            visible: true,
+            value: true,
+          },
+          {
+            name: 'append',
+            type: 'boolean',
+            required: false,
+            label: 'Append',
+            visible: true,
+            value: false,
+          },
+          {
+            name: 'uiPercentage',
+            type: 'number',
+            required: false,
+            label: 'UI Percentage',
+            visible: true,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'filesystemFileDelete',
+    description: 'methodDescriptions.fileDelete',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'Protocol V2 delete file',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Path',
+            placeholder: 'vol0:test.bin',
+            value: 'vol0:test.bin',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'filesystemPermissionFix',
+    description: 'methodDescriptions.filesystemPermissionFix',
+    noDeviceIdReq: true,
+    presets: [],
+  },
+  {
+    method: 'filesystemPathInfoQuery',
+    description: 'methodDescriptions.filesystemPathInfoQuery',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'FilesystemPathInfoQuery',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Path',
+            placeholder: 'vol0:test.bin',
+            value: 'vol0:test.bin',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'filesystemFileRead',
+    description: 'methodDescriptions.filesystemFileRead',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'FilesystemFileRead',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Path',
+            placeholder: 'vol0:test.bin',
+            value: 'vol0:test.bin',
+          },
+          {
+            name: 'offset',
+            type: 'number',
+            required: false,
+            label: 'Start Offset',
+            visible: true,
+            value: 0,
+          },
+          {
+            name: 'totalSize',
+            type: 'number',
+            required: false,
+            label: 'Read Length',
+            description: '0 reads from the start offset to the end of the file.',
+            visible: true,
+            value: 0,
+          },
+          {
+            name: 'chunkLen',
+            type: 'number',
+            required: false,
+            label: 'Chunk Length',
+            validation: {
+              min: 64,
+              max: 4096,
+            },
+            visible: true,
+            value: 4096,
+          },
+          {
+            name: 'uiPercentage',
+            type: 'number',
+            required: false,
+            label: 'UI Percentage',
+            visible: true,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'filesystemFileWrite',
+    description: 'methodDescriptions.filesystemFileWrite',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'FilesystemFileWrite',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Path',
+            placeholder: 'vol0:test.bin',
+            value: 'vol0:test.bin',
+          },
+          {
+            name: 'offset',
+            type: 'number',
+            required: false,
+            label: 'Offset',
+            visible: true,
+            value: 0,
+          },
+          {
+            name: 'totalSize',
+            type: 'number',
+            required: false,
+            label: 'Total Size',
+            description: 'Auto-filled from selected file size.',
+            visible: true,
+            value: 0,
+          },
+          {
+            name: 'chunkSize',
+            type: 'number',
+            required: false,
+            label: 'Chunk Size',
+            description: 'Upload chunk size. WebUSB maximum is 4096 bytes.',
+            validation: {
+              min: 64,
+              max: 4096,
+            },
+            value: 4096,
+          },
+          {
+            name: 'data',
+            type: 'file',
+            required: true,
+            label: 'File Data',
+            description: 'Select a full file. SDK splits it into Protocol V2 chunks automatically.',
+            accept: '.bin,.txt,.json',
+            visible: true,
+            editable: true,
+          },
+          {
+            name: 'overwrite',
+            type: 'boolean',
+            required: false,
+            label: 'Overwrite',
+            visible: true,
+            value: true,
+          },
+          {
+            name: 'append',
+            type: 'boolean',
+            required: false,
+            label: 'Append',
+            visible: true,
+            value: false,
+          },
+          {
+            name: 'uiPercentage',
+            type: 'number',
+            required: false,
+            label: 'UI Percentage',
+            visible: true,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'filesystemFileDelete',
+    description: 'methodDescriptions.filesystemFileDelete',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'FilesystemFileDelete',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Path',
+            placeholder: 'vol0:test.bin',
+            value: 'vol0:test.bin',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'filesystemDirList',
+    description: 'methodDescriptions.filesystemDirList',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'FilesystemDirList',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Path',
+            placeholder: 'vol0:',
+            value: 'vol0:',
+          },
+          {
+            name: 'depth',
+            type: 'number',
+            required: false,
+            label: 'Depth',
+            description: 'Recursive depth. 0 means unlimited.',
+            value: 0,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'filesystemDirMake',
+    description: 'methodDescriptions.filesystemDirMake',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'FilesystemDirMake',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Path',
+            placeholder: 'vol0:updates',
+            value: 'vol0:updates',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'filesystemDirRemove',
+    description: 'methodDescriptions.filesystemDirRemove',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'FilesystemDirRemove',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Path',
+            placeholder: 'vol0:updates',
+            value: 'vol0:updates',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'filesystemFormat',
+    description: 'methodDescriptions.filesystemFormat',
+    noDeviceIdReq: true,
+    presets: [],
+  },
   // === 固件信息检查 ===
+  {
+    method: 'checkBridgeStatus',
+    description: 'Check whether the local hardware bridge is available',
+    noConnIdReq: true,
+    noDeviceIdReq: true,
+    presets: [],
+  },
+  {
+    method: 'checkFirmwareTypeAvailable',
+    description: 'Check the latest release available for a device and firmware type',
+    noConnIdReq: true,
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'Pro universal firmware',
+        parameters: [
+          {
+            name: 'deviceType',
+            type: 'select',
+            required: true,
+            label: 'Device Type',
+            options: ['classic', 'classic1s', 'classicpure', 'mini', 'touch', 'pro', 'pro2'],
+            value: 'pro',
+          },
+          {
+            name: 'firmwareType',
+            type: 'select',
+            required: true,
+            label: 'Firmware Type',
+            options: ['universal', 'bitcoinonly'],
+            value: 'universal',
+          },
+        ],
+      },
+    ],
+  },
   {
     method: 'checkFirmwareRelease',
     description: 'methodDescriptions.checkFirmwareRelease',
@@ -224,6 +1052,72 @@ const api: UnifiedMethodConfig[] = [
   // === 固件更新 ===
 
   {
+    method: 'firmwareUpdate',
+    description: 'Legacy firmware update entry point',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'Update firmware from release metadata',
+        parameters: [
+          {
+            name: 'updateType',
+            type: 'select',
+            required: true,
+            label: 'Update Type',
+            options: [
+              { label: 'Firmware', value: 'firmware' },
+              { label: 'BLE Firmware', value: 'ble' },
+            ],
+            value: 'firmware',
+          },
+          {
+            name: 'rebootOnSuccess',
+            type: 'boolean',
+            required: false,
+            label: 'Reboot On Success',
+            value: true,
+          },
+        ],
+      },
+      {
+        title: 'Update firmware from local binary',
+        parameters: [
+          {
+            name: 'updateType',
+            type: 'select',
+            required: true,
+            label: 'Update Type',
+            options: [
+              { label: 'Firmware', value: 'firmware' },
+              { label: 'BLE Firmware', value: 'ble' },
+            ],
+            value: 'firmware',
+          },
+          {
+            name: 'binary',
+            type: 'file',
+            required: true,
+            label: 'Firmware Binary',
+            accept: '.bin',
+          },
+          {
+            name: 'rebootOnSuccess',
+            type: 'boolean',
+            required: false,
+            label: 'Reboot On Success',
+            value: true,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'deviceUpdateReboot',
+    description: 'Reboot the device into its update flow',
+    noDeviceIdReq: true,
+    presets: [],
+  },
+  {
     method: 'deviceUpdateBootloader',
     description: 'methodDescriptions.deviceUpdateBootloader',
     noDeviceIdReq: true,
@@ -236,7 +1130,8 @@ const api: UnifiedMethodConfig[] = [
             type: 'file',
             required: false,
             label: 'Bootloader Binary',
-            description: 'Upload bootloader binary file (.bin). If not provided, latest will be downloaded automatically.',
+            description:
+              'Upload bootloader binary file (.bin). If not provided, latest will be downloaded automatically.',
             accept: '.bin',
             visible: true,
             editable: true,
@@ -259,11 +1154,43 @@ const api: UnifiedMethodConfig[] = [
   },
 ];
 
+const FILESYSTEM_METHOD_NAMES: Partial<Record<string, HardwareApiMethod>> = {
+  filesystemPathInfoQuery: 'pathInfo',
+  filesystemDirList: 'dirList',
+  filesystemDirMake: 'dirMake',
+  filesystemDirRemove: 'dirRemove',
+  filesystemFileRead: 'fileRead',
+  filesystemFileWrite: 'fileWrite',
+  filesystemFileDelete: 'fileDelete',
+};
+
+const normalizedApi = Array.from(
+  new Map(
+    api.map(item => {
+      const method = FILESYSTEM_METHOD_NAMES[item.method] ?? item.method;
+      return [method, { ...item, method }] as const;
+    })
+  ).values()
+);
+
+const DEVELOPMENT_FIRMWARE_METHODS = new Set<HardwareApiMethod>([
+  'deviceFirmwareUpdate',
+  'deviceGetFirmwareUpdateStatus',
+  'filesystemPermissionFix',
+  'filesystemFormat',
+]);
+
+export const firmwareDebugApi: UnifiedMethodConfig[] = normalizedApi
+  .filter(item => DEVELOPMENT_FIRMWARE_METHODS.has(item.method as HardwareApiMethod))
+  .map(item => ({ ...item, debugOnly: true }));
+
 // 导出链配置对象
 export const firmware: {
   api: UnifiedMethodConfig[];
   id: DeviceMethodCategory;
 } = {
   id: 'firmware',
-  api,
+  api: normalizedApi.filter(
+    item => !DEVELOPMENT_FIRMWARE_METHODS.has(item.method as HardwareApiMethod)
+  ),
 };

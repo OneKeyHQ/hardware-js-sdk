@@ -5,12 +5,11 @@ import { UI_REQUEST } from '../../constants/ui-request';
 import { BaseMethod } from '../BaseMethod';
 import { getSysResourceBinary } from '../firmware/getBinary';
 import { updateResources } from '../firmware/uploadFirmware';
-import { getDeviceFirmwareVersion, getDeviceType, getFirmwareType } from '../../utils';
 import { createUiMessage } from '../../events/ui-request';
 import { DataManager } from '../../data-manager';
 
 import type { Deferred } from '@onekeyfe/hd-shared';
-import type { Features, KnownDevice } from '../../types';
+import type { KnownDevice } from '../../types';
 import type { DeviceFullyUploadResourceParams } from '../../types/api/deviceFullyUploadResource';
 
 export default class DeviceFullyUploadResource extends BaseMethod {
@@ -33,12 +32,12 @@ export default class DeviceFullyUploadResource extends BaseMethod {
     );
   };
 
-  isSupportResourceUpdate(features: Features, updateType: string) {
+  isSupportResourceUpdate(updateType: string) {
     if (updateType !== 'firmware') return false;
 
-    const deviceType = getDeviceType(features);
+    const deviceType = this.device.getCurrentDeviceType();
     const isTouchMode = deviceType === EDeviceType.Touch || deviceType === EDeviceType.Pro;
-    const currentVersion = getDeviceFirmwareVersion(features).join('.');
+    const currentVersion = this.device.getCurrentFirmwareVersionString() ?? '0.0.0';
 
     return isTouchMode && semver.gte(currentVersion, '3.4.0');
   }
@@ -49,10 +48,10 @@ export default class DeviceFullyUploadResource extends BaseMethod {
 
     const payload = this.payload as DeviceFullyUploadResourceParams;
 
-    const deviceFirmwareType = getFirmwareType(features);
+    const deviceFirmwareType = device.getCurrentFirmwareType();
     const firmwareType = payload.firmwareType ?? deviceFirmwareType;
 
-    if (!features?.bootloader_mode && features) {
+    if (!device.isBootloader() && features) {
       // check & upgrade firmware resource
       if (features) {
         let { binary } = this.payload;

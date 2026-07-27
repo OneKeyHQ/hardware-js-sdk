@@ -1,15 +1,24 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CoreApi, UiEvent, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
+import {
+  CoreApi,
+  DEVICE,
+  DeviceStateEvent,
+  Features,
+  LOG_EVENT,
+  UiEvent,
+  UI_REQUEST,
+  UI_RESPONSE,
+} from '@onekeyfe/hd-core';
 import { useDeviceStore } from '../../store/deviceStore';
-import { useHardwareStore } from '../../store/hardwareStore';
 
-import { submitPin, submitPassphrase } from '../../services/hardwareService';
+import { submitPin } from '../../services/hardwareService';
+import { applyDeviceStateToDevice } from '../../services/deviceStateAdapter';
 import { EDeviceType } from '@onekeyfe/hd-shared';
 import GlobalDialogManager from '../global/GlobalDialogManager';
 import WebUsbAuthorizeDialog from '../global/WebUsbAuthorizeDialog';
-import { logData, logInfo, logError } from '../../utils/logger';
-import { SDKUtils } from '../../utils/hardwareInstance';
+import { logData, logInfo, logError, logHardware } from '../../utils/logger';
+import { isSdkDebugEnabled, SDKUtils } from '../../utils/hardwareInstance';
 import { create } from 'zustand';
 
 // 声明全局弹窗管理器类型
@@ -27,10 +36,44 @@ interface SDKProviderProps {
   children: React.ReactNode;
 }
 
+const SDK_DEBUG_LOG_PATTERN =
+  /(ProtocolV2|WebUsbTransport|hd-transport-webusb|DeviceCommands|call-)/;
+const SDK_PROTOCOL_V2_RAW_LOG_PATTERN =
+  /\[ProtocolV2[^\]]*\]\s+(TX frame|RX frame|TX name=.*\|\s*RX seq=|RX payload type=|TX payload name=)/;
+const SDK_DEBUG_LOG_FLUSH_INTERVAL_MS = 300;
+const SDK_DEBUG_LOG_MAX_QUEUE_LENGTH = 200;
+const SDK_DEBUG_LOG_MAX_BATCH_LENGTH = 60;
+const SDK_DEBUG_LOG_MAX_TEXT_LENGTH = 1800;
+
+function stringifySdkLogItem(item: unknown): string {
+  if (typeof item === 'string') return item;
+  try {
+    return JSON.stringify(item);
+  } catch {
+    return String(item);
+  }
+}
+
+function truncateSdkDebugText(text: string): string {
+  if (text.length <= SDK_DEBUG_LOG_MAX_TEXT_LENGTH) return text;
+  return `${text.slice(0, SDK_DEBUG_LOG_MAX_TEXT_LENGTH)}...`;
+}
+
+function getProtocolV2RawLogLines(text: string): string[] {
+  return text
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => SDK_PROTOCOL_V2_RAW_LOG_PATTERN.test(line));
+}
+
 // 固件进度状态管理
 export interface FirmwareProgressData {
   progress: number;
   progressType: 'transferData' | 'installingFirmware';
+  transferredBytes?: number;
+  totalBytes?: number;
+  rateBytesPerSecond?: number;
+  elapsedMs?: number;
 }
 
 export const useFirmwareProgressStore = create<{
@@ -58,20 +101,155 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
     | typeof UI_RESPONSE.SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE
   >(UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE);
   const lastSdkRef = useRef<CoreApi | null>(null);
+  const cleanupSdkListenersRef = useRef<(() => void) | null>(null);
+  const sdkDebugLogQueueRef = useRef<string[]>([]);
+  const sdkDebugLogFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const progressUpdateRef = useRef<{ time: number; progress: number }>({
+    time: 0,
+    progress: -1,
+  });
+  const progressLogRef = useRef<{ time: number; progress: number }>({
+    time: 0,
+    progress: -1,
+  });
+
+  const flushSdkDebugLogs = useCallback(() => {
+    sdkDebugLogFlushTimerRef.current = null;
+
+    const queuedLogs = sdkDebugLogQueueRef.current.splice(0);
+    if (queuedLogs.length === 0) return;
+
+    const droppedCount = Math.max(queuedLogs.length - SDK_DEBUG_LOG_MAX_BATCH_LENGTH, 0);
+    const visibleLogs = queuedLogs.slice(-SDK_DEBUG_LOG_MAX_BATCH_LENGTH);
+
+    logHardware(
+      'SDK debug log',
+      {
+        count: queuedLogs.length,
+        ...(droppedCount > 0 ? { dropped: droppedCount } : {}),
+        message: visibleLogs.join('\n'),
+      },
+      {
+        console: false,
+        persist: false,
+        store: false,
+      }
+    );
+  }, []);
 
   const setupSDKEventListeners = useCallback(
     (sdkInstance: CoreApi) => {
+      cleanupSdkListenersRef.current?.();
+      const sdkDebugEnabled = isSdkDebugEnabled();
+
+      const updateFirmwareProgress = (
+        data: FirmwareProgressData,
+        options: { force?: boolean } = {}
+      ) => {
+        const now = Date.now();
+        const previous = progressUpdateRef.current;
+        const shouldUpdate =
+          options.force ||
+          data.progress >= 100 ||
+          data.progress === 0 ||
+          (data.progress !== previous.progress && now - previous.time >= 100) ||
+          now - previous.time >= 100;
+
+        if (!shouldUpdate) return;
+
+        progressUpdateRef.current = {
+          time: now,
+          progress: data.progress,
+        };
+        useFirmwareProgressStore.getState().setProgressData(data);
+      };
+
+      const logProgressEvent = (type: UiEvent['type'], data: FirmwareProgressData) => {
+        const now = Date.now();
+        const previous = progressLogRef.current;
+        if (data.progress < 100 && now - previous.time < 1000) {
+          return;
+        }
+        progressLogRef.current = {
+          time: now,
+          progress: data.progress,
+        };
+        logHardware(
+          'SDK progress event',
+          {
+            type,
+            progress: data.progress,
+            progressType: data.progressType,
+            transferredBytes: data.transferredBytes,
+            totalBytes: data.totalBytes,
+            rateBytesPerSecond: data.rateBytesPerSecond,
+          },
+          {
+            console: false,
+            persist: false,
+          }
+        );
+      };
+
+      const handleLogEvent = (message: { payload?: unknown }) => {
+        if (!sdkDebugEnabled) {
+          return;
+        }
+
+        const payload = message.payload;
+        const items = Array.isArray(payload) ? payload : [payload];
+        const text = items
+          .filter(item => item !== undefined && item !== null)
+          .map(stringifySdkLogItem)
+          .join(' ');
+
+        if (!text || !SDK_DEBUG_LOG_PATTERN.test(text)) {
+          return;
+        }
+
+        getProtocolV2RawLogLines(text).forEach(line => {
+          logHardware(
+            'Protocol V2 raw transport',
+            { line },
+            {
+              console: false,
+              persist: false,
+            }
+          );
+        });
+
+        sdkDebugLogQueueRef.current.push(truncateSdkDebugText(text));
+        if (sdkDebugLogQueueRef.current.length > SDK_DEBUG_LOG_MAX_QUEUE_LENGTH) {
+          sdkDebugLogQueueRef.current.splice(
+            0,
+            sdkDebugLogQueueRef.current.length - SDK_DEBUG_LOG_MAX_QUEUE_LENGTH
+          );
+        }
+
+        if (!sdkDebugLogFlushTimerRef.current) {
+          sdkDebugLogFlushTimerRef.current = setTimeout(
+            flushSdkDebugLogs,
+            SDK_DEBUG_LOG_FLUSH_INTERVAL_MS
+          );
+        }
+      };
+
       // 监听SDK UI事件
-      sdkInstance.on('UI_EVENT', (message: UiEvent) => {
+      const handleUiEvent = (message: UiEvent) => {
         const latestCurrentDevice = useDeviceStore.getState().currentDevice;
-        logInfo(`收到UI事件: ${message.type}`, message.payload as logData);
+        const isProgressEvent =
+          message.type === UI_REQUEST.DEVICE_PROGRESS ||
+          message.type === UI_REQUEST.FIRMWARE_PROGRESS;
+        if (!isProgressEvent) {
+          logInfo(`收到UI事件: ${message.type}`, message.payload as logData);
+        }
 
         // 处理设备动作状态
         if (message.type === UI_REQUEST.CLOSE_UI_WINDOW) {
           clearDeviceAction();
           // 重置固件进度状态
           useFirmwareProgressStore.getState().reset();
-        } else if (message.type) {
+        } else if (message.type && !isProgressEvent) {
           setDeviceAction({
             isActive: true,
             actionType: message.type,
@@ -86,6 +264,7 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
             if (
               latestCurrentDevice &&
               (latestCurrentDevice.deviceType === EDeviceType.Pro ||
+                latestCurrentDevice.deviceType === EDeviceType.Pro2 ||
                 latestCurrentDevice.deviceType === EDeviceType.Touch)
             ) {
               submitPin('@@ONEKEY_INPUT_PIN_IN_DEVICE').catch(console.error);
@@ -95,14 +274,7 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
             break;
 
           case 'ui-request_passphrase': {
-            const hardwareState = useHardwareStore.getState();
-            const shouldAutoSubmit = hardwareState.commonParameters.useEmptyPassphrase;
-
-            if (shouldAutoSubmit) {
-              submitPassphrase('', false, false).catch(console.error);
-            } else {
-              window.globalDialogManager?.showPassphraseDialog();
-            }
+            window.globalDialogManager?.showPassphraseDialog();
             break;
           }
 
@@ -122,18 +294,52 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
             break;
           }
 
-          case 'ui-firmware-progress':
+          case UI_REQUEST.FIRMWARE_PROGRESS:
             if (message.payload && typeof message.payload === 'object') {
               const payload = message.payload as {
                 progress?: number;
                 progressType?: string;
+                transferredBytes?: number;
+                totalBytes?: number;
+                rateBytesPerSecond?: number;
+                elapsedMs?: number;
                 [key: string]: unknown;
               };
               if (typeof payload.progress === 'number' && payload.progressType) {
-                useFirmwareProgressStore.getState().setProgressData({
+                const progressData = {
                   progress: payload.progress,
                   progressType: payload.progressType as 'transferData' | 'installingFirmware',
-                });
+                  transferredBytes: payload.transferredBytes,
+                  totalBytes: payload.totalBytes,
+                  rateBytesPerSecond: payload.rateBytesPerSecond,
+                  elapsedMs: payload.elapsedMs,
+                };
+                updateFirmwareProgress(progressData, { force: payload.progress >= 100 });
+                logProgressEvent(message.type, progressData);
+              }
+            }
+            break;
+
+          case UI_REQUEST.DEVICE_PROGRESS:
+            if (message.payload && typeof message.payload === 'object') {
+              const payload = message.payload as {
+                progress?: number;
+                transferredBytes?: number;
+                totalBytes?: number;
+                rateBytesPerSecond?: number;
+                elapsedMs?: number;
+              };
+              if (typeof payload.progress === 'number') {
+                const progressData = {
+                  progress: payload.progress,
+                  progressType: 'transferData',
+                  transferredBytes: payload.transferredBytes,
+                  totalBytes: payload.totalBytes,
+                  rateBytesPerSecond: payload.rateBytesPerSecond,
+                  elapsedMs: payload.elapsedMs,
+                } satisfies FirmwareProgressData;
+                updateFirmwareProgress(progressData, { force: payload.progress >= 100 });
+                logProgressEvent(message.type, progressData);
               }
             }
             break;
@@ -141,18 +347,66 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
           default:
             break;
         }
-      });
+      };
 
       // 监听设备连接/断开事件
-      sdkInstance.on('device-connect', device => {
-        logInfo('device-connect', device);
-      });
+      const handleDeviceConnect = () => {
+        logInfo('device-connect');
+      };
 
-      sdkInstance.on('device-disconnect', device => {
-        logInfo('device-disconnect', device);
-      });
+      const handleDeviceDisconnect = () => {
+        logInfo('device-disconnect');
+      };
+
+      const handleDeviceFeatures = (features: Features) => {
+        const store = useDeviceStore.getState();
+        store.setDeviceFeatures(features);
+        if (store.currentDevice) {
+          store.setCurrentDevice({
+            ...store.currentDevice,
+            features,
+          });
+        }
+      };
+
+      const handleDeviceState = (stateEvent: DeviceStateEvent) => {
+        const store = useDeviceStore.getState();
+        const currentDevice = store.currentDevice;
+        if (!currentDevice) return;
+        const matchesDevice =
+          currentDevice.connectId === stateEvent.connectId ||
+          Boolean(
+            stateEvent.state.identity.serialNo &&
+              (currentDevice.serialNo || currentDevice.uuid) === stateEvent.state.identity.serialNo
+          ) ||
+          Boolean(
+            stateEvent.state.identity.deviceId &&
+              currentDevice.deviceId === stateEvent.state.identity.deviceId
+          );
+        if (matchesDevice) {
+          store.setCurrentDevice(applyDeviceStateToDevice(currentDevice, stateEvent.state));
+        }
+      };
+
+      sdkInstance.on(LOG_EVENT, handleLogEvent);
+      sdkInstance.on('UI_EVENT', handleUiEvent);
+      sdkInstance.on('device-connect', handleDeviceConnect);
+      sdkInstance.on('device-disconnect', handleDeviceDisconnect);
+      sdkInstance.on(DEVICE.FEATURES, handleDeviceFeatures);
+      sdkInstance.on(DEVICE.STATE, handleDeviceState);
+
+      const cleanup = () => {
+        sdkInstance.off(LOG_EVENT, handleLogEvent);
+        sdkInstance.off('UI_EVENT', handleUiEvent);
+        sdkInstance.off('device-connect', handleDeviceConnect);
+        sdkInstance.off('device-disconnect', handleDeviceDisconnect);
+        sdkInstance.off(DEVICE.FEATURES, handleDeviceFeatures);
+        sdkInstance.off(DEVICE.STATE, handleDeviceState);
+      };
+      cleanupSdkListenersRef.current = cleanup;
+      return cleanup;
     },
-    [setDeviceAction, clearDeviceAction]
+    [setDeviceAction, clearDeviceAction, flushSdkDebugLogs]
   );
 
   // 初始化SDK
@@ -214,7 +468,21 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
 
   useEffect(() => {
     handleInitializeSDK();
+    return () => {
+      cleanupSdkListenersRef.current?.();
+      cleanupSdkListenersRef.current = null;
+    };
   }, [handleInitializeSDK]);
+
+  useEffect(() => {
+    return () => {
+      if (sdkDebugLogFlushTimerRef.current) {
+        clearTimeout(sdkDebugLogFlushTimerRef.current);
+        sdkDebugLogFlushTimerRef.current = null;
+      }
+      sdkDebugLogQueueRef.current = [];
+    };
+  }, []);
 
   return (
     <>
@@ -229,10 +497,11 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
             vendorId: device?.vendorId,
             productId: device?.productId,
           });
-          lastSdkRef.current?.uiResponse({
+          const response = {
             type: webUsbResponseType,
             payload: { deviceId: device?.serialNumber ?? '' },
-          });
+          };
+          lastSdkRef.current?.uiResponse(response);
         }}
         onCancel={() => {
           logError('WebUSB bootloader authorization cancelled by user');

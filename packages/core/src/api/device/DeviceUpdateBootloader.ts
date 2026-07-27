@@ -9,7 +9,6 @@ import { updateBootloader } from '../firmware/uploadFirmware';
 import { DeviceModelToTypes } from '../../types';
 import { DataManager } from '../../data-manager';
 import { checkBootloaderLength } from '../firmware/updateBootloader';
-import { getDeviceType, getFirmwareType } from '../../utils';
 
 import type { DeviceUpdateBootloaderParams } from '../../types/api/deviceUpdateBootloader';
 import type { EFirmwareType } from '@onekeyfe/hd-shared';
@@ -74,13 +73,13 @@ export default class DeviceUpdateBootloader extends FirmwareUpdateBaseMethod<any
     }
 
     // Check if device is in bootloader mode
-    if (features && features.bootloader_mode) {
+    if (features && device.isBootloader()) {
       // Use emmcFileWrite + reboot logic for bootloader mode
       this.postTipMessage(FirmwareUpdateTipMessage.UpdateBootloader);
       return this.updateBootloaderWithEmmcFileWrite(device, binary);
     }
 
-    if (features && !features.bootloader_mode) {
+    if (features && !device.isBootloader()) {
       // Use original updateBootloader logic for normal mode
       await updateBootloader(
         this.device.getCommands().typedCall.bind(this.device.getCommands()),
@@ -98,8 +97,8 @@ export default class DeviceUpdateBootloader extends FirmwareUpdateBaseMethod<any
 
     const payload = this.payload as DeviceUpdateBootloaderParams;
 
-    const deviceType = getDeviceType(features);
-    const deviceFirmwareType = getFirmwareType(features);
+    const deviceType = device.getCurrentDeviceType();
+    const deviceFirmwareType = device.getCurrentFirmwareType();
     const firmwareType = payload.firmwareType ?? deviceFirmwareType;
 
     if (DeviceModelToTypes.model_touch.includes(deviceType)) {

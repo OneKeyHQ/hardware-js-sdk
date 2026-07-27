@@ -1,0 +1,6 @@
+interface:
+  display_name: 'Hardware Firmware Protobuf'
+  short_description: 'Firmware schema and generated artifact workflow'
+  default_prompt: 'Use $hardware-firmware-protobuf to update firmware schemas and SDK generated artifacts safely.'
+policy:
+  allow_implicit_invocation: false

@@ -13,16 +13,21 @@ import PanelView from './ui/Panel';
 import { getItem, setItem } from '../utils/storeUtil';
 import { connectionTypeAtom } from '../atoms/deviceConnectAtoms';
 import { deviceActionsAtom, deviceListAtom, selectDeviceAtom } from '../atoms/deviceAtoms';
+import { useCommonParams } from '../provider/CommonParamsProvider';
+import { applyDeviceStateToExampleDevice } from '../utils/deviceStateAdapter';
 
 import type { ConnectionType } from '../atoms/deviceConnectAtoms';
 import type { ForwardedRef } from 'react';
-import type { Features } from '@onekeyfe/hd-transport';
+import type { DeviceState, Features } from '@onekeyfe/hd-core';
+import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
 
 export type Device = {
   connectId: string;
   name: string;
   features?: Features;
+  deviceState?: DeviceState;
   deviceType?: string;
+  protocolType?: HardwareConnectProtocol;
   id?: string;
   state?: string;
 };
@@ -36,12 +41,21 @@ const shouldUseCommonSdk = (connectionType: ConnectionType | null): boolean =>
   connectionType === 'desktop-web-ble' || connectionType === 'webusb';
 
 /**
- * Check if switching between connection types requires app restart
+ * Check if switching between connection types requires app restart.
+ * Restart is needed when:
+ * - Switching between different SDK types (common sdk vs iframe sdk)
+ * - Switching between different transport classes within the same SDK
  */
 const needsRestartForSwitch = (from: ConnectionType | null, to: ConnectionType | null): boolean => {
+  if (from === to) return false;
   const fromUsesCommonSdk = shouldUseCommonSdk(from);
   const toUsesCommonSdk = shouldUseCommonSdk(to);
-  return fromUsesCommonSdk !== toUsesCommonSdk;
+  // Different SDK type -> restart
+  if (fromUsesCommonSdk !== toUsesCommonSdk) return true;
+  // Same SDK but different transport class -> also restart
+  // (switchTransport is a no-op in hd-common-connect-sdk)
+  if (fromUsesCommonSdk && toUsesCommonSdk && from !== to) return true;
+  return false;
 };
 
 const storeConnectionType = async (value: ConnectionType) => {
@@ -83,6 +97,7 @@ const Item = ({ item, onPress, connected }: ItemProps) => {
     >
       <ListItem.Text>{item.name}</ListItem.Text>
       <ListItem.Text>{item.deviceType}</ListItem.Text>
+      {!!item.protocolType && <ListItem.Text>{item.protocolType}</ListItem.Text>}
       <ListItem.Text>{item.connectId}</ListItem.Text>
       <Button onPress={onPress}>{intl.formatMessage({ id: 'action__connect_device' })}</Button>
     </ListItem>
@@ -106,21 +121,41 @@ function DeviceListFC(
   const devices = useAtomValue(deviceListAtom);
   const setDeviceActions = useSetAtom(deviceActionsAtom);
   const [connectionType, setConnectionType] = useAtom(connectionTypeAtom);
+  const { commonParams } = useCommonParams();
 
   // Initialize connection type from storage on mount
   useEffect(() => {
     getStoredConnectionType().then(storedType => {
       if (storedType) {
         setConnectionType(storedType);
+      } else if (Platform.OS === 'web' && (window as any).desktopApi) {
+        // In Electron, default to Desktop BLE instead of Bridge
+        // to avoid axios compatibility issues in the renderer process
+        setConnectionType('desktop-web-ble');
       }
     });
   }, [setConnectionType]);
 
   const selectDevice = useCallback(
-    (device: Device | undefined) => {
+    async (device: Device | undefined) => {
+      if (!device?.connectId || !sdk) {
+        setDeviceActions({ type: 'select', payload: device });
+        return;
+      }
+
       setDeviceActions({ type: 'select', payload: device });
+
+      const stateRes = await sdk.getDeviceState(device.connectId, {
+        connectProtocol: commonParams.connectProtocol,
+      });
+      if (!stateRes.success || !stateRes.payload) return;
+
+      setDeviceActions({
+        type: 'select',
+        payload: applyDeviceStateToExampleDevice(device, stateRes.payload),
+      });
     },
-    [setDeviceActions]
+    [commonParams.connectProtocol, sdk, setDeviceActions]
   );
 
   const searchDevices = useCallback(async () => {
@@ -136,7 +171,13 @@ function DeviceListFC(
         console.warn('WebUSB request device failed:', error);
       }
     }
-    const response = await sdk.searchDevices();
+    const response = await sdk.searchDevices(
+      commonParams.connectProtocol
+        ? {
+            connectProtocol: commonParams.connectProtocol,
+          }
+        : undefined
+    );
     const foundDevices = (response.payload as unknown as Device[]) ?? [];
     setDeviceActions({ type: 'setList', payload: foundDevices });
 
@@ -149,7 +190,7 @@ function DeviceListFC(
       const device = foundDevices[0];
       selectDevice(device);
     }
-  }, [intl, sdk, selectDevice, setDeviceActions, connectionType]);
+  }, [intl, sdk, selectDevice, setDeviceActions, connectionType, commonParams.connectProtocol]);
 
   const deviceCancel = useCallback(() => {
     if (!sdk) return alert(intl.formatMessage({ id: 'tip__sdk_not_ready' }));

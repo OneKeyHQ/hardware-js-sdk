@@ -38,6 +38,10 @@ export default class SolGetAddress extends BaseMethod<SolanaGetAddress[]> {
     });
   }
 
+  getVersionRange() {
+    return {};
+  }
+
   async run() {
     const responses: SolanaAddress[] = [];
 

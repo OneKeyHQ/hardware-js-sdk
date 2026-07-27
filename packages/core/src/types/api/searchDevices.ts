@@ -1,4 +1,4 @@
 import type { SearchDevice } from '../device';
-import type { Response } from '../params';
+import type { CommonParams, Response } from '../params';
 
-export declare function searchDevices(): Response<SearchDevice[]>;
+export declare function searchDevices(params?: CommonParams): Response<SearchDevice[]>;

@@ -1,10 +1,11 @@
 import BleUtils from '@onekeyfe/react-native-ble-utils';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import { LoggerNames, getLogger } from '@onekeyfe/hd-core';
+
+import { bleLogger } from './logger';
 
 import type { Peripheral } from '@onekeyfe/react-native-ble-utils';
 
-const Logger = getLogger(LoggerNames.HdBleTransport);
+const Logger = bleLogger;
 
 /**
  * get the device basic info of connected devices
@@ -20,14 +21,17 @@ export const pairDevice = (macAddress: string) => BleUtils.pairDevice(macAddress
 
 export const onDeviceBondState = (bleMacAddress: string): Promise<Peripheral | undefined> =>
   new Promise((resolve, reject) => {
-    let timeout: any | undefined;
-
-    const cleanup = (cleanupListener: (() => void) | undefined) => {
+    const cleanup = () => {
       if (timeout) {
         clearTimeout(timeout);
       }
       if (cleanupListener) cleanupListener();
     };
+
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(ERRORS.TypedError(HardwareErrorCode.BleDeviceNotBonded, 'device is not bonded'));
+    }, 60 * 1000);
 
     const cleanupListener = BleUtils.onDeviceBondState(peripheral => {
       if (peripheral.id?.toLowerCase() !== bleMacAddress.toLowerCase()) {
@@ -35,21 +39,14 @@ export const onDeviceBondState = (bleMacAddress: string): Promise<Peripheral | u
       }
       const { bondState } = peripheral;
 
-      if (bondState.preState === 'BOND_NONE' && bondState.state === 'BOND_BONDING') {
-        timeout = setTimeout(() => {
-          cleanup(cleanupListener);
-          reject(ERRORS.TypedError(HardwareErrorCode.BleDeviceNotBonded, 'device is not bonded'));
-        }, 60 * 1000);
-      }
-
       const hasBonded = bondState.preState === 'BOND_BONDING' && bondState.state === 'BOND_BONDED';
       const hasCanceled = bondState.preState === 'BOND_BONDING' && bondState.state === 'BOND_NONE';
       Logger.debug('onDeviceBondState bondState:', bondState);
       if (hasBonded) {
-        cleanup(cleanupListener);
+        cleanup();
         resolve(peripheral);
       } else if (hasCanceled) {
-        cleanup(cleanupListener);
+        cleanup();
         reject(ERRORS.TypedError(HardwareErrorCode.BleDeviceBondedCanceled, 'bonding canceled'));
       }
     });
