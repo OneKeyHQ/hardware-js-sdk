@@ -1,8 +1,7 @@
 import type { IBLEFirmwareReleaseInfo } from '../settings';
 import type { EFirmwareType } from '@onekeyfe/hd-shared';
-import type { Features } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
-import type { IDeviceBLEFirmwareStatus, IDeviceFirmwareStatus } from '../device';
+import type { Features, IDeviceBLEFirmwareStatus, IDeviceFirmwareStatus } from '../device';
 
 export type FirmwareRelease = {
   shouldUpdate?: boolean;

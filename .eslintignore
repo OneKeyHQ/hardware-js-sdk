@@ -13,6 +13,7 @@ packages/connect-examples/react-native-demo/
 packages/connect-examples/native-android-example/
 packages/connect-examples/native-ios-example/
 packages/connect-examples/developer-portal/
+.claude/
 packages/hwk-trezor-protobuf/
 packages/hwk-trezor-protocol/
 packages/hwk-trezor-schema-utils/

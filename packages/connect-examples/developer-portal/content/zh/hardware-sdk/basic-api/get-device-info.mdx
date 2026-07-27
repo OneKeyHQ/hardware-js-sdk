@@ -1,0 +1,56 @@
+---
+title: 获取设备状态
+---
+
+# 获取设备状态
+
+`getDeviceState` 是 Protocol V1 和 Protocol V2 设备统一的正式信息接口。Pro、Pro2、Classic、Mini 和 Touch 都返回同一种 `DeviceState`；协议消息及其差异只保留在 SDK 内部。
+
+```typescript
+const response = await HardwareSDK.getDeviceState(connectId);
+```
+
+普通模式下，每次调用都会同步运行时状态：Pro2 由 SDK 读取 `DeviceStatusGet`，Protocol V1 设备刷新兼容的 `Features` 状态。bootloader 和 romloader 模式始终不会收到 `DeviceStatusGet`。
+
+## 可选 scope
+
+界面还需要设置或固件元数据时，传入对应的业务语义 scope：
+
+```typescript
+const versions = await HardwareSDK.getDeviceState(connectId, {
+  scope: 'firmware',
+});
+
+const settings = await HardwareSDK.getDeviceState(connectId, {
+  scope: 'settings',
+});
+```
+
+可用 scope 为默认的 `runtime`、`settings` 和 `firmware`。bootloader/romloader 模式下，默认与 `firmware` scope 返回可用的 `DeviceInfo`，`settings` 返回不支持错误；任何 scope 都不会向 loader 发送 `DeviceStatusGet`。
+
+## 状态分区
+
+返回快照包含：
+
+- `identity`：设备类型、ID、序列号、标签、蓝牙名称和 `displayName`。
+- `status`：模式、初始化、锁定、备份、PIN 和密码短语状态。
+- `settings`：语言、显示、安全、蓝牙和 Pro2 设置。
+- `versions`：固件、bootloader、主板、蓝牙和安全芯片版本。
+- `verification`：显式刷新后获得的 build ID 和哈希。
+
+SDK 内部的 `session` 与原始协议诊断数据不会出现在公共返回结果中。
+
+界面展示名称统一使用 `state.identity.displayName`，优先级为 `label`、`bleName`、设备型号名称。
+
+## 状态事件
+
+通过 `DEVICE.STATE` 接收更新。设置或改名成功后，SDK 会先更新状态快照，再发送完整状态事件，调用方无需额外回读。
+
+```typescript
+HardwareSDK.on(DEVICE.STATE, ({ state, revision }) => {
+  renderDevice(state.identity.displayName);
+  persistIfNewer(state, revision);
+});
+```
+
+`getFeatures` 和 `DEVICE.FEATURES` 仅用于 Protocol V1 兼容。`getDeviceInfo`、`deviceInfoGet`、`deviceStatusGet` 和 `deviceSettingsGet` 不属于公共 API。

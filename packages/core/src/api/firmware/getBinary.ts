@@ -46,7 +46,7 @@ export const getBinary = async ({
   }
 
   if (version && !semver.eq(releaseInfo.version.join('.'), version.join('.'))) {
-    const touchWithoutVersion = getDeviceType(features) === 'touch' && !features.onekey_version;
+    const touchWithoutVersion = getDeviceType(features) === 'touch' && !features.firmwareVersion;
     if (!touchWithoutVersion) {
       throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'firmware version mismatch');
     }

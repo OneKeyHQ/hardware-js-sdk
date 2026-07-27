@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "skillsDirectory": ".skillshare/skills",
+  "projectInstructionFiles": ["AGENTS.md", "CLAUDE.md"],
+  "projectMarkdownFiles": [
+    "README.md",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "docs/README.md",
+    "docs/maintenance/agent-workflow.md",
+    "docs/superpowers/README.md"
+  ],
+  "budgets": {
+    "maxDiscoverableSkills": 12,
+    "maxImplicitSkills": 6,
+    "maxTotalDescriptionCharacters": 2800,
+    "maxImplicitDescriptionCharacters": 1800,
+    "maxImplicitDescriptionCharactersPerSkill": 300,
+    "maxExplicitDescriptionCharactersPerSkill": 500,
+    "maxSkillBodyLines": 180,
+    "maxProjectInstructionBytes": 8000
+  }
+}

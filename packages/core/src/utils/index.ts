@@ -8,9 +8,11 @@ export {
   getDeviceTypeByBleName,
   getDeviceType,
   getDeviceBleName,
+  getDeviceSerialNo,
   getDeviceUUID,
   getDeviceLabel,
   getMethodVersionRange,
+  isMethodVersionRangeUnsupported,
   getFirmwareType,
 } from './deviceInfoUtils';
 export {
@@ -28,7 +30,24 @@ export {
   checkNeedUpdateBootForTouch,
   checkNeedUpdateBootForClassicAndMini,
 } from '../api/firmware/updateBootloader';
-export { getLanguageConfig, getAutoLockOptions, getAutoShutDownOptions } from './deviceSettings';
+export {
+  DEVICE_SETTINGS_SHARED_FIELDS,
+  DEVICE_SETTINGS_V1_ONLY_FIELDS,
+  DEVICE_SETTINGS_V2_ONLY_FIELDS,
+  PROTOCOL_V2_NEVER_TIMEOUT_MS,
+  getAutoLockOptions,
+  getAutoShutDownOptions,
+  getDeviceSettingsCapabilities,
+  getLanguageConfig,
+  normalizeSafetyCheckLevel,
+} from './deviceSettings';
+export type {
+  DeviceSettingsCapabilities,
+  DeviceSettingsDurationOption,
+  DeviceSettingsField,
+  DeviceSettingsProtocol,
+  DeviceSettingsValueOption,
+} from './deviceSettings';
 
 // Helpers utils
 
@@ -37,6 +56,8 @@ export { getHDPath, getScriptType, getOutputScriptType } from '../api/helpers/pa
 export const isBleConnect = (env: string) => env === 'react-native' || env === 'lowlevel';
 
 export { getHomeScreenHex, getHomeScreenDefaultList, getHomeScreenSize } from './homescreen';
+export { encodePro2Wallpaper, PRO2_WALLPAPER_HEIGHT, PRO2_WALLPAPER_WIDTH } from './pro2Wallpaper';
+export type { Pro2WallpaperColorFormat } from './pro2Wallpaper';
 
 export const wait = (ms: number) =>
   new Promise(resolve => {

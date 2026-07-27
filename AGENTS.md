@@ -1,73 +1,122 @@
-# OneKey Hardware SDK - Codex 文档指引
+# OneKey Hardware JS SDK Agent Instructions
 
-## 📚 Context7 文档支持
+This repository is a TypeScript monorepo for hardware-wallet communication across WebUSB,
+Electron BLE, React Native BLE, Node USB, HTTP bridge, low-level plugins, and emulators. Keep
+changes typed, backward compatible, transport-aware, and safe for physical devices.
 
-本项目已在 Context7 上索引，可通过 MCP 工具获取最新文档和代码示例：
+## Start With Scope
 
-```json
-{
-  "url": "https://context7.com/onekeyhq/hardware-js-sdk",
-  "library_id": "/onekeyhq/hardware-js-sdk"
-}
-```
+Before analyzing or changing hardware behavior, state:
 
-**使用方法**：
-- 使用 `mcp__context7__get-library-docs` 工具获取文档
-- Library ID: `/onekeyhq/hardware-js-sdk`
-- 可指定 topic 参数聚焦特定主题，如 `transport`、`signing`、`bip39` 等
+- Target runtime and transport: browser WebUSB, Electron BLE, React Native BLE, Node USB,
+  bridge, low-level plugin, or emulator.
+- Device family and protocol: Classic/Mini/Touch/Pro with Protocol V1, Pro2 with Protocol V2,
+  or both.
+- Connection phase: discovery, acquire, probe, initialize, call, reconnect, release, or dispose.
+- Expected behavior, current failure, non-passing condition, and final pass condition.
 
-## 📁 问题分流指引
+Use [docs/README.md](./docs/README.md) as the documentation index. Read only the documents
+relevant to the task.
 
-根据问题类型，请参考对应的专业文档：
+## Code Quality
 
-### 🔌 连接与传输问题
-**症状**: WebUSB权限错误、设备连接失败、传输超时
-- 📖 **参考**: [docs/transport.md](./docs/transport.md)
-- 🤖 **Agent**: hardware-sdk-expert
+- Keep TypeScript precise. Avoid unnecessary `any`, unsafe casts, floating promises, and
+  unjustified `@ts-ignore` or lint suppression.
+- Write comments in English and only for non-obvious protocol, security, compatibility, or
+  platform behavior.
+- Keep platform-specific behavior in its transport or adapter instead of adding global runtime
+  assumptions.
+- Preserve existing code and public surfaces unless removal is required by the request.
+- Do not commit code that fails the relevant lint, test, or build checks.
 
-### ⛓️ 区块链集成问题
-**症状**: 签名失败、地址生成错误、交易构建问题
-- 📖 **参考**: [docs/chain.md](./docs/chain.md)
-- 🤖 **Agent**: hardware-sdk-expert
+## Architecture Boundaries
 
-### 🔐 助记词与密钥管理
-**症状**: SLIP39恢复失败、密钥派生错误、种子生成问题
-- 📖 **参考**: [docs/slip39.md](./docs/slip39.md)
-- 🤖 **Agent**: hardware-sdk-expert
+- `packages/hd-transport` owns protobuf loading, protocol encoding/decoding, framing, sessions,
+  sequence handling, timeouts, and shared link lifecycle.
+- Platform transport packages own physical discovery, connection, reads/writes, notifications,
+  endpoint/characteristic handling, and platform error mapping.
+- `packages/core` owns Device lifecycle, public methods, wallet sessions, state mapping, events,
+  unlock coordination, firmware orchestration, and public compatibility.
+- Entry SDKs select and configure transports; they must not duplicate protocol state machines.
+- Keep the legacy `hd-*` stack and the `hwk-*` adapter stack within their existing package
+  boundaries. Do not introduce a new cross-stack dependency without an architecture review.
 
-### 🏗️ 架构与开发问题
-**症状**: 构建失败、依赖问题、monorepo结构疑问
-- 📖 **参考**: [docs/architecture.md](./docs/architecture.md)
-- 🤖 **Agent**: hardware-sdk-expert
+See [architecture overview](./docs/architecture/overview.md) and
+[architecture decisions](./docs/architecture/decisions.md).
 
-### 🤖 AI Agent 集成 / CLI 使用
-**症状**: CLI 命令使用、Agent Skill 配置、链支持查询
-- 📖 **文档**: developer-portal 的 `agent-integration.mdx`
-- 🔧 **`@onekeyfe/cli`**（`onekey` 命令）— 全功能钱包 CLI：`auth login` 选择登录方式（mnemonic / app-transfer / hardware），`balance` / `transfer` / `swap` / `device ...` 等业务命令登录后自动沿用该模式
-- 🔧 **`@onekeyfe/hardware-cli`**（`onekey-hw` 命令）— 纯硬件钱包 CLI，AI Agent 直连设备优先选它
+## Protocol And Transport Safety
 
-如果你要**通过 `onekey` CLI 使用硬件钱包**：
-```bash
-npm install -g @onekeyfe/cli
+- Detect protocol from an active device response. Never infer V1/V2 only from PID, product name,
+  BLE name, or USB descriptor.
+- Preserve Protocol V1 behavior when adding Protocol V2 support, and test both when shared code
+  changes.
+- Keep Protocol V2 calls serialized per device. Do not reset or reuse sequence numbers across an
+  ordinary reconnect.
+- Treat timeout, disconnect, I/O, generation, framing, CRC, and sequence failures as link-fatal.
+- Do not automatically replay commands with side effects. Retry only where Core has established
+  idempotency.
+- Invalidate reads and notifications from an old connection generation before accepting new data.
 
-# Step 1：登录时选择硬件模式（--hardware 只在 auth login 上有）
-onekey auth login --hardware
+See [Protocol V1/V2 transport](./docs/protocol/protocol-v1-v2.md).
 
-# Step 2：登录后的业务命令不需要再加 flag，自动走硬件钱包
-onekey balance --chain eth
-onekey device search
-onekey device firmware
-```
+## Device And Wallet Security
 
-如果要**只调硬件操作、不走 onekey 账户体系**（更轻、AI Agent 场景友好）：
-```bash
-npm install -g @onekeyfe/hardware-cli
-onekey-hw search
-onekey-hw get-address --chain evm --use-empty-passphrase
-```
+- Never commit, print, log, snapshot, or place in fixtures: mnemonics, seeds, private keys, xprv,
+  PINs, passphrases, wallet session IDs, raw signing payloads, or other sensitive device data.
+- Never bypass device confirmation, permission prompts, PIN/passphrase flows, unlock policies,
+  transaction verification, or firmware authenticity checks.
+- Do not expose internal wallet sessions or raw protocol state through public APIs or events.
+- Cryptography, derivation paths, signing serialization, secure-channel code, and unlock/session
+  changes require focused tests and security review.
+- Use deterministic, protocol-defined serialization for hashes and signatures. Do not replace it
+  with ad hoc `JSON.stringify()`.
 
-## 🤖 专业Agent
+See [wallet session and security](./docs/device/wallet-session-and-security.md).
 
-**hardware-sdk-expert** - 硬件SDK架构专家
-- 擅长：三层架构分析、WebUSB/BLE协议、BIP32/BIP39/SLIP39
-- 工作方式：优先查阅相关文档，然后进行代码分析
+## Firmware, Protobuf, And Generated Files
+
+- Protocol V2 protobuf source of truth is
+  `submodules/firmware-pro2/sys/protobuf/onekey_protocol/latest/`.
+- Update schemas and types through `yarn update-protobuf`; do not hand-edit generated outputs.
+- Keep transport schema, Core schema/mapping, generated types, tests, and relevant docs in the
+  same change.
+- Do not move firmware submodule pointers, switch firmware branches, or include unrelated firmware
+  changes unless the task explicitly requires it.
+- Firmware install, device wipe, bootloader operations, and physical-device mutation require
+  explicit user authorization and an identified target device.
+
+## Compatibility
+
+- Treat exported APIs, TypeScript types, event names and payloads, error codes, transport
+  selection, and package entry points as compatibility surfaces.
+- Prefer additive changes. Document and test intentional breaking changes.
+- Keep all published package versions aligned and run `yarn check-versions` for release work.
+- Do not modify generated build output or `dist/`.
+
+## Debugging And Logging
+
+- Reproduce before editing. If a fix attempt fails, revisit the layer ownership and root cause.
+- Use one stable, filterable debug prefix and remove temporary logs before shipping.
+- Log small non-sensitive scalars and state transitions, not complete descriptors, requests,
+  responses, byte buffers, or wallet/device objects.
+- Element discovery or connection alone is not proof. Verify protocol, initialized state, real
+  request/response behavior, cleanup, and relevant error/log evidence.
+
+## Git And Validation
+
+- The base branch is `onekey`; never make feature changes directly on it.
+- Preserve unrelated user changes and submodule state.
+- Commit format is `type: short description`; do not add tool attribution or `Co-Authored-By`.
+- Before commit run `yarn agent:check --profile commit`.
+- Before PR readiness run `yarn agent:check --profile pr`.
+- Use the compact summary first; detailed logs are under `node_modules/.cache/agent-checks`.
+- Prefer focused package tests/builds while iterating; do not use a passing full build as a
+  substitute for transport- or protocol-specific tests.
+- Publishing packages, pushing, creating a PR, enabling auto-merge, installing firmware, or
+  wiping a device must be explicitly requested.
+
+## Agent Knowledge
+
+Detailed workflows live under `.skillshare/skills`; do not duplicate their content here.
+Operational or destructive skills must be invoked explicitly. Keep durable technical facts in
+`docs/`, and keep skills focused on procedure, routing, and validation.

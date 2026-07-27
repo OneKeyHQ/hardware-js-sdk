@@ -167,8 +167,8 @@ passphrase 本身。
 
 - 作为 `passphraseState` 通用参数传给后续所有需要绑在这个隐藏钱包上的 SDK
   调用。
-- 跨进程复用：持久化 `(deviceId, passphraseState, session_id)` 三元组，进程
-  启动时调 `preloadSessionCache` 恢复 session。
+- 使用 `deviceId + passphraseState` 持久化钱包身份；`session_id` 由 SDK
+  内部 Store 管理，不进入应用接口。
 - 清掉缓存的 `passphraseState` **不会**让隐藏钱包失效 —— 用户再输一次同样的
   passphrase 就能复现出相同的钱包。
 
@@ -176,7 +176,7 @@ passphrase 本身。
 | --- | --- | --- |
 | 生命周期 | 锁屏前 | 事实上永久（passphrase 不变就不变）|
 | 是否确定性 | 每次会话随机 | 按 passphrase 确定性 |
-| 角色 | 保持设备侧 session 有效 | 指明"是哪一个隐藏钱包" |
+| 角色 | SDK 内部设备 Session 句柄 | 公共隐藏钱包标识 |
 
 ## 实例拼装
 

@@ -18,7 +18,7 @@ autoUpdater.logger = log;
 const isMac = process.platform === 'darwin';
 const isWin = process.platform === 'win32';
 
-const APP_NAME = 'OneKey Example';
+const APP_NAME = 'OneKey Electron Demo';
 app.name = APP_NAME;
 let mainWindow: BrowserWindow | null;
 

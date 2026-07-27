@@ -65,6 +65,55 @@ function getHardwareSDKInstance() {
 }
 
 let runPromise;
+let receiveQueue = [];
+let protocolV2Buffer = [];
+let protocolV2ExpectedLength = 0;
+
+function resolveReceive(hexString) {
+  if (runPromise) {
+    const current = runPromise;
+    runPromise = undefined;
+    current.resolve(hexString);
+    return;
+  }
+  receiveQueue.push(hexString);
+}
+
+function resetProtocolV2Buffer() {
+  protocolV2Buffer = [];
+  protocolV2ExpectedLength = 0;
+}
+
+function handleProtocolV2Chunk(data) {
+  protocolV2Buffer = protocolV2Buffer.concat([...data]);
+
+  if (protocolV2ExpectedLength === 0 && protocolV2Buffer.length >= 3) {
+    if (protocolV2Buffer[0] !== 0x5a) {
+      resetProtocolV2Buffer();
+      return;
+    }
+    protocolV2ExpectedLength = protocolV2Buffer[1] | (protocolV2Buffer[2] << 8);
+  }
+
+  while (protocolV2ExpectedLength > 0 && protocolV2Buffer.length >= protocolV2ExpectedLength) {
+    const frame = Buffer.from(protocolV2Buffer.slice(0, protocolV2ExpectedLength));
+    protocolV2Buffer = protocolV2Buffer.slice(protocolV2ExpectedLength);
+    protocolV2ExpectedLength = 0;
+    resolveReceive(frame.toString("hex"));
+
+    if (protocolV2Buffer.length === 0) {
+      return;
+    }
+
+    if (protocolV2Buffer.length >= 3 && protocolV2Buffer[0] === 0x5a) {
+      protocolV2ExpectedLength = protocolV2Buffer[1] | (protocolV2Buffer[2] << 8);
+    } else {
+      resetProtocolV2Buffer();
+      return;
+    }
+  }
+}
+
 function createLowlevelPlugin() {
   const plugin = {
     enumerate: () => {
@@ -84,6 +133,10 @@ function createLowlevelPlugin() {
     },
     receive: () => {
       return new Promise((resolve) => {
+        if (receiveQueue.length > 0) {
+          resolve(receiveQueue.shift());
+          return;
+        }
         runPromise = createDeferred();
         const response = runPromise.promise;
         resolve(response);
@@ -200,16 +253,16 @@ function registerBridgeHandler() {
     }
   });
 
-  // Keep the original monitorCharacteristic handler
   let bufferLength = 0;
   let buffer = [];
   bridge.registerHandler("monitorCharacteristic", async (hexString) => {
-    if (!runPromise) {
-      console.log("runPromise is not initialized, maybe not call receive");
-      return;
-    }
     try {
       const data = Buffer.from(hexString, "hex");
+      if (protocolV2Buffer.length > 0 || data[0] === 0x5a) {
+        handleProtocolV2Chunk(data);
+        return;
+      }
+
       if (isHeaderChunk(data)) {
         bufferLength = data.readInt32BE(5);
         buffer = [...data.subarray(3)];
@@ -218,18 +271,13 @@ function registerBridgeHandler() {
       }
       if (buffer.length - COMMON_HEADER_SIZE >= bufferLength) {
         const value = Buffer.from(buffer);
-        console.log(
-          "[onekey-js-bridge] Received a complete packet of data, resolve Promise, ",
-          "buffer: ",
-          value
-        );
         bufferLength = 0;
         buffer = [];
-        runPromise.resolve(value.toString("hex"));
+        resolveReceive(value.toString("hex"));
       }
     } catch (e) {
       console.log("monitor data error: ", e);
-      runPromise.reject(e);
+      runPromise?.reject(e);
     }
   });
 }

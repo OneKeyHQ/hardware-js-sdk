@@ -117,6 +117,8 @@ export async function setupBle() {
 }
 ```
 
+React Native BLE transport 会在连接后自动探测 Protocol V1 / Protocol V2。Protocol V2 设备使用 `0x5A` frame、BLE UART router 和 CRC8 校验；这些 encode/decode、frame 重组和 CRC8 校验都由 SDK 内部处理，应用层不需要实现 CRC8 查表或手动选择协议。
+
 ## 发现设备并识别 device_id
 
 ```ts
@@ -153,6 +155,7 @@ if (res.success) {
 ## 提示
 
 - 始终尽早订阅 `UI_EVENT`，以免 PIN/密码短语/确认阻塞请求。参见 [配置事件](/zh/hardware-sdk/core-api-guide#events-ui)。
+- 不要在 React Native 应用层重写 BLE 分包或 CRC8。只要使用 `@onekeyfe/hd-ble-sdk`，Protocol V2 的 `0x5A` frame 和 CRC8 都由 transport 层维护。
 - 保持 BLE 权限与操作系统版本同步。在物理设备上测试。
 - 更多示例请查看：[react-native-demo](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/react-native-demo)
 

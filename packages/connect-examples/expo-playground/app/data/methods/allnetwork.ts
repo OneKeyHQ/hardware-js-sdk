@@ -15,6 +15,11 @@ const api: UnifiedMethodConfig[] = [
 
             value: [
               {
+                network: 'btc',
+                path: "m/44'/0'/0'/0/0",
+                showOnOneKey: false,
+              },
+              {
                 network: 'tbtc',
                 path: "m/44'/1'/0'/0/0",
                 showOnOneKey: false,
@@ -22,6 +27,16 @@ const api: UnifiedMethodConfig[] = [
               {
                 network: 'ltc',
                 path: "m/44'/2'/0'/0/0",
+                showOnOneKey: false,
+              },
+              {
+                network: 'ltc',
+                path: "m/49'/2'/0'/0/0",
+                showOnOneKey: false,
+              },
+              {
+                network: 'ltc',
+                path: "m/84'/2'/0'/0/0",
                 showOnOneKey: false,
               },
               {
@@ -37,6 +52,11 @@ const api: UnifiedMethodConfig[] = [
               {
                 network: 'doge',
                 path: "m/44'/3'/0'/0/0",
+                showOnOneKey: false,
+              },
+              {
+                network: 'doge',
+                path: "m/48'/3'/0'/0/0",
                 showOnOneKey: false,
               },
               {
@@ -196,6 +216,11 @@ const api: UnifiedMethodConfig[] = [
                 showOnOneKey: false,
               },
               {
+                network: 'scdo',
+                path: "m/44'/541'/0'/0/0",
+                showOnOneKey: false,
+              },
+              {
                 network: 'ton',
                 path: "m/44'/607'/0'",
                 walletVersion: 3,
@@ -204,8 +229,216 @@ const api: UnifiedMethodConfig[] = [
                 showOnOneKey: false,
               },
               {
+                network: 'alph',
+                path: "m/44'/1234'/0'/0/0",
+                includePublicKey: true,
+                showOnOneKey: false,
+                group: 0,
+              },
+              {
                 network: 'nostr',
                 path: "m/44'/1237'/0'/0/0",
+                showOnOneKey: false,
+              },
+              {
+                network: 'neo',
+                path: "m/44'/888'/0'/0/0",
+                showOnOneKey: false,
+              },
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Batch ADA Get Address',
+        parameters: [
+          {
+            name: 'bundle',
+            type: 'textarea',
+            value: [
+              {
+                network: 'ada',
+                path: "m/1852'/1815'/0'",
+                showOnOneKey: false,
+              },
+              {
+                network: 'dynex',
+                path: "m/44'/29538'/0'/0'/0'",
+                showOnOneKey: false,
+              },
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Batch Bitcoin Variant Get Address',
+        parameters: [
+          {
+            name: 'bundle',
+            type: 'textarea',
+            value: [
+              {
+                network: 'btc',
+                path: "m/44'/0'/0'/0/0",
+                showOnOneKey: false,
+              },
+              {
+                network: 'tbtc',
+                path: "m/44'/1'/0'/0/0",
+                showOnOneKey: false,
+              },
+              {
+                network: 'ltc',
+                path: "m/44'/2'/0'/0/0",
+                showOnOneKey: false,
+              },
+              {
+                network: 'bch',
+                path: "m/44'/145'/0'/0/0",
+                showOnOneKey: false,
+              },
+              {
+                network: 'neurai',
+                path: "m/44'/1900'/0'/0/0",
+                showOnOneKey: false,
+              },
+              {
+                network: 'doge',
+                path: "m/44'/3'/0'/0/0",
+                showOnOneKey: false,
+              },
+              {
+                network: 'btc',
+                chainName: 'bitcoin',
+                path: "m/44'/0'/0'/0/0",
+                showOnOneKey: false,
+              },
+              {
+                network: 'btc',
+                chainName: 'testnet',
+                path: "m/44'/1'/0'/0/0",
+                showOnOneKey: false,
+              },
+              {
+                network: 'btc',
+                chainName: 'litecoin',
+                path: "m/44'/2'/0'/0/0",
+                showOnOneKey: false,
+              },
+              {
+                network: 'btc',
+                chainName: 'bcash',
+                path: "m/44'/145'/0'/0/0",
+                showOnOneKey: false,
+              },
+              {
+                network: 'btc',
+                chainName: 'neurai',
+                path: "m/44'/1900'/0'/0/0",
+                showOnOneKey: false,
+              },
+              {
+                network: 'btc',
+                chainName: 'dogecoin',
+                path: "m/44'/3'/0'/0/0",
+                showOnOneKey: false,
+              },
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Batch Bitcoin Get Address',
+        parameters: [
+          {
+            name: 'bundle',
+            type: 'textarea',
+            value: [
+              ...Array.from({ length: 10 }, (_, i) => ({
+                network: 'btc',
+                path: `m/44'/0'/0'/0/${i}`,
+                showOnOneKey: false,
+              })),
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Batch Ethereum Get Address',
+        parameters: [
+          {
+            name: 'bundle',
+            type: 'textarea',
+            value: [
+              ...Array.from({ length: 10 }, (_, i) => ({
+                network: 'evm',
+                path: `m/44'/60'/0'/0/${i}`,
+                showOnOneKey: false,
+              })),
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Batch Get Address For Soft Gen Xpub',
+        parameters: [
+          {
+            name: 'bundle',
+            type: 'textarea',
+            value: [
+              {
+                network: 'btc',
+                path: "m/44'/0'/0'/0/0",
+                showOnOneKey: false,
+              },
+              {
+                network: 'btc',
+                path: "m/48'/0'/0'/0/0",
+                showOnOneKey: false,
+              },
+              {
+                network: 'btc',
+                path: "m/49'/0'/0'/0/0",
+                showOnOneKey: false,
+              },
+              {
+                network: 'btc',
+                path: "m/84'/0'/0'/0/0",
+                showOnOneKey: false,
+              },
+              {
+                network: 'btc',
+                path: "m/86'/0'/0'/0/0",
+                showOnOneKey: false,
+              },
+              {
+                network: 'ltc',
+                path: "m/44'/2'/0'/0/0",
+                showOnOneKey: false,
+              },
+              {
+                network: 'ltc',
+                path: "m/48'/2'/0'/0/0",
+                showOnOneKey: false,
+              },
+              {
+                network: 'ltc',
+                path: "m/49'/2'/0'/0/0",
+                showOnOneKey: false,
+              },
+              {
+                network: 'ltc',
+                path: "m/84'/2'/0'/0/0",
+                showOnOneKey: false,
+              },
+              {
+                network: 'doge',
+                path: "m/44'/3'/0'/0/0",
+                showOnOneKey: false,
+              },
+              {
+                network: 'doge',
+                path: "m/48'/3'/0'/0/0",
                 showOnOneKey: false,
               },
             ],
@@ -215,6 +448,14 @@ const api: UnifiedMethodConfig[] = [
     ],
   },
 ];
+
+api.push({
+  method: 'allNetworkGetAddressByLoop',
+  description: 'Get addresses with real-time callback for each generated address',
+  presets: api[0].presets.map(item => ({
+    ...item,
+  })),
+});
 
 // 导出链配置对象
 export const allnetwork: {

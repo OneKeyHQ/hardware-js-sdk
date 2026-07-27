@@ -9,9 +9,8 @@ import type { TonSignDataParams } from '../../types/api/tonSignData';
 
 export default class TonSignData extends BaseMethod<HardwareTonSignData> {
   init() {
-    // Keep strict-check off until the firmware release that ships TonSignData
-    // is decided — we don't yet know the min versions for touch/classic1s.
-    // Flip back to true and add getVersionRange() once those numbers land.
+    // Keep strict-check off for touch/classic1s until their firmware release
+    // versions are decided. Pro2 is explicitly allowed by getVersionRange().
     this.strictCheckDeviceSupport = false;
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
@@ -49,6 +48,10 @@ export default class TonSignData extends BaseMethod<HardwareTonSignData> {
       is_bounceable: this.payload.isBounceable,
       is_testnet_only: this.payload.isTestnetOnly,
     };
+  }
+
+  getVersionRange() {
+    return {};
   }
 
   async run() {

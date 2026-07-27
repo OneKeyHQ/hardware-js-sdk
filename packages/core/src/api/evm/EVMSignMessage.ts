@@ -36,7 +36,7 @@ export default class EVMSignMessage extends BaseMethod<EthereumSignMessageOneKey
   }
 
   async run() {
-    if (TransportManager.getMessageVersion() === 'v1') {
+    if (TransportManager.getProtocolV1MessageSchema() === 'v1LegacySchema') {
       return signMessageLegacyV1({
         typedCall: this.device.commands.typedCall.bind(this.device.commands),
         params: this.params,

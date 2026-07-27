@@ -6,7 +6,20 @@ title: 获取密码短语状态
 
 ## 获取设备的 passphraseState
 
-请求此 API 将提示用户输入密码短语。此方法将返回一个字符串结果，可用作后续 API 的 `passphraseState` 请求参数。SDK 会将此参数与用户的输入进行比较。如果结果匹配，参数将被缓存以减少用户输入并改善用户体验。
+提示用户输入密码短语（在设备上或通过软件输入），然后返回包含 `passphrase_state` 的设备会话信息 — 一个由密码短语派生的设备端会话标识符。
+
+将 `passphrase_state` 的值作为 `passphraseState` 传入后续 API 调用。设备会识别活跃会话并跳过密码短语提示，用户每次会话只需输入一次密码短语。
+
+```
+会话流程:
+  getPassphraseState(connectId)   ← 用户输入一次密码短语
+    → { passphrase_state: "abc123", session_id: "...", passphrase_protection: true }
+
+  evmGetAddress(..., { passphraseState: "abc123" })  ← 无需再次输入
+  btcGetAddress(..., { passphraseState: "abc123" })  ← 无需再次输入
+```
+
+> **错误 112（设备密码短语状态错误）**：会话已过期（例如设备锁定后重新解锁，或种子已更改）。重新调用 `getPassphraseState` 获取新的状态，然后重试。你可以通过在 API 调用中传入 `skipPassphraseCheck: true` 来避免错误 112 — 此时 SDK 会触发 `REQUEST_PASSPHRASE` 事件，让你的事件处理器重新提示用户。
 
 ```typescript
 const response = await HardwareSDK.getPassphraseState(connectId);
@@ -16,18 +29,32 @@ const response = await HardwareSDK.getPassphraseState(connectId);
 
 [**可选通用参数**](/zh/hardware-sdk/core-api-guide#common-params)
 
+| 名称 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `allowCreateAttachPin` | `boolean` | 否 | 为 `true` 时，允许设备为密码短语会话创建新的 attach-PIN 绑定。适用于首次设置隐藏钱包。 |
+
 ### 示例
 
 ```typescript
 const response = await HardwareSDK.getPassphraseState(connectId);
+
+if (response.success) {
+  const { passphrase_state, session_id, passphrase_protection } = response.payload;
+  // 在后续调用中使用 passphrase_state
+}
 ```
 
 ### 返回结果
 
-```
+```typescript
 {
     success: true,
-    payload: string
+    payload: {
+        passphrase_state: string | undefined,   // 会话标识符 — 在后续调用中作为 passphraseState 传入
+        session_id: string | undefined,          // 设备会话 ID
+        unlocked_attach_pin: boolean | undefined, // attach-PIN 是否已解锁
+        passphrase_protection: boolean | null     // 设备是否启用了密码短语保护
+    }
 }
 ```
 

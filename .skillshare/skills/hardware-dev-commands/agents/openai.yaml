@@ -1,0 +1,6 @@
+interface:
+  display_name: 'Hardware Dev Commands'
+  short_description: 'SDK development, build, test, and validation commands'
+  default_prompt: 'Use $hardware-dev-commands to choose the correct Hardware SDK command.'
+policy:
+  allow_implicit_invocation: true

@@ -4,7 +4,7 @@ import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
 
 import type { StellarGetAddress as HardwareStellarGetAddress } from '@onekeyfe/hd-transport';
-import type { StellarAddress, StellarGetAddressParams } from '../../types';
+import type { DeviceFirmwareRange, StellarAddress, StellarGetAddressParams } from '../../types';
 
 export default class StellarGetAddress extends BaseMethod<HardwareStellarGetAddress[]> {
   hasBundle = false;
@@ -36,6 +36,15 @@ export default class StellarGetAddress extends BaseMethod<HardwareStellarGetAddr
         show_display: showOnOneKey,
       });
     });
+  }
+
+  getVersionRange(): DeviceFirmwareRange {
+    return {
+      pro2: {
+        min: '0.0.0',
+        unsupported: true,
+      },
+    };
   }
 
   async run() {

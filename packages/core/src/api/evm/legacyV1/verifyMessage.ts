@@ -7,13 +7,15 @@ export default async function ({
   typedCall: TypedCall;
   params: EthereumVerifyMessageOneKey;
 }): Promise<Success> {
-  const res = await typedCall('EthereumVerifyMessage', 'Success', {
+  // The generated legacy type omits chain_id, but old firmware accepts the OneKey
+  // extension. A non-fresh object preserves that runtime field without a type cast.
+  const message = {
     signature: params.signature,
     message: params.message,
     address: params.address,
-    // @ts-ignore
     chain_id: params.chain_id,
-  });
+  };
+  const res = await typedCall('EthereumVerifyMessage', 'Success', message);
 
   return Promise.resolve(res.message);
 }

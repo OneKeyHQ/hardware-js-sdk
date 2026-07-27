@@ -14,7 +14,7 @@ import { uploadFirmware } from './firmware/uploadFirmware';
 import { createUiMessage } from '../events';
 import { DeviceModelToTypes, type KnownDevice } from '../types';
 import { isEnteredManuallyBoot } from './firmware/bootloaderHelper';
-import { LoggerNames, getDeviceType, getDeviceUUID, getLogger, wait } from '../utils';
+import { LoggerNames, getLogger, wait } from '../utils';
 import { DataManager } from '../data-manager';
 import { DevicePool } from '../device/DevicePool';
 
@@ -92,7 +92,7 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
               true
             );
             await this.device.initialize();
-            if (this.device.features?.bootloader_mode) {
+            if (this.device.isBootloader()) {
               clearInterval(intervalTimer);
               this.checkPromise?.resolve(true);
             }
@@ -105,7 +105,7 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
           const devicesDescriptor = deviceDiff?.descriptors ?? [];
           const { deviceList } = await DevicePool.getDevices(devicesDescriptor, connectId);
 
-          if (deviceList.length === 1 && deviceList[0]?.features?.bootloader_mode) {
+          if (deviceList.length === 1 && deviceList[0]?.isBootloader()) {
             // should update current device from cache
             // because device was reboot and had some new requests
             this.device.updateFromCache(deviceList[0]);
@@ -131,10 +131,18 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
   async run() {
     const { device, params } = this;
     const { features, commands } = device;
-    const deviceType = getDeviceType(features);
+    const deviceType = device.getCurrentDeviceType();
 
-    if (!features?.bootloader_mode && features) {
-      const uuid = getDeviceUUID(features);
+    // Protocol V2 (Pro2) uses DeviceFirmwareUpdate and must not enter this legacy flow.
+    if (device.isProtocolV2()) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        'Protocol V2 firmware update must use firmwareUpdateV4'
+      );
+    }
+
+    if (!device.isBootloader() && features) {
+      const serialNo = device.getCurrentSerialNo();
       // should go to bootloader mode manually
       if (isEnteredManuallyBoot(features, params.updateType)) {
         return Promise.reject(ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateManuallyEnterBoot));
@@ -153,7 +161,7 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
 
         // force clean classic device cache so that the device can initialize again
         if (DeviceModelToTypes.model_classic.includes(deviceType)) {
-          DevicePool.clearDeviceCache(uuid);
+          DevicePool.clearDeviceCache(serialNo);
         }
         delete DevicePool.devicesCache[''];
         await this.checkPromise?.promise;

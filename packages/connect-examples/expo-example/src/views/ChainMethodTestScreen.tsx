@@ -14,8 +14,8 @@ export default function ChainMethodTestScreen() {
 
   return (
     <PageView>
-      <DeviceProvider>
-        <CommonParamsProvider>
+      <CommonParamsProvider>
+        <DeviceProvider>
           <HardwareInputPinDialogProvider>
             <Stack>
               <PanelView title={intl.formatMessage({ id: 'tab__chain_method_test' })}>
@@ -23,8 +23,8 @@ export default function ChainMethodTestScreen() {
               </PanelView>
             </Stack>
           </HardwareInputPinDialogProvider>
-        </CommonParamsProvider>
-      </DeviceProvider>
+        </DeviceProvider>
+      </CommonParamsProvider>
     </PageView>
   );
 }

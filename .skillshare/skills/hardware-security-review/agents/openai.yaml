@@ -1,0 +1,6 @@
+interface:
+  display_name: 'Hardware Security Review'
+  short_description: 'Review sensitive hardware wallet security boundaries'
+  default_prompt: 'Use $hardware-security-review to audit a hardware SDK change for security regressions.'
+policy:
+  allow_implicit_invocation: false

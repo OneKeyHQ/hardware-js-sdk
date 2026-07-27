@@ -1,5 +1,6 @@
 export const IOS_PACKET_LENGTH = 128;
 export const ANDROID_PACKET_LENGTH = 192;
+export const ANDROID_DEFAULT_MTU = 23;
 
 type BluetoothServices = Record<
   string,
@@ -35,9 +36,32 @@ export const getInfosForServiceUuid = (serviceUuid: string, deviceType: 'classic
   if (!services) {
     return null;
   }
-  const service = services[serviceUuid];
+  const normalizedServiceUuid = normalizeBleUuid(serviceUuid);
+  const service =
+    services[serviceUuid] ??
+    Object.values(services).find(
+      item => normalizeBleUuid(item.serviceUuid) === normalizedServiceUuid
+    );
   if (!service) {
     return null;
   }
   return service;
+};
+
+export const normalizeBleUuid = (uuid?: string | null) =>
+  (uuid ?? '').replace(/-/g, '').toLowerCase();
+
+export const getBleUuidKey = (uuid?: string | null) => {
+  const normalized = normalizeBleUuid(uuid);
+  return normalized.length >= 8 ? normalized.substring(4, 8) : normalized;
+};
+
+export const isSameBleUuid = (left?: string | null, right?: string | null) => {
+  const normalizedLeft = normalizeBleUuid(left);
+  const normalizedRight = normalizeBleUuid(right);
+
+  return (
+    normalizedLeft === normalizedRight ||
+    (getBleUuidKey(left) !== '' && getBleUuidKey(left) === getBleUuidKey(right))
+  );
 };

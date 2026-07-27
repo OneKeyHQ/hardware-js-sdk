@@ -1,11 +1,19 @@
 import { HardwareErrorCode } from './HardwareError';
 
+export const HARDWARE_CONNECT_PROTOCOL = {
+  V1: 'V1',
+  V2: 'V2',
+} as const;
+
+export type HardwareConnectProtocol =
+  (typeof HARDWARE_CONNECT_PROTOCOL)[keyof typeof HARDWARE_CONNECT_PROTOCOL];
+
 export const ONEKEY_WEBUSB_FILTER = [
   { vendorId: 0x1209, productId: 0x53c0 }, // Classic Boot、Classic1s Boot、Mini Boot
-  { vendorId: 0x1209, productId: 0x53c1 }, // Classic Firmware、Classic1s Firmware、Mini Firmware、Pro Firmware、Touch Firmware
-  { vendorId: 0x1209, productId: 0x4f4a }, // Pro Boot、Touch Boot
-  { vendorId: 0x1209, productId: 0x4f4b }, // Pro Firmware、Touch Firmware（Not implemented Trezor）
-  // { vendorId: 0x1209, productId: 0x4f4c }, // Pro Board
+  { vendorId: 0x1209, productId: 0x53c1 }, // Classic/Classic1s/Mini/Pro/Touch firmware and legacy Pro2; keep for existing devices
+  { vendorId: 0x1209, productId: 0x4f4a }, // Pro bootloader, Touch bootloader, Pro2
+  { vendorId: 0x1209, productId: 0x4f4b }, // Pro/Touch firmware (Trezor not implemented), Pro2
+  { vendorId: 0x1209, productId: 0x4f4c }, // Pro board and Pro2 with the new firmware PID
   // { vendorId: 0x1209, productId: 0x4f50 }, // Touch Board
 ];
 
@@ -137,6 +145,12 @@ export const isOnekeyDevice = (name: string | null, id?: string): boolean => {
     return false;
   }
   if (normalizedName.startsWith('onekey') || normalizedName.startsWith('bixinkey')) return true;
-  if (normalizedName.startsWith('touch ') || normalizedName.startsWith('pro ')) return true;
+  if (
+    normalizedName.startsWith('touch ') ||
+    normalizedName.startsWith('pro ') ||
+    normalizedName.startsWith('pro2 ')
+  ) {
+    return true;
+  }
   return isOneKeyShortName(normalizedName);
 };
