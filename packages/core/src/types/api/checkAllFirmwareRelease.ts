@@ -12,6 +12,7 @@ import type {
   IProtocolV2FirmwareComponentTarget,
 } from '../settings';
 import type { FirmwareUpdateV4Target } from './firmwareUpdate';
+import type { FirmwareUpdatePlan } from './firmwareUpdatePlan';
 
 export type FirmwareRelease = {
   shouldUpdate?: boolean;
@@ -64,12 +65,14 @@ export type AllFirmwareRelease = {
   components?: ProtocolV2FirmwareComponentRelease[];
   targetsToUpdate?: FirmwareUpdateV4Target[];
   release?: IFirmwareReleaseInfo;
+  firmwareUpdatePlan?: FirmwareUpdatePlan;
 };
 
 export type CheckAllFirmwareReleaseParams = {
   checkBridgeRelease?: boolean;
   checkFirmwareHash?: boolean;
   firmwareType?: EFirmwareType;
+  platform?: 'native' | 'desktop' | 'ext' | 'web' | 'web-embed';
 };
 
 export declare function checkAllFirmwareRelease(

@@ -19,6 +19,11 @@ export * from './types';
 export { whitelist, whitelistExtension } from './data/config';
 export { executeCallback, cleanupCallback };
 export { preloadSessionCache } from './device/Device';
+export {
+  getFirmwareUpdateHostBindingGeneration,
+  registerFirmwareUpdateHostBinding,
+  unregisterFirmwareUpdateHostBinding,
+} from './api/firmware/FirmwareHostBinding';
 
 const HardwareSdk = ({
   init,

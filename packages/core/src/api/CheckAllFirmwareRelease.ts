@@ -8,6 +8,7 @@ import {
   getBootloaderReleaseInfo,
   getFirmwareReleaseInfo,
 } from './firmware/releaseHelper';
+import { buildFirmwareUpdatePlan } from './firmware/FirmwareUpdatePlan';
 import { getBridgeReleaseInfo } from '../utils/bridgeUpdate';
 import { getDeviceFirmwareVersion, getDeviceType, getFirmwareType } from '../utils';
 import { BaseMethod } from './BaseMethod';
@@ -269,8 +270,11 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
     }
 
     const { features } = this.device;
-    const { checkBridgeRelease, firmwareType: firmwareTypeParams } = this
-      .payload as CheckAllFirmwareReleaseParams;
+    const {
+      checkBridgeRelease,
+      firmwareType: firmwareTypeParams,
+      platform,
+    } = this.payload as CheckAllFirmwareReleaseParams;
 
     if (!features) {
       return Promise.resolve(null);
@@ -301,6 +305,14 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
       firmwareType,
     });
     const bleFirmwareReleaseInfo = getBleFirmwareReleaseInfo(features);
+    const firmwareUpdatePlan = buildFirmwareUpdatePlan({
+      features,
+      firmwareType,
+      platform: platform ?? 'web',
+      firmware: firmwareRelease,
+      ble: bleFirmwareReleaseInfo,
+      bootloader: bootloaderRelease,
+    });
 
     return {
       firmware: firmwareRelease,
@@ -315,7 +327,8 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
           }
         : undefined,
       features,
-    } as AllFirmwareRelease;
+      firmwareUpdatePlan,
+    } as unknown as AllFirmwareRelease;
   }
 
   private async runProtocolV2(): Promise<AllFirmwareRelease> {

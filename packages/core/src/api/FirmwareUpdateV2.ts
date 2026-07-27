@@ -14,18 +14,44 @@ import { BaseMethod } from './BaseMethod';
 import { validateParams } from './helpers/paramsValidator';
 import { DevicePool } from '../device/DevicePool';
 import { getBinary, getInfo, getSysResourceBinary } from './firmware/getBinary';
-import { updateResources, uploadFirmware } from './firmware/uploadFirmware';
+import {
+  updateResources,
+  updateResourcesFromSources,
+  uploadFirmwareFromSource,
+} from './firmware/uploadFirmware';
 import { LoggerNames, getLogger, wait } from '../utils';
 import { FirmwareUpdateTipMessage, createUiMessage } from '../events/ui-request';
 import { DeviceModelToTypes } from '../types';
 import { DataManager } from '../data-manager';
 import { DEVICE } from '../events';
+import { type FirmwareByteSource, openFirmwareByteSource } from './firmware/FirmwareArtifactSource';
+import { FirmwareCheckpointWriter } from './firmware/FirmwareCheckpoint';
+import { resolveFirmwareUpdateHostBinding } from './firmware/FirmwareHostBinding';
+import {
+  assertFirmwareUpdatePreparedPlanBinding,
+  getFirmwareUpdateResourceName,
+} from './firmware/FirmwareUpdatePreparedPlan';
 
 import type { Features, KnownDevice } from '../types';
 import type { FirmwareBinary } from './firmware/getBinary';
+import type {
+  FirmwareArtifactReader,
+  FirmwareArtifactReference,
+  FirmwareCheckpointParams,
+} from '../types/api/firmwareUpdate';
+import type { FirmwareUpdatePreparedPlan } from '../types/api/firmwareUpdatePreparedPlan';
 
-type Params = {
+type Params = FirmwareCheckpointParams & {
   binary?: ArrayBuffer;
+  artifact?: FirmwareArtifactReference;
+  resourceArtifact?: FirmwareArtifactReference;
+  resourceEntries?: Array<{
+    entryName: string;
+    artifact: FirmwareArtifactReference;
+  }>;
+  artifactReader?: FirmwareArtifactReader;
+  preparedPlan?: FirmwareUpdatePreparedPlan;
+  platform?: FirmwareUpdatePreparedPlan['platform'];
   version?: number[];
   updateType: 'firmware' | 'ble';
   forcedUpdateRes?: boolean;
@@ -106,6 +132,13 @@ const normalizeFirmwareBinary = (binary: unknown): FirmwareBinary | undefined =>
   return normalized.buffer;
 };
 
+const toArrayBuffer = (binary: FirmwareBinary): ArrayBuffer => {
+  if (binary instanceof ArrayBuffer) {
+    return binary;
+  }
+  return new Uint8Array(binary.buffer, binary.byteOffset, binary.byteLength).slice().buffer;
+};
+
 export default class FirmwareUpdateV2 extends BaseMethod<Params> {
   checkPromise: Deferred<any> | null = null;
 
@@ -150,6 +183,42 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
       this.params = {
         ...this.params,
         binary: payload.binary,
+      };
+    }
+
+    if ('artifact' in payload) {
+      const hostBinding = resolveFirmwareUpdateHostBinding(payload.hostBindingGeneration);
+      const target = payload.isUpdateBootloader ? 'bootloader' : payload.updateType;
+      const resourceBindings = [
+        ...(payload.resourceArtifact
+          ? [{ target: 'resource' as const, artifact: payload.resourceArtifact }]
+          : []),
+        ...(payload.resourceEntries ?? []).map(
+          (entry: { entryName: string; artifact: FirmwareArtifactReference }) => ({
+            target: 'resource' as const,
+            entryName: entry.entryName,
+            artifact: entry.artifact,
+          })
+        ),
+      ];
+      assertFirmwareUpdatePreparedPlanBinding({
+        preparedPlan: payload.preparedPlan,
+        executor: 'v2',
+        platform: payload.platform,
+        scopeTargets: [target, ...(target === 'firmware' ? (['resource'] as const) : [])],
+        bindings: [{ target, artifact: payload.artifact }, ...resourceBindings],
+      });
+      this.params = {
+        ...this.params,
+        preparedPlan: payload.preparedPlan,
+        hostBindingGeneration: payload.hostBindingGeneration,
+        artifact: payload.artifact,
+        resourceArtifact: payload.resourceArtifact,
+        resourceEntries: payload.resourceEntries,
+        artifactReader: hostBinding.artifactReader,
+        checkpointSink: hostBinding.checkpointSink,
+        checkpointSequenceStart: payload.checkpointSequenceStart,
+        resumeCheckpoint: payload.resumeCheckpoint,
       };
     }
   }
@@ -343,152 +412,293 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
     const { device, params } = this;
     const { features, commands } = device;
     const deviceType = device.getCurrentDeviceType();
+    const checkpointWriter = new FirmwareCheckpointWriter(params, {
+      required: !!params.artifactReader,
+    });
 
     const deviceFirmwareType = device.getCurrentFirmwareType();
     const firmwareType = params.firmwareType ?? deviceFirmwareType;
 
     this.checkVersionForCopyTouchResource(features, firmwareType);
 
-    let preparedBinary: FirmwareBinary | undefined;
-    const acquireFirmwareBinary = async (): Promise<FirmwareBinary> => {
-      try {
-        if (preparedBinary) {
-          return preparedBinary;
-        }
-
-        if (params.binary !== undefined) {
-          preparedBinary = normalizeFirmwareBinary(params.binary);
-          if (!preparedBinary) {
-            throw new Error('firmware binary is empty or invalid');
+    let preparedSource: FirmwareByteSource | undefined;
+    try {
+      const acquireFirmwareSource = async (): Promise<FirmwareByteSource> => {
+        try {
+          if (preparedSource) {
+            return preparedSource;
           }
-          return preparedBinary;
-        }
 
-        if (!device.features) {
-          throw ERRORS.TypedError(
-            HardwareErrorCode.RuntimeError,
-            'no features found for this device'
-          );
-        }
+          if (params.binary !== undefined) {
+            const binary = normalizeFirmwareBinary(params.binary);
+            if (!binary) {
+              throw new Error('firmware binary is empty or invalid');
+            }
+            const source = await openFirmwareByteSource({
+              binary: toArrayBuffer(binary),
+            });
+            if (!source) {
+              throw new Error('firmware binary is empty or invalid');
+            }
+            preparedSource = source;
+            return source;
+          }
 
-        this.postTipMessage('DownloadFirmware');
-        const firmware = await getBinary({
-          features: device.features,
-          version: params.version,
-          updateType: params.updateType,
-          isUpdateBootloader: params.isUpdateBootloader,
-          firmwareType,
-          requestOptions: FIRMWARE_DOWNLOAD_REQUEST_OPTIONS,
-        });
-        preparedBinary = normalizeFirmwareBinary(firmware.binary);
-        if (!preparedBinary) {
-          throw new Error('downloaded firmware binary is empty or invalid');
-        }
-        this.postTipMessage('DownloadFirmwareSuccess');
-        return preparedBinary;
-      } catch (err) {
-        throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
-      }
-    };
+          if (params.artifact) {
+            const source = await openFirmwareByteSource({
+              artifact: params.artifact,
+              reader: params.artifactReader,
+            });
+            if (!source) {
+              throw new Error('firmware artifact is not prepared');
+            }
+            preparedSource = source;
+            return source;
+          }
 
-    if (!device.isBootloader() && features) {
-      const serialNo = device.getCurrentSerialNo();
-      // should go to bootloader mode manually
-      if (this.isEnteredManuallyBoot()) {
-        return Promise.reject(ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateManuallyEnterBoot));
-      }
-
-      // check & upgrade firmware resource
-      if (this.isSupportResourceUpdate(params.updateType)) {
-        this.postTipMessage('CheckLatestUiResource');
-        const resourceUrl = DataManager.getSysResourcesLatestRelease({
-          features,
-          forcedUpdateRes: params.forcedUpdateRes,
-          firmwareType,
-        });
-        if (resourceUrl) {
-          this.postTipMessage('DownloadLatestUiResource');
-          const resource = await getSysResourceBinary(resourceUrl);
-          this.postTipMessage('DownloadLatestUiResourceSuccess');
-          if (resource) {
-            await updateResources(
-              this.device.getCommands().typedCall.bind(this.device.getCommands()),
-              this.postMessage,
-              device,
-              resource.binary
+          if (!device.features) {
+            throw ERRORS.TypedError(
+              HardwareErrorCode.RuntimeError,
+              'no features found for this device'
             );
           }
+
+          if (
+            params.artifactReader ||
+            DataManager.getSettings('firmwareManifestMode') === 'external-only'
+          ) {
+            throw ERRORS.TypedError(
+              HardwareErrorCode.RuntimeError,
+              'Firmware must be prepared by the external firmware host',
+              {
+                firmwareUpdateCode: 'FirmwareArtifactsNotPrepared',
+                artifactName: 'firmware',
+              }
+            );
+          }
+
+          this.postTipMessage('DownloadFirmware');
+          const firmware = await getBinary({
+            features: device.features,
+            version: params.version,
+            updateType: params.updateType,
+            isUpdateBootloader: params.isUpdateBootloader,
+            firmwareType,
+            requestOptions: FIRMWARE_DOWNLOAD_REQUEST_OPTIONS,
+          });
+          const binary = normalizeFirmwareBinary(firmware.binary);
+          if (!binary) {
+            throw new Error('downloaded firmware binary is empty or invalid');
+          }
+          const source = await openFirmwareByteSource({
+            binary: toArrayBuffer(binary),
+          });
+          if (!source) {
+            throw new Error('downloaded firmware binary is empty or invalid');
+          }
+          preparedSource = source;
+          this.postTipMessage('DownloadFirmwareSuccess');
+          return source;
+        } catch (err) {
+          throw ERRORS.TypedError(
+            HardwareErrorCode.FirmwareUpdateDownloadFailed,
+            err.message ?? err
+          );
         }
-      }
+      };
 
-      // check if the device commands has been disposed
-      this.device?.commands?.checkDisposed();
-
-      // A failed firmware download must leave the device in normal mode.
-      await acquireFirmwareBinary();
-
-      // The request may outlive the current transport command instance.
-      this.device?.commands?.checkDisposed();
-
-      // auto go to bootloader mode
-      try {
-        this.postTipMessage('AutoRebootToBootloader');
-        const bootRes = await commands.typedCall('DeviceBackToBoot', 'Success');
-        // @ts-expect-error
-        if (bootRes.type === 'CallMethodError') {
-          throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateAutoEnterBootFailure);
+      if (!device.isBootloader() && features) {
+        const serialNo = device.getCurrentSerialNo();
+        // should go to bootloader mode manually
+        if (this.isEnteredManuallyBoot()) {
+          throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateManuallyEnterBoot);
         }
-        this.postTipMessage('GoToBootloaderSuccess');
-        this.checkDeviceToBootloader(this.payload.connectId);
 
-        // force clean classic device cache so that the device can initialize again
-        if (DeviceModelToTypes.model_classic.includes(deviceType)) {
-          DevicePool.clearDeviceCache(serialNo);
+        // All network-backed input must be ready before the first device mutation.
+        await acquireFirmwareSource();
+
+        // check & upgrade firmware resource
+        if (this.isSupportResourceUpdate(params.updateType)) {
+          this.postTipMessage('CheckLatestUiResource');
+          const resourceUrl = DataManager.getSysResourcesLatestRelease({
+            features,
+            forcedUpdateRes: params.forcedUpdateRes,
+            firmwareType,
+          });
+          if (resourceUrl) {
+            this.postTipMessage('DownloadLatestUiResource');
+            if (params.resourceEntries?.length) {
+              const sources: Array<{
+                entryName: string;
+                source: FirmwareByteSource;
+              }> = [];
+              try {
+                for (const entry of params.resourceEntries) {
+                  const resourceName = getFirmwareUpdateResourceName(entry.entryName);
+                  const source = await openFirmwareByteSource({
+                    artifact: entry.artifact,
+                    reader: params.artifactReader,
+                  });
+                  if (!source) {
+                    throw new Error('Firmware resource entry is not prepared');
+                  }
+                  sources.push({ entryName: resourceName, source });
+                }
+                await checkpointWriter.commit({
+                  stage: 'FILE_TRANSFER_STARTED',
+                  target: 'resource',
+                });
+                await updateResourcesFromSources(
+                  this.device.getCommands().typedCall.bind(this.device.getCommands()),
+                  this.postMessage,
+                  device,
+                  sources.map(entry => ({
+                    entryName: entry.entryName,
+                    source: entry.source,
+                  }))
+                );
+                await checkpointWriter.commit({
+                  stage: 'FILE_TRANSFER_COMPLETED',
+                  target: 'resource',
+                });
+              } finally {
+                await Promise.all(
+                  sources.map(entry => entry.source.close().catch(() => undefined))
+                );
+              }
+              this.postTipMessage('DownloadLatestUiResourceSuccess');
+            } else {
+              let resourceBinary: ArrayBuffer | Buffer;
+              if (params.resourceArtifact) {
+                throw ERRORS.TypedError(
+                  HardwareErrorCode.RuntimeError,
+                  'Firmware resource archive must be materialized into prepared entries',
+                  {
+                    firmwareUpdateCode: 'FirmwareArtifactsNotPrepared',
+                    artifactName: 'resource',
+                  }
+                );
+              } else {
+                if (
+                  params.artifactReader ||
+                  DataManager.getSettings('firmwareManifestMode') === 'external-only'
+                ) {
+                  throw ERRORS.TypedError(
+                    HardwareErrorCode.RuntimeError,
+                    'Firmware resource must be prepared by the external firmware host',
+                    {
+                      firmwareUpdateCode: 'FirmwareArtifactsNotPrepared',
+                      artifactName: 'resource',
+                    }
+                  );
+                }
+                resourceBinary = (await getSysResourceBinary(resourceUrl)).binary;
+              }
+              this.postTipMessage('DownloadLatestUiResourceSuccess');
+              await checkpointWriter.commit({
+                stage: 'FILE_TRANSFER_STARTED',
+                target: 'resource',
+              });
+              await updateResources(
+                this.device.getCommands().typedCall.bind(this.device.getCommands()),
+                this.postMessage,
+                device,
+                resourceBinary
+              );
+              await checkpointWriter.commit({
+                stage: 'FILE_TRANSFER_COMPLETED',
+                target: 'resource',
+              });
+            }
+          }
         }
-        delete DevicePool.devicesCache[''];
-        await this.checkPromise?.promise;
-        this.checkPromise = null;
 
         // check if the device commands has been disposed
         this.device?.commands?.checkDisposed();
 
-        /**
-         * Touch 1 with bootloader v2.5.0 issue: BLE chip need more time for looking up name, here change the delay time to 3000ms after rebooting.
-         */
-        const isTouch = DeviceModelToTypes.model_touch.includes(deviceType);
-        await wait(isTouch ? 3000 : 1500);
-      } catch (e) {
-        if (e instanceof HardwareError) {
-          return Promise.reject(e);
+        // The request may outlive the current transport command instance.
+        this.device?.commands?.checkDisposed();
+
+        // auto go to bootloader mode
+        try {
+          this.postTipMessage('AutoRebootToBootloader');
+          await checkpointWriter.commit({
+            stage: 'BEFORE_DEVICE_MODE_CHANGE',
+            target: params.isUpdateBootloader ? 'bootloader' : params.updateType,
+          });
+          const bootRes = await commands.typedCall('DeviceBackToBoot', 'Success');
+          // @ts-expect-error
+          if (bootRes.type === 'CallMethodError') {
+            throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateAutoEnterBootFailure);
+          }
+          this.postTipMessage('GoToBootloaderSuccess');
+          this.checkDeviceToBootloader(this.payload.connectId);
+
+          // force clean classic device cache so that the device can initialize again
+          if (DeviceModelToTypes.model_classic.includes(deviceType)) {
+            DevicePool.clearDeviceCache(serialNo);
+          }
+          delete DevicePool.devicesCache[''];
+          await this.checkPromise?.promise;
+          this.checkPromise = null;
+
+          // check if the device commands has been disposed
+          this.device?.commands?.checkDisposed();
+
+          /**
+           * Touch 1 with bootloader v2.5.0 issue: BLE chip need more time for looking up name, here change the delay time to 3000ms after rebooting.
+           */
+          const isTouch = DeviceModelToTypes.model_touch.includes(deviceType);
+          await wait(isTouch ? 3000 : 1500);
+        } catch (e) {
+          if (e instanceof HardwareError) {
+            return Promise.reject(e);
+          }
+          console.log('auto go to bootloader mode failed: ', e);
+          return Promise.reject(
+            ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateAutoEnterBootFailure)
+          );
         }
-        console.log('auto go to bootloader mode failed: ', e);
-        return Promise.reject(
-          ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateAutoEnterBootFailure)
-        );
       }
+
+      // Devices already in bootloader mode still acquire through the same helper.
+      const source = await acquireFirmwareSource();
+
+      // check if the device commands has been disposed
+      this.device?.commands?.checkDisposed();
+
+      await this.device.acquire();
+
+      const target = params.isUpdateBootloader ? 'bootloader' : params.updateType;
+      await checkpointWriter.commit({
+        stage: 'FILE_TRANSFER_STARTED',
+        target,
+      });
+      const response = await uploadFirmwareFromSource(
+        params.updateType,
+        this.device.getCommands().typedCall.bind(this.device.getCommands()),
+        this.postMessage,
+        device,
+        source,
+        true,
+        params.isUpdateBootloader
+      );
+      await checkpointWriter.commit({
+        stage: 'FILE_TRANSFER_COMPLETED',
+        target,
+      });
+
+      if (this.connectId) {
+        DevicePool.clearDeviceCache(this.connectId);
+      }
+
+      await checkpointWriter.commit({
+        stage: 'FINAL_VERIFIED',
+        target,
+      });
+      return response;
+    } finally {
+      await preparedSource?.close().catch(() => undefined);
     }
-
-    // Devices already in bootloader mode still acquire through the same helper.
-    const binary = await acquireFirmwareBinary();
-
-    // check if the device commands has been disposed
-    this.device?.commands?.checkDisposed();
-
-    await this.device.acquire();
-
-    const response = await uploadFirmware(
-      params.updateType,
-      this.device.getCommands().typedCall.bind(this.device.getCommands()),
-      this.postMessage,
-      device,
-      { payload: binary, rebootOnSuccess: true },
-      params.isUpdateBootloader
-    );
-
-    if (this.connectId) {
-      DevicePool.clearDeviceCache(this.connectId);
-    }
-
-    return response;
   }
 }

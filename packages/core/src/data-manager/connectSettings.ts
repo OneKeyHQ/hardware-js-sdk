@@ -115,8 +115,19 @@ export const parseConnectSettings = (input: Partial<ConnectSettings> = {}) => {
     settings.fetchConfig = input.fetchConfig;
   }
 
+  if (
+    input.firmwareManifestMode === 'sdk-managed' ||
+    input.firmwareManifestMode === 'external-only'
+  ) {
+    settings.firmwareManifestMode = input.firmwareManifestMode;
+  }
+
   if (input.configFetcher) {
     settings.configFetcher = input.configFetcher;
+  }
+
+  if (input.preloadedConfig) {
+    settings.preloadedConfig = input.preloadedConfig;
   }
 
   return settings;
