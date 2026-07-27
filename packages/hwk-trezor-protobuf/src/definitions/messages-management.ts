@@ -218,6 +218,7 @@ export type AuthenticateDevice = Static<typeof AuthenticateDevice>;
 export const AuthenticateDevice = Type.Object(
     {
         challenge: Type.String(),
+        stream: Type.Optional(Type.Boolean()),
     },
     { $id: 'AuthenticateDevice' },
 );
@@ -233,6 +234,47 @@ export const AuthenticityProof = Type.Object(
         mcu_signature: Type.Optional(Type.String()),
     },
     { $id: 'AuthenticityProof' },
+);
+
+export type AuthenticityProofSizes = Static<typeof AuthenticityProofSizes>;
+export const AuthenticityProofSizes = Type.Object(
+    {
+        optiga_certificates: Type.Array(Type.Number()),
+        optiga_signature: Type.Number(),
+        tropic_certificates: Type.Array(Type.Number()),
+        tropic_signature: Type.Optional(Type.Number()),
+        mcu_certificates: Type.Array(Type.Number()),
+        mcu_signature: Type.Optional(Type.Number()),
+    },
+    { $id: 'AuthenticityProofSizes' },
+);
+
+export enum AuthenticityProofType {
+    OPTIGA = 0,
+    TROPIC = 1,
+    MCU = 2,
+}
+
+export type EnumAuthenticityProofType = Static<typeof EnumAuthenticityProofType>;
+export const EnumAuthenticityProofType = Type.Enum(AuthenticityProofType);
+
+export type GetAuthenticityProofChunk = Static<typeof GetAuthenticityProofChunk>;
+export const GetAuthenticityProofChunk = Type.Object(
+    {
+        proof_type: Type.Optional(EnumAuthenticityProofType),
+        index: Type.Optional(Type.Number()),
+        offset: Type.Number(),
+        size: Type.Number(),
+    },
+    { $id: 'GetAuthenticityProofChunk' },
+);
+
+export type AuthenticityProofChunk = Static<typeof AuthenticityProofChunk>;
+export const AuthenticityProofChunk = Type.Object(
+    {
+        chunk: Type.String(),
+    },
+    { $id: 'AuthenticityProofChunk' },
 );
 
 export type Slip39Group = Static<typeof Slip39Group>;

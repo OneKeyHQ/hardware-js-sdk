@@ -247,7 +247,8 @@ Ledger 客户端提交的 `verified`、`deviceId`、`attestationPubKey` 只能�
 3. 使用后端内置、版本化的生产 root 集合及吊销表；
 4. 验证证书链角色、有效期、签名算法与 nonce 签名；
 5. 从证书推导型号，客户端的 `deviceModelHint` 只做一致性检查；
-6. T3W1 强制 Optiga + Tropic，两条链的 subject serial 必须一致；
+6. T3W1 强制 Optiga + Tropic + MCU/ML-DSA 三层证明，三张设备证书的
+   subject serial 必须都存在且一致；缺任一层直接拒绝；
 7. 不接受 debug/staging root；
 8. 从已验证证书推导权威 vendor DSID：
    - 有 subject serial：`trezor:v1:<serial>`；
@@ -259,16 +260,50 @@ Ledger 客户端提交的 `verified`、`deviceId`、`attestationPubKey` 只能�
 
 Ledger DMK genuine check 的 secure channel 位于设备与 Ledger HSM 之间，公开 action 只给出 genuine verdict，不能把客户端布尔值转换成 OneKey 可验证证明。因此：
 
-1. 后端创建一次性 relay session 和单次 WSS token；
-2. relay 只允许既定的 Ledger genuine 上游，禁止任意代理；
-3. relay 在不改变字节流的前提下记录本次会话所需的协议状态；
-4. 必须观察到同一会话的设备 attestation certificate 读取和最终 genuine verdict；
-5. 设备公钥与 verdict 必须属于同一上游连接、同一 relay session；
-6. 会话完成后立刻失效，不允许重连或重放；
-7. 权威 DSID 为 `ledger:v1:<sha3_256(device-attestation-public-key)>`；
-8. 上游断开、协议缺失、无法确定 freshness 或 `isGenuine=false` 时一律拒绝发券。
+推荐实现是“服务端拥有 Genuine Check 状态机”，而不是客户端运行 DMK 后上传结果：
 
-relay 方案上线前必须完成 Ledger 协议、服务条款、freshness 和重放保证的安全评审。如果 relay 不能可靠建立这些保证，Ledger 活动应保持 fail closed，直到 Ledger 提供绑定 OneKey nonce/audience 的 JWS/COSE receipt，或使用具备 endorsement attestation 的专用 Ledger App。
+1. 后端创建一次性 session、challenge 和短期鉴权 token；
+2. App 只负责 USB/BLE APDU 转发，不解释、不修改、不决定结果；
+3. 后端运行 Ledger DMK `GenuineCheckDeviceAction`，其 transport 通过上述
+   双向通道把 APDU 发给 App，再由 App 发给物理设备；
+4. 后端自己的 DMK 实例得到 `isGenuine` 和同一会话中的 attestation
+   `deviceId`，并把它们原子绑定到 session；
+5. 会话完成后立即失效，断线不能续用，APDU 序号、方向、大小和总量都要限制；
+6. 权威 DSID 为 `ledger:v1:<sha3_256(device-attestation-public-key)>`；
+7. 上游断开、协议缺失、无法确定 freshness 或 `isGenuine=false` 时一律拒绝发券。
+
+另一条可接受路线是 Ledger 向 OneKey 服务端返回带 nonce/audience 的厂商签名
+JWS/COSE receipt。单纯透明代理 Ledger WSS、由客户端计算 `isGenuine`，除非安全评审能
+证明服务端可独立观察并绑定最终 verdict，否则仍然不够；客户端
+`{ verified: true, deviceId }` 永远不能作为发券证据。
+
+### 4.4 当前本地 mock 的真实性和边界
+
+本地 mock 只替换部署位置，不替换密码学验证：
+
+- Trezor：本地可信 background 生成 32-byte challenge，设备签名，background
+  使用固定生产根证书重新验证原始 Optiga/Tropic/MCU 证明，验证成功后才生成开发券。
+  这段 verifier 和 evidence DTO 可以原样移动到后端。
+- Ledger：本地可信 background 直接运行官方 DMK Genuine Check 并连接 Ledger HSM，
+  同一个函数拿到真实 verdict 后才生成开发券。它验证了设备、SDK 和厂商网络流程，
+  但结果不能作为可上传的服务端证明；生产仍需上一节的“服务端 DMK + 远程 APDU
+  transport”或厂商签名 receipt。
+- `runTrustedLocalMockDeviceClaim` 接收的是执行真实验真的闭包，不接受 renderer
+  提交的 attestation DTO；challenge 在执行器内部生成，领券前不会交给不可信调用方
+  决定验证结果。
+
+### 4.5 平台与联网矩阵
+
+| 厂商方案                            | macOS / Windows / Linux Desktop | 浏览器插件        | iOS / Android                   | 验证时联网                        |
+| ----------------------------------- | ------------------------------- | ----------------- | ------------------------------- | --------------------------------- |
+| Trezor 本地证书验证                 | 支持，USB/BLE 取 proof          | WebUSB 可用时支持 | 有对应 USB/BLE transport 时支持 | 不需要；拿到 proof 后可完全离线验 |
+| Trezor 后端发券                     | 支持                            | 支持              | 支持                            | 需要连接 OneKey 后端提交 proof    |
+| Ledger 当前本地 DMK mock            | 支持 WebHID/BLE                 | WebHID 可用时支持 | DMK BLE transport 可用时支持    | 必须连接 Ledger HSM               |
+| Ledger 生产服务端 DMK + APDU bridge | 支持                            | 支持              | 支持                            | 必须连接 OneKey 后端和 Ledger HSM |
+
+操作系统不是主要限制，真正的限制是该端是否具备对应 USB/BLE transport。Trezor
+One / Model T 没有本方案需要的制造商安全元件证明，不能参加“原厂设备认证发券”；
+Ledger 没有公开支持的离线制造商验真流程，必须 fail closed 地依赖在线厂商服务。
 
 ## 5. 数据模型与事务
 
@@ -416,7 +451,8 @@ AND postAddTask(walletId, campaignId) has never completed
 
 ## 9. 上线门槛
 
-- Trezor：challenge 置换、重放、错用户、过期、debug root、错链、缺 Tropic、serial 不同、畸形/超大 DER 全部拒绝；
+- Trezor：challenge 置换、重放、错用户、过期、debug root、错链、缺
+  Optiga/Tropic/MCU 任一层、serial 不同、畸形/超大 DER 全部拒绝；
 - Ledger：伪造 `{verified:true, deviceId}` 必须拒绝；relay session 过期、错用户、重放、APDU 篡改、non-genuine、缺 certificate、并发双提交全部拒绝；
 - 两端：地址签名与 challenge 不匹配、活动重复领取、事务中途失败不发券；
 - 名称同步：只在首次新建钱包触发、只改用户确认项、加密/云端来源不误报成功；

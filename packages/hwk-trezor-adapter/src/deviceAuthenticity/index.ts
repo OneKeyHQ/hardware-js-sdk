@@ -25,9 +25,9 @@ export type AuthenticateDeviceResult = {
    * the explicit model policy verified up to a trusted Trezor root CA AND the
    * device signed our challenge:
    *  - Optiga (all secure-element models), and
-   *  - Tropic + matching serial number (T3W1).
-   * ML-DSA / MCU is NOT checked (needs @noble/post-quantum). The reward backend
-   * must independently verify raw proof under its own versioned policy.
+   *  - Tropic + MCU/ML-DSA + matching serial numbers (T3W1).
+   * The reward backend must independently verify the same raw proof under its
+   * own versioned policy; this client result is only a UX preview.
    */
   verified: boolean;
   /**
@@ -65,10 +65,14 @@ const modelConfigOf = (config: DeviceAuthenticityConfig, deviceModel: string) =>
 
 export const getRequiredDeviceAuthenticityLayers = (
   deviceModel: string
-): readonly ('optiga' | 'tropic')[] => (deviceModel === 'T3W1' ? ['optiga', 'tropic'] : ['optiga']);
+): readonly ('optiga' | 'tropic' | 'mcu')[] =>
+  deviceModel === 'T3W1' ? ['optiga', 'tropic', 'mcu'] : ['optiga'];
 
 const isTropicExpected = (deviceModel: string): boolean =>
   getRequiredDeviceAuthenticityLayers(deviceModel).includes('tropic');
+
+const isMcuExpected = (deviceModel: string): boolean =>
+  getRequiredDeviceAuthenticityLayers(deviceModel).includes('mcu');
 
 const matchedDebugKey = (
   config: DeviceAuthenticityConfig,
@@ -78,9 +82,11 @@ const matchedDebugKey = (
   if (!rootPubKey) return false;
   const m = modelConfigOf(config, deviceModel);
   if (!m?.debug) return false;
-  return [...(m.debug.rootPubKeysOptiga ?? []), ...(m.debug.rootPubKeysTropic ?? [])].includes(
-    rootPubKey
-  );
+  return [
+    ...(m.debug.rootPubKeysOptiga ?? []),
+    ...(m.debug.rootPubKeysTropic ?? []),
+    ...(m.debug.rootPubKeysMLDSA ?? []),
+  ].includes(rootPubKey);
 };
 
 /**
@@ -126,10 +132,10 @@ export const authenticateDeviceFromProof = ({
       };
     }
 
-    // 2) On T3W1 the Tropic layer is also required, and its serial number must
-    // match Optiga's. This defeats a transplanted-Optiga forgery: an attacker
-    // moving a genuine Optiga onto a fake board cannot also satisfy Tropic.
+    // 2) On T3W1 the independent Tropic and MCU layers are also required.
+    // Their certificate serial numbers must match Optiga's.
     let usedDebugKey = matchedDebugKey(config, deviceModel, optiga.rootPubKey);
+    const serialNumbers = [optiga.serialNumber];
     if (isTropicExpected(deviceModel)) {
       const { tropic_certificates: tropicCertificates, tropic_signature: tropicSignature } = proof;
       if (!tropicSignature || !tropicCertificates?.length) {
@@ -143,11 +149,31 @@ export const authenticateDeviceFromProof = ({
       if (!tropic.valid) {
         return { verified: false, error: tropic.error };
       }
-      const serialsPresent = !!optiga.serialNumber && !!tropic.serialNumber;
-      if (!serialsPresent || optiga.serialNumber !== tropic.serialNumber) {
-        return { verified: false, error: 'SERIAL_NUMBER_MISMATCH' };
-      }
+      serialNumbers.push(tropic.serialNumber);
       usedDebugKey = usedDebugKey || matchedDebugKey(config, deviceModel, tropic.rootPubKey);
+    }
+    if (isMcuExpected(deviceModel)) {
+      const { mcu_certificates: mcuCertificates, mcu_signature: mcuSignature } = proof;
+      if (!mcuSignature || !mcuCertificates?.length) {
+        return { verified: false, error: 'RESPONSE_PAYLOAD_MISSING' };
+      }
+      const mcu = verifyAuthenticityProof({
+        ...common,
+        certificates: mcuCertificates,
+        signature: mcuSignature,
+      });
+      if (!mcu.valid) {
+        return { verified: false, error: mcu.error };
+      }
+      serialNumbers.push(mcu.serialNumber);
+      usedDebugKey = usedDebugKey || matchedDebugKey(config, deviceModel, mcu.rootPubKey);
+    }
+    if (
+      serialNumbers.length > 1 &&
+      (serialNumbers.some(serialNumber => !serialNumber) ||
+        serialNumbers.some(serialNumber => serialNumber !== serialNumbers[0]))
+    ) {
+      return { verified: false, error: 'SERIAL_NUMBER_MISMATCH' };
     }
 
     const deviceId =

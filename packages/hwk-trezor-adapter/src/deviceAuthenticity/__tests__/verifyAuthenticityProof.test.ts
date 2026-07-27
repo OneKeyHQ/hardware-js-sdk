@@ -1,7 +1,15 @@
 import { authenticateDeviceFromProof, getRequiredDeviceAuthenticityLayers } from '..';
 import { prepareDeviceAuthenticityData, verifyAuthenticityProof } from '../verifyAuthenticityProof';
+import { verifySignatureMLDSA44 } from '../verifySignatures';
+import { ml_dsa44 } from '@noble/post-quantum/ml-dsa.js';
 
 import type { DeviceAuthenticityConfig } from '../types';
+import {
+  CHALLENGE as MCU_CHALLENGE,
+  DEVICE_CERT_MCU,
+  SIGNATURE_MCU,
+  T3W1_ROOT_PUB_KEY_MLDSA,
+} from './mcuFixture';
 
 // Golden vectors from trezor-suite `mockDeviceAuthenticityData.ts`.
 // These are real device/CA certificate chains and challenge signatures.
@@ -95,11 +103,36 @@ describe('verifyAuthenticityProof', () => {
     expect(result.valid).toBe(false);
     if (!result.valid) expect(result.error).toBe('ROOT_PUBKEY_NOT_FOUND');
   });
+
+  it('verifies Trezor Suite’s genuine MCU ML-DSA certificate and challenge signature', () => {
+    const result = verifyAuthenticityProof({
+      certificates: [DEVICE_CERT_MCU],
+      signature: SIGNATURE_MCU,
+      signedData: prepareDeviceAuthenticityData({
+        payload: Buffer.from(MCU_CHALLENGE, 'hex'),
+      }),
+      deviceModel: 'T3W1',
+      config: {
+        version: 1,
+        T3W1: {
+          rootPubKeysOptiga: [],
+          rootPubKeysMLDSA: [T3W1_ROOT_PUB_KEY_MLDSA],
+        },
+      },
+    });
+
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      expect(result.rootPubKey).toBe(T3W1_ROOT_PUB_KEY_MLDSA);
+      expect(result.deviceCertPubKey).toBeTruthy();
+      expect(result.serialNumber).toBeTruthy();
+    }
+  });
 });
 
 describe('authenticateDeviceFromProof', () => {
   it('keeps T3W1 Tropic requirements independent from root-key configuration', () => {
-    expect(getRequiredDeviceAuthenticityLayers('T3W1')).toEqual(['optiga', 'tropic']);
+    expect(getRequiredDeviceAuthenticityLayers('T3W1')).toEqual(['optiga', 'tropic', 'mcu']);
     expect(getRequiredDeviceAuthenticityLayers('T2B1')).toEqual(['optiga']);
   });
 
@@ -194,6 +227,43 @@ describe('authenticateDeviceFromProof', () => {
     // The optiga device cert says model T2B1, so it fails model check before we
     // even reach the tropic requirement; either way it must NOT verify on T3W1.
     expect(result.verified).toBe(false);
+  });
+
+  it('requires the MCU ML-DSA layer on T3W1', () => {
+    const result = authenticateDeviceFromProof({
+      proof: {
+        optiga_certificates: [DEVICE_CERT_TROPIC, CA_CERT_TROPIC],
+        optiga_signature: SIGNATURE_TROPIC,
+        tropic_certificates: [DEVICE_CERT_TROPIC, CA_CERT_TROPIC],
+        tropic_signature: SIGNATURE_TROPIC,
+      },
+      challenge: Buffer.from(CHALLENGE, 'hex'),
+      deviceModel: 'T3W1',
+      config: {
+        version: 1,
+        T3W1: {
+          rootPubKeysOptiga: [],
+          rootPubKeysTropic: [T3W1_ROOT_PUB_KEY_TROPIC],
+          rootPubKeysMLDSA: [],
+        },
+      },
+    });
+
+    expect(result.verified).toBe(false);
+    expect(result.error).toBe('RESPONSE_PAYLOAD_MISSING');
+  });
+});
+
+describe('ML-DSA-44 verification', () => {
+  it('verifies the exact message signature and rejects a different challenge', () => {
+    const keys = ml_dsa44.keygen();
+    const message = Uint8Array.from([1, 2, 3, 4]);
+    const signature = ml_dsa44.sign(message, keys.secretKey);
+
+    expect(verifySignatureMLDSA44(keys.publicKey, message, signature)).toBe(true);
+    expect(verifySignatureMLDSA44(keys.publicKey, Uint8Array.from([1, 2, 3, 5]), signature)).toBe(
+      false
+    );
   });
 });
 

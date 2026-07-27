@@ -1,13 +1,14 @@
 import { ed25519 } from '@noble/curves/ed25519';
 import { p256 } from '@noble/curves/p256';
 import { sha256 } from '@noble/hashes/sha256';
+import { ml_dsa44 } from '@noble/post-quantum/ml-dsa.js';
 
 import { type AlgorithmName, fixSignature } from './x509certificate';
 
 export type VerifySignature = (
   rawKey: Uint8Array,
   data: Uint8Array,
-  signature: Uint8Array,
+  signature: Uint8Array
 ) => boolean;
 
 // P-256 (secp256r1) ECDSA over SHA-256. Hardware attestation signatures are NOT
@@ -33,12 +34,17 @@ export const verifySignatureEd25519: VerifySignature = (rawKey, data, signature)
   }
 };
 
+export const verifySignatureMLDSA44: VerifySignature = (rawKey, data, signature) => {
+  try {
+    return ml_dsa44.verify(signature, data, rawKey);
+  } catch {
+    return false;
+  }
+};
+
 export const getVerifyFn = (algorithmName: AlgorithmName): VerifySignature => {
   if (algorithmName === 'P-256') return verifySignatureP256;
   if (algorithmName === 'Ed25519') return verifySignatureEd25519;
-  // MLDSA44 is a T3W1-only secondary (Tropic/MCU) signature and needs
-  // @noble/post-quantum, which is not a dependency here. The primary Optiga
-  // (P-256) result already yields a valid per-device identity for every
-  // attestation-capable model, so ML-DSA verification is intentionally unsupported.
+  if (algorithmName === 'MLDSA44') return verifySignatureMLDSA44;
   throw new Error(`Unsupported signature algorithm: ${algorithmName}`);
 };
