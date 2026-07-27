@@ -8,20 +8,20 @@ import { validateCaCertExtensions } from './validateCaCertExtensions';
 import { getVerifyFn } from './verifySignatures';
 import { type ParsedCertificate, parseCertificate } from './x509certificate';
 
-const getChunkSize = (byteLength: number): Buffer => {
-  if (byteLength < 0xfd) return Buffer.from([byteLength]);
+const getChunkSize = (byteLength: number): Uint8Array => {
+  if (byteLength < 0xfd) return Uint8Array.from([byteLength]);
   if (byteLength <= 0xffff) {
     const b = Buffer.alloc(3);
     b[0] = 0xfd;
     b.writeUInt16LE(byteLength, 1);
 
-    return b;
+    return Uint8Array.from(b);
   }
   const b = Buffer.alloc(5);
   b[0] = 0xfe;
   b.writeUInt32LE(byteLength, 1);
 
-  return b;
+  return Uint8Array.from(b);
 };
 
 // Compose the data against which the signatures are verified: each chunk is
@@ -33,9 +33,18 @@ export const prepareDeviceAuthenticityData = ({
   payload: Buffer | Buffer[];
   prefix?: string;
 }): Uint8Array => {
-  const chunks = [Buffer.from(prefix), ...(Array.isArray(payload) ? payload : [payload])];
-
-  return Buffer.concat(chunks.flatMap(chunk => [getChunkSize(chunk.byteLength), chunk]));
+  const chunks = [
+    Uint8Array.from(Buffer.from(prefix)),
+    ...(Array.isArray(payload) ? payload : [payload]).map(chunk => Uint8Array.from(chunk)),
+  ];
+  const framed = chunks.flatMap(chunk => [getChunkSize(chunk.byteLength), chunk]);
+  const result = new Uint8Array(framed.reduce((total, chunk) => total + chunk.byteLength, 0));
+  let offset = 0;
+  for (const chunk of framed) {
+    result.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return result;
 };
 
 const getRootPubKeys = ({
@@ -54,6 +63,7 @@ const getRootPubKeys = ({
   const prod = [
     ...(modelConfig.rootPubKeysOptiga ?? []),
     ...(modelConfig.rootPubKeysTropic ?? []),
+    ...(modelConfig.rootPubKeysMLDSA ?? []),
   ];
   if (!allowDebugKeys) return prod;
 
@@ -61,6 +71,7 @@ const getRootPubKeys = ({
     ...prod,
     ...(modelConfig.debug?.rootPubKeysOptiga ?? []),
     ...(modelConfig.debug?.rootPubKeysTropic ?? []),
+    ...(modelConfig.debug?.rootPubKeysMLDSA ?? []),
   ];
 };
 
@@ -75,10 +86,10 @@ const matchRootPubKeyToCertificate = ({
 
   return allRootPubKeys.find(rootPubKey =>
     verifySignatureFn(
-      Buffer.from(rootPubKey, 'hex'),
+      Uint8Array.from(Buffer.from(rootPubKey, 'hex')),
       cert.tbsCertificate.asn1.raw,
-      cert.signatureValue.bits.bytes,
-    ),
+      cert.signatureValue.bits.bytes
+    )
   );
 };
 
@@ -115,17 +126,55 @@ export const verifyAuthenticityProof = ({
   const allRootPubKeys = getRootPubKeys({ config, deviceModel, allowDebugKeys });
 
   const parsedCertificates = certificates.map(c =>
-    parseCertificate(new Uint8Array(Buffer.from(c, 'hex'))),
+    parseCertificate(new Uint8Array(Buffer.from(c, 'hex')))
   );
 
   const firstCertAlgName = parsedCertificates[0]?.signatureAlgorithm.algorithmName;
-  // Only the [device, CA] scheme (P-256 / Ed25519) is supported. The single-cert
-  // ML-DSA scheme (T3W1 secondary) is not verifiable here.
-  if (firstCertAlgName !== 'P-256' && firstCertAlgName !== 'Ed25519') {
+  if (firstCertAlgName === 'MLDSA44') {
+    if (parsedCertificates.length !== 1) {
+      return { valid: false, error: 'RESPONSE_MALFORMED' };
+    }
+    const [deviceCert] = parsedCertificates;
+    const deviceCertPubKey = Buffer.from(
+      deviceCert.tbsCertificate.subjectPublicKeyInfo.bits.bytes
+    ).toString('hex');
+    const rootPubKeyMatch = matchRootPubKeyToCertificate({
+      allRootPubKeys,
+      cert: deviceCert,
+    });
+    if (rootPubKeyMatch === undefined) {
+      return { valid: false, deviceCertPubKey, error: 'ROOT_PUBKEY_NOT_FOUND' };
+    }
+    if (parseModelFromDeviceCertSubject(deviceCert) !== deviceModel) {
+      return {
+        valid: false,
+        rootPubKey: rootPubKeyMatch,
+        deviceCertPubKey,
+        error: 'INVALID_DEVICE_MODEL',
+      };
+    }
+    const isSignatureValid = getVerifyFn('MLDSA44')(
+      Uint8Array.from(deviceCert.tbsCertificate.subjectPublicKeyInfo.bits.bytes),
+      signedData,
+      Uint8Array.from(Buffer.from(signature, 'hex'))
+    );
+    if (!isSignatureValid) {
+      return {
+        valid: false,
+        rootPubKey: rootPubKeyMatch,
+        deviceCertPubKey,
+        error: 'INVALID_DEVICE_SIGNATURE',
+      };
+    }
     return {
-      valid: false,
-      error: firstCertAlgName === 'MLDSA44' ? 'UNSUPPORTED_ALGORITHM' : 'RESPONSE_MALFORMED',
+      valid: true,
+      rootPubKey: rootPubKeyMatch,
+      deviceCertPubKey,
+      serialNumber: parseSerialNumberFromDeviceCert(deviceCert),
     };
+  }
+  if (firstCertAlgName !== 'P-256' && firstCertAlgName !== 'Ed25519') {
+    return { valid: false, error: 'RESPONSE_MALFORMED' };
   }
   if (parsedCertificates.length !== 2) {
     return { valid: false, error: 'RESPONSE_MALFORMED' };
@@ -133,7 +182,7 @@ export const verifyAuthenticityProof = ({
 
   const [deviceCert, caCert] = parsedCertificates;
   const deviceCertPubKey = Buffer.from(
-    deviceCert.tbsCertificate.subjectPublicKeyInfo.bits.bytes,
+    deviceCert.tbsCertificate.subjectPublicKeyInfo.bits.bytes
   ).toString('hex');
 
   const deviceCertAlgName = deviceCert.signatureAlgorithm.algorithmName;
@@ -163,6 +212,10 @@ export const verifyAuthenticityProof = ({
       error: 'CA_PUBKEY_BLACKLISTED',
     };
   }
+  const caCertValidityFrom = caCert.tbsCertificate.validity.from.getTime();
+  if (caCertValidityFrom > Date.now()) {
+    throw new Error(`CA validity from ${caCertValidityFrom} can't be in the future`);
+  }
 
   // 2) Device model in the certificate must match the connected device.
   const modelFromSubject = parseModelFromDeviceCertSubject(deviceCert);
@@ -178,9 +231,9 @@ export const verifyAuthenticityProof = ({
 
   // 3) Device certificate must be signed by the CA pub key.
   const isDeviceCertValid = verifySignatureFn(
-    Buffer.from(caPubKeyBytes),
+    Uint8Array.from(caPubKeyBytes),
     deviceCert.tbsCertificate.asn1.raw,
-    deviceCert.signatureValue.bits.bytes,
+    deviceCert.signatureValue.bits.bytes
   );
   if (!isDeviceCertValid) {
     return {
@@ -194,9 +247,9 @@ export const verifyAuthenticityProof = ({
 
   // 4) The challenge signature must be produced by the device key.
   const isSignatureValid = verifySignatureFn(
-    Buffer.from(deviceCert.tbsCertificate.subjectPublicKeyInfo.bits.bytes),
+    Uint8Array.from(deviceCert.tbsCertificate.subjectPublicKeyInfo.bits.bytes),
     signedData,
-    Buffer.from(signature, 'hex'),
+    Uint8Array.from(Buffer.from(signature, 'hex'))
   );
   if (!isSignatureValid) {
     return {

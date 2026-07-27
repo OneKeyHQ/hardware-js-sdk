@@ -1,4 +1,5 @@
 import type { DeviceAuthenticityConfig } from './types';
+import { T3W1_ROOT_PUB_KEYS_MLDSA } from './trezorRootKeysMLDSA';
 
 /**
  * Trezor manufacturing root CA public keys, per internal model.
@@ -6,9 +7,6 @@ import type { DeviceAuthenticityConfig } from './types';
  * https://github.com/trezor/trezor-firmware/blob/main/core/embed/projects/prodtest/cmd/hsm_keys.h
  * Mirrored from @trezor/device-authenticity `deviceAuthenticityConfig`.
  *
- * Note: ML-DSA (rootPubKeysMLDSA) keys are intentionally omitted — ML-DSA
- * verification is not supported here (see verifySignatures.ts), and the Optiga
- * P-256 path already provides a valid per-device identity for every model.
  * Devices without a secure element (T1B1, T2T1) do not support AuthenticateDevice
  * and are therefore absent from this config.
  */
@@ -63,6 +61,7 @@ export const deviceAuthenticityConfig: DeviceAuthenticityConfig = {
       // upstream: DEV_AUTH_ROOT_PROD_BACKUP_ED25519
       '5612606584ee7e0bc313b13f7ac94156bb4cb75bd77585ddbe579301306e85f1',
     ],
+    rootPubKeysMLDSA: [...T3W1_ROOT_PUB_KEYS_MLDSA],
     debug: {
       rootPubKeysOptiga: [
         // upstream: DEV_AUTH_ROOT_DEBUG_P256

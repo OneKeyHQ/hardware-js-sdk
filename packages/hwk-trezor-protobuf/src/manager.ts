@@ -286,11 +286,14 @@ export const ProtobufManager = () => {
         // https://github.com/trezor/trezor-firmware/pull/6549
         const patchedPayload =
             messageName === 'Failure' &&
-            binaryPayload.subarray(0, 2).compare(Buffer.from('0811', 'hex')) === 0
+            binaryPayload[0] === 0x08 &&
+            binaryPayload[1] === 0x11
                 ? binaryPayload.subarray(0, 2)
                 : binaryPayload;
 
-        const decoded = fromBinary(schema, patchedPayload, { readUnknownFields: false });
+        const decoded = fromBinary(schema, Uint8Array.from(patchedPayload), {
+            readUnknownFields: false,
+        });
         const json = toJson(schema, decoded, { useProtoFieldName: true });
         const message = transformSchemaFields('decode', schema, json as Record<string, unknown>);
 

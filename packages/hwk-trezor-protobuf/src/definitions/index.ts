@@ -143,6 +143,8 @@ import {
     ApplySettings,
     AuthenticateDevice,
     AuthenticityProof,
+    AuthenticityProofChunk,
+    AuthenticityProofSizes,
     BackupDevice,
     Cancel,
     CancelAuthorization,
@@ -161,6 +163,7 @@ import {
     Features,
     FirmwareHash,
     GetEntropy,
+    GetAuthenticityProofChunk,
     GetFeatures,
     GetFirmwareHash,
     GetNextU2FCounter,
@@ -426,6 +429,9 @@ export const MessageType = Type.Object(
         FirmwareHash,
         AuthenticateDevice,
         AuthenticityProof,
+        AuthenticityProofSizes,
+        GetAuthenticityProofChunk,
+        AuthenticityProofChunk,
         WipeDevice,
         LoadDevice,
         ResetDevice,
@@ -670,7 +676,8 @@ export type WireInMessage =
     | 'Cancel'
     | 'GetEntropy'
     | 'GetFirmwareHash'
-    | 'AuthenticityProof'
+    | 'AuthenticateDevice'
+    | 'GetAuthenticityProofChunk'
     | 'WipeDevice'
     | 'LoadDevice'
     | 'ResetDevice'
@@ -788,7 +795,9 @@ export type WireOutMessage =
     | 'DataChunkRequest'
     | 'Entropy'
     | 'FirmwareHash'
-    | 'AuthenticateDevice'
+    | 'AuthenticityProof'
+    | 'AuthenticityProofSizes'
+    | 'AuthenticityProofChunk'
     | 'EntropyRequest'
     | 'EntropyCheckReady'
     | 'WordRequest'

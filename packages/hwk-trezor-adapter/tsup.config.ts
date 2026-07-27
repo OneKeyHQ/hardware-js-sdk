@@ -15,6 +15,10 @@ export default defineConfig({
   clean: true,
   sourcemap: true,
   splitting: true,
+  // Local debug-watch copies only this package's dist into app-monorepo.
+  // Bundle the ML-DSA implementation so that flow works without publishing or
+  // separately installing a new transitive package in every client platform.
+  noExternal: [/^@noble\/post-quantum/, /^@noble\/ciphers/, /^@noble\/curves/, /^@noble\/hashes/],
   external: [
     '@onekeyfe/hwk-adapter-core',
     '@onekeyfe/hwk-trezor-protobuf',
