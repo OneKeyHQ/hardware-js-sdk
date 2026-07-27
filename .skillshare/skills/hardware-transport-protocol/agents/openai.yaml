@@ -1,0 +1,6 @@
+interface:
+  display_name: 'Hardware Transport Protocol'
+  short_description: 'USB, BLE, Protocol V1/V2 transport workflow'
+  default_prompt: 'Use $hardware-transport-protocol to diagnose a hardware transport or protocol issue.'
+policy:
+  allow_implicit_invocation: true

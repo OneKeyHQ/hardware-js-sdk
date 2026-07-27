@@ -115,6 +115,10 @@ export const parseConnectSettings = (input: Partial<ConnectSettings> = {}) => {
     settings.fetchConfig = input.fetchConfig;
   }
 
+  if (input.configFetcher) {
+    settings.configFetcher = input.configFetcher;
+  }
+
   return settings;
 };
 

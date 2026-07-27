@@ -75,7 +75,6 @@ axios.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   // node environment
   if (config.url?.startsWith('http://localhost:21333')) {
     if (!config.headers.get('Origin')) {
-      console.log('set node request origin');
       // add Origin field for request headers
       config.headers.set('Origin', 'https://jssdk.onekey.so');
     }

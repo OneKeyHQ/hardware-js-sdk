@@ -1,0 +1,152 @@
+syntax = "proto2";
+
+package onekey.pro2.resource.v1;
+
+// 本文件是设计示例，不是当前正式 wire schema。
+
+enum ResourceHashAlgorithm {
+  RESOURCE_HASH_ALGORITHM_INVALID = 0;
+  RESOURCE_HASH_ALGORITHM_SHA3_512 = 1;
+}
+
+enum ResourceArtifactStatus {
+  RESOURCE_ARTIFACT_STATUS_INVALID = 0;
+  RESOURCE_ARTIFACT_STATUS_PRESENT = 1;
+  RESOURCE_ARTIFACT_STATUS_REQUIRED = 2;
+  RESOURCE_ARTIFACT_STATUS_RECEIVING = 3;
+  RESOURCE_ARTIFACT_STATUS_INVALID_LOCAL = 4;
+  RESOURCE_ARTIFACT_STATUS_INCOMPATIBLE = 5;
+  RESOURCE_ARTIFACT_STATUS_NO_SPACE = 6;
+  RESOURCE_ARTIFACT_STATUS_VERIFIED = 7;
+}
+
+enum ResourceUpdatePhase {
+  RESOURCE_UPDATE_PHASE_IDLE = 0;
+  RESOURCE_UPDATE_PHASE_PLANNING = 1;
+  RESOURCE_UPDATE_PHASE_READY = 2;
+  RESOURCE_UPDATE_PHASE_RECEIVING = 3;
+  RESOURCE_UPDATE_PHASE_VERIFYING = 4;
+  RESOURCE_UPDATE_PHASE_COMMITTING = 5;
+  RESOURCE_UPDATE_PHASE_PENDING_REBOOT = 6;
+  RESOURCE_UPDATE_PHASE_HEALTHY = 7;
+  RESOURCE_UPDATE_PHASE_ROLLED_BACK = 8;
+  RESOURCE_UPDATE_PHASE_FAILED = 9;
+  RESOURCE_UPDATE_PHASE_CANCELLED = 10;
+}
+
+enum ResourceUpdateError {
+  RESOURCE_UPDATE_ERROR_NONE = 0;
+  RESOURCE_UPDATE_ERROR_MANIFEST_FORMAT = 1;
+  RESOURCE_UPDATE_ERROR_MANIFEST_SIGNATURE = 2;
+  RESOURCE_UPDATE_ERROR_INCOMPATIBLE_DEVICE = 3;
+  RESOURCE_UPDATE_ERROR_INCOMPATIBLE_FIRMWARE = 4;
+  RESOURCE_UPDATE_ERROR_INCOMPATIBLE_BOOTLOADER = 5;
+  RESOURCE_UPDATE_ERROR_INVALID_ARTIFACT_ROLE = 6;
+  RESOURCE_UPDATE_ERROR_NO_SPACE = 7;
+  RESOURCE_UPDATE_ERROR_SESSION_NOT_FOUND = 8;
+  RESOURCE_UPDATE_ERROR_INVALID_OFFSET = 9;
+  RESOURCE_UPDATE_ERROR_FILE_WRITE = 10;
+  RESOURCE_UPDATE_ERROR_SIZE_MISMATCH = 11;
+  RESOURCE_UPDATE_ERROR_HASH_MISMATCH = 12;
+  RESOURCE_UPDATE_ERROR_ARTIFACT_SIGNATURE = 13;
+  RESOURCE_UPDATE_ERROR_COMMIT_NOT_READY = 14;
+  RESOURCE_UPDATE_ERROR_COMMIT_FAILED = 15;
+  RESOURCE_UPDATE_ERROR_HEALTH_CHECK_FAILED = 16;
+}
+
+message ResourceHash {
+  required ResourceHashAlgorithm algorithm = 1;
+  required bytes value = 2;
+}
+
+message DeviceResourceUpdateCapabilitiesGet {}
+
+message DeviceResourceUpdateCapabilities {
+  required uint32 protocol_version = 1;
+  repeated uint32 manifest_versions = 2;
+  required bool content_addressed_store = 3;
+  required bool resume_supported = 4;
+  required uint32 max_artifact_count = 5;
+  required uint32 max_manifest_size = 6;
+  required uint32 preferred_usb_chunk_size = 7;
+  required uint32 preferred_ble_chunk_size = 8;
+}
+
+message DeviceResourceUpdatePrepare {
+  required bytes manifest = 1;
+}
+
+message DeviceResourceUpdateItem {
+  required string artifact_id = 1;
+  required string group = 2;
+  required ResourceHash content_hash = 3;
+  required uint64 size = 4;
+  required ResourceArtifactStatus status = 5;
+
+  // Returned only when resuming; the SDK continues from this absolute offset.
+  optional uint64 processed_bytes = 6 [default = 0];
+  optional ResourceUpdateError error = 7 [default = RESOURCE_UPDATE_ERROR_NONE];
+}
+
+message DeviceResourceUpdatePlan {
+  required string session_id = 1;
+  required string release_id = 2;
+  required ResourceUpdatePhase phase = 3;
+  repeated DeviceResourceUpdateItem items = 4;
+  required uint64 full_release_bytes = 5;
+  required uint64 required_transfer_bytes = 6;
+  required uint64 reused_bytes = 7;
+  required uint64 available_bytes = 8;
+  required bool reboot_required = 9;
+  optional ResourceUpdateError error = 10 [default = RESOURCE_UPDATE_ERROR_NONE];
+}
+
+message DeviceResourceArtifactWrite {
+  required string session_id = 1;
+  required string artifact_id = 2;
+  required uint64 offset = 3;
+  required bytes data = 4;
+}
+
+message DeviceResourceArtifactWriteAck {
+  required string session_id = 1;
+  required string artifact_id = 2;
+  required uint64 processed_bytes = 3;
+  optional ResourceUpdateError error = 4 [default = RESOURCE_UPDATE_ERROR_NONE];
+}
+
+message DeviceResourceArtifactFinish {
+  required string session_id = 1;
+  required string artifact_id = 2;
+  required ResourceHash content_hash = 3;
+}
+
+message DeviceResourceArtifactResult {
+  required string session_id = 1;
+  required string artifact_id = 2;
+  required ResourceArtifactStatus status = 3;
+  optional ResourceUpdateError error = 4 [default = RESOURCE_UPDATE_ERROR_NONE];
+}
+
+message DeviceResourceUpdateCommit {
+  required string session_id = 1;
+}
+
+message DeviceResourceUpdateCancel {
+  required string session_id = 1;
+  optional bool remove_staging = 2 [default = true];
+}
+
+message DeviceResourceUpdateStatusGet {
+  optional string session_id = 1;
+}
+
+message DeviceResourceUpdateStatus {
+  optional string session_id = 1;
+  optional string release_id = 2;
+  required ResourceUpdatePhase phase = 3;
+  repeated DeviceResourceUpdateItem items = 4;
+  optional uint32 progress = 5;
+  optional ResourceUpdateError error = 6 [default = RESOURCE_UPDATE_ERROR_NONE];
+  optional string rollback_release_id = 7;
+}

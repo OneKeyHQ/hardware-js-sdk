@@ -3,10 +3,9 @@ import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { hex2BfcAddress, publicKeyToAddress } from './normalize';
-import { supportBatchPublicKey } from '../../utils/deviceFeaturesUtils';
-import { batchGetPublickeys } from '../helpers/batchGetPublickeys';
+import { batchGetPublickeys, supportBatchPublicKeyByDevice } from '../helpers/batchGetPublickeys';
 
-import type { BenfenAddress, BenfenGetAddressParams } from '../../types';
+import type { BenfenAddress, BenfenGetAddressParams, DeviceFirmwareRange } from '../../types';
 import type { BenfenGetAddress as HardwareBenfenGetAddress } from '@onekeyfe/hd-transport';
 
 export default class BenfenGetAddress extends BaseMethod<HardwareBenfenGetAddress[]> {
@@ -47,8 +46,12 @@ export default class BenfenGetAddress extends BaseMethod<HardwareBenfenGetAddres
     });
   }
 
-  getVersionRange() {
+  getVersionRange(): DeviceFirmwareRange {
     return {
+      pro2: {
+        min: '0.0.0',
+        unsupported: true,
+      },
       pro: {
         min: '4.12.0',
       },
@@ -59,7 +62,7 @@ export default class BenfenGetAddress extends BaseMethod<HardwareBenfenGetAddres
   }
 
   async run() {
-    const supportsBatchPublicKey = supportBatchPublicKey(this.device?.features);
+    const supportsBatchPublicKey = supportBatchPublicKeyByDevice(this.device);
     let responses: BenfenAddress[] = [];
 
     if (supportsBatchPublicKey) {
@@ -75,7 +78,8 @@ export default class BenfenGetAddress extends BaseMethod<HardwareBenfenGetAddres
             'BenfenAddress',
             param
           );
-          address = addressRes.message.address;
+          // BenfenAddress.address is optional in proto but always present on success.
+          address = addressRes.message.address ?? '';
         } else {
           address = publicKeyToAddress(publicKey);
         }
@@ -103,7 +107,7 @@ export default class BenfenGetAddress extends BaseMethod<HardwareBenfenGetAddres
           );
           const result = {
             path: serializedPath(param.address_n),
-            address: hex2BfcAddress(res.message.address),
+            address: hex2BfcAddress(res.message.address ?? ''),
           };
           if (this.shouldConfirm) {
             this.postPreviousAddressMessage(result);

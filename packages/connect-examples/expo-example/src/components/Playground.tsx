@@ -7,22 +7,40 @@ import PlaygroundExecutor, { type MethodPayload } from './PlaygroundExecutor';
 import { useExpandMode } from '../provider/ExpandModeProvider';
 import { Button } from './ui/Button';
 import AutoWrapperTextArea from './ui/AutoWrapperTextArea';
+import { SwitchInput } from './SwitchInput';
 
 export interface PresupposeProps {
   title: string;
   value: any; // JSON object
 }
 
+export interface CheckboxFieldProps {
+  /** Dotted path in parameter JSON, such as `targets.hw` or `types.build_id`. */
+  path: string;
+  label: string;
+}
+
+export interface CheckboxGroupProps {
+  title: string;
+  fields: CheckboxFieldProps[];
+}
+
 export type PlaygroundProps = {
   description?: string;
   presupposes?: PresupposeProps[];
+  /** Optional boolean shortcut synchronized bidirectionally with parameter JSON. */
+  checkboxGroups?: CheckboxGroupProps[];
   deprecated?: boolean;
 } & MethodPayload;
+
+const getValueAtPath = (obj: any, path: string): unknown =>
+  path.split('.').reduce((acc, key) => (acc == null ? undefined : acc[key]), obj);
 
 const Playground = ({
   method,
   description,
   presupposes,
+  checkboxGroups,
   deprecated,
   noConnIdReq,
   noDeviceIdReq,
@@ -91,6 +109,69 @@ const Playground = ({
     }
     return null;
   }, [fillParameterCallback, intl, presupposes]);
+
+  const parsedParams = useMemo(() => {
+    try {
+      const value = JSON.parse(params);
+      return value && typeof value === 'object' && !Array.isArray(value) ? value : undefined;
+    } catch (error) {
+      return undefined;
+    }
+  }, [params]);
+
+  const toggleCheckboxField = useCallback((path: string, checked: boolean) => {
+    let payload: any;
+    try {
+      payload = JSON.parse(paramsRef.current);
+    } catch (error) {
+      payload = {};
+    }
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      payload = {};
+    }
+
+    const keys = path.split('.');
+    let cursor = payload;
+    for (let i = 0; i < keys.length - 1; i += 1) {
+      if (!cursor[keys[i]] || typeof cursor[keys[i]] !== 'object') {
+        cursor[keys[i]] = {};
+      }
+      cursor = cursor[keys[i]];
+    }
+    const leafKey = keys[keys.length - 1];
+    if (checked) {
+      cursor[leafKey] = true;
+    } else {
+      delete cursor[leafKey];
+    }
+    setParams(JSON.stringify(payload, null, 2));
+  }, []);
+
+  const CheckboxGroupsView = useMemo(() => {
+    if (!checkboxGroups || checkboxGroups.length === 0) return null;
+    return (
+      <>
+        {checkboxGroups.map(group => (
+          <Stack key={`checkbox-group-${group.title}`} paddingHorizontal="$2">
+            <Text fontSize={16} fontWeight="bold">
+              {group.title}
+            </Text>
+            <Stack flexDirection="row" flexWrap="wrap">
+              {group.fields.map(field => (
+                <SwitchInput
+                  key={`checkbox-${group.title}-${field.path}`}
+                  vertical
+                  label={field.label}
+                  value={getValueAtPath(parsedParams, field.path) === true}
+                  onToggle={checked => toggleCheckboxField(field.path, checked)}
+                />
+              ))}
+            </Stack>
+          </Stack>
+        ))}
+      </>
+    );
+  }, [checkboxGroups, parsedParams, toggleCheckboxField]);
 
   const RequestParamsView = useMemo(
     () => (
@@ -175,6 +256,7 @@ const Playground = ({
             {description}
           </Text>
           {PresupposeView}
+          {CheckboxGroupsView}
           {RequestParamsView}
           {PlaygroundExecutorView}
           {ResponseView}

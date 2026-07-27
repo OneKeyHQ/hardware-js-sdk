@@ -48,8 +48,7 @@ const DeviceInfoPage: React.FC = () => {
         value = onekeyValue;
         break;
       }
-      const featuresValue =
-        currentDevice?.features?.[f as keyof typeof currentDevice.features];
+      const featuresValue = currentDevice?.features?.[f as keyof typeof currentDevice.features];
       if (featuresValue != null && featuresValue !== '') {
         value = featuresValue;
         break;

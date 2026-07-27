@@ -1,4 +1,4 @@
-import { HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { EDeviceType, EFirmwareType, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import FirmwareUpdateV2 from '../../src/api/FirmwareUpdateV2';
 import { getBinary } from '../../src/api/firmware/getBinary';
@@ -113,6 +113,14 @@ const createMethod = ({
     },
     commands,
     getCommands: () => commands,
+    getCurrentDeviceType: () =>
+      deviceType === 'PURE' ? EDeviceType.ClassicPure : EDeviceType.Classic1s,
+    getCurrentFirmwareType: () => EFirmwareType.Universal,
+    getCurrentFirmwareVersionString: () => '3.0.0',
+    getCurrentBootloaderVersionString: () => '0.0.0',
+    getCurrentSerialNo: () => (deviceType === 'PURE' ? 'CP123456' : 'CL123456'),
+    isBootloader: () => bootloaderMode,
+    isProtocolV2: () => false,
     acquire,
     toMessageObject: jest.fn(() => ({})),
   } as any;

@@ -11,7 +11,65 @@ const JSON_PARAMETER_NAMES = [
   'outputs',
   'refTxs',
   'payload',
+  'targets',
+  'types',
+  'select',
+  'resume',
+  'firmwareVersion',
+  'bleVersion',
+  'bootloaderVersion',
 ] as const;
+
+const LAZY_PARAMETER_VALUE_MARKER = '__expoPlaygroundLazyParameterValue';
+
+export type LazyParameterValue<T = unknown> = {
+  readonly [LAZY_PARAMETER_VALUE_MARKER]: true;
+  readonly label?: string;
+  readonly previewValue: unknown;
+  readonly resolve: () => T;
+};
+
+export function createLazyParameterValue<T>({
+  label,
+  previewValue,
+  resolve,
+}: {
+  label?: string;
+  previewValue: unknown;
+  resolve: () => T;
+}): LazyParameterValue<T> {
+  return {
+    [LAZY_PARAMETER_VALUE_MARKER]: true,
+    label,
+    previewValue,
+    resolve,
+  };
+}
+
+export function isLazyParameterValue(value: unknown): value is LazyParameterValue {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    (value as Record<string, unknown>)[LAZY_PARAMETER_VALUE_MARKER] === true &&
+    typeof (value as { resolve?: unknown }).resolve === 'function'
+  );
+}
+
+export function getParameterDisplayValue(value: unknown): unknown {
+  if (isLazyParameterValue(value)) {
+    return value.previewValue;
+  }
+
+  return value;
+}
+
+function resolveLazyParameterValue(paramName: string, value: unknown): unknown {
+  if (!isLazyParameterValue(value)) {
+    return value;
+  }
+
+  return parseParameterValue(paramName, value.resolve());
+}
 
 /**
  * 检查参数是否需要 JSON 解析
@@ -39,6 +97,10 @@ export function shouldParseAsJSON(paramName: string, value: unknown): boolean {
  * @returns 解析后的参数值
  */
 export function parseParameterValue(paramName: string, value: unknown): unknown {
+  if (isLazyParameterValue(value)) {
+    return value;
+  }
+
   // 如果值已经是对象，直接返回（预设值可能已经是对象）
   if (
     typeof value === 'object' &&
@@ -69,14 +131,57 @@ export function parseParameterValue(paramName: string, value: unknown): unknown 
  * @param params 参数对象
  * @returns 处理后的参数对象
  */
-export function processParameters(params: Record<string, unknown>): Record<string, unknown> {
+export function processParameters(
+  params: Record<string, unknown>,
+  options: { resolveLazyValues?: boolean } = {}
+): Record<string, unknown> {
   const processedParams: Record<string, unknown> = {};
 
   Object.entries(params).forEach(([key, value]) => {
-    processedParams[key] = parseParameterValue(key, value);
+    const parsedValue = parseParameterValue(key, value);
+    processedParams[key] = options.resolveLazyValues
+      ? resolveLazyParameterValue(key, parsedValue)
+      : parsedValue;
   });
 
   return processedParams;
+}
+
+export function resolveLazyParameterValues(
+  params: Record<string, unknown>
+): Record<string, unknown> {
+  return processParameters(params, { resolveLazyValues: true });
+}
+
+/**
+ * Expand dotted parameter names into nested objects.
+ *
+ * For example, `{ 'targets.hw': true }` becomes `{ targets: { hw: true } }`.
+ * Preserve keys without dots for advanced methods with nested boolean parameters.
+ */
+export function unflattenParameters(data: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  Object.entries(data).forEach(([key, value]) => {
+    if (!key.includes('.')) {
+      result[key] = value;
+      return;
+    }
+    const segments = key.split('.');
+    let cursor = result;
+    for (let i = 0; i < segments.length - 1; i += 1) {
+      const segment = segments[i];
+      if (
+        !cursor[segment] ||
+        typeof cursor[segment] !== 'object' ||
+        Array.isArray(cursor[segment])
+      ) {
+        cursor[segment] = {};
+      }
+      cursor = cursor[segment] as Record<string, unknown>;
+    }
+    cursor[segments[segments.length - 1]] = value;
+  });
+  return result;
 }
 
 /**

@@ -13,6 +13,7 @@ import HardwareSdk, {
   createUiMessage,
   enableLog,
   executeCallback,
+  getLogBlockLabel,
   getLogger,
   initCore,
   parseConnectSettings,
@@ -38,7 +39,9 @@ const eventEmitter = new EventEmitter();
 const Log = getLogger(LoggerNames.HdCommonConnectSdk);
 
 const getTransport = async (env: ConnectSettings['env']) => {
-  if (env === 'desktop-web-ble') return ElectronBleTransport;
+  if (env === 'desktop-web-ble') {
+    return ElectronBleTransport;
+  }
   if (env === 'webusb' || env === 'desktop-webusb') return WebUsbTransport;
   if (env === 'lowlevel') return LowlevelTransport;
   if (env === 'node-usb') {
@@ -57,10 +60,15 @@ let _settings = parseConnectSettings();
 let _messageID = 0;
 export const messagePromises: { [key: number]: Deferred<any> } = {};
 
-const dispose = () => {
+const dispose = async () => {
+  const core = _core;
+  _core = undefined;
   eventEmitter.removeAllListeners();
-  _core?.dispose?.();
+  Object.keys(messagePromises).forEach(key => {
+    delete messagePromises[Number(key)];
+  });
   _settings = parseConnectSettings();
+  await core?.dispose?.();
 };
 
 const uiResponse = (response: UiResponseEvent) => {
@@ -82,8 +90,9 @@ function handleMessage(message: CoreMessage) {
     return;
   }
 
+  const blockLog = getLogBlockLabel(message);
   if (event !== LOG_EVENT) {
-    Log.debug('hd-common-connect-sdk handleMessage', message);
+    Log.debug('hd-common-connect-sdk handleMessage', blockLog ?? message);
   }
   switch (event) {
     case UI_EVENT:
@@ -98,7 +107,13 @@ function handleMessage(message: CoreMessage) {
     case DEVICE_EVENT:
       if (
         (
-          [DEVICE.CONNECT, DEVICE.DISCONNECT, DEVICE.FEATURES, DEVICE.SUPPORT_FEATURES] as string[]
+          [
+            DEVICE.CONNECT,
+            DEVICE.DISCONNECT,
+            DEVICE.FEATURES,
+            DEVICE.STATE,
+            DEVICE.SUPPORT_FEATURES,
+          ] as string[]
         ).includes(message.type)
       ) {
         eventEmitter.emit(message.type, message.payload);
@@ -157,7 +172,8 @@ const init = async (
 };
 
 const call = async (params: any) => {
-  Log.debug('call: ', params);
+  const blockLog = getLogBlockLabel(params);
+  Log.debug('call: ', blockLog ?? params);
 
   try {
     const response = await postMessage({ event: IFRAME.CALL, type: IFRAME.CALL, payload: params });

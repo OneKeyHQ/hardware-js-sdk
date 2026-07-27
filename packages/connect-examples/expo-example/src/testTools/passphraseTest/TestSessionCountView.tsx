@@ -402,6 +402,7 @@ export default function TestSessionCountView() {
     pushRunnerLog,
     selectedDevice?.connectId,
     showOnOneKey,
+    stopTest,
     testChain,
   ]);
 

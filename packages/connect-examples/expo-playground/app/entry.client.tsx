@@ -33,6 +33,11 @@ import ChainMethodsIndexPage from './routes/chains.$chainId._index';
 import ChainMethodExecutePage from './routes/chains.$chainId.$methodName';
 import DeviceMethodsIndexPage from './routes/device-methods._index';
 import DeviceMethodExecutePage from './routes/device-methods.$methodName';
+import Pro2DebugPage from './routes/pro2-debug';
+import Pro2UpdatePage from './routes/pro2-update';
+import Pro2SpecialUpdatePage from './routes/pro2-special-update';
+import MethodBatchTestPage from './routes/method-batch-test';
+import MultisigTestPage from './routes/multisig-test';
 
 // Import styles
 import './tailwind.css';
@@ -121,6 +126,14 @@ const router = createHashRouter(
         },
 
         {
+          path: 'device-method',
+          element: <DeviceMethodsIndexPage />,
+        },
+        {
+          path: 'device-method/:methodName',
+          element: <DeviceMethodExecutePage />,
+        },
+        {
           path: 'device-methods',
           element: <DeviceMethodsIndexPage />,
         },
@@ -140,6 +153,27 @@ const router = createHashRouter(
         {
           path: 'chains/:chainId/:methodName',
           element: <ChainMethodExecutePage />,
+        },
+
+        {
+          path: 'pro2-debug',
+          element: <Pro2DebugPage />,
+        },
+        {
+          path: 'pro2-update',
+          element: <Pro2UpdatePage />,
+        },
+        {
+          path: 'pro2-special-update',
+          element: <Pro2SpecialUpdatePage />,
+        },
+        {
+          path: 'method-batch-test',
+          element: <MethodBatchTestPage />,
+        },
+        {
+          path: 'multisig-test',
+          element: <MultisigTestPage />,
         },
       ],
     },

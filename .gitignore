@@ -1,6 +1,9 @@
 node_modules
 .yarn
 .DS_Store
+.wrangler
+__pycache__/
+*.py[cod]
 
 .idea
 *.sublime-project
@@ -27,6 +30,10 @@ logs
 
 # automation test reports
 automation-report-*.json
+
+# protobuf build temp files (packages/hd-transport/scripts/protobuf-build.sh)
+messages-tmp.proto
+messages-protocol-v2-tmp.proto
 
 # build outputs
 lib
@@ -82,3 +89,6 @@ packages/connect-examples/expo-example/web-build
 
 # Expo web export
 **/web-build
+.vercel
+.env*.local
+.worktrees/

@@ -4,6 +4,7 @@ import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
 
 import MessagesJSON from '../data/messages/messages.json';
 import MessagesLegacyV1JSON from '../data/messages/messages_legacy_v1.json';
+import MessagesProtocolV2JSON from '../data/messages/messages-protocol-v2.json';
 import {
   LoggerNames,
   getDeviceBLEFirmwareVersion,
@@ -33,6 +34,7 @@ const Log = getLogger(LoggerNames.Core);
 
 export const FIRMWARE_FIELDS = [
   'firmware',
+  'firmware-v1',
   'firmware-v2',
   'firmware-v8',
   'firmware-btc-v8',
@@ -40,10 +42,12 @@ export const FIRMWARE_FIELDS = [
 
 export type IFirmwareField = (typeof FIRMWARE_FIELDS)[number];
 
-export type MessageVersion = 'latest' | 'v1';
+export type ProtocolV1MessageSchema = 'v1CurrentSchema' | 'v1LegacySchema';
+export type ProtobufMessageSchema = ProtocolV1MessageSchema | 'v2Schema';
 
 const FIRMWARE_FIELD_TYPE_MAP: Readonly<Record<IFirmwareField, EFirmwareType>> = {
   firmware: EFirmwareType.Universal,
+  'firmware-v1': EFirmwareType.Universal,
   'firmware-v2': EFirmwareType.Universal,
   'firmware-v8': EFirmwareType.Universal,
   'firmware-btc-v8': EFirmwareType.BitcoinOnly,
@@ -62,7 +66,9 @@ function getFirmwareTypeFromField(firmwareField: IFirmwareField): EFirmwareType 
 }
 
 export default class DataManager {
-  static deviceMap: DeviceTypeMap = {
+  static deviceMap: DeviceTypeMap & {
+    [k: string]: DeviceTypeMap[keyof DeviceTypeMap] | undefined;
+  } = {
     [EDeviceType.Classic]: {
       firmware: [],
       ble: [],
@@ -83,6 +89,10 @@ export default class DataManager {
       firmware: [],
       ble: [],
     },
+    [EDeviceType.Pro2]: {
+      firmware: [],
+      ble: [],
+    },
     [EDeviceType.ClassicPure]: {
       firmware: [],
       ble: [],
@@ -93,9 +103,10 @@ export default class DataManager {
 
   static settings: ConnectSettings;
 
-  static messages: { [version in MessageVersion]: JSON } = {
-    latest: MessagesJSON as unknown as JSON,
-    v1: MessagesLegacyV1JSON as unknown as JSON,
+  static messages: { [schema in ProtobufMessageSchema]: JSON } = {
+    v1CurrentSchema: MessagesJSON as unknown as JSON,
+    v1LegacySchema: MessagesLegacyV1JSON as unknown as JSON,
+    v2Schema: MessagesProtocolV2JSON as unknown as JSON,
   };
 
   static lastCheckTimestamp = 0;
@@ -109,11 +120,11 @@ export default class DataManager {
 
     const deviceFirmwareType = getFirmwareType(features);
     const deviceFirmwareVersion = getDeviceFirmwareVersion(features);
-    if (features.firmware_present === false) {
+    if (features.firmwarePresent === false) {
       return 'none';
     }
 
-    if (DeviceModelToTypes.model_mini.includes(deviceType) && features.bootloader_mode) {
+    if (DeviceModelToTypes.model_mini.includes(deviceType) && features.bootloaderMode) {
       return 'unknown';
     }
 
@@ -259,8 +270,8 @@ export default class DataManager {
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
 
     if (
-      features.firmware_present === false ||
-      (DeviceModelToTypes.model_classic.includes(deviceType) && features.bootloader_mode)
+      features.firmwarePresent === false ||
+      (DeviceModelToTypes.model_classic.includes(deviceType) && features.bootloaderMode)
     ) {
       // Always return least changelog
       return getReleaseChangelog(targetDeviceConfigList, '0.0.0');
@@ -298,15 +309,15 @@ export default class DataManager {
     const deviceType = getDeviceType(features);
     if (deviceType === EDeviceType.Unknown) return 'unknown';
 
-    const deviceBLEFirmwareVersion = getDeviceBLEFirmwareVersion(features);
+    const deviceBleFirmwareVersion = getDeviceBLEFirmwareVersion(features);
 
     /** mini has no device ble_ver */
-    if (!deviceBLEFirmwareVersion) {
+    if (!deviceBleFirmwareVersion) {
       return 'none';
     }
 
     const targetDeviceConfigList = this.deviceMap[deviceType]?.ble ?? [];
-    const currentVersion = deviceBLEFirmwareVersion.join('.');
+    const currentVersion = deviceBleFirmwareVersion.join('.');
     return getReleaseStatus(targetDeviceConfigList, currentVersion);
   };
 
@@ -314,14 +325,14 @@ export default class DataManager {
     const deviceType = getDeviceType(features);
     if (deviceType === EDeviceType.Unknown) return [];
 
-    const deviceBLEFirmwareVersion = getDeviceBLEFirmwareVersion(features);
+    const deviceBleFirmwareVersion = getDeviceBLEFirmwareVersion(features);
 
-    if (!deviceBLEFirmwareVersion) {
+    if (!deviceBleFirmwareVersion) {
       return [];
     }
 
     const targetDeviceConfigList = this.deviceMap[deviceType]?.ble ?? [];
-    const currentVersion = deviceBLEFirmwareVersion.join('.');
+    const currentVersion = deviceBleFirmwareVersion.join('.');
     return getReleaseChangelog(targetDeviceConfigList, currentVersion);
   };
 
@@ -442,6 +453,7 @@ export default class DataManager {
         [EDeviceType.Mini]: this.enrichFirmwareReleaseInfo(data.mini),
         [EDeviceType.Touch]: this.enrichFirmwareReleaseInfo(data.touch),
         [EDeviceType.Pro]: this.enrichFirmwareReleaseInfo(data.pro),
+        [EDeviceType.Pro2]: this.enrichFirmwareReleaseInfo(data.pro2),
       };
       this.assets = {
         bridge: data.bridge,
@@ -472,8 +484,8 @@ export default class DataManager {
     }
   }
 
-  static getProtobufMessages(messageVersion: MessageVersion = 'latest'): JSON {
-    return this.messages[messageVersion];
+  static getProtobufMessages(schema: ProtobufMessageSchema = 'v1CurrentSchema'): JSON {
+    return this.messages[schema];
   }
 
   static getSettings(key?: undefined): ConnectSettings;

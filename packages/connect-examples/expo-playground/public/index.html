@@ -5,13 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>OneKey Developer Playground</title>
     <meta name="description" content="Interactive playground for OneKey Hardware SDK. Test hardware wallet APIs, manage devices, and explore blockchain integrations.">
+    <meta name="application-name" content="OneKey Developer Playground">
+    <meta name="apple-mobile-web-app-title" content="OneKey Playground">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#000000">
+    <link rel="canonical" href="<%= OG_URL %>">
 
     <!-- Open Graph Meta Tags -->
     <meta property="og:title" content="OneKey Developer Playground">
     <meta property="og:description" content="Interactive playground for OneKey Hardware SDK. Test hardware wallet APIs and blockchain integrations.">
     <meta property="og:type" content="website">
-    <meta property="og:image" content="<%= BASE_PATH %>og.jpg">
+    <meta property="og:url" content="<%= OG_URL %>">
+    <meta property="og:site_name" content="OneKey Developer Playground">
+    <meta property="og:image" content="<%= OG_IMAGE_URL %>">
+    <meta property="og:image:secure_url" content="<%= OG_IMAGE_URL %>">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="OneKey Developer Playground">
 
     <!-- Twitter Meta Tags -->
     <meta name="twitter:card" content="summary_large_image">
@@ -19,14 +31,17 @@
     <meta name="twitter:description" content="Interactive playground for OneKey Hardware SDK. Test hardware wallet APIs and blockchain integrations.">
     <meta name="twitter:creator" content="@OneKeyHQ">
     <meta name="twitter:site" content="@OneKeyHQ">
-    <meta name="twitter:image" content="<%= BASE_PATH %>og.jpg">
+    <meta name="twitter:url" content="<%= OG_URL %>">
+    <meta name="twitter:image" content="<%= OG_IMAGE_URL %>">
+    <meta name="twitter:image:alt" content="OneKey Developer Playground">
 
     <!-- Favicon and icons -->
-    <link rel="icon" href="<%= BASE_PATH %>favicon.ico" sizes="any">
+    <link rel="manifest" href="<%= BASE_PATH %>manifest.json">
+    <link rel="icon" href="<%= BASE_PATH %>favicon.ico" sizes="16x16 24x24 32x32 48x48" type="image/x-icon">
     <link rel="icon" type="image/png" sizes="32x32" href="<%= BASE_PATH %>favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="<%= BASE_PATH %>favicon-16x16.png">
-    <link rel="apple-touch-icon" href="<%= BASE_PATH %>apple-touch-icon.png">
-    <link rel="shortcut icon" href="<%= BASE_PATH %>favicon.ico">
+    <link rel="apple-touch-icon" sizes="192x192" href="<%= BASE_PATH %>apple-touch-icon.png">
+    <link rel="shortcut icon" href="<%= BASE_PATH %>favicon.ico" type="image/x-icon">
     
     <!-- 基础样式 -->
     <style>

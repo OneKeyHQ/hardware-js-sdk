@@ -71,8 +71,12 @@ export const getHardwareSDKInstance = memoizee(
           fetchConfig: true,
         };
 
-        // Get stored connection type to determine SDK type and transport
-        const storedConnectionType = await getStoredConnectionType();
+        // Get stored connection type to determine SDK type and transport.
+        // In Electron, Desktop BLE now auto-detects Protocol V1/V2.
+        let storedConnectionType = await getStoredConnectionType();
+        if (!storedConnectionType && Platform.OS === 'web' && (window as any).desktopApi) {
+          storedConnectionType = 'desktop-web-ble';
+        }
         const useCommonSdk = shouldUseCommonSdk(storedConnectionType);
 
         console.log('SDK Configuration: =====> ', {
