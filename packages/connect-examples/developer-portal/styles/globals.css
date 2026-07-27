@@ -693,6 +693,62 @@ tbody tr:hover {
   background-color: rgba(16, 17, 26, 0.95) !important;
 }
 
+.nextra-mobile-nav {
+  overflow: hidden;
+  background-color: #101111 !important;
+}
+
+.nextra-mobile-nav .nextra-sidebar-footer {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+.onekey-navbar-inner {
+  width: 100%;
+  max-width: var(--nextra-content-width, 90rem);
+  padding-left: max(env(safe-area-inset-left), 1rem);
+  padding-right: max(env(safe-area-inset-right), 1rem);
+}
+
+@media (min-width: 768px) {
+  .onekey-navbar-inner {
+    padding-left: max(env(safe-area-inset-left), 1.5rem);
+    padding-right: max(env(safe-area-inset-right), 1.5rem);
+  }
+}
+
+@media (max-width: 1023px) {
+  .onekey-primary-nav {
+    display: none !important;
+  }
+
+  header.nextra-navbar .nextra-hamburger {
+    display: inline-flex !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  header.nextra-navbar .nextra-hamburger {
+    display: none !important;
+  }
+}
+
+@media (max-width: 420px) {
+  header.nextra-navbar .onekey-logo-subtitle {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) and (pointer: coarse) {
+  header.nextra-navbar nav > a:not([aria-label="Home page"]),
+  header.nextra-navbar .nextra-hamburger {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
 /* 顶栏下拉菜单在当前分区时高亮（与链接 aria-current 行为保持一致） */
 header.nextra-navbar button[data-onekey-nav-active="true"] {
   font-weight: 500 !important;
@@ -1655,7 +1711,7 @@ body:has(.landing-page) header.nextra-navbar button[data-onekey-nav-active="true
   color: #ffffff !important;
 }
 
-@media (min-width: 769px) and (max-width: 1024px) {
+@media (min-width: 769px) and (max-width: 1279px) {
   header.nextra-navbar .onekey-logo-subtitle {
     display: none;
   }
