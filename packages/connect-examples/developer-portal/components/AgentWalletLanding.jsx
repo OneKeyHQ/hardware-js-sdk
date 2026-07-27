@@ -217,7 +217,7 @@ export function AgentWalletLanding({ locale = 'en' }) {
   const basePath = `/${locale}`
 
   return (
-    <div className="landing-page flex min-h-screen max-w-full flex-col overflow-x-hidden bg-[#101111] text-white">
+    <div className="landing-page flex min-h-screen flex-col overflow-x-hidden bg-[#101111] text-white">
       <main className="flex flex-col">
         {/* HERO — copy + product shot */}
         <section className="relative overflow-hidden">
