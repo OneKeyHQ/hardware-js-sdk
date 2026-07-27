@@ -6,7 +6,12 @@ import { decodeMessage as decodeV1Message } from './v1/receive';
 import { createMessageFromName, createMessageFromType } from '../serialization/protobuf/messages';
 import { encode as encodeProtobuf } from '../serialization/protobuf/encode';
 import { decode as decodeProtobuf } from '../serialization/protobuf/decode';
-import { decodeFrame as decodeV2Frame, encodeProtobufFrame, isAckFrame } from './v2';
+import {
+  decodeFrame as decodeV2Frame,
+  encodeProtobufFrame,
+  inspectFrameHeader,
+  isAckFrame,
+} from './v2';
 
 import type { Root } from 'protobufjs/light';
 
@@ -71,15 +76,19 @@ export const ProtocolV1 = {
 
 export const ProtocolV2 = {
   isAckFrame,
+  inspectFrameHeader,
 
   inspectFrame(schemas: ProtocolV2Schemas, frame: Uint8Array) {
-    const { messageTypeId, pbPayload, seq } = decodeV2Frame(frame);
+    const { messageTypeId, pbPayload, seq, router, packetSrc, dataType } = decodeV2Frame(frame);
     const { messageName } = createProtocolV2MessageFromType(messageTypeId, schemas);
     return {
       messageName,
       messageTypeId,
       pbPayload,
       seq,
+      router,
+      packetSrc,
+      dataType,
       type: messageName,
     };
   },

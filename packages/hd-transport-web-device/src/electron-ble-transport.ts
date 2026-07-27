@@ -378,11 +378,12 @@ export default class ElectronBleTransport {
     }
 
     if (expectedProtocol === 'V2') {
-      // Skip probing when the caller explicitly confirms V2, such as reconnect after a
-      // firmware reboot where expectedProtocol carries the previously probed result.
-      this.deviceProtocol.set(uuid, 'V2');
-      this.Log?.debug(`[Electron BLE] detectProtocol: uuid=${uuid} -> V2 (expected)`);
-      return 'V2';
+      if (await this.probeProtocolV2(uuid)) {
+        this.deviceProtocol.set(uuid, 'V2');
+        this.Log?.debug(`[Electron BLE] detectProtocol: uuid=${uuid} -> V2 (expected)`);
+        return 'V2';
+      }
+      throw this.createProtocolMismatchError(expectedProtocol);
     }
 
     // Protocol must be actively probed after connection. Name, PID, and descriptors only

@@ -182,7 +182,7 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
       }
     }
 
-    let binary;
+    let binary: ArrayBuffer | undefined;
     try {
       if (params.binary) {
         binary = this.params.binary;
@@ -205,6 +205,13 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
       }
     } catch (err) {
       throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
+    }
+
+    if (!binary) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.FirmwareUpdateDownloadFailed,
+        'Firmware binary is unavailable'
+      );
     }
 
     await this.device.acquire();

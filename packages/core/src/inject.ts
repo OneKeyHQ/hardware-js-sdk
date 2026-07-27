@@ -165,24 +165,14 @@ export const createCoreApi = (
   protocolInfoRequest: (connectId, params) =>
     call({ ...params, connectId, method: 'protocolInfoRequest' }),
   ping: (connectId, params) => call({ ...params, connectId, method: 'ping' }),
-  deviceFirmwareUpdate: (connectId, params) =>
-    call({ ...params, connectId, method: 'deviceFirmwareUpdate' }),
   deviceGetFirmwareUpdateStatus: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceGetFirmwareUpdateStatus' }),
-  deviceFactoryInfoSet: (connectId, params) =>
-    call({ ...params, connectId, method: 'deviceFactoryInfoSet' }),
   deviceFactoryInfoGet: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceFactoryInfoGet' }),
-  filesystemPermissionFix: (connectId, params) =>
-    call({ ...params, connectId, method: 'filesystemPermissionFix' }),
-  filesystemFormat: connectId => call({ connectId, method: 'filesystemFormat' }),
   uploadPortfolio: (connectId, params) => call({ ...params, connectId, method: 'uploadPortfolio' }),
   fileRead: (connectId, params) => call({ ...params, connectId, method: 'fileRead' }),
-  fileWrite: (connectId, params) => call({ ...params, connectId, method: 'fileWrite' }),
-  fileDelete: (connectId, params) => call({ ...params, connectId, method: 'fileDelete' }),
   dirList: (connectId, params) => call({ ...params, connectId, method: 'dirList' }),
   dirMake: (connectId, params) => call({ ...params, connectId, method: 'dirMake' }),
-  dirRemove: (connectId, params) => call({ ...params, connectId, method: 'dirRemove' }),
   pathInfo: (connectId, params) => call({ ...params, connectId, method: 'pathInfo' }),
   deviceRecovery: (connectId, params) => call({ ...params, connectId, method: 'deviceRecovery' }),
   deviceReset: (connectId, params) => call({ ...params, connectId, method: 'deviceReset' }),
