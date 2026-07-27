@@ -34,14 +34,16 @@ describe('public device state API boundary', () => {
     expect(api).not.toHaveProperty('deviceSessionOpen');
     expect(api).not.toHaveProperty('deviceSettingsSet');
     expect(api).not.toHaveProperty('deviceSettingsPageShow');
-    expect(api.deviceFirmwareUpdate).toBeInstanceOf(Function);
+    expect(api).not.toHaveProperty('deviceFirmwareUpdate');
     expect(api.deviceGetFirmwareUpdateStatus).toBeInstanceOf(Function);
-    expect(api.deviceFactoryInfoSet).toBeInstanceOf(Function);
+    expect(api).not.toHaveProperty('deviceFactoryInfoSet');
     expect(api.deviceFactoryInfoGet).toBeInstanceOf(Function);
-    expect(api.filesystemPermissionFix).toBeInstanceOf(Function);
-    expect(api.filesystemFormat).toBeInstanceOf(Function);
+    expect(api).not.toHaveProperty('filesystemPermissionFix');
+    expect(api).not.toHaveProperty('filesystemFormat');
     expect(api.fileRead).toBeInstanceOf(Function);
-    expect(api.fileWrite).toBeInstanceOf(Function);
+    expect(api).not.toHaveProperty('fileWrite');
+    expect(api).not.toHaveProperty('fileDelete');
+    expect(api).not.toHaveProperty('dirRemove');
     expect(api).not.toHaveProperty('filesystemFileRead');
     expect(api).not.toHaveProperty('filesystemDirList');
 
@@ -52,10 +54,12 @@ describe('public device state API boundary', () => {
     expect(publicMethods).not.toHaveProperty('deviceSessionOpen');
     expect(publicMethods).not.toHaveProperty('deviceSettingsSet');
     expect(publicMethods).not.toHaveProperty('deviceSettingsPageShow');
-    expect(publicMethods).toHaveProperty('filesystemPermissionFix');
-    expect(publicMethods).toHaveProperty('filesystemFormat');
+    expect(publicMethods).not.toHaveProperty('filesystemPermissionFix');
+    expect(publicMethods).not.toHaveProperty('filesystemFormat');
     expect(publicMethods).toHaveProperty('fileRead');
-    expect(publicMethods).toHaveProperty('fileWrite');
+    expect(publicMethods).not.toHaveProperty('fileWrite');
+    expect(publicMethods).not.toHaveProperty('fileDelete');
+    expect(publicMethods).not.toHaveProperty('dirRemove');
     expect(publicMethods).not.toHaveProperty('filesystemFileRead');
   });
 
@@ -139,9 +143,7 @@ describe('public device state API boundary', () => {
   test.each([
     'protocolInfoRequest',
     'ping',
-    'deviceFirmwareUpdate',
     'deviceGetFirmwareUpdateStatus',
-    'deviceFactoryInfoSet',
     'deviceFactoryInfoGet',
   ])('keeps the public development method %s available to the dispatcher', name => {
     expect(
@@ -166,17 +168,22 @@ describe('public device state API boundary', () => {
     ).toThrow(`Method ${name} is not set`);
   });
 
-  test.each(['filesystemPermissionFix', 'filesystemFormat'])(
-    'keeps the development maintenance method %s available to the dispatcher',
-    name => {
-      expect(
-        findMethod({
-          id: 1,
-          payload: { method: name },
-        } as any)
-      ).toBeDefined();
-    }
-  );
+  test.each([
+    'deviceFirmwareUpdate',
+    'deviceFactoryInfoSet',
+    'filesystemPermissionFix',
+    'filesystemFormat',
+    'fileWrite',
+    'fileDelete',
+    'dirRemove',
+  ])('rejects removed privileged method %s', name => {
+    expect(() =>
+      findMethod({
+        id: 1,
+        payload: { method: name },
+      } as any)
+    ).toThrow(`Method ${name} is not set`);
+  });
 
   test('projects getFeatures from the canonical state for Protocol V1 compatibility', async () => {
     const state = createEmptyDeviceState({

@@ -75,7 +75,8 @@ App 只展示“请在设备上操作”，不调用 `uiResponse()`。API `Succe
 
 ## 固件升级
 
-Protocol V1 继续使用 `firmwareUpdate` 至 `firmwareUpdateV3`；Pro2 使用 `firmwareUpdateV4`。低阶 `deviceFirmwareUpdate` 只负责发送安装目标，不执行完整升级编排。
+Protocol V1 继续使用 `firmwareUpdate` 至 `firmwareUpdateV3`；Pro2 使用 `firmwareUpdateV4`。低阶
+`DeviceFirmwareUpdate` 只供 Core 内部升级编排发送安装目标，不属于公共 `CoreApi`。
 
 切换固件类型不新增 `DeviceSettingsPageShow` 页面。`firmwareUpdateV4` 保持 `retry-on-locked`，解锁后发送 `DeviceReboot(Bootloader)`，确认与重启页面由设备固件处理，SDK 随后负责重连和升级编排。
 

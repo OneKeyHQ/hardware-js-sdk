@@ -29,6 +29,23 @@ const definedEntries = <T extends Record<string, unknown>>(value: T): T =>
     Object.entries(value).filter(([, fieldValue]) => fieldValue !== undefined)
   ) as T;
 
+const sanitizeRawFeatures = (features: Features): Features['raw'] => {
+  if (!features.raw) return undefined;
+
+  const raw = { ...features.raw };
+  if (raw.protocolV1Features) {
+    const { session_id: _sessionId, ...protocolV1Features } = raw.protocolV1Features;
+    const compatibilityFields = protocolV1Features as typeof protocolV1Features & {
+      sessionId?: string;
+      passphraseState?: string;
+    };
+    delete compatibilityFields.sessionId;
+    delete compatibilityFields.passphraseState;
+    raw.protocolV1Features = compatibilityFields as PROTO.Features;
+  }
+  return raw;
+};
+
 const imageVersion = (image?: DeviceFirmwareImageInfo | null) => image?.version ?? undefined;
 
 const bytesToHex = (value: unknown): string | undefined => {
@@ -127,7 +144,7 @@ export const mapFeaturesToState = (features: Features): DeviceStatePatch => ({
   },
   capabilities: features.capabilities,
   verification: definedEntries(features.verify ?? {}),
-  raw: features.raw,
+  raw: sanitizeRawFeatures(features),
 });
 
 export const mapProtocolV1FeaturesToState = (

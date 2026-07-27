@@ -16,6 +16,12 @@ export const projectFeatures = (state: StoredDeviceState): Features => {
   delete publicRawFeatures.session_id;
   delete publicRawFeatures.sessionId;
   delete publicRawFeatures.passphraseState;
+  const publicRaw = snapshot.raw
+    ? {
+        ...snapshot.raw,
+        protocolV1Features: publicRawFeatures,
+      }
+    : undefined;
   const rawOneKeyFeatures = snapshot.raw?.protocolV1OneKeyFeatures ?? {};
   const bootloaderMode =
     snapshot.protocol === 'V1'
@@ -84,7 +90,7 @@ export const projectFeatures = (state: StoredDeviceState): Features => {
     se04BootVersion: snapshot.versions.se04Boot,
     seVersion: snapshot.versions.se ?? null,
     verify: snapshot.verification,
-    raw: snapshot.raw,
+    raw: publicRaw,
     device_id: snapshot.identity.deviceId ?? undefined,
     ble_name: snapshot.identity.bleName ?? undefined,
     passphrase_protection: snapshot.status.passphraseProtection ?? undefined,

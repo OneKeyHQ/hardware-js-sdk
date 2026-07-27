@@ -48,3 +48,11 @@ export const PROTOCOL_V2_CHANNEL_SOCKET = 2;
 
 /** packet_src for protobuf commands; firmware routes zero to the protobuf dispatcher. */
 export const PROTOCOL_V2_PACKET_SRC_COMMAND = 0;
+
+/**
+ * Shared upper bound for a Protocol V2 request without a method-specific timeout.
+ * Interactive and signing calls may wait on the device UI, so keep this longer than
+ * ordinary transport timeouts while still preventing a stalled link from blocking
+ * the per-device queue forever.
+ */
+export const PROTOCOL_V2_DEFAULT_RESPONSE_TIMEOUT_MS = 5 * 60 * 1000;
