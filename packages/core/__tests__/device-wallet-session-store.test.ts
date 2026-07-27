@@ -116,7 +116,7 @@ describe('ClearSessionCache', () => {
     expect(deviceWalletSessionStore.get('device-2', 'hidden-a')).toBe('session-b');
   });
 
-  test('keeps legacy Features session fields as projections of the store', async () => {
+  test('keeps wallet sessions internal instead of projecting them through Features', async () => {
     const device = Device.fromDescriptor({ id: 'one', path: 'one' } as never);
     device.features = {
       protocol: 'V1',
@@ -133,11 +133,14 @@ describe('ClearSessionCache', () => {
     } as never;
 
     expect(device.state).not.toHaveProperty('session');
+    expect(device.getInternalState()).toBe('session-a');
     expect(device.features).toMatchObject({
-      sessionId: 'session-a',
-      session_id: 'session-a',
-      passphraseState: 'hidden-a',
+      sessionId: null,
+      session_id: null,
     });
+    expect(device.features).not.toHaveProperty('passphraseState');
+    expect(device.features?.raw?.protocolV1Features).not.toHaveProperty('sessionId');
+    expect(device.features?.raw?.protocolV1Features).not.toHaveProperty('session_id');
 
     const method = new ClearSessionCache({
       payload: {
@@ -151,10 +154,8 @@ describe('ClearSessionCache', () => {
 
     expect(device.features?.sessionId).toBeNull();
     expect(device.features?.session_id).toBeNull();
-    expect(device.state?.raw?.protocolV1Features).toMatchObject({
-      sessionId: 'session-a',
-      session_id: 'session-a',
-    });
+    expect(device.state?.raw?.protocolV1Features).not.toHaveProperty('sessionId');
+    expect(device.state?.raw?.protocolV1Features).not.toHaveProperty('session_id');
   });
 
   test('clears one wallet without using a device', async () => {

@@ -38,10 +38,11 @@ Transport 在 `acquire()` 完成物理连接后执行协议探测：
    `transferIn` 消费 V2 响应。
 4. 两者均失败时，清理本次连接资源并返回协议探测错误。
 
-显式协议参数的语义：
+显式协议参数只是探测优先级提示，不能替代活动响应验证：
 
-- `connectProtocol='V1'`：必须验证 V1。
-- `connectProtocol='V2'`：信任上层已确认的协议，用于固件升级重启后的重连，避免重复探测。
+- `connectProtocol='V1'`：必须收到有效的 V1 响应。
+- `connectProtocol='V2'`：必须收到有效的 V2 `Ping` 响应；固件升级重连也不能只信任 PID、
+  设备名或旧连接缓存。
 
 V2 probe 使用 `Ping { message: 'protocol-v2-probe' }`。探测消息只用于确认链路，不等同于查询协议版本或设备信息。
 
@@ -78,7 +79,7 @@ V2 帧用于承载 protobuf payload。维护时重点关注以下字段：
 | magic          | 固定帧标识 `0x5A`                         |
 | message type   | 请求或响应的消息编号                      |
 | payload length | protobuf payload 长度                     |
-| sequence       | 当前 Transport 生命周期内持续递增的帧序号 |
+| sequence       | 每个发送方向独立、在活动会话内持续递增的帧序号 |
 | payload        | protobuf 编码结果                         |
 | CRC8           | 帧完整性校验                              |
 
@@ -103,6 +104,9 @@ V2 帧用于承载 protobuf payload。维护时重点关注以下字段：
 - Session、frame assembler 与平台 adapter 在活动 Link 内复用。
 - `ProtocolV2SequenceCursor` 的生命周期长于一次连接；普通断开和重连不会把 sequence 重置为 1。
 - Transport `dispose` 时才清除 cursor、队列和全部 Link。
+- ACK 的 sequence 必须回显本次请求 sequence；设备业务响应使用自己的发送序列，
+  SDK 校验该方向的连续性，不能把它与请求 sequence 强行比较。
+- 每次读取都有有限超时；调用未指定时使用共享的 5 分钟默认值。
 
 Link-fatal 错误包括响应超时、断连、I/O、generation 失效和帧错误。发生后必须先使 Link
 失效，再取消读取、清空 assembler、关闭平台连接并清理协议缓存。

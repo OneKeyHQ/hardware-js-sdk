@@ -95,7 +95,7 @@ export async function getProtocolV2WalletSession(
     message.btc_test_address,
     device.getCurrentDeviceId(),
     message.session_id,
-    options?.initSession ? null : device.features?.sessionId ?? null
+    options?.initSession ? null : cachedSessionId ?? null
   );
 
   return {

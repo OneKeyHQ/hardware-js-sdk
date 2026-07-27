@@ -156,12 +156,16 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (
 
   // Attach to pin try to fix internal state
   const deviceId = device.getCurrentDeviceId();
+  let existingSessionId: string | null | undefined;
+  if (!options?.initSession && typeof device.getInternalState === 'function') {
+    existingSessionId = device.getInternalState();
+  }
   device.updateInternalState(
     device.getCurrentPassphraseProtection() ?? false,
     passphraseState,
     deviceId,
     newSession,
-    options?.initSession ? null : device.features?.sessionId
+    options?.initSession ? null : existingSessionId
   );
 
   return {

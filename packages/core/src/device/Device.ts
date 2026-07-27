@@ -222,24 +222,7 @@ export class Device extends EventEmitter {
 
   get features(): Features | undefined {
     if (!this.state) return undefined;
-    const features = projectFeatures(this.state);
-    const sessionCacheDeviceKey =
-      this.state.identity.deviceId ||
-      (this.isProtocolV2()
-        ? this.originalDescriptor.path || this.originalDescriptor.id
-        : undefined);
-    const sessionId =
-      sessionCacheDeviceKey && this.passphraseState
-        ? deviceWalletSessionStore.get(sessionCacheDeviceKey, this.passphraseState)
-        : undefined;
-    return sessionId
-      ? {
-          ...features,
-          sessionId,
-          session_id: sessionId,
-          passphraseState: this.passphraseState,
-        }
-      : features;
+    return projectFeatures(this.state);
   }
 
   set features(features: Features | undefined) {
@@ -828,16 +811,10 @@ export class Device extends EventEmitter {
 
     const initStartAt = Date.now();
     try {
-      // @ts-expect-error
-      const { message } = await Promise.race([
-        this.commands.typedCall('Initialize', 'Features', payload),
-        new Promise((_, reject) => {
-          setTimeout(() => {
-            reject(ERRORS.TypedError(HardwareErrorCode.DeviceInitializeFailed));
-            // iOS ble bound device timeout 20s
-          }, 25 * 1000);
-        }),
-      ]);
+      const { message } = await this.commands.typedCall('Initialize', 'Features', payload, {
+        // iOS BLE bound devices can need close to 20 seconds.
+        timeoutMs: 25 * 1000,
+      });
 
       const initCostMs = Date.now() - initStartAt;
       this.setLastInitializeDuration(initCostMs);
@@ -972,10 +949,6 @@ export class Device extends EventEmitter {
         ? protoFeatures
         : buildProtocolV1FeaturesPayload(protoFeatures, this.features);
 
-    // GetFeatures doesn't return 'session_id'
-    if (this.features?.sessionId && !feat.sessionId) {
-      feat.sessionId = this.features.sessionId;
-    }
     feat.unlocked = feat.unlocked ?? true;
 
     feat = fixFeaturesFirmwareVersion(feat);

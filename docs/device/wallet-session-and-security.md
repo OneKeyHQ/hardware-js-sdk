@@ -604,6 +604,8 @@ Protocol V2 采用“Firmware 负责钱包选择、Host 负责会话缓存与身
 
 `PassphraseAck` 只属于 Protocol V1 的 firmware 中间请求流程。Pro2 的
 `DeviceSessionGet` 是 Core 内部获取/恢复 Session 的协议命令，不是公共查询 API。
+公共 `Features`、`DeviceState.raw`、设备事件和日志均不得包含 `session_id`；
+Session 仅保存在按设备和 `passphraseState` 隔离的内部缓存中。
 
 ## 10. Protocol V2 transport session 与 seq 管理
 
@@ -616,7 +618,8 @@ Protocol V2 采用“Firmware 负责钱包选择、Host 负责会话缓存与身
 - 调 transport 的 `writeFrame()` 和 `readFrame()`。
 - 按 expectedTypes / intermediateTypes 过滤响应。
 - 串行化同一 session 上的调用，避免两个并发调用互相消费响应。
-- 写阶段有 watchdog；读阶段按调用可选 timeout，避免用户确认和固件安装被默认短超时截断。
+- 写阶段有 watchdog；读阶段使用调用指定 timeout，未指定时使用共享的 5 分钟上限，
+  避免无限等待，同时允许用户确认和固件安装设置更合适的业务超时。
 
 这里的 `seq` 是协议帧序号，不等同于设备 `session_id`。它用于 V2 帧级诊断和顺序控制；设备 wallet/passphrase session 仍由固件消息里的 `session_id` 表达。
 

@@ -382,3 +382,26 @@ describe('DeviceCommands Protocol V2 interactive response compatibility', () => 
     });
   });
 });
+
+describe('DeviceCommands cancellation', () => {
+  it('stops waiting after the bounded cancellation timeout', async () => {
+    jest.useFakeTimers({ doNotFake: ['performance'] });
+    try {
+      const commands = createCommands();
+      commands.disposed = false;
+      commands.callPromise = new Promise(() => {});
+      const dispose = jest.fn().mockResolvedValue(undefined);
+      commands.dispose = dispose;
+
+      const cancellation = commands.cancel();
+      jest.advanceTimersByTime(10_000);
+      await Promise.resolve();
+
+      await expect(cancellation).resolves.toBeUndefined();
+      expect(dispose).toHaveBeenCalledWith(true);
+      expect(commands.callPromise).toBeUndefined();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+});

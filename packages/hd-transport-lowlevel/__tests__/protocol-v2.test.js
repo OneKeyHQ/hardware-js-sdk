@@ -172,7 +172,7 @@ describe('LowlevelTransport protocol framing', () => {
         supported_messages: [60200, 60201, 60206, 60207],
         protobuf_definition: 'onekey-protocol-v2',
       },
-      { router: PROTOCOL_V2_CHANNEL_BLE_UART }
+      { router: PROTOCOL_V2_CHANNEL_BLE_UART, seq: 2 }
     );
     const plugin = createPlugin({
       devices: [{ id: 'pro2-id', name: 'OneKey Pro 2', commType: 'ble' }],
@@ -253,15 +253,19 @@ describe('LowlevelTransport protocol framing', () => {
   });
 
   test('reuses the active generation when Core acquires the same BLE connection again', async () => {
-    const probeResponse = ProtocolV2.encodeFrame(
-      schemas,
-      'Success',
-      { message: 'ok' },
-      { router: PROTOCOL_V2_CHANNEL_BLE_UART }
+    const responses = [1, 2, 3, 4].map(seq =>
+      bytesToHex(
+        ProtocolV2.encodeFrame(
+          schemas,
+          'Success',
+          { message: 'ok' },
+          { router: PROTOCOL_V2_CHANNEL_BLE_UART, seq }
+        )
+      )
     );
     const plugin = createPlugin({
       devices: [{ id: 'repeated-acquire-id', name: 'OneKey Pro 2', commType: 'ble' }],
-      responses: [bytesToHex(probeResponse), bytesToHex(probeResponse)],
+      responses,
     });
     const lowlevel = configureTransport(plugin);
 
@@ -283,13 +287,19 @@ describe('LowlevelTransport protocol framing', () => {
     const sentSeqs = plugin.send.mock.calls.map(([, hex]) =>
       Number.parseInt(hex.slice(12, 14), 16)
     );
-    expect(sentSeqs).toEqual([1, 2]);
+    expect(sentSeqs).toEqual([1, 2, 3, 4]);
   });
 
-  test('trusts explicit Protocol V2 during bootloader reconnect without probing Ping', async () => {
+  test('actively probes explicit Protocol V2 during bootloader reconnect', async () => {
+    const probeResponse = ProtocolV2.encodeFrame(
+      schemas,
+      'Success',
+      { message: 'ok' },
+      { router: PROTOCOL_V2_CHANNEL_BLE_UART }
+    );
     const plugin = createPlugin({
       devices: [{ id: 'bootloader-v2-id', name: 'OneKey Pro 2', commType: 'ble' }],
-      responses: [],
+      responses: [bytesToHex(probeResponse)],
     });
     const lowlevel = configureTransport(plugin);
 
@@ -299,8 +309,8 @@ describe('LowlevelTransport protocol framing', () => {
       uuid: 'bootloader-v2-id',
       protocolType: 'V2',
     });
-    expect(plugin.send).not.toHaveBeenCalled();
-    expect(plugin.receive).not.toHaveBeenCalled();
+    expect(plugin.send).toHaveBeenCalledTimes(1);
+    expect(plugin.receive).toHaveBeenCalledTimes(1);
   });
 
   test('resets the lowlevel connection before probing Protocol V2 after a V1 timeout', async () => {
@@ -342,11 +352,23 @@ describe('LowlevelTransport protocol framing', () => {
   });
 
   test('disconnects a tainted Protocol V2 link after a response timeout', async () => {
+    const probeResponse = ProtocolV2.encodeFrame(
+      schemas,
+      'Success',
+      { message: 'ok' },
+      { router: PROTOCOL_V2_CHANNEL_BLE_UART }
+    );
     const plugin = createPlugin({
       devices: [{ id: 'timeout-v2-id', name: 'OneKey Pro 2', commType: 'ble' }],
-      responses: [],
+      responses: [bytesToHex(probeResponse)],
     });
-    plugin.receive.mockImplementation(() => new Promise(() => {}));
+    let receiveCount = 0;
+    plugin.receive.mockImplementation(() => {
+      receiveCount += 1;
+      return receiveCount === 1
+        ? Promise.resolve(bytesToHex(probeResponse))
+        : new Promise(() => {});
+    });
     const lowlevel = configureTransport(plugin);
 
     await lowlevel.acquire({ uuid: 'timeout-v2-id', expectedProtocol: 'V2' });

@@ -53,18 +53,11 @@ export { default as deviceInfoGet } from './protocol-v2/DeviceInfoGet';
 export { default as deviceStatusGet } from './protocol-v2/DeviceStatusGet';
 export { default as protocolInfoRequest } from './protocol-v2/ProtocolInfoRequest';
 export { default as ping } from './protocol-v2/Ping';
-export { default as deviceFirmwareUpdate } from './protocol-v2/DeviceFirmwareUpdate';
 export { default as deviceGetFirmwareUpdateStatus } from './protocol-v2/DeviceGetFirmwareUpdateStatus';
-export { default as deviceFactoryInfoSet } from './protocol-v2/DeviceFactoryInfoSet';
 export { default as deviceFactoryInfoGet } from './protocol-v2/DeviceFactoryInfoGet';
-export { default as filesystemPermissionFix } from './protocol-v2/FilesystemPermissionFix';
-export { default as filesystemFormat } from './protocol-v2/FilesystemFormat';
 export { default as fileRead } from './FileRead';
-export { default as fileWrite } from './FileWrite';
-export { default as fileDelete } from './FileDelete';
 export { default as dirList } from './DirList';
 export { default as dirMake } from './DirMake';
-export { default as dirRemove } from './DirRemove';
 export { default as pathInfo } from './PathInfo';
 export { default as uploadPortfolio } from './UploadPortfolio';
 

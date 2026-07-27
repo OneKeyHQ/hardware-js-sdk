@@ -238,17 +238,17 @@ V2 调用 `openWalletSession()`。地址、签名和 `preInitialize` 仍沿用�
 
 ## Protocol V2 公共边界
 
-正式业务应使用按业务语义组织的公共 API。Pro2 调试阶段仍临时公开部分底层开发接口，
-由 App 按设备分流；这些接口同样显式声明在 `CoreApi` 中，不使用隐藏的 internal 分发表：
+正式业务应使用按业务语义组织的公共 API。只读诊断接口可以暂时保留，但会直接改变设备、
+文件系统或安装状态的底层命令必须留在 Core 内部：
 
-| 分类           | 正式业务 API                                             | 调试阶段临时公开的开发 API                                |
-| -------------- | -------------------------------------------------------- | --------------------------------------------------------- |
-| 状态           | `getDeviceState`                                         | `deviceInfoGet`、`deviceStatusGet`                        |
-| 设置           | `deviceSettings`、`deviceChangePin`、`deviceWipe`        | 无                                                        |
-| 钱包 Session   | `openWalletSession`、`clearSessionCache`                 | 无；`deviceSessionOpen` 不是 SDK API                      |
-| 固件           | `firmwareUpdateV4` 等高层流程                            | `deviceFirmwareUpdate`、`deviceGetFirmwareUpdateStatus`   |
-| 文件维护       | `uploadPortfolio`、`deviceUploadWallpaper`、高层固件升级 | `file*`、`dir*`、`pathInfo`、权限修复与格式化命令         |
-| 协议与工厂调试 | 无                                                       | `protocolInfoRequest`、`ping`、`deviceFactoryInfoGet/Set` |
+| 分类           | 正式业务 API                                             | 保留的只读/诊断 API                                      | Core 内部命令                                                               |
+| -------------- | -------------------------------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------- |
+| 状态           | `getDeviceState`                                         | `deviceInfoGet`、`deviceStatusGet`                        | 无                                                                          |
+| 设置           | `deviceSettings`、`deviceChangePin`、`deviceWipe`        | 无                                                        | 无                                                                          |
+| 钱包 Session   | `openWalletSession`、`clearSessionCache`                 | 无                                                        | `deviceSessionOpen`                                                         |
+| 固件           | `firmwareUpdateV4` 等高层流程                            | `deviceGetFirmwareUpdateStatus`                           | `deviceFirmwareUpdate`                                                      |
+| 文件维护       | `uploadPortfolio`、`deviceUploadWallpaper`、高层固件升级 | `fileRead`、`dirList`、`pathInfo`，以及受约束的 `dirMake` | `fileWrite`、`fileDelete`、`dirRemove`、`filesystemFormat/PermissionFix`     |
+| 协议与工厂调试 | 无                                                       | `protocolInfoRequest`、`ping`、`deviceFactoryInfoGet`     | `deviceFactoryInfoSet`                                                      |
 
 `getFeatures`、`getOnekeyFeatures` 仅作为 Protocol V1 兼容入口保留并标记废弃，新接入使用 `getDeviceState`。
 

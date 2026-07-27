@@ -14,9 +14,7 @@ const publicDevelopmentMethodNames = [
   'deviceStatusGet',
   'protocolInfoRequest',
   'ping',
-  'deviceFirmwareUpdate',
   'deviceGetFirmwareUpdateStatus',
-  'deviceFactoryInfoSet',
   'deviceFactoryInfoGet',
 ] as const;
 
@@ -26,16 +24,16 @@ const removedRawSettingsMethodNames = [
   'deviceSettingsPageShow',
 ] as const;
 
-const publicFilesystemMethodNames = [
-  'filesystemPermissionFix',
+const publicFilesystemMethodNames = ['fileRead', 'dirList', 'dirMake', 'pathInfo'] as const;
+
+const removedPrivilegedMethodNames = [
+  'deviceFactoryInfoSet',
   'filesystemFormat',
-  'fileRead',
+  'filesystemPermissionFix',
+  'deviceFirmwareUpdate',
   'fileWrite',
   'fileDelete',
-  'dirList',
-  'dirMake',
   'dirRemove',
-  'pathInfo',
 ] as const;
 
 const unpublishedFilesystemAliases = [
@@ -69,6 +67,10 @@ describe('public Pro2 API boundary', () => {
       expect(api).not.toHaveProperty(name);
       expect(publicMethods).not.toHaveProperty(name);
     });
+    removedPrivilegedMethodNames.forEach(name => {
+      expect(api).not.toHaveProperty(name);
+      expect(publicMethods).not.toHaveProperty(name);
+    });
     unpublishedFilesystemAliases.forEach(name => {
       expect(api).not.toHaveProperty(name);
       expect(publicMethods).not.toHaveProperty(name);
@@ -98,6 +100,18 @@ describe('public Pro2 API boundary', () => {
 
   test.each(removedRawSettingsMethodNames)(
     'rejects removed raw settings method %s at the SDK dispatcher boundary',
+    name => {
+      expect(() =>
+        findMethod({
+          id: 1,
+          payload: { method: name },
+        } as any)
+      ).toThrow(`Method ${name} is not set`);
+    }
+  );
+
+  test.each(removedPrivilegedMethodNames)(
+    'rejects removed privileged method %s at the SDK dispatcher boundary',
     name => {
       expect(() =>
         findMethod({

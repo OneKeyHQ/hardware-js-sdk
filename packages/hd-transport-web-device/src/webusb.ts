@@ -293,10 +293,11 @@ export default class WebUsbTransport {
     }
 
     if (expectedProtocol === 'V2') {
-      // Skip probing when the caller explicitly confirms V2, such as reconnect after a
-      // firmware reboot where expectedProtocol carries the previously probed result.
-      this.deviceProtocol.set(path, 'V2');
-      return 'V2';
+      if (await this.probeProtocolV2(path)) {
+        this.deviceProtocol.set(path, 'V2');
+        return 'V2';
+      }
+      throw this.createProtocolMismatchError(expectedProtocol);
     }
 
     // Protocol must be actively probed after connection. Name, PID, and descriptors only
@@ -658,7 +659,7 @@ export default class WebUsbTransport {
   }
 
   private async withProtocolReadTimeout<T>(
-    _path: string,
+    path: string,
     promise: Promise<T>,
     timeoutMs: number,
     protocol: ProtocolType,
@@ -680,9 +681,16 @@ export default class WebUsbTransport {
       return await Promise.race([
         guardedPromise,
         new Promise<never>((_, reject) => {
-          timer = setTimeout(() => {
+          timer = setTimeout(async () => {
             timedOut = true;
             onTimeout?.();
+            if (protocol === 'V1') {
+              try {
+                await this.resetConnectionAfterProbe(path);
+              } catch (error) {
+                this.Log.debug('[WebUsbTransport] reset after Protocol V1 timeout failed:', error);
+              }
+            }
             reject(new Error(`Protocol ${protocol} read timeout after ${timeoutMs}ms`));
           }, timeoutMs);
         }),

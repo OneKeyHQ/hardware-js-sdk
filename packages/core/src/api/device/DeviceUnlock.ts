@@ -17,7 +17,6 @@ export default class DeviceUnlock extends BaseMethod<LockDevice> {
   }
 
   async run() {
-    await this.device.unlockDevice();
-    return this.device.getDeviceState();
+    return this.device.unlockDevice();
   }
 }
