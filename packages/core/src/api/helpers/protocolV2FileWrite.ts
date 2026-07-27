@@ -152,6 +152,12 @@ export async function writeProtocolV2File(options: ProtocolV2FileWriteOptions) {
         options.throwIfAborted?.();
       }
     }
+    if (!response) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        'FilesystemFileWrite completed without a response'
+      );
+    }
     options.throwIfAborted?.();
     lastMessage = response.message;
     const rawProcessedByte = response.message?.processed_byte;

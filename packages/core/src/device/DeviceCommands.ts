@@ -337,20 +337,27 @@ export class DeviceCommands {
     if (this.disposed) {
       return;
     }
-    this.dispose(true);
-    if (this.callPromise) {
-      try {
-        await Promise.all([
-          new Promise((_resolve, reject) =>
-            // eslint-disable-next-line no-promise-executor-return
-            setTimeout(() => reject(new Error('cancel timeout')), 10 * 1000)
-          ),
-          await this.callPromise,
-        ]);
-      } catch {
-        // device error
+    const activeCall = this.callPromise;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const cancellation = (async () => {
+      await this.dispose(true);
+      await activeCall?.catch(() => undefined);
+    })();
+
+    try {
+      await Promise.race([
+        cancellation,
+        new Promise<void>(resolve => {
+          timer = setTimeout(resolve, 10 * 1000);
+        }),
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
+      if (this.callPromise === activeCall) {
         this.callPromise = undefined;
       }
+      // The cancellation work may finish after the bounded wait.
+      cancellation.catch(() => undefined);
     }
   }
 

@@ -285,6 +285,16 @@ export default class LowlevelTransport {
       const jsonData = ProtocolV1.decodeMessage(messages, response);
       return check.call(jsonData);
     } catch (e) {
+      if (
+        e?.errorCode === HardwareErrorCode.BleTimeoutError &&
+        options?.timeoutMs !== PROTOCOL_PROBE_TIMEOUT_MS
+      ) {
+        try {
+          await this.resetConnectionAfterProbe(uuid, 'V1');
+        } catch (resetError) {
+          this.Log.debug('[LowlevelTransport] reset after Protocol V1 timeout failed:', resetError);
+        }
+      }
       if (name === 'Initialize' && options?.timeoutMs === PROTOCOL_PROBE_TIMEOUT_MS) {
         this.Log.debug('[LowlevelTransport] Protocol V1 Initialize probe call failed:', e);
       } else {
@@ -327,12 +337,12 @@ export default class LowlevelTransport {
     protocolHint?: ProtocolType
   ): Promise<ProtocolType> {
     if (expectedProtocol === 'V2') {
-      // Bootloader may not answer Ping after an update reboot. An explicit V2 hint means
-      // the protocol was already confirmed, so establish the link and let the first
-      // business command validate it, matching RN and Electron BLE.
-      this.deviceProtocol.set(uuid, 'V2');
-      this.Log?.debug(`[LowlevelTransport] detectProtocol: uuid=${uuid} -> V2 (expected)`);
-      return 'V2';
+      if (await this.probeProtocolV2(uuid)) {
+        this.deviceProtocol.set(uuid, 'V2');
+        this.Log?.debug(`[LowlevelTransport] detectProtocol: uuid=${uuid} -> V2 (expected)`);
+        return 'V2';
+      }
+      throw this.createProtocolMismatchError(expectedProtocol);
     }
 
     if (expectedProtocol === 'V1') {

@@ -1,4 +1,9 @@
-import { PROTO_DATA_TYPE_ACK, PROTO_HEAD_CRC_SIZE, PROTO_HEAD_SOF } from './constants';
+import {
+  PROTO_DATA_TYPE_ACK,
+  PROTO_DATA_TYPE_PACKET,
+  PROTO_HEAD_CRC_SIZE,
+  PROTO_HEAD_SOF,
+} from './constants';
 import { crc8 } from './crc8';
 
 export interface ProtoV2Frame {
@@ -8,9 +13,23 @@ export interface ProtoV2Frame {
   pbPayload: Uint8Array;
   /** Sequence number from the frame header */
   seq: number;
+  /** Routing channel from the frame header */
+  router: number;
+  /** Packet source from the frame header */
+  packetSrc: number;
+  /** Packet or ACK discriminator from the frame header */
+  dataType: number;
 }
 
-function validateFrame(data: Uint8Array): number {
+export type ProtoV2FrameHeader = {
+  frameLen: number;
+  router: number;
+  packetSrc: number;
+  dataType: number;
+  seq: number;
+};
+
+export function inspectFrameHeader(data: Uint8Array): ProtoV2FrameHeader {
   if (data.length < PROTO_HEAD_CRC_SIZE) {
     throw new Error(`Protocol V2 frame too short: ${data.length} bytes`);
   }
@@ -23,8 +42,10 @@ function validateFrame(data: Uint8Array): number {
 
   const frameLen = data[1] + data[2] * 256;
 
-  if (data.length < frameLen) {
-    throw new Error(`Frame truncated: expected ${frameLen} bytes, got ${data.length}`);
+  if (data.length !== frameLen) {
+    throw new Error(
+      `Protocol V2 frame length mismatch: expected ${frameLen} bytes, got ${data.length}`
+    );
   }
 
   const expectedHeaderCrc = crc8(data, 3);
@@ -45,7 +66,22 @@ function validateFrame(data: Uint8Array): number {
     );
   }
 
-  return frameLen;
+  // eslint-disable-next-line no-bitwise
+  const dataType = data[5] & 0x03;
+  // eslint-disable-next-line no-bitwise
+  const packetSrc = (data[5] >> 2) & 0x0f;
+  const seq = data[6];
+  if (seq === 0) {
+    throw new Error('Invalid Protocol V2 sequence: 0 is reserved');
+  }
+
+  return {
+    frameLen,
+    router: data[4],
+    packetSrc,
+    dataType,
+    seq,
+  };
 }
 
 export function isAckFrame(data: Uint8Array): boolean {
@@ -54,9 +90,9 @@ export function isAckFrame(data: Uint8Array): boolean {
     return false;
   }
 
-  const frameLen = validateFrame(data);
-  if (frameLen !== PROTO_HEAD_CRC_SIZE) {
-    throw new Error(`Invalid Protocol V2 ACK frame length: ${frameLen}`);
+  const header = inspectFrameHeader(data);
+  if (header.frameLen !== PROTO_HEAD_CRC_SIZE) {
+    throw new Error(`Invalid Protocol V2 ACK frame length: ${header.frameLen}`);
   }
   return true;
 }
@@ -72,9 +108,10 @@ export function isAckFrame(data: Uint8Array): boolean {
  * Returns the decoded messageTypeId, raw protobuf payload, and sequence number.
  */
 export function decodeFrame(data: Uint8Array): ProtoV2Frame {
-  const frameLen = validateFrame(data);
-
-  const seq = data[6];
+  const { frameLen, router, packetSrc, dataType, seq } = inspectFrameHeader(data);
+  if (dataType !== PROTO_DATA_TYPE_PACKET) {
+    throw new Error(`Invalid Protocol V2 data type: expected packet, got ${dataType}`);
+  }
   // Payload spans bytes 7 to frameLen-2 (inclusive), excluding final CRC byte
   const payloadData = data.slice(7, frameLen - 1);
 
@@ -85,5 +122,5 @@ export function decodeFrame(data: Uint8Array): ProtoV2Frame {
   const messageTypeId = payloadData[0] + payloadData[1] * 256;
   const pbPayload = payloadData.slice(2);
 
-  return { messageTypeId, pbPayload, seq };
+  return { messageTypeId, pbPayload, seq, router, packetSrc, dataType };
 }

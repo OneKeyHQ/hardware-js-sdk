@@ -8,7 +8,10 @@ const {
   probeProtocolV2,
 } = require('../src/protocols/v2/session');
 const protocolV2 = require('../src/protocols/v2');
-const { PROTOCOL_V2_FRAME_MAX_BYTES } = require('../src/constants');
+const {
+  PROTOCOL_V2_DEFAULT_RESPONSE_TIMEOUT_MS,
+  PROTOCOL_V2_FRAME_MAX_BYTES,
+} = require('../src/constants');
 
 const protocolV1Messages = parseConfigure({
   nested: {
@@ -221,6 +224,7 @@ const schemas = {
 
 const rewriteSeq = (frame, seq) => {
   const copy = new Uint8Array(frame);
+  copy[4] = 1;
   copy[6] = seq;
   copy[copy.length - 1] = protocolV2.crc8(copy, copy.length - 1);
   return copy;
@@ -429,7 +433,7 @@ describe('Protocol V2 framing and session', () => {
       logger,
       logPrefix: 'ProtocolV2 Test',
       writeFrame: () => Promise.resolve(),
-      readFrame: () => Promise.resolve(response),
+      readFrame: () => Promise.resolve(rewriteSeq(response, 1)),
     });
 
     await expect(session.call('Ping', { message: 'hello' })).rejects.toThrow();
@@ -451,7 +455,10 @@ describe('Protocol V2 framing and session', () => {
     const response = ProtocolV2.encodeFrame(schemas, 'Success', {
       message: 'ok',
     });
-    const readFrame = jest.fn().mockResolvedValueOnce(ack).mockResolvedValueOnce(response);
+    const readFrame = jest
+      .fn()
+      .mockResolvedValueOnce(ack)
+      .mockResolvedValueOnce(rewriteSeq(response, 1));
     const session = new ProtocolV2Session({
       schemas,
       router: 1,
@@ -468,6 +475,41 @@ describe('Protocol V2 framing and session', () => {
     expect(readFrame).toHaveBeenCalledTimes(2);
   });
 
+  test('session rejects an ACK that belongs to another request sequence', async () => {
+    const ack = new Uint8Array(8);
+    ack[0] = 0x5a;
+    ack[1] = 8;
+    ack[4] = 1;
+    ack[5] = 1;
+    ack[6] = 2;
+    ack[3] = protocolV2.crc8(ack, 3);
+    ack[7] = protocolV2.crc8(ack, 7);
+    const session = new ProtocolV2Session({
+      schemas,
+      router: 1,
+      writeFrame: () => Promise.resolve(),
+      readFrame: () => Promise.resolve(ack),
+    });
+
+    await expect(session.call('Ping', { message: 'hello' })).rejects.toThrow(
+      'Protocol V2 ACK sequence mismatch: expected 1, got 2'
+    );
+  });
+
+  test('session rejects a response from another routing channel', async () => {
+    const response = ProtocolV2.encodeFrame(schemas, 'Success', { message: 'wrong route' });
+    const session = new ProtocolV2Session({
+      schemas,
+      router: 1,
+      writeFrame: () => Promise.resolve(),
+      readFrame: () => Promise.resolve(response),
+    });
+
+    await expect(session.call('Ping', { message: 'hello' })).rejects.toThrow(
+      'Protocol V2 router mismatch: expected 1, got 0'
+    );
+  });
+
   test('session rejects BLE frames above its configured frame limit before writing', async () => {
     const writeFrame = jest.fn().mockResolvedValue(undefined);
     const response = ProtocolV2.encodeFrame(schemas, 'Success', {
@@ -478,7 +520,7 @@ describe('Protocol V2 framing and session', () => {
       router: 1,
       maxFrameBytes: 2048,
       writeFrame,
-      readFrame: () => Promise.resolve(response),
+      readFrame: () => Promise.resolve(rewriteSeq(response, 1)),
     });
 
     await expect(session.call('Ping', { message: 'x'.repeat(2048) })).rejects.toThrow(
@@ -498,7 +540,7 @@ describe('Protocol V2 framing and session', () => {
         new Promise(resolve => {
           setTimeout(resolve, 30);
         }),
-      readFrame: () => Promise.resolve(response),
+      readFrame: () => Promise.resolve(rewriteSeq(response, 1)),
     });
 
     await expect(
@@ -538,6 +580,25 @@ describe('Protocol V2 framing and session', () => {
     expect(logger.debug).not.toHaveBeenCalled();
   });
 
+  test('session rejects a gap in the device-owned response sequence', async () => {
+    const response = ProtocolV2.encodeFrame(schemas, 'Success', { message: 'ok' });
+    const readFrame = jest
+      .fn()
+      .mockResolvedValueOnce(rewriteSeq(response, 1))
+      .mockResolvedValueOnce(rewriteSeq(response, 3));
+    const session = new ProtocolV2Session({
+      schemas,
+      router: 1,
+      writeFrame: () => Promise.resolve(),
+      readFrame,
+    });
+
+    await session.call('Ping', { message: 'first' });
+    await expect(session.call('Ping', { message: 'second' })).rejects.toThrow(
+      'Protocol V2 response sequence mismatch: expected 2, got 3'
+    );
+  });
+
   test('session does not log transmit or receive payload details', async () => {
     const response = ProtocolV2.encodeFrame(schemas, 'Success', {
       message: 'accepted',
@@ -549,7 +610,7 @@ describe('Protocol V2 framing and session', () => {
       schemas,
       router: 1,
       writeFrame: () => Promise.resolve(),
-      readFrame: () => Promise.resolve(response),
+      readFrame: () => Promise.resolve(rewriteSeq(response, 1)),
       logger,
       logPrefix: 'ProtocolV2 Test',
     });
@@ -575,7 +636,7 @@ describe('Protocol V2 framing and session', () => {
       schemas,
       router: 1,
       writeFrame: () => Promise.resolve(),
-      readFrame: () => Promise.resolve(response),
+      readFrame: () => Promise.resolve(rewriteSeq(response, 1)),
       logger,
     });
 
@@ -600,7 +661,10 @@ describe('Protocol V2 framing and session', () => {
     const logger = {
       debug: jest.fn(),
     };
-    const readFrame = jest.fn().mockResolvedValueOnce(stale).mockResolvedValueOnce(response);
+    const readFrame = jest
+      .fn()
+      .mockResolvedValueOnce(rewriteSeq(stale, 1))
+      .mockResolvedValueOnce(rewriteSeq(response, 2));
     const session = new ProtocolV2Session({
       schemas,
       router: 1,
@@ -637,7 +701,9 @@ describe('Protocol V2 framing and session', () => {
       const [writtenFrame] = written;
       const { seq } = protocolV2.decodeFrame(writtenFrame);
       return Promise.resolve(
-        readFrame.mock.calls.length === 1 ? rewriteSeq(progress, seq) : rewriteSeq(success, seq)
+        readFrame.mock.calls.length === 1
+          ? rewriteSeq(progress, seq)
+          : rewriteSeq(success, protocolV2.nextProtoSeq(seq))
       );
     });
     const session = new ProtocolV2Session({
@@ -814,7 +880,7 @@ describe('Protocol V2 framing and session', () => {
         }
         return Promise.resolve();
       },
-      readFrame: () => Promise.resolve(response),
+      readFrame: () => Promise.resolve(rewriteSeq(response, 1)),
     });
 
     await expect(session.call('Ping', { message: '1' })).rejects.toThrow('transport write failed');
@@ -883,6 +949,7 @@ describe('Protocol V2 framing and session', () => {
     const writeContexts = [];
     const readContexts = [];
     const response = ProtocolV2.encodeFrame(schemas, 'Success', { message: 'ok' });
+    let responseSeq = 0;
     const session = new ProtocolV2Session({
       schemas,
       router: 1,
@@ -893,16 +960,24 @@ describe('Protocol V2 framing and session', () => {
       },
       readFrame: context => {
         readContexts.push(context);
-        return Promise.resolve(response);
+        responseSeq = protocolV2.nextProtoSeq(responseSeq);
+        return Promise.resolve(rewriteSeq(response, responseSeq));
       },
     });
 
     await session.call('Ping', { message: 'ping' }, { timeoutMs: 123 });
     await session.call('FileWrite', {}, { timeoutMs: 456 });
+    await session.call('Ping', { message: 'default-timeout' });
 
     expect(writeContexts).toEqual([
       { messageName: 'Ping', timeoutMs: 123, highVolume: false, generation: 7 },
       { messageName: 'FileWrite', timeoutMs: 456, highVolume: true, generation: 7 },
+      {
+        messageName: 'Ping',
+        timeoutMs: PROTOCOL_V2_DEFAULT_RESPONSE_TIMEOUT_MS,
+        highVolume: false,
+        generation: 7,
+      },
     ]);
     expect(readContexts).toEqual(writeContexts);
   });

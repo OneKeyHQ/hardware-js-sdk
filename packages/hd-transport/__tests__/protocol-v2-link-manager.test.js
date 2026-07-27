@@ -55,7 +55,12 @@ const rewriteSeq = (frame, seq) => {
 const createAdapterFactory = sentSeqs => {
   const adapters = [];
   let generation = 0;
-  const success = ProtocolV2.encodeFrame(schemas, 'Success', { message: 'ok' });
+  const success = ProtocolV2.encodeFrame(
+    schemas,
+    'Success',
+    { message: 'ok' },
+    { router: 1, packetSrc: 0, seq: 1 }
+  );
 
   return {
     adapters,
@@ -200,7 +205,12 @@ describe('ProtocolV2LinkManager', () => {
     const deviceABlocked = new Promise(resolve => {
       releaseDeviceA = resolve;
     });
-    const success = ProtocolV2.encodeFrame(schemas, 'Success', { message: 'ok' });
+    const success = ProtocolV2.encodeFrame(
+      schemas,
+      'Success',
+      { message: 'ok' },
+      { router: 1, packetSrc: 0, seq: 1 }
+    );
     const createAdapter = key => {
       let requestSeq = 0;
       return {
@@ -298,7 +308,12 @@ describe('ProtocolV2LinkManager', () => {
     const writeBlocked = new Promise(resolve => {
       releaseWrite = resolve;
     });
-    const success = ProtocolV2.encodeFrame(schemas, 'Success', { message: 'ok' });
+    const success = ProtocolV2.encodeFrame(
+      schemas,
+      'Success',
+      { message: 'ok' },
+      { router: 1, packetSrc: 0, seq: 1 }
+    );
     const adapter = {
       router: 1,
       generation: 1,

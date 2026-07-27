@@ -1,6 +1,10 @@
-import { PROTOCOL_V2_PACKET_SRC_COMMAND } from '../../constants';
+import {
+  PROTOCOL_V2_DEFAULT_RESPONSE_TIMEOUT_MS,
+  PROTOCOL_V2_PACKET_SRC_COMMAND,
+} from '../../constants';
 import { ProtocolV2FrameAssembler, concatUint8Arrays } from './frame-assembler';
 import { ProtocolV2SequenceCursor } from './sequence-cursor';
+import { nextProtoSeq } from './encode';
 import { ProtocolV2 } from '..';
 import * as check from '../../utils/highlevel-checks';
 import { LogBlockCommand } from '../../utils/logBlockCommand';
@@ -145,6 +149,8 @@ export class ProtocolV2Session {
   // in-flight calls on the same session would steal each other's responses.
   private pendingCall: Promise<unknown> = Promise.resolve();
 
+  private lastResponseSequence?: number;
+
   constructor(options: ProtocolV2SessionOptions) {
     this.options = options;
     this.sequenceCursor = options.sequenceCursor ?? new ProtocolV2SequenceCursor();
@@ -181,11 +187,15 @@ export class ProtocolV2Session {
       createTimeoutError,
       generation = 0,
     } = this.options;
+    const timeoutMs =
+      callOptions.timeoutMs && callOptions.timeoutMs > 0
+        ? callOptions.timeoutMs
+        : PROTOCOL_V2_DEFAULT_RESPONSE_TIMEOUT_MS;
 
     const shouldReduceDebug = shouldReduceProtocolV2Debug(name);
     const callContext: ProtocolV2CallContext = {
       messageName: name,
-      timeoutMs: callOptions.timeoutMs,
+      timeoutMs,
       highVolume: shouldReduceDebug,
       generation,
     };
@@ -235,8 +245,24 @@ export class ProtocolV2Session {
           // Timed out while waiting: drop the late frame and stop reading.
           break;
         }
+        const header = ProtocolV2.inspectFrameHeader(rxFrame);
+        if (header.router !== router) {
+          throw new Error(`Protocol V2 router mismatch: expected ${router}, got ${header.router}`);
+        }
+        if (header.packetSrc !== packetSrc) {
+          throw new Error(
+            `Protocol V2 packet source mismatch: expected ${packetSrc}, got ${header.packetSrc}`
+          );
+        }
+
         const isAck = ProtocolV2.isAckFrame(rxFrame);
-        if (!isAck) {
+        if (isAck) {
+          if (header.seq !== protoSeq) {
+            throw new Error(
+              `Protocol V2 ACK sequence mismatch: expected ${protoSeq}, got ${header.seq}`
+            );
+          }
+        } else {
           // Suppress Protocol V2 RX frame logs to avoid excessive transport diagnostics.
           /*
           const rxMetadata = ProtocolV2.inspectFrame(schemas, rxFrame);
@@ -253,6 +279,17 @@ export class ProtocolV2Session {
           */
 
           const decoded = ProtocolV2.decodeFrame(schemas, rxFrame);
+          if (
+            this.lastResponseSequence !== undefined &&
+            decoded.seq !== nextProtoSeq(this.lastResponseSequence)
+          ) {
+            throw new Error(
+              `Protocol V2 response sequence mismatch: expected ${nextProtoSeq(
+                this.lastResponseSequence
+              )}, got ${decoded.seq}`
+            );
+          }
+          this.lastResponseSequence = decoded.seq;
 
           const response = check.call(decoded);
           if (callOptions.intermediateTypes?.includes(response.type)) {
@@ -275,11 +312,11 @@ export class ProtocolV2Session {
 
     return withProtocolTimeout(
       readResponse(),
-      callOptions.timeoutMs,
+      timeoutMs,
       () =>
         createTimeoutError
-          ? createTimeoutError(name, callOptions.timeoutMs ?? 0)
-          : new Error(`Protocol V2 response timeout after ${callOptions.timeoutMs}ms for ${name}`),
+          ? createTimeoutError(name, timeoutMs)
+          : new Error(`Protocol V2 response timeout after ${timeoutMs}ms for ${name}`),
       () => {
         cancellation.cancelled = true;
       }

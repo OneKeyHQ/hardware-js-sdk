@@ -1262,6 +1262,7 @@ describe('Protocol V2 feature adapter', () => {
         promptPassphrase: jest.fn().mockResolvedValue({ passphrase: 'state-pro2-secret' }),
       },
       updateInternalState,
+      getInternalState: () => 'feature-session',
       getCurrentDeviceId: () => 'pro-device-id',
       getCurrentPassphraseProtection: () => true,
     }) as any;
@@ -4661,7 +4662,7 @@ describe('Protocol V2 protected method execution', () => {
       errorCode: HardwareErrorCode.DeviceLocked,
     });
 
-  test('uses locked retry by default for SDK business methods', () => {
+  test('does not replay SDK methods unless they are explicitly classified as retry-safe', () => {
     class TestBusinessMethod extends BaseMethod {
       init() {}
 
@@ -4675,7 +4676,7 @@ describe('Protocol V2 protected method execution', () => {
       payload: { method: 'testBusinessMethod' },
     } as any);
 
-    expect(method.unlockPolicy).toBe('retry-on-locked');
+    expect(method.unlockPolicy).toBe('none');
   });
 
   test.each([
@@ -5103,32 +5104,24 @@ describe('Protocol V2 current low-level methods', () => {
     });
   });
 
-  test('returns canonical public state after explicit device unlock', async () => {
+  test('preserves the legacy Features response after explicit device unlock', async () => {
     const method = new DeviceUnlock({
       id: 1,
       payload: { method: 'deviceUnlock' },
     });
     method.init();
 
-    const state = {
-      schemaVersion: 1,
-      revision: 2,
-      updatedAt: 1,
+    const features = {
       protocol: 'V2',
-      protocolVersion: 1,
-      identity: {},
-      status: { unlocked: true },
-      settings: {},
-      versions: {},
-      capabilities: [],
+      unlocked: true,
+      sessionId: null,
+      session_id: null,
     };
-    const unlockDevice = jest.fn().mockResolvedValue({ raw: { protocolV2DeviceStatus: {} } });
-    const getDeviceState = jest.fn().mockResolvedValue(state);
-    (method as any).device = { unlockDevice, getDeviceState };
+    const unlockDevice = jest.fn().mockResolvedValue(features);
+    (method as any).device = { unlockDevice };
 
-    await expect(method.run()).resolves.toBe(state);
+    await expect(method.run()).resolves.toBe(features);
     expect(unlockDevice).toHaveBeenCalledTimes(1);
-    expect(getDeviceState).toHaveBeenCalledWith();
   });
 
   test.each([

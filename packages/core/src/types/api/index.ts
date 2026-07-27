@@ -1,7 +1,5 @@
 import type {
   deviceFactoryInfoGet,
-  deviceFactoryInfoSet,
-  deviceFirmwareUpdate,
   deviceGetFirmwareUpdateStatus,
   deviceGetOnboardingStatus,
   deviceInfoGet,
@@ -10,12 +8,7 @@ import type {
   deviceUploadWallpaper,
   dirList,
   dirMake,
-  dirRemove,
-  fileDelete,
   fileRead,
-  fileWrite,
-  filesystemFormat,
-  filesystemPermissionFix,
   pathInfo,
   ping,
   protocolInfoRequest,
@@ -248,19 +241,12 @@ export type CoreApi = {
   deviceStatusGet: typeof deviceStatusGet;
   protocolInfoRequest: typeof protocolInfoRequest;
   ping: typeof ping;
-  deviceFirmwareUpdate: typeof deviceFirmwareUpdate;
   deviceGetFirmwareUpdateStatus: typeof deviceGetFirmwareUpdateStatus;
-  deviceFactoryInfoSet: typeof deviceFactoryInfoSet;
   deviceFactoryInfoGet: typeof deviceFactoryInfoGet;
-  filesystemPermissionFix: typeof filesystemPermissionFix;
-  filesystemFormat: typeof filesystemFormat;
   uploadPortfolio: typeof uploadPortfolio;
   fileRead: typeof fileRead;
-  fileWrite: typeof fileWrite;
-  fileDelete: typeof fileDelete;
   dirList: typeof dirList;
   dirMake: typeof dirMake;
-  dirRemove: typeof dirRemove;
   pathInfo: typeof pathInfo;
 
   /**
