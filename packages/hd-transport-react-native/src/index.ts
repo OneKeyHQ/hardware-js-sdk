@@ -103,7 +103,6 @@ const getFirmwareUploadWriteRetryType = (error: unknown): FirmwareUploadWriteRet
 
 const resolveFirmwareUploadRetryDelay = (attempt: number, baseDelayMs = 200, maxDelayMs = 1200) =>
   Math.min(baseDelayMs * 2 ** attempt, maxDelayMs);
-const BLE_RESPONSE_TIMEOUT_MS = 30_000;
 const PROTOCOL_PROBE_TIMEOUT_MS = 1000;
 const PROTOCOL_V2_PROBE_TIMEOUT_MS = 10_000;
 const DEVICE_SCAN_TIMEOUT_MS = 8000;
@@ -1616,10 +1615,18 @@ export default class ReactNativeBleTransport {
       androidPacketLength: tuning.androidPacketLength,
       mtu: Platform.OS === 'android' ? transport.mtuSize : undefined,
     });
+    let packetsWritten = 0;
     for (let offset = 0; offset < frame.length; offset += packetCapacity) {
       const chunk = frame.slice(offset, offset + packetCapacity);
       const base64 = Buffer.from(chunk).toString('base64');
       await transport.writeCharacteristic.writeWithoutResponse(base64);
+      packetsWritten += 1;
+      if (
+        offset + packetCapacity < frame.length &&
+        packetsWritten % FIRMWARE_UPLOAD_WRITE_BURST_SIZE === 0
+      ) {
+        await delay(FIRMWARE_UPLOAD_WRITE_PAUSE_MS);
+      }
     }
   }
 
@@ -1633,10 +1640,7 @@ export default class ReactNativeBleTransport {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
     }
 
-    const callOptions = {
-      ...options,
-      timeoutMs: options?.timeoutMs ?? BLE_RESPONSE_TIMEOUT_MS,
-    };
+    const callOptions = options;
     const highVolumeWrite = LogBlockCommand.has(name);
 
     if (highVolumeWrite) {

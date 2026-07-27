@@ -52,7 +52,7 @@ const HIGH_VOLUME_DEBUG_CALLS = new Set([
   'FirmwareUpload',
   'ResourceAck',
 ]);
-const SENSITIVE_DEBUG_CALLS = new Set(['DeviceSessionGet']);
+const SENSITIVE_DEBUG_CALLS = new Set(['DeviceSessionGet', 'DeviceSessionOpen']);
 
 function shouldReduceDebugForCall(type: string) {
   return HIGH_VOLUME_DEBUG_CALLS.has(type);
@@ -452,6 +452,7 @@ export class DeviceCommands {
         'PassphraseAck',
         'Cancel',
         'DeviceSessionGet',
+        'DeviceSessionOpen',
         'BixinPinInputOnDevice',
         'FilesystemFileRead',
         'FilesystemFileWrite',
