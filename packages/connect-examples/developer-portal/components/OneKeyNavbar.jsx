@@ -22,7 +22,7 @@ export function OneKeyNavbar({
   const alignClass = align === 'left' ? 'x:me-auto' : ''
   const logoStyle = align === 'right' ? { marginRight: 'auto' } : undefined
   const navWrapperClass = cn(
-    'x:mx-auto x:flex x:max-w-(--nextra-content-width) x:items-center x:gap-4 x:pl-[max(env(safe-area-inset-left),1.5rem)] x:pr-[max(env(safe-area-inset-right),1.5rem)]',
+    'onekey-navbar-inner x:mx-auto x:flex x:max-w-(--nextra-content-width) x:items-center x:gap-2 x:md:gap-4',
     'x:justify-end',
     className
   )
