@@ -122,6 +122,82 @@ describe('LedgerConnectorBase runtime genuine-check relay', () => {
   });
 });
 
+describe('LedgerConnectorBase server-owned APDU bridge', () => {
+  it('pauses the session refresher and forwards raw APDUs on the existing session', async () => {
+    const releaseRefresher = jest.fn();
+    const dmk = {
+      disableDeviceSessionRefresher: jest.fn().mockReturnValue(releaseRefresher),
+      getConnectedDevice: jest.fn().mockReturnValue({
+        id: 'physical-ledger',
+        modelId: 'nanoX',
+        name: 'Ledger Nano X',
+        type: 'USB',
+      }),
+      sendApdu: jest.fn().mockResolvedValue({
+        data: Uint8Array.from([0xab, 0xcd]),
+        statusCode: Uint8Array.from([0x90, 0x00]),
+      }),
+    };
+    const connector = new LedgerConnectorBase(async () => ({}), {
+      dmk: dmk as any,
+    });
+
+    await expect(
+      connector.call('session-1', 'startDeviceAttestationApduBridge', {})
+    ).resolves.toEqual({
+      success: true,
+      payload: {
+        id: 'physical-ledger',
+        modelId: 'nanoX',
+        name: 'Ledger Nano X',
+        connectionType: 'USB',
+      },
+    });
+    await expect(
+      connector.call('session-1', 'exchangeDeviceAttestationApdu', {
+        apduHex: 'e001000000',
+        timeoutMs: 2_000,
+      })
+    ).resolves.toEqual({
+      success: true,
+      payload: {
+        dataHex: 'abcd',
+        statusCodeHex: '9000',
+      },
+    });
+    await connector.call('session-1', 'stopDeviceAttestationApduBridge', {});
+
+    expect(dmk.disableDeviceSessionRefresher).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      blockerId: 'onekey-ledger-attestation-relay',
+    });
+    expect(dmk.sendApdu).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      apdu: Uint8Array.from([0xe0, 0x01, 0x00, 0x00, 0x00]),
+      abortTimeout: 2_000,
+      triggersDisconnection: false,
+    });
+    expect(releaseRefresher).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects APDUs when no server bridge owns the session', async () => {
+    const connector = new LedgerConnectorBase(async () => ({}), {
+      dmk: {} as any,
+    });
+
+    const result = await connector.call(
+      'session-1',
+      'exchangeDeviceAttestationApdu',
+      { apduHex: 'e001000000' }
+    );
+
+    expect(result).toMatchObject({
+      success: false,
+      error: { message: expect.stringContaining('not active') },
+    });
+  });
+});
+
 describe('LedgerConnectorBase BLE discovery', () => {
   it('allows transport ids as BLE connectId even when they are not four-character names', async () => {
     const connector = new SearchConnector(

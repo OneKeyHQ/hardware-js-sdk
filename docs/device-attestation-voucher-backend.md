@@ -277,17 +277,80 @@ JWS/COSE receipt。单纯透明代理 Ledger WSS、由客户端计算 `isGenuine
 证明服务端可独立观察并绑定最终 verdict，否则仍然不够；客户端
 `{ verified: true, deviceId }` 永远不能作为发券证据。
 
-### 4.4 当前本地 mock 的真实性和边界
+#### 4.3.1 可直接部署的 DMK 状态机
 
-本地 mock 只替换部署位置，不替换密码学验证：
+当前 SDK 已提供 Node-only subpath：
+
+```ts
+import {
+  LedgerAttestationRelayServer,
+} from '@onekeyfe/hwk-ledger-adapter/attestation-relay';
+
+const relay = await LedgerAttestationRelayServer.listen({
+  host: '127.0.0.1',
+  port: 0,
+});
+const ticket = relay.createSession();
+// ticket.webSocketUrl 给 App；ticket.result 只留在可信服务端。
+const authoritativeResult = await ticket.result;
+```
+
+`LedgerAttestationRelayServer` 内部运行官方
+`GenuineCheckDeviceAction`，不是模拟 `isGenuine`。它通过自定义 DMK
+`TransportFactory` 把每条 APDU 交给 WSS 客户端，客户端再用已连接的 USB/BLE
+session 发给物理 Ledger。服务端同时直连 Ledger 官方 HSM endpoint，因此验证时必须
+联网。
+
+推荐持久化状态机：
+
+| 状态       | 允许事件                                          | 下一个状态                   |
+| ---------- | ------------------------------------------------- | ---------------------------- |
+| `CREATED`  | App 使用一次性 token 建立 WSS                     | `CONNECTED`                  |
+| `CONNECTED`| 首条合法 `hello(version, device metadata)`        | `RUNNING`                    |
+| `RUNNING`  | 服务端 `apdu-request` / App `apdu-response`       | `RUNNING`                    |
+| `RUNNING`  | DMK `Completed(isGenuine=true, deviceId present)` | `GENUINE`                    |
+| `RUNNING`  | `isGenuine=false`                                 | `NOT_GENUINE`                |
+| 任意非终态 | 超时、断线、乱序、超限、DMK/HSM/设备错误          | `FAILED` / `EXPIRED`         |
+| `GENUINE`  | claim 事务验证地址签名并成功发券                  | `CONSUMED`                   |
+| 任意终态   | 重连、重复 token、重复 claim                      | 拒绝，状态不回退             |
+
+WSS 消息：
+
+```text
+App -> Server: hello
+Server -> App: ready
+Server -> App: apdu-request(requestId, apduHex, timeoutMs)
+App -> Server: apdu-response(requestId, dataHex, statusCodeHex)
+App -> Server: apdu-error(requestId, message)
+Server -> App: interaction / result / error
+```
+
+实现已经约束：
+
+- 32-byte CSPRNG token、单次消费、默认 TTL 5 分钟；
+- 严格版本/字段/hex/model 校验；
+- 同时最多一条未完成 APDU，requestId 必须匹配，拒绝乱序；
+- 单 APDU 最大 8 KiB、单会话最多 256 次、单次超时最大 60 秒；
+- `isGenuine=false` 时丢弃任何 `deviceId`；
+- 只有服务端保存的 Promise/数据库 session 能完成 claim，客户端 `result` 不具备授权力。
+
+生产化时保持 `protocol.ts`、`relayTransport.ts` 和
+`runLedgerDmkGenuineCheck.ts` 不变；将内存 ticket store 替换为 Redis/数据库，把本地
+`ws://` 升级为 TLS `wss://`，接入 OneKey 登录态、限流、审计和多实例 sticky routing。
+同一 attestation session 的 WSS 与 DMK runner 必须由同一 worker 拥有，或用严格有序的
+消息队列转发。
+
+### 4.4 当前本地服务的真实性和边界
+
+本地服务只替换部署位置，不替换密码学验证：
 
 - Trezor：本地可信 background 生成 32-byte challenge，设备签名，background
   使用固定生产根证书重新验证原始 Optiga/Tropic/MCU 证明，验证成功后才生成开发券。
   这段 verifier 和 evidence DTO 可以原样移动到后端。
-- Ledger：本地可信 background 直接运行官方 DMK Genuine Check 并连接 Ledger HSM，
-  同一个函数拿到真实 verdict 后才生成开发券。它验证了设备、SDK 和厂商网络流程，
-  但结果不能作为可上传的服务端证明；生产仍需上一节的“服务端 DMK + 远程 APDU
-  transport”或厂商签名 receipt。
+- Ledger：本地可信 Node 服务运行官方 DMK Genuine Check 并连接 Ledger HSM；App
+  background 只转发 APDU。服务端内部 ticket 拿到真实 verdict + DSID 后才生成开发券。
+  这已经是上一节的“服务端 DMK + 远程 APDU transport”，只是 WSS 当前监听
+  `127.0.0.1`；迁到远端后不改变信任边界。
 - `runTrustedLocalMockDeviceClaim` 接收的是执行真实验真的闭包，不接受 renderer
   提交的 attestation DTO；challenge 在执行器内部生成，领券前不会交给不可信调用方
   决定验证结果。
@@ -298,7 +361,7 @@ JWS/COSE receipt。单纯透明代理 Ledger WSS、由客户端计算 `isGenuine
 | ----------------------------------- | ------------------------------- | ----------------- | ------------------------------- | --------------------------------- |
 | Trezor 本地证书验证                 | 支持，USB/BLE 取 proof          | WebUSB 可用时支持 | 有对应 USB/BLE transport 时支持 | 不需要；拿到 proof 后可完全离线验 |
 | Trezor 后端发券                     | 支持                            | 支持              | 支持                            | 需要连接 OneKey 后端提交 proof    |
-| Ledger 当前本地 DMK mock            | 支持 WebHID/BLE                 | WebHID 可用时支持 | DMK BLE transport 可用时支持    | 必须连接 Ledger HSM               |
+| Ledger 当前本地 DMK server          | 支持 WebHID/BLE                 | Node relay 不内置 | 当前本地 server 仅 Desktop       | 必须连接 Ledger HSM               |
 | Ledger 生产服务端 DMK + APDU bridge | 支持                            | 支持              | 支持                            | 必须连接 OneKey 后端和 Ledger HSM |
 
 操作系统不是主要限制，真正的限制是该端是否具备对应 USB/BLE transport。Trezor
