@@ -938,7 +938,7 @@ input[type="search"]::placeholder,
 }
 
 .agent-wallet-disclaimer {
-  margin: 0 0 var(--space-6);
+  margin: var(--space-10) 0 var(--space-6);
   padding: var(--space-4) var(--space-5);
   border: 1px solid rgba(251, 191, 36, 0.35);
   border-left: 4px solid #f59e0b;
@@ -960,6 +960,10 @@ input[type="search"]::placeholder,
   color: inherit;
   font-size: 14px;
   line-height: 1.65;
+}
+
+body:has(.landing-page) .agent-wallet-disclaimer {
+  margin-top: 0;
 }
 
 /* Ensure main footer stays visible */
@@ -1613,6 +1617,7 @@ hr {
 /* Landing page container - break out of article constraints */
 .landing-page {
   width: 100vw;
+  max-width: none;
   margin-left: calc(-50vw + 50%);
   flex: 1;
   display: flex;
