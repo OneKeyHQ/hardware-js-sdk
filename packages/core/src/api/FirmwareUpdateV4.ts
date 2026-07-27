@@ -794,7 +794,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         if (!bundle.url) {
           throw new Error(`Missing Protocol V2 RESC bundle binary: ${bundle.name}`);
         }
-        Log.log(`[FirmwareUpdateV4] downloading RESC bundle ${bundle.name} from ${bundle.url}`);
+        Log.log(`[FirmwareUpdateV4] downloading remote RESC bundle ${bundle.name}`);
         ({ binary } = await getSysResourceBinary(bundle.url));
       }
       if (binary.byteLength === 0) {
