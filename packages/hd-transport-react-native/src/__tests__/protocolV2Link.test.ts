@@ -91,6 +91,7 @@ const schemas = {
 const createHarness = () => {
   const uuid = 'rn-pro2-id';
   const sentSeqs: number[] = [];
+  let responseSeq = 0;
   let shouldRespond = true;
   let notifyCallback:
     | ((
@@ -111,11 +112,12 @@ const createHarness = () => {
     const frame = Buffer.from(base64, 'base64');
     sentSeqs.push(frame[6]);
     if (shouldRespond) {
+      responseSeq += 1;
       const response = ProtocolV2.encodeFrame(
         schemas,
         'Success',
         { message: 'ok' },
-        { router: PROTOCOL_V2_CHANNEL_BLE_UART }
+        { router: PROTOCOL_V2_CHANNEL_BLE_UART, seq: responseSeq }
       );
       notifyCallback?.(null, { value: Buffer.from(response).toString('base64') });
     }

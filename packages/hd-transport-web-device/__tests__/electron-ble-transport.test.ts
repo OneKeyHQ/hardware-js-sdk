@@ -141,7 +141,6 @@ describe('ElectronBleTransport protocol detection', () => {
       { message: 'ok' },
       { router: PROTOCOL_V2_CHANNEL_BLE_UART }
     );
-
     nobleBle.onNotification.mockImplementation(handler => {
       notificationHandler = handler;
       return jest.fn();
@@ -220,19 +219,21 @@ describe('ElectronBleTransport protocol detection', () => {
     const device = { id: 'named-pro2-id', name: 'OneKey Pro 2' };
     const nobleBle = createNobleBle(device);
     let notificationHandler: ((deviceId: string, data: string) => void) | undefined;
-    const probeResponse = ProtocolV2.encodeFrame(
-      schemas,
-      'Success',
-      { message: 'ok' },
-      { router: PROTOCOL_V2_CHANNEL_BLE_UART }
-    );
 
     nobleBle.onNotification.mockImplementation(handler => {
       notificationHandler = handler;
       return jest.fn();
     });
+    let responseSeq = 0;
     nobleBle.write.mockImplementation(() => {
-      setTimeout(() => notificationHandler?.(device.id, bytesToHex(probeResponse)), 0);
+      responseSeq += 1;
+      const response = ProtocolV2.encodeFrame(
+        schemas,
+        'Success',
+        { message: 'ok' },
+        { router: PROTOCOL_V2_CHANNEL_BLE_UART, seq: responseSeq }
+      );
+      setTimeout(() => notificationHandler?.(device.id, bytesToHex(response)), 0);
       return Promise.resolve();
     });
     const transport = configureTransport(nobleBle);
@@ -304,19 +305,20 @@ describe('ElectronBleTransport protocol detection', () => {
     const device = { id: 'repeated-acquire-pro2-id', name: 'OneKey Pro 2' };
     const nobleBle = createNobleBle(device);
     let notificationHandler: ((deviceId: string, data: string) => void) | undefined;
-    const response = ProtocolV2.encodeFrame(
-      schemas,
-      'Success',
-      { message: 'ok' },
-      { router: PROTOCOL_V2_CHANNEL_BLE_UART }
-    );
-
     nobleBle.onNotification.mockImplementation(handler => {
       notificationHandler = handler;
       return jest.fn();
     });
+    let responseSeq = 0;
     nobleBle.write.mockImplementation(() => {
-      setTimeout(() => notificationHandler?.(device.id, bytesToHex(response)), 0);
+      responseSeq += 1;
+      const sequencedResponse = ProtocolV2.encodeFrame(
+        schemas,
+        'Success',
+        { message: 'ok' },
+        { router: PROTOCOL_V2_CHANNEL_BLE_UART, seq: responseSeq }
+      );
+      setTimeout(() => notificationHandler?.(device.id, bytesToHex(sequencedResponse)), 0);
       return Promise.resolve();
     });
     const transport = configureTransport(nobleBle);
@@ -334,7 +336,7 @@ describe('ElectronBleTransport protocol detection', () => {
       const sentSeqs = nobleBle.write.mock.calls.map(([, hex]) =>
         Number.parseInt(hex.slice(12, 14), 16)
       );
-      expect(sentSeqs).toEqual([1, 2]);
+      expect(sentSeqs).toEqual([1, 2, 3]);
     } finally {
       await transport.release(device.id);
     }

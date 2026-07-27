@@ -29,6 +29,14 @@ export type ProtocolV2UiMode = 'auto' | 'none';
 
 const Log = getLogger(LoggerNames.Method);
 
+const isRetrySafeProtocolV2Method = (name: string) =>
+  /(?:GetAddress|GetPublicKey|Sign(?:In|Offchain)?Message|SignTransaction|SignTypedData|SignPsbt|SignProof|SignData|SignEvent|SignSchnorr|VerifyMessage|EncryptMessage|DecryptMessage)$/.test(
+    name
+  ) ||
+  name === 'allNetworkGetAddressByLoop' ||
+  name === 'lnurlAuth' ||
+  name === 'cipherKeyValue';
+
 const isEvmLedgerLegacyPathWithHighIndex = (path: unknown) => {
   let addressN: number[] | undefined;
   if (typeof path === 'string') {
@@ -171,8 +179,8 @@ export abstract class BaseMethod<Params = undefined> {
    */
   requireProtocolV2 = false;
 
-  /** Core unlocks and retries Protocol V2 business methods once when the device is locked. */
-  unlockPolicy: UnlockPolicy = 'retry-on-locked';
+  /** Core unlocks and retries only explicitly replay-safe Protocol V2 methods. */
+  unlockPolicy: UnlockPolicy = 'none';
 
   /** Non-blocking Protocol V2 interaction synthesized by the SDK. */
   protocolV2UiInteraction?: ProtocolV2InteractionDescriptor;
@@ -206,6 +214,9 @@ export abstract class BaseMethod<Params = undefined> {
     this.useDevice = true;
     this.allowDeviceMode = [UI_REQUEST.NOT_INITIALIZE];
     this.requireDeviceMode = [];
+    if (isRetrySafeProtocolV2Method(this.name)) {
+      this.unlockPolicy = 'retry-on-locked';
+    }
   }
 
   abstract init(): void;
