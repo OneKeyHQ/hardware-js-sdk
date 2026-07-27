@@ -178,7 +178,7 @@ const call = async (params: any) => {
   try {
     const response = await postMessage({ event: IFRAME.CALL, type: IFRAME.CALL, payload: params });
     if (response) {
-      Log.debug('response: ', response);
+      Log.debug('response: ', blockLog ? '[REDACTED]' : response);
 
       if (!response.success) {
         if (response.payload?.code === HardwareErrorCode.BleUnsupported) {

@@ -62,7 +62,6 @@ const toBleDescriptor = (
 
 const BLE_PACKET_SIZE = 192;
 const BLE_WRITE_DELAY_MS = 5;
-const BLE_RESPONSE_TIMEOUT_MS = 30_000;
 const PROTOCOL_PROBE_TIMEOUT_MS = 1000;
 const PROTOCOL_V2_PROBE_TIMEOUT_MS = 5000;
 
@@ -761,10 +760,7 @@ export default class ElectronBleTransport {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
     }
 
-    const callOptions = {
-      ...options,
-      timeoutMs: options?.timeoutMs ?? BLE_RESPONSE_TIMEOUT_MS,
-    };
+    const callOptions = options;
 
     try {
       return await this.protocolV2Links.call(
