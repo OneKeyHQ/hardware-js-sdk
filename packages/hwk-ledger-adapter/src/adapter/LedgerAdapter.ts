@@ -153,6 +153,21 @@ export type LedgerAttestationResult = {
   note: string;
 };
 
+export type LedgerAttestationBridgeDevice = {
+  id: string;
+  modelId: 'nanoS' | 'nanoSP' | 'nanoX' | 'stax' | 'flex' | 'apexp';
+  name?: string;
+  connectionType?: 'USB' | 'BLE';
+};
+
+export type LedgerAttestationApduBridge = {
+  device: LedgerAttestationBridgeDevice;
+  exchangeApdu: (
+    apduHex: string,
+    timeoutMs?: number
+  ) => Promise<{ dataHex: string; statusCodeHex: string }>;
+};
+
 export class LedgerAdapter implements IHardwareWallet {
   readonly vendor = 'ledger' as const;
 
@@ -853,6 +868,75 @@ export class LedgerAdapter implements IHardwareWallet {
       return success(result as LedgerDeviceInfo);
     } catch (err) {
       return this.errorToFailure(err);
+    }
+  }
+
+  /**
+   * Reserves the existing physical Ledger session while a server-owned DMK
+   * Genuine Check drives it. The callback can only exchange raw APDUs; the
+   * authoritative verdict remains in the server state machine.
+   */
+  async runDeviceAttestationApduBridge<T>(
+    connectId: string,
+    run: (bridge: LedgerAttestationApduBridge) => Promise<T>
+  ): Promise<Response<T>> {
+    const queueKey = connectId || '__ledger_default__';
+    try {
+      const payload = await this._jobQueue.enqueue(
+        queueKey,
+        async signal => {
+          const device = (await this._runConnectorCall(
+            connectId,
+            'startDeviceAttestationApduBridge',
+            {},
+            signal
+          )) as LedgerAttestationBridgeDevice;
+          const sessionId =
+            this._sessions.get(connectId) ??
+            (this._sessions.size === 1
+              ? this._sessions.values().next().value
+              : undefined);
+          if (!sessionId) {
+            throw new Error(
+              'Ledger attestation bridge started without an active device session'
+            );
+          }
+          try {
+            return await run({
+              device,
+              exchangeApdu: async (apduHex, timeoutMs) =>
+                (await this._callConnector(
+                  sessionId,
+                  'exchangeDeviceAttestationApdu',
+                  { apduHex, timeoutMs },
+                  signal
+                )) as { dataHex: string; statusCodeHex: string },
+            });
+          } finally {
+            try {
+              await this._callConnector(
+                sessionId,
+                'stopDeviceAttestationApduBridge',
+                {}
+              );
+            } catch {
+              // reset() also releases the refresher blocker if the session died.
+              this.connector.reset();
+              this.resetState();
+            }
+          }
+        },
+        {
+          label: 'ledgerDeviceAttestationApduBridge',
+          rejectIfBusy: true,
+          busyError: LedgerAdapter._createDeviceBusyError(
+            'ledgerDeviceAttestationApduBridge'
+          ),
+        }
+      );
+      return success(payload);
+    } catch (error) {
+      return this.errorToFailure<T>(error);
     }
   }
 

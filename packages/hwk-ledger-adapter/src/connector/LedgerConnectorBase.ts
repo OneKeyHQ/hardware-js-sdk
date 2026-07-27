@@ -247,6 +247,12 @@ export class LedgerConnectorBase implements IConnector {
   // ---------------------------------------------------------------------------
   private readonly _cancellers = new Map<string, (reason?: CancelReason) => void>();
 
+  /**
+   * A server-owned attestation relay temporarily owns the raw APDU stream.
+   * The stored function re-enables DMK's session refresher when ownership ends.
+   */
+  private readonly _attestationBridgeReleasers = new Map<string, () => void>();
+
   // ---------------------------------------------------------------------------
   // Per-session DMK state subscriptions
   //
@@ -598,6 +604,7 @@ export class LedgerConnectorBase implements IConnector {
   }
 
   async disconnect(sessionId: string): Promise<void> {
+    this._releaseAttestationBridge(sessionId);
     if (!this._deviceManager) return;
 
     const deviceId = this._deviceManager.getDeviceId(sessionId);
@@ -676,6 +683,7 @@ export class LedgerConnectorBase implements IConnector {
       externalConnectId
     );
     this._unwatchSessionState(sessionId);
+    this._releaseAttestationBridge(sessionId);
     this._signerManager?.invalidate(sessionId);
     this._cancellers.get(sessionId)?.({
       code: HardwareErrorCode.DeviceDisconnected,
@@ -938,6 +946,63 @@ export class LedgerConnectorBase implements IConnector {
           ctx.clearCanceller(sessionId);
         }
       }
+      case 'startDeviceAttestationApduBridge': {
+        if (this._attestationBridgeReleasers.has(sessionId)) {
+          throw new Error('Ledger device attestation APDU bridge is already active');
+        }
+        const dmk = await ctx.getOrCreateDmk();
+        const release = dmk.disableDeviceSessionRefresher({
+          sessionId,
+          blockerId: 'onekey-ledger-attestation-relay',
+        });
+        try {
+          const device = dmk.getConnectedDevice({ sessionId });
+          this._attestationBridgeReleasers.set(sessionId, release);
+          return {
+            id: device.id,
+            modelId: device.modelId,
+            name: device.name,
+            connectionType: device.type,
+          };
+        } catch (error) {
+          release();
+          throw error;
+        }
+      }
+      case 'exchangeDeviceAttestationApdu': {
+        if (!this._attestationBridgeReleasers.has(sessionId)) {
+          throw new Error('Ledger device attestation APDU bridge is not active');
+        }
+        const p = params as { apduHex?: unknown; timeoutMs?: unknown };
+        if (
+          typeof p.apduHex !== 'string' ||
+          p.apduHex.length < 8 ||
+          p.apduHex.length % 2 !== 0 ||
+          !/^[0-9a-f]+$/i.test(p.apduHex) ||
+          p.apduHex.length / 2 > 8 * 1024
+        ) {
+          throw new Error('Invalid Ledger device attestation APDU');
+        }
+        const requestedTimeout =
+          typeof p.timeoutMs === 'number' && Number.isFinite(p.timeoutMs)
+            ? p.timeoutMs
+            : 30_000;
+        const timeoutMs = Math.max(1_000, Math.min(requestedTimeout, 60_000));
+        const dmk = await ctx.getOrCreateDmk();
+        const response = await dmk.sendApdu({
+          sessionId,
+          apdu: Uint8Array.from(Buffer.from(p.apduHex, 'hex')),
+          abortTimeout: timeoutMs,
+          triggersDisconnection: false,
+        });
+        return {
+          dataHex: Buffer.from(response.data).toString('hex'),
+          statusCodeHex: Buffer.from(response.statusCode).toString('hex'),
+        };
+      }
+      case 'stopDeviceAttestationApduBridge':
+        this._releaseAttestationBridge(sessionId);
+        return undefined;
       default:
         throw new Error(`LedgerConnector: unknown method "${method}"`);
     }
@@ -1201,6 +1266,7 @@ export class LedgerConnectorBase implements IConnector {
    */
   private _resetSignersAndSessions(): void {
     debugLog('[DMK] _resetSignersAndSessions called');
+    this._releaseAllAttestationBridges();
     this._signerManager?.clearAll();
     this._signerManager = null;
     this._deviceAppsManager?.clearAll();
@@ -1211,6 +1277,7 @@ export class LedgerConnectorBase implements IConnector {
 
   private _resetAll(): void {
     debugLog('[DMK] _resetAll called');
+    this._releaseAllAttestationBridges();
     // Cancel any in-flight DeviceActions so their observables unsubscribe
     // and DMK's intent queues don't keep orphaned slots alive.
     for (const cancel of this._cancellers.values()) {
@@ -1238,6 +1305,23 @@ export class LedgerConnectorBase implements IConnector {
     this._signerManager = null;
     this._deviceAppsManager = null;
     this._dmk = null;
+  }
+
+  private _releaseAttestationBridge(sessionId: string): void {
+    const release = this._attestationBridgeReleasers.get(sessionId);
+    if (!release) return;
+    this._attestationBridgeReleasers.delete(sessionId);
+    try {
+      release();
+    } catch {
+      // The DMK session may already be gone; ownership is still cleared.
+    }
+  }
+
+  private _releaseAllAttestationBridges(): void {
+    for (const sessionId of [...this._attestationBridgeReleasers.keys()]) {
+      this._releaseAttestationBridge(sessionId);
+    }
   }
 
   // ---------------------------------------------------------------------------
