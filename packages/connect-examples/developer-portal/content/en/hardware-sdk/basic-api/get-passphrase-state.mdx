@@ -6,14 +6,14 @@ title: Get Passphrase State
 
 ## Get the passphraseState of the device
 
-Prompts the user to enter their passphrase (on-device or via software), then returns a `passphraseState` string — a device-side session identifier derived from the passphrase.
+Prompts the user to enter their passphrase (on-device or via software), then returns device session information including a `passphrase_state` string — a device-side session identifier derived from the passphrase.
 
-Pass this value as `passphraseState` in subsequent API calls. The device recognizes the active session and skips the passphrase prompt entirely, so the user only needs to enter their passphrase once per session.
+Pass the `passphrase_state` value as `passphraseState` in subsequent API calls. The device recognizes the active session and skips the passphrase prompt entirely, so the user only needs to enter their passphrase once per session.
 
 ```
 Session flow:
   getPassphraseState(connectId)   ← user enters passphrase once
-    → passphraseState = "abc123"
+    → { passphrase_state: "abc123", session_id: "...", passphrase_protection: true }
 
   evmGetAddress(..., { passphraseState: "abc123" })  ← no passphrase prompt
   btcGetAddress(..., { passphraseState: "abc123" })  ← no passphrase prompt
@@ -29,22 +29,36 @@ const response = await HardwareSDK.getPassphraseState(connectId);
 
 [**Optional common params**](/en/hardware-sdk/core-api-guide#common-params)
 
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `allowCreateAttachPin` | `boolean` | No | When `true`, allows the device to create a new attach-PIN binding for the passphrase session. Useful for first-time hidden wallet setup. |
+
 ### Example
 
 ```typescript
 const response = await HardwareSDK.getPassphraseState(connectId);
-```
 
-Result
-
-```
-{
-    success: true,
-    payload: string
+if (response.success) {
+  const { passphrase_state, session_id, passphrase_protection } = response.payload;
+  // Use passphrase_state in subsequent calls
 }
 ```
 
-Error
+### Result
+
+```typescript
+{
+    success: true,
+    payload: {
+        passphrase_state: string | undefined,   // session identifier — pass as passphraseState in subsequent calls
+        session_id: string | undefined,          // device session ID
+        unlocked_attach_pin: boolean | undefined, // whether attach-PIN was unlocked
+        passphrase_protection: boolean | null     // whether passphrase protection is enabled on the device
+    }
+}
+```
+
+### Error
 
 ```typescript
 {

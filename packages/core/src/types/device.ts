@@ -1,8 +1,13 @@
-import { EDeviceType } from '@onekeyfe/hd-shared';
+import { EDeviceType, type EFirmwareType } from '@onekeyfe/hd-shared';
 
 import type { IVersionArray } from './settings';
 import type { PROTO } from '../constants';
-import type { OneKeyDeviceCommType } from '@onekeyfe/hd-transport';
+import type {
+  Enum_SafetyCheckLevel,
+  OneKeyDeviceCommType,
+  ProtocolV2DeviceInfo,
+  DeviceStatus as ProtocolV2DeviceStatus,
+} from '@onekeyfe/hd-transport';
 
 export type DeviceStatus = 'available' | 'occupied' | 'used';
 
@@ -23,6 +28,12 @@ export type UnavailableCapabilities = { [key: string]: UnavailableCapability };
 
 export type KnownDevice = {
   connectId: string | null;
+  /**
+   * Stable physical-device identity. Current SDK responses always include this
+   * value; it remains optional in the type during the uuid compatibility window.
+   */
+  serialNo?: string;
+  /** @deprecated Use serialNo instead. */
   uuid: string;
   deviceId: string | null;
   deviceType: IDeviceType | null;
@@ -33,7 +44,9 @@ export type KnownDevice = {
   name: string;
   error?: typeof undefined;
   mode: EOneKeyDeviceMode;
-  features: PROTO.Features;
+  features?: Features;
+  /** Unified SDK device-state snapshot; features remains a legacy projection. */
+  state?: DeviceState;
   unavailableCapabilities: UnavailableCapabilities;
   bleFirmwareVersion: IVersionArray | null;
   firmwareVersion: IVersionArray | null;
@@ -46,6 +59,17 @@ export type KnownDevice = {
 
 export type SearchDevice = {
   connectId: string | null;
+  /**
+   * Available after device initialization. BLE discovery does not connect to the
+   * device, so it returns null until a later initialized device response. Current
+   * SDK responses always include the field; it remains optional in the type during
+   * the uuid compatibility window.
+   */
+  serialNo?: string | null;
+  /**
+   * @deprecated Ambiguous legacy identifier. Use serialNo for hardware identity
+   * and connectId for transport routing.
+   */
   uuid: string;
   deviceId: string | null;
   deviceType: IDeviceType;
@@ -85,7 +109,243 @@ export type SearchDevice = {
 
 export type Device = KnownDevice;
 
-export type Features = PROTO.Features;
+export type DeviceFeaturesProtocol = 'V1' | 'V2' | 'unknown';
+
+export type DeviceFeaturesMode =
+  | 'normal'
+  | 'bootloader'
+  | 'romloader'
+  | 'notInitialized'
+  | 'backupMode'
+  | 'unknown';
+
+export type DeviceFeaturesVerify = {
+  firmwareBuildId?: string;
+  firmwareHash?: string;
+  bootloaderBuildId?: string;
+  bootloaderHash?: string;
+  boardBuildId?: string;
+  boardHash?: string;
+  bleBuildId?: string;
+  bleHash?: string;
+  se01BuildId?: string;
+  se01Hash?: string;
+  se02BuildId?: string;
+  se02Hash?: string;
+  se03BuildId?: string;
+  se03Hash?: string;
+  se04BuildId?: string;
+  se04Hash?: string;
+  se01BootBuildId?: string;
+  se01BootHash?: string;
+  se02BootBuildId?: string;
+  se02BootHash?: string;
+  se03BootBuildId?: string;
+  se03BootHash?: string;
+  se04BootBuildId?: string;
+  se04BootHash?: string;
+};
+
+export type DeviceFeaturesRaw = {
+  protocolV1Features?: PROTO.Features;
+  protocolV1OneKeyFeatures?: OnekeyFeatures;
+  protocolV2DeviceInfo?: ProtocolV2DeviceInfo;
+  protocolV2DeviceStatus?: ProtocolV2DeviceStatus;
+};
+
+export type DeviceFeaturesRawPatch = {
+  [Key in keyof DeviceFeaturesRaw]?: DeviceFeaturesRaw[Key] | null;
+};
+
+export type DeviceStateProtocol = DeviceFeaturesProtocol;
+export type DeviceStateMode = DeviceFeaturesMode;
+export type DeviceStateSection = 'identity' | 'status' | 'settings' | 'versions' | 'verification';
+
+export type DeviceStateUpdateSource =
+  | 'initialize'
+  | 'device-info'
+  | 'device-status'
+  | 'settings-read'
+  | 'settings-write'
+  | 'change-pin'
+  | 'lock'
+  | 'unlock'
+  | 'passphrase'
+  | 'session-clear'
+  | 'firmware-update'
+  | 'transport-reconnect'
+  | 'compatibility';
+
+export type DeviceStateIdentity = {
+  deviceType: IDeviceType;
+  firmwareType: EFirmwareType;
+  model: string | null;
+  vendor: string | null;
+  deviceId: string | null;
+  serialNo: string;
+  label: string | null;
+  bleName: string | null;
+};
+
+export type DeviceStateStatus = {
+  mode: DeviceStateMode;
+  initialized: boolean | null;
+  unlocked: boolean | null;
+  firmwarePresent: boolean | null;
+  backupRequired: boolean | null;
+  noBackup: boolean | null;
+  unfinishedBackup: boolean | null;
+  recoveryMode: boolean | null;
+  passphraseProtection: boolean | null;
+  pinProtection: boolean | null;
+  attachToPinEnabled: boolean | null;
+  unlockedAttachPin: boolean | null;
+};
+
+export type DeviceStateSettings = {
+  language: string | null;
+  bleEnabled: boolean | null;
+  sdCardPresent: boolean | null;
+  sdProtection: boolean | null;
+  wipeCodeProtection: boolean | null;
+  passphraseAlwaysOnDevice: boolean | null;
+  safetyChecks: Enum_SafetyCheckLevel | null;
+  autoLockDelayMs: number | null;
+  autoShutdownDelayMs: number | null;
+  displayRotation: number | null;
+  experimentalFeatures: boolean | null;
+  wallpaperPath: string | null;
+  brightness: number | null;
+  animationEnabled: boolean | null;
+  tapToWake: boolean | null;
+  hapticFeedback: boolean | null;
+  deviceNameDisplayEnabled: boolean | null;
+  airgapMode: boolean | null;
+  fidoEnabled: boolean | null;
+  usbLockEnabled: boolean | null;
+  randomKeypad: boolean | null;
+};
+
+export type DeviceStateVersions = {
+  firmware: string | null;
+  bootloader: string | null;
+  board: string | null;
+  ble: string | null;
+  /** @deprecated Kept for legacy consumers; new code should read se01. */
+  se?: string | null;
+  se01?: string | null;
+  se02?: string | null;
+  se03?: string | null;
+  se04?: string | null;
+  se01Boot?: string | null;
+  se02Boot?: string | null;
+  se03Boot?: string | null;
+  se04Boot?: string | null;
+};
+
+export type DeviceState = {
+  schemaVersion: 1;
+  revision: number;
+  updatedAt: number;
+  protocol: DeviceStateProtocol;
+  /** Device-message protocol version, independent of the SDK V1/V2 protocol family. */
+  protocolVersion: number | null;
+  identity: DeviceStateIdentity;
+  status: DeviceStateStatus;
+  settings: DeviceStateSettings;
+  versions: DeviceStateVersions;
+  capabilities: Array<number | string>;
+  verification?: Partial<DeviceFeaturesVerify>;
+};
+
+export type DeviceStatePatch = {
+  protocol?: DeviceStateProtocol;
+  protocolVersion?: number | null;
+  identity?: Partial<DeviceStateIdentity>;
+  status?: Partial<DeviceStateStatus>;
+  settings?: Partial<DeviceStateSettings>;
+  versions?: Partial<DeviceStateVersions>;
+  capabilities?: Array<number | string>;
+  verification?: DeviceFeaturesVerify;
+  raw?: DeviceFeaturesRawPatch;
+};
+
+export type DeviceStateEvent = {
+  connectId: string | null;
+  state: DeviceState;
+  revision: number;
+  source: DeviceStateUpdateSource;
+  changedKeys: string[];
+};
+
+export type NormalizedFeatures = {
+  protocol: DeviceFeaturesProtocol;
+  protocolVersion?: number | null;
+  deviceType: IDeviceType;
+  firmwareType: EFirmwareType;
+  model: string | null;
+  vendor: string | null;
+  deviceId: string | null;
+  serialNo: string;
+  label: string | null;
+  bleName: string | null;
+  capabilities: Array<number | string>;
+  mode: DeviceFeaturesMode;
+  initialized: boolean | null;
+  bootloaderMode: boolean | null;
+  unlocked: boolean | null;
+  firmwarePresent: boolean | null;
+  passphraseProtection: boolean | null;
+  pinProtection: boolean | null;
+  backupRequired: boolean | null;
+  noBackup: boolean | null;
+  unfinishedBackup: boolean | null;
+  recoveryMode: boolean | null;
+  language: string | null;
+  bleEnabled: boolean | null;
+  sdCardPresent: boolean | null;
+  sdProtection: boolean | null;
+  wipeCodeProtection: boolean | null;
+  passphraseAlwaysOnDevice: boolean | null;
+  attachToPinEnabled?: boolean | null;
+  safetyChecks: Enum_SafetyCheckLevel | null;
+  autoLockDelayMs: number | null;
+  autoShutdownDelayMs: number | null;
+  displayRotation: number | null;
+  experimentalFeatures: boolean | null;
+  wallpaperPath: string | null;
+  brightness: number | null;
+  animationEnabled: boolean | null;
+  tapToWake: boolean | null;
+  hapticFeedback: boolean | null;
+  deviceNameDisplayEnabled: boolean | null;
+  airgapMode: boolean | null;
+  fidoEnabled: boolean | null;
+  usbLockEnabled: boolean | null;
+  randomKeypad: boolean | null;
+  firmwareVersion: string | null;
+  bootloaderVersion: string | null;
+  boardVersion: string | null;
+  bleVersion: string | null;
+  se01Version?: string | null;
+  se02Version?: string | null;
+  se03Version?: string | null;
+  se04Version?: string | null;
+  se01BootVersion?: string | null;
+  se02BootVersion?: string | null;
+  se03BootVersion?: string | null;
+  se04BootVersion?: string | null;
+  seVersion?: string | null;
+  verify?: DeviceFeaturesVerify;
+  sessionId: string | null;
+  passphraseState?: string;
+  unlockedAttachPin?: boolean;
+  raw?: DeviceFeaturesRaw;
+};
+
+export type Features = NormalizedFeatures &
+  Partial<Omit<PROTO.Features, keyof NormalizedFeatures>> &
+  Partial<Omit<PROTO.OnekeyFeatures, keyof NormalizedFeatures | keyof PROTO.Features>>;
 
 export type OnekeyFeatures = PROTO.OnekeyFeatures;
 
@@ -96,7 +356,8 @@ export type IDeviceType =
   | EDeviceType.ClassicPure
   | EDeviceType.Mini
   | EDeviceType.Touch
-  | EDeviceType.Pro;
+  | EDeviceType.Pro
+  | EDeviceType.Pro2;
 
 /**
  * model_classic: 'classic' | 'classic1s' | 'classicpure'
@@ -124,6 +385,7 @@ export const DeviceTypeToModels: { [deviceType in IDeviceType]: IDeviceModel[] }
   [EDeviceType.Mini]: ['model_mini'],
   [EDeviceType.Touch]: ['model_touch'],
   [EDeviceType.Pro]: ['model_touch'],
+  [EDeviceType.Pro2]: [],
   [EDeviceType.Unknown]: [],
 };
 
@@ -136,6 +398,7 @@ export type ITransportStatus = 'valid' | 'outdated';
 export type IVersionRange = {
   min: string;
   max?: string;
+  unsupported?: boolean;
 };
 
 export type DeviceFirmwareRange = {

@@ -1,65 +1,116 @@
-# Hardware-js-sdk
+# OneKey Hardware JS SDK
 
-Hardware-js-sdk is designed to allow third-party developers to quickly access the OneKey hardware wallet. The repository structure uses the monorepo to make each module more manageable.
+OneKey Hardware JS SDK is a TypeScript monorepo for integrating OneKey and supported third-party
+hardware wallets across browser, desktop, React Native, Node.js, bridge, low-level, and emulator
+environments.
 
-## Packages
+## Package families
 
-| package                                                                     | description                                                           |
-| --------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| [@onekeyfe/core](./packages/core)                                           | The core process of hardware wallet connection.                       |
-| [@onekeyfe/hd-web-sdk](./packages/hd-web-sdk)                               | Using the sdk in the web platform.                                    |
-| [@onekeyfe/hd-ble-sdk](./packages/hd-ble-sdk)                               | Using the SDK in BLE communication environment. e.g: iOS / Android    |
-| [@onekeyfe/hd-common-sdk](./packages/hd-common-connect-sdk)                 | Using the SDK in a node or web-usb environment                        |
-| [@onekeyfe/hd-transport](./packages/hd-transport)                           | Data serialization and deserialization of hardware communication data |
-| [@onekeyfe/hd-transport-http](./packages/hd-transport-http)                 | communication lib for http                                            |
-| [@onekeyfe/hd-transport-react-native](./packages/hd-transport-react-native) | communication lib for React Native                                    |
-| [@onekeyfe/hd-transport-webusb](./packages/hd-transport-webusb)             | communication lib for WebUSB                                          |
-| [@onekeyfe/hd-shared](./packages/shared)                                    | Tools, error definitions, constants                                   |
-| [@onekeyfe/hardware-cli](./packages/hd-cli)                                | CLI for AI agent integration (Claude Code, Cursor, etc.)              |
+### OneKey `hd-*` stack
+
+| Package                               | Path                                                                         | Responsibility                                                                      |
+| ------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `@onekeyfe/hd-core`                   | [`packages/core`](./packages/core)                                           | Public methods, Device lifecycle, state, events, wallet sessions, and orchestration |
+| `@onekeyfe/hd-web-sdk`                | [`packages/hd-web-sdk`](./packages/hd-web-sdk)                               | Browser-facing SDK                                                                  |
+| `@onekeyfe/hd-ble-sdk`                | [`packages/hd-ble-sdk`](./packages/hd-ble-sdk)                               | React Native BLE-facing SDK                                                         |
+| `@onekeyfe/hd-common-connect-sdk`     | [`packages/hd-common-connect-sdk`](./packages/hd-common-connect-sdk)         | Runtime transport selection and shared connect entry                                |
+| `@onekeyfe/hd-transport`              | [`packages/hd-transport`](./packages/hd-transport)                           | Protocol V1/V2 schema, framing, sessions, and shared transport contracts            |
+| `@onekeyfe/hd-transport-web-device`   | [`packages/hd-transport-web-device`](./packages/hd-transport-web-device)     | WebUSB and Electron BLE transport                                                   |
+| `@onekeyfe/hd-transport-react-native` | [`packages/hd-transport-react-native`](./packages/hd-transport-react-native) | React Native BLE transport                                                          |
+| `@onekeyfe/hd-transport-usb`          | [`packages/hd-transport-usb`](./packages/hd-transport-usb)                   | Node USB transport                                                                  |
+| `@onekeyfe/hd-transport-http`         | [`packages/hd-transport-http`](./packages/hd-transport-http)                 | HTTP bridge transport                                                               |
+| `@onekeyfe/hd-transport-lowlevel`     | [`packages/hd-transport-lowlevel`](./packages/hd-transport-lowlevel)         | Low-level plugin transport                                                          |
+| `@onekeyfe/hd-transport-emulator`     | [`packages/hd-transport-emulator`](./packages/hd-transport-emulator)         | Emulator transport                                                                  |
+| `@onekeyfe/hd-shared`                 | [`packages/shared`](./packages/shared)                                       | Shared constants, errors, types, and utilities                                      |
+| `@onekeyfe/hardware-cli`              | [`packages/hd-cli`](./packages/hd-cli)                                       | Hardware-only CLI for developers and AI agents                                      |
+
+### Hardware-kit `hwk-*` adapter stack
+
+The adapter stack separates public hardware-wallet contracts from vendor-specific implementations:
+
+- [`packages/hwk-adapter-core`](./packages/hwk-adapter-core): common adapter and connector contracts.
+- [`packages/hwk-ledger-adapter`](./packages/hwk-ledger-adapter): Ledger behavior, with BLE and
+  WebHID connectors.
+- [`packages/hwk-trezor-adapter`](./packages/hwk-trezor-adapter): Trezor-compatible adapter.
+- [`packages/hwk-trezor-connector`](./packages/hwk-trezor-connector): shared connector behavior,
+  with WebUSB, Electron BLE, and React Native BLE connectors.
+- [`packages/hwk-trezor-core`](./packages/hwk-trezor-core): Trezor-compatible Core runtime,
+  protocol, transport, protobuf, and type-support packages.
+
+Do not introduce dependencies between the `hd-*` and `hwk-*` stacks without reviewing the
+architecture boundary.
 
 ## Documentation
 
-See the full documentation on [developer.onekey.so](https://developer.onekey.so/connect-to-hardware/hardware-sdk).
+- [Developer documentation](https://developer.onekey.so/connect-to-hardware/hardware-sdk):
+  integration and public API guidance.
+- [Internal documentation index](./docs/README.md): architecture, protocol, device, SDK, business,
+  design, testing, and maintenance facts.
+- [Agent instructions](./AGENTS.md): repository-wide engineering and safety rules.
+- [Agent workflow maintenance](./docs/maintenance/agent-workflow.md): how instructions, skills,
+  commands, and validation fit together.
 
-## hardware-js-sdk development
+Package-specific integration details remain in each package README. Historical plans under
+`docs/superpowers/` are not current technical facts.
 
-Before you start make sure you have downloaded and installed NVM, Yarn and git with git lfs.
+## Setup
 
-- `git clone git@github.com:OneKeyHQ/hardware-js-sdk.git`
-- `git submodule update --init --recursive`
-- `yarn`
-- `yarn bootstrap`
+Prerequisites:
 
-Run a dev build:
+- Node.js through NVM or another version manager
+- Yarn 1
+- Git with Git LFS
 
-- `yarn dev:web` (web sdk)
-- `yarn dev:ble` (react-native sdk)
-- `yarn dev:core` (core package)
-- `yarn dev:transport-http` (transport-http package)
-- `yarn dev:shared` (shared package)
+```bash
+git clone git@github.com:OneKeyHQ/hardware-js-sdk.git
+cd hardware-js-sdk
+git submodule update --init --recursive
+yarn
+yarn bootstrap
+```
 
-### Development with example desktop app (Recommend)
-- `yarn bootstrap && yarn build`
-- `yarn example:desktop`
+Build all packages:
 
-### Development with example mobile app
-- `yarn bootstrap && yarn build`
-- `yarn example` select ios or android in menu.
+```bash
+yarn build
+```
 
-### Development with example web app
-- Build web sdk
-- Edit connect src in `packages/connect-examples/expo-example/src/constants/connect.ts`, change `CONNECT_SRC` to `https://localhost:8087/`
-- `yarn dev:web`
-- Open chrome browser, enter `https://localhost:8087/`, simply type "thisisunsafe" directly on your keyboard (no need to press Enter)
-- Run example app
-- `yarn bootstrap && yarn build`
-- `yarn example` select web in menu.
+Common development entries:
 
-### Development onekey-app monorepo
+```bash
+yarn dev:web
+yarn dev:ble
+yarn dev:core
+yarn dev:transport
+yarn dev:transport-web-device
+yarn dev:transport-rn
+yarn example:desktop
+```
 
-- Build all packages
-- `yarn bootstrap && yarn build`
-- Edit .env file, APP_MONOREPO_LOCAL_PATH=/path/to/v5-app-monorepo
-- `yarn debug:watcher`
+## Validation
 
-Open v5-app-monorepo, run `yarn && yarn app:xxxx` to start the app.
+Use the repository gates before lower-level commands:
+
+```bash
+# Changed files and affected packages
+yarn agent:check --profile commit
+
+# Full PR-readiness checks
+yarn agent:check --profile pr
+```
+
+Use focused package tests and builds while iterating. Protocol and protobuf changes should follow
+the dependency order documented in [the agent workflow](./docs/maintenance/agent-workflow.md).
+
+## Developing with app-monorepo
+
+Build the SDK and configure `APP_MONOREPO_LOCAL_PATH` in the local environment:
+
+```bash
+yarn bootstrap
+yarn build
+yarn debug:watcher
+```
+
+Then start the target app-monorepo application. Keep local paths and environment-specific values
+out of commits.

@@ -30,6 +30,9 @@ export default class SuiSignMessage extends BaseMethod<HardwareSuiSignMessage> {
 
   getVersionRange() {
     return {
+      pro2: {
+        min: '0.0.0',
+      },
       model_mini: {
         min: '3.4.0',
       },

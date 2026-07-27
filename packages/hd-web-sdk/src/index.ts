@@ -13,6 +13,7 @@ import HardwareSdk, {
   createErrorMessage,
   enableLog,
   executeCallback,
+  getLogBlockLabel,
   getLogger,
   parseConnectSettings,
   parseMessage,
@@ -70,7 +71,13 @@ const handleMessage = async (message: CoreMessage) => {
     case DEVICE_EVENT:
       if (
         (
-          [DEVICE.CONNECT, DEVICE.DISCONNECT, DEVICE.FEATURES, DEVICE.SUPPORT_FEATURES] as string[]
+          [
+            DEVICE.CONNECT,
+            DEVICE.DISCONNECT,
+            DEVICE.FEATURES,
+            DEVICE.STATE,
+            DEVICE.SUPPORT_FEATURES,
+          ] as string[]
         ).includes(message.type)
       ) {
         eventEmitter.emit(message.type, message.payload);
@@ -135,9 +142,12 @@ const createJSBridge = (messageEvent: PostMessageEvent) => {
 
       receiveHandler: async messageEvent => {
         const message = parseMessage(messageEvent);
+        const blockLog = getLogBlockLabel(message);
         if (message.event !== 'LOG_EVENT') {
           if (['DEVICE_EVENT', 'FIRMWARE_EVENT'].includes(message.event)) {
             // Log.debug('Host Bridge Receive message: ', message);
+          } else if (blockLog) {
+            Log.debug('Host Bridge Receive message: ', blockLog);
           } else {
             Log.debug('Host Bridge Receive message: ', message);
           }
@@ -146,6 +156,8 @@ const createJSBridge = (messageEvent: PostMessageEvent) => {
         if (message.event !== 'LOG_EVENT') {
           if (['DEVICE_EVENT', 'FIRMWARE_EVENT'].includes(message.event)) {
             // Log.debug('Host Bridge response: ', message);
+          } else if (blockLog) {
+            Log.debug('Host Bridge response: ', blockLog);
           } else {
             Log.debug('Host Bridge response: ', message);
           }
@@ -184,7 +196,8 @@ const init = async (settings: Partial<ConnectSettings>) => {
 };
 
 const call = async (params: any) => {
-  Log.debug('call : ', params);
+  const blockLog = getLogBlockLabel(params);
+  Log.debug('call : ', blockLog ?? params);
   /**
    * Try to recreate iframe if it's initialize failed
    */
@@ -258,6 +271,7 @@ const addHardwareGlobalEventListener = (listener: (message: CoreMessage) => void
     DEVICE.CONNECT,
     DEVICE.DISCONNECT,
     DEVICE.FEATURES,
+    DEVICE.STATE,
     DEVICE.SUPPORT_FEATURES,
     UI_REQUEST.FIRMWARE_PROGRESS,
     UI_REQUEST.FIRMWARE_TIP,

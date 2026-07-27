@@ -1,7 +1,6 @@
 import { BaseMethod } from './BaseMethod';
 import { UI_REQUEST } from '../constants/ui-request';
 import { getBootloaderReleaseInfo } from './firmware/releaseHelper';
-import { getFirmwareType } from '../utils';
 
 import type { CheckBootloaderReleaseParams } from '../types/api/checkBootloaderRelease';
 
@@ -19,7 +18,7 @@ export default class CheckBootloaderRelease extends BaseMethod {
     const { features } = this.device;
     const payload = this.payload as CheckBootloaderReleaseParams;
 
-    const deviceFirmwareType = getFirmwareType(features);
+    const deviceFirmwareType = this.device.getCurrentFirmwareType();
     const firmwareType = payload.firmwareType ?? deviceFirmwareType;
 
     const releaseInfo = getBootloaderReleaseInfo({

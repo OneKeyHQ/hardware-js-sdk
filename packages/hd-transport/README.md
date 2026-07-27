@@ -18,11 +18,9 @@ In order to be able to use new features of onekey-firmware you need to update pr
 
 1. `git submodule update --init --recursive` to initialize git submodules.
 1. `yarn update-submodules` to update firmware submodule
-1. `yarn update:protobuf` to generate new `./messages.json` and `./src/types/messages.ts`
+1. `yarn update-protobuf` to generate new `./messages.json`, `./messages-protocol-v2.json` and `./src/types/messages.ts`
 
-git submodule update --init --recursive to initialize firmware submodule
-yarn update-submodules to update firmware submodule
-yarn update:protobuf to generate new ./messages.json and ./src/types/messages.ts
+The same task can be run from the repository root with `yarn update-protobuf`. The Protocol V2 schema requires the `firmware-pro2` submodule checked out on branch `dev`.
 
 ## Docs
 

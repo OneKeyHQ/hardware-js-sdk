@@ -1,9 +1,10 @@
-import { useState, useEffect, forwardRef, useImperativeHandle, useCallback } from 'react';
+import { useState, useEffect, forwardRef, useImperativeHandle, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '../ui/Button';
 import { Alert, AlertDescription } from '../ui/Alert';
 import { Save, X } from 'lucide-react';
 import { Textarea } from '../ui/Textarea';
+import { getUntruncatedJsonPreview } from '../../utils/jsonPreview';
 
 interface JsonEditorProps {
   data: Record<string, unknown> | null;
@@ -24,7 +25,28 @@ const JsonEditor = forwardRef<JsonEditorRef, JsonEditorProps>(
   ({ data, onSave, disabled = false, onCopy, isEditing = false, onEditingChange }, ref) => {
     const [editValue, setEditValue] = useState('');
     const [error, setError] = useState<string | null>(null);
+    const [isPreviewTruncated, setIsPreviewTruncated] = useState(false);
     const { t } = useTranslation();
+
+    const preview = useMemo(
+      () =>
+        data
+          ? getUntruncatedJsonPreview(data, {
+              indent: 2,
+            })
+          : null,
+      [data]
+    );
+
+    const setEditorValueFromData = useCallback(() => {
+      if (preview) {
+        setEditValue(preview.text);
+        setIsPreviewTruncated(preview.truncated);
+      } else {
+        setEditValue('{}');
+        setIsPreviewTruncated(false);
+      }
+    }, [preview]);
 
     // 暴露给外部的方法
     useImperativeHandle(ref, () => ({
@@ -34,18 +56,14 @@ const JsonEditor = forwardRef<JsonEditorRef, JsonEditorProps>(
     }));
 
     const handleOpen = useCallback(() => {
-      if (data) {
-        setEditValue(JSON.stringify(data, null, 2));
-      } else {
-        setEditValue('{}');
-      }
+      setEditorValueFromData();
       setError(null);
-    }, [data]);
+    }, [setEditorValueFromData]);
 
     const handleCopy = async (): Promise<boolean> => {
-      if (data) {
+      if (preview) {
         try {
-          await navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+          await navigator.clipboard.writeText(preview.text);
           onCopy?.();
           return true;
         } catch (err) {
@@ -57,6 +75,10 @@ const JsonEditor = forwardRef<JsonEditorRef, JsonEditorProps>(
     };
 
     const handleSave = () => {
+      if (isPreviewTruncated) {
+        return;
+      }
+
       try {
         const parsed = JSON.parse(editValue);
         onSave(parsed);
@@ -75,14 +97,10 @@ const JsonEditor = forwardRef<JsonEditorRef, JsonEditorProps>(
     // 监听外部编辑状态变化 - 只在编辑状态开启时初始化数据
     useEffect(() => {
       if (isEditing && !disabled) {
-        if (data) {
-          setEditValue(JSON.stringify(data, null, 2));
-        } else {
-          setEditValue('{}');
-        }
+        setEditorValueFromData();
         setError(null);
       }
-    }, [isEditing, disabled, data]);
+    }, [isEditing, disabled, setEditorValueFromData]);
 
     return (
       <>
@@ -90,11 +108,11 @@ const JsonEditor = forwardRef<JsonEditorRef, JsonEditorProps>(
           data ? (
             <div className="relative">
               <pre className="bg-gradient-to-br from-muted/20 to-muted/40 p-2 rounded-lg text-xs overflow-auto max-h-72 md:max-h-80 border border-border/30 text-foreground font-mono leading-tight shadow-sm">
-                {JSON.stringify(data, null, 2)}
+                {preview?.text}
               </pre>
               <div className="absolute top-1 right-1 opacity-60 hover:opacity-100 transition-opacity">
                 <span className="text-xs text-muted-foreground bg-background/80 px-1.5 py-0.5 rounded-sm">
-                  JSON
+                  {preview?.truncated ? 'JSON preview' : 'JSON'}
                 </span>
               </div>
             </div>
@@ -112,9 +130,17 @@ const JsonEditor = forwardRef<JsonEditorRef, JsonEditorProps>(
               id="json-textarea"
               value={editValue}
               onChange={e => setEditValue(e.target.value)}
+              readOnly={isPreviewTruncated}
               className="w-full h-72 md:h-80 p-3 text-sm font-mono"
               placeholder={t('components.jsonEditor.enterJsonData')}
             />
+            {isPreviewTruncated && (
+              <Alert className="border-border bg-muted/30 rounded-lg">
+                <AlertDescription className="text-muted-foreground font-medium">
+                  Large JSON preview is read-only. The original value is preserved for execution.
+                </AlertDescription>
+              </Alert>
+            )}
             {error && (
               <Alert variant="warning" className="border-orange-200/50 bg-orange-50/50 rounded-lg">
                 <X className="h-4 w-4 text-orange-600" />
@@ -132,6 +158,7 @@ const JsonEditor = forwardRef<JsonEditorRef, JsonEditorProps>(
               <Button
                 onClick={handleSave}
                 variant="default"
+                disabled={isPreviewTruncated}
                 className="bg-foreground hover:bg-foreground/90 text-background shadow-sm hover:shadow-md transition-all duration-200"
               >
                 <Save className="h-4 w-4 mr-2" />

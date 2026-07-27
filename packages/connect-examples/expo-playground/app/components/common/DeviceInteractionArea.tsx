@@ -26,6 +26,12 @@ interface FirmwareProgressData {
   progressType: 'transferData' | 'installingFirmware';
 }
 
+interface FirmwareVersionInfo {
+  bootloaderVersion?: string;
+  firmwareVersion?: string;
+  bleVersion?: string;
+}
+
 interface DeviceInteractionAreaProps {
   status: ExecutionStatus;
   deviceAction?: {
@@ -39,8 +45,11 @@ interface DeviceInteractionAreaProps {
   isCancelling?: boolean;
   // 添加固件进度相关属性
   firmwareProgress?: FirmwareProgressData | null;
+  firmwareVersions?: FirmwareVersionInfo | null;
   // 添加当前设备信息
   currentDevice?: DeviceInfo | null;
+  title?: string | null;
+  compact?: boolean;
 }
 
 const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
@@ -52,9 +61,14 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
   onReset,
   isCancelling = false,
   firmwareProgress,
+  firmwareVersions,
   currentDevice,
+  title,
+  compact = false,
 }) => {
   const { t } = useTranslation();
+  const panelTitle =
+    title === undefined ? t('components.methodExecutor.expectedUserExperience') : title;
 
   // 获取状态配置
   const getStatusConfig = () => {
@@ -62,28 +76,28 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
       case 'loading':
         return {
           icon: <Clock className="h-5 w-5 animate-spin" />,
-          color: 'text-blue-600',
-          bgColor: 'bg-blue-50',
-          borderColor: 'border-blue-200',
-          badgeColor: 'bg-blue-100 text-blue-800 border-blue-300',
+          color: 'text-primary-foreground',
+          bgColor: 'bg-primary',
+          borderColor: 'border-primary',
+          badgeColor: 'bg-primary text-primary-foreground border-primary',
           message: t('components.methodExecutor.executing'),
         };
       case 'device-interaction':
         return {
           icon: <Clock className="h-5 w-5 animate-pulse" />,
-          color: 'text-green-600',
-          bgColor: 'bg-green-50',
-          borderColor: 'border-green-200',
-          badgeColor: 'bg-green-100 text-green-800 border-green-300',
+          color: 'text-primary-foreground',
+          bgColor: 'bg-primary',
+          borderColor: 'border-primary',
+          badgeColor: 'bg-primary text-primary-foreground border-primary',
           message: t('deviceOperations.deviceInstructions'),
         };
       case 'success':
         return {
           icon: <CheckCircle className="h-5 w-5" />,
-          color: 'text-green-600',
-          bgColor: 'bg-green-50',
-          borderColor: 'border-green-200',
-          badgeColor: 'bg-green-100 text-green-800 border-green-300',
+          color: 'text-primary-foreground',
+          bgColor: 'bg-primary',
+          borderColor: 'border-primary',
+          badgeColor: 'bg-primary text-primary-foreground border-primary',
           message: t('components.methodExecutor.executionSuccess'),
         };
       case 'error':
@@ -133,18 +147,42 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
 
   const statusConfig = getStatusConfig();
   const progressConfig = getFirmwareProgressConfig();
+  const firmwareVersionRows = firmwareVersions
+    ? [
+        {
+          label: t('common.bootVersion'),
+          value: firmwareVersions.bootloaderVersion,
+        },
+        {
+          label: t('common.firmwareVersion'),
+          value: firmwareVersions.firmwareVersion,
+        },
+        {
+          label: t('common.bluetoothVersion'),
+          value: firmwareVersions.bleVersion,
+        },
+      ].filter(row => row.value)
+    : [];
 
   return (
     <Card className="bg-card border border-border/50 shadow-sm h-full flex flex-col">
-      <CardHeader className="pb-1 flex-shrink-0">
-        <CardTitle className="text-sm text-foreground flex items-center justify-between">
-          {t('components.methodExecutor.expectedUserExperience')}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="flex-1 flex flex-col min-h-0">
+      {panelTitle && (
+        <CardHeader className="pb-1 flex-shrink-0">
+          <CardTitle className="text-sm text-foreground flex items-center justify-between">
+            {panelTitle}
+          </CardTitle>
+        </CardHeader>
+      )}
+      <CardContent className={`flex-1 flex flex-col min-h-0 ${compact ? 'p-4' : ''}`}>
         <div className="flex flex-col items-center justify-center h-full">
           {/* 设备展示区域 - 占用更多空间 */}
-          <div className="flex-1 w-full flex items-center justify-center min-h-0 mb-6">
+          <div
+            className={
+              compact
+                ? 'order-2 flex-1 w-full flex items-center justify-center min-h-[96px] mb-3'
+                : 'order-2 flex-1 w-full flex items-center justify-center min-h-0 mb-6'
+            }
+          >
             {status === 'success' ? (
               <div className="w-full h-full flex items-center justify-center">
                 <DeviceActionAnimation
@@ -166,7 +204,7 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
                 />
               </div>
             ) : deviceAction ? (
-              <div className="w-100 h-100">
+              <div className={compact ? 'w-28 h-28' : 'w-100 h-100'}>
                 <DeviceActionAnimation
                   action={deviceAction.actionType}
                   deviceModel={deviceModel}
@@ -178,10 +216,14 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center">
                 {/* 设备图片或默认图标 */}
-                <div className="relative mb-8">
+                <div className={`relative ${compact ? 'mb-2' : 'mb-8'}`}>
                   {currentDevice ? (
                     /* 显示真实设备图片 */
-                    <div className="w-32 h-48 flex items-center justify-center">
+                    <div
+                      className={`${
+                        compact ? 'w-16 h-24' : 'w-32 h-48'
+                      } flex items-center justify-center`}
+                    >
                       <img
                         src={getDeviceImagePath(currentDevice.deviceType)}
                         alt={`OneKey ${currentDevice.deviceType || 'Device'}`}
@@ -190,7 +232,11 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
                     </div>
                   ) : (
                     /* 默认设备图标 */
-                    <div className="w-24 h-36 bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm relative overflow-hidden">
+                    <div
+                      className={`${
+                        compact ? 'w-16 h-24' : 'w-24 h-36'
+                      } bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm relative overflow-hidden`}
+                    >
                       {/* 屏幕区域 */}
                       <div className="absolute top-3 left-3 right-3 h-20 bg-gray-900 dark:bg-gray-100 rounded-sm"></div>
 
@@ -201,11 +247,11 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
                 </div>
 
                 {/* 设备信息 */}
-                <div className="text-center space-y-3">
-                  <h3 className="text-base font-medium text-foreground">
+                <div className={`text-center ${compact ? 'space-y-1' : 'space-y-3'}`}>
+                  <h3 className={`${compact ? 'text-sm' : 'text-base'} font-medium text-foreground`}>
                     {currentDevice ? `OneKey ${currentDevice.deviceType || 'Device'}` : ''}
                   </h3>
-                  <p className="text-sm text-muted-foreground">
+                  <p className={`${compact ? 'text-xs' : 'text-sm'} text-muted-foreground`}>
                     {status === 'idle'
                       ? currentDevice
                         ? t('components.methodExecutor.deviceConnected')
@@ -221,7 +267,7 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
 
           {/* 固件更新进度显示 */}
           {firmwareProgress && progressConfig && (
-            <div className="w-full mb-4 p-3 bg-muted/30 rounded-lg border border-border/50">
+            <div className="order-3 w-full mb-4 p-3 bg-muted/30 rounded-lg border border-border/50">
               <div className="flex items-center gap-2 mb-2">
                 <div className={progressConfig.color}>{progressConfig.icon}</div>
                 <span className="text-sm font-medium text-foreground">{progressConfig.title}</span>
@@ -234,12 +280,39 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
             </div>
           )}
 
+          {status === 'success' && firmwareVersionRows.length > 0 && (
+            <div className="order-4 w-full mb-4 rounded-lg border border-primary bg-primary p-3 text-primary-foreground">
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircle className="h-4 w-4 text-primary-foreground" />
+                <span className="text-sm font-medium text-primary-foreground">
+                  {t('components.deviceInteractionArea.updatedVersions')}
+                </span>
+              </div>
+              <div className="space-y-1">
+                {firmwareVersionRows.map(row => (
+                  <div key={row.label} className="flex items-center justify-between gap-3 text-xs">
+                    <span className="text-primary-foreground/80">{row.label}</span>
+                    <span className="font-mono font-medium text-primary-foreground">
+                      {row.value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* 执行控制按钮 - 并排布局，恢复文字 */}
-          <div className="w-full grid grid-cols-2 gap-4 flex-shrink-0">
+          <div
+            className={`w-full grid grid-cols-2 ${
+              compact ? 'order-1 mb-3 gap-3' : 'order-5 gap-4'
+            } flex-shrink-0`}
+          >
             <Button
               onClick={onExecute}
               disabled={status === 'loading' || status === 'device-interaction'}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground h-11 text-sm flex items-center gap-2"
+              className={`bg-primary hover:bg-primary/90 text-primary-foreground ${
+                compact ? 'h-10' : 'h-11'
+              } text-sm flex items-center gap-2`}
             >
               {status === 'loading' || status === 'device-interaction' ? (
                 <>
@@ -263,8 +336,10 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
               disabled={status === 'idle' || status === 'error' || isCancelling}
               className={
                 status === 'loading' || status === 'device-interaction'
-                  ? 'h-11 text-sm flex items-center gap-2'
-                  : 'border-border text-foreground hover:bg-muted h-11 text-sm flex items-center gap-2'
+                  ? `${compact ? 'h-10' : 'h-11'} text-sm flex items-center gap-2`
+                  : `border-border text-foreground hover:bg-muted ${
+                      compact ? 'h-10' : 'h-11'
+                    } text-sm flex items-center gap-2`
               }
             >
               {isCancelling ? (

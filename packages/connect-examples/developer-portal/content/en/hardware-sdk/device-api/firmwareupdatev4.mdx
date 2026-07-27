@@ -1,0 +1,65 @@
+---
+title: firmwareUpdateV4
+---
+
+# firmwareUpdateV4
+
+## Protocol V2 firmware update
+
+New firmware update flow for Protocol V2 devices. This method is independent from `firmwareUpdateV3` and uses Protocol V2 reboot, filesystem write, install trigger, and status polling messages for the full update.
+
+- Device: Protocol V2 devices
+- Flow: `DeviceReboot` -> `FilesystemFileWrite` -> `DeviceFirmwareUpdate` -> `DeviceGetFirmwareUpdateStatus` -> internal state refresh
+
+```typescript
+const res = await HardwareSDK.firmwareUpdateV4(connectId, {
+  platform: 'desktop', // 'native' | 'desktop' | 'ext' | 'web' | 'web-embed'
+  // Explicit firmware targets (all optional)
+  // applicationP1Binary: ArrayBuffer,
+  // applicationP2Binary: ArrayBuffer,
+  // coprocessorBinary: ArrayBuffer,
+  // bootloaderBinary: ArrayBuffer,
+  // se01Binary: ArrayBuffer,
+  // se02Binary: ArrayBuffer,
+  // se03Binary: ArrayBuffer,
+  // se04Binary: ArrayBuffer,
+
+  // RESC packages are written directly to their device paths.
+  resourceBundleFiles: [
+    {
+      binary: imagesBundle,
+      devicePath: 'vol0:/resource/images/images.okpkg',
+    },
+  ],
+
+  // Optional: force updating resource package
+  forcedUpdateRes: false,
+});
+```
+
+### Params
+
+[Optional common params](/en/hardware-sdk/core-api-guide#common-params)
+
+- `platform` - required `"native" | "desktop" | "ext" | "web" | "web-embed"` execution environment
+- `applicationP1Binary` / `applicationP2Binary` - optional signed application payload packages
+- `coprocessorBinary` - optional signed coprocessor payload package
+- `bootloaderBinary` - optional signed Bootloader payload package
+- `se01Binary` ... `se04Binary` - optional signed secure-element payload packages
+- `resourceBundleFiles` - optional `{ binary: ArrayBuffer; devicePath: string }[]` RESC packages written directly to the specified device paths
+- `forcedUpdateRes` - optional `boolean`; bypass remote resource-bundle version/hash checks
+
+When only `resourceBundleFiles` is provided, the SDK does not download remote firmware components and does not send a firmware installation request.
+
+### Result
+
+```typescript
+{
+  success: true,
+  payload: {
+    bleVersion: string,
+    firmwareVersion: string,
+    bootloaderVersion: string,
+  }
+}
+```

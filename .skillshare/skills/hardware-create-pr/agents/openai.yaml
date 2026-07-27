@@ -1,0 +1,6 @@
+interface:
+  display_name: 'Hardware Create PR'
+  short_description: 'Validate, commit, push, and create a Hardware SDK PR'
+  default_prompt: 'Use $hardware-create-pr to create a PR for the current Hardware SDK changes.'
+policy:
+  allow_implicit_invocation: false
