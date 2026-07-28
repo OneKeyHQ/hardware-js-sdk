@@ -71,7 +71,7 @@ export default class DeviceUploadWallpaper extends BaseMethod<DeviceUploadWallpa
     this.path = `${WALLPAPER_DIRECTORY}/${normalizeFileName(fileName, this.encoded.data)}`;
     this.params = { width, height, rgba: rgbaBytes, fileName, chunkSize };
     this.requireProtocolV2 = true;
-    this.unlockPolicy = 'retry-on-locked';
+    this.unlockPolicy = 'unlock-before-run';
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
   }

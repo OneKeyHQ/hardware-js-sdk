@@ -153,7 +153,8 @@ export interface Device {
  * This allows short-lived processes (e.g. CLI) to restore a previously
  * obtained session, avoiding the need to re-enter passphrase on every
  * invocation. The session must have been obtained from a prior
- * getPassphraseState() call on the same device.
+ * wallet-session call on the same device. This compatibility hook is intended
+ * for a trusted CLI process restoring its own OS-keychain entry.
  *
  * @param deviceId - The device's device_id (from features)
  * @param passphraseState - The passphrase state token
@@ -317,7 +318,7 @@ export class Device extends EventEmitter {
       instanceId: this.instanceId,
       createdAt: this.createdAt,
       deviceType,
-      /** ID for current seeds, will clear after replace a new seed at device */
+      /** Wallet-lifecycle ID; changes after the device is wiped or reinitialized. */
       deviceId,
       path: this.originalDescriptor?.path,
       bleName,
@@ -674,16 +675,14 @@ export class Device extends EventEmitter {
     const deviceId = _deviceId || this.getCurrentDeviceId();
     if (deviceId) return deviceId;
     if (this.isProtocolV2()) {
-      return this.originalDescriptor.path || this.originalDescriptor.id;
+      return this.originalDescriptor.path;
     }
     return undefined;
   }
 
   private reconcileSessionCacheDeviceIdentity(previousDeviceId?: string) {
     deviceWalletSessionStore.reconcileDeviceIdentity({
-      temporaryKey: this.isProtocolV2()
-        ? this.originalDescriptor.path || this.originalDescriptor.id
-        : undefined,
+      temporaryKey: this.isProtocolV2() ? this.originalDescriptor.path : undefined,
       previousDeviceId,
       nextDeviceId: this.getCurrentDeviceId(),
     });

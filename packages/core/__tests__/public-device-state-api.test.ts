@@ -28,19 +28,19 @@ describe('public device state API boundary', () => {
     expect(api.getFeatures).toBeInstanceOf(Function);
     expect(api.getOnekeyFeatures).toBeInstanceOf(Function);
     expect(api).not.toHaveProperty('getDeviceInfo');
-    expect(api.deviceInfoGet).toBeInstanceOf(Function);
-    expect(api.deviceStatusGet).toBeInstanceOf(Function);
+    expect(api).not.toHaveProperty('deviceInfoGet');
+    expect(api).not.toHaveProperty('deviceStatusGet');
     expect(api).not.toHaveProperty('deviceSettingsGet');
     expect(api).not.toHaveProperty('deviceSessionOpen');
     expect(api).not.toHaveProperty('deviceSettingsSet');
     expect(api).not.toHaveProperty('deviceSettingsPageShow');
     expect(api).not.toHaveProperty('deviceFirmwareUpdate');
-    expect(api.deviceGetFirmwareUpdateStatus).toBeInstanceOf(Function);
+    expect(api).not.toHaveProperty('deviceGetFirmwareUpdateStatus');
     expect(api).not.toHaveProperty('deviceFactoryInfoSet');
-    expect(api.deviceFactoryInfoGet).toBeInstanceOf(Function);
+    expect(api).not.toHaveProperty('deviceFactoryInfoGet');
     expect(api).not.toHaveProperty('filesystemPermissionFix');
     expect(api).not.toHaveProperty('filesystemFormat');
-    expect(api.fileRead).toBeInstanceOf(Function);
+    expect(api).not.toHaveProperty('fileRead');
     expect(api).not.toHaveProperty('fileWrite');
     expect(api).not.toHaveProperty('fileDelete');
     expect(api).not.toHaveProperty('dirRemove');
@@ -48,15 +48,15 @@ describe('public device state API boundary', () => {
     expect(api).not.toHaveProperty('filesystemDirList');
 
     expect(publicMethods).not.toHaveProperty('getDeviceInfo');
-    expect(publicMethods).toHaveProperty('deviceInfoGet');
-    expect(publicMethods).toHaveProperty('deviceStatusGet');
+    expect(publicMethods).not.toHaveProperty('deviceInfoGet');
+    expect(publicMethods).not.toHaveProperty('deviceStatusGet');
     expect(publicMethods).not.toHaveProperty('deviceSettingsGet');
     expect(publicMethods).not.toHaveProperty('deviceSessionOpen');
     expect(publicMethods).not.toHaveProperty('deviceSettingsSet');
     expect(publicMethods).not.toHaveProperty('deviceSettingsPageShow');
     expect(publicMethods).not.toHaveProperty('filesystemPermissionFix');
     expect(publicMethods).not.toHaveProperty('filesystemFormat');
-    expect(publicMethods).toHaveProperty('fileRead');
+    expect(publicMethods).not.toHaveProperty('fileRead');
     expect(publicMethods).not.toHaveProperty('fileWrite');
     expect(publicMethods).not.toHaveProperty('fileDelete');
     expect(publicMethods).not.toHaveProperty('dirRemove');
@@ -129,32 +129,6 @@ describe('public device state API boundary', () => {
   });
 
   test.each([
-    ['deviceInfoGet', DeviceInfoGet],
-    ['deviceStatusGet', DeviceStatusGet],
-  ])('allows the dispatcher to run the public development method %s', (name, Method) => {
-    const instance = findMethod({
-      id: 1,
-      payload: { method: name },
-    } as any);
-
-    expect(instance).toBeInstanceOf(Method);
-  });
-
-  test.each([
-    'protocolInfoRequest',
-    'ping',
-    'deviceGetFirmwareUpdateStatus',
-    'deviceFactoryInfoGet',
-  ])('keeps the public development method %s available to the dispatcher', name => {
-    expect(
-      findMethod({
-        id: 1,
-        payload: { method: name },
-      } as any)
-    ).toBeDefined();
-  });
-
-  test.each([
     'deviceSessionOpen',
     'deviceSettingsGet',
     'deviceSettingsSet',
@@ -173,6 +147,16 @@ describe('public device state API boundary', () => {
     'deviceFactoryInfoSet',
     'filesystemPermissionFix',
     'filesystemFormat',
+    'deviceInfoGet',
+    'deviceStatusGet',
+    'protocolInfoRequest',
+    'ping',
+    'deviceGetFirmwareUpdateStatus',
+    'deviceFactoryInfoGet',
+    'fileRead',
+    'dirList',
+    'dirMake',
+    'pathInfo',
     'fileWrite',
     'fileDelete',
     'dirRemove',
@@ -247,18 +231,34 @@ describe('public device state API boundary', () => {
   });
 });
 
-// 这些临时 Pro2 查询不再属于 CoreApi；若重新暴露，下列断言会产生未使用的 ts-expect-error。
-// @ts-expect-error getDeviceInfo 已从公共 API 删除
+// These raw Protocol V2 commands are intentionally absent from CoreApi.
+// @ts-expect-error getDeviceInfo is not part of the public API
 type RemovedGetDeviceInfo = CoreApi['getDeviceInfo'];
-// @ts-expect-error deviceInfoGet 已从公共 API 删除
+// @ts-expect-error deviceInfoGet is not part of the public API
 type RemovedDeviceInfoGet = CoreApi['deviceInfoGet'];
-// @ts-expect-error deviceStatusGet 已从公共 API 删除
+// @ts-expect-error deviceStatusGet is not part of the public API
 type RemovedDeviceStatusGet = CoreApi['deviceStatusGet'];
-// @ts-expect-error deviceSettingsGet 已从公共 API 删除
+// @ts-expect-error protocolInfoRequest is not part of the public API
+type RemovedProtocolInfoRequest = CoreApi['protocolInfoRequest'];
+// @ts-expect-error ping is not part of the public API
+type RemovedPing = CoreApi['ping'];
+// @ts-expect-error deviceGetFirmwareUpdateStatus is not part of the public API
+type RemovedFirmwareUpdateStatus = CoreApi['deviceGetFirmwareUpdateStatus'];
+// @ts-expect-error deviceFactoryInfoGet is not part of the public API
+type RemovedFactoryInfoGet = CoreApi['deviceFactoryInfoGet'];
+// @ts-expect-error fileRead is not part of the public API
+type RemovedFileRead = CoreApi['fileRead'];
+// @ts-expect-error dirList is not part of the public API
+type RemovedDirList = CoreApi['dirList'];
+// @ts-expect-error dirMake is not part of the public API
+type RemovedDirMake = CoreApi['dirMake'];
+// @ts-expect-error pathInfo is not part of the public API
+type RemovedPathInfo = CoreApi['pathInfo'];
+// @ts-expect-error deviceSettingsGet is not part of the public API
 type RemovedDeviceSettingsGet = CoreApi['deviceSettingsGet'];
-// @ts-expect-error deviceSettingsSet 已从公共 API 删除
+// @ts-expect-error deviceSettingsSet is not part of the public API
 type RemovedDeviceSettingsSet = CoreApi['deviceSettingsSet'];
-// @ts-expect-error deviceSettingsPageShow 已从公共 API 删除
+// @ts-expect-error deviceSettingsPageShow is not part of the public API
 type RemovedDeviceSettingsPageShow = CoreApi['deviceSettingsPageShow'];
-// @ts-expect-error refreshDeviceState 已被 getDeviceState scope 取代
+// @ts-expect-error refreshDeviceState was replaced by getDeviceState scope
 type RemovedRefreshDeviceState = CoreApi['refreshDeviceState'];

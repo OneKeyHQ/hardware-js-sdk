@@ -158,6 +158,18 @@ describe('ClearSessionCache', () => {
     expect(device.state?.raw?.protocolV1Features).not.toHaveProperty('session_id');
   });
 
+  test('uses only the transport path as the temporary Protocol V2 cache key', () => {
+    const device = Device.fromDescriptor({ id: 'descriptor-id' } as never);
+    device.features = {
+      protocol: 'V2',
+      passphraseState: 'hidden-a',
+      sessionId: 'session-a',
+    } as never;
+
+    expect(device.getInternalState()).toBeUndefined();
+    expect(deviceWalletSessionStore.get('descriptor-id', 'hidden-a')).toBeUndefined();
+  });
+
   test('clears one wallet without using a device', async () => {
     deviceWalletSessionStore.set('device-1', 'hidden-a', 'session-a');
     deviceWalletSessionStore.set('device-1', 'hidden-b', 'session-b');

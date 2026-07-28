@@ -4,13 +4,13 @@
 
 ## 设备设置
 
-| SDK 方法                 | protobuf                 | 返回值           | 解锁策略             |
+| Core 内部操作            | protobuf                 | 返回值           | 解锁策略             |
 | ------------------------ | ------------------------ | ---------------- | -------------------- |
 | `deviceSettingsGet`      | `DeviceSettingsGet`      | `DeviceSettings` | 不解锁，直接读取     |
 | `deviceSettingsSet`      | `DeviceSettingsSet`      | `Success`        | 按字段决定是否解锁   |
-| `deviceSettingsPageShow` | `DeviceSettingsPageShow` | `Success`        | 锁定后解锁并重试一次 |
+| `deviceSettingsPageShow` | `DeviceSettingsPageShow` | `Success`        | 已知锁定时先解锁，只执行一次 |
 
-这些接口只支持 Protocol V2，不会自动回退到 V1 的 `deviceSettings`。
+这些原始命令不属于公共 `CoreApi`；调用方统一使用 `deviceSettings`，Core 再按 V1/V2 路由。
 
 `DeviceSettings` 的公开字段包含设备名称、蓝牙、语言、壁纸路径、亮度、自动锁定、自动关机、动画、轻触唤醒、震动、USB 锁定、随机键盘以及安全模式状态，锁定时也可以读取。`passphrase_enable` 与 `fido_enabled` 是私有字段，仅在设备解锁时返回。字段以当前 protobuf 和生成类型为准。
 
@@ -25,7 +25,9 @@
 - `DevicePassphrase`
 - `DeviceAirgap`
 
-`deviceSettingsGet` 显式声明 `unlockPolicy='none'`，不会因为缓存状态或设备响应触发自动解锁。`deviceSettingsSet` 根据字段计算 `none` 或 `retry-on-locked`；`deviceSettingsPageShow` 始终使用 `retry-on-locked`。只有收到结构化 `DeviceLocked` 时才解锁并重试一次，第二次失败不会循环重试。
+读取状态使用 `unlockPolicy='none'`，不会触发自动解锁。统一 `deviceSettings` 根据字段计算
+`none` 或 `unlock-before-run`；设备页面同样使用 `unlock-before-run`。已知设备锁定时先解锁，
+但收到 locked 响应后不重放设置写入或页面操作。
 
 页面打开前，SDK 统一发送非阻塞 `REQUEST_BUTTON`，payload 包含
 `source='method-lifecycle'`、`reason='settings-page'`、`completion='operation-completed'` 和具体 `page`。
@@ -48,7 +50,7 @@ App 只展示“请在设备上操作”，不调用 `uiResponse()`。API `Succe
 `uploadPortfolio` 是后台文件同步与应用流程，不需要设备确认：
 
 - 文件写入固定关闭分片进度 Event。
-- SDK 不生成 `REQUEST_PIN` 或 `REQUEST_BUTTON`，包括自动解锁阶段。
+- SDK 不生成 `REQUEST_PIN` 或 `REQUEST_BUTTON`；已知锁定时可静默先解锁。
 - firmware 直接校验 pending package、更新 Portfolio 数据并返回最终 `Success/Failure`。
 - App 以 `PortfolioUpdate` 最终响应为准，不等待设备页面。
 
@@ -78,7 +80,9 @@ App 只展示“请在设备上操作”，不调用 `uiResponse()`。API `Succe
 Protocol V1 继续使用 `firmwareUpdate` 至 `firmwareUpdateV3`；Pro2 使用 `firmwareUpdateV4`。低阶
 `DeviceFirmwareUpdate` 只供 Core 内部升级编排发送安装目标，不属于公共 `CoreApi`。
 
-切换固件类型不新增 `DeviceSettingsPageShow` 页面。`firmwareUpdateV4` 保持 `retry-on-locked`，解锁后发送 `DeviceReboot(Bootloader)`，确认与重启页面由设备固件处理，SDK 随后负责重连和升级编排。
+切换固件类型不新增 `DeviceSettingsPageShow` 页面。`firmwareUpdateV4` 使用
+`unlock-before-run`：已知锁定时先解锁，再发送 `DeviceReboot(Bootloader)`；升级编排一旦开始，
+收到 locked 错误也不会从头重放。确认与重启页面由设备固件处理，SDK 随后负责重连和升级编排。
 
 支持的 Pro2 目标包括 bootloader、application P1/P2、coprocessor、SE01 ～ SE04 和 RESC bundle。`romloaderBinary` 虽仍存在于部分兼容类型中，但当前安装请求不接受 `ROMLOADER`，必须走 loader 专用流程。
 

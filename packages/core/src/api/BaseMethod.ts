@@ -23,19 +23,15 @@ import type { CoreMessage } from '../events';
 import type { ProtocolV2InteractionDescriptor } from '../protocols/protocol-v2/uiInteraction';
 import type { RequestContext } from '../utils/tracing';
 import type { CoreContext } from '../core';
+import {
+  getProtocolV2UnlockPolicy,
+  type UnlockPolicy,
+} from '../protocols/protocol-v2/unlockPolicy';
 
-export type UnlockPolicy = 'none' | 'retry-on-locked';
+export type { UnlockPolicy } from '../protocols/protocol-v2/unlockPolicy';
 export type ProtocolV2UiMode = 'auto' | 'none';
 
 const Log = getLogger(LoggerNames.Method);
-
-const isRetrySafeProtocolV2Method = (name: string) =>
-  /(?:GetAddress|GetPublicKey|Sign(?:In|Offchain)?Message|SignTransaction|SignTypedData|SignPsbt|SignProof|SignData|SignEvent|SignSchnorr|VerifyMessage|EncryptMessage|DecryptMessage)$/.test(
-    name
-  ) ||
-  name === 'allNetworkGetAddressByLoop' ||
-  name === 'lnurlAuth' ||
-  name === 'cipherKeyValue';
 
 const isEvmLedgerLegacyPathWithHighIndex = (path: unknown) => {
   let addressN: number[] | undefined;
@@ -214,9 +210,7 @@ export abstract class BaseMethod<Params = undefined> {
     this.useDevice = true;
     this.allowDeviceMode = [UI_REQUEST.NOT_INITIALIZE];
     this.requireDeviceMode = [];
-    if (isRetrySafeProtocolV2Method(this.name)) {
-      this.unlockPolicy = 'retry-on-locked';
-    }
+    this.unlockPolicy = getProtocolV2UnlockPolicy(this.name);
   }
 
   abstract init(): void;

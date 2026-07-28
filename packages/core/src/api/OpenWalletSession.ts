@@ -34,6 +34,22 @@ const wasResumed = (session: unknown) =>
   'resumed' in session &&
   (session as { resumed?: unknown }).resumed === true;
 
+const requireHiddenWalletResponse = (session: {
+  passphraseState?: string;
+  newSession?: string;
+}) => {
+  if (!session.passphraseState) {
+    throw ERRORS.TypedError(
+      HardwareErrorCode.DeviceInitializeFailed,
+      'Hidden wallet response is missing passphraseState'
+    );
+  }
+  return {
+    passphraseState: session.passphraseState,
+    ...(session.newSession ? { sessionId: session.newSession } : {}),
+  };
+};
+
 type NormalizedOpenWalletSessionParams = OpenWalletSessionParams & {
   legacySessionToClear?: {
     deviceId?: string;
@@ -192,7 +208,7 @@ export default class OpenWalletSession extends BaseMethod<NormalizedOpenWalletSe
         protocol,
         walletType: 'hidden',
         deviceId: currentDeviceId,
-        passphraseState: session.passphraseState ?? null,
+        ...requireHiddenWalletResponse(session),
         resumed: wasResumed(session) || session.newSession === cachedSessionId,
       };
     }
@@ -206,16 +222,16 @@ export default class OpenWalletSession extends BaseMethod<NormalizedOpenWalletSe
       deviceId: currentDeviceId,
       resumed: wasResumed(session),
     } as const;
-    return session.passphraseState
+    return state.status?.passphraseProtection === false
       ? {
-          ...responseBase,
-          walletType: 'hidden',
-          passphraseState: session.passphraseState,
-        }
-      : {
           ...responseBase,
           walletType: 'standard',
           passphraseState: null,
+        }
+      : {
+          ...responseBase,
+          walletType: 'hidden',
+          ...requireHiddenWalletResponse(session),
         };
   }
 }
