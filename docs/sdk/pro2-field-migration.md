@@ -321,7 +321,8 @@ DeviceSessionOpen(select/resume) -> DeviceSession
 `btc_test_address`。缺少任一字段都视为协议响应不完整，Core 不会把它降级解释为标准钱包。
 
 标准钱包不读取其他钱包的 Session Store 项；它只协商 eventless 模式，不调用
-`DeviceSessionOpen`，并返回 `passphraseState: null`。SDK 不注册可调用的
+`DeviceSessionOpen`，并返回 `passphraseState: null`；如果固件响应包含 `session_id`，SDK 只做
+可选透传，不补造也不额外查询。SDK 不注册可调用的
 `deviceSessionOpen` API；该名称只表示 Core 内部发送给设备的 Protocol V2 命令，
 不能通过低层 `call()` 绕过公共钱包流程。
 
