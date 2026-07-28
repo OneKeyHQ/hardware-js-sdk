@@ -1,13 +1,13 @@
 # 交接文档：第三方硬件设备唯一 ID + 账户名迁移
 
-> 最后更新：2026-07-27
+> 最后更新：2026-07-28
 > 本文保留了早期调查过程；以本节状态和
 > `docs/device-attestation-voucher-backend.md` 的生产边界为准。
 
 > **重要纠正**：早期 T3W1 真机结果只覆盖 Optiga + Tropic，不能代表当前要求的
-> Optiga + Tropic + MCU/ML-DSA 三层完整证明已经在当前 App 会话跑通。Ledger 已改成
-> “本地 OneKey 服务端拥有 DMK 状态机、App 只转发物理设备 APDU”；它不是离线证明，
-> 本地实现只用于 Monorepo 联调，生产后端按本文协议独立实现。
+> Optiga + Tropic + MCU/ML-DSA 三层完整证明已经在当前 App 会话跑通。客户端已移除
+> 本地 Node/WSS/DMK 服务端，只保留最小真机集成检查；生产 Ledger relay 和发券信任
+> 边界由后端按 `docs/device-attestation-voucher-backend.md` 独立实现。
 
 ---
 
@@ -16,13 +16,13 @@
 | 项                                                          | 状态                                                     | 真机验证                                                           |
 | ----------------------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------ |
 | Trezor 设备唯一 ID（AuthenticateDevice 本地验签）           | ✅ 已补齐流式 proof + Optiga/Tropic/MCU 三层验证         | ⏳ 当前版本待 Safe 7 重新实测；官方 ML-DSA 真向量已通过            |
-| Ledger 设备唯一 ID（服务端 DMK Genuine Check）              | ✅ 本地 TS 服务端 + 一次性 WSS APDU relay 已实现         | ⏳ 新状态机待连接 Nano X 真机跑通                                  |
+| Ledger 设备唯一 ID（官方 DMK Genuine Check）                | ✅ SDK 直接厂商验真；客户端无本地 Node relay             | ✅ Nano X 真机已返回 genuine + DSID                                |
 | Ledger 裸 attestation 公钥提取（transport tap）             | ✅ 已实现，已同步                                        | ⏳ 待测 `attestationPubKey` 字段                                   |
 | Review 修复（H1/H2/M1/M2/M3）                               | ✅ 已应用 + 单测                                         | H1 已随 T3W1 真机验证                                              |
 | app-monorepo 调试页（Developer→Gallery→DeviceAuthenticity） | ✅ 已加                                                  | ✅ 已用它测通两端                                                  |
 | 账户名读取 · Ledger                                         | ✅ Desktop 已实现只读清单                                | ✅ 本机读出 Ethereum 名称/地址                                     |
 | 账户名读取 · Trezor                                         | ✅ Desktop 已实现 Suite 缓存只读清单                     | ✅ 本机读出 Bitcoin 首个 receive address；不连接设备               |
-| 本地 mock 发券                                              | ✅ 本地可信服务拥有 challenge→ 验真 → 发券全流程         | Trezor 当前版待真机；Ledger WSS/DMK 集成测试已通过，待真机         |
+| 本地 mock 发券                                              | ✅ 仅作 UI 联调：SDK 真机验真后生成 DEV 券               | 不作为后端可信凭证；生产发券由后端独立实现                         |
 
 ---
 
@@ -38,8 +38,8 @@
 
 | 仓库                                               | 分支                                           | 作用                                                                                                            |
 | -------------------------------------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `~/Development/OnekeyWork/hardware-js-sdk`         | `codex/device-attestation-voucher-proof`       | SDK、Ledger 本地/远端 relay server、设备 APDU bridge                                                           |
-| `~/Development/OnekeyWork/app-monorepo-fix-ledger` | `codex/third-party-device-onboarding-rewards`  | 设备详情页、Desktop 本地服务启动、Claim 与账户名清单                                                            |
+| `~/Development/OnekeyWork/hardware-js-sdk`         | `codex/device-attestation-voucher-proof`       | Trezor/Ledger 真机验真 SDK 与设备传输能力                                                                         |
+| `~/Development/OnekeyWork/app-monorepo-fix-ledger` | `codex/third-party-device-onboarding-rewards`  | 设备详情页、最小本地验真 UI、Claim 演示与账户名清单                                                               |
 | 参考（只读）                                       | —                                              | `~/Development/OnekeyWork/trezor-suite`、`trezor-firmware`、`node_modules/@ledgerhq/device-management-kit`(DMK) |
 
 > ⚠️ 关键前提：设备认证只能加在**新 `hwk-*` 栈**（`hwk-trezor-adapter`/`hwk-ledger-adapter`/`hwk-trezor-connector`），**不能**加在 legacy `packages/core`（`DeviceVerify.ts` 那套）——legacy 的 wire protobuf 里没有 `AuthenticateDevice` 消息、features 也没有 `internal_model`。
@@ -108,40 +108,20 @@ MCU(ML-DSA-44)，并要求三层设备证书 serial 一致。
 
 **真机结果**（Nano X）：`Verified ✅`，`deviceId=818706ff78239d1ab642df69c1d1fdd48acfc59ba282f4139383cfee31adfcdc`（走 genuine-check backend）。`attestationPubKey` 字段的真机验证**待做**（清缓存重启 Desktop 后看 Ledger 结果多一行 `attestationPubKey: 04...`）。
 
-#### 3.2.1 当前 Monorepo 本地“服务端拥有 DMK”实现
+#### 3.2.1 当前 Monorepo 最小验证实现
 
-现在 Claim 不再调用客户端 `verifyDeviceAuthenticity()` 后相信它返回的布尔值。真实路径是：
+App Monorepo 不再内置 Node/WSS/DMK 服务端。设备详情页的开发按钮只做两件事：
 
-1. Desktop background 启动 `LedgerLocalAttestationServer`，只监听
-   `127.0.0.1`，创建 32-byte 一次性 token 和 5 分钟 ticket；
-2. SDK 的 `LedgerAdapter.runDeviceAttestationApduBridge()` 独占当前已连接
-   Ledger session，并暂停 DMK session refresher；
-3. App 连接 ticket 的 `ws://127.0.0.1/.../<token>`，只处理
-   `apdu-request → exchangeDeviceAttestationApdu → apdu-response`；
-4. 服务端自己的 DMK 使用自定义 `TransportFactory`，执行官方
-   `GenuineCheckDeviceAction`，并直接连接 Ledger HSM；
-5. 只有服务端内部 `ticket.result` 的 `isGenuine + deviceId` 能进入发券函数。
-   WSS 发给客户端的 `result` 仅用于 UX，客户端不能提交它来发券；
-6. success、failure、断线或取消都会恢复 refresher 并释放设备队列。
+1. 调用 `adapter.hw.verifyDeviceAuthenticity()` 跑真实设备/厂商验真；
+2. 验真成功后生成一张本地 `DEV-LOCAL-*` 券，验证 UI 流程。
 
-代码都在 App Monorepo：
+Trezor 会使用 background 生成的 32-byte challenge；Ledger 直接运行 SDK 中的官方
+DMK Genuine Check 并连接 Ledger HSM。两者结果都是真实集成结果，但客户端返回的
+`verified/deviceId` **不能作为生产后端发券凭证**。
 
-- `packages/kit-bg/src/services/ServiceThirdPartyHardware/ledgerLocalAttestationServer/`
-  - `LedgerLocalAttestationServer.ts`：一次性 ticket/WSS 会话；
-  - `relayTransport.ts`：远端 APDU → DMK `TransportFactory`；
-  - `runLedgerDmkGenuineCheck.ts`：服务端官方 DMK action；
-  - `protocol.ts`：严格消息解析、大小/次数/顺序限制。
-- SDK 只保留 `LedgerConnectorBase.ts` 的
-  `start/exchange/stopDeviceAttestationApduBridge`；
-- SDK `LedgerAdapter.ts`：`runDeviceAttestationApduBridge()` 在整个 relay 生命周期独占
-  DeviceJobQueue；
-- App Desktop：
-  `ServiceThirdPartyHardware/ledgerLocalAttestationBridge.desktop.ts`。
-
-这套 Node 服务不从 SDK 发布，也不作为生产后端包。后端团队按
-`docs/device-attestation-voucher-backend.md` 的状态机和 WSS contract 独立实现；
-App 的 APDU client 后续只需把本地 `ws://127.0.0.1` ticket 换成后端返回的
-`wss://attestation.<domain>`。
+后端团队按 `docs/device-attestation-voucher-backend.md` 独立实现 challenge、Ledger
+relay、状态机、鉴权、幂等和发券事务。客户端当前没有可复用的本地服务端代码，也不
+直接依赖 `ws`、`rxjs`、`purify-ts` 或 Ledger DMK 包。
 
 ### 3.3 Review 修复状态（Fable 5 审查）
 
@@ -182,9 +162,8 @@ yarn workspace @onekeyhq/desktop dev
 **注意**：缓存不能边跑边清（webpack 会立刻重新生成）——必须先停 Desktop 再清。
 **构建环境**：`tsup` 曾部分缺失，`yarn install` 可恢复（本会话已跑过一次）。
 
-> 当前使用 `yarn debug:watch` 同步本地 SDK，不发 alpha 包。
-> `hwk-ledger-adapter` 只需同步 `dist`；本地 relay 已归属 App Monorepo，不需要同步
-> SDK `package.json`。
+> 当前使用 `yarn debug:watcher` 同步本地 SDK，不发 alpha 包。
+> `hwk-ledger-adapter` 只需同步 `dist`；App Monorepo 不再包含本地 relay。
 
 ---
 

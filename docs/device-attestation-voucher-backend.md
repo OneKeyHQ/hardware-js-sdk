@@ -279,18 +279,12 @@ JWS/COSE receipt。单纯透明代理 Ledger WSS、由客户端计算 `isGenuine
 
 #### 4.3.1 后端需要独立实现的 DMK 状态机
 
-App Monorepo 中有一份只用于本地联调的参考实现：
-
-`packages/kit-bg/src/services/ServiceThirdPartyHardware/ledgerLocalAttestationServer/`
-
-它不属于 Hardware SDK、不通过 npm subpath 发布，也不是生产后端交付物。后端团队
+App Monorepo 不再内置 Node/WSS/DMK 参考服务。客户端只保留真机集成检查；后端团队
 需要使用自己的服务框架、鉴权、存储和部署方式独立实现下面的状态机与 WSS contract。
 
-本地 `LedgerLocalAttestationServer` 运行官方
-`GenuineCheckDeviceAction`，不是模拟 `isGenuine`。它通过自定义 DMK
-`TransportFactory` 把每条 APDU 交给 WSS 客户端，客户端再用已连接的 USB/BLE
-session 发给物理 Ledger。服务端同时直连 Ledger 官方 HSM endpoint，因此验证时必须
-联网。
+后端运行官方 `GenuineCheckDeviceAction`，通过自定义 DMK `TransportFactory` 把每条
+APDU 交给 WSS 客户端，客户端再用已连接的 USB/BLE session 发给物理 Ledger。后端
+同时直连 Ledger 官方 HSM endpoint，因此验证时必须联网。
 
 推荐持久化状态机：
 
@@ -316,7 +310,7 @@ App -> Server: apdu-error(requestId, message)
 Server -> App: interaction / result / error
 ```
 
-实现已经约束：
+后端实现必须约束：
 
 - 32-byte CSPRNG token、单次消费、默认 TTL 5 分钟；
 - 严格版本/字段/hex/model 校验；
@@ -325,27 +319,18 @@ Server -> App: interaction / result / error
 - `isGenuine=false` 时丢弃任何 `deviceId`；
 - 只有服务端保存的 Promise/数据库 session 能完成 claim，客户端 `result` 不具备授权力。
 
-后端实现时可参考本地 `protocol.ts`、`relayTransport.ts` 和
-`runLedgerDmkGenuineCheck.ts` 的行为，但不要求复用其代码。生产必须将内存 ticket
-store 替换为 Redis/数据库，把本地 `ws://` 升级为 TLS `wss://`，接入 OneKey 登录态、
-限流、审计和多实例 sticky routing。
+生产必须使用 Redis/数据库保存 ticket，把连接暴露为 TLS `wss://`，接入 OneKey
+登录态、限流、审计和多实例 sticky routing。
 同一 attestation session 的 WSS 与 DMK runner 必须由同一 worker 拥有，或用严格有序的
 消息队列转发。
 
-### 4.4 当前本地服务的真实性和边界
+### 4.4 当前客户端最小集成检查的边界
 
-本地服务只替换部署位置，不替换密码学验证：
-
-- Trezor：本地可信 background 生成 32-byte challenge，设备签名，background
-  使用固定生产根证书重新验证原始 Optiga/Tropic/MCU 证明，验证成功后才生成开发券。
-  这段 verifier 和 evidence DTO 可以原样移动到后端。
-- Ledger：本地可信 Node 服务运行官方 DMK Genuine Check 并连接 Ledger HSM；App
-  background 只转发 APDU。服务端内部 ticket 拿到真实 verdict + DSID 后才生成开发券。
-  这已经是上一节的“服务端 DMK + 远程 APDU transport”，只是 WSS 当前监听
-  `127.0.0.1`；迁到远端后不改变信任边界。
-- `runTrustedLocalMockDeviceClaim` 接收的是执行真实验真的闭包，不接受 renderer
-  提交的 attestation DTO；challenge 在执行器内部生成，领券前不会交给不可信调用方
-  决定验证结果。
+- Trezor：background 生成 32-byte challenge，SDK 让设备签名并验证生产证书链。
+- Ledger：SDK 直接运行官方 DMK Genuine Check 并连接 Ledger HSM。
+- 两条路径成功后只生成本地开发券，用于验证 UI 和设备通讯。
+- 客户端结果不是后端可信凭证。生产后端不能相信客户端提交的
+  `{ verified, deviceId }`，必须按前文自己验证或见证完整会话。
 
 ### 4.5 平台与联网矩阵
 
@@ -353,7 +338,7 @@ store 替换为 Redis/数据库，把本地 `ws://` 升级为 TLS `wss://`，接
 | ----------------------------------- | ------------------------------- | ----------------- | ------------------------------- | --------------------------------- |
 | Trezor 本地证书验证                 | 支持，USB/BLE 取 proof          | WebUSB 可用时支持 | 有对应 USB/BLE transport 时支持 | 不需要；拿到 proof 后可完全离线验 |
 | Trezor 后端发券                     | 支持                            | 支持              | 支持                            | 需要连接 OneKey 后端提交 proof    |
-| Ledger 当前本地 DMK server          | 支持 WebHID/BLE                 | Node relay 不内置 | 当前本地 server 仅 Desktop       | 必须连接 Ledger HSM               |
+| Ledger 客户端集成检查               | 支持 WebHID/BLE                 | 支持对应 transport| 支持对应 transport              | 必须连接 Ledger HSM               |
 | Ledger 生产服务端 DMK + APDU bridge | 支持                            | 支持              | 支持                            | 必须连接 OneKey 后端和 Ledger HSM |
 
 操作系统不是主要限制，真正的限制是该端是否具备对应 USB/BLE transport。Trezor
