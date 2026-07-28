@@ -1,10 +1,7 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  entry: {
-    index: 'src/index.ts',
-    'attestation-relay': 'src/attestationRelay/index.ts',
-  },
+  entry: ['src/index.ts'],
   format: ['cjs', 'esm'],
   dts: true,
   clean: true,
@@ -21,6 +18,5 @@ export default defineConfig({
     'react-native',
     'react-native-ble-plx',
     'rxjs',
-    'ws',
   ],
 });

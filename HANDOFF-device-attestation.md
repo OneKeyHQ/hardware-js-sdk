@@ -7,7 +7,7 @@
 > **重要纠正**：早期 T3W1 真机结果只覆盖 Optiga + Tropic，不能代表当前要求的
 > Optiga + Tropic + MCU/ML-DSA 三层完整证明已经在当前 App 会话跑通。Ledger 已改成
 > “本地 OneKey 服务端拥有 DMK 状态机、App 只转发物理设备 APDU”；它不是离线证明，
-> 但服务端所有权与生产方案一致，后续可把同一套 TypeScript 搬到远端。
+> 本地实现只用于 Monorepo 联调，生产后端按本文协议独立实现。
 
 ---
 
@@ -108,11 +108,11 @@ MCU(ML-DSA-44)，并要求三层设备证书 serial 一致。
 
 **真机结果**（Nano X）：`Verified ✅`，`deviceId=818706ff78239d1ab642df69c1d1fdd48acfc59ba282f4139383cfee31adfcdc`（走 genuine-check backend）。`attestationPubKey` 字段的真机验证**待做**（清缓存重启 Desktop 后看 Ledger 结果多一行 `attestationPubKey: 04...`）。
 
-#### 3.2.1 当前“服务端拥有 DMK”实现
+#### 3.2.1 当前 Monorepo 本地“服务端拥有 DMK”实现
 
 现在 Claim 不再调用客户端 `verifyDeviceAuthenticity()` 后相信它返回的布尔值。真实路径是：
 
-1. Desktop background 启动 `LedgerAttestationRelayServer`，只监听
+1. Desktop background 启动 `LedgerLocalAttestationServer`，只监听
    `127.0.0.1`，创建 32-byte 一次性 token 和 5 分钟 ticket；
 2. SDK 的 `LedgerAdapter.runDeviceAttestationApduBridge()` 独占当前已连接
    Ledger session，并暂停 DMK session refresher；
@@ -124,23 +124,24 @@ MCU(ML-DSA-44)，并要求三层设备证书 serial 一致。
    WSS 发给客户端的 `result` 仅用于 UX，客户端不能提交它来发券；
 6. success、failure、断线或取消都会恢复 refresher 并释放设备队列。
 
-代码：
+代码都在 App Monorepo：
 
-- `packages/hwk-ledger-adapter/src/attestationRelay/`
-  - `LedgerAttestationRelayServer.ts`：一次性 ticket/WSS 会话；
+- `packages/kit-bg/src/services/ServiceThirdPartyHardware/ledgerLocalAttestationServer/`
+  - `LedgerLocalAttestationServer.ts`：一次性 ticket/WSS 会话；
   - `relayTransport.ts`：远端 APDU → DMK `TransportFactory`；
   - `runLedgerDmkGenuineCheck.ts`：服务端官方 DMK action；
   - `protocol.ts`：严格消息解析、大小/次数/顺序限制。
-- `LedgerConnectorBase.ts`：
+- SDK 只保留 `LedgerConnectorBase.ts` 的
   `start/exchange/stopDeviceAttestationApduBridge`；
-- `LedgerAdapter.ts`：`runDeviceAttestationApduBridge()` 在整个 relay 生命周期独占
+- SDK `LedgerAdapter.ts`：`runDeviceAttestationApduBridge()` 在整个 relay 生命周期独占
   DeviceJobQueue；
 - App Desktop：
   `ServiceThirdPartyHardware/ledgerLocalAttestationBridge.desktop.ts`。
 
-本地与远端的业务代码不变。上线时把 `LedgerAttestationRelayServer.listen()` 放进
-后端进程，用 API 创建 session，把 `ws://127.0.0.1` ticket 换成带登录态/短期 token 的
-`wss://attestation.<domain>`；App 的 APDU client 与协议无需改写。
+这套 Node 服务不从 SDK 发布，也不作为生产后端包。后端团队按
+`docs/device-attestation-voucher-backend.md` 的状态机和 WSS contract 独立实现；
+App 的 APDU client 后续只需把本地 `ws://127.0.0.1` ticket 换成后端返回的
+`wss://attestation.<domain>`。
 
 ### 3.3 Review 修复状态（Fable 5 审查）
 
@@ -182,8 +183,8 @@ yarn workspace @onekeyhq/desktop dev
 **构建环境**：`tsup` 曾部分缺失，`yarn install` 可恢复（本会话已跑过一次）。
 
 > 当前使用 `yarn debug:watch` 同步本地 SDK，不发 alpha 包。
-> `scripts/monitor-config.json` 已让 `hwk-ledger-adapter` 同步 `dist` 和
-> `package.json`，因为 `attestation-relay` 是新的 Node-only package subpath。
+> `hwk-ledger-adapter` 只需同步 `dist`；本地 relay 已归属 App Monorepo，不需要同步
+> SDK `package.json`。
 
 ---
 

@@ -277,25 +277,16 @@ JWS/COSE receipt。单纯透明代理 Ledger WSS、由客户端计算 `isGenuine
 证明服务端可独立观察并绑定最终 verdict，否则仍然不够；客户端
 `{ verified: true, deviceId }` 永远不能作为发券证据。
 
-#### 4.3.1 可直接部署的 DMK 状态机
+#### 4.3.1 后端需要独立实现的 DMK 状态机
 
-当前 SDK 已提供 Node-only subpath：
+App Monorepo 中有一份只用于本地联调的参考实现：
 
-```ts
-import {
-  LedgerAttestationRelayServer,
-} from '@onekeyfe/hwk-ledger-adapter/attestation-relay';
+`packages/kit-bg/src/services/ServiceThirdPartyHardware/ledgerLocalAttestationServer/`
 
-const relay = await LedgerAttestationRelayServer.listen({
-  host: '127.0.0.1',
-  port: 0,
-});
-const ticket = relay.createSession();
-// ticket.webSocketUrl 给 App；ticket.result 只留在可信服务端。
-const authoritativeResult = await ticket.result;
-```
+它不属于 Hardware SDK、不通过 npm subpath 发布，也不是生产后端交付物。后端团队
+需要使用自己的服务框架、鉴权、存储和部署方式独立实现下面的状态机与 WSS contract。
 
-`LedgerAttestationRelayServer` 内部运行官方
+本地 `LedgerLocalAttestationServer` 运行官方
 `GenuineCheckDeviceAction`，不是模拟 `isGenuine`。它通过自定义 DMK
 `TransportFactory` 把每条 APDU 交给 WSS 客户端，客户端再用已连接的 USB/BLE
 session 发给物理 Ledger。服务端同时直连 Ledger 官方 HSM endpoint，因此验证时必须
@@ -334,9 +325,10 @@ Server -> App: interaction / result / error
 - `isGenuine=false` 时丢弃任何 `deviceId`；
 - 只有服务端保存的 Promise/数据库 session 能完成 claim，客户端 `result` 不具备授权力。
 
-生产化时保持 `protocol.ts`、`relayTransport.ts` 和
-`runLedgerDmkGenuineCheck.ts` 不变；将内存 ticket store 替换为 Redis/数据库，把本地
-`ws://` 升级为 TLS `wss://`，接入 OneKey 登录态、限流、审计和多实例 sticky routing。
+后端实现时可参考本地 `protocol.ts`、`relayTransport.ts` 和
+`runLedgerDmkGenuineCheck.ts` 的行为，但不要求复用其代码。生产必须将内存 ticket
+store 替换为 Redis/数据库，把本地 `ws://` 升级为 TLS `wss://`，接入 OneKey 登录态、
+限流、审计和多实例 sticky routing。
 同一 attestation session 的 WSS 与 DMK runner 必须由同一 worker 拥有，或用严格有序的
 消息队列转发。
 
