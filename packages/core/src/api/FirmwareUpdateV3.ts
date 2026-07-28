@@ -9,6 +9,7 @@ import {
   getDeviceBLEFirmwareVersion,
   getDeviceBootloaderVersion,
   getDeviceFirmwareVersion,
+  getDeviceUUID,
   getLogger,
 } from '../utils';
 import { getBinary, getSysResourceBinary } from './firmware/getBinary';
@@ -20,6 +21,7 @@ import { buildProtocolV1FeaturesPayload } from '../deviceProfile';
 import { openFirmwareByteSource } from './firmware/FirmwareArtifactSource';
 import { resolveFirmwareUpdateHostBinding } from './firmware/FirmwareHostBinding';
 import {
+  assertFirmwareUpdatePreparedPlanDeviceIdentity,
   assertFirmwareUpdatePreparedPlanBinding,
   getFirmwareUpdateResourceName,
 } from './firmware/FirmwareUpdatePreparedPlan';
@@ -156,6 +158,12 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
 
     if (!features) {
       throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Device features not available');
+    }
+    if (this.params.preparedPlan) {
+      assertFirmwareUpdatePreparedPlanDeviceIdentity({
+        preparedPlan: this.params.preparedPlan,
+        deviceIdentity: getDeviceUUID(features) || undefined,
+      });
     }
 
     const deviceFirmwareType = device.getCurrentFirmwareType();

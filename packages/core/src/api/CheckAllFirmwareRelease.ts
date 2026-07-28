@@ -305,14 +305,21 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
       firmwareType,
     });
     const bleFirmwareReleaseInfo = getBleFirmwareReleaseInfo(features);
-    const firmwareUpdatePlan = buildFirmwareUpdatePlan({
-      features,
-      firmwareType,
-      platform: platform ?? 'web',
-      firmware: firmwareRelease,
-      ble: bleFirmwareReleaseInfo,
-      bootloader: bootloaderRelease,
-    });
+    let firmwareUpdatePlan;
+    try {
+      firmwareUpdatePlan = buildFirmwareUpdatePlan({
+        features,
+        firmwareType,
+        platform: platform ?? 'web',
+        firmware: firmwareRelease,
+        ble: bleFirmwareReleaseInfo,
+        bootloader: bootloaderRelease,
+      });
+    } catch {
+      // A Plan is an optional external-host capability. Release checks remain
+      // available for legacy and recovery flows when a Plan cannot be built.
+      firmwareUpdatePlan = undefined;
+    }
 
     return {
       firmware: firmwareRelease,

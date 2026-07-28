@@ -295,7 +295,21 @@ export const validateFirmwareUpdatePreparedPlan = (value: unknown): FirmwareUpda
   return preparedPlan;
 };
 
-export type FirmwareUpdatePreparedBinding = {
+export const assertFirmwareUpdatePreparedPlanDeviceIdentity = ({
+  preparedPlan: value,
+  deviceIdentity,
+}: {
+  preparedPlan: unknown;
+  deviceIdentity: string | undefined;
+}): FirmwareUpdatePreparedPlan => {
+  const preparedPlan = validateFirmwareUpdatePreparedPlan(value);
+  if (!deviceIdentity || preparedPlan.deviceIdentity !== deviceIdentity) {
+    throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError);
+  }
+  return preparedPlan;
+};
+
+type FirmwareUpdatePreparedBinding = {
   target: FirmwareUpdatePlan['targetsToUpdate'][number];
   artifact: FirmwareArtifactReference;
   logicalName?: string;

@@ -2,6 +2,7 @@ import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
 
 import { buildFirmwareUpdatePlan } from '../../src/api/firmware/FirmwareUpdatePlan';
 import {
+  assertFirmwareUpdatePreparedPlanDeviceIdentity,
   assertFirmwareUpdatePreparedPlanBinding,
   prepareFirmwareUpdatePlan,
   validateFirmwareUpdatePreparedPlan,
@@ -76,6 +77,18 @@ describe('FirmwareUpdatePreparedPlan', () => {
     expect(prepared.preparedPlanDigest).toMatch(/^[a-f0-9]{64}$/u);
     expect(JSON.stringify(prepared)).not.toContain('https://');
     expect(validateFirmwareUpdatePreparedPlan(prepared)).toEqual(prepared);
+    expect(
+      assertFirmwareUpdatePreparedPlanDeviceIdentity({
+        preparedPlan: prepared,
+        deviceIdentity: plan.deviceIdentity,
+      })
+    ).toEqual(prepared);
+    expect(() =>
+      assertFirmwareUpdatePreparedPlanDeviceIdentity({
+        preparedPlan: prepared,
+        deviceIdentity: 'different-device-id',
+      })
+    ).toThrow();
     expect(
       assertFirmwareUpdatePreparedPlanBinding({
         preparedPlan: prepared,

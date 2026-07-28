@@ -19,7 +19,7 @@ import {
   updateResourcesFromSources,
   uploadFirmwareFromSource,
 } from './firmware/uploadFirmware';
-import { LoggerNames, getLogger, wait } from '../utils';
+import { LoggerNames, getDeviceUUID, getLogger, wait } from '../utils';
 import { FirmwareUpdateTipMessage, createUiMessage } from '../events/ui-request';
 import { DeviceModelToTypes } from '../types';
 import { DataManager } from '../data-manager';
@@ -27,6 +27,7 @@ import { DEVICE } from '../events';
 import { type FirmwareByteSource, openFirmwareByteSource } from './firmware/FirmwareArtifactSource';
 import { resolveFirmwareUpdateHostBinding } from './firmware/FirmwareHostBinding';
 import {
+  assertFirmwareUpdatePreparedPlanDeviceIdentity,
   assertFirmwareUpdatePreparedPlanBinding,
   getFirmwareUpdateResourceName,
 } from './firmware/FirmwareUpdatePreparedPlan';
@@ -406,6 +407,20 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
     const { device, params } = this;
     const { features, commands } = device;
     const deviceType = device.getCurrentDeviceType();
+
+    // Protocol V2 (Pro2) uses DeviceFirmwareUpdate and must not enter this legacy flow.
+    if (device.isProtocolV2()) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        'Protocol V2 firmware update must use firmwareUpdateV4'
+      );
+    }
+    if (params.preparedPlan) {
+      assertFirmwareUpdatePreparedPlanDeviceIdentity({
+        preparedPlan: params.preparedPlan,
+        deviceIdentity: getDeviceUUID(features) || undefined,
+      });
+    }
 
     const deviceFirmwareType = device.getCurrentFirmwareType();
     const firmwareType = params.firmwareType ?? deviceFirmwareType;

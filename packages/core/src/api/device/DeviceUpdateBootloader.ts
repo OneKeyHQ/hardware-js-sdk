@@ -11,7 +11,11 @@ import { DataManager } from '../../data-manager';
 import { checkBootloaderLength, checkBootloaderSourceLength } from '../firmware/updateBootloader';
 import { openFirmwareByteSource } from '../firmware/FirmwareArtifactSource';
 import { resolveFirmwareUpdateHostBinding } from '../firmware/FirmwareHostBinding';
-import { assertFirmwareUpdatePreparedPlanBinding } from '../firmware/FirmwareUpdatePreparedPlan';
+import {
+  assertFirmwareUpdatePreparedPlanBinding,
+  assertFirmwareUpdatePreparedPlanDeviceIdentity,
+} from '../firmware/FirmwareUpdatePreparedPlan';
+import { getDeviceUUID } from '../../utils';
 
 import type { DeviceUpdateBootloaderParams } from '../../types/api/deviceUpdateBootloader';
 import type { EFirmwareType } from '@onekeyfe/hd-shared';
@@ -160,6 +164,10 @@ export default class DeviceUpdateBootloader extends FirmwareUpdateBaseMethod<any
       artifactReader: hostBinding?.artifactReader ?? payload.artifactReader,
     };
     if (payload.artifact) {
+      assertFirmwareUpdatePreparedPlanDeviceIdentity({
+        preparedPlan: payload.preparedPlan,
+        deviceIdentity: getDeviceUUID(features) || undefined,
+      });
       assertFirmwareUpdatePreparedPlanBinding({
         preparedPlan: payload.preparedPlan,
         executor: 'v2',

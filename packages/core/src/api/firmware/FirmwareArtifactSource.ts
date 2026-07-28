@@ -58,7 +58,7 @@ export const assertFirmwareArtifactReference = (
   return artifact;
 };
 
-export const assertFirmwareArtifactRead = (size: number, offset: number, length: number) => {
+const assertFirmwareArtifactRead = (size: number, offset: number, length: number) => {
   if (
     !Number.isSafeInteger(offset) ||
     offset < 0 ||

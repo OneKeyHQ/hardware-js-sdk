@@ -149,7 +149,7 @@ export const digestFirmwareUpdateContract = (value: unknown): string =>
     sha256(new TextEncoder().encode(JSON.stringify(canonicalizeFirmwareUpdateContract(value))))
   );
 
-export const digestFirmwareUpdatePlan = (plan: Omit<FirmwareUpdatePlan, 'planDigest'>): string =>
+const digestFirmwareUpdatePlan = (plan: Omit<FirmwareUpdatePlan, 'planDigest'>): string =>
   digestFirmwareUpdateContract(plan);
 
 const planError = (message: string): never => {
