@@ -6,7 +6,7 @@ describe('hd-ble-sdk device state events', () => {
     const source = readFileSync(resolve(__dirname, '../src/index.ts'), 'utf8');
     const deviceEventHandler = source.slice(
       source.indexOf('case DEVICE_EVENT:'),
-      source.indexOf('case IFRAME.CALLBACK:'),
+      source.indexOf('case IFRAME.CALLBACK:')
     );
 
     expect(deviceEventHandler).toContain('DEVICE.STATE');
