@@ -43,6 +43,7 @@ const HEADER_LENGTH = PROTOCOL_V1_MESSAGE_HEADER_SIZE;
 const PACKET_IO_MAX_RETRIES = 3;
 const PACKET_IO_RETRY_DELAY = 300;
 const PROTOCOL_PROBE_TIMEOUT = 1000;
+const EXPECTED_PROTOCOL_V2_PROBE_ATTEMPTS = 2;
 function inferProtocolHintFromDeviceName(name?: string | null): ProtocolType | undefined {
   return /\bpro\s*2\b/i.test(name ?? '') ? 'V2' : undefined;
 }
@@ -269,6 +270,13 @@ export default class WebUsbTransport {
     );
   }
 
+  private createProtocolProbeTimeoutError(expected: ProtocolType, attempts: number) {
+    return ERRORS.TypedError(
+      HardwareErrorCode.RuntimeError,
+      `Protocol ${expected} probe timeout after ${attempts} attempts`
+    );
+  }
+
   private createProtocolDetectionError() {
     return ERRORS.TypedError(
       HardwareErrorCode.RuntimeError,
@@ -291,11 +299,25 @@ export default class WebUsbTransport {
     }
 
     if (expectedProtocol === 'V2') {
-      if (await this.probeProtocolV2(path)) {
-        this.deviceProtocol.set(path, 'V2');
-        return 'V2';
+      for (let attempt = 1; attempt <= EXPECTED_PROTOCOL_V2_PROBE_ATTEMPTS; attempt += 1) {
+        if (await this.probeProtocolV2(path)) {
+          this.deviceProtocol.set(path, 'V2');
+          return 'V2';
+        }
+        await this.resetConnectionAfterProbe(path);
+        if (attempt < EXPECTED_PROTOCOL_V2_PROBE_ATTEMPTS) {
+          this.Log?.debug(
+            `[WebUsbTransport] Protocol V2 probe timed out, retrying ${
+              attempt + 1
+            }/${EXPECTED_PROTOCOL_V2_PROBE_ATTEMPTS}`
+          );
+        }
       }
-      throw this.createProtocolMismatchError(expectedProtocol);
+      this.deviceProtocol.delete(path);
+      throw this.createProtocolProbeTimeoutError(
+        expectedProtocol,
+        EXPECTED_PROTOCOL_V2_PROBE_ATTEMPTS
+      );
     }
 
     // Protocol must be actively probed after connection. Name, PID, and descriptors only
@@ -310,12 +332,10 @@ export default class WebUsbTransport {
         this.deviceProtocol.set(path, protocol);
         return protocol;
       }
-      if (protocol === 'V1') {
-        // A timed-out WebUSB transferIn cannot be cancelled in place. Closing and
-        // reopening the device guarantees the next protocol probe cannot consume a
-        // late V1 response. V2 timeout recovery is owned by callProtocolV2.
-        await this.resetConnectionAfterProbe(path);
-      }
+      // A timed-out WebUSB transferIn cannot be cancelled in place. Closing and
+      // reopening the device guarantees the next protocol probe cannot consume a
+      // late response from the previous protocol generation.
+      await this.resetConnectionAfterProbe(path);
     }
 
     this.deviceProtocol.delete(path);
@@ -716,7 +736,7 @@ export default class WebUsbTransport {
     }
 
     return probeProtocolV2Helper({
-      call: (name, data, options) => this.callProtocolV2(path, name, data, options),
+      call: (name, data, options) => this.callProtocolV2(path, name, data, options, false),
       timeoutMs: PROTOCOL_PROBE_TIMEOUT,
       logger: this.Log,
       logPrefix: 'ProtocolV2 WebUSB',
@@ -798,7 +818,8 @@ export default class WebUsbTransport {
     path: string,
     name: string,
     data: Record<string, unknown>,
-    options?: TransportCallOptions
+    options?: TransportCallOptions,
+    resetOnError = true
   ) {
     const protocolV1Messages = this.messages;
     if (!this.messagesV2) {
@@ -841,7 +862,7 @@ export default class WebUsbTransport {
     try {
       return await session.call(name, data, options);
     } catch (error) {
-      if (isProtocolV2LinkError(error) || this.isRetryablePacketIoError(error)) {
+      if (resetOnError && (isProtocolV2LinkError(error) || this.isRetryablePacketIoError(error))) {
         try {
           await this.resetConnectionAfterProbe(path);
         } catch (resetError) {
