@@ -5,16 +5,6 @@ export const LogBlockEvent: Set<string> = new Set([
   UI_RESPONSE.RECEIVE_PASSPHRASE,
 ]);
 
-const LogBlockMethod: Set<string> = new Set([
-  'evmSignTypedData',
-  'openWalletSession',
-  'DeviceSessionGet',
-  'deviceUploadWallpaper',
-  'uploadPortfolio',
-  'fileWrite',
-  'fileRead',
-]);
-
 export function getLogBlockLabel(message: unknown): string | undefined {
   if (!message || typeof message !== 'object') return undefined;
 
@@ -29,9 +19,5 @@ export function getLogBlockLabel(message: unknown): string | undefined {
   }
 
   const methodName = method ?? payload?.method;
-  if (methodName && LogBlockMethod.has(methodName)) {
-    return methodName;
-  }
-
-  return undefined;
+  return methodName;
 }

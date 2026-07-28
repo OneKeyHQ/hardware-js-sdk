@@ -60,4 +60,21 @@ describe('getLogBlockLabel', () => {
       expect(getLogBlockLabel({ payload: { method, data: new Uint8Array(1024) } })).toBe(method);
     }
   );
+
+  it.each(['evmSignMessage', 'btcSignMessage', 'evmSignTransaction'])(
+    'blocks request and response payload logging for every API method including %s',
+    method => {
+      expect(getLogBlockLabel({ method, message: 'sensitive signing payload' })).toBe(method);
+      expect(
+        getLogBlockLabel({
+          event: 'iframe-call',
+          payload: { method, message: 'sensitive signing payload' },
+        })
+      ).toBe(method);
+    }
+  );
+
+  it('does not classify events without an API method as method calls', () => {
+    expect(getLogBlockLabel({ event: 'DEVICE_EVENT', type: 'device-connect' })).toBeUndefined();
+  });
 });
