@@ -2,7 +2,6 @@ import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { assertFirmwareArtifactReference } from './FirmwareArtifactSource';
 import {
-  FIRMWARE_UPDATE_PLAN_EPOCH_KINDS,
   FIRMWARE_UPDATE_PLAN_ROLES,
   FIRMWARE_UPDATE_PLAN_TARGETS,
   assertFirmwareUpdatePlan,
@@ -177,7 +176,7 @@ export const prepareFirmwareUpdatePlan = ({
 }): FirmwareUpdatePreparedPlan => {
   const plan = assertFirmwareUpdatePlan(value);
   const planWithoutDigest: Omit<FirmwareUpdatePreparedPlan, 'preparedPlanDigest'> = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     planDigest: plan.planDigest,
     networkPolicy: 'forbid',
     executor: plan.executor,
@@ -187,7 +186,6 @@ export const prepareFirmwareUpdatePlan = ({
     platform: plan.platform,
     leaseRef: assertOpaqueLeaseRef(leaseRef),
     artifacts: assertPreparedArtifacts({ plan, artifacts }),
-    epochs: plan.epochs,
     targetsToUpdate: plan.targetsToUpdate,
   };
   return {
@@ -213,18 +211,16 @@ export const validateFirmwareUpdatePreparedPlan = (value: unknown): FirmwareUpda
     'platform',
     'leaseRef',
     'artifacts',
-    'epochs',
     'targetsToUpdate',
   ];
   if (
     Object.keys(value).length !== exactKeys.length ||
     exactKeys.some(key => !Object.prototype.hasOwnProperty.call(value, key)) ||
-    preparedPlan.schemaVersion !== 1 ||
+    preparedPlan.schemaVersion !== 2 ||
     preparedPlan.networkPolicy !== 'forbid' ||
     !/^[a-f0-9]{64}$/u.test(preparedPlan.planDigest) ||
     !/^[a-f0-9]{64}$/u.test(preparedPlan.preparedPlanDigest) ||
     !Array.isArray(preparedPlan.artifacts) ||
-    !Array.isArray(preparedPlan.epochs) ||
     !Array.isArray(preparedPlan.targetsToUpdate) ||
     (preparedPlan.executor !== 'v2' &&
       preparedPlan.executor !== 'v3' &&
@@ -283,27 +279,6 @@ export const validateFirmwareUpdatePreparedPlan = (value: unknown): FirmwareUpda
     artifactTargets.add(artifact.target);
     assertFirmwareArtifactReference(artifact.artifact);
     artifact.materializedEntries?.forEach(assertPreparedEntry);
-  }
-  for (const [index, epoch] of preparedPlan.epochs.entries()) {
-    if (
-      !epoch ||
-      typeof epoch !== 'object' ||
-      Object.keys(epoch).length !== 4 ||
-      !Object.prototype.hasOwnProperty.call(epoch, 'epoch') ||
-      !Object.prototype.hasOwnProperty.call(epoch, 'kind') ||
-      !Object.prototype.hasOwnProperty.call(epoch, 'artifactIds') ||
-      !Object.prototype.hasOwnProperty.call(epoch, 'targets') ||
-      epoch.epoch !== index ||
-      !FIRMWARE_UPDATE_PLAN_EPOCH_KINDS.has(epoch.kind) ||
-      !Array.isArray(epoch.artifactIds) ||
-      !Array.isArray(epoch.targets) ||
-      epoch.artifactIds.some(artifactId => !artifactIds.has(artifactId)) ||
-      new Set(epoch.artifactIds).size !== epoch.artifactIds.length ||
-      epoch.targets.some(target => !FIRMWARE_UPDATE_PLAN_TARGETS.has(target)) ||
-      new Set(epoch.targets).size !== epoch.targets.length
-    ) {
-      return preparedPlanError('Firmware prepared plan epoch is invalid');
-    }
   }
   if (
     preparedPlan.targetsToUpdate.some(target => !FIRMWARE_UPDATE_PLAN_TARGETS.has(target)) ||

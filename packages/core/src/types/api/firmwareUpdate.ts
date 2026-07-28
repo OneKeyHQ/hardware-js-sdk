@@ -24,39 +24,8 @@ export interface FirmwareArtifactReader {
   close(input: { readerId: string }): Promise<void>;
 }
 
-export type FirmwareCheckpointStage =
-  | 'EPOCH_STARTED'
-  | 'EPOCH_COMPLETED'
-  | 'BEFORE_DEVICE_MODE_CHANGE'
-  | 'FILE_TRANSFER_STARTED'
-  | 'FILE_TRANSFER_COMPLETED'
-  | 'INSTALL_REQUESTED'
-  | 'INSTALL_ACCEPTED'
-  | 'FINAL_VERIFIED';
-
-export interface FirmwareCheckpoint {
-  schemaVersion: 1;
-  sequence: number;
-  stage: FirmwareCheckpointStage;
-  destructiveActionStarted: boolean;
-  target?: string;
-  epoch?: number;
-}
-
-export interface FirmwareCheckpointSink {
-  commit(checkpoint: FirmwareCheckpoint): Promise<void>;
-}
-
 export interface FirmwareUpdateHostBinding {
   artifactReader: FirmwareArtifactReader;
-  checkpointSink: FirmwareCheckpointSink;
-}
-
-export interface FirmwareCheckpointParams {
-  hostBindingGeneration?: number;
-  checkpointSink?: FirmwareCheckpointSink;
-  checkpointSequenceStart?: number;
-  resumeCheckpoint?: FirmwareCheckpoint;
 }
 
 export interface FirmwareUpdateBinaryParams {
@@ -64,7 +33,7 @@ export interface FirmwareUpdateBinaryParams {
   updateType: IUpdateType;
 }
 
-export interface FirmwareUpdateArtifactParams extends FirmwareCheckpointParams {
+export interface FirmwareUpdateArtifactParams {
   preparedPlan: FirmwareUpdatePreparedPlan;
   hostBindingGeneration: number;
   artifact: FirmwareArtifactReference;
@@ -112,8 +81,9 @@ export declare function firmwareUpdateV2(
   params: Params<FirmwareUpdateArtifactParams & Platform>
 ): Response<PROTO.Success>;
 
-export interface FirmwareUpdateV3Params extends FirmwareCheckpointParams {
+export interface FirmwareUpdateV3Params {
   preparedPlan?: FirmwareUpdatePreparedPlan;
+  hostBindingGeneration?: number;
   bleVersion?: number[];
   bleBinary?: ArrayBuffer;
   chunkSize?: number;
@@ -159,8 +129,9 @@ export type FirmwareUpdateV4Target =
   | 'se03'
   | 'se04';
 
-export interface FirmwareUpdateV4Params extends FirmwareCheckpointParams {
+export interface FirmwareUpdateV4Params {
   preparedPlan?: FirmwareUpdatePreparedPlan;
+  hostBindingGeneration?: number;
   platform: IPlatform;
   expectedDeviceId?: string;
   chunkSize?: number;

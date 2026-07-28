@@ -190,38 +190,6 @@ describe('buildFirmwareUpdatePlan', () => {
       'resourceBundle:images',
     ]);
     expect(plan.targetsToUpdate).toEqual(['boot', 'app_v1', 'se01', 'resource']);
-    expect(plan.epochs).toEqual([
-      {
-        epoch: 0,
-        kind: 'resource-sync',
-        artifactIds: ['resourceBundle:images'],
-        targets: ['resource'],
-      },
-      {
-        epoch: 1,
-        kind: 'bootloader-install',
-        artifactIds: ['component:boot'],
-        targets: ['boot'],
-      },
-      {
-        epoch: 2,
-        kind: 'bootloader-verify',
-        artifactIds: [],
-        targets: ['boot'],
-      },
-      {
-        epoch: 3,
-        kind: 'component-install',
-        artifactIds: ['component:app_v1', 'component:se01'],
-        targets: ['app_v1', 'se01'],
-      },
-      {
-        epoch: 4,
-        kind: 'final-verify',
-        artifactIds: [],
-        targets: ['boot', 'app_v1', 'se01', 'resource'],
-      },
-    ]);
     expect(plan.artifacts[1]).toEqual(
       expect.objectContaining({
         expectedSize: 1024,

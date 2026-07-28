@@ -10,7 +10,6 @@ import { DeviceModelToTypes } from '../../types';
 import { DataManager } from '../../data-manager';
 import { checkBootloaderLength, checkBootloaderSourceLength } from '../firmware/updateBootloader';
 import { openFirmwareByteSource } from '../firmware/FirmwareArtifactSource';
-import { FirmwareCheckpointWriter } from '../firmware/FirmwareCheckpoint';
 import { resolveFirmwareUpdateHostBinding } from '../firmware/FirmwareHostBinding';
 import { assertFirmwareUpdatePreparedPlanBinding } from '../firmware/FirmwareUpdatePreparedPlan';
 
@@ -68,14 +67,12 @@ export default class DeviceUpdateBootloader extends FirmwareUpdateBaseMethod<any
     firmwareType,
     binary: preparedBinary,
     source: preparedSource,
-    checkpointWriter,
   }: {
     device: Device;
     features?: Features;
     firmwareType: EFirmwareType;
     binary?: ArrayBuffer;
     source?: FirmwareByteSource;
-    checkpointWriter: FirmwareCheckpointWriter;
   }) {
     if (preparedSource) {
       if (!(await checkBootloaderSourceLength(preparedSource))) {
@@ -83,43 +80,19 @@ export default class DeviceUpdateBootloader extends FirmwareUpdateBaseMethod<any
       }
       if (features && device.isBootloader()) {
         this.postTipMessage(FirmwareUpdateTipMessage.UpdateBootloader);
-        await checkpointWriter.commit({
-          stage: 'FILE_TRANSFER_STARTED',
-          target: 'bootloader',
-        });
         const result = await this.updateBootloaderWithEmmcFileWriteFromSource(
           device,
           preparedSource
         );
-        await checkpointWriter.commit({
-          stage: 'FILE_TRANSFER_COMPLETED',
-          target: 'bootloader',
-        });
-        await checkpointWriter.commit({
-          stage: 'FINAL_VERIFIED',
-          target: 'bootloader',
-        });
         return result;
       }
       if (features && !device.isBootloader()) {
-        await checkpointWriter.commit({
-          stage: 'FILE_TRANSFER_STARTED',
-          target: 'bootloader',
-        });
         await updateBootloaderFromSource(
           this.device.getCommands().typedCall.bind(this.device.getCommands()),
           this.postMessage,
           device,
           preparedSource
         );
-        await checkpointWriter.commit({
-          stage: 'FILE_TRANSFER_COMPLETED',
-          target: 'bootloader',
-        });
-        await checkpointWriter.commit({
-          stage: 'FINAL_VERIFIED',
-          target: 'bootloader',
-        });
         return true;
       }
     }
@@ -158,42 +131,18 @@ export default class DeviceUpdateBootloader extends FirmwareUpdateBaseMethod<any
     if (features && device.isBootloader()) {
       // Use emmcFileWrite + reboot logic for bootloader mode
       this.postTipMessage(FirmwareUpdateTipMessage.UpdateBootloader);
-      await checkpointWriter.commit({
-        stage: 'FILE_TRANSFER_STARTED',
-        target: 'bootloader',
-      });
       const result = await this.updateBootloaderWithEmmcFileWrite(device, binary);
-      await checkpointWriter.commit({
-        stage: 'FILE_TRANSFER_COMPLETED',
-        target: 'bootloader',
-      });
-      await checkpointWriter.commit({
-        stage: 'FINAL_VERIFIED',
-        target: 'bootloader',
-      });
       return result;
     }
 
     if (features && !device.isBootloader()) {
       // Use original updateBootloader logic for normal mode
-      await checkpointWriter.commit({
-        stage: 'FILE_TRANSFER_STARTED',
-        target: 'bootloader',
-      });
       await updateBootloader(
         this.device.getCommands().typedCall.bind(this.device.getCommands()),
         this.postMessage,
         device,
         binary
       );
-      await checkpointWriter.commit({
-        stage: 'FILE_TRANSFER_COMPLETED',
-        target: 'bootloader',
-      });
-      await checkpointWriter.commit({
-        stage: 'FINAL_VERIFIED',
-        target: 'bootloader',
-      });
       return Promise.resolve(true);
     }
   }
@@ -209,11 +158,7 @@ export default class DeviceUpdateBootloader extends FirmwareUpdateBaseMethod<any
     const executionParams = {
       ...payload,
       artifactReader: hostBinding?.artifactReader ?? payload.artifactReader,
-      checkpointSink: hostBinding?.checkpointSink ?? payload.checkpointSink,
     };
-    const checkpointWriter = new FirmwareCheckpointWriter(executionParams, {
-      required: !!hostBinding,
-    });
     if (payload.artifact) {
       assertFirmwareUpdatePreparedPlanBinding({
         preparedPlan: payload.preparedPlan,
@@ -246,7 +191,6 @@ export default class DeviceUpdateBootloader extends FirmwareUpdateBaseMethod<any
             features,
             firmwareType,
             source,
-            checkpointWriter,
           });
         }
         return true;
@@ -266,7 +210,6 @@ export default class DeviceUpdateBootloader extends FirmwareUpdateBaseMethod<any
         features,
         firmwareType,
         binary,
-        checkpointWriter,
       });
     }
 

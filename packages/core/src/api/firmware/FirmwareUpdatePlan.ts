@@ -12,8 +12,6 @@ import {
 import type {
   FirmwareUpdatePlan,
   FirmwareUpdatePlanArtifact,
-  FirmwareUpdatePlanEpoch,
-  FirmwareUpdatePlanEpochKind,
   FirmwareUpdatePlanTarget,
 } from '../../types/api/firmwareUpdatePlan';
 import type { Features } from '../../types';
@@ -207,15 +205,6 @@ export const FIRMWARE_UPDATE_PLAN_ROLES = new Set([
 
 const PLAN_CONTAINERS = new Set(['raw', 'zip']);
 
-export const FIRMWARE_UPDATE_PLAN_EPOCH_KINDS = new Set<FirmwareUpdatePlanEpochKind>([
-  'legacy-update',
-  'resource-sync',
-  'bootloader-install',
-  'bootloader-verify',
-  'component-install',
-  'final-verify',
-]);
-
 const PLAN_PLATFORMS = new Set<FirmwareUpdatePlatform>([
   'native',
   'desktop',
@@ -238,11 +227,10 @@ export const assertFirmwareUpdatePlan = (value: unknown): FirmwareUpdatePlan => 
     'firmwareType',
     'platform',
     'artifacts',
-    'epochs',
     'targetsToUpdate',
   ]);
   if (
-    plan.schemaVersion !== 1 ||
+    plan.schemaVersion !== 2 ||
     typeof plan.planDigest !== 'string' ||
     !/^[a-f0-9]{64}$/u.test(plan.planDigest) ||
     (plan.executor !== 'v2' && plan.executor !== 'v3' && plan.executor !== 'v4') ||
@@ -303,32 +291,6 @@ export const assertFirmwareUpdatePlan = (value: unknown): FirmwareUpdatePlan => 
       assertBoundedString(artifact.targetVersion, 'target version', 64);
     }
   }
-  if (!Array.isArray(plan.epochs) || plan.epochs.length > 32) {
-    return planError('Firmware update plan epochs are invalid');
-  }
-  for (const [index, item] of plan.epochs.entries()) {
-    const epoch = asRecord(item);
-    if (!epoch) {
-      return planError('Firmware update plan epoch is invalid');
-    }
-    assertExactKeys(epoch, ['epoch', 'kind', 'artifactIds', 'targets']);
-    if (
-      epoch.epoch !== index ||
-      !FIRMWARE_UPDATE_PLAN_EPOCH_KINDS.has(epoch.kind as FirmwareUpdatePlanEpochKind) ||
-      !Array.isArray(epoch.artifactIds) ||
-      !Array.isArray(epoch.targets) ||
-      epoch.artifactIds.some(
-        artifactId => typeof artifactId !== 'string' || !artifactIds.has(artifactId)
-      ) ||
-      new Set(epoch.artifactIds).size !== epoch.artifactIds.length ||
-      epoch.targets.some(
-        target => !FIRMWARE_UPDATE_PLAN_TARGETS.has(target as FirmwareUpdatePlanTarget)
-      ) ||
-      new Set(epoch.targets).size !== epoch.targets.length
-    ) {
-      return planError('Firmware update plan epoch contract is invalid');
-    }
-  }
   if (
     !Array.isArray(plan.targetsToUpdate) ||
     plan.targetsToUpdate.some(
@@ -361,16 +323,6 @@ export const assertFirmwareUpdatePlan = (value: unknown): FirmwareUpdatePlan => 
       plan.deviceIdentity === 'unavailable')
   ) {
     return planError('Firmware update plan executor contract is invalid');
-  }
-  const expectedEpochKinds = compileFirmwareUpdateEpochKinds({
-    executor: plan.executor,
-    targets: plan.targetsToUpdate as FirmwareUpdatePlanTarget[],
-  });
-  if (
-    plan.epochs.length !== expectedEpochKinds.length ||
-    plan.epochs.some((epoch, index) => epoch.kind !== expectedEpochKinds[index])
-  ) {
-    return planError('Firmware update plan epoch order is invalid');
   }
   const { planDigest, ...withoutDigest } = plan as unknown as FirmwareUpdatePlan;
   if (digestFirmwareUpdatePlan(withoutDigest) !== planDigest) {
@@ -425,65 +377,6 @@ const getExecutor = (features: Features): FirmwareUpdatePlan['executor'] => {
     return 'v3';
   }
   return 'v2';
-};
-
-export const compileFirmwareUpdateEpochKinds = ({
-  executor,
-  targets,
-}: {
-  executor: FirmwareUpdatePlan['executor'];
-  targets: readonly FirmwareUpdatePlanTarget[];
-}): FirmwareUpdatePlanEpochKind[] => {
-  if (executor !== 'v4') {
-    return ['legacy-update', 'final-verify'];
-  }
-  const targetSet = new Set(targets);
-  const kinds: FirmwareUpdatePlanEpochKind[] = [];
-  if (targetSet.has('resource')) kinds.push('resource-sync');
-  if (targetSet.has('boot')) {
-    kinds.push('bootloader-install', 'bootloader-verify');
-  }
-  if (targets.some(target => target !== 'resource' && target !== 'boot')) {
-    kinds.push('component-install');
-  }
-  kinds.push('final-verify');
-  return kinds;
-};
-
-const compileFirmwareUpdateEpochs = ({
-  executor,
-  artifacts,
-}: {
-  executor: FirmwareUpdatePlan['executor'];
-  artifacts: readonly FirmwareUpdatePlanArtifact[];
-}): FirmwareUpdatePlanEpoch[] => {
-  const targets = [...new Set(artifacts.map(artifact => artifact.target))];
-  return compileFirmwareUpdateEpochKinds({ executor, targets }).map((kind, epoch) => {
-    let epochArtifacts: readonly FirmwareUpdatePlanArtifact[] = [];
-    if (kind === 'legacy-update') {
-      epochArtifacts = artifacts;
-    } else if (kind === 'resource-sync') {
-      epochArtifacts = artifacts.filter(artifact => artifact.target === 'resource');
-    } else if (kind === 'bootloader-install') {
-      epochArtifacts = artifacts.filter(artifact => artifact.target === 'boot');
-    } else if (kind === 'component-install') {
-      epochArtifacts = artifacts.filter(
-        artifact => artifact.target !== 'resource' && artifact.target !== 'boot'
-      );
-    }
-    let epochTargets = [...new Set(epochArtifacts.map(artifact => artifact.target))];
-    if (kind === 'final-verify') {
-      epochTargets = targets;
-    } else if (kind === 'bootloader-verify') {
-      epochTargets = ['boot'];
-    }
-    return {
-      epoch,
-      kind,
-      artifactIds: epochArtifacts.map(artifact => artifact.artifactId),
-      targets: epochTargets,
-    };
-  });
 };
 
 const buildProtocolV2Artifacts = (
@@ -712,14 +605,13 @@ export const buildFirmwareUpdatePlan = ({
     );
   }
   const planWithoutDigest: Omit<FirmwareUpdatePlan, 'planDigest'> = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     executor,
     deviceIdentity: deviceIdentity || 'unavailable',
     deviceModel: String(getDeviceType(features)),
     firmwareType,
     platform,
     artifacts,
-    epochs: compileFirmwareUpdateEpochs({ executor, artifacts }),
     targetsToUpdate,
   };
   return {

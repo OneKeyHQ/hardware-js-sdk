@@ -1,15 +1,12 @@
 import type { Success } from '@onekeyfe/hd-transport';
 import type { EFirmwareType } from '@onekeyfe/hd-shared';
-import type {
-  FirmwareArtifactReader,
-  FirmwareArtifactReference,
-  FirmwareCheckpointParams,
-} from './firmwareUpdate';
+import type { FirmwareArtifactReader, FirmwareArtifactReference } from './firmwareUpdate';
 import type { FirmwareUpdatePreparedPlan } from './firmwareUpdatePreparedPlan';
 import type { Response } from '../params';
 
-export type DeviceUpdateBootloaderParams = FirmwareCheckpointParams & {
+export type DeviceUpdateBootloaderParams = {
   preparedPlan?: FirmwareUpdatePreparedPlan;
+  hostBindingGeneration?: number;
   binary?: ArrayBuffer;
   artifact?: FirmwareArtifactReference;
   artifactReader?: FirmwareArtifactReader;

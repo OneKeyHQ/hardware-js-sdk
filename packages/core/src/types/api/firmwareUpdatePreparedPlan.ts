@@ -2,7 +2,6 @@ import type { FirmwareArtifactReference } from './firmwareUpdate';
 import type {
   FirmwareUpdatePlan,
   FirmwareUpdatePlanArtifactRole,
-  FirmwareUpdatePlanEpoch,
   FirmwareUpdatePlanTarget,
 } from './firmwareUpdatePlan';
 
@@ -29,7 +28,7 @@ export interface FirmwareUpdatePreparedArtifact {
 }
 
 export interface FirmwareUpdatePreparedPlan {
-  schemaVersion: 1;
+  schemaVersion: 2;
   preparedPlanDigest: string;
   planDigest: string;
   networkPolicy: 'forbid';
@@ -40,7 +39,6 @@ export interface FirmwareUpdatePreparedPlan {
   platform: FirmwareUpdatePlan['platform'];
   leaseRef: string;
   artifacts: FirmwareUpdatePreparedArtifact[];
-  epochs: FirmwareUpdatePlanEpoch[];
   targetsToUpdate: FirmwareUpdatePlanTarget[];
 }
 

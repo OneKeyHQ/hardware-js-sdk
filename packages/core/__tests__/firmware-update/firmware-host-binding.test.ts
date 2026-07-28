@@ -17,9 +17,6 @@ const createBinding = () => ({
     ),
     close: jest.fn(() => Promise.resolve()),
   },
-  checkpointSink: {
-    commit: jest.fn(() => Promise.resolve()),
-  },
 });
 
 describe('firmware host binding generation', () => {

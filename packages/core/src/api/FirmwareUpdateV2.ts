@@ -25,7 +25,6 @@ import { DeviceModelToTypes } from '../types';
 import { DataManager } from '../data-manager';
 import { DEVICE } from '../events';
 import { type FirmwareByteSource, openFirmwareByteSource } from './firmware/FirmwareArtifactSource';
-import { FirmwareCheckpointWriter } from './firmware/FirmwareCheckpoint';
 import { resolveFirmwareUpdateHostBinding } from './firmware/FirmwareHostBinding';
 import {
   assertFirmwareUpdatePreparedPlanBinding,
@@ -37,11 +36,10 @@ import type { FirmwareBinary } from './firmware/getBinary';
 import type {
   FirmwareArtifactReader,
   FirmwareArtifactReference,
-  FirmwareCheckpointParams,
 } from '../types/api/firmwareUpdate';
 import type { FirmwareUpdatePreparedPlan } from '../types/api/firmwareUpdatePreparedPlan';
 
-type Params = FirmwareCheckpointParams & {
+type Params = {
   binary?: ArrayBuffer;
   artifact?: FirmwareArtifactReference;
   resourceArtifact?: FirmwareArtifactReference;
@@ -211,14 +209,10 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
       this.params = {
         ...this.params,
         preparedPlan: payload.preparedPlan,
-        hostBindingGeneration: payload.hostBindingGeneration,
         artifact: payload.artifact,
         resourceArtifact: payload.resourceArtifact,
         resourceEntries: payload.resourceEntries,
         artifactReader: hostBinding.artifactReader,
-        checkpointSink: hostBinding.checkpointSink,
-        checkpointSequenceStart: payload.checkpointSequenceStart,
-        resumeCheckpoint: payload.resumeCheckpoint,
       };
     }
   }
@@ -412,9 +406,6 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
     const { device, params } = this;
     const { features, commands } = device;
     const deviceType = device.getCurrentDeviceType();
-    const checkpointWriter = new FirmwareCheckpointWriter(params, {
-      required: !!params.artifactReader,
-    });
 
     const deviceFirmwareType = device.getCurrentFirmwareType();
     const firmwareType = params.firmwareType ?? deviceFirmwareType;
@@ -544,10 +535,6 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
                   }
                   sources.push({ entryName: resourceName, source });
                 }
-                await checkpointWriter.commit({
-                  stage: 'FILE_TRANSFER_STARTED',
-                  target: 'resource',
-                });
                 await updateResourcesFromSources(
                   this.device.getCommands().typedCall.bind(this.device.getCommands()),
                   this.postMessage,
@@ -557,10 +544,6 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
                     source: entry.source,
                   }))
                 );
-                await checkpointWriter.commit({
-                  stage: 'FILE_TRANSFER_COMPLETED',
-                  target: 'resource',
-                });
               } finally {
                 await Promise.all(
                   sources.map(entry => entry.source.close().catch(() => undefined))
@@ -595,26 +578,15 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
                 resourceBinary = (await getSysResourceBinary(resourceUrl)).binary;
               }
               this.postTipMessage('DownloadLatestUiResourceSuccess');
-              await checkpointWriter.commit({
-                stage: 'FILE_TRANSFER_STARTED',
-                target: 'resource',
-              });
               await updateResources(
                 this.device.getCommands().typedCall.bind(this.device.getCommands()),
                 this.postMessage,
                 device,
                 resourceBinary
               );
-              await checkpointWriter.commit({
-                stage: 'FILE_TRANSFER_COMPLETED',
-                target: 'resource',
-              });
             }
           }
         }
-
-        // check if the device commands has been disposed
-        this.device?.commands?.checkDisposed();
 
         // The request may outlive the current transport command instance.
         this.device?.commands?.checkDisposed();
@@ -622,10 +594,6 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
         // auto go to bootloader mode
         try {
           this.postTipMessage('AutoRebootToBootloader');
-          await checkpointWriter.commit({
-            stage: 'BEFORE_DEVICE_MODE_CHANGE',
-            target: params.isUpdateBootloader ? 'bootloader' : params.updateType,
-          });
           const bootRes = await commands.typedCall('DeviceBackToBoot', 'Success');
           // @ts-expect-error
           if (bootRes.type === 'CallMethodError') {
@@ -669,11 +637,6 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
 
       await this.device.acquire();
 
-      const target = params.isUpdateBootloader ? 'bootloader' : params.updateType;
-      await checkpointWriter.commit({
-        stage: 'FILE_TRANSFER_STARTED',
-        target,
-      });
       const response = await uploadFirmwareFromSource(
         params.updateType,
         this.device.getCommands().typedCall.bind(this.device.getCommands()),
@@ -683,19 +646,11 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
         true,
         params.isUpdateBootloader
       );
-      await checkpointWriter.commit({
-        stage: 'FILE_TRANSFER_COMPLETED',
-        target,
-      });
 
       if (this.connectId) {
         DevicePool.clearDeviceCache(this.connectId);
       }
 
-      await checkpointWriter.commit({
-        stage: 'FINAL_VERIFIED',
-        target,
-      });
       return response;
     } finally {
       await preparedSource?.close().catch(() => undefined);

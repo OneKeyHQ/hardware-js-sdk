@@ -18,8 +18,7 @@ class FirmwareHostBindingRegistry {
       !binding ||
       typeof binding.artifactReader?.open !== 'function' ||
       typeof binding.artifactReader.read !== 'function' ||
-      typeof binding.artifactReader.close !== 'function' ||
-      typeof binding.checkpointSink?.commit !== 'function'
+      typeof binding.artifactReader.close !== 'function'
     ) {
       return bindingError('Firmware host binding is invalid');
     }
@@ -80,13 +79,6 @@ class FirmwareHostBindingRegistry {
           return result;
         },
         close: input => binding.artifactReader.close(input),
-      },
-      checkpointSink: {
-        commit: async checkpoint => {
-          assertCurrent();
-          await binding.checkpointSink.commit(checkpoint);
-          assertCurrent();
-        },
       },
     };
   }

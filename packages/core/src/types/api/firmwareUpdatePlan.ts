@@ -23,23 +23,8 @@ export interface FirmwareUpdatePlanArtifact {
   targetVersion?: string;
 }
 
-export type FirmwareUpdatePlanEpochKind =
-  | 'legacy-update'
-  | 'resource-sync'
-  | 'bootloader-install'
-  | 'bootloader-verify'
-  | 'component-install'
-  | 'final-verify';
-
-export interface FirmwareUpdatePlanEpoch {
-  epoch: number;
-  kind: FirmwareUpdatePlanEpochKind;
-  artifactIds: string[];
-  targets: FirmwareUpdatePlanTarget[];
-}
-
 export interface FirmwareUpdatePlan {
-  schemaVersion: 1;
+  schemaVersion: 2;
   planDigest: string;
   executor: 'v2' | 'v3' | 'v4';
   deviceIdentity: string;
@@ -47,6 +32,5 @@ export interface FirmwareUpdatePlan {
   firmwareType: EFirmwareType;
   platform: 'native' | 'desktop' | 'ext' | 'web' | 'web-embed';
   artifacts: FirmwareUpdatePlanArtifact[];
-  epochs: FirmwareUpdatePlanEpoch[];
   targetsToUpdate: FirmwareUpdatePlanTarget[];
 }

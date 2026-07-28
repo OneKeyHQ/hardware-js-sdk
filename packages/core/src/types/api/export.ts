@@ -28,10 +28,6 @@ export type {
 export type {
   FirmwareArtifactReader,
   FirmwareArtifactReference,
-  FirmwareCheckpoint,
-  FirmwareCheckpointParams,
-  FirmwareCheckpointSink,
-  FirmwareCheckpointStage,
   FirmwareUpdateHostBinding,
   FirmwareUpdateArtifactParams,
   FirmwareUpdateParams,
@@ -44,8 +40,6 @@ export type {
   FirmwareUpdatePlan,
   FirmwareUpdatePlanArtifact,
   FirmwareUpdatePlanArtifactRole,
-  FirmwareUpdatePlanEpoch,
-  FirmwareUpdatePlanEpochKind,
   FirmwareUpdatePlanTarget,
 } from './firmwareUpdatePlan';
 export type {

@@ -9,7 +9,6 @@ import {
   getDeviceBLEFirmwareVersion,
   getDeviceBootloaderVersion,
   getDeviceFirmwareVersion,
-  getFirmwareType,
   getLogger,
 } from '../utils';
 import { getBinary, getSysResourceBinary } from './firmware/getBinary';
@@ -19,7 +18,6 @@ import { DevicePool } from '../device/DevicePool';
 import { DEVICE } from '../events';
 import { buildProtocolV1FeaturesPayload } from '../deviceProfile';
 import { openFirmwareByteSource } from './firmware/FirmwareArtifactSource';
-import { FirmwareCheckpointWriter } from './firmware/FirmwareCheckpoint';
 import { resolveFirmwareUpdateHostBinding } from './firmware/FirmwareHostBinding';
 import {
   assertFirmwareUpdatePreparedPlanBinding,
@@ -33,7 +31,6 @@ import type {
 import type { Deferred, EFirmwareType } from '@onekeyfe/hd-shared';
 import type { TypedResponseMessage } from '../device/DeviceCommands';
 import type { FirmwareByteSource } from './firmware/FirmwareArtifactSource';
-import type { Features } from '../types';
 
 const Log = getLogger(LoggerNames.Method);
 
@@ -56,8 +53,6 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
   private isSwitchFirmware = false;
 
   private artifactSources: FirmwareByteSource[] = [];
-
-  private checkpointWriter?: FirmwareCheckpointWriter;
 
   init() {
     this.allowDeviceMode = [UI_REQUEST.BOOTLOADER, UI_REQUEST.NOT_INITIALIZE];
@@ -127,7 +122,6 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
 
     this.params = {
       preparedPlan: payload.preparedPlan,
-      hostBindingGeneration: payload.hostBindingGeneration,
       bleBinary: payload.bleBinary,
       firmwareBinary: payload.firmwareBinary,
       forcedUpdateRes: payload.forcedUpdateRes,
@@ -140,9 +134,6 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
       platform: payload.platform,
       artifactReader: hostBinding?.artifactReader ?? payload.artifactReader,
       artifacts: payload.artifacts,
-      checkpointSink: hostBinding?.checkpointSink ?? payload.checkpointSink,
-      checkpointSequenceStart: payload.checkpointSequenceStart,
-      resumeCheckpoint: payload.resumeCheckpoint,
     };
   }
 
@@ -157,9 +148,6 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
   private async runProtocolV1() {
     const { device } = this;
     const { features } = device;
-    this.checkpointWriter = new FirmwareCheckpointWriter(this.params, {
-      required: !!this.params.artifactReader,
-    });
 
     const deviceType = device.getCurrentDeviceType();
     const bootloaderCurrVersion = device.getCurrentBootloaderVersionString() ?? '0.0.0';
@@ -173,9 +161,6 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     const deviceFirmwareType = device.getCurrentFirmwareType();
     const firmwareType = this.params.firmwareType ?? deviceFirmwareType;
     this.isSwitchFirmware = firmwareType !== deviceFirmwareType;
-
-    const reconciled = await this.reconcileInterruptedInstall(features);
-    if (reconciled) return reconciled;
 
     let resourceBinary: ArrayBuffer | null = null;
     let resourceEntries: Array<{ entryName: string; source: FirmwareByteSource }> = [];
@@ -203,7 +188,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     }
 
     try {
-      await this.enterBootloaderMode(this.checkpointWriter);
+      await this.enterBootloaderMode();
       return await this.executeUpdate({
         resourceBinary,
         resourceEntries,
@@ -213,55 +198,6 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     } finally {
       await this.closeArtifactSources();
     }
-  }
-
-  private async reconcileInterruptedInstall(features: Features) {
-    const checkpoint = this.params.resumeCheckpoint;
-    if (
-      !checkpoint ||
-      !['INSTALL_REQUESTED', 'INSTALL_ACCEPTED', 'FINAL_VERIFIED'].includes(checkpoint.stage)
-    ) {
-      return undefined;
-    }
-
-    const versions = {
-      bootloaderVersion: getDeviceBootloaderVersion(features).join('.'),
-      bleVersion: getDeviceBLEFirmwareVersion(features).join('.'),
-      firmwareVersion: getDeviceFirmwareVersion(features).join('.'),
-    };
-    const expectedVersions = [
-      [this.params.bootloaderVersion, versions.bootloaderVersion],
-      [this.params.bleVersion, versions.bleVersion],
-      [this.params.firmwareVersion, versions.firmwareVersion],
-    ] as const;
-    const hasExpectedVersion = expectedVersions.some(([expected]) => !!expected);
-    const versionsMatch =
-      hasExpectedVersion &&
-      expectedVersions.every(([expected, actual]) => !expected || expected.join('.') === actual);
-    const firmwareTypeMatches =
-      this.params.firmwareType === undefined ||
-      getFirmwareType(features) === this.params.firmwareType;
-
-    if (versionsMatch && firmwareTypeMatches) {
-      await this.checkpointWriter?.commit({
-        stage: 'FINAL_VERIFIED',
-        target: 'firmware',
-      });
-      return versions;
-    }
-
-    throw ERRORS.TypedError(
-      HardwareErrorCode.RuntimeError,
-      checkpoint.stage === 'FINAL_VERIFIED'
-        ? 'Firmware recovery final state conflicts with the checkpoint'
-        : 'Firmware install status cannot be safely reconciled',
-      {
-        firmwareUpdateCode:
-          checkpoint.stage === 'FINAL_VERIFIED'
-            ? 'FirmwareTransactionConflict'
-            : 'FirmwareReconciliationUnavailable',
-      }
-    );
   }
 
   private validateDeviceAndVersion(deviceType: EDeviceType, bootloaderVersion: string) {
@@ -515,55 +451,31 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
         const name = fileName.split('/').pop();
         if (!file.dir && fileName.indexOf('__MACOSX') === -1 && name) {
           const data = await file.async('arraybuffer');
-          await this.checkpointWriter?.commit({
-            stage: 'FILE_TRANSFER_STARTED',
-            target: `resource:${name}`,
-          });
           processedSize = await this.emmcCommonUpdateProcess({
             payload: data,
             filePath: `0:res/${name}`,
             processedSize,
             totalSize,
           });
-          await this.checkpointWriter?.commit({
-            stage: 'FILE_TRANSFER_COMPLETED',
-            target: `resource:${name}`,
-          });
         }
       }
     }
 
     for (const entry of resourceEntries) {
-      await this.checkpointWriter?.commit({
-        stage: 'FILE_TRANSFER_STARTED',
-        target: `resource:${entry.entryName}`,
-      });
       processedSize = await this.emmcCommonUpdateProcessFromSource({
         source: entry.source,
         filePath: `0:res/${entry.entryName}`,
         processedSize,
         totalSize,
       });
-      await this.checkpointWriter?.commit({
-        stage: 'FILE_TRANSFER_COMPLETED',
-        target: `resource:${entry.entryName}`,
-      });
     }
 
     if (bootloaderSource) {
-      await this.checkpointWriter?.commit({
-        stage: 'FILE_TRANSFER_STARTED',
-        target: 'bootloader',
-      });
       processedSize = await this.emmcCommonUpdateProcessFromSource({
         source: bootloaderSource,
         filePath: `0:boot/bootloader.bin`,
         processedSize,
         totalSize,
-      });
-      await this.checkpointWriter?.commit({
-        stage: 'FILE_TRANSFER_COMPLETED',
-        target: 'bootloader',
       });
     }
 
@@ -571,20 +483,11 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
 
     for (const firmware of fwSources) {
       if (firmware) {
-        const target = firmware.fileName === 'ble-firmware.bin' ? 'ble' : 'firmware';
-        await this.checkpointWriter?.commit({
-          stage: 'FILE_TRANSFER_STARTED',
-          target,
-        });
         processedSize = await this.emmcCommonUpdateProcessFromSource({
           source: firmware.source,
           filePath: `0:updates/${firmware.fileName}`,
           processedSize,
           totalSize,
-        });
-        await this.checkpointWriter?.commit({
-          stage: 'FILE_TRANSFER_COMPLETED',
-          target,
         });
       }
     }
@@ -592,15 +495,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     // trigger firmware update
     try {
       this.postTipMessage(FirmwareUpdateTipMessage.ConfirmOnDevice);
-      await this.checkpointWriter?.commit({
-        stage: 'INSTALL_REQUESTED',
-        target: 'firmware',
-      });
       await this.startEmmcFirmwareUpdate({ path: '0:updates' });
-      await this.checkpointWriter?.commit({
-        stage: 'INSTALL_ACCEPTED',
-        target: 'firmware',
-      });
     } catch (error) {
       Log.error('triggerFirmwareUpdateEmmc error: ', error);
       // Re-throw errors with specific error codes that should not be ignored
@@ -685,10 +580,6 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
         if (firmwareVersion !== '0.0.0') {
           this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdateCompleted);
           DevicePool.resetState();
-          await this.checkpointWriter?.commit({
-            stage: 'FINAL_VERIFIED',
-            target: 'firmware',
-          });
           return {
             bootloaderVersion,
             bleVersion,
