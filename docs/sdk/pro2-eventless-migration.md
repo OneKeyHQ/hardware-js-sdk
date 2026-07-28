@@ -48,9 +48,9 @@ SDK 内部根据协议版本选择 Event 来源和后续动作。
   打开，对 App 的阶段提示由 SDK 合成。
 
 ```text
-PassphraseAck(passphrase)                -> select HOST_PASSPHRASE
-PassphraseAck(on_device)                 -> select DEVICE_PASSPHRASE
-PassphraseAck(on_device_attach_pin)      -> select ATTACH_PIN
+PassphraseAck(passphrase)                -> select.host_passphrase
+PassphraseAck(on_device)                 -> select.passphrase_on_device
+PassphraseAck(on_device_attach_pin)      -> select.attach_pin_on_device
 Initialize(session_id)                   -> resume session_id
 ```
 
@@ -194,7 +194,7 @@ Cancel 必须绑定当前设备和 Transport source；断连时清理请求、UI
 ## firmware-pro2 实施清单
 
 - 实现 `DeviceSessionOpen(select/resume)`，成功返回非空 `session_id + btc_test_address`。
-- `select` 明确支持 HOST_PASSPHRASE、DEVICE_PASSPHRASE 和 ATTACH_PIN。
+- `select` 明确支持 `host_passphrase`、`passphrase_on_device` 和 `attach_pin_on_device`。
 - 删除 seed session 中 Passphrase/Button Host ACK 状态。
 - `DeviceSessionAskPin` 直接显示设备 PIN/指纹页面。
 - 地址、公钥、签名、设置和危险操作直接显示本地 UI。
