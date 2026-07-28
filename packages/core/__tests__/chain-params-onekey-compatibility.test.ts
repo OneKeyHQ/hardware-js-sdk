@@ -1,7 +1,13 @@
+import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
+
+import BenfenGetAddress from '../src/api/benfen/BenfenGetAddress';
 import ConfluxSignTransaction from '../src/api/conflux/ConfluxSignTransaction';
 import EVMSignTransaction from '../src/api/evm/EVMSignTransaction';
+import EVMSignMessageEIP712 from '../src/api/evm/EVMSignMessageEIP712';
 import KaspaSignTransaction from '../src/api/kaspa/KaspaSignTransaction';
 import XrpSignTransaction from '../src/api/xrp/XrpSignTransaction';
+
+import type { Device } from '../src/device/Device';
 
 jest.mock('../src/data/config', () => ({
   getSDKVersion: jest.fn(() => '1.0.0'),
@@ -145,5 +151,79 @@ describe('onekey public-chain parameter compatibility', () => {
       },
     });
     expect(() => streaming.init()).not.toThrow();
+  });
+
+  it('keeps validating the Kaspa legacy input amount', () => {
+    const payload = buildKaspaPayload();
+    const method = new KaspaSignTransaction({
+      id: 1,
+      payload: {
+        ...payload,
+        sigHashType: 0x41,
+        inputs: [
+          {
+            ...payload.inputs[0],
+            output: { script: KASPA_SCRIPT },
+          },
+        ],
+      },
+    });
+
+    expect(() => method.init()).toThrow('Missing required parameter: satoshis');
+  });
+
+  it('keeps the deprecated EIP-712 method callable on existing Protocol V1 devices', async () => {
+    const method = new EVMSignMessageEIP712({
+      id: 1,
+      payload: {
+        method: 'evmSignMessageEIP712',
+        path: "m/44'/60'/0'/0/0",
+        domainHash: `0x${'11'.repeat(32)}`,
+        messageHash: `0x${'22'.repeat(32)}`,
+      },
+    });
+    method.init();
+
+    const typedCall = jest.fn().mockResolvedValue({
+      message: {
+        address: '0x1234',
+        signature: 'abcd',
+      },
+    });
+    method.device = {
+      commands: { typedCall },
+      getCurrentFirmwareVersionString: jest.fn(() => '4.10.0'),
+      getCurrentMethodVersionRange: jest.fn(() => undefined),
+      getCurrentFirmwareType: jest.fn(() => EFirmwareType.Universal),
+      getProtocol: jest.fn(() => 'V1'),
+    } as unknown as Device;
+
+    await expect(method.run()).resolves.toEqual({
+      address: '0x1234',
+      signature: 'abcd',
+    });
+    expect(typedCall).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a Benfen response that omits the address', async () => {
+    const method = new BenfenGetAddress({
+      id: 1,
+      payload: {
+        method: 'benfenGetAddress',
+        path: "m/44'/728'/0'/0'/0'",
+        showOnOneKey: false,
+      },
+    });
+    method.init();
+    method.device = {
+      commands: {
+        typedCall: jest.fn().mockResolvedValue({ message: {} }),
+      },
+      getCurrentFirmwareVersionString: jest.fn(() => '1.0.0'),
+      getCurrentDeviceType: jest.fn(() => EDeviceType.Classic),
+      isProtocolV2: jest.fn(() => false),
+    } as unknown as Device;
+
+    await expect(method.run()).rejects.toThrow(/address/i);
   });
 });
