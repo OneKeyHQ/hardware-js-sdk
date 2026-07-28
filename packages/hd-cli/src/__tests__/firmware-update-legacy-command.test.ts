@@ -5,9 +5,7 @@ describe('firmware-update-legacy CLI command', () => {
     const command = program.commands.find(item => item.name() === 'firmware-update-legacy');
 
     expect(command).toBeDefined();
-    expect(command?.description()).toBe(
-      'Update Classic/Pure firmware through the legacy protocol'
-    );
+    expect(command?.description()).toBe('Update Classic/Pure firmware through the legacy protocol');
     expect(command?.options.find(option => option.long === '--binary')?.mandatory).toBe(true);
     expect(command?.options.some(option => option.long === '--device-name')).toBe(true);
     expect(command?.options.some(option => option.long === '--update-type')).toBe(true);
