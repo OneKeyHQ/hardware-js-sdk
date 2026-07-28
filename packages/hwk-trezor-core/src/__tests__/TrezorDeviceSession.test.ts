@@ -1,3 +1,5 @@
+import { randomBytes } from 'node:crypto';
+
 import {
   thp as protocolThp,
   v1 as protocolV1,
@@ -173,7 +175,7 @@ describe('TrezorDeviceSession', () => {
           encryptedPayload: Buffer.alloc(16, 6),
           staticKey: Buffer.alloc(32, 10),
           hostStaticKeys: {
-            privateKey: Buffer.alloc(32, 11),
+            privateKey: randomBytes(32),
             publicKey: Buffer.alloc(32, 12),
           },
         }),
@@ -252,7 +254,7 @@ describe('TrezorDeviceSession', () => {
             encryptedPayload: Buffer.alloc(16, 6),
             staticKey: Buffer.alloc(32, 10),
             hostStaticKeys: {
-              privateKey: Buffer.alloc(32, 11),
+              privateKey: randomBytes(32),
               publicKey: Buffer.alloc(32, 12),
             },
           }),
@@ -325,7 +327,7 @@ describe('TrezorDeviceSession', () => {
           encryptedPayload: Buffer.alloc(16, 6),
           staticKey: Buffer.alloc(32, 10),
           hostStaticKeys: {
-            privateKey: Buffer.alloc(32, 11),
+            privateKey: randomBytes(32),
             publicKey: Buffer.alloc(32, 12),
           },
         }),
