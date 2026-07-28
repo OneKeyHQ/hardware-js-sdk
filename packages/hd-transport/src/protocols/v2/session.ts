@@ -1,11 +1,9 @@
 import {
-  PROTOCOL_V2_DEFAULT_DELIVERY_TIMEOUT_MS,
   PROTOCOL_V2_DEFAULT_RESPONSE_TIMEOUT_MS,
   PROTOCOL_V2_PACKET_SRC_COMMAND,
 } from '../../constants';
 import { ProtocolV2FrameAssembler, concatUint8Arrays } from './frame-assembler';
 import { ProtocolV2SequenceCursor } from './sequence-cursor';
-import { nextProtoSeq } from './encode';
 import { ProtocolV2LinkError } from './errors';
 import { ProtocolV2 } from '..';
 import * as check from '../../utils/highlevel-checks';
@@ -27,7 +25,6 @@ export type ProtocolV2CallContext = {
   highVolume: boolean;
   generation: number;
   signal: AbortSignal;
-  deliveryAttempt: number;
 };
 
 type ProtocolLogger = {
@@ -52,9 +49,6 @@ export type ProtocolV2SessionOptions = {
 
 export type ProtocolV2CallOptions = {
   timeoutMs?: number;
-  deliveryTimeoutMs?: number;
-  deliveryRetryPolicy?: 'retry-idempotent';
-  deliveryMaxRetries?: number;
   expectedTypes?: string[];
   intermediateTypes?: string[];
   onIntermediateResponse?: (response: MessageFromOneKey) => void;
@@ -219,14 +213,6 @@ export class ProtocolV2Session {
       callOptions.timeoutMs && callOptions.timeoutMs > 0
         ? callOptions.timeoutMs
         : PROTOCOL_V2_DEFAULT_RESPONSE_TIMEOUT_MS;
-    const deliveryTimeoutMs =
-      callOptions.deliveryTimeoutMs && callOptions.deliveryTimeoutMs > 0
-        ? callOptions.deliveryTimeoutMs
-        : PROTOCOL_V2_DEFAULT_DELIVERY_TIMEOUT_MS;
-    const deliveryMaxRetries =
-      callOptions.deliveryRetryPolicy === 'retry-idempotent'
-        ? Math.max(0, Math.floor(callOptions.deliveryMaxRetries ?? 1))
-        : 0;
     const abortController = new AbortController();
 
     const shouldReduceDebug = shouldReduceProtocolV2Debug(name);
@@ -236,7 +222,6 @@ export class ProtocolV2Session {
       highVolume: shouldReduceDebug,
       generation,
       signal: abortController.signal,
-      deliveryAttempt: 0,
     };
 
     const runCall = async (): Promise<MessageFromOneKey> => {
@@ -255,59 +240,12 @@ export class ProtocolV2Session {
       }
 
       await writeFrame(frame, baseCallContext);
-      let delivered = false;
-      let deliveryAttempt = 0;
-      let pendingRead: Promise<Uint8Array> | undefined;
 
       // Some Protocol V2 operations emit progress notifications before the
       // terminal response. Consume those frames here so callers still see a
       // request/terminal-response shaped API.
       while (!abortController.signal.aborted) {
-        const readContext: ProtocolV2CallContext = {
-          ...baseCallContext,
-          timeoutMs: delivered ? timeoutMs : Math.min(timeoutMs, deliveryTimeoutMs),
-          deliveryAttempt,
-        };
-        if (!pendingRead) {
-          pendingRead = readFrame(readContext);
-        }
-
-        let rxFrame: Uint8Array | undefined;
-        do {
-          if (delivered) {
-            rxFrame = await pendingRead;
-          } else {
-            try {
-              rxFrame = await withProtocolTimeout(
-                pendingRead,
-                deliveryTimeoutMs,
-                () =>
-                  new ProtocolV2LinkError(
-                    'delivery-timeout',
-                    `Protocol V2 delivery timeout after ${deliveryTimeoutMs}ms for ${name}`
-                  ),
-                undefined,
-                abortController.signal
-              );
-            } catch (error) {
-              if (
-                error instanceof ProtocolV2LinkError &&
-                error.code === 'delivery-timeout' &&
-                deliveryAttempt < deliveryMaxRetries &&
-                !abortController.signal.aborted
-              ) {
-                deliveryAttempt += 1;
-                await writeFrame(frame, {
-                  ...baseCallContext,
-                  deliveryAttempt,
-                });
-              } else {
-                throw error;
-              }
-            }
-          }
-        } while (rxFrame === undefined);
-        pendingRead = undefined;
+        const rxFrame = await readFrame(baseCallContext);
         if (abortController.signal.aborted) break;
 
         let header: ReturnType<typeof ProtocolV2.inspectFrameHeader>;
@@ -350,9 +288,7 @@ export class ProtocolV2Session {
               `Protocol V2 ACK sequence mismatch: expected ${protoSeq}, got ${header.seq}`
             );
           }
-          delivered = true;
         } else {
-          delivered = true;
           let decoded: ReturnType<typeof ProtocolV2.decodeFrame>;
           try {
             decoded = ProtocolV2.decodeFrame(schemas, rxFrame);
@@ -363,15 +299,12 @@ export class ProtocolV2Session {
               cause
             );
           }
-          if (
-            this.lastResponseSequence !== undefined &&
-            decoded.seq !== nextProtoSeq(this.lastResponseSequence)
-          ) {
+          // Firmware owns one TX sequence across all channels and packet sources,
+          // so frames routed elsewhere create valid gaps in this session.
+          if (this.lastResponseSequence === decoded.seq) {
             throw new ProtocolV2LinkError(
               'response-sequence',
-              `Protocol V2 response sequence mismatch: expected ${nextProtoSeq(
-                this.lastResponseSequence
-              )}, got ${decoded.seq}`
+              `Protocol V2 duplicate response sequence: ${decoded.seq}`
             );
           }
           this.lastResponseSequence = decoded.seq;
@@ -436,8 +369,6 @@ export async function probeProtocolV2({
       {
         timeoutMs,
         expectedTypes: ['Success'],
-        deliveryRetryPolicy: 'retry-idempotent',
-        deliveryMaxRetries: 1,
       }
     );
     if (response.type === 'Success') {

@@ -119,7 +119,6 @@ describe('ProtocolV2LinkManager', () => {
         timeoutMs: 123,
         highVolume: false,
         generation: 1,
-        deliveryAttempt: 0,
         signal: expect.any(AbortSignal),
       })
     );
