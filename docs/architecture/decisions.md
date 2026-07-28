@@ -56,10 +56,8 @@ Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类�
   业务方法只要接收 `deviceId`，也必须在业务命令前执行同一实时身份校验。
 - `openWalletSession()` 的显式 `mode` 是唯一流程意图；一旦传入 `mode`，不得再混用
   `useEmptyPassphrase` 或 `initSession`。`standard/select-hidden` 也不得携带钱包绑定。
-- 未传 `mode` 时只做旧参数兼容：`useEmptyPassphrase=true` 进入 `standard`；
-  否则 `initSession=true` 进入新的 `select-hidden` 并使当前设备上明确指定的旧钱包
-  Session 失效；否则完整的 `deviceId + passphraseState` 进入 `resume-hidden`，无绑定则
-  进入 `select-hidden`。
+- `openWalletSession()` 必须显式传入 `mode`；旧参数兼容只保留在原
+  `getPassphraseState()` 入口，避免新 API 同时存在两套意图表达。
 - `resume-hidden` 只接收 `deviceId + passphraseState`，由 Core 从 Store 查找
   `sessionId`；缓存不存在时返回 `WalletSessionInvalid`，固件拒绝恢复时透传规范化错误，
   且都不自动选择其他钱包。
@@ -68,8 +66,8 @@ Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类�
 - 隐藏钱包选择先用 `DeviceSessionAskPassphrase` 或
   `DeviceSessionAskPin { type: AttachToPin }` 在设备端准备上下文，再用空参数
   `DeviceSessionGet` 取得最终 Session；恢复缓存使用带 `session_id` 的 `DeviceSessionGet`。
-- Protocol V2 不再接收 Host Passphrase 明文；兼容 UI 返回的软件输入值只表示继续设备端
-  Passphrase 流程，SDK 不把该值写入协议请求。
+- Pro2 的 `DeviceSessionAskPassphrase.passphrase` 支持 Host 输入；字段缺省表示设备端输入。
+  Pro2 尚未发布，不保留开发阶段旧固件的能力降级分支。
 - 显式 `resume-hidden` 被固件拒绝时，Core 只清除当前隐藏钱包缓存并返回规范化错误，
   不自动退化为需要用户确认的隐藏钱包选择；`DeviceSessionError_InvalidSession=2`
   统一映射为 `WalletSessionInvalid`。

@@ -1,5 +1,6 @@
 import transport, { PROTOCOL_V2_CHANNEL_BLE_UART, bytesToHex } from '@onekeyfe/hd-transport';
 import { HardwareErrorCode } from '@onekeyfe/hd-shared';
+import EventEmitter from 'events';
 
 import ElectronBleTransport from '../src/electron-ble-transport';
 
@@ -111,7 +112,10 @@ const createNobleBle = (device = { id: 'flaky-pro2-id', name: 'Unknown BLE Devic
   ),
 });
 
-const configureTransport = (nobleBle: ReturnType<typeof createNobleBle>) => {
+const configureTransport = (
+  nobleBle: ReturnType<typeof createNobleBle>,
+  emitter?: EventEmitter
+) => {
   (global as any).window = {
     desktopApi: {
       nobleBle,
@@ -119,7 +123,7 @@ const configureTransport = (nobleBle: ReturnType<typeof createNobleBle>) => {
   };
 
   const transport = new ElectronBleTransport();
-  transport.init(createLogger());
+  transport.init(createLogger(), emitter);
   transport.configure(protocolV1Schema);
   transport.configureProtocolV2(protocolV2Schema);
   return transport;
@@ -129,6 +133,54 @@ describe('ElectronBleTransport protocol detection', () => {
   afterEach(() => {
     delete (global as any).window;
     jest.clearAllMocks();
+  });
+
+  test('keeps raw BLE lifecycle payloads off the public device event channel', async () => {
+    const device = { id: 'lifecycle-pro2-id', name: 'OneKey Pro 2' };
+    const nobleBle = createNobleBle(device);
+    const emitter = new EventEmitter();
+    let notificationHandler: ((deviceId: string, data: string) => void) | undefined;
+    let disconnectHandler: ((device: { id: string; name: string | null }) => void) | undefined;
+    let responseSeq = 0;
+
+    nobleBle.onNotification.mockImplementation(handler => {
+      notificationHandler = handler;
+      return jest.fn();
+    });
+    nobleBle.onDeviceDisconnected.mockImplementation(handler => {
+      disconnectHandler = handler;
+      return jest.fn();
+    });
+    nobleBle.write.mockImplementation(() => {
+      responseSeq += 1;
+      const response = ProtocolV2.encodeFrame(
+        schemas,
+        'Success',
+        { message: 'ok' },
+        { router: PROTOCOL_V2_CHANNEL_BLE_UART, seq: responseSeq }
+      );
+      setTimeout(() => notificationHandler?.(device.id, bytesToHex(response)), 0);
+      return Promise.resolve();
+    });
+
+    const publicConnect = jest.fn();
+    const publicDisconnect = jest.fn();
+    const transportDisconnect = jest.fn();
+    emitter.on('device-connect', publicConnect);
+    emitter.on('device-disconnect', publicDisconnect);
+    emitter.on('transport-device-disconnect', transportDisconnect);
+    const bleTransport = configureTransport(nobleBle, emitter);
+
+    await bleTransport.acquire({ uuid: device.id, expectedProtocol: 'V2' });
+    disconnectHandler?.(device);
+
+    expect(publicConnect).not.toHaveBeenCalled();
+    expect(publicDisconnect).not.toHaveBeenCalled();
+    expect(transportDisconnect).toHaveBeenCalledWith({
+      id: device.id,
+      connectId: device.id,
+      name: device.name,
+    });
   });
 
   test('detects Protocol V2 after Protocol V1 probe timeout', async () => {
@@ -339,6 +391,54 @@ describe('ElectronBleTransport protocol detection', () => {
       expect(sentSeqs).toEqual([1, 2, 3]);
     } finally {
       await transport.release(device.id);
+    }
+  });
+
+  test('preserves the active Protocol V2 link when the same schema is configured again', async () => {
+    const device = { id: 'stable-schema-pro2-id', name: 'OneKey Pro 2' };
+    const nobleBle = createNobleBle(device);
+    let notificationHandler: ((deviceId: string, data: string) => void) | undefined;
+    nobleBle.onNotification.mockImplementation(handler => {
+      notificationHandler = handler;
+      return jest.fn();
+    });
+    let responseSeq = 0;
+    nobleBle.write.mockImplementation(() => {
+      responseSeq += 1;
+      const response = ProtocolV2.encodeFrame(
+        schemas,
+        'Success',
+        { message: 'ok' },
+        { router: PROTOCOL_V2_CHANNEL_BLE_UART, seq: responseSeq }
+      );
+      setTimeout(() => notificationHandler?.(device.id, bytesToHex(response)), 0);
+      return Promise.resolve();
+    });
+    const bleTransport = configureTransport(nobleBle);
+
+    try {
+      await bleTransport.acquire({ uuid: device.id, expectedProtocol: 'V2' });
+      const invalidateAllLinks = jest.spyOn(
+        (bleTransport as any).protocolV2Links,
+        'invalidateAllLinks'
+      );
+      bleTransport.configureProtocolV2(protocolV2Schema);
+      await new Promise<void>(resolve => {
+        setTimeout(resolve, 0);
+      });
+      expect(invalidateAllLinks).not.toHaveBeenCalled();
+      await expect(
+        bleTransport.call(device.id, 'Ping', { message: 'same-schema' })
+      ).resolves.toEqual({
+        type: 'Success',
+        message: { message: 'ok' },
+      });
+      const sentSeqs = nobleBle.write.mock.calls.map(([, hex]) =>
+        Number.parseInt(hex.slice(12, 14), 16)
+      );
+      expect(sentSeqs).toEqual([1, 2]);
+    } finally {
+      await bleTransport.release(device.id);
     }
   });
 });

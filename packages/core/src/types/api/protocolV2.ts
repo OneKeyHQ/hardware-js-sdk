@@ -27,6 +27,16 @@ export type FileInfo = {
 
 // ── Method signatures ─────────────────────────────────────────────────────
 
+export type TestProtocolV2PingParams = CommonParams & {
+  /** Firmware diagnostic echo payload, limited to 63 UTF-8 bytes. */
+  message?: string;
+};
+
+export declare function testProtocolV2Ping(
+  connectId: string,
+  params?: TestProtocolV2PingParams
+): Response<Success>;
+
 export declare function deviceReboot(
   connectId: string,
   params: CommonParams & DeviceRebootParams

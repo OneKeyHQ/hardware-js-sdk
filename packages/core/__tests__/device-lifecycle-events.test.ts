@@ -1,3 +1,5 @@
+import { TRANSPORT_EVENT } from '@onekeyfe/hd-transport';
+
 import { initConnector, initCore } from '../src/core';
 import { DataManager } from '../src/data-manager';
 import TransportManager from '../src/data-manager/TransportManager';
@@ -57,6 +59,63 @@ describe('public device lifecycle events', () => {
     await core?.dispose();
     core = undefined;
     jest.restoreAllMocks();
+  });
+
+  test('registers the shared device lifecycle listeners exactly once', async () => {
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
+    core = initCore();
+    initConnector();
+
+    for (const id of ['first-call', 'second-call']) {
+      await core.handleMessage({
+        id,
+        event: IFRAME.CALL,
+        type: IFRAME.CALL,
+        payload: { method: 'clearSessionCache' },
+      } as CoreMessage);
+    }
+
+    expect(DevicePool.emitter.listenerCount(DEVICE.CONNECT)).toBe(1);
+    expect(DevicePool.emitter.listenerCount(DEVICE.DISCONNECT)).toBe(1);
+  });
+
+  test('converts an internal transport disconnect into a public KnownDevice snapshot', () => {
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
+    core = initCore();
+    initConnector();
+    const messages: CoreMessage[] = [];
+    core.on(CORE_EVENT, message => messages.push(message));
+    const device = createInitializedDevice('V2');
+    DevicePool.devicesCache['ble-connect-id'] = device;
+
+    DevicePool.emitter.emit(TRANSPORT_EVENT.DEVICE_DISCONNECT, {
+      id: 'ble-connect-id',
+      connectId: 'ble-connect-id',
+      name: 'OneKey Test BLE',
+    });
+
+    const disconnectMessage = messages.find(message => message.type === DEVICE.DISCONNECT);
+    expect(disconnectMessage?.payload.device).toMatchObject({
+      connectId: 'ble-connect-id',
+      serialNo: 'SERIAL-001',
+      state: { protocol: 'V2' },
+    });
+    expect(() => JSON.stringify(disconnectMessage?.payload.device)).not.toThrow();
+  });
+
+  test('treats an acquired BLE device as reusable until the transport disconnects', async () => {
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue('desktop-web-ble' as never);
+    const device = createInitializedDevice('V2');
+    const acquire = jest.spyOn(device, 'acquire').mockResolvedValue(undefined);
+    (device as unknown as { deviceAcquired: boolean }).deviceAcquired = true;
+    (device as any).commands = { disposed: false };
+
+    expect(device.isUsedHere()).toBe(true);
+    await expect(device.connect('V2')).resolves.toBe(true);
+    expect(acquire).not.toHaveBeenCalled();
+
+    device.markTransportDisconnected();
+    expect(device.isUsedHere()).toBe(false);
   });
 
   test.each([

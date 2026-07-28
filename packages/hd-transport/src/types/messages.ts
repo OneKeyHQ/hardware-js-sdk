@@ -4679,6 +4679,24 @@ export enum MoneroNetworkType {
   FAKECHAIN = 3,
 }
 
+export enum UiAnimationType {
+  Unknown = 0,
+  Signing = 1,
+}
+
+export enum UiAnimationCommand {
+  CommandUnknown = 0,
+  Start = 1,
+  Stop = 2,
+  Refresh = 3,
+}
+
+// UiAnimationRequest
+export type UiAnimationRequest = {
+  command: UiAnimationCommand;
+  type?: UiAnimationType;
+};
+
 // ViewAmount
 export type ViewAmount = {
   is_unlimited: boolean;
@@ -5083,7 +5101,9 @@ export type DeviceSessionAskPin = {
 };
 
 // DeviceSessionAskPassphrase
-export type DeviceSessionAskPassphrase = {};
+export type DeviceSessionAskPassphrase = {
+  passphrase?: string;
+};
 
 export enum DeviceSessionAskPin_FailureSubCodes {
   UserCancel = 1,
@@ -5865,6 +5885,7 @@ export type MessageType = {
   Wallpaper: Wallpaper;
   UnlockPath: UnlockPath;
   UnlockedPathRequest: UnlockedPathRequest;
+  UiAnimationRequest: UiAnimationRequest;
   ViewAmount: ViewAmount;
   ViewDetail: ViewDetail;
   ViewTip: ViewTip;

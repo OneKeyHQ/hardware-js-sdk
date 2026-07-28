@@ -1,5 +1,6 @@
 import semver from 'semver';
 import EventEmitter from 'events';
+import { TRANSPORT_EVENT } from '@onekeyfe/hd-transport';
 import {
   ERRORS,
   ERROR_CODES_REQUIRE_RELEASE,
@@ -70,7 +71,11 @@ import type { CoreMessage, IFrameCallMessage, UiPromise, UiPromiseResponse } fro
 import type { DeviceEvents, InitOptions, RunOptions } from '../device/Device';
 import type { SdkTracingContext } from '../utils/tracing';
 import type { Deferred } from '@onekeyfe/hd-shared';
-import type { LowlevelTransportSharedPlugin, OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
+import type {
+  LowlevelTransportSharedPlugin,
+  OneKeyDeviceInfo,
+  TransportDeviceDisconnectEvent,
+} from '@onekeyfe/hd-transport';
 import type { BaseMethod } from '../api/BaseMethod';
 
 const Log = getLogger(LoggerNames.Core);
@@ -173,8 +178,6 @@ export const callAPI = async (context: CoreContext, message: CoreMessage) => {
     return createResponseMessage(method?.responseID ?? message.id, false, { error });
   }
 
-  DevicePool.emitter.on(DEVICE.CONNECT, onDeviceConnectHandler);
-
   if (!method.useDevice) {
     updateMethodRequestContext(method, { status: 'running' });
     try {
@@ -236,7 +239,6 @@ const handlePreWarmSignal = async (
   method: BaseMethod
 ): Promise<any> => {
   const createAckResponse = () => {
-    DevicePool.emitter.removeListener(DEVICE.CONNECT, onDeviceConnectHandler);
     completeMethodRequestContext(method);
     method.dispose();
     return createResponseMessage(method.responseID, true, true);
@@ -874,8 +876,15 @@ function isRetryableBleProtocolV2ProbeError(method: BaseMethod, error: unknown) 
  */
 async function connectDeviceForBle(method: BaseMethod, device: Device, retryCount = 0) {
   try {
-    await device.acquire(method.payload.connectProtocol);
+    const shouldAcquire =
+      !device.hasDeviceAcquire() || !device.commands || device.commands.disposed;
+    if (shouldAcquire) {
+      await device.acquire(method.payload.connectProtocol);
+    }
     if (method.payload?.onlyConnectBleDevice) {
+      if (shouldAcquire) {
+        DevicePool.emitter.emit(DEVICE.CONNECT, device);
+      }
       return;
     }
     // Skip initialize if conditions are met
@@ -885,6 +894,9 @@ async function connectDeviceForBle(method: BaseMethod, device: Device, retryCoun
       device.markPreInitialized({
         passphraseState: initOptions.passphraseState,
       });
+    }
+    if (shouldAcquire) {
+      DevicePool.emitter.emit(DEVICE.CONNECT, device);
     }
   } catch (err) {
     if (
@@ -1186,8 +1198,6 @@ const cleanup = () => {
 
 const removeDeviceListener = (device: Device) => {
   device.removeAllListeners();
-  DevicePool.emitter.removeAllListeners(DEVICE.CONNECT);
-  // DevicePool.emitter.removeListener(DEVICE.DISCONNECT, onDeviceDisconnectHandler);
 };
 
 /**
@@ -1208,6 +1218,20 @@ const onDeviceDisconnectHandler = (device: Device) => {
   const deviceObject = device.toMessageObject();
   if (!deviceObject) return;
   postMessage(createDeviceMessage(DEVICE.DISCONNECT, { device: deviceObject }));
+};
+
+const onTransportDeviceDisconnectHandler = (event: TransportDeviceDisconnectEvent) => {
+  const device =
+    deviceCacheMap.get(event.connectId) ??
+    DevicePool.devicesCache[event.connectId] ??
+    DevicePool.getDeviceByPath(event.connectId);
+  if (!device) {
+    Log.debug('Ignoring transport disconnect for an unknown device:', event.connectId);
+    return;
+  }
+
+  device.markTransportDisconnected();
+  DevicePool.emitter.emit(DEVICE.DISCONNECT, device);
 };
 
 const onDevicePinHandler = async (...[device, type, callback]: DeviceEvents['pin']) => {
@@ -1528,7 +1552,15 @@ export const initCore = () => {
 
 export const initConnector = () => {
   _connector = new DeviceConnector();
+  DevicePool.emitter.removeListener(DEVICE.CONNECT, onDeviceConnectHandler);
+  DevicePool.emitter.removeListener(DEVICE.DISCONNECT, onDeviceDisconnectHandler);
+  DevicePool.emitter.removeListener(
+    TRANSPORT_EVENT.DEVICE_DISCONNECT,
+    onTransportDeviceDisconnectHandler
+  );
+  DevicePool.emitter.on(DEVICE.CONNECT, onDeviceConnectHandler);
   DevicePool.emitter.on(DEVICE.DISCONNECT, onDeviceDisconnectHandler);
+  DevicePool.emitter.on(TRANSPORT_EVENT.DEVICE_DISCONNECT, onTransportDeviceDisconnectHandler);
   return _connector;
 };
 
