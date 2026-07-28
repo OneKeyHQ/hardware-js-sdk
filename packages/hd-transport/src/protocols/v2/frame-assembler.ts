@@ -1,6 +1,7 @@
 import { PROTOCOL_V2_FRAME_MAX_BYTES } from '../../constants';
 import { PROTO_HEAD_CRC_SIZE, PROTO_HEAD_SOF, PROTO_PRE_HEAD_SIZE } from './constants';
 import { crc8 } from './crc8';
+import { ProtocolV2LinkError } from './errors';
 
 export function concatUint8Arrays(arrays: Uint8Array[]): Uint8Array {
   const totalLength = arrays.reduce((sum, arr) => sum + arr.length, 0);
@@ -58,7 +59,7 @@ export class ProtocolV2FrameAssembler {
 
     if (this.buffer[0] !== PROTO_HEAD_SOF) {
       this.reset();
-      throw new Error('Invalid Protocol V2 SOF');
+      throw new ProtocolV2LinkError('frame', 'Invalid Protocol V2 SOF');
     }
 
     const expectedLen = this.buffer[1] + this.buffer[2] * 256;
@@ -67,11 +68,11 @@ export class ProtocolV2FrameAssembler {
       // complete frame: without resetting, this poison prefix would stay in
       // the buffer forever and deadlock the caller's drain loop.
       this.reset();
-      throw new Error(`Protocol V2 frame length too small: ${expectedLen}`);
+      throw new ProtocolV2LinkError('frame', `Protocol V2 frame length too small: ${expectedLen}`);
     }
     if (expectedLen > this.maxFrameBytes) {
       this.reset();
-      throw new Error(`Protocol V2 frame too large: ${expectedLen}`);
+      throw new ProtocolV2LinkError('frame', `Protocol V2 frame too large: ${expectedLen}`);
     }
 
     if (this.buffer.length < PROTO_PRE_HEAD_SIZE) return undefined;
@@ -82,7 +83,8 @@ export class ProtocolV2FrameAssembler {
     const expectedHeaderCrc = crc8(this.buffer, 3);
     if (this.buffer[3] !== expectedHeaderCrc) {
       this.reset();
-      throw new Error(
+      throw new ProtocolV2LinkError(
+        'frame',
         `Protocol V2 header CRC mismatch: expected 0x${expectedHeaderCrc
           .toString(16)
           .padStart(2, '0')}`

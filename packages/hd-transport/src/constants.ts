@@ -56,3 +56,9 @@ export const PROTOCOL_V2_PACKET_SRC_COMMAND = 0;
  * the per-device queue forever.
  */
 export const PROTOCOL_V2_DEFAULT_RESPONSE_TIMEOUT_MS = 5 * 60 * 1000;
+
+/**
+ * Maximum time from a completed write to the matching ACK or first valid response.
+ * Device-side confirmation may be slow, but link delivery should be confirmed promptly.
+ */
+export const PROTOCOL_V2_DEFAULT_DELIVERY_TIMEOUT_MS = 5 * 1000;

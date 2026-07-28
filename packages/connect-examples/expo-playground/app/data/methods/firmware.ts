@@ -1,6 +1,9 @@
 import type { UnifiedMethodConfig, DeviceMethodCategory } from '../types';
 import type { HardwareApiMethod } from '../../services/hardwareService';
-import { PRO2_FIRMWARE_FILE_ACCEPT } from '../../constants/firmwareFiles';
+import {
+  PRO2_FIRMWARE_FILE_ACCEPT,
+  PRO2_REMOTE_FIRMWARE_TARGETS,
+} from '../../constants/firmwareFiles';
 
 const api: UnifiedMethodConfig[] = [
   {
@@ -270,6 +273,15 @@ const api: UnifiedMethodConfig[] = [
             label: 'Platform',
             options: [{ label: 'Web', value: 'web' }],
             value: 'web',
+          },
+          {
+            name: 'targetsToUpdate',
+            type: 'textarea',
+            required: true,
+            label: 'Remote Targets',
+            value: [...PRO2_REMOTE_FIRMWARE_TARGETS],
+            visible: true,
+            editable: false,
           },
         ],
       },

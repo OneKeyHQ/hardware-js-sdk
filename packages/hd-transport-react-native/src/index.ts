@@ -15,6 +15,7 @@ import transport, {
   PROTOCOL_V2_BLE_FRAME_MAX_BYTES,
   PROTOCOL_V2_CHANNEL_BLE_UART,
   type ProtocolType,
+  type ProtocolV2CallContext,
   ProtocolV2FrameAssembler,
   ProtocolV2LinkManager,
   type TransportCallOptions,
@@ -1608,7 +1609,47 @@ export default class ReactNativeBleTransport {
     }
   }
 
-  private async writeProtocolV2Frame(transport: BleTransport, frame: Uint8Array) {
+  private async writeProtocolV2Packet(
+    transport: BleTransport,
+    base64: string,
+    context: ProtocolV2CallContext,
+    assertCurrentGeneration: () => void
+  ) {
+    let attempt = 0;
+    for (;;) {
+      assertCurrentGeneration();
+      if (context.signal.aborted) {
+        throw new Error(`Protocol V2 BLE write aborted for ${context.messageName}`);
+      }
+      try {
+        await transport.writeCharacteristic.writeWithoutResponse(base64);
+        assertCurrentGeneration();
+        return;
+      } catch (error) {
+        if (
+          getFirmwareUploadWriteRetryType(error) !== 'congested' ||
+          attempt >= FIRMWARE_UPLOAD_WRITE_MAX_RETRIES
+        ) {
+          throw error;
+        }
+        const delayMs = resolveFirmwareUploadRetryDelay(attempt);
+        attempt += 1;
+        Log?.debug('[ReactNativeBleTransport] Protocol V2 congested write retry:', {
+          name: context.messageName,
+          attempt,
+          delayMs,
+        });
+        await delay(delayMs);
+      }
+    }
+  }
+
+  private async writeProtocolV2Frame(
+    transport: BleTransport,
+    frame: Uint8Array,
+    context: ProtocolV2CallContext,
+    assertCurrentGeneration: () => void
+  ) {
     const tuning = getProtocolV2BleTuning();
     const packetCapacity = resolveProtocolV2PacketCapacity({
       platform: Platform.OS,
@@ -1620,7 +1661,7 @@ export default class ReactNativeBleTransport {
     for (let offset = 0; offset < frame.length; offset += packetCapacity) {
       const chunk = frame.slice(offset, offset + packetCapacity);
       const base64 = Buffer.from(chunk).toString('base64');
-      await transport.writeCharacteristic.writeWithoutResponse(base64);
+      await this.writeProtocolV2Packet(transport, base64, context, assertCurrentGeneration);
       packetsWritten += 1;
       if (
         offset + packetCapacity < frame.length &&
@@ -1628,6 +1669,9 @@ export default class ReactNativeBleTransport {
       ) {
         await delay(FIRMWARE_UPLOAD_WRITE_PAUSE_MS);
       }
+    }
+    if (packetsWritten > FIRMWARE_UPLOAD_WRITE_BURST_SIZE) {
+      await delay(FIRMWARE_UPLOAD_WRITE_FLUSH_DELAY_MS);
     }
   }
 
@@ -1684,10 +1728,10 @@ export default class ReactNativeBleTransport {
         this.protocolV2Assemblers.get(uuid)?.reset();
         this.resetProtocolV2Frames(uuid);
       },
-      writeFrame: async (frame: Uint8Array) => {
+      writeFrame: async (frame: Uint8Array, context: ProtocolV2CallContext) => {
         assertCurrentGeneration();
         const currentTransport = this.getCachedTransport(uuid);
-        await this.writeProtocolV2Frame(currentTransport, frame);
+        await this.writeProtocolV2Frame(currentTransport, frame, context, assertCurrentGeneration);
       },
       readFrame: async () => {
         assertCurrentGeneration();

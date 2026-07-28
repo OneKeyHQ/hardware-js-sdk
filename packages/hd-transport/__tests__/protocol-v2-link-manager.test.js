@@ -113,12 +113,16 @@ describe('ProtocolV2LinkManager', () => {
 
     await manager.call('device-a', createAdapter, 'Ping', { message: '1' }, { timeoutMs: 123 });
 
-    expect(adapters[0].prepareCall).toHaveBeenCalledWith({
-      messageName: 'Ping',
-      timeoutMs: 123,
-      highVolume: false,
-      generation: 1,
-    });
+    expect(adapters[0].prepareCall).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messageName: 'Ping',
+        timeoutMs: 123,
+        highVolume: false,
+        generation: 1,
+        deliveryAttempt: 0,
+        signal: expect.any(AbortSignal),
+      })
+    );
   });
 
   test('invalidates a link-fatal call before the next call creates a new link', async () => {
