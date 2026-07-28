@@ -1,5 +1,5 @@
 import HardwareSDK from "@onekeyfe/hd-common-connect-sdk";
-import { createDeferred, isHeaderChunk, COMMON_HEADER_SIZE } from "./utils";
+import { createDeferred } from "./utils";
 
 const UI_EVENT = "UI_EVENT";
 const UI_REQUEST = {
@@ -70,52 +70,30 @@ function getHardwareSDKInstance() {
 
 let runPromise;
 let receiveQueue = [];
-let protocolV2Buffer = [];
-let protocolV2ExpectedLength = 0;
+let receiveGeneration = 0;
+let activeConnection;
+
+function resetReceiveState(reason) {
+  receiveGeneration += 1;
+  receiveQueue = [];
+  if (runPromise) {
+    const current = runPromise;
+    runPromise = undefined;
+    current.reject(new Error(reason));
+  }
+}
 
 function resolveReceive(hexString) {
-  if (runPromise) {
+  if (!activeConnection) {
+    return;
+  }
+  if (runPromise?.generation === receiveGeneration) {
     const current = runPromise;
     runPromise = undefined;
     current.resolve(hexString);
     return;
   }
-  receiveQueue.push(hexString);
-}
-
-function resetProtocolV2Buffer() {
-  protocolV2Buffer = [];
-  protocolV2ExpectedLength = 0;
-}
-
-function handleProtocolV2Chunk(data) {
-  protocolV2Buffer = protocolV2Buffer.concat([...data]);
-
-  if (protocolV2ExpectedLength === 0 && protocolV2Buffer.length >= 3) {
-    if (protocolV2Buffer[0] !== 0x5a) {
-      resetProtocolV2Buffer();
-      return;
-    }
-    protocolV2ExpectedLength = protocolV2Buffer[1] | (protocolV2Buffer[2] << 8);
-  }
-
-  while (protocolV2ExpectedLength > 0 && protocolV2Buffer.length >= protocolV2ExpectedLength) {
-    const frame = Buffer.from(protocolV2Buffer.slice(0, protocolV2ExpectedLength));
-    protocolV2Buffer = protocolV2Buffer.slice(protocolV2ExpectedLength);
-    protocolV2ExpectedLength = 0;
-    resolveReceive(frame.toString("hex"));
-
-    if (protocolV2Buffer.length === 0) {
-      return;
-    }
-
-    if (protocolV2Buffer.length >= 3 && protocolV2Buffer[0] === 0x5a) {
-      protocolV2ExpectedLength = protocolV2Buffer[1] | (protocolV2Buffer[2] << 8);
-    } else {
-      resetProtocolV2Buffer();
-      return;
-    }
-  }
+  receiveQueue.push({ generation: receiveGeneration, hexString });
 }
 
 function createLowlevelPlugin() {
@@ -135,25 +113,43 @@ function createLowlevelPlugin() {
         });
       });
     },
-    receive: () => {
-      return new Promise((resolve) => {
-        if (receiveQueue.length > 0) {
-          resolve(receiveQueue.shift());
-          return;
+    receive: (uuid) => {
+      if (uuid !== activeConnection) {
+        return Promise.reject(new Error(`No active connection for ${uuid}`));
+      }
+      while (receiveQueue.length > 0) {
+        const queued = receiveQueue.shift();
+        if (queued.generation === receiveGeneration) {
+          return Promise.resolve(queued.hexString);
         }
-        runPromise = createDeferred();
-        const response = runPromise.promise;
-        resolve(response);
-      });
+      }
+      const deferred = createDeferred();
+      runPromise = { ...deferred, generation: receiveGeneration };
+      return deferred.promise;
     },
     connect: (uuid) => {
-      return new Promise((resolve) => {
+      const connectionChanged = activeConnection !== uuid;
+      if (connectionChanged) {
+        activeConnection = undefined;
+        resetReceiveState(`Connection changed to ${uuid}`);
+      }
+      const generation = receiveGeneration;
+      return new Promise((resolve, reject) => {
         bridge.callHandler("connect", { uuid }, () => {
+          if (generation !== receiveGeneration) {
+            reject(new Error(`Stale connection callback for ${uuid}`));
+            return;
+          }
+          activeConnection = uuid;
           resolve();
         });
       });
     },
     disconnect: (uuid) => {
+      if (activeConnection === uuid) {
+        activeConnection = undefined;
+      }
+      resetReceiveState(`Disconnected from ${uuid}`);
       return new Promise((resolve) => {
         bridge.callHandler("disconnect", { uuid }, (response) => {
           console.log("call connect response: ", response);
@@ -245,31 +241,12 @@ function registerBridgeHandler() {
     }
   });
 
-  let bufferLength = 0;
-  let buffer = [];
   bridge.registerHandler("monitorCharacteristic", async (hexString) => {
     try {
-      const data = Buffer.from(hexString, "hex");
-      if (protocolV2Buffer.length > 0 || data[0] === 0x5a) {
-        handleProtocolV2Chunk(data);
-        return;
-      }
-
-      if (isHeaderChunk(data)) {
-        bufferLength = data.readInt32BE(5);
-        buffer = [...data.subarray(3)];
-      } else {
-        buffer = buffer.concat([...data]);
-      }
-      if (buffer.length - COMMON_HEADER_SIZE >= bufferLength) {
-        const value = Buffer.from(buffer);
-        bufferLength = 0;
-        buffer = [];
-        resolveReceive(value.toString("hex"));
-      }
+      resolveReceive(hexString);
     } catch (e) {
       console.log("monitor data error: ", e);
-      runPromise?.reject(e);
+      resetReceiveState(`Monitor failed: ${e.message}`);
     }
   });
 }
