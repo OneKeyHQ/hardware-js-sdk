@@ -1,16 +1,20 @@
 import {
+  PROTOCOL_V2_DEFAULT_DELIVERY_TIMEOUT_MS,
   PROTOCOL_V2_DEFAULT_RESPONSE_TIMEOUT_MS,
   PROTOCOL_V2_PACKET_SRC_COMMAND,
 } from '../../constants';
 import { ProtocolV2FrameAssembler, concatUint8Arrays } from './frame-assembler';
 import { ProtocolV2SequenceCursor } from './sequence-cursor';
 import { nextProtoSeq } from './encode';
+import { ProtocolV2LinkError } from './errors';
 import { ProtocolV2 } from '..';
 import * as check from '../../utils/highlevel-checks';
 import { LogBlockCommand } from '../../utils/logBlockCommand';
 
 import type { Root } from 'protobufjs/light';
 import type { MessageFromOneKey } from '../../types';
+
+export * from './errors';
 
 export type ProtocolV2Schemas = {
   protocolV1: Root;
@@ -22,6 +26,8 @@ export type ProtocolV2CallContext = {
   timeoutMs?: number;
   highVolume: boolean;
   generation: number;
+  signal: AbortSignal;
+  deliveryAttempt: number;
 };
 
 type ProtocolLogger = {
@@ -46,6 +52,9 @@ export type ProtocolV2SessionOptions = {
 
 export type ProtocolV2CallOptions = {
   timeoutMs?: number;
+  deliveryTimeoutMs?: number;
+  deliveryRetryPolicy?: 'retry-idempotent';
+  deliveryMaxRetries?: number;
   expectedTypes?: string[];
   intermediateTypes?: string[];
   onIntermediateResponse?: (response: MessageFromOneKey) => void;
@@ -118,11 +127,13 @@ export async function withProtocolTimeout<T>(
   promise: Promise<T>,
   timeoutMs: number | undefined,
   createTimeoutError: () => Error,
-  onTimeout?: () => void
+  onTimeout?: () => void,
+  abortSignal?: AbortSignal
 ): Promise<T> {
   if (!timeoutMs) return promise;
 
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let abortHandler: (() => void) | undefined;
   try {
     return await Promise.race([
       promise,
@@ -134,9 +145,26 @@ export async function withProtocolTimeout<T>(
           reject(createTimeoutError());
         }, timeoutMs);
       }),
+      ...(abortSignal
+        ? [
+            new Promise<never>((_, reject) => {
+              abortHandler = () => {
+                reject(new Error('Protocol V2 operation aborted'));
+              };
+              if (abortSignal.aborted) {
+                abortHandler();
+              } else {
+                abortSignal.addEventListener('abort', abortHandler, { once: true });
+              }
+            }),
+          ]
+        : []),
     ]);
   } finally {
     if (timer) clearTimeout(timer);
+    if (abortHandler) {
+      abortSignal?.removeEventListener('abort', abortHandler);
+    }
   }
 }
 
@@ -169,7 +197,7 @@ export class ProtocolV2Session {
     return result;
   }
 
-  private async executeCall(
+  private executeCall(
     name: string,
     data: Record<string, unknown>,
     callOptions: ProtocolV2CallOptions
@@ -191,99 +219,156 @@ export class ProtocolV2Session {
       callOptions.timeoutMs && callOptions.timeoutMs > 0
         ? callOptions.timeoutMs
         : PROTOCOL_V2_DEFAULT_RESPONSE_TIMEOUT_MS;
+    const deliveryTimeoutMs =
+      callOptions.deliveryTimeoutMs && callOptions.deliveryTimeoutMs > 0
+        ? callOptions.deliveryTimeoutMs
+        : PROTOCOL_V2_DEFAULT_DELIVERY_TIMEOUT_MS;
+    const deliveryMaxRetries =
+      callOptions.deliveryRetryPolicy === 'retry-idempotent'
+        ? Math.max(0, Math.floor(callOptions.deliveryMaxRetries ?? 1))
+        : 0;
+    const abortController = new AbortController();
 
     const shouldReduceDebug = shouldReduceProtocolV2Debug(name);
-    const callContext: ProtocolV2CallContext = {
+    const baseCallContext: ProtocolV2CallContext = {
       messageName: name,
       timeoutMs,
       highVolume: shouldReduceDebug,
       generation,
+      signal: abortController.signal,
+      deliveryAttempt: 0,
     };
-    await prepareCall?.(callContext);
-    const protoSeq = this.sequenceCursor.next();
-    const frame = ProtocolV2.encodeFrame(schemas, name, data, {
-      packetSrc,
-      router,
-      seq: protoSeq,
-    });
-    // Suppress Protocol V2 TX frame logs to avoid excessive transport diagnostics.
-    /*
-    const txMetadata = ProtocolV2.inspectFrame(schemas, frame);
 
-    if (!shouldReduceDebug) {
-      logger?.debug?.(`[${logPrefix}] TX`, {
-        method: name,
-        type: name,
-        typeId: txMetadata.messageTypeId,
-        seq: txMetadata.seq,
-        bytes: frame.length,
+    const runCall = async (): Promise<MessageFromOneKey> => {
+      await prepareCall?.(baseCallContext);
+      const protoSeq = this.sequenceCursor.next();
+      const frame = ProtocolV2.encodeFrame(schemas, name, data, {
+        packetSrc,
+        router,
+        seq: protoSeq,
       });
-    }
-    */
 
-    if (maxFrameBytes !== undefined && frame.length > maxFrameBytes) {
-      throw new Error(
-        `Protocol V2 frame too large for transport: ${frame.length} > ${maxFrameBytes}`
-      );
-    }
+      if (maxFrameBytes !== undefined && frame.length > maxFrameBytes) {
+        throw new Error(
+          `Protocol V2 frame too large for transport: ${frame.length} > ${maxFrameBytes}`
+        );
+      }
 
-    await writeFrame(frame, callContext);
+      await writeFrame(frame, baseCallContext);
+      let delivered = false;
+      let deliveryAttempt = 0;
+      let pendingRead: Promise<Uint8Array> | undefined;
 
-    // Cancellation flag for the read loop: when the response timeout fires,
-    // Promise.race alone would leave this loop running as a zombie that keeps
-    // consuming frames meant for the next call. The timeout callback flips the
-    // flag so the loop exits and discards any late frame.
-    const cancellation = { cancelled: false };
-
-    const readResponse = async (): Promise<MessageFromOneKey> => {
       // Some Protocol V2 operations emit progress notifications before the
       // terminal response. Consume those frames here so callers still see a
       // request/terminal-response shaped API.
-      while (!cancellation.cancelled) {
-        const rxFrame = await readFrame(callContext);
-        if (cancellation.cancelled) {
-          // Timed out while waiting: drop the late frame and stop reading.
-          break;
+      while (!abortController.signal.aborted) {
+        const readContext: ProtocolV2CallContext = {
+          ...baseCallContext,
+          timeoutMs: delivered ? timeoutMs : Math.min(timeoutMs, deliveryTimeoutMs),
+          deliveryAttempt,
+        };
+        if (!pendingRead) {
+          pendingRead = readFrame(readContext);
         }
-        const header = ProtocolV2.inspectFrameHeader(rxFrame);
+
+        let rxFrame: Uint8Array | undefined;
+        do {
+          if (delivered) {
+            rxFrame = await pendingRead;
+          } else {
+            try {
+              rxFrame = await withProtocolTimeout(
+                pendingRead,
+                deliveryTimeoutMs,
+                () =>
+                  new ProtocolV2LinkError(
+                    'delivery-timeout',
+                    `Protocol V2 delivery timeout after ${deliveryTimeoutMs}ms for ${name}`
+                  ),
+                undefined,
+                abortController.signal
+              );
+            } catch (error) {
+              if (
+                error instanceof ProtocolV2LinkError &&
+                error.code === 'delivery-timeout' &&
+                deliveryAttempt < deliveryMaxRetries &&
+                !abortController.signal.aborted
+              ) {
+                deliveryAttempt += 1;
+                await writeFrame(frame, {
+                  ...baseCallContext,
+                  deliveryAttempt,
+                });
+              } else {
+                throw error;
+              }
+            }
+          }
+        } while (rxFrame === undefined);
+        pendingRead = undefined;
+        if (abortController.signal.aborted) break;
+
+        let header: ReturnType<typeof ProtocolV2.inspectFrameHeader>;
+        try {
+          header = ProtocolV2.inspectFrameHeader(rxFrame);
+        } catch (cause) {
+          throw new ProtocolV2LinkError(
+            'frame',
+            `Protocol V2 frame validation failed: ${getErrorMessage(cause)}`,
+            cause
+          );
+        }
         if (header.router !== router) {
-          throw new Error(`Protocol V2 router mismatch: expected ${router}, got ${header.router}`);
+          throw new ProtocolV2LinkError(
+            'router',
+            `Protocol V2 router mismatch: expected ${router}, got ${header.router}`
+          );
         }
         if (header.packetSrc !== packetSrc) {
-          throw new Error(
+          throw new ProtocolV2LinkError(
+            'packet-source',
             `Protocol V2 packet source mismatch: expected ${packetSrc}, got ${header.packetSrc}`
           );
         }
 
-        const isAck = ProtocolV2.isAckFrame(rxFrame);
+        let isAck: boolean;
+        try {
+          isAck = ProtocolV2.isAckFrame(rxFrame);
+        } catch (cause) {
+          throw new ProtocolV2LinkError(
+            'frame',
+            `Protocol V2 ACK validation failed: ${getErrorMessage(cause)}`,
+            cause
+          );
+        }
         if (isAck) {
           if (header.seq !== protoSeq) {
-            throw new Error(
+            throw new ProtocolV2LinkError(
+              'ack-sequence',
               `Protocol V2 ACK sequence mismatch: expected ${protoSeq}, got ${header.seq}`
             );
           }
+          delivered = true;
         } else {
-          // Suppress Protocol V2 RX frame logs to avoid excessive transport diagnostics.
-          /*
-          const rxMetadata = ProtocolV2.inspectFrame(schemas, rxFrame);
-
-          if (!shouldReduceDebug) {
-            logger?.debug?.(`[${logPrefix}] RX`, {
-              method: name,
-              type: rxMetadata.type,
-              typeId: rxMetadata.messageTypeId,
-              seq: rxMetadata.seq,
-              bytes: rxFrame.length,
-            });
+          delivered = true;
+          let decoded: ReturnType<typeof ProtocolV2.decodeFrame>;
+          try {
+            decoded = ProtocolV2.decodeFrame(schemas, rxFrame);
+          } catch (cause) {
+            throw new ProtocolV2LinkError(
+              'frame',
+              `Protocol V2 frame decode failed: ${getErrorMessage(cause)}`,
+              cause
+            );
           }
-          */
-
-          const decoded = ProtocolV2.decodeFrame(schemas, rxFrame);
           if (
             this.lastResponseSequence !== undefined &&
             decoded.seq !== nextProtoSeq(this.lastResponseSequence)
           ) {
-            throw new Error(
+            throw new ProtocolV2LinkError(
+              'response-sequence',
               `Protocol V2 response sequence mismatch: expected ${nextProtoSeq(
                 this.lastResponseSequence
               )}, got ${decoded.seq}`
@@ -305,20 +390,19 @@ export class ProtocolV2Session {
           }
         }
       }
-      // Only reachable after cancellation; the outer promise has already been
-      // rejected by the timeout, so this rejection is consumed by the race.
+
       throw new Error(`Protocol V2 read loop cancelled after timeout for ${name}`);
     };
 
     return withProtocolTimeout(
-      readResponse(),
+      runCall(),
       timeoutMs,
       () =>
         createTimeoutError
           ? createTimeoutError(name, timeoutMs)
           : new Error(`Protocol V2 response timeout after ${timeoutMs}ms for ${name}`),
       () => {
-        cancellation.cancelled = true;
+        abortController.abort();
       }
     );
   }
@@ -349,7 +433,12 @@ export async function probeProtocolV2({
     const response = await call(
       'Ping',
       { message: 'protocol-v2-probe' },
-      { timeoutMs, expectedTypes: ['Success'] }
+      {
+        timeoutMs,
+        expectedTypes: ['Success'],
+        deliveryRetryPolicy: 'retry-idempotent',
+        deliveryMaxRetries: 1,
+      }
     );
     if (response.type === 'Success') {
       return true;

@@ -7,8 +7,10 @@ import transport, {
   PROTOCOL_V2_CHANNEL_USB,
   PROTOCOL_V2_FRAME_MAX_BYTES,
   ProtocolV2FrameAssembler,
+  ProtocolV2LinkError,
   ProtocolV2SequenceCursor,
   ProtocolV2Session,
+  isProtocolV2LinkError,
   probeProtocolV2 as probeProtocolV2Helper,
 } from '@onekeyfe/hd-transport';
 import {
@@ -833,23 +835,23 @@ export default class WebUsbTransport {
         logger: this.Log,
         logPrefix: 'ProtocolV2 WebUSB',
         createTimeoutError: (messageName: string, timeoutMs: number) =>
-          new Error(`Protocol V2 response timeout after ${timeoutMs}ms for ${messageName}`),
+          new ProtocolV2LinkError(
+            'response-timeout',
+            `Protocol V2 response timeout after ${timeoutMs}ms for ${messageName}`
+          ),
       });
       this.protocolV2Sessions.set(path, session);
     }
 
     this.protocolV2ReadTimeouts.set(path, options?.timeoutMs);
-    this.protocolV2Assemblers.get(path)?.reset();
     try {
       return await session.call(name, data, options);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
-      if (message.includes('protocol v2 read timeout') || message.includes('response timeout')) {
+      if (isProtocolV2LinkError(error) || this.isRetryablePacketIoError(error)) {
         try {
           await this.resetConnectionAfterProbe(path);
         } catch (resetError) {
-          this.Log.debug('[WebUsbTransport] Protocol V2 timeout reset failed:', resetError);
+          this.Log.debug('[WebUsbTransport] Protocol V2 link reset failed:', resetError);
         }
       }
       throw error;
@@ -887,14 +889,7 @@ export default class WebUsbTransport {
           dataView.buffer.slice(dataView.byteOffset, dataView.byteOffset + dataView.byteLength)
         )
       );
-      try {
-        frame = assembler.push(bytes);
-      } catch (error) {
-        throw ERRORS.TypedError(
-          HardwareErrorCode.NetworkError,
-          error instanceof Error ? error.message : String(error)
-        );
-      }
+      frame = assembler.push(bytes);
     }
     return frame;
   }

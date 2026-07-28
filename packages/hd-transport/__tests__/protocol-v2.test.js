@@ -2,6 +2,7 @@ const { ProtocolV2 } = require('../src/protocols');
 const { parseConfigure } = require('../src/serialization/protobuf/messages');
 const {
   ProtocolV2FrameAssembler,
+  ProtocolV2LinkError,
   ProtocolV2SequenceCursor,
   ProtocolV2Session,
   hexToBytes,
@@ -9,6 +10,7 @@ const {
 } = require('../src/protocols/v2/session');
 const protocolV2 = require('../src/protocols/v2');
 const {
+  PROTOCOL_V2_DEFAULT_DELIVERY_TIMEOUT_MS,
   PROTOCOL_V2_DEFAULT_RESPONSE_TIMEOUT_MS,
   PROTOCOL_V2_FRAME_MAX_BYTES,
 } = require('../src/constants');
@@ -475,6 +477,115 @@ describe('Protocol V2 framing and session', () => {
     expect(readFrame).toHaveBeenCalledTimes(2);
   });
 
+  test('session accepts a terminal response as delivery confirmation before an ACK', async () => {
+    const response = ProtocolV2.encodeFrame(schemas, 'Success', {
+      message: 'ok',
+    });
+    const session = new ProtocolV2Session({
+      schemas,
+      router: 1,
+      writeFrame: () => Promise.resolve(),
+      readFrame: () => Promise.resolve(rewriteSeq(response, 1)),
+    });
+
+    await expect(
+      session.call(
+        'Ping',
+        { message: 'hello' },
+        { deliveryTimeoutMs: 10, expectedTypes: ['Success'] }
+      )
+    ).resolves.toEqual({
+      type: 'Success',
+      message: {
+        message: 'ok',
+      },
+    });
+  });
+
+  test('session fails delivery quickly when neither an ACK nor a response arrives', async () => {
+    const writeFrame = jest.fn().mockResolvedValue(undefined);
+    const session = new ProtocolV2Session({
+      schemas,
+      router: 1,
+      writeFrame,
+      readFrame: () => new Promise(() => {}),
+    });
+
+    await expect(
+      session.call('Ping', { message: 'hello' }, { timeoutMs: 100, deliveryTimeoutMs: 10 })
+    ).rejects.toMatchObject({
+      name: 'ProtocolV2LinkError',
+      code: 'delivery-timeout',
+    });
+    expect(writeFrame).toHaveBeenCalledTimes(1);
+  });
+
+  test('session only retransmits delivery for an explicitly idempotent call', async () => {
+    const response = ProtocolV2.encodeFrame(schemas, 'Success', {
+      message: 'ok',
+    });
+    const writeFrame = jest.fn().mockResolvedValue(undefined);
+    let resolveRead;
+    const readFrame = jest.fn(
+      () =>
+        new Promise(resolve => {
+          resolveRead = resolve;
+        })
+    );
+    const session = new ProtocolV2Session({
+      schemas,
+      router: 1,
+      writeFrame,
+      readFrame,
+    });
+
+    const call = session.call(
+      'Ping',
+      { message: 'hello' },
+      {
+        timeoutMs: 200,
+        deliveryTimeoutMs: 10,
+        deliveryRetryPolicy: 'retry-idempotent',
+        deliveryMaxRetries: 1,
+      }
+    );
+    await new Promise(resolve => {
+      setTimeout(resolve, 20);
+    });
+    resolveRead(rewriteSeq(response, 1));
+
+    await expect(call).resolves.toEqual({
+      type: 'Success',
+      message: {
+        message: 'ok',
+      },
+    });
+    expect(writeFrame).toHaveBeenCalledTimes(2);
+    expect(readFrame).toHaveBeenCalledTimes(1);
+    expect(writeFrame.mock.calls[1][1].deliveryAttempt).toBe(1);
+  });
+
+  test('session never retransmits a side-effecting call without an idempotent policy', async () => {
+    const writeFrame = jest.fn().mockResolvedValue(undefined);
+    const session = new ProtocolV2Session({
+      schemas,
+      router: 1,
+      writeFrame,
+      readFrame: () => new Promise(() => {}),
+    });
+
+    await expect(
+      session.call(
+        'FileWrite',
+        {},
+        { timeoutMs: 100, deliveryTimeoutMs: 10, deliveryMaxRetries: 3 }
+      )
+    ).rejects.toMatchObject({
+      code: 'delivery-timeout',
+    });
+    expect(writeFrame).toHaveBeenCalledTimes(1);
+  });
+
   test('session rejects an ACK that belongs to another request sequence', async () => {
     const ack = new Uint8Array(8);
     ack[0] = 0x5a;
@@ -491,8 +602,12 @@ describe('Protocol V2 framing and session', () => {
       readFrame: () => Promise.resolve(ack),
     });
 
-    await expect(session.call('Ping', { message: 'hello' })).rejects.toThrow(
-      'Protocol V2 ACK sequence mismatch: expected 1, got 2'
+    await expect(session.call('Ping', { message: 'hello' })).rejects.toEqual(
+      expect.objectContaining({
+        name: 'ProtocolV2LinkError',
+        code: 'ack-sequence',
+        message: 'Protocol V2 ACK sequence mismatch: expected 1, got 2',
+      })
     );
   });
 
@@ -505,8 +620,8 @@ describe('Protocol V2 framing and session', () => {
       readFrame: () => Promise.resolve(response),
     });
 
-    await expect(session.call('Ping', { message: 'hello' })).rejects.toThrow(
-      'Protocol V2 router mismatch: expected 1, got 0'
+    await expect(session.call('Ping', { message: 'hello' })).rejects.toBeInstanceOf(
+      ProtocolV2LinkError
     );
   });
 
@@ -529,28 +644,40 @@ describe('Protocol V2 framing and session', () => {
     expect(writeFrame).not.toHaveBeenCalled();
   });
 
-  test('session starts response timeout after the frame is written', async () => {
-    const response = ProtocolV2.encodeFrame(schemas, 'Success', {
-      message: 'ok',
-    });
+  test('session watchdog covers a write that never settles', async () => {
+    const readFrame = jest.fn();
+    let writeSignal;
     const session = new ProtocolV2Session({
       schemas,
       router: 1,
-      writeFrame: () =>
-        new Promise(resolve => {
-          setTimeout(resolve, 30);
-        }),
-      readFrame: () => Promise.resolve(rewriteSeq(response, 1)),
+      writeFrame: (_frame, context) => {
+        writeSignal = context.signal;
+        return new Promise(() => {});
+      },
+      readFrame,
     });
 
     await expect(
       session.call('Ping', { message: 'hello' }, { timeoutMs: 10, expectedTypes: ['Success'] })
-    ).resolves.toEqual({
-      type: 'Success',
-      message: {
-        message: 'ok',
-      },
+    ).rejects.toThrow('Protocol V2 response timeout after 10ms for Ping');
+    expect(writeSignal.aborted).toBe(true);
+    expect(readFrame).not.toHaveBeenCalled();
+  });
+
+  test('session watchdog covers prepareCall before writing', async () => {
+    const writeFrame = jest.fn();
+    const session = new ProtocolV2Session({
+      schemas,
+      router: 1,
+      prepareCall: () => new Promise(() => {}),
+      writeFrame,
+      readFrame: jest.fn(),
     });
+
+    await expect(session.call('Ping', { message: 'hello' }, { timeoutMs: 10 })).rejects.toThrow(
+      'Protocol V2 response timeout after 10ms for Ping'
+    );
+    expect(writeFrame).not.toHaveBeenCalled();
   });
 
   test('session logs a device-owned response seq without rejecting the frame', async () => {
@@ -969,17 +1096,62 @@ describe('Protocol V2 framing and session', () => {
     await session.call('FileWrite', {}, { timeoutMs: 456 });
     await session.call('Ping', { message: 'default-timeout' });
 
-    expect(writeContexts).toEqual([
-      { messageName: 'Ping', timeoutMs: 123, highVolume: false, generation: 7 },
-      { messageName: 'FileWrite', timeoutMs: 456, highVolume: true, generation: 7 },
+    const normalizeContext = ({ signal, ...context }) => ({
+      ...context,
+      signalAborted: signal.aborted,
+    });
+    expect(writeContexts.map(normalizeContext)).toEqual([
+      {
+        messageName: 'Ping',
+        timeoutMs: 123,
+        highVolume: false,
+        generation: 7,
+        deliveryAttempt: 0,
+        signalAborted: false,
+      },
+      {
+        messageName: 'FileWrite',
+        timeoutMs: 456,
+        highVolume: true,
+        generation: 7,
+        deliveryAttempt: 0,
+        signalAborted: false,
+      },
       {
         messageName: 'Ping',
         timeoutMs: PROTOCOL_V2_DEFAULT_RESPONSE_TIMEOUT_MS,
         highVolume: false,
         generation: 7,
+        deliveryAttempt: 0,
+        signalAborted: false,
       },
     ]);
-    expect(readContexts).toEqual(writeContexts);
+    expect(readContexts.map(normalizeContext)).toEqual([
+      {
+        messageName: 'Ping',
+        timeoutMs: 123,
+        highVolume: false,
+        generation: 7,
+        deliveryAttempt: 0,
+        signalAborted: false,
+      },
+      {
+        messageName: 'FileWrite',
+        timeoutMs: 456,
+        highVolume: true,
+        generation: 7,
+        deliveryAttempt: 0,
+        signalAborted: false,
+      },
+      {
+        messageName: 'Ping',
+        timeoutMs: PROTOCOL_V2_DEFAULT_DELIVERY_TIMEOUT_MS,
+        highVolume: false,
+        generation: 7,
+        deliveryAttempt: 0,
+        signalAborted: false,
+      },
+    ]);
   });
 
   test('assembler throws and resets on frames with an impossible length field', () => {
@@ -1085,6 +1257,8 @@ describe('Protocol V2 framing and session', () => {
       {
         timeoutMs: 1,
         expectedTypes: ['Success'],
+        deliveryRetryPolicy: 'retry-idempotent',
+        deliveryMaxRetries: 1,
       }
     );
     expect(call).toHaveBeenCalledTimes(1);

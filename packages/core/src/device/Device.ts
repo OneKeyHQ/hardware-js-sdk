@@ -788,37 +788,55 @@ export class Device extends EventEmitter {
       return;
     }
 
-    // Log.debug('initialize param:', options);
-
-    this.passphraseState = options?.passphraseState;
-
-    if (options?.initSession) {
-      this.clearInternalState(options?.deviceId);
-    }
-
-    const internalState = this.getInternalState(options?.deviceId);
-    const payload: any = {};
-    if (internalState) {
-      payload.session_id = internalState;
-    }
-
-    if (options?.deriveCardano) {
-      payload.derive_cardano = true;
-    }
-    payload.passphrase_state = options?.passphraseState;
-    payload.is_contains_attach = true;
-
-    const initStartAt = Date.now();
     try {
-      const { message } = await this.commands.typedCall('Initialize', 'Features', payload, {
-        // iOS BLE bound devices can need close to 20 seconds.
-        timeoutMs: 25 * 1000,
-      });
+      const callInitialize = async (payload: Record<string, unknown>, initSession?: boolean) => {
+        const initStartAt = Date.now();
+        const { message } = await this.commands.typedCall('Initialize', 'Features', payload, {
+          // iOS BLE bound devices can need close to 20 seconds.
+          timeoutMs: 25 * 1000,
+        });
+        this.setLastInitializeDuration(Date.now() - initStartAt);
+        this._updateFeatures(message, initSession);
+        await TransportManager.reconfigure(this.features);
+      };
 
-      const initCostMs = Date.now() - initStartAt;
-      this.setLastInitializeDuration(initCostMs);
-      this._updateFeatures(message, options?.initSession);
-      await TransportManager.reconfigure(this.features);
+      const expectedDeviceId = options?.deviceId;
+      if (expectedDeviceId) {
+        // Establish the live physical identity before sending wallet-bound state.
+        this.passphraseState = undefined;
+        await callInitialize({ is_contains_attach: true });
+        if (!this.checkDeviceId(expectedDeviceId)) {
+          throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError);
+        }
+      }
+
+      this.passphraseState = options?.passphraseState;
+
+      if (options?.initSession) {
+        this.clearInternalState(options?.deviceId);
+      }
+
+      const internalState = this.getInternalState(options?.deviceId);
+      const payload: Record<string, unknown> = {
+        passphrase_state: options?.passphraseState,
+        is_contains_attach: true,
+      };
+      if (internalState) {
+        payload.session_id = internalState;
+      }
+      if (options?.deriveCardano) {
+        payload.derive_cardano = true;
+      }
+
+      const requiresWalletInitialize =
+        !expectedDeviceId ||
+        Boolean(internalState) ||
+        Boolean(options?.passphraseState) ||
+        options?.deriveCardano === true ||
+        options?.initSession === true;
+      if (requiresWalletInitialize) {
+        await callInitialize(payload, options?.initSession);
+      }
     } catch (error) {
       Log.error('Initialization failed:', error);
       throw error;
