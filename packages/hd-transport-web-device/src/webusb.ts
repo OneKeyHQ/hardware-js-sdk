@@ -651,6 +651,17 @@ export default class WebUsbTransport {
     throw lastError;
   }
 
+  private async transferInOnce(path: string, length: number): Promise<DataView> {
+    const device = await this.findDevice(path);
+    if (!device.opened) {
+      throw new Error('USBDevice is not open for transferIn');
+    }
+    const endpoints = this.deviceEndpoints.get(path);
+    const endpointIn = endpoints?.endpointIn ?? this.endpointId;
+    const result = await device.transferIn(endpointIn, length);
+    return this.getTransferInData(result);
+  }
+
   private async resetConnectionAfterProbe(path: string) {
     this.protocolV2Assemblers.get(path)?.reset();
     this.protocolV2Sessions.delete(path);
@@ -884,17 +895,13 @@ export default class WebUsbTransport {
     const deadline = timeoutMs ? Date.now() + timeoutMs : undefined;
 
     while (!frame) {
-      const cancelToken = { cancelled: false };
-      const transferIn = this.transferInWithRetry(path, PROTOCOL_V2_FRAME_MAX_BYTES, cancelToken);
+      const transferIn = this.transferInOnce(path, PROTOCOL_V2_FRAME_MAX_BYTES);
       const dataView = deadline
         ? await this.withProtocolReadTimeout(
             path,
             transferIn,
             Math.max(deadline - Date.now(), 1),
-            'V2',
-            () => {
-              cancelToken.cancelled = true;
-            }
+            'V2'
           )
         : await transferIn;
       const bytes = new Uint8Array(
