@@ -146,6 +146,7 @@ describe('openWalletSession', () => {
       walletType: 'standard',
       deviceId: 'device-1',
       passphraseState: null,
+      sessionId: 'main-wallet-session',
       resumed: false,
     });
     expect(method.payload.useEmptyPassphrase).toBe(true);

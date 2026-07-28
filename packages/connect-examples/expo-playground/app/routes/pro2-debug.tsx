@@ -208,7 +208,7 @@ const PRO2_METHOD_WIRE_INFO: Record<string, MethodWireInfo> = {
       'resume.session_id or select.{host_passphrase|passphrase_on_device|attach_pin_on_device}',
     rx: '60607 (DeviceSession), optionally 60603 (DeviceStatus)',
     rxPayload: PRO2_DYNAMIC_RESPONSE,
-    decoded: 'walletType / deviceId / passphraseState / resumed',
+    decoded: 'walletType / deviceId / passphraseState / optional sessionId / resumed',
   },
   deviceCancel: {
     tx: '20 (Cancel)',
