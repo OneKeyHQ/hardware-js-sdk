@@ -6,11 +6,8 @@ import transport, {
   PROTOCOL_V1_USB_PACKET_SIZE,
   PROTOCOL_V2_CHANNEL_USB,
   PROTOCOL_V2_FRAME_MAX_BYTES,
-  ProtocolV2FrameAssembler,
   ProtocolV2LinkError,
-  ProtocolV2SequenceCursor,
-  ProtocolV2Session,
-  isProtocolV2LinkError,
+  ProtocolV2UsbTransportBase,
   probeProtocolV2 as probeProtocolV2Helper,
 } from '@onekeyfe/hd-transport';
 import {
@@ -28,6 +25,8 @@ import type {
   AcquireInput,
   OneKeyDeviceInfoBase,
   ProtocolType,
+  ProtocolV2CallContext,
+  ProtocolV2Schemas,
   TransportCallOptions,
 } from '@onekeyfe/hd-transport';
 
@@ -68,7 +67,7 @@ interface TransferCancelToken {
   cancelled: boolean;
 }
 
-export default class WebUsbTransport {
+export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> {
   messages: ReturnType<typeof transport.parseConfigure> | undefined;
 
   /** Protobuf schema for Protocol V2 transports. */
@@ -78,15 +77,6 @@ export default class WebUsbTransport {
   private deviceProtocol: Map<string, ProtocolType> = new Map();
 
   private deviceProtocolHints: Map<string, ProtocolType> = new Map();
-
-  /** Per-device Protocol V2 assembler that retains extra frames from one read. */
-  private protocolV2Assemblers: Map<string, ProtocolV2FrameAssembler> = new Map();
-
-  /** Per-device Protocol V2 session that keeps sequence numbers monotonic. */
-  private protocolV2Sessions: Map<string, ProtocolV2Session> = new Map();
-
-  /** Sequence cursors survive ordinary reconnects and cached session rebuilds. */
-  private protocolV2Sequences: Map<string, ProtocolV2SequenceCursor> = new Map();
 
   /** Per-path USB endpoint / interface numbers (discovered from USB descriptors) */
   private deviceEndpoints: Map<string, DeviceEndpoints> = new Map();
@@ -121,6 +111,14 @@ export default class WebUsbTransport {
 
   interfaceId = INTERFACE_ID;
 
+  constructor() {
+    super({
+      router: PROTOCOL_V2_CHANNEL_USB,
+      maxFrameBytes: PROTOCOL_V2_FRAME_MAX_BYTES,
+      logPrefix: 'ProtocolV2 WebUSB',
+    });
+  }
+
   /**
    * Initialize WebUSB transport
    */
@@ -151,7 +149,9 @@ export default class WebUsbTransport {
    */
   configureProtocolV2(signedData: any) {
     this.messagesV2 = parseConfigure(signedData);
-    this.protocolV2Sessions.clear();
+    this.invalidateAllProtocolV2UsbLinks('Protocol V2 schema reconfigured').catch(error =>
+      this.Log?.debug('[WebUsbTransport] schema link cleanup failed:', error)
+    );
   }
 
   /**
@@ -240,6 +240,7 @@ export default class WebUsbTransport {
   async acquire(input: AcquireInput) {
     if (!input.path) return;
     try {
+      await this.rotateProtocolV2UsbGeneration(input.path, 'WebUSB transport acquired');
       await this.closeOpenDevice(input.path);
       await this.connect(input.path ?? '', true);
       const deviceName = this.deviceList.find(device => device.path === input.path)?.device
@@ -447,16 +448,12 @@ export default class WebUsbTransport {
     // Discover endpoints from USB descriptors; descriptors are not used for protocol selection.
     const endpoints = this.discoverEndpoints(device);
     this.deviceEndpoints.set(path, endpoints);
-    this.protocolV2Assemblers.get(path)?.reset();
-    this.protocolV2Assemblers.set(path, new ProtocolV2FrameAssembler(PROTOCOL_V2_FRAME_MAX_BYTES));
-
     await device.claimInterface(endpoints.interfaceNumber);
     await this.clearEndpointHalt(device, 'in', endpoints.endpointIn);
     await this.clearEndpointHalt(device, 'out', endpoints.endpointOut);
   }
 
   private async closeOpenDevice(path: string) {
-    this.protocolV2Assemblers.get(path)?.reset();
     const current = this.deviceList.find(device => device.path === path)?.device;
     if (!current?.opened) return;
 
@@ -663,8 +660,7 @@ export default class WebUsbTransport {
   }
 
   private async resetConnectionAfterProbe(path: string) {
-    this.protocolV2Assemblers.get(path)?.reset();
-    this.protocolV2Sessions.delete(path);
+    await this.rotateProtocolV2UsbGeneration(path, 'WebUSB protocol probe reset');
 
     try {
       const device = await this.findDevice(path);
@@ -747,7 +743,7 @@ export default class WebUsbTransport {
     }
 
     return probeProtocolV2Helper({
-      call: (name, data, options) => this.callProtocolV2(path, name, data, options, false),
+      call: (name, data, options) => this.callProtocolV2(path, name, data, options),
       timeoutMs: PROTOCOL_PROBE_TIMEOUT,
       logger: this.Log,
       logPrefix: 'ProtocolV2 WebUSB',
@@ -829,89 +825,9 @@ export default class WebUsbTransport {
     path: string,
     name: string,
     data: Record<string, unknown>,
-    options?: TransportCallOptions,
-    resetOnError = true
+    options?: TransportCallOptions
   ) {
-    const protocolV1Messages = this.messages;
-    if (!this.messagesV2) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.TransportNotConfigured,
-        'Protocol V2 schema not configured'
-      );
-    }
-    if (!protocolV1Messages) {
-      throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
-    }
-
-    let session = this.protocolV2Sessions.get(path);
-    if (!session) {
-      let sequenceCursor = this.protocolV2Sequences.get(path);
-      if (!sequenceCursor) {
-        sequenceCursor = new ProtocolV2SequenceCursor();
-        this.protocolV2Sequences.set(path, sequenceCursor);
-      }
-      session = new ProtocolV2Session({
-        schemas: {
-          protocolV1: protocolV1Messages,
-          protocolV2: this.messagesV2,
-        },
-        router: PROTOCOL_V2_CHANNEL_USB,
-        sequenceCursor,
-        writeFrame: (frame: Uint8Array) => this.transferOutOnce(path, frame),
-        readFrame: context => this.receiveProtocolV2Frame(path, context.timeoutMs),
-        logger: this.Log,
-        logPrefix: 'ProtocolV2 WebUSB',
-        createTimeoutError: (messageName: string, timeoutMs: number) =>
-          new ProtocolV2LinkError(
-            'response-timeout',
-            `Protocol V2 response timeout after ${timeoutMs}ms for ${messageName}`
-          ),
-      });
-      this.protocolV2Sessions.set(path, session);
-    }
-
-    try {
-      return await session.call(name, data, options);
-    } catch (error) {
-      if (resetOnError && (isProtocolV2LinkError(error) || this.isRetryablePacketIoError(error))) {
-        try {
-          await this.resetConnectionAfterProbe(path);
-        } catch (resetError) {
-          this.Log.debug('[WebUsbTransport] Protocol V2 link reset failed:', resetError);
-        }
-      }
-      throw error;
-    }
-  }
-
-  private async receiveProtocolV2Frame(path: string, timeoutMs?: number): Promise<Uint8Array> {
-    let assembler = this.protocolV2Assemblers.get(path);
-    if (!assembler) {
-      assembler = new ProtocolV2FrameAssembler(PROTOCOL_V2_FRAME_MAX_BYTES);
-      this.protocolV2Assemblers.set(path, assembler);
-    }
-
-    let frame: Uint8Array | undefined = assembler.push(new Uint8Array(0));
-    const deadline = timeoutMs ? Date.now() + timeoutMs : undefined;
-
-    while (!frame) {
-      const transferIn = this.transferInOnce(path, PROTOCOL_V2_FRAME_MAX_BYTES);
-      const dataView = deadline
-        ? await this.withProtocolReadTimeout(
-            path,
-            transferIn,
-            Math.max(deadline - Date.now(), 1),
-            'V2'
-          )
-        : await transferIn;
-      const bytes = new Uint8Array(
-        this.toArrayBuffer(
-          dataView.buffer.slice(dataView.byteOffset, dataView.byteOffset + dataView.byteLength)
-        )
-      );
-      frame = assembler.push(bytes);
-    }
-    return frame;
+    return this.callProtocolV2Usb(path, name, data, options);
   }
 
   /**
@@ -966,17 +882,61 @@ export default class WebUsbTransport {
    * Release device
    */
   async release(path: string) {
-    const device: USBDevice = await this.findDevice(path);
-    const endpoints = this.deviceEndpoints.get(path);
-    const ifaceNum = endpoints?.interfaceNumber ?? this.interfaceId;
-    await device.releaseInterface(ifaceNum);
-    await device.close();
+    await this.invalidateProtocolV2UsbLink(path, 'WebUSB transport released');
+    await this.closeOpenDevice(path);
     this.deviceProtocol.delete(path);
     this.deviceProtocolHints.delete(path);
-    this.protocolV2Assemblers.get(path)?.reset();
-    this.protocolV2Assemblers.delete(path);
-    this.protocolV2Sessions.delete(path);
     this.deviceEndpoints.delete(path);
+  }
+
+  protected getProtocolV2UsbSchemas(): ProtocolV2Schemas {
+    if (!this.messages || !this.messagesV2) {
+      throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
+    }
+    return {
+      protocolV1: this.messages,
+      protocolV2: this.messagesV2,
+    };
+  }
+
+  protected getProtocolV2UsbLogger() {
+    return this.Log;
+  }
+
+  protected async writeProtocolV2UsbPacket(
+    path: string,
+    frame: Uint8Array,
+    _context: ProtocolV2CallContext
+  ): Promise<void> {
+    await this.transferOutOnce(path, frame);
+  }
+
+  protected async readProtocolV2UsbPacket(
+    path: string,
+    _context: ProtocolV2CallContext
+  ): Promise<Uint8Array> {
+    const dataView = await this.transferInOnce(path, PROTOCOL_V2_FRAME_MAX_BYTES);
+    return new Uint8Array(
+      this.toArrayBuffer(
+        dataView.buffer.slice(dataView.byteOffset, dataView.byteOffset + dataView.byteLength)
+      )
+    );
+  }
+
+  protected async resetProtocolV2UsbNativeLink(path: string, _reason: string): Promise<void> {
+    await this.closeOpenDevice(path);
+  }
+
+  protected onProtocolV2UsbLinkInvalidated(path: string, reason: string) {
+    this.deviceProtocol.delete(path);
+    this.Log?.debug(`[WebUsbTransport] Protocol V2 link invalidated: ${path}`, reason);
+  }
+
+  protected createProtocolV2UsbTimeoutError(name: string, timeoutMs: number): Error {
+    return new ProtocolV2LinkError(
+      'response-timeout',
+      `Protocol V2 response timeout after ${timeoutMs}ms for ${name}`
+    );
   }
 
   /**

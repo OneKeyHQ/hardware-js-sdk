@@ -1,4 +1,5 @@
 import { ProtocolV2SequenceCursor } from './sequence-cursor';
+import { ProtocolV2LinkError } from './errors';
 import { ProtocolV2Session, getErrorMessage } from './session';
 
 import type { MessageFromOneKey, TransportCallOptions } from '../../types';
@@ -40,6 +41,10 @@ export class ProtocolV2LinkManager<Key> {
 
   private readonly callQueues = new Map<Key, Promise<unknown>>();
 
+  private readonly generations = new Map<Key, number>();
+
+  private readonly invalidationReasons = new Map<Key, { generation: number; reason: string }>();
+
   private readonly options: ProtocolV2LinkManagerOptions<Key>;
 
   constructor(options: ProtocolV2LinkManagerOptions<Key>) {
@@ -53,7 +58,11 @@ export class ProtocolV2LinkManager<Key> {
     data: Record<string, unknown>,
     options?: TransportCallOptions
   ): Promise<MessageFromOneKey> {
-    const run = () => this.executeCall(key, createAdapter, name, data, options);
+    const generation = this.generations.get(key) ?? 0;
+    const run = () => {
+      this.assertCallGeneration(key, generation);
+      return this.executeCall(key, createAdapter, name, data, options);
+    };
     const previous = this.callQueues.get(key) ?? Promise.resolve();
     const result = previous.then(run, run);
     const queue = result.catch(() => undefined);
@@ -68,6 +77,10 @@ export class ProtocolV2LinkManager<Key> {
   }
 
   async invalidateLink(key: Key, reason: string): Promise<void> {
+    const generation = (this.generations.get(key) ?? 0) + 1;
+    this.generations.set(key, generation);
+    this.invalidationReasons.set(key, { generation, reason });
+
     const link = this.links.get(key);
     if (!link) return;
 
@@ -78,7 +91,8 @@ export class ProtocolV2LinkManager<Key> {
   }
 
   async invalidateAllLinks(reason: string): Promise<void> {
-    await Promise.all(Array.from(this.links.keys(), key => this.invalidateLink(key, reason)));
+    const keys = new Set([...this.links.keys(), ...this.callQueues.keys()]);
+    await Promise.all(Array.from(keys, key => this.invalidateLink(key, reason)));
   }
 
   async dispose(reason: string): Promise<void> {
@@ -156,5 +170,17 @@ export class ProtocolV2LinkManager<Key> {
     if (this.callQueues.get(key) === queue) {
       this.callQueues.delete(key);
     }
+  }
+
+  private assertCallGeneration(key: Key, generation: number) {
+    const currentGeneration = this.generations.get(key) ?? 0;
+    if (currentGeneration === generation) return;
+
+    const invalidation = this.invalidationReasons.get(key);
+    const reason =
+      invalidation?.generation === currentGeneration
+        ? invalidation.reason
+        : 'Protocol V2 link generation changed';
+    throw new ProtocolV2LinkError('generation', reason);
   }
 }
