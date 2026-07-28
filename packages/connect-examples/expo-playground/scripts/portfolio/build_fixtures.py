@@ -1,0 +1,318 @@
+#!/usr/bin/env python3
+"""Build signed Pro2 Portfolio fixtures with firmware-pro2's canonical packer."""
+
+from __future__ import annotations
+
+import argparse
+import copy
+import json
+import subprocess
+import tempfile
+from pathlib import Path
+from typing import Any
+
+
+PLAYGROUND_ROOT = Path(__file__).resolve().parents[2]
+REPOSITORY_ROOT = PLAYGROUND_ROOT.parents[2]
+DEFAULT_FIRMWARE_ROOT = REPOSITORY_ROOT.parent / "firmware-pro2"
+DEFAULT_OUTPUT = PLAYGROUND_ROOT / "public" / "portfolio-cases"
+TIMESTAMP_MS = 1785200000000
+
+
+def token(
+    symbol: str,
+    name: str,
+    balance: str,
+    fiat: str,
+    percentage: float,
+    color: int,
+    network_id: str,
+    *,
+    is_native: bool,
+    is_all_networks: bool = False,
+    contract_address: str = "",
+    icon_name: str | None = None,
+) -> dict[str, Any]:
+    return {
+        "symbol": symbol,
+        "name": name,
+        "contractAddress": contract_address,
+        "iconName": icon_name or symbol,
+        "color": color,
+        "isNative": is_native,
+        "isAllNetworks": is_all_networks,
+        "balance": balance,
+        "fiatValue": fiat,
+        "portfolioPercentage": percentage,
+        "networkId": network_id,
+    }
+
+
+def token_set(
+    balances: list[str], fiats: list[str], percentages: list[float]
+) -> list[dict[str, Any]]:
+    definitions = [
+        ("BTC", "Bitcoin", 0xF7931A, "btc--0", True, False),
+        ("ETH", "Ethereum", 0x8C8CFF, "evm--1", True, False),
+        ("SOL", "Solana", 0x14F195, "sol--101", True, False),
+        ("USDC", "USD Coin", 0x2775CA, "", False, True),
+        ("USDT", "Tether USD", 0x26A17B, "", False, True),
+    ]
+    return [
+        token(
+            symbol,
+            name,
+            balances[index],
+            fiats[index],
+            percentages[index],
+            color,
+            network_id,
+            is_native=is_native,
+            is_all_networks=is_all_networks,
+        )
+        for index, (symbol, name, color, network_id, is_native, is_all_networks) in enumerate(
+            definitions
+        )
+    ]
+
+
+def payload(
+    label: str,
+    total: str,
+    tokens: list[dict[str, Any]],
+    other_count: int,
+    other_fiat: str,
+    other_percentage: float,
+) -> dict[str, Any]:
+    return {
+        "v": 1,
+        "ts": TIMESTAMP_MS,
+        "account": {"label": label, "addressMasked": "0x12...ab"},
+        "totalFiat": total,
+        "tokenCount": len(tokens),
+        "tokens": tokens,
+        "otherTokens": {
+            "count": other_count,
+            "fiat": other_fiat,
+            "portfolioPercentage": other_percentage,
+        },
+    }
+
+
+def glyph_payload(label: str, values: list[str]) -> dict[str, Any]:
+    tokens = token_set(["999.9Q"] * 5, values[1:6], [15] * 5)
+    return payload(label, values[0], tokens, 7, values[6], 25)
+
+
+def case(
+    case_id: str,
+    title: str,
+    description: str,
+    expected: str,
+    value: dict[str, Any],
+) -> dict[str, Any]:
+    result = {
+        "id": case_id,
+        "title": title,
+        "description": description,
+        "expected": expected,
+        "payload": value,
+    }
+    if expected != "client-block":
+        result["package"] = f"{case_id}.okpkg"
+    if expected == "reject":
+        result["expectedError"] = "Invalid portfolio package"
+    if expected == "client-block":
+        result["expectedError"] = "金额字符串超过 7 位有效数字"
+    return result
+
+
+def build_cases(sample_path: Path) -> list[dict[str, Any]]:
+    baseline = json.loads(sample_path.read_text(encoding="utf-8"))
+    baseline["ts"] = TIMESTAMP_MS
+    baseline["account"]["label"] = "P00 Transport baseline"
+
+    zero = payload("P01 Zero assets", "$0.00", [], 0, "$0.00", 0)
+    small = payload(
+        "P02 Small and subscript",
+        "$2.01K",
+        token_set(
+            ["0", "0.1235", "0.01235", "0.001235", "0.0₄7276"],
+            ["$0.00", "< $0.01", "$12.35", "$999.99", "$1.00K"],
+            [0, 10, 20, 30, 40],
+        ),
+        0,
+        "$0.00",
+        0,
+    )
+    units = payload(
+        "P03 Units and caps",
+        "> $999.99Q",
+        token_set(
+            ["999.9", "1K", "123.5K", "1M", ">999.9Q"],
+            ["$999.99", "$1.00K", "$123.46K", "$123.46M", "> $999.99Q"],
+            [5, 10, 20, 25, 30],
+        ),
+        99,
+        "$10.00K",
+        10,
+    )
+    glyph_a = glyph_payload(
+        "P04 Glyph A",
+        ["€999.99Q", "₩999.99Q", "₹999.99Q", "₽999.99Q", "₺999.99Q", "₫999.99Q", "฿999.99Q"],
+    )
+    glyph_b = glyph_payload(
+        "P05 Glyph B",
+        ["₱999.99Q", "₦999.99Q", "₴999.99Q", "₪999.99Q", "₿999.99Q", "₸999.99Q", "₡999.99Q"],
+    )
+    glyph_c = glyph_payload(
+        "P06 Glyph C",
+        ["₲999.99Q", "₵999.99Q", "₭999.99Q", "₮999.99Q", "₼999.99Q", "₾999.99Q", "₨999.99Q"],
+    )
+    glyph_d = glyph_payload(
+        "P07 Glyph D and ISO",
+        ["৳999.99Q", "៛999.99Q", "؋999.99Q", "XYZ 999.99Q", "$999.99Q", "£999.99Q", "¥999.99Q"],
+    )
+    ordered = payload(
+        "P08 Order color other",
+        "$100.00K",
+        token_set(
+            ["1", "2", "3", "4", "5"],
+            ["$1.00", "$90.00K", "$5.00K", "$3.00K", "$1.00K"],
+            [1, 50, 10, 20, 18],
+        ),
+        65535,
+        "$1.00K",
+        1,
+    )
+    parser_max = payload("P09 Parser max 47 bytes", "A" * 47, [], 0, "$0.00", 0)
+    guard = payload(
+        "P10 Negative guard",
+        "$1.00K",
+        [token("BTC", "Bitcoin", "1K", "$1.00K", 100, 0xF7931A, "btc--0", is_native=True)],
+        0,
+        "$0.00",
+        0,
+    )
+
+    too_long = copy.deepcopy(guard)
+    too_long["account"]["label"] = "N01 48-byte amount"
+    too_long["totalFiat"] = "A" * 48
+
+    mismatch = copy.deepcopy(small)
+    mismatch["account"]["label"] = "N02 tokenCount mismatch"
+    mismatch["tokenCount"] = 4
+
+    six_tokens = copy.deepcopy(small)
+    six_tokens["account"]["label"] = "N03 six tokens"
+    six_tokens["tokens"].append(
+        token("XRP", "XRP", "1", "$1.00", 0, 0x23292F, "xrp--0", is_native=True)
+    )
+    six_tokens["tokenCount"] = 6
+
+    extra_field = copy.deepcopy(guard)
+    extra_field["account"]["label"] = "N04 extra root field"
+    extra_field["currency"] = "usd"
+
+    bad_percentage = copy.deepcopy(guard)
+    bad_percentage["account"]["label"] = "N05 percentage overflow"
+    bad_percentage["tokens"][0]["portfolioPercentage"] = 100.01
+
+    bad_network = copy.deepcopy(guard)
+    bad_network["account"]["label"] = "N06 empty network"
+    bad_network["tokens"][0]["networkId"] = ""
+
+    bad_color = copy.deepcopy(guard)
+    bad_color["account"]["label"] = "N07 color overflow"
+    bad_color["tokens"][0]["color"] = 0x1000000
+
+    eight_digits = copy.deepcopy(guard)
+    eight_digits["account"]["label"] = "L01 significant digit guard"
+    eight_digits["totalFiat"] = "$123,456.78"
+
+    return [
+        case("P00", "完整传输基线", "验证完整 5 Token v1 数据、签名包、分块写入与 PortfolioUpdate 全链路。", "accept", baseline),
+        case("P01", "零资产同步", "验证 tokenCount=0、空 tokens 和全零 Other 仍是合法同步数据。", "accept", zero),
+        case("P02", "小额与下标", "覆盖零值、< $0.01、普通小数及 Unicode 下标小数 0.0₄7276。", "accept", small),
+        case("P03", "单位进位与上限", "覆盖 K/M/Q 进位、四位 Token 精度、两位 Fiat 精度和 >999.99Q 封顶。", "accept", units),
+        case("P04", "币种字形 A", "覆盖 €、₩、₹、₽、₺、₫、฿ 的金额字符串传输。", "accept", glyph_a),
+        case("P05", "币种字形 B", "覆盖 ₱、₦、₴、₪、₿、₸、₡ 的金额字符串传输。", "accept", glyph_b),
+        case("P06", "币种字形 C", "覆盖 ₲、₵、₭、₮、₼、₾、₨ 的金额字符串传输。", "accept", glyph_c),
+        case("P07", "币种字形与 ISO 降级", "覆盖 ৳、៛、؋、常用符号，以及不支持字符降级后的 XYZ 前缀。", "accept", glyph_d),
+        case("P08", "顺序、颜色与 Other", "验证 Token 数组顺序、RGB888 颜色、百分比和 Other 最大 count=65535。", "accept", ordered),
+        case("P09", "47 字节边界", "验证金额字段恰好 47 个 UTF-8 字节时仍被固件接受。", "accept", parser_max),
+        case("P10", "反向测试保护基线", "在非法用例前写入一份有效数据，用于确认后续拒绝不会破坏已安装 Portfolio。", "accept", guard),
+        case("N01", "48 字节金额", "金额字段超过固件 47 字节上限，预期返回 Invalid portfolio package。", "reject", too_long),
+        case("N02", "Token 数量不一致", "tokenCount 与 tokens.length 不一致，预期固件拒绝。", "reject", mismatch),
+        case("N03", "超过 5 个 Token", "发送 6 个详情 Token，验证固件的 5 项上限。", "reject", six_tokens),
+        case("N04", "根对象额外字段", "增加已移除的 currency 字段，验证 v1 精确对象结构。", "reject", extra_field),
+        case("N05", "百分比越界", "portfolioPercentage=100.01，验证 0..100 范围。", "reject", bad_percentage),
+        case("N06", "非聚合 Token 缺少网络", "isAllNetworks=false 且 networkId 为空，预期固件拒绝。", "reject", bad_network),
+        case("N07", "颜色越界", "color=0x1000000 超出 RGB888 范围，预期固件拒绝。", "reject", bad_color),
+        case("L01", "8 位有效数字客户端拦截", "金额包含 8 位 ASCII 有效数字；必须在上传前拦截，绝不传给硬件。", "client-block", eight_digits),
+        case("P11", "最终有效数据恢复", "所有反向用例结束后恢复有效 Portfolio，避免设备停留在测试保护数据之外。", "accept", guard),
+    ]
+
+
+def build_package(firmware_root: Path, json_path: Path, output_path: Path) -> None:
+    package_dir = firmware_root / "utils" / "payload_package"
+    cli = package_dir / "payload_package.py"
+    config = firmware_root / "utils" / "onekey_protocol_cli" / "portfolio.dev-package.json"
+    python = firmware_root / ".venv" / "bin" / "python"
+    command = [str(python), str(cli), "pack", "--config", str(config)]
+    for slot in range(1, 5):
+        command.extend([f"--sk-{slot}", str(package_dir / "keys" / f"sk_ed25519_dev_{slot}.bin")])
+    command.extend(
+        ["--input", str(json_path), "--entry-name", "portfolio.json", "--output", str(output_path)]
+    )
+    subprocess.run(command, cwd=firmware_root, check=True)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--firmware-repo", type=Path, default=DEFAULT_FIRMWARE_ROOT)
+    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    args = parser.parse_args()
+
+    firmware_root = args.firmware_repo.resolve()
+    output = args.output.resolve()
+    sample = firmware_root / "utils" / "onekey_protocol_cli" / "portfolio.sample.json"
+    if not sample.is_file():
+        parser.error(f"firmware-pro2 Portfolio sample not found: {sample}")
+
+    firmware_commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=firmware_root, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    cases = build_cases(sample)
+    output.mkdir(parents=True, exist_ok=True)
+
+    for stale in output.glob("*.okpkg"):
+        stale.unlink()
+
+    with tempfile.TemporaryDirectory(prefix="portfolio-fixtures-") as temp_dir:
+        temp_root = Path(temp_dir)
+        for item in cases:
+            package_name = item.get("package")
+            if not package_name:
+                continue
+            json_path = temp_root / f"{item['id']}.json"
+            json_path.write_text(
+                json.dumps(item["payload"], ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+            )
+            build_package(firmware_root, json_path, output / package_name)
+
+    manifest = {
+        "version": 1,
+        "firmwareCommit": firmware_commit,
+        "intervalMs": 15000,
+        "cases": cases,
+    }
+    (output / "manifest.json").write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+    print(f"Built {sum('package' in item for item in cases)} packages and {len(cases)} cases in {output}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
