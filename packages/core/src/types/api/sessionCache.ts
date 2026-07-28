@@ -1,9 +1,14 @@
 import type { Response } from '../params';
 
-export type ClearSessionCacheParams = {
-  deviceId?: string;
-  passphraseState?: string;
-};
+export type ClearSessionCacheParams =
+  | {
+      deviceId?: never;
+      passphraseState?: never;
+    }
+  | {
+      deviceId: string;
+      passphraseState?: string;
+    };
 
 export type ClearSessionCachePayload = {
   cleared: true;

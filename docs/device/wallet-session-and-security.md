@@ -53,7 +53,11 @@
 - 旧参数形式的 `initSession=true` 只使当前设备上明确指定的旧钱包 Session 失效；
   钱包标识不匹配、设备切换和显式 `clearSessionCache()` 也会按各自范围使缓存失效。
 - 调用方提供预期 `passphraseState` 时，设备返回的钱包标识必须一致，否则 SDK 清缓存并抛出钱包状态校验错误。
-- `clearSessionCache()` 只清理 SDK 内存状态，不向 Pro1 或 Pro2 发送关闭 Session 命令。
+- Protocol V1 调用携带 `deviceId` 时，Core 先用不含 `session_id/passphrase_state` 的
+  `Initialize` 校验实时身份；一致后才允许复用钱包 Session，避免把旧身份的 Session 发给当前硬件。
+- Pro2 解锁后以刷新后的 `passphraseProtection` 判定钱包类型，不使用解锁前快照。
+- `clearSessionCache()` 只清理 SDK 内存状态，不向 Pro1 或 Pro2 发送关闭 Session 命令；
+  单独提供 `passphraseState` 属于参数错误，不会清理全局缓存。
 - 当前没有独立的“查询设备当前打开哪个钱包”需求；`getDeviceState()` 只用于查询
   Passphrase/Attach PIN 功能与运行状态。App 以 `openWalletSession()` 的返回值作为本次
   钱包身份事实，不直接调用未公开的低层 `DeviceSessionOpen`，也不在页面渲染时重复打开钱包。
@@ -686,8 +690,10 @@ App 在“打开钱包”阶段读取并缓存 protocol
 
 ```text
 App 调 evmGetAddress({ passphraseState })
-  -> Device.initialize({ passphraseState })
+  -> Device.initialize({ deviceId, passphraseState })
+  -> V1 先用无钱包绑定字段的 Initialize 校验实时 deviceId
   -> getInternalState() 命中 deviceId@passphraseState
+  -> V1 身份一致后才通过第二次 Initialize 透传 session_id/passphrase_state
   -> Pro2 后续安全检查使用 DeviceSessionOpen({ resume: { session_id } })
   -> core 再 checkPassphraseStateSafety()
   -> method.run()
@@ -772,6 +778,7 @@ Protocol V2 的响应当前主要按类型匹配。如果同一 session 上两�
    `openWalletSession()` 在 V1 映射到旧 Passphrase 交互，在 Pro2 映射到
    `DeviceSessionOpen(select/resume)` 钱包流程。
 4. 业务方法如设置、固件、文件、设备状态类通常会设置 `useDevicePassphraseState=false`，避免无意义触发 passphrase 校验。
+5. 钱包业务方法只要接收 `deviceId`，就必须启用实时设备身份检查；Protocol V1 在身份确认前不得透传缓存 Session。
 
 ## 15. 关键源码索引
 

@@ -6,7 +6,10 @@ import transportPackage, {
 } from '@onekeyfe/hd-transport';
 import { HardwareErrorCode } from '@onekeyfe/hd-shared';
 
-import ReactNativeBleTransport from '../index';
+import ReactNativeBleTransport, {
+  configureProtocolV2BleTuning,
+  resetProtocolV2BleTuning,
+} from '../index';
 
 jest.mock(
   'react-native',
@@ -168,6 +171,10 @@ const createHarness = () => {
 };
 
 describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
+  afterEach(() => {
+    resetProtocolV2BleTuning();
+  });
+
   test('keeps the Protocol V2 sequence across probe and the next call', async () => {
     const { transport, uuid, sentSeqs } = createHarness();
 
@@ -241,5 +248,65 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     const rejection = expect(call).rejects.toThrow('React Native BLE transport disconnected');
     await transport.disconnect(uuid);
     await rejection;
+  });
+
+  test('chunks large frames and retries only transient GATT congestion', async () => {
+    const transport = new ReactNativeBleTransport({ scanTimeout: 1 }) as any;
+    const congested = { status: 143, message: 'GATT_CONGESTED' };
+    const writeWithoutResponse = jest
+      .fn()
+      .mockRejectedValueOnce(congested)
+      .mockResolvedValue(undefined);
+    const bleTransport = {
+      mtuSize: 23,
+      writeCharacteristic: { writeWithoutResponse },
+    };
+    const context = {
+      messageName: 'Ping',
+      timeoutMs: 1000,
+      highVolume: false,
+      generation: 1,
+      signal: new AbortController().signal,
+      deliveryAttempt: 0,
+    };
+    const assertCurrentGeneration = jest.fn();
+    configureProtocolV2BleTuning({ iosPacketLength: 20 });
+
+    await transport.writeProtocolV2Frame(
+      bleTransport,
+      new Uint8Array(30),
+      context,
+      assertCurrentGeneration
+    );
+
+    expect(writeWithoutResponse).toHaveBeenCalledTimes(3);
+    expect(writeWithoutResponse.mock.calls[0][0]).toBe(writeWithoutResponse.mock.calls[1][0]);
+    expect(Buffer.from(writeWithoutResponse.mock.calls[2][0], 'base64')).toHaveLength(10);
+    expect(assertCurrentGeneration).toHaveBeenCalled();
+  });
+
+  test('does not retry a disconnected Protocol V2 write inside a partial frame', async () => {
+    const transport = new ReactNativeBleTransport({ scanTimeout: 1 }) as any;
+    const writeWithoutResponse = jest
+      .fn()
+      .mockRejectedValue({ errorCode: 205, message: 'Device disconnected' });
+    const bleTransport = {
+      mtuSize: 23,
+      writeCharacteristic: { writeWithoutResponse },
+    };
+    const context = {
+      messageName: 'FileWrite',
+      timeoutMs: 1000,
+      highVolume: true,
+      generation: 1,
+      signal: new AbortController().signal,
+      deliveryAttempt: 0,
+    };
+    configureProtocolV2BleTuning({ iosPacketLength: 20 });
+
+    await expect(
+      transport.writeProtocolV2Frame(bleTransport, new Uint8Array(30), context, jest.fn())
+    ).rejects.toMatchObject({ errorCode: 205 });
+    expect(writeWithoutResponse).toHaveBeenCalledTimes(1);
   });
 });

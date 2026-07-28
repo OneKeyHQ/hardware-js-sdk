@@ -7,6 +7,8 @@ import { formatAnyHex } from '../helpers/hexUtils';
 import type { ConfluxSignMessageCIP23 as HardwareConfluxSignMessageCIP23 } from '@onekeyfe/hd-transport';
 
 export default class ConfluxSignMessageCIP23 extends BaseMethod<HardwareConfluxSignMessageCIP23> {
+  checkDeviceId = true;
+
   init() {
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
     this.allowUsePreInitialize = true;

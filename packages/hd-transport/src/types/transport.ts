@@ -49,6 +49,13 @@ export type MessageFromOneKey = { type: string; message: Record<string, any> };
 
 export type TransportCallOptions = {
   timeoutMs?: number;
+  deliveryTimeoutMs?: number;
+  /**
+   * Replay the exact frame only when the caller explicitly declares the request idempotent.
+   * Side-effecting calls must leave this unset.
+   */
+  deliveryRetryPolicy?: 'retry-idempotent';
+  deliveryMaxRetries?: number;
   expectedTypes?: string[];
   intermediateTypes?: string[];
   onIntermediateResponse?: (response: MessageFromOneKey) => void;
