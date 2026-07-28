@@ -9,7 +9,6 @@ import {
 } from '@onekeyfe/hd-transport';
 
 import TransportManager from '../data-manager/TransportManager';
-import DataManager from '../data-manager/DataManager';
 import { LoggerNames, getLogger, patchFeatures } from '../utils';
 import { DEVICE, type PassphraseRequestPayload } from '../events';
 import { DeviceModelToTypes } from '../types';
@@ -39,10 +38,6 @@ type TypedCallResponseMap = {
 };
 export type DefaultMessageResponse = TypedCallResponseMap[MessageKey];
 
-const MAX_DEBUG_ARRAY_ITEMS = 20;
-const MAX_DEBUG_OBJECT_KEYS = 40;
-const MAX_DEBUG_STRING_LENGTH = 512;
-const MAX_DEBUG_DEPTH = 4;
 const HIGH_VOLUME_DEBUG_CALLS = new Set([
   'FilesystemFileRead',
   'FilesystemFileWrite',
@@ -53,7 +48,6 @@ const HIGH_VOLUME_DEBUG_CALLS = new Set([
   'FirmwareUpload',
   'ResourceAck',
 ]);
-const SENSITIVE_DEBUG_CALLS = new Set(['DeviceSessionGet']);
 const DEVICE_SESSION_CALLS = new Set([
   'DeviceSessionGet',
   'DeviceSessionAskPin',
@@ -62,100 +56,6 @@ const DEVICE_SESSION_CALLS = new Set([
 
 function shouldReduceDebugForCall(type: string) {
   return HIGH_VOLUME_DEBUG_CALLS.has(type);
-}
-
-function shouldBlockDebugForCall(type: string) {
-  return SENSITIVE_DEBUG_CALLS.has(type);
-}
-
-function getBinaryByteLength(value: unknown): number | undefined {
-  if (value instanceof ArrayBuffer) {
-    return value.byteLength;
-  }
-
-  if (ArrayBuffer.isView(value)) {
-    return value.byteLength;
-  }
-
-  if (typeof Blob !== 'undefined' && value instanceof Blob) {
-    return value.size;
-  }
-
-  return undefined;
-}
-
-function summarizeRedactedData(value: unknown): string {
-  const byteLength = getBinaryByteLength(value);
-  if (byteLength !== undefined) {
-    return `[redacted data: ${byteLength} bytes]`;
-  }
-
-  if (typeof value === 'string') {
-    return `[redacted data: string length=${value.length}]`;
-  }
-
-  if (Array.isArray(value)) {
-    return `[redacted data: array length=${value.length}]`;
-  }
-
-  if (value && typeof value === 'object') {
-    return `[redacted data: object keys=${Object.keys(value).length}]`;
-  }
-
-  return `[redacted data: ${typeof value}]`;
-}
-
-function sanitizeDebugPayload(value: unknown, key = '', depth = 0): unknown {
-  if (key === 'data' && value !== null && value !== undefined) {
-    return summarizeRedactedData(value);
-  }
-
-  // Redact passphrase-bearing keys as defense in depth so wallet identifiers and
-  // host passphrases cannot reach diagnostic logs through a future call path.
-  if (key && /passphrase/i.test(key)) {
-    return '[redacted passphrase]';
-  }
-
-  const byteLength = getBinaryByteLength(value);
-  if (byteLength !== undefined) {
-    return `[binary: ${byteLength} bytes]`;
-  }
-
-  if (typeof value === 'string') {
-    return value.length > MAX_DEBUG_STRING_LENGTH
-      ? `${value.slice(0, MAX_DEBUG_STRING_LENGTH)}... (len=${value.length})`
-      : value;
-  }
-
-  if (!value || typeof value !== 'object') {
-    return value;
-  }
-
-  if (depth >= MAX_DEBUG_DEPTH) {
-    return Array.isArray(value)
-      ? `[array length=${value.length}]`
-      : `[object keys=${Object.keys(value).length}]`;
-  }
-
-  if (Array.isArray(value)) {
-    const items = value
-      .slice(0, MAX_DEBUG_ARRAY_ITEMS)
-      .map(item => sanitizeDebugPayload(item, key, depth + 1));
-    if (value.length > MAX_DEBUG_ARRAY_ITEMS) {
-      items.push(`... (${value.length - MAX_DEBUG_ARRAY_ITEMS} more)`);
-    }
-    return items;
-  }
-
-  const entries = Object.entries(value).slice(0, MAX_DEBUG_OBJECT_KEYS);
-  const sanitized: Record<string, unknown> = {};
-  entries.forEach(([entryKey, entryValue]) => {
-    sanitized[entryKey] = sanitizeDebugPayload(entryValue, entryKey, depth + 1);
-  });
-  if (Object.keys(value).length > MAX_DEBUG_OBJECT_KEYS) {
-    sanitized.__truncated__ = `${Object.keys(value).length - MAX_DEBUG_OBJECT_KEYS} more keys`;
-  }
-  return sanitized;
 }
 
 /**
@@ -382,14 +282,15 @@ export class DeviceCommands {
       const promise = this.transport.call(this.mainId, type, msg ?? {}, options) as any;
       this.callPromise = promise;
       const res = await promise;
-      if (res.type === 'Failure') {
-        LogCore.debug('[DeviceCommands] [call] Received', res.type, res.message);
-      } else if (!shouldReduceDebug) {
+      if (!shouldReduceDebug) {
         LogCore.debug('[DeviceCommands] [call] Received', res.type);
       }
       return res;
     } catch (error) {
-      LogCore.debug('[DeviceCommands] [call] Received error', error);
+      LogCore.debug('[DeviceCommands] [call] Received error', {
+        request: type,
+        errorCode: error?.errorCode,
+      });
       if (error.errorCode === HardwareErrorCode.BleDeviceBondError) {
         return {
           type: 'BleDeviceBondError',
@@ -410,9 +311,6 @@ export class DeviceCommands {
         }
       }
 
-      if (responseData) {
-        Log.debug('error response', responseData);
-      }
       if (responseError === 'device disconnected during action') {
         return { type: 'BridgeDeviceDisconnected', message: { error: responseError } } as any;
       }
@@ -457,32 +355,6 @@ export class DeviceCommands {
       );
     }
 
-    // Structured log of actual outgoing payloads (skip acks)
-    try {
-      const skipTypes: MessageKey[] = [
-        'ButtonAck',
-        'PinMatrixAck',
-        'PassphraseAck',
-        'Cancel',
-        'DeviceSessionGet',
-        'BixinPinInputOnDevice',
-        'FilesystemFileRead',
-        'FilesystemFileWrite',
-        'FileRead',
-        'FileWrite',
-        'EmmcFileRead',
-        'EmmcFileWrite',
-        'FirmwareUpload',
-        'ResourceAck',
-      ] as any;
-      if (!skipTypes.includes(type) && !shouldBlockDebugForCall(type) && msg) {
-        // Use debug channel to avoid noise escalation
-        Log.debug('[DeviceCommands] [typedCall] Sending payload', type, sanitizeDebugPayload(msg));
-      }
-    } catch (e) {
-      // ignore logging errors
-    }
-
     const expectedTypes = Array.isArray(resType) ? resType : resType.split('|');
     const response = await this._commonCall(type, msg, {
       ...options,
@@ -500,14 +372,11 @@ export class DeviceCommands {
       // throw bridge network error
       if (error instanceof HardwareError) {
         if (error.errorCode === HardwareErrorCode.ResponseUnexpectTypeError) {
-          if (!shouldBlockDebugForCall(type)) {
-            Log.debug('[DeviceCommands] [typedCall] Unexpected response type', {
-              request: type,
-              expected: resType,
-              received: response.type,
-              response: sanitizeDebugPayload(response.message),
-            });
-          }
+          Log.debug('[DeviceCommands] [typedCall] Unexpected response type', {
+            request: type,
+            expected: resType,
+            received: response.type,
+          });
           // Do not intercept CallMethodError
           // Do not intercept “assertType: Response of unexpected type” error
           // Blocking the above two messages will not know what the specific error message is, and the specific error should be handled by the subsequent business logic.
@@ -546,12 +415,11 @@ export class DeviceCommands {
     options?: TransportCallOptions
   ): Promise<DefaultMessageResponse> {
     try {
-      if (shouldReduceDebugForCall(callType) || shouldBlockDebugForCall(callType)) {
-        // Skip high-volume or security-sensitive response payloads.
-      } else if (DataManager.getSettings('env') === 'react-native') {
-        Log.debug('_filterCommonTypes: ', JSON.stringify(sanitizeDebugPayload(res)));
-      } else {
-        Log.debug('_filterCommonTypes: ', sanitizeDebugPayload(res));
+      if (!shouldReduceDebugForCall(callType)) {
+        Log.debug('_filterCommonTypes: ', {
+          request: callType,
+          response: res.type,
+        });
       }
     } catch (error) {
       // ignore
