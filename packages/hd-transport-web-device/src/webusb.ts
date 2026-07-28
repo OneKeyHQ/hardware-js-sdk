@@ -87,9 +87,6 @@ export default class WebUsbTransport {
   /** Sequence cursors survive ordinary reconnects and cached session rebuilds. */
   private protocolV2Sequences: Map<string, ProtocolV2SequenceCursor> = new Map();
 
-  /** Read timeout for the current Protocol V2 call, consumed by cached readFrame. */
-  private protocolV2ReadTimeouts: Map<string, number | undefined> = new Map();
-
   /** Per-path USB endpoint / interface numbers (discovered from USB descriptors) */
   private deviceEndpoints: Map<string, DeviceEndpoints> = new Map();
 
@@ -154,7 +151,6 @@ export default class WebUsbTransport {
   configureProtocolV2(signedData: any) {
     this.messagesV2 = parseConfigure(signedData);
     this.protocolV2Sessions.clear();
-    this.protocolV2ReadTimeouts.clear();
   }
 
   /**
@@ -638,7 +634,6 @@ export default class WebUsbTransport {
   private async resetConnectionAfterProbe(path: string) {
     this.protocolV2Assemblers.get(path)?.reset();
     this.protocolV2Sessions.delete(path);
-    this.protocolV2ReadTimeouts.delete(path);
 
     try {
       const device = await this.findDevice(path);
@@ -831,7 +826,7 @@ export default class WebUsbTransport {
         router: PROTOCOL_V2_CHANNEL_USB,
         sequenceCursor,
         writeFrame: (frame: Uint8Array) => this.transferOutOnce(path, frame),
-        readFrame: () => this.receiveProtocolV2Frame(path, this.protocolV2ReadTimeouts.get(path)),
+        readFrame: context => this.receiveProtocolV2Frame(path, context.timeoutMs),
         logger: this.Log,
         logPrefix: 'ProtocolV2 WebUSB',
         createTimeoutError: (messageName: string, timeoutMs: number) =>
@@ -843,7 +838,6 @@ export default class WebUsbTransport {
       this.protocolV2Sessions.set(path, session);
     }
 
-    this.protocolV2ReadTimeouts.set(path, options?.timeoutMs);
     try {
       return await session.call(name, data, options);
     } catch (error) {
@@ -855,8 +849,6 @@ export default class WebUsbTransport {
         }
       }
       throw error;
-    } finally {
-      this.protocolV2ReadTimeouts.delete(path);
     }
   }
 
@@ -956,7 +948,6 @@ export default class WebUsbTransport {
     this.protocolV2Assemblers.get(path)?.reset();
     this.protocolV2Assemblers.delete(path);
     this.protocolV2Sessions.delete(path);
-    this.protocolV2ReadTimeouts.delete(path);
     this.deviceEndpoints.delete(path);
   }
 

@@ -697,6 +697,12 @@ describe('openWalletSession', () => {
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionOpen', 'DeviceSession', {
       resume: { session_id: 'known-session' },
     });
+    const sessionOpenCall = typedCall.mock.calls.findIndex(
+      ([requestName]) => requestName === 'DeviceSessionOpen'
+    );
+    expect(device.getDeviceState.mock.invocationCallOrder[1]).toBeLessThan(
+      typedCall.mock.invocationCallOrder[sessionOpenCall]
+    );
   });
 
   test('rejects a Protocol V2 resume when the refreshed deviceId does not match', async () => {
@@ -738,7 +744,8 @@ describe('openWalletSession', () => {
     await expect(method.run()).rejects.toMatchObject({
       errorCode: HardwareErrorCode.DeviceCheckDeviceIdError,
     });
-    expect(device.clearInternalState).toHaveBeenCalled();
+    expect(typedCall).not.toHaveBeenCalled();
+    expect(device.clearInternalState).not.toHaveBeenCalled();
     expect(deviceWalletSessionStore.get('device-1', 'hidden-state')).toBeUndefined();
   });
 
