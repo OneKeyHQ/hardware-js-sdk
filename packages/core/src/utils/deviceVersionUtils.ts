@@ -12,7 +12,7 @@ import type { DeviceFeaturesInput } from './deviceFeaturesCompat';
 
 const EMPTY_VERSION: IVersionArray = [0, 0, 0];
 
-const parseDeviceVersion = (version?: string | null): IVersionArray => {
+export const parseDeviceVersion = (version?: string | null): IVersionArray => {
   const parsed = version ? semver.parse(version) : null;
   return parsed ? [parsed.major, parsed.minor, parsed.patch] : [...EMPTY_VERSION];
 };

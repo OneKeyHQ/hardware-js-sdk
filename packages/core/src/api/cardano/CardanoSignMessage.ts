@@ -7,6 +7,10 @@ import { validatePath } from '../helpers/pathUtils';
 import type { CardanoSignMessageParams } from '../../types/api/cardanoSignMessage';
 
 export default class CardanoSignMessage extends BaseMethod<CardanoSignMessageParams> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle?: boolean;
 
   isCheck?: boolean;

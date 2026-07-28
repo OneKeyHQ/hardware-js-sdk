@@ -35,10 +35,6 @@ export default class EVMSignMessageEIP712 extends BaseMethod<EthereumSignMessage
 
   getVersionRange(): DeviceFirmwareRange {
     return {
-      pro2: {
-        min: '0.0.0',
-        unsupported: true,
-      },
       model_mini: {
         min: '2.1.9',
       },

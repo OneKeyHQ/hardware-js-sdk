@@ -4,9 +4,11 @@ import { normalizeRebootType } from './helpers';
 import type { DeviceRebootParams } from './helpers';
 
 export default class DeviceReboot extends BaseMethod<DeviceRebootParams> {
+  getSupportedProtocols() {
+    return ['V2'] as const;
+  }
+
   init() {
-    // Protocol V2 (Pro2) only; Core rejects non-V2 devices.
-    this.requireProtocolV2 = true;
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
     this.params = {

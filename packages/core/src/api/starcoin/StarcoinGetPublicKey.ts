@@ -10,6 +10,10 @@ import type {
 } from '../../types/api/starcoinGetPublicKey';
 
 export default class StarcoinGetPublicKey extends BaseMethod<HardwareStarcoinGetPublicKey[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {

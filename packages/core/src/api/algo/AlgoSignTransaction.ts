@@ -7,6 +7,10 @@ import type { SolanaSignTransactionParams } from '../../types';
 import type { AlgorandSignTx as HardwareAlgorandSignTx } from '@onekeyfe/hd-transport';
 
 export default class AlgoSignTransaction extends BaseMethod<HardwareAlgorandSignTx> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {

@@ -87,9 +87,12 @@ function getDeviceTransferProgress(
 }
 
 export default class FileRead extends BaseMethod<FileReadParams> {
+  getSupportedProtocols() {
+    return ['V2'] as const;
+  }
+
   init() {
     // Protocol V2 (Pro2) only; Core rejects non-V2 devices.
-    this.requireProtocolV2 = true;
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
     const path = validateProtocolV2FilesystemPath(this.payload.path, 'path');

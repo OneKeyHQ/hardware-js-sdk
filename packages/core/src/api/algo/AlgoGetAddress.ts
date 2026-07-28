@@ -6,6 +6,10 @@ import type { AlgorandGetAddress as HardwareAlgoGetAddress } from '@onekeyfe/hd-
 import type { AlgoAddress, AlgoGetAddressParams } from '../../types';
 
 export default class AlgoGetAddress extends BaseMethod<HardwareAlgoGetAddress[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {

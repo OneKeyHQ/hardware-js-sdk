@@ -5,6 +5,10 @@ import { BaseMethod } from '../BaseMethod';
 import type { WipeDevice } from '@onekeyfe/hd-transport';
 
 export default class DeviceWipe extends BaseMethod<WipeDevice> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
     this.unlockPolicy = 'unlock-before-run';
     this.useDevicePassphraseState = false;

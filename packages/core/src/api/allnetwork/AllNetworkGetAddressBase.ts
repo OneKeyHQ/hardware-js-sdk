@@ -12,7 +12,6 @@ import { validateParams } from '../helpers/paramsValidator';
 import { PROTO } from '../../constants';
 import { findMethod } from '../utils';
 import { DEVICE, IFRAME, createUiMessage } from '../../events';
-import { isMethodVersionRangeUnsupported } from '../../utils';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { onDeviceButtonHandler } from '../../core';
 import {
@@ -260,6 +259,10 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
     chain_name?: string;
   }[]
 > {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   abortController: AbortController | null = null;
 
   init() {
@@ -459,12 +462,9 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
  * @param method BaseMethod
  */
 function preCheckDeviceSupport(device: Device, method: BaseMethod) {
+  method.assertProtocolSupported(device.getProtocol(), device.getCurrentFirmwareType());
   const versionRange = device.getCurrentMethodVersionRange(type => method.getVersionRange()[type]);
   const currentVersion = device.getCurrentFirmwareVersionString() ?? '0.0.0';
-
-  if (isMethodVersionRangeUnsupported(versionRange)) {
-    throw ERRORS.createDeviceNotSupportMethodError(method.name, device.getCurrentFirmwareType());
-  }
 
   if (
     versionRange &&
@@ -504,14 +504,6 @@ function handleSkippableHardwareError(
       type => method.getVersionRange()[type]
     );
     const currentVersion = device.getCurrentFirmwareVersionString() ?? '0.0.0';
-
-    if (isMethodVersionRangeUnsupported(versionRange)) {
-      error = ERRORS.createDeviceNotSupportMethodError(
-        method.name,
-        device.getCurrentFirmwareType()
-      );
-      return error;
-    }
 
     if (
       versionRange &&

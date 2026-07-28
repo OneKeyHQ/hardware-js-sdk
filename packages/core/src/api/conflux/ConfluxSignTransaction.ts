@@ -16,6 +16,10 @@ import type {
 import type { ConfluxSignTx, ConfluxTxRequest } from '@onekeyfe/hd-transport';
 
 export default class ConfluxSignTransaction extends BaseMethod {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   checkDeviceId = true;
 
   addressN: number[] = [];
@@ -37,7 +41,7 @@ export default class ConfluxSignTransaction extends BaseMethod {
 
     // check if transaction is valid
     const schema: SchemaParam[] = [
-      { name: 'to', type: 'string', required: true },
+      { name: 'to', type: 'hexString', required: true },
       { name: 'value', type: 'hexString', required: true },
       { name: 'gasLimit', type: 'hexString', required: true },
       { name: 'gasPrice', type: 'hexString', required: true },
@@ -50,10 +54,7 @@ export default class ConfluxSignTransaction extends BaseMethod {
 
     validateParams(tx, schema);
 
-    this.formattedTx = {
-      ...formatAnyHex(tx),
-      to: tx.to,
-    };
+    this.formattedTx = formatAnyHex(tx);
   }
 
   processTxRequest = async (request: ConfluxTxRequest, data: string): Promise<ConfluxSignedTx> => {

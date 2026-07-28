@@ -8,9 +8,13 @@ import type { TonSignData as HardwareTonSignData } from '@onekeyfe/hd-transport'
 import type { TonSignDataParams } from '../../types/api/tonSignData';
 
 export default class TonSignData extends BaseMethod<HardwareTonSignData> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
     // Keep strict-check off for touch/classic1s until their firmware release
-    // versions are decided. Pro2 is explicitly allowed by getVersionRange().
+    // versions are decided. Protocol V2 support is declared independently.
     this.strictCheckDeviceSupport = false;
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];

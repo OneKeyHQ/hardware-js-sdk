@@ -6,6 +6,10 @@ import { validatePath } from '../helpers/pathUtils';
 import type { XrpSignTransactionParams } from '../../types/api/xrpSignTransaction';
 
 export default class XrpGetAddress extends BaseMethod<XrpSignTransactionParams> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {
@@ -30,7 +34,7 @@ export default class XrpGetAddress extends BaseMethod<XrpSignTransactionParams> 
       { name: 'payment', type: 'object' },
     ]);
     validateParams(transaction.payment, [
-      { name: 'amount', type: 'uint', required: true },
+      { name: 'amount', type: 'number', required: true },
       { name: 'destination', type: 'string', required: true },
       { name: 'destinationTag', type: 'number' },
     ]);

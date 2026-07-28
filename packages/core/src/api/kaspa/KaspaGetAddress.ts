@@ -7,6 +7,10 @@ import type { KaspaGetAddress as HardwareKaspaGetAddress } from '@onekeyfe/hd-tr
 import type { KaspaAddress, KaspaGetAddressParams } from '../../types';
 
 export default class KaspaGetAddress extends BaseMethod<HardwareKaspaGetAddress[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {

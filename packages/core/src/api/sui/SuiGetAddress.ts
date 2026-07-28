@@ -9,6 +9,10 @@ import type { SuiAddress, SuiGetAddressParams } from '../../types';
 import type { SuiGetAddress as HardwareSuiGetAddress } from '@onekeyfe/hd-transport';
 
 export default class SuiGetAddress extends BaseMethod<HardwareSuiGetAddress[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   shouldConfirm = false;

@@ -73,6 +73,10 @@ const settingsPageForPayload = (
 };
 
 export default class DeviceSettings extends BaseMethod<ApplySettings> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
     this.useDevicePassphraseState = false;
 

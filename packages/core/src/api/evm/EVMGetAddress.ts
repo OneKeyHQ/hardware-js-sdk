@@ -10,6 +10,10 @@ import type { EVMAddress, EVMGetAddressParams } from '../../types';
 import type { EthereumGetAddressOneKey } from '@onekeyfe/hd-transport';
 
 export default class EvmGetAddress extends BaseMethod<EthereumGetAddressOneKey[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {

@@ -7,6 +7,10 @@ import { serializedPath, validatePath } from '../helpers/pathUtils';
 import type { CardanoPublicKey, CardanoPublicKeyParams } from '../../types/api/cardanoGetPublicKey';
 
 export default class CardanoGetPublicKey extends BaseMethod<CardanoPublicKeyParams[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle?: boolean;
 
   init() {

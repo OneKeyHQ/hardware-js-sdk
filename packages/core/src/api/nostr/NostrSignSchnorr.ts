@@ -6,6 +6,10 @@ import { validateParams } from '../helpers/paramsValidator';
 import type { NostrSignSchnorr as SignSchnorr } from '@onekeyfe/hd-transport';
 
 export default class NostrSignSchnorr extends BaseMethod<SignSchnorr> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {

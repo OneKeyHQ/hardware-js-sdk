@@ -398,7 +398,6 @@ export type ITransportStatus = 'valid' | 'outdated';
 export type IVersionRange = {
   min: string;
   max?: string;
-  unsupported?: boolean;
 };
 
 export type DeviceFirmwareRange = {

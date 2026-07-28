@@ -1,10 +1,11 @@
+import { Enum_SafetyCheckLevel } from '@onekeyfe/hd-transport';
+
 import AllNetworkGetAddressBase from '../src/api/allnetwork/AllNetworkGetAddressBase';
 import EvmGetAddress from '../src/api/evm/EVMGetAddress';
 import EVMGetPublicKey from '../src/api/evm/EVMGetPublicKey';
 import { findMethod } from '../src/api/utils';
 import { getDeviceType, getFirmwareType, getMethodVersionRange } from '../src/utils';
 import { getDeviceFirmwareVersion } from '../src/utils/deviceVersionUtils';
-import { Enum_SafetyCheckLevel } from '@onekeyfe/hd-transport';
 
 import type { EDeviceType } from '@onekeyfe/hd-shared';
 
@@ -33,6 +34,7 @@ const createDevice = (onekeyDeviceType: string) => {
       },
       // BaseMethod reads state through Device accessors; reuse production mappers in the stub.
       isProtocolV2: () => false,
+      getProtocol: () => 'V1' as const,
       getCurrentDeviceType: () => getDeviceType(features as any),
       getCurrentSafetyChecks: () => features.safety_checks,
       getCurrentFirmwareType: () => getFirmwareType(features as any),
