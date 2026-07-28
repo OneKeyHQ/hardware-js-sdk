@@ -96,6 +96,32 @@ describe('WebUsbTransport Protocol V2 timeout recovery', () => {
     expect(webusb.protocolV2Sessions.has(path)).toBe(false);
   });
 
+  test('does not reconnect inside a Protocol V2 frame read after a USB I/O failure', async () => {
+    const webusb = new WebUsbTransport() as any;
+    const path = 'pro2-webusb';
+    webusb.messages = transport.parseConfigure(schema);
+    webusb.messagesV2 = transport.parseConfigure(schema);
+    webusb.transferOutOnce = jest.fn().mockResolvedValue(undefined);
+    webusb.transferInOnce = jest
+      .fn()
+      .mockRejectedValue(new Error('NetworkError: transferIn device disconnected'));
+    webusb.transferInWithRetry = jest.fn();
+    webusb.reconnectForPacketIoRetry = jest.fn();
+    webusb.resetConnectionAfterProbe = jest.fn().mockImplementation(() => {
+      webusb.protocolV2Sessions.delete(path);
+      webusb.protocolV2Assemblers.get(path)?.reset();
+    });
+
+    await expect(webusb.callProtocolV2(path, 'Ping', { message: 'read-error' })).rejects.toThrow(
+      'NetworkError'
+    );
+
+    expect(webusb.transferInOnce).toHaveBeenCalledTimes(1);
+    expect(webusb.transferInWithRetry).not.toHaveBeenCalled();
+    expect(webusb.reconnectForPacketIoRetry).not.toHaveBeenCalled();
+    expect(webusb.resetConnectionAfterProbe).toHaveBeenCalledWith(path);
+  });
+
   test.each(['router', 'packet-source', 'ack-sequence', 'response-sequence', 'frame'] as const)(
     'invalidates cached state for typed Protocol V2 %s errors',
     async code => {
