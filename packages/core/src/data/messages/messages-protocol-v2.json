@@ -482,9 +482,9 @@
         "MessageType_DeviceStatus": 60603,
         "MessageType_DevGetOnboardingStatus": 60604,
         "MessageType_DevOnboardingStatus": 60605,
-        "MessageType_DeviceSessionGet": 60606,
         "MessageType_DeviceSession": 60607,
         "MessageType_DeviceSessionAskPin": 60608,
+        "MessageType_DeviceSessionOpen": 60609,
         "MessageType_FilesystemPermissionFix": 60800,
         "MessageType_FilesystemPathInfo": 60801,
         "MessageType_FilesystemPathInfoQuery": 60802,
@@ -506,7 +506,8 @@
         [90, 92],
         [114, 122],
         [300, 304],
-        [309, 312]
+        [309, 312],
+        [60606, 60606]
       ]
     },
     "AlephiumGetAddress": {
@@ -11744,7 +11745,15 @@
       }
     },
     "ProtocolInfoRequest": {
-      "fields": {}
+      "fields": {
+        "eventless_wallet_session": {
+          "type": "bool",
+          "id": 1,
+          "options": {
+            "default": false
+          }
+        }
+      }
     },
     "ProtocolInfo": {
       "fields": {
@@ -12427,11 +12436,75 @@
         }
       }
     },
-    "DeviceSessionGet": {
+    "DeviceSessionErrorCode": {
+      "values": {
+        "DeviceSessionError_None": 0,
+        "DeviceSessionError_UserCancelled": 1,
+        "DeviceSessionError_InvalidSession": 2,
+        "DeviceSessionError_AttachPinUnavailable": 3,
+        "DeviceSessionError_PassphraseDisabled": 4,
+        "DeviceSessionError_Busy": 5
+      }
+    },
+    "DeviceSessionResume": {
       "fields": {
         "session_id": {
+          "rule": "required",
           "type": "bytes",
           "id": 1
+        }
+      }
+    },
+    "DeviceSessionHostPassphrase": {
+      "fields": {
+        "passphrase": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "DeviceSessionPassphraseOnDevice": {
+      "fields": {}
+    },
+    "DeviceSessionAttachPinOnDevice": {
+      "fields": {}
+    },
+    "DeviceSessionSelect": {
+      "oneofs": {
+        "access": {
+          "oneof": ["host_passphrase", "passphrase_on_device", "attach_pin_on_device"]
+        }
+      },
+      "fields": {
+        "host_passphrase": {
+          "type": "DeviceSessionHostPassphrase",
+          "id": 1
+        },
+        "passphrase_on_device": {
+          "type": "DeviceSessionPassphraseOnDevice",
+          "id": 2
+        },
+        "attach_pin_on_device": {
+          "type": "DeviceSessionAttachPinOnDevice",
+          "id": 3
+        }
+      }
+    },
+    "DeviceSessionOpen": {
+      "oneofs": {
+        "mode": {
+          "oneof": ["resume", "select"]
+        }
+      },
+      "fields": {
+        "resume": {
+          "type": "DeviceSessionResume",
+          "id": 1
+        },
+        "select": {
+          "type": "DeviceSessionSelect",
+          "id": 2
         }
       }
     },

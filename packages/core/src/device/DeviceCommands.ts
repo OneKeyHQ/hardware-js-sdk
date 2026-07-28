@@ -1,6 +1,7 @@
 import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import {
   DeviceErrorCode,
+  DeviceSessionErrorCode,
   type FailureType,
   type Messages,
   type Transport,
@@ -52,7 +53,7 @@ const HIGH_VOLUME_DEBUG_CALLS = new Set([
   'FirmwareUpload',
   'ResourceAck',
 ]);
-const SENSITIVE_DEBUG_CALLS = new Set(['DeviceSessionGet', 'DeviceSessionOpen']);
+const SENSITIVE_DEBUG_CALLS = new Set(['DeviceSessionOpen']);
 
 function shouldReduceDebugForCall(type: string) {
   return HIGH_VOLUME_DEBUG_CALLS.has(type);
@@ -458,7 +459,6 @@ export class DeviceCommands {
         'PinMatrixAck',
         'PassphraseAck',
         'Cancel',
-        'DeviceSessionGet',
         'DeviceSessionOpen',
         'BixinPinInputOnDevice',
         'FilesystemFileRead',
@@ -607,6 +607,42 @@ export class DeviceCommands {
         const isLegacyProtocolV2LockedFailure =
           this.device.isProtocolV2() && /^device (?:is )?locked$/i.test(normalizedMessage);
         if (
+          callType === 'DeviceSessionOpen' &&
+          subcode === DeviceSessionErrorCode.DeviceSessionError_InvalidSession
+        ) {
+          error = ERRORS.TypedError(HardwareErrorCode.WalletSessionInvalid, message, {
+            failureCode: code,
+            subcode,
+            firmwareMessage: message,
+          });
+        } else if (
+          callType === 'DeviceSessionOpen' &&
+          subcode === DeviceSessionErrorCode.DeviceSessionError_UserCancelled
+        ) {
+          error = ERRORS.TypedError(HardwareErrorCode.ActionCancelled, message, {
+            failureCode: code,
+            subcode,
+            firmwareMessage: message,
+          });
+        } else if (
+          callType === 'DeviceSessionOpen' &&
+          subcode === DeviceSessionErrorCode.DeviceSessionError_AttachPinUnavailable
+        ) {
+          error = ERRORS.TypedError(HardwareErrorCode.DeviceCheckUnlockTypeError, message, {
+            failureCode: code,
+            subcode,
+            firmwareMessage: message,
+          });
+        } else if (
+          callType === 'DeviceSessionOpen' &&
+          subcode === DeviceSessionErrorCode.DeviceSessionError_PassphraseDisabled
+        ) {
+          error = ERRORS.TypedError(HardwareErrorCode.DeviceNotOpenedPassphrase, message, {
+            failureCode: code,
+            subcode,
+            firmwareMessage: message,
+          });
+        } else if (
           subcode === DeviceErrorCode.DeviceError_ActionCancelled ||
           isLegacyProtocolV2ActionCancelledFailure
         ) {

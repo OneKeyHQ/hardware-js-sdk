@@ -8,8 +8,8 @@
 本文说明 OneKey `hd-*` SDK 对 App 暴露的公共事件：事件由谁生成、哪些事件会暂停调用、应用如何回传结果，以及设备、固件和运行环境通知如何分发。
 
 Protocol V2/Pro2 的“无 Event”表示 firmware 不再发送需要 Host ACK 的 UI 中间消息。
-当前钱包选择在设备端完成，SDK 不再通过 Passphrase Event 收集输入。本文后续凡引用
-`DeviceSessionOpen(select/resume)` 的“V2 目标”段落均为历史方案；当前钱包流程以
+SDK 继续通过 Passphrase Event 收集一次三选一意图，再主动发送
+`DeviceSessionOpen(select/resume)`；当前钱包流程以
 [SDK Core 运行时](./core-runtime.md#钱包-session) 为准。
 
 这些公共事件不都来自硬件。维护事件时必须先区分设备协议中间消息、`hd-*` SDK 公共事件和 `hwk-*` Adapter 公共事件。
@@ -141,7 +141,8 @@ V2 不伪造硬件 `ButtonRequest/PinMatrixRequest/PassphraseRequest`。阻塞 E
 - V1 `PassphraseAck` 是对 firmware 中间请求的回复。
 - V2 `DeviceSessionOpen(select)` 是 SDK 主动发起并返回最终 Session 的完整命令。
 - 两者仅在 Host Passphrase、设备 Passphrase、Attach PIN 三种选择参数上存在一一映射。
-- V2 的 `resume session_id` 没有对应的 `PassphraseAck` 语义；标准钱包不调用 `DeviceSessionOpen`。
+- V2 的 `resume session_id` 没有对应的 `PassphraseAck` 语义；标准钱包不调用
+  `DeviceSessionOpen`，直接使用默认空 Passphrase 上下文。
 - `ButtonRequest/ButtonAck` 在 V2 被删除，不能解释成 `DeviceSessionOpen` 的旧名称。
 
 ## 必须回传的 UI 请求

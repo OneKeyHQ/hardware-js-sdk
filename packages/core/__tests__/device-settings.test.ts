@@ -70,7 +70,7 @@ describe('DeviceSettings protocol routing', () => {
 
     method.init();
 
-    expect(method.unlockPolicy).toBe('retry-on-locked');
+    expect(method.unlockPolicy).toBe('unlock-before-run');
   });
 
   it('uses ApplySettings and commits the confirmed patch for Protocol V1', async () => {

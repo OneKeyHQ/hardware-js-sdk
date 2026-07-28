@@ -4744,7 +4744,9 @@ export type ViewVerifyPage = {
 };
 
 // ProtocolInfoRequest
-export type ProtocolInfoRequest = {};
+export type ProtocolInfoRequest = {
+  eventless_wallet_session?: boolean;
+};
 
 // ProtocolInfo
 export type ProtocolInfo = {
@@ -5049,9 +5051,42 @@ export type ProtocolV2DeviceInfo = {
   status?: DeviceStatus;
 };
 
-// DeviceSessionGet
-export type DeviceSessionGet = {
-  session_id?: string;
+export enum DeviceSessionErrorCode {
+  DeviceSessionError_None = 0,
+  DeviceSessionError_UserCancelled = 1,
+  DeviceSessionError_InvalidSession = 2,
+  DeviceSessionError_AttachPinUnavailable = 3,
+  DeviceSessionError_PassphraseDisabled = 4,
+  DeviceSessionError_Busy = 5,
+}
+
+// DeviceSessionResume
+export type DeviceSessionResume = {
+  session_id: string;
+};
+
+// DeviceSessionHostPassphrase
+export type DeviceSessionHostPassphrase = {
+  passphrase: string;
+};
+
+// DeviceSessionPassphraseOnDevice
+export type DeviceSessionPassphraseOnDevice = {};
+
+// DeviceSessionAttachPinOnDevice
+export type DeviceSessionAttachPinOnDevice = {};
+
+// DeviceSessionSelect
+export type DeviceSessionSelect = {
+  host_passphrase?: DeviceSessionHostPassphrase;
+  passphrase_on_device?: DeviceSessionPassphraseOnDevice;
+  attach_pin_on_device?: DeviceSessionAttachPinOnDevice;
+};
+
+// DeviceSessionOpen
+export type DeviceSessionOpen = {
+  resume?: DeviceSessionResume;
+  select?: DeviceSessionSelect;
 };
 
 // DeviceSession
@@ -5881,7 +5916,12 @@ export type MessageType = {
   DeviceInfoTargets: DeviceInfoTargets;
   DeviceInfoTypes: DeviceInfoTypes;
   DeviceInfoGet: DeviceInfoGet;
-  DeviceSessionGet: DeviceSessionGet;
+  DeviceSessionResume: DeviceSessionResume;
+  DeviceSessionHostPassphrase: DeviceSessionHostPassphrase;
+  DeviceSessionPassphraseOnDevice: DeviceSessionPassphraseOnDevice;
+  DeviceSessionAttachPinOnDevice: DeviceSessionAttachPinOnDevice;
+  DeviceSessionSelect: DeviceSessionSelect;
+  DeviceSessionOpen: DeviceSessionOpen;
   DeviceSession: DeviceSession;
   DeviceSessionAskPin: DeviceSessionAskPin;
   DeviceStatus: DeviceStatus;

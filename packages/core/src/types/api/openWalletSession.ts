@@ -47,10 +47,13 @@ export type OpenWalletSessionPayload = OpenWalletSessionPayloadBase &
     | {
         walletType: 'standard';
         passphraseState: null;
+        sessionId?: never;
       }
     | {
         walletType: 'hidden';
         passphraseState: string;
+        /** CLI compatibility only; applications should resume by wallet binding. */
+        sessionId?: string;
       }
   );
 

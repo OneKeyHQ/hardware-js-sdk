@@ -38,8 +38,10 @@ Protocol V2 响应依靠串行调用、消息类型和帧序号维持请求边�
 
 Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类不同状态，不能共用缓存：
 
-- V1/V2 的 `openWalletSession()` 只返回钱包身份 `deviceId + passphraseState`；
-  公共调用方不接收、保存或传回 `sessionId`。
+- V1/V2 的 `openWalletSession()` 对标准/隐藏钱包都返回设备生成的
+  `deviceId + passphraseState + sessionId`；`sessionId` 仅用于现有 CLI 兼容。
+- 普通 App 调用方不接收、保存或传回 `sessionId`；短生命周期 CLI 可以将一次钱包选择
+  得到的完整三元组保存到 OS Keychain，并通过 `preloadSessionCache()` 恢复到 Core Store。
 - V1/V2 共用 `DeviceWalletSessionStore`，缓存键为 `deviceKey + passphraseState`。
 - `DeviceWalletSessionStore` 是 Core 内唯一可用于恢复的钱包 Session 缓存源；
   `DeviceState` 和协议 raw 快照都不是 Session 缓存。
@@ -53,16 +55,20 @@ Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类�
 - `resume-hidden` 只接收 `deviceId + passphraseState`，由 Core 从 Store 查找
   `sessionId`；缓存不存在时返回 `WalletSessionInvalid`，固件拒绝恢复时透传规范化错误，
   且都不自动选择其他钱包。
-- V2 由设备端解锁流程选择钱包；Core 使用 `DeviceSessionGet({})` 获取当前钱包 Session，
-  或使用 `DeviceSessionGet({ session_id })` 恢复缓存，并把 `btc_test_address` 归一化为 `passphraseState`。
-- 标准钱包直接使用默认空 Passphrase 上下文，不调用 `DeviceSessionGet`，也不读取或写入隐藏钱包 Session Store。
+- V2 先通过 `ProtocolInfoRequest { eventless_wallet_session: true }` 协商无中间固件 Event；
+  标准钱包直接使用默认空 Passphrase 上下文，不调用 `DeviceSessionOpen`。
+- 隐藏钱包使用 `DeviceSessionOpen(select)` 明确选择 Host Passphrase、设备输入或 Attach PIN，
+  使用 `DeviceSessionOpen(resume)` 恢复缓存，并把 `btc_test_address` 归一化为 `passphraseState`。
 - 显式 `resume-hidden` 被固件拒绝时，Core 只清除当前隐藏钱包缓存并返回规范化错误，
-  不自动退化为需要用户确认的隐藏钱包选择；当前固件协议没有稳定 InvalidSession 子码。
-- V2 的 `DeviceSessionGet` 成功响应必须同时包含非空 `session_id` 和
+  不自动退化为需要用户确认的隐藏钱包选择；`DeviceSessionError_InvalidSession=2`
+  统一映射为 `WalletSessionInvalid`。
+- V2 的 `DeviceSessionOpen` 成功响应必须同时包含非空 `session_id` 和
   `btc_test_address`；缺少任一字段都视为协议响应不完整，不得降级为标准钱包。
 - 返回的钱包标识与调用方预期不一致时，必须清理缓存并抛出安全错误。
 - `session_id` 不是钱包身份，必须与同一次返回的 `deviceId + passphraseState` 绑定使用。
-- `session_id` 不出现在公共 `DeviceState`、设备消息顶层或 `openWalletSession()` 契约中。
+- `session_id` 不出现在公共 `DeviceState` 或设备消息顶层；隐藏钱包的可选
+  `openWalletSession().sessionId` 和 Legacy `Features.sessionId` 只用于 CLI 兼容，
+  普通 App 不得把它们写入数据库。
 - 公共 `clearSessionCache()` 只清理 `DeviceWalletSessionStore`，
   不发送 Protocol V1/V2 命令，也不表示设备端 Session 已关闭。
 
@@ -76,8 +82,10 @@ Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类�
 
 自动解锁会产生用户交互，也可能造成有副作用请求重复执行，因此必须由方法显式声明：
 
-- `BaseMethod` 默认使用 `unlockPolicy = 'none'`。
-- 允许自动解锁的方法声明 `unlockPolicy = 'retry-on-locked'`。
+- `BaseMethod` 默认使用 `unlockPolicy = 'none'`；安全重放方法由完整显式白名单声明
+  `unlockPolicy = 'retry-on-locked'`。
+- 有副作用的方法只能声明 `unlockPolicy = 'unlock-before-run'`：已知设备锁定时先解锁，
+  但收到 locked 响应后不重放原操作。
 - 只有结构化 `HardwareErrorCode.DeviceLocked` 会触发解锁。
 - 解锁成功后原方法最多重试一次；取消、解锁失败或第二次调用失败时直接返回错误。
 - Protocol V1、未声明策略的方法和其他错误不进入自动解锁流程。
