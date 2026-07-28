@@ -160,7 +160,7 @@ function main() {
         NODE_OPTIONS: '--max-old-space-size=8192',
       },
     });
-    run(logDirectory, 'full test', 'yarn', ['test', '--', '--runInBand']);
+    run(logDirectory, 'full test', 'yarn', ['test']);
     run(logDirectory, 'full build', 'yarn', ['build']);
   }
 
