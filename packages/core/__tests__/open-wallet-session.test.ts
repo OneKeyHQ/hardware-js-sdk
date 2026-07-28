@@ -756,11 +756,11 @@ describe('openWalletSession', () => {
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
       session_id: 'known-session',
     });
-    const sessionOpenCall = typedCall.mock.calls.findIndex(
-      ([requestName]) => requestName === 'DeviceSessionOpen'
+    const sessionGetCall = typedCall.mock.calls.findIndex(
+      ([requestName]) => requestName === 'DeviceSessionGet'
     );
     expect(device.getDeviceState.mock.invocationCallOrder[1]).toBeLessThan(
-      typedCall.mock.invocationCallOrder[sessionOpenCall]
+      typedCall.mock.invocationCallOrder[sessionGetCall]
     );
   });
 
