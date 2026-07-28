@@ -34,6 +34,7 @@ export const zh = {
       portfolioTest: 'Portfolio 测试',
       methodBatchTest: '链方法批量测试',
       multisigTest: '多签测试',
+      walletSessionTest: '钱包 Session 测试',
       navigation: '导航',
       current: '当前',
       toggleTheme: '切换主题',
