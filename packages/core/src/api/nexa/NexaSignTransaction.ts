@@ -9,6 +9,8 @@ import type { TypedCall } from '@onekeyfe/hd-transport';
 import type { DeviceFirmwareRange, NexaSignTransactionParams, NexaSignature } from '../../types';
 
 export default class NexaSignTransaction extends BaseMethod<NexaSignTransactionParams> {
+  checkDeviceId = true;
+
   hasBundle = false;
 
   init() {

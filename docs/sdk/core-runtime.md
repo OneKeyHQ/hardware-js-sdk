@@ -140,7 +140,8 @@ Core 先把公共钱包意图归一化，再映射到各协议：
   -> V2: REQUEST_PASSPHRASE 三选一 -> DeviceSessionOpen(select)
 
 恢复隐藏钱包
-  -> V1: 按 passphraseState 校验并复用兼容 Session
+  -> V1: 先用无钱包绑定字段的 Initialize 校验实时 deviceId，
+         再按 passphraseState 校验并复用兼容 Session
   -> V2: DeviceSessionOpen({ resume: { session_id } })
 ```
 
@@ -173,6 +174,8 @@ Core 先把公共钱包意图归一化，再映射到各协议：
 
 隐藏钱包结果直接使用同一次硬件响应中的字段。Core 只执行协议字段名归一化，不从
 Features、descriptor 或 Store 补造钱包标识；标准钱包没有 `DeviceSession` 响应。
+Pro2 需要解锁时，钱包类型以解锁完成并刷新后的设备状态为准，不使用解锁前的
+`passphraseProtection` 快照。
 
 参数校验失败也遵循 Core 的统一响应结构，不以 rejected Promise 暴露裸异常。例如
 `resume-hidden` 缺少 `deviceId` 时返回：
@@ -200,11 +203,18 @@ V1 通过 `Initialize.session_id` 恢复，V2 通过 `DeviceSessionOpen({ resume
 - 没有参数时清除全部设备和钱包的缓存。
 - 只传 `deviceId` 时清除该设备的全部钱包缓存。
 - 同时传 `deviceId + passphraseState` 时只清除指定钱包缓存。
+- 单独传 `passphraseState` 时返回 `CallMethodInvalidParameter`，不会退化成全局清理。
 - 不修改 `DeviceState` 或协议 raw 快照，也不执行 Lock、Cancel 或设备端 Session Close。
 
 V1 被清理的是由 `Initialize/Features` 或 `GetPassphraseState` 获得的本地 `session_id`
 映射；V2 被清理的是由 `DeviceSessionOpen` 返回的本地 `session_id` 映射。下次打开钱包时，
 Core 会重新执行对应协议的钱包 Session 建立或恢复流程。
+
+Protocol V1 的业务调用同时提供 `deviceId` 与钱包绑定时，Core 先发送不含
+`session_id/passphrase_state` 的 `Initialize` 获取实时设备身份；只有实时 `deviceId`
+与调用方一致，才会发送第二次 `Initialize` 复用该钱包的缓存 Session。身份不一致时立即返回
+`DeviceCheckDeviceIdError`，不会把旧设备或旧初始化生命周期的 Session 发给当前硬件。
+所有接收 `deviceId` 的钱包业务方法都应在业务命令前启用同一身份检查。
 
 App 迁移时只替换“打开/切换钱包”阶段：新流程在 V1/V2 都调用 `openWalletSession()`；
 已有 V1 集成可以继续使用 Legacy `getPassphraseState()`。地址、签名和 `preInitialize` 仍沿用原来的

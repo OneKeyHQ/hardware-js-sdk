@@ -31,6 +31,7 @@ import {
 
 import type { FirmwareUpdateV4Params, FirmwareUpdateV4Target } from '../types/api/firmwareUpdate';
 import type { EFirmwareType } from '@onekeyfe/hd-shared';
+import type { ProtocolV2DeviceInfo } from '@onekeyfe/hd-transport';
 import type { PROTO } from '../constants';
 import type { TypedResponseMessage } from '../device/DeviceCommands';
 import type {
@@ -364,22 +365,19 @@ const parseProtocolV2OkppHeader = (bytes: Uint8Array): ProtocolV2OkppHeader | nu
 };
 
 export const assertProtocolV2ReconnectIdentity = (
-  expectedDeviceId?: string,
-  actualDeviceId?: string,
-  options: { allowMissingActual?: boolean } = {}
+  expectedSerialNumber?: string,
+  actualSerialNumber?: string
 ) => {
-  if (!expectedDeviceId) return;
-  if (!actualDeviceId) {
-    if (options.allowMissingActual) return;
+  if (!expectedSerialNumber || !actualSerialNumber) {
     throw ERRORS.TypedError(
       HardwareErrorCode.DeviceNotFound,
-      'Protocol V2 reconnect identity unavailable'
+      'Protocol V2 reconnect physical identity unavailable'
     );
   }
-  if (actualDeviceId !== expectedDeviceId) {
+  if (actualSerialNumber !== expectedSerialNumber) {
     throw ERRORS.TypedError(
       HardwareErrorCode.DeviceNotFound,
-      `Protocol V2 reconnect identity mismatch: expected ${expectedDeviceId}, received ${actualDeviceId}`
+      `Protocol V2 reconnect physical identity mismatch: expected ${expectedSerialNumber}, received ${actualSerialNumber}`
     );
   }
 };
@@ -393,7 +391,7 @@ export const assertProtocolV2ReconnectIdentity = (
  * - completion waits for target status to finish, reboots to normal, then polls DeviceInfo
  */
 export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareUpdateV4Params> {
-  private protocolV2ExpectedDeviceId?: string;
+  private protocolV2ExpectedSerialNumber?: string;
 
   init() {
     this.allowDeviceMode = [UI_REQUEST.BOOTLOADER, UI_REQUEST.NOT_INITIALIZE];
@@ -483,8 +481,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   }
 
   private async runProtocolV2() {
+    await this.captureProtocolV2PhysicalIdentity();
     const deviceFeatures = await this.getProtocolV2DeviceFeatures();
-    this.protocolV2ExpectedDeviceId = deviceFeatures.deviceId ?? undefined;
     const deviceFirmwareType = getFirmwareType(deviceFeatures);
     const firmwareType = this.params.firmwareType ?? deviceFirmwareType;
 
@@ -548,6 +546,38 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       if (features) return features;
     }
     throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Device features not available');
+  }
+
+  private getProtocolV2SerialNumber(deviceInfo: ProtocolV2DeviceInfo) {
+    const serialNumber = deviceInfo.hw?.serial_no?.trim();
+    return serialNumber || undefined;
+  }
+
+  private assertProtocolV2DeviceInfoIdentity(deviceInfo: ProtocolV2DeviceInfo) {
+    assertProtocolV2ReconnectIdentity(
+      this.protocolV2ExpectedSerialNumber,
+      this.getProtocolV2SerialNumber(deviceInfo)
+    );
+  }
+
+  private async requestProtocolV2PhysicalIdentity() {
+    return requestProtocolV2DeviceInfo({
+      commands: this.device.getCommands(),
+      timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
+    });
+  }
+
+  private async captureProtocolV2PhysicalIdentity() {
+    const deviceInfo = await this.requestProtocolV2PhysicalIdentity();
+    const serialNumber = this.getProtocolV2SerialNumber(deviceInfo);
+    assertProtocolV2ReconnectIdentity(serialNumber, serialNumber);
+    this.protocolV2ExpectedSerialNumber = serialNumber;
+  }
+
+  private async verifyProtocolV2ReconnectIdentity() {
+    const deviceInfo = await this.requestProtocolV2PhysicalIdentity();
+    this.assertProtocolV2DeviceInfoIdentity(deviceInfo);
+    return deviceInfo;
   }
 
   private prepareBootloaderBinary(): ArrayBuffer | null {
@@ -946,19 +976,18 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           commands: this.device.getCommands(),
           timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
         });
+        this.assertProtocolV2DeviceInfoIdentity(deviceInfo);
         // This is a reconnect probe after a Bootloader reboot. Bootloader does not
         // support DeviceStatusGet, so the generic runtime-mode probe is invalid here.
         const features = this.device.updateProtocolV2Features(deviceInfo, null, 'bootloader');
-        assertProtocolV2ReconnectIdentity(
-          this.protocolV2ExpectedDeviceId,
-          features.deviceId ?? undefined,
-          { allowMissingActual: !!features.bootloaderMode }
-        );
         if (features?.bootloaderMode) {
           return features;
         }
         lastError = new Error('Protocol V2 device is reachable but is not in bootloader mode');
       } catch (error) {
+        if (this.isProtocolV2ReconnectIdentityError(error)) {
+          throw error;
+        }
         lastError = error;
         Log.log('Protocol V2 bootloader mode not ready, polling reconnect: ', error);
       }
@@ -1203,6 +1232,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     while (Date.now() - startTime < PROTOCOL_V2_INSTALL_TIMEOUT) {
       try {
         await this.reconnectProtocolV2Device();
+        await this.verifyProtocolV2ReconnectIdentity();
         try {
           const statusResponse = await this.device.getCommands().typedCall(
             'DeviceFirmwareUpdateStatusGet',
@@ -1249,6 +1279,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         }
       } catch (error) {
         lastError = error;
+        if (this.isProtocolV2ReconnectIdentityError(error)) {
+          throw error;
+        }
         if (error instanceof HardwareError && error.errorCode === HardwareErrorCode.FirmwareError) {
           throw error;
         }
@@ -1265,6 +1298,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
   private async exitProtocolV2BootloaderToNormal() {
     await this.reconnectProtocolV2Device();
+    await this.verifyProtocolV2ReconnectIdentity();
     // The connection may still be in bootloader. Request a Normal reboot directly;
     // repeating it after an automatic App reboot is idempotent.
     await this.protocolV2Reboot(DeviceRebootType.Normal);
@@ -1304,13 +1338,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           // Completion needs target versions only; keep scope aligned with the request.
           request: PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST,
         });
+        this.assertProtocolV2DeviceInfoIdentity(deviceInfo);
         const features = await this.device.probeProtocolV2RuntimeState(
           deviceInfo,
           PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT
-        );
-        assertProtocolV2ReconnectIdentity(
-          this.protocolV2ExpectedDeviceId,
-          features.deviceId ?? undefined
         );
         if (features.mode !== 'normal' || features.bootloaderMode) {
           throw ERRORS.TypedError(
@@ -1320,9 +1351,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         }
         return features;
       } catch (error) {
-        // A confirmed deviceId change is a firmware contract violation and cannot be
-        // fixed by polling. A temporarily missing identity may still become ready.
-        if (this.isProtocolV2ReconnectIdentityMismatch(error)) {
+        if (this.isProtocolV2ReconnectIdentityError(error)) {
           throw error;
         }
         lastError = error;
@@ -1362,13 +1391,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       await this.ensureProtocolV2DeviceAcquired();
       this.device.commands.disposed = false;
       this.device.getCommands().mainId = this.device.mainId ?? '';
-      assertProtocolV2ReconnectIdentity(
-        this.protocolV2ExpectedDeviceId,
-        this.device.getCurrentDeviceId(),
-        // Cached identity may be absent immediately after acquire. Reject only an
-        // existing mismatch; the final refresh performs strict identity validation.
-        { allowMissingActual: true }
-      );
       return;
     }
 
@@ -1389,13 +1411,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     await this.ensureProtocolV2DeviceAcquired();
     this.device.commands.disposed = false;
     this.device.getCommands().mainId = this.device.mainId ?? '';
-    assertProtocolV2ReconnectIdentity(
-      this.protocolV2ExpectedDeviceId,
-      this.device.getCurrentDeviceId(),
-      // Cached identity may be absent immediately after acquire. Reject only an
-      // existing mismatch; the final refresh performs strict identity validation.
-      { allowMissingActual: true }
-    );
   }
 
   /**
@@ -1412,8 +1427,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     });
   }
 
-  private isProtocolV2ReconnectIdentityMismatch(error: unknown) {
-    return this.normalizeErrorMessage(error).includes('Protocol V2 reconnect identity mismatch');
+  private isProtocolV2ReconnectIdentityError(error: unknown) {
+    return this.normalizeErrorMessage(error).includes('Protocol V2 reconnect physical identity');
   }
 
   private async protocolV2CommonUpdateProcess(params: ProtocolV2FileTransferParams) {

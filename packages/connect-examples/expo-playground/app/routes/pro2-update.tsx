@@ -17,7 +17,10 @@ import { useToast } from '../hooks/use-toast';
 import { useDeviceStore } from '../store/deviceStore';
 import { isPro2DeviceInfo } from '../utils/pro2Device';
 import type { DeviceInfo } from '../types/hardware';
-import { PRO2_FIRMWARE_FILE_ACCEPT } from '../constants/firmwareFiles';
+import {
+  PRO2_FIRMWARE_FILE_ACCEPT,
+  PRO2_REMOTE_FIRMWARE_TARGETS,
+} from '../constants/firmwareFiles';
 
 const TARGET_FIELDS = [
   {
@@ -247,7 +250,11 @@ export default function Pro2UpdatePage() {
       }
 
       if (selectedPayloadCount === 0) {
-        addLog('info', 'firmwareUpdateV4 remote config: pro2 firmware-v1 components');
+        params.targetsToUpdate = [...PRO2_REMOTE_FIRMWARE_TARGETS];
+        addLog(
+          'info',
+          `firmwareUpdateV4 remote config targets: ${PRO2_REMOTE_FIRMWARE_TARGETS.join(', ')}`
+        );
       } else {
         const targetNames = [
           selectedBundleCount > 0 ? `RESC bundles(${selectedBundleCount})` : null,
