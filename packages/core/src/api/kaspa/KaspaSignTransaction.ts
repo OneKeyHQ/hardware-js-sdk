@@ -81,9 +81,7 @@ export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactio
         { name: 'outputIndex', type: 'number', required: true },
         { name: 'sequenceNumber', required: true },
       ]);
-      if (usesStreamingParams) {
-        validateParams(input.output, [{ name: 'satoshis', required: true }]);
-      }
+      validateParams(input.output, [{ name: 'satoshis', required: true }]);
 
       const addressN = validatePath(input.path, 3);
 
