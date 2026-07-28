@@ -65,6 +65,7 @@ class FakeUsbTransport extends ProtocolV2UsbTransportBase {
     this.nextReadError = undefined;
     this.writeBlock = undefined;
     this.readBlock = undefined;
+    this.coalesceNextResponses = false;
   }
 
   callDevice(key, message, timeoutMs) {
@@ -118,6 +119,10 @@ class FakeUsbTransport extends ProtocolV2UsbTransportBase {
     return { started, release };
   }
 
+  coalesceNextTwoResponses() {
+    this.coalesceNextResponses = true;
+  }
+
   getProtocolV2UsbSchemas() {
     return schemas;
   }
@@ -135,8 +140,22 @@ class FakeUsbTransport extends ProtocolV2UsbTransportBase {
       { message: 'ok' },
       { router: PROTOCOL_V2_CHANNEL_USB, seq }
     );
-    const splitAt = Math.min(4, response.length);
-    this.packetQueues.set(key, [response.slice(0, splitAt), response.slice(splitAt)]);
+    if (this.coalesceNextResponses) {
+      this.coalesceNextResponses = false;
+      const nextResponse = ProtocolV2.encodeFrame(
+        schemas,
+        'Success',
+        { message: 'ok' },
+        { router: PROTOCOL_V2_CHANNEL_USB, seq: Number(seq) + 1 }
+      );
+      const packet = new Uint8Array(response.length + nextResponse.length);
+      packet.set(response);
+      packet.set(nextResponse, response.length);
+      this.packetQueues.set(key, [packet]);
+    } else {
+      const splitAt = Math.min(4, response.length);
+      this.packetQueues.set(key, [response.slice(0, splitAt), response.slice(splitAt)]);
+    }
 
     const block = this.writeBlock;
     if (block) {
@@ -212,6 +231,21 @@ describe('ProtocolV2UsbTransportBase', () => {
       ['device-a', 111],
       ['device-a', 222],
       ['device-a', 222],
+    ]);
+  });
+
+  test('keeps a coalesced response buffered for the next call', async () => {
+    const transport = new FakeUsbTransport();
+    await transport.rotate('device-a');
+    transport.coalesceNextTwoResponses();
+
+    await transport.callDevice('device-a', 'first');
+    await transport.callDevice('device-a', 'second');
+
+    expect(transport.readCounts.get('device-a')).toBe(1);
+    expect(transport.sentSeqs).toEqual([
+      ['device-a', 1],
+      ['device-a', 2],
     ]);
   });
 
