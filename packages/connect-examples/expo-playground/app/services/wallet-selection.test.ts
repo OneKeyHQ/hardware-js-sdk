@@ -13,7 +13,8 @@ describe('expo-playground 钱包选择模式', () => {
   test('Passphrase 请求交给用户选择窗口处理', () => {
     const source = readPlaygroundSource('components/providers/SDKProvider.tsx');
 
-    expect(source).toContain('window.globalDialogManager?.showPassphraseDialog();');
+    expect(source).toContain('window.globalDialogManager?.showPassphraseDialog({');
+    expect(source).toContain('existsAttachPinUser: message.payload.existsAttachPinUser === true');
     expect(source).not.toContain('PLAYGROUND_MOCK_PASSPHRASE');
   });
 

@@ -31,6 +31,7 @@ import {
   UploadCloud,
   ShieldCheck,
   ChartPie,
+  KeyRound,
 } from 'lucide-react';
 import { getDeviceLabel } from '@onekeyfe/hd-core';
 import packageJson from '../../package.json';
@@ -111,6 +112,11 @@ const navigationItems = [
     title: 'common.multisigTest',
     url: '/multisig-test',
     icon: ShieldCheck,
+  },
+  {
+    title: 'common.walletSessionTest',
+    url: '/wallet-session-test',
+    icon: KeyRound,
   },
 ];
 

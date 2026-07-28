@@ -34,6 +34,7 @@ export const en = {
       portfolioTest: 'Portfolio Test',
       methodBatchTest: 'Chain Method Batch Test',
       multisigTest: 'Multisig Test',
+      walletSessionTest: 'Wallet Session Test',
       navigation: 'Navigation',
       current: 'Current',
       toggleTheme: 'Toggle Theme',
