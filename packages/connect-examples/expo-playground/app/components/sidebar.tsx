@@ -30,6 +30,7 @@ import {
   Usb,
   UploadCloud,
   ShieldCheck,
+  ChartPie,
 } from 'lucide-react';
 import { getDeviceLabel } from '@onekeyfe/hd-core';
 import packageJson from '../../package.json';
@@ -95,6 +96,11 @@ const navigationItems = [
     title: 'common.pro2SpecialUpdate',
     url: '/pro2-special-update',
     icon: UploadCloud,
+  },
+  {
+    title: 'common.portfolioTest',
+    url: '/portfolio-test',
+    icon: ChartPie,
   },
   {
     title: 'common.methodBatchTest',
