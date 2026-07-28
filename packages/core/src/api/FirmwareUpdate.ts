@@ -133,14 +133,6 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
     const { features, commands } = device;
     const deviceType = device.getCurrentDeviceType();
 
-    // Protocol V2 (Pro2) uses DeviceFirmwareUpdate and must not enter this legacy flow.
-    if (device.isProtocolV2()) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.RuntimeError,
-        'Protocol V2 firmware update must use firmwareUpdateV4'
-      );
-    }
-
     if (!device.isBootloader() && features) {
       const serialNo = device.getCurrentSerialNo();
       // should go to bootloader mode manually

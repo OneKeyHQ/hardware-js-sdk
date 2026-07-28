@@ -7,6 +7,10 @@ import type { FilecoinGetAddress as HardwareFilecoinGetAddress } from '@onekeyfe
 import type { FilecoinAddress, FilecoinGetAddressParams } from '../../types';
 
 export default class FilecoinGetAddress extends BaseMethod<HardwareFilecoinGetAddress[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {

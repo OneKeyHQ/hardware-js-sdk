@@ -32,6 +32,10 @@ const getOutputAddressN = (output: KaspaOutputParam) =>
   'addressN' in output ? output.addressN : undefined;
 
 export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactionParams> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   // Protocols this tx can be signed with; the device picks via its first response.

@@ -6,6 +6,10 @@ import { validatePath } from '../helpers/pathUtils';
 import type { XrpSignTransactionParams } from '../../types/api/xrpSignTransaction';
 
 export default class XrpGetAddress extends BaseMethod<XrpSignTransactionParams> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {

@@ -1,6 +1,10 @@
 import { BaseMethod } from '../BaseMethod';
 
 export default class DeviceSupportFeatures extends BaseMethod {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
     this.useDevicePassphraseState = false;
     this.skipForceUpdateCheck = true;

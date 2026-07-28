@@ -29,10 +29,6 @@ export default class BenfenSignMessage extends BaseMethod<HardwareBenfenSignMess
 
   getVersionRange(): DeviceFirmwareRange {
     return {
-      pro2: {
-        min: '0.0.0',
-        unsupported: true,
-      },
       pro: {
         min: '4.12.0',
       },

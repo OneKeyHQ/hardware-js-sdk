@@ -7,6 +7,10 @@ import { batchGetPublickeys } from '../helpers/batchGetPublickeys';
 import type { SuiGetAddressParams, SuiPublicKey } from '../../types';
 
 export default class SuiGetPublicKey extends BaseMethod<any> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {

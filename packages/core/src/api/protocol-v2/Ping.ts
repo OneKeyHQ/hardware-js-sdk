@@ -32,9 +32,12 @@ export function validateProtocolV2PingMessage(value: unknown): string {
 }
 
 export default class Ping extends BaseMethod<{ message?: string }> {
+  getSupportedProtocols() {
+    return ['V2'] as const;
+  }
+
   init() {
     // Protocol V2 (Pro2) only; Core rejects non-V2 devices.
-    this.requireProtocolV2 = true;
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
     this.params = { message: validateProtocolV2PingMessage(this.payload.message) };

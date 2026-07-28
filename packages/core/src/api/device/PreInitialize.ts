@@ -18,6 +18,10 @@ const parseInitOptions = (payload?: {
 });
 
 export default class PreInitialize extends BaseMethod {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;

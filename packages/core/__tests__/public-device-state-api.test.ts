@@ -1,3 +1,5 @@
+import { EFirmwareType, HardwareErrorCode } from '@onekeyfe/hd-shared';
+
 import * as publicMethods from '../src/api';
 import GetFeatures from '../src/api/GetFeatures';
 import GetOnekeyFeatures from '../src/api/GetOnekeyFeatures';
@@ -195,7 +197,7 @@ describe('public device state API boundary', () => {
     });
   });
 
-  test('rejects getFeatures for Protocol V2 devices', async () => {
+  test('declares getFeatures unsupported on Protocol V2 devices', () => {
     const getDeviceState = jest.fn();
     const method = new GetFeatures({ id: 1, payload: { method: 'getFeatures' } });
     method.init();
@@ -207,13 +209,13 @@ describe('public device state API boundary', () => {
       isProtocolV2: () => true,
     };
 
-    await expect(method.run()).rejects.toMatchObject({
-      errorCode: expect.any(Number),
-    });
+    expect(() => method.assertProtocolSupported('V2', EFirmwareType.Universal)).toThrow(
+      expect.objectContaining({ errorCode: HardwareErrorCode.DeviceNotSupportMethod })
+    );
     expect(getDeviceState).not.toHaveBeenCalled();
   });
 
-  test('rejects getOnekeyFeatures for Protocol V2 devices', async () => {
+  test('declares getOnekeyFeatures unsupported on Protocol V2 devices', () => {
     const typedCall = jest.fn();
     const method = new GetOnekeyFeatures({ id: 1, payload: { method: 'getOnekeyFeatures' } });
     method.init();
@@ -224,9 +226,9 @@ describe('public device state API boundary', () => {
       isProtocolV2: () => true,
     };
 
-    await expect(method.run()).rejects.toMatchObject({
-      errorCode: expect.any(Number),
-    });
+    expect(() => method.assertProtocolSupported('V2', EFirmwareType.Universal)).toThrow(
+      expect.objectContaining({ errorCode: HardwareErrorCode.DeviceNotSupportMethod })
+    );
     expect(typedCall).not.toHaveBeenCalled();
   });
 });

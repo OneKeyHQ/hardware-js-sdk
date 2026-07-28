@@ -45,10 +45,6 @@ export default class NexaGetAddress extends BaseMethod<HardwareNexaGetAddress[]>
 
   getVersionRange(): DeviceFirmwareRange {
     return {
-      pro2: {
-        min: '0.0.0',
-        unsupported: true,
-      },
       model_mini: {
         min: '3.2.0',
       },

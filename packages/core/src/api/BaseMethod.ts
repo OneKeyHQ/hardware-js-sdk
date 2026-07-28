@@ -1,20 +1,25 @@
 import semver from 'semver';
 import {
+  type EFirmwareType,
   ERRORS,
   HardwareErrorCode,
   createDeviceNotSupportMethodError,
   createNeedUpgradeFirmwareHardwareError,
 } from '@onekeyfe/hd-shared';
-import { Enum_SafetyCheckLevel } from '@onekeyfe/hd-transport';
+import { Enum_SafetyCheckLevel, type ProtocolType } from '@onekeyfe/hd-transport';
 
 import { createDeviceMessage } from '../events/device';
 import { UI_REQUEST } from '../constants/ui-request';
 import { DEVICE, FIRMWARE, createFirmwareMessage, createUiMessage } from '../events';
 import { getHDPath, toHardened } from './helpers/pathUtils';
 import { getBleFirmwareReleaseInfo, getFirmwareReleaseInfo } from './firmware/releaseHelper';
-import { LoggerNames, getLogger, isMethodVersionRangeUnsupported } from '../utils';
+import { LoggerNames, getLogger } from '../utils';
 import { generateInstanceId } from '../utils/tracing';
 import { DeviceModelToTypes } from '../types';
+import {
+  type UnlockPolicy,
+  getProtocolV2UnlockPolicy,
+} from '../protocols/protocol-v2/unlockPolicy';
 
 import type { Device } from '../device/Device';
 import type DeviceConnector from '../device/DeviceConnector';
@@ -23,10 +28,6 @@ import type { CoreMessage } from '../events';
 import type { ProtocolV2InteractionDescriptor } from '../protocols/protocol-v2/uiInteraction';
 import type { RequestContext } from '../utils/tracing';
 import type { CoreContext } from '../core';
-import {
-  getProtocolV2UnlockPolicy,
-  type UnlockPolicy,
-} from '../protocols/protocol-v2/unlockPolicy';
 
 export type { UnlockPolicy } from '../protocols/protocol-v2/unlockPolicy';
 export type ProtocolV2UiMode = 'auto' | 'none';
@@ -167,16 +168,22 @@ export abstract class BaseMethod<Params = undefined> {
    */
   strictCheckDeviceSupport = false;
 
-  /**
-   * Whether this method supports Protocol V2 devices (Pro2) only.
-   * Core enforces this after the protocol is established during acquire and initialize,
-   * so implementations do not need to repeat the check.
-   * @default false
-   */
-  requireProtocolV2 = false;
-
   /** Core unlocks and retries only explicitly replay-safe Protocol V2 methods. */
   unlockPolicy: UnlockPolicy = 'none';
+
+  getSupportedProtocols(): readonly ProtocolType[] {
+    return ['V1'];
+  }
+
+  supportsProtocol(protocol: ProtocolType): boolean {
+    return this.getSupportedProtocols().includes(protocol);
+  }
+
+  assertProtocolSupported(protocol: ProtocolType, firmwareType: EFirmwareType): void {
+    if (!this.supportsProtocol(protocol)) {
+      throw createDeviceNotSupportMethodError(this.name, firmwareType);
+    }
+  }
 
   /** Non-blocking Protocol V2 interaction synthesized by the SDK. */
   protocolV2UiInteraction?: ProtocolV2InteractionDescriptor;
@@ -305,10 +312,6 @@ export abstract class BaseMethod<Params = undefined> {
 
     const firmwareVersion = this.device.getCurrentFirmwareVersionString() ?? '0.0.0';
     const versionRange = this.device.getCurrentMethodVersionRange(type => getVersionRange()[type]);
-
-    if (isMethodVersionRangeUnsupported(versionRange)) {
-      throw createDeviceNotSupportMethodError(this.name, this.device.getCurrentFirmwareType());
-    }
 
     if (!versionRange) {
       if (options?.strictCheckDeviceSupport) {

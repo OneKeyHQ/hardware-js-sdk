@@ -7,6 +7,10 @@ import { formatAnyHex } from '../helpers/hexUtils';
 import type { ConfluxSignMessage as HardwareConfluxSignMessage } from '@onekeyfe/hd-transport';
 
 export default class ConfluxSignMessage extends BaseMethod<HardwareConfluxSignMessage> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   checkDeviceId = true;
 
   init() {

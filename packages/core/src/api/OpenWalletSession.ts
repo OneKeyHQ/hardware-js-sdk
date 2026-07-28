@@ -80,6 +80,10 @@ const normalizeParams = (payload: Record<string, unknown>): OpenWalletSessionPar
 };
 
 export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParams> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
     this.useDevicePassphraseState = false;
     this.skipForceUpdateCheck = true;

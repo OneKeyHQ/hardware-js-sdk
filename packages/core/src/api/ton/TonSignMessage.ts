@@ -19,6 +19,10 @@ import type {
 import type { TonSignedMessageResponse } from '../../types/api/tonSignMessage';
 
 export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   initState: string | null = null;
 
   init() {

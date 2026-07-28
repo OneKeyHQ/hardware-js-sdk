@@ -42,10 +42,6 @@ export default class AlephiumSignTransaction extends BaseMethod<HardwareAlephium
 
   getVersionRange(): DeviceFirmwareRange {
     return {
-      pro2: {
-        min: '0.0.0',
-        unsupported: true,
-      },
       model_touch: {
         min: '4.10.0',
       },

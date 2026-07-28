@@ -7,6 +7,10 @@ import type { FilecoinSignTransactionParams } from '../../types';
 import type { FilecoinSignTx as HardwareFilecoinSignTx } from '@onekeyfe/hd-transport';
 
 export default class FilecoinSignTransaction extends BaseMethod<HardwareFilecoinSignTx> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {

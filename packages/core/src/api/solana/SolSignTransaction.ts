@@ -8,6 +8,10 @@ import type { SolanaSignTransactionParams, SolanaSignedTx } from '../../types';
 import type { SolanaSignTx as HardwareSolanaSignTx } from '@onekeyfe/hd-transport';
 
 export default class SolSignTransaction extends BaseMethod<HardwareSolanaSignTx[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {

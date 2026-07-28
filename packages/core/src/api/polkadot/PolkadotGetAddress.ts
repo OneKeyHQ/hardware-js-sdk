@@ -7,6 +7,10 @@ import type { PolkadotGetAddress as HardwarePolkadotGetAddress } from '@onekeyfe
 import type { PolkadotAddress, PolkadotGetAddressParams } from '../../types';
 
 export default class PolkadotGetAddress extends BaseMethod<HardwarePolkadotGetAddress[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {

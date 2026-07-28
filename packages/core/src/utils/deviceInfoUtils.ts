@@ -110,8 +110,5 @@ export const getMethodVersionRange = (
   return undefined;
 };
 
-export const isMethodVersionRangeUnsupported = (versionRange?: IVersionRange): boolean =>
-  versionRange?.unsupported === true;
-
 export const getFirmwareType = (features?: DeviceFeaturesInput) =>
   resolveDeviceFirmwareType(features);

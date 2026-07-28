@@ -1,8 +1,11 @@
 import { BaseMethod } from '../BaseMethod';
 
 export default class DeviceStatusGet extends BaseMethod {
+  getSupportedProtocols() {
+    return ['V2'] as const;
+  }
+
   init() {
-    this.requireProtocolV2 = true;
     this.unlockPolicy = 'none';
     this.useDevicePassphraseState = false;
     this.skipForceUpdateCheck = true;

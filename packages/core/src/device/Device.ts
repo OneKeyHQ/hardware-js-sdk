@@ -3,6 +3,7 @@ import semver from 'semver';
 import { DeviceRebootType, DeviceSessionPinType, Enum_Capability } from '@onekeyfe/hd-transport';
 import {
   EDeviceType,
+  EFirmwareType,
   ERRORS,
   ERROR_CODES_REQUIRE_DISCONNECT,
   ERROR_CODES_REQUIRE_RELEASE,
@@ -12,24 +13,12 @@ import {
   createDeviceNotSupportMethodError,
 } from '@onekeyfe/hd-shared';
 
-import {
-  LoggerNames,
-  getDeviceBLEFirmwareVersion,
-  getDeviceBleName,
-  getDeviceBootloaderVersion,
-  getDeviceFirmwareVersion,
-  getDeviceLabel,
-  getDeviceSerialNo,
-  getDeviceType,
-  getFirmwareType,
-  getLogger,
-} from '../utils';
+import { LoggerNames, getLogger } from '../utils';
 import {
   fixFeaturesFirmwareVersion,
   getPassphraseStateWithRefreshDeviceInfo,
-  supportInputPinOnSoftware,
-  supportModifyHomescreen,
 } from '../utils/deviceFeaturesUtils';
+import { parseDeviceVersion } from '../utils/deviceVersionUtils';
 import { generateInstanceId } from '../utils/tracing';
 // eslint-disable-next-line import/no-cycle
 import { DeviceCommands } from './DeviceCommands';
@@ -65,7 +54,6 @@ import { DEVICE, UI_REQUEST } from '../events';
 import { DataManager } from '../data-manager';
 import TransportManager from '../data-manager/TransportManager';
 import { toHardened } from '../api/helpers/pathUtils';
-import { existCapability } from '../utils/capabilitieUtils';
 import {
   PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST,
   PROTOCOL_V2_FULL_DEVICE_INFO_REQUEST,
@@ -298,7 +286,7 @@ export class Device extends EventEmitter {
     const deviceType = this.getCurrentDeviceType();
 
     const bleName = this.getCurrentBleName();
-    const label = this.getCurrentLabel();
+    const displayName = this.getCurrentDisplayName();
     const serialNo = this.getCurrentSerialNo();
     const connectId = this.getConnectId();
     const deviceId = this.getCurrentDeviceId() || null;
@@ -322,10 +310,10 @@ export class Device extends EventEmitter {
       deviceId,
       path: this.originalDescriptor?.path,
       bleName,
-      name: label || bleName || `OneKey ${deviceType?.toUpperCase()}`,
+      name: displayName || bleName || `OneKey ${deviceType?.toUpperCase()}`,
       // Keep the legacy top-level field string-compatible while preserving
       // the canonical nullable value at state.identity.label.
-      label: label ?? '',
+      label: displayName ?? '',
       mode: this.getMode(),
       features,
       state,
@@ -543,15 +531,15 @@ export class Device extends EventEmitter {
   }
 
   getCurrentDeviceType() {
-    return getDeviceType(this.features);
+    return this.state?.identity.deviceType ?? EDeviceType.Unknown;
   }
 
   getCurrentDeviceId() {
-    return this.features?.deviceId || undefined;
+    return this.state?.identity.deviceId || undefined;
   }
 
   getCurrentSerialNo() {
-    return getDeviceSerialNo(this.features);
+    return this.state?.identity.serialNo ?? '';
   }
 
   getConnectId() {
@@ -564,37 +552,54 @@ export class Device extends EventEmitter {
   }
 
   getCurrentBleName() {
-    return getDeviceBleName(this.features);
+    return this.state?.identity.bleName ?? null;
   }
 
   getCurrentLabel() {
-    return getDeviceLabel(this.features);
+    return this.state?.identity.label ?? null;
+  }
+
+  getCurrentDisplayName() {
+    if (!this.state) return null;
+
+    const label = this.getCurrentLabel();
+    if (label) return label;
+
+    const bleName = this.getCurrentBleName();
+    if (bleName) return bleName;
+
+    const deviceType = this.getCurrentDeviceType();
+    if (deviceType === EDeviceType.ClassicPure) {
+      return 'OneKey Classic 1S';
+    }
+
+    return `OneKey ${deviceType.charAt(0).toUpperCase() + deviceType.slice(1)}`;
   }
 
   getCurrentPassphraseProtection() {
-    return this.features?.passphraseProtection;
+    return this.state?.status.passphraseProtection;
   }
 
   getCurrentFirmwareType() {
-    return getFirmwareType(this.features);
+    return this.state?.identity.firmwareType ?? EFirmwareType.Universal;
   }
 
   getCurrentFirmwareVersionString() {
-    return getDeviceFirmwareVersion(this.features)?.join('.');
+    return parseDeviceVersion(this.state?.versions.firmware).join('.');
   }
 
   getCurrentBLEFirmwareVersionString() {
-    if (!this.features) return undefined;
-    return getDeviceBLEFirmwareVersion(this.features).join('.');
+    if (!this.state) return undefined;
+    return parseDeviceVersion(this.state.versions.ble).join('.');
   }
 
   getCurrentBootloaderVersionString() {
-    if (!this.features) return undefined;
-    return getDeviceBootloaderVersion(this.features).join('.');
+    if (!this.state) return undefined;
+    return parseDeviceVersion(this.state.versions.bootloader).join('.');
   }
 
   getCurrentSafetyChecks() {
-    return this.features?.safetyChecks;
+    return this.state?.settings.safetyChecks;
   }
 
   getCurrentMethodVersionRange(
@@ -639,8 +644,6 @@ export class Device extends EventEmitter {
   }
 
   supportInputPinOnSoftware(): SupportFeatureType {
-    if (this.features) return supportInputPinOnSoftware(this.features);
-
     const deviceType = this.getCurrentDeviceType();
     if (
       deviceType === EDeviceType.Touch ||
@@ -663,8 +666,6 @@ export class Device extends EventEmitter {
     if (this.isProtocolV2()) {
       return { support: true };
     }
-
-    if (this.features) return supportModifyHomescreen(this.features);
 
     const deviceType = this.getCurrentDeviceType();
     if (DeviceModelToTypes.model_mini.includes(deviceType)) {
@@ -698,7 +699,7 @@ export class Device extends EventEmitter {
     Log.debug(
       'getInternalState session param: ',
       `device_id: ${_deviceId}`,
-      `features.deviceId: ${this.features?.deviceId}`,
+      `currentDeviceId: ${this.getCurrentDeviceId()}`,
       `hasPassphraseState: ${Boolean(this.passphraseState)}`
     );
 
@@ -749,7 +750,7 @@ export class Device extends EventEmitter {
       'setInternalState session param: ',
       `hasState: ${Boolean(state)}`,
       `initSession: ${initSession}`,
-      `deviceId: ${this.features?.deviceId}`,
+      `deviceId: ${this.getCurrentDeviceId()}`,
       `hasPassphraseState: ${Boolean(this.passphraseState)}`
     );
 
@@ -782,7 +783,7 @@ export class Device extends EventEmitter {
     if (this.isProtocolV2()) {
       this.passphraseState = options?.passphraseState;
       if (this.state && !options?.initSession && !this.protocolV2StateNeedsReload) {
-        if (this.features?.bootloaderMode) {
+        if (this.state.status.mode === 'bootloader' || this.state.status.mode === 'romloader') {
           return;
         }
         // Normal calls reuse the cache. Explicit getDeviceState refreshes, unlock flow,
@@ -1331,20 +1332,17 @@ export class Device extends EventEmitter {
         break;
     }
 
-    if (this.features?.bootloaderMode) return EOneKeyDeviceMode.bootloader;
-    if (this.features?.initialized === false) return EOneKeyDeviceMode.notInitialized;
-    if (this.features?.noBackup) return EOneKeyDeviceMode.backupMode;
     return EOneKeyDeviceMode.normal;
   }
 
   getFirmwareVersion() {
-    if (!this.features) return null;
-    return getDeviceFirmwareVersion(this.features);
+    if (!this.state) return null;
+    return parseDeviceVersion(this.state.versions.firmware);
   }
 
   getBLEFirmwareVersion() {
-    if (!this.features) return null;
-    return getDeviceBLEFirmwareVersion(this.features);
+    if (!this.state) return null;
+    return parseDeviceVersion(this.state.versions.ble);
   }
 
   isUsed() {
@@ -1372,19 +1370,22 @@ export class Device extends EventEmitter {
   }
 
   isBootloader() {
-    return this.features && !!this.features.bootloaderMode;
+    if (!this.state) return undefined;
+    return this.state.status.mode === 'bootloader' || this.state.status.mode === 'romloader';
   }
 
   isInitialized() {
-    return this.features && !!this.features.initialized;
+    if (!this.state) return undefined;
+    return this.state.status.initialized === true;
   }
 
   isSeedless() {
-    return this.features && !!this.features.noBackup;
+    if (!this.state) return undefined;
+    return this.state.status.noBackup === true;
   }
 
   isUnacquired(): boolean {
-    return this.features === undefined;
+    return this.state === undefined;
   }
 
   hasUnexpectedMode(allow: string[], require: string[]) {
@@ -1415,7 +1416,7 @@ export class Device extends EventEmitter {
       deviceType === EDeviceType.Touch ||
       deviceType === EDeviceType.Pro ||
       deviceType === EDeviceType.Pro2;
-    const unlocked = this.features?.unlocked;
+    const unlocked = this.state?.status.unlocked;
     const preCheckTouch = isModeT && unlocked === false;
     const passphraseProtection = this.getCurrentPassphraseProtection();
 
@@ -1465,8 +1466,7 @@ export class Device extends EventEmitter {
       type => this.supportUnlockVersionRange()[type]
     );
 
-    const supportAttachPinCapability = existCapability(
-      this.features,
+    const supportAttachPinCapability = this.state?.capabilities.includes(
       Enum_Capability.Capability_AttachToPin
     );
     const supportUnlock =
@@ -1477,7 +1477,7 @@ export class Device extends EventEmitter {
 
     if (supportUnlock) {
       const res = await this.commands.typedCall('UnLockDevice', 'UnLockDeviceResponse');
-      if (this.features) {
+      if (this.state) {
         this.updateState(
           {
             status: {

@@ -18,6 +18,10 @@ import type {
 import type { SchemaParam } from '../helpers/paramsValidator';
 
 export default class EVMSignTransaction extends BaseMethod {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   addressN: number[] = [];
 
   isEIP1559 = false;

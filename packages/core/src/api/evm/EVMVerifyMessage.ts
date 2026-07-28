@@ -9,6 +9,10 @@ import verifyMessage from './latest/verifyMessage';
 import type { EthereumVerifyMessageOneKey } from '@onekeyfe/hd-transport';
 
 export default class EVMSignMessage extends BaseMethod<EthereumVerifyMessageOneKey> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
