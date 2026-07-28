@@ -1,4 +1,3 @@
-import { isEmpty } from 'lodash';
 import { EDeviceType } from '@onekeyfe/hd-shared';
 
 import { DeviceModelToTypes } from '../types';
@@ -61,21 +60,9 @@ export const getDeviceUUID = getDeviceSerialNo;
 export const getDeviceLabel = (features?: DeviceFeaturesInput) => {
   if (!features) return null;
 
-  const deviceType = getDeviceType(features);
-  if (deviceType == null) return null;
-
-  if ('label' in features && typeof features.label === 'string' && !isEmpty(features.label)) {
-    return features.label;
-  }
-
-  const bleName = getDeviceBleName(features);
-  if (!isEmpty(bleName)) return bleName;
-
-  if (deviceType === EDeviceType.ClassicPure) {
-    return 'OneKey Classic 1S';
-  }
-
-  return `OneKey ${deviceType.charAt(0).toUpperCase() + deviceType.slice(1)}`;
+  return 'label' in features && typeof features.label === 'string' && features.label.length > 0
+    ? features.label
+    : null;
 };
 
 /**

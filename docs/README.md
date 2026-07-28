@@ -18,10 +18,11 @@
 
 1. [Protocol V1/V2 传输协议](./protocol/protocol-v1-v2.md)
 2. [SDK Core 运行时](./sdk/core-runtime.md)
-3. [Pro2 字段迁移](./sdk/pro2-field-migration.md)
-4. [钱包 Session 与设备安全](./device/wallet-session-and-security.md)
-5. [Pro2 设备管理](./business/pro2-device-management.md)
-6. [Pro2 资源更新架构设计](./design/pro2-resource-update/README.md)
+3. [SDK Core 运行时——App Passphrase 接入约定](./sdk/core-runtime.md#app-passphrase-接入约定)
+4. [Pro2 字段迁移](./sdk/pro2-field-migration.md)
+5. [钱包 Session 与设备安全](./device/wallet-session-and-security.md)
+6. [Pro2 设备管理](./business/pro2-device-management.md)
+7. [Pro2 资源更新架构设计](./design/pro2-resource-update/README.md)
 
 ### 排查事件和 UI 交互
 
@@ -50,7 +51,7 @@
 | 协议 | [Protocol V1/V2 传输协议](./protocol/protocol-v1-v2.md)            | 探测、Schema、帧、Link、USB/BLE、错误恢复       |
 | SDK  | [SDK Core 运行时](./sdk/core-runtime.md)                           | Core adapter、Features、Profile、文件和升级入口 |
 | SDK  | [SDK 事件](./sdk/events.md)                                        | 设备中间消息、`hd-*` 与 `hwk-*` 事件边界        |
-| SDK  | [Pro2 无固件中间 Event 迁移](./sdk/pro2-eventless-migration.md)    | 当前 `DeviceSessionOpen` 迁移与兼容清单         |
+| SDK  | [Pro2 无固件中间 Event 迁移](./sdk/pro2-eventless-migration.md)    | 当前钱包 Session 拆分请求迁移与兼容清单         |
 | SDK  | [Pro2 字段迁移](./sdk/pro2-field-migration.md)                     | Protocol V2 字段拆分、SDK 映射和 Feature 缺口   |
 | 设备 | [钱包 Session 与设备安全](./device/wallet-session-and-security.md) | 初始化、Passphrase、Attach-to-PIN、Session 缓存 |
 | 设备 | [SLIP-39](./device/slip39.md)                                      | 恢复模型、EMS、校验和 SDK 边界                  |

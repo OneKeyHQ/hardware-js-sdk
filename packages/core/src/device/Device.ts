@@ -1,6 +1,6 @@
 import EventEmitter from 'events';
 import semver from 'semver';
-import { DeviceRebootType, Enum_Capability } from '@onekeyfe/hd-transport';
+import { DeviceRebootType, DeviceSessionPinType, Enum_Capability } from '@onekeyfe/hd-transport';
 import {
   EDeviceType,
   ERRORS,
@@ -322,8 +322,10 @@ export class Device extends EventEmitter {
       deviceId,
       path: this.originalDescriptor?.path,
       bleName,
-      name: bleName || label || `OneKey ${deviceType?.toUpperCase()}`,
-      label: label || 'OneKey',
+      name: label || bleName || `OneKey ${deviceType?.toUpperCase()}`,
+      // Keep the legacy top-level field string-compatible while preserving
+      // the canonical nullable value at state.identity.label.
+      label: label ?? '',
       mode: this.getMode(),
       features,
       state,
@@ -1068,6 +1070,22 @@ export class Device extends EventEmitter {
     this.clearPreInitialized();
   }
 
+  invalidateAfterWipe() {
+    const deviceId = this.getCurrentDeviceId();
+    if (deviceId) {
+      deviceWalletSessionStore.deleteDevice(deviceId);
+    }
+    if (this.isProtocolV2() && this.originalDescriptor.path !== deviceId) {
+      deviceWalletSessionStore.deleteDevice(this.originalDescriptor.path);
+      this.protocolV2StateNeedsReload = true;
+    }
+
+    this.passphraseState = undefined;
+    this.stateStore = new DeviceStateStore();
+    this.clearPreInitialized();
+    this.needReloadDevice = true;
+  }
+
   markProtocolV2Reboot(rebootType: DeviceRebootType) {
     if (!this.isProtocolV2()) return;
 
@@ -1418,12 +1436,17 @@ export class Device extends EventEmitter {
     };
   }
 
-  async unlockDevice() {
+  async unlockDevice(pinType: DeviceSessionPinType = DeviceSessionPinType.Main) {
     if (this.isProtocolV2()) {
       try {
-        await this.commands.typedCall('DeviceSessionAskPin', 'Success', undefined, {
-          timeoutMs: 120_000,
-        });
+        await this.commands.typedCall(
+          'DeviceSessionAskPin',
+          'Success',
+          { type: pinType },
+          {
+            timeoutMs: 120_000,
+          }
+        );
       } catch (error) {
         const errorText =
           error instanceof Error

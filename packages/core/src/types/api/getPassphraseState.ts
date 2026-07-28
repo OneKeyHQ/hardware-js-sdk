@@ -3,10 +3,11 @@ import type { CommonParams, Response } from '../params';
 export type GetPassphraseStateParams = CommonParams;
 
 /**
- * Legacy Protocol V1 wallet API.
+ * Compatibility wallet-state API for existing App integrations.
  *
- * This remains supported for Protocol V1 integrations. New cross-protocol integrations
- * and all Protocol V2 callers should use `openWalletSession`.
+ * Protocol V1 keeps its parameterless firmware flow. Protocol V2 maps the existing
+ * `useEmptyPassphrase` and `initSession` intent to the device-only wallet-session flow.
+ * New integrations should prefer `openWalletSession` for explicit wallet intent.
  */
 export declare function getPassphraseState(
   connectId?: string,

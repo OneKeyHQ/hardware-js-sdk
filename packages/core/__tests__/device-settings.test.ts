@@ -37,7 +37,6 @@ function createDevice({ protocol }: { protocol: 'V1' | 'V2' }) {
 
 describe('DeviceSettings protocol routing', () => {
   it.each([
-    ['label', { label: 'Shared Label' }],
     ['language', { language: 'ja-JP' }],
     ['brightness', { brightness: 80 }],
     ['haptic feedback', { hapticFeedback: true }],
@@ -56,6 +55,7 @@ describe('DeviceSettings protocol routing', () => {
   });
 
   it.each([
+    ['label', { label: 'Shared Label' }],
     ['auto lock', { autoLockDelayMs: 60_000 }],
     ['auto shutdown', { autoShutdownDelayMs: 120_000 }],
     ['mixed settings', { brightness: 80, autoLockDelayMs: 60_000 }],
