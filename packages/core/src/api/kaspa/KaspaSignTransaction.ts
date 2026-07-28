@@ -9,12 +9,7 @@ import { serialize, zeroSubnetworkID } from './helpers/TransferSerialize';
 import { SignatureType } from './helpers/SignatureType';
 
 import type { TypedResponseMessage } from '../../device/DeviceCommands';
-import type {
-  KaspaSignInputParams,
-  KaspaSignOutputParams,
-  KaspaSignTransactionParams,
-  KaspaSignature,
-} from '../../types';
+import type { KaspaSignTransactionParams, KaspaSignature } from '../../types';
 import type {
   KaspaInputScriptType,
   KaspaTxRequest,
@@ -27,6 +22,14 @@ import type {
 const P2PK_SCRIPT = /^(20[0-9a-f]{64}ac|21[0-9a-f]{66}ab)$/i;
 
 const isStreamableScript = (script?: string) => !script || P2PK_SCRIPT.test(script);
+
+type KaspaOutputParam = KaspaSignTransactionParams['outputs'][number];
+
+const getOutputAddress = (output: KaspaOutputParam) =>
+  'address' in output ? output.address : undefined;
+
+const getOutputAddressN = (output: KaspaOutputParam) =>
+  'addressN' in output ? output.addressN : undefined;
 
 export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactionParams> {
   hasBundle = false;
@@ -43,10 +46,20 @@ export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactio
 
     const payload = this.payload as KaspaSignTransactionParams;
 
+    const payloadInputs = Array.isArray(payload.inputs) ? payload.inputs : [];
+    const payloadOutputs = Array.isArray(payload.outputs) ? payload.outputs : [];
+
+    const usesStreamingParams =
+      payload.refTxs !== undefined ||
+      payload.payload !== undefined ||
+      payload.gas !== undefined ||
+      payloadInputs.some(input => !input.output?.script) ||
+      payloadOutputs.some(output => !!getOutputAddress(output) || !!getOutputAddressN(output));
+
     // check payload
     validateParams(payload, [
       { name: 'version', type: 'number' },
-      { name: 'sigHashType', type: 'number' },
+      { name: 'sigHashType', type: 'number', required: !usesStreamingParams },
       { name: 'inputs', type: 'array', required: true },
       { name: 'outputs', type: 'array', required: true },
       { name: 'lockTime', required: true },
@@ -57,14 +70,16 @@ export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactio
       { name: 'useTweak', type: 'boolean' },
     ]);
 
-    const inputs: KaspaSignInputParams[] = payload.inputs.map(input => {
+    const inputs: KaspaSignTransactionParams['inputs'] = payload.inputs.map(input => {
       validateParams(input, [
         { name: 'path', type: 'string', required: true },
         { name: 'prevTxId', type: 'string', required: true },
         { name: 'outputIndex', type: 'number', required: true },
         { name: 'sequenceNumber', required: true },
       ]);
-      validateParams(input.output, [{ name: 'satoshis', required: true }]);
+      if (usesStreamingParams) {
+        validateParams(input.output, [{ name: 'satoshis', required: true }]);
+      }
 
       const addressN = validatePath(input.path, 3);
 
@@ -86,17 +101,18 @@ export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactio
       ]);
     });
 
-    const outputs: KaspaSignOutputParams[] = payload.outputs.map(output => {
+    const outputs: KaspaSignTransactionParams['outputs'] = payload.outputs.map(output => {
+      const addressN = getOutputAddressN(output);
       validateParams(output, [
         { name: 'satoshis', required: true },
         { name: 'address', type: 'string' },
-        { name: 'script', type: 'string' },
+        { name: 'script', type: 'string', required: !usesStreamingParams },
         { name: 'scriptVersion', type: 'number' },
       ]);
 
       return {
         ...output,
-        addressN: output.addressN ? validatePath(output.addressN, 3) : undefined,
+        addressN: addressN ? validatePath(addressN, 3) : undefined,
         scriptVersion: output.scriptVersion ?? 0,
       };
     });
@@ -132,7 +148,9 @@ export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactio
 
     this.supportsStreaming =
       isDefaultSigHashType &&
-      this.params.outputs.every(output => !!output.address || !!output.addressN) &&
+      this.params.outputs.every(
+        output => !!getOutputAddress(output) || !!getOutputAddressN(output)
+      ) &&
       this.params.inputs.every(input => isStreamableScript(input.output.script)) &&
       this.params.outputs.every(output => isStreamableScript(output.script));
 
@@ -361,12 +379,14 @@ export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactio
             `KaspaSignTransaction: device requested output ${requestIndex} out of range`
           );
         }
-        const isChange = !!output.addressN;
+        const address = getOutputAddress(output);
+        const addressN = getOutputAddressN(output);
+        const isChange = !!addressN;
         response = await typedCall('KaspaTxAckOutput', 'KaspaTxRequest', {
           script_type: isChange ? 'KASPA_PAYTOCHANGE' : 'KASPA_PAYTOADDRESS',
           amount: output.satoshis,
-          address_n: (output.addressN as number[]) ?? [],
-          address: output.address,
+          address_n: (addressN as number[]) ?? [],
+          address,
           scheme: params.scheme,
           use_tweak: params.useTweak,
         });

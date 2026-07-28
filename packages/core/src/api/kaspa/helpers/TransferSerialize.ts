@@ -4,11 +4,7 @@ import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { SignatureType } from './SignatureType';
 import { HashWriter } from './HashWriter';
 
-import type {
-  KaspaSignInputParams,
-  KaspaSignOutputParams,
-  KaspaSignTransactionParams,
-} from '../../../types';
+import type { KaspaSignTransactionParams } from '../../../types';
 
 export function zeroHash() {
   return Buffer.alloc(32);
@@ -33,7 +29,7 @@ function isSighashNone(sighashType: number) {
   return (sighashType & 31) === SignatureType.SIGHASH_NONE;
 }
 
-function hashOutpoint(hashWriter: HashWriter, input: KaspaSignInputParams) {
+function hashOutpoint(hashWriter: HashWriter, input: KaspaSignTransactionParams['inputs'][number]) {
   hashWriter.writeHash(Buffer.from(input.prevTxId, 'hex'));
   hashWriter.writeUInt32LE(input.outputIndex);
 }
@@ -75,7 +71,7 @@ function getSigOpCountsHash(transaction: KaspaSignTransactionParams, sighashType
   return hashWriter.finalize();
 }
 
-function hashTxOut(hashWriter: HashWriter, output: KaspaSignOutputParams) {
+function hashTxOut(hashWriter: HashWriter, output: KaspaSignTransactionParams['outputs'][number]) {
   hashWriter.writeUInt64LE(output.satoshis);
   hashWriter.writeUInt16LE(0); // TODO: USE REAL SCRIPT VERSION
   if (output.script === undefined) {
