@@ -25,7 +25,10 @@ export type AuthenticateDeviceResult = {
    * the explicit model policy verified up to a trusted Trezor root CA AND the
    * device signed our challenge:
    *  - Optiga (all secure-element models), and
-   *  - Tropic + MCU/ML-DSA + matching serial numbers (T3W1).
+   *  - Tropic (T3W1 / Safe 7).
+   * This mirrors Trezor Connect's production authenticity policy. The raw MCU
+   * fields remain in the returned proof but are not a client-side pass/fail
+   * condition.
    * The reward backend must independently verify the same raw proof under its
    * own versioned policy; this client result is only a UX preview.
    */
@@ -65,14 +68,10 @@ const modelConfigOf = (config: DeviceAuthenticityConfig, deviceModel: string) =>
 
 export const getRequiredDeviceAuthenticityLayers = (
   deviceModel: string
-): readonly ('optiga' | 'tropic' | 'mcu')[] =>
-  deviceModel === 'T3W1' ? ['optiga', 'tropic', 'mcu'] : ['optiga'];
+): readonly ('optiga' | 'tropic')[] => (deviceModel === 'T3W1' ? ['optiga', 'tropic'] : ['optiga']);
 
 const isTropicExpected = (deviceModel: string): boolean =>
   getRequiredDeviceAuthenticityLayers(deviceModel).includes('tropic');
-
-const isMcuExpected = (deviceModel: string): boolean =>
-  getRequiredDeviceAuthenticityLayers(deviceModel).includes('mcu');
 
 const matchedDebugKey = (
   config: DeviceAuthenticityConfig,
@@ -82,11 +81,9 @@ const matchedDebugKey = (
   if (!rootPubKey) return false;
   const m = modelConfigOf(config, deviceModel);
   if (!m?.debug) return false;
-  return [
-    ...(m.debug.rootPubKeysOptiga ?? []),
-    ...(m.debug.rootPubKeysTropic ?? []),
-    ...(m.debug.rootPubKeysMLDSA ?? []),
-  ].includes(rootPubKey);
+  return [...(m.debug.rootPubKeysOptiga ?? []), ...(m.debug.rootPubKeysTropic ?? [])].includes(
+    rootPubKey
+  );
 };
 
 /**
@@ -132,10 +129,8 @@ export const authenticateDeviceFromProof = ({
       };
     }
 
-    // 2) On T3W1 the independent Tropic and MCU layers are also required.
-    // Their certificate serial numbers must match Optiga's.
+    // 2) Trezor Connect requires the independent Tropic proof on T3W1.
     let usedDebugKey = matchedDebugKey(config, deviceModel, optiga.rootPubKey);
-    const serialNumbers = [optiga.serialNumber];
     if (isTropicExpected(deviceModel)) {
       const { tropic_certificates: tropicCertificates, tropic_signature: tropicSignature } = proof;
       if (!tropicSignature || !tropicCertificates?.length) {
@@ -149,31 +144,7 @@ export const authenticateDeviceFromProof = ({
       if (!tropic.valid) {
         return { verified: false, error: tropic.error };
       }
-      serialNumbers.push(tropic.serialNumber);
       usedDebugKey = usedDebugKey || matchedDebugKey(config, deviceModel, tropic.rootPubKey);
-    }
-    if (isMcuExpected(deviceModel)) {
-      const { mcu_certificates: mcuCertificates, mcu_signature: mcuSignature } = proof;
-      if (!mcuSignature || !mcuCertificates?.length) {
-        return { verified: false, error: 'RESPONSE_PAYLOAD_MISSING' };
-      }
-      const mcu = verifyAuthenticityProof({
-        ...common,
-        certificates: mcuCertificates,
-        signature: mcuSignature,
-      });
-      if (!mcu.valid) {
-        return { verified: false, error: mcu.error };
-      }
-      serialNumbers.push(mcu.serialNumber);
-      usedDebugKey = usedDebugKey || matchedDebugKey(config, deviceModel, mcu.rootPubKey);
-    }
-    if (
-      serialNumbers.length > 1 &&
-      (serialNumbers.some(serialNumber => !serialNumber) ||
-        serialNumbers.some(serialNumber => serialNumber !== serialNumbers[0]))
-    ) {
-      return { verified: false, error: 'SERIAL_NUMBER_MISMATCH' };
     }
 
     const deviceId =

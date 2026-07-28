@@ -1,7 +1,6 @@
 export type CertPubKeys = {
   rootPubKeysOptiga: string[];
   rootPubKeysTropic?: string[];
-  rootPubKeysMLDSA?: string[];
 };
 
 export type ModelPubKeys = CertPubKeys & {

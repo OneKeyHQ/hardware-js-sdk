@@ -4,10 +4,10 @@
 > 本文保留了早期调查过程；以本节状态和
 > `docs/device-attestation-voucher-backend.md` 的生产边界为准。
 
-> **重要纠正**：早期 T3W1 真机结果只覆盖 Optiga + Tropic，不能代表当前要求的
-> Optiga + Tropic + MCU/ML-DSA 三层完整证明已经在当前 App 会话跑通。客户端已移除
-> 本地 Node/WSS/DMK 服务端，只保留最小真机集成检查；生产 Ledger relay 和发券信任
-> 边界由后端按 `docs/device-attestation-voucher-backend.md` 独立实现。
+> **重要纠正**：客户端验真已收敛为 Trezor Connect 的生产策略：所有支持机型验证
+> Optiga，T3W1 / Safe 7 再验证 Tropic。设备返回的 MCU 字段仍保留在 raw proof 中，
+> 但不使用自定义 ML-DSA/serial 规则覆盖厂商结果。客户端已移除本地 Node/WSS/DMK
+> 服务端，只保留最小真机集成检查；生产 Ledger relay 和发券信任边界由后端独立实现。
 
 ---
 
@@ -15,7 +15,7 @@
 
 | 项                                                          | 状态                                                     | 真机验证                                                           |
 | ----------------------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------ |
-| Trezor 设备唯一 ID（AuthenticateDevice 本地验签）           | ✅ 已补齐流式 proof + Optiga/Tropic/MCU 三层验证         | ⏳ 当前版本待 Safe 7 重新实测；官方 ML-DSA 真向量已通过            |
+| Trezor 设备唯一 ID（AuthenticateDevice 本地验签）           | ✅ 流式 proof + 官方 Optiga/Tropic 验证策略              | ⏳ 当前修复待 Safe 7 重新点击验证                                  |
 | Ledger 设备唯一 ID（官方 DMK Genuine Check）                | ✅ SDK 直接厂商验真；客户端无本地 Node relay             | ✅ Nano X 真机已返回 genuine + DSID                                |
 | Ledger 裸 attestation 公钥提取（transport tap）             | ✅ 已实现，已同步                                        | ⏳ 待测 `attestationPubKey` 字段                                   |
 | Review 修复（H1/H2/M1/M2/M3）                               | ✅ 已应用 + 单测                                         | H1 已随 T3W1 真机验证                                              |
@@ -53,8 +53,8 @@
 **机制**：`AuthenticateDevice({ challenge, stream: true })` → 旧固件直接返回
 `AuthenticityProof`，Safe 7 当前固件先返回各 proof part 的大小，再由主机以
 `GetAuthenticityProofChunk` 分块取回。主机侧使用 Trezor 公开的生产根验证证书与
-challenge 签名。T3W1 强制同时验证 Optiga(P-256)、Tropic(Ed25519) 和
-MCU(ML-DSA-44)，并要求三层设备证书 serial 一致。
+challenge 签名。T3W1 按 Trezor Connect 的生产策略同时验证
+Optiga(P-256) 和 Tropic(Ed25519)。MCU proof 会随 raw evidence 返回，但不参与当前客户端 verdict。
 
 **支持机型**：Safe 3（T2B1/T3B1）、Safe 5（T3T1）、T3W1（+Tropic）。**Trezor One(T1B1)/Model T(T2T1) 无安全芯片，不支持**。
 
@@ -69,11 +69,11 @@ MCU(ML-DSA-44)，并要求三层设备证书 serial 一致。
 **新增验签模块**：`packages/hwk-trezor-adapter/src/deviceAuthenticity/`（从 `@trezor/device-authenticity` 移植）：
 
 - `x509certificate.ts`（DER/X.509 解析，自包含，原样移植）
-- `verifySignatures.ts`（P-256 + Ed25519 + ML-DSA-44；P-256 **关 lowS**——硬件签名非 low-S）
+- `verifySignatures.ts`（P-256 + Ed25519；P-256 **关 lowS**——硬件签名非 low-S）
 - `verifyAuthenticityProof.ts`（根 CA→CA→ 设备 →challenge 全链 + CA 黑名单钩子）
-- `config.ts` + `trezorRootKeysMLDSA.ts`（Trezor 公开生产根）
-- `index.ts`（`authenticateDeviceFromProof()`：整体 try/catch 兜底、T3W1 强制三层 + serial 交叉校验、debug-key 标记）
-- `__tests__/verifyAuthenticityProof.test.ts`（包含 Trezor Suite 官方 MCU/ML-DSA 真证书和签名黄金向量）
+- `config.ts`（Trezor 公开 Optiga/Tropic 生产根）
+- `index.ts`（`authenticateDeviceFromProof()`：整体 try/catch 兜底、T3W1 强制 Optiga + Tropic、debug-key 标记）
+- `__tests__/verifyAuthenticityProof.test.ts`（Optiga/Tropic 真证书和签名黄金向量）
 
 **设备调用接线**（3 处）：
 
@@ -81,7 +81,7 @@ MCU(ML-DSA-44)，并要求三层设备证书 serial 一致。
 - `hwk-trezor-connector/src/index.ts`：switch 加 `case 'authenticateDevice'` 发 `AuthenticateDevice` 消息
 - `hwk-trezor-adapter/src/adapter/TrezorAdapter.ts`：`verifyDeviceAuthenticity` 方法
 
-**真机结果**（T3W1）：`Verified ✅`，`deviceId=serialNumber` = `3437333132303432353030383646`（ASCII "4731204250086F"），`rootPubKey` 命中 T3W1 PROD Optiga 根键（非 debug）。**证明 H1 修复（optiga+tropic+serial 三重）在真机通过**。
+**历史真机结果**（T3W1）：`Verified ✅`，`deviceId=serialNumber` = `3437333132303432353030383646`（ASCII "4731204250086F"），`rootPubKey` 命中 T3W1 PROD Optiga 根键（非 debug）。2026-07-28 收敛官方策略后的版本需要重新点击一次 Claim 验证。
 
 ### 3.2 Ledger（必须走 Ledger 后端）
 
@@ -125,15 +125,15 @@ relay、状态机、鉴权、幂等和发券事务。客户端当前没有可复
 
 ### 3.3 Review 修复状态（Fable 5 审查）
 
-- **H1**（T3W1 只验 Optiga = 芯片移植攻击面）→ ✅ 代码修复：T3W1 强制
-  Optiga + Tropic + MCU/ML-DSA，并交叉校验 serial；当前三层版本待 Safe 7 真机重测。
+- **H1**（T3W1 只验 Optiga = 芯片移植攻击面）→ ✅ 按 Trezor Connect 生产策略，
+  T3W1 强制 Optiga + Tropic；不再追加未经厂商 API 定义的 MCU/serial verdict。
 - **H2**（Ledger 假 id 易误用）→ ✅ 已被 genuine-check 重构取代：现在 Ledger 有真 `verified` + 后端验证的 deviceId。
 - **H3**（Ledger `E0 52` p1/p2 是猜测 + 批次证书风险）→ ✅ 真机坐实"裸 E0 52 不成立"，已改走 genuine-check（彻底绕开该风险）。
 - **M1**（无吊销通道）→ ✅ 加 CA 公钥黑名单钩子（默认空）。
 - **M2**（畸形证书抛未捕获异常）→ ✅ `authenticateDeviceFromProof` 整体 try/catch → `verified:false`。
 - **M3**（debug key 无守卫）→ ✅ 参数改名 `dangerouslyAllowDebugKeys` + 结果带 `usedDebugKey` 标志。
-- 已补：ML-DSA-44、Safe 7 流式 proof protobuf/连接逻辑和生产根；仍待当前 App
-  真机完整跑通。L1（CA notBefore 未来检查，Low）仍未做。
+- 已补：Safe 7 流式 proof protobuf/连接逻辑和 Optiga/Tropic 生产根；仍待当前 App
+  重新点击真机验真。L1（CA notBefore 未来检查，Low）仍未做。
 
 ---
 
@@ -142,20 +142,20 @@ relay、状态机、鉴权、幂等和发券事务。客户端当前没有可复
 app-monorepo 通过**文件拷贝**吃 SDK（node_modules 里是 dist 副本，不是软链）。每次改 SDK 都要走完整链路，**光重启不清缓存不生效**：
 
 ```bash
-# 1. 在 hardware-js-sdk 构建改过的包
+# Terminal A：同步所有本地 SDK dist 到 app-monorepo
 cd ~/Development/OnekeyWork/hardware-js-sdk
-yarn workspace @onekeyfe/hwk-ledger-adapter build   # 或改了哪个包就构建哪个
+yarn debug:watcher
 
-# 2. 同步 dist 到 app-monorepo（cp -R 只覆盖不删）
-cp -R packages/hwk-ledger-adapter/dist/. \
-  ~/Development/OnekeyWork/app-monorepo-fix-ledger/node_modules/@onekeyfe/hwk-ledger-adapter/dist/
+# Terminal B：构建并监听改过的包
+yarn workspace @onekeyfe/hwk-trezor-adapter dev
+# Ledger 改动时换成 @onekeyfe/hwk-ledger-adapter
 
-# 3. 【关键】停掉 Desktop dev，清 webpack 持久缓存（webpack 把 node_modules 当不可变，不清就用旧代码！）
+# 如果 Desktop 已缓存旧的 node_modules bundle：停掉 Desktop 后清一次缓存
 cd ~/Development/OnekeyWork/app-monorepo-fix-ledger
 rm -rf apps/desktop/node_modules/.cache node_modules/.cache/web node_modules/.cache/babel-loader
 
-# 4. 重启 Desktop（第一次无缓存会慢几分钟）
-yarn workspace @onekeyhq/desktop dev
+# 再启动 Desktop
+corepack yarn app:desktop
 ```
 
 **判断新代码是否生效**：看报错信息变没变（每版报错串不同）。曾因缓存导致改了半天还跑旧代码、报旧的 `GET CERTIFICATE failed with status 6604`。

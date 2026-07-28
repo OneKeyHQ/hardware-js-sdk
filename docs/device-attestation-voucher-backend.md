@@ -247,8 +247,9 @@ Ledger 客户端提交的 `verified`、`deviceId`、`attestationPubKey` 只能�
 3. 使用后端内置、版本化的生产 root 集合及吊销表；
 4. 验证证书链角色、有效期、签名算法与 nonce 签名；
 5. 从证书推导型号，客户端的 `deviceModelHint` 只做一致性检查；
-6. T3W1 强制 Optiga + Tropic + MCU/ML-DSA 三层证明，三张设备证书的
-   subject serial 必须都存在且一致；缺任一层直接拒绝；
+6. T3W1 至少按当前 Trezor Connect 生产策略强制验证 Optiga + Tropic；
+   `mcu_*` 字段可随 raw proof 保存，但在后端采用 MCU/ML-DSA 前必须先对齐
+   Trezor 官方库的版本化策略和测试向量，不能使用客户端自创条件；
 7. 不接受 debug/staging root；
 8. 从已验证证书推导权威 vendor DSID：
    - 有 subject serial：`trezor:v1:<serial>`；
@@ -492,7 +493,7 @@ AND postAddTask(walletId, campaignId) has never completed
 ## 9. 上线门槛
 
 - Trezor：challenge 置换、重放、错用户、过期、debug root、错链、缺
-  Optiga/Tropic/MCU 任一层、serial 不同、畸形/超大 DER 全部拒绝；
+  Optiga（T3W1 还缺 Tropic）、畸形/超大 DER 全部拒绝；
 - Ledger：伪造 `{verified:true, deviceId}` 必须拒绝；relay session 过期、错用户、重放、APDU 篡改、non-genuine、缺 certificate、并发双提交全部拒绝；
 - 两端：地址签名与 challenge 不匹配、活动重复领取、事务中途失败不发券；
 - 名称同步：只在首次新建钱包触发、只改用户确认项、加密/云端来源不误报成功；
