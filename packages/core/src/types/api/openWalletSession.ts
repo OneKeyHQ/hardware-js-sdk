@@ -5,35 +5,16 @@ export type OpenWalletSessionParams =
       mode: 'standard';
       deviceId?: never;
       passphraseState?: never;
-      useEmptyPassphrase?: never;
-      initSession?: never;
     }
   | {
       mode: 'select-hidden';
       deviceId?: never;
       passphraseState?: never;
-      useEmptyPassphrase?: never;
-      initSession?: never;
     }
   | {
       mode: 'resume-hidden';
       deviceId: string;
       passphraseState: string;
-      useEmptyPassphrase?: never;
-      initSession?: never;
-    }
-  | {
-      /**
-       * Compatibility form. `useEmptyPassphrase: true` opens the standard wallet;
-       * otherwise `initSession: true` starts a fresh hidden-wallet selection, a
-       * complete wallet binding resumes a hidden wallet, and no binding starts the
-       * hidden-wallet selection flow.
-       */
-      mode?: undefined;
-      useEmptyPassphrase?: boolean;
-      initSession?: boolean;
-      deviceId?: string;
-      passphraseState?: string;
     };
 
 type OpenWalletSessionPayloadBase = {

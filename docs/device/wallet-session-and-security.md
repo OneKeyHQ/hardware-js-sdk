@@ -598,9 +598,10 @@ Session 打开请求。
 
 ### 8.2 UI 事件流
 
-Protocol V2 的钱包选择由 SDK 主动发起带 `deviceOnly=true` 的 `REQUEST_PASSPHRASE`。App 回传
-Host Passphrase 或 `passphraseOnDevice` 时，SDK 统一进入设备端 Passphrase；回传
-`attachPinOnDevice` 时进入 Attach PIN。两种路径准备成功后都调用 `DeviceSessionGet`。
+Protocol V2 的钱包选择由 SDK 主动发起 `REQUEST_PASSPHRASE`。App 可以回传 Host Passphrase，
+并通过 `DeviceSessionAskPassphrase.passphrase` 传给固件；`passphraseOnDevice` 使用不含该字段的
+请求。`attachPinOnDevice` 进入 Attach PIN；三种路径准备成功后都调用
+`DeviceSessionGet`。
 Protocol V1 继续保留原
 `PassphraseRequest -> PassphraseAck` 行为。
 
@@ -626,7 +627,7 @@ Protocol V2 采用“Host 明确选择入口、Firmware 在设备端执行钱包
 | 能力                | Firmware / SE 职责                           | SDK / Host 职责                                                            |
 | ------------------- | -------------------------------------------- | -------------------------------------------------------------------------- |
 | 标准钱包            | 保持默认空 Passphrase seed 上下文            | 协商 eventless；锁定时发送 `DeviceSessionAskPin(Main)`                     |
-| Passphrase 钱包     | 在设备端输入 Passphrase 并准备隐藏钱包       | 发送 `DeviceSessionAskPassphrase`，再发送空参数 `DeviceSessionGet`         |
+| Passphrase 钱包     | 接收 Host 明文或在设备端输入并准备隐藏钱包   | 按选择发送带/不带 `passphrase` 的 Ask，再发送空参数 `DeviceSessionGet` |
 | 使用已有 Attach PIN | 在设备端验证 Attach PIN，恢复绑定 Passphrase | 刷新状态并校验 `unlocked_by_attach_to_pin`                                 |
 | Session 恢复        | 按可选 `session_id` 打开指定 Session         | 按 `deviceKey + passphraseState` 缓存；发送 `DeviceSessionGet(session_id)` |
 | 钱包标识            | 返回最终 `btc_test_address + session_id`     | 映射为 `passphraseState + newSession`，校验预期钱包                        |

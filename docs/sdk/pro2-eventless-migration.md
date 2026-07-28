@@ -42,7 +42,8 @@ SDK 内部根据协议版本选择 Event 来源和后续动作。
 
 - `PassphraseAck` 是对 firmware `PassphraseRequest` 的中间回复，只表达 Host Passphrase、设备
   Passphrase 或 Attach PIN 三种隐藏钱包进入方式。
-- `DeviceSessionAskPassphrase` 与 `DeviceSessionAskPin(AttachToPin)` 只在设备端准备访问上下文，
+- `DeviceSessionAskPassphrase` 与 `DeviceSessionAskPin(AttachToPin)` 准备访问上下文，
+  前者可选携带 Host Passphrase，字段缺省时在设备端输入，
   随后的空参数 `DeviceSessionGet` 才返回最终 Session。
 - `DeviceSessionGet(session_id)` 承接原 `Initialize(session_id)` 的 Session 恢复语义，
   这不是 `PassphraseAck` 原有能力。
@@ -50,7 +51,7 @@ SDK 内部根据协议版本选择 Event 来源和后续动作。
   打开，对 App 的阶段提示由 SDK 合成。
 
 ```text
-PassphraseAck(passphrase/on_device)      -> DeviceSessionAskPassphrase -> DeviceSessionGet({})
+PassphraseAck(passphrase/on_device)      -> DeviceSessionAskPassphrase({ passphrase? }) -> DeviceSessionGet({})
 PassphraseAck(on_device_attach_pin)      -> DeviceSessionAskPin(AttachToPin) -> DeviceSessionGet({})
 Initialize(session_id)                   -> DeviceSessionGet({ session_id })
 ```
@@ -68,7 +69,7 @@ Initialize(session_id)                   -> DeviceSessionGet({ session_id })
 
 | 模块         | SDK → App                       | App 响应             | SDK → firmware                    | firmware 行为                                   |
 | ------------ | ------------------------------- | -------------------- | --------------------------------- | ----------------------------------------------- |
-| 钱包 Session | `REQUEST_PASSPHRASE` 阻塞选择   | `RECEIVE_PASSPHRASE` | AskPassphrase/AskPin → SessionGet | 设备 Passphrase 或 Attach PIN，返回最终 Session |
+| 钱包 Session | `REQUEST_PASSPHRASE` 阻塞选择   | `RECEIVE_PASSPHRASE` | AskPassphrase/AskPin → SessionGet | Host/设备 Passphrase 或 Attach PIN，返回最终 Session |
 | PIN / 解锁   | `REQUEST_PIN` 非阻塞提示        | 无                   | `DeviceSessionAskPin(type)`       | 本地 PIN/指纹，返回解锁结果                     |
 | 地址 / 公钥  | `REQUEST_BUTTON` 非阻塞提示     | 无                   | 原地址/公钥方法                   | 本地确认，返回最终数据                          |
 | 签名         | `REQUEST_BUTTON` 非阻塞通用提示 | 无                   | 原签名方法 + 数据握手             | 本地完成所有确认页                              |
@@ -95,15 +96,14 @@ Pro2 继续进入这套 Event UI，但 payload 必须声明：
   source: 'wallet-session-coordinator',
   passphraseState: expectedPassphraseState,
   existsAttachPinUser: boolean,
-  deviceOnly: true,
   reason: 'open-wallet' | 'session-recovery',
   expectedPassphraseState?: string,
 }
 ```
 
-App 的 Pro2 分支可以继续返回现有三种选择形状，但所有 Passphrase 实际输入都迁移到设备端：
+App 的 Pro2 分支继续返回现有三种选择形状：
 
-- App 输入 Passphrase（仅作为兼容的“继续隐藏钱包”意图，明文不会发送给 Pro2）。
+- App 输入 Passphrase（通过可选字段发送给 Pro2）。
 - `passphraseOnDevice=true`。
 - `attachPinOnDevice=true`，且 `existsAttachPinUser=true`。
 - 用户取消。
@@ -212,7 +212,8 @@ Cancel 必须绑定当前设备和 Transport source；断连时清理请求、UI
 
 - 增加并统一使用钱包 Session coordinator。
 - `passphraseState` 非空时优先表示隐藏钱包；`useEmptyPassphrase=true` 表示标准钱包。
-- Host/设备 Passphrase 意图统一映射到 `DeviceSessionAskPassphrase`；Attach PIN 映射到
+- Host/设备 Passphrase 意图统一映射到带/不带 `passphrase` 字段的
+  `DeviceSessionAskPassphrase`；Attach PIN 映射到
   `DeviceSessionAskPin(AttachToPin)`，随后统一调用空参数 `DeviceSessionGet`。
 - `DeviceWalletSessionStore` 继续只缓存 `deviceKey + passphraseState`；标准钱包不增加缓存 key，也不调用
   `DeviceSessionGet`。
@@ -230,9 +231,8 @@ Cancel 必须绑定当前设备和 Transport source；断连时清理请求、UI
 ## app-monorepo 实施清单
 
 - 保留现有 Hardware UI Event 容器和 `uiResponse()` 通道。
-- `REQUEST_PASSPHRASE` 在 Pro2 携带 `deviceOnly=true`；App 应隐藏软件 Passphrase 输入框，
-  `source/reason` 仍只作为可选文案增强。
-- Pro2 主 PIN、Hidden Wallet PIN 与 Passphrase 均只在设备端输入。
+- `source/reason` 仍只作为可选文案增强。
+- Pro2 主 PIN 与 Hidden Wallet PIN 只在设备端输入；Passphrase 可在 App 或设备端输入。
 - Hidden Wallet PIN 入口由 `existsAttachPinUser` 决定。
 - `REQUEST_BUTTON/REQUEST_PIN` 的 Pro2 非阻塞场景不发送 `uiResponse()`。
 - 用户关闭硬件交互 UI 时取消当前调用；收到 `CLOSE_UI_WINDOW` 时只幂等收起。
@@ -255,7 +255,7 @@ Cancel 必须绑定当前设备和 Transport source；断连时清理请求、UI
 
 - 标准钱包先协商 `eventless_wallet_session=true`，锁定时调用 `AskPin(Main)`，不调用 `DeviceSessionGet`，
   不生成或暴露隐藏钱包的 `passphraseState/sessionId`。
-- 兼容 Host 意图、设备 Passphrase、Attach PIN 三种隐藏钱包选择都返回正确钱包标识，且 Host 明文不进入协议请求。
+- Host Passphrase、设备 Passphrase、Attach PIN 三种隐藏钱包选择都返回正确钱包标识。
 - 首次隐藏钱包、Session 恢复、Session 失效重选保持原 API 调用不重放。
 - Passphrase 与对应 Attach PIN 返回相同 `btc_test_address`。
 - 钱包标识不一致时终止业务。

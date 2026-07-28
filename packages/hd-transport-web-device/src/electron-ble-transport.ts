@@ -3,6 +3,7 @@ import transport, {
   PROTOCOL_V2_CHANNEL_BLE_UART,
   ProtocolV2FrameAssembler,
   ProtocolV2LinkManager,
+  TRANSPORT_EVENT,
   bytesToHex,
   hexToBytes,
   probeProtocolV2 as probeProtocolV2Helper,
@@ -75,6 +76,8 @@ export default class ElectronBleTransport {
   private _messages: ReturnType<typeof transport.parseConfigure> | undefined;
 
   private _messagesV2: ReturnType<typeof transport.parseConfigure> | undefined;
+
+  private protocolV2SchemaConfiguration: string | undefined;
 
   name = 'ElectronBleTransport';
 
@@ -206,10 +209,19 @@ export default class ElectronBleTransport {
   }
 
   configureProtocolV2(signedData: any) {
+    const configuration = typeof signedData === 'string' ? signedData : JSON.stringify(signedData);
+    if (this.protocolV2SchemaConfiguration === configuration) {
+      return;
+    }
+
+    const isReconfiguration = this.protocolV2SchemaConfiguration !== undefined;
     this._messagesV2 = parseConfigure(signedData);
-    this.protocolV2Links
-      .invalidateAllLinks('Protocol V2 schema reconfigured')
-      .catch(error => this.Log?.debug('[Electron BLE] schema link cleanup failed:', error));
+    this.protocolV2SchemaConfiguration = configuration;
+    if (isReconfiguration) {
+      this.protocolV2Links
+        .invalidateAllLinks('Protocol V2 schema reconfigured')
+        .catch(error => this.Log?.debug('[Electron BLE] schema link cleanup failed:', error));
+    }
   }
 
   async listen() {
@@ -290,7 +302,7 @@ export default class ElectronBleTransport {
         (disconnectedDevice: any) => {
           if (disconnectedDevice.id === uuid) {
             this.cleanupDeviceState(uuid);
-            this.emitter?.emit('device-disconnect', {
+            this.emitter?.emit(TRANSPORT_EVENT.DEVICE_DISCONNECT, {
               name: disconnectedDevice.name,
               id: disconnectedDevice.id,
               connectId: disconnectedDevice.id,
@@ -301,12 +313,6 @@ export default class ElectronBleTransport {
       this.disconnectCleanups.set(uuid, disconnectCleanup);
 
       const protocolType = await this.detectProtocol(uuid, expectedProtocol, protocolHint);
-
-      this.emitter?.emit('device-connect', {
-        name: device.name,
-        id: device.id,
-        connectId: device.id,
-      });
 
       return {
         ...toBleDescriptor({ id: device.id, name: device.name }, protocolType),

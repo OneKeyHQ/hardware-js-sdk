@@ -18,6 +18,7 @@ import transport, {
   type ProtocolV2CallContext,
   ProtocolV2FrameAssembler,
   ProtocolV2LinkManager,
+  TRANSPORT_EVENT,
   type TransportCallOptions,
   probeProtocolV2 as probeProtocolV2Helper,
 } from '@onekeyfe/hd-transport';
@@ -245,6 +246,8 @@ export default class ReactNativeBleTransport {
 
   _messagesV2: ReturnType<typeof transport.parseConfigure> | undefined;
 
+  private protocolV2SchemaConfiguration: string | undefined;
+
   name = 'ReactNativeBleTransport';
 
   configured = false;
@@ -293,6 +296,8 @@ export default class ReactNativeBleTransport {
 
   private monitorTokens: Map<string, number> = new Map();
 
+  private disconnectEventTokens: Map<string, number> = new Map();
+
   private nextMonitorToken = 1;
 
   constructor(options: TransportOptions) {
@@ -311,10 +316,19 @@ export default class ReactNativeBleTransport {
   }
 
   configureProtocolV2(signedData: any) {
+    const configuration = typeof signedData === 'string' ? signedData : JSON.stringify(signedData);
+    if (this.protocolV2SchemaConfiguration === configuration) {
+      return;
+    }
+
+    const isReconfiguration = this.protocolV2SchemaConfiguration !== undefined;
     this._messagesV2 = parseConfigure(signedData);
-    this.protocolV2Links
-      .invalidateAllLinks('Protocol V2 schema reconfigured')
-      .catch(error => Log?.debug('Protocol V2 schema link cleanup failed:', error));
+    this.protocolV2SchemaConfiguration = configuration;
+    if (isReconfiguration) {
+      this.protocolV2Links
+        .invalidateAllLinks('Protocol V2 schema reconfigured')
+        .catch(error => Log?.debug('Protocol V2 schema link cleanup failed:', error));
+    }
   }
 
   listen() {
@@ -428,6 +442,7 @@ export default class ReactNativeBleTransport {
 
   attachDisconnectSubscription(transport: BleTransport, device: Device, uuid: string) {
     transport.disconnectSubscription?.remove();
+    const { monitorToken } = transport;
     transport.disconnectSubscription = device.onDisconnected(() => {
       if (this.firmwareUploadWriteRecoveryIds.has(uuid)) {
         Log?.debug('device disconnect ignored during FirmwareUpload write recovery: ', uuid);
@@ -437,14 +452,14 @@ export default class ReactNativeBleTransport {
         Log?.debug('device disconnect ignored for stale transport: ', device?.id);
         return;
       }
+      if (this.monitorTokens.get(uuid) !== monitorToken) {
+        Log?.debug('device disconnect ignored for stale generation: ', device?.id);
+        return;
+      }
 
       try {
         Log?.debug('device disconnect: ', device?.id);
-        this.emitter?.emit('device-disconnect', {
-          name: device?.name,
-          id: device?.id,
-          connectId: device?.id,
-        });
+        this.emitDeviceDisconnect(uuid, device?.name, monitorToken);
         if (this.runPromise) {
           const error = ERRORS.TypedError(HardwareErrorCode.BleConnectedError);
           this.runPromise.reject(error);
@@ -455,6 +470,22 @@ export default class ReactNativeBleTransport {
       } finally {
         this.release(uuid, true);
       }
+    });
+  }
+
+  private emitDeviceDisconnect(uuid: string, name: string | null | undefined, token?: number) {
+    if (token === undefined || this.disconnectEventTokens.get(uuid) === token) {
+      return;
+    }
+    if (this.monitorTokens.get(uuid) !== token) {
+      Log?.debug('device disconnect event ignored for stale generation: ', uuid);
+      return;
+    }
+    this.disconnectEventTokens.set(uuid, token);
+    this.emitter?.emit(TRANSPORT_EVENT.DEVICE_DISCONNECT, {
+      name,
+      id: uuid,
+      connectId: uuid,
     });
   }
 
@@ -799,12 +830,6 @@ export default class ReactNativeBleTransport {
     }
 
     const protocolType = await this.detectProtocol(uuid, expectedProtocol, protocolHint);
-
-    this.emitter?.emit('device-connect', {
-      name: device.name,
-      id: device.id,
-      connectId: device.id,
-    });
 
     this.attachDisconnectSubscription(transport, device, uuid);
 
@@ -1262,6 +1287,7 @@ export default class ReactNativeBleTransport {
   async disconnect(session: string) {
     await this.protocolV2Links.invalidateLink(session, 'React Native BLE transport disconnected');
     const transport = transportCache[session];
+    const monitorToken = transport?.monitorToken ?? this.monitorTokens.get(session);
 
     // Clean up disconnect subscription first to prevent onDisconnected callback
     // from being triggered when we cancel the connection below
@@ -1325,13 +1351,12 @@ export default class ReactNativeBleTransport {
 
     // emit the disconnect event
     try {
-      this.emitter?.emit('device-disconnect', {
-        name: transport?.device?.name,
-        id: session,
-        connectId: session,
-      });
+      this.emitDeviceDisconnect(session, transport?.device?.name, monitorToken);
     } catch (e) {
       Log?.error('resetSession: emit disconnect event error: ', e);
+    }
+    if (monitorToken !== undefined && this.monitorTokens.get(session) === monitorToken) {
+      this.monitorTokens.delete(session);
     }
     // eslint-disable-next-line no-promise-executor-return
     await new Promise<void>(resolve => setTimeout(() => resolve(), 100));

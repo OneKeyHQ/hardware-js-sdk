@@ -2,6 +2,7 @@ import type {
   deviceGetOnboardingStatus,
   deviceReboot,
   deviceUploadWallpaper,
+  testProtocolV2Ping,
   uploadPortfolio,
 } from './protocolV2';
 import type { off, on, removeAllListeners } from './event';
@@ -149,6 +150,7 @@ export type { DeviceStateScope, GetDeviceStateParams } from './getDeviceState';
 export type { GetPassphraseStateParams } from './getPassphraseState';
 export type { OpenWalletSessionParams, OpenWalletSessionPayload } from './openWalletSession';
 export type { ClearSessionCacheParams, ClearSessionCachePayload } from './sessionCache';
+export type { TestProtocolV2PingParams } from './protocolV2';
 
 export type CoreApi = {
   /**
@@ -172,6 +174,7 @@ export type CoreApi = {
    * Test function
    */
   testInitializeDeviceDuration: typeof testInitializeDeviceDuration;
+  testProtocolV2Ping: typeof testProtocolV2Ping;
   preInitialize: typeof preInitialize;
 
   /**
