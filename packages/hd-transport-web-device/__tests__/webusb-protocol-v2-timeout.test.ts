@@ -53,7 +53,6 @@ describe('WebUsbTransport Protocol V2 timeout recovery', () => {
     webusb.receiveProtocolV2Frame = jest.fn(() => new Promise<void>(() => {}));
     webusb.resetConnectionAfterProbe = jest.fn().mockImplementation(() => {
       webusb.protocolV2Sessions.delete(path);
-      webusb.protocolV2ReadTimeouts.delete(path);
       webusb.protocolV2Assemblers.get(path)?.reset();
     });
 
@@ -88,7 +87,6 @@ describe('WebUsbTransport Protocol V2 timeout recovery', () => {
         .mockResolvedValue(recoveredResponse);
       webusb.resetConnectionAfterProbe = jest.fn().mockImplementation(() => {
         webusb.protocolV2Sessions.delete(path);
-        webusb.protocolV2ReadTimeouts.delete(path);
         webusb.protocolV2Assemblers.get(path)?.reset();
       });
 
@@ -133,5 +131,34 @@ describe('WebUsbTransport Protocol V2 timeout recovery', () => {
     await webusb.callProtocolV2(path, 'Ping', { message: 'second' });
 
     expect(reset).not.toHaveBeenCalled();
+  });
+
+  test('keeps queued Protocol V2 read timeouts scoped to each call', async () => {
+    const webusb = new WebUsbTransport() as any;
+    const path = 'pro2-webusb';
+    let responseSequence = 0;
+    webusb.messages = transport.parseConfigure(schema);
+    webusb.messagesV2 = transport.parseConfigure(schema);
+    webusb.transferOutOnce = jest.fn().mockResolvedValue(undefined);
+    webusb.receiveProtocolV2Frame = jest.fn().mockImplementation(() => {
+      responseSequence += 1;
+      return Promise.resolve(
+        ProtocolV2.encodeFrame(
+          { protocolV1: webusb.messages, protocolV2: webusb.messagesV2 },
+          'Success',
+          { message: 'ok' },
+          { seq: responseSequence }
+        )
+      );
+    });
+
+    await Promise.all([
+      webusb.callProtocolV2(path, 'Ping', { message: 'long' }, { timeoutMs: 1_000 }),
+      webusb.callProtocolV2(path, 'Ping', { message: 'short' }, { timeoutMs: 25 }),
+    ]);
+
+    expect(
+      webusb.receiveProtocolV2Frame.mock.calls.map(([, timeoutMs]: unknown[]) => timeoutMs)
+    ).toEqual([1_000, 25]);
   });
 });
