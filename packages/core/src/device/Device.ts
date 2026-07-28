@@ -344,6 +344,10 @@ export class Device extends EventEmitter {
     // eslint-disable-next-line no-async-promise-executor
     return new Promise<boolean>(async (resolve, reject) => {
       if (DataManager.isBleConnect(env)) {
+        if (this.hasDeviceAcquire() && this.commands && !this.commands.disposed) {
+          resolve(true);
+          return;
+        }
         try {
           await this.acquire(connectProtocol);
           resolve(true);
@@ -1065,6 +1069,7 @@ export class Device extends EventEmitter {
   }
 
   markTransportDisconnected() {
+    this.deviceAcquired = false;
     if (!this.isProtocolV2()) return;
     this.protocolV2StateNeedsReload = true;
     this.clearPreInitialized();
@@ -1357,7 +1362,7 @@ export class Device extends EventEmitter {
   isUsedHere() {
     const env = DataManager.getSettings('env');
     if (DataManager.isBleConnect(env)) {
-      return false;
+      return this.deviceAcquired;
     }
     return this.isUsed() && this.originalDescriptor.session === this.mainId;
   }
@@ -1439,14 +1444,7 @@ export class Device extends EventEmitter {
   async unlockDevice(pinType: DeviceSessionPinType = DeviceSessionPinType.Main) {
     if (this.isProtocolV2()) {
       try {
-        await this.commands.typedCall(
-          'DeviceSessionAskPin',
-          'Success',
-          { type: pinType },
-          {
-            timeoutMs: 120_000,
-          }
-        );
+        await this.commands.typedCall('DeviceSessionAskPin', 'Success', { type: pinType });
       } catch (error) {
         const errorText =
           error instanceof Error

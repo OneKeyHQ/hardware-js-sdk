@@ -2,6 +2,7 @@ import { ERRORS, HardwareError, HardwareErrorCode, wait } from '@onekeyfe/hd-sha
 import {
   DeviceRebootType,
   PROTOCOL_V2_BLE_FILE_CHUNK_SIZE,
+  PROTOCOL_V2_BLE_FILE_READ_CHUNK_SIZE,
   PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE,
 } from '@onekeyfe/hd-transport';
 
@@ -370,7 +371,10 @@ export const assertProtocolV2ReconnectIdentity = (
   actualSerialNumber?: string
 ) => {
   if (!expectedSerialNumber || !actualSerialNumber) {
-    return;
+    throw ERRORS.TypedError(
+      HardwareErrorCode.DeviceNotFound,
+      'Protocol V2 reconnect physical identity is unavailable'
+    );
   }
   if (actualSerialNumber !== expectedSerialNumber) {
     throw ERRORS.TypedError(
@@ -450,13 +454,17 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     };
   }
 
-  private getProtocolV2FirmwareChunkSize() {
+  private getProtocolV2FirmwareChunkSize(direction: 'read' | 'write' = 'write') {
     const payloadChunkSize = Number(this.params?.chunkSize);
     const env = DataManager.getSettings('env');
-    const maxChunkSize =
-      this.params?.platform === 'native' || (env && DataManager.isBleConnect(env))
-        ? PROTOCOL_V2_BLE_FILE_CHUNK_SIZE
-        : PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE;
+    const isBle = this.params?.platform === 'native' || (env && DataManager.isBleConnect(env));
+    let maxChunkSize = PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE;
+    if (isBle) {
+      maxChunkSize =
+        direction === 'read'
+          ? PROTOCOL_V2_BLE_FILE_READ_CHUNK_SIZE
+          : PROTOCOL_V2_BLE_FILE_CHUNK_SIZE;
+    }
     if (!Number.isFinite(payloadChunkSize) || payloadChunkSize <= 0) {
       return maxChunkSize;
     }
@@ -669,7 +677,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       return null;
     }
 
-    const chunkSize = this.getProtocolV2FirmwareChunkSize();
+    const chunkSize = this.getProtocolV2FirmwareChunkSize('read');
     const chunks: Uint8Array[] = [];
     let offset = 0;
     while (offset < PROTOCOL_V2_OKPP_HEADER_SIZE) {

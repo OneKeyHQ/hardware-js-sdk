@@ -247,13 +247,13 @@ App 不应按型号或 PID 自行选择协议，也不应直接发送
 | App 意图          | Pro V1 固件流程                         | Pro2 Protocol V2 固件流程                                  |
 | ----------------- | --------------------------------------- | ---------------------------------------------------------- |
 | 标准钱包          | 空 Passphrase 兼容流程                  | 必要时 `DeviceSessionAskPin(Main)`                         |
-| 设备端 Passphrase | `GetPassphraseState -> PassphraseState` | `DeviceSessionAskPassphrase -> DeviceSessionGet({})`       |
+| Passphrase 隐藏钱包 | `GetPassphraseState -> PassphraseState` | `DeviceSessionAskPassphrase({ passphrase? }) -> DeviceSessionGet({})` |
 | Attach-to-PIN     | `GetPassphraseState -> PassphraseState` | `DeviceSessionAskPin(AttachToPin) -> DeviceSessionGet({})` |
 | 恢复已选隐藏钱包  | Core 管理 V1 Session 复用               | `DeviceSessionGet({ session_id })`                         |
 
-Pro2 上的 `REQUEST_PASSPHRASE` 始终是 `deviceOnly=true`。旧 App 仍可按原有 UI response
-形式提交“设备输入 Passphrase”或“Attach PIN”意图；Core 只使用该选择编排协议，
-不会把 Host 端 Passphrase 明文传给 Pro2。
+Pro2 Protocol V2 支持软件输入：Core 将非空值放入
+`DeviceSessionAskPassphrase.passphrase`；选择设备输入时发送空请求。Pro2 尚未发布，SDK 不兼容
+缺少该字段的开发阶段旧固件。
 
 对 App 的最小回归检查是：
 

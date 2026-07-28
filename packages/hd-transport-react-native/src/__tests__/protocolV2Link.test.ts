@@ -2,6 +2,7 @@ import { EventEmitter } from 'events';
 import transportPackage, {
   PROTOCOL_V2_CHANNEL_BLE_UART,
   ProtocolV2,
+  TRANSPORT_EVENT,
   bytesToHex,
 } from '@onekeyfe/hd-transport';
 import { HardwareErrorCode } from '@onekeyfe/hd-shared';
@@ -102,6 +103,7 @@ const createHarness = () => {
         characteristic: { value: string } | null
       ) => void)
     | undefined;
+  let disconnectCallback: (() => void) | undefined;
   const notifyCharacteristic = {
     uuid: '0003',
     deviceID: uuid,
@@ -140,7 +142,11 @@ const createHarness = () => {
     localName: 'OneKey Pro 2',
     serviceUUIDs: ['fffd'],
     isConnected: jest.fn(() => Promise.resolve(true)),
-    onDisconnected: jest.fn(() => ({ remove: jest.fn() })),
+    cancelConnection: jest.fn(() => Promise.resolve()),
+    onDisconnected: jest.fn(callback => {
+      disconnectCallback = callback;
+      return { remove: jest.fn() };
+    }),
   };
   const bleManager = {
     devices: jest.fn(() => Promise.resolve([device])),
@@ -148,16 +154,18 @@ const createHarness = () => {
     cancelTransaction: jest.fn(() => Promise.resolve()),
   };
   const transport = new ReactNativeBleTransport({ scanTimeout: 1 });
+  const emitter = new EventEmitter();
   transport.blePlxManager = bleManager;
   transport.resolveCharacteristics = jest.fn(() =>
     Promise.resolve({ writeCharacteristic, notifyCharacteristic })
   );
-  transport.init({ debug: jest.fn(), error: jest.fn() }, new EventEmitter());
+  transport.init({ debug: jest.fn(), error: jest.fn() }, emitter);
   transport.configure(protocolV1Schema);
   transport.configureProtocolV2(protocolV2Schema);
 
   return {
     transport,
+    emitter,
     uuid,
     sentSeqs,
     writeCharacteristic,
@@ -166,6 +174,9 @@ const createHarness = () => {
     },
     emitMonitorError(error: Error & { reason?: string }) {
       notifyCallback?.(error, null);
+    },
+    emitDisconnect() {
+      disconnectCallback?.();
     },
   };
 };
@@ -248,6 +259,23 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     const rejection = expect(call).rejects.toThrow('React Native BLE transport disconnected');
     await transport.disconnect(uuid);
     await rejection;
+  });
+
+  test('emits one disconnect event when the physical callback races manual cleanup', async () => {
+    const harness = createHarness();
+    const disconnectListener = jest.fn();
+    harness.emitter.on(TRANSPORT_EVENT.DEVICE_DISCONNECT, disconnectListener);
+
+    await harness.transport.acquire({ uuid: harness.uuid });
+    harness.emitDisconnect();
+    await harness.transport.disconnect(harness.uuid);
+
+    expect(disconnectListener).toHaveBeenCalledTimes(1);
+    expect(disconnectListener).toHaveBeenCalledWith({
+      name: 'OneKey Pro 2',
+      id: harness.uuid,
+      connectId: harness.uuid,
+    });
   });
 
   test('chunks large frames and retries only transient GATT congestion', async () => {

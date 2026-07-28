@@ -11506,6 +11506,33 @@
         }
       }
     },
+    "UiAnimationType": {
+      "values": {
+        "Unknown": 0,
+        "Signing": 1
+      }
+    },
+    "UiAnimationCommand": {
+      "values": {
+        "CommandUnknown": 0,
+        "Start": 1,
+        "Stop": 2,
+        "Refresh": 3
+      }
+    },
+    "UiAnimationRequest": {
+      "fields": {
+        "command": {
+          "rule": "required",
+          "type": "UiAnimationCommand",
+          "id": 1
+        },
+        "type": {
+          "type": "UiAnimationType",
+          "id": 2
+        }
+      }
+    },
     "ViewAmount": {
       "fields": {
         "is_unlimited": {
@@ -12482,7 +12509,12 @@
       }
     },
     "DeviceSessionAskPassphrase": {
-      "fields": {}
+      "fields": {
+        "passphrase": {
+          "type": "string",
+          "id": 1
+        }
+      }
     },
     "DeviceSessionAskPin_FailureSubCodes": {
       "values": {

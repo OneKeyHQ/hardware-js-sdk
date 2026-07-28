@@ -1,5 +1,15 @@
 import type EventEmitter from 'events';
 
+export const TRANSPORT_EVENT = {
+  DEVICE_DISCONNECT: 'transport-device-disconnect',
+} as const;
+
+export type TransportDeviceDisconnectEvent = {
+  id: string;
+  connectId: string;
+  name: string | null;
+};
+
 export type ProtocolType = 'V1' | 'V2';
 
 export type OneKeyDeviceCommType =

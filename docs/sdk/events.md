@@ -151,7 +151,7 @@ V2 不伪造硬件 `ButtonRequest/PinMatrixRequest/PassphraseRequest`。阻塞 E
 | ----------------------------------------------- | --------------------------- | ---------------------------------- | ---------------------------------------------- | --------------------------------------------------- |
 | `REQUEST_PIN`                                   | V1 硬件消息转换             | `PinMatrixRequest`                 | `RECEIVE_PIN`                                  | `PinMatrixAck` 或切换设备输入                       |
 | `REQUEST_PASSPHRASE`                            | V1 硬件消息转换             | `PassphraseRequest`                | `RECEIVE_PASSPHRASE`                           | `PassphraseAck`                                     |
-| `REQUEST_PASSPHRASE`                            | V2 WalletSessionCoordinator | 隐藏钱包首次选择                   | `RECEIVE_PASSPHRASE`                           | 选择设备 Passphrase 或 Attach PIN；随后获取 Session |
+| `REQUEST_PASSPHRASE`                            | V2 WalletSessionCoordinator | 隐藏钱包首次选择                   | `RECEIVE_PASSPHRASE`                           | 选择 Host/设备 Passphrase 或 Attach PIN；随后获取 Session |
 | `REQUEST_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE`   | Core 流程生成               | 老 WebUSB 升级重启到 bootloader 后 | `SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE`   | 把重新授权的 `deviceId` 交回旧固件流程              |
 | `REQUEST_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE` | Core 流程生成               | 老固件切换或重连阶段               | `SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE` | 把重新选择的 `deviceId` 交回旧固件流程              |
 
@@ -237,11 +237,11 @@ HardwareSDK.uiResponse({
 V1 中，`attachPinOnDevice` 只有在设备的 `PassphraseRequest.exists_attach_pin_user` 为真时才会转换成
 `PassphraseAck.on_device_attach_pin`。
 
-V2 中，SDK 根据 `DeviceStatus.attach_to_pin_enabled` 生成 `existsAttachPinUser`，并设置
-`deviceOnly=true`。`passphraseOnDevice` 映射为 `DeviceSessionAskPassphrase`，
+V2 中，SDK 根据 `DeviceStatus.attach_to_pin_enabled` 生成 `existsAttachPinUser`。
+非空软件值映射为 `DeviceSessionAskPassphrase({ passphrase })`，`passphraseOnDevice` 映射为
+空参数 `DeviceSessionAskPassphrase({})`，
 `attachPinOnDevice` 映射为 `DeviceSessionAskPin(AttachToPin)`；成功后统一调用
-`DeviceSessionGet({})`。为兼容旧 App，提交非空普通 Passphrase 仍表示选择隐藏钱包，但明文不会
-进入 Protocol V2 请求，用户需要在设备端重新输入。
+`DeviceSessionGet({})`。Pro2 尚未发布，不保留开发阶段旧固件的 `deviceOnly` 降级。
 
 ## 不需要回传的设备交互
 
@@ -400,7 +400,7 @@ SELECT_DEVICE_* -> 当前对应设备选择等待
 1. V1 实现 PIN、Passphrase 和 WebUSB 设备选择的 `uiResponse()`。
 2. V2 只为阻塞钱包选择回传 Passphrase 选择；`REQUEST_PIN/REQUEST_BUTTON` 不响应。
 3. 根据 Event `source/reason` 区分 V1 硬件转换与 V2 SDK 合成来源；Pro2 的
-   `REQUEST_PASSPHRASE` 也携带 `deviceOnly=true`，不得把软件输入值发送给设备。
+   `REQUEST_PASSPHRASE` 可回传软件输入值、设备输入或 Attach PIN 三种选择。
 4. Button 和设备端 Passphrase 阶段提示只展示，不发送响应。
 5. 用户主动关闭交互 UI 时取消当前调用；收到 `CLOSE_UI_WINDOW/CLOSE_UI_PIN_WINDOW` 时只幂等关闭。
 6. 不并行启动两个需要同类型 UI 响应的调用。

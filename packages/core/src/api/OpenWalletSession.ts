@@ -21,13 +21,6 @@ const requiredString = (value: unknown, name: string) => {
   return value.trim();
 };
 
-const optionalBoolean = (value: unknown, name: string) => {
-  if (value !== undefined && typeof value !== 'boolean') {
-    throw invalidParameter(`Parameter [${name}] must be a boolean.`);
-  }
-  return value;
-};
-
 const wasResumed = (session: unknown) =>
   !!session &&
   typeof session === 'object' &&
@@ -53,72 +46,31 @@ const requireHiddenWalletResponse = (session: {
   };
 };
 
-type NormalizedOpenWalletSessionParams = OpenWalletSessionParams & {
-  legacySessionToClear?: {
-    deviceId?: string;
-    passphraseState: string;
-  };
-};
-
-const normalizeParams = (payload: Record<string, unknown>): NormalizedOpenWalletSessionParams => {
-  if (payload.mode !== undefined) {
-    if (
-      payload.mode !== 'standard' &&
-      payload.mode !== 'select-hidden' &&
-      payload.mode !== 'resume-hidden'
-    ) {
+const normalizeParams = (payload: Record<string, unknown>): OpenWalletSessionParams => {
+  if (payload.mode === undefined) {
+    throw invalidParameter('Parameter [mode] is required.');
+  }
+  if (
+    payload.mode !== 'standard' &&
+    payload.mode !== 'select-hidden' &&
+    payload.mode !== 'resume-hidden'
+  ) {
+    throw invalidParameter(
+      'Parameter [mode] must be one of standard, select-hidden, or resume-hidden.'
+    );
+  }
+  if (payload.useEmptyPassphrase !== undefined || payload.initSession !== undefined) {
+    throw invalidParameter(
+      'Legacy parameters [useEmptyPassphrase] and [initSession] are not supported by openWalletSession.'
+    );
+  }
+  if (payload.mode === 'standard' || payload.mode === 'select-hidden') {
+    if (payload.deviceId !== undefined || payload.passphraseState !== undefined) {
       throw invalidParameter(
-        'Parameter [mode] must be one of standard, select-hidden, or resume-hidden.'
+        'Parameters [deviceId] and [passphraseState] are only allowed with mode [resume-hidden].'
       );
     }
-    if (payload.useEmptyPassphrase !== undefined || payload.initSession !== undefined) {
-      throw invalidParameter(
-        'Parameters [useEmptyPassphrase] and [initSession] cannot be used with [mode].'
-      );
-    }
-    if (payload.mode === 'standard' || payload.mode === 'select-hidden') {
-      if (payload.deviceId !== undefined || payload.passphraseState !== undefined) {
-        throw invalidParameter(
-          'Parameters [deviceId] and [passphraseState] are only allowed with mode [resume-hidden].'
-        );
-      }
-      return { mode: payload.mode };
-    }
-    return {
-      mode: 'resume-hidden',
-      deviceId: requiredString(payload.deviceId, 'deviceId'),
-      passphraseState: requiredString(payload.passphraseState, 'passphraseState'),
-    };
-  }
-
-  const useEmptyPassphrase = optionalBoolean(payload.useEmptyPassphrase, 'useEmptyPassphrase');
-  const initSession = optionalBoolean(payload.initSession, 'initSession');
-  if (useEmptyPassphrase === true) {
-    return { mode: 'standard' };
-  }
-  if (initSession === true) {
-    const deviceId =
-      payload.deviceId === undefined ? undefined : requiredString(payload.deviceId, 'deviceId');
-    const passphraseState =
-      payload.passphraseState === undefined
-        ? undefined
-        : requiredString(payload.passphraseState, 'passphraseState');
-    return {
-      mode: 'select-hidden',
-      ...(passphraseState
-        ? {
-            legacySessionToClear: {
-              deviceId,
-              passphraseState,
-            },
-          }
-        : {}),
-    };
-  }
-
-  const hasWalletBinding = payload.deviceId !== undefined || payload.passphraseState !== undefined;
-  if (!hasWalletBinding) {
-    return { mode: 'select-hidden' };
+    return { mode: payload.mode };
   }
   return {
     mode: 'resume-hidden',
@@ -127,7 +79,7 @@ const normalizeParams = (payload: Record<string, unknown>): NormalizedOpenWallet
   };
 };
 
-export default class OpenWalletSession extends BaseMethod<NormalizedOpenWalletSessionParams> {
+export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParams> {
   init() {
     this.useDevicePassphraseState = false;
     this.skipForceUpdateCheck = true;
@@ -139,32 +91,17 @@ export default class OpenWalletSession extends BaseMethod<NormalizedOpenWalletSe
     const isProtocolV2 = this.device.isProtocolV2();
     const state = await this.device.getDeviceState({ refreshSections: ['status'] });
     let currentDeviceId = state.identity.deviceId;
-    const { legacySessionToClear } = this.params;
     const requireDeviceId = () => {
       if (!currentDeviceId) {
         throw ERRORS.TypedError(HardwareErrorCode.DeviceInitializeFailed);
       }
       return currentDeviceId;
     };
-    const clearLegacySession = () => {
-      const deviceId = requireDeviceId();
-      if (
-        legacySessionToClear &&
-        (!legacySessionToClear.deviceId || legacySessionToClear.deviceId === deviceId)
-      ) {
-        deviceWalletSessionStore.delete(deviceId, legacySessionToClear.passphraseState);
-      }
-    };
     const refreshProtocolV2DeviceId = async () => {
       const refreshedState = await this.device.getDeviceState({ refreshSections: ['status'] });
       currentDeviceId = refreshedState.identity.deviceId;
-      clearLegacySession();
       return requireDeviceId();
     };
-
-    if (!isProtocolV2) {
-      clearLegacySession();
-    }
 
     const protocol = isProtocolV2 ? 'V2' : 'V1';
 
