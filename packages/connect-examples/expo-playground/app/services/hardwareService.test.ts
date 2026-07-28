@@ -53,6 +53,7 @@ const mockClearSessionCache = jest.fn(async (...args: unknown[]) => {
     payload: { cleared: true },
   };
 });
+const mockUiResponse = jest.fn();
 let mockDeviceType = 'pro';
 let mockProtocol: 'V1' | 'V2' = 'V1';
 let mockProtocolVersion: number | null = 1;
@@ -66,6 +67,7 @@ jest.mock('../utils/hardwareInstance', () => ({
     promptWebDeviceAccess: mockPromptWebDeviceAccess,
     clearSessionCache: mockClearSessionCache,
     deviceStatusGet: mockDeviceStatusGet,
+    uiResponse: mockUiResponse,
   }),
   clearSDKInstanceCache: () => undefined,
   TransportManager: {
@@ -127,7 +129,7 @@ jest.mock('./previewHardwareParams', () => ({
   previewHardwareParams: () => undefined,
 }));
 
-import { callHardwareAPI, getDeviceSearchUserMessage } from './hardwareService';
+import { callHardwareAPI, getDeviceSearchUserMessage, submitAttachPin } from './hardwareService';
 
 const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
 
@@ -138,6 +140,7 @@ afterEach(() => {
   mockGetPassphraseState.mockClear();
   mockOpenWalletSession.mockClear();
   mockDeviceStatusGet.mockClear();
+  mockUiResponse.mockClear();
   mockDeviceType = 'pro';
   mockProtocol = 'V1';
   mockProtocolVersion = 1;
@@ -147,6 +150,25 @@ afterEach(() => {
   } else {
     Reflect.deleteProperty(globalThis, 'window');
   }
+});
+
+describe('wallet selection UI responses', () => {
+  test('selects Attach PIN without sending a host passphrase', async () => {
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: {},
+    });
+
+    await submitAttachPin();
+
+    expect(mockUiResponse).toHaveBeenCalledWith({
+      type: 'ui-receive_passphrase',
+      payload: {
+        value: '',
+        attachPinOnDevice: true,
+      },
+    });
+  });
 });
 
 describe('callHardwareAPI', () => {
