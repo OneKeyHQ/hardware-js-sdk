@@ -18,6 +18,151 @@ DEFAULT_FIRMWARE_ROOT = REPOSITORY_ROOT.parent / "firmware-pro2"
 DEFAULT_OUTPUT = PLAYGROUND_ROOT / "public" / "portfolio-cases"
 TIMESTAMP_MS = 1785200000000
 
+TokenMapping = tuple[str, str, str, str, str]
+
+NATIVE_TOKEN_MAPPINGS: list[TokenMapping] = [
+    ("BTC", "Bitcoin", "btc--0", "", "BTC"),
+    ("DOGE", "Dogecoin", "doge--0", "", "DOGE"),
+    ("BCH", "Bitcoin Cash", "bch--0", "", "BCH"),
+    ("LTC", "Litecoin", "ltc--0", "", "LTC"),
+    ("XNA", "Neurai", "neurai--0", "", "XNA"),
+    ("TBTC", "Bitcoin", "tbtc--0", "", "BTC"),
+    ("SBTC", "Bitcoin", "tbtc--1", "", "BTC"),
+    ("ETH", "Ethereum", "evm--1", "", "ETH"),
+    ("BNB", "BNB", "evm--56", "", "BNB"),
+    ("POL", "POL", "evm--137", "", "POL"),
+    ("ETH", "Ethereum", "evm--42161", "", "ETH"),
+    ("AVAX", "Avalanche", "evm--43114", "", "AVAX"),
+    ("ETH", "Ethereum", "evm--10", "", "ETH"),
+    ("ETH", "Ethereum", "evm--324", "", "ETH"),
+    ("MNT", "Mantle", "evm--5000", "", "MNT"),
+    ("ETH", "Ethereum", "evm--59144", "", "ETH"),
+    ("KAVA", "Kava", "evm--2222", "", "KAVA"),
+    ("FIL", "Filecoin", "evm--314", "", "FIL"),
+    ("ETHW", "EthereumPoW", "evm--10001", "", "ETHW"),
+    ("TETH", "Ethereum", "evm--11155111", "", "ETH"),
+    ("ETC", "Ethereum Classic", "evm--61", "", "ETC"),
+    ("CRO", "Cronos", "evm--25", "", "CRO"),
+    ("CFX", "Conflux", "evm--1030", "", "CFX"),
+    ("ETH", "Ethereum", "evm--288", "", "ETH"),
+    ("ETH", "Ethereum", "evm--8453", "", "ETH"),
+    ("ETH", "Ethereum", "evm--1313161554", "", "ETH"),
+    ("S", "Sonic", "evm--146", "", "S"),
+    ("HSK", "HashKey Chain", "evm--177", "", "HSK"),
+    ("ETH", "Ethereum", "evm--560048", "", "ETH"),
+    ("TIA", "Celestia", "cosmos--celestia", "", "TIA"),
+    ("SCRT", "Secret Network", "cosmos--secret-4", "", "SCRT"),
+    ("JUNO", "Juno", "cosmos--juno-1", "", "JUNO"),
+    ("FET", "Fetch.ai", "cosmos--fetchhub-4", "", "FET"),
+    ("CRO", "Cronos", "cosmos--crypto-org-chain-mainnet-1", "", "CRO"),
+    ("AKT", "Akash", "cosmos--akashnet-2", "", "AKT"),
+    ("OSMO", "Osmosis", "cosmos--osmosis-1", "", "OSMO"),
+    ("ATOM", "Cosmos", "cosmos--cosmoshub-4", "", "ATOM"),
+    ("BABY", "Babylon", "cosmos--bbn-1", "", "BABY"),
+    ("TBABY", "Babylon", "cosmos--bbn-test-5", "", "BABY"),
+    ("USDC", "USD Coin", "cosmos--noble-1", "", "USDC"),
+    ("ASTR", "Astar", "dot--astar", "", "ASTR"),
+    ("MANTA", "Manta", "dot--manta", "", "MANTA"),
+    ("DOT", "Polkadot", "dot--asset-hub", "", "DOT"),
+    ("KSM", "Kusama", "dot--kusama-assethub", "", "KSM"),
+    ("APT", "Aptos", "aptos--1", "0x1::aptos_coin::AptosCoin", "APT"),
+    ("ADA", "Cardano", "ada--0", "", "ADA"),
+    ("XRP", "XRP", "xrp--0", "", "XRP"),
+    ("nostr", "Nostr", "nostr--0", "", "NOSTR"),
+    ("NEAR", "NEAR", "near--0", "", "NEAR"),
+    ("TRX", "TRON", "tron--0x2b6653dc", "", "TRON"),
+    ("CFX", "Conflux", "cfx--1029", "", "CFX"),
+    ("SOL", "Solana", "sol--101", "", "SOL"),
+    ("NEX", "Nexa", "nexa--0", "", "NEX"),
+    ("KAS", "Kaspa", "kaspa--kaspa", "", "KAS"),
+    ("FIL", "Filecoin", "fil--314", "", "FIL"),
+    ("ALGO", "Algorand", "algo--4160", "", "ALGO"),
+    ("SUI", "Sui", "sui--mainnet", "0x2::sui::SUI", "SUI"),
+    ("CKB", "Nervos", "nervos--mainnet", "", "CKB"),
+    ("ALPH", "Alephium", "alph--mainnet", "", "ALPH"),
+    ("GRAM", "TON", "ton--mainnet", "", "TON"),
+    ("BFC", "BenFen", "bfc--mainnet", "", "BFC"),
+    ("XLM", "Stellar", "stellar--mainnet", "", "XLM"),
+    ("XLM", "Stellar", "stellar--testnet", "", "XLM"),
+]
+
+CONTRACT_TOKEN_MAPPINGS: list[TokenMapping] = [
+    (
+        "USDT",
+        "Tether USD",
+        "evm--1",
+        "0xdac17f958d2ee523a2206206994597c13d831ec7",
+        "USDT",
+    ),
+    (
+        "USDC",
+        "USD Coin",
+        "evm--1",
+        "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+        "USDC",
+    ),
+    (
+        "USDT",
+        "Tether USD",
+        "evm--56",
+        "0x55d398326f99059ff775485246999027b3197955",
+        "USDT",
+    ),
+    (
+        "USDC",
+        "USD Coin",
+        "evm--56",
+        "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d",
+        "USDC",
+    ),
+    (
+        "USDT",
+        "Tether USD",
+        "evm--137",
+        "0xc2132d05d31c914a87c6611c10748aeb04b58e8f",
+        "USDT",
+    ),
+    (
+        "USDC",
+        "USD Coin",
+        "evm--137",
+        "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359",
+        "USDC",
+    ),
+    (
+        "USDT",
+        "Tether USD",
+        "sol--101",
+        "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+        "USDT",
+    ),
+    (
+        "USDC",
+        "USD Coin",
+        "sol--101",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "USDC",
+    ),
+    (
+        "USDT",
+        "Tether USD",
+        "tron--0x2b6653dc",
+        "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
+        "USDT",
+    ),
+]
+
+AGGREGATE_TOKEN_MAPPINGS: list[TokenMapping] = [
+    ("BTC", "Bitcoin", "", "", "BTC"),
+    ("ETH", "Ethereum", "", "", "ETH"),
+    ("BNB", "BNB", "", "", "BNB"),
+    ("SOL", "Solana", "", "", "SOL"),
+    ("TRX", "TRON", "", "", "TRON"),
+    ("USDC", "USD Coin", "", "", "USDC"),
+    ("USDT", "Tether USD", "", "", "USDT"),
+    ("XRP", "XRP", "", "", "XRP"),
+]
+
 
 def token(
     symbol: str,
@@ -124,6 +269,73 @@ def case(
         result["expectedError"] = "Invalid portfolio package"
     if expected == "client-block":
         result["expectedError"] = "金额字符串超过 7 位有效数字"
+    return result
+
+
+def mapping_payload(
+    label: str,
+    mappings: list[TokenMapping],
+    *,
+    is_native: bool,
+    is_all_networks: bool,
+) -> dict[str, Any]:
+    colors = [0xF7931A, 0x8C8CFF, 0x14F195, 0x2775CA, 0x26A17B]
+    percentage = round(100 / len(mappings), 2)
+    percentages = [percentage] * len(mappings)
+    percentages[-1] = round(100 - sum(percentages[:-1]), 2)
+    tokens = [
+        token(
+            symbol,
+            name,
+            str(index),
+            f"${index * 10:.2f}",
+            percentages[index - 1],
+            colors[index - 1],
+            network_id,
+            is_native=is_native,
+            is_all_networks=is_all_networks,
+            contract_address=contract_address,
+            icon_name=icon_name,
+        )
+        for index, (symbol, name, network_id, contract_address, icon_name) in enumerate(
+            mappings, start=1
+        )
+    ]
+    total = sum(index * 10 for index in range(1, len(mappings) + 1))
+    return payload(label, f"${total:.2f}", tokens, 0, "$0.00", 0)
+
+
+def build_mapping_cases() -> list[dict[str, Any]]:
+    definitions = [
+        ("Native", "原生资产映射", NATIVE_TOKEN_MAPPINGS, True, False),
+        ("Contract", "合约资产映射", CONTRACT_TOKEN_MAPPINGS, False, False),
+        ("All Networks", "全网络聚合映射", AGGREGATE_TOKEN_MAPPINGS, False, True),
+    ]
+    result: list[dict[str, Any]] = []
+    case_number = 1
+    for label, title, mappings, is_native, is_all_networks in definitions:
+        batches = [mappings[index : index + 5] for index in range(0, len(mappings), 5)]
+        for batch_number, batch in enumerate(batches, start=1):
+            case_id = f"M{case_number:02d}"
+            identifiers = ", ".join(
+                network_id or icon_name
+                for _, _, network_id, _, icon_name in batch
+            )
+            result.append(
+                case(
+                    case_id,
+                    f"{title} {batch_number}/{len(batches)}",
+                    f"验证 {identifiers} 的 networkId、contractAddress、name 与 iconName 正常传输和显示。",
+                    "accept",
+                    mapping_payload(
+                        f"{case_id} {label} {batch_number}",
+                        batch,
+                        is_native=is_native,
+                        is_all_networks=is_all_networks,
+                    ),
+                )
+            )
+            case_number += 1
     return result
 
 
@@ -241,6 +453,7 @@ def build_cases(sample_path: Path) -> list[dict[str, Any]]:
         case("P07", "币种字形与 ISO 降级", "覆盖 ৳、៛、؋、常用符号，以及不支持字符降级后的 XYZ 前缀。", "accept", glyph_d),
         case("P08", "顺序、颜色与 Other", "验证 Token 数组顺序、RGB888 颜色、百分比和 Other 最大 count=65535。", "accept", ordered),
         case("P09", "47 字节边界", "验证金额字段恰好 47 个 UTF-8 字节时仍被固件接受。", "accept", parser_max),
+        *build_mapping_cases(),
         case("P10", "反向测试保护基线", "在非法用例前写入一份有效数据，用于确认后续拒绝不会破坏已安装 Portfolio。", "accept", guard),
         case("N01", "48 字节金额", "金额字段超过固件 47 字节上限，预期返回 Invalid portfolio package。", "reject", too_long),
         case("N02", "Token 数量不一致", "tokenCount 与 tokens.length 不一致，预期固件拒绝。", "reject", mismatch),
