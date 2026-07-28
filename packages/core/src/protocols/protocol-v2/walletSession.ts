@@ -1,10 +1,11 @@
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { DeviceSessionPinType } from '@onekeyfe/hd-transport';
 
 import { DEVICE } from '../../events';
 import { assertCompleteDeviceSession } from './deviceSession';
 import { isDeviceLockedError } from './lockedError';
 
-import type { DeviceSessionOpen } from '@onekeyfe/hd-transport';
+import type { DeviceSessionGet } from '@onekeyfe/hd-transport';
 import type { Device } from '../../device/Device';
 
 export async function requestProtocolV2DeviceStatus(device: Device) {
@@ -23,15 +24,36 @@ const negotiateEventlessWalletSession = async (device: Device) => {
   });
 };
 
-const openDeviceSession = async (device: Device, request: DeviceSessionOpen) => {
+const getDeviceSession = async (device: Device, request: DeviceSessionGet) => {
   try {
-    return await device.commands.typedCall('DeviceSessionOpen', 'DeviceSession', request);
+    return await device.commands.typedCall('DeviceSessionGet', 'DeviceSession', request);
   } catch (error) {
     if (!isDeviceLockedError(error)) {
       throw error;
     }
-    await device.unlockDevice();
-    return device.commands.typedCall('DeviceSessionOpen', 'DeviceSession', request);
+    await device.unlockDevice(DeviceSessionPinType.Main);
+    return device.commands.typedCall('DeviceSessionGet', 'DeviceSession', request);
+  }
+};
+
+const askDevicePassphrase = async (device: Device) => {
+  const request = () =>
+    device.commands.typedCall(
+      'DeviceSessionAskPassphrase',
+      'Success',
+      {},
+      {
+        timeoutMs: 120_000,
+      }
+    );
+  try {
+    return await request();
+  } catch (error) {
+    if (!isDeviceLockedError(error)) {
+      throw error;
+    }
+    await device.unlockDevice(DeviceSessionPinType.Main);
+    return request();
   }
 };
 
@@ -42,13 +64,13 @@ const selectDeviceSession = async (device: Device) => {
     reason: 'open-wallet' as const,
   };
   const response = await device.commands.promptPassphrase(
-    { existsAttachPinUser, ...metadata },
+    { existsAttachPinUser, deviceOnly: true, ...metadata },
     { cancelDeviceOnReject: false }
   );
-  const hostPassphrase =
-    typeof response.passphrase === 'string' ? response.passphrase.normalize('NFKD') : undefined;
+  const hasHostPassphrase =
+    typeof response.passphrase === 'string' && response.passphrase.length > 0;
   const selections = [
-    !!hostPassphrase,
+    hasHostPassphrase,
     response.passphraseOnDevice === true,
     response.attachPinOnDevice === true,
   ].filter(Boolean).length;
@@ -68,17 +90,15 @@ const selectDeviceSession = async (device: Device) => {
       );
     }
     device.emit(DEVICE.ATTACH_PIN_ON_DEVICE, device, metadata);
-    return openDeviceSession(device, { select: { attach_pin_on_device: {} } });
+    await device.unlockDevice(DeviceSessionPinType.AttachToPin);
+    return getDeviceSession(device, {});
   }
 
-  if (response.passphraseOnDevice) {
-    device.emit(DEVICE.PASSPHRASE_ON_DEVICE, device, metadata);
-    return openDeviceSession(device, { select: { passphrase_on_device: {} } });
-  }
-
-  return openDeviceSession(device, {
-    select: { host_passphrase: { passphrase: hostPassphrase as string } },
-  });
+  // Protocol V2 no longer accepts host-provided passphrase text. A legacy host
+  // response is treated only as the user's choice to continue on the device.
+  device.emit(DEVICE.PASSPHRASE_ON_DEVICE, device, metadata);
+  await askDevicePassphrase(device);
+  return getDeviceSession(device, {});
 };
 
 export async function getProtocolV2WalletSession(
@@ -91,6 +111,7 @@ export async function getProtocolV2WalletSession(
 ) {
   if (options?.initSession) {
     device.clearInternalState();
+    device.passphraseState = undefined;
   }
 
   await negotiateEventlessWalletSession(device);
@@ -103,7 +124,7 @@ export async function getProtocolV2WalletSession(
     : options?.expectedPassphraseState ?? device.passphraseState;
 
   if (device.features?.unlocked === false) {
-    await device.unlockDevice();
+    await device.unlockDevice(DeviceSessionPinType.Main);
   }
 
   if (options?.onlyMainPin || device.getCurrentPassphraseProtection() === false) {
@@ -122,7 +143,7 @@ export async function getProtocolV2WalletSession(
 
   if (cachedSessionId && expectedPassphraseState) {
     try {
-      response = await openDeviceSession(device, { resume: { session_id: cachedSessionId } });
+      response = await getDeviceSession(device, { session_id: cachedSessionId });
       resumed = true;
     } catch (error) {
       device.clearInternalState();

@@ -8,7 +8,7 @@ export const LogBlockEvent: Set<string> = new Set([
 const LogBlockMethod: Set<string> = new Set([
   'evmSignTypedData',
   'openWalletSession',
-  'DeviceSessionOpen',
+  'DeviceSessionGet',
   'deviceUploadWallpaper',
   'uploadPortfolio',
   'fileWrite',

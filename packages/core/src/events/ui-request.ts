@@ -107,6 +107,7 @@ export interface UiRequestPassphrase {
     device: Device;
     passphraseState?: string;
     existsAttachPinUser?: boolean;
+    deviceOnly?: boolean;
     source?: 'wallet-session-coordinator';
     reason?: 'open-wallet' | 'session-recovery';
     expectedPassphraseState?: string;

@@ -53,7 +53,12 @@ const HIGH_VOLUME_DEBUG_CALLS = new Set([
   'FirmwareUpload',
   'ResourceAck',
 ]);
-const SENSITIVE_DEBUG_CALLS = new Set(['DeviceSessionOpen']);
+const SENSITIVE_DEBUG_CALLS = new Set(['DeviceSessionGet']);
+const DEVICE_SESSION_CALLS = new Set([
+  'DeviceSessionGet',
+  'DeviceSessionAskPin',
+  'DeviceSessionAskPassphrase',
+]);
 
 function shouldReduceDebugForCall(type: string) {
   return HIGH_VOLUME_DEBUG_CALLS.has(type);
@@ -459,7 +464,7 @@ export class DeviceCommands {
         'PinMatrixAck',
         'PassphraseAck',
         'Cancel',
-        'DeviceSessionOpen',
+        'DeviceSessionGet',
         'BixinPinInputOnDevice',
         'FilesystemFileRead',
         'FilesystemFileWrite',
@@ -607,7 +612,7 @@ export class DeviceCommands {
         const isLegacyProtocolV2LockedFailure =
           this.device.isProtocolV2() && /^device (?:is )?locked$/i.test(normalizedMessage);
         if (
-          callType === 'DeviceSessionOpen' &&
+          DEVICE_SESSION_CALLS.has(callType) &&
           subcode === DeviceSessionErrorCode.DeviceSessionError_InvalidSession
         ) {
           error = ERRORS.TypedError(HardwareErrorCode.WalletSessionInvalid, message, {
@@ -616,7 +621,7 @@ export class DeviceCommands {
             firmwareMessage: message,
           });
         } else if (
-          callType === 'DeviceSessionOpen' &&
+          DEVICE_SESSION_CALLS.has(callType) &&
           subcode === DeviceSessionErrorCode.DeviceSessionError_UserCancelled
         ) {
           error = ERRORS.TypedError(HardwareErrorCode.ActionCancelled, message, {
@@ -625,7 +630,7 @@ export class DeviceCommands {
             firmwareMessage: message,
           });
         } else if (
-          callType === 'DeviceSessionOpen' &&
+          DEVICE_SESSION_CALLS.has(callType) &&
           subcode === DeviceSessionErrorCode.DeviceSessionError_AttachPinUnavailable
         ) {
           error = ERRORS.TypedError(HardwareErrorCode.DeviceCheckUnlockTypeError, message, {
@@ -634,7 +639,7 @@ export class DeviceCommands {
             firmwareMessage: message,
           });
         } else if (
-          callType === 'DeviceSessionOpen' &&
+          DEVICE_SESSION_CALLS.has(callType) &&
           subcode === DeviceSessionErrorCode.DeviceSessionError_PassphraseDisabled
         ) {
           error = ERRORS.TypedError(HardwareErrorCode.DeviceNotOpenedPassphrase, message, {

@@ -369,10 +369,7 @@ export const assertProtocolV2ReconnectIdentity = (
   actualSerialNumber?: string
 ) => {
   if (!expectedSerialNumber || !actualSerialNumber) {
-    throw ERRORS.TypedError(
-      HardwareErrorCode.DeviceNotFound,
-      'Protocol V2 reconnect physical identity unavailable'
-    );
+    return;
   }
   if (actualSerialNumber !== expectedSerialNumber) {
     throw ERRORS.TypedError(

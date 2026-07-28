@@ -18,7 +18,7 @@ export function assertCompleteDeviceSession(
   ) {
     throw ERRORS.TypedError(
       HardwareErrorCode.RuntimeError,
-      'DeviceSessionOpen returned an incomplete DeviceSession response.'
+      'DeviceSessionGet returned an incomplete DeviceSession response.'
     );
   }
 }
