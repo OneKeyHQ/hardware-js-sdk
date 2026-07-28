@@ -337,6 +337,26 @@ export async function submitPassphrase(
   }
 }
 
+export async function submitAttachPin(): Promise<void> {
+  logRequest('Selecting Attach PIN on device');
+  if (typeof window === 'undefined') return;
+
+  try {
+    const sdkInstance = await getSDKInstance();
+    sdkInstance.uiResponse({
+      type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+      payload: {
+        value: '',
+        attachPinOnDevice: true,
+      },
+    });
+    logResponse('Attach PIN selection submitted');
+  } catch (error) {
+    logError('Failed to submit Attach PIN selection', { error });
+    throw error;
+  }
+}
+
 // 获取设备的passphraseState
 export async function getPassphraseState(connectId: string): Promise<ApiResponse> {
   if (typeof window === 'undefined') {
