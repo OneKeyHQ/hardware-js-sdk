@@ -2,13 +2,7 @@ import { recoverAddress } from 'ethers';
 import { describe, expect, test } from '@jest/globals';
 
 import { generateEthFixtures } from '../generateEthFixtures';
-import type { MultisigMnemonics } from '../readMnemonics';
-
-const TEST_MNEMONICS: MultisigMnemonics = [
-  'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about',
-  'legal winner thank year wave sausage worth useful legal winner thank yellow',
-  'letter advice cage absurd amount doctor acoustic avoid letter advice cage above',
-];
+import { TEST_MNEMONICS } from './testMnemonics';
 
 describe('generateEthFixtures', () => {
   test('生成三个确定性的 Safe EIP-712 用例', async () => {

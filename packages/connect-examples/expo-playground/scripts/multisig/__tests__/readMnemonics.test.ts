@@ -4,10 +4,9 @@ import {
   mergeMultisigMnemonicEnv,
   readMultisigMnemonics,
 } from '../readMnemonics';
+import { TEST_MNEMONICS } from './testMnemonics';
 
-const MNEMONIC_1 = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
-const MNEMONIC_2 = 'legal winner thank year wave sausage worth useful legal winner thank yellow';
-const MNEMONIC_3 = 'letter advice cage absurd amount doctor acoustic avoid letter advice cage above';
+const [MNEMONIC_1, MNEMONIC_2, MNEMONIC_3] = TEST_MNEMONICS;
 
 function createEnv(overrides: Record<string, string | undefined> = {}): NodeJS.ProcessEnv {
   return {

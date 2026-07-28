@@ -5,13 +5,7 @@ import { address as bitcoinAddress, networks, Transaction } from 'bitcoinjs-lib'
 
 import MessagesJSON from '../../../../../core/src/data/messages/messages.json';
 import { generateBtcFixtures } from '../generateBtcFixtures';
-import type { MultisigMnemonics } from '../readMnemonics';
-
-const TEST_MNEMONICS: MultisigMnemonics = [
-  'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about',
-  'legal winner thank year wave sausage worth useful legal winner thank yellow',
-  'letter advice cage absurd amount doctor acoustic avoid letter advice cage above',
-];
+import { TEST_MNEMONICS } from './testMnemonics';
 
 describe('generateBtcFixtures', () => {
   test('生成三种 2-of-3 fixture 和图片同构的 P2WSH 2-of-2 fixture', async () => {
