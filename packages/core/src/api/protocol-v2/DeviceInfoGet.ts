@@ -1,5 +1,3 @@
-import { createDeviceNotSupportMethodError } from '@onekeyfe/hd-shared';
-
 import { UI_REQUEST } from '../../constants/ui-request';
 import { PROTOCOL_V2_DEVICE_INFO_TIMEOUT_MS } from '../../protocols/protocol-v2';
 import { BaseMethod } from '../BaseMethod';
@@ -109,9 +107,11 @@ export default class DeviceInfoGet extends BaseMethod<{
   targets: DeviceInfoGetTargets;
   types: DeviceInfoGetTypes;
 }> {
+  getSupportedProtocols() {
+    return ['V2'] as const;
+  }
+
   init() {
-    // Protocol V2 (Pro2) only; Core rejects non-V2 devices.
-    this.requireProtocolV2 = true;
     this.unlockPolicy = 'none';
     this.allowDeviceMode = [
       ...this.allowDeviceMode,
@@ -127,10 +127,6 @@ export default class DeviceInfoGet extends BaseMethod<{
   }
 
   async run() {
-    if (!this.device.isProtocolV2()) {
-      throw createDeviceNotSupportMethodError(this.name, this.device.getCurrentFirmwareType());
-    }
-
     const res = await this.device.commands.typedCall(
       'DeviceInfoGet',
       'DeviceInfo',

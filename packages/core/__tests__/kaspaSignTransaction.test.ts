@@ -38,6 +38,7 @@ const createMethod = (overrides: Record<string, unknown> = {}) =>
       method: 'kaspaSignTransaction',
       version: 0,
       lockTime: 0,
+      sigHashType: 0x41,
       inputs: [buildInput(SCRIPT)],
       outputs: [{ satoshis: 100000, script: SCRIPT }],
       ...overrides,
@@ -130,9 +131,9 @@ describe('KaspaSignTransaction capability flags', () => {
   });
 
   it('throws when neither protocol fits', () => {
-    expect(() => createMethod({ outputs: [{ satoshis: 1 }] }).init()).toThrow(
-      'outputs require either address/addressN'
-    );
+    expect(() =>
+      createMethod({ inputs: [buildInput()], outputs: [{ satoshis: 1 }] }).init()
+    ).toThrow('outputs require either address/addressN');
   });
 });
 

@@ -7,6 +7,10 @@ import { invalidParameter } from '../helpers/filesystemValidation';
 import type { ChangePin } from '@onekeyfe/hd-transport';
 
 export default class DeviceChangePin extends BaseMethod<ChangePin> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
     this.unlockPolicy = 'unlock-before-run';
     this.useDevicePassphraseState = false;

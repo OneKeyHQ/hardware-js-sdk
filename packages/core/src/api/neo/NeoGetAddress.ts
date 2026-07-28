@@ -40,10 +40,6 @@ export default class NeoGetAddress extends BaseMethod<HardwareNeoGetAddress[]> {
 
   getVersionRange(): DeviceFirmwareRange {
     return {
-      pro2: {
-        min: '0.0.0',
-        unsupported: true,
-      },
       pro: {
         min: '4.12.0',
       },

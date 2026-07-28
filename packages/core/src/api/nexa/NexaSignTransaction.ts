@@ -31,10 +31,6 @@ export default class NexaSignTransaction extends BaseMethod<NexaSignTransactionP
 
   getVersionRange(): DeviceFirmwareRange {
     return {
-      pro2: {
-        min: '0.0.0',
-        unsupported: true,
-      },
       model_mini: {
         min: '3.2.0',
       },

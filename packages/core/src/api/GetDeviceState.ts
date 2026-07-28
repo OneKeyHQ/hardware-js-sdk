@@ -17,6 +17,10 @@ const isLoaderMode = (mode: string) => mode === 'bootloader' || mode === 'romloa
 export default class GetDeviceState extends BaseMethod<
   Required<Pick<GetDeviceStateParams, 'scope'>>
 > {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
     const scope = (this.payload.scope ?? 'runtime') as DeviceStateScope;
     if (!Object.prototype.hasOwnProperty.call(SCOPE_SECTIONS, scope)) {

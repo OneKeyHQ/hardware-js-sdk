@@ -25,6 +25,7 @@ describe('AllNetworkGetAddressBase tracing', () => {
       connectId: 'connect-id',
       deviceId: 'device-id',
       getVersionRange: jest.fn().mockReturnValue({}),
+      assertProtocolSupported: jest.fn(),
       init: jest.fn(),
       name: 'xrpGetAddress',
       responseID: 42,
@@ -45,6 +46,7 @@ describe('AllNetworkGetAddressBase tracing', () => {
     method.device = {
       instanceId: deviceInstanceId,
       getCurrentFirmwareType: jest.fn(),
+      getProtocol: jest.fn().mockReturnValue('V1'),
       getCurrentFirmwareVersionString: jest.fn().mockReturnValue('1.0.0'),
       getCurrentMethodVersionRange: jest
         .fn()

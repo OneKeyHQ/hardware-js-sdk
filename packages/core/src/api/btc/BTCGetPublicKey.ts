@@ -5,7 +5,10 @@ import { getScriptType, isTaprootPath, serializedPath, validatePath } from '../h
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { getCoinInfo } from './helpers/btcParamsUtils';
-import { getBitcoinForkVersionRange } from './helpers/versionLimit';
+import {
+  getBitcoinForkSupportedProtocols,
+  getBitcoinForkVersionRange,
+} from './helpers/versionLimit';
 import { batchGetPublickeys } from '../helpers/batchGetPublickeys';
 import { createExtendedPublicKey, getVersionBytes } from './helpers/xpubUtils';
 
@@ -14,6 +17,10 @@ import type { BTCGetAddressParams } from '../../types/api/btcGetAddress';
 import type { GetPublicKey } from '@onekeyfe/hd-transport';
 
 export default class BTCGetPublicKey extends BaseMethod<GetPublicKey[]> {
+  getSupportedProtocols() {
+    return getBitcoinForkSupportedProtocols(this.params?.map(param => param.coin_name) ?? []);
+  }
+
   hasBundle = false;
 
   init() {

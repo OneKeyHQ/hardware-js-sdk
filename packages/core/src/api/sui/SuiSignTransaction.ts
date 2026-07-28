@@ -15,6 +15,10 @@ import type { TypedCall, TypedResponseMessage } from '../../device/DeviceCommand
 type SuiSignTx = Omit<HardwareSuiSignTx, 'data_initial_chunk' | 'data_length'> & HardwareSuiSignTx;
 
 export default class SuiSignTransaction extends BaseMethod<SuiSignTx> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];

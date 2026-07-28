@@ -8,6 +8,10 @@ import type { CipheredKeyValue, CipheredKeyValueParams } from '../types';
 import type { CipherKeyValue as HardwareCipherKeyValue } from '@onekeyfe/hd-transport';
 
 export default class CipherKeyValue extends BaseMethod<HardwareCipherKeyValue[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {

@@ -37,6 +37,10 @@ const NEM_MOSAIC_CREATION = 0x4001;
 const NEM_SUPPLY_CHANGE = 0x4002;
 
 export default class NEMSignTransaction extends BaseMethod<NEMSignTx> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   NEM_MOSAIC_LEVY_TYPES: Record<number, string> = {
     1: 'MosaicLevy_Absolute',
     2: 'MosaicLevy_Percentile',

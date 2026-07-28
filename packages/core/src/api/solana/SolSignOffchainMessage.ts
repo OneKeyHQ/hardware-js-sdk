@@ -7,6 +7,10 @@ import { stripHexPrefix } from '../helpers/hexUtils';
 import type { SolanaSignOffChainMessage as HardwareSolSignOffChainMessage } from '@onekeyfe/hd-transport';
 
 export default class SolSignOffchainMessage extends BaseMethod<HardwareSolSignOffChainMessage> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];

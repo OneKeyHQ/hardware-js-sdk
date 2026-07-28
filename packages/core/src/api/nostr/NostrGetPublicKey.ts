@@ -8,6 +8,10 @@ import type { BTCGetAddressParams } from '../../types/api/btcGetAddress';
 import type { NostrPublicKey } from '../../types/api/nostrGetPublicKey';
 
 export default class NostrGetPublicKey extends BaseMethod<GetPublicKey[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {

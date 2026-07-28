@@ -1,16 +1,19 @@
 import { TronMessageType } from '@onekeyfe/hd-transport';
-import { createDeviceNotSupportMethodError } from '@onekeyfe/hd-shared';
+import { EFirmwareType, createDeviceNotSupportMethodError } from '@onekeyfe/hd-shared';
 
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { stripHexPrefix } from '../helpers/hexUtils';
-import { getFirmwareType } from '../../utils';
 
 import type { TronSignMessage as HardwareTronSignMessage } from '@onekeyfe/hd-transport';
 
 export default class TronSignMessage extends BaseMethod<HardwareTronSignMessage> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
@@ -27,10 +30,7 @@ export default class TronSignMessage extends BaseMethod<HardwareTronSignMessage>
     const addressN = validatePath(path, 3);
 
     if (this.payload.messageType === 'V1' || this.payload.messageType == null) {
-      throw createDeviceNotSupportMethodError(
-        'TronSignMessage',
-        getFirmwareType(this.device?.features)
-      );
+      throw createDeviceNotSupportMethodError('TronSignMessage', EFirmwareType.Universal);
     }
 
     const messageType = TronMessageType.V2;

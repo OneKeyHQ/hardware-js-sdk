@@ -24,9 +24,12 @@ export type FileWriteParams = {
 };
 
 export default class FileWrite extends BaseMethod<FileWriteParams> {
+  getSupportedProtocols() {
+    return ['V2'] as const;
+  }
+
   init() {
     // Protocol V2 (Pro2) only; Core rejects non-V2 devices.
-    this.requireProtocolV2 = true;
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
     validateRequiredData(this.payload.data, 'data');

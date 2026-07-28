@@ -6,6 +6,10 @@ import { validateParams } from '../helpers/paramsValidator';
 import type { NostrDecryptMessage as DecryptMessage } from '@onekeyfe/hd-transport';
 
 export default class NostrDecryptMessage extends BaseMethod<DecryptMessage> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {

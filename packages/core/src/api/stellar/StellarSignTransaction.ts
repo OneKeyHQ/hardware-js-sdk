@@ -10,11 +10,7 @@ import type {
   StellarSignTx as HardwareStellarSignTx,
   StellarSignedTx,
 } from '@onekeyfe/hd-transport';
-import type {
-  DeviceFirmwareRange,
-  StellarOperation,
-  StellarSignTransactionParams,
-} from '../../types';
+import type { StellarOperation, StellarSignTransactionParams } from '../../types';
 
 // Firmware accepts up to 1024 bytes per chunk; 1 byte = 2 hex chars
 const SOROBAN_CHUNK_BYTES = 1024;
@@ -31,15 +27,6 @@ export default class StellarSignTransaction extends BaseMethod<HardwareStellarSi
     ext: string;
     extSent: number;
   };
-
-  getVersionRange(): DeviceFirmwareRange {
-    return {
-      pro2: {
-        min: '0.0.0',
-        unsupported: true,
-      },
-    };
-  }
 
   parseOperation = (op: StellarOperation) => {
     switch (op.type) {

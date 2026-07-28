@@ -1,8 +1,11 @@
 import { BaseMethod } from '../BaseMethod';
 
 export default class DeviceGetOnboardingStatus extends BaseMethod {
+  getSupportedProtocols() {
+    return ['V2'] as const;
+  }
+
   init() {
-    this.requireProtocolV2 = true;
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
   }

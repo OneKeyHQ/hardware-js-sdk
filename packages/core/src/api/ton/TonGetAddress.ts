@@ -7,6 +7,10 @@ import type { TonGetAddress as HardwareTonGetAddress } from '@onekeyfe/hd-transp
 import type { TonAddress, TonGetAddressParams } from '../../types';
 
 export default class TonGetAddress extends BaseMethod<HardwareTonGetAddress[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   shouldConfirm = false;

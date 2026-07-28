@@ -7,6 +7,10 @@ import { batchGetPublickeys } from '../helpers/batchGetPublickeys';
 import type { AptosGetAddressParams, AptosPublicKey } from '../../types';
 
 export default class AptosGetPublicKey extends BaseMethod<any> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {

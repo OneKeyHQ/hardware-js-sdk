@@ -114,6 +114,28 @@ Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类�
 - `packages/core/src/protocols/protocol-v2/unlockRetry.ts`
 - `packages/core/src/device/DeviceCommands.ts`
 
+## 方法协议能力与固件版本边界
+
+Core 在设备完成 acquire/initialize、协议类型已由真实设备响应确认后，必须先检查方法的协议
+能力，再检查对应机型的固件版本范围，最后才允许进入方法实现和 `typedCall()`：
+
+- `BaseMethod.getSupportedProtocols()` 默认只返回 Protocol V1，新增 Protocol V2 支持必须显式
+  返回 `['V1', 'V2']`；Protocol V2 专属方法只返回 `['V2']`。
+- 协议不匹配统一返回 `DeviceNotSupportMethod`，不得先向设备发送消息再依赖
+  `UnknownMessage/UnexpectedMessage` 判断能力。
+- `DeviceFirmwareRange` 只表达方法已受支持时的 `min/max` 固件版本，不表达协议不支持，禁止用
+  `0.0.0`、虚构版本或布尔哨兵编码能力状态。
+- 参数会改变协议能力时，由方法覆写 `getSupportedProtocols()` 动态判断；例如 BTC Neurai fork
+  当前仅允许 Protocol V1，其固件版本范围仍单独维护。
+- Core 主调用管线与 all-network 内部方法分发复用同一个 `BaseMethod` 协议断言。Transport 不维护
+  SDK 公共方法白名单，也不承担业务能力判断。
+
+主要实现：
+
+- `packages/core/src/api/BaseMethod.ts`
+- `packages/core/src/core/index.ts`
+- `packages/core/src/api/allnetwork/AllNetworkGetAddressBase.ts`
+
 ## 维护规则
 
 - 只有持续影响多个模块、不能仅从代码局部理解的规则才进入本文。

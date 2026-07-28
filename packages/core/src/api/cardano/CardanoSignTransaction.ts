@@ -32,6 +32,10 @@ import type {
 } from '../../types/api/cardano';
 
 export default class CardanoSignTransaction extends BaseMethod<any> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle?: boolean;
 
   getVersionRange() {

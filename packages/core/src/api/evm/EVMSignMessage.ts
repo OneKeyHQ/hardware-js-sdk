@@ -10,6 +10,10 @@ import signMessageLegacyV1 from './legacyV1/signMessage';
 import type { EthereumSignMessageOneKey } from '@onekeyfe/hd-transport';
 
 export default class EVMSignMessage extends BaseMethod<EthereumSignMessageOneKey> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];

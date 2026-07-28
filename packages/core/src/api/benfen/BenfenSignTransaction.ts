@@ -36,10 +36,6 @@ export default class BenfenSignTransaction extends BaseMethod<BenfenSignTx> {
 
   getVersionRange(): DeviceFirmwareRange {
     return {
-      pro2: {
-        min: '0.0.0',
-        unsupported: true,
-      },
       pro: {
         min: '4.12.0',
       },

@@ -7,6 +7,10 @@ import type { StarcoinGetAddress as HardwareStarcoinGetAddress } from '@onekeyfe
 import type { StarcoinAddress, StarcoinGetAddressParams } from '../../types/api/starcoinGetAddress';
 
 export default class StarcoinGetAddress extends BaseMethod<HardwareStarcoinGetAddress[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {

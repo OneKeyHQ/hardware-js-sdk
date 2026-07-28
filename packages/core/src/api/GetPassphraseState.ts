@@ -5,6 +5,10 @@ import { getPassphraseStateWithRefreshDeviceInfo } from '../utils/deviceFeatures
 import { BaseMethod } from './BaseMethod';
 
 export default class GetPassphraseState extends BaseMethod {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
     this.useDevicePassphraseState = false;

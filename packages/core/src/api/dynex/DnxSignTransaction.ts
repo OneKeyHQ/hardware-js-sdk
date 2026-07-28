@@ -1,5 +1,3 @@
-import { createDeviceNotSupportMethodError } from '@onekeyfe/hd-shared';
-
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
@@ -118,10 +116,6 @@ export default class DnxSignTransaction extends BaseMethod<DnxSignTx> {
   }
 
   async run() {
-    if (this.device.isProtocolV2()) {
-      throw createDeviceNotSupportMethodError(this.name, this.device.getCurrentFirmwareType());
-    }
-
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
 
     const res = await this.device.commands.typedCall('DnxSignTx', 'DnxInputRequest', {

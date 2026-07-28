@@ -12,6 +12,10 @@ import type { AptosAddress, AptosGetAddressParams } from '../../types';
 import type { AptosGetAddress as HardwareAptosGetAddress } from '@onekeyfe/hd-transport';
 
 export default class AptosGetAddress extends BaseMethod<HardwareAptosGetAddress[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   shouldConfirm = false;

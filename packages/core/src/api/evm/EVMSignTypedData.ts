@@ -56,6 +56,10 @@ const MINI_MAX_ARRAY_TYPE_FIELDS = 24;
 const MINI_MAX_ARRAY_ELEMENTS = 24;
 
 export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];

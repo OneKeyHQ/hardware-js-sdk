@@ -1,4 +1,4 @@
-import { HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { EFirmwareType, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { DeviceRebootType, DeviceSessionPinType, DeviceSettingsPage } from '@onekeyfe/hd-transport';
 
 import * as firmwareBinaryApi from '../src/api/firmware/getBinary';
@@ -50,7 +50,7 @@ import TonSignProof from '../src/api/ton/TonSignProof';
 import TronGetAddress from '../src/api/tron/TronGetAddress';
 import StellarGetAddress from '../src/api/stellar/StellarGetAddress';
 import BenfenSignMessage from '../src/api/benfen/BenfenSignMessage';
-import { getBitcoinForkVersionRange } from '../src/api/btc/helpers/versionLimit';
+import { getBitcoinForkSupportedProtocols } from '../src/api/btc/helpers/versionLimit';
 import { DataManager } from '../src/data-manager';
 import { createCoreApi } from '../src/inject';
 import { Device, preloadSessionCache } from '../src/device/Device';
@@ -80,7 +80,6 @@ import {
   getFirmwareUpdateField,
   getFirmwareUpdateFieldArray,
   getMethodVersionRange,
-  isMethodVersionRangeUnsupported,
 } from '../src/utils';
 import { getDeviceFirmwareVersion } from '../src/utils/deviceVersionUtils';
 import {
@@ -129,7 +128,7 @@ describe('DeviceUploadWallpaper', () => {
     method.init();
     const result = await method.run();
 
-    expect(method.requireProtocolV2).toBe(true);
+    expect(method.getSupportedProtocols()).toEqual(['V2']);
     expect(method.unlockPolicy).toBe('unlock-before-run');
     expect(typedCall).toHaveBeenNthCalledWith(1, 'FilesystemDirMake', 'Success', {
       path: 'vol1:/wallpapers',
@@ -971,7 +970,7 @@ describe('Protocol V2 feature adapter', () => {
       wallet_initialized: false,
     });
     expect(typedCall).toHaveBeenCalledWith('DevGetOnboardingStatus', 'DevOnboardingStatus', {});
-    expect(method.requireProtocolV2).toBe(true);
+    expect(method.getSupportedProtocols()).toEqual(['V2']);
   });
 
   test('routes onboarding without exposing the raw session command through CoreApi', async () => {
@@ -1957,13 +1956,6 @@ describe('Protocol V2 feature adapter', () => {
   });
 
   test('marks known unsupported public-chain methods as unsupported on Protocol V2', () => {
-    const features = normalizeProtocolV2Features({ ...descriptor, protocolType: 'V2' } as any, {
-      fw: {
-        application: {
-          version: '9.9.9',
-        },
-      },
-    });
     const stellar = new StellarGetAddress({
       id: 1,
       payload: {
@@ -1992,21 +1984,10 @@ describe('Protocol V2 feature adapter', () => {
     benfen.init();
     lnurlAuth.init();
 
-    const stellarRange = getMethodVersionRange(features, type => stellar.getVersionRange()[type]);
-    const benfenRange = getMethodVersionRange(features, type => benfen.getVersionRange()[type]);
-    const lnurlAuthRange = getMethodVersionRange(
-      features,
-      type => lnurlAuth.getVersionRange()[type]
-    );
-    const neuraiRange = getMethodVersionRange(
-      features,
-      type => getBitcoinForkVersionRange(['Neurai'])[type]
-    );
-
-    expect(isMethodVersionRangeUnsupported(stellarRange)).toBe(true);
-    expect(isMethodVersionRangeUnsupported(benfenRange)).toBe(true);
-    expect(isMethodVersionRangeUnsupported(lnurlAuthRange)).toBe(true);
-    expect(isMethodVersionRangeUnsupported(neuraiRange)).toBe(true);
+    expect(stellar.supportsProtocol('V2')).toBe(false);
+    expect(benfen.supportsProtocol('V2')).toBe(false);
+    expect(lnurlAuth.supportsProtocol('V2')).toBe(false);
+    expect(getBitcoinForkSupportedProtocols(['Neurai'])).toEqual(['V1']);
   });
 
   test('does not block batch public key support checks on Protocol V2', async () => {
@@ -2045,7 +2026,7 @@ describe('Protocol V2 feature adapter', () => {
     });
   });
 
-  test('rejects legacy getOnekeyFeatures for Protocol V2 devices', async () => {
+  test('declares legacy getOnekeyFeatures unsupported on Protocol V2', () => {
     const method = new GetOnekeyFeatures({
       id: 1,
       payload: {
@@ -2059,9 +2040,9 @@ describe('Protocol V2 feature adapter', () => {
       commands: { typedCall },
     });
 
-    await expect(method.run()).rejects.toMatchObject({
-      errorCode: expect.any(Number),
-    });
+    expect(() => method.assertProtocolSupported('V2', EFirmwareType.Universal)).toThrow(
+      expect.objectContaining({ errorCode: HardwareErrorCode.DeviceNotSupportMethod })
+    );
     expect(typedCall).not.toHaveBeenCalled();
   });
 
@@ -2594,16 +2575,8 @@ describe('API compatibility handling', () => {
 
     polkadotGetAddressMethod.init();
 
-    expect(
-      isMethodVersionRangeUnsupported(
-        getMethodVersionRange(features, type => tronMethod.getVersionRange()[type])
-      )
-    ).toBe(false);
-    expect(
-      isMethodVersionRangeUnsupported(
-        getMethodVersionRange(features, type => solMethod.getVersionRange()[type])
-      )
-    ).toBe(false);
+    expect(tronMethod.supportsProtocol('V2')).toBe(true);
+    expect(solMethod.supportsProtocol('V2')).toBe(true);
     expect(
       getMethodVersionRange(features, type => tonGetAddressMethod.getVersionRange()[type])
     ).toEqual({
@@ -2759,7 +2732,7 @@ describe('API compatibility handling', () => {
     expect(params.data_initial_chunk).toHaveLength(2048);
   });
 
-  test('returns a typed unsupported error for Dynex signing on Protocol V2', async () => {
+  test('declares Dynex signing unsupported on Protocol V2', () => {
     const method = new DnxSignTransaction({
       id: 1,
       payload: {
@@ -2781,17 +2754,14 @@ describe('API compatibility handling', () => {
     });
 
     method.init();
-    (method as any).device = stubDevice({
-      originalDescriptor: { protocolType: 'V2' },
-      features: normalizeProtocolV2Features({ ...descriptor, protocolType: 'V2' } as any),
-    });
-
-    await expect(method.run()).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.DeviceNotSupportMethod,
-    });
+    expect(() => method.assertProtocolSupported('V2', EFirmwareType.Universal)).toThrow(
+      expect.objectContaining({
+        errorCode: HardwareErrorCode.DeviceNotSupportMethod,
+      })
+    );
   });
 
-  test('returns a typed unsupported error for Dynex address on Protocol V2', async () => {
+  test('declares Dynex address unsupported on Protocol V2', () => {
     const method = new DnxGetAddress({
       id: 1,
       payload: {
@@ -2802,14 +2772,11 @@ describe('API compatibility handling', () => {
     });
 
     method.init();
-    (method as any).device = stubDevice({
-      originalDescriptor: { protocolType: 'V2' },
-      features: normalizeProtocolV2Features({ ...descriptor, protocolType: 'V2' } as any),
-    });
-
-    await expect(method.run()).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.DeviceNotSupportMethod,
-    });
+    expect(() => method.assertProtocolSupported('V2', EFirmwareType.Universal)).toThrow(
+      expect.objectContaining({
+        errorCode: HardwareErrorCode.DeviceNotSupportMethod,
+      })
+    );
   });
 });
 
@@ -2848,18 +2815,16 @@ describe('Protocol V2 firmware update targets', () => {
     return header;
   };
 
-  test('keeps Protocol V2 firmware updates off the firmwareUpdateV3 path', async () => {
+  test('keeps Protocol V2 firmware updates off the firmwareUpdateV3 path', () => {
     const method = new FirmwareUpdateV3({
       id: 1,
       payload: {
         method: 'firmwareUpdateV3',
       },
     });
-    (method as any).device = stubDevice({
-      originalDescriptor: { protocolType: 'V2' },
-    });
-
-    await expect(method.run()).rejects.toThrow('firmwareUpdateV4');
+    expect(() => method.assertProtocolSupported('V2', EFirmwareType.Universal)).toThrow(
+      expect.objectContaining({ errorCode: HardwareErrorCode.DeviceNotSupportMethod })
+    );
   });
 
   test('uses Protocol V2 features after BLE final reconnect without V1 Initialize', async () => {
@@ -5779,7 +5744,7 @@ describe('Protocol V2 raw device info method', () => {
     );
   });
 
-  test('rejects on Protocol V1 devices instead of sending an unknown message', async () => {
+  test('rejects on Protocol V1 devices instead of sending an unknown message', () => {
     const method = buildMethod();
     const typedCall = jest.fn();
     (method as any).device = stubDevice({
@@ -5787,7 +5752,9 @@ describe('Protocol V2 raw device info method', () => {
       commands: { typedCall },
     });
 
-    await expect(method.run()).rejects.toThrow();
+    expect(() => method.assertProtocolSupported('V1', EFirmwareType.Universal)).toThrow(
+      expect.objectContaining({ errorCode: HardwareErrorCode.DeviceNotSupportMethod })
+    );
     expect(typedCall).not.toHaveBeenCalled();
   });
 });
