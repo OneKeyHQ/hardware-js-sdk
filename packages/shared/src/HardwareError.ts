@@ -485,15 +485,15 @@ export const HardwareErrorCode = {
   PinMismatch: 828,
 
   /**
+   * Device refused to sign: refTxs don't match the spent input's outpoint
+   */
+  KaspaPrevTxIdMismatch: 829,
+
+  /**
    * Protocol V2 device must be unlocked before the requested operation.
    * @params: { failureCode?: string; subcode?: number; firmwareMessage?: string }
    */
-  DeviceLocked: 829,
-
-  /**
-   * Device refused to sign: refTxs don't match the spent input's outpoint
-   */
-  KaspaPrevTxIdMismatch: 830,
+  DeviceLocked: 830,
 
   /**
    * The cached wallet session is invalid or has expired.
