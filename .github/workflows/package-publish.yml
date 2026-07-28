@@ -1,6 +1,13 @@
 name: publish-npm-packages
 
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+    inputs:
+      prerelease_dist_tag:
+        description: 'npm dist-tag used for prerelease packages'
+        required: true
+        default: 'next'
+        type: string
 
 permissions:
   contents: write
@@ -38,7 +45,7 @@ jobs:
   publish-and-release:
     needs: get-version
     runs-on: ubuntu-latest
-    name: "Publish v${{ needs.get-version.outputs.version }}"
+    name: 'Publish v${{ needs.get-version.outputs.version }}'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -65,13 +72,18 @@ jobs:
       - name: Publish to NPM
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          PRERELEASE_DIST_TAG: ${{ inputs.prerelease_dist_tag }}
         run: |
           echo "📦 Publishing packages to NPM (v${{ needs.get-version.outputs.version }})..."
           IS_PRERELEASE=${{ needs.get-version.outputs.is_prerelease }}
 
           if [ "$IS_PRERELEASE" = "true" ]; then
-            echo "📦 Publishing with --dist-tag next for prerelease"
-            yarn publish-packages -y --no-verify-access --dist-tag next
+            if ! node -e 'const semver = require("semver"); const tag = process.argv[1]; const valid = /^[a-zA-Z][a-zA-Z0-9._-]*$/.test(tag) && tag.toLowerCase() !== "latest" && semver.validRange(tag) === null; process.exit(valid ? 0 : 1);' "$PRERELEASE_DIST_TAG"; then
+              echo "❌ Invalid prerelease npm dist-tag: $PRERELEASE_DIST_TAG"
+              exit 1
+            fi
+            echo "📦 Publishing prerelease with explicit dist-tag: $PRERELEASE_DIST_TAG"
+            yarn publish-packages -y --no-verify-access --dist-tag "$PRERELEASE_DIST_TAG"
           else
             echo "📦 Publishing with --dist-tag latest for stable release"
             yarn publish-packages -y --no-verify-access --dist-tag latest
@@ -79,6 +91,8 @@ jobs:
           echo "✅ Packages published successfully"
 
       - name: Publication Summary
+        env:
+          PRERELEASE_DIST_TAG: ${{ inputs.prerelease_dist_tag }}
         run: |
           VERSION=${{ needs.get-version.outputs.version }}
           IS_PRERELEASE=${{ needs.get-version.outputs.is_prerelease }}
@@ -87,7 +101,7 @@ jobs:
           echo "📦 Published version: $VERSION"
 
           if [ "$IS_PRERELEASE" = "true" ]; then
-            echo "📦 Prerelease version published to NPM"
+            echo "📦 Prerelease version published with dist-tag: $PRERELEASE_DIST_TAG"
             echo "⏭️ Skipping GitHub release creation for prerelease"
           else
             echo "🚀 Stable version published to NPM"
