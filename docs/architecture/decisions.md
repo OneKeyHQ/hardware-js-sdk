@@ -9,8 +9,10 @@ Protocol V2 响应依靠串行调用、消息类型和帧序号维持请求边�
 - 每个 Transport 实例持有一个 `ProtocolV2LinkManager`，并按设备 key 隔离 Link。
 - 同一设备的调用串行执行，Link 内复用 Session、frame assembler 和平台 adapter。
 - `ProtocolV2SequenceCursor` 跨普通断开、重连和 Link 失效保持递增，只在 Transport `dispose` 时清除。
+- 固件业务响应 sequence 是跨 channel/source 的全局发送序列。单个 Transport 只能拒绝连续
+  重复的响应序号，不能要求相邻可见响应绝对连续；其他路由会形成合法间隙。
 - 超时、断连、I/O、generation 和帧错误属于 link-fatal；protobuf `Failure` 等业务响应不自动判定为 link-fatal。
-- Link 失效后允许序列号出现间隙，但不得回退或复用旧序列号。
+- Link 失效后允许 SDK 发送序列出现间隙，但不得回退或复用旧序列号。
 
 主要实现：
 
