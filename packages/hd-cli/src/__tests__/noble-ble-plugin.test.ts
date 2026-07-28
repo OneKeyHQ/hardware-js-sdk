@@ -163,7 +163,11 @@ describe('Noble BLE plugin notification routing', () => {
 
     await (plugin.send as any)('device-a', 'aa', { withoutResponse: false });
 
-    expect(device.write.write).toHaveBeenCalledWith(expect.any(Buffer), false, expect.any(Function));
+    expect(device.write.write).toHaveBeenCalledWith(
+      expect.any(Buffer),
+      false,
+      expect.any(Function)
+    );
   });
 
   test('does not add a fixed delay between 192-byte writes', async () => {

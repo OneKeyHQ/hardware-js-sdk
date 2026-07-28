@@ -18,10 +18,7 @@ if (!targetDir) {
 const { basePath, projects, specialProjects } = config;
 
 const watchPaths = projects.flatMap(project => {
-  const watchTargets = [
-    ...(specialProjects[project] || [config.defaultWatchDir]),
-    'package.json',
-  ];
+  const watchTargets = [...(specialProjects[project] || [config.defaultWatchDir]), 'package.json'];
   return watchTargets.map(target => {
     const dirPath = path.join(basePath, project, target);
     console.log('Observe directory file changes:', dirPath);

@@ -5,9 +5,9 @@ describe('live device identity', () => {
     let currentDeviceId = 'OLD_DEVICE_ID';
     const device = {
       isProtocolV2: () => true,
-      getDeviceState: jest.fn().mockImplementation(async () => {
+      getDeviceState: jest.fn().mockImplementation(() => {
         currentDeviceId = 'NEW_DEVICE_ID';
-        return { identity: { deviceId: currentDeviceId } };
+        return Promise.resolve({ identity: { deviceId: currentDeviceId } });
       }),
       checkDeviceId: jest.fn((expected: string) => currentDeviceId === expected),
     };
