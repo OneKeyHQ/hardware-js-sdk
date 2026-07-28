@@ -17,16 +17,6 @@
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
       }
-    },
-    "./attestation-relay": {
-      "import": {
-        "types": "./dist/attestation-relay.d.mts",
-        "default": "./dist/attestation-relay.mjs"
-      },
-      "require": {
-        "types": "./dist/attestation-relay.d.ts",
-        "default": "./dist/attestation-relay.js"
-      }
     }
   },
   "files": [
@@ -62,13 +52,9 @@
     "@ledgerhq/hw-transport": "^6.34.1",
     "@noble/hashes": "^1.3.3",
     "@onekeyfe/hwk-adapter-core": "1.2.1",
-    "bitcoinjs-lib": "npm:@onekeyfe/bitcoinjs-lib@7.0.1",
-    "purify-ts": "2.1.0",
-    "rxjs": "7.8.2",
-    "ws": "^7.5.10"
+    "bitcoinjs-lib": "npm:@onekeyfe/bitcoinjs-lib@7.0.1"
   },
   "devDependencies": {
-    "@types/ws": "^8.5.5",
     "rimraf": "^5.0.0",
     "tsup": "^8.0.0",
     "typescript": "^5.4.0"
