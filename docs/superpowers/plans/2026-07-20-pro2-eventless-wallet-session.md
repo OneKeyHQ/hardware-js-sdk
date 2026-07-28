@@ -22,7 +22,7 @@
 
 1. 先增加类型/序列化测试，验证 `DeviceSessionOpen` 只支持隐藏钱包的 `resume`、Host Passphrase、设备 Passphrase 和 Attach PIN 选择，协议类型中不存在 `STANDARD`、`wallet_type` 和 `hidden_wallet` 包装层。
 2. 运行单测，确认因消息类型尚不存在而失败。
-3. 在 Pro2 proto 中以消息号 `60606` 替换 `DeviceSessionGet`，定义互斥的 `resume` / `select` 载荷；`select` 直接包含三种隐藏钱包 access，保留 `DeviceSession` 返回结构。
+3. 在 Pro2 proto 中新增消息号 `60609` 的 `DeviceSessionOpen`，定义互斥的 `resume` / `select` 载荷；`select` 直接包含三种隐藏钱包 access，保留 `DeviceSession` 返回结构。
 4. 运行 `yarn workspace @onekeyfe/hd-transport update:protobuf` 生成 SDK 两份 schema 和 TypeScript 类型。
 5. 重新运行协议单测并执行 `git diff --check`。
 
@@ -61,11 +61,11 @@
 6. 实现 `DeviceSessionOpen` 的恢复、选择、状态校验、锁定后解锁重试和定向缓存失效逻辑。
 7. 运行 `protocol-v2.test.ts`、`DeviceCommands.test.ts` 和钱包 Store 测试。
 
-## 任务 4：更新公开兼容 API，清理旧 `DeviceSessionGet` 命名
+## 任务 4：更新公开兼容 API，清理旧 Session 查询命名
 
 **文件：**
 
-- 删除：`packages/core/src/api/protocol-v2/DeviceSessionGet.ts`
+- 删除：旧的 Protocol V2 原始 Session 查询 API 文件
 - 新增：`packages/core/src/api/protocol-v2/DeviceSessionOpen.ts`
 - 修改：`packages/core/src/api/index.ts`
 - 修改：`packages/core/src/inject.ts`
@@ -73,7 +73,7 @@
 - 测试：`packages/core/__tests__/protocol-v2.test.ts`
 
 1. 先写失败测试：Core API 暴露仅用于隐藏钱包的 `deviceSessionOpen`，且原有业务入口 `getPassphraseState` 的标准钱包路径继续成功但返回 `undefined` passphraseState。
-2. 用 `DeviceSessionOpen` 替换仅用于调试的 `DeviceSessionGet` API，避免公开层继续暴露已经删除的固件请求。
+2. 用 `DeviceSessionOpen` 替换仅用于调试的旧 Session 查询 API，避免公开层继续暴露已经删除的固件请求。
 3. 不新增 `STANDARD_WALLET_KEY`，也不放宽 `DeviceWalletSessionStore` 对缺少 `passphraseState` 的拒绝规则。
 4. 运行 Core API 路由测试、类型检查及 Store 测试。
 

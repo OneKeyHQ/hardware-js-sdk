@@ -19,7 +19,7 @@ const createCommands = () => {
 };
 
 describe('DeviceCommands failure mapping', () => {
-  it('does not log DeviceSessionGet response secrets', async () => {
+  it('does not log DeviceSessionOpen response secrets', async () => {
     const commands = createCommands();
     const log = getLogger(LoggerNames.DeviceCommands);
     log.messages.length = 0;
@@ -33,12 +33,74 @@ describe('DeviceCommands failure mapping', () => {
             btc_test_address: 'secret-wallet-address',
           },
         } as any,
-        'DeviceSessionGet'
+        'DeviceSessionOpen'
       )
     ).resolves.toMatchObject({ type: 'DeviceSession' });
 
     expect(JSON.stringify(log.messages)).not.toContain('secret-session-id');
     expect(JSON.stringify(log.messages)).not.toContain('secret-wallet-address');
+  });
+
+  it('maps an invalid DeviceSessionOpen resume to WalletSessionInvalid', async () => {
+    const commands = createCommands();
+
+    await expect(
+      commands._filterCommonTypes(
+        {
+          type: 'Failure',
+          message: {
+            code: 'Failure_ProcessError',
+            subcode: 2,
+            message: 'Invalid session',
+          },
+        } as any,
+        'DeviceSessionOpen'
+      )
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.WalletSessionInvalid,
+      params: {
+        failureCode: 'Failure_ProcessError',
+        subcode: 2,
+        firmwareMessage: 'Invalid session',
+      },
+    });
+  });
+
+  it('maps DeviceSessionOpen user cancellation to ActionCancelled', async () => {
+    const commands = createCommands();
+
+    await expect(
+      commands._filterCommonTypes(
+        {
+          type: 'Failure',
+          message: {
+            code: 'Failure_ProcessError',
+            subcode: 1,
+            message: 'Cancelled on device',
+          },
+        } as any,
+        'DeviceSessionOpen'
+      )
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.ActionCancelled,
+    });
+  });
+
+  it.each([
+    [3, HardwareErrorCode.DeviceCheckUnlockTypeError],
+    [4, HardwareErrorCode.DeviceNotOpenedPassphrase],
+  ])('maps DeviceSessionOpen subcode %s to its canonical wallet error', async (subcode, code) => {
+    const commands = createCommands();
+
+    await expect(
+      commands._filterCommonTypes(
+        {
+          type: 'Failure',
+          message: { code: 'Failure_ProcessError', subcode, message: 'Session selection failed' },
+        } as any,
+        'DeviceSessionOpen'
+      )
+    ).rejects.toMatchObject({ errorCode: code });
   });
 
   it('rejects the Pro2 bootloader DeviceStatusGet unsupported response', async () => {

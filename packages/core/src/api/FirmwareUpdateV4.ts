@@ -398,7 +398,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   init() {
     this.allowDeviceMode = [UI_REQUEST.BOOTLOADER, UI_REQUEST.NOT_INITIALIZE];
     this.requireDeviceMode = [];
-    this.unlockPolicy = 'retry-on-locked';
+    this.unlockPolicy = 'unlock-before-run';
     this.useDevicePassphraseState = false;
     this.skipForceUpdateCheck = true;
 

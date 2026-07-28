@@ -42,7 +42,7 @@ Protocol V2 因此按字段用途、变化频率和安全边界进行拆分。
 | 设备基本信息       | `DeviceInfoGet -> DeviceInfo`                           | 型号、序列号、主控、蓝牙芯片、SE 芯片及版本   | `getDeviceState({ scope: 'firmware' })`            |
 | 设备实时状态       | `DeviceStatusGet -> DeviceStatus`                       | 初始化、解锁、备份、Passphrase、Attach-to-PIN | `getDeviceState()`                                 |
 | 用户设置           | `DeviceSettingsGet/Set/PageShow`                        | label、语言、蓝牙、亮度、锁屏、振动等         | `getDeviceState({ scope: 'settings' })` / 高层 API |
-| 钱包会话           | `DeviceSessionGet -> DeviceSession`                     | 获取/恢复、`session_id`、钱包标识             | Core 内部钱包 Session 管理                         |
+| 钱包会话           | `DeviceSessionOpen -> DeviceSession`                    | 选择/恢复、`session_id`、钱包标识             | Core 内部钱包 Session 管理                         |
 | PIN 解锁           | `DeviceSessionAskPin -> Success`                        | 在设备端完成钱包解锁与选择                    | 受保护方法的解锁流程                               |
 | 设备操作与固件管理 | `DeviceReboot`、`DeviceCertificate*`、`DeviceFirmware*` | 重启、证书、固件安装                          | 对应专用 API 和升级流程                            |
 | 生产制造信息       | `DeviceFactoryInfo*`、`DeviceFactoryTest` 等            | 生产时间、工厂测试、永久锁                    | 生产制造专用 API                                   |
@@ -173,7 +173,7 @@ bootloader/romloader 模式直接返回可用的身份和版本快照，不会�
 
 | Protocol V2 字段            | 含义                       | SDK 字段                                  |
 | --------------------------- | -------------------------- | ----------------------------------------- |
-| `device_id`                 | 设备唯一 ID                | `DeviceState.identity.deviceId`           |
+| `device_id`                 | 钱包初始化生命周期 ID      | `DeviceState.identity.deviceId`           |
 | `unlocked`                  | 设备是否解锁               | `DeviceState.status.unlocked`             |
 | `init_states`               | 设备是否完成初始化         | `DeviceState.status.initialized`          |
 | `backup_required`           | 是否需要备份               | `DeviceState.status.backupRequired`       |
@@ -287,17 +287,17 @@ label、语言、蓝牙开关、自动锁屏和振动反馈都属于用户配置
 钱包会话通过以下消息建立或恢复：
 
 ```text
-DeviceSessionGet(session_id?) -> DeviceSession
+DeviceSessionOpen(select/resume) -> DeviceSession
 ```
 
 ### 8.1 字段说明
 
-| Protocol V2 字段   | 含义                             | SDK 当前处理                 |
-| ------------------ | -------------------------------- | ---------------------------- |
-| 请求 `session_id`  | 尝试恢复之前的隐藏钱包 Session   | Core 内部传入当前钱包缓存值  |
-| 空请求             | 获取设备解锁流程当前选择的钱包   | 不收集或发送 Host Passphrase |
-| 响应 `session_id`  | 当前钱包 Session ID              | 保存到当前钱包缓存           |
-| `btc_test_address` | 用于确认当前钱包上下文的稳定标识 | 映射为内部 `passphraseState` |
+| Protocol V2 字段    | 含义                                 | SDK 当前处理                 |
+| ------------------- | ------------------------------------ | ---------------------------- |
+| `resume.session_id` | 尝试恢复之前的隐藏钱包 Session       | Core 内部传入当前钱包缓存值  |
+| `select`            | 选择 Host/设备 Passphrase/Attach PIN | Core 将 UI 选择映射为 oneof  |
+| 响应 `session_id`   | 当前钱包 Session ID                  | 保存到当前钱包缓存           |
+| `btc_test_address`  | 用于确认当前钱包上下文的稳定标识     | 映射为内部 `passphraseState` |
 
 这里的 `btc_test_address` 用于确认当前打开的是不是预期钱包，不用于用户资产地址展示。
 
@@ -305,27 +305,28 @@ DeviceSessionGet(session_id?) -> DeviceSession
 
 ```text
 读取当前隐藏钱包缓存 session_id
-    -> DeviceSessionGet({ session_id })
+    -> DeviceSessionOpen({ resume: { session_id } })
     -> 返回 DeviceSession
     -> 校验 btc_test_address 是否符合预期钱包
 ```
 
 如果缓存 Session 无效：
 
-1. 当前固件返回通用失败，协议没有稳定 `InvalidSession` 子码。
+1. 固件返回 `DeviceSessionError_InvalidSession=2`。
 2. Core 清除当前钱包的 Session 缓存并返回规范化错误。
 3. 显式 `openWalletSession({ mode: 'resume-hidden' })` 不自动进入选择流程；App 应明确发起
    `select-hidden`，由设备端重新完成 PIN/Passphrase/Attach PIN 选择。
 
-`DeviceSessionGet` 的成功响应必须同时携带非空 `session_id` 和
+`DeviceSessionOpen` 的成功响应必须同时携带非空 `session_id` 和
 `btc_test_address`。缺少任一字段都视为协议响应不完整，Core 不会把它降级解释为标准钱包。
 
-标准钱包不读取 Session Store，也不调用 `DeviceSessionGet`。SDK 不注册可调用的
-`deviceSessionGet` API；该名称只表示 Core 内部发送给设备的 Protocol V2 命令，
+标准钱包不读取其他钱包的 Session Store 项；它只协商 eventless 模式，不调用
+`DeviceSessionOpen`，并返回 `passphraseState: null`。SDK 不注册可调用的
+`deviceSessionOpen` API；该名称只表示 Core 内部发送给设备的 Protocol V2 命令，
 不能通过低层 `call()` 绕过公共钱包流程。
 
 App 按设备分流的调试阶段，Pro2 应调用公共 `openWalletSession()`，不要直接调用原始
-`deviceSessionGet`。新代码使用 `standard/select-hidden/resume-hidden` 显式表达意图；
+`deviceSessionOpen`。新代码使用 `standard/select-hidden/resume-hidden` 显式表达意图；
 为了兼容迁移中的旧调用，未传 `mode` 时，`useEmptyPassphrase=true` 映射为
 `standard`，`initSession=true` 映射为新的 `select-hidden`，完整
 `deviceId + passphraseState` 映射为 `resume-hidden`。显式 `mode` 不允许与这些旧意图参数

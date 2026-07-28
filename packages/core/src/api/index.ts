@@ -48,17 +48,6 @@ export { default as promptWebDeviceAccess } from './PromptWebDeviceAccess';
 export { default as deviceReboot } from './protocol-v2/DeviceReboot';
 export { default as deviceGetOnboardingStatus } from './protocol-v2/DeviceGetOnboardingStatus';
 export { default as deviceUploadWallpaper } from './protocol-v2/DeviceUploadWallpaper';
-// Protocol V2 development APIs. These remain public while Pro2 integration is in development.
-export { default as deviceInfoGet } from './protocol-v2/DeviceInfoGet';
-export { default as deviceStatusGet } from './protocol-v2/DeviceStatusGet';
-export { default as protocolInfoRequest } from './protocol-v2/ProtocolInfoRequest';
-export { default as ping } from './protocol-v2/Ping';
-export { default as deviceGetFirmwareUpdateStatus } from './protocol-v2/DeviceGetFirmwareUpdateStatus';
-export { default as deviceFactoryInfoGet } from './protocol-v2/DeviceFactoryInfoGet';
-export { default as fileRead } from './FileRead';
-export { default as dirList } from './DirList';
-export { default as dirMake } from './DirMake';
-export { default as pathInfo } from './PathInfo';
 export { default as uploadPortfolio } from './UploadPortfolio';
 
 export { default as cipherKeyValue } from './CipherKeyValue';

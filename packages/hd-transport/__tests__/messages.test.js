@@ -101,17 +101,44 @@ describe('messages', () => {
     expect(v2Messages.nested.MessageType.values).toMatchObject({
       MessageType_DeviceStatusGet: 60602,
       MessageType_DeviceStatus: 60603,
-      MessageType_DeviceSessionGet: 60606,
       MessageType_DeviceSession: 60607,
       MessageType_DeviceSessionAskPin: 60608,
+      MessageType_DeviceSessionOpen: 60609,
     });
     expect(v2Messages.nested.DeviceStatusGet).toEqual({ fields: {} });
-    expect(v2Messages.nested.DeviceSessionGet.fields.session_id).toMatchObject({
+    expect(v2Messages.nested.ProtocolInfoRequest.fields.eventless_wallet_session).toMatchObject({
+      id: 1,
+      type: 'bool',
+      options: { default: false },
+    });
+    expect(v2Messages.nested).not.toHaveProperty('DeviceSessionGet');
+    expect(v2Messages.nested.DeviceSessionResume.fields.session_id).toMatchObject({
+      rule: 'required',
       id: 1,
       type: 'bytes',
     });
-    expect(v2Messages.nested).not.toHaveProperty('DeviceSessionOpen');
-    expect(v2Messages.nested).not.toHaveProperty('DeviceSessionResume');
+    expect(v2Messages.nested.DeviceSessionOpen.fields).toMatchObject({
+      resume: { id: 1, type: 'DeviceSessionResume' },
+      select: { id: 2, type: 'DeviceSessionSelect' },
+    });
+    expect(v2Messages.nested.DeviceSessionSelect.fields).toMatchObject({
+      host_passphrase: { id: 1, type: 'DeviceSessionHostPassphrase' },
+      passphrase_on_device: { id: 2, type: 'DeviceSessionPassphraseOnDevice' },
+      attach_pin_on_device: { id: 3, type: 'DeviceSessionAttachPinOnDevice' },
+    });
+    expect(v2Messages.nested.DeviceSessionHostPassphrase.fields.passphrase).toMatchObject({
+      rule: 'required',
+      id: 1,
+      type: 'string',
+    });
+    expect(v2Messages.nested.DeviceSessionErrorCode.values).toEqual({
+      DeviceSessionError_None: 0,
+      DeviceSessionError_UserCancelled: 1,
+      DeviceSessionError_InvalidSession: 2,
+      DeviceSessionError_AttachPinUnavailable: 3,
+      DeviceSessionError_PassphraseDisabled: 4,
+      DeviceSessionError_Busy: 5,
+    });
     expect(v2Messages.nested).not.toHaveProperty('DeviceWalletSelect');
     expect(v2Messages.nested).not.toHaveProperty('DeviceWalletType');
     expect(v2Messages.nested).not.toHaveProperty('DeviceHiddenWalletSelect');
@@ -126,9 +153,7 @@ describe('messages', () => {
     expect(v2Messages.nested.MessageType.values).not.toHaveProperty(
       'MessageType_DeviceSessionPinResult'
     );
-    expect(v2Messages.nested.MessageType.values).not.toHaveProperty(
-      'MessageType_DeviceSessionOpen'
-    );
+    expect(v2Messages.nested.MessageType.values).not.toHaveProperty('MessageType_DeviceSessionGet');
   });
 
   test('Protocol V2 onboarding status matches the current firmware-pro2 schema', () => {

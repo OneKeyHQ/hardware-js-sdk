@@ -1,17 +1,7 @@
 import type {
-  deviceFactoryInfoGet,
-  deviceGetFirmwareUpdateStatus,
   deviceGetOnboardingStatus,
-  deviceInfoGet,
   deviceReboot,
-  deviceStatusGet,
   deviceUploadWallpaper,
-  dirList,
-  dirMake,
-  fileRead,
-  pathInfo,
-  ping,
-  protocolInfoRequest,
   uploadPortfolio,
 } from './protocolV2';
 import type { off, on, removeAllListeners } from './event';
@@ -237,17 +227,7 @@ export type CoreApi = {
   deviceReboot: typeof deviceReboot;
   deviceGetOnboardingStatus: typeof deviceGetOnboardingStatus;
   deviceUploadWallpaper: typeof deviceUploadWallpaper;
-  deviceInfoGet: typeof deviceInfoGet;
-  deviceStatusGet: typeof deviceStatusGet;
-  protocolInfoRequest: typeof protocolInfoRequest;
-  ping: typeof ping;
-  deviceGetFirmwareUpdateStatus: typeof deviceGetFirmwareUpdateStatus;
-  deviceFactoryInfoGet: typeof deviceFactoryInfoGet;
   uploadPortfolio: typeof uploadPortfolio;
-  fileRead: typeof fileRead;
-  dirList: typeof dirList;
-  dirMake: typeof dirMake;
-  pathInfo: typeof pathInfo;
 
   /**
    * All network function
