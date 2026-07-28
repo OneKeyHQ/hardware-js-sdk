@@ -5060,33 +5060,9 @@ export enum DeviceSessionErrorCode {
   DeviceSessionError_Busy = 5,
 }
 
-// DeviceSessionResume
-export type DeviceSessionResume = {
-  session_id: string;
-};
-
-// DeviceSessionHostPassphrase
-export type DeviceSessionHostPassphrase = {
-  passphrase: string;
-};
-
-// DeviceSessionPassphraseOnDevice
-export type DeviceSessionPassphraseOnDevice = {};
-
-// DeviceSessionAttachPinOnDevice
-export type DeviceSessionAttachPinOnDevice = {};
-
-// DeviceSessionSelect
-export type DeviceSessionSelect = {
-  host_passphrase?: DeviceSessionHostPassphrase;
-  passphrase_on_device?: DeviceSessionPassphraseOnDevice;
-  attach_pin_on_device?: DeviceSessionAttachPinOnDevice;
-};
-
-// DeviceSessionOpen
-export type DeviceSessionOpen = {
-  resume?: DeviceSessionResume;
-  select?: DeviceSessionSelect;
+// DeviceSessionGet
+export type DeviceSessionGet = {
+  session_id?: string;
 };
 
 // DeviceSession
@@ -5095,8 +5071,19 @@ export type DeviceSession = {
   btc_test_address?: string;
 };
 
+export enum DeviceSessionPinType {
+  Any = 1,
+  Main = 2,
+  AttachToPin = 3,
+}
+
 // DeviceSessionAskPin
-export type DeviceSessionAskPin = {};
+export type DeviceSessionAskPin = {
+  type?: DeviceSessionPinType;
+};
+
+// DeviceSessionAskPassphrase
+export type DeviceSessionAskPassphrase = {};
 
 export enum DeviceSessionAskPin_FailureSubCodes {
   UserCancel = 1,
@@ -5916,14 +5903,10 @@ export type MessageType = {
   DeviceInfoTargets: DeviceInfoTargets;
   DeviceInfoTypes: DeviceInfoTypes;
   DeviceInfoGet: DeviceInfoGet;
-  DeviceSessionResume: DeviceSessionResume;
-  DeviceSessionHostPassphrase: DeviceSessionHostPassphrase;
-  DeviceSessionPassphraseOnDevice: DeviceSessionPassphraseOnDevice;
-  DeviceSessionAttachPinOnDevice: DeviceSessionAttachPinOnDevice;
-  DeviceSessionSelect: DeviceSessionSelect;
-  DeviceSessionOpen: DeviceSessionOpen;
+  DeviceSessionGet: DeviceSessionGet;
   DeviceSession: DeviceSession;
   DeviceSessionAskPin: DeviceSessionAskPin;
+  DeviceSessionAskPassphrase: DeviceSessionAskPassphrase;
   DeviceStatus: DeviceStatus;
   DeviceStatusGet: DeviceStatusGet;
   DevOnboardingSetupStatus: DevOnboardingSetupStatus;

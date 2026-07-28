@@ -24,10 +24,12 @@ export default class DeviceWipe extends BaseMethod<WipeDevice> {
       const res = await this.device.commands.typedCall('DeviceSettingsPageShow', 'Success', {
         page: DeviceSettingsPage.DeviceReset,
       });
+      this.device.invalidateAfterWipe();
       return Promise.resolve(res.message);
     }
 
     const res = await this.device.commands.typedCall('WipeDevice', 'Success');
+    this.device.invalidateAfterWipe();
 
     return Promise.resolve(res.message);
   }

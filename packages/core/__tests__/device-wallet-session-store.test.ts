@@ -1,6 +1,7 @@
 import { HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import ClearSessionCache from '../src/api/ClearSessionCache';
+import DeviceWipe from '../src/api/device/DeviceWipe';
 import {
   DeviceWalletSessionStore,
   deviceWalletSessionStore,
@@ -93,6 +94,46 @@ describe('DeviceWalletSessionStore', () => {
 
     store.clear();
     expect(store.get('device-2', 'hidden-a')).toBeUndefined();
+  });
+});
+
+describe('Device wipe lifecycle invalidation', () => {
+  beforeEach(() => {
+    deviceWalletSessionStore.clear();
+  });
+
+  test('clears the old Protocol V2 identity and wallet sessions after wipe succeeds', async () => {
+    const device = Device.fromDescriptor({
+      id: 'pro2-descriptor',
+      path: 'pro2-path',
+      protocolType: 'V2',
+    } as never);
+    device.features = {
+      protocol: 'V2',
+      deviceId: 'old-device-id',
+      unlocked: true,
+      passphraseProtection: true,
+    } as never;
+    device.passphraseState = 'hidden-a';
+    deviceWalletSessionStore.set('old-device-id', 'hidden-a', 'old-session');
+    deviceWalletSessionStore.set('pro2-path', 'hidden-a', 'temporary-session');
+    device.markPreInitialized({ passphraseState: 'hidden-a' });
+    device.commands = {
+      typedCall: jest.fn().mockResolvedValue({ message: { message: 'accepted' } }),
+    } as never;
+
+    const method = new DeviceWipe({ id: 1, payload: { method: 'deviceWipe' } });
+    method.init();
+    (method as any).device = device;
+
+    await expect(method.run()).resolves.toEqual({ message: 'accepted' });
+
+    expect(device.features).toBeUndefined();
+    expect(device.passphraseState).toBeUndefined();
+    expect(device.needReloadDevice).toBe(true);
+    expect(device.isPreInitializedValid(60_000)).toBe(false);
+    expect(deviceWalletSessionStore.get('old-device-id', 'hidden-a')).toBeUndefined();
+    expect(deviceWalletSessionStore.get('pro2-path', 'hidden-a')).toBeUndefined();
   });
 });
 

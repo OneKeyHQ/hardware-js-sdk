@@ -101,9 +101,10 @@ describe('messages', () => {
     expect(v2Messages.nested.MessageType.values).toMatchObject({
       MessageType_DeviceStatusGet: 60602,
       MessageType_DeviceStatus: 60603,
+      MessageType_DeviceSessionGet: 60606,
       MessageType_DeviceSession: 60607,
       MessageType_DeviceSessionAskPin: 60608,
-      MessageType_DeviceSessionOpen: 60609,
+      MessageType_DeviceSessionAskPassphrase: 60609,
     });
     expect(v2Messages.nested.DeviceStatusGet).toEqual({ fields: {} });
     expect(v2Messages.nested.ProtocolInfoRequest.fields.eventless_wallet_session).toMatchObject({
@@ -111,25 +112,14 @@ describe('messages', () => {
       type: 'bool',
       options: { default: false },
     });
-    expect(v2Messages.nested).not.toHaveProperty('DeviceSessionGet');
-    expect(v2Messages.nested.DeviceSessionResume.fields.session_id).toMatchObject({
-      rule: 'required',
+    expect(v2Messages.nested.DeviceSessionGet.fields.session_id).toMatchObject({
       id: 1,
       type: 'bytes',
     });
-    expect(v2Messages.nested.DeviceSessionOpen.fields).toMatchObject({
-      resume: { id: 1, type: 'DeviceSessionResume' },
-      select: { id: 2, type: 'DeviceSessionSelect' },
-    });
-    expect(v2Messages.nested.DeviceSessionSelect.fields).toMatchObject({
-      host_passphrase: { id: 1, type: 'DeviceSessionHostPassphrase' },
-      passphrase_on_device: { id: 2, type: 'DeviceSessionPassphraseOnDevice' },
-      attach_pin_on_device: { id: 3, type: 'DeviceSessionAttachPinOnDevice' },
-    });
-    expect(v2Messages.nested.DeviceSessionHostPassphrase.fields.passphrase).toMatchObject({
-      rule: 'required',
-      id: 1,
-      type: 'string',
+    expect(v2Messages.nested.DeviceSessionPinType.values).toEqual({
+      Any: 1,
+      Main: 2,
+      AttachToPin: 3,
     });
     expect(v2Messages.nested.DeviceSessionErrorCode.values).toEqual({
       DeviceSessionError_None: 0,
@@ -146,14 +136,20 @@ describe('messages', () => {
       session_id: { id: 1, type: 'bytes' },
       btc_test_address: { id: 2, type: 'string' },
     });
-    expect(v2Messages.nested.DeviceSessionAskPin).toEqual({ fields: {} });
+    expect(v2Messages.nested.DeviceSessionAskPin.fields.type).toMatchObject({
+      id: 1,
+      type: 'DeviceSessionPinType',
+    });
+    expect(v2Messages.nested.DeviceSessionAskPassphrase).toEqual({ fields: {} });
     expect(v2Messages.nested.DeviceSessionAskPin_FailureSubCodes.values).toEqual({
       UserCancel: 1,
     });
     expect(v2Messages.nested.MessageType.values).not.toHaveProperty(
       'MessageType_DeviceSessionPinResult'
     );
-    expect(v2Messages.nested.MessageType.values).not.toHaveProperty('MessageType_DeviceSessionGet');
+    expect(v2Messages.nested.MessageType.values).not.toHaveProperty(
+      'MessageType_DeviceSessionOpen'
+    );
   });
 
   test('Protocol V2 onboarding status matches the current firmware-pro2 schema', () => {

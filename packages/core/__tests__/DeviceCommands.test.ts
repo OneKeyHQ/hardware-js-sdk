@@ -19,7 +19,7 @@ const createCommands = () => {
 };
 
 describe('DeviceCommands failure mapping', () => {
-  it('does not log DeviceSessionOpen response secrets', async () => {
+  it('does not log DeviceSessionGet response secrets', async () => {
     const commands = createCommands();
     const log = getLogger(LoggerNames.DeviceCommands);
     log.messages.length = 0;
@@ -33,7 +33,7 @@ describe('DeviceCommands failure mapping', () => {
             btc_test_address: 'secret-wallet-address',
           },
         } as any,
-        'DeviceSessionOpen'
+        'DeviceSessionGet'
       )
     ).resolves.toMatchObject({ type: 'DeviceSession' });
 
@@ -41,7 +41,7 @@ describe('DeviceCommands failure mapping', () => {
     expect(JSON.stringify(log.messages)).not.toContain('secret-wallet-address');
   });
 
-  it('maps an invalid DeviceSessionOpen resume to WalletSessionInvalid', async () => {
+  it('maps an invalid DeviceSessionGet resume to WalletSessionInvalid', async () => {
     const commands = createCommands();
 
     await expect(
@@ -54,7 +54,7 @@ describe('DeviceCommands failure mapping', () => {
             message: 'Invalid session',
           },
         } as any,
-        'DeviceSessionOpen'
+        'DeviceSessionGet'
       )
     ).rejects.toMatchObject({
       errorCode: HardwareErrorCode.WalletSessionInvalid,
@@ -66,7 +66,7 @@ describe('DeviceCommands failure mapping', () => {
     });
   });
 
-  it('maps DeviceSessionOpen user cancellation to ActionCancelled', async () => {
+  it('maps wallet-session user cancellation to ActionCancelled', async () => {
     const commands = createCommands();
 
     await expect(
@@ -79,7 +79,7 @@ describe('DeviceCommands failure mapping', () => {
             message: 'Cancelled on device',
           },
         } as any,
-        'DeviceSessionOpen'
+        'DeviceSessionAskPassphrase'
       )
     ).rejects.toMatchObject({
       errorCode: HardwareErrorCode.ActionCancelled,
@@ -89,7 +89,7 @@ describe('DeviceCommands failure mapping', () => {
   it.each([
     [3, HardwareErrorCode.DeviceCheckUnlockTypeError],
     [4, HardwareErrorCode.DeviceNotOpenedPassphrase],
-  ])('maps DeviceSessionOpen subcode %s to its canonical wallet error', async (subcode, code) => {
+  ])('maps wallet-session subcode %s to its canonical wallet error', async (subcode, code) => {
     const commands = createCommands();
 
     await expect(
@@ -98,7 +98,7 @@ describe('DeviceCommands failure mapping', () => {
           type: 'Failure',
           message: { code: 'Failure_ProcessError', subcode, message: 'Session selection failed' },
         } as any,
-        'DeviceSessionOpen'
+        'DeviceSessionAskPin'
       )
     ).rejects.toMatchObject({ errorCode: code });
   });

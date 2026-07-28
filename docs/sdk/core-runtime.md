@@ -115,12 +115,12 @@ Protocol V2 的自动锁屏和自动关机使用 `0x10000000` 表示“永不”
 
 公共钱包 Session API 按协议明确分层：
 
-| 公共 API                 | 语义                                                                  |
-| ------------------------ | --------------------------------------------------------------------- |
-| `getPassphraseState()`   | 无参数 Legacy Protocol V1 当前钱包状态入口；Protocol V2 返回不支持    |
-| `openWalletSession()`    | Protocol V1/V2 统一钱包入口；支持标准、隐藏、Attach-to-PIN 与显式恢复 |
-| `clearSessionCache()`    | 仅清除 `DeviceWalletSessionStore`，不发送设备协议命令                 |
-| 原始 `DeviceSessionOpen` | 仅为 Core 内部 Protocol V2 设备命令，不是可调用的 SDK API             |
+| 公共 API               | 语义                                                                   |
+| ---------------------- | ---------------------------------------------------------------------- |
+| `getPassphraseState()` | 现有 App 跨协议兼容入口；V1 保持旧流程，V2 由 Core 映射到 Ask/Get 流程 |
+| `openWalletSession()`  | Protocol V1/V2 统一钱包入口；支持标准、隐藏、Attach-to-PIN 与显式恢复  |
+| `clearSessionCache()`  | 仅清除 `DeviceWalletSessionStore`，不发送设备协议命令                  |
+| 原始 Session 请求      | `DeviceSessionAskPin/AskPassphrase/Get` 仅供 Core 内部编排             |
 
 当前没有“只读查询设备当前打开哪个钱包”的公共需求，因此不提供
 原始钱包 Session 查询接口。`getDeviceState()` 只返回 Passphrase、Attach PIN 等设备功能和运行状态，
@@ -133,16 +133,17 @@ Core 先把公共钱包意图归一化，再映射到各协议：
 ```text
 标准钱包
   -> V1: PassphraseRequest 自动回复空字符串
-  -> V2: 协商 eventless_wallet_session=true，使用默认空 Passphrase 上下文
+  -> V2: 协商 eventless_wallet_session=true；锁定时 AskPin(Main)
 
 隐藏钱包 / Attach-to-PIN
   -> V1: GetPassphraseState -> PassphraseRequest / PassphraseAck
-  -> V2: REQUEST_PASSPHRASE 三选一 -> DeviceSessionOpen(select)
+  -> V2: REQUEST_PASSPHRASE 选择 -> AskPassphrase 或 AskPin(AttachToPin)
+         -> DeviceSessionGet({})
 
 恢复隐藏钱包
   -> V1: 先用无钱包绑定字段的 Initialize 校验实时 deviceId，
          再按 passphraseState 校验并复用兼容 Session
-  -> V2: DeviceSessionOpen({ resume: { session_id } })
+  -> V2: DeviceSessionGet({ session_id })
 ```
 
 显式调用只使用 `mode` 表达意图，不能再混入旧参数：
@@ -192,10 +193,10 @@ Pro2 需要解锁时，钱包类型以解锁完成并刷新后的设备状态为
 
 `openWalletSession({ mode: 'resume-hidden' })` 在 Protocol V1/V2 都只接收
 `deviceId + passphraseState`。Core 按该 key 从唯一 Store 读取内部 `sessionId`：
-V1 通过 `Initialize.session_id` 恢复，V2 通过 `DeviceSessionOpen({ resume: { session_id } })` 恢复。
+V1 通过 `Initialize.session_id` 恢复，V2 通过 `DeviceSessionGet({ session_id })` 恢复。
 缓存不存在时 Core 返回 `HardwareErrorCode.WalletSessionInvalid`；固件拒绝缓存 Session
 时，Core 清理当前隐藏钱包缓存并透传规范化的固件错误，不会暗中切换钱包。
-`DeviceSessionOpen` 成功时必须同时返回非空
+`DeviceSessionGet` 成功时必须同时返回非空
 `session_id + btc_test_address`，否则 Core 将其视为不完整响应，而不是标准钱包。
 
 `clearSessionCache()` 对 V1 和 V2 执行相同的 Core 本地操作：
@@ -207,7 +208,7 @@ V1 通过 `Initialize.session_id` 恢复，V2 通过 `DeviceSessionOpen({ resume
 - 不修改 `DeviceState` 或协议 raw 快照，也不执行 Lock、Cancel 或设备端 Session Close。
 
 V1 被清理的是由 `Initialize/Features` 或 `GetPassphraseState` 获得的本地 `session_id`
-映射；V2 被清理的是由 `DeviceSessionOpen` 返回的本地 `session_id` 映射。下次打开钱包时，
+映射；V2 被清理的是由 `DeviceSessionGet` 返回的本地 `session_id` 映射。下次打开钱包时，
 Core 会重新执行对应协议的钱包 Session 建立或恢复流程。
 
 Protocol V1 的业务调用同时提供 `deviceId` 与钱包绑定时，Core 先发送不含
@@ -216,11 +217,56 @@ Protocol V1 的业务调用同时提供 `deviceId` 与钱包绑定时，Core 先
 `DeviceCheckDeviceIdError`，不会把旧设备或旧初始化生命周期的 Session 发给当前硬件。
 所有接收 `deviceId` 的钱包业务方法都应在业务命令前启用同一身份检查。
 
-App 迁移时只替换“打开/切换钱包”阶段：新流程在 V1/V2 都调用 `openWalletSession()`；
-已有 V1 集成可以继续使用 Legacy `getPassphraseState()`。地址、签名和 `preInitialize` 仍沿用原来的
+新 App 在“打开/切换钱包”阶段优先调用 `openWalletSession()`；已有 V1/V2 集成可以继续使用
+兼容 `getPassphraseState()`。地址、签名和 `preInitialize` 仍沿用原来的
 `passphraseState` / `useEmptyPassphrase` 参数，不应在每条业务指令前重复打开 Session。
 因此 App 的钱包 key 无需加入 `sessionId`；V1/V2 的 `sessionId` 都由 Core 统一按
 `deviceId + passphraseState` 管理。
+
+### App Passphrase 接入约定
+
+已经使用 Pro V1 `getPassphraseState()` 通讯流程的 App 接入 Pro2 时，公共调用方式和业务数据
+模型保持不变：
+
+```ts
+const result = await HardwareSDK.getPassphraseState({
+  connectId,
+  deviceId,
+});
+
+if (result.success) {
+  const { passphraseState } = result.payload;
+  // 仍以 deviceId + passphraseState 作为钱包引用。
+}
+```
+
+App 不应按型号或 PID 自行选择协议，也不应直接发送
+`DeviceSessionAskPin/DeviceSessionAskPassphrase/DeviceSessionGet`。Core 会在完成设备响应探测后
+自动分流：
+
+| App 意图          | Pro V1 固件流程                         | Pro2 Protocol V2 固件流程                                  |
+| ----------------- | --------------------------------------- | ---------------------------------------------------------- |
+| 标准钱包          | 空 Passphrase 兼容流程                  | 必要时 `DeviceSessionAskPin(Main)`                         |
+| 设备端 Passphrase | `GetPassphraseState -> PassphraseState` | `DeviceSessionAskPassphrase -> DeviceSessionGet({})`       |
+| Attach-to-PIN     | `GetPassphraseState -> PassphraseState` | `DeviceSessionAskPin(AttachToPin) -> DeviceSessionGet({})` |
+| 恢复已选隐藏钱包  | Core 管理 V1 Session 复用               | `DeviceSessionGet({ session_id })`                         |
+
+Pro2 上的 `REQUEST_PASSPHRASE` 始终是 `deviceOnly=true`。旧 App 仍可按原有 UI response
+形式提交“设备输入 Passphrase”或“Attach PIN”意图；Core 只使用该选择编排协议，
+不会把 Host 端 Passphrase 明文传给 Pro2。
+
+对 App 的最小回归检查是：
+
+1. Pro V1 的标准钱包、隐藏钱包和 Attach-to-PIN 流程保持原行为。
+2. Pro2 能通过同一 `getPassphraseState()` 入口打开隐藏钱包，并返回非空
+   `passphraseState`。
+3. 后续地址和签名调用继续传入该 `passphraseState`，不持久化、打印或作为
+   钱包主键使用 `sessionId`。
+4. 切换钱包、断开重连和 Session 失效后，不会把一个
+   `deviceId + passphraseState` 的 Session 路由到另一个钱包。
+
+新集成建议用 `openWalletSession({ mode })` 显式表达意图，但这是渐进式迁移，不是
+Pro2 接入的强制前置条件。
 
 `openWalletSession()` 在标准/隐藏钱包结果中都可选透传固件返回的 `sessionId`。Legacy
 `Features.session_id/sessionId` 仍只用于现有 CLI 的受控 OS Keychain 恢复；这些字段都

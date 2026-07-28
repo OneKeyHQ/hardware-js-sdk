@@ -1262,6 +1262,7 @@ const onDevicePassphraseHandler = async (
       device: device.toMessageObject() as KnownDevice,
       passphraseState: device.passphraseState,
       existsAttachPinUser: requestPayload.existsAttachPinUser,
+      deviceOnly: requestPayload.deviceOnly,
       source: requestPayload.source,
       reason: requestPayload.reason,
       expectedPassphraseState: requestPayload.expectedPassphraseState,

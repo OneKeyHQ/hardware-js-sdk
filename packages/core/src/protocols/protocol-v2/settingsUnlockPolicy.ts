@@ -3,7 +3,6 @@ import type { UnlockPolicy } from '../../api/BaseMethod';
 import type { ProtocolV2InteractionDescriptor } from './uiInteraction';
 
 const LOCK_FREE_DEVICE_SETTINGS = new Set<keyof DeviceSettings>([
-  'label',
   'language',
   'brightness',
   'haptic_feedback',
