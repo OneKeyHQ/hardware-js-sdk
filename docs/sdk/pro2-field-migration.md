@@ -298,7 +298,7 @@ DeviceSessionGet({ session_id }) -> DeviceSession
 | ----------------------------- | -------------------------------- | -------------------------------------------- |
 | `DeviceSessionGet.session_id` | 尝试恢复之前的隐藏钱包 Session   | Core 内部传入当前钱包缓存值                  |
 | `DeviceSessionPinType`        | `Any/Main/AttachToPin` PIN 路由  | 标准钱包固定 `Main`，Attach 选择固定对应类型 |
-| `DeviceSessionAskPassphrase`  | 请求在设备端输入 Passphrase      | 不接受或透传 Host 明文                       |
+| `DeviceSessionAskPassphrase`  | 准备 Passphrase 隐藏钱包          | 可选携带 Host 明文；字段缺省为设备端输入      |
 | 响应 `session_id`             | 当前钱包 Session ID              | 保存到当前钱包缓存                           |
 | `btc_test_address`            | 用于确认当前钱包上下文的稳定标识 | 映射为内部 `passphraseState`                 |
 
@@ -330,10 +330,8 @@ SDK 不注册可调用的原始 Session API，接入方不能通过低层 `call(
 App 不得直接调用原始 Session 请求。现有 App 可继续调用公共
 `getPassphraseState()`，Core 会在 Pro2 上映射到新协议；新代码优先使用
 `openWalletSession()` 的 `standard/select-hidden/resume-hidden` 显式表达意图。
-为了兼容迁移中的旧调用，未传 `mode` 时，`useEmptyPassphrase=true` 映射为
-`standard`，`initSession=true` 映射为新的 `select-hidden`，完整
-`deviceId + passphraseState` 映射为 `resume-hidden`。显式 `mode` 不允许与这些旧意图参数
-混用。
+`openWalletSession()` 必须显式传入 `mode`，且不接受旧的
+`useEmptyPassphrase/initSession` 参数。旧调用继续通过 `getPassphraseState()` 兼容。
 
 ## 9. PIN 解锁结果
 

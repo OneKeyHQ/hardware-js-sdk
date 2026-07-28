@@ -41,9 +41,10 @@ export type {
   OneKeyDeviceInfoBase,
   OneKeyDeviceCommType,
   ProtocolType,
+  TransportDeviceDisconnectEvent,
 } from './types';
 
-export { Messages } from './types';
+export { Messages, TRANSPORT_EVENT } from './types';
 export * from './types/messages';
 export * from './utils/logBlockCommand';
 

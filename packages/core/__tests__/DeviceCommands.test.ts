@@ -103,6 +103,41 @@ describe('DeviceCommands failure mapping', () => {
     ).rejects.toMatchObject({ errorCode: code });
   });
 
+  it.each([
+    ['DeviceSessionGet', 5, 'Another flow in progress'],
+    ['DeviceSessionAskPin', 0, 'Busy'],
+  ])('maps %s firmware busy failures to DeviceBusy', async (callType, subcode, message) => {
+    const commands = createCommands();
+
+    await expect(
+      commands._filterCommonTypes(
+        {
+          type: 'Failure',
+          message: { code: 'Failure_ProcessError', subcode, message },
+        } as any,
+        callType
+      )
+    ).rejects.toMatchObject({ errorCode: HardwareErrorCode.DeviceBusy });
+  });
+
+  it('maps the current AskPin passphrase-disabled response without relying on a subcode', async () => {
+    const commands = createCommands();
+
+    await expect(
+      commands._filterCommonTypes(
+        {
+          type: 'Failure',
+          message: {
+            code: 'Failure_ProcessError',
+            subcode: 0,
+            message: 'Passphrase disabled',
+          },
+        } as any,
+        'DeviceSessionAskPin'
+      )
+    ).rejects.toMatchObject({ errorCode: HardwareErrorCode.DeviceNotOpenedPassphrase });
+  });
+
   it('rejects the Pro2 bootloader DeviceStatusGet unsupported response', async () => {
     const commands = createCommands();
 

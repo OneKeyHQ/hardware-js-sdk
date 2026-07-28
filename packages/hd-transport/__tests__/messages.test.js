@@ -140,7 +140,14 @@ describe('messages', () => {
       id: 1,
       type: 'DeviceSessionPinType',
     });
-    expect(v2Messages.nested.DeviceSessionAskPassphrase).toEqual({ fields: {} });
+    expect(v2Messages.nested.DeviceSessionAskPassphrase).toEqual({
+      fields: {
+        passphrase: {
+          type: 'string',
+          id: 1,
+        },
+      },
+    });
     expect(v2Messages.nested.DeviceSessionAskPin_FailureSubCodes.values).toEqual({
       UserCancel: 1,
     });

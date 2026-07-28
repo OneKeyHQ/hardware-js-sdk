@@ -1,6 +1,7 @@
 import { LoggerNames, getLogger } from '../../utils';
 import { isDeviceLockedError } from './lockedError';
 import { isProtocolV2UiEnabled, resolveProtocolV2UiInteraction } from './uiInteraction';
+import { restoreProtocolV2WalletSession } from './walletSession';
 
 import type { BaseMethod } from '../../api/BaseMethod';
 import type { Device } from '../../device/Device';
@@ -10,9 +11,14 @@ const Log = getLogger(LoggerNames.Core);
 
 type RunnableMethod = Pick<
   BaseMethod,
-  'run' | 'unlockPolicy' | 'protocolV2UiInteraction' | 'protocolV2UiMode' | 'params' | 'payload'
+  | 'run'
+  | 'unlockPolicy'
+  | 'protocolV2UiInteraction'
+  | 'protocolV2UiMode'
+  | 'params'
+  | 'payload'
+  | 'useDevicePassphraseState'
 > & { name?: string };
-type UnlockableDevice = Pick<Device, 'isProtocolV2' | 'unlockDevice' | 'features'>;
 type UiInteractionCoordinator = Pick<
   ProtocolV2UiInteractionCoordinator,
   'enterMethodInteraction' | 'enterUnlockInteraction' | 'resumeMethodInteraction'
@@ -20,7 +26,7 @@ type UiInteractionCoordinator = Pick<
 
 export async function runMethodWithUnlockRetry(
   method: RunnableMethod,
-  device: UnlockableDevice,
+  device: Device,
   uiCoordinator?: UiInteractionCoordinator
 ) {
   const shouldEmitUi = isProtocolV2UiEnabled(method);
@@ -59,6 +65,17 @@ export async function runMethodWithUnlockRetry(
     }
     await device.unlockDevice();
     Log.debug('Protocol V2 unlock completed', { method: method.name });
+    const expectedPassphraseState = method.payload?.useEmptyPassphrase
+      ? undefined
+      : method.payload?.passphraseState ?? device.passphraseState;
+    if (
+      method.useDevicePassphraseState &&
+      typeof expectedPassphraseState === 'string' &&
+      expectedPassphraseState.length > 0
+    ) {
+      await restoreProtocolV2WalletSession(device, expectedPassphraseState);
+      Log.debug('Protocol V2 wallet session restored after unlock', { method: method.name });
+    }
     if (shouldEmitUi) {
       uiCoordinator?.resumeMethodInteraction();
     }

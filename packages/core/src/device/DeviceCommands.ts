@@ -516,6 +516,25 @@ export class DeviceCommands {
             firmwareMessage: message,
           });
         } else if (
+          DEVICE_SESSION_CALLS.has(callType) &&
+          (subcode === DeviceSessionErrorCode.DeviceSessionError_Busy ||
+            /^(?:busy|another flow in progress)$/i.test(normalizedMessage))
+        ) {
+          error = ERRORS.TypedError(HardwareErrorCode.DeviceBusy, message, {
+            failureCode: code,
+            subcode,
+            firmwareMessage: message,
+          });
+        } else if (
+          callType === 'DeviceSessionAskPin' &&
+          /^passphrase disabled$/i.test(normalizedMessage)
+        ) {
+          error = ERRORS.TypedError(HardwareErrorCode.DeviceNotOpenedPassphrase, message, {
+            failureCode: code,
+            subcode,
+            firmwareMessage: message,
+          });
+        } else if (
           subcode === DeviceErrorCode.DeviceError_ActionCancelled ||
           isLegacyProtocolV2ActionCancelledFailure
         ) {

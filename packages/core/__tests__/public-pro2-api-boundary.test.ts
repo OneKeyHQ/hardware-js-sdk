@@ -30,6 +30,7 @@ const removedRawMethodNames = [
   'dirMake',
   'dirRemove',
   'pathInfo',
+  'testProtocolV2FileWrite',
 ] as const;
 
 const unpublishedFilesystemAliases = [
@@ -48,6 +49,8 @@ describe('public Pro2 API boundary', () => {
 
     expect(api.deviceGetOnboardingStatus).toBeInstanceOf(Function);
     expect(api.uploadPortfolio).toBeInstanceOf(Function);
+    expect(api.testProtocolV2Ping).toBeInstanceOf(Function);
+    expect(publicMethods.testProtocolV2Ping).toBeInstanceOf(Function);
 
     expect(api).not.toHaveProperty('deviceSessionOpen');
     expect(publicMethods).not.toHaveProperty('deviceSessionOpen');
@@ -59,6 +62,25 @@ describe('public Pro2 API boundary', () => {
       expect(api).not.toHaveProperty(name);
       expect(publicMethods).not.toHaveProperty(name);
     });
+  });
+
+  test('routes the diagnostic Protocol V2 Ping without publishing the raw ping command', async () => {
+    const call = jest.fn().mockResolvedValue({ success: true, payload: { message: 'benchmark' } });
+    const api = createCoreApi(call as CoreApi['call']) as CoreApi;
+
+    await api.testProtocolV2Ping('connect-id', {
+      message: 'benchmark',
+      connectProtocol: 'V2',
+    });
+
+    expect(call).toHaveBeenCalledWith({
+      method: 'testProtocolV2Ping',
+      connectId: 'connect-id',
+      message: 'benchmark',
+      connectProtocol: 'V2',
+    });
+    expect(api).not.toHaveProperty('ping');
+    expect(publicMethods).not.toHaveProperty('ping');
   });
 
   test('rejects deviceSessionOpen at the SDK dispatcher boundary', () => {
