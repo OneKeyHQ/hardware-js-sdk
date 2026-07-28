@@ -1,9 +1,9 @@
 # Pro2 无固件中间 Event：SDK / App / firmware 迁移清单
 
-> 历史说明：本文记录曾基于 `DeviceSessionOpen(select/resume)` 设计的迁移方案，不代表
-> 当前 firmware-pro2 `dev` 协议。当前实现以
+> 当前契约：firmware-pro2 `dev` 已实现 `DeviceSessionOpen(select/resume)` 与
+> `ProtocolInfoRequest.eventless_wallet_session`。当前实现以
 > [SDK Core 运行时](./core-runtime.md) 和 [Pro2 字段迁移](./pro2-field-migration.md)
-> 为准：固件使用 `DeviceSessionGet(session_id?)`，钱包输入与选择在设备端完成。
+> 为准；本文作为 SDK/App 迁移清单。
 
 产品与协议总设计见：
 [Pro2 无固件中间 Event 设计索引](../superpowers/specs/2026-07-16-pro2-eventless-index.md)。
@@ -17,7 +17,7 @@
 - `ButtonRequest / ButtonAck`。
 - `PinMatrixRequest / PinMatrixAck`。
 
-当时规划的分层是：
+当前分层是：
 
 ```text
 App
@@ -42,7 +42,7 @@ SDK 内部根据协议版本选择 Event 来源和后续动作。
 - `PassphraseAck` 是对 firmware `PassphraseRequest` 的中间回复，只表达 Host Passphrase、设备
   Passphrase 或 Attach PIN 三种隐藏钱包进入方式。
 - `DeviceSessionOpen(select)` 主动执行隐藏钱包选择并返回最终 Session；它承接上述三种参数语义。
-- `DeviceSessionOpen(resume)` 承接原 `Initialize/DeviceSessionGet(session_id)` 的 Session 恢复语义，
+- `DeviceSessionOpen(resume)` 承接原 `Initialize(session_id)` 的 Session 恢复语义，
   这不是 `PassphraseAck` 原有能力。
 - `ButtonRequest/ButtonAck` 不改名；它们从 V2 firmware 状态机中删除，设备页面由 select 命令内部
   打开，对 App 的阶段提示由 SDK 合成。
@@ -51,7 +51,7 @@ SDK 内部根据协议版本选择 Event 来源和后续动作。
 PassphraseAck(passphrase)                -> select HOST_PASSPHRASE
 PassphraseAck(on_device)                 -> select DEVICE_PASSPHRASE
 PassphraseAck(on_device_attach_pin)      -> select ATTACH_PIN
-Initialize/DeviceSessionGet(session_id)  -> resume session_id
+Initialize(session_id)                   -> resume session_id
 ```
 
 ## 不在删除范围
@@ -145,18 +145,16 @@ requestId/connectId 关联，并在取消、超时、断连和方法结束时清
 
 ```text
 业务请求
-  -> DeviceLocked（必须发生在副作用前）
-  -> SDK emit REQUEST_PIN(deviceOnly, source=unlock-coordinator)
-  -> DeviceSessionAskPin
-  -> 解锁成功后 method.run() 只重试一次
+  -> 安全重放白名单：DeviceLocked -> 解锁 -> method.run() 最多重试一次
+  -> 有副作用方法：已知 locked -> 先解锁 -> method.run() 只执行一次
 ```
 
 - App 不回传 PIN，也不重发业务请求。
 - Pro2 `REQUEST_PIN` 是非阻塞设备提示。
-- 非幂等方法只有在 firmware 保证 locked 发生于副作用前时才能启用自动重试。
+- 非幂等方法不得在收到 locked 响应后重放，只能使用 `unlock-before-run`。
 - 同一设备并发调用共享串行解锁任务。
-- `uploadPortfolio` 通过 `protocolV2UiMode='none'` 明确关闭自动解锁提示；它可以继续走内部解锁与重试，
-  但不会产生 `REQUEST_PIN/REQUEST_BUTTON`。
+- `uploadPortfolio` 通过 `protocolV2UiMode='none'` 明确关闭自动解锁提示；缓存状态已知锁定时
+  可以先解锁，但文件写入与应用流程只执行一次，不产生 `REQUEST_PIN/REQUEST_BUTTON`。
 
 ## 地址、公钥、签名和设备管理
 
@@ -233,7 +231,8 @@ Cancel 必须绑定当前设备和 Transport source；断连时清理请求、UI
 - Hidden Wallet PIN 入口由 `existsAttachPinUser` 决定。
 - `REQUEST_BUTTON/REQUEST_PIN` 的 Pro2 非阻塞场景不发送 `uiResponse()`。
 - 用户关闭硬件交互 UI 时取消当前调用；收到 `CLOSE_UI_WINDOW` 时只幂等收起。
-- 继续保存 `passphraseState`，不暴露或保存 firmware `session_id`。
+- App 继续保存 `passphraseState`，忽略 CLI 兼容的 `openWalletSession().sessionId`，不把
+  firmware `session_id` 写入 App 数据库。
 - 不把 onboarding 阶段 Event 当成唯一状态来源。
 
 ## 回归测试
@@ -247,7 +246,8 @@ Cancel 必须绑定当前设备和 Transport source；断连时清理请求、UI
 
 ### 钱包与解锁
 
-- 标准钱包直接使用默认空 Passphrase 上下文，不调用 `DeviceSessionOpen`，也不读取或写入隐藏钱包 Session Store。
+- 标准钱包先协商 `eventless_wallet_session=true`，随后不调用 `DeviceSessionOpen`，
+  不生成或暴露隐藏钱包的 `passphraseState/sessionId`。
 - Host Passphrase、设备 Passphrase、Attach PIN 三种隐藏钱包选择都返回正确钱包标识。
 - 首次隐藏钱包、Session 恢复、Session 失效重选保持原 API 调用不重放。
 - Passphrase 与对应 Attach PIN 返回相同 `btc_test_address`。

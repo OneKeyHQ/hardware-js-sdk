@@ -8,7 +8,7 @@ import type { ChangePin } from '@onekeyfe/hd-transport';
 
 export default class DeviceChangePin extends BaseMethod<ChangePin> {
   init() {
-    this.unlockPolicy = 'retry-on-locked';
+    this.unlockPolicy = 'unlock-before-run';
     this.useDevicePassphraseState = false;
 
     // check payload

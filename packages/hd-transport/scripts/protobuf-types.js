@@ -69,6 +69,9 @@ const ENUM_KEYS = [
   'ProtocolV2Capability',
 ];
 
+// Safety checks are accepted as both protobuf enum names and numeric legacy values.
+const ENUM_KEYS_WITH_NUMERIC_VALUES = ['SafetyCheckLevel'];
+
 const parseEnumTypescript = (itemName, item) => {
   const value = [];
   const IS_KEY = ENUM_KEYS.includes(itemName);
@@ -87,7 +90,10 @@ const parseEnumTypescript = (itemName, item) => {
   value.push('}');
 
   if (IS_KEY) {
-    value.push(`export type ${itemName} = keyof typeof Enum_${itemName};`);
+    const numericValue = ENUM_KEYS_WITH_NUMERIC_VALUES.includes(itemName)
+      ? ` | Enum_${itemName}`
+      : '';
+    value.push(`export type ${itemName} = keyof typeof Enum_${itemName}${numericValue};`);
   }
   // empty line
   value.push('');
