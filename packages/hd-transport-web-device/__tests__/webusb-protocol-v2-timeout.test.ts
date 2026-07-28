@@ -43,6 +43,38 @@ describe('WebUsbTransport Protocol V2 timeout recovery', () => {
     expect(webusb.deviceProtocol.get(path)).toBe('V2');
   });
 
+  test('retries an expected Protocol V2 probe once after resetting the connection', async () => {
+    const webusb = new WebUsbTransport() as any;
+    const path = 'pro2-webusb';
+    webusb.probeProtocolV1 = jest.fn();
+    webusb.probeProtocolV2 = jest.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    webusb.resetConnectionAfterProbe = jest.fn().mockResolvedValue(undefined);
+
+    await expect(webusb.detectProtocol(path, 'V2')).resolves.toBe('V2');
+
+    expect(webusb.probeProtocolV2).toHaveBeenCalledTimes(2);
+    expect(webusb.probeProtocolV1).not.toHaveBeenCalled();
+    expect(webusb.resetConnectionAfterProbe).toHaveBeenCalledTimes(1);
+    expect(webusb.deviceProtocol.get(path)).toBe('V2');
+  });
+
+  test('reports a Protocol V2 probe timeout only after the bounded retry is exhausted', async () => {
+    const webusb = new WebUsbTransport() as any;
+    const path = 'pro2-webusb';
+    webusb.probeProtocolV1 = jest.fn();
+    webusb.probeProtocolV2 = jest.fn().mockResolvedValue(false);
+    webusb.resetConnectionAfterProbe = jest.fn().mockResolvedValue(undefined);
+
+    await expect(webusb.detectProtocol(path, 'V2')).rejects.toThrow(
+      'Protocol V2 probe timeout after 2 attempts'
+    );
+
+    expect(webusb.probeProtocolV2).toHaveBeenCalledTimes(2);
+    expect(webusb.probeProtocolV1).not.toHaveBeenCalled();
+    expect(webusb.resetConnectionAfterProbe).toHaveBeenCalledTimes(2);
+    expect(webusb.deviceProtocol.has(path)).toBe(false);
+  });
+
   test('invalidates and resets the cached connection before another call can start', async () => {
     const webusb = new WebUsbTransport() as any;
     const path = 'pro2-webusb';
