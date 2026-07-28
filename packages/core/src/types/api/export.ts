@@ -161,6 +161,8 @@ export type {
   KaspaSignTransactionParams,
   KaspaSignInputParams,
   KaspaSignOutputParams,
+  KaspaStreamingSignInputParams,
+  KaspaStreamingSignOutputParams,
 } from './kaspaSignTransaction';
 
 export type { NexaAddress, NexaGetAddressParams } from './nexaGetAddress';
