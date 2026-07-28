@@ -45,13 +45,7 @@ export default class EVMSignMessageEIP712 extends BaseMethod<EthereumSignMessage
   }
 
   async run() {
-    this.checkFeatureVersionLimit(
-      () => true,
-      () => this.getVersionRange(),
-      {
-        strictCheckDeviceSupport: true,
-      }
-    );
+    this.assertProtocolSupported(this.device.getProtocol(), this.device.getCurrentFirmwareType());
 
     const res = await this.device.commands.typedCall(
       'EthereumSignMessageEIP712',

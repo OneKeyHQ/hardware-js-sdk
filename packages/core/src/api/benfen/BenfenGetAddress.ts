@@ -1,3 +1,5 @@
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
@@ -7,6 +9,13 @@ import { batchGetPublickeys, supportBatchPublicKeyByDevice } from '../helpers/ba
 
 import type { BenfenAddress, BenfenGetAddressParams, DeviceFirmwareRange } from '../../types';
 import type { BenfenGetAddress as HardwareBenfenGetAddress } from '@onekeyfe/hd-transport';
+
+const requireAddress = (address: string | undefined): string => {
+  if (address == null) {
+    throw ERRORS.TypedError(HardwareErrorCode.CallMethodError, "Field 'address' is null");
+  }
+  return address;
+};
 
 export default class BenfenGetAddress extends BaseMethod<HardwareBenfenGetAddress[]> {
   hasBundle = false;
@@ -74,8 +83,7 @@ export default class BenfenGetAddress extends BaseMethod<HardwareBenfenGetAddres
             'BenfenAddress',
             param
           );
-          // BenfenAddress.address is optional in proto but always present on success.
-          address = addressRes.message.address ?? '';
+          address = requireAddress(addressRes.message.address);
         } else {
           address = publicKeyToAddress(publicKey);
         }
@@ -103,7 +111,7 @@ export default class BenfenGetAddress extends BaseMethod<HardwareBenfenGetAddres
           );
           const result = {
             path: serializedPath(param.address_n),
-            address: hex2BfcAddress(res.message.address ?? ''),
+            address: hex2BfcAddress(requireAddress(res.message.address)),
           };
           if (this.shouldConfirm) {
             this.postPreviousAddressMessage(result);
