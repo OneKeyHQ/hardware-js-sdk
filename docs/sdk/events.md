@@ -147,13 +147,13 @@ V2 不伪造硬件 `ButtonRequest/PinMatrixRequest/PassphraseRequest`。阻塞 E
 
 ## 必须回传的 UI 请求
 
-| UI 请求                                         | 协议/来源                   | 主要触发点                          | Core 等待的响应                                | 结果如何回到设备/流程                                            |
-| ----------------------------------------------- | --------------------------- | ----------------------------------- | ---------------------------------------------- | ---------------------------------------------------------------- |
-| `REQUEST_PIN`                                   | V1 硬件消息转换             | `PinMatrixRequest`                  | `RECEIVE_PIN`                                  | `PinMatrixAck` 或切换设备输入                                    |
-| `REQUEST_PASSPHRASE`                            | V1 硬件消息转换             | `PassphraseRequest`                 | `RECEIVE_PASSPHRASE`                           | `PassphraseAck`                                                  |
-| `REQUEST_PASSPHRASE`                            | V2 WalletSessionCoordinator | 隐藏钱包首次选择或 Session 恢复失败 | `RECEIVE_PASSPHRASE`                           | 按响应执行 `select HOST_PASSPHRASE/DEVICE_PASSPHRASE/ATTACH_PIN` |
-| `REQUEST_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE`   | Core 流程生成               | 老 WebUSB 升级重启到 bootloader 后  | `SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE`   | 把重新授权的 `deviceId` 交回旧固件流程                           |
-| `REQUEST_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE` | Core 流程生成               | 老固件切换或重连阶段                | `SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE` | 把重新选择的 `deviceId` 交回旧固件流程                           |
+| UI 请求                                         | 协议/来源                   | 主要触发点                          | Core 等待的响应                                | 结果如何回到设备/流程                                                         |
+| ----------------------------------------------- | --------------------------- | ----------------------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------- |
+| `REQUEST_PIN`                                   | V1 硬件消息转换             | `PinMatrixRequest`                  | `RECEIVE_PIN`                                  | `PinMatrixAck` 或切换设备输入                                                 |
+| `REQUEST_PASSPHRASE`                            | V1 硬件消息转换             | `PassphraseRequest`                 | `RECEIVE_PASSPHRASE`                           | `PassphraseAck`                                                               |
+| `REQUEST_PASSPHRASE`                            | V2 WalletSessionCoordinator | 隐藏钱包首次选择或 Session 恢复失败 | `RECEIVE_PASSPHRASE`                           | 按响应执行 `select.host_passphrase/passphrase_on_device/attach_pin_on_device` |
+| `REQUEST_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE`   | Core 流程生成               | 老 WebUSB 升级重启到 bootloader 后  | `SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE`   | 把重新授权的 `deviceId` 交回旧固件流程                                        |
+| `REQUEST_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE` | Core 流程生成               | 老固件切换或重连阶段                | `SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE` | 把重新选择的 `deviceId` 交回旧固件流程                                        |
 
 两个 WebUSB 设备选择请求不是硬件协议消息，Protocol V2 的 `firmwareUpdateV4` 当前也不通过这两个 Event 处理 Pro2 重连。
 
@@ -238,9 +238,9 @@ V1 中，`attachPinOnDevice` 只有在设备的 `PassphraseRequest.exists_attach
 `PassphraseAck.on_device_attach_pin`。
 
 V2 中，SDK 根据 `DeviceStatus.attach_to_pin_enabled` 生成 `existsAttachPinUser`。App 提交普通
-Passphrase 时映射为 `DeviceSessionOpen(select HIDDEN, HOST_PASSPHRASE)`；
+Passphrase 时映射为 `DeviceSessionOpen({ select: { host_passphrase } })`；
 `passphraseOnDevice/attachPinOnDevice` 分别映射为
-`DeviceSessionOpen(select HIDDEN, DEVICE_PASSPHRASE/ATTACH_PIN)`。Host Passphrase 沿用现有 NFKD
+`DeviceSessionOpen({ select: { passphrase_on_device/attach_pin_on_device } })`。Host Passphrase 沿用现有 NFKD
 标准化规则，只用于当前调用，不进入缓存、持久化状态或日志。
 
 ## 不需要回传的设备交互
@@ -269,7 +269,7 @@ Pro2 设置页 Event 还会携带 `source='method-lifecycle'`、`reason`、`comp
 
 V1 用户选择设备端输入后，设备可能返回 `ButtonRequest_PassphraseEntry`，Core 将其转换为
 `REQUEST_PASSPHRASE_ON_DEVICE`。V2 在
-`DeviceSessionOpen(select HIDDEN, DEVICE_PASSPHRASE)` 发出前由 SDK 合成同名阶段提示。两者都只
+`DeviceSessionOpen({ select: { passphrase_on_device } })` 发出前由 SDK 合成同名阶段提示。两者都只
 用于更新设备输入 UI，不要求响应。
 
 ### 关闭事件

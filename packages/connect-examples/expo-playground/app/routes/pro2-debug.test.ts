@@ -50,6 +50,10 @@ describe('Pro2 Debug 钱包与状态方法', () => {
     expect(source).toContain("passphraseState: '[REDACTED]'");
   });
 
+  test('钱包 Session 说明包含固件可选返回的 sessionId', () => {
+    expect(source).toContain('optional sessionId');
+  });
+
   test('统一状态说明包含默认实时 status 和可选业务 scope', () => {
     expect(source).toContain('Default: DeviceStatusGet in normal mode');
     expect(source).toContain('firmware: full DeviceInfoGet');

@@ -34,6 +34,9 @@ const wasResumed = (session: unknown) =>
   'resumed' in session &&
   (session as { resumed?: unknown }).resumed === true;
 
+const forwardSessionId = (session: { newSession?: string }) =>
+  session.newSession ? { sessionId: session.newSession } : {};
+
 const requireHiddenWalletResponse = (session: {
   passphraseState?: string;
   newSession?: string;
@@ -46,7 +49,7 @@ const requireHiddenWalletResponse = (session: {
   }
   return {
     passphraseState: session.passphraseState,
-    ...(session.newSession ? { sessionId: session.newSession } : {}),
+    ...forwardSessionId(session),
   };
 };
 
@@ -171,6 +174,7 @@ export default class OpenWalletSession extends BaseMethod<NormalizedOpenWalletSe
         walletType: 'standard',
         deviceId: currentDeviceId,
         passphraseState: null,
+        ...forwardSessionId(session),
         resumed: wasResumed(session),
       };
     }
@@ -227,6 +231,7 @@ export default class OpenWalletSession extends BaseMethod<NormalizedOpenWalletSe
           ...responseBase,
           walletType: 'standard',
           passphraseState: null,
+          ...forwardSessionId(session),
         }
       : {
           ...responseBase,
