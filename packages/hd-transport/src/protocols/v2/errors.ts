@@ -1,5 +1,4 @@
 export type ProtocolV2LinkErrorCode =
-  | 'delivery-timeout'
   | 'response-timeout'
   | 'router'
   | 'packet-source'

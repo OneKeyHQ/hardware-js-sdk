@@ -10,7 +10,6 @@ const {
 } = require('../src/protocols/v2/session');
 const protocolV2 = require('../src/protocols/v2');
 const {
-  PROTOCOL_V2_DEFAULT_DELIVERY_TIMEOUT_MS,
   PROTOCOL_V2_DEFAULT_RESPONSE_TIMEOUT_MS,
   PROTOCOL_V2_FRAME_MAX_BYTES,
 } = require('../src/constants');
@@ -477,7 +476,7 @@ describe('Protocol V2 framing and session', () => {
     expect(readFrame).toHaveBeenCalledTimes(2);
   });
 
-  test('session accepts a terminal response as delivery confirmation before an ACK', async () => {
+  test('session accepts a terminal response before an ACK', async () => {
     const response = ProtocolV2.encodeFrame(schemas, 'Success', {
       message: 'ok',
     });
@@ -489,11 +488,7 @@ describe('Protocol V2 framing and session', () => {
     });
 
     await expect(
-      session.call(
-        'Ping',
-        { message: 'hello' },
-        { deliveryTimeoutMs: 10, expectedTypes: ['Success'] }
-      )
+      session.call('Ping', { message: 'hello' }, { expectedTypes: ['Success'] })
     ).resolves.toEqual({
       type: 'Success',
       message: {
@@ -502,88 +497,34 @@ describe('Protocol V2 framing and session', () => {
     });
   });
 
-  test('session fails delivery quickly when neither an ACK nor a response arrives', async () => {
-    const writeFrame = jest.fn().mockResolvedValue(undefined);
-    const session = new ProtocolV2Session({
-      schemas,
-      router: 1,
-      writeFrame,
-      readFrame: () => new Promise(() => {}),
-    });
-
-    await expect(
-      session.call('Ping', { message: 'hello' }, { timeoutMs: 100, deliveryTimeoutMs: 10 })
-    ).rejects.toMatchObject({
-      name: 'ProtocolV2LinkError',
-      code: 'delivery-timeout',
-    });
-    expect(writeFrame).toHaveBeenCalledTimes(1);
-  });
-
-  test('session only retransmits delivery for an explicitly idempotent call', async () => {
+  test('session uses the unified response timeout before the first ACK', async () => {
     const response = ProtocolV2.encodeFrame(schemas, 'Success', {
       message: 'ok',
     });
-    const writeFrame = jest.fn().mockResolvedValue(undefined);
-    let resolveRead;
-    const readFrame = jest.fn(
-      () =>
-        new Promise(resolve => {
-          resolveRead = resolve;
-        })
-    );
+    const readFrame = jest.fn(() => Promise.resolve(rewriteSeq(response, 1)));
     const session = new ProtocolV2Session({
       schemas,
       router: 1,
-      writeFrame,
+      writeFrame: () => Promise.resolve(),
       readFrame,
     });
 
-    const call = session.call(
-      'Ping',
-      { message: 'hello' },
-      {
-        timeoutMs: 200,
-        deliveryTimeoutMs: 10,
-        deliveryRetryPolicy: 'retry-idempotent',
-        deliveryMaxRetries: 1,
-      }
-    );
-    await new Promise(resolve => {
-      setTimeout(resolve, 20);
-    });
-    resolveRead(rewriteSeq(response, 1));
-
-    await expect(call).resolves.toEqual({
+    await expect(
+      session.call(
+        'Ping',
+        { message: 'hello' },
+        {
+          timeoutMs: 12_345,
+          expectedTypes: ['Success'],
+        }
+      )
+    ).resolves.toEqual({
       type: 'Success',
       message: {
         message: 'ok',
       },
     });
-    expect(writeFrame).toHaveBeenCalledTimes(2);
-    expect(readFrame).toHaveBeenCalledTimes(1);
-    expect(writeFrame.mock.calls[1][1].deliveryAttempt).toBe(1);
-  });
-
-  test('session never retransmits a side-effecting call without an idempotent policy', async () => {
-    const writeFrame = jest.fn().mockResolvedValue(undefined);
-    const session = new ProtocolV2Session({
-      schemas,
-      router: 1,
-      writeFrame,
-      readFrame: () => new Promise(() => {}),
-    });
-
-    await expect(
-      session.call(
-        'FileWrite',
-        {},
-        { timeoutMs: 100, deliveryTimeoutMs: 10, deliveryMaxRetries: 3 }
-      )
-    ).rejects.toMatchObject({
-      code: 'delivery-timeout',
-    });
-    expect(writeFrame).toHaveBeenCalledTimes(1);
+    expect(readFrame).toHaveBeenCalledWith(expect.objectContaining({ timeoutMs: 12_345 }));
   });
 
   test('session rejects an ACK that belongs to another request sequence', async () => {
@@ -707,12 +648,28 @@ describe('Protocol V2 framing and session', () => {
     expect(logger.debug).not.toHaveBeenCalled();
   });
 
-  test('session rejects a gap in the device-owned response sequence', async () => {
+  test('session accepts gaps in the firmware-global response sequence', async () => {
     const response = ProtocolV2.encodeFrame(schemas, 'Success', { message: 'ok' });
     const readFrame = jest
       .fn()
       .mockResolvedValueOnce(rewriteSeq(response, 1))
-      .mockResolvedValueOnce(rewriteSeq(response, 3));
+      .mockResolvedValueOnce(rewriteSeq(response, 4));
+    const session = new ProtocolV2Session({
+      schemas,
+      router: 1,
+      writeFrame: () => Promise.resolve(),
+      readFrame,
+    });
+
+    await session.call('Ping', { message: 'first' });
+    await expect(session.call('Ping', { message: 'second' })).resolves.toMatchObject({
+      type: 'Success',
+    });
+  });
+
+  test('session rejects a duplicate device response sequence', async () => {
+    const response = ProtocolV2.encodeFrame(schemas, 'Success', { message: 'ok' });
+    const readFrame = jest.fn(() => Promise.resolve(rewriteSeq(response, 7)));
     const session = new ProtocolV2Session({
       schemas,
       router: 1,
@@ -722,7 +679,7 @@ describe('Protocol V2 framing and session', () => {
 
     await session.call('Ping', { message: 'first' });
     await expect(session.call('Ping', { message: 'second' })).rejects.toThrow(
-      'Protocol V2 response sequence mismatch: expected 2, got 3'
+      'Protocol V2 duplicate response sequence: 7'
     );
   });
 
@@ -1106,7 +1063,6 @@ describe('Protocol V2 framing and session', () => {
         timeoutMs: 123,
         highVolume: false,
         generation: 7,
-        deliveryAttempt: 0,
         signalAborted: false,
       },
       {
@@ -1114,7 +1070,6 @@ describe('Protocol V2 framing and session', () => {
         timeoutMs: 456,
         highVolume: true,
         generation: 7,
-        deliveryAttempt: 0,
         signalAborted: false,
       },
       {
@@ -1122,7 +1077,6 @@ describe('Protocol V2 framing and session', () => {
         timeoutMs: PROTOCOL_V2_DEFAULT_RESPONSE_TIMEOUT_MS,
         highVolume: false,
         generation: 7,
-        deliveryAttempt: 0,
         signalAborted: false,
       },
     ]);
@@ -1132,7 +1086,6 @@ describe('Protocol V2 framing and session', () => {
         timeoutMs: 123,
         highVolume: false,
         generation: 7,
-        deliveryAttempt: 0,
         signalAborted: false,
       },
       {
@@ -1140,15 +1093,13 @@ describe('Protocol V2 framing and session', () => {
         timeoutMs: 456,
         highVolume: true,
         generation: 7,
-        deliveryAttempt: 0,
         signalAborted: false,
       },
       {
         messageName: 'Ping',
-        timeoutMs: PROTOCOL_V2_DEFAULT_DELIVERY_TIMEOUT_MS,
+        timeoutMs: PROTOCOL_V2_DEFAULT_RESPONSE_TIMEOUT_MS,
         highVolume: false,
         generation: 7,
-        deliveryAttempt: 0,
         signalAborted: false,
       },
     ]);
@@ -1257,8 +1208,6 @@ describe('Protocol V2 framing and session', () => {
       {
         timeoutMs: 1,
         expectedTypes: ['Success'],
-        deliveryRetryPolicy: 'retry-idempotent',
-        deliveryMaxRetries: 1,
       }
     );
     expect(call).toHaveBeenCalledTimes(1);
