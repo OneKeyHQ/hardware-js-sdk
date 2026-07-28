@@ -197,7 +197,16 @@ export default class OpenWalletSession extends BaseMethod<NormalizedOpenWalletSe
     }
 
     if (this.params.mode === 'resume-hidden') {
-      if (!isProtocolV2 && requireDeviceId() !== this.params.deviceId) {
+      if (isProtocolV2) {
+        if (this.device.features?.unlocked === false) {
+          await this.device.unlockDevice();
+        }
+        const refreshedDeviceId = await refreshProtocolV2DeviceId();
+        if (refreshedDeviceId !== this.params.deviceId) {
+          deviceWalletSessionStore.delete(this.params.deviceId, this.params.passphraseState);
+          throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError);
+        }
+      } else if (requireDeviceId() !== this.params.deviceId) {
         throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError);
       }
       this.device.passphraseState = this.params.passphraseState;
@@ -221,11 +230,7 @@ export default class OpenWalletSession extends BaseMethod<NormalizedOpenWalletSe
         : await getPassphraseStateWithRefreshDeviceInfo(this.device, {
             expectPassphraseState: this.params.passphraseState,
           });
-      const deviceId = isProtocolV2 ? await refreshProtocolV2DeviceId() : requireDeviceId();
-      if (deviceId !== this.params.deviceId) {
-        this.device.clearInternalState();
-        throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError);
-      }
+      const deviceId = requireDeviceId();
       if (!session.passphraseState) {
         this.device.clearInternalState();
         throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError);

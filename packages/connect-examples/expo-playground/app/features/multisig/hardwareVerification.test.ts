@@ -40,7 +40,7 @@ describe('verifyMultisigHardwareResult', () => {
   });
 
   test('从所有 EVM 交易签名恢复并校验 Signer 1 地址', async () => {
-    const wallet = new Wallet(`0x${'01'.padStart(64, '0')}`);
+    const wallet = Wallet.createRandom();
     const testCases = BUILT_IN_MULTISIG_CASES.filter(
       testCase => testCase.method === 'evmSignTransaction'
     );
@@ -125,7 +125,7 @@ describe('verifyMultisigHardwareResult', () => {
   });
 
   test('BTC 接受字节不同但可由当前 signer 公钥验证的签名', async () => {
-    const privateKey = '01'.padStart(64, '0');
+    const privateKey = Wallet.createRandom().signingKey.privateKey.slice(2);
     const sighash = '11'.repeat(32);
     const [offlineSignature, hardwareSignature] = await Promise.all([
       sign(sighash, privateKey, { canonical: true, der: true }),
