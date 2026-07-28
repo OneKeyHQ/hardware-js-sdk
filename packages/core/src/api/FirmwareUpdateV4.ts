@@ -6,6 +6,7 @@ import {
 } from '@onekeyfe/hd-transport';
 
 import { FirmwareUpdateTipMessage, UI_REQUEST } from '../events/ui-request';
+import { validateProtocolV2FilesystemPath } from './helpers/filesystemValidation';
 import { validateParams } from './helpers/paramsValidator';
 import {
   LoggerNames,
@@ -785,11 +786,17 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   ): ProtocolV2ResourceBundleBinary[] | undefined {
     // Manual binaries are installed directly without comparison.
     if (this.params.resourceBundleFiles?.length) {
-      return this.params.resourceBundleFiles.map(file => ({
-        name: file.devicePath.split('/').pop() ?? file.devicePath,
-        binary: file.binary,
-        devicePath: file.devicePath,
-      }));
+      return this.params.resourceBundleFiles.map((file, index) => {
+        const devicePath = validateProtocolV2FilesystemPath(
+          file.devicePath,
+          `resourceBundleFiles[${index}].devicePath`
+        );
+        return {
+          name: devicePath.split('/').pop() ?? devicePath,
+          binary: file.binary,
+          devicePath,
+        };
+      });
     }
 
     if (!this.params.targetsToUpdate?.includes('resource')) {
@@ -800,10 +807,13 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const release = DataManager.getFirmwareLatestRelease(features, firmwareType);
     if (!release?.resourceBundles?.length) return undefined;
 
-    return release.resourceBundles.map(bundle => ({
+    return release.resourceBundles.map((bundle, index) => ({
       name: bundle.name,
       binary: new ArrayBuffer(0),
-      devicePath: bundle.devicePath,
+      devicePath: validateProtocolV2FilesystemPath(
+        bundle.devicePath,
+        `resourceBundles[${index}].devicePath`
+      ),
       url: bundle.url,
       version: bundle.version,
       payloadHash: bundle.payloadHash,
