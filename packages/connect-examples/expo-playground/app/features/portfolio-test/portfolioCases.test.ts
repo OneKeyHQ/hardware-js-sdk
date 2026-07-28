@@ -1,10 +1,14 @@
 import { describe, expect, test } from '@jest/globals';
 
+import manifestJson from '../../../public/portfolio-cases/manifest.json';
 import {
   countSignificantAsciiDigits,
   getPortfolioDisplayAmounts,
   validatePortfolioSignificantDigits,
+  type PortfolioCasesManifest,
 } from './portfolioCases';
+
+const manifest = manifestJson as PortfolioCasesManifest;
 
 describe('Portfolio test case validation', () => {
   test.each([
@@ -35,5 +39,48 @@ describe('Portfolio test case validation', () => {
       '超过 7 位有效数字'
     );
     expect(validatePortfolioSignificantDigits({ totalFiat: '$12,345.67' })).toBeNull();
+  });
+
+  test('includes the complete normal token mapping fixtures', () => {
+    const mappingCases = manifest.cases.filter(item => item.id.startsWith('M'));
+    const mappingTokens = mappingCases.flatMap(item =>
+      Array.isArray(item.payload.tokens) ? item.payload.tokens : []
+    ) as {
+      contractAddress: string;
+      isAllNetworks: boolean;
+      isNative: boolean;
+      name: string;
+      networkId: string;
+    }[];
+
+    expect(mappingCases).toHaveLength(17);
+    expect(mappingTokens).toHaveLength(80);
+    expect(mappingTokens.filter(token => token.isNative)).toHaveLength(63);
+    expect(
+      mappingTokens.filter(token => !token.isNative && !token.isAllNetworks)
+    ).toHaveLength(9);
+    expect(mappingTokens.filter(token => token.isAllNetworks)).toHaveLength(8);
+    expect(Math.max(...mappingCases.map(item => item.payload.tokenCount as number))).toBe(5);
+  });
+
+  test('preserves case-sensitive contract addresses in mapping fixtures', () => {
+    const mappingTokens = manifest.cases
+      .filter(item => item.id.startsWith('M'))
+      .flatMap(item => (Array.isArray(item.payload.tokens) ? item.payload.tokens : [])) as {
+      contractAddress: string;
+      networkId: string;
+    }[];
+
+    expect(
+      mappingTokens.find(
+        token => token.networkId === 'sol--101' && Boolean(token.contractAddress)
+      )?.contractAddress
+    ).toBe('Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB');
+    expect(
+      mappingTokens.find(
+        token =>
+          token.networkId === 'tron--0x2b6653dc' && Boolean(token.contractAddress)
+      )?.contractAddress
+    ).toBe('TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t');
   });
 });

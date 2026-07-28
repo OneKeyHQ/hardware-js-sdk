@@ -328,8 +328,8 @@ export default function PortfolioTestPage() {
               <h1 className="text-2xl font-semibold text-foreground">Pro2 Portfolio 专项测试</h1>
             </div>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              逐项验证金额格式、币种降级、精确 JSON 结构与固件边界。批量模式每隔 15 秒执行一次；
-              正向用例必须完整通过上传和 PortfolioUpdate，反向用例必须返回指定拒绝原因。
+              逐项验证金额格式、Native/Contract/All Networks Token 映射、精确 JSON 结构与固件边界。
+              批量模式每隔 15 秒执行一次；正向用例必须完整通过上传和 PortfolioUpdate，反向用例必须返回指定拒绝原因。
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
