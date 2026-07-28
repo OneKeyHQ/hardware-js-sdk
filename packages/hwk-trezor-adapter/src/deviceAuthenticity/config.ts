@@ -1,5 +1,4 @@
 import type { DeviceAuthenticityConfig } from './types';
-import { T3W1_ROOT_PUB_KEYS_MLDSA } from './trezorRootKeysMLDSA';
 
 /**
  * Trezor manufacturing root CA public keys, per internal model.
@@ -61,7 +60,6 @@ export const deviceAuthenticityConfig: DeviceAuthenticityConfig = {
       // upstream: DEV_AUTH_ROOT_PROD_BACKUP_ED25519
       '5612606584ee7e0bc313b13f7ac94156bb4cb75bd77585ddbe579301306e85f1',
     ],
-    rootPubKeysMLDSA: [...T3W1_ROOT_PUB_KEYS_MLDSA],
     debug: {
       rootPubKeysOptiga: [
         // upstream: DEV_AUTH_ROOT_DEBUG_P256

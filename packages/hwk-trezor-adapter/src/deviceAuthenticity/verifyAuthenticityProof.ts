@@ -60,18 +60,13 @@ const getRootPubKeys = ({
   if (!modelConfig || typeof modelConfig === 'number') {
     throw new Error(`Pubkeys for ${deviceModel} not found in config`);
   }
-  const prod = [
-    ...(modelConfig.rootPubKeysOptiga ?? []),
-    ...(modelConfig.rootPubKeysTropic ?? []),
-    ...(modelConfig.rootPubKeysMLDSA ?? []),
-  ];
+  const prod = [...(modelConfig.rootPubKeysOptiga ?? []), ...(modelConfig.rootPubKeysTropic ?? [])];
   if (!allowDebugKeys) return prod;
 
   return [
     ...prod,
     ...(modelConfig.debug?.rootPubKeysOptiga ?? []),
     ...(modelConfig.debug?.rootPubKeysTropic ?? []),
-    ...(modelConfig.debug?.rootPubKeysMLDSA ?? []),
   ];
 };
 
@@ -130,49 +125,9 @@ export const verifyAuthenticityProof = ({
   );
 
   const firstCertAlgName = parsedCertificates[0]?.signatureAlgorithm.algorithmName;
-  if (firstCertAlgName === 'MLDSA44') {
-    if (parsedCertificates.length !== 1) {
-      return { valid: false, error: 'RESPONSE_MALFORMED' };
-    }
-    const [deviceCert] = parsedCertificates;
-    const deviceCertPubKey = Buffer.from(
-      deviceCert.tbsCertificate.subjectPublicKeyInfo.bits.bytes
-    ).toString('hex');
-    const rootPubKeyMatch = matchRootPubKeyToCertificate({
-      allRootPubKeys,
-      cert: deviceCert,
-    });
-    if (rootPubKeyMatch === undefined) {
-      return { valid: false, deviceCertPubKey, error: 'ROOT_PUBKEY_NOT_FOUND' };
-    }
-    if (parseModelFromDeviceCertSubject(deviceCert) !== deviceModel) {
-      return {
-        valid: false,
-        rootPubKey: rootPubKeyMatch,
-        deviceCertPubKey,
-        error: 'INVALID_DEVICE_MODEL',
-      };
-    }
-    const isSignatureValid = getVerifyFn('MLDSA44')(
-      Uint8Array.from(deviceCert.tbsCertificate.subjectPublicKeyInfo.bits.bytes),
-      signedData,
-      Uint8Array.from(Buffer.from(signature, 'hex'))
-    );
-    if (!isSignatureValid) {
-      return {
-        valid: false,
-        rootPubKey: rootPubKeyMatch,
-        deviceCertPubKey,
-        error: 'INVALID_DEVICE_SIGNATURE',
-      };
-    }
-    return {
-      valid: true,
-      rootPubKey: rootPubKeyMatch,
-      deviceCertPubKey,
-      serialNumber: parseSerialNumberFromDeviceCert(deviceCert),
-    };
-  }
+  // This mirrors Trezor Connect's production policy: Optiga uses P-256 and
+  // Safe 7's additional Tropic proof uses Ed25519. MCU/ML-DSA is not a separate
+  // client-side pass/fail condition.
   if (firstCertAlgName !== 'P-256' && firstCertAlgName !== 'Ed25519') {
     return { valid: false, error: 'RESPONSE_MALFORMED' };
   }
