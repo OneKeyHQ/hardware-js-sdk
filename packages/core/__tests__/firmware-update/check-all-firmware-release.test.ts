@@ -1,4 +1,4 @@
-import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
+import { ERRORS, EDeviceType, EFirmwareType, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import CheckAllFirmwareRelease from '../../src/api/CheckAllFirmwareRelease';
 import { buildFirmwareUpdatePlan } from '../../src/api/firmware/FirmwareUpdatePlan';
@@ -36,7 +36,40 @@ const mockGetFirmwareReleaseInfo = getFirmwareReleaseInfo as jest.MockedFunction
   typeof getFirmwareReleaseInfo
 >;
 
+const noUpdate = {
+  status: 'valid' as const,
+  release: undefined,
+};
+
+const createMethod = (serialNo = 'device-id') => {
+  const method = new CheckAllFirmwareRelease({
+    id: 1,
+    payload: {
+      method: 'checkAllFirmwareRelease',
+      platform: 'native',
+    },
+  });
+  method.init();
+  method.device = {
+    features: {
+      deviceType: EDeviceType.Classic1s,
+      serialNo,
+      firmwareType: EFirmwareType.Universal,
+      firmwareVersion: '1.0.0',
+      bootloaderVersion: '1.0.0',
+    },
+  } as typeof method.device;
+  return method;
+};
+
 describe('CheckAllFirmwareRelease', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetFirmwareReleaseInfo.mockReturnValue(noUpdate);
+    mockGetBootloaderReleaseInfo.mockReturnValue(noUpdate);
+    mockGetBleFirmwareReleaseInfo.mockReturnValue(noUpdate);
+  });
+
   test('keeps release information available when an optional Plan cannot be built', async () => {
     const firmware = {
       status: 'outdated' as const,
@@ -45,36 +78,14 @@ describe('CheckAllFirmwareRelease', () => {
         version: [3, 0, 0],
       },
     };
-    const noUpdate = {
-      status: 'valid' as const,
-      release: undefined,
-    };
     mockGetFirmwareReleaseInfo.mockReturnValue(firmware);
-    mockGetBootloaderReleaseInfo.mockReturnValue(noUpdate);
-    mockGetBleFirmwareReleaseInfo.mockReturnValue(noUpdate);
     mockBuildFirmwareUpdatePlan.mockImplementation(() => {
-      throw new Error('FirmwarePlanInvalid');
+      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Plan cannot be built', {
+        firmwareUpdateCode: 'FirmwarePlanInvalid',
+      });
     });
 
-    const method = new CheckAllFirmwareRelease({
-      id: 1,
-      payload: {
-        method: 'checkAllFirmwareRelease',
-        platform: 'native',
-      },
-    });
-    method.init();
-    method.device = {
-      features: {
-        deviceType: EDeviceType.Classic1s,
-        serialNo: '',
-        firmwareType: EFirmwareType.Universal,
-        firmwareVersion: '1.0.0',
-        bootloaderVersion: '1.0.0',
-      },
-    } as typeof method.device;
-
-    await expect(method.run()).resolves.toEqual(
+    await expect(createMethod('').run()).resolves.toEqual(
       expect.objectContaining({
         firmware,
         bootloader: noUpdate,
@@ -82,5 +93,35 @@ describe('CheckAllFirmwareRelease', () => {
         firmwareUpdatePlan: undefined,
       })
     );
+  });
+
+  test('returns an optional Plan when the builder succeeds', async () => {
+    const plan = {
+      schemaVersion: 2 as const,
+      planDigest: 'a'.repeat(64),
+      executor: 'v3' as const,
+      deviceIdentity: 'device-id',
+      deviceModel: EDeviceType.Classic1s,
+      firmwareType: EFirmwareType.Universal,
+      platform: 'native' as const,
+      artifacts: [],
+      targetsToUpdate: [],
+    };
+    mockBuildFirmwareUpdatePlan.mockReturnValue(plan);
+
+    await expect(createMethod().run()).resolves.toEqual(
+      expect.objectContaining({
+        firmwareUpdatePlan: plan,
+      })
+    );
+  });
+
+  test('does not hide unexpected Plan builder failures', async () => {
+    const unexpectedError = new Error('unexpected builder failure');
+    mockBuildFirmwareUpdatePlan.mockImplementation(() => {
+      throw unexpectedError;
+    });
+
+    await expect(createMethod().run()).rejects.toBe(unexpectedError);
   });
 });

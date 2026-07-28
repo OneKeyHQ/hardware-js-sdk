@@ -111,7 +111,14 @@ const assertArtifactUrl = (value: unknown, label: string): string => {
       { firmwareUpdateCode: 'FirmwarePlanInvalid' }
     );
   }
-  const parsed = new URL(raw);
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, `${label} URL is invalid`, {
+      firmwareUpdateCode: 'FirmwarePlanInvalid',
+    });
+  }
   if (
     parsed.protocol !== 'https:' ||
     parsed.port !== '' ||

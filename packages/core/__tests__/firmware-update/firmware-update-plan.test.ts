@@ -293,6 +293,34 @@ describe('buildFirmwareUpdatePlan', () => {
     expect(first.planDigest).not.toBe(desktop.planDigest);
   });
 
+  test('normalizes a malformed artifact URL to FirmwarePlanInvalid', () => {
+    let thrown: unknown;
+    try {
+      buildFirmwareUpdatePlan({
+        features: createFeatures({ deviceType: EDeviceType.Classic1s }),
+        firmwareType: EFirmwareType.Universal,
+        platform: 'native',
+        firmware: {
+          status: 'outdated',
+          release: {
+            url: 'not a url',
+            version: [3, 0, 0],
+          },
+        },
+        ble: noUpdate,
+        bootloader: noUpdate,
+      });
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toMatchObject({
+      params: {
+        firmwareUpdateCode: 'FirmwarePlanInvalid',
+      },
+    });
+  });
+
   test('binds trusted artifact integrity metadata into the plan digest', () => {
     const createPlan = (fingerprint: string) =>
       buildFirmwareUpdatePlan({
