@@ -203,8 +203,9 @@ const PRO2_METHOD_WIRE_INFO: Record<string, MethodWireInfo> = {
     decoded: 'DevOnboardingStatus',
   },
   openWalletSession: {
-    tx: '60606 (DeviceSessionGet), optionally 60608 (DeviceSessionAskPin)',
-    txPayload: 'optional cached session_id; wallet selection stays on device',
+    tx: '60609 (DeviceSessionOpen), optionally 60608 (DeviceSessionAskPin)',
+    txPayload:
+      'resume.session_id or select.{host_passphrase|passphrase_on_device|attach_pin_on_device}',
     rx: '60607 (DeviceSession), optionally 60603 (DeviceStatus)',
     rxPayload: PRO2_DYNAMIC_RESPONSE,
     decoded: 'walletType / deviceId / passphraseState / resumed',

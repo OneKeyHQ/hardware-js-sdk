@@ -6,7 +6,7 @@ import type { WipeDevice } from '@onekeyfe/hd-transport';
 
 export default class DeviceWipe extends BaseMethod<WipeDevice> {
   init() {
-    this.unlockPolicy = 'retry-on-locked';
+    this.unlockPolicy = 'unlock-before-run';
     this.useDevicePassphraseState = false;
     this.protocolV2UiInteraction = {
       request: 'button',

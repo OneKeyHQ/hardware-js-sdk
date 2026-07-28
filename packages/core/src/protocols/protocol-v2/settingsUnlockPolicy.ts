@@ -12,7 +12,7 @@ const LOCK_FREE_DEVICE_SETTINGS = new Set<keyof DeviceSettings>([
 export const getProtocolV2SettingsUnlockPolicy = (settings: DeviceSettings): UnlockPolicy =>
   Object.keys(settings).every(key => LOCK_FREE_DEVICE_SETTINGS.has(key as keyof DeviceSettings))
     ? 'none'
-    : 'retry-on-locked';
+    : 'unlock-before-run';
 
 export type ProtocolV2SettingsOperation =
   | {
@@ -32,7 +32,7 @@ export const getProtocolV2SettingsBehavior = (
 } => {
   if (operation.kind === 'page') {
     return {
-      unlockPolicy: 'retry-on-locked',
+      unlockPolicy: 'unlock-before-run',
       uiInteraction: {
         request: 'button',
         source: 'method-lifecycle',

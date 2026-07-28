@@ -160,20 +160,7 @@ export const createCoreApi = (
     call({ ...params, connectId, method: 'deviceGetOnboardingStatus' }),
   deviceUploadWallpaper: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceUploadWallpaper' }),
-  deviceInfoGet: (connectId, params) => call({ ...params, connectId, method: 'deviceInfoGet' }),
-  deviceStatusGet: (connectId, params) => call({ ...params, connectId, method: 'deviceStatusGet' }),
-  protocolInfoRequest: (connectId, params) =>
-    call({ ...params, connectId, method: 'protocolInfoRequest' }),
-  ping: (connectId, params) => call({ ...params, connectId, method: 'ping' }),
-  deviceGetFirmwareUpdateStatus: (connectId, params) =>
-    call({ ...params, connectId, method: 'deviceGetFirmwareUpdateStatus' }),
-  deviceFactoryInfoGet: (connectId, params) =>
-    call({ ...params, connectId, method: 'deviceFactoryInfoGet' }),
   uploadPortfolio: (connectId, params) => call({ ...params, connectId, method: 'uploadPortfolio' }),
-  fileRead: (connectId, params) => call({ ...params, connectId, method: 'fileRead' }),
-  dirList: (connectId, params) => call({ ...params, connectId, method: 'dirList' }),
-  dirMake: (connectId, params) => call({ ...params, connectId, method: 'dirMake' }),
-  pathInfo: (connectId, params) => call({ ...params, connectId, method: 'pathInfo' }),
   deviceRecovery: (connectId, params) => call({ ...params, connectId, method: 'deviceRecovery' }),
   deviceReset: (connectId, params) => call({ ...params, connectId, method: 'deviceReset' }),
   deviceSettings: (connectId, params) => call({ ...params, connectId, method: 'deviceSettings' }),

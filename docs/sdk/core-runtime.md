@@ -88,11 +88,11 @@ selector。
 
 设置能力按当前协议源定义：
 
-| 能力范围 | 公共参数 |
-| -------- | -------- |
-| V1/V2 共有 | `label`、`language`、`usePassphrase`、`autoLockDelayMs`、`autoShutdownDelayMs`、`hapticFeedback`、`bluetoothEnabled` |
-| 仅 V1 | `homescreen`、`passphraseSource`、`displayRotation`、`passphraseAlwaysOnDevice`、`safetyChecks`、`experimentalFeatures`、`changeBrightness` |
-| 仅 V2 | `brightness`、`airgapMode`、`animationEnabled`、`tapToWake`、`deviceNameDisplayEnabled`、`fidoEnabled`、`usbLockEnabled`、`randomKeypad` |
+| 能力范围   | 公共参数                                                                                                                                    |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| V1/V2 共有 | `label`、`language`、`usePassphrase`、`autoLockDelayMs`、`autoShutdownDelayMs`、`hapticFeedback`、`bluetoothEnabled`                        |
+| 仅 V1      | `homescreen`、`passphraseSource`、`displayRotation`、`passphraseAlwaysOnDevice`、`safetyChecks`、`experimentalFeatures`、`changeBrightness` |
+| 仅 V2      | `brightness`、`airgapMode`、`animationEnabled`、`tapToWake`、`deviceNameDisplayEnabled`、`fidoEnabled`、`usbLockEnabled`、`randomKeypad`    |
 
 `bluetoothEnabled` 在 V1/V2 分别映射为 `use_ble` / `bt_enable`。当前 Protocol V2
 protobuf 没有 `experimental_features`，所以该参数只支持 V1。请求包含当前协议不支持的字段时，
@@ -120,27 +120,28 @@ Protocol V2 的自动锁屏和自动关机使用 `0x10000000` 表示“永不”
 | `getPassphraseState()`   | 无参数 Legacy Protocol V1 当前钱包状态入口；Protocol V2 返回不支持    |
 | `openWalletSession()`    | Protocol V1/V2 统一钱包入口；支持标准、隐藏、Attach-to-PIN 与显式恢复 |
 | `clearSessionCache()`    | 仅清除 `DeviceWalletSessionStore`，不发送设备协议命令                 |
-| 原始 `DeviceSessionGet`  | 仅为 Core 内部 Protocol V2 设备命令，不是可调用的 SDK API            |
+| 原始 `DeviceSessionOpen` | 仅为 Core 内部 Protocol V2 设备命令，不是可调用的 SDK API             |
 
 当前没有“只读查询设备当前打开哪个钱包”的公共需求，因此不提供
-`deviceSessionGet/getWalletSessionState`。`getDeviceState()` 只返回 Passphrase、Attach PIN
-等设备功能和运行状态，不返回钱包身份。App 在 `openWalletSession()` 成功后保存返回的
-`deviceId + walletType + passphraseState`；Core 单独保存并管理内部 `sessionId`。
+原始钱包 Session 查询接口。`getDeviceState()` 只返回 Passphrase、Attach PIN 等设备功能和运行状态，
+不返回钱包身份。App 在 `openWalletSession()` 成功后保存返回的
+`deviceId + walletType + passphraseState`；Core 单独保存并管理内部 `sessionId`。现有 CLI
+可使用设备响应中的 `sessionId` 做 OS Keychain 恢复，普通 App 忽略该字段。
 
 Core 先把公共钱包意图归一化，再映射到各协议：
 
 ```text
 标准钱包
   -> V1: PassphraseRequest 自动回复空字符串
-  -> V2: 使用默认空 Passphrase 上下文，不打开隐藏钱包 DeviceSession
+  -> V2: 协商 eventless_wallet_session=true，使用默认空 Passphrase 上下文
 
 隐藏钱包 / Attach-to-PIN
   -> V1: GetPassphraseState -> PassphraseRequest / PassphraseAck
-  -> V2: 设备端 PIN/Passphrase/Attach PIN 解锁选择 -> DeviceSessionGet({})
+  -> V2: REQUEST_PASSPHRASE 三选一 -> DeviceSessionOpen(select)
 
 恢复隐藏钱包
   -> V1: 按 passphraseState 校验并复用兼容 Session
-  -> V2: DeviceSessionGet({ session_id })
+  -> V2: DeviceSessionOpen({ resume: { session_id } })
 ```
 
 显式调用只使用 `mode` 表达意图，不能再混入旧参数：
@@ -165,14 +166,13 @@ Core 先把公共钱包意图归一化，再映射到各协议：
 
 `openWalletSession()` 的成功结果以 `walletType` 作为判别字段：
 
-| `walletType` | `passphraseState` | 含义                                   |
-| ------------ | ----------------- | -------------------------------------- |
-| `standard`   | `null`            | 标准钱包没有可供隐藏钱包恢复使用的标识 |
-| `hidden`     | 非空字符串        | 当前隐藏钱包标识，可与 `deviceId` 持久化 |
+| `walletType` | `passphraseState` | `sessionId` | 含义                                          |
+| ------------ | ----------------- | ----------- | --------------------------------------------- |
+| `standard`   | `null`            | 不存在      | 使用设备默认空 Passphrase 上下文              |
+| `hidden`     | 非空字符串        | 可选字符串  | 设备返回隐藏钱包标识；Session 只保留 CLI 兼容 |
 
-因此 `{ walletType: 'standard', passphraseState: null }` 是完整、正确的成功结果，不表示
-设备漏回字段。诊断日志可以对非空 `passphraseState` 脱敏，但必须保留 `null`，避免把标准
-钱包误显示成存在一个被隐藏的钱包标识。
+隐藏钱包结果直接使用同一次硬件响应中的字段。Core 只执行协议字段名归一化，不从
+Features、descriptor 或 Store 补造钱包标识；标准钱包没有 `DeviceSession` 响应。
 
 参数校验失败也遵循 Core 的统一响应结构，不以 rejected Promise 暴露裸异常。例如
 `resume-hidden` 缺少 `deviceId` 时返回：
@@ -189,10 +189,10 @@ Core 先把公共钱包意图归一化，再映射到各协议：
 
 `openWalletSession({ mode: 'resume-hidden' })` 在 Protocol V1/V2 都只接收
 `deviceId + passphraseState`。Core 按该 key 从唯一 Store 读取内部 `sessionId`：
-V1 通过 `Initialize.session_id` 恢复，V2 通过 `DeviceSessionGet({ session_id })` 恢复。
+V1 通过 `Initialize.session_id` 恢复，V2 通过 `DeviceSessionOpen({ resume: { session_id } })` 恢复。
 缓存不存在时 Core 返回 `HardwareErrorCode.WalletSessionInvalid`；固件拒绝缓存 Session
 时，Core 清理当前隐藏钱包缓存并透传规范化的固件错误，不会暗中切换钱包。
-`DeviceSessionGet` 成功时必须同时返回非空
+`DeviceSessionOpen` 成功时必须同时返回非空
 `session_id + btc_test_address`，否则 Core 将其视为不完整响应，而不是标准钱包。
 
 `clearSessionCache()` 对 V1 和 V2 执行相同的 Core 本地操作：
@@ -203,7 +203,7 @@ V1 通过 `Initialize.session_id` 恢复，V2 通过 `DeviceSessionGet({ session
 - 不修改 `DeviceState` 或协议 raw 快照，也不执行 Lock、Cancel 或设备端 Session Close。
 
 V1 被清理的是由 `Initialize/Features` 或 `GetPassphraseState` 获得的本地 `session_id`
-映射；V2 被清理的是由 `DeviceSessionGet` 返回的本地 `session_id` 映射。下次打开钱包时，
+映射；V2 被清理的是由 `DeviceSessionOpen` 返回的本地 `session_id` 映射。下次打开钱包时，
 Core 会重新执行对应协议的钱包 Session 建立或恢复流程。
 
 App 迁移时只替换“打开/切换钱包”阶段：V1 继续调用 Legacy `getPassphraseState()`，
@@ -212,8 +212,9 @@ V2 调用 `openWalletSession()`。地址、签名和 `preInitialize` 仍沿用�
 因此 App 的钱包 key 无需加入 `sessionId`；V1/V2 的 `sessionId` 都由 Core 统一按
 `deviceId + passphraseState` 管理。
 
-`openWalletSession()` 的返回值同样不包含 `sessionId`。兼容 `Features.session_id/sessionId`
-只用于旧 V1 投影和 Core 内部迁移，不复制到设备消息顶层，也不属于新业务接口。
+`openWalletSession()` 仅在隐藏钱包结果中可选返回设备生成的 `sessionId`。Legacy
+`Features.session_id/sessionId` 仍只用于现有 CLI 的受控 OS Keychain 恢复；这些字段都
+不进入公共 `DeviceState`、普通 App 数据库或钱包主键。
 
 详见 [钱包 Session 与设备安全](../device/wallet-session-and-security.md) 和 [SDK 关键架构决策](../architecture/decisions.md#钱包-session-所有权与缓存键)。
 
@@ -241,14 +242,14 @@ V2 调用 `openWalletSession()`。地址、签名和 `preInitialize` 仍沿用�
 正式业务应使用按业务语义组织的公共 API。只读诊断接口可以暂时保留，但会直接改变设备、
 文件系统或安装状态的底层命令必须留在 Core 内部：
 
-| 分类           | 正式业务 API                                             | 保留的只读/诊断 API                                      | Core 内部命令                                                               |
-| -------------- | -------------------------------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------- |
-| 状态           | `getDeviceState`                                         | `deviceInfoGet`、`deviceStatusGet`                        | 无                                                                          |
-| 设置           | `deviceSettings`、`deviceChangePin`、`deviceWipe`        | 无                                                        | 无                                                                          |
-| 钱包 Session   | `openWalletSession`、`clearSessionCache`                 | 无                                                        | `deviceSessionOpen`                                                         |
-| 固件           | `firmwareUpdateV4` 等高层流程                            | `deviceGetFirmwareUpdateStatus`                           | `deviceFirmwareUpdate`                                                      |
-| 文件维护       | `uploadPortfolio`、`deviceUploadWallpaper`、高层固件升级 | `fileRead`、`dirList`、`pathInfo`，以及受约束的 `dirMake` | `fileWrite`、`fileDelete`、`dirRemove`、`filesystemFormat/PermissionFix`     |
-| 协议与工厂调试 | 无                                                       | `protocolInfoRequest`、`ping`、`deviceFactoryInfoGet`     | `deviceFactoryInfoSet`                                                      |
+| 分类           | 正式业务 API                                             | 保留的只读/诊断 API                                       | Core 内部命令                                                            |
+| -------------- | -------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------ |
+| 状态           | `getDeviceState`                                         | `deviceInfoGet`、`deviceStatusGet`                        | 无                                                                       |
+| 设置           | `deviceSettings`、`deviceChangePin`、`deviceWipe`        | 无                                                        | 无                                                                       |
+| 钱包 Session   | `openWalletSession`、`clearSessionCache`                 | 无                                                        | `deviceSessionOpen`                                                      |
+| 固件           | `firmwareUpdateV4` 等高层流程                            | `deviceGetFirmwareUpdateStatus`                           | `deviceFirmwareUpdate`                                                   |
+| 文件维护       | `uploadPortfolio`、`deviceUploadWallpaper`、高层固件升级 | `fileRead`、`dirList`、`pathInfo`，以及受约束的 `dirMake` | `fileWrite`、`fileDelete`、`dirRemove`、`filesystemFormat/PermissionFix` |
+| 协议与工厂调试 | 无                                                       | `protocolInfoRequest`、`ping`、`deviceFactoryInfoGet`     | `deviceFactoryInfoSet`                                                   |
 
 `getFeatures`、`getOnekeyFeatures` 仅作为 Protocol V1 兼容入口保留并标记废弃，新接入使用 `getDeviceState`。
 

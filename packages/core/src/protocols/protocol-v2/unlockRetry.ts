@@ -25,9 +25,7 @@ export async function runMethodWithUnlockRetry(
 ) {
   const shouldEmitUi = isProtocolV2UiEnabled(method);
   const shouldUnlockBeforeRun =
-    device.isProtocolV2() &&
-    method.unlockPolicy === 'retry-on-locked' &&
-    device.features?.unlocked === false;
+    device.isProtocolV2() && method.unlockPolicy !== 'none' && device.features?.unlocked === false;
 
   if (shouldUnlockBeforeRun) {
     if (shouldEmitUi) {
