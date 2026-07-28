@@ -42,6 +42,9 @@ Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类�
 
 - V1/V2 的 `openWalletSession()` 对标准/隐藏钱包都返回 `deviceId + passphraseState`；固件响应
   包含 `session_id` 时，SDK 原样可选透传为 `sessionId`，不补造也不额外查询。
+- 现有 App 可继续调用 `getPassphraseState()`：V1 保持原固件消息流，V2 由 Core 将
+  `useEmptyPassphrase/initSession` 意图映射到新的 Ask/Get Session 流程；这不代表 Pro2
+  恢复了同名固件消息。
 - 普通 App 调用方即使收到 `sessionId` 也不应保存或传回；短生命周期 CLI 可以将一次钱包选择
   得到的非空三元组保存到 OS Keychain，并通过 `preloadSessionCache()` 恢复到 Core Store。
 - V1/V2 共用 `DeviceWalletSessionStore`，缓存键为 `deviceKey + passphraseState`。
@@ -61,13 +64,16 @@ Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类�
   `sessionId`；缓存不存在时返回 `WalletSessionInvalid`，固件拒绝恢复时透传规范化错误，
   且都不自动选择其他钱包。
 - V2 先通过 `ProtocolInfoRequest { eventless_wallet_session: true }` 协商无中间固件 Event；
-  标准钱包直接使用默认空 Passphrase 上下文，不调用 `DeviceSessionOpen`。
-- 隐藏钱包使用 `DeviceSessionOpen(select)` 明确选择 Host Passphrase、设备输入或 Attach PIN，
-  使用 `DeviceSessionOpen(resume)` 恢复缓存，并把 `btc_test_address` 归一化为 `passphraseState`。
+  标准钱包锁定时显式使用 `DeviceSessionAskPin { type: Main }`，不会创建隐藏钱包 Session。
+- 隐藏钱包选择先用 `DeviceSessionAskPassphrase` 或
+  `DeviceSessionAskPin { type: AttachToPin }` 在设备端准备上下文，再用空参数
+  `DeviceSessionGet` 取得最终 Session；恢复缓存使用带 `session_id` 的 `DeviceSessionGet`。
+- Protocol V2 不再接收 Host Passphrase 明文；兼容 UI 返回的软件输入值只表示继续设备端
+  Passphrase 流程，SDK 不把该值写入协议请求。
 - 显式 `resume-hidden` 被固件拒绝时，Core 只清除当前隐藏钱包缓存并返回规范化错误，
   不自动退化为需要用户确认的隐藏钱包选择；`DeviceSessionError_InvalidSession=2`
   统一映射为 `WalletSessionInvalid`。
-- V2 的 `DeviceSessionOpen` 成功响应必须同时包含非空 `session_id` 和
+- V2 的 `DeviceSessionGet` 成功响应必须同时包含非空 `session_id` 和
   `btc_test_address`；缺少任一字段都视为协议响应不完整，不得降级为标准钱包。
 - 返回的钱包标识与调用方预期不一致时，必须清理缓存并抛出安全错误。
 - Pro2 在解锁流程刷新状态后，以刷新后的 `passphraseProtection` 判定标准/隐藏钱包，
@@ -80,6 +86,10 @@ Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类�
   `deviceId + passphraseState` 三种范围；单独传 `passphraseState` 返回参数错误，避免误清
   所有设备。该 API 只清理 `DeviceWalletSessionStore`，不发送 Protocol V1/V2 命令，
   也不表示设备端 Session 已关闭。
+- 设备 wipe 只有在固件明确返回成功后，Core 才清除旧 `deviceId`、对应钱包 Session、
+  Protocol V2 临时 descriptor Session、设备状态和预初始化元数据；下一次调用必须重新读取
+  实时身份。wipe 后产生的新 `deviceId` 是新的钱包生命周期，调用方不得覆盖旧钱包绑定，
+  也不得绕过原有 `deviceId` 不匹配校验。
 
 主要实现：
 

@@ -54,6 +54,7 @@ export interface DeviceButtonRequestPayload extends Omit<PROTO.ButtonRequest, 'c
 
 export type PassphraseRequestPayload = {
   existsAttachPinUser?: boolean;
+  deviceOnly?: boolean;
   source?: 'wallet-session-coordinator';
   reason?: 'open-wallet' | 'session-recovery';
   expectedPassphraseState?: string;
