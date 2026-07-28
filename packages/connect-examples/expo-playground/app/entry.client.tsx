@@ -36,6 +36,7 @@ import DeviceMethodExecutePage from './routes/device-methods.$methodName';
 import Pro2DebugPage from './routes/pro2-debug';
 import Pro2UpdatePage from './routes/pro2-update';
 import Pro2SpecialUpdatePage from './routes/pro2-special-update';
+import PortfolioTestPage from './routes/portfolio-test';
 import MethodBatchTestPage from './routes/method-batch-test';
 import MultisigTestPage from './routes/multisig-test';
 
@@ -166,6 +167,10 @@ const router = createHashRouter(
         {
           path: 'pro2-special-update',
           element: <Pro2SpecialUpdatePage />,
+        },
+        {
+          path: 'portfolio-test',
+          element: <PortfolioTestPage />,
         },
         {
           path: 'method-batch-test',
