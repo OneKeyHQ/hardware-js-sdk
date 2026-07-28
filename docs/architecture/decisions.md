@@ -38,10 +38,10 @@ Protocol V2 响应依靠串行调用、消息类型和帧序号维持请求边�
 
 Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类不同状态，不能共用缓存：
 
-- V1/V2 的 `openWalletSession()` 对标准/隐藏钱包都返回设备生成的
-  `deviceId + passphraseState + sessionId`；`sessionId` 仅用于现有 CLI 兼容。
-- 普通 App 调用方不接收、保存或传回 `sessionId`；短生命周期 CLI 可以将一次钱包选择
-  得到的完整三元组保存到 OS Keychain，并通过 `preloadSessionCache()` 恢复到 Core Store。
+- V1/V2 的 `openWalletSession()` 对标准/隐藏钱包都返回 `deviceId + passphraseState`；固件响应
+  包含 `session_id` 时，SDK 原样可选透传为 `sessionId`，不补造也不额外查询。
+- 普通 App 调用方即使收到 `sessionId` 也不应保存或传回；短生命周期 CLI 可以将一次钱包选择
+  得到的非空三元组保存到 OS Keychain，并通过 `preloadSessionCache()` 恢复到 Core Store。
 - V1/V2 共用 `DeviceWalletSessionStore`，缓存键为 `deviceKey + passphraseState`。
 - `DeviceWalletSessionStore` 是 Core 内唯一可用于恢复的钱包 Session 缓存源；
   `DeviceState` 和协议 raw 快照都不是 Session 缓存。
@@ -66,7 +66,7 @@ Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类�
   `btc_test_address`；缺少任一字段都视为协议响应不完整，不得降级为标准钱包。
 - 返回的钱包标识与调用方预期不一致时，必须清理缓存并抛出安全错误。
 - `session_id` 不是钱包身份，必须与同一次返回的 `deviceId + passphraseState` 绑定使用。
-- `session_id` 不出现在公共 `DeviceState` 或设备消息顶层；隐藏钱包的可选
+- `session_id` 不出现在公共 `DeviceState` 或设备消息顶层；标准/隐藏钱包结果中的可选
   `openWalletSession().sessionId` 和 Legacy `Features.sessionId` 只用于 CLI 兼容，
   普通 App 不得把它们写入数据库。
 - 公共 `clearSessionCache()` 只清理 `DeviceWalletSessionStore`，

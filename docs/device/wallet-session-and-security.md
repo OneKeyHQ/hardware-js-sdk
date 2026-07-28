@@ -33,8 +33,8 @@
   `passphraseState`。
 - 公开 `getPassphraseState()` 是 Legacy Protocol V1 入口；Protocol V2 调用会返回不支持。
 - Protocol V1/V2 都可以使用统一 `openWalletSession()`，显式区分 `standard`、
-  `select-hidden` 和 `resume-hidden`。标准钱包返回 `passphraseState: null` 且不返回
-  `sessionId`；隐藏钱包返回设备生成的非空 `passphraseState`，`sessionId` 仅作可选 CLI 兼容。
+  `select-hidden` 和 `resume-hidden`。标准钱包返回 `passphraseState: null`，隐藏钱包返回设备生成的
+  非空 `passphraseState`；两者都只在固件响应包含 `session_id` 时可选透传 `sessionId`。
   `passphraseState` 可与 `deviceId` 组成钱包绑定；`sessionId` 仅供受控 CLI 兼容，
   正常 App 流程忽略该字段。显式 `mode` 是唯一流程意图，不得与
   `useEmptyPassphrase/initSession` 混用。
@@ -60,7 +60,7 @@
 
 App 可持久化 `deviceId + walletType + passphraseState` 作为钱包引用；不得保存
 `sessionId`、Passphrase 明文、`initSession` 或本次调用的 `resumed`。CLI 是唯一兼容例外：
-它可以把同一次钱包选择得到的 `deviceId + passphraseState + sessionId` 作为一个整体存入
+它可以把同一次钱包选择得到的非空 `deviceId + passphraseState + sessionId` 作为一个整体存入
 操作系统 Keychain，并在新的短生命周期进程启动时调用 `preloadSessionCache()`。该入口不能
 接受网页、插件或普通 App 业务层提供的值。没有受控预加载时，Core Store 仍是进程内缓存；
 SDK 重启或 Session 失效后，显式 `resume-hidden` 返回 `WalletSessionInvalid`，由 App 再明确
@@ -206,8 +206,8 @@ deviceKey
 2. 同一 deviceId 下存在多个隐藏钱包，SDK 可能复用到错误的 passphrase session。
 
 因此现在的策略是：**passphraseState 是从 Store 复用 device session 的必要条件**。
-V1/V2 的 `openWalletSession()` 返回钱包身份 `deviceId + passphraseState`，并为现有 CLI
-同时返回设备生成的 `sessionId`。普通 App 调用方恢复隐藏钱包时只传回两个钱包身份字段，Core 再读取
+V1/V2 的 `openWalletSession()` 返回钱包身份 `deviceId + passphraseState`，并在固件响应包含
+`session_id` 时为现有 CLI 可选透传 `sessionId`。普通 App 调用方恢复隐藏钱包时只传回两个钱包身份字段，Core 再读取
 内部 `sessionId`。短生命周期 CLI 可以从
 自己受保护的 OS Keychain 恢复完整三元组，并通过 `preloadSessionCache()` 注入 Core Store；
 SDK 仍不接受业务 API payload 直接携带 `sessionId`。
@@ -662,7 +662,6 @@ Pro2 子模块里可以看到 SE session 的底层处理：
 
 - `handle_session_new()` 调 `SE_CMD_SESSION_START` 生成 32 字节 session_id。
 - `handle_session_open()` 调 `SE_CMD_SESSION_OPEN` 打开指定 session_id。
-- `handle_session_get_current_id()` 调 `SE_CMD_SESSION_GET_CURRENT_ID` 查询当前 session_id。
 - MicroPython 扩展 `se_start_session()` 在未打开 session 时会 new + open。
 
 这说明 device `session_id` 本质上是安全芯片/固件侧的 seed/passphrase session 句柄。SDK 缓存它的目的不是绕过安全校验，而是在同一 passphraseState 下复用设备已经建立的上下文，减少重复输入 passphrase 或重复初始化成本。
@@ -678,8 +677,8 @@ App 在“打开钱包”阶段读取并缓存 protocol
   -> core 找到 Device
   -> Device.initialize()
   -> Pro2: DeviceSessionOpen(select/resume) / Pro V1: GetPassphraseState
-  -> 固件返回 passphraseState 与 session_id
-  -> SDK updateInternalState(deviceId, passphraseState, sessionId)
+  -> 固件返回 passphraseState；响应包含 session_id 时 SDK 原样透传
+  -> SDK updateInternalState(deviceId, passphraseState, optional sessionId)
   -> App 仍只用 passphraseState 标识钱包，后续业务调用参数不变
 ```
 
