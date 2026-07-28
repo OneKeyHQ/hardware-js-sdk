@@ -1,5 +1,5 @@
 import { TronMessageType } from '@onekeyfe/hd-transport';
-import { EFirmwareType, createDeviceNotSupportMethodError } from '@onekeyfe/hd-shared';
+import { createDeviceNotSupportMethodError } from '@onekeyfe/hd-shared';
 
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
@@ -10,6 +10,8 @@ import { stripHexPrefix } from '../helpers/hexUtils';
 import type { TronSignMessage as HardwareTronSignMessage } from '@onekeyfe/hd-transport';
 
 export default class TronSignMessage extends BaseMethod<HardwareTronSignMessage> {
+  private isLegacyMessageType = false;
+
   getSupportedProtocols() {
     return ['V1', 'V2'] as const;
   }
@@ -29,9 +31,8 @@ export default class TronSignMessage extends BaseMethod<HardwareTronSignMessage>
     const { path, messageHex } = this.payload;
     const addressN = validatePath(path, 3);
 
-    if (this.payload.messageType === 'V1' || this.payload.messageType == null) {
-      throw createDeviceNotSupportMethodError('TronSignMessage', EFirmwareType.Universal);
-    }
+    this.isLegacyMessageType =
+      this.payload.messageType === 'V1' || this.payload.messageType == null;
 
     const messageType = TronMessageType.V2;
 
@@ -72,6 +73,13 @@ export default class TronSignMessage extends BaseMethod<HardwareTronSignMessage>
   }
 
   async run() {
+    if (this.isLegacyMessageType) {
+      throw createDeviceNotSupportMethodError(
+        'TronSignMessage',
+        this.device.getCurrentFirmwareType()
+      );
+    }
+
     this.checkFeatureVersionLimit(
       () => this.params.message_type === TronMessageType.V2,
       () => this.getMessageV2VersionRange(),
