@@ -267,7 +267,6 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
       highVolume: false,
       generation: 1,
       signal: new AbortController().signal,
-      deliveryAttempt: 0,
     };
     const assertCurrentGeneration = jest.fn();
     configureProtocolV2BleTuning({ iosPacketLength: 20 });
@@ -300,7 +299,6 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
       highVolume: true,
       generation: 1,
       signal: new AbortController().signal,
-      deliveryAttempt: 0,
     };
     configureProtocolV2BleTuning({ iosPacketLength: 20 });
 

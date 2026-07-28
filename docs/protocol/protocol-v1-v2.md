@@ -79,7 +79,7 @@ V2 帧用于承载 protobuf payload。维护时重点关注以下字段：
 | magic          | 固定帧标识 `0x5A`                         |
 | message type   | 请求或响应的消息编号                      |
 | payload length | protobuf payload 长度                     |
-| sequence       | 每个发送方向独立、在活动会话内持续递增的帧序号 |
+| sequence       | 每个发送方向独立、跨 channel/source 递增的全局帧序号 |
 | payload        | protobuf 编码结果                         |
 | CRC8           | 帧完整性校验                              |
 
@@ -104,13 +104,15 @@ V2 帧用于承载 protobuf payload。维护时重点关注以下字段：
 - Session、frame assembler 与平台 adapter 在活动 Link 内复用。
 - `ProtocolV2SequenceCursor` 的生命周期长于一次连接；普通断开和重连不会把 sequence 重置为 1。
 - Transport `dispose` 时才清除 cursor、队列和全部 Link。
-- ACK 的 sequence 必须回显本次请求 sequence；设备业务响应使用自己的发送序列，
-  SDK 校验该方向的连续性，不能把它与请求 sequence 强行比较。
+- ACK 的 sequence 必须回显本次请求 sequence；设备业务响应使用固件全局发送序列，
+  该序列会被其他 channel/source 占用。SDK 必须允许合法间隙，但拒绝当前 Link 中连续收到
+  相同业务响应序号；不能把业务响应 sequence 与请求 sequence 强行比较。
 - 同一个有限 watchdog 覆盖 `prepareCall`、完整 frame 写入和响应读取；调用未指定时使用
   共享的 5 分钟默认值，超时信号必须传给平台 adapter 以取消当前 generation 的工作。
-- 写入后默认等待 5 秒交付确认；匹配的 ACK 或首个合法业务响应都表示设备已收到请求。
-- 交付超时默认不重发。只有调用方显式标记为幂等时，Session 才可在有界次数内重发
-  完全相同的 frame；文件写入、设置和固件安装等副作用请求不得启用该策略。
+- ACK 与业务响应共用同一个调用超时，不设置独立的交付看门狗；未在 5 秒内收到 ACK
+  不能判定链路失败，因为设备可能正在正常等待用户输入。
+- Session 不自动重发请求；文件写入、设置和固件安装等副作用请求的重试只能由了解
+  业务幂等性的 Core 流程决定。
 
 Link-fatal 错误包括响应超时、断连、I/O、generation 失效和帧错误。发生后必须先使 Link
 失效，再取消读取、清空 assembler、关闭平台连接并清理协议缓存。
