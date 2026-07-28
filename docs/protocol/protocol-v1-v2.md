@@ -106,7 +106,11 @@ V2 帧用于承载 protobuf payload。维护时重点关注以下字段：
 - Transport `dispose` 时才清除 cursor、队列和全部 Link。
 - ACK 的 sequence 必须回显本次请求 sequence；设备业务响应使用自己的发送序列，
   SDK 校验该方向的连续性，不能把它与请求 sequence 强行比较。
-- 每次读取都有有限超时；调用未指定时使用共享的 5 分钟默认值。
+- 同一个有限 watchdog 覆盖 `prepareCall`、完整 frame 写入和响应读取；调用未指定时使用
+  共享的 5 分钟默认值，超时信号必须传给平台 adapter 以取消当前 generation 的工作。
+- 写入后默认等待 5 秒交付确认；匹配的 ACK 或首个合法业务响应都表示设备已收到请求。
+- 交付超时默认不重发。只有调用方显式标记为幂等时，Session 才可在有界次数内重发
+  完全相同的 frame；文件写入、设置和固件安装等副作用请求不得启用该策略。
 
 Link-fatal 错误包括响应超时、断连、I/O、generation 失效和帧错误。发生后必须先使 Link
 失效，再取消读取、清空 assembler、关闭平台连接并清理协议缓存。
@@ -135,6 +139,9 @@ Node USB 与 WebUSB 共享 `ProtocolV2UsbTransportBase`，差异只存在于原�
 - 在 reset、reconnect 和 dispose 时轮换 generation 并取消旧读取。
 
 WebUSB 还需要处理浏览器授权、页面生命周期和浏览器返回的 `USBInTransferResult`；Node USB 负责原生设备句柄与 transfer 错误映射。这些差异不能改变公共 Session 的超时和重试语义。
+WebUSB 不得在每次调用前单独清空 assembler；assembler 与响应序列链只随 link generation
+一起失效。router、packet source、ACK/响应 sequence、framing/CRC 和超时统一使用类型化
+Link 错误，并触发 session、assembler、读取状态和平台连接重建。
 
 主要实现：
 
@@ -147,6 +154,8 @@ BLE 平台实现包括 Electron、React Native 和 lowlevel 插件。公共约�
 
 - 连接后发现服务和特征，先建立 notification 订阅，再开始协议调用。
 - 写入按平台 MTU 或插件上限分包，设备响应由 notification 回传。
+- React Native 的大 frame 写入使用有界 burst 和 flush pause；只对明确的
+  `GATT_CONGESTED` 做有界退避重试，断连或 generation 变化立即中止，不能跨连接继续写。
 - notification 数据统一进入 `ProtocolV2FrameAssembler`，不能假设一次通知就是一帧。
 - 重连或重新订阅后，旧回调必须通过 generation/token 失效。
 - lowlevel 插件只提供连接、读写和订阅能力，不复制协议状态机。

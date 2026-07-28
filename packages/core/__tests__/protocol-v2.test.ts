@@ -2729,6 +2729,7 @@ describe('Protocol V2 firmware update targets', () => {
         return Promise.resolve({
           type: 'DeviceInfo',
           message: {
+            hw: { serial_no: 'BLE-PRO2-SERIAL' },
             fw: {
               bootloader: { version: '0.0.0' },
               application: { version: '0.0.0' },
@@ -2749,6 +2750,7 @@ describe('Protocol V2 firmware update targets', () => {
     });
     const commands = { typedCall };
 
+    (method as any).protocolV2ExpectedSerialNumber = 'BLE-PRO2-SERIAL';
     (method as any).isBleReconnect = jest.fn(() => true);
     (method as any).device = stubDevice({
       originalDescriptor: { id: 'ble-id', path: 'ble-path', protocolType: 'V2' },
@@ -2810,6 +2812,7 @@ describe('Protocol V2 firmware update targets', () => {
       originalDescriptor: { id: 'ble-id', path: 'ble-path', protocolType: 'V2' },
       features: { capabilities: [] },
     });
+    (method as any).captureProtocolV2PhysicalIdentity = jest.fn().mockResolvedValue(undefined);
     (method as any).prepareBootloaderBinary = jest.fn().mockReturnValue(null);
     (method as any).collectExplicitTargetBinaries = jest.fn().mockReturnValue([
       {
@@ -2875,6 +2878,7 @@ describe('Protocol V2 firmware update targets', () => {
     });
     (method as any).reconnectProtocolV2Device = reconnectProtocolV2Device;
     (method as any).device.getCommands = () => ({ typedCall });
+    (method as any).protocolV2ExpectedSerialNumber = 'PR9999999999';
     method.postTipMessage = jest.fn();
 
     await (method as any).enterProtocolV2BootloaderMode();
@@ -2940,7 +2944,7 @@ describe('Protocol V2 firmware update targets', () => {
       });
     (method as any).reconnectProtocolV2Device = reconnectProtocolV2Device;
     (method as any).device.getCommands = () => ({ typedCall });
-    (method as any).protocolV2ExpectedDeviceId = '8693920D7CA90CEC4A88353D';
+    (method as any).protocolV2ExpectedSerialNumber = 'PR9999999999';
 
     await (method as any).waitForProtocolV2BootloaderMode(60 * 1000, 0);
 
@@ -3059,7 +3063,7 @@ describe('Protocol V2 firmware update targets', () => {
         fw: { application: { version: '1.0.0' } },
       },
     });
-    (method as any).protocolV2ExpectedDeviceId = 'expected-device';
+    (method as any).protocolV2ExpectedSerialNumber = 'expected-serial';
     (method as any).reconnectProtocolV2Device = reconnectProtocolV2Device;
     (method as any).device = stubDevice({
       getCommands: () => ({ typedCall }),
@@ -3085,6 +3089,7 @@ describe('Protocol V2 firmware update targets', () => {
     });
     method.postTipMessage = jest.fn();
     (method as any).reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
+    (method as any).verifyProtocolV2ReconnectIdentity = jest.fn().mockResolvedValue(undefined);
     (method as any).protocolV2Reboot = jest.fn().mockResolvedValue({
       message: 'Device rebooted successfully',
     });
@@ -3221,6 +3226,7 @@ describe('Protocol V2 firmware update targets', () => {
       getCommands: () => ({ typedCall }),
     });
     (method as any).reconnectProtocolV2Device = reconnectProtocolV2Device;
+    (method as any).verifyProtocolV2ReconnectIdentity = jest.fn().mockResolvedValue(undefined);
     method.postProgressMessage = jest.fn();
 
     await (method as any).waitForProtocolV2FirmwareUpdateComplete([
@@ -3253,6 +3259,7 @@ describe('Protocol V2 firmware update targets', () => {
       getCommands: () => ({ typedCall }),
     });
     (method as any).reconnectProtocolV2Device = reconnectProtocolV2Device;
+    (method as any).verifyProtocolV2ReconnectIdentity = jest.fn().mockResolvedValue(undefined);
     method.postProgressMessage = jest.fn();
 
     await (method as any).waitForProtocolV2FirmwareUpdateComplete([
@@ -3285,6 +3292,7 @@ describe('Protocol V2 firmware update targets', () => {
       getCommands: () => ({ typedCall }),
     });
     (method as any).reconnectProtocolV2Device = reconnectProtocolV2Device;
+    (method as any).verifyProtocolV2ReconnectIdentity = jest.fn().mockResolvedValue(undefined);
     method.postProgressMessage = jest.fn();
 
     await expect(
@@ -3402,6 +3410,7 @@ describe('Protocol V2 firmware update targets', () => {
       getCommands: () => ({ typedCall }),
     });
     (method as any).reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
+    (method as any).verifyProtocolV2ReconnectIdentity = jest.fn().mockResolvedValue(undefined);
     (method as any).probeProtocolV2NormalMode = jest.fn().mockResolvedValue(false);
 
     await expect(
@@ -3830,6 +3839,7 @@ describe('Protocol V2 firmware update targets', () => {
       },
     });
     method.init();
+    (method as any).captureProtocolV2PhysicalIdentity = jest.fn().mockResolvedValue(undefined);
 
     const order: string[] = [];
     const resourceBinary = new Uint8Array([1, 2, 3]).buffer;
@@ -3910,6 +3920,7 @@ describe('Protocol V2 firmware update targets', () => {
       },
     });
     method.init();
+    (method as any).captureProtocolV2PhysicalIdentity = jest.fn().mockResolvedValue(undefined);
 
     const getSysResourceBinarySpy = jest
       .spyOn(firmwareBinaryApi, 'getSysResourceBinary')
@@ -4021,6 +4032,7 @@ describe('Protocol V2 firmware update targets', () => {
       },
     });
     method.init();
+    (method as any).captureProtocolV2PhysicalIdentity = jest.fn().mockResolvedValue(undefined);
 
     const remoteBinaries = {
       bootloaderBinary: new Uint8Array([1]).buffer,
@@ -4067,6 +4079,7 @@ describe('Protocol V2 firmware update targets', () => {
       },
     });
     method.init();
+    (method as any).captureProtocolV2PhysicalIdentity = jest.fn().mockResolvedValue(undefined);
 
     (method as any).device = stubDevice({
       originalDescriptor: { protocolType: 'V2' },
@@ -4108,6 +4121,7 @@ describe('Protocol V2 firmware update targets', () => {
       },
     });
     method.init();
+    (method as any).captureProtocolV2PhysicalIdentity = jest.fn().mockResolvedValue(undefined);
 
     (method as any).device = stubDevice({
       originalDescriptor: { protocolType: 'V2' },
@@ -4621,29 +4635,49 @@ describe('Protocol V2 firmware update method', () => {
 });
 
 describe('Protocol V2 firmware reconnect identity', () => {
-  test('rejects a different device before firmware transfer resumes', () => {
-    expect(() => assertProtocolV2ReconnectIdentity('expected-device', 'other-device')).toThrow(
+  test('requires the same physical serial before firmware transfer resumes', () => {
+    expect(() => assertProtocolV2ReconnectIdentity('expected-serial', 'other-serial')).toThrow(
       'identity mismatch'
     );
-    expect(() => assertProtocolV2ReconnectIdentity('expected-device', undefined)).toThrow(
+    expect(() => assertProtocolV2ReconnectIdentity('expected-serial', undefined)).toThrow(
       'identity unavailable'
     );
     expect(() =>
-      assertProtocolV2ReconnectIdentity('expected-device', 'expected-device')
+      assertProtocolV2ReconnectIdentity('expected-serial', 'expected-serial')
     ).not.toThrow();
+    expect(() => assertProtocolV2ReconnectIdentity(undefined, 'actual-serial')).toThrow(
+      'identity unavailable'
+    );
   });
 
-  test('allows bootloader reconnect without wallet device id after USB identity is selected', () => {
-    expect(() =>
-      assertProtocolV2ReconnectIdentity('expected-device', undefined, {
-        allowMissingActual: true,
-      })
-    ).not.toThrow();
-    expect(() =>
-      assertProtocolV2ReconnectIdentity('expected-device', 'other-device', {
-        allowMissingActual: true,
-      })
-    ).toThrow('identity mismatch');
+  test('captures physical identity from active DeviceInfo instead of wallet deviceId', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const typedCall = jest.fn().mockResolvedValue({
+      type: 'DeviceInfo',
+      message: {
+        protocol_version: 1,
+        hw: { serial_no: 'PRO2-PHYSICAL-1' },
+      },
+    });
+    (method as any).device = stubDevice({
+      features: { deviceId: 'wallet-derived-id' },
+      getCommands: () => ({ typedCall }),
+    });
+
+    await (method as any).captureProtocolV2PhysicalIdentity();
+
+    expect((method as any).protocolV2ExpectedSerialNumber).toBe('PRO2-PHYSICAL-1');
+    expect(typedCall).toHaveBeenCalledWith(
+      'DeviceInfoGet',
+      'DeviceInfo',
+      expect.objectContaining({ targets: expect.objectContaining({ hw: true }) }),
+      { timeoutMs: 5000 }
+    );
   });
 });
 

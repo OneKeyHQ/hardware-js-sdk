@@ -46,6 +46,9 @@ Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类�
 - `DeviceWalletSessionStore` 是 Core 内唯一可用于恢复的钱包 Session 缓存源；
   `DeviceState` 和协议 raw 快照都不是 Session 缓存。
 - 没有 `passphraseState` 时不得扫描或复用其他钱包的缓存 Session。
+- Protocol V1 请求携带 `deviceId` 时，Core 必须先发送不含 `session_id/passphrase_state`
+  的 `Initialize` 确认实时 `deviceId`；身份一致后才允许读取并透传对应钱包 Session。
+  业务方法只要接收 `deviceId`，也必须在业务命令前执行同一实时身份校验。
 - `openWalletSession()` 的显式 `mode` 是唯一流程意图；一旦传入 `mode`，不得再混用
   `useEmptyPassphrase` 或 `initSession`。`standard/select-hidden` 也不得携带钱包绑定。
 - 未传 `mode` 时只做旧参数兼容：`useEmptyPassphrase=true` 进入 `standard`；
@@ -65,12 +68,16 @@ Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类�
 - V2 的 `DeviceSessionOpen` 成功响应必须同时包含非空 `session_id` 和
   `btc_test_address`；缺少任一字段都视为协议响应不完整，不得降级为标准钱包。
 - 返回的钱包标识与调用方预期不一致时，必须清理缓存并抛出安全错误。
+- Pro2 在解锁流程刷新状态后，以刷新后的 `passphraseProtection` 判定标准/隐藏钱包，
+  不得使用解锁前的状态快照路由钱包结果。
 - `session_id` 不是钱包身份，必须与同一次返回的 `deviceId + passphraseState` 绑定使用。
 - `session_id` 不出现在公共 `DeviceState` 或设备消息顶层；标准/隐藏钱包结果中的可选
   `openWalletSession().sessionId` 和 Legacy `Features.sessionId` 只用于 CLI 兼容，
   普通 App 不得把它们写入数据库。
-- 公共 `clearSessionCache()` 只清理 `DeviceWalletSessionStore`，
-  不发送 Protocol V1/V2 命令，也不表示设备端 Session 已关闭。
+- 公共 `clearSessionCache()` 只接受无参数、仅 `deviceId`、或完整
+  `deviceId + passphraseState` 三种范围；单独传 `passphraseState` 返回参数错误，避免误清
+  所有设备。该 API 只清理 `DeviceWalletSessionStore`，不发送 Protocol V1/V2 命令，
+  也不表示设备端 Session 已关闭。
 
 主要实现：
 
