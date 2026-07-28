@@ -6,6 +6,10 @@ import type { RebootToBootloader } from '@onekeyfe/hd-transport';
 
 // Reboot BootLoader
 export default class DeviceRebootToBootloader extends BaseMethod<RebootToBootloader> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
     this.useDevicePassphraseState = false;
     this.skipForceUpdateCheck = true;

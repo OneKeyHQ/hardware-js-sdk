@@ -78,12 +78,6 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
   }
 
   async run() {
-    if (this.device.isProtocolV2()) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.RuntimeError,
-        'Protocol V2 firmware update must use firmwareUpdateV4'
-      );
-    }
     Log.debug('FirmwareUpdateV3 strategy: Protocol V1');
     return this.runProtocolV1();
   }

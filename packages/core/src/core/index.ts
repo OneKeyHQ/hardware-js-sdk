@@ -15,14 +15,7 @@ import {
   createNewFirmwareUnReleaseHardwareError,
 } from '@onekeyfe/hd-shared';
 
-import {
-  LoggerNames,
-  enableLog,
-  getLogger,
-  isMethodVersionRangeUnsupported,
-  setLoggerPostMessage,
-  wait,
-} from '../utils';
+import { LoggerNames, enableLog, getLogger, setLoggerPostMessage, wait } from '../utils';
 import {
   findDefectiveBatchDevice,
   getDefectiveDeviceInfo,
@@ -440,11 +433,9 @@ const onCallDevice = async (
     await waitForPendingPromise(getPrePendingCallPromise, setPrePendingCallPromise);
 
     const inner = async (): Promise<void> => {
-      // The protocol is established after acquire/initialize. Reject Protocol V2-only
-      // methods on other devices through BaseMethod.requireProtocolV2.
-      if (method.requireProtocolV2 && !device.isProtocolV2()) {
-        throw createDeviceNotSupportMethodError(method.name, device.getCurrentFirmwareType());
-      }
+      // Protocol is established from an active device response during acquire/initialize.
+      // Reject unsupported methods before any method-specific device command is sent.
+      method.assertProtocolSupported(device.getProtocol(), device.getCurrentFirmwareType());
 
       // check firmware version
       const versionRange = device.getCurrentMethodVersionRange(
@@ -502,10 +493,6 @@ const onCallDevice = async (
             currentVersions
           );
         }
-      }
-
-      if (isMethodVersionRangeUnsupported(versionRange)) {
-        throw createDeviceNotSupportMethodError(method.name, deviceFirmwareType);
       }
 
       if (versionRange) {

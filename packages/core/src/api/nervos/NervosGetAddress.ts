@@ -42,10 +42,6 @@ export default class NervosGetAddress extends BaseMethod<HardwareNervosGetAddres
 
   getVersionRange(): DeviceFirmwareRange {
     return {
-      pro2: {
-        min: '0.0.0',
-        unsupported: true,
-      },
       model_mini: {
         min: '3.7.0',
       },

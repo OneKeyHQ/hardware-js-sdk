@@ -6,6 +6,10 @@ import type { CosmosGetAddress as HardwareCosmosGetAddress } from '@onekeyfe/hd-
 import type { CosmosAddress, CosmosGetAddressParams } from '../../types';
 
 export default class CosmosGetAddress extends BaseMethod<HardwareCosmosGetAddress[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {

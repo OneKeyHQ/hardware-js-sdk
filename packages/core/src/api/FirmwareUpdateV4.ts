@@ -395,6 +395,10 @@ export const assertProtocolV2ReconnectIdentity = (
 export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareUpdateV4Params> {
   private protocolV2ExpectedSerialNumber?: string;
 
+  getSupportedProtocols() {
+    return ['V2'] as const;
+  }
+
   init() {
     this.allowDeviceMode = [UI_REQUEST.BOOTLOADER, UI_REQUEST.NOT_INITIALIZE];
     this.requireDeviceMode = [];
@@ -475,13 +479,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   }
 
   async run() {
-    if (!this.device.isProtocolV2()) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.RuntimeError,
-        'firmwareUpdateV4 requires a Protocol V2 device'
-      );
-    }
-
     Log.debug('FirmwareUpdateV4 strategy: Protocol V2');
     return this.runProtocolV2();
   }

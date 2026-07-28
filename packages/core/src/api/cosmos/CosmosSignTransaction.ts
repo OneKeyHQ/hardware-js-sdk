@@ -9,6 +9,10 @@ import type { CosmosSignTx as HardwareCosmosSignTx } from '@onekeyfe/hd-transpor
 import type { CosmosSignTransactionParams } from '../../types';
 
 export default class CosmosSignTransaction extends BaseMethod<HardwareCosmosSignTx> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {

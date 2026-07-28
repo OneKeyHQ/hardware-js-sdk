@@ -7,6 +7,10 @@ import { batchGetPublickeys } from '../helpers/batchGetPublickeys';
 import type { CosmosAddress, CosmosGetPublicKeyParams } from '../../types';
 
 export default class CosmosGetPublicKey extends BaseMethod<any> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {

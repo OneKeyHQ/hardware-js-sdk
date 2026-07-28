@@ -6,6 +6,10 @@ import type { RebootToBoardloaderParams } from '../../types/api/deviceRebootToBo
 
 // Reboot BoardLoader
 export default class DeviceRebootToBoardloader extends BaseMethod<RebootToBoardloaderParams> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
     this.useDevicePassphraseState = false;
     this.skipForceUpdateCheck = true;

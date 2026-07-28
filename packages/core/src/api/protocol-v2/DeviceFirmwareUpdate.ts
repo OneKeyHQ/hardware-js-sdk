@@ -12,9 +12,12 @@ import type { MessageFromOneKey } from '@onekeyfe/hd-transport';
 import type { DeviceFirmwareUpdateParams } from './helpers';
 
 export default class DeviceFirmwareUpdate extends BaseMethod<DeviceFirmwareUpdateParams> {
+  getSupportedProtocols() {
+    return ['V2'] as const;
+  }
+
   init() {
     // Protocol V2 (Pro2) only; Core rejects non-V2 devices.
-    this.requireProtocolV2 = true;
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
     this.params = {

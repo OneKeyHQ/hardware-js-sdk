@@ -41,6 +41,10 @@ function normalizeFileName(fileName: string | undefined, data: Uint8Array): stri
 }
 
 export default class DeviceUploadWallpaper extends BaseMethod<DeviceUploadWallpaperParams> {
+  getSupportedProtocols() {
+    return ['V2'] as const;
+  }
+
   private encoded?: { data: Uint8Array; colorFormat: Pro2WallpaperColorFormat };
 
   private directoryReady = false;
@@ -70,7 +74,6 @@ export default class DeviceUploadWallpaper extends BaseMethod<DeviceUploadWallpa
     this.encoded = encodePro2Wallpaper({ width, height, rgba: rgbaBytes });
     this.path = `${WALLPAPER_DIRECTORY}/${normalizeFileName(fileName, this.encoded.data)}`;
     this.params = { width, height, rgba: rgbaBytes, fileName, chunkSize };
-    this.requireProtocolV2 = true;
     this.unlockPolicy = 'unlock-before-run';
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;

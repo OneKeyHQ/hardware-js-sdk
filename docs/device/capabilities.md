@@ -128,6 +128,11 @@
 
 当前兼容性测试插件目录没有 Pro2 插件，因此本文不能据此给出 Pro2 的完整成功/失败矩阵。Pro2 支持情况应由 Protocol V2 真机测试和各方法的 `pro2` 版本/能力限制单独生成；不要把 Pro 的结果直接复制给 Pro2。
 
+Core 方法以 `BaseMethod.getSupportedProtocols()` 作为协议能力事实源：默认方法仅支持 Protocol
+V1，支持 Pro2 的共享方法必须显式声明 `['V1', 'V2']`，Pro2 专属方法声明 `['V2']`。只有协议
+检查通过后才读取 `DeviceFirmwareRange` 的 `min/max`；版本范围缺失或 `0.0.0` 不再用于表示
+“不支持”。
+
 ---
 
 ## 配置文件位置（overrides 规则）

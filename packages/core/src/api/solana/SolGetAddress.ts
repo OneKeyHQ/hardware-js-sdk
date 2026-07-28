@@ -9,6 +9,10 @@ import type { SolanaAddress, SolanaGetAddressParams } from '../../types';
 export default class SolGetAddress extends BaseMethod<SolanaGetAddress[]> {
   hasBundle = false;
 
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];

@@ -11,6 +11,10 @@ import type { EVMGetPublicKeyParams, EVMPublicKey } from '../../types';
 import type { EthereumGetPublicKey, EthereumGetPublicKeyOneKey } from '@onekeyfe/hd-transport';
 
 export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKeyOneKey[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   confirmShowOnOneKey = false;

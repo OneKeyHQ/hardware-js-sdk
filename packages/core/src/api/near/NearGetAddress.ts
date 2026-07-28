@@ -7,6 +7,10 @@ import type { NearGetAddress as HardwareNearGetAddress } from '@onekeyfe/hd-tran
 import type { NearAddress, NearGetAddressParams } from '../../types';
 
 export default class NearGetAddress extends BaseMethod<HardwareNearGetAddress[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {

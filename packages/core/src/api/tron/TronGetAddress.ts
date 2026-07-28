@@ -7,6 +7,10 @@ import type { TronGetAddress as HardwareTronGetAddress } from '@onekeyfe/hd-tran
 import type { TronAddress, TronGetAddressParams } from '../../types';
 
 export default class TronGetAddress extends BaseMethod<HardwareTronGetAddress[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {

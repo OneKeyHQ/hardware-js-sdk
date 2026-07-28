@@ -1,5 +1,4 @@
 import semver from 'semver';
-import { createDeviceNotSupportMethodError } from '@onekeyfe/hd-shared';
 
 import { UI_REQUEST } from '../constants/ui-request';
 import { fixVersion } from '../utils/deviceFeaturesUtils';
@@ -26,10 +25,6 @@ export default class GetOnekeyFeatures extends BaseMethod {
   }
 
   async run() {
-    if (this.device.isProtocolV2()) {
-      throw createDeviceNotSupportMethodError(this.name, this.device.getCurrentFirmwareType());
-    }
-
     const { message } = await this.device.commands.typedCall('OnekeyGetFeatures', 'OnekeyFeatures');
     normalizeOnekeyFirmwareVersion(message);
     return Promise.resolve(message);

@@ -7,6 +7,10 @@ import type { AptosSignMessage as HardwareAptosSignMessage } from '@onekeyfe/hd-
 import type { AptosMessageSignature, AptosSignMessageParams } from '../../types';
 
 export default class AptosSignMessage extends BaseMethod<HardwareAptosSignMessage> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];

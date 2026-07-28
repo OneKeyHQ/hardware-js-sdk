@@ -7,6 +7,10 @@ import { stripHexPrefix } from '../helpers/hexUtils';
 import type { SolanaSignUnsafeMessage as HardwareSolSignUnsafeMessage } from '@onekeyfe/hd-transport';
 
 export default class SolSignMessage extends BaseMethod<HardwareSolSignUnsafeMessage> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];

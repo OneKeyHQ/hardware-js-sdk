@@ -7,6 +7,10 @@ import { formatAnyHex } from '../helpers/hexUtils';
 import type { StarcoinSignMessage as HardwareStarcoinSignMessage } from '@onekeyfe/hd-transport';
 
 export default class StarcoinSignMessage extends BaseMethod<HardwareStarcoinSignMessage> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];

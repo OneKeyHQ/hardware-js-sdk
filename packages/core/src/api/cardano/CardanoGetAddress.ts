@@ -13,6 +13,10 @@ import type { CardanoAddress, CardanoGetAddressParams } from '../../types/api/ca
 import type { CardanoGetAddressMethodParams } from '../../types';
 
 export default class CardanoGetAddress extends BaseMethod<CardanoGetAddressParams[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle?: boolean;
 
   isCheck?: boolean;
