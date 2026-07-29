@@ -122,6 +122,26 @@ const splitFrame = (frame, index) => [
 ];
 
 describe('LowlevelTransport protocol framing', () => {
+  test('keeps active links when the Protocol V2 schema is configured repeatedly', () => {
+    const lowlevel = new LowlevelTransport();
+    const invalidateAllLinks = jest.fn().mockResolvedValue(undefined);
+    lowlevel.protocolV2Links.invalidateAllLinks = invalidateAllLinks;
+
+    lowlevel.configureProtocolV2(protocolV2Schema);
+    lowlevel.configureProtocolV2(protocolV2Schema);
+
+    expect(invalidateAllLinks).not.toHaveBeenCalled();
+
+    lowlevel.configureProtocolV2({
+      nested: {
+        ...protocolV2Schema.nested,
+        ExtraMessage: { fields: {} },
+      },
+    });
+
+    expect(invalidateAllLinks).toHaveBeenCalledWith('Protocol V2 schema reconfigured');
+  });
+
   test('keeps Protocol V1 raw notification chunks compatible', async () => {
     const responseChunks = ProtocolV1.encodeTransportPackets(schemas.protocolV1, 'Success', {
       message: 'ok',
