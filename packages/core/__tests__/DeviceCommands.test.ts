@@ -234,6 +234,34 @@ describe('DeviceCommands failure mapping', () => {
     }
   );
 
+  it.each(['Cancelled', 'User cancelled typed data signing'])(
+    'maps the Protocol V2 MP engine cancellation response "%s" to ActionCancelled',
+    async message => {
+      const commands = createCommands();
+
+      await expect(
+        commands._filterCommonTypes(
+          {
+            type: 'Failure',
+            message: {
+              code: 'Failure_ProcessError',
+              subcode: 1,
+              message,
+            },
+          } as any,
+          'SignTx'
+        )
+      ).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.ActionCancelled,
+        params: {
+          failureCode: 'Failure_ProcessError',
+          subcode: 1,
+          firmwareMessage: message,
+        },
+      });
+    }
+  );
+
   it('does not use the legacy cancellation-message fallback for Protocol V1', async () => {
     const commands = createCommands();
     (commands.device.isProtocolV2 as jest.Mock).mockReturnValue(false);
