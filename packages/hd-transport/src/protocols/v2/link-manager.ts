@@ -45,6 +45,8 @@ export class ProtocolV2LinkManager<Key> {
 
   private readonly invalidationReasons = new Map<Key, { generation: number; reason: string }>();
 
+  private readonly invalidations = new Map<Key, Promise<void>>();
+
   private readonly options: ProtocolV2LinkManagerOptions<Key>;
 
   constructor(options: ProtocolV2LinkManagerOptions<Key>) {
@@ -81,17 +83,37 @@ export class ProtocolV2LinkManager<Key> {
     this.generations.set(key, generation);
     this.invalidationReasons.set(key, { generation, reason });
 
+    const pendingInvalidation = this.invalidations.get(key);
     const link = this.links.get(key);
-    if (!link) return;
+    if (!link) {
+      await pendingInvalidation;
+      return;
+    }
 
     this.links.delete(key);
     link.state.invalidatedReason = reason;
-    await link.adapter.reset(reason);
-    await this.options.onLinkInvalidated?.(key, reason);
+    const invalidation = (async () => {
+      await pendingInvalidation?.catch(() => undefined);
+      await link.adapter.reset(reason);
+      await this.options.onLinkInvalidated?.(key, reason);
+    })();
+    this.invalidations.set(key, invalidation);
+
+    try {
+      await invalidation;
+    } finally {
+      if (this.invalidations.get(key) === invalidation) {
+        this.invalidations.delete(key);
+      }
+    }
   }
 
   async invalidateAllLinks(reason: string): Promise<void> {
-    const keys = new Set([...this.links.keys(), ...this.callQueues.keys()]);
+    const keys = new Set([
+      ...this.links.keys(),
+      ...this.callQueues.keys(),
+      ...this.invalidations.keys(),
+    ]);
     await Promise.all(Array.from(keys, key => this.invalidateLink(key, reason)));
   }
 
@@ -99,6 +121,7 @@ export class ProtocolV2LinkManager<Key> {
     await this.invalidateAllLinks(reason);
     this.sequences.clear();
     this.callQueues.clear();
+    this.invalidations.clear();
   }
 
   private getOrCreateLink(key: Key, createAdapter: () => ProtocolV2LinkAdapter): ProtocolV2Link {
