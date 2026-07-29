@@ -37,7 +37,8 @@
   `select-hidden` 和 `resume-hidden`。标准钱包返回 `passphraseState: null`，隐藏钱包返回设备生成的
   非空 `passphraseState`。`passphraseState` 可与 `deviceId` 组成钱包绑定；固件
   `session_id` 只写入 Core 内部 Store，不进入公共响应。显式 `mode` 是唯一流程意图，不得与
-  `useEmptyPassphrase/initSession` 混用。
+  `useEmptyPassphrase/initSession` 混用。TypeScript 调用方应使用 SDK 导出的
+  `OpenWalletSessionMode.Standard/SelectHidden/ResumeHidden`，避免在业务代码中重复维护协议字符串。
 - 参数校验错误通过统一失败响应返回
   `{ success: false, payload: { error, code } }`；缺少 `resume-hidden` 必填绑定时使用
   `CallMethodInvalidParameter`，不向调用方抛出只有 message 的裸异常。
