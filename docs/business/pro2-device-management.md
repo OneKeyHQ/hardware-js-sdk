@@ -88,8 +88,8 @@ Protocol V1 继续使用 `firmwareUpdate` 至 `firmwareUpdateV3`；Pro2 使用 `
 
 高层升级流程：
 
-1. 获取组件版本和设备状态。
-2. 根据调用方二进制或远端 release 配置准备目标，并在重启前下载、校验所有远端
+1. 调用 `checkAllFirmwareRelease` 获取组件版本、建议升级目标和远端 release 配置。
+2. 将返回的 `targetsToUpdate` 传给 `firmwareUpdateV4`；SDK 在重启前下载、校验所有远端
    firmware 与 RESC binary；空文件直接终止升级。
 3. 比较版本和 fingerprint；`forceTargets` 只跳过指定目标的版本判断。
 4. 对 RESC bundle 比较设备 header、版本和 hash。
@@ -108,6 +108,22 @@ Protocol V1 继续使用 `firmwareUpdate` 至 `firmwareUpdateV3`；Pro2 使用 `
 - release 配置、SDK target 类型和固件枚举必须同步发布。
 
 `firmwareUpdateV4` 为兼容旧接口仍返回 BLE、application 和 bootloader 三类版本。需要 SE、P1/P2、hash、build ID 或 coprocessor 版本时，应调用 `getDeviceState({ scope: 'firmware' })`。
+
+`checkAllFirmwareRelease` 的 Protocol V2 分支读取设备状态并解析已加载的 Pro2 `firmware-v1` 配置，但不下载
+完整二进制、不重启设备，也不执行安装。配置中每个 `components.*.version` 是该 target 的建议
+版本；返回的 `targetsToUpdate` 可直接作为 `firmwareUpdateV4` 的同名参数。版本相同时，SDK
+优先使用 `components.*.payloadHash`，旧配置则通过 HTTP Range 只读取远端 OKPP 元数据，并对
+Bootloader/P1/P2 使用 payload hash 区分同版本 hotfix；配置中的
+`fingerprint` 是完整 `.okpkg` 的 SHA-256，只用于下载后的完整文件校验，不能与设备 payload hash
+直接比较。缺少当前版本或无法取得可比元数据的组件标记为 `unknown`，不会自动加入升级目标；
+ROMloader 标记为 `unsupported`。
+
+P1 对应 `DeviceInfo.fw.application`，P2 对应 `DeviceInfo.fw.application_data`。Normal mode 只报告
+P1 时，P1/P2 按同一 application package set 处理；P1 需要 hotfix 时两个 application target
+一起更新。Bootloader mode 能报告 P2 时，SDK 分别比较 P1/P2。
+
+发布配置应为 Bootloader/P1/P2 写入 OKPP `payloadHash`。旧配置的 Range 回退要求 CDN 允许
+对应运行环境跨域读取 `Range` 响应；否则相同版本组件返回 `unknown`，不会误判为已是最新版本。
 
 主要实现：
 

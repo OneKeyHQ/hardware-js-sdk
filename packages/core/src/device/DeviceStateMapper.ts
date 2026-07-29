@@ -242,6 +242,8 @@ export const mapProtocolV2DeviceInfoToState = (
       : { mode },
     versions: definedEntries({
       firmware: imageVersion(info.fw?.application),
+      applicationP1: imageVersion(info.fw?.application),
+      applicationP2: imageVersion(info.fw?.application_data),
       bootloader: imageVersion(info.fw?.bootloader),
       board: imageVersion(info.fw?.romloader),
       ble: imageVersion(info.coprocessor?.application),
@@ -257,6 +259,10 @@ export const mapProtocolV2DeviceInfoToState = (
     verification: definedEntries({
       firmwareBuildId: imageBuildId(info.fw?.application),
       firmwareHash: imageHash(info.fw?.application),
+      applicationP1BuildId: imageBuildId(info.fw?.application),
+      applicationP1Hash: imageHash(info.fw?.application),
+      applicationP2BuildId: imageBuildId(info.fw?.application_data),
+      applicationP2Hash: imageHash(info.fw?.application_data),
       bootloaderBuildId: imageBuildId(info.fw?.bootloader),
       bootloaderHash: imageHash(info.fw?.bootloader),
       boardBuildId: imageBuildId(info.fw?.romloader),

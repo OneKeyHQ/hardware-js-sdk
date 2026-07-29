@@ -54,7 +54,10 @@ export type IProtocolV2FirmwareComponentTarget =
 export type IProtocolV2FirmwareComponent = {
   target: IProtocolV2FirmwareComponentTarget;
   url: string;
+  /** SHA-256 of the complete okpkg, used after downloading the package. */
   fingerprint?: string;
+  /** OKPP payload hash, used to detect same-version package changes. */
+  payloadHash?: string;
   version?: IVersionArray;
 };
 

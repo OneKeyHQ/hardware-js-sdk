@@ -27,6 +27,26 @@ describe('networkUtils httpRequest retry bounds', () => {
     expect(requestSpy.mock.calls[0][0]).not.toHaveProperty('onDownloadProgress');
   });
 
+  it('accepts partial content and forwards byte-range headers', async () => {
+    const packageHeader = new ArrayBuffer(640);
+    const requestSpy = jest.spyOn(axios, 'request').mockResolvedValue({
+      status: 206,
+      data: packageHeader,
+    });
+
+    await expect(
+      httpRequest('https://example.com/application-p1.okpkg', 'binary', {
+        headers: { Range: 'bytes=0-639' },
+      })
+    ).resolves.toBe(packageHeader);
+
+    expect(requestSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        headers: { Range: 'bytes=0-639' },
+      })
+    );
+  });
+
   it('passes the per-attempt timeout and stops after the configured retry count', async () => {
     const timeoutError = Object.assign(new Error('timeout'), {
       code: 'ECONNABORTED',
