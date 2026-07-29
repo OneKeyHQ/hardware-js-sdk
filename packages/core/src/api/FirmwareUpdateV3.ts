@@ -750,7 +750,11 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
 
           if (deviceList.length === 1) {
             this.device.updateFromCache(deviceList[0]);
-            await this.device.acquire();
+            // Reconnect failures are expected while installation still owns USB.
+            // Keep them in this polling loop instead of rejecting the active firmware run.
+            await this.device.acquire(undefined, {
+              throwOnRunPromiseError: true,
+            });
             this.device.commands.disposed = false;
             this.device.getCommands().mainId = this.device.mainId ?? '';
             return;
