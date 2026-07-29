@@ -117,6 +117,8 @@ export default class LowlevelTransport {
     },
   });
 
+  private protocolV2SchemaConfiguration: string | undefined;
+
   getProtocolType(path: string): ProtocolType | undefined {
     return this.deviceProtocol.get(path);
   }
@@ -135,10 +137,20 @@ export default class LowlevelTransport {
   }
 
   configureProtocolV2(signedData: any) {
+    const configuration = typeof signedData === 'string' ? signedData : JSON.stringify(signedData);
+    if (this.protocolV2SchemaConfiguration === configuration) {
+      return;
+    }
+
+    const isReconfiguration = this.protocolV2SchemaConfiguration !== undefined;
     this._messagesV2 = parseConfigure(signedData);
-    this.protocolV2Links
-      .invalidateAllLinks('Protocol V2 schema reconfigured')
-      .catch(error => this.Log?.debug('Protocol V2 schema link cleanup failed:', error));
+    this.protocolV2SchemaConfiguration = configuration;
+
+    if (isReconfiguration) {
+      this.protocolV2Links
+        .invalidateAllLinks('Protocol V2 schema reconfigured')
+        .catch(error => this.Log?.debug('Protocol V2 schema link cleanup failed:', error));
+    }
   }
 
   listen() {
