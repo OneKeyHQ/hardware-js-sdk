@@ -148,7 +148,12 @@ import type { ConnectSettings } from '../settings';
 export * from './export';
 export type { DeviceStateScope, GetDeviceStateParams } from './getDeviceState';
 export type { GetPassphraseStateParams } from './getPassphraseState';
-export type { OpenWalletSessionParams, OpenWalletSessionPayload } from './openWalletSession';
+export { OpenWalletSessionMode } from './openWalletSession';
+export type {
+  OpenWalletSessionModeValue,
+  OpenWalletSessionParams,
+  OpenWalletSessionPayload,
+} from './openWalletSession';
 export type { ClearSessionCacheParams, ClearSessionCachePayload } from './sessionCache';
 export type { TestProtocolV2PingParams } from './protocolV2';
 

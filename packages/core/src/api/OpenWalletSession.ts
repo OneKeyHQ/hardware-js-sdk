@@ -5,6 +5,7 @@ import { getProtocolV2WalletSession } from '../protocols/protocol-v2/walletSessi
 import { getPassphraseStateWithRefreshDeviceInfo } from '../utils/deviceFeaturesUtils';
 import { BaseMethod } from './BaseMethod';
 import { invalidParameter } from './helpers/paramsValidator';
+import { OpenWalletSessionMode } from '../types/api/openWalletSession';
 
 import type {
   OpenWalletSessionParams,
@@ -44,9 +45,9 @@ const normalizeParams = (payload: Record<string, unknown>): OpenWalletSessionPar
     throw invalidParameter('Parameter [mode] is required.');
   }
   if (
-    payload.mode !== 'standard' &&
-    payload.mode !== 'select-hidden' &&
-    payload.mode !== 'resume-hidden'
+    payload.mode !== OpenWalletSessionMode.Standard &&
+    payload.mode !== OpenWalletSessionMode.SelectHidden &&
+    payload.mode !== OpenWalletSessionMode.ResumeHidden
   ) {
     throw invalidParameter(
       'Parameter [mode] must be one of standard, select-hidden, or resume-hidden.'
@@ -57,7 +58,10 @@ const normalizeParams = (payload: Record<string, unknown>): OpenWalletSessionPar
       'Legacy parameters [useEmptyPassphrase] and [initSession] are not supported by openWalletSession.'
     );
   }
-  if (payload.mode === 'standard' || payload.mode === 'select-hidden') {
+  if (
+    payload.mode === OpenWalletSessionMode.Standard ||
+    payload.mode === OpenWalletSessionMode.SelectHidden
+  ) {
     if (payload.deviceId !== undefined || payload.passphraseState !== undefined) {
       throw invalidParameter(
         'Parameters [deviceId] and [passphraseState] are only allowed with mode [resume-hidden].'
@@ -66,7 +70,7 @@ const normalizeParams = (payload: Record<string, unknown>): OpenWalletSessionPar
     return { mode: payload.mode };
   }
   return {
-    mode: 'resume-hidden',
+    mode: OpenWalletSessionMode.ResumeHidden,
     deviceId: requiredString(payload.deviceId, 'deviceId'),
     passphraseState: requiredString(payload.passphraseState, 'passphraseState'),
   };
@@ -81,7 +85,7 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
     this.useDevicePassphraseState = false;
     this.skipForceUpdateCheck = true;
     this.params = normalizeParams(this.payload as unknown as Record<string, unknown>);
-    this.payload.useEmptyPassphrase = this.params.mode === 'standard';
+    this.payload.useEmptyPassphrase = this.params.mode === OpenWalletSessionMode.Standard;
   }
 
   async run(): Promise<OpenWalletSessionPayload> {
@@ -102,7 +106,7 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
 
     const protocol = isProtocolV2 ? 'V2' : 'V1';
 
-    if (this.params.mode === 'standard') {
+    if (this.params.mode === OpenWalletSessionMode.Standard) {
       this.device.passphraseState = undefined;
       const session = isProtocolV2
         ? await getProtocolV2WalletSession(this.device, { onlyMainPin: true })
@@ -129,7 +133,7 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
       };
     }
 
-    if (this.params.mode === 'resume-hidden') {
+    if (this.params.mode === OpenWalletSessionMode.ResumeHidden) {
       if (isProtocolV2) {
         if (this.device.features?.unlocked === false) {
           await this.device.unlockDevice();
