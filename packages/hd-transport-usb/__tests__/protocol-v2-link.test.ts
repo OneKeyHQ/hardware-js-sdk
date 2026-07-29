@@ -253,6 +253,17 @@ const createHarness = () => {
 };
 
 describe('NodeUsbTransport Protocol V2 link lifecycle', () => {
+  test('keeps active links when the Protocol V2 schema is configured repeatedly', () => {
+    const transport = new NodeUsbTransport() as any;
+    transport.invalidateAllProtocolV2UsbLinks = jest.fn().mockResolvedValue(undefined);
+    const schemaSource = JSON.stringify(protocolV2Schema);
+
+    transport.configureProtocolV2(schemaSource);
+    transport.configureProtocolV2(schemaSource);
+
+    expect(transport.invalidateAllProtocolV2UsbLinks).not.toHaveBeenCalled();
+  });
+
   test('does not retry a native transfer cancelled by probe cleanup', () => {
     const { transport } = createHarness();
 
