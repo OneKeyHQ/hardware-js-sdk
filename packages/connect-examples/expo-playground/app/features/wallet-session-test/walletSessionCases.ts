@@ -50,7 +50,7 @@ export const WALLET_SESSION_CASES: WalletSessionCaseDefinition[] = [
   {
     id: 'standard-open',
     title: '打开标准钱包',
-    description: '验证标准钱包返回 null passphraseState，sessionId 仅按固件响应可选透传。',
+    description: '验证标准钱包返回 null passphraseState，设备 Session 始终保留在 SDK 内部。',
     category: 'standard',
     protocols: BOTH_PROTOCOLS,
     prerequisites: ['webusb-baseline'],
@@ -78,7 +78,7 @@ export const WALLET_SESSION_CASES: WalletSessionCaseDefinition[] = [
     category: 'hidden',
     protocols: BOTH_PROTOCOLS,
     prerequisites: ['standard-address'],
-    steps: ['调用 openWalletSession(hidden, passphrase)', '按弹窗选择 Host 或设备端输入'],
+    steps: ['调用 openWalletSession(select-hidden)', '按弹窗在设备端输入 Passphrase'],
     expected: ['walletType=hidden', 'passphraseState 非空', 'deviceId 与基线一致'],
     execution: 'interactive',
     sdkMethod: 'openWalletSession',
@@ -114,7 +114,7 @@ export const WALLET_SESSION_CASES: WalletSessionCaseDefinition[] = [
     category: 'hidden',
     protocols: BOTH_PROTOCOLS,
     prerequisites: ['hidden-a-resume'],
-    steps: ['调用 openWalletSession(hidden, passphrase)', '输入不同于钱包 A 的 Passphrase'],
+    steps: ['调用 openWalletSession(select-hidden)', '在设备端输入不同于钱包 A 的 Passphrase'],
     expected: ['返回隐藏钱包', 'passphraseState 与 A 不同'],
     execution: 'interactive',
     sdkMethod: 'openWalletSession',
@@ -175,11 +175,11 @@ export const WALLET_SESSION_CASES: WalletSessionCaseDefinition[] = [
     protocols: BOTH_PROTOCOLS,
     prerequisites: ['wallet-cache-invalid'],
     steps: [
-      '调用 openWalletSession(hidden, passphrase)',
-      '输入与钱包 A 相同的测试 Passphrase',
+      '调用 openWalletSession(select-hidden)',
+      '在设备端输入与钱包 A 相同的测试 Passphrase',
       '再次获取地址',
     ],
-    expected: ['passphraseState 与钱包 A 相同', '地址仍为钱包 A', 'V2 返回新的 sessionId'],
+    expected: ['passphraseState 与钱包 A 相同', '地址仍为钱包 A', '响应标记为新选择而非恢复'],
     execution: 'interactive',
     sdkMethod: 'openWalletSession',
   },
@@ -275,16 +275,16 @@ export const WALLET_SESSION_CASES: WalletSessionCaseDefinition[] = [
     protocols: BOTH_PROTOCOLS,
     prerequisites: ['attach-pin-preflight'],
     steps: [
-      '调用 openWalletSession(hidden, attach-pin)',
-      '直接在设备上输入 Attach PIN',
+      '调用 openWalletSession(select-hidden)',
+      '在统一钱包选择弹窗中选择 Attach PIN，并在设备上输入',
       '刷新设备状态并确认 Attach PIN 解锁',
     ],
     expected: [
       '返回隐藏钱包',
       'unlockedAttachPin=true',
-      '不触发 Passphrase 弹窗',
+      '只触发一次统一钱包选择弹窗',
       'Passphrase 不进入网页',
-      'sessionId 只记录存在性',
+      '设备 Session 不进入公共响应',
     ],
     execution: 'interactive',
     sdkMethod: 'openWalletSession',
@@ -354,24 +354,13 @@ export const WALLET_SESSION_CASES: WalletSessionCaseDefinition[] = [
   },
 ];
 
-export function summarizeWalletSession(
-  payload: OpenWalletSessionPayload,
-  previousSessionId?: string
-): Record<string, unknown> {
-  const sessionRelation =
-    !payload.sessionId || !previousSessionId
-      ? 'not-comparable'
-      : payload.sessionId === previousSessionId
-      ? 'same'
-      : 'changed';
-
+export function summarizeWalletSession(payload: OpenWalletSessionPayload): Record<string, unknown> {
   return {
     protocol: payload.protocol,
     walletType: payload.walletType,
     deviceId: payload.deviceId,
     passphraseState: payload.passphraseState,
-    sessionId: payload.sessionId ? 'present' : 'not-returned',
-    sessionRelation,
+    sessionVisibility: 'sdk-internal',
     resumed: payload.resumed,
   };
 }

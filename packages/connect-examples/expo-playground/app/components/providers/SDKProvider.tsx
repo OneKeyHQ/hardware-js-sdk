@@ -26,7 +26,10 @@ declare global {
   interface Window {
     globalDialogManager?: {
       showPinDialog: () => void;
-      showPassphraseDialog: () => void;
+      showPassphraseDialog: (options?: {
+        deviceOnly?: boolean;
+        existsAttachPinUser?: boolean;
+      }) => void;
       closeAllDialogs: () => void;
     };
   }
@@ -274,7 +277,10 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
             break;
 
           case 'ui-request_passphrase': {
-            window.globalDialogManager?.showPassphraseDialog();
+            window.globalDialogManager?.showPassphraseDialog({
+              deviceOnly: message.payload?.deviceOnly === true,
+              existsAttachPinUser: message.payload?.existsAttachPinUser === true,
+            });
             break;
           }
 

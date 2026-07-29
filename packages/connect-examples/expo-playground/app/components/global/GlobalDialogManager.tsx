@@ -7,7 +7,10 @@ declare global {
   interface Window {
     globalDialogManager?: {
       showPinDialog: () => void;
-      showPassphraseDialog: () => void;
+      showPassphraseDialog: (options?: {
+        deviceOnly?: boolean;
+        existsAttachPinUser?: boolean;
+      }) => void;
       closeAllDialogs: () => void;
     };
   }
@@ -17,6 +20,10 @@ declare global {
 const GlobalDialogManager: React.FC = () => {
   const [pinDialogOpen, setPinDialogOpen] = useState(false);
   const [passphraseDialogOpen, setPassphraseDialogOpen] = useState(false);
+  const [passphraseDialogOptions, setPassphraseDialogOptions] = useState<{
+    deviceOnly?: boolean;
+    existsAttachPinUser?: boolean;
+  }>({});
 
   const handlePinClose = () => {
     console.log('[GlobalDialogManager] Close PIN dialog');
@@ -36,8 +43,9 @@ const GlobalDialogManager: React.FC = () => {
         console.log('[GlobalDialogManager] Show PIN dialog');
         setPinDialogOpen(true);
       },
-      showPassphraseDialog: () => {
+      showPassphraseDialog: options => {
         console.log('[GlobalDialogManager] Show Passphrase dialog');
+        setPassphraseDialogOptions(options ?? {});
         setPassphraseDialogOpen(true);
       },
       closeAllDialogs: () => {
@@ -56,7 +64,12 @@ const GlobalDialogManager: React.FC = () => {
   return (
     <>
       <PinDialog isOpen={pinDialogOpen} onClose={handlePinClose} />
-      <PassphraseDialog isOpen={passphraseDialogOpen} onClose={handlePassphraseClose} />
+      <PassphraseDialog
+        isOpen={passphraseDialogOpen}
+        onClose={handlePassphraseClose}
+        deviceOnly={passphraseDialogOptions.deviceOnly === true}
+        allowAttachPin={passphraseDialogOptions.existsAttachPinUser === true}
+      />
     </>
   );
 };

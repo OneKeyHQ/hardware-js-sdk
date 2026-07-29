@@ -146,6 +146,10 @@ describe('messages', () => {
           type: 'string',
           id: 1,
         },
+        on_device: {
+          type: 'bool',
+          id: 2,
+        },
       },
     });
     expect(v2Messages.nested.DeviceSessionAskPin_FailureSubCodes.values).toEqual({

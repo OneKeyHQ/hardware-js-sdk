@@ -101,12 +101,15 @@ describe('openWalletSession', () => {
     expect(promptPassphrase).toHaveBeenCalledWith(
       {
         existsAttachPinUser: false,
+        deviceOnly: true,
         source: 'wallet-session-coordinator',
         reason: 'open-wallet',
       },
       { cancelDeviceOnReject: false }
     );
-    expect(typedCall).toHaveBeenNthCalledWith(2, 'DeviceSessionAskPassphrase', 'Success', {});
+    expect(typedCall).toHaveBeenNthCalledWith(2, 'DeviceSessionAskPassphrase', 'Success', {
+      on_device: true,
+    });
     expect(typedCall).toHaveBeenNthCalledWith(3, 'DeviceSessionGet', 'DeviceSession', {});
   });
 
@@ -221,7 +224,9 @@ describe('openWalletSession', () => {
       passphraseState: 'hidden-state',
     });
     expect(promptPassphrase).toHaveBeenCalled();
-    expect(typedCall).toHaveBeenNthCalledWith(2, 'DeviceSessionAskPassphrase', 'Success', {});
+    expect(typedCall).toHaveBeenNthCalledWith(2, 'DeviceSessionAskPassphrase', 'Success', {
+      on_device: true,
+    });
     expect(typedCall).toHaveBeenNthCalledWith(3, 'DeviceSessionGet', 'DeviceSession', {});
   });
 
@@ -298,7 +303,9 @@ describe('openWalletSession', () => {
     expect(typedCall).toHaveBeenCalledWith('ProtocolInfoRequest', 'ProtocolInfo', {
       eventless_wallet_session: true,
     });
-    expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {});
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {
+      on_device: true,
+    });
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
     expect(promptPassphrase).toHaveBeenCalled();
     expect(deviceWalletSessionStore.get('device-1', 'new-hidden-state')).toBe('new-hidden-session');
@@ -590,7 +597,9 @@ describe('openWalletSession', () => {
       passphraseState: 'hidden-state',
       resumed: false,
     });
-    expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {});
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {
+      on_device: true,
+    });
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
     expect(promptPassphrase).toHaveBeenCalled();
     expect(device.passphraseState).toBeUndefined();
@@ -616,7 +625,9 @@ describe('openWalletSession', () => {
       walletType: 'hidden',
       passphraseState: 'device-state',
     });
-    expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {});
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {
+      on_device: true,
+    });
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
   });
 
@@ -649,6 +660,7 @@ describe('openWalletSession', () => {
     expect(promptPassphrase).toHaveBeenCalledWith(
       {
         existsAttachPinUser: false,
+        deviceOnly: true,
         source: 'wallet-session-coordinator',
         reason: 'open-wallet',
       },
@@ -656,6 +668,7 @@ describe('openWalletSession', () => {
     );
     expect(typedCall).toHaveBeenNthCalledWith(2, 'DeviceSessionAskPassphrase', 'Success', {
       passphrase: 'host hidden wallet',
+      on_device: false,
     });
   });
 
@@ -682,6 +695,7 @@ describe('openWalletSession', () => {
     expect(promptPassphrase).toHaveBeenCalledWith(
       {
         existsAttachPinUser: true,
+        deviceOnly: true,
         source: 'wallet-session-coordinator',
         reason: 'open-wallet',
       },

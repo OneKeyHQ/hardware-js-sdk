@@ -41,7 +41,7 @@ const askDevicePassphrase = async (device: Device, passphrase?: string) => {
     device.commands.typedCall(
       'DeviceSessionAskPassphrase',
       'Success',
-      passphrase ? { passphrase } : {}
+      passphrase ? { passphrase, on_device: false } : { on_device: true }
     );
   try {
     return await request();
@@ -63,6 +63,7 @@ const selectDeviceSession = async (device: Device) => {
   const response = await device.commands.promptPassphrase(
     {
       existsAttachPinUser,
+      deviceOnly: true,
       ...metadata,
     },
     { cancelDeviceOnReject: false }
