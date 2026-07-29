@@ -79,6 +79,22 @@ describe('public device lifecycle events', () => {
     expect(DevicePool.emitter.listenerCount(DEVICE.DISCONNECT)).toBe(1);
   });
 
+  test('keeps shared device lifecycle listeners across a device cache reset', () => {
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
+    core = initCore();
+    initConnector();
+    const messages: CoreMessage[] = [];
+    core.on(CORE_EVENT, message => messages.push(message));
+    const device = createInitializedDevice('V2');
+
+    DevicePool.resetState();
+    DevicePool.emitter.emit(DEVICE.CONNECT, device);
+    DevicePool.emitter.emit(DEVICE.DISCONNECT, device);
+
+    expect(messages.filter(message => message.type === DEVICE.CONNECT)).toHaveLength(1);
+    expect(messages.filter(message => message.type === DEVICE.DISCONNECT)).toHaveLength(1);
+  });
+
   test('converts an internal transport disconnect into a public KnownDevice snapshot', () => {
     jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
     core = initCore();

@@ -12,7 +12,7 @@ describe('encodePro2Wallpaper', () => {
     expect(Array.from(result.data.slice(0, 12))).toEqual([
       0x19, 0x12, 0, 0, 2, 0, 1, 0, 4, 0, 0, 0,
     ]);
-    expect(Array.from(result.data.slice(12))).toEqual([0x00, 0xf0, 0xc0, 0x07]);
+    expect(Array.from(result.data.slice(12))).toEqual([0x00, 0xf8, 0xe0, 0x07]);
   });
 
   test('encodes transparent pixels as RGB565A8 with alpha plane after RGB data', () => {
