@@ -43,6 +43,8 @@ export type KnownDevice = {
   bleName: string | null;
   name: string;
   error?: typeof undefined;
+  /** Current SDK/transport usage state for connection indicators. */
+  status?: DeviceStatus;
   mode: EOneKeyDeviceMode;
   features?: Features;
   /** Unified SDK device-state snapshot; features remains a legacy projection. */

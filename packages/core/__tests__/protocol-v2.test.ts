@@ -2063,6 +2063,10 @@ describe('Protocol V2 feature adapter', () => {
       .mockResolvedValueOnce({
         type: 'DeviceStatus',
         message: { init_states: true, unlocked: true },
+      })
+      .mockResolvedValueOnce({
+        type: 'DeviceSettings',
+        message: { language: 'zh-Hans-CN' },
       });
 
     (device as any).commands = { typedCall };
@@ -2080,7 +2084,8 @@ describe('Protocol V2 feature adapter', () => {
     expect(device.features?.passphraseProtection).toBeNull();
     expect(device.features?.label).toBeNull();
     expect(device.features?.firmwareVersion).toBe('1.2.3');
-    expect(typedCall).toHaveBeenCalledTimes(2);
+    expect(device.state?.settings.language).toBe('zh_cn');
+    expect(typedCall).toHaveBeenCalledTimes(3);
     expect(typedCall).toHaveBeenNthCalledWith(
       1,
       'DeviceInfoGet',
@@ -2105,6 +2110,29 @@ describe('Protocol V2 feature adapter', () => {
       }
     );
     expect(typedCall).toHaveBeenNthCalledWith(2, 'DeviceStatusGet', 'DeviceStatus', {});
+    expect(typedCall).toHaveBeenNthCalledWith(3, 'DeviceSettingsGet', 'DeviceSettings', {});
+  });
+
+  test('keeps a cached Protocol V2 call usable when the silent settings refresh fails', async () => {
+    const device = Device.fromDescriptor({ path: 'usb-path', protocolType: 'V2' } as any);
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce({
+        type: 'DeviceInfo',
+        message: { hw: { serial_no: 'PR2SERIAL' }, fw: { application: { version: '1.2.3' } } },
+      })
+      .mockResolvedValueOnce({
+        type: 'DeviceStatus',
+        message: { init_states: true, unlocked: true },
+      })
+      .mockRejectedValueOnce(new Error('settings unavailable'));
+    (device as any).commands = { typedCall };
+
+    await device.initialize();
+    await expect(device.initialize()).resolves.toBeUndefined();
+
+    expect(device.state?.status.mode).toBe('normal');
+    expect(typedCall).toHaveBeenLastCalledWith('DeviceSettingsGet', 'DeviceSettings', {});
   });
 
   test('recognizes bootloader when DeviceStatusGet fails', async () => {

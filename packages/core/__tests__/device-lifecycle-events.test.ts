@@ -118,6 +118,25 @@ describe('public device lifecycle events', () => {
     expect(device.isUsedHere()).toBe(false);
   });
 
+  test('exposes the current transport usage state in public device snapshots', () => {
+    const getSettings = jest
+      .spyOn(DataManager, 'getSettings')
+      .mockReturnValue('desktop-web-ble' as never);
+    const device = createInitializedDevice('V2');
+
+    expect(device.toMessageObject()?.status).toBe('available');
+
+    (device as unknown as { deviceAcquired: boolean }).deviceAcquired = true;
+    expect(device.toMessageObject()?.status).toBe('used');
+
+    device.markTransportDisconnected();
+    expect(device.toMessageObject()?.status).toBe('available');
+
+    getSettings.mockReturnValue('web' as never);
+    device.originalDescriptor.session = 'external-session';
+    expect(device.toMessageObject()?.status).toBe('occupied');
+  });
+
   test.each([
     ['react-native', 'V1'],
     ['react-native', 'V2'],
@@ -154,6 +173,7 @@ describe('public device lifecycle events', () => {
         connectId: 'ble-connect-id',
         serialNo: 'SERIAL-001',
         uuid: 'SERIAL-001',
+        status: 'available',
         label: 'OneKey Test',
         state: { protocol },
       });
@@ -161,6 +181,7 @@ describe('public device lifecycle events', () => {
         connectId: 'ble-connect-id',
         serialNo: 'SERIAL-001',
         uuid: 'SERIAL-001',
+        status: 'available',
         label: 'Updated label',
         state: { protocol },
       });
