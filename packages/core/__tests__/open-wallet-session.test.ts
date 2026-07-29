@@ -101,7 +101,7 @@ describe('openWalletSession', () => {
     expect(promptPassphrase).toHaveBeenCalledWith(
       {
         existsAttachPinUser: false,
-        deviceOnly: true,
+        deviceOnly: false,
         source: 'wallet-session-coordinator',
         reason: 'open-wallet',
       },
@@ -660,7 +660,7 @@ describe('openWalletSession', () => {
     expect(promptPassphrase).toHaveBeenCalledWith(
       {
         existsAttachPinUser: false,
-        deviceOnly: true,
+        deviceOnly: false,
         source: 'wallet-session-coordinator',
         reason: 'open-wallet',
       },
@@ -695,7 +695,7 @@ describe('openWalletSession', () => {
     expect(promptPassphrase).toHaveBeenCalledWith(
       {
         existsAttachPinUser: true,
-        deviceOnly: true,
+        deviceOnly: false,
         source: 'wallet-session-coordinator',
         reason: 'open-wallet',
       },
