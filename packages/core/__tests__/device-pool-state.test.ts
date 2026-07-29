@@ -9,11 +9,11 @@ jest.mock('../src/data/config', () => ({
 
 describe('DevicePool state lifecycle', () => {
   beforeEach(() => {
-    DevicePool.resetState();
+    DevicePool.dispose();
   });
 
   afterEach(() => {
-    DevicePool.resetState();
+    DevicePool.dispose();
   });
 
   test('refreshes runtime state for a cached Protocol V2 discovery result', async () => {
@@ -72,6 +72,18 @@ describe('DevicePool state lifecycle', () => {
     expect(device.markTransportDisconnected).toHaveBeenCalledTimes(1);
     expect(onDisconnect).toHaveBeenCalledWith(device);
     expect(DevicePool.disconnectPool).toEqual([]);
+  });
+
+  test('preserves shared listeners when resetting cached device state', () => {
+    const listener = jest.fn();
+    DevicePool.emitter.on(DEVICE.CONNECT, listener);
+    DevicePool.devicesCache = { stale: {} as Device };
+
+    DevicePool.resetState();
+    DevicePool.emitter.emit(DEVICE.CONNECT, { path: 'next-device' });
+
+    expect(DevicePool.devicesCache).toEqual({});
+    expect(listener).toHaveBeenCalledWith({ path: 'next-device' });
   });
 
   test('releases a newly created device when initialization fails', async () => {

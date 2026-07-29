@@ -160,6 +160,37 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
     });
   });
 
+  test('keeps same-version hash-aware components unknown without metadata payloadHash', () => {
+    const packageSet: IFirmwareReleaseInfo = {
+      ...release,
+      required: false,
+      resourceBundles: undefined,
+      installOrder: ['applicationP1'],
+      components: {
+        applicationP1: {
+          target: 'APPLICATION_P1',
+          version: [1, 0, 0],
+          url: 'https://untrusted.example/application-p1.okpkg',
+          fingerprint: 'file-sha256-p1',
+        },
+      },
+    };
+
+    expect(
+      buildProtocolV2FirmwareRelease({
+        currentVersions: { ...currentVersions, applicationP1: '1.0.0' },
+        currentVerification: { applicationP1Hash: 'aa'.repeat(32) },
+        firmwareType: EFirmwareType.Universal,
+        release: packageSet,
+      })
+    ).toMatchObject({
+      status: 'unknown',
+      hasUpgrade: false,
+      targetsToUpdate: [],
+      components: [{ configKey: 'applicationP1', status: 'unknown' }],
+    });
+  });
+
   test('updates both application packages when normal mode only reports P1', () => {
     const packageSet: IFirmwareReleaseInfo = {
       ...release,

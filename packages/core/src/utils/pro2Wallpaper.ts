@@ -85,15 +85,9 @@ export function encodePro2Wallpaper(options: {
     for (let x = 0; x < width; x += 1) {
       const sourceOffset = (y * width + x) * 4;
       const thresholdIndex = ((y & 7) << 3) + (x & 7);
-      let red = Math.min(rgba[sourceOffset] + RED_THRESHOLD[thresholdIndex], 0xff) & 0xf8;
-      let green = Math.min(rgba[sourceOffset + 1] + GREEN_THRESHOLD[thresholdIndex], 0xff) & 0xfc;
-      let blue = Math.min(rgba[sourceOffset + 2] + BLUE_THRESHOLD[thresholdIndex], 0xff) & 0xf8;
-      if (!hasTransparency) {
-        const alpha = rgba[sourceOffset + 3];
-        red = (red * alpha) >> 8;
-        green = (green * alpha) >> 8;
-        blue = (blue * alpha) >> 8;
-      }
+      const red = Math.min(rgba[sourceOffset] + RED_THRESHOLD[thresholdIndex], 0xff) & 0xf8;
+      const green = Math.min(rgba[sourceOffset + 1] + GREEN_THRESHOLD[thresholdIndex], 0xff) & 0xfc;
+      const blue = Math.min(rgba[sourceOffset + 2] + BLUE_THRESHOLD[thresholdIndex], 0xff) & 0xf8;
       const rgb565 = ((red >> 3) << 11) | ((green >> 2) << 5) | (blue >> 3);
       const rgbOffset = 12 + y * stride + x * 2;
       data[rgbOffset] = rgb565 & 0xff;
