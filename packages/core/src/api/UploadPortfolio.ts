@@ -23,7 +23,7 @@ export default class UploadPortfolio extends FileWrite {
       timeoutMs,
     };
     super.init();
-    this.unlockPolicy = 'unlock-before-run';
+    this.unlockPolicy = 'none';
     // Portfolio is a background write/apply flow and never synthesizes UI events.
     this.protocolV2UiMode = 'none';
   }
