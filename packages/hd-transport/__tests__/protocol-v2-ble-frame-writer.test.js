@@ -61,6 +61,26 @@ describe('Protocol V2 BLE frame writer', () => {
     expect(writePacket).not.toHaveBeenCalled();
   });
 
+  test('surfaces an abort that occurs while the final packet write is completing', async () => {
+    const controller = new AbortController();
+    const writePacket = jest.fn().mockImplementation(() => {
+      controller.abort();
+      return Promise.resolve();
+    });
+
+    await expect(
+      writeProtocolV2BleFrame({
+        frame: new Uint8Array(4),
+        packetCapacity: 4,
+        signal: controller.signal,
+        abortMessage: 'Protocol V2 BLE write aborted for Ping',
+        writePacket,
+      })
+    ).rejects.toThrow('Protocol V2 BLE write aborted for Ping');
+
+    expect(writePacket).toHaveBeenCalledTimes(1);
+  });
+
   test('applies bounded burst pauses and one final flush delay', async () => {
     const waits = [];
     const writePacket = jest.fn().mockResolvedValue(undefined);
