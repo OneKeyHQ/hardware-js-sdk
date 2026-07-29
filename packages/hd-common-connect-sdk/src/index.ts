@@ -13,8 +13,10 @@ import HardwareSdk, {
   createUiMessage,
   enableLog,
   executeCallback,
+  formatLogMethodLabel,
   getLogBlockLabel,
   getLogger,
+  getSafeLogPayload,
   initCore,
   parseConnectSettings,
   setLoggerPostMessage,
@@ -92,7 +94,7 @@ function handleMessage(message: CoreMessage) {
 
   const blockLog = getLogBlockLabel(message);
   if (event !== LOG_EVENT) {
-    Log.debug('hd-common-connect-sdk handleMessage', blockLog ?? message);
+    Log.debug('hd-common-connect-sdk handleMessage', getSafeLogPayload(message, blockLog));
   }
   switch (event) {
     case UI_EVENT:
@@ -173,12 +175,12 @@ const init = async (
 
 const call = async (params: any) => {
   const blockLog = getLogBlockLabel(params);
-  Log.debug('call: ', blockLog ?? params);
+  Log.debug(formatLogMethodLabel('call:', blockLog), getSafeLogPayload(params, blockLog));
 
   try {
     const response = await postMessage({ event: IFRAME.CALL, type: IFRAME.CALL, payload: params });
     if (response) {
-      Log.debug('response: ', blockLog ? '[REDACTED]' : response);
+      Log.debug(formatLogMethodLabel('response:', blockLog), getSafeLogPayload(response, blockLog));
 
       if (!response.success) {
         if (response.payload?.code === HardwareErrorCode.BleUnsupported) {

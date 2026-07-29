@@ -195,13 +195,22 @@ describe('Pro2 设备方法配置', () => {
     expect(protocolV2Method?.supportedDevices).toBeUndefined();
     expect(protocolV2Method?.presets.map(item => item.title)).toEqual([
       'Open standard wallet',
-      'Select hidden wallet',
+      'Open hidden wallet',
       'Resume hidden wallet',
     ]);
     expect(protocolV2Method?.presets.map(item => item.parameters[0]?.value)).toEqual([
       'standard',
-      'select-hidden',
+      'hidden',
       'resume-hidden',
+    ]);
+    expect(protocolV2Method?.presets[1]?.parameters.map(item => item.name)).toEqual([
+      'mode',
+      'access',
+    ]);
+    expect(protocolV2Method?.presets[1]?.parameters[1]?.value).toBe('passphrase');
+    expect(protocolV2Method?.presets[1]?.parameters[1]?.options).toEqual([
+      { label: 'Passphrase Hidden Wallet', value: 'passphrase' },
+      { label: 'Attach-to-PIN Wallet', value: 'attach-pin' },
     ]);
     expect(protocolV2Method?.presets[2]?.parameters.map(item => item.name)).toEqual([
       'mode',

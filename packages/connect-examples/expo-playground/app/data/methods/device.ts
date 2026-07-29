@@ -88,16 +88,27 @@ const api: UnifiedMethodConfig[] = [
         ],
       },
       {
-        title: 'Select hidden wallet',
-        description: 'Start the Protocol V2 wallet selection flow and open a hidden wallet.',
+        title: 'Open hidden wallet',
+        description: 'Choose a Passphrase hidden wallet or an Attach-to-PIN wallet.',
         parameters: [
           {
             name: 'mode',
             type: 'select',
             required: true,
             label: 'Wallet Session Mode',
-            value: 'select-hidden',
-            options: [{ label: 'Select Hidden', value: 'select-hidden' }],
+            value: 'hidden',
+            options: [{ label: 'Hidden', value: 'hidden' }],
+          },
+          {
+            name: 'access',
+            type: 'select',
+            required: true,
+            label: 'Hidden Wallet Access',
+            value: 'passphrase',
+            options: [
+              { label: 'Passphrase Hidden Wallet', value: 'passphrase' },
+              { label: 'Attach-to-PIN Wallet', value: 'attach-pin' },
+            ],
           },
         ],
       },

@@ -5103,6 +5103,7 @@ export type DeviceSessionAskPin = {
 // DeviceSessionAskPassphrase
 export type DeviceSessionAskPassphrase = {
   passphrase?: string;
+  on_device?: boolean;
 };
 
 export enum DeviceSessionAskPin_FailureSubCodes {

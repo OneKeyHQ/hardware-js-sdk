@@ -66,6 +66,28 @@ if [[ ! -d "$SRC_PRO2_LEGACY" || ! -d "$SRC_PRO2_LATEST" ]]; then
     exit 1
 fi
 
+SESSION_OPTIONS="$SRC_PRO2_LATEST/messages_device_session.options"
+if [[ ! -f "$SESSION_OPTIONS" ]]; then
+    echo "firmware-pro2 device session nanopb options are missing"
+    exit 1
+fi
+
+require_session_option() {
+    local field=$1
+    local max_size=$2
+    if ! grep -Eq "^${field}[[:space:]]+max_size:${max_size}[[:space:]]*$" "$SESSION_OPTIONS"; then
+        echo "firmware-pro2 nanopb option is missing: ${field} max_size:${max_size}"
+        exit 1
+    fi
+}
+
+# These bounds live in the split device-session options file and must stay in
+# sync with the firmware's fixed nanopb buffers even though protobufjs ignores them.
+require_session_option 'DeviceSessionGet\.session_id' 32
+require_session_option 'DeviceSession\.session_id' 32
+require_session_option 'DeviceSession\.btc_test_address' 50
+require_session_option 'DeviceSessionAskPassphrase\.passphrase' 51
+
 {
     echo 'syntax = "proto2";'
     echo 'import "google/protobuf/descriptor.proto";'

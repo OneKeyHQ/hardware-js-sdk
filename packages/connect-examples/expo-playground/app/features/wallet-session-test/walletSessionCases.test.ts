@@ -11,6 +11,7 @@ type WalletSessionCasesModule = {
     sdkMethod?: string;
   }>;
   buildWrongDeviceId?: (deviceId: string) => string;
+  assertAttachPinUnlocked?: (state: { status: { unlockedAttachPin: boolean | null } }) => void;
   summarizeWalletSession?: (
     payload: {
       protocol: 'V1' | 'V2';
@@ -90,6 +91,24 @@ describe('wallet session WebUSB test matrix', () => {
     attachCases.forEach(item => {
       expect(item.protocols).toEqual(['V1', 'V2']);
     });
+
+    const selectCase = attachCases.find(item => item.id === 'attach-pin-select');
+    expect(selectCase?.steps).toContain('刷新设备状态并确认 Attach PIN 解锁');
+    expect(selectCase?.expected).toContain('unlockedAttachPin=true');
+    expect(selectCase?.expected).toContain('不触发 Passphrase 弹窗');
+  });
+
+  test('rejects a hidden-wallet selection that was not unlocked by Attach PIN', async () => {
+    const { assertAttachPinUnlocked } = await loadCasesModule();
+
+    expect(assertAttachPinUnlocked).toBeDefined();
+    expect(() => assertAttachPinUnlocked?.({ status: { unlockedAttachPin: true } })).not.toThrow();
+    expect(() => assertAttachPinUnlocked?.({ status: { unlockedAttachPin: false } })).toThrow(
+      'unlockedAttachPin=true'
+    );
+    expect(() => assertAttachPinUnlocked?.({ status: { unlockedAttachPin: null } })).toThrow(
+      'unlockedAttachPin=true'
+    );
   });
 
   test('never wires factory reset to a destructive SDK method', async () => {
@@ -104,7 +123,7 @@ describe('wallet session WebUSB test matrix', () => {
     });
   });
 
-  test('redacts wallet identifiers and compares session IDs without exposing them', async () => {
+  test('shows deviceId and passphraseState while comparing session IDs without exposing them', async () => {
     const { summarizeWalletSession } = await loadCasesModule();
     expect(summarizeWalletSession).toBeDefined();
 
@@ -125,13 +144,15 @@ describe('wallet session WebUSB test matrix', () => {
     const serialized = JSON.stringify(summary);
 
     expect(summary).toMatchObject({
+      deviceId: rawDeviceId,
+      passphraseState: rawPassphraseState,
       sessionId: 'present',
       sessionRelation: 'same',
       resumed: true,
     });
     expect(serialized).not.toContain(rawSessionId);
-    expect(serialized).not.toContain(rawDeviceId);
-    expect(serialized).not.toContain(rawPassphraseState);
+    expect(serialized).toContain(rawDeviceId);
+    expect(serialized).toContain(rawPassphraseState);
   });
 
   test('builds a deterministic mismatched device ID without accepting an empty identity', async () => {

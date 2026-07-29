@@ -37,7 +37,7 @@ describe('createUnifiedLogEntry', () => {
     expect(JSON.stringify(entry.data)).not.toContain('do-not-log-this-session');
   });
 
-  test('标准钱包保留空钱包标识，隐藏钱包标识继续脱敏', () => {
+  test('标准钱包和隐藏钱包都保留 passphraseState', () => {
     const standardEntry = createUnifiedLogEntry('response', 'Standard wallet', {
       walletType: 'standard',
       passphraseState: null,
@@ -53,7 +53,7 @@ describe('createUnifiedLogEntry', () => {
     });
     expect(hiddenEntry.data).toEqual({
       walletType: 'hidden',
-      passphraseState: '[REDACTED]',
+      passphraseState: 'wallet-identifier',
     });
   });
 });

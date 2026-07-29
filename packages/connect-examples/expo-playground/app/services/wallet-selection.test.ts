@@ -10,12 +10,19 @@ const readPlaygroundSource = (relativePath: string) =>
   );
 
 describe('expo-playground 钱包选择模式', () => {
-  test('Passphrase 请求交给用户选择窗口处理', () => {
+  test('Passphrase 请求只打开 Passphrase 输入窗口', () => {
     const source = readPlaygroundSource('components/providers/SDKProvider.tsx');
 
-    expect(source).toContain('window.globalDialogManager?.showPassphraseDialog({');
-    expect(source).toContain('existsAttachPinUser: message.payload.existsAttachPinUser === true');
+    expect(source).toContain('globalDialogManager?.showPassphraseDialog()');
+    expect(source).not.toContain('existsAttachPinUser');
     expect(source).not.toContain('PLAYGROUND_MOCK_PASSPHRASE');
+  });
+
+  test('Attach PIN 由显式钱包访问模式直接触发', () => {
+    const source = readPlaygroundSource('routes/wallet-session-test.tsx');
+
+    expect(source).toContain("access: 'attach-pin'");
+    expect(source).not.toContain('submitAttachPin');
   });
 
   test('调用参数准备阶段不再强制切换到隐藏钱包', () => {

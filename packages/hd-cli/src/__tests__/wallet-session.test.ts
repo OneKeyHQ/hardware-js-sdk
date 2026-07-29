@@ -45,7 +45,8 @@ describe('CLI wallet session', () => {
     await expect(prepareSession(sdk as never, globalOpts)).resolves.toBe('wallet-state');
 
     expect(sdk.openWalletSession).toHaveBeenCalledWith('pro2-connect-id', {
-      mode: 'select-hidden',
+      mode: 'hidden',
+      access: 'passphrase',
     });
     expect(sdk.getFeatures).not.toHaveBeenCalled();
     expect(saveSessionToKeychain).toHaveBeenCalledWith(

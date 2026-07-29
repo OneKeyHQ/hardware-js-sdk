@@ -1,5 +1,11 @@
 import { JsBridgeIframe, setPostMessageListenerFlag } from '@onekeyfe/cross-inpage-provider-core';
-import { LoggerNames, getLogBlockLabel, getLogger } from '@onekeyfe/hd-core';
+import {
+  LoggerNames,
+  formatLogMethodLabel,
+  getLogBlockLabel,
+  getLogger,
+  getSafeLogPayload,
+} from '@onekeyfe/hd-core';
 import { ERRORS } from '@onekeyfe/hd-shared';
 
 import JSBridgeConfig from '../iframe/bridge-config';
@@ -31,22 +37,17 @@ export const sendMessage = async (messages: CoreMessage, isHost = true): Promise
   try {
     const blockLog = getLogBlockLabel(messages);
     if (messages.event !== 'LOG_EVENT') {
-      if (blockLog) {
-        Log.debug('request: ', blockLog);
-      } else {
-        Log.debug('request: ', messages);
-      }
+      Log.debug(formatLogMethodLabel('request:', blockLog), getSafeLogPayload(messages, blockLog));
     }
     const result = await bridge?.request({
       scope: JSBridgeConfig.scope,
       data: { ...messages },
     });
     if (messages.event !== 'LOG_EVENT') {
-      if (blockLog) {
-        Log.debug('request result: ', blockLog);
-      } else {
-        Log.debug('request result: ', result);
-      }
+      Log.debug(
+        formatLogMethodLabel('request result:', blockLog),
+        getSafeLogPayload(result, blockLog)
+      );
     }
     return result;
   } catch (error) {

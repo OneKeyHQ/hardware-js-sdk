@@ -2,16 +2,12 @@ import React, { useState } from 'react';
 import PinDialog from './PinDialog';
 import PassphraseDialog from './PassphraseDialog';
 
-export type PassphraseDialogOptions = {
-  existsAttachPinUser?: boolean;
-};
-
 // 声明全局弹窗管理器类型
 declare global {
   interface Window {
     globalDialogManager?: {
       showPinDialog: () => void;
-      showPassphraseDialog: (options?: PassphraseDialogOptions) => void;
+      showPassphraseDialog: () => void;
       closeAllDialogs: () => void;
     };
   }
@@ -21,9 +17,6 @@ declare global {
 const GlobalDialogManager: React.FC = () => {
   const [pinDialogOpen, setPinDialogOpen] = useState(false);
   const [passphraseDialogOpen, setPassphraseDialogOpen] = useState(false);
-  const [passphraseDialogOptions, setPassphraseDialogOptions] = useState<PassphraseDialogOptions>(
-    {}
-  );
 
   const handlePinClose = () => {
     console.log('[GlobalDialogManager] Close PIN dialog');
@@ -33,7 +26,6 @@ const GlobalDialogManager: React.FC = () => {
   const handlePassphraseClose = () => {
     console.log('[GlobalDialogManager] Close Passphrase dialog');
     setPassphraseDialogOpen(false);
-    setPassphraseDialogOptions({});
   };
 
   // 导出弹窗控制方法到全局
@@ -44,16 +36,14 @@ const GlobalDialogManager: React.FC = () => {
         console.log('[GlobalDialogManager] Show PIN dialog');
         setPinDialogOpen(true);
       },
-      showPassphraseDialog: options => {
+      showPassphraseDialog: () => {
         console.log('[GlobalDialogManager] Show Passphrase dialog');
-        setPassphraseDialogOptions(options ?? {});
         setPassphraseDialogOpen(true);
       },
       closeAllDialogs: () => {
         console.log('[GlobalDialogManager] Close all dialogs');
         setPinDialogOpen(false);
         setPassphraseDialogOpen(false);
-        setPassphraseDialogOptions({});
       },
     };
 
@@ -66,11 +56,7 @@ const GlobalDialogManager: React.FC = () => {
   return (
     <>
       <PinDialog isOpen={pinDialogOpen} onClose={handlePinClose} />
-      <PassphraseDialog
-        isOpen={passphraseDialogOpen}
-        onClose={handlePassphraseClose}
-        existsAttachPinUser={passphraseDialogOptions.existsAttachPinUser}
-      />
+      <PassphraseDialog isOpen={passphraseDialogOpen} onClose={handlePassphraseClose} />
     </>
   );
 };

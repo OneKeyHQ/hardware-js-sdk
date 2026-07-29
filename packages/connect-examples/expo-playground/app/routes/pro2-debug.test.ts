@@ -46,8 +46,8 @@ describe('Pro2 Debug 钱包与状态方法', () => {
     expect(source).not.toContain("'deviceSettingsPageShow'");
   });
 
-  test('钱包标识不写入协议调试日志', () => {
-    expect(source).toContain("passphraseState: '[REDACTED]'");
+  test('钱包标识写入协议调试日志时不脱敏', () => {
+    expect(source).not.toContain("passphraseState: '[REDACTED]'");
   });
 
   test('钱包 Session 说明包含固件可选返回的 sessionId', () => {

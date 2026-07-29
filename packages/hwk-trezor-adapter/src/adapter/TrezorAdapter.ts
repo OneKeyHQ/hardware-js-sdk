@@ -259,7 +259,6 @@ export class TrezorAdapter implements IHardwareWallet {
       'credentials',
       'host_static_key',
       'passphrase',
-      'passphraseState',
       'pin',
       'trezor_static_public_key',
     ]);

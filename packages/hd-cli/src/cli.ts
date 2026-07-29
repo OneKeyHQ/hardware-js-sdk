@@ -825,7 +825,8 @@ sessionCmd
 
       // 3. Open a hidden wallet session (triggers 1/2/3 selection).
       const sessionResult = await sdk.openWalletSession(connectId, {
-        mode: 'select-hidden',
+        mode: 'hidden',
+        access: 'passphrase',
       });
       if (!sessionResult.success) {
         outputResult(globalOpts, sessionResult);
@@ -1093,7 +1094,8 @@ export async function prepareSession(
 
   // ── Step 6: Keychain miss → openWalletSession (triggers 1/2/3 prompt) ──
   const sessionResult = await sdk.openWalletSession(connectId, {
-    mode: 'select-hidden',
+    mode: 'hidden',
+    access: 'passphrase',
   });
 
   if (sessionResult.success && sessionResult.payload) {

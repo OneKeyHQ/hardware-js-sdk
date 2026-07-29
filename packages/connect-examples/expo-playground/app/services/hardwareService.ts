@@ -192,7 +192,8 @@ const preparePassphraseParams = async (
 
   try {
     const passphraseResult = await sdk.openWalletSession(connectId, {
-      mode: 'select-hidden',
+      mode: 'hidden',
+      access: 'passphrase',
     });
 
     if (!passphraseResult.success) {
@@ -333,26 +334,6 @@ export async function submitPassphrase(
     logResponse('Passphrase response submitted successfully');
   } catch (error) {
     logError('Failed to submit passphrase response', { error });
-    throw error;
-  }
-}
-
-export async function submitAttachPin(): Promise<void> {
-  logRequest('Selecting Attach PIN on device');
-  if (typeof window === 'undefined') return;
-
-  try {
-    const sdkInstance = await getSDKInstance();
-    sdkInstance.uiResponse({
-      type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-      payload: {
-        value: '',
-        attachPinOnDevice: true,
-      },
-    });
-    logResponse('Attach PIN selection submitted');
-  } catch (error) {
-    logError('Failed to submit Attach PIN selection', { error });
     throw error;
   }
 }
