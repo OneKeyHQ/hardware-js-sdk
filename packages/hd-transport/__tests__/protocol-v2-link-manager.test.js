@@ -186,6 +186,54 @@ describe('ProtocolV2LinkManager', () => {
     expect(adapters[1].reset).toHaveBeenCalledWith('schema changed');
   });
 
+  test('waits for an in-flight native cleanup before a concurrent invalidation resolves', async () => {
+    const sentSeqs = [];
+    const { adapters, createAdapter } = createAdapterFactory(sentSeqs);
+    let markCleanupStarted;
+    let finishCleanup;
+    const cleanupStarted = new Promise(resolve => {
+      markCleanupStarted = resolve;
+    });
+    const cleanupBlocked = new Promise(resolve => {
+      finishCleanup = resolve;
+    });
+    const onLinkInvalidated = jest.fn(async () => {
+      markCleanupStarted();
+      await cleanupBlocked;
+    });
+    const manager = new ProtocolV2LinkManager({
+      getSchemas: () => schemas,
+      classifyError: () => 'recoverable',
+      onLinkInvalidated,
+    });
+
+    await manager.call('device-a', createAdapter, 'Ping', { message: '1' });
+
+    const release = manager.invalidateLink('device-a', 'release');
+    await cleanupStarted;
+
+    let acquireSettled = false;
+    const acquire = manager.invalidateLink('device-a', 'acquire').then(() => {
+      acquireSettled = true;
+    });
+    await new Promise(resolve => {
+      setImmediate(resolve);
+    });
+
+    expect(acquireSettled).toBe(false);
+    expect(adapters[0].reset).toHaveBeenCalledTimes(1);
+    expect(onLinkInvalidated).toHaveBeenCalledTimes(1);
+
+    finishCleanup();
+    await Promise.all([release, acquire]);
+
+    await manager.call('device-a', createAdapter, 'Ping', { message: '2' });
+
+    expect(acquireSettled).toBe(true);
+    expect(sentSeqs).toEqual([1, 2]);
+    expect(adapters).toHaveLength(2);
+  });
+
   test('dispose clears active links and sequence cursors', async () => {
     const sentSeqs = [];
     const { adapters, createAdapter } = createAdapterFactory(sentSeqs);
