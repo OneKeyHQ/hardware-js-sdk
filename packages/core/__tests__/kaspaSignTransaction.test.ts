@@ -135,6 +135,15 @@ describe('KaspaSignTransaction capability flags', () => {
       createMethod({ inputs: [buildInput()], outputs: [{ satoshis: 1 }] }).init()
     ).toThrow('outputs require either address/addressN');
   });
+
+  it('rejects outputs containing both address and addressN', () => {
+    expect(() =>
+      createMethod({
+        inputs: [buildInput()],
+        outputs: [{ satoshis: 1, address: ADDRESS, addressN: CHANGE_PATH }],
+      }).init()
+    ).toThrow('outputs must not contain both address and addressN');
+  });
 });
 
 describe('KaspaSignTransaction protocol negotiation', () => {

@@ -104,7 +104,14 @@ export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactio
     });
 
     const outputs: KaspaSignTransactionParams['outputs'] = payload.outputs.map(output => {
+      const address = getOutputAddress(output);
       const addressN = getOutputAddressN(output);
+      if (address !== undefined && addressN !== undefined) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.CallMethodInvalidParameter,
+          'KaspaSignTransaction: outputs must not contain both address and addressN'
+        );
+      }
       validateParams(output, [
         { name: 'satoshis', required: true },
         { name: 'address', type: 'string' },

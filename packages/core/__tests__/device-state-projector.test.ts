@@ -73,7 +73,7 @@ describe('DeviceStateProjector', () => {
     });
   });
 
-  test('returns an isolated compatibility snapshot', () => {
+  test('returns an isolated compatibility snapshot without internal raw state', () => {
     const state = createEmptyDeviceState({ deviceType: EDeviceType.Pro });
     state.protocol = 'V1';
     state.capabilities = [1];
@@ -85,10 +85,10 @@ describe('DeviceStateProjector', () => {
     const features = projectFeatures(state);
     features.capabilities.push(2);
     if (features.verify) features.verify.firmwareBuildId = 'mutated';
-    if (features.raw?.protocolV1Features) features.raw.protocolV1Features.label = 'Mutated';
 
     expect(state.capabilities).toEqual([1]);
     expect(state.verification?.firmwareBuildId).toBe('build-1');
     expect(state.raw.protocolV1Features?.label).toBe('Original');
+    expect(features).not.toHaveProperty('raw');
   });
 });
