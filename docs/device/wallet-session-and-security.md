@@ -130,9 +130,7 @@ Pro 当前仍走 Protocol V1 初始化，入口在 `Device.initialize()`：
 Pro2 不走传统 `Initialize/GetFeatures`。`Device.initialize()` 中如果 `isProtocolV2()` 为 true，会走专用分支：
 
 1. 写入 `this.passphraseState = options?.passphraseState`。
-2. 如果已有 `DeviceState` 且无需强制新 session，则复用缓存；normal 模式会静默读取一次
-   `DeviceSettingsGet`，同步设备端直接修改的语言等设置，但不默认刷新 `DeviceStatus`。
-   静默设置读取失败不会阻断原业务调用。
+2. 如果已有 `DeviceState` 且无需强制新 session，则复用缓存；普通业务调用不默认读取运行状态。
 3. 否则调用 `_initializeProtocolV2()`。
 4. `_initializeProtocolV2()` 通过 `requestProtocolV2DeviceInfo()` 发送 `DeviceInfoGet`。
 5. `DeviceStateMapper` 将响应合并进统一 `DeviceState`；V2 不对外构造第二套 `Features`。
