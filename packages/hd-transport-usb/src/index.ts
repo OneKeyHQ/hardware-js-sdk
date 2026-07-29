@@ -164,6 +164,8 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
   /** Protobuf schema for Protocol V2 transports. */
   messagesV2: ReturnType<typeof transport.parseConfigure> | undefined;
 
+  private protocolV2SchemaSource: string | undefined;
+
   name = 'NodeUsbTransport';
 
   version = '';
@@ -226,7 +228,17 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
   }
 
   configureProtocolV2(signedData: any) {
+    const schemaSource =
+      typeof signedData === 'string'
+        ? signedData
+        : JSON.stringify(signedData) ?? String(signedData);
+    if (schemaSource === this.protocolV2SchemaSource) return;
+
+    const hadProtocolV2Schema = this.protocolV2SchemaSource !== undefined;
     this.messagesV2 = parseConfigure(signedData);
+    this.protocolV2SchemaSource = schemaSource;
+    if (!hadProtocolV2Schema) return;
+
     this.invalidateAllProtocolV2UsbLinks('Protocol V2 schema reconfigured').catch(error =>
       this.Log?.debug('[NodeUsbTransport] schema link cleanup failed:', error)
     );

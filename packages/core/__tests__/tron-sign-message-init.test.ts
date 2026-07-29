@@ -43,4 +43,32 @@ describe('TronSignMessage legacy message validation', () => {
       }
     }
   );
+
+  test('allows Protocol V2 message signing on Pro2', async () => {
+    const method = new TronSignMessage({
+      id: 1,
+      payload: {
+        method: 'tronSignMessage',
+        path: "m/44'/195'/0'/0/0",
+        messageHex: '00',
+        messageType: 'V2',
+      },
+    });
+    method.init();
+
+    const typedCall = jest.fn().mockResolvedValue({ message: { signature: 'signature' } });
+    method.device = {
+      commands: { typedCall },
+      getCurrentFirmwareVersionString: jest.fn(() => '0.0.0'),
+      getCurrentMethodVersionRange: jest.fn(selector => selector('pro2')),
+      getCurrentFirmwareType: jest.fn(() => EFirmwareType.Universal),
+    } as unknown as Device;
+
+    await expect(method.run()).resolves.toEqual({ signature: 'signature' });
+    expect(typedCall).toHaveBeenCalledWith('TronSignMessage', 'TronMessageSignature', {
+      address_n: [2147483692, 2147483843, 2147483648, 0, 0],
+      message: '00',
+      message_type: 2,
+    });
+  });
 });

@@ -57,6 +57,9 @@ export default class TronSignMessage extends BaseMethod<HardwareTronSignMessage>
 
   getMessageV2VersionRange() {
     return {
+      pro2: {
+        min: '0.0.0',
+      },
       pro: {
         min: '4.16.0',
       },

@@ -73,6 +73,8 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
   /** Protobuf schema for Protocol V2 transports. */
   messagesV2: ReturnType<typeof transport.parseConfigure> | undefined;
 
+  private protocolV2SchemaSource: string | undefined;
+
   /** Per-path protocol type detected by active wire-level probe. */
   private deviceProtocol: Map<string, ProtocolType> = new Map();
 
@@ -148,7 +150,17 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
    * Cache the Protocol V2 protobuf schema.
    */
   configureProtocolV2(signedData: any) {
+    const schemaSource =
+      typeof signedData === 'string'
+        ? signedData
+        : JSON.stringify(signedData) ?? String(signedData);
+    if (schemaSource === this.protocolV2SchemaSource) return;
+
+    const hadProtocolV2Schema = this.protocolV2SchemaSource !== undefined;
     this.messagesV2 = parseConfigure(signedData);
+    this.protocolV2SchemaSource = schemaSource;
+    if (!hadProtocolV2Schema) return;
+
     this.invalidateAllProtocolV2UsbLinks('Protocol V2 schema reconfigured').catch(error =>
       this.Log?.debug('[WebUsbTransport] schema link cleanup failed:', error)
     );

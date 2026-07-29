@@ -199,6 +199,42 @@ describe('DeviceUploadWallpaper', () => {
 });
 
 describe('UploadPortfolio', () => {
+  test('writes and applies the portfolio while the device is locked without unlocking', async () => {
+    const packageBytes = new Uint8Array([1, 2, 3]);
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce({ message: { processed_byte: 3 } })
+      .mockResolvedValueOnce({ message: { message: 'Portfolio updated' } });
+    const unlockDevice = jest.fn().mockResolvedValue(undefined);
+    const device = stubDevice({
+      features: { unlocked: false },
+      commands: { typedCall },
+      isProtocolV2: () => true,
+      unlockDevice,
+    });
+    const method = new UploadPortfolio({
+      id: 1,
+      payload: {
+        method: 'uploadPortfolio',
+        packageBytes,
+      },
+    });
+    (method as any).device = device;
+
+    method.init();
+    await runMethodWithUnlockRetry(method, device as any);
+
+    expect(unlockDevice).not.toHaveBeenCalled();
+    expect(typedCall).toHaveBeenNthCalledWith(
+      1,
+      'FilesystemFileWrite',
+      'FilesystemFile',
+      expect.any(Object),
+      { timeoutMs: undefined }
+    );
+    expect(typedCall).toHaveBeenNthCalledWith(2, 'PortfolioUpdate', 'Success', {});
+  });
+
   test('stages the complete package before applying PortfolioUpdate', async () => {
     const packageBytes = new Uint8Array([1, 2, 3]);
     const typedCall = jest
@@ -218,7 +254,7 @@ describe('UploadPortfolio', () => {
     method.init();
     const result = await method.run();
 
-    expect(method.unlockPolicy).toBe('unlock-before-run');
+    expect(method.unlockPolicy).toBe('none');
     expect(method.protocolV2UiMode).toBe('none');
     expect(method.protocolV2UiInteraction).toBeUndefined();
     expect(method.payload.emitProgress).toBe(false);
@@ -5172,6 +5208,93 @@ describe('Protocol V2 protected method execution', () => {
     ]);
   });
 
+  test('restores the expected hidden-wallet session after pre-unlock without selecting Attach PIN', async () => {
+    const calls: string[] = [];
+    const method = {
+      name: 'evmSignMessage',
+      payload: { passphraseState: 'hidden-state' },
+      useDevicePassphraseState: true,
+      unlockPolicy: 'retry-on-locked',
+      run: jest.fn(() => {
+        calls.push('run');
+        return Promise.resolve({ message: 'ok' });
+      }),
+    };
+    const typedCall = jest.fn((requestType: string, _responseType: string, request: any) => {
+      if (requestType === 'ProtocolInfoRequest') {
+        calls.push('negotiate-session');
+        return Promise.resolve({ message: { version: 2 } });
+      }
+      if (requestType === 'DeviceSessionGet') {
+        calls.push('resume-hidden-session');
+        expect(request).toEqual({ session_id: 'hidden-session' });
+        return Promise.resolve({
+          message: {
+            session_id: 'hidden-session',
+            btc_test_address: 'hidden-state',
+          },
+        });
+      }
+      throw new Error(`Unexpected request: ${requestType}`);
+    });
+    const features = {
+      unlocked: false,
+      unlockedAttachPin: true,
+      passphraseProtection: true,
+    };
+    const device = {
+      features,
+      passphraseState: 'hidden-state',
+      commands: { typedCall },
+      isProtocolV2: () => true,
+      unlockDevice: jest.fn(() => {
+        calls.push('unlock-main');
+        features.unlocked = true;
+        features.unlockedAttachPin = false;
+        return Promise.resolve();
+      }),
+      getCurrentPassphraseProtection: () => true,
+      getInternalState: () => 'hidden-session',
+      clearInternalState: jest.fn(),
+      getCurrentDeviceId: () => 'wallet-device-id',
+      updateInternalState: jest.fn(() => calls.push('validate-hidden-session')),
+    };
+
+    await expect(runMethodWithUnlockRetry(method as any, device as any)).resolves.toEqual({
+      message: 'ok',
+    });
+    expect(device.unlockDevice).toHaveBeenCalledWith();
+    expect(calls).toEqual([
+      'unlock-main',
+      'negotiate-session',
+      'resume-hidden-session',
+      'validate-hidden-session',
+      'run',
+    ]);
+  });
+
+  test('does not restore a hidden-wallet session for a standard-wallet pre-unlock', async () => {
+    const method = {
+      name: 'evmGetAddress',
+      payload: { useEmptyPassphrase: true },
+      useDevicePassphraseState: true,
+      unlockPolicy: 'retry-on-locked',
+      run: jest.fn().mockResolvedValue({ address: 'standard-wallet-address' }),
+    };
+    const device = {
+      features: { unlocked: false },
+      passphraseState: 'stale-hidden-state',
+      isProtocolV2: () => true,
+      unlockDevice: jest.fn().mockResolvedValue(undefined),
+    };
+
+    await expect(runMethodWithUnlockRetry(method as any, device as any)).resolves.toEqual({
+      address: 'standard-wallet-address',
+    });
+    expect(device.unlockDevice).toHaveBeenCalledTimes(1);
+    expect(method.run).toHaveBeenCalledTimes(1);
+  });
+
   test('unlocks before showing the method interaction when cached status is locked', async () => {
     const calls: string[] = [];
     const method = {
@@ -5257,10 +5380,10 @@ describe('Protocol V2 protected method execution', () => {
     }
   });
 
-  test('keeps auto unlock but suppresses all synthesized UI for eventless methods', async () => {
+  test('runs lock-free eventless methods without unlocking or synthesized UI', async () => {
     const method = {
       name: 'uploadPortfolio',
-      unlockPolicy: 'unlock-before-run',
+      unlockPolicy: 'none',
       protocolV2UiMode: 'none',
       run: jest.fn().mockResolvedValue({ message: 'ok' }),
     };
@@ -5278,17 +5401,17 @@ describe('Protocol V2 protected method execution', () => {
     await expect(
       runMethodWithUnlockRetry(method as any, device as any, uiCoordinator as any)
     ).resolves.toEqual({ message: 'ok' });
-    expect(device.unlockDevice).toHaveBeenCalledTimes(1);
+    expect(device.unlockDevice).not.toHaveBeenCalled();
     expect(uiCoordinator.enterMethodInteraction).not.toHaveBeenCalled();
     expect(uiCoordinator.enterUnlockInteraction).not.toHaveBeenCalled();
     expect(uiCoordinator.resumeMethodInteraction).not.toHaveBeenCalled();
   });
 
-  test('does not replay a state-changing method after a locked response', async () => {
+  test('does not unlock or replay a lock-free state-changing method after a locked response', async () => {
     const error = deviceLockedError();
     const method = {
       name: 'uploadPortfolio',
-      unlockPolicy: 'unlock-before-run',
+      unlockPolicy: 'none',
       run: jest.fn().mockRejectedValue(error),
     };
     const device = {
