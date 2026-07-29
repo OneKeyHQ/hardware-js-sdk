@@ -1,5 +1,7 @@
 export type ProtocolV2LinkErrorCode =
   | 'response-timeout'
+  | 'io'
+  | 'generation'
   | 'router'
   | 'packet-source'
   | 'ack-sequence'

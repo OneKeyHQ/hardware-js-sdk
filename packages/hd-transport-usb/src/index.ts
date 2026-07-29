@@ -7,6 +7,7 @@ import transport, {
   PROTOCOL_V1_USB_PACKET_SIZE,
   PROTOCOL_V2_CHANNEL_USB,
   PROTOCOL_V2_FRAME_MAX_BYTES,
+  ProtocolV2LinkError,
   ProtocolV2UsbTransportBase,
   probeProtocolV2 as probeProtocolV2Helper,
 } from '@onekeyfe/hd-transport';
@@ -1015,7 +1016,10 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
   }
 
   protected createProtocolV2UsbTimeoutError(name: string, timeoutMs: number): Error {
-    return new Error(`Protocol V2 response timeout after ${timeoutMs}ms for ${name}`);
+    return new ProtocolV2LinkError(
+      'response-timeout',
+      `Protocol V2 response timeout after ${timeoutMs}ms for ${name}`
+    );
   }
 
   private async callProtocolV2(

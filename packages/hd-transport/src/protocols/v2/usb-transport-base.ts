@@ -1,5 +1,7 @@
 import { ProtocolV2FrameAssembler } from './frame-assembler';
+import { ProtocolV2LinkError, isProtocolV2LinkError } from './errors';
 import { ProtocolV2LinkManager } from './link-manager';
+import { getErrorMessage } from './session';
 
 import type { MessageFromOneKey, TransportCallOptions } from '../../types';
 import type { ProtocolV2CallContext, ProtocolV2Schemas, ProtocolV2SessionOptions } from './session';
@@ -32,7 +34,7 @@ export abstract class ProtocolV2UsbTransportBase<Key> {
     this.protocolV2UsbOptions = options;
     this.protocolV2UsbLinks = new ProtocolV2LinkManager<Key>({
       getSchemas: () => this.getProtocolV2UsbSchemas(),
-      classifyError: () => 'link-fatal',
+      classifyError: error => (isProtocolV2LinkError(error) ? 'link-fatal' : 'recoverable'),
       onLinkInvalidated: async (key, reason) => {
         this.protocolV2UsbAssemblers.get(key)?.reset();
         await this.resetProtocolV2UsbNativeLink(key, reason);
@@ -118,10 +120,13 @@ export abstract class ProtocolV2UsbTransportBase<Key> {
 
     const assertCurrentGeneration = () => {
       if (cancellation.reason) {
-        throw new Error(cancellation.reason);
+        throw new ProtocolV2LinkError('generation', cancellation.reason);
       }
       if (this.protocolV2UsbGenerations.get(key) !== generation) {
-        throw new Error('Protocol V2 USB connection generation changed');
+        throw new ProtocolV2LinkError(
+          'generation',
+          'Protocol V2 USB connection generation changed'
+        );
       }
     };
 
@@ -131,11 +136,14 @@ export abstract class ProtocolV2UsbTransportBase<Key> {
       generation,
       prepareCall: () => {
         assertCurrentGeneration();
-        this.getProtocolV2UsbAssembler(key).reset();
       },
       writeFrame: async (frame: Uint8Array, context: ProtocolV2CallContext) => {
         assertCurrentGeneration();
-        await this.writeProtocolV2UsbPacket(key, frame, context);
+        try {
+          await this.writeProtocolV2UsbPacket(key, frame, context);
+        } catch (error) {
+          throw this.createProtocolV2UsbIoError('write', error);
+        }
         assertCurrentGeneration();
       },
       readFrame: async (context: ProtocolV2CallContext) => {
@@ -143,13 +151,15 @@ export abstract class ProtocolV2UsbTransportBase<Key> {
         const assembler = this.getProtocolV2UsbAssembler(key);
         let frame = assembler.push(new Uint8Array(0));
         while (!frame) {
-          const packetRead = this.readProtocolV2UsbPacket(key, context).then(packet => ({
-            packet,
-          }));
+          const packetRead = this.readProtocolV2UsbPacket(key, context)
+            .then(packet => ({ packet }))
+            .catch(error => {
+              throw this.createProtocolV2UsbIoError('read', error);
+            });
           const cancelled = cancellation.promise.then(reason => ({ reason }));
           const result = await Promise.race([packetRead, cancelled]);
           if ('reason' in result) {
-            throw new Error(result.reason);
+            throw new ProtocolV2LinkError('generation', result.reason);
           }
           assertCurrentGeneration();
           frame = assembler.push(result.packet);
@@ -190,5 +200,14 @@ export abstract class ProtocolV2UsbTransportBase<Key> {
       },
     };
     return cancellation;
+  }
+
+  private createProtocolV2UsbIoError(operation: 'read' | 'write', error: unknown) {
+    if (isProtocolV2LinkError(error)) return error;
+    return new ProtocolV2LinkError(
+      'io',
+      `Protocol V2 USB ${operation} failed: ${getErrorMessage(error) || 'unknown error'}`,
+      error
+    );
   }
 }

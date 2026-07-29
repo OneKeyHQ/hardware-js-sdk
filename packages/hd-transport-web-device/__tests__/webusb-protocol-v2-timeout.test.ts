@@ -1,6 +1,6 @@
 import transport, {
+  PROTOCOL_V2_CHANNEL_USB,
   ProtocolV2,
-  ProtocolV2FrameAssembler,
   ProtocolV2LinkError,
 } from '@onekeyfe/hd-transport';
 
@@ -80,20 +80,21 @@ describe('WebUsbTransport Protocol V2 timeout recovery', () => {
     const path = 'pro2-webusb';
     webusb.messages = transport.parseConfigure(schema);
     webusb.messagesV2 = transport.parseConfigure(schema);
-    webusb.protocolV2Assemblers.set(path, new ProtocolV2FrameAssembler());
-    webusb.transferOutOnce = jest.fn().mockResolvedValue(undefined);
-    webusb.receiveProtocolV2Frame = jest.fn(() => new Promise<void>(() => {}));
-    webusb.resetConnectionAfterProbe = jest.fn().mockImplementation(() => {
-      webusb.protocolV2Sessions.delete(path);
-      webusb.protocolV2Assemblers.get(path)?.reset();
-    });
+    webusb.writeProtocolV2UsbPacket = jest.fn().mockResolvedValue(undefined);
+    webusb.readProtocolV2UsbPacket = jest.fn(() => new Promise<void>(() => {}));
+    webusb.resetProtocolV2UsbNativeLink = jest.fn().mockResolvedValue(undefined);
+    webusb.resetConnectionAfterProbe = jest.fn();
+    await webusb.rotateProtocolV2UsbGeneration(path, 'test connection');
 
     await expect(
       webusb.callProtocolV2(path, 'Ping', { message: 'timeout' }, { timeoutMs: 10 })
     ).rejects.toThrow('timeout');
 
-    expect(webusb.resetConnectionAfterProbe).toHaveBeenCalledWith(path);
-    expect(webusb.protocolV2Sessions.has(path)).toBe(false);
+    expect(webusb.resetProtocolV2UsbNativeLink).toHaveBeenCalledWith(
+      path,
+      expect.stringContaining('timeout')
+    );
+    expect(webusb.resetConnectionAfterProbe).not.toHaveBeenCalled();
   });
 
   test('does not reconnect inside a Protocol V2 frame read after a USB I/O failure', async () => {
@@ -101,25 +102,50 @@ describe('WebUsbTransport Protocol V2 timeout recovery', () => {
     const path = 'pro2-webusb';
     webusb.messages = transport.parseConfigure(schema);
     webusb.messagesV2 = transport.parseConfigure(schema);
-    webusb.transferOutOnce = jest.fn().mockResolvedValue(undefined);
-    webusb.transferInOnce = jest
+    webusb.writeProtocolV2UsbPacket = jest.fn().mockResolvedValue(undefined);
+    webusb.readProtocolV2UsbPacket = jest
       .fn()
       .mockRejectedValue(new Error('NetworkError: transferIn device disconnected'));
-    webusb.transferInWithRetry = jest.fn();
-    webusb.reconnectForPacketIoRetry = jest.fn();
-    webusb.resetConnectionAfterProbe = jest.fn().mockImplementation(() => {
-      webusb.protocolV2Sessions.delete(path);
-      webusb.protocolV2Assemblers.get(path)?.reset();
-    });
+    webusb.resetProtocolV2UsbNativeLink = jest.fn().mockResolvedValue(undefined);
+    webusb.resetConnectionAfterProbe = jest.fn();
+    await webusb.rotateProtocolV2UsbGeneration(path, 'test connection');
 
     await expect(webusb.callProtocolV2(path, 'Ping', { message: 'read-error' })).rejects.toThrow(
       'NetworkError'
     );
 
-    expect(webusb.transferInOnce).toHaveBeenCalledTimes(1);
-    expect(webusb.transferInWithRetry).not.toHaveBeenCalled();
-    expect(webusb.reconnectForPacketIoRetry).not.toHaveBeenCalled();
-    expect(webusb.resetConnectionAfterProbe).toHaveBeenCalledWith(path);
+    expect(webusb.readProtocolV2UsbPacket).toHaveBeenCalledTimes(1);
+    expect(webusb.resetProtocolV2UsbNativeLink).toHaveBeenCalledWith(
+      path,
+      expect.stringContaining('NetworkError')
+    );
+    expect(webusb.resetConnectionAfterProbe).not.toHaveBeenCalled();
+  });
+
+  test('rejects an active Protocol V2 read without reconnecting after release', async () => {
+    const webusb = new WebUsbTransport() as any;
+    const path = 'pro2-webusb';
+    let markReadStarted: () => void = () => undefined;
+    const readStarted = new Promise<void>(resolve => {
+      markReadStarted = resolve;
+    });
+    webusb.messages = transport.parseConfigure(schema);
+    webusb.messagesV2 = transport.parseConfigure(schema);
+    webusb.writeProtocolV2UsbPacket = jest.fn().mockResolvedValue(undefined);
+    webusb.readProtocolV2UsbPacket = jest.fn().mockImplementation(() => {
+      markReadStarted();
+      return new Promise<void>(() => {});
+    });
+    webusb.closeOpenDevice = jest.fn().mockResolvedValue(undefined);
+    webusb.connect = jest.fn();
+    await webusb.rotateProtocolV2UsbGeneration(path, 'test connection');
+
+    const call = webusb.callProtocolV2(path, 'Ping', { message: 'release' });
+    await readStarted;
+    await webusb.release(path);
+
+    await expect(call).rejects.toThrow('WebUSB transport released');
+    expect(webusb.connect).not.toHaveBeenCalled();
   });
 
   test.each(['router', 'packet-source', 'ack-sequence', 'response-sequence', 'frame'] as const)(
@@ -129,32 +155,34 @@ describe('WebUsbTransport Protocol V2 timeout recovery', () => {
       const path = 'pro2-webusb';
       webusb.messages = transport.parseConfigure(schema);
       webusb.messagesV2 = transport.parseConfigure(schema);
-      webusb.protocolV2Assemblers.set(path, new ProtocolV2FrameAssembler());
-      webusb.transferOutOnce = jest.fn().mockResolvedValue(undefined);
+      webusb.writeProtocolV2UsbPacket = jest.fn().mockResolvedValue(undefined);
       const recoveredResponse = ProtocolV2.encodeFrame(
         { protocolV1: webusb.messages, protocolV2: webusb.messagesV2 },
         'Success',
         { message: 'recovered' },
         { seq: 1 }
       );
-      webusb.receiveProtocolV2Frame = jest
+      webusb.readProtocolV2UsbPacket = jest
         .fn()
         .mockRejectedValueOnce(
           new ProtocolV2LinkError(code, `Protocol V2 ${code} validation failed`)
         )
         .mockResolvedValue(recoveredResponse);
-      webusb.resetConnectionAfterProbe = jest.fn().mockImplementation(() => {
-        webusb.protocolV2Sessions.delete(path);
-        webusb.protocolV2Assemblers.get(path)?.reset();
-      });
+      webusb.resetProtocolV2UsbNativeLink = jest.fn().mockResolvedValue(undefined);
+      webusb.resetConnectionAfterProbe = jest.fn();
+      await webusb.rotateProtocolV2UsbGeneration(path, 'test connection');
 
       await expect(webusb.callProtocolV2(path, 'Ping', { message: 'mismatch' })).rejects.toThrow(
         `${code} validation failed`
       );
 
-      expect(webusb.resetConnectionAfterProbe).toHaveBeenCalledWith(path);
-      expect(webusb.protocolV2Sessions.has(path)).toBe(false);
+      expect(webusb.resetProtocolV2UsbNativeLink).toHaveBeenCalledWith(
+        path,
+        expect.stringContaining(`${code} validation failed`)
+      );
+      expect(webusb.resetConnectionAfterProbe).not.toHaveBeenCalled();
 
+      await webusb.rotateProtocolV2UsbGeneration(path, 'test reconnect');
       await expect(
         webusb.callProtocolV2(path, 'Ping', { message: 'after-reset' })
       ).resolves.toMatchObject({
@@ -167,39 +195,53 @@ describe('WebUsbTransport Protocol V2 timeout recovery', () => {
   test('does not discard buffered Protocol V2 frames before each call', async () => {
     const webusb = new WebUsbTransport() as any;
     const path = 'pro2-webusb';
-    const assembler = new ProtocolV2FrameAssembler();
-    const reset = jest.spyOn(assembler, 'reset');
-    let responseSequence = 0;
     webusb.messages = transport.parseConfigure(schema);
     webusb.messagesV2 = transport.parseConfigure(schema);
-    webusb.protocolV2Assemblers.set(path, assembler);
-    webusb.transferOutOnce = jest.fn().mockResolvedValue(undefined);
-    webusb.receiveProtocolV2Frame = jest.fn().mockImplementation(() => {
-      responseSequence += 1;
-      const response = ProtocolV2.encodeFrame(
-        { protocolV1: webusb.messages, protocolV2: webusb.messagesV2 },
-        'Success',
-        { message: 'ok' },
-        { seq: responseSequence }
-      );
-      return Promise.resolve(response);
+    webusb.writeProtocolV2UsbPacket = jest.fn().mockResolvedValue(undefined);
+    const firstResponse = ProtocolV2.encodeFrame(
+      { protocolV1: webusb.messages, protocolV2: webusb.messagesV2 },
+      'Success',
+      { message: 'first' },
+      { router: PROTOCOL_V2_CHANNEL_USB, seq: 1 }
+    );
+    const secondResponse = ProtocolV2.encodeFrame(
+      { protocolV1: webusb.messages, protocolV2: webusb.messagesV2 },
+      'Success',
+      { message: 'second' },
+      { router: PROTOCOL_V2_CHANNEL_USB, seq: 2 }
+    );
+    const coalescedResponses = new Uint8Array(firstResponse.length + secondResponse.length);
+    coalescedResponses.set(firstResponse);
+    coalescedResponses.set(secondResponse, firstResponse.length);
+    webusb.readProtocolV2UsbPacket = jest.fn().mockResolvedValue(coalescedResponses);
+    webusb.resetProtocolV2UsbNativeLink = jest.fn().mockResolvedValue(undefined);
+    await webusb.rotateProtocolV2UsbGeneration(path, 'test connection');
+
+    await expect(webusb.callProtocolV2(path, 'Ping', { message: 'first' })).resolves.toMatchObject({
+      type: 'Success',
+      message: { message: 'first' },
     });
+    await expect(webusb.callProtocolV2(path, 'Ping', { message: 'second' })).resolves.toMatchObject(
+      {
+        type: 'Success',
+        message: { message: 'second' },
+      }
+    );
 
-    await webusb.callProtocolV2(path, 'Ping', { message: 'first' });
-    await webusb.callProtocolV2(path, 'Ping', { message: 'second' });
-
-    expect(reset).not.toHaveBeenCalled();
+    expect(webusb.readProtocolV2UsbPacket).toHaveBeenCalledTimes(1);
   });
 
   test('keeps queued Protocol V2 read timeouts scoped to each call', async () => {
     const webusb = new WebUsbTransport() as any;
     const path = 'pro2-webusb';
     let responseSequence = 0;
+    const readTimeouts: number[] = [];
     webusb.messages = transport.parseConfigure(schema);
     webusb.messagesV2 = transport.parseConfigure(schema);
-    webusb.transferOutOnce = jest.fn().mockResolvedValue(undefined);
-    webusb.receiveProtocolV2Frame = jest.fn().mockImplementation(() => {
+    webusb.writeProtocolV2UsbPacket = jest.fn().mockResolvedValue(undefined);
+    webusb.readProtocolV2UsbPacket = jest.fn().mockImplementation((_path, context) => {
       responseSequence += 1;
+      readTimeouts.push(context.timeoutMs);
       return Promise.resolve(
         ProtocolV2.encodeFrame(
           { protocolV1: webusb.messages, protocolV2: webusb.messagesV2 },
@@ -209,14 +251,14 @@ describe('WebUsbTransport Protocol V2 timeout recovery', () => {
         )
       );
     });
+    webusb.resetProtocolV2UsbNativeLink = jest.fn().mockResolvedValue(undefined);
+    await webusb.rotateProtocolV2UsbGeneration(path, 'test connection');
 
     await Promise.all([
       webusb.callProtocolV2(path, 'Ping', { message: 'long' }, { timeoutMs: 1_000 }),
       webusb.callProtocolV2(path, 'Ping', { message: 'short' }, { timeoutMs: 25 }),
     ]);
 
-    expect(
-      webusb.receiveProtocolV2Frame.mock.calls.map(([, timeoutMs]: unknown[]) => timeoutMs)
-    ).toEqual([1_000, 25]);
+    expect(readTimeouts).toEqual([1_000, 25]);
   });
 });

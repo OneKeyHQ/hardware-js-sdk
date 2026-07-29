@@ -341,4 +341,49 @@ describe('ProtocolV2LinkManager', () => {
     await expect(call).rejects.toThrow('device disconnected');
     expect(adapter.readFrame).not.toHaveBeenCalled();
   });
+
+  test('rejects calls queued before their link generation is invalidated', async () => {
+    let releaseWrite;
+    let markWriteStarted;
+    const writeStarted = new Promise(resolve => {
+      markWriteStarted = resolve;
+    });
+    const writeBlocked = new Promise(resolve => {
+      releaseWrite = resolve;
+    });
+    const success = ProtocolV2.encodeFrame(
+      schemas,
+      'Success',
+      { message: 'ok' },
+      { router: 1, packetSrc: 0, seq: 1 }
+    );
+    const adapter = {
+      router: 1,
+      generation: 1,
+      prepareCall: jest.fn(),
+      writeFrame: jest.fn(async () => {
+        markWriteStarted();
+        await writeBlocked;
+      }),
+      readFrame: jest.fn(() => Promise.resolve(success)),
+      reset: jest.fn(),
+    };
+    const createAdapter = jest.fn(() => adapter);
+    const manager = new ProtocolV2LinkManager({
+      getSchemas: () => schemas,
+      classifyError: () => 'recoverable',
+    });
+
+    const activeCall = manager.call('device-a', createAdapter, 'Ping', { message: 'active' });
+    await writeStarted;
+    const queuedCall = manager.call('device-a', createAdapter, 'Ping', { message: 'queued' });
+    await manager.invalidateLink('device-a', 'device released');
+    releaseWrite();
+
+    await expect(activeCall).rejects.toThrow('device released');
+    await expect(queuedCall).rejects.toThrow('device released');
+    expect(createAdapter).toHaveBeenCalledTimes(1);
+    expect(adapter.writeFrame).toHaveBeenCalledTimes(1);
+    expect(adapter.readFrame).not.toHaveBeenCalled();
+  });
 });
