@@ -5,8 +5,8 @@
  * Passphrase flow aligns with app-monorepo CLI:
  *   - Standard wallet: --use-empty-passphrase, auto-respond
  *   - Hidden wallet: interactive 1/2/3 selection (standard / pinentry / on-device)
- *   - Session caching: passphraseState + sessionId stored in OS keychain,
- *     preloaded via preloadSessionCache on next invocation
+ *   - Legacy session caching: existing OS keychain entries may still be preloaded,
+ *     but public SDK responses never expose new device session ids
  */
 
 import * as readline from 'node:readline';

@@ -27,13 +27,7 @@ const wasResumed = (session: unknown) =>
   'resumed' in session &&
   (session as { resumed?: unknown }).resumed === true;
 
-const forwardSessionId = (session: { newSession?: string }) =>
-  session.newSession ? { sessionId: session.newSession } : {};
-
-const requireHiddenWalletResponse = (session: {
-  passphraseState?: string;
-  newSession?: string;
-}) => {
+const requireHiddenWalletResponse = (session: { passphraseState?: string }) => {
   if (!session.passphraseState) {
     throw ERRORS.TypedError(
       HardwareErrorCode.DeviceInitializeFailed,
@@ -42,7 +36,6 @@ const requireHiddenWalletResponse = (session: {
   }
   return {
     passphraseState: session.passphraseState,
-    ...forwardSessionId(session),
   };
 };
 
@@ -132,7 +125,6 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
         walletType: 'standard',
         deviceId,
         passphraseState: null,
-        ...forwardSessionId(session),
         resumed: wasResumed(session),
       };
     }
@@ -200,7 +192,6 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
           ...responseBase,
           walletType: 'standard',
           passphraseState: null,
-          ...forwardSessionId(session),
         }
       : {
           ...responseBase,

@@ -8,6 +8,7 @@ import transport, {
   bytesToHex,
   hexToBytes,
   probeProtocolV2 as probeProtocolV2Helper,
+  writeProtocolV2BleFrame,
 } from '@onekeyfe/hd-transport';
 import {
   ERRORS,
@@ -15,14 +16,18 @@ import {
   HardwareErrorCodeMessage,
   createDeferred,
   isHeaderChunk,
-  wait,
 } from '@onekeyfe/hd-shared';
 
 import { createTransportCallLog, shouldSuppressHighVolumeCallLog } from './transportLog';
 
 import type { Deferred } from '@onekeyfe/hd-shared';
 import type { DesktopAPI } from '@onekeyfe/hd-transport-electron';
-import type { OneKeyDeviceInfo, ProtocolType, TransportCallOptions } from '@onekeyfe/hd-transport';
+import type {
+  OneKeyDeviceInfo,
+  ProtocolType,
+  ProtocolV2CallContext,
+  TransportCallOptions,
+} from '@onekeyfe/hd-transport';
 import type EventEmitter from 'events';
 
 const { parseConfigure, ProtocolV1, check } = transport;
@@ -292,7 +297,7 @@ export default class ElectronBleTransport {
       }
 
       this.v1Buffers.set(uuid, { buffer: [], bufferLength: 0 });
-      this.v2Assemblers.set(uuid, new ProtocolV2FrameAssembler());
+      this.v2Assemblers.set(uuid, new ProtocolV2FrameAssembler(PROTOCOL_V2_BLE_FRAME_MAX_BYTES));
 
       await window.desktopApi.nobleBle.subscribe(uuid);
 
@@ -509,28 +514,6 @@ export default class ElectronBleTransport {
     return detected;
   }
 
-  private async writeWithChunking(uuid: string, hexData: string): Promise<void> {
-    const totalBytes = hexData.length / 2;
-
-    if (totalBytes <= BLE_PACKET_SIZE) {
-      await wait(BLE_WRITE_DELAY_MS);
-      await this.writeOnce(uuid, hexData);
-      return;
-    }
-
-    for (let offset = 0; offset < hexData.length; ) {
-      const chunkHexLen = Math.min(BLE_PACKET_SIZE * 2, hexData.length - offset);
-      const chunkHex = hexData.substring(offset, offset + chunkHexLen);
-      offset += chunkHexLen;
-
-      await this.writeOnce(uuid, chunkHex);
-
-      if (offset < hexData.length) {
-        await wait(BLE_WRITE_DELAY_MS);
-      }
-    }
-  }
-
   private async writeOnce(uuid: string, hexData: string): Promise<void> {
     const nobleBle = window.desktopApi?.nobleBle;
     if (!nobleBle) {
@@ -538,6 +521,25 @@ export default class ElectronBleTransport {
     }
 
     await nobleBle.write(uuid, hexData);
+  }
+
+  private writeProtocolV2Frame(
+    uuid: string,
+    frame: Uint8Array,
+    context: ProtocolV2CallContext,
+    assertCurrentGeneration: () => void
+  ) {
+    return writeProtocolV2BleFrame({
+      frame,
+      packetCapacity: BLE_PACKET_SIZE,
+      assertActive: assertCurrentGeneration,
+      signal: context.signal,
+      abortMessage: `Protocol V2 BLE write aborted for ${context.messageName}`,
+      initialDelayMs: frame.length <= BLE_PACKET_SIZE ? BLE_WRITE_DELAY_MS : 0,
+      burstSize: 1,
+      burstPauseMs: BLE_WRITE_DELAY_MS,
+      writePacket: packet => this.writeOnce(uuid, bytesToHex(packet)),
+    });
   }
 
   private handleNotification(deviceId: string, hexData: string): void {
@@ -801,10 +803,8 @@ export default class ElectronBleTransport {
         this.v2Assemblers.get(uuid)?.reset();
         this.resetProtocolV2Frames(uuid);
       },
-      writeFrame: (frame: Uint8Array) => {
-        assertCurrentGeneration();
-        return this.writeWithChunking(uuid, bytesToHex(frame));
-      },
+      writeFrame: (frame: Uint8Array, context: ProtocolV2CallContext) =>
+        this.writeProtocolV2Frame(uuid, frame, context, assertCurrentGeneration),
       readFrame: async () => {
         assertCurrentGeneration();
         const rxFrame = await this.readProtocolV2Frame(uuid);
