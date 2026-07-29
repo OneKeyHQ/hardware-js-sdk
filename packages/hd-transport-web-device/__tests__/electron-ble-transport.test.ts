@@ -441,4 +441,37 @@ describe('ElectronBleTransport protocol detection', () => {
       await bleTransport.release(device.id);
     }
   });
+
+  test('rejects oversized Protocol V2 requests before writing to Electron BLE', async () => {
+    const device = { id: 'oversized-frame-pro2-id', name: 'OneKey Pro 2' };
+    const nobleBle = createNobleBle(device);
+    let notificationHandler: ((deviceId: string, data: string) => void) | undefined;
+    const probeResponse = ProtocolV2.encodeFrame(
+      schemas,
+      'Success',
+      { message: 'ok' },
+      { router: PROTOCOL_V2_CHANNEL_BLE_UART }
+    );
+    nobleBle.onNotification.mockImplementation(handler => {
+      notificationHandler = handler;
+      return jest.fn();
+    });
+    nobleBle.write.mockImplementation(() => {
+      setTimeout(() => notificationHandler?.(device.id, bytesToHex(probeResponse)), 0);
+      return Promise.resolve();
+    });
+    const bleTransport = configureTransport(nobleBle);
+
+    try {
+      await bleTransport.acquire({ uuid: device.id, expectedProtocol: 'V2' });
+      expect(nobleBle.write).toHaveBeenCalledTimes(1);
+
+      await expect(
+        bleTransport.call(device.id, 'Ping', { message: 'x'.repeat(2048) })
+      ).rejects.toThrow(/Protocol V2 frame too large for transport/);
+      expect(nobleBle.write).toHaveBeenCalledTimes(1);
+    } finally {
+      await bleTransport.release(device.id);
+    }
+  });
 });

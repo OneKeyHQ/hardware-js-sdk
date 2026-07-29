@@ -31,41 +31,6 @@ import type {
 /** SearchDevice enriched with features fetched after discovery */
 type EnrichedSearchDevice = SearchDevice & { features?: Features };
 
-function extractPassphraseSession(payload: unknown): {
-  passphraseState?: string;
-  sessionId?: string;
-} {
-  if (typeof payload === 'string') {
-    return { passphraseState: payload };
-  }
-  if (!payload || typeof payload !== 'object') {
-    return {};
-  }
-
-  const statePayload = payload as {
-    passphrase_state?: unknown;
-    passphraseState?: unknown;
-    session_id?: unknown;
-    sessionId?: unknown;
-  };
-
-  let passphraseState: string | undefined;
-  if (typeof statePayload.passphrase_state === 'string') {
-    passphraseState = statePayload.passphrase_state;
-  } else if (typeof statePayload.passphraseState === 'string') {
-    passphraseState = statePayload.passphraseState;
-  }
-
-  let sessionId: string | undefined;
-  if (typeof statePayload.session_id === 'string') {
-    sessionId = statePayload.session_id;
-  } else if (typeof statePayload.sessionId === 'string') {
-    sessionId = statePayload.sessionId;
-  }
-
-  return { passphraseState, sessionId };
-}
-
 const program = new Command();
 const { version: cliVersion } = JSON.parse(
   readFileSync(resolve(__dirname, '../package.json'), 'utf8')
@@ -847,7 +812,7 @@ sessionCmd
         });
         return;
       }
-      const device: EnrichedSearchDevice = searchResult.payload[0];
+      const device = searchResult.payload[0] as SearchDevice & { features?: Features };
       const connectId = device.connectId || globalOpts.connectId;
 
       // 2. Unlock if locked — getPassphraseState below talks to a live
@@ -858,53 +823,32 @@ sessionCmd
         await unlockWithRetry(sdk, connectId);
       }
 
-      // 3. Get passphraseState (triggers 1/2/3 selection)
-      const psResult = await sdk.getPassphraseState(connectId, {
-        initSession: true,
-        useEmptyPassphrase: false,
+      // 3. Open a hidden wallet session (triggers 1/2/3 selection).
+      const sessionResult = await sdk.openWalletSession(connectId, {
+        mode: 'select-hidden',
       });
-      if (!psResult.success) {
-        outputResult(globalOpts, psResult);
+      if (!sessionResult.success) {
+        outputResult(globalOpts, sessionResult);
         return;
       }
-      const { passphraseState, sessionId: passphraseSessionId } = extractPassphraseSession(
-        psResult.payload
-      );
-      if (!passphraseState) {
+      if (sessionResult.payload.walletType !== 'hidden') {
         outputResult(globalOpts, {
           success: false,
-          payload: { error: 'getPassphraseState did not return passphraseState' },
+          payload: { error: 'Hidden wallet selection did not return a hidden wallet session' },
         });
         return;
       }
+      const { deviceId, passphraseState, sessionId } = sessionResult.payload;
 
       // 4. Get address to verify + extract deviceId
-      const addrResult = await sdk.evmGetAddress(connectId, device.deviceId || '', {
+      const addrResult = await sdk.evmGetAddress(connectId, deviceId, {
         path: "m/44'/60'/0'/0/0",
         showOnOneKey: false,
         passphraseState,
       });
 
-      // 5. Fetch the now-active session_id via getFeatures.
-      //
-      // IMPORTANT: pass `passphraseState` here. Without it, the SDK's
-      // connectStateChange guard (core/index.ts) would see the payload's
-      // passphraseState flip from mnNy → undefined, clear the cached Device,
-      // and call Initialize again with no passphrase_state / no session_id.
-      // That Initialize resets the device to the standard wallet and returns
-      // a *standard-wallet* session_id — which we'd then save in the keychain
-      // paired with the hidden-wallet passphraseState. On the next CLI run
-      // the mismatch would trigger PassphraseRequest (1/2/3 again).
-      const featResult = await sdk.getFeatures(connectId, {
-        passphraseState,
-        skipPassphraseCheck: true,
-      });
-      const featPayload = featResult?.success ? featResult.payload : undefined;
-      const deviceId = featPayload?.deviceId || device.deviceId || '';
-      const sessionId = passphraseSessionId || featPayload?.sessionId || '';
-
-      // 6. Save to keychain
-      if (passphraseState && deviceId && sessionId) {
+      // 5. Persist only the session id returned by the explicit wallet-session API.
+      if (sessionId) {
         await saveSessionToKeychain(deviceId, passphraseState, sessionId);
       }
 
@@ -1023,11 +967,11 @@ async function unlockWithRetry(
  *
  * 1. If --use-empty-passphrase or --passphrase-state provided → use as-is
  * 2. Try keychain → preloadSessionCache → use cached session
- * 3. Keychain miss → getPassphraseState (triggers 1/2/3 prompt) → save to keychain
+ * 3. Keychain miss → openWalletSession (triggers 1/2/3 prompt) → save to keychain
  *
  * After this, globalOpts.passphraseState is set and getCommonParams will include it.
  */
-async function prepareSession(
+export async function prepareSession(
   sdk: typeof import('@onekeyfe/hd-common-connect-sdk').default,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   globalOpts: Record<string, any>
@@ -1038,7 +982,7 @@ async function prepareSession(
   }
 
   // Errors from the SDK calls below (PIN cancelled, transport broken,
-  // getPassphraseState rejection) intentionally propagate to runCommand's
+  // openWalletSession rejection) intentionally propagate to runCommand's
   // catch block, which renders them as structured `{ success: false,
   // payload: { error, code } }` output instead of silently falling through
   // to a confusing downstream error 112 / 114.
@@ -1147,38 +1091,22 @@ async function prepareSession(
     }
   }
 
-  // ── Step 6: Keychain miss → getPassphraseState (triggers 1/2/3 prompt) ──
-  const psResult = await sdk.getPassphraseState(connectId, {
-    initSession: true,
-    useEmptyPassphrase: false,
+  // ── Step 6: Keychain miss → openWalletSession (triggers 1/2/3 prompt) ──
+  const sessionResult = await sdk.openWalletSession(connectId, {
+    mode: 'select-hidden',
   });
 
-  if (psResult.success && psResult.payload) {
-    const { passphraseState, sessionId: passphraseSessionId } = extractPassphraseSession(
-      psResult.payload
-    );
-    if (!passphraseState) {
+  if (sessionResult.success && sessionResult.payload) {
+    if (sessionResult.payload.walletType !== 'hidden') {
       return undefined;
     }
+    const { deviceId: sessionDeviceId, passphraseState, sessionId } = sessionResult.payload;
+    globalOpts.deviceId = sessionDeviceId;
     globalOpts.passphraseState = passphraseState;
 
-    // Save session to keychain for next invocation.
-    //
-    // Pass passphraseState to keep connectStateChange=false — otherwise
-    // Initialize would be re-run without passphrase_state, resetting the
-    // device to the standard wallet and returning a mismatched session_id.
-    // See the matching comment in `session connect`.
-    if (deviceId) {
-      const featAfter = await sdk.getFeatures(connectId, {
-        passphraseState,
-        skipPassphraseCheck: true,
-      });
-      const sessionId =
-        passphraseSessionId || (featAfter?.success ? featAfter.payload?.sessionId : undefined);
-      if (sessionId) {
-        await saveSessionToKeychain(deviceId, passphraseState, sessionId);
-        await preloadSessionFromKeychain(deviceId);
-      }
+    if (sessionId) {
+      await saveSessionToKeychain(sessionDeviceId, passphraseState, sessionId);
+      await preloadSessionFromKeychain(sessionDeviceId);
     }
 
     return passphraseState;
