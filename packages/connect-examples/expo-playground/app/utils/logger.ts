@@ -13,7 +13,6 @@ type LogOptions = {
 const SENSITIVE_LOG_KEYS = new Set([
   'mnemonic',
   'passphrase',
-  'passphrasestate',
   'password',
   'pin',
   'privatekey',

@@ -16,7 +16,6 @@ import { submitPin } from '../../services/hardwareService';
 import { applyDeviceStateToDevice } from '../../services/deviceStateAdapter';
 import { EDeviceType } from '@onekeyfe/hd-shared';
 import GlobalDialogManager from '../global/GlobalDialogManager';
-import type { PassphraseDialogOptions } from '../global/GlobalDialogManager';
 import WebUsbAuthorizeDialog from '../global/WebUsbAuthorizeDialog';
 import { logData, logInfo, logError, logHardware } from '../../utils/logger';
 import { isSdkDebugEnabled, SDKUtils } from '../../utils/hardwareInstance';
@@ -27,7 +26,7 @@ declare global {
   interface Window {
     globalDialogManager?: {
       showPinDialog: () => void;
-      showPassphraseDialog: (options?: PassphraseDialogOptions) => void;
+      showPassphraseDialog: () => void;
       closeAllDialogs: () => void;
     };
   }
@@ -275,9 +274,7 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
             break;
 
           case 'ui-request_passphrase': {
-            window.globalDialogManager?.showPassphraseDialog({
-              existsAttachPinUser: message.payload.existsAttachPinUser === true,
-            });
+            window.globalDialogManager?.showPassphraseDialog();
             break;
           }
 

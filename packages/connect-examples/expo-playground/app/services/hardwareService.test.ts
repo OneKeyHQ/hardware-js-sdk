@@ -54,6 +54,7 @@ const mockClearSessionCache = jest.fn(async (...args: unknown[]) => {
   };
 });
 const mockUiResponse = jest.fn();
+const mockLogRequest = jest.fn();
 let mockDeviceType = 'pro';
 let mockProtocol: 'V1' | 'V2' = 'V1';
 let mockProtocolVersion: number | null = 1;
@@ -78,7 +79,7 @@ jest.mock('../utils/hardwareInstance', () => ({
 
 jest.mock('../utils/logger', () => ({
   logError: () => undefined,
-  logRequest: () => undefined,
+  logRequest: (...args: unknown[]) => mockLogRequest(...args),
   logResponse: () => undefined,
   logInfo: () => undefined,
 }));
@@ -129,7 +130,7 @@ jest.mock('./previewHardwareParams', () => ({
   previewHardwareParams: () => undefined,
 }));
 
-import { callHardwareAPI, getDeviceSearchUserMessage, submitAttachPin } from './hardwareService';
+import { callHardwareAPI, getDeviceSearchUserMessage, submitPassphrase } from './hardwareService';
 
 const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
 
@@ -141,6 +142,7 @@ afterEach(() => {
   mockOpenWalletSession.mockClear();
   mockDeviceStatusGet.mockClear();
   mockUiResponse.mockClear();
+  mockLogRequest.mockClear();
   mockDeviceType = 'pro';
   mockProtocol = 'V1';
   mockProtocolVersion = 1;
@@ -153,19 +155,40 @@ afterEach(() => {
 });
 
 describe('wallet selection UI responses', () => {
-  test('selects Attach PIN without sending a host passphrase', async () => {
+  test('submits a host passphrase without selecting device entry or logging the value', async () => {
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: {},
+    });
+    const testPassphrase = 'host-passphrase-test-sentinel';
+
+    await submitPassphrase(testPassphrase, false, true);
+
+    expect(mockUiResponse).toHaveBeenCalledWith({
+      type: 'ui-receive_passphrase',
+      payload: {
+        value: testPassphrase,
+        passphraseOnDevice: false,
+        save: true,
+      },
+    });
+    expect(JSON.stringify(mockLogRequest.mock.calls)).not.toContain(testPassphrase);
+  });
+
+  test('selects on-device passphrase entry without sending a host value', async () => {
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {},
     });
 
-    await submitAttachPin();
+    await submitPassphrase('', true);
 
     expect(mockUiResponse).toHaveBeenCalledWith({
       type: 'ui-receive_passphrase',
       payload: {
         value: '',
-        attachPinOnDevice: true,
+        passphraseOnDevice: true,
+        save: false,
       },
     });
   });
@@ -283,7 +306,8 @@ describe('callHardwareAPI', () => {
     await callHardwareAPI('evmGetAddress', params);
 
     expect(mockOpenWalletSession).toHaveBeenCalledWith('connect-id', {
-      mode: 'select-hidden',
+      mode: 'hidden',
+      access: 'passphrase',
     });
     expect(mockGetPassphraseState).not.toHaveBeenCalled();
     expect(params).toMatchObject({ passphraseState: 'pro2-hidden-state' });
@@ -305,7 +329,8 @@ describe('callHardwareAPI', () => {
 
     expect(mockGetPassphraseState).not.toHaveBeenCalled();
     expect(mockOpenWalletSession).toHaveBeenCalledWith('connect-id', {
-      mode: 'select-hidden',
+      mode: 'hidden',
+      access: 'passphrase',
     });
     expect(params).toMatchObject({ passphraseState: 'pro2-hidden-state' });
   });

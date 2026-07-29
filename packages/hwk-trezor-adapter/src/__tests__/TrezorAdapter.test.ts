@@ -1102,8 +1102,7 @@ describe('TrezorAdapter', () => {
         expect(result.payload[0]).not.toHaveProperty('passphraseState');
         expect(result.payload[0]).not.toHaveProperty('useEmptyPassphrase');
       }
-      expect(logs.some(log => log.includes('"passphraseState":"[redacted]"'))).toBe(true);
-      expect(logs.some(log => log.includes('aabbccdd'))).toBe(false);
+      expect(logs.some(log => log.includes('"passphraseState":"aabbccdd"'))).toBe(true);
     } finally {
       unsubscribe();
     }

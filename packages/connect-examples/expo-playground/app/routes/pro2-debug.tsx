@@ -379,12 +379,6 @@ function getDataSummary(data: unknown) {
 }
 
 function sanitizeRequestParameters(method: string, params: Record<string, unknown>) {
-  if (method === 'openWalletSession' && typeof params.passphraseState === 'string') {
-    return {
-      ...params,
-      passphraseState: '[REDACTED]',
-    };
-  }
   if (method === 'deviceUploadWallpaper' && 'rgba' in params) {
     const { rgba, ...rest } = params;
     return { ...rest, rgba_size: getDataSummary(rgba).data_size };

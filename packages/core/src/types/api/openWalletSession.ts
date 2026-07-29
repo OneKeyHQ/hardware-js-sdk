@@ -3,16 +3,19 @@ import type { CommonParams, Response } from '../params';
 export type OpenWalletSessionParams =
   | {
       mode: 'standard';
+      access?: never;
       deviceId?: never;
       passphraseState?: never;
     }
   | {
-      mode: 'select-hidden';
+      mode: 'hidden';
+      access: 'prompt' | 'passphrase' | 'attach-pin';
       deviceId?: never;
       passphraseState?: never;
     }
   | {
       mode: 'resume-hidden';
+      access?: never;
       deviceId: string;
       passphraseState: string;
     };
@@ -38,8 +41,8 @@ export type OpenWalletSessionPayload = OpenWalletSessionPayloadBase &
   );
 
 /**
- * Opens the standard, hidden, or Attach-to-PIN wallet flow through a unified
- * Protocol V1/V2 API.
+ * Opens the standard wallet, explicitly selects a hidden-wallet access method,
+ * or resumes a known hidden wallet through a unified Protocol V1/V2 API.
  */
 export declare function openWalletSession(
   connectId: string,

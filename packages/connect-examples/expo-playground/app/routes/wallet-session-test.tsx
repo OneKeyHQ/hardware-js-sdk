@@ -23,10 +23,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import { Progress } from '../components/ui/Progress';
 import {
   WALLET_SESSION_CASES,
+  assertAttachPinUnlocked,
   buildWrongDeviceId,
   summarizeWalletSession,
   type WalletSessionCaseDefinition,
 } from '../features/wallet-session-test/walletSessionCases';
+import {
+  createWalletSessionTraceProxy,
+  type WalletSessionApiTrace,
+} from '../features/wallet-session-test/walletSessionTrace';
 import { hydrateConnectedDeviceInfo, searchDevices } from '../services/hardwareService';
 import { applyDeviceStateToDevice } from '../services/deviceStateAdapter';
 import { useDeviceStore } from '../store/deviceStore';
@@ -42,6 +47,7 @@ type CaseResult = {
   status: CaseStatus;
   message?: string;
   details?: Record<string, unknown>;
+  calls?: WalletSessionApiTrace[];
   durationMs?: number;
 };
 
@@ -122,10 +128,6 @@ function requireAddress(response: unknown): string {
     throw new Error('evmGetAddress 没有返回地址');
   }
   return payload.address;
-}
-
-function safeValue(value: string | null | undefined): string {
-  return value ? `set:${value.length}` : 'not-set';
 }
 
 function durationText(durationMs?: number): string {
@@ -245,7 +247,8 @@ export default function WalletSessionTestPage() {
       sdk: CoreApi,
       device: DeviceInfo,
       params:
-        | { mode: 'standard' | 'select-hidden' }
+        | { mode: 'standard' }
+        | { mode: 'hidden'; access: 'prompt' | 'passphrase' | 'attach-pin' }
         | { mode: 'resume-hidden'; deviceId: string; passphraseState: string }
     ): Promise<OpenWalletSessionPayload> => {
       const response = await sdk.openWalletSession(device.connectId, params);
@@ -297,13 +300,18 @@ export default function WalletSessionTestPage() {
   );
 
   const executeCase = useCallback(
-    async (definition: WalletSessionCaseDefinition): Promise<SafeCaseOutput> => {
+    async (
+      definition: WalletSessionCaseDefinition,
+      calls: WalletSessionApiTrace[]
+    ): Promise<SafeCaseOutput> => {
       if (transportType !== 'webusb') {
         throw new Error('本模块只验证浏览器 WebUSB，请先在首页切换到 WebUSB');
       }
       if (!currentDevice) throw new Error('请先连接 WebUSB 设备');
 
-      const sdk = await SDKUtils.getInstance();
+      const sdk = createWalletSessionTraceProxy(await SDKUtils.getInstance(), trace => {
+        calls.push(trace);
+      });
       const context = contextRef.current;
       const baselineDeviceId = context.baselineDeviceId;
 
@@ -323,7 +331,7 @@ export default function WalletSessionTestPage() {
             message: '已建立实时 WebUSB 设备基线',
             details: {
               protocol: state.protocol,
-              deviceId: safeValue(deviceId),
+              deviceId,
               initialized: state.status.initialized,
               unlocked: state.status.unlocked,
               passphraseProtection: state.status.passphraseProtection,
@@ -359,13 +367,16 @@ export default function WalletSessionTestPage() {
           updateContext({ standardAddress: first });
           return {
             message: '标准钱包地址稳定',
-            details: { address: safeValue(first), repeatedAddressMatches: true },
+            details: { address: first, repeatedAddressMatches: true },
           };
         }
         case 'hidden-a-select':
         case 'hidden-b-select': {
           if (!baselineDeviceId) throw new Error('缺少设备身份基线');
-          const wallet = await openWallet(sdk, currentDevice, { mode: 'select-hidden' });
+          const wallet = await openWallet(sdk, currentDevice, {
+            mode: 'hidden',
+            access: 'passphrase',
+          });
           if (wallet.walletType !== 'hidden' || !wallet.passphraseState) {
             throw new Error('设备没有返回完整的隐藏钱包标识');
           }
@@ -414,7 +425,7 @@ export default function WalletSessionTestPage() {
           updateContext({ [key]: { ...wallet, address: first } });
           return {
             message: `隐藏钱包 ${key === 'hiddenA' ? 'A' : 'B'} 地址稳定且隔离`,
-            details: { address: safeValue(first), repeatedAddressMatches: true },
+            details: { address: first, repeatedAddressMatches: true },
           };
         }
         case 'hidden-a-resume': {
@@ -515,7 +526,10 @@ export default function WalletSessionTestPage() {
         case 'hidden-a-reselect-after-clear': {
           const previous = context.hiddenA;
           if (!previous?.address) throw new Error('缺少钱包 A 地址基线');
-          const wallet = await openWallet(sdk, currentDevice, { mode: 'select-hidden' });
+          const wallet = await openWallet(sdk, currentDevice, {
+            mode: 'hidden',
+            access: 'passphrase',
+          });
           if (wallet.walletType !== 'hidden' || !wallet.passphraseState) {
             throw new Error('设备没有返回完整的隐藏钱包标识');
           }
@@ -617,13 +631,22 @@ export default function WalletSessionTestPage() {
           };
         }
         case 'attach-pin-select': {
-          const wallet = await openWallet(sdk, currentDevice, { mode: 'select-hidden' });
+          const prompts = passphrasePromptCountRef.current;
+          const wallet = await openWallet(sdk, currentDevice, {
+            mode: 'hidden',
+            access: 'attach-pin',
+          });
+          if (passphrasePromptCountRef.current !== prompts) {
+            throw new Error('Attach PIN 流程不应触发 Passphrase 弹窗');
+          }
           if (wallet.walletType !== 'hidden' || !wallet.passphraseState) {
             throw new Error('Attach PIN 没有返回隐藏钱包标识');
           }
           if (wallet.protocol === 'V2' && !wallet.sessionId) {
             throw new Error('Protocol V2 Attach PIN 钱包没有返回 sessionId');
           }
+          const state = await refreshDeviceState(sdk, currentDevice);
+          assertAttachPinUnlocked(state);
           updateContext({
             attachWallet: {
               deviceId: wallet.deviceId,
@@ -640,8 +663,7 @@ export default function WalletSessionTestPage() {
           const wallet = context.attachWallet;
           if (!wallet) return { message: '没有 Attach PIN 钱包上下文', skipped: true };
           const state = await refreshDeviceState(sdk, currentDevice);
-          if (state.status.unlockedAttachPin !== true)
-            throw new Error('设备未报告 unlockedAttachPin=true');
+          assertAttachPinUnlocked(state);
           if (requireDeviceId(state) !== wallet.deviceId)
             throw new Error('Attach PIN 后 deviceId 发生变化');
           const address = await getAddress(sdk, currentDevice, wallet.deviceId, {
@@ -650,7 +672,7 @@ export default function WalletSessionTestPage() {
           updateContext({ attachWallet: { ...wallet, address } });
           return {
             message: 'Attach PIN 状态与隐藏钱包地址一致',
-            details: { unlockedAttachPin: true, address: safeValue(address) },
+            details: { unlockedAttachPin: true, address },
           };
         }
         case 'reconnect-same-device': {
@@ -749,16 +771,18 @@ export default function WalletSessionTestPage() {
   const runCase = useCallback(
     async (definition: WalletSessionCaseDefinition) => {
       const startedAt = performance.now();
+      const calls: WalletSessionApiTrace[] = [];
       setRunningCaseId(definition.id);
       setResults(previous => ({ ...previous, [definition.id]: { status: 'running' } }));
       try {
-        const output = await executeCase(definition);
+        const output = await executeCase(definition, calls);
         setResults(previous => ({
           ...previous,
           [definition.id]: {
             status: output.skipped ? 'skipped' : 'passed',
             message: output.message,
             details: output.details,
+            calls,
             durationMs: Math.round(performance.now() - startedAt),
           },
         }));
@@ -768,6 +792,7 @@ export default function WalletSessionTestPage() {
           [definition.id]: {
             status: 'failed',
             message: error instanceof Error ? error.message : '未知错误',
+            calls,
             durationMs: Math.round(performance.now() - startedAt),
           },
         }));
@@ -822,7 +847,8 @@ export default function WalletSessionTestPage() {
               </div>
               <p className="max-w-3xl text-sm text-muted-foreground">
                 使用真实浏览器 WebUSB 和真实硬件验证标准钱包、隐藏钱包、Attach PIN、
-                deviceId、passphraseState、sessionId 存在性、缓存隔离及设备重置边界。
+                deviceId、passphraseState、sessionId 存在性、缓存隔离及设备重置边界。每个用例
+                都展示实际 SDK 方法、位置参数和接口响应。
               </p>
             </div>
             <Button variant="outline" onClick={resetLocalRun} disabled={Boolean(runningCaseId)}>
@@ -843,7 +869,10 @@ export default function WalletSessionTestPage() {
             <ShieldAlert className="h-4 w-4" />
             <AlertTitle>安全边界</AlertTitle>
             <AlertDescription className="space-y-1">
-              <p>页面不接收、不保存、不打印助记词、Passphrase、PIN 或原始 sessionId。</p>
+              <p>
+                deviceId、passphraseState、地址和普通响应字段会原样显示；页面不会显示助记词、
+                Passphrase、PIN、私钥或原始 sessionId。
+              </p>
               <p>
                 可在专用测试设备上使用你自己的公开测试向量，但恢复必须在 OneKey App/设备端完成，
                 不能把助记词输入本页面、终端或日志。
@@ -923,6 +952,9 @@ export default function WalletSessionTestPage() {
                             </Badge>
                           ))}
                           <Badge variant="secondary">{definition.execution}</Badge>
+                          {definition.sdkMethod && (
+                            <Badge variant="outline">SDK: {definition.sdkMethod}</Badge>
+                          )}
                           {definition.destructive && (
                             <Badge variant="destructive">外部高风险步骤</Badge>
                           )}
@@ -977,6 +1009,57 @@ export default function WalletSessionTestPage() {
                                 {durationText(result.durationMs)}
                               </div>
                             )}
+                          </div>
+                        )}
+                        {result.calls && result.calls.length > 0 && (
+                          <div className="space-y-2 border-t border-border pt-3 text-xs">
+                            <div className="flex items-center justify-between gap-3 font-semibold">
+                              <span>实际 SDK 调用</span>
+                              <Badge variant="outline">{result.calls.length} 次</Badge>
+                            </div>
+                            {result.calls.map((call, index) => (
+                              <div
+                                key={`${call.startedAt}-${call.method}-${index}`}
+                                className="overflow-hidden rounded-md border border-border bg-muted/20"
+                              >
+                                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2">
+                                  <span className="font-semibold text-foreground">
+                                    {index + 1}. {call.method}
+                                  </span>
+                                  <span className="text-muted-foreground">
+                                    {durationText(call.durationMs)} · {call.startedAt}
+                                  </span>
+                                </div>
+                                <div className="grid gap-px bg-border lg:grid-cols-2">
+                                  <div className="min-w-0 bg-background p-3">
+                                    <div className="mb-2 font-semibold text-muted-foreground">
+                                      调用参数（位置参数）
+                                    </div>
+                                    <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-all text-foreground">
+                                      {JSON.stringify(call.arguments, null, 2)}
+                                    </pre>
+                                  </div>
+                                  <div className="min-w-0 bg-background p-3">
+                                    <div className="mb-2 font-semibold text-muted-foreground">
+                                      {call.error === undefined ? '原始响应' : '原始异常'}
+                                    </div>
+                                    <pre
+                                      className={`max-h-80 overflow-auto whitespace-pre-wrap break-all ${
+                                        call.error === undefined
+                                          ? 'text-foreground'
+                                          : 'text-destructive'
+                                      }`}
+                                    >
+                                      {JSON.stringify(
+                                        call.error === undefined ? call.response : call.error,
+                                        null,
+                                        2
+                                      )}
+                                    </pre>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         )}
                         <Button
