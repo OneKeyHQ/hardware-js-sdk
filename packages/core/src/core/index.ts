@@ -1516,7 +1516,7 @@ export default class Core extends EventEmitter {
     // Preserve synchronous dispose semantics for in-memory state and listeners.
     _deviceList = undefined;
     _connector = undefined;
-    DevicePool.resetState();
+    DevicePool.dispose();
     deviceCacheMap.clear();
     preWarmInflight.clear();
     preWarmDoneAt.clear();

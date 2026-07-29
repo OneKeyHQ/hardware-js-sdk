@@ -1433,7 +1433,7 @@ function buildFirmwareUpdateV4Metrics({
   };
 }
 
-async function runFirmwareUpdateV4WithRetry({
+export async function runFirmwareUpdateV4WithRetry({
   sdk,
   globalOpts,
   params,
@@ -1447,147 +1447,143 @@ async function runFirmwareUpdateV4WithRetry({
   const totalBytes = getFirmwareUpdateV4TotalBytes(params);
   const maxAttempts = Math.max((retries ?? 2) + 1, 1);
   let currentSdk = sdk;
-  let lastResult: unknown;
   let retried = false;
+  let attempt = 1;
+  let { connectId } = globalOpts;
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    let progressEvents = 0;
-    let lastProgress = -1;
-    let transferStartedAt: number | undefined;
-    let transferEndedAt: number | undefined;
-    let installProgressEvents = 0;
-    let lastInstallProgress = -1;
-    let installStartedAt: number | undefined;
-    let installEndedAt: number | undefined;
-    let lastPrintedTransferProgress = -10;
-    let lastPrintedInstallProgress = -10;
-    const totalStartedAt = Date.now();
-    const connectId =
-      retried && globalOpts.transport === 'usb' && globalOpts.connectId
-        ? undefined
-        : globalOpts.connectId;
-
-    const onUiEvent = (message: unknown) => {
-      if (!message || typeof message !== 'object') return;
-      const messageType = (message as { type?: string }).type;
-      const payload = getFirmwareUpdatePayload(message);
-
-      if (messageType === UI_REQUEST.FIRMWARE_TIP) {
-        const tipMessage = (payload?.data as { message?: unknown } | undefined)?.message;
-        if (typeof tipMessage === 'string') {
-          process.stderr.write(`[onekey-hw] Firmware: ${tipMessage}\n`);
-        }
-        return;
+  if (globalOpts.transport === 'usb') {
+    for (; attempt <= maxAttempts; attempt += 1) {
+      const probeResult = await currentSdk.getDeviceState(connectId, {
+        scope: 'runtime',
+        connectProtocol: 'V2',
+        retryCount: 0,
+      });
+      if (isSuccessResult(probeResult)) break;
+      if (attempt >= maxAttempts || !isProtocolV2UsbProbeTransientResult(probeResult)) {
+        return probeResult;
       }
 
-      if (messageType === UI_REQUEST.REQUEST_BUTTON) {
-        const code = typeof payload?.code === 'string' ? ` (${payload.code})` : '';
-        process.stderr.write(
-          `[onekey-hw] Please confirm the firmware update on your device${code}.\n`
-        );
-        return;
-      }
-
-      if (messageType !== UI_REQUEST.FIRMWARE_PROGRESS || !payload) return;
-      const progress = Number(payload.progress);
-      if (!Number.isFinite(progress)) return;
-
-      if (payload.progressType === 'transferData') {
-        progressEvents += 1;
-        lastProgress = Math.max(lastProgress, progress);
-        transferStartedAt ??= Date.now();
-        lastPrintedTransferProgress = maybePrintFirmwareProgress({
-          progressType: 'transfer',
-          progress,
-          payload,
-          lastPrintedProgress: lastPrintedTransferProgress,
-        });
-        if (progress >= 100) {
-          transferEndedAt ??= Date.now();
-        }
-        return;
-      }
-
-      if (payload.progressType === 'installingFirmware') {
-        installProgressEvents += 1;
-        lastInstallProgress = Math.max(lastInstallProgress, progress);
-        installStartedAt ??= Date.now();
-        lastPrintedInstallProgress = maybePrintFirmwareProgress({
-          progressType: 'install',
-          progress,
-          payload,
-          lastPrintedProgress: lastPrintedInstallProgress,
-        });
-        if (progress >= 100) {
-          installEndedAt ??= Date.now();
-        }
-      }
-    };
-
-    currentSdk.on(UI_EVENT, onUiEvent);
-    try {
-      lastResult = await currentSdk.firmwareUpdateV4(connectId, params);
-    } finally {
-      currentSdk.off?.(UI_EVENT, onUiEvent);
+      retried = true;
+      process.stderr.write(
+        `[onekey-hw] Protocol V2 USB probe was transient; retrying read-only probe (${attempt}/${maxAttempts})...\n`
+      );
+      await disposeSDK();
+      await new Promise(resolve => {
+        setTimeout(resolve, 3000);
+      });
+      currentSdk = await createSDK(globalOpts);
+      if (globalOpts.connectId) connectId = undefined;
     }
-    if (installStartedAt !== undefined && installEndedAt === undefined) {
-      installEndedAt = Date.now();
-    }
-
-    const metrics = buildFirmwareUpdateV4Metrics({
-      attempt,
-      maxAttempts,
-      totalBytes,
-      totalStartedAt,
-      transferStartedAt,
-      transferEndedAt,
-      installStartedAt,
-      installEndedAt,
-      progressEvents,
-      lastProgress,
-      installProgressEvents,
-      lastInstallProgress,
-      retried,
-    });
-
-    if (lastResult && typeof lastResult === 'object') {
-      const payload = ((lastResult as { payload?: unknown }).payload ?? {}) as Record<
-        string,
-        unknown
-      >;
-      lastResult = {
-        ...(lastResult as Record<string, unknown>),
-        payload: {
-          ...payload,
-          metrics,
-        },
-      };
-    }
-
-    if (isSuccessResult(lastResult)) {
-      return lastResult;
-    }
-
-    if (
-      attempt >= maxAttempts ||
-      globalOpts.transport !== 'usb' ||
-      !isProtocolV2UsbProbeTransientResult(lastResult)
-    ) {
-      return lastResult;
-    }
-
-    retried = true;
-    process.stderr.write(
-      `[onekey-hw] Protocol V2 USB probe was transient; retrying firmwareUpdateV4 (${attempt}/${maxAttempts})...\n`
-    );
-    await disposeSDK();
-    await new Promise(resolve => {
-      setTimeout(resolve, 3000);
-    });
-    currentSdk = await createSDK(globalOpts);
   }
 
-  return lastResult;
+  let progressEvents = 0;
+  let lastProgress = -1;
+  let transferStartedAt: number | undefined;
+  let transferEndedAt: number | undefined;
+  let installProgressEvents = 0;
+  let lastInstallProgress = -1;
+  let installStartedAt: number | undefined;
+  let installEndedAt: number | undefined;
+  let lastPrintedTransferProgress = -10;
+  let lastPrintedInstallProgress = -10;
+  const totalStartedAt = Date.now();
+
+  const onUiEvent = (message: unknown) => {
+    if (!message || typeof message !== 'object') return;
+    const messageType = (message as { type?: string }).type;
+    const payload = getFirmwareUpdatePayload(message);
+
+    if (messageType === UI_REQUEST.FIRMWARE_TIP) {
+      const tipMessage = (payload?.data as { message?: unknown } | undefined)?.message;
+      if (typeof tipMessage === 'string') {
+        process.stderr.write(`[onekey-hw] Firmware: ${tipMessage}\n`);
+      }
+      return;
+    }
+
+    if (messageType === UI_REQUEST.REQUEST_BUTTON) {
+      const code = typeof payload?.code === 'string' ? ` (${payload.code})` : '';
+      process.stderr.write(
+        `[onekey-hw] Please confirm the firmware update on your device${code}.\n`
+      );
+      return;
+    }
+
+    if (messageType !== UI_REQUEST.FIRMWARE_PROGRESS || !payload) return;
+    const progress = Number(payload.progress);
+    if (!Number.isFinite(progress)) return;
+
+    if (payload.progressType === 'transferData') {
+      progressEvents += 1;
+      lastProgress = Math.max(lastProgress, progress);
+      transferStartedAt ??= Date.now();
+      lastPrintedTransferProgress = maybePrintFirmwareProgress({
+        progressType: 'transfer',
+        progress,
+        payload,
+        lastPrintedProgress: lastPrintedTransferProgress,
+      });
+      if (progress >= 100) {
+        transferEndedAt ??= Date.now();
+      }
+      return;
+    }
+
+    if (payload.progressType === 'installingFirmware') {
+      installProgressEvents += 1;
+      lastInstallProgress = Math.max(lastInstallProgress, progress);
+      installStartedAt ??= Date.now();
+      lastPrintedInstallProgress = maybePrintFirmwareProgress({
+        progressType: 'install',
+        progress,
+        payload,
+        lastPrintedProgress: lastPrintedInstallProgress,
+      });
+      if (progress >= 100) {
+        installEndedAt ??= Date.now();
+      }
+    }
+  };
+
+  currentSdk.on(UI_EVENT, onUiEvent);
+  let result: unknown;
+  try {
+    result = await currentSdk.firmwareUpdateV4(connectId, params);
+  } finally {
+    currentSdk.off?.(UI_EVENT, onUiEvent);
+  }
+  if (installStartedAt !== undefined && installEndedAt === undefined) {
+    installEndedAt = Date.now();
+  }
+
+  const metrics = buildFirmwareUpdateV4Metrics({
+    attempt,
+    maxAttempts,
+    totalBytes,
+    totalStartedAt,
+    transferStartedAt,
+    transferEndedAt,
+    installStartedAt,
+    installEndedAt,
+    progressEvents,
+    lastProgress,
+    installProgressEvents,
+    lastInstallProgress,
+    retried,
+  });
+
+  if (result && typeof result === 'object') {
+    const payload = ((result as { payload?: unknown }).payload ?? {}) as Record<string, unknown>;
+    return {
+      ...(result as Record<string, unknown>),
+      payload: {
+        ...payload,
+        metrics,
+      },
+    };
+  }
+
+  return result;
 }
 
 function buildFirmwareUpdateV4Params(opts: {

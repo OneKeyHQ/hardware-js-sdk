@@ -110,10 +110,10 @@ Protocol V1 继续使用 `firmwareUpdate` 至 `firmwareUpdateV3`；Pro2 使用 `
 `firmwareUpdateV4` 为兼容旧接口仍返回 BLE、application 和 bootloader 三类版本。需要 SE、P1/P2、hash、build ID 或 coprocessor 版本时，应调用 `getDeviceState({ scope: 'firmware' })`。
 
 `checkAllFirmwareRelease` 的 Protocol V2 分支读取设备状态并解析已加载的 Pro2 `firmware-v1` 配置，但不下载
-完整二进制、不重启设备，也不执行安装。配置中每个 `components.*.version` 是该 target 的建议
+二进制、不重启设备，也不执行安装。配置中每个 `components.*.version` 是该 target 的建议
 版本；返回的 `targetsToUpdate` 可直接作为 `firmwareUpdateV4` 的同名参数。版本相同时，SDK
-优先使用 `components.*.payloadHash`，旧配置则通过 HTTP Range 只读取远端 OKPP 元数据，并对
-Bootloader/P1/P2 使用 payload hash 区分同版本 hotfix；配置中的
+仅使用 `components.*.payloadHash` 对 Bootloader/P1/P2 区分同版本 hotfix；缺少合法
+`payloadHash` 时状态保持 `unknown`，不会在检查阶段访问组件 URL。配置中的
 `fingerprint` 是完整 `.okpkg` 的 SHA-256，只用于下载后的完整文件校验，不能与设备 payload hash
 直接比较。缺少当前版本或无法取得可比元数据的组件标记为 `unknown`，不会自动加入升级目标；
 ROMloader 标记为 `unsupported`。
