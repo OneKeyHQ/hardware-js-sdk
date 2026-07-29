@@ -5,6 +5,7 @@ import {
   PROTOCOL_V2_BLE_FILE_READ_CHUNK_SIZE,
   PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE,
 } from '@onekeyfe/hd-transport';
+import { sha256 } from '@noble/hashes/sha256';
 
 import { FirmwareUpdateTipMessage, UI_REQUEST } from '../events/ui-request';
 import { validateProtocolV2FilesystemPath } from './helpers/filesystemValidation';
@@ -366,6 +367,15 @@ const parseProtocolV2OkppHeader = (bytes: Uint8Array): ProtocolV2OkppHeader | nu
   };
 };
 
+export const isProtocolV2FirmwareFingerprintValid = (
+  binary: ArrayBuffer | Uint8Array,
+  fingerprint: string | undefined
+) => {
+  const expectedFingerprint = normalizeProtocolV2Hex(fingerprint);
+  if (!expectedFingerprint) return true;
+  return bytesToHex(sha256(toProtocolV2Bytes(binary))) === expectedFingerprint;
+};
+
 export const assertProtocolV2ReconnectIdentity = (
   expectedSerialNumber?: string,
   actualSerialNumber?: string
@@ -716,6 +726,22 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     }
 
     const { binary } = await getSysResourceBinary(component.url);
+    if (!isProtocolV2FirmwareFingerprintValid(binary, component.fingerprint)) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        `Protocol V2 firmware fingerprint mismatch: ${key}/${component.target}`
+      );
+    }
+    const expectedPayloadHash = normalizeProtocolV2Hex(component.payloadHash);
+    if (expectedPayloadHash) {
+      const header = parseProtocolV2OkppHeader(toProtocolV2Bytes(binary));
+      if (!header || header.payloadHash !== expectedPayloadHash) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.RuntimeError,
+          `Protocol V2 firmware payload hash mismatch: ${key}/${component.target}`
+        );
+      }
+    }
     return {
       ...target,
       binary,
@@ -832,15 +858,34 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const prefetched: ProtocolV2ResourceBundleBinary[] = [];
     for (const bundle of bundles) {
       let { binary } = bundle;
+      let downloadedFromRemote = false;
       if (binary.byteLength === 0) {
         if (!bundle.url) {
           throw new Error(`Missing Protocol V2 RESC bundle binary: ${bundle.name}`);
         }
         Log.log(`[FirmwareUpdateV4] downloading remote RESC bundle ${bundle.name}`);
         ({ binary } = await getSysResourceBinary(bundle.url));
+        downloadedFromRemote = true;
       }
       if (binary.byteLength === 0) {
         throw new Error(`Protocol V2 RESC bundle is empty: ${bundle.name}`);
+      }
+      if (downloadedFromRemote && (bundle.version || bundle.payloadHash || bundle.headerHash)) {
+        const header = parseProtocolV2OkppHeader(toProtocolV2Bytes(binary));
+        if (!header || header.type !== 'RESC') {
+          throw new Error(`Invalid Protocol V2 RESC bundle header: ${bundle.name}`);
+        }
+        if (bundle.version && compareProtocolV2Versions(header.version, bundle.version) !== 0) {
+          throw new Error(`Protocol V2 RESC bundle version mismatch: ${bundle.name}`);
+        }
+        const expectedPayloadHash = normalizeProtocolV2Hex(bundle.payloadHash);
+        if (expectedPayloadHash && header.payloadHash !== expectedPayloadHash) {
+          throw new Error(`Protocol V2 RESC bundle payload hash mismatch: ${bundle.name}`);
+        }
+        const expectedHeaderHash = normalizeProtocolV2Hex(bundle.headerHash);
+        if (expectedHeaderHash && header.headerHash !== expectedHeaderHash) {
+          throw new Error(`Protocol V2 RESC bundle header hash mismatch: ${bundle.name}`);
+        }
       }
       prefetched.push({ ...bundle, binary });
     }
