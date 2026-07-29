@@ -787,9 +787,8 @@ export class Device extends EventEmitter {
         if (this.state.status.mode === 'bootloader' || this.state.status.mode === 'romloader') {
           return;
         }
-        // Device-side settings may change without a host command. Refresh them before
-        // a normal cached call, but never turn a best-effort state sync into a call failure.
-        await this.refreshProtocolV2SettingsSilently();
+        // Normal calls reuse the cache. Explicit getDeviceState refreshes, unlock flow,
+        // and device events update dynamic state without polling on every SDK call.
         return;
       }
       await this._initializeProtocolV2(options);
@@ -966,19 +965,6 @@ export class Device extends EventEmitter {
       throw ERRORS.TypedError(HardwareErrorCode.DeviceInitializeFailed);
     }
     return params.includeRaw ? cloneDeviceState(this.state) : createPublicDeviceState(this.state);
-  }
-
-  private async refreshProtocolV2SettingsSilently() {
-    if (!this.isProtocolV2() || this.state?.status.mode !== 'normal') return;
-
-    try {
-      const { message } = await this.commands.typedCall('DeviceSettingsGet', 'DeviceSettings', {});
-      this.updateState(mapDeviceSettingsToState(message), 'settings-read');
-    } catch (error) {
-      Log.debug('Unable to refresh Protocol V2 settings during cached initialization', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
   }
 
   _updateFeatures(protoFeatures: PROTO.Features | Features, initSession?: boolean) {
