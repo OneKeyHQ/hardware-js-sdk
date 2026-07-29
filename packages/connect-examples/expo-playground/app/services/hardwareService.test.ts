@@ -192,6 +192,25 @@ describe('wallet selection UI responses', () => {
       },
     });
   });
+
+  test('selects Attach PIN without sending a passphrase value', async () => {
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: {},
+    });
+
+    await submitPassphrase('', false, false, true);
+
+    expect(mockUiResponse).toHaveBeenCalledWith({
+      type: 'ui-receive_passphrase',
+      payload: {
+        value: '',
+        passphraseOnDevice: false,
+        attachPinOnDevice: true,
+        save: false,
+      },
+    });
+  });
 });
 
 describe('callHardwareAPI', () => {
@@ -306,8 +325,7 @@ describe('callHardwareAPI', () => {
     await callHardwareAPI('evmGetAddress', params);
 
     expect(mockOpenWalletSession).toHaveBeenCalledWith('connect-id', {
-      mode: 'hidden',
-      access: 'passphrase',
+      mode: 'select-hidden',
     });
     expect(mockGetPassphraseState).not.toHaveBeenCalled();
     expect(params).toMatchObject({ passphraseState: 'pro2-hidden-state' });
@@ -329,8 +347,7 @@ describe('callHardwareAPI', () => {
 
     expect(mockGetPassphraseState).not.toHaveBeenCalled();
     expect(mockOpenWalletSession).toHaveBeenCalledWith('connect-id', {
-      mode: 'hidden',
-      access: 'passphrase',
+      mode: 'select-hidden',
     });
     expect(params).toMatchObject({ passphraseState: 'pro2-hidden-state' });
   });

@@ -192,8 +192,7 @@ const preparePassphraseParams = async (
 
   try {
     const passphraseResult = await sdk.openWalletSession(connectId, {
-      mode: 'hidden',
-      access: 'passphrase',
+      mode: 'select-hidden',
     });
 
     if (!passphraseResult.success) {
@@ -315,9 +314,10 @@ export async function submitPin(pin: string | null): Promise<void> {
 export async function submitPassphrase(
   passphrase: string,
   onDevice = false,
-  save = false
+  save = false,
+  attachPinOnDevice = false
 ): Promise<void> {
-  logRequest('Submitting passphrase response', { onDevice, save });
+  logRequest('Submitting passphrase response', { onDevice, attachPinOnDevice, save });
   if (typeof window === 'undefined') return;
 
   try {
@@ -327,6 +327,7 @@ export async function submitPassphrase(
       payload: {
         value: passphrase || '',
         passphraseOnDevice: onDevice,
+        ...(attachPinOnDevice ? { attachPinOnDevice: true } : {}),
         save: save,
       },
     };

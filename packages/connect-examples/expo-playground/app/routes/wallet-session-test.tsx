@@ -39,7 +39,13 @@ import { useTransportPersistence } from '../store/persistenceStore';
 import type { DeviceInfo } from '../types/hardware';
 import { SDKUtils } from '../utils/hardwareInstance';
 
-import type { CoreApi, DeviceState, OpenWalletSessionPayload, UiEvent } from '@onekeyfe/hd-core';
+import type {
+  CoreApi,
+  DeviceState,
+  OpenWalletSessionParams,
+  OpenWalletSessionPayload,
+  UiEvent,
+} from '@onekeyfe/hd-core';
 
 type CaseStatus = 'idle' | 'running' | 'passed' | 'failed' | 'skipped';
 
@@ -54,14 +60,12 @@ type CaseResult = {
 type WalletReference = {
   deviceId: string;
   passphraseState: string;
-  sessionId?: string;
   address?: string;
 };
 
 type RuntimeContext = {
   baselineDeviceId?: string;
   baselineProtocol?: 'V1' | 'V2';
-  standardSessionId?: string;
   standardAddress?: string;
   hiddenA?: WalletReference;
   hiddenB?: WalletReference;
@@ -246,10 +250,7 @@ export default function WalletSessionTestPage() {
     async (
       sdk: CoreApi,
       device: DeviceInfo,
-      params:
-        | { mode: 'standard' }
-        | { mode: 'hidden'; access: 'prompt' | 'passphrase' | 'attach-pin' }
-        | { mode: 'resume-hidden'; deviceId: string; passphraseState: string }
+      params: OpenWalletSessionParams
     ): Promise<OpenWalletSessionPayload> => {
       const response = await sdk.openWalletSession(device.connectId, params);
       return requireSuccess<OpenWalletSessionPayload>(response, 'openWalletSession');
@@ -353,10 +354,9 @@ export default function WalletSessionTestPage() {
           ) {
             throw new Error('标准钱包返回值与实时设备身份不一致');
           }
-          updateContext({ standardSessionId: wallet.sessionId });
           return {
             message: '标准钱包契约正确',
-            details: summarizeWalletSession(wallet, context.standardSessionId),
+            details: summarizeWalletSession(wallet),
           };
         }
         case 'standard-address': {
@@ -374,8 +374,7 @@ export default function WalletSessionTestPage() {
         case 'hidden-b-select': {
           if (!baselineDeviceId) throw new Error('缺少设备身份基线');
           const wallet = await openWallet(sdk, currentDevice, {
-            mode: 'hidden',
-            access: 'passphrase',
+            mode: 'select-hidden',
           });
           if (wallet.walletType !== 'hidden' || !wallet.passphraseState) {
             throw new Error('设备没有返回完整的隐藏钱包标识');
@@ -387,22 +386,15 @@ export default function WalletSessionTestPage() {
           if (other?.passphraseState === wallet.passphraseState) {
             throw new Error('钱包 A 与钱包 B 返回了相同 passphraseState，请输入不同 Passphrase');
           }
-          if (wallet.protocol === 'V2' && !wallet.sessionId) {
-            throw new Error('Protocol V2 隐藏钱包没有透传固件 sessionId');
-          }
-          if (wallet.sessionId && other?.sessionId && wallet.sessionId === other.sessionId) {
-            throw new Error('钱包 A 与钱包 B 返回了相同 sessionId');
-          }
           updateContext({
             [key]: {
               deviceId: wallet.deviceId,
               passphraseState: wallet.passphraseState,
-              sessionId: wallet.sessionId,
             },
           });
           return {
             message: `已选择隐藏钱包 ${key === 'hiddenA' ? 'A' : 'B'}`,
-            details: summarizeWalletSession(wallet, other?.sessionId),
+            details: summarizeWalletSession(wallet),
           };
         }
         case 'hidden-a-address':
@@ -443,12 +435,9 @@ export default function WalletSessionTestPage() {
           if (address !== wallet.address) throw new Error('恢复钱包 A 后地址发生变化');
           if (passphrasePromptCountRef.current !== prompts)
             throw new Error('恢复钱包 A 时重新选择了钱包');
-          updateContext({
-            hiddenA: { ...wallet, sessionId: resumed.sessionId ?? wallet.sessionId },
-          });
           return {
             message: '钱包 A 已从 SDK Session Store 恢复',
-            details: summarizeWalletSession(resumed, wallet.sessionId),
+            details: summarizeWalletSession(resumed),
           };
         }
         case 'wallet-isolation': {
@@ -527,8 +516,7 @@ export default function WalletSessionTestPage() {
           const previous = context.hiddenA;
           if (!previous?.address) throw new Error('缺少钱包 A 地址基线');
           const wallet = await openWallet(sdk, currentDevice, {
-            mode: 'hidden',
-            access: 'passphrase',
+            mode: 'select-hidden',
           });
           if (wallet.walletType !== 'hidden' || !wallet.passphraseState) {
             throw new Error('设备没有返回完整的隐藏钱包标识');
@@ -536,15 +524,8 @@ export default function WalletSessionTestPage() {
           if (wallet.passphraseState !== previous.passphraseState) {
             throw new Error('重新选择后不是原钱包 A；请确认输入了相同测试 Passphrase');
           }
-          if (wallet.protocol === 'V2' && !wallet.sessionId) {
-            throw new Error('Protocol V2 没有返回新 sessionId');
-          }
-          if (
-            wallet.protocol === 'V2' &&
-            previous.sessionId &&
-            wallet.sessionId === previous.sessionId
-          ) {
-            throw new Error('清缓存并重新选择后仍返回旧 sessionId');
+          if (wallet.resumed) {
+            throw new Error('清缓存并重新选择后不应标记为恢复旧 Session');
           }
           const address = await getAddress(sdk, currentDevice, wallet.deviceId, {
             passphraseState: wallet.passphraseState,
@@ -554,12 +535,11 @@ export default function WalletSessionTestPage() {
             hiddenA: {
               ...previous,
               deviceId: wallet.deviceId,
-              sessionId: wallet.sessionId,
             },
           });
           return {
             message: '钱包 A 身份稳定，Session 已重新建立',
-            details: summarizeWalletSession(wallet, previous.sessionId),
+            details: summarizeWalletSession(wallet),
           };
         }
         case 'other-wallet-survives': {
@@ -577,12 +557,9 @@ export default function WalletSessionTestPage() {
           if (address !== wallet.address) throw new Error('钱包 B 地址发生变化');
           if (passphrasePromptCountRef.current !== prompts)
             throw new Error('钱包 B 恢复时重新选择了钱包');
-          updateContext({
-            hiddenB: { ...wallet, sessionId: resumed.sessionId ?? wallet.sessionId },
-          });
           return {
             message: '钱包 B 未受钱包 A 缓存清理影响',
-            details: summarizeWalletSession(resumed, wallet.sessionId),
+            details: summarizeWalletSession(resumed),
           };
         }
         case 'invalid-cache-params': {
@@ -633,17 +610,13 @@ export default function WalletSessionTestPage() {
         case 'attach-pin-select': {
           const prompts = passphrasePromptCountRef.current;
           const wallet = await openWallet(sdk, currentDevice, {
-            mode: 'hidden',
-            access: 'attach-pin',
+            mode: 'select-hidden',
           });
-          if (passphrasePromptCountRef.current !== prompts) {
-            throw new Error('Attach PIN 流程不应触发 Passphrase 弹窗');
+          if (passphrasePromptCountRef.current !== prompts + 1) {
+            throw new Error('Attach PIN 流程应通过一次统一钱包选择弹窗触发');
           }
           if (wallet.walletType !== 'hidden' || !wallet.passphraseState) {
             throw new Error('Attach PIN 没有返回隐藏钱包标识');
-          }
-          if (wallet.protocol === 'V2' && !wallet.sessionId) {
-            throw new Error('Protocol V2 Attach PIN 钱包没有返回 sessionId');
           }
           const state = await refreshDeviceState(sdk, currentDevice);
           assertAttachPinUnlocked(state);
@@ -651,7 +624,6 @@ export default function WalletSessionTestPage() {
             attachWallet: {
               deviceId: wallet.deviceId,
               passphraseState: wallet.passphraseState,
-              sessionId: wallet.sessionId,
             },
           });
           return {
@@ -847,8 +819,8 @@ export default function WalletSessionTestPage() {
               </div>
               <p className="max-w-3xl text-sm text-muted-foreground">
                 使用真实浏览器 WebUSB 和真实硬件验证标准钱包、隐藏钱包、Attach PIN、
-                deviceId、passphraseState、sessionId 存在性、缓存隔离及设备重置边界。每个用例
-                都展示实际 SDK 方法、位置参数和接口响应。
+                deviceId、passphraseState、缓存隔离及设备重置边界。每个用例 都展示实际 SDK
+                方法、位置参数和接口响应。
               </p>
             </div>
             <Button variant="outline" onClick={resetLocalRun} disabled={Boolean(runningCaseId)}>
@@ -871,7 +843,7 @@ export default function WalletSessionTestPage() {
             <AlertDescription className="space-y-1">
               <p>
                 deviceId、passphraseState、地址和普通响应字段会原样显示；页面不会显示助记词、
-                Passphrase、PIN、私钥或原始 sessionId。
+                Passphrase、PIN、私钥或 SDK 内部 Session。
               </p>
               <p>
                 可在专用测试设备上使用你自己的公开测试向量，但恢复必须在 OneKey App/设备端完成，

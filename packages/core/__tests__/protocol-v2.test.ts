@@ -947,7 +947,9 @@ describe('Protocol V2 feature adapter', () => {
     });
 
     expect(promptPassphrase).toHaveBeenCalled();
-    expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {});
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {
+      on_device: true,
+    });
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
   });
 
@@ -1162,7 +1164,7 @@ describe('Protocol V2 feature adapter', () => {
     });
     expect(typedCall.mock.calls).toEqual([
       ['ProtocolInfoRequest', 'ProtocolInfo', { eventless_wallet_session: true }],
-      ['DeviceSessionAskPassphrase', 'Success', {}],
+      ['DeviceSessionAskPassphrase', 'Success', { on_device: true }],
     ]);
   });
 
@@ -1419,6 +1421,7 @@ describe('Protocol V2 feature adapter', () => {
     expect(promptPassphrase).toHaveBeenCalledWith(
       {
         existsAttachPinUser: false,
+        deviceOnly: true,
         source: 'wallet-session-coordinator',
         reason: 'open-wallet',
       },
@@ -1740,7 +1743,9 @@ describe('Protocol V2 feature adapter', () => {
     );
 
     expect(device.getInternalState()).toBeUndefined();
-    expect(typedCall).toHaveBeenNthCalledWith(2, 'DeviceSessionAskPassphrase', 'Success', {});
+    expect(typedCall).toHaveBeenNthCalledWith(2, 'DeviceSessionAskPassphrase', 'Success', {
+      on_device: true,
+    });
   });
 
   test('useEmptyPassphrase ignores a stale hidden-wallet state during Protocol V2 safety check', async () => {

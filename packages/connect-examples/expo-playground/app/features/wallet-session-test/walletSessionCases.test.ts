@@ -12,17 +12,13 @@ type WalletSessionCasesModule = {
   }>;
   buildWrongDeviceId?: (deviceId: string) => string;
   assertAttachPinUnlocked?: (state: { status: { unlockedAttachPin: boolean | null } }) => void;
-  summarizeWalletSession?: (
-    payload: {
-      protocol: 'V1' | 'V2';
-      walletType: 'standard' | 'hidden';
-      deviceId: string;
-      passphraseState: string | null;
-      sessionId?: string;
-      resumed: boolean;
-    },
-    previousSessionId?: string
-  ) => Record<string, unknown>;
+  summarizeWalletSession?: (payload: {
+    protocol: 'V1' | 'V2';
+    walletType: 'standard' | 'hidden';
+    deviceId: string;
+    passphraseState: string | null;
+    resumed: boolean;
+  }) => Record<string, unknown>;
 };
 
 async function loadCasesModule(): Promise<WalletSessionCasesModule> {
@@ -95,7 +91,7 @@ describe('wallet session WebUSB test matrix', () => {
     const selectCase = attachCases.find(item => item.id === 'attach-pin-select');
     expect(selectCase?.steps).toContain('刷新设备状态并确认 Attach PIN 解锁');
     expect(selectCase?.expected).toContain('unlockedAttachPin=true');
-    expect(selectCase?.expected).toContain('不触发 Passphrase 弹窗');
+    expect(selectCase?.expected).toContain('只触发一次统一钱包选择弹窗');
   });
 
   test('rejects a hidden-wallet selection that was not unlocked by Attach PIN', async () => {
@@ -123,34 +119,28 @@ describe('wallet session WebUSB test matrix', () => {
     });
   });
 
-  test('shows deviceId and passphraseState while comparing session IDs without exposing them', async () => {
+  test('shows the public wallet identity while keeping device sessions internal', async () => {
     const { summarizeWalletSession } = await loadCasesModule();
     expect(summarizeWalletSession).toBeDefined();
 
-    const rawSessionId = 'sensitive-session-id-value';
     const rawDeviceId = 'sensitive-device-id-value';
     const rawPassphraseState = 'sensitive-passphrase-state-value';
-    const summary = summarizeWalletSession?.(
-      {
-        protocol: 'V2',
-        walletType: 'hidden',
-        deviceId: rawDeviceId,
-        passphraseState: rawPassphraseState,
-        sessionId: rawSessionId,
-        resumed: true,
-      },
-      rawSessionId
-    );
+    const summary = summarizeWalletSession?.({
+      protocol: 'V2',
+      walletType: 'hidden',
+      deviceId: rawDeviceId,
+      passphraseState: rawPassphraseState,
+      resumed: true,
+    });
     const serialized = JSON.stringify(summary);
 
     expect(summary).toMatchObject({
       deviceId: rawDeviceId,
       passphraseState: rawPassphraseState,
-      sessionId: 'present',
-      sessionRelation: 'same',
+      sessionVisibility: 'sdk-internal',
       resumed: true,
     });
-    expect(serialized).not.toContain(rawSessionId);
+    expect(serialized).not.toContain('sessionId');
     expect(serialized).toContain(rawDeviceId);
     expect(serialized).toContain(rawPassphraseState);
   });

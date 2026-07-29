@@ -18,10 +18,12 @@ describe('expo-playground 钱包选择模式', () => {
     expect(source).not.toContain('PLAYGROUND_MOCK_PASSPHRASE');
   });
 
-  test('Attach PIN 由显式钱包访问模式直接触发', () => {
+  test('钱包 Session 页面使用统一隐藏钱包选择模式', () => {
     const source = readPlaygroundSource('routes/wallet-session-test.tsx');
 
-    expect(source).toContain("access: 'attach-pin'");
+    expect(source).toContain("mode: 'select-hidden'");
+    expect(source).not.toContain("mode: 'hidden'");
+    expect(source).not.toContain("access: 'attach-pin'");
     expect(source).not.toContain('submitAttachPin');
   });
 

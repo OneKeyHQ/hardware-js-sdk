@@ -10,9 +10,16 @@ import { Eye, EyeOff } from 'lucide-react';
 interface PassphraseDialogProps {
   isOpen: boolean;
   onClose: () => void;
+  deviceOnly?: boolean;
+  allowAttachPin?: boolean;
 }
 
-const PassphraseDialog: React.FC<PassphraseDialogProps> = ({ isOpen, onClose }) => {
+const PassphraseDialog: React.FC<PassphraseDialogProps> = ({
+  isOpen,
+  onClose,
+  deviceOnly = false,
+  allowAttachPin = false,
+}) => {
   const { t } = useTranslation();
   const [passphrase, setPassphrase] = useState('');
   const [confirmPassphrase, setConfirmPassphrase] = useState('');
@@ -53,6 +60,16 @@ const PassphraseDialog: React.FC<PassphraseDialogProps> = ({ isOpen, onClose }) 
     }
   };
 
+  const handleUseAttachPin = async () => {
+    try {
+      await submitPassphrase('', false, false, true);
+      resetState();
+      onClose();
+    } catch (error) {
+      console.error('Attach PIN selection failed:', error);
+    }
+  };
+
   // 重置状态函数
   const resetState = () => {
     setPassphrase('');
@@ -81,7 +98,9 @@ const PassphraseDialog: React.FC<PassphraseDialogProps> = ({ isOpen, onClose }) 
             {t('passphrase.title', 'Enter Passphrase')}
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground">
-            {t('passphrase.webInputDescription', 'Enter passphrase on web to continue')}
+            {deviceOnly
+              ? t('passphrase.inputOnDevice', 'Enter on device')
+              : t('passphrase.webInputDescription', 'Enter passphrase on web to continue')}
           </DialogDescription>
         </div>
 
@@ -94,78 +113,84 @@ const PassphraseDialog: React.FC<PassphraseDialogProps> = ({ isOpen, onClose }) 
 
         <div className="space-y-3">
           {/* Passphrase 输入区域 */}
-          <div className="space-y-2">
-            <label htmlFor="passphrase-input" className="text-sm font-medium text-foreground">
-              Passphrase
-            </label>
-            <div className="relative">
-              <Input
-                id="passphrase-input"
-                name="device-passphrase"
-                type={showPassphrase ? 'text' : 'password'}
-                placeholder={t('passphrase.placeholder', 'Enter passphrase')}
-                value={passphrase}
-                onChange={e => setPassphrase(e.target.value)}
-                className="h-10 pr-10"
-                maxLength={50}
-                autoComplete="off"
-                data-1p-ignore="true"
-                data-form-type="other"
-                spellCheck="false"
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
-                onClick={() => setShowPassphrase(!showPassphrase)}
-              >
-                {showPassphrase ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-              </Button>
+          {!deviceOnly ? (
+            <div className="space-y-2">
+              <label htmlFor="passphrase-input" className="text-sm font-medium text-foreground">
+                Passphrase
+              </label>
+              <div className="relative">
+                <Input
+                  id="passphrase-input"
+                  name="device-passphrase"
+                  type={showPassphrase ? 'text' : 'password'}
+                  placeholder={t('passphrase.placeholder', 'Enter passphrase')}
+                  value={passphrase}
+                  onChange={e => setPassphrase(e.target.value)}
+                  className="h-10 pr-10"
+                  maxLength={50}
+                  autoComplete="off"
+                  data-1p-ignore="true"
+                  data-form-type="other"
+                  spellCheck="false"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
+                  onClick={() => setShowPassphrase(!showPassphrase)}
+                >
+                  {showPassphrase ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                </Button>
+              </div>
             </div>
-          </div>
+          ) : null}
 
           {/* 确认 Passphrase */}
-          <div className="space-y-2">
-            <label htmlFor="confirm-passphrase" className="text-sm font-medium text-foreground">
-              {t('passphrase.confirmPassphrase', 'Confirm Passphrase')}
-            </label>
-            <div className="relative">
-              <Input
-                id="confirm-passphrase"
-                name="device-passphrase-confirm"
-                type={showPassphrase ? 'text' : 'password'}
-                placeholder={t('passphrase.confirmPlaceholder', 'Re-enter passphrase')}
-                value={confirmPassphrase}
-                onChange={e => setConfirmPassphrase(e.target.value)}
-                className="h-10 pr-10"
-                autoComplete="off"
-                data-1p-ignore="true"
-                data-form-type="other"
-                spellCheck="false"
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
-                onClick={() => setShowPassphrase(!showPassphrase)}
-              >
-                {showPassphrase ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-              </Button>
+          {!deviceOnly ? (
+            <div className="space-y-2">
+              <label htmlFor="confirm-passphrase" className="text-sm font-medium text-foreground">
+                {t('passphrase.confirmPassphrase', 'Confirm Passphrase')}
+              </label>
+              <div className="relative">
+                <Input
+                  id="confirm-passphrase"
+                  name="device-passphrase-confirm"
+                  type={showPassphrase ? 'text' : 'password'}
+                  placeholder={t('passphrase.confirmPlaceholder', 'Re-enter passphrase')}
+                  value={confirmPassphrase}
+                  onChange={e => setConfirmPassphrase(e.target.value)}
+                  className="h-10 pr-10"
+                  autoComplete="off"
+                  data-1p-ignore="true"
+                  data-form-type="other"
+                  spellCheck="false"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
+                  onClick={() => setShowPassphrase(!showPassphrase)}
+                >
+                  {showPassphrase ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                </Button>
+              </div>
             </div>
-          </div>
+          ) : null}
 
           {/* 按钮区域 - 紧凑布局 */}
           <div className="space-y-2 pt-3">
             {/* 主要操作按钮 */}
-            <Button
-              onClick={handleSubmit}
-              disabled={!isFormValid}
-              className="w-full h-10 bg-neutral-800 text-white hover:bg-neutral-700 dark:bg-neutral-200 dark:text-neutral-900 dark:hover:bg-neutral-300 border-none shadow-none"
-            >
-              {t('common.confirm', 'Confirm')}
-            </Button>
+            {!deviceOnly ? (
+              <Button
+                onClick={handleSubmit}
+                disabled={!isFormValid}
+                className="w-full h-10 bg-neutral-800 text-white hover:bg-neutral-700 dark:bg-neutral-200 dark:text-neutral-900 dark:hover:bg-neutral-300 border-none shadow-none"
+              >
+                {t('common.confirm', 'Confirm')}
+              </Button>
+            ) : null}
 
             {/* 次要操作 - 合并为一行 */}
             <div className="flex space-x-2">
@@ -176,6 +201,16 @@ const PassphraseDialog: React.FC<PassphraseDialogProps> = ({ isOpen, onClose }) 
               >
                 {t('passphrase.inputOnDevice', 'Enter on device')}
               </Button>
+
+              {allowAttachPin ? (
+                <Button
+                  variant="outline"
+                  onClick={handleUseAttachPin}
+                  className="flex-1 h-10 border border-neutral-300 text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-white text-sm shadow-none"
+                >
+                  Attach PIN
+                </Button>
+              ) : null}
 
               <Button
                 variant="ghost"
