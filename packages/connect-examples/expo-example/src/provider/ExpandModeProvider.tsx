@@ -21,12 +21,13 @@ export const ExpandModeProvider: React.FC<{ children: ReactNode }> = ({ children
 
   return (
     <ExpandModeContext.Provider value={providerValue}>
-      <Stack gap="$2">
+      <Stack>
         <Button
           id="expand-mode-button"
-          alignSelf="flex-end"
-          marginHorizontal="$2"
-          marginTop="$2"
+          zIndex={100}
+          position="absolute"
+          top="$5"
+          right="$3"
           variant="primary"
           onPress={toggleExpandMode}
         >

@@ -1,27 +1,20 @@
-import type { DeviceState, Features, IDeviceType, OnekeyFeatures } from '@onekeyfe/hd-core';
+import type { IDeviceType, Features, OnekeyFeatures } from '@onekeyfe/hd-core';
 
 export interface DeviceInfo {
   connectId: string;
   deviceId: string;
-  serialNo?: string | null;
-  /** @deprecated Use serialNo instead. */
   uuid: string;
   deviceType: IDeviceType;
   name: string;
   label?: string;
   path?: string;
   features?: Features;
-  deviceState?: DeviceState;
-  protocol?: DeviceState['protocol'];
-  protocolVersion?: DeviceState['protocolVersion'];
   onekeyFeatures?: OnekeyFeatures;
 }
 
 export interface SearchDeviceInfo {
   connectId: string;
   deviceId: string;
-  serialNo?: string | null;
-  /** @deprecated Use serialNo instead. */
   uuid: string;
   deviceType: IDeviceType;
   name: string;

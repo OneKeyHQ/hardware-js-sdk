@@ -53,7 +53,7 @@ export default function IndexPage() {
     if (sdkInitState.error) {
       toast({
         title: t('transport.sdkInitError'),
-        description: t('transport.sdkInitDescription'),
+        description: sdkInitState.error,
         variant: 'destructive',
       });
     }
@@ -243,12 +243,8 @@ export default function IndexPage() {
 
                       <div className="grid grid-cols-2 gap-x-8 gap-y-3">
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">
-                            {t('common.serialNo')}
-                          </span>
-                          <span className="text-xs font-mono">
-                            {currentDevice.serialNo || currentDevice.uuid || 'N/A'}
-                          </span>
+                          <span className="text-sm text-muted-foreground">{t('common.uuid')}</span>
+                          <span className="text-xs font-mono">{currentDevice.uuid || 'N/A'}</span>
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-sm text-muted-foreground">deviceId</span>
@@ -261,7 +257,7 @@ export default function IndexPage() {
                                 {t('common.firmwareVersion')}
                               </span>
                               <span className="text-sm">
-                                {currentDevice.features.firmwareVersion}
+                                {currentDevice.features.onekey_firmware_version}
                               </span>
                             </div>
                             <div className="flex items-center justify-between">
@@ -269,7 +265,9 @@ export default function IndexPage() {
                                 {t('common.bluetoothVersion')}
                               </span>
                               <span className="text-sm">
-                                {currentDevice.features.bleVersion || 'N/A'}
+                                {currentDevice.features.onekey_ble_version ||
+                                  currentDevice.features.ble_ver ||
+                                  'N/A'}
                               </span>
                             </div>
                             <div className="flex items-center justify-between">
@@ -277,7 +275,7 @@ export default function IndexPage() {
                                 {t('common.bootVersion')}
                               </span>
                               <span className="text-sm">
-                                {currentDevice.features.bootloaderVersion || 'N/A'}
+                                {currentDevice.features.onekey_boot_version || 'N/A'}
                               </span>
                             </div>
                           </>

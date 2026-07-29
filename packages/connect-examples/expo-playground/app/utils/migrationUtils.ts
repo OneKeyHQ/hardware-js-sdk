@@ -1,5 +1,5 @@
 import { usePersistenceStore } from '../store/persistenceStore';
-import type { TransportType } from './hardwareInstance';
+import { TransportType } from '../services/hardwareService';
 
 // 旧版本 localStorage 键名
 const LEGACY_KEYS = {

@@ -1,28 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  submitPassphrase,
-  submitAttachPin,
-  cancelHardwareOperation,
-} from '../../services/hardwareService';
+import { submitPassphrase, cancelHardwareOperation } from '../../services/hardwareService';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../ui/Dialog';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Alert, AlertDescription } from '../ui/Alert';
-import { Eye, EyeOff, KeyRound } from 'lucide-react';
-import { getPassphraseDialogActions } from './passphraseDialogActions';
+import { Eye, EyeOff } from 'lucide-react';
 
 interface PassphraseDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  existsAttachPinUser?: boolean;
 }
 
-const PassphraseDialog: React.FC<PassphraseDialogProps> = ({
-  isOpen,
-  onClose,
-  existsAttachPinUser = false,
-}) => {
+const PassphraseDialog: React.FC<PassphraseDialogProps> = ({ isOpen, onClose }) => {
   const { t } = useTranslation();
   const [passphrase, setPassphrase] = useState('');
   const [confirmPassphrase, setConfirmPassphrase] = useState('');
@@ -63,16 +53,6 @@ const PassphraseDialog: React.FC<PassphraseDialogProps> = ({
     }
   };
 
-  const handleUseAttachPin = async () => {
-    try {
-      await submitAttachPin();
-      resetState();
-      onClose();
-    } catch (error) {
-      console.error('Attach PIN selection failed:', error);
-    }
-  };
-
   // 重置状态函数
   const resetState = () => {
     setPassphrase('');
@@ -88,7 +68,6 @@ const PassphraseDialog: React.FC<PassphraseDialogProps> = ({
   }, [isOpen]);
 
   const isFormValid = passphrase && passphrase === confirmPassphrase;
-  const actions = getPassphraseDialogActions(existsAttachPinUser);
 
   return (
     <Dialog open={isOpen} onOpenChange={handleCancel}>
@@ -207,16 +186,6 @@ const PassphraseDialog: React.FC<PassphraseDialogProps> = ({
                 {t('common.cancel', 'Cancel')}
               </Button>
             </div>
-            {actions.includes('attach-pin') && (
-              <Button
-                variant="outline"
-                onClick={handleUseAttachPin}
-                className="w-full h-10 border-orange-300 text-orange-700 hover:bg-orange-50 dark:border-orange-700 dark:text-orange-300 dark:hover:bg-orange-950/40 gap-2 text-sm shadow-none"
-              >
-                <KeyRound className="h-4 w-4" />
-                {t('passphrase.useAttachPin', 'Use Attach PIN on device')}
-              </Button>
-            )}
           </div>
         </div>
       </DialogContent>

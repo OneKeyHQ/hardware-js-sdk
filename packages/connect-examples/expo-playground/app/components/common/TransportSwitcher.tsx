@@ -5,11 +5,7 @@ import { useDeviceStore } from '../../store/deviceStore';
 import { SDKUtils } from '../../utils/hardwareInstance';
 import { useToast } from '../../hooks/use-toast';
 import { useTransportPersistence } from '../../store/persistenceStore';
-import {
-  hydrateConnectedDeviceInfo,
-  switchTransport,
-  searchDevices,
-} from '../../services/hardwareService';
+import { switchTransport, searchDevices } from '../../services/hardwareService';
 import type { TransportType } from '../../utils/hardwareInstance';
 import { DeviceInfo } from '../../types/hardware';
 import { Button } from '../ui/Button';
@@ -77,12 +73,43 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
   const handleDeviceConnection = async (devices: DeviceInfo[]) => {
     if (!devices.length) return;
 
-    // Connect the first device automatically; the outer flow converts errors to UI messages.
-    const targetDevice = devices[0];
-    const hydratedDevice = await hydrateConnectedDeviceInfo(targetDevice);
-    setCurrentDevice(hydratedDevice);
-    if (hydratedDevice.features) {
-      setDeviceFeatures(hydratedDevice.features);
+    try {
+      // 自动选择第一个设备进行连接
+      const targetDevice = devices[0];
+
+      // 获取设备特征信息
+      const sdk = await SDKUtils.getInstance();
+      if (targetDevice.connectId && targetDevice.deviceId) {
+        const featuresResult = await sdk.getFeatures(targetDevice.connectId);
+        if (featuresResult.success && featuresResult.payload) {
+          setDeviceFeatures(featuresResult.payload);
+
+          // 获取OneKey特定的features
+          const onekeyFeaturesResult = await sdk.getOnekeyFeatures(targetDevice.connectId);
+          if (onekeyFeaturesResult.success && onekeyFeaturesResult.payload) {
+            // 更新设备信息，包含onekeyFeatures
+            const updatedDevice = {
+              ...targetDevice,
+              features: featuresResult.payload,
+              onekeyFeatures: onekeyFeaturesResult.payload,
+            };
+            setCurrentDevice(updatedDevice);
+          } else {
+            // 即使获取onekeyFeatures失败，也设置基本的设备信息
+            const updatedDevice = {
+              ...targetDevice,
+              features: featuresResult.payload,
+            };
+            setCurrentDevice(updatedDevice);
+          }
+        } else {
+          setCurrentDevice(targetDevice);
+        }
+      } else {
+        setCurrentDevice(targetDevice);
+      }
+    } catch (error) {
+      console.error('Auto connection error:', error);
     }
   };
 
@@ -121,33 +148,22 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
       if (!result.success) {
         return toast({
           title: t('transport.connectionFailed'),
-          description: t('transport.switchFailed'),
+          description: result.payload?.error || t('transport.switchFailed'),
           variant: 'warning',
         });
       }
 
       // Notify SDK and search devices
       const sdkInstance = await SDKUtils.getInstance();
-      const response = {
+      sdkInstance.uiResponse({
         type: UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE,
         payload: { deviceId: device.serialNumber ?? '' },
-      };
-      sdkInstance.uiResponse(response);
+      });
 
       const searchResult = await searchDevices();
       if (searchResult.success && searchResult.payload) {
         const devices = searchResult.payload as DeviceInfo[];
         setConnectedDevices(devices);
-
-        if (devices.length === 0) {
-          toast({
-            title: t('transport.connectionFailed'),
-            description: t('transport.webusb.deviceUnavailable'),
-            variant: 'warning',
-          });
-          return;
-        }
-
         await handleDeviceConnection(devices);
         toast({
           title: t('transport.connectionSuccessful'),
@@ -157,7 +173,7 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
       } else {
         toast({
           title: t('transport.searchFailed'),
-          description: t('transport.webusb.deviceUnavailable'),
+          description: searchResult.payload?.error || t('transport.searchDeviceFailed'),
           variant: 'warning',
         });
         setConnectedDevices([]);
@@ -202,9 +218,10 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
       const result = await switchTransport(newTransport);
 
       if (!result.success) {
+        const errorMessage = result.payload?.error || t('transport.switchFailed');
         toast({
           title: t('transport.connectionFailed'),
-          description: t('transport.switchFailed'),
+          description: errorMessage,
           variant: 'warning',
         });
         return;
@@ -228,17 +245,20 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
           });
         }
       } else {
+        const errorMessage = searchResult.payload?.error || t('transport.searchDeviceFailed');
         toast({
           title: t('transport.searchFailed'),
-          description: t('transport.searchDeviceFailed'),
+          description: errorMessage,
           variant: 'warning',
         });
         setConnectedDevices([]);
       }
-    } catch {
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : t('transport.unknownConnectionError');
       toast({
         title: t('transport.connectionTip'),
-        description: t('transport.unknownConnectionError'),
+        description: errorMessage,
         variant: 'warning',
       });
       setConnectedDevices([]);
@@ -253,7 +273,7 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
     if (sdkInitState.error) {
       toast({
         title: t('transport.sdkInitError'),
-        description: t('transport.sdkInitDescription'),
+        description: sdkInitState.error,
         variant: 'destructive',
       });
     }

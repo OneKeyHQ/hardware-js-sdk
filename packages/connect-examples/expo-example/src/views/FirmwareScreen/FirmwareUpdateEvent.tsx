@@ -59,9 +59,6 @@ function FirmwareUpdateEventView({
         case 'GoToBootloaderSuccess':
           newMessage = intl.formatMessage({ id: 'message__wait_begin_update' });
           break;
-        case 'SwitchFirmwareReconnectDevice':
-          newMessage = intl.formatMessage({ id: 'message__firmware_reconnect_device' });
-          break;
         case 'ConfirmOnDevice':
           newMessage = intl.formatMessage({ id: 'message__confirm_on_device' });
           break;

@@ -54,64 +54,6 @@ const api: UnifiedMethodConfig[] = [
         ],
       },
       {
-        title: 'Get address (Testnet)',
-        parameters: [
-          {
-            name: 'addressParameters',
-            type: 'textarea',
-            required: true,
-            label: 'Address Parameters',
-            value: {
-              addressType: 0,
-              path: "m/1852'/1815'/0'/0/0",
-              stakingPath: "m/1852'/1815'/0'/2/0",
-              stakingKeyHash: undefined,
-              paymentScriptHash: undefined,
-              stakingScriptHash: undefined,
-            },
-          },
-          {
-            name: 'protocolMagic',
-            type: 'number',
-            required: true,
-            label: 'Protocol Magic',
-            value: 1097911063,
-          },
-          {
-            name: 'networkId',
-            type: 'number',
-            required: true,
-            label: 'Network ID',
-            value: 0,
-          },
-          {
-            name: 'derivationType',
-            type: 'number',
-            required: false,
-            label: 'Derivation Type',
-            description: 'Derivation type (1 for Classic, 2 for Touch)',
-            value: 1,
-          },
-          {
-            name: 'address',
-            type: 'string',
-            value: '',
-          },
-          {
-            name: 'showOnOneKey',
-            type: 'boolean',
-            required: false,
-            label: 'Show on Device',
-            value: false,
-          },
-          {
-            name: 'isCheck',
-            type: 'boolean',
-            value: false,
-          },
-        ],
-      },
-      {
         title: 'Classic Batch Get Address',
         parameters: [
           {
@@ -275,62 +217,6 @@ const api: UnifiedMethodConfig[] = [
           },
         ],
       },
-      {
-        title: 'Classic Batch Get PublicKey',
-        parameters: [
-          {
-            name: 'bundle',
-            type: 'textarea',
-            required: true,
-            label: 'Bundle Configuration',
-            value: [
-              {
-                path: "m/1852'/1815'/0'",
-                showOnOneKey: false,
-                derivationType: 1,
-              },
-              {
-                path: "m/1852'/1815'/0'",
-                showOnOneKey: false,
-                derivationType: 1,
-              },
-              {
-                path: "m/1852'/1815'/0'",
-                showOnOneKey: false,
-                derivationType: 1,
-              },
-            ],
-          },
-        ],
-      },
-      {
-        title: 'Touch Batch Get PublicKey',
-        parameters: [
-          {
-            name: 'bundle',
-            type: 'textarea',
-            required: true,
-            label: 'Bundle Configuration',
-            value: [
-              {
-                path: "m/1852'/1815'/0'",
-                showOnOneKey: false,
-                derivationType: 2,
-              },
-              {
-                path: "m/1852'/1815'/0'",
-                showOnOneKey: false,
-                derivationType: 1,
-              },
-              {
-                path: "m/1852'/1815'/0'",
-                showOnOneKey: false,
-                derivationType: 2,
-              },
-            ],
-          },
-        ],
-      },
     ],
   },
   {
@@ -368,47 +254,6 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Network ID',
             value: 1,
-          },
-        ],
-      },
-      {
-        title: 'Sign Message (Testnet)',
-        parameters: [
-          {
-            name: 'path',
-            type: 'string',
-            required: true,
-            label: 'Derivation Path',
-            value: "m/1852'/1815'/0'/0/0",
-          },
-          {
-            name: 'message',
-            type: 'string',
-            required: true,
-            label: 'Message',
-            value: 'Hello World',
-          },
-          {
-            name: 'derivationType',
-            type: 'number',
-            required: false,
-            label: 'Derivation Type',
-            description: 'Derivation type (1 for Classic, 2 for Touch)',
-            value: 1,
-          },
-          {
-            name: 'networkId',
-            type: 'number',
-            required: true,
-            label: 'Network ID',
-            value: 0,
-          },
-          {
-            name: 'protocolMagic',
-            type: 'number',
-            required: true,
-            label: 'Protocol Magic',
-            value: 1097911063,
           },
         ],
       },

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { UI_EVENT, UI_REQUEST, UI_RESPONSE, getDeviceSerialNo } from '@onekeyfe/hd-core';
+import { UI_EVENT, UI_REQUEST, UI_RESPONSE, getDeviceUUID } from '@onekeyfe/hd-core';
 import { Stack, Text, XStack, YStack } from 'tamagui';
 import { useIntl } from 'react-intl';
 import { get, isEmpty } from 'lodash';
@@ -175,10 +175,10 @@ function ExecuteView() {
           error: `actual: ${payload.bootloader_mode}, 预期: bootloader 模式`,
         });
       }
-      const serialNo = getDeviceSerialNo(payload);
-      if (isEmpty(serialNo)) {
+      const uuid = getDeviceUUID(payload);
+      if (isEmpty(uuid)) {
         return Promise.resolve({
-          error: `actual: ${serialNo}, 预期: 成功读取设备序列号`,
+          error: `actual: ${uuid}, 预期: 成功读取设备序列号`,
         });
       }
 

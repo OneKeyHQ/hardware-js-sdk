@@ -14,7 +14,7 @@ interface DialogState {
 
 interface HardwareInputPinDialogContextType {
   dialogState: DialogState;
-  openDialog: (sdk: any, features?: Features) => void;
+  openDialog: (sdk: any, features: Features) => void;
   closeDialog: () => void;
 }
 
@@ -37,7 +37,7 @@ export const HardwareInputPinDialogProvider: React.FC<{ children: ReactNode }> =
   }, [dialogState.sdk]);
 
   const openDialog = useCallback(
-    (sdk: any, features?: Features, payload?: any) => {
+    (sdk: any, features: Features, payload?: any) => {
       if (supportInputPinOnSoftware(features).support) {
         setDialogState({ isOpen: true, sdk, payload });
       } else {

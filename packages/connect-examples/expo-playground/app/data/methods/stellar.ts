@@ -81,10 +81,6 @@ const api: UnifiedMethodConfig[] = [
               source: 'GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV',
               fee: 100,
               sequence: '4294967297',
-              timebounds: {
-                minTime: 0,
-                maxTime: 0,
-              },
               memo: {
                 type: 0,
               },
@@ -129,10 +125,6 @@ const api: UnifiedMethodConfig[] = [
               source: 'GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV',
               fee: 100,
               sequence: '4294967297',
-              timebounds: {
-                minTime: 0,
-                maxTime: 0,
-              },
               memo: {
                 type: 1,
                 text: 'test memo',

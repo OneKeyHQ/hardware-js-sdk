@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import { summarizeJsonValue } from '../utils/jsonPreview';
 
 // 通用参数状态
 export interface CommonParametersState {
@@ -134,7 +133,6 @@ export const useHardwareStore = create<HardwareState>()(
       );
     },
 
-
     // 手动更新执行参数
     updateExecutionParameters: () => {
       set(
@@ -193,8 +191,8 @@ function calculateExecutionParameters(
 ): Record<string, unknown> {
   // 合并所有参数
   const allParams = {
-    ...commonParams,
     ...methodParams,
+    ...commonParams,
   };
 
   // 过滤无效值
@@ -215,16 +213,8 @@ function calculateExecutionParameters(
 
   console.log('[HardwareStore] 📋 计算执行参数:', {
     原始通用参数: commonParams,
-    原始方法参数: summarizeJsonValue(methodParams, {
-      maxDepth: 5,
-      maxArrayItems: 12,
-      maxStringLength: 256,
-    }),
-    最终执行参数: summarizeJsonValue(cleanParams, {
-      maxDepth: 5,
-      maxArrayItems: 12,
-      maxStringLength: 256,
-    }),
+    原始方法参数: methodParams,
+    最终执行参数: cleanParams,
   });
 
   return cleanParams;
@@ -248,7 +238,7 @@ export async function convertFilesToArrayBuffers(
 
   // 处理文件参数
   for (const [key, value] of Object.entries(result)) {
-    if (typeof File !== 'undefined' && value instanceof File) {
+    if (value instanceof File) {
       try {
         const arrayBuffer = await fileToArrayBuffer(value);
         result[key] = arrayBuffer;
@@ -258,22 +248,6 @@ export async function convertFilesToArrayBuffers(
         );
       } catch (error) {
         console.error(`[FileConverter] ❌ 文件转换失败: ${key}`, error);
-        delete result[key];
-      }
-    } else if (
-      typeof File !== 'undefined' &&
-      Array.isArray(value) &&
-      value.every(item => item instanceof File)
-    ) {
-      try {
-        const arrayBuffers = await Promise.all(value.map(file => fileToArrayBuffer(file)));
-        result[key] = arrayBuffers;
-
-        console.log(
-          `[FileConverter] 📁 文件数组参数转换: ${key} -> ArrayBuffer[] (${arrayBuffers.length} files)`
-        );
-      } catch (error) {
-        console.error(`[FileConverter] ❌ 文件数组转换失败: ${key}`, error);
         delete result[key];
       }
     }

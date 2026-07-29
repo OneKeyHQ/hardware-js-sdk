@@ -5,16 +5,14 @@ import { DeviceInfo } from '../types/hardware';
 import type { UnifiedLogEntry } from '../components/common/UnifiedLogger';
 
 import { isClassicModelDevice, isTouchModelDevice } from '../utils/deviceTypeUtils';
-import { summarizeJsonValue } from '../utils/jsonPreview';
-import { parseDeviceVersionTuple } from '../services/deviceStateSelectors';
-import type { DeviceState as HardwareDeviceState, Features, IDeviceType } from '@onekeyfe/hd-core';
+import type { IDeviceType, Features } from '@onekeyfe/hd-core';
 import {
   UiEvent,
   getDeviceFirmwareVersion,
   getDeviceBLEFirmwareVersion,
   getDeviceBootloaderVersion,
   getDeviceLabel,
-  getDeviceSerialNo,
+  getDeviceUUID,
 } from '@onekeyfe/hd-core';
 
 // 设备动作状态
@@ -51,7 +49,6 @@ export interface CompressedLogEntry {
   content?: string; // 压缩后的JSON字符串
   data?: string; // 压缩后的JSON字符串 (兼容性)
   compressed?: boolean;
-  transient?: boolean;
 }
 
 // 持久化日志存储结构
@@ -72,7 +69,6 @@ interface DeviceState {
   connectedDevices: DeviceInfo[];
   currentDevice: DeviceInfo | null;
   deviceFeatures: Features | undefined;
-  deviceState: HardwareDeviceState | undefined;
   isConnecting: boolean;
 
   // Device action state for lottie animations
@@ -113,7 +109,7 @@ interface DeviceState {
   getCurrentDeviceBLEVersion: () => [number, number, number] | null;
   getCurrentDeviceBootloaderVersion: () => [number, number, number] | null;
   getCurrentDeviceLabel: () => string | null;
-  getCurrentDeviceSerialNo: () => string | null;
+  getCurrentDeviceUUID: () => string | null;
 }
 
 // 默认日志存储配置
@@ -122,23 +118,6 @@ const DEFAULT_LOG_CONFIG: LogStorageConfig = {
   maxSizeBytes: 30 * 1024 * 1024, // 最大30MB
   expirationDays: 2, // 2天过期
   compressionEnabled: true, // 启用压缩
-};
-
-const MAX_TRANSIENT_LOG_ENTRIES = 300;
-
-let lastPersistedDeviceStoreValue: string | null = null;
-
-const getSafePersistedLogData = (data: Record<string, unknown> | null) => {
-  if (!data) return null;
-  const summarized = summarizeJsonValue(data, {
-    maxDepth: 6,
-    maxArrayItems: 20,
-    maxObjectKeys: 60,
-    maxStringLength: 512,
-  });
-  return summarized && typeof summarized === 'object' && !Array.isArray(summarized)
-    ? (summarized as Record<string, unknown>)
-    : { value: summarized };
 };
 
 // 智能压缩函数 - 使用LZ-string进行真正的压缩
@@ -248,9 +227,8 @@ const filterUIEventData = (log: UnifiedLogEntry): UnifiedLogEntry => {
 const compressLogEntry = (log: UnifiedLogEntry, config: LogStorageConfig): CompressedLogEntry => {
   // 先过滤UI事件数据
   const filteredLog = filterUIEventData(log);
-  const logData = getSafePersistedLogData(
-    filteredLog.data || (typeof filteredLog.content === 'object' ? filteredLog.content : null)
-  );
+  const logData =
+    filteredLog.data || (typeof filteredLog.content === 'object' ? filteredLog.content : null);
 
   if (!config.compressionEnabled || !logData) {
     return {
@@ -265,7 +243,6 @@ const compressLogEntry = (log: UnifiedLogEntry, config: LogStorageConfig): Compr
       content: logData ? JSON.stringify(logData) : undefined,
       data: logData ? JSON.stringify(logData) : undefined,
       compressed: false,
-      transient: filteredLog.transient,
     };
   }
 
@@ -287,7 +264,6 @@ const compressLogEntry = (log: UnifiedLogEntry, config: LogStorageConfig): Compr
     content: compressedData,
     data: compressedData,
     compressed: wasCompressed,
-    transient: filteredLog.transient,
   };
 };
 
@@ -304,23 +280,7 @@ const decompressLogEntry = (compressed: CompressedLogEntry): UnifiedLogEntry => 
     message: compressed.message,
     content: decompressedData || null,
     data: decompressedData,
-    ...(compressed.transient ? { transient: true } : {}),
   };
-};
-
-const trimTransientLogs = (logs: UnifiedLogEntry[]): UnifiedLogEntry[] => {
-  let transientCount = logs.reduce((count, log) => count + (log.transient ? 1 : 0), 0);
-  if (transientCount <= MAX_TRANSIENT_LOG_ENTRIES) {
-    return logs;
-  }
-
-  return logs.filter(log => {
-    if (!log.transient || transientCount <= MAX_TRANSIENT_LOG_ENTRIES) {
-      return true;
-    }
-    transientCount -= 1;
-    return false;
-  });
 };
 
 export const useDeviceStore = create<DeviceState>()(
@@ -330,7 +290,6 @@ export const useDeviceStore = create<DeviceState>()(
       connectedDevices: [],
       currentDevice: null,
       deviceFeatures: undefined,
-      deviceState: undefined,
       isConnecting: false,
       logs: [],
       deviceAction: {
@@ -346,8 +305,7 @@ export const useDeviceStore = create<DeviceState>()(
 
       // Actions
       setConnectedDevices: (devices: DeviceInfo[]) => set({ connectedDevices: devices }),
-      setCurrentDevice: (device: DeviceInfo | null) =>
-        set({ currentDevice: device, deviceState: device?.deviceState }),
+      setCurrentDevice: (device: DeviceInfo | null) => set({ currentDevice: device }),
       setDeviceFeatures: (features: Features | undefined) => set({ deviceFeatures: features }),
       setIsConnecting: (isConnecting: boolean) => set({ isConnecting }),
 
@@ -374,7 +332,7 @@ export const useDeviceStore = create<DeviceState>()(
 
       addLog: (log: UnifiedLogEntry) =>
         set(state => {
-          const newLogs = trimTransientLogs([...state.logs, log]);
+          const newLogs = [...state.logs, log];
           // 在内存中也进行基本的大小限制
           if (newLogs.length > state.logStorageConfig.maxEntries) {
             return {
@@ -457,9 +415,7 @@ export const useDeviceStore = create<DeviceState>()(
               const timestamp =
                 typeof log.timestamp === 'string' ? log.timestamp : log.timestamp.toISOString();
               const message = log.message || log.title || '';
-              const data = getSafePersistedLogData(
-                log.data || (typeof log.content === 'object' ? log.content : null)
-              );
+              const data = log.data || (typeof log.content === 'object' ? log.content : null);
               return `[${timestamp}] ${log.type.toUpperCase()}: ${message}${
                 data ? '\nData: ' + JSON.stringify(data, null, 2) : ''
               }`;
@@ -467,19 +423,7 @@ export const useDeviceStore = create<DeviceState>()(
             .join('\n\n');
         }
 
-        return JSON.stringify(
-          logs.map(log => ({
-            ...log,
-            data: getSafePersistedLogData(
-              log.data || (typeof log.content === 'object' ? log.content : null)
-            ),
-            content: getSafePersistedLogData(
-              log.data || (typeof log.content === 'object' ? log.content : null)
-            ),
-          })),
-          null,
-          2
-        );
+        return JSON.stringify(logs, null, 2);
       },
 
       // Device type helpers
@@ -497,40 +441,23 @@ export const useDeviceStore = create<DeviceState>()(
       },
       getCurrentDeviceFirmwareVersion: () => {
         const state = get();
-        return (
-          parseDeviceVersionTuple(state.deviceState?.versions.firmware) ||
-          getDeviceFirmwareVersion(state.deviceFeatures)
-        );
+        return getDeviceFirmwareVersion(state.deviceFeatures);
       },
       getCurrentDeviceBLEVersion: () => {
         const state = get();
-        return (
-          parseDeviceVersionTuple(state.deviceState?.versions.ble) ||
-          getDeviceBLEFirmwareVersion(state.deviceFeatures)
-        );
+        return getDeviceBLEFirmwareVersion(state.deviceFeatures as Features);
       },
       getCurrentDeviceBootloaderVersion: () => {
         const state = get();
-        return (
-          parseDeviceVersionTuple(state.deviceState?.versions.bootloader) ||
-          getDeviceBootloaderVersion(state.deviceFeatures)
-        );
+        return getDeviceBootloaderVersion(state.deviceFeatures);
       },
       getCurrentDeviceLabel: () => {
         const state = get();
-        return (
-          state.currentDevice?.deviceState?.identity.label ||
-          state.currentDevice?.deviceState?.identity.bleName ||
-          state.currentDevice?.name ||
-          getDeviceLabel(state.deviceFeatures)
-        );
+        return getDeviceLabel(state.deviceFeatures);
       },
-      getCurrentDeviceSerialNo: () => {
+      getCurrentDeviceUUID: () => {
         const state = get();
-        return (
-          state.deviceState?.identity.serialNo ||
-          (state.deviceFeatures ? getDeviceSerialNo(state.deviceFeatures) : null)
-        );
+        return state.deviceFeatures ? getDeviceUUID(state.deviceFeatures) : null;
       },
     }),
     {
@@ -539,9 +466,7 @@ export const useDeviceStore = create<DeviceState>()(
 
       // 只持久化日志和配置，其他状态保持会话级别
       partialize: state => ({
-        logs: state.logs
-          .filter(log => !log.transient)
-          .map(log => compressLogEntry(log, state.logStorageConfig)),
+        logs: state.logs.map(log => compressLogEntry(log, state.logStorageConfig)),
         logStorageConfig: state.logStorageConfig,
       }),
 
@@ -560,9 +485,7 @@ export const useDeviceStore = create<DeviceState>()(
               parsed.state.lastCleanup = new Date().toISOString();
             }
 
-            const serialized = JSON.stringify(parsed);
-            lastPersistedDeviceStoreValue = serialized;
-            return serialized;
+            return JSON.stringify(parsed);
           } catch (error) {
             console.warn('Failed to read persisted logs:', error);
             // 如果是版本错误，清除存储并返回null以重新初始化
@@ -583,12 +506,7 @@ export const useDeviceStore = create<DeviceState>()(
               parsed.state.logs = cleanupLogs(parsed.state.logs, config);
             }
 
-            const serialized = JSON.stringify(parsed);
-            if (serialized === lastPersistedDeviceStoreValue) {
-              return;
-            }
-            localStorage.setItem(name, serialized);
-            lastPersistedDeviceStoreValue = serialized;
+            localStorage.setItem(name, JSON.stringify(parsed));
           } catch (error) {
             console.warn('Failed to persist logs:', error);
           }

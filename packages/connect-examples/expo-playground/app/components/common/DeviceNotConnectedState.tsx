@@ -3,23 +3,20 @@ import { Button } from '../ui/Button';
 import { useTranslation } from 'react-i18next';
 import { Search, AlertTriangle, ArrowRight } from 'lucide-react';
 import { useDeviceStore } from '../../store/deviceStore';
-import { hydrateConnectedDeviceInfo, searchDevices } from '../../services/hardwareService';
+import { searchDevices } from '../../services/hardwareService';
 import { useToast } from '../../hooks/use-toast';
-import { isPro2DeviceInfo } from '../../utils/pro2Device';
-import type { DeviceInfo } from '../../types/hardware';
+import { SDKUtils } from '../../utils/hardwareInstance';
 
 interface DeviceNotConnectedStateProps {
   className?: string;
   showFullPage?: boolean;
   title?: string;
   description?: string;
-  pro2Only?: boolean;
 }
 
 export function DeviceNotConnectedState({
   className = '',
   showFullPage = false,
-  pro2Only = false,
 }: DeviceNotConnectedStateProps) {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -55,26 +52,27 @@ export function DeviceNotConnectedState({
       const searchResult = await searchDevices();
 
       if (searchResult.success && searchResult.payload) {
-        const foundDevices = searchResult.payload as DeviceInfo[];
-        const devices = pro2Only ? foundDevices.filter(isPro2DeviceInfo) : foundDevices;
+        const devices = searchResult.payload;
         setConnectedDevices(devices);
 
         // 自动连接第一个设备
         if (devices.length > 0) {
           const targetDevice = devices[0];
-          const hydratedDevice = await hydrateConnectedDeviceInfo(targetDevice);
-          const hydratedDevices = [hydratedDevice, ...devices.slice(1)];
+          setCurrentDevice(targetDevice);
 
-          setConnectedDevices(hydratedDevices);
-          setCurrentDevice(hydratedDevice);
-          if (hydratedDevice.features) {
-            setDeviceFeatures(hydratedDevice.features);
+          // 获取设备特征信息
+          const sdk = await SDKUtils.getInstance();
+          if (targetDevice.connectId && targetDevice.deviceId) {
+            const featuresResult = await sdk.getFeatures(targetDevice.connectId);
+            if (featuresResult.success && featuresResult.payload) {
+              setDeviceFeatures(featuresResult.payload);
+            }
           }
 
           toast({
             title: t('device.connected'),
             description: `${t('device.connectedTo')} ${
-              hydratedDevice.label || hydratedDevice.deviceType
+              targetDevice.label || targetDevice.deviceType
             }`,
             variant: 'default',
           });
@@ -86,16 +84,19 @@ export function DeviceNotConnectedState({
           });
         }
       } else {
+        const errorMessage = searchResult.payload?.error || t('transport.searchDeviceFailed');
         toast({
           title: t('transport.searchFailed'),
-          description: t('transport.searchDeviceFailed'),
+          description: errorMessage,
           variant: 'warning',
         });
       }
-    } catch {
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : t('transport.unknownConnectionError');
       toast({
         title: t('transport.connectionTip'),
-        description: t('transport.unknownConnectionError'),
+        description: errorMessage,
         variant: 'warning',
       });
     } finally {

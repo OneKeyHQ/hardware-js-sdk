@@ -133,7 +133,7 @@ function buildRegistry(modules: ModuleConfig[]): MethodsRegistry {
       return allMethodsList.filter(
         method =>
           method.method.toString().toLowerCase().includes(lowerQuery) ||
-          (method.description ?? '').toLowerCase().includes(lowerQuery)
+          method.description.toLowerCase().includes(lowerQuery)
       );
     },
     getChain: (chainId: string) => chains.find(chain => chain.id === chainId),

@@ -5,6 +5,7 @@ import { DeviceProvider } from '../provider/DeviceProvider';
 import { HardwareInputPinDialogProvider } from '../provider/HardwareInputPinProvider';
 import PageView from '../components/ui/Page';
 import PanelView from '../components/ui/Panel';
+
 // Import all SLIP39 test components
 import { SLIP39AddressValidation } from '../testTools/slip39Test/SLIP39AddressValidation';
 import { SLIP39BatchTest } from '../testTools/slip39Test/SLIP39BatchTest';

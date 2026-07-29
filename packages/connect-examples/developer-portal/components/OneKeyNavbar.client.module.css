@@ -58,14 +58,51 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
-/* 弹窗打开时隐藏导航触发器，避免与弹窗顶部按钮产生重复感。 */
+.menuTrigger {
+  border-radius: 8px;
+}
+
+.menuTrigger:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.menuTrigger:focus-visible {
+  outline: 2px solid rgba(79, 245, 95, 0.72);
+  outline-offset: 4px;
+  box-shadow: none;
+}
+
+.menuTrigger[data-pointer-focus='true']:focus-visible {
+  outline: none;
+}
+
+.menuSurface {
+  border-color: rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+}
+
+.menuSurface:focus,
+.menuSurface:focus-visible {
+  outline: none;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
+}
+
+/* Hide the header search trigger while the dialog provides its own controls. */
 :global(html[data-docs-ai-open='true']) .assistActions {
   opacity: 0;
   pointer-events: none;
   transform: translateY(-4px);
 }
 
-@media (max-width: 1120px) {
+@media (max-width: 1279px) {
+  .assistButton {
+    width: 36px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .buttonLabel,
   .searchHotkeyWrap {
     display: none;
   }
@@ -73,11 +110,14 @@
 
 @media (max-width: 768px) {
   .assistActions {
-    margin-right: 4px;
+    margin-right: 0;
   }
 
   .assistButton {
-    padding: 0 10px;
+    width: 44px;
+    height: 44px;
+    justify-content: center;
+    padding: 0;
   }
 
   .buttonLabel,

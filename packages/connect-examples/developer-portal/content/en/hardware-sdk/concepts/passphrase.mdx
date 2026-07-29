@@ -116,7 +116,7 @@ sequenceDiagram
 ```ts
 // Step 1: Get passphrase state (prompts user once)
 const state = await HardwareSDK.getPassphraseState(connectId);
-const passphraseState = state.payload.passphrase_state;
+const passphraseState = state.payload;
 
 // Step 2: Use passphraseState in subsequent calls (no more prompts)
 const commonParams = {
@@ -136,15 +136,71 @@ await HardwareSDK.btcGetAddress(connectId, deviceId, {
 });
 ```
 
-### Session ownership
+### Cross-process session reuse (CLI / scripts)
 
-Applications persist only `deviceId + passphraseState`. The SDK keeps the
-ephemeral `session_id` in its in-memory wallet-session store and restores it
-automatically while the SDK process and device session remain valid.
+For short-lived processes (CLI tools, automation scripts), you can persist the session and restore it on the next invocation using `preloadSessionCache`.
 
-Do not read, persist, or pass a `sessionId` through application APIs. After a
-process restart, device lock, or invalid session, open the wallet again and let
-the user complete the normal passphrase flow.
+```mermaid
+sequenceDiagram
+    participant Process1 as Process 1
+    participant SDK
+    participant Device
+    participant Storage as Keychain / File
+
+    Process1->>SDK: getPassphraseState → passphraseState
+    Process1->>SDK: searchDevices → session_id
+    Process1->>Storage: save(deviceId, passphraseState, session_id)
+
+    Note over Process1: Process exits
+
+    participant Process2 as Process 2
+    Process2->>Storage: load(deviceId) → passphraseState, session_id
+    Process2->>SDK: preloadSessionCache(deviceId, passphraseState, session_id)
+    Process2->>SDK: evmGetAddress(..., passphraseState)
+    SDK->>Device: Initialize with session_id
+    Device-->>SDK: Session recognized → no passphrase prompt
+    SDK-->>Process2: { address }
+```
+
+```ts
+import { preloadSessionCache } from '@onekeyfe/hd-core';
+
+// On startup: restore session from persistent storage
+const { deviceId, passphraseState, sessionId } = loadFromStorage();
+preloadSessionCache(deviceId, passphraseState, sessionId);
+
+// Now SDK calls with this passphraseState skip the passphrase prompt
+await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  passphraseState,
+});
+```
+
+> **Important: device locking invalidates sessions.** All OneKey devices clear passphrase sessions when locked (whether by auto-lock timeout, manual lock, or USB disconnection). Once locked, the cached `session_id` becomes invalid and the user must re-enter their passphrase after unlocking (PIN). Session reuse only works when the device remains unlocked between invocations.
+
+### Unlock-first pattern (recommended for CLI)
+
+For devices that may auto-lock (Touch/Pro), always unlock before attempting session reuse:
+
+```ts
+// 1. Check if device is locked
+const features = await HardwareSDK.getFeatures(connectId);
+
+// 2. Unlock if needed (triggers PIN on device)
+let wasLocked = false;
+if (!features.payload.unlocked) {
+  wasLocked = true;
+  await HardwareSDK.deviceUnlock(connectId, {});
+}
+
+// 3. Only reuse cached session if device was already unlocked
+if (!wasLocked) {
+  // Try preloadSessionCache from persistent storage
+  preloadSessionCache(deviceId, savedPassphraseState, savedSessionId);
+} else {
+  // Device was locked → old session is invalid → must re-prompt
+}
+```
 
 ## Security tips
 

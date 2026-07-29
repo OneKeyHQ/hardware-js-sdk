@@ -1,6 +1,7 @@
-import React, { memo, useCallback, useMemo, useState } from 'react';
+import React, { memo, useEffect, useMemo, useState } from 'react';
 import { FlatList, Platform } from 'react-native';
-import { Stack, Text, XStack, YStack } from 'tamagui';
+import { Stack, YStack } from 'tamagui';
+import { useIntl } from 'react-intl';
 
 import PageView from '../components/ui/Page';
 import HandleSDKEvents from '../components/HandleSDKEvents';
@@ -14,7 +15,6 @@ import { CollapsibleSection } from '../components/CollapsibleSection';
 import Playground from '../components/Playground';
 import PanelView from '../components/ui/Panel';
 import { useMedia } from '../provider/MediaProvider';
-import { Button } from '../components/ui/Button';
 
 import type { PlaygroundProps as ApiPayloadProps } from '../components/Playground';
 
@@ -150,15 +150,6 @@ const playgroundConfig = [
   },
 ];
 
-const pro2PlaygroundConfig = [
-  {
-    title: 'Pro2 Protocol V2 API',
-    data: require('../data/pro2').default,
-  },
-];
-
-type PayloadTab = 'all' | 'pro2';
-
 interface ApiPayloadItem {
   title: string;
   data: Array<React.JSX.IntrinsicAttributes & ApiPayloadProps>;
@@ -204,57 +195,29 @@ const PayloadStack = memo(({ data }: { data: React.JSX.IntrinsicAttributes & Api
 });
 PayloadStack.displayName = 'PayloadStack';
 
-const ApiPayload = () => {
-  const [activeTab, setActiveTab] = useState<PayloadTab>('all');
-  const payloadConfig = activeTab === 'pro2' ? pro2PlaygroundConfig : playgroundConfig;
-
-  const renderPayloadTabs = useCallback(
-    () => (
-      <XStack gap="$2" alignItems="center">
-        {(
-          [
-            { key: 'all', label: 'All API' },
-            { key: 'pro2', label: 'Pro2' },
-          ] as Array<{ key: PayloadTab; label: string }>
-        ).map(tab => (
-          <Button
-            key={tab.key}
-            size="small"
-            variant={activeTab === tab.key ? 'primary' : 'tertiary'}
-            onPress={() => setActiveTab(tab.key)}
-          >
-            <Text color={activeTab === tab.key ? '$textInverse' : '$textSubdued'}>{tab.label}</Text>
-          </Button>
-        ))}
-      </XStack>
-    ),
-    [activeTab]
-  );
-
-  return (
-    <Stack>
-      <HandleSDKEvents />
+const ApiPayload = () => (
+  <Stack>
+    <HandleSDKEvents />
+    <DeviceProvider>
       <CommonParamsProvider>
-        <DeviceProvider>
-          <CommonParamsView />
-          <ExpandModeProvider>
-            <PanelView title="API Payload" renderRight={renderPayloadTabs}>
-              <FlatList
-                data={payloadConfig}
-                renderItem={({ item }) => <ApiPayloadItem item={item} />}
-                keyExtractor={item => item.title}
-                initialNumToRender={5}
-                maxToRenderPerBatch={3}
-              />
-            </PanelView>
-          </ExpandModeProvider>
-          <UploadScreen />
-          <ChangeScreenComponent />
-        </DeviceProvider>
+        <CommonParamsView />
+        <ExpandModeProvider>
+          <PanelView title="API Payload">
+            <FlatList
+              data={playgroundConfig}
+              renderItem={({ item }) => <ApiPayloadItem item={item} />}
+              keyExtractor={item => item.title}
+              initialNumToRender={5}
+              maxToRenderPerBatch={3}
+            />
+          </PanelView>
+        </ExpandModeProvider>
+        <UploadScreen />
+        <ChangeScreenComponent />
       </CommonParamsProvider>
-    </Stack>
-  );
-};
+    </DeviceProvider>
+  </Stack>
+);
 
 export default function ApiPayloadScreen() {
   return (
