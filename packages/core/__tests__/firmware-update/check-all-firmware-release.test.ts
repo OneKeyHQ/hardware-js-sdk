@@ -1,4 +1,4 @@
-import { ERRORS, EDeviceType, EFirmwareType, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { EDeviceType, EFirmwareType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import CheckAllFirmwareRelease from '../../src/api/CheckAllFirmwareRelease';
 import { buildFirmwareUpdatePlan } from '../../src/api/firmware/FirmwareUpdatePlan';
@@ -15,6 +15,7 @@ jest.mock('../../src/data/config', () => ({
 
 jest.mock('../../src/api/firmware/FirmwareUpdatePlan', () => ({
   buildFirmwareUpdatePlan: jest.fn(),
+  validateFirmwareUpdatePlanForceTargets: jest.fn(value => value ?? []),
 }));
 
 jest.mock('../../src/api/firmware/releaseHelper', () => ({
@@ -145,6 +146,21 @@ describe('CheckAllFirmwareRelease', () => {
         forceUpdateTargets: ['firmware', 'resource'],
       })
     );
+  });
+
+  test('does not hide a Plan failure for an explicitly forced target', async () => {
+    const planError = ERRORS.TypedError(
+      HardwareErrorCode.RuntimeError,
+      'Forced firmware target is unavailable',
+      {
+        firmwareUpdateCode: 'FirmwarePlanInvalid',
+      }
+    );
+    mockBuildFirmwareUpdatePlan.mockImplementation(() => {
+      throw planError;
+    });
+
+    await expect(createMethodWithForceTargets().run()).rejects.toBe(planError);
   });
 
   test('does not hide unexpected Plan builder failures', async () => {

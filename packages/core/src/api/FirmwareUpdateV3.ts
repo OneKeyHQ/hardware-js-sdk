@@ -13,6 +13,7 @@ import {
   getLogger,
 } from '../utils';
 import { getBinary, getSysResourceBinary } from './firmware/getBinary';
+import { normalizeFirmwarePreparationError } from './firmware/FirmwarePreparationError';
 import { DataManager } from '../data-manager';
 import { FirmwareUpdateBaseMethod } from './firmware/FirmwareUpdateBaseMethod';
 import { DevicePool } from '../device/DevicePool';
@@ -21,8 +22,8 @@ import { buildProtocolV1FeaturesPayload } from '../deviceProfile';
 import { openFirmwareByteSource } from './firmware/FirmwareArtifactSource';
 import { resolveFirmwareUpdateHostBinding } from './firmware/FirmwareHostBinding';
 import {
-  assertFirmwareUpdatePreparedPlanDeviceIdentity,
   assertFirmwareUpdatePreparedPlanBinding,
+  assertFirmwareUpdatePreparedPlanDeviceIdentity,
   getFirmwareUpdateResourceName,
 } from './firmware/FirmwareUpdatePreparedPlan';
 
@@ -184,7 +185,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
       this.postTipMessage(FirmwareUpdateTipMessage.FinishDownloadFirmware);
     } catch (err) {
       await this.closeArtifactSources();
-      throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
+      throw normalizeFirmwarePreparationError(err);
     }
 
     if (!bootloaderSource && fwSources.length === 0) {

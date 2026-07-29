@@ -25,6 +25,63 @@ const noUpdate = {
   release: undefined,
 };
 
+const expectFirmwarePlanInvalid = (build: () => unknown, expectedMessage?: string) => {
+  let thrown: unknown;
+  try {
+    build();
+  } catch (error) {
+    thrown = error;
+  }
+  expect(thrown).toMatchObject({
+    params: {
+      firmwareUpdateCode: 'FirmwarePlanInvalid',
+    },
+  });
+  if (expectedMessage) {
+    expect(thrown).toBeInstanceOf(Error);
+    expect((thrown as Error).message).toContain(expectedMessage);
+  }
+};
+
+type BuildPlanInput = Parameters<typeof buildFirmwareUpdatePlan>[0];
+
+const createLegacyForceInput = (
+  forceUpdateTargets: unknown,
+  release: Record<string, unknown> = {
+    url: 'https://firmware.onekey.so/pro/firmware.bin',
+    version: [4, 21, 0],
+  }
+): BuildPlanInput => ({
+  features: createFeatures({
+    deviceType: EDeviceType.Pro,
+    firmwareVersion: '4.21.0',
+    bootloaderVersion: '2.8.4',
+  }),
+  firmwareType: EFirmwareType.Universal,
+  platform: 'desktop',
+  firmware: { status: 'valid', release },
+  ble: noUpdate,
+  bootloader: noUpdate,
+  forceUpdateTargets: forceUpdateTargets as BuildPlanInput['forceUpdateTargets'],
+});
+
+const createProtocolV2ForceInput = (
+  forceUpdateTargets: unknown,
+  release: Record<string, unknown>
+): BuildPlanInput => ({
+  features: createFeatures({
+    deviceType: EDeviceType.Pro2,
+    firmwareVersion: '1.0.0',
+    bootloaderVersion: '1.0.0',
+  }),
+  firmwareType: EFirmwareType.Universal,
+  platform: 'desktop',
+  firmware: { status: 'valid', release },
+  ble: noUpdate,
+  bootloader: noUpdate,
+  forceUpdateTargets: forceUpdateTargets as BuildPlanInput['forceUpdateTargets'],
+});
+
 describe('buildFirmwareUpdatePlan', () => {
   test('selects all legacy artifacts before execution and chooses the desktop full resource', () => {
     const plan = buildFirmwareUpdatePlan({
@@ -191,6 +248,118 @@ describe('buildFirmwareUpdatePlan', () => {
     expect(plan.artifacts.map(artifact => artifact.artifactId)).toEqual(['firmware']);
     expect(plan.targetsToUpdate).toEqual(['firmware']);
   });
+
+  test.each([
+    {
+      label: 'a non-array value',
+      forceUpdateTargets: 'firmware',
+    },
+    {
+      label: 'an unknown target',
+      forceUpdateTargets: ['firmware', 'unknown'],
+    },
+    {
+      label: 'a duplicate target',
+      forceUpdateTargets: ['firmware', 'firmware'],
+    },
+  ])('rejects $label in forceUpdateTargets', ({ forceUpdateTargets }) => {
+    expectFirmwarePlanInvalid(() =>
+      buildFirmwareUpdatePlan(createLegacyForceInput(forceUpdateTargets))
+    );
+  });
+
+  test('rejects an explicitly forced legacy resource without a resource artifact', () => {
+    expectFirmwarePlanInvalid(() => buildFirmwareUpdatePlan(createLegacyForceInput(['resource'])));
+  });
+
+  test.each(['ble', 'bootloader'] as const)(
+    'rejects the unsupported Pro2 %s force target',
+    forceTarget => {
+      expectFirmwarePlanInvalid(
+        () =>
+          buildFirmwareUpdatePlan(
+            createProtocolV2ForceInput([forceTarget], {
+              components: {
+                applicationP1: {
+                  target: 'APPLICATION_P1',
+                  url: 'https://firmware.onekey.so/pro2/application-p1.bin',
+                },
+              },
+            })
+          ),
+        'does not support forced'
+      );
+    }
+  );
+
+  test.each([
+    {
+      forceTarget: 'firmware' as const,
+      release: {
+        components: {},
+        resourceBundles: [
+          {
+            name: 'images',
+            url: 'https://firmware.onekey.so/pro2/images.okpkg',
+          },
+        ],
+      },
+    },
+    {
+      forceTarget: 'resource' as const,
+      release: {
+        components: {
+          applicationP1: {
+            target: 'APPLICATION_P1',
+            url: 'https://firmware.onekey.so/pro2/application-p1.bin',
+          },
+        },
+      },
+    },
+  ])(
+    'rejects a Pro2 $forceTarget force target not represented by an artifact',
+    ({ forceTarget, release }) => {
+      expectFirmwarePlanInvalid(() =>
+        buildFirmwareUpdatePlan(createProtocolV2ForceInput([forceTarget], release))
+      );
+    }
+  );
+
+  test.each([
+    {
+      forceTarget: 'firmware' as const,
+      expectedArtifactIds: ['component:app_v1'],
+      expectedTargets: ['app_v1'],
+    },
+    {
+      forceTarget: 'resource' as const,
+      expectedArtifactIds: ['resourceBundle:images'],
+      expectedTargets: ['resource'],
+    },
+  ])(
+    'limits a Pro2 $forceTarget force to the selected artifact role',
+    ({ forceTarget, expectedArtifactIds, expectedTargets }) => {
+      const plan = buildFirmwareUpdatePlan(
+        createProtocolV2ForceInput([forceTarget], {
+          components: {
+            applicationP1: {
+              target: 'APPLICATION_P1',
+              url: 'https://firmware.onekey.so/pro2/application-p1.bin',
+            },
+          },
+          resourceBundles: [
+            {
+              name: 'images',
+              url: 'https://firmware.onekey.so/pro2/images.okpkg',
+            },
+          ],
+        })
+      );
+
+      expect(plan.artifacts.map(artifact => artifact.artifactId)).toEqual(expectedArtifactIds);
+      expect(plan.targetsToUpdate).toEqual(expectedTargets);
+    }
+  );
 
   test('rejects a prepared native plan without a stable device identity', () => {
     const features = createFeatures({

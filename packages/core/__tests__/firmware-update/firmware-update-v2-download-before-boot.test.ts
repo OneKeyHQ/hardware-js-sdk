@@ -1,4 +1,4 @@
-import { EDeviceType, EFirmwareType, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { EDeviceType, EFirmwareType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import FirmwareUpdateV2 from '../../src/api/FirmwareUpdateV2';
 import { getBinary } from '../../src/api/firmware/getBinary';
@@ -176,6 +176,25 @@ describe('FirmwareUpdateV2 download-before-reboot safety', () => {
     });
 
     expect(mockGetBinary).toHaveBeenCalledTimes(1);
+    expectNoFirmwareMutationCalls(typedCall);
+    expect(acquire).not.toHaveBeenCalled();
+    expect(mockUploadFirmwareFromSource).not.toHaveBeenCalled();
+  });
+
+  it('preserves structured preparation errors before any firmware mutation', async () => {
+    const preparationError = ERRORS.TypedError(
+      HardwareErrorCode.RuntimeError,
+      'Firmware must be prepared by the external firmware host',
+      {
+        firmwareUpdateCode: 'FirmwareArtifactsNotPrepared',
+        artifactName: 'firmware',
+      }
+    );
+    mockGetBinary.mockRejectedValue(preparationError);
+    const { method, typedCall, acquire } = createMethod();
+
+    await expect(method.run()).rejects.toBe(preparationError);
+
     expectNoFirmwareMutationCalls(typedCall);
     expect(acquire).not.toHaveBeenCalled();
     expect(mockUploadFirmwareFromSource).not.toHaveBeenCalled();

@@ -166,6 +166,30 @@ const planError = (message: string): never => {
   });
 };
 
+const FIRMWARE_UPDATE_PLAN_FORCE_TARGETS = new Set<FirmwareUpdatePlanForceTarget>([
+  'firmware',
+  'ble',
+  'bootloader',
+  'resource',
+]);
+
+export const validateFirmwareUpdatePlanForceTargets = (
+  value: unknown
+): FirmwareUpdatePlanForceTarget[] => {
+  if (value === undefined) {
+    return [];
+  }
+  if (
+    !Array.isArray(value) ||
+    value.length > FIRMWARE_UPDATE_PLAN_FORCE_TARGETS.size ||
+    value.some(target => !FIRMWARE_UPDATE_PLAN_FORCE_TARGETS.has(target)) ||
+    new Set(value).size !== value.length
+  ) {
+    return planError('Firmware update force targets are invalid');
+  }
+  return [...value] as FirmwareUpdatePlanForceTarget[];
+};
+
 const assertExactKeys = (
   value: Record<string, unknown>,
   required: readonly string[],
@@ -388,13 +412,20 @@ const getExecutor = (features: Features): FirmwareUpdatePlan['executor'] => {
 };
 
 const buildProtocolV2Artifacts = (
-  release: ReleaseRecord
+  release: ReleaseRecord,
+  {
+    includeComponents = true,
+    includeResources = true,
+  }: {
+    includeComponents?: boolean;
+    includeResources?: boolean;
+  } = {}
 ): {
   artifacts: FirmwareUpdatePlanArtifact[];
   targets: FirmwareUpdatePlanTarget[];
 } => {
   const components = asRecord(release.components);
-  if (!components) {
+  if (includeComponents && !components) {
     throw ERRORS.TypedError(
       HardwareErrorCode.RuntimeError,
       'Protocol V2 release has no component set',
@@ -404,15 +435,15 @@ const buildProtocolV2Artifacts = (
   const installOrder = Array.isArray(release.installOrder)
     ? release.installOrder.filter((key): key is string => typeof key === 'string')
     : [];
-  const componentKeys = [
-    ...installOrder,
-    ...Object.keys(components).filter(key => !installOrder.includes(key)),
-  ];
+  const componentKeys =
+    includeComponents && components
+      ? [...installOrder, ...Object.keys(components).filter(key => !installOrder.includes(key))]
+      : [];
   const artifacts: FirmwareUpdatePlanArtifact[] = [];
   const targets: FirmwareUpdatePlanTarget[] = [];
   const componentTargets = new Set<FirmwareUpdatePlanTarget>();
   for (const key of componentKeys) {
-    const component = asRecord(components[key]);
+    const component = asRecord(components?.[key]);
     const targetName = asString(component?.target)?.toUpperCase();
     if (targetName === 'ROMLOADER') {
       throw ERRORS.TypedError(
@@ -453,7 +484,8 @@ const buildProtocolV2Artifacts = (
     targets.push(target);
   }
 
-  const bundles = Array.isArray(release.resourceBundles) ? release.resourceBundles : [];
+  const bundles =
+    includeResources && Array.isArray(release.resourceBundles) ? release.resourceBundles : [];
   const resourceBundleNames = new Set<string>();
   for (const value of bundles) {
     const bundle = asRecord(value);
@@ -492,6 +524,63 @@ const buildProtocolV2Artifacts = (
   return { artifacts, targets: [...new Set(targets)] };
 };
 
+const isForcedTargetRepresented = ({
+  executor,
+  forcedTarget,
+  artifacts,
+  targetsToUpdate,
+}: {
+  executor: FirmwareUpdatePlan['executor'];
+  forcedTarget: FirmwareUpdatePlanForceTarget;
+  artifacts: readonly FirmwareUpdatePlanArtifact[];
+  targetsToUpdate: readonly FirmwareUpdatePlanTarget[];
+}): boolean => {
+  if (executor !== 'v4') {
+    return artifacts.some(
+      artifact => artifact.target === forcedTarget && targetsToUpdate.includes(forcedTarget)
+    );
+  }
+  if (forcedTarget === 'firmware') {
+    return artifacts.some(
+      artifact => artifact.role === 'component' && targetsToUpdate.includes(artifact.target)
+    );
+  }
+  if (forcedTarget === 'resource') {
+    return artifacts.some(
+      artifact =>
+        artifact.role === 'resourceBundle' &&
+        artifact.target === 'resource' &&
+        targetsToUpdate.includes('resource')
+    );
+  }
+  return false;
+};
+
+const assertForcedTargetsRepresented = ({
+  executor,
+  forcedTargets,
+  artifacts,
+  targetsToUpdate,
+}: {
+  executor: FirmwareUpdatePlan['executor'];
+  forcedTargets: readonly FirmwareUpdatePlanForceTarget[];
+  artifacts: readonly FirmwareUpdatePlanArtifact[];
+  targetsToUpdate: readonly FirmwareUpdatePlanTarget[];
+}) => {
+  for (const forcedTarget of forcedTargets) {
+    if (
+      !isForcedTargetRepresented({
+        executor,
+        forcedTarget,
+        artifacts,
+        targetsToUpdate,
+      })
+    ) {
+      planError(`Forced firmware update target ${forcedTarget} is not represented by the plan`);
+    }
+  }
+};
+
 export const buildFirmwareUpdatePlan = ({
   features,
   firmwareType,
@@ -513,12 +602,23 @@ export const buildFirmwareUpdatePlan = ({
   let artifacts: FirmwareUpdatePlanArtifact[] = [];
   let targetsToUpdate: FirmwareUpdatePlanTarget[] = [];
   const firmwareRelease = asRelease(firmware);
-  const forcedTargets = new Set(forceUpdateTargets);
+  const validatedForceTargets = validateFirmwareUpdatePlanForceTargets(forceUpdateTargets);
+  const forcedTargets = new Set(validatedForceTargets);
   const shouldUpdateFirmware = isUpgrade(firmware) || forcedTargets.has('firmware');
   const shouldUpdateResource = isUpgrade(firmware) || forcedTargets.has('resource');
 
+  if (
+    executor === 'v4' &&
+    validatedForceTargets.some(target => target === 'ble' || target === 'bootloader')
+  ) {
+    planError('Protocol V2 does not support forced BLE or legacy bootloader targets');
+  }
+
   if (executor === 'v4' && (shouldUpdateFirmware || shouldUpdateResource)) {
-    const protocolV2 = buildProtocolV2Artifacts(firmwareRelease ?? {});
+    const protocolV2 = buildProtocolV2Artifacts(firmwareRelease ?? {}, {
+      includeComponents: shouldUpdateFirmware,
+      includeResources: shouldUpdateResource,
+    });
     artifacts = protocolV2.artifacts;
     targetsToUpdate = protocolV2.targets;
   } else {
@@ -609,6 +709,13 @@ export const buildFirmwareUpdatePlan = ({
     targetsToUpdate = [...new Set(artifacts.map(artifact => artifact.target))];
   }
 
+  assertForcedTargetsRepresented({
+    executor,
+    forcedTargets: validatedForceTargets,
+    artifacts,
+    targetsToUpdate,
+  });
+
   const deviceIdentity = getDeviceUUID(features);
   if (
     artifacts.length > 0 &&
@@ -631,8 +738,8 @@ export const buildFirmwareUpdatePlan = ({
     artifacts,
     targetsToUpdate,
   };
-  return {
+  return assertFirmwareUpdatePlan({
     ...planWithoutDigest,
     planDigest: digestFirmwareUpdatePlan(planWithoutDigest),
-  };
+  });
 };

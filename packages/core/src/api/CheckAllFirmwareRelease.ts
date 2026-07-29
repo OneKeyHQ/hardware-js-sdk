@@ -294,6 +294,7 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
       platform,
       forceUpdateTargets,
     } = this.payload as CheckAllFirmwareReleaseParams;
+    const validatedForceUpdateTargets = validateFirmwareUpdatePlanForceTargets(forceUpdateTargets);
 
     if (!features) {
       return Promise.resolve(null);
@@ -333,10 +334,11 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
         firmware: firmwareRelease,
         ble: bleFirmwareReleaseInfo,
         bootloader: bootloaderRelease,
-        forceUpdateTargets,
+        forceUpdateTargets: validatedForceUpdateTargets,
       });
     } catch (error) {
       if (
+        validatedForceUpdateTargets.length > 0 ||
         !(error instanceof HardwareError) ||
         error.params?.firmwareUpdateCode !== 'FirmwarePlanInvalid'
       ) {

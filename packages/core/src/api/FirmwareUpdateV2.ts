@@ -14,6 +14,7 @@ import { BaseMethod } from './BaseMethod';
 import { validateParams } from './helpers/paramsValidator';
 import { DevicePool } from '../device/DevicePool';
 import { getBinary, getInfo, getSysResourceBinary } from './firmware/getBinary';
+import { normalizeFirmwarePreparationError } from './firmware/FirmwarePreparationError';
 import {
   updateResources,
   updateResourcesFromSources,
@@ -27,8 +28,8 @@ import { DEVICE } from '../events';
 import { type FirmwareByteSource, openFirmwareByteSource } from './firmware/FirmwareArtifactSource';
 import { resolveFirmwareUpdateHostBinding } from './firmware/FirmwareHostBinding';
 import {
-  assertFirmwareUpdatePreparedPlanDeviceIdentity,
   assertFirmwareUpdatePreparedPlanBinding,
+  assertFirmwareUpdatePreparedPlanDeviceIdentity,
   getFirmwareUpdateResourceName,
 } from './firmware/FirmwareUpdatePreparedPlan';
 
@@ -506,10 +507,7 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
           this.postTipMessage('DownloadFirmwareSuccess');
           return source;
         } catch (err) {
-          throw ERRORS.TypedError(
-            HardwareErrorCode.FirmwareUpdateDownloadFailed,
-            err.message ?? err
-          );
+          throw normalizeFirmwarePreparationError(err);
         }
       };
 
