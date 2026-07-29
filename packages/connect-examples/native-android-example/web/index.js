@@ -1,5 +1,5 @@
 import HardwareSDK from "@onekeyfe/hd-common-connect-sdk";
-import { createDeferred } from "./utils";
+import { createDeferred, isHeaderChunk, COMMON_HEADER_SIZE } from "./utils";
 
 const UI_EVENT = "UI_EVENT";
 const UI_REQUEST = {
@@ -69,33 +69,6 @@ function getHardwareSDKInstance() {
 }
 
 let runPromise;
-let receiveQueue = [];
-let receiveGeneration = 0;
-let activeConnection;
-
-function resetReceiveState(reason) {
-  receiveGeneration += 1;
-  receiveQueue = [];
-  if (runPromise) {
-    const current = runPromise;
-    runPromise = undefined;
-    current.reject(new Error(reason));
-  }
-}
-
-function resolveReceive(hexString) {
-  if (!activeConnection) {
-    return;
-  }
-  if (runPromise?.generation === receiveGeneration) {
-    const current = runPromise;
-    runPromise = undefined;
-    current.resolve(hexString);
-    return;
-  }
-  receiveQueue.push({ generation: receiveGeneration, hexString });
-}
-
 function createLowlevelPlugin() {
   const plugin = {
     enumerate: () => {
@@ -113,43 +86,21 @@ function createLowlevelPlugin() {
         });
       });
     },
-    receive: (uuid) => {
-      if (uuid !== activeConnection) {
-        return Promise.reject(new Error(`No active connection for ${uuid}`));
-      }
-      while (receiveQueue.length > 0) {
-        const queued = receiveQueue.shift();
-        if (queued.generation === receiveGeneration) {
-          return Promise.resolve(queued.hexString);
-        }
-      }
-      const deferred = createDeferred();
-      runPromise = { ...deferred, generation: receiveGeneration };
-      return deferred.promise;
+    receive: () => {
+      return new Promise((resolve) => {
+        runPromise = createDeferred();
+        const response = runPromise.promise;
+        resolve(response);
+      });
     },
     connect: (uuid) => {
-      const connectionChanged = activeConnection !== uuid;
-      if (connectionChanged) {
-        activeConnection = undefined;
-        resetReceiveState(`Connection changed to ${uuid}`);
-      }
-      const generation = receiveGeneration;
-      return new Promise((resolve, reject) => {
+      return new Promise((resolve) => {
         bridge.callHandler("connect", { uuid }, () => {
-          if (generation !== receiveGeneration) {
-            reject(new Error(`Stale connection callback for ${uuid}`));
-            return;
-          }
-          activeConnection = uuid;
           resolve();
         });
       });
     },
     disconnect: (uuid) => {
-      if (activeConnection === uuid) {
-        activeConnection = undefined;
-      }
-      resetReceiveState(`Disconnected from ${uuid}`);
       return new Promise((resolve) => {
         bridge.callHandler("disconnect", { uuid }, (response) => {
           console.log("call connect response: ", response);
@@ -241,12 +192,36 @@ function registerBridgeHandler() {
     }
   });
 
+  // Keep the original monitorCharacteristic handler
+  let bufferLength = 0;
+  let buffer = [];
   bridge.registerHandler("monitorCharacteristic", async (hexString) => {
+    if (!runPromise) {
+      console.log("runPromise is not initialized, maybe not call receive");
+      return;
+    }
     try {
-      resolveReceive(hexString);
+      const data = Buffer.from(hexString, "hex");
+      if (isHeaderChunk(data)) {
+        bufferLength = data.readInt32BE(5);
+        buffer = [...data.subarray(3)];
+      } else {
+        buffer = buffer.concat([...data]);
+      }
+      if (buffer.length - COMMON_HEADER_SIZE >= bufferLength) {
+        const value = Buffer.from(buffer);
+        console.log(
+          "[onekey-js-bridge] Received a complete packet of data, resolve Promise, ",
+          "buffer: ",
+          value
+        );
+        bufferLength = 0;
+        buffer = [];
+        runPromise.resolve(value.toString("hex"));
+      }
     } catch (e) {
       console.log("monitor data error: ", e);
-      resetReceiveState(`Monitor failed: ${e.message}`);
+      runPromise.reject(e);
     }
   });
 }
