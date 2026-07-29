@@ -6,27 +6,25 @@ import { Input } from '../ui/Input';
 import { Checkbox } from '../ui/Checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/Select';
 import { ExternalLink } from 'lucide-react';
-import type { ParameterField, SelectOption, UnifiedMethodConfig } from '../../data/types';
+import type { ParameterField, UnifiedMethodConfig } from '../../data/types';
 import { useHardwareStore } from '../../store/hardwareStore';
 import { Alert, AlertDescription } from '../ui/Alert';
-import { getParameterDisplayValue, parseParameterValue } from '../../utils/parameterUtils';
+import { parseParameterValue } from '../../utils/parameterUtils';
 import type { CommonParametersState } from '../../store/hardwareStore';
-import { methodSupportsCommonParameters } from '../../utils/constants';
-import { getJsonPreview } from '../../utils/jsonPreview';
+import { METHODS_REQUIRING_PASSPHRASE_CHECK } from '../../utils/constants';
 
 interface ParameterInputProps {
   methodConfig: UnifiedMethodConfig;
   selectedPreset: string | null;
   onPresetChange: (presetTitle: string) => void;
   onParamChange?: (paramName: string, value: unknown) => void;
-  embedded?: boolean;
 }
 
 // 需要passphrase检查的方法列表
 
 // 通用配置函数 - 只在需要时显示passphrase相关参数
 const getCommonParameters = (t: (key: string) => string, methodName: string): ParameterField[] => {
-  const needsPassphrase = methodSupportsCommonParameters(methodName);
+  const needsPassphrase = METHODS_REQUIRING_PASSPHRASE_CHECK.includes(methodName);
 
   if (!needsPassphrase) {
     return [];
@@ -63,19 +61,11 @@ const getCommonParameters = (t: (key: string) => string, methodName: string): Pa
   ];
 };
 
-const getFileValueName = (value: unknown): string | null => {
-  if (typeof File !== 'undefined' && value instanceof File) {
-    return value.name;
-  }
-  return null;
-};
-
 const ParameterInput: React.FC<ParameterInputProps> = ({
   methodConfig,
   selectedPreset,
   onPresetChange,
   onParamChange,
-  embedded = false,
 }) => {
   const { t } = useTranslation();
   const {
@@ -103,33 +93,86 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
 
   // 获取可见的方法参数
   const visibleMethodParameters = useMemo((): ParameterField[] => {
+    console.log('[ParameterInput] 调试信息:', {
+      method: methodConfig.method,
+      hasBundleParam,
+      selectedPreset,
+      presetsLength: presets?.length || 0,
+      presets: presets?.map(p => ({
+        title: p.title,
+        parametersLength: p.parameters?.length || 0,
+        parameters: p.parameters?.map(param => ({
+          name: param.name,
+          type: param.type,
+          visible: param.visible,
+          value: param.value,
+        })),
+      })),
+    });
+
     const commonParamNames = ['useEmptyPassphrase', 'passphraseState', 'deriveCardano'];
 
     // 使用统一的预设方式获取参数
     if (selectedPreset && presets) {
       const preset = presets.find(p => p.title === selectedPreset);
+      console.log('[ParameterInput] 找到的预设:', {
+        preset: preset
+          ? {
+              title: preset.title,
+              parametersLength: preset.parameters?.length || 0,
+              parameters: preset.parameters?.map(param => ({
+                name: param.name,
+                type: param.type,
+                visible: param.visible,
+                value: param.value,
+                shouldFilter:
+                  param.visible === false ||
+                  commonParamNames.includes(param.name) ||
+                  param.name === 'bundle',
+              })),
+            }
+          : null,
+      });
 
       if (preset && preset.parameters) {
+        console.log(
+          '[ParameterInput] 预设参数:',
+          preset.parameters.map(param => ({
+            name: param.name,
+            type: param.type,
+            visible: param.visible,
+            value: param.value,
+          }))
+        );
+
         // 过滤掉通用参数、不可见参数和 bundle 参数
-        return preset.parameters.filter(
+        const filtered = preset.parameters.filter(
           (param: ParameterField) =>
             param.visible !== false &&
             !commonParamNames.includes(param.name) &&
             param.name !== 'bundle' // 排除 bundle 参数
         );
+        console.log(
+          '[ParameterInput] 过滤后的参数:',
+          filtered.map(param => ({
+            name: param.name,
+            type: param.type,
+            visible: param.visible,
+            value: param.value,
+          }))
+        );
+        console.log('[ParameterInput] 使用预设参数:', filtered.length);
+        return filtered;
       }
     }
 
+    console.log('[ParameterInput] 无参数可显示');
     return []; // 没有可显示的参数
-  }, [selectedPreset, presets]);
+  }, [methodConfig, hasBundleParam, selectedPreset, presets]);
 
   // 参数变化处理
   const handleParamChange = (paramName: string, value: unknown) => {
-    if (
-      paramName === 'useEmptyPassphrase' ||
-      paramName === 'passphraseState' ||
-      paramName === 'deriveCardano'
-    ) {
+    if (paramName === 'useEmptyPassphrase' || paramName === 'passphraseState' || paramName === 'deriveCardano') {
       setCommonParameter(paramName as keyof typeof commonParameters, value);
       return;
     }
@@ -176,22 +219,21 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
   };
 
   // 获取文件参数配置
-  const getFileParameterConfig = (field: ParameterField) => {
-    const paramName = field.name;
+  const getFileParameterConfig = (paramName: string) => {
     // 根据参数名称智能推断文件类型配置
     const getConfigByPattern = () => {
       if (/firmware/i.test(paramName)) {
         return {
-          accept: field.accept || '.bin',
+          accept: '.bin',
           title: t('components.firmwareFileUpload.firmwareFile'),
-          description: field.description || t('components.firmwareFileUpload.firmwareDesc'),
+          description: t('components.firmwareFileUpload.firmwareDesc'),
         };
       }
       if (/bootloader/i.test(paramName)) {
         return {
-          accept: field.accept || '.bin',
+          accept: '.bin',
           title: t('components.firmwareFileUpload.bootloaderFile'),
-          description: field.description || t('components.firmwareFileUpload.bootloaderDesc'),
+          description: t('components.firmwareFileUpload.bootloaderDesc'),
         };
       }
       if (/ble/i.test(paramName)) {
@@ -203,23 +245,16 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
       }
       if (/resource/i.test(paramName)) {
         return {
-          accept: field.accept || '.zip',
+          accept: '.zip',
           title: t('components.firmwareFileUpload.resourceFile'),
-          description: field.description || t('components.firmwareFileUpload.resourceDesc'),
-        };
-      }
-      if (/data/i.test(paramName)) {
-        return {
-          accept: field.accept || '.bin',
-          title: field.label || paramName,
-          description: field.description || '',
+          description: t('components.firmwareFileUpload.resourceDesc'),
         };
       }
       // 默认配置
       return {
-        accept: field.accept || '.bin',
-        title: field.label || t('components.firmwareFileUpload.firmwareFile'),
-        description: field.description || t('components.firmwareFileUpload.firmwareDesc'),
+        accept: '.bin',
+        title: t('components.firmwareFileUpload.firmwareFile'),
+        description: t('components.firmwareFileUpload.firmwareDesc'),
       };
     };
 
@@ -236,9 +271,8 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
 
   // 渲染文件选择器
   const renderFilePicker = (field: ParameterField) => {
-    const config = getFileParameterConfig(field);
-    const currentValue = getParameterValue(field);
-    const currentFileName = getFileValueName(currentValue);
+    const config = getFileParameterConfig(field.name);
+    const currentValue = getParameterValue(field) as File | null;
 
     // 优先使用字段配置的accept，否则使用默认配置
     const acceptTypes = field.accept || config.accept;
@@ -259,8 +293,8 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
                 className="absolute inset-0 w-full h-full opacity-0 z-10"
               />
               <div className="bg-background border border-border rounded-md px-3 py-1.5 text-xs hover:bg-muted/50 hover:border-primary cursor-pointer transition-colors select-none">
-                {currentFileName ? (
-                  <span className="text-foreground cursor-pointer">{currentFileName}</span>
+                {currentValue ? (
+                  <span className="text-foreground cursor-pointer">{currentValue.name}</span>
                 ) : (
                   <span className="text-muted-foreground cursor-pointer">
                     {t('components.parameterInput.selectFirmwareFile', { title: config.title })}
@@ -307,46 +341,30 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
     const isEditable = field.editable !== false;
 
     // 对于 textarea 类型，如果值是对象，需要序列化为 JSON 字符串显示
-    const getDisplayPreview = (val: unknown): { text: string; truncated: boolean } => {
-      const displayValue = getParameterDisplayValue(val);
-      if (field.type === 'textarea' && typeof displayValue === 'object' && displayValue !== null) {
-        const preview = getJsonPreview(displayValue, {
-          maxDepth: 6,
-          maxArrayItems: 12,
-          maxStringLength: 512,
-        });
-        return { text: preview.text, truncated: preview.truncated };
+    const getDisplayValue = (val: unknown): string => {
+      if (field.type === 'textarea' && typeof val === 'object' && val !== null) {
+        return JSON.stringify(val, null, 2);
       }
-      return { text: String(displayValue || ''), truncated: false };
+      return String(val || '');
     };
-    const displayPreview = getDisplayPreview(value);
-    const isReadonlyPreview = displayPreview.truncated;
 
     return (
       <div key={field.name} className="flex items-center gap-2">
         <div className="min-w-0 flex-shrink-0 w-32">{renderFieldLabel(field)}</div>
         <div className="flex-1 min-w-0">
           {field.type === 'textarea' ? (
-            <div className="space-y-1">
-              <textarea
-                id={field.name}
-                value={displayPreview.text}
-                onChange={e => {
-                  if (!isEditable || isReadonlyPreview) return;
-                  handleParamChange(field.name, e.target.value);
-                }}
-                placeholder={field.placeholder}
-                disabled={!isEditable}
-                readOnly={isReadonlyPreview}
-                rows={3}
-                className="w-full px-3 py-1.5 text-xs bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary resize-none disabled:opacity-50 disabled:cursor-not-allowed"
-              />
-              {isReadonlyPreview && (
-                <div className="text-[11px] text-muted-foreground">
-                  Large JSON preview. The original value is preserved for execution.
-                </div>
-              )}
-            </div>
+            <textarea
+              id={field.name}
+              value={getDisplayValue(value)}
+              onChange={e => {
+                if (!isEditable) return;
+                handleParamChange(field.name, e.target.value);
+              }}
+              placeholder={field.placeholder}
+              disabled={!isEditable}
+              rows={3}
+              className="w-full px-3 py-1.5 text-xs bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary resize-none disabled:opacity-50 disabled:cursor-not-allowed"
+            />
           ) : (
             <Input
               id={field.name}
@@ -379,26 +397,14 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
   const renderSelect = (field: ParameterField) => {
     const value = getParameterValue(field);
     const isEditable = field.editable !== false;
-    const options = (field.options ?? []) as Array<string | SelectOption>;
-    const resolveOptionValue = (selectedValue: string) => {
-      const selected = options.find(option => {
-        const optionValue = typeof option === 'string' ? option : option.value;
-        return String(optionValue) === selectedValue;
-      });
-      return typeof selected === 'string' || selected === undefined
-        ? selectedValue
-        : selected.value;
-    };
 
     return (
       <div key={field.name} className="flex items-center gap-2">
         <div className="min-w-0 flex-shrink-0 w-32">{renderFieldLabel(field)}</div>
         <div className="flex-1 min-w-0">
           <Select
-            value={String(value ?? '')}
-            onValueChange={newValue =>
-              isEditable && handleParamChange(field.name, resolveOptionValue(newValue))
-            }
+            value={String(value || '')}
+            onValueChange={newValue => isEditable && handleParamChange(field.name, newValue)}
             disabled={!isEditable}
           >
             <SelectTrigger
@@ -412,7 +418,7 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
               />
             </SelectTrigger>
             <SelectContent>
-              {options.map(option => {
+              {field.options?.map(option => {
                 // 支持字符串和对象两种格式
                 if (typeof option === 'string') {
                   return (
@@ -422,7 +428,7 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
                   );
                 } else {
                   return (
-                    <SelectItem key={String(option.value)} value={String(option.value)}>
+                    <SelectItem key={option.value} value={option.value}>
                       {String(option.label)}
                     </SelectItem>
                   );
@@ -464,106 +470,98 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
   const commonParams = getCommonParameters(t, methodConfig.method);
   const hasCommonParams = commonParams.length > 0;
 
-  const content = (
-    <div className="space-y-2">
-      {/* Compact layout */}
-      <div className="space-y-2">
-        {/* Show the preset selector at the top when multiple presets exist. */}
-        {hasMultiplePresets && (
-          <div className="flex items-center gap-2">
-            <label className="text-xs font-medium text-foreground min-w-0 flex-shrink-0">
-              {t('components.parameterInput.selectPreset')}:
-            </label>
-            <Select value={selectedPreset || ''} onValueChange={handlePresetChange}>
-              <SelectTrigger className="bg-background border-border focus:border-primary text-xs h-7 flex-1">
-                <SelectValue placeholder={t('components.parameterInput.selectPreset')} />
-              </SelectTrigger>
-              <SelectContent>
-                {presets.map(preset => (
-                  <SelectItem key={preset.title} value={preset.title}>
-                    {preset.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-
-        {/* Compact two-column parameter area */}
-        <div className={`grid grid-cols-1 gap-2 ${hasCommonParams ? 'md:grid-cols-2' : ''}`}>
-          {/* Common parameters shown only for methods that need a passphrase. */}
-          {hasCommonParams && (
-            <div className="space-y-1">
-              <div className="flex items-center gap-1">
-                <h4 className="text-xs font-medium text-foreground">
-                  {t('components.parameterInput.commonParameters')}
-                </h4>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() =>
-                    window.open(
-                      'https://developer.onekey.so/connect-to-hardware/page-1/common-params',
-                      '_blank'
-                    )
-                  }
-                  className="h-3 px-1 text-xs text-muted-foreground hover:text-primary"
-                >
-                  <ExternalLink className="h-2 w-2" />
-                </Button>
-              </div>
-              <div className="space-y-1">{commonParams.map(renderParameterField)}</div>
+  return (
+    <Card className="bg-card border border-border/50 shadow-sm">
+      <CardContent className="space-y-2 pb-2 pt-2">
+        {/* 优化的紧凑布局 */}
+        <div className="space-y-2">
+          {/* 预设选择器 - 如果有多个预设则显示在顶部 */}
+          {hasMultiplePresets && (
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-medium text-foreground min-w-0 flex-shrink-0">
+                {t('components.parameterInput.selectPreset')}:
+              </label>
+              <Select value={selectedPreset || ''} onValueChange={handlePresetChange}>
+                <SelectTrigger className="bg-background border-border focus:border-primary text-xs h-7 flex-1">
+                  <SelectValue placeholder={t('components.parameterInput.selectPreset')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {presets.map(preset => (
+                    <SelectItem key={preset.title} value={preset.title}>
+                      {preset.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
 
-          {/* Method parameters */}
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2">
-              <h4 className="text-xs font-medium text-foreground">
-                {t('components.parameterInput.methodParameters')}
-              </h4>
-              {selectedPreset && (
-                <span className="text-xs text-muted-foreground">({selectedPreset})</span>
-              )}
-            </div>
-            {visibleMethodParameters.length > 0 ? (
-              <div className="space-y-1">{visibleMethodParameters.map(renderParameterField)}</div>
-            ) : (
-              <div className="text-center py-1">
-                <p className="text-xs text-muted-foreground">
-                  {hasBundleParam
-                    ? t('components.parameterInput.parametersInBundle')
-                    : hasPresets && selectedPreset
-                    ? t('components.parameterInput.noAdditionalParams')
-                    : hasPresets
-                    ? t('components.parameterInput.selectPresetFirst')
-                    : t('components.parameterInput.noAdditionalParams')}
-                </p>
+          {/* 参数区域 - 紧凑两列布局 */}
+          <div className={`grid grid-cols-1 gap-2 ${hasCommonParams ? 'md:grid-cols-2' : ''}`}>
+            {/* 通用参数 - 只在需要passphrase的方法中显示 */}
+            {hasCommonParams && (
+              <div className="space-y-1">
+                <div className="flex items-center gap-1">
+                  <h4 className="text-xs font-medium text-foreground">
+                    {t('components.parameterInput.commonParameters')}
+                  </h4>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      window.open(
+                        'https://developer.onekey.so/connect-to-hardware/page-1/common-params',
+                        '_blank'
+                      )
+                    }
+                    className="h-3 px-1 text-xs text-muted-foreground hover:text-primary"
+                  >
+                    <ExternalLink className="h-2 w-2" />
+                  </Button>
+                </div>
+                <div className="space-y-1">{commonParams.map(renderParameterField)}</div>
               </div>
             )}
+
+            {/* 方法参数 */}
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <h4 className="text-xs font-medium text-foreground">
+                  {t('components.parameterInput.methodParameters')}
+                </h4>
+                {selectedPreset && (
+                  <span className="text-xs text-muted-foreground">({selectedPreset})</span>
+                )}
+              </div>
+              {visibleMethodParameters.length > 0 ? (
+                <div className="space-y-1">{visibleMethodParameters.map(renderParameterField)}</div>
+              ) : (
+                <div className="text-center py-1">
+                  <p className="text-xs text-muted-foreground">
+                    {hasBundleParam
+                      ? t('components.parameterInput.parametersInBundle')
+                      : hasPresets && selectedPreset
+                      ? t('components.parameterInput.noAdditionalParams')
+                      : hasPresets
+                      ? t('components.parameterInput.selectPresetFirst')
+                      : t('components.parameterInput.noAdditionalParams')}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Compact bundle parameter hint */}
-      {hasBundleParam && (
-        <Alert className="border-border bg-muted/20 py-1">
-          <AlertDescription className="text-muted-foreground text-xs">
-            <strong>{t('components.parameterInput.batchMode')}</strong>
-            {t('components.parameterInput.batchModeDesc')}
-          </AlertDescription>
-        </Alert>
-      )}
-    </div>
-  );
-
-  if (embedded) {
-    return content;
-  }
-
-  return (
-    <Card className="bg-card border border-border/50 shadow-sm">
-      <CardContent className="space-y-2 pb-2 pt-2">{content}</CardContent>
+        {/* Bundle参数提示 - 更紧凑 */}
+        {hasBundleParam && (
+          <Alert className="border-border bg-muted/20 py-1">
+            <AlertDescription className="text-muted-foreground text-xs">
+              <strong>{t('components.parameterInput.batchMode')}</strong>
+              {t('components.parameterInput.batchModeDesc')}
+            </AlertDescription>
+          </Alert>
+        )}
+      </CardContent>
     </Card>
   );
 };

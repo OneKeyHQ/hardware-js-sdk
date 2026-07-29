@@ -47,7 +47,7 @@ const getFooterData = (isZh, locale) => {
 const IntegrationCard = ({ title, description, icon: Icon, iconSrc, href, cta, className = '' }) => (
   <Link
     href={href}
-    className={`flex h-[234px] w-full flex-col justify-between rounded-[16px] border border-white/10 bg-[#222] p-[32px] no-underline ${className}`}
+    className={`flex min-h-[210px] w-full flex-col justify-between rounded-[16px] border border-white/10 bg-[#222] p-[24px] no-underline sm:min-h-[234px] sm:p-[32px] ${className}`}
   >
     <div className="flex flex-col gap-[24px]">
       <div className="flex items-center gap-[12px]">
@@ -58,7 +58,10 @@ const IntegrationCard = ({ title, description, icon: Icon, iconSrc, href, cta, c
             <Icon className="size-[20px] text-white" />
           )}
         </div>
-        <span className="text-[24px] font-semibold leading-[30px]" style={{ color: '#FFFFFF' }}>
+        <span
+          className="text-[20px] font-semibold leading-[25px] sm:text-[24px] sm:leading-[30px]"
+          style={{ color: '#FFFFFF' }}
+        >
           {title}
         </span>
       </div>
@@ -183,7 +186,7 @@ export function LandingPage({ locale = 'en' }) {
 
   return (
     <div className="flex min-h-screen flex-col bg-[#101111] font-sans text-white">
-      <main className="flex flex-col gap-[120px]">
+      <main className="flex flex-col gap-[72px] sm:gap-[96px] lg:gap-[120px]">
         <section
           className="relative w-full overflow-hidden"
           style={{
@@ -192,138 +195,153 @@ export function LandingPage({ locale = 'en' }) {
             backgroundPosition: 'center bottom',
           }}
         >
-          <div className="relative mx-auto h-[810px] w-full max-w-[1440px]">
-            <div className="absolute left-[64px] top-[169px] z-10 flex w-[711px] flex-col gap-[0px]">
-              <h1 className="text-[52px] font-semibold leading-[56px]">
+          <div className="relative mx-auto min-h-[560px] w-full max-w-[1440px] lg:h-[810px] lg:min-h-0">
+            <div className="absolute inset-x-[20px] top-[84px] z-10 flex flex-col items-center text-center sm:inset-x-[32px] sm:top-[104px] lg:left-[64px] lg:right-auto lg:top-[169px] lg:w-[711px] lg:items-start lg:text-left">
+              <h1 className="max-w-full text-[36px] font-semibold leading-[40px] sm:text-[44px] sm:leading-[48px] lg:text-[52px] lg:leading-[56px]">
                 <span className="bg-gradient-to-r from-[#57E668] to-[#16D629] bg-clip-text text-transparent">
                   {copy.heroTitle}
                 </span>
               </h1>
-              <p className="mt-[0px] text-[16px] leading-[56px] text-white/60">
+              <p className="mt-[16px] max-w-[620px] text-[16px] leading-[24px] text-white/60 lg:mt-0 lg:leading-[56px]">
                 {copy.heroSubtitle}
               </p>
-            </div>
-            <div className="absolute left-[64px] top-[335px] z-10 flex items-center gap-[8px]">
-              <button
-                type="button"
-                onClick={() => {
-                  const section = document.getElementById('hardware-integration')
-                  if (section) {
-                    const offset = 160
-                    const sectionTop = section.getBoundingClientRect().top + window.scrollY
-                    window.scrollTo({ top: sectionTop - offset, behavior: 'smooth' })
-                  }
-                }}
-                className="flex items-center justify-center rounded-[50px] px-[32px] py-[18px] text-[16px] font-medium hover:opacity-90 transition-opacity"
-                style={{
-                  backgroundImage:
-                    'linear-gradient(90deg, rgb(79, 245, 95) 0%, rgb(33, 233, 53) 100%)',
-                  color: '#101111',
-                  cursor: 'pointer',
-                }}
-              >
-                {copy.ctaPrimary}
-              </button>
-              <Link
-                href={`/${locale}/changelog`}
-                className="flex items-center justify-center rounded-[50px] bg-white px-[32px] py-[18px] text-[16px] font-medium text-[#101111] no-underline"
-                style={{ color: '#101111' }}
-              >
-                {copy.ctaSecondary}
-              </Link>
+              <div className="mt-[32px] grid w-full max-w-[420px] grid-cols-1 gap-[12px] sm:grid-cols-2 lg:mt-[54px] lg:flex lg:w-auto lg:max-w-none lg:items-center lg:gap-[8px]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const section = document.getElementById('hardware-integration')
+                    if (section) {
+                      const offset = 160
+                      const sectionTop = section.getBoundingClientRect().top + window.scrollY
+                      window.scrollTo({ top: sectionTop - offset, behavior: 'smooth' })
+                    }
+                  }}
+                  className="flex min-h-[52px] items-center justify-center rounded-[50px] px-[24px] py-[14px] text-[16px] font-medium transition-opacity hover:opacity-90 sm:px-[32px] sm:py-[18px]"
+                  style={{
+                    backgroundImage:
+                      'linear-gradient(90deg, rgb(79, 245, 95) 0%, rgb(33, 233, 53) 100%)',
+                    color: '#101111',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {copy.ctaPrimary}
+                </button>
+                <Link
+                  href={`/${locale}/changelog`}
+                  className="flex min-h-[52px] items-center justify-center rounded-[50px] bg-white px-[24px] py-[14px] text-[16px] font-medium text-[#101111] no-underline sm:px-[32px] sm:py-[18px]"
+                  style={{ color: '#101111' }}
+                >
+                  {copy.ctaSecondary}
+                </Link>
+              </div>
             </div>
               <img
                 src={heroSecurity05}
                 alt=""
-                className="pointer-events-none absolute left-[calc(50%+334.5px)] top-[-65px] h-[919px] w-[915px] -translate-x-1/2 object-cover opacity-70"
+                className="pointer-events-none absolute left-[calc(50%+334.5px)] top-[-65px] hidden h-[919px] w-[915px] -translate-x-1/2 object-cover opacity-70 lg:block"
               />
               <img
                 src={heroSecurity04}
                 alt=""
-                className="pointer-events-none absolute left-[calc(50%+309.5px)] top-[11px] h-[863px] w-[831px] -translate-x-1/2 object-cover"
+                className="pointer-events-none absolute left-[calc(50%+309.5px)] top-[11px] hidden h-[863px] w-[831px] -translate-x-1/2 object-cover lg:block"
               />
               <img
                 src={heroSecurity03}
                 alt=""
-                className="pointer-events-none absolute left-[calc(50%+309.5px)] top-[11px] h-[863px] w-[831px] -translate-x-1/2 object-cover opacity-20"
+                className="pointer-events-none absolute left-[calc(50%+309.5px)] top-[11px] hidden h-[863px] w-[831px] -translate-x-1/2 object-cover opacity-20 lg:block"
               />
               <img
                 src={heroSecurity02}
                 alt=""
-                className="pointer-events-none absolute left-[calc(50%+309.5px)] top-[11px] h-[863px] w-[831px] -translate-x-1/2 object-cover"
+                className="pointer-events-none absolute left-[calc(50%+309.5px)] top-[11px] hidden h-[863px] w-[831px] -translate-x-1/2 object-cover lg:block"
               />
               <img
                 src={heroSecurity01}
                 alt=""
-                className="pointer-events-none absolute left-[calc(50%+309.5px)] top-[11px] h-[863px] w-[831px] -translate-x-1/2 object-cover opacity-50"
+                className="pointer-events-none absolute left-[calc(50%+309.5px)] top-[11px] hidden h-[863px] w-[831px] -translate-x-1/2 object-cover opacity-50 lg:block"
               />
           </div>
         </section>
 
         <section
           id="hardware-integration"
-          className="mx-auto flex w-full max-w-[1440px] flex-col items-center px-[64px]"
+          className="mx-auto flex w-full max-w-[1440px] flex-col items-center px-[20px] sm:px-[32px] lg:px-[64px]"
         >
           <div className="flex w-full flex-col items-center gap-[8px] text-center">
-            <h2 className="text-[40px] font-medium leading-[46px]" style={{ color: '#FFFFFF' }}>{copy.hardwareTitle}</h2>
+            <h2
+              className="text-[32px] font-medium leading-[38px] sm:text-[40px] sm:leading-[46px]"
+              style={{ color: '#FFFFFF' }}
+            >
+              {copy.hardwareTitle}
+            </h2>
             <span className="text-[16px]" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
               {copy.hardwareSubtitle}
             </span>
           </div>
-          <div className="mt-[24px] grid w-full grid-cols-1 gap-[32px] lg:grid-cols-3">
+          <div className="mt-[24px] grid w-full grid-cols-1 gap-[16px] sm:gap-[24px] lg:grid-cols-3 lg:gap-[32px]">
             {integrationCards.map((card) => (
               <IntegrationCard key={card.title} {...card} />
             ))}
           </div>
         </section>
 
-        <section className="mx-auto flex w-full max-w-[1440px] flex-col items-center px-[64px]">
+        <section className="mx-auto flex w-full max-w-[1440px] flex-col items-center px-[20px] sm:px-[32px] lg:px-[64px]">
           <div className="flex w-full flex-col items-center gap-[8px] text-center">
-            <h2 className="text-[40px] font-medium leading-[46px]" style={{ color: '#FFFFFF' }}>{copy.dappTitle}</h2>
+            <h2
+              className="text-[32px] font-medium leading-[38px] sm:text-[40px] sm:leading-[46px]"
+              style={{ color: '#FFFFFF' }}
+            >
+              {copy.dappTitle}
+            </h2>
             <span className="text-[16px]" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
               {copy.dappSubtitle}
             </span>
           </div>
-          <div className="mt-[24px] grid w-full grid-cols-1 gap-[32px] lg:grid-cols-3">
+          <div className="mt-[24px] grid w-full grid-cols-1 gap-[16px] sm:gap-[24px] lg:grid-cols-3 lg:gap-[32px]">
             {dappCards.map((card) => (
               <IntegrationCard key={card.title} {...card} />
             ))}
           </div>
         </section>
 
-        <section className="mx-auto flex w-full max-w-[1440px] flex-col items-center px-[64px]">
+        <section className="mx-auto flex w-full max-w-[1440px] flex-col items-center px-[20px] sm:px-[32px] lg:px-[64px]">
           <div className="flex w-full flex-col items-center gap-[8px] text-center">
-            <h2 className="text-[40px] font-medium leading-[46px]" style={{ color: '#FFFFFF' }}>{copy.offlineTitle}</h2>
+            <h2
+              className="text-[32px] font-medium leading-[38px] sm:text-[40px] sm:leading-[46px]"
+              style={{ color: '#FFFFFF' }}
+            >
+              {copy.offlineTitle}
+            </h2>
             <span className="text-[16px]" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
               {copy.offlineSubtitle}
             </span>
           </div>
-          <div className="mt-[24px] grid w-full grid-cols-1 gap-[32px] lg:grid-cols-3">
+          <div className="mt-[24px] grid w-full grid-cols-1 gap-[16px] sm:gap-[24px] lg:grid-cols-3 lg:gap-[32px]">
             {offlineCards.map((card) => (
               <IntegrationCard key={card.title} {...card} />
             ))}
           </div>
         </section>
 
-        <section className="mx-auto w-full max-w-[1440px] px-[64px]">
+        <section className="mx-auto w-full max-w-[1440px] px-[20px] sm:px-[32px] lg:px-[64px]">
           <div
-            className="relative flex flex-col items-start gap-[40px] rounded-[24px] bg-[#222222] p-[40px] lg:flex-row lg:items-center"
+            className="relative flex flex-col items-start gap-[32px] rounded-[24px] bg-[#222222] p-[24px] sm:p-[32px] lg:flex-row lg:items-center lg:gap-[40px] lg:p-[40px]"
           >
-            <div className="flex w-full max-w-[591px] flex-col gap-[40px]">
+            <div className="flex w-full max-w-[591px] flex-col gap-[32px] lg:gap-[40px]">
               <div className="flex flex-col gap-[8px]">
-                <div className="text-[30px] font-medium leading-[36px] text-white">
+                <div className="text-[26px] font-medium leading-[32px] text-white sm:text-[30px] sm:leading-[36px]">
                   {copy.supportTitle}
                 </div>
                 <div className="text-[16px] leading-[20px] text-white/70">
                   {copy.supportSubtitle}
                 </div>
               </div>
-              <div className="flex flex-wrap gap-[16px]">
+              <div className="flex w-full flex-col gap-[12px] sm:flex-row sm:flex-wrap sm:gap-[16px]">
                 <a
                   href="https://help.onekey.so/hc/requests/new"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-[8px] rounded-[50px] px-[20px] py-[10px] text-[16px] font-medium text-[#101111] no-underline"
+                  className="flex min-h-[44px] items-center justify-center gap-[8px] rounded-[50px] px-[20px] py-[10px] text-[16px] font-medium text-[#101111] no-underline"
                   style={{
                     backgroundImage:
                       'linear-gradient(90deg, rgb(79, 245, 95) 0%, rgb(33, 233, 53) 100%)',
@@ -336,7 +354,7 @@ export function LandingPage({ locale = 'en' }) {
                   href="https://github.com/OneKeyHQ/hardware-js-sdk/issues"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-[8px] rounded-[50px] border border-white px-[20px] py-[10px] text-[16px] font-medium text-white no-underline"
+                  className="flex min-h-[44px] items-center justify-center gap-[8px] rounded-[50px] border border-white px-[20px] py-[10px] text-[16px] font-medium text-white no-underline"
                 >
                   GitHub Issues
                 </a>
@@ -351,8 +369,8 @@ export function LandingPage({ locale = 'en' }) {
         </section>
       </main>
 
-      <footer className="mt-[120px] w-full rounded-t-[64px] bg-[#101111]">
-        <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-[80px] px-[64px] py-[120px] lg:flex-row lg:gap-[133px]">
+      <footer className="mt-[72px] w-full rounded-t-[40px] bg-[#101111] sm:mt-[96px] sm:rounded-t-[64px] lg:mt-[120px]">
+        <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-[56px] px-[20px] py-[72px] sm:px-[32px] sm:py-[96px] lg:flex-row lg:gap-[133px] lg:px-[64px] lg:py-[120px]">
           <div className="flex shrink-0 flex-col gap-[10px]">
             <div className="flex flex-col gap-[16px]">
               <img
@@ -514,12 +532,12 @@ export function LandingPage({ locale = 'en' }) {
       </footer>
 
       {showSubscribeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
-          <div className="relative max-h-[90vh] w-full max-w-[520px] overflow-hidden rounded-[16px] bg-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-[16px]">
+          <div className="relative max-h-[calc(100dvh-32px)] w-full max-w-[520px] overflow-hidden rounded-[16px] bg-white">
             <button
               type="button"
               onClick={() => setShowSubscribeModal(false)}
-              className="absolute right-[16px] top-[16px] z-10 flex size-[32px] items-center justify-center rounded-full bg-black/10 hover:bg-black/20"
+              className="absolute right-[12px] top-[12px] z-10 flex size-[44px] items-center justify-center rounded-full bg-black/10 hover:bg-black/20"
               aria-label="Close"
             >
               <X className="size-[20px] text-gray-600" />

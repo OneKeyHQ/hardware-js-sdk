@@ -2757,6 +2757,7 @@ export function useAutomationTest() {
           'SecurityCheck'
         );
         setPendingUiActions('deviceSettings', 'disable safety checks', ['confirm']);
+        // @ts-expect-error safetyChecks not in type definitions yet
         await sdk.deviceSettings(connectId, { safetyChecks: 0 });
         addLog('[SecurityCheck] safetyChecks set to strict (0)');
 
@@ -3050,6 +3051,7 @@ export function useAutomationTest() {
           forceUseEmptyPassphrase = preparation.forceUseEmptyPassphrase;
 
           setPendingUiActions('deviceSettings', 'disable safety checks', ['confirm']);
+          // @ts-expect-error safetyChecks not in type definitions yet
           await SDK.deviceSettings(ctx.connectId, { safetyChecks: 0 });
           addLog('[SecurityCheck] safetyChecks set to strict (0)');
           singleSecurityCheckPreparedRef.current = {

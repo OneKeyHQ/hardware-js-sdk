@@ -36,7 +36,7 @@ const ChainsIndexPage: React.FC = () => {
   };
 
   return (
-    <ListBoundary>
+    <ListBoundary title={t('chains.title')} icon={Layers}>
       <PageLayout fixedHeight={true}>
         <div className="flex-1 flex flex-col px-4 py-3 min-h-0 h-full">
           {/* 面包屑导航 + 搜索框 */}

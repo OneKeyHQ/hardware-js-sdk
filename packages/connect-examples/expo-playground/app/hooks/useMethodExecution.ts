@@ -2,8 +2,6 @@ import { useState, useCallback } from 'react';
 import { useToast } from './use-toast';
 import { convertFilesToArrayBuffers } from '../store/hardwareStore';
 import { cancelHardwareOperation } from '../services/hardwareService';
-import { logRequest, logResponse } from '../utils/logger';
-import { getParameterDisplayValue, isLazyParameterValue } from '../utils/parameterUtils';
 import type { ExecutionStatus } from '~/data/types';
 import type { UiEvent } from '@onekeyfe/hd-core';
 import { useFirmwareProgressStore } from '../components/providers/SDKProvider';
@@ -33,65 +31,6 @@ interface UseMethodExecutionReturn {
   cancel: (deviceConnectId?: string) => Promise<void>;
   reset: () => void;
   setDeviceAction: (action: { actionType: UiEvent['type']; deviceInfo?: unknown } | null) => void;
-}
-
-const MAX_LOG_STRING_LENGTH = 512;
-const MAX_LOG_ARRAY_ITEMS = 40;
-
-function formatByteSize(value: number): string {
-  if (value < 1024) return `${value} B`;
-  if (value < 1024 * 1024) return `${(value / 1024).toFixed(2)} KB`;
-  return `${(value / (1024 * 1024)).toFixed(2)} MB`;
-}
-
-function summarizeExecutionLogValue(value: unknown, depth = 0): unknown {
-  if (isLazyParameterValue(value)) {
-    return summarizeExecutionLogValue(getParameterDisplayValue(value), depth);
-  }
-
-  if (typeof value === 'bigint') return value.toString();
-  if (value === undefined || value === null || typeof value !== 'object') {
-    if (typeof value === 'string' && value.length > MAX_LOG_STRING_LENGTH) {
-      return `${value.slice(0, MAX_LOG_STRING_LENGTH)}... (len=${value.length})`;
-    }
-    return value;
-  }
-
-  if (value instanceof ArrayBuffer) {
-    return `<ArrayBuffer ${formatByteSize(value.byteLength)}>`;
-  }
-
-  if (ArrayBuffer.isView(value)) {
-    return `<${value.constructor.name} ${formatByteSize(value.byteLength)}>`;
-  }
-
-  if (typeof Blob !== 'undefined' && value instanceof Blob) {
-    const fileName = 'name' in value && typeof value.name === 'string' ? value.name : 'Blob';
-    return `<${fileName} ${formatByteSize(value.size)}>`;
-  }
-
-  if (Array.isArray(value)) {
-    const items = value.length > MAX_LOG_ARRAY_ITEMS ? value.slice(0, MAX_LOG_ARRAY_ITEMS) : value;
-    const summarized = items.map(item => summarizeExecutionLogValue(item, depth + 1));
-    return value.length > MAX_LOG_ARRAY_ITEMS
-      ? [...summarized, `... (${value.length - MAX_LOG_ARRAY_ITEMS} more items)`]
-      : summarized;
-  }
-
-  if (depth >= 6) {
-    return '[Object]';
-  }
-
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>).map(([key, item]) => [
-      key,
-      summarizeExecutionLogValue(item, depth + 1),
-    ])
-  );
-}
-
-function summarizeExecutionLogData(data: Record<string, unknown>) {
-  return summarizeExecutionLogValue(data) as Record<string, unknown>;
 }
 
 export function useMethodExecution({
@@ -135,16 +74,9 @@ export function useMethodExecution({
           executionParams = params;
         }
 
-        logRequest('Execution send data', summarizeExecutionLogData(executionParams));
-
         const startTime = Date.now();
         const result = await handler(executionParams);
         const duration = Date.now() - startTime;
-
-        logResponse(
-          'Execution receive data',
-          summarizeExecutionLogValue(result) as Record<string, unknown>
-        );
 
         // 检查执行结果（主要针对firmware类型）
         if (type === 'firmware' && result.success === false) {

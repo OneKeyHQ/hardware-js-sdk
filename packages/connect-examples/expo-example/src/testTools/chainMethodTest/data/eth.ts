@@ -229,13 +229,13 @@ const ethData: ChainMethodEntry[] = [
         },
       },
       {
-        title: 'EIP-7702 With Pre-signed Authorization (Test)',
+        title: 'EIP-7702 Additional Authorization',
         value: {
           path: "m/44'/60'/0'/0/0",
           transaction: {
             to: '0x4Cd241E8d1510e30b2076397afc7508Ae59C66c9',
             value: '0x0',
-            data: '0x', // empty data for authorization only
+            data: '0x',
             chainId: 1,
             nonce: '0x5',
             gasLimit: '0x7530',
@@ -246,10 +246,7 @@ const ethData: ChainMethodEntry[] = [
               {
                 chainId: 1,
                 address: '0x4Cd241E8d1510e30b2076397afc7508Ae59C66c9',
-                nonce: '0x5',
-                yParity: 1,
-                r: '0xdeadbeef1234567890abcdef1234567890abcdef1234567890abcdef123456789',
-                s: '0xcafebabe567890abcdef1234567890abcdef1234567890abcdef1234567890abc',
+                nonce: '0x6',
               },
             ],
           },

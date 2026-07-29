@@ -13,7 +13,7 @@ import {
 } from './ui/sidebar';
 import { Badge } from './ui/Badge';
 import { Card, CardContent } from './ui/Card';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation , useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useDeviceStore } from '../store/deviceStore';
 import { useTransportPersistence } from '../store/persistenceStore';
@@ -26,12 +26,6 @@ import {
   XCircle,
   Server,
   Info,
-  ListChecks,
-  Usb,
-  UploadCloud,
-  ShieldCheck,
-  ChartPie,
-  KeyRound,
 } from 'lucide-react';
 import { getDeviceLabel } from '@onekeyfe/hd-core';
 import packageJson from '../../package.json';
@@ -42,20 +36,6 @@ import onekeyLogo from '../assets/onekey.png';
 // 版本信息
 const VERSION = packageJson.version;
 const COMMIT_SHA = process.env.COMMIT_SHA || 'dev-build';
-const PUSH_TIMESTAMP = process.env.PUSH_TIMESTAMP || process.env.BUILD_TIME || __BUILD_TIME__;
-
-const formatVersionTimestamp = (timestamp?: string) => {
-  if (!timestamp) return '';
-
-  const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) {
-    return timestamp;
-  }
-
-  return date.toISOString().replace('T', ' ').slice(0, 16);
-};
-
-const VERSION_TIMESTAMP = formatVersionTimestamp(PUSH_TIMESTAMP);
 
 const navigationItems = [
   {
@@ -82,41 +62,6 @@ const navigationItems = [
     title: 'common.logs',
     url: '/logs',
     icon: FileText,
-  },
-  {
-    title: 'common.pro2Debug',
-    url: '/pro2-debug',
-    icon: Usb,
-  },
-  {
-    title: 'common.pro2Update',
-    url: '/pro2-update',
-    icon: ListChecks,
-  },
-  {
-    title: 'common.pro2SpecialUpdate',
-    url: '/pro2-special-update',
-    icon: UploadCloud,
-  },
-  {
-    title: 'common.portfolioTest',
-    url: '/portfolio-test',
-    icon: ChartPie,
-  },
-  {
-    title: 'common.methodBatchTest',
-    url: '/method-batch-test',
-    icon: ListChecks,
-  },
-  {
-    title: 'common.multisigTest',
-    url: '/multisig-test',
-    icon: ShieldCheck,
-  },
-  {
-    title: 'common.walletSessionTest',
-    url: '/wallet-session-test',
-    icon: KeyRound,
   },
 ];
 
@@ -220,13 +165,13 @@ export function AppSidebar() {
 
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-muted-foreground font-medium">
-                          {t('common.serialNo')}
+                          {t('common.uuid')}
                         </span>
                         <span
                           className="text-xs font-mono text-foreground truncate max-w-24"
-                          title={currentDevice.serialNo || currentDevice.uuid}
+                          title={currentDevice.connectId}
                         >
-                          {(currentDevice.serialNo || currentDevice.uuid)?.slice(0, 8) || '--'}
+                          {currentDevice.connectId?.slice(0, 8)}...
                         </span>
                       </div>
 
@@ -277,7 +222,7 @@ export function AppSidebar() {
 
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-muted-foreground font-medium">
-                          {t('common.serialNo')}
+                          {t('common.uuid')}
                         </span>
                         <span className="text-xs text-muted-foreground">--</span>
                       </div>
@@ -339,11 +284,6 @@ export function AppSidebar() {
             <div className="text-xs text-muted-foreground font-mono">
               v{VERSION} • {COMMIT_SHA.slice(0, 8)}
             </div>
-            {VERSION_TIMESTAMP ? (
-              <div className="text-[10px] leading-4 text-muted-foreground/80 font-mono">
-                {VERSION_TIMESTAMP}
-              </div>
-            ) : null}
           </div>
         </div>
       </SidebarFooter>

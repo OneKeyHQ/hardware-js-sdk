@@ -6,18 +6,13 @@ title: 获取设备特性
 
 ## 获取设备特性
 
-`getFeatures()` 仅用于 Protocol V1 老设备兼容。它会访问设备并返回旧版
-`Features` 结构；Protocol V2（包括 Pro 2）不支持此接口。
-
-新接入以及需要同时支持 Pro / Pro 2 的业务，请统一使用
-[`getDeviceState()`](/zh/hardware-sdk/basic-api/get-device-info)。SDK 会在内部兼容协议差异，
-外部不需要理解 `DeviceInfoGet`、`DeviceStatusGet` 等原始消息。
+获取设备的所有属性。
 
 ```typescript
 const response = await HardwareSDK.getFeatures(connectId);
 ```
 
-> 此兼容调用可能使 Protocol V1 设备返回主页。不要将它用于 Protocol V2 的状态刷新。
+> 如果屏幕正在显示其他内容，您也可以调用此方法返回主页。
 
 ### 参数
 

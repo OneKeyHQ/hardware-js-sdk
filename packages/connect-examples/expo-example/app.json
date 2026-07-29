@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "OneKey Expo Demo",
-    "slug": "onekey-expo-demo",
-    "scheme": "onekey-expo-demo",
+    "name": "HardwareExample",
+    "slug": "hardware-example",
+    "scheme": "hardware-example",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

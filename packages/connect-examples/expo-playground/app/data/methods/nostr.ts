@@ -119,6 +119,45 @@ const api: UnifiedMethodConfig[] = [
             name: 'path',
             type: 'string',
             required: true,
+
+            value: "m/44'/1237'/0'/0/0",
+          },
+          {
+            name: 'pubkey',
+            type: 'string',
+            required: true,
+            label: 'Pubkey',
+            value: '2118c65161c7d68b4bdbe1374f658532670057ab1bb0c99937d0ff7cff45cb5e',
+          },
+          {
+            name: 'plaintext',
+            type: 'string',
+            required: true,
+            label: 'Plaintext',
+            value: 'Hello world',
+          },
+          {
+            name: 'showOnOneKey',
+            type: 'boolean',
+
+            value: false,
+          },
+        ],
+      },
+    ],
+  },
+
+  {
+    method: 'nostrEncryptMessage',
+    description: 'methodDescriptions.nostrEncryptMessage',
+    presets: [
+      {
+        title: 'Encrypt message',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
             label: 'Derivation Path',
             value: "m/44'/1237'/0'/0/0",
           },

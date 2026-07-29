@@ -17,7 +17,8 @@ import {
 
 import type { createTestRunnerAtoms } from './Context/TestRunnerVerifyProvider';
 import type { TestCaseDataWithKey, VerifyState } from './types';
-import type { CoreApi, Features, OnekeyFeatures, Success, Unsuccessful } from '@onekeyfe/hd-core';
+import type { OnekeyFeatures } from '@onekeyfe/hd-transport';
+import type { CoreApi, Features, Success, Unsuccessful } from '@onekeyfe/hd-core';
 
 // 自定义状态管理器类型
 type CustomStateManager = ReturnType<typeof createTestRunnerAtoms>;

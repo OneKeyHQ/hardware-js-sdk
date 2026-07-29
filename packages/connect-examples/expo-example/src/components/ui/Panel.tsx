@@ -16,14 +16,7 @@ const PanelView = ({ title, children, renderRight }: PanelViewProps) => (
     testID={`panel-view-${title}`}
   >
     {!!title && (
-      <Card.Header
-        padded
-        flexDirection="row"
-        justifyContent="space-between"
-        alignItems="center"
-        flexWrap="wrap"
-        gap="$2"
-      >
+      <Card.Header padded flexDirection="row" justifyContent="space-between">
         <Text fontWeight="bold">{title}</Text>
         {renderRight && renderRight()}
       </Card.Header>

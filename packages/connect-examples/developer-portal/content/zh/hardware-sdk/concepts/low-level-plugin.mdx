@@ -22,7 +22,7 @@ title: 底层传输插件
 
 ### BLE 头部数据示例
 
-Protocol V1 收到的第一个 BLE 数据包（头部包）示例：
+收到的第一个 BLE 数据包（头部包）示例：
 
 ```
 原始数据: 3F 23 23 00 02 00 00 00 0A 12 08 ...
@@ -33,28 +33,6 @@ Protocol V1 收到的第一个 BLE 数据包（头部包）示例：
 ```
 
 检测头部包：**前 3 字节为 `3F 23 23`**
-
-### Protocol V2 BLE 帧
-
-Protocol V2 使用 `0x5A` 开头的完整 frame，并带有两段 CRC8：
-
-```
-5A LenL LenH HeaderCRC Router Attr Seq Payload... CRC
-```
-
-| 字段 | 说明 |
-|------|------|
-| `5A` | Protocol V2 起始字节 |
-| `LenL/LenH` | little-endian 总 frame 长度 |
-| `HeaderCRC` | 对前 3 字节计算 CRC8 |
-| `Router` | BLE UART 使用 `1` |
-| `Attr` / `Seq` | 协议属性和递增序号 |
-| `Payload` | `MsgTypeL MsgTypeH + protobuf bytes` |
-| `CRC` | 对除最后 CRC 外的整帧计算 CRC8 |
-
-CRC8 是 Protocol V2 协议必需字段，不是设备数据。使用 `@onekeyfe/hd-common-connect-sdk` 的 `lowlevel` 环境时，JS SDK 会负责计算 CRC8、重组 frame 并校验 CRC8；原生 Kotlin/Swift/Flutter 插件可以把单个 BLE notification chunk 的 hex 字符串从 `receive()` 返回，也可以返回已经重组好的完整 `0x5A` frame。无论哪种方式，都不要去掉 header、payload 或末尾 CRC。
-
-只有在完全绕过 OneKey SDK、自己实现 Protocol V2 encode/decode 时，才需要在原生侧实现同样的 CRC8 算法。
 
 原生示例（均基于低层插件）：
 
@@ -86,7 +64,7 @@ export type LowlevelTransportSharedPlugin = {
 | 数据包大小 | 固定 64 字节 | 可变长度 (取决于 MTU) |
 | 每个包前缀 | 所有包都有 `0x3F` | 仅头部包有 `0x3F 0x23 0x23` |
 | 填充 | 零填充到 64 字节 | 无需填充 |
-| `receive()` 返回 | 每次一个 64 字节帧 | **单个 BLE notification chunk，或完整 Protocol V1/V2 消息** |
+| `receive()` 返回 | 每次一个 64 字节帧 | **完整重组后的消息** |
 
 ---
 
@@ -116,9 +94,9 @@ export type LowlevelTransportSharedPlugin = {
 
 ## BLE 协议（原生移动端）
 
-BLE 使用可变长度块，**插件必须自行重组完整消息或完整 frame**。
+BLE 使用可变长度块，**插件必须自行重组完整消息**。
 
-### Protocol V1 数据包格式
+### 数据包格式
 
 **头部块（消息第一个包）：**
 
@@ -205,53 +183,14 @@ class BleMessageAssembler {
 }
 ```
 
-### Protocol V2 frame 重组规则
-
-如果你选择在原生侧提前重组 V2 frame，可以按下面的规则处理。SDK 的 lowlevel transport 自身也会做同样的重组，因此原生侧直接转发 notification chunk 也是可行的：
-
-- 累积 notification bytes。
-- 缓冲区至少 3 字节后，用 `LenL | (LenH << 8)` 读取总 frame 长度。
-- 缓冲区达到总长度后，把完整 frame 转成 hex 并 resolve `receive()`。
-- 如果同一个 notification 里拼进了下一帧，保留剩余 bytes 继续解析。
-- 原生侧不需要计算 CRC8，SDK 会在 decode 时校验。
-
-简化示例：
-
-```typescript
-let protocolV2Buffer: number[] = []
-let protocolV2ExpectedLength = 0
-
-function onProtocolV2Notification(data: Uint8Array, resolveFrame: (hex: string) => void) {
-  protocolV2Buffer.push(...data)
-
-  if (protocolV2ExpectedLength === 0 && protocolV2Buffer.length >= 3) {
-    if (protocolV2Buffer[0] !== 0x5A) {
-      protocolV2Buffer = []
-      return
-    }
-    protocolV2ExpectedLength = protocolV2Buffer[1] | (protocolV2Buffer[2] << 8)
-  }
-
-  while (protocolV2ExpectedLength > 0 && protocolV2Buffer.length >= protocolV2ExpectedLength) {
-    const frame = new Uint8Array(protocolV2Buffer.slice(0, protocolV2ExpectedLength))
-    resolveFrame(Array.from(frame).map(b => b.toString(16).padStart(2, '0')).join(''))
-
-    protocolV2Buffer = protocolV2Buffer.slice(protocolV2ExpectedLength)
-    protocolV2ExpectedLength = protocolV2Buffer.length >= 3 && protocolV2Buffer[0] === 0x5A
-      ? protocolV2Buffer[1] | (protocolV2Buffer[2] << 8)
-      : 0
-  }
-}
-```
-
 ### 常见错误
 
 ```typescript
-// ❌ 错误: 去掉 Protocol V2 header/CRC，只返回 payload
-receive() { return this.payloadOnlyQueue.shift() }
+// ❌ 错误: 重新分片成 64 字节包
+receive() { return this.messageQueue.shift() }
 
-// ✅ 正确: 返回原始 notification chunk，或完整重组后的 V1/V2 frame
-receive() { return this.rawChunkOrCompleteFramePromise }
+// ✅ 正确: 返回完整重组后的消息
+receive() { return this.completeMessagePromise }
 ```
 
 ```typescript
@@ -274,7 +213,7 @@ import HardwareSDK from '@onekeyfe/hd-common-connect-sdk'
 const plugin = {
   enumerate: () => Promise.resolve([{ id: 'foo', name: 'bar' }]),
   send: (uuid, data) => { /* 发送 hex 数据 */ },
-  receive: () => { /* BLE: 原始 notification chunk 或完整消息 */ },
+  receive: () => { /* WebUSB: 64字节帧 / BLE: 完整消息 */ },
   connect: (uuid) => { /* BLE Android: 先配对! */ },
   disconnect: (uuid) => { /* 清理连接 */ },
   init: () => { /* 初始化 BLE 栈 */ },

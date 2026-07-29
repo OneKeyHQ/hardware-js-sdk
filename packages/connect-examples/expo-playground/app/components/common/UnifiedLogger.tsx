@@ -20,7 +20,6 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../../hooks/use-toast';
 import CollapsibleJsonViewer from './CollapsibleJsonViewer';
-import { formatJsonPreview, getSearchableJsonText } from '../../utils/jsonPreview';
 
 // 兼容现有的日志类型定义
 export type LogType = 'request' | 'response' | 'hardware' | 'error' | 'info';
@@ -35,7 +34,6 @@ export interface UnifiedLogEntry {
   content?: string | Record<string, unknown> | null;
   data?: Record<string, unknown>;
   description?: string;
-  transient?: boolean;
 }
 
 interface UnifiedLoggerProps {
@@ -45,7 +43,6 @@ interface UnifiedLoggerProps {
   showFilters?: boolean;
   showHeader?: boolean;
   className?: string;
-  compact?: boolean;
   externalSearchTerm?: string;
   externalFilter?: string;
 }
@@ -55,8 +52,7 @@ const SmartContentDisplay: React.FC<{
   content: string | Record<string, unknown> | null;
   type: LogType;
   title: string;
-  compact?: boolean;
-}> = ({ content, compact = false }) => {
+}> = ({ content }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const { t } = useTranslation();
 
@@ -64,18 +60,11 @@ const SmartContentDisplay: React.FC<{
 
   // 如果是字符串，直接显示
   if (typeof content === 'string') {
-    const displayContent = formatJsonPreview(content, {
-      maxStringLength: compact ? 1200 : 3000,
-    });
-    const lines = displayContent.split('\n');
+    const lines = content.split('\n');
     if (lines.length <= 3) {
       return (
-        <pre
-          className={`${
-            compact ? 'text-[11px] p-1.5' : 'text-xs p-2'
-          } bg-muted/30 dark:bg-muted/20 rounded-md whitespace-pre-wrap break-words min-w-0 overflow-hidden leading-relaxed`}
-        >
-          {displayContent}
+        <pre className="text-xs bg-muted/30 dark:bg-muted/20 p-2 rounded-md whitespace-pre-wrap break-words min-w-0 overflow-hidden">
+          {content}
         </pre>
       );
     }
@@ -84,12 +73,8 @@ const SmartContentDisplay: React.FC<{
 
     return (
       <div className="space-y-1">
-        <pre
-          className={`${
-            compact ? 'text-[11px] p-1.5' : 'text-xs p-2'
-          } bg-muted/30 dark:bg-muted/20 rounded-md whitespace-pre-wrap break-words min-w-0 overflow-hidden leading-relaxed`}
-        >
-          {isExpanded ? displayContent : previewContent}
+        <pre className="text-xs bg-muted/30 dark:bg-muted/20 p-2 rounded-md whitespace-pre-wrap break-words min-w-0 overflow-hidden">
+          {isExpanded ? content : previewContent}
         </pre>
         <Button
           variant="ghost"
@@ -128,7 +113,6 @@ const UnifiedLogger: React.FC<UnifiedLoggerProps> = ({
   showFilters = false,
   showHeader = true,
   className = '',
-  compact = false,
   externalSearchTerm = '',
   externalFilter = '',
 }) => {
@@ -215,9 +199,9 @@ const UnifiedLogger: React.FC<UnifiedLoggerProps> = ({
           log.description || '',
           log.message || '',
           typeof normalizedLog.content === 'string'
-            ? getSearchableJsonText(normalizedLog.content)
+            ? normalizedLog.content
             : normalizedLog.content
-            ? getSearchableJsonText(normalizedLog.content)
+            ? JSON.stringify(normalizedLog.content)
             : '',
         ]
           .join(' ')
@@ -258,12 +242,8 @@ const UnifiedLogger: React.FC<UnifiedLoggerProps> = ({
       const normalizedLog = normalizeLogEntry(log);
       const content = normalizedLog.content
         ? typeof normalizedLog.content === 'string'
-          ? formatJsonPreview(normalizedLog.content, { maxStringLength: 3000 })
-          : formatJsonPreview(normalizedLog.content, {
-              maxDepth: 6,
-              maxArrayItems: 20,
-              maxStringLength: 512,
-            })
+          ? normalizedLog.content
+          : JSON.stringify(normalizedLog.content, null, 2)
         : '';
 
       const logText = `[${normalizedLog.timestamp.toLocaleString()}] [${log.type.toUpperCase()}] ${
@@ -344,10 +324,7 @@ const UnifiedLogger: React.FC<UnifiedLoggerProps> = ({
       )}
 
       <CardContent className="p-0 flex flex-col flex-1 min-h-0 relative">
-        <div
-          ref={internalScrollRef}
-          className={`flex-1 min-h-0 overflow-y-auto ${compact ? 'p-2' : 'p-3'}`}
-        >
+        <div ref={internalScrollRef} className="flex-1 min-h-0 overflow-y-auto p-3">
           {filteredLogs.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <FileText className="h-8 w-8 text-muted-foreground mb-2" />
@@ -358,30 +335,24 @@ const UnifiedLogger: React.FC<UnifiedLoggerProps> = ({
               </p>
             </div>
           ) : (
-            <div className={compact ? 'space-y-1.5' : 'space-y-2'}>
+            <div className="space-y-2">
               {/* 移除虚拟化，直接渲染所有日志项 */}
               {filteredLogs.map(log => {
                 const config = getLogTypeConfig(log.type);
                 return (
                   <div
                     key={log.id}
-                    className={`${config.bgColor} border border-border/30 rounded-lg ${
-                      compact ? 'p-1.5 space-y-1' : 'p-2 space-y-1.5'
-                    }`}
+                    className={`${config.bgColor} border border-border/30 rounded-lg p-2 space-y-1.5`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0 flex-1">
                         <Badge
-                          className={`${config.badge} ${
-                            compact ? 'text-[10px] px-1 py-0.5' : 'text-xs px-1.5 py-0.5'
-                          } flex items-center gap-1`}
+                          className={`${config.badge} text-xs px-1.5 py-0.5 flex items-center gap-1`}
                         >
                           {config.icon}
                           {log.type}
                         </Badge>
-                        <span
-                          className={`${compact ? 'text-[10px]' : 'text-xs'} text-muted-foreground`}
-                        >
+                        <span className="text-xs text-muted-foreground">
                           {log.normalizedTimestamp.toLocaleString()}
                         </span>
                       </div>
@@ -395,20 +366,12 @@ const UnifiedLogger: React.FC<UnifiedLoggerProps> = ({
                       </Button>
                     </div>
 
-                    <div className={compact ? 'space-y-0' : 'space-y-0.5'}>
-                      <h4
-                        className={`${compact ? 'text-[11px]' : 'text-xs'} font-medium ${
-                          config.color
-                        }`}
-                      >
+                    <div className="space-y-0.5">
+                      <h4 className={`text-xs font-medium ${config.color}`}>
                         {log.normalizedTitle}
                       </h4>
                       {log.description && (
-                        <p
-                          className={`${compact ? 'text-[11px]' : 'text-xs'} text-muted-foreground`}
-                        >
-                          {log.description}
-                        </p>
+                        <p className="text-xs text-muted-foreground">{log.description}</p>
                       )}
                     </div>
 
@@ -417,7 +380,6 @@ const UnifiedLogger: React.FC<UnifiedLoggerProps> = ({
                         content={log.normalizedContent}
                         type={log.type}
                         title={log.normalizedTitle}
-                        compact={compact}
                       />
                     )}
                   </div>

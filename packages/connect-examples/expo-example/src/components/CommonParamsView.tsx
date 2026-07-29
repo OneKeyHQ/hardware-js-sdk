@@ -1,15 +1,10 @@
 import { Stack } from 'tamagui';
 import { useIntl } from 'react-intl';
-import { Picker } from '@react-native-picker/picker';
 
 import { useCommonParams } from '../provider/CommonParamsProvider';
 import { CommonInput } from './CommonInput';
 import { SwitchInput } from './SwitchInput';
 import PanelView from './ui/Panel';
-
-import type { CommonParams } from '@onekeyfe/hd-core';
-
-type ConnectProtocolOption = 'auto' | NonNullable<CommonParams['connectProtocol']>;
 
 export default function CommonParamsView() {
   const intl = useIntl();
@@ -19,26 +14,9 @@ export default function CommonParamsView() {
     setOptionalParams({ ...commonParams, [param]: value });
   };
 
-  const handleSetConnectProtocol = (value: ConnectProtocolOption) => {
-    setOptionalParams({
-      ...commonParams,
-      connectProtocol: value === 'auto' ? undefined : value,
-    });
-  };
-
   return (
     <PanelView title={intl.formatMessage({ id: 'title__common_parameters' })}>
       <Stack gap="$4" flexDirection="row" flexWrap="wrap">
-        <Stack width={160} minHeight={45}>
-          <Picker
-            selectedValue={commonParams.connectProtocol ?? 'auto'}
-            onValueChange={handleSetConnectProtocol}
-          >
-            <Picker.Item label="Protocol Auto" value="auto" />
-            <Picker.Item label="Protocol V1 (Pro1)" value="V1" />
-            <Picker.Item label="Protocol V2 (Pro2)" value="V2" />
-          </Picker>
-        </Stack>
         <CommonInput
           label="Passphrase State"
           type="text"

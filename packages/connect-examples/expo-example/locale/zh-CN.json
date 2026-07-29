@@ -170,7 +170,6 @@
   "message__download_latest_ui_resource_success": "下载最新 UI 资源成功",
   "message__reboot_to_bootloader": "重启到 Bootloader...",
   "message__wait_begin_update": "等待开始更新中...",
-  "message__firmware_reconnect_device": "重启并重新连接设备中...",
   "message__confirm_on_device": "在设备上确认...",
   "message__firmware_erase_success": "固件安装中...",
   "message__firmware_start_transfer": "固件开始传输中...",

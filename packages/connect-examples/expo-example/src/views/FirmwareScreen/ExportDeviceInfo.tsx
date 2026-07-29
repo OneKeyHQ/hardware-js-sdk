@@ -3,7 +3,7 @@ import { useIntl } from 'react-intl';
 import { Button } from '../../components/ui/Button';
 import { downloadFile } from '../../utils/downloadUtils';
 import { useDeviceFieldContext } from './DeviceFieldContext';
-import { getFirmwareDeviceSummary } from '../../utils/deviceUtils';
+import { getDeviceBasicInfo } from '../../utils/deviceUtils';
 
 import type { Features } from '@onekeyfe/hd-core';
 
@@ -80,7 +80,7 @@ export function ExportDeviceInfo() {
       bootloaderVersion,
       boardloaderVersion,
       firmwareVersion,
-    } = getFirmwareDeviceSummary(features, onekeyFeatures);
+    } = getDeviceBasicInfo(features, onekeyFeatures);
 
     const bootloaderMode = intl.formatMessage({
       id: getDeviceMode(features),

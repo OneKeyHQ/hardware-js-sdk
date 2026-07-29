@@ -175,8 +175,9 @@ persisting the passphrase itself.
 
 - Pass as the `passphraseState` common-param on every SDK call that must
   stay on the same hidden wallet.
-- Persist `deviceId + passphraseState` as the wallet identity. The SDK keeps
-  `session_id` private and restores it from its in-memory store.
+- Cache across processes by persisting
+  `(deviceId, passphraseState, session_id)` together and calling
+  `preloadSessionCache` on startup.
 - Clearing the cached `passphraseState` does **not** invalidate the hidden
   wallet — the wallet is reproducible by re-entering the same passphrase.
 
@@ -184,7 +185,7 @@ persisting the passphrase itself.
 | --- | --- | --- |
 | Lifetime | Until device lock | Effectively forever (until passphrase changes) |
 | Determinism | Random per session | Deterministic per passphrase |
-| Role | SDK-internal device-session handle | Public hidden-wallet identifier |
+| Role | Keeps device-side session alive | Identifies which hidden wallet to use |
 
 ## Putting it together — real example
 

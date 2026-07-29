@@ -1,20 +1,9 @@
 import type { HardwareApiMethod } from '~/services/hardwareService';
 
-export type LegacyFilesystemMethod =
-  | 'filesystemPathInfoQuery'
-  | 'filesystemDirList'
-  | 'filesystemDirMake'
-  | 'filesystemDirRemove'
-  | 'filesystemFileRead'
-  | 'filesystemFileWrite'
-  | 'filesystemFileDelete';
-
-export type PlaygroundHardwareMethod = HardwareApiMethod | LegacyFilesystemMethod;
-
 // 选项类型定义
 export interface SelectOption {
   label: string;
-  value: string | number | boolean;
+  value: string;
 }
 
 // 参数字段类型 - 包含值和UI配置
@@ -95,7 +84,7 @@ export type AllMethodCategory = ChainCategory | DeviceMethodCategory;
 
 // **统一的方法配置类型**
 export interface UnifiedMethodConfig {
-  method: PlaygroundHardwareMethod;
+  method: HardwareApiMethod;
   description?: string;
   category?: MethodCategory;
 
@@ -108,7 +97,6 @@ export interface UnifiedMethodConfig {
   deprecated?: boolean;
   supportedDevices?: string[];
   tags?: string[];
-  debugOnly?: boolean;
 }
 
 // 执行状态

@@ -44,7 +44,6 @@ const response = await HardwareSDK.tonSignMessage(connectId, deviceId, {
 * `isBounceable` - _optional_ `boolean` whether message is bounceable (default: false)
 * `isTestnetOnly` - _optional_ `boolean` whether to use testnet (default: false)
 * `jettonMasterAddress` - _optional_ `string` Jetton master contract address
-* `jettonWalletAddress` - _optional_ `string` Jetton wallet contract address
 * `jettonAmount` - _optional_ `number` amount of jettons to transfer
 * `fwdFee` - _optional_ `number` forward fee for jetton transfer
 * `comment` - _optional_ `string` message comment
@@ -80,24 +79,6 @@ const jettonResponse = await HardwareSDK.tonSignMessage(connectId, deviceId, {
     extDestination: ['UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_'],
     extTonAmount: [100],
     extPayload: ['48656c6c6f204f6e654b6579'],
-});
-
-// Jetton transfer
-const jettonTransferResponse = await HardwareSDK.tonSignMessage(connectId, deviceId, {
-    path: "m/44'/607'/0'",
-    destination: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
-    tonAmount: 100,
-    seqno: 0,
-    expireAt: Date.now() + 1000 * 60 * 60 * 24,
-    jettonMasterAddress: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
-    jettonWalletAddress: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
-    jettonAmount: 101,
-    fwdFee: 100,
-    comment: '48656c6c6f204f6e654b6579',
-    mode: 1,
-    walletVersion: 3,
-    isBounceable: false,
-    isTestnetOnly: false,
 });
 
 ```
