@@ -124,6 +124,10 @@ export type DeviceFeaturesMode =
 export type DeviceFeaturesVerify = {
   firmwareBuildId?: string;
   firmwareHash?: string;
+  applicationP1BuildId?: string;
+  applicationP1Hash?: string;
+  applicationP2BuildId?: string;
+  applicationP2Hash?: string;
   bootloaderBuildId?: string;
   bootloaderHash?: string;
   boardBuildId?: string;
@@ -230,6 +234,8 @@ export type DeviceStateSettings = {
 
 export type DeviceStateVersions = {
   firmware: string | null;
+  applicationP1?: string | null;
+  applicationP2?: string | null;
   bootloader: string | null;
   board: string | null;
   ble: string | null;

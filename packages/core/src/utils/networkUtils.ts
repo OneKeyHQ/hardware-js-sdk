@@ -1,6 +1,8 @@
 import axios, { type AxiosResponse } from 'axios';
 
 export type HttpRequestOptions = {
+  /** Additional request headers, such as a byte range for package metadata reads. */
+  headers?: Record<string, string>;
   /** Axios adapter-defined request timeout retained for existing opt-in callers. */
   timeoutMs?: number;
   /** Deadline for DNS, connection, TLS, redirects, and the first response-body progress. */
@@ -108,9 +110,9 @@ export const httpRequest = async <T = unknown>(
   type = 'text',
   options: HttpRequestOptions = {}
 ): Promise<T> => {
-  const headers: any = {};
+  const headers: Record<string, string> = { ...options.headers };
   if (url.indexOf('ngrok-free.app') > -1) {
-    headers['ngrok-skip-browser-warning'] = true;
+    headers['ngrok-skip-browser-warning'] = 'true';
   }
 
   const timeoutMs =
@@ -245,7 +247,7 @@ export const httpRequest = async <T = unknown>(
       throw new Error(`httpRequest completed without a response: ${url}`);
     }
 
-    if (+response.status === 200) {
+    if (+response.status >= 200 && +response.status < 300) {
       return response.data;
     }
 

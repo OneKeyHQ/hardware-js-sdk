@@ -111,7 +111,8 @@ describe('DeviceStateMapper', () => {
         protocol_version: 2,
         hw: { serial_no: 'SERIAL-1' },
         fw: {
-          application: { version: '5.0.0' },
+          application: { version: '5.0.0', build_id: 'p1-build', hash: [0x01, 0x02] },
+          application_data: { version: '5.0.1', build_id: 'p2-build', hash: [0x03, 0x04] },
           bootloader: { version: '2.0.0' },
         },
         coprocessor: {
@@ -129,8 +130,16 @@ describe('DeviceStateMapper', () => {
     });
     expect(patch.versions).toMatchObject({
       firmware: '5.0.0',
+      applicationP1: '5.0.0',
+      applicationP2: '5.0.1',
       bootloader: '2.0.0',
       ble: '1.2.3',
+    });
+    expect(patch.verification).toMatchObject({
+      applicationP1BuildId: 'p1-build',
+      applicationP1Hash: '0102',
+      applicationP2BuildId: 'p2-build',
+      applicationP2Hash: '0304',
     });
     expect(patch).toMatchObject({ protocolVersion: 2 });
     expect(patch.status?.unlocked).toBeUndefined();
