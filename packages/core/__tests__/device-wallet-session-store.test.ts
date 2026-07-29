@@ -195,8 +195,7 @@ describe('ClearSessionCache', () => {
       session_id: null,
     });
     expect(device.features).not.toHaveProperty('passphraseState');
-    expect(device.features?.raw?.protocolV1Features).not.toHaveProperty('sessionId');
-    expect(device.features?.raw?.protocolV1Features).not.toHaveProperty('session_id');
+    expect(device.features).not.toHaveProperty('raw');
 
     const method = new ClearSessionCache({
       payload: {
