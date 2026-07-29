@@ -3,6 +3,7 @@ import transport, {
   ProtocolV2,
   ProtocolV2LinkError,
 } from '@onekeyfe/hd-transport';
+import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
 
 import WebUsbTransport from '../src/webusb';
 
@@ -20,6 +21,34 @@ const schema = {
 };
 
 describe('WebUsbTransport Protocol V2 timeout recovery', () => {
+  test('only enumerates devices with real USB serial numbers', async () => {
+    const filter = ONEKEY_WEBUSB_FILTER[0];
+    const deviceWithSerial = {
+      ...filter,
+      manufacturerName: 'OneKey',
+      productName: 'OneKey Pro 2',
+      serialNumber: 'PRO2-SERIAL',
+    } as USBDevice;
+    const deviceWithoutSerial = {
+      ...filter,
+      manufacturerName: 'OneKey',
+      productName: 'OneKey Pro 2',
+      serialNumber: null,
+    } as USBDevice;
+    const webusb = new WebUsbTransport();
+    webusb.usb = {
+      getDevices: jest.fn().mockResolvedValue([deviceWithSerial, deviceWithoutSerial]),
+    } as unknown as USB;
+
+    await expect(webusb.getConnectedDevices()).resolves.toEqual([
+      {
+        path: 'PRO2-SERIAL',
+        device: deviceWithSerial,
+        commType: 'webusb',
+      },
+    ]);
+  });
+
   test('keeps active links when the Protocol V2 schema is configured repeatedly', () => {
     const webusb = new WebUsbTransport() as any;
     webusb.invalidateAllProtocolV2UsbLinks = jest.fn().mockResolvedValue(undefined);
