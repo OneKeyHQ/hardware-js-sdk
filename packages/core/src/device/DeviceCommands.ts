@@ -54,6 +54,13 @@ const DEVICE_SESSION_CALLS = new Set([
   'DeviceSessionAskPassphrase',
 ]);
 
+// Protocol V2 subcodes are domain-scoped, so cross-domain cancellation fallback
+// must use explicit firmware cancellation messages instead of a global number map.
+const isProtocolV2ActionCancelledMessage = (message: string) =>
+  /^(?:cancel(?:led|ed)(?: on device)?|confirm dismissed|user cancel(?:led|ed)(?:\s+.*)?)$/i.test(
+    message
+  );
+
 function shouldReduceDebugForCall(type: string) {
   return HIGH_VOLUME_DEBUG_CALLS.has(type);
 }
@@ -474,9 +481,8 @@ export class DeviceCommands {
 
       if (code === 'Failure_ProcessError') {
         const normalizedMessage = message?.trim() ?? '';
-        const isLegacyProtocolV2ActionCancelledFailure =
-          this.device.isProtocolV2() &&
-          /^(?:cancelled on device|confirm dismissed)$/i.test(normalizedMessage);
+        const isProtocolV2ActionCancelledFailure =
+          this.device.isProtocolV2() && isProtocolV2ActionCancelledMessage(normalizedMessage);
         const isLegacyProtocolV2LockedFailure =
           this.device.isProtocolV2() && /^device (?:is )?locked$/i.test(normalizedMessage);
         if (
@@ -536,7 +542,7 @@ export class DeviceCommands {
           });
         } else if (
           subcode === DeviceErrorCode.DeviceError_ActionCancelled ||
-          isLegacyProtocolV2ActionCancelledFailure
+          isProtocolV2ActionCancelledFailure
         ) {
           error = ERRORS.TypedError(HardwareErrorCode.ActionCancelled, message, {
             failureCode: code,
