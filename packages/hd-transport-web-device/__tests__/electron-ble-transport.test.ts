@@ -183,7 +183,7 @@ describe('ElectronBleTransport protocol detection', () => {
     });
   });
 
-  test('uses the Protocol V2 BLE writer without changing the Protocol V1 packet path', async () => {
+  test('uses the Protocol V2 BLE writer with the Electron packet size', async () => {
     const device = { id: 'chunked-pro2-id', name: 'OneKey Pro 2' };
     const nobleBle = createNobleBle(device);
     const bleTransport = configureTransport(nobleBle) as any;
@@ -257,6 +257,7 @@ describe('ElectronBleTransport protocol detection', () => {
       return Promise.resolve();
     });
     const transport = configureTransport(nobleBle);
+    const protocolV2Writer = jest.spyOn(transport as any, 'writeProtocolV2Frame');
 
     try {
       await expect(transport.acquire({ uuid: device.id })).resolves.toEqual(
@@ -265,6 +266,7 @@ describe('ElectronBleTransport protocol detection', () => {
         })
       );
       expect(transport.getProtocolType(device.id)).toBe('V1');
+      expect(protocolV2Writer).not.toHaveBeenCalled();
     } finally {
       await transport.release(device.id);
     }
