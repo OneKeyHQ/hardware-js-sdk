@@ -34,8 +34,11 @@ V2 不支持传统 `GetFeatures`。Core 在初始化时发送默认范围的 `De
 
 `scope` 是可选参数；省略时等价于 `scope: 'runtime'`。这里的 scope 只决定本次读取需要主动刷新的数据分区，不裁剪返回值：三种 scope 最终都会返回完整的公共 `DeviceState` 快照。`runtime` 在 Protocol V1 刷新 `GetFeatures`，在 Protocol V2 normal 模式刷新 `DeviceStatusGet`；bootloader / romloader 模式会跳过不支持的状态命令并返回当前可用快照。
 
-原始 `DeviceSettingsGet` 不属于公共 API，只供 SDK 内部 `getDeviceState({ scope: 'settings' })`
-流程使用；Pro2 Debug 的状态诊断只保留 `deviceInfoGet` 与 `deviceStatusGet`。
+原始 `DeviceSettingsGet` 不属于公共 API，只供 SDK 内部状态同步使用：显式
+`getDeviceState({ scope: 'settings' })` 会严格刷新设置；Pro2 normal 模式复用缓存初始化时也会
+静默读取一次设置，使设备端直接修改的语言等字段在下一次 App 交互时进入 `DeviceState`。
+静默读取失败不会使原业务调用失败。Pro2 Debug 的状态诊断只保留 `deviceInfoGet` 与
+`deviceStatusGet`。
 
 ### 状态消费与兼容 Selector 边界
 
@@ -55,6 +58,7 @@ Core 包根保留以下设备信息 selector，供仍持有兼容 `Features` 的
 | `getDeviceBLEFirmwareVersion()`        | 读取 BLE / coprocessor 固件版本                 | 保留原名和大写 `BLE`                                    |
 | `getDeviceBoardloaderVersion()`        | 读取 board / romloader 版本                     | 保留历史拼写，不增加 `getDeviceBoardVersion`            |
 | `KnownDevice.serialNo`                 | 初始化后的稳定物理设备身份                      | 规范字段                                                |
+| `KnownDevice.status`                   | 当前 transport 使用状态                        | `available` / `used` / `occupied`，供连接状态展示       |
 | `SearchDevice.serialNo`                | 已初始化设备的序列号；未连接的 BLE 扫描结果为空 | 规范字段                                                |
 | `getDeviceUUID()` / `KnownDevice.uuid` | 初始化后与 `serialNo` 相同                      | 废弃兼容；新业务不再使用                                |
 | `SearchDevice.uuid`                    | 历史混合字段；BLE 扫描时可能是 Transport UUID   | 废弃兼容；路由使用 `connectId`，硬件身份使用 `serialNo` |
@@ -107,7 +111,8 @@ Protocol V2 的自动锁屏和自动关机使用 `0x10000000` 表示“永不”
 每次实际状态变化都会发送 `DEVICE.STATE`。宿主应用应监听该事件并持久化完整状态，
 不需要为 label、language、auto-lock 等字段分别维护手工数据库 patch。Protocol V1 额外发送
 兼容事件 `DEVICE.FEATURES`；Protocol V2 不发送该事件。设置读取与写入事件分别使用
-`settings-read` 和 `settings-write` 来源。
+`settings-read` 和 `settings-write` 来源。Pro2 在 normal 模式复用缓存初始化时会静默读取设置；
+若设备端直接修改了语言等字段，下一次成功建立的 App 调用链会据此发送 `settings-read` 状态事件。
 
 详见 [钱包 Session 与设备安全](../device/wallet-session-and-security.md) 和 [SDK 关键架构决策](../architecture/decisions.md#受保护方法的单次解锁重试)。
 

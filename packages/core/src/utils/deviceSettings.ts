@@ -90,8 +90,18 @@ export const mapLanguageFromProtocolV2 = (language?: string) =>
   language ? PROTOCOL_V2_LANGUAGE_KEY_BY_TAG[language] ?? language : undefined;
 
 const PRO2_LANGUAGE_OPTIONS = [
-  ...Object.entries(LANGUAGE_LABELS).map(([code, label]) => ({ code, label })),
+  { code: 'en', label: 'English' },
+  { code: 'zh_cn', label: '简体中文' },
+  { code: 'zh_hk', label: '繁體中文（香港）' },
   { code: 'zh-Hant-TW', label: '繁體中文（台灣）' },
+  { code: 'ja', label: '日本語' },
+  { code: 'ko', label: '한국어' },
+  { code: 'fr', label: 'Français' },
+  { code: 'de', label: 'Deutsch' },
+  { code: 'ru', label: 'Русский' },
+  { code: 'es', label: 'Español' },
+  { code: 'it', label: 'Italiano' },
+  { code: 'pt_br', label: 'Portuguese (Brazil)' },
   { code: 'vi-Latn-VN', label: 'Tiếng Việt' },
   { code: 'tr-Latn-TR', label: 'Türkçe' },
   { code: 'id-Latn-ID', label: 'Bahasa Indonesia' },
