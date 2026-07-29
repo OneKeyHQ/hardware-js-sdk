@@ -292,6 +292,7 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
       checkBridgeRelease,
       firmwareType: firmwareTypeParams,
       platform,
+      forceUpdateTargets,
     } = this.payload as CheckAllFirmwareReleaseParams;
 
     if (!features) {
@@ -332,6 +333,7 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
         firmware: firmwareRelease,
         ble: bleFirmwareReleaseInfo,
         bootloader: bootloaderRelease,
+        forceUpdateTargets,
       });
     } catch (error) {
       if (

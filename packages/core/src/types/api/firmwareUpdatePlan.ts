@@ -11,6 +11,8 @@ export type FirmwareUpdatePlanArtifactRole =
 
 export type FirmwareUpdatePlanTarget = 'firmware' | 'ble' | 'bootloader' | FirmwareUpdateV4Target;
 
+export type FirmwareUpdatePlanForceTarget = 'firmware' | 'ble' | 'bootloader' | 'resource';
+
 export interface FirmwareUpdatePlanArtifact {
   artifactId: string;
   role: FirmwareUpdatePlanArtifactRole;

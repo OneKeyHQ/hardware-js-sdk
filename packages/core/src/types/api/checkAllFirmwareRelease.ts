@@ -12,7 +12,10 @@ import type {
   IProtocolV2FirmwareComponentTarget,
 } from '../settings';
 import type { FirmwareUpdateV4Target } from './firmwareUpdate';
-import type { FirmwareUpdatePlan } from './firmwareUpdatePlan';
+import type {
+  FirmwareUpdatePlan,
+  FirmwareUpdatePlanForceTarget,
+} from './firmwareUpdatePlan';
 
 export type FirmwareRelease = {
   shouldUpdate?: boolean;
@@ -73,6 +76,7 @@ export type CheckAllFirmwareReleaseParams = {
   checkFirmwareHash?: boolean;
   firmwareType?: EFirmwareType;
   platform?: 'native' | 'desktop' | 'ext' | 'web' | 'web-embed';
+  forceUpdateTargets?: FirmwareUpdatePlanForceTarget[];
 };
 
 export declare function checkAllFirmwareRelease(

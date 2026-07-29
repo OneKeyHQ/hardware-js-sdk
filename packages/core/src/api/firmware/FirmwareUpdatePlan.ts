@@ -12,6 +12,7 @@ import {
 import type {
   FirmwareUpdatePlan,
   FirmwareUpdatePlanArtifact,
+  FirmwareUpdatePlanForceTarget,
   FirmwareUpdatePlanTarget,
 } from '../../types/api/firmwareUpdatePlan';
 import type { Features } from '../../types';
@@ -498,6 +499,7 @@ export const buildFirmwareUpdatePlan = ({
   firmware,
   ble,
   bootloader,
+  forceUpdateTargets,
 }: {
   features: Features;
   firmwareType: EFirmwareType;
@@ -505,18 +507,22 @@ export const buildFirmwareUpdatePlan = ({
   firmware: ReleaseSelection;
   ble: ReleaseSelection;
   bootloader?: ReleaseSelection;
+  forceUpdateTargets?: FirmwareUpdatePlanForceTarget[];
 }): FirmwareUpdatePlan => {
   const executor = getExecutor(features);
   let artifacts: FirmwareUpdatePlanArtifact[] = [];
   let targetsToUpdate: FirmwareUpdatePlanTarget[] = [];
   const firmwareRelease = asRelease(firmware);
+  const forcedTargets = new Set(forceUpdateTargets);
+  const shouldUpdateFirmware = isUpgrade(firmware) || forcedTargets.has('firmware');
+  const shouldUpdateResource = isUpgrade(firmware) || forcedTargets.has('resource');
 
-  if (executor === 'v4' && isUpgrade(firmware)) {
+  if (executor === 'v4' && (shouldUpdateFirmware || shouldUpdateResource)) {
     const protocolV2 = buildProtocolV2Artifacts(firmwareRelease ?? {});
     artifacts = protocolV2.artifacts;
     targetsToUpdate = protocolV2.targets;
   } else {
-    if (isUpgrade(bootloader)) {
+    if (isUpgrade(bootloader) || forcedTargets.has('bootloader')) {
       artifacts.push({
         artifactId: 'bootloader',
         role: 'bootloader',
@@ -534,52 +540,56 @@ export const buildFirmwareUpdatePlan = ({
           : {}),
       });
     }
-    if (isUpgrade(firmware)) {
+    if (shouldUpdateFirmware || shouldUpdateResource) {
       if (!firmwareRelease) {
         throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Firmware release is invalid', {
           firmwareUpdateCode: 'FirmwarePlanInvalid',
         });
       }
-      artifacts.push({
-        artifactId: 'firmware',
-        role: 'firmware',
-        target: 'firmware',
-        url: assertArtifactUrl(firmwareRelease.url, 'Firmware release'),
-        container: 'raw',
-        ...asIntegrity({
-          size: firmwareRelease.expectedSize,
-          sha256: firmwareRelease.fingerprint,
-        }),
-        ...(asVersion(firmwareRelease.version)
-          ? { targetVersion: asVersion(firmwareRelease.version) }
-          : {}),
-      });
-      const resourceUrl = selectResourceUrl({
-        release: firmwareRelease,
-        features,
-        platform,
-      });
-      if (resourceUrl) {
+      if (shouldUpdateFirmware) {
         artifacts.push({
-          artifactId: 'resource',
-          role: 'resource',
-          target: 'resource',
-          url: assertArtifactUrl(resourceUrl, 'Firmware resource release'),
-          container: 'zip',
+          artifactId: 'firmware',
+          role: 'firmware',
+          target: 'firmware',
+          url: assertArtifactUrl(firmwareRelease.url, 'Firmware release'),
+          container: 'raw',
           ...asIntegrity({
-            size:
-              resourceUrl === asString(firmwareRelease.fullResource)
-                ? firmwareRelease.fullResourceExpectedSize
-                : firmwareRelease.resourceExpectedSize,
-            sha256:
-              resourceUrl === asString(firmwareRelease.fullResource)
-                ? firmwareRelease.fullResourceFingerprint
-                : firmwareRelease.resourceFingerprint,
+            size: firmwareRelease.expectedSize,
+            sha256: firmwareRelease.fingerprint,
           }),
+          ...(asVersion(firmwareRelease.version)
+            ? { targetVersion: asVersion(firmwareRelease.version) }
+            : {}),
         });
       }
+      if (shouldUpdateResource) {
+        const resourceUrl = selectResourceUrl({
+          release: firmwareRelease,
+          features,
+          platform,
+        });
+        if (resourceUrl) {
+          artifacts.push({
+            artifactId: 'resource',
+            role: 'resource',
+            target: 'resource',
+            url: assertArtifactUrl(resourceUrl, 'Firmware resource release'),
+            container: 'zip',
+            ...asIntegrity({
+              size:
+                resourceUrl === asString(firmwareRelease.fullResource)
+                  ? firmwareRelease.fullResourceExpectedSize
+                  : firmwareRelease.resourceExpectedSize,
+              sha256:
+                resourceUrl === asString(firmwareRelease.fullResource)
+                  ? firmwareRelease.fullResourceFingerprint
+                  : firmwareRelease.resourceFingerprint,
+            }),
+          });
+        }
+      }
     }
-    if (isUpgrade(ble)) {
+    if (isUpgrade(ble) || forcedTargets.has('ble')) {
       const bleRelease = asRelease(ble);
       artifacts.push({
         artifactId: 'ble',

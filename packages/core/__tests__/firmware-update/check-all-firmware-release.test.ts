@@ -62,6 +62,15 @@ const createMethod = (serialNo = 'device-id') => {
   return method;
 };
 
+const createMethodWithForceTargets = () => {
+  const method = createMethod();
+  method.payload = {
+    ...method.payload,
+    forceUpdateTargets: ['firmware', 'resource'],
+  };
+  return method;
+};
+
 describe('CheckAllFirmwareRelease', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -112,6 +121,28 @@ describe('CheckAllFirmwareRelease', () => {
     await expect(createMethod().run()).resolves.toEqual(
       expect.objectContaining({
         firmwareUpdatePlan: plan,
+      })
+    );
+  });
+
+  test('passes host-selected update targets to the Plan builder', async () => {
+    mockBuildFirmwareUpdatePlan.mockReturnValue({
+      schemaVersion: 2,
+      planDigest: 'a'.repeat(64),
+      executor: 'v2',
+      deviceIdentity: 'device-id',
+      deviceModel: EDeviceType.Classic1s,
+      firmwareType: EFirmwareType.Universal,
+      platform: 'native',
+      artifacts: [],
+      targetsToUpdate: [],
+    });
+
+    await createMethodWithForceTargets().run();
+
+    expect(mockBuildFirmwareUpdatePlan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        forceUpdateTargets: ['firmware', 'resource'],
       })
     );
   });

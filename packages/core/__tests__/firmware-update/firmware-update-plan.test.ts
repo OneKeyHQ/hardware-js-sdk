@@ -122,6 +122,76 @@ describe('buildFirmwareUpdatePlan', () => {
     expect(plan.platform).toBe('native');
   });
 
+  test('includes same-version legacy artifacts selected by the host', () => {
+    const plan = buildFirmwareUpdatePlan({
+      features: createFeatures({
+        deviceType: EDeviceType.Pro,
+        firmwareVersion: '4.21.0',
+        bootloaderVersion: '2.8.4',
+      }),
+      firmwareType: EFirmwareType.Universal,
+      platform: 'desktop',
+      firmware: {
+        status: 'valid',
+        release: {
+          url: 'https://firmware.onekey.so/pro/firmware.bin',
+          version: [4, 21, 0],
+          resource: 'https://firmware.onekey.so/pro/resource.zip',
+        },
+      },
+      ble: {
+        status: 'valid',
+        release: {
+          webUpdate: 'https://firmware.onekey.so/pro/ble.bin',
+          version: [2, 3, 7],
+        },
+      },
+      bootloader: {
+        status: 'valid',
+        release: {
+          bootloaderResource: 'https://firmware.onekey.so/pro/bootloader.bin',
+          bootloaderVersion: [2, 8, 4],
+        },
+      },
+      forceUpdateTargets: ['firmware', 'resource', 'ble', 'bootloader'],
+    });
+
+    expect(plan.executor).toBe('v3');
+    expect(plan.artifacts.map(artifact => artifact.artifactId)).toEqual([
+      'bootloader',
+      'firmware',
+      'resource',
+      'ble',
+    ]);
+    expect(plan.targetsToUpdate).toEqual(['bootloader', 'firmware', 'resource', 'ble']);
+  });
+
+  test('does not include a same-version resource unless the host selects it', () => {
+    const plan = buildFirmwareUpdatePlan({
+      features: createFeatures({
+        deviceType: EDeviceType.Pro,
+        firmwareVersion: '4.21.0',
+        bootloaderVersion: '2.8.4',
+      }),
+      firmwareType: EFirmwareType.Universal,
+      platform: 'desktop',
+      firmware: {
+        status: 'valid',
+        release: {
+          url: 'https://firmware.onekey.so/pro/firmware.bin',
+          version: [4, 21, 0],
+          resource: 'https://firmware.onekey.so/pro/resource.zip',
+        },
+      },
+      ble: noUpdate,
+      bootloader: noUpdate,
+      forceUpdateTargets: ['firmware'],
+    });
+
+    expect(plan.artifacts.map(artifact => artifact.artifactId)).toEqual(['firmware']);
+    expect(plan.targetsToUpdate).toEqual(['firmware']);
+  });
+
   test('rejects a prepared native plan without a stable device identity', () => {
     const features = createFeatures({
       deviceType: EDeviceType.Classic1s,

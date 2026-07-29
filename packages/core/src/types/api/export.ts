@@ -40,6 +40,7 @@ export type {
   FirmwareUpdatePlan,
   FirmwareUpdatePlanArtifact,
   FirmwareUpdatePlanArtifactRole,
+  FirmwareUpdatePlanForceTarget,
   FirmwareUpdatePlanTarget,
 } from './firmwareUpdatePlan';
 export type {
