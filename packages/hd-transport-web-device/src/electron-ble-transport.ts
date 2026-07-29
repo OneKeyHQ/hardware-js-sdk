@@ -125,7 +125,7 @@ export default class ElectronBleTransport {
       this.rejectProtocolV2Frames(uuid, new Error(reason));
       this.Log?.debug('[Electron BLE] Protocol V2 link invalidated:', uuid, reason);
       if (reason.startsWith('Protocol V2 link-fatal error:')) {
-        await this.release(uuid);
+        await this.releaseNative(uuid);
       }
     },
   });
@@ -342,6 +342,15 @@ export default class ElectronBleTransport {
   async release(id: string) {
     try {
       await this.protocolV2Links.invalidateLink(id, 'Electron BLE transport released');
+      await this.releaseNative(id);
+    } catch (error) {
+      this.Log?.error('[Electron BLE] release failed:', error);
+      this.cleanupDeviceState(id);
+    }
+  }
+
+  private async releaseNative(id: string) {
+    try {
       if (this.connectedDevices.has(id)) {
         if (window.desktopApi?.nobleBle) {
           await window.desktopApi.nobleBle.unsubscribe(id);

@@ -290,7 +290,7 @@ export default class ReactNativeBleTransport {
       this.rejectProtocolV2Frames(uuid, new Error(reason));
       Log?.debug('[ReactNativeBleTransport] Protocol V2 link invalidated:', uuid, reason);
       if (reason.startsWith('Protocol V2 link-fatal error:')) {
-        await this.release(uuid, true);
+        await this.releaseNative(uuid, true);
       }
     },
   });
@@ -980,8 +980,12 @@ export default class ReactNativeBleTransport {
   }
 
   async release(uuid: string, onclose = false) {
-    const transport = transportCache[uuid];
     await this.protocolV2Links.invalidateLink(uuid, 'React Native BLE transport released');
+    return this.releaseNative(uuid, onclose);
+  }
+
+  private async releaseNative(uuid: string, onclose = false) {
+    const transport = transportCache[uuid];
     if (this.runPromise) {
       const error = ERRORS.TypedError(HardwareErrorCode.BleForceCleanRunPromise);
       this.runPromise.reject(error);
