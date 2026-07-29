@@ -2,7 +2,7 @@
  * Passphrase session management for hd-cli.
  *
  * Aligns with app-monorepo's CLI pattern:
- *   Login:   getPassphraseState → passphraseState + sessionId → keychain
+ *   Login:   openWalletSession → passphraseState + sessionId → keychain
  *   Command: keychain → preloadSessionCache → SDK call (no passphrase prompt)
  *   Stale:   error 112 → clear keychain → re-prompt → retry
  *   Logout:  keychain delete
