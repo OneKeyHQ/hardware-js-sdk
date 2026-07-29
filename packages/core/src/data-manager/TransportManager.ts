@@ -17,7 +17,7 @@ const LowLevelLogger = getLogger(LoggerNames.HdTransportLowLevel);
 const NodeUsbLogger = getLogger(LoggerNames.HdTransportNodeUsb);
 const WebBleLogger = getLogger(LoggerNames.HdWebBleTransport);
 const WebUsbLogger = getLogger(LoggerNames.HdTransportWebUsb);
-const REACT_NATIVE_BLE_SCAN_TIMEOUT_MS = 8000;
+const REACT_NATIVE_BLE_SCAN_TIMEOUT_MS = 3000;
 
 /**
  * transport 在同一个环境中只会存在一个
