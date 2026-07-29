@@ -10,7 +10,6 @@ import {
 } from './firmware/releaseHelper';
 import { getBridgeReleaseInfo } from '../utils/bridgeUpdate';
 import { getDeviceFirmwareVersion, getDeviceType, getFirmwareType } from '../utils';
-import { httpRequest } from '../utils/networkUtils';
 import { BaseMethod } from './BaseMethod';
 
 import type {
@@ -63,47 +62,9 @@ const CURRENT_HASH_BY_COMPONENT_TARGET: Readonly<
   APPLICATION_P2: 'applicationP2Hash',
 };
 
-const PROTOCOL_V2_PACKAGE_METADATA_END = 0x27f;
-const PROTOCOL_V2_PACKAGE_PAYLOAD_HASH_OFFSET = 0x200;
-const PROTOCOL_V2_PACKAGE_PAYLOAD_HASH_SIZE = 64;
-
-function bytesToHex(bytes: Uint8Array): string {
-  return Array.from(bytes)
-    .map(byte => byte.toString(16).padStart(2, '0'))
-    .join('');
-}
-
 function normalizeHex(value: string | undefined): string | undefined {
   const normalized = value?.replace(/^0x/i, '').toLowerCase();
   return normalized && /^[0-9a-f]+$/.test(normalized) ? normalized : undefined;
-}
-
-async function getRemoteComponentPayloadHash(url: string): Promise<string | null> {
-  try {
-    const binary = await httpRequest<ArrayBuffer>(url, 'binary', {
-      headers: { Range: `bytes=0-${PROTOCOL_V2_PACKAGE_METADATA_END}` },
-      connectTimeoutMs: 5000,
-      readTimeoutMs: 5000,
-      overallTimeoutMs: 10000,
-      maxRetries: 1,
-      retryDelayMs: 250,
-    });
-    const bytes = new Uint8Array(binary);
-    if (
-      bytes.byteLength <= PROTOCOL_V2_PACKAGE_METADATA_END ||
-      String.fromCharCode(...bytes.slice(0, 4)) !== 'OKPP'
-    ) {
-      return null;
-    }
-    return bytesToHex(
-      bytes.slice(
-        PROTOCOL_V2_PACKAGE_PAYLOAD_HASH_OFFSET,
-        PROTOCOL_V2_PACKAGE_PAYLOAD_HASH_OFFSET + PROTOCOL_V2_PACKAGE_PAYLOAD_HASH_SIZE
-      )
-    );
-  } catch {
-    return null;
-  }
 }
 
 function toVersionString(version: number[] | undefined): string | null {
@@ -162,19 +123,19 @@ function buildComponentRelease({
       status = 'outdated';
     } else if (semver.gt(currentVersion, targetVersion)) {
       status = 'valid';
-    } else if (remotePayloadHash !== undefined) {
-      const currentHashKey = CURRENT_HASH_BY_COMPONENT_TARGET[componentTarget];
-      const currentHash = normalizeHex(
-        currentHashKey ? currentVerification[currentHashKey] : undefined
-      );
-      const expectedHash = normalizeHex(remotePayloadHash ?? undefined);
-      if (currentHash && expectedHash) {
-        status = expectedHash.startsWith(currentHash) ? 'valid' : 'outdated';
-      } else {
-        status = 'unknown';
-      }
     } else {
-      status = 'valid';
+      const currentHashKey = CURRENT_HASH_BY_COMPONENT_TARGET[componentTarget];
+      if (!currentHashKey) {
+        status = 'valid';
+      } else {
+        const currentHash = normalizeHex(currentVerification[currentHashKey]);
+        const expectedHash = normalizeHex(remotePayloadHash ?? undefined);
+        if (currentHash && expectedHash) {
+          status = expectedHash.startsWith(currentHash) ? 'valid' : 'outdated';
+        } else {
+          status = 'unknown';
+        }
+      }
     }
   }
 
@@ -234,7 +195,7 @@ export function buildProtocolV2FirmwareRelease({
       currentVerification,
       remotePayloadHash: Object.prototype.hasOwnProperty.call(remotePayloadHashes, configKey)
         ? remotePayloadHashes[configKey]
-        : undefined,
+        : normalizeHex(component.payloadHash),
       releaseRequired: release.required,
     })
   );
@@ -374,40 +335,9 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
     const firmwareType =
       firmwareTypeParam ?? state.identity.firmwareType ?? EFirmwareType.Universal;
     const release = DataManager.getFirmwareLatestRelease(features, firmwareType);
-    const remotePayloadHashes: Record<string, string | null> = {};
-    if (release) {
-      await Promise.all(
-        getOrderedComponentEntries(release).map(async ([configKey, component]) => {
-          const componentTarget =
-            component.target.toUpperCase() as IProtocolV2FirmwareComponentTarget;
-          if (!CURRENT_HASH_BY_COMPONENT_TARGET[componentTarget]) return;
-          const currentVersionKey = CURRENT_VERSION_BY_COMPONENT_TARGET[componentTarget];
-          const currentVersion = currentVersionKey
-            ? state.versions[currentVersionKey] ??
-              (componentTarget === 'APPLICATION_P1' ? state.versions.firmware : null)
-            : null;
-          const targetVersion = toVersionString(component.version);
-          if (
-            currentVersion &&
-            targetVersion &&
-            semver.valid(currentVersion) &&
-            semver.valid(targetVersion) &&
-            semver.eq(currentVersion, targetVersion)
-          ) {
-            const configuredPayloadHash = normalizeHex(component.payloadHash);
-            if (configuredPayloadHash) {
-              remotePayloadHashes[configKey] = configuredPayloadHash;
-            } else if (component.fingerprint && component.url) {
-              remotePayloadHashes[configKey] = await getRemoteComponentPayloadHash(component.url);
-            }
-          }
-        })
-      );
-    }
     const plan = buildProtocolV2FirmwareRelease({
       currentVersions: state.versions,
       currentVerification: state.verification,
-      remotePayloadHashes,
       firmwareType,
       release,
     });

@@ -17,18 +17,18 @@ describe('Core.dispose', () => {
     const connectorStop = jest.spyOn(connector, 'stop');
     const transportStop = jest.fn().mockResolvedValue(undefined);
     jest.spyOn(TransportManager, 'getTransport').mockReturnValue({ stop: transportStop } as never);
-    const resetDevicePool = jest.spyOn(DevicePool, 'resetState');
+    const disposeDevicePool = jest.spyOn(DevicePool, 'dispose');
     const core = new Core();
 
     const firstDispose = core.dispose();
     expect(connectorStop).toHaveBeenCalledTimes(1);
     expect(transportStop).toHaveBeenCalledTimes(1);
-    expect(resetDevicePool).toHaveBeenCalledTimes(1);
+    expect(disposeDevicePool).toHaveBeenCalledTimes(1);
 
     await firstDispose;
     await core.dispose();
     expect(connectorStop).toHaveBeenCalledTimes(1);
     expect(transportStop).toHaveBeenCalledTimes(1);
-    expect(resetDevicePool).toHaveBeenCalledTimes(1);
+    expect(disposeDevicePool).toHaveBeenCalledTimes(1);
   });
 });
