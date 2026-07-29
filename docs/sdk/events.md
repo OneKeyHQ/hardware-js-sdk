@@ -73,7 +73,9 @@ HardwareSDK.on(DEVICE.CONNECT, ({ device }) => {
 应监听 `DEVICE.STATE`；Protocol V1 兼容业务也可以继续监听 `DEVICE.FEATURES`。
 
 快照中的 `connectId` 用于后续 SDK 调用和 transport 路由，`serialNo` 用于识别物理设备；
-`uuid` 仅作为 `serialNo` 的废弃兼容别名保留。调用方不应保存事件对象并期待其字段原地更新。
+`uuid` 仅作为 `serialNo` 的废弃兼容别名保留。`status` 表示当前 transport 使用状态：
+`available` 为已发现且空闲，`used` 为当前 SDK 会话正在使用，`occupied` 为被其他会话占用。
+调用方不应保存事件对象并期待其字段原地更新。
 
 `DEVICE_EVENT` 不会像 `UI_EVENT` 一样作为公共聚合监听被外层 SDK 转发。当前外层转发 `DEVICE.CONNECT`、`DEVICE.DISCONNECT`、`DEVICE.STATE`、Protocol V1 的 `DEVICE.FEATURES` 和 `DEVICE.SUPPORT_FEATURES`。
 
