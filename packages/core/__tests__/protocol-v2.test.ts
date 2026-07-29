@@ -1421,7 +1421,7 @@ describe('Protocol V2 feature adapter', () => {
     expect(promptPassphrase).toHaveBeenCalledWith(
       {
         existsAttachPinUser: false,
-        deviceOnly: true,
+        deviceOnly: false,
         source: 'wallet-session-coordinator',
         reason: 'open-wallet',
       },

@@ -63,7 +63,7 @@ const selectDeviceSession = async (device: Device) => {
   const response = await device.commands.promptPassphrase(
     {
       existsAttachPinUser,
-      deviceOnly: true,
+      deviceOnly: false,
       ...metadata,
     },
     { cancelDeviceOnReject: false }
