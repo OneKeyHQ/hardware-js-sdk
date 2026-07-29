@@ -7,8 +7,7 @@
     "AGENTS.md",
     "CLAUDE.md",
     "docs/README.md",
-    "docs/maintenance/agent-workflow.md",
-    "docs/superpowers/README.md"
+    "docs/maintenance/agent-workflow.md"
   ],
   "budgets": {
     "maxDiscoverableSkills": 12,

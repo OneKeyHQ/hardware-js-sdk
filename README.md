@@ -50,8 +50,8 @@ architecture boundary.
 - [Agent workflow maintenance](./docs/maintenance/agent-workflow.md): how instructions, skills,
   commands, and validation fit together.
 
-Package-specific integration details remain in each package README. Historical plans under
-`docs/superpowers/` are not current technical facts.
+Package-specific integration details remain in each package README. Historical plans are retained
+in Git, commits, issues, and pull requests rather than treated as current technical facts.
 
 ## Setup
 
