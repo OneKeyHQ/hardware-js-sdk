@@ -83,14 +83,6 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
   /** Per-path USB endpoint / interface numbers (discovered from USB descriptors) */
   private deviceEndpoints: Map<string, DeviceEndpoints> = new Map();
 
-  /**
-   * Early Pro2 boards have no USB serial number. Assign a session-stable mock path per
-   * USBDevice instance so discovery retains them; reconnecting creates a new instance/path.
-   */
-  private mockSerialPaths: WeakMap<USBDevice, string> = new WeakMap();
-
-  private mockSerialCounter = 0;
-
   name = 'WebUsbTransport';
 
   stopped = false;
@@ -196,25 +188,6 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
   }
 
   /**
-   * Use the USB serial as the device path, falling back to a session-stable mock path.
-   */
-  private getDevicePath(device: USBDevice): string {
-    if (typeof device.serialNumber === 'string' && device.serialNumber.length > 0) {
-      return device.serialNumber;
-    }
-    let path = this.mockSerialPaths.get(device);
-    if (!path) {
-      this.mockSerialCounter += 1;
-      path = `mock-serial:${device.vendorId.toString(16)}:${device.productId.toString(16)}:${
-        this.mockSerialCounter
-      }`;
-      this.mockSerialPaths.set(device, path);
-      this.Log?.debug(`[WebUSB] device has no serial number, using mock path: ${path}`);
-    }
-    return path;
-  }
-
-  /**
    * Get list of connected devices
    */
   async getConnectedDevices() {
@@ -226,11 +199,12 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
         (desc: { vendorId: number; productId: number }) =>
           dev.vendorId === desc.vendorId && dev.productId === desc.productId
       );
-      return isOneKey && !isKnownTrezorWebUsbDevice(dev);
+      const hasSerialNumber = typeof dev.serialNumber === 'string' && dev.serialNumber.length > 0;
+      return isOneKey && hasSerialNumber && !isKnownTrezorWebUsbDevice(dev);
     });
 
     this.deviceList = onekeyDevices.map(device => {
-      const path = this.getDevicePath(device);
+      const path = device.serialNumber as string;
       const protocolHint = inferProtocolHintFromDeviceName(device.productName);
       if (protocolHint) {
         this.deviceProtocolHints.set(path, protocolHint);
