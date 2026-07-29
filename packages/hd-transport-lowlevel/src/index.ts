@@ -10,12 +10,14 @@ import transport, {
   hexToBytes,
   probeProtocolV2 as probeProtocolV2Helper,
   withProtocolTimeout,
+  writeProtocolV2BleFrame,
 } from '@onekeyfe/hd-transport';
 
 import type EventEmitter from 'events';
 import type {
   LowLevelDevice,
   LowlevelTransportSharedPlugin,
+  ProtocolV2CallContext,
   ProtocolType,
   TransportCallOptions,
 } from '@onekeyfe/hd-transport';
@@ -185,7 +187,10 @@ export default class LowlevelTransport {
       );
     }
 
-    this.protocolV2Assemblers.set(input.uuid, new ProtocolV2FrameAssembler());
+    this.protocolV2Assemblers.set(
+      input.uuid,
+      new ProtocolV2FrameAssembler(PROTOCOL_V2_BLE_FRAME_MAX_BYTES)
+    );
     const protocolHint = input.expectedProtocol
       ? undefined
       : this.deviceProtocolHints.get(input.uuid);
@@ -507,7 +512,7 @@ export default class LowlevelTransport {
   private async readProtocolV2Frame(uuid: string, timeoutMs?: number, commandName = 'ProtocolV2') {
     let assembler = this.protocolV2Assemblers.get(uuid);
     if (!assembler) {
-      assembler = new ProtocolV2FrameAssembler();
+      assembler = new ProtocolV2FrameAssembler(PROTOCOL_V2_BLE_FRAME_MAX_BYTES);
       this.protocolV2Assemblers.set(uuid, assembler);
     }
 
@@ -525,11 +530,20 @@ export default class LowlevelTransport {
     return frame;
   }
 
-  private async writeProtocolV2Frame(uuid: string, frame: Uint8Array) {
-    for (let offset = 0; offset < frame.length; offset += LOWLEVEL_PROTOCOL_V2_PACKET_LENGTH) {
-      const chunk = frame.slice(offset, offset + LOWLEVEL_PROTOCOL_V2_PACKET_LENGTH);
-      await this.plugin.send(uuid, bytesToHex(chunk));
-    }
+  private async writeProtocolV2Frame(
+    uuid: string,
+    frame: Uint8Array,
+    context: ProtocolV2CallContext,
+    assertCurrentGeneration: () => void
+  ) {
+    await writeProtocolV2BleFrame({
+      frame,
+      packetCapacity: LOWLEVEL_PROTOCOL_V2_PACKET_LENGTH,
+      assertActive: assertCurrentGeneration,
+      signal: context.signal,
+      abortMessage: `Protocol V2 BLE write aborted for ${context.messageName}`,
+      writePacket: packet => this.plugin.send(uuid, bytesToHex(packet)),
+    });
   }
 
   private async callProtocolV2(
@@ -572,10 +586,8 @@ export default class LowlevelTransport {
         assertCurrentGeneration();
         this.protocolV2Assemblers.get(uuid)?.reset();
       },
-      writeFrame: (frame: Uint8Array) => {
-        assertCurrentGeneration();
-        return this.writeProtocolV2Frame(uuid, frame);
-      },
+      writeFrame: (frame: Uint8Array, context: ProtocolV2CallContext) =>
+        this.writeProtocolV2Frame(uuid, frame, context, assertCurrentGeneration),
       readFrame: (context: { messageName: string; timeoutMs?: number }) => {
         assertCurrentGeneration();
         return this.readProtocolV2Frame(uuid, context.timeoutMs, context.messageName);

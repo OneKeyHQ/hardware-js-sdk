@@ -162,6 +162,23 @@ describe('LowlevelTransport protocol framing', () => {
     });
   });
 
+  test('uses the Protocol V2 BLE writer with the lowlevel compatibility packet size', async () => {
+    const plugin = createPlugin({ devices: [], responses: [] });
+    const lowlevel = configureTransport(plugin);
+    const context = {
+      messageName: 'Ping',
+      timeoutMs: 1000,
+      highVolume: false,
+      generation: 1,
+      signal: new AbortController().signal,
+    };
+
+    await lowlevel.writeProtocolV2Frame('pro2-id', new Uint8Array(130), context, jest.fn());
+
+    expect(plugin.send).toHaveBeenCalledTimes(3);
+    expect(plugin.send.mock.calls.map(([, hex]) => hex.length / 2)).toEqual([64, 64, 2]);
+  });
+
   test('rejects calls before protocol detection', async () => {
     const responseChunks = ProtocolV1.encodeTransportPackets(schemas.protocolV1, 'Success', {
       message: 'ok',

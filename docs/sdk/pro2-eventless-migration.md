@@ -236,8 +236,8 @@ Cancel 必须绑定当前设备和 Transport source；断连时清理请求、UI
 - Hidden Wallet PIN 入口由 `existsAttachPinUser` 决定。
 - `REQUEST_BUTTON/REQUEST_PIN` 的 Pro2 非阻塞场景不发送 `uiResponse()`。
 - 用户关闭硬件交互 UI 时取消当前调用；收到 `CLOSE_UI_WINDOW` 时只幂等收起。
-- App 继续保存 `passphraseState`，忽略 CLI 兼容的 `openWalletSession().sessionId`，不把
-  firmware `session_id` 写入 App 数据库。
+- App 继续保存 `passphraseState`；`openWalletSession()` 不再返回 firmware `session_id`，
+  App 数据库也不得保存该内部值。
 - 现有 App 可继续使用 `getPassphraseState()`；Pro2 的协议分流由 Core 完成。新流程优先使用
   `openWalletSession()` 显式表达标准、选择隐藏钱包或恢复隐藏钱包。
 - 不把 onboarding 阶段 Event 当成唯一状态来源。
@@ -254,7 +254,7 @@ Cancel 必须绑定当前设备和 Transport source；断连时清理请求、UI
 ### 钱包与解锁
 
 - 标准钱包先协商 `eventless_wallet_session=true`，锁定时调用 `AskPin(Main)`，不调用 `DeviceSessionGet`，
-  不生成或暴露隐藏钱包的 `passphraseState/sessionId`。
+  不生成或暴露隐藏钱包的 `passphraseState/sessionId`；隐藏钱包的 `sessionId` 也只保留在 Core 内部。
 - Host Passphrase、设备 Passphrase、Attach PIN 三种隐藏钱包选择都返回正确钱包标识。
 - 首次隐藏钱包、Session 恢复、Session 失效重选保持原 API 调用不重放。
 - Passphrase 与对应 Attach PIN 返回相同 `btc_test_address`。

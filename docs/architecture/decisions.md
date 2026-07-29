@@ -26,6 +26,9 @@ Protocol V2 响应依靠串行调用、消息类型和帧序号维持请求边�
 
 - 公共层负责 protobuf 编解码、帧组装、调用串行化、超时、序列号和 Link 生命周期。
 - Transport adapter 只负责平台连接、原生读写、notification/endpoint 管理和平台错误映射。
+- Protocol V2 BLE 的完整 frame 分片循环、调用取消和 generation 边界由共享
+  `ProtocolV2BleFrameWriter` 负责；Electron、React Native 和 lowlevel adapter 只提供各自的
+  单包容量、节流参数和原生写入。Protocol V1 的既有 BLE 分包不复用该路径。
 - Node USB 与 WebUSB 复用 `ProtocolV2UsbTransportBase`。
 - USB 在 open、claim、reset 或 reconnect 后轮换 generation，旧 generation 的异步读写必须失败。
 - Transport 不自动重发 Protocol V2 业务命令；有副作用操作的重试由了解幂等性的 Core 流程决定。
@@ -40,13 +43,13 @@ Protocol V2 响应依靠串行调用、消息类型和帧序号维持请求边�
 
 Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类不同状态，不能共用缓存：
 
-- V1/V2 的 `openWalletSession()` 对标准/隐藏钱包都返回 `deviceId + passphraseState`；固件响应
-  包含 `session_id` 时，SDK 原样可选透传为 `sessionId`，不补造也不额外查询。
+- V1/V2 的 `openWalletSession()` 对标准/隐藏钱包都只返回公开钱包身份
+  `deviceId + passphraseState`；固件 `session_id` 只进入 Core 内部 Store，不通过公共响应透传。
 - 现有 App 可继续调用 `getPassphraseState()`：V1 保持原固件消息流，V2 由 Core 将
   `useEmptyPassphrase/initSession` 意图映射到新的 Ask/Get Session 流程；这不代表 Pro2
   恢复了同名固件消息。
-- 普通 App 调用方即使收到 `sessionId` 也不应保存或传回；短生命周期 CLI 可以将一次钱包选择
-  得到的非空三元组保存到 OS Keychain，并通过 `preloadSessionCache()` 恢复到 Core Store。
+- 旧版 CLI 已保存在 OS Keychain 中的完整三元组可以继续通过 `preloadSessionCache()` 恢复，
+  但新的公共钱包选择响应不再提供原始 `sessionId`，也不再创建新的跨进程 Session 缓存。
 - V1/V2 共用 `DeviceWalletSessionStore`，缓存键为 `deviceKey + passphraseState`。
 - `DeviceWalletSessionStore` 是 Core 内唯一可用于恢复的钱包 Session 缓存源；
   `DeviceState` 和协议 raw 快照都不是 Session 缓存。
@@ -77,9 +80,8 @@ Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类�
 - Pro2 在解锁流程刷新状态后，以刷新后的 `passphraseProtection` 判定标准/隐藏钱包，
   不得使用解锁前的状态快照路由钱包结果。
 - `session_id` 不是钱包身份，必须与同一次返回的 `deviceId + passphraseState` 绑定使用。
-- `session_id` 不出现在公共 `DeviceState` 或设备消息顶层；标准/隐藏钱包结果中的可选
-  `openWalletSession().sessionId` 和 Legacy `Features.sessionId` 只用于 CLI 兼容，
-  普通 App 不得把它们写入数据库。
+- `session_id` 不出现在公共 `DeviceState`、设备消息顶层或 `openWalletSession()` 响应；
+  Legacy `Features.sessionId` 的公共投影保持为空，仅允许 Core 内部缓存使用真实值。
 - 公共 `clearSessionCache()` 只接受无参数、仅 `deviceId`、或完整
   `deviceId + passphraseState` 三种范围；单独传 `passphraseState` 返回参数错误，避免误清
   所有设备。该 API 只清理 `DeviceWalletSessionStore`，不发送 Protocol V1/V2 命令，

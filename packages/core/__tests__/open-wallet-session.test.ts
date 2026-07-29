@@ -184,7 +184,6 @@ describe('openWalletSession', () => {
       walletType: 'standard',
       deviceId: 'device-1',
       passphraseState: null,
-      sessionId: 'main-wallet-session',
       resumed: false,
     });
     expect(method.payload.useEmptyPassphrase).toBe(true);
@@ -261,7 +260,6 @@ describe('openWalletSession', () => {
       walletType: 'hidden',
       deviceId: 'device-1',
       passphraseState: 'hidden-state-after-unlock',
-      sessionId: 'hidden-session-after-unlock',
       resumed: false,
     });
     expect(device.unlockDevice).toHaveBeenCalledWith(DeviceSessionPinType.Main);
@@ -295,7 +293,6 @@ describe('openWalletSession', () => {
       walletType: 'hidden',
       deviceId: 'device-1',
       passphraseState: 'new-hidden-state',
-      sessionId: 'new-hidden-session',
       resumed: false,
     });
     expect(typedCall).toHaveBeenCalledWith('ProtocolInfoRequest', 'ProtocolInfo', {
@@ -369,7 +366,6 @@ describe('openWalletSession', () => {
       walletType: 'hidden',
       deviceId: 'device-1',
       passphraseState: 'hidden-state',
-      sessionId: 'renewed-session',
       resumed: true,
     });
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
@@ -567,7 +563,7 @@ describe('openWalletSession', () => {
     expect(device.clearInternalState).toHaveBeenCalled();
   });
 
-  test('selects a hidden wallet and returns the CLI compatibility session', async () => {
+  test('selects a hidden wallet without exposing the internal device session', async () => {
     const typedCall = jest
       .fn()
       .mockResolvedValueOnce({ message: { version: 2 } })
@@ -592,7 +588,6 @@ describe('openWalletSession', () => {
       walletType: 'hidden',
       deviceId: 'device-1',
       passphraseState: 'hidden-state',
-      sessionId: 'hidden-session',
       resumed: false,
     });
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {});
@@ -759,7 +754,6 @@ describe('openWalletSession', () => {
       walletType: 'hidden',
       deviceId: 'device-1',
       passphraseState: 'hidden-state',
-      sessionId: 'renewed-session',
       resumed: true,
     });
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {

@@ -183,6 +183,24 @@ describe('ElectronBleTransport protocol detection', () => {
     });
   });
 
+  test('uses the Protocol V2 BLE writer without changing the Protocol V1 packet path', async () => {
+    const device = { id: 'chunked-pro2-id', name: 'OneKey Pro 2' };
+    const nobleBle = createNobleBle(device);
+    const bleTransport = configureTransport(nobleBle) as any;
+    const context = {
+      messageName: 'Ping',
+      timeoutMs: 1000,
+      highVolume: false,
+      generation: 1,
+      signal: new AbortController().signal,
+    };
+
+    await bleTransport.writeProtocolV2Frame(device.id, new Uint8Array(193), context, jest.fn());
+
+    expect(nobleBle.write).toHaveBeenCalledTimes(2);
+    expect(nobleBle.write.mock.calls.map(([, hex]) => hex.length / 2)).toEqual([192, 1]);
+  });
+
   test('detects Protocol V2 after Protocol V1 probe timeout', async () => {
     const device = { id: 'unknown-pro2-id', name: 'Unknown BLE Device' };
     const nobleBle = createNobleBle(device);

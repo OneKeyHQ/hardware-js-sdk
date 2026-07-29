@@ -331,6 +331,13 @@ describe('Protocol V2 framing and session', () => {
     expect(() => assembler.push(oversized)).toThrow('Protocol V2 frame too large');
   });
 
+  test('enforces a transport-specific receive frame boundary', () => {
+    const assembler = new ProtocolV2FrameAssembler(2048);
+    const oversizedHeader = new Uint8Array([0x5a, 0x01, 0x08]);
+
+    expect(() => assembler.push(oversizedHeader)).toThrow('Protocol V2 frame too large: 2049');
+  });
+
   test('enforces the firmware 4200-byte Protocol V2 frame boundary', () => {
     const boundaryFrame = ProtocolV2.encodeFrame(schemas, 'Ping', {
       message: 'x'.repeat(4187),

@@ -54,6 +54,7 @@ export * as protocolV1 from './protocols/v1';
 export * as protocolV2 from './protocols/v2';
 export * from './protocols/v2/session';
 export * from './protocols/v2/link-manager';
+export * from './protocols/v2/ble-frame-writer';
 export * from './protocols/v2/usb-transport-base';
 
 export default {

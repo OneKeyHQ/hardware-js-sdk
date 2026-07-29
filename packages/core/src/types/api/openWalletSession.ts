@@ -21,8 +21,6 @@ type OpenWalletSessionPayloadBase = {
   protocol: 'V1' | 'V2';
   deviceId: string;
   resumed: boolean;
-  /** Forwarded only when the firmware response contains a wallet session id. */
-  sessionId?: string;
 };
 
 export type OpenWalletSessionPayload = OpenWalletSessionPayloadBase &
