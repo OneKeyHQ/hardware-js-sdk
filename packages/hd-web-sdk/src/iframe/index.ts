@@ -10,7 +10,6 @@ import {
   createIFrameMessage,
   getLogBlockLabel,
   getLogger,
-  getSafeLogPayload,
   initCore,
   parseConnectSettings,
   parseMessage,
@@ -88,7 +87,11 @@ export async function init(payload: IFrameInit['payload']) {
     receiveHandler: async messageEvent => {
       const message = parseMessage(messageEvent);
       const blockLog = getLogBlockLabel(message);
-      Log.debug('Frame Bridge Receive message: ', getSafeLogPayload(message, blockLog));
+      if (blockLog) {
+        Log.debug('Frame Bridge Receive message: ', blockLog);
+      } else {
+        Log.debug('Frame Bridge Receive message: ', message);
+      }
 
       if (message.event === IFRAME.SWITCH_TRANSPORT) {
         Log.debug('switchCoreTransport', message.payload.env);
@@ -97,7 +100,11 @@ export async function init(payload: IFrameInit['payload']) {
       }
 
       const response = await _core?.handleMessage(message);
-      Log.debug('Frame Bridge response message: ', getSafeLogPayload(response, blockLog));
+      if (blockLog) {
+        Log.debug('Frame Bridge response message: ', blockLog);
+      } else {
+        Log.debug('Frame Bridge response message: ', message);
+      }
       return response;
     },
   });

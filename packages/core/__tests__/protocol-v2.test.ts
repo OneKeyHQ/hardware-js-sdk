@@ -947,9 +947,7 @@ describe('Protocol V2 feature adapter', () => {
     });
 
     expect(promptPassphrase).toHaveBeenCalled();
-    expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {
-      on_device: true,
-    });
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {});
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
   });
 
@@ -1164,7 +1162,7 @@ describe('Protocol V2 feature adapter', () => {
     });
     expect(typedCall.mock.calls).toEqual([
       ['ProtocolInfoRequest', 'ProtocolInfo', { eventless_wallet_session: true }],
-      ['DeviceSessionAskPassphrase', 'Success', { on_device: true }],
+      ['DeviceSessionAskPassphrase', 'Success', {}],
     ]);
   });
 
@@ -1379,7 +1377,6 @@ describe('Protocol V2 feature adapter', () => {
       deviceType: 'pro2',
       firmwareVersion: '4.15.0',
       passphraseProtection: true,
-      unlocked: true,
       sessionId: 'feature-session',
       unlockedAttachPin: true,
     };
@@ -1540,7 +1537,6 @@ describe('Protocol V2 feature adapter', () => {
       deviceType: 'pro2',
       firmwareVersion: '9.9.9',
       passphraseProtection: true,
-      unlocked: true,
       sessionId: 'old-feature-session',
       unlockedAttachPin: false,
     };
@@ -1725,14 +1721,13 @@ describe('Protocol V2 feature adapter', () => {
       })
     );
 
-    (device as any).features = normalizeProtocolV2Features(
-      {
-        ...descriptor,
-        protocolType: 'V2',
-      } as any,
-      { status: { unlocked: true, passphrase_enabled: true } }
-    );
+    (device as any).features = normalizeProtocolV2Features({
+      ...descriptor,
+      protocolType: 'V2',
+    } as any);
     (device as any).features.firmwareVersion = '4.15.0';
+    (device as any).features.passphraseProtection = true;
+    (device as any).features.unlocked = true;
     (device as any).commands = {
       typedCall,
       promptPassphrase: jest.fn().mockResolvedValue({ passphraseOnDevice: true }),
@@ -1745,9 +1740,7 @@ describe('Protocol V2 feature adapter', () => {
     );
 
     expect(device.getInternalState()).toBeUndefined();
-    expect(typedCall).toHaveBeenNthCalledWith(2, 'DeviceSessionAskPassphrase', 'Success', {
-      on_device: true,
-    });
+    expect(typedCall).toHaveBeenNthCalledWith(2, 'DeviceSessionAskPassphrase', 'Success', {});
   });
 
   test('useEmptyPassphrase ignores a stale hidden-wallet state during Protocol V2 safety check', async () => {

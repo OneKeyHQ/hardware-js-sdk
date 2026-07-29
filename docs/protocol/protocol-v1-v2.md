@@ -74,14 +74,14 @@ V2 消息编号以 firmware-pro2 的 `MessageType` 定义为准，按系统能�
 
 V2 帧用于承载 protobuf payload。维护时重点关注以下字段：
 
-| 字段           | 作用                                      |
-| -------------- | ----------------------------------------- |
-| magic          | 固定帧标识 `0x5A`                         |
-| message type   | 请求或响应的消息编号                      |
-| payload length | protobuf payload 长度                     |
+| 字段           | 作用                                                 |
+| -------------- | ---------------------------------------------------- |
+| magic          | 固定帧标识 `0x5A`                                    |
+| message type   | 请求或响应的消息编号                                 |
+| payload length | protobuf payload 长度                                |
 | sequence       | 每个发送方向独立、跨 channel/source 递增的全局帧序号 |
-| payload        | protobuf 编码结果                         |
-| CRC8           | 帧完整性校验                              |
+| payload        | protobuf 编码结果                                    |
+| CRC8           | 帧完整性校验                                         |
 
 编码、解码和长度校验必须使用同一套公共实现。BLE notification 或 USB 读取可能返回半帧、多帧或旧连接数据，因此原生读取结果不能直接交给 protobuf 解码。
 
@@ -155,7 +155,9 @@ Link 错误，并触发 session、assembler、读取状态和平台连接重建�
 BLE 平台实现包括 Electron、React Native 和 lowlevel 插件。公共约束如下：
 
 - 连接后发现服务和特征，先建立 notification 订阅，再开始协议调用。
-- 写入按平台 MTU 或插件上限分包，设备响应由 notification 回传。
+- Protocol V2 完整 frame 统一由 `ProtocolV2BleFrameWriter` 按平台 MTU 或插件上限分包；
+  平台 adapter 只提供单包写入、容量、节流参数和平台错误映射。Protocol V1 保持原有分包协议，
+  不进入该 writer。
 - React Native 的大 frame 写入使用有界 burst 和 flush pause；只对明确的
   `GATT_CONGESTED` 做有界退避重试，断连或 generation 变化立即中止，不能跨连接继续写。
 - notification 数据统一进入 `ProtocolV2FrameAssembler`，不能假设一次通知就是一帧。

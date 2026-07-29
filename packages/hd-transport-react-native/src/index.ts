@@ -21,6 +21,7 @@ import transport, {
   TRANSPORT_EVENT,
   type TransportCallOptions,
   probeProtocolV2 as probeProtocolV2Helper,
+  writeProtocolV2BleFrame,
 } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode, createDeferred, isOnekeyDevice } from '@onekeyfe/hd-shared';
 
@@ -289,7 +290,7 @@ export default class ReactNativeBleTransport {
       this.rejectProtocolV2Frames(uuid, new Error(reason));
       Log?.debug('[ReactNativeBleTransport] Protocol V2 link invalidated:', uuid, reason);
       if (reason.startsWith('Protocol V2 link-fatal error:')) {
-        await this.release(uuid, true);
+        await this.releaseNative(uuid, true);
       }
     },
   });
@@ -819,7 +820,10 @@ export default class ReactNativeBleTransport {
     );
     transportCache[uuid] = transport;
 
-    this.protocolV2Assemblers.set(uuid, new ProtocolV2FrameAssembler());
+    this.protocolV2Assemblers.set(
+      uuid,
+      new ProtocolV2FrameAssembler(PROTOCOL_V2_BLE_FRAME_MAX_BYTES)
+    );
 
     if (Platform.OS === 'ios') {
       await new Promise<void>(resolve => {
@@ -976,8 +980,12 @@ export default class ReactNativeBleTransport {
   }
 
   async release(uuid: string, onclose = false) {
-    const transport = transportCache[uuid];
     await this.protocolV2Links.invalidateLink(uuid, 'React Native BLE transport released');
+    return this.releaseNative(uuid, onclose);
+  }
+
+  private async releaseNative(uuid: string, onclose = false) {
+    const transport = transportCache[uuid];
     if (this.runPromise) {
       const error = ERRORS.TypedError(HardwareErrorCode.BleForceCleanRunPromise);
       this.runPromise.reject(error);
@@ -1682,22 +1690,24 @@ export default class ReactNativeBleTransport {
       androidPacketLength: tuning.androidPacketLength,
       mtu: Platform.OS === 'android' ? transport.mtuSize : undefined,
     });
-    let packetsWritten = 0;
-    for (let offset = 0; offset < frame.length; offset += packetCapacity) {
-      const chunk = frame.slice(offset, offset + packetCapacity);
-      const base64 = Buffer.from(chunk).toString('base64');
-      await this.writeProtocolV2Packet(transport, base64, context, assertCurrentGeneration);
-      packetsWritten += 1;
-      if (
-        offset + packetCapacity < frame.length &&
-        packetsWritten % FIRMWARE_UPLOAD_WRITE_BURST_SIZE === 0
-      ) {
-        await delay(FIRMWARE_UPLOAD_WRITE_PAUSE_MS);
-      }
-    }
-    if (packetsWritten > FIRMWARE_UPLOAD_WRITE_BURST_SIZE) {
-      await delay(FIRMWARE_UPLOAD_WRITE_FLUSH_DELAY_MS);
-    }
+    await writeProtocolV2BleFrame({
+      frame,
+      packetCapacity,
+      assertActive: assertCurrentGeneration,
+      signal: context.signal,
+      abortMessage: `Protocol V2 BLE write aborted for ${context.messageName}`,
+      burstSize: FIRMWARE_UPLOAD_WRITE_BURST_SIZE,
+      burstPauseMs: FIRMWARE_UPLOAD_WRITE_PAUSE_MS,
+      flushDelayMs: FIRMWARE_UPLOAD_WRITE_FLUSH_DELAY_MS,
+      wait: delay,
+      writePacket: packet =>
+        this.writeProtocolV2Packet(
+          transport,
+          Buffer.from(packet).toString('base64'),
+          context,
+          assertCurrentGeneration
+        ),
+    });
   }
 
   private async callProtocolV2(

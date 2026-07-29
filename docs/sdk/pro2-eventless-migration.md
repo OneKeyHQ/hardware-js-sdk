@@ -67,15 +67,15 @@ Initialize(session_id)                   -> DeviceSessionGet({ session_id })
 
 ## 模块迁移总表
 
-| 模块         | SDK → App                       | App 响应             | SDK → firmware                    | firmware 行为                                        |
-| ------------ | ------------------------------- | -------------------- | --------------------------------- | ---------------------------------------------------- |
+| 模块         | SDK → App                       | App 响应             | SDK → firmware                    | firmware 行为                                   |
+| ------------ | ------------------------------- | -------------------- | --------------------------------- | ----------------------------------------------- |
 | 钱包 Session | `REQUEST_PASSPHRASE` 阻塞选择   | `RECEIVE_PASSPHRASE` | AskPassphrase/AskPin → SessionGet | Host/设备 Passphrase 或 Attach PIN，返回最终 Session |
-| PIN / 解锁   | `REQUEST_PIN` 非阻塞提示        | 无                   | `DeviceSessionAskPin(type)`       | 本地 PIN/指纹，返回解锁结果                          |
-| 地址 / 公钥  | `REQUEST_BUTTON` 非阻塞提示     | 无                   | 原地址/公钥方法                   | 本地确认，返回最终数据                               |
-| 签名         | `REQUEST_BUTTON` 非阻塞通用提示 | 无                   | 原签名方法 + 数据握手             | 本地完成所有确认页                                   |
-| 设备管理     | `REQUEST_BUTTON` 非阻塞提示     | 无                   | 页面命令或最终操作命令            | 本地设置/危险操作 UI                                 |
-| Onboarding   | 可选非阻塞阶段通知              | 无                   | 状态查询/页面命令                 | 本地流程；状态查询为事实来源                         |
-| Cancel       | 关闭 UI 可取消当前调用          | cancel API/调用取消  | `Cancel`                          | 关闭当前页面并结束原请求                             |
+| PIN / 解锁   | `REQUEST_PIN` 非阻塞提示        | 无                   | `DeviceSessionAskPin(type)`       | 本地 PIN/指纹，返回解锁结果                     |
+| 地址 / 公钥  | `REQUEST_BUTTON` 非阻塞提示     | 无                   | 原地址/公钥方法                   | 本地确认，返回最终数据                          |
+| 签名         | `REQUEST_BUTTON` 非阻塞通用提示 | 无                   | 原签名方法 + 数据握手             | 本地完成所有确认页                              |
+| 设备管理     | `REQUEST_BUTTON` 非阻塞提示     | 无                   | 页面命令或最终操作命令            | 本地设置/危险操作 UI                            |
+| Onboarding   | 可选非阻塞阶段通知              | 无                   | 状态查询/页面命令                 | 本地流程；状态查询为事实来源                    |
+| Cancel       | 关闭 UI 可取消当前调用          | cancel API/调用取消  | `Cancel`                          | 关闭当前页面并结束原请求                        |
 
 ## 钱包 Session：兼容现有 App Event UI
 
@@ -110,7 +110,7 @@ App 的 Pro2 分支继续返回现有三种选择形状：
 
 SDK 将响应转换为 Ask 请求并在成功后执行 `DeviceSessionGet({})`，而不是 `PassphraseAck`。
 显式 `resume-hidden` 只通过带 `session_id` 的 `DeviceSessionGet` 恢复指定 Session，不能打开设备
-钱包选择 UI；恢复失效时返回规范化错误，由 App 明确发起 `hidden` 并指定 `access`。
+钱包选择 UI；恢复失效时返回规范化错误，由 App 明确发起 `select-hidden`。
 
 ## SDK 公共 Event 适配
 
@@ -236,8 +236,8 @@ Cancel 必须绑定当前设备和 Transport source；断连时清理请求、UI
 - Hidden Wallet PIN 入口由 `existsAttachPinUser` 决定。
 - `REQUEST_BUTTON/REQUEST_PIN` 的 Pro2 非阻塞场景不发送 `uiResponse()`。
 - 用户关闭硬件交互 UI 时取消当前调用；收到 `CLOSE_UI_WINDOW` 时只幂等收起。
-- App 继续保存 `passphraseState`，忽略 CLI 兼容的 `openWalletSession().sessionId`，不把
-  firmware `session_id` 写入 App 数据库。
+- App 继续保存 `passphraseState`；`openWalletSession()` 不再返回 firmware `session_id`，
+  App 数据库也不得保存该内部值。
 - 现有 App 可继续使用 `getPassphraseState()`；Pro2 的协议分流由 Core 完成。新流程优先使用
   `openWalletSession()` 显式表达标准、选择隐藏钱包或恢复隐藏钱包。
 - 不把 onboarding 阶段 Event 当成唯一状态来源。
@@ -254,7 +254,7 @@ Cancel 必须绑定当前设备和 Transport source；断连时清理请求、UI
 ### 钱包与解锁
 
 - 标准钱包先协商 `eventless_wallet_session=true`，锁定时调用 `AskPin(Main)`，不调用 `DeviceSessionGet`，
-  不生成或暴露隐藏钱包的 `passphraseState/sessionId`。
+  不生成或暴露隐藏钱包的 `passphraseState/sessionId`；隐藏钱包的 `sessionId` 也只保留在 Core 内部。
 - Host Passphrase、设备 Passphrase、Attach PIN 三种隐藏钱包选择都返回正确钱包标识。
 - 首次隐藏钱包、Session 恢复、Session 失效重选保持原 API 调用不重放。
 - Passphrase 与对应 Attach PIN 返回相同 `btc_test_address`。

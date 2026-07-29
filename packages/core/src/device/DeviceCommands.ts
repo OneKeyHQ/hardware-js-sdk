@@ -27,10 +27,6 @@ export type PassphrasePromptResponse = {
   cache?: boolean;
 };
 
-type DeviceCallOptions = TransportCallOptions & {
-  passphraseAccess?: 'prompt' | 'passphrase' | 'attach-pin';
-};
-
 type MessageType = Messages.MessageType;
 type MessageKey = Extract<keyof MessageType, string>;
 export type TypedResponseMessage<T extends MessageKey> = {
@@ -57,41 +53,6 @@ const DEVICE_SESSION_CALLS = new Set([
   'DeviceSessionAskPin',
   'DeviceSessionAskPassphrase',
 ]);
-const REQUEST_BODY_DEBUG_CALLS = new Set([
-  ...DEVICE_SESSION_CALLS,
-  'ProtocolInfoRequest',
-  'DeviceStatusGet',
-]);
-const SENSITIVE_REQUEST_LOG_KEYS = new Set([
-  'entropy',
-  'mnemonic',
-  'passphrase',
-  'password',
-  'pin',
-  'privatekey',
-  'seed',
-  'xprv',
-]);
-
-const normalizeRequestLogKey = (key: string) => key.replace(/[_-]/g, '').toLowerCase();
-
-const sanitizeRequestBodyForLog = (value: unknown): unknown => {
-  if (ArrayBuffer.isView(value)) return `[BINARY:${value.byteLength}]`;
-  if (value instanceof ArrayBuffer) return `[BINARY:${value.byteLength}]`;
-  if (Array.isArray(value)) return value.map(sanitizeRequestBodyForLog);
-  if (!value || typeof value !== 'object') return value;
-
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>).map(([key, item]) => [
-      key,
-      SENSITIVE_REQUEST_LOG_KEYS.has(normalizeRequestLogKey(key)) &&
-      item !== null &&
-      item !== undefined
-        ? '[REDACTED]'
-        : sanitizeRequestBodyForLog(item),
-    ])
-  );
-};
 
 // Protocol V2 subcodes are domain-scoped, so cross-domain cancellation fallback
 // must use explicit firmware cancellation messages instead of a global number map.
@@ -109,7 +70,9 @@ function shouldReduceDebugForCall(type: string) {
  * User confirmation and PIN/passphrase entry have unbounded think time. Preserve only
  * response-related options such as expectedTypes and intermediateTypes.
  */
-const stripInteractiveAckTimeout = (options?: DeviceCallOptions): DeviceCallOptions | undefined => {
+const stripInteractiveAckTimeout = (
+  options?: TransportCallOptions
+): TransportCallOptions | undefined => {
   if (!options) return options;
   const { timeoutMs: _timeoutMs, ...rest } = options;
   return rest;
@@ -319,12 +282,7 @@ export class DeviceCommands {
   ): Promise<DefaultMessageResponse> {
     const shouldReduceDebug = shouldReduceDebugForCall(type);
     if (!shouldReduceDebug) {
-      Log.debug('[DeviceCommands] [call] Sending', {
-        type,
-        message: REQUEST_BODY_DEBUG_CALLS.has(type)
-          ? sanitizeRequestBodyForLog(msg ?? {})
-          : '[NOT_LOGGED]',
-      });
+      Log.debug('[DeviceCommands] [call] Sending', type);
     }
 
     try {
@@ -333,33 +291,6 @@ export class DeviceCommands {
       const res = await promise;
       if (!shouldReduceDebug) {
         LogCore.debug('[DeviceCommands] [call] Received', res.type);
-      }
-      if (type === 'DeviceSessionGet') {
-        const responseMessage = res.message as Record<string, unknown>;
-        if (res.type === 'Failure') {
-          LogCore.debug('[DeviceSessionGet debug] raw Failure response', {
-            type: res.type,
-            message: responseMessage,
-          });
-        } else {
-          const { session_id: sessionId, ...visibleMessage } = responseMessage;
-          let sessionIdLength: number | undefined;
-          if (typeof sessionId === 'string') {
-            sessionIdLength = sessionId.length;
-          } else if (sessionId instanceof Uint8Array) {
-            sessionIdLength = sessionId.byteLength;
-          }
-          LogCore.debug('[DeviceSessionGet debug] response', {
-            type: res.type,
-            message: {
-              ...visibleMessage,
-              session_id:
-                sessionId === undefined
-                  ? undefined
-                  : { present: true, type: typeof sessionId, length: sessionIdLength },
-            },
-          });
-        }
       }
       return res;
     } catch (error) {
@@ -408,21 +339,21 @@ export class DeviceCommands {
     type: T,
     resType: R,
     msg?: MessageType[T],
-    options?: DeviceCallOptions
+    options?: TransportCallOptions
   ): Promise<TypedCallResponseMap[R[number]]>;
 
   typedCall<T extends MessageKey, R extends MessageKey>(
     type: T,
     resType: R,
     msg?: MessageType[T],
-    options?: DeviceCallOptions
+    options?: TransportCallOptions
   ): Promise<TypedResponseMessage<R>>;
 
   async typedCall(
     type: MessageKey,
     resType: MessageKey | MessageKey[],
     msg?: DefaultMessageResponse['message'],
-    options?: DeviceCallOptions
+    options?: TransportCallOptions
   ) {
     if (this.disposed) {
       throw ERRORS.TypedError(
@@ -479,17 +410,16 @@ export class DeviceCommands {
   async _commonCall(
     type: MessageKey,
     msg?: DefaultMessageResponse['message'],
-    options?: DeviceCallOptions
+    options?: TransportCallOptions
   ) {
-    const { passphraseAccess: _passphraseAccess, ...transportOptions } = options ?? {};
-    const resp = await this.call(type, msg, transportOptions);
+    const resp = await this.call(type, msg, options);
     return this._filterCommonTypes(resp, type, options);
   }
 
   _filterCommonTypes(
     res: DefaultMessageResponse,
     callType: MessageKey,
-    options?: DeviceCallOptions
+    options?: TransportCallOptions
   ): Promise<DefaultMessageResponse> {
     try {
       if (!shouldReduceDebugForCall(callType)) {
@@ -705,33 +635,10 @@ export class DeviceCommands {
 
     if (res.type === 'PassphraseRequest') {
       const existsAttachPinUser = res.message.exists_attach_pin_user;
-      if (options?.passphraseAccess === 'attach-pin') {
-        if (!existsAttachPinUser) {
-          return Promise.reject(
-            ERRORS.TypedError(
-              HardwareErrorCode.DeviceCheckUnlockTypeError,
-              'Attach PIN wallet selection is unavailable on this device.'
-            )
-          );
-        }
-        return this._commonCall(
-          'PassphraseAck',
-          { on_device_attach_pin: true },
-          stripInteractiveAckTimeout(options)
-        );
-      }
       return this.promptPassphrase({
-        existsAttachPinUser:
-          options?.passphraseAccess === 'passphrase' ? false : existsAttachPinUser,
+        existsAttachPinUser,
       }).then(response => {
         const { passphrase, passphraseOnDevice, attachPinOnDevice } = response;
-
-        if (options?.passphraseAccess === 'passphrase' && attachPinOnDevice) {
-          throw ERRORS.TypedError(
-            HardwareErrorCode.RuntimeError,
-            'Attach PIN cannot be selected during the passphrase wallet flow.'
-          );
-        }
 
         // Attach PIN on device
         if (attachPinOnDevice && existsAttachPinUser) {

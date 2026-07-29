@@ -46,9 +46,7 @@ import {
   createDeviceMessage,
   createResponseMessage,
   createUiMessage,
-  formatLogMethodLabel,
   getLogBlockLabel,
-  getSafeLogPayload,
 } from '../events';
 import TransportManager from '../data-manager/TransportManager';
 import DeviceConnector from '../device/DeviceConnector';
@@ -1453,14 +1451,14 @@ export default class Core extends EventEmitter {
       case IFRAME.CALL: {
         const logBlockLabel = getLogBlockLabel(message);
         Log.log(
-          formatLogMethodLabel(`[${Date.now()}][CALL_API]`, logBlockLabel),
-          getSafeLogPayload(message, logBlockLabel)
+          `[${Date.now()}][CALL_API]`,
+          logBlockLabel ? { method: logBlockLabel, payload: '[REDACTED]' } : message
         );
         const response = await callAPI(this.getCoreContext(), message);
         const { success, payload } = response;
         Log.log(
-          formatLogMethodLabel(`[${Date.now()}][CALL_API_RESPONSE]`, logBlockLabel),
-          getSafeLogPayload(response, logBlockLabel)
+          `[${Date.now()}][CALL_API_RESPONSE]`,
+          logBlockLabel ? { method: logBlockLabel, payload: '[REDACTED]' } : response
         );
         if (success) {
           return response;

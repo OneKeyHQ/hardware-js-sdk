@@ -1,6 +1,3 @@
-const fs = require('fs');
-const path = require('path');
-
 const {
   createMessageFromName,
   createMessageFromType,
@@ -149,10 +146,6 @@ describe('messages', () => {
           type: 'string',
           id: 1,
         },
-        on_device: {
-          type: 'bool',
-          id: 2,
-        },
       },
     });
     expect(v2Messages.nested.DeviceSessionAskPin_FailureSubCodes.values).toEqual({
@@ -164,19 +157,6 @@ describe('messages', () => {
     expect(v2Messages.nested.MessageType.values).not.toHaveProperty(
       'MessageType_DeviceSessionOpen'
     );
-  });
-
-  test('Protocol V2 device session nanopb bounds stay in the split options file', () => {
-    const optionsPath = path.resolve(
-      __dirname,
-      '../../../submodules/firmware-pro2/sys/protobuf/onekey_protocol/latest/messages_device_session.options'
-    );
-    const options = fs.readFileSync(optionsPath, 'utf8');
-
-    expect(options).toMatch(/^DeviceSessionGet\.session_id\s+max_size:32\s*$/m);
-    expect(options).toMatch(/^DeviceSession\.session_id\s+max_size:32\s*$/m);
-    expect(options).toMatch(/^DeviceSession\.btc_test_address\s+max_size:50\s*$/m);
-    expect(options).toMatch(/^DeviceSessionAskPassphrase\.passphrase\s+max_size:51\s*$/m);
   });
 
   test('Protocol V2 onboarding status matches the current firmware-pro2 schema', () => {
