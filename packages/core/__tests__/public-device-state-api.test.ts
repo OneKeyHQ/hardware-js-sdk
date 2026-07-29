@@ -1,6 +1,7 @@
 import { EFirmwareType, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import * as publicMethods from '../src/api';
+import * as publicTypes from '../src/types';
 import GetFeatures from '../src/api/GetFeatures';
 import GetOnekeyFeatures from '../src/api/GetOnekeyFeatures';
 import DeviceInfoGet from '../src/api/protocol-v2/DeviceInfoGet';
@@ -17,6 +18,14 @@ jest.mock('../src/data/config', () => ({
 }));
 
 describe('public device state API boundary', () => {
+  test('exports canonical wallet session modes', () => {
+    expect((publicTypes as Record<string, unknown>).OpenWalletSessionMode).toEqual({
+      Standard: 'standard',
+      SelectHidden: 'select-hidden',
+      ResumeHidden: 'resume-hidden',
+    });
+  });
+
   test('exposes canonical device state operations without raw settings methods', () => {
     const api = createCoreApi(jest.fn() as CoreApi['call']) as Record<string, unknown>;
 
@@ -74,7 +83,7 @@ describe('public device state API boundary', () => {
       useEmptyPassphrase: false,
     });
     await api.openWalletSession('device-2', {
-      mode: 'resume-hidden',
+      mode: publicTypes.OpenWalletSessionMode.ResumeHidden,
       deviceId: 'wallet-device-1',
       passphraseState: 'wallet-state-1',
     });

@@ -1,18 +1,27 @@
 import type { CommonParams, Response } from '../params';
 
+export const OpenWalletSessionMode = {
+  Standard: 'standard',
+  SelectHidden: 'select-hidden',
+  ResumeHidden: 'resume-hidden',
+} as const;
+
+export type OpenWalletSessionModeValue =
+  (typeof OpenWalletSessionMode)[keyof typeof OpenWalletSessionMode];
+
 export type OpenWalletSessionParams =
   | {
-      mode: 'standard';
+      mode: typeof OpenWalletSessionMode.Standard;
       deviceId?: never;
       passphraseState?: never;
     }
   | {
-      mode: 'select-hidden';
+      mode: typeof OpenWalletSessionMode.SelectHidden;
       deviceId?: never;
       passphraseState?: never;
     }
   | {
-      mode: 'resume-hidden';
+      mode: typeof OpenWalletSessionMode.ResumeHidden;
       deviceId: string;
       passphraseState: string;
     };
