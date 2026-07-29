@@ -14,11 +14,7 @@ import {
 import { selectSearchDevice } from './deviceSelection';
 import { getCanonicalDeviceState, getCompatibleFeatures } from './deviceStateCommands';
 import { createSDK, disposeSDK } from './sdk';
-import {
-  clearSessionFromKeychain,
-  preloadSessionFromKeychain,
-  saveSessionToKeychain,
-} from './session';
+import { clearSessionFromKeychain, preloadSessionFromKeychain } from './session';
 
 import type {
   DeviceStateScope,
@@ -800,7 +796,7 @@ const sessionCmd = program.command('session').description('Manage device passphr
 
 sessionCmd
   .command('connect')
-  .description('Connect device and establish passphrase session (cached for subsequent commands)')
+  .description('Connect device and select a hidden wallet for this invocation')
   .action(() =>
     runCommand({}, async ({ sdk, globalOpts }) => {
       // 1. Search for device
@@ -825,8 +821,7 @@ sessionCmd
 
       // 3. Open a hidden wallet session (triggers 1/2/3 selection).
       const sessionResult = await sdk.openWalletSession(connectId, {
-        mode: 'hidden',
-        access: 'passphrase',
+        mode: 'select-hidden',
       });
       if (!sessionResult.success) {
         outputResult(globalOpts, sessionResult);
@@ -839,7 +834,7 @@ sessionCmd
         });
         return;
       }
-      const { deviceId, passphraseState, sessionId } = sessionResult.payload;
+      const { deviceId, passphraseState } = sessionResult.payload;
 
       // 4. Get address to verify + extract deviceId
       const addrResult = await sdk.evmGetAddress(connectId, deviceId, {
@@ -848,17 +843,11 @@ sessionCmd
         passphraseState,
       });
 
-      // 5. Persist only the session id returned by the explicit wallet-session API.
-      if (sessionId) {
-        await saveSessionToKeychain(deviceId, passphraseState, sessionId);
-      }
-
       outputResult(globalOpts, {
         success: true,
         payload: {
           passphraseState,
           deviceId,
-          ...(sessionId ? { sessionId } : {}),
           ...(addrResult?.success ? { address: addrResult.payload.address } : {}),
         },
       });
@@ -967,8 +956,8 @@ async function unlockWithRetry(
  * Prepare passphrase session before SDK calls.
  *
  * 1. If --use-empty-passphrase or --passphrase-state provided → use as-is
- * 2. Try keychain → preloadSessionCache → use cached session
- * 3. Keychain miss → openWalletSession (triggers 1/2/3 prompt) → save to keychain
+ * 2. Try a legacy keychain entry → preloadSessionCache → use cached session
+ * 3. Keychain miss → openWalletSession (triggers 1/2/3 prompt)
  *
  * After this, globalOpts.passphraseState is set and getCommonParams will include it.
  */
@@ -1081,7 +1070,7 @@ export async function prepareSession(
     return undefined;
   }
 
-  // ── Step 5: Try keychain session reuse ───────────────────────────
+  // ── Step 5: Try legacy keychain session reuse ────────────────────
   // Only attempt if device was already unlocked — locking invalidates
   // all passphrase sessions, so cached session_id is useless after unlock.
   if (!wasLocked && deviceId) {
@@ -1094,22 +1083,16 @@ export async function prepareSession(
 
   // ── Step 6: Keychain miss → openWalletSession (triggers 1/2/3 prompt) ──
   const sessionResult = await sdk.openWalletSession(connectId, {
-    mode: 'hidden',
-    access: 'passphrase',
+    mode: 'select-hidden',
   });
 
   if (sessionResult.success && sessionResult.payload) {
     if (sessionResult.payload.walletType !== 'hidden') {
       return undefined;
     }
-    const { deviceId: sessionDeviceId, passphraseState, sessionId } = sessionResult.payload;
+    const { deviceId: sessionDeviceId, passphraseState } = sessionResult.payload;
     globalOpts.deviceId = sessionDeviceId;
     globalOpts.passphraseState = passphraseState;
-
-    if (sessionId) {
-      await saveSessionToKeychain(sessionDeviceId, passphraseState, sessionId);
-      await preloadSessionFromKeychain(sessionDeviceId);
-    }
 
     return passphraseState;
   }

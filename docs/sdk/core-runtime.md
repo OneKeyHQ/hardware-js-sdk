@@ -55,7 +55,7 @@ Core 包根保留以下设备信息 selector，供仍持有兼容 `Features` 的
 | `getDeviceBLEFirmwareVersion()`        | 读取 BLE / coprocessor 固件版本                 | 保留原名和大写 `BLE`                                    |
 | `getDeviceBoardloaderVersion()`        | 读取 board / romloader 版本                     | 保留历史拼写，不增加 `getDeviceBoardVersion`            |
 | `KnownDevice.serialNo`                 | 初始化后的稳定物理设备身份                      | 规范字段                                                |
-| `KnownDevice.status`                   | 当前 transport 使用状态                         | `available` / `used` / `occupied`，供连接状态展示       |
+| `KnownDevice.status`                   | 当前 transport 使用状态                        | `available` / `used` / `occupied`，供连接状态展示       |
 | `SearchDevice.serialNo`                | 已初始化设备的序列号；未连接的 BLE 扫描结果为空 | 规范字段                                                |
 | `getDeviceUUID()` / `KnownDevice.uuid` | 初始化后与 `serialNo` 相同                      | 废弃兼容；新业务不再使用                                |
 | `SearchDevice.uuid`                    | 历史混合字段；BLE 扫描时可能是 Transport UUID   | 废弃兼容；路由使用 `connectId`，硬件身份使用 `serialNo` |
@@ -127,8 +127,8 @@ Protocol V2 的自动锁屏和自动关机使用 `0x10000000` 表示“永不”
 当前没有“只读查询设备当前打开哪个钱包”的公共需求，因此不提供
 原始钱包 Session 查询接口。`getDeviceState()` 只返回 Passphrase、Attach PIN 等设备功能和运行状态，
 不返回钱包身份。App 在 `openWalletSession()` 成功后保存返回的
-`deviceId + walletType + passphraseState`；固件响应包含 `session_id` 时，Core 原样可选透传
-`sessionId`，不补造也不额外查询。现有 CLI 可使用该字段做 OS Keychain 恢复，普通 App 忽略该字段。
+`deviceId + walletType + passphraseState`；固件响应中的 `session_id` 只写入 Core 内部
+`DeviceWalletSessionStore`，不通过公共响应导出。
 
 Core 先把公共钱包意图归一化，再映射到各协议：
 
@@ -150,30 +150,30 @@ Core 先把公共钱包意图归一化，再映射到各协议：
 
 显式调用只使用 `mode` 表达意图，不能再混入旧参数：
 
-| `mode`          | 可携带的钱包绑定             | 行为                                        |
-| --------------- | ---------------------------- | ------------------------------------------- |
-| `standard`      | 无                           | 打开标准钱包                                |
-| `hidden`        | `access`                     | 选择或直接打开 Passphrase / Attach PIN 钱包 |
-| `resume-hidden` | `deviceId + passphraseState` | 恢复指定隐藏钱包                            |
+| `mode`          | 可携带的钱包绑定             | 行为             |
+| --------------- | ---------------------------- | ---------------- |
+| `standard`      | 无                           | 打开标准钱包     |
+| `select-hidden` | 无                           | 重新选择隐藏钱包 |
+| `resume-hidden` | `deviceId + passphraseState` | 恢复指定隐藏钱包 |
 
 为了支持 App 按设备分流的调试迁移，未传 `mode` 时保留旧参数归一化，优先级如下：
 
 1. `useEmptyPassphrase=true`：进入 `standard`，优先于其他旧字段。
-2. 否则 `initSession=true`：进入 Legacy 隐藏钱包选择；如果同时提供旧
+2. 否则 `initSession=true`：进入 `select-hidden`；如果同时提供旧
    `passphraseState`，Core 只使当前设备上该钱包的旧 Session 失效。
 3. 否则完整提供 `deviceId + passphraseState`：进入 `resume-hidden`。
-4. 否则没有钱包绑定：进入 Legacy 隐藏钱包选择；绑定字段不完整则返回参数错误。
+4. 否则没有钱包绑定：进入 `select-hidden`；绑定字段不完整则返回参数错误。
 
 `useEmptyPassphrase=false` 和 `initSession=false` 不会单独选择模式。显式 `mode` 与
-`useEmptyPassphrase/initSession` 混用，或给 `standard/hidden` 携带钱包绑定，
+`useEmptyPassphrase/initSession` 混用，或给 `standard/select-hidden` 携带钱包绑定，
 都会返回 `CallMethodInvalidParameter`，避免同一请求存在两个流程意图。
 
 `openWalletSession()` 的成功结果以 `walletType` 作为判别字段：
 
-| `walletType` | `passphraseState` | `sessionId` | 含义                                          |
-| ------------ | ----------------- | ----------- | --------------------------------------------- |
-| `standard`   | `null`            | 可选字符串  | 使用设备默认空 Passphrase 上下文              |
-| `hidden`     | 非空字符串        | 可选字符串  | 设备返回隐藏钱包标识；Session 只保留 CLI 兼容 |
+| `walletType` | `passphraseState` | 含义                             |
+| ------------ | ----------------- | -------------------------------- |
+| `standard`   | `null`            | 使用设备默认空 Passphrase 上下文 |
+| `hidden`     | 非空字符串        | 设备返回隐藏钱包标识             |
 
 隐藏钱包结果直接使用同一次硬件响应中的字段。Core 只执行协议字段名归一化，不从
 Features、descriptor 或 Store 补造钱包标识；标准钱包没有 `DeviceSession` 响应。
@@ -246,17 +246,16 @@ App 不应按型号或 PID 自行选择协议，也不应直接发送
 `DeviceSessionAskPin/DeviceSessionAskPassphrase/DeviceSessionGet`。Core 会在完成设备响应探测后
 自动分流：
 
-| App 意图            | Pro V1 固件流程                         | Pro2 Protocol V2 固件流程                                    |
-| ------------------- | --------------------------------------- | ------------------------------------------------------------ | --------------------------------------------- |
-| 标准钱包            | 空 Passphrase 兼容流程                  | 必要时 `DeviceSessionAskPin(Main)`                           |
-| Passphrase 隐藏钱包 | `GetPassphraseState -> PassphraseState` | `DeviceSessionAskPassphrase({ passphrase, on_device: false } | { on_device: true }) -> DeviceSessionGet({})` |
-| Attach-to-PIN       | `GetPassphraseState -> PassphraseState` | `DeviceSessionAskPin(AttachToPin) -> DeviceSessionGet({})`   |
-| 恢复已选隐藏钱包    | Core 管理 V1 Session 复用               | `DeviceSessionGet({ session_id })`                           |
+| App 意图          | Pro V1 固件流程                         | Pro2 Protocol V2 固件流程                                  |
+| ----------------- | --------------------------------------- | ---------------------------------------------------------- |
+| 标准钱包          | 空 Passphrase 兼容流程                  | 必要时 `DeviceSessionAskPin(Main)`                         |
+| Passphrase 隐藏钱包 | `GetPassphraseState -> PassphraseState` | `DeviceSessionAskPassphrase({ passphrase? }) -> DeviceSessionGet({})` |
+| Attach-to-PIN     | `GetPassphraseState -> PassphraseState` | `DeviceSessionAskPin(AttachToPin) -> DeviceSessionGet({})` |
+| 恢复已选隐藏钱包  | Core 管理 V1 Session 复用               | `DeviceSessionGet({ session_id })`                         |
 
-Pro2 Protocol V2 支持软件输入：Core 发送
-`DeviceSessionAskPassphrase { passphrase, on_device: false }`；选择设备输入时发送
-`{ on_device: true }`。两种模式必须显式携带 `on_device`，且与 `passphrase` 保持互斥。Pro2
-尚未发布，SDK 不兼容缺少该字段的开发阶段旧固件。
+Pro2 Protocol V2 支持软件输入：Core 将非空值放入
+`DeviceSessionAskPassphrase.passphrase`；选择设备输入时发送空请求。Pro2 尚未发布，SDK 不兼容
+缺少该字段的开发阶段旧固件。
 
 对 App 的最小回归检查是：
 
@@ -271,9 +270,9 @@ Pro2 Protocol V2 支持软件输入：Core 发送
 新集成建议用 `openWalletSession({ mode })` 显式表达意图，但这是渐进式迁移，不是
 Pro2 接入的强制前置条件。
 
-`openWalletSession()` 在标准/隐藏钱包结果中都可选透传固件返回的 `sessionId`。Legacy
-`Features.session_id/sessionId` 仍只用于现有 CLI 的受控 OS Keychain 恢复；这些字段都
-不进入公共 `DeviceState`、普通 App 数据库或钱包主键。
+`openWalletSession()` 的标准/隐藏钱包结果都不包含固件 `sessionId`。Legacy
+`Features.session_id/sessionId` 的公共投影保持为空；旧版 CLI 已存在的受控 OS Keychain
+记录仍可通过兼容入口预加载，但不会再从新的公共钱包响应创建记录。
 
 详见 [钱包 Session 与设备安全](../device/wallet-session-and-security.md) 和 [SDK 关键架构决策](../architecture/decisions.md#钱包-session-所有权与缓存键)。
 

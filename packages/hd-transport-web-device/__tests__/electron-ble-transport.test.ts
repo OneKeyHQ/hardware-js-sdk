@@ -183,6 +183,24 @@ describe('ElectronBleTransport protocol detection', () => {
     });
   });
 
+  test('uses the Protocol V2 BLE writer with the Electron packet size', async () => {
+    const device = { id: 'chunked-pro2-id', name: 'OneKey Pro 2' };
+    const nobleBle = createNobleBle(device);
+    const bleTransport = configureTransport(nobleBle) as any;
+    const context = {
+      messageName: 'Ping',
+      timeoutMs: 1000,
+      highVolume: false,
+      generation: 1,
+      signal: new AbortController().signal,
+    };
+
+    await bleTransport.writeProtocolV2Frame(device.id, new Uint8Array(193), context, jest.fn());
+
+    expect(nobleBle.write).toHaveBeenCalledTimes(2);
+    expect(nobleBle.write.mock.calls.map(([, hex]) => hex.length / 2)).toEqual([192, 1]);
+  });
+
   test('detects Protocol V2 after Protocol V1 probe timeout', async () => {
     const device = { id: 'unknown-pro2-id', name: 'Unknown BLE Device' };
     const nobleBle = createNobleBle(device);
@@ -239,6 +257,7 @@ describe('ElectronBleTransport protocol detection', () => {
       return Promise.resolve();
     });
     const transport = configureTransport(nobleBle);
+    const protocolV2Writer = jest.spyOn(transport as any, 'writeProtocolV2Frame');
 
     try {
       await expect(transport.acquire({ uuid: device.id })).resolves.toEqual(
@@ -247,6 +266,7 @@ describe('ElectronBleTransport protocol detection', () => {
         })
       );
       expect(transport.getProtocolType(device.id)).toBe('V1');
+      expect(protocolV2Writer).not.toHaveBeenCalled();
     } finally {
       await transport.release(device.id);
     }

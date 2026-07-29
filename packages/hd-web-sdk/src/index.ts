@@ -13,10 +13,8 @@ import HardwareSdk, {
   createErrorMessage,
   enableLog,
   executeCallback,
-  formatLogMethodLabel,
   getLogBlockLabel,
   getLogger,
-  getSafeLogPayload,
   parseConnectSettings,
   parseMessage,
   setLoggerPostMessage,
@@ -148,16 +146,20 @@ const createJSBridge = (messageEvent: PostMessageEvent) => {
         if (message.event !== 'LOG_EVENT') {
           if (['DEVICE_EVENT', 'FIRMWARE_EVENT'].includes(message.event)) {
             // Log.debug('Host Bridge Receive message: ', message);
+          } else if (blockLog) {
+            Log.debug('Host Bridge Receive message: ', blockLog);
           } else {
-            Log.debug('Host Bridge Receive message: ', getSafeLogPayload(message, blockLog));
+            Log.debug('Host Bridge Receive message: ', message);
           }
         }
         const response = await handleMessage(message);
         if (message.event !== 'LOG_EVENT') {
           if (['DEVICE_EVENT', 'FIRMWARE_EVENT'].includes(message.event)) {
             // Log.debug('Host Bridge response: ', message);
+          } else if (blockLog) {
+            Log.debug('Host Bridge response: ', blockLog);
           } else {
-            Log.debug('Host Bridge response: ', getSafeLogPayload(response, blockLog));
+            Log.debug('Host Bridge response: ', message);
           }
         }
         return response;
@@ -195,7 +197,7 @@ const init = async (settings: Partial<ConnectSettings>) => {
 
 const call = async (params: any) => {
   const blockLog = getLogBlockLabel(params);
-  Log.debug(formatLogMethodLabel('call:', blockLog), getSafeLogPayload(params, blockLog));
+  Log.debug('call : ', blockLog ?? params);
   /**
    * Try to recreate iframe if it's initialize failed
    */

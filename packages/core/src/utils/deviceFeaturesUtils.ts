@@ -106,7 +106,6 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (
     expectPassphraseState?: string;
     onlyMainPin?: boolean;
     initSession?: boolean;
-    hiddenWalletAccess?: 'prompt' | 'passphrase' | 'attach-pin';
   }
 ) => {
   if (device.isProtocolV2()) {
@@ -122,7 +121,6 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (
       initSession: options?.initSession,
       expectedPassphraseState: options?.expectPassphraseState,
       onlyMainPin: options?.onlyMainPin,
-      hiddenWalletAccess: options?.hiddenWalletAccess,
     });
   }
 
@@ -187,7 +185,6 @@ export const getPassphraseState = async (
     expectPassphraseState?: string;
     onlyMainPin?: boolean;
     initSession?: boolean;
-    hiddenWalletAccess?: 'prompt' | 'passphrase' | 'attach-pin';
   }
 ): Promise<{
   passphraseState: string | undefined;
@@ -208,7 +205,6 @@ export const getPassphraseState = async (
       initSession: options?.initSession,
       expectedPassphraseState: options?.expectPassphraseState,
       onlyMainPin: options?.onlyMainPin,
-      hiddenWalletAccess: options?.hiddenWalletAccess,
     });
   }
 
@@ -224,12 +220,11 @@ export const getPassphraseState = async (
       passphrase_state: options?.onlyMainPin ? undefined : options?.expectPassphraseState,
     };
 
-    const response = options?.hiddenWalletAccess
-      ? await commands.typedCall('GetPassphraseState', 'PassphraseState', payload, {
-          passphraseAccess: options.hiddenWalletAccess,
-        })
-      : await commands.typedCall('GetPassphraseState', 'PassphraseState', payload);
-    const { message, type } = response;
+    const { message, type } = await commands.typedCall(
+      'GetPassphraseState',
+      'PassphraseState',
+      payload
+    );
 
     // @ts-expect-error
     if (type === 'CallMethodError') {

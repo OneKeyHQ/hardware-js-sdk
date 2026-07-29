@@ -1,14 +1,13 @@
 import { prepareSession } from '../cli';
-import { preloadSessionFromKeychain, saveSessionToKeychain } from '../session';
+import { preloadSessionFromKeychain } from '../session';
 
 jest.mock('../session', () => ({
   clearSessionFromKeychain: jest.fn(),
   preloadSessionFromKeychain: jest.fn(),
-  saveSessionToKeychain: jest.fn(),
 }));
 
 describe('CLI wallet session', () => {
-  test('persists the session returned by openWalletSession without reading it from features', async () => {
+  test('uses the public wallet identity without persisting an internal session id', async () => {
     const sdk = {
       searchDevices: jest.fn().mockResolvedValue({
         success: true,
@@ -34,7 +33,6 @@ describe('CLI wallet session', () => {
           walletType: 'hidden',
           deviceId: 'device-id',
           passphraseState: 'wallet-state',
-          sessionId: 'wallet-session-id',
           resumed: false,
         },
       }),
@@ -45,15 +43,9 @@ describe('CLI wallet session', () => {
     await expect(prepareSession(sdk as never, globalOpts)).resolves.toBe('wallet-state');
 
     expect(sdk.openWalletSession).toHaveBeenCalledWith('pro2-connect-id', {
-      mode: 'hidden',
-      access: 'passphrase',
+      mode: 'select-hidden',
     });
     expect(sdk.getFeatures).not.toHaveBeenCalled();
-    expect(saveSessionToKeychain).toHaveBeenCalledWith(
-      'device-id',
-      'wallet-state',
-      'wallet-session-id'
-    );
     expect(globalOpts).toMatchObject({
       connectId: 'pro2-connect-id',
       deviceId: 'device-id',

@@ -41,7 +41,7 @@ const askDevicePassphrase = async (device: Device, passphrase?: string) => {
     device.commands.typedCall(
       'DeviceSessionAskPassphrase',
       'Success',
-      passphrase ? { passphrase, on_device: false } : { on_device: true }
+      passphrase ? { passphrase } : {}
     );
   try {
     return await request();
@@ -54,28 +54,15 @@ const askDevicePassphrase = async (device: Device, passphrase?: string) => {
   }
 };
 
-type HiddenWalletAccess = 'prompt' | 'passphrase' | 'attach-pin';
-
-const selectDeviceSession = async (device: Device, access?: HiddenWalletAccess) => {
+const selectDeviceSession = async (device: Device) => {
   const existsAttachPinUser = device.features?.attachToPinEnabled === true;
   const metadata = {
     source: 'wallet-session-coordinator' as const,
     reason: 'open-wallet' as const,
   };
-  if (access === 'attach-pin') {
-    if (!existsAttachPinUser) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.DeviceCheckUnlockTypeError,
-        'Attach PIN wallet selection is unavailable on this device.'
-      );
-    }
-    await device.unlockDevice(DeviceSessionPinType.AttachToPin);
-    return getDeviceSession(device, {});
-  }
-
   const response = await device.commands.promptPassphrase(
     {
-      existsAttachPinUser: access === 'passphrase' ? false : existsAttachPinUser,
+      existsAttachPinUser,
       ...metadata,
     },
     { cancelDeviceOnReject: false }
@@ -85,7 +72,7 @@ const selectDeviceSession = async (device: Device, access?: HiddenWalletAccess) 
   const selections = [
     hasHostPassphrase,
     response.passphraseOnDevice === true,
-    (access === undefined || access === 'prompt') && response.attachPinOnDevice === true,
+    response.attachPinOnDevice === true,
   ].filter(Boolean).length;
 
   if (selections !== 1) {
@@ -102,6 +89,7 @@ const selectDeviceSession = async (device: Device, access?: HiddenWalletAccess) 
         'Attach PIN wallet selection is unavailable on this device.'
       );
     }
+    device.emit(DEVICE.ATTACH_PIN_ON_DEVICE, device, metadata);
     await device.unlockDevice(DeviceSessionPinType.AttachToPin);
     return getDeviceSession(device, {});
   }
@@ -123,7 +111,6 @@ export async function getProtocolV2WalletSession(
     expectedPassphraseState?: string;
     onlyMainPin?: boolean;
     resumeOnly?: boolean;
-    hiddenWalletAccess?: HiddenWalletAccess;
   }
 ) {
   if (options?.initSession) {
@@ -140,9 +127,7 @@ export async function getProtocolV2WalletSession(
     ? undefined
     : options?.expectedPassphraseState ?? device.passphraseState;
 
-  // Locked status may omit capabilities such as Attach PIN. Only trust wallet
-  // selection capabilities after the device is explicitly known to be unlocked.
-  if (device.features?.unlocked !== true) {
+  if (device.features?.unlocked === false) {
     await device.unlockDevice(DeviceSessionPinType.Main);
   }
 
@@ -175,7 +160,7 @@ export async function getProtocolV2WalletSession(
       device.clearInternalState();
       throw ERRORS.TypedError(HardwareErrorCode.WalletSessionInvalid);
     }
-    response = await selectDeviceSession(device, options?.hiddenWalletAccess);
+    response = await selectDeviceSession(device);
   }
 
   const { message } = response;

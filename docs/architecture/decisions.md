@@ -26,6 +26,9 @@ Protocol V2 响应依靠串行调用、消息类型和帧序号维持请求边�
 
 - 公共层负责 protobuf 编解码、帧组装、调用串行化、超时、序列号和 Link 生命周期。
 - Transport adapter 只负责平台连接、原生读写、notification/endpoint 管理和平台错误映射。
+- Protocol V2 BLE 的完整 frame 分片循环、调用取消和 generation 边界由共享
+  `ProtocolV2BleFrameWriter` 负责；Electron、React Native 和 lowlevel adapter 只提供各自的
+  单包容量、节流参数和原生写入。Protocol V1 的既有 BLE 分包不复用该路径。
 - Node USB 与 WebUSB 复用 `ProtocolV2UsbTransportBase`。
 - USB 在 open、claim、reset 或 reconnect 后轮换 generation，旧 generation 的异步读写必须失败。
 - Transport 不自动重发 Protocol V2 业务命令；有副作用操作的重试由了解幂等性的 Core 流程决定。
@@ -40,13 +43,13 @@ Protocol V2 响应依靠串行调用、消息类型和帧序号维持请求边�
 
 Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类不同状态，不能共用缓存：
 
-- V1/V2 的 `openWalletSession()` 对标准/隐藏钱包都返回 `deviceId + passphraseState`；固件响应
-  包含 `session_id` 时，SDK 原样可选透传为 `sessionId`，不补造也不额外查询。
+- V1/V2 的 `openWalletSession()` 对标准/隐藏钱包都只返回公开钱包身份
+  `deviceId + passphraseState`；固件 `session_id` 只进入 Core 内部 Store，不通过公共响应透传。
 - 现有 App 可继续调用 `getPassphraseState()`：V1 保持原固件消息流，V2 由 Core 将
   `useEmptyPassphrase/initSession` 意图映射到新的 Ask/Get Session 流程；这不代表 Pro2
   恢复了同名固件消息。
-- 普通 App 调用方即使收到 `sessionId` 也不应保存或传回；短生命周期 CLI 可以将一次钱包选择
-  得到的非空三元组保存到 OS Keychain，并通过 `preloadSessionCache()` 恢复到 Core Store。
+- 旧版 CLI 已保存在 OS Keychain 中的完整三元组可以继续通过 `preloadSessionCache()` 恢复，
+  但新的公共钱包选择响应不再提供原始 `sessionId`，也不再创建新的跨进程 Session 缓存。
 - V1/V2 共用 `DeviceWalletSessionStore`，缓存键为 `deviceKey + passphraseState`。
 - `DeviceWalletSessionStore` 是 Core 内唯一可用于恢复的钱包 Session 缓存源；
   `DeviceState` 和协议 raw 快照都不是 Session 缓存。
@@ -55,17 +58,9 @@ Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类�
   的 `Initialize` 确认实时 `deviceId`；身份一致后才允许读取并透传对应钱包 Session。
   业务方法只要接收 `deviceId`，也必须在业务命令前执行同一实时身份校验。
 - `openWalletSession()` 的显式 `mode` 是唯一流程意图；一旦传入 `mode`，不得再混用
-  `useEmptyPassphrase` 或 `initSession`。`standard/hidden` 也不得携带钱包绑定。
-- `hidden` 必须显式携带 `access: prompt | passphrase | attach-pin`。正式 App 使用 `prompt`，
-  Core 在主 PIN 解锁并刷新能力后让 App 选择 Passphrase 隐藏钱包或 Attach-to-PIN 钱包；
-  `passphrase` 直接进入 Host/设备端口令输入，`attach-pin` 直接进入设备 Attach PIN 解锁。
-  专项调用不得通过伪造 UI response 选择已知访问方式。
+  `useEmptyPassphrase` 或 `initSession`。`standard/select-hidden` 也不得携带钱包绑定。
 - `openWalletSession()` 必须显式传入 `mode`；旧参数兼容只保留在原
   `getPassphraseState()` 入口，避免新 API 同时存在两套意图表达。
-- `openWalletSession(hidden|resume-hidden)` 在设备明确关闭 Passphrase 时返回
-  `DeviceNotOpenedPassphrase`，不得成功降级为标准钱包；`standard` 和旧
-  `getPassphraseState()` 保持原有兼容行为。SDK 不得为完成钱包选择而隐式修改设备的
-  Passphrase 设置。
 - `resume-hidden` 只接收 `deviceId + passphraseState`，由 Core 从 Store 查找
   `sessionId`；缓存不存在时返回 `WalletSessionInvalid`，固件拒绝恢复时透传规范化错误，
   且都不自动选择其他钱包。
@@ -73,11 +68,9 @@ Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类�
   标准钱包锁定时显式使用 `DeviceSessionAskPin { type: Main }`，不会创建隐藏钱包 Session。
 - 隐藏钱包选择先用 `DeviceSessionAskPassphrase` 或
   `DeviceSessionAskPin { type: AttachToPin }` 在设备端准备上下文，再用空参数
-  `DeviceSessionGet` 取得最终 Session；用户选择 Attach PIN 后直接发送 `DeviceSessionAskPin`，
-  不额外生成 SDK `REQUEST_PIN` 弹窗；恢复缓存使用带 `session_id` 的 `DeviceSessionGet`。
-- Pro2 的 `DeviceSessionAskPassphrase` 必须显式选择输入源：Host 输入发送
-  `{ passphrase, on_device: false }`，设备输入发送 `{ on_device: true }`；Attach-to-PIN 独立走
-  `DeviceSessionAskPin(AttachToPin)`。Pro2 尚未发布，不保留开发阶段旧固件的能力降级分支。
+  `DeviceSessionGet` 取得最终 Session；恢复缓存使用带 `session_id` 的 `DeviceSessionGet`。
+- Pro2 的 `DeviceSessionAskPassphrase.passphrase` 支持 Host 输入；字段缺省表示设备端输入。
+  Pro2 尚未发布，不保留开发阶段旧固件的能力降级分支。
 - 显式 `resume-hidden` 被固件拒绝时，Core 只清除当前隐藏钱包缓存并返回规范化错误，
   不自动退化为需要用户确认的隐藏钱包选择；`DeviceSessionError_InvalidSession=2`
   统一映射为 `WalletSessionInvalid`。
@@ -85,12 +78,10 @@ Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类�
   `btc_test_address`；缺少任一字段都视为协议响应不完整，不得降级为标准钱包。
 - 返回的钱包标识与调用方预期不一致时，必须清理缓存并抛出安全错误。
 - Pro2 在解锁流程刷新状态后，以刷新后的 `passphraseProtection` 判定标准/隐藏钱包，
-  并以刷新后的 `attachToPinEnabled` 决定是否提供 Attach PIN 入口；不得使用解锁前的状态快照
-  路由钱包结果或判断 Attach PIN 能力。
+  不得使用解锁前的状态快照路由钱包结果。
 - `session_id` 不是钱包身份，必须与同一次返回的 `deviceId + passphraseState` 绑定使用。
-- `session_id` 不出现在公共 `DeviceState` 或设备消息顶层；标准/隐藏钱包结果中的可选
-  `openWalletSession().sessionId` 和 Legacy `Features.sessionId` 只用于 CLI 兼容，
-  普通 App 不得把它们写入数据库。
+- `session_id` 不出现在公共 `DeviceState`、设备消息顶层或 `openWalletSession()` 响应；
+  Legacy `Features.sessionId` 的公共投影保持为空，仅允许 Core 内部缓存使用真实值。
 - 公共 `clearSessionCache()` 只接受无参数、仅 `deviceId`、或完整
   `deviceId + passphraseState` 三种范围；单独传 `passphraseState` 返回参数错误，避免误清
   所有设备。该 API 只清理 `DeviceWalletSessionStore`，不发送 Protocol V1/V2 命令，

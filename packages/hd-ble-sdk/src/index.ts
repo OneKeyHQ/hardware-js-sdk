@@ -13,10 +13,8 @@ import HardwareSdk, {
   createUiMessage,
   enableLog,
   executeCallback,
-  formatLogMethodLabel,
-  getLogBlockLabel,
   getLogger,
-  getSafeLogPayload,
+  getLogBlockLabel,
   initCore,
   parseConnectSettings,
   setLoggerPostMessage,
@@ -148,12 +146,12 @@ const init = async (settings: Partial<ConnectSettings>) => {
 
 const call = async (params: any) => {
   const blockLog = getLogBlockLabel(params);
-  Log.debug(formatLogMethodLabel('call:', blockLog), getSafeLogPayload(params, blockLog));
+  Log.debug('call: ', blockLog ?? params);
 
   try {
     const response = await postMessage({ event: IFRAME.CALL, type: IFRAME.CALL, payload: params });
     if (response) {
-      Log.debug(formatLogMethodLabel('response:', blockLog), getSafeLogPayload(response, blockLog));
+      Log.debug('response: ', blockLog ? '[REDACTED]' : response);
 
       if (!response.success) {
         if (response.payload?.code === HardwareErrorCode.BlePermissionError) {

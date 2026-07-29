@@ -27,13 +27,7 @@ const wasResumed = (session: unknown) =>
   'resumed' in session &&
   (session as { resumed?: unknown }).resumed === true;
 
-const forwardSessionId = (session: { newSession?: string }) =>
-  session.newSession ? { sessionId: session.newSession } : {};
-
-const requireHiddenWalletResponse = (session: {
-  passphraseState?: string;
-  newSession?: string;
-}) => {
+const requireHiddenWalletResponse = (session: { passphraseState?: string }) => {
   if (!session.passphraseState) {
     throw ERRORS.TypedError(
       HardwareErrorCode.DeviceInitializeFailed,
@@ -42,16 +36,7 @@ const requireHiddenWalletResponse = (session: {
   }
   return {
     passphraseState: session.passphraseState,
-    ...forwardSessionId(session),
   };
-};
-
-const assertPassphraseEnabledForHiddenWallet = (
-  passphraseProtection: boolean | null | undefined
-) => {
-  if (passphraseProtection === false) {
-    throw ERRORS.TypedError(HardwareErrorCode.DeviceNotOpenedPassphrase);
-  }
 };
 
 const normalizeParams = (payload: Record<string, unknown>): OpenWalletSessionParams => {
@@ -60,46 +45,25 @@ const normalizeParams = (payload: Record<string, unknown>): OpenWalletSessionPar
   }
   if (
     payload.mode !== 'standard' &&
-    payload.mode !== 'hidden' &&
+    payload.mode !== 'select-hidden' &&
     payload.mode !== 'resume-hidden'
   ) {
-    throw invalidParameter('Parameter [mode] must be one of standard, hidden, or resume-hidden.');
+    throw invalidParameter(
+      'Parameter [mode] must be one of standard, select-hidden, or resume-hidden.'
+    );
   }
   if (payload.useEmptyPassphrase !== undefined || payload.initSession !== undefined) {
     throw invalidParameter(
       'Legacy parameters [useEmptyPassphrase] and [initSession] are not supported by openWalletSession.'
     );
   }
-  if (payload.mode === 'standard') {
-    if (payload.access !== undefined) {
-      throw invalidParameter('Parameter [access] is only allowed with mode [hidden].');
-    }
+  if (payload.mode === 'standard' || payload.mode === 'select-hidden') {
     if (payload.deviceId !== undefined || payload.passphraseState !== undefined) {
       throw invalidParameter(
         'Parameters [deviceId] and [passphraseState] are only allowed with mode [resume-hidden].'
       );
     }
-    return { mode: 'standard' };
-  }
-  if (payload.mode === 'hidden') {
-    if (
-      payload.access !== 'prompt' &&
-      payload.access !== 'passphrase' &&
-      payload.access !== 'attach-pin'
-    ) {
-      throw invalidParameter(
-        'Parameter [access] must be one of prompt, passphrase, or attach-pin with mode [hidden].'
-      );
-    }
-    if (payload.deviceId !== undefined || payload.passphraseState !== undefined) {
-      throw invalidParameter(
-        'Parameters [deviceId] and [passphraseState] are only allowed with mode [resume-hidden].'
-      );
-    }
-    return { mode: 'hidden', access: payload.access };
-  }
-  if (payload.access !== undefined) {
-    throw invalidParameter('Parameter [access] is only allowed with mode [hidden].');
+    return { mode: payload.mode };
   }
   return {
     mode: 'resume-hidden',
@@ -161,7 +125,6 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
         walletType: 'standard',
         deviceId,
         passphraseState: null,
-        ...forwardSessionId(session),
         resumed: wasResumed(session),
       };
     }
@@ -201,7 +164,6 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
             expectPassphraseState: this.params.passphraseState,
           });
       const deviceId = requireDeviceId();
-      assertPassphraseEnabledForHiddenWallet(this.device.getCurrentPassphraseProtection());
       if (!session.passphraseState) {
         this.device.clearInternalState();
         throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError);
@@ -217,25 +179,24 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
 
     this.device.passphraseState = undefined;
     const session = isProtocolV2
-      ? await getProtocolV2WalletSession(this.device, {
-          initSession: true,
-          hiddenWalletAccess: this.params.access,
-        })
-      : await getPassphraseStateWithRefreshDeviceInfo(this.device, {
-          initSession: true,
-          hiddenWalletAccess: this.params.access,
-        });
+      ? await getProtocolV2WalletSession(this.device, { initSession: true })
+      : await getPassphraseStateWithRefreshDeviceInfo(this.device, { initSession: true });
     const deviceId = isProtocolV2 ? await refreshProtocolV2DeviceId() : requireDeviceId();
     const responseBase = {
       protocol,
       deviceId,
       resumed: wasResumed(session),
     } as const;
-    assertPassphraseEnabledForHiddenWallet(this.device.getCurrentPassphraseProtection());
-    return {
-      ...responseBase,
-      walletType: 'hidden',
-      ...requireHiddenWalletResponse(session),
-    };
+    return this.device.getCurrentPassphraseProtection() === false
+      ? {
+          ...responseBase,
+          walletType: 'standard',
+          passphraseState: null,
+        }
+      : {
+          ...responseBase,
+          walletType: 'hidden',
+          ...requireHiddenWalletResponse(session),
+        };
   }
 }
