@@ -1,5 +1,6 @@
 import transport, {
   PROTOCOL_V1_MESSAGE_HEADER_SIZE,
+  PROTOCOL_V2_BLE_FRAME_MAX_BYTES,
   PROTOCOL_V2_CHANNEL_BLE_UART,
   ProtocolV2FrameAssembler,
   ProtocolV2LinkManager,
@@ -793,6 +794,7 @@ export default class ElectronBleTransport {
 
     return {
       router: PROTOCOL_V2_CHANNEL_BLE_UART,
+      maxFrameBytes: PROTOCOL_V2_BLE_FRAME_MAX_BYTES,
       generation,
       prepareCall: () => {
         assertCurrentGeneration();
