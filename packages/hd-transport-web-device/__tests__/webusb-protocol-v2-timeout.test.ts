@@ -20,6 +20,30 @@ const schema = {
 };
 
 describe('WebUsbTransport Protocol V2 timeout recovery', () => {
+  test('keeps active links when the Protocol V2 schema is configured repeatedly', () => {
+    const webusb = new WebUsbTransport() as any;
+    webusb.invalidateAllProtocolV2UsbLinks = jest.fn().mockResolvedValue(undefined);
+    const schemaSource = JSON.stringify(schema);
+
+    webusb.configureProtocolV2(schemaSource);
+    webusb.configureProtocolV2(schemaSource);
+
+    expect(webusb.invalidateAllProtocolV2UsbLinks).not.toHaveBeenCalled();
+
+    webusb.configureProtocolV2(
+      JSON.stringify({
+        ...schema,
+        nested: {
+          ...schema.nested,
+          Failure: { fields: { message: { type: 'string', id: 1 } } },
+        },
+      })
+    );
+    expect(webusb.invalidateAllProtocolV2UsbLinks).toHaveBeenCalledWith(
+      'Protocol V2 schema reconfigured'
+    );
+  });
+
   test('resets the connection between a failed V1 probe and the V2 probe', async () => {
     const webusb = new WebUsbTransport() as any;
     const path = 'pro2-webusb';

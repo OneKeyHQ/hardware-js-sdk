@@ -24,6 +24,22 @@ type UiInteractionCoordinator = Pick<
   'enterMethodInteraction' | 'enterUnlockInteraction' | 'resumeMethodInteraction'
 >;
 
+const restoreExpectedWalletSessionAfterUnlock = async (method: RunnableMethod, device: Device) => {
+  const expectedPassphraseState = method.payload?.useEmptyPassphrase
+    ? undefined
+    : method.payload?.passphraseState ?? device.passphraseState;
+  if (
+    !method.useDevicePassphraseState ||
+    typeof expectedPassphraseState !== 'string' ||
+    expectedPassphraseState.length === 0
+  ) {
+    return;
+  }
+
+  await restoreProtocolV2WalletSession(device, expectedPassphraseState);
+  Log.debug('Protocol V2 wallet session restored after unlock', { method: method.name });
+};
+
 export async function runMethodWithUnlockRetry(
   method: RunnableMethod,
   device: Device,
@@ -39,6 +55,7 @@ export async function runMethodWithUnlockRetry(
     }
     await device.unlockDevice();
     Log.debug('Protocol V2 pre-unlock completed', { method: method.name });
+    await restoreExpectedWalletSessionAfterUnlock(method, device);
     if (shouldEmitUi) {
       uiCoordinator?.enterMethodInteraction(resolveProtocolV2UiInteraction(method));
     }
@@ -65,17 +82,7 @@ export async function runMethodWithUnlockRetry(
     }
     await device.unlockDevice();
     Log.debug('Protocol V2 unlock completed', { method: method.name });
-    const expectedPassphraseState = method.payload?.useEmptyPassphrase
-      ? undefined
-      : method.payload?.passphraseState ?? device.passphraseState;
-    if (
-      method.useDevicePassphraseState &&
-      typeof expectedPassphraseState === 'string' &&
-      expectedPassphraseState.length > 0
-    ) {
-      await restoreProtocolV2WalletSession(device, expectedPassphraseState);
-      Log.debug('Protocol V2 wallet session restored after unlock', { method: method.name });
-    }
+    await restoreExpectedWalletSessionAfterUnlock(method, device);
     if (shouldEmitUi) {
       uiCoordinator?.resumeMethodInteraction();
     }
