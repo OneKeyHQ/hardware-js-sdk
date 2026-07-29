@@ -182,6 +182,10 @@ const createHarness = () => {
 };
 
 describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
+  test('keeps the legacy default BLE scan timeout', () => {
+    expect(new ReactNativeBleTransport({}).scanTimeout).toBe(3000);
+  });
+
   afterEach(() => {
     resetProtocolV2BleTuning();
   });

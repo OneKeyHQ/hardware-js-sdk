@@ -107,7 +107,7 @@ const resolveFirmwareUploadRetryDelay = (attempt: number, baseDelayMs = 200, max
   Math.min(baseDelayMs * 2 ** attempt, maxDelayMs);
 const PROTOCOL_PROBE_TIMEOUT_MS = 1000;
 const PROTOCOL_V2_PROBE_TIMEOUT_MS = 10_000;
-const DEVICE_SCAN_TIMEOUT_MS = 8000;
+const DEVICE_SCAN_TIMEOUT_MS = 3000;
 const IOS_NOTIFY_READY_DELAY_MS = 150;
 const ANDROID_NOTIFY_READY_DELAY_MS = 300;
 export type ProtocolV2BleTuning = {
