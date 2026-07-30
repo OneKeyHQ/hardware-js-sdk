@@ -1,4 +1,4 @@
-import { UI_RESPONSE, getLogBlockLabel } from '../src/events';
+import { UI_REQUEST, UI_RESPONSE, getLogBlockLabel } from '../src/events';
 
 describe('getLogBlockLabel', () => {
   it('blocks evmSignTypedData params before logging large typed data', () => {
@@ -34,6 +34,21 @@ describe('getLogBlockLabel', () => {
   it('keeps existing sensitive UI response blocking', () => {
     expect(getLogBlockLabel({ type: UI_RESPONSE.RECEIVE_PIN })).toBe(UI_RESPONSE.RECEIVE_PIN);
   });
+
+  it.each([UI_REQUEST.REQUEST_PASSPHRASE, UI_REQUEST.REQUEST_PASSPHRASE_ON_DEVICE])(
+    'blocks wallet identifiers in %s event logging',
+    type => {
+      expect(
+        getLogBlockLabel({
+          type,
+          payload: {
+            passphraseState: 'wallet-identifier',
+            expectedPassphraseState: 'expected-wallet-identifier',
+          },
+        })
+      ).toBe(type);
+    }
+  );
 
   it('blocks openWalletSession wallet identifiers in direct and iframe call logging', () => {
     const payload = {
