@@ -42,7 +42,7 @@ export const getInfosForServiceUuid = (serviceUuid: string, deviceType: 'classic
     Object.values(services).find(
       item =>
         normalizeBleUuid(item.serviceUuid) === normalizedServiceUuid ||
-        getBleUuidKey(item.serviceUuid) === getBleUuidKey(serviceUuid)
+        matchesKnownBleUuid(serviceUuid, createKnownBleUuidAliases(item.serviceUuid))
     );
   if (!service) {
     return null;
@@ -53,17 +53,8 @@ export const getInfosForServiceUuid = (serviceUuid: string, deviceType: 'classic
 export const normalizeBleUuid = (uuid?: string | null) =>
   (uuid ?? '').replace(/-/g, '').toLowerCase();
 
-export const getBleUuidKey = (uuid?: string | null) => {
-  const normalized = normalizeBleUuid(uuid);
-  return normalized.length >= 8 ? normalized.substring(4, 8) : normalized;
-};
-
 export const isSameBleUuid = (left?: string | null, right?: string | null) => {
-  const normalizedLeft = normalizeBleUuid(left);
-  const normalizedRight = normalizeBleUuid(right);
-
-  return (
-    normalizedLeft === normalizedRight ||
-    (getBleUuidKey(left) !== '' && getBleUuidKey(left) === getBleUuidKey(right))
-  );
+  if (!left || !right) return false;
+  return matchesKnownBleUuid(left, createKnownBleUuidAliases(right));
 };
+import { createKnownBleUuidAliases, matchesKnownBleUuid } from '@onekeyfe/hd-shared';

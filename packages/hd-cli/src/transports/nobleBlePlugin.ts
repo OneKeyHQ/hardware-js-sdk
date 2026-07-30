@@ -1,8 +1,13 @@
 import {
   ERRORS,
   HardwareErrorCode,
+  ONEKEY_NOTIFY_CHARACTERISTIC_UUID,
   ONEKEY_SERVICE_UUID,
+  ONEKEY_WRITE_CHARACTERISTIC_UUID,
+  createKnownBleUuidAliases,
+  hasOnekeyCommunicationService,
   isOnekeyBluetoothDevice,
+  matchesKnownBleUuid,
 } from '@onekeyfe/hd-shared';
 
 import type { LowLevelDevice, LowlevelTransportSharedPlugin } from '@onekeyfe/hd-transport';
@@ -39,12 +44,9 @@ type NobleNotificationState = {
 };
 
 const ONEKEY_SERVICE_UUIDS = [ONEKEY_SERVICE_UUID];
-const NORMALIZED_WRITE_UUID = '0002';
-const NORMALIZED_NOTIFY_UUID = '0003';
-const NORMALIZED_ONEKEY_SERVICE_UUIDS = new Set([
-  ...ONEKEY_SERVICE_UUIDS.map(uuid => getBleUuidKey(uuid)),
-  '0001',
-]);
+const ONEKEY_SERVICE_UUID_ALIASES = createKnownBleUuidAliases(ONEKEY_SERVICE_UUID);
+const ONEKEY_WRITE_UUID_ALIASES = createKnownBleUuidAliases(ONEKEY_WRITE_CHARACTERISTIC_UUID);
+const ONEKEY_NOTIFY_UUID_ALIASES = createKnownBleUuidAliases(ONEKEY_NOTIFY_CHARACTERISTIC_UUID);
 
 const BLUETOOTH_INIT_TIMEOUT = 10_000;
 const DEVICE_SCAN_TIMEOUT = 8_000;
@@ -62,17 +64,16 @@ const deviceCharacteristics = new Map<string, CharacteristicPair>();
 const notificationStates = new Map<string, NobleNotificationState>();
 const notificationGenerations = new Map<string, number>();
 
-function getBleUuidKey(uuid?: string | null) {
-  const normalized = (uuid ?? '').replace(/-/g, '').toLowerCase();
-  return normalized.length >= 8 ? normalized.substring(4, 8) : normalized;
-}
-
 function isOneKeyPeripheral(peripheral: Peripheral) {
-  return isOnekeyBluetoothDevice({
-    id: peripheral.id,
-    localName: peripheral.advertisement?.localName,
-    serviceUuids: peripheral.advertisement?.serviceUuids,
-  });
+  const serviceUuids = peripheral.advertisement?.serviceUuids;
+  return (
+    hasOnekeyCommunicationService(serviceUuids) &&
+    isOnekeyBluetoothDevice({
+      id: peripheral.id,
+      localName: peripheral.advertisement?.localName,
+      serviceUuids,
+    })
+  );
 }
 
 function enqueueNotification(deviceId: string, generation: number, data: Buffer) {
@@ -272,7 +273,7 @@ async function discoverCharacteristics(peripheral: Peripheral): Promise<Characte
     });
   });
 
-  const service = services.find(s => NORMALIZED_ONEKEY_SERVICE_UUIDS.has(getBleUuidKey(s.uuid)));
+  const service = services.find(s => matchesKnownBleUuid(s.uuid, ONEKEY_SERVICE_UUID_ALIASES));
   if (!service) {
     throw ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, 'No BLE service found');
   }
@@ -291,10 +292,9 @@ async function discoverCharacteristics(peripheral: Peripheral): Promise<Characte
   let writeCharacteristic: Characteristic | undefined;
   let notifyCharacteristic: Characteristic | undefined;
   for (const characteristic of characteristics) {
-    const uuidKey = getBleUuidKey(characteristic.uuid);
-    if (uuidKey === NORMALIZED_WRITE_UUID) {
+    if (matchesKnownBleUuid(characteristic.uuid, ONEKEY_WRITE_UUID_ALIASES)) {
       writeCharacteristic = characteristic;
-    } else if (uuidKey === NORMALIZED_NOTIFY_UUID) {
+    } else if (matchesKnownBleUuid(characteristic.uuid, ONEKEY_NOTIFY_UUID_ALIASES)) {
       notifyCharacteristic = characteristic;
     }
   }

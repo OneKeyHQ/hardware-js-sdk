@@ -13,4 +13,8 @@ describe('React Native BLE service filters', () => {
       serviceUuid: '00000001-0000-1000-8000-00805f9b34fb',
     });
   });
+
+  test('does not match a vendor-specific UUID containing the OneKey short key', () => {
+    expect(getInfosForServiceUuid('abcd0001-1234-5678-9012-abcdefabcdef', 'classic')).toBeNull();
+  });
 });
