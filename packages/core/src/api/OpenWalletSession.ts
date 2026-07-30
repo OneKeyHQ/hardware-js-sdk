@@ -128,7 +128,7 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
         protocol,
         walletType: 'standard',
         deviceId,
-        passphraseState: null,
+        passphraseState: session.passphraseState ?? null,
         resumed: wasResumed(session),
       };
     }
@@ -191,7 +191,7 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
       deviceId,
       resumed: wasResumed(session),
     } as const;
-    return this.device.getCurrentPassphraseProtection() === false
+    return !isProtocolV2 && this.device.getCurrentPassphraseProtection() === false
       ? {
           ...responseBase,
           walletType: 'standard',

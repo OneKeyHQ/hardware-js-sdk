@@ -55,7 +55,7 @@ Core 包根保留以下设备信息 selector，供仍持有兼容 `Features` 的
 | `getDeviceBLEFirmwareVersion()`        | 读取 BLE / coprocessor 固件版本                 | 保留原名和大写 `BLE`                                    |
 | `getDeviceBoardloaderVersion()`        | 读取 board / romloader 版本                     | 保留历史拼写，不增加 `getDeviceBoardVersion`            |
 | `KnownDevice.serialNo`                 | 初始化后的稳定物理设备身份                      | 规范字段                                                |
-| `KnownDevice.status`                   | 当前 transport 使用状态                        | `available` / `used` / `occupied`，供连接状态展示       |
+| `KnownDevice.status`                   | 当前 transport 使用状态                         | `available` / `used` / `occupied`，供连接状态展示       |
 | `SearchDevice.serialNo`                | 已初始化设备的序列号；未连接的 BLE 扫描结果为空 | 规范字段                                                |
 | `getDeviceUUID()` / `KnownDevice.uuid` | 初始化后与 `serialNo` 相同                      | 废弃兼容；新业务不再使用                                |
 | `SearchDevice.uuid`                    | 历史混合字段；BLE 扫描时可能是 Transport UUID   | 废弃兼容；路由使用 `connectId`，硬件身份使用 `serialNo` |
@@ -78,7 +78,7 @@ selector。
 - 每次公共 `getDeviceState()` 读取都会在 normal 模式刷新 `DeviceStatus`，调用方不需要管理缓存刷新参数。
 - bootloader / romloader 模式不会发送 `DeviceStatusGet`。
 - 公共 `DeviceState` 与 `DEVICE.STATE` 不包含协议 raw 数据或钱包 `session_id`；两者只在 Core 内部用于 V1 兼容和会话恢复。
-- V2 PIN 解锁使用 `DeviceSessionAskPin -> Success`，随后刷新 `DeviceStatus`，以获得设备确认的解锁与 Passphrase/Attach PIN 状态。
+- V2 PIN 解锁使用 `DeviceSessionAskPin -> DeviceSession`，随后刷新 `DeviceStatus`，以获得设备确认的解锁与 Passphrase/Attach PIN 状态。
 - 受保护方法是否允许单次解锁后重试，由方法显式声明；Transport 不重放业务请求。
 
 ## 统一设置与 DeviceState 更新
@@ -246,15 +246,15 @@ App 不应按型号或 PID 自行选择协议，也不应直接发送
 `DeviceSessionAskPin/DeviceSessionAskPassphrase/DeviceSessionGet`。Core 会在完成设备响应探测后
 自动分流：
 
-| App 意图          | Pro V1 固件流程                         | Pro2 Protocol V2 固件流程                                  |
-| ----------------- | --------------------------------------- | ---------------------------------------------------------- |
-| 标准钱包          | 空 Passphrase 兼容流程                  | 必要时 `DeviceSessionAskPin(Main)`                         |
-| Passphrase 隐藏钱包 | `GetPassphraseState -> PassphraseState` | `DeviceSessionAskPassphrase({ passphrase? }) -> DeviceSessionGet({})` |
-| Attach-to-PIN     | `GetPassphraseState -> PassphraseState` | `DeviceSessionAskPin(AttachToPin) -> DeviceSessionGet({})` |
-| 恢复已选隐藏钱包  | Core 管理 V1 Session 复用               | `DeviceSessionGet({ session_id })`                         |
+| App 意图            | Pro V1 固件流程                         | Pro2 Protocol V2 固件流程                                                 |
+| ------------------- | --------------------------------------- | ------------------------------------------------------------------------- |
+| 标准钱包            | 空 Passphrase 兼容流程                  | 必要时 `DeviceSessionAskPin(Main)`                                        |
+| Passphrase 隐藏钱包 | `GetPassphraseState -> PassphraseState` | `DeviceSessionAskPassphrase({ on_device, passphrase? }) -> DeviceSession` |
+| Attach-to-PIN       | `GetPassphraseState -> PassphraseState` | `DeviceSessionAskPin(AttachToPin) -> DeviceSession`                       |
+| 恢复已选隐藏钱包    | Core 管理 V1 Session 复用               | `DeviceSessionGet({ session_id })`                                        |
 
 Pro2 Protocol V2 支持软件输入：Core 将非空值放入
-`DeviceSessionAskPassphrase.passphrase`；选择设备输入时发送空请求。Pro2 尚未发布，SDK 不兼容
+`DeviceSessionAskPassphrase.passphrase`；选择设备输入时显式发送 `on_device: true`。Pro2 尚未发布，SDK 不兼容
 缺少该字段的开发阶段旧固件。
 
 对 App 的最小回归检查是：
