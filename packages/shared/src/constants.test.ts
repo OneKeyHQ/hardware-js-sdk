@@ -27,8 +27,25 @@ describe('hardware device identity filters', () => {
     ).toBe(false);
   });
 
-  it('ignores FFFD even when the advertised name resembles OneKey', () => {
-    expect(isOnekeyBluetoothDevice({ name: 'OneKey Pro 2', serviceUuids: ['fffd'] })).toBe(false);
+  it('keeps Pro2 communication advertisements and rejects its Find My advertisement', () => {
+    expect(
+      isOnekeyBluetoothDevice({
+        name: 'Pro2 A1B2',
+        serviceUuids: ['0001', 'fffd'],
+      })
+    ).toBe(true);
+    expect(
+      isOnekeyBluetoothDevice({
+        localName: 'Pro2 A1B2 - Find My',
+        serviceUuids: ['fffd'],
+      })
+    ).toBe(false);
+    expect(
+      isOnekeyBluetoothDevice({
+        name: 'Pro2 5E9D - Finde My',
+        serviceUuids: ['0001', 'fffd'],
+      })
+    ).toBe(false);
   });
 
   it('keeps OneKey discovery on the communication service', () => {

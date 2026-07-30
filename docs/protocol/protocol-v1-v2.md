@@ -59,7 +59,7 @@ V2 probe 使用 `Ping { message: 'protocol-v2-probe' }`。探测消息只用于�
 
 主要实现：
 
-- `packages/hd-transport/src/protocols/v2/probe.ts`
+- `packages/hd-transport/src/protocols/v2/session.ts`
 - 各 Transport 的 `detectProtocol()` / `acquire()`
 - `packages/core/src/device/Device.ts`
 
@@ -102,7 +102,8 @@ V2 帧用于承载 protobuf payload。维护时重点关注以下字段：
 
 主要实现：
 
-- `packages/hd-transport/src/protocols/v2/codec.ts`
+- `packages/hd-transport/src/protocols/v2/encode.ts`
+- `packages/hd-transport/src/protocols/v2/decode.ts`
 - `packages/hd-transport/src/protocols/v2/frame-assembler.ts`
 - `packages/hd-transport/src/protocols/v2/session.ts`
 

@@ -350,6 +350,11 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
       return path;
     } catch (error: any) {
       this.Log?.debug('NodeUsbTransport acquire error: ', error);
+      try {
+        await this.release(path);
+      } catch (cleanupError) {
+        this.Log?.debug('NodeUsbTransport acquire cleanup error: ', cleanupError);
+      }
       throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound, error.message ?? String(error));
     }
   }
