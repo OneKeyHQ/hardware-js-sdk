@@ -1,5 +1,5 @@
 import transport, { PROTOCOL_V2_CHANNEL_BLE_UART, bytesToHex } from '@onekeyfe/hd-transport';
-import { HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
 import EventEmitter from 'events';
 
 import ElectronBleTransport from '../src/electron-ble-transport';
@@ -270,6 +270,85 @@ describe('ElectronBleTransport protocol detection', () => {
     } finally {
       await transport.release(device.id);
     }
+  });
+
+  test('invalidates and disconnects a Protocol V1 link after a response timeout', async () => {
+    const device = { id: 'classic-timeout-id', name: 'OneKey Classic' };
+    const nobleBle = createNobleBle(device);
+    let notificationHandler: ((deviceId: string, data: string) => void) | undefined;
+    const v1ResponseHex = '3f23230002000000040a026f6b';
+    let writeCount = 0;
+
+    nobleBle.onNotification.mockImplementation(handler => {
+      notificationHandler = handler;
+      return jest.fn();
+    });
+    nobleBle.write.mockImplementation(() => {
+      writeCount += 1;
+      if (writeCount === 1) {
+        setTimeout(() => notificationHandler?.(device.id, v1ResponseHex), 0);
+      }
+      return Promise.resolve();
+    });
+    const bleTransport = configureTransport(nobleBle);
+
+    await bleTransport.acquire({ uuid: device.id, expectedProtocol: 'V1' });
+    await expect(
+      bleTransport.call(device.id, 'Initialize', {}, { timeoutMs: 5 })
+    ).rejects.toMatchObject({ errorCode: HardwareErrorCode.BleTimeoutError });
+
+    expect(nobleBle.unsubscribe).toHaveBeenCalledWith(device.id);
+    expect(nobleBle.disconnect).toHaveBeenCalledWith(device.id);
+    expect(bleTransport.getProtocolType(device.id)).toBeUndefined();
+  });
+
+  test('keeps another device V2 reader when force-cleaning a V1 call', async () => {
+    const device = { id: 'classic-force-clean-id', name: 'OneKey Classic' };
+    const nobleBle = createNobleBle(device);
+    let notificationHandler: ((deviceId: string, data: string) => void) | undefined;
+    const v1ResponseHex = '3f23230002000000040a026f6b';
+    nobleBle.onNotification.mockImplementation(handler => {
+      notificationHandler = handler;
+      return jest.fn();
+    });
+    nobleBle.write.mockImplementation(() => {
+      setTimeout(() => notificationHandler?.(device.id, v1ResponseHex), 0);
+      return Promise.resolve();
+    });
+    const bleTransport = configureTransport(nobleBle) as any;
+    const activeV1Call = createDeferred<string>();
+    const otherDeviceReader = createDeferred<Uint8Array>();
+    activeV1Call.promise.catch(() => undefined);
+    otherDeviceReader.promise.catch(() => undefined);
+    bleTransport.runPromise = activeV1Call;
+    bleTransport.v2FramePromises.set('device-b', otherDeviceReader);
+
+    await bleTransport.acquire({
+      uuid: device.id,
+      expectedProtocol: 'V1',
+      forceCleanRunPromise: true,
+    });
+
+    expect(bleTransport.v2FramePromises.get('device-b')).toBe(otherDeviceReader);
+    await bleTransport.release(device.id);
+  });
+
+  test('rejects a pending V2 reader when its device frame state resets', async () => {
+    const nobleBle = createNobleBle();
+    const bleTransport = configureTransport(nobleBle) as any;
+    const reader = createDeferred<Uint8Array>();
+    bleTransport.v2FramePromises.set('device-a', reader);
+    const result = Promise.race([
+      reader.promise.then(
+        () => 'resolved',
+        () => 'rejected'
+      ),
+      new Promise(resolve => setTimeout(() => resolve('pending'), 20)),
+    ]);
+
+    bleTransport.resetProtocolV2Frames('device-a');
+
+    await expect(result).resolves.toBe('rejected');
   });
 
   test('throws when both protocol probes fail', async () => {

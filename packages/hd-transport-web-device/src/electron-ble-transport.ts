@@ -92,6 +92,8 @@ export default class ElectronBleTransport {
 
   runPromise: Deferred<Uint8Array | string> | null = null;
 
+  private runPromiseDeviceId: string | null = null;
+
   Log?: any;
 
   emitter?: EventEmitter;
@@ -182,6 +184,11 @@ export default class ElectronBleTransport {
     this.v2Assemblers.delete(deviceId);
     this.resetProtocolV2Frames(deviceId);
     this.notificationTokens.delete(deviceId);
+    if (this.runPromise && this.runPromiseDeviceId === deviceId) {
+      this.runPromise.reject(ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected));
+      this.runPromise = null;
+      this.runPromiseDeviceId = null;
+    }
 
     const notifyCleanup = this.notificationCleanups.get(deviceId);
     if (notifyCleanup) {
@@ -270,8 +277,8 @@ export default class ElectronBleTransport {
     if (forceCleanRunPromise && this.runPromise) {
       const error = ERRORS.TypedError(HardwareErrorCode.BleForceCleanRunPromise);
       this.runPromise.reject(error);
-      this.rejectAllProtocolV2Frames(error);
       this.runPromise = null;
+      this.runPromiseDeviceId = null;
     }
 
     try {
@@ -307,6 +314,8 @@ export default class ElectronBleTransport {
       const cleanup = this.createNotificationSubscription(uuid);
       this.notificationCleanups.set(uuid, cleanup);
 
+      const protocolType = await this.detectProtocol(uuid, expectedProtocol, protocolHint);
+
       const disconnectCleanup = window.desktopApi.nobleBle.onDeviceDisconnected(
         (disconnectedDevice: any) => {
           if (disconnectedDevice.id === uuid) {
@@ -320,8 +329,6 @@ export default class ElectronBleTransport {
         }
       );
       this.disconnectCleanups.set(uuid, disconnectCleanup);
-
-      const protocolType = await this.detectProtocol(uuid, expectedProtocol, protocolHint);
 
       return {
         ...toBleDescriptor({ id: device.id, name: device.name }, protocolType),
@@ -458,10 +465,11 @@ export default class ElectronBleTransport {
     this.v1Buffers.set(uuid, { buffer: [], bufferLength: 0 });
     this.v2Assemblers.get(uuid)?.reset();
     this.resetProtocolV2Frames(uuid);
-    if (this.runPromise) {
+    if (this.runPromise && this.runPromiseDeviceId === uuid) {
       const error = ERRORS.TypedError(HardwareErrorCode.BleForceCleanRunPromise);
       this.runPromise.reject(error);
       this.runPromise = null;
+      this.runPromiseDeviceId = null;
     }
 
     const notifyCleanup = this.notificationCleanups.get(uuid);
@@ -477,9 +485,17 @@ export default class ElectronBleTransport {
       this.Log?.debug(`[Electron BLE] unsubscribe after Protocol ${protocol} probe failed:`, error);
     }
     try {
+      await window.desktopApi?.nobleBle?.disconnect(uuid);
+    } catch (error) {
+      this.Log?.debug(`[Electron BLE] disconnect after Protocol ${protocol} probe failed:`, error);
+    }
+    this.connectedDevices.delete(uuid);
+    try {
+      await window.desktopApi?.nobleBle?.connect(uuid);
+      this.connectedDevices.add(uuid);
       await window.desktopApi?.nobleBle?.subscribe(uuid);
     } catch (error) {
-      this.Log?.debug(`[Electron BLE] resubscribe after Protocol ${protocol} probe failed:`, error);
+      this.Log?.debug(`[Electron BLE] reconnect after Protocol ${protocol} probe failed:`, error);
       throw error;
     }
 
@@ -560,7 +576,7 @@ export default class ElectronBleTransport {
       const error = ERRORS.TypedError(HardwareErrorCode.BleDeviceBondedCanceled);
       if (this.deviceProtocol.get(deviceId) === 'V2') {
         this.rejectProtocolV2Frames(deviceId, error);
-      } else if (this.runPromise) {
+      } else if (this.runPromise && this.runPromiseDeviceId === deviceId) {
         this.runPromise.reject(error);
       }
       return;
@@ -615,17 +631,8 @@ export default class ElectronBleTransport {
     this.getProtocolV2FrameQueue(uuid).push(frame);
   }
 
-  private rejectAllProtocolV2Frames(error: Error) {
-    this.v2FrameQueues.clear();
-    for (const framePromise of this.v2FramePromises.values()) {
-      framePromise.reject(error);
-    }
-    this.v2FramePromises.clear();
-  }
-
   private resetProtocolV2Frames(uuid: string) {
-    this.v2FrameQueues.delete(uuid);
-    this.v2FramePromises.delete(uuid);
+    this.rejectProtocolV2Frames(uuid, new Error(`Protocol V2 frame state reset for ${uuid}`));
   }
 
   private rejectProtocolV2Frames(uuid: string, error: Error) {
@@ -659,13 +666,18 @@ export default class ElectronBleTransport {
 
     if (result.error) {
       this.Log?.error('[Electron BLE] Protocol V1 packet processing error:', result.error);
-      if (this.runPromise) {
+      if (this.runPromise && this.runPromiseDeviceId === deviceId) {
         this.runPromise.reject(ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError));
       }
       return;
     }
 
-    if (result.isComplete && result.completePacket && this.runPromise) {
+    if (
+      result.isComplete &&
+      result.completePacket &&
+      this.runPromise &&
+      this.runPromiseDeviceId === deviceId
+    ) {
       this.runPromise.resolve(result.completePacket);
     }
   }
@@ -719,6 +731,7 @@ export default class ElectronBleTransport {
     const runPromise = createDeferred<Uint8Array | string>();
     runPromise.promise.catch(() => undefined);
     this.runPromise = runPromise;
+    this.runPromiseDeviceId = uuid;
     const messages = this._messages;
     const buffers = ProtocolV1.encodeTransportPackets(messages, name, data);
     let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -763,11 +776,24 @@ export default class ElectronBleTransport {
       return check.call(jsonData);
     } catch (e) {
       this.Log?.error('[Electron BLE] Protocol V1 call error:', e);
+      const isProbeTimeout =
+        name === 'Initialize' && options?.timeoutMs === PROTOCOL_PROBE_TIMEOUT_MS;
+      if ((e as { errorCode?: unknown })?.errorCode === HardwareErrorCode.BleTimeoutError) {
+        this.v1Buffers.set(uuid, { buffer: [], bufferLength: 0 });
+        const notifyCleanup = this.notificationCleanups.get(uuid);
+        notifyCleanup?.();
+        this.notificationCleanups.delete(uuid);
+        this.notificationTokens.delete(uuid);
+        if (!isProbeTimeout) {
+          await this.releaseNative(uuid);
+        }
+      }
       throw e;
     } finally {
       if (timeout) clearTimeout(timeout);
       if (this.runPromise === runPromise) {
         this.runPromise = null;
+        this.runPromiseDeviceId = null;
       }
     }
   }

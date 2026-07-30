@@ -5,10 +5,11 @@ import transportPackage, {
   TRANSPORT_EVENT,
   bytesToHex,
 } from '@onekeyfe/hd-transport';
-import { HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
 
 import ReactNativeBleTransport, {
   configureProtocolV2BleTuning,
+  getFirmwareUploadWriteRetryType,
   resetProtocolV2BleTuning,
 } from '../index';
 
@@ -181,9 +182,116 @@ const createHarness = () => {
   };
 };
 
+const createV1Harness = () => {
+  const uuid = 'rn-classic-id';
+  let notifyCallback:
+    | ((error: Error | null, characteristic: { value: string } | null) => void)
+    | undefined;
+  const notifyCharacteristic = {
+    uuid: '0003',
+    deviceID: uuid,
+    isNotifiable: true,
+    monitor: jest.fn(callback => {
+      notifyCallback = callback;
+      return { remove: jest.fn() };
+    }),
+  };
+  let writeCount = 0;
+  const writeCharacteristic = {
+    uuid: '0002',
+    deviceID: uuid,
+    isWritableWithResponse: true,
+    isWritableWithoutResponse: true,
+    writeWithoutResponse: jest.fn(() => {
+      writeCount += 1;
+      if (writeCount === 1) {
+        notifyCallback?.(null, {
+          value: Buffer.from('3f23230002000000040a026f6b', 'hex').toString('base64'),
+        });
+      }
+      return Promise.resolve();
+    }),
+  };
+  const device = {
+    id: uuid,
+    name: 'OneKey Classic',
+    localName: 'OneKey Classic',
+    serviceUUIDs: ['00000001-0000-1000-8000-00805f9b34fb'],
+    isConnected: jest.fn(() => Promise.resolve(true)),
+    cancelConnection: jest.fn(() => Promise.resolve()),
+    onDisconnected: jest.fn(() => ({ remove: jest.fn() })),
+  };
+  const transport = new ReactNativeBleTransport({ scanTimeout: 1 });
+  transport.blePlxManager = {
+    devices: jest.fn(() => Promise.resolve([device])),
+    connectedDevices: jest.fn(() => Promise.resolve([])),
+    cancelTransaction: jest.fn(() => Promise.resolve()),
+  } as any;
+  transport.resolveCharacteristics = jest.fn(() =>
+    Promise.resolve({ writeCharacteristic, notifyCharacteristic })
+  );
+  transport.init({ debug: jest.fn(), error: jest.fn() }, new EventEmitter());
+  transport.configure(protocolV1Schema);
+  transport.configureProtocolV2(protocolV2Schema);
+  return { transport, uuid, device };
+};
+
 describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
+  test('does not classify disconnects as retryable firmware writes', () => {
+    expect(
+      getFirmwareUploadWriteRetryType({
+        errorCode: 205,
+        message: 'Device disconnected after write',
+      })
+    ).toBeNull();
+  });
+
+  test('keeps another device reader when releasing a device with an active V1 call', async () => {
+    const transport = new ReactNativeBleTransport({ scanTimeout: 1 }) as any;
+    const activeV1Call = createDeferred<string>();
+    const otherDeviceReader = createDeferred<Uint8Array>();
+    activeV1Call.promise.catch(() => undefined);
+    otherDeviceReader.promise.catch(() => undefined);
+    transport.runPromise = activeV1Call;
+    transport.runPromiseDeviceId = 'device-a';
+    transport.protocolV2FramePromises.set('device-b', otherDeviceReader);
+
+    await transport.releaseNative('device-a', true);
+
+    expect(transport.protocolV2FramePromises.get('device-b')).toBe(otherDeviceReader);
+  });
+
+  test('rejects a pending reader when its device frame state resets', async () => {
+    const transport = new ReactNativeBleTransport({ scanTimeout: 1 }) as any;
+    const reader = createDeferred<Uint8Array>();
+    transport.protocolV2FramePromises.set('device-a', reader);
+    const result = Promise.race([
+      reader.promise.then(
+        () => 'resolved',
+        () => 'rejected'
+      ),
+      new Promise(resolve => setTimeout(() => resolve('pending'), 20)),
+    ]);
+
+    transport.resetProtocolV2Frames('device-a');
+
+    await expect(result).resolves.toBe('rejected');
+  });
+
   test('keeps the legacy default BLE scan timeout', () => {
     expect(new ReactNativeBleTransport({}).scanTimeout).toBe(3000);
+  });
+
+  test('disconnects and invalidates a Protocol V1 link after a response timeout', async () => {
+    const { transport, uuid, device } = createV1Harness();
+
+    await transport.acquire({ uuid, expectedProtocol: 'V1' });
+    await expect(transport.call(uuid, 'Initialize', {}, { timeoutMs: 5 })).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleTimeoutError,
+    });
+
+    expect(device.cancelConnection).toHaveBeenCalled();
+    expect(transport.getProtocolType(uuid)).toBeUndefined();
   });
 
   afterEach(() => {

@@ -162,10 +162,41 @@ type BluetoothDeviceIdentity = {
   serviceUuids?: Array<string | null | undefined> | null;
 };
 
-const getBluetoothServiceUuidKey = (uuid?: string | null) => {
-  const normalized = (uuid ?? '').replace(/-/g, '').toLowerCase();
-  return normalized.length >= 8 ? normalized.substring(4, 8) : normalized;
+const BLUETOOTH_BASE_UUID_SUFFIX = '00001000800000805f9b34fb';
+
+export const normalizeBleUuid = (uuid?: string | null) =>
+  (uuid ?? '').replace(/-/g, '').toLowerCase();
+
+export const createKnownBleUuidAliases = (uuid: string): ReadonlySet<string> => {
+  const normalized = normalizeBleUuid(uuid);
+  const aliases = new Set([normalized]);
+
+  if (normalized.length !== 32 || !normalized.endsWith(BLUETOOTH_BASE_UUID_SUFFIX)) {
+    return aliases;
+  }
+
+  const assignedNumber = normalized.slice(0, 8);
+  aliases.add(assignedNumber);
+  if (assignedNumber.startsWith('0000')) {
+    aliases.add(assignedNumber.slice(4));
+  }
+  return aliases;
 };
+
+export const matchesKnownBleUuid = (
+  actualUuid: string | null | undefined,
+  aliases: ReadonlySet<string>
+) => aliases.has(normalizeBleUuid(actualUuid));
+
+const ONEKEY_COMMUNICATION_SERVICE_ALIASES = createKnownBleUuidAliases(ONEKEY_SERVICE_UUID);
+const FIDO_SERVICE_ALIASES = createKnownBleUuidAliases('0000fffd-0000-1000-8000-00805f9b34fb');
+
+export const hasOnekeyCommunicationService = (
+  serviceUuids: Array<string | null | undefined> | null | undefined
+) =>
+  (serviceUuids ?? []).some(uuid =>
+    matchesKnownBleUuid(uuid, ONEKEY_COMMUNICATION_SERVICE_ALIASES)
+  );
 
 export const isOnekeyBluetoothDevice = ({
   id,
@@ -174,7 +205,7 @@ export const isOnekeyBluetoothDevice = ({
   serviceUuids,
 }: BluetoothDeviceIdentity): boolean => {
   const advertisedServiceUuids = serviceUuids ?? [];
-  if (advertisedServiceUuids.some(uuid => getBluetoothServiceUuidKey(uuid) === 'fffd')) {
+  if (advertisedServiceUuids.some(uuid => matchesKnownBleUuid(uuid, FIDO_SERVICE_ALIASES))) {
     return false;
   }
 
@@ -182,5 +213,5 @@ export const isOnekeyBluetoothDevice = ({
     return true;
   }
 
-  return advertisedServiceUuids.some(uuid => getBluetoothServiceUuidKey(uuid) === '0001');
+  return hasOnekeyCommunicationService(advertisedServiceUuids);
 };

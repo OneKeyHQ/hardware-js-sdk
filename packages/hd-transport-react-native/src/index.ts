@@ -60,13 +60,12 @@ const FIRMWARE_UPLOAD_WRITE_BURST_SIZE = Platform.OS === 'ios' ? 4 : 5;
 const FIRMWARE_UPLOAD_WRITE_PAUSE_MS = Platform.OS === 'ios' ? 8 : 10;
 const FIRMWARE_UPLOAD_WRITE_FLUSH_DELAY_MS = Platform.OS === 'ios' ? 24 : 30;
 const FIRMWARE_UPLOAD_WRITE_MAX_RETRIES = 8;
-const FIRMWARE_UPLOAD_RECONNECT_RETRY_DELAY_MS = 2000;
 const ANDROID_FIRMWARE_UPLOAD_PACKET_LENGTH = 192;
 const FIRMWARE_UPLOAD_WRITE_PACKET_CAPACITY =
   Platform.OS === 'ios' ? IOS_PACKET_LENGTH : ANDROID_FIRMWARE_UPLOAD_PACKET_LENGTH;
 const ANDROID_GATT_CONGESTED_STATUS = 143;
 
-type FirmwareUploadWriteRetryType = 'congested' | 'reconnectable';
+type FirmwareUploadWriteRetryType = 'congested';
 type ResolvedBleCharacteristics = {
   writeCharacteristic: Characteristic;
   notifyCharacteristic: Characteristic;
@@ -77,7 +76,9 @@ const delay = (ms: number) =>
     setTimeout(resolve, ms);
   });
 
-const getFirmwareUploadWriteRetryType = (error: unknown): FirmwareUploadWriteRetryType | null => {
+export const getFirmwareUploadWriteRetryType = (
+  error: unknown
+): FirmwareUploadWriteRetryType | null => {
   if (!error || typeof error !== 'object') return null;
   const bleWriteError = error as {
     androidErrorCode?: unknown;
@@ -87,13 +88,6 @@ const getFirmwareUploadWriteRetryType = (error: unknown): FirmwareUploadWriteRet
     message?: unknown;
     name?: unknown;
   };
-
-  if (
-    bleWriteError.errorCode === BleErrorCode.DeviceDisconnected ||
-    bleWriteError.errorCode === BleErrorCode.CharacteristicNotFound
-  ) {
-    return 'reconnectable';
-  }
 
   if (
     bleWriteError.androidErrorCode === ANDROID_GATT_CONGESTED_STATUS ||
@@ -252,6 +246,8 @@ export default class ReactNativeBleTransport {
   scanTimeout = DEVICE_SCAN_TIMEOUT_MS;
 
   runPromise: Deferred<any> | null = null;
+
+  private runPromiseDeviceId: string | null = null;
 
   emitter?: EventEmitter;
 
@@ -439,10 +435,9 @@ export default class ReactNativeBleTransport {
       try {
         Log?.debug('device disconnect: ', device?.id);
         this.emitDeviceDisconnect(uuid, device?.name, monitorToken);
-        if (this.runPromise) {
+        if (this.runPromise && this.runPromiseDeviceId === uuid) {
           const error = ERRORS.TypedError(HardwareErrorCode.BleConnectedError);
           this.runPromise.reject(error);
-          this.rejectAllProtocolV2Frames(error);
         }
       } catch (e) {
         Log?.debug('device disconnect error: ', e);
@@ -687,8 +682,8 @@ export default class ReactNativeBleTransport {
     if (forceCleanRunPromise && this.runPromise) {
       const error = ERRORS.TypedError(HardwareErrorCode.BleForceCleanRunPromise);
       this.runPromise.reject(error);
-      this.rejectAllProtocolV2Frames(error);
       this.runPromise = null;
+      this.runPromiseDeviceId = null;
       Log?.debug('Force clean Bluetooth run promise, forceCleanRunPromise: ', forceCleanRunPromise);
     }
 
@@ -876,7 +871,7 @@ export default class ReactNativeBleTransport {
           this.rejectProtocolV2Frames(uuid, ERRORS.TypedError(errorCode));
           return;
         }
-        if (this.runPromise) {
+        if (this.runPromise && this.runPromiseDeviceId === uuid) {
           let ERROR:
             | typeof HardwareErrorCode.BleDeviceBondError
             | typeof HardwareErrorCode.BleCharacteristicNotifyError
@@ -899,7 +894,6 @@ export default class ReactNativeBleTransport {
               HardwareErrorCode.BleCharacteristicNotifyChangeFailure
             );
             this.runPromise.reject(notifyError);
-            this.rejectAllProtocolV2Frames(notifyError);
             Log?.debug(
               `${HardwareErrorCode.BleCharacteristicNotifyChangeFailure} ${error.message}    ${error.reason}`
             );
@@ -907,7 +901,6 @@ export default class ReactNativeBleTransport {
           }
           const notifyError = ERRORS.TypedError(ERROR);
           this.runPromise.reject(notifyError);
-          this.rejectAllProtocolV2Frames(notifyError);
           Log?.debug(': monitor notify error, and has unreleased Promise', Error);
         }
 
@@ -952,7 +945,9 @@ export default class ReactNativeBleTransport {
           // );
           bufferLength = 0;
           buffer = [];
-          this.runPromise?.resolve(value.toString('hex'));
+          if (this.runPromiseDeviceId === uuid) {
+            this.runPromise?.resolve(value.toString('hex'));
+          }
         }
       } catch (error) {
         Log?.debug('monitor data error: ', error);
@@ -960,7 +955,9 @@ export default class ReactNativeBleTransport {
         if (this.deviceProtocol.get(uuid) === 'V2') {
           this.rejectProtocolV2Frames(uuid, notifyError);
         } else {
-          this.runPromise?.reject(notifyError);
+          if (this.runPromiseDeviceId === uuid) {
+            this.runPromise?.reject(notifyError);
+          }
         }
       }
     }, notifyTransactionId);
@@ -975,11 +972,12 @@ export default class ReactNativeBleTransport {
 
   private async releaseNative(uuid: string, onclose = false) {
     const transport = transportCache[uuid];
-    if (this.runPromise) {
+    if (this.runPromise && this.runPromiseDeviceId === uuid) {
       const error = ERRORS.TypedError(HardwareErrorCode.BleForceCleanRunPromise);
       this.runPromise.reject(error);
       this.runPromise = null;
-      this.rejectAllProtocolV2Frames(error);
+      this.runPromiseDeviceId = null;
+      this.rejectProtocolV2Frames(uuid, error);
     } else {
       this.resetProtocolV2Frames(uuid);
     }
@@ -1087,6 +1085,7 @@ export default class ReactNativeBleTransport {
     const runPromise = createDeferred<string>();
     runPromise.promise.catch(() => undefined);
     this.runPromise = runPromise;
+    this.runPromiseDeviceId = uuid;
     const messages = this._messages;
     const buffers = ProtocolV1.encodeTransportPackets(messages, name, data);
     let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -1186,31 +1185,14 @@ export default class ReactNativeBleTransport {
               if (!retryType || attempt >= FIRMWARE_UPLOAD_WRITE_MAX_RETRIES) {
                 throw error;
               }
-              const shouldReconnect = retryType === 'reconnectable';
-              const delayMs = shouldReconnect
-                ? FIRMWARE_UPLOAD_RECONNECT_RETRY_DELAY_MS
-                : resolveFirmwareUploadRetryDelay(attempt);
+              const delayMs = resolveFirmwareUploadRetryDelay(attempt);
               Log?.debug('[ReactNativeBleTransport] FirmwareUpload write retry:', {
                 attempt: attempt + 1,
                 delayMs,
-                reconnect: shouldReconnect,
                 error,
               });
-              if (shouldReconnect) {
-                this.firmwareUploadWriteRecoveryIds.add(uuid);
-              }
               await delay(delayMs);
               attempt += 1;
-              if (shouldReconnect) {
-                try {
-                  await this.reconnectFirmwareUploadTransport(uuid, transport);
-                } catch (e) {
-                  Log?.debug('[ReactNativeBleTransport] FirmwareUpload reconnect error:', e);
-                  if (attempt >= FIRMWARE_UPLOAD_WRITE_MAX_RETRIES) {
-                    throw e;
-                  }
-                }
-              }
             }
           }
         },
@@ -1268,11 +1250,20 @@ export default class ReactNativeBleTransport {
       } else {
         Log?.error('call error: ', e);
       }
+      const isProbeTimeout =
+        name === 'Initialize' && options?.timeoutMs === PROTOCOL_PROBE_TIMEOUT_MS;
+      if (
+        !isProbeTimeout &&
+        (e as { errorCode?: unknown })?.errorCode === HardwareErrorCode.BleTimeoutError
+      ) {
+        await this.disconnect(uuid);
+      }
       throw e;
     } finally {
       if (timeout) clearTimeout(timeout);
       if (this.runPromise === runPromise) {
         this.runPromise = null;
+        this.runPromiseDeviceId = null;
       }
     }
   }
@@ -1365,6 +1356,7 @@ export default class ReactNativeBleTransport {
       // this.runPromise.reject(new Error('Transport_CallCanceled'));
     }
     this.runPromise = null;
+    this.runPromiseDeviceId = null;
   }
 
   private getCachedTransport(uuid: string) {
@@ -1592,17 +1584,8 @@ export default class ReactNativeBleTransport {
     this.getProtocolV2FrameQueue(uuid).push(frame);
   }
 
-  private rejectAllProtocolV2Frames(error: Error) {
-    this.protocolV2FrameQueues.clear();
-    for (const framePromise of this.protocolV2FramePromises.values()) {
-      framePromise.reject(error);
-    }
-    this.protocolV2FramePromises.clear();
-  }
-
   private resetProtocolV2Frames(uuid: string) {
-    this.protocolV2FrameQueues.delete(uuid);
-    this.protocolV2FramePromises.delete(uuid);
+    this.rejectProtocolV2Frames(uuid, new Error(`Protocol V2 frame state reset for ${uuid}`));
   }
 
   private rejectProtocolV2Frames(uuid: string, error: Error) {

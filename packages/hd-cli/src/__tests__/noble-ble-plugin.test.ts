@@ -39,6 +39,7 @@ const createPeripheral = (id: string) => {
       connect: jest.fn(callback => callback()),
       disconnect: jest.fn(callback => callback()),
     },
+    service,
     write,
     notify,
   };
@@ -82,6 +83,35 @@ describe('Noble BLE plugin notification routing', () => {
     await expect(devicesPromise).resolves.toEqual([
       expect.objectContaining({ id: 'onekey-device' }),
     ]);
+    jest.useRealTimers();
+  });
+
+  test('does not enumerate a name-only candidate without the communication service', async () => {
+    jest.useFakeTimers({ doNotFake: ['performance'] });
+    const nameOnly = createPeripheral('name-only-device');
+    nameOnly.peripheral.advertisement.serviceUuids = [];
+    const noble = new EventEmitter() as EventEmitter & {
+      state: string;
+      startScanning: jest.Mock;
+      stopScanning: jest.Mock;
+    };
+    noble.state = 'poweredOn';
+    noble.startScanning = jest.fn((_services, _duplicates, callback) => {
+      callback?.();
+      noble.emit('discover', nameOnly.peripheral);
+    });
+    noble.stopScanning = jest.fn(callback => callback?.());
+    jest.doMock('@stoprocent/noble', () => noble);
+
+    const { createNobleBlePlugin } = await import('../transports/nobleBlePlugin');
+    const plugin = createNobleBlePlugin();
+    await plugin.init();
+    const devicesPromise = plugin.enumerate();
+    await Promise.resolve();
+    jest.runAllTimers();
+    await Promise.resolve();
+
+    await expect(devicesPromise).resolves.toEqual([]);
     jest.useRealTimers();
   });
 
@@ -171,6 +201,29 @@ describe('Noble BLE plugin notification routing', () => {
 
     await expect(plugin.connect('device-a')).rejects.toThrow('service discovery failed');
     expect(device.peripheral.disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  test('rejects a vendor-specific service containing the OneKey short UUID', async () => {
+    const device = createPeripheral('device-a');
+    device.service.uuid = 'abcd0001-1234-5678-9012-abcdefabcdef';
+    const noble = new EventEmitter() as EventEmitter & {
+      state: string;
+      startScanning: jest.Mock;
+      stopScanning: jest.Mock;
+    };
+    noble.state = 'poweredOn';
+    noble.startScanning = jest.fn((_services, _duplicates, callback) => {
+      callback?.();
+      noble.emit('discover', device.peripheral);
+    });
+    noble.stopScanning = jest.fn(callback => callback?.());
+    jest.doMock('@stoprocent/noble', () => noble);
+
+    const { createNobleBlePlugin } = await import('../transports/nobleBlePlugin');
+    const plugin = createNobleBlePlugin();
+    await plugin.init();
+
+    await expect(plugin.connect('device-a')).rejects.toThrow('No BLE service found');
   });
 
   test('unsubscribes and disconnects an untracked peripheral when notification setup fails', async () => {

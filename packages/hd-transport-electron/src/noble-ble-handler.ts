@@ -12,14 +12,16 @@ import {
   ONEKEY_NOTIFY_CHARACTERISTIC_UUID,
   ONEKEY_SERVICE_UUID,
   ONEKEY_WRITE_CHARACTERISTIC_UUID,
+  createKnownBleUuidAliases,
+  hasOnekeyCommunicationService,
   isOnekeyBluetoothDevice,
+  matchesKnownBleUuid,
   wait,
 } from '@onekeyfe/hd-shared';
 import pRetry from 'p-retry';
 
-import { createKnownBleUuidAliases, matchesKnownBleUuid } from './ble-uuid';
 import { safeLog } from './types/noble-extended';
-import { softRefreshSubscription } from './ble-ops';
+import { runBleCallbackOperation, softRefreshSubscription } from './ble-ops';
 
 import type { IpcMainInvokeEvent, WebContents } from 'electron';
 import type { Characteristic, Peripheral, Service } from '@stoprocent/noble';
@@ -42,6 +44,7 @@ const bluetoothState: {
 
 // Global persistent state listener for app layer
 let persistentStateListener: ((state: string) => void) | null = null;
+let persistentDiscoverListener: ((peripheral: Peripheral) => void) | null = null;
 
 // Device cache and connection state
 const discoveredDevices = new Map<string, Peripheral>();
@@ -53,6 +56,10 @@ const subscribedDevices = new Map<string, boolean>(); // Track subscription stat
 
 // 🔒 Subscription operation state tracking to prevent race conditions
 const subscriptionOperations = new Map<string, 'subscribing' | 'unsubscribing' | 'idle'>();
+const deviceDisconnectListeners = new Map<
+  string,
+  { peripheral: Peripheral; listener: () => void }
+>();
 
 // Windows-only response watchdog state moved to utils/windows-ble-recovery
 
@@ -73,6 +80,7 @@ const FAST_SCAN_TIMEOUT = 8000; // 8 seconds for targeted scanning (Pro2 has lon
 const DEVICE_CHECK_INTERVAL = 500; // 500ms interval for periodic device checks
 const CONNECTION_TIMEOUT = 8000; // 8 seconds for device connection (BLE reconnect after release can be slow)
 const SERVICE_DISCOVERY_TIMEOUT = 10000; // 10 seconds for service discovery
+const BLE_CLEANUP_TIMEOUT = 250;
 
 // Write-related constants
 const BLE_PACKET_SIZE = 192;
@@ -84,11 +92,15 @@ const ABORTABLE_WRITE_ERROR_PATTERNS = [
 ];
 
 function isOneKeyPeripheral(peripheral: Peripheral) {
-  return isOnekeyBluetoothDevice({
-    id: peripheral.id,
-    localName: peripheral.advertisement?.localName,
-    serviceUuids: peripheral.advertisement?.serviceUuids,
-  });
+  const serviceUuids = peripheral.advertisement?.serviceUuids;
+  return (
+    hasOnekeyCommunicationService(serviceUuids) &&
+    isOnekeyBluetoothDevice({
+      id: peripheral.id,
+      localName: peripheral.advertisement?.localName,
+      serviceUuids,
+    })
+  );
 }
 
 /**
@@ -269,9 +281,12 @@ async function initializeNoble(): Promise<void> {
     });
 
     // Set up device discovery
-    noble.on('discover', (peripheral: Peripheral) => {
-      handleDeviceDiscovered(peripheral);
-    });
+    if (!persistentDiscoverListener) {
+      persistentDiscoverListener = (peripheral: Peripheral) => {
+        handleDeviceDiscovered(peripheral);
+      };
+      noble.on('discover', persistentDiscoverListener);
+    }
 
     logger?.info('[NobleBLE] Noble initialized successfully');
   } catch (error) {
@@ -333,6 +348,11 @@ function cleanupDevice(
 
   // 1. Clean up connection state
   if (cleanupConnection) {
+    const disconnectEntry = deviceDisconnectListeners.get(deviceId);
+    if (disconnectEntry) {
+      disconnectEntry.peripheral.removeListener('disconnect', disconnectEntry.listener);
+      deviceDisconnectListeners.delete(deviceId);
+    }
     connectedDevices.delete(deviceId);
     deviceCharacteristics.delete(deviceId);
     notificationCallbacks.delete(deviceId);
@@ -382,13 +402,16 @@ function setupDisconnectListener(
   deviceId: string,
   webContents: WebContents
 ): void {
-  // Remove any existing disconnect listeners to avoid duplicates
-  peripheral.removeAllListeners('disconnect');
+  const existing = deviceDisconnectListeners.get(deviceId);
+  if (existing) {
+    existing.peripheral.removeListener('disconnect', existing.listener);
+  }
 
-  // Set up new disconnect listener
-  peripheral.on('disconnect', () => {
+  const listener = () => {
     handleDeviceDisconnect(deviceId, webContents);
-  });
+  };
+  deviceDisconnectListeners.set(deviceId, { peripheral, listener });
+  peripheral.on('disconnect', listener);
 }
 
 // ===== Write helpers (inline) =====
@@ -607,16 +630,14 @@ function handleDeviceDiscovered(peripheral: Peripheral): void {
 function ensureDiscoverListener(): void {
   if (!noble) return;
 
-  // Check if discover listener exists by checking listener count
-  const listenerCount = (noble as any).listenerCount('discover');
-
-  if (listenerCount === 0) {
+  if (!persistentDiscoverListener) {
     logger?.info('[NobleBLE] Discover listener missing, re-adding it');
-    noble.on('discover', (peripheral: Peripheral) => {
+    persistentDiscoverListener = (peripheral: Peripheral) => {
       handleDeviceDiscovered(peripheral);
-    });
+    };
+    noble.on('discover', persistentDiscoverListener);
   } else {
-    logger?.debug('[NobleBLE] Discover listener already exists, count:', listenerCount);
+    logger?.debug('[NobleBLE] Discover listener already registered');
   }
 }
 
@@ -753,30 +774,24 @@ async function enumerateDevices(): Promise<DeviceInfo[]> {
 // Stop scanning
 async function stopScanning(): Promise<void> {
   if (!noble) return;
-
-  return new Promise<void>(resolve => {
-    if (!noble) {
-      resolve();
-      return;
-    }
-
-    noble.stopScanning(() => {
-      logger?.info('[NobleBLE] Scanning stopped');
-      resolve();
-    });
+  const nobleInstance = noble;
+  await runBleCallbackOperation(callback => nobleInstance.stopScanning(() => callback()), {
+    timeoutMs: BLE_CLEANUP_TIMEOUT,
+    timeoutBehavior: 'resolve',
   });
+  logger?.info('[NobleBLE] Scanning stopped');
 }
 
 // Clean up all Noble listeners (for app exit)
 function cleanupNobleListeners(): void {
   if (!noble) return;
 
-  // Remove all listeners to prevent memory leaks
-  // Noble uses EventEmitter, need to use removeAllListeners
   try {
-    (noble as any).removeAllListeners('discover');
-    (noble as any).removeAllListeners('stateChange');
-    logger?.info('[NobleBLE] All Noble listeners cleaned up');
+    if (persistentDiscoverListener) {
+      noble.removeListener('discover', persistentDiscoverListener);
+      persistentDiscoverListener = null;
+    }
+    logger?.info('[NobleBLE] Owned Noble listeners cleaned up');
   } catch (error) {
     logger?.error('[NobleBLE] Failed to clean up some listeners:', error);
   }
@@ -969,29 +984,23 @@ async function forceReconnectPeripheral(peripheral: Peripheral, deviceId: string
 
   // Step 2: Force disconnect if connected
   if (peripheral.state === 'connected') {
-    // Remove disconnect listener before intentional disconnect to avoid spurious events
-    peripheral.removeAllListeners('disconnect');
-    await new Promise<void>(resolve => {
-      peripheral.disconnect(() => {
-        logger?.info('[NobleBLE] Force disconnect completed');
-        resolve();
-      });
-    });
+    await runBleCallbackOperation(
+      callback =>
+        peripheral.disconnect(() => {
+          logger?.info('[NobleBLE] Force disconnect completed');
+          callback();
+        }),
+      { timeoutMs: BLE_CLEANUP_TIMEOUT, timeoutBehavior: 'resolve' }
+    );
   }
 
   // Step 3: Re-establish connection
-  await new Promise<void>((resolve, reject) => {
-    peripheral.connect((error: Error | undefined) => {
-      if (error) {
-        logger?.error('[NobleBLE] Force reconnect failed:', error);
-        reject(ERRORS.TypedError(HardwareErrorCode.BleConnectedError, error.message));
-      } else {
-        logger?.info('[NobleBLE] Force reconnect successful');
-        connectedDevices.set(deviceId, peripheral);
-        resolve();
-      }
-    });
+  await runBleCallbackOperation(callback => peripheral.connect(callback), {
+    timeoutMs: CONNECTION_TIMEOUT,
+    timeoutBehavior: 'reject',
   });
+  logger?.info('[NobleBLE] Force reconnect successful');
+  connectedDevices.set(deviceId, peripheral);
 
   // Wait for connection to stabilize
   await wait(500);
@@ -1122,16 +1131,26 @@ async function setupConnectionAndDiscoverServices(
   deviceId: string,
   webContents: WebContents
 ): Promise<CharacteristicPair> {
-  // Force reconnect to clear GATT cache
-  await forceReconnectPeripheral(peripheral, deviceId);
   setupDisconnectListener(peripheral, deviceId, webContents);
 
-  // Discover services and characteristics with retry
   try {
     return await discoverServicesAndCharacteristicsWithRetry(peripheral, deviceId);
-  } catch (error) {
-    // Last resort: fresh scan to get new peripheral object
-    logger?.error('[NobleBLE] Service discovery failed, attempting fresh scan...', error);
+  } catch (initialError) {
+    logger?.info('[NobleBLE] Direct service discovery failed, retrying after reconnect', {
+      deviceId,
+      error: initialError,
+    });
+  }
+
+  await forceReconnectPeripheral(peripheral, deviceId);
+  setupDisconnectListener(peripheral, deviceId, webContents);
+  try {
+    return await discoverServicesAndCharacteristicsWithRetry(peripheral, deviceId);
+  } catch (reconnectError) {
+    logger?.error(
+      '[NobleBLE] Service discovery failed after reconnect, attempting fresh scan...',
+      reconnectError
+    );
     return freshScanAndDiscover(deviceId, webContents);
   }
 }
@@ -1294,20 +1313,21 @@ async function disconnectDevice(deviceId: string): Promise<void> {
     return;
   }
 
-  return new Promise<void>(resolve => {
-    // Remove disconnect listener to avoid triggering handleDeviceDisconnect
-    peripheral.removeAllListeners('disconnect');
+  const disconnectEntry = deviceDisconnectListeners.get(deviceId);
+  if (disconnectEntry) {
+    disconnectEntry.peripheral.removeListener('disconnect', disconnectEntry.listener);
+    deviceDisconnectListeners.delete(deviceId);
+  }
 
-    peripheral.disconnect(() => {
-      // Clean up device state using unified function
-      cleanupDevice(deviceId, undefined, {
-        cleanupConnection: true,
-        sendDisconnectEvent: false,
-        cancelOperations: true,
-        reason: 'manual-disconnect',
-      });
-      resolve();
-    });
+  await runBleCallbackOperation(callback => peripheral.disconnect(() => callback()), {
+    timeoutMs: BLE_CLEANUP_TIMEOUT,
+    timeoutBehavior: 'resolve',
+  });
+  cleanupDevice(deviceId, undefined, {
+    cleanupConnection: true,
+    sendDisconnectEvent: false,
+    cancelOperations: true,
+    reason: 'manual-disconnect',
   });
 }
 
@@ -1328,17 +1348,11 @@ async function unsubscribeNotifications(deviceId: string): Promise<void> {
   subscriptionOperations.set(deviceId, 'unsubscribing');
 
   try {
-    await new Promise<void>((resolve, reject) => {
-      notifyCharacteristic.unsubscribe((error: Error | undefined) => {
-        if (error) {
-          logger?.error('[NobleBLE] Notification unsubscription failed:', error);
-          reject(error);
-        } else {
-          logger?.info('[NobleBLE] Notification unsubscription successful');
-          resolve();
-        }
-      });
+    await runBleCallbackOperation(callback => notifyCharacteristic.unsubscribe(callback), {
+      timeoutMs: BLE_CLEANUP_TIMEOUT,
+      timeoutBehavior: 'resolve',
     });
+    logger?.info('[NobleBLE] Notification unsubscription completed');
 
     // Remove all listeners and clear subscription status
     notifyCharacteristic.removeAllListeners('data');
@@ -1431,19 +1445,13 @@ async function subscribeNotifications(
     notifyCharacteristic: Characteristic
   ): Promise<void> {
     // Listeners already cleaned up above, no need to repeat
-    await new Promise<void>(resolve => {
-      notifyCharacteristic.unsubscribe(() => {
-        resolve();
-      });
+    await runBleCallbackOperation(callback => notifyCharacteristic.unsubscribe(callback), {
+      timeoutMs: BLE_CLEANUP_TIMEOUT,
+      timeoutBehavior: 'resolve',
     });
-    await new Promise<void>((resolve, reject) => {
-      notifyCharacteristic.subscribe((error?: Error) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-        resolve();
-      });
+    await runBleCallbackOperation(callback => notifyCharacteristic.subscribe(callback), {
+      timeoutMs: CONNECTION_TIMEOUT,
+      timeoutBehavior: 'reject',
     });
 
     notifyCharacteristic.on('data', (data: Buffer) => {
@@ -1595,32 +1603,24 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
     // Cleanup on app quit
     webContents.on('destroyed', () => {
       safeLog(logger, 'info', 'Cleaning up Noble BLE handlers');
+      (async () => {
+        const deviceIds = Array.from(connectedDevices.keys());
+        for (const deviceId of deviceIds) {
+          await unsubscribeNotifications(deviceId).catch(() => undefined);
+          await disconnectDevice(deviceId).catch(() => undefined);
+        }
 
-      // 1. Clean up all connected devices (unified cleanup, avoid duplicates)
-      const deviceIds = Array.from(connectedDevices.keys());
-      deviceIds.forEach(deviceId => {
-        cleanupDevice(deviceId, undefined, {
-          cleanupConnection: true,
-          sendDisconnectEvent: false,
-          cancelOperations: true,
-          reason: 'app-quit',
-        });
+        await stopScanning().catch(() => undefined);
+        if (noble && persistentStateListener) {
+          noble.removeListener('stateChange', persistentStateListener);
+          persistentStateListener = null;
+        }
+        cleanupNobleListeners();
+        discoveredDevices.clear();
+        safeLog(logger, 'info', 'Noble BLE cleanup completed');
+      })().catch(error => {
+        safeLog(logger, 'error', 'Noble BLE cleanup failed', error);
       });
-
-      // 2. Stop scanning
-      stopScanning();
-
-      // 3. Clean up Noble listeners
-      if (noble && persistentStateListener) {
-        noble.removeListener('stateChange', persistentStateListener);
-        persistentStateListener = null;
-      }
-      cleanupNobleListeners();
-
-      // 4. Clear discovered devices cache
-      discoveredDevices.clear();
-
-      safeLog(logger, 'info', 'Noble BLE cleanup completed');
     });
 
     safeLog(logger, 'info', 'Noble BLE IPC handlers setup completed');

@@ -1,6 +1,40 @@
 import type { Characteristic } from '@stoprocent/noble';
 import type { Logger } from './types/noble-extended';
 
+type BleCallback = (error?: Error) => void;
+
+export function runBleCallbackOperation(
+  operation: (callback: BleCallback) => void,
+  options: { timeoutMs: number; timeoutBehavior: 'resolve' | 'reject' }
+): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const settle = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      if (error) {
+        reject(error);
+      } else {
+        resolve();
+      }
+    };
+    const timeout = setTimeout(() => {
+      if (options.timeoutBehavior === 'reject') {
+        settle(new Error(`BLE operation timed out after ${options.timeoutMs}ms`));
+      } else {
+        settle();
+      }
+    }, options.timeoutMs);
+
+    try {
+      operation(settle);
+    } catch (error) {
+      settle(error instanceof Error ? error : new Error(String(error)));
+    }
+  });
+}
+
 export interface SoftRefreshParams {
   deviceId: string;
   notifyCharacteristic: Characteristic | null | undefined;
@@ -30,18 +64,14 @@ export async function softRefreshSubscription(params: SoftRefreshParams): Promis
 
   subscriptionOperations.set(deviceId, 'subscribing');
 
-  await new Promise<void>(resolve => {
-    notifyCharacteristic.unsubscribe(() => resolve());
+  await runBleCallbackOperation(callback => notifyCharacteristic.unsubscribe(callback), {
+    timeoutMs: 250,
+    timeoutBehavior: 'resolve',
   });
 
-  await new Promise<void>((resolve, reject) => {
-    notifyCharacteristic.subscribe((error?: Error) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-      resolve();
-    });
+  await runBleCallbackOperation(callback => notifyCharacteristic.subscribe(callback), {
+    timeoutMs: 8_000,
+    timeoutBehavior: 'reject',
   });
 
   notifyCharacteristic.removeAllListeners('data');
