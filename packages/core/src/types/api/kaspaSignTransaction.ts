@@ -13,13 +13,25 @@ export type KaspaSignInputParams = {
   sequenceNumber: number | string;
   output: {
     satoshis: number | string;
-    // Required by the legacy host-prehash flow; unused by the streaming protocol.
-    script?: string;
+    script: string;
   };
   sigOpCount?: number;
 };
 
 export type KaspaSignOutputParams = {
+  satoshis: number | string;
+  script: string;
+  scriptVersion: number;
+};
+
+export type KaspaStreamingSignInputParams = Omit<KaspaSignInputParams, 'output'> & {
+  output: {
+    satoshis: number | string;
+    script?: string;
+  };
+};
+
+export type KaspaStreamingSignOutputParams = {
   satoshis: number | string;
   // Streaming protocol describes outputs by address; the device builds the script itself.
   // `address` for an external output, `addressN` (BIP-32 path) for a change output.
