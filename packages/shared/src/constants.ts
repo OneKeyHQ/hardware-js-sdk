@@ -154,3 +154,33 @@ export const isOnekeyDevice = (name: string | null, id?: string): boolean => {
   }
   return isOneKeyShortName(normalizedName);
 };
+
+type BluetoothDeviceIdentity = {
+  id?: string;
+  name?: string | null;
+  localName?: string | null;
+  serviceUuids?: Array<string | null | undefined> | null;
+};
+
+const getBluetoothServiceUuidKey = (uuid?: string | null) => {
+  const normalized = (uuid ?? '').replace(/-/g, '').toLowerCase();
+  return normalized.length >= 8 ? normalized.substring(4, 8) : normalized;
+};
+
+export const isOnekeyBluetoothDevice = ({
+  id,
+  name,
+  localName,
+  serviceUuids,
+}: BluetoothDeviceIdentity): boolean => {
+  const advertisedServiceUuids = serviceUuids ?? [];
+  if (advertisedServiceUuids.some(uuid => getBluetoothServiceUuidKey(uuid) === 'fffd')) {
+    return false;
+  }
+
+  if (isOnekeyDevice(name ?? null, id) || isOnekeyDevice(localName ?? null, id)) {
+    return true;
+  }
+
+  return advertisedServiceUuids.some(uuid => getBluetoothServiceUuidKey(uuid) === '0001');
+};

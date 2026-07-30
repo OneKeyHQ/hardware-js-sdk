@@ -23,7 +23,12 @@ import transport, {
   probeProtocolV2 as probeProtocolV2Helper,
   writeProtocolV2BleFrame,
 } from '@onekeyfe/hd-transport';
-import { ERRORS, HardwareErrorCode, createDeferred, isOnekeyDevice } from '@onekeyfe/hd-shared';
+import {
+  ERRORS,
+  HardwareErrorCode,
+  createDeferred,
+  isOnekeyBluetoothDevice,
+} from '@onekeyfe/hd-shared';
 
 import { getConnectedDeviceIds, onDeviceBondState, pairDevice } from './BleManager';
 import { hasWritableCapability, resolveProtocolV2PacketCapacity } from './bleStrategy';
@@ -31,7 +36,6 @@ import { subscribeBleOn } from './subscribeBleOn';
 import {
   ANDROID_PACKET_LENGTH,
   IOS_PACKET_LENGTH,
-  getBleUuidKey,
   getBluetoothServiceUuids,
   getInfosForServiceUuid,
   isSameBleUuid,
@@ -160,16 +164,6 @@ function inferProtocolHintFromDeviceName(name?: string | null): ProtocolType | u
 
 function getDeviceDisplayName(device?: Device | null) {
   return device?.name || device?.localName || null;
-}
-
-function isGenericBleService(uuid?: string | null) {
-  return ['1800', '1801', '180a'].includes(getBleUuidKey(uuid));
-}
-
-function hasKnownOneKeyService(device?: Device | null) {
-  return (device?.serviceUUIDs ?? []).some(serviceUuid =>
-    getInfosForServiceUuid(serviceUuid, 'classic')
-  );
 }
 
 const ANDROID_REQUEST_MTU = 256;
@@ -359,29 +353,15 @@ export default class ReactNativeBleTransport {
       }
     }
 
-    let fallbackServiceUuid: string | undefined;
-
     if (!infos) {
       const services = await device.services();
       Log?.debug(
         '[ReactNativeBleTransport] Known OneKey service UUID not found, discovered services:',
         services?.map(service => service.uuid)
       );
-
-      const knownService = services.find(service =>
-        getInfosForServiceUuid(service.uuid, 'classic')
-      );
-      const fallbackService =
-        knownService ?? services.find(service => !isGenericBleService(service.uuid)) ?? services[0];
-
-      if (fallbackService) {
-        fallbackServiceUuid = fallbackService.uuid;
-        characteristics = await device.characteristicsForService(fallbackService.uuid);
-        Log?.debug('[ReactNativeBleTransport] Using fallback BLE service:', fallbackService.uuid);
-      }
     }
 
-    if (!infos && !fallbackServiceUuid) {
+    if (!infos) {
       try {
         Log?.debug('cancel connection when service not found');
         await device.cancelConnection();
@@ -391,9 +371,7 @@ export default class ReactNativeBleTransport {
       throw ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound);
     }
 
-    const serviceUuid = infos?.serviceUuid ?? fallbackServiceUuid;
-    const writeUuid = infos?.writeUuid ?? '00000002-0000-1000-8000-00805f9b34fb';
-    const notifyUuid = infos?.notifyUuid ?? '00000003-0000-1000-8000-00805f9b34fb';
+    const { serviceUuid, writeUuid, notifyUuid } = infos;
 
     if (!serviceUuid) {
       throw ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound);
@@ -607,10 +585,12 @@ export default class ReactNativeBleTransport {
           }
 
           const displayName = getDeviceDisplayName(device);
-          const isOneKey =
-            isOnekeyDevice(device?.name ?? null, device?.id) ||
-            isOnekeyDevice(device?.localName ?? null, device?.id) ||
-            hasKnownOneKeyService(device);
+          const isOneKey = isOnekeyBluetoothDevice({
+            id: device?.id,
+            name: device?.name,
+            localName: device?.localName,
+            serviceUuids: device?.serviceUUIDs,
+          });
           if (isOneKey) {
             addDevice(device as unknown as Device);
           } else if (displayName && /\bpro\s*2\b/i.test(displayName)) {
@@ -627,10 +607,18 @@ export default class ReactNativeBleTransport {
       getConnectedDeviceIds(Platform.OS === 'ios' ? getBluetoothServiceUuids() : []).then(
         devices => {
           for (const device of devices) {
-            const { serviceUUIDs } = device as { serviceUUIDs?: string[] };
-            const hasCachedServiceUuid = Boolean(serviceUUIDs?.length);
-            const keepDevice = Platform.OS === 'ios' || hasCachedServiceUuid;
-            if (keepDevice) {
+            const localName =
+              'localName' in device && typeof device.localName === 'string'
+                ? device.localName
+                : null;
+            if (
+              isOnekeyBluetoothDevice({
+                id: device.id,
+                name: device.name,
+                localName,
+                serviceUuids: device.serviceUUIDs,
+              })
+            ) {
               Log?.debug('search connected peripheral: ', device.id);
               addDevice(device as unknown as Device);
             }

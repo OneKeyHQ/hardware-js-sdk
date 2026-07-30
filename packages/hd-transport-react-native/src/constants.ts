@@ -12,17 +12,11 @@ type BluetoothServices = Record<
 >;
 
 const ClassicServiceUUID = '00000001-0000-1000-8000-00805f9b34fb';
-const Pro2ServiceUUID = 'fffd';
 
 const OneKeyServices: Record<string, BluetoothServices> = {
   classic: {
     [ClassicServiceUUID]: {
       serviceUuid: ClassicServiceUUID,
-      writeUuid: '00000002-0000-1000-8000-00805f9b34fb',
-      notifyUuid: '00000003-0000-1000-8000-00805f9b34fb',
-    },
-    [Pro2ServiceUUID]: {
-      serviceUuid: Pro2ServiceUUID,
       writeUuid: '00000002-0000-1000-8000-00805f9b34fb',
       notifyUuid: '00000003-0000-1000-8000-00805f9b34fb',
     },
