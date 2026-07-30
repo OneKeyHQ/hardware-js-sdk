@@ -150,12 +150,13 @@ await HardwareSDK.evmSignTransaction(connectId, deviceId, { ... });
 
 ### `session_id` —— 短期会话 token
 
-设备初始化 Passphrase Session 时临时生成的随机 token。固件会将它返回给
-Core，但当前公共钱包会话响应和公共 Features 投影都不暴露该值。
+设备初始化 passphrase session 时临时生成的随机 token。
+`getPassphraseState` 或任何触发 session 初始化的调用之后，会出现在
+`features.session_id` 里。
 
 - **锁屏即失效**（自动锁、手动锁、USB 断开）。
 - SDK 内部用它维持设备端缓存的 passphrase。
-- 不暴露给新的 App 集成；应用只需要 `deviceId + passphraseState`。
+- 一般不直接暴露给应用代码 —— 大多数应用只需要 `passphraseState`。
 
 ### `passphraseState` —— 隐藏钱包标识
 
@@ -166,8 +167,8 @@ passphrase 本身。
 
 - 作为 `passphraseState` 通用参数传给后续所有需要绑在这个隐藏钱包上的 SDK
   调用。
-- 持久化 `deviceId + passphraseState` 作为钱包身份。新进程应显式重新打开钱包，
-  不持久化 SDK 内部 Session ID。
+- 跨进程复用：持久化 `(deviceId, passphraseState, session_id)` 三元组，进程
+  启动时调 `preloadSessionCache` 恢复 session。
 - 清掉缓存的 `passphraseState` **不会**让隐藏钱包失效 —— 用户再输一次同样的
   passphrase 就能复现出相同的钱包。
 
@@ -234,8 +235,8 @@ SDK 层暴露给应用用的稳定 ID。**路由始终用 `connectId`**；如果
 - `session_id` 锁屏即失效；`passphraseState` 不会。
 - `passphraseState` 标识**是哪一个隐藏钱包**；`session_id` 标识**这条还活着
   的会话**。
-- 新集成持久化 `deviceId + passphraseState` 作为钱包身份，并在每个新进程中
-  显式打开钱包。`session_id` 由 SDK 内部管理。
+- 跨调用复用会话就一起持久化 `(passphraseState, session_id)`；如果两次调用
+  之间设备锁屏了，就丢掉缓存的 `session_id`、强制重新解锁。
 
 ### `device_id`（蛇形）vs `deviceId`（驼峰）
 
