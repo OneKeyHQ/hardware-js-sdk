@@ -5269,6 +5269,225 @@
   resolved "https://registry.npmjs.org/@onekeyfe/cross-inpage-provider-types/-/cross-inpage-provider-types-2.2.67.tgz#e36a59855a1d781f296d7563a93cac868ae46098"
   integrity sha512-sjTF8kpcxWrZtFfHtdQhJ6KneyLTmg+Z4rnn0acEK5Vwoy07EjmF9xjBTyMoInrNwPc7OIwkaiXX+JYr0ovNgw==
 
+"@onekeyfe/hd-ble-sdk@1.1.34-alpha.1":
+  version "1.1.34-alpha.1"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-ble-sdk/-/hd-ble-sdk-1.1.34-alpha.1.tgz#c9fa2aff76534258d87f3da3cff36793bc9431ae"
+  integrity sha512-6RsohKxWyUtWoC+SyyfjhsHAEJ+w/etSudg0rXpm1Bw/XOaYgMTm1US645UuitIuQ3BEzZ9SrDYYcqRoLPKKJg==
+  dependencies:
+    "@onekeyfe/hd-core" "1.1.34-alpha.1"
+    "@onekeyfe/hd-shared" "1.1.34-alpha.1"
+    "@onekeyfe/hd-transport-react-native" "1.1.34-alpha.1"
+
+"@onekeyfe/hd-common-connect-sdk@1.1.34-alpha.1":
+  version "1.1.34-alpha.1"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-common-connect-sdk/-/hd-common-connect-sdk-1.1.34-alpha.1.tgz#9462144bef36d00775a76198845ea7ebab9d642e"
+  integrity sha512-1UOU0DMbb0/y/pJCvSIypFtlM9NIEshSyZir16rOTViQQ/ySfvV8ZVKQjZC2X1EpjYVmP/fwXAL2Fx4SndX7zA==
+  dependencies:
+    "@onekeyfe/hd-core" "1.1.34-alpha.1"
+    "@onekeyfe/hd-shared" "1.1.34-alpha.1"
+    "@onekeyfe/hd-transport-emulator" "1.1.34-alpha.1"
+    "@onekeyfe/hd-transport-http" "1.1.34-alpha.1"
+    "@onekeyfe/hd-transport-lowlevel" "1.1.34-alpha.1"
+    "@onekeyfe/hd-transport-usb" "1.1.34-alpha.1"
+    "@onekeyfe/hd-transport-web-device" "1.1.34-alpha.1"
+
+"@onekeyfe/hd-core@1.1.34-alpha.1":
+  version "1.1.34-alpha.1"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-core/-/hd-core-1.1.34-alpha.1.tgz#bd0bb68a0a66e99716a9859326de200411bf0967"
+  integrity sha512-sYCIW14V/GflbwSUzKfhzbINIcIGkqLlOqYn6Ces6LkqFDbfxJA8t6juXxzP0pmCwIbGVhzn1sIBwi7gbaqdtQ==
+  dependencies:
+    "@onekeyfe/hd-shared" "1.1.34-alpha.1"
+    "@onekeyfe/hd-transport" "1.1.34-alpha.1"
+    axios "1.15.2"
+    bignumber.js "^9.0.2"
+    bytebuffer "^5.0.1"
+    jszip "^3.10.1"
+    parse-uri "^1.0.7"
+    semver "^7.3.7"
+
+"@onekeyfe/hd-shared@1.1.34-alpha.1":
+  version "1.1.34-alpha.1"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-shared/-/hd-shared-1.1.34-alpha.1.tgz#8e3b92265a06d8241b7ab1f6282fb810c5648c91"
+  integrity sha512-JaZEOHQD0X2ceZ9XjuEwQ0VOMJm/kjZq8rFEtq32qBYoe1bLz065HNGnoUcRtBqTrc/6LsjIzyllZHbEVMSuJQ==
+
+"@onekeyfe/hd-transport-electron@1.1.34-alpha.1":
+  version "1.1.34-alpha.1"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-transport-electron/-/hd-transport-electron-1.1.34-alpha.1.tgz#871cc4d7fd9e8ca4ad4c3a346442e1afd9a7cee0"
+  integrity sha512-5QQykRMXJQugxQEffU81hcxpjw3mSaLqFJy1eOBo04B9SXjNaZTOTKfSxc6WlmLnDo6EMjk7HkNod//tcTRbUQ==
+  dependencies:
+    "@onekeyfe/hd-core" "1.1.34-alpha.1"
+    "@onekeyfe/hd-shared" "1.1.34-alpha.1"
+    "@onekeyfe/hd-transport" "1.1.34-alpha.1"
+    "@stoprocent/noble" "2.3.16"
+    p-retry "^4.6.2"
+
+"@onekeyfe/hd-transport-emulator@1.1.34-alpha.1":
+  version "1.1.34-alpha.1"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-transport-emulator/-/hd-transport-emulator-1.1.34-alpha.1.tgz#768feb5628d71cd1523fdccbc3b6fc937d3728b1"
+  integrity sha512-ctu3/tvlWG/B5SdjdpG3R4KgFfwAQjlXdbH5WWpgWIcp8NYPq0uqyHTH42pr9h3nH45I0Pt3JPHZr6hr6zrffA==
+  dependencies:
+    "@onekeyfe/hd-shared" "1.1.34-alpha.1"
+    "@onekeyfe/hd-transport" "1.1.34-alpha.1"
+    axios "1.15.2"
+    secure-json-parse "^4.0.0"
+
+"@onekeyfe/hd-transport-http@1.1.34-alpha.1":
+  version "1.1.34-alpha.1"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-transport-http/-/hd-transport-http-1.1.34-alpha.1.tgz#8342181ef09bac73387c5522728ac2fb0aba49d6"
+  integrity sha512-ig4bs6KuxeOIKKRusLGrMtZs3b208TLujKRJtsmteRicXqCDqplrI6Bgq1uNLQ74vTjMrGqjXuKO87jlhzU+kQ==
+  dependencies:
+    "@onekeyfe/hd-shared" "1.1.34-alpha.1"
+    "@onekeyfe/hd-transport" "1.1.34-alpha.1"
+    axios "1.15.2"
+    secure-json-parse "^4.0.0"
+
+"@onekeyfe/hd-transport-lowlevel@1.1.34-alpha.1":
+  version "1.1.34-alpha.1"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-transport-lowlevel/-/hd-transport-lowlevel-1.1.34-alpha.1.tgz#77bf3654f54a8c637406b6218c51015eccf65f19"
+  integrity sha512-28wTVhSWP5shzlC94r8OCfHHuf4Fj+UdUdOnZtRMl8FJs0s98sb0bmvtxdy8HdZgrR5fCtpTp+rLRRVGXeFdKw==
+  dependencies:
+    "@onekeyfe/hd-shared" "1.1.34-alpha.1"
+    "@onekeyfe/hd-transport" "1.1.34-alpha.1"
+
+"@onekeyfe/hd-transport-react-native@1.1.34-alpha.1":
+  version "1.1.34-alpha.1"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-transport-react-native/-/hd-transport-react-native-1.1.34-alpha.1.tgz#1ee0516ce32f7b84a1c9b09e83e38a0e2b8a9f64"
+  integrity sha512-3PDkVCKqeAxQDoDZPNxRx8PzO/fF6+MASW64ueLLQVQaKoiX5z4Xb6wtgoF348GkZItoLqF5lb7WAYiWXXSROw==
+  dependencies:
+    "@onekeyfe/hd-core" "1.1.34-alpha.1"
+    "@onekeyfe/hd-shared" "1.1.34-alpha.1"
+    "@onekeyfe/hd-transport" "1.1.34-alpha.1"
+    "@onekeyfe/react-native-ble-utils" "^0.1.6"
+    react-native-ble-plx "3.5.1"
+
+"@onekeyfe/hd-transport-usb@1.1.34-alpha.1":
+  version "1.1.34-alpha.1"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-transport-usb/-/hd-transport-usb-1.1.34-alpha.1.tgz#dc5865935ad7cdab44958135a51dbcb9a65927d1"
+  integrity sha512-fBgsLjjmw5XCS1e4DLbVvw0fcAvsWfmoaoVDb6kBEVMHrJGD5oRtCi1zu3QeBWaytaUQk5V61e66JlAHaFZqSA==
+  dependencies:
+    "@onekeyfe/hd-shared" "1.1.34-alpha.1"
+    "@onekeyfe/hd-transport" "1.1.34-alpha.1"
+    bytebuffer "^5.0.1"
+    usb "^2.14.0"
+
+"@onekeyfe/hd-transport-web-device@1.1.34-alpha.1":
+  version "1.1.34-alpha.1"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-transport-web-device/-/hd-transport-web-device-1.1.34-alpha.1.tgz#b6c10b1d72626277068c3b386983c87c97a3314c"
+  integrity sha512-N5yqc9vfUwAR78mKn3Uv1UsEiolmtJ0YtAYi+5KrmZ/yjz9PuNTlxwympJn7cNIDPN69tNaEHEftAFN9GNlBBw==
+  dependencies:
+    "@onekeyfe/hd-shared" "1.1.34-alpha.1"
+    "@onekeyfe/hd-transport" "1.1.34-alpha.1"
+
+"@onekeyfe/hd-transport@1.1.34-alpha.1":
+  version "1.1.34-alpha.1"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-transport/-/hd-transport-1.1.34-alpha.1.tgz#260203c548a7c0eedcaa39381cbdf3d3d7156861"
+  integrity sha512-dN6snOkLP8KDoyuULgYpbxZo9SmX1rh8EBZFIiEu4DyNxIrS6cBrNDAL2PlMqCqDIV3XZKtqId7TlBFw0FZ4aQ==
+  dependencies:
+    bytebuffer "^5.0.1"
+    long "^4.0.0"
+    protobufjs "^6.11.2"
+
+"@onekeyfe/hd-web-sdk@1.1.34-alpha.1":
+  version "1.1.34-alpha.1"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-web-sdk/-/hd-web-sdk-1.1.34-alpha.1.tgz#d7edfdd57b8997e2d1e5d4685deada5129047bb7"
+  integrity sha512-NRqoAgvasfBLVpZk3Ig3VR2bcIK1uwjq69irWwt4dEEIZ7yGuGzJVbV+brObiIh0odjibAxEBdaNOyL1FMCFMw==
+  dependencies:
+    "@onekeyfe/cross-inpage-provider-core" "2.2.67"
+    "@onekeyfe/hd-core" "1.1.34-alpha.1"
+    "@onekeyfe/hd-shared" "1.1.34-alpha.1"
+    "@onekeyfe/hd-transport-http" "1.1.34-alpha.1"
+    "@onekeyfe/hd-transport-web-device" "1.1.34-alpha.1"
+
+"@onekeyfe/hwk-adapter-core@1.1.34-alpha.1":
+  version "1.1.34-alpha.1"
+  resolved "https://registry.npmjs.org/@onekeyfe/hwk-adapter-core/-/hwk-adapter-core-1.1.34-alpha.1.tgz#09f04102d0ea44c2ded40474544a46cacc793d23"
+  integrity sha512-gwF8laqg1kbBFqEMFgKBTZyXrhKQnTRHfULXYUXc7zYBdU6wmxtPKa5vDnHthnYUXWR6IPYS6wVSvar3173FFA==
+  dependencies:
+    "@noble/hashes" "^1.7.1"
+
+"@onekeyfe/hwk-ledger-adapter@1.1.34-alpha.1":
+  version "1.1.34-alpha.1"
+  resolved "https://registry.npmjs.org/@onekeyfe/hwk-ledger-adapter/-/hwk-ledger-adapter-1.1.34-alpha.1.tgz#1345f6eb89d42eadd86a881c2529da1c77b08703"
+  integrity sha512-a5b1x+VVdz1MSQIYpGsazfl0qNa2nbJmgPimHtSfen2HK3thmar1bk8MejY+ixXByZfH0yLthYoT0iwLhB3S1w==
+  dependencies:
+    "@ledgerhq/context-module" "^1.0.0"
+    "@ledgerhq/device-management-kit" "^1.1.0"
+    "@ledgerhq/device-signer-kit-bitcoin" "^1.0.0"
+    "@ledgerhq/device-signer-kit-ethereum" "^1.9.0"
+    "@ledgerhq/device-signer-kit-solana" "^1.7.0"
+    "@ledgerhq/hw-app-trx" "^6.34.1"
+    "@ledgerhq/hw-transport" "^6.34.1"
+    "@onekeyfe/hwk-adapter-core" "1.1.34-alpha.1"
+    bitcoinjs-lib "npm:@onekeyfe/bitcoinjs-lib@7.0.1"
+
+"@onekeyfe/hwk-ledger-connector-ble@1.1.34-alpha.1":
+  version "1.1.34-alpha.1"
+  resolved "https://registry.npmjs.org/@onekeyfe/hwk-ledger-connector-ble/-/hwk-ledger-connector-ble-1.1.34-alpha.1.tgz#4e20743cd50ad78150b409c6bfafe468ed9a4086"
+  integrity sha512-Qp4KsTqW2HeojIefVrr8cM6lVifGRN6+zDYirFDVaxXZAA/ieAzNkoJiwhQq3h4/jDXcApa5pH+QwlpPDziVtA==
+  dependencies:
+    "@ledgerhq/device-management-kit" "^1.1.0"
+    "@ledgerhq/device-signer-kit-bitcoin" "^1.0.0"
+    "@ledgerhq/device-signer-kit-ethereum" "^1.9.0"
+    "@ledgerhq/device-signer-kit-solana" "^1.7.0"
+    "@ledgerhq/device-transport-kit-react-native-ble" "^1.0.0"
+    "@onekeyfe/hwk-adapter-core" "1.1.34-alpha.1"
+    "@onekeyfe/hwk-ledger-adapter" "1.1.34-alpha.1"
+
+"@onekeyfe/hwk-ledger-connector-webhid@1.1.34-alpha.1":
+  version "1.1.34-alpha.1"
+  resolved "https://registry.npmjs.org/@onekeyfe/hwk-ledger-connector-webhid/-/hwk-ledger-connector-webhid-1.1.34-alpha.1.tgz#8eddb1869c13b63cd2da17a6cb5a9dcf8980ebfe"
+  integrity sha512-aiENkKUgbD2atgnarPyKXaSZSE/zyM3422tJExrdcsXvGAAHsAtD29boycCzGGdPA0EbuxlXr/W7k97VrIf1sQ==
+  dependencies:
+    "@ledgerhq/device-management-kit" "^1.1.0"
+    "@ledgerhq/device-signer-kit-bitcoin" "^1.0.0"
+    "@ledgerhq/device-signer-kit-ethereum" "^1.9.0"
+    "@ledgerhq/device-signer-kit-solana" "^1.7.0"
+    "@ledgerhq/device-transport-kit-web-hid" "^1.0.0"
+    "@onekeyfe/hwk-adapter-core" "1.1.34-alpha.1"
+    "@onekeyfe/hwk-ledger-adapter" "1.1.34-alpha.1"
+
+"@onekeyfe/hwk-trezor-adapter@1.1.34-alpha.1":
+  version "1.1.34-alpha.1"
+  resolved "https://registry.npmjs.org/@onekeyfe/hwk-trezor-adapter/-/hwk-trezor-adapter-1.1.34-alpha.1.tgz#8809cee6dbd49fef01483afcc11b534ce6ef4e5d"
+  integrity sha512-vksokPByeVwgBL+LepTXPipZTJxlArD9ifB94gkr/HKtnO8c7fY1vpqciaiGpBhAsAbaBqIjViM0St1O4STdTw==
+  dependencies:
+    "@onekeyfe/hwk-adapter-core" "1.1.34-alpha.1"
+    "@onekeyfe/hwk-trezor-core" "1.1.34-alpha.1"
+    tslib "^2.6.2"
+
+"@onekeyfe/hwk-trezor-connector-rn-ble@1.1.34-alpha.1":
+  version "1.1.34-alpha.1"
+  resolved "https://registry.npmjs.org/@onekeyfe/hwk-trezor-connector-rn-ble/-/hwk-trezor-connector-rn-ble-1.1.34-alpha.1.tgz#4092dad5dd995c65c3fd55bd55a7d264bc494afd"
+  integrity sha512-nnqTjvURRPN87RamO+1wTQ4r2NK7Ep3ErR69YSGuEU0a6JKfwT54x7wsiZqTzK8OoKQqbwdtsiiU1w4ISBogeA==
+  dependencies:
+    "@onekeyfe/hwk-adapter-core" "1.1.34-alpha.1"
+    "@onekeyfe/hwk-trezor-adapter" "1.1.34-alpha.1"
+    "@onekeyfe/hwk-trezor-connector" "1.1.34-alpha.1"
+    buffer "^6.0.3"
+    react-native-ble-plx "^3.5.1"
+
+"@onekeyfe/hwk-trezor-connector-webusb@1.1.34-alpha.1":
+  version "1.1.34-alpha.1"
+  resolved "https://registry.npmjs.org/@onekeyfe/hwk-trezor-connector-webusb/-/hwk-trezor-connector-webusb-1.1.34-alpha.1.tgz#7487138e592155e4c25ca75d5ff27f311337cd62"
+  integrity sha512-C7Pa0Ero7m1ijg90BaqKaEHHkFa+IOa9xj8Cmygz9ckJd3Kt4J0oQnwWwW3mNRHpj/8pG+2KtMp6a9S6lhs5fg==
+  dependencies:
+    "@onekeyfe/hwk-adapter-core" "1.1.34-alpha.1"
+    "@onekeyfe/hwk-trezor-connector" "1.1.34-alpha.1"
+    buffer "^6.0.3"
+
+"@onekeyfe/hwk-trezor-connector@1.1.34-alpha.1":
+  version "1.1.34-alpha.1"
+  resolved "https://registry.npmjs.org/@onekeyfe/hwk-trezor-connector/-/hwk-trezor-connector-1.1.34-alpha.1.tgz#e35ef0cfdcb6bd85bf785d9399e48f22ee2e0627"
+  integrity sha512-w1WrKMgS9Da7ctuNfr7OhDp3YrO8utyzWuM/f3LjfNg6rPBogFYFM/8K8GFzxfojiWdEJl+JZCCju5rBmA1y4A==
+  dependencies:
+    "@onekeyfe/hwk-adapter-core" "1.1.34-alpha.1"
+    "@onekeyfe/hwk-trezor-core" "1.1.34-alpha.1"
+
+"@onekeyfe/hwk-trezor-core@1.1.34-alpha.1":
+  version "1.1.34-alpha.1"
+  resolved "https://registry.npmjs.org/@onekeyfe/hwk-trezor-core/-/hwk-trezor-core-1.1.34-alpha.1.tgz#7c546189c76211109e4a6b0e3d4290608938abe7"
+  integrity sha512-lTkcGwymMGGyQCn6UN+hoqH2q4LjYx97W6KC0IoUEdwNP1Pipa4YjDi0dvRfJaCaYYErgMfhR3Z2/BapqG+dYQ==
+
 "@onekeyfe/react-native-ble-utils@^0.1.3":
   version "0.1.3"
   resolved "https://registry.yarnpkg.com/@onekeyfe/react-native-ble-utils/-/react-native-ble-utils-0.1.3.tgz#5b6b669c53e11b960b77554529d08ef0be2cbf71"
