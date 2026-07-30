@@ -30,8 +30,6 @@ export default class GetPassphraseState extends BaseMethod {
         : undefined
     );
 
-    const passphraseProtection = this.device.getCurrentPassphraseProtection();
-
-    return Promise.resolve(passphraseProtection === true ? passphraseState : undefined);
+    return passphraseState;
   }
 }

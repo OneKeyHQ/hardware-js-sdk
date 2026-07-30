@@ -66,10 +66,9 @@ Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类�
   且都不自动选择其他钱包。
 - V2 先通过 `ProtocolInfoRequest { eventless_wallet_session: true }` 协商无中间固件 Event；
   标准钱包锁定时显式使用 `DeviceSessionAskPin { type: Main }`，不会创建隐藏钱包 Session。
-- 隐藏钱包选择先用 `DeviceSessionAskPassphrase` 或
-  `DeviceSessionAskPin { type: AttachToPin }` 在设备端准备上下文，再用空参数
-  `DeviceSessionGet` 取得最终 Session；恢复缓存使用带 `session_id` 的 `DeviceSessionGet`。
-  空参数请求缺少有效 prepared context 时必须失败，不得隐式创建标准钱包 Session。
+- 创建钱包会话时，`DeviceSessionAskPassphrase` 与 `DeviceSessionAskPin` 必须原子返回
+  完整 `DeviceSession`；`DeviceSessionGet` 只允许携带非空 `session_id` 恢复已有会话。
+  协议不存在 prepared context，也不允许空参数 Get 隐式选择钱包。
 - Pro2 的 `DeviceSessionAskPassphrase` 必须显式携带输入来源：Host 输入发送
   `{ on_device: false, passphrase }`，设备输入发送 `{ on_device: true }`。不得省略
   `on_device`，也不得同时发送设备输入标记和 Host Passphrase。

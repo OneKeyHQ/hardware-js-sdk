@@ -42,17 +42,17 @@ SDK 内部根据协议版本选择 Event 来源和后续动作。
 
 - `PassphraseAck` 是对 firmware `PassphraseRequest` 的中间回复，只表达 Host Passphrase、设备
   Passphrase 或 Attach PIN 三种隐藏钱包进入方式。
-- `DeviceSessionAskPassphrase` 与 `DeviceSessionAskPin(AttachToPin)` 准备访问上下文，
-  前者用 `on_device=true` 选择设备输入，或用 `on_device=false + passphrase` 提供 Host Passphrase，
-  随后的空参数 `DeviceSessionGet` 才返回最终 Session。
+- `DeviceSessionAskPassphrase` 与 `DeviceSessionAskPin` 原子完成验证和钱包切换并直接返回
+  `DeviceSession`；前者用 `on_device=true` 选择设备输入，或用
+  `on_device=false + passphrase` 提供 Host Passphrase。
 - `DeviceSessionGet(session_id)` 承接原 `Initialize(session_id)` 的 Session 恢复语义，
   这不是 `PassphraseAck` 原有能力。
 - `ButtonRequest/ButtonAck` 不改名；它们从 V2 firmware 状态机中删除，设备页面由显式 Ask 命令
   打开，对 App 的阶段提示由 SDK 合成。
 
 ```text
-PassphraseAck(passphrase/on_device)      -> DeviceSessionAskPassphrase({ on_device, passphrase? }) -> DeviceSessionGet({})
-PassphraseAck(on_device_attach_pin)      -> DeviceSessionAskPin(AttachToPin) -> DeviceSessionGet({})
+PassphraseAck(passphrase/on_device)      -> DeviceSessionAskPassphrase({ on_device, passphrase? }) -> DeviceSession
+PassphraseAck(on_device_attach_pin)      -> DeviceSessionAskPin(AttachToPin) -> DeviceSession
 Initialize(session_id)                   -> DeviceSessionGet({ session_id })
 ```
 
@@ -197,10 +197,9 @@ Cancel 必须绑定当前设备和 Transport source；断连时清理请求、UI
 
 - 实现 `DeviceSessionAskPassphrase`、带 `Any/Main/AttachToPin` 类型的 `DeviceSessionAskPin`，
   以及可选 `session_id` 的 `DeviceSessionGet`。
-- Ask 请求成功后保留短时 prepared session；随后空参数 `DeviceSessionGet` 返回最终
-  `session_id + btc_test_address`。
-- 空参数 `DeviceSessionGet` 只能消费同一 Transport source、同一连接 generation 且未过期的
-  prepared session；上下文缺失或失效时返回 `InvalidSession`，不得隐式创建标准钱包。
+- Ask 请求成功后直接返回最终 `session_id + btc_test_address`，不保留跨请求的 prepared 状态。
+- `DeviceSessionGet` 必须携带非空 `session_id`；缺失、长度错误或会话失效均返回
+  `InvalidSession`，不得隐式创建或选择钱包。
 - 删除 seed session 中 Passphrase/Button Host ACK 状态。
 - `DeviceSessionAskPin` 直接显示设备 PIN/指纹页面。
 - 地址、公钥、签名、设置和危险操作直接显示本地 UI。
@@ -215,12 +214,11 @@ Cancel 必须绑定当前设备和 Transport source；断连时清理请求、UI
 - 增加并统一使用钱包 Session coordinator。
 - `passphraseState` 非空时优先表示隐藏钱包；`useEmptyPassphrase=true` 表示标准钱包。
 - Host/设备 Passphrase 意图统一映射到显式 `on_device=false/true` 的
-  `DeviceSessionAskPassphrase`；Attach PIN 映射到
-  `DeviceSessionAskPin(AttachToPin)`，随后统一调用空参数 `DeviceSessionGet`。
-- Host Passphrase 先做 NFKD 规范化，并校验为 1–50 个 UTF-8 字节且不含 NUL；空参数
-  `DeviceSessionGet` 失败后不得通过解锁重试或重新选择钱包来改变原请求身份。
-- `DeviceWalletSessionStore` 继续只缓存 `deviceKey + passphraseState`；标准钱包不增加缓存 key，也不调用
-  `DeviceSessionGet`。
+  `DeviceSessionAskPassphrase`；Attach PIN 映射到 `DeviceSessionAskPin(AttachToPin)`；两者直接
+  返回最终 Session。
+- Host Passphrase 先做 NFKD 规范化，并校验为 1–50 个 UTF-8 字节且不含 NUL。
+- `DeviceWalletSessionStore` 继续只缓存 `deviceKey + passphraseState`；恢复时只调用带
+  `session_id` 的 `DeviceSessionGet`。
 - 复用公共 UI Event 层，不伪造 Transport protobuf Request。
 - V2 收到 firmware UI 中间消息时报告协议错误。
 - 为合成 Event 增加稳定 `source/reason/device` payload。
