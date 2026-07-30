@@ -2,9 +2,8 @@ import React, { useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CoreApi, UiEvent, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { useDeviceStore } from '../../store/deviceStore';
-import { useHardwareStore } from '../../store/hardwareStore';
 
-import { submitPin, submitPassphrase } from '../../services/hardwareService';
+import { submitPin } from '../../services/hardwareService';
 import { EDeviceType } from '@onekeyfe/hd-shared';
 import GlobalDialogManager from '../global/GlobalDialogManager';
 import WebUsbAuthorizeDialog from '../global/WebUsbAuthorizeDialog';
@@ -17,7 +16,11 @@ declare global {
   interface Window {
     globalDialogManager?: {
       showPinDialog: () => void;
-      showPassphraseDialog: () => void;
+      showPassphraseDialog: (options?: {
+        deviceOnly?: boolean;
+        existsAttachPinUser?: boolean;
+        allowProtocolV2Utf8?: boolean;
+      }) => void;
       closeAllDialogs: () => void;
     };
   }
@@ -86,6 +89,7 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
             if (
               latestCurrentDevice &&
               (latestCurrentDevice.deviceType === EDeviceType.Pro ||
+                latestCurrentDevice.deviceType === EDeviceType.Pro2 ||
                 latestCurrentDevice.deviceType === EDeviceType.Touch)
             ) {
               submitPin('@@ONEKEY_INPUT_PIN_IN_DEVICE').catch(console.error);
@@ -95,14 +99,11 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
             break;
 
           case 'ui-request_passphrase': {
-            const hardwareState = useHardwareStore.getState();
-            const shouldAutoSubmit = hardwareState.commonParameters.useEmptyPassphrase;
-
-            if (shouldAutoSubmit) {
-              submitPassphrase('', false, false).catch(console.error);
-            } else {
-              window.globalDialogManager?.showPassphraseDialog();
-            }
+            window.globalDialogManager?.showPassphraseDialog({
+              deviceOnly: message.payload?.deviceOnly === true,
+              existsAttachPinUser: message.payload?.existsAttachPinUser === true,
+              allowProtocolV2Utf8: message.payload?.source === 'wallet-session-coordinator',
+            });
             break;
           }
 

@@ -125,7 +125,7 @@ sequenceDiagram
   opt 阻塞选择 Event
     App->>SDK: uiResponse(UI_RESPONSE.*)
     SDK->>Core: UI_EVENT response
-    Core->>Device: AskPassphrase/AskPin，再 DeviceSessionGet
+    Core->>Device: AskPassphrase/AskPin，直接返回 DeviceSession
   end
   opt 非阻塞提示 Event
     Core->>Device: 原业务命令
@@ -141,8 +141,8 @@ V2 不伪造硬件 `ButtonRequest/PinMatrixRequest/PassphraseRequest`。阻塞 E
 这里的“转换”不是把协议消息换名：
 
 - V1 `PassphraseAck` 是对 firmware 中间请求的回复。
-- V2 把访问准备与 Session 获取拆开：设备 Passphrase 使用 `DeviceSessionAskPassphrase`，
-  Attach PIN 使用 `DeviceSessionAskPin(AttachToPin)`，两者成功后再调用空参数 `DeviceSessionGet`。
+- V2 的设备 Passphrase 使用 `DeviceSessionAskPassphrase`，Attach PIN 使用
+  `DeviceSessionAskPin(AttachToPin)`；两者原子返回 `DeviceSession`。
 - V2 恢复使用 `DeviceSessionGet({ session_id })`；它没有对应的 `PassphraseAck` 语义。
 - 标准钱包锁定时只调用 `DeviceSessionAskPin(Main)`，不调用 `DeviceSessionGet`。
 - `ButtonRequest/ButtonAck` 在 V2 被删除，不能解释成任一新 Session 请求的旧名称。
