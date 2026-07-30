@@ -25,7 +25,7 @@ export default class UploadPortfolio extends FileWrite {
     super.init();
     this.unlockPolicy = 'none';
     // Portfolio is a background write/apply flow and never synthesizes UI events.
-    this.protocolV2UiMode = 'none';
+    this.protocolV2InteractionMode = 'none';
   }
 
   async run() {

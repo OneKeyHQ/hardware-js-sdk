@@ -284,8 +284,10 @@ describe('DeviceSettings protocol routing', () => {
     (method as any).device = device;
 
     expect(method.unlockPolicy).toBe('none');
-    expect(method.protocolV2UiInteraction).toBeUndefined();
-    await expect(method.run()).rejects.toMatchObject({
+    expect(method.protocolV2Interaction).toBeUndefined();
+    await expect(
+      Promise.resolve().then(() => method.validateForDevice(device))
+    ).rejects.toMatchObject({
       errorCode: HardwareErrorCode.CallMethodInvalidParameter,
     });
     expect(typedCall).not.toHaveBeenCalled();
@@ -305,8 +307,10 @@ describe('DeviceSettings protocol routing', () => {
     (method as any).device = device;
 
     expect(method.unlockPolicy).toBe('none');
-    expect(method.protocolV2UiInteraction).toBeUndefined();
-    await expect(method.run()).rejects.toMatchObject({
+    expect(method.protocolV2Interaction).toBeUndefined();
+    await expect(
+      Promise.resolve().then(() => method.validateForDevice(device))
+    ).rejects.toMatchObject({
       errorCode: HardwareErrorCode.CallMethodInvalidParameter,
     });
     expect(typedCall).not.toHaveBeenCalled();
@@ -325,7 +329,9 @@ describe('DeviceSettings protocol routing', () => {
     method.init();
     (method as any).device = device;
 
-    await expect(method.run()).rejects.toMatchObject({
+    await expect(
+      Promise.resolve().then(() => method.validateForDevice(device))
+    ).rejects.toMatchObject({
       errorCode: HardwareErrorCode.CallMethodInvalidParameter,
       message: 'Protocol V2 does not support settings: safetyChecks.',
     });
@@ -387,7 +393,9 @@ describe('DeviceSettings protocol routing', () => {
     method.init();
     (method as any).device = device;
 
-    await expect(method.run()).rejects.toMatchObject({
+    await expect(
+      Promise.resolve().then(() => method.validateForDevice(device))
+    ).rejects.toMatchObject({
       errorCode: HardwareErrorCode.CallMethodInvalidParameter,
     });
     expect(typedCall).not.toHaveBeenCalled();

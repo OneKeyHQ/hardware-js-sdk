@@ -1,6 +1,8 @@
+import { createProtocolV2DeviceInteraction } from './interaction';
+
 import type { DeviceSettings, DeviceSettingsPage } from '@onekeyfe/hd-transport';
 import type { UnlockPolicy } from '../../api/BaseMethod';
-import type { ProtocolV2InteractionDescriptor } from './uiInteraction';
+import type { ProtocolV2DeviceInteraction, ProtocolV2InteractionReason } from './interaction';
 
 const LOCK_FREE_DEVICE_SETTINGS = new Set<keyof DeviceSettings>([
   'language',
@@ -21,40 +23,39 @@ export type ProtocolV2SettingsOperation =
   | {
       kind: 'page';
       page: DeviceSettingsPage;
+      reason?: ProtocolV2InteractionReason;
+      operation?: string;
     };
 
 export const getProtocolV2SettingsBehavior = (
   operation: ProtocolV2SettingsOperation
 ): {
   unlockPolicy: UnlockPolicy;
-  uiInteraction?: ProtocolV2InteractionDescriptor;
+  interaction?: ProtocolV2DeviceInteraction;
 } => {
   if (operation.kind === 'page') {
     return {
       unlockPolicy: 'unlock-before-run',
-      uiInteraction: {
-        request: 'button',
-        source: 'method-lifecycle',
-        reason: 'settings-page',
+      interaction: createProtocolV2DeviceInteraction({
+        kind: 'confirm-on-device',
+        reason: operation.reason ?? 'settings-page',
         completion: 'operation-completed',
-        deviceOnly: true,
         page: operation.page,
-      },
+        operation: operation.operation,
+      }),
     };
   }
 
   return {
     unlockPolicy: getProtocolV2SettingsUnlockPolicy(operation.settings),
-    uiInteraction:
+    interaction:
       typeof operation.settings.label === 'string'
-        ? {
-            request: 'button',
-            source: 'method-lifecycle',
+        ? createProtocolV2DeviceInteraction({
+            kind: 'confirm-on-device',
             reason: 'device-management',
             completion: 'operation-completed',
-            deviceOnly: true,
             operation: 'change-label',
-          }
+          })
         : undefined,
   };
 };

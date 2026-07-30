@@ -238,8 +238,8 @@ requestId/connectId 关联，并在取消、超时、断连和方法结束时清
 - Pro2 `REQUEST_PIN` 是非阻塞设备提示。
 - 非幂等方法不得在收到 locked 响应后重放，只能使用 `unlock-before-run`。
 - 同一设备并发调用共享串行解锁任务。
-- `uploadPortfolio` 通过 `protocolV2UiMode='none'` 明确关闭自动解锁提示；缓存状态已知锁定时
-  可以先解锁，但文件写入与应用流程只执行一次，不产生 `REQUEST_PIN/REQUEST_BUTTON`。
+- `uploadPortfolio` 通过 `protocolV2InteractionMode='none'` 和 `unlockPolicy='none'` 明确关闭自动解锁；
+  文件写入与应用流程只执行一次，不产生 `REQUEST_PIN/REQUEST_BUTTON`。
 
 ## 地址、公钥、签名和设备管理
 

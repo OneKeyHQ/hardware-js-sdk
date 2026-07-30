@@ -3,8 +3,10 @@ import { DeviceSettingsPage } from '@onekeyfe/hd-transport';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { invalidParameter } from '../helpers/filesystemValidation';
+import { getProtocolV2SettingsBehavior } from '../../protocols/protocol-v2/settingsBehavior';
 
 import type { ChangePin } from '@onekeyfe/hd-transport';
+import type { Device } from '../../device/Device';
 
 export default class DeviceChangePin extends BaseMethod<ChangePin> {
   getSupportedProtocols() {
@@ -12,7 +14,6 @@ export default class DeviceChangePin extends BaseMethod<ChangePin> {
   }
 
   init() {
-    this.unlockPolicy = 'unlock-before-run';
     this.useDevicePassphraseState = false;
 
     // check payload
@@ -21,23 +22,26 @@ export default class DeviceChangePin extends BaseMethod<ChangePin> {
     this.params = {
       remove: this.payload.remove,
     };
-    this.protocolV2UiInteraction = {
-      request: 'button',
-      source: 'method-lifecycle',
-      reason: 'change-pin',
-      completion: 'operation-completed',
-      deviceOnly: true,
+    const behavior = getProtocolV2SettingsBehavior({
+      kind: 'page',
       page: DeviceSettingsPage.DevicePinChange,
-    };
+      reason: 'change-pin',
+      operation: 'change-pin',
+    });
+    this.unlockPolicy = behavior.unlockPolicy;
+    this.protocolV2Interaction = behavior.interaction;
+  }
+
+  validateForDevice(device: Device) {
+    if (device.isProtocolV2() && this.params.remove) {
+      throw invalidParameter(
+        'Parameter [remove=true] is not supported by the Pro2 device PIN page.'
+      );
+    }
   }
 
   async run() {
     if (this.device.isProtocolV2()) {
-      if (this.params.remove) {
-        throw invalidParameter(
-          'Parameter [remove=true] is not supported by the Pro2 device PIN page.'
-        );
-      }
       const res = await this.device.commands.typedCall('DeviceSettingsPageShow', 'Success', {
         page: DeviceSettingsPage.DevicePinChange,
       });

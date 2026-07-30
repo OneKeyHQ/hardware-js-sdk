@@ -9,7 +9,7 @@ import {
   mapCommonSettingsToProtocolV2,
   mapDeviceSettingsToState,
 } from '../../device/DeviceStateMapper';
-import { getProtocolV2SettingsBehavior } from '../../protocols/protocol-v2/settingsUnlockPolicy';
+import { getProtocolV2SettingsBehavior } from '../../protocols/protocol-v2/settingsBehavior';
 import {
   DEVICE_SETTINGS_V1_ONLY_FIELDS,
   DEVICE_SETTINGS_V2_ONLY_FIELDS,
@@ -18,6 +18,7 @@ import {
 } from '../../utils/deviceSettings';
 
 import type { ApplySettings } from '@onekeyfe/hd-transport';
+import type { Device } from '../../device/Device';
 import type { DeviceSettingsParams } from '../../types/api/deviceSettings';
 
 const assertSettingsSupported = (
@@ -135,7 +136,7 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
       // V1 may still accept passphrase plus direct settings. Suppress only the
       // Protocol V2 pre-run interaction; run() returns the protocol-specific error.
       this.unlockPolicy = 'none';
-      this.protocolV2UiInteraction = undefined;
+      this.protocolV2Interaction = undefined;
       return;
     }
     const behavior =
@@ -146,7 +147,29 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
           })
         : getProtocolV2SettingsBehavior({ kind: 'page', page });
     this.unlockPolicy = behavior.unlockPolicy;
-    this.protocolV2UiInteraction = behavior.uiInteraction;
+    this.protocolV2Interaction = behavior.interaction;
+  }
+
+  validateForDevice(device: Device) {
+    if (!device.isProtocolV2()) return;
+
+    assertSettingsSupported(this.payload, DEVICE_SETTINGS_V1_ONLY_FIELDS, 'Protocol V2');
+    const capabilities = getDeviceSettingsCapabilities(device.getCurrentDeviceType(), 'V2');
+    assertProtocolV2SettingValues(this.payload, capabilities);
+
+    const settings = mapCommonSettingsToProtocolV2(this.payload);
+    const hasPassphrasePage = this.payload.usePassphrase !== undefined;
+    const hasAirgapPage = this.payload.airgapMode !== undefined;
+    if (hasPassphrasePage && hasAirgapPage) {
+      throw invalidParameter(
+        'Protocol V2 passphrase and air-gap settings must be changed in separate calls.'
+      );
+    }
+    if ((hasPassphrasePage || hasAirgapPage) && Object.keys(settings).length > 0) {
+      throw invalidParameter(
+        'Protocol V2 on-device settings must not be combined with direct settings.'
+      );
+    }
   }
 
   getVersionRange() {
@@ -163,28 +186,9 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
   async run() {
     try {
       if (this.device.isProtocolV2()) {
-        assertSettingsSupported(this.payload, DEVICE_SETTINGS_V1_ONLY_FIELDS, 'Protocol V2');
-        const capabilities = getDeviceSettingsCapabilities(
-          this.device.getCurrentDeviceType(),
-          'V2'
-        );
-        assertProtocolV2SettingValues(this.payload, capabilities);
         const settings = mapCommonSettingsToProtocolV2(this.payload);
         const requestedPassphrase = this.payload.usePassphrase;
         const requestedAirgap = this.payload.airgapMode;
-        const hasPassphrasePage = requestedPassphrase !== undefined;
-        const hasAirgapPage = requestedAirgap !== undefined;
-
-        if (hasPassphrasePage && hasAirgapPage) {
-          throw invalidParameter(
-            'Protocol V2 passphrase and air-gap settings must be changed in separate calls.'
-          );
-        }
-        if ((hasPassphrasePage || hasAirgapPage) && Object.keys(settings).length > 0) {
-          throw invalidParameter(
-            'Protocol V2 on-device settings must not be combined with direct settings.'
-          );
-        }
         if (requestedPassphrase !== undefined) {
           const current = await this.device.getDeviceState({ refreshSections: ['status'] });
           if (current.status.passphraseProtection === requestedPassphrase) {

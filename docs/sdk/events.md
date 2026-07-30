@@ -168,8 +168,9 @@ Event 必须在取消、超时、断连和方法结束时清理。
 `DeviceLocked` 后合成的非阻塞“请在设备解锁”提示，不接受 PIN 响应。
 
 该提示由统一交互协调器生成，payload 包含 `source='unlock-coordinator'`、
-`reason='device-locked'`、`deviceOnly=true` 和触发方法名。设备解锁后 SDK 在原调用内最多重试一次，
-App 不重发业务请求。声明 `protocolV2UiMode='none'` 的后台方法不会生成该提示。
+`reason='device-locked'`、`deviceOnly=true` 和触发方法名。只有声明 `retry-on-locked` 的安全重放
+白名单方法会在设备解锁后最多重试一次；`unlock-before-run` 方法进入 `run()` 后不会重放。
+App 不重发业务请求。声明 `protocolV2InteractionMode='none'` 的后台方法不会生成该提示。
 
 软件输入：
 
@@ -288,8 +289,9 @@ V1 用户选择设备端输入后，设备可能返回 `ButtonRequest_Passphrase
 | `CLOSE_UI_WINDOW`     | Core 流程生成 | 调用结束、取消、错误退出或下一次调用初始化 | 收起当前硬件交互 UI |
 | `CLOSE_UI_PIN_WINDOW` | Core 流程生成 | Passphrase 安全检查完成或批量流程结束      | 只收起 PIN 相关 UI  |
 
-关闭事件是状态通知，不代表一个新的业务失败，也不需要回传。App 收到关闭通知时只幂等收起 UI，
-不能反向触发第二次 Cancel；只有用户主动关闭/取消交互时才取消当前 SDK 调用。
+关闭事件是状态通知，不代表一个新的业务失败，也不需要回传。一次合成交互结束时 Core 只发送一次
+关闭通知；App 收到后仍应幂等收起 UI，不能反向触发第二次 Cancel；只有用户主动关闭/取消交互时
+才取消当前 SDK 调用。
 
 ## 进度和中间结果
 

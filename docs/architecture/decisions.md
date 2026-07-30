@@ -103,24 +103,47 @@ Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类�
 - `packages/core/src/protocols/protocol-v2/walletSession.ts`
 - `packages/core/src/device/Device.ts`
 
-## 受保护方法的单次解锁重试
+## 受保护方法的解锁协调
 
 自动解锁会产生用户交互，也可能造成有副作用请求重复执行，因此必须由方法显式声明：
 
 - `BaseMethod` 默认使用 `unlockPolicy = 'none'`；安全重放方法由完整显式白名单声明
   `unlockPolicy = 'retry-on-locked'`。
-- 有副作用的方法只能声明 `unlockPolicy = 'unlock-before-run'`：已知设备锁定时先解锁，
-  但收到 locked 响应后不重放原操作。
+- 有副作用的方法只能声明 `unlockPolicy = 'unlock-before-run'`：仅当执行前缓存状态明确为锁定时先解锁；
+  一旦进入 `run()`，Core 不得因为后续 `DeviceLocked` 重放整个方法。
+- 超时、断连、I/O、帧错误和其他执行结果不明确的失败不得触发重试。
 - 只有结构化 `HardwareErrorCode.DeviceLocked` 会触发解锁。
-- 解锁成功后原方法最多重试一次；取消、解锁失败或第二次调用失败时直接返回错误。
+- 只有 `retry-on-locked` 白名单方法在解锁成功后最多重试一次；取消、解锁失败或第二次调用失败时
+  直接返回错误。
 - Protocol V1、未声明策略的方法和其他错误不进入自动解锁流程。
 - 锁定错误优先依据 Protocol V2 Failure 的 code/subcode，消息文本只作兼容回退。
 
 主要实现：
 
 - `packages/core/src/api/BaseMethod.ts`
-- `packages/core/src/protocols/protocol-v2/unlockRetry.ts`
+- `packages/core/src/protocols/protocol-v2/methodLifecycle.ts`
 - `packages/core/src/device/DeviceCommands.ts`
+
+## Protocol V2 方法交互与调用前校验
+
+Protocol V2 不依赖固件 `ButtonRequest` 驱动 UI。Core 使用内部设备交互意图描述业务语义，再由
+兼容适配器转换为现有公共 UI 事件：
+
+- `BaseMethod.protocolV2Interaction` 只能声明设备侧确认、设备侧 PIN、原因、页面和操作等业务意图，
+  不得直接声明 `REQUEST_BUTTON`、`REQUEST_PIN`、`source` 或 `deviceOnly` 等公共事件字段。
+- `ProtocolV2UiInteractionCoordinator` 是唯一将内部意图映射为旧 UI 事件并负责去重、恢复和关闭的层。
+- 方法通过 `validateForDevice()` 执行依赖真实协议或设备能力的同步校验；该钩子必须在解锁、UI 事件和
+  `run()` 之前执行，不得发送设备命令。
+- Protocol V2 settings 页面统一通过 `settingsBehavior` 生成解锁策略和交互意图，避免页面、策略和 UI
+  元数据在不同方法中重复定义。
+- Protocol V1 继续使用固件事件，内部 Protocol V2 意图不得改变其事件和命令行为。
+
+主要实现：
+
+- `packages/core/src/protocols/protocol-v2/interaction.ts`
+- `packages/core/src/protocols/protocol-v2/uiInteraction.ts`
+- `packages/core/src/protocols/protocol-v2/methodLifecycle.ts`
+- `packages/core/src/protocols/protocol-v2/settingsBehavior.ts`
 
 ## 方法协议能力与固件版本边界
 

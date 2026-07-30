@@ -1,6 +1,7 @@
 import { DeviceSettingsPage } from '@onekeyfe/hd-transport';
 
 import { BaseMethod } from '../BaseMethod';
+import { getProtocolV2SettingsBehavior } from '../../protocols/protocol-v2/settingsBehavior';
 
 import type { WipeDevice } from '@onekeyfe/hd-transport';
 
@@ -10,17 +11,15 @@ export default class DeviceWipe extends BaseMethod<WipeDevice> {
   }
 
   init() {
-    this.unlockPolicy = 'unlock-before-run';
     this.useDevicePassphraseState = false;
-    this.protocolV2UiInteraction = {
-      request: 'button',
-      source: 'method-lifecycle',
-      reason: 'device-management',
-      completion: 'operation-completed',
-      deviceOnly: true,
+    const behavior = getProtocolV2SettingsBehavior({
+      kind: 'page',
       page: DeviceSettingsPage.DeviceReset,
+      reason: 'device-management',
       operation: 'wipe-device',
-    };
+    });
+    this.unlockPolicy = behavior.unlockPolicy;
+    this.protocolV2Interaction = behavior.interaction;
   }
 
   async run() {

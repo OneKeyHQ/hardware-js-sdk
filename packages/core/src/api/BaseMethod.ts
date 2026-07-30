@@ -25,12 +25,12 @@ import type { Device } from '../device/Device';
 import type DeviceConnector from '../device/DeviceConnector';
 import type { DeviceFirmwareRange, KnownDevice } from '../types';
 import type { CoreMessage } from '../events';
-import type { ProtocolV2InteractionDescriptor } from '../protocols/protocol-v2/uiInteraction';
+import type { ProtocolV2DeviceInteraction } from '../protocols/protocol-v2/interaction';
 import type { RequestContext } from '../utils/tracing';
 import type { CoreContext } from '../core';
 
 export type { UnlockPolicy } from '../protocols/protocol-v2/unlockPolicy';
-export type ProtocolV2UiMode = 'auto' | 'none';
+export type ProtocolV2InteractionMode = 'auto' | 'none';
 
 const Log = getLogger(LoggerNames.Method);
 
@@ -185,11 +185,11 @@ export abstract class BaseMethod<Params = undefined> {
     }
   }
 
-  /** Non-blocking Protocol V2 interaction synthesized by the SDK. */
-  protocolV2UiInteraction?: ProtocolV2InteractionDescriptor;
+  /** Device-side interaction intent used by the Protocol V2 compatibility adapter. */
+  protocolV2Interaction?: ProtocolV2DeviceInteraction;
 
   /** Special background methods may suppress all synthesized Protocol V2 UI events. */
-  protocolV2UiMode: ProtocolV2UiMode = 'auto';
+  protocolV2InteractionMode: ProtocolV2InteractionMode = 'auto';
 
   protected throwIfAborted() {
     if (this.abortSignal?.aborted) {
@@ -221,6 +221,8 @@ export abstract class BaseMethod<Params = undefined> {
   }
 
   abstract init(): void;
+
+  validateForDevice(_device: Device): void {}
 
   abstract run(): Promise<any>;
 

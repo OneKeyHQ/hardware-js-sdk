@@ -69,7 +69,7 @@ import {
   getProtocolV2WalletSession,
   refreshProtocolV2DeviceStatus,
 } from '../src/protocols/protocol-v2/walletSession';
-import { runMethodWithUnlockRetry } from '../src/protocols/protocol-v2/unlockRetry';
+import { runMethodWithProtocolV2Lifecycle } from '../src/protocols/protocol-v2/methodLifecycle';
 import { BaseMethod } from '../src/api/BaseMethod';
 import {
   buildProtocolV1FeaturesPayload,
@@ -231,7 +231,7 @@ describe('UploadPortfolio', () => {
     (method as any).device = device;
 
     method.init();
-    await runMethodWithUnlockRetry(method, device as any);
+    await runMethodWithProtocolV2Lifecycle(method, device as any);
 
     expect(unlockDevice).not.toHaveBeenCalled();
     expect(typedCall).toHaveBeenNthCalledWith(
@@ -264,8 +264,8 @@ describe('UploadPortfolio', () => {
     const result = await method.run();
 
     expect(method.unlockPolicy).toBe('none');
-    expect(method.protocolV2UiMode).toBe('none');
-    expect(method.protocolV2UiInteraction).toBeUndefined();
+    expect(method.protocolV2InteractionMode).toBe('none');
+    expect(method.protocolV2Interaction).toBeUndefined();
     expect(method.payload.emitProgress).toBe(false);
     expect(typedCall).toHaveBeenNthCalledWith(
       1,
@@ -5555,6 +5555,37 @@ describe('Protocol V2 protected method execution', () => {
       errorCode: HardwareErrorCode.DeviceLocked,
     });
 
+  test('validates device-specific parameters before unlock, UI, or method execution', async () => {
+    const validationError = new Error('Unsupported Protocol V2 parameters');
+    const method = {
+      name: 'deviceChangePin',
+      unlockPolicy: 'unlock-before-run',
+      validateForDevice: jest.fn(() => {
+        throw validationError;
+      }),
+      run: jest.fn().mockResolvedValue({ message: 'unexpected' }),
+    };
+    const device = {
+      features: { unlocked: false },
+      isProtocolV2: () => true,
+      unlockDevice: jest.fn(),
+    };
+    const uiCoordinator = {
+      enterMethodInteraction: jest.fn(),
+      enterUnlockInteraction: jest.fn(),
+      resumeMethodInteraction: jest.fn(),
+    };
+
+    await expect(
+      runMethodWithProtocolV2Lifecycle(method as any, device as any, uiCoordinator as any)
+    ).rejects.toBe(validationError);
+    expect(method.validateForDevice).toHaveBeenCalledWith(device);
+    expect(device.unlockDevice).not.toHaveBeenCalled();
+    expect(uiCoordinator.enterUnlockInteraction).not.toHaveBeenCalled();
+    expect(uiCoordinator.enterMethodInteraction).not.toHaveBeenCalled();
+    expect(method.run).not.toHaveBeenCalled();
+  });
+
   test('does not replay SDK methods unless they are explicitly classified as retry-safe', () => {
     class TestBusinessMethod extends BaseMethod {
       init() {}
@@ -5594,12 +5625,10 @@ describe('Protocol V2 protected method execution', () => {
 
     method.init();
 
-    expect(method.protocolV2UiInteraction).toEqual({
-      request: 'button',
-      source: 'method-lifecycle',
+    expect(method.protocolV2Interaction).toEqual({
+      kind: 'confirm-on-device',
       reason: 'device-management',
       completion: 'operation-completed',
-      deviceOnly: true,
       operation: 'change-label',
     });
   });
@@ -5622,7 +5651,11 @@ describe('Protocol V2 protected method execution', () => {
     const method = {
       name: 'testBusinessMethod',
       unlockPolicy: 'retry-on-locked',
-      protocolV2UiInteraction: { reason: 'settings-page' },
+      protocolV2Interaction: {
+        kind: 'confirm-on-device',
+        reason: 'settings-page',
+        completion: 'operation-completed',
+      },
       run: jest
         .fn()
         .mockImplementationOnce(() => {
@@ -5648,7 +5681,7 @@ describe('Protocol V2 protected method execution', () => {
     };
 
     await expect(
-      runMethodWithUnlockRetry(method as any, device as any, uiCoordinator as any)
+      runMethodWithProtocolV2Lifecycle(method as any, device as any, uiCoordinator as any)
     ).resolves.toEqual({ message: 'ok' });
     expect(calls).toEqual([
       'method-prompt',
@@ -5711,7 +5744,7 @@ describe('Protocol V2 protected method execution', () => {
       updateInternalState: jest.fn(() => calls.push('validate-hidden-session')),
     };
 
-    await expect(runMethodWithUnlockRetry(method as any, device as any)).resolves.toEqual({
+    await expect(runMethodWithProtocolV2Lifecycle(method as any, device as any)).resolves.toEqual({
       message: 'ok',
     });
     expect(calls).toEqual([
@@ -5756,7 +5789,9 @@ describe('Protocol V2 protected method execution', () => {
       updateInternalState: jest.fn(),
     };
 
-    await expect(runMethodWithUnlockRetry(method as any, device as any)).rejects.toBe(restoreError);
+    await expect(runMethodWithProtocolV2Lifecycle(method as any, device as any)).rejects.toBe(
+      restoreError
+    );
     expect(method.run).toHaveBeenCalledTimes(1);
     expect(device.unlockDevice).toHaveBeenCalledTimes(1);
     expect(device.clearInternalState).toHaveBeenCalledTimes(1);
@@ -5815,7 +5850,7 @@ describe('Protocol V2 protected method execution', () => {
       updateInternalState: jest.fn(() => calls.push('validate-hidden-session')),
     };
 
-    await expect(runMethodWithUnlockRetry(method as any, device as any)).resolves.toEqual({
+    await expect(runMethodWithProtocolV2Lifecycle(method as any, device as any)).resolves.toEqual({
       message: 'ok',
     });
     expect(device.unlockDevice).toHaveBeenCalledWith();
@@ -5843,7 +5878,7 @@ describe('Protocol V2 protected method execution', () => {
       unlockDevice: jest.fn().mockResolvedValue(undefined),
     };
 
-    await expect(runMethodWithUnlockRetry(method as any, device as any)).resolves.toEqual({
+    await expect(runMethodWithProtocolV2Lifecycle(method as any, device as any)).resolves.toEqual({
       address: 'standard-wallet-address',
     });
     expect(device.unlockDevice).toHaveBeenCalledTimes(1);
@@ -5855,7 +5890,11 @@ describe('Protocol V2 protected method execution', () => {
     const method = {
       name: 'deviceSettingsPageShow',
       unlockPolicy: 'unlock-before-run',
-      protocolV2UiInteraction: { reason: 'settings-page' },
+      protocolV2Interaction: {
+        kind: 'confirm-on-device',
+        reason: 'settings-page',
+        completion: 'operation-completed',
+      },
       run: jest.fn(() => {
         calls.push('run');
         return Promise.resolve({ message: 'ok' });
@@ -5876,11 +5915,57 @@ describe('Protocol V2 protected method execution', () => {
     };
 
     await expect(
-      runMethodWithUnlockRetry(method as any, device as any, uiCoordinator as any)
+      runMethodWithProtocolV2Lifecycle(method as any, device as any, uiCoordinator as any)
     ).resolves.toEqual({ message: 'ok' });
     expect(calls).toEqual(['unlock-prompt', 'unlock', 'method-prompt', 'run']);
     expect(method.run).toHaveBeenCalledTimes(1);
     expect(uiCoordinator.enterMethodInteraction).toHaveBeenCalledTimes(1);
+    expect(uiCoordinator.resumeMethodInteraction).not.toHaveBeenCalled();
+  });
+
+  test('does not replay an unlock-before-run method when cached status is stale', async () => {
+    const calls: string[] = [];
+    const error = deviceLockedError();
+    const method = {
+      name: 'deviceSettingsPageShow',
+      unlockPolicy: 'unlock-before-run',
+      protocolV2Interaction: {
+        kind: 'confirm-on-device',
+        reason: 'settings-page',
+        completion: 'operation-completed',
+      },
+      run: jest
+        .fn()
+        .mockImplementationOnce(() => {
+          calls.push('run-1');
+          return Promise.reject(error);
+        })
+        .mockImplementationOnce(() => {
+          calls.push('run-2');
+          return Promise.resolve({ message: 'ok' });
+        }),
+    };
+    const device = {
+      features: { unlocked: true },
+      isProtocolV2: () => true,
+      unlockDevice: jest.fn(() => {
+        calls.push('unlock');
+        return Promise.resolve();
+      }),
+    };
+    const uiCoordinator = {
+      enterMethodInteraction: jest.fn(() => calls.push('method-prompt')),
+      enterUnlockInteraction: jest.fn(() => calls.push('unlock-prompt')),
+      resumeMethodInteraction: jest.fn(() => calls.push('method-prompt')),
+    };
+
+    await expect(
+      runMethodWithProtocolV2Lifecycle(method as any, device as any, uiCoordinator as any)
+    ).rejects.toBe(error);
+    expect(calls).toEqual(['method-prompt', 'run-1']);
+    expect(method.run).toHaveBeenCalledTimes(1);
+    expect(device.unlockDevice).not.toHaveBeenCalled();
+    expect(uiCoordinator.enterUnlockInteraction).not.toHaveBeenCalled();
     expect(uiCoordinator.resumeMethodInteraction).not.toHaveBeenCalled();
   });
 
@@ -5902,14 +5987,12 @@ describe('Protocol V2 protected method execution', () => {
       resumeMethodInteraction: jest.fn(),
     };
 
-    await runMethodWithUnlockRetry(method as any, device as any, uiCoordinator as any);
+    await runMethodWithProtocolV2Lifecycle(method as any, device as any, uiCoordinator as any);
 
     expect(uiCoordinator.enterMethodInteraction).toHaveBeenCalledWith({
-      request: 'button',
-      source: 'method-lifecycle',
+      kind: 'confirm-on-device',
       reason: 'signing-confirmation',
       completion: 'operation-completed',
-      deviceOnly: true,
       operation: 'evmSignMessage',
     });
   });
@@ -5929,7 +6012,9 @@ describe('Protocol V2 protected method execution', () => {
         unlockDevice: jest.fn(),
       };
 
-      await expect(runMethodWithUnlockRetry(method as any, device as any)).rejects.toBe(error);
+      await expect(runMethodWithProtocolV2Lifecycle(method as any, device as any)).rejects.toBe(
+        error
+      );
       expect(device.unlockDevice).not.toHaveBeenCalled();
       expect(method.run).toHaveBeenCalledTimes(1);
     }
@@ -5939,7 +6024,7 @@ describe('Protocol V2 protected method execution', () => {
     const method = {
       name: 'uploadPortfolio',
       unlockPolicy: 'none',
-      protocolV2UiMode: 'none',
+      protocolV2InteractionMode: 'none',
       run: jest.fn().mockResolvedValue({ message: 'ok' }),
     };
     const device = {
@@ -5954,7 +6039,7 @@ describe('Protocol V2 protected method execution', () => {
     };
 
     await expect(
-      runMethodWithUnlockRetry(method as any, device as any, uiCoordinator as any)
+      runMethodWithProtocolV2Lifecycle(method as any, device as any, uiCoordinator as any)
     ).resolves.toEqual({ message: 'ok' });
     expect(device.unlockDevice).not.toHaveBeenCalled();
     expect(uiCoordinator.enterMethodInteraction).not.toHaveBeenCalled();
@@ -5975,7 +6060,9 @@ describe('Protocol V2 protected method execution', () => {
       unlockDevice: jest.fn(),
     };
 
-    await expect(runMethodWithUnlockRetry(method as any, device as any)).rejects.toBe(error);
+    await expect(runMethodWithProtocolV2Lifecycle(method as any, device as any)).rejects.toBe(
+      error
+    );
     expect(method.run).toHaveBeenCalledTimes(1);
     expect(device.unlockDevice).not.toHaveBeenCalled();
   });
@@ -5998,7 +6085,7 @@ describe('Protocol V2 protected method execution', () => {
     };
 
     await expect(
-      runMethodWithUnlockRetry(
+      runMethodWithProtocolV2Lifecycle(
         unlockFailMethod as any,
         unlockFailDevice as any,
         unlockFailCoordinator as any
@@ -6024,7 +6111,7 @@ describe('Protocol V2 protected method execution', () => {
     };
 
     await expect(
-      runMethodWithUnlockRetry(
+      runMethodWithProtocolV2Lifecycle(
         retryFailMethod as any,
         retryFailDevice as any,
         retryFailCoordinator as any
@@ -6069,12 +6156,10 @@ describe('Protocol V2 current low-level methods', () => {
       page: DeviceSettingsPage.DeviceReset,
     });
     expect(v2InvalidateAfterWipe).toHaveBeenCalledTimes(1);
-    expect(v2Method.protocolV2UiInteraction).toEqual({
-      request: 'button',
-      source: 'method-lifecycle',
+    expect(v2Method.protocolV2Interaction).toEqual({
+      kind: 'confirm-on-device',
       reason: 'device-management',
       completion: 'operation-completed',
-      deviceOnly: true,
       page: DeviceSettingsPage.DeviceReset,
       operation: 'wipe-device',
     });
@@ -6127,32 +6212,43 @@ describe('Protocol V2 current low-level methods', () => {
     expect(v2TypedCall).toHaveBeenCalledWith('DeviceSettingsPageShow', 'Success', {
       page: DeviceSettingsPage.DevicePinChange,
     });
-    expect(v2Method.protocolV2UiInteraction).toEqual({
-      request: 'button',
-      source: 'method-lifecycle',
+    expect(v2Method.protocolV2Interaction).toEqual({
+      kind: 'confirm-on-device',
       reason: 'change-pin',
       completion: 'operation-completed',
-      deviceOnly: true,
       page: DeviceSettingsPage.DevicePinChange,
+      operation: 'change-pin',
     });
   });
 
   test('rejects removing a PIN through the Pro2 page-only Change PIN flow', async () => {
     const typedCall = jest.fn();
+    const unlockDevice = jest.fn();
+    const uiCoordinator = {
+      enterMethodInteraction: jest.fn(),
+      enterUnlockInteraction: jest.fn(),
+      resumeMethodInteraction: jest.fn(),
+    };
     const method = new DeviceChangePin({
       id: 1,
       payload: { method: 'deviceChangePin', remove: true },
     });
     method.init();
-    (method as any).device = stubDevice({
+    const device = stubDevice({
+      features: { unlocked: false },
       isProtocolV2: () => true,
+      unlockDevice,
       commands: { typedCall },
     });
+    (method as any).device = device;
 
-    await expect(method.run()).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.CallMethodInvalidParameter,
-    });
+    await expect(
+      runMethodWithProtocolV2Lifecycle(method, device as any, uiCoordinator as any)
+    ).rejects.toMatchObject({ errorCode: HardwareErrorCode.CallMethodInvalidParameter });
     expect(typedCall).not.toHaveBeenCalled();
+    expect(unlockDevice).not.toHaveBeenCalled();
+    expect(uiCoordinator.enterUnlockInteraction).not.toHaveBeenCalled();
+    expect(uiCoordinator.enterMethodInteraction).not.toHaveBeenCalled();
   });
 
   test('sends ProtocolInfoRequest from protocolInfoRequest', async () => {
@@ -6214,12 +6310,10 @@ describe('Protocol V2 current low-level methods', () => {
     });
     method.init();
 
-    expect(method.protocolV2UiInteraction).toEqual({
-      request: 'pin',
-      source: 'method-lifecycle',
+    expect(method.protocolV2Interaction).toEqual({
+      kind: 'enter-pin-on-device',
       reason: 'device-unlock',
       completion: 'operation-completed',
-      deviceOnly: true,
       operation: 'unlock-device',
     });
   });

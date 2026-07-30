@@ -1,4 +1,5 @@
 import { BaseMethod } from '../BaseMethod';
+import { createProtocolV2DeviceInteraction } from '../../protocols/protocol-v2/interaction';
 
 import type { LockDevice } from '@onekeyfe/hd-transport';
 
@@ -10,14 +11,12 @@ export default class DeviceUnlock extends BaseMethod<LockDevice> {
   init() {
     this.useDevicePassphraseState = false;
     this.unlockPolicy = 'none';
-    this.protocolV2UiInteraction = {
-      request: 'pin',
-      source: 'method-lifecycle',
+    this.protocolV2Interaction = createProtocolV2DeviceInteraction({
+      kind: 'enter-pin-on-device',
       reason: 'device-unlock',
       completion: 'operation-completed',
-      deviceOnly: true,
       operation: 'unlock-device',
-    };
+    });
   }
 
   async run() {

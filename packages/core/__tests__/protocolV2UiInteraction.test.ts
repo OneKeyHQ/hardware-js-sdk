@@ -1,9 +1,11 @@
 import { UI_REQUEST } from '../src/events';
+import { ProtocolV2UiInteractionCoordinator } from '../src/protocols/protocol-v2/uiInteraction';
 import {
-  ProtocolV2UiInteractionCoordinator,
-  isProtocolV2UiEnabled,
-  resolveProtocolV2UiInteraction,
-} from '../src/protocols/protocol-v2/uiInteraction';
+  isProtocolV2InteractionEnabled,
+  resolveProtocolV2DeviceInteraction,
+} from '../src/protocols/protocol-v2/interaction';
+import { getProtocolV2SettingsBehavior } from '../src/protocols/protocol-v2/settingsBehavior';
+import { DeviceSettingsPage } from '@onekeyfe/hd-transport';
 
 const createDevice = (protocolV2 = true) => ({
   isProtocolV2: jest.fn(() => protocolV2),
@@ -11,12 +13,30 @@ const createDevice = (protocolV2 = true) => ({
 });
 
 const changePinInteraction = {
-  request: 'button',
-  source: 'method-lifecycle',
+  kind: 'confirm-on-device',
   reason: 'change-pin',
   completion: 'page-accepted',
-  deviceOnly: true,
 } as const;
+
+test('describes a settings page as a device interaction intent without legacy UI fields', () => {
+  expect(
+    getProtocolV2SettingsBehavior({
+      kind: 'page',
+      page: DeviceSettingsPage.DevicePinChange,
+      reason: 'change-pin',
+      operation: 'change-pin',
+    } as any)
+  ).toEqual({
+    unlockPolicy: 'unlock-before-run',
+    interaction: {
+      kind: 'confirm-on-device',
+      reason: 'change-pin',
+      completion: 'operation-completed',
+      page: DeviceSettingsPage.DevicePinChange,
+      operation: 'change-pin',
+    },
+  });
+});
 
 describe('ProtocolV2UiInteractionCoordinator', () => {
   test('does not synthesize UI events for Protocol V1 devices', () => {
@@ -60,11 +80,9 @@ describe('ProtocolV2UiInteractionCoordinator', () => {
     const coordinator = new ProtocolV2UiInteractionCoordinator(createDevice() as any, postMessage);
 
     coordinator.enterMethodInteraction({
-      request: 'pin',
-      source: 'method-lifecycle',
+      kind: 'enter-pin-on-device',
       reason: 'device-unlock',
       completion: 'operation-completed',
-      deviceOnly: true,
       operation: 'unlock-device',
     });
 
@@ -111,8 +129,8 @@ describe('ProtocolV2UiInteractionCoordinator', () => {
 
     const coordinator = new ProtocolV2UiInteractionCoordinator(createDevice() as any, postMessage);
     coordinator.enterMethodInteraction(changePinInteraction);
-    coordinator.close();
-    coordinator.close();
+    expect(coordinator.close()).toBe(true);
+    expect(coordinator.close()).toBe(false);
 
     expect(postMessage.mock.calls.map(([message]) => message.type)).toEqual([
       UI_REQUEST.REQUEST_BUTTON,
@@ -131,19 +149,19 @@ describe('ProtocolV2UiInteractionCoordinator', () => {
   });
 
   test('disables both synthesized prompts and compatibility close events for Portfolio', () => {
-    expect(isProtocolV2UiEnabled({ protocolV2UiMode: 'none' })).toBe(false);
-    expect(isProtocolV2UiEnabled({ protocolV2UiMode: 'auto' })).toBe(true);
-    expect(isProtocolV2UiEnabled({})).toBe(true);
+    expect(isProtocolV2InteractionEnabled({ protocolV2InteractionMode: 'none' })).toBe(false);
+    expect(isProtocolV2InteractionEnabled({ protocolV2InteractionMode: 'auto' })).toBe(true);
+    expect(isProtocolV2InteractionEnabled({})).toBe(true);
   });
 });
 
-describe('resolveProtocolV2UiInteraction', () => {
+describe('resolveProtocolV2DeviceInteraction', () => {
   test('keeps explicit method metadata as the highest-priority policy', () => {
     expect(
-      resolveProtocolV2UiInteraction({
+      resolveProtocolV2DeviceInteraction({
         name: 'evmSignMessage',
         params: {},
-        protocolV2UiInteraction: changePinInteraction,
+        protocolV2Interaction: changePinInteraction,
       })
     ).toBe(changePinInteraction);
   });
@@ -153,23 +171,21 @@ describe('resolveProtocolV2UiInteraction', () => {
     ['btcGetPublicKey', 'public-key-confirmation'],
   ])('synthesizes display confirmation metadata for %s', (name, reason) => {
     expect(
-      resolveProtocolV2UiInteraction({
+      resolveProtocolV2DeviceInteraction({
         name,
         params: [{ show_display: false }, { show_display: true }],
       })
     ).toEqual({
-      request: 'button',
-      source: 'method-lifecycle',
+      kind: 'confirm-on-device',
       reason,
       completion: 'operation-completed',
-      deviceOnly: true,
       operation: name,
     });
   });
 
   test.each(['evmGetAddress', 'btcGetPublicKey'])('keeps non-display %s calls eventless', name => {
     expect(
-      resolveProtocolV2UiInteraction({
+      resolveProtocolV2DeviceInteraction({
         name,
         params: [{ show_display: false }],
       })
@@ -178,7 +194,7 @@ describe('resolveProtocolV2UiInteraction', () => {
 
   test('uses the public address payload for aggregate address methods', () => {
     expect(
-      resolveProtocolV2UiInteraction({
+      resolveProtocolV2DeviceInteraction({
         name: 'allNetworkGetAddress',
         params: undefined,
         payload: {
@@ -193,7 +209,7 @@ describe('resolveProtocolV2UiInteraction', () => {
 
   test('covers the loop-based aggregate address method', () => {
     expect(
-      resolveProtocolV2UiInteraction({
+      resolveProtocolV2DeviceInteraction({
         name: 'allNetworkGetAddressByLoop',
         payload: { bundle: [{ showOnOneKey: true }] },
       })
@@ -214,12 +230,10 @@ describe('resolveProtocolV2UiInteraction', () => {
     'evmVerifyMessage',
     'starcoinVerifyMessage',
   ])('synthesizes one generic signing confirmation for %s', name => {
-    expect(resolveProtocolV2UiInteraction({ name, params: {} })).toEqual({
-      request: 'button',
-      source: 'method-lifecycle',
+    expect(resolveProtocolV2DeviceInteraction({ name, params: {} })).toEqual({
+      kind: 'confirm-on-device',
       reason: 'signing-confirmation',
       completion: 'operation-completed',
-      deviceOnly: true,
       operation: name,
     });
   });
@@ -228,20 +242,20 @@ describe('resolveProtocolV2UiInteraction', () => {
     'uses the display flag for interactive cryptographic method %s',
     name => {
       expect(
-        resolveProtocolV2UiInteraction({ name, params: { show_display: true } })
+        resolveProtocolV2DeviceInteraction({ name, params: { show_display: true } })
       ).toMatchObject({
         reason: 'signing-confirmation',
         operation: name,
       });
       expect(
-        resolveProtocolV2UiInteraction({ name, params: { show_display: false } })
+        resolveProtocolV2DeviceInteraction({ name, params: { show_display: false } })
       ).toBeUndefined();
     }
   );
 
   test('only prompts for cipherKeyValue when the active direction asks for confirmation', () => {
     expect(
-      resolveProtocolV2UiInteraction({
+      resolveProtocolV2DeviceInteraction({
         name: 'cipherKeyValue',
         params: [{ encrypt: true, ask_on_encrypt: true, ask_on_decrypt: false }],
       })
@@ -250,7 +264,7 @@ describe('resolveProtocolV2UiInteraction', () => {
       operation: 'cipherKeyValue',
     });
     expect(
-      resolveProtocolV2UiInteraction({
+      resolveProtocolV2DeviceInteraction({
         name: 'cipherKeyValue',
         params: [{ encrypt: false, ask_on_encrypt: true, ask_on_decrypt: false }],
       })
@@ -260,7 +274,7 @@ describe('resolveProtocolV2UiInteraction', () => {
   test.each(['deviceVerify', 'deviceStatusGet', 'uploadPortfolio'])(
     'does not infer an interaction for %s',
     name => {
-      expect(resolveProtocolV2UiInteraction({ name, params: {} })).toBeUndefined();
+      expect(resolveProtocolV2DeviceInteraction({ name, params: {} })).toBeUndefined();
     }
   );
 });
