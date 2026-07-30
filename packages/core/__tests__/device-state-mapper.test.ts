@@ -1,6 +1,6 @@
 import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
 
-import { Enum_SafetyCheckLevel } from '@onekeyfe/hd-transport';
+import { DeviceType, Enum_SafetyCheckLevel } from '@onekeyfe/hd-transport';
 import {
   mapApplySettingsToState,
   mapDeviceSettingsToState,
@@ -109,7 +109,7 @@ describe('DeviceStateMapper', () => {
     const patch = mapProtocolV2DeviceInfoToState(
       {
         protocol_version: 2,
-        hw: { serial_no: 'SERIAL-1' },
+        hw: { Device_type: DeviceType.PRO2, serial_no: 'SERIAL-1' },
         fw: {
           application: { version: '5.0.0', build_id: 'p1-build', hash: [0x01, 0x02] },
           application_data: { version: '5.0.1', build_id: 'p2-build', hash: [0x03, 0x04] },
@@ -143,6 +143,17 @@ describe('DeviceStateMapper', () => {
     });
     expect(patch).toMatchObject({ protocolVersion: 2 });
     expect(patch.status?.unlocked).toBeUndefined();
+  });
+
+  test('maps the hardware model independently from Protocol V2', () => {
+    const pro = mapProtocolV2DeviceInfoToState({
+      protocol_version: 2,
+      hw: { Device_type: 'PRO' as unknown as DeviceType, serial_no: 'SERIAL-PRO' },
+    });
+    const unknown = mapProtocolV2DeviceInfoToState({ protocol_version: 2, hw: {} });
+
+    expect(pro.identity).toMatchObject({ deviceType: EDeviceType.Pro, model: 'pro' });
+    expect(unknown.identity).toMatchObject({ deviceType: EDeviceType.Unknown, model: null });
   });
 
   test('keeps normal mode when Protocol V2 application and SE versions are returned together', () => {

@@ -18,7 +18,7 @@ Core / DeviceCommands
 
 | 维度     | Protocol V1                  | Protocol V2                              |
 | -------- | ---------------------------- | ---------------------------------------- |
-| 当前设备 | Classic、Mini、Touch、Pro 等 | Pro2                                     |
+| 当前设备 | Classic、Mini、Touch、Pro 等 | 当前为 Pro2，后续可扩展到 Pro 等机型     |
 | 初始化   | `Initialize -> Features`     | `Ping` 探测，随后 `DeviceInfoGet` 初始化 |
 | 消息编号 | protobuf message type        | `MessageType`，按系统模块分组            |
 | 帧       | V1 分包格式                  | `0x5A` 帧头、长度、序列号、CRC8          |
@@ -38,13 +38,24 @@ Transport 在 `acquire()` 完成物理连接后执行协议探测：
    `transferIn` 消费 V2 响应。
 4. 两者均失败时，清理本次连接资源并返回协议探测错误。
 
-显式协议参数只是探测优先级提示，不能替代活动响应验证：
+协议选择输入分为两种语义，二者都不能替代活动响应验证：
+
+- 公共请求中的 `connectProtocol` 映射为严格的 `expectedProtocol`。它用于调用方确实要求某一协议的
+  场景，不允许静默回退。
+- descriptor、历史活动探测结果和设备名推导值映射为非严格的 `protocolHint`。它只改变 probe 顺序，
+  首次失败后必须尝试另一协议。
+
+严格预期的验证规则：
 
 - `connectProtocol='V1'`：必须收到有效的 V1 响应。
 - `connectProtocol='V2'`：必须收到有效的 V2 `Ping` 响应；固件升级重连也不能只信任 PID、
   设备名或旧连接缓存。
 
 V2 probe 使用 `Ping { message: 'protocol-v2-probe' }`。探测消息只用于确认链路，不等同于查询协议版本或设备信息。
+
+公共设备对象同样使用 `connectProtocol` 字段作为输出，但输出语义是当前连接已经活动探测确认的协议，
+不是原请求值。Core 的方法能力检查只读取该确认结果。设备型号独立来自 V1 `Features` 或 V2
+`DeviceInfo.hw.Device_type`；例如未来 Pro 返回 V2 时仍应识别为 Pro，而不是因为协议为 V2 被改成 Pro2。
 
 主要实现：
 

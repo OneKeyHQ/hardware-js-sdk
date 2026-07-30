@@ -10,4 +10,5 @@ export type BleAcquireInput = {
   uuid: string;
   forceCleanRunPromise?: boolean;
   expectedProtocol?: ProtocolType;
+  protocolHint?: ProtocolType;
 };

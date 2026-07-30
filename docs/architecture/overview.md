@@ -42,7 +42,7 @@ flowchart TD
 | 协议        | 设备范围                                | 传输方式            | 主要能力                                                    |
 | ----------- | --------------------------------------- | ------------------- | ----------------------------------------------------------- |
 | Protocol V1 | Classic / Mini / Touch / Pro 等现有设备 | USB、BLE、Bridge 等 | 钱包业务能力，`Initialize -> Features` 握手，签名和地址派生 |
-| Protocol V2 | Pro2                                    | USB、BLE            | 设备信息、钱包 Session、文件系统、设置、固件更新和协议探测  |
+| Protocol V2 | 当前为 Pro2，后续可扩展到 Pro 等机型    | USB、BLE            | 设备信息、钱包 Session、文件系统、设置、固件更新和协议探测  |
 
 协议选择是传输层内部职责。外部调用方不需要显式选择 V1 或 V2，也不应该依赖 PID、设备名或 USB descriptor 来判断协议。
 
@@ -54,7 +54,9 @@ flowchart TD
 - `ProtocolV2SequenceCursor`：让普通断开和重连后的帧序号继续递增，Transport dispose 时再清除。
 - `probeProtocolV2()`：公共 V2 probe helper，发送 `Ping { message: 'protocol-v2-probe' }` 并执行失败清理钩子。
 
-各 transport 的 `detectProtocol()` 根据 hint 和连接缓存选择 V1/V2 probe 顺序。显式 `connectProtocol='V1'` 会验证 V1；显式 `connectProtocol='V2'` 用于上层已经确认协议的重连路径，直接记录 V2 并跳过重复探测。
+各 transport 的 `detectProtocol()` 根据 hint 和连接缓存选择 V1/V2 probe 顺序。调用方显式传入的
+`connectProtocol` 是严格预期，必须通过对应协议的活动响应验证；descriptor 或历史连接中的协议只作为
+`protocolHint`，首次 probe 失败后必须清理旧探测状态并尝试另一协议。
 
 WebUSB、Electron BLE、React Native BLE 和 lowlevel BLE 只负责各自的物理连接、读写、订阅/桥接和平台错误映射，不再各自复制 V2 协议会话逻辑。
 
@@ -85,12 +87,15 @@ WebUSB、Electron BLE、React Native BLE 和 lowlevel BLE 只负责各自的物�
 - `identity.bleName` 只保存广播/连接名称。
 - 面向用户的展示名称继续使用兼容设备对象的 `name`；`DeviceState.identity` 不保存派生展示字段。
 - V1 原始 `model` 只用于协议兼容，不作为产品展示名。
+- Protocol V2 的设备型号来自 `DeviceInfo.hw.Device_type`，不得根据 V2 协议反推为 Pro2。
 - Protocol V2 的 SE 镜像存在与否不决定主控运行模式；应用镜像存在时保持 normal 或已确认的 onboarding mode。
 - `raw` 按协议来源键字段级合并，只供 SDK 内部兼容逻辑使用；钱包 session 也只用于 Core 运行时恢复。公共 `getDeviceState()` 和 `DEVICE.STATE` 均不暴露二者。
 
 ## 自动协议探测
 
-支持 Protocol V2 的传输实现会在 `acquire()` 后主动探测协议。没有 V2 hint 时默认先验证 V1，V1 失败后再 probe V2；有 V2 hint 或 V2 连接缓存时会先验证 V2。显式 `connectProtocol='V1'` 会验证 V1，显式 `connectProtocol='V2'` 则信任上层已经确认的协议，用于固件升级重启后的重连：
+支持 Protocol V2 的传输实现会在 `acquire()` 后主动探测协议。没有 V2 hint 时默认先验证 V1，V1
+失败后再 probe V2；有 V2 hint 或 V2 连接缓存时会先验证 V2，失败后仍会回退验证 V1。显式
+`connectProtocol='V1'` 或 `'V2'` 都是严格预期，只验证指定协议并在不匹配时失败：
 
 ```mermaid
 flowchart TD
@@ -128,7 +133,9 @@ V1 设备仍可在 `Initialize` 后通过 `TransportManager.reconfigure(features
 
 ## Device 层职责
 
-`Device.acquire()` 完成后会从 transport 读取检测到的协议类型，并写回 `originalDescriptor.protocolType`。后续 `Device.initialize()` 基于该字段选择初始化路径：
+`Device.acquire()` 完成后会从 transport 读取检测到的协议类型，并写回
+`originalDescriptor.protocolType`。该字段在下一次连接时只作为 hint，在当前活动连接中则是能力判断的
+唯一协议结果。后续 `Device.initialize()` 基于该字段选择初始化路径：
 
 - V1：发送 `Initialize`，使用真实 `Features`
 - V2：Transport acquire 已用 `Ping` probe 确认链路；初始化再用不含 status target 的 `DeviceInfoGet` 建立 `DeviceState`
@@ -165,7 +172,8 @@ flowchart TD
 ## 设计原则
 
 - 协议判断必须基于连接后的设备响应，而不是静态 PID、名称或 descriptor。
-- Pro2 支持 USB 和 BLE，WebUSB、Electron BLE 和 React Native BLE 都应自动选择 Protocol V2。
+- 当前 Pro2 支持 USB 和 BLE；WebUSB、Electron BLE 和 React Native BLE 都应通过活动响应选择
+  Protocol V2，且不得假设 Pro 永远使用 V1。
 - 协议探测、V2 frame 重组和 V2 call 路由应复用 Protocol Session 层，避免在具体 transport 中重复实现。
 - Electron BLE 默认入口是 `desktop-web-ble`，不再提供按设备型号拆分的 env alias。
 - V1 schema 兼容逻辑和 V2 schema 路由逻辑分离，避免为了新协议改动现有设备的初始化路径。

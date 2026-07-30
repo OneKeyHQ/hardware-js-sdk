@@ -82,9 +82,10 @@ export default class DeviceConnector {
     path: string,
     session?: string | null,
     forceCleanRunPromise?: boolean,
-    connectProtocol?: HardwareConnectProtocol
+    expectedProtocol?: HardwareConnectProtocol,
+    protocolHint?: HardwareConnectProtocol
   ) {
-    Log.debug('acquire', path, session, connectProtocol);
+    Log.debug('acquire', path, session, expectedProtocol, protocolHint);
     const env = DataManager.getSettings('env');
     try {
       let res;
@@ -92,21 +93,23 @@ export default class DeviceConnector {
         res = await this.transport.acquire({
           uuid: path,
           forceCleanRunPromise,
-          expectedProtocol: connectProtocol,
+          expectedProtocol,
+          protocolHint,
         });
       } else {
         res = await this.transport.acquire({
           path,
           previous: session ?? null,
-          expectedProtocol: connectProtocol,
+          expectedProtocol,
+          protocolHint,
         });
       }
-      if (connectProtocol) {
+      if (expectedProtocol) {
         const detectedProtocol = this.transport.getProtocolType(path);
-        if (detectedProtocol !== connectProtocol) {
+        if (detectedProtocol !== expectedProtocol) {
           throw ERRORS.TypedError(
             HardwareErrorCode.RuntimeError,
-            `Device protocol mismatch: expected ${connectProtocol}, detected ${detectedProtocol}`
+            `Device protocol mismatch: expected ${expectedProtocol}, detected ${detectedProtocol}`
           );
         }
       }

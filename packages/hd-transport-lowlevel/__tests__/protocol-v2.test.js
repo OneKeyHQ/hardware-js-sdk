@@ -122,6 +122,29 @@ const splitFrame = (frame, index) => [
 ];
 
 describe('LowlevelTransport protocol framing', () => {
+  test('falls back to Protocol V2 when a cached V1 hint is stale', async () => {
+    const plugin = createPlugin({ devices: [], responses: [] });
+    const lowlevel = configureTransport(plugin);
+    const events = [];
+    lowlevel.probeProtocolV1 = jest.fn().mockImplementation(() => {
+      events.push('probe-v1');
+      return Promise.resolve(false);
+    });
+    lowlevel.resetConnectionAfterProbe = jest.fn().mockImplementation(() => {
+      events.push('reset');
+      return Promise.resolve();
+    });
+    lowlevel.probeProtocolV2 = jest.fn().mockImplementation(() => {
+      events.push('probe-v2');
+      return Promise.resolve(true);
+    });
+
+    await expect(lowlevel.detectProtocol('pro-lowlevel', undefined, 'V1')).resolves.toBe('V2');
+
+    expect(events).toEqual(['probe-v1', 'reset', 'probe-v2']);
+    expect(lowlevel.getProtocolType('pro-lowlevel')).toBe('V2');
+  });
+
   test('keeps active links when the Protocol V2 schema is configured repeatedly', () => {
     const lowlevel = new LowlevelTransport();
     const invalidateAllLinks = jest.fn().mockResolvedValue(undefined);

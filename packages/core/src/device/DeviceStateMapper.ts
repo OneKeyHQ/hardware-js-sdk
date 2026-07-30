@@ -1,6 +1,7 @@
-import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
+import { EFirmwareType } from '@onekeyfe/hd-shared';
 
 import { buildProtocolV1FeaturesPayload } from '../deviceProfile/buildDeviceFeatures';
+import { resolveProtocolV2DeviceIdentity } from '../deviceProfile/protocolV2DeviceIdentity';
 import {
   mapLanguageFromProtocolV2,
   mapLanguageToProtocolV2,
@@ -211,14 +212,15 @@ export const mapProtocolV2DeviceInfoToState = (
   mode: DeviceStateMode = 'unknown'
 ): DeviceStatePatch => {
   const loader = mode === 'bootloader' || mode === 'romloader';
+  const identity = resolveProtocolV2DeviceIdentity(info.hw?.Device_type);
 
   return {
     protocol: 'V2',
     protocolVersion: info.protocol_version,
     identity: definedEntries({
-      deviceType: EDeviceType.Pro2,
+      deviceType: identity.deviceType,
       firmwareType: EFirmwareType.Universal,
-      model: 'pro2',
+      model: identity.model,
       vendor: 'onekey.so',
       serialNo: info.hw?.serial_no,
       bleName: info.coprocessor?.bt_adv_name,
