@@ -104,9 +104,14 @@ describe('WebUsbTransport Protocol V2 timeout recovery', () => {
 
     await expect(webusb.probeProtocolV1(path)).resolves.toBe(true);
 
-    expect(webusb.callProtocolV1).toHaveBeenCalledWith(path, 'Initialize', {}, {
-      timeoutMs: 5000,
-    });
+    expect(webusb.callProtocolV1).toHaveBeenCalledWith(
+      path,
+      'Initialize',
+      {},
+      {
+        timeoutMs: 5000,
+      }
+    );
   });
 
   test('retries an expected Protocol V2 probe once after resetting the connection', async () => {
