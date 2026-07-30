@@ -42,8 +42,8 @@ Protocol V2 因此按字段用途、变化频率和安全边界进行拆分。
 | 设备基本信息       | `DeviceInfoGet -> DeviceInfo`                           | 型号、序列号、主控、蓝牙芯片、SE 芯片及版本   | `getDeviceState({ scope: 'firmware' })`            |
 | 设备实时状态       | `DeviceStatusGet -> DeviceStatus`                       | 初始化、解锁、备份、Passphrase、Attach-to-PIN | `getDeviceState()`                                 |
 | 用户设置           | `DeviceSettingsGet/Set/PageShow`                        | label、语言、蓝牙、亮度、锁屏、振动等         | `getDeviceState({ scope: 'settings' })` / 高层 API |
-| 钱包会话           | `DeviceSessionGet -> DeviceSession`                     | 获取/恢复 `session_id` 与钱包标识             | Core 内部钱包 Session 管理                         |
-| 钱包访问准备       | `DeviceSessionAskPin/AskPassphrase -> Success`          | 在设备端完成主 PIN、Attach PIN 或 Passphrase  | 受保护方法与钱包选择流程                           |
+| 钱包会话恢复       | `DeviceSessionGet -> DeviceSession`                     | 按 `session_id` 恢复已有钱包会话              | Core 内部钱包 Session 管理                         |
+| 钱包会话创建       | `DeviceSessionAskPin/AskPassphrase -> DeviceSession`    | 验证并原子返回主钱包或隐藏钱包会话            | 受保护方法与钱包选择流程                           |
 | 设备操作与固件管理 | `DeviceReboot`、`DeviceCertificate*`、`DeviceFirmware*` | 重启、证书、固件安装                          | 对应专用 API 和升级流程                            |
 | 生产制造信息       | `DeviceFactoryInfo*`、`DeviceFactoryTest` 等            | 生产时间、工厂测试、永久锁                    | 生产制造专用 API                                   |
 
@@ -287,8 +287,8 @@ label、语言、蓝牙开关、自动锁屏和振动反馈都属于用户配置
 钱包会话通过以下消息建立或恢复：
 
 ```text
-DeviceSessionAskPassphrase -> Success -> DeviceSessionGet({}) -> DeviceSession
-DeviceSessionAskPin(AttachToPin) -> Success -> DeviceSessionGet({}) -> DeviceSession
+DeviceSessionAskPassphrase -> DeviceSession
+DeviceSessionAskPin(Main/AttachToPin) -> DeviceSession
 DeviceSessionGet({ session_id }) -> DeviceSession
 ```
 
@@ -298,7 +298,7 @@ DeviceSessionGet({ session_id }) -> DeviceSession
 | ----------------------------- | -------------------------------- | ------------------------------------------------------------------------------- |
 | `DeviceSessionGet.session_id` | 尝试恢复之前的隐藏钱包 Session   | Core 内部传入当前钱包缓存值                                                     |
 | `DeviceSessionPinType`        | `Any/Main/AttachToPin` PIN 路由  | 标准钱包固定 `Main`，Attach 选择固定对应类型                                    |
-| `DeviceSessionAskPassphrase`  | 准备 Passphrase 隐藏钱包         | Host 显式发送 `on_device=false + passphrase`；设备输入显式发送 `on_device=true` |
+| `DeviceSessionAskPassphrase`  | 创建 Passphrase 隐藏钱包会话     | Host 显式发送 `on_device=false + passphrase`；设备输入显式发送 `on_device=true` |
 | 响应 `session_id`             | 当前钱包 Session ID              | 保存到当前钱包缓存                                                              |
 | `btc_test_address`            | 用于确认当前钱包上下文的稳定标识 | 映射为内部 `passphraseState`                                                    |
 
@@ -323,8 +323,9 @@ DeviceSessionGet({ session_id }) -> DeviceSession
 `DeviceSessionGet` 的成功响应必须同时携带非空 `session_id` 和
 `btc_test_address`。缺少任一字段都视为协议响应不完整，Core 不会把它降级解释为标准钱包。
 
-标准钱包不读取其他钱包的 Session Store 项；它只协商 eventless 模式，锁定时发送
-`DeviceSessionAskPin(Main)`，不调用 `DeviceSessionGet`，并返回 `passphraseState: null`。
+标准钱包不读取其他钱包的 Session Store 项；它只协商 eventless 模式并发送
+`DeviceSessionAskPin(Main)`。标准钱包和隐藏钱包都返回设备生成的 `passphraseState`，调用方必须
+以 `walletType` 判断钱包类型。
 SDK 不注册可调用的原始 Session API，接入方不能通过低层 `call()` 绕过公共钱包流程。
 
 App 不得直接调用原始 Session 请求。现有 App 可继续调用公共
@@ -338,7 +339,7 @@ App 不得直接调用原始 Session 请求。现有 App 可继续调用公共
 PIN 解锁使用：
 
 ```text
-DeviceSessionAskPin -> Success -> DeviceStatusGet -> DeviceStatus
+DeviceSessionAskPin -> DeviceSession -> DeviceStatusGet -> DeviceStatus
 ```
 
 | `DeviceStatus` 字段         | SDK 字段                                  | 含义                         |
@@ -347,7 +348,7 @@ DeviceSessionAskPin -> Success -> DeviceStatusGet -> DeviceStatus
 | `unlocked_by_attach_to_pin` | `DeviceState.status.unlockedAttachPin`    | 是否通过 Attach PIN 解锁     |
 | `passphrase_enabled`        | `DeviceState.status.passphraseProtection` | 解锁后确认的 Passphrase 状态 |
 
-`Success` 只表示设备端解锁流程完成；Core 随后读取 `DeviceStatus`，不从成功响应猜测钱包状态。
+`DeviceSession` 表示设备端解锁及钱包会话创建完成；Core 随后读取 `DeviceStatus`，不从会话响应猜测设备设置状态。
 
 ## 10. 设备操作与固件管理
 
