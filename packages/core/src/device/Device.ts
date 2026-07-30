@@ -297,6 +297,8 @@ export class Device extends EventEmitter {
     return {
       /** Android uses a MAC address, while iOS and USB use transport-specific identifiers. */
       connectId: DataManager.isBleConnect(env) ? this.mainId || null : connectId,
+      /** Persist this after the first active probe so later calls do not need to guess. */
+      connectProtocol: this.originalDescriptor.protocolType,
       /** Stable physical-device identity. */
       serialNo,
       /** @deprecated Use serialNo instead. */

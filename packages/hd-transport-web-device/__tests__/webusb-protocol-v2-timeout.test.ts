@@ -96,6 +96,19 @@ describe('WebUsbTransport Protocol V2 timeout recovery', () => {
     expect(webusb.deviceProtocol.get(path)).toBe('V2');
   });
 
+  test('allows legacy WebUSB Initialize up to the Node USB probe timeout', async () => {
+    const webusb = new WebUsbTransport() as any;
+    const path = 'pro-webusb';
+    webusb.messages = {};
+    webusb.callProtocolV1 = jest.fn().mockResolvedValue({});
+
+    await expect(webusb.probeProtocolV1(path)).resolves.toBe(true);
+
+    expect(webusb.callProtocolV1).toHaveBeenCalledWith(path, 'Initialize', {}, {
+      timeoutMs: 5000,
+    });
+  });
+
   test('retries an expected Protocol V2 probe once after resetting the connection', async () => {
     const webusb = new WebUsbTransport() as any;
     const path = 'pro2-webusb';
