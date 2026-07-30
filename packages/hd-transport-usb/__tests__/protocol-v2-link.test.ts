@@ -308,6 +308,25 @@ describe('NodeUsbTransport Protocol V2 link lifecycle', () => {
     );
   });
 
+  test('releases the USB interface when protocol detection rejects acquire', async () => {
+    const harness = createHarness();
+    const { transport, path, device, iface } = harness;
+    await transport.enumerate();
+    device.close.mockClear();
+    iface.release.mockClear();
+    jest
+      .spyOn(transport as any, 'detectProtocol')
+      .mockRejectedValueOnce(new Error('terminal protocol probe failure'));
+
+    await expect(transport.acquire({ path })).rejects.toMatchObject({
+      errorCode: expect.any(Number),
+    });
+
+    expect(iface.release).toHaveBeenCalledTimes(1);
+    expect(device.close).toHaveBeenCalledTimes(1);
+    expect((transport as any).openDevices.has(path)).toBe(false);
+  });
+
   test('stop releases an acquired USB interface even before a Protocol V2 call', async () => {
     const harness = createHarness();
     const { transport, path, device, iface } = harness;

@@ -954,10 +954,8 @@ export default class ReactNativeBleTransport {
         const notifyError = ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError);
         if (this.deviceProtocol.get(uuid) === 'V2') {
           this.rejectProtocolV2Frames(uuid, notifyError);
-        } else {
-          if (this.runPromiseDeviceId === uuid) {
-            this.runPromise?.reject(notifyError);
-          }
+        } else if (this.runPromiseDeviceId === uuid) {
+          this.runPromise?.reject(notifyError);
         }
       }
     }, notifyTransactionId);
@@ -1245,13 +1243,13 @@ export default class ReactNativeBleTransport {
       const jsonData = ProtocolV1.decodeMessage(messages, response);
       return check.call(jsonData);
     } catch (e) {
-      if (name === 'Initialize' && options?.timeoutMs === PROTOCOL_PROBE_TIMEOUT_MS) {
-        Log?.debug('[ReactNativeBleTransport] Protocol V1 Initialize probe call failed:', e);
+      if (name === 'GetFeatures' && options?.timeoutMs === PROTOCOL_PROBE_TIMEOUT_MS) {
+        Log?.debug('[ReactNativeBleTransport] Protocol V1 GetFeatures probe call failed:', e);
       } else {
         Log?.error('call error: ', e);
       }
       const isProbeTimeout =
-        name === 'Initialize' && options?.timeoutMs === PROTOCOL_PROBE_TIMEOUT_MS;
+        name === 'GetFeatures' && options?.timeoutMs === PROTOCOL_PROBE_TIMEOUT_MS;
       if (
         !isProbeTimeout &&
         (e as { errorCode?: unknown })?.errorCode === HardwareErrorCode.BleTimeoutError
@@ -1377,7 +1375,7 @@ export default class ReactNativeBleTransport {
   private createProtocolDetectionError() {
     return ERRORS.TypedError(
       HardwareErrorCode.BleTimeoutError,
-      'Unable to detect BLE protocol: device did not respond to Protocol V1 Initialize or Protocol V2 Ping'
+      'Unable to detect BLE protocol: device did not respond to Protocol V1 GetFeatures or Protocol V2 Ping'
     );
   }
 
@@ -1428,6 +1426,13 @@ export default class ReactNativeBleTransport {
       if (i > 0) {
         // Reset subscriptions and buffers after a failed probe before trying another protocol.
         await this.resetProbeStateAfterProtocolProbe(uuid, probeOrder[i - 1]);
+        if (!transportCache[uuid]) {
+          const reacquired = await this.acquire({
+            uuid,
+            expectedProtocol: protocol,
+          });
+          return reacquired.protocolType;
+        }
       }
       const detected =
         protocol === 'V1' ? await this.probeProtocolV1(uuid) : await this.probeProtocolV2(uuid);
@@ -1505,11 +1510,13 @@ export default class ReactNativeBleTransport {
 
     try {
       this.deviceProtocol.set(uuid, 'V1');
-      await this.callProtocolV1(uuid, 'Initialize', {}, { timeoutMs: PROTOCOL_PROBE_TIMEOUT_MS });
+      // GetFeatures identifies Protocol V1 without resetting an existing wallet
+      // session before Core has a chance to restore a hidden wallet.
+      await this.callProtocolV1(uuid, 'GetFeatures', {}, { timeoutMs: PROTOCOL_PROBE_TIMEOUT_MS });
       return true;
     } catch (error) {
       this.clearProbeProtocol(uuid, 'V1');
-      Log?.debug('[ReactNativeBleTransport] Protocol V1 Initialize probe failed:', error);
+      Log?.debug('[ReactNativeBleTransport] Protocol V1 GetFeatures probe failed:', error);
       return false;
     }
   }

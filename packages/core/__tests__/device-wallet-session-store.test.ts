@@ -345,7 +345,7 @@ describe('Protocol V1 wallet identity initialization', () => {
     jest.restoreAllMocks();
   });
 
-  test('verifies the live device id before sending a cached wallet session', async () => {
+  test('verifies the live device id without resetting the cached wallet session', async () => {
     const device = Device.fromDescriptor({ id: 'connect-b', path: 'connect-b' } as never);
     device.features = {
       protocol: 'V1',
@@ -365,15 +365,10 @@ describe('Protocol V1 wallet identity initialization', () => {
       device.initialize({ deviceId: 'cached-device-a', passphraseState: 'hidden-a' })
     ).rejects.toMatchObject({ errorCode: HardwareErrorCode.DeviceCheckDeviceIdError });
     expect(typedCall).toHaveBeenCalledTimes(1);
-    expect(typedCall).toHaveBeenCalledWith(
-      'Initialize',
-      'Features',
-      expect.not.objectContaining({ session_id: 'session-a' }),
-      expect.any(Object)
-    );
+    expect(typedCall).toHaveBeenCalledWith('GetFeatures', 'Features', {});
   });
 
-  test('resumes a cached V1 wallet only after the live device id matches', async () => {
+  test('resumes a cached V1 wallet after a non-destructive live identity read', async () => {
     const device = Device.fromDescriptor({ id: 'connect-a', path: 'connect-a' } as never);
     device.features = {
       protocol: 'V1',
@@ -395,13 +390,7 @@ describe('Protocol V1 wallet identity initialization', () => {
     await device.initialize({ deviceId: 'device-a', passphraseState: 'hidden-a' });
 
     expect(typedCall).toHaveBeenCalledTimes(2);
-    expect(typedCall).toHaveBeenNthCalledWith(
-      1,
-      'Initialize',
-      'Features',
-      expect.not.objectContaining({ session_id: 'session-a' }),
-      expect.any(Object)
-    );
+    expect(typedCall).toHaveBeenNthCalledWith(1, 'GetFeatures', 'Features', {});
     expect(typedCall).toHaveBeenNthCalledWith(
       2,
       'Initialize',

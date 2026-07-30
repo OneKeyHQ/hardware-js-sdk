@@ -835,9 +835,12 @@ export class Device extends EventEmitter {
 
       const expectedDeviceId = options?.deviceId;
       if (expectedDeviceId) {
-        // Establish the live physical identity before sending wallet-bound state.
+        // Verify the physical device with a read-only Features request. An
+        // empty-context Initialize would invalidate a cached V1 hidden-wallet session.
         this.passphraseState = undefined;
-        await callInitialize({ is_contains_attach: true });
+        const { message } = await this.commands.typedCall('GetFeatures', 'Features', {});
+        this._updateFeatures(message);
+        await TransportManager.reconfigure(this.features);
         if (!this.checkDeviceId(expectedDeviceId)) {
           throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError);
         }

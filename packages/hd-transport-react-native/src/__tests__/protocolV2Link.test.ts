@@ -51,6 +51,7 @@ const { parseConfigure } = transportPackage;
 const protocolV1Schema = {
   nested: {
     Initialize: { fields: {} },
+    GetFeatures: { fields: {} },
     Success: {
       fields: {
         message: { type: 'string', id: 1 },
@@ -60,6 +61,7 @@ const protocolV1Schema = {
       values: {
         MessageType_Initialize: 1,
         MessageType_Success: 2,
+        MessageType_GetFeatures: 55,
       },
     },
   },
@@ -270,7 +272,9 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
         () => 'resolved',
         () => 'rejected'
       ),
-      new Promise(resolve => setTimeout(() => resolve('pending'), 20)),
+      new Promise(resolve => {
+        setTimeout(() => resolve('pending'), 20);
+      }),
     ]);
 
     transport.resetProtocolV2Frames('device-a');
@@ -280,6 +284,26 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
 
   test('keeps the legacy default BLE scan timeout', () => {
     expect(new ReactNativeBleTransport({}).scanTimeout).toBe(3000);
+  });
+
+  test('reconnects before falling back to Protocol V1 after a fatal V2 probe failure', async () => {
+    const { transport, uuid } = createV1Harness();
+    const probeProtocolV2 = jest
+      .spyOn(transport as any, 'probeProtocolV2')
+      .mockImplementationOnce(async () => {
+        await (transport as any).releaseNative(uuid, true);
+        return false;
+      });
+    const resolveCharacteristics = jest.spyOn(transport as any, 'resolveCharacteristics');
+
+    await expect(transport.acquire({ uuid, protocolHint: 'V2' })).resolves.toEqual({
+      uuid,
+      protocolType: 'V1',
+    });
+
+    expect(probeProtocolV2).toHaveBeenCalledTimes(1);
+    expect(resolveCharacteristics).toHaveBeenCalledTimes(2);
+    expect(transport.getProtocolType(uuid)).toBe('V1');
   });
 
   test('disconnects and invalidates a Protocol V1 link after a response timeout', async () => {

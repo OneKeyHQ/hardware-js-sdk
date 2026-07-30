@@ -11,6 +11,9 @@ const protocolV1Schema = {
     Initialize: {
       fields: {},
     },
+    GetFeatures: {
+      fields: {},
+    },
     Success: {
       fields: {
         message: {
@@ -23,6 +26,7 @@ const protocolV1Schema = {
       values: {
         MessageType_Initialize: 1,
         MessageType_Success: 2,
+        MessageType_GetFeatures: 55,
       },
     },
   },
@@ -238,7 +242,7 @@ describe('ElectronBleTransport protocol detection', () => {
     }
   });
 
-  test('detects Protocol V1 when device responds to Initialize', async () => {
+  test('reconnects Protocol V1 with a non-destructive GetFeatures probe', async () => {
     const device = { id: 'classic-id', name: 'OneKey Classic' };
     const nobleBle = createNobleBle(device);
     let notificationHandler: ((deviceId: string, data: string) => void) | undefined;
@@ -252,7 +256,7 @@ describe('ElectronBleTransport protocol detection', () => {
       return jest.fn();
     });
     nobleBle.write.mockImplementation(() => {
-      // Respond to first write (V1 Initialize probe) with V1 Success
+      // The first write is the V1 GetFeatures probe; answer with a V1 Success response.
       setTimeout(() => notificationHandler?.(device.id, v1ResponseHex), 0);
       return Promise.resolve();
     });
@@ -266,6 +270,13 @@ describe('ElectronBleTransport protocol detection', () => {
         })
       );
       expect(transport.getProtocolType(device.id)).toBe('V1');
+      await expect(transport.acquire({ uuid: device.id, expectedProtocol: 'V1' })).resolves.toEqual(
+        expect.objectContaining({
+          uuid: device.id,
+        })
+      );
+      expect(nobleBle.write).toHaveBeenCalledTimes(2);
+      expect(nobleBle.write.mock.calls.every(([, hex]) => /^3f23230037/.test(hex))).toBe(true);
       expect(protocolV2Writer).not.toHaveBeenCalled();
     } finally {
       await transport.release(device.id);
@@ -343,7 +354,9 @@ describe('ElectronBleTransport protocol detection', () => {
         () => 'resolved',
         () => 'rejected'
       ),
-      new Promise(resolve => setTimeout(() => resolve('pending'), 20)),
+      new Promise(resolve => {
+        setTimeout(() => resolve('pending'), 20);
+      }),
     ]);
 
     bleTransport.resetProtocolV2Frames('device-a');
