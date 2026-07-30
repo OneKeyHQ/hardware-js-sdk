@@ -1,3 +1,5 @@
+import { createKnownBleUuidAliases, matchesKnownBleUuid } from '@onekeyfe/hd-shared';
+
 export const IOS_PACKET_LENGTH = 128;
 export const ANDROID_PACKET_LENGTH = 192;
 export const ANDROID_DEFAULT_MTU = 23;
@@ -57,4 +59,3 @@ export const isSameBleUuid = (left?: string | null, right?: string | null) => {
   if (!left || !right) return false;
   return matchesKnownBleUuid(left, createKnownBleUuidAliases(right));
 };
-import { createKnownBleUuidAliases, matchesKnownBleUuid } from '@onekeyfe/hd-shared';

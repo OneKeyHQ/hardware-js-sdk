@@ -2,12 +2,10 @@ import { runBleCallbackOperation } from '../ble-ops';
 
 describe('Electron Noble callback operations', () => {
   test('settles when Noble never invokes the callback', async () => {
-    const result = await runBleCallbackOperation(
-      callback => {
-        void callback;
-      },
-      { timeoutMs: 5, timeoutBehavior: 'resolve' }
-    );
+    const result = await runBleCallbackOperation(() => undefined, {
+      timeoutMs: 5,
+      timeoutBehavior: 'resolve',
+    });
 
     expect(result).toBeUndefined();
   });
