@@ -279,16 +279,22 @@ export class NobleBleHandler {
    * safe in `hd-transport-electron` and was copied here by mistake.)
    */
   async scan(options?: {
+    /** Accepted for IPC compatibility with older renderers, but ALWAYS ignored — see the doc comment above. */
     serviceUuids?: string[];
     durationMs?: number;
   }): Promise<TrezorBleDeviceInfo[]> {
     await this.init();
-    const serviceUuids = options?.serviceUuids ?? [];
     if (!this._scanning) {
       this._scanning = true;
       // allowDuplicates=true keeps advertisements flowing so we can age out gone devices.
       try {
-        await this._requireNoble().startScanningAsync(serviceUuids, true);
+        await this._requireNoble().startScanningAsync([], true);
+        // warn: unfiltered scan on the noble instance shared with the OneKey
+        // handler — must always be visible for cross-correlation.
+        this._log('warn', 'scan.start', {
+          ignoredServiceUuids: options?.serviceUuids,
+          allowDuplicates: true,
+        });
       } catch (error) {
         this._scanning = false;
         this._log('warn', 'scan.start.error', { error: String(error) });

@@ -2,8 +2,11 @@ import { EventEmitter } from 'events';
 import { TREZOR_BLE_UUIDS } from '@onekeyfe/hwk-trezor-adapter';
 
 import { NobleBleHandler } from '../NobleBleHandler';
+import { TrezorElectronBleTransport } from '../TrezorElectronBleTransport';
 import { initTrezorBleSupport } from '../main';
 import { TREZOR_BLE_CHANNELS } from '../constants';
+
+import type { TrezorBleApi } from '../types/desktop-api';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -299,5 +302,53 @@ describe('initTrezorBleSupport', () => {
 
     await handle.dispose();
     expect(ipcMain.handlers.size).toBe(0);
+  });
+
+  test('renderer transport → IPC → handler scan stays unfiltered end to end', async () => {
+    // The regression this guards: the renderer transport used to send a
+    // service-UUID filter over IPC, and the handler forwarded it to
+    // noble.startScanningAsync. On Windows noble applies that filter per
+    // received packet, and a Safe 7's ADV packet carries only its name — so
+    // the JS-side Trezor filter never even saw the device. The full production
+    // path must reach noble with NO native filter.
+    const safe7 = new FakePeripheral('id-safe7', { localName: 'Trezor Safe 7' });
+    const noble = new FakeNoble([safe7]);
+    const ipcMain = new FakeIpcMain();
+    const webContents = { send: () => undefined };
+
+    const handle = initTrezorBleSupport(webContents, {
+      ipcMain,
+      nobleFactory: () => noble as any,
+    });
+
+    // Renderer-side bridge exactly as a preload would wire it: every call goes
+    // through the IPC channel, nothing shortcuts to the handler.
+    const invoke = (channel: string, ...args: any[]) => ipcMain.invoke(channel, ...args);
+    const bridge = {
+      scan: (options?: unknown) => invoke(TREZOR_BLE_CHANNELS.scan, options),
+      stopScan: () => invoke(TREZOR_BLE_CHANNELS.stopScan),
+      connect: (id: string) => invoke(TREZOR_BLE_CHANNELS.connect, id),
+      disconnect: (id: string) => invoke(TREZOR_BLE_CHANNELS.disconnect, id),
+      subscribe: (id: string) => invoke(TREZOR_BLE_CHANNELS.subscribe, id),
+      unsubscribe: (id: string) => invoke(TREZOR_BLE_CHANNELS.unsubscribe, id),
+      write: (id: string, hexData: string) => invoke(TREZOR_BLE_CHANNELS.write, id, hexData),
+      checkAvailability: () => invoke(TREZOR_BLE_CHANNELS.availability),
+      getDevice: (id: string) => invoke(TREZOR_BLE_CHANNELS.getDevice, id),
+      readRssi: (id: string) => invoke(TREZOR_BLE_CHANNELS.readRssi, id),
+      cancelPairing: () => invoke(TREZOR_BLE_CHANNELS.cancelPairing),
+      onNotification: () => () => undefined,
+      onDeviceDisconnected: () => () => undefined,
+    } as unknown as TrezorBleApi;
+
+    const transport = new TrezorElectronBleTransport({ bridge });
+    const devices = await transport.scan(0);
+
+    // The Safe 7 advertises no service UUID (name only), so it survives the
+    // trip iff the native scan really ran unfiltered.
+    expect(devices.map(d => d.id)).toEqual(['id-safe7']);
+    expect(noble.startScanningAsync).toHaveBeenCalledWith([], true);
+
+    await transport.stopScan();
+    await handle.dispose();
   });
 });
