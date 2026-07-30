@@ -8,6 +8,21 @@ import { isDeviceLockedError } from './lockedError';
 import type { DeviceSessionGet } from '@onekeyfe/hd-transport';
 import type { Device } from '../../device/Device';
 
+const HOST_PASSPHRASE_MAX_BYTES = 50;
+
+const utf8ByteLength = (value: string): number | undefined => {
+  let length = 0;
+  for (const character of value) {
+    const codePoint = character.codePointAt(0) ?? 0;
+    if (codePoint >= 0xd800 && codePoint <= 0xdfff) return undefined;
+    if (codePoint <= 0x7f) length += 1;
+    else if (codePoint <= 0x7ff) length += 2;
+    else if (codePoint <= 0xffff) length += 3;
+    else length += 4;
+  }
+  return length;
+};
+
 export async function requestProtocolV2DeviceStatus(device: Device) {
   const { message } = await device.commands.typedCall('DeviceStatusGet', 'DeviceStatus', {});
   return message;
@@ -28,7 +43,10 @@ const getDeviceSession = async (device: Device, request: DeviceSessionGet) => {
   try {
     return await device.commands.typedCall('DeviceSessionGet', 'DeviceSession', request);
   } catch (error) {
-    if (!isDeviceLockedError(error)) {
+    // Retrying an empty Get after unlocking can consume a different wallet if
+    // the prepared Host/device/Attach-PIN context was invalidated by the lock.
+    // A resume request is safe because its explicit session_id remains bound.
+    if (!isDeviceLockedError(error) || !request.session_id) {
       throw error;
     }
     await device.unlockDevice(DeviceSessionPinType.Main);
@@ -41,7 +59,7 @@ const askDevicePassphrase = async (device: Device, passphrase?: string) => {
     device.commands.typedCall(
       'DeviceSessionAskPassphrase',
       'Success',
-      passphrase ? { passphrase } : {}
+      passphrase ? { passphrase, on_device: false } : { on_device: true }
     );
   try {
     return await request();
@@ -54,21 +72,36 @@ const askDevicePassphrase = async (device: Device, passphrase?: string) => {
   }
 };
 
-const selectDeviceSession = async (device: Device) => {
+const selectDeviceSession = async (device: Device, expectedPassphraseState?: string) => {
   const existsAttachPinUser = device.features?.attachToPinEnabled === true;
   const metadata = {
     source: 'wallet-session-coordinator' as const,
-    reason: 'open-wallet' as const,
+    reason: expectedPassphraseState ? ('session-recovery' as const) : ('open-wallet' as const),
+    ...(expectedPassphraseState ? { expectedPassphraseState } : {}),
   };
   const response = await device.commands.promptPassphrase(
     {
       existsAttachPinUser,
+      deviceOnly: false,
       ...metadata,
     },
     { cancelDeviceOnReject: false }
   );
-  const hasHostPassphrase =
-    typeof response.passphrase === 'string' && response.passphrase.length > 0;
+  const hostPassphrase =
+    typeof response.passphrase === 'string' ? response.passphrase.normalize('NFKD') : undefined;
+  const hasHostPassphrase = typeof hostPassphrase === 'string' && hostPassphrase.length > 0;
+  const hostPassphraseByteLength = hasHostPassphrase ? utf8ByteLength(hostPassphrase) : undefined;
+  if (
+    hasHostPassphrase &&
+    (hostPassphrase.includes('\0') ||
+      hostPassphraseByteLength === undefined ||
+      hostPassphraseByteLength > HOST_PASSPHRASE_MAX_BYTES)
+  ) {
+    throw ERRORS.TypedError(
+      HardwareErrorCode.RuntimeError,
+      `Host passphrase must contain 1 to ${HOST_PASSPHRASE_MAX_BYTES} valid UTF-8 bytes without NUL.`
+    );
+  }
   const selections = [
     hasHostPassphrase,
     response.passphraseOnDevice === true,
@@ -95,7 +128,7 @@ const selectDeviceSession = async (device: Device) => {
   }
 
   if (hasHostPassphrase) {
-    await askDevicePassphrase(device, response.passphrase);
+    await askDevicePassphrase(device, hostPassphrase);
     return getDeviceSession(device, {});
   }
 
@@ -160,7 +193,7 @@ export async function getProtocolV2WalletSession(
       device.clearInternalState();
       throw ERRORS.TypedError(HardwareErrorCode.WalletSessionInvalid);
     }
-    response = await selectDeviceSession(device);
+    response = await selectDeviceSession(device, expectedPassphraseState);
   }
 
   const { message } = response;
