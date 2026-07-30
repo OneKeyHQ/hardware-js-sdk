@@ -280,7 +280,7 @@ export class Device extends EventEmitter {
 
   // simplified object to pass via postMessage
   toMessageObject(): DeviceTyped | null {
-    if (this.isUnacquired()) return null;
+    if (this.isUnacquired() || !this.features) return null;
 
     const env = DataManager.getSettings('env');
     const deviceType = this.getCurrentDeviceType();

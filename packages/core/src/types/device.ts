@@ -48,7 +48,7 @@ export type KnownDevice = {
   /** Current SDK/transport usage state for connection indicators. */
   status?: DeviceStatus;
   mode: EOneKeyDeviceMode;
-  features?: Features;
+  features: Features;
   /** Unified SDK device-state snapshot; features remains a legacy projection. */
   state?: DeviceState;
   unavailableCapabilities: UnavailableCapabilities;
