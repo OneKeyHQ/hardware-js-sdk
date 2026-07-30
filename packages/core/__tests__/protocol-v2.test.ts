@@ -1889,6 +1889,7 @@ describe('Protocol V2 feature adapter', () => {
 
     const message = device.toMessageObject();
     expect(message).toMatchObject({
+      connectProtocol: 'V2',
       serialNo: 'CACHED-SERIAL',
       uuid: 'CACHED-SERIAL',
       deviceId: null,

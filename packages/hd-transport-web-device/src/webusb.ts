@@ -41,7 +41,11 @@ const REPORT_ID = PROTOCOL_V1_REPORT_ID;
 const HEADER_LENGTH = PROTOCOL_V1_MESSAGE_HEADER_SIZE;
 const PACKET_IO_MAX_RETRIES = 3;
 const PACKET_IO_RETRY_DELAY = 300;
-const PROTOCOL_PROBE_TIMEOUT = 1000;
+// Legacy devices can take longer to answer Initialize after a WebUSB reset.
+// Keep this aligned with Node USB so a slow Protocol V1 response is not
+// misreported as a protocol mismatch during acquire.
+const PROTOCOL_V1_PROBE_TIMEOUT = 5000;
+const PROTOCOL_V2_PROBE_TIMEOUT = 1000;
 const EXPECTED_PROTOCOL_V2_PROBE_ATTEMPTS = 2;
 function inferProtocolHintFromDeviceName(name?: string | null): ProtocolType | undefined {
   return /\bpro\s*2\b/i.test(name ?? '') ? 'V2' : undefined;
@@ -711,7 +715,14 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     }
 
     try {
-      await this.callProtocolV1(path, 'Initialize', {}, { timeoutMs: PROTOCOL_PROBE_TIMEOUT });
+      await this.callProtocolV1(
+        path,
+        'Initialize',
+        {},
+        {
+          timeoutMs: PROTOCOL_V1_PROBE_TIMEOUT,
+        }
+      );
       return true;
     } catch (_error) {
       return false;
@@ -725,7 +736,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
 
     return probeProtocolV2Helper({
       call: (name, data, options) => this.callProtocolV2(path, name, data, options),
-      timeoutMs: PROTOCOL_PROBE_TIMEOUT,
+      timeoutMs: PROTOCOL_V2_PROBE_TIMEOUT,
       logger: this.Log,
       logPrefix: 'ProtocolV2 WebUSB',
     });

@@ -141,6 +141,7 @@ describe('public device lifecycle events', () => {
     const device = createInitializedDevice('V2');
 
     expect(device.toMessageObject()?.status).toBe('available');
+    expect(device.toMessageObject()?.connectProtocol).toBe('V2');
 
     (device as unknown as { deviceAcquired: boolean }).deviceAcquired = true;
     expect(device.toMessageObject()?.status).toBe('used');

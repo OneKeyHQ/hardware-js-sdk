@@ -1,4 +1,4 @@
-import { EDeviceType, type EFirmwareType } from '@onekeyfe/hd-shared';
+import { EDeviceType, type EFirmwareType, type HardwareConnectProtocol } from '@onekeyfe/hd-shared';
 
 import type { IVersionArray } from './settings';
 import type { PROTO } from '../constants';
@@ -28,6 +28,8 @@ export type UnavailableCapabilities = { [key: string]: UnavailableCapability };
 
 export type KnownDevice = {
   connectId: string | null;
+  /** Protocol family confirmed by the transport's active probe. */
+  connectProtocol?: HardwareConnectProtocol;
   /**
    * Stable physical-device identity. Current SDK responses always include this
    * value; it remains optional in the type during the uuid compatibility window.
@@ -61,6 +63,8 @@ export type KnownDevice = {
 
 export type SearchDevice = {
   connectId: string | null;
+  /** Protocol family confirmed by the transport's active probe. */
+  connectProtocol?: HardwareConnectProtocol;
   /**
    * Available after device initialization. BLE discovery does not connect to the
    * device, so it returns null until a later initialized device response. Current
