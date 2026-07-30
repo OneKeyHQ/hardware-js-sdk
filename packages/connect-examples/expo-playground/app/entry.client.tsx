@@ -33,7 +33,6 @@ import ChainMethodsIndexPage from './routes/chains.$chainId._index';
 import ChainMethodExecutePage from './routes/chains.$chainId.$methodName';
 import DeviceMethodsIndexPage from './routes/device-methods._index';
 import DeviceMethodExecutePage from './routes/device-methods.$methodName';
-import WalletSessionTestPage from './routes/wallet-session-test';
 
 // Import styles
 import './tailwind.css';
@@ -119,10 +118,6 @@ const router = createHashRouter(
         {
           path: 'device-info',
           element: <DeviceInfoPage />,
-        },
-        {
-          path: 'wallet-session-test',
-          element: <WalletSessionTestPage />,
         },
 
         {
