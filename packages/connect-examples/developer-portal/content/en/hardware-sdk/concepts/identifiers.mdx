@@ -157,13 +157,13 @@ purposes.
 ### `session_id` — ephemeral session token
 
 Short-lived random token the device mints when a passphrase session is
-initialised. Firmware returns it to Core, but current public wallet-session
-responses and the public Features projection do not expose it.
+initialised. Returned in `features.session_id` after `getPassphraseState`
+or any call that initialises a session.
 
 - **Invalidated on lock** (auto-lock, manual lock, USB disconnect).
 - Used internally by the SDK to keep the device's cached passphrase alive.
-- Not surfaced to new app integrations; applications only need
-  `deviceId + passphraseState`.
+- Rarely surfaced to app code directly — most apps only need
+  `passphraseState`.
 
 ### `passphraseState` — hidden wallet identifier
 
@@ -175,8 +175,9 @@ persisting the passphrase itself.
 
 - Pass as the `passphraseState` common-param on every SDK call that must
   stay on the same hidden wallet.
-- Persist `deviceId + passphraseState` as the wallet identity. A new process
-  explicitly opens the wallet again; it does not persist the internal session ID.
+- Cache across processes by persisting
+  `(deviceId, passphraseState, session_id)` together and calling
+  `preloadSessionCache` on startup.
 - Clearing the cached `passphraseState` does **not** invalidate the hidden
   wallet — the wallet is reproducible by re-entering the same passphrase.
 
@@ -248,9 +249,9 @@ ID across transports.
 - `session_id` expires when the device locks; `passphraseState` does not.
 - `passphraseState` identifies **which hidden wallet**; `session_id`
   authenticates **this live session**.
-- New integrations persist `deviceId + passphraseState` as wallet identity
-  and explicitly open the wallet in each new process. The SDK keeps
-  `session_id` internal.
+- Persist `(passphraseState, session_id)` together to reuse a session
+  across invocations; if the device locked between invocations, discard
+  the cached `session_id` and force a fresh unlock.
 
 ### `device_id` (snake_case) vs `deviceId` (camelCase)
 
