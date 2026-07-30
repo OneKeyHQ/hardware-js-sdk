@@ -3851,7 +3851,7 @@ describe('Protocol V2 firmware update targets', () => {
     expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'installingFirmware');
   });
 
-  test('accepts a missing firmware status handler as an app reboot signal', async () => {
+  test('accepts a missing firmware status handler only after confirming normal mode', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -3867,7 +3867,9 @@ describe('Protocol V2 firmware update targets', () => {
       getCommands: () => ({ typedCall }),
     });
     (method as any).reconnectProtocolV2Device = reconnectProtocolV2Device;
-    (method as any).verifyProtocolV2ReconnectIdentity = jest.fn().mockResolvedValue(undefined);
+    const deviceInfo = { hw: { serial_no: 'PRO2-PHYSICAL-1' } };
+    (method as any).verifyProtocolV2ReconnectIdentity = jest.fn().mockResolvedValue(deviceInfo);
+    (method as any).probeProtocolV2NormalMode = jest.fn().mockResolvedValue(true);
     method.postProgressMessage = jest.fn();
 
     await (method as any).waitForProtocolV2FirmwareUpdateComplete([
@@ -3876,6 +3878,70 @@ describe('Protocol V2 firmware update targets', () => {
 
     expect(reconnectProtocolV2Device).toHaveBeenCalledTimes(1);
     expect(typedCall.mock.calls.map(call => call[0])).toEqual(['DeviceFirmwareUpdateStatusGet']);
+    expect((method as any).probeProtocolV2NormalMode).toHaveBeenCalledWith(deviceInfo);
+  });
+
+  test.each([
+    [{ mode: 'normal', bootloaderMode: false }, true],
+    [{ mode: 'bootloader', bootloaderMode: true }, false],
+  ])('derives firmware completion from the runtime-state probe: %o', async (features, expected) => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const deviceInfo = { hw: { serial_no: 'PRO2-PHYSICAL-1' } };
+    const probeProtocolV2RuntimeState = jest.fn().mockResolvedValue(features);
+    (method as any).device = stubDevice({ probeProtocolV2RuntimeState });
+
+    await expect((method as any).probeProtocolV2NormalMode(deviceInfo)).resolves.toBe(expected);
+    expect(probeProtocolV2RuntimeState).toHaveBeenCalledWith(deviceInfo, 5000);
+  });
+
+  test('keeps polling when the firmware status handler is missing in loader mode', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const typedCall = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('Failure: Handler not registered for this message'))
+      .mockResolvedValueOnce({
+        type: 'DeviceFirmwareUpdateStatus',
+        message: { records: [{ target_id: 4, status: 2 }] },
+      });
+    const deviceInfo = { hw: { serial_no: 'PRO2-PHYSICAL-1' } };
+    const setTimeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation(((
+      callback: () => void
+    ) => {
+      callback();
+      return 0 as any;
+    }) as typeof setTimeout);
+
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+    });
+    (method as any).reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
+    (method as any).verifyProtocolV2ReconnectIdentity = jest.fn().mockResolvedValue(deviceInfo);
+    (method as any).probeProtocolV2NormalMode = jest.fn().mockResolvedValue(false);
+    method.postProgressMessage = jest.fn();
+
+    try {
+      await (method as any).waitForProtocolV2FirmwareUpdateComplete([
+        { target_id: 4, path: 'vol0:/application_p1.bin' },
+      ]);
+    } finally {
+      setTimeoutSpy.mockRestore();
+    }
+
+    expect(typedCall.mock.calls.map(call => call[0])).toEqual([
+      'DeviceFirmwareUpdateStatusGet',
+      'DeviceFirmwareUpdateStatusGet',
+    ]);
+    expect((method as any).probeProtocolV2NormalMode).toHaveBeenCalledWith(deviceInfo);
   });
 
   test('polls target status after update ACK and finishes when all targets complete', async () => {
@@ -5007,8 +5073,14 @@ describe('Protocol V2 firmware update targets', () => {
       return 0 as any;
     }) as typeof setTimeout);
 
+    const initialize = jest.fn().mockResolvedValue(undefined);
     (method as any).device = stubDevice({
       getCommands: () => ({ typedCall }),
+      initialize,
+    });
+    (method as any).reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
+    (method as any).verifyProtocolV2ReconnectIdentity = jest.fn().mockResolvedValue({
+      hw: { serial_no: 'PRO2-PHYSICAL-1' },
     });
     method.postProgressMessage = jest.fn();
 
@@ -5024,6 +5096,9 @@ describe('Protocol V2 firmware update targets', () => {
     }
 
     expect(writeOffsets).toEqual([0, 4000, 0, 4000, 8000]);
+    expect((method as any).reconnectProtocolV2Device).toHaveBeenCalledTimes(1);
+    expect((method as any).verifyProtocolV2ReconnectIdentity).toHaveBeenCalledTimes(1);
+    expect(initialize).toHaveBeenCalledTimes(1);
   });
 
   test('rejects a chunk-relative processed_byte during firmware staging', async () => {

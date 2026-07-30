@@ -1291,7 +1291,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     while (Date.now() - startTime < PROTOCOL_V2_INSTALL_TIMEOUT) {
       try {
         await this.reconnectProtocolV2Device();
-        await this.verifyProtocolV2ReconnectIdentity();
+        const deviceInfo = await this.verifyProtocolV2ReconnectIdentity();
         try {
           const statusResponse = await this.device.getCommands().typedCall(
             'DeviceFirmwareUpdateStatusGet',
@@ -1321,20 +1321,25 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           ) {
             throw error;
           }
-          // App firmware does not register DeviceFirmwareUpdateStatusGet. If the
-          // device already rebooted into App, this endpoint error signals that the
-          // install phase ended; the later phase performs the final readiness check.
+          // App firmware does not register DeviceFirmwareUpdateStatusGet. Treat the
+          // missing endpoint as completion only after the runtime probe confirms App mode.
           if (isProtocolV2FirmwareStatusEndpointUnavailable(error)) {
-            Log.log(
-              '[FirmwareUpdateV4] firmware status endpoint unavailable after reboot; continue with normal-mode verification'
+            if (await this.probeProtocolV2NormalMode(deviceInfo)) {
+              Log.log(
+                '[FirmwareUpdateV4] firmware status endpoint unavailable after confirmed App reboot'
+              );
+              return;
+            }
+            lastError = new Error(
+              'Protocol V2 firmware status endpoint is unavailable while the device remains in loader mode'
             );
-            return;
+          } else {
+            lastError = error;
+            Log.log(
+              '[FirmwareUpdateV4] DeviceFirmwareUpdateStatusGet unavailable during install: ',
+              error
+            );
           }
-          lastError = error;
-          Log.log(
-            '[FirmwareUpdateV4] DeviceFirmwareUpdateStatusGet unavailable during install: ',
-            error
-          );
         }
       } catch (error) {
         lastError = error;
@@ -1361,6 +1366,14 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     // The connection may still be in bootloader. Request a Normal reboot directly;
     // repeating it after an automatic App reboot is idempotent.
     await this.protocolV2Reboot(DeviceRebootType.Normal);
+  }
+
+  private async probeProtocolV2NormalMode(deviceInfo: ProtocolV2DeviceInfo) {
+    const features = await this.device.probeProtocolV2RuntimeState(
+      deviceInfo,
+      PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT
+    );
+    return features.mode === 'normal' && !features.bootloaderMode;
   }
 
   private async waitForProtocolV2FinalFeatures() {
@@ -1615,9 +1628,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const env = DataManager.getSettings('env');
     if (DataManager.isBleConnect(env)) {
       await wait(3000);
-      await this.acquireProtocolV2BleDevice();
-      await this.device.initialize();
     }
+    await this.reconnectProtocolV2Device();
+    await this.verifyProtocolV2ReconnectIdentity();
+    await this.device.initialize();
     await wait(2000);
   }
 
