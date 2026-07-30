@@ -144,6 +144,29 @@ describe('normalizeEvmSignTxHexFields', () => {
     ).toThrow(/accessList\[0\]\.storageKeys\[1\] must be a hex string/);
   });
 
+  it('accepts an empty accessList and an entry carrying no storageKeys', () => {
+    // The per-item hex validation must not turn these into a hard failure:
+    // an empty list is the normal EIP-1559 case, and storageKeys is optional
+    // in practice even though the type declares it.
+    const out = normalizeEvmSignTxHexFields({
+      path: "m/44'/60'/0'/0/0",
+      maxFeePerGas: '0x3',
+      maxPriorityFeePerGas: '0x1',
+      accessList: [],
+    } as unknown as EvmSignTxTrezorParams);
+    expect(out.accessList).toEqual([]);
+
+    const noKeys = normalizeEvmSignTxHexFields({
+      path: "m/44'/60'/0'/0/0",
+      maxFeePerGas: '0x3',
+      maxPriorityFeePerGas: '0x1',
+      accessList: [{ address: '0xabcdef0000000000000000000000000000000001' }],
+    } as unknown as EvmSignTxTrezorParams);
+    expect(noKeys.accessList).toEqual([
+      { address: 'abcdef0000000000000000000000000000000001' },
+    ]);
+  });
+
   it('rejects invalid hex in amount fields instead of signing truncated bytes', () => {
     expect(() =>
       normalizeEvmSignTxHexFields({
