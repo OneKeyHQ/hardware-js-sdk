@@ -237,7 +237,9 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
         .productName;
       const protocolHint = input.expectedProtocol
         ? undefined
-        : this.deviceProtocolHints.get(input.path) ?? inferProtocolHintFromDeviceName(deviceName);
+        : input.protocolHint ??
+          this.deviceProtocolHints.get(input.path) ??
+          inferProtocolHintFromDeviceName(deviceName);
       if (protocolHint) {
         this.deviceProtocolHints.set(input.path, protocolHint);
       }

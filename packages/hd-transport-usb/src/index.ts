@@ -346,7 +346,7 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
       await this.rotateProtocolV2UsbGeneration(path, 'Node USB transport acquired');
       await this.closeOpenDevice(path);
       await this.openDevice(path);
-      await this.detectProtocol(path, input.expectedProtocol);
+      await this.detectProtocol(path, input.expectedProtocol, input.protocolHint);
       return path;
     } catch (error: any) {
       this.Log?.debug('NodeUsbTransport acquire error: ', error);
@@ -843,7 +843,8 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
 
   private async detectProtocol(
     path: string,
-    expectedProtocol?: ProtocolType
+    expectedProtocol?: ProtocolType,
+    protocolHint?: ProtocolType
   ): Promise<ProtocolType> {
     if (expectedProtocol === 'V2') {
       if (await this.probeProtocolV2(path)) {
@@ -862,19 +863,19 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
       throw this.createProtocolMismatchError(expectedProtocol);
     }
 
-    if (this.deviceProtocol.get(path) === 'V2' && (await this.probeProtocolV2(path))) {
-      this.deviceProtocol.set(path, 'V2');
-      return 'V2';
-    }
+    const probeOrder: ProtocolType[] =
+      protocolHint === 'V2' || this.deviceProtocol.get(path) === 'V2' ? ['V2', 'V1'] : ['V1', 'V2'];
 
-    if (await this.probeProtocolV1(path)) {
-      this.deviceProtocol.set(path, 'V1');
-      return 'V1';
-    }
-
-    if (await this.probeProtocolV2(path)) {
-      this.deviceProtocol.set(path, 'V2');
-      return 'V2';
+    for (const [index, protocol] of probeOrder.entries()) {
+      if (index > 0) {
+        await this.resetConnectionAfterProbe(path);
+      }
+      const detected =
+        protocol === 'V1' ? await this.probeProtocolV1(path) : await this.probeProtocolV2(path);
+      if (detected) {
+        this.deviceProtocol.set(path, protocol);
+        return protocol;
+      }
     }
 
     this.deviceProtocol.delete(path);

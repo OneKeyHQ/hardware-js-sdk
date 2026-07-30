@@ -1,4 +1,4 @@
-import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
+import { EFirmwareType } from '@onekeyfe/hd-shared';
 
 import {
   resolveDeviceBleFirmwareVersion,
@@ -11,6 +11,7 @@ import {
   resolveDeviceType,
 } from '../utils/deviceFeaturesCompat';
 import { normalizeSafetyCheckLevel } from '../utils/deviceSettings';
+import { resolveProtocolV2DeviceIdentity } from './protocolV2DeviceIdentity';
 
 import type {
   DeviceFirmwareImageInfo,
@@ -224,6 +225,12 @@ export const buildProtocolV2FeaturesPayload = ({
   const samePhysicalDevice =
     !incomingSerialNo || !previous?.serialNo || incomingSerialNo === previous.serialNo;
   const cached = samePhysicalDevice ? previous : undefined;
+  const incomingDeviceType = info?.hw?.Device_type;
+  const resolvedIdentity = resolveProtocolV2DeviceIdentity(incomingDeviceType);
+  const cachedIdentity =
+    incomingDeviceType === undefined || incomingDeviceType === null ? cached : undefined;
+  const deviceType = cachedIdentity ? cachedIdentity.deviceType : resolvedIdentity.deviceType;
+  const model = cachedIdentity ? cachedIdentity.model : resolvedIdentity.model;
 
   const firmwareVersion = firstMeaningfulVersion(
     getImageVersion(fwApplication),
@@ -270,9 +277,9 @@ export const buildProtocolV2FeaturesPayload = ({
   return {
     protocol: 'V2',
     protocolVersion: deviceInfo?.protocol_version ?? cached?.protocolVersion ?? null,
-    deviceType: EDeviceType.Pro2,
+    deviceType,
     firmwareType: cached?.firmwareType ?? EFirmwareType.Universal,
-    model: 'pro2',
+    model,
     vendor: 'onekey.so',
     deviceId,
     serialNo,

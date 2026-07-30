@@ -95,6 +95,41 @@ describe('public device lifecycle events', () => {
     expect(messages.filter(message => message.type === DEVICE.DISCONNECT)).toHaveLength(1);
   });
 
+  test('uses a cached protocol as a fallback-capable acquire hint', async () => {
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
+    const device = Device.fromDescriptor({
+      id: 'ble-id',
+      path: 'ble-id',
+      commType: 'ble',
+      protocolType: 'V1',
+    } as never);
+    const acquire = jest.fn().mockResolvedValue({ uuid: 'ble-id', protocolType: 'V2' });
+    device.deviceConnector = { acquire } as never;
+
+    await device.acquire();
+
+    expect(acquire).toHaveBeenCalledWith('ble-id', undefined, true, undefined, 'V1');
+    expect(device.getProtocol()).toBe('V2');
+    expect(device.originalDescriptor.protocolType).toBe('V2');
+  });
+
+  test('keeps an explicit connectProtocol as a strict expected protocol', async () => {
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
+    const device = Device.fromDescriptor({
+      id: 'ble-id',
+      path: 'ble-id',
+      commType: 'ble',
+      protocolType: 'V1',
+    } as never);
+    const acquire = jest.fn().mockResolvedValue({ uuid: 'ble-id', protocolType: 'V2' });
+    device.deviceConnector = { acquire } as never;
+
+    await device.acquire('V2');
+
+    expect(acquire).toHaveBeenCalledWith('ble-id', undefined, true, 'V2', undefined);
+    expect(device.getProtocol()).toBe('V2');
+  });
+
   test('converts an internal transport disconnect into a public KnownDevice snapshot', () => {
     jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
     core = initCore();

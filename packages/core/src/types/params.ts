@@ -60,7 +60,8 @@ export interface CommonParams {
   usePreInitialize?: boolean;
 
   /**
-   * Expected transport protocol. If omitted, SDK probes Protocol V1 then Protocol V2.
+   * Strictly expected transport protocol. The SDK actively verifies this value and
+   * rejects a mismatch. If omitted, a cached protocol only influences probe order.
    */
   connectProtocol?: HardwareConnectProtocol;
 }

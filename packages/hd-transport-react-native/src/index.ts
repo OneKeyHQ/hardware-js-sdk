@@ -781,7 +781,8 @@ export default class ReactNativeBleTransport {
 
     const protocolHint = expectedProtocol
       ? undefined
-      : this.deviceProtocolHints.get(uuid) ??
+      : input.protocolHint ??
+        this.deviceProtocolHints.get(uuid) ??
         inferProtocolHintFromDeviceName(getDeviceDisplayName(device));
 
     // release transport before new transport instance

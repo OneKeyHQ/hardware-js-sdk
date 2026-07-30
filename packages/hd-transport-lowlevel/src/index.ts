@@ -17,8 +17,8 @@ import type EventEmitter from 'events';
 import type {
   LowLevelDevice,
   LowlevelTransportSharedPlugin,
-  ProtocolV2CallContext,
   ProtocolType,
+  ProtocolV2CallContext,
   TransportCallOptions,
 } from '@onekeyfe/hd-transport';
 import type { LowLevelAcquireInput } from './types';
@@ -193,7 +193,7 @@ export default class LowlevelTransport {
     );
     const protocolHint = input.expectedProtocol
       ? undefined
-      : this.deviceProtocolHints.get(input.uuid);
+      : input.protocolHint ?? this.deviceProtocolHints.get(input.uuid);
     const protocolType = await this.detectProtocol(
       input.uuid,
       input.expectedProtocol,
@@ -371,31 +371,20 @@ export default class LowlevelTransport {
       throw this.createProtocolMismatchError(expectedProtocol);
     }
 
-    if (protocolHint === 'V2' && (await this.probeProtocolV2(uuid))) {
-      this.deviceProtocol.set(uuid, 'V2');
-      this.Log?.debug(`[LowlevelTransport] detectProtocol: uuid=${uuid} -> V2 (hint)`);
-      return 'V2';
-    }
+    const probeOrder: ProtocolType[] =
+      protocolHint === 'V2' || this.deviceProtocol.get(uuid) === 'V2' ? ['V2', 'V1'] : ['V1', 'V2'];
 
-    const cachedProtocol = this.deviceProtocol.get(uuid);
-    if (cachedProtocol === 'V2' && (await this.probeProtocolV2(uuid))) {
-      this.deviceProtocol.set(uuid, 'V2');
-      this.Log?.debug(`[LowlevelTransport] detectProtocol: uuid=${uuid} -> V2 (cached)`);
-      return 'V2';
-    }
-
-    const protocolV1Detected = await this.probeProtocolV1(uuid);
-    if (protocolV1Detected) {
-      this.deviceProtocol.set(uuid, 'V1');
-      this.Log?.debug(`[LowlevelTransport] detectProtocol: uuid=${uuid} -> V1`);
-      return 'V1';
-    }
-
-    await this.resetConnectionAfterProbe(uuid, 'V1');
-    if (await this.probeProtocolV2(uuid)) {
-      this.deviceProtocol.set(uuid, 'V2');
-      this.Log?.debug(`[LowlevelTransport] detectProtocol: uuid=${uuid} -> V2`);
-      return 'V2';
+    for (const [index, protocol] of probeOrder.entries()) {
+      if (index > 0) {
+        await this.resetConnectionAfterProbe(uuid, probeOrder[index - 1]);
+      }
+      const detected =
+        protocol === 'V1' ? await this.probeProtocolV1(uuid) : await this.probeProtocolV2(uuid);
+      if (detected) {
+        this.deviceProtocol.set(uuid, protocol);
+        this.Log?.debug(`[LowlevelTransport] detectProtocol: uuid=${uuid} -> ${protocol}`);
+        return protocol;
+      }
     }
 
     this.deviceProtocol.delete(uuid);

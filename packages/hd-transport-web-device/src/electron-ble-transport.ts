@@ -42,6 +42,7 @@ export type BleAcquireInput = {
   uuid: string;
   forceCleanRunPromise?: boolean;
   expectedProtocol?: ProtocolType;
+  protocolHint?: ProtocolType;
 };
 
 interface PacketProcessResult {
@@ -284,7 +285,9 @@ export default class ElectronBleTransport {
       }
       const protocolHint = expectedProtocol
         ? undefined
-        : this.deviceProtocolHints.get(uuid) ?? inferProtocolHintFromDeviceName(device.name);
+        : input.protocolHint ??
+          this.deviceProtocolHints.get(uuid) ??
+          inferProtocolHintFromDeviceName(device.name);
       if (protocolHint) {
         this.deviceProtocolHints.set(uuid, protocolHint);
       }

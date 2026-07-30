@@ -253,6 +253,28 @@ const createHarness = () => {
 };
 
 describe('NodeUsbTransport Protocol V2 link lifecycle', () => {
+  test('falls back to Protocol V2 when a cached V1 hint is stale', async () => {
+    const transport = new NodeUsbTransport() as any;
+    const events: string[] = [];
+    transport.probeProtocolV1 = jest.fn().mockImplementation(() => {
+      events.push('probe-v1');
+      return Promise.resolve(false);
+    });
+    transport.resetConnectionAfterProbe = jest.fn().mockImplementation(() => {
+      events.push('reset');
+      return Promise.resolve();
+    });
+    transport.probeProtocolV2 = jest.fn().mockImplementation(() => {
+      events.push('probe-v2');
+      return Promise.resolve(true);
+    });
+
+    await expect(transport.detectProtocol('pro-usb', undefined, 'V1')).resolves.toBe('V2');
+
+    expect(events).toEqual(['probe-v1', 'reset', 'probe-v2']);
+    expect(transport.getProtocolType('pro-usb')).toBe('V2');
+  });
+
   test('keeps active links when the Protocol V2 schema is configured repeatedly', () => {
     const transport = new NodeUsbTransport() as any;
     transport.invalidateAllProtocolV2UsbLinks = jest.fn().mockResolvedValue(undefined);

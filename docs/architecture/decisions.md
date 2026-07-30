@@ -33,6 +33,15 @@ Protocol V2 响应依靠串行调用、消息类型和帧序号维持请求边�
 - USB 在 open、claim、reset 或 reconnect 后轮换 generation，旧 generation 的异步读写必须失败。
 - Transport 不自动重发 Protocol V2 业务命令；有副作用操作的重试由了解幂等性的 Core 流程决定。
 
+协议选择状态必须区分三种含义：
+
+- `expectedProtocol` 来自调用方显式 `connectProtocol`，属于严格约束，活动探测不匹配时立即失败。
+- `protocolHint` 来自 descriptor、历史确认结果或名称提示，只决定首次 probe 顺序，失败后允许切换协议。
+- `detectedProtocol` 只来自当前活动连接响应，是初始化分支、方法能力检查和公共输出的唯一依据。
+
+协议版本与设备型号互相独立。Protocol V2 设备型号读取 `DeviceInfo.hw.Device_type`；不能用 V2 推导
+Pro2，也不能用 Pro/Pro2 型号反推协议。这样 Pro 后续迁移到 Protocol V2 时不需要改业务能力模型。
+
 主要实现：
 
 - `packages/hd-transport/src/protocols/v2/usb-transport-base.ts`
