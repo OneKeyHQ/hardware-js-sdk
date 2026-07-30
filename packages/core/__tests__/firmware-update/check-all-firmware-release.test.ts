@@ -52,6 +52,7 @@ const createMethod = (serialNo = 'device-id') => {
   });
   method.init();
   method.device = {
+    isProtocolV2: jest.fn(() => false),
     features: {
       deviceType: EDeviceType.Classic1s,
       serialNo,

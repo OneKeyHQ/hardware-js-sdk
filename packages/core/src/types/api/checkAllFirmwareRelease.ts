@@ -12,10 +12,7 @@ import type {
   IProtocolV2FirmwareComponentTarget,
 } from '../settings';
 import type { FirmwareUpdateV4Target } from './firmwareUpdate';
-import type {
-  FirmwareUpdatePlan,
-  FirmwareUpdatePlanForceTarget,
-} from './firmwareUpdatePlan';
+import type { FirmwareUpdatePlan, FirmwareUpdatePlanForceTarget } from './firmwareUpdatePlan';
 
 export type FirmwareRelease = {
   shouldUpdate?: boolean;
