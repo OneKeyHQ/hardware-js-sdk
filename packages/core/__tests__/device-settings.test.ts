@@ -226,6 +226,28 @@ describe('DeviceSettings protocol routing', () => {
     });
   });
 
+  it('accepts a locked Pro2 as confirmation after disabling passphrase', async () => {
+    const { device, getDeviceState } = createDevice({ protocol: 'V2' });
+    getDeviceState
+      .mockResolvedValueOnce({
+        status: { unlocked: true, passphraseProtection: true },
+      })
+      .mockResolvedValueOnce({
+        status: { unlocked: false, passphraseProtection: true },
+      });
+    const method = new DeviceSettings({
+      id: 6,
+      payload: {
+        method: 'deviceSettings',
+        usePassphrase: false,
+      },
+    });
+    method.init();
+    (method as any).device = device;
+
+    await expect(method.run()).resolves.toEqual({ message: 'Success' });
+  });
+
   it('keeps Protocol V1 passphrase settings on ApplySettings', async () => {
     const { device, typedCall, getDeviceState } = createDevice({ protocol: 'V1' });
     const method = new DeviceSettings({
