@@ -122,11 +122,18 @@ export const resolveDeviceBleName = (features?: DeviceFeaturesInput): string | n
 export const resolveDeviceFirmwareVersion = (features?: DeviceFeaturesInput): string | null => {
   if (!features) return null;
   const compatible = asCompatibleFeatures(features);
+  const bootloaderMode = compatible.bootloaderMode ?? compatible.bootloader_mode;
   return firstMeaningfulVersion(
     compatible.firmwareVersion,
     compatible.onekey_firmware_version,
     compatible.onekey_version,
-    versionFromParts(compatible.major_version, compatible.minor_version, compatible.patch_version)
+    bootloaderMode
+      ? null
+      : versionFromParts(
+          compatible.major_version,
+          compatible.minor_version,
+          compatible.patch_version
+        )
   );
 };
 

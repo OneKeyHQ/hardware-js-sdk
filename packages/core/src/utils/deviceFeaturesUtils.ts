@@ -160,6 +160,10 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (
   if (!options?.initSession && typeof device.getInternalState === 'function') {
     existingSessionId = device.getInternalState();
   }
+  if (options?.expectPassphraseState && passphraseState !== options.expectPassphraseState) {
+    device.clearInternalState();
+    throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError);
+  }
   device.updateInternalState(
     device.getCurrentPassphraseProtection() ?? false,
     passphraseState,

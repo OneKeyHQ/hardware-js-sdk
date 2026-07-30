@@ -241,6 +241,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
       return await Promise.resolve(input.path);
     } catch (e) {
       this.Log.debug('acquire error: ', e instanceof Error ? `${e.name}: ${e.message}` : String(e));
+      await this.closeOpenDevice(input.path);
       throw e;
     }
   }
@@ -281,7 +282,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
         this.deviceProtocol.set(path, 'V1');
         return 'V1';
       }
-      await this.resetConnectionAfterProbe(path);
+      await this.closeConnectionAfterProbe(path);
       throw this.createProtocolMismatchError(expectedProtocol);
     }
 
@@ -291,13 +292,15 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
           this.deviceProtocol.set(path, 'V2');
           return 'V2';
         }
-        await this.resetConnectionAfterProbe(path);
         if (attempt < EXPECTED_PROTOCOL_V2_PROBE_ATTEMPTS) {
+          await this.resetConnectionAfterProbe(path);
           this.Log?.debug(
             `[WebUsbTransport] Protocol V2 probe timed out, retrying ${
               attempt + 1
             }/${EXPECTED_PROTOCOL_V2_PROBE_ATTEMPTS}`
           );
+        } else {
+          await this.closeConnectionAfterProbe(path);
         }
       }
       this.deviceProtocol.delete(path);
@@ -312,17 +315,21 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     const probeOrder: ProtocolType[] =
       protocolHint === 'V2' || this.deviceProtocol.get(path) === 'V2' ? ['V2', 'V1'] : ['V1', 'V2'];
 
-    for (const protocol of probeOrder) {
+    for (const [index, protocol] of probeOrder.entries()) {
       const detected =
         protocol === 'V1' ? await this.probeProtocolV1(path) : await this.probeProtocolV2(path);
       if (detected) {
         this.deviceProtocol.set(path, protocol);
         return protocol;
       }
-      // A timed-out WebUSB transferIn cannot be cancelled in place. Closing and
-      // reopening the device guarantees the next protocol probe cannot consume a
-      // late response from the previous protocol generation.
-      await this.resetConnectionAfterProbe(path);
+      if (index < probeOrder.length - 1) {
+        // A timed-out WebUSB transferIn cannot be cancelled in place. Closing and
+        // reopening the device guarantees the next protocol probe cannot consume a
+        // late response from the previous protocol generation.
+        await this.resetConnectionAfterProbe(path);
+      } else {
+        await this.closeConnectionAfterProbe(path);
+      }
     }
 
     this.deviceProtocol.delete(path);
@@ -645,25 +652,13 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     return this.getTransferInData(result);
   }
 
-  private async resetConnectionAfterProbe(path: string) {
+  private async closeConnectionAfterProbe(path: string) {
     await this.rotateProtocolV2UsbGeneration(path, 'WebUSB protocol probe reset');
+    await this.closeOpenDevice(path);
+  }
 
-    try {
-      const device = await this.findDevice(path);
-      if (device.opened) {
-        const endpoints = this.deviceEndpoints.get(path);
-        const ifaceNum = endpoints?.interfaceNumber ?? this.interfaceId;
-        try {
-          await device.releaseInterface(ifaceNum);
-        } catch (error) {
-          this.Log.debug('[WebUsbTransport] releaseInterface after protocol probe error:', error);
-        }
-        await device.close();
-      }
-    } catch (error) {
-      this.Log.debug('[WebUsbTransport] close after protocol probe error:', error);
-    }
-
+  private async resetConnectionAfterProbe(path: string) {
+    await this.closeConnectionAfterProbe(path);
     await this.getConnectedDevices();
     await this.connect(path, false);
   }

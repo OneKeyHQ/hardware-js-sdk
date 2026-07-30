@@ -168,7 +168,7 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
             expectPassphraseState: this.params.passphraseState,
           });
       const deviceId = requireDeviceId();
-      if (!session.passphraseState) {
+      if (!session.passphraseState || session.passphraseState !== this.params.passphraseState) {
         this.device.clearInternalState();
         throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError);
       }

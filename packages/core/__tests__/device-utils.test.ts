@@ -61,6 +61,7 @@ describe('device feature selectors', () => {
     } as PROTO.Features;
 
     expect(getDeviceType(features)).toBe(EDeviceType.Classic);
+    expect(getDeviceFirmwareVersion(features)).toEqual([0, 0, 0]);
     expect(getDeviceBootloaderVersion(features)).toEqual([1, 8, 3]);
   });
 

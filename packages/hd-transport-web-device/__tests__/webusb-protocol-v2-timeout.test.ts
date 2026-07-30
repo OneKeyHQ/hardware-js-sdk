@@ -117,6 +117,7 @@ describe('WebUsbTransport Protocol V2 timeout recovery', () => {
     webusb.probeProtocolV1 = jest.fn();
     webusb.probeProtocolV2 = jest.fn().mockResolvedValue(false);
     webusb.resetConnectionAfterProbe = jest.fn().mockResolvedValue(undefined);
+    webusb.closeConnectionAfterProbe = jest.fn().mockResolvedValue(undefined);
 
     await expect(webusb.detectProtocol(path, 'V2')).rejects.toThrow(
       'Protocol V2 probe timeout after 2 attempts'
@@ -124,8 +125,38 @@ describe('WebUsbTransport Protocol V2 timeout recovery', () => {
 
     expect(webusb.probeProtocolV2).toHaveBeenCalledTimes(2);
     expect(webusb.probeProtocolV1).not.toHaveBeenCalled();
-    expect(webusb.resetConnectionAfterProbe).toHaveBeenCalledTimes(2);
+    expect(webusb.resetConnectionAfterProbe).toHaveBeenCalledTimes(1);
+    expect(webusb.closeConnectionAfterProbe).toHaveBeenCalledTimes(1);
     expect(webusb.deviceProtocol.has(path)).toBe(false);
+  });
+
+  test('closes the reopened device when acquire exhausts the expected Protocol V2 probe', async () => {
+    const webusb = new WebUsbTransport() as any;
+    const path = 'pro2-webusb';
+    const device = {
+      opened: false,
+      releaseInterface: jest.fn().mockResolvedValue(undefined),
+      close: jest.fn().mockImplementation(() => {
+        device.opened = false;
+        return Promise.resolve();
+      }),
+    };
+    webusb.deviceList = [{ path, device }];
+    webusb.Log = { debug: jest.fn() };
+    webusb.rotateProtocolV2UsbGeneration = jest.fn().mockResolvedValue(undefined);
+    webusb.connect = jest.fn().mockImplementation(() => {
+      device.opened = true;
+      return Promise.resolve();
+    });
+    webusb.detectProtocol = jest.fn().mockRejectedValue(new Error('terminal probe failure'));
+
+    await expect(webusb.acquire({ path, expectedProtocol: 'V2' })).rejects.toThrow(
+      'terminal probe failure'
+    );
+
+    expect(device.releaseInterface).toHaveBeenCalledTimes(1);
+    expect(device.close).toHaveBeenCalledTimes(1);
+    expect(device.opened).toBe(false);
   });
 
   test('invalidates and resets the cached connection before another call can start', async () => {

@@ -437,16 +437,24 @@ export function createNobleBlePlugin(): LowlevelTransportSharedPlugin {
       }
 
       await connectPeripheral(peripheral);
-      const characteristics = await discoverCharacteristics(peripheral);
-      const notificationState = createNotificationState(uuid);
+      let characteristics: CharacteristicPair | undefined;
       try {
+        characteristics = await discoverCharacteristics(peripheral);
+        const notificationState = createNotificationState(uuid);
         await subscribeNotifications(uuid, notificationState.generation, characteristics.notify);
+        connectedDevices.set(uuid, peripheral);
+        deviceCharacteristics.set(uuid, characteristics);
       } catch (error) {
         clearNotificationState(uuid, `BLE notification subscription failed: ${uuid}`);
+        if (characteristics) {
+          characteristics.notify.removeAllListeners('data');
+          await waitForNobleCleanup(callback => characteristics?.notify.unsubscribe(callback));
+        }
+        if (peripheral.state !== 'disconnected') {
+          await waitForNobleCleanup(callback => peripheral?.disconnect(callback));
+        }
         throw error;
       }
-      connectedDevices.set(uuid, peripheral);
-      deviceCharacteristics.set(uuid, characteristics);
     },
 
     async disconnect(uuid: string) {
