@@ -127,6 +127,25 @@ describe('NobleBleHandler', () => {
     await handler.stopScan();
   });
 
+  test('an explicitly passed serviceUuids filter is ignored, not forwarded to noble', async () => {
+    // serviceUuids survives on the IPC options only so an older renderer stays
+    // compatible; honouring it would reintroduce the Windows ADV-drop bug, so
+    // the handler must discard it rather than pass it to startScanningAsync.
+    const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
+    const noble = new FakeNoble([peripheral]);
+    const handler = new NobleBleHandler({ nobleFactory: () => noble as any });
+
+    const devices = await handler.scan({
+      serviceUuids: [TREZOR_BLE_UUIDS.service],
+      durationMs: 0,
+    });
+
+    expect(devices.map(d => d.id)).toEqual(['id-1']);
+    expect(noble.startScanningAsync).toHaveBeenCalledWith([], true);
+
+    await handler.stopScan();
+  });
+
   test('connect falls back to connect-by-id when the device is not discoverable', async () => {
     // The regression this guards: a bonded Safe 7 STOPS ADVERTISING (it holds
     // the link and waits for the host), so after OS pairing it can never be
