@@ -112,6 +112,38 @@ describe('normalizeEvmSignTxHexFields', () => {
     ]);
   });
 
+  it('rejects invalid hex in an accessList address instead of signing truncated bytes', () => {
+    expect(() =>
+      normalizeEvmSignTxHexFields({
+        path: "m/44'/60'/0'/0/0",
+        maxFeePerGas: '0x3',
+        maxPriorityFeePerGas: '0x1',
+        accessList: [
+          {
+            address: '0xzzcdef0000000000000000000000000000000001',
+            storageKeys: ['0x01'],
+          },
+        ],
+      } as EvmSignTxTrezorParams)
+    ).toThrow(/accessList\[0\]\.address must be a hex string/);
+  });
+
+  it('rejects invalid hex in an accessList storage key instead of signing truncated bytes', () => {
+    expect(() =>
+      normalizeEvmSignTxHexFields({
+        path: "m/44'/60'/0'/0/0",
+        maxFeePerGas: '0x3',
+        maxPriorityFeePerGas: '0x1',
+        accessList: [
+          {
+            address: '0xabcdef0000000000000000000000000000000001',
+            storageKeys: ['0x01', '0xGG'],
+          },
+        ],
+      } as EvmSignTxTrezorParams)
+    ).toThrow(/accessList\[0\]\.storageKeys\[1\] must be a hex string/);
+  });
+
   it('rejects invalid hex in amount fields instead of signing truncated bytes', () => {
     expect(() =>
       normalizeEvmSignTxHexFields({

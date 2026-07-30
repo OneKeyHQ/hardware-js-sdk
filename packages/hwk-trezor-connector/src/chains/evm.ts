@@ -81,6 +81,16 @@ export function normalizeEvmSignTxHexFields(tx: EvmSignTxTrezorParams): EvmSignT
   if (tx.data !== undefined) {
     assertHexString('data', tx.data);
   }
+  // accessList is nested, so the top-level field whitelist above cannot see
+  // its hex values; without per-item validation an invalid character would
+  // survive until protobuf's Buffer.from(value, 'hex') silently truncates it
+  // and the device signs a different access list than the caller sent.
+  tx.accessList?.forEach((entry, i) => {
+    assertHexString(`accessList[${i}].address`, entry.address);
+    entry.storageKeys?.forEach((key, j) => {
+      assertHexString(`accessList[${i}].storageKeys[${j}]`, key);
+    });
+  });
   return {
     ...tx,
     value: hex('value', tx.value),
