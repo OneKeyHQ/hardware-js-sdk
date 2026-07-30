@@ -294,13 +294,13 @@ DeviceSessionGet({ session_id }) -> DeviceSession
 
 ### 8.1 字段说明
 
-| Protocol V2 字段/消息         | 含义                             | SDK 当前处理                                 |
-| ----------------------------- | -------------------------------- | -------------------------------------------- |
-| `DeviceSessionGet.session_id` | 尝试恢复之前的隐藏钱包 Session   | Core 内部传入当前钱包缓存值                  |
-| `DeviceSessionPinType`        | `Any/Main/AttachToPin` PIN 路由  | 标准钱包固定 `Main`，Attach 选择固定对应类型 |
-| `DeviceSessionAskPassphrase`  | 准备 Passphrase 隐藏钱包          | 可选携带 Host 明文；字段缺省为设备端输入      |
-| 响应 `session_id`             | 当前钱包 Session ID              | 保存到当前钱包缓存                           |
-| `btc_test_address`            | 用于确认当前钱包上下文的稳定标识 | 映射为内部 `passphraseState`                 |
+| Protocol V2 字段/消息         | 含义                             | SDK 当前处理                                                                    |
+| ----------------------------- | -------------------------------- | ------------------------------------------------------------------------------- |
+| `DeviceSessionGet.session_id` | 尝试恢复之前的隐藏钱包 Session   | Core 内部传入当前钱包缓存值                                                     |
+| `DeviceSessionPinType`        | `Any/Main/AttachToPin` PIN 路由  | 标准钱包固定 `Main`，Attach 选择固定对应类型                                    |
+| `DeviceSessionAskPassphrase`  | 准备 Passphrase 隐藏钱包         | Host 显式发送 `on_device=false + passphrase`；设备输入显式发送 `on_device=true` |
+| 响应 `session_id`             | 当前钱包 Session ID              | 保存到当前钱包缓存                                                              |
+| `btc_test_address`            | 用于确认当前钱包上下文的稳定标识 | 映射为内部 `passphraseState`                                                    |
 
 这里的 `btc_test_address` 用于确认当前打开的是不是预期钱包，不用于用户资产地址展示。
 

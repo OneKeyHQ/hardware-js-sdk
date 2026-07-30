@@ -163,6 +163,28 @@ describe('messages', () => {
     );
   });
 
+  test('Protocol V2 passphrase selection keeps the explicit input source on wire', () => {
+    const messages = parseConfigure(v2Messages);
+    const { Message } = createMessageFromName(messages, 'DeviceSessionAskPassphrase');
+
+    const onDevice = Message.encode(Message.create({ on_device: true })).finish();
+    const onHost = Message.encode(
+      Message.create({
+        passphrase: 'host hidden wallet',
+        on_device: false,
+      })
+    ).finish();
+
+    expect(Buffer.from(onDevice).toString('hex')).toBe('1001');
+    expect(Buffer.from(onHost).toString('hex')).toBe(
+      '0a12686f73742068696464656e2077616c6c65741000'
+    );
+    expect(Message.decode(onHost)).toMatchObject({
+      passphrase: 'host hidden wallet',
+      on_device: false,
+    });
+  });
+
   test('Protocol V2 onboarding status matches the current firmware-pro2 schema', () => {
     expect(v2Messages.nested.DevOnboardingStep.values).toMatchObject({
       DEV_ONBOARDING_STEP_UNKNOWN: 0,

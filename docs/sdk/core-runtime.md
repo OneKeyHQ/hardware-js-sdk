@@ -254,8 +254,10 @@ App 不应按型号或 PID 自行选择协议，也不应直接发送
 | 恢复已选隐藏钱包    | Core 管理 V1 Session 复用               | `DeviceSessionGet({ session_id })`                                               |
 
 Pro2 Protocol V2 的 wire contract 要求显式输入位置：设备输入发送
-`{ on_device: true }`，软件输入发送 `{ on_device: false, passphrase }`。正式 App 的
-`select-hidden` UI 使用 `deviceOnly=true`，因此正常业务只会走设备输入或 Attach PIN。
+`{ on_device: true }`，Host 输入发送 `{ on_device: false, passphrase }`。`select-hidden` 的
+`REQUEST_PASSPHRASE` 使用 `deviceOnly=false`，正式 App 应同时提供 Host 输入和设备输入；当
+`existsAttachPinUser=true` 时还应提供 Attach PIN。Host Passphrase 只用于当前阻塞请求，不应写入
+日志、缓存、持久化存储或钱包引用。
 
 对 App 的最小回归检查是：
 

@@ -25,6 +25,7 @@ import {
   WALLET_SESSION_CASES,
   assertAttachPinUnlocked,
   buildWrongDeviceId,
+  getSatisfiedPrerequisiteIds,
   summarizeWalletSession,
   type WalletSessionCaseDefinition,
 } from '../features/wallet-session-test/walletSessionCases';
@@ -73,8 +74,14 @@ type RuntimeContext = {
   preReset?: {
     deviceId: string;
     standardAddress: string;
-    hidden?: WalletReference;
+    hidden: WalletReference;
   };
+};
+
+type RuntimeCheckpoint = {
+  runtimeId: string;
+  deviceId: string;
+  passphraseState: string;
 };
 
 type SafeCaseOutput = {
@@ -85,6 +92,26 @@ type SafeCaseOutput = {
 
 const EVM_TEST_PATH = "m/44'/60'/0'/0/0";
 const RUNTIME_CHECKPOINT_KEY = 'onekey.wallet-session-test.runtime-checkpoint';
+const RUNTIME_INSTANCE_ID = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+function readRuntimeCheckpoint(): RuntimeCheckpoint | undefined {
+  const value = window.sessionStorage.getItem(RUNTIME_CHECKPOINT_KEY);
+  if (!value) return undefined;
+  try {
+    const checkpoint = JSON.parse(value) as Partial<RuntimeCheckpoint>;
+    if (
+      typeof checkpoint.runtimeId === 'string' &&
+      typeof checkpoint.deviceId === 'string' &&
+      typeof checkpoint.passphraseState === 'string'
+    ) {
+      return checkpoint as RuntimeCheckpoint;
+    }
+  } catch {
+    // Invalid checkpoints are discarded below.
+  }
+  window.sessionStorage.removeItem(RUNTIME_CHECKPOINT_KEY);
+  return undefined;
+}
 
 const CATEGORY_LABELS: Record<WalletSessionCaseDefinition['category'], string> = {
   environment: '环境与协议',
@@ -316,6 +343,16 @@ export default function WalletSessionTestPage() {
       const context = contextRef.current;
       const baselineDeviceId = context.baselineDeviceId;
 
+      if (
+        context.baselineProtocol &&
+        !definition.protocols.includes(context.baselineProtocol)
+      ) {
+        return {
+          message: `当前协议 ${context.baselineProtocol} 不属于该用例范围`,
+          skipped: true,
+        };
+      }
+
       switch (definition.id) {
         case 'webusb-baseline': {
           const state = await refreshDeviceState(sdk, currentDevice);
@@ -323,10 +360,25 @@ export default function WalletSessionTestPage() {
           if (state.protocol !== 'V1' && state.protocol !== 'V2') {
             throw new Error(`不支持的协议状态：${state.protocol}`);
           }
-          const checkpointText = window.sessionStorage.getItem(RUNTIME_CHECKPOINT_KEY);
-          const checkpoint = checkpointText
-            ? (JSON.parse(checkpointText) as { deviceId?: unknown })
-            : undefined;
+          const checkpoint = readRuntimeCheckpoint();
+          let runtimeSessionOutcome: 'not-set' | 'rejected-as-expected' = 'not-set';
+          if (checkpoint) {
+            if (checkpoint.runtimeId === RUNTIME_INSTANCE_ID) {
+              throw new Error('重启检查点已记录，请先完整刷新浏览器页面再验证');
+            }
+            if (checkpoint.deviceId !== deviceId) {
+              throw new Error('浏览器/Core 重启后 deviceId 发生变化');
+            }
+            const prompts = passphrasePromptCountRef.current;
+            const response = await sdk.openWalletSession(currentDevice.connectId, {
+              mode: 'resume-hidden',
+              deviceId: checkpoint.deviceId,
+              passphraseState: checkpoint.passphraseState,
+            });
+            assertExpectedFailure(response, ['WalletSessionInvalid'], prompts);
+            runtimeSessionOutcome = 'rejected-as-expected';
+            window.sessionStorage.removeItem(RUNTIME_CHECKPOINT_KEY);
+          }
           updateContext({ baselineDeviceId: deviceId, baselineProtocol: state.protocol });
           return {
             message: '已建立实时 WebUSB 设备基线',
@@ -338,9 +390,10 @@ export default function WalletSessionTestPage() {
               passphraseProtection: state.status.passphraseProtection,
               attachToPinEnabled: state.status.attachToPinEnabled,
               runtimeCheckpointMatches:
-                typeof checkpoint?.deviceId === 'string'
-                  ? checkpoint.deviceId === deviceId
-                  : 'not-set',
+                checkpoint ? checkpoint.deviceId === deviceId : 'not-set',
+              runtimeSessionOutcome,
+              persistedWalletReference: Boolean(checkpoint),
+              persistedInternalSession: false,
             },
           };
         }
@@ -579,8 +632,54 @@ export default function WalletSessionTestPage() {
           return { message: '已清理当前设备的全部 SDK Session 缓存' };
         }
         case 'device-cache-invalid': {
-          const wallet = context.hiddenB;
-          if (!wallet) throw new Error('缺少钱包 B');
+          const walletA = context.hiddenA;
+          const walletB = context.hiddenB;
+          if (!walletA || !walletB) throw new Error('缺少钱包 A/B');
+          const prompts = passphrasePromptCountRef.current;
+          const responseA = await sdk.openWalletSession(currentDevice.connectId, {
+            mode: 'resume-hidden',
+            deviceId: walletA.deviceId,
+            passphraseState: walletA.passphraseState,
+          });
+          assertExpectedFailure(responseA, ['WalletSessionInvalid'], prompts);
+          const responseB = await sdk.openWalletSession(currentDevice.connectId, {
+            mode: 'resume-hidden',
+            deviceId: walletB.deviceId,
+            passphraseState: walletB.passphraseState,
+          });
+          assertExpectedFailure(responseB, ['WalletSessionInvalid'], prompts);
+          return {
+            message: '设备级清理后钱包 A/B 均按预期失效',
+            details: { walletAInvalid: true, walletBInvalid: true, passphrasePrompted: false },
+          };
+        }
+        case 'hidden-a-reselect-after-device-clear': {
+          const previous = context.hiddenA;
+          if (!previous?.address) throw new Error('缺少钱包 A 地址基线');
+          const wallet = await openWallet(sdk, currentDevice, { mode: 'select-hidden' });
+          if (wallet.walletType !== 'hidden' || !wallet.passphraseState) {
+            throw new Error('设备没有返回完整的隐藏钱包标识');
+          }
+          if (wallet.passphraseState !== previous.passphraseState) {
+            throw new Error('重新选择后不是原钱包 A；请确认输入了相同测试 Passphrase');
+          }
+          const address = await getAddress(sdk, currentDevice, wallet.deviceId, {
+            passphraseState: wallet.passphraseState,
+          });
+          if (address !== previous.address) throw new Error('重新选择钱包 A 后地址发生变化');
+          updateContext({ hiddenA: { ...previous, deviceId: wallet.deviceId } });
+          return {
+            message: '设备级清理后钱包 A Session 已重新建立',
+            details: summarizeWalletSession(wallet),
+          };
+        }
+        case 'all-cache-clear': {
+          requireSuccess(await sdk.clearSessionCache({}), 'clearSessionCache(all)');
+          return { message: '已调用无参数全局清理，后续用例将验证钱包 A 失效' };
+        }
+        case 'all-cache-invalid': {
+          const wallet = context.hiddenA;
+          if (!wallet) throw new Error('缺少钱包 A');
           const prompts = passphrasePromptCountRef.current;
           const response = await sdk.openWalletSession(currentDevice.connectId, {
             mode: 'resume-hidden',
@@ -588,10 +687,6 @@ export default function WalletSessionTestPage() {
             passphraseState: wallet.passphraseState,
           });
           return assertExpectedFailure(response, ['WalletSessionInvalid'], prompts);
-        }
-        case 'all-cache-clear': {
-          requireSuccess(await sdk.clearSessionCache({}), 'clearSessionCache(all)');
-          return { message: '已清理 Core 内全部钱包 Session 缓存，未向设备发命令' };
         }
         case 'attach-pin-preflight': {
           const state = await refreshDeviceState(sdk, currentDevice);
@@ -607,7 +702,9 @@ export default function WalletSessionTestPage() {
             details: { attachToPinEnabled: true },
           };
         }
-        case 'attach-pin-select': {
+        case 'attach-pin-select':
+        case 'attach-pin-reselect-after-standard-rejection': {
+          const previousAttachWallet = context.attachWallet;
           const prompts = passphrasePromptCountRef.current;
           const wallet = await openWallet(sdk, currentDevice, {
             mode: 'select-hidden',
@@ -618,6 +715,15 @@ export default function WalletSessionTestPage() {
           if (wallet.walletType !== 'hidden' || !wallet.passphraseState) {
             throw new Error('Attach PIN 没有返回隐藏钱包标识');
           }
+          if (baselineDeviceId && wallet.deviceId !== baselineDeviceId) {
+            throw new Error('Attach PIN 钱包 deviceId 与设备身份基线不一致');
+          }
+          if (
+            definition.id === 'attach-pin-reselect-after-standard-rejection' &&
+            previousAttachWallet?.passphraseState !== wallet.passphraseState
+          ) {
+            throw new Error('重新选择后不是原 Attach PIN 钱包');
+          }
           const state = await refreshDeviceState(sdk, currentDevice);
           assertAttachPinUnlocked(state);
           updateContext({
@@ -627,7 +733,10 @@ export default function WalletSessionTestPage() {
             },
           });
           return {
-            message: 'Attach PIN 钱包选择完成',
+            message:
+              definition.id === 'attach-pin-select'
+                ? 'Attach PIN 钱包选择完成'
+                : '已重新进入原 Attach PIN 钱包',
             details: summarizeWalletSession(wallet),
           };
         }
@@ -638,14 +747,50 @@ export default function WalletSessionTestPage() {
           assertAttachPinUnlocked(state);
           if (requireDeviceId(state) !== wallet.deviceId)
             throw new Error('Attach PIN 后 deviceId 发生变化');
-          const address = await getAddress(sdk, currentDevice, wallet.deviceId, {
+          const firstAddress = await getAddress(sdk, currentDevice, wallet.deviceId, {
             passphraseState: wallet.passphraseState,
           });
-          updateContext({ attachWallet: { ...wallet, address } });
+          const secondAddress = await getAddress(sdk, currentDevice, wallet.deviceId, {
+            passphraseState: wallet.passphraseState,
+          });
+          if (firstAddress !== secondAddress) {
+            throw new Error('Attach PIN 钱包同一路径重复获取了不同地址');
+          }
+          updateContext({ attachWallet: { ...wallet, address: firstAddress } });
           return {
             message: 'Attach PIN 状态与隐藏钱包地址一致',
-            details: { unlockedAttachPin: true, address },
+            details: {
+              unlockedAttachPin: true,
+              address: firstAddress,
+              repeatedAddressMatches: true,
+            },
           };
+        }
+        case 'attach-pin-standard-rejected': {
+          const prompts = passphrasePromptCountRef.current;
+          const response = await sdk.openWalletSession(currentDevice.connectId, {
+            mode: 'standard',
+          });
+          return assertExpectedFailure(response, ['DeviceCheckUnlockTypeError'], prompts);
+        }
+        case 'attach-pin-wrong-wallet-rejected': {
+          const attachWallet = context.attachWallet;
+          const walletA = context.hiddenA;
+          if (!attachWallet || !walletA) throw new Error('缺少 Attach PIN 钱包或钱包 A');
+          if (attachWallet.passphraseState === walletA.passphraseState) {
+            return {
+              message: 'Attach PIN 当前绑定的就是钱包 A，无法构造不同钱包状态；请更换测试绑定',
+              details: { walletMismatchAvailable: false },
+              skipped: true,
+            };
+          }
+          const prompts = passphrasePromptCountRef.current;
+          const response = await sdk.evmGetAddress(currentDevice.connectId, walletA.deviceId, {
+            path: EVM_TEST_PATH,
+            showOnOneKey: false,
+            passphraseState: walletA.passphraseState,
+          });
+          return assertExpectedFailure(response, ['DeviceCheckPassphraseStateError'], prompts);
         }
         case 'reconnect-same-device': {
           if (!baselineDeviceId) throw new Error('缺少设备身份基线');
@@ -659,21 +804,72 @@ export default function WalletSessionTestPage() {
             details: { deviceIdMatches: true, connectIdUsedAsWalletIdentity: false },
           };
         }
+        case 'reconnect-session-outcome': {
+          const wallet = context.hiddenA;
+          if (!wallet?.address) throw new Error('缺少钱包 A 地址基线');
+          const prompts = passphrasePromptCountRef.current;
+          const response = await sdk.openWalletSession(currentDevice.connectId, {
+            mode: 'resume-hidden',
+            deviceId: wallet.deviceId,
+            passphraseState: wallet.passphraseState,
+          });
+          if (!response.success) {
+            const output = assertExpectedFailure(response, ['WalletSessionInvalid'], prompts);
+            return {
+              ...output,
+              message: '重连后固件 Session 已失效，SDK 安全拒绝且没有隐式选择钱包',
+              details: { resumeOutcome: 'invalidated', passphrasePrompted: false },
+            };
+          }
+          const resumed = requireSuccess<OpenWalletSessionPayload>(
+            response,
+            'openWalletSession(reconnect resume)'
+          );
+          if (
+            resumed.walletType !== 'hidden' ||
+            resumed.deviceId !== wallet.deviceId ||
+            resumed.passphraseState !== wallet.passphraseState
+          ) {
+            throw new Error('重连后恢复到了错误的钱包身份');
+          }
+          const address = await getAddress(sdk, currentDevice, wallet.deviceId, {
+            passphraseState: wallet.passphraseState,
+          });
+          if (address !== wallet.address) throw new Error('重连恢复后钱包 A 地址发生变化');
+          if (passphrasePromptCountRef.current !== prompts) {
+            throw new Error('重连恢复过程中重新选择了钱包');
+          }
+          return {
+            message: '重连后钱包 A Session 仍有效且地址保持一致',
+            details: { resumeOutcome: 'resumed', addressMatches: true, passphrasePrompted: false },
+          };
+        }
         case 'runtime-restart-checkpoint': {
-          if (!baselineDeviceId) throw new Error('缺少设备身份基线');
+          const wallet = context.hiddenA;
+          if (!baselineDeviceId || !wallet?.address) {
+            throw new Error('缺少设备身份或钱包 A 地址基线');
+          }
           window.sessionStorage.setItem(
             RUNTIME_CHECKPOINT_KEY,
-            JSON.stringify({ deviceId: baselineDeviceId })
+            JSON.stringify({
+              runtimeId: RUNTIME_INSTANCE_ID,
+              deviceId: baselineDeviceId,
+              passphraseState: wallet.passphraseState,
+            } satisfies RuntimeCheckpoint)
           );
           return {
             message: '检查点已保存。刷新页面后重新连接并执行“WebUSB 连接与身份基线”',
-            details: { persistedSessionId: false, persistedPassphraseState: false },
+            details: {
+              persistedWalletReference: true,
+              persistedSessionId: false,
+              nextExpectedError: 'WalletSessionInvalid',
+            },
           };
         }
         case 'capture-pre-reset': {
           if (!destructiveAcknowledged) throw new Error('请先确认测试设备已备份并理解 wipe 不可逆');
-          if (!baselineDeviceId || !context.standardAddress) {
-            throw new Error('缺少设备身份或标准地址基线');
+          if (!baselineDeviceId || !context.standardAddress || !context.hiddenA?.address) {
+            throw new Error('缺少设备身份、标准地址或钱包 A 基线');
           }
           updateContext({
             preReset: {
@@ -702,23 +898,20 @@ export default function WalletSessionTestPage() {
           if (address !== preReset.standardAddress) {
             throw new Error('恢复后的标准钱包地址与重置前不同；请确认恢复的是同一测试钱包');
           }
-          let oldIdentityRejected: boolean | 'not-tested' = 'not-tested';
-          if (preReset.hidden) {
-            const response = await sdk.evmGetAddress(device.connectId, preReset.deviceId, {
-              path: EVM_TEST_PATH,
-              showOnOneKey: false,
-              passphraseState: preReset.hidden.passphraseState,
-            });
-            oldIdentityRejected = !response.success;
-            if (!oldIdentityRejected) throw new Error('旧 deviceId 仍可用于重置后的设备');
-          }
+          const prompts = passphrasePromptCountRef.current;
+          const response = await sdk.evmGetAddress(device.connectId, preReset.deviceId, {
+            path: EVM_TEST_PATH,
+            showOnOneKey: false,
+            passphraseState: preReset.hidden.passphraseState,
+          });
+          assertExpectedFailure(response, ['DeviceCheckDeviceIdError'], prompts);
           updateContext({ baselineDeviceId: nextDeviceId, standardAddress: address });
           return {
             message: '重置后的新 deviceId 与恢复钱包地址语义正确',
             details: {
               deviceIdChanged: true,
               restoredAddressMatches: true,
-              oldIdentityRejected,
+              oldIdentityRejected: true,
               sessionIdPersistedByPage: false,
             },
           };
@@ -775,13 +968,8 @@ export default function WalletSessionTestPage() {
     [executeCase]
   );
 
-  const completedIds = useMemo(
-    () =>
-      new Set(
-        Object.entries(results)
-          .filter(([, result]) => result.status === 'passed' || result.status === 'skipped')
-          .map(([id]) => id)
-      ),
+  const satisfiedPrerequisiteIds = useMemo(
+    () => getSatisfiedPrerequisiteIds(results),
     [results]
   );
   const completedCount = Object.values(results).filter(result =>
@@ -846,6 +1034,10 @@ export default function WalletSessionTestPage() {
                 Passphrase、PIN、私钥或 SDK 内部 Session。
               </p>
               <p>
+                隐藏钱包选择支持 Host 输入、设备端输入和 Attach PIN；Host Passphrase 仅通过阻塞弹窗
+                提交给当前 SDK 请求，不写入本页结果、跟踪日志或浏览器存储。
+              </p>
+              <p>
                 可在专用测试设备上使用你自己的公开测试向量，但恢复必须在 OneKey App/设备端完成，
                 不能把助记词输入本页面、终端或日志。
               </p>
@@ -897,7 +1089,7 @@ export default function WalletSessionTestPage() {
                 {group.cases.map(definition => {
                   const result = results[definition.id] ?? { status: 'idle' as const };
                   const missingPrerequisites = definition.prerequisites.filter(
-                    prerequisite => !completedIds.has(prerequisite)
+                    prerequisite => !satisfiedPrerequisiteIds.has(prerequisite)
                   );
                   const protocolUnsupported = Boolean(
                     contextRef.current.baselineProtocol &&

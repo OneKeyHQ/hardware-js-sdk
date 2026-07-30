@@ -62,10 +62,10 @@ See [Protocol V1/V2 transport](./docs/protocol/protocol-v1-v2.md).
 ## Device And Wallet Security
 
 - Never commit, print, log, snapshot, or place in fixtures: mnemonics, seeds, private keys, xprv,
-  PINs, passphrases, wallet session IDs, raw signing payloads, or other sensitive device data.
+  PINs, passphrases, raw signing payloads, or other sensitive device data.
 - Never bypass device confirmation, permission prompts, PIN/passphrase flows, unlock policies,
   transaction verification, or firmware authenticity checks.
-- Do not expose internal wallet sessions or raw protocol state through public APIs or events.
+- Do not expose raw protocol state through public APIs or events.
 - Cryptography, derivation paths, signing serialization, secure-channel code, and unlock/session
   changes require focused tests and security review.
 - Use deterministic, protocol-defined serialization for hashes and signatures. Do not replace it
