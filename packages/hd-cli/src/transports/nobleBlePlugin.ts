@@ -2,7 +2,7 @@ import {
   ERRORS,
   HardwareErrorCode,
   ONEKEY_SERVICE_UUID,
-  isOnekeyDevice,
+  isOnekeyBluetoothDevice,
 } from '@onekeyfe/hd-shared';
 
 import type { LowLevelDevice, LowlevelTransportSharedPlugin } from '@onekeyfe/hd-transport';
@@ -39,7 +39,6 @@ type NobleNotificationState = {
 };
 
 const ONEKEY_SERVICE_UUIDS = [ONEKEY_SERVICE_UUID];
-const PRO2_ADVERTISEMENT_SERVICE_UUID_KEYS = new Set(['fffd']);
 const NORMALIZED_WRITE_UUID = '0002';
 const NORMALIZED_NOTIFY_UUID = '0003';
 const NORMALIZED_ONEKEY_SERVICE_UUIDS = new Set([
@@ -68,24 +67,12 @@ function getBleUuidKey(uuid?: string | null) {
   return normalized.length >= 8 ? normalized.substring(4, 8) : normalized;
 }
 
-function isGenericBleService(uuid?: string | null) {
-  return ['1800', '1801', '180a', '180f'].includes(getBleUuidKey(uuid));
-}
-
-function hasOneKeyAdvertisementService(peripheral: Peripheral) {
-  const serviceUuids = peripheral.advertisement?.serviceUuids ?? [];
-  return serviceUuids.some(uuid => {
-    const uuidKey = getBleUuidKey(uuid);
-    return (
-      NORMALIZED_ONEKEY_SERVICE_UUIDS.has(uuidKey) ||
-      PRO2_ADVERTISEMENT_SERVICE_UUID_KEYS.has(uuidKey)
-    );
-  });
-}
-
 function isOneKeyPeripheral(peripheral: Peripheral) {
-  const deviceName = peripheral.advertisement?.localName || null;
-  return isOnekeyDevice(deviceName, peripheral.id) || hasOneKeyAdvertisementService(peripheral);
+  return isOnekeyBluetoothDevice({
+    id: peripheral.id,
+    localName: peripheral.advertisement?.localName,
+    serviceUuids: peripheral.advertisement?.serviceUuids,
+  });
 }
 
 function enqueueNotification(deviceId: string, generation: number, data: Buffer) {
@@ -230,7 +217,7 @@ async function scanDevices(targetDeviceId?: string) {
 
     const onDiscover = (peripheral: Peripheral) => {
       if (targetDeviceId && peripheral.id !== targetDeviceId) return;
-      if (!targetDeviceId && !isOneKeyPeripheral(peripheral)) return;
+      if (!isOneKeyPeripheral(peripheral)) return;
 
       discoveredDevices.set(peripheral.id, peripheral);
       found.set(peripheral.id, peripheral);
@@ -285,13 +272,7 @@ async function discoverCharacteristics(peripheral: Peripheral): Promise<Characte
     });
   });
 
-  let service = services.find(s => NORMALIZED_ONEKEY_SERVICE_UUIDS.has(getBleUuidKey(s.uuid)));
-  if (!service) {
-    service =
-      services.find(s => PRO2_ADVERTISEMENT_SERVICE_UUID_KEYS.has(getBleUuidKey(s.uuid))) ||
-      services.find(s => !isGenericBleService(s.uuid)) ||
-      services[0];
-  }
+  const service = services.find(s => NORMALIZED_ONEKEY_SERVICE_UUIDS.has(getBleUuidKey(s.uuid)));
   if (!service) {
     throw ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, 'No BLE service found');
   }

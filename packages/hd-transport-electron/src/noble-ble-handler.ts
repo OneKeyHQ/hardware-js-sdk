@@ -10,7 +10,7 @@ import {
   ERRORS,
   HardwareErrorCode,
   ONEKEY_SERVICE_UUID,
-  isOnekeyDevice,
+  isOnekeyBluetoothDevice,
   wait,
 } from '@onekeyfe/hd-shared';
 import pRetry from 'p-retry';
@@ -59,7 +59,6 @@ const subscriptionOperations = new Map<string, 'subscribing' | 'unsubscribing' |
 
 // Service UUIDs to scan for - using constants from hd-shared
 const ONEKEY_SERVICE_UUIDS = [ONEKEY_SERVICE_UUID];
-const PRO2_ADVERTISEMENT_SERVICE_UUID_KEYS = new Set(['fffd']);
 
 // Pre-normalized characteristic identifiers for fast comparison
 const NORMALIZED_WRITE_UUID = '0002';
@@ -92,24 +91,12 @@ const NORMALIZED_ONEKEY_SERVICE_UUIDS = new Set([
   '0001',
 ]);
 
-function isGenericBleService(uuid?: string | null) {
-  return ['1800', '1801', '180a', '180f'].includes(getBleUuidKey(uuid));
-}
-
-function hasOneKeyAdvertisementService(peripheral: Peripheral) {
-  const serviceUuids = peripheral.advertisement?.serviceUuids ?? [];
-  return serviceUuids.some(uuid => {
-    const uuidKey = getBleUuidKey(uuid);
-    return (
-      NORMALIZED_ONEKEY_SERVICE_UUIDS.has(uuidKey) ||
-      PRO2_ADVERTISEMENT_SERVICE_UUID_KEYS.has(uuidKey)
-    );
-  });
-}
-
 function isOneKeyPeripheral(peripheral: Peripheral) {
-  const deviceName = peripheral.advertisement?.localName || null;
-  return isOnekeyDevice(deviceName, peripheral.id) || hasOneKeyAdvertisementService(peripheral);
+  return isOnekeyBluetoothDevice({
+    id: peripheral.id,
+    localName: peripheral.advertisement?.localName,
+    serviceUuids: peripheral.advertisement?.serviceUuids,
+  });
 }
 
 /**
@@ -656,7 +643,7 @@ async function performTargetedScan(targetDeviceId: string): Promise<Peripheral |
   return new Promise((resolve, reject) => {
     // Local discover listener - only matches target device
     const onDiscover = (peripheral: Peripheral) => {
-      if (peripheral.id === targetDeviceId) {
+      if (peripheral.id === targetDeviceId && isOneKeyPeripheral(peripheral)) {
         logger?.info('[NobleBLE] Target device found during targeted scan:', {
           id: peripheral.id,
           name: peripheral.advertisement?.localName,
@@ -905,14 +892,7 @@ async function discoverServicesAndCharacteristics(
     });
 
     // Find OneKey service — Noble may expose 128-bit UUIDs as short UUID keys.
-    let service = services.find(s => NORMALIZED_ONEKEY_SERVICE_UUIDS.has(getBleUuidKey(s.uuid)));
-    if (!service) {
-      logger?.info('[NobleBLE] Known OneKey service UUID not found, trying first vendor service');
-      service =
-        services.find(s => PRO2_ADVERTISEMENT_SERVICE_UUID_KEYS.has(getBleUuidKey(s.uuid))) ||
-        services.find(s => !isGenericBleService(s.uuid)) ||
-        services[0];
-    }
+    const service = services.find(s => NORMALIZED_ONEKEY_SERVICE_UUIDS.has(getBleUuidKey(s.uuid)));
     if (!service) {
       throw ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound);
     }

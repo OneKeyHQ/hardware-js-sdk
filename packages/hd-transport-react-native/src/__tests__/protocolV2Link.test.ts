@@ -140,7 +140,7 @@ const createHarness = () => {
     id: uuid,
     name: 'OneKey Pro 2',
     localName: 'OneKey Pro 2',
-    serviceUUIDs: ['fffd'],
+    serviceUUIDs: ['00000001-0000-1000-8000-00805f9b34fb'],
     isConnected: jest.fn(() => Promise.resolve(true)),
     cancelConnection: jest.fn(() => Promise.resolve()),
     onDisconnected: jest.fn(callback => {

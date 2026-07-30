@@ -33,7 +33,7 @@ const createPeripheral = (id: string) => {
       state: 'connected',
       advertisement: {
         localName: `OneKey Pro 2 ${id}`,
-        serviceUuids: ['fffd'],
+        serviceUuids: ['0001'],
       },
       discoverServices: jest.fn((_uuids, callback) => callback(null, [service])),
       connect: jest.fn(callback => callback()),
@@ -46,8 +46,43 @@ const createPeripheral = (id: string) => {
 
 describe('Noble BLE plugin notification routing', () => {
   afterEach(() => {
+    jest.useRealTimers();
     jest.resetModules();
     jest.clearAllMocks();
+  });
+
+  test('does not enumerate Find My advertisements that expose FFFD', async () => {
+    jest.useFakeTimers({ doNotFake: ['performance'] });
+    const oneKey = createPeripheral('onekey-device');
+    const findMy = createPeripheral('find-my-device');
+    findMy.peripheral.advertisement.localName = 'Find My';
+    findMy.peripheral.advertisement.serviceUuids = ['fffd'];
+    const noble = new EventEmitter() as EventEmitter & {
+      state: string;
+      startScanning: jest.Mock;
+      stopScanning: jest.Mock;
+    };
+    noble.state = 'poweredOn';
+    noble.startScanning = jest.fn((_services, _duplicates, callback) => {
+      callback?.();
+      noble.emit('discover', findMy.peripheral);
+      noble.emit('discover', oneKey.peripheral);
+    });
+    noble.stopScanning = jest.fn(callback => callback?.());
+    jest.doMock('@stoprocent/noble', () => noble);
+
+    const { createNobleBlePlugin } = await import('../transports/nobleBlePlugin');
+    const plugin = createNobleBlePlugin();
+    await plugin.init();
+    const devicesPromise = plugin.enumerate();
+    await Promise.resolve();
+    jest.runAllTimers();
+    await Promise.resolve();
+
+    await expect(devicesPromise).resolves.toEqual([
+      expect.objectContaining({ id: 'onekey-device' }),
+    ]);
+    jest.useRealTimers();
   });
 
   test('routes notifications to the receiver waiting for the same device', async () => {

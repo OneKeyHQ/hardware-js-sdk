@@ -1,4 +1,4 @@
-import { isKnownTrezorWebUsbDevice, isOnekeyDevice } from './constants';
+import { isKnownTrezorWebUsbDevice, isOnekeyBluetoothDevice, isOnekeyDevice } from './constants';
 
 describe('hardware device identity filters', () => {
   it('accepts known OneKey BLE names', () => {
@@ -11,6 +11,26 @@ describe('hardware device identity filters', () => {
   it('rejects known Trezor and Ledger BLE names from OneKey discovery', () => {
     expect(isOnekeyDevice('Trezor Safe 7')).toBe(false);
     expect(isOnekeyDevice('Ledger Nano X')).toBe(false);
+  });
+
+  it('does not identify an unnamed FFFD or Find My advertisement as OneKey', () => {
+    expect(isOnekeyBluetoothDevice({ name: 'Find My', serviceUuids: ['fffd'] })).toBe(false);
+    expect(
+      isOnekeyBluetoothDevice({ serviceUuids: ['0000fffd-0000-1000-8000-00805f9b34fb'] })
+    ).toBe(false);
+  });
+
+  it('ignores FFFD even when the advertised name resembles OneKey', () => {
+    expect(isOnekeyBluetoothDevice({ name: 'OneKey Pro 2', serviceUuids: ['fffd'] })).toBe(false);
+  });
+
+  it('keeps OneKey discovery on the communication service', () => {
+    expect(
+      isOnekeyBluetoothDevice({
+        name: 'OneKey Pro 2',
+        serviceUuids: ['00000001-0000-1000-8000-00805f9b34fb'],
+      })
+    ).toBe(true);
   });
 
   it('only filters WebUSB descriptors that are explicitly identified as Trezor', () => {
