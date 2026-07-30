@@ -9,12 +9,15 @@ import {
   EOneKeyBleMessageKeys,
   ERRORS,
   HardwareErrorCode,
+  ONEKEY_NOTIFY_CHARACTERISTIC_UUID,
   ONEKEY_SERVICE_UUID,
+  ONEKEY_WRITE_CHARACTERISTIC_UUID,
   isOnekeyBluetoothDevice,
   wait,
 } from '@onekeyfe/hd-shared';
 import pRetry from 'p-retry';
 
+import { createKnownBleUuidAliases, matchesKnownBleUuid } from './ble-uuid';
 import { safeLog } from './types/noble-extended';
 import { softRefreshSubscription } from './ble-ops';
 
@@ -59,10 +62,9 @@ const subscriptionOperations = new Map<string, 'subscribing' | 'unsubscribing' |
 
 // Service UUIDs to scan for - using constants from hd-shared
 const ONEKEY_SERVICE_UUIDS = [ONEKEY_SERVICE_UUID];
-
-// Pre-normalized characteristic identifiers for fast comparison
-const NORMALIZED_WRITE_UUID = '0002';
-const NORMALIZED_NOTIFY_UUID = '0003';
+const ONEKEY_SERVICE_UUID_ALIASES = createKnownBleUuidAliases(ONEKEY_SERVICE_UUID);
+const ONEKEY_WRITE_UUID_ALIASES = createKnownBleUuidAliases(ONEKEY_WRITE_CHARACTERISTIC_UUID);
+const ONEKEY_NOTIFY_UUID_ALIASES = createKnownBleUuidAliases(ONEKEY_NOTIFY_CHARACTERISTIC_UUID);
 
 // Timeout and interval constants
 const BLUETOOTH_INIT_TIMEOUT = 10000; // 10 seconds for Bluetooth initialization
@@ -80,16 +82,6 @@ const IS_WINDOWS = process.platform === 'win32';
 const ABORTABLE_WRITE_ERROR_PATTERNS = [
   /status:\s*3/i, // Windows pairing cancelled / GATT write failed
 ];
-
-function getBleUuidKey(uuid?: string | null) {
-  const normalized = (uuid ?? '').replace(/-/g, '').toLowerCase();
-  return normalized.length >= 8 ? normalized.substring(4, 8) : normalized;
-}
-
-const NORMALIZED_ONEKEY_SERVICE_UUIDS = new Set([
-  ...ONEKEY_SERVICE_UUIDS.map(uuid => getBleUuidKey(uuid)),
-  '0001',
-]);
 
 function isOneKeyPeripheral(peripheral: Peripheral) {
   return isOnekeyBluetoothDevice({
@@ -892,7 +884,7 @@ async function discoverServicesAndCharacteristics(
     });
 
     // Find OneKey service — Noble may expose 128-bit UUIDs as short UUID keys.
-    const service = services.find(s => NORMALIZED_ONEKEY_SERVICE_UUIDS.has(getBleUuidKey(s.uuid)));
+    const service = services.find(s => matchesKnownBleUuid(s.uuid, ONEKEY_SERVICE_UUID_ALIASES));
     if (!service) {
       throw ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound);
     }
@@ -918,12 +910,9 @@ async function discoverServicesAndCharacteristics(
     let notifyCharacteristic: Characteristic | null = null;
 
     for (const characteristic of characteristics) {
-      const uuid = characteristic.uuid.replace(/-/g, '').toLowerCase();
-      const uuidKey = uuid.length >= 8 ? uuid.substring(4, 8) : uuid;
-
-      if (uuidKey === NORMALIZED_WRITE_UUID) {
+      if (matchesKnownBleUuid(characteristic.uuid, ONEKEY_WRITE_UUID_ALIASES)) {
         writeCharacteristic = characteristic;
-      } else if (uuidKey === NORMALIZED_NOTIFY_UUID) {
+      } else if (matchesKnownBleUuid(characteristic.uuid, ONEKEY_NOTIFY_UUID_ALIASES)) {
         notifyCharacteristic = characteristic;
       }
     }
