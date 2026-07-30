@@ -54,6 +54,9 @@
   `btc_test_address` 建立标准钱包内部索引，不引入 SDK 自造的 `STANDARD_WALLET_KEY`。
 - 旧参数形式的 `initSession=true` 只使当前设备上明确指定的旧钱包 Session 失效；
   钱包标识不匹配、设备切换和显式 `clearSessionCache()` 也会按各自范围使缓存失效。
+- Pro2 的 SE 每台设备最多保留三个钱包 Session。Core Store 同样按设备限制为最新三个；写入第四个
+  不同钱包时按插入顺序淘汰最旧记录，并同步清除可能指向该记录的标准钱包索引。SDK 不再向设备发送
+  已知被 SE 淘汰的 Session；调用方再次访问该钱包时应重新选择或解锁。
 - 调用方提供预期 `passphraseState` 时，首次结果不一致会触发一次钱包类型对应的恢复；最终仍不一致
   才清理当前钱包缓存并抛出钱包状态校验错误。
 - Protocol V1 调用携带 `deviceId` 时，Core 先用不含 `session_id/passphrase_state` 的
@@ -208,6 +211,11 @@ deviceKey
 `getStandardInternalState()` 读取标准索引，所以 App 无需在后续标准钱包业务调用中回传
 `passphraseState`。Store 可以暂存刚由设备返回、但尚未绑定钱包标识的 pending Session；pending
 状态只用于同一次初始化链路，不能作为任意钱包的查询结果。
+
+主映射按每台设备独立维护最多三个不同 `passphraseState`，与 Pro2 SE 的容量一致。更新已有钱包的
+`sessionId` 不占用新槽位；写入第四个不同钱包时淘汰最早写入的钱包。如果被淘汰项是标准钱包，
+`standard` 内部索引同时删除，避免后续标准钱包恢复把过期 `sessionId` 发给设备。不同 `deviceKey`
+之间的容量和淘汰顺序互不影响。
 
 ### 5.2 为什么必须带 passphraseState
 

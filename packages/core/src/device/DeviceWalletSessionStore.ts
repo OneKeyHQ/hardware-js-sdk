@@ -1,4 +1,6 @@
 export class DeviceWalletSessionStore {
+  private static readonly MAX_SESSIONS_PER_DEVICE = 3;
+
   private readonly walletSessions = new Map<string, Map<string, string>>();
 
   private readonly standardWalletSessions = new Map<
@@ -19,6 +21,18 @@ export class DeviceWalletSessionStore {
     if (!deviceSessions) {
       deviceSessions = new Map<string, string>();
       this.walletSessions.set(deviceKey, deviceSessions);
+    }
+    if (
+      !deviceSessions.has(passphraseState) &&
+      deviceSessions.size >= DeviceWalletSessionStore.MAX_SESSIONS_PER_DEVICE
+    ) {
+      const oldestPassphraseState = deviceSessions.keys().next().value as string | undefined;
+      if (oldestPassphraseState) {
+        deviceSessions.delete(oldestPassphraseState);
+        if (this.standardWalletSessions.get(deviceKey)?.passphraseState === oldestPassphraseState) {
+          this.standardWalletSessions.delete(deviceKey);
+        }
+      }
     }
     deviceSessions.set(passphraseState, sessionId);
   }
@@ -84,18 +98,20 @@ export class DeviceWalletSessionStore {
 
     const sourceSessions = this.walletSessions.get(from);
     if (sourceSessions) {
-      const targetSessions = this.walletSessions.get(to) ?? new Map<string, string>();
-      this.walletSessions.set(to, targetSessions);
       sourceSessions.forEach((sessionId, passphraseState) => {
-        if (!targetSessions.has(passphraseState)) {
-          targetSessions.set(passphraseState, sessionId);
+        if (!this.get(to, passphraseState)) {
+          this.set(to, passphraseState, sessionId);
         }
       });
       this.walletSessions.delete(from);
     }
 
     const standardWalletSession = this.standardWalletSessions.get(from);
-    if (standardWalletSession && !this.standardWalletSessions.has(to)) {
+    if (
+      standardWalletSession &&
+      !this.standardWalletSessions.has(to) &&
+      this.get(to, standardWalletSession.passphraseState) === standardWalletSession.sessionId
+    ) {
       this.standardWalletSessions.set(to, standardWalletSession);
     }
     this.standardWalletSessions.delete(from);

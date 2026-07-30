@@ -3,6 +3,7 @@ import { DeviceSessionPinType } from '@onekeyfe/hd-transport';
 
 import GetPassphraseState from '../src/api/GetPassphraseState';
 import OpenWalletSession from '../src/api/OpenWalletSession';
+import { Device } from '../src/device/Device';
 import { deviceWalletSessionStore } from '../src/device/DeviceWalletSessionStore';
 
 jest.mock('../src/data/config', () => ({
@@ -833,6 +834,39 @@ describe('openWalletSession', () => {
     );
     expect(device.unlockDevice).toHaveBeenCalledWith(DeviceSessionPinType.AttachToPin);
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
+  });
+
+  test('uses the complete Attach PIN wire flow without a main PIN unlock', async () => {
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce({ message: { version: 2 } })
+      .mockResolvedValueOnce({ message: { message: 'PIN verified' } })
+      .mockResolvedValueOnce({
+        message: { btc_test_address: 'attach-state', session_id: 'attach-session' },
+      });
+    const promptPassphrase = jest.fn().mockResolvedValue({ attachPinOnDevice: true });
+    const method = new OpenWalletSession({
+      payload: { method: 'openWalletSession', connectId: 'connect-id', mode: 'select-hidden' },
+    });
+    method.init();
+    const device = createDevice({ typedCall, promptPassphrase });
+    device.features.attachToPinEnabled = true;
+    device.unlockDevice = Device.prototype.unlockDevice.bind(device);
+    method.device = device as any;
+
+    await expect(method.run()).resolves.toMatchObject({
+      walletType: 'hidden',
+      passphraseState: 'attach-state',
+    });
+    expect(device.commands.typedCall.mock.calls).toEqual([
+      ['ProtocolInfoRequest', 'ProtocolInfo', { eventless_wallet_session: true }],
+      ['DeviceSessionAskPin', 'Success', { type: DeviceSessionPinType.AttachToPin }],
+      ['DeviceStatusGet', 'DeviceStatus', {}],
+      ['DeviceSessionGet', 'DeviceSession', {}],
+    ]);
+    expect(device.commands.typedCall).not.toHaveBeenCalledWith('DeviceSessionAskPin', 'Success', {
+      type: DeviceSessionPinType.Main,
+    });
   });
 
   test.each([
