@@ -55,18 +55,19 @@ const askDevicePassphrase = async (device: Device, passphrase?: string) => {
   const request = () =>
     device.commands.typedCall(
       'DeviceSessionAskPassphrase',
-      'DeviceSession',
+      'Success',
       passphrase ? { passphrase, on_device: false } : { on_device: true }
     );
   try {
-    return await request();
+    await request();
   } catch (error) {
     if (!isDeviceLockedError(error)) {
       throw error;
     }
     await device.unlockDevice(DeviceSessionPinType.Main);
-    return request();
+    await request();
   }
+  await refreshProtocolV2DeviceStatus(device);
 };
 
 const selectDeviceSession = async (device: Device, expectedPassphraseState?: string) => {
@@ -120,18 +121,18 @@ const selectDeviceSession = async (device: Device, expectedPassphraseState?: str
       );
     }
     device.emit(DEVICE.ATTACH_PIN_ON_DEVICE, device, metadata);
-    const { session } = await device.openProtocolV2WalletSessionWithPin(
-      DeviceSessionPinType.AttachToPin
-    );
-    return { message: session };
+    await device.unlockDevice(DeviceSessionPinType.AttachToPin);
+    return getDeviceSession(device, {});
   }
 
   if (hasHostPassphrase) {
-    return askDevicePassphrase(device, hostPassphrase);
+    await askDevicePassphrase(device, hostPassphrase);
+    return getDeviceSession(device, {});
   }
 
   device.emit(DEVICE.PASSPHRASE_ON_DEVICE, device, metadata);
-  return askDevicePassphrase(device);
+  await askDevicePassphrase(device);
+  return getDeviceSession(device, {});
 };
 
 export async function getProtocolV2WalletSession(
@@ -144,7 +145,11 @@ export async function getProtocolV2WalletSession(
   }
 ) {
   if (options?.initSession) {
-    device.clearInternalState();
+    if (options.onlyMainPin) {
+      device.clearStandardInternalState?.();
+    } else {
+      device.clearInternalState();
+    }
     device.passphraseState = undefined;
   }
 
@@ -153,18 +158,41 @@ export async function getProtocolV2WalletSession(
   if (options?.onlyMainPin) {
     device.passphraseState = undefined;
   }
-  const expectedPassphraseState = options?.onlyMainPin
+  let expectedPassphraseState = options?.onlyMainPin
     ? undefined
     : options?.expectedPassphraseState ?? device.passphraseState;
 
+  const cachedStandardSession = options?.onlyMainPin
+    ? device.getStandardInternalState?.()
+    : undefined;
   const cachedSessionId =
-    typeof device.getInternalState === 'function' ? device.getInternalState() : undefined;
+    !options?.onlyMainPin && typeof device.getInternalState === 'function'
+      ? device.getInternalState()
+      : undefined;
   let response;
   let resumed = false;
 
   if (options?.onlyMainPin) {
-    const { session } = await device.openProtocolV2WalletSessionWithPin(DeviceSessionPinType.Main);
-    response = { message: session };
+    expectedPassphraseState = cachedStandardSession?.passphraseState;
+    if (cachedStandardSession) {
+      try {
+        if (device.features?.unlockedAttachPin === true) {
+          await device.unlockDevice(DeviceSessionPinType.Main);
+        }
+        response = await getDeviceSession(device, {
+          session_id: cachedStandardSession.sessionId,
+        });
+        resumed = true;
+      } catch (error) {
+        device.clearStandardInternalState?.();
+        throw error;
+      }
+    }
+
+    if (!response) {
+      await device.unlockDevice(DeviceSessionPinType.Main);
+      response = await getDeviceSession(device, {});
+    }
   } else if (cachedSessionId && expectedPassphraseState) {
     try {
       response = await getDeviceSession(device, { session_id: cachedSessionId });
@@ -183,25 +211,60 @@ export async function getProtocolV2WalletSession(
     response = await selectDeviceSession(device, expectedPassphraseState);
   }
 
-  const { message } = response;
+  let { message } = response;
   try {
     assertCompleteDeviceSession(message);
   } catch (error) {
-    device.clearInternalState();
+    if (options?.onlyMainPin) {
+      device.clearStandardInternalState?.();
+    } else {
+      device.clearInternalState();
+    }
     throw error;
   }
   if (expectedPassphraseState && expectedPassphraseState !== message.btc_test_address) {
-    device.clearInternalState();
-    throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError);
+    resumed = false;
+    if (options?.onlyMainPin) {
+      device.clearStandardInternalState?.();
+      await device.unlockDevice(DeviceSessionPinType.Main);
+      response = await getDeviceSession(device, {});
+    } else {
+      device.clearInternalState();
+      response = await selectDeviceSession(device, expectedPassphraseState);
+    }
+    message = response.message;
+    try {
+      assertCompleteDeviceSession(message);
+    } catch (error) {
+      if (options?.onlyMainPin) {
+        device.clearStandardInternalState?.();
+      } else {
+        device.clearInternalState();
+      }
+      throw error;
+    }
+    if (expectedPassphraseState !== message.btc_test_address) {
+      if (options?.onlyMainPin) {
+        device.clearStandardInternalState?.();
+      } else {
+        device.clearInternalState();
+      }
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError);
+    }
   }
 
-  device.updateInternalState(
+  const internalStateArgs = [
     true,
     message.btc_test_address,
     device.getCurrentDeviceId(),
     message.session_id,
-    options?.initSession ? null : cachedSessionId ?? null
-  );
+    options?.initSession ? null : cachedSessionId ?? null,
+  ] as const;
+  if (options?.onlyMainPin) {
+    device.updateInternalState(...internalStateArgs, 'standard');
+  } else {
+    device.updateInternalState(...internalStateArgs);
+  }
 
   return {
     passphraseState: message.btc_test_address,

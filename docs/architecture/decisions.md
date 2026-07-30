@@ -50,10 +50,13 @@ Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类�
   恢复了同名固件消息。
 - 旧版 CLI 已保存在 OS Keychain 中的完整三元组可以继续通过 `preloadSessionCache()` 恢复，
   但新的公共钱包选择响应不再提供原始 `sessionId`，也不再创建新的跨进程 Session 缓存。
-- V1/V2 共用 `DeviceWalletSessionStore`，缓存键为 `deviceKey + passphraseState`。
+- V1/V2 共用 `DeviceWalletSessionStore`，主映射键为 `deviceKey + passphraseState`。Protocol V2
+  另按 `deviceKey` 保存一个指向真实标准钱包 `{ passphraseState, sessionId }` 的内部索引；该索引
+  只服务显式 `standard/useEmptyPassphrase` 意图，不是伪造的钱包标识，也不能用于隐藏钱包查询。
 - `DeviceWalletSessionStore` 是 Core 内唯一可用于恢复的钱包 Session 缓存源；
   `DeviceState` 和协议 raw 快照都不是 Session 缓存。
-- 没有 `passphraseState` 时不得扫描或复用其他钱包的缓存 Session。
+- 恢复隐藏钱包时，没有 `passphraseState` 不得扫描或复用其他钱包的缓存 Session。标准钱包由
+  显式标准钱包意图读取专用索引，因此不需要 App 回传标准钱包 `passphraseState`。
 - Protocol V1 请求携带 `deviceId` 时，Core 必须先发送不含 `session_id/passphrase_state`
   的 `Initialize` 确认实时 `deviceId`；身份一致后才允许读取并透传对应钱包 Session。
   业务方法只要接收 `deviceId`，也必须在业务命令前执行同一实时身份校验。
@@ -61,24 +64,25 @@ Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类�
   `useEmptyPassphrase` 或 `initSession`。`standard/select-hidden` 也不得携带钱包绑定。
 - `openWalletSession()` 必须显式传入 `mode`；旧参数兼容只保留在原
   `getPassphraseState()` 入口，避免新 API 同时存在两套意图表达。
-- `resume-hidden` 只接收 `deviceId + passphraseState`，由 Core 从 Store 查找
-  `sessionId`；缓存不存在时返回 `WalletSessionInvalid`，固件拒绝恢复时透传规范化错误，
-  且都不自动选择其他钱包。
-- V2 先通过 `ProtocolInfoRequest { eventless_wallet_session: true }` 协商无中间固件 Event；
-  标准钱包锁定时显式使用 `DeviceSessionAskPin { type: Main }`，不会创建隐藏钱包 Session。
-- 创建钱包会话时，`DeviceSessionAskPassphrase` 与 `DeviceSessionAskPin` 必须原子返回
-  完整 `DeviceSession`；`DeviceSessionGet` 只允许携带非空 `session_id` 恢复已有会话。
-  协议不存在 prepared context，也不允许空参数 Get 隐式选择钱包。
+- `resume-hidden` 只接收 `deviceId + passphraseState`，由 Core 从 Store 查找 `sessionId`；本地缓存
+  不存在时返回 `WalletSessionInvalid`。固件返回的实际钱包不匹配时，Core 允许一次显式钱包重选，
+  最终仍不匹配才返回 `DeviceCheckPassphraseStateError`。
+- V2 先通过 `ProtocolInfoRequest { eventless_wallet_session: true }` 协商无中间固件 Event。
+  `DeviceSessionAskPin` 和 `DeviceSessionAskPassphrase` 只返回 `Success`；Core 随后使用空参数
+  `DeviceSessionGet` 读取当前 Session。恢复时使用带 `session_id` 的 `DeviceSessionGet`。
+- `DeviceSessionGet` 的 `session_id` 可选：缺省表示读取当前 Session，存在表示尝试恢复目标 Session；
+  两种调用都必须返回固件最终实际的完整 `DeviceSession`，正常状态错配不返回 `InvalidSession`。
 - Pro2 的 `DeviceSessionAskPassphrase` 必须显式携带输入来源：Host 输入发送
   `{ on_device: false, passphrase }`，设备输入发送 `{ on_device: true }`。不得省略
   `on_device`，也不得同时发送设备输入标记和 Host Passphrase。
   Pro2 尚未发布，不保留开发阶段旧固件的能力降级分支。
-- 显式 `resume-hidden` 被固件拒绝时，Core 只清除当前隐藏钱包缓存并返回规范化错误，
-  不自动退化为需要用户确认的隐藏钱包选择；`DeviceSessionError_InvalidSession=2`
-  统一映射为 `WalletSessionInvalid`。
+- 标准钱包首次打开时执行 `AskPin(Main) -> Get()`；缓存恢复结果不匹配时执行一次相同流程重建。
+  隐藏钱包缓存恢复结果不匹配时执行一次统一钱包选择，再执行 Ask 与 `Get()`。恢复不得删除同设备
+  的其他钱包 Session。
 - V2 的 `DeviceSessionGet` 成功响应必须同时包含非空 `session_id` 和
   `btc_test_address`；缺少任一字段都视为协议响应不完整，不得降级为标准钱包。
-- 返回的钱包标识与调用方预期不一致时，必须清理缓存并抛出安全错误。
+- 首次返回的钱包标识与调用方预期不一致时必须进入对应的一次性恢复；恢复后仍不一致时清理当前
+  钱包缓存并抛出安全错误，不允许循环重试。
 - Pro2 在解锁流程刷新状态后，以刷新后的 `passphraseProtection` 判定标准/隐藏钱包，
   不得使用解锁前的状态快照路由钱包结果。
 - `session_id` 不是钱包身份，必须与同一次返回的 `deviceId + passphraseState` 绑定使用。

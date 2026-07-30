@@ -35,6 +35,21 @@ describe('DeviceWalletSessionStore', () => {
     expect(store.get('device-2', 'hidden-a')).toBe('session-c');
   });
 
+  test('indexes the standard wallet without replacing hidden-wallet sessions', () => {
+    const store = new DeviceWalletSessionStore();
+    store.set('device-1', 'hidden-a', 'hidden-session-a');
+
+    store.setStandard('device-1', 'standard-state', 'standard-session-1');
+    store.setStandard('device-1', 'standard-state', 'standard-session-2');
+
+    expect(store.getStandard('device-1')).toEqual({
+      passphraseState: 'standard-state',
+      sessionId: 'standard-session-2',
+    });
+    expect(store.get('device-1', 'standard-state')).toBe('standard-session-2');
+    expect(store.get('device-1', 'hidden-a')).toBe('hidden-session-a');
+  });
+
   test('keeps pending sessions unreadable until wallet binding', () => {
     const store = new DeviceWalletSessionStore();
     store.setPending('device-1', 'pending-session');
@@ -46,6 +61,7 @@ describe('DeviceWalletSessionStore', () => {
   test('migrates descriptor keys to stable device ids', () => {
     const store = new DeviceWalletSessionStore();
     store.set('ble-path', 'hidden-a', 'session-a');
+    store.setStandard('ble-path', 'standard-state', 'standard-session');
     store.setPending('ble-path', 'pending-session');
 
     store.reconcileDeviceIdentity({
@@ -55,6 +71,11 @@ describe('DeviceWalletSessionStore', () => {
 
     expect(store.get('ble-path', 'hidden-a')).toBeUndefined();
     expect(store.get('stable-device-id', 'hidden-a')).toBe('session-a');
+    expect(store.getStandard('ble-path')).toBeUndefined();
+    expect(store.getStandard('stable-device-id')).toEqual({
+      passphraseState: 'standard-state',
+      sessionId: 'standard-session',
+    });
     expect(store.getPending('ble-path')).toBeUndefined();
     expect(store.getPending('stable-device-id')).toBe('pending-session');
   });
@@ -82,11 +103,16 @@ describe('DeviceWalletSessionStore', () => {
     const store = new DeviceWalletSessionStore();
     store.set('device-1', 'hidden-a', 'session-a');
     store.set('device-1', 'hidden-b', 'session-b');
+    store.setStandard('device-1', 'standard-state', 'standard-session');
     store.set('device-2', 'hidden-a', 'session-c');
 
     store.delete('device-1', 'hidden-a');
     expect(store.get('device-1', 'hidden-a')).toBeUndefined();
     expect(store.get('device-1', 'hidden-b')).toBe('session-b');
+    expect(store.getStandard('device-1')?.sessionId).toBe('standard-session');
+
+    store.delete('device-1', 'standard-state');
+    expect(store.getStandard('device-1')).toBeUndefined();
 
     store.deleteDevice('device-1');
     expect(store.get('device-1', 'hidden-b')).toBeUndefined();
