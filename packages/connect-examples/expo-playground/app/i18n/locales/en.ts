@@ -28,7 +28,6 @@ export const en = {
       networks: 'Networks',
       home: 'Home',
       emulator: 'Emulator',
-      walletSessionTest: 'Wallet Session Test',
       navigation: 'Navigation',
       current: 'Current',
       toggleTheme: 'Toggle Theme',
@@ -611,7 +610,7 @@ export const en = {
           title: 'Authorize WebUSB',
           description:
             'Your device switched to bootloader mode to apply the update. Chrome treats this as a new USB device. Please authorize it to continue the firmware update.',
-          tip: "Ensure your device is connected. If the chooser doesn't appear, try a different USB port or reconnect the cable.",
+          tip: 'Ensure your device is connected. If the chooser doesn\'t appear, try a different USB port or reconnect the cable.',
           selectButton: 'Select Device',
           selecting: 'Selecting...',
           troubleshooting:

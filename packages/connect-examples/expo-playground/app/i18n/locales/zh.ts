@@ -28,7 +28,6 @@ export const zh = {
       networks: '网络',
       home: '首页',
       emulator: '模拟器',
-      walletSessionTest: '钱包 Session 测试',
       navigation: '导航',
       current: '当前',
       toggleTheme: '切换主题',
