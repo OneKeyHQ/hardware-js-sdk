@@ -174,6 +174,8 @@ export interface NobleBleHandlerOptions {
   uuids?: typeof TREZOR_BLE_UUIDS;
   /** Override the 244-byte chunk size. */
   chunkSize?: number;
+  /** Override the overall connect timeout (tests only; defaults to 31s). */
+  connectTimeoutMs?: number;
   logger?: TrezorDebugLogger;
 }
 
@@ -191,6 +193,8 @@ export class NobleBleHandler {
   private readonly _uuids: typeof TREZOR_BLE_UUIDS;
 
   private readonly _chunkSize: number;
+
+  private readonly _connectTimeoutMs: number;
 
   private readonly _logger?: NobleBleHandlerOptions['logger'];
 
@@ -221,6 +225,7 @@ export class NobleBleHandler {
     this._factory = options.nobleFactory ?? DEFAULT_NOBLE_FACTORY;
     this._uuids = options.uuids ?? TREZOR_BLE_UUIDS;
     this._chunkSize = options.chunkSize ?? TREZOR_BLE_PACKET_SIZE;
+    this._connectTimeoutMs = options.connectTimeoutMs ?? BLE_CONNECT_TIMEOUT_MS;
     this._logger = options.logger;
   }
 
@@ -580,15 +585,23 @@ export class NobleBleHandler {
   // out` reject (device unreachable) vs a connectAsync `connection failed`
   // reject (link refused / stale bond) — mapped to different error codes there.
   async connect(id: string): Promise<{ id: string; name?: string }> {
+    // Promise.race only times out the CALLER — it cannot cancel the in-flight
+    // _connectInner (noble has no abort). Without the claim token a late
+    // connectAsync success would still discover services and commit to
+    // _connected: an open GATT link nobody owns, and since a linked Safe 7
+    // stops advertising, every retry then dead-ends until app restart. The
+    // token flags the attempt as abandoned so a late success tears the link
+    // down instead of committing it.
+    const claim = { abandoned: false };
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<never>((_, reject) => {
-      timer = setTimeout(
-        () => reject(new Error(`connect timed out after ${BLE_CONNECT_TIMEOUT_MS}ms`)),
-        BLE_CONNECT_TIMEOUT_MS
-      );
+      timer = setTimeout(() => {
+        claim.abandoned = true;
+        reject(new Error(`connect timed out after ${this._connectTimeoutMs}ms`));
+      }, this._connectTimeoutMs);
     });
     try {
-      return await Promise.race([this._connectInner(id), timeout]);
+      return await Promise.race([this._connectInner(id, claim), timeout]);
     } catch (error) {
       const peripheral = this._discovered.get(id);
       if (peripheral) await this._safeDisconnect(peripheral);
@@ -598,7 +611,10 @@ export class NobleBleHandler {
     }
   }
 
-  private async _connectInner(id: string): Promise<{ id: string; name?: string }> {
+  private async _connectInner(
+    id: string,
+    claim: { abandoned: boolean }
+  ): Promise<{ id: string; name?: string }> {
     await this.init();
     // Stop scanning (keep the cache) and let the radio settle before connecting.
     await this._pauseScan();
@@ -643,6 +659,21 @@ export class NobleBleHandler {
       throw new Error(`Trezor BLE device not found: ${id}`);
     }
 
+    // Checked after every await that can outlive the caller's timeout. The
+    // rejection thrown here is unobservable (Promise.race already settled) —
+    // its only job is to stop the flow before it commits an unowned link.
+    const abortIfAbandoned = async (stage: string) => {
+      if (!claim.abandoned) return;
+      // Tear down only a link nobody owns: if a previous connect still holds
+      // this id in _connected, its keep-alive timers manage the link.
+      if (peripheral && peripheral.state === 'connected' && !this._connected.has(id)) {
+        await this._safeDisconnect(peripheral);
+      }
+      this._log('warn', 'connect.abandoned', { id, route, stage });
+      throw new Error(`connect abandoned after timeout: ${id}`);
+    };
+    await abortIfAbandoned('resolve');
+
     const wasConnected = peripheral.state === 'connected';
     // The single line that explains any BLE connect after the fact.
     this._log('warn', 'connect.route', {
@@ -653,6 +684,7 @@ export class NobleBleHandler {
     });
     if (!wasConnected) {
       await peripheral.connectAsync();
+      await abortIfAbandoned('link');
     }
 
     try {
@@ -667,6 +699,8 @@ export class NobleBleHandler {
       if (!writeChar || !notifyChar) {
         throw new Error(`Trezor BLE characteristics not found on device ${id}`);
       }
+      // Last gate before commit: service discovery can also outlast the timeout.
+      await abortIfAbandoned('discovery');
 
       const disconnectHandler = () => {
         this._cleanupDevice(id, /* unexpected */ true);

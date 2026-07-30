@@ -149,6 +149,44 @@ describe('NobleBleHandler', () => {
     // _connectInner: scanning first is what keeps macOS from hanging).
   }, 15_000);
 
+  test('a connect that outlives its timeout is torn down, not committed', async () => {
+    // Promise.race only rejects the caller; noble's connectAsync keeps running.
+    // If its late success were committed to _connected, the handler would hold
+    // a GATT link nobody owns — and a linked Safe 7 stops advertising, so every
+    // retry would dead-end until app restart.
+    const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
+    peripheral.connectAsync = jest.fn(async () => {
+      // Resolves well after the caller's timeout below.
+      await new Promise(resolve => {
+        setTimeout(resolve, 400);
+      });
+      peripheral.state = 'connected';
+    });
+    const noble = new FakeNoble([peripheral]);
+    const handler = new NobleBleHandler({
+      nobleFactory: () => noble as any,
+      // Fires while connectAsync is in flight: _connectInner spends 300ms in
+      // the settle delay first, and connectAsync itself takes 400ms more.
+      connectTimeoutMs: 400,
+    });
+    await handler.scan({ durationMs: 0 }); // put the peripheral in the cache
+
+    await expect(handler.connect('id-1')).rejects.toThrow(/timed out/);
+
+    // Let the late connectAsync success and the abandoned-path teardown settle.
+    await new Promise(resolve => {
+      setTimeout(resolve, 700);
+    });
+
+    // The late success must NOT have been committed…
+    await expect(handler.subscribe('id-1')).rejects.toThrow(/not connected/i);
+    // …and the link it opened must have been torn down again.
+    expect(peripheral.disconnectAsync).toHaveBeenCalled();
+    expect(peripheral.state).toBe('disconnected');
+
+    await handler.stopScan();
+  }, 10_000);
+
   test('connect discovers chars and write splits into chunks', async () => {
     const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
     const noble = new FakeNoble([peripheral]);
