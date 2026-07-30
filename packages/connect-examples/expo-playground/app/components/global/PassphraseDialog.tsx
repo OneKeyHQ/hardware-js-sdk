@@ -14,6 +14,8 @@ interface PassphraseDialogProps {
   allowAttachPin?: boolean;
 }
 
+const PASSPHRASE_PATTERN = /^[\x20-\x7e]{1,50}$/;
+
 const PassphraseDialog: React.FC<PassphraseDialogProps> = ({
   isOpen,
   onClose,
@@ -26,8 +28,8 @@ const PassphraseDialog: React.FC<PassphraseDialogProps> = ({
   const [showPassphrase, setShowPassphrase] = useState(false);
 
   const handleSubmit = async () => {
-    // 验证两次输入是否一致
-    if (passphrase !== confirmPassphrase) {
+    // 与正式 App 和设备键盘保持一致：1–50 个可打印 ASCII 字符。
+    if (!PASSPHRASE_PATTERN.test(passphrase) || passphrase !== confirmPassphrase) {
       // TODO: 可以添加toast提示
       return;
     }
@@ -84,11 +86,11 @@ const PassphraseDialog: React.FC<PassphraseDialogProps> = ({
     }
   }, [isOpen]);
 
-  const isFormValid = passphrase && passphrase === confirmPassphrase;
+  const isFormValid = PASSPHRASE_PATTERN.test(passphrase) && passphrase === confirmPassphrase;
   return (
     <Dialog open={isOpen} onOpenChange={handleCancel}>
       <DialogContent
-        className="w-96 bg-background p-6 max-w-sm mx-auto"
+        className="w-[calc(100vw-2rem)] max-w-sm box-border bg-background p-5 sm:p-6"
         onPointerDownOutside={e => e.preventDefault()}
         onEscapeKeyDown={e => e.preventDefault()}
       >
@@ -105,8 +107,8 @@ const PassphraseDialog: React.FC<PassphraseDialogProps> = ({
         </div>
 
         {/* 警告提示 - 简化 */}
-        <Alert className="mb-3 bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-700 py-2 flex items-center gap-2">
-          <AlertDescription className="text-orange-800 dark:text-orange-200 text-xs">
+        <Alert className="w-full max-w-full min-w-0 box-border mb-3 bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-700 py-2">
+          <AlertDescription className="min-w-0 break-words text-orange-800 dark:text-orange-200 text-xs">
             {t('passphrase.warningMessage', 'Lost passphrase cannot be recovered')}
           </AlertDescription>
         </Alert>
@@ -161,6 +163,7 @@ const PassphraseDialog: React.FC<PassphraseDialogProps> = ({
                   value={confirmPassphrase}
                   onChange={e => setConfirmPassphrase(e.target.value)}
                   className="h-10 pr-10"
+                  maxLength={50}
                   autoComplete="off"
                   data-1p-ignore="true"
                   data-form-type="other"
@@ -179,6 +182,15 @@ const PassphraseDialog: React.FC<PassphraseDialogProps> = ({
             </div>
           ) : null}
 
+          {!deviceOnly && passphrase && !PASSPHRASE_PATTERN.test(passphrase) ? (
+            <p className="text-xs text-destructive">
+              {t(
+                'passphrase.invalidCharacters',
+                'Use 1–50 printable ASCII characters (space through ~)'
+              )}
+            </p>
+          ) : null}
+
           {/* 按钮区域 - 紧凑布局 */}
           <div className="space-y-2 pt-3">
             {/* 主要操作按钮 */}
@@ -192,12 +204,13 @@ const PassphraseDialog: React.FC<PassphraseDialogProps> = ({
               </Button>
             ) : null}
 
-            {/* 次要操作 - 合并为一行 */}
-            <div className="flex space-x-2">
+            {/* 次要操作 */}
+            <div className="grid grid-cols-2 gap-2">
               <Button
                 variant="outline"
+                size="sm"
                 onClick={handleUseDevice}
-                className="flex-1 h-10 border border-neutral-300 text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-white text-sm shadow-none"
+                className="min-w-0 w-full h-10 whitespace-normal border border-neutral-300 text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-white text-sm leading-tight shadow-none"
               >
                 {t('passphrase.inputOnDevice', 'Enter on device')}
               </Button>
@@ -205,8 +218,9 @@ const PassphraseDialog: React.FC<PassphraseDialogProps> = ({
               {allowAttachPin ? (
                 <Button
                   variant="outline"
+                  size="sm"
                   onClick={handleUseAttachPin}
-                  className="flex-1 h-10 border border-neutral-300 text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-white text-sm shadow-none"
+                  className="min-w-0 w-full h-10 whitespace-normal border border-neutral-300 text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-white text-sm leading-tight shadow-none"
                 >
                   Attach PIN
                 </Button>
@@ -214,8 +228,11 @@ const PassphraseDialog: React.FC<PassphraseDialogProps> = ({
 
               <Button
                 variant="ghost"
+                size="sm"
                 onClick={handleCancel}
-                className="flex-1 h-10 text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-white text-sm shadow-none"
+                className={`min-w-0 w-full h-10 whitespace-normal text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-white text-sm leading-tight shadow-none ${
+                  allowAttachPin ? 'col-span-2' : ''
+                }`}
               >
                 {t('common.cancel', 'Cancel')}
               </Button>

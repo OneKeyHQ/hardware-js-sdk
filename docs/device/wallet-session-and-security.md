@@ -287,8 +287,9 @@ await HardwareSDK.clearSessionCache({ deviceId, passphraseState });
    `DeviceSessionAskPin(Main)`，隐藏钱包按意图发送 Ask 请求后再用 `DeviceSessionGet` 获取结果。
 7. 缓存 `session_id` 无法打开时，SDK 只清理当前钱包缓存并返回规范化错误，由 App
    显式发起新的 `select-hidden`，不会在恢复请求中自动切换钱包。
-8. Pro2 正式 App 的隐藏钱包选择只展示设备输入 Passphrase 或 Attach PIN；Core 的兼容路径仍会把
-   Host Passphrase 编码为 `{ on_device: false, passphrase }`，但不会缓存或记录明文。
+8. Pro2 隐藏钱包选择通过统一弹窗提供 Host 输入、设备输入和 Attach PIN 三种入口。Host
+   Passphrase 编码为 `{ on_device: false, passphrase }`，仅用于当前阻塞请求，不缓存、记录或写入
+   钱包引用；设备输入编码为 `{ on_device: true }`。
 9. Pro2 固件返回 `DeviceSession`：`session_id` 和 `btc_test_address`，SDK 将 `btc_test_address` 映射为上层 `passphraseState`。
 10. Pro V1 仍走 `GetPassphraseState -> PassphraseState`，返回 `passphrase_state/session_id/unlocked_attach_pin`。
 11. 如果 features 显示未开启 passphrase 但现在拿到了 state，会按需刷新设备状态。
@@ -595,10 +596,16 @@ Session 打开请求。
 
 ### 8.2 UI 事件流
 
-Protocol V2 的钱包选择由 SDK 主动发起带 `deviceOnly=true` 的 `REQUEST_PASSPHRASE`。App 回传
-`passphraseOnDevice` 时发送 `{ on_device: true }`；兼容 Host 输入时发送
-`{ on_device: false, passphrase }`。`attachPinOnDevice` 进入 Attach PIN；三种路径准备成功后都调用
-`DeviceSessionGet`。
+Protocol V2 的钱包选择由 SDK 主动发起带 `deviceOnly=false` 的 `REQUEST_PASSPHRASE`，并通过
+`existsAttachPinUser` 告知 App 是否展示 Attach PIN。App 回传 Host Passphrase 时发送
+`{ on_device: false, passphrase }`，回传 `passphraseOnDevice` 时发送 `{ on_device: true }`，回传
+`attachPinOnDevice` 时进入 Attach PIN。三种路径准备成功后都调用 `DeviceSessionGet`。Host
+Passphrase 只在该次交互中转交给固件，不进入日志、缓存或钱包 Session 公共响应。
+Core 会再次执行幂等 NFKD 规范化，并按固件上限拒绝空值、NUL 或超过 50 个 UTF-8 字节的
+Host Passphrase；正式 App 和 Expo Playground 的表单进一步限制为 1–50 个可打印 ASCII 字符。
+空参数 `DeviceSessionGet` 只能消费同一来源、同一 generation 且未超时的 prepared context；
+上下文缺失或失效时必须返回 `InvalidSession`，不得回退到空 Passphrase/标准钱包。只有携带
+显式 `session_id` 的恢复请求允许在设备锁定后解锁并重试。
 Protocol V1 继续保留原
 `PassphraseRequest -> PassphraseAck` 行为。
 
@@ -633,6 +640,9 @@ Protocol V2 采用“Host 明确选择入口、Firmware 在设备端执行钱包
 
 `PassphraseAck` 只属于 Protocol V1 的 firmware 中间请求流程。Pro2 的
 拆分后的 Session 请求是 Core 内部选择/恢复隐藏钱包的协议命令，不是公共查询 API。
+Host passphrase 在 Core 中先执行 NFKD 规范化；结果必须为 1–50 个合法 UTF-8 字节，且不含
+NUL 或孤立 UTF-16 surrogate。这样可以避免 JavaScript/Protobuf 编码器替换非法字符串后进入
+与用户输入不同的钱包。
 公共 `Features`、`DeviceState.raw`、设备事件和日志均不得包含 `session_id`；
 Session 仅保存在按设备和 `passphraseState` 隔离的内部缓存中。
 

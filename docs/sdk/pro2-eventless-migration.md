@@ -199,6 +199,8 @@ Cancel 必须绑定当前设备和 Transport source；断连时清理请求、UI
   以及可选 `session_id` 的 `DeviceSessionGet`。
 - Ask 请求成功后保留短时 prepared session；随后空参数 `DeviceSessionGet` 返回最终
   `session_id + btc_test_address`。
+- 空参数 `DeviceSessionGet` 只能消费同一 Transport source、同一连接 generation 且未过期的
+  prepared session；上下文缺失或失效时返回 `InvalidSession`，不得隐式创建标准钱包。
 - 删除 seed session 中 Passphrase/Button Host ACK 状态。
 - `DeviceSessionAskPin` 直接显示设备 PIN/指纹页面。
 - 地址、公钥、签名、设置和危险操作直接显示本地 UI。
@@ -215,6 +217,8 @@ Cancel 必须绑定当前设备和 Transport source；断连时清理请求、UI
 - Host/设备 Passphrase 意图统一映射到显式 `on_device=false/true` 的
   `DeviceSessionAskPassphrase`；Attach PIN 映射到
   `DeviceSessionAskPin(AttachToPin)`，随后统一调用空参数 `DeviceSessionGet`。
+- Host Passphrase 先做 NFKD 规范化，并校验为 1–50 个 UTF-8 字节且不含 NUL；空参数
+  `DeviceSessionGet` 失败后不得通过解锁重试或重新选择钱包来改变原请求身份。
 - `DeviceWalletSessionStore` 继续只缓存 `deviceKey + passphraseState`；标准钱包不增加缓存 key，也不调用
   `DeviceSessionGet`。
 - 复用公共 UI Event 层，不伪造 Transport protobuf Request。

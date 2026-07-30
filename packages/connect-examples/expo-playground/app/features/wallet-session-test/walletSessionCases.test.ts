@@ -19,6 +19,9 @@ type WalletSessionCasesModule = {
     passphraseState: string | null;
     resumed: boolean;
   }) => Record<string, unknown>;
+  getSatisfiedPrerequisiteIds?: (
+    results: Record<string, { status: string }>
+  ) => Set<string>;
 };
 
 async function loadCasesModule(): Promise<WalletSessionCasesModule> {
@@ -33,6 +36,8 @@ describe('wallet session WebUSB test matrix', () => {
   test('covers wallet identity, cache isolation, Attach PIN, reconnect and reset flows', async () => {
     const { WALLET_SESSION_CASES = [] } = await loadCasesModule();
     const ids = new Set(WALLET_SESSION_CASES.map(item => item.id));
+
+    expect(ids.size).toBe(WALLET_SESSION_CASES.length);
 
     expect(ids).toEqual(
       new Set([
@@ -51,18 +56,72 @@ describe('wallet session WebUSB test matrix', () => {
         'other-wallet-survives',
         'device-cache-clear',
         'device-cache-invalid',
+        'hidden-a-reselect-after-device-clear',
         'all-cache-clear',
+        'all-cache-invalid',
         'invalid-cache-params',
         'wrong-device-id',
         'attach-pin-preflight',
         'attach-pin-select',
         'attach-pin-state',
+        'attach-pin-standard-rejected',
+        'attach-pin-reselect-after-standard-rejection',
+        'attach-pin-wrong-wallet-rejected',
         'reconnect-same-device',
+        'reconnect-session-outcome',
         'runtime-restart-checkpoint',
         'capture-pre-reset',
         'verify-post-reset',
       ])
     );
+  });
+
+  test('only passed cases satisfy prerequisites while skipped cases remain terminal results', async () => {
+    const { getSatisfiedPrerequisiteIds } = await loadCasesModule();
+    expect(getSatisfiedPrerequisiteIds).toBeDefined();
+
+    const satisfied = getSatisfiedPrerequisiteIds?.({
+      passed: { status: 'passed' },
+      skipped: { status: 'skipped' },
+      failed: { status: 'failed' },
+      running: { status: 'running' },
+    });
+
+    expect([...Array.from(satisfied ?? [])]).toEqual(['passed']);
+  });
+
+  test('makes restart, reconnect, global clear and Attach PIN safety expectations executable', async () => {
+    const { WALLET_SESSION_CASES = [] } = await loadCasesModule();
+    const byId = new Map(WALLET_SESSION_CASES.map(item => [item.id, item]));
+
+    expect(byId.get('runtime-restart-checkpoint')?.prerequisites).toContain('hidden-a-address');
+    expect(byId.get('runtime-restart-checkpoint')?.expected.join(' ')).toContain(
+      'WalletSessionInvalid'
+    );
+    expect(byId.get('reconnect-session-outcome')?.expected.join(' ')).toContain(
+      '不得自动选择新钱包'
+    );
+    expect(byId.get('all-cache-invalid')?.expected.join(' ')).toContain('WalletSessionInvalid');
+    expect(byId.get('attach-pin-standard-rejected')?.expected.join(' ')).toContain(
+      'DeviceCheckUnlockTypeError'
+    );
+    expect(byId.get('attach-pin-wrong-wallet-rejected')?.expected.join(' ')).toContain(
+      'DeviceCheckPassphraseStateError'
+    );
+    expect(byId.get('attach-pin-state')?.expected.join(' ')).toContain('重复获取地址一致');
+  });
+
+  test('covers Host, device and Attach PIN hidden-wallet selection paths', async () => {
+    const { WALLET_SESSION_CASES = [] } = await loadCasesModule();
+    const byId = new Map(WALLET_SESSION_CASES.map(item => [item.id, item]));
+
+    expect(byId.get('hidden-a-select')?.steps.join(' ')).toContain('Host 表单');
+    expect(byId.get('hidden-a-select')?.expected.join(' ')).toContain('Host Passphrase 输入可用');
+    expect(byId.get('hidden-b-select')?.steps.join(' ')).toContain('设备端输入');
+    expect(byId.get('hidden-b-select')?.expected.join(' ')).toContain(
+      '设备端 Passphrase 输入可用'
+    );
+    expect(byId.get('attach-pin-select')?.steps.join(' ')).toContain('选择 Attach PIN');
   });
 
   test('keeps every case explicit and orders prerequisites before dependants', async () => {

@@ -69,7 +69,10 @@ Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类�
 - 隐藏钱包选择先用 `DeviceSessionAskPassphrase` 或
   `DeviceSessionAskPin { type: AttachToPin }` 在设备端准备上下文，再用空参数
   `DeviceSessionGet` 取得最终 Session；恢复缓存使用带 `session_id` 的 `DeviceSessionGet`。
-- Pro2 的 `DeviceSessionAskPassphrase.passphrase` 支持 Host 输入；字段缺省表示设备端输入。
+  空参数请求缺少有效 prepared context 时必须失败，不得隐式创建标准钱包 Session。
+- Pro2 的 `DeviceSessionAskPassphrase` 必须显式携带输入来源：Host 输入发送
+  `{ on_device: false, passphrase }`，设备输入发送 `{ on_device: true }`。不得省略
+  `on_device`，也不得同时发送设备输入标记和 Host Passphrase。
   Pro2 尚未发布，不保留开发阶段旧固件的能力降级分支。
 - 显式 `resume-hidden` 被固件拒绝时，Core 只清除当前隐藏钱包缓存并返回规范化错误，
   不自动退化为需要用户确认的隐藏钱包选择；`DeviceSessionError_InvalidSession=2`
