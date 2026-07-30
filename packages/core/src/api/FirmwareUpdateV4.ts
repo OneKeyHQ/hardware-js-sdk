@@ -767,10 +767,12 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const targetsToUpdate = new Set(this.params.targetsToUpdate ?? []);
 
     for (const [key, component] of entries) {
-      const target = this.getRemoteComponentTarget(key, component);
-      const updateTarget = PROTOCOL_V2_UPDATE_TARGET_BY_TARGET_ID.get(target.targetId);
-      const shouldInstall = updateTarget ? targetsToUpdate.has(updateTarget) : false;
-      if (shouldInstall) {
+      const targetName = component.target?.toUpperCase();
+      const target = PROTOCOL_V2_REMOTE_COMPONENT_TARGETS[targetName];
+      const updateTarget = target
+        ? PROTOCOL_V2_UPDATE_TARGET_BY_TARGET_ID.get(target.targetId)
+        : undefined;
+      if (updateTarget && targetsToUpdate.has(updateTarget)) {
         const remoteBinary = await this.downloadRemoteProtocolV2Component(key, component);
         if (remoteBinary.kind === 'bootloader') {
           bootloaderBinary = remoteBinary.binary;

@@ -112,6 +112,59 @@ describe('Noble BLE plugin notification routing', () => {
     expect(result).toBe('completed');
   });
 
+  test('disconnects an untracked peripheral when service discovery fails', async () => {
+    const device = createPeripheral('device-a');
+    device.peripheral.discoverServices.mockImplementation((_uuids, callback) =>
+      callback(new Error('service discovery failed'))
+    );
+    const noble = new EventEmitter() as EventEmitter & {
+      state: string;
+      startScanning: jest.Mock;
+      stopScanning: jest.Mock;
+    };
+    noble.state = 'poweredOn';
+    noble.startScanning = jest.fn((_services, _duplicates, callback) => {
+      callback?.();
+      noble.emit('discover', device.peripheral);
+    });
+    noble.stopScanning = jest.fn(callback => callback?.());
+    jest.doMock('@stoprocent/noble', () => noble);
+
+    const { createNobleBlePlugin } = await import('../transports/nobleBlePlugin');
+    const plugin = createNobleBlePlugin();
+    await plugin.init();
+
+    await expect(plugin.connect('device-a')).rejects.toThrow('service discovery failed');
+    expect(device.peripheral.disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  test('unsubscribes and disconnects an untracked peripheral when notification setup fails', async () => {
+    const device = createPeripheral('device-a');
+    device.notify.subscribe.mockImplementation(callback =>
+      callback(new Error('notification setup failed'))
+    );
+    const noble = new EventEmitter() as EventEmitter & {
+      state: string;
+      startScanning: jest.Mock;
+      stopScanning: jest.Mock;
+    };
+    noble.state = 'poweredOn';
+    noble.startScanning = jest.fn((_services, _duplicates, callback) => {
+      callback?.();
+      noble.emit('discover', device.peripheral);
+    });
+    noble.stopScanning = jest.fn(callback => callback?.());
+    jest.doMock('@stoprocent/noble', () => noble);
+
+    const { createNobleBlePlugin } = await import('../transports/nobleBlePlugin');
+    const plugin = createNobleBlePlugin();
+    await plugin.init();
+
+    await expect(plugin.connect('device-a')).rejects.toThrow('notification setup failed');
+    expect(device.notify.unsubscribe).toHaveBeenCalled();
+    expect(device.peripheral.disconnect).toHaveBeenCalledTimes(1);
+  });
+
   test('uses withoutResponse for normal and high-volume writes', async () => {
     const device = createPeripheral('device-a');
     const noble = new EventEmitter() as EventEmitter & {

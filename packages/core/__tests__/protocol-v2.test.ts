@@ -3970,6 +3970,62 @@ describe('Protocol V2 firmware update targets', () => {
     getFirmwareLatestReleaseSpy.mockRestore();
   });
 
+  test('ignores an unsupported remote ROMLOADER component when installing selected targets', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+        targetsToUpdate: ['app_v1'],
+      },
+    });
+    method.init();
+    const applicationBinary = new Uint8Array([1]).buffer;
+    const downloadRemoteComponent = jest.fn().mockResolvedValue({
+      fileName: 'application_p1.bin',
+      binary: applicationBinary,
+      targetId: 4,
+      kind: 'firmware',
+    });
+    (method as any).downloadRemoteProtocolV2Component = downloadRemoteComponent;
+    const getFirmwareLatestReleaseSpy = jest
+      .spyOn(DataManager, 'getFirmwareLatestRelease')
+      .mockReturnValue({
+        required: false,
+        version: [1, 0, 0],
+        url: '',
+        installOrder: ['romloader', 'applicationP1'],
+        components: {
+          romloader: {
+            target: 'ROMLOADER',
+            url: 'https://example.com/romloader.bin',
+          },
+          applicationP1: {
+            target: 'APPLICATION_P1',
+            url: 'https://example.com/application-p1.bin',
+          },
+        },
+        fingerprint: '',
+        changelog: { 'zh-CN': '', 'en-US': '' },
+      });
+
+    const remoteBinaries = await (method as any).prepareRemoteProtocolV2Binaries('universal', {
+      deviceType: 'pro2',
+      firmwareVersion: '0.0.0',
+    });
+
+    expect(downloadRemoteComponent).toHaveBeenCalledTimes(1);
+    expect(downloadRemoteComponent).toHaveBeenCalledWith(
+      'applicationP1',
+      expect.objectContaining({ target: 'APPLICATION_P1' })
+    );
+    expect(remoteBinaries.fwBinaryMap).toEqual([
+      { fileName: 'application_p1.bin', binary: applicationBinary, targetId: 4 },
+    ]);
+
+    getFirmwareLatestReleaseSpy.mockRestore();
+  });
+
   test('maps remote Pro2 resource bundles to direct-write descriptors', () => {
     const method = new FirmwareUpdateV4({
       id: 1,
