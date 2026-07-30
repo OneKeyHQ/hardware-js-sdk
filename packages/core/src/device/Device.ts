@@ -76,7 +76,6 @@ import type { PassphrasePromptResponse } from './DeviceCommands';
 import type { Deferred, HardwareConnectProtocol } from '@onekeyfe/hd-shared';
 import type {
   OneKeyDeviceInfo as DeviceDescriptor,
-  DeviceSession,
   DeviceStatus,
   ProtocolV2DeviceInfo,
   Success,
@@ -720,13 +719,20 @@ export class Device extends EventEmitter {
     return deviceWalletSessionStore.get(deviceId, this.passphraseState);
   }
 
+  getStandardInternalState(_deviceId?: string) {
+    const deviceId = this.getSessionCacheDeviceKey(_deviceId);
+    if (!deviceId) return undefined;
+    return deviceWalletSessionStore.getStandard(deviceId);
+  }
+
   // attach to pin to fix internal state
   updateInternalState(
     enablePassphrase: boolean,
     passphraseState: string | undefined,
     deviceId: string | undefined,
     sessionId: string | null = null,
-    featuresSessionId: string | null = null
+    featuresSessionId: string | null = null,
+    walletType: 'standard' | 'hidden' = 'hidden'
   ) {
     Log.debug(
       'updateInternalState session param: ',
@@ -743,7 +749,15 @@ export class Device extends EventEmitter {
     if (enablePassphrase) {
       const walletSessionId =
         sessionId || featuresSessionId || deviceWalletSessionStore.getPending(cacheDeviceKey);
-      deviceWalletSessionStore.set(cacheDeviceKey, passphraseState, walletSessionId ?? undefined);
+      if (walletType === 'standard') {
+        deviceWalletSessionStore.setStandard(
+          cacheDeviceKey,
+          passphraseState,
+          walletSessionId ?? undefined
+        );
+      } else {
+        deviceWalletSessionStore.set(cacheDeviceKey, passphraseState, walletSessionId ?? undefined);
+      }
     }
 
     deviceWalletSessionStore.deletePending(cacheDeviceKey);
@@ -780,6 +794,12 @@ export class Device extends EventEmitter {
     if (this.passphraseState) {
       deviceWalletSessionStore.delete(deviceId, this.passphraseState);
     }
+  }
+
+  clearStandardInternalState(_deviceId?: string) {
+    const deviceId = this.getSessionCacheDeviceKey(_deviceId);
+    if (!deviceId) return;
+    deviceWalletSessionStore.deleteStandard(deviceId);
   }
 
   async initialize(options?: InitOptions) {
@@ -1452,39 +1472,23 @@ export class Device extends EventEmitter {
     };
   }
 
-  async openProtocolV2WalletSessionWithPin(
-    pinType: DeviceSessionPinType = DeviceSessionPinType.Main
-  ): Promise<{ session: DeviceSession; deviceStatus: Features }> {
-    if (!this.isProtocolV2()) {
-      throw createDeviceNotSupportMethodError('openWalletSession', this.getCurrentFirmwareType());
-    }
-    let response;
-    try {
-      response = await this.commands.typedCall('DeviceSessionAskPin', 'DeviceSession', {
-        type: pinType,
-      });
-    } catch (error) {
-      const errorText =
-        error instanceof Error
-          ? `${error.name} ${error.message}`
-          : String((error as { message?: unknown } | null)?.message ?? error ?? '');
-      if (errorText.includes('Failure_UnexpectedMessage')) {
-        throw createDeviceNotSupportMethodError('deviceUnlock', this.getCurrentFirmwareType());
-      }
-      throw error;
-    }
-
-    const status = await requestProtocolV2DeviceStatus({ commands: this.commands });
-    return {
-      session: response.message,
-      deviceStatus: this.updateProtocolV2Status(status),
-    };
-  }
-
   async unlockDevice(pinType: DeviceSessionPinType = DeviceSessionPinType.Main) {
     if (this.isProtocolV2()) {
-      const result = await this.openProtocolV2WalletSessionWithPin(pinType);
-      return result.deviceStatus;
+      try {
+        await this.commands.typedCall('DeviceSessionAskPin', 'Success', { type: pinType });
+      } catch (error) {
+        const errorText =
+          error instanceof Error
+            ? `${error.name} ${error.message}`
+            : String((error as { message?: unknown } | null)?.message ?? error ?? '');
+        if (errorText.includes('Failure_UnexpectedMessage')) {
+          throw createDeviceNotSupportMethodError('deviceUnlock', this.getCurrentFirmwareType());
+        }
+        throw error;
+      }
+
+      const status = await requestProtocolV2DeviceStatus({ commands: this.commands });
+      return this.updateProtocolV2Status(status);
     }
 
     const firmwareVersion = this.getCurrentFirmwareVersionString() ?? '0.0.0';

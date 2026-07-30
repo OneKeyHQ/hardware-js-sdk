@@ -4,7 +4,7 @@
 > 适用读者：Core、Transport 与 App 硬件接入维护者
 > 内容状态：兼容迁移中
 > 代码范围：`packages/core`
-> 最后代码核验：2026-07-27
+> 最后代码核验：2026-07-30
 > 前置阅读：[SDK 架构概览](../architecture/overview.md)
 
 本页描述“协议消息如何进入 SDK 公共能力”，不重复壁纸、设备设置、固件升级等完整用户流程。
@@ -78,7 +78,7 @@ selector。
 - 每次公共 `getDeviceState()` 读取都会在 normal 模式刷新 `DeviceStatus`，调用方不需要管理缓存刷新参数。
 - bootloader / romloader 模式不会发送 `DeviceStatusGet`。
 - 公共 `DeviceState` 与 `DEVICE.STATE` 不包含协议 raw 数据或钱包 `session_id`；两者只在 Core 内部用于 V1 兼容和会话恢复。
-- V2 PIN 解锁使用 `DeviceSessionAskPin -> DeviceSession`，随后刷新 `DeviceStatus`，以获得设备确认的解锁与 Passphrase/Attach PIN 状态。
+- V2 PIN 解锁使用 `DeviceSessionAskPin -> Success`，随后刷新 `DeviceStatus`；需要钱包 Session 时再调用 `DeviceSessionGet`。
 - 受保护方法是否允许单次解锁后重试，由方法显式声明；Transport 不重放业务请求。
 
 ## 统一设置与 DeviceState 更新
@@ -135,12 +135,13 @@ Core 先把公共钱包意图归一化，再映射到各协议：
 ```text
 标准钱包
   -> V1: PassphraseRequest 自动回复空字符串
-  -> V2: 协商 eventless_wallet_session=true；锁定时 AskPin(Main)
+  -> V2 首次/状态错配: 协商 eventless；AskPin(Main) -> Success -> DeviceSessionGet()
+  -> V2 已解锁且缓存有效: 协商 eventless；DeviceSessionGet(session_id) -> DeviceSession
 
 隐藏钱包 / Attach-to-PIN
   -> V1: GetPassphraseState -> PassphraseRequest / PassphraseAck
   -> V2: REQUEST_PASSPHRASE 选择 -> AskPassphrase 或 AskPin(AttachToPin)
-         -> DeviceSessionGet({})
+         -> Success -> DeviceStatusGet -> DeviceSessionGet()
 
 恢复隐藏钱包
   -> V1: 先用无钱包绑定字段的 Initialize 校验实时 deviceId，
@@ -172,11 +173,12 @@ Core 先把公共钱包意图归一化，再映射到各协议：
 
 | `walletType` | `passphraseState` | 含义                             |
 | ------------ | ----------------- | -------------------------------- |
-| `standard`   | `null`            | 使用设备默认空 Passphrase 上下文 |
+| `standard`   | V2 非空；V1 可空  | 使用设备默认空 Passphrase 上下文 |
 | `hidden`     | 非空字符串        | 设备返回隐藏钱包标识             |
 
-隐藏钱包结果直接使用同一次硬件响应中的字段。Core 只执行协议字段名归一化，不从
-Features、descriptor 或 Store 补造钱包标识；标准钱包没有 `DeviceSession` 响应。
+Pro2 标准钱包和隐藏钱包都直接使用同一次硬件 `DeviceSession` 响应中的字段。Core 只执行协议字段名
+归一化，不从 Features、descriptor 或 Store 补造钱包标识；跨协议钱包类型只看 `walletType`，不能
+根据 `passphraseState` 是否为空推断。
 Pro2 需要解锁时，钱包类型以解锁完成并刷新后的设备状态为准，不使用解锁前的
 `passphraseProtection` 快照。
 
@@ -200,6 +202,13 @@ V1 通过 `Initialize.session_id` 恢复，V2 通过 `DeviceSessionGet({ session
 时，Core 清理当前隐藏钱包缓存并透传规范化的固件错误，不会暗中切换钱包。
 `DeviceSessionGet` 成功时必须同时返回非空
 `session_id + btc_test_address`，否则 Core 将其视为不完整响应，而不是标准钱包。
+
+标准钱包不要求 App 提供钱包绑定。Core 在同一个 Store 中维护
+`deviceKey -> { passphraseState, sessionId }` 标准钱包内部索引：首次或设备已锁定时通过
+`DeviceSessionAskPin(Main)` 获取标准 Session；设备已解锁且索引有效时通过
+`DeviceSessionGet(session_id)` 复用。缓存失效会在同一次明确的标准钱包调用中重建；返回地址与
+缓存地址不一致时则执行一次 `AskPin(Main) -> Get()` 重建；最终地址仍不一致才清除标准索引并
+终止业务。以上操作都不会清除同设备的隐藏钱包记录。
 
 `clearSessionCache()` 对 V1 和 V2 执行相同的 Core 本地操作：
 
@@ -246,12 +255,12 @@ App 不应按型号或 PID 自行选择协议，也不应直接发送
 `DeviceSessionAskPin/DeviceSessionAskPassphrase/DeviceSessionGet`。Core 会在完成设备响应探测后
 自动分流：
 
-| App 意图            | Pro V1 固件流程                         | Pro2 Protocol V2 固件流程                                                 |
-| ------------------- | --------------------------------------- | ------------------------------------------------------------------------- |
-| 标准钱包            | 空 Passphrase 兼容流程                  | 必要时 `DeviceSessionAskPin(Main)`                                        |
-| Passphrase 隐藏钱包 | `GetPassphraseState -> PassphraseState` | `DeviceSessionAskPassphrase({ on_device, passphrase? }) -> DeviceSession` |
-| Attach-to-PIN       | `GetPassphraseState -> PassphraseState` | `DeviceSessionAskPin(AttachToPin) -> DeviceSession`                       |
-| 恢复已选隐藏钱包    | Core 管理 V1 Session 复用               | `DeviceSessionGet({ session_id })`                                        |
+| App 意图            | Pro V1 固件流程                         | Pro2 Protocol V2 固件流程                                     |
+| ------------------- | --------------------------------------- | ------------------------------------------------------------- |
+| 标准钱包            | 空 Passphrase 兼容流程                  | AskPin(Main) -> Success -> Get()，或 Get(标准 Session)        |
+| Passphrase 隐藏钱包 | `GetPassphraseState -> PassphraseState` | AskPassphrase({ on_device, passphrase? }) -> Success -> Get() |
+| Attach-to-PIN       | `GetPassphraseState -> PassphraseState` | AskPin(AttachToPin) -> Success -> Get()                       |
+| 恢复已选隐藏钱包    | Core 管理 V1 Session 复用               | `DeviceSessionGet({ session_id })`                            |
 
 Pro2 Protocol V2 支持软件输入：Core 将非空值放入
 `DeviceSessionAskPassphrase.passphrase`；选择设备输入时显式发送 `on_device: true`。Pro2 尚未发布，SDK 不兼容

@@ -1,6 +1,11 @@
 export class DeviceWalletSessionStore {
   private readonly walletSessions = new Map<string, Map<string, string>>();
 
+  private readonly standardWalletSessions = new Map<
+    string,
+    { passphraseState: string; sessionId: string }
+  >();
+
   private readonly pendingSessions = new Map<string, string>();
 
   get(deviceKey: string, passphraseState?: string) {
@@ -18,6 +23,17 @@ export class DeviceWalletSessionStore {
     deviceSessions.set(passphraseState, sessionId);
   }
 
+  getStandard(deviceKey: string) {
+    if (!deviceKey) return undefined;
+    return this.standardWalletSessions.get(deviceKey);
+  }
+
+  setStandard(deviceKey: string, passphraseState?: string, sessionId?: string) {
+    if (!deviceKey || !passphraseState || !sessionId) return;
+    this.set(deviceKey, passphraseState, sessionId);
+    this.standardWalletSessions.set(deviceKey, { passphraseState, sessionId });
+  }
+
   setPending(deviceKey: string, sessionId?: string) {
     if (!deviceKey || !sessionId) return;
     this.pendingSessions.set(deviceKey, sessionId);
@@ -30,11 +46,24 @@ export class DeviceWalletSessionStore {
 
   delete(deviceKey: string, passphraseState?: string) {
     if (!deviceKey || !passphraseState) return;
+    const standardWalletSession = this.standardWalletSessions.get(deviceKey);
+    if (standardWalletSession?.passphraseState === passphraseState) {
+      this.standardWalletSessions.delete(deviceKey);
+    }
     const deviceSessions = this.walletSessions.get(deviceKey);
     if (!deviceSessions) return;
     deviceSessions.delete(passphraseState);
     if (deviceSessions.size === 0) {
       this.walletSessions.delete(deviceKey);
+    }
+  }
+
+  deleteStandard(deviceKey: string) {
+    if (!deviceKey) return;
+    const standardWalletSession = this.standardWalletSessions.get(deviceKey);
+    this.standardWalletSessions.delete(deviceKey);
+    if (standardWalletSession) {
+      this.delete(deviceKey, standardWalletSession.passphraseState);
     }
   }
 
@@ -46,6 +75,7 @@ export class DeviceWalletSessionStore {
   deleteDevice(deviceKey: string) {
     if (!deviceKey) return;
     this.walletSessions.delete(deviceKey);
+    this.standardWalletSessions.delete(deviceKey);
     this.pendingSessions.delete(deviceKey);
   }
 
@@ -63,6 +93,12 @@ export class DeviceWalletSessionStore {
       });
       this.walletSessions.delete(from);
     }
+
+    const standardWalletSession = this.standardWalletSessions.get(from);
+    if (standardWalletSession && !this.standardWalletSessions.has(to)) {
+      this.standardWalletSessions.set(to, standardWalletSession);
+    }
+    this.standardWalletSessions.delete(from);
 
     const pendingSession = this.pendingSessions.get(from);
     if (pendingSession && !this.pendingSessions.has(to)) {
@@ -98,6 +134,7 @@ export class DeviceWalletSessionStore {
 
   clear() {
     this.walletSessions.clear();
+    this.standardWalletSessions.clear();
     this.pendingSessions.clear();
   }
 }
