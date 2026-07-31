@@ -1,4 +1,5 @@
 import EVMSignTransaction from '../src/api/evm/EVMSignTransaction';
+import TransportManager from '../src/data-manager/TransportManager';
 
 import type { EVMTransactionEIP7702 } from '../src/types';
 
@@ -17,19 +18,87 @@ jest.mock('../src/device/Device', () => ({
   Device: jest.fn(),
 }));
 
+const mockTransportManager = jest.mocked(TransportManager);
+
 describe('EVMSignTransaction EIP-7702', () => {
   let mockDevice: any;
   let mockTypedCall: jest.Mock;
 
   beforeEach(() => {
+    mockTransportManager.getProtocolV1MessageSchema.mockReturnValue('v1CurrentSchema');
     mockTypedCall = jest.fn();
     mockDevice = {
+      isProtocolV2: jest.fn(() => false),
       commands: {
         typedCall: {
           bind: jest.fn(() => mockTypedCall),
         },
       },
     };
+  });
+
+  describe('Protocol-specific schema routing', () => {
+    const transaction: EVMTransactionEIP7702 = {
+      to: '0x4Cd241E8d1510e30b2076397afc7508Ae59C66c9',
+      value: '0x0',
+      gasLimit: '0x5208',
+      nonce: '0x0',
+      chainId: 1,
+      maxFeePerGas: '0xbebc200',
+      maxPriorityFeePerGas: '0x9502f900',
+      authorizationList: [
+        {
+          chainId: 1,
+          address: '0x4Cd241E8d1510e30b2076397afc7508Ae59C66c9',
+          nonce: '0x1',
+        },
+      ],
+    };
+
+    const createTransactionMethod = () => {
+      const method = new EVMSignTransaction({
+        id: 1,
+        payload: {
+          method: 'evmSignTransaction',
+          path: "m/44'/60'/0'/0/0",
+          transaction,
+        },
+      });
+      method.device = mockDevice;
+      method.init();
+      return method;
+    };
+
+    it('keeps Protocol V2 on current OneKey messages after a legacy V1 device', async () => {
+      mockTransportManager.getProtocolV1MessageSchema.mockReturnValue('v1LegacySchema');
+      mockDevice.isProtocolV2.mockReturnValue(true);
+      mockTypedCall.mockResolvedValue({
+        message: {
+          signature_v: 27,
+          signature_r: '01',
+          signature_s: '02',
+          authorization_signatures: [],
+        },
+      });
+
+      await expect(createTransactionMethod().run()).resolves.toMatchObject({
+        v: '0x1b',
+      });
+      expect(mockTypedCall).toHaveBeenCalledWith(
+        'EthereumSignTxEIP7702OneKey',
+        'EthereumTxRequestOneKey',
+        expect.any(Object)
+      );
+    });
+
+    it('continues to use legacy messages for a Protocol V1 legacy device', async () => {
+      mockTransportManager.getProtocolV1MessageSchema.mockReturnValue('v1LegacySchema');
+
+      await expect(createTransactionMethod().run()).rejects.toThrow(
+        'EIP7702 not supported by Trezor'
+      );
+      expect(mockTypedCall).not.toHaveBeenCalled();
+    });
   });
 
   describe('EIP-7702 Transaction Detection', () => {

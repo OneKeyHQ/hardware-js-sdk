@@ -15,8 +15,8 @@ import {
   type EthereumSignTypedDataMessage,
   type EthereumSignTypedDataTypes,
 } from '../../types';
-import TransportManager from '../../data-manager/TransportManager';
 import { signTypedHash as signTypedHashLegacyV1 } from './legacyV1/signTypedHash';
+import { shouldUseLegacyV1EvmMessages } from './protocol';
 import { signTypedHash } from './latest/signTypedHash';
 import { signTypedData as signTypedDataLegacyV1 } from './legacyV1/signTypedData';
 import { signTypedData } from './latest/signTypedData';
@@ -278,29 +278,23 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
 
     let supportTrezor = false;
     let response: MessageResponse<MessageKey>;
-    switch (TransportManager.getProtocolV1MessageSchema()) {
-      case 'v1LegacySchema':
-        supportTrezor = true;
-        response = await signTypedDataLegacyV1({
-          typedCall: this.device.commands.typedCall.bind(this.device.commands),
-          addressN,
-          data,
-          metamaskV4Compat,
-          chainId,
-        });
-        break;
-
-      case 'v1CurrentSchema':
-      default:
-        supportTrezor = false;
-        response = await signTypedData({
-          typedCall: this.device.commands.typedCall.bind(this.device.commands),
-          addressN,
-          data,
-          metamaskV4Compat,
-          chainId,
-        });
-        break;
+    if (shouldUseLegacyV1EvmMessages(this.device)) {
+      supportTrezor = true;
+      response = await signTypedDataLegacyV1({
+        typedCall: this.device.commands.typedCall.bind(this.device.commands),
+        addressN,
+        data,
+        metamaskV4Compat,
+        chainId,
+      });
+    } else {
+      response = await signTypedData({
+        typedCall: this.device.commands.typedCall.bind(this.device.commands),
+        addressN,
+        data,
+        metamaskV4Compat,
+        chainId,
+      });
     }
 
     return this.handleSignTypedData({
@@ -326,28 +320,24 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
   }) {
     if (!domainHash) throw ERRORS.TypedError('Runtime', 'domainHash is required');
 
-    switch (TransportManager.getProtocolV1MessageSchema()) {
-      case 'v1LegacySchema':
-        return signTypedHashLegacyV1({
-          typedCall,
-          addressN,
-          domainHash,
-          messageHash,
-          chainId,
-          device: this.device,
-        });
-
-      case 'v1CurrentSchema':
-      default:
-        return signTypedHash({
-          typedCall,
-          addressN,
-          domainHash,
-          messageHash,
-          chainId,
-          device: this.device,
-        });
+    if (shouldUseLegacyV1EvmMessages(this.device)) {
+      return signTypedHashLegacyV1({
+        typedCall,
+        addressN,
+        domainHash,
+        messageHash,
+        chainId,
+        device: this.device,
+      });
     }
+    return signTypedHash({
+      typedCall,
+      addressN,
+      domainHash,
+      messageHash,
+      chainId,
+      device: this.device,
+    });
   }
 
   getVersionRange() {
