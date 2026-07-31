@@ -1,7 +1,9 @@
 import { HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { DeviceType } from '@onekeyfe/hd-transport';
 
 import { Device } from '../src/device/Device';
 import { DEVICE } from '../src/events';
+import { PROTOCOL_V2_DEVICE_STATUS_GET_MESSAGE_TYPE } from '../src/protocols/protocol-v2';
 
 jest.mock('../src/data/config', () => ({
   getSDKVersion: jest.fn(() => '1.0.0'),
@@ -28,6 +30,18 @@ const createV1Device = (typedCall: jest.Mock) => {
   return device;
 };
 
+const protocolV2ApplicationInfo = {
+  version: 1,
+  build_fingerprint: 'application__5.0.0__abcdef0__PROD__RELEASE',
+  supported_messages: [PROTOCOL_V2_DEVICE_STATUS_GET_MESSAGE_TYPE],
+};
+
+const getProtocolV2LoaderInfo = (mode: 'bootloader' | 'romloader') => ({
+  version: 1,
+  build_fingerprint: `${mode}__1.0.0__abcdef0__PROD__RELEASE`,
+  supported_messages: [],
+});
+
 describe('getDeviceState', () => {
   test('does not expose the internal wallet session', async () => {
     const device = createV2Device(jest.fn());
@@ -39,45 +53,55 @@ describe('getDeviceState', () => {
   });
 
   test('hydrates Protocol V2 with separate DeviceInfoGet and DeviceStatusGet', async () => {
-    const typedCall = jest.fn().mockImplementation((requestType: string) => ({
-      message:
-        requestType === 'DeviceInfoGet'
-          ? {
-              protocol_version: 2,
-              hw: { serial_no: 'SERIAL-1' },
-              fw: { application: { version: '5.0.0' } },
-            }
-          : { init_states: true, unlocked: true },
-    }));
+    const typedCall = jest.fn().mockImplementation((requestType: string) => {
+      if (requestType === 'DeviceInfoGet') {
+        return {
+          message: {
+            protocol_version: 2,
+            hw: { serial_no: 'SERIAL-1' },
+            fw: { application: { version: '5.0.0' } },
+          },
+        };
+      }
+      if (requestType === 'ProtocolInfoRequest') {
+        return { message: protocolV2ApplicationInfo };
+      }
+      return { message: { init_states: true, unlocked: true } };
+    });
     const device = createV2Device(typedCall);
 
     const state = await device.getDeviceState();
 
     expect(state.identity.serialNo).toBe('SERIAL-1');
-    expect(typedCall).toHaveBeenCalledTimes(2);
+    expect(typedCall).toHaveBeenCalledTimes(3);
     expect(typedCall.mock.calls[0][0]).toBe('DeviceInfoGet');
     expect(typedCall.mock.calls[0][2]?.targets?.status).not.toBe(true);
     expect(typedCall).toHaveBeenCalledWith('DeviceStatusGet', 'DeviceStatus', {});
   });
 
   test('uses one full DeviceInfoGet plus DeviceStatusGet when firmware refresh initializes state', async () => {
-    const typedCall = jest.fn().mockImplementation((requestType: string) => ({
-      message:
-        requestType === 'DeviceInfoGet'
-          ? {
-              protocol_version: 2,
-              hw: { serial_no: 'SERIAL-1' },
-              fw: { application: { version: '5.0.0', hash: 'HASH-1' } },
-            }
-          : { init_states: true, unlocked: true },
-    }));
+    const typedCall = jest.fn().mockImplementation((requestType: string) => {
+      if (requestType === 'DeviceInfoGet') {
+        return {
+          message: {
+            protocol_version: 2,
+            hw: { serial_no: 'SERIAL-1' },
+            fw: { application: { version: '5.0.0', hash: 'HASH-1' } },
+          },
+        };
+      }
+      if (requestType === 'ProtocolInfoRequest') {
+        return { message: protocolV2ApplicationInfo };
+      }
+      return { message: { init_states: true, unlocked: true } };
+    });
     const device = createV2Device(typedCall);
 
     await device.getDeviceState({
       refreshSections: ['identity', 'versions', 'verification'],
     });
 
-    expect(typedCall).toHaveBeenCalledTimes(2);
+    expect(typedCall).toHaveBeenCalledTimes(3);
     expect(typedCall).toHaveBeenNthCalledWith(
       1,
       'DeviceInfoGet',
@@ -115,13 +139,13 @@ describe('getDeviceState', () => {
   });
 
   test.each(['bootloader', 'romloader'] as const)(
-    'temporarily treats failed DeviceStatusGet with %s metadata as bootloader',
+    'uses ProtocolInfo to preserve %s mode without DeviceStatusGet',
     async mode => {
       const typedCall = jest.fn().mockImplementation((requestType: string) => {
         if (requestType === 'DeviceInfoGet') {
           return {
             message: {
-              hw: { serial_no: 'SERIAL-1' },
+              hw: { Device_type: DeviceType.PRO2, serial_no: 'SERIAL-1' },
               fw:
                 mode === 'romloader'
                   ? { romloader: { version: '1.0.0' } }
@@ -129,24 +153,38 @@ describe('getDeviceState', () => {
             },
           };
         }
-        throw new Error('DeviceStatusGet unavailable');
+        if (requestType === 'ProtocolInfoRequest') {
+          return { message: getProtocolV2LoaderInfo(mode) };
+        }
+        throw new Error(`Unexpected request: ${requestType}`);
       });
       const device = createV2Device(typedCall);
       device.updateState({ protocol: 'V2', status: { mode } }, 'initialize');
 
       const state = await device.getDeviceState({ refreshSections: ['status'] });
 
-      expect(state.status.mode).toBe('bootloader');
+      expect(state.status.mode).toBe(mode);
       expect(typedCall.mock.calls.map(call => call[0])).toEqual([
         'DeviceInfoGet',
-        'DeviceStatusGet',
+        'ProtocolInfoRequest',
       ]);
     }
   );
 
   test('refreshes Protocol V2 status only when explicitly requested in normal mode', async () => {
-    const typedCall = jest.fn().mockResolvedValue({
-      message: { init_states: true, unlocked: true, device_id: 'device-1' },
+    const typedCall = jest.fn().mockImplementation((requestType: string) => {
+      if (requestType === 'DeviceInfoGet') {
+        return {
+          message: {
+            hw: { serial_no: 'SERIAL-1' },
+            fw: { application: { version: '5.0.0' } },
+          },
+        };
+      }
+      if (requestType === 'ProtocolInfoRequest') {
+        return { message: protocolV2ApplicationInfo };
+      }
+      return { message: { init_states: true, unlocked: true, device_id: 'device-1' } };
     });
     const device = createV2Device(typedCall);
     device.updateState({ protocol: 'V2', status: { mode: 'normal' } }, 'initialize');
@@ -203,6 +241,9 @@ describe('getDeviceState', () => {
           message: { init_states: true, unlocked: false, device_id: 'device-1' },
         };
       }
+      if (requestType === 'ProtocolInfoRequest') {
+        return { message: protocolV2ApplicationInfo };
+      }
       if (requestType === 'DeviceSettingsGet') {
         return { message: { label: 'Renamed Pro 2' } };
       }
@@ -215,6 +256,7 @@ describe('getDeviceState', () => {
 
     expect(typedCall.mock.calls.map(call => call[0])).toEqual([
       'DeviceInfoGet',
+      'ProtocolInfoRequest',
       'DeviceStatusGet',
       'DeviceSettingsGet',
     ]);
@@ -236,6 +278,9 @@ describe('getDeviceState', () => {
         return {
           message: { init_states: true, unlocked: false, device_id: 'device-1' },
         };
+      }
+      if (requestType === 'ProtocolInfoRequest') {
+        return { message: protocolV2ApplicationInfo };
       }
       throw Object.assign(new Error('Device locked'), {
         errorCode: HardwareErrorCode.DeviceLocked,
@@ -383,7 +428,10 @@ describe('getDeviceState', () => {
           },
         };
       }
-      throw new Error('DeviceStatusGet unavailable in bootloader');
+      if (requestType === 'ProtocolInfoRequest') {
+        return { message: getProtocolV2LoaderInfo('bootloader') };
+      }
+      throw new Error(`Unexpected request: ${requestType}`);
     });
     const device = createV2Device(typedCall);
     device.updateState(

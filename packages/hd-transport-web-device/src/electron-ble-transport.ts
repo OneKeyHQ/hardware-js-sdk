@@ -706,7 +706,7 @@ export default class ElectronBleTransport {
       );
     }
     if (!shouldSuppressHighVolumeCallLog(name)) {
-      this.Log?.debug('transport call', createTransportCallLog(name, protocol));
+      this.Log?.debug('transport call', createTransportCallLog(name, protocol, data));
     }
 
     if (protocol === 'V2') {

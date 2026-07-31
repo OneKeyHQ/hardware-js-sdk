@@ -19,6 +19,90 @@ const createCommands = () => {
 };
 
 describe('DeviceCommands failure mapping', () => {
+  it('logs passphrase call request and response without exposing the passphrase', async () => {
+    const commands = createCommands();
+    const requestLog = getLogger(LoggerNames.DeviceCommands);
+    const responseLog = getLogger(LoggerNames.Core);
+    requestLog.messages.length = 0;
+    responseLog.messages.length = 0;
+    commands.mainId = 'main-id';
+    commands.transport = {
+      call: jest.fn().mockResolvedValue({
+        type: 'Success',
+        message: {
+          message: 'Passphrase accepted',
+        },
+      }),
+    } as any;
+
+    await expect(
+      commands.call('DeviceSessionAskPassphrase', {
+        passphrase: 'hidden-wallet-secret',
+        on_device: false,
+      })
+    ).resolves.toMatchObject({ type: 'Success' });
+
+    expect(requestLog.messages.at(-1)?.message).toEqual([
+      '[DeviceCommands] [call] Sending',
+      'DeviceSessionAskPassphrase',
+      {
+        passphrase: '[REDACTED]',
+        on_device: false,
+      },
+    ]);
+    expect(responseLog.messages.at(-1)?.message).toEqual([
+      '[DeviceCommands] [call] Received',
+      'Success',
+      {
+        message: 'Passphrase accepted',
+      },
+    ]);
+    expect(JSON.stringify([...requestLog.messages, ...responseLog.messages])).not.toContain(
+      'hidden-wallet-secret'
+    );
+  });
+
+  it('logs DeviceStatus response fields without exposing the device ID', async () => {
+    const commands = createCommands();
+    const log = getLogger(LoggerNames.Core);
+    log.messages.length = 0;
+    commands.mainId = 'main-id';
+    commands.transport = {
+      call: jest.fn().mockResolvedValue({
+        type: 'DeviceStatus',
+        message: {
+          device_id: 'sensitive-device-id',
+          unlocked: true,
+          init_states: true,
+          backup_required: false,
+          passphrase_enabled: true,
+          attach_to_pin_enabled: false,
+          unlocked_by_attach_to_pin: false,
+        },
+      }),
+    } as any;
+
+    await expect(commands.call('DeviceStatusGet', {})).resolves.toMatchObject({
+      type: 'DeviceStatus',
+    });
+
+    const receivedLog = log.messages.at(-1)?.message;
+    expect(receivedLog).toEqual([
+      '[DeviceCommands] [call] Received',
+      'DeviceStatus',
+      {
+        device_id: '[REDACTED]',
+        unlocked: true,
+        init_states: true,
+        backup_required: false,
+        passphrase_enabled: true,
+        attach_to_pin_enabled: false,
+        unlocked_by_attach_to_pin: false,
+      },
+    ]);
+    expect(JSON.stringify(receivedLog)).not.toContain('sensitive-device-id');
+  });
+
   it('does not log DeviceSessionGet response secrets', async () => {
     const commands = createCommands();
     const log = getLogger(LoggerNames.DeviceCommands);

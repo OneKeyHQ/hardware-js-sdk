@@ -40,6 +40,9 @@ describe('DeviceSettings protocol routing', () => {
     ['language', { language: 'ja-JP' }],
     ['brightness', { brightness: 80 }],
     ['haptic feedback', { hapticFeedback: true }],
+    ['animation', { animationEnabled: true }],
+    ['tap to wake', { tapToWake: true }],
+    ['device name display', { deviceNameDisplayEnabled: true }],
   ])('does not unlock Protocol V2 before changing %s', (_name, settings) => {
     const method = new DeviceSettings({
       id: 1,

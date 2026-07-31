@@ -152,7 +152,7 @@ SDK 当前使用的典型范围：
 
 | 场景        | 读取内容                                           | 原因                         |
 | ----------- | -------------------------------------------------- | ---------------------------- |
-| 初始化      | hw、fw、coprocessor；version、specific             | 建立静态信息并投影已缓存状态 |
+| 初始化      | hw、fw、coprocessor；version、specific             | 建立静态信息，结合 ProtocolInfo 识别运行阶段 |
 | 轻量刷新    | hw、fw、coprocessor；version、specific             | 刷新静态信息，不隐式读取状态 |
 | versions    | hw、fw、coprocessor、se1 至 se4；version、specific | 展示所有组件版本             |
 | verify/full | 所有 target；version、build_id、hash、specific     | 设备完整校验                 |
@@ -166,8 +166,10 @@ DeviceStatusGet -> DeviceStatus
 ```
 
 `DeviceInfoGet.targets.status` 是即将从底层协议删除的历史字段，SDK 业务流程不再构造或公开它。
-初始化不会隐式调用 `DeviceStatusGet`；每次公共 `getDeviceState()` 都会在 normal 模式刷新运行状态。
-bootloader/romloader 模式直接返回可用的身份和版本快照，不会发送 `DeviceStatusGet`。
+初始化先读取 `ProtocolInfo`：`build_fingerprint` 的 binary 段识别 application、bootloader 或
+romloader，`supported_messages` 判断 `DeviceStatusGet` 是否可调用。application 在声明支持时
+读取运行状态；bootloader/romloader 直接返回可用的身份和版本快照，绝不发送
+`DeviceStatusGet`。每次公共 `getDeviceState()` 也遵循同一规则。
 
 ### 6.1 字段映射
 
@@ -200,14 +202,16 @@ bootloader/romloader 模式直接返回可用的身份和版本快照，不会�
 设备初始化过程的具体步骤没有塞进 `DeviceStatus`，而是使用独立消息：
 
 ```text
-DevGetOnboardingStatus -> DevOnboardingStatus
+OnboardingStatusGet -> OnboardingStatus
 ```
 
 返回内容：
 
-- `stage`：当前初始化阶段。
-- `status_code`：阶段状态码。
-- `detail_code`：更具体的状态或错误码。
+- `step`：当前 onboarding 粗粒度步骤。
+- `phase`：步骤内的当前页面阶段。
+- `setup`：创建或恢复类型及所选备份介质。
+- `pin_set`：是否已设置 PIN。
+- `wallet_initialized`：钱包是否已完成初始化。
 
 `DeviceStatus.init_states` 只表示最终是否初始化完成，不能替代 onboarding 的详细阶段。
 
@@ -287,20 +291,20 @@ label、语言、蓝牙开关、自动锁屏和振动反馈都属于用户配置
 钱包会话通过以下消息建立或恢复：
 
 ```text
-DeviceSessionAskPassphrase -> DeviceSession
+DeviceSessionAskPassphrase -> Success -> DeviceSessionGet -> DeviceSession
 DeviceSessionAskPin(Main/AttachToPin) -> DeviceSession
 DeviceSessionGet({ session_id }) -> DeviceSession
 ```
 
 ### 8.1 字段说明
 
-| Protocol V2 字段/消息         | 含义                             | SDK 当前处理                                                                    |
-| ----------------------------- | -------------------------------- | ------------------------------------------------------------------------------- |
-| `DeviceSessionGet.session_id` | 尝试恢复之前的隐藏钱包 Session   | Core 内部传入当前钱包缓存值                                                     |
-| `DeviceSessionPinType`        | `Any/Main/AttachToPin` PIN 路由  | 标准钱包固定 `Main`，Attach 选择固定对应类型                                    |
-| `DeviceSessionAskPassphrase`  | 创建 Passphrase 隐藏钱包会话     | Host 显式发送 `on_device=false + passphrase`；设备输入显式发送 `on_device=true` |
-| 响应 `session_id`             | 当前钱包 Session ID              | 保存到当前钱包缓存                                                              |
-| `btc_test_address`            | 用于确认当前钱包上下文的稳定标识 | 映射为内部 `passphraseState`                                                    |
+| Protocol V2 字段/消息         | 含义                             | SDK 当前处理                                                         |
+| ----------------------------- | -------------------------------- | -------------------------------------------------------------------- |
+| `DeviceSessionGet.session_id` | 尝试恢复之前的隐藏钱包 Session   | Core 内部传入当前钱包缓存值                                          |
+| `DeviceSessionPinType`        | `Any/Main/AttachToPin` PIN 路由  | 标准钱包固定 `Main`，Attach 选择固定对应类型                         |
+| `DeviceSessionAskPassphrase`  | 创建 Passphrase 隐藏钱包会话     | Host：`{ passphrase, on_device: false }`；设备：`{ on_device: true }` |
+| 响应 `session_id`             | 当前钱包 Session ID              | 保存到当前钱包缓存                                                   |
+| `btc_test_address`            | 用于确认当前钱包上下文的稳定标识 | 映射为内部 `passphraseState`                                         |
 
 这里的 `btc_test_address` 用于确认当前打开的是不是预期钱包，不用于用户资产地址展示。
 
@@ -315,17 +319,19 @@ DeviceSessionGet({ session_id }) -> DeviceSession
 
 如果缓存 Session 无效：
 
-1. 固件返回 `DeviceSessionError_InvalidSession=2`。
-2. Core 清除当前钱包的 Session 缓存并返回规范化错误。
-3. 显式 `openWalletSession({ mode: 'resume-hidden' })` 不自动进入选择流程；App 应明确发起
-   `select-hidden`，由设备端重新完成 PIN/Passphrase/Attach PIN 选择。
+1. 固件可能返回 `DeviceSessionError_InvalidSession=2`，也可能返回最终实际 Session。
+2. Core 清除失效句柄，或发现返回的 `btc_test_address` 与预期不一致。
+3. Pro2 的公开 `openWalletSession({ mode: 'resume-hidden' })` 在同一次调用中重新完成
+   PIN/Passphrase/Attach PIN 选择，并再次校验 `passphraseState`；最终不匹配才失败。
+4. SDK 内部要求无交互的签名重试仍使用严格恢复，失效时直接返回
+   `WalletSessionInvalid`，不会弹出钱包选择。
 
 `DeviceSessionGet` 的成功响应必须同时携带非空 `session_id` 和
 `btc_test_address`。缺少任一字段都视为协议响应不完整，Core 不会把它降级解释为标准钱包。
 
-标准钱包不读取其他钱包的 Session Store 项；它只协商 eventless 模式并发送
-`DeviceSessionAskPin(Main)`。标准钱包和隐藏钱包都返回设备生成的 `passphraseState`，调用方必须
-以 `walletType` 判断钱包类型。
+标准钱包不读取其他钱包的 Session Store 项；它只读取内部标准索引，必要时协商 eventless 模式并
+发送 `DeviceSessionAskPin(Main)`。公共响应中的标准钱包 `passphraseState` 固定为 `null`，
+隐藏钱包返回设备生成的 `passphraseState`；调用方必须以 `walletType` 判断钱包类型。
 SDK 不注册可调用的原始 Session API，接入方不能通过低层 `call()` 绕过公共钱包流程。
 
 App 不得直接调用原始 Session 请求。现有 App 可继续调用公共
@@ -529,13 +535,18 @@ build ID 和 hash 只在 `getDeviceState({ scope: 'firmware' })` 中请求，并
 
 | 标准字段或能力                        | 当前 Protocol V2 情况                             | SDK 当前处理与需要修改的内容                           |
 | ------------------------------------- | ------------------------------------------------- | ------------------------------------------------------ |
-| 显式运行模式                          | 没有 normal/bootloader/romloader 字段             | SDK 暂按响应结构区分；后续应由固件增加明确字段         |
+| 显式运行模式                          | `ProtocolInfo.build_fingerprint` 提供 binary 名称 | SDK 映射为 normal/bootloader/romloader                 |
 | `applicationDataVersion/BuildId/Hash` | 已提供 `fw.application_data`                      | 当前只在内部 raw 中；如 App 需要，应新增明确的标准字段 |
 | `safetyChecks`                        | DeviceInfo、DeviceStatus、DeviceSettings 均无来源 | 当前保持 `null`，需要固件提供读取来源                  |
 | `batteryLevel`                        | 当前 Protocol V2 没有来源                         | 无可靠值，不能用于 Pro 2 升级前低电量拦截              |
 | `noBackup` 等 V1 细分状态             | 当前只提供 `backup_required`                      | 不从一个布尔值推导其他状态；需要协议增加明确字段       |
 
-当前 SDK 的兼容判断规则是：包含 `fw.application` 或 `fw.application_data` 时属于应用形态；明确的 romloader 结构映射为 `romloader`；两者都不存在的 loader 响应映射为 `bootloader`。SE application/bootloader 同时出现不参与主控运行模式判断。版本刷新不得覆盖已经由 runtime 或 onboarding 确认的 `notInitialized/backupMode`。
+当前 SDK 不再从 `DeviceInfo` 镜像结构猜测主控运行模式。标准 fingerprint 格式为
+`<binary>__<version>__<commit>__<PROD|DEV>__<DEBUG|RELEASE>`，其中 binary 只接受
+`application`、`bootloader`、`romloader`。fingerprint 无法识别时，只有
+`supported_messages` 明确包含 `DeviceStatusGet` 才允许作为旧固件兼容路径读取状态；两者都
+无法确认时初始化安全失败。版本刷新不得覆盖已经由 runtime 或 onboarding 确认的
+`notInitialized/backupMode`。
 
 ## 16. 完整迁移矩阵
 

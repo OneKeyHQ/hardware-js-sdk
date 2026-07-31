@@ -50,15 +50,16 @@ SDK 内部根据协议版本选择 Event 来源和后续动作。
 - `PassphraseAck` 是对 firmware `PassphraseRequest` 的中间回复，只表达 Host Passphrase、设备
   Passphrase 或 Attach PIN 三种隐藏钱包进入方式。
 - `DeviceSessionAskPassphrase` 与 `DeviceSessionAskPin` 完成验证和钱包切换并返回 `Success`；
-  前者用 `on_device=true` 选择设备输入，或用
-  `on_device=false + passphrase` 提供 Host Passphrase。
+  前者通过必填 `on_device` 区分设备输入与 Host 输入。Host 输入同时携带非空 `passphrase`；
+  设备输入不携带明文。Attach-to-PIN 始终使用 `DeviceSessionAskPin(AttachToPin)`。
 - `DeviceSessionGet(session_id)` 承接原 `Initialize(session_id)` 的 Session 恢复语义，
   这不是 `PassphraseAck` 原有能力。
 - `ButtonRequest/ButtonAck` 不改名；它们从 V2 firmware 状态机中删除，设备页面由显式 Ask 命令
   打开，对 App 的阶段提示由 SDK 合成。
 
 ```text
-PassphraseAck(passphrase/on_device)      -> DeviceSessionAskPassphrase({ on_device, passphrase? }) -> Success -> DeviceSessionGet()
+PassphraseAck(passphrase)                -> DeviceSessionAskPassphrase({ on_device: false, passphrase }) -> Success -> DeviceSessionGet()
+PassphraseAck(on_device)                 -> DeviceSessionAskPassphrase({ on_device: true }) -> Success -> DeviceSessionGet()
 PassphraseAck(on_device_attach_pin)      -> DeviceSessionAskPin(AttachToPin) -> Success -> DeviceSessionGet()
 Initialize(session_id)                   -> DeviceSessionGet({ session_id })
 ```
@@ -117,8 +118,10 @@ App 的 Pro2 分支继续返回现有三种选择形状：
 
 SDK 将响应转换为 `DeviceSessionAskPassphrase` 或 `DeviceSessionAskPin(AttachToPin)`；Ask 只返回
 `Success`，之后用空参数 `DeviceSessionGet` 获取实际 Session，不发送 `PassphraseAck`。
-显式 `resume-hidden` 先通过带 `session_id` 的 `DeviceSessionGet` 尝试恢复。固件返回的实际钱包状态
-不匹配时，SDK 合成一次 `REQUEST_PASSPHRASE` 让用户重新进入目标钱包；最终仍不匹配才报安全错误。
+显式 `resume-hidden` 有缓存时先通过带 `session_id` 的 `DeviceSessionGet` 尝试恢复。没有缓存、
+句柄失效或固件返回的实际钱包状态不匹配时，SDK 合成一次 `REQUEST_PASSPHRASE` 让用户重新进入
+目标钱包；最终仍不匹配才报安全错误。`session_id` 只作为恢复提示，钱包身份以
+`deviceId + passphraseState` 校验结果为准。
 
 ### Protocol V2 当前时序
 
@@ -165,11 +168,9 @@ sequenceDiagram
   SDK->>FW: ProtocolInfoRequest(eventless_wallet_session=true)
   FW-->>SDK: ProtocolInfo
   SDK-->>App: REQUEST_PASSPHRASE（SDK 合成）
-  App->>SDK: RECEIVE_PASSPHRASE（Host / Device / Attach PIN）
+  App->>SDK: RECEIVE_PASSPHRASE（Host / Attach PIN）
   alt Host Passphrase
-    SDK->>FW: DeviceSessionAskPassphrase(on_device=false, passphrase)
-  else 设备输入 Passphrase
-    SDK->>FW: DeviceSessionAskPassphrase(on_device=true)
+    SDK->>FW: DeviceSessionAskPassphrase(passphrase)
   else Attach PIN
     SDK->>FW: DeviceSessionAskPin(AttachToPin)
   end
@@ -262,7 +263,7 @@ SDK 不合成交互 Event，也不发送文件分片进度 Event。
 
 - Pro2 禁止 `WordRequest/WordAck` 与 `EntropyRequest/EntropyAck`。
 - SDK 不得为兼容 App 而合成这些敏感数据请求。
-- `DevOnboardingStatus` 是事实来源。
+- `OnboardingStatus` 是事实来源。
 - SDK 可以发不含敏感信息的阶段通知，但 App 必须能通过查询恢复。
 
 ## Cancel 与 UI 生命周期
@@ -296,14 +297,17 @@ Cancel 必须绑定当前设备和 Transport source；断连时清理请求、UI
 ## hardware-js-sdk 实施清单
 
 - 增加并统一使用钱包 Session coordinator。
-- 标准钱包与隐藏钱包均可返回非空 `passphraseState`；钱包分类只使用 `walletType`，不得根据
-  `passphraseState` 是否为空推断钱包类型。
-- Host/设备 Passphrase 意图统一映射到显式 `on_device=false/true` 的
-  `DeviceSessionAskPassphrase`；Attach PIN 映射到 `DeviceSessionAskPin(AttachToPin)`；Ask 成功后
-  统一调用空参数 `DeviceSessionGet`。
+- 标准钱包公共响应固定返回 `passphraseState=null`；隐藏钱包返回非空 `passphraseState`。
+  钱包分类仍只使用 `walletType`，不得根据 `passphraseState` 是否为空反推底层协议。
+- Host Passphrase 映射到
+  `DeviceSessionAskPassphrase({ passphrase, on_device: false })`；设备端 Passphrase 映射到
+  `DeviceSessionAskPassphrase({ on_device: true })`；Attach PIN 映射到
+  `DeviceSessionAskPin(AttachToPin)`；Ask 成功后统一调用空参数 `DeviceSessionGet`。
 - Host Passphrase 先做 NFKD 规范化，并校验为 1–50 个 UTF-8 字节且不含 NUL。
 - `DeviceWalletSessionStore` 以 `deviceKey + passphraseState` 保存真实钱包映射，并为每台设备维护
   一个指向真实标准钱包记录的内部索引；该索引只由显式标准钱包意图读取。
+- Store 不实现 LRU 或固件容量镜像；Session 的创建、容量和淘汰由硬件管理，SDK 只在固件拒绝句柄
+  或钱包身份校验失败时清理对应记录。
 - Get 返回状态与业务预期不匹配时只恢复一次：标准钱包走 AskMain，隐藏钱包走统一钱包选择；
   第二次仍不匹配才抛出 `DeviceCheckPassphraseStateError`。
 - 复用公共 UI Event 层，不伪造 Transport protobuf Request。

@@ -4,6 +4,7 @@ import type {
   DeviceInfoGet,
   DeviceSEInfo,
   DeviceStatus,
+  ProtocolInfo,
   ProtocolV2DeviceInfo,
 } from '@onekeyfe/hd-transport';
 import type { DeviceCommands } from '../../device/DeviceCommands';
@@ -53,26 +54,53 @@ export const getProtocolV2SeState = (se?: DeviceSEInfo): ProtocolV2SeStateLabel 
 export const getProtocolV2SeType = (se?: DeviceSEInfo): string | null =>
   normalizeEnumValue(DeviceSeType, se?.type);
 
-export type ProtocolV2RuntimeMode = 'normal' | 'bootloader';
+export type ProtocolV2RuntimeMode = 'normal' | 'bootloader' | 'romloader';
 
 /**
- * TODO: Once firmware-pro2 exposes ProtocolInfo.build_fingerprint, parse the running
- * binary name and remove the temporary DeviceStatusGet-failure heuristic. romloader
- * is a separate recovery flow and is excluded until its contract is defined.
- *
- * The temporary contract has two states: DeviceStatusGet success means normal and
- * failure means bootloader. Do not infer mode from application/SE/romloader fields.
+ * Protocol V2 fingerprints use:
+ * <binary>__<version>__<commit>__<PROD|DEV>__<DEBUG|RELEASE>
  */
-export const getProtocolV2RuntimeMode = ({
-  deviceInfo: _deviceInfo,
-  deviceStatusAvailable,
-}: {
-  deviceInfo?: ProtocolV2DeviceInfo | null;
-  deviceStatusAvailable: boolean;
-}): ProtocolV2RuntimeMode => {
-  if (deviceStatusAvailable) return 'normal';
-  return 'bootloader';
+export type ProtocolV2BuildFingerprint = {
+  binary: 'application' | 'bootloader' | 'romloader';
+  version: string;
+  commit: string;
+  environment: 'PROD' | 'DEV';
+  buildType: 'DEBUG' | 'RELEASE';
 };
+
+export const parseProtocolV2BuildFingerprint = (
+  buildFingerprint: string | null | undefined
+): ProtocolV2BuildFingerprint | null => {
+  if (!buildFingerprint) return null;
+  const [binary, version, commit, environment, buildType, ...extra] = buildFingerprint.split('__');
+  if (
+    extra.length > 0 ||
+    (binary !== 'application' && binary !== 'bootloader' && binary !== 'romloader') ||
+    !version ||
+    !commit ||
+    (environment !== 'PROD' && environment !== 'DEV') ||
+    (buildType !== 'DEBUG' && buildType !== 'RELEASE')
+  ) {
+    return null;
+  }
+  return { binary, version, commit, environment, buildType };
+};
+
+export const getProtocolV2RuntimeMode = (
+  protocolInfo: ProtocolInfo
+): ProtocolV2RuntimeMode | undefined => {
+  const binary = parseProtocolV2BuildFingerprint(protocolInfo.build_fingerprint)?.binary;
+  if (binary === 'application') return 'normal';
+  return binary;
+};
+
+// MessageType_DeviceStatusGet in the Protocol V2 protobuf registry.
+export const PROTOCOL_V2_DEVICE_STATUS_GET_MESSAGE_TYPE = 60602;
+
+export const supportsProtocolV2Message = (
+  protocolInfo: ProtocolInfo,
+  messageType: number
+): boolean => protocolInfo.supported_messages.includes(messageType);
 
 export const PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST = {
   targets: {
@@ -130,6 +158,20 @@ export const PROTOCOL_V2_FULL_DEVICE_INFO_REQUEST = {
 
 export const PROTOCOL_V2_DEVICE_INFO_REQUEST = PROTOCOL_V2_FULL_DEVICE_INFO_REQUEST;
 export const PROTOCOL_V2_DEVICE_INFO_TIMEOUT_MS = 10 * 1000;
+
+export async function requestProtocolV2ProtocolInfo({
+  commands,
+  timeoutMs,
+}: {
+  commands: DeviceCommands;
+  timeoutMs?: number;
+}): Promise<ProtocolInfo> {
+  const response =
+    timeoutMs === undefined
+      ? await commands.typedCall('ProtocolInfoRequest', 'ProtocolInfo', {})
+      : await commands.typedCall('ProtocolInfoRequest', 'ProtocolInfo', {}, { timeoutMs });
+  return response.message;
+}
 
 export async function requestProtocolV2DeviceInfo({
   commands,

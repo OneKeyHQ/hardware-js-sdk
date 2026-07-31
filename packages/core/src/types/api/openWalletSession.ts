@@ -36,7 +36,7 @@ export type OpenWalletSessionPayload = OpenWalletSessionPayloadBase &
   (
     | {
         walletType: 'standard';
-        passphraseState: string | null;
+        passphraseState: null;
       }
     | {
         walletType: 'hidden';

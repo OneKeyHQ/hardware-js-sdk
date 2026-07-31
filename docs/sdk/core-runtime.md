@@ -23,11 +23,14 @@ flowchart TD
 
 ## 设备信息与 DeviceState
 
-V2 不支持传统 `GetFeatures`。Core 在初始化时发送默认范围的 `DeviceInfoGet`，并把结果映射进 Device 内唯一的 `DeviceState`。外部无需理解 `DeviceProfile` 或 V2 原始消息。
+V2 不支持传统 `GetFeatures`。Core 在初始化时发送默认范围的 `DeviceInfoGet`，再读取
+`ProtocolInfo` 判断当前运行的是 application、bootloader 还是 romloader，并把结果映射进
+Device 内唯一的 `DeviceState`。只有 application 且 `supported_messages` 声明支持时才读取
+`DeviceStatus`。外部无需理解 `DeviceProfile` 或 V2 原始消息。
 
 | 调用                                    | 语义                                                                     |
 | --------------------------------------- | ------------------------------------------------------------------------ |
-| 初始化 adapter                          | 请求 hw、fw、coprocessor 基础字段，并更新 Device 内唯一 DeviceState 缓存 |
+| 初始化 adapter                          | 请求基础设备信息与协议运行阶段；按能力读取实时状态，并更新唯一 DeviceState 缓存 |
 | `getDeviceState()`                      | 默认刷新运行状态并返回 V1/V2 统一的完整 `DeviceState` 快照               |
 | `getDeviceState({ scope: 'settings' })` | 刷新运行状态和设置                                                       |
 | `getDeviceState({ scope: 'firmware' })` | 刷新运行状态、身份、完整版本与校验信息                                   |
@@ -74,9 +77,17 @@ selector。
 
 ## 状态与 PIN 解锁
 
-- `DeviceInfoGet` 默认不请求 status target，也不会隐式补发 `DeviceStatusGet`。
+- `DeviceInfoGet` 默认不请求 status target；初始化流程在读取 `ProtocolInfo` 后独立决定是否发送
+  `DeviceStatusGet`。
 - 每次公共 `getDeviceState()` 读取都会在 normal 模式刷新 `DeviceStatus`，调用方不需要管理缓存刷新参数。
+- `build_fingerprint` 的 binary 段只用于识别 application、bootloader、romloader 运行阶段；
+  `supported_messages` 才是消息能力来源，不能用版本号、commit 或 PROD/DEV 信息推导能力。
 - bootloader / romloader 模式不会发送 `DeviceStatusGet`。
+- Core 内部使用互斥的 `isBootloader()` / `isRomloader()` 判断；兼容字段
+  `bootloaderMode` 只表示广义 loader，不能用于区分两种模式。romloader 固件升级直接使用当前
+  连接，不发送 `DeviceReboot(Bootloader)`。
+- `isRomloader()` 和上述直升行为仅适用于 Pro2 + Protocol V2。Pro Protocol V1 的历史
+  boardloader 保持原有流程，不与 romloader 互转。
 - 公共 `DeviceState` 与 `DEVICE.STATE` 不包含协议 raw 数据或钱包 `session_id`；两者只在 Core 内部用于 V1 兼容和会话恢复。
 - V2 PIN 解锁使用 `DeviceSessionAskPin -> Success`，随后刷新 `DeviceStatus`；需要钱包 Session 时再调用 `DeviceSessionGet`。
 - 受保护方法是否允许单次解锁后重试，由方法显式声明；Transport 不重放业务请求。
@@ -173,12 +184,12 @@ Core 先把公共钱包意图归一化，再映射到各协议：
 
 | `walletType` | `passphraseState` | 含义                             |
 | ------------ | ----------------- | -------------------------------- |
-| `standard`   | V2 非空；V1 可空  | 使用设备默认空 Passphrase 上下文 |
+| `standard`   | `null`            | 使用设备默认空 Passphrase 上下文 |
 | `hidden`     | 非空字符串        | 设备返回隐藏钱包标识             |
 
-Pro2 标准钱包和隐藏钱包都直接使用同一次硬件 `DeviceSession` 响应中的字段。Core 只执行协议字段名
-归一化，不从 Features、descriptor 或 Store 补造钱包标识；跨协议钱包类型只看 `walletType`，不能
-根据 `passphraseState` 是否为空推断。
+Pro2 标准钱包仍使用硬件 `DeviceSession` 中的 `btc_test_address` 建立内部索引，但不会把该内部
+指纹暴露给 App。隐藏钱包的公共 `passphraseState` 直接来自同一次硬件响应；Core 不从 Features、
+descriptor 或 Store 补造钱包标识。跨协议钱包类型只看 `walletType`。
 Pro2 需要解锁时，钱包类型以解锁完成并刷新后的设备状态为准，不使用解锁前的
 `passphraseProtection` 快照。
 
@@ -198,8 +209,9 @@ Pro2 需要解锁时，钱包类型以解锁完成并刷新后的设备状态为
 `openWalletSession({ mode: 'resume-hidden' })` 在 Protocol V1/V2 都只接收
 `deviceId + passphraseState`。Core 按该 key 从唯一 Store 读取内部 `sessionId`：
 V1 通过 `Initialize.session_id` 恢复，V2 通过 `DeviceSessionGet({ session_id })` 恢复。
-缓存不存在时 Core 返回 `HardwareErrorCode.WalletSessionInvalid`；固件拒绝缓存 Session
-时，Core 清理当前隐藏钱包缓存并透传规范化的固件错误，不会暗中切换钱包。
+V1 缓存不存在时返回 `HardwareErrorCode.WalletSessionInvalid`。V2 缓存不存在、固件拒绝缓存
+Session 或返回钱包指纹不匹配时，Core 清理对应句柄并在同一次公开调用中重新选择目标钱包；只有
+最终 `passphraseState` 与业务绑定一致才成功。
 `DeviceSessionGet` 成功时必须同时返回非空
 `session_id + btc_test_address`，否则 Core 将其视为不完整响应，而不是标准钱包。
 
@@ -255,16 +267,17 @@ App 不应按型号或 PID 自行选择协议，也不应直接发送
 `DeviceSessionAskPin/DeviceSessionAskPassphrase/DeviceSessionGet`。Core 会在完成设备响应探测后
 自动分流：
 
-| App 意图            | Pro V1 固件流程                         | Pro2 Protocol V2 固件流程                                     |
-| ------------------- | --------------------------------------- | ------------------------------------------------------------- |
-| 标准钱包            | 空 Passphrase 兼容流程                  | AskPin(Main) -> Success -> Get()，或 Get(标准 Session)        |
-| Passphrase 隐藏钱包 | `GetPassphraseState -> PassphraseState` | AskPassphrase({ on_device, passphrase? }) -> Success -> Get() |
-| Attach-to-PIN       | `GetPassphraseState -> PassphraseState` | AskPin(AttachToPin) -> Success -> Get()                       |
-| 恢复已选隐藏钱包    | Core 管理 V1 Session 复用               | `DeviceSessionGet({ session_id })`                            |
+| App 意图              | Pro V1 固件流程                         | Pro2 Protocol V2 固件流程                                           |
+| --------------------- | --------------------------------------- | ------------------------------------------------------------------- |
+| 标准钱包              | 空 Passphrase 兼容流程                  | AskPin(Main) -> Success -> Get()，或 Get(标准 Session)              |
+| Host Passphrase 钱包  | `GetPassphraseState -> PassphraseState` | AskPassphrase({ on_device: false, passphrase }) -> Success -> Get() |
+| 设备端 Passphrase 钱包 | `GetPassphraseState -> PassphraseState` | AskPassphrase({ on_device: true }) -> Success -> Get()              |
+| Attach-to-PIN         | `GetPassphraseState -> PassphraseState` | AskPin(AttachToPin) -> Success -> Get()                             |
+| 恢复已选隐藏钱包      | Core 管理 V1 Session 复用               | `DeviceSessionGet({ session_id })`                                  |
 
-Pro2 Protocol V2 支持软件输入：Core 将非空值放入
-`DeviceSessionAskPassphrase.passphrase`；选择设备输入时显式发送 `on_device: true`。Pro2 尚未发布，SDK 不兼容
-缺少该字段的开发阶段旧固件。
+Pro2 Protocol V2 的 `DeviceSessionAskPassphrase.on_device` 是必填字段。Host 输入必须同时携带
+非空 `passphrase` 和 `on_device: false`；设备输入只携带 `on_device: true`。Attach-to-PIN 不复用
+空 Passphrase 请求，始终使用 `DeviceSessionAskPin(AttachToPin)`。
 
 对 App 的最小回归检查是：
 

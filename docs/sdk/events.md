@@ -149,13 +149,13 @@ V2 不伪造硬件 `ButtonRequest/PinMatrixRequest/PassphraseRequest`。阻塞 E
 
 ## 必须回传的 UI 请求
 
-| UI 请求                                         | 协议/来源                   | 主要触发点                         | Core 等待的响应                                | 结果如何回到设备/流程                                            |
-| ----------------------------------------------- | --------------------------- | ---------------------------------- | ---------------------------------------------- | ---------------------------------------------------------------- |
-| `REQUEST_PIN`                                   | V1 硬件消息转换             | `PinMatrixRequest`                 | `RECEIVE_PIN`                                  | `PinMatrixAck` 或切换设备输入                                    |
-| `REQUEST_PASSPHRASE`                            | V1 硬件消息转换             | `PassphraseRequest`                | `RECEIVE_PASSPHRASE`                           | `PassphraseAck`                                                  |
-| `REQUEST_PASSPHRASE`                            | V2 WalletSessionCoordinator | 隐藏钱包首次选择或状态错配恢复     | `RECEIVE_PASSPHRASE`                           | 选择 Host/设备 Passphrase 或 Attach PIN；Ask 后由 Get 取 Session |
-| `REQUEST_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE`   | Core 流程生成               | 老 WebUSB 升级重启到 bootloader 后 | `SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE`   | 把重新授权的 `deviceId` 交回旧固件流程                           |
-| `REQUEST_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE` | Core 流程生成               | 老固件切换或重连阶段               | `SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE` | 把重新选择的 `deviceId` 交回旧固件流程                           |
+| UI 请求                                         | 协议/来源                   | 主要触发点                         | Core 等待的响应                                | 结果如何回到设备/流程                                       |
+| ----------------------------------------------- | --------------------------- | ---------------------------------- | ---------------------------------------------- | ----------------------------------------------------------- |
+| `REQUEST_PIN`                                   | V1 硬件消息转换             | `PinMatrixRequest`                 | `RECEIVE_PIN`                                  | `PinMatrixAck` 或切换设备输入                               |
+| `REQUEST_PASSPHRASE`                            | V1 硬件消息转换             | `PassphraseRequest`                | `RECEIVE_PASSPHRASE`                           | `PassphraseAck`                                             |
+| `REQUEST_PASSPHRASE`                            | V2 WalletSessionCoordinator | 隐藏钱包首次选择或状态错配恢复     | `RECEIVE_PASSPHRASE`                           | 选择 Host Passphrase 或 Attach PIN；Ask 后由 Get 取 Session |
+| `REQUEST_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE`   | Core 流程生成               | 老 WebUSB 升级重启到 bootloader 后 | `SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE`   | 把重新授权的 `deviceId` 交回旧固件流程                      |
+| `REQUEST_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE` | Core 流程生成               | 老固件切换或重连阶段               | `SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE` | 把重新选择的 `deviceId` 交回旧固件流程                      |
 
 两个 WebUSB 设备选择请求不是硬件协议消息，Protocol V2 的 `firmwareUpdateV4` 当前也不通过这两个 Event 处理 Pro2 重连。
 
@@ -242,16 +242,16 @@ V1 中，`attachPinOnDevice` 只有在设备的 `PassphraseRequest.exists_attach
 V2 中，SDK 根据 `DeviceStatus.attach_to_pin_enabled` 生成 `existsAttachPinUser`。
 首次选择使用 `reason='open-wallet'`；业务调用缺少本地 Session、需要用户重新确认原钱包时使用
 `reason='session-recovery'` 并携带 `expectedPassphraseState`，最终响应仍必须与该钱包标识一致。
-非空软件值映射为 `DeviceSessionAskPassphrase({ on_device: false, passphrase })`，
-`passphraseOnDevice` 映射为 `DeviceSessionAskPassphrase({ on_device: true })`；`on_device`
-必须显式存在，省略该字段会被固件拒绝。
+非空软件值映射为
+`DeviceSessionAskPassphrase({ passphrase, on_device: false })`；`passphraseOnDevice` 映射为
+`DeviceSessionAskPassphrase({ on_device: true })`。两种请求必须互斥，不能同时携带 Host
+Passphrase 与 `on_device: true`。
 Host 值在发送前执行 NFKD 规范化，并且规范化后必须为 1–50 个合法 UTF-8 字节、不得包含
 NUL 或孤立 UTF-16 surrogate；长度不能用 JavaScript `string.length` 代替。
 `REQUEST_PASSPHRASE`、`REQUEST_PASSPHRASE_ON_DEVICE` 以及对应 UI 响应都属于日志阻断事件，
 不得把明文输入、`passphraseState` 或 `expectedPassphraseState` 写入 SDK/Bridge 日志。
 `attachPinOnDevice` 映射为 `DeviceSessionAskPin(AttachToPin)`；Ask 成功后使用空参数
-`DeviceSessionGet` 读取当前实际 Session。Pro2 尚未发布，不保留开发阶段旧固件的
-`deviceOnly` 降级。
+`DeviceSessionGet` 读取当前实际 Session。
 
 ## 不需要回传的设备交互
 

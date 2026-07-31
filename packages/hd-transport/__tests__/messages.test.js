@@ -101,16 +101,21 @@ describe('messages', () => {
     expect(v2Messages.nested.MessageType.values).toMatchObject({
       MessageType_DeviceStatusGet: 60602,
       MessageType_DeviceStatus: 60603,
-      MessageType_DeviceSessionGet: 60606,
-      MessageType_DeviceSession: 60607,
-      MessageType_DeviceSessionAskPin: 60608,
-      MessageType_DeviceSessionAskPassphrase: 60609,
+      MessageType_DeviceSessionGet: 61200,
+      MessageType_DeviceSession: 61201,
+      MessageType_DeviceSessionAskPin: 61202,
+      MessageType_DeviceSessionAskPassphrase: 61203,
     });
     expect(v2Messages.nested.DeviceStatusGet).toEqual({ fields: {} });
     expect(v2Messages.nested.ProtocolInfoRequest.fields.eventless_wallet_session).toMatchObject({
       id: 1,
       type: 'bool',
       options: { default: false },
+    });
+    expect(v2Messages.nested.ProtocolInfo.fields).toMatchObject({
+      version: { id: 1, type: 'uint32', rule: 'required' },
+      build_fingerprint: { id: 2, type: 'string', rule: 'required' },
+      supported_messages: { id: 3, type: 'uint32', rule: 'repeated' },
     });
     expect(v2Messages.nested.DeviceSessionGet.fields.session_id).toMatchObject({
       id: 1,
@@ -147,6 +152,7 @@ describe('messages', () => {
           id: 1,
         },
         on_device: {
+          rule: 'required',
           type: 'bool',
           id: 2,
         },
@@ -163,52 +169,54 @@ describe('messages', () => {
     );
   });
 
-  test('Protocol V2 passphrase selection keeps the explicit input source on wire', () => {
+  test('Protocol V2 passphrase selection explicitly selects host or device input on wire', () => {
     const messages = parseConfigure(v2Messages);
     const { Message } = createMessageFromName(messages, 'DeviceSessionAskPassphrase');
 
-    const onDevice = Message.encode(Message.create({ on_device: true })).finish();
     const onHost = Message.encode(
-      Message.create({
-        passphrase: 'host hidden wallet',
-        on_device: false,
-      })
+      Message.create({ passphrase: 'host hidden wallet', on_device: false })
     ).finish();
+    const onDevice = Message.encode(Message.create({ on_device: true })).finish();
 
-    expect(Buffer.from(onDevice).toString('hex')).toBe('1001');
     expect(Buffer.from(onHost).toString('hex')).toBe(
       '0a12686f73742068696464656e2077616c6c65741000'
     );
+    expect(Buffer.from(onDevice).toString('hex')).toBe('1001');
     expect(Message.decode(onHost)).toMatchObject({
       passphrase: 'host hidden wallet',
       on_device: false,
     });
+    expect(Message.decode(onDevice)).toMatchObject({ on_device: true });
   });
 
   test('Protocol V2 onboarding status matches the current firmware-pro2 schema', () => {
-    expect(v2Messages.nested.DevOnboardingStep.values).toMatchObject({
-      DEV_ONBOARDING_STEP_UNKNOWN: 0,
-      DEV_ONBOARDING_STEP_CHECKING: 1,
-      DEV_ONBOARDING_STEP_PERSONALIZATION: 2,
-      DEV_ONBOARDING_STEP_PIN: 3,
-      DEV_ONBOARDING_STEP_SETUP: 4,
-      DEV_ONBOARDING_STEP_DONE: 5,
+    expect(v2Messages.nested.MessageType.values).toMatchObject({
+      MessageType_OnboardingStatusGet: 61600,
+      MessageType_OnboardingStatus: 61601,
     });
-    expect(v2Messages.nested.DevOnboardingPhase.values).toBeDefined();
-    expect(v2Messages.nested.DevOnboardingSetupKind.values).toBeDefined();
-    expect(v2Messages.nested.DevOnboardingSetupMethod.values).toBeDefined();
-    expect(v2Messages.nested.DevOnboardingSetupStatus.fields).toMatchObject({
-      kind: { id: 1, type: 'DevOnboardingSetupKind' },
-      method: { id: 2, type: 'DevOnboardingSetupMethod' },
+    expect(v2Messages.nested.OnboardingStep.values).toMatchObject({
+      ONBOARDING_STEP_UNKNOWN: 0,
+      ONBOARDING_STEP_CHECKING: 1,
+      ONBOARDING_STEP_PERSONALIZATION: 2,
+      ONBOARDING_STEP_PIN: 3,
+      ONBOARDING_STEP_SETUP: 4,
+      ONBOARDING_STEP_DONE: 5,
     });
-    expect(v2Messages.nested.DevOnboardingStatus.fields).toMatchObject({
-      step: { id: 1, type: 'DevOnboardingStep' },
-      phase: { id: 2, type: 'DevOnboardingPhase' },
-      setup: { id: 3, type: 'DevOnboardingSetupStatus' },
+    expect(v2Messages.nested.OnboardingPhase.values).toBeDefined();
+    expect(v2Messages.nested.OnboardingSetupKind.values).toBeDefined();
+    expect(v2Messages.nested.OnboardingSetupMethod.values).toBeDefined();
+    expect(v2Messages.nested.OnboardingSetupStatus.fields).toMatchObject({
+      kind: { id: 1, type: 'OnboardingSetupKind' },
+      method: { id: 2, type: 'OnboardingSetupMethod' },
+    });
+    expect(v2Messages.nested.OnboardingStatus.fields).toMatchObject({
+      step: { id: 1, type: 'OnboardingStep' },
+      phase: { id: 2, type: 'OnboardingPhase' },
+      setup: { id: 3, type: 'OnboardingSetupStatus' },
       pin_set: { id: 4, type: 'bool' },
       wallet_initialized: { id: 5, type: 'bool' },
     });
-    expect(v2Messages.nested).not.toHaveProperty('DevOnboardingStage');
+    expect(v2Messages.nested).not.toHaveProperty('DevOnboardingStatus');
   });
 
   test('Protocol V2 does not restore retired unlock or passphrase ids', () => {

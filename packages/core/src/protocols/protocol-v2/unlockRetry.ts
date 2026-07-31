@@ -1,7 +1,7 @@
 import { LoggerNames, getLogger } from '../../utils';
 import { isDeviceLockedError } from './lockedError';
 import { isProtocolV2UiEnabled, resolveProtocolV2UiInteraction } from './uiInteraction';
-import { restoreProtocolV2WalletSession } from './walletSession';
+import { refreshProtocolV2DeviceStatus, restoreProtocolV2WalletSession } from './walletSession';
 
 import type { BaseMethod } from '../../api/BaseMethod';
 import type { Device } from '../../device/Device';
@@ -46,8 +46,23 @@ export async function runMethodWithUnlockRetry(
   uiCoordinator?: UiInteractionCoordinator
 ) {
   const shouldEmitUi = isProtocolV2UiEnabled(method);
+  const isProtocolV2 = device.isProtocolV2();
+  const requiresFreshStatus =
+    isProtocolV2 &&
+    method.unlockPolicy === 'unlock-before-run' &&
+    !device.isBootloader?.() &&
+    !device.isRomloader?.();
+
+  if (requiresFreshStatus) {
+    await refreshProtocolV2DeviceStatus(device);
+  }
+
   const shouldUnlockBeforeRun =
-    device.isProtocolV2() && method.unlockPolicy !== 'none' && device.features?.unlocked === false;
+    isProtocolV2 &&
+    method.unlockPolicy !== 'none' &&
+    !device.isBootloader?.() &&
+    !device.isRomloader?.() &&
+    device.features?.unlocked === false;
 
   if (shouldUnlockBeforeRun) {
     if (shouldEmitUi) {
@@ -68,11 +83,7 @@ export async function runMethodWithUnlockRetry(
   try {
     return await method.run();
   } catch (error) {
-    if (
-      !device.isProtocolV2() ||
-      method.unlockPolicy !== 'retry-on-locked' ||
-      !isDeviceLockedError(error)
-    ) {
+    if (!isProtocolV2 || method.unlockPolicy !== 'retry-on-locked' || !isDeviceLockedError(error)) {
       throw error;
     }
 
