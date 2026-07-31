@@ -379,6 +379,7 @@ export type GetAddress = {
 // Address
 export type Address = {
   address: string;
+  mac?: string;
 };
 
 // GetOwnershipId
@@ -418,6 +419,14 @@ export type VerifyMessage = {
   coin_name?: string;
 };
 
+export type CoinJoinRequest = {
+  fee_rate: number;
+  no_fee_threshold: number;
+  min_registrable_amount: number;
+  mask_public_key: string;
+  signature: string;
+};
+
 // SignTx
 export type SignTx = {
   outputs_count: number;
@@ -432,6 +441,8 @@ export type SignTx = {
   branch_id?: number;
   amount_unit?: AmountUnit;
   decred_staking_ticket?: boolean;
+  serialize?: boolean;
+  coinjoin_request?: CoinJoinRequest;
 };
 
 export enum Enum_RequestType {
@@ -442,6 +453,7 @@ export enum Enum_RequestType {
   TXEXTRADATA = 4,
   TXORIGINPUT = 5,
   TXORIGOUTPUT = 6,
+  TXPAYMENTREQ = 7,
 }
 export type RequestType = keyof typeof Enum_RequestType;
 
@@ -486,6 +498,7 @@ type CommonTxInputType = {
   witness?: string; // used by EXTERNAL, depending on script_pubkey
   ownership_proof?: string; // used by EXTERNAL, depending on script_pubkey
   commitment_data?: string; // used by EXTERNAL, depending on ownership_proof
+  coinjoin_flags?: number; // Protocol V2 only (CoinJoin)
 };
 
 export type TxInputType =
@@ -688,12 +701,15 @@ export type OwnershipProof = {
 // AuthorizeCoinJoin
 export type AuthorizeCoinJoin = {
   coordinator: string;
-  max_total_fee: number;
+  max_total_fee?: number;
   fee_per_anonymity?: number;
   address_n: number[];
   coin_name?: string;
   script_type?: InputScriptType;
   amount_unit?: AmountUnit;
+  max_rounds?: number;
+  max_coordinator_fee_rate?: number;
+  max_fee_per_kvbyte?: number;
 };
 
 export type BIP32Address = {
@@ -1177,12 +1193,16 @@ export enum FailureType {
   Failure_WipeCodeMismatch = 13,
   Failure_InvalidSession = 14,
   Failure_FirmwareError = 99,
+  Failure_InvalidMessage = 1,
+  Failure_UndefinedError = 2,
+  Failure_UsageError = 3,
 }
 
 // Failure
 export type Failure = {
   code?: FailureType;
   message?: string;
+  subcode?: number;
 };
 
 export enum Enum_ButtonRequestType {
@@ -2328,6 +2348,9 @@ export enum Enum_BackupType {
   Bip39 = 0,
   Slip39_Basic = 1,
   Slip39_Advanced = 2,
+  Slip39_Single_Extendable = 3,
+  Slip39_Basic_Extendable = 4,
+  Slip39_Advanced_Extendable = 5,
 }
 export type BackupType = keyof typeof Enum_BackupType;
 
@@ -2336,7 +2359,7 @@ export enum Enum_SafetyCheckLevel {
   PromptAlways = 1,
   PromptTemporarily = 2,
 }
-export type SafetyCheckLevel = keyof typeof Enum_SafetyCheckLevel;
+export type SafetyCheckLevel = keyof typeof Enum_SafetyCheckLevel | Enum_SafetyCheckLevel;
 
 // Initialize
 export type Initialize = {
@@ -2487,6 +2510,19 @@ export type Features = {
   onekey_se04_state?: string | null;
   attach_to_pin_user?: boolean;
   unlocked_attach_pin?: boolean;
+  coprocessor_bt_name?: string;
+  coprocessor_version?: string;
+  coprocessor_bt_enable?: boolean;
+  romloader_version?: string;
+  onekey_romloader_version?: string;
+  onekey_romloader_hash?: string;
+  onekey_bootloader_version?: string;
+  onekey_bootloader_hash?: string;
+  onekey_bootloader_build_id?: string;
+  onekey_coprocessor_bt_name?: string;
+  onekey_coprocessor_version?: string;
+  onekey_coprocessor_build_id?: string;
+  onekey_coprocessor_hash?: string;
 };
 
 // OnekeyFeatures
@@ -2535,6 +2571,28 @@ export type OnekeyFeatures = {
   onekey_se02_boot_build_id?: string;
   onekey_se03_boot_build_id?: string;
   onekey_se04_boot_build_id?: string;
+  onekey_romloader_version?: string;
+  onekey_bootloader_version?: string;
+  onekey_romloader_hash?: string;
+  onekey_bootloader_hash?: string;
+  onekey_romloader_build_id?: string;
+  onekey_bootloader_build_id?: string;
+  onekey_coprocessor_bt_name?: string;
+  onekey_coprocessor_version?: string;
+  onekey_coprocessor_build_id?: string;
+  onekey_coprocessor_hash?: string;
+  onekey_se01_bootloader_version?: string;
+  onekey_se02_bootloader_version?: string;
+  onekey_se03_bootloader_version?: string;
+  onekey_se04_bootloader_version?: string;
+  onekey_se01_bootloader_hash?: string;
+  onekey_se02_bootloader_hash?: string;
+  onekey_se03_bootloader_hash?: string;
+  onekey_se04_bootloader_hash?: string;
+  onekey_se01_bootloader_build_id?: string;
+  onekey_se02_bootloader_build_id?: string;
+  onekey_se03_bootloader_build_id?: string;
+  onekey_se04_bootloader_build_id?: string;
 };
 
 // LockDevice
@@ -3033,7 +3091,7 @@ export type MoneroTransactionRsigData = {
 export type MoneroGetAddress = {
   address_n: number[];
   show_display?: boolean;
-  network_type?: number;
+  network_type?: number | MoneroNetworkType;
   account?: number;
   minor?: number;
   payment_id?: string;
@@ -3047,7 +3105,7 @@ export type MoneroAddress = {
 // MoneroGetWatchKey
 export type MoneroGetWatchKey = {
   address_n: number[];
-  network_type?: number;
+  network_type?: number | MoneroNetworkType;
 };
 
 // MoneroWatchKey
@@ -3078,7 +3136,7 @@ export type MoneroTransactionData = {
 export type MoneroTransactionInitRequest = {
   version?: number;
   address_n: number[];
-  network_type?: number;
+  network_type?: number | MoneroNetworkType;
   tsx_data?: MoneroTransactionData;
 };
 
@@ -3208,7 +3266,7 @@ export type MoneroKeyImageExportInitRequest = {
   num?: number;
   hash?: string;
   address_n: number[];
-  network_type?: number;
+  network_type?: number | MoneroNetworkType;
   subs: MoneroSubAddressIndicesList[];
 };
 
@@ -3250,7 +3308,7 @@ export type MoneroKeyImageSyncFinalAck = {
 // MoneroGetTxKeyRequest
 export type MoneroGetTxKeyRequest = {
   address_n: number[];
-  network_type?: number;
+  network_type?: number | MoneroNetworkType;
   salt1?: string;
   salt2?: string;
   tx_enc_keys?: string;
@@ -3269,7 +3327,7 @@ export type MoneroGetTxKeyAck = {
 // MoneroLiveRefreshStartRequest
 export type MoneroLiveRefreshStartRequest = {
   address_n: number[];
-  network_type?: number;
+  network_type?: number | MoneroNetworkType;
 };
 
 // MoneroLiveRefreshStartAck
@@ -4297,6 +4355,7 @@ export type TonSignedMessage = {
   signature?: string;
   signning_message?: string;
   init_data_length?: number;
+  signing_message?: string;
 };
 
 // TonSignProof
@@ -4491,6 +4550,729 @@ export enum CommandFlags {
   Factory_Only = 1,
 }
 
+// experimental_message
+export type experimental_message = {};
+
+// experimental_field
+export type experimental_field = {};
+
+export type TextMemo = {
+  text: string;
+};
+
+export type RefundMemo = {
+  address: string;
+  mac: string;
+};
+
+export type CoinPurchaseMemo = {
+  coin_type: number;
+  amount: UintType;
+  address: string;
+  mac: string;
+};
+
+export type PaymentRequestMemo = {
+  text_memo?: TextMemo;
+  refund_memo?: RefundMemo;
+  coin_purchase_memo?: CoinPurchaseMemo;
+};
+
+// TxAckPaymentRequest
+export type TxAckPaymentRequest = {
+  nonce?: string;
+  recipient_name: string;
+  memos?: PaymentRequestMemo[];
+  amount?: UintType;
+  signature: string;
+};
+
+// EthereumSignTypedDataQR
+export type EthereumSignTypedDataQR = {
+  address_n: number[];
+  json_data?: string;
+  chain_id?: number;
+  metamask_v4_compat?: boolean;
+  request_id?: string;
+};
+
+// SetBusy
+export type SetBusy = {
+  expiry_ms?: number;
+};
+
+// GetFirmwareHash
+export type GetFirmwareHash = {
+  challenge?: string;
+};
+
+// FirmwareHash
+export type FirmwareHash = {
+  hash: string;
+};
+
+// GetNonce
+export type GetNonce = {};
+
+// Nonce
+export type Nonce = {
+  nonce: string;
+};
+
+// WriteSEPrivateKey
+export type WriteSEPrivateKey = {
+  private_key: string;
+};
+
+// UnlockPath
+export type UnlockPath = {
+  address_n: number[];
+  mac?: string;
+};
+
+// UnlockedPathRequest
+export type UnlockedPathRequest = {
+  mac?: string;
+};
+
+export enum MoneroNetworkType {
+  MAINNET = 0,
+  TESTNET = 1,
+  STAGENET = 2,
+  FAKECHAIN = 3,
+}
+
+export enum UiAnimationType {
+  Unknown = 0,
+  Signing = 1,
+}
+
+export enum UiAnimationCommand {
+  CommandUnknown = 0,
+  Start = 1,
+  Stop = 2,
+  Refresh = 3,
+}
+
+// UiAnimationRequest
+export type UiAnimationRequest = {
+  command: UiAnimationCommand;
+  type?: UiAnimationType;
+};
+
+// ProtocolInfoRequest
+export type ProtocolInfoRequest = {
+  eventless_wallet_session?: boolean;
+};
+
+// ProtocolInfo
+export type ProtocolInfo = {
+  version: number;
+  build_fingerprint: string;
+  supported_messages: number[];
+};
+
+export enum DeviceErrorCode {
+  DeviceError_None = 0,
+  DeviceError_Busy = 1,
+  DeviceError_NotInitialized = 2,
+  DeviceError_ActionCancelled = 3,
+  DeviceError_PinAlreadyUsed = 4,
+  DeviceError_PersistFailed = 5,
+  DeviceError_SeError = 6,
+  DeviceError_InvalidLanguage = 7,
+  DeviceError_WallpaperNotUsable = 8,
+  DeviceError_DeviceLocked = 9,
+}
+
+export enum DeviceRebootType {
+  Normal = 0,
+  Romloader = 1,
+  Bootloader = 2,
+}
+
+// DeviceReboot
+export type DeviceReboot = {
+  reboot_type: DeviceRebootType;
+};
+
+// DeviceSettings
+export type DeviceSettings = {
+  bt_enable?: boolean;
+  language?: string;
+  wallpaper_path?: string;
+  brightness?: number;
+  animation_enable?: boolean;
+  tap_to_wake?: boolean;
+  haptic_feedback?: boolean;
+  device_name_display_enabled?: boolean;
+  airgap_mode?: boolean;
+  usb_lock_enable?: boolean;
+  random_keypad?: boolean;
+  passphrase_enable?: boolean;
+  fido_enabled?: boolean;
+  autolock_delay_ms?: number;
+  autoshutdown_delay_ms?: number;
+  label?: string;
+};
+
+// DeviceSettingsGet
+export type DeviceSettingsGet = {};
+
+// DeviceSettingsSet
+export type DeviceSettingsSet = {
+  settings: DeviceSettings;
+};
+
+export enum DeviceSettingsPage {
+  DeviceReset = 0,
+  DevicePinChange = 1,
+  DevicePassphrase = 2,
+  DeviceAirgap = 3,
+}
+
+// DeviceSettingsPageShow
+export type DeviceSettingsPageShow = {
+  page: DeviceSettingsPage;
+  field_name?: string;
+};
+
+// DeviceCertificate
+export type DeviceCertificate = {
+  cert_and_pubkey: string;
+  private_key?: string;
+};
+
+// DeviceCertificateWrite
+export type DeviceCertificateWrite = {
+  cert: DeviceCertificate;
+};
+
+// DeviceCertificateRead
+export type DeviceCertificateRead = {};
+
+// DeviceCertificateSignature
+export type DeviceCertificateSignature = {
+  data: string;
+};
+
+// DeviceCertificateSign
+export type DeviceCertificateSign = {
+  data: string;
+};
+
+// DeviceMiscUsbMscControl
+export type DeviceMiscUsbMscControl = {
+  enable: boolean;
+};
+
+export enum DeviceFactoryAck {
+  FACTORY_ACK_SUCCESS = 0,
+  FACTORY_ACK_FAIL = 1,
+}
+
+// DeviceFactoryInfoManufactureTime
+export type DeviceFactoryInfoManufactureTime = {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+};
+
+// DeviceFactoryInfo
+export type DeviceFactoryInfo = {
+  version?: number;
+  serial_number?: string;
+  burn_in_completed?: boolean;
+  factory_test_completed?: boolean;
+  manufacture_time?: DeviceFactoryInfoManufactureTime;
+};
+
+// DeviceFactoryInfoSet
+export type DeviceFactoryInfoSet = {
+  info: DeviceFactoryInfo;
+};
+
+// DeviceFactoryInfoGet
+export type DeviceFactoryInfoGet = {};
+
+// DeviceFactoryPermanentLock
+export type DeviceFactoryPermanentLock = {
+  check_a: string;
+  check_b: string;
+};
+
+// DeviceFactoryTest
+export type DeviceFactoryTest = {
+  burn_in_test: boolean;
+};
+
+export enum DeviceFirmwareTargetType {
+  FW_MGMT_TARGET_INVALID = 0,
+  FW_MGMT_TARGET_CRATE = 1,
+  FW_MGMT_TARGET_ROMLOADER = 2,
+  FW_MGMT_TARGET_BOOTLOADER = 3,
+  FW_MGMT_TARGET_APPLICATION_P1 = 4,
+  FW_MGMT_TARGET_APPLICATION_P2 = 5,
+  FW_MGMT_TARGET_COPROCESSOR = 6,
+  FW_MGMT_TARGET_SE01 = 7,
+  FW_MGMT_TARGET_SE02 = 8,
+  FW_MGMT_TARGET_SE03 = 9,
+  FW_MGMT_TARGET_SE04 = 10,
+}
+
+export enum DeviceFirmwareUpdateTaskStatus {
+  FW_MGMT_UPDATER_TASK_STATUS_PENDING = 0,
+  FW_MGMT_UPDATER_TASK_STATUS_IN_PROGRESS = 1,
+  FW_MGMT_UPDATER_TASK_STATUS_FINISHED = 2,
+  FW_MGMT_UPDATER_TASK_STATUS_FAILED_FILE_NOT_FOUND = 3,
+  FW_MGMT_UPDATER_TASK_STATUS_FAILED_FILE_READ = 4,
+  FW_MGMT_UPDATER_TASK_STATUS_FAILED_FILE_WRITE = 5,
+  FW_MGMT_UPDATER_TASK_STATUS_FAILED_VERIFY = 6,
+  FW_MGMT_UPDATER_TASK_STATUS_FAILED_INSTALL = 7,
+  FW_MGMT_UPDATER_TASK_STATUS_FAILED_ABORT = 8,
+  FW_MGMT_UPDATER_TASK_STATUS_FAILED_BUSY = 9,
+  FW_MGMT_UPDATER_TASK_STATUS_FAILED_ENTRY_OUT_OF_BOUNDS = 10,
+}
+
+// DeviceFirmwareTarget
+export type DeviceFirmwareTarget = {
+  target_id: DeviceFirmwareTargetType;
+  path: string;
+};
+
+// DeviceFirmwareUpdateRequest
+export type DeviceFirmwareUpdateRequest = {
+  targets: DeviceFirmwareTarget[];
+};
+
+// DeviceFirmwareUpdateRecord
+export type DeviceFirmwareUpdateRecord = {
+  target_id: DeviceFirmwareTargetType;
+  status?: DeviceFirmwareUpdateTaskStatus;
+  payload_version?: number;
+  path?: string;
+};
+
+// DeviceFirmwareUpdateRecordFields
+export type DeviceFirmwareUpdateRecordFields = {
+  status?: boolean;
+  payload_version?: boolean;
+  path?: boolean;
+};
+
+// DeviceFirmwareUpdateStatusGet
+export type DeviceFirmwareUpdateStatusGet = {
+  fields?: DeviceFirmwareUpdateRecordFields;
+};
+
+// DeviceFirmwareUpdateStatus
+export type DeviceFirmwareUpdateStatus = {
+  records: DeviceFirmwareUpdateRecord[];
+};
+
+export enum DeviceType {
+  CLASSIC1 = 0,
+  CLASSIC1S = 1,
+  MINI = 2,
+  TOUCH = 3,
+  PRO = 5,
+  CLASSIC1S_PURE = 6,
+  PRO2 = 7,
+  NEO = 8,
+}
+
+export enum DeviceSeType {
+  THD89 = 0,
+  SE608A = 1,
+}
+
+export enum DeviceSEState {
+  BOOT = 0,
+  APP_FACTORY = 51,
+  APP = 85,
+}
+
+// DeviceFirmwareImageInfo
+export type DeviceFirmwareImageInfo = {
+  version?: string;
+  build_id?: string;
+  hash?: string;
+};
+
+// DeviceHardwareInfo
+export type DeviceHardwareInfo = {
+  Device_type?: DeviceType;
+  serial_no?: string;
+  hardware_version?: string;
+  hardware_version_raw_adc?: number;
+};
+
+// DeviceMainMcuInfo
+export type DeviceMainMcuInfo = {
+  romloader?: DeviceFirmwareImageInfo;
+  bootloader?: DeviceFirmwareImageInfo;
+  application?: DeviceFirmwareImageInfo;
+  application_data?: DeviceFirmwareImageInfo;
+};
+
+// DeviceCoprocessorInfo
+export type DeviceCoprocessorInfo = {
+  bootloader?: DeviceFirmwareImageInfo;
+  application?: DeviceFirmwareImageInfo;
+  bt_adv_name?: string;
+  bt_mac?: string;
+};
+
+// DeviceSEInfo
+export type DeviceSEInfo = {
+  bootloader?: DeviceFirmwareImageInfo;
+  application?: DeviceFirmwareImageInfo;
+  type?: DeviceSeType;
+  state?: DeviceSEState;
+};
+
+// DeviceInfoTargets
+export type DeviceInfoTargets = {
+  hw?: boolean;
+  fw?: boolean;
+  coprocessor?: boolean;
+  se1?: boolean;
+  se2?: boolean;
+  se3?: boolean;
+  se4?: boolean;
+};
+
+// DeviceInfoTypes
+export type DeviceInfoTypes = {
+  version?: boolean;
+  build_id?: boolean;
+  hash?: boolean;
+  specific?: boolean;
+};
+
+// DeviceInfoGet
+export type DeviceInfoGet = {
+  targets?: DeviceInfoTargets;
+  types?: DeviceInfoTypes;
+};
+
+// ProtocolV2DeviceInfo
+export type ProtocolV2DeviceInfo = {
+  protocol_version: number;
+  hw?: DeviceHardwareInfo;
+  fw?: DeviceMainMcuInfo;
+  coprocessor?: DeviceCoprocessorInfo;
+  se1?: DeviceSEInfo;
+  se2?: DeviceSEInfo;
+  se3?: DeviceSEInfo;
+  se4?: DeviceSEInfo;
+};
+
+export enum DeviceSessionErrorCode {
+  DeviceSessionError_None = 0,
+  DeviceSessionError_UserCancelled = 1,
+  DeviceSessionError_InvalidSession = 2,
+  DeviceSessionError_AttachPinUnavailable = 3,
+  DeviceSessionError_PassphraseDisabled = 4,
+  DeviceSessionError_Busy = 5,
+}
+
+// DeviceSessionGet
+export type DeviceSessionGet = {
+  session_id?: string;
+};
+
+// DeviceSession
+export type DeviceSession = {
+  session_id?: string;
+  btc_test_address?: string;
+};
+
+export enum DeviceSessionPinType {
+  Any = 1,
+  Main = 2,
+  AttachToPin = 3,
+}
+
+// DeviceSessionAskPin
+export type DeviceSessionAskPin = {
+  type?: DeviceSessionPinType;
+};
+
+// DeviceSessionAskPassphrase
+export type DeviceSessionAskPassphrase = {
+  passphrase?: string;
+  on_device: boolean;
+};
+
+export enum DeviceSessionAskPin_FailureSubCodes {
+  UserCancel = 1,
+}
+
+// DeviceStatus
+export type DeviceStatus = {
+  device_id?: string;
+  unlocked?: boolean;
+  init_states?: boolean;
+  backup_required?: boolean;
+  passphrase_enabled?: boolean;
+  attach_to_pin_enabled?: boolean;
+  unlocked_by_attach_to_pin?: boolean;
+};
+
+// DeviceStatusGet
+export type DeviceStatusGet = {};
+
+// FilesystemPermissionFix
+export type FilesystemPermissionFix = {};
+
+// FilesystemPathInfo
+export type FilesystemPathInfo = {
+  exist: boolean;
+  size: number;
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+  readonly: boolean;
+  hidden: boolean;
+  system: boolean;
+  archive: boolean;
+  directory: boolean;
+};
+
+// FilesystemPathInfoQuery
+export type FilesystemPathInfoQuery = {
+  path: string;
+};
+
+// FilesystemFile
+export type FilesystemFile = {
+  path: string;
+  offset: number;
+  total_size: number;
+  data?: Buffer | ArrayBuffer | Uint8Array | string;
+  data_hash?: number;
+  processed_byte?: number;
+};
+
+// FilesystemFileRead
+export type FilesystemFileRead = {
+  file: FilesystemFile;
+  chunk_len?: number;
+  ui_percentage?: number;
+};
+
+// FilesystemFileWrite
+export type FilesystemFileWrite = {
+  file: FilesystemFile;
+  overwrite: boolean;
+  append: boolean;
+  ui_percentage?: number;
+};
+
+// FilesystemFileDelete
+export type FilesystemFileDelete = {
+  path: string;
+};
+
+// FilesystemDir
+export type FilesystemDir = {
+  path: string;
+  child_dirs?: string;
+  child_files?: string;
+};
+
+// FilesystemDirList
+export type FilesystemDirList = {
+  path: string;
+  depth?: number;
+};
+
+// FilesystemDirMake
+export type FilesystemDirMake = {
+  path: string;
+};
+
+// FilesystemDirRemove
+export type FilesystemDirRemove = {
+  path: string;
+};
+
+// FilesystemFormat
+export type FilesystemFormat = {
+  data: boolean;
+  user: boolean;
+};
+
+// InternalMyAddressRequest
+export type InternalMyAddressRequest = {
+  coin_type: number;
+  chain_id: number;
+  account_index: number;
+  derive_type: number;
+};
+
+export enum OnboardingStep {
+  ONBOARDING_STEP_UNKNOWN = 0,
+  ONBOARDING_STEP_CHECKING = 1,
+  ONBOARDING_STEP_PERSONALIZATION = 2,
+  ONBOARDING_STEP_PIN = 3,
+  ONBOARDING_STEP_SETUP = 4,
+  ONBOARDING_STEP_DONE = 5,
+}
+
+export enum OnboardingPhase {
+  ONBOARDING_PHASE_UNKNOWN = 0,
+  ONBOARDING_PHASE_SAFETY_CHECK = 1,
+  ONBOARDING_PHASE_PIN_SETUP = 2,
+  ONBOARDING_PHASE_FINGERPRINT_SETUP = 3,
+  ONBOARDING_PHASE_SETUP_CHOICE = 4,
+  ONBOARDING_PHASE_WALLET_CREATE_START = 5,
+  ONBOARDING_PHASE_RECOVERY_PHRASE_VIEW = 6,
+  ONBOARDING_PHASE_RECOVERY_PHRASE_CONFIRM = 7,
+  ONBOARDING_PHASE_RESTORE_METHOD_CHOICE = 8,
+  ONBOARDING_PHASE_RECOVERY_PHRASE_RESTORE = 9,
+  ONBOARDING_PHASE_SEEDCARD_RESTORE = 10,
+  ONBOARDING_PHASE_WALLET_READY = 11,
+  ONBOARDING_PHASE_SEEDCARD_BACKUP_PROMPT = 12,
+  ONBOARDING_PHASE_SEEDCARD_BACKUP = 13,
+}
+
+export enum OnboardingSetupKind {
+  ONBOARDING_SETUP_KIND_UNKNOWN = 0,
+  ONBOARDING_SETUP_KIND_CHOICE = 1,
+  ONBOARDING_SETUP_KIND_CREATE = 2,
+  ONBOARDING_SETUP_KIND_RESTORE = 3,
+}
+
+export enum OnboardingSetupMethod {
+  ONBOARDING_SETUP_METHOD_UNKNOWN = 0,
+  ONBOARDING_SETUP_METHOD_RECOVERY_PHRASE = 1,
+  ONBOARDING_SETUP_METHOD_SEEDCARD = 2,
+}
+
+// OnboardingSetupStatus
+export type OnboardingSetupStatus = {
+  kind?: OnboardingSetupKind;
+  method?: OnboardingSetupMethod;
+};
+
+// OnboardingStatusGet
+export type OnboardingStatusGet = {};
+
+// OnboardingStatus
+export type OnboardingStatus = {
+  step?: OnboardingStep;
+  phase?: OnboardingPhase;
+  setup?: OnboardingSetupStatus;
+  pin_set?: boolean;
+  wallet_initialized?: boolean;
+};
+
+// PortfolioUpdate
+export type PortfolioUpdate = {};
+
+// ViewAmount
+export type ViewAmount = {
+  is_unlimited: boolean;
+  num: string;
+};
+
+// ViewDetail
+export type ViewDetail = {
+  key: number;
+  value: string;
+  is_overview: boolean;
+  has_icon: boolean;
+};
+
+export enum ViewTipType {
+  Default = 0,
+  Highlight = 1,
+  Recommend = 2,
+  Warning = 3,
+  Danger = 4,
+}
+
+// ViewTip
+export type ViewTip = {
+  type: ViewTipType;
+  text: string;
+};
+
+// ViewRawData
+export type ViewRawData = {
+  initial_data: string;
+  placeholder: number;
+};
+
+export enum ViewSignLayout {
+  LayoutDefault = 0,
+  LayoutSafeTxCreate = 1,
+  LayoutFinalConfirm = 2,
+  Layout7702 = 3,
+  LayoutFlat = 4,
+  LayoutEthApprove = 5,
+}
+
+// ViewSignPage
+export type ViewSignPage = {
+  title: string;
+  amount?: UintType;
+  general: ViewDetail[];
+  tip?: ViewTip;
+  raw_data?: ViewRawData;
+  slide_to_confirm?: boolean;
+  layout?: ViewSignLayout;
+};
+
+// ViewVerifyPage
+export type ViewVerifyPage = {
+  title: string;
+  address: string;
+  path: string;
+  network?: string;
+  derive_type?: string;
+  value_key?: number;
+};
+
+export enum ProtocolV2FailureType {
+  Failure_InvalidMessage = 1,
+  Failure_UndefinedError = 2,
+  Failure_UsageError = 3,
+  Failure_DataError = 4,
+  Failure_ProcessError = 5,
+}
+
+export enum Enum_ProtocolV2Capability {
+  Capability_Bitcoin = 1,
+  Capability_Bitcoin_like = 2,
+  Capability_Binance = 3,
+  Capability_Cardano = 4,
+  Capability_Crypto = 5,
+  Capability_EOS = 6,
+  Capability_Ethereum = 7,
+  Capability_Lisk = 8,
+  Capability_Monero = 9,
+  Capability_NEM = 10,
+  Capability_Ripple = 11,
+  Capability_Stellar = 12,
+  Capability_Tezos = 13,
+  Capability_U2F = 14,
+  Capability_Shamir = 15,
+  Capability_ShamirGroups = 16,
+  Capability_PassphraseEntry = 17,
+  Capability_AttachToPin = 18,
+  Capability_EthereumTypedData = 1000,
+}
+export type ProtocolV2Capability = keyof typeof Enum_ProtocolV2Capability;
+
 // custom connect definitions
 export type MessageType = {
   AlephiumGetAddress: AlephiumGetAddress;
@@ -4547,6 +5329,7 @@ export type MessageType = {
   SignMessage: SignMessage;
   MessageSignature: MessageSignature;
   VerifyMessage: VerifyMessage;
+  CoinJoinRequest: CoinJoinRequest;
   SignTx: SignTx;
   TxRequestDetailsType: TxRequestDetailsType;
   TxRequestSerializedType: TxRequestSerializedType;
@@ -4824,7 +5607,7 @@ export type MessageType = {
   BixinBackupDeviceAck: BixinBackupDeviceAck;
   DeviceInfoSettings: DeviceInfoSettings;
   GetDeviceInfo: GetDeviceInfo;
-  DeviceInfo: DeviceInfo;
+  DeviceInfo: DeviceInfo | ProtocolV2DeviceInfo;
   ReadSEPublicKey: ReadSEPublicKey;
   SEPublicKey: SEPublicKey;
   WriteSEPublicCert: WriteSEPublicCert;
@@ -5056,6 +5839,85 @@ export type MessageType = {
   TronSignMessage: TronSignMessage;
   TronMessageSignature: TronMessageSignature;
   facotry: facotry;
+  experimental_message: experimental_message;
+  experimental_field: experimental_field;
+  TextMemo: TextMemo;
+  RefundMemo: RefundMemo;
+  CoinPurchaseMemo: CoinPurchaseMemo;
+  PaymentRequestMemo: PaymentRequestMemo;
+  TxAckPaymentRequest: TxAckPaymentRequest;
+  EthereumSignTypedDataQR: EthereumSignTypedDataQR;
+  SetBusy: SetBusy;
+  GetFirmwareHash: GetFirmwareHash;
+  FirmwareHash: FirmwareHash;
+  GetNonce: GetNonce;
+  Nonce: Nonce;
+  WriteSEPrivateKey: WriteSEPrivateKey;
+  UnlockPath: UnlockPath;
+  UnlockedPathRequest: UnlockedPathRequest;
+  UiAnimationRequest: UiAnimationRequest;
+  ProtocolInfoRequest: ProtocolInfoRequest;
+  ProtocolInfo: ProtocolInfo;
+  DeviceReboot: DeviceReboot;
+  DeviceSettings: DeviceSettings;
+  DeviceSettingsGet: DeviceSettingsGet;
+  DeviceSettingsSet: DeviceSettingsSet;
+  DeviceSettingsPageShow: DeviceSettingsPageShow;
+  DeviceCertificate: DeviceCertificate;
+  DeviceCertificateWrite: DeviceCertificateWrite;
+  DeviceCertificateRead: DeviceCertificateRead;
+  DeviceCertificateSignature: DeviceCertificateSignature;
+  DeviceCertificateSign: DeviceCertificateSign;
+  DeviceMiscUsbMscControl: DeviceMiscUsbMscControl;
+  DeviceFactoryInfoManufactureTime: DeviceFactoryInfoManufactureTime;
+  DeviceFactoryInfo: DeviceFactoryInfo;
+  DeviceFactoryInfoSet: DeviceFactoryInfoSet;
+  DeviceFactoryInfoGet: DeviceFactoryInfoGet;
+  DeviceFactoryPermanentLock: DeviceFactoryPermanentLock;
+  DeviceFactoryTest: DeviceFactoryTest;
+  DeviceFirmwareTarget: DeviceFirmwareTarget;
+  DeviceFirmwareUpdateRequest: DeviceFirmwareUpdateRequest;
+  DeviceFirmwareUpdateRecord: DeviceFirmwareUpdateRecord;
+  DeviceFirmwareUpdateRecordFields: DeviceFirmwareUpdateRecordFields;
+  DeviceFirmwareUpdateStatusGet: DeviceFirmwareUpdateStatusGet;
+  DeviceFirmwareUpdateStatus: DeviceFirmwareUpdateStatus;
+  DeviceFirmwareImageInfo: DeviceFirmwareImageInfo;
+  DeviceHardwareInfo: DeviceHardwareInfo;
+  DeviceMainMcuInfo: DeviceMainMcuInfo;
+  DeviceCoprocessorInfo: DeviceCoprocessorInfo;
+  DeviceSEInfo: DeviceSEInfo;
+  DeviceInfoTargets: DeviceInfoTargets;
+  DeviceInfoTypes: DeviceInfoTypes;
+  DeviceInfoGet: DeviceInfoGet;
+  DeviceSessionGet: DeviceSessionGet;
+  DeviceSession: DeviceSession;
+  DeviceSessionAskPin: DeviceSessionAskPin;
+  DeviceSessionAskPassphrase: DeviceSessionAskPassphrase;
+  DeviceStatus: DeviceStatus;
+  DeviceStatusGet: DeviceStatusGet;
+  FilesystemPermissionFix: FilesystemPermissionFix;
+  FilesystemPathInfo: FilesystemPathInfo;
+  FilesystemPathInfoQuery: FilesystemPathInfoQuery;
+  FilesystemFile: FilesystemFile;
+  FilesystemFileRead: FilesystemFileRead;
+  FilesystemFileWrite: FilesystemFileWrite;
+  FilesystemFileDelete: FilesystemFileDelete;
+  FilesystemDir: FilesystemDir;
+  FilesystemDirList: FilesystemDirList;
+  FilesystemDirMake: FilesystemDirMake;
+  FilesystemDirRemove: FilesystemDirRemove;
+  FilesystemFormat: FilesystemFormat;
+  InternalMyAddressRequest: InternalMyAddressRequest;
+  OnboardingSetupStatus: OnboardingSetupStatus;
+  OnboardingStatusGet: OnboardingStatusGet;
+  OnboardingStatus: OnboardingStatus;
+  PortfolioUpdate: PortfolioUpdate;
+  ViewAmount: ViewAmount;
+  ViewDetail: ViewDetail;
+  ViewTip: ViewTip;
+  ViewRawData: ViewRawData;
+  ViewSignPage: ViewSignPage;
+  ViewVerifyPage: ViewVerifyPage;
 };
 
 export type MessageKey = keyof MessageType;
@@ -5065,8 +5927,19 @@ export type MessageResponse<T extends MessageKey> = {
   message: MessageType[T];
 };
 
-export type TypedCall = <T extends MessageKey, R extends MessageKey>(
-  type: T,
-  resType: R,
-  message?: MessageType[T]
-) => Promise<MessageResponse<R>>;
+export type MessageResponseMap = {
+  [K in MessageKey]: MessageResponse<K>;
+};
+
+export type TypedCall = {
+  <T extends MessageKey, R extends readonly MessageKey[]>(
+    type: T,
+    resType: R,
+    message?: MessageType[T]
+  ): Promise<MessageResponseMap[R[number]]>;
+  <T extends MessageKey, R extends MessageKey>(
+    type: T,
+    resType: R,
+    message?: MessageType[T]
+  ): Promise<MessageResponse<R>>;
+};

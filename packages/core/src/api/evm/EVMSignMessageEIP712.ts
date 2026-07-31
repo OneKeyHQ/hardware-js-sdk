@@ -5,6 +5,7 @@ import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
 
 import type { EthereumSignMessageEIP712 } from '@onekeyfe/hd-transport';
+import type { DeviceFirmwareRange } from '../../types';
 
 /**
  * @deprecated Use EVMSignTypedData instead.
@@ -32,7 +33,7 @@ export default class EVMSignMessageEIP712 extends BaseMethod<EthereumSignMessage
     };
   }
 
-  getVersionRange() {
+  getVersionRange(): DeviceFirmwareRange {
     return {
       model_mini: {
         min: '2.1.9',
@@ -44,6 +45,8 @@ export default class EVMSignMessageEIP712 extends BaseMethod<EthereumSignMessage
   }
 
   async run() {
+    this.assertProtocolSupported(this.device.getProtocol(), this.device.getCurrentFirmwareType());
+
     const res = await this.device.commands.typedCall(
       'EthereumSignMessageEIP712',
       'EthereumMessageSignature',

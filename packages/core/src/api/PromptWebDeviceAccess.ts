@@ -51,9 +51,14 @@ export default class PromptWebDeviceAccess extends BaseMethod {
         }
 
         if (isWebUsbEnv) {
+          const usbDevice = device as USBDevice;
+          const path = usbDevice.serialNumber;
+          if (!path) {
+            throw ERRORS.TypedError(HardwareErrorCode.WebDevicePromptAccessError);
+          }
           devicesDescriptor = [
             {
-              path: (device as USBDevice).serialNumber ?? '',
+              path,
               device,
               debug: true,
             },

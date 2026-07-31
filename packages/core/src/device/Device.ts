@@ -1,56 +1,90 @@
 import EventEmitter from 'events';
 import semver from 'semver';
-import { Enum_Capability } from '@onekeyfe/hd-transport';
+import { DeviceRebootType, DeviceSessionPinType, Enum_Capability } from '@onekeyfe/hd-transport';
 import {
   EDeviceType,
+  EFirmwareType,
   ERRORS,
   ERROR_CODES_REQUIRE_DISCONNECT,
   ERROR_CODES_REQUIRE_RELEASE,
   HardwareError,
   HardwareErrorCode,
   createDeferred,
+  createDeviceNotSupportMethodError,
 } from '@onekeyfe/hd-shared';
 
-import {
-  LoggerNames,
-  getDeviceBLEFirmwareVersion,
-  getDeviceBleName,
-  getDeviceFirmwareVersion,
-  getDeviceLabel,
-  getDeviceType,
-  getDeviceUUID,
-  getLogger,
-  getMethodVersionRange,
-} from '../utils';
+import { LoggerNames, getLogger } from '../utils';
 import {
   fixFeaturesFirmwareVersion,
   getPassphraseStateWithRefreshDeviceInfo,
 } from '../utils/deviceFeaturesUtils';
+import { parseDeviceVersion } from '../utils/deviceVersionUtils';
 import { generateInstanceId } from '../utils/tracing';
 // eslint-disable-next-line import/no-cycle
 import { DeviceCommands } from './DeviceCommands';
+import { mergeDeviceFeaturesPatch } from './DeviceFeaturesState';
+import {
+  mapDeviceSettingsToState,
+  mapFeaturesToState,
+  mapProtocolV1OnekeyFeaturesToState,
+  mapProtocolV2DeviceInfoToState,
+  mapProtocolV2DeviceStatusToState,
+} from './DeviceStateMapper';
+import { projectFeatures } from './DeviceStateProjector';
+import { DeviceStateStore, createPublicDeviceState } from './DeviceStateStore';
+import { cloneDeviceState } from './cloneDeviceState';
+import { deviceWalletSessionStore } from './DeviceWalletSessionStore';
 import {
   type DeviceFirmwareRange,
+  DeviceModelToTypes,
+  type DeviceStateEvent,
+  type DeviceStatePatch,
+  type DeviceStateUpdateSource,
+  DeviceTypeToModels,
   type Device as DeviceTyped,
   EOneKeyDeviceMode,
   type Features,
+  type IDeviceModel,
+  type IDeviceType,
+  type IVersionRange,
+  type SupportFeatureType,
   type UnavailableCapabilities,
 } from '../types';
 import { DEVICE, UI_REQUEST } from '../events';
 import { DataManager } from '../data-manager';
 import TransportManager from '../data-manager/TransportManager';
 import { toHardened } from '../api/helpers/pathUtils';
-import { existCapability } from '../utils/capabilitieUtils';
+import {
+  PROTOCOL_V2_DEVICE_STATUS_GET_MESSAGE_TYPE,
+  PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST,
+  PROTOCOL_V2_FULL_DEVICE_INFO_REQUEST,
+  PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST,
+  type ProtocolV2RuntimeMode,
+  getProtocolV2RuntimeMode,
+  requestProtocolV2DeviceInfo,
+  requestProtocolV2DeviceStatus,
+  requestProtocolV2ProtocolInfo,
+  supportsProtocolV2Message,
+} from '../protocols/protocol-v2/features';
+import { buildProtocolV1FeaturesPayload } from '../deviceProfile';
+import { resolveProtocolV2DeviceIdentity } from '../deviceProfile/protocolV2DeviceIdentity';
 
 import type { PROTO } from '../constants';
+import type { DeviceStateReadOptions } from '../types/api/getDeviceState';
 import type {
   DeviceButtonRequestPayload,
   DeviceFeaturesPayload,
   PassphraseRequestPayload,
 } from '../events';
 import type { PassphrasePromptResponse } from './DeviceCommands';
-import type { Deferred } from '@onekeyfe/hd-shared';
-import type { OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
+import type { Deferred, HardwareConnectProtocol } from '@onekeyfe/hd-shared';
+import type {
+  OneKeyDeviceInfo as DeviceDescriptor,
+  DeviceStatus,
+  ProtocolInfo,
+  ProtocolV2DeviceInfo,
+  Success,
+} from '@onekeyfe/hd-transport';
 import type DeviceConnector from './DeviceConnector';
 
 export type InitOptions = {
@@ -58,6 +92,10 @@ export type InitOptions = {
   deviceId?: string;
   passphraseState?: string;
   deriveCardano?: boolean;
+  connectProtocol?: HardwareConnectProtocol;
+  protocolV2DeviceInfoTimeoutMs?: number;
+  /** Refresh Protocol V2 runtime state before returning discovery results. */
+  refreshRuntimeState?: boolean;
 };
 
 export type RunOptions = {
@@ -72,11 +110,33 @@ const parseRunOptions = (options?: RunOptions): RunOptions => {
 
 const Log = getLogger(LoggerNames.Device);
 
+const isProtocolV2DeviceStatusUnsupportedError = (error: unknown) => {
+  if (error instanceof HardwareError) {
+    if (error.errorCode === HardwareErrorCode.DeviceNotSupportMethod) {
+      return true;
+    }
+    if (error.params?.failureCode === 'Failure_UnexpectedMessage') {
+      return true;
+    }
+  }
+
+  const message =
+    error instanceof Error
+      ? error.message
+      : String((error as { message?: unknown } | null)?.message ?? error ?? '');
+  return (
+    /^Failure_UnexpectedMessage(?:,|\b)/i.test(message) ||
+    /\b(?:unsupported message|handler not registered|message handler not found)\b/i.test(message)
+  );
+};
+
 export interface DeviceEvents {
   [DEVICE.PIN]: [Device, PROTO.PinMatrixRequestType | undefined, (err: any, pin: string) => void];
-  [DEVICE.PASSPHRASE_ON_DEVICE]: [Device, ((response: any) => void)?];
+  [DEVICE.PASSPHRASE_ON_DEVICE]: [Device, PassphraseRequestPayload?];
+  [DEVICE.ATTACH_PIN_ON_DEVICE]: [Device, PassphraseRequestPayload?];
   [DEVICE.BUTTON]: [Device, DeviceButtonRequestPayload];
   [DEVICE.FEATURES]: [Device, DeviceFeaturesPayload];
+  [DEVICE.STATE]: [Device, DeviceStateEvent];
   [DEVICE.PASSPHRASE]: [
     Device,
     PassphraseRequestPayload,
@@ -100,15 +160,14 @@ export interface Device {
   emit<K extends keyof DeviceEvents>(type: K, ...args: DeviceEvents[K]): boolean;
 }
 
-const deviceSessionCache: Record<string, string> = {};
-
 /**
  * Pre-populate the device session cache with a known session ID.
  *
  * This allows short-lived processes (e.g. CLI) to restore a previously
  * obtained session, avoiding the need to re-enter passphrase on every
  * invocation. The session must have been obtained from a prior
- * getPassphraseState() call on the same device.
+ * wallet-session call on the same device. This compatibility hook is intended
+ * for a trusted CLI process restoring its own OS-keychain entry.
  *
  * @param deviceId - The device's device_id (from features)
  * @param passphraseState - The passphrase state token
@@ -119,8 +178,7 @@ export function preloadSessionCache(
   passphraseState: string,
   sessionId: string
 ): void {
-  const key = `${deviceId}@${passphraseState}`;
-  deviceSessionCache[key] = sessionId;
+  deviceWalletSessionStore.set(deviceId, passphraseState, sessionId);
 }
 
 export class Device extends EventEmitter {
@@ -166,15 +224,34 @@ export class Device extends EventEmitter {
    */
   private deviceAcquired = false;
 
-  /**
-   * 设备信息
-   */
-  features: Features | undefined = undefined;
+  /** Canonical device-state cache; legacy Features is a compatibility projection. */
+  private stateStore = new DeviceStateStore();
 
-  /**
-   * 是否需要更新设备信息
-   */
-  featuresNeedsReload = false;
+  /** Force the next initialization to reload DeviceInfo after reconnect or reboot. */
+  private protocolV2StateNeedsReload = false;
+
+  get state() {
+    return this.stateStore.getState();
+  }
+
+  get features(): Features | undefined {
+    if (!this.state) return undefined;
+    return projectFeatures(this.state);
+  }
+
+  set features(features: Features | undefined) {
+    this.stateStore = new DeviceStateStore();
+    if (features) {
+      this.stateStore.update(mapFeaturesToState(features), 'compatibility');
+      const { passphraseState } = features;
+      const sessionId = features.sessionId ?? features.session_id;
+      const deviceKey = this.getSessionCacheDeviceKey(features.deviceId ?? undefined);
+      if (passphraseState && sessionId && deviceKey) {
+        this.passphraseState = passphraseState;
+        deviceWalletSessionStore.set(deviceKey, passphraseState, sessionId);
+      }
+    }
+  }
 
   runPromise?: Deferred<void> | null;
 
@@ -231,29 +308,43 @@ export class Device extends EventEmitter {
     if (this.isUnacquired() || !this.features) return null;
 
     const env = DataManager.getSettings('env');
-    const deviceType = getDeviceType(this.features);
+    const deviceType = this.getCurrentDeviceType();
 
-    const bleName = getDeviceBleName(this.features);
-    const label = getDeviceLabel(this.features);
+    const bleName = this.getCurrentBleName();
+    const displayName = this.getCurrentDisplayName();
+    const serialNo = this.getCurrentSerialNo();
+    const connectId = this.getConnectId();
+    const deviceId = this.getCurrentDeviceId() || null;
+
+    const { features } = this;
+    const state = this.state ? createPublicDeviceState(this.state) : undefined;
 
     return {
-      /** Android uses Mac address, iOS uses uuid, USB uses uuid  */
-      connectId: DataManager.isBleConnect(env) ? this.mainId || null : getDeviceUUID(this.features),
-      /** Hardware ID, will not change at any time */
-      uuid: getDeviceUUID(this.features),
+      /** Android uses a MAC address, while iOS and USB use transport-specific identifiers. */
+      connectId: DataManager.isBleConnect(env) ? this.mainId || null : connectId,
+      /** Persist this after the first active probe so later calls do not need to guess. */
+      connectProtocol: this.originalDescriptor.protocolType,
+      /** Stable physical-device identity. */
+      serialNo,
+      /** @deprecated Use serialNo instead. */
+      uuid: serialNo,
       commType: this.originalDescriptor.commType,
       sdkInstanceId: this.sdkInstanceId,
       instanceId: this.instanceId,
       createdAt: this.createdAt,
       deviceType,
-      /** ID for current seeds, will clear after replace a new seed at device */
-      deviceId: this.features.device_id || null,
+      /** Wallet-lifecycle ID; changes after the device is wiped or reinitialized. */
+      deviceId,
       path: this.originalDescriptor?.path,
       bleName,
-      name: bleName || label || `OneKey ${deviceType?.toUpperCase()}`,
-      label: label || 'OneKey',
+      name: displayName || bleName || `OneKey ${deviceType?.toUpperCase()}`,
+      // Keep the legacy top-level field string-compatible while preserving
+      // the canonical nullable value at state.identity.label.
+      label: displayName ?? '',
+      status: this.getStatus(),
       mode: this.getMode(),
-      features: this.features,
+      features,
+      state,
       firmwareVersion: this.getFirmwareVersion(),
       bleFirmwareVersion: this.getBLEFirmwareVersion(),
       unavailableCapabilities: this.unavailableCapabilities,
@@ -264,13 +355,17 @@ export class Device extends EventEmitter {
    * Device connect
    * @returns {Promise<boolean>}
    */
-  connect() {
+  connect(connectProtocol?: HardwareConnectProtocol) {
     const env = DataManager.getSettings('env');
     // eslint-disable-next-line no-async-promise-executor
     return new Promise<boolean>(async (resolve, reject) => {
       if (DataManager.isBleConnect(env)) {
+        if (this.hasDeviceAcquire() && this.commands && !this.commands.disposed) {
+          resolve(true);
+          return;
+        }
         try {
-          await this.acquire();
+          await this.acquire(connectProtocol);
           resolve(true);
         } catch (error) {
           reject(error);
@@ -280,7 +375,7 @@ export class Device extends EventEmitter {
       // 不存在 Session ID 或存在 Session ID 但设备在别处使用，都需要 acquire 获取最新 sessionID
       if (!this.mainId || (!this.isUsedHere() && this.originalDescriptor)) {
         try {
-          await this.acquire();
+          await this.acquire(connectProtocol);
           resolve(true);
         } catch (error) {
           reject(error);
@@ -295,29 +390,62 @@ export class Device extends EventEmitter {
     });
   }
 
-  async acquire() {
+  async acquire(
+    expectedProtocol?: HardwareConnectProtocol,
+    options?: { throwOnRunPromiseError?: boolean }
+  ) {
     const env = DataManager.getSettings('env');
     const mainIdKey = DataManager.isBleConnect(env) ? 'id' : 'session';
+    const protocolHint = expectedProtocol ? undefined : this.originalDescriptor.protocolType;
     try {
+      let acquireResult: unknown;
       if (DataManager.isBleConnect(env)) {
-        const res = await this.deviceConnector?.acquire(this.originalDescriptor.id);
-        this.mainId = (res as unknown as any).uuid ?? '';
+        // acquire starts a new BLE session. Any previous runPromise belongs to a dead
+        // session, such as an interrupted probe or firmware-update reboot, and would
+        // otherwise block the new session. Device cannot distinguish recovery from a
+        // regular acquire, so BLE always clears it intentionally.
+        acquireResult = await this.deviceConnector?.acquire(
+          this.originalDescriptor.id,
+          undefined,
+          true,
+          expectedProtocol,
+          protocolHint
+        );
+        this.mainId = (acquireResult as any)?.uuid ?? '';
         Log.debug('Expected uuid:', this.mainId);
       } else {
-        this.mainId = await this.deviceConnector?.acquire(
+        acquireResult = await this.deviceConnector?.acquire(
           this.originalDescriptor.path,
-          this.originalDescriptor.session
+          this.originalDescriptor.session,
+          undefined,
+          expectedProtocol,
+          protocolHint
         );
+        this.mainId = acquireResult as string | undefined;
         Log.debug('Expected session id:', this.mainId);
       }
       this.deviceAcquired = true;
       this.updateDescriptor({ [mainIdKey]: this.mainId } as unknown as DeviceDescriptor);
+
+      // Propagate protocol version detected during acquire.
+      const detectedProtocol =
+        (acquireResult as { protocolType?: HardwareConnectProtocol } | undefined)?.protocolType ??
+        TransportManager.transport?.getProtocolType?.(
+          DataManager.isBleConnect(env) ? this.originalDescriptor.id : this.originalDescriptor.path
+        );
+      if (detectedProtocol) {
+        this.originalDescriptor.protocolType = detectedProtocol;
+      }
+
       if (this.commands) {
         await this.commands.dispose(false);
       }
 
       this.commands = new DeviceCommands(this, this.mainId ?? '');
     } catch (error) {
+      if (options?.throwOnRunPromiseError) {
+        throw error;
+      }
       if (this.runPromise) {
         this.runPromise.reject(error);
       } else {
@@ -368,12 +496,10 @@ export class Device extends EventEmitter {
   }
 
   /**
-   * Pre-initialize: connect + Initialize ahead of the sign. Only runs the
-   * fallback init when features are missing (gate on `!this.features`, not
-   * isUsedHere which is always false on BLE); otherwise just records the mark.
+   * Pre-initialize: connect + Initialize ahead of the sign.
    */
   async preInitialize(initOptions?: InitOptions) {
-    if (!this.features) {
+    if (this.isUnacquired()) {
       await this.acquire();
       await this.initialize(initOptions);
     }
@@ -419,23 +545,195 @@ export class Device extends EventEmitter {
     return this.commands;
   }
 
-  private generateStateKey(deviceId: string, passphraseState?: string) {
-    if (passphraseState) {
-      return `${deviceId}@${passphraseState}`;
+  /**
+   * Canonical protocol discriminator.
+   *
+   * descriptor.protocolType is established by active probing; V2 features are mapped
+   * from DeviceInfoGet. All protocol branches must use this method instead of reading
+   * originalDescriptor.protocolType directly or inferring a protocol from features.
+   */
+  getProtocol(): 'V1' | 'V2' {
+    return this.originalDescriptor.protocolType === 'V2' ? 'V2' : 'V1';
+  }
+
+  isProtocolV2() {
+    return this.getProtocol() === 'V2';
+  }
+
+  getCurrentDeviceType() {
+    return this.state?.identity.deviceType ?? EDeviceType.Unknown;
+  }
+
+  getCurrentDeviceId() {
+    return this.state?.identity.deviceId || undefined;
+  }
+
+  getCurrentSerialNo() {
+    return this.state?.identity.serialNo ?? '';
+  }
+
+  getConnectId() {
+    const serialNo = this.getCurrentSerialNo();
+    if (serialNo) return serialNo;
+
+    // connectId is an internal routing key. Falling back to the transport descriptor
+    // does not change the business meaning of features.serialNo or deviceId.
+    return this.originalDescriptor.path || this.originalDescriptor.id || '';
+  }
+
+  getCurrentBleName() {
+    return this.state?.identity.bleName ?? null;
+  }
+
+  getCurrentLabel() {
+    return this.state?.identity.label ?? null;
+  }
+
+  getCurrentDisplayName() {
+    if (!this.state) return null;
+
+    const label = this.getCurrentLabel();
+    if (label) return label;
+
+    const bleName = this.getCurrentBleName();
+    if (bleName) return bleName;
+
+    const deviceType = this.getCurrentDeviceType();
+    if (deviceType === EDeviceType.ClassicPure) {
+      return 'OneKey Classic 1S';
     }
-    return deviceId;
+
+    return `OneKey ${deviceType.charAt(0).toUpperCase() + deviceType.slice(1)}`;
+  }
+
+  getCurrentPassphraseProtection() {
+    return this.state?.status.passphraseProtection;
+  }
+
+  getCurrentFirmwareType() {
+    return this.state?.identity.firmwareType ?? EFirmwareType.Universal;
+  }
+
+  getCurrentFirmwareVersionString() {
+    return parseDeviceVersion(this.state?.versions.firmware).join('.');
+  }
+
+  getCurrentBLEFirmwareVersionString() {
+    if (!this.state) return undefined;
+    return parseDeviceVersion(this.state.versions.ble).join('.');
+  }
+
+  getCurrentBootloaderVersionString() {
+    if (!this.state) return undefined;
+    return parseDeviceVersion(this.state.versions.bootloader).join('.');
+  }
+
+  getCurrentSafetyChecks() {
+    return this.state?.settings.safetyChecks;
+  }
+
+  getCurrentMethodVersionRange(
+    getVersionRange: (deviceModel: IDeviceType | IDeviceModel) => IVersionRange | undefined
+  ) {
+    const deviceType = this.getCurrentDeviceType();
+    const versionRange = getVersionRange(deviceType);
+    if (versionRange) return versionRange;
+
+    // Most-specific model first; must match getMethodVersionRange in deviceInfoUtils,
+    // otherwise e.g. Classic1s resolves the looser model_mini range before model_classic1s.
+    const modelFallbacks: IDeviceModel[] = [
+      'model_classic1s',
+      'model_classic',
+      'model_mini',
+      'model_touch',
+    ];
+    for (const model of modelFallbacks) {
+      if (DeviceTypeToModels[deviceType]?.includes(model)) {
+        const fallbackRange = getVersionRange(model);
+        if (fallbackRange) return fallbackRange;
+      }
+    }
+    return undefined;
+  }
+
+  supportNewPassphrase(): SupportFeatureType {
+    const deviceType = this.getCurrentDeviceType();
+    if (
+      deviceType === EDeviceType.Touch ||
+      deviceType === EDeviceType.Pro ||
+      deviceType === EDeviceType.Pro2
+    ) {
+      return { support: true };
+    }
+
+    const firmwareVersion = this.getCurrentFirmwareVersionString();
+    return {
+      support: Boolean(firmwareVersion && semver.gte(firmwareVersion, '2.4.0')),
+      require: '2.4.0',
+    };
+  }
+
+  supportInputPinOnSoftware(): SupportFeatureType {
+    const deviceType = this.getCurrentDeviceType();
+    if (
+      deviceType === EDeviceType.Touch ||
+      deviceType === EDeviceType.Pro ||
+      deviceType === EDeviceType.Pro2
+    ) {
+      return { support: false };
+    }
+
+    const firmwareVersion = this.getCurrentFirmwareVersionString();
+    return {
+      support: Boolean(firmwareVersion && semver.gte(firmwareVersion, '2.3.0')),
+      require: '2.3.0',
+    };
+  }
+
+  supportModifyHomescreen(): SupportFeatureType {
+    // Pro2 has an independent 1.x version line and must not use the Touch/Pro 3.4.0
+    // threshold. ApplySettings includes homescreen from the first V2 firmware version.
+    if (this.isProtocolV2()) {
+      return { support: true };
+    }
+
+    const deviceType = this.getCurrentDeviceType();
+    if (DeviceModelToTypes.model_mini.includes(deviceType)) {
+      return { support: true };
+    }
+
+    const firmwareVersion = this.getCurrentFirmwareVersionString();
+    return {
+      support: Boolean(firmwareVersion && semver.gte(firmwareVersion, '3.4.0')),
+    };
+  }
+
+  private getSessionCacheDeviceKey(_deviceId?: string) {
+    const deviceId = _deviceId || this.getCurrentDeviceId();
+    if (deviceId) return deviceId;
+    if (this.isProtocolV2()) {
+      return this.originalDescriptor.path;
+    }
+    return undefined;
+  }
+
+  private reconcileSessionCacheDeviceIdentity(previousDeviceId?: string) {
+    deviceWalletSessionStore.reconcileDeviceIdentity({
+      temporaryKey: this.isProtocolV2() ? this.originalDescriptor.path : undefined,
+      previousDeviceId,
+      nextDeviceId: this.getCurrentDeviceId(),
+    });
   }
 
   getInternalState(_deviceId?: string) {
-    Log.debug('getInternalState session cache: ', deviceSessionCache);
     Log.debug(
       'getInternalState session param: ',
       `device_id: ${_deviceId}`,
-      `features.device_id: ${this.features?.device_id}`,
-      `passphraseState: ${this.passphraseState}`
+      `currentDeviceId: ${this.getCurrentDeviceId()}`,
+      `hasPassphraseState: ${Boolean(this.passphraseState)}`
     );
 
-    const deviceId = _deviceId || this.features?.device_id;
+    const deviceId = this.getSessionCacheDeviceKey(_deviceId);
     if (!deviceId) return undefined;
     // Security invariant: no passphraseState → no session lookup.
     // A previous fallback that scanned `${deviceId}@*` keys could silently
@@ -445,146 +743,472 @@ export class Device extends EventEmitter {
     // downstream call carries it and hits the primary lookup below.
     if (!this.passphraseState) return undefined;
 
-    const usePassKey = this.generateStateKey(deviceId, this.passphraseState);
-    return deviceSessionCache[usePassKey];
+    return deviceWalletSessionStore.get(deviceId, this.passphraseState);
+  }
+
+  getStandardInternalState(_deviceId?: string) {
+    const deviceId = this.getSessionCacheDeviceKey(_deviceId);
+    if (!deviceId) return undefined;
+    return deviceWalletSessionStore.getStandard(deviceId);
   }
 
   // attach to pin to fix internal state
   updateInternalState(
     enablePassphrase: boolean,
     passphraseState: string | undefined,
-    deviceId: string,
+    deviceId: string | undefined,
     sessionId: string | null = null,
-    featuresSessionId: string | null = null
+    featuresSessionId: string | null = null,
+    walletType: 'standard' | 'hidden' = 'hidden'
   ) {
     Log.debug(
       'updateInternalState session param: ',
       `device_id: ${deviceId}`,
       `enablePassphrase: ${enablePassphrase}`,
-      `passphraseState: ${passphraseState}`,
-      `sessionId: ${sessionId}`,
-      `featuresSessionId: ${featuresSessionId}`
+      `hasPassphraseState: ${Boolean(passphraseState)}`,
+      `hasSessionId: ${Boolean(sessionId)}`,
+      `hasFeaturesSessionId: ${Boolean(featuresSessionId)}`
     );
 
+    const cacheDeviceKey = this.getSessionCacheDeviceKey(deviceId);
+    if (!cacheDeviceKey) return;
+
     if (enablePassphrase) {
-      // update the sessionId
-      if (sessionId) {
-        deviceSessionCache[this.generateStateKey(deviceId, passphraseState)] = sessionId;
-      } else if (featuresSessionId) {
-        deviceSessionCache[this.generateStateKey(deviceId, passphraseState)] = featuresSessionId;
+      const walletSessionId =
+        sessionId || featuresSessionId || deviceWalletSessionStore.getPending(cacheDeviceKey);
+      if (walletType === 'standard') {
+        deviceWalletSessionStore.setStandard(
+          cacheDeviceKey,
+          passphraseState,
+          walletSessionId ?? undefined
+        );
+      } else {
+        deviceWalletSessionStore.set(cacheDeviceKey, passphraseState, walletSessionId ?? undefined);
       }
     }
 
-    // delete the old sessionId
-    const oldKey = `${deviceId}`;
-    if (deviceSessionCache[oldKey]) {
-      delete deviceSessionCache[oldKey];
-    }
-
-    Log.debug('updateInternalState session cache: ', deviceSessionCache);
+    deviceWalletSessionStore.deletePending(cacheDeviceKey);
   }
 
   private setInternalState(state: string, initSession?: boolean) {
     Log.debug(
       'setInternalState session param: ',
-      `state: ${state}`,
+      `hasState: ${Boolean(state)}`,
       `initSession: ${initSession}`,
-      `device_id: ${this.features?.device_id}`,
-      `passphraseState: ${this.passphraseState}`
+      `deviceId: ${this.getCurrentDeviceId()}`,
+      `hasPassphraseState: ${Boolean(this.passphraseState)}`
     );
 
-    if (!this.features) return;
     if (!this.passphraseState && !initSession) return;
 
-    const deviceId = this.features?.device_id;
+    const deviceId = this.getSessionCacheDeviceKey();
     if (!deviceId) return;
 
-    const key = this.generateStateKey(deviceId, this.passphraseState);
-
-    if (state) {
-      deviceSessionCache[key] = state;
+    if (this.passphraseState) {
+      deviceWalletSessionStore.set(deviceId, this.passphraseState, state);
+    } else if (initSession) {
+      deviceWalletSessionStore.setPending(deviceId, state);
     }
-    Log.debug('setInternalState done session cache: ', deviceSessionCache);
   }
 
   clearInternalState(_deviceId?: string) {
     Log.debug('clearInternalState param: ', _deviceId);
 
-    const deviceId = _deviceId || this.features?.device_id;
+    const deviceId = this.getSessionCacheDeviceKey(_deviceId);
     if (!deviceId) return;
-    const key = `${deviceId}`;
-    delete deviceSessionCache[key];
+    deviceWalletSessionStore.deletePending(deviceId);
 
     if (this.passphraseState) {
-      const usePassKey = this.generateStateKey(deviceId, this.passphraseState);
-      delete deviceSessionCache[usePassKey];
+      deviceWalletSessionStore.delete(deviceId, this.passphraseState);
     }
   }
 
+  clearStandardInternalState(_deviceId?: string) {
+    const deviceId = this.getSessionCacheDeviceKey(_deviceId);
+    if (!deviceId) return;
+    deviceWalletSessionStore.deleteStandard(deviceId);
+  }
+
   async initialize(options?: InitOptions) {
-    // Log.debug('initialize param:', options);
-
-    this.passphraseState = options?.passphraseState;
-
-    if (options?.initSession) {
-      this.clearInternalState(options?.deviceId);
+    // Protocol V2 does not support legacy Initialize; use its dedicated flow.
+    if (this.isProtocolV2()) {
+      this.passphraseState = options?.passphraseState;
+      if (this.state && !options?.initSession && !this.protocolV2StateNeedsReload) {
+        if (this.state.status.mode === 'bootloader' || this.state.status.mode === 'romloader') {
+          return;
+        }
+        // Normal calls reuse the cache. Explicit getDeviceState refreshes, unlock flow,
+        // and device events update dynamic state without polling on every SDK call.
+        return;
+      }
+      await this._initializeProtocolV2(options);
+      this.protocolV2StateNeedsReload = false;
+      return;
     }
 
-    const internalState = this.getInternalState(options?.deviceId);
-    const payload: any = {};
-    if (internalState) {
-      payload.session_id = internalState;
-    }
-
-    if (options?.deriveCardano) {
-      payload.derive_cardano = true;
-    }
-    payload.passphrase_state = options?.passphraseState;
-    payload.is_contains_attach = true;
-
-    const initStartAt = Date.now();
     try {
-      // @ts-expect-error
-      const { message } = await Promise.race([
-        this.commands.typedCall('Initialize', 'Features', payload),
-        new Promise((_, reject) => {
-          setTimeout(() => {
-            reject(ERRORS.TypedError(HardwareErrorCode.DeviceInitializeFailed));
-            // iOS ble bound device timeout 20s
-          }, 25 * 1000);
-        }),
-      ]);
+      const callInitialize = async (payload: Record<string, unknown>, initSession?: boolean) => {
+        const initStartAt = Date.now();
+        const { message } = await this.commands.typedCall('Initialize', 'Features', payload, {
+          // iOS BLE bound devices can need close to 20 seconds.
+          timeoutMs: 25 * 1000,
+        });
+        this.setLastInitializeDuration(Date.now() - initStartAt);
+        this._updateFeatures(message, initSession);
+        await TransportManager.reconfigure(this.features);
+      };
 
-      const initCostMs = Date.now() - initStartAt;
-      this.setLastInitializeDuration(initCostMs);
-      this._updateFeatures(message, options?.initSession);
-      await TransportManager.reconfigure(this.features);
+      const expectedDeviceId = options?.deviceId;
+      if (expectedDeviceId) {
+        // 先只读校验物理设备身份；钱包上下文仍由下方携带完整参数的
+        // Initialize 选择，避免标准钱包请求复用此前的隐藏钱包上下文。
+        this.passphraseState = undefined;
+        const { message } = await this.commands.typedCall('GetFeatures', 'Features', {});
+        this._updateFeatures(message);
+        await TransportManager.reconfigure(this.features);
+        if (!this.checkDeviceId(expectedDeviceId)) {
+          throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError);
+        }
+      }
+
+      this.passphraseState = options?.passphraseState;
+
+      if (options?.initSession) {
+        this.clearInternalState(options?.deviceId);
+      }
+
+      const internalState = this.getInternalState(options?.deviceId);
+      const payload: Record<string, unknown> = {
+        passphrase_state: options?.passphraseState,
+        is_contains_attach: true,
+      };
+      if (internalState) {
+        payload.session_id = internalState;
+      }
+      if (options?.deriveCardano) {
+        payload.derive_cardano = true;
+      }
+
+      await callInitialize(payload, options?.initSession);
     } catch (error) {
       Log.error('Initialization failed:', error);
       throw error;
     }
   }
 
-  async getFeatures() {
-    const { message } = await this.commands.typedCall('GetFeatures', 'Features', {});
-    this._updateFeatures(message);
+  /**
+   * Device initialization over Protocol V2.
+   *
+   * Protocol V2 bypasses legacy Initialize/GetFeatures and builds its canonical
+   * features state directly from DeviceInfoGet.
+   */
+  private async _initializeProtocolV2(options?: InitOptions) {
+    Log.debug('Initialize device via Protocol V2 features adapter');
+
+    try {
+      // typedCall applies the request timeout. An outer Promise.race would leak its
+      // timer and leave the underlying call active after rejection.
+      const deviceInfo = await requestProtocolV2DeviceInfo({
+        commands: this.commands,
+        timeoutMs: options?.protocolV2DeviceInfoTimeoutMs,
+      });
+      // The default request excludes SE/hash data and therefore uses basic scope.
+      // Full version and verification data require getDeviceState({ scope: 'firmware' }).
+      const features = await this.probeProtocolV2RuntimeState(
+        deviceInfo,
+        options?.protocolV2DeviceInfoTimeoutMs
+      );
+      Log.debug('Protocol V2 features:', features);
+    } catch (error) {
+      Log.error('Protocol V2 initialization failed:', error);
+      throw error;
+    }
   }
 
-  _updateFeatures(feat: Features, initSession?: boolean) {
-    // GetFeatures doesn't return 'session_id'
-    if (this.features && this.features.session_id && !feat.session_id) {
-      feat.session_id = this.features.session_id;
+  async getFeatures() {
+    if (this.isProtocolV2()) {
+      const deviceInfo = await requestProtocolV2DeviceInfo({
+        commands: this.commands,
+      });
+      return this.probeProtocolV2RuntimeState(deviceInfo);
     }
-    if (this.features && this.features.device_id && feat.session_id) {
-      this.setInternalState(feat.session_id, initSession);
+
+    const { message } = await this.commands.typedCall('GetFeatures', 'Features', {});
+    this._updateFeatures(message);
+    return this.features;
+  }
+
+  async getDeviceState(params: DeviceStateReadOptions = {}) {
+    const refresh = new Set(params.refreshSections ?? []);
+    const getProtocolV2DeviceInfoRequest = () => {
+      if (refresh.has('verification')) return PROTOCOL_V2_FULL_DEVICE_INFO_REQUEST;
+      if (refresh.has('versions')) return PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST;
+      return PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST;
+    };
+    let initializedWithDeviceInfo = false;
+    let refreshedDeviceInfo: ProtocolV2DeviceInfo | undefined;
+
+    if (!this.state) {
+      if (this.isProtocolV2()) {
+        const deviceInfo = await requestProtocolV2DeviceInfo({
+          commands: this.commands,
+          request: getProtocolV2DeviceInfoRequest(),
+        });
+        await this.probeProtocolV2RuntimeState(deviceInfo);
+        refreshedDeviceInfo = deviceInfo;
+        initializedWithDeviceInfo = true;
+      } else {
+        await this.getFeatures();
+      }
+    } else if (!this.isProtocolV2() && refresh.size > 0) {
+      await this.getFeatures();
     }
+
+    if (!this.isProtocolV2() && refresh.has('verification')) {
+      const { message } = await this.commands.typedCall('OnekeyGetFeatures', 'OnekeyFeatures');
+      this.updateState(mapProtocolV1OnekeyFeaturesToState(message), 'device-info');
+    }
+
+    if (this.isProtocolV2()) {
+      const refreshDeviceInfo =
+        refresh.has('identity') || refresh.has('versions') || refresh.has('verification');
+      if (refreshDeviceInfo && !initializedWithDeviceInfo) {
+        const deviceInfo = await requestProtocolV2DeviceInfo({
+          commands: this.commands,
+          request: getProtocolV2DeviceInfoRequest(),
+        });
+        refreshedDeviceInfo = deviceInfo;
+        if (!refresh.has('status')) {
+          this.updateState(
+            mapProtocolV2DeviceInfoToState(deviceInfo, this.state?.status.mode),
+            'device-info'
+          );
+        }
+      }
+
+      if (refresh.has('status') && !initializedWithDeviceInfo) {
+        const deviceInfo =
+          refreshedDeviceInfo ??
+          (await requestProtocolV2DeviceInfo({
+            commands: this.commands,
+            request: getProtocolV2DeviceInfoRequest(),
+          }));
+        await this.probeProtocolV2RuntimeState(deviceInfo);
+      }
+
+      if (refresh.has('settings') && this.state?.status.mode === 'normal') {
+        const { message } = await this.commands.typedCall(
+          'DeviceSettingsGet',
+          'DeviceSettings',
+          {}
+        );
+        this.updateState(mapDeviceSettingsToState(message), 'settings-read');
+      }
+    }
+
+    if (!this.state) {
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceInitializeFailed);
+    }
+    return params.includeRaw ? cloneDeviceState(this.state) : createPublicDeviceState(this.state);
+  }
+
+  _updateFeatures(protoFeatures: PROTO.Features | Features, initSession?: boolean) {
+    const previousDeviceId = this.getCurrentDeviceId();
+    let feat =
+      'protocol' in protoFeatures
+        ? protoFeatures
+        : buildProtocolV1FeaturesPayload(protoFeatures, this.features);
+
     feat.unlocked = feat.unlocked ?? true;
 
     feat = fixFeaturesFirmwareVersion(feat);
 
-    this.features = feat;
-    this.featuresNeedsReload = false;
-    this.emit(DEVICE.FEATURES, this, feat);
+    this.updateState(mapFeaturesToState(feat), 'initialize');
+    this.reconcileSessionCacheDeviceIdentity(previousDeviceId);
+    if (feat.deviceId && feat.sessionId) {
+      this.setInternalState(feat.sessionId, initSession);
+    }
+  }
+
+  updateState(patch: DeviceStatePatch, source: DeviceStateUpdateSource) {
+    const result = this.stateStore.update(patch, source);
+    if (result.changedKeys.length === 0) return result.state;
+
+    const event: DeviceStateEvent = {
+      connectId: this.getConnectId() ?? null,
+      state: createPublicDeviceState(result.state),
+      revision: result.revision,
+      source,
+      changedKeys: result.changedKeys,
+    };
+    Log.debug('Device state patch committed', {
+      source,
+      keys: result.changedKeys,
+    });
+    this.emit(DEVICE.STATE, this, event);
+    if (result.state.protocol === 'V1') {
+      this.emit(DEVICE.FEATURES, this, projectFeatures(result.state));
+    }
+    return result.state;
+  }
+
+  updateFeaturesPatch(patch: Partial<Features>, source: DeviceStateUpdateSource) {
+    const currentFeatures = this.features;
+    if (!currentFeatures) return undefined;
+
+    const features = mergeDeviceFeaturesPatch(currentFeatures, patch);
+    if (features === currentFeatures) return currentFeatures;
+
+    const normalized = fixFeaturesFirmwareVersion(features);
+    this.updateState(mapFeaturesToState(normalized), source);
+    return this.features;
+  }
+
+  async probeProtocolV2RuntimeState(deviceInfo: ProtocolV2DeviceInfo, timeoutMs?: number) {
+    const protocolInfo = await requestProtocolV2ProtocolInfo({
+      commands: this.commands,
+      timeoutMs,
+    });
+    const runtimeMode = getProtocolV2RuntimeMode(protocolInfo);
+    const protocolV2DeviceType = resolveProtocolV2DeviceIdentity(
+      deviceInfo.hw?.Device_type
+    ).deviceType;
+    if (runtimeMode === 'romloader' && protocolV2DeviceType !== EDeviceType.Pro2) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.DeviceInitializeFailed,
+        'Protocol V2 romloader mode is only supported for Pro2.'
+      );
+    }
+    const deviceStatusSupported = supportsProtocolV2Message(
+      protocolInfo,
+      PROTOCOL_V2_DEVICE_STATUS_GET_MESSAGE_TYPE
+    );
+
+    if (runtimeMode === 'bootloader' || runtimeMode === 'romloader') {
+      return this.updateProtocolV2Features(deviceInfo, null, runtimeMode, protocolInfo);
+    }
+
+    if (!deviceStatusSupported) {
+      if (runtimeMode === 'normal') {
+        return this.updateProtocolV2Features(deviceInfo, null, runtimeMode, protocolInfo);
+      }
+      throw ERRORS.TypedError(
+        HardwareErrorCode.DeviceInitializeFailed,
+        `Unknown Protocol V2 build fingerprint without DeviceStatusGet capability: ${protocolInfo.build_fingerprint}`
+      );
+    }
+
+    let deviceStatus: DeviceStatus;
+    try {
+      deviceStatus = await requestProtocolV2DeviceStatus({
+        commands: this.commands,
+        timeoutMs,
+      });
+    } catch (error) {
+      if (runtimeMode === undefined && isProtocolV2DeviceStatusUnsupportedError(error)) {
+        return this.updateProtocolV2Features(deviceInfo, null, 'bootloader', protocolInfo);
+      }
+      throw error;
+    }
+    return this.updateProtocolV2Features(deviceInfo, deviceStatus, 'normal', protocolInfo);
+  }
+
+  updateProtocolV2Features(
+    deviceInfo?: ProtocolV2DeviceInfo,
+    deviceStatus?: DeviceStatus | null,
+    runtimeMode?: ProtocolV2RuntimeMode,
+    protocolInfo?: ProtocolInfo
+  ) {
+    const previousDeviceId = this.getCurrentDeviceId();
+    const resolvedMode = runtimeMode ?? (deviceStatus ? 'normal' : this.state?.status.mode);
+    if (deviceInfo) {
+      this.updateState(mapProtocolV2DeviceInfoToState(deviceInfo, resolvedMode), 'device-info');
+    }
+    if (protocolInfo) {
+      this.updateState({ raw: { protocolV2ProtocolInfo: protocolInfo } }, 'device-info');
+    }
+    if (deviceStatus) {
+      this.updateState(mapProtocolV2DeviceStatusToState(deviceStatus), 'device-status');
+    }
+    this.reconcileSessionCacheDeviceIdentity(previousDeviceId);
+    return this.features as Features;
+  }
+
+  updateProtocolV2Status(status: DeviceStatus) {
+    const previousDeviceInfo = this.state?.raw?.protocolV2DeviceInfo;
+    const previousStatus = this.state?.raw?.protocolV2DeviceStatus;
+    return this.updateProtocolV2Features(previousDeviceInfo, {
+      ...previousStatus,
+      ...status,
+    });
+  }
+
+  markTransportDisconnected() {
+    this.deviceAcquired = false;
+    if (!this.isProtocolV2()) return;
+    this.protocolV2StateNeedsReload = true;
+    this.clearPreInitialized();
+  }
+
+  invalidateAfterWipe() {
+    const deviceId = this.getCurrentDeviceId();
+    if (deviceId) {
+      deviceWalletSessionStore.deleteDevice(deviceId);
+    }
+    if (this.isProtocolV2() && this.originalDescriptor.path !== deviceId) {
+      deviceWalletSessionStore.deleteDevice(this.originalDescriptor.path);
+      this.protocolV2StateNeedsReload = true;
+    }
+
+    this.passphraseState = undefined;
+    this.stateStore = new DeviceStateStore();
+    this.clearPreInitialized();
+    this.needReloadDevice = true;
+  }
+
+  markProtocolV2Reboot(rebootType: DeviceRebootType) {
+    if (!this.isProtocolV2()) return;
+
+    this.protocolV2StateNeedsReload = true;
+    this.clearPreInitialized();
+    let loaderMode: 'bootloader' | 'romloader' | undefined;
+    if (rebootType === DeviceRebootType.Bootloader) {
+      loaderMode = 'bootloader';
+    } else if (rebootType === DeviceRebootType.Romloader) {
+      loaderMode = 'romloader';
+    }
+    if (loaderMode) {
+      this.updateState(
+        {
+          identity: { deviceId: null },
+          status: {
+            mode: loaderMode,
+            initialized: null,
+            unlocked: null,
+            firmwarePresent: null,
+            backupRequired: null,
+            noBackup: null,
+            unfinishedBackup: null,
+            recoveryMode: null,
+            passphraseProtection: null,
+            pinProtection: null,
+            attachToPinEnabled: null,
+            unlockedAttachPin: null,
+          },
+          raw: { protocolV2ProtocolInfo: null, protocolV2DeviceStatus: null },
+        },
+        'transport-reconnect'
+      );
+      return;
+    }
+
+    this.updateState(
+      {
+        status: { mode: 'normal', unlocked: null },
+        raw: { protocolV2ProtocolInfo: null, protocolV2DeviceStatus: null },
+      },
+      'transport-reconnect'
+    );
   }
 
   /**
@@ -605,7 +1229,11 @@ export class Device extends EventEmitter {
     }
 
     if (forceUpdate) {
-      this.originalDescriptor = descriptor;
+      // Enumerated descriptors may omit protocolType, so preserve an actively probed value.
+      this.originalDescriptor = {
+        ...descriptor,
+        protocolType: descriptor.protocolType ?? this.originalDescriptor.protocolType,
+      };
     }
   }
 
@@ -626,19 +1254,37 @@ export class Device extends EventEmitter {
 
     options = parseRunOptions(options);
 
-    this.runPromise = createDeferred(this._runInner.bind(this, fn, options));
-    return this.runPromise.promise;
+    const runPromise = createDeferred<void>();
+    this.runPromise = runPromise;
+    this._runInner(fn, options, runPromise).catch(error => {
+      if (this.runPromise === runPromise) {
+        this.runPromise = null;
+      }
+      runPromise.reject(error);
+    });
+    return runPromise.promise;
   }
 
-  async _runInner<T>(fn: (() => Promise<T>) | undefined, options: RunOptions) {
+  async _runInner<T>(
+    fn: (() => Promise<T>) | undefined,
+    options: RunOptions,
+    runPromise: Deferred<void>
+  ) {
+    const clearRunPromise = () => {
+      if (this.runPromise === runPromise) {
+        this.runPromise = null;
+      }
+    };
+
     if (!this.isUsedHere() || this.commands.disposed) {
       const env = DataManager.getSettings('env');
       if (env !== 'react-native') {
         try {
-          await this.acquire();
+          await this.acquire(options.connectProtocol);
         } catch (error) {
-          this.runPromise = null;
-          return Promise.reject(error);
+          clearRunPromise();
+          runPromise.reject(error);
+          return;
         }
 
         try {
@@ -648,16 +1294,19 @@ export class Device extends EventEmitter {
             }
           }
         } catch (error) {
-          this.runPromise = null;
+          await this.release();
+          clearRunPromise();
           if (error instanceof HardwareError) {
-            return Promise.reject(error);
+            runPromise.reject(error);
+            return;
           }
-          return Promise.reject(
+          runPromise.reject(
             ERRORS.TypedError(
               HardwareErrorCode.DeviceInitializeFailed,
               `Initialize failed: ${error.message as string}, code: ${error.code as string}`
             )
           );
+          return;
         }
       } else if (env === 'react-native') {
         // TODO: implement react-native acquire
@@ -676,9 +1325,7 @@ export class Device extends EventEmitter {
       try {
         await fn();
       } catch (e) {
-        if (this.runPromise) {
-          this.runPromise.reject(e);
-        }
+        runPromise.reject(e);
 
         if (
           e instanceof HardwareError &&
@@ -691,7 +1338,7 @@ export class Device extends EventEmitter {
           Log.debug(`error code ${e.errorCode} release device, mainId: ${this.mainId}`);
         }
 
-        this.runPromise = null;
+        clearRunPromise();
         return;
       }
     }
@@ -705,11 +1352,8 @@ export class Device extends EventEmitter {
       Log.debug('release device, mainId: ', this.mainId);
     }
 
-    if (this.runPromise) {
-      this.runPromise.resolve();
-    }
-
-    this.runPromise = null;
+    runPromise.resolve();
+    clearRunPromise();
   }
 
   async interruptionFromOutside() {
@@ -748,33 +1392,37 @@ export class Device extends EventEmitter {
   }
 
   getMode() {
-    if (this.features?.bootloader_mode) {
-      // bootloader mode
-      return EOneKeyDeviceMode.bootloader;
+    switch (this.state?.status.mode) {
+      case 'bootloader':
+      case 'romloader':
+        return EOneKeyDeviceMode.bootloader;
+      case 'notInitialized':
+        return EOneKeyDeviceMode.notInitialized;
+      case 'backupMode':
+        return EOneKeyDeviceMode.backupMode;
+      case 'normal':
+        return EOneKeyDeviceMode.normal;
+      default:
+        break;
     }
 
-    if (!this.features?.initialized) {
-      // not initialized
-      return EOneKeyDeviceMode.notInitialized;
-    }
-
-    if (this.features?.no_backup) {
-      // backup mode
-      return EOneKeyDeviceMode.backupMode;
-    }
-
-    // normal mode
     return EOneKeyDeviceMode.normal;
   }
 
+  getStatus() {
+    if (this.isUsedElsewhere()) return 'occupied' as const;
+    if (this.isUsedHere()) return 'used' as const;
+    return 'available' as const;
+  }
+
   getFirmwareVersion() {
-    if (!this.features) return null;
-    return getDeviceFirmwareVersion(this.features);
+    if (!this.state) return null;
+    return parseDeviceVersion(this.state.versions.firmware);
   }
 
   getBLEFirmwareVersion() {
-    if (!this.features) return null;
-    return getDeviceBLEFirmwareVersion(this.features);
+    if (!this.state) return null;
+    return parseDeviceVersion(this.state.versions.ble);
   }
 
   isUsed() {
@@ -792,7 +1440,7 @@ export class Device extends EventEmitter {
   isUsedHere() {
     const env = DataManager.getSettings('env');
     if (DataManager.isBleConnect(env)) {
-      return false;
+      return this.deviceAcquired;
     }
     return this.isUsed() && this.originalDescriptor.session === this.mainId;
   }
@@ -802,26 +1450,38 @@ export class Device extends EventEmitter {
   }
 
   isBootloader() {
-    return this.features && !!this.features.bootloader_mode;
+    if (!this.state) return undefined;
+    return this.state.status.mode === 'bootloader';
+  }
+
+  isRomloader() {
+    if (!this.state) return undefined;
+    return (
+      this.isProtocolV2() &&
+      this.getCurrentDeviceType() === EDeviceType.Pro2 &&
+      this.state.status.mode === 'romloader'
+    );
   }
 
   isInitialized() {
-    return this.features && !!this.features.initialized;
+    if (!this.state) return undefined;
+    return this.state.status.initialized === true;
   }
 
   isSeedless() {
-    return this.features && !!this.features.no_backup;
+    if (!this.state) return undefined;
+    return this.state.status.noBackup === true;
   }
 
   isUnacquired(): boolean {
-    return this.features === undefined;
+    return this.state === undefined;
   }
 
   hasUnexpectedMode(allow: string[], require: string[]) {
     // both allow and require cases might generate single unexpected mode
-    if (this.features) {
+    if (!this.isUnacquired()) {
       // allow cases
-      if (this.isBootloader() && !allow.includes(UI_REQUEST.BOOTLOADER)) {
+      if (this.isBootloader() && !this.isProtocolV2() && !allow.includes(UI_REQUEST.BOOTLOADER)) {
         return UI_REQUEST.BOOTLOADER;
       }
       if (!this.isInitialized() && !allow.includes(UI_REQUEST.NOT_INITIALIZE)) {
@@ -840,27 +1500,30 @@ export class Device extends EventEmitter {
   }
 
   hasUsePassphrase() {
+    const deviceType = this.getCurrentDeviceType();
     const isModeT =
-      getDeviceType(this.features) === EDeviceType.Touch ||
-      getDeviceType(this.features) === EDeviceType.Pro;
-    const preCheckTouch = isModeT && this.features?.unlocked === false;
+      deviceType === EDeviceType.Touch ||
+      deviceType === EDeviceType.Pro ||
+      deviceType === EDeviceType.Pro2;
+    const unlocked = this.state?.status.unlocked;
+    const preCheckTouch = isModeT && unlocked === false;
+    const passphraseProtection = this.getCurrentPassphraseProtection();
 
-    return this.features && (!!this.features.passphrase_protection || preCheckTouch);
+    return Boolean(passphraseProtection === true || preCheckTouch);
   }
 
   checkDeviceId(deviceId: string) {
-    if (this.features) {
-      return this.features.device_id === deviceId;
-    }
-    return false;
+    return this.getCurrentDeviceId() === deviceId;
   }
 
-  async lockDevice() {
+  async lockDevice(): Promise<Success> {
     const res = await this.commands.typedCall('LockDevice', 'Success', {});
+    this.updateState({ status: { unlocked: false } }, 'lock');
     return res.message;
   }
 
   supportUnlockVersionRange(): DeviceFirmwareRange {
+    // This range applies to Protocol V1 Pro devices; Pro2 has a dedicated unlock flow.
     return {
       pro: {
         min: '4.15.0',
@@ -868,36 +1531,62 @@ export class Device extends EventEmitter {
     };
   }
 
-  async unlockDevice() {
-    const firmwareVersion = getDeviceFirmwareVersion(this.features)?.join('.');
-    const versionRange = getMethodVersionRange(
-      this.features,
+  async unlockDevice(pinType: DeviceSessionPinType = DeviceSessionPinType.Main) {
+    if (this.isProtocolV2()) {
+      try {
+        await this.commands.typedCall('DeviceSessionAskPin', 'Success', { type: pinType });
+      } catch (error) {
+        const errorText =
+          error instanceof Error
+            ? `${error.name} ${error.message}`
+            : String((error as { message?: unknown } | null)?.message ?? error ?? '');
+        if (errorText.includes('Failure_UnexpectedMessage')) {
+          throw createDeviceNotSupportMethodError('deviceUnlock', this.getCurrentFirmwareType());
+        }
+        throw error;
+      }
+
+      const status = await requestProtocolV2DeviceStatus({ commands: this.commands });
+      return this.updateProtocolV2Status(status);
+    }
+
+    const firmwareVersion = this.getCurrentFirmwareVersionString() ?? '0.0.0';
+    const versionRange = this.getCurrentMethodVersionRange(
       type => this.supportUnlockVersionRange()[type]
     );
 
-    const supportAttachPinCapability = existCapability(
-      this.features,
+    const supportAttachPinCapability = this.state?.capabilities.includes(
       Enum_Capability.Capability_AttachToPin
     );
-
     const supportUnlock =
-      supportAttachPinCapability || (versionRange && semver.gte(firmwareVersion, versionRange.min));
+      supportAttachPinCapability ||
+      (versionRange &&
+        semver.valid(firmwareVersion) &&
+        semver.gte(firmwareVersion, versionRange.min));
 
     if (supportUnlock) {
       const res = await this.commands.typedCall('UnLockDevice', 'UnLockDeviceResponse');
-      if (this.features) {
-        this.features.unlocked = res.message.unlocked == null ? null : res.message.unlocked;
-        this.features.unlocked_attach_pin =
-          res.message.unlocked_attach_pin == null ? undefined : res.message.unlocked_attach_pin;
-        this.features.passphrase_protection =
-          res.message.passphrase_protection == null ? null : res.message.passphrase_protection;
+      if (this.state) {
+        this.updateState(
+          {
+            status: {
+              unlocked: res.message.unlocked == null ? null : res.message.unlocked,
+              unlockedAttachPin:
+                res.message.unlocked_attach_pin == null ? null : res.message.unlocked_attach_pin,
+              passphraseProtection:
+                res.message.passphrase_protection == null
+                  ? null
+                  : res.message.passphrase_protection,
+            },
+          },
+          'unlock'
+        );
 
         return Promise.resolve(this.features);
       }
 
-      const featuresRes = await this.commands.typedCall('GetFeatures', 'Features');
-      this._updateFeatures(featuresRes.message);
-      return Promise.resolve(featuresRes.message);
+      const features = await this.getFeatures();
+      return Promise.resolve(features);
     }
 
     const { type } = await this.commands.typedCall('GetAddress', 'Address', {
@@ -911,9 +1600,8 @@ export class Device extends EventEmitter {
     if (type === 'CallMethodError') {
       throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'unlock device error');
     }
-    const res = await this.commands.typedCall('GetFeatures', 'Features');
-    this._updateFeatures(res.message);
-    return Promise.resolve(res.message);
+    const features = await this.getFeatures();
+    return Promise.resolve(features);
   }
 
   async checkPassphraseStateSafety(
@@ -921,29 +1609,40 @@ export class Device extends EventEmitter {
     useEmptyPassphrase?: boolean,
     skipPassphraseCheck?: boolean
   ) {
-    if (!this.features) return false;
+    if (this.isUnacquired()) return false;
 
+    const expectedPassphraseState = useEmptyPassphrase ? undefined : passphraseState;
     const { passphraseState: newPassphraseState, unlockedAttachPin } =
       await getPassphraseStateWithRefreshDeviceInfo(this, {
-        expectPassphraseState: passphraseState,
+        expectPassphraseState: expectedPassphraseState,
         onlyMainPin: useEmptyPassphrase,
       });
-
-    if (skipPassphraseCheck) {
-      return true;
-    }
 
     // Main wallet and unlock Attach Pin, throw safe error
     const mainWalletUseAttachPin = unlockedAttachPin && useEmptyPassphrase;
     const useErrorAttachPin =
-      unlockedAttachPin && passphraseState && passphraseState !== newPassphraseState;
+      unlockedAttachPin &&
+      expectedPassphraseState &&
+      expectedPassphraseState !== newPassphraseState;
+    const passphraseStateMismatch =
+      !!expectedPassphraseState && expectedPassphraseState !== newPassphraseState;
 
     Log.debug('Check passphrase state safety: ', {
-      passphraseState,
-      newPassphraseState,
+      hasExpectedPassphraseState: Boolean(expectedPassphraseState),
+      hasNewPassphraseState: Boolean(newPassphraseState),
+      passphraseStateMatches:
+        Boolean(expectedPassphraseState) && expectedPassphraseState === newPassphraseState,
       unlockedAttachPin,
       useEmptyPassphrase,
     });
+
+    if (skipPassphraseCheck) {
+      if (passphraseStateMismatch) {
+        this.clearInternalState();
+        return false;
+      }
+      return true;
+    }
 
     if (mainWalletUseAttachPin || useErrorAttachPin) {
       try {
@@ -956,7 +1655,7 @@ export class Device extends EventEmitter {
     }
 
     // When exists passphraseState, check passphraseState
-    if (passphraseState && passphraseState !== newPassphraseState) {
+    if (passphraseStateMismatch) {
       this.clearInternalState();
       return false;
     }

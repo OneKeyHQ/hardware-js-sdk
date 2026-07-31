@@ -7,6 +7,10 @@ import type { AptosSignSIWAMessage } from '@onekeyfe/hd-transport';
 import type { AptosSignInMessageParams, AptosSignInMessageSignature } from '../../types';
 
 export default class AptosSignInMessage extends BaseMethod<AptosSignSIWAMessage> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];

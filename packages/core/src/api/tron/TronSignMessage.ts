@@ -6,11 +6,16 @@ import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { stripHexPrefix } from '../helpers/hexUtils';
-import { getFirmwareType } from '../../utils';
 
 import type { TronSignMessage as HardwareTronSignMessage } from '@onekeyfe/hd-transport';
 
 export default class TronSignMessage extends BaseMethod<HardwareTronSignMessage> {
+  private isLegacyMessageType = false;
+
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
@@ -26,12 +31,8 @@ export default class TronSignMessage extends BaseMethod<HardwareTronSignMessage>
     const { path, messageHex } = this.payload;
     const addressN = validatePath(path, 3);
 
-    if (this.payload.messageType === 'V1' || this.payload.messageType == null) {
-      throw createDeviceNotSupportMethodError(
-        'TronSignMessage',
-        getFirmwareType(this.device.features)
-      );
-    }
+    this.isLegacyMessageType =
+      this.payload.messageType === 'V1' || this.payload.messageType == null;
 
     const messageType = TronMessageType.V2;
 
@@ -45,6 +46,9 @@ export default class TronSignMessage extends BaseMethod<HardwareTronSignMessage>
 
   getVersionRange() {
     return {
+      pro2: {
+        min: '0.0.0',
+      },
       model_mini: {
         min: '2.5.0',
       },
@@ -53,6 +57,9 @@ export default class TronSignMessage extends BaseMethod<HardwareTronSignMessage>
 
   getMessageV2VersionRange() {
     return {
+      pro2: {
+        min: '0.0.0',
+      },
       pro: {
         min: '4.16.0',
       },
@@ -69,6 +76,13 @@ export default class TronSignMessage extends BaseMethod<HardwareTronSignMessage>
   }
 
   async run() {
+    if (this.isLegacyMessageType) {
+      throw createDeviceNotSupportMethodError(
+        'TronSignMessage',
+        this.device.getCurrentFirmwareType()
+      );
+    }
+
     this.checkFeatureVersionLimit(
       () => this.params.message_type === TronMessageType.V2,
       () => this.getMessageV2VersionRange(),

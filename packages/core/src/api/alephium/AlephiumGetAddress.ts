@@ -4,7 +4,7 @@ import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
 
 import type { AlephiumGetAddress as HardwareAlephiumGetAddress } from '@onekeyfe/hd-transport';
-import type { AlephiumAddress, AlephiumGetAddressParams } from '../../types';
+import type { AlephiumAddress, AlephiumGetAddressParams, DeviceFirmwareRange } from '../../types';
 
 export default class AlephiumGetAddress extends BaseMethod<HardwareAlephiumGetAddress[]> {
   hasBundle = false;
@@ -43,7 +43,7 @@ export default class AlephiumGetAddress extends BaseMethod<HardwareAlephiumGetAd
     });
   }
 
-  getVersionRange() {
+  getVersionRange(): DeviceFirmwareRange {
     return {
       model_touch: {
         min: '4.10.0',

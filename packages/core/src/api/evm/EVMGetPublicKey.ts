@@ -2,16 +2,19 @@ import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { supportBatchPublicKey } from '../../utils/deviceFeaturesUtils';
-import TransportManager from '../../data-manager/TransportManager';
 import getPublicKey from './latest/getPublicKey';
 import getPublicKeyLegacyV1 from './legacyV1/getPublicKey';
-import { batchGetPublickeys } from '../helpers/batchGetPublickeys';
+import { shouldUseLegacyV1EvmMessages } from './protocol';
+import { batchGetPublickeys, supportBatchPublicKeyByDevice } from '../helpers/batchGetPublickeys';
 
 import type { EVMGetPublicKeyParams, EVMPublicKey } from '../../types';
 import type { EthereumGetPublicKey, EthereumGetPublicKeyOneKey } from '@onekeyfe/hd-transport';
 
 export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKeyOneKey[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   confirmShowOnOneKey = false;
@@ -57,7 +60,7 @@ export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKeyOneK
   }
 
   getEvmPublicKey(param: EthereumGetPublicKey) {
-    if (TransportManager.getMessageVersion() === 'v1') {
+    if (shouldUseLegacyV1EvmMessages(this.device)) {
       return getPublicKeyLegacyV1({
         typedCall: this.device.commands.typedCall.bind(this.device.commands),
         param,
@@ -73,7 +76,7 @@ export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKeyOneK
   async run() {
     const responses: EVMPublicKey[] = [];
 
-    if (this.useBatch && supportBatchPublicKey(this.device?.features)) {
+    if (this.useBatch && supportBatchPublicKeyByDevice(this.device)) {
       try {
         const res = await batchGetPublickeys(this.device, this.params, 'secp256k1', 60, {
           includeNode: false,

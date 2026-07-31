@@ -1,4 +1,11 @@
-import { isKnownTrezorWebUsbDevice, isOnekeyDevice } from './constants';
+import {
+  createKnownBleUuidAliases,
+  hasOnekeyCommunicationService,
+  isKnownTrezorWebUsbDevice,
+  isOnekeyBluetoothDevice,
+  isOnekeyDevice,
+  matchesKnownBleUuid,
+} from './constants';
 
 describe('hardware device identity filters', () => {
   it('accepts known OneKey BLE names', () => {
@@ -11,6 +18,71 @@ describe('hardware device identity filters', () => {
   it('rejects known Trezor and Ledger BLE names from OneKey discovery', () => {
     expect(isOnekeyDevice('Trezor Safe 7')).toBe(false);
     expect(isOnekeyDevice('Ledger Nano X')).toBe(false);
+  });
+
+  it('does not identify an unnamed FFFD or Find My advertisement as OneKey', () => {
+    expect(isOnekeyBluetoothDevice({ name: 'Find My', serviceUuids: ['fffd'] })).toBe(false);
+    expect(
+      isOnekeyBluetoothDevice({ serviceUuids: ['0000fffd-0000-1000-8000-00805f9b34fb'] })
+    ).toBe(false);
+  });
+
+  it('keeps Pro2 communication advertisements and rejects its Find My advertisement', () => {
+    expect(
+      isOnekeyBluetoothDevice({
+        name: 'Pro2 A1B2',
+        serviceUuids: ['0001', 'fffd'],
+      })
+    ).toBe(true);
+    expect(
+      isOnekeyBluetoothDevice({
+        localName: 'Pro2 A1B2 - Find My',
+        serviceUuids: ['fffd'],
+      })
+    ).toBe(false);
+    expect(
+      isOnekeyBluetoothDevice({
+        name: 'Pro2 5E9D - Finde My',
+        serviceUuids: ['0001', 'fffd'],
+      })
+    ).toBe(false);
+  });
+
+  it('keeps OneKey discovery on the communication service', () => {
+    expect(
+      isOnekeyBluetoothDevice({
+        name: 'OneKey Pro 2',
+        serviceUuids: ['00000001-0000-1000-8000-00805f9b34fb'],
+      })
+    ).toBe(true);
+  });
+
+  it('only aliases standard Bluetooth Base UUID representations', () => {
+    const aliases = createKnownBleUuidAliases('00000001-0000-1000-8000-00805f9b34fb');
+
+    expect(matchesKnownBleUuid('0001', aliases)).toBe(true);
+    expect(matchesKnownBleUuid('00000001', aliases)).toBe(true);
+    expect(matchesKnownBleUuid('abcd0001-1234-5678-9012-abcdefabcdef', aliases)).toBe(false);
+  });
+
+  it('does not treat vendor-specific UUID fragments as communication or FIDO services', () => {
+    expect(
+      isOnekeyBluetoothDevice({
+        name: 'OneKey Pro 2',
+        serviceUuids: ['abcdfffd-1234-5678-9012-abcdefabcdef'],
+      })
+    ).toBe(true);
+    expect(
+      isOnekeyBluetoothDevice({
+        serviceUuids: ['abcd0001-1234-5678-9012-abcdefabcdef'],
+      })
+    ).toBe(false);
+  });
+
+  it('requires an explicitly advertised communication service for strict discovery', () => {
+    expect(hasOnekeyCommunicationService([])).toBe(false);
+    expect(hasOnekeyCommunicationService(['0001'])).toBe(true);
+    expect(hasOnekeyCommunicationService(['abcd0001-1234-5678-9012-abcdefabcdef'])).toBe(false);
   });
 
   it('only filters WebUSB descriptors that are explicitly identified as Trezor', () => {

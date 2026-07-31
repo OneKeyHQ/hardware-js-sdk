@@ -9,7 +9,7 @@ jest.mock('../src/data/config', () => ({
 }));
 
 jest.mock('../src/data-manager/TransportManager', () => ({
-  getMessageVersion: jest.fn(() => 'v2'),
+  getProtocolV1MessageSchema: jest.fn(() => 'v1CurrentSchema'),
 }));
 
 jest.mock('../src/device/Device', () => ({
@@ -494,6 +494,86 @@ describe('EVMSignTypedData — hasClassicFamilyTypedDataFormatViolations', () =>
       };
       const method = createMethod(data);
       expect(method.hasClassicFamilyTypedDataFormatViolations(data)).toBe(false);
+    });
+  });
+});
+
+describe('EVMSignTypedData — OneKey Pro Safe Protocol V1', () => {
+  it('收到 Pro 的 Safe 请求后按 EthereumGnosisSafeTxAck 字段回传', async () => {
+    const data = {
+      types: {
+        EIP712Domain: [
+          { name: 'chainId', type: 'uint256' },
+          { name: 'verifyingContract', type: 'address' },
+        ],
+        SafeTx: [
+          { name: 'to', type: 'address' },
+          { name: 'value', type: 'uint256' },
+          { name: 'data', type: 'bytes' },
+          { name: 'operation', type: 'uint8' },
+          { name: 'safeTxGas', type: 'uint256' },
+          { name: 'baseGas', type: 'uint256' },
+          { name: 'gasPrice', type: 'uint256' },
+          { name: 'gasToken', type: 'address' },
+          { name: 'refundReceiver', type: 'address' },
+          { name: 'nonce', type: 'uint256' },
+        ],
+      },
+      primaryType: 'SafeTx',
+      domain: {
+        chainId: '0x89',
+        verifyingContract: '0x673f21761c5400531a37554a602fe0407addd0dd',
+      },
+      message: {
+        to: '0x5618207d27d78f09f61a5d92190d58c453feb4b7',
+        value: '1000',
+        data: '0x001234',
+        operation: '1',
+        safeTxGas: '256',
+        baseGas: '0',
+        gasPrice: '15',
+        gasToken: '0x0000000000000000000000000000000000000000',
+        refundReceiver: '0x0000000000000000000000000000000000000000',
+        nonce: '2',
+      },
+    } as EthereumSignTypedDataMessage<EthereumSignTypedDataTypes>;
+    const method = createMethod(data);
+    const typedCall = jest.fn().mockResolvedValue({
+      type: 'EthereumTypedDataSignatureOneKey',
+      message: {
+        address: '0x5618207d27d78f09f61a5d92190d58c453feb4b7',
+        signature: 'abcd',
+      },
+    });
+
+    const result = await method.handleSignTypedData({
+      typedCall: typedCall as any,
+      signData: data,
+      response: { type: 'EthereumGnosisSafeTxRequest', message: {} } as any,
+      supportTrezor: false,
+    });
+
+    expect(typedCall).toHaveBeenCalledWith(
+      'EthereumGnosisSafeTxAck',
+      ['EthereumTypedDataSignature', 'EthereumTypedDataSignatureOneKey'],
+      {
+        to: '0x5618207d27d78f09f61a5d92190d58c453feb4b7',
+        value: '03e8',
+        data: '1234',
+        operation: 1,
+        safeTxGas: '0100',
+        baseGas: '00',
+        gasPrice: '0f',
+        gasToken: '0x0000000000000000000000000000000000000000',
+        refundReceiver: '0x0000000000000000000000000000000000000000',
+        nonce: '02',
+        chain_id: 137,
+        verifyingContract: '0x673f21761c5400531a37554a602fe0407addd0dd',
+      }
+    );
+    expect(result).toEqual({
+      address: '0x5618207d27d78f09f61a5d92190d58c453feb4b7',
+      signature: 'abcd',
     });
   });
 });

@@ -30,6 +30,24 @@ export type KaspaSignOutputParams = {
   scriptVersion?: number;
 };
 
+export type KaspaStreamingSignInputParams = Omit<KaspaSignInputParams, 'output'> & {
+  output: {
+    satoshis: number | string;
+    script?: string;
+  };
+};
+
+export type KaspaStreamingSignOutputParams = {
+  satoshis: number | string;
+  // Streaming protocol describes outputs by address; the device builds the script itself.
+  // `address` for an external output, `addressN` (BIP-32 path) for a change output.
+  address?: string;
+  addressN?: string | number[];
+  // Legacy host-prehash fields, unused by the streaming protocol but kept for compatibility.
+  script?: string;
+  scriptVersion?: number;
+};
+
 // Referenced (previous) transactions for the streaming protocol's input
 // verification: the device may ask for the transactions the inputs spend from
 // (selected by prev_tx_id) to verify input amounts on-device.
@@ -58,8 +76,8 @@ export type KaspaRefTransaction = {
 
 export type KaspaSignTransactionParams = {
   version: number;
-  inputs: KaspaSignInputParams[];
-  outputs: KaspaSignOutputParams[];
+  inputs: Array<KaspaSignInputParams | KaspaStreamingSignInputParams>;
+  outputs: Array<KaspaSignOutputParams | KaspaStreamingSignOutputParams>;
   lockTime: number | string;
   sigHashType?: SignatureType;
   sigOpCount?: number;

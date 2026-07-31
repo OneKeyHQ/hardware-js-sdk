@@ -16,6 +16,12 @@ import type {
 import type { ConfluxSignTx, ConfluxTxRequest } from '@onekeyfe/hd-transport';
 
 export default class ConfluxSignTransaction extends BaseMethod {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
+  checkDeviceId = true;
+
   addressN: number[] = [];
 
   formattedTx: ConfluxTransaction | undefined;

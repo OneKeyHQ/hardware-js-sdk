@@ -3,7 +3,7 @@ import EventEmitter from 'events';
 // eslint-disable-next-line import/no-cycle
 import { Device } from './Device';
 import { DEVICE } from '../events';
-import { LoggerNames, getDeviceUUID, getLogger } from '../utils';
+import { LoggerNames, getLogger } from '../utils';
 
 import type { InitOptions } from './Device';
 import type { OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
@@ -106,26 +106,32 @@ export class DevicePool extends EventEmitter {
         if (exist) {
           // Log.debug('find existed Device: ', connectId);
           device.updateDescriptor(exist, true);
+          await this._refreshRuntimeState(device, initOptions);
           devices[connectId] = device;
           deviceList.push(device);
-          await this._checkDevicePool(initOptions);
+          await this._checkDevicePool(initOptions, connectId);
           return { devices, deviceList };
         }
         Log.debug('found device in cache, but path is different: ', connectId);
       }
     }
 
-    for await (const descriptor of descriptorList) {
+    const matchedDescriptor = connectId
+      ? descriptorList.find(descriptor => descriptor.path === connectId)
+      : undefined;
+    const descriptorsToInitialize = matchedDescriptor ? [matchedDescriptor] : descriptorList;
+
+    for await (const descriptor of descriptorsToInitialize) {
       const device = await this._createDevice(descriptor, initOptions);
 
-      if (device.features) {
-        const uuid = getDeviceUUID(device.features);
-        if (this.devicesCache[uuid]) {
-          const cache = this.devicesCache[uuid];
+      const connectId = device.getConnectId();
+      if (connectId) {
+        if (this.devicesCache[connectId]) {
+          const cache = this.devicesCache[connectId];
           cache.updateDescriptor(descriptor, true);
         }
-        this.devicesCache[uuid] = device;
-        devices[uuid] = device;
+        this.devicesCache[connectId] = device;
+        devices[connectId] = device;
       }
 
       deviceList.push(device);
@@ -133,7 +139,7 @@ export class DevicePool extends EventEmitter {
     // Log.debug('get devices result : ', devices, deviceList);
     // console.log('device poll -> connected: ', this.connectedPool);
     // console.log('device poll -> disconnected: ', this.disconnectPool);
-    await this._checkDevicePool(initOptions);
+    await this._checkDevicePool(initOptions, matchedDescriptor ? connectId : undefined);
     return { devices, deviceList };
   }
 
@@ -150,33 +156,74 @@ export class DevicePool extends EventEmitter {
     if (!device) {
       device = Device.fromDescriptor(descriptor);
       device.deviceConnector = this.connector;
-      await device.connect();
-      await device.initialize(initOptions);
-      await device.release();
+      await device.connect(initOptions?.connectProtocol);
+      try {
+        await device.initialize(initOptions);
+        if (initOptions?.refreshRuntimeState && device.isProtocolV2()) {
+          await this._refreshProtocolV2DiscoveryState(device);
+        }
+      } finally {
+        await device.release();
+      }
     }
     return device;
   }
 
-  static async _checkDevicePool(initOptions?: InitOptions) {
-    await this._sendConnectMessage(initOptions);
+  static async _refreshRuntimeState(device: Device, initOptions?: InitOptions) {
+    if (!initOptions?.refreshRuntimeState || !device.isProtocolV2()) return;
+    let refreshError: unknown;
+    await device.run(
+      async () => {
+        try {
+          await this._refreshProtocolV2DiscoveryState(device);
+        } catch (error) {
+          // Device.run releases after the callback; then propagate the actual read error.
+          refreshError = error;
+        }
+      },
+      { connectProtocol: initOptions.connectProtocol }
+    );
+    if (refreshError instanceof Error) throw refreshError;
+    if (refreshError) throw new Error(String(refreshError));
+  }
+
+  /**
+   * Device lists require live mode and name data. A status failure remains a connection
+   * error; settings only supplies a label, so its failure retains the existing name.
+   * Device.getDeviceState skips unsupported status/settings calls in loader mode.
+   */
+  static async _refreshProtocolV2DiscoveryState(device: Device) {
+    await device.getDeviceState({ refreshSections: ['status'] });
+    try {
+      await device.getDeviceState({ refreshSections: ['settings'] });
+    } catch (error) {
+      Log.debug('Unable to refresh Protocol V2 device label during discovery', error);
+    }
+  }
+
+  static async _checkDevicePool(initOptions?: InitOptions, connectId?: string) {
+    await this._sendConnectMessage(initOptions, connectId);
     this._sendDisconnectMessage();
   }
 
-  static async _sendConnectMessage(initOptions?: InitOptions) {
+  static async _sendConnectMessage(initOptions?: InitOptions, connectId?: string) {
     for (let i = this.connectedPool.length - 1; i >= 0; i--) {
       const descriptor = this.connectedPool[i];
-      const device = await this._createDevice(descriptor, initOptions);
-      Log.debug('emit DEVICE.CONNECT: ', device?.features);
-      this.emitter.emit(DEVICE.CONNECT, device);
-      this.connectedPool.splice(i, 1);
+      if (!connectId || descriptor.path === connectId) {
+        const device = await this._createDevice(descriptor, initOptions);
+        Log.debug('emit DEVICE.CONNECT: ', device?.features);
+        this.emitter.emit(DEVICE.CONNECT, device);
+        this.connectedPool.splice(i, 1);
+      }
     }
   }
 
   static _sendDisconnectMessage() {
     for (let i = this.disconnectPool.length - 1; i >= 0; i--) {
-      const descriptor = this.connectedPool[i];
+      const descriptor = this.disconnectPool[i];
       const device = descriptor?.path ? this.getDeviceByPath(descriptor.path) : null;
       if (device) {
+        device.markTransportDisconnected();
         this.emitter.emit(DEVICE.DISCONNECT, device);
       }
       this.disconnectPool.splice(i, 1);
@@ -216,6 +263,7 @@ export class DevicePool extends EventEmitter {
       }
 
       Log.debug('emit DEVICE.DISCONNECT: ', device.features);
+      device.markTransportDisconnected();
       this.emitter.emit(DEVICE.DISCONNECT, device);
     });
   }
@@ -258,9 +306,11 @@ export class DevicePool extends EventEmitter {
     this.disconnectPool = [];
     this.devicesCache = {};
 
-    // Clear all event listeners but keep the emitter instance
-    this.emitter.removeAllListeners();
-
     Log.debug('DevicePool state has been reset');
+  }
+
+  static dispose() {
+    this.resetState();
+    this.emitter.removeAllListeners();
   }
 }

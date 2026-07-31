@@ -164,7 +164,9 @@ export function completeRequestContext(responseID: number, error?: Error): void 
     context.status = error ? 'error' : 'success';
     if (error) {
       context.error = error.message;
-      Log.error(
+      // Method errors already reach callers through the standard API response.
+      // Request tracing is diagnostic and must not emit a second user-facing error.
+      Log.debug(
         `[RequestContext] [completeRequestContext] Error: ${formatRequestContext(context)}`
       );
     }

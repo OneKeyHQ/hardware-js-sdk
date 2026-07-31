@@ -18,8 +18,8 @@ const config = [
   {
     input: path.resolve('./src/index.ts'),
     output: { file: 'dist/index.d.ts', format: 'es' },
-    format: 'es',
-    plugins: [dts()],
+    // Preserve API JSDoc tags such as @deprecated in published declarations.
+    plugins: [dts({ compilerOptions: { removeComments: false } })],
   },
 ];
 

@@ -9,8 +9,6 @@ import {
   getDeviceBLEFirmwareVersion,
   getDeviceBootloaderVersion,
   getDeviceFirmwareVersion,
-  getDeviceType,
-  getFirmwareType,
   getLogger,
 } from '../utils';
 import { getBinary, getSysResourceBinary } from './firmware/getBinary';
@@ -18,6 +16,7 @@ import { DataManager } from '../data-manager';
 import { FirmwareUpdateBaseMethod } from './firmware/FirmwareUpdateBaseMethod';
 import { DevicePool } from '../device/DevicePool';
 import { DEVICE } from '../events';
+import { buildProtocolV1FeaturesPayload } from '../deviceProfile';
 
 import type { FirmwareUpdateV3Params } from '../types/api/firmwareUpdate';
 import type { Deferred, EFirmwareType } from '@onekeyfe/hd-shared';
@@ -79,11 +78,19 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
   }
 
   async run() {
+    Log.debug('FirmwareUpdateV3 strategy: Protocol V1');
+    return this.runProtocolV1();
+  }
+
+  /**
+   * Protocol V1 firmware update strategy for existing Pro devices.
+   */
+  private async runProtocolV1() {
     const { device } = this;
     const { features } = device;
 
-    const deviceType = getDeviceType(features);
-    const bootloaderCurrVersion = getDeviceBootloaderVersion(features).join('.');
+    const deviceType = device.getCurrentDeviceType();
+    const bootloaderCurrVersion = device.getCurrentBootloaderVersionString() ?? '0.0.0';
 
     this.validateDeviceAndVersion(deviceType, bootloaderCurrVersion);
 
@@ -91,7 +98,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
       throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Device features not available');
     }
 
-    const deviceFirmwareType = getFirmwareType(features);
+    const deviceFirmwareType = device.getCurrentFirmwareType();
     const firmwareType = this.params.firmwareType ?? deviceFirmwareType;
     this.isSwitchFirmware = firmwareType !== deviceFirmwareType;
 
@@ -251,6 +258,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     }
 
     this.postTipMessage(FirmwareUpdateTipMessage.StartTransferData);
+
     // Process resource zip contents
     if (resourceBinary) {
       const file = await JSZip.loadAsync(resourceBinary);
@@ -291,12 +299,10 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
       }
     }
 
-    // trigger firmware update, support folder updates
+    // trigger firmware update
     try {
       this.postTipMessage(FirmwareUpdateTipMessage.ConfirmOnDevice);
-      await this.startEmmcFirmwareUpdate({
-        path: '0:updates',
-      });
+      await this.startEmmcFirmwareUpdate({ path: '0:updates' });
     } catch (error) {
       Log.error('triggerFirmwareUpdateEmmc error: ', error);
       // Re-throw errors with specific error codes that should not be ignored
@@ -373,7 +379,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
           }),
         ]);
         getFeaturesTimeoutCount = 0;
-        const features = featuresRes.message;
+        const features = buildProtocolV1FeaturesPayload(featuresRes.message, this.device.features);
         const bootloaderVersion = getDeviceBootloaderVersion(features).join('.');
         const bleVersion = getDeviceBLEFirmwareVersion(features).join('.');
         const firmwareVersion = getDeviceFirmwareVersion(features).join('.');

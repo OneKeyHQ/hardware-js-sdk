@@ -9,6 +9,10 @@ import type { NEMAddress, NEMGetAddressParams } from '../../types';
 const MAINNET = 0x68; // 104
 
 export default class NEMGetAddress extends BaseMethod<HardwareNEMGetAddress[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {

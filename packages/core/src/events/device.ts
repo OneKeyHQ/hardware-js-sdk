@@ -1,6 +1,11 @@
 import type { MessageFactoryFn } from './utils';
 import type { PROTO } from '../constants';
-import type { KnownDevice as Device, Features, SupportFeatures } from '../types/device';
+import type {
+  KnownDevice as Device,
+  DeviceStateEvent,
+  Features,
+  SupportFeatures,
+} from '../types/device';
 
 export const DEVICE_EVENT = 'DEVICE_EVENT';
 export const DEVICE = {
@@ -23,12 +28,14 @@ export const DEVICE = {
   PIN: 'pin',
   PASSPHRASE: 'passphrase',
   PASSPHRASE_ON_DEVICE: 'passphrase_on_device',
+  ATTACH_PIN_ON_DEVICE: 'attach_pin_on_device',
   WORD: 'word',
   SUPPORT_FEATURES: 'support_features',
   SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE: 'select_device_in_bootloader_for_web_device',
   SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE: 'select_device_for_switch_firmware_web_device',
 
   FEATURES: 'features',
+  STATE: 'state',
 } as const;
 
 export interface DeviceConnnectRequest {
@@ -47,6 +54,10 @@ export interface DeviceButtonRequestPayload extends Omit<PROTO.ButtonRequest, 'c
 
 export type PassphraseRequestPayload = {
   existsAttachPinUser?: boolean;
+  deviceOnly?: boolean;
+  source?: 'wallet-session-coordinator';
+  reason?: 'open-wallet' | 'session-recovery';
+  expectedPassphraseState?: string;
 };
 
 export interface DeviceButtonRequest {
@@ -61,6 +72,11 @@ export interface DeviceSendFeatures {
   payload: DeviceFeaturesPayload;
 }
 
+export interface DeviceSendState {
+  type: typeof DEVICE.STATE;
+  payload: DeviceStateEvent;
+}
+
 export type DeviceSupportFeaturesPayload = SupportFeatures & { device: Device | null };
 export interface DeviceSendSupportFeatures {
   type: typeof DEVICE.SUPPORT_FEATURES;
@@ -69,6 +85,7 @@ export interface DeviceSendSupportFeatures {
 
 export type DeviceEvent =
   | DeviceButtonRequest
+  | DeviceSendState
   | DeviceSendFeatures
   | DeviceSendSupportFeatures
   | DeviceDisconnnectRequest

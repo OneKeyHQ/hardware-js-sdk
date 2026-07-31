@@ -1,12 +1,16 @@
-import transport, { LogBlockCommand } from '@onekeyfe/hd-transport';
+import transport from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { request as http } from './http';
 import { DEFAULT_URL } from './constants';
 
-import type { AcquireInput, OneKeyDeviceInfoWithSession } from '@onekeyfe/hd-transport';
+import type {
+  AcquireInput,
+  OneKeyDeviceInfoWithSession,
+  ProtocolType,
+} from '@onekeyfe/hd-transport';
 
-const { check, buildOne, receiveOne, parseConfigure } = transport;
+const { check, ProtocolV1, parseConfigure } = transport;
 
 type IncompleteRequestOptions = {
   body?: Array<any> | Record<string, unknown> | string;
@@ -26,6 +30,11 @@ export default class HttpTransport {
   url: string;
 
   Log?: any;
+
+  // HttpTransport (Bridge) speaks Protocol V1 only.
+  getProtocolType(_path: string): ProtocolType {
+    return 'V1';
+  }
 
   constructor(url?: string) {
     this.url = url == null ? DEFAULT_URL : url;
@@ -111,13 +120,9 @@ export default class HttpTransport {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
     }
     const messages = this._messages;
-    if (LogBlockCommand.has(name)) {
-      this.Log.debug('call-', ' name: ', name);
-    } else {
-      this.Log.debug('call-', ' name: ', name, ' data: ', data);
-    }
+    this.Log.debug('transport call', { name, protocol: 'V1' });
 
-    const o = buildOne(messages, name, data);
+    const o = ProtocolV1.encodeEnvelope(messages, name, data);
     const outData = o.toString('hex');
     const resData = await this._post({
       url: `/call/${session}`,
@@ -127,7 +132,7 @@ export default class HttpTransport {
     if (typeof resData !== 'string') {
       throw ERRORS.TypedError(HardwareErrorCode.NetworkError, 'Returning data is not string.');
     }
-    const jsonData = receiveOne(messages, resData);
+    const jsonData = ProtocolV1.decodeMessage(messages, resData);
     return check.call(jsonData);
   }
 
@@ -136,7 +141,7 @@ export default class HttpTransport {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
     }
     const messages = this._messages;
-    const outData = buildOne(messages, name, data).toString('hex');
+    const outData = ProtocolV1.encodeEnvelope(messages, name, data).toString('hex');
     await this._post({
       url: `/post/${session}`,
       body: outData,
@@ -154,7 +159,7 @@ export default class HttpTransport {
     if (typeof resData !== 'string') {
       throw ERRORS.TypedError(HardwareErrorCode.NetworkError, 'Returning data is not string.');
     }
-    const jsonData = receiveOne(messages, resData);
+    const jsonData = ProtocolV1.decodeMessage(messages, resData);
     return check.call(jsonData);
   }
 

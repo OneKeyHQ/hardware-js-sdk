@@ -30,6 +30,7 @@ export default class RequestQueue {
       method.responseID = requestId;
     }
     const abortController = new AbortController();
+    method.abortSignal = abortController.signal;
     const task = { id: requestId, method, abortController };
     this.requestQueue.set(requestId, task);
     return task;

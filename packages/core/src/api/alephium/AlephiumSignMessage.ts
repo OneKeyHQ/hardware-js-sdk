@@ -5,6 +5,7 @@ import { validateParams } from '../helpers/paramsValidator';
 import { stripHexPrefix } from '../helpers/hexUtils';
 
 import type { AlephiumSignMessage as HardwareAlephiumSignMessage } from '@onekeyfe/hd-transport';
+import type { DeviceFirmwareRange } from '../../types';
 
 export default class AlephiumSignMessage extends BaseMethod<HardwareAlephiumSignMessage> {
   init() {
@@ -30,7 +31,7 @@ export default class AlephiumSignMessage extends BaseMethod<HardwareAlephiumSign
     };
   }
 
-  getVersionRange() {
+  getVersionRange(): DeviceFirmwareRange {
     return {
       model_touch: {
         min: '4.10.0',

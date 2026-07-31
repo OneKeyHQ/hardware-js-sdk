@@ -9,8 +9,6 @@ export const subscribeBleOn = (bleManager: BlePlxManager, ms = 1000): Promise<vo
     let done = false;
 
     const subscription = bleManager.onStateChange(state => {
-      console.log('ble state -> ', state);
-
       if (state === 'PoweredOn') {
         if (done) return;
         clearTimeout();

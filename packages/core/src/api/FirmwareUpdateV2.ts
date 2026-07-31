@@ -15,22 +15,13 @@ import { validateParams } from './helpers/paramsValidator';
 import { DevicePool } from '../device/DevicePool';
 import { getBinary, getInfo, getSysResourceBinary } from './firmware/getBinary';
 import { updateResources, uploadFirmware } from './firmware/uploadFirmware';
-import {
-  LoggerNames,
-  getDeviceFirmwareVersion,
-  getDeviceType,
-  getDeviceUUID,
-  getFirmwareType,
-  getLogger,
-  wait,
-} from '../utils';
+import { LoggerNames, getLogger, wait } from '../utils';
 import { FirmwareUpdateTipMessage, createUiMessage } from '../events/ui-request';
 import { DeviceModelToTypes } from '../types';
 import { DataManager } from '../data-manager';
 import { DEVICE } from '../events';
 
 import type { Features, KnownDevice } from '../types';
-import type { Device } from '../device/Device';
 import type { FirmwareBinary } from './firmware/getBinary';
 
 type Params = {
@@ -174,7 +165,7 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
     );
   };
 
-  private async _promptDeviceInBootloaderForWebDevice({ device }: { device: Device }) {
+  private async _promptDeviceInBootloaderForWebDevice() {
     return new Promise((resolve, reject) => {
       if (this.device.listenerCount(DEVICE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE) > 0) {
         this.device.emit(
@@ -205,9 +196,8 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
     // eslint-disable-next-line prefer-const
     let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
 
-    const isTouchOrProDevice =
-      getDeviceType(this?.device?.features) === EDeviceType.Touch ||
-      getDeviceType(this?.device?.features) === EDeviceType.Pro;
+    const deviceType = this.device?.getCurrentDeviceType();
+    const isTouchOrProDevice = deviceType === EDeviceType.Touch || deviceType === EDeviceType.Pro;
 
     const intervalTimer: ReturnType<typeof setInterval> | undefined = setInterval(
       async () => {
@@ -229,9 +219,7 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
 
           try {
             this.postTipMessage(FirmwareUpdateTipMessage.SelectDeviceInBootloaderForWebDevice);
-            const confirmed = await this._promptDeviceInBootloaderForWebDevice({
-              device: this.device,
-            });
+            const confirmed = await this._promptDeviceInBootloaderForWebDevice();
             if (confirmed) {
               await this._checkDeviceInBootloaderMode(connectId, intervalTimer, timeoutTimer);
             }
@@ -253,7 +241,7 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
               true
             );
             await this.device.initialize();
-            if (this.device.features?.bootloader_mode) {
+            if (this.device.isBootloader()) {
               clearInterval(intervalTimer);
               this.checkPromise?.resolve(true);
             }
@@ -286,7 +274,7 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
     const devicesDescriptor = deviceDiff?.descriptors ?? [];
     const { deviceList } = await DevicePool.getDevices(devicesDescriptor, connectId);
 
-    if (deviceList.length === 1 && deviceList[0]?.features?.bootloader_mode) {
+    if (deviceList.length === 1 && deviceList[0]?.isBootloader()) {
       // should update current device from cache
       // because device was reboot and had some new requests
       this.device.updateFromCache(deviceList[0]);
@@ -300,22 +288,22 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
     return false;
   }
 
-  isEnteredManuallyBoot(features: Features) {
-    const deviceType = getDeviceType(features);
+  isEnteredManuallyBoot() {
+    const deviceType = this.device.getCurrentDeviceType();
     const isMini = deviceType === EDeviceType.Mini;
     const isBoot183ClassicUpBle =
       this.params.updateType === 'firmware' &&
       deviceType === EDeviceType.Classic &&
-      features.bootloader_version === '1.8.3';
+      this.device.getCurrentBootloaderVersionString() === '1.8.3';
     return isMini || isBoot183ClassicUpBle;
   }
 
-  isSupportResourceUpdate(features: Features, updateType: string) {
+  isSupportResourceUpdate(updateType: string) {
     if (updateType !== 'firmware') return false;
 
-    const deviceType = getDeviceType(features);
+    const deviceType = this.device.getCurrentDeviceType();
     const isTouchMode = deviceType === EDeviceType.Touch || deviceType === EDeviceType.Pro;
-    const currentVersion = getDeviceFirmwareVersion(features).join('.');
+    const currentVersion = this.device.getCurrentFirmwareVersionString() ?? '0.0.0';
 
     return isTouchMode && semver.gte(currentVersion, '3.2.0');
   }
@@ -326,8 +314,8 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
    */
   checkVersionForCopyTouchResource(features: Features | undefined, firmwareType: EFirmwareType) {
     if (!features) return;
-    const deviceType = getDeviceType(features);
-    const currentVersion = getDeviceFirmwareVersion(features).join('.');
+    const deviceType = this.device.getCurrentDeviceType();
+    const currentVersion = this.device.getCurrentFirmwareVersionString() ?? '0.0.0';
     const targetVersion = this.params.version?.join('.');
     const { updateType } = this.params;
 
@@ -351,9 +339,9 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
   async run() {
     const { device, params } = this;
     const { features, commands } = device;
-    const deviceType = getDeviceType(features);
+    const deviceType = device.getCurrentDeviceType();
 
-    const deviceFirmwareType = getFirmwareType(device.features);
+    const deviceFirmwareType = device.getCurrentFirmwareType();
     const firmwareType = params.firmwareType ?? deviceFirmwareType;
 
     this.checkVersionForCopyTouchResource(features, firmwareType);
@@ -400,15 +388,15 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
       }
     };
 
-    if (!features?.bootloader_mode && features) {
-      const uuid = getDeviceUUID(features);
+    if (!device.isBootloader() && features) {
+      const serialNo = device.getCurrentSerialNo();
       // should go to bootloader mode manually
-      if (this.isEnteredManuallyBoot(features)) {
+      if (this.isEnteredManuallyBoot()) {
         return Promise.reject(ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateManuallyEnterBoot));
       }
 
       // check & upgrade firmware resource
-      if (features && this.isSupportResourceUpdate(features, params.updateType)) {
+      if (this.isSupportResourceUpdate(params.updateType)) {
         this.postTipMessage('CheckLatestUiResource');
         const resourceUrl = DataManager.getSysResourcesLatestRelease({
           features,
@@ -452,7 +440,7 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
 
         // force clean classic device cache so that the device can initialize again
         if (DeviceModelToTypes.model_classic.includes(deviceType)) {
-          DevicePool.clearDeviceCache(uuid);
+          DevicePool.clearDeviceCache(serialNo);
         }
         delete DevicePool.devicesCache[''];
         await this.checkPromise?.promise;

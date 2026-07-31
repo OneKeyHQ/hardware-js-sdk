@@ -13,6 +13,7 @@ import HardwareSdk, {
   createUiMessage,
   enableLog,
   executeCallback,
+  getLogBlockLabel,
   getLogger,
   initCore,
   parseConnectSettings,
@@ -84,7 +85,13 @@ function handleMessage(message: CoreMessage) {
     case DEVICE_EVENT:
       if (
         (
-          [DEVICE.CONNECT, DEVICE.DISCONNECT, DEVICE.FEATURES, DEVICE.SUPPORT_FEATURES] as string[]
+          [
+            DEVICE.CONNECT,
+            DEVICE.DISCONNECT,
+            DEVICE.FEATURES,
+            DEVICE.STATE,
+            DEVICE.SUPPORT_FEATURES,
+          ] as string[]
         ).includes(message.type)
       ) {
         eventEmitter.emit(message.type, message.payload);
@@ -138,12 +145,13 @@ const init = async (settings: Partial<ConnectSettings>) => {
 };
 
 const call = async (params: any) => {
-  Log.debug('call: ', params);
+  const blockLog = getLogBlockLabel(params);
+  Log.debug('call: ', blockLog ?? params);
 
   try {
     const response = await postMessage({ event: IFRAME.CALL, type: IFRAME.CALL, payload: params });
     if (response) {
-      Log.debug('response: ', response);
+      Log.debug('response: ', blockLog ? '[REDACTED]' : response);
 
       if (!response.success) {
         if (response.payload?.code === HardwareErrorCode.BlePermissionError) {

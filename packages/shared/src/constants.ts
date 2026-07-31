@@ -1,11 +1,19 @@
 import { HardwareErrorCode } from './HardwareError';
 
+export const HARDWARE_CONNECT_PROTOCOL = {
+  V1: 'V1',
+  V2: 'V2',
+} as const;
+
+export type HardwareConnectProtocol =
+  (typeof HARDWARE_CONNECT_PROTOCOL)[keyof typeof HARDWARE_CONNECT_PROTOCOL];
+
 export const ONEKEY_WEBUSB_FILTER = [
   { vendorId: 0x1209, productId: 0x53c0 }, // Classic Boot、Classic1s Boot、Mini Boot
-  { vendorId: 0x1209, productId: 0x53c1 }, // Classic Firmware、Classic1s Firmware、Mini Firmware、Pro Firmware、Touch Firmware
-  { vendorId: 0x1209, productId: 0x4f4a }, // Pro Boot、Touch Boot
-  { vendorId: 0x1209, productId: 0x4f4b }, // Pro Firmware、Touch Firmware（Not implemented Trezor）
-  // { vendorId: 0x1209, productId: 0x4f4c }, // Pro Board
+  { vendorId: 0x1209, productId: 0x53c1 }, // Classic/Classic1s/Mini/Pro/Touch firmware and legacy Pro2; keep for existing devices
+  { vendorId: 0x1209, productId: 0x4f4a }, // Pro bootloader, Touch bootloader, Pro2
+  { vendorId: 0x1209, productId: 0x4f4b }, // Pro/Touch firmware (Trezor not implemented), Pro2
+  { vendorId: 0x1209, productId: 0x4f4c }, // Pro board and Pro2 with the new firmware PID
   // { vendorId: 0x1209, productId: 0x4f50 }, // Touch Board
 ];
 
@@ -137,6 +145,80 @@ export const isOnekeyDevice = (name: string | null, id?: string): boolean => {
     return false;
   }
   if (normalizedName.startsWith('onekey') || normalizedName.startsWith('bixinkey')) return true;
-  if (normalizedName.startsWith('touch ') || normalizedName.startsWith('pro ')) return true;
+  if (
+    normalizedName.startsWith('touch ') ||
+    normalizedName.startsWith('pro ') ||
+    normalizedName.startsWith('pro2 ')
+  ) {
+    return true;
+  }
   return isOneKeyShortName(normalizedName);
+};
+
+type BluetoothDeviceIdentity = {
+  id?: string;
+  name?: string | null;
+  localName?: string | null;
+  serviceUuids?: Array<string | null | undefined> | null;
+};
+
+const BLUETOOTH_BASE_UUID_SUFFIX = '00001000800000805f9b34fb';
+
+export const normalizeBleUuid = (uuid?: string | null) =>
+  (uuid ?? '').replace(/-/g, '').toLowerCase();
+
+export const createKnownBleUuidAliases = (uuid: string): ReadonlySet<string> => {
+  const normalized = normalizeBleUuid(uuid);
+  const aliases = new Set([normalized]);
+
+  if (normalized.length !== 32 || !normalized.endsWith(BLUETOOTH_BASE_UUID_SUFFIX)) {
+    return aliases;
+  }
+
+  const assignedNumber = normalized.slice(0, 8);
+  aliases.add(assignedNumber);
+  if (assignedNumber.startsWith('0000')) {
+    aliases.add(assignedNumber.slice(4));
+  }
+  return aliases;
+};
+
+export const matchesKnownBleUuid = (
+  actualUuid: string | null | undefined,
+  aliases: ReadonlySet<string>
+) => aliases.has(normalizeBleUuid(actualUuid));
+
+const ONEKEY_COMMUNICATION_SERVICE_ALIASES = createKnownBleUuidAliases(ONEKEY_SERVICE_UUID);
+const FIDO_SERVICE_ALIASES = createKnownBleUuidAliases('0000fffd-0000-1000-8000-00805f9b34fb');
+
+const isFindMyAdvertisementName = (value?: string | null) =>
+  /\bfinde?\s+my\b/.test(value?.trim().toLowerCase() ?? '');
+
+export const hasOnekeyCommunicationService = (
+  serviceUuids: Array<string | null | undefined> | null | undefined
+) =>
+  (serviceUuids ?? []).some(uuid =>
+    matchesKnownBleUuid(uuid, ONEKEY_COMMUNICATION_SERVICE_ALIASES)
+  );
+
+export const isOnekeyBluetoothDevice = ({
+  id,
+  name,
+  localName,
+  serviceUuids,
+}: BluetoothDeviceIdentity): boolean => {
+  const advertisedServiceUuids = serviceUuids ?? [];
+  if (isFindMyAdvertisementName(name) || isFindMyAdvertisementName(localName)) {
+    return false;
+  }
+
+  if (hasOnekeyCommunicationService(advertisedServiceUuids)) {
+    return true;
+  }
+
+  if (advertisedServiceUuids.some(uuid => matchesKnownBleUuid(uuid, FIDO_SERVICE_ALIASES))) {
+    return false;
+  }
+
+  return isOnekeyDevice(name ?? null, id) || isOnekeyDevice(localName ?? null, id);
 };

@@ -61,7 +61,7 @@ jobs:
       - name: Install dependencies
         run: |
           echo "📦 Installing dependencies..."
-          yarn
+          yarn install --frozen-lockfile
           yarn bootstrap
 
       - name: Build packages

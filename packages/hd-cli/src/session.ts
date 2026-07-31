@@ -1,11 +1,8 @@
 /**
  * Passphrase session management for hd-cli.
  *
- * Aligns with app-monorepo's CLI pattern:
- *   Login:   getPassphraseState → passphraseState + sessionId → keychain
- *   Command: keychain → preloadSessionCache → SDK call (no passphrase prompt)
- *   Stale:   error 112 → clear keychain → re-prompt → retry
- *   Logout:  keychain delete
+ * Existing keychain entries remain readable for compatibility, but the public
+ * SDK no longer exposes new device session ids for persistence.
  */
 
 import { preloadSessionCache } from '@onekeyfe/hd-core';
@@ -53,25 +50,6 @@ export async function preloadSessionFromKeychain(deviceId: string): Promise<stri
     // Non-fatal — fall through to passphrase prompt
   }
   return undefined;
-}
-
-/**
- * Save passphraseState + sessionId to keychain for next CLI invocation.
- */
-export async function saveSessionToKeychain(
-  deviceId: string,
-  passphraseState: string,
-  sessionId: string
-): Promise<void> {
-  try {
-    const storage = getStorage();
-    await Promise.all([
-      storage.set(psKey(deviceId), Buffer.from(passphraseState, 'utf-8')),
-      storage.set(sidKey(deviceId), Buffer.from(sessionId, 'utf-8')),
-    ]);
-  } catch {
-    // Non-fatal — session still works in-memory for this invocation
-  }
 }
 
 /**

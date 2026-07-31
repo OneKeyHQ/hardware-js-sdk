@@ -7,6 +7,10 @@ import { batchGetPublickeys } from '../helpers/batchGetPublickeys';
 import type { SuiGetAddressParams, SuiPublicKey } from '../../types';
 
 export default class SuiGetPublicKey extends BaseMethod<any> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {
@@ -40,6 +44,9 @@ export default class SuiGetPublicKey extends BaseMethod<any> {
 
   getVersionRange() {
     return {
+      pro2: {
+        min: '0.0.0',
+      },
       model_mini: {
         min: '3.0.0',
       },

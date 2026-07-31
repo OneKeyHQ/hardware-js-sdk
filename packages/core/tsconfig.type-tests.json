@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": [
+    "./src",
+    "./__tests__/kaspa-public-types.type-test.ts",
+    "./__tests__/known-device-public-types.type-test.ts"
+  ],
+  "exclude": ["./dist", "../../node_modules"]
+}

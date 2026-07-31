@@ -5,6 +5,7 @@ import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
 
 import type { NeoSignTx } from '@onekeyfe/hd-transport';
+import type { DeviceFirmwareRange } from '../../types';
 
 export default class NeoSignTransaction extends BaseMethod<NeoSignTx> {
   init() {
@@ -29,7 +30,7 @@ export default class NeoSignTransaction extends BaseMethod<NeoSignTx> {
     };
   }
 
-  getVersionRange() {
+  getVersionRange(): DeviceFirmwareRange {
     return {
       pro: {
         min: '4.12.0',

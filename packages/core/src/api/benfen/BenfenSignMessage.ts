@@ -5,6 +5,7 @@ import { validateParams } from '../helpers/paramsValidator';
 import { stripHexPrefix } from '../helpers/hexUtils';
 
 import type { BenfenSignMessage as HardwareBenfenSignMessage } from '@onekeyfe/hd-transport';
+import type { DeviceFirmwareRange } from '../../types';
 
 export default class BenfenSignMessage extends BaseMethod<HardwareBenfenSignMessage> {
   init() {
@@ -26,7 +27,7 @@ export default class BenfenSignMessage extends BaseMethod<HardwareBenfenSignMess
     };
   }
 
-  getVersionRange() {
+  getVersionRange(): DeviceFirmwareRange {
     return {
       pro: {
         min: '4.12.0',

@@ -28,8 +28,15 @@ export type {
   FirmwareUpdateParams,
   FirmwareUpdateBinaryParams,
   FirmwareUpdateV3Params,
+  FirmwareUpdateV4Params,
+  FirmwareUpdateV4Target,
 } from './firmwareUpdate';
 export type { AllFirmwareRelease } from './checkAllFirmwareRelease';
+export type {
+  ProtocolV2FirmwareComponentRelease,
+  ProtocolV2FirmwareComponentReleaseStatus,
+  ProtocolV2FirmwareReleaseStatus,
+} from './checkAllFirmwareRelease';
 
 export type { AllNetworkAddressParams, AllNetworkGetAddressParams } from './allNetworkGetAddress';
 
@@ -160,6 +167,8 @@ export type {
   KaspaSignTransactionParams,
   KaspaSignInputParams,
   KaspaSignOutputParams,
+  KaspaStreamingSignInputParams,
+  KaspaStreamingSignOutputParams,
 } from './kaspaSignTransaction';
 
 export type { NexaAddress, NexaGetAddressParams } from './nexaGetAddress';

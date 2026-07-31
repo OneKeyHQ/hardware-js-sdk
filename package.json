@@ -23,11 +23,13 @@
     ]
   },
   "scripts": {
+    "agent:check": "node scripts/agent-check.js",
     "bootstrap": "npx patch-package && lerna bootstrap",
     "build": "lerna run build --ignore @onekeyfe/hwk-trezor-protobuf --ignore @onekeyfe/hwk-trezor-protocol --ignore @onekeyfe/hwk-trezor-schema-utils --ignore @onekeyfe/hwk-trezor-transport --ignore @onekeyfe/hwk-trezor-type-utils --ignore @onekeyfe/hwk-trezor-utils",
     "clean": "lerna clean --yes",
     "clean-workspace": "yarn clean && lerna run clean",
     "lint": "eslint .",
+    "lint:agent-context": "node scripts/agent-context-check.js",
     "lint:staged": "lint-staged",
     "test": "lerna run test --ignore @onekeyfe/hwk-trezor-protobuf --ignore @onekeyfe/hwk-trezor-protocol --ignore @onekeyfe/hwk-trezor-schema-utils --ignore @onekeyfe/hwk-trezor-transport --ignore @onekeyfe/hwk-trezor-type-utils --ignore @onekeyfe/hwk-trezor-utils",
     "setup": "yarn && yarn bootstrap && yarn build",

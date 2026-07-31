@@ -1,0 +1,77 @@
+{
+  "format_version": 1,
+  "release_id": "pro2-resource-2026-07-16.1",
+  "display_version": "2026.07.16",
+  "resource_schema": 2,
+  "channel": "stable",
+  "compatibility": {
+    "models": ["pro2"],
+    "hardware_revisions": ["*"],
+    "min_firmware": "2.1.0",
+    "max_firmware": null,
+    "min_bootloader": "1.4.0"
+  },
+  "artifacts": [
+    {
+      "artifact_id": "ui-images",
+      "role": "RESOURCE_UI",
+      "group": "interface",
+      "required": true,
+      "display_name_key": "resource_group_interface",
+      "content_hash": {
+        "algorithm": "SHA3_512",
+        "value": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
+      },
+      "size": 3145728,
+      "object_key": "objects/00/11/0011223344556677.okpkg",
+      "dependencies": []
+    },
+    {
+      "artifact_id": "ui-animations",
+      "role": "RESOURCE_ANIMATION",
+      "group": "animation",
+      "required": false,
+      "display_name_key": "resource_group_animation",
+      "content_hash": {
+        "algorithm": "SHA3_512",
+        "value": "11223344556677889900aabbccddeeff11223344556677889900aabbccddeeff11223344556677889900aabbccddeeff11223344556677889900aabbccddeeff"
+      },
+      "size": 8388608,
+      "object_key": "objects/11/22/1122334455667788.okpkg",
+      "dependencies": ["ui-images"]
+    },
+    {
+      "artifact_id": "translations-zh-hans",
+      "role": "RESOURCE_TRANSLATION",
+      "group": "language",
+      "required": false,
+      "display_name_key": "resource_group_language",
+      "content_hash": {
+        "algorithm": "SHA3_512",
+        "value": "22334455667788990011aabbccddeeff22334455667788990011aabbccddeeff22334455667788990011aabbccddeeff22334455667788990011aabbccddeeff"
+      },
+      "size": 28672,
+      "object_key": "objects/22/33/2233445566778899.okpkg",
+      "dependencies": ["font-noto-sc"]
+    },
+    {
+      "artifact_id": "font-noto-sc",
+      "role": "RESOURCE_FONT",
+      "group": "font",
+      "required": false,
+      "display_name_key": "resource_group_font",
+      "content_hash": {
+        "algorithm": "SHA3_512",
+        "value": "33445566778899001122aabbccddeeff33445566778899001122aabbccddeeff33445566778899001122aabbccddeeff33445566778899001122aabbccddeeff"
+      },
+      "size": 12582912,
+      "object_key": "objects/33/44/3344556677889900.okpkg",
+      "dependencies": []
+    }
+  ],
+  "signature": {
+    "algorithm": "ED25519",
+    "key_id": "resource-manifest-prod-01",
+    "value": "示例签名：实际签名覆盖除 signature.value 外的规范化 Manifest 字节"
+  }
+}

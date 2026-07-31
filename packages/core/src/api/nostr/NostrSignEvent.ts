@@ -10,6 +10,10 @@ import { bytesToHex, hexToBytes } from '../helpers/hexUtils';
 import type { NostrSignEvent as SignEvent } from '@onekeyfe/hd-transport';
 
 export default class NostrSignEvent extends BaseMethod<SignEvent> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {

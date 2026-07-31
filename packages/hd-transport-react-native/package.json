@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hd-transport-react-native",
-  "version": "1.1.34-alpha.1",
+  "version": "1.2.0-alpha.35",
   "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
   "license": "MIT",
   "main": "dist/index.js",
@@ -15,13 +15,14 @@
   "scripts": {
     "dev": "rimraf dist && rollup -c ../../build/rollup.config.js -w",
     "build": "rimraf dist && rollup -c ../../build/rollup.config.js",
+    "test": "jest",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   },
   "dependencies": {
-    "@onekeyfe/hd-core": "1.1.34-alpha.1",
-    "@onekeyfe/hd-shared": "1.1.34-alpha.1",
-    "@onekeyfe/hd-transport": "1.1.34-alpha.1",
+    "@onekeyfe/hd-core": "1.2.0-alpha.35",
+    "@onekeyfe/hd-shared": "1.2.0-alpha.35",
+    "@onekeyfe/hd-transport": "1.2.0-alpha.35",
     "@onekeyfe/react-native-ble-utils": "^0.1.6",
     "react-native-ble-plx": "3.5.1"
   }

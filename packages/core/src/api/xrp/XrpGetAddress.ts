@@ -11,6 +11,10 @@ export default class XrpGetAddress extends BaseMethod<
     show_display: boolean;
   }[]
 > {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   shouldConfirm = false;

@@ -12,15 +12,16 @@ import {
   ONEKEY_NOTIFY_CHARACTERISTIC_UUID,
   ONEKEY_SERVICE_UUID,
   ONEKEY_WRITE_CHARACTERISTIC_UUID,
-  isHeaderChunk,
-  isOnekeyDevice,
+  createKnownBleUuidAliases,
+  hasOnekeyCommunicationService,
+  isOnekeyBluetoothDevice,
+  matchesKnownBleUuid,
   wait,
 } from '@onekeyfe/hd-shared';
-import { COMMON_HEADER_SIZE } from '@onekeyfe/hd-transport';
 import pRetry from 'p-retry';
 
 import { safeLog } from './types/noble-extended';
-import { softRefreshSubscription } from './ble-ops';
+import { runBleCallbackOperation, softRefreshSubscription } from './ble-ops';
 
 import type { IpcMainInvokeEvent, WebContents } from 'electron';
 import type { Characteristic, Peripheral, Service } from '@stoprocent/noble';
@@ -43,6 +44,7 @@ const bluetoothState: {
 
 // Global persistent state listener for app layer
 let persistentStateListener: ((state: string) => void) | null = null;
+let persistentDiscoverListener: ((peripheral: Peripheral) => void) | null = null;
 
 // Device cache and connection state
 const discoveredDevices = new Map<string, Peripheral>();
@@ -54,15 +56,10 @@ const subscribedDevices = new Map<string, boolean>(); // Track subscription stat
 
 // 🔒 Subscription operation state tracking to prevent race conditions
 const subscriptionOperations = new Map<string, 'subscribing' | 'unsubscribing' | 'idle'>();
-
-// Packet reassembly state for each device
-interface PacketAssemblyState {
-  bufferLength: number;
-  buffer: number[];
-  packetCount: number;
-  messageId?: string; // Add message ID to track concurrent requests
-}
-const devicePacketStates = new Map<string, PacketAssemblyState>();
+const deviceDisconnectListeners = new Map<
+  string,
+  { peripheral: Peripheral; listener: () => void }
+>();
 
 // Windows-only response watchdog state moved to utils/windows-ble-recovery
 
@@ -72,18 +69,18 @@ const devicePacketStates = new Map<string, PacketAssemblyState>();
 
 // Service UUIDs to scan for - using constants from hd-shared
 const ONEKEY_SERVICE_UUIDS = [ONEKEY_SERVICE_UUID];
-
-// Pre-normalized characteristic identifiers for fast comparison
-const NORMALIZED_WRITE_UUID = '0002';
-const NORMALIZED_NOTIFY_UUID = '0003';
+const ONEKEY_SERVICE_UUID_ALIASES = createKnownBleUuidAliases(ONEKEY_SERVICE_UUID);
+const ONEKEY_WRITE_UUID_ALIASES = createKnownBleUuidAliases(ONEKEY_WRITE_CHARACTERISTIC_UUID);
+const ONEKEY_NOTIFY_UUID_ALIASES = createKnownBleUuidAliases(ONEKEY_NOTIFY_CHARACTERISTIC_UUID);
 
 // Timeout and interval constants
 const BLUETOOTH_INIT_TIMEOUT = 10000; // 10 seconds for Bluetooth initialization
-const DEVICE_SCAN_TIMEOUT = 5000; // 5 seconds for device scanning
-const FAST_SCAN_TIMEOUT = 1500; // 1.5 seconds for fast targeted scanning
+const DEVICE_SCAN_TIMEOUT = 8000; // 8 seconds for device scanning (Pro2 has longer advertising interval)
+const FAST_SCAN_TIMEOUT = 8000; // 8 seconds for targeted scanning (Pro2 has longer advertising interval)
 const DEVICE_CHECK_INTERVAL = 500; // 500ms interval for periodic device checks
-const CONNECTION_TIMEOUT = 3000; // 3 seconds for device connection
+const CONNECTION_TIMEOUT = 8000; // 8 seconds for device connection (BLE reconnect after release can be slow)
 const SERVICE_DISCOVERY_TIMEOUT = 10000; // 10 seconds for service discovery
+const BLE_CLEANUP_TIMEOUT = 250;
 
 // Write-related constants
 const BLE_PACKET_SIZE = 192;
@@ -94,101 +91,25 @@ const ABORTABLE_WRITE_ERROR_PATTERNS = [
   /status:\s*3/i, // Windows pairing cancelled / GATT write failed
 ];
 
-// Validation limits
-const MIN_HEADER_LENGTH = 9; // Minimum header chunk length
-
-// Packet processing result types
-interface PacketProcessResult {
-  isComplete: boolean;
-  completePacket?: string;
-  error?: string;
+function isOneKeyPeripheral(peripheral: Peripheral) {
+  const serviceUuids = peripheral.advertisement?.serviceUuids;
+  return (
+    hasOnekeyCommunicationService(serviceUuids) &&
+    isOnekeyBluetoothDevice({
+      id: peripheral.id,
+      localName: peripheral.advertisement?.localName,
+      serviceUuids,
+    })
+  );
 }
 
-// Process incoming BLE notification data with proper packet reassembly
-function processNotificationData(deviceId: string, data: Buffer): PacketProcessResult {
-  //  notification telemetry
-  logger?.info('[NobleBLE] Notification', {
-    deviceId,
-    dataLength: data.length,
-  });
-
-  // Get or initialize packet state for this device
-  let packetState = devicePacketStates.get(deviceId);
-  if (!packetState) {
-    packetState = { bufferLength: 0, buffer: [], packetCount: 0 };
-    devicePacketStates.set(deviceId, packetState);
-    logger?.info('[NobleBLE] Initialized new packet state for device:', deviceId);
-  }
-
-  try {
-    if (isHeaderChunk(data)) {
-      // Validate header chunk
-      if (data.length < MIN_HEADER_LENGTH) {
-        return { isComplete: false, error: 'Invalid header chunk: too short' };
-      }
-
-      // Generate message ID for this packet sequence
-      const messageId = `${deviceId}-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-
-      // Reset packet state for new message
-      packetState.bufferLength = data.readInt32BE(5);
-      packetState.buffer = [...data.subarray(3)];
-      packetState.packetCount = 1;
-      packetState.messageId = messageId;
-
-      // Only validate for negative lengths (which would be invalid)
-      if (packetState.bufferLength < 0) {
-        logger?.error('[NobleBLE] Invalid negative packet length detected:', {
-          length: packetState.bufferLength,
-          dataLength: data.length,
-          rawHeader: data.subarray(0, Math.min(16, data.length)).toString('hex'),
-          lengthBytes: data.subarray(5, 9).toString('hex'),
-        });
-        resetPacketState(packetState);
-        return { isComplete: false, error: 'Invalid packet length in header' };
-      }
-    } else {
-      // Validate we have an active packet session
-      if (packetState.bufferLength === 0) {
-        return { isComplete: false, error: 'Received data chunk without header' };
-      }
-
-      // Increment packet counter and append data
-      packetState.packetCount += 1;
-      packetState.buffer = packetState.buffer.concat([...data]);
-    }
-
-    // Check if packet is complete
-    if (packetState.buffer.length - COMMON_HEADER_SIZE >= packetState.bufferLength) {
-      const completeBuffer = Buffer.from(packetState.buffer);
-      const hexString = completeBuffer.toString('hex');
-
-      logger?.info('[NobleBLE] Packet assembled', {
-        deviceId,
-        totalPackets: packetState.packetCount,
-        expectedLength: packetState.bufferLength,
-        actualLength: packetState.buffer.length - COMMON_HEADER_SIZE,
-      });
-
-      // Reset packet state for next message
-      resetPacketState(packetState);
-
-      return { isComplete: true, completePacket: hexString };
-    }
-
-    return { isComplete: false };
-  } catch (error) {
-    resetPacketState(packetState);
-    return { isComplete: false, error: `Packet processing error: ${error}` };
-  }
-}
-
-// Reset packet state to clean state
-function resetPacketState(packetState: PacketAssemblyState): void {
-  packetState.bufferLength = 0;
-  packetState.buffer = [];
-  packetState.packetCount = 0;
-  packetState.messageId = undefined;
+/**
+ * Forward a single BLE notification chunk (not an assembled packet) to the
+ * renderer-side transport. Packet reassembly is handled by ElectronBleTransport.
+ */
+function emitRawNotification(deviceId: string, data: Buffer): void {
+  const appCb = notificationCallbacks.get(deviceId);
+  if (appCb) appCb(data.toString('hex'));
 }
 
 // Check Bluetooth availability - returns detailed state
@@ -250,7 +171,6 @@ function setupPersistentStateListener(): void {
       deviceCharacteristics.clear();
       subscribedDevices.clear();
       notificationCallbacks.clear();
-      devicePacketStates.clear();
       subscriptionOperations.clear();
       pairedDevices.clear();
 
@@ -361,9 +281,12 @@ async function initializeNoble(): Promise<void> {
     });
 
     // Set up device discovery
-    noble.on('discover', (peripheral: Peripheral) => {
-      handleDeviceDiscovered(peripheral);
-    });
+    if (!persistentDiscoverListener) {
+      persistentDiscoverListener = (peripheral: Peripheral) => {
+        handleDeviceDiscovered(peripheral);
+      };
+      noble.on('discover', persistentDiscoverListener);
+    }
 
     logger?.info('[NobleBLE] Noble initialized successfully');
   } catch (error) {
@@ -425,10 +348,14 @@ function cleanupDevice(
 
   // 1. Clean up connection state
   if (cleanupConnection) {
+    const disconnectEntry = deviceDisconnectListeners.get(deviceId);
+    if (disconnectEntry) {
+      disconnectEntry.peripheral.removeListener('disconnect', disconnectEntry.listener);
+      deviceDisconnectListeners.delete(deviceId);
+    }
     connectedDevices.delete(deviceId);
     deviceCharacteristics.delete(deviceId);
     notificationCallbacks.delete(deviceId);
-    devicePacketStates.delete(deviceId);
     subscribedDevices.delete(deviceId);
     subscriptionOperations.delete(deviceId);
     pairedDevices.delete(deviceId);
@@ -475,13 +402,16 @@ function setupDisconnectListener(
   deviceId: string,
   webContents: WebContents
 ): void {
-  // Remove any existing disconnect listeners to avoid duplicates
-  peripheral.removeAllListeners('disconnect');
+  const existing = deviceDisconnectListeners.get(deviceId);
+  if (existing) {
+    existing.peripheral.removeListener('disconnect', existing.listener);
+  }
 
-  // Set up new disconnect listener
-  peripheral.on('disconnect', () => {
+  const listener = () => {
     handleDeviceDisconnect(deviceId, webContents);
-  });
+  };
+  deviceDisconnectListeners.set(deviceId, { peripheral, listener });
+  peripheral.on('disconnect', listener);
 }
 
 // ===== Write helpers (inline) =====
@@ -590,8 +520,7 @@ async function attemptWindowsWriteUntilPaired(
         subscriptionOperations,
         subscribedDevices,
         pairedDevices,
-        notificationCallbacks,
-        processNotificationData,
+        onNotificationData: emitRawNotification,
         logger,
       });
       logger?.info('[BLE-Write] Subscription refresh completed', { deviceId });
@@ -618,12 +547,6 @@ async function transmitHexDataToDevice(deviceId: string, hexData: string): Promi
   }
 
   const toBuffer = Buffer.from(hexData, 'hex');
-  logger?.info('[NobleBLE] Writing data:', {
-    deviceId,
-    dataLength: toBuffer.length,
-    firstBytes: toBuffer.subarray(0, 8).toString('hex'),
-  });
-
   const doGetWriteCharacteristic = () => deviceCharacteristics.get(deviceId)?.write;
 
   if (!IS_WINDOWS || pairedDevices.has(deviceId)) {
@@ -685,15 +608,21 @@ async function transmitHexDataToDevice(deviceId: string, hexData: string): Promi
 
 // Handle discovered device (for general enumeration only)
 function handleDeviceDiscovered(peripheral: Peripheral): void {
-  const deviceName = peripheral.advertisement?.localName || 'Unknown Device';
-
-  // Only process OneKey devices for general discovery
-  if (!isOnekeyDevice(deviceName)) {
+  // Only process OneKey candidates for general discovery. Avoid logging every
+  // ambient BLE peripheral; it makes Pro2 debugging hard to read.
+  if (!isOneKeyPeripheral(peripheral)) {
     return;
   }
 
-  logger?.info('[NobleBLE] Discovered OneKey device:', deviceName);
+  const isNewDevice = !discoveredDevices.has(peripheral.id);
   discoveredDevices.set(peripheral.id, peripheral);
+  if (isNewDevice) {
+    logger?.debug('[NobleBLE] OneKey BLE device discovered', {
+      deviceId: peripheral.id,
+      name: peripheral.advertisement?.localName || 'Unknown Device',
+      serviceUUIDs: peripheral.advertisement?.serviceUuids || [],
+    });
+  }
 }
 
 // Ensure discover listener is properly set up
@@ -701,16 +630,14 @@ function handleDeviceDiscovered(peripheral: Peripheral): void {
 function ensureDiscoverListener(): void {
   if (!noble) return;
 
-  // Check if discover listener exists by checking listener count
-  const listenerCount = (noble as any).listenerCount('discover');
-
-  if (listenerCount === 0) {
+  if (!persistentDiscoverListener) {
     logger?.info('[NobleBLE] Discover listener missing, re-adding it');
-    noble.on('discover', (peripheral: Peripheral) => {
+    persistentDiscoverListener = (peripheral: Peripheral) => {
       handleDeviceDiscovered(peripheral);
-    });
+    };
+    noble.on('discover', persistentDiscoverListener);
   } else {
-    logger?.debug('[NobleBLE] Discover listener already exists, count:', listenerCount);
+    logger?.debug('[NobleBLE] Discover listener already registered');
   }
 }
 
@@ -729,7 +656,7 @@ async function performTargetedScan(targetDeviceId: string): Promise<Peripheral |
   return new Promise((resolve, reject) => {
     // Local discover listener - only matches target device
     const onDiscover = (peripheral: Peripheral) => {
-      if (peripheral.id === targetDeviceId) {
+      if (peripheral.id === targetDeviceId && isOneKeyPeripheral(peripheral)) {
         logger?.info('[NobleBLE] Target device found during targeted scan:', {
           id: peripheral.id,
           name: peripheral.advertisement?.localName,
@@ -753,8 +680,8 @@ async function performTargetedScan(targetDeviceId: string): Promise<Peripheral |
     // Add local listener for this scan
     nobleInstance.on('discover', onDiscover);
 
-    // Start scanning
-    nobleInstance.startScanning(ONEKEY_SERVICE_UUIDS, false, (error?: Error) => {
+    // Start scanning — no service UUID filter (Pro2 may use different service UUID)
+    nobleInstance.startScanning([], false, (error?: Error) => {
       if (error) {
         clearTimeout(timeoutId);
         nobleInstance.removeListener('discover', onDiscover);
@@ -816,15 +743,19 @@ async function enumerateDevices(): Promise<DeviceInfo[]> {
       });
     };
 
-    // Set timeout for scanning
+    // Set timeout for scanning — use longer timeout to catch slow-advertising devices like Pro2
     const timeoutId = setTimeout(() => {
+      // Final collection before resolving — catches devices discovered near the deadline
+      checkDevices();
       cleanup();
       logger?.info('[NobleBLE] Scan completed, found devices:', devices.length);
       resolve(devices);
     }, DEVICE_SCAN_TIMEOUT);
 
-    // Start scanning for OneKey service UUIDs
-    nobleInstance.startScanning(ONEKEY_SERVICE_UUIDS, false, (error?: Error) => {
+    // Start scanning without a service UUID filter so Pro2 advertisements with
+    // short vendor UUIDs can be found, but only OneKey candidates are logged/returned.
+    logger?.info('[NobleBLE] Scanning for OneKey BLE devices');
+    nobleInstance.startScanning([], false, (error?: Error) => {
       if (error) {
         cleanup();
         logger?.error('[NobleBLE] Failed to start scanning:', error);
@@ -843,30 +774,24 @@ async function enumerateDevices(): Promise<DeviceInfo[]> {
 // Stop scanning
 async function stopScanning(): Promise<void> {
   if (!noble) return;
-
-  return new Promise<void>(resolve => {
-    if (!noble) {
-      resolve();
-      return;
-    }
-
-    noble.stopScanning(() => {
-      logger?.info('[NobleBLE] Scanning stopped');
-      resolve();
-    });
+  const nobleInstance = noble;
+  await runBleCallbackOperation(callback => nobleInstance.stopScanning(() => callback()), {
+    timeoutMs: BLE_CLEANUP_TIMEOUT,
+    timeoutBehavior: 'resolve',
   });
+  logger?.info('[NobleBLE] Scanning stopped');
 }
 
 // Clean up all Noble listeners (for app exit)
 function cleanupNobleListeners(): void {
   if (!noble) return;
 
-  // Remove all listeners to prevent memory leaks
-  // Noble uses EventEmitter, need to use removeAllListeners
   try {
-    (noble as any).removeAllListeners('discover');
-    (noble as any).removeAllListeners('stateChange');
-    logger?.info('[NobleBLE] All Noble listeners cleaned up');
+    if (persistentDiscoverListener) {
+      noble.removeListener('discover', persistentDiscoverListener);
+      persistentDiscoverListener = null;
+    }
+    logger?.info('[NobleBLE] Owned Noble listeners cleaned up');
   } catch (error) {
     logger?.error('[NobleBLE] Failed to clean up some listeners:', error);
   }
@@ -952,9 +877,9 @@ async function discoverServicesAndCharacteristics(
 
   // Main discovery logic as async function
   const discoveryPromise = (async (): Promise<CharacteristicPair> => {
-    // Step 1: Discover services (promisified)
+    // Step 1: Discover ALL services (no filter — Pro2 may use different service UUID)
     const services = await new Promise<Service[]>((resolve, reject) => {
-      peripheral.discoverServices(ONEKEY_SERVICE_UUIDS, (error, svc) => {
+      peripheral.discoverServices([], (error, svc) => {
         if (error) {
           logger?.error('[NobleBLE] Service discovery failed:', error);
           reject(ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, error.message));
@@ -965,51 +890,47 @@ async function discoverServicesAndCharacteristics(
     });
 
     if (!services || services.length === 0) {
-      throw ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, 'No OneKey services found');
+      throw ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, 'No services found');
     }
 
-    const service = services[0];
-    logger?.info('[NobleBLE] Found service:', service.uuid);
+    logger?.debug('[NobleBLE] services discovered', {
+      deviceId: peripheral.id,
+      serviceUUIDs: services.map(service => service.uuid),
+    });
 
-    // Step 2: Discover characteristics (promisified)
+    // Find OneKey service — Noble may expose 128-bit UUIDs as short UUID keys.
+    const service = services.find(s => matchesKnownBleUuid(s.uuid, ONEKEY_SERVICE_UUID_ALIASES));
+    if (!service) {
+      throw ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound);
+    }
+    const selectedService = service;
+    logger?.debug('[NobleBLE] service selected', {
+      deviceId: peripheral.id,
+      serviceUuid: selectedService.uuid,
+    });
+    // Step 2: Discover ALL characteristics (no filter)
     const characteristics = await new Promise<Characteristic[]>((resolve, reject) => {
-      service.discoverCharacteristics(
-        [ONEKEY_WRITE_CHARACTERISTIC_UUID, ONEKEY_NOTIFY_CHARACTERISTIC_UUID],
-        (error, chars) => {
-          if (error) {
-            logger?.error('[NobleBLE] Characteristic discovery failed:', error);
-            reject(ERRORS.TypedError(HardwareErrorCode.BleCharacteristicNotFound, error.message));
-          } else {
-            resolve(chars);
-          }
+      selectedService.discoverCharacteristics([], (error, chars) => {
+        if (error) {
+          logger?.error('[NobleBLE] Characteristic discovery failed:', error);
+          reject(ERRORS.TypedError(HardwareErrorCode.BleCharacteristicNotFound, error.message));
+        } else {
+          resolve(chars);
         }
-      );
+      });
     });
 
     // Step 3: Find required characteristics
-    logger?.info('[NobleBLE] Discovered characteristics:', {
-      count: characteristics?.length || 0,
-      uuids: characteristics?.map(c => c.uuid) || [],
-    });
-
     let writeCharacteristic: Characteristic | null = null;
     let notifyCharacteristic: Characteristic | null = null;
 
     for (const characteristic of characteristics) {
-      const uuid = characteristic.uuid.replace(/-/g, '').toLowerCase();
-      const uuidKey = uuid.length >= 8 ? uuid.substring(4, 8) : uuid;
-
-      if (uuidKey === NORMALIZED_WRITE_UUID) {
+      if (matchesKnownBleUuid(characteristic.uuid, ONEKEY_WRITE_UUID_ALIASES)) {
         writeCharacteristic = characteristic;
-      } else if (uuidKey === NORMALIZED_NOTIFY_UUID) {
+      } else if (matchesKnownBleUuid(characteristic.uuid, ONEKEY_NOTIFY_UUID_ALIASES)) {
         notifyCharacteristic = characteristic;
       }
     }
-
-    logger?.info('[NobleBLE] Characteristic discovery result:', {
-      writeFound: !!writeCharacteristic,
-      notifyFound: !!notifyCharacteristic,
-    });
 
     if (!writeCharacteristic || !notifyCharacteristic) {
       logger?.error(
@@ -1023,6 +944,13 @@ async function discoverServicesAndCharacteristics(
         'Required characteristics not found'
       );
     }
+
+    logger?.debug('[NobleBLE] characteristics selected', {
+      deviceId: peripheral.id,
+      serviceUuid: selectedService.uuid,
+      writeUuid: writeCharacteristic.uuid,
+      notifyUuid: notifyCharacteristic.uuid,
+    });
 
     return { write: writeCharacteristic, notify: notifyCharacteristic };
   })();
@@ -1056,29 +984,23 @@ async function forceReconnectPeripheral(peripheral: Peripheral, deviceId: string
 
   // Step 2: Force disconnect if connected
   if (peripheral.state === 'connected') {
-    // Remove disconnect listener before intentional disconnect to avoid spurious events
-    peripheral.removeAllListeners('disconnect');
-    await new Promise<void>(resolve => {
-      peripheral.disconnect(() => {
-        logger?.info('[NobleBLE] Force disconnect completed');
-        resolve();
-      });
-    });
+    await runBleCallbackOperation(
+      callback =>
+        peripheral.disconnect(() => {
+          logger?.info('[NobleBLE] Force disconnect completed');
+          callback();
+        }),
+      { timeoutMs: BLE_CLEANUP_TIMEOUT, timeoutBehavior: 'resolve' }
+    );
   }
 
   // Step 3: Re-establish connection
-  await new Promise<void>((resolve, reject) => {
-    peripheral.connect((error: Error | undefined) => {
-      if (error) {
-        logger?.error('[NobleBLE] Force reconnect failed:', error);
-        reject(ERRORS.TypedError(HardwareErrorCode.BleConnectedError, error.message));
-      } else {
-        logger?.info('[NobleBLE] Force reconnect successful');
-        connectedDevices.set(deviceId, peripheral);
-        resolve();
-      }
-    });
+  await runBleCallbackOperation(callback => peripheral.connect(callback), {
+    timeoutMs: CONNECTION_TIMEOUT,
+    timeoutBehavior: 'reject',
   });
+  logger?.info('[NobleBLE] Force reconnect successful');
+  connectedDevices.set(deviceId, peripheral);
 
   // Wait for connection to stabilize
   await wait(500);
@@ -1209,16 +1131,26 @@ async function setupConnectionAndDiscoverServices(
   deviceId: string,
   webContents: WebContents
 ): Promise<CharacteristicPair> {
-  // Force reconnect to clear GATT cache
-  await forceReconnectPeripheral(peripheral, deviceId);
   setupDisconnectListener(peripheral, deviceId, webContents);
 
-  // Discover services and characteristics with retry
   try {
     return await discoverServicesAndCharacteristicsWithRetry(peripheral, deviceId);
-  } catch (error) {
-    // Last resort: fresh scan to get new peripheral object
-    logger?.error('[NobleBLE] Service discovery failed, attempting fresh scan...', error);
+  } catch (initialError) {
+    logger?.info('[NobleBLE] Direct service discovery failed, retrying after reconnect', {
+      deviceId,
+      error: initialError,
+    });
+  }
+
+  await forceReconnectPeripheral(peripheral, deviceId);
+  setupDisconnectListener(peripheral, deviceId, webContents);
+  try {
+    return await discoverServicesAndCharacteristicsWithRetry(peripheral, deviceId);
+  } catch (reconnectError) {
+    logger?.error(
+      '[NobleBLE] Service discovery failed after reconnect, attempting fresh scan...',
+      reconnectError
+    );
     return freshScanAndDiscover(deviceId, webContents);
   }
 }
@@ -1320,7 +1252,6 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
         existingCharacteristics.notify.removeAllListeners('data');
       }
       notificationCallbacks.delete(deviceId);
-      devicePacketStates.delete(deviceId);
       subscribedDevices.delete(deviceId);
       // Continue to re-setup the connection properly
     }
@@ -1382,20 +1313,21 @@ async function disconnectDevice(deviceId: string): Promise<void> {
     return;
   }
 
-  return new Promise<void>(resolve => {
-    // Remove disconnect listener to avoid triggering handleDeviceDisconnect
-    peripheral.removeAllListeners('disconnect');
+  const disconnectEntry = deviceDisconnectListeners.get(deviceId);
+  if (disconnectEntry) {
+    disconnectEntry.peripheral.removeListener('disconnect', disconnectEntry.listener);
+    deviceDisconnectListeners.delete(deviceId);
+  }
 
-    peripheral.disconnect(() => {
-      // Clean up device state using unified function
-      cleanupDevice(deviceId, undefined, {
-        cleanupConnection: true,
-        sendDisconnectEvent: false,
-        cancelOperations: true,
-        reason: 'manual-disconnect',
-      });
-      resolve();
-    });
+  await runBleCallbackOperation(callback => peripheral.disconnect(() => callback()), {
+    timeoutMs: BLE_CLEANUP_TIMEOUT,
+    timeoutBehavior: 'resolve',
+  });
+  cleanupDevice(deviceId, undefined, {
+    cleanupConnection: true,
+    sendDisconnectEvent: false,
+    cancelOperations: true,
+    reason: 'manual-disconnect',
   });
 }
 
@@ -1416,22 +1348,15 @@ async function unsubscribeNotifications(deviceId: string): Promise<void> {
   subscriptionOperations.set(deviceId, 'unsubscribing');
 
   try {
-    await new Promise<void>((resolve, reject) => {
-      notifyCharacteristic.unsubscribe((error: Error | undefined) => {
-        if (error) {
-          logger?.error('[NobleBLE] Notification unsubscription failed:', error);
-          reject(error);
-        } else {
-          logger?.info('[NobleBLE] Notification unsubscription successful');
-          resolve();
-        }
-      });
+    await runBleCallbackOperation(callback => notifyCharacteristic.unsubscribe(callback), {
+      timeoutMs: BLE_CLEANUP_TIMEOUT,
+      timeoutBehavior: 'resolve',
     });
+    logger?.info('[NobleBLE] Notification unsubscription completed');
 
     // Remove all listeners and clear subscription status
     notifyCharacteristic.removeAllListeners('data');
     notificationCallbacks.delete(deviceId);
-    devicePacketStates.delete(deviceId);
     subscribedDevices.delete(deviceId);
   } finally {
     // 🔒 CRITICAL: Always clear operation state (even on error)
@@ -1498,14 +1423,6 @@ async function subscribeNotifications(
     // Just update the callback without re-subscribing
     notificationCallbacks.set(deviceId, callback);
 
-    // Reset packet state for new session
-    devicePacketStates.set(deviceId, {
-      bufferLength: 0,
-      buffer: [],
-      packetCount: 0,
-      messageId: undefined,
-    });
-
     // 🔒 Clear operation state
     subscriptionOperations.set(deviceId, 'idle');
     return Promise.resolve();
@@ -1522,33 +1439,19 @@ async function subscribeNotifications(
   // Store callback for this device
   notificationCallbacks.set(deviceId, callback);
 
-  // Reset packet state for new subscription session
-  devicePacketStates.set(deviceId, {
-    bufferLength: 0,
-    buffer: [],
-    packetCount: 0,
-    messageId: undefined,
-  });
-
   // Helper: rebuild a clean application-layer subscription
   async function rebuildAppSubscription(
     deviceId: string,
     notifyCharacteristic: Characteristic
   ): Promise<void> {
     // Listeners already cleaned up above, no need to repeat
-    await new Promise<void>(resolve => {
-      notifyCharacteristic.unsubscribe(() => {
-        resolve();
-      });
+    await runBleCallbackOperation(callback => notifyCharacteristic.unsubscribe(callback), {
+      timeoutMs: BLE_CLEANUP_TIMEOUT,
+      timeoutBehavior: 'resolve',
     });
-    await new Promise<void>((resolve, reject) => {
-      notifyCharacteristic.subscribe((error?: Error) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-        resolve();
-      });
+    await runBleCallbackOperation(callback => notifyCharacteristic.subscribe(callback), {
+      timeoutMs: CONNECTION_TIMEOUT,
+      timeoutBehavior: 'reject',
     });
 
     notifyCharacteristic.on('data', (data: Buffer) => {
@@ -1558,15 +1461,7 @@ async function subscribeNotifications(
         logger?.info('[NobleBLE] Device paired successfully', { deviceId });
       }
 
-      const result = processNotificationData(deviceId, data);
-      if (result.error) {
-        logger?.error('[NobleBLE] Packet processing error:', result.error);
-        return;
-      }
-      if (result.isComplete && result.completePacket) {
-        const appCb = notificationCallbacks.get(deviceId);
-        if (appCb) appCb(result.completePacket);
-      }
+      emitRawNotification(deviceId, data);
     });
   }
 
@@ -1581,29 +1476,25 @@ async function subscribeNotifications(
 
 // Setup IPC handlers
 export function setupNobleBleHandlers(webContents: WebContents): void {
-  // Use console.log for initial logging as electron-log might not be available yet.
-  console.log('[NobleBLE] Attempting to set up Noble BLE handlers.');
   try {
-    console.log('[NobleBLE] NOBLE_VERSION_771');
-
     // @ts-ignore – electron-log is only available at runtime
     // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
     logger = require('electron-log') as Logger;
-    console.log('[NobleBLE] electron-log loaded successfully.');
 
     // @ts-ignore – electron is only available at runtime
     // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
     const { ipcMain } = require('electron');
-    console.log('[NobleBLE] electron.ipcMain loaded successfully.');
 
     safeLog(logger, 'info', 'Setting up Noble BLE IPC handlers');
 
     // Handle enumerate request
-    console.log(`[NobleBLE] Registering handler for: ${EOneKeyBleMessageKeys.NOBLE_BLE_ENUMERATE}`);
     ipcMain.handle(EOneKeyBleMessageKeys.NOBLE_BLE_ENUMERATE, async () => {
       try {
         const devices = await enumerateDevices();
-        safeLog(logger, 'info', 'Enumeration completed, devices:', devices);
+        safeLog(logger, 'debug', 'Enumeration completed', {
+          count: devices.length,
+          devices: devices.map(device => ({ id: device.id, name: device.name })),
+        });
         return devices;
       } catch (error) {
         safeLog(logger, 'error', 'Enumeration failed:', error);
@@ -1648,7 +1539,6 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
     ipcMain.handle(
       EOneKeyBleMessageKeys.NOBLE_BLE_WRITE,
       async (_event: IpcMainInvokeEvent, deviceId: string, hexData: string) => {
-        logger?.info('[NobleBLE] IPC WRITE', { deviceId, len: hexData.length });
         await transmitHexDataToDevice(deviceId, hexData);
       }
     );
@@ -1713,32 +1603,24 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
     // Cleanup on app quit
     webContents.on('destroyed', () => {
       safeLog(logger, 'info', 'Cleaning up Noble BLE handlers');
+      (async () => {
+        const deviceIds = Array.from(connectedDevices.keys());
+        for (const deviceId of deviceIds) {
+          await unsubscribeNotifications(deviceId).catch(() => undefined);
+          await disconnectDevice(deviceId).catch(() => undefined);
+        }
 
-      // 1. Clean up all connected devices (unified cleanup, avoid duplicates)
-      const deviceIds = Array.from(connectedDevices.keys());
-      deviceIds.forEach(deviceId => {
-        cleanupDevice(deviceId, undefined, {
-          cleanupConnection: true,
-          sendDisconnectEvent: false,
-          cancelOperations: true,
-          reason: 'app-quit',
-        });
+        await stopScanning().catch(() => undefined);
+        if (noble && persistentStateListener) {
+          noble.removeListener('stateChange', persistentStateListener);
+          persistentStateListener = null;
+        }
+        cleanupNobleListeners();
+        discoveredDevices.clear();
+        safeLog(logger, 'info', 'Noble BLE cleanup completed');
+      })().catch(error => {
+        safeLog(logger, 'error', 'Noble BLE cleanup failed', error);
       });
-
-      // 2. Stop scanning
-      stopScanning();
-
-      // 3. Clean up Noble listeners
-      if (noble && persistentStateListener) {
-        noble.removeListener('stateChange', persistentStateListener);
-        persistentStateListener = null;
-      }
-      cleanupNobleListeners();
-
-      // 4. Clear discovered devices cache
-      discoveredDevices.clear();
-
-      safeLog(logger, 'info', 'Noble BLE cleanup completed');
     });
 
     safeLog(logger, 'info', 'Noble BLE IPC handlers setup completed');

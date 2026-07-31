@@ -1,5 +1,8 @@
+import { createKnownBleUuidAliases, matchesKnownBleUuid } from '@onekeyfe/hd-shared';
+
 export const IOS_PACKET_LENGTH = 128;
 export const ANDROID_PACKET_LENGTH = 192;
+export const ANDROID_DEFAULT_MTU = 23;
 
 type BluetoothServices = Record<
   string,
@@ -35,9 +38,24 @@ export const getInfosForServiceUuid = (serviceUuid: string, deviceType: 'classic
   if (!services) {
     return null;
   }
-  const service = services[serviceUuid];
+  const normalizedServiceUuid = normalizeBleUuid(serviceUuid);
+  const service =
+    services[serviceUuid] ??
+    Object.values(services).find(
+      item =>
+        normalizeBleUuid(item.serviceUuid) === normalizedServiceUuid ||
+        matchesKnownBleUuid(serviceUuid, createKnownBleUuidAliases(item.serviceUuid))
+    );
   if (!service) {
     return null;
   }
   return service;
+};
+
+export const normalizeBleUuid = (uuid?: string | null) =>
+  (uuid ?? '').replace(/-/g, '').toLowerCase();
+
+export const isSameBleUuid = (left?: string | null, right?: string | null) => {
+  if (!left || !right) return false;
+  return matchesKnownBleUuid(left, createKnownBleUuidAliases(right));
 };

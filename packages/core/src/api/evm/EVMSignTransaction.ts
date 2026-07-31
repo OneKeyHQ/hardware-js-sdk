@@ -5,9 +5,9 @@ import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
-import TransportManager from '../../data-manager/TransportManager';
 import { signTransaction } from './latest/signTransaction';
 import { signTransaction as signTransactionLegacyV1 } from './legacyV1/signTransaction';
+import { shouldUseLegacyV1EvmMessages } from './protocol';
 
 import type {
   EVMSignTransactionParams,
@@ -18,6 +18,10 @@ import type {
 import type { SchemaParam } from '../helpers/paramsValidator';
 
 export default class EVMSignTransaction extends BaseMethod {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   addressN: number[] = [];
 
   isEIP1559 = false;
@@ -122,7 +126,7 @@ export default class EVMSignTransaction extends BaseMethod {
 
     if (formattedTx == null) throw ERRORS.TypedError('Runtime', 'formattedTx is not set');
 
-    if (TransportManager.getMessageVersion() === 'v1') {
+    if (shouldUseLegacyV1EvmMessages(this.device)) {
       return signTransactionLegacyV1({
         typedCall: this.device.commands.typedCall.bind(this.device.commands),
         addressN,

@@ -3,13 +3,17 @@ import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
-import TransportManager from '../../data-manager/TransportManager';
 import signMessage from './latest/signMessage';
 import signMessageLegacyV1 from './legacyV1/signMessage';
+import { shouldUseLegacyV1EvmMessages } from './protocol';
 
 import type { EthereumSignMessageOneKey } from '@onekeyfe/hd-transport';
 
 export default class EVMSignMessage extends BaseMethod<EthereumSignMessageOneKey> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
@@ -36,7 +40,7 @@ export default class EVMSignMessage extends BaseMethod<EthereumSignMessageOneKey
   }
 
   async run() {
-    if (TransportManager.getMessageVersion() === 'v1') {
+    if (shouldUseLegacyV1EvmMessages(this.device)) {
       return signMessageLegacyV1({
         typedCall: this.device.commands.typedCall.bind(this.device.commands),
         params: this.params,

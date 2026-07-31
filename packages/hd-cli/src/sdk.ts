@@ -5,8 +5,8 @@
  * Passphrase flow aligns with app-monorepo CLI:
  *   - Standard wallet: --use-empty-passphrase, auto-respond
  *   - Hidden wallet: interactive 1/2/3 selection (standard / pinentry / on-device)
- *   - Session caching: passphraseState + sessionId stored in OS keychain,
- *     preloaded via preloadSessionCache on next invocation
+ *   - Legacy session caching: existing OS keychain entries may still be preloaded,
+ *     but public SDK responses never expose new device session ids
  */
 
 import * as readline from 'node:readline';
@@ -14,14 +14,17 @@ import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
 import { DEVICE, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 
 import { promptPassphraseViaPinentry } from './pinentry';
+import { createNobleBlePlugin } from './transports/nobleBlePlugin';
 
-import type { ConnectSettings } from '@onekeyfe/hd-core';
+import type { ConnectSettings, KnownDevice } from '@onekeyfe/hd-core';
 import type { PinentryResult } from './pinentry';
 
 export interface SDKOptions {
   connectId?: string;
   passphraseState?: string;
   useEmptyPassphrase?: boolean;
+  debug?: boolean;
+  transport?: 'usb' | 'ble';
 }
 
 /**
@@ -166,12 +169,12 @@ function registerEventHandlers(sdk: typeof HardwareSDK): void {
     }
   });
 
-  sdk.on(DEVICE.CONNECT, (device: any) => {
+  sdk.on(DEVICE.CONNECT, ({ device }: { device: KnownDevice }) => {
     const name = device?.label || device?.name;
     if (name) process.stderr.write(`[onekey-hw] Device connected: ${name}\n`);
   });
 
-  sdk.on(DEVICE.DISCONNECT, (device: any) => {
+  sdk.on(DEVICE.DISCONNECT, ({ device }: { device: KnownDevice }) => {
     const name = device?.label || device?.name;
     if (name) process.stderr.write(`[onekey-hw] Device disconnected: ${name}\n`);
   });
@@ -182,12 +185,17 @@ function registerEventHandlers(sdk: typeof HardwareSDK): void {
 // ---------------------------------------------------------------------------
 
 async function initSDK(): Promise<typeof HardwareSDK> {
+  const transport = currentOpts.transport ?? 'usb';
   const settings: Partial<ConnectSettings> = {
-    debug: false,
+    debug: currentOpts.debug ?? false,
     fetchConfig: true,
-    env: 'node-usb',
+    env: transport === 'ble' ? 'lowlevel' : 'node-usb',
   };
-  await HardwareSDK.init(settings);
+  await HardwareSDK.init(
+    settings,
+    undefined,
+    transport === 'ble' ? createNobleBlePlugin() : undefined
+  );
 
   // Defensive: strip any stale listeners (e.g. left over from a previous
   // dispose/init cycle in a long-running process) before wiring ours.
@@ -223,7 +231,7 @@ export async function disposeSDK(): Promise<void> {
   if (!sdkReadyPromise) return;
   try {
     const sdk = await sdkReadyPromise;
-    sdk.dispose();
+    await Promise.resolve(sdk.dispose());
   } catch {
     // ignore errors during cleanup
   } finally {

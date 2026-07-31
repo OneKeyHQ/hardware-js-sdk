@@ -7,6 +7,12 @@ import type { ConfluxGetAddress as HardwareConfluxGetAddress } from '@onekeyfe/h
 import type { ConfluxAddress, ConfluxGetAddressParams } from '../../types/api/confluxGetAddress';
 
 export default class ConfluxGetAddress extends BaseMethod<HardwareConfluxGetAddress[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
+  checkDeviceId = true;
+
   hasBundle = false;
 
   init() {

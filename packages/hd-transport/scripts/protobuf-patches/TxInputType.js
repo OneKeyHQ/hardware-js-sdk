@@ -29,6 +29,7 @@ type CommonTxInputType = {|
     witness?: string, // used by EXTERNAL, depending on script_pubkey
     ownership_proof?: string, // used by EXTERNAL, depending on script_pubkey
     commitment_data?: string, // used by EXTERNAL, depending on ownership_proof
+    coinjoin_flags?: number, // Protocol V2 only (CoinJoin)
 |};
 
 export type TxInputType =

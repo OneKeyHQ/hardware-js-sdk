@@ -1,24 +1,24 @@
 import semver from 'semver';
 import { bytesToHex } from '@noble/hashes/utils';
+import { EDeviceType } from '@onekeyfe/hd-shared';
 
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
-import { getDeviceFirmwareVersion, getDeviceType } from '../../utils';
 import { DeviceModelToTypes } from '../../types';
 
-import type {
-  SuiSignTx as HardwareSuiSignTx,
-  SuiSignedTx,
-  TypedCall,
-} from '@onekeyfe/hd-transport';
-import type { TypedResponseMessage } from '../../device/DeviceCommands';
+import type { SuiSignTx as HardwareSuiSignTx, SuiSignedTx } from '@onekeyfe/hd-transport';
+import type { TypedCall, TypedResponseMessage } from '../../device/DeviceCommands';
 
 type SuiSignTx = Omit<HardwareSuiSignTx, 'data_initial_chunk' | 'data_length'> & HardwareSuiSignTx;
 
 export default class SuiSignTransaction extends BaseMethod<SuiSignTx> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
@@ -43,6 +43,9 @@ export default class SuiSignTransaction extends BaseMethod<SuiSignTx> {
 
   getVersionRange() {
     return {
+      pro2: {
+        min: '0.0.0',
+      },
       model_mini: {
         min: '3.0.0',
       },
@@ -53,8 +56,12 @@ export default class SuiSignTransaction extends BaseMethod<SuiSignTx> {
   }
 
   supportChunkTransfer() {
-    const deviceType = getDeviceType(this.device.features);
-    const deviceFirmwareVersion = getDeviceFirmwareVersion(this.device.features).join('.');
+    if (this.device.isProtocolV2() || this.device.getCurrentDeviceType() === EDeviceType.Pro2) {
+      return true;
+    }
+
+    const deviceType = this.device.getCurrentDeviceType();
+    const deviceFirmwareVersion = this.device.getCurrentFirmwareVersionString() ?? '0.0.0';
 
     if (DeviceModelToTypes.model_mini.includes(deviceType)) {
       if (semver.valid(deviceFirmwareVersion)) {
@@ -85,7 +92,7 @@ export default class SuiSignTransaction extends BaseMethod<SuiSignTx> {
 
     if (!data_length) {
       // sign Done
-      return res.message;
+      return res.message as SuiSignedTx;
     }
 
     const payload = data.subarray(offset, offset + data_length);
@@ -104,7 +111,7 @@ export default class SuiSignTransaction extends BaseMethod<SuiSignTx> {
   async run() {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
     let offset = 0;
-    let data: Buffer;
+    let data = Buffer.alloc(0);
 
     if (this.supportChunkTransfer()) {
       offset = this.chunkByteSize;
@@ -121,7 +128,6 @@ export default class SuiSignTransaction extends BaseMethod<SuiSignTx> {
       ...this.params,
     });
 
-    // @ts-expect-error
     return this.processTxRequest(typedCall, res, data, offset);
   }
 }

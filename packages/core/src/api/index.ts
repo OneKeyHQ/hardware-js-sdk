@@ -1,11 +1,15 @@
 export { default as testInitializeDeviceDuration } from './test/TestInitializeDeviceDuration';
+export { default as testProtocolV2Ping } from './protocol-v2/Ping';
 export { default as preInitialize } from './device/PreInitialize';
 
 export { default as searchDevices } from './SearchDevices';
 export { default as getFeatures } from './GetFeatures';
+export { default as getDeviceState } from './GetDeviceState';
 export { default as getOnekeyFeatures } from './GetOnekeyFeatures';
 export { default as getPassphraseState } from './GetPassphraseState';
+export { default as openWalletSession } from './OpenWalletSession';
 export { default as getLogs } from './GetLogs';
+export { default as clearSessionCache } from './ClearSessionCache';
 export { default as checkFirmwareRelease } from './CheckFirmwareRelease';
 export { default as checkBLEFirmwareRelease } from './CheckBLEFirmwareRelease';
 export { default as checkBridgeStatus } from './CheckBridgeStatus';
@@ -38,7 +42,14 @@ export { default as getNextU2FCounter } from './u2f/GetNextU2FCounter';
 export { default as firmwareUpdate } from './FirmwareUpdate';
 export { default as firmwareUpdateV2 } from './FirmwareUpdateV2';
 export { default as firmwareUpdateV3 } from './FirmwareUpdateV3';
+export { default as firmwareUpdateV4 } from './FirmwareUpdateV4';
 export { default as promptWebDeviceAccess } from './PromptWebDeviceAccess';
+
+// Pro2 business API
+export { default as deviceReboot } from './protocol-v2/DeviceReboot';
+export { default as deviceGetOnboardingStatus } from './protocol-v2/DeviceGetOnboardingStatus';
+export { default as deviceUploadWallpaper } from './protocol-v2/DeviceUploadWallpaper';
+export { default as uploadPortfolio } from './UploadPortfolio';
 
 export { default as cipherKeyValue } from './CipherKeyValue';
 

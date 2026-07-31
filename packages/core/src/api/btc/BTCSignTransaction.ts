@@ -7,7 +7,10 @@ import { validateParams } from '../helpers/paramsValidator';
 import signtx from './helpers/signtx';
 import signtxLegacy from './helpers/signtxLegacy';
 import { getCoinInfo } from './helpers/btcParamsUtils';
-import { getBitcoinForkVersionRange } from './helpers/versionLimit';
+import {
+  getBitcoinForkSupportedProtocols,
+  getBitcoinForkVersionRange,
+} from './helpers/versionLimit';
 
 import type {
   AccountAddresses,
@@ -26,6 +29,10 @@ type Params = {
   coinName: string;
 };
 export default class BTCSignTransaction extends BaseMethod<Params> {
+  getSupportedProtocols() {
+    return getBitcoinForkSupportedProtocols([this.params?.coinName]);
+  }
+
   init() {
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];

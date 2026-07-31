@@ -11,6 +11,10 @@ import type { TronSignTx } from '@onekeyfe/hd-transport';
 import type { DeviceFirmwareRange } from '../../types';
 
 export default class TronSignTransaction extends BaseMethod<TronSignTx> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   parseTx(tx: TronTransaction, address_n: number[]): TronSignTx {
     const unSignTx = {
       address_n,
@@ -148,6 +152,9 @@ export default class TronSignTransaction extends BaseMethod<TronSignTx> {
 
   getVersionRange() {
     return {
+      pro2: {
+        min: '0.0.0',
+      },
       model_mini: {
         min: '2.5.0',
       },

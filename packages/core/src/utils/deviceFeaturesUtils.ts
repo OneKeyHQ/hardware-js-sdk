@@ -1,31 +1,46 @@
 import semver from 'semver';
 import { isNaN } from 'lodash';
 import { EDeviceType, type EFirmwareType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import { Enum_Capability } from '@onekeyfe/hd-transport';
+import { Enum_Capability, type GetPassphraseState } from '@onekeyfe/hd-transport';
 
 import { toHardened } from '../api/helpers/pathUtils';
 import { DeviceModelToTypes, DeviceTypeToModels } from '../types';
-import DataManager, { type IFirmwareField, type MessageVersion } from '../data-manager/DataManager';
+import DataManager, {
+  type IFirmwareField,
+  type ProtocolV1MessageSchema,
+} from '../data-manager/DataManager';
 import { PROTOBUF_MESSAGE_CONFIG } from '../data-manager/MessagesConfig';
 import { getDeviceType } from './deviceInfoUtils';
 import { getDeviceFirmwareVersion } from './deviceVersionUtils';
 import { existCapability } from './capabilitieUtils';
+import { getProtocolV2WalletSession } from '../protocols/protocol-v2/walletSession';
 
 import type { Device } from '../device/Device';
-import type { DeviceCommands } from '../device/DeviceCommands';
-import type { Features, SupportFeatureType } from '../types';
+import type { Features, IDeviceType, SupportFeatureType } from '../types';
 
-export const getSupportMessageVersion = (
+export const getSupportProtocolV1MessageSchema = (
   features: Features | undefined
-): { messages: JSON; messageVersion: MessageVersion } => {
+): { messages: JSON; protocolV1MessageSchema: ProtocolV1MessageSchema } => {
   if (!features)
     return {
-      messages: DataManager.messages.latest,
-      messageVersion: 'latest',
+      messages: DataManager.messages.v1CurrentSchema,
+      protocolV1MessageSchema: 'v1CurrentSchema',
     };
 
   const currentDeviceVersion = getDeviceFirmwareVersion(features).join('.');
   const deviceType = getDeviceType(features);
+
+  // In bootloader mode the major/minor/patch fields carry the bootloader version, not the
+  // firmware version; normalizing them would mis-route to the legacy schema (e.g. 2.x < 3.3.0).
+  // The legacy getDeviceFirmwareVersion returned 0.0.0 here and landed on v1CurrentSchema, so
+  // force v1CurrentSchema for every bootloader device, including in-place upgrades on
+  // Classic1s/Touch/Pro where firmware is still present.
+  if (features.bootloaderMode === true) {
+    return {
+      messages: DataManager.messages.v1CurrentSchema,
+      protocolV1MessageSchema: 'v1CurrentSchema',
+    };
+  }
 
   const deviceVersionConfigs =
     PROTOBUF_MESSAGE_CONFIG[deviceType] ||
@@ -37,26 +52,30 @@ export const getSupportMessageVersion = (
   const sortedDeviceVersionConfigs =
     deviceVersionConfigs?.sort((a, b) => semver.compare(b.minVersion, a.minVersion)) ?? [];
 
-  for (const { minVersion, messageVersion } of sortedDeviceVersionConfigs) {
+  for (const { minVersion, protocolV1MessageSchema } of sortedDeviceVersionConfigs) {
     if (semver.gte(currentDeviceVersion, minVersion)) {
       return {
-        messages: DataManager.messages[messageVersion],
-        messageVersion,
+        messages: DataManager.messages[protocolV1MessageSchema],
+        protocolV1MessageSchema,
       };
     }
   }
 
   return {
-    messages: DataManager.messages.latest,
-    messageVersion: 'latest',
+    messages: DataManager.messages.v1CurrentSchema,
+    protocolV1MessageSchema: 'v1CurrentSchema',
   };
 };
 
-export const supportInputPinOnSoftware = (features: Features): SupportFeatureType => {
+export const supportInputPinOnSoftware = (features?: Features): SupportFeatureType => {
   if (!features) return { support: false };
 
   const deviceType = getDeviceType(features);
-  if (deviceType === EDeviceType.Touch || deviceType === EDeviceType.Pro) {
+  if (
+    deviceType === EDeviceType.Touch ||
+    deviceType === EDeviceType.Pro ||
+    deviceType === EDeviceType.Pro2
+  ) {
     return { support: false };
   }
 
@@ -68,7 +87,11 @@ export const supportNewPassphrase = (features?: Features): SupportFeatureType =>
   if (!features) return { support: false };
 
   const deviceType = getDeviceType(features);
-  if (deviceType === EDeviceType.Touch || deviceType === EDeviceType.Pro) {
+  if (
+    deviceType === EDeviceType.Touch ||
+    deviceType === EDeviceType.Pro ||
+    deviceType === EDeviceType.Pro2
+  ) {
     return { support: true };
   }
 
@@ -82,25 +105,46 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (
   options?: {
     expectPassphraseState?: string;
     onlyMainPin?: boolean;
+    initSession?: boolean;
   }
 ) => {
-  const { features, commands } = device;
-  const locked = features?.unlocked === false;
-
-  const { passphraseState, newSession, unlockedAttachPin } = await getPassphraseState(
-    features,
-    commands,
-    {
-      ...options,
+  if (device.isProtocolV2()) {
+    if (!device.features) {
+      return {
+        passphraseState: undefined,
+        newSession: undefined,
+        unlockedAttachPin: undefined,
+      };
     }
-  );
+
+    return getProtocolV2WalletSession(device, {
+      initSession: options?.initSession,
+      expectedPassphraseState: options?.expectPassphraseState,
+      onlyMainPin: options?.onlyMainPin,
+    });
+  }
+
+  const { features } = device;
+  const locked = features?.unlocked === false;
+  const deviceType = device.getCurrentDeviceType();
+
+  if (options?.initSession) {
+    device.clearInternalState();
+  }
+
+  const { passphraseState, newSession, unlockedAttachPin } = await getPassphraseState(device, {
+    ...options,
+  });
 
   const isModeT =
-    getDeviceType(features) === EDeviceType.Touch || getDeviceType(features) === EDeviceType.Pro;
+    deviceType === EDeviceType.Touch ||
+    deviceType === EDeviceType.Pro ||
+    deviceType === EDeviceType.Pro2;
 
   // 如果可以获取到 passphraseState，但是设备 features 显示设备未开启 passphrase，需要刷新设备状态
   // if passphraseState can be obtained, but the device features show that the device has not enabled passphrase, the device status needs to be refreshed
-  const needRefreshWithPassphrase = passphraseState && features?.passphrase_protection !== true;
+  const needRefreshWithPassphrase =
+    passphraseState && device.getCurrentPassphraseProtection() !== true;
   // 如果 Touch/Pro 在之前是锁定状态，刷新设备状态
   // if Touch/Pro was locked before, refresh the device state
   const needRefreshWithLocked = isModeT && locked;
@@ -111,49 +155,76 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (
   }
 
   // Attach to pin try to fix internal state
-  if (features?.device_id) {
-    device.updateInternalState(
-      device.features?.passphrase_protection ?? false,
-      passphraseState,
-      device.features?.device_id ?? '',
-      newSession,
-      device.features?.session_id
-    );
+  const deviceId = device.getCurrentDeviceId();
+  let existingSessionId: string | null | undefined;
+  if (!options?.initSession && typeof device.getInternalState === 'function') {
+    existingSessionId = device.getInternalState();
   }
+  device.updateInternalState(
+    device.getCurrentPassphraseProtection() ?? false,
+    passphraseState,
+    deviceId,
+    newSession,
+    options?.initSession ? null : existingSessionId
+  );
 
-  return { passphraseState, newSession, unlockedAttachPin };
+  return {
+    passphraseState,
+    newSession,
+    unlockedAttachPin: unlockedAttachPin ?? device.features?.unlockedAttachPin,
+  };
 };
 
+// Applies to Protocol V1 Pro only; Pro2 has an independent version line.
+const supportProSeriesAttachPinPassphrase = (deviceType: IDeviceType, firmwareVersion: string) =>
+  deviceType === EDeviceType.Pro && semver.gte(firmwareVersion, '4.15.0');
+
 export const getPassphraseState = async (
-  features: Features | undefined,
-  commands: DeviceCommands,
+  device: Device,
   options?: {
     expectPassphraseState?: string;
     onlyMainPin?: boolean;
+    initSession?: boolean;
   }
 ): Promise<{
   passphraseState: string | undefined;
   newSession: string | undefined;
   unlockedAttachPin: boolean | undefined;
 }> => {
+  const { features, commands } = device;
+
+  // Preserve legacy empty-result semantics until the device has established state.
   if (!features)
     return { passphraseState: undefined, newSession: undefined, unlockedAttachPin: undefined };
 
-  const firmwareVersion = getDeviceFirmwareVersion(features);
-  const deviceType = getDeviceType(features);
+  const firmwareVersion = device.getCurrentFirmwareVersionString() ?? '0.0.0';
+  const deviceType = device.getCurrentDeviceType();
+
+  if (device.isProtocolV2()) {
+    return getProtocolV2WalletSession(device, {
+      initSession: options?.initSession,
+      expectedPassphraseState: options?.expectPassphraseState,
+      onlyMainPin: options?.onlyMainPin,
+    });
+  }
 
   const supportAttachPinCapability = existCapability(
     features,
     Enum_Capability.Capability_AttachToPin
   );
   const supportGetPassphraseState =
-    supportAttachPinCapability ||
-    (deviceType === EDeviceType.Pro && semver.gte(firmwareVersion.join('.'), '4.15.0'));
+    supportAttachPinCapability || supportProSeriesAttachPinPassphrase(deviceType, firmwareVersion);
 
   if (supportGetPassphraseState) {
-    const { message, type } = await commands.typedCall('GetPassphraseState', 'PassphraseState', {
+    const payload: GetPassphraseState = {
       passphrase_state: options?.onlyMainPin ? undefined : options?.expectPassphraseState,
-    });
+    };
+
+    const { message, type } = await commands.typedCall(
+      'GetPassphraseState',
+      'PassphraseState',
+      payload
+    );
 
     // @ts-expect-error
     if (type === 'CallMethodError') {
@@ -186,40 +257,8 @@ export const getPassphraseState = async (
   };
 };
 
-export const supportBatchPublicKey = (
-  features?: Features,
-  options?: {
-    includeNode?: boolean;
-  }
-): boolean => {
-  if (!features) return false;
-  const currentVersion = getDeviceFirmwareVersion(features).join('.');
-
-  const deviceType = getDeviceType(features);
-  // btc batch get public key
-  if (!!options?.includeNode && deviceType === EDeviceType.Pro) {
-    return semver.gte(currentVersion, '4.14.0');
-  }
-  if (!!options?.includeNode && deviceType === EDeviceType.Touch) {
-    return semver.gte(currentVersion, '4.11.0');
-  }
-  if (!!options?.includeNode && DeviceModelToTypes.model_classic1s.includes(deviceType)) {
-    return semver.gte(currentVersion, '3.12.0');
-  }
-  if (!!options?.includeNode && DeviceModelToTypes.model_mini.includes(deviceType)) {
-    return semver.gte(currentVersion, '3.10.0');
-  }
-  if (options?.includeNode) {
-    return false;
-  }
-
-  // support batch get public key
-  if (deviceType === EDeviceType.Touch || deviceType === EDeviceType.Pro) {
-    return semver.gte(currentVersion, '3.1.0');
-  }
-
-  return semver.gte(currentVersion, '2.6.0');
-};
+// supportBatchPublicKey 已迁移为 device-aware 版本：
+// 见 api/helpers/batchGetPublickeys.ts 的 supportBatchPublicKeyByDevice
 
 export const supportModifyHomescreen = (features?: Features): SupportFeatureType => {
   if (!features) return { support: false };
@@ -278,6 +317,9 @@ export const getFirmwareUpdateField = ({
   if (deviceType === EDeviceType.Pro) {
     return latestFirmwareField;
   }
+  if (deviceType === EDeviceType.Pro2) {
+    return 'firmware-v1';
+  }
   return 'firmware';
 };
 /**
@@ -321,6 +363,10 @@ export const getFirmwareUpdateFieldArray = (
     return ['firmware-v8'];
   }
 
+  if (deviceType === 'pro2') {
+    return ['firmware-v1'];
+  }
+
   return ['firmware'];
 };
 
@@ -340,12 +386,8 @@ export const fixFeaturesFirmwareVersion = (features: Features): Features => {
   // fix Touch、Pro device when bootloader version is lower than 2.5.2, the features returned do not have firmware_version error
   const tempFeatures = { ...features };
 
-  if (tempFeatures.onekey_firmware_version && !semver.valid(tempFeatures.onekey_firmware_version)) {
-    tempFeatures.onekey_firmware_version = fixVersion(tempFeatures.onekey_firmware_version);
-  }
-
-  if (tempFeatures.onekey_version && !semver.valid(tempFeatures.onekey_version)) {
-    tempFeatures.onekey_version = fixVersion(tempFeatures.onekey_version);
+  if (tempFeatures.firmwareVersion && !semver.valid(tempFeatures.firmwareVersion)) {
+    tempFeatures.firmwareVersion = fixVersion(tempFeatures.firmwareVersion);
   }
 
   return tempFeatures;

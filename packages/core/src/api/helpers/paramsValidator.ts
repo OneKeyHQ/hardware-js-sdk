@@ -20,7 +20,7 @@ export type SchemaParam = {
   allowNegative?: boolean;
 };
 
-const invalidParameter = (message: string) =>
+export const invalidParameter = (message: string) =>
   ERRORS.TypedError(HardwareErrorCode.CallMethodInvalidParameter, message);
 
 const invalidResponse = (message: string) =>

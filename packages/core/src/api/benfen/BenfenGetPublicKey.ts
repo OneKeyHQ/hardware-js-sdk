@@ -4,7 +4,7 @@ import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { batchGetPublickeys } from '../helpers/batchGetPublickeys';
 
-import type { BenfenGetPublicKeyParams, BenfenPublicKey } from '../../types';
+import type { BenfenGetPublicKeyParams, BenfenPublicKey, DeviceFirmwareRange } from '../../types';
 
 export default class BenfenGetPublicKey extends BaseMethod<any> {
   hasBundle = false;
@@ -38,7 +38,7 @@ export default class BenfenGetPublicKey extends BaseMethod<any> {
     });
   }
 
-  getVersionRange() {
+  getVersionRange(): DeviceFirmwareRange {
     return {
       pro: {
         min: '4.12.0',

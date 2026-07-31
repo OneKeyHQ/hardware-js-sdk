@@ -1,0 +1,6 @@
+interface:
+  display_name: 'Hardware Chain Integration'
+  short_description: 'Address derivation and signing integration workflow'
+  default_prompt: 'Use $hardware-chain-integration to implement or review a hardware wallet chain integration.'
+policy:
+  allow_implicit_invocation: true

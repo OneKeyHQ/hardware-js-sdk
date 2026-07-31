@@ -1,11 +1,9 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { Command } from 'commander';
+import { UI_EVENT, UI_REQUEST, getDeviceType } from '@onekeyfe/hd-core';
+import { EDeviceType } from '@onekeyfe/hd-shared';
 
-import { createSDK, disposeSDK } from './sdk';
-import {
-  clearSessionFromKeychain,
-  preloadSessionFromKeychain,
-  saveSessionToKeychain,
-} from './session';
 import {
   resolveBatchGetAddress,
   resolveGetAddress,
@@ -13,12 +11,16 @@ import {
   resolveSignMessage,
   resolveSignTransaction,
 } from './chains';
+import { selectSearchDevice } from './deviceSelection';
+import { getCanonicalDeviceState, getCompatibleFeatures } from './deviceStateCommands';
+import { createSDK, disposeSDK } from './sdk';
+import { clearSessionFromKeychain, preloadSessionFromKeychain } from './session';
 
 import type {
+  DeviceStateScope,
   EthereumSignTypedDataMessage,
   EthereumSignTypedDataTypes,
   Features,
-  IDeviceType,
   SearchDevice,
 } from '@onekeyfe/hd-core';
 
@@ -26,11 +28,14 @@ import type {
 type EnrichedSearchDevice = SearchDevice & { features?: Features };
 
 const program = new Command();
+const { version: cliVersion } = JSON.parse(
+  readFileSync(resolve(__dirname, '../package.json'), 'utf8')
+) as { version: string };
 
 program
   .name('onekey-hw')
   .description('OneKey hardware wallet CLI for AI agent integration')
-  .version('1.1.26-alpha.1');
+  .version(cliVersion);
 
 // ============================================================
 // Global Options
@@ -41,8 +46,10 @@ program.option(
   '--device-id <id>',
   'Persistent device ID from getFeatures (changes when seed changes)'
 );
+program.option('--transport <transport>', 'Transport to use: usb or ble', 'usb');
 program.option('--passphrase-state <state>', 'Passphrase state for hidden wallet access');
 program.option('--use-empty-passphrase', 'Use standard wallet (skip passphrase prompt)');
+program.option('--debug', 'Enable SDK debug logs');
 
 // ============================================================
 // Device Commands
@@ -54,28 +61,6 @@ program
   .action(() =>
     runCommand({}, async ({ sdk, globalOpts }) => {
       const result = await sdk.searchDevices();
-
-      // Auto-fetch features for each discovered device (doesn't require PIN)
-      if (result?.success && Array.isArray(result.payload)) {
-        for (const device of result.payload as EnrichedSearchDevice[]) {
-          if (device.connectId) {
-            try {
-              const features = await sdk.getFeatures(device.connectId);
-              if (features?.success && features.payload) {
-                device.features = features.payload;
-                device.name = features.payload.label || features.payload.ble_name || device.name;
-                const devType = features.payload.onekey_device_type?.toLowerCase();
-                if (devType) {
-                  device.deviceType = devType as IDeviceType;
-                }
-              }
-            } catch {
-              // Features fetch failed — device may need PIN, continue with basic info
-            }
-          }
-        }
-      }
-
       outputResult(globalOpts, result);
     })
   );
@@ -85,25 +70,117 @@ program
   .description('Get device features (firmware, unlock state, passphrase protection, etc.)')
   .action(() =>
     runCommand({}, async ({ sdk, globalOpts }) => {
-      // Resolve connectId: explicit flag wins, else pick the first attached device
-      let { connectId } = globalOpts as { connectId?: string };
-      if (!connectId) {
-        const searchResult = await sdk.searchDevices();
-        if (
-          !searchResult?.success ||
-          !Array.isArray(searchResult.payload) ||
-          searchResult.payload.length === 0
-        ) {
-          outputResult(globalOpts, {
-            success: false,
-            payload: { error: 'No device found', code: 'NO_DEVICE' },
-          });
-          return;
-        }
-        connectId = (searchResult.payload[0] as EnrichedSearchDevice).connectId ?? undefined;
-      }
-      const result = await sdk.getFeatures(connectId || '');
+      const result = await getCompatibleFeatures(sdk, globalOpts.connectId);
       outputResult(globalOpts, result);
+    })
+  );
+
+program
+  .command('get-state')
+  .description('Get canonical device state for Protocol V1 and Protocol V2 devices')
+  .option('--scope <scope>', 'State refresh scope: runtime, settings, or firmware', 'runtime')
+  .action((opts: { scope: string }) =>
+    runCommand({}, async ({ sdk, globalOpts }) => {
+      const supportedScopes: DeviceStateScope[] = ['runtime', 'settings', 'firmware'];
+      if (!supportedScopes.includes(opts.scope as DeviceStateScope)) {
+        const error = new Error(`Unsupported device state scope: ${opts.scope}`);
+        (error as Error & { code?: string }).code = 'INVALID_DEVICE_STATE_SCOPE';
+        throw error;
+      }
+      const result = await getCanonicalDeviceState(
+        sdk,
+        globalOpts.connectId,
+        opts.scope as DeviceStateScope
+      );
+      outputResult(globalOpts, result);
+    })
+  );
+
+program
+  .command('upload-wallpaper')
+  .description('Upload and activate a Pro2 wallpaper')
+  .requiredOption('--rgba <path>', '604x1024 raw RGBA file')
+  .option('--file-name <name>', 'Device wallpaper file name', 'wallpaper-cli')
+  .option('--chunk-size <bytes>', 'Transfer chunk size in bytes')
+  .action(opts =>
+    runCommand({}, async ({ sdk, globalOpts, params }) => {
+      const rgba = readBinaryParam(opts.rgba);
+      const expectedBytes = 604 * 1024 * 4;
+      if (rgba.byteLength !== expectedBytes) {
+        throw new Error(
+          `Invalid RGBA size: expected ${expectedBytes} bytes, received ${rgba.byteLength}`
+        );
+      }
+
+      let transferStartedAt: number | undefined;
+      let transferEndedAt: number | undefined;
+      let lastProgress = -1;
+      let lastPrintedProgress = -10;
+      let progressTotalBytes = 0;
+      let transferredBytes = 0;
+      const totalStartedAt = Date.now();
+      const onUiEvent = (message: unknown) => {
+        if (!message || typeof message !== 'object') return;
+        const event = message as {
+          type?: string;
+          payload?: {
+            progress?: number;
+            transferredBytes?: number;
+            totalBytes?: number;
+            rateBytesPerSecond?: number;
+          };
+        };
+        if (event.type !== UI_REQUEST.DEVICE_PROGRESS || !event.payload) return;
+        const progress = Number(event.payload.progress);
+        if (!Number.isFinite(progress)) return;
+        transferStartedAt ??= Date.now();
+        lastProgress = Math.max(lastProgress, progress);
+        const totalBytes = Number(event.payload.totalBytes);
+        if (Number.isFinite(totalBytes) && totalBytes > 0) progressTotalBytes = totalBytes;
+        const confirmedBytes = Number(event.payload.transferredBytes);
+        if (Number.isFinite(confirmedBytes) && confirmedBytes >= 0) {
+          transferredBytes = Math.max(transferredBytes, confirmedBytes);
+        }
+        const printableProgress = Math.floor(progress / 10) * 10;
+        if (printableProgress > lastPrintedProgress || progress >= 100) {
+          const rate = Number(event.payload.rateBytesPerSecond);
+          const rateText =
+            Number.isFinite(rate) && rate > 0 ? ` ${(rate / 1024).toFixed(2)} KiB/s` : '';
+          process.stderr.write(
+            `[onekey-hw] Wallpaper transfer: ${Math.round(progress)}%${rateText}\n`
+          );
+          lastPrintedProgress = progress >= 100 ? 100 : printableProgress;
+        }
+        if (progress >= 100) transferEndedAt ??= Date.now();
+      };
+
+      sdk.on(UI_EVENT, onUiEvent);
+      let result: any;
+      try {
+        result = await sdk.deviceUploadWallpaper(globalOpts.connectId, {
+          ...params,
+          width: 604,
+          height: 1024,
+          rgba,
+          fileName: opts.fileName,
+          chunkSize: opts.chunkSize ? safeParseInt(opts.chunkSize, '--chunk-size') : undefined,
+        });
+      } finally {
+        sdk.off?.(UI_EVENT, onUiEvent);
+      }
+
+      const endedAt = transferEndedAt ?? Date.now();
+      const totalBytes = Number(result?.payload?.size) || progressTotalBytes;
+      outputResult(globalOpts, {
+        ...result,
+        metrics: buildWallpaperUploadMetrics({
+          totalBytes,
+          transferredBytes: result?.success ? totalBytes : transferredBytes,
+          startedAt: transferStartedAt ?? totalStartedAt,
+          endedAt,
+          lastProgress,
+        }),
+      });
     })
   );
 
@@ -502,16 +579,80 @@ program
   );
 
 program
+  .command('firmware-update-legacy')
+  .description('Update Classic/Pure firmware through the legacy protocol')
+  .requiredOption('--binary <path>', 'Local firmware binary path')
+  .option('--device-name <name>', 'BLE advertising name, for example K1514')
+  .option('--update-type <type>', 'Firmware component: firmware or ble', 'firmware')
+  .option('--no-reboot', 'Do not reboot the device after a successful update')
+  .action(opts =>
+    runCommand({}, async ({ sdk, globalOpts }) => {
+      if (opts.updateType !== 'firmware' && opts.updateType !== 'ble') {
+        throw new Error(`Unsupported --update-type: ${opts.updateType}. Use "firmware" or "ble".`);
+      }
+
+      const connectId = await resolveLegacyFirmwareConnectId(
+        sdk,
+        globalOpts.connectId,
+        opts.deviceName
+      );
+      const result = await sdk.firmwareUpdate(connectId, {
+        binary: readBinaryParam(opts.binary),
+        updateType: opts.updateType,
+        rebootOnSuccess: opts.reboot,
+        timeout: getLegacyFirmwareConnectTimeout(globalOpts.transport),
+      });
+      outputResult(globalOpts, result);
+    })
+  );
+
+export function getLegacyFirmwareConnectTimeout(transport: 'usb' | 'ble') {
+  return transport === 'usb' ? 90_000 : undefined;
+}
+
+program
   .command('firmware-update-ble')
-  .description('BLE firmware update is not supported via CLI')
+  .description('Run Protocol V2 firmware update over BLE')
   .action(() =>
     respondAndExit({
       success: false,
       payload: {
         error:
-          'BLE firmware update via CLI is not supported. Please use the OneKey App or https://firmware.onekey.so/ to update firmware.',
-        code: 'FIRMWARE_UPDATE_NOT_SUPPORTED',
+          'Use `onekey-hw --transport ble firmware-update-v4` for BLE Protocol V2 firmware updates.',
+        code: 'USE_FIRMWARE_UPDATE_V4',
       },
+    })
+  );
+
+program
+  .command('firmware-update-v4')
+  .description('Run Protocol V2 firmware update through sdk.firmwareUpdateV4')
+  .option('--chunk-size <bytes>', 'Transfer chunk size in bytes')
+  .option(
+    '--resource-bundle <spec...>',
+    'RESC bundle direct-write spec: <localPath>:<devicePath>, e.g. wallpaper.okpkg:vol0:/bundles/images/wallpaper.okpkg'
+  )
+  .option('--romloader <path>', 'FW_MGMT_TARGET_ROMLOADER binary path')
+  .option('--bootloader <path>', 'FW_MGMT_TARGET_BOOTLOADER binary path')
+  .option('--application-p1 <path>', 'FW_MGMT_TARGET_APPLICATION_P1 binary path')
+  .option('--application-p2 <path>', 'FW_MGMT_TARGET_APPLICATION_P2 binary path')
+  .option('--coprocessor <path>', 'FW_MGMT_TARGET_COPROCESSOR binary path')
+  .option('--se01 <path>', 'FW_MGMT_TARGET_SE01 binary path')
+  .option('--se02 <path>', 'FW_MGMT_TARGET_SE02 binary path')
+  .option('--se03 <path>', 'FW_MGMT_TARGET_SE03 binary path')
+  .option('--se04 <path>', 'FW_MGMT_TARGET_SE04 binary path')
+  .option('--forced-update-res', 'Force resource update')
+  .option('--retries <count>', 'Retry count for transient Protocol V2 USB probe failures')
+  .action(opts =>
+    runCommand({}, async ({ sdk, globalOpts }) => {
+      const params = buildFirmwareUpdateV4Params(opts);
+      const result = await runFirmwareUpdateV4WithRetry({
+        sdk,
+        globalOpts,
+        params,
+        retries: opts.retries ? safeParseInt(opts.retries, '--retries') : undefined,
+      });
+      outputResult(globalOpts, result);
     })
   );
 
@@ -655,7 +796,7 @@ const sessionCmd = program.command('session').description('Manage device passphr
 
 sessionCmd
   .command('connect')
-  .description('Connect device and establish passphrase session (cached for subsequent commands)')
+  .description('Connect device and select a hidden wallet for this invocation')
   .action(() =>
     runCommand({}, async ({ sdk, globalOpts }) => {
       // 1. Search for device
@@ -667,7 +808,17 @@ sessionCmd
         });
         return;
       }
-      const device = searchResult.payload[0] as EnrichedSearchDevice;
+      const device = selectSearchDevice(
+        searchResult.payload as Array<SearchDevice & { features?: Features }>,
+        globalOpts.connectId
+      );
+      if (!device) {
+        outputResult(globalOpts, {
+          success: false,
+          payload: { error: 'No matching device found', code: 'NO_DEVICE' },
+        });
+        return;
+      }
       const connectId = device.connectId || globalOpts.connectId;
 
       // 2. Unlock if locked — getPassphraseState below talks to a live
@@ -678,53 +829,35 @@ sessionCmd
         await unlockWithRetry(sdk, connectId);
       }
 
-      // 3. Get passphraseState (triggers 1/2/3 selection)
-      const psResult = await sdk.getPassphraseState(connectId, {
-        initSession: true,
-        useEmptyPassphrase: false,
+      // 3. Open a hidden wallet session (triggers 1/2/3 selection).
+      const sessionResult = await sdk.openWalletSession(connectId, {
+        mode: 'select-hidden',
       });
-      if (!psResult.success) {
-        outputResult(globalOpts, psResult);
+      if (!sessionResult.success) {
+        outputResult(globalOpts, sessionResult);
         return;
       }
-      const passphraseState = psResult.payload;
+      if (sessionResult.payload.walletType !== 'hidden') {
+        outputResult(globalOpts, {
+          success: false,
+          payload: { error: 'Hidden wallet selection did not return a hidden wallet session' },
+        });
+        return;
+      }
+      const { deviceId, passphraseState } = sessionResult.payload;
 
       // 4. Get address to verify + extract deviceId
-      const addrResult = await sdk.evmGetAddress(connectId, device.deviceId || '', {
+      const addrResult = await sdk.evmGetAddress(connectId, deviceId, {
         path: "m/44'/60'/0'/0/0",
         showOnOneKey: false,
         passphraseState,
       });
-
-      // 5. Fetch the now-active session_id via getFeatures.
-      //
-      // IMPORTANT: pass `passphraseState` here. Without it, the SDK's
-      // connectStateChange guard (core/index.ts) would see the payload's
-      // passphraseState flip from mnNy → undefined, clear the cached Device,
-      // and call Initialize again with no passphrase_state / no session_id.
-      // That Initialize resets the device to the standard wallet and returns
-      // a *standard-wallet* session_id — which we'd then save in the keychain
-      // paired with the hidden-wallet passphraseState. On the next CLI run
-      // the mismatch would trigger PassphraseRequest (1/2/3 again).
-      const featResult = await sdk.getFeatures(connectId, {
-        passphraseState,
-        skipPassphraseCheck: true,
-      });
-      const featPayload = featResult?.success ? featResult.payload : undefined;
-      const deviceId = featPayload?.device_id || device.deviceId || '';
-      const sessionId = featPayload?.session_id || '';
-
-      // 6. Save to keychain
-      if (passphraseState && deviceId && sessionId) {
-        await saveSessionToKeychain(deviceId, passphraseState, sessionId);
-      }
 
       outputResult(globalOpts, {
         success: true,
         payload: {
           passphraseState,
           deviceId,
-          ...(sessionId ? { sessionId } : {}),
           ...(addrResult?.success ? { address: addrResult.payload.address } : {}),
         },
       });
@@ -737,9 +870,11 @@ sessionCmd
   .action(() =>
     runCommand({}, async ({ sdk, globalOpts }) => {
       const searchResult = await sdk.searchDevices();
-      const device = // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-        (searchResult?.payload as any)?.[0];
-      const deviceId = device?.features?.device_id || device?.deviceId;
+      const device = selectSearchDevice(
+        (searchResult?.payload as Array<SearchDevice & { features?: Features }>) ?? [],
+        globalOpts.connectId
+      );
+      const deviceId = device?.deviceId || device?.features?.device_id;
       if (deviceId) {
         await clearSessionFromKeychain(deviceId);
       }
@@ -833,12 +968,12 @@ async function unlockWithRetry(
  * Prepare passphrase session before SDK calls.
  *
  * 1. If --use-empty-passphrase or --passphrase-state provided → use as-is
- * 2. Try keychain → preloadSessionCache → use cached session
- * 3. Keychain miss → getPassphraseState (triggers 1/2/3 prompt) → save to keychain
+ * 2. Try a legacy keychain entry → preloadSessionCache → use cached session
+ * 3. Keychain miss → openWalletSession (triggers 1/2/3 prompt)
  *
  * After this, globalOpts.passphraseState is set and getCommonParams will include it.
  */
-async function prepareSession(
+export async function prepareSession(
   sdk: typeof import('@onekeyfe/hd-common-connect-sdk').default,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   globalOpts: Record<string, any>
@@ -849,7 +984,7 @@ async function prepareSession(
   }
 
   // Errors from the SDK calls below (PIN cancelled, transport broken,
-  // getPassphraseState rejection) intentionally propagate to runCommand's
+  // openWalletSession rejection) intentionally propagate to runCommand's
   // catch block, which renders them as structured `{ success: false,
   // payload: { error, code } }` output instead of silently falling through
   // to a confusing downstream error 112 / 114.
@@ -864,17 +999,39 @@ async function prepareSession(
     return undefined;
   }
 
-  const device = searchResult.payload[0] as {
+  const device = selectSearchDevice(
+    searchResult.payload as Array<{
+      connectId?: string;
+      deviceId?: string;
+      deviceType?: string;
+      features?: {
+        deviceId?: string | null;
+        deviceType?: string;
+        sessionId?: string | null;
+        passphraseProtection?: boolean | null;
+        unlocked?: boolean | null;
+      };
+    }>,
+    globalOpts.connectId
+  );
+
+  if (!device) {
+    throw new Error(`未找到指定的 BLE 设备: ${globalOpts.connectId}`);
+  }
+
+  const selectedDevice = device as {
     connectId?: string;
     deviceId?: string;
+    deviceType?: string;
     features?: {
-      device_id?: string;
-      session_id?: string;
-      passphrase_protection?: boolean | null;
+      deviceId?: string | null;
+      deviceType?: string;
+      sessionId?: string | null;
+      passphraseProtection?: boolean | null;
       unlocked?: boolean | null;
     };
   };
-  const connectId = device.connectId || globalOpts.connectId || '';
+  const connectId = selectedDevice.connectId || globalOpts.connectId || '';
   if (!globalOpts.connectId && connectId) {
     globalOpts.connectId = connectId;
   }
@@ -882,17 +1039,20 @@ async function prepareSession(
   // ── Step 2: Get features if searchDevices didn't populate them ──
   // getFeatures failures here are non-fatal — we fall through to Step 3
   // which will fail with a clearer error if the device is truly unreachable.
-  let deviceId = device.features?.device_id || device.deviceId || '';
-  let unlocked = device.features?.unlocked;
-  let passphraseProtection = device.features?.passphrase_protection;
+  let deviceId = selectedDevice.features?.deviceId || selectedDevice.deviceId || '';
+  let deviceType =
+    selectedDevice.features?.deviceType ?? selectedDevice.deviceType ?? EDeviceType.Unknown;
+  let unlocked = selectedDevice.features?.unlocked;
+  let passphraseProtection = selectedDevice.features?.passphraseProtection;
 
   if (!deviceId || unlocked == null || passphraseProtection == null) {
     try {
       const featResult = await sdk.getFeatures(connectId);
       if (featResult?.success && featResult.payload) {
-        deviceId = featResult.payload.device_id || deviceId;
+        deviceId = featResult.payload.deviceId || deviceId;
+        deviceType = getDeviceType(featResult.payload) || deviceType;
         unlocked = featResult.payload.unlocked;
-        passphraseProtection = featResult.payload.passphrase_protection;
+        passphraseProtection = featResult.payload.passphraseProtection;
       }
     } catch {
       /* non-fatal — Step 3 will surface a clear error if device is gone */
@@ -908,9 +1068,9 @@ async function prepareSession(
   if (wasLocked) {
     process.stderr.write('[onekey-hw] Device is locked. Unlocking (PIN required)...\n');
     const { payload: feat } = await unlockWithRetry(sdk, connectId);
-    deviceId = feat.device_id || deviceId;
+    deviceId = feat.deviceId || deviceId;
     unlocked = feat.unlocked;
-    passphraseProtection = feat.passphrase_protection;
+    passphraseProtection = feat.passphraseProtection;
   }
 
   if (!globalOpts.deviceId && deviceId) {
@@ -918,11 +1078,11 @@ async function prepareSession(
   }
 
   // ── Step 4: Check passphrase protection ──────────────────────────
-  if (passphraseProtection === false) {
+  if (passphraseProtection === false && deviceType !== EDeviceType.Pro2) {
     return undefined;
   }
 
-  // ── Step 5: Try keychain session reuse ───────────────────────────
+  // ── Step 5: Try legacy keychain session reuse ────────────────────
   // Only attempt if device was already unlocked — locking invalidates
   // all passphrase sessions, so cached session_id is useless after unlock.
   if (!wasLocked && deviceId) {
@@ -933,33 +1093,18 @@ async function prepareSession(
     }
   }
 
-  // ── Step 6: Keychain miss → getPassphraseState (triggers 1/2/3 prompt) ──
-  const psResult = await sdk.getPassphraseState(connectId, {
-    initSession: true,
-    useEmptyPassphrase: false,
+  // ── Step 6: Keychain miss → openWalletSession (triggers 1/2/3 prompt) ──
+  const sessionResult = await sdk.openWalletSession(connectId, {
+    mode: 'select-hidden',
   });
 
-  if (psResult.success && psResult.payload) {
-    const passphraseState = psResult.payload;
-    globalOpts.passphraseState = passphraseState;
-
-    // Save session to keychain for next invocation.
-    //
-    // Pass passphraseState to keep connectStateChange=false — otherwise
-    // Initialize would be re-run without passphrase_state, resetting the
-    // device to the standard wallet and returning a mismatched session_id.
-    // See the matching comment in `session connect`.
-    if (deviceId) {
-      const featAfter = await sdk.getFeatures(connectId, {
-        passphraseState,
-        skipPassphraseCheck: true,
-      });
-      const sessionId = featAfter?.success ? featAfter.payload?.session_id : undefined;
-      if (sessionId) {
-        await saveSessionToKeychain(deviceId, passphraseState, sessionId);
-        await preloadSessionFromKeychain(deviceId);
-      }
+  if (sessionResult.success && sessionResult.payload) {
+    if (sessionResult.payload.walletType !== 'hidden') {
+      return undefined;
     }
+    const { deviceId: sessionDeviceId, passphraseState } = sessionResult.payload;
+    globalOpts.deviceId = sessionDeviceId;
+    globalOpts.passphraseState = passphraseState;
 
     return passphraseState;
   }
@@ -977,8 +1122,8 @@ function outputResult(_globalOpts: Record<string, any>, result: unknown): void {
   ) {
     process.exitCode = 1;
   }
-  // No process.exit here — runCommand() below handles dispose + exit so SDK
-  // async cleanup (USB release, event listener teardown) finishes first.
+  // No process.exit here — runCommand() waits for SDK cleanup, then lets Node
+  // exit naturally so leaked USB handles remain observable.
 }
 
 /**
@@ -990,7 +1135,7 @@ function outputResult(_globalOpts: Record<string, any>, result: unknown): void {
  *   3. run the handler (which calls outputResult on success)
  *   4. report uncaught errors as a structured failure result
  *   5. dispose SDK
- *   6. drain event loop and process.exit with the right code
+ *   6. let Node exit naturally after all SDK resources are released
  *
  * This fixes three previous bugs:
  *   - Most signing commands skipped prepareSession, so keychain sessions
@@ -1016,6 +1161,9 @@ async function runCommand(
 ): Promise<void> {
   const globalOpts = program.opts();
   try {
+    if (globalOpts.transport !== 'usb' && globalOpts.transport !== 'ble') {
+      throw new Error(`Unsupported transport: ${globalOpts.transport}. Use "usb" or "ble".`);
+    }
     const sdk = await createSDK(globalOpts);
     if (options.needsSession) {
       await prepareSession(sdk, globalOpts);
@@ -1039,9 +1187,7 @@ async function runCommand(
     // promise reference. Idempotent, safe to call even if init failed.
     await disposeSDK();
   }
-  // SDK event listeners can keep the event loop alive after dispose.
-  // setImmediate lets any trailing stdout/stderr writes flush first.
-  setImmediate(() => process.exit(process.exitCode ?? 0));
+  // disposeSDK awaits transport cleanup; let Node exit naturally so leaks remain visible.
 }
 
 /** For commands that don't touch the SDK at all (e.g. firmware-update stubs). */
@@ -1064,6 +1210,447 @@ function safeJsonParse(input: string, label: string): unknown {
   }
 }
 
+function readBinaryParam(path: string): ArrayBuffer {
+  const buffer = readFileSync(path);
+  return new Uint8Array(buffer).buffer;
+}
+
+async function resolveLegacyFirmwareConnectId(
+  sdk: AnySdk,
+  explicitConnectId?: string,
+  deviceName?: string
+): Promise<string> {
+  if (explicitConnectId && !deviceName) return explicitConnectId;
+
+  const searchResult = await sdk.searchDevices();
+  if (!searchResult?.success || !Array.isArray(searchResult.payload)) {
+    throw new Error('Unable to scan BLE devices');
+  }
+
+  const devices = searchResult.payload as EnrichedSearchDevice[];
+  const normalizedName = deviceName?.trim().toLowerCase();
+  const matches = normalizedName
+    ? devices.filter(device => device.name?.trim().toLowerCase() === normalizedName)
+    : devices.filter(device => device.deviceType?.toLowerCase() === 'classic');
+
+  if (matches.length === 0) {
+    throw new Error(
+      normalizedName
+        ? `BLE device not found by name: ${deviceName}`
+        : 'No Classic/Pure BLE device found'
+    );
+  }
+  if (matches.length > 1) {
+    throw new Error(
+      normalizedName
+        ? `Multiple BLE devices found by name: ${deviceName}`
+        : 'Multiple Classic/Pure BLE devices found; specify --device-name'
+    );
+  }
+
+  const [{ connectId, name }] = matches;
+  if (!connectId) throw new Error(`BLE device has no connect ID: ${name}`);
+  return connectId;
+}
+
+function parseResourceBundleParam(spec: string): { binary: ArrayBuffer; devicePath: string } {
+  const sep = spec.indexOf(':');
+  if (sep <= 0 || sep === spec.length - 1) {
+    throw new Error(
+      `Invalid --resource-bundle value: "${spec}". Expected <localPath>:<devicePath>`
+    );
+  }
+  const localPath = spec.slice(0, sep);
+  const devicePath = spec.slice(sep + 1);
+  if (!devicePath.startsWith('vol')) {
+    throw new Error(
+      `Invalid --resource-bundle device path: "${devicePath}". Expected a vol*:/... path`
+    );
+  }
+  return {
+    binary: readBinaryParam(localPath),
+    devicePath,
+  };
+}
+
+function getFirmwareUpdateV4TotalBytes(params: ReturnType<typeof buildFirmwareUpdateV4Params>) {
+  return [
+    ...(params.resourceBundleFiles?.map(item => item.binary) ?? []),
+    params.bootloaderBinary,
+    params.applicationP1Binary,
+    params.applicationP2Binary,
+    params.coprocessorBinary,
+    params.se01Binary,
+    params.se02Binary,
+    params.se03Binary,
+    params.se04Binary,
+  ].reduce((total, binary) => total + (binary?.byteLength ?? 0), 0);
+}
+
+function getFirmwareUpdateV4ErrorText(result: unknown) {
+  if (!result || typeof result !== 'object') return '';
+  const { payload } = result as { payload?: unknown };
+  if (!payload || typeof payload !== 'object') return '';
+  const { error } = payload as { error?: unknown };
+  return typeof error === 'string' ? error : '';
+}
+
+function isProtocolV2UsbProbeTransientResult(result: unknown) {
+  const error = getFirmwareUpdateV4ErrorText(result);
+  return (
+    error.includes('Device protocol mismatch') &&
+    error.includes('expected V2') &&
+    error.includes('did not respond to expected protocol')
+  );
+}
+
+function isSuccessResult(result: unknown) {
+  return (
+    !!result && typeof result === 'object' && (result as { success?: boolean }).success === true
+  );
+}
+
+function getFirmwareUpdatePayload(message: unknown) {
+  if (!message || typeof message !== 'object') return undefined;
+  return (message as { payload?: Record<string, unknown> }).payload;
+}
+
+function formatFirmwareProgress(progress: number) {
+  if (!Number.isFinite(progress)) return '0%';
+  return `${Math.min(Math.max(Math.round(progress), 0), 100)}%`;
+}
+
+function formatFirmwareBytes(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '';
+  return `${(bytes / 1024).toFixed(1)} KiB`;
+}
+
+export function buildWallpaperUploadMetrics({
+  totalBytes,
+  transferredBytes,
+  startedAt,
+  endedAt,
+  lastProgress,
+}: {
+  totalBytes: number;
+  transferredBytes: number;
+  startedAt: number;
+  endedAt: number;
+  lastProgress: number;
+}) {
+  const elapsedMs = Math.max(endedAt - startedAt, 0);
+  return {
+    totalBytes,
+    transferredBytes,
+    totalSeconds: Number((elapsedMs / 1000).toFixed(2)),
+    transferKiBPerSecond:
+      elapsedMs > 0 ? Number((transferredBytes / 1024 / (elapsedMs / 1000)).toFixed(2)) : null,
+    lastProgress,
+  };
+}
+
+function maybePrintFirmwareProgress({
+  progressType,
+  progress,
+  payload,
+  lastPrintedProgress,
+}: {
+  progressType: string;
+  progress: number;
+  payload: Record<string, unknown>;
+  lastPrintedProgress: number;
+}) {
+  const printableProgress = Math.floor(progress / 10) * 10;
+  if (printableProgress <= lastPrintedProgress && progress < 100) {
+    return lastPrintedProgress;
+  }
+
+  const transferredBytes = Number(payload.transferredBytes);
+  const totalBytes = Number(payload.totalBytes);
+  const rateBytesPerSecond = Number(payload.rateBytesPerSecond);
+  const sizeText =
+    Number.isFinite(transferredBytes) && Number.isFinite(totalBytes) && totalBytes > 0
+      ? ` ${formatFirmwareBytes(transferredBytes)}/${formatFirmwareBytes(totalBytes)}`
+      : '';
+  const speedText =
+    Number.isFinite(rateBytesPerSecond) && rateBytesPerSecond > 0
+      ? ` ${(rateBytesPerSecond / 1024).toFixed(2)} KiB/s`
+      : '';
+
+  process.stderr.write(
+    `[onekey-hw] Firmware ${progressType}: ${formatFirmwareProgress(
+      progress
+    )}${sizeText}${speedText}\n`
+  );
+  return progress >= 100 ? 100 : printableProgress;
+}
+
+function buildFirmwareUpdateV4Metrics({
+  attempt,
+  maxAttempts,
+  totalBytes,
+  totalStartedAt,
+  transferStartedAt,
+  transferEndedAt,
+  installStartedAt,
+  installEndedAt,
+  progressEvents,
+  lastProgress,
+  installProgressEvents,
+  lastInstallProgress,
+  retried,
+}: {
+  attempt: number;
+  maxAttempts: number;
+  totalBytes: number;
+  totalStartedAt: number;
+  transferStartedAt?: number;
+  transferEndedAt?: number;
+  installStartedAt?: number;
+  installEndedAt?: number;
+  progressEvents: number;
+  lastProgress: number;
+  installProgressEvents: number;
+  lastInstallProgress: number;
+  retried: boolean;
+}) {
+  const totalElapsedMs = Date.now() - totalStartedAt;
+  const transferElapsedMs =
+    transferStartedAt !== undefined && transferEndedAt !== undefined
+      ? transferEndedAt - transferStartedAt
+      : undefined;
+  const installElapsedMs =
+    installStartedAt !== undefined && installEndedAt !== undefined
+      ? installEndedAt - installStartedAt
+      : undefined;
+
+  return {
+    attempt,
+    maxAttempts,
+    retried,
+    totalBytes,
+    progressEvents,
+    lastProgress,
+    installProgressEvents,
+    lastInstallProgress,
+    transferSeconds:
+      transferElapsedMs !== undefined ? Number((transferElapsedMs / 1000).toFixed(2)) : null,
+    transferKiBPerSecond:
+      transferElapsedMs !== undefined && transferElapsedMs > 0
+        ? Number((totalBytes / 1024 / (transferElapsedMs / 1000)).toFixed(2))
+        : null,
+    installSeconds:
+      installElapsedMs !== undefined ? Number((installElapsedMs / 1000).toFixed(2)) : null,
+    totalSeconds: Number((totalElapsedMs / 1000).toFixed(2)),
+  };
+}
+
+export async function runFirmwareUpdateV4WithRetry({
+  sdk,
+  globalOpts,
+  params,
+  retries,
+}: {
+  sdk: AnySdk;
+  globalOpts: Record<string, any>;
+  params: ReturnType<typeof buildFirmwareUpdateV4Params>;
+  retries?: number;
+}) {
+  const totalBytes = getFirmwareUpdateV4TotalBytes(params);
+  const maxAttempts = Math.max((retries ?? 2) + 1, 1);
+  let currentSdk = sdk;
+  let retried = false;
+  let attempt = 1;
+  let { connectId } = globalOpts;
+
+  if (globalOpts.transport === 'usb') {
+    for (; attempt <= maxAttempts; attempt += 1) {
+      const probeResult = await currentSdk.getDeviceState(connectId, {
+        scope: 'runtime',
+        connectProtocol: 'V2',
+        retryCount: 0,
+      });
+      if (isSuccessResult(probeResult)) break;
+      if (attempt >= maxAttempts || !isProtocolV2UsbProbeTransientResult(probeResult)) {
+        return probeResult;
+      }
+
+      retried = true;
+      process.stderr.write(
+        `[onekey-hw] Protocol V2 USB probe was transient; retrying read-only probe (${attempt}/${maxAttempts})...\n`
+      );
+      await disposeSDK();
+      await new Promise(resolve => {
+        setTimeout(resolve, 3000);
+      });
+      currentSdk = await createSDK(globalOpts);
+      if (globalOpts.connectId) connectId = undefined;
+    }
+  }
+
+  let progressEvents = 0;
+  let lastProgress = -1;
+  let transferStartedAt: number | undefined;
+  let transferEndedAt: number | undefined;
+  let installProgressEvents = 0;
+  let lastInstallProgress = -1;
+  let installStartedAt: number | undefined;
+  let installEndedAt: number | undefined;
+  let lastPrintedTransferProgress = -10;
+  let lastPrintedInstallProgress = -10;
+  const totalStartedAt = Date.now();
+
+  const onUiEvent = (message: unknown) => {
+    if (!message || typeof message !== 'object') return;
+    const messageType = (message as { type?: string }).type;
+    const payload = getFirmwareUpdatePayload(message);
+
+    if (messageType === UI_REQUEST.FIRMWARE_TIP) {
+      const tipMessage = (payload?.data as { message?: unknown } | undefined)?.message;
+      if (typeof tipMessage === 'string') {
+        process.stderr.write(`[onekey-hw] Firmware: ${tipMessage}\n`);
+      }
+      return;
+    }
+
+    if (messageType === UI_REQUEST.REQUEST_BUTTON) {
+      const code = typeof payload?.code === 'string' ? ` (${payload.code})` : '';
+      process.stderr.write(
+        `[onekey-hw] Please confirm the firmware update on your device${code}.\n`
+      );
+      return;
+    }
+
+    if (messageType !== UI_REQUEST.FIRMWARE_PROGRESS || !payload) return;
+    const progress = Number(payload.progress);
+    if (!Number.isFinite(progress)) return;
+
+    if (payload.progressType === 'transferData') {
+      progressEvents += 1;
+      lastProgress = Math.max(lastProgress, progress);
+      transferStartedAt ??= Date.now();
+      lastPrintedTransferProgress = maybePrintFirmwareProgress({
+        progressType: 'transfer',
+        progress,
+        payload,
+        lastPrintedProgress: lastPrintedTransferProgress,
+      });
+      if (progress >= 100) {
+        transferEndedAt ??= Date.now();
+      }
+      return;
+    }
+
+    if (payload.progressType === 'installingFirmware') {
+      installProgressEvents += 1;
+      lastInstallProgress = Math.max(lastInstallProgress, progress);
+      installStartedAt ??= Date.now();
+      lastPrintedInstallProgress = maybePrintFirmwareProgress({
+        progressType: 'install',
+        progress,
+        payload,
+        lastPrintedProgress: lastPrintedInstallProgress,
+      });
+      if (progress >= 100) {
+        installEndedAt ??= Date.now();
+      }
+    }
+  };
+
+  currentSdk.on(UI_EVENT, onUiEvent);
+  let result: unknown;
+  try {
+    result = await currentSdk.firmwareUpdateV4(connectId, params);
+  } finally {
+    currentSdk.off?.(UI_EVENT, onUiEvent);
+  }
+  if (installStartedAt !== undefined && installEndedAt === undefined) {
+    installEndedAt = Date.now();
+  }
+
+  const metrics = buildFirmwareUpdateV4Metrics({
+    attempt,
+    maxAttempts,
+    totalBytes,
+    totalStartedAt,
+    transferStartedAt,
+    transferEndedAt,
+    installStartedAt,
+    installEndedAt,
+    progressEvents,
+    lastProgress,
+    installProgressEvents,
+    lastInstallProgress,
+    retried,
+  });
+
+  if (result && typeof result === 'object') {
+    const payload = ((result as { payload?: unknown }).payload ?? {}) as Record<string, unknown>;
+    return {
+      ...(result as Record<string, unknown>),
+      payload: {
+        ...payload,
+        metrics,
+      },
+    };
+  }
+
+  return result;
+}
+
+function buildFirmwareUpdateV4Params(opts: {
+  chunkSize?: string;
+  resourceBundle?: string[];
+  romloader?: string;
+  bootloader?: string;
+  applicationP1?: string;
+  applicationP2?: string;
+  coprocessor?: string;
+  se01?: string;
+  se02?: string;
+  se03?: string;
+  se04?: string;
+  forcedUpdateRes?: boolean;
+}) {
+  const params = {
+    platform: 'desktop' as const,
+    connectProtocol: 'V2' as const,
+    chunkSize: opts.chunkSize ? safeParseInt(opts.chunkSize, '--chunk-size') : undefined,
+    forcedUpdateRes: opts.forcedUpdateRes,
+    resourceBundleFiles: opts.resourceBundle?.map(parseResourceBundleParam),
+    romloaderBinary: opts.romloader ? readBinaryParam(opts.romloader) : undefined,
+    bootloaderBinary: opts.bootloader ? readBinaryParam(opts.bootloader) : undefined,
+    applicationP1Binary: opts.applicationP1 ? readBinaryParam(opts.applicationP1) : undefined,
+    applicationP2Binary: opts.applicationP2 ? readBinaryParam(opts.applicationP2) : undefined,
+    coprocessorBinary: opts.coprocessor ? readBinaryParam(opts.coprocessor) : undefined,
+    se01Binary: opts.se01 ? readBinaryParam(opts.se01) : undefined,
+    se02Binary: opts.se02 ? readBinaryParam(opts.se02) : undefined,
+    se03Binary: opts.se03 ? readBinaryParam(opts.se03) : undefined,
+    se04Binary: opts.se04 ? readBinaryParam(opts.se04) : undefined,
+  };
+
+  const hasPayload = [
+    params.resourceBundleFiles,
+    params.romloaderBinary,
+    params.bootloaderBinary,
+    params.applicationP1Binary,
+    params.applicationP2Binary,
+    params.coprocessorBinary,
+    params.se01Binary,
+    params.se02Binary,
+    params.se03Binary,
+    params.se04Binary,
+  ].some(Boolean);
+
+  if (!hasPayload) {
+    const err = new Error('firmware-update-v4 requires at least one binary path');
+    (err as Error & { code?: string }).code = 'MISSING_FIRMWARE_BINARY';
+    throw err;
+  }
+
+  return params;
+}
+
 /**
  * #9 FIX: Safe parseInt with NaN check
  */
@@ -1075,4 +1662,8 @@ function safeParseInt(input: string, label: string): number {
   return num;
 }
 
-program.parse();
+export { program };
+
+if (require.main === module) {
+  program.parse();
+}

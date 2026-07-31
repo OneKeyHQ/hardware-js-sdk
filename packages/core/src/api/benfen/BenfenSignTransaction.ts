@@ -8,6 +8,7 @@ import { formatAnyHex } from '../helpers/hexUtils';
 
 import type { BenfenSignTx, BenfenSignedTx, MessageType, TypedCall } from '@onekeyfe/hd-transport';
 import type { TypedResponseMessage } from '../../device/DeviceCommands';
+import type { DeviceFirmwareRange } from '../../types';
 
 export default class BenfenSignTransaction extends BaseMethod<BenfenSignTx> {
   init() {
@@ -33,7 +34,7 @@ export default class BenfenSignTransaction extends BaseMethod<BenfenSignTx> {
     };
   }
 
-  getVersionRange() {
+  getVersionRange(): DeviceFirmwareRange {
     return {
       pro: {
         min: '4.12.0',

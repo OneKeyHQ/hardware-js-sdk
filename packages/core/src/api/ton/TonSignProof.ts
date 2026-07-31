@@ -7,6 +7,10 @@ import type { TonSignProof as HardwareTonSignProof } from '@onekeyfe/hd-transpor
 import type { TonSignProofParams } from '../../types';
 
 export default class TonSignProof extends BaseMethod<HardwareTonSignProof> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
     this.strictCheckDeviceSupport = true;
     this.checkDeviceId = true;
@@ -44,6 +48,9 @@ export default class TonSignProof extends BaseMethod<HardwareTonSignProof> {
 
   getVersionRange() {
     return {
+      pro2: {
+        min: '0.0.0',
+      },
       model_touch: {
         min: '4.10.0',
       },

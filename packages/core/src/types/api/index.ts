@@ -1,9 +1,17 @@
+import type {
+  deviceGetOnboardingStatus,
+  deviceReboot,
+  deviceUploadWallpaper,
+  testProtocolV2Ping,
+  uploadPortfolio,
+} from './protocolV2';
 import type { off, on, removeAllListeners } from './event';
 import type { uiResponse } from './uiResponse';
 import type { init, updateSettings } from './init';
 import type { testInitializeDeviceDuration } from './testInitializeDeviceDuration';
 import type { preInitialize } from './preInitialize';
 import type { getLogs } from './getLogs';
+import type { clearSessionCache } from './sessionCache';
 import type { checkBridgeStatus } from './checkBridgeStatus';
 import type { checkBridgeRelease } from './checkBridgeRelease';
 import type { checkBootloaderRelease } from './checkBootloaderRelease';
@@ -11,11 +19,18 @@ import type { checkAllFirmwareRelease } from './checkAllFirmwareRelease';
 import type { checkFirmwareTypeAvailable } from './checkFirmwareTypeAvailable';
 import type { searchDevices } from './searchDevices';
 import type { getFeatures } from './getFeatures';
+import type { getDeviceState } from './getDeviceState';
 import type { getOnekeyFeatures } from './getOnekeyFeatures';
 import type { getPassphraseState } from './getPassphraseState';
+import type { openWalletSession } from './openWalletSession';
 import type { checkFirmwareRelease } from './checkFirmwareRelease';
 import type { checkBLEFirmwareRelease } from './checkBLEFirmwareRelease';
-import type { firmwareUpdate, firmwareUpdateV2, firmwareUpdateV3 } from './firmwareUpdate';
+import type {
+  firmwareUpdate,
+  firmwareUpdateV2,
+  firmwareUpdateV3,
+  firmwareUpdateV4,
+} from './firmwareUpdate';
 import type { promptWebDeviceAccess } from './promptWebDeviceAccess';
 import type { deviceReset } from './deviceReset';
 import type { deviceRecovery } from './deviceRecovery';
@@ -131,6 +146,16 @@ import type { neoSignTransaction } from './neoSignTransaction';
 import type { ConnectSettings } from '../settings';
 
 export * from './export';
+export type { DeviceStateScope, GetDeviceStateParams } from './getDeviceState';
+export type { GetPassphraseStateParams } from './getPassphraseState';
+export { OpenWalletSessionMode } from './openWalletSession';
+export type {
+  OpenWalletSessionModeValue,
+  OpenWalletSessionParams,
+  OpenWalletSessionPayload,
+} from './openWalletSession';
+export type { ClearSessionCacheParams, ClearSessionCachePayload } from './sessionCache';
+export type { TestProtocolV2PingParams } from './protocolV2';
 
 export type CoreApi = {
   /**
@@ -141,18 +166,20 @@ export type CoreApi = {
   off: typeof off;
   emit: (event: string, ...args: any[]) => void;
   removeAllListeners: typeof removeAllListeners;
-  dispose: () => void;
+  dispose: () => void | Promise<void>;
   call: (params: any) => Promise<any>;
   uiResponse: typeof uiResponse;
   cancel: (connectId?: string) => void;
   updateSettings: typeof updateSettings;
   switchTransport: (env: ConnectSettings['env']) => Promise<{ success: boolean }>;
   getLogs: typeof getLogs;
+  clearSessionCache: typeof clearSessionCache;
 
   /**
    * Test function
    */
   testInitializeDeviceDuration: typeof testInitializeDeviceDuration;
+  testProtocolV2Ping: typeof testProtocolV2Ping;
   preInitialize: typeof preInitialize;
 
   /**
@@ -170,8 +197,10 @@ export type CoreApi = {
   searchDevices: typeof searchDevices;
   promptWebDeviceAccess: typeof promptWebDeviceAccess;
   getFeatures: typeof getFeatures;
+  getDeviceState: typeof getDeviceState;
   getOnekeyFeatures: typeof getOnekeyFeatures;
   getPassphraseState: typeof getPassphraseState;
+  openWalletSession: typeof openWalletSession;
   deviceBackup: typeof deviceBackup;
   deviceChangePin: typeof deviceChangePin;
   deviceFlags: typeof deviceFlags;
@@ -197,7 +226,16 @@ export type CoreApi = {
   firmwareUpdate: typeof firmwareUpdate;
   firmwareUpdateV2: typeof firmwareUpdateV2;
   firmwareUpdateV3: typeof firmwareUpdateV3;
+  firmwareUpdateV4: typeof firmwareUpdateV4;
   cipherKeyValue: typeof cipherKeyValue;
+
+  /**
+   * Pro2 business API
+   */
+  deviceReboot: typeof deviceReboot;
+  deviceGetOnboardingStatus: typeof deviceGetOnboardingStatus;
+  deviceUploadWallpaper: typeof deviceUploadWallpaper;
+  uploadPortfolio: typeof uploadPortfolio;
 
   /**
    * All network function

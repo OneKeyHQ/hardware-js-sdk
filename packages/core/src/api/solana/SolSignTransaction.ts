@@ -8,6 +8,10 @@ import type { SolanaSignTransactionParams, SolanaSignedTx } from '../../types';
 import type { SolanaSignTx as HardwareSolanaSignTx } from '@onekeyfe/hd-transport';
 
 export default class SolSignTransaction extends BaseMethod<HardwareSolanaSignTx[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {
@@ -43,6 +47,9 @@ export default class SolSignTransaction extends BaseMethod<HardwareSolanaSignTx[
   getVersionRange() {
     if (this.existsVersionedTx()) {
       return {
+        pro2: {
+          min: '0.0.0',
+        },
         model_mini: {
           min: '3.1.0',
         },
@@ -53,6 +60,9 @@ export default class SolSignTransaction extends BaseMethod<HardwareSolanaSignTx[
     }
 
     return {
+      pro2: {
+        min: '0.0.0',
+      },
       classic: {
         min: '2.1.9',
       },

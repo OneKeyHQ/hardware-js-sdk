@@ -5,11 +5,14 @@ import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
 import { getCoinInfo } from './helpers/btcParamsUtils';
-import { getDeviceType } from '../../utils';
 
 import type { SignPsbt } from '@onekeyfe/hd-transport';
 
 export default class BTCSignPsbt extends BaseMethod<SignPsbt> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
@@ -50,7 +53,7 @@ export default class BTCSignPsbt extends BaseMethod<SignPsbt> {
     } catch (error) {
       const { message } = error;
 
-      const deviceType = getDeviceType(this.device.features);
+      const deviceType = this.device.getCurrentDeviceType();
       if (
         message.includes('PSBT parse failed') &&
         (deviceType === EDeviceType.Classic1s || deviceType === EDeviceType.ClassicPure)

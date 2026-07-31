@@ -8,6 +8,10 @@ import type { PolkadotSignTransactionParams } from '../../types';
 import type { PolkadotSignTx as HardwarePolkadotSignTx } from '@onekeyfe/hd-transport';
 
 export default class PolkadotSignTransaction extends BaseMethod<HardwarePolkadotSignTx> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {
