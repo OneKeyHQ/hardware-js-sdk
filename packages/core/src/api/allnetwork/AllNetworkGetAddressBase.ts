@@ -459,7 +459,9 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
       show_display: false,
     });
 
-    this.postMessage(createUiMessage(UI_REQUEST.CLOSE_UI_PIN_WINDOW));
+    if (!this.device.isProtocolV2()) {
+      this.postMessage(createUiMessage(UI_REQUEST.CLOSE_UI_PIN_WINDOW));
+    }
 
     if (res.message.root_fingerprint == null) {
       throw ERRORS.TypedError(HardwareErrorCode.CallMethodInvalidParameter);

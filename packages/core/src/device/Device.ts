@@ -74,7 +74,9 @@ import type { DeviceStateReadOptions } from '../types/api/getDeviceState';
 import type {
   DeviceButtonRequestPayload,
   DeviceFeaturesPayload,
+  HardwareUiInteractionMeta,
   PassphraseRequestPayload,
+  ProtocolV2UiEventMetadata,
 } from '../events';
 import type { PassphrasePromptResponse } from './DeviceCommands';
 import type { Deferred, HardwareConnectProtocol } from '@onekeyfe/hd-shared';
@@ -132,6 +134,8 @@ const isProtocolV2DeviceStatusUnsupportedError = (error: unknown) => {
 
 export interface DeviceEvents {
   [DEVICE.PIN]: [Device, PROTO.PinMatrixRequestType | undefined, (err: any, pin: string) => void];
+  [DEVICE.PIN_ON_DEVICE]: [Device, DeviceSessionPinType, ProtocolV2UiEventMetadata?];
+  [DEVICE.PIN_ON_DEVICE_COMPLETE]: [Device, HardwareUiInteractionMeta];
   [DEVICE.PASSPHRASE_ON_DEVICE]: [Device, PassphraseRequestPayload?];
   [DEVICE.ATTACH_PIN_ON_DEVICE]: [Device, PassphraseRequestPayload?];
   [DEVICE.BUTTON]: [Device, DeviceButtonRequestPayload];
@@ -238,6 +242,15 @@ export class Device extends EventEmitter {
 
   /** Invalidates an in-flight runtime-context response without adding a transport epoch. */
   private protocolV2RuntimeContextRequestToken?: object;
+
+  private protocolV2UiInteraction?: {
+    interactionId: string;
+    phaseCounter: number;
+    sequence: number;
+    opened: boolean;
+  };
+
+  private protocolV2UiInteractionCounter = 0;
 
   get state() {
     return this.stateStore.getState();
@@ -1579,6 +1592,75 @@ export class Device extends EventEmitter {
     return res.message;
   }
 
+  beginProtocolV2UiInteraction() {
+    if (!this.isProtocolV2()) return;
+    this.protocolV2UiInteraction = {
+      interactionId: `${this.instanceId}:${Date.now()}:${++this.protocolV2UiInteractionCounter}`,
+      phaseCounter: 0,
+      sequence: 0,
+      opened: false,
+    };
+  }
+
+  createProtocolV2UiPhaseMetadata(
+    phase: HardwareUiInteractionMeta['phase'],
+    transition: HardwareUiInteractionMeta['transition'],
+    options?: {
+      phaseId?: string;
+      outcome?: HardwareUiInteractionMeta['outcome'];
+    }
+  ): HardwareUiInteractionMeta | undefined {
+    if (!this.isProtocolV2()) return undefined;
+    if (!this.protocolV2UiInteraction) this.beginProtocolV2UiInteraction();
+
+    const interaction = this.protocolV2UiInteraction;
+    if (!interaction) return undefined;
+    const phaseId =
+      options?.phaseId ?? `${interaction.interactionId}:phase-${++interaction.phaseCounter}`;
+    interaction.opened = true;
+    interaction.sequence += 1;
+
+    return {
+      interactionId: interaction.interactionId,
+      phaseId,
+      sequence: interaction.sequence,
+      phase,
+      transition,
+      ...(options?.outcome ? { outcome: options.outcome } : {}),
+      protocol: 'V2',
+    };
+  }
+
+  completeProtocolV2UiPhase(
+    phase: HardwareUiInteractionMeta,
+    outcome: HardwareUiInteractionMeta['outcome'] = 'succeeded'
+  ) {
+    return this.createProtocolV2UiPhaseMetadata(phase.phase, 'complete', {
+      phaseId: phase.phaseId,
+      outcome,
+    });
+  }
+
+  finishProtocolV2UiInteraction(outcome: HardwareUiInteractionMeta['outcome'] = 'succeeded') {
+    const interaction = this.protocolV2UiInteraction;
+    if (!interaction?.opened) {
+      this.protocolV2UiInteraction = undefined;
+      return undefined;
+    }
+
+    const phaseId = `${interaction.interactionId}:phase-${Math.max(interaction.phaseCounter, 1)}`;
+    const metadata = this.createProtocolV2UiPhaseMetadata('processing', 'finish', {
+      phaseId,
+      outcome,
+    });
+    this.protocolV2UiInteraction = undefined;
+    return metadata;
+  }
+
+  hasOpenProtocolV2UiInteraction() {
+    return this.protocolV2UiInteraction?.opened === true;
+  }
+
   supportUnlockVersionRange(): DeviceFirmwareRange {
     // This range applies to Protocol V1 Pro devices; Pro2 has a dedicated unlock flow.
     return {
@@ -1588,10 +1670,33 @@ export class Device extends EventEmitter {
     };
   }
 
-  async unlockDevice(pinType: DeviceSessionPinType = DeviceSessionPinType.Main) {
+  async unlockDevice(
+    pinType?: DeviceSessionPinType,
+    options?: ProtocolV2UiEventMetadata & { emitUiEvent?: boolean }
+  ) {
     if (this.isProtocolV2()) {
+      const requestedPinType = pinType ?? DeviceSessionPinType.Main;
+      const interaction =
+        options?.interaction ??
+        (options?.emitUiEvent === false
+          ? undefined
+          : this.createProtocolV2UiPhaseMetadata('pin', 'start'));
+      if (options?.emitUiEvent !== false) {
+        this.emit(DEVICE.PIN_ON_DEVICE, this, requestedPinType, {
+          source: options?.source ?? 'unlock-coordinator',
+          reason: options?.reason ?? 'device-unlock',
+          deviceOnly: options?.deviceOnly ?? true,
+          completion: options?.completion,
+          method: options?.method,
+          page: options?.page,
+          operation: options?.operation,
+          interaction: options?.interaction ?? interaction,
+        });
+      }
       try {
-        await this.commands.typedCall('DeviceSessionAskPin', 'Success', { type: pinType });
+        await this.commands.typedCall('DeviceSessionAskPin', 'Success', {
+          type: requestedPinType,
+        });
       } catch (error) {
         const errorText =
           error instanceof Error
@@ -1601,6 +1706,11 @@ export class Device extends EventEmitter {
           throw createDeviceNotSupportMethodError('deviceUnlock', this.getCurrentFirmwareType());
         }
         throw error;
+      }
+
+      const completion = interaction ? this.completeProtocolV2UiPhase(interaction) : undefined;
+      if (completion) {
+        this.emit(DEVICE.PIN_ON_DEVICE_COMPLETE, this, completion);
       }
 
       const status = await requestProtocolV2DeviceStatus({ commands: this.commands });
@@ -1664,7 +1774,8 @@ export class Device extends EventEmitter {
   async checkPassphraseStateSafety(
     passphraseState?: string,
     useEmptyPassphrase?: boolean,
-    skipPassphraseCheck?: boolean
+    skipPassphraseCheck?: boolean,
+    deriveCardano?: boolean
   ) {
     if (this.isUnacquired()) return false;
 
@@ -1673,6 +1784,7 @@ export class Device extends EventEmitter {
       await getPassphraseStateWithRefreshDeviceInfo(this, {
         expectPassphraseState: expectedPassphraseState,
         onlyMainPin: useEmptyPassphrase,
+        deriveCardano,
       });
 
     // Main wallet and unlock Attach Pin, throw safe error

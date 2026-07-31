@@ -188,7 +188,7 @@ export abstract class BaseMethod<Params = undefined> {
   /** Non-blocking Protocol V2 interaction synthesized by the SDK. */
   protocolV2UiInteraction?: ProtocolV2InteractionDescriptor;
 
-  /** Special background methods may suppress all synthesized Protocol V2 UI events. */
+  /** Special background methods may suppress method-level Protocol V2 UI events. */
   protocolV2UiMode: ProtocolV2UiMode = 'auto';
 
   protected throwIfAborted() {

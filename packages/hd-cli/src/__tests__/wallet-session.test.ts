@@ -1,4 +1,5 @@
 import { prepareSession } from '../cli';
+import { resolvePassphraseByChoice } from '../sdk';
 import { preloadSessionFromKeychain } from '../session';
 
 jest.mock('../session', () => ({
@@ -7,6 +8,14 @@ jest.mock('../session', () => ({
 }));
 
 describe('CLI wallet session', () => {
+  test('maps the Attach PIN choice to an on-device Attach PIN response', async () => {
+    await expect(resolvePassphraseByChoice('4')).resolves.toEqual({
+      value: '',
+      passphraseOnDevice: false,
+      attachPinOnDevice: true,
+    });
+  });
+
   test('uses the public wallet identity without persisting an internal session id', async () => {
     const sdk = {
       searchDevices: jest.fn().mockResolvedValue({

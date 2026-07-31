@@ -121,6 +121,18 @@ describe('messages', () => {
       id: 1,
       type: 'bytes',
     });
+    expect(v2Messages.nested.DeviceSessionGet.fields).toMatchObject({
+      btc_test_address: { id: 2, type: 'string' },
+      seed_domains: {
+        id: 3,
+        type: 'DeviceSessionSeedDomain',
+        rule: 'repeated',
+      },
+    });
+    expect(v2Messages.nested.DeviceSessionSeedDomain.values).toEqual({
+      SeedDomain_Standard: 1,
+      SeedDomain_Cardano: 2,
+    });
     expect(v2Messages.nested.DeviceSessionPinType.values).toEqual({
       Any: 1,
       Main: 2,

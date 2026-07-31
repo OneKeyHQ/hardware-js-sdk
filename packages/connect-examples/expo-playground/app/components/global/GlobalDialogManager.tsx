@@ -34,10 +34,12 @@ const GlobalDialogManager: React.FC = () => {
     window.globalDialogManager = {
       showPinDialog: () => {
         console.log('[GlobalDialogManager] Show PIN dialog');
+        setPassphraseDialogOpen(false);
         setPinDialogOpen(true);
       },
       showPassphraseDialog: () => {
         console.log('[GlobalDialogManager] Show Passphrase dialog');
+        setPinDialogOpen(false);
         setPassphraseDialogOpen(true);
       },
       closeAllDialogs: () => {

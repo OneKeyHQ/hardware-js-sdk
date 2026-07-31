@@ -73,6 +73,7 @@ export function findPinentry(): string | null {
 export interface PinentryResult {
   value: string;
   passphraseOnDevice: boolean;
+  attachPinOnDevice?: boolean;
 }
 
 // CLI-variant policy differs from app-monorepo: we fall back to on-device

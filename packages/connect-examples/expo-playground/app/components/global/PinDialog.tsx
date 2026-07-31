@@ -34,7 +34,6 @@ const PinDialog: React.FC<PinDialogProps> = ({ isOpen, onClose }) => {
     try {
       await submitPin(pin);
       setPin('');
-      onClose();
     } catch (error) {
       console.error('PIN submit failed:', error);
     }
@@ -44,7 +43,6 @@ const PinDialog: React.FC<PinDialogProps> = ({ isOpen, onClose }) => {
     try {
       await submitPin('@@ONEKEY_INPUT_PIN_IN_DEVICE');
       setPin('');
-      onClose();
     } catch (error) {
       console.error('Device PIN input failed:', error);
     }

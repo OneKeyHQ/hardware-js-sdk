@@ -3,6 +3,8 @@ import { registerHardwareUiEventListeners } from '../src/core/deviceEventRegistr
 
 const handlers = {
   pin: jest.fn(),
+  pinOnDevice: jest.fn(),
+  pinOnDeviceComplete: jest.fn(),
   button: jest.fn(),
   passphrase: jest.fn(),
   passphraseOnDevice: jest.fn(),
@@ -21,6 +23,8 @@ describe('hardware UI event registration', () => {
     expect(registerHardwareUiEventListeners(device as any, handlers)).toBe(true);
     expect(device.on.mock.calls.map(([type]) => type)).toEqual([
       DEVICE.PIN,
+      DEVICE.PIN_ON_DEVICE,
+      DEVICE.PIN_ON_DEVICE_COMPLETE,
       DEVICE.BUTTON,
       DEVICE.PASSPHRASE,
       DEVICE.PASSPHRASE_ON_DEVICE,
@@ -34,6 +38,8 @@ describe('hardware UI event registration', () => {
     expect(registerHardwareUiEventListeners(device as any, handlers)).toBe(true);
     expect(device.on.mock.calls.map(([type]) => type)).toEqual([
       DEVICE.PIN,
+      DEVICE.PIN_ON_DEVICE,
+      DEVICE.PIN_ON_DEVICE_COMPLETE,
       DEVICE.BUTTON,
       DEVICE.PASSPHRASE,
       DEVICE.PASSPHRASE_ON_DEVICE,

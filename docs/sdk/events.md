@@ -1,7 +1,7 @@
 # OneKey `hd-*` SDK 公共事件（SDK → App）
 
 > - 文档状态：Protocol V1 当前契约 + Protocol V2 通用事件边界
-> - 最后代码核验：2026-07-30
+> - 最后代码核验：2026-07-31
 > - 适用范围：`@onekeyfe/hd-core`、`hd-web-sdk`、`hd-common-connect-sdk`
 > - 事实来源：`packages/core/src/events`、`packages/core/src/core/index.ts` 和 SDK 外层消息转发实现
 
@@ -164,12 +164,15 @@ Event 必须在取消、超时、断连和方法结束时清理。
 
 ### PIN 响应
 
-以下 `RECEIVE_PIN` 只适用于 Protocol V1。Protocol V2/Pro2 的 `REQUEST_PIN` 是 SDK 在
-`DeviceLocked` 后合成的非阻塞“请在设备解锁”提示，不接受 PIN 响应。
+以下 `RECEIVE_PIN` 只适用于 Protocol V1。Protocol V2/Pro2 的 `REQUEST_PIN` 是 SDK 在发送
+`DeviceSessionAskPin` 前合成的非阻塞设备操作提示，不接受 PIN 响应。`Main` 映射为
+`ButtonRequest_PinEntry`，`AttachToPin` 映射为 `ButtonRequest_AttachPin`。
 
-该提示由统一交互协调器生成，payload 包含 `source='unlock-coordinator'`、
-`reason='device-locked'`、`deviceOnly=true` 和触发方法名。设备解锁后 SDK 在原调用内最多重试一次，
-App 不重发业务请求。声明 `protocolV2UiMode='none'` 的后台方法不会生成该提示。
+锁定重试提示由统一交互协调器生成，payload 包含 `source='unlock-coordinator'`、
+`reason='device-locked'`、`deviceOnly=true` 和触发方法名；钱包选择提示由钱包 Session 协调器生成。
+设备解锁后 SDK 在原调用内最多重试一次，App 不重发业务请求。
+`protocolV2UiMode='none'` 只抑制普通方法交互提示；如果实际发送了 `DeviceSessionAskPin`，
+SDK 仍必须生成该 PIN 提示。
 
 软件输入：
 
@@ -340,6 +343,14 @@ HardwareSDK.on(FIRMWARE_EVENT, message => {
 
 `DEVICE.STATE` 是 V1/V2 的统一状态变更通知。它可能来自设备读取、设置成功后的 confirmed patch
 或解锁结果；相同 patch 不会重复发送。新接入只消费完整 `DeviceState`，无需识别底层协议。
+
+设置调用中的状态刷新会先在 Core 内更新 `DeviceState` 并同步发出 `DEVICE.STATE`，随后 API Promise
+才完成。App 如果在 listener 中异步落库，必须把“设置调用完成”和“该设备的事件落库完成”串行化，
+再读取本地状态；不能在 Promise 返回后立即读取旧 `Features` 缓存，也不能用请求参数乐观覆盖设备状态。
+
+Pro2 的 `status.passphraseProtection` 只在设备已解锁、私有 Status 可验证时具有权威值。关闭
+passphrase 后设备可能主动锁定，此时后续锁定快照允许该字段为 `undefined`；App 应保留最近一次已确认值，
+并在解锁后通过 `getDeviceState({ scope: 'settings' })` 刷新，而不是把锁定快照解释为 `false`。
 
 `DEVICE.FEATURES` 仅用于 Protocol V1 兼容。Protocol V2 不发送该事件，也不支持 `getFeatures()`。
 

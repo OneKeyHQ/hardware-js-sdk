@@ -61,6 +61,7 @@ import { createCoreApi } from '../src/inject';
 import { Device, preloadSessionCache } from '../src/device/Device';
 import { deviceWalletSessionStore } from '../src/device/DeviceWalletSessionStore';
 import { DevicePool } from '../src/device/DevicePool';
+import { DEVICE } from '../src/events';
 import { UI_REQUEST } from '../src/events/ui-request';
 import {
   PROTOCOL_V2_DEVICE_INFO_TIMEOUT_MS,
@@ -867,6 +868,7 @@ describe('Protocol V2 feature adapter', () => {
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
       session_id: 'standard-session',
+      btc_test_address: 'standard-state',
     });
     expect(deviceWalletSessionStore.getStandard(deviceId)).toEqual({
       passphraseState: 'standard-state',
@@ -1336,6 +1338,7 @@ describe('Protocol V2 feature adapter', () => {
 
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
       session_id: 'session-a',
+      btc_test_address: 'state-a',
     });
     expect(device.getInternalState()).toBe('session-b');
   });
@@ -1403,7 +1406,11 @@ describe('Protocol V2 feature adapter', () => {
     });
     expect(typedCall.mock.calls).toEqual([
       ['ProtocolInfoRequest', 'ProtocolInfo', { eventless_wallet_session: true }],
-      ['DeviceSessionGet', 'DeviceSession', { session_id: 'session-a' }],
+      [
+        'DeviceSessionGet',
+        'DeviceSession',
+        { session_id: 'session-a', btc_test_address: 'state-a' },
+      ],
     ]);
     expect(promptPassphrase).not.toHaveBeenCalled();
     expect(device.getInternalState()).toBeUndefined();
@@ -1610,9 +1617,9 @@ describe('Protocol V2 feature adapter', () => {
         errorCode: HardwareErrorCode.DeviceCheckUnlockTypeError,
       });
 
-      expect(promptPassphrase).toHaveBeenCalledTimes(1);
-      expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPin', 'Success', {
-        type: DeviceSessionPinType.AttachToPin,
+      expect(promptPassphrase).not.toHaveBeenCalled();
+      expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
+        btc_test_address: 'expected-state',
       });
       expect(typedCall).toHaveBeenCalledWith('LockDevice', 'Success', {});
       expect(typedCall.mock.calls.filter(call => call[0] === 'DeviceSessionGet')).toHaveLength(1);
@@ -1676,7 +1683,17 @@ describe('Protocol V2 feature adapter', () => {
       }),
       { cancelDeviceOnReject: false }
     );
-    expect(unlockDevice).toHaveBeenCalledWith(DeviceSessionPinType.AttachToPin);
+    expect(unlockDevice).toHaveBeenCalledWith(
+      DeviceSessionPinType.AttachToPin,
+      expect.objectContaining({
+        emitUiEvent: false,
+        interaction: expect.objectContaining({
+          phase: 'pin',
+          transition: 'start',
+          protocol: 'V2',
+        }),
+      })
+    );
     expect(device.getInternalState()).toBe('new-attach-session');
   });
 
@@ -1960,12 +1977,10 @@ describe('Protocol V2 feature adapter', () => {
     expect(getFeatures).not.toHaveBeenCalled();
   });
 
-  test('marks an interactive cache miss as a wallet-session recovery', async () => {
+  test('uses the cached wallet address when the local session is missing', async () => {
     const typedCall = jest
       .fn()
       .mockResolvedValueOnce({ message: { version: 2 } })
-      .mockResolvedValueOnce({ message: { message: 'Passphrase prepared' } })
-      .mockResolvedValueOnce({ message: { unlocked: true, unlocked_attach_pin: false } })
       .mockResolvedValueOnce({
         message: {
           btc_test_address: 'expected-state',
@@ -1993,16 +2008,10 @@ describe('Protocol V2 feature adapter', () => {
     await expect(
       getProtocolV2WalletSession(device, { expectedPassphraseState: 'expected-state' })
     ).resolves.toMatchObject({ passphraseState: 'expected-state' });
-    expect(promptPassphrase).toHaveBeenCalledWith(
-      {
-        existsAttachPinUser: false,
-        deviceOnly: false,
-        source: 'wallet-session-coordinator',
-        reason: 'session-recovery',
-        expectedPassphraseState: 'expected-state',
-      },
-      { cancelDeviceOnReject: false }
-    );
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
+      btc_test_address: 'expected-state',
+    });
+    expect(promptPassphrase).not.toHaveBeenCalled();
   });
 
   test('reuses the Pro2 session opened by legacy getPassphraseState on the next App call', async () => {
@@ -2068,7 +2077,11 @@ describe('Protocol V2 feature adapter', () => {
       true
     );
     expect(typedCall.mock.calls).toEqual([
-      ['DeviceSessionGet', 'DeviceSession', { session_id: 'session-pro2-app' }],
+      [
+        'DeviceSessionGet',
+        'DeviceSession',
+        { session_id: 'session-pro2-app', btc_test_address: 'state-pro2-app' },
+      ],
     ]);
   });
 
@@ -2335,12 +2348,15 @@ describe('Protocol V2 feature adapter', () => {
     );
 
     expect(device.getInternalState()).toBeUndefined();
-    expect(typedCall).toHaveBeenNthCalledWith(2, 'DeviceSessionAskPassphrase', 'Success', {
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
+      btc_test_address: 'expected-state',
+    });
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {
       passphrase: 'host hidden wallet',
       on_device: false,
     });
-    expect(typedCall).toHaveBeenNthCalledWith(3, 'DeviceStatusGet', 'DeviceStatus', {});
-    expect(typedCall).toHaveBeenNthCalledWith(4, 'DeviceSessionGet', 'DeviceSession', {});
+    expect(typedCall).toHaveBeenCalledWith('DeviceStatusGet', 'DeviceStatus', {});
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
   });
 
   test('useEmptyPassphrase ignores a stale hidden-wallet state during Protocol V2 safety check', async () => {
@@ -3193,9 +3209,23 @@ describe('Protocol V2 feature adapter', () => {
         status: { init_states: true },
       }
     );
+    const pinOnDevice = jest.fn();
+    device.on(DEVICE.PIN_ON_DEVICE, pinOnDevice);
 
     const features = await device.unlockDevice();
 
+    expect(pinOnDevice).toHaveBeenCalledWith(
+      device,
+      DeviceSessionPinType.Main,
+      expect.objectContaining({
+        source: 'unlock-coordinator',
+        reason: 'device-unlock',
+        deviceOnly: true,
+      })
+    );
+    expect(pinOnDevice.mock.invocationCallOrder[0]).toBeLessThan(
+      typedCall.mock.invocationCallOrder[0]
+    );
     expect(typedCall.mock.calls).toEqual([
       ['DeviceSessionAskPin', 'Success', { type: DeviceSessionPinType.Main }],
       ['DeviceStatusGet', 'DeviceStatus', {}],
@@ -3241,9 +3271,12 @@ describe('Protocol V2 feature adapter', () => {
       throw new Error(`Unexpected request: ${requestType}`);
     });
     (device as any).commands = { typedCall };
+    const pinOnDevice = jest.fn();
+    device.on(DEVICE.PIN_ON_DEVICE, pinOnDevice);
 
-    await device.unlockDevice();
+    await device.unlockDevice(DeviceSessionPinType.Main, { emitUiEvent: false });
 
+    expect(pinOnDevice).not.toHaveBeenCalled();
     expect(typedCall.mock.calls).toEqual([
       ['DeviceSessionAskPin', 'Success', { type: DeviceSessionPinType.Main }],
       ['DeviceStatusGet', 'DeviceStatus', {}],
@@ -6241,7 +6274,10 @@ describe('Protocol V2 protected method execution', () => {
       }
       if (requestType === 'DeviceSessionGet') {
         calls.push('resume-hidden-session');
-        expect(request).toEqual({ session_id: 'hidden-session' });
+        expect(request).toEqual({
+          session_id: 'hidden-session',
+          btc_test_address: 'hidden-state',
+        });
         return Promise.resolve({
           message: {
             session_id: 'hidden-session',
@@ -6346,7 +6382,10 @@ describe('Protocol V2 protected method execution', () => {
       }
       if (requestType === 'DeviceSessionGet') {
         calls.push('resume-hidden-session');
-        expect(request).toEqual({ session_id: 'hidden-session' });
+        expect(request).toEqual({
+          session_id: 'hidden-session',
+          btc_test_address: 'hidden-state',
+        });
         return Promise.resolve({
           message: {
             session_id: 'hidden-session',
@@ -6386,7 +6425,12 @@ describe('Protocol V2 protected method execution', () => {
     await expect(runMethodWithUnlockRetry(method as any, device as any)).resolves.toEqual({
       message: 'ok',
     });
-    expect(device.unlockDevice).toHaveBeenCalledWith();
+    expect(device.unlockDevice).toHaveBeenCalledWith(undefined, {
+      source: 'unlock-coordinator',
+      reason: 'device-locked',
+      deviceOnly: true,
+      method: 'evmSignMessage',
+    });
     expect(calls).toEqual([
       'unlock-main',
       'negotiate-session',
@@ -6591,6 +6635,38 @@ describe('Protocol V2 protected method execution', () => {
       runMethodWithUnlockRetry(method as any, device as any, uiCoordinator as any)
     ).resolves.toEqual({ message: 'ok' });
     expect(device.unlockDevice).not.toHaveBeenCalled();
+    expect(uiCoordinator.enterMethodInteraction).not.toHaveBeenCalled();
+    expect(uiCoordinator.enterUnlockInteraction).not.toHaveBeenCalled();
+    expect(uiCoordinator.resumeMethodInteraction).not.toHaveBeenCalled();
+  });
+
+  test('keeps the PIN prompt when an eventless method actually unlocks the device', async () => {
+    const lockedError = deviceLockedError();
+    const method = {
+      name: 'backgroundRead',
+      unlockPolicy: 'retry-on-locked',
+      protocolV2UiMode: 'none',
+      run: jest.fn().mockRejectedValueOnce(lockedError).mockResolvedValueOnce({ message: 'ok' }),
+    };
+    const device = {
+      isProtocolV2: () => true,
+      unlockDevice: jest.fn().mockResolvedValue(undefined),
+    };
+    const uiCoordinator = {
+      enterMethodInteraction: jest.fn(),
+      enterUnlockInteraction: jest.fn(),
+      resumeMethodInteraction: jest.fn(),
+    };
+
+    await expect(
+      runMethodWithUnlockRetry(method as any, device as any, uiCoordinator as any)
+    ).resolves.toEqual({ message: 'ok' });
+    expect(device.unlockDevice).toHaveBeenCalledWith(undefined, {
+      source: 'unlock-coordinator',
+      reason: 'device-locked',
+      deviceOnly: true,
+      method: 'backgroundRead',
+    });
     expect(uiCoordinator.enterMethodInteraction).not.toHaveBeenCalled();
     expect(uiCoordinator.enterUnlockInteraction).not.toHaveBeenCalled();
     expect(uiCoordinator.resumeMethodInteraction).not.toHaveBeenCalled();

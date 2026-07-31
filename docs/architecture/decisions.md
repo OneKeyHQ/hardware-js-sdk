@@ -82,6 +82,11 @@ Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类�
 - V2 先通过 `ProtocolInfoRequest { eventless_wallet_session: true }` 协商无中间固件 Event。
   `DeviceSessionAskPin` 和 `DeviceSessionAskPassphrase` 只返回 `Success`；Core 随后使用空参数
   `DeviceSessionGet` 读取当前 Session。恢复时使用带 `session_id` 的 `DeviceSessionGet`。
+- Protocol V2 每次实际发送 `DeviceSessionAskPin` 前，Core 必须向 App 合成一次非阻塞
+  `UI_REQUEST.REQUEST_PIN`：`Main` 映射为 `ButtonRequest_PinEntry`，`AttachToPin` 映射为
+  `ButtonRequest_AttachPin`。App 只展示设备端操作提示，不回传 PIN；已有方法交互协调器发出提示的
+  路径必须抑制底层重复 Event。`protocolV2UiMode='none'` 只抑制普通方法交互提示，
+  不得抑制已实际触发的设备端 PIN 提示。
 - `DeviceSessionGet` 的 `session_id` 可选：缺省表示读取当前 Session，存在表示尝试恢复目标 Session；
   两种调用都必须返回固件最终实际的完整 `DeviceSession`，正常状态错配不返回 `InvalidSession`。
 - Pro2 的 `DeviceSessionAskPassphrase` 必须显式携带输入来源：Host 输入发送

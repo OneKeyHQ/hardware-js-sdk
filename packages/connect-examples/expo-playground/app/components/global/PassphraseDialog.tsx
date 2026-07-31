@@ -28,7 +28,6 @@ const PassphraseDialog: React.FC<PassphraseDialogProps> = ({ isOpen, onClose }) 
     try {
       await submitPassphrase(passphrase, false);
       resetState();
-      onClose();
     } catch (error) {
       console.error('Passphrase submit failed:', error);
     }
@@ -47,7 +46,6 @@ const PassphraseDialog: React.FC<PassphraseDialogProps> = ({ isOpen, onClose }) 
     try {
       await submitPassphrase('', true);
       resetState();
-      onClose();
     } catch (error) {
       console.error('Device input failed:', error);
     }

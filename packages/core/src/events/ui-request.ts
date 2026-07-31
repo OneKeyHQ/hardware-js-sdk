@@ -56,6 +56,16 @@ export type ProtocolV2UiEventSource =
 
 export type ProtocolV2UiCompletion = 'page-accepted' | 'operation-completed';
 
+export type HardwareUiInteractionMeta = {
+  interactionId: string;
+  phaseId: string;
+  sequence: number;
+  phase: 'pin' | 'passphrase' | 'passphrase-on-device' | 'button' | 'processing';
+  transition: 'start' | 'complete' | 'finish';
+  outcome?: 'submitted' | 'succeeded' | 'failed' | 'cancelled' | 'disconnected';
+  protocol: 'V2';
+};
+
 export type ProtocolV2UiEventMetadata = {
   source?: ProtocolV2UiEventSource;
   reason?: string;
@@ -64,12 +74,29 @@ export type ProtocolV2UiEventMetadata = {
   method?: string;
   page?: string | number;
   operation?: string;
+  interaction?: HardwareUiInteractionMeta;
 };
+
+export type UiRequestWindowClose =
+  | {
+      type: typeof UI_REQUEST.CLOSE_UI_WINDOW;
+      payload: HardwareUiInteractionMeta;
+    }
+  | {
+      type: typeof UI_REQUEST.CLOSE_UI_PIN_WINDOW;
+      payload: HardwareUiInteractionMeta;
+    }
+  | {
+      type: typeof UI_REQUEST.CLOSE_UI_WINDOW;
+      payload?: undefined;
+    }
+  | {
+      type: typeof UI_REQUEST.CLOSE_UI_PIN_WINDOW;
+      payload?: undefined;
+    };
 
 export interface UiRequestWithoutPayload {
   type:
-    | typeof UI_REQUEST.CLOSE_UI_WINDOW
-    | typeof UI_REQUEST.CLOSE_UI_PIN_WINDOW
     | typeof UI_REQUEST.BLUETOOTH_PERMISSION
     | typeof UI_REQUEST.BLUETOOTH_UNSUPPORTED
     | typeof UI_REQUEST.BLUETOOTH_POWERED_OFF
@@ -111,6 +138,7 @@ export interface UiRequestPassphrase {
     source?: 'wallet-session-coordinator';
     reason?: 'open-wallet' | 'session-recovery';
     expectedPassphraseState?: string;
+    interaction?: HardwareUiInteractionMeta;
   };
 }
 
@@ -121,6 +149,7 @@ export interface UiRequestPassphraseOnDevice {
     passphraseState?: string;
     source?: 'wallet-session-coordinator';
     reason?: 'open-wallet' | 'session-recovery';
+    interaction?: HardwareUiInteractionMeta;
   };
 }
 
@@ -191,6 +220,7 @@ export interface PreviousAddressResult {
 
 export type UiEvent =
   | UiRequestWithoutPayload
+  | UiRequestWindowClose
   | UiRequestDeviceAction
   | UiRequestButton
   | UiRequestPassphraseOnDevice

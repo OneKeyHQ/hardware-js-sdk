@@ -5,6 +5,7 @@ import { refreshProtocolV2DeviceStatus, restoreProtocolV2WalletSession } from '.
 
 import type { BaseMethod } from '../../api/BaseMethod';
 import type { Device } from '../../device/Device';
+import type { HardwareUiInteractionMeta } from '../../events';
 import type { ProtocolV2UiInteractionCoordinator } from './uiInteraction';
 
 const Log = getLogger(LoggerNames.Core);
@@ -46,6 +47,7 @@ export async function runMethodWithUnlockRetry(
   uiCoordinator?: UiInteractionCoordinator
 ) {
   const shouldEmitUi = isProtocolV2UiEnabled(method);
+  const shouldCoordinateUi = shouldEmitUi && uiCoordinator !== undefined;
   const isProtocolV2 = device.isProtocolV2();
   const requiresFreshStatus =
     isProtocolV2 &&
@@ -65,19 +67,29 @@ export async function runMethodWithUnlockRetry(
     device.features?.unlocked === false;
 
   if (shouldUnlockBeforeRun) {
-    if (shouldEmitUi) {
-      uiCoordinator?.enterUnlockInteraction(method.name);
-    }
-    await device.unlockDevice();
+    const unlockInteraction: HardwareUiInteractionMeta | undefined = shouldCoordinateUi
+      ? uiCoordinator?.enterUnlockInteraction(method.name)
+      : undefined;
+    await device.unlockDevice(
+      undefined,
+      shouldCoordinateUi
+        ? { emitUiEvent: false, interaction: unlockInteraction }
+        : {
+            source: 'unlock-coordinator',
+            reason: 'device-locked',
+            deviceOnly: true,
+            method: method.name,
+          }
+    );
     Log.debug('Protocol V2 pre-unlock completed', { method: method.name });
     await restoreExpectedWalletSessionAfterUnlock(method, device);
-    if (shouldEmitUi) {
+    if (shouldCoordinateUi) {
       uiCoordinator?.enterMethodInteraction(resolveProtocolV2UiInteraction(method));
     }
     return method.run();
   }
 
-  if (shouldEmitUi) {
+  if (shouldCoordinateUi) {
     uiCoordinator?.enterMethodInteraction(resolveProtocolV2UiInteraction(method));
   }
   try {
@@ -88,13 +100,23 @@ export async function runMethodWithUnlockRetry(
     }
 
     Log.debug('Protocol V2 unlock retry triggered', { method: method.name });
-    if (shouldEmitUi) {
-      uiCoordinator?.enterUnlockInteraction(method.name);
-    }
-    await device.unlockDevice();
+    const unlockInteraction: HardwareUiInteractionMeta | undefined = shouldCoordinateUi
+      ? uiCoordinator?.enterUnlockInteraction(method.name)
+      : undefined;
+    await device.unlockDevice(
+      undefined,
+      shouldCoordinateUi
+        ? { emitUiEvent: false, interaction: unlockInteraction }
+        : {
+            source: 'unlock-coordinator',
+            reason: 'device-locked',
+            deviceOnly: true,
+            method: method.name,
+          }
+    );
     Log.debug('Protocol V2 unlock completed', { method: method.name });
     await restoreExpectedWalletSessionAfterUnlock(method, device);
-    if (shouldEmitUi) {
+    if (shouldCoordinateUi) {
       uiCoordinator?.resumeMethodInteraction();
     }
     try {

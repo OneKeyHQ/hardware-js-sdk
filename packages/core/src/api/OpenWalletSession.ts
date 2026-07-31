@@ -1,4 +1,5 @@
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { DeviceSessionPinType } from '@onekeyfe/hd-transport';
 
 import { deviceWalletSessionStore } from '../device/DeviceWalletSessionStore';
 import { getProtocolV2WalletSession } from '../protocols/protocol-v2/walletSession';
@@ -105,7 +106,12 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
     };
     const unlockProtocolV2IfLocked = async () => {
       if (isProtocolV2 && state.status.unlocked === false) {
-        await this.device.unlockDevice();
+        await this.device.unlockDevice(DeviceSessionPinType.Main, {
+          source: 'unlock-coordinator',
+          reason: 'device-locked',
+          deviceOnly: true,
+          method: 'openWalletSession',
+        });
       }
     };
 
@@ -116,6 +122,7 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
       const session = isProtocolV2
         ? await getProtocolV2WalletSession(this.device, {
             onlyMainPin: true,
+            deriveCardano: this.payload.deriveCardano,
             selectMainWalletBeforeRestore:
               state.status.unlocked === false || state.status.unlockedAttachPin === true,
           })
@@ -170,6 +177,7 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
       const session = isProtocolV2
         ? await getProtocolV2WalletSession(this.device, {
             expectedPassphraseState: this.params.passphraseState,
+            deriveCardano: this.payload.deriveCardano,
           })
         : await getPassphraseStateWithRefreshDeviceInfo(this.device, {
             expectPassphraseState: this.params.passphraseState,
@@ -191,7 +199,10 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
     this.device.passphraseState = undefined;
     await unlockProtocolV2IfLocked();
     const session = isProtocolV2
-      ? await getProtocolV2WalletSession(this.device, { forceWalletSelection: true })
+      ? await getProtocolV2WalletSession(this.device, {
+          forceWalletSelection: true,
+          deriveCardano: this.payload.deriveCardano,
+        })
       : await getPassphraseStateWithRefreshDeviceInfo(this.device, { initSession: true });
     const deviceId = isProtocolV2 ? await refreshProtocolV2DeviceId() : requireDeviceId();
     if (isProtocolV2 && this.device.getCurrentPassphraseProtection() !== true) {

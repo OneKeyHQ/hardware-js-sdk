@@ -1,6 +1,6 @@
 import semver from 'semver';
 import EventEmitter from 'events';
-import { TRANSPORT_EVENT } from '@onekeyfe/hd-transport';
+import { DeviceSessionPinType, TRANSPORT_EVENT } from '@onekeyfe/hd-transport';
 import {
   ERRORS,
   ERROR_CODES_REQUIRE_RELEASE,
@@ -407,6 +407,8 @@ const onCallDevice = async (
 
   registerHardwareUiEventListeners(device, {
     pin: onDevicePinHandler,
+    pinOnDevice: onEnterPinOnDeviceHandler,
+    pinOnDeviceComplete: onPinOnDeviceCompleteHandler,
     button: onDeviceButtonHandler,
     passphrase: message.payload.useEmptyPassphrase
       ? onEmptyPassphraseHandler
@@ -422,6 +424,7 @@ const onCallDevice = async (
   );
 
   const protocolV2UiCoordinator = new ProtocolV2UiInteractionCoordinator(device, postMessage);
+  device.beginProtocolV2UiInteraction();
   device.on(
     DEVICE.SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE,
     onSelectDeviceForSwitchFirmwareWebDeviceHandler
@@ -595,7 +598,8 @@ const onCallDevice = async (
         const passphraseStateSafety = await device.checkPassphraseStateSafety(
           method.payload?.passphraseState,
           method.payload?.useEmptyPassphrase,
-          method.payload?.skipPassphraseCheck
+          method.payload?.skipPassphraseCheck,
+          hasDeriveCardano(method)
         );
 
         // Double check, handles the special case of Touch/Pro
@@ -608,8 +612,11 @@ const onCallDevice = async (
           );
         }
 
-        // close pin popup window
-        postMessage(createUiMessage(UI_REQUEST.CLOSE_UI_PIN_WINDOW));
+        // Protocol V2 emits the PIN phase completion from DeviceSessionAskPin.
+        // Keep the legacy compatibility close for Protocol V1 only.
+        if (!device.isProtocolV2()) {
+          postMessage(createUiMessage(UI_REQUEST.CLOSE_UI_PIN_WINDOW));
+        }
       }
 
       // Automatic check safety_check level for Kovan, Ropsten, Rinkeby, Goerli test networks.
@@ -1283,6 +1290,7 @@ const onDevicePassphraseHandler = async (
       source: requestPayload.source,
       reason: requestPayload.reason,
       expectedPassphraseState: requestPayload.expectedPassphraseState,
+      ...(requestPayload.interaction ? { interaction: requestPayload.interaction } : {}),
     })
   );
   // wait for passphrase
@@ -1312,6 +1320,7 @@ const onEnterPassphraseOnDeviceHandler = (
       passphraseState: device.passphraseState,
       source: requestPayload?.source,
       reason: requestPayload?.reason,
+      ...(requestPayload?.interaction ? { interaction: requestPayload.interaction } : {}),
     })
   );
 };
@@ -1325,8 +1334,37 @@ const onEnterAttachPinOnDeviceHandler = (
       type: 'ButtonRequest_AttachPin',
       source: requestPayload?.source,
       reason: requestPayload?.reason,
+      ...(requestPayload?.interaction ? { interaction: requestPayload.interaction } : {}),
     })
   );
+};
+
+const onEnterPinOnDeviceHandler = (
+  ...[device, pinType, metadata]: [...DeviceEvents['pin_on_device']]
+) => {
+  postMessage(
+    createUiMessage(UI_REQUEST.REQUEST_PIN, {
+      device: device.toMessageObject() as KnownDevice,
+      type:
+        pinType === DeviceSessionPinType.AttachToPin
+          ? 'ButtonRequest_AttachPin'
+          : 'ButtonRequest_PinEntry',
+      source: metadata?.source,
+      reason: metadata?.reason,
+      deviceOnly: metadata?.deviceOnly ?? true,
+      completion: metadata?.completion,
+      method: metadata?.method,
+      page: metadata?.page,
+      operation: metadata?.operation,
+      ...(metadata?.interaction ? { interaction: metadata.interaction } : {}),
+    })
+  );
+};
+
+const onPinOnDeviceCompleteHandler = (
+  ...[_, metadata]: [...DeviceEvents['pin_on_device_complete']]
+) => {
+  postMessage(createUiMessage(UI_REQUEST.CLOSE_UI_PIN_WINDOW, metadata));
 };
 
 const onSelectDeviceInBootloaderForWebDeviceHandler = async (

@@ -21,6 +21,6 @@ export default class DeviceUnlock extends BaseMethod<LockDevice> {
   }
 
   async run() {
-    return this.device.unlockDevice();
+    return this.device.unlockDevice(undefined, { emitUiEvent: false });
   }
 }

@@ -45,16 +45,20 @@
   `CallMethodInvalidParameter`，不向调用方抛出只有 message 的裸异常。
 - 未传 `mode` 时保留旧参数兼容：`useEmptyPassphrase=true` 进入标准钱包；否则
   `initSession=true` 重新选择隐藏钱包；否则完整钱包绑定恢复隐藏钱包，无绑定则开始隐藏钱包选择。
-- Pro2 显式恢复缺少本地 Session 缓存、缓存被固件判定失效或返回实际钱包状态不匹配时，SDK
-  允许一次交互式重选目标隐藏钱包；最终只接受 `passphraseState` 与业务绑定一致的结果。V1
-  缺少本地 Session 缓存时仍返回 `WalletSessionInvalid`。
+- Pro2 显式恢复会把预期 `passphraseState` 映射为 `DeviceSessionGet.btc_test_address`。本地有缓存时
+  同时发送 `session_id`；没有缓存时固件可以先按地址静默复用当前 SE Session，无法复用时再完成
+  设备端 passphrase 流程。缓存被固件拒绝或返回的钱包不匹配时，SDK 仍只接受与业务绑定一致的
+  最终 `passphraseState`。V1 缺少本地 Session 缓存时仍返回 `WalletSessionInvalid`。
 - Protocol V2 的 `DeviceSessionGet` 成功响应必须同时包含非空 `session_id` 和
   `btc_test_address`；缺少任一字段都按不完整协议响应处理，不得识别为标准钱包。
 - Protocol V2 空参数 `DeviceSessionGet()` 只读取固件当前钱包 Session，不保证当前钱包是标准钱包。
   标准钱包首次打开时调用 `DeviceSessionAskPin(Main)`，成功后调用 `DeviceSessionGet()`；缓存有效时
-  先调用 `DeviceSessionGet(session_id)` 恢复，恢复结果不匹配时再执行一次
+  先调用 `DeviceSessionGet(session_id, btc_test_address)` 恢复，恢复结果不匹配时再执行一次
   `AskPin(Main) -> Get()` 重建。Core 使用返回的真实
   `btc_test_address` 建立标准钱包内部索引，不引入 SDK 自造的 `STANDARD_WALLET_KEY`。
+- Core 把现有 `deriveCardano` 意图映射为 `DeviceSessionGet.seed_domains`：普通业务请求
+  `[Standard]`，Cardano 业务请求 `[Standard, Cardano]`。调用链没有提供派生意图时省略该字段，
+  保持固件“派生全部支持域”的兼容行为。
 - `DeviceSessionAskPin` 的类型按目标钱包选择：目标是标准钱包时使用 `Main`，包括当前处于
   Attach PIN 上下文而需要切回标准钱包的情况；目标是 Attach PIN 绑定的隐藏钱包时才使用
   `AttachToPin`。`unlockedAttachPin=true` 只描述当前上下文，不决定下一次 Ask 的 PIN 类型。
@@ -317,8 +321,10 @@ await HardwareSDK.clearSessionCache({ deviceId, passphraseState });
 6. Protocol V2 / Pro2 每次钱包预检都发送
    `ProtocolInfoRequest { eventless_wallet_session: true }`。标准钱包首次打开时发送
    `DeviceSessionAskPin(Main) -> DeviceSessionGet()`；缓存存在时发送
-   `DeviceSessionGet(session_id)`。隐藏钱包按选择发送 Ask，成功后发送 `DeviceSessionGet()`。
-7. 固件对带 `session_id` 的 Get 返回当前实际 Session。若首次 `passphraseState` 不匹配，标准钱包
+   `DeviceSessionGet(session_id, btc_test_address)`。隐藏钱包恢复时携带 `btc_test_address`，按新钱包
+   选择时仍先发送 Ask，成功后发送 `DeviceSessionGet()`。
+7. 固件按 `btc_test_address` 校验当前 SE Session，并对带 `session_id` 的 Get 尝试恢复指定 Session。
+   若首次 `passphraseState` 不匹配，标准钱包
    执行一次 `AskPin(Main) -> Get()`；隐藏钱包执行一次统一钱包选择及 `Ask -> Get()`。第二次仍不
    匹配才抛出 `DeviceCheckPassphraseStateError`。SDK 不为普通过期主动 `LockDevice`。
 8. Pro2 隐藏钱包选择通过统一弹窗提供 Host 输入、设备输入和 Attach PIN。Host Passphrase 编码为

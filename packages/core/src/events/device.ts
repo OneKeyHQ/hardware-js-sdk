@@ -1,4 +1,5 @@
 import type { MessageFactoryFn } from './utils';
+import type { HardwareUiInteractionMeta } from './ui-request';
 import type { PROTO } from '../constants';
 import type {
   KnownDevice as Device,
@@ -26,6 +27,8 @@ export const DEVICE = {
   // onekey-transport events in protobuf format
   BUTTON: 'button',
   PIN: 'pin',
+  PIN_ON_DEVICE: 'pin_on_device',
+  PIN_ON_DEVICE_COMPLETE: 'pin_on_device_complete',
   PASSPHRASE: 'passphrase',
   PASSPHRASE_ON_DEVICE: 'passphrase_on_device',
   ATTACH_PIN_ON_DEVICE: 'attach_pin_on_device',
@@ -58,6 +61,7 @@ export type PassphraseRequestPayload = {
   source?: 'wallet-session-coordinator';
   reason?: 'open-wallet' | 'session-recovery';
   expectedPassphraseState?: string;
+  interaction?: HardwareUiInteractionMeta;
 };
 
 export interface DeviceButtonRequest {

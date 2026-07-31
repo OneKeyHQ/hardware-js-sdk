@@ -1,6 +1,6 @@
 import { UI_REQUEST, createUiMessage } from '../../events';
 
-import type { CoreMessage, ProtocolV2UiCompletion } from '../../events';
+import type { CoreMessage, HardwareUiInteractionMeta, ProtocolV2UiCompletion } from '../../events';
 import type { Device } from '../../device/Device';
 import type { KnownDevice } from '../../types';
 
@@ -28,7 +28,15 @@ type ProtocolV2InteractionMethod = {
   protocolV2UiInteraction?: ProtocolV2InteractionDescriptor;
 };
 
-type InteractionDevice = Pick<Device, 'isProtocolV2' | 'toMessageObject'>;
+type InteractionDevice = Pick<Device, 'isProtocolV2' | 'toMessageObject'> &
+  Partial<
+    Pick<
+      Device,
+      | 'createProtocolV2UiPhaseMetadata'
+      | 'finishProtocolV2UiInteraction'
+      | 'hasOpenProtocolV2UiInteraction'
+    >
+  >;
 type PostMessage = (message: CoreMessage) => void;
 
 export const isProtocolV2UiEnabled = (method: { protocolV2UiMode?: 'auto' | 'none' }) =>
@@ -156,12 +164,17 @@ export class ProtocolV2UiInteractionCoordinator {
     this.methodInteraction = interaction;
     if (!interaction) return;
     const { request, ...metadata } = interaction;
+    const interactionMeta = this.device.createProtocolV2UiPhaseMetadata?.(
+      request === 'pin' ? 'pin' : 'button',
+      'start'
+    );
 
     this.emit(
       request === 'pin' ? UI_REQUEST.REQUEST_PIN : UI_REQUEST.REQUEST_BUTTON,
       {
         device: this.device.toMessageObject() as KnownDevice,
         ...metadata,
+        ...(interactionMeta ? { interaction: interactionMeta } : {}),
       },
       `method:${request}:${interaction.reason}:${interaction.page ?? ''}:${
         interaction.operation ?? ''
@@ -169,7 +182,8 @@ export class ProtocolV2UiInteractionCoordinator {
     );
   }
 
-  enterUnlockInteraction(method?: string) {
+  enterUnlockInteraction(method?: string): HardwareUiInteractionMeta | undefined {
+    const interaction = this.device.createProtocolV2UiPhaseMetadata?.('pin', 'start');
     this.emit(
       UI_REQUEST.REQUEST_PIN,
       {
@@ -178,9 +192,11 @@ export class ProtocolV2UiInteractionCoordinator {
         reason: 'device-locked',
         deviceOnly: true,
         method,
+        ...(interaction ? { interaction } : {}),
       },
       `unlock:${method ?? ''}`
     );
+    return interaction;
   }
 
   resumeMethodInteraction() {
@@ -188,9 +204,19 @@ export class ProtocolV2UiInteractionCoordinator {
   }
 
   close() {
-    if (!this.device.isProtocolV2() || !this.opened || this.closed) return;
+    if (
+      !this.device.isProtocolV2() ||
+      (!this.opened && !this.device.hasOpenProtocolV2UiInteraction?.()) ||
+      this.closed
+    )
+      return;
     this.closed = true;
-    this.postMessage(createUiMessage(UI_REQUEST.CLOSE_UI_WINDOW));
+    const interaction = this.device.finishProtocolV2UiInteraction?.();
+    this.postMessage(
+      interaction
+        ? createUiMessage(UI_REQUEST.CLOSE_UI_WINDOW, interaction)
+        : createUiMessage(UI_REQUEST.CLOSE_UI_WINDOW)
+    );
   }
 
   private emit(
