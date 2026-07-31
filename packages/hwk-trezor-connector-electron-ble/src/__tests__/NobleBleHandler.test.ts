@@ -127,6 +127,33 @@ describe('NobleBleHandler', () => {
     await handler.stopScan();
   });
 
+  test('a connected device that stopped advertising still appears in scan results', async () => {
+    // Field-verified behavior: a Safe 7 stops advertising while it holds a
+    // link (bonding alone does not silence it). With keep-alive holding the
+    // link for up to minutes, the scan cache ages the device out — so the one
+    // device the user is actively using would vanish from the device list
+    // unless connected devices are merged into the snapshot.
+    const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
+    const noble = new FakeNoble([peripheral]);
+    const handler = new NobleBleHandler({ nobleFactory: () => noble as any });
+
+    await handler.scan({ durationMs: 0 });
+    await handler.connect('id-1');
+
+    // The link is up: the device no longer advertises...
+    (noble as any).peripherals.length = 0;
+    // ...and the discovery cache from the earlier scan is gone.
+    await handler.stopScan();
+
+    const devices = await handler.scan({ durationMs: 0 });
+    expect(devices.map(d => ({ id: d.id, state: d.state }))).toEqual([
+      { id: 'id-1', state: 'connected' },
+    ]);
+
+    await handler.disconnect('id-1');
+    await handler.stopScan();
+  });
+
   test('an explicitly passed serviceUuids filter is ignored, not forwarded to noble', async () => {
     // serviceUuids survives on the IPC options only so an older renderer stays
     // compatible; honouring it would reintroduce the Windows ADV-drop bug, so

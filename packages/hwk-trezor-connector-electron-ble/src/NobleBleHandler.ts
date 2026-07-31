@@ -341,6 +341,16 @@ export class NobleBleHandler {
       if (!isTrezorPeripheral(peripheral)) continue;
       result.push(peripheralToInfo(peripheral));
     }
+    // A device WE hold a link to stops advertising (standard BLE), so it ages
+    // out of the scan cache above within the TTL — exactly while keep-alive
+    // holds the link for up to minutes. Without this merge, the one device the
+    // user is actively using vanishes from the device list. Field-verified:
+    // pairing/THP handshake alone does NOT silence a Safe 7; holding the
+    // connection does.
+    for (const [id, entry] of this._connected) {
+      if (result.some(info => info.id === id)) continue;
+      result.push(peripheralToInfo(entry.peripheral));
+    }
     return result;
   }
 
@@ -516,12 +526,13 @@ export class NobleBleHandler {
   /**
    * Connect by id with no scan and no advertisement.
    *
-   * This is the ONLY path that reaches a device which is bonded but silent. A
-   * Trezor Safe 7 stops advertising once it holds a link and waits for the host
-   * (its screen says "wait connection"), so after OS pairing no amount of
-   * scanning will ever rediscover it — and `_scanUntilFound` alone therefore
+   * This is the ONLY path that reaches a device which is connected but silent.
+   * A Trezor Safe 7 stops advertising while it HOLDS A LINK (standard BLE; its
+   * screen says "wait connection") — field-verified: bonding/THP handshake
+   * alone does NOT silence it, holding the connection does. So while a link is
+   * up, no amount of scanning will rediscover it — `_scanUntilFound` alone
    * dead-ends with "device not found" on a device that is sitting right there,
-   * bonded and reachable.
+   * connected and reachable.
    *
    * noble supports this: `noble.connectAsync(id)` needs no prior `discover`,
    * because both native backends materialize the peripheral themselves (Windows
