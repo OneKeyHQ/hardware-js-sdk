@@ -1,4 +1,4 @@
-import { ERRORS, HardwareError, HardwareErrorCode, wait } from '@onekeyfe/hd-shared';
+import { EDeviceType, ERRORS, HardwareError, HardwareErrorCode, wait } from '@onekeyfe/hd-shared';
 import {
   DeviceRebootType,
   PROTOCOL_V2_BLE_FILE_CHUNK_SIZE,
@@ -994,14 +994,31 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     if (typeof this.device.isBootloader === 'function') {
       return this.device.isBootloader();
     }
-    return !!this.device.features?.bootloaderMode;
+    return (
+      this.device.features?.mode === 'bootloader' ||
+      (this.device.features?.mode == null && !!this.device.features?.bootloaderMode)
+    );
+  }
+
+  private isProtocolV2RomloaderMode() {
+    if (!this.device.isProtocolV2() || this.device.getCurrentDeviceType() !== EDeviceType.Pro2) {
+      return false;
+    }
+    if (typeof this.device.isRomloader === 'function') {
+      return this.device.isRomloader();
+    }
+    return this.device.features?.mode === 'romloader';
   }
 
   async enterProtocolV2BootloaderMode() {
     // romloader is the first update environment and forwards targets to bootloader.
     // It rejects DeviceRebootType.Bootloader, so reuse the current connection.
-    if (this.isProtocolV2BootloaderMode() || this.device.features?.mode === 'romloader') {
-      Log.debug('Protocol V2 device is already in loader mode, skip reboot to bootloader');
+    if (this.isProtocolV2RomloaderMode()) {
+      Log.debug('Protocol V2 device is in romloader mode; start firmware update directly');
+      return false;
+    }
+    if (this.isProtocolV2BootloaderMode()) {
+      Log.debug('Protocol V2 device is already in bootloader mode, skip reboot');
       return false;
     }
 
@@ -1036,10 +1053,11 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
         });
         this.assertProtocolV2DeviceInfoIdentity(deviceInfo);
-        // This is a reconnect probe after a Bootloader reboot. Bootloader does not
-        // support DeviceStatusGet, so the generic runtime-mode probe is invalid here.
-        const features = this.device.updateProtocolV2Features(deviceInfo, null, 'bootloader');
-        if (features?.bootloaderMode) {
+        const features = await this.device.probeProtocolV2RuntimeState(
+          deviceInfo,
+          PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT
+        );
+        if (features?.mode === 'bootloader') {
           return features;
         }
         lastError = new Error('Protocol V2 device is reachable but is not in bootloader mode');

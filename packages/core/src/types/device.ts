@@ -7,6 +7,7 @@ import type {
   OneKeyDeviceCommType,
   ProtocolV2DeviceInfo,
   DeviceStatus as ProtocolV2DeviceStatus,
+  ProtocolInfo as ProtocolV2ProtocolInfo,
 } from '@onekeyfe/hd-transport';
 
 export type DeviceStatus = 'available' | 'occupied' | 'used';
@@ -159,6 +160,7 @@ export type DeviceFeaturesVerify = {
 export type DeviceFeaturesRaw = {
   protocolV1Features?: PROTO.Features;
   protocolV1OneKeyFeatures?: OnekeyFeatures;
+  protocolV2ProtocolInfo?: ProtocolV2ProtocolInfo;
   protocolV2DeviceInfo?: ProtocolV2DeviceInfo;
   protocolV2DeviceStatus?: ProtocolV2DeviceStatus;
 };

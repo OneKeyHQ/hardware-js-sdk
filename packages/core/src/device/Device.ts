@@ -55,6 +55,7 @@ import { DataManager } from '../data-manager';
 import TransportManager from '../data-manager/TransportManager';
 import { toHardened } from '../api/helpers/pathUtils';
 import {
+  PROTOCOL_V2_DEVICE_STATUS_GET_MESSAGE_TYPE,
   PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST,
   PROTOCOL_V2_FULL_DEVICE_INFO_REQUEST,
   PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST,
@@ -62,8 +63,11 @@ import {
   getProtocolV2RuntimeMode,
   requestProtocolV2DeviceInfo,
   requestProtocolV2DeviceStatus,
+  requestProtocolV2ProtocolInfo,
+  supportsProtocolV2Message,
 } from '../protocols/protocol-v2/features';
 import { buildProtocolV1FeaturesPayload } from '../deviceProfile';
+import { resolveProtocolV2DeviceIdentity } from '../deviceProfile/protocolV2DeviceIdentity';
 
 import type { PROTO } from '../constants';
 import type { DeviceStateReadOptions } from '../types/api/getDeviceState';
@@ -77,6 +81,7 @@ import type { Deferred, HardwareConnectProtocol } from '@onekeyfe/hd-shared';
 import type {
   OneKeyDeviceInfo as DeviceDescriptor,
   DeviceStatus,
+  ProtocolInfo,
   ProtocolV2DeviceInfo,
   Success,
 } from '@onekeyfe/hd-transport';
@@ -1040,39 +1045,59 @@ export class Device extends EventEmitter {
   }
 
   async probeProtocolV2RuntimeState(deviceInfo: ProtocolV2DeviceInfo, timeoutMs?: number) {
-    let deviceStatus: DeviceStatus;
-    try {
-      deviceStatus = await requestProtocolV2DeviceStatus({
-        commands: this.commands,
-        timeoutMs,
-      });
-    } catch (error) {
-      const runtimeMode = getProtocolV2RuntimeMode({
-        deviceInfo,
-        deviceStatusAvailable: false,
-      });
-      Log.debug('Protocol V2 DeviceStatusGet unavailable; use temporary loader fallback', {
-        runtimeMode,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      return this.updateProtocolV2Features(deviceInfo, null, runtimeMode);
+    const protocolInfo = await requestProtocolV2ProtocolInfo({
+      commands: this.commands,
+      timeoutMs,
+    });
+    const runtimeMode = getProtocolV2RuntimeMode(protocolInfo);
+    const protocolV2DeviceType = resolveProtocolV2DeviceIdentity(
+      deviceInfo.hw?.Device_type
+    ).deviceType;
+    if (runtimeMode === 'romloader' && protocolV2DeviceType !== EDeviceType.Pro2) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.DeviceInitializeFailed,
+        'Protocol V2 romloader mode is only supported for Pro2.'
+      );
     }
-    return this.updateProtocolV2Features(deviceInfo, deviceStatus, 'normal');
+    const deviceStatusSupported = supportsProtocolV2Message(
+      protocolInfo,
+      PROTOCOL_V2_DEVICE_STATUS_GET_MESSAGE_TYPE
+    );
+
+    if (runtimeMode === 'bootloader' || runtimeMode === 'romloader') {
+      return this.updateProtocolV2Features(deviceInfo, null, runtimeMode, protocolInfo);
+    }
+
+    if (!deviceStatusSupported) {
+      if (runtimeMode === 'normal') {
+        return this.updateProtocolV2Features(deviceInfo, null, runtimeMode, protocolInfo);
+      }
+      throw ERRORS.TypedError(
+        HardwareErrorCode.DeviceInitializeFailed,
+        `Unknown Protocol V2 build fingerprint without DeviceStatusGet capability: ${protocolInfo.build_fingerprint}`
+      );
+    }
+
+    const deviceStatus = await requestProtocolV2DeviceStatus({
+      commands: this.commands,
+      timeoutMs,
+    });
+    return this.updateProtocolV2Features(deviceInfo, deviceStatus, 'normal', protocolInfo);
   }
 
   updateProtocolV2Features(
     deviceInfo?: ProtocolV2DeviceInfo,
     deviceStatus?: DeviceStatus | null,
-    runtimeMode?: ProtocolV2RuntimeMode
+    runtimeMode?: ProtocolV2RuntimeMode,
+    protocolInfo?: ProtocolInfo
   ) {
     const previousDeviceId = this.getCurrentDeviceId();
-    const resolvedMode =
-      runtimeMode ??
-      (deviceStatus
-        ? getProtocolV2RuntimeMode({ deviceInfo, deviceStatusAvailable: true })
-        : this.state?.status.mode);
+    const resolvedMode = runtimeMode ?? (deviceStatus ? 'normal' : this.state?.status.mode);
     if (deviceInfo) {
       this.updateState(mapProtocolV2DeviceInfoToState(deviceInfo, resolvedMode), 'device-info');
+    }
+    if (protocolInfo) {
+      this.updateState({ raw: { protocolV2ProtocolInfo: protocolInfo } }, 'device-info');
     }
     if (deviceStatus) {
       this.updateState(mapProtocolV2DeviceStatusToState(deviceStatus), 'device-status');
@@ -1142,7 +1167,7 @@ export class Device extends EventEmitter {
             attachToPinEnabled: null,
             unlockedAttachPin: null,
           },
-          raw: { protocolV2DeviceStatus: null },
+          raw: { protocolV2ProtocolInfo: null, protocolV2DeviceStatus: null },
         },
         'transport-reconnect'
       );
@@ -1152,7 +1177,7 @@ export class Device extends EventEmitter {
     this.updateState(
       {
         status: { mode: 'normal', unlocked: null },
-        raw: { protocolV2DeviceStatus: null },
+        raw: { protocolV2ProtocolInfo: null, protocolV2DeviceStatus: null },
       },
       'transport-reconnect'
     );
@@ -1398,7 +1423,16 @@ export class Device extends EventEmitter {
 
   isBootloader() {
     if (!this.state) return undefined;
-    return this.state.status.mode === 'bootloader' || this.state.status.mode === 'romloader';
+    return this.state.status.mode === 'bootloader';
+  }
+
+  isRomloader() {
+    if (!this.state) return undefined;
+    return (
+      this.isProtocolV2() &&
+      this.getCurrentDeviceType() === EDeviceType.Pro2 &&
+      this.state.status.mode === 'romloader'
+    );
   }
 
   isInitialized() {

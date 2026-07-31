@@ -4596,21 +4596,6 @@ export type EthereumSignTypedDataQR = {
   request_id?: string;
 };
 
-// InternalMyAddressRequest
-export type InternalMyAddressRequest = {
-  coin_type: number;
-  chain_id: number;
-  account_index: number;
-  derive_type: number;
-};
-
-// StartSession
-export type StartSession = {
-  session_id?: string;
-  _skip_passphrase?: boolean;
-  derive_cardano?: boolean;
-};
-
 // SetBusy
 export type SetBusy = {
   expiry_ms?: number;
@@ -4637,28 +4622,6 @@ export type Nonce = {
 // WriteSEPrivateKey
 export type WriteSEPrivateKey = {
   private_key: string;
-};
-
-export enum WallpaperTarget {
-  Home = 0,
-  Lock = 1,
-}
-
-// SetWallpaper
-export type SetWallpaper = {
-  target: WallpaperTarget;
-  path: string;
-};
-
-// GetWallpaper
-export type GetWallpaper = {
-  target: WallpaperTarget;
-};
-
-// Wallpaper
-export type Wallpaper = {
-  target: WallpaperTarget;
-  path: string;
 };
 
 // UnlockPath
@@ -4697,70 +4660,6 @@ export type UiAnimationRequest = {
   type?: UiAnimationType;
 };
 
-// ViewAmount
-export type ViewAmount = {
-  is_unlimited: boolean;
-  num: string;
-};
-
-// ViewDetail
-export type ViewDetail = {
-  key: number;
-  value: string;
-  is_overview: boolean;
-  has_icon: boolean;
-};
-
-export enum ViewTipType {
-  Default = 0,
-  Highlight = 1,
-  Recommend = 2,
-  Warning = 3,
-  Danger = 4,
-}
-
-// ViewTip
-export type ViewTip = {
-  type: ViewTipType;
-  text: string;
-};
-
-// ViewRawData
-export type ViewRawData = {
-  initial_data: string;
-  placeholder: number;
-};
-
-export enum ViewSignLayout {
-  LayoutDefault = 0,
-  LayoutSafeTxCreate = 1,
-  LayoutFinalConfirm = 2,
-  Layout7702 = 3,
-  LayoutFlat = 4,
-  LayoutEthApprove = 5,
-}
-
-// ViewSignPage
-export type ViewSignPage = {
-  title: string;
-  amount?: UintType;
-  general: ViewDetail[];
-  tip?: ViewTip;
-  raw_data?: ViewRawData;
-  slide_to_confirm?: boolean;
-  layout?: ViewSignLayout;
-};
-
-// ViewVerifyPage
-export type ViewVerifyPage = {
-  title: string;
-  address: string;
-  path: string;
-  network?: string;
-  derive_type?: string;
-  value_key?: number;
-};
-
 // ProtocolInfoRequest
 export type ProtocolInfoRequest = {
   eventless_wallet_session?: boolean;
@@ -4769,8 +4668,8 @@ export type ProtocolInfoRequest = {
 // ProtocolInfo
 export type ProtocolInfo = {
   version: number;
+  build_fingerprint: string;
   supported_messages: number[];
-  protobuf_definition?: string;
 };
 
 export enum DeviceErrorCode {
@@ -4862,6 +4761,54 @@ export type DeviceCertificateSign = {
   data: string;
 };
 
+// DeviceMiscUsbMscControl
+export type DeviceMiscUsbMscControl = {
+  enable: boolean;
+};
+
+export enum DeviceFactoryAck {
+  FACTORY_ACK_SUCCESS = 0,
+  FACTORY_ACK_FAIL = 1,
+}
+
+// DeviceFactoryInfoManufactureTime
+export type DeviceFactoryInfoManufactureTime = {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+};
+
+// DeviceFactoryInfo
+export type DeviceFactoryInfo = {
+  version?: number;
+  serial_number?: string;
+  burn_in_completed?: boolean;
+  factory_test_completed?: boolean;
+  manufacture_time?: DeviceFactoryInfoManufactureTime;
+};
+
+// DeviceFactoryInfoSet
+export type DeviceFactoryInfoSet = {
+  info: DeviceFactoryInfo;
+};
+
+// DeviceFactoryInfoGet
+export type DeviceFactoryInfoGet = {};
+
+// DeviceFactoryPermanentLock
+export type DeviceFactoryPermanentLock = {
+  check_a: string;
+  check_b: string;
+};
+
+// DeviceFactoryTest
+export type DeviceFactoryTest = {
+  burn_in_test: boolean;
+};
+
 export enum DeviceFirmwareTargetType {
   FW_MGMT_TARGET_INVALID = 0,
   FW_MGMT_TARGET_CRATE = 1,
@@ -4924,49 +4871,6 @@ export type DeviceFirmwareUpdateStatusGet = {
 // DeviceFirmwareUpdateStatus
 export type DeviceFirmwareUpdateStatus = {
   records: DeviceFirmwareUpdateRecord[];
-};
-
-export enum DeviceFactoryAck {
-  FACTORY_ACK_SUCCESS = 0,
-  FACTORY_ACK_FAIL = 1,
-}
-
-// DeviceFactoryInfoManufactureTime
-export type DeviceFactoryInfoManufactureTime = {
-  year: number;
-  month: number;
-  day: number;
-  hour: number;
-  minute: number;
-  second: number;
-};
-
-// DeviceFactoryInfo
-export type DeviceFactoryInfo = {
-  version?: number;
-  serial_number?: string;
-  burn_in_completed?: boolean;
-  factory_test_completed?: boolean;
-  manufacture_time?: DeviceFactoryInfoManufactureTime;
-};
-
-// DeviceFactoryInfoSet
-export type DeviceFactoryInfoSet = {
-  info: DeviceFactoryInfo;
-};
-
-// DeviceFactoryInfoGet
-export type DeviceFactoryInfoGet = {};
-
-// DeviceFactoryPermanentLock
-export type DeviceFactoryPermanentLock = {
-  check_a: string;
-  check_b: string;
-};
-
-// DeviceFactoryTest
-export type DeviceFactoryTest = {
-  burn_in_test: boolean;
 };
 
 export enum DeviceType {
@@ -5039,7 +4943,6 @@ export type DeviceInfoTargets = {
   se2?: boolean;
   se3?: boolean;
   se4?: boolean;
-  status?: boolean;
 };
 
 // DeviceInfoTypes
@@ -5066,7 +4969,6 @@ export type ProtocolV2DeviceInfo = {
   se2?: DeviceSEInfo;
   se3?: DeviceSEInfo;
   se4?: DeviceSEInfo;
-  status?: DeviceStatus;
 };
 
 export enum DeviceSessionErrorCode {
@@ -5103,7 +5005,7 @@ export type DeviceSessionAskPin = {
 // DeviceSessionAskPassphrase
 export type DeviceSessionAskPassphrase = {
   passphrase?: string;
-  on_device?: boolean;
+  on_device: boolean;
 };
 
 export enum DeviceSessionAskPin_FailureSubCodes {
@@ -5123,63 +5025,6 @@ export type DeviceStatus = {
 
 // DeviceStatusGet
 export type DeviceStatusGet = {};
-
-export enum DevOnboardingStep {
-  DEV_ONBOARDING_STEP_UNKNOWN = 0,
-  DEV_ONBOARDING_STEP_CHECKING = 1,
-  DEV_ONBOARDING_STEP_PERSONALIZATION = 2,
-  DEV_ONBOARDING_STEP_PIN = 3,
-  DEV_ONBOARDING_STEP_SETUP = 4,
-  DEV_ONBOARDING_STEP_DONE = 5,
-}
-
-export enum DevOnboardingPhase {
-  DEV_ONBOARDING_PHASE_UNKNOWN = 0,
-  DEV_ONBOARDING_PHASE_SAFETY_CHECK = 1,
-  DEV_ONBOARDING_PHASE_PIN_SETUP = 2,
-  DEV_ONBOARDING_PHASE_FINGERPRINT_SETUP = 3,
-  DEV_ONBOARDING_PHASE_SETUP_CHOICE = 4,
-  DEV_ONBOARDING_PHASE_WALLET_CREATE_START = 5,
-  DEV_ONBOARDING_PHASE_RECOVERY_PHRASE_VIEW = 6,
-  DEV_ONBOARDING_PHASE_RECOVERY_PHRASE_CONFIRM = 7,
-  DEV_ONBOARDING_PHASE_RESTORE_METHOD_CHOICE = 8,
-  DEV_ONBOARDING_PHASE_RECOVERY_PHRASE_RESTORE = 9,
-  DEV_ONBOARDING_PHASE_SEEDCARD_RESTORE = 10,
-  DEV_ONBOARDING_PHASE_WALLET_READY = 11,
-  DEV_ONBOARDING_PHASE_SEEDCARD_BACKUP_PROMPT = 12,
-  DEV_ONBOARDING_PHASE_SEEDCARD_BACKUP = 13,
-}
-
-export enum DevOnboardingSetupKind {
-  DEV_ONBOARDING_SETUP_KIND_UNKNOWN = 0,
-  DEV_ONBOARDING_SETUP_KIND_CHOICE = 1,
-  DEV_ONBOARDING_SETUP_KIND_CREATE = 2,
-  DEV_ONBOARDING_SETUP_KIND_RESTORE = 3,
-}
-
-export enum DevOnboardingSetupMethod {
-  DEV_ONBOARDING_SETUP_METHOD_UNKNOWN = 0,
-  DEV_ONBOARDING_SETUP_METHOD_RECOVERY_PHRASE = 1,
-  DEV_ONBOARDING_SETUP_METHOD_SEEDCARD = 2,
-}
-
-// DevOnboardingSetupStatus
-export type DevOnboardingSetupStatus = {
-  kind?: DevOnboardingSetupKind;
-  method?: DevOnboardingSetupMethod;
-};
-
-// DevGetOnboardingStatus
-export type DevGetOnboardingStatus = {};
-
-// DevOnboardingStatus
-export type DevOnboardingStatus = {
-  step?: DevOnboardingStep;
-  phase?: DevOnboardingPhase;
-  setup?: DevOnboardingSetupStatus;
-  pin_set?: boolean;
-  wallet_initialized?: boolean;
-};
 
 // FilesystemPermissionFix
 export type FilesystemPermissionFix = {};
@@ -5265,8 +5110,137 @@ export type FilesystemFormat = {
   user: boolean;
 };
 
+// InternalMyAddressRequest
+export type InternalMyAddressRequest = {
+  coin_type: number;
+  chain_id: number;
+  account_index: number;
+  derive_type: number;
+};
+
+export enum OnboardingStep {
+  ONBOARDING_STEP_UNKNOWN = 0,
+  ONBOARDING_STEP_CHECKING = 1,
+  ONBOARDING_STEP_PERSONALIZATION = 2,
+  ONBOARDING_STEP_PIN = 3,
+  ONBOARDING_STEP_SETUP = 4,
+  ONBOARDING_STEP_DONE = 5,
+}
+
+export enum OnboardingPhase {
+  ONBOARDING_PHASE_UNKNOWN = 0,
+  ONBOARDING_PHASE_SAFETY_CHECK = 1,
+  ONBOARDING_PHASE_PIN_SETUP = 2,
+  ONBOARDING_PHASE_FINGERPRINT_SETUP = 3,
+  ONBOARDING_PHASE_SETUP_CHOICE = 4,
+  ONBOARDING_PHASE_WALLET_CREATE_START = 5,
+  ONBOARDING_PHASE_RECOVERY_PHRASE_VIEW = 6,
+  ONBOARDING_PHASE_RECOVERY_PHRASE_CONFIRM = 7,
+  ONBOARDING_PHASE_RESTORE_METHOD_CHOICE = 8,
+  ONBOARDING_PHASE_RECOVERY_PHRASE_RESTORE = 9,
+  ONBOARDING_PHASE_SEEDCARD_RESTORE = 10,
+  ONBOARDING_PHASE_WALLET_READY = 11,
+  ONBOARDING_PHASE_SEEDCARD_BACKUP_PROMPT = 12,
+  ONBOARDING_PHASE_SEEDCARD_BACKUP = 13,
+}
+
+export enum OnboardingSetupKind {
+  ONBOARDING_SETUP_KIND_UNKNOWN = 0,
+  ONBOARDING_SETUP_KIND_CHOICE = 1,
+  ONBOARDING_SETUP_KIND_CREATE = 2,
+  ONBOARDING_SETUP_KIND_RESTORE = 3,
+}
+
+export enum OnboardingSetupMethod {
+  ONBOARDING_SETUP_METHOD_UNKNOWN = 0,
+  ONBOARDING_SETUP_METHOD_RECOVERY_PHRASE = 1,
+  ONBOARDING_SETUP_METHOD_SEEDCARD = 2,
+}
+
+// OnboardingSetupStatus
+export type OnboardingSetupStatus = {
+  kind?: OnboardingSetupKind;
+  method?: OnboardingSetupMethod;
+};
+
+// OnboardingStatusGet
+export type OnboardingStatusGet = {};
+
+// OnboardingStatus
+export type OnboardingStatus = {
+  step?: OnboardingStep;
+  phase?: OnboardingPhase;
+  setup?: OnboardingSetupStatus;
+  pin_set?: boolean;
+  wallet_initialized?: boolean;
+};
+
 // PortfolioUpdate
 export type PortfolioUpdate = {};
+
+// ViewAmount
+export type ViewAmount = {
+  is_unlimited: boolean;
+  num: string;
+};
+
+// ViewDetail
+export type ViewDetail = {
+  key: number;
+  value: string;
+  is_overview: boolean;
+  has_icon: boolean;
+};
+
+export enum ViewTipType {
+  Default = 0,
+  Highlight = 1,
+  Recommend = 2,
+  Warning = 3,
+  Danger = 4,
+}
+
+// ViewTip
+export type ViewTip = {
+  type: ViewTipType;
+  text: string;
+};
+
+// ViewRawData
+export type ViewRawData = {
+  initial_data: string;
+  placeholder: number;
+};
+
+export enum ViewSignLayout {
+  LayoutDefault = 0,
+  LayoutSafeTxCreate = 1,
+  LayoutFinalConfirm = 2,
+  Layout7702 = 3,
+  LayoutFlat = 4,
+  LayoutEthApprove = 5,
+}
+
+// ViewSignPage
+export type ViewSignPage = {
+  title: string;
+  amount?: UintType;
+  general: ViewDetail[];
+  tip?: ViewTip;
+  raw_data?: ViewRawData;
+  slide_to_confirm?: boolean;
+  layout?: ViewSignLayout;
+};
+
+// ViewVerifyPage
+export type ViewVerifyPage = {
+  title: string;
+  address: string;
+  path: string;
+  network?: string;
+  derive_type?: string;
+  value_key?: number;
+};
 
 export enum ProtocolV2FailureType {
   Failure_InvalidMessage = 1,
@@ -5873,26 +5847,15 @@ export type MessageType = {
   PaymentRequestMemo: PaymentRequestMemo;
   TxAckPaymentRequest: TxAckPaymentRequest;
   EthereumSignTypedDataQR: EthereumSignTypedDataQR;
-  InternalMyAddressRequest: InternalMyAddressRequest;
-  StartSession: StartSession;
   SetBusy: SetBusy;
   GetFirmwareHash: GetFirmwareHash;
   FirmwareHash: FirmwareHash;
   GetNonce: GetNonce;
   Nonce: Nonce;
   WriteSEPrivateKey: WriteSEPrivateKey;
-  SetWallpaper: SetWallpaper;
-  GetWallpaper: GetWallpaper;
-  Wallpaper: Wallpaper;
   UnlockPath: UnlockPath;
   UnlockedPathRequest: UnlockedPathRequest;
   UiAnimationRequest: UiAnimationRequest;
-  ViewAmount: ViewAmount;
-  ViewDetail: ViewDetail;
-  ViewTip: ViewTip;
-  ViewRawData: ViewRawData;
-  ViewSignPage: ViewSignPage;
-  ViewVerifyPage: ViewVerifyPage;
   ProtocolInfoRequest: ProtocolInfoRequest;
   ProtocolInfo: ProtocolInfo;
   DeviceReboot: DeviceReboot;
@@ -5905,18 +5868,19 @@ export type MessageType = {
   DeviceCertificateRead: DeviceCertificateRead;
   DeviceCertificateSignature: DeviceCertificateSignature;
   DeviceCertificateSign: DeviceCertificateSign;
-  DeviceFirmwareTarget: DeviceFirmwareTarget;
-  DeviceFirmwareUpdateRequest: DeviceFirmwareUpdateRequest;
-  DeviceFirmwareUpdateRecord: DeviceFirmwareUpdateRecord;
-  DeviceFirmwareUpdateRecordFields: DeviceFirmwareUpdateRecordFields;
-  DeviceFirmwareUpdateStatusGet: DeviceFirmwareUpdateStatusGet;
-  DeviceFirmwareUpdateStatus: DeviceFirmwareUpdateStatus;
+  DeviceMiscUsbMscControl: DeviceMiscUsbMscControl;
   DeviceFactoryInfoManufactureTime: DeviceFactoryInfoManufactureTime;
   DeviceFactoryInfo: DeviceFactoryInfo;
   DeviceFactoryInfoSet: DeviceFactoryInfoSet;
   DeviceFactoryInfoGet: DeviceFactoryInfoGet;
   DeviceFactoryPermanentLock: DeviceFactoryPermanentLock;
   DeviceFactoryTest: DeviceFactoryTest;
+  DeviceFirmwareTarget: DeviceFirmwareTarget;
+  DeviceFirmwareUpdateRequest: DeviceFirmwareUpdateRequest;
+  DeviceFirmwareUpdateRecord: DeviceFirmwareUpdateRecord;
+  DeviceFirmwareUpdateRecordFields: DeviceFirmwareUpdateRecordFields;
+  DeviceFirmwareUpdateStatusGet: DeviceFirmwareUpdateStatusGet;
+  DeviceFirmwareUpdateStatus: DeviceFirmwareUpdateStatus;
   DeviceFirmwareImageInfo: DeviceFirmwareImageInfo;
   DeviceHardwareInfo: DeviceHardwareInfo;
   DeviceMainMcuInfo: DeviceMainMcuInfo;
@@ -5931,9 +5895,6 @@ export type MessageType = {
   DeviceSessionAskPassphrase: DeviceSessionAskPassphrase;
   DeviceStatus: DeviceStatus;
   DeviceStatusGet: DeviceStatusGet;
-  DevOnboardingSetupStatus: DevOnboardingSetupStatus;
-  DevGetOnboardingStatus: DevGetOnboardingStatus;
-  DevOnboardingStatus: DevOnboardingStatus;
   FilesystemPermissionFix: FilesystemPermissionFix;
   FilesystemPathInfo: FilesystemPathInfo;
   FilesystemPathInfoQuery: FilesystemPathInfoQuery;
@@ -5946,7 +5907,17 @@ export type MessageType = {
   FilesystemDirMake: FilesystemDirMake;
   FilesystemDirRemove: FilesystemDirRemove;
   FilesystemFormat: FilesystemFormat;
+  InternalMyAddressRequest: InternalMyAddressRequest;
+  OnboardingSetupStatus: OnboardingSetupStatus;
+  OnboardingStatusGet: OnboardingStatusGet;
+  OnboardingStatus: OnboardingStatus;
   PortfolioUpdate: PortfolioUpdate;
+  ViewAmount: ViewAmount;
+  ViewDetail: ViewDetail;
+  ViewTip: ViewTip;
+  ViewRawData: ViewRawData;
+  ViewSignPage: ViewSignPage;
+  ViewVerifyPage: ViewVerifyPage;
 };
 
 export type MessageKey = keyof MessageType;

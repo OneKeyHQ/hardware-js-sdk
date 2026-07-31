@@ -3,7 +3,7 @@ import transport, {
   ProtocolV2,
   ProtocolV2LinkError,
 } from '@onekeyfe/hd-transport';
-import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
+import { HardwareErrorCode, ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
 
 import WebUsbTransport from '../src/webusb';
 
@@ -94,6 +94,25 @@ describe('WebUsbTransport Protocol V2 timeout recovery', () => {
 
     expect(events).toEqual(['probe-v1', 'reset', 'probe-v2']);
     expect(webusb.deviceProtocol.get(path)).toBe('V2');
+  });
+
+  test('reports DeviceNotFound when automatic protocol detection exhausts both probes', async () => {
+    const webusb = new WebUsbTransport() as any;
+    const path = 'unresponsive-webusb';
+    webusb.probeProtocolV1 = jest.fn().mockResolvedValue(false);
+    webusb.probeProtocolV2 = jest.fn().mockResolvedValue(false);
+    webusb.resetConnectionAfterProbe = jest.fn().mockResolvedValue(undefined);
+    webusb.closeConnectionAfterProbe = jest.fn().mockResolvedValue(undefined);
+
+    await expect(webusb.detectProtocol(path)).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.DeviceNotFound,
+    });
+
+    expect(webusb.probeProtocolV1).toHaveBeenCalledTimes(1);
+    expect(webusb.probeProtocolV2).toHaveBeenCalledTimes(1);
+    expect(webusb.resetConnectionAfterProbe).toHaveBeenCalledTimes(1);
+    expect(webusb.closeConnectionAfterProbe).toHaveBeenCalledTimes(1);
+    expect(webusb.deviceProtocol.has(path)).toBe(false);
   });
 
   test('allows legacy WebUSB Initialize up to the Node USB probe timeout', async () => {

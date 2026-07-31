@@ -36,15 +36,18 @@ describe('DeviceWalletSessionStore', () => {
     expect(store.get('device-2', 'hidden-a')).toBe('session-c');
   });
 
-  test('evicts the oldest wallet session when a device exceeds the SE capacity of three', () => {
+  test('keeps SDK session handles without mirroring hardware eviction policy', () => {
     const store = new DeviceWalletSessionStore();
     store.setStandard('device-1', 'wallet-a', 'session-a');
     store.set('device-1', 'wallet-b', 'session-b');
     store.set('device-1', 'wallet-c', 'session-c');
     store.set('device-1', 'wallet-d', 'session-d');
 
-    expect(store.get('device-1', 'wallet-a')).toBeUndefined();
-    expect(store.getStandard('device-1')).toBeUndefined();
+    expect(store.get('device-1', 'wallet-a')).toBe('session-a');
+    expect(store.getStandard('device-1')).toEqual({
+      passphraseState: 'wallet-a',
+      sessionId: 'session-a',
+    });
     expect(store.get('device-1', 'wallet-b')).toBe('session-b');
     expect(store.get('device-1', 'wallet-c')).toBe('session-c');
     expect(store.get('device-1', 'wallet-d')).toBe('session-d');
@@ -95,7 +98,7 @@ describe('DeviceWalletSessionStore', () => {
     expect(store.getPending('stable-device-id')).toBe('pending-session');
   });
 
-  test('keeps the three-session limit when descriptor sessions merge into a stable device id', () => {
+  test('keeps every known handle when descriptor sessions merge into a stable device id', () => {
     const store = new DeviceWalletSessionStore();
     store.setStandard('stable-device-id', 'wallet-a', 'session-a');
     store.set('stable-device-id', 'wallet-b', 'session-b');
@@ -107,8 +110,11 @@ describe('DeviceWalletSessionStore', () => {
       nextDeviceId: 'stable-device-id',
     });
 
-    expect(store.get('stable-device-id', 'wallet-a')).toBeUndefined();
-    expect(store.getStandard('stable-device-id')).toBeUndefined();
+    expect(store.get('stable-device-id', 'wallet-a')).toBe('session-a');
+    expect(store.getStandard('stable-device-id')).toEqual({
+      passphraseState: 'wallet-a',
+      sessionId: 'session-a',
+    });
     expect(store.get('stable-device-id', 'wallet-b')).toBe('session-b');
     expect(store.get('stable-device-id', 'wallet-c')).toBe('session-c');
     expect(store.get('stable-device-id', 'wallet-d')).toBe('session-d');

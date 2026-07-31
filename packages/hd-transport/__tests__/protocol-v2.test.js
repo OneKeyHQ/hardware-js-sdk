@@ -73,14 +73,14 @@ const protocolV2Messages = parseConfigure({
           type: 'uint32',
           id: 1,
         },
+        build_fingerprint: {
+          type: 'string',
+          id: 2,
+        },
         supported_messages: {
           type: 'uint32',
-          id: 2,
-          rule: 'repeated',
-        },
-        protobuf_definition: {
-          type: 'string',
           id: 3,
+          rule: 'repeated',
         },
       },
     },
@@ -211,7 +211,7 @@ const protocolV2Messages = parseConfigure({
         MessageType_FileWrite: 60805,
         MessageType_DeviceFirmwareUpdateRequest: 61000,
         MessageType_DeviceFirmwareUpdateStatus: 61002,
-        MessageType_DeviceSession: 60607,
+        MessageType_DeviceSession: 61201,
         MessageType_PartialNested: 62000,
       },
     },
@@ -235,8 +235,8 @@ describe('Protocol V2 framing and session', () => {
   test('encodes and decodes Protocol V2 protobuf frames', () => {
     const frame = ProtocolV2.encodeFrame(schemas, 'ProtocolInfo', {
       version: 1,
+      build_fingerprint: 'application__1.0.0__abc__DEV__DEBUG',
       supported_messages: [60200, 60201],
-      protobuf_definition: 'proto',
     });
 
     const parsed = protocolV2.decodeFrame(frame);
@@ -251,8 +251,8 @@ describe('Protocol V2 framing and session', () => {
       seq: parsed.seq,
       message: {
         version: 1,
+        build_fingerprint: 'application__1.0.0__abc__DEV__DEBUG',
         supported_messages: [60200, 60201],
-        protobuf_definition: 'proto',
       },
     });
   });
@@ -297,10 +297,10 @@ describe('Protocol V2 framing and session', () => {
     const malformedPayload = new Uint8Array(32);
     malformedPayload[0] = 0x0a;
     malformedPayload[1] = 101;
-    const frame = protocolV2.encodeProtobufFrame(60607, malformedPayload);
+    const frame = protocolV2.encodeProtobufFrame(61201, malformedPayload);
 
     expect(() => ProtocolV2.decodeFrame(schemas, frame)).toThrow(
-      'Protocol V2 protobuf decode failed for "DeviceSession" (60607, 32-byte payload); ' +
+      'Protocol V2 protobuf decode failed for "DeviceSession" (61201, 32-byte payload); ' +
         'the payload is malformed or incompatible with the active SDK schema.'
     );
   });
@@ -397,8 +397,8 @@ describe('Protocol V2 framing and session', () => {
       type: 'ProtocolInfo',
       message: {
         version: 2,
+        build_fingerprint: null,
         supported_messages: [60206],
-        protobuf_definition: null,
       },
     });
   });
@@ -408,8 +408,8 @@ describe('Protocol V2 framing and session', () => {
     const logger = { debug: jest.fn() };
     const response = ProtocolV2.encodeFrame(schemas, 'ProtocolInfo', {
       version: 2,
+      build_fingerprint: 'application__1.0.0__sensitive__DEV__DEBUG',
       supported_messages: [60206],
-      protobuf_definition: 'sensitive-schema',
     });
     const session = new ProtocolV2Session({
       schemas,
@@ -648,8 +648,8 @@ describe('Protocol V2 framing and session', () => {
       type: 'ProtocolInfo',
       message: {
         version: 2,
+        build_fingerprint: null,
         supported_messages: [],
-        protobuf_definition: null,
       },
     });
     expect(logger.debug).not.toHaveBeenCalled();
@@ -770,8 +770,8 @@ describe('Protocol V2 framing and session', () => {
       type: 'ProtocolInfo',
       message: {
         version: 2,
+        build_fingerprint: null,
         supported_messages: [],
-        protobuf_definition: null,
       },
     });
 

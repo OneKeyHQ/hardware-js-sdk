@@ -79,8 +79,6 @@
         "MessageType_ResetDevice": 14,
         "MessageType_SetBusy": 16,
         "MessageType_Features": 17,
-        "MessageType_PinMatrixRequest": 18,
-        "MessageType_PinMatrixAck": 19,
         "MessageType_Cancel": 20,
         "MessageType_LockDevice": 24,
         "MessageType_ApplySettings": 25,
@@ -142,20 +140,6 @@
         "MessageType_CosiSignature": 74,
         "MessageType_BatchGetPublickeys": 10016,
         "MessageType_EcdsaPublicKeys": 10017,
-        "MessageType_DebugLinkDecision": 100,
-        "MessageType_DebugLinkGetState": 101,
-        "MessageType_DebugLinkState": 102,
-        "MessageType_DebugLinkStop": 103,
-        "MessageType_DebugLinkLog": 104,
-        "MessageType_DebugLinkMemoryRead": 110,
-        "MessageType_DebugLinkMemory": 111,
-        "MessageType_DebugLinkMemoryWrite": 112,
-        "MessageType_DebugLinkFlashErase": 113,
-        "MessageType_DebugLinkLayout": 9001,
-        "MessageType_DebugLinkReseedRandom": 9002,
-        "MessageType_DebugLinkRecordScreen": 9003,
-        "MessageType_DebugLinkEraseSdCard": 9005,
-        "MessageType_DebugLinkWatchLayout": 9006,
         "MessageType_EthereumGetPublicKey": 450,
         "MessageType_EthereumPublicKey": 451,
         "MessageType_EthereumGetAddress": 56,
@@ -419,13 +403,6 @@
         "MessageType_TonSignProof": 11905,
         "MessageType_TonSignedProof": 11906,
         "MessageType_TonTxAck": 11907,
-        "MessageType_ScdoGetAddress": 12001,
-        "MessageType_ScdoAddress": 12002,
-        "MessageType_ScdoSignTx": 12003,
-        "MessageType_ScdoSignedTx": 12004,
-        "MessageType_ScdoTxAck": 12005,
-        "MessageType_ScdoSignMessage": 12006,
-        "MessageType_ScdoSignedMessage": 12007,
         "MessageType_AlephiumGetAddress": 12101,
         "MessageType_AlephiumAddress": 12102,
         "MessageType_AlephiumSignTx": 12103,
@@ -448,11 +425,6 @@
         "MessageType_NeoAddress": 12302,
         "MessageType_NeoSignTx": 12303,
         "MessageType_NeoSignedTx": 12304,
-        "MessageType_UiviewShowAddressRequest": 30200,
-        "MessageType_UiviewShowPublicKeyRequest": 30201,
-        "MessageType_UiviewConfirmTxRequest": 30202,
-        "MessageType_UiviewConfirmSignMessageRequest": 30203,
-        "MessageType_UiviewResponse": 30204,
         "MessageType_DeviceFactoryInfoSet": 60000,
         "MessageType_DeviceFactoryInfoGet": 60001,
         "MessageType_DeviceFactoryInfo": 60002,
@@ -473,19 +445,11 @@
         "MessageType_DeviceCertificateRead": 60422,
         "MessageType_DeviceCertificateSignature": 60423,
         "MessageType_DeviceCertificateSign": 60424,
-        "MessageType_SetWallpaper": 60430,
-        "MessageType_GetWallpaper": 60431,
-        "MessageType_Wallpaper": 60432,
+        "MessageType_DeviceMiscUsbMscControl": 60440,
         "MessageType_DeviceInfoGet": 60600,
         "MessageType_DeviceInfo": 60601,
         "MessageType_DeviceStatusGet": 60602,
         "MessageType_DeviceStatus": 60603,
-        "MessageType_DevGetOnboardingStatus": 60604,
-        "MessageType_DevOnboardingStatus": 60605,
-        "MessageType_DeviceSessionGet": 60606,
-        "MessageType_DeviceSession": 60607,
-        "MessageType_DeviceSessionAskPin": 60608,
-        "MessageType_DeviceSessionAskPassphrase": 60609,
         "MessageType_FilesystemPermissionFix": 60800,
         "MessageType_FilesystemPathInfo": 60801,
         "MessageType_FilesystemPathInfoQuery": 60802,
@@ -501,7 +465,13 @@
         "MessageType_DeviceFirmwareUpdateRequest": 61000,
         "MessageType_DeviceFirmwareUpdateStatusGet": 61001,
         "MessageType_DeviceFirmwareUpdateStatus": 61002,
-        "MessageType_PortfolioUpdate": 61200
+        "MessageType_DeviceSessionGet": 61200,
+        "MessageType_DeviceSession": 61201,
+        "MessageType_DeviceSessionAskPin": 61202,
+        "MessageType_DeviceSessionAskPassphrase": 61203,
+        "MessageType_PortfolioUpdate": 61400,
+        "MessageType_OnboardingStatusGet": 61600,
+        "MessageType_OnboardingStatus": 61601
       },
       "reserved": [
         [90, 92],
@@ -5960,30 +5930,6 @@
         }
       }
     },
-    "InternalMyAddressRequest": {
-      "fields": {
-        "coin_type": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 1
-        },
-        "chain_id": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 2
-        },
-        "account_index": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 3
-        },
-        "derive_type": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 4
-        }
-      }
-    },
     "KaspaGetAddress": {
       "fields": {
         "address_n": {
@@ -6187,28 +6133,6 @@
           "id": 8001
         }
       }
-    },
-    "StartSession": {
-      "fields": {
-        "session_id": {
-          "type": "bytes",
-          "id": 1
-        },
-        "_skip_passphrase": {
-          "type": "bool",
-          "id": 2,
-          "options": {
-            "deprecated": true
-          }
-        },
-        "derive_cardano": {
-          "type": "bool",
-          "id": 3
-        }
-      }
-    },
-    "EndSession": {
-      "fields": {}
     },
     "GetFeatures": {
       "fields": {}
@@ -7328,49 +7252,6 @@
         },
         "hash": {
           "type": "bytes",
-          "id": 2
-        }
-      }
-    },
-    "WallpaperTarget": {
-      "values": {
-        "Home": 0,
-        "Lock": 1
-      }
-    },
-    "SetWallpaper": {
-      "fields": {
-        "target": {
-          "rule": "required",
-          "type": "WallpaperTarget",
-          "id": 1
-        },
-        "path": {
-          "rule": "required",
-          "type": "string",
-          "id": 2
-        }
-      }
-    },
-    "GetWallpaper": {
-      "fields": {
-        "target": {
-          "rule": "required",
-          "type": "WallpaperTarget",
-          "id": 1
-        }
-      }
-    },
-    "Wallpaper": {
-      "fields": {
-        "target": {
-          "rule": "required",
-          "type": "WallpaperTarget",
-          "id": 1
-        },
-        "path": {
-          "rule": "required",
-          "type": "string",
           "id": 2
         }
       }
@@ -11533,162 +11414,6 @@
         }
       }
     },
-    "ViewAmount": {
-      "fields": {
-        "is_unlimited": {
-          "rule": "required",
-          "type": "bool",
-          "id": 1
-        },
-        "num": {
-          "rule": "required",
-          "type": "string",
-          "id": 2
-        }
-      }
-    },
-    "ViewDetail": {
-      "fields": {
-        "key": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 1
-        },
-        "value": {
-          "rule": "required",
-          "type": "string",
-          "id": 2
-        },
-        "is_overview": {
-          "rule": "required",
-          "type": "bool",
-          "id": 3
-        },
-        "has_icon": {
-          "rule": "required",
-          "type": "bool",
-          "id": 4
-        }
-      }
-    },
-    "ViewTipType": {
-      "values": {
-        "Default": 0,
-        "Highlight": 1,
-        "Recommend": 2,
-        "Warning": 3,
-        "Danger": 4
-      }
-    },
-    "ViewTip": {
-      "fields": {
-        "type": {
-          "rule": "required",
-          "type": "ViewTipType",
-          "id": 1
-        },
-        "text": {
-          "rule": "required",
-          "type": "string",
-          "id": 2
-        }
-      }
-    },
-    "ViewRawData": {
-      "fields": {
-        "initial_data": {
-          "rule": "required",
-          "type": "string",
-          "id": 1
-        },
-        "placeholder": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 2
-        }
-      }
-    },
-    "ViewSignLayout": {
-      "values": {
-        "LayoutDefault": 0,
-        "LayoutSafeTxCreate": 1,
-        "LayoutFinalConfirm": 2,
-        "Layout7702": 3,
-        "LayoutFlat": 4,
-        "LayoutEthApprove": 5
-      }
-    },
-    "ViewSignPage": {
-      "fields": {
-        "title": {
-          "rule": "required",
-          "type": "string",
-          "id": 1
-        },
-        "amount": {
-          "type": "ViewAmount",
-          "id": 2
-        },
-        "general": {
-          "rule": "repeated",
-          "type": "ViewDetail",
-          "id": 3
-        },
-        "tip": {
-          "type": "ViewTip",
-          "id": 4
-        },
-        "raw_data": {
-          "type": "ViewRawData",
-          "id": 5
-        },
-        "slide_to_confirm": {
-          "type": "bool",
-          "id": 6,
-          "options": {
-            "default": true
-          }
-        },
-        "layout": {
-          "type": "ViewSignLayout",
-          "id": 7,
-          "options": {
-            "default": "LayoutDefault"
-          }
-        }
-      }
-    },
-    "ViewVerifyPage": {
-      "fields": {
-        "title": {
-          "rule": "required",
-          "type": "string",
-          "id": 1
-        },
-        "address": {
-          "rule": "required",
-          "type": "string",
-          "id": 2
-        },
-        "path": {
-          "rule": "required",
-          "type": "string",
-          "id": 3
-        },
-        "network": {
-          "type": "string",
-          "id": 4
-        },
-        "derive_type": {
-          "type": "string",
-          "id": 5
-        },
-        "value_key": {
-          "type": "uint32",
-          "id": 6
-        }
-      }
-    },
     "WebAuthnListResidentCredentials": {
       "fields": {}
     },
@@ -11789,17 +11514,18 @@
           "type": "uint32",
           "id": 1
         },
+        "build_fingerprint": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        },
         "supported_messages": {
           "rule": "repeated",
           "type": "uint32",
-          "id": 2,
+          "id": 3,
           "options": {
             "packed": false
           }
-        },
-        "protobuf_definition": {
-          "type": "string",
-          "id": 3
         }
       }
     },
@@ -12027,6 +11753,114 @@
         }
       }
     },
+    "DeviceMiscUsbMscControl": {
+      "fields": {
+        "enable": {
+          "rule": "required",
+          "type": "bool",
+          "id": 1
+        }
+      }
+    },
+    "DeviceFactoryAck": {
+      "values": {
+        "FACTORY_ACK_SUCCESS": 0,
+        "FACTORY_ACK_FAIL": 1
+      }
+    },
+    "DeviceFactoryInfoManufactureTime": {
+      "fields": {
+        "year": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
+        },
+        "month": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        },
+        "day": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 3
+        },
+        "hour": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 4
+        },
+        "minute": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 5
+        },
+        "second": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 6
+        }
+      }
+    },
+    "DeviceFactoryInfo": {
+      "fields": {
+        "version": {
+          "type": "uint32",
+          "id": 1
+        },
+        "serial_number": {
+          "type": "string",
+          "id": 2
+        },
+        "burn_in_completed": {
+          "type": "bool",
+          "id": 3
+        },
+        "factory_test_completed": {
+          "type": "bool",
+          "id": 4
+        },
+        "manufacture_time": {
+          "type": "DeviceFactoryInfoManufactureTime",
+          "id": 5
+        }
+      }
+    },
+    "DeviceFactoryInfoSet": {
+      "fields": {
+        "info": {
+          "rule": "required",
+          "type": "DeviceFactoryInfo",
+          "id": 1
+        }
+      }
+    },
+    "DeviceFactoryInfoGet": {
+      "fields": {}
+    },
+    "DeviceFactoryPermanentLock": {
+      "fields": {
+        "check_a": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        },
+        "check_b": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "DeviceFactoryTest": {
+      "fields": {
+        "burn_in_test": {
+          "rule": "required",
+          "type": "bool",
+          "id": 1
+        }
+      }
+    },
     "DeviceFirmwareTargetType": {
       "values": {
         "FW_MGMT_TARGET_INVALID": 0,
@@ -12130,105 +11964,6 @@
         "records": {
           "rule": "repeated",
           "type": "DeviceFirmwareUpdateRecord",
-          "id": 1
-        }
-      }
-    },
-    "DeviceFactoryAck": {
-      "values": {
-        "FACTORY_ACK_SUCCESS": 0,
-        "FACTORY_ACK_FAIL": 1
-      }
-    },
-    "DeviceFactoryInfoManufactureTime": {
-      "fields": {
-        "year": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 1
-        },
-        "month": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 2
-        },
-        "day": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 3
-        },
-        "hour": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 4
-        },
-        "minute": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 5
-        },
-        "second": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 6
-        }
-      }
-    },
-    "DeviceFactoryInfo": {
-      "fields": {
-        "version": {
-          "type": "uint32",
-          "id": 1
-        },
-        "serial_number": {
-          "type": "string",
-          "id": 2
-        },
-        "burn_in_completed": {
-          "type": "bool",
-          "id": 3
-        },
-        "factory_test_completed": {
-          "type": "bool",
-          "id": 4
-        },
-        "manufacture_time": {
-          "type": "DeviceFactoryInfoManufactureTime",
-          "id": 5
-        }
-      }
-    },
-    "DeviceFactoryInfoSet": {
-      "fields": {
-        "info": {
-          "rule": "required",
-          "type": "DeviceFactoryInfo",
-          "id": 1
-        }
-      }
-    },
-    "DeviceFactoryInfoGet": {
-      "fields": {}
-    },
-    "DeviceFactoryPermanentLock": {
-      "fields": {
-        "check_a": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 1
-        },
-        "check_b": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 2
-        }
-      }
-    },
-    "DeviceFactoryTest": {
-      "fields": {
-        "burn_in_test": {
-          "rule": "required",
-          "type": "bool",
           "id": 1
         }
       }
@@ -12383,10 +12118,6 @@
         "se4": {
           "type": "bool",
           "id": 430
-        },
-        "status": {
-          "type": "bool",
-          "id": 10000
         }
       }
     },
@@ -12456,10 +12187,6 @@
         "se4": {
           "type": "DeviceSEInfo",
           "id": 430
-        },
-        "status": {
-          "type": "DeviceStatus",
-          "id": 10000
         }
       }
     },
@@ -12515,6 +12242,7 @@
           "id": 1
         },
         "on_device": {
+          "rule": "required",
           "type": "bool",
           "id": 2
         }
@@ -12559,88 +12287,6 @@
     },
     "DeviceStatusGet": {
       "fields": {}
-    },
-    "DevOnboardingStep": {
-      "values": {
-        "DEV_ONBOARDING_STEP_UNKNOWN": 0,
-        "DEV_ONBOARDING_STEP_CHECKING": 1,
-        "DEV_ONBOARDING_STEP_PERSONALIZATION": 2,
-        "DEV_ONBOARDING_STEP_PIN": 3,
-        "DEV_ONBOARDING_STEP_SETUP": 4,
-        "DEV_ONBOARDING_STEP_DONE": 5
-      }
-    },
-    "DevOnboardingPhase": {
-      "values": {
-        "DEV_ONBOARDING_PHASE_UNKNOWN": 0,
-        "DEV_ONBOARDING_PHASE_SAFETY_CHECK": 1,
-        "DEV_ONBOARDING_PHASE_PIN_SETUP": 2,
-        "DEV_ONBOARDING_PHASE_FINGERPRINT_SETUP": 3,
-        "DEV_ONBOARDING_PHASE_SETUP_CHOICE": 4,
-        "DEV_ONBOARDING_PHASE_WALLET_CREATE_START": 5,
-        "DEV_ONBOARDING_PHASE_RECOVERY_PHRASE_VIEW": 6,
-        "DEV_ONBOARDING_PHASE_RECOVERY_PHRASE_CONFIRM": 7,
-        "DEV_ONBOARDING_PHASE_RESTORE_METHOD_CHOICE": 8,
-        "DEV_ONBOARDING_PHASE_RECOVERY_PHRASE_RESTORE": 9,
-        "DEV_ONBOARDING_PHASE_SEEDCARD_RESTORE": 10,
-        "DEV_ONBOARDING_PHASE_WALLET_READY": 11,
-        "DEV_ONBOARDING_PHASE_SEEDCARD_BACKUP_PROMPT": 12,
-        "DEV_ONBOARDING_PHASE_SEEDCARD_BACKUP": 13
-      }
-    },
-    "DevOnboardingSetupKind": {
-      "values": {
-        "DEV_ONBOARDING_SETUP_KIND_UNKNOWN": 0,
-        "DEV_ONBOARDING_SETUP_KIND_CHOICE": 1,
-        "DEV_ONBOARDING_SETUP_KIND_CREATE": 2,
-        "DEV_ONBOARDING_SETUP_KIND_RESTORE": 3
-      }
-    },
-    "DevOnboardingSetupMethod": {
-      "values": {
-        "DEV_ONBOARDING_SETUP_METHOD_UNKNOWN": 0,
-        "DEV_ONBOARDING_SETUP_METHOD_RECOVERY_PHRASE": 1,
-        "DEV_ONBOARDING_SETUP_METHOD_SEEDCARD": 2
-      }
-    },
-    "DevOnboardingSetupStatus": {
-      "fields": {
-        "kind": {
-          "type": "DevOnboardingSetupKind",
-          "id": 1
-        },
-        "method": {
-          "type": "DevOnboardingSetupMethod",
-          "id": 2
-        }
-      }
-    },
-    "DevGetOnboardingStatus": {
-      "fields": {}
-    },
-    "DevOnboardingStatus": {
-      "fields": {
-        "step": {
-          "type": "DevOnboardingStep",
-          "id": 1
-        },
-        "phase": {
-          "type": "DevOnboardingPhase",
-          "id": 2
-        },
-        "setup": {
-          "type": "DevOnboardingSetupStatus",
-          "id": 3
-        },
-        "pin_set": {
-          "type": "bool",
-          "id": 4
-        },
-        "wallet_initialized": {
-          "type": "bool",
-          "id": 5
-        }
-      }
     },
     "FilesystemPermissionFix": {
       "fields": {}
@@ -12868,8 +12514,270 @@
         }
       }
     },
+    "InternalMyAddressRequest": {
+      "fields": {
+        "coin_type": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
+        },
+        "chain_id": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        },
+        "account_index": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 3
+        },
+        "derive_type": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 4
+        }
+      }
+    },
+    "OnboardingStep": {
+      "values": {
+        "ONBOARDING_STEP_UNKNOWN": 0,
+        "ONBOARDING_STEP_CHECKING": 1,
+        "ONBOARDING_STEP_PERSONALIZATION": 2,
+        "ONBOARDING_STEP_PIN": 3,
+        "ONBOARDING_STEP_SETUP": 4,
+        "ONBOARDING_STEP_DONE": 5
+      }
+    },
+    "OnboardingPhase": {
+      "values": {
+        "ONBOARDING_PHASE_UNKNOWN": 0,
+        "ONBOARDING_PHASE_SAFETY_CHECK": 1,
+        "ONBOARDING_PHASE_PIN_SETUP": 2,
+        "ONBOARDING_PHASE_FINGERPRINT_SETUP": 3,
+        "ONBOARDING_PHASE_SETUP_CHOICE": 4,
+        "ONBOARDING_PHASE_WALLET_CREATE_START": 5,
+        "ONBOARDING_PHASE_RECOVERY_PHRASE_VIEW": 6,
+        "ONBOARDING_PHASE_RECOVERY_PHRASE_CONFIRM": 7,
+        "ONBOARDING_PHASE_RESTORE_METHOD_CHOICE": 8,
+        "ONBOARDING_PHASE_RECOVERY_PHRASE_RESTORE": 9,
+        "ONBOARDING_PHASE_SEEDCARD_RESTORE": 10,
+        "ONBOARDING_PHASE_WALLET_READY": 11,
+        "ONBOARDING_PHASE_SEEDCARD_BACKUP_PROMPT": 12,
+        "ONBOARDING_PHASE_SEEDCARD_BACKUP": 13
+      }
+    },
+    "OnboardingSetupKind": {
+      "values": {
+        "ONBOARDING_SETUP_KIND_UNKNOWN": 0,
+        "ONBOARDING_SETUP_KIND_CHOICE": 1,
+        "ONBOARDING_SETUP_KIND_CREATE": 2,
+        "ONBOARDING_SETUP_KIND_RESTORE": 3
+      }
+    },
+    "OnboardingSetupMethod": {
+      "values": {
+        "ONBOARDING_SETUP_METHOD_UNKNOWN": 0,
+        "ONBOARDING_SETUP_METHOD_RECOVERY_PHRASE": 1,
+        "ONBOARDING_SETUP_METHOD_SEEDCARD": 2
+      }
+    },
+    "OnboardingSetupStatus": {
+      "fields": {
+        "kind": {
+          "type": "OnboardingSetupKind",
+          "id": 1
+        },
+        "method": {
+          "type": "OnboardingSetupMethod",
+          "id": 2
+        }
+      }
+    },
+    "OnboardingStatusGet": {
+      "fields": {}
+    },
+    "OnboardingStatus": {
+      "fields": {
+        "step": {
+          "type": "OnboardingStep",
+          "id": 1
+        },
+        "phase": {
+          "type": "OnboardingPhase",
+          "id": 2
+        },
+        "setup": {
+          "type": "OnboardingSetupStatus",
+          "id": 3
+        },
+        "pin_set": {
+          "type": "bool",
+          "id": 4
+        },
+        "wallet_initialized": {
+          "type": "bool",
+          "id": 5
+        }
+      }
+    },
     "PortfolioUpdate": {
       "fields": {}
+    },
+    "ViewAmount": {
+      "fields": {
+        "is_unlimited": {
+          "rule": "required",
+          "type": "bool",
+          "id": 1
+        },
+        "num": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        }
+      }
+    },
+    "ViewDetail": {
+      "fields": {
+        "key": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
+        },
+        "value": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        },
+        "is_overview": {
+          "rule": "required",
+          "type": "bool",
+          "id": 3
+        },
+        "has_icon": {
+          "rule": "required",
+          "type": "bool",
+          "id": 4
+        }
+      }
+    },
+    "ViewTipType": {
+      "values": {
+        "Default": 0,
+        "Highlight": 1,
+        "Recommend": 2,
+        "Warning": 3,
+        "Danger": 4
+      }
+    },
+    "ViewTip": {
+      "fields": {
+        "type": {
+          "rule": "required",
+          "type": "ViewTipType",
+          "id": 1
+        },
+        "text": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        }
+      }
+    },
+    "ViewRawData": {
+      "fields": {
+        "initial_data": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        },
+        "placeholder": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        }
+      }
+    },
+    "ViewSignLayout": {
+      "values": {
+        "LayoutDefault": 0,
+        "LayoutSafeTxCreate": 1,
+        "LayoutFinalConfirm": 2,
+        "Layout7702": 3,
+        "LayoutFlat": 4,
+        "LayoutEthApprove": 5
+      }
+    },
+    "ViewSignPage": {
+      "fields": {
+        "title": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        },
+        "amount": {
+          "type": "ViewAmount",
+          "id": 2
+        },
+        "general": {
+          "rule": "repeated",
+          "type": "ViewDetail",
+          "id": 3
+        },
+        "tip": {
+          "type": "ViewTip",
+          "id": 4
+        },
+        "raw_data": {
+          "type": "ViewRawData",
+          "id": 5
+        },
+        "slide_to_confirm": {
+          "type": "bool",
+          "id": 6,
+          "options": {
+            "default": true
+          }
+        },
+        "layout": {
+          "type": "ViewSignLayout",
+          "id": 7,
+          "options": {
+            "default": "LayoutDefault"
+          }
+        }
+      }
+    },
+    "ViewVerifyPage": {
+      "fields": {
+        "title": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        },
+        "address": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        },
+        "path": {
+          "rule": "required",
+          "type": "string",
+          "id": 3
+        },
+        "network": {
+          "type": "string",
+          "id": 4
+        },
+        "derive_type": {
+          "type": "string",
+          "id": 5
+        },
+        "value_key": {
+          "type": "uint32",
+          "id": 6
+        }
+      }
     },
     "google": {
       "nested": {

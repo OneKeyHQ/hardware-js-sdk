@@ -16,15 +16,15 @@ Core / DeviceCommands
 
 ## V1 与 V2 核心差异
 
-| 维度     | Protocol V1                  | Protocol V2                              |
-| -------- | ---------------------------- | ---------------------------------------- |
-| 当前设备 | Classic、Mini、Touch、Pro 等 | 当前为 Pro2，后续可扩展到 Pro 等机型     |
-| 初始化   | `Initialize -> Features`     | `Ping` 探测，随后 `DeviceInfoGet` 初始化 |
-| 消息编号 | protobuf message type        | `MessageType`，按系统模块分组            |
-| 帧       | V1 分包格式                  | `0x5A` 帧头、长度、序列号、CRC8          |
-| Schema   | 可按固件版本切换             | 独立 `messages-protocol-v2.json`         |
-| 调用模型 | 既有 Transport 调用链        | 每设备 Link、串行队列、持续递增 sequence |
-| 失败恢复 | 沿用 V1 Transport 语义       | link-fatal 失效 Link，不自动重放业务命令 |
+| 维度     | Protocol V1                  | Protocol V2                                                                                    |
+| -------- | ---------------------------- | ---------------------------------------------------------------------------------------------- |
+| 当前设备 | Classic、Mini、Touch、Pro 等 | 当前为 Pro2，后续可扩展到 Pro 等机型                                                           |
+| 初始化   | `Initialize -> Features`     | `Ping` 探测，随后读取 `DeviceInfo` 与 `ProtocolInfo`；仅 application 按能力读取 `DeviceStatus` |
+| 消息编号 | protobuf message type        | `MessageType`，按系统模块分组                                                                  |
+| 帧       | V1 分包格式                  | `0x5A` 帧头、长度、序列号、CRC8                                                                |
+| Schema   | 可按固件版本切换             | 独立 `messages-protocol-v2.json`                                                               |
+| 调用模型 | 既有 Transport 调用链        | 每设备 Link、串行队列、持续递增 sequence                                                       |
+| 失败恢复 | 沿用 V1 Transport 语义       | link-fatal 失效 Link，不自动重放业务命令                                                       |
 
 V1 与 V2 的判断必须依据连接后的设备响应，不能只依赖 PID、设备名或 USB descriptor。
 
@@ -36,7 +36,8 @@ Transport 在 `acquire()` 完成物理连接后执行协议探测：
 2. 没有 V2 hint 时，默认先验证 V1 `Initialize`。
 3. WebUSB 的 V1 probe 失败后必须关闭并重新打开连接，再执行 V2 probe，避免未取消的
    `transferIn` 消费 V2 响应。
-4. 两者均失败时，清理本次连接资源并返回协议探测错误。
+4. 两者均失败时，清理本次连接资源；WebUSB 公共调用返回 `DeviceNotFound`，具体 probe
+   失败原因仅保留在 Transport 调试日志中。
 
 协议选择输入分为两种语义，二者都不能替代活动响应验证：
 

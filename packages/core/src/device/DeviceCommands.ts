@@ -6,6 +6,7 @@ import {
   type Messages,
   type Transport,
   type TransportCallOptions,
+  getSafeTransportLogPayload,
 } from '@onekeyfe/hd-transport';
 
 import TransportManager from '../data-manager/TransportManager';
@@ -282,7 +283,11 @@ export class DeviceCommands {
   ): Promise<DefaultMessageResponse> {
     const shouldReduceDebug = shouldReduceDebugForCall(type);
     if (!shouldReduceDebug) {
-      Log.debug('[DeviceCommands] [call] Sending', type);
+      Log.debug(
+        '[DeviceCommands] [call] Sending',
+        type,
+        getSafeTransportLogPayload(msg ?? {}, type)
+      );
     }
 
     try {
@@ -290,13 +295,18 @@ export class DeviceCommands {
       this.callPromise = promise;
       const res = await promise;
       if (!shouldReduceDebug) {
-        LogCore.debug('[DeviceCommands] [call] Received', res.type);
+        LogCore.debug(
+          '[DeviceCommands] [call] Received',
+          res.type,
+          getSafeTransportLogPayload(res.message, res.type)
+        );
       }
       return res;
     } catch (error) {
       LogCore.debug('[DeviceCommands] [call] Received error', {
         request: type,
         errorCode: error?.errorCode,
+        response: getSafeTransportLogPayload(error?.response?.data, type),
       });
       if (error.errorCode === HardwareErrorCode.BleDeviceBondError) {
         return {

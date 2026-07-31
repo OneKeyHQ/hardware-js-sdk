@@ -260,7 +260,7 @@ export const buildProtocolV2FeaturesPayload = ({
   const attachToPinEnabled = status?.attach_to_pin_enabled ?? cached?.attachToPinEnabled ?? null;
   const unlockedAttachPin =
     status?.unlocked_by_attach_to_pin ?? cached?.unlockedAttachPin ?? undefined;
-  const bootloaderMode = runtimeMode === 'bootloader';
+  const bootloaderMode = runtimeMode === 'bootloader' || runtimeMode === 'romloader';
   let mode: DeviceFeaturesMode = 'unknown';
   if (runtimeMode) {
     mode = runtimeMode;

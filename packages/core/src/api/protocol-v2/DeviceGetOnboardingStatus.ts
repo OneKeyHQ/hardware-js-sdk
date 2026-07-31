@@ -12,8 +12,8 @@ export default class DeviceGetOnboardingStatus extends BaseMethod {
 
   async run() {
     const { message } = await this.device.commands.typedCall(
-      'DevGetOnboardingStatus',
-      'DevOnboardingStatus',
+      'OnboardingStatusGet',
+      'OnboardingStatus',
       {}
     );
     return message;

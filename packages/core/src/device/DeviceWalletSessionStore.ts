@@ -1,6 +1,4 @@
 export class DeviceWalletSessionStore {
-  private static readonly MAX_SESSIONS_PER_DEVICE = 3;
-
   private readonly walletSessions = new Map<string, Map<string, string>>();
 
   private readonly standardWalletSessions = new Map<
@@ -21,18 +19,6 @@ export class DeviceWalletSessionStore {
     if (!deviceSessions) {
       deviceSessions = new Map<string, string>();
       this.walletSessions.set(deviceKey, deviceSessions);
-    }
-    if (
-      !deviceSessions.has(passphraseState) &&
-      deviceSessions.size >= DeviceWalletSessionStore.MAX_SESSIONS_PER_DEVICE
-    ) {
-      const oldestPassphraseState = deviceSessions.keys().next().value as string | undefined;
-      if (oldestPassphraseState) {
-        deviceSessions.delete(oldestPassphraseState);
-        if (this.standardWalletSessions.get(deviceKey)?.passphraseState === oldestPassphraseState) {
-          this.standardWalletSessions.delete(deviceKey);
-        }
-      }
     }
     deviceSessions.set(passphraseState, sessionId);
   }

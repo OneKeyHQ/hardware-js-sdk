@@ -3,12 +3,17 @@ import { DeviceSessionPinType } from '@onekeyfe/hd-transport';
 
 import { DEVICE } from '../../events';
 import { assertCompleteDeviceSession } from './deviceSession';
-import { isDeviceLockedError } from './lockedError';
 
-import type { DeviceSessionGet } from '@onekeyfe/hd-transport';
+import type { DeviceSessionAskPassphrase, DeviceSessionGet } from '@onekeyfe/hd-transport';
 import type { Device } from '../../device/Device';
 
 const HOST_PASSPHRASE_MAX_BYTES = 50;
+
+const isWalletSessionInvalidError = (error: unknown) =>
+  typeof error === 'object' &&
+  error !== null &&
+  'errorCode' in error &&
+  (error as { errorCode?: unknown }).errorCode === HardwareErrorCode.WalletSessionInvalid;
 
 const utf8ByteLength = (value: string): number | undefined => {
   let length = 0;
@@ -39,34 +44,11 @@ const negotiateEventlessWalletSession = async (device: Device) => {
   });
 };
 
-const getDeviceSession = async (device: Device, request: DeviceSessionGet) => {
-  try {
-    return await device.commands.typedCall('DeviceSessionGet', 'DeviceSession', request);
-  } catch (error) {
-    if (!isDeviceLockedError(error) || !request.session_id) {
-      throw error;
-    }
-    await device.unlockDevice(DeviceSessionPinType.Main);
-    return device.commands.typedCall('DeviceSessionGet', 'DeviceSession', request);
-  }
-};
+const getDeviceSession = async (device: Device, request: DeviceSessionGet) =>
+  device.commands.typedCall('DeviceSessionGet', 'DeviceSession', request);
 
-const askDevicePassphrase = async (device: Device, passphrase?: string) => {
-  const request = () =>
-    device.commands.typedCall(
-      'DeviceSessionAskPassphrase',
-      'Success',
-      passphrase ? { passphrase, on_device: false } : { on_device: true }
-    );
-  try {
-    await request();
-  } catch (error) {
-    if (!isDeviceLockedError(error)) {
-      throw error;
-    }
-    await device.unlockDevice(DeviceSessionPinType.Main);
-    await request();
-  }
+const askDevicePassphrase = async (device: Device, requestPayload: DeviceSessionAskPassphrase) => {
+  await device.commands.typedCall('DeviceSessionAskPassphrase', 'Success', requestPayload);
   await refreshProtocolV2DeviceStatus(device);
 };
 
@@ -126,25 +108,33 @@ const selectDeviceSession = async (device: Device, expectedPassphraseState?: str
   }
 
   if (hasHostPassphrase) {
-    await askDevicePassphrase(device, hostPassphrase);
+    await askDevicePassphrase(device, {
+      passphrase: hostPassphrase,
+      on_device: false,
+    });
     return getDeviceSession(device, {});
   }
 
   device.emit(DEVICE.PASSPHRASE_ON_DEVICE, device, metadata);
-  await askDevicePassphrase(device);
+  await askDevicePassphrase(device, { on_device: true });
   return getDeviceSession(device, {});
 };
 
 export async function getProtocolV2WalletSession(
   device: Device,
   options?: {
+    forceWalletSelection?: boolean;
+    /** @deprecated 兼容旧 getPassphraseState；新流程使用 forceWalletSelection。 */
     initSession?: boolean;
     expectedPassphraseState?: string;
     onlyMainPin?: boolean;
     resumeOnly?: boolean;
   }
 ) {
-  if (options?.initSession) {
+  const forceWalletSelection =
+    options?.forceWalletSelection === true || options?.initSession === true;
+
+  if (forceWalletSelection) {
     if (options.onlyMainPin) {
       device.clearStandardInternalState?.();
     } else {
@@ -185,7 +175,10 @@ export async function getProtocolV2WalletSession(
         resumed = true;
       } catch (error) {
         device.clearStandardInternalState?.();
-        throw error;
+        if (!isWalletSessionInvalidError(error)) {
+          throw error;
+        }
+        resumed = false;
       }
     }
 
@@ -199,7 +192,10 @@ export async function getProtocolV2WalletSession(
       resumed = true;
     } catch (error) {
       device.clearInternalState();
-      throw error;
+      if (options?.resumeOnly || !isWalletSessionInvalidError(error)) {
+        throw error;
+      }
+      resumed = false;
     }
   }
 
@@ -224,6 +220,10 @@ export async function getProtocolV2WalletSession(
   }
   if (expectedPassphraseState && expectedPassphraseState !== message.btc_test_address) {
     resumed = false;
+    if (options?.resumeOnly) {
+      device.clearInternalState();
+      throw ERRORS.TypedError(HardwareErrorCode.WalletSessionInvalid);
+    }
     if (options?.onlyMainPin) {
       device.clearStandardInternalState?.();
       await device.unlockDevice(DeviceSessionPinType.Main);
@@ -258,7 +258,7 @@ export async function getProtocolV2WalletSession(
     message.btc_test_address,
     device.getCurrentDeviceId(),
     message.session_id,
-    options?.initSession ? null : cachedSessionId ?? null,
+    forceWalletSelection ? null : cachedSessionId ?? null,
   ] as const;
   if (options?.onlyMainPin) {
     device.updateInternalState(...internalStateArgs, 'standard');

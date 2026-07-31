@@ -2,14 +2,19 @@ import type { DeviceSettings, DeviceSettingsPage } from '@onekeyfe/hd-transport'
 import type { UnlockPolicy } from '../../api/BaseMethod';
 import type { ProtocolV2InteractionDescriptor } from './uiInteraction';
 
-const LOCK_FREE_DEVICE_SETTINGS = new Set<keyof DeviceSettings>([
+export const PROTOCOL_V2_LOCK_FREE_DEVICE_SETTINGS = [
   'language',
   'brightness',
+  'animation_enable',
+  'tap_to_wake',
   'haptic_feedback',
-]);
+  'device_name_display_enabled',
+] as const satisfies readonly (keyof DeviceSettings)[];
+
+const lockFreeDeviceSettings = new Set<keyof DeviceSettings>(PROTOCOL_V2_LOCK_FREE_DEVICE_SETTINGS);
 
 export const getProtocolV2SettingsUnlockPolicy = (settings: DeviceSettings): UnlockPolicy =>
-  Object.keys(settings).every(key => LOCK_FREE_DEVICE_SETTINGS.has(key as keyof DeviceSettings))
+  Object.keys(settings).every(key => lockFreeDeviceSettings.has(key as keyof DeviceSettings))
     ? 'none'
     : 'unlock-before-run';
 

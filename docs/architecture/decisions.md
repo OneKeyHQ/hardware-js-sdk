@@ -74,8 +74,11 @@ Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类�
 - `openWalletSession()` 必须显式传入 `mode`；旧参数兼容只保留在原
   `getPassphraseState()` 入口，避免新 API 同时存在两套意图表达。
 - `resume-hidden` 只接收 `deviceId + passphraseState`，由 Core 从 Store 查找 `sessionId`；本地缓存
-  不存在时返回 `WalletSessionInvalid`。固件返回的实际钱包不匹配时，Core 允许一次显式钱包重选，
-  最终仍不匹配才返回 `DeviceCheckPassphraseStateError`。
+  对 V2 只是非权威恢复提示。V2 本地缓存不存在、句柄失效或固件返回的实际钱包不匹配时，Core
+  允许一次显式钱包重选，最终仍不匹配才返回 `DeviceCheckPassphraseStateError`；V1 缺少缓存时
+  仍返回 `WalletSessionInvalid`。
+- Session 容量与淘汰由 Pro2 固件管理；Core Store 不实现 LRU 或镜像硬件容量，只在获得新句柄、
+  固件拒绝旧句柄或钱包身份校验失败时更新对应映射。
 - V2 先通过 `ProtocolInfoRequest { eventless_wallet_session: true }` 协商无中间固件 Event。
   `DeviceSessionAskPin` 和 `DeviceSessionAskPassphrase` 只返回 `Success`；Core 随后使用空参数
   `DeviceSessionGet` 读取当前 Session。恢复时使用带 `session_id` 的 `DeviceSessionGet`。
@@ -83,8 +86,13 @@ Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类�
   两种调用都必须返回固件最终实际的完整 `DeviceSession`，正常状态错配不返回 `InvalidSession`。
 - Pro2 的 `DeviceSessionAskPassphrase` 必须显式携带输入来源：Host 输入发送
   `{ on_device: false, passphrase }`，设备输入发送 `{ on_device: true }`。不得省略
-  `on_device`，也不得同时发送设备输入标记和 Host Passphrase。
-  Pro2 尚未发布，不保留开发阶段旧固件的能力降级分支。
+  `on_device`，也不得同时发送设备输入标记和 Host Passphrase。Attach-to-PIN 继续使用
+  `DeviceSessionAskPin(AttachToPin)`。
+- Pro2 的钱包 Session 协调器不得捕获 `DeviceLocked` 后隐式解锁或重放协议请求。需要选择或恢复
+  隐藏钱包的业务方法必须先刷新 `DeviceStatus`；状态明确为锁定时先执行
+  `DeviceSessionAskPin(Main)`，否则直接调用钱包 Session 协议。调用期间返回的结构化
+  `DeviceLocked` 必须原样向上抛出，避免重复有副作用的请求。Attach-to-PIN 分支仍只执行
+  `DeviceSessionAskPin(AttachToPin)`。
 - 标准钱包首次打开时执行 `AskPin(Main) -> Get()`；缓存恢复结果不匹配时执行一次相同流程重建。
   隐藏钱包缓存恢复结果不匹配时执行一次统一钱包选择，再执行 Ask 与 `Get()`。恢复不得删除同设备
   的其他钱包 Session。
@@ -120,6 +128,12 @@ Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类�
   `unlockPolicy = 'retry-on-locked'`。
 - 有副作用的方法只能声明 `unlockPolicy = 'unlock-before-run'`：已知设备锁定时先解锁，
   但收到 locked 响应后不重放原操作。
+- `unlock-before-run` 仅对 Pro2 / Protocol V2 生效。统一方法入口在正常固件模式下先刷新
+  `DeviceStatus`，状态明确锁定才解锁；Bootloader 和 Romloader 不支持 `DeviceStatusGet`，
+  必须跳过状态查询与解锁，直接进入固件升级流程。
+- Pro2 设置按固件锁定边界分类：语言、亮度、动画、轻触唤醒、振动反馈、设备名称显示和壁纸
+  无需解锁；自动锁定、自动关机、蓝牙、FIDO、USB Lock、随机键盘和设备名称修改需要先解锁；
+  Change PIN、Passphrase、Air-gap 与 Wipe 先解锁后打开设备确认页。未知新增设置默认要求解锁。
 - 只有结构化 `HardwareErrorCode.DeviceLocked` 会触发解锁。
 - 解锁成功后原方法最多重试一次；取消、解锁失败或第二次调用失败时直接返回错误。
 - Protocol V1、未声明策略的方法和其他错误不进入自动解锁流程。
@@ -152,6 +166,34 @@ Core 在设备完成 acquire/initialize、协议类型已由真实设备响应�
 - `packages/core/src/api/BaseMethod.ts`
 - `packages/core/src/core/index.ts`
 - `packages/core/src/api/allnetwork/AllNetworkGetAddressBase.ts`
+
+## Protocol V2 运行阶段与消息能力分离
+
+Pro2 acquire 后的初始化、重连和固件升级重连统一读取 `ProtocolInfo`：
+
+- `build_fingerprint` 固定为
+  `<binary>__<version>__<commit>__<PROD|DEV>__<DEBUG|RELEASE>`；Core 只使用 binary
+  识别 application、bootloader、romloader，并分别映射为 normal、bootloader、romloader。
+- `supported_messages` 是当前固件阶段的实时 handler 清单，也是消息能力的唯一判断来源。
+  禁止根据 fingerprint 的版本、commit、环境、构建类型或 `DeviceInfo` 镜像结构推导能力。
+- bootloader 与 romloader 不调用 `DeviceStatusGet`。application 也只有在
+  `supported_messages` 包含对应 MessageType 时才调用。
+- `Device.isBootloader()` 与 `Device.isRomloader()` 是互斥的精确模式判断。兼容
+  `Features.bootloaderMode/bootloader_mode` 仍表示广义 loader 状态，不能用于区分两种 loader；
+  新流程必须读取 `DeviceState.status.mode` 或上述精确判断。
+- romloader 语义当前严格限定为 Pro2 + Protocol V2，并由
+  `DeviceInfo.hw.Device_type=PRO2` 与活动 V2 响应共同确认。Pro Protocol V1 的历史
+  boardloader 是另一套状态，不得映射为 romloader，也不得进入 Pro2 FirmwareUpdateV4 直升流程。
+- fingerprint 无法解析但明确声明支持 `DeviceStatusGet` 时，可读取状态作为旧固件兼容路径；
+  fingerprint 与能力均无法确认时必须安全失败，不能向未知阶段试探性发送状态命令。
+- `ProtocolInfo` 与 `DeviceInfo`、`DeviceStatus` 一同保存在 Core 内部 raw 状态；公共
+  `DeviceState` 和事件不暴露协议原始响应。
+
+主要实现：
+
+- `packages/core/src/protocols/protocol-v2/features.ts`
+- `packages/core/src/device/Device.ts`
+- `packages/core/src/api/FirmwareUpdateV4.ts`
 
 ## 维护规则
 

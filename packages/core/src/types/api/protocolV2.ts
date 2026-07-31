@@ -1,5 +1,5 @@
 import type { CommonParams, Response } from '../params';
-import type { DevOnboardingStatus, Success } from '@onekeyfe/hd-transport';
+import type { OnboardingStatus, Success } from '@onekeyfe/hd-transport';
 import type { DeviceRebootParams } from '../../api/protocol-v2/helpers';
 import type {
   DeviceUploadWallpaperParams,
@@ -45,7 +45,7 @@ export declare function deviceReboot(
 export declare function deviceGetOnboardingStatus(
   connectId: string,
   params?: CommonParams
-): Response<DevOnboardingStatus>;
+): Response<OnboardingStatus>;
 
 export declare function deviceUploadWallpaper(
   connectId: string,
