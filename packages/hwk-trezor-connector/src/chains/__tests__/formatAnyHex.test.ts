@@ -177,6 +177,19 @@ describe('normalizeEvmSignTxHexFields', () => {
     ).toThrow(/value must be a hex string/);
   });
 
+  it('pads odd-length data exactly like Trezor Suite (upstream parity)', () => {
+    // Suite's EthereumSignTransaction deep-pads the whole tx, calldata
+    // included. Excluding data from the padding is what once produced
+    // Buffer.from truncation and a fractional data_length here.
+    const out = normalizeEvmSignTxHexFields({
+      path: "m/44'/60'/0'/0/0",
+      value: '0x1',
+      data: '0xabc',
+      chainId: 1,
+    } as EvmSignTxTrezorParams);
+    expect(out.data).toBe('0abc'); // 2 whole bytes, data_length = 2
+  });
+
   it('rejects invalid hex in the data field', () => {
     expect(() =>
       normalizeEvmSignTxHexFields({

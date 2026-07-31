@@ -78,9 +78,6 @@ export function normalizeEvmSignTxHexFields(tx: EvmSignTxTrezorParams): EvmSignT
     assertHexString(name, value);
     return formatAnyHex(value) as string;
   };
-  if (tx.data !== undefined) {
-    assertHexString('data', tx.data);
-  }
   // accessList is nested, so the top-level field whitelist above cannot see
   // its hex values; without per-item validation an invalid character would
   // survive until protobuf's Buffer.from(value, 'hex') silently truncates it
@@ -93,6 +90,11 @@ export function normalizeEvmSignTxHexFields(tx: EvmSignTxTrezorParams): EvmSignT
   });
   return {
     ...tx,
+    // data included on purpose: Trezor Suite's EthereumSignTransaction runs its
+    // deepTransform strip/pad over the WHOLE tx, calldata too — special-casing
+    // data out of the padding here is what created truncation + fractional
+    // data_length on odd input. Byte-for-byte parity with upstream.
+    data: hex('data', tx.data),
     value: hex('value', tx.value),
     nonce: hex('nonce', tx.nonce),
     gasLimit: hex('gasLimit', tx.gasLimit),
