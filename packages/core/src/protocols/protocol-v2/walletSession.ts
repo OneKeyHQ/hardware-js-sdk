@@ -60,8 +60,23 @@ const negotiateEventlessWalletSession = async (device: Device) => {
   await device.ensureProtocolV2RuntimeContext();
 };
 
-const getDeviceSession = async (device: Device, request: DeviceSessionGet) =>
-  device.commands.typedCall('DeviceSessionGet', 'DeviceSession', request);
+const getDeviceSession = async (
+  device: Device,
+  request: DeviceSessionGet,
+  deriveCardano?: boolean
+) => {
+  const payload =
+    deriveCardano === undefined
+      ? request
+      : {
+          ...request,
+          seed_domains: [
+            DeviceSessionSeedDomain.SeedDomain_Standard,
+            ...(deriveCardano ? [DeviceSessionSeedDomain.SeedDomain_Cardano] : []),
+          ],
+        };
+  return device.commands.typedCall('DeviceSessionGet', 'DeviceSession', payload);
+};
 
 const buildDeviceSessionGetRequest = ({
   sessionId,
