@@ -105,6 +105,11 @@ Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类�
   `btc_test_address`；缺少任一字段都视为协议响应不完整，不得降级为标准钱包。
 - 首次返回的钱包标识与调用方预期不一致时必须进入对应的一次性恢复；恢复后仍不一致时清理当前
   钱包缓存并抛出安全错误，不允许循环重试。
+- Pro2 钱包身份不匹配时，Core 必须刷新 `DeviceStatus` 判断实际解锁来源。若
+  `unlocked_by_attach_to_pin=true`，说明 Attach PIN 打开了非目标隐藏钱包，Core 必须按 Pro V1
+  的 fail-closed 策略尝试 `LockDevice`、清理当前钱包 Session，并返回
+  `DeviceCheckUnlockTypeError`，不得继续重选或执行后续业务。非 Attach 的普通 Session 错配仍允许
+  一次统一钱包重选；即使旧固件不支持锁定，也必须清缓存并终止调用。
 - Pro2 在解锁流程刷新状态后，以刷新后的 `passphraseProtection` 判定标准/隐藏钱包，
   不得使用解锁前的状态快照路由钱包结果。
 - `session_id` 不是钱包身份，必须与同一次返回的 `deviceId + passphraseState` 绑定使用。

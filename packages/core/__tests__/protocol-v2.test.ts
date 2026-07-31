@@ -1554,6 +1554,72 @@ describe('Protocol V2 feature adapter', () => {
     expect(device.getInternalState()).toBeUndefined();
   });
 
+  test.each([false, true])(
+    'rejects a different Attach PIN wallet when Pro2 lock failure is %s',
+    async lockFails => {
+      const deviceId = 'attach-mismatch-device';
+      const device = Device.fromDescriptor({ ...descriptor, protocolType: 'V2' } as any);
+      (device as any).features = normalizeProtocolV2Features(
+        { ...descriptor, protocolType: 'V2' } as any,
+        {
+          status: {
+            device_id: deviceId,
+            unlocked: true,
+            passphrase_enabled: true,
+            attach_to_pin_enabled: true,
+            unlocked_by_attach_to_pin: false,
+          },
+        }
+      );
+      device.passphraseState = 'expected-state';
+
+      const typedCall = jest.fn((request: string) => {
+        if (request === 'ProtocolInfoRequest') return { message: { version: 2 } };
+        if (request === 'DeviceSessionAskPin') return { message: { message: 'PIN verified' } };
+        if (request === 'DeviceStatusGet') {
+          return {
+            message: {
+              device_id: deviceId,
+              unlocked: true,
+              passphrase_enabled: true,
+              attach_to_pin_enabled: true,
+              unlocked_by_attach_to_pin: true,
+            },
+          };
+        }
+        if (request === 'DeviceSessionGet') {
+          return {
+            message: {
+              btc_test_address: 'wrong-attach-state',
+              session_id: 'wrong-attach-session',
+            },
+          };
+        }
+        if (request === 'LockDevice') {
+          if (lockFails) throw new Error('Lock unsupported');
+          return { message: { message: 'Device locked' } };
+        }
+        throw new Error(`Unexpected request: ${request}`);
+      });
+      const promptPassphrase = jest.fn().mockResolvedValue({ attachPinOnDevice: true });
+      (device as any).commands = { typedCall, promptPassphrase };
+
+      await expect(
+        getProtocolV2WalletSession(device, { expectedPassphraseState: 'expected-state' })
+      ).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.DeviceCheckUnlockTypeError,
+      });
+
+      expect(promptPassphrase).toHaveBeenCalledTimes(1);
+      expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPin', 'Success', {
+        type: DeviceSessionPinType.AttachToPin,
+      });
+      expect(typedCall).toHaveBeenCalledWith('LockDevice', 'Success', {});
+      expect(typedCall.mock.calls.filter(call => call[0] === 'DeviceSessionGet')).toHaveLength(1);
+      expect(device.getInternalState()).toBeUndefined();
+    }
+  );
+
   test('recovers an expired Attach PIN wallet through the unified wallet selector', async () => {
     const device = Device.fromDescriptor({
       id: 'cache-device-attach-recovery',

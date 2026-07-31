@@ -65,6 +65,9 @@
   句柄被硬件判定失效时，Core 清除该项并按当前公共流程重新选择或解锁。
 - 调用方提供预期 `passphraseState` 时，首次结果不一致会触发一次钱包类型对应的恢复；最终仍不一致
   才清理当前钱包缓存并抛出钱包状态校验错误。
+- Protocol V2 钱包身份不一致时会刷新实时状态；如果实际上下文由 Attach PIN 解锁，则沿用 Pro V1
+  的 fail-closed 策略：尝试锁定设备、清理当前钱包 Session，并返回
+  `DeviceCheckUnlockTypeError`，不再进入钱包重选。非 Attach 的普通 Session 错配仍允许一次重选。
 - Protocol V1 调用携带 `deviceId` 时，Core 先用不含 `session_id/passphrase_state` 的
   `Initialize` 校验实时身份；一致后才允许复用钱包 Session，避免把旧身份的 Session 发给当前硬件。
 - Pro2 解锁后以刷新后的 `passphraseProtection` 判定钱包类型，不使用解锁前快照。

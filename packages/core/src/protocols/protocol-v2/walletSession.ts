@@ -176,6 +176,29 @@ export async function getProtocolV2WalletSession(
   let resumed = false;
   let mainWalletSelected = false;
 
+  const clearCurrentWalletSession = () => {
+    if (options?.onlyMainPin) {
+      device.clearStandardInternalState?.();
+    } else {
+      device.clearInternalState();
+    }
+  };
+
+  const rejectMismatchedAttachPinWallet = async () => {
+    const features = await refreshProtocolV2DeviceStatus(device);
+    if (features.unlockedAttachPin !== true) {
+      return;
+    }
+
+    try {
+      await device.lockDevice();
+    } catch {
+      // Reject the mismatched Attach PIN wallet even when older firmware cannot lock.
+    }
+    clearCurrentWalletSession();
+    throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckUnlockTypeError);
+  };
+
   const selectMainWallet = async (force = false) => {
     if (force || !mainWalletSelected) {
       await device.unlockDevice(DeviceSessionPinType.Main);
@@ -241,6 +264,7 @@ export async function getProtocolV2WalletSession(
   }
   if (expectedPassphraseState && expectedPassphraseState !== message.btc_test_address) {
     resumed = false;
+    await rejectMismatchedAttachPinWallet();
     if (options?.resumeOnly) {
       device.clearInternalState();
       throw ERRORS.TypedError(HardwareErrorCode.WalletSessionInvalid);
@@ -265,11 +289,8 @@ export async function getProtocolV2WalletSession(
       throw error;
     }
     if (expectedPassphraseState !== message.btc_test_address) {
-      if (options?.onlyMainPin) {
-        device.clearStandardInternalState?.();
-      } else {
-        device.clearInternalState();
-      }
+      await rejectMismatchedAttachPinWallet();
+      clearCurrentWalletSession();
       throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError);
     }
   }
