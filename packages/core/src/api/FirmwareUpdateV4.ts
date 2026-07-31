@@ -872,7 +872,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       if (binary.byteLength === 0) {
         throw new Error(`Protocol V2 RESC bundle is empty: ${bundle.name}`);
       }
-      if (downloadedFromRemote && (bundle.version || bundle.payloadHash || bundle.headerHash)) {
+      if (downloadedFromRemote) {
         const header = parseProtocolV2OkppHeader(toProtocolV2Bytes(binary));
         if (!header || header.type !== 'RESC') {
           throw new Error(`Invalid Protocol V2 RESC bundle header: ${bundle.name}`);
@@ -1275,10 +1275,17 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const matchingTargets = statusTargets.filter(target =>
       expectedTargetIds.has(normalizeProtocolV2TargetId(target.target_id) ?? -1)
     );
-    const completedTargets = matchingTargets.filter(target =>
-      isProtocolV2TargetStatusFinished(target.status)
-    );
-    if (completedTargets.length === expectedTargetIds.size && expectedTargetIds.size > 0) {
+    const completedTargetIds = new Set<number>();
+    matchingTargets.forEach(target => {
+      const targetId = normalizeProtocolV2TargetId(target.target_id);
+      if (targetId !== undefined && isProtocolV2TargetStatusFinished(target.status)) {
+        completedTargetIds.add(targetId);
+      }
+    });
+    const allExpectedTargetsCompleted =
+      expectedTargetIds.size > 0 &&
+      Array.from(expectedTargetIds).every(targetId => completedTargetIds.has(targetId));
+    if (allExpectedTargetsCompleted) {
       this.postProgressMessage(100, 'installingFirmware');
       return true;
     }
@@ -1288,7 +1295,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         isProtocolV2TargetStatusInProgress(target.status)
       );
       const completedProgress = Math.floor(
-        (completedTargets.length / expectedTargetIds.size) * 100
+        (completedTargetIds.size / expectedTargetIds.size) * 100
       );
       // The protocol exposes no per-target percentage, so report coarse progress by
       // completed targets and use 1% once work starts to keep the UI responsive.

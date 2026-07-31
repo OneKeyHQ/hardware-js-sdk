@@ -110,6 +110,26 @@ const parseRunOptions = (options?: RunOptions): RunOptions => {
 
 const Log = getLogger(LoggerNames.Device);
 
+const isProtocolV2DeviceStatusUnsupportedError = (error: unknown) => {
+  if (error instanceof HardwareError) {
+    if (error.errorCode === HardwareErrorCode.DeviceNotSupportMethod) {
+      return true;
+    }
+    if (error.params?.failureCode === 'Failure_UnexpectedMessage') {
+      return true;
+    }
+  }
+
+  const message =
+    error instanceof Error
+      ? error.message
+      : String((error as { message?: unknown } | null)?.message ?? error ?? '');
+  return (
+    /^Failure_UnexpectedMessage(?:,|\b)/i.test(message) ||
+    /\b(?:unsupported message|handler not registered|message handler not found)\b/i.test(message)
+  );
+};
+
 export interface DeviceEvents {
   [DEVICE.PIN]: [Device, PROTO.PinMatrixRequestType | undefined, (err: any, pin: string) => void];
   [DEVICE.PASSPHRASE_ON_DEVICE]: [Device, PassphraseRequestPayload?];
@@ -1078,10 +1098,18 @@ export class Device extends EventEmitter {
       );
     }
 
-    const deviceStatus = await requestProtocolV2DeviceStatus({
-      commands: this.commands,
-      timeoutMs,
-    });
+    let deviceStatus: DeviceStatus;
+    try {
+      deviceStatus = await requestProtocolV2DeviceStatus({
+        commands: this.commands,
+        timeoutMs,
+      });
+    } catch (error) {
+      if (runtimeMode === undefined && isProtocolV2DeviceStatusUnsupportedError(error)) {
+        return this.updateProtocolV2Features(deviceInfo, null, 'bootloader', protocolInfo);
+      }
+      throw error;
+    }
     return this.updateProtocolV2Features(deviceInfo, deviceStatus, 'normal', protocolInfo);
   }
 

@@ -70,8 +70,8 @@ import {
   getProtocolV2RuntimeMode,
   parseProtocolV2BuildFingerprint,
   requestProtocolV2DeviceInfo,
-  requestProtocolV2ProtocolInfo,
   requestProtocolV2DeviceStatus,
+  requestProtocolV2ProtocolInfo,
   supportsProtocolV2Message,
 } from '../src/protocols/protocol-v2/features';
 import {
@@ -2839,6 +2839,59 @@ describe('Protocol V2 feature adapter', () => {
     });
   });
 
+  test('maps an explicit unsupported DeviceStatusGet response to bootloader for an unknown fingerprint', async () => {
+    const device = Device.fromDescriptor({
+      path: 'usb-path',
+      protocolType: 'V2',
+    } as any);
+    const protocolInfo = {
+      ...protocolV2ApplicationInfo,
+      build_fingerprint: 'legacy-fingerprint',
+    };
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce({ type: 'ProtocolInfo', message: protocolInfo })
+      .mockRejectedValueOnce(new Error('Failure_UnexpectedMessage,Unknown message'));
+    (device as any).commands = { typedCall };
+
+    await device.probeProtocolV2RuntimeState({
+      hw: { Device_type: DeviceType.PRO2, serial_no: 'PR2SERIAL' },
+      fw: { bootloader: { version: '0.2.0' } },
+    });
+
+    expect(device.features).toMatchObject({
+      mode: 'bootloader',
+      bootloaderMode: true,
+      initialized: null,
+    });
+  });
+
+  test('propagates DeviceStatusGet link failures instead of mapping them to bootloader', async () => {
+    const device = Device.fromDescriptor({
+      path: 'usb-path',
+      protocolType: 'V2',
+    } as any);
+    const protocolInfo = {
+      ...protocolV2ApplicationInfo,
+      build_fingerprint: 'legacy-fingerprint',
+    };
+    const linkError = new Error('Protocol V2 CRC mismatch');
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce({ type: 'ProtocolInfo', message: protocolInfo })
+      .mockRejectedValueOnce(linkError);
+    (device as any).commands = { typedCall };
+
+    await expect(
+      device.probeProtocolV2RuntimeState({
+        hw: { Device_type: DeviceType.PRO2, serial_no: 'PR2SERIAL' },
+        fw: { application: { version: '1.2.3' } },
+      })
+    ).rejects.toBe(linkError);
+
+    expect(device.features).toBeUndefined();
+  });
+
   test('fails safely when runtime fingerprint and capabilities are both unknown', async () => {
     const device = Device.fromDescriptor({
       path: 'usb-path',
@@ -4339,6 +4392,19 @@ describe('Protocol V2 firmware update targets', () => {
       )
     ).toBe(true);
 
+    (method.postProgressMessage as jest.Mock).mockClear();
+    expect(
+      (method as any).assertProtocolV2TargetStatus(
+        [
+          { target_id: 4, status: 'FW_MGMT_UPDATER_TASK_STATUS_FINISHED' },
+          { target_id: 4, status: 'FW_MGMT_UPDATER_TASK_STATUS_FINISHED' },
+        ],
+        new Set([4, 10])
+      )
+    ).toBe(false);
+    expect(method.postProgressMessage).toHaveBeenCalledWith(50, 'installingFirmware');
+    expect(method.postProgressMessage).not.toHaveBeenCalledWith(100, 'installingFirmware');
+
     expect(
       (method as any).assertProtocolV2TargetStatus([{ target_id: 4, status: 1 }], expectedTargetIds)
     ).toBe(false);
@@ -4944,7 +5010,7 @@ describe('Protocol V2 firmware update targets', () => {
     (method as any).captureProtocolV2PhysicalIdentity = jest.fn().mockResolvedValue(undefined);
 
     const order: string[] = [];
-    const resourceBinary = new Uint8Array([1, 2, 3]).buffer;
+    const resourceBinary = buildOkppHeader().buffer as ArrayBuffer;
     const getSysResourceBinarySpy = jest
       .spyOn(firmwareBinaryApi, 'getSysResourceBinary')
       .mockImplementation(() => {
@@ -5010,6 +5076,31 @@ describe('Protocol V2 firmware update targets', () => {
 
     getSysResourceBinarySpy.mockRestore();
     getFirmwareLatestReleaseSpy.mockRestore();
+  });
+
+  test('rejects a remote RESC bundle without an OKPP header when metadata is absent', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const getSysResourceBinarySpy = jest
+      .spyOn(firmwareBinaryApi, 'getSysResourceBinary')
+      .mockResolvedValue({ binary: new Uint8Array([1, 2, 3]).buffer });
+
+    await expect(
+      (method as any).prefetchProtocolV2ResourceBundles([
+        {
+          name: 'images',
+          binary: new ArrayBuffer(0),
+          devicePath: 'vol0:/resource/images/images.okpkg',
+          url: 'https://example.com/images.okpkg',
+        },
+      ])
+    ).rejects.toThrow('Invalid Protocol V2 RESC bundle header: images');
+
+    getSysResourceBinarySpy.mockRestore();
   });
 
   test('rejects an empty remote RESC bundle before entering bootloader', async () => {
