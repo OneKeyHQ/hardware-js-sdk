@@ -30,6 +30,10 @@ export default class GetPassphraseState extends BaseMethod {
         : undefined
     );
 
+    if (!isProtocolV2 && this.device.getCurrentPassphraseProtection() !== true) {
+      return undefined;
+    }
+
     return passphraseState;
   }
 }
