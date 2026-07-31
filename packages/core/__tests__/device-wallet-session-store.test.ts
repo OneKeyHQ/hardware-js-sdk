@@ -1,6 +1,7 @@
-import { HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { EDeviceType, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import ClearSessionCache from '../src/api/ClearSessionCache';
+import GetPassphraseState from '../src/api/GetPassphraseState';
 import DeviceWipe from '../src/api/device/DeviceWipe';
 import {
   DeviceWalletSessionStore,
@@ -401,5 +402,71 @@ describe('Protocol V1 wallet identity initialization', () => {
       }),
       expect.any(Object)
     );
+  });
+
+  test('selects the standard V1 wallet after a non-destructive live identity read', async () => {
+    const device = Device.fromDescriptor({ id: 'connect-a', path: 'connect-a' } as never);
+    device.features = {
+      protocol: 'V1',
+      deviceId: 'device-a',
+      unlocked: true,
+      passphraseProtection: false,
+    } as never;
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce({ type: 'Features', message: { device_id: 'device-a' } })
+      .mockResolvedValueOnce({ type: 'Features', message: { device_id: 'device-a' } });
+    device.commands = { typedCall } as never;
+    jest.spyOn(TransportManager, 'reconfigure').mockResolvedValue(undefined);
+
+    await device.initialize({ deviceId: 'device-a' });
+
+    expect(typedCall).toHaveBeenCalledTimes(2);
+    expect(typedCall).toHaveBeenNthCalledWith(1, 'GetFeatures', 'Features', {});
+    expect(typedCall).toHaveBeenNthCalledWith(
+      2,
+      'Initialize',
+      'Features',
+      {
+        passphrase_state: undefined,
+        is_contains_attach: true,
+      },
+      expect.any(Object)
+    );
+  });
+});
+
+describe('Protocol V1 passphrase state classification', () => {
+  test('does not expose a standard-wallet address as passphrase state', async () => {
+    const typedCall = jest.fn().mockResolvedValue({
+      type: 'Address',
+      message: { address: 'standard-wallet-address' },
+    });
+    const method = new GetPassphraseState({
+      payload: {
+        method: 'getPassphraseState',
+        connectId: 'connect-a',
+      },
+    });
+    method.device = {
+      features: {},
+      commands: { typedCall },
+      isProtocolV2: () => false,
+      getCurrentDeviceType: () => EDeviceType.Classic,
+      getCurrentFirmwareVersionString: () => '1.0.0',
+      getCurrentPassphraseProtection: () => false,
+      getCurrentDeviceId: () => 'device-a',
+      getFeatures: jest.fn(),
+      getInternalState: () => undefined,
+      updateInternalState: jest.fn(),
+    } as never;
+
+    await expect(method.run()).resolves.toBeUndefined();
+    expect(typedCall).toHaveBeenCalledWith('GetAddress', 'Address', {
+      address_n: expect.any(Array),
+      coin_name: 'Testnet',
+      script_type: 'SPENDADDRESS',
+      show_display: false,
+    });
   });
 });

@@ -835,8 +835,8 @@ export class Device extends EventEmitter {
 
       const expectedDeviceId = options?.deviceId;
       if (expectedDeviceId) {
-        // Verify the physical device with a read-only Features request. An
-        // empty-context Initialize would invalidate a cached V1 hidden-wallet session.
+        // 先只读校验物理设备身份；钱包上下文仍由下方携带完整参数的
+        // Initialize 选择，避免标准钱包请求复用此前的隐藏钱包上下文。
         this.passphraseState = undefined;
         const { message } = await this.commands.typedCall('GetFeatures', 'Features', {});
         this._updateFeatures(message);
@@ -864,15 +864,7 @@ export class Device extends EventEmitter {
         payload.derive_cardano = true;
       }
 
-      const requiresWalletInitialize =
-        !expectedDeviceId ||
-        Boolean(internalState) ||
-        Boolean(options?.passphraseState) ||
-        options?.deriveCardano === true ||
-        options?.initSession === true;
-      if (requiresWalletInitialize) {
-        await callInitialize(payload, options?.initSession);
-      }
+      await callInitialize(payload, options?.initSession);
     } catch (error) {
       Log.error('Initialization failed:', error);
       throw error;
