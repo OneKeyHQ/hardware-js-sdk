@@ -28,6 +28,11 @@ Core / DeviceCommands
 
 V1 与 V2 的判断必须依据连接后的设备响应，不能只依赖 PID、设备名或 USB descriptor。
 
+Protocol V2 的 `ProtocolInfoRequest` 同时承担运行阶段查询和 eventless wallet session 策略协商。
+Core 固定发送 `eventless_wallet_session=true`，同一活动 Link 只在首次使用时协商；并发首次读取合并
+为一个请求，disconnect/reboot/wipe 后重新协商。固件对重复 `true` 请求保持幂等，避免查询能力时
+意外清除钱包 Session。
+
 ## 自动协议探测
 
 Transport 在 `acquire()` 完成物理连接后执行协议探测：

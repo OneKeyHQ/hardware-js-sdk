@@ -88,12 +88,17 @@ Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类�
   `{ on_device: false, passphrase }`，设备输入发送 `{ on_device: true }`。不得省略
   `on_device`，也不得同时发送设备输入标记和 Host Passphrase。Attach-to-PIN 继续使用
   `DeviceSessionAskPin(AttachToPin)`。
+- `DeviceSessionAskPin` 的 PIN 类型由目标钱包意图决定，而不是由调用前的当前上下文决定：
+  `Main` 用于选择标准钱包，也用于从 Attach-to-PIN 隐藏钱包上下文切回标准钱包；
+  `AttachToPin` 只用于选择该 Attach PIN 绑定的隐藏钱包。`unlockedAttachPin=true` 是当前上下文状态，
+  不表示后续请求应继续使用 `AttachToPin`。
 - Pro2 的钱包 Session 协调器不得捕获 `DeviceLocked` 后隐式解锁或重放协议请求。需要选择或恢复
   隐藏钱包的业务方法必须先刷新 `DeviceStatus`；状态明确为锁定时先执行
   `DeviceSessionAskPin(Main)`，否则直接调用钱包 Session 协议。调用期间返回的结构化
   `DeviceLocked` 必须原样向上抛出，避免重复有副作用的请求。Attach-to-PIN 分支仍只执行
   `DeviceSessionAskPin(AttachToPin)`。
-- 标准钱包首次打开时执行 `AskPin(Main) -> Get()`；缓存恢复结果不匹配时执行一次相同流程重建。
+- 空参数 `DeviceSessionGet()` 只读取固件当前钱包 Session，不是标准钱包选择命令。标准钱包首次打开时
+  执行 `AskPin(Main) -> Get()`；缓存恢复结果不匹配时执行一次相同流程重建。
   隐藏钱包缓存恢复结果不匹配时执行一次统一钱包选择，再执行 Ask 与 `Get()`。恢复不得删除同设备
   的其他钱包 Session。
 - V2 的 `DeviceSessionGet` 成功响应必须同时包含非空 `session_id` 和
@@ -171,6 +176,11 @@ Core 在设备完成 acquire/initialize、协议类型已由真实设备响应�
 
 Pro2 acquire 后的初始化、重连和固件升级重连统一读取 `ProtocolInfo`：
 
+- Core 的所有 `ProtocolInfoRequest` 固定携带 `eventless_wallet_session=true`。固件必须保证同一
+  source 上重复的 `true -> true` 请求幂等，不得清除活动 wallet session；空请求与显式 `false`
+  继续保留旧的重置语义。
+- `ProtocolInfo` 是活动 Link 的运行时上下文。Core 对首次并发读取做 single-flight，并在 transport
+  disconnect、reboot、wipe 后失效；普通 status/settings/wallet 调用复用缓存，不重复协商。
 - `build_fingerprint` 固定为
   `<binary>__<version>__<commit>__<PROD|DEV>__<DEBUG|RELEASE>`；Core 只使用 binary
   识别 application、bootloader、romloader，并分别映射为 normal、bootloader、romloader。
@@ -186,7 +196,8 @@ Pro2 acquire 后的初始化、重连和固件升级重连统一读取 `Protocol
   boardloader 是另一套状态，不得映射为 romloader，也不得进入 Pro2 FirmwareUpdateV4 直升流程。
 - fingerprint 无法解析但明确声明支持 `DeviceStatusGet` 时，可读取状态作为旧固件兼容路径；
   fingerprint 与能力均无法确认时必须安全失败，不能向未知阶段试探性发送状态命令。
-- `ProtocolInfo` 与 `DeviceInfo`、`DeviceStatus` 一同保存在 Core 内部 raw 状态；公共
+- `DeviceInfo` 负责硬件身份、镜像版本和校验信息，`ProtocolInfo` 负责运行阶段与消息能力，
+  `DeviceStatus` 负责实时钱包/锁定状态。三者一同保存在 Core 内部 raw 状态；公共
   `DeviceState` 和事件不暴露协议原始响应。
 
 主要实现：

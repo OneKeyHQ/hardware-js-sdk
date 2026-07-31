@@ -14,6 +14,8 @@ import { findMethod } from '../utils';
 import { DEVICE, IFRAME, createUiMessage } from '../../events';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { onDeviceButtonHandler } from '../../core';
+import { runMethodWithUnlockRetry } from '../../protocols/protocol-v2/unlockRetry';
+import { ensureProtocolV2WalletSessionUnlocked } from '../../protocols/protocol-v2/walletSession';
 import {
   completeRequestContext,
   createRequestContext,
@@ -384,7 +386,25 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
         }
       }
 
-      const response = await method.run();
+      // Protocol V2 hands a wallet session to exactly one blockchain request.
+      // The parent all-network call consumes its first handoff while fetching
+      // the root fingerprint, so each nested chain method must resume the
+      // requested hidden wallet before it sends its own device command.
+      if (this.device.isProtocolV2() && this.payload.passphraseState) {
+        await ensureProtocolV2WalletSessionUnlocked(this.device);
+        const passphraseStateSafety = await this.device.checkPassphraseStateSafety(
+          this.payload.passphraseState,
+          false,
+          this.payload.skipPassphraseCheck
+        );
+        if (!passphraseStateSafety) {
+          throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError);
+        }
+      }
+
+      const response = this.device.isProtocolV2()
+        ? await runMethodWithUnlockRetry(method, this.device)
+        : await method.run();
 
       if (!Array.isArray(response) || response.length === 0) {
         throw new Error('No response');

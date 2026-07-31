@@ -416,14 +416,16 @@ function stubDevice<T extends Record<string, any>>(device: T): T {
     }
     return d.features;
   };
+  d.ensureProtocolV2RuntimeContext ??= (timeoutMs?: number) =>
+    requestProtocolV2ProtocolInfo({
+      commands: d.getCommands?.() ?? d.commands,
+      timeoutMs,
+    });
   d.probeProtocolV2RuntimeState ??= async (
     deviceInfo: ProtocolV2DeviceInfo,
     timeoutMs?: number
   ) => {
-    const protocolInfo = await requestProtocolV2ProtocolInfo({
-      commands: d.getCommands(),
-      timeoutMs,
-    });
+    const protocolInfo = await d.ensureProtocolV2RuntimeContext(timeoutMs);
     const runtimeMode = getProtocolV2RuntimeMode(protocolInfo);
     if (runtimeMode === 'bootloader' || runtimeMode === 'romloader') {
       return d.updateProtocolV2Features(deviceInfo, null, runtimeMode, protocolInfo);
@@ -804,7 +806,7 @@ describe('Protocol V2 feature adapter', () => {
     ).resolves.toEqual({
       passphraseState: 'state-1',
       newSession: 'session-1',
-      unlockedAttachPin: undefined,
+      unlockedAttachPin: false,
       resumed: false,
     });
     expect(typedCall).toHaveBeenCalledWith('ProtocolInfoRequest', 'ProtocolInfo', {
@@ -2000,7 +2002,6 @@ describe('Protocol V2 feature adapter', () => {
       true
     );
     expect(typedCall.mock.calls).toEqual([
-      ['ProtocolInfoRequest', 'ProtocolInfo', { eventless_wallet_session: true }],
       ['DeviceSessionGet', 'DeviceSession', { session_id: 'session-pro2-app' }],
     ]);
   });
@@ -2309,6 +2310,9 @@ describe('Protocol V2 feature adapter', () => {
     expect(typedCall).toHaveBeenCalledTimes(4);
     expect(typedCall).toHaveBeenCalledWith('ProtocolInfoRequest', 'ProtocolInfo', {
       eventless_wallet_session: true,
+    });
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPin', 'Success', {
+      type: DeviceSessionPinType.Main,
     });
   });
 
@@ -2680,7 +2684,9 @@ describe('Protocol V2 feature adapter', () => {
         timeoutMs: PROTOCOL_V2_DEVICE_INFO_TIMEOUT_MS,
       }
     );
-    expect(typedCall).toHaveBeenNthCalledWith(2, 'ProtocolInfoRequest', 'ProtocolInfo', {});
+    expect(typedCall).toHaveBeenNthCalledWith(2, 'ProtocolInfoRequest', 'ProtocolInfo', {
+      eventless_wallet_session: true,
+    });
     expect(typedCall).toHaveBeenNthCalledWith(3, 'DeviceStatusGet', 'DeviceStatus', {});
   });
 
@@ -2718,7 +2724,9 @@ describe('Protocol V2 feature adapter', () => {
       }),
       expect.anything()
     );
-    expect(typedCall).toHaveBeenNthCalledWith(2, 'ProtocolInfoRequest', 'ProtocolInfo', {});
+    expect(typedCall).toHaveBeenNthCalledWith(2, 'ProtocolInfoRequest', 'ProtocolInfo', {
+      eventless_wallet_session: true,
+    });
     expect(typedCall).not.toHaveBeenCalledWith('DeviceStatusGet', 'DeviceStatus', {});
     expect(device.features).toMatchObject({
       deviceId: null,
@@ -2985,10 +2993,6 @@ describe('Protocol V2 feature adapter', () => {
         },
       })
       .mockResolvedValueOnce({
-        type: 'ProtocolInfo',
-        message: protocolV2ApplicationInfo,
-      })
-      .mockResolvedValueOnce({
         type: 'DeviceStatus',
         message: { init_states: true, unlocked: true },
       });
@@ -3009,7 +3013,7 @@ describe('Protocol V2 feature adapter', () => {
       firmwareVersion: '1.2.4',
       passphraseProtection: null,
     });
-    expect(typedCall).toHaveBeenCalledTimes(6);
+    expect(typedCall).toHaveBeenCalledTimes(5);
     expect(typedCall).toHaveBeenNthCalledWith(
       4,
       'DeviceInfoGet',
@@ -6185,6 +6189,10 @@ describe('Protocol V2 protected method execution', () => {
       features: { unlocked: true, passphraseProtection: true },
       passphraseState: 'hidden-state',
       commands: { typedCall },
+      ensureProtocolV2RuntimeContext: () =>
+        typedCall('ProtocolInfoRequest', 'ProtocolInfo', {
+          eventless_wallet_session: true,
+        }).then(response => response.message),
       isProtocolV2: () => true,
       unlockDevice: jest.fn(() => {
         calls.push('unlock');
@@ -6233,6 +6241,10 @@ describe('Protocol V2 protected method execution', () => {
       features: { unlocked: true, passphraseProtection: true },
       passphraseState: 'hidden-state',
       commands: { typedCall },
+      ensureProtocolV2RuntimeContext: () =>
+        typedCall('ProtocolInfoRequest', 'ProtocolInfo', {
+          eventless_wallet_session: true,
+        }).then(response => response.message),
       isProtocolV2: () => true,
       unlockDevice: jest.fn().mockResolvedValue(undefined),
       getCurrentPassphraseProtection: () => true,
@@ -6287,6 +6299,10 @@ describe('Protocol V2 protected method execution', () => {
       features,
       passphraseState: 'hidden-state',
       commands: { typedCall },
+      ensureProtocolV2RuntimeContext: () =>
+        typedCall('ProtocolInfoRequest', 'ProtocolInfo', {
+          eventless_wallet_session: true,
+        }).then(response => response.message),
       isProtocolV2: () => true,
       unlockDevice: jest.fn(() => {
         calls.push('unlock-main');
@@ -6718,7 +6734,9 @@ describe('Protocol V2 current low-level methods', () => {
 
     await method.run();
 
-    expect(typedCall).toHaveBeenCalledWith('ProtocolInfoRequest', 'ProtocolInfo', {});
+    expect(typedCall).toHaveBeenCalledWith('ProtocolInfoRequest', 'ProtocolInfo', {
+      eventless_wallet_session: true,
+    });
   });
 
   test('sends DeviceFactoryInfoSet and DeviceFactoryInfoGet', async () => {

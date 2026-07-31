@@ -4,7 +4,7 @@
 > 适用读者：Core、App 钱包接入与安全审查人员
 > 内容状态：兼容迁移中
 > 代码范围：`packages/core`、App 钱包 Session 接入
-> 最后代码核验：2026-07-30
+> 最后代码核验：2026-07-31
 > 前置阅读：[SDK 架构概览](../architecture/overview.md)
 
 ## 1. 范围与核心结论
@@ -50,9 +50,14 @@
   缺少本地 Session 缓存时仍返回 `WalletSessionInvalid`。
 - Protocol V2 的 `DeviceSessionGet` 成功响应必须同时包含非空 `session_id` 和
   `btc_test_address`；缺少任一字段都按不完整协议响应处理，不得识别为标准钱包。
-- Protocol V2 标准钱包首次或缓存状态错配时调用 `DeviceSessionAskPin(Main)`，成功后调用
-  `DeviceSessionGet()`；缓存有效时调用 `DeviceSessionGet(session_id)` 恢复。Core 使用返回的真实
+- Protocol V2 空参数 `DeviceSessionGet()` 只读取固件当前钱包 Session，不保证当前钱包是标准钱包。
+  标准钱包首次打开时调用 `DeviceSessionAskPin(Main)`，成功后调用 `DeviceSessionGet()`；缓存有效时
+  先调用 `DeviceSessionGet(session_id)` 恢复，恢复结果不匹配时再执行一次
+  `AskPin(Main) -> Get()` 重建。Core 使用返回的真实
   `btc_test_address` 建立标准钱包内部索引，不引入 SDK 自造的 `STANDARD_WALLET_KEY`。
+- `DeviceSessionAskPin` 的类型按目标钱包选择：目标是标准钱包时使用 `Main`，包括当前处于
+  Attach PIN 上下文而需要切回标准钱包的情况；目标是 Attach PIN 绑定的隐藏钱包时才使用
+  `AttachToPin`。`unlockedAttachPin=true` 只描述当前上下文，不决定下一次 Ask 的 PIN 类型。
 - 旧参数形式的 `initSession=true` 只使当前设备上明确指定的旧钱包 Session 失效；
   钱包标识不匹配、设备切换和显式 `clearSessionCache()` 也会按各自范围使缓存失效。
 - Pro2 Session 的容量与淘汰完全由硬件管理。Core Store 只保存
@@ -137,12 +142,17 @@ Pro2 不走传统 `Initialize/GetFeatures`。`Device.initialize()` 中如果 `is
 1. 写入 `this.passphraseState = options?.passphraseState`。
 2. 如果已有 `DeviceState` 且无需强制新 session，则复用缓存；普通业务调用不默认读取运行状态。
 3. 否则调用 `_initializeProtocolV2()`。
-4. `_initializeProtocolV2()` 通过 `requestProtocolV2DeviceInfo()` 发送 `DeviceInfoGet`。
-5. `DeviceStateMapper` 将响应合并进统一 `DeviceState`；V2 不对外构造第二套 `Features`。
+4. `_initializeProtocolV2()` 先发送 `DeviceInfoGet`，再发送固定携带
+   `eventless_wallet_session=true` 的 `ProtocolInfoRequest`。
+5. normal 模式且能力清单包含 `DeviceStatusGet` 时读取实时状态；loader 模式不读取状态。
+6. `DeviceStateMapper` 将响应合并进统一 `DeviceState`；V2 不对外构造第二套 `Features`。
 
 为什么 Pro2 不复用 V1 Initialize：Protocol V2 当前是系统协议能力，设备信息来自 `Ping + DeviceInfoGet`，并且文档中已明确 V2 不支持传统 `GetFeatures`。SDK 统一输出 `DeviceState`，避免业务层直接理解 V2 原始 schema。
 
-需要注意：当前实现只按 `firmware-pro2` 的真实响应映射。`device_id` 只来自显式 `DeviceStatusGet`，不会用 `hw.serial_no` 或 transport path 兜底；默认初始化不会发送 `DeviceStatusGet`。
+需要注意：当前实现只按 `firmware-pro2` 的真实响应映射。`device_id` 只来自显式
+`DeviceStatusGet`，不会用 `hw.serial_no` 或 transport path 兜底。初始化只在 normal 模式按能力读取
+一次状态；后续普通业务调用复用 `DeviceInfo/ProtocolInfo`，明确刷新 runtime/status 时才读取
+`DeviceStatusGet`。
 
 ## 4. deviceId 与设备身份逻辑
 

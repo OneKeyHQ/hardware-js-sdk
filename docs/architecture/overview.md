@@ -69,9 +69,10 @@ WebUSB、Electron BLE、React Native BLE 和 lowlevel BLE 只负责各自的物�
 | 协议 | 数据来源                       | 标准输出      | 兼容输出                      |
 | ---- | ------------------------------ | ------------- | ----------------------------- |
 | V1   | `Initialize -> Features`       | `DeviceState` | `getFeatures()` 投影（仅 V1） |
-| V2   | `Ping` probe + `DeviceInfoGet` | `DeviceState` | 不支持 `getFeatures()`        |
+| V2   | `Ping` probe + `DeviceInfoGet/ProtocolInfo/DeviceStatus` | `DeviceState` | 不支持 `getFeatures()`        |
 
-`getDeviceState()` 和 `DEVICE.STATE` 共享同一份完整快照。normal 模式下每次公共读取都会刷新 `DeviceStatus`；bootloader/romloader 模式自动跳过该命令。
+`getDeviceState()` 和 `DEVICE.STATE` 共享同一份完整快照。normal 模式下只有明确请求 runtime/status
+刷新时才读取 `DeviceStatus`；bootloader/romloader 模式自动跳过该命令。
 
 公共刷新范围按业务语义定义，调用方不需要理解底层协议命令：
 
@@ -138,7 +139,9 @@ V1 设备仍可在 `Initialize` 后通过 `TransportManager.reconfigure(features
 唯一协议结果。后续 `Device.initialize()` 基于该字段选择初始化路径：
 
 - V1：发送 `Initialize`，使用真实 `Features`
-- V2：Transport acquire 已用 `Ping` probe 确认链路；初始化再用不含 status target 的 `DeviceInfoGet` 建立 `DeviceState`
+- V2：Transport acquire 已用 `Ping` probe 确认链路；初始化依次读取不含 status target 的
+  `DeviceInfoGet`、固定启用 eventless wallet session 的 `ProtocolInfoRequest`，并仅在 normal
+  模式且能力已声明时读取 `DeviceStatusGet`
 
 Protocol V2 没有传统 `GetFeatures`。公共调用方统一读取 `getDeviceState()`；原始 `DeviceInfoGet`、`DeviceStatusGet` 和 `DeviceSettingsGet` 只保留在 SDK 内部。设备身份以 `serialNo/deviceId` 的语义区分为准。
 

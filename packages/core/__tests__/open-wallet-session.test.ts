@@ -5,6 +5,7 @@ import GetPassphraseState from '../src/api/GetPassphraseState';
 import OpenWalletSession from '../src/api/OpenWalletSession';
 import { Device } from '../src/device/Device';
 import { deviceWalletSessionStore } from '../src/device/DeviceWalletSessionStore';
+import { ensureProtocolV2WalletSessionUnlocked } from '../src/protocols/protocol-v2/walletSession';
 
 jest.mock('../src/data/config', () => ({
   getSDKVersion: jest.fn(() => '1.0.0'),
@@ -43,6 +44,11 @@ const createDevice = ({
       }),
       promptPassphrase,
     },
+    ensureProtocolV2RuntimeContext: jest.fn(() =>
+      device.commands.typedCall('ProtocolInfoRequest', 'ProtocolInfo', {
+        eventless_wallet_session: true,
+      })
+    ),
     getDeviceState: jest.fn().mockResolvedValue({
       identity: { deviceId: 'device-1' },
       status: { passphraseProtection },
@@ -80,6 +86,46 @@ const createDevice = ({
 describe('openWalletSession', () => {
   beforeEach(() => {
     deviceWalletSessionStore.clear();
+  });
+
+  test('unlocks a locked Protocol V2 device before restoring a wallet session', async () => {
+    const device = {
+      commands: {
+        typedCall: jest.fn().mockResolvedValue({ message: { unlocked: false } }),
+      },
+      isBootloader: jest.fn().mockReturnValue(false),
+      isProtocolV2: jest.fn().mockReturnValue(true),
+      isRomloader: jest.fn().mockReturnValue(false),
+      state: { status: { unlocked: false } },
+      unlockDevice: jest.fn().mockResolvedValue(undefined),
+      updateProtocolV2Status: jest.fn(function updateProtocolV2Status(
+        this: { state: { status: { unlocked: boolean } } },
+        status: { unlocked?: boolean }
+      ) {
+        this.state.status.unlocked = status.unlocked ?? this.state.status.unlocked;
+      }),
+    };
+
+    await expect(ensureProtocolV2WalletSessionUnlocked(device as any)).resolves.toBe(true);
+    expect(device.commands.typedCall).toHaveBeenCalledWith('DeviceStatusGet', 'DeviceStatus', {});
+    expect(device.unlockDevice).toHaveBeenCalledWith(DeviceSessionPinType.Main);
+  });
+
+  test('does not request PIN when wallet-session recovery finds the device unlocked', async () => {
+    const device = {
+      commands: {
+        typedCall: jest.fn().mockResolvedValue({ message: { unlocked: true } }),
+      },
+      isBootloader: jest.fn().mockReturnValue(false),
+      isProtocolV2: jest.fn().mockReturnValue(true),
+      isRomloader: jest.fn().mockReturnValue(false),
+      state: { status: { unlocked: true } },
+      unlockDevice: jest.fn(),
+      updateProtocolV2Status: jest.fn(),
+    };
+
+    await expect(ensureProtocolV2WalletSessionUnlocked(device as any)).resolves.toBe(false);
+    expect(device.unlockDevice).not.toHaveBeenCalled();
   });
 
   test.each([{ useEmptyPassphrase: true }, { initSession: true }, {}])(
@@ -721,6 +767,14 @@ describe('openWalletSession', () => {
     method.init();
     const device = createDevice({ typedCall });
     device.features.unlockedAttachPin = true;
+    device.getDeviceState = jest.fn().mockResolvedValue({
+      identity: { deviceId: 'device-1' },
+      status: {
+        unlocked: true,
+        unlockedAttachPin: true,
+        passphraseProtection: true,
+      },
+    });
     device.unlockDevice = jest.fn().mockImplementation(() => {
       device.features.unlockedAttachPin = false;
       return Promise.resolve(device.features);

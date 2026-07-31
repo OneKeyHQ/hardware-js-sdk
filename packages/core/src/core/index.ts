@@ -56,6 +56,7 @@ import RequestQueue from './RequestQueue';
 import { registerHardwareUiEventListeners } from './deviceEventRegistration';
 import { getSynchronize } from '../utils/getSynchronize';
 import { runMethodWithUnlockRetry } from '../protocols/protocol-v2/unlockRetry';
+import { ensureProtocolV2WalletSessionUnlocked } from '../protocols/protocol-v2/walletSession';
 import {
   ProtocolV2UiInteractionCoordinator,
   isProtocolV2UiEnabled,
@@ -586,6 +587,9 @@ const onCallDevice = async (
             )
           );
         }
+
+        // Wallet-session recovery is part of the protected business call, not onboarding.
+        await ensureProtocolV2WalletSessionUnlocked(device);
 
         // Check Device passphrase State
         const passphraseStateSafety = await device.checkPassphraseStateSafety(

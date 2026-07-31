@@ -168,8 +168,15 @@ export async function requestProtocolV2ProtocolInfo({
 }): Promise<ProtocolInfo> {
   const response =
     timeoutMs === undefined
-      ? await commands.typedCall('ProtocolInfoRequest', 'ProtocolInfo', {})
-      : await commands.typedCall('ProtocolInfoRequest', 'ProtocolInfo', {}, { timeoutMs });
+      ? await commands.typedCall('ProtocolInfoRequest', 'ProtocolInfo', {
+          eventless_wallet_session: true,
+        })
+      : await commands.typedCall(
+          'ProtocolInfoRequest',
+          'ProtocolInfo',
+          { eventless_wallet_session: true },
+          { timeoutMs }
+        );
   return response.message;
 }
 

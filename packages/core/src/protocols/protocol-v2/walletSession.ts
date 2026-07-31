@@ -38,10 +38,22 @@ export async function refreshProtocolV2DeviceStatus(device: Device) {
   return device.updateProtocolV2Status(status);
 }
 
+export async function ensureProtocolV2WalletSessionUnlocked(device: Device) {
+  if (!device.isProtocolV2() || device.isBootloader?.() || device.isRomloader?.()) {
+    return false;
+  }
+
+  await refreshProtocolV2DeviceStatus(device);
+  if (device.state?.status.unlocked !== false) {
+    return false;
+  }
+
+  await device.unlockDevice(DeviceSessionPinType.Main);
+  return true;
+}
+
 const negotiateEventlessWalletSession = async (device: Device) => {
-  await device.commands.typedCall('ProtocolInfoRequest', 'ProtocolInfo', {
-    eventless_wallet_session: true,
-  });
+  await device.ensureProtocolV2RuntimeContext();
 };
 
 const getDeviceSession = async (device: Device, request: DeviceSessionGet) =>
@@ -128,6 +140,7 @@ export async function getProtocolV2WalletSession(
     initSession?: boolean;
     expectedPassphraseState?: string;
     onlyMainPin?: boolean;
+    selectMainWalletBeforeRestore?: boolean;
     resumeOnly?: boolean;
   }
 ) {
@@ -161,13 +174,21 @@ export async function getProtocolV2WalletSession(
       : undefined;
   let response;
   let resumed = false;
+  let mainWalletSelected = false;
+
+  const selectMainWallet = async (force = false) => {
+    if (force || !mainWalletSelected) {
+      await device.unlockDevice(DeviceSessionPinType.Main);
+      mainWalletSelected = true;
+    }
+  };
 
   if (options?.onlyMainPin) {
     expectedPassphraseState = cachedStandardSession?.passphraseState;
     if (cachedStandardSession) {
       try {
-        if (device.features?.unlockedAttachPin === true) {
-          await device.unlockDevice(DeviceSessionPinType.Main);
+        if (options?.selectMainWalletBeforeRestore) {
+          await selectMainWallet();
         }
         response = await getDeviceSession(device, {
           session_id: cachedStandardSession.sessionId,
@@ -183,7 +204,7 @@ export async function getProtocolV2WalletSession(
     }
 
     if (!response) {
-      await device.unlockDevice(DeviceSessionPinType.Main);
+      await selectMainWallet();
       response = await getDeviceSession(device, {});
     }
   } else if (cachedSessionId && expectedPassphraseState) {
@@ -226,7 +247,7 @@ export async function getProtocolV2WalletSession(
     }
     if (options?.onlyMainPin) {
       device.clearStandardInternalState?.();
-      await device.unlockDevice(DeviceSessionPinType.Main);
+      await selectMainWallet(true);
       response = await getDeviceSession(device, {});
     } else {
       device.clearInternalState();
@@ -269,7 +290,7 @@ export async function getProtocolV2WalletSession(
   return {
     passphraseState: message.btc_test_address,
     newSession: message.session_id,
-    unlockedAttachPin: device.features?.unlockedAttachPin ?? undefined,
+    unlockedAttachPin: mainWalletSelected ? false : undefined,
     resumed,
   };
 }

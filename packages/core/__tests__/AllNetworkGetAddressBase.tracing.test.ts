@@ -18,6 +18,79 @@ class TestAllNetworkMethod extends AllNetworkGetAddressBase {
 }
 
 describe('AllNetworkGetAddressBase tracing', () => {
+  test('resumes a Protocol V2 hidden wallet before running a nested chain method', async () => {
+    const calls: string[] = [];
+    const checkPassphraseStateSafety = jest.fn().mockImplementation(() => {
+      calls.push('resume-hidden-session');
+      return Promise.resolve(true);
+    });
+    const innerMethod = {
+      checkSafetyLevelOnTestNet: jest.fn().mockResolvedValue(false),
+      connectId: 'connect-id',
+      deviceId: 'device-id',
+      getVersionRange: jest.fn().mockReturnValue({}),
+      assertProtocolSupported: jest.fn(),
+      init: jest.fn(),
+      name: 'evmGetAddress',
+      responseID: 43,
+      run: jest.fn().mockImplementation(() => {
+        calls.push('run-chain-method');
+        return Promise.resolve([{ address: '0xhidden' }]);
+      }),
+      setDevice: jest.fn(),
+      strictCheckDeviceSupport: false,
+    };
+    (findMethod as jest.Mock).mockReturnValue(innerMethod);
+    const method = new TestAllNetworkMethod({
+      id: 1,
+      payload: {
+        method: 'allNetworkGetAddress',
+        connectId: 'connect-id',
+        deviceId: 'device-id',
+        passphraseState: 'hidden-state',
+        bundle: [],
+      },
+    });
+    method.device = {
+      checkPassphraseStateSafety,
+      commands: {
+        typedCall: jest.fn().mockResolvedValue({ message: { unlocked: true } }),
+      },
+      getCurrentFirmwareType: jest.fn(),
+      getProtocol: jest.fn().mockReturnValue('V2'),
+      getCurrentFirmwareVersionString: jest.fn().mockReturnValue('1.0.0'),
+      getCurrentMethodVersionRange: jest
+        .fn()
+        .mockImplementation((getRange: (type: string) => unknown) => getRange('pro2')),
+      instanceId: 'device-instance',
+      isProtocolV2: jest.fn().mockReturnValue(true),
+      isBootloader: jest.fn().mockReturnValue(false),
+      isRomloader: jest.fn().mockReturnValue(false),
+      off: jest.fn(),
+      on: jest.fn(),
+      state: { status: { unlocked: true } },
+      updateProtocolV2Status: jest.fn(),
+    } as any;
+
+    await method.callMethod(
+      'evmGetAddress',
+      {
+        bundle: [
+          {
+            _originRequestParams: {
+              network: 'evm',
+              path: "m/44'/60'/0'/0/0",
+            },
+          },
+        ],
+      },
+      0
+    );
+
+    expect(checkPassphraseStateSafety).toHaveBeenCalledWith('hidden-state', false, undefined);
+    expect(calls).toEqual(['resume-hidden-session', 'run-chain-method']);
+  });
+
   test('releases the nested request context when an unhandled error escapes', async () => {
     const deviceInstanceId = 'device-instance';
     const innerMethod = {
@@ -51,6 +124,7 @@ describe('AllNetworkGetAddressBase tracing', () => {
       getCurrentMethodVersionRange: jest
         .fn()
         .mockImplementation((getRange: (type: string) => unknown) => getRange('classic')),
+      isProtocolV2: jest.fn().mockReturnValue(false),
       off: jest.fn(),
       on: jest.fn(),
     } as any;

@@ -114,7 +114,11 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
     if (this.params.mode === OpenWalletSessionMode.Standard) {
       this.device.passphraseState = undefined;
       const session = isProtocolV2
-        ? await getProtocolV2WalletSession(this.device, { onlyMainPin: true })
+        ? await getProtocolV2WalletSession(this.device, {
+            onlyMainPin: true,
+            selectMainWalletBeforeRestore:
+              state.status.unlocked === false || state.status.unlockedAttachPin === true,
+          })
         : await getPassphraseStateWithRefreshDeviceInfo(this.device, {
             onlyMainPin: true,
             initSession: this.payload.initSession,
