@@ -649,6 +649,46 @@ export default class ReactNativeBleTransport {
     });
   }
 
+  private async installTransportForAcquire(
+    uuid: string,
+    device: Device,
+    characteristics?: ResolvedBleCharacteristics
+  ) {
+    const { writeCharacteristic, notifyCharacteristic } =
+      characteristics ?? (await this.resolveCharacteristics(device));
+    const transport = new BleTransport(device, writeCharacteristic, notifyCharacteristic);
+    if (Platform.OS === 'android') {
+      transport.mtuSize = typeof device.mtu === 'number' ? device.mtu : transport.mtuSize;
+    }
+    const monitorToken = this.nextMonitorToken;
+    this.nextMonitorToken += 1;
+    const notifyTransactionId = `${uuid}:notify:${monitorToken}`;
+    transport.monitorToken = monitorToken;
+    transport.notifyTransactionId = notifyTransactionId;
+    this.monitorTokens.set(uuid, monitorToken);
+    transport.notifySubscription = this._monitorCharacteristic(
+      transport.notifyCharacteristic,
+      uuid,
+      monitorToken,
+      notifyTransactionId
+    );
+    transportCache[uuid] = transport;
+    this.protocolV2Assemblers.set(
+      uuid,
+      new ProtocolV2FrameAssembler(PROTOCOL_V2_BLE_FRAME_MAX_BYTES)
+    );
+
+    if (Platform.OS === 'ios') {
+      await new Promise<void>(resolve => {
+        setTimeout(resolve, IOS_NOTIFY_READY_DELAY_MS);
+      });
+    } else if (Platform.OS === 'android') {
+      await delay(ANDROID_NOTIFY_READY_DELAY_MS);
+    }
+
+    return transport;
+  }
+
   async acquire(input: BleAcquireInput) {
     const { uuid, forceCleanRunPromise, expectedProtocol } = input;
 
@@ -772,13 +812,16 @@ export default class ReactNativeBleTransport {
     }
 
     device = await requestAndroidMtu(device);
-    const { writeCharacteristic, notifyCharacteristic } = await this.resolveCharacteristics(device);
+    const acquiredDevice = device;
+    const { writeCharacteristic, notifyCharacteristic } = await this.resolveCharacteristics(
+      acquiredDevice
+    );
 
     const protocolHint = expectedProtocol
       ? undefined
       : input.protocolHint ??
         this.deviceProtocolHints.get(uuid) ??
-        inferProtocolHintFromDeviceName(getDeviceDisplayName(device));
+        inferProtocolHintFromDeviceName(getDeviceDisplayName(acquiredDevice));
 
     // release transport before new transport instance
     await this.release(uuid, true);
@@ -786,42 +829,30 @@ export default class ReactNativeBleTransport {
       this.deviceProtocolHints.set(uuid, protocolHint);
     }
 
-    const transport = new BleTransport(device, writeCharacteristic, notifyCharacteristic);
-    if (Platform.OS === 'android') {
-      transport.mtuSize = typeof device.mtu === 'number' ? device.mtu : transport.mtuSize;
+    await this.installTransportForAcquire(uuid, acquiredDevice, {
+      writeCharacteristic,
+      notifyCharacteristic,
+    });
+
+    try {
+      const protocolType = await this.detectProtocol(
+        uuid,
+        expectedProtocol,
+        protocolHint,
+        async () => {
+          await this.installTransportForAcquire(uuid, acquiredDevice);
+        }
+      );
+      const currentTransport = transportCache[uuid];
+      if (!currentTransport) {
+        throw ERRORS.TypedError(HardwareErrorCode.TransportNotFound);
+      }
+      this.attachDisconnectSubscription(currentTransport, acquiredDevice, uuid);
+      return { uuid, protocolType };
+    } catch (error) {
+      await this.release(uuid, true);
+      throw error;
     }
-    const monitorToken = this.nextMonitorToken;
-    this.nextMonitorToken += 1;
-    const notifyTransactionId = `${uuid}:notify:${monitorToken}`;
-    transport.monitorToken = monitorToken;
-    transport.notifyTransactionId = notifyTransactionId;
-    this.monitorTokens.set(uuid, monitorToken);
-    transport.notifySubscription = this._monitorCharacteristic(
-      transport.notifyCharacteristic,
-      uuid,
-      monitorToken,
-      notifyTransactionId
-    );
-    transportCache[uuid] = transport;
-
-    this.protocolV2Assemblers.set(
-      uuid,
-      new ProtocolV2FrameAssembler(PROTOCOL_V2_BLE_FRAME_MAX_BYTES)
-    );
-
-    if (Platform.OS === 'ios') {
-      await new Promise<void>(resolve => {
-        setTimeout(resolve, IOS_NOTIFY_READY_DELAY_MS);
-      });
-    } else if (Platform.OS === 'android') {
-      await delay(ANDROID_NOTIFY_READY_DELAY_MS);
-    }
-
-    const protocolType = await this.detectProtocol(uuid, expectedProtocol, protocolHint);
-
-    this.attachDisconnectSubscription(transport, device, uuid);
-
-    return { uuid, protocolType };
   }
 
   _monitorCharacteristic(
@@ -1388,7 +1419,8 @@ export default class ReactNativeBleTransport {
   private async detectProtocol(
     uuid: string,
     expectedProtocol?: ProtocolType,
-    protocolHint?: ProtocolType
+    protocolHint?: ProtocolType,
+    rebuildTransport?: () => Promise<void>
   ): Promise<ProtocolType> {
     if (expectedProtocol === 'V1') {
       if (await this.probeProtocolV1(uuid)) {
@@ -1427,11 +1459,10 @@ export default class ReactNativeBleTransport {
         // Reset subscriptions and buffers after a failed probe before trying another protocol.
         await this.resetProbeStateAfterProtocolProbe(uuid, probeOrder[i - 1]);
         if (!transportCache[uuid]) {
-          const reacquired = await this.acquire({
-            uuid,
-            expectedProtocol: protocol,
-          });
-          return reacquired.protocolType;
+          if (!rebuildTransport) {
+            throw ERRORS.TypedError(HardwareErrorCode.TransportNotFound);
+          }
+          await rebuildTransport();
         }
       }
       const detected =

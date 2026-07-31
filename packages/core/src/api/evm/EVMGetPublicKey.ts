@@ -2,9 +2,9 @@ import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import TransportManager from '../../data-manager/TransportManager';
 import getPublicKey from './latest/getPublicKey';
 import getPublicKeyLegacyV1 from './legacyV1/getPublicKey';
+import { shouldUseLegacyV1EvmMessages } from './protocol';
 import { batchGetPublickeys, supportBatchPublicKeyByDevice } from '../helpers/batchGetPublickeys';
 
 import type { EVMGetPublicKeyParams, EVMPublicKey } from '../../types';
@@ -60,7 +60,7 @@ export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKeyOneK
   }
 
   getEvmPublicKey(param: EthereumGetPublicKey) {
-    if (TransportManager.getProtocolV1MessageSchema() === 'v1LegacySchema') {
+    if (shouldUseLegacyV1EvmMessages(this.device)) {
       return getPublicKeyLegacyV1({
         typedCall: this.device.commands.typedCall.bind(this.device.commands),
         param,
