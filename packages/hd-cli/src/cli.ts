@@ -808,7 +808,17 @@ sessionCmd
         });
         return;
       }
-      const device = searchResult.payload[0] as SearchDevice & { features?: Features };
+      const device = selectSearchDevice(
+        searchResult.payload as Array<SearchDevice & { features?: Features }>,
+        globalOpts.connectId
+      );
+      if (!device) {
+        outputResult(globalOpts, {
+          success: false,
+          payload: { error: 'No matching device found', code: 'NO_DEVICE' },
+        });
+        return;
+      }
       const connectId = device.connectId || globalOpts.connectId;
 
       // 2. Unlock if locked — getPassphraseState below talks to a live
@@ -860,8 +870,10 @@ sessionCmd
   .action(() =>
     runCommand({}, async ({ sdk, globalOpts }) => {
       const searchResult = await sdk.searchDevices();
-      const device = // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-        (searchResult?.payload as any)?.[0];
+      const device = selectSearchDevice(
+        (searchResult?.payload as Array<SearchDevice & { features?: Features }>) ?? [],
+        globalOpts.connectId
+      );
       const deviceId = device?.deviceId || device?.features?.device_id;
       if (deviceId) {
         await clearSessionFromKeychain(deviceId);

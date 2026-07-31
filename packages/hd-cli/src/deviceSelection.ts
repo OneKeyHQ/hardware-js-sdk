@@ -1,4 +1,4 @@
-export function selectSearchDevice<T extends { connectId?: string }>(
+export function selectSearchDevice<T extends { connectId?: string | null }>(
   devices: T[],
   preferredConnectId?: string
 ): T | undefined {
