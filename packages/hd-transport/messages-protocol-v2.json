@@ -12201,26 +12201,11 @@
         "DeviceSessionError_Busy": 5
       }
     },
-    "DeviceSessionSeedDomain": {
-      "values": {
-        "SeedDomain_Standard": 1,
-        "SeedDomain_Cardano": 2
-      }
-    },
     "DeviceSessionGet": {
       "fields": {
         "session_id": {
           "type": "bytes",
           "id": 1
-        },
-        "btc_test_address": {
-          "type": "string",
-          "id": 2
-        },
-        "seed_domains": {
-          "rule": "repeated",
-          "type": "DeviceSessionSeedDomain",
-          "id": 3
         }
       }
     },

@@ -135,6 +135,7 @@ describe('messages', () => {
       SeedDomain_Standard: 1,
       SeedDomain_Cardano: 2,
     });
+    expect(v2Messages.nested).not.toHaveProperty('DeviceSessionSeedDomain');
     expect(v2Messages.nested.DeviceSessionPinType.values).toEqual({
       Any: 1,
       Main: 2,
