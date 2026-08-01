@@ -1,13 +1,12 @@
 import { BaseMethod } from '../BaseMethod';
 import { UI_REQUEST } from '../../constants/ui-request';
 
-export default class DeviceFactoryInfoGet extends BaseMethod {
+export default class DeviceFactoryCertificateRead extends BaseMethod {
   getSupportedProtocols() {
     return ['V2'] as const;
   }
 
   init() {
-    // Protocol V2 (Pro2) only; Core rejects non-V2 devices.
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
     this.unlockPolicy = 'none';
@@ -17,10 +16,10 @@ export default class DeviceFactoryInfoGet extends BaseMethod {
 
   async run() {
     const res = await this.device.commands.typedCall(
-      'DeviceFactoryInfoGet',
-      'DeviceFactoryInfo',
+      'DeviceCertificateRead',
+      'DeviceCertificate',
       {}
     );
-    return Promise.resolve(res.message);
+    return res.message;
   }
 }

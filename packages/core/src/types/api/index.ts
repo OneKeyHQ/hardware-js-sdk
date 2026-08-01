@@ -1,8 +1,13 @@
 import type {
   deviceGetOnboardingStatus,
+  deviceProvisionFactoryInfo,
+  deviceReadFactoryCertificate,
+  deviceReadFactoryInfo,
   deviceReboot,
   deviceUploadNft,
+  deviceSignFactoryChallenge,
   deviceUploadWallpaper,
+  deviceWriteFactoryCertificate,
   testProtocolV2Ping,
   uploadPortfolio,
 } from './protocolV2';
@@ -239,7 +244,12 @@ export type {
   OpenWalletSessionPayload,
 } from './openWalletSession';
 export type { ClearSessionCacheParams, ClearSessionCachePayload } from './sessionCache';
-export type { TestProtocolV2PingParams } from './protocolV2';
+export type {
+  DeviceFactoryCertificateWriteParams,
+  DeviceFactoryChallengeSignParams,
+  DeviceFactoryInfoSetParams,
+  TestProtocolV2PingParams,
+} from './protocolV2';
 
 export type CoreApi = {
   /**
@@ -328,6 +338,11 @@ export type CoreApi = {
   deviceReboot: typeof deviceReboot;
   deviceGetOnboardingStatus: typeof deviceGetOnboardingStatus;
   deviceUploadNft: typeof deviceUploadNft;
+  deviceProvisionFactoryInfo: typeof deviceProvisionFactoryInfo;
+  deviceReadFactoryInfo: typeof deviceReadFactoryInfo;
+  deviceWriteFactoryCertificate: typeof deviceWriteFactoryCertificate;
+  deviceReadFactoryCertificate: typeof deviceReadFactoryCertificate;
+  deviceSignFactoryChallenge: typeof deviceSignFactoryChallenge;
   deviceUploadWallpaper: typeof deviceUploadWallpaper;
   uploadPortfolio: typeof uploadPortfolio;
 
