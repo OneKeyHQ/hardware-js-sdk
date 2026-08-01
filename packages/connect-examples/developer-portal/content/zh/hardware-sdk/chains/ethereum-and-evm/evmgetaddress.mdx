@@ -1,0 +1,90 @@
+---
+title: evmGetAddress
+---
+
+# evmGetAddress
+
+## 以太坊：获取地址
+
+显示指定 BIP32 路径派生的地址，并返回给调用者。用户需要在 OneKey 上确认导出。
+
+```typescript
+const response = await HardwareSDK.evmGetAddress(connectId, deviceId, params)
+```
+
+### 参数
+
+[**可选通用参数**](/zh/hardware-sdk/core-api-guide#common-params)
+
+**导出单个地址**
+
+* `path` - _必需_ `string | Array<number>` 最小长度为 5。[更多信息](/zh/hardware-sdk/core-api-guide#hd-path)
+* `showOnOneKey` - _可选_ `boolean` 决定是否在设备上显示地址。默认设置为 `true`
+* `chainId` - _可选_ `number` ETH 中的 ChainId 是特定以太坊网络的唯一标识符，用于区分不同版本的区块链。[参考](https://github.com/ethereum-lists/chains/tree/master/_data/chains)
+
+**导出批量地址**
+
+* `bundle` - 包含 `path` 和 `showOnOneKey` 字段的对象 `Array`
+
+#### 示例
+
+显示第一个以太坊账户的地址：
+
+```typescript
+HardwareSDK.evmGetAddress({
+    path: "m/44'/60'/0'/0/0",
+    chainId: 1
+});
+```
+
+返回一批以太坊地址而不在设备上显示：
+
+```typescript
+HardwareSDK.evmGetAddress({
+    bundle: [
+        { path: "m/44'/60'/0'/0/0", chainId: 1, showOnOneKey: false }, // 账户 1
+        { path: "m/44'/60'/1'/0/0", chainId: 1, showOnOneKey: false }, // 账户 2
+        { path: "m/44'/60'/2'/0/0", chainId: 1, showOnOneKey: false }  // 账户 3
+    ]
+});
+```
+
+#### 返回结果
+
+只有一个地址的结果
+
+```typescript
+{
+    success: true,
+    payload: {
+        address: string,     // 显示的地址
+        path: Array<number> // 强化路径
+    }
+}
+
+```
+
+按 FIFO 排序的批量地址结果
+
+```typescript
+{
+    success: true,
+    payload: [
+        { address: string, path: Array<number> }, // 账户 1
+        { address: string, path: Array<number> }, // 账户 2
+        { address: string, path: Array<number> }  // 账户 3
+    ]
+}
+```
+
+错误
+
+```
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误码
+    }
+}
+```

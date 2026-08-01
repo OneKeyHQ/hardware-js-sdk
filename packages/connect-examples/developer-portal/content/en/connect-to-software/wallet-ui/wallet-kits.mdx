@@ -1,0 +1,56 @@
+---
+title: Wallet UI Libraries
+description: Pre-built wallet connection UI components for quick integration
+---
+
+import { Callout } from 'nextra/components'
+
+# Wallet UI Libraries
+
+Pre-built wallet connection libraries that provide beautiful wallet selection modals, mobile support, and handle edge cases automatically.
+
+<Callout type="info">
+**Recommended for most projects.** These libraries save development time and provide battle-tested wallet connection flows.
+</Callout>
+
+---
+
+## Choose Your Library
+
+| Library | Framework | Features |
+|---------|-----------|----------|
+| [RainbowKit](/en/connect-to-software/wallet-ui/rainbowkit) | React only | Beautiful modal, highly customizable, wagmi integration |
+| [Web3Modal](/en/connect-to-software/wallet-ui/web3modal) | React/Vue/JS | WalletConnect ecosystem, mobile QR codes, AppKit |
+| [Web3-Onboard](/en/connect-to-software/wallet-ui/web3-onboard) | React/Vue/JS | Blocknative, extensive customization |
+
+---
+
+## Quick Comparison
+
+| Feature | RainbowKit | Web3Modal | Web3-Onboard |
+|---------|------------|-----------|--------------|
+| React | ✅ | ✅ | ✅ |
+| Vue | ❌ | ✅ | ✅ |
+| Vanilla JS | ❌ | ✅ | ✅ |
+| Mobile QR | ✅ | ✅ | ✅ |
+| Theming | High | Medium | High |
+| Bundle size | Medium | Medium | Medium |
+
+---
+
+## When to Use
+
+Use Wallet UI Libraries when you:
+- Want a polished wallet selection experience out of the box
+- Need mobile wallet support with QR codes
+- Don't want to build custom wallet connection UI
+- Want WalletConnect integration
+
+---
+
+## Alternative: Custom UI
+
+If you need full control over the wallet UI, consider:
+- [Wagmi](/en/connect-to-software/react-hooks/wagmi) - React hooks without UI
+- [Provider API](/en/connect-to-software/provider/eth) - Direct wallet access
+

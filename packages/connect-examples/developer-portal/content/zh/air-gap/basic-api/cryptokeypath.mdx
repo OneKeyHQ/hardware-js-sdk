@@ -1,0 +1,48 @@
+---
+title: CryptoKeypath
+---
+
+# CryptoKeypath
+
+`CryptoKeypath` 类表示加密密钥路径（BIP-44 派生路径）。
+
+## 参数
+
+| 参数 | 类型 | 描述 |
+|-----------|------|-------------|
+| `components` | `PathComponent[]` | 路径组件数组（默认：空） |
+| `sourceFingerprint` | `Buffer` | 源指纹（可选） |
+| `depth` | `number` | 深度（可选） |
+
+## PathComponent
+
+`PathComponent` 类表示密钥路径中的单个组件。
+
+### 参数
+
+| 参数 | 类型 | 描述 |
+|-----------|------|-------------|
+| `index` | `number` | 组件索引（可选） |
+| `hardened` | `boolean` | 是否为硬化派生 |
+
+## 示例
+
+```ts
+import { CryptoKeypath, PathComponent } from '@keystonehq/bc-ur-registry';
+
+// BIP44: m/44'/60'/0'/0/0
+const keypath = new CryptoKeypath([
+  new PathComponent({ index: 44, hardened: true }),
+  new PathComponent({ index: 60, hardened: true }),
+  new PathComponent({ index: 0, hardened: true }),
+  new PathComponent({ index: 0, hardened: false }),
+  new PathComponent({ index: 0, hardened: false }),
+]);
+```
+
+## UR 示例
+
+```
+ur:crypto-keypath/xxxxx
+```
+

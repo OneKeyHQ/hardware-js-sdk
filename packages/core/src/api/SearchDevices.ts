@@ -1,9 +1,12 @@
 import { BaseMethod } from './BaseMethod';
-import DeviceConnector from '../device/DeviceConnector';
 import TransportManager from '../data-manager/TransportManager';
 import { DataManager } from '../data-manager';
-import { getDeviceTypeByBleName } from '../utils';
+import { LoggerNames, getDeviceTypeByBleName, getLogger } from '../utils';
 import { DevicePool } from '../device/DevicePool';
+
+import type DeviceConnector from '../device/DeviceConnector';
+
+const Log = getLogger(LoggerNames.DevicePool);
 
 export default class SearchDevices extends BaseMethod {
   connector?: DeviceConnector;
@@ -33,17 +36,45 @@ export default class SearchDevices extends BaseMethod {
         const lowerId = device.id?.toLowerCase();
         if (!seenIds.has(lowerId)) {
           seenIds.add(lowerId);
+          const bleName =
+            device.name ?? (device as unknown as { localName?: string }).localName ?? '';
           devices.push({
             ...device,
             connectId: device.id,
-            deviceType: getDeviceTypeByBleName(device.name ?? ''),
+            serialNo: null,
+            // Legacy BLE discovery identifier. The physical serial number is unavailable here.
+            uuid: device.id,
+            deviceId: null,
+            name: bleName || device.name,
+            deviceType: getDeviceTypeByBleName(bleName),
           });
         }
       }
       return devices;
     }
 
-    const { deviceList } = await DevicePool.getDevices(devicesDescriptor);
+    const deviceList = [];
+    for (const descriptor of devicesDescriptor) {
+      try {
+        // Discovery is best effort. Browsers may retain WebUSB grants for devices that
+        // are offline, busy, or not ready, so one descriptor must not abort the scan.
+        const result = await DevicePool.getDevices([descriptor], descriptor.path, {
+          connectProtocol: this.payload.connectProtocol,
+          refreshRuntimeState: true,
+        });
+        deviceList.push(...result.deviceList);
+      } catch (error) {
+        const errorCode =
+          error && typeof error === 'object' && 'errorCode' in error
+            ? (error as { errorCode?: unknown }).errorCode
+            : undefined;
+        Log.debug('Skip unavailable device during search', {
+          path: descriptor.path,
+          ...(errorCode !== undefined ? { errorCode } : {}),
+        });
+      }
+    }
+
     return deviceList.map(device => device.toMessageObject());
   }
 }

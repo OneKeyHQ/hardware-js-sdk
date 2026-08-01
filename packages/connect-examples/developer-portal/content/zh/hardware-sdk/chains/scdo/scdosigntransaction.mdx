@@ -1,0 +1,81 @@
+---
+title: scdoSignTransaction
+---
+
+# scdoSignTransaction
+
+#### 使用要求
+
+* 固件版本要求
+  * Touch: 4.10.0
+
+#### SCDO：签名交易
+
+使用指定 BIP32 路径派生的私钥对交易进行签名。
+
+```typescript
+const response = await HardwareSDK.scdoSignTransaction(connectId, deviceId, {
+    path: "m/44'/541'/0'/0/0",
+    nonce: "0x0",
+    gasPrice: "0xbebc200",
+    gasLimit: "0x5208",
+    to: "1S0118a02f993fc7a4348fd36b7f7a596948f02b31",
+    value: "0xf4240",
+    timestamp: "0",
+    data: "0x", // 可选
+    txType: 0   // 可选
+});
+```
+
+**参数**
+
+可选通用参数
+
+* `path` - _必需_ `string | Array<number>` 最小长度为 3。[更多信息](/zh/hardware-sdk/core-api-guide#hd-path)
+* `nonce` - _必需_ `string` 十六进制格式的交易 nonce
+* `gasPrice` - _必需_ `string` 十六进制格式的交易 gas 价格
+* `gasLimit` - _必需_ `string` 十六进制格式的交易 gas 限制
+* `to` - _必需_ `string` 目标地址
+* `value` - _必需_ `string` 十六进制格式的交易金额
+* `timestamp` - _可选_ `string` 交易时间戳
+* `data` - _可选_ `string` 十六进制格式的交易数据
+* `txType` - _可选_ `number` 交易类型
+
+**示例**
+
+```typescript
+const response = await HardwareSDK.scdoSignTransaction(connectId, deviceId, {
+    path: "m/44'/541'/0'/0/0",
+    nonce: "0x0",
+    gasPrice: "0xbebc200",
+    gasLimit: "0x5208",
+    to: "1S0118a02f993fc7a4348fd36b7f7a596948f02b31",
+    value: "0xf4240",
+    timestamp: "0"
+});
+```
+
+返回结果
+
+```typescript
+{
+    success: true,
+    payload: {
+        signature: string,
+        data_length: number,
+        path: string
+    }
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number  // 错误码
+    }
+}
+```

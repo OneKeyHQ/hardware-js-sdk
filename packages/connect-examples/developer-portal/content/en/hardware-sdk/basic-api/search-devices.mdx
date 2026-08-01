@@ -1,0 +1,67 @@
+---
+title: Search Devices
+---
+
+# Search Devices
+
+## Search device
+
+Searches for connected devices and returns the search results to the developer as an array. \
+\
+In the case of USB connections, the returned data already contains device details. \
+\
+In the case of Bluetooth device search, the data returned contains only the device name and device connectId, and the developer selects the device that needs to be paired before getting the device information.
+
+```typescript
+const response = await HardwareSDK.searchDevices();
+```
+
+### Params
+
+* empty
+
+### Example
+
+```typescript
+HardwareSDK.searchDevices().then(result => {
+    console.log(`device list: ${result}`)
+});
+```
+
+Result
+
+```typescript
+{
+    success: true,
+    payload: [
+        {
+            "connectId": string, // device connection id (stable for the same device; reset does not change it).
+                                  // Format depends on transport:
+                                  //   WebUSB/Bridge  → device serial, e.g. "PRC10J0017A"
+                                  //   Android BLE    → MAC address, e.g. "AA:BB:CC:DD:EE:FF"
+                                  //   iOS BLE        → CoreBluetooth UUID, e.g. "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
+                                  //   Desktop BLE (Electron/Noble, macOS)   → 32-char hex UUID, e.g. "1f6dad0b8782aab31d2f7ae2b11e5b6c"
+                                  //   Desktop BLE (Electron/Noble, Windows) → 12-char lowercase hex (MAC w/o colons), e.g. "e4e65539cf33"
+                                  //   Desktop BLE (Electron/Noble, Linux)   → MAC address
+                                  // ⚠️ USB and BLE connectIds for the same device are different values.
+            "uuid": string, // device unique id 
+            "deviceType": string, // device type, 'classic' | 'mini' | 'touch' | 'pro'
+            "deviceId": string, // device id; changes after reset/wipe/recovery; only returned when using the webusb transport of @onekeyfe/hd-common-connect-sdk.
+            "path": string, // device serial number when USB is connected via WebUSB
+            "name": string, // bluetooth name for the device
+        },
+    ]
+}
+```
+
+Error
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code: number // error code
+    }
+}
+```

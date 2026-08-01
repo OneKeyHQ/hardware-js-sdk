@@ -1,3 +1,5 @@
+import { EFirmwareType } from './firmwareType';
+
 export interface IHardwareError {
   errorCode: ValueOf<typeof HardwareErrorCode>;
   message?: string;
@@ -12,7 +14,38 @@ type ErrorCodeUnion = ValueOf<typeof HardwareErrorCode>;
 
 function fillStringWithArguments(value: string, object: object) {
   if (typeof value !== 'string') return value;
-  return value.replace(/\{([^}]+)\}/g, (_, arg: string) => (object as unknown as any)[arg] || '?');
+  // Avoid regex with potential catastrophic backtracking by parsing manually in linear time
+  if (value.indexOf('{') === -1) return value;
+  let result = '';
+  let i = 0;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const dict = object as any;
+  while (i < value.length) {
+    const open = value.indexOf('{', i);
+    if (open === -1) {
+      result += value.slice(i);
+      break;
+    }
+    const close = value.indexOf('}', open + 1);
+    if (close === -1) {
+      // No matching closing brace; append the rest as-is
+      result += value.slice(i);
+      break;
+    }
+    // Append text before the placeholder
+    result += value.slice(i, open);
+    const key = value.slice(open + 1, close);
+    if (key.length === 0) {
+      // Keep '{}' unchanged to match original regex behavior
+      result += '{}';
+    } else {
+      const replacement = dict[key];
+      // Preserve original semantics: falsy values fallback to '?'
+      result += replacement ? String(replacement) : '?';
+    }
+    i = close + 1;
+  }
+  return result;
 }
 
 export class HardwareError extends Error {
@@ -137,6 +170,11 @@ export const HardwareErrorCode = {
   DeviceBusy: 117,
 
   /**
+   * Device check unlock type not match error
+   */
+  DeviceCheckUnlockTypeError: 118,
+
+  /**
    * Not initialized
    */
   NotInitialized: 200,
@@ -246,6 +284,17 @@ export const HardwareErrorCode = {
   ForbiddenKeyPath: 416,
 
   /**
+   * Repeat unlocking
+   * all network get address by loop need repeat unlocking
+   */
+  RepeatUnlocking: 417,
+
+  /**
+   * Defective firmware detected
+   */
+  DefectiveFirmware: 418,
+
+  /**
    * Netword request error
    */
   NetworkError: 500,
@@ -294,6 +343,8 @@ export const HardwareErrorCode = {
   BleDeviceBondedCanceled: 718,
   BlePeerRemovedPairingInformation: 719,
   BleDeviceDisconnected: 720,
+  BlePoweredOff: 721,
+  BleUnsupported: 722,
 
   /**
    * Hardware runtiome errors
@@ -394,6 +445,63 @@ export const HardwareErrorCode = {
   EmmcFileWriteFirmwareError: 819,
 
   /**
+   * Firmware verification failed (e.g., bootloader file verify failed)
+   */
+  FirmwareVerificationFailed: 820,
+
+  /**
+   * Web bridge coonect needs permission
+   */
+  BridgeNeedsPermission: 821,
+
+  CallQueueActionCancelled: 822,
+  /**
+   * Firmware downgrade not allowed
+   */
+  FirmwareDowngradeNotAllowed: 823,
+  /**
+   * Cosmos invalid JSON message, Only support Amino msgs.
+   */
+  CosmosInvalidJsonMessage: 824,
+  /**
+   * No setting provided
+   */
+  DeviceSettingsNotProvided: 825,
+
+  /**
+   * Language not supported
+   */
+  DeviceSettingsLanguageNotSupport: 826,
+
+  /**
+   * Too many inputs
+   * @params: { count?: string }
+   */
+  TooManyInputs: 827,
+
+  /**
+   * The two PIN entries did not match while setting/changing PIN on device
+   */
+  PinMismatch: 828,
+
+  /**
+   * Device refused to sign: refTxs don't match the spent input's outpoint
+   */
+  KaspaPrevTxIdMismatch: 829,
+
+  /**
+   * Protocol V2 device must be unlocked before the requested operation.
+   * @params: { failureCode?: string; subcode?: number; firmwareMessage?: string }
+   */
+  DeviceLocked: 830,
+
+  /**
+   * The cached wallet session is invalid or has expired.
+   * @params: { failureCode?: string; subcode?: number; firmwareMessage?: string }
+   */
+  WalletSessionInvalid: 831,
+
+  /**
    * Lowlevel transport connect error
    */
   LowlevelTrasnportConnectError: 900,
@@ -432,6 +540,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.DeviceDetectInBootloaderMode]: 'Device in bootloader mode',
   [HardwareErrorCode.NotAllowInBootloaderMode]: 'Device not allow in bootloader mode',
   [HardwareErrorCode.DeviceBusy]: 'Device is busy',
+  [HardwareErrorCode.DeviceCheckUnlockTypeError]: 'Device check unlock type not match error',
   /**
    * Node Errors
    */
@@ -466,6 +575,8 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
     'Please use OneKey desktop client to update the firmware',
   [HardwareErrorCode.DeviceNotSupportMethod]: 'Device not support this method',
   [HardwareErrorCode.ForbiddenKeyPath]: 'Forbidden key path',
+  [HardwareErrorCode.RepeatUnlocking]: 'Repeat unlocking',
+  [HardwareErrorCode.DefectiveFirmware]: 'Device firmware is defective, please update immediately',
 
   /**
    * Network Errors
@@ -505,6 +616,8 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.BleCharacteristicNotifyChangeFailure]: 'Characteristic Notify Change Failure',
   [HardwareErrorCode.BleTransportCallCanceled]: 'Ble Transport call canceled',
   [HardwareErrorCode.BleDeviceDisconnected]: 'Device disconnected',
+  [HardwareErrorCode.BlePoweredOff]: 'Bluetooth is turned off',
+  [HardwareErrorCode.BleUnsupported]: 'Bluetooth is not supported on this device',
 
   /**
    * Runtime Error
@@ -513,6 +626,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.PinInvalid]: 'Pin invalid',
   [HardwareErrorCode.PinCancelled]: 'Pin cancelled',
   [HardwareErrorCode.ActionCancelled]: 'Action cancelled by user',
+  [HardwareErrorCode.CallQueueActionCancelled]: 'Action cancelled by user on call queue',
   [HardwareErrorCode.FirmwareError]: 'Firmware installation failed',
   [HardwareErrorCode.ResponseUnexpectTypeError]: 'Response type is not expected',
   [HardwareErrorCode.BridgeNetworkError]: 'Bridge network error',
@@ -529,6 +643,18 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.DataOverload]: 'Params data overload',
   [HardwareErrorCode.BTCPsbtTooManyUtxos]: 'PSBT too many utxos',
   [HardwareErrorCode.EmmcFileWriteFirmwareError]: 'EMMC file write firmware error',
+  [HardwareErrorCode.FirmwareVerificationFailed]: 'Firmware verification failed',
+  [HardwareErrorCode.BridgeNeedsPermission]: 'Bridge needs permission',
+  [HardwareErrorCode.FirmwareDowngradeNotAllowed]: 'Firmware downgrade not allowed',
+  [HardwareErrorCode.CosmosInvalidJsonMessage]:
+    'Cosmos invalid JSON message, Only support Amino msgs.',
+  [HardwareErrorCode.DeviceSettingsNotProvided]: 'No setting provided',
+  [HardwareErrorCode.DeviceSettingsLanguageNotSupport]: 'Language not supported',
+  [HardwareErrorCode.TooManyInputs]: 'Too many inputs',
+  [HardwareErrorCode.PinMismatch]: 'PIN mismatch',
+  [HardwareErrorCode.DeviceLocked]: 'Device locked',
+  [HardwareErrorCode.KaspaPrevTxIdMismatch]: 'Kaspa previous transaction id mismatch',
+  [HardwareErrorCode.WalletSessionInvalid]: 'Wallet session is invalid or expired',
 
   /**
    * Lowlevel transport
@@ -577,40 +703,136 @@ export const CreateErrorByMessage = (message: string): HardwareError => {
   return new HardwareError(message);
 };
 
-const createNewFirmwareUnReleaseHardwareError = (currentVersion: string, requireVersion: string) =>
-  TypedError(
-    HardwareErrorCode.NewFirmwareUnRelease,
-    'Device firmware version is too low, please update to the latest version',
-    { current: currentVersion, require: requireVersion }
-  );
+// Map low-level bridge/libusb error strings to structured HardwareError
+export const CreateHardwareErrorByBridgeError = (raw: string): HardwareError => {
+  const msg = String(raw || '');
+  // Permission denied when accessing USB device via libusb (e.g., missing udev rules)
+  if (msg.includes('LIBUSB_ERROR_ACCESS')) {
+    return TypedError(HardwareErrorCode.BridgeNeedsPermission, 'LIBUSB_ERROR_ACCESS');
+  }
+  // Fallback: treat as bridge/network error with original message
+  return TypedError(HardwareErrorCode.BridgeNetworkError, msg);
+};
 
-const createNeedUpgradeFirmwareHardwareError = (currentVersion: string, requireVersion: string) =>
-  TypedError(
-    HardwareErrorCode.CallMethodNeedUpgradeFirmware,
-    `Device firmware version is too low, please update to ${requireVersion}`,
-    { current: currentVersion, require: requireVersion }
+const createNewFirmwareUnReleaseHardwareError = ({
+  currentVersion,
+  requireVersion,
+  methodName,
+  firmwareType,
+}: {
+  currentVersion: string;
+  requireVersion: string;
+  methodName?: string;
+  firmwareType?: EFirmwareType;
+}) => {
+  if (methodName?.startsWith('btc') === false && firmwareType === EFirmwareType.BitcoinOnly) {
+    return createDeviceNotSupportMethodError(methodName ?? '', firmwareType);
+  }
+
+  const methodInfo = methodName ? ` for method '${methodName}'` : '';
+  return TypedError(
+    HardwareErrorCode.NewFirmwareUnRelease,
+    `Device firmware version is too low${methodInfo}, please update to the latest version`,
+    { current: currentVersion, require: requireVersion, method: methodName }
   );
+};
+
+const createNeedUpgradeFirmwareHardwareError = ({
+  currentVersion,
+  requireVersion,
+  methodName,
+  firmwareType,
+}: {
+  currentVersion: string;
+  requireVersion: string;
+  methodName?: string;
+  firmwareType?: EFirmwareType;
+}) => {
+  if (methodName?.startsWith('btc') === false && firmwareType === EFirmwareType.BitcoinOnly) {
+    return createDeviceNotSupportMethodError(methodName ?? '', firmwareType);
+  }
+
+  const methodInfo = methodName ? ` for method '${methodName}'` : '';
+  return TypedError(
+    HardwareErrorCode.CallMethodNeedUpgradeFirmware,
+    `Device firmware version is too low${methodInfo}, please update to ${requireVersion}`,
+    { current: currentVersion, require: requireVersion, method: methodName }
+  );
+};
 
 const createNewFirmwareForceUpdateHardwareError = (
   connectId: string | undefined,
-  deviceId: string | undefined
-) =>
-  TypedError(
-    HardwareErrorCode.NewFirmwareForceUpdate,
-    'Device firmware version is too low, please update to the latest version',
-    { connectId, deviceId }
-  );
+  deviceId: string | undefined,
+  versionTypes?: ('firmware' | 'ble')[],
+  currentVersions?: {
+    firmware?: string;
+    ble?: string;
+  }
+) => {
+  const types = versionTypes || [];
+  const typeMap = { firmware: 'firmware', ble: 'BLE firmware' };
+  const requiredTypes = types.filter(type => type in typeMap);
 
-const createDeprecatedHardwareError = (currentVersion: string, deprecatedVersion: string) =>
-  TypedError(
+  const getVersionInfo = () => {
+    const versions = [];
+    if (currentVersions?.firmware) versions.push(`firmware version: ${currentVersions.firmware}`);
+    if (currentVersions?.ble) versions.push(`BLE version: ${currentVersions.ble}`);
+    return versions.length > 0 ? ` (${versions.join(', ')})` : '';
+  };
+
+  const getTypeDescription = () => requiredTypes.map(type => typeMap[type]).join(' and ');
+  const message = `Device ${getTypeDescription()} version is too low. ${getVersionInfo()}`;
+
+  return TypedError(HardwareErrorCode.NewFirmwareForceUpdate, message, {
+    connectId,
+    deviceId,
+    versionTypes,
+    currentVersions,
+  });
+};
+
+const createDeprecatedHardwareError = (
+  currentVersion: string,
+  deprecatedVersion: string,
+  methodName?: string
+) => {
+  const methodInfo = methodName ? ` Method '${methodName}'` : 'This method';
+  return TypedError(
     HardwareErrorCode.CallMethodDeprecated,
-    `Device firmware version is too high, this method has been deprecated in ${deprecatedVersion}`,
-    { current: currentVersion, deprecated: deprecatedVersion }
+    `Device firmware version is too high. ${methodInfo} has been deprecated in ${deprecatedVersion}`,
+    { current: currentVersion, deprecated: deprecatedVersion, method: methodName }
   );
+};
+
+const createDefectiveFirmwareError = (
+  serialNo: string,
+  seVersion: string,
+  deviceType: string,
+  connectId?: string,
+  deviceId?: string
+) => {
+  const message = `Defective firmware detected (Serial: ${serialNo}, SE: ${seVersion}). Please update immediately.`;
+
+  return TypedError(HardwareErrorCode.DefectiveFirmware, message, {
+    serialNo,
+    seVersion,
+    deviceType,
+    connectId,
+    deviceId,
+  });
+};
+
+const createDeviceNotSupportMethodError = (methodName: string, firmwareType: EFirmwareType) =>
+  TypedError(HardwareErrorCode.DeviceNotSupportMethod, `Device not support this method`, {
+    firmwareType: firmwareType.toString(),
+    method: methodName,
+  });
 
 export {
   createNewFirmwareUnReleaseHardwareError,
   createNeedUpgradeFirmwareHardwareError,
   createNewFirmwareForceUpdateHardwareError,
   createDeprecatedHardwareError,
+  createDefectiveFirmwareError,
+  createDeviceNotSupportMethodError,
 };

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+
 import { BaseMethod } from './BaseMethod';
 
 export default class CheckBridgeStatus extends BaseMethod {

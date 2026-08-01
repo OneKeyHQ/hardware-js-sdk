@@ -1,13 +1,21 @@
-import { ConfluxSignMessageCIP23 as HardwareConfluxSignMessageCIP23 } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
 
+import type { ConfluxSignMessageCIP23 as HardwareConfluxSignMessageCIP23 } from '@onekeyfe/hd-transport';
+
 export default class ConfluxSignMessageCIP23 extends BaseMethod<HardwareConfluxSignMessageCIP23> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
+  checkDeviceId = true;
+
   init() {
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = true;
 
     validateParams(this.payload, [
       { name: 'path', required: true },

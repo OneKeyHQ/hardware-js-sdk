@@ -1,0 +1,84 @@
+---
+title: Mobile & Deeplinks
+description: Integrate OneKey wallet in mobile web apps and WebViews using deeplinks
+---
+
+# Mobile & Deeplinks
+
+Integrate OneKey wallet in mobile web apps and WebViews using deeplinks and universal links.
+
+## Overview
+
+When building mobile web apps or integrating within WebViews, you can use OneKey's deeplink system to connect to the wallet app directly.
+
+## Deeplink Formats
+
+### Custom Scheme
+
+```
+onekey-wallet://wc?uri={encodeURIComponent(wcUri)}
+```
+
+### Universal Link (Recommended)
+
+```
+https://app.onekey.so/wc/connect/wc?uri={encodeURIComponent(wcUri)}
+```
+
+> **Tip:** Universal links are recommended as they work more reliably across different mobile platforms and browsers.
+
+## Usage Example
+
+```javascript
+// Generate WalletConnect URI from your dApp
+const wcUri = 'wc:a281...' // Your WalletConnect URI
+
+// Option 1: Custom scheme
+const customSchemeLink = `onekey-wallet://wc?uri=${encodeURIComponent(wcUri)}`
+
+// Option 2: Universal link (recommended)
+const universalLink = `https://app.onekey.so/wc/connect/wc?uri=${encodeURIComponent(wcUri)}`
+
+// Open the link
+window.location.href = universalLink
+```
+
+## Platform-Specific Notes
+
+### iOS
+
+- Universal links work best when the OneKey app is installed
+- If the app is not installed, the universal link will redirect to the App Store
+
+### Android
+
+- Custom scheme links require the OneKey app to be installed
+- Universal links fall back gracefully to web if the app is not present
+
+## Best Practices
+
+1. **Detect mobile environment** - Only show deeplink options on mobile devices
+2. **Provide fallback** - Offer alternative connection methods if deeplinks fail
+3. **Use universal links** - They provide better UX than custom schemes
+4. **Handle timeouts** - If the user doesn't return to your app, show a retry option
+
+```javascript
+// Detect mobile environment
+const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+
+if (isMobile) {
+  // Use deeplinks for mobile
+  window.location.href = universalLink
+} else {
+  // Use regular WalletConnect QR for desktop
+  showQRCode(wcUri)
+}
+```
+
+## Related
+
+- [RainbowKit](/en/connect-to-software/wallet-ui/rainbowkit/) - Handles mobile detection automatically
+- [Web3Modal](/en/connect-to-software/wallet-ui/web3modal/) - Built-in mobile support
+- [Provider API](/en/connect-to-software/provider/eth/) - Direct provider integration
+
+

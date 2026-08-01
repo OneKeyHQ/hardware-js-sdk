@@ -1,8 +1,11 @@
 import semver from 'semver';
 import { EDeviceType } from '@onekeyfe/hd-shared';
-import type { Features, IDeviceType } from '../types';
+
 import { getDeviceType } from './deviceInfoUtils';
 import { getDeviceFirmwareVersion } from './deviceVersionUtils';
+import { PRO2_WALLPAPER_HEIGHT, PRO2_WALLPAPER_WIDTH } from './pro2Wallpaper';
+
+import type { Features, IDeviceType } from '../types';
 
 type IScreenData = { name: string; hex: string };
 
@@ -308,6 +311,15 @@ export const getHomeScreenSize = ({
   homeScreenType: 'WallPaper' | 'Nft';
   thumbnail?: boolean;
 }) => {
+  if (deviceType === EDeviceType.Pro2) {
+    return thumbnail
+      ? undefined
+      : {
+          width: PRO2_WALLPAPER_WIDTH,
+          height: PRO2_WALLPAPER_HEIGHT,
+        };
+  }
+
   const sizes: Partial<
     Record<
       IDeviceType,

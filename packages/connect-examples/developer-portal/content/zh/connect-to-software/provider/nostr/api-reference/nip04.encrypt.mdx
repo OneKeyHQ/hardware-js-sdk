@@ -1,0 +1,33 @@
+---
+title: nip04.encrypt
+---
+
+# nip04.encrypt
+
+### 方法
+
+```
+async function nip04.encrypt(pubkey, plaintext): string
+```
+
+### 响应
+
+返回 NIP-04 规范中指定的密文和 iv
+
+### 参数
+
+* `pubkey` — _必填_ `string` 公钥
+* `message` — _必填_ `string` 要加密的字符串
+
+### 示例
+
+```javascript
+const provider = (window.$onekey && window.$onekey.nostr) || window.nostr;
+
+const encrypted = async provider.nip04.encrypt(pubkey, "要加密的数据")
+```
+
+### 演示
+
+<iframe src="https://codepen.io/OneKeyHQ/pen/rNPZwaa" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
+

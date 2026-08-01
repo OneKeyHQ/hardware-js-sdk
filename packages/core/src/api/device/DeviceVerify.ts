@@ -1,12 +1,13 @@
 import { sha256 } from '@noble/hashes/sha256';
-import { BixinVerifyDeviceRequest } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { bytesToHex } from '@noble/hashes/utils';
+
 import { formatAnyHex } from '../helpers/hexUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { getDeviceType } from '../../utils';
 import { DeviceModelToTypes } from '../../types';
+
+import type { BixinVerifyDeviceRequest } from '@onekeyfe/hd-transport';
 import type { DeviceVerifySignature } from '../../types';
 import { UI_REQUEST } from '../../events';
 
@@ -26,7 +27,7 @@ export default class DeviceVerify extends BaseMethod<BixinVerifyDeviceRequest> {
 
   async run() {
     // For Classic、Mini device we use EthereumSignTypedData
-    const deviceType = getDeviceType(this.device.features);
+    const deviceType = this.device.getCurrentDeviceType();
     let response: DeviceVerifySignature | undefined;
 
     if (DeviceModelToTypes.model_classic.includes(deviceType)) {

@@ -1,16 +1,21 @@
-import { NearGetAddress as HardwareNearGetAddress } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { NearGetAddressParams, NearAddress } from '../../types';
+
+import type { NearGetAddress as HardwareNearGetAddress } from '@onekeyfe/hd-transport';
+import type { NearAddress, NearGetAddressParams } from '../../types';
 
 export default class NearGetAddress extends BaseMethod<HardwareNearGetAddress[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };

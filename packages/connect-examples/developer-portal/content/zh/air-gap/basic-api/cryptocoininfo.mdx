@@ -1,0 +1,35 @@
+---
+title: CryptoCoinInfo
+---
+
+# CryptoCoinInfo
+
+`CryptoCoinInfo` 类表示加密货币信息。
+
+## 类型
+
+```typescript
+export enum Type {
+  bitcoin = 0,
+  ethereum = 60,
+}
+
+export enum Network {
+  mainnet,
+  testnet,
+}
+```
+
+## 参数
+
+| 参数 | 类型 | 描述 |
+|-----------|------|-------------|
+| `Type` | `enum` | 货币类型（如 `bitcoin = 0`，`ethereum = 60`） |
+| `Network` | `enum` | 网络类型（`mainnet` 或 `testnet`） |
+
+## UR 示例
+
+```
+ur:crypto-coin-info/xxxxx
+```
+

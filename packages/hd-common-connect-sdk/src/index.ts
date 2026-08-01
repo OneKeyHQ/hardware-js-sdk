@@ -1,33 +1,58 @@
 import EventEmitter from 'events';
 import HardwareSdk, {
-  ConnectSettings,
-  enableLog,
-  parseConnectSettings,
-  initCore,
-  Core,
-  createErrorMessage,
   CORE_EVENT,
-  CoreMessage,
-  IFRAME,
-  UI_EVENT,
-  UiResponseEvent,
-  LOG_EVENT,
-  getLogger,
-  LoggerNames,
-  setLoggerPostMessage,
-  FIRMWARE_EVENT,
-  DEVICE_EVENT,
   DEVICE,
-  LowLevelCoreApi,
+  DEVICE_EVENT,
+  FIRMWARE_EVENT,
+  IFRAME,
+  LOG_EVENT,
+  LoggerNames,
+  UI_EVENT,
+  UI_REQUEST,
+  createErrorMessage,
+  createUiMessage,
+  enableLog,
+  executeCallback,
+  getLogBlockLabel,
+  getLogger,
+  initCore,
+  parseConnectSettings,
+  setLoggerPostMessage,
 } from '@onekeyfe/hd-core';
-import { ERRORS, createDeferred, Deferred, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import type { LowlevelTransportSharedPlugin } from '@onekeyfe/hd-transport';
+import { ERRORS, HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
 import HttpTransport from '@onekeyfe/hd-transport-http';
-import WebusbTransport from '@onekeyfe/hd-transport-webusb';
+import { ElectronBleTransport, WebUsbTransport } from '@onekeyfe/hd-transport-web-device';
 import LowlevelTransport from '@onekeyfe/hd-transport-lowlevel';
+import EmulatorTransport from '@onekeyfe/hd-transport-emulator';
+
+import type { Deferred } from '@onekeyfe/hd-shared';
+import type {
+  ConnectSettings,
+  Core,
+  CoreMessage,
+  LowLevelCoreApi,
+  UiResponseEvent,
+} from '@onekeyfe/hd-core';
+import type { LowlevelTransportSharedPlugin } from '@onekeyfe/hd-transport';
 
 const eventEmitter = new EventEmitter();
 const Log = getLogger(LoggerNames.HdCommonConnectSdk);
+
+const getTransport = async (env: ConnectSettings['env']) => {
+  if (env === 'desktop-web-ble') {
+    return ElectronBleTransport;
+  }
+  if (env === 'webusb' || env === 'desktop-webusb') return WebUsbTransport;
+  if (env === 'lowlevel') return LowlevelTransport;
+  if (env === 'node-usb') {
+    // Dynamic import — usb is a native Node.js module (libusb C++ bindings)
+    // that cannot be resolved by browser/React Native bundlers
+    const { default: NodeUsbTransport } = await import('@onekeyfe/hd-transport-usb');
+    return NodeUsbTransport;
+  }
+  if (env === 'emulator') return EmulatorTransport;
+  return HttpTransport;
+};
 
 let _core: Core | undefined;
 let _settings = parseConnectSettings();
@@ -35,9 +60,15 @@ let _settings = parseConnectSettings();
 let _messageID = 0;
 export const messagePromises: { [key: number]: Deferred<any> } = {};
 
-const dispose = () => {
+const dispose = async () => {
+  const core = _core;
+  _core = undefined;
   eventEmitter.removeAllListeners();
+  Object.keys(messagePromises).forEach(key => {
+    delete messagePromises[Number(key)];
+  });
   _settings = parseConnectSettings();
+  await core?.dispose?.();
 };
 
 const uiResponse = (response: UiResponseEvent) => {
@@ -59,8 +90,9 @@ function handleMessage(message: CoreMessage) {
     return;
   }
 
+  const blockLog = getLogBlockLabel(message);
   if (event !== LOG_EVENT) {
-    Log.debug('hd-common-connect-sdk handleMessage', message);
+    Log.debug('hd-common-connect-sdk handleMessage', blockLog ?? message);
   }
   switch (event) {
     case UI_EVENT:
@@ -75,12 +107,23 @@ function handleMessage(message: CoreMessage) {
     case DEVICE_EVENT:
       if (
         (
-          [DEVICE.CONNECT, DEVICE.DISCONNECT, DEVICE.FEATURES, DEVICE.SUPPORT_FEATURES] as string[]
+          [
+            DEVICE.CONNECT,
+            DEVICE.DISCONNECT,
+            DEVICE.FEATURES,
+            DEVICE.STATE,
+            DEVICE.SUPPORT_FEATURES,
+          ] as string[]
         ).includes(message.type)
       ) {
         eventEmitter.emit(message.type, message.payload);
       }
       break;
+    case IFRAME.CALLBACK: {
+      const { callbackId, data, error } = message.payload;
+      executeCallback(callbackId, data, error);
+      break;
+    }
     default:
       Log.log('No need to be captured message', message.event);
   }
@@ -115,19 +158,7 @@ const init = async (
   Log.debug('init');
 
   try {
-    console.log(_settings.env);
-    // const Transport = _settings.env === 'webusb' ? WebusbTransport : HttpTransport;
-    let Transport: any;
-    switch (_settings.env) {
-      case 'webusb':
-        Transport = WebusbTransport;
-        break;
-      case 'lowlevel':
-        Transport = LowlevelTransport;
-        break;
-      default:
-        Transport = HttpTransport;
-    }
+    const Transport = await getTransport(_settings.env);
     _core = await initCore(_settings, Transport, plugin);
     _core?.on(CORE_EVENT, handleMessage);
     setLoggerPostMessage(handleMessage);
@@ -141,12 +172,25 @@ const init = async (
 };
 
 const call = async (params: any) => {
-  Log.debug('call: ', params);
+  const blockLog = getLogBlockLabel(params);
+  Log.debug('call: ', blockLog ?? params);
 
   try {
     const response = await postMessage({ event: IFRAME.CALL, type: IFRAME.CALL, payload: params });
     if (response) {
-      Log.debug('response: ', response);
+      Log.debug('response: ', blockLog ? '[REDACTED]' : response);
+
+      if (!response.success) {
+        if (response.payload?.code === HardwareErrorCode.BleUnsupported) {
+          postMessage(createUiMessage(UI_REQUEST.BLUETOOTH_UNSUPPORTED), false);
+        }
+        if (response.payload?.code === HardwareErrorCode.BlePoweredOff) {
+          postMessage(createUiMessage(UI_REQUEST.BLUETOOTH_POWERED_OFF), false);
+        }
+        if (response.payload?.code === HardwareErrorCode.BlePermissionError) {
+          postMessage(createUiMessage(UI_REQUEST.BLUETOOTH_PERMISSION), false);
+        }
+      }
 
       return response;
     }

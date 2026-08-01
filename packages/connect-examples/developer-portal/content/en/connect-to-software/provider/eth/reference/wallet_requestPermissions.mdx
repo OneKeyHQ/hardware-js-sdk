@@ -1,0 +1,76 @@
+---
+title: wallet_requestPermissions
+description: Request permissions for the dApp
+---
+
+# wallet_requestPermissions
+
+Requests permissions for the dApp to access specific methods. This is part of the EIP-2255 wallet permissions system.
+
+---
+
+## Parameters
+
+`Array` containing a permission request object:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `eth_accounts` | `object` | Request access to user accounts |
+
+---
+
+## Returns
+
+`Array` of permission objects:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `parentCapability` | `string` | The permission name |
+| `date` | `number` | Timestamp when granted |
+| `caveats` | `array` | Restrictions on the permission |
+
+---
+
+## Example
+
+```typescript
+const permissions = await window.$onekey.ethereum.request({
+  method: 'wallet_requestPermissions',
+  params: [{ eth_accounts: {} }]
+})
+
+console.log('Granted permissions:', permissions)
+// [{ parentCapability: 'eth_accounts', date: 1234567890, caveats: [...] }]
+```
+
+### Check Specific Permission
+
+```typescript
+const permissions = await window.$onekey.ethereum.request({
+  method: 'wallet_requestPermissions',
+  params: [{ eth_accounts: {} }]
+})
+
+const hasAccountsPermission = permissions.some(
+  p => p.parentCapability === 'eth_accounts'
+)
+console.log('Has accounts permission:', hasAccountsPermission)
+```
+
+---
+
+## Errors
+
+| Code | Message | Description |
+|------|---------|-------------|
+| 4001 | User rejected the request | User denied the permission request |
+| -32602 | Invalid params | Invalid permission request |
+
+---
+
+## Notes
+
+- Currently only `eth_accounts` permission is supported
+- Calling this method triggers the connection prompt if not already connected
+- Permissions persist until revoked by the user
+- Specified by [EIP-2255](https://eips.ethereum.org/EIPS/eip-2255)

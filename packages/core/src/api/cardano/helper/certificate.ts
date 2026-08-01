@@ -1,17 +1,19 @@
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+
 import { validateParams } from '../../helpers/paramsValidator';
 import { validatePath } from '../../helpers/pathUtils';
+import { PROTO } from '../../../constants';
+
 import type {
   CardanoCertificate,
-  CardanoPoolParameters,
-  CertificateWithPoolOwnersAndRelays,
+  CardanoDRep,
   CardanoPoolMargin,
   CardanoPoolMetadata,
-  CardanoPoolRelay,
   CardanoPoolOwner,
-  CardanoDRep,
+  CardanoPoolParameters,
+  CardanoPoolRelay,
+  CertificateWithPoolOwnersAndRelays,
 } from '../../../types/api/cardano';
-import { PROTO } from '../../../constants';
 
 export type PoolParametersWithOwnersAndRelays = {
   poolParameters?: PROTO.CardanoPoolParametersType;

@@ -1,16 +1,17 @@
-import { ScdoGetAddress as HardwareScdoGetAddress } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { ScdoAddress, ScdoGetAddressParams } from '../../types';
+
+import type { ScdoGetAddress as HardwareScdoGetAddress } from '@onekeyfe/hd-transport';
+import type { DeviceFirmwareRange, ScdoAddress, ScdoGetAddressParams } from '../../types';
 
 export default class ScdoGetAddress extends BaseMethod<HardwareScdoGetAddress[]> {
   hasBundle = false;
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };
@@ -37,7 +38,7 @@ export default class ScdoGetAddress extends BaseMethod<HardwareScdoGetAddress[]>
     });
   }
 
-  getVersionRange() {
+  getVersionRange(): DeviceFirmwareRange {
     return {
       model_touch: {
         min: '4.10.0',

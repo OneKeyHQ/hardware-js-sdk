@@ -1,0 +1,99 @@
+---
+title: eth_sendTransaction
+description: Send a transaction to the network
+---
+
+# eth_sendTransaction
+
+Creates a new transaction and prompts the user to confirm it. Returns the transaction hash on success.
+
+---
+
+## Parameters
+
+`Array` containing a single transaction object:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `from` | `string` | Yes | Sender address |
+| `to` | `string` | No | Recipient address (omit for contract creation) |
+| `value` | `string` | No | Value to send in wei (hex) |
+| `data` | `string` | No | Contract call data or bytecode |
+| `gas` | `string` | No | Gas limit (hex) |
+| `gasPrice` | `string` | No | Gas price in wei (hex), for legacy transactions |
+| `maxFeePerGas` | `string` | No | Max fee per gas (hex), for EIP-1559 |
+| `maxPriorityFeePerGas` | `string` | No | Max priority fee (hex), for EIP-1559 |
+| `nonce` | `string` | No | Transaction nonce (hex) |
+
+---
+
+## Returns
+
+`string` - The transaction hash (32-byte hex string)
+
+---
+
+## Examples
+
+### Send ETH
+
+```typescript
+const txHash = await window.$onekey.ethereum.request({
+  method: 'eth_sendTransaction',
+  params: [{
+    from: '0xYourAddress...',
+    to: '0xRecipientAddress...',
+    value: '0xDE0B6B3A7640000', // 1 ETH in wei
+  }]
+})
+
+console.log('Transaction hash:', txHash)
+```
+
+### Call Contract Function
+
+```typescript
+const txHash = await window.$onekey.ethereum.request({
+  method: 'eth_sendTransaction',
+  params: [{
+    from: '0xYourAddress...',
+    to: '0xContractAddress...',
+    data: '0xa9059cbb...', // Encoded function call
+    gas: '0x5208',
+  }]
+})
+```
+
+### EIP-1559 Transaction
+
+```typescript
+const txHash = await window.$onekey.ethereum.request({
+  method: 'eth_sendTransaction',
+  params: [{
+    from: '0xYourAddress...',
+    to: '0xRecipientAddress...',
+    value: '0xDE0B6B3A7640000',
+    maxFeePerGas: '0x2540BE400',      // 10 Gwei
+    maxPriorityFeePerGas: '0x3B9ACA00', // 1 Gwei
+  }]
+})
+```
+
+---
+
+## Errors
+
+| Code | Message | Description |
+|------|---------|-------------|
+| 4001 | User rejected the request | User denied the transaction |
+| -32000 | Insufficient funds | Not enough balance |
+| -32602 | Invalid params | Invalid transaction parameters |
+
+---
+
+## Notes
+
+- Always use hex strings with `0x` prefix for numeric values
+- If `gas` is not provided, the wallet will estimate it
+- For EIP-1559 chains, prefer `maxFeePerGas` over `gasPrice`
+- The `from` address must be an account the user has connected

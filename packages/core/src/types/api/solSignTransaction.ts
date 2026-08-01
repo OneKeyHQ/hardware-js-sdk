@@ -1,4 +1,7 @@
-import { SolanaSignedTx as HardwareSolanaSignedTx } from '@onekeyfe/hd-transport';
+import type {
+  SolanaSignedTx as HardwareSolanaSignedTx,
+  SolanaTxExtraInfo,
+} from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type SolanaSignedTx = {
@@ -8,6 +11,7 @@ export type SolanaSignedTx = {
 export type SolanaSignTransactionParams = {
   path: string | number[];
   rawTx?: string;
+  extraInfo?: SolanaTxExtraInfo;
 };
 
 export declare function solSignTransaction(

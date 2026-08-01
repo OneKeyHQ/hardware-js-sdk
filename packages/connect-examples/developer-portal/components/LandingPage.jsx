@@ -1,0 +1,558 @@
+'use client'
+
+import { useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import {
+  Usb,
+  Bluetooth,
+  Smartphone,
+  QrCode,
+  ArrowUpRight,
+  ChevronDown,
+  X,
+  // Bot,
+} from 'lucide-react'
+
+const heroSecurity05 = '/landing-page/security-05.png'
+const heroSecurity04 = '/landing-page/security-04.png'
+const heroSecurity03 = '/landing-page/security-03.png'
+const heroSecurity02 = '/landing-page/security-02.png'
+const heroSecurity01 = '/landing-page/security-01.png'
+
+const getFooterData = (isZh, locale) => {
+  const portalColumn = {
+    title: isZh ? 'OneKey 开发者门户' : 'OneKey Developer portal',
+    items: [
+      { label: isZh ? '首页' : 'Home', href: `/${locale}` },
+      { label: 'Playground', href: 'https://hardware-example.onekey.so/' },
+      { label: 'Hardware-js-sdk', href: 'https://github.com/OneKeyHQ/hardware-js-sdk/' },
+      { label: 'Cross-inpage-provider', href: 'https://github.com/OneKeyHQ/cross-inpage-provider' },
+      { label: 'App-monorepo', href: 'https://github.com/OneKeyHQ/app-monorepo' },
+    ],
+  }
+
+  const legalColumn = {
+    title: isZh ? '法律' : 'Legal',
+    items: [
+      { label: isZh ? '用户协议' : 'User Agreement', href: 'https://help.onekey.so/hc/articles/11461297' },
+      { label: isZh ? '隐私政策' : 'Privacy Policy', href: 'https://help.onekey.so/hc/articles/11461298' },
+      { label: isZh ? '官方成员验证' : 'Team Verification', href: 'https://onekey.so/team-verification' },
+    ],
+  }
+
+  return { portalColumn, legalColumn }
+}
+
+const IntegrationCard = ({ title, description, icon: Icon, iconSrc, href, cta, className = '' }) => (
+  <Link
+    href={href}
+    className={`flex min-h-[210px] w-full flex-col justify-between rounded-[16px] border border-white/10 bg-[#222] p-[24px] no-underline sm:min-h-[234px] sm:p-[32px] ${className}`}
+  >
+    <div className="flex flex-col gap-[24px]">
+      <div className="flex items-center gap-[12px]">
+        <div className="flex size-[38px] items-center justify-center rounded-full bg-[#191919]">
+          {iconSrc ? (
+            <img src={iconSrc} alt="" className="size-[20px]" />
+          ) : (
+            <Icon className="size-[20px] text-white" />
+          )}
+        </div>
+        <span
+          className="text-[20px] font-semibold leading-[25px] sm:text-[24px] sm:leading-[30px]"
+          style={{ color: '#FFFFFF' }}
+        >
+          {title}
+        </span>
+      </div>
+      <span className="text-[16px] leading-[20px]" style={{ color: '#FFFFFFB2' }}>
+        {description}
+      </span>
+    </div>
+    <div className="flex items-center gap-[4px] text-[#16d629]">
+      <span className="text-[18px] leading-[20px]">{cta}</span>
+      <ArrowUpRight className="size-[16px]" />
+    </div>
+  </Link>
+)
+
+export function LandingPage({ locale = 'en' }) {
+  const router = useRouter()
+  const [showSubscribeModal, setShowSubscribeModal] = useState(false)
+  const [showLanguageMenu, setShowLanguageMenu] = useState(false)
+  const isZh = locale === 'zh'
+
+  const handleLanguageChange = (newLocale) => {
+    setShowLanguageMenu(false)
+    router.push(`/${newLocale}`)
+  }
+
+  const copy = isZh
+    ? {
+        heroTitle: 'OneKey 开发者门户',
+        heroSubtitle: '用 OneKey 硬件构建安全的 Web3 体验。',
+        ctaPrimary: '开始构建',
+        ctaSecondary: '更新日志',
+        viewDocs: '查看文档',
+        hardwareTitle: '硬件接入',
+        hardwareSubtitle: '通过 USB 或 BLE 连接 OneKey 设备。',
+        dappTitle: 'dApp 接入',
+        dappSubtitle: 'SDK 与 API 用于钱包连接与签名。',
+        offlineTitle: '离线签名',
+        offlineSubtitle: '使用二维码进行离线签名。',
+        supportTitle: '需要集成支持？',
+        supportSubtitle: '获取架构评审、传输方案选择与生产环境落地支持。',
+        supportPrimary: '提交需求',
+      }
+    : {
+        heroTitle: 'OneKey Developer Portal',
+        heroSubtitle: 'Integrate secure, hardware-backed signing into your dApp, wallet, or blockchain stack.',
+        ctaPrimary: 'Get Started',
+        ctaSecondary: 'View Changelog',
+        viewDocs: 'View docs',
+        hardwareTitle: 'Hardware Integration',
+        hardwareSubtitle: 'Connect to OneKey devices over USB or BLE transports.',
+        dappTitle: 'dApp Integration',
+        dappSubtitle: 'SDKs and APIs for wallet connectivity and signing.',
+        offlineTitle: 'Offline Signing',
+        offlineSubtitle: 'Air-gapped signing flows using QR codes.',
+        supportTitle: 'Need integration support?',
+        supportSubtitle: 'Get help with architecture reviews, transport selection, and production rollout.',
+        supportPrimary: 'Submit a Request',
+      }
+  const integrationCards = [
+    {
+      title: isZh ? 'WebUSB 连接' : 'WebUSB Connection',
+      description: isZh ? '适用于网页与桌面浏览器的 USB 传输。' : 'USB transport for web apps and desktop browsers.',
+      icon: Usb,
+      href: `/${locale}/hardware-sdk/transport/web-usb`,
+      cta: copy.viewDocs,
+    },
+    {
+      title: isZh ? 'React Native BLE' : 'React Native BLE',
+      description: isZh ? '适用于 React Native 的 BLE 传输。' : 'BLE transport for React Native apps.',
+      icon: Bluetooth,
+      href: `/${locale}/hardware-sdk/transport/react-native-ble`,
+      cta: copy.viewDocs,
+    },
+    {
+      title: isZh ? '原生移动端 BLE' : 'Native Mobile BLE',
+      description: isZh ? '适用于原生移动端的 BLE 传输。' : 'BLE transport for native mobile apps.',
+      icon: Smartphone,
+      href: `/${locale}/hardware-sdk/transport/native-ble`,
+      cta: copy.viewDocs,
+    },
+    /*
+    {
+      title: isZh ? 'OneKey Agent Wallet' : 'OneKey Agent Wallet',
+      description: isZh
+        ? '在 OneKey GUI 中管理 Agent 钱包，绑定 keyless 账号，并将高风险操作交给硬件确认。'
+        : 'Manage agent wallets in the OneKey GUI, bind keyless accounts, and escalate high-risk actions to hardware confirmation.',
+      icon: Bot,
+      href: `/${locale}/agent-wallet`,
+      cta: copy.viewDocs,
+    },
+    */
+  ]
+
+  const dappCards = [
+    {
+      title: isZh ? 'Provider API' : 'Provider API',
+      description: isZh ? 'Provider 接入规范、支持链与签名能力说明。' : 'Provider integration specs, supported chains, and signing capabilities.',
+      icon: Usb,
+      href: `/${locale}/connect-to-software/provider`,
+      cta: copy.viewDocs,
+      iconSrc: '/landing-page/icon-provider.svg',
+    },
+    {
+      title: isZh ? 'Web3Modal UI 组件' : 'Web3Modal UI Kit',
+      description: isZh ? '可直接集成的钱包连接 UI，支持移动端。' : 'Drop-in wallet connection UI with mobile support.',
+      icon: Bluetooth,
+      href: `/${locale}/connect-to-software/wallet-ui/web3modal`,
+      cta: copy.viewDocs,
+      iconSrc: '/landing-page/icon-web3Modal.svg',
+    },
+  ]
+
+  const offlineCards = [
+    {
+      title: isZh ? 'Air-Gapped QR 流程' : 'Air-Gapped QR Flow',
+      description: isZh ? '通过二维码离线签名与数据交换。' : 'Sign transactions offline with QR-based data exchange.',
+      icon: QrCode,
+      href: `/${locale}/air-gap`,
+      cta: copy.viewDocs,
+    },
+  ]
+
+  return (
+    <div className="flex min-h-screen flex-col bg-[#101111] font-sans text-white">
+      <main className="flex flex-col gap-[72px] sm:gap-[96px] lg:gap-[120px]">
+        <section
+          className="relative w-full overflow-hidden"
+          style={{
+            backgroundImage: "url('/landing-page/hero-bg.svg')",
+            backgroundSize: 'cover',
+            backgroundPosition: 'center bottom',
+          }}
+        >
+          <div className="relative mx-auto min-h-[560px] w-full max-w-[1440px] lg:h-[810px] lg:min-h-0">
+            <div className="absolute inset-x-[20px] top-[84px] z-10 flex flex-col items-center text-center sm:inset-x-[32px] sm:top-[104px] lg:left-[64px] lg:right-auto lg:top-[169px] lg:w-[711px] lg:items-start lg:text-left">
+              <h1 className="max-w-full text-[36px] font-semibold leading-[40px] sm:text-[44px] sm:leading-[48px] lg:text-[52px] lg:leading-[56px]">
+                <span className="bg-gradient-to-r from-[#57E668] to-[#16D629] bg-clip-text text-transparent">
+                  {copy.heroTitle}
+                </span>
+              </h1>
+              <p className="mt-[16px] max-w-[620px] text-[16px] leading-[24px] text-white/60 lg:mt-0 lg:leading-[56px]">
+                {copy.heroSubtitle}
+              </p>
+              <div className="mt-[32px] grid w-full max-w-[420px] grid-cols-1 gap-[12px] sm:grid-cols-2 lg:mt-[54px] lg:flex lg:w-auto lg:max-w-none lg:items-center lg:gap-[8px]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const section = document.getElementById('hardware-integration')
+                    if (section) {
+                      const offset = 160
+                      const sectionTop = section.getBoundingClientRect().top + window.scrollY
+                      window.scrollTo({ top: sectionTop - offset, behavior: 'smooth' })
+                    }
+                  }}
+                  className="flex min-h-[52px] items-center justify-center rounded-[50px] px-[24px] py-[14px] text-[16px] font-medium transition-opacity hover:opacity-90 sm:px-[32px] sm:py-[18px]"
+                  style={{
+                    backgroundImage:
+                      'linear-gradient(90deg, rgb(79, 245, 95) 0%, rgb(33, 233, 53) 100%)',
+                    color: '#101111',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {copy.ctaPrimary}
+                </button>
+                <Link
+                  href={`/${locale}/changelog`}
+                  className="flex min-h-[52px] items-center justify-center rounded-[50px] bg-white px-[24px] py-[14px] text-[16px] font-medium text-[#101111] no-underline sm:px-[32px] sm:py-[18px]"
+                  style={{ color: '#101111' }}
+                >
+                  {copy.ctaSecondary}
+                </Link>
+              </div>
+            </div>
+              <img
+                src={heroSecurity05}
+                alt=""
+                className="pointer-events-none absolute left-[calc(50%+334.5px)] top-[-65px] hidden h-[919px] w-[915px] -translate-x-1/2 object-cover opacity-70 lg:block"
+              />
+              <img
+                src={heroSecurity04}
+                alt=""
+                className="pointer-events-none absolute left-[calc(50%+309.5px)] top-[11px] hidden h-[863px] w-[831px] -translate-x-1/2 object-cover lg:block"
+              />
+              <img
+                src={heroSecurity03}
+                alt=""
+                className="pointer-events-none absolute left-[calc(50%+309.5px)] top-[11px] hidden h-[863px] w-[831px] -translate-x-1/2 object-cover opacity-20 lg:block"
+              />
+              <img
+                src={heroSecurity02}
+                alt=""
+                className="pointer-events-none absolute left-[calc(50%+309.5px)] top-[11px] hidden h-[863px] w-[831px] -translate-x-1/2 object-cover lg:block"
+              />
+              <img
+                src={heroSecurity01}
+                alt=""
+                className="pointer-events-none absolute left-[calc(50%+309.5px)] top-[11px] hidden h-[863px] w-[831px] -translate-x-1/2 object-cover opacity-50 lg:block"
+              />
+          </div>
+        </section>
+
+        <section
+          id="hardware-integration"
+          className="mx-auto flex w-full max-w-[1440px] flex-col items-center px-[20px] sm:px-[32px] lg:px-[64px]"
+        >
+          <div className="flex w-full flex-col items-center gap-[8px] text-center">
+            <h2
+              className="text-[32px] font-medium leading-[38px] sm:text-[40px] sm:leading-[46px]"
+              style={{ color: '#FFFFFF' }}
+            >
+              {copy.hardwareTitle}
+            </h2>
+            <span className="text-[16px]" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
+              {copy.hardwareSubtitle}
+            </span>
+          </div>
+          <div className="mt-[24px] grid w-full grid-cols-1 gap-[16px] sm:gap-[24px] lg:grid-cols-3 lg:gap-[32px]">
+            {integrationCards.map((card) => (
+              <IntegrationCard key={card.title} {...card} />
+            ))}
+          </div>
+        </section>
+
+        <section className="mx-auto flex w-full max-w-[1440px] flex-col items-center px-[20px] sm:px-[32px] lg:px-[64px]">
+          <div className="flex w-full flex-col items-center gap-[8px] text-center">
+            <h2
+              className="text-[32px] font-medium leading-[38px] sm:text-[40px] sm:leading-[46px]"
+              style={{ color: '#FFFFFF' }}
+            >
+              {copy.dappTitle}
+            </h2>
+            <span className="text-[16px]" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
+              {copy.dappSubtitle}
+            </span>
+          </div>
+          <div className="mt-[24px] grid w-full grid-cols-1 gap-[16px] sm:gap-[24px] lg:grid-cols-3 lg:gap-[32px]">
+            {dappCards.map((card) => (
+              <IntegrationCard key={card.title} {...card} />
+            ))}
+          </div>
+        </section>
+
+        <section className="mx-auto flex w-full max-w-[1440px] flex-col items-center px-[20px] sm:px-[32px] lg:px-[64px]">
+          <div className="flex w-full flex-col items-center gap-[8px] text-center">
+            <h2
+              className="text-[32px] font-medium leading-[38px] sm:text-[40px] sm:leading-[46px]"
+              style={{ color: '#FFFFFF' }}
+            >
+              {copy.offlineTitle}
+            </h2>
+            <span className="text-[16px]" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
+              {copy.offlineSubtitle}
+            </span>
+          </div>
+          <div className="mt-[24px] grid w-full grid-cols-1 gap-[16px] sm:gap-[24px] lg:grid-cols-3 lg:gap-[32px]">
+            {offlineCards.map((card) => (
+              <IntegrationCard key={card.title} {...card} />
+            ))}
+          </div>
+        </section>
+
+        <section className="mx-auto w-full max-w-[1440px] px-[20px] sm:px-[32px] lg:px-[64px]">
+          <div
+            className="relative flex flex-col items-start gap-[32px] rounded-[24px] bg-[#222222] p-[24px] sm:p-[32px] lg:flex-row lg:items-center lg:gap-[40px] lg:p-[40px]"
+          >
+            <div className="flex w-full max-w-[591px] flex-col gap-[32px] lg:gap-[40px]">
+              <div className="flex flex-col gap-[8px]">
+                <div className="text-[26px] font-medium leading-[32px] text-white sm:text-[30px] sm:leading-[36px]">
+                  {copy.supportTitle}
+                </div>
+                <div className="text-[16px] leading-[20px] text-white/70">
+                  {copy.supportSubtitle}
+                </div>
+              </div>
+              <div className="flex w-full flex-col gap-[12px] sm:flex-row sm:flex-wrap sm:gap-[16px]">
+                <a
+                  href="https://help.onekey.so/hc/requests/new"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex min-h-[44px] items-center justify-center gap-[8px] rounded-[50px] px-[20px] py-[10px] text-[16px] font-medium text-[#101111] no-underline"
+                  style={{
+                    backgroundImage:
+                      'linear-gradient(90deg, rgb(79, 245, 95) 0%, rgb(33, 233, 53) 100%)',
+                    color: '#101111',
+                  }}
+                >
+                  {copy.supportPrimary}
+                </a>
+                <a
+                  href="https://github.com/OneKeyHQ/hardware-js-sdk/issues"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex min-h-[44px] items-center justify-center gap-[8px] rounded-[50px] border border-white px-[20px] py-[10px] text-[16px] font-medium text-white no-underline"
+                >
+                  GitHub Issues
+                </a>
+              </div>
+            </div>
+            <img
+              src="/landing-page/device.png"
+              alt="OneKey device"
+              className="pointer-events-none hidden size-[400px] object-contain lg:absolute lg:right-[40px] lg:top-[-80px] lg:block"
+            />
+          </div>
+        </section>
+      </main>
+
+      <footer className="mt-[72px] w-full rounded-t-[40px] bg-[#101111] sm:mt-[96px] sm:rounded-t-[64px] lg:mt-[120px]">
+        <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-[56px] px-[20px] py-[72px] sm:px-[32px] sm:py-[96px] lg:flex-row lg:gap-[133px] lg:px-[64px] lg:py-[120px]">
+          <div className="flex shrink-0 flex-col gap-[10px]">
+            <div className="flex flex-col gap-[16px]">
+              <img
+                src="/landing-page/onekey-brand.svg"
+                alt="OneKey"
+                className="h-[57px] w-[233px]"
+              />
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowLanguageMenu(!showLanguageMenu)}
+                  className="flex w-fit items-center gap-[8px] rounded-[50px] border border-white px-[20px] py-[10px] text-[16px] font-medium text-white"
+                >
+                  {isZh ? '中文' : 'English'}
+                  <ChevronDown className={`size-[24px] transition-transform ${showLanguageMenu ? 'rotate-180' : ''}`} />
+                </button>
+                {showLanguageMenu && (
+                  <div className="absolute left-0 top-full z-20 mt-[8px] flex flex-col overflow-hidden rounded-[12px] border border-white/10 bg-[#1a1a1a]">
+                    <button
+                      type="button"
+                      onClick={() => handleLanguageChange('en')}
+                      className={`px-[20px] py-[12px] text-left text-[14px] hover:bg-white/10 ${!isZh ? 'text-[#16d629]' : 'text-white'}`}
+                    >
+                      English
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleLanguageChange('zh')}
+                      className={`px-[20px] py-[12px] text-left text-[14px] hover:bg-white/10 ${isZh ? 'text-[#16d629]' : 'text-white'}`}
+                    >
+                      中文
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex flex-col gap-[24px] pt-[10px]">
+              <div className="flex items-center gap-[16px]">
+                <a
+                  href="https://twitter.com/onekeyHQ"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Twitter"
+                >
+                  <img src="/landing-page/social/twitter.svg" alt="" className="size-[24px]" />
+                </a>
+                <a
+                  href="https://github.com/OneKeyHQ"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="GitHub"
+                >
+                  <img src="/landing-page/social/github.svg" alt="" className="size-[24px]" />
+                </a>
+                <a
+                  href="https://discord.gg/onekey"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Discord"
+                >
+                  <img src="/landing-page/social/discord.svg" alt="" className="size-[24px]" />
+                </a>
+              </div>
+              <div className="flex flex-col gap-[16px]">
+                <div className="flex items-center gap-[16px]">
+                  <a
+                    href="https://github.com/OneKeyHQ"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <img
+                      src="/landing-page/badge-osi.svg"
+                      alt="Open Source"
+                      className="h-[33px] w-[96px]"
+                    />
+                  </a>
+                  <img
+                    src="/landing-page/badge-cceal.svg"
+                    alt="CCEAL 5+ ISO 27001"
+                    className="h-[32px] w-[108px]"
+                  />
+                </div>
+                <p className="text-[12px] leading-[15px] text-white/60">
+                  Since 2019 - {new Date().getFullYear()} | OneKey Limited All Rights Reserved
+                </p>
+                <p className="mt-2 font-mono text-[11px] leading-[14px] text-white/40">
+                  SDK v{process.env.NEXT_PUBLIC_SDK_VERSION || 'dev'}
+                  {process.env.NEXT_PUBLIC_COMMIT_SHORT && process.env.NEXT_PUBLIC_COMMIT_SHORT !== 'local' && (
+                    <>
+                      {' '}
+                      ·{' '}
+                      <a
+                        href={`https://github.com/OneKeyHQ/hardware-js-sdk/commit/${process.env.NEXT_PUBLIC_COMMIT_ID || ''}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="transition-colors hover:text-white/60"
+                      >
+                        {process.env.NEXT_PUBLIC_COMMIT_SHORT}
+                      </a>
+                    </>
+                  )}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-1 flex-col gap-[80px]">
+            <div className="flex flex-wrap gap-[40px] lg:gap-[80px]">
+              <div className="flex flex-col gap-[32px]">
+                <p className="text-[14px] font-medium leading-[20px] text-white/60">
+                  {getFooterData(isZh, locale).portalColumn.title}
+                </p>
+                <div className="flex flex-col gap-[16px]">
+                  {getFooterData(isZh, locale).portalColumn.items.map((item) => (
+                    <a
+                      key={item.label}
+                      href={item.href}
+                      className="text-[16px] leading-[20px] text-white hover:text-white/80"
+                      target={item.href.startsWith('http') ? '_blank' : undefined}
+                      rel={item.href.startsWith('http') ? 'noopener noreferrer' : undefined}
+                    >
+                      {item.label}
+                    </a>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-[32px]">
+                <p className="text-[14px] font-medium leading-[17px] text-white/60">
+                  {getFooterData(isZh, locale).legalColumn.title}
+                </p>
+                <div className="flex flex-col gap-[16px]">
+                  {getFooterData(isZh, locale).legalColumn.items.map((item) => (
+                    <a
+                      key={item.label}
+                      href={item.href}
+                      className="text-[16px] font-medium leading-[20px] text-white hover:text-white/80"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {item.label}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-[16px]">
+              <button
+                type="button"
+                onClick={() => setShowSubscribeModal(true)}
+                className="w-fit rounded-[50px] border border-white px-[20px] py-[10px] text-[16px] font-medium text-white hover:bg-white/10"
+              >
+                {isZh ? '订阅我们的通知' : 'Subscribe to our notifications'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </footer>
+
+      {showSubscribeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-[16px]">
+          <div className="relative max-h-[calc(100dvh-32px)] w-full max-w-[520px] overflow-hidden rounded-[16px] bg-white">
+            <button
+              type="button"
+              onClick={() => setShowSubscribeModal(false)}
+              className="absolute right-[12px] top-[12px] z-10 flex size-[44px] items-center justify-center rounded-full bg-black/10 hover:bg-black/20"
+              aria-label="Close"
+            >
+              <X className="size-[20px] text-gray-600" />
+            </button>
+            <iframe
+              title="Subscribe to OneKey notifications"
+              width="100%"
+              height="640"
+              src="https://42580da6.sibforms.com/serve/MUIEAI9xKoDAfTUz53hH6tfFw33F9jhgZ4pvLBMCebFgxpaWbthSByPZWMaeONkK5X2ffORCqwK1J-ZPnWiv0QO7xOKU7GNASRGHZkksxcx-GnE0kkPbJ-GFDvZ5MC1vPT1lybkIKZZxZI5eXofyZQqeXNaaGT6-nQJ1hNb5FG0tvGLpgNK3oBe9Wvx3lpghzTTkwiYcWH25Xt1o"
+              allowFullScreen
+              style={{ display: 'block', maxWidth: '100%' }}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

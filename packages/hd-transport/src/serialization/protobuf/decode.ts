@@ -1,6 +1,8 @@
-import { Type, Message, Field } from 'protobufjs/light';
 import ByteBuffer from 'bytebuffer';
+
 import { isPrimitiveField } from '../../utils/protobuf';
+
+import type { Field, Message, Type } from 'protobufjs/light';
 
 const transform = (field: Field, value: any) => {
   // [compatibility]: optional undefined keys should be null. Example: Features.fw_major.
@@ -38,6 +40,13 @@ function messageToJSON(Message: Message<Record<string, unknown>>, fields: Type['
     // @ts-ignore
     const value = message[key];
 
+    if (value == null) {
+      if (field.optional) {
+        res[key] = null;
+      }
+      return;
+    }
+
     /* istanbul ignore else  */
     if (field.repeated) {
       /* istanbul ignore else  */
@@ -61,7 +70,10 @@ function messageToJSON(Message: Message<Record<string, unknown>>, fields: Type['
     }
     // message type
     else if (field.resolvedType!.fields) {
-      res[key] = messageToJSON(value, field.resolvedType!.fields);
+      // [compatibility]: absent optional sub-messages are not own properties
+      // of the decoded instance, so value is undefined here; decode them to
+      // null, matching the optional primitive-field convention above.
+      res[key] = value == null ? null : messageToJSON(value, (field.resolvedType as Type).fields);
     } else {
       throw new Error(`case not handled: ${key}`);
     }

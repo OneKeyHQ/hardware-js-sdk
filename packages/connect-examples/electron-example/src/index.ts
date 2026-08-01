@@ -1,18 +1,12 @@
-import {
-  screen,
-  app,
-  BrowserWindow,
-  session,
-  ipcMain,
-  USBDevice,
-  SerialPort,
-  HIDDevice,
-} from 'electron';
+import { BrowserWindow, app, ipcMain, screen, session, shell } from 'electron';
 import path from 'path';
 import isDevelopment from 'electron-is-dev';
 import { format as formatUrl } from 'url';
 import log from 'electron-log';
 import { autoUpdater } from 'electron-updater';
+import { exec } from 'child_process';
+import { initNobleBleSupport } from '@onekeyfe/hd-transport-electron';
+
 import initProcess, { restartBridge } from './process';
 import { ipcMessageKeys } from './config';
 
@@ -88,6 +82,7 @@ function createMainWindow() {
       spellcheck: false,
       webviewTag: true,
       webSecurity: !isDevelopment,
+      // @ts-expect-error
       nativeWindowOpen: true,
       allowRunningInsecureContent: isDevelopment,
       // webview injected js needs isolation=false, because property can not be exposeInMainWorld() when isolation enabled.
@@ -201,7 +196,8 @@ function createMainWindow() {
     log.debug('WebUSB: select-usb-device 事件触发');
     log.debug('WebUSB: 可用设备列表:', JSON.stringify(details.deviceList, null, 2));
 
-    // 阻止默认行为，以便我们可以自定义设备选择
+    // 阻止默认行为，以便我们可以自动选择设备
+    // 这是 Electron 的优势：不像浏览器必须显示弹窗，桌面应用可以自动化处理
     event.preventDefault();
 
     // 直接选择第一个设备
@@ -263,6 +259,10 @@ function createMainWindow() {
     }
   });
 
+  ipcMain.on(ipcMessageKeys.APP_RESTART, () => {
+    browserWindow?.reload();
+  });
+
   return browserWindow;
 }
 
@@ -283,6 +283,15 @@ if (!singleInstance && !process.mas) {
     if (!mainWindow) {
       mainWindow = createMainWindow();
     }
+
+    try {
+      log.info('Initializing Noble BLE support...');
+      initNobleBleSupport(mainWindow.webContents);
+      log.info('Noble BLE support initialized successfully.');
+    } catch (e) {
+      log.error('Failed to initialize Noble BLE support:', e);
+    }
+
     initChildProcess();
     showMainWindow();
     console.log('日志文件位置:', log.transports.file.getFile().path);
@@ -296,6 +305,49 @@ ipcMain.on(ipcMessageKeys.UPDATE_RESTART, () => {
 
 ipcMain.on(ipcMessageKeys.APP_RELOAD_BRIDGE_PROCESS, () => {
   restartBridge();
+});
+
+// Simplified Bluetooth System API Implementation
+class BluetoothSystemManager {
+  openBluetoothSettings(): void {
+    try {
+      if (process.platform === 'darwin') {
+        exec('open "/System/Library/PreferencePanes/Bluetooth.prefPane"');
+      } else if (process.platform === 'win32') {
+        shell.openExternal('ms-settings:bluetooth');
+      } else {
+        log.warn('Opening Bluetooth settings not supported on this platform');
+      }
+    } catch (error) {
+      log.error('Failed to open Bluetooth settings:', error);
+    }
+  }
+
+  openPrivacySettings(): void {
+    try {
+      if (process.platform === 'darwin') {
+        exec('open "x-apple.systempreferences:com.apple.preference.security?Privacy_Bluetooth"');
+      } else if (process.platform === 'win32') {
+        shell.openExternal('ms-settings:privacy-bluetooth');
+      } else {
+        log.warn('Opening privacy settings not supported on this platform');
+      }
+    } catch (error) {
+      log.error('Failed to open privacy settings:', error);
+    }
+  }
+}
+
+// Create global instance
+const bluetoothManager = new BluetoothSystemManager();
+
+// Register simplified IPC handlers for Bluetooth system API
+ipcMain.handle('bluetooth-open-bluetooth-settings', () => {
+  bluetoothManager.openBluetoothSettings();
+});
+
+ipcMain.handle('bluetooth-open-privacy-settings', () => {
+  bluetoothManager.openPrivacySettings();
 });
 
 // 配置 GitHub 发布提供者
@@ -325,7 +377,7 @@ app.on('ready', () => {
   }, 5000);
 });
 
-// wuit when all windows are closed, except on macOS. There, it's common
+// quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q
 app.on('window-all-closed', (event: Event) => {

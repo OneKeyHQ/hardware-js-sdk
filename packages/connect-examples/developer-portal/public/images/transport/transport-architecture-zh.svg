@@ -1,0 +1,178 @@
+<svg host="65bd71144e" xmlns="http://www.w3.org/2000/svg" style="background: transparent; background-color: transparent;" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="961px" height="346px" viewBox="-0.5 -0.5 961 346" content="&lt;mxfile&gt;&lt;diagram id=&quot;TransportArchitecture&quot; name=&quot;Transport Architecture&quot;&gt;zVdbb5swFP41lraHSFxiMI9AoLtfGlXVHg2YgEowcpwm3a/fsTFJWJjWdenWViL2d44vnO/j+Bi58Xp/JWhXfeQFa5BjFXvkLpDjEIzhqYCHHphbXg+sRF30kH0ElvV3ZkDLoNu6YJuRo+S8kXU3BnPetiyXPWbGUiH4bjOCSt6MV+3oip0By5w25+htXcjKoI5lHQ1vWL2qzNL+YFjTwdkAm4oWfHcCuQlyY8G57FvrfcwaFbshLv249BfWw8YEa+VjBtCui6ko+mH3tNmaN0QJRlGIgjlKfPUMiUZsRJSjms+xvvGtgJ+w65AD/LnAjhuhZI4igoJQ+ZMQhTZKAkQsFIGJoChBga1miB0U+dC4eWsCIR+G6Aq+bQumNmjDhLuqlmzZ0VxZdyAnwCq5boy55K00ArHnQ9/Mpey0qVcttHMICBMA3DMha6AyNIZ1XRTKOyrrpol5w4Xehcv80ilLwDdS8Dt2YvFywjJlOQ+2ib9ag+1PIBP8K8bXTIoHcNkfNNMPMV8CNt3dUVaBZ7DqRFEDRo2SV4eZj2RDw/A9zf2muJvk/g2AO3gpQJeL9/B89W75ekSxh0iMiK+5jlCoRRLFKPC0CSh2TilWYAQ40VYbhanWkqXaIInQRQSP/QMluSDQ1tT4wyqkVyMM9C4rmieLpLRBCf6USALPd6n3PCI59P+FSnYs226yiO/PdHLLspslvJ/XwHJRBrnAW0mtD6z1gVGSalmEaG7xlt2xhxJElVbFLOfrNW9nJj/PQImXI9T9G0ILzEgxnyKUOJnrPROhjuWcEXo4Ik4Jta0LMCraKTavGYWT0rE+UVnfq28/+pA8idusYS+I0LIsnTyfIrTwMg9fiFCX/E9CW03ZFKnDMY6Pp7fK2TEKreE0dnVWTlXO7tM5pGpI+b0Mxmn/t9RLQdtNx4WcNXzXsHtV9Y3GB7HaDiwIyV2l9WEiNTXsJTXVRpAeioy02UrF+AtRE8nZtJoygufYuoyavPn/VBOtxYp2U2oKazG7gtiCPL5ej6Xho9DTJZ6vCI5SLSrguDf1Rz00FkpySgeALH6uGqO+DvjcsvdMReOL4C+E9jxneLoWxFmQFfgytAfW72m3yXPRXpmq7xfXAV9V8mF8zBGqNksMnao28w+f7IHAYyE5rh0TFOqEBFkHir8hCehawkyhz54XeS0osfqfvBbov+cpEFwHP67i8/9cCdA93je17eTS7iY/AA==&lt;/diagram&gt;&lt;/mxfile&gt;">
+    <defs/>
+    <g>
+        <g>
+            <rect x="0" y="0" width="960" height="60" rx="9" ry="9" fill="#e7f2ff" stroke="#6c8ebf" pointer-events="all" style="fill: light-dark(rgb(231, 242, 255), rgb(22, 31, 42)); stroke: light-dark(rgb(108, 142, 191), rgb(92, 121, 163));"/>
+        </g>
+        <g>
+            <g transform="translate(-0.5 -0.5)">
+                <switch>
+                    <foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+                        <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 958px; height: 1px; padding-top: 30px; margin-left: 1px;">
+                            <div style="box-sizing: border-box; font-size: 0; text-align: center; color: #000000; ">
+                                <div style="display: inline-block; font-size: 14px; font-family: &quot;Helvetica&quot;; color: light-dark(#000000, #ffffff); line-height: 1.2; pointer-events: all; font-weight: bold; white-space: normal; word-wrap: normal; ">
+                                    应用层 / Your App
+                                    <br/>
+                                    业务逻辑 · UI
+                                </div>
+                            </div>
+                        </div>
+                    </foreignObject>
+                    <text x="480" y="34" fill="light-dark(#000000, #ffffff)" font-family="&quot;Helvetica&quot;" font-size="14px" text-anchor="middle" font-weight="bold">
+                        应用层 / Your App...
+                    </text>
+                </switch>
+            </g>
+        </g>
+        <g>
+            <rect x="0" y="70" width="960" height="60" rx="9" ry="9" fill="#f1ebf7" stroke="#9673a6" pointer-events="all" style="fill: light-dark(rgb(241, 235, 247), rgb(36, 31, 41)); stroke: light-dark(rgb(150, 115, 166), rgb(149, 119, 163));"/>
+        </g>
+        <g>
+            <g transform="translate(-0.5 -0.5)">
+                <switch>
+                    <foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+                        <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 958px; height: 1px; padding-top: 100px; margin-left: 1px;">
+                            <div style="box-sizing: border-box; font-size: 0; text-align: center; color: #000000; ">
+                                <div style="display: inline-block; font-size: 14px; font-family: &quot;Helvetica&quot;; color: light-dark(#000000, #ffffff); line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">
+                                    Hardware SDK (JS)
+                                    <br/>
+                                    指令编排 · 消息封装 · 错误处理
+                                </div>
+                            </div>
+                        </div>
+                    </foreignObject>
+                    <text x="480" y="104" fill="light-dark(#000000, #ffffff)" font-family="&quot;Helvetica&quot;" font-size="14px" text-anchor="middle">
+                        Hardware SDK (JS)...
+                    </text>
+                </switch>
+            </g>
+        </g>
+        <g>
+            <rect x="0" y="152" width="220" height="100" rx="15" ry="15" fill="#d5e8d4" stroke="#82b366" pointer-events="all" style="fill: light-dark(rgb(213, 232, 212), rgb(31, 47, 30)); stroke: light-dark(rgb(130, 179, 102), rgb(68, 110, 44));"/>
+        </g>
+        <g>
+            <g transform="translate(-0.5 -0.5)">
+                <switch>
+                    <foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+                        <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 218px; height: 1px; padding-top: 202px; margin-left: 1px;">
+                            <div style="box-sizing: border-box; font-size: 0; text-align: center; color: #000000; ">
+                                <div style="display: inline-block; font-size: 13px; font-family: &quot;Helvetica&quot;; color: light-dark(#000000, #ffffff); line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">
+                                    WebUSB
+                                    <br/>
+                                    包：@onekeyfe/hd-common-connect-sdk
+                                </div>
+                            </div>
+                        </div>
+                    </foreignObject>
+                    <text x="110" y="206" fill="light-dark(#000000, #ffffff)" font-family="&quot;Helvetica&quot;" font-size="13px" text-anchor="middle">
+                        WebUSB...
+                    </text>
+                </switch>
+            </g>
+        </g>
+        <g>
+            <rect x="260" y="152" width="220" height="100" rx="15" ry="15" fill="#fff2cc" stroke="#d6b656" pointer-events="all" style="fill: light-dark(rgb(255, 242, 204), rgb(40, 29, 0)); stroke: light-dark(rgb(214, 182, 86), rgb(109, 81, 0));"/>
+        </g>
+        <g>
+            <g transform="translate(-0.5 -0.5)">
+                <switch>
+                    <foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+                        <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 218px; height: 1px; padding-top: 202px; margin-left: 261px;">
+                            <div style="box-sizing: border-box; font-size: 0; text-align: center; color: #000000; ">
+                                <div style="display: inline-block; font-size: 13px; font-family: &quot;Helvetica&quot;; color: light-dark(#000000, #ffffff); line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">
+                                    React Native BLE
+                                    <br/>
+                                    包：@onekeyfe/hd-ble-sdk
+                                </div>
+                            </div>
+                        </div>
+                    </foreignObject>
+                    <text x="370" y="206" fill="light-dark(#000000, #ffffff)" font-family="&quot;Helvetica&quot;" font-size="13px" text-anchor="middle">
+                        React Native BLE...
+                    </text>
+                </switch>
+            </g>
+        </g>
+        <g>
+            <rect x="520" y="152" width="220" height="100" rx="15" ry="15" fill="#f8cecc" stroke="#b85450" pointer-events="all" style="fill: light-dark(rgb(248, 206, 204), rgb(81, 45, 43)); stroke: light-dark(rgb(184, 84, 80), rgb(215, 129, 126));"/>
+        </g>
+        <g>
+            <g transform="translate(-0.5 -0.5)">
+                <switch>
+                    <foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+                        <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 218px; height: 1px; padding-top: 202px; margin-left: 521px;">
+                            <div style="box-sizing: border-box; font-size: 0; text-align: center; color: #000000; ">
+                                <div style="display: inline-block; font-size: 13px; font-family: &quot;Helvetica&quot;; color: light-dark(#000000, #ffffff); line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">
+                                    底层传输插件 (Native)
+                                    <br/>
+                                    包：@onekeyfe/hd-transport-lowlevel
+                                    <br/>
+                                    场景：原生 / Flutter
+                                </div>
+                            </div>
+                        </div>
+                    </foreignObject>
+                    <text x="630" y="206" fill="light-dark(#000000, #ffffff)" font-family="&quot;Helvetica&quot;" font-size="13px" text-anchor="middle">
+                        底层传输插件 (Native)...
+                    </text>
+                </switch>
+            </g>
+        </g>
+        <g>
+            <rect x="780" y="152" width="180" height="100" rx="15" ry="15" fill="#cce5ff" stroke="#5b9bd5" pointer-events="all" style="fill: light-dark(rgb(204, 229, 255), rgb(24, 46, 68)); stroke: light-dark(rgb(91, 155, 213), rgb(65, 120, 170));"/>
+        </g>
+        <g>
+            <g transform="translate(-0.5 -0.5)">
+                <switch>
+                    <foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+                        <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 178px; height: 1px; padding-top: 202px; margin-left: 781px;">
+                            <div style="box-sizing: border-box; font-size: 0; text-align: center; color: #000000; ">
+                                <div style="display: inline-block; font-size: 13px; font-family: &quot;Helvetica&quot;; color: light-dark(#000000, #ffffff); line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">
+                                    Air-Gap (QR)
+                                    <br/>
+                                    离线扫码签名
+                                    <br/>
+                                    仅 OneKey Pro
+                                </div>
+                            </div>
+                        </div>
+                    </foreignObject>
+                    <text x="870" y="206" fill="light-dark(#000000, #ffffff)" font-family="&quot;Helvetica&quot;" font-size="13px" text-anchor="middle">
+                        Air-Gap (QR)...
+                    </text>
+                </switch>
+            </g>
+        </g>
+        <g>
+            <rect x="0" y="275" width="960" height="70" rx="10.5" ry="10.5" fill="#f5f5f5" stroke="#666666" pointer-events="all" style="fill: light-dark(rgb(245, 245, 245), rgb(26, 26, 26)); stroke: light-dark(rgb(102, 102, 102), rgb(149, 149, 149));"/>
+        </g>
+        <g>
+            <g transform="translate(-0.5 -0.5)">
+                <switch>
+                    <foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+                        <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 958px; height: 1px; padding-top: 310px; margin-left: 1px;">
+                            <div style="box-sizing: border-box; font-size: 0; text-align: center; color: #000000; ">
+                                <div style="display: inline-block; font-size: 14px; font-family: &quot;Helvetica&quot;; color: light-dark(#000000, #ffffff); line-height: 1.2; pointer-events: all; font-weight: bold; white-space: normal; word-wrap: normal; ">
+                                    硬件设备 / OneKey Hardware
+                                    <br/>
+                                    接口：USB / BLE
+                                </div>
+                            </div>
+                        </div>
+                    </foreignObject>
+                    <text x="480" y="314" fill="light-dark(#000000, #ffffff)" font-family="&quot;Helvetica&quot;" font-size="14px" text-anchor="middle" font-weight="bold">
+                        硬件设备 / OneKey Hardware...
+                    </text>
+                </switch>
+            </g>
+        </g>
+    </g>
+    <switch>
+        <g requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"/>
+        <a transform="translate(0,-5)" xlink:href="https://www.drawio.com/doc/faq/svg-export-text-problems" target="_blank">
+            <text text-anchor="middle" font-size="10px" x="50%" y="100%">
+                Text is not SVG - cannot display
+            </text>
+        </a>
+    </switch>
+</svg>

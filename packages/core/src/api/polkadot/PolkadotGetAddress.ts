@@ -1,17 +1,21 @@
-import { PolkadotGetAddress as HardwarePolkadotGetAddress } from '@onekeyfe/hd-transport';
-
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { PolkadotAddress, PolkadotGetAddressParams } from '../../types';
-import { getPolkadotVersionRangeWithBundle } from './networks';
+import { getPolkadotVersionRangeWithBundle, parseNetwork } from './networks';
+
+import type { PolkadotGetAddress as HardwarePolkadotGetAddress } from '@onekeyfe/hd-transport';
+import type { PolkadotAddress, PolkadotGetAddressParams } from '../../types';
 
 export default class PolkadotGetAddress extends BaseMethod<HardwarePolkadotGetAddress[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode];
+    this.allowDeviceMode = [...this.allowDeviceMode];
 
     this.hasBundle = !!this.payload?.bundle;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };
@@ -37,7 +41,7 @@ export default class PolkadotGetAddress extends BaseMethod<HardwarePolkadotGetAd
       this.params.push({
         address_n: addressN,
         prefix,
-        network,
+        network: parseNetwork(network),
         show_display: showOnOneKey,
       });
     });

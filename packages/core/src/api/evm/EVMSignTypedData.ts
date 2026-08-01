@@ -1,31 +1,42 @@
 import semver from 'semver';
-import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import {
-  EthereumTypedDataSignature,
-  EthereumTypedDataStructAck,
-  MessageKey,
-  MessageResponse,
-  TypedCall,
-} from '@onekeyfe/hd-transport';
 import { get } from 'lodash';
 import BigNumber from 'bignumber.js';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { Enum_Capability } from '@onekeyfe/hd-transport';
+
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { formatAnyHex, stripHexStartZeroes } from '../helpers/hexUtils';
-import { getDeviceFirmwareVersion, getDeviceType } from '../../utils';
+import { formatAnyHex, parseChainId, stripHexStartZeroes } from '../helpers/hexUtils';
+import { existCapability } from '../../utils/capabilitieUtils';
 import {
   DeviceModelToTypes,
   type EthereumSignTypedDataMessage,
   type EthereumSignTypedDataTypes,
 } from '../../types';
-import TransportManager from '../../data-manager/TransportManager';
 import { signTypedHash as signTypedHashLegacyV1 } from './legacyV1/signTypedHash';
+import { shouldUseLegacyV1EvmMessages } from './protocol';
 import { signTypedHash } from './latest/signTypedHash';
 import { signTypedData as signTypedDataLegacyV1 } from './legacyV1/signTypedData';
 import { signTypedData } from './latest/signTypedData';
 import { encodeData, getFieldType, parseArrayType } from '../helpers/typeNameUtils';
+
+import type {
+  EthereumTypedDataSignature,
+  EthereumTypedDataStructAck,
+  EthereumTypedDataStructAckOneKey,
+  MessageKey,
+  MessageResponse,
+  TypedCall,
+} from '@onekeyfe/hd-transport';
+
+/**
+ * EthereumTypedDataStructAckOneKey and EthereumTypedDataStructAck have identical
+ * fields and enum values. This zero-cost nominal conversion avoids scattered `any`.
+ */
+const toOneKeyStructAck = (ack: EthereumTypedDataStructAck): EthereumTypedDataStructAckOneKey =>
+  ack as unknown as EthereumTypedDataStructAckOneKey;
 
 export type EVMSignTypedDataParams = {
   addressN: number[];
@@ -36,10 +47,23 @@ export type EVMSignTypedDataParams = {
   chainId?: number;
 };
 
+const MINI_MAX_STRUCT_FIELDS = 16;
+const MINI_MAX_ACCESS_PATH_DEPTH = 6;
+const MINI_MAX_CUSTOM_DEP_STRUCTS = 8;
+const MINI_MAX_NAME_LENGTH = 63;
+const MINI_MAX_DYNAMIC_VALUE_BYTES = 1536;
+const MINI_MAX_ARRAY_TYPE_FIELDS = 24;
+const MINI_MAX_ARRAY_ELEMENTS = 24;
+
 export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = true;
 
     validateParams(this.payload, [
       { name: 'path', required: true },
@@ -48,6 +72,7 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
       { name: 'domainHash', type: 'hexString' },
       { name: 'messageHash', type: 'hexString' },
       { name: 'chainId', type: 'number' },
+      { name: 'usePreInitialize', type: 'boolean' },
     ]);
 
     const { path, data, metamaskV4Compat, domainHash, messageHash, chainId } = this.payload;
@@ -116,7 +141,6 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
       if (supportTrezor) {
         response = await typedCall(
           'EthereumTypedDataStructAck',
-          // @ts-ignore
           [
             'EthereumTypedDataStructRequest',
             'EthereumTypedDataValueRequest',
@@ -127,13 +151,12 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
       } else {
         response = await typedCall(
           'EthereumTypedDataStructAckOneKey',
-          // @ts-ignore
           [
             'EthereumTypedDataStructRequestOneKey',
             'EthereumTypedDataValueRequestOneKey',
             'EthereumTypedDataSignatureOneKey',
           ],
-          dataStruckAck
+          toOneKeyStructAck(dataStruckAck)
         );
       }
     }
@@ -169,7 +192,7 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
         } else if (typeof memberData === 'object' && memberData !== null) {
           const memberTypeDefinition = types[memberTypeName][index];
           memberTypeName = memberTypeDefinition.type;
-          memberData = memberData[memberTypeDefinition.name];
+          memberData = (memberData as Record<string, unknown>)[memberTypeDefinition.name];
         } else {
           // TODO
         }
@@ -206,6 +229,14 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
 
     if (response.type === 'EthereumGnosisSafeTxRequest') {
       const { data } = this.params;
+      const verifyingContract = data.domain?.verifyingContract;
+      // verifyingContract is required by proto and essential to a Gnosis Safe signature.
+      if (!verifyingContract) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.CallMethodInvalidParameter,
+          'EIP712Domain.verifyingContract is required for Gnosis Safe transaction'
+        );
+      }
       const param = {
         to: data.message.to,
         value: formatAnyHex(new BigNumber(data.message.value).toString(16)),
@@ -217,12 +248,11 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
         gasToken: data.message.gasToken,
         refundReceiver: data.message.refundReceiver,
         nonce: formatAnyHex(new BigNumber(data.message.nonce).toString(16)),
-        chain_id: new BigNumber(data.domain.chainId ?? '0x', 16).toNumber(),
-        verifyingContract: data.domain.verifyingContract,
+        chain_id: parseChainId(data.domain.chainId),
+        verifyingContract,
       };
       response = await typedCall(
         'EthereumGnosisSafeTxAck',
-        // @ts-ignore
         ['EthereumTypedDataSignature', 'EthereumTypedDataSignatureOneKey'],
         param
       );
@@ -248,29 +278,23 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
 
     let supportTrezor = false;
     let response: MessageResponse<MessageKey>;
-    switch (TransportManager.getMessageVersion()) {
-      case 'v1':
-        supportTrezor = true;
-        response = await signTypedDataLegacyV1({
-          typedCall: this.device.commands.typedCall.bind(this.device.commands),
-          addressN,
-          data,
-          metamaskV4Compat,
-          chainId,
-        });
-        break;
-
-      case 'latest':
-      default:
-        supportTrezor = false;
-        response = await signTypedData({
-          typedCall: this.device.commands.typedCall.bind(this.device.commands),
-          addressN,
-          data,
-          metamaskV4Compat,
-          chainId,
-        });
-        break;
+    if (shouldUseLegacyV1EvmMessages(this.device)) {
+      supportTrezor = true;
+      response = await signTypedDataLegacyV1({
+        typedCall: this.device.commands.typedCall.bind(this.device.commands),
+        addressN,
+        data,
+        metamaskV4Compat,
+        chainId,
+      });
+    } else {
+      response = await signTypedData({
+        typedCall: this.device.commands.typedCall.bind(this.device.commands),
+        addressN,
+        data,
+        metamaskV4Compat,
+        chainId,
+      });
     }
 
     return this.handleSignTypedData({
@@ -296,28 +320,24 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
   }) {
     if (!domainHash) throw ERRORS.TypedError('Runtime', 'domainHash is required');
 
-    switch (TransportManager.getMessageVersion()) {
-      case 'v1':
-        return signTypedHashLegacyV1({
-          typedCall,
-          addressN,
-          domainHash,
-          messageHash,
-          chainId,
-          device: this.device,
-        });
-
-      case 'latest':
-      default:
-        return signTypedHash({
-          typedCall,
-          addressN,
-          domainHash,
-          messageHash,
-          chainId,
-          device: this.device,
-        });
+    if (shouldUseLegacyV1EvmMessages(this.device)) {
+      return signTypedHashLegacyV1({
+        typedCall,
+        addressN,
+        domainHash,
+        messageHash,
+        chainId,
+        device: this.device,
+      });
     }
+    return signTypedHash({
+      typedCall,
+      addressN,
+      domainHash,
+      messageHash,
+      chainId,
+      device: this.device,
+    });
   }
 
   getVersionRange() {
@@ -334,10 +354,16 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
 
     let biggerLimit = 1024; // 1k
 
-    const currentVersion = getDeviceFirmwareVersion(this.device.features).join('.');
+    const currentVersion = this.device.getCurrentFirmwareVersionString() ?? '0.0.0';
+    const currentDeviceType = this.device.getCurrentDeviceType();
     const supportBiggerDataVersion = '4.4.0';
 
-    if (semver.gte(currentVersion, supportBiggerDataVersion)) {
+    const supportBiggerData =
+      DeviceModelToTypes.model_classic1s.includes(currentDeviceType) ||
+      (DeviceModelToTypes.model_touch.includes(currentDeviceType) &&
+        semver.gte(currentVersion, supportBiggerDataVersion));
+
+    if (supportBiggerData) {
       biggerLimit = 1536; // 1.5k
     }
 
@@ -375,10 +401,146 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
     return false;
   }
 
+  hasClassicFamilyTypedDataFormatViolations(
+    item: EthereumSignTypedDataMessage<EthereumSignTypedDataTypes>
+  ) {
+    if (!item?.types || !item.primaryType) return false;
+
+    const isArrayType = (typeName: string) => /\[[0-9]*\]$/.test(typeName);
+    const isBytesType = (typeName: string) => /^bytes(\d*)$/.test(typeName);
+    const isStructType = (typeName: string) => typeName in item.types;
+
+    if (Object.values(item.types).some(fields => fields.length > MINI_MAX_STRUCT_FIELDS)) {
+      return true;
+    }
+
+    if (
+      Object.entries(item.types).some(
+        ([typeName, fields]) =>
+          typeName.length > MINI_MAX_NAME_LENGTH ||
+          fields.some(field => field.name.length > MINI_MAX_NAME_LENGTH)
+      )
+    ) {
+      return true;
+    }
+
+    const totalArrayTypeFields = Object.values(item.types).reduce(
+      (count, fields) => count + fields.filter(field => isArrayType(field.type)).length,
+      0
+    );
+    if (totalArrayTypeFields > MINI_MAX_ARRAY_TYPE_FIELDS) {
+      return true;
+    }
+
+    const getDepth = (typeName: string, visiting: Set<string>): number => {
+      if (isArrayType(typeName)) {
+        const { entryTypeName } = parseArrayType(typeName);
+        return 1 + getDepth(entryTypeName, visiting);
+      }
+
+      if (!isStructType(typeName)) return 1;
+
+      // Cyclic reference detected — return a value that guarantees violation
+      if (visiting.has(typeName)) return MINI_MAX_ACCESS_PATH_DEPTH + 1;
+
+      visiting.add(typeName);
+      const depth = item.types[typeName].reduce((maxDepth, { type }) => {
+        const nextDepth = 1 + getDepth(type, visiting);
+        return Math.max(maxDepth, nextDepth);
+      }, 1);
+      visiting.delete(typeName);
+      return depth;
+    };
+
+    const maxPathDepth =
+      1 +
+      Math.max(
+        getDepth('EIP712Domain', new Set()),
+        getDepth(item.primaryType as string, new Set())
+      );
+    if (maxPathDepth > MINI_MAX_ACCESS_PATH_DEPTH) {
+      return true;
+    }
+
+    const depStructs = new Set<string>();
+    const collectDeps = (typeName: string, visiting: Set<string>) => {
+      if (isArrayType(typeName)) {
+        const { entryTypeName } = parseArrayType(typeName);
+        collectDeps(entryTypeName, visiting);
+        return;
+      }
+
+      if (!isStructType(typeName) || visiting.has(typeName)) return;
+
+      visiting.add(typeName);
+      if (typeName !== 'EIP712Domain' && typeName !== item.primaryType) {
+        depStructs.add(typeName);
+      }
+      item.types[typeName].forEach(({ type }) => collectDeps(type, visiting));
+      visiting.delete(typeName);
+    };
+
+    collectDeps('EIP712Domain', new Set());
+    collectDeps(item.primaryType as string, new Set());
+    if (depStructs.size > MINI_MAX_CUSTOM_DEP_STRUCTS) {
+      return true;
+    }
+
+    const dynamicSize = (typeName: string, value: unknown) => {
+      if (typeName === 'string') {
+        return typeof value === 'string' ? Buffer.byteLength(value, 'utf8') : 0;
+      }
+      if (isBytesType(typeName) && typeof value === 'string') {
+        const startIndex = value.startsWith('0x') ? 2 : 0;
+        return (value.length - startIndex) / 2;
+      }
+      return 0;
+    };
+
+    const walkValue = (typeName: string, value: unknown): boolean => {
+      if (value == null) return false;
+
+      if (isArrayType(typeName)) {
+        if (!Array.isArray(value)) return false;
+        const { entryTypeName } = parseArrayType(typeName);
+        const entryIsStruct = isStructType(entryTypeName);
+        const entryIsPrimitive = !entryIsStruct && !isArrayType(entryTypeName);
+
+        // In MetaMask V4, struct arrays are encoded individually and each element
+        // occupies a slot, so large struct arrays hit firmware limits just like primitives.
+        // In non-V4 mode struct arrays are hashed as a single blob, bypassing the limit.
+        if (
+          value.length > MINI_MAX_ARRAY_ELEMENTS &&
+          (entryIsPrimitive || (this.params.metamaskV4Compat && entryIsStruct))
+        ) {
+          return true;
+        }
+
+        return value.some(entry => walkValue(entryTypeName, entry));
+      }
+
+      if (dynamicSize(typeName, value) > MINI_MAX_DYNAMIC_VALUE_BYTES) {
+        return true;
+      }
+
+      if (typeof value === 'object' && isStructType(typeName)) {
+        return item.types[typeName].some(({ name, type }) =>
+          walkValue(type, (value as Record<string, unknown>)[name])
+        );
+      }
+
+      return false;
+    };
+
+    return (
+      walkValue('EIP712Domain', item.domain) || walkValue(item.primaryType as string, item.message)
+    );
+  }
+
   supportSignTyped() {
-    const deviceType = getDeviceType(this.device.features);
+    const deviceType = this.device.getCurrentDeviceType();
     if (DeviceModelToTypes.model_mini.includes(deviceType)) {
-      const currentVersion = getDeviceFirmwareVersion(this.device.features).join('.');
+      const currentVersion = this.device.getCurrentFirmwareVersionString() ?? '0.0.0';
       const supportSignTypedVersion = '2.2.0';
 
       if (semver.lt(currentVersion, supportSignTypedVersion)) {
@@ -399,9 +561,20 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
 
     const { addressN, chainId } = this.params;
 
-    // For Classic、Mini device we use EthereumSignTypedData
-    const deviceType = getDeviceType(this.device.features);
-    if (DeviceModelToTypes.model_mini.includes(deviceType)) {
+    // Classic1s / ClassicPure 3.14.0+, supported EthereumSignTypedDataOneKey
+    const supportEip712OnClassic = existCapability(
+      this.device.features,
+      Enum_Capability.Capability_EthereumTypedData
+    );
+
+    // For Classic / Mini:
+    // - If parsed typed-data capability is missing, keep using blind-sign.
+    // - For Mini with parsed capability, add extra format checks before parsed signing.
+    const deviceType = this.device.getCurrentDeviceType();
+    if (
+      DeviceModelToTypes.model_mini.includes(deviceType) &&
+      (!supportEip712OnClassic || this.hasClassicFamilyTypedDataFormatViolations(this.params.data))
+    ) {
       validateParams(this.params, [
         { name: 'domainHash', type: 'hexString', required: true },
         { name: 'messageHash', type: 'hexString', required: true },

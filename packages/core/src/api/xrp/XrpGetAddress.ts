@@ -1,11 +1,9 @@
-import { deriveAddress } from 'ripple-keypairs';
 import { UI_REQUEST } from '../../constants/ui-request';
-import { XrpAddress, XrpGetAddressParams } from '../../types/api/xrpGetAddress';
-import { supportBatchPublicKey } from '../../utils/deviceFeaturesUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
-import { batchGetPublickeys } from '../helpers/batchGetPublickeys';
+
+import type { XrpAddress, XrpGetAddressParams } from '../../types/api/xrpGetAddress';
 
 export default class XrpGetAddress extends BaseMethod<
   {
@@ -13,13 +11,17 @@ export default class XrpGetAddress extends BaseMethod<
     show_display: boolean;
   }[]
 > {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   shouldConfirm = false;
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };
@@ -57,22 +59,6 @@ export default class XrpGetAddress extends BaseMethod<
   }
 
   async run() {
-    if (this.hasBundle && supportBatchPublicKey(this.device?.features) && !this.shouldConfirm) {
-      const res = await batchGetPublickeys(this.device, this.params, 'secp256k1', 144);
-      const result = res.message.public_keys.map((publicKey: string, index: number) => ({
-        path: serializedPath((this.params as unknown as any[])[index].address_n),
-        address: deriveAddress(publicKey),
-        publicKey,
-        pub: publicKey,
-      }));
-
-      validateResult(result, ['address', 'publicKey'], {
-        expectedLength: this.params.length,
-      });
-
-      return Promise.resolve(result);
-    }
-
     const responses: XrpAddress[] = [];
     for (let i = 0; i < this.params.length; i++) {
       const param = this.params[i];

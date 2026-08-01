@@ -1,0 +1,83 @@
+---
+title: tonSignProof
+---
+
+# tonSignProof
+
+### 使用要求
+
+* 固件版本要求
+  * Touch: 4.10.0
+
+### TON：签名证明
+
+使用指定 BIP32 路径派生的私钥为 dApp 身份验证签名证明消息。用户需要在 OneKey 设备上确认操作。
+
+```typescript
+const result = await HardwareSDK.tonSignProof(connectId, deviceId, {
+    path: "m/44'/607'/0'",
+    appdomain: "onekey.so",
+    comment: "48656c6c6f204f6e654b6579",
+    expireAt: Date.now() + 1000 * 60 * 60 * 24,
+    walletVersion: "V4R2",
+    isBounceable: false,
+    isTestnetOnly: false
+});
+```
+
+#### 参数
+
+[**可选通用参数**](/zh/hardware-sdk/core-api-guide#common-params)
+
+* `path` - _必需_ `string | Array<number>` 最小长度为 3
+* `appdomain` - _必需_ `string` 请求证明的 dApp 域名
+* `comment` - _可选_ `string` 十六进制格式的消息备注
+* `expireAt` - _必需_ `number` 证明过期时间戳
+* `walletVersion` - _可选_ `TonWalletVersion` TON 钱包版本（默认：3）
+* `walletId` - _可选_ `number` 钱包 ID（默认：698983191）
+* `workchain` - _可选_ `TonWorkChain` TON 工作链（0: 基础链，1: 主链）
+* `isBounceable` - _可选_ `boolean` 消息是否可弹回（默认：false）
+* `isTestnetOnly` - _可选_ `boolean` 是否使用测试网（默认：false）
+
+#### 返回值
+
+响应
+
+* `signature` - 十六进制格式的证明签名
+
+#### 示例
+
+```typescript
+const response = await HardwareSDK.tonSignProof(connectId, deviceId, {
+    path: "m/44'/607'/0'",
+    appdomain: "onekey.so",
+    comment: "48656c6c6f204f6e654b6579",
+    expireAt: Date.now() + 1000 * 60 * 60 * 24,
+    walletVersion: 3,
+    isBounceable: false,
+    isTestnetOnly: false
+});
+```
+
+返回结果
+
+```typescript
+{
+    success: true,
+    payload: {
+        signature: string;
+    }
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误码
+    }
+}
+```

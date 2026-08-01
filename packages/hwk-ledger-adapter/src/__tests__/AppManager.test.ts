@@ -1,0 +1,207 @@
+import {
+  CloseAppCommand,
+  CommandResultFactory,
+  GetAppAndVersionCommand,
+  OpenAppCommand,
+} from '@ledgerhq/device-management-kit';
+import { HardwareErrorCode } from '@onekeyfe/hwk-adapter-core';
+
+import { AppManager } from '../app/AppManager';
+
+function createMockDmk() {
+  return {
+    startDiscovering: jest.fn(),
+    stopDiscovering: jest.fn(),
+    listenToAvailableDevices: jest.fn(),
+    connect: jest.fn(),
+    disconnect: jest.fn(),
+    sendCommand: jest.fn(),
+  };
+}
+
+/** Helper to build a success CommandResult for GetAppAndVersionCommand. */
+function appResult(name: string) {
+  return CommandResultFactory({ data: { name, version: '1.0.0' } });
+}
+
+/** Helper to build a success CommandResult for void commands. */
+function voidResult() {
+  return CommandResultFactory({ data: undefined as void });
+}
+
+describe('AppManager', () => {
+  let dmk: ReturnType<typeof createMockDmk>;
+  let appManager: AppManager;
+
+  beforeEach(() => {
+    dmk = createMockDmk();
+    appManager = new AppManager(dmk as any, { waitMs: 10, maxRetries: 3 });
+  });
+
+  describe('getAppName (static)', () => {
+    it('maps ETH to Ethereum', () => {
+      expect(AppManager.getAppName('ETH')).toBe('Ethereum');
+    });
+
+    it('maps BTC to Bitcoin', () => {
+      expect(AppManager.getAppName('BTC')).toBe('Bitcoin');
+    });
+
+    it('maps SOL to Solana', () => {
+      expect(AppManager.getAppName('SOL')).toBe('Solana');
+    });
+
+    it('maps TRX to Tron', () => {
+      expect(AppManager.getAppName('TRX')).toBe('Tron');
+    });
+
+    it('maps XRP to XRP', () => {
+      expect(AppManager.getAppName('XRP')).toBe('XRP');
+    });
+
+    it('maps ADA to Cardano', () => {
+      expect(AppManager.getAppName('ADA')).toBe('Cardano');
+    });
+
+    it('maps DOT to Polkadot', () => {
+      expect(AppManager.getAppName('DOT')).toBe('Polkadot');
+    });
+
+    it('maps ATOM to Cosmos', () => {
+      expect(AppManager.getAppName('ATOM')).toBe('Cosmos');
+    });
+
+    it('returns undefined for unknown chain', () => {
+      expect(AppManager.getAppName('UNKNOWN')).toBeUndefined();
+    });
+  });
+
+  describe('ensureAppOpen', () => {
+    it('returns immediately if correct app is already open', async () => {
+      dmk.sendCommand.mockResolvedValue(appResult('Ethereum'));
+
+      await appManager.ensureAppOpen('session-1', 'Ethereum');
+
+      // sendCommand should only be called once (getCurrentApp)
+      expect(dmk.sendCommand).toHaveBeenCalledTimes(1);
+    });
+
+    it('opens the target app if a different app is running', async () => {
+      let getAppCallCount = 0;
+      dmk.sendCommand.mockImplementation(async (params: { command: unknown }) => {
+        if (params.command instanceof GetAppAndVersionCommand) {
+          getAppCallCount++;
+          // First call: wrong app, second call: dashboard, third call: target app
+          if (getAppCallCount === 1) return appResult('Bitcoin');
+          if (getAppCallCount === 2) return appResult('BOLOS');
+          return appResult('Ethereum');
+        }
+        // close-app and open-app return void result
+        return voidResult();
+      });
+
+      await appManager.ensureAppOpen('session-1', 'Ethereum');
+
+      // Should have called: getCurrentApp, closeApp, getCurrentApp (dashboard), openApp, getCurrentApp (Ethereum)
+      const { calls } = dmk.sendCommand.mock;
+      const closeAppCall = calls.find((call: any[]) => call[0].command instanceof CloseAppCommand);
+      expect(closeAppCall).toBeDefined();
+
+      const openAppCall = calls.find((call: any[]) => call[0].command instanceof OpenAppCommand);
+      expect(openAppCall).toBeDefined();
+    });
+
+    it('opens the target app directly from dashboard', async () => {
+      let getAppCallCount = 0;
+      dmk.sendCommand.mockImplementation(async (params: { command: unknown }) => {
+        if (params.command instanceof GetAppAndVersionCommand) {
+          getAppCallCount++;
+          if (getAppCallCount === 1) return appResult('BOLOS');
+          return appResult('Ethereum');
+        }
+        return voidResult();
+      });
+
+      await appManager.ensureAppOpen('session-1', 'Ethereum');
+
+      // Should NOT have called close-app since we're on dashboard
+      const { calls } = dmk.sendCommand.mock;
+      const closeAppCalls = calls.filter(
+        (call: any[]) => call[0].command instanceof CloseAppCommand
+      );
+      expect(closeAppCalls).toHaveLength(0);
+
+      const openAppCall = calls.find((call: any[]) => call[0].command instanceof OpenAppCommand);
+      expect(openAppCall).toBeDefined();
+    });
+
+    it('throws if the target app fails to open after max retries', async () => {
+      dmk.sendCommand.mockImplementation(async (params: { command: unknown }) => {
+        if (params.command instanceof GetAppAndVersionCommand) {
+          return appResult('BOLOS');
+        }
+        return voidResult();
+      });
+
+      await expect(appManager.ensureAppOpen('session-1', 'Ethereum')).rejects.toThrow(
+        /failed to open/i
+      );
+    });
+
+    it('throws AppNotInstalled when OpenAppCommand fails with 0x6807 (unknown application)', async () => {
+      dmk.sendCommand.mockImplementation(async (params: { command: unknown }) => {
+        if (params.command instanceof GetAppAndVersionCommand) {
+          return appResult('BOLOS');
+        }
+        return {
+          error: {
+            _tag: 'OpenAppCommandError',
+            errorCode: '6807',
+            message: 'Unknown application name',
+          },
+        };
+      });
+
+      await expect(appManager.ensureAppOpen('session-1', 'Tron')).rejects.toMatchObject({
+        code: HardwareErrorCode.AppNotInstalled,
+        errorCode: '6807',
+        appName: 'Tron',
+      });
+    });
+
+    it('throws UserRejected when the user refuses the open-app prompt (0x5501)', async () => {
+      dmk.sendCommand.mockImplementation(async (params: { command: unknown }) => {
+        if (params.command instanceof GetAppAndVersionCommand) {
+          return appResult('BOLOS');
+        }
+        return {
+          error: {
+            _tag: 'ActionRefusedError',
+            errorCode: '5501',
+            message: 'Action refused on device.',
+          },
+        };
+      });
+
+      await expect(appManager.ensureAppOpen('session-1', 'Tron')).rejects.toMatchObject({
+        code: HardwareErrorCode.UserRejected,
+        errorCode: '5501',
+        appName: 'Tron',
+      });
+    });
+
+    it('does not default to AppNotInstalled when OpenAppCommand fails without an error code', async () => {
+      dmk.sendCommand.mockImplementation(async (params: { command: unknown }) => {
+        if (params.command instanceof GetAppAndVersionCommand) {
+          return appResult('BOLOS');
+        }
+        return { error: {} };
+      });
+
+      await expect(appManager.ensureAppOpen('session-1', 'Tron')).rejects.toMatchObject({
+        code: undefined,
+        appName: 'Tron',
+      });
+    });
+  });
+});

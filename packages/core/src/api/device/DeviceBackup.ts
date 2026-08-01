@@ -1,5 +1,6 @@
-import { BackupDevice } from '@onekeyfe/hd-transport';
 import { BaseMethod } from '../BaseMethod';
+
+import type { BackupDevice } from '@onekeyfe/hd-transport';
 
 export default class DeviceBackup extends BaseMethod<BackupDevice> {
   init() {

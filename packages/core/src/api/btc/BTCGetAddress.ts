@@ -1,18 +1,26 @@
-import { GetAddress } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { getScriptType, serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { BTCAddress, BTCGetAddressParams } from '../../types/api/btcGetAddress';
 import { getCoinInfo } from './helpers/btcParamsUtils';
-import { getBitcoinForkVersionRange } from './helpers/versionLimit';
+import {
+  getBitcoinForkSupportedProtocols,
+  getBitcoinForkVersionRange,
+} from './helpers/versionLimit';
+
+import type { BTCAddress, BTCGetAddressParams } from '../../types/api/btcGetAddress';
+import type { GetAddress } from '@onekeyfe/hd-transport';
 
 export default class BTCGetAddress extends BaseMethod<GetAddress[]> {
   hasBundle = false;
 
+  getSupportedProtocols() {
+    return getBitcoinForkSupportedProtocols(this.params?.map(param => param.coin_name) ?? []);
+  }
+
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     this.hasBundle = Object.prototype.hasOwnProperty.call(this.payload, 'bundle');
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };

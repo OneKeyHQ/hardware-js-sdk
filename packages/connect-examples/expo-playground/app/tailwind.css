@@ -1,0 +1,458 @@
+/* OneKey 官网字体导入 */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  @apply bg-background text-foreground;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  height: 100%;
+}
+
+#root {
+  height: 100%;
+}
+
+@layer base {
+  :root {
+    /* OneKey Brand Colors */
+    --ok-green: 110 81% 69%; /* #82f072 */
+    --ok-green-secondary: 108 63% 61%; /* #6fd85a */
+    --ok-green-accent: 105 48% 40%; /* #4a9635 */
+    --ok-green-soft: 110 81% 69% / 0.1; /* #82f072 with 10% opacity */
+
+    /* Light Mode - Inspired by OneKey App */
+    --background: 0 0% 98%; /* #fafafa - Clean off-white background */
+    --foreground: 220 13% 18%; /* #2d3748 - Dark text for excellent readability */
+
+    /* Card system with clear hierarchy */
+    --card: 0 0% 100%; /* #ffffff - Pure white cards */
+    --card-foreground: 220 13% 18%; /* #2d3748 - Dark text on cards */
+
+    /* Elevated surfaces */
+    --popover: 0 0% 100%; /* #ffffff - White popovers */
+    --popover-foreground: 220 13% 18%; /* #2d3748 - Dark text */
+
+    /* Primary colors - OneKey green for accents only */
+    --primary: var(--ok-green);
+    --primary-foreground: 220 13% 18%; /* Dark text on green */
+
+    /* Secondary surfaces */
+    --secondary: 220 14% 96%; /* #f7fafc - Very light gray */
+    --secondary-foreground: 220 13% 28%; /* #4a5568 - Medium dark text */
+
+    /* Muted elements */
+    --muted: 220 13% 94%; /* #f1f5f9 - Light gray backgrounds */
+    --muted-foreground: 220 9% 46%; /* #718096 - Muted text */
+
+    /* Accent colors */
+    --accent: 220 13% 94%; /* #f1f5f9 - Light accent */
+    --accent-foreground: 220 13% 18%; /* #2d3748 - Dark text */
+
+    /* Status colors */
+    --destructive: 0 84% 60%; /* #f56565 - Red for errors */
+    --destructive-foreground: 0 0% 98%; /* White text on red */
+
+    /* Borders and inputs - clear definition */
+    --border: 220 13% 91%; /* #e2e8f0 - Light gray borders */
+    --input: 220 13% 91%; /* #e2e8f0 - Input borders */
+
+    /* Chart colors */
+    --chart-2: 217 91% 60%; /* Blue */
+    --chart-3: 262 83% 58%; /* Purple */
+    --chart-4: 43 96% 56%; /* Yellow */
+    --chart-5: 27 96% 61%; /* Orange */
+
+    --radius: 0.75rem; /* 12px - More modern rounded corners */
+
+    /* Sidebar - Light Mode with enhanced contrast */
+    --sidebar-background: 220 14% 97%; /* #f8fafc - Slightly cooler and more distinct */
+    --sidebar-foreground: 220 13% 18%; /* #2d3748 - Dark text */
+    --sidebar-primary-foreground: 220 13% 18%; /* Dark text on green */
+    --sidebar-accent: 220 14% 94%; /* #f1f5f9 - Light hover with better contrast */
+    --sidebar-accent-foreground: 220 13% 18%; /* #2d3748 - Dark text */
+    --sidebar-border: 220 13% 85%; /* #d2d6dc - More visible borders */
+  }
+
+  .dark {
+    /* OneKey Brand Colors (same as light) */
+    --ok-green: 110 81% 69%; /* #82f072 */
+    --ok-green-secondary: 108 63% 61%; /* #6fd85a */
+    --ok-green-accent: 105 48% 40%; /* #4a9635 */
+    --ok-green-soft: 110 81% 69% / 0.1; /* #82f072 with 10% opacity */
+
+    /* Dark Mode - Inspired by OneKey App's elegant dark theme */
+    --background: 220 13% 9%; /* #1a202c - Deep dark background */
+    --foreground: 220 14% 96%; /* #f7fafc - Light text for excellent contrast */
+
+    /* Card system with elevated surfaces */
+    --card: 220 13% 12%; /* #2d3748 - Elevated dark cards */
+    --card-foreground: 220 14% 96%; /* #f7fafc - Light text on cards */
+
+    /* Elevated surfaces - higher than cards */
+    --popover: 220 13% 15%; /* #374151 - More elevated surfaces */
+    --popover-foreground: 220 14% 96%; /* #f7fafc - Light text */
+
+    /* Primary colors - OneKey green for accents */
+    --primary: var(--ok-green);
+    --primary-foreground: 220 13% 9%; /* Dark text on green for contrast */
+
+    /* Secondary surfaces */
+    --secondary: 220 13% 16%; /* #4a5568 - Medium dark surfaces */
+    --secondary-foreground: 220 14% 96%; /* #f7fafc - Light text */
+
+    /* Muted elements */
+    --muted: 220 13% 16%; /* #4a5568 - Muted backgrounds */
+    --muted-foreground: 220 9% 64%; /* #a0aec0 - Muted text */
+
+    /* Accent colors */
+    --accent: 220 13% 16%; /* #4a5568 - Dark accent */
+    --accent-foreground: 220 14% 96%; /* #f7fafc - Light text */
+
+    /* Status colors */
+    --destructive: 0 63% 31%; /* #742a2a - Dark red for errors */
+    --destructive-foreground: 220 14% 96%; /* Light text on dark red */
+
+    /* Borders and inputs - subtle but visible */
+    --border: 220 13% 20%; /* #4a5568 - Visible borders in dark mode */
+    --input: 220 13% 20%; /* #4a5568 - Input borders */
+
+    /* Chart colors - adjusted for dark backgrounds */
+    --chart-2: 217 91% 60%; /* Blue */
+    --chart-3: 262 83% 58%; /* Purple */
+    --chart-4: 43 96% 56%; /* Yellow */
+    --chart-5: 27 96% 61%; /* Orange */
+
+    /* Sidebar - Dark Mode with clear separation */
+    --sidebar-background: 220 13% 8%; /* #171923 - Darker than main background */
+    --sidebar-foreground: 220 14% 96%; /* #f7fafc - Light text */
+    --sidebar-primary-foreground: 220 13% 9%; /* Dark text on green */
+    --sidebar-accent: 220 13% 12%; /* #2d3748 - Hover state */
+    --sidebar-accent-foreground: 220 14% 96%; /* #f7fafc - Light text */
+    --sidebar-border: 220 13% 20%; /* #4a5568 - Visible borders */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-normal;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    /* Smooth transitions for theme switching */
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold text-foreground;
+  }
+
+  /* OneKey 按钮样式增强 - 更现代的设计 */
+  .onekey-btn-primary {
+    @apply bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary/95;
+    @apply transition-all duration-200 ease-in-out;
+    @apply shadow-sm hover:shadow-md hover:shadow-primary/20;
+    @apply border border-primary/20;
+  }
+
+  .onekey-btn-secondary {
+    @apply bg-secondary text-secondary-foreground hover:bg-secondary/80;
+    @apply border border-border shadow-sm hover:shadow-md;
+    @apply transition-all duration-200 ease-in-out;
+  }
+
+  /* OneKey 卡片样式 - 增强层次感 */
+  .onekey-card {
+    @apply bg-card text-card-foreground rounded-xl border border-border;
+    @apply shadow-sm hover:shadow-md transition-all duration-200 ease-in-out;
+    /* Subtle backdrop blur for modern glass effect */
+    backdrop-filter: blur(8px);
+  }
+
+  /* 分界线样式 - 清晰的视觉分隔 */
+  .onekey-divider {
+    @apply border-border bg-border/50 h-px my-5;
+  }
+
+  /* 导航项样式 - 清晰的选中状态 */
+  .onekey-nav-item {
+    @apply transition-all duration-200 ease-in-out;
+    @apply hover:bg-accent hover:text-accent-foreground;
+    @apply rounded-lg border border-transparent;
+  }
+
+  .onekey-nav-item.active {
+    @apply bg-primary/10 text-primary border-primary/20;
+    @apply shadow-sm;
+  }
+
+  /* 状态指示器 */
+  .onekey-status-connected {
+    @apply bg-primary/10 text-primary border-primary/20;
+  }
+
+  .onekey-status-disconnected {
+    @apply bg-muted text-muted-foreground border-border;
+  }
+
+  /* 分类标题样式 */
+  .onekey-category-title {
+    @apply space-y-0.5 mb-0.5;
+  }
+
+  .onekey-category-title h3 {
+    @apply text-base font-semibold text-foreground;
+  }
+
+  .onekey-category-title p {
+    @apply text-xs font-light text-muted-foreground opacity-70;
+  }
+
+  /* 分类卡片增强 */
+  .onekey-category-card {
+    @apply bg-card border border-border rounded-xl shadow-sm hover:shadow-md;
+    @apply transition-all duration-200 ease-in-out;
+  }
+
+  .onekey-category-card .category-header {
+    @apply relative bg-muted/30 border-b border-border/50 p-4 rounded-t-xl;
+  }
+
+  /* Light mode specific enhancements */
+  .onekey-category-card:not(.dark) .category-header {
+    @apply bg-gradient-to-r from-slate-50/80 to-slate-50/40;
+    @apply border-slate-200/60;
+  }
+
+  /* Dark mode specific enhancements */
+  .dark .onekey-category-card .category-header {
+    @apply bg-gradient-to-r from-slate-800/40 to-slate-800/20;
+    @apply border-slate-700/50;
+  }
+
+  /* 方法项样式 */
+  .onekey-method-item {
+    @apply flex items-center justify-between p-3 rounded-lg;
+    @apply border border-transparent hover:border-border/50 hover:bg-muted/30;
+    @apply cursor-pointer transition-all duration-200;
+  }
+
+  .onekey-method-item:hover {
+    @apply shadow-sm;
+  }
+
+  /* 代码块样式 - 更好的对比度 */
+  code {
+    @apply relative rounded-md bg-muted px-[0.4rem] py-[0.25rem] font-mono text-sm font-medium;
+    @apply border border-border/50;
+  }
+
+  /* MDX 内容样式优化 */
+  .prose {
+    /* 基础字体大小和行高 */
+    font-size: 1rem; /* 16px */
+    line-height: 1.7;
+    background-color: transparent; /* Ensure background is transparent */
+    color: var(--foreground); /* Explicitly set color for base prose text */
+  }
+
+  /* Ensure prose text color is correct in dark mode */
+  .dark .prose {
+    color: var(--foreground);
+  }
+
+  /* Override highlight.js background */
+  .hljs {
+    background-color: transparent !important;
+  }
+
+  .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+    @apply text-foreground font-semibold;
+    margin-top: 1.5em;
+    margin-bottom: 0.8em;
+    line-height: 1.2;
+  }
+
+  .prose h1 {
+    font-size: 2.25rem; /* 36px */
+  }
+
+  .prose h2 {
+    font-size: 1.875rem; /* 30px */
+  }
+
+  .prose h3 {
+    font-size: 1.5rem; /* 24px */
+  }
+
+  .prose h4 {
+    font-size: 1.25rem; /* 20px */
+  }
+
+  .prose p {
+    margin-bottom: 1em;
+  }
+
+  .prose ul, .prose ol {
+    margin-top: 1em;
+    margin-bottom: 1em;
+    padding-left: 1.5em;
+    list-style-type: disc;
+  }
+
+  .prose ul ul {
+    list-style-type: circle;
+  }
+
+  .prose ul ul ul {
+    list-style-type: square;
+  }
+
+  .prose li {
+    margin-bottom: 0.5em;
+  }
+
+  .prose code {
+    font-size: 0.875rem; /* 14px */
+    background-color: var(--muted);
+    color: var(--muted-foreground);
+    border: 1px solid var(--border);
+    padding: 0.2em 0.4em;
+    border-radius: 0.3em;
+  }
+
+  .prose pre {
+    @apply bg-muted text-foreground border border-border rounded-lg p-4 text-sm overflow-auto;
+    line-height: 1.5;
+  }
+
+  .prose a {
+    @apply text-blue-500 hover:underline;
+  }
+
+  /* 滚动条美化 - 适配深色主题 */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-border/80;
+  }
+
+  /* 输入框增强 */
+  .onekey-input {
+    @apply bg-background border-input;
+    @apply focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background;
+    @apply transition-all duration-200 ease-in-out;
+  }
+
+  /* 选择框增强 */
+  .onekey-select {
+    @apply bg-background border-input;
+    @apply focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background;
+  }
+
+  /* 工具提示样式 */
+  .onekey-tooltip {
+    @apply bg-popover text-popover-foreground border border-border;
+    @apply shadow-md rounded-lg px-3 py-2 text-sm;
+    backdrop-filter: blur(8px);
+  }
+
+  /* 徽章样式增强 */
+  .onekey-badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+    @apply transition-all duration-200 ease-in-out;
+  }
+
+  .onekey-badge.success {
+    @apply bg-blue-500/10 text-blue-500 border border-blue-500/20;
+  }
+
+  .onekey-badge.warning {
+    @apply bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border border-yellow-500/20;
+  }
+
+  .onekey-badge.error {
+    @apply bg-destructive/10 text-destructive border border-destructive/20;
+  }
+
+  /* 加载状态 */
+  .onekey-loading {
+    @apply animate-pulse bg-muted rounded;
+  }
+
+  /* 焦点样式统一 */
+  .onekey-focus {
+    @apply focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background;
+  }
+
+  /* Line clamp utilities - 确保文字溢出显示省略号 */
+  .line-clamp-1 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+  }
+
+  .line-clamp-2 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .line-clamp-none {
+    overflow: visible;
+    display: block;
+    -webkit-box-orient: horizontal;
+    -webkit-line-clamp: none;
+  }
+}
+
+/* 响应式设计增强 */
+@media (max-width: 768px) {
+  .onekey-card {
+    @apply rounded-lg; /* 移动端使用较小的圆角 */
+  }
+
+  :root {
+    --radius: 0.5rem; /* 移动端较小的圆角 */
+  }
+
+  /* 小屏幕：描述文本显示2行 */
+  .description-text {
+    -webkit-line-clamp: 2 !important;
+  }
+}
+
+/* 中等屏幕：描述文本显示1行 */
+@media (min-width: 640px) and (max-width: 1023px) {
+  .description-text {
+    -webkit-line-clamp: 1 !important;
+  }
+}
+
+/* 大屏幕：描述文本完整显示 */
+@media (min-width: 1024px) {
+  .description-text {
+    -webkit-line-clamp: none !important;
+    display: block !important;
+  }
+}

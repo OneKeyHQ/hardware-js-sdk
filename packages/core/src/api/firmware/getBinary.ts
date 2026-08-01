@@ -1,21 +1,29 @@
 import semver from 'semver';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import { Features } from '../../types';
+
 import { getDeviceType, httpRequest } from '../../utils';
 import { DataManager } from '../../data-manager';
 import { findLatestRelease } from '../../utils/release';
 import { getFirmwareUpdateField } from '../../utils/deviceFeaturesUtils';
-import { IFirmwareField } from '../../data-manager/DataManager';
+
+import type { Features } from '../../types';
+import type { HttpRequestOptions } from '../../utils/networkUtils';
+import type { EFirmwareType } from '@onekeyfe/hd-shared';
+import type { IFirmwareField } from '../../data-manager/DataManager';
+
+export type FirmwareBinary = ArrayBuffer | Buffer;
 
 export interface GetInfoProps {
   features: Features;
   updateType: 'firmware' | 'ble';
   isUpdateBootloader?: boolean;
   targetVersion?: string;
+  firmwareType: EFirmwareType;
 }
 
 interface GetBinaryProps extends GetInfoProps {
   version?: number[];
+  requestOptions?: HttpRequestOptions;
 }
 
 export const getBinary = async ({
@@ -23,15 +31,22 @@ export const getBinary = async ({
   updateType,
   version,
   isUpdateBootloader,
+  firmwareType,
+  requestOptions,
 }: GetBinaryProps) => {
-  const releaseInfo = getInfo({ features, updateType, targetVersion: version?.join('.') });
+  const releaseInfo = getInfo({
+    features,
+    updateType,
+    targetVersion: version?.join('.'),
+    firmwareType,
+  });
 
   if (!releaseInfo) {
     throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'no firmware found for this device');
   }
 
   if (version && !semver.eq(releaseInfo.version.join('.'), version.join('.'))) {
-    const touchWithoutVersion = getDeviceType(features) === 'touch' && !features.onekey_version;
+    const touchWithoutVersion = getDeviceType(features) === 'touch' && !features.firmwareVersion;
     if (!touchWithoutVersion) {
       throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'firmware version mismatch');
     }
@@ -45,9 +60,9 @@ export const getBinary = async ({
       : isUpdateBootloader
       ? releaseInfo.bootloaderResource
       : releaseInfo.url;
-  let fw;
+  let fw: FirmwareBinary;
   try {
-    fw = await httpRequest(url, 'binary');
+    fw = await httpRequest(url, 'binary', requestOptions);
   } catch {
     throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Method_FirmwareUpdate_DownloadFailed');
   }
@@ -59,7 +74,7 @@ export const getBinary = async ({
 };
 
 export const getSysResourceBinary = async (url: string) => {
-  let fw;
+  let fw: FirmwareBinary;
   try {
     fw = await httpRequest(url, 'binary');
   } catch {
@@ -71,7 +86,7 @@ export const getSysResourceBinary = async (url: string) => {
   };
 };
 
-export const getInfo = ({ features, updateType, targetVersion }: GetInfoProps) => {
+export const getInfo = ({ features, updateType, targetVersion, firmwareType }: GetInfoProps) => {
   const deviceType = getDeviceType(features);
   if (deviceType === 'unknown') {
     return null;
@@ -82,6 +97,7 @@ export const getInfo = ({ features, updateType, targetVersion }: GetInfoProps) =
     features,
     updateType,
     targetVersion,
+    firmwareType,
   });
   const releaseInfo = deviceMap?.[deviceType]?.[firmwareUpdateField] ?? [];
   return findLatestRelease(releaseInfo);

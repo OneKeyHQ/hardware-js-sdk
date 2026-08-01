@@ -1,0 +1,32 @@
+---
+title: getNetwork
+---
+
+# getNetwork
+
+Get network of current account
+
+### Method
+
+```typescript
+async function getNetwork(): string
+```
+
+### Response
+
+the network. `livenet` and `testnet`
+
+### Example
+
+```typescript
+const provider = (window.$onekey &#x26;&#x26; window.$onekey.btc) || window.unisat;
+
+const network = async provider.getNetwork()
+
+```
+
+### Demo
+
+
+<iframe src="https://codepen.io/OneKeyHQ/pen/xxMaLqz" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
+

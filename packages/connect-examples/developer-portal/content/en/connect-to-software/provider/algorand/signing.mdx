@@ -1,0 +1,73 @@
+---
+title: Signing
+description: Sign messages on Algorand using OneKey
+---
+
+import { Callout } from 'nextra/components'
+
+# Signing
+
+Learn how to sign messages for authentication on Algorand.
+
+---
+
+## Sign Arbitrary Message
+
+```typescript
+const message = new TextEncoder().encode('Hello Algorand!')
+
+const { signature, address } = await provider.signMessage(
+  message,
+  'utf8' // or 'base64'
+)
+
+console.log('Signature:', signature)
+console.log('Signer:', address)
+```
+
+---
+
+## Verify Signature
+
+```typescript
+import nacl from 'tweetnacl'
+
+const message = new TextEncoder().encode('Hello Algorand!')
+const { signature } = await provider.signMessage(message)
+
+// Get public key from address
+const publicKey = algosdk.decodeAddress(provider.address).publicKey
+
+const isValid = nacl.sign.detached.verify(message, signature, publicKey)
+console.log('Valid:', isValid)
+```
+
+---
+
+## Error Handling
+
+```typescript
+try {
+  const signedTxns = await provider.signTxns(walletTxns)
+} catch (error) {
+  if (error.code === 4001) {
+    console.log('User rejected the request')
+  } else if (error.code === 4100) {
+    console.log('Wallet is locked')
+  } else {
+    console.error('Error:', error.message)
+  }
+}
+```
+
+---
+
+## Common Error Codes
+
+| Code | Description |
+|------|-------------|
+| 4001 | User rejected request |
+| 4100 | Unauthorized |
+| 4200 | Unsupported method |
+| 4300 | Invalid input |
+

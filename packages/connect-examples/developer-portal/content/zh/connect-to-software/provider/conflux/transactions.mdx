@@ -1,0 +1,153 @@
+---
+title: 交易
+description: 使用 OneKey 在 Conflux 上发送交易
+---
+
+import { Callout } from 'nextra/components'
+
+# 交易
+
+了解如何在 Conflux 上发送交易。
+
+---
+
+## 发送交易
+
+```typescript
+const txHash = await provider.request({
+  method: 'cfx_sendTransaction',
+  params: [{
+    from: senderAddress,
+    to: recipientAddress,
+    value: '0xDE0B6B3A7640000', // 1 CFX（以 Drip 为单位，十六进制）
+    gas: '0x5208', // 21000
+  }]
+})
+
+console.log('交易哈希:', txHash)
+```
+
+---
+
+## 带 Gas 估算发送
+
+```typescript
+// 首先估算 gas
+const gasEstimate = await provider.request({
+  method: 'cfx_estimateGasAndCollateral',
+  params: [{
+    from: senderAddress,
+    to: recipientAddress,
+    value: '0xDE0B6B3A7640000',
+  }]
+})
+
+// 使用估算值发送
+const txHash = await provider.request({
+  method: 'cfx_sendTransaction',
+  params: [{
+    from: senderAddress,
+    to: recipientAddress,
+    value: '0xDE0B6B3A7640000',
+    gas: gasEstimate.gasLimit,
+    storageLimit: gasEstimate.storageCollateralized,
+  }]
+})
+```
+
+---
+
+## 调用合约
+
+```typescript
+const result = await provider.request({
+  method: 'cfx_call',
+  params: [{
+    to: contractAddress,
+    data: encodedFunctionCall,
+  }, 'latest_state']
+})
+
+console.log('结果:', result)
+```
+
+---
+
+## 与 js-conflux-sdk 配合使用
+
+### 安装
+
+```bash
+npm install js-conflux-sdk
+```
+
+### 连接 Provider
+
+```typescript
+import { Conflux } from 'js-conflux-sdk'
+
+const conflux = new Conflux({
+  url: 'https://main.confluxrpc.com',
+  networkId: 1029,
+})
+
+// 使用 OneKey provider 进行签名
+conflux.provider = provider
+```
+
+### 使用 SDK 发送交易
+
+```typescript
+// 创建并发送交易
+const tx = await conflux.cfx.sendTransaction({
+  from: senderAddress,
+  to: recipientAddress,
+  value: Conflux.Drip.fromCFX(1), // 1 CFX
+})
+
+console.log('交易:', tx)
+
+// 等待确认
+const receipt = await tx.executed()
+console.log('收据:', receipt)
+```
+
+### 合约交互
+
+```typescript
+const contract = conflux.Contract({
+  abi: contractABI,
+  address: contractAddress,
+})
+
+// 读取
+const result = await contract.someViewFunction().call()
+
+// 写入
+const tx = await contract.someWriteFunction(param1, param2).sendTransaction({
+  from: senderAddress,
+})
+
+const receipt = await tx.executed()
+```
+
+---
+
+## 错误处理
+
+```typescript
+try {
+  const accounts = await provider.request({
+    method: 'cfx_requestAccounts'
+  })
+} catch (error) {
+  if (error.code === 4001) {
+    console.log('用户拒绝了请求')
+  } else if (error.code === -32603) {
+    console.log('内部错误')
+  } else {
+    console.error('错误:', error.message)
+  }
+}
+```
+

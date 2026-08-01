@@ -1,0 +1,111 @@
+---
+title: Signing
+description: Sign data on TON using OneKey
+---
+
+import { Callout } from 'nextra/components'
+
+# Signing
+
+Learn how to sign data for off-chain verification.
+
+---
+
+## Sign Arbitrary Data
+
+Sign data cells for off-chain verification:
+
+```typescript
+const result = await provider.send({
+  method: 'signData',
+  id: Date.now().toString(),
+  params: [
+    JSON.stringify({
+      schema_crc: 0, // Custom schema identifier
+      cell: cellBoc.toString('base64'), // Base64 encoded cell to sign
+    })
+  ]
+})
+
+if ('result' in result) {
+  console.log('Signature:', result.result.signature) // Base64 signature
+  console.log('Timestamp:', result.result.timestamp) // UNIX timestamp
+}
+```
+
+---
+
+## Sign Proof (Authentication)
+
+Request proof for authentication during connection:
+
+```typescript
+const connectEvent = await provider.connect(2, {
+  manifestUrl: 'https://yourapp.com/tonconnect-manifest.json',
+  items: [
+    { name: 'ton_addr' },
+    {
+      name: 'ton_proof',
+      payload: 'your-server-generated-challenge' // Nonce for replay protection
+    }
+  ]
+})
+
+if (connectEvent.event === 'connect') {
+  const proofItem = connectEvent.payload.items.find(i => i.name === 'ton_proof')
+
+  if (proofItem) {
+    // Send proof to your backend for verification
+    const proof = proofItem.proof
+    console.log({
+      signature: proof.signature,
+      timestamp: proof.timestamp,
+      domain: proof.domain,
+      payload: proof.payload,
+    })
+  }
+}
+```
+
+---
+
+## Error Handling
+
+```typescript
+const result = await provider.send({
+  method: 'sendTransaction',
+  id: Date.now().toString(),
+  params: [/* ... */]
+})
+
+if ('error' in result) {
+  switch (result.error.code) {
+    case 300:
+      console.log('User rejected the transaction')
+      break
+    case 1:
+      console.log('Bad request - check parameters')
+      break
+    case 400:
+      console.log('Method not supported')
+      break
+    default:
+      console.error('Error:', result.error.message)
+  }
+} else {
+  console.log('Success:', result.result)
+}
+```
+
+---
+
+## Error Codes
+
+| Code | Description |
+|------|-------------|
+| 0 | Unknown error |
+| 1 | Bad request |
+| 100 | Unknown app |
+| 300 | User rejected request |
+| 400 | Method not supported |
+

@@ -1,0 +1,48 @@
+---
+title: CryptoKeypath
+---
+
+# CryptoKeypath
+
+The `CryptoKeypath` class represents a cryptographic key path (BIP-44 derivation path).
+
+## Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `components` | `PathComponent[]` | Array of path components (default: empty) |
+| `sourceFingerprint` | `Buffer` | The source fingerprint (optional) |
+| `depth` | `number` | The depth (optional) |
+
+## PathComponent
+
+The `PathComponent` class represents an individual component in a key path.
+
+### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `index` | `number` | The component index (optional) |
+| `hardened` | `boolean` | Whether it is hardened |
+
+## Example
+
+```ts
+import { CryptoKeypath, PathComponent } from '@keystonehq/bc-ur-registry';
+
+// BIP44: m/44'/60'/0'/0/0
+const keypath = new CryptoKeypath([
+  new PathComponent({ index: 44, hardened: true }),
+  new PathComponent({ index: 60, hardened: true }),
+  new PathComponent({ index: 0, hardened: true }),
+  new PathComponent({ index: 0, hardened: false }),
+  new PathComponent({ index: 0, hardened: false }),
+]);
+```
+
+## UR Example
+
+```
+ur:crypto-keypath/xxxxx
+```
+

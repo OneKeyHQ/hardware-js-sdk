@@ -1,23 +1,37 @@
-import { TypedCall } from '@onekeyfe/hd-transport';
-import { EVMTransaction, EVMTransactionEIP1559 } from '../../../types';
-import { evmSignTx, evmSignTxEip1559 } from '../latest/signTransaction';
+import { evmSignTx, evmSignTxEip1559, evmSignTxEip7702 } from '../latest/signTransaction';
+
+import type { TypedCall } from '@onekeyfe/hd-transport';
+import type { EVMTransaction, EVMTransactionEIP1559, EVMTransactionEIP7702 } from '../../../types';
 
 export const signTransaction = async ({
   typedCall,
   isEIP1559,
+  isEIP7702,
   addressN,
   tx,
 }: {
   addressN: number[];
-  tx: EVMTransaction | EVMTransactionEIP1559;
+  tx: EVMTransaction | EVMTransactionEIP1559 | EVMTransactionEIP7702;
   isEIP1559: boolean;
+  isEIP7702: boolean;
   typedCall: TypedCall;
-}) =>
-  isEIP1559
-    ? evmSignTxEip1559({
-        typedCall,
-        addressN,
-        tx: tx as EVMTransactionEIP1559,
-        supportTrezor: true,
-      })
-    : evmSignTx({ typedCall, addressN, tx: tx as EVMTransaction, supportTrezor: true });
+}) => {
+  if (isEIP7702) {
+    return evmSignTxEip7702({
+      typedCall,
+      addressN,
+      tx: tx as EVMTransactionEIP7702,
+      supportTrezor: true,
+    });
+  }
+  if (isEIP1559) {
+    return evmSignTxEip1559({
+      typedCall,
+      addressN,
+      tx: tx as EVMTransactionEIP1559,
+      supportTrezor: true,
+    });
+  }
+
+  return evmSignTx({ typedCall, addressN, tx: tx as EVMTransaction, supportTrezor: true });
+};

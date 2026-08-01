@@ -1,57 +1,86 @@
-import { Deferred, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { RebootType } from '@onekeyfe/hd-transport';
+
 import { UI_REQUEST } from '../../constants/ui-request';
-import { BaseMethod } from '../BaseMethod';
+import { FirmwareUpdateTipMessage } from '../../events/ui-request';
+import { FirmwareUpdateBaseMethod } from '../firmware/FirmwareUpdateBaseMethod';
 import { getSysResourceBinary } from '../firmware/getBinary';
 import { updateBootloader } from '../firmware/uploadFirmware';
-import { createUiMessage } from '../../events/ui-request';
 import { DeviceModelToTypes } from '../../types';
 import { DataManager } from '../../data-manager';
-import { checkBootloaderLength, checkNeedUpdateBootForTouch } from '../firmware/updateBootloader';
-import { getDeviceType } from '../../utils';
+import { checkBootloaderLength } from '../firmware/updateBootloader';
 
+import type { DeviceUpdateBootloaderParams } from '../../types/api/deviceUpdateBootloader';
+import type { EFirmwareType } from '@onekeyfe/hd-shared';
 import type { Device } from '../../device/Device';
-import type { Features, KnownDevice } from '../../types';
+import type { Features } from '../../types';
 
-export default class DeviceUpdateBootloader extends BaseMethod {
-  checkPromise: Deferred<any> | null = null;
-
+export default class DeviceUpdateBootloader extends FirmwareUpdateBaseMethod<any> {
   init() {
-    this.notAllowDeviceMode = [UI_REQUEST.BOOTLOADER, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [UI_REQUEST.BOOTLOADER, UI_REQUEST.NOT_INITIALIZE];
     this.requireDeviceMode = [];
     this.useDevicePassphraseState = false;
     this.skipForceUpdateCheck = true;
   }
 
-  postTipMessage = (message: string) => {
-    this.postMessage(
-      createUiMessage(UI_REQUEST.FIRMWARE_TIP, {
-        device: this.device.toMessageObject() as KnownDevice,
-        data: {
-          message,
-        },
-      })
-    );
-  };
+  async updateBootloaderWithEmmcFileWrite(_device: Device, binary: ArrayBuffer) {
+    const filePath = '0:boot/bootloader.bin';
 
-  async updateTouchBootloader(device: Device, features?: Features) {
-    if (features && !features.bootloader_mode) {
-      let { binary } = this.payload;
-      if (!binary) {
-        this.postTipMessage('CheckLatestUiResource');
-        const resourceUrl = DataManager.getBootloaderResource(features);
-        if (resourceUrl) {
-          this.postTipMessage('DownloadLatestBootloaderResource');
-          const resource = await getSysResourceBinary(resourceUrl);
-          this.postTipMessage('DownloadLatestBootloaderResourceSuccess');
-          if (resource) {
-            binary = resource.binary;
-          }
+    this.postTipMessage(FirmwareUpdateTipMessage.StartTransferData);
+
+    // Use the more robust emmcCommonUpdateProcess from FirmwareUpdateBaseMethod
+    await this.emmcCommonUpdateProcess({
+      payload: binary,
+      filePath,
+    });
+
+    this.postTipMessage(FirmwareUpdateTipMessage.ConfirmOnDevice);
+
+    // Reboot to apply bootloader update using the inherited reboot method
+    await this.reboot(RebootType.Normal); // Normal reboot (RebootType.Normal = 0)
+
+    this.postTipMessage(FirmwareUpdateTipMessage.UpdateBootloaderSuccess);
+    return true;
+  }
+
+  async updateTouchBootloader({
+    device,
+    features,
+    firmwareType,
+  }: {
+    device: Device;
+    features?: Features;
+    firmwareType: EFirmwareType;
+  }) {
+    let { binary } = this.payload;
+    if (!binary) {
+      this.postTipMessage(FirmwareUpdateTipMessage.CheckLatestUiResource);
+      const resourceUrl = features
+        ? DataManager.getBootloaderResource(features, firmwareType)
+        : null;
+      if (resourceUrl) {
+        this.postTipMessage(FirmwareUpdateTipMessage.DownloadLatestBootloaderResource);
+        const resource = await getSysResourceBinary(resourceUrl);
+        this.postTipMessage(FirmwareUpdateTipMessage.DownloadLatestBootloaderResourceSuccess);
+        if (resource) {
+          binary = resource.binary;
         }
       }
+    }
 
-      if (!checkBootloaderLength(binary)) {
-        throw ERRORS.TypedError(HardwareErrorCode.CheckDownloadFileError);
-      }
+    if (!checkBootloaderLength(binary)) {
+      throw ERRORS.TypedError(HardwareErrorCode.CheckDownloadFileError);
+    }
+
+    // Check if device is in bootloader mode
+    if (features && device.isBootloader()) {
+      // Use emmcFileWrite + reboot logic for bootloader mode
+      this.postTipMessage(FirmwareUpdateTipMessage.UpdateBootloader);
+      return this.updateBootloaderWithEmmcFileWrite(device, binary);
+    }
+
+    if (features && !device.isBootloader()) {
+      // Use original updateBootloader logic for normal mode
       await updateBootloader(
         this.device.getCommands().typedCall.bind(this.device.getCommands()),
         this.postMessage,
@@ -60,17 +89,20 @@ export default class DeviceUpdateBootloader extends BaseMethod {
       );
       return Promise.resolve(true);
     }
-
-    return Promise.resolve(true);
   }
 
   async run() {
     const { device } = this;
     const { features } = device;
 
-    const deviceType = getDeviceType(features);
+    const payload = this.payload as DeviceUpdateBootloaderParams;
+
+    const deviceType = device.getCurrentDeviceType();
+    const deviceFirmwareType = device.getCurrentFirmwareType();
+    const firmwareType = payload.firmwareType ?? deviceFirmwareType;
+
     if (DeviceModelToTypes.model_touch.includes(deviceType)) {
-      return this.updateTouchBootloader(device, features);
+      return this.updateTouchBootloader({ device, features, firmwareType });
     }
 
     return Promise.resolve(true);

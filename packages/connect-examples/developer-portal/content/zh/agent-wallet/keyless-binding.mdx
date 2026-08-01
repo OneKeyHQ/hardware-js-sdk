@@ -1,0 +1,46 @@
+---
+title: Keyless 绑定
+---
+
+# Keyless 绑定
+
+Keyless 绑定是产品边界：用户可以在 OneKey GUI 中管理 Agent Wallet，而不需要把私钥记下来、导出来，或粘贴给 Agent runtime。
+
+CLI 接收到的是 App Transfer 会话。它不应该向 Agent 暴露原始私钥、解密凭据、访问 token、助记词或 keychain 内容。
+
+## 用户体验
+
+对用户来说，这应该像一个可管理的钱包，而不是一套私钥管理流程：
+
+| 用户诉求 | OneKey 行为 |
+| --- | --- |
+| 创建自动化钱包 | 在 OneKey GUI 中创建和管理 Agent Wallet。 |
+| 从 AI client 使用 | 通过 App Transfer 配对，不粘贴私钥。 |
+| 知道当前钱包 | Agent 读取 `onekey auth status` 并展示地址。 |
+| 移动资金 | 必须明确确认；必要时升级到硬件控制。 |
+| 结束访问 | 使用 `onekey auth logout` 清除当前 CLI 会话。 |
+
+## 职责划分
+
+| 端 | 职责 |
+| --- | --- |
+| OneKey GUI | 创建和管理 Agent Wallet 及 keyless 账号关系 |
+| `onekey` CLI | 持有活动会话，暴露 schema-backed 钱包命令，并使用系统凭据存储 |
+| Agent runtime | 读取 schema、调用命令、总结结果，并在写操作前请求确认 |
+
+## Agent 规则
+
+- 将 GUI 管理的 Agent Wallet 视为账号关系的来源。
+- 使用 `onekey auth status`，不要猜当前活动钱包。
+- 资金操作前使用 `onekey get-address` 展示活动地址。
+- 不要求用户粘贴私钥、助记词或解密凭据。
+- 不把 keychain 路径或凭据 payload 作为回答输出。
+
+## 常用命令
+
+```bash
+onekey auth status
+onekey get-address
+onekey balance --chain eth
+onekey history --chain eth --detail
+```

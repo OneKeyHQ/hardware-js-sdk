@@ -1,0 +1,146 @@
+---
+title: wallet_watchAsset
+description: 将代币添加到钱包的跟踪列表
+---
+
+# wallet_watchAsset
+
+请求钱包跟踪新代币。这会提示用户将指定的代币添加到钱包的代币列表中。
+
+---
+
+## 参数
+
+`object` 包含：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `type` | `string` | 是 | 代币类型（目前仅支持 `ERC20`） |
+| `options` | `object` | 是 | 代币详情 |
+| `options.address` | `string` | 是 | 代币合约地址 |
+| `options.symbol` | `string` | 是 | 代币符号（1-11 个字符） |
+| `options.decimals` | `number` | 是 | 代币精度 |
+| `options.image` | `string` | 否 | 代币图标 URL |
+
+---
+
+## 返回值
+
+`boolean` - 如果添加成功返回 `true`，否则返回 `false`
+
+---
+
+## 示例
+
+```typescript
+const wasAdded = await window.$onekey.ethereum.request({
+  method: 'wallet_watchAsset',
+  params: {
+    type: 'ERC20',
+    options: {
+      address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+      symbol: 'USDC',
+      decimals: 6,
+      image: 'https://cryptologos.cc/logos/usd-coin-usdc-logo.png'
+    }
+  }
+})
+
+if (wasAdded) {
+  console.log('代币已添加到钱包')
+} else {
+  console.log('用户拒绝添加代币')
+}
+```
+
+### 添加多个代币
+
+```typescript
+const tokens = [
+  {
+    address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+    symbol: 'USDC',
+    decimals: 6
+  },
+  {
+    address: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+    symbol: 'USDT',
+    decimals: 6
+  },
+  {
+    address: '0x6B175474E89094C44Da98b954EescdecAD3F9c6',
+    symbol: 'DAI',
+    decimals: 18
+  }
+]
+
+async function addTokens(tokenList) {
+  for (const token of tokenList) {
+    try {
+      await window.$onekey.ethereum.request({
+        method: 'wallet_watchAsset',
+        params: {
+          type: 'ERC20',
+          options: token
+        }
+      })
+    } catch (error) {
+      console.error(`添加 ${token.symbol} 失败:`, error)
+    }
+  }
+}
+```
+
+### 添加自定义项目代币
+
+```typescript
+async function suggestToken() {
+  const chainId = await window.$onekey.ethereum.request({
+    method: 'eth_chainId'
+  })
+
+  // 不同网络的代币地址
+  const tokenAddresses = {
+    '0x1': '0x...主网地址',
+    '0x89': '0x...Polygon地址',
+    '0xa4b1': '0x...Arbitrum地址'
+  }
+
+  const address = tokenAddresses[chainId]
+  if (!address) {
+    throw new Error('此网络上没有该代币')
+  }
+
+  return window.$onekey.ethereum.request({
+    method: 'wallet_watchAsset',
+    params: {
+      type: 'ERC20',
+      options: {
+        address,
+        symbol: 'TOKEN',
+        decimals: 18,
+        image: 'https://example.com/token-logo.png'
+      }
+    }
+  })
+}
+```
+
+---
+
+## 错误码
+
+| 错误码 | 消息 | 说明 |
+|--------|------|------|
+| 4001 | User rejected the request | 用户拒绝添加代币 |
+| -32602 | Invalid params | 代币参数无效 |
+
+---
+
+## 说明
+
+- 目前仅支持 `ERC20` 类型
+- 钱包可能已经在跟踪该代币（仍返回 `true`）
+- 图片 URL 应为 HTTPS 且可访问
+- 符号应与链上符号匹配以获得最佳用户体验
+- 遵循 [EIP-747](https://eips.ethereum.org/EIPS/eip-747) 规范

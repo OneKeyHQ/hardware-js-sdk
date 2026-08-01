@@ -1,25 +1,25 @@
-import { Device, Characteristic, BleErrorCode } from 'react-native-ble-plx';
-import { getLogger, LoggerNames, wait } from '@onekeyfe/hd-core';
-// import { wait } from '@onekeyfe/hd-core/src/utils';
-
-const Log = getLogger(LoggerNames.HdBleTransport);
+import type { Characteristic, Device, Subscription } from 'react-native-ble-plx';
 
 export default class BleTransport {
   id: string;
 
+  name = 'ReactNativeBleTransport';
+
   device: Device;
 
-  mtuSize = 20;
+  mtuSize = 23;
 
   writeCharacteristic: Characteristic;
 
   notifyCharacteristic: Characteristic;
 
-  nofitySubscription?: () => void;
+  notifySubscription?: Subscription;
 
-  static MAX_RETRIES = 5;
+  disconnectSubscription?: Subscription;
 
-  static RETRY_DELAY = 2000;
+  notifyTransactionId?: string;
+
+  monitorToken?: number;
 
   constructor(
     device: Device,
@@ -30,40 +30,9 @@ export default class BleTransport {
     this.device = device;
     this.writeCharacteristic = writeCharacteristic;
     this.notifyCharacteristic = notifyCharacteristic;
-    console.log(`BleTransport(${String(this.id)}) new instance`);
   }
 
-  /**
-   * @description only for pro / touch , while upgrade firmware
-   * @param data
-   * @param retryCount
-   * @returns
-   */
-  async writeWithRetry(data: string, retryCount = BleTransport.MAX_RETRIES): Promise<void> {
-    try {
-      await this.writeCharacteristic.writeWithoutResponse(data);
-    } catch (error) {
-      Log?.debug(
-        `Write retry attempt ${BleTransport.MAX_RETRIES - retryCount + 1}, error: ${error}`
-      );
-      if (retryCount > 0) {
-        await wait(BleTransport.RETRY_DELAY);
-        if (
-          error.errorCode === BleErrorCode.DeviceDisconnected ||
-          error.errorCode === BleErrorCode.CharacteristicNotFound
-        ) {
-          try {
-            await this.device.connect();
-            await this.device.discoverAllServicesAndCharacteristics();
-          } catch (e) {
-            Log?.debug(`Connect or discoverAllServicesAndCharacteristics error: ${e}`);
-          }
-        } else {
-          Log?.debug(`writeCharacteristic error: ${error}`);
-        }
-        return this.writeWithRetry(data, retryCount - 1);
-      }
-      throw error;
-    }
+  async writeWithRetry(data: string): Promise<void> {
+    await this.writeCharacteristic.writeWithoutResponse(data);
   }
 }

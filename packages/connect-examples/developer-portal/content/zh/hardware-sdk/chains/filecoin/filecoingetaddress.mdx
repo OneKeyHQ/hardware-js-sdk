@@ -1,0 +1,98 @@
+---
+title: filecoinGetAddress
+---
+
+# filecoinGetAddress
+
+### 使用要求
+
+* 固件版本要求
+  * Touch: 3.5.0
+  * Classic/Mini: 2.10.0
+
+## Filecoin：获取地址
+
+获取指定 BIP32 路径派生的地址。用户需要确认导出。
+
+```typescript
+const result = await HardwareSDK.filecoinGetAddress(connectId, deviceId, params);
+```
+
+## 参数
+
+[**可选通用参数**](/zh/hardware-sdk/core-api-guide#common-params)
+
+### 导出单个公钥
+
+* `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](/zh/hardware-sdk/core-api-guide#hd-path)
+* `showOnOneKey` - _可选_ `boolean` 决定是否在设备上显示地址。默认设置为 `true`
+* `isTestnet` - _可选_ `boolean` 是否为测试网。
+
+
+
+#### 导出批量公钥
+
+* `bundle` - 包含 `path`、`coin` 字段的对象 `Array`
+
+### 示例
+
+返回第一个 Filecoin 账户的公钥：
+
+```typescript
+HardwareSDK.filecoinGetAddress(connectId, deviceId, {
+    path: "m/44'/461'/0'/0/0",
+    showOnOneKey: true,
+    isTestnet: false
+});
+```
+
+返回多个 Filecoin 账户的批量公钥：
+
+```typescript
+HardwareSDK.filecoinGetAddress(connectId, deviceId, {
+    bundle: [
+        { path: "m/44'/461'/0'/0/0" }, // 账户 1
+        { path: "m/44'/461'/0'" }, // 账户 2
+        { path: "m/44'/461'/0'/0/1" }  // 账户 3
+    ]
+});
+```
+
+### 返回结果
+
+只有一个公钥的结果
+
+```typescript
+{
+    success: true,
+    payload: {
+        path: Array<number>, // 强化路径
+        address: string,   // 地址
+    }
+}
+```
+
+批量公钥的结果
+
+```typescript
+{
+    success: true,
+    payload: [
+        { path, address }, // 账户 1
+        { path, address }, // 账户 2
+        { path, address }, // 账户 3
+    ]
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误码
+    }
+}
+```

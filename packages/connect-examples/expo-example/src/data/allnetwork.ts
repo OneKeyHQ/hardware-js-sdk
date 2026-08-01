@@ -3,7 +3,7 @@ import { type PlaygroundProps } from '../components/Playground';
 const api: PlaygroundProps[] = [
   {
     method: 'allNetworkGetAddress',
-    description: 'Get address',
+
     presupposes: [
       {
         title: 'Batch Get Address',
@@ -25,6 +25,16 @@ const api: PlaygroundProps[] = [
               showOnOneKey: false,
             },
             {
+              network: 'ltc',
+              path: "m/49'/2'/0'/0/0",
+              showOnOneKey: false,
+            },
+            {
+              network: 'ltc',
+              path: "m/84'/2'/0'/0/0",
+              showOnOneKey: false,
+            },
+            {
               network: 'bch',
               path: "m/44'/145'/0'/0/0",
               showOnOneKey: false,
@@ -39,7 +49,11 @@ const api: PlaygroundProps[] = [
               path: "m/44'/3'/0'/0/0",
               showOnOneKey: false,
             },
-
+            {
+              network: 'doge',
+              path: "m/48'/3'/0'/0/0",
+              showOnOneKey: false,
+            },
             {
               network: 'btc',
               chainName: 'bitcoin',
@@ -76,7 +90,6 @@ const api: PlaygroundProps[] = [
               path: "m/44'/3'/0'/0/0",
               showOnOneKey: false,
             },
-
             {
               network: 'evm',
               path: "m/44'/60'/0'/0/0",
@@ -345,8 +358,78 @@ const api: PlaygroundProps[] = [
           ],
         },
       },
+      {
+        title: 'Batch Get Address For Soft Gen Xpub',
+        value: {
+          bundle: [
+            {
+              network: 'btc',
+              path: "m/44'/0'/0'/0/0",
+              showOnOneKey: false,
+            },
+            {
+              network: 'btc',
+              path: "m/48'/0'/0'/0/0",
+              showOnOneKey: false,
+            },
+            {
+              network: 'btc',
+              path: "m/49'/0'/0'/0/0",
+              showOnOneKey: false,
+            },
+            {
+              network: 'btc',
+              path: "m/84'/0'/0'/0/0",
+              showOnOneKey: false,
+            },
+            {
+              network: 'btc',
+              path: "m/86'/0'/0'/0/0",
+              showOnOneKey: false,
+            },
+            {
+              network: 'ltc',
+              path: "m/44'/2'/0'/0/0",
+              showOnOneKey: false,
+            },
+            {
+              network: 'ltc',
+              path: "m/48'/2'/0'/0/0",
+              showOnOneKey: false,
+            },
+            {
+              network: 'ltc',
+              path: "m/49'/2'/0'/0/0",
+              showOnOneKey: false,
+            },
+            {
+              network: 'ltc',
+              path: "m/84'/2'/0'/0/0",
+              showOnOneKey: false,
+            },
+            {
+              network: 'doge',
+              path: "m/44'/3'/0'/0/0",
+              showOnOneKey: false,
+            },
+            {
+              network: 'doge',
+              path: "m/48'/3'/0'/0/0",
+              showOnOneKey: false,
+            },
+          ],
+        },
+      },
     ],
   },
 ];
+
+api.push({
+  method: 'allNetworkGetAddressByLoop',
+  description: 'Get addresses with real-time callback for each generated address',
+  presupposes: api[0].presupposes?.map(item => ({
+    ...item,
+  })),
+});
 
 export default api;

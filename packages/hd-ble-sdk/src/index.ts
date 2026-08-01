@@ -1,32 +1,32 @@
 import EventEmitter from 'events';
 import HardwareSdk, {
-  ConnectSettings,
-  enableLog,
-  parseConnectSettings,
-  initCore,
-  Core,
+  CORE_EVENT,
+  DEVICE,
+  DEVICE_EVENT,
+  FIRMWARE_EVENT,
+  IFRAME,
+  LOG_EVENT,
+  LoggerNames,
+  UI_EVENT,
+  UI_REQUEST,
   createErrorMessage,
   createUiMessage,
-  CORE_EVENT,
-  CoreMessage,
-  IFRAME,
-  UI_EVENT,
-  UiResponseEvent,
-  UI_REQUEST,
-  LOG_EVENT,
+  enableLog,
+  executeCallback,
+  getLogBlockLabel,
   getLogger,
-  LoggerNames,
+  initCore,
+  parseConnectSettings,
   setLoggerPostMessage,
-  FIRMWARE_EVENT,
-  DEVICE_EVENT,
-  DEVICE,
 } from '@onekeyfe/hd-core';
-import { ERRORS, createDeferred, Deferred, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
 import ReactNativeTransport from '@onekeyfe/hd-transport-react-native';
+
+import type { Deferred } from '@onekeyfe/hd-shared';
+import type { ConnectSettings, Core, CoreMessage, UiResponseEvent } from '@onekeyfe/hd-core';
 
 const eventEmitter = new EventEmitter();
 const Log = getLogger(LoggerNames.HdBleSdk);
-
 let _core: Core | undefined;
 let _settings = parseConnectSettings();
 
@@ -85,12 +85,23 @@ function handleMessage(message: CoreMessage) {
     case DEVICE_EVENT:
       if (
         (
-          [DEVICE.CONNECT, DEVICE.DISCONNECT, DEVICE.FEATURES, DEVICE.SUPPORT_FEATURES] as string[]
+          [
+            DEVICE.CONNECT,
+            DEVICE.DISCONNECT,
+            DEVICE.FEATURES,
+            DEVICE.STATE,
+            DEVICE.SUPPORT_FEATURES,
+          ] as string[]
         ).includes(message.type)
       ) {
         eventEmitter.emit(message.type, message.payload);
       }
       break;
+    case IFRAME.CALLBACK: {
+      const { callbackId, data, error } = message.payload;
+      executeCallback(callbackId, data, error);
+      break;
+    }
     default:
       Log.log('No need to be captured message', message.event);
   }
@@ -134,12 +145,13 @@ const init = async (settings: Partial<ConnectSettings>) => {
 };
 
 const call = async (params: any) => {
-  Log.debug('call: ', params);
+  const blockLog = getLogBlockLabel(params);
+  Log.debug('call: ', blockLog ?? params);
 
   try {
     const response = await postMessage({ event: IFRAME.CALL, type: IFRAME.CALL, payload: params });
     if (response) {
-      Log.debug('response: ', response);
+      Log.debug('response: ', blockLog ? '[REDACTED]' : response);
 
       if (!response.success) {
         if (response.payload?.code === HardwareErrorCode.BlePermissionError) {

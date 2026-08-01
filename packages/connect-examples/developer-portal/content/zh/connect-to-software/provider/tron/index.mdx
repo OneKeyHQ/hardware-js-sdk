@@ -1,0 +1,356 @@
+---
+title: TRON
+description: 通过 OneKey 的 TronLink 兼容 Provider 集成 TRON
+---
+
+import { Callout, Tabs } from 'nextra/components'
+
+# TRON
+
+使用 OneKey 的 TronLink 兼容 Provider 集成 TRON 区块链。通过 `window.$onekey.tron` 或 `window.tronWeb` 访问。
+
+<Callout type="info">
+OneKey 的 TRON Provider 完全兼容 TronLink，包括 TronWeb 和 SunWeb 实例。
+</Callout>
+
+---
+
+## 快速链接
+
+- [API 参考](#api-参考)
+- [连接钱包](#连接钱包)
+- [交易](#交易)
+- [消息签名](#消息签名)
+
+---
+
+## Provider 检测
+
+```typescript
+// OneKey 注入 provider 和 TronWeb 实例
+const provider = window.$onekey?.tron
+
+// 连接后 TronWeb 全局可用
+const tronWeb = window.tronWeb
+
+if (!provider) {
+  throw new Error('未检测到 OneKey TRON provider')
+}
+
+// 检查是否兼容 TronLink
+console.log('isTronLink:', provider.isTronLink) // true
+```
+
+---
+
+## 快速开始
+
+### 请求账户
+
+```typescript
+// 请求连接
+const result = await provider.request({
+  method: 'tron_requestAccounts'
+})
+
+if (result.code === 200) {
+  console.log('已连接!')
+  const address = tronWeb.defaultAddress.base58
+  console.log('地址:', address)
+} else {
+  console.log('连接被拒绝:', result.message)
+}
+```
+
+### 检查连接状态
+
+```typescript
+// 检查 TronWeb 是否就绪
+if (tronWeb && tronWeb.ready) {
+  console.log('已连接:', tronWeb.defaultAddress.base58)
+} else {
+  console.log('未连接')
+}
+```
+
+---
+
+## 使用 TronWeb
+
+连接后，TronWeb 实例全局可用：
+
+### 获取余额
+
+```typescript
+const balance = await tronWeb.trx.getBalance(tronWeb.defaultAddress.base58)
+console.log('余额:', tronWeb.fromSun(balance), 'TRX')
+```
+
+### 发送 TRX
+
+```typescript
+const tx = await tronWeb.trx.sendTransaction(
+  'TRecipientAddress...',
+  tronWeb.toSun(10) // 10 TRX
+)
+
+console.log('交易:', tx.txid)
+```
+
+### 发送 TRC20 代币
+
+```typescript
+const contractAddress = 'TTokenContractAddress...'
+const contract = await tronWeb.contract().at(contractAddress)
+
+// 获取精度
+const decimals = await contract.decimals().call()
+
+// 转账代币
+const amount = 100 * (10 ** decimals) // 100 个代币
+const tx = await contract.transfer(
+  'TRecipientAddress...',
+  amount
+).send()
+
+console.log('交易:', tx)
+```
+
+---
+
+## 交易
+
+### 签名交易
+
+签名交易但不广播：
+
+```typescript
+// 构建交易
+const tx = await tronWeb.transactionBuilder.sendTrx(
+  'TRecipientAddress...',
+  tronWeb.toSun(10),
+  tronWeb.defaultAddress.base58
+)
+
+// 通过 provider 签名
+const signedTx = await provider.sign(tx)
+
+console.log('已签名交易:', signedTx)
+
+// 手动广播
+const result = await tronWeb.trx.sendRawTransaction(signedTx)
+```
+
+### 智能合约交互
+
+```typescript
+// 调用合约方法
+const contract = await tronWeb.contract().at(contractAddress)
+
+// 读取（view 函数）
+const result = await contract.someViewFunction().call()
+
+// 写入（需要签名）
+const tx = await contract.someWriteFunction(param1, param2).send({
+  feeLimit: 100_000_000, // 100 TRX
+  callValue: 0,
+})
+```
+
+### 触发智能合约
+
+```typescript
+const tx = await tronWeb.transactionBuilder.triggerSmartContract(
+  contractAddress,
+  'transfer(address,uint256)',
+  { feeLimit: 100_000_000 },
+  [
+    { type: 'address', value: recipientAddress },
+    { type: 'uint256', value: amount }
+  ],
+  tronWeb.defaultAddress.base58
+)
+
+const signedTx = await provider.sign(tx.transaction)
+const result = await tronWeb.trx.sendRawTransaction(signedTx)
+```
+
+---
+
+## 消息签名
+
+### 签名消息 V1（十六进制）
+
+签名十六进制编码的消息：
+
+```typescript
+const message = tronWeb.toHex('Hello TRON!')
+const signature = await provider.signMessage(message)
+
+console.log('签名:', signature)
+```
+
+### 签名消息 V2（UTF-8）
+
+直接签名 UTF-8 消息：
+
+```typescript
+const message = 'Hello TRON!'
+const signature = await provider.signMessageV2(message)
+
+console.log('签名:', signature)
+```
+
+### 验证签名
+
+```typescript
+const message = 'Hello TRON!'
+const signature = await provider.signMessageV2(message)
+
+// 使用 TronWeb 验证
+const address = await tronWeb.trx.verifyMessageV2(message, signature)
+console.log('签名者:', address)
+```
+
+---
+
+## 事件处理
+
+### 监听账户变化
+
+```typescript
+provider.on('accountsChanged', (accounts) => {
+  if (accounts[0]) {
+    console.log('账户已变更:', accounts[0])
+  } else {
+    console.log('已断开连接')
+  }
+})
+```
+
+### 监听网络变化
+
+```typescript
+provider.on('chainChanged', (chainId) => {
+  console.log('网络已变更:', chainId)
+  // 建议在网络变化时重新加载页面
+})
+```
+
+### Window 事件（TronLink 兼容）
+
+```typescript
+// 监听 TronLink 初始化
+window.addEventListener('tronLink#initialized', () => {
+  console.log('TronLink 已初始化')
+})
+
+// 监听消息
+window.addEventListener('message', (event) => {
+  if (event.data.isTronLink) {
+    const { action, data } = event.data.message
+    console.log('TronLink 事件:', action, data)
+  }
+})
+```
+
+---
+
+## API 参考
+
+### Provider 方法
+
+| 方法 | 说明 |
+|------|------|
+| `request({ method, params })` | 通用 JSON-RPC 请求 |
+| `sign(transaction)` | 签名交易 |
+| `signMessage(hexMessage)` | 签名十六进制消息（V1） |
+| `signMessageV2(message)` | 签名 UTF-8 消息（V2） |
+
+### Request 方法
+
+| 方法 | 说明 |
+|------|------|
+| `tron_requestAccounts` | 请求连接 |
+| `tron_getProviderState` | 获取 provider 状态 |
+| `tron_signTransaction` | 签名交易 |
+| `signMessageV1` | 签名消息 V1 |
+| `signMessageV2` | 签名消息 V2 |
+
+### 响应码
+
+| 错误码 | 说明 |
+|--------|------|
+| 200 | 成功 |
+| 4000 | 用户拒绝 |
+| 4001 | 请求排队中 |
+
+### 事件
+
+| 事件 | 说明 |
+|------|------|
+| `accountsChanged` | 账户已变更 |
+| `chainChanged` | 网络已变更 |
+| `connect` | 已连接 |
+| `disconnect` | 已断开连接 |
+
+---
+
+## 使用 SunWeb
+
+用于 DappChain（侧链）操作：
+
+```typescript
+const sunWeb = window.sunWeb
+
+// 主链到侧链
+await sunWeb.depositTrx(
+  amount,
+  depositFee,
+  feeLimit
+)
+
+// 侧链到主链
+await sunWeb.withdrawTrx(
+  amount,
+  withdrawFee,
+  feeLimit
+)
+```
+
+---
+
+## 错误处理
+
+```typescript
+try {
+  const result = await provider.request({
+    method: 'tron_requestAccounts'
+  })
+
+  if (result.code !== 200) {
+    throw new Error(result.message)
+  }
+} catch (error) {
+  if (error.code === 4001) {
+    console.log('用户拒绝了请求')
+  } else {
+    console.error('错误:', error.message)
+  }
+}
+```
+
+---
+
+## 从 TronLink 迁移
+
+OneKey 兼容 TronLink。更新你的检测逻辑：
+
+```typescript
+// 之前（仅 TronLink）
+const tronWeb = window.tronWeb
+
+// 之后（OneKey 优先，TronLink 回退）
+const provider = window.$onekey?.tron || window.tronLink
+const tronWeb = window.tronWeb // 两者都会注入这个
+```

@@ -3,43 +3,54 @@ import { createContext, useMemo, useState } from 'react';
 import type { Features, OnekeyFeatures } from '@onekeyfe/hd-transport';
 import type { TestCaseDataWithKey } from '../types';
 
-export const TestRunnerContext = createContext<{
-  runnerTestCaseTitle?: string;
-  setRunnerTestCaseTitle?: React.Dispatch<React.SetStateAction<string>>;
+export type RunnerState = 'running' | 'done' | 'stopped' | 'none';
+export type TestRunnerCallbacks = {
+  onRunnerStateChange?: (state: RunnerState) => void;
+};
 
-  runnerDone?: boolean;
-  setRunnerDone?: React.Dispatch<React.SetStateAction<boolean | undefined>>;
+export const TestRunnerContext = createContext<{
+  runnerState: RunnerState;
+  setRunnerState?: React.Dispatch<React.SetStateAction<RunnerState>>;
+
+  runnerTestCaseTitle?: string;
+  setRunnerTestCaseTitle?: React.Dispatch<React.SetStateAction<string | undefined>>;
 
   runningDeviceFeatures?: Features;
-  setRunningDeviceFeatures?: React.Dispatch<React.SetStateAction<Features>>;
+  setRunningDeviceFeatures?: React.Dispatch<React.SetStateAction<Features | undefined>>;
 
   runningOneKeyDeviceFeatures?: OnekeyFeatures;
-  setRunningOneKeyDeviceFeatures?: React.Dispatch<React.SetStateAction<OnekeyFeatures>>;
+  setRunningOneKeyDeviceFeatures?: React.Dispatch<React.SetStateAction<OnekeyFeatures | undefined>>;
 
   timestampBeginTest?: number;
-  setTimestampBeginTest?: React.Dispatch<React.SetStateAction<number>>;
+  setTimestampBeginTest?: React.Dispatch<React.SetStateAction<number | undefined>>;
 
   timestampEndTest?: number;
-  setTimestampEndTest?: React.Dispatch<React.SetStateAction<number>>;
+  setTimestampEndTest?: React.Dispatch<React.SetStateAction<number | undefined>>;
 
   itemValues: TestCaseDataWithKey[];
   setItemValues?: React.Dispatch<React.SetStateAction<TestCaseDataWithKey[]>>;
 
   runnerLogs?: string[];
   setRunnerLogs?: React.Dispatch<React.SetStateAction<string[]>>;
+
+  callbacks: TestRunnerCallbacks;
+  setCallbacks?: (callbacks: TestRunnerCallbacks) => void;
 }>({
+  runnerState: 'none',
   itemValues: [],
+  callbacks: {},
 });
 
 export function TestRunnerProvider({ children }: { children: React.ReactNode }) {
   const [itemValues, setItemValues] = useState<TestCaseDataWithKey[]>([]);
   const [runnerLogs, setRunnerLogs] = useState<string[]>([]);
   const [runnerTestCaseTitle, setRunnerTestCaseTitle] = useState<string>();
-  const [runnerDone, setRunnerDone] = useState<boolean>();
+  const [runnerState, setRunnerState] = useState<RunnerState>('none');
   const [runningDeviceFeatures, setRunningDeviceFeatures] = useState<Features>();
   const [runningOneKeyDeviceFeatures, setRunningOneKeyDeviceFeatures] = useState<OnekeyFeatures>();
   const [timestampBeginTest, setTimestampBeginTest] = useState<number>();
   const [timestampEndTest, setTimestampEndTest] = useState<number>();
+  const [callbacks, setCallbacks] = useState<TestRunnerCallbacks>({});
 
   const value = useMemo(
     () => ({
@@ -47,8 +58,6 @@ export function TestRunnerProvider({ children }: { children: React.ReactNode }) 
       setItemValues,
       runnerTestCaseTitle,
       setRunnerTestCaseTitle,
-      runnerDone,
-      setRunnerDone,
       runningDeviceFeatures,
       setRunningDeviceFeatures,
       runningOneKeyDeviceFeatures,
@@ -59,16 +68,21 @@ export function TestRunnerProvider({ children }: { children: React.ReactNode }) 
       setTimestampEndTest,
       runnerLogs,
       setRunnerLogs,
+      runnerState,
+      setRunnerState,
+      callbacks,
+      setCallbacks,
     }),
     [
       itemValues,
-      runnerDone,
-      runnerLogs,
       runnerTestCaseTitle,
       runningDeviceFeatures,
       runningOneKeyDeviceFeatures,
       timestampBeginTest,
       timestampEndTest,
+      runnerLogs,
+      runnerState,
+      callbacks,
     ]
   );
 

@@ -1,5 +1,8 @@
-import { MessageFactoryFn } from './utils';
-import { getBleFirmwareReleaseInfo, getFirmwareReleaseInfo } from '../api/firmware/releaseHelper';
+import type { MessageFactoryFn } from './utils';
+import type {
+  getBleFirmwareReleaseInfo,
+  getFirmwareReleaseInfo,
+} from '../api/firmware/releaseHelper';
 import type { KnownDevice as Device } from '../types/device';
 
 export const FIRMWARE_EVENT = 'FIRMWARE_EVENT';

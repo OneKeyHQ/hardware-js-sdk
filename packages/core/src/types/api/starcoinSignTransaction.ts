@@ -1,4 +1,4 @@
-import { StarcoinSignedTx } from '@onekeyfe/hd-transport';
+import type { StarcoinSignedTx } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type StarcoinSignTransactionParams = {

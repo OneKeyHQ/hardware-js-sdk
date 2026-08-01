@@ -1,5 +1,6 @@
-import { SetU2FCounter as HardwareSetU2FCounter } from '@onekeyfe/hd-transport';
 import { BaseMethod } from '../BaseMethod';
+
+import type { SetU2FCounter as HardwareSetU2FCounter } from '@onekeyfe/hd-transport';
 
 export default class SetU2FCounter extends BaseMethod<HardwareSetU2FCounter> {
   init() {

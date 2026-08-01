@@ -1,0 +1,135 @@
+---
+title: API 参考
+description: OneKey Aptos provider 完整 API 参考
+---
+
+# API 参考
+
+OneKey Aptos provider 方法和类型的完整参考。
+
+---
+
+## 方法
+
+| 方法 | 描述 |
+|------|------|
+| `connect()` | 连接钱包并获取账户 |
+| `disconnect()` | 断开钱包连接 |
+| `isConnected()` | 检查连接状态 |
+| `account()` | 获取当前账户信息 |
+| `network()` | 获取当前网络名称 |
+| `getNetwork()` | 获取完整网络信息 |
+| `getNetworkURL()` | 获取网络 RPC URL |
+| `signMessage(request)` | 签署任意消息 |
+| `signAndSubmitTransaction(payload, options?)` | 签署并提交交易 |
+| `signTransaction(payload, options?)` | 签署交易但不提交 |
+| `signTransactionV2(params)` | 签署 BCS 序列化的交易 |
+| `signAndSubmitTransactionV2(params)` | 签署并提交（Standard V1.1.0） |
+| `signIn(payload)` | AIP 登录流程 |
+| `onAccountChange(callback)` | 监听账户变更 |
+| `onNetworkChange(callback)` | 监听网络变更 |
+| `onDisconnect(callback)` | 监听断开连接 |
+
+---
+
+## 类型
+
+### 账户信息
+
+```typescript
+interface AptosAccountInfo {
+  address: string    // 带 0x 前缀的十六进制地址
+  publicKey: string  // Ed25519 公钥
+}
+```
+
+### 网络信息
+
+```typescript
+interface AptosNetwork {
+  name: string       // 网络名称
+  chainId: string    // 链 ID
+  url: string        // RPC URL
+}
+```
+
+### 签署消息请求
+
+```typescript
+interface SignMessageRequest {
+  message: string    // 要签署的消息
+  nonce?: string     // 可选的 nonce
+  address?: boolean  // 在消息中包含地址
+  application?: boolean // 包含应用信息
+  chainId?: boolean  // 包含链 ID
+}
+```
+
+### 签署消息响应
+
+```typescript
+interface SignMessageResponse {
+  signature: string     // 十六进制签名
+  fullMessage: string   // 完整的已签名消息
+  prefix: string        // APTOS 前缀
+  address?: string      // 签名者地址
+  application?: string  // 应用信息
+  chainId?: number      // 链 ID
+  nonce: string         // 使用的 nonce
+}
+```
+
+### 交易 Payload
+
+```typescript
+interface TransactionPayload {
+  type: 'entry_function_payload' | 'script_payload' | 'module_bundle_payload'
+  function: string       // Module::function 格式
+  type_arguments: string[]
+  arguments: any[]
+}
+```
+
+### 签署交易 V2 参数
+
+```typescript
+interface SignTransactionV2Params {
+  transaction: string        // BCS 序列化的交易
+  transactionType: 'simple' | 'multi_agent'
+  asFeePayer?: boolean       // 作为代付方签署
+}
+```
+
+---
+
+## 支持的网络
+
+| 网络 | 描述 |
+|------|------|
+| Mainnet | 生产网络 |
+| Testnet | 测试环境 |
+| Devnet | 开发环境 |
+
+---
+
+## 事件
+
+| 事件 | 回调参数 | 描述 |
+|------|----------|------|
+| `accountChanged` | `address: string \| null` | 账户已变更 |
+| `accountChangedV2` | `account: AptosAccountInfo \| null` | 账户已变更（完整信息） |
+| `networkChange` | `network: string \| null` | 网络已变更 |
+| `disconnect` | - | 钱包已断开连接 |
+
+---
+
+## 错误码
+
+| 错误码 | 描述 |
+|--------|------|
+| 4001 | 用户拒绝请求 |
+| 4100 | 未授权 |
+| 4200 | 不支持的方法 |
+| 4201 | 不支持的网络 |
+| -32603 | 内部错误 |
+

@@ -1,0 +1,171 @@
+---
+title: 交易
+description: 使用 OneKey 在 Algorand 上发送交易
+---
+
+import { Callout } from 'nextra/components'
+
+# 交易
+
+了解如何在 Algorand 上签署和发送交易。
+
+---
+
+## 签署交易 (ARC-0001)
+
+签署一个或多个交易：
+
+```typescript
+import algosdk from 'algosdk'
+
+// 创建交易
+const suggestedParams = await algodClient.getTransactionParams().do()
+
+const txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+  from: senderAddress,
+  to: recipientAddress,
+  amount: 1000000, // 1 ALGO (microAlgos)
+  suggestedParams,
+})
+
+// 准备签名
+const walletTxns = [{
+  txn: Buffer.from(algosdk.encodeUnsignedTransaction(txn)).toString('base64'),
+}]
+
+// 签名
+const signedTxns = await provider.signTxns(walletTxns)
+
+console.log('已签名的交易:', signedTxns)
+```
+
+---
+
+## 签署多个交易
+
+```typescript
+// 交易组
+const txns = [txn1, txn2, txn3]
+algosdk.assignGroupID(txns)
+
+// 准备签名
+const walletTxns = txns.map(txn => ({
+  txn: Buffer.from(algosdk.encodeUnsignedTransaction(txn)).toString('base64'),
+}))
+
+// 签署全部
+const signedTxns = await provider.signTxns(walletTxns)
+```
+
+---
+
+## 部分签名（多签）
+
+```typescript
+// 只签署组中的特定交易
+const walletTxns = [
+  { txn: encodedTxn1 },
+  { txn: encodedTxn2, signers: [] }, // 跳过这个
+  { txn: encodedTxn3 },
+]
+
+const signedTxns = await provider.signTxns(walletTxns)
+// signedTxns[1] 将为 null
+```
+
+---
+
+## 提交交易
+
+广播已签名的交易：
+
+```typescript
+const result = await provider.postTxns(signedTxns)
+console.log('交易 ID:', result.txIDs)
+```
+
+---
+
+## 签名并提交
+
+一步完成签名和广播：
+
+```typescript
+const result = await provider.signAndPostTxns(walletTxns)
+console.log('交易 ID:', result.txIDs)
+```
+
+---
+
+## 旧版交易 API
+
+### 签署交易（旧版）
+
+```typescript
+// 创建交易为 Uint8Array
+const txnBytes = algosdk.encodeUnsignedTransaction(txn)
+
+// 签名
+const signedTxnBytes = await provider.signTransaction([txnBytes])
+
+// 发送
+const { txId } = await algodClient.sendRawTransaction(signedTxnBytes[0]).do()
+```
+
+### 签署并发送（旧版）
+
+```typescript
+const result = await provider.signAndSendTransaction([txnBytes])
+console.log('交易 ID:', result.txId)
+```
+
+---
+
+## 完整示例
+
+```typescript
+import algosdk from 'algosdk'
+
+async function sendAlgo() {
+  // 连接
+  const provider = window.$onekey?.algo
+  const { address } = await provider.connect()
+
+  // 设置客户端
+  const algodClient = new algosdk.Algodv2(
+    '',
+    'https://mainnet-api.algonode.cloud',
+    ''
+  )
+
+  // 获取参数
+  const suggestedParams = await algodClient.getTransactionParams().do()
+
+  // 创建交易
+  const txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+    from: address,
+    to: 'RECIPIENT_ADDRESS',
+    amount: 1000000, // 1 ALGO
+    suggestedParams,
+  })
+
+  // 签名
+  const walletTxns = [{
+    txn: Buffer.from(algosdk.encodeUnsignedTransaction(txn)).toString('base64'),
+  }]
+
+  const signedTxns = await provider.signTxns(walletTxns)
+
+  // 发送
+  const { txId } = await algodClient.sendRawTransaction(
+    Buffer.from(signedTxns[0], 'base64')
+  ).do()
+
+  console.log('交易 ID:', txId)
+
+  // 等待确认
+  await algosdk.waitForConfirmation(algodClient, txId, 4)
+  console.log('已确认！')
+}
+```
+

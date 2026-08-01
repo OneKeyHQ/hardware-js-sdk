@@ -1,4 +1,4 @@
-import { ScdoSignedMessage } from '@onekeyfe/hd-transport';
+import type { ScdoSignedMessage } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type ScdoSignMessageParams = {

@@ -1,10 +1,12 @@
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import { OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
+
 import { BaseMethod } from './BaseMethod';
 import TransportManager from '../data-manager/TransportManager';
 import { DataManager } from '../data-manager';
 import { DevicePool } from '../device/DevicePool';
-import { getLogger, LoggerNames } from '../utils';
+import { LoggerNames, getLogger } from '../utils';
+
+import type { OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
 
 const Log = getLogger(LoggerNames.Method);
 
@@ -49,9 +51,14 @@ export default class PromptWebDeviceAccess extends BaseMethod {
         }
 
         if (isWebUsbEnv) {
+          const usbDevice = device as USBDevice;
+          const path = usbDevice.serialNumber;
+          if (!path) {
+            throw ERRORS.TypedError(HardwareErrorCode.WebDevicePromptAccessError);
+          }
           devicesDescriptor = [
             {
-              path: (device as USBDevice).serialNumber ?? '',
+              path,
               device,
               debug: true,
             },

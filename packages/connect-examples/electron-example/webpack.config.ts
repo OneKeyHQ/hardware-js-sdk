@@ -42,11 +42,21 @@ module.exports = {
   },
   externals: [
     nodeExternals({
-      allowlist: Object.keys({
-        ...pkg.dependencies,
-        ...pkg.devDependencies,
-      }),
+      allowlist: [
+        // Include all @onekeyfe packages to handle transitive dependencies
+        /^@onekeyfe\//,
+        ...Object.keys({
+          ...pkg.dependencies,
+          ...pkg.devDependencies,
+        }),
+      ],
     }),
+    {
+      '@stoprocent/noble': 'commonjs @stoprocent/noble',
+      '@stoprocent/bluetooth-hci-socket': 'commonjs @stoprocent/bluetooth-hci-socket',
+      bufferutil: 'commonjs bufferutil',
+      'utf-8-validate': 'commonjs utf-8-validate',
+    },
   ],
   output: {
     path: path.resolve(__dirname, 'dist'),

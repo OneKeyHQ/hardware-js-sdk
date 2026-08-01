@@ -1,16 +1,21 @@
-import { FilecoinGetAddress as HardwareFilecoinGetAddress } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { FilecoinAddress, FilecoinGetAddressParams } from '../../types';
+
+import type { FilecoinGetAddress as HardwareFilecoinGetAddress } from '@onekeyfe/hd-transport';
+import type { FilecoinAddress, FilecoinGetAddressParams } from '../../types';
 
 export default class FilecoinGetAddress extends BaseMethod<HardwareFilecoinGetAddress[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };

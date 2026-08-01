@@ -3,7 +3,7 @@ import { type PlaygroundProps } from '../components/Playground';
 const api: PlaygroundProps[] = [
   {
     method: 'nervosGetAddress',
-    description: 'Get address',
+
     presupposes: [
       {
         title: 'Get address',
@@ -39,7 +39,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'nervosSignTransaction',
-    description: 'Sign Transaction',
+
     presupposes: [
       {
         title: 'Normal Transaction',

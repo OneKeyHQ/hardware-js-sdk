@@ -1,0 +1,31 @@
+---
+title: switchNetwork
+---
+
+# switchNetwork
+
+切换当前账户的网络
+
+### 方法
+
+```typescript
+async function switchNetwork(network: string): void
+```
+
+### 参数
+
+网络类型。可选值：`livenet`（主网）和 `testnet`（测试网）
+
+### 示例
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+async provider.switchNetwork("livenet");
+
+```
+
+### 演示
+
+<iframe src="https://codepen.io/OneKeyHQ/pen/ZEwMJKJ" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
+

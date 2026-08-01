@@ -1,6 +1,7 @@
+import type { IFirmwareReleaseInfo } from '../settings';
+import type { EFirmwareType } from '@onekeyfe/hd-shared';
 import type { Response } from '../params';
 import type { IDeviceFirmwareStatus } from '../device';
-import { IFirmwareReleaseInfo } from '../settings';
 
 type FirmwareRelease = {
   status: IDeviceFirmwareStatus;
@@ -12,4 +13,11 @@ type FirmwareRelease = {
   bootloaderMode: boolean;
 };
 
-export declare function checkFirmwareRelease(connectId?: string): Response<FirmwareRelease>;
+export type CheckFirmwareReleaseParams = {
+  firmwareType?: EFirmwareType;
+};
+
+export declare function checkFirmwareRelease(
+  connectId?: string,
+  params?: CheckFirmwareReleaseParams
+): Response<FirmwareRelease>;

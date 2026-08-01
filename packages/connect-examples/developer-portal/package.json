@@ -1,0 +1,45 @@
+{
+  "name": "@onekeyfe/developer-portal",
+  "version": "1.1.26-alpha.2",
+  "private": true,
+  "scripts": {
+    "dev": "next",
+    "dev:webpack": "next dev --webpack -p 3001",
+    "dev:ai-gateway": "node ./scripts/context7-chat-gateway.mjs",
+    "build": "next build && pagefind --site out --output-subdir _pagefind",
+    "start": "npx serve@latest out",
+    "clean": "rimraf out .next"
+  },
+  "dependencies": {
+    "@ai-sdk/react": "3.0.110",
+    "@reactour/tour": "^3.8.0",
+    "@tailwindcss/postcss": "^4.1.17",
+    "@xstate/react": "^6.0.0",
+    "ai": "^6.0.108",
+    "autoprefixer": "^10.4.22",
+    "gsap": "^3.14.2",
+    "lottie-react": "^2.4.1",
+    "lucide-react": "^0.554.0",
+    "next": "16.0.10",
+    "nextra": "4.6.0",
+    "nextra-theme-docs": "4.6.0",
+    "pagefind": "^1.4.0",
+    "postcss": "^8.5.6",
+    "prism-react-renderer": "^2.4.1",
+    "prismjs": "^1.29.0",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "tailwindcss": "^4.1.17",
+    "typescript": "^5.9.3",
+    "xstate": "^5.25.0",
+    "zod": "^4.3.6"
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e",
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.7",
+    "baseline-browser-mapping": "^2.9.7"
+  }
+}

@@ -3,7 +3,7 @@ import { type PlaygroundProps } from '../components/Playground';
 const api: PlaygroundProps[] = [
   {
     method: 'kaspaGetAddress',
-    description: 'Get address',
+
     presupposes: [
       {
         title: 'Get address',
@@ -43,7 +43,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'kaspaSignTransaction',
-    description: 'Sign Transaction',
+
     presupposes: [
       {
         title: 'Sign Transaction',

@@ -1,33 +1,28 @@
 import {
-  createDeferred,
-  Deferred,
+  type Deferred,
   EDeviceType,
+  type EFirmwareType,
   ERRORS,
   HardwareError,
   HardwareErrorCode,
+  createDeferred,
 } from '@onekeyfe/hd-shared';
 import semver from 'semver';
+
 import { UI_REQUEST } from '../constants/ui-request';
 import { BaseMethod } from './BaseMethod';
 import { validateParams } from './helpers/paramsValidator';
 import { DevicePool } from '../device/DevicePool';
 import { getBinary, getInfo, getSysResourceBinary } from './firmware/getBinary';
 import { updateResources, uploadFirmware } from './firmware/uploadFirmware';
-import {
-  getDeviceType,
-  getDeviceUUID,
-  wait,
-  getLogger,
-  LoggerNames,
-  getDeviceFirmwareVersion,
-} from '../utils';
-import { createUiMessage, FirmwareUpdateTipMessage } from '../events/ui-request';
+import { LoggerNames, getLogger, wait } from '../utils';
+import { FirmwareUpdateTipMessage, createUiMessage } from '../events/ui-request';
 import { DeviceModelToTypes } from '../types';
 import { DataManager } from '../data-manager';
-
-import type { KnownDevice, Features } from '../types';
-import type { Device } from '../device/Device';
 import { DEVICE } from '../events';
+
+import type { Features, KnownDevice } from '../types';
+import type { FirmwareBinary } from './firmware/getBinary';
 
 type Params = {
   binary?: ArrayBuffer;
@@ -35,15 +30,87 @@ type Params = {
   updateType: 'firmware' | 'ble';
   forcedUpdateRes?: boolean;
   isUpdateBootloader?: boolean;
+  firmwareType?: EFirmwareType;
 };
 
 const Log = getLogger(LoggerNames.Method);
+
+const FIRMWARE_DOWNLOAD_REQUEST_OPTIONS = {
+  connectTimeoutMs: 60_000,
+  readTimeoutMs: 60_000,
+  overallTimeoutMs: 180_000,
+  maxRetries: 2,
+  retryDelayMs: 500,
+} as const;
+
+const normalizeFirmwareBinary = (binary: unknown): FirmwareBinary | undefined => {
+  if (typeof binary !== 'object' || binary === null) {
+    return undefined;
+  }
+
+  const isNodeBuffer =
+    typeof Buffer !== 'undefined' &&
+    typeof Buffer.isBuffer === 'function' &&
+    Buffer.isBuffer(binary);
+  if (isNodeBuffer) {
+    return binary.byteLength > 0 ? binary : undefined;
+  }
+
+  if (typeof ArrayBuffer !== 'undefined' && binary instanceof ArrayBuffer) {
+    return binary.byteLength > 0 ? binary : undefined;
+  }
+
+  if (
+    typeof ArrayBuffer !== 'undefined' &&
+    typeof ArrayBuffer.isView === 'function' &&
+    ArrayBuffer.isView(binary)
+  ) {
+    if (binary.byteLength <= 0) {
+      return undefined;
+    }
+    const source = new Uint8Array(binary.buffer, binary.byteOffset, binary.byteLength);
+    const normalized = new Uint8Array(binary.byteLength);
+    normalized.set(source);
+    return normalized.buffer;
+  }
+
+  const customBuffer = binary as {
+    [index: number]: unknown;
+    byteLength?: unknown;
+    constructor?: {
+      isBuffer?: (value: unknown) => boolean;
+    };
+    length?: unknown;
+  };
+  if (
+    typeof customBuffer.constructor?.isBuffer !== 'function' ||
+    !customBuffer.constructor.isBuffer(binary) ||
+    typeof customBuffer.byteLength !== 'number' ||
+    !Number.isSafeInteger(customBuffer.byteLength) ||
+    customBuffer.byteLength <= 0 ||
+    typeof customBuffer.length !== 'number' ||
+    customBuffer.length !== customBuffer.byteLength
+  ) {
+    return undefined;
+  }
+
+  const { byteLength } = customBuffer;
+  const normalized = new Uint8Array(byteLength);
+  for (let index = 0; index < byteLength; index += 1) {
+    const { [index]: byte } = customBuffer;
+    if (typeof byte !== 'number' || !Number.isInteger(byte) || byte < 0 || byte > 255) {
+      return undefined;
+    }
+    normalized[index] = byte;
+  }
+  return normalized.buffer;
+};
 
 export default class FirmwareUpdateV2 extends BaseMethod<Params> {
   checkPromise: Deferred<any> | null = null;
 
   init() {
-    this.notAllowDeviceMode = [UI_REQUEST.BOOTLOADER, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [UI_REQUEST.BOOTLOADER, UI_REQUEST.NOT_INITIALIZE];
     this.requireDeviceMode = [];
     this.useDevicePassphraseState = false;
     this.skipForceUpdateCheck = true;
@@ -55,6 +122,7 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
       { name: 'binary', type: 'buffer' },
       { name: 'forcedUpdateRes', type: 'boolean' },
       { name: 'platform', type: 'string', required: true },
+      { name: 'firmwareType', type: 'string' },
     ]);
 
     if (!payload.updateType) {
@@ -74,6 +142,7 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
       this.params = {
         ...this.params,
         version: payload.version,
+        firmwareType: payload.firmwareType,
       };
     }
 
@@ -96,7 +165,7 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
     );
   };
 
-  private async _promptDeviceInBootloaderForWebDevice({ device }: { device: Device }) {
+  private async _promptDeviceInBootloaderForWebDevice() {
     return new Promise((resolve, reject) => {
       if (this.device.listenerCount(DEVICE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE) > 0) {
         this.device.emit(
@@ -127,9 +196,8 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
     // eslint-disable-next-line prefer-const
     let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
 
-    const isTouchOrProDevice =
-      getDeviceType(this?.device?.features) === EDeviceType.Touch ||
-      getDeviceType(this?.device?.features) === EDeviceType.Pro;
+    const deviceType = this.device?.getCurrentDeviceType();
+    const isTouchOrProDevice = deviceType === EDeviceType.Touch || deviceType === EDeviceType.Pro;
 
     const intervalTimer: ReturnType<typeof setInterval> | undefined = setInterval(
       async () => {
@@ -141,15 +209,17 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
           await wait(3000);
         }
 
-        if (checkCount > 4 && DataManager.isWebUsbConnect(DataManager.getSettings('env'))) {
+        if (
+          checkCount > 4 &&
+          DataManager.isBrowserWebUsb(DataManager.getSettings('env')) &&
+          !this.payload.skipWebDevicePrompt
+        ) {
           clearInterval(intervalTimer);
           clearTimeout(timeoutTimer);
 
           try {
             this.postTipMessage(FirmwareUpdateTipMessage.SelectDeviceInBootloaderForWebDevice);
-            const confirmed = await this._promptDeviceInBootloaderForWebDevice({
-              device: this.device,
-            });
+            const confirmed = await this._promptDeviceInBootloaderForWebDevice();
             if (confirmed) {
               await this._checkDeviceInBootloaderMode(connectId, intervalTimer, timeoutTimer);
             }
@@ -171,7 +241,7 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
               true
             );
             await this.device.initialize();
-            if (this.device.features?.bootloader_mode) {
+            if (this.device.isBootloader()) {
               clearInterval(intervalTimer);
               this.checkPromise?.resolve(true);
             }
@@ -204,7 +274,7 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
     const devicesDescriptor = deviceDiff?.descriptors ?? [];
     const { deviceList } = await DevicePool.getDevices(devicesDescriptor, connectId);
 
-    if (deviceList.length === 1 && deviceList[0]?.features?.bootloader_mode) {
+    if (deviceList.length === 1 && deviceList[0]?.isBootloader()) {
       // should update current device from cache
       // because device was reboot and had some new requests
       this.device.updateFromCache(deviceList[0]);
@@ -218,22 +288,22 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
     return false;
   }
 
-  isEnteredManuallyBoot(features: Features) {
-    const deviceType = getDeviceType(features);
+  isEnteredManuallyBoot() {
+    const deviceType = this.device.getCurrentDeviceType();
     const isMini = deviceType === EDeviceType.Mini;
     const isBoot183ClassicUpBle =
       this.params.updateType === 'firmware' &&
       deviceType === EDeviceType.Classic &&
-      features.bootloader_version === '1.8.3';
+      this.device.getCurrentBootloaderVersionString() === '1.8.3';
     return isMini || isBoot183ClassicUpBle;
   }
 
-  isSupportResourceUpdate(features: Features, updateType: string) {
+  isSupportResourceUpdate(updateType: string) {
     if (updateType !== 'firmware') return false;
 
-    const deviceType = getDeviceType(features);
+    const deviceType = this.device.getCurrentDeviceType();
     const isTouchMode = deviceType === EDeviceType.Touch || deviceType === EDeviceType.Pro;
-    const currentVersion = getDeviceFirmwareVersion(features).join('.');
+    const currentVersion = this.device.getCurrentFirmwareVersionString() ?? '0.0.0';
 
     return isTouchMode && semver.gte(currentVersion, '3.2.0');
   }
@@ -242,14 +312,14 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
    * Check the version number of Touch to determine if it
    * needs to be upgraded via the desktop
    */
-  checkVersionForCopyTouchResource(features?: Features) {
+  checkVersionForCopyTouchResource(features: Features | undefined, firmwareType: EFirmwareType) {
     if (!features) return;
-    const deviceType = getDeviceType(features);
-    const currentVersion = getDeviceFirmwareVersion(features).join('.');
+    const deviceType = this.device.getCurrentDeviceType();
+    const currentVersion = this.device.getCurrentFirmwareVersionString() ?? '0.0.0';
     const targetVersion = this.params.version?.join('.');
     const { updateType } = this.params;
 
-    const releaseInfo = getInfo({ features, updateType });
+    const releaseInfo = getInfo({ features, updateType, firmwareType });
     if (!releaseInfo) return;
     const { fullResourceRange } = releaseInfo;
     if (!fullResourceRange) return;
@@ -269,24 +339,70 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
   async run() {
     const { device, params } = this;
     const { features, commands } = device;
-    const deviceType = getDeviceType(features);
+    const deviceType = device.getCurrentDeviceType();
 
-    this.checkVersionForCopyTouchResource(features);
+    const deviceFirmwareType = device.getCurrentFirmwareType();
+    const firmwareType = params.firmwareType ?? deviceFirmwareType;
 
-    if (!features?.bootloader_mode && features) {
-      const uuid = getDeviceUUID(features);
+    this.checkVersionForCopyTouchResource(features, firmwareType);
+
+    let preparedBinary: FirmwareBinary | undefined;
+    const acquireFirmwareBinary = async (): Promise<FirmwareBinary> => {
+      try {
+        if (preparedBinary) {
+          return preparedBinary;
+        }
+
+        if (params.binary !== undefined) {
+          preparedBinary = normalizeFirmwareBinary(params.binary);
+          if (!preparedBinary) {
+            throw new Error('firmware binary is empty or invalid');
+          }
+          return preparedBinary;
+        }
+
+        if (!device.features) {
+          throw ERRORS.TypedError(
+            HardwareErrorCode.RuntimeError,
+            'no features found for this device'
+          );
+        }
+
+        this.postTipMessage('DownloadFirmware');
+        const firmware = await getBinary({
+          features: device.features,
+          version: params.version,
+          updateType: params.updateType,
+          isUpdateBootloader: params.isUpdateBootloader,
+          firmwareType,
+          requestOptions: FIRMWARE_DOWNLOAD_REQUEST_OPTIONS,
+        });
+        preparedBinary = normalizeFirmwareBinary(firmware.binary);
+        if (!preparedBinary) {
+          throw new Error('downloaded firmware binary is empty or invalid');
+        }
+        this.postTipMessage('DownloadFirmwareSuccess');
+        return preparedBinary;
+      } catch (err) {
+        throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
+      }
+    };
+
+    if (!device.isBootloader() && features) {
+      const serialNo = device.getCurrentSerialNo();
       // should go to bootloader mode manually
-      if (this.isEnteredManuallyBoot(features)) {
+      if (this.isEnteredManuallyBoot()) {
         return Promise.reject(ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateManuallyEnterBoot));
       }
 
       // check & upgrade firmware resource
-      if (features && this.isSupportResourceUpdate(features, params.updateType)) {
+      if (this.isSupportResourceUpdate(params.updateType)) {
         this.postTipMessage('CheckLatestUiResource');
-        const resourceUrl = DataManager.getSysResourcesLatestRelease(
+        const resourceUrl = DataManager.getSysResourcesLatestRelease({
           features,
-          params.forcedUpdateRes
-        );
+          forcedUpdateRes: params.forcedUpdateRes,
+          firmwareType,
+        });
         if (resourceUrl) {
           this.postTipMessage('DownloadLatestUiResource');
           const resource = await getSysResourceBinary(resourceUrl);
@@ -305,6 +421,12 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
       // check if the device commands has been disposed
       this.device?.commands?.checkDisposed();
 
+      // A failed firmware download must leave the device in normal mode.
+      await acquireFirmwareBinary();
+
+      // The request may outlive the current transport command instance.
+      this.device?.commands?.checkDisposed();
+
       // auto go to bootloader mode
       try {
         this.postTipMessage('AutoRebootToBootloader');
@@ -318,7 +440,7 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
 
         // force clean classic device cache so that the device can initialize again
         if (DeviceModelToTypes.model_classic.includes(deviceType)) {
-          DevicePool.clearDeviceCache(uuid);
+          DevicePool.clearDeviceCache(serialNo);
         }
         delete DevicePool.devicesCache[''];
         await this.checkPromise?.promise;
@@ -343,31 +465,8 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
       }
     }
 
-    let binary;
-
-    try {
-      if (params.binary) {
-        binary = this.params.binary;
-      } else {
-        if (!device.features) {
-          throw ERRORS.TypedError(
-            HardwareErrorCode.RuntimeError,
-            'no features found for this device'
-          );
-        }
-        this.postTipMessage('DownloadFirmware');
-        const firmware = await getBinary({
-          features: device.features,
-          version: params.version,
-          updateType: params.updateType,
-          isUpdateBootloader: params.isUpdateBootloader,
-        });
-        binary = firmware.binary;
-        this.postTipMessage('DownloadFirmwareSuccess');
-      }
-    } catch (err) {
-      throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
-    }
+    // Devices already in bootloader mode still acquire through the same helper.
+    const binary = await acquireFirmwareBinary();
 
     // check if the device commands has been disposed
     this.device?.commands?.checkDisposed();
@@ -379,7 +478,8 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
       this.device.getCommands().typedCall.bind(this.device.getCommands()),
       this.postMessage,
       device,
-      { payload: binary, rebootOnSuccess: true }
+      { payload: binary, rebootOnSuccess: true },
+      params.isUpdateBootloader
     );
 
     if (this.connectId) {

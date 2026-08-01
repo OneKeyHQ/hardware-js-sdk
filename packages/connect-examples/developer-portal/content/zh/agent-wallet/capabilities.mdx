@@ -1,0 +1,74 @@
+---
+title: 能力地图
+---
+
+# 能力地图
+
+OneKey Agent Wallet 不只是登录或托管流程。它向 AI Agent 暴露真实的钱包、swap、行情和安全能力，同时把控制权保留在 OneKey。
+
+## Wallet Operations
+
+用户想查余额、收款地址、交易历史、BTC 地址类型或转账时使用这一类能力。
+
+| 用户意图 | 自然语言 | Skill 路由 |
+| --- | --- | --- |
+| 查看当前钱包 | `What wallet am I using?` | `onekey-wallet` 读取活动会话。 |
+| 展示收款地址 | `Show my ETH receiving address.` | `onekey-wallet` 返回当前收款地址。 |
+| 查余额 | `Show my wallet balance on Ethereum.` | `onekey-wallet` 查询活动钱包余额。 |
+| 查历史 | `Show my last 5 BTC transactions.` | `onekey-wallet` 获取近期历史。 |
+| BTC 地址类型 | `Show my BTC taproot address.` | `onekey-wallet` 保留指定 BTC 地址类型。 |
+| 转账 | `Send 50 USDC to this address.` | `onekey-wallet` 校验、预览并请求确认。 |
+
+转账必须先展示确认信息，包括资产、金额、接收方、链、可用时的费用、余额状态和下一步安全检查。
+
+## Swap and Bridge
+
+用户想交易、买入、卖出、兑换、跨链或签 BTC PSBT 时使用这一类能力。
+
+| 用户意图 | 自然语言 | Skill 路由 |
+| --- | --- | --- |
+| 获取报价 | `Quote 1 ETH to USDC.` | `onekey-swap` 只报价，不执行。 |
+| 构建交易 | `Prepare the swap, but do not submit.` | `onekey-swap` 在审阅后准备订单。 |
+| 确认后执行 | `Yes, execute the swap.` | `onekey-swap` 只执行已确认订单。 |
+| 查询状态 | `What happened to this swap?` | `onekey-swap` 跟踪已有订单。 |
+| 发现跨链网络 | `Can I bridge USDC from Ethereum to Base?` | `onekey-swap` 报价前检查 bridge 支持。 |
+| BTC sign-only | `Swap BTC to USDC using taproot and sign only.` | `onekey-swap` 保留 taproot，返回 signed 或 preview PSBT。 |
+
+标准流程是 quote、安全检查、确认、build、execute。报价和执行不应该合并在同一个 assistant turn。
+
+## Market and Research
+
+用户想查价格、trending tokens、token 信息、K 线、流动性、持仓或研究时使用这一类能力。
+
+| 用户意图 | 自然语言 | Skill 路由 |
+| --- | --- | --- |
+| 单币价格 | `What is the SOL price?` | `onekey-market` 返回价格和 24h 上下文。 |
+| Trending tokens | `What tokens are trending on Solana?` | `onekey-market` 返回短列表。 |
+| Token 搜索 | `Search BONK on Solana.` | `onekey-market` 保留 Solana 上下文。 |
+| Token 详情 | `Show token info for USDC on Ethereum.` | `onekey-market` 解析 token 详情。 |
+| K 线 | `Show ETH 1H candles.` | `onekey-market` 返回图表数据。 |
+| 流动性 / 持仓 | `Show liquidity for PEPE.` | `onekey-market` 汇总流动性或持仓。 |
+
+Market 回答默认是只读的。如果用户随后要求买入或 swap，Agent 应先完成研究，再进入单独的交易确认流程。
+
+## Security Checks
+
+资金操作和合约交互前，以及用户询问 token 或交易是否安全时使用这一类能力。
+
+| 用户意图 | 自然语言 | Skill 路由 |
+| --- | --- | --- |
+| Token audit | `Is this token safe?` | `onekey-security` 报告风险等级和原因。 |
+| 交易模拟 | `What happens if I sign this?` | `onekey-security` 在签名前模拟。 |
+| 授权风险 | `Review this unlimited USDC approval.` | `onekey-security` 明确提示无限授权风险。 |
+| 链不匹配 | `Send SOL to 0x...` | 停止并报告 Solana/EVM 地址不匹配 |
+| 假合约风险 | `Swap 500 USDC to WETH at 0x...` | 因 token/contract mismatch 停止 |
+
+高风险或数据不完整时，应阻断后续资金操作，直到用户明确接受风险。
+
+## Hardware Control
+
+用户想使用设备签名、验证设备真伪、修改 PIN/passphrase，或让敏感操作走 clear signing 时使用这一类能力。
+
+用户可见路径仍然是自然语言：连接设备、验证真伪、切换到硬件会话、必要时选择 passphrase 行为，并在设备上审阅敏感操作。
+
+硬件登录会切换当前活动会话。登录后，wallet、transfer、swap、sign 命令会自动使用硬件会话。

@@ -3,16 +3,22 @@ import { PROTO } from '../../constants';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validateParams } from '../helpers/paramsValidator';
 import { validatePath } from '../helpers/pathUtils';
-import { CardanoSignMessageParams } from '../../types/api/cardanoSignMessage';
+
+import type { CardanoSignMessageParams } from '../../types/api/cardanoSignMessage';
 
 export default class CardanoSignMessage extends BaseMethod<CardanoSignMessageParams> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle?: boolean;
 
   isCheck?: boolean;
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = false;
 
     const { payload } = this;
     validateParams(payload, [
@@ -20,6 +26,8 @@ export default class CardanoSignMessage extends BaseMethod<CardanoSignMessagePar
       { name: 'message', type: 'string', required: true },
       { name: 'derivationType', type: 'number' },
       { name: 'networkId', type: 'number', required: true },
+      { name: 'addressType', type: 'number' },
+      { name: 'protocolMagic', type: 'number' },
     ]);
 
     const addressN = validatePath(payload.path, 3);
@@ -32,6 +40,8 @@ export default class CardanoSignMessage extends BaseMethod<CardanoSignMessagePar
           ? payload.derivationType
           : PROTO.CardanoDerivationType.ICARUS,
       network_id: payload.networkId,
+      address_type: payload.addressType,
+      protocol_magic: payload.protocolMagic,
     };
   }
 
@@ -43,7 +53,20 @@ export default class CardanoSignMessage extends BaseMethod<CardanoSignMessagePar
     };
   }
 
+  getAddressTypeVersionRange() {
+    return {
+      pro: {
+        min: '4.9.3',
+      },
+    };
+  }
+
   async run() {
+    this.checkFeatureVersionLimit(
+      () => this.params.address_type !== null && this.params.address_type !== undefined,
+      () => this.getAddressTypeVersionRange()
+    );
+
     const res = await this.device.commands.typedCall(
       'CardanoSignMessage',
       'CardanoMessageSignature',

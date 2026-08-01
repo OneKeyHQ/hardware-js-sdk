@@ -1,0 +1,109 @@
+---
+title: kaspaSignTransaction
+---
+
+# kaspaSignTransaction
+
+### 使用要求
+
+* 固件版本要求
+  * Touch: 4.3.0
+  * Classic/Mini: 3.0.0
+
+## Kaspa：签名交易
+
+使用指定 BIP32 路径派生的私钥对交易进行签名。用户需要在 OneKey 上确认所有交易详情。
+
+```typescript
+const result = await HardwareSDK.kaspaSignTransaction(connectId, deviceId, params);
+```
+
+### 参数
+
+[**可选通用参数**](/zh/hardware-sdk/core-api-guide#common-params)
+
+* `version` - _必需_ `number` 交易版本。
+* `inputs` - _必需_ [KaspaSignInputParams](https://github.com/OneKeyHQ/hardware-js-sdk/blob/269ee367141ae2186a9a63d1d89e9f4c70428623/packages/core/src/types/api/kaspaSignTransaction.ts#L9C1-L19C3) 的 `Array`。
+* `outputs` - _必需_ [KaspaSignOutputParams](https://github.com/OneKeyHQ/hardware-js-sdk/blob/269ee367141ae2186a9a63d1d89e9f4c70428623/packages/core/src/types/api/kaspaSignTransaction.ts#L21C1-L26C1) 的 `Array`。
+* `lockTime` - _必需_ `number`
+* `sigHashType` - _必需_ `number`
+  * ```
+    SIGHASH_ALL = 0x01,
+    SIGHASH_NONE = 0x02,
+    SIGHASH_SINGLE = 0x03,
+    SIGHASH_FORKID = 0x40,
+    SIGHASH_ANYONECANPAY = 0x80,
+    ```
+* `sigOpCount` - _可选_ `number`
+* `subNetworkID` - _可选_ `string`
+* `prefix` - _可选_ `string` 地址前缀。默认设置为 `kaspa`
+* `scheme` - _可选_ `string` 加密算法模式。默认设置为 `schnorr`
+
+
+
+### 示例
+
+```typescript
+const response = await HardwareSDK.kaspaSignTransaction(
+  connectId,
+  deviceId,
+  {
+    version: 0,
+    lockTime: '0',
+    sigHashType: 0x1,
+    sigOpCount: 1,
+    subNetworkID: "00000000000000000000000000000000",
+    prefix: "prefix",
+    scheme: "schnorr",
+    inputs: [
+      {
+        outputIndex: 1,
+        path: "m/44'/111111'/0'/0/0",
+        prevTxId: '1f226507807ff7dc5a7f8f2dec353fffc9dacc2645d8aecd02e5046907e3e2b2',
+        sequenceNumber: '0',
+        sigOpCount: 1,
+        output: {
+          satoshis: '990096458',
+          script: '207afdae557e69c0040fd4135adffc60f9486fb21f4cbae233fd6db3e84ba47c55ac',
+        },
+      },
+    ],
+    outputs: [
+      {
+        satoshis: '100000000',
+        script: '205ca3a7530284e5c5e472544edd6002c3afeb8c8f84d3a728fad255a4872753fbac',
+        scriptVersion: 0,
+      },
+      {
+        satoshis: '890094182',
+        script: '207afdae557e69c0040fd4135adffc60f9486fb21f4cbae233fd6db3e84ba47c55ac',
+        scriptVersion: 0,
+      },
+    ]
+  }
+);
+```
+
+返回结果
+
+```typescript
+{
+  success: true,
+  payload: {
+    index: 0,
+    signature: "signed data"
+  }
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误码
+    }
+}
+```

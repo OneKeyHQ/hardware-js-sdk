@@ -6,11 +6,13 @@ import {
   getDeviceType,
 } from '../../utils';
 
-export const getFirmwareReleaseInfo = (features: Features) => {
-  const firmwareStatus = DataManager.getFirmwareStatus(features);
-  const changelog = DataManager.getFirmwareChangelog(features);
-  const release = DataManager.getFirmwareLatestRelease(features);
-  const bootloaderMode = !!features.bootloader_mode;
+import type { EFirmwareType } from '@onekeyfe/hd-shared';
+
+export const getFirmwareReleaseInfo = (features: Features, firmwareType: EFirmwareType) => {
+  const firmwareStatus = DataManager.getFirmwareStatus(features, firmwareType);
+  const changelog = DataManager.getFirmwareChangelog(features, firmwareType);
+  const release = DataManager.getFirmwareLatestRelease(features, firmwareType);
+  const bootloaderMode = !!features.bootloaderMode;
   return {
     status: firmwareStatus,
     changelog,
@@ -23,7 +25,7 @@ export const getBleFirmwareReleaseInfo = (features: Features) => {
   const firmwareStatus = DataManager.getBLEFirmwareStatus(features);
   const changelog = DataManager.getBleFirmwareChangelog(features);
   const release = DataManager.getBleFirmwareLatestRelease(features);
-  const bootloaderMode = !!features.bootloader_mode;
+  const bootloaderMode = !!features.bootloaderMode;
   return {
     status: firmwareStatus,
     changelog,
@@ -32,11 +34,16 @@ export const getBleFirmwareReleaseInfo = (features: Features) => {
   };
 };
 
-export const getBootloaderReleaseInfo = (
-  features: Features,
-  willUpdateFirmwareVersion?: string
-) => {
-  const release = DataManager.getFirmwareLatestRelease(features);
+export const getBootloaderReleaseInfo = ({
+  features,
+  willUpdateFirmwareVersion,
+  firmwareType,
+}: {
+  features: Features;
+  willUpdateFirmwareVersion?: string;
+  firmwareType: EFirmwareType;
+}) => {
+  const release = DataManager.getFirmwareLatestRelease(features, firmwareType);
   const changelog = [release?.bootloaderChangelog].filter(
     item =>
       item != null &&
@@ -45,16 +52,20 @@ export const getBootloaderReleaseInfo = (
       Object.prototype.hasOwnProperty.call(item, 'en-US')
   );
 
-  const bootloaderMode = !!features.bootloader_mode;
+  const bootloaderMode = !!features.bootloaderMode;
 
   let shouldUpdate = false;
 
   const deviceType = getDeviceType(features);
   // classic mini classic1s
   if (DeviceModelToTypes.model_mini.includes(deviceType)) {
-    shouldUpdate = !!checkNeedUpdateBootForClassicAndMini(features, willUpdateFirmwareVersion);
+    shouldUpdate = !!checkNeedUpdateBootForClassicAndMini({
+      features,
+      willUpdateFirmware: willUpdateFirmwareVersion,
+      firmwareType,
+    });
   } else if (DeviceModelToTypes.model_touch.includes(deviceType)) {
-    shouldUpdate = checkNeedUpdateBootForTouch(features);
+    shouldUpdate = checkNeedUpdateBootForTouch(features, firmwareType);
   }
 
   return {

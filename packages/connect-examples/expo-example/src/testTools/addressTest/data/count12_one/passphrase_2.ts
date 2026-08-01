@@ -1,4 +1,5 @@
 import { INDEX_MARK } from '../../baseParams';
+
 import type { AddressTestCaseData } from '../types';
 
 export default {

@@ -1,0 +1,79 @@
+---
+title: confluxSignTransaction
+---
+
+# confluxSignTransaction
+
+## 使用要求
+
+* 固件版本要求
+  * Touch: 3.0.0
+  * Classic/Mini: 2.4.0
+
+### Conflux：签名交易 <a href="#cardano-sign-transaction" id="cardano-sign-transaction"></a>
+
+对指定交易进行签名。用户需要在 OneKey 上确认所有交易详情。
+
+```typescript
+const response = await HardwareSDK.confluxSignTransaction(connectId, deviceId, params)
+```
+
+### 参数
+
+[**可选通用参数**](/zh/hardware-sdk/core-api-guide#common-params)
+
+* `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](/zh/hardware-sdk/core-api-guide#hd-path)
+* `transaction` - _必需_ `ConfluxTransaction` 类型
+  * `to` - _必需_ `string` 地址十六进制字符串
+  * `value` - _必需_ `string` 金额转换为 BigInt 十六进制字符串
+  * `gasLimit` - _必需_ `string` gas 限制转换为 BigInt 十六进制字符串
+  * `gasPrice` - _必需_ `string` gas 价格转换为 BigInt 十六进制字符串
+  * `nonce` - _必需_ `string` nonce 转换为 BigInt 十六进制字符串
+  * `epochHeight` - _必需_ `string` epoch 高度转换为 BigInt 十六进制字符串
+  * `storageLimit` - _必需_ `string` 存储限制转换为 BigInt 十六进制字符串
+  * `chainId` - _必需_ `number` 链的 ID
+  * `data` - _可选_ `string` 十六进制数据
+
+### 示例
+
+```typescript
+HardwareSDK.confluxSignTransaction(connectId, deviceId, {
+    path: "m/44'/503'/0'/0'/0",
+    transaction: {
+        to: "0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8",
+        value: "0xf4240",
+        data: "0x01",
+        chainId: "1",
+        nonce: "0x00",
+        epochHeight: "0x00",
+        gasPrice: "0xbebc200",
+        gasLimit: "0x5208",
+        storageLimit: "0x5208",
+    }
+});
+```
+
+返回结果
+
+```typescript
+{
+    success: true,
+    payload: {
+        v: string;
+        r: string;
+        s: string;
+    }
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误码
+    }
+}
+```

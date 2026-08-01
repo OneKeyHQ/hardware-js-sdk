@@ -1,21 +1,25 @@
-import {
-  type AlephiumSignedTx,
-  type AlephiumSignTx as HardwareAlephiumSignTx,
-  TypedCall,
-} from '@onekeyfe/hd-transport';
 import { bytesToHex } from '@noble/hashes/utils';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { AlephiumSignTransactionParams } from '../../types';
+
+import type {
+  AlephiumSignedTx,
+  AlephiumTxRequest,
+  AlephiumSignTx as HardwareAlephiumSignTx,
+  TypedCall,
+} from '@onekeyfe/hd-transport';
+import type { AlephiumSignTransactionParams, DeviceFirmwareRange } from '../../types';
 import type { TypedResponseMessage } from '../../device/DeviceCommands';
 
 export default class AlephiumSignTransaction extends BaseMethod<HardwareAlephiumSignTx> {
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = true;
 
     // check payload
     validateParams(this.payload, [
@@ -36,7 +40,7 @@ export default class AlephiumSignTransaction extends BaseMethod<HardwareAlephium
     };
   }
 
-  getVersionRange() {
+  getVersionRange(): DeviceFirmwareRange {
     return {
       model_touch: {
         min: '4.10.0',
@@ -55,7 +59,10 @@ export default class AlephiumSignTransaction extends BaseMethod<HardwareAlephium
     data: Buffer,
     scriptOpt?: Buffer,
     dataOffset = 0
-  ): Promise<AlephiumSignedTx> => {
+    // The final AlephiumTxRequest may return a signature without data_length or address,
+    // so the result accurately uses a union type.
+  ): Promise<AlephiumSignedTx | AlephiumTxRequest> => {
+    const responseType = res.type;
     if (res.type === 'AlephiumSignedTx') {
       return res.message;
     }
@@ -106,7 +113,10 @@ export default class AlephiumSignTransaction extends BaseMethod<HardwareAlephium
       return this.processTxRequest(typedCall, response, data, scriptOpt, dataOffset);
     }
 
-    throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, `Unknown response type: ${res.type}`);
+    throw ERRORS.TypedError(
+      HardwareErrorCode.RuntimeError,
+      `Unknown response type: ${responseType}`
+    );
   };
 
   async run() {

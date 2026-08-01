@@ -1,4 +1,11 @@
-import {
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+
+import { UI_REQUEST } from '../../constants/ui-request';
+import { validatePath } from '../helpers/pathUtils';
+import { BaseMethod } from '../BaseMethod';
+import { validateParams } from '../helpers/paramsValidator';
+
+import type {
   NEMAggregateModification,
   NEMImportanceTransfer,
   NEMMosaicCreation,
@@ -9,13 +16,7 @@ import {
   NEMTransactionCommon,
   NEMTransfer,
 } from '@onekeyfe/hd-transport';
-
-import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import { UI_REQUEST } from '../../constants/ui-request';
-import { validatePath } from '../helpers/pathUtils';
-import { BaseMethod } from '../BaseMethod';
-import { validateParams } from '../helpers/paramsValidator';
-import {
+import type {
   NEMAggregateModificationTransaction,
   NEMImportanceTransaction,
   NEMMosaicCreationTransaction,
@@ -36,6 +37,10 @@ const NEM_MOSAIC_CREATION = 0x4001;
 const NEM_SUPPLY_CHANGE = 0x4002;
 
 export default class NEMSignTransaction extends BaseMethod<NEMSignTx> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   NEM_MOSAIC_LEVY_TYPES: Record<number, string> = {
     1: 'MosaicLevy_Absolute',
     2: 'MosaicLevy_Percentile',
@@ -228,7 +233,8 @@ export default class NEMSignTransaction extends BaseMethod<NEMSignTx> {
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = true;
 
     validateParams(this.payload, [
       { name: 'path', required: true },

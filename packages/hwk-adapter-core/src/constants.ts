@@ -1,0 +1,1 @@
+export const DEVICE_CONNECT_RETRY_DELAY_MS = 1000;

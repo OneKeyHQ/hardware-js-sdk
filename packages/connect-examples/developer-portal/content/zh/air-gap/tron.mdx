@@ -1,0 +1,65 @@
+---
+title: Tron
+---
+
+# Tron
+
+Tron 离线签名使用相同的动画二维码传输模式。
+
+## 数据类型
+
+- 请求 UR：`tron-sign-request`
+- 响应 UR：`tron-signature`
+
+> Tron 助手由我们的 QR 钱包 SDK 提供，遵循标准 UR 模式。
+
+## 流程
+
+1. 构建 Tron 签名请求（交易/消息 + BIP-44 路径）
+2. 编码为 UR，显示为动画二维码
+3. 扫描设备响应，解码签名
+4. 广播到 Tron 网络
+
+## 示例
+
+### 构建 Tron 签名请求（UR）
+
+```ts
+import { TronSignRequest } from '@keystonehq/bc-ur-registry-tron';
+import { CryptoKeypath, PathComponent } from '@keystonehq/bc-ur-registry';
+import { airGapUrUtils } from '@keystonehq/keystone-sdk';
+
+// BIP44: m/44'/195'/0'/0/0
+const keypath = new CryptoKeypath([
+  new PathComponent({ index: 44, hardened: true }),
+  new PathComponent({ index: 195, hardened: true }),
+  new PathComponent({ index: 0, hardened: true }),
+  new PathComponent({ index: 0, hardened: false }),
+  new PathComponent({ index: 0, hardened: false }),
+]);
+
+const req = new TronSignRequest({
+  signData: Buffer.from(rawTxHex, 'hex'),
+  derivationPath: keypath,
+});
+
+const ur = req.toUR();
+const frames = airGapUrUtils.urToQrcode(ur);
+```
+
+### 解码 Tron 签名（UR）
+
+```ts
+import { URDecoder } from '@ngraveio/bc-ur';
+import { TronSignature } from '@keystonehq/bc-ur-registry-tron';
+
+const dec = new URDecoder();
+// 对每个扫描的帧执行 dec.receivePart(frameString)
+if (dec.isComplete()) {
+  const ur = dec.resultUR();            // 'tron-signature'
+  const sig = TronSignature.fromCBOR(ur.cbor);
+  const signature = sig.getSignature();
+  // 将已签名交易广播到 Tron 网络
+}
+```
+

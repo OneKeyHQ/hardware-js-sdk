@@ -1,13 +1,16 @@
 import { memo, useCallback, useContext, useEffect, useState } from 'react';
-import { CoreMessage, IFirmwareUpdateTipMessage, UI_EVENT, UI_REQUEST } from '@onekeyfe/hd-core';
+import { UI_EVENT, UI_REQUEST } from '@onekeyfe/hd-core';
 import { Dialog, Stack, Text, Unspaced } from 'tamagui';
 import { X } from '@tamagui/lucide-icons';
 import { useIntl } from 'react-intl';
 import { useFocusEffect } from '@react-navigation/native';
+
 import HardwareSDKContext from '../../provider/HardwareSDKContext';
 import { Button } from '../../components/ui/Button';
 import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
 import { useMedia } from '../../provider/MediaProvider';
+
+import type { CoreMessage, IFirmwareUpdateTipMessage } from '@onekeyfe/hd-core';
 
 let registerListener = false;
 function FirmwareUpdateEventView({

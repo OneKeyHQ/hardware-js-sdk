@@ -1,0 +1,25 @@
+---
+title: 签名消息
+---
+
+# 签名消息
+
+当 Web 应用连接到 OneKey 时，还可以请求用户签名指定的消息。
+
+要发送消息让用户签名，Web 应用必须：
+
+* 提供 UTF-8 编码的字符串。
+* 由用户的 OneKey 钱包进行签名。
+
+方法调用将返回一个 [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise)，其中包含 `signatures` 对象。
+
+```javascript
+const res = await provider.request({
+  method: 'near_signMessages',
+  params: {
+    messages: ['hello world', 'onekey near wallet'], // 必须是数组类型
+  },
+});
+console.log('near_signMessages', res, res.signatures);
+```
+

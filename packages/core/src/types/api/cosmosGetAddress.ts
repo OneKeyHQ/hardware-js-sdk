@@ -1,4 +1,4 @@
-import { CosmosAddress as HardwareCosmosAddress } from '@onekeyfe/hd-transport';
+import type { CosmosAddress as HardwareCosmosAddress } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type CosmosAddress = {

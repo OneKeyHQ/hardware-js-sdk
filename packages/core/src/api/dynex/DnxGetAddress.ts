@@ -1,17 +1,17 @@
-import type { DnxGetAddress as HardwareDnxGetAddress } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
 
-import type { DnxGetAddressParams, DnxAddress } from '../../types';
+import type { DnxGetAddress as HardwareDnxGetAddress } from '@onekeyfe/hd-transport';
+import type { DnxAddress, DnxGetAddressParams } from '../../types';
 
 export default class DnxGetAddress extends BaseMethod<HardwareDnxGetAddress[]> {
   hasBundle = false;
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };

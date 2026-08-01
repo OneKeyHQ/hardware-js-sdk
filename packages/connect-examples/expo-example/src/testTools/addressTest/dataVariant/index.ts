@@ -1,13 +1,14 @@
-import { singleAddressTestCount24Two, batchAddressTestCount24Two } from './count24_two/index';
-import { singleAddressTestCount24One, batchAddressTestCount24One } from './count24_one/index';
-import { singleAddressTestCount24Three, batchAddressTestCount24Three } from './count24_three/index';
-import { singleAddressTestCount12Three, batchAddressTestCount12Three } from './count12_three/index';
-import { singleAddressTestCount12Two, batchAddressTestCount12Two } from './count12_two/index';
-import { singleAddressTestCount12One, batchAddressTestCount12One } from './count12_one/index';
-import { singleAddressTestCount18Three, batchAddressTestCount18Three } from './count18_three/index';
-import { singleAddressTestCount18Two, batchAddressTestCount18Two } from './count18_two/index';
-import { singleAddressTestCount18One, batchAddressTestCount18One } from './count18_one/index';
-import { AddressBatchTestCase, AddressTestCase } from '../types';
+import { batchAddressTestCount24Two, singleAddressTestCount24Two } from './count24_two/index';
+import { batchAddressTestCount24One, singleAddressTestCount24One } from './count24_one/index';
+import { batchAddressTestCount24Three, singleAddressTestCount24Three } from './count24_three/index';
+import { batchAddressTestCount12Three, singleAddressTestCount12Three } from './count12_three/index';
+import { batchAddressTestCount12Two, singleAddressTestCount12Two } from './count12_two/index';
+import { batchAddressTestCount12One, singleAddressTestCount12One } from './count12_one/index';
+import { batchAddressTestCount18Three, singleAddressTestCount18Three } from './count18_three/index';
+import { batchAddressTestCount18Two, singleAddressTestCount18Two } from './count18_two/index';
+import { batchAddressTestCount18One, singleAddressTestCount18One } from './count18_one/index';
+
+import type { AddressBatchTestCase, AddressTestCase } from '../types';
 // import { singleAddressTestCount12Two } from './count12_two';
 
 export const testCases: AddressTestCase[] = [

@@ -1,0 +1,157 @@
+---
+title: Getting Started
+description: Connect to Sui using OneKey's Sui Wallet Standard provider
+---
+
+import { Callout } from 'nextra/components'
+
+# Getting Started
+
+Learn how to detect, connect, and interact with Sui using OneKey's provider.
+
+<Callout type="info">
+OneKey implements the Sui Wallet Standard, ensuring compatibility with all Sui dApps.
+</Callout>
+
+---
+
+## Provider Detection
+
+```typescript
+// Detect OneKey Sui provider
+const provider = window.$onekey?.sui
+
+if (!provider) {
+  throw new Error('OneKey Sui provider not detected')
+}
+```
+
+---
+
+## Check Permissions
+
+```typescript
+// Check if already connected
+const hasPermission = await provider.hasPermissions()
+
+if (hasPermission) {
+  const accounts = await provider.getAccounts()
+  console.log('Connected accounts:', accounts)
+}
+```
+
+---
+
+## Request Connection
+
+```typescript
+// Request permissions to connect
+const result = await provider.requestPermissions()
+
+if (result) {
+  const accounts = await provider.getAccounts()
+  console.log('Connected:', accounts[0].address)
+}
+```
+
+---
+
+## Get Accounts
+
+```typescript
+const accounts = await provider.getAccounts()
+
+accounts.forEach(account => {
+  console.log({
+    address: account.address,     // Sui address
+    publicKey: account.publicKey, // Public key (hex string)
+  })
+})
+```
+
+---
+
+## Get Active Chain
+
+```typescript
+const chain = await provider.getActiveChain()
+
+console.log('Active chain:', chain) // e.g., 'sui:testnet'
+```
+
+---
+
+## Check Connection Status
+
+```typescript
+const isConnected = provider.isConnected()
+console.log('Connected:', isConnected)
+```
+
+---
+
+## Disconnect
+
+```typescript
+await provider.disconnect()
+```
+
+---
+
+## Event Listeners
+
+### Listen for Account Changes
+
+```typescript
+provider.onAccountChange((account) => {
+  if (account) {
+    console.log('Account changed:', account.address)
+  } else {
+    console.log('Disconnected')
+  }
+})
+```
+
+### Listen for Network Changes
+
+```typescript
+provider.onNetworkChange((network) => {
+  console.log('Network changed:', network)
+})
+```
+
+---
+
+## Using with Sui Wallet Kit
+
+For React applications, use the official Sui Wallet Kit:
+
+```bash
+npm install @mysten/dapp-kit @mysten/sui.js @tanstack/react-query
+```
+
+```tsx
+import { SuiClientProvider, WalletProvider } from '@mysten/dapp-kit'
+import { getFullnodeUrl } from '@mysten/sui.js/client'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+
+const queryClient = new QueryClient()
+const networks = {
+  mainnet: { url: getFullnodeUrl('mainnet') },
+  testnet: { url: getFullnodeUrl('testnet') },
+}
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <SuiClientProvider networks={networks} defaultNetwork="mainnet">
+        <WalletProvider>
+          <YourApp />
+        </WalletProvider>
+      </SuiClientProvider>
+    </QueryClientProvider>
+  )
+}
+```
+
+OneKey is automatically detected through the Sui Wallet Standard.

@@ -1,19 +1,24 @@
-import { EthereumGetAddressOneKey } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { EVMAddress, EVMGetAddressParams } from '../../types';
-import TransportManager from '../../data-manager/TransportManager';
 import getAddressLegacyV1 from './legacyV1/getAddress';
 import getAddress from './latest/getAddress';
+import { shouldUseLegacyV1EvmMessages } from './protocol';
+
+import type { EVMAddress, EVMGetAddressParams } from '../../types';
+import type { EthereumGetAddressOneKey } from '@onekeyfe/hd-transport';
 
 export default class EvmGetAddress extends BaseMethod<EthereumGetAddressOneKey[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };
@@ -43,7 +48,7 @@ export default class EvmGetAddress extends BaseMethod<EthereumGetAddressOneKey[]
   }
 
   async getEvmAddress(param: EthereumGetAddressOneKey) {
-    if (TransportManager.getMessageVersion() === 'v1') {
+    if (shouldUseLegacyV1EvmMessages(this.device)) {
       return getAddressLegacyV1({
         typedCall: this.device.commands.typedCall.bind(this.device.commands),
         param,

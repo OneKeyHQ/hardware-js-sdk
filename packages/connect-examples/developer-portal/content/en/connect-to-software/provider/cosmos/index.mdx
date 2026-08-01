@@ -1,0 +1,329 @@
+---
+title: Cosmos
+description: Cosmos integration via OneKey's Keplr-compatible provider
+---
+
+import { Callout, Tabs } from 'nextra/components'
+
+# Cosmos
+
+Integrate Cosmos ecosystem chains using OneKey's Keplr-compatible provider. Access via `window.$onekey.cosmos`.
+
+<Callout type="info">
+OneKey's Cosmos provider is fully compatible with the Keplr wallet interface, making migration seamless.
+</Callout>
+
+---
+
+## Quick Links
+
+- [API Reference](#api-reference)
+- [Chain Management](#chain-management)
+- [Signing Messages](#signing-messages)
+- [Sending Transactions](#sending-transactions)
+
+---
+
+## Provider Detection
+
+```typescript
+// Detect OneKey Cosmos provider
+const provider = window.$onekey?.cosmos
+
+if (!provider) {
+  throw new Error('OneKey Cosmos provider not detected')
+}
+
+// Check if it's OneKey
+console.log('Provider:', provider.isOneKey ? 'OneKey' : 'Unknown')
+```
+
+---
+
+## Quick Start
+
+### Connect to Chain
+
+```typescript
+const chainId = 'cosmoshub-4'
+
+// Enable the chain - returns key info
+const key = await provider.enable(chainId)
+
+// Or enable multiple chains at once
+await provider.enable(['cosmoshub-4', 'osmosis-1', 'juno-1'])
+```
+
+### Get Account Info
+
+```typescript
+const chainId = 'cosmoshub-4'
+const key = await provider.getKey(chainId)
+
+console.log({
+  name: key.name,           // Account name
+  algo: key.algo,           // Signing algorithm (secp256k1)
+  pubKey: key.pubKey,       // Public key (Uint8Array)
+  address: key.address,     // Bech32 address (Uint8Array)
+  bech32Address: key.bech32Address,  // Bech32 formatted address
+  isNanoLedger: key.isNanoLedger,    // Hardware wallet flag
+})
+```
+
+---
+
+## Chain Management
+
+### Add Custom Chain
+
+Use `experimentalSuggestChain` to add chains not natively supported:
+
+```typescript
+await provider.experimentalSuggestChain({
+  chainId: 'my-chain-1',
+  chainName: 'My Custom Chain',
+  rpc: 'https://rpc.mychain.io',
+  rest: 'https://lcd.mychain.io',
+  bip44: { coinType: 118 },
+  bech32Config: {
+    bech32PrefixAccAddr: 'mychain',
+    bech32PrefixAccPub: 'mychainpub',
+    bech32PrefixValAddr: 'mychainvaloper',
+    bech32PrefixValPub: 'mychainvaloperpub',
+    bech32PrefixConsAddr: 'mychainvalcons',
+    bech32PrefixConsPub: 'mychainvalconspub',
+  },
+  currencies: [{
+    coinDenom: 'TOKEN',
+    coinMinimalDenom: 'utoken',
+    coinDecimals: 6,
+  }],
+  feeCurrencies: [{
+    coinDenom: 'TOKEN',
+    coinMinimalDenom: 'utoken',
+    coinDecimals: 6,
+    gasPriceStep: { low: 0.01, average: 0.025, high: 0.04 },
+  }],
+  stakeCurrency: {
+    coinDenom: 'TOKEN',
+    coinMinimalDenom: 'utoken',
+    coinDecimals: 6,
+  },
+})
+```
+
+### Disconnect
+
+```typescript
+await provider.disconnect()
+```
+
+---
+
+## Signing Messages
+
+### Sign Amino (Legacy)
+
+For legacy Amino-encoded transactions:
+
+```typescript
+const chainId = 'cosmoshub-4'
+const signer = 'cosmos1...'
+
+const signDoc = {
+  chain_id: chainId,
+  account_number: '0',
+  sequence: '0',
+  fee: {
+    amount: [{ denom: 'uatom', amount: '5000' }],
+    gas: '200000',
+  },
+  msgs: [{
+    type: 'cosmos-sdk/MsgSend',
+    value: {
+      from_address: signer,
+      to_address: 'cosmos1...',
+      amount: [{ denom: 'uatom', amount: '1000000' }],
+    },
+  }],
+  memo: '',
+}
+
+const result = await provider.signAmino(chainId, signer, signDoc)
+
+console.log({
+  signed: result.signed,       // Signed document
+  signature: result.signature, // { pub_key, signature }
+})
+```
+
+### Sign Direct (Protobuf)
+
+For modern Protobuf-encoded transactions:
+
+```typescript
+import { makeSignDoc } from '@cosmjs/proto-signing'
+
+const chainId = 'cosmoshub-4'
+const signer = 'cosmos1...'
+
+const signDoc = makeSignDoc(
+  bodyBytes,      // Transaction body
+  authInfoBytes,  // Auth info with fee
+  chainId,
+  accountNumber
+)
+
+const result = await provider.signDirect(chainId, signer, signDoc)
+
+console.log({
+  signed: result.signed,
+  signature: result.signature,
+})
+```
+
+### Sign Arbitrary Data
+
+For signing arbitrary messages (useful for authentication):
+
+```typescript
+const chainId = 'cosmoshub-4'
+const signer = 'cosmos1...'
+const data = 'Login to MyApp at 2024-01-01T00:00:00Z'
+
+const signature = await provider.signArbitrary(chainId, signer, data)
+
+// Verify the signature
+const isValid = await provider.verifyArbitrary(chainId, signer, data, signature)
+console.log('Signature valid:', isValid)
+```
+
+---
+
+## Sending Transactions
+
+### Broadcast Transaction
+
+```typescript
+const chainId = 'cosmoshub-4'
+const txBytes = new Uint8Array([...]) // Signed transaction bytes
+
+// Broadcast modes: 'block', 'sync', 'async'
+const result = await provider.sendTx(chainId, txBytes, 'sync')
+
+console.log('TX Hash:', result)
+```
+
+---
+
+## Offline Signers
+
+Get offline signers for use with CosmJS:
+
+```typescript
+import { SigningStargateClient } from '@cosmjs/stargate'
+
+const chainId = 'cosmoshub-4'
+
+// Auto-detect best signer type
+const offlineSigner = await provider.getOfflineSignerAuto(chainId)
+
+// Or use specific signer types
+const aminoSigner = provider.getOfflineSignerOnlyAmino(chainId)
+const directSigner = provider.getOfflineSigner(chainId)
+
+// Use with CosmJS
+const client = await SigningStargateClient.connectWithSigner(
+  'https://rpc.cosmos.network',
+  offlineSigner
+)
+
+// Send tokens
+const result = await client.sendTokens(
+  senderAddress,
+  recipientAddress,
+  [{ denom: 'uatom', amount: '1000000' }],
+  { amount: [{ denom: 'uatom', amount: '5000' }], gas: '200000' }
+)
+```
+
+---
+
+## API Reference
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `enable(chainIds)` | Enable chain(s) and get key info |
+| `disable(chainIds)` | Disable chain(s) |
+| `disconnect()` | Disconnect from all chains |
+| `getKey(chainId)` | Get account key for chain |
+| `signAmino(chainId, signer, signDoc)` | Sign Amino-encoded transaction |
+| `signDirect(chainId, signer, signDoc)` | Sign Protobuf-encoded transaction |
+| `sendTx(chainId, tx, mode)` | Broadcast signed transaction |
+| `signArbitrary(chainId, signer, data)` | Sign arbitrary message |
+| `verifyArbitrary(chainId, signer, data, signature)` | Verify signature |
+| `experimentalSuggestChain(chainInfo)` | Add custom chain |
+| `getOfflineSigner(chainId)` | Get Direct offline signer |
+| `getOfflineSignerOnlyAmino(chainId)` | Get Amino-only offline signer |
+| `getOfflineSignerAuto(chainId)` | Auto-detect best signer type |
+
+### Key Interface
+
+```typescript
+interface Key {
+  name: string              // Human-readable name
+  algo: string              // Signing algorithm
+  pubKey: Uint8Array        // Public key bytes
+  address: Uint8Array       // Address bytes
+  bech32Address: string     // Bech32 formatted address
+  isNanoLedger: boolean     // True if hardware wallet
+  isKeystone: boolean       // True if Keystone hardware
+}
+```
+
+### Supported Chains
+
+| Chain | Chain ID | Native Support |
+|-------|----------|----------------|
+| Cosmos Hub | `cosmoshub-4` | Yes |
+| Osmosis | `osmosis-1` | Yes |
+| Juno | `juno-1` | Yes |
+| Stargaze | `stargaze-1` | Yes |
+| Akash | `akashnet-2` | Yes |
+| Secret Network | `secret-4` | Yes |
+| Custom | Any | Via `experimentalSuggestChain` |
+
+---
+
+## Error Handling
+
+```typescript
+try {
+  await provider.enable('cosmoshub-4')
+} catch (error) {
+  if (error.code === 4001) {
+    console.log('User rejected the request')
+  } else if (error.message.includes('not supported')) {
+    console.log('Chain not supported, try experimentalSuggestChain')
+  } else {
+    console.error('Connection failed:', error)
+  }
+}
+```
+
+---
+
+## Migration from Keplr
+
+OneKey's Cosmos provider is Keplr-compatible. Simply change your provider detection:
+
+```typescript
+// Before (Keplr only)
+const provider = window.keplr
+
+// After (OneKey with Keplr fallback)
+const provider = window.$onekey?.cosmos || window.keplr
+```
+

@@ -1,5 +1,6 @@
 import { INDEX_MARK } from '../../baseParams';
-import { PubkeyTestCaseData } from '../types';
+
+import type { PubkeyTestCaseData } from '../types';
 
 export default {
   name: 'two-passphrase24-密语1',
@@ -84,6 +85,286 @@ export default {
             public_key: '0278c35d68093fba8c2dc519e64bd1b6bba47c725542534f0105928e454d7b12c8',
           },
           xpub: 'xpub6Cq658ZpDGVPZaCb98qLpDgEZKivjwBjAYv6n4u8YyxE6WeNMjBvL8BennEfP9aLuFRPAHNn4Yb9NoNBs4FZKHM9NQHbozyuvGoJ6gSn7pk',
+        },
+      },
+    },
+    {
+      method: 'btcGetPublicKey',
+      name: 'btcGetPublicKey-test-xpub',
+      params: {
+        path: "m/44'/1'/$$INDEX$$'",
+        coin: 'test',
+      },
+      result: {
+        '0': {
+          node: {
+            public_key: '0318ba755bd8b981f8921404588070e637ee34eca6ec2f89064e7a5c750cae160b',
+          },
+          xpub: 'tpubDCjj9bi6nYHXjx79r1fWa3yAWKc1rdDqary5ytZfygviAnUMoQKJ2HhEaS7cXmmwEBayauqEWdVHuxVv5MwTJaBgvKKfKapsBk5d2RYi6xq',
+        },
+        '100': {
+          node: {
+            public_key: '022e451f01ed19e78244da6d09495c35ed2abf6493bc79b1205b5b83989b0e45d2',
+          },
+          xpub: 'tpubDCjj9bi6nYHcAMrFeBw4c5fhEfwYeE81mMimTEhiX5BptvFk2dADXEt4vvPSbVf7AWhUUz5oNnJxyRq92a5Waq9w4p2vFUJ4x7skqTm9qcd',
+        },
+        '2147483647': {
+          node: {
+            public_key: '0391134ea1dfc0902319694bd1aea94bd2b8c0e2dadfa7241e96cadea72576ec63',
+          },
+          xpub: 'tpubDCjj9biF8CpVuUu5TdUz7mPwHRBw8MokRDL2x1xhShMmBfPVDBGUqWnv1UkXiYaxfYmKRg9sENv7uZ8VwxRnj55aaq9dhvQnZTKKBYu5YrB',
+        },
+      },
+    },
+    {
+      method: 'btcGetPublicKey',
+      name: 'btcGetPublicKey-xpub-48',
+      params: {
+        path: "m/48'/0'/$$INDEX$$'",
+        coin: 'btc',
+      },
+      result: {
+        '0': {
+          node: {
+            public_key: '02bdc6a1b55d563a6de4ed7dc39bbccedd8b0a0e72d9c6b6fc16415400a95d5155',
+          },
+          xpub: 'xpub6CLidNBN4988ReRvPriGHbdA12npKzorDzHq6Y8Aa94kmhJU2GVk6BE7iE7BEtGTXLUSxZgfSuFBerLvRM7nRpZLvTzZXxLucALp7DZRjA7',
+        },
+        '100': {
+          node: {
+            public_key: '02e0560efc68e2864dc771954c729bc1017af48dfb64a1444583980d1154427740',
+          },
+          xpub: 'xpub6CLidNBN498CpaxjCGVdPHWdT4fCFsK1Snpf83ueuKSWC4NQ6r83AtGh1QCbg9wWMcw9jCHjYeAWu28RZUtoPW9tRk3AC7Y136TkZ1YdqND',
+        },
+        '2147483647': {
+          node: {
+            public_key: '0284f8222180333d469671003f1a924cb7158cde1635eef066b496b1aa354b06db',
+          },
+          xpub: 'xpub6CLidNBWPof6ZghGQv9QNmQa957PfWCePhzoASB88KfuxCEAfBBszgoPAaiCQHjhWAAFG1sjmhgAjXuz8MMykZZ1ESSDFrwcVpueHnBQqGG',
+        },
+      },
+    },
+    {
+      method: 'btcGetPublicKey',
+      name: 'btcGetPublicKey-xpub-49',
+      params: {
+        path: "m/49'/0'/$$INDEX$$'",
+        coin: 'btc',
+      },
+      result: {
+        '0': {
+          node: {
+            public_key: '03bb20d8d8376d3d199a46923f6fe97f2f00057f0ac065d57e40684480e5575116',
+          },
+          xpub: 'ypub6Y3iNW4P21c7cWgimkFBRm2cD36Uy6rHCLzjCBtKMEfiwPP8m7iyprxZAGh61GYjhYfWhp4CkZP4672qBnXMrk8czxfc7RePM1Zgo55GaU9',
+        },
+        '100': {
+          node: {
+            public_key: '02a91b7066ec291ff61cadbde943a2570e00ae76d0575aa34ae90926a4114af89a',
+          },
+          xpub: 'ypub6Y3iNW4P21cBzuveCRXb7WdWhgbifN293irjMsEvugNS78cjNwQfE3K1nRb38DV8Fy97JRxL9PUnLjj8wj9irBre2ZWYznaq1birFGNBVbe',
+        },
+        '2147483647': {
+          node: {
+            public_key: '03f5c6a6d20376feb2488787a0211270b6557f0587606cbac651807ca2029952db',
+          },
+          xpub: 'ypub6Y3iNW4XMg95jBV8eUvrXA75pm828Ys7E36EgMir8xCygdj7jTuvXCntg3pJ6v4tL1bwqtVyKVRuXaz8UuYEKnLwEn6kPzotik6TrPmaVCe',
+        },
+      },
+    },
+    {
+      method: 'btcGetPublicKey',
+      name: 'btcGetPublicKey-xpub-84',
+      params: {
+        path: "m/84'/0'/$$INDEX$$'",
+        coin: 'btc',
+      },
+      result: {
+        '0': {
+          node: {
+            public_key: '03fe94a94433f5fa3d28e8b892f654a94dc0872d27b7277e3466ec28c84463e305',
+          },
+          xpub: 'zpub6r41m8cmCT8NUARYuic4dkjeMQBVorEAs2K7MMXgmWNHRFDwM195vcM5VsmWhCqLWcE7VYLHKCQrUyYmRzSuGVB3RS8UReUtCFL61M8MSPW',
+        },
+        '100': {
+          node: {
+            public_key: '0290e1fce91f0daea15443498265214cb6325643cb31a0a06eddda250c34b2eb25',
+          },
+          xpub: 'zpub6r41m8cmCT8SspDqK19GDFkQPXZqy9X2wvaWoPmtd6gf5R14YykcR7S31sLuQadfaWgbVgq7dsAwv3yREyHUiuEVv8yQvtKLWr14MQQXMyZ',
+        },
+        '2147483647': {
+          node: {
+            public_key: '02a746ce21ccf50edbb9031984ded4784d490d1d05c69bc9044b0d888c68f96ae5',
+          },
+          xpub: 'zpub6r41m8cuY7fLd16hRk2cac7ELWJhQA5Qk9NTMkryyMuMhBw8bV9Ey9kbsqeQPTXkTVaYkhuyWKRFxucgDVZQvXZuixsdYDxJDax34NSkkkt',
+        },
+      },
+    },
+    {
+      method: 'btcGetPublicKey',
+      name: 'btcGetPublicKey-xpub-86',
+      params: {
+        path: "m/86'/0'/$$INDEX$$'",
+        coin: 'btc',
+      },
+      result: {
+        '0': {
+          node: {
+            public_key: '036a8bdcbfbf3a182f2d152f821e31a432aedea1b76d0f3cbf696fd2c1e3394d9d',
+          },
+          xpub: 'xpub6D8VzT7zzUFkZmR1QPxqCEBEy21MbD189V6a9uaDWWRFSpDkxP9PcKKvj9pZTdNcfwhnG9K5unzytiTNDGuGMY5LkcjeA8fjbuFeQgMw9D8',
+        },
+        '100': {
+          node: {
+            public_key: '03b648131f116ef96fdf0cd1cf38a4b372087016b2f949d3b292cc715db0a8e112',
+          },
+          xpub: 'xpub6D8VzT7zzUFpwHiupMEJkyqT4aRoqEt98Hzi1e9rsiSTYgiB6d9HXVSuiq56avAMtUgFGNQBQkVq3nSDURFntTYsuESFiBq6CMp3NaF32mk',
+        },
+        '2147483647': {
+          node: {
+            public_key: '03a2ed6762ecdfcbf8bbf775bad00cd202c0a2cfc14e58ac7c97812ef44c843fcc',
+          },
+          xpub: 'xpub6D8VzT89L8nihJj9zkdnAkqPPKkhhZ49uFEfUK2NQiDx1uBafPuypdSJhZ1ZZ9vb2P4PyVVSAb87cUGVYbounuNbAq5VJ1Dt6tbpFja3vSt',
+        },
+      },
+    },
+    {
+      method: 'btcGetPublicKey',
+      name: 'btcGetPublicKey-xpub-44-ltc',
+      params: {
+        path: "m/44'/2'/$$INDEX$$'",
+        coin: 'ltc',
+      },
+      result: {
+        '0': {
+          node: {
+            public_key: '02e25392eed34476f358e111484941b1c46c202d58af943367d02f6654429185dc',
+          },
+          xpub: 'Ltub2YniCYsDmC8teQuUHmuFJFBLnoGnL136gcLGC8yiLyRzJ5e9vFdK3RVjbQWsnaf4abifqhJvQ1WhiBCS9kFxFVaYJzEBiqbNUEE2Eb78MRi',
+        },
+        '100': {
+          node: {
+            public_key: '02cccf8b7970bcea0d362c52df08988b4b9c0267de22a7dc1a9c94a0163af2c123',
+          },
+          xpub: 'Ltub2YniCYsDmC8y44VJW6JxF8rq9gG2eF92XctmFAX7Lbbw3CV9D25GRejQ5f6qMyCjp9XYUx2imGWE8xEuf8Q33DN3qupAdjPV4zHMhc2JJgb',
+        },
+        '2147483647': {
+          node: {
+            public_key: '0249b10904293b1649078a0ac07850170714d66e20897d32ae985b6247a17d1e0a',
+          },
+          xpub: 'Ltub2YniCYsN6rfrmUwDdDetfbp8jUPGLy6JmYKDqMS32bB2nMKH9L6peAgi2x31vA9ZC8thU7yJz7iWWGTkTucNZ9wHXNYo2aHHwvViB8YAVQm',
+        },
+      },
+    },
+    {
+      method: 'btcGetPublicKey',
+      name: 'btcGetPublicKey-xpub-49-ltc',
+      params: {
+        path: "m/49'/2'/$$INDEX$$'",
+        coin: 'ltc',
+      },
+      result: {
+        '0': {
+          node: {
+            public_key: '02e92552ff6cca95c62c93eb3eb2edbd89dddfc425d1a8fafaf6bf871894442947',
+          },
+          xpub: 'Mtub2sKL5CBmemDRAFtA3126Sm75jPsMkfZ2rA2DrEbV5g69Tg8rqwwf88ens1DxarvxkRNsdep5Uddy9326fxoQUbdPi6Phj3m3t7BtxyBPPMQ',
+        },
+        '100': {
+          node: {
+            public_key: '02a06e212fa78c39d057acdcd00f73bdc943eab6e805f75f87171899153ec711c8',
+          },
+          xpub: 'Mtub2sKL5CBmemDVYZqSg2pSH41faUg1NZPg6WeE9x7z9qKBRQtEACeq8xkVzt4ZL4ksmUq7Vo6SuWYpyyc46Je1wnFrAWGpDTkguzWrUtY4qvx',
+        },
+        '2147483647': {
+          node: {
+            public_key: '0225c39b41dc450258291c2aedb1af262d8d13756d67a2909826dc213cd83ac910',
+          },
+          xpub: 'Mtub2sKL5CBuzRkPKdVbFaYx4FjLjCXu2ePYrE86eZjsk4RczE6jwMBKKWkpT8LGKrTvRgeqSPaPyLadHePuYmeQLQL6rbFoKPo26B6k1WaNkQF',
+        },
+      },
+    },
+    {
+      method: 'btcGetPublicKey',
+      name: 'btcGetPublicKey-xpub-84-ltc',
+      params: {
+        path: "m/84'/2'/$$INDEX$$'",
+        coin: 'ltc',
+      },
+      result: {
+        '0': {
+          node: {
+            public_key: '0247ec7d9f5c93a35536d574220a15d69a85284a15608f6abf300b2eb2ea5a7ac3',
+          },
+          xpub: 'zpub6qZZcMgrQUQLpVRxzC26ZJKzvxRdEGfVFju57t8jzwXbRM5J9SzRxU9uTf1nE3GYGvND38hMMSSbELi7AeNXmPAEjZAJbraAp6PxDKc6A3G',
+        },
+        '100': {
+          node: {
+            public_key: '034ef7e5eb6442884576db5251723a1d5b22defe1abb57e639d0d1904233d87a29',
+          },
+          xpub: 'zpub6qZZcMgrQUQREqDr5rNZcsHpAQYZGJtR7GTxgG3yZ5R6uhsqeZcQXPJeCtWgGsy9qjAUyEW4zHKpJZNjArQiZ3jWXrqpJK1wdcNHXNryZx9',
+        },
+        '2147483647': {
+          node: {
+            public_key: '02812a066f5a0f9010c489dbb307a9453f5c1e80de2cbc7c26e841580662756d7c',
+          },
+          xpub: 'zpub6qZZcMgzk8wJyr1iEsiWKVZCqQ6skKwu2EQRH1CFP1QTEaJsABtSgy6BsjRj1iN3kXaz9YypfWv8T8JxoAkZUDry27N4wj7JpnAykP9cmPV',
+        },
+      },
+    },
+    {
+      method: 'btcGetPublicKey',
+      name: 'btcGetPublicKey-xpub-44-doge',
+      params: {
+        path: "m/44'/3'/$$INDEX$$'",
+        coin: 'doge',
+      },
+      result: {
+        '0': {
+          node: {
+            public_key: '02c6a69d6951af413242e8f6b3e25016290c8d870beb6b6e9dabc4767115101f7d',
+          },
+          xpub: 'dgub8rUXqGnhdphhx8hSqcoT1wjZb394G8guwECLTREYrTxT9sWwMp7xz9DbQ5RrmaDqZ2pkbpYUsUfszurnS5dATGSf5KFqFFbiL81iumAxL5h',
+        },
+        '100': {
+          node: {
+            public_key: '035b5ea4698c6599b6d273672524ea9bb282f72f0ea452ea3da00c847d2ea9e850',
+          },
+          xpub: 'dgub8rUXqGnhdphnNQ1Ez5Knbutfy7ATCt1aHqr3mQQ7JRR6geDbZTHhy8XHgYYjoV4KPEZReGFFaruS9KBAJy8fJT38Q3RKWFHzVtxKMG9C34X',
+        },
+        '2147483647': {
+          node: {
+            public_key: '03dafde35de90532b3f17b476f4e98dfb49eaa913ccbbd908922face99ffaf8fe8',
+          },
+          xpub: 'dgub8rUXqGnqyVEg7Bz7XFa6U9J97XVda4PAnSzu6B5c3FZszpCQwN9vm6LpTTjiQZcSXpK6yEGGuwB3FmcLbVa9AdpbfGfZ3iytmnEgQA9SU4V',
+        },
+      },
+    },
+    {
+      method: 'btcGetPublicKey',
+      name: 'btcGetPublicKey-xpub-48-doge',
+      params: {
+        path: "m/48'/3'/$$INDEX$$'",
+        coin: 'doge',
+      },
+      result: {
+        '0': {
+          node: {
+            public_key: '0394cf165bb4da63cc9d032fcf016e1ddfe691ac133ff3004d3b867b60c284d881',
+          },
+          xpub: 'dgub8s22VpDTwMJQJMo6eF64WQesf1kE4uqxCbkiwYYgc8pjWaUhaAZVXur1WDv1Uh7Q4B9uPNakqDyzSS6beY7CeHEh5Kwk7LhfZnsoxustjt5',
+        },
+        '100': {
+          node: {
+            public_key: '03a752b6b01c14b22951fe6de37fb4af0bfbabbecf993cb36cd1e2889cb53d6eea',
+          },
+          xpub: 'dgub8s22VpDTwMJUhp3pYifaJMMLag1weyeF2AKYjDrvzQBX8xEV47Br3d2CzJ24CSipLEnpH2eo9hvs64DQsaTFKnUGaGpJkyRFJt9jYp9uw6E',
+        },
+        '2147483647': {
+          node: {
+            public_key: '02f372c25c19f9898080495599cad07395e89922c6ab53fab319376f5f5a993d9f',
+          },
+          xpub: 'dgub8s22VpDcH1qNRvbqhSi5uYtoy9pmpCc8tMVpmCJwtx4TGNpiy33qHYSvgSQC3v7WuhA1vpbPjrTVZACikZKtVkRcZFg6ekDbU5rZfkNwfmE',
         },
       },
     },

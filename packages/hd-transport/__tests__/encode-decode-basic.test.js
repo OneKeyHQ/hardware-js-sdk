@@ -1,4 +1,5 @@
 const ProtoBuf = require('protobufjs/light');
+
 const { encode } = require('../src/serialization/protobuf/encode');
 const { decode } = require('../src/serialization/protobuf/decode');
 

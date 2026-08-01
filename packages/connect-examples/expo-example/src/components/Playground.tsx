@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as Clipboard from 'expo-clipboard';
 import { Group, H4, Stack, Text } from 'tamagui';
 import { useIntl } from 'react-intl';
+
 import PlaygroundExecutor, { type MethodPayload } from './PlaygroundExecutor';
 import { useExpandMode } from '../provider/ExpandModeProvider';
 import { Button } from './ui/Button';
@@ -13,7 +14,7 @@ export interface PresupposeProps {
 }
 
 export type PlaygroundProps = {
-  description: string;
+  description?: string;
   presupposes?: PresupposeProps[];
   deprecated?: boolean;
 } & MethodPayload;

@@ -1,12 +1,16 @@
-import { TonGetAddress as HardwareTonGetAddress } from '@onekeyfe/hd-transport';
-
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { TonAddress, TonGetAddressParams } from '../../types';
+
+import type { TonGetAddress as HardwareTonGetAddress } from '@onekeyfe/hd-transport';
+import type { TonAddress, TonGetAddressParams } from '../../types';
 
 export default class TonGetAddress extends BaseMethod<HardwareTonGetAddress[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   shouldConfirm = false;
@@ -14,7 +18,7 @@ export default class TonGetAddress extends BaseMethod<HardwareTonGetAddress[]> {
   init() {
     this.strictCheckDeviceSupport = true;
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };
@@ -57,6 +61,9 @@ export default class TonGetAddress extends BaseMethod<HardwareTonGetAddress[]> {
 
   getVersionRange() {
     return {
+      pro2: {
+        min: '0.0.0',
+      },
       model_touch: {
         min: '4.10.0',
       },

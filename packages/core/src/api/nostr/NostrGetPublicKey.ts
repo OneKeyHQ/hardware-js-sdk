@@ -1,17 +1,22 @@
-import { NostrGetPublicKey as GetPublicKey } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { BTCGetAddressParams } from '../../types/api/btcGetAddress';
-import { NostrPublicKey } from '../../types/api/nostrGetPublicKey';
+
+import type { NostrGetPublicKey as GetPublicKey } from '@onekeyfe/hd-transport';
+import type { BTCGetAddressParams } from '../../types/api/btcGetAddress';
+import type { NostrPublicKey } from '../../types/api/nostrGetPublicKey';
 
 export default class NostrGetPublicKey extends BaseMethod<GetPublicKey[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     this.hasBundle = Object.prototype.hasOwnProperty.call(this.payload, 'bundle');
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };

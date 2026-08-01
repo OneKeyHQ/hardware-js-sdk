@@ -1,0 +1,53 @@
+---
+description: 将 OneKey 集成到 RainbowKit (EVM)
+---
+
+# RainbowKit
+
+## 文档
+
+- 官方文档：https://www.rainbowkit.com/docs/introduction
+
+## 安装
+
+```bash
+yarn add @rainbow-me/rainbowkit wagmi viem
+# 或
+npm install @rainbow-me/rainbowkit wagmi viem
+```
+
+## 配置 OneKey
+
+将 OneKey 钱包添加到 RainbowKit 配置中。
+
+```javascript
+// 导入 OneKey 钱包
+import { oneKeyWallet } from "@rainbow-me/rainbowkit/wallets";
+
+const appName = "OneKey Demo";
+const projectId = "12345";
+
+const { wallets } = getDefaultWallets({ appName, projectId, chains });
+const connectors = connectorsForWallets([
+  ...wallets,
+  {
+    groupName: "推荐",
+    // 配置 OneKey 钱包
+    wallets: [oneKeyWallet({ chains })]
+  }
+]);
+
+const wagmiConfig = createConfig({
+  connectors,
+  publicClient
+});
+```
+
+## 快速开始 / Demo
+
+
+<iframe src="https://codesandbox.io/embed/rainbowkit-demo-hg62ng?autoresize=1&fontsize=14&hidenavigation=1&theme=dark" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
+
+## 相关链接
+
+- React + wagmi（基于 Hooks 的集成）：[指南](/zh/connect-to-software/react-hooks/wagmi)

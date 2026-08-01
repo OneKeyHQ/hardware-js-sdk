@@ -1,0 +1,116 @@
+---
+title: API 参考
+description: OneKey Sui provider 完整 API 参考
+---
+
+# API 参考
+
+OneKey Sui provider 方法和类型的完整参考。
+
+---
+
+## 方法
+
+| 方法 | 描述 |
+|------|------|
+| `hasPermissions()` | 检查是否已连接 |
+| `requestPermissions()` | 请求连接 |
+| `disconnect()` | 断开钱包连接 |
+| `getAccounts()` | 获取已连接的账户（返回 `address`、`publicKey`） |
+| `getActiveChain()` | 获取当前链 |
+| `isConnected()` | 检查连接状态 |
+| `signAndExecuteTransactionBlock(input)` | 签署并执行交易，需传入 `account`/`chain` |
+| `signTransactionBlock(input)` | 仅签署交易，需传入 `account`/`chain` |
+| `signAndExecuteTransaction(input)` | 签署并执行（新 API，使用 `Transaction`，需 `account`/`chain`） |
+| `signTransaction(input)` | 签署交易（新 API，使用 `Transaction`，需 `account`/`chain`） |
+| `signMessage(input)` | 签署消息（旧版，需 `account`/`chain`） |
+| `signPersonalMessage(input)` | 签署个人消息（需 `account`/`chain`） |
+| `onAccountChange(callback)` | 监听账户变更 |
+| `onNetworkChange(callback)` | 监听网络变更 |
+
+---
+
+## 类型
+
+### 钱包账户
+
+```typescript
+interface WalletAccount {
+  address: string
+  publicKey: Uint8Array
+  chains: string[]
+  features: string[]
+}
+```
+
+### 签署并执行交易块输入
+
+```typescript
+interface SignAndExecuteTransactionBlockInput {
+  transactionBlock: TransactionBlock
+  options?: {
+    showEffects?: boolean
+    showEvents?: boolean
+    showObjectChanges?: boolean
+    showBalanceChanges?: boolean
+    showInput?: boolean
+    showRawInput?: boolean
+  }
+}
+```
+
+### 签署交易块输出
+
+```typescript
+interface SignTransactionBlockOutput {
+  transactionBlockBytes: string
+  signature: string
+}
+```
+
+### 签署个人消息输入
+
+```typescript
+interface SignPersonalMessageInput {
+  message: Uint8Array
+}
+```
+
+### 签署个人消息输出
+
+```typescript
+interface SignPersonalMessageOutput {
+  signature: string
+  bytes: string
+}
+```
+
+---
+
+## 支持的链
+
+| 链 | 标识符 |
+|----|--------|
+| 测试网 | `sui:testnet` |
+| 开发网 | `sui:devnet` |
+
+---
+
+## 事件
+
+| 事件 | 回调参数 | 描述 |
+|------|----------|------|
+| `accountChanged` | `{ address, publicKey } \| null` | 账户已变更 |
+| `networkChange` | `network: string \| null` | 网络已变更 |
+| `connect` | `address: string` | 已连接 |
+| `disconnect` | - | 已断开连接 |
+
+---
+
+## 错误码
+
+| 错误码 | 描述 |
+|--------|------|
+| 4001 | 用户拒绝请求 |
+| 4100 | 未授权 |
+| -32603 | 内部错误 |

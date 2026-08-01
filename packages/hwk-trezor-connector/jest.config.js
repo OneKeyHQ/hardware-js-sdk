@@ -1,0 +1,25 @@
+module.exports = {
+  preset: '../../jest.config.js',
+  testEnvironment: 'node',
+  modulePathIgnorePatterns: ['node_modules', '<rootDir>/dist'],
+  moduleNameMapper: {
+    '^@onekeyfe/hwk-adapter-core$': '<rootDir>/../hwk-adapter-core/src/index.ts',
+    '^@onekeyfe/hwk-trezor-core$': '<rootDir>/../hwk-trezor-core/src/index.ts',
+    '^@onekeyfe/hwk-trezor-protobuf$': '<rootDir>/../hwk-trezor-protobuf/src/index.ts',
+    '^@onekeyfe/hwk-trezor-protobuf/hwk$': '<rootDir>/../hwk-trezor-protobuf/hwk.ts',
+    '^@onekeyfe/hwk-trezor-protocol$': '<rootDir>/../hwk-trezor-protocol/src/index.ts',
+    '^@onekeyfe/hwk-trezor-transport$': '<rootDir>/../hwk-trezor-transport/src/index.ts',
+    '^@onekeyfe/hwk-trezor-transport/hwk$': '<rootDir>/../hwk-trezor-transport/hwk.ts',
+    '^@onekeyfe/hwk-trezor-type-utils$': '<rootDir>/../hwk-trezor-type-utils/src/index.ts',
+    '^@onekeyfe/hwk-trezor-utils$': '<rootDir>/../hwk-trezor-utils/src/index.ts',
+    '^@onekeyfe/hwk-trezor-schema-utils$': '<rootDir>/../hwk-trezor-schema-utils/src/index.ts',
+    '^@trezor/protobuf$': '<rootDir>/../hwk-trezor-protobuf/src/index.ts',
+    '^@trezor/protocol$': '<rootDir>/../hwk-trezor-protocol/src/index.ts',
+    '^@trezor/protocol/src/errors$': '<rootDir>/../hwk-trezor-protocol/src/errors.ts',
+    '^@trezor/protocol/src/protocol-v2/constants$':
+      '<rootDir>/../hwk-trezor-protocol/src/protocol-v2/constants.ts',
+    '^@trezor/schema-utils$': '<rootDir>/../hwk-trezor-schema-utils/src/index.ts',
+    '^@trezor/type-utils$': '<rootDir>/../hwk-trezor-type-utils/src/index.ts',
+    '^@trezor/utils$': '<rootDir>/../hwk-trezor-utils/src/index.ts',
+  },
+};

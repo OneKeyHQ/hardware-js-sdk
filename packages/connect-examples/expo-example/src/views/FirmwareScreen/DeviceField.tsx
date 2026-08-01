@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { Stack, Text, XStack } from 'tamagui';
+
 import { useDeviceFieldContext } from './DeviceFieldContext';
 import { getReleaseUrl } from '../../utils/deviceUtils';
 import { useMedia } from '../../provider/MediaProvider';

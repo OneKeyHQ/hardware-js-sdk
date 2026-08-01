@@ -1,0 +1,57 @@
+---
+title: Get Passphrase State
+---
+
+# Get Passphrase State
+
+## Get the passphraseState of the device
+
+Prompts the user to enter their passphrase (on-device or via software), then returns a `passphraseState` string — a device-side session identifier derived from the passphrase.
+
+Pass this value as `passphraseState` in subsequent API calls. The device recognizes the active session and skips the passphrase prompt entirely, so the user only needs to enter their passphrase once per session.
+
+```
+Session flow:
+  getPassphraseState(connectId)   ← user enters passphrase once
+    → passphraseState = "abc123"
+
+  evmGetAddress(..., { passphraseState: "abc123" })  ← no passphrase prompt
+  btcGetAddress(..., { passphraseState: "abc123" })  ← no passphrase prompt
+```
+
+> **Error 112 (Device passphrase state error)**: The session has expired (e.g. device was locked and re-unlocked, or seed changed). Call `getPassphraseState` again to obtain a fresh state, then retry. You can prevent error 112 by passing `skipPassphraseCheck: true` in your API calls — in that case, the SDK fires `REQUEST_PASSPHRASE` instead, letting your event handler re-prompt the user.
+
+```typescript
+const response = await HardwareSDK.getPassphraseState(connectId);
+```
+
+### Params
+
+[**Optional common params**](/en/hardware-sdk/core-api-guide#common-params)
+
+### Example
+
+```typescript
+const response = await HardwareSDK.getPassphraseState(connectId);
+```
+
+Result
+
+```
+{
+    success: true,
+    payload: string
+}
+```
+
+Error
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code: number // error code
+    }
+}
+```

@@ -1,25 +1,122 @@
-name: publish-npm-package
+name: publish-npm-packages
 
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+    inputs:
+      prerelease_dist_tag:
+        description: 'npm dist-tag used for prerelease packages'
+        required: true
+        default: 'next'
+        type: string
+
+permissions:
+  contents: write
+  id-token: write
 
 jobs:
-  package-publish:
+  get-version:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version-info.outputs.version }}
+      is_prerelease: ${{ steps.version-info.outputs.is_prerelease }}
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@v2
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          node-version: '18.x'
+          fetch-depth: 0
+
+      - name: Get version information
+        id: version-info
+        run: |
+          # Get version from core package (assuming independent versioning)
+          VERSION=$(node -p "require('./packages/core/package.json').version")
+          echo "📦 Package version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          # Check if this is a prerelease version (contains -)
+          if [[ "$VERSION" =~ - ]]; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+            echo "📦 Detected prerelease version: $VERSION"
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+            echo "📦 Detected stable version: $VERSION"
+          fi
+
+  publish-and-release:
+    needs: get-version
+    runs-on: ubuntu-latest
+    name: 'Publish v${{ needs.get-version.outputs.version }}'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
           registry-url: 'https://registry.npmjs.org'
-      - name: Install Package
+
+      - name: Install dependencies
         run: |
-          yarn
+          echo "📦 Installing dependencies..."
+          yarn install --frozen-lockfile
           yarn bootstrap
-      - name: Build Target
+
+      - name: Build packages
         run: |
+          echo "🔨 Building packages..."
           yarn build
-      - name: Publish
+
+      - name: Publish to NPM
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          PRERELEASE_DIST_TAG: ${{ inputs.prerelease_dist_tag }}
         run: |
-          yarn publish-packages -y --no-verify-access
+          echo "📦 Publishing packages to NPM (v${{ needs.get-version.outputs.version }})..."
+          IS_PRERELEASE=${{ needs.get-version.outputs.is_prerelease }}
+
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            if ! node -e 'const semver = require("semver"); const tag = process.argv[1]; const valid = /^[a-zA-Z][a-zA-Z0-9._-]*$/.test(tag) && tag.toLowerCase() !== "latest" && semver.validRange(tag) === null; process.exit(valid ? 0 : 1);' "$PRERELEASE_DIST_TAG"; then
+              echo "❌ Invalid prerelease npm dist-tag: $PRERELEASE_DIST_TAG"
+              exit 1
+            fi
+            echo "📦 Publishing prerelease with explicit dist-tag: $PRERELEASE_DIST_TAG"
+            yarn publish-packages -y --no-verify-access --dist-tag "$PRERELEASE_DIST_TAG"
+          else
+            echo "📦 Publishing with --dist-tag latest for stable release"
+            yarn publish-packages -y --no-verify-access --dist-tag latest
+          fi
+          echo "✅ Packages published successfully"
+
+      - name: Publication Summary
+        env:
+          PRERELEASE_DIST_TAG: ${{ inputs.prerelease_dist_tag }}
+        run: |
+          VERSION=${{ needs.get-version.outputs.version }}
+          IS_PRERELEASE=${{ needs.get-version.outputs.is_prerelease }}
+
+          echo "✅ NPM publication completed successfully"
+          echo "📦 Published version: $VERSION"
+
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            echo "📦 Prerelease version published with dist-tag: $PRERELEASE_DIST_TAG"
+            echo "⏭️ Skipping GitHub release creation for prerelease"
+          else
+            echo "🚀 Stable version published to NPM"
+            echo "🎯 Will automatically create GitHub release..."
+          fi
+
+    outputs:
+      version: ${{ needs.get-version.outputs.version }}
+      is_prerelease: ${{ needs.get-version.outputs.is_prerelease }}
+
+  create-github-release:
+    needs: publish-and-release
+    if: needs.publish-and-release.outputs.is_prerelease == 'false'
+    uses: ./.github/workflows/github-release.yml
+    with:
+      version: ${{ needs.publish-and-release.outputs.version }}
+      is_prerelease: false
+    secrets: inherit

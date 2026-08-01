@@ -1,16 +1,21 @@
-import { StarcoinGetAddress as HardwareStarcoinGetAddress } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
-import { validatePath, serializedPath } from '../helpers/pathUtils';
+import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { StarcoinAddress, StarcoinGetAddressParams } from '../../types/api/starcoinGetAddress';
+
+import type { StarcoinGetAddress as HardwareStarcoinGetAddress } from '@onekeyfe/hd-transport';
+import type { StarcoinAddress, StarcoinGetAddressParams } from '../../types/api/starcoinGetAddress';
 
 export default class StarcoinGetAddress extends BaseMethod<HardwareStarcoinGetAddress[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };

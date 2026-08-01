@@ -1,0 +1,65 @@
+---
+title: suiSignMessage
+---
+
+# suiSignMessage
+
+### 使用要求
+
+* 固件版本要求
+  * Touch: 4.6.0
+  * Classic/Mini: 3.4.0
+
+### Sui：签名消息
+
+使用指定 BIP32 路径派生的私钥对消息进行签名。
+
+```typescript
+const result = await HardwareSDK.suiSignMessage(connectId, deviceId, params);
+```
+
+### 参数
+
+[**可选通用参数**](/zh/hardware-sdk/core-api-guide#common-params)
+
+* `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](/zh/hardware-sdk/core-api-guide#hd-path)
+* `messageHex` - _必需_ `string` 十六进制格式的待签名消息
+
+### 示例
+
+```typescript
+// 原始消息
+const message = "Hello World";
+
+// 转换为十六进制
+const messageHex = Buffer.from(message).toString('hex');
+
+HardwareSDK.suiSignMessage(connectId, deviceId, {
+    path: "m/44'/784'/0'/0'/0'",
+    messageHex,
+});
+```
+
+#### 返回结果
+
+```typescript
+{
+    success: true,
+    payload: {
+        address: string,
+        signature: string,
+    }
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误码
+    }
+}
+```

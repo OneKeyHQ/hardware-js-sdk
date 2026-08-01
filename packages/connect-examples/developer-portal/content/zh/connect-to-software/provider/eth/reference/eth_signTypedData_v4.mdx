@@ -1,0 +1,155 @@
+---
+title: eth_signTypedData_v4
+description: 签名结构化数据 (EIP-712)
+---
+
+# eth_signTypedData_v4
+
+根据 EIP-712 规范签名结构化数据。这是签名结构化数据的推荐方法，能提供更好的安全性和用户体验。
+
+---
+
+## 参数
+
+| 索引 | 类型 | 说明 |
+|------|------|------|
+| 0 | `string` | 签名账户地址 |
+| 1 | `string` | 类型化数据的 JSON 字符串 |
+
+---
+
+## 返回值
+
+`string` - 签名（65 字节十六进制字符串）
+
+---
+
+## 类型化数据结构
+
+```typescript
+interface TypedData {
+  types: {
+    EIP712Domain: Array<{ name: string; type: string }>
+    [typeName: string]: Array<{ name: string; type: string }>
+  }
+  primaryType: string
+  domain: {
+    name?: string
+    version?: string
+    chainId?: number
+    verifyingContract?: string
+    salt?: string
+  }
+  message: Record<string, any>
+}
+```
+
+---
+
+## 示例
+
+```typescript
+const typedData = {
+  types: {
+    EIP712Domain: [
+      { name: 'name', type: 'string' },
+      { name: 'version', type: 'string' },
+      { name: 'chainId', type: 'uint256' },
+      { name: 'verifyingContract', type: 'address' }
+    ],
+    Person: [
+      { name: 'name', type: 'string' },
+      { name: 'wallet', type: 'address' }
+    ],
+    Mail: [
+      { name: 'from', type: 'Person' },
+      { name: 'to', type: 'Person' },
+      { name: 'contents', type: 'string' }
+    ]
+  },
+  primaryType: 'Mail',
+  domain: {
+    name: 'My dApp',
+    version: '1',
+    chainId: 1,
+    verifyingContract: '0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC'
+  },
+  message: {
+    from: {
+      name: 'Alice',
+      wallet: '0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826'
+    },
+    to: {
+      name: 'Bob',
+      wallet: '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB'
+    },
+    contents: 'Hello, Bob!'
+  }
+}
+
+const signature = await window.$onekey.ethereum.request({
+  method: 'eth_signTypedData_v4',
+  params: [accounts[0], JSON.stringify(typedData)]
+})
+
+console.log('签名:', signature)
+```
+
+### Permit 签名 (ERC-2612)
+
+```typescript
+const permitData = {
+  types: {
+    EIP712Domain: [
+      { name: 'name', type: 'string' },
+      { name: 'version', type: 'string' },
+      { name: 'chainId', type: 'uint256' },
+      { name: 'verifyingContract', type: 'address' }
+    ],
+    Permit: [
+      { name: 'owner', type: 'address' },
+      { name: 'spender', type: 'address' },
+      { name: 'value', type: 'uint256' },
+      { name: 'nonce', type: 'uint256' },
+      { name: 'deadline', type: 'uint256' }
+    ]
+  },
+  primaryType: 'Permit',
+  domain: {
+    name: 'USD Coin',
+    version: '2',
+    chainId: 1,
+    verifyingContract: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
+  },
+  message: {
+    owner: accounts[0],
+    spender: '0xSpenderAddress...',
+    value: '1000000000', // 1000 USDC
+    nonce: 0,
+    deadline: Math.floor(Date.now() / 1000) + 3600
+  }
+}
+
+const signature = await window.$onekey.ethereum.request({
+  method: 'eth_signTypedData_v4',
+  params: [accounts[0], JSON.stringify(permitData)]
+})
+```
+
+---
+
+## 错误码
+
+| 错误码 | 消息 | 说明 |
+|--------|------|------|
+| 4001 | User rejected the request | 用户拒绝签名请求 |
+| -32602 | Invalid params | 类型化数据结构无效 |
+
+---
+
+## 说明
+
+- 类型化数据必须是有效的 JSON 字符串
+- domain 中的 `chainId` 应与当前连接的链匹配
+- 用户将看到数据的可读表示形式
+- 遵循 [EIP-712](https://eips.ethereum.org/EIPS/eip-712) 规范

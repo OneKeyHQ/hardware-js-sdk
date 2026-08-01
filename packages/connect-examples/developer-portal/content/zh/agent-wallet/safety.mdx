@@ -1,0 +1,52 @@
+---
+title: 安全规则
+---
+
+# 安全规则
+
+Agent Wallet 工作流可以读取余额、构建交易、执行兑换。安全边界必须清楚。
+
+## 只读与写操作
+
+| 请求类型 | 示例 | 必须行为 |
+| --- | --- | --- |
+| 只读 | Balance、receive address、price、trending tokens、history、token info | 返回简洁结果和一个有用下一步。 |
+| 准备阶段 | Swap quote、transaction build、token audit、simulation | 展示结果和风险上下文；不要提交。 |
+| 写操作 | Transfer、swap execute、approval、broadcast、signing | 执行前必须明确确认。 |
+| 硬件门控写操作 | 大额转账、敏感合约调用、hidden-wallet signing | 必须要求 OneKey 设备确认；设备拒绝时停止。 |
+
+## 绝不暴露密钥
+
+Agent 绝不能输出：
+
+- 私钥或助记词。
+- 解密后的 Agent Wallet 凭据。
+- 硬件钱包 passphrase。
+- Access token。
+- Keychain 内容或凭据 payload。
+
+## 写操作必须确认
+
+任何 transfer、swap execute、approval 或 signing request 之前，都要展示紧凑确认：
+
+| 字段 | 必须包含 |
+| --- | --- |
+| Action | Transfer、swap、sign、approve 或 broadcast |
+| Source | 钱包地址和链 |
+| Destination | 接收方、合约或目标链 |
+| Amount | 原生币或 token 数量 |
+| Fees | 可用时展示 gas 或 fee estimate |
+| Risk result | 可用时展示 security audit 或 simulation 结果 |
+| Hardware step | 适用时展示设备确认要求 |
+
+用户确认前不要提交。
+
+## 停止条件
+
+遇到以下状态时停止并报告：
+
+- `onekey auth status` 显示未认证。
+- 活动地址与用户预期钱包不一致。
+- 设备锁定、断开、拒绝或正在等待 PIN/passphrase。
+- CLI schema 没有暴露 Agent 想使用的参数。
+- 安全命令返回高风险结果，而用户没有明确接受。

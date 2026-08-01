@@ -1,5 +1,6 @@
 import { validateParams } from '../../helpers/paramsValidator';
 import { validatePath } from '../../helpers/pathUtils';
+
 import type { PROTO } from '../../../constants';
 
 export type Path = number[];

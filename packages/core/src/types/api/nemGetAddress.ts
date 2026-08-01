@@ -1,4 +1,4 @@
-import { NEMAddress as HardwareNEMAddress } from '@onekeyfe/hd-transport';
+import type { NEMAddress as HardwareNEMAddress } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type NEMAddress = {

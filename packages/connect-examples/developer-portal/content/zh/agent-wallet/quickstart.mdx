@@ -1,0 +1,82 @@
+---
+title: 快速开始
+---
+
+# 快速开始
+
+先在 AI client 里安装 OneKey wallet skills。之后用户直接用自然语言提钱包请求；skills 会在背后处理 CLI preflight、schema discovery 和安全路由。
+
+只读请求可以直接返回结果。Quote、build、audit、simulation 只解释将会发生什么，不移动资金。Transfer、swap execute、approval、broadcast、signing 都必须有一次明确确认。
+
+## 1. 安装 Skills
+
+### Claude Code
+
+```text
+/plugin marketplace add OneKeyHQ/onekey-wallet-skills
+/plugin install onekey-wallet-skills
+```
+
+### Codex
+
+告诉 Codex：
+
+```text
+Fetch and follow instructions from https://raw.githubusercontent.com/OneKeyHQ/onekey-wallet-skills/main/.codex/INSTALL.md
+```
+
+### Cursor
+
+克隆 skill pack，并把 Cursor 指向 plugin 目录：
+
+```bash
+git clone https://github.com/OneKeyHQ/onekey-wallet-skills
+```
+
+### OpenCode 和 OpenClaw
+
+按 [`onekey-wallet-skills`](https://github.com/OneKeyHQ/onekey-wallet-skills) 仓库里的对应安装说明接入。所有 client 都使用同一组四个 skills：wallet、swap、market、security。
+
+## 2. 连接 Agent Wallet
+
+在 AI client 里输入：
+
+```text
+Connect my OneKey Agent Wallet.
+```
+
+Skill 会通过 OneKey GUI App Transfer 配对本机会话，并总结当前活动钱包。如果缺少 `onekey` CLI，skill preflight 会先安装再继续；用户不需要手动配置 CLI 命令。
+
+## 3. 先试只读 Prompt
+
+先从不会移动资金的请求开始：
+
+| 对 AI client 说 | Skill 路由 |
+| --- | --- |
+| `Show my wallet balance.` | Wallet |
+| `Show my receiving address for ETH.` | Wallet |
+| `What tokens are trending right now?` | Market |
+| `What is the price of SOL?` | Market |
+| `Is this token safe before I buy it?` | Security |
+
+回答应该结果优先：钱包状态、route、risk 和一个有用的下一步，而不是把原始终端输出甩给用户。
+
+## 4. 交易前先报价
+
+输入：
+
+```text
+Quote a swap from 1 ETH to USDC. Do not execute yet.
+```
+
+Swap skill 应先报价、运行相关安全检查、展示 route 和预计输出，然后在执行前停止。后续类似 `Yes, execute the swap` 的确认，只能执行已经审阅过的订单。
+
+## 5. 使用硬件确认
+
+高风险操作可以输入：
+
+```text
+Use my OneKey hardware wallet for this transfer.
+```
+
+Wallet skill 会切换到硬件会话，涉及资金移动的动作可以升级到设备端 clear signing。硬件登录后，普通 wallet、transfer、swap、signing prompt 会自动使用当前硬件会话。

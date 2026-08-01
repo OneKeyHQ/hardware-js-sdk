@@ -1,5 +1,8 @@
-import { Deferred, createDeferred, HardwareErrorCode, ERRORS } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
+
 import { getOrigin } from '../utils/urlUtils';
+
+import type { Deferred } from '@onekeyfe/hd-shared';
 
 /* eslint-disable import/no-mutable-exports */
 export let instance: HTMLIFrameElement | null;

@@ -1,0 +1,233 @@
+---
+title: Aptos Wallet Adapter
+description: Integrate OneKey with Aptos Wallet Adapter for React dApps
+---
+
+import { Callout } from 'nextra/components'
+
+# Aptos Wallet Adapter
+
+Official Aptos wallet connection library for React. OneKey is automatically detected via Wallet Standard, no additional configuration required.
+
+<Callout type="info">
+OneKey is automatically detected by the Aptos Wallet Adapter. The wallet will appear in the connection modal without any extra setup.
+</Callout>
+
+---
+
+## Installation
+
+```bash
+npm install @aptos-labs/wallet-adapter-react @aptos-labs/ts-sdk
+```
+
+---
+
+## Basic Setup
+
+Wrap your application with `AptosWalletAdapterProvider`:
+
+```tsx filename="App.tsx"
+import { AptosWalletAdapterProvider } from '@aptos-labs/wallet-adapter-react'
+
+function App() {
+  return (
+    <AptosWalletAdapterProvider autoConnect={true}>
+      <YourApp />
+    </AptosWalletAdapterProvider>
+  )
+}
+```
+
+---
+
+## Wallet Connection
+
+### Connect Button
+
+```tsx filename="ConnectButton.tsx"
+import { useWallet } from '@aptos-labs/wallet-adapter-react'
+
+function ConnectButton() {
+  const { connect, disconnect, account, connected, wallets } = useWallet()
+
+  if (connected && account) {
+    return (
+      <div>
+        <p>Connected: {account.address.slice(0, 6)}...{account.address.slice(-4)}</p>
+        <button onClick={disconnect}>Disconnect</button>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      {wallets?.map((wallet) => (
+        <button
+          key={wallet.name}
+          onClick={() => connect(wallet.name)}
+        >
+          <img src={wallet.icon} alt={wallet.name} width={24} />
+          {wallet.name}
+        </button>
+      ))}
+    </div>
+  )
+}
+```
+
+### Wallet Selection Modal
+
+For a more polished UI, use the built-in modal components or build your own:
+
+```tsx filename="WalletModal.tsx"
+import { useWallet } from '@aptos-labs/wallet-adapter-react'
+import { useState } from 'react'
+
+function WalletModal() {
+  const { wallets, connect } = useWallet()
+  const [isOpen, setIsOpen] = useState(false)
+
+  return (
+    <>
+      <button onClick={() => setIsOpen(true)}>Connect Wallet</button>
+
+      {isOpen && (
+        <div className="modal">
+          <h2>Select Wallet</h2>
+          {wallets?.map((wallet) => (
+            <button
+              key={wallet.name}
+              onClick={() => {
+                connect(wallet.name)
+                setIsOpen(false)
+              }}
+            >
+              <img src={wallet.icon} alt={wallet.name} width={24} />
+              {wallet.name}
+            </button>
+          ))}
+          <button onClick={() => setIsOpen(false)}>Close</button>
+        </div>
+      )}
+    </>
+  )
+}
+```
+
+---
+
+## Transactions
+
+### Sign and Submit Transaction
+
+```tsx
+import { useWallet } from '@aptos-labs/wallet-adapter-react'
+import { Aptos, AptosConfig, Network } from '@aptos-labs/ts-sdk'
+
+function TransferAPT() {
+  const { account, signAndSubmitTransaction } = useWallet()
+
+  const config = new AptosConfig({ network: Network.MAINNET })
+  const aptos = new Aptos(config)
+
+  const handleTransfer = async () => {
+    if (!account) return
+
+    const response = await signAndSubmitTransaction({
+      sender: account.address,
+      data: {
+        function: '0x1::aptos_account::transfer',
+        functionArguments: [
+          '0x1234...', // recipient address
+          100000000,   // amount in octas (1 APT = 100000000)
+        ],
+      },
+    })
+
+    // Wait for transaction
+    const result = await aptos.waitForTransaction({
+      transactionHash: response.hash,
+    })
+
+    console.log('Transaction confirmed:', result)
+  }
+
+  return <button onClick={handleTransfer}>Transfer APT</button>
+}
+```
+
+### Sign Message
+
+```tsx
+import { useWallet } from '@aptos-labs/wallet-adapter-react'
+
+function SignMessage() {
+  const { signMessage, account } = useWallet()
+
+  const handleSign = async () => {
+    const response = await signMessage({
+      message: 'Welcome to My dApp!',
+      nonce: crypto.randomUUID(),
+    })
+
+    console.log('Signature:', response.signature)
+    console.log('Full message:', response.fullMessage)
+  }
+
+  return <button onClick={handleSign}>Sign Message</button>
+}
+```
+
+---
+
+## Network Configuration
+
+Configure the network in the provider:
+
+```tsx
+import { AptosWalletAdapterProvider } from '@aptos-labs/wallet-adapter-react'
+import { Network } from '@aptos-labs/ts-sdk'
+
+function App() {
+  return (
+    <AptosWalletAdapterProvider
+      autoConnect={true}
+      dappConfig={{
+        network: Network.MAINNET,
+        // Optional: specify additional networks
+        aptosApiKeys: {
+          [Network.MAINNET]: 'YOUR_API_KEY',
+          [Network.TESTNET]: 'YOUR_TESTNET_KEY',
+        },
+      }}
+    >
+      <YourApp />
+    </AptosWalletAdapterProvider>
+  )
+}
+```
+
+---
+
+## Hooks Reference
+
+| Hook | Description |
+|------|-------------|
+| `useWallet()` | Main hook for wallet connection and transactions |
+| `account` | Current connected account |
+| `connected` | Connection status |
+| `wallets` | List of available wallets |
+| `connect(walletName)` | Connect to a specific wallet |
+| `disconnect()` | Disconnect current wallet |
+| `signAndSubmitTransaction(payload)` | Sign and submit a transaction |
+| `signMessage(request)` | Sign an arbitrary message |
+| `network` | Current network info |
+
+---
+
+## Resources
+
+- [Aptos Wallet Adapter Documentation](https://aptos.dev/en/build/sdks/wallet-adapter)
+- [Aptos TypeScript SDK](https://aptos.dev/en/build/sdks/ts-sdk)
+- [Aptos Provider API](/en/connect-to-software/provider/aptos)

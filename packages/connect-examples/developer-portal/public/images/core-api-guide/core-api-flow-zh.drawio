@@ -1,0 +1,110 @@
+<mxfile host="65bd71144e">
+    <diagram id="core-api-flow-zh" name="core-api-flow-zh">
+        <mxGraphModel dx="855" dy="406" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="1400" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="2" value="应用启动" style="ellipse;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1E88E5;" parent="1" vertex="1">
+                    <mxGeometry x="360" y="20" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="3" value="SDK.int(env, fetchConfig)&amp;nbsp; 一次性" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#388E3C;" parent="1" vertex="1">
+                    <mxGeometry x="330" y="120" width="260" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="4" value="订阅 UI / DEVICE / FIRMWARE 事件" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#F57C00;" parent="1" vertex="1">
+                    <mxGeometry x="330" y="220" width="260" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="5" value="searchDevices → connectId" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1F5FE;strokeColor=#0288D1;" parent="1" vertex="1">
+                    <mxGeometry x="330" y="320" width="260" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="6" value="找到设备？" style="rhombus;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#8E24AA;" parent="1" vertex="1">
+                    <mxGeometry x="350" y="430" width="220" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="47" value="" style="edgeStyle=none;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=0.5;exitY=0;exitDx=0;exitDy=0;" parent="1" source="7" target="5" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="155" y="350" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="155" y="360"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="7" value="提示连接设备并重试搜索" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFEBEE;strokeColor=#C62828;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="440" width="230" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="8" value="getFeatures → deviceId（与 connectId 缓存）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#2E7D32;" parent="1" vertex="1">
+                    <mxGeometry x="330" y="570" width="260" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="9" value="发起核心 API 调用(connectId + deviceId + params)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0F2F1;strokeColor=#00796B;" parent="1" vertex="1">
+                    <mxGeometry x="330" y="690" width="260" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="45" value="" style="edgeStyle=none;html=1;" parent="1" source="10" target="11" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="10" value="收到 UI_REQUEST？" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFFDE7;strokeColor=#FBC02D;" parent="1" vertex="1">
+                    <mxGeometry x="350" y="810" width="220" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="49" value="" style="edgeStyle=none;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="11" target="12">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="155" y="1000" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="155" y="1000"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="11" value="收集输入（PIN / Passphrase）→ 调用 uiResponse" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F1F8E9;strokeColor=#7CB342;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="815" width="230" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="12" value="调用成功？" style="rhombus;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1565C0;" parent="1" vertex="1">
+                    <mxGeometry x="350" y="950" width="220" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="13" value="消费 payload / 展示给用户" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#388E3C;" parent="1" vertex="1">
+                    <mxGeometry x="330" y="1080" width="260" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="14" value="错误分类(传输/参数/用户拒绝/Bootloader)→ &lt;br&gt;修复或换参/重连" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFEBEE;strokeColor=#C62828;" parent="1" vertex="1">
+                    <mxGeometry x="620" y="1080" width="260" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="20" style="endArrow=block;endFill=1;strokeColor=#616161;edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="2" target="3" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="21" style="endArrow=block;endFill=1;strokeColor=#616161;edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="3" target="4" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="22" style="endArrow=block;endFill=1;strokeColor=#616161;edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="4" target="5" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="23" style="endArrow=block;endFill=1;strokeColor=#616161;edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="5" target="6" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="24" value="是" style="endArrow=block;endFill=1;strokeColor=#616161;edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="6" target="8" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="25" value="否" style="endArrow=block;endFill=1;strokeColor=#616161;edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="6" target="7" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="27" style="endArrow=block;endFill=1;strokeColor=#616161;edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="8" target="9" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="28" style="endArrow=block;endFill=1;strokeColor=#616161;edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="9" target="10" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="31" value="否" style="endArrow=block;endFill=1;strokeColor=#616161;edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="10" target="12" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="32" value="是" style="endArrow=block;endFill=1;strokeColor=#616161;edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="12" target="13" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="33" value="否" style="endArrow=block;endFill=1;strokeColor=#616161;edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="12" target="14" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="34" value="修复后重试" style="endArrow=block;endFill=1;strokeColor=#616161;edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" parent="1" target="9" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="800" y="1080" as="sourcePoint"/>
+                        <mxPoint x="740" y="725" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="800" y="725"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

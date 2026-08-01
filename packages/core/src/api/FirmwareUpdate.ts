@@ -1,23 +1,24 @@
 import {
+  EFirmwareType,
   ERRORS,
-  HardwareErrorCode,
   HardwareError,
+  HardwareErrorCode,
   createDeferred,
-  Deferred,
 } from '@onekeyfe/hd-shared';
+
 import { UI_REQUEST } from '../constants/ui-request';
 import { BaseMethod } from './BaseMethod';
 import { validateParams } from './helpers/paramsValidator';
 import { getBinary } from './firmware/getBinary';
 import { uploadFirmware } from './firmware/uploadFirmware';
 import { createUiMessage } from '../events';
-import { type KnownDevice, DeviceModelToTypes } from '../types';
-
+import { DeviceModelToTypes, type KnownDevice } from '../types';
 import { isEnteredManuallyBoot } from './firmware/bootloaderHelper';
-
-import { LoggerNames, getDeviceType, getDeviceUUID, getLogger, wait } from '../utils';
+import { LoggerNames, getLogger, wait } from '../utils';
 import { DataManager } from '../data-manager';
 import { DevicePool } from '../device/DevicePool';
+
+import type { Deferred } from '@onekeyfe/hd-shared';
 
 type Params = {
   binary?: ArrayBuffer;
@@ -31,7 +32,7 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
   checkPromise: Deferred<any> | null = null;
 
   init() {
-    this.notAllowDeviceMode = [UI_REQUEST.BOOTLOADER, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [UI_REQUEST.BOOTLOADER, UI_REQUEST.NOT_INITIALIZE];
     this.requireDeviceMode = [];
     this.useDevicePassphraseState = false;
     this.skipForceUpdateCheck = true;
@@ -91,7 +92,7 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
               true
             );
             await this.device.initialize();
-            if (this.device.features?.bootloader_mode) {
+            if (this.device.isBootloader()) {
               clearInterval(intervalTimer);
               this.checkPromise?.resolve(true);
             }
@@ -104,7 +105,7 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
           const devicesDescriptor = deviceDiff?.descriptors ?? [];
           const { deviceList } = await DevicePool.getDevices(devicesDescriptor, connectId);
 
-          if (deviceList.length === 1 && deviceList[0]?.features?.bootloader_mode) {
+          if (deviceList.length === 1 && deviceList[0]?.isBootloader()) {
             // should update current device from cache
             // because device was reboot and had some new requests
             this.device.updateFromCache(deviceList[0]);
@@ -130,10 +131,10 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
   async run() {
     const { device, params } = this;
     const { features, commands } = device;
-    const deviceType = getDeviceType(features);
+    const deviceType = device.getCurrentDeviceType();
 
-    if (!features?.bootloader_mode && features) {
-      const uuid = getDeviceUUID(features);
+    if (!device.isBootloader() && features) {
+      const serialNo = device.getCurrentSerialNo();
       // should go to bootloader mode manually
       if (isEnteredManuallyBoot(features, params.updateType)) {
         return Promise.reject(ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateManuallyEnterBoot));
@@ -152,7 +153,7 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
 
         // force clean classic device cache so that the device can initialize again
         if (DeviceModelToTypes.model_classic.includes(deviceType)) {
-          DevicePool.clearDeviceCache(uuid);
+          DevicePool.clearDeviceCache(serialNo);
         }
         delete DevicePool.devicesCache[''];
         await this.checkPromise?.promise;
@@ -166,14 +167,14 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
         if (e instanceof HardwareError) {
           return Promise.reject(e);
         }
-        console.log('auto go to bootloader mode failed: ', e);
+        Log.log('auto go to bootloader mode failed: ', e);
         return Promise.reject(
           ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateAutoEnterBootFailure)
         );
       }
     }
 
-    let binary;
+    let binary: ArrayBuffer | undefined;
     try {
       if (params.binary) {
         binary = this.params.binary;
@@ -189,12 +190,20 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
           features: device.features,
           version: params.version,
           updateType: params.updateType,
+          firmwareType: EFirmwareType.Universal,
         });
         binary = firmware.binary;
         this.postTipMessage('DownloadFirmwareSuccess');
       }
     } catch (err) {
       throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
+    }
+
+    if (!binary) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.FirmwareUpdateDownloadFailed,
+        'Firmware binary is unavailable'
+      );
     }
 
     await this.device.acquire();
@@ -204,7 +213,8 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
       this.device.getCommands().typedCall.bind(this.device.getCommands()),
       this.postMessage,
       device,
-      { payload: binary, rebootOnSuccess: this.payload.rebootOnSuccess }
+      { payload: binary, rebootOnSuccess: this.payload.rebootOnSuccess },
+      false
     );
 
     if (this.connectId) {

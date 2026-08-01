@@ -1,0 +1,232 @@
+---
+title: Low-level transport plugin
+---
+
+# Low-level transport plugin
+
+> Use this only when WebUSB / React Native BLE / official native adapters cannot meet your scenario. You will own device lifecycle and message frame handling, so expect higher maintenance cost.
+
+> **Note:** The `lowlevel` env and `LowlevelTransportSharedPlugin` are designed for **BLE (Bluetooth)** communication only. For **USB** communication in Node.js/CLI environments, use `NodeUsbTransport` (env `node-usb`) instead — it handles protocol encoding and USB I/O directly via libusb without needing a plugin.
+
+Our Bluetooth SDK is developed using React Native. You may not be using React Native to develop your application, for example, you may be using Swift, Kotlin, or Flutter. At this point, adding a dependency on React Native to your project may not be a good choice.
+
+We provide a new communication method where you can use the LowlevelTransportSharedPlugin to communicate with the hardware. You are free to use any technology stack of your choice. You will need to finish the protocol for device connect, disconnect, send data, and receive data.
+
+## Quick Reference
+
+### OneKey BLE UUIDs
+
+| Purpose | UUID |
+|---------|------|
+| Service | `00000001-0000-1000-8000-00805f9b34fb` |
+| Write Characteristic | `00000002-0000-1000-8000-00805f9b34fb` |
+| Notify Characteristic | `00000003-0000-1000-8000-00805f9b34fb` |
+
+### BLE Header Data Example
+
+Example of the first BLE packet received (header packet):
+
+```
+Raw data: 3F 23 23 00 02 00 00 00 0A 12 08 ...
+          │  │  │  │  │  │        │  └─ Protobuf payload starts
+          │  │  │  │  │  └────────┴─ Payload length: 0x0000000A = 10 bytes
+          │  │  │  └──┴─ Message type: 0x0002
+          └──┴──┴─ Magic: 0x3F 0x23 0x23 (fixed identifier)
+```
+
+Detect header packet: **First 3 bytes are `3F 23 23`**
+
+Native examples (all based on the Low-Level Transport Plugin):
+
+- [Android Native](/en/hardware-sdk/transport/android) — WebView + JSBridge + Nordic BLE
+- [iOS Native](/en/hardware-sdk/transport/ios) — WebView + JSBridge + CoreBluetooth
+- [Flutter Native](/en/hardware-sdk/transport/flutter) — WebView + platform channel + BLE
+
+## LowlevelTransportSharedPlugin Interface
+
+```typescript
+export type LowLevelDevice = { id: string; name: string };
+export type LowlevelTransportSharedPlugin = {
+  enumerate: () => Promise<LowLevelDevice[]>;
+  send: (uuid: string, data: string) => Promise<void>;
+  receive: () => Promise<string>;
+  connect: (uuid: string) => Promise<void>;
+  disconnect: (uuid: string) => Promise<void>;
+  init: () => Promise<void>;
+  version: string;
+};
+```
+
+## WebUSB vs BLE: Protocol Differences
+
+**Important:** The transport protocol differs between WebUSB (Desktop) and BLE (Mobile):
+
+| | WebUSB (Desktop) | BLE (Native Mobile) |
+|---|---|---|
+| Packet size | Fixed 64 bytes | Variable (MTU-dependent) |
+| Packet prefix | `0x3F` on every packet | `0x3F 0x23 0x23` only on header |
+| Padding | Zero-pad to 64 bytes | No padding needed |
+| `receive()` returns | One 64-byte frame at a time | **Complete reassembled message** |
+
+---
+
+## WebUSB Protocol (Desktop)
+
+Transport uses fixed 64-byte frames; the SDK handles message assembly.
+
+> **Magic bytes:** `0x3F 0x23 0x23` are fixed protocol identifier bytes used to detect packet boundaries.
+
+**First packet:**
+
+| Offset | Length | Content |
+|--------|--------|---------|
+| 0 | 3 | Magic: `0x3F 0x23 0x23` |
+| 3 | 2 | Message type (BE uint16) |
+| 5 | 4 | Payload length (BE uint32) |
+| 9 | 55 | First 55 bytes of protobuf (zero-padded) |
+
+**Subsequent packets:**
+
+| Offset | Length | Content |
+|--------|--------|---------|
+| 0 | 1 | Magic: `0x3F` |
+| 1 | 63 | Remaining protobuf bytes (zero-padded) |
+
+---
+
+## BLE Protocol (Native Mobile)
+
+BLE uses variable-length chunks. **Your plugin must reassemble complete messages.**
+
+### Packet Format
+
+**Header chunk (first packet of a message):**
+
+```
+┌─────────┬──────────────┬──────────┬──────────────┬─────────────┐
+│ Byte 0  │  Byte 1-2    │ Byte 3-4 │  Byte 5-8    │  Byte 9+    │
+├─────────┼──────────────┼──────────┼──────────────┼─────────────┤
+│  0x3F   │  0x23 0x23   │  Type    │   Length     │  Payload... │
+│ (magic) │   (magic)    │ (BE u16) │  (BE u32)    │             │
+└─────────┴──────────────┴──────────┴──────────────┴─────────────┘
+```
+
+**Continuation chunks:** Raw payload data only, no prefix.
+
+### Header Detection
+
+```typescript
+function isHeaderChunk(data: Uint8Array): boolean {
+  return data.length >= 9 &&
+         data[0] === 0x3F &&  // '?'
+         data[1] === 0x23 &&  // '#'
+         data[2] === 0x23     // '#'
+}
+```
+
+### Reading Payload Length (Big Endian)
+
+```typescript
+function readUint32BE(buffer: Uint8Array, offset: number): number {
+  return (
+    (buffer[offset] << 24) |
+    (buffer[offset + 1] << 16) |
+    (buffer[offset + 2] << 8) |
+    buffer[offset + 3]
+  ) >>> 0
+}
+
+// Usage: payloadLength = readUint32BE(data, 5)
+```
+
+### Message Reassembly Example
+
+```typescript
+class BleMessageAssembler {
+  private buffer: number[] = []
+  private expectedLength = 0
+  private resolve: ((hex: string) => void) | null = null
+
+  onNotification(data: Uint8Array): void {
+    if (this.isHeader(data)) {
+      this.expectedLength = this.readUint32BE(data, 5)
+      this.buffer = [...data.subarray(3)]  // Skip 3F 23 23
+    } else {
+      this.buffer.push(...data)
+    }
+
+    // Check completion: buffer = Type(2) + Length(4) + Payload
+    if (this.buffer.length - 6 >= this.expectedLength) {
+      const hex = this.toHex(new Uint8Array(this.buffer))
+      this.buffer = []
+      this.expectedLength = 0
+      if (this.resolve) {
+        this.resolve(hex)
+        this.resolve = null
+      }
+    }
+  }
+
+  receive(): Promise<string> {
+    return new Promise(resolve => { this.resolve = resolve })
+  }
+
+  private isHeader(d: Uint8Array): boolean {
+    return d.length >= 9 && d[0] === 0x3F && d[1] === 0x23 && d[2] === 0x23
+  }
+
+  private readUint32BE(b: Uint8Array, o: number): number {
+    return ((b[o] << 24) | (b[o+1] << 16) | (b[o+2] << 8) | b[o+3]) >>> 0
+  }
+
+  private toHex(arr: Uint8Array): string {
+    return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('')
+  }
+}
+```
+
+### Common Mistakes
+
+```typescript
+// ❌ WRONG: Re-fragmenting into 64-byte packets
+receive() { return this.messageQueue.shift() }
+
+// ✅ CORRECT: Return complete reassembled message
+receive() { return this.completeMessagePromise }
+```
+
+```typescript
+// ❌ Inefficient: String concatenation
+let buffer = ''
+buffer += dataViewToHex(chunk)
+
+// ✅ Better: Use arrays
+let buffer: number[] = []
+buffer.push(...chunk)
+```
+
+---
+
+## Initialization Example
+
+```typescript
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk'
+
+const plugin = {
+  enumerate: () => Promise.resolve([{ id: 'foo', name: 'bar' }]),
+  send: (uuid, data) => { /* Send hex data */ },
+  receive: () => { /* WebUSB: 64-byte frame / BLE: Complete message */ },
+  connect: (uuid) => { /* BLE Android: Bond first! */ },
+  disconnect: (uuid) => { /* Clean up connection */ },
+  init: () => { /* Initialize BLE stack */ },
+  version: 'OneKey-1.0'
+}
+
+HardwareSDK.init({ env: 'lowlevel', debug: true }, undefined, plugin)
+```
+
+## Next Steps
+
+- [Android Guide](/en/hardware-sdk/transport/android) — Bonding flow, delays, retry
+- [iOS Guide](/en/hardware-sdk/transport/ios) — CoreBluetooth implementation
+- [Flutter Guide](/en/hardware-sdk/transport/flutter) — Platform channel bridge

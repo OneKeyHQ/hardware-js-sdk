@@ -1,21 +1,31 @@
-import type { GetPublicKey } from '@onekeyfe/hd-transport';
+import { HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
+
 import { UI_REQUEST } from '../../constants/ui-request';
 import { getScriptType, isTaprootPath, serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { BTCGetAddressParams } from '../../types/api/btcGetAddress';
 import { getCoinInfo } from './helpers/btcParamsUtils';
-import { BTCPublicKey } from '../../types/api/btcGetPublicKey';
-import { getBitcoinForkVersionRange } from './helpers/versionLimit';
+import {
+  getBitcoinForkSupportedProtocols,
+  getBitcoinForkVersionRange,
+} from './helpers/versionLimit';
 import { batchGetPublickeys } from '../helpers/batchGetPublickeys';
-import { createExtendedPublicKey } from './helpers/xpubUtils';
+import { createExtendedPublicKey, getVersionBytes } from './helpers/xpubUtils';
+
+import type { BTCPublicKey } from '../../types/api/btcGetPublicKey';
+import type { BTCGetAddressParams } from '../../types/api/btcGetAddress';
+import type { GetPublicKey } from '@onekeyfe/hd-transport';
 
 export default class BTCGetPublicKey extends BaseMethod<GetPublicKey[]> {
+  getSupportedProtocols() {
+    return getBitcoinForkSupportedProtocols(this.params?.map(param => param.coin_name) ?? []);
+  }
+
   hasBundle = false;
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     this.hasBundle = Object.prototype.hasOwnProperty.call(this.payload, 'bundle');
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };
@@ -74,24 +84,34 @@ export default class BTCGetPublicKey extends BaseMethod<GetPublicKey[]> {
         throw new Error('Goto getPublickey');
       }
 
+      for (const param of this.params) {
+        // init() sets coin_name; keep an empty fallback for the generated optional type.
+        const versionBytes = getVersionBytes(param.coin_name ?? '', param.script_type);
+        if (!versionBytes) {
+          throw new Error(
+            `Invalid coinName, not support generate xpub for scriptType: ${param.script_type}`
+          );
+        }
+      }
+
       const res = await batchGetPublickeys(this.device, this.params, 'secp256k1', 0, {
         includeNode: true,
         ignoreCoinType: true,
       });
 
-      if (!res.message?.hd_nodes || this.params.length !== res.message.hd_nodes.length) {
+      if (!res?.hd_nodes || this.params.length !== res.hd_nodes.length) {
         throw new Error('Invalid response from Publickeys');
       }
 
       for (let i = 0; i < this.params.length; i++) {
         const param = this.params[i];
-        const node = res.message.hd_nodes[i];
+        const node = res.hd_nodes[i];
 
         const path = serializedPath(param.address_n);
 
-        const xpub = createExtendedPublicKey(node, param.coin_name, param.script_type);
+        const xpub = createExtendedPublicKey(node, param.coin_name ?? '', param.script_type);
 
-        const rootFingerprint = res.message.root_fingerprint;
+        const rootFingerprint = res.root_fingerprint;
 
         let xpubSegwit = xpub;
         if (this.isBtcNetwork(param) && isTaprootPath(param.address_n)) {
@@ -112,6 +132,18 @@ export default class BTCGetPublicKey extends BaseMethod<GetPublicKey[]> {
         });
       }
     } catch (error) {
+      if (error instanceof HardwareError) {
+        const { errorCode } = error;
+        if (
+          errorCode === HardwareErrorCode.PinCancelled ||
+          errorCode === HardwareErrorCode.ActionCancelled ||
+          errorCode === HardwareErrorCode.ResponseUnexpectTypeError ||
+          errorCode === HardwareErrorCode.PinInvalid
+        ) {
+          throw error;
+        }
+      }
+
       // clear responses
       responses = [];
 

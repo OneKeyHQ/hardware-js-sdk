@@ -1,0 +1,28 @@
+---
+title: requestAccounts
+---
+
+# requestAccounts
+
+To begin interaction, you first need to obtain the appropriate permissions. Calling requestAccounts() will prompt the user to allow the use of the browser's web access feature. After this, you are free to call any other API methods.
+
+### Method
+
+```typescript
+async function requestAccounts(): string[]
+```
+
+### Example
+
+```typescript
+const provider = (window.$onekey &#x26;&#x26; window.$onekey.btc) || window.unisat;
+
+const accounts = async provider.requestAccounts()
+
+```
+
+### Demo
+
+
+<iframe src="https://codepen.io/OneKeyHQ/pen/mdvGwga" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
+

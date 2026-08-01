@@ -1,14 +1,20 @@
-import { SolanaSignOffChainMessage as HardwareSolSignOffChainMessage } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { stripHexPrefix } from '../helpers/hexUtils';
 
+import type { SolanaSignOffChainMessage as HardwareSolSignOffChainMessage } from '@onekeyfe/hd-transport';
+
 export default class SolSignOffchainMessage extends BaseMethod<HardwareSolSignOffChainMessage> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = true;
 
     // check payload
     validateParams(this.payload, [
@@ -34,6 +40,9 @@ export default class SolSignOffchainMessage extends BaseMethod<HardwareSolSignOf
 
   getVersionRange() {
     return {
+      pro2: {
+        min: '0.0.0',
+      },
       pro: {
         min: '4.12.0',
       },

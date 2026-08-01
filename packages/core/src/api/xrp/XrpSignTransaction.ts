@@ -1,15 +1,21 @@
 import { UI_REQUEST } from '../../constants/ui-request';
-import { XrpSignTransactionParams } from '../../types/api/xrpSignTransaction';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { validatePath } from '../helpers/pathUtils';
 
+import type { XrpSignTransactionParams } from '../../types/api/xrpSignTransaction';
+
 export default class XrpGetAddress extends BaseMethod<XrpSignTransactionParams> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = true;
 
     const { payload } = this;
     validateParams(payload, [

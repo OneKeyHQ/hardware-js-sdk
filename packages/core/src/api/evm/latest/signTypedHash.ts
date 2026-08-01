@@ -1,8 +1,8 @@
-import { MessageResponse, TypedCall } from '@onekeyfe/hd-transport';
 import semver from 'semver';
 import { EDeviceType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import { Device } from '../../../device/Device';
-import { getDeviceFirmwareVersion, getDeviceType } from '../../../utils';
+
+import type { Device } from '../../../device/Device';
+import type { MessageResponse, TypedCall } from '@onekeyfe/hd-transport';
 
 export const signTypedHash = async ({
   typedCall,
@@ -19,10 +19,10 @@ export const signTypedHash = async ({
   domainHash: string;
   messageHash: string | undefined;
 }): Promise<MessageResponse<'EthereumTypedDataSignatureOneKey'>> => {
-  const deviceType = getDeviceType(device.features);
+  const deviceType = device.getCurrentDeviceType();
   if (deviceType === EDeviceType.Touch || deviceType === EDeviceType.Pro) {
     // Touch Pro Sign NestedArrays
-    const currentVersion = getDeviceFirmwareVersion(device.features).join('.');
+    const currentVersion = device.getCurrentFirmwareVersionString() ?? '0.0.0';
     const supportNestedArraysSignVersion = '4.2.0';
 
     // 4.2.0 is the first version that supports nested arrays in signTypedData

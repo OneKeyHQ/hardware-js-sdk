@@ -1,16 +1,25 @@
-import { SignMessage } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
 import { getCoinAndScriptType } from './helpers/btcParamsUtils';
-import { getBitcoinForkVersionRange } from './helpers/versionLimit';
+import {
+  getBitcoinForkSupportedProtocols,
+  getBitcoinForkVersionRange,
+} from './helpers/versionLimit';
+
+import type { SignMessage } from '@onekeyfe/hd-transport';
 
 export default class BTCSignMessage extends BaseMethod<SignMessage> {
+  getSupportedProtocols() {
+    return getBitcoinForkSupportedProtocols([this.params?.coin_name]);
+  }
+
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = true;
 
     validateParams(this.payload, [
       { name: 'path', required: true },
@@ -38,7 +47,7 @@ export default class BTCSignMessage extends BaseMethod<SignMessage> {
         noScriptType = false;
       }
     } else {
-      finalScriptType = noScriptType ? undefined : scriptType;
+      finalScriptType = scriptType;
     }
 
     this.params = {

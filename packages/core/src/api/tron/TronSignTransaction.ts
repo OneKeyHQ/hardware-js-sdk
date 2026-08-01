@@ -1,14 +1,20 @@
-import { TronSignTx } from '@onekeyfe/hd-transport';
 import { isEmpty } from 'lodash';
+
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { TronTransaction } from '../../types/api/tronSignTransaction';
 import { formatAnyHex } from '../helpers/hexUtils';
-import { DeviceFirmwareRange } from '../../types';
+
+import type { TronTransaction } from '../../types/api/tronSignTransaction';
+import type { TronSignTx } from '@onekeyfe/hd-transport';
+import type { DeviceFirmwareRange } from '../../types';
 
 export default class TronSignTransaction extends BaseMethod<TronSignTx> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   parseTx(tx: TronTransaction, address_n: number[]): TronSignTx {
     const unSignTx = {
       address_n,
@@ -67,6 +73,7 @@ export default class TronSignTransaction extends BaseMethod<TronSignTx> {
             balance: tx.contract.delegateResourceContract.balance,
             receiver_address: tx.contract.delegateResourceContract.receiverAddress,
             lock: tx.contract.delegateResourceContract.lock,
+            lock_period: tx.contract.delegateResourceContract.lockPeriod,
           },
         };
       }
@@ -119,7 +126,8 @@ export default class TronSignTransaction extends BaseMethod<TronSignTx> {
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = true;
 
     // check payload
     validateParams(this.payload, [
@@ -144,6 +152,9 @@ export default class TronSignTransaction extends BaseMethod<TronSignTx> {
 
   getVersionRange() {
     return {
+      pro2: {
+        min: '0.0.0',
+      },
       model_mini: {
         min: '2.5.0',
       },
@@ -154,6 +165,9 @@ export default class TronSignTransaction extends BaseMethod<TronSignTx> {
     return {
       pro: {
         min: '4.13.0',
+      },
+      touch: {
+        min: '4.12.0',
       },
       model_classic1s: {
         min: '3.12.0',
@@ -170,8 +184,34 @@ export default class TronSignTransaction extends BaseMethod<TronSignTx> {
     );
   }
 
+  supportDelegateResourceLockPeriodVersionRange(): DeviceFirmwareRange {
+    return {
+      pro: {
+        min: '4.15.0',
+      },
+      touch: {
+        min: '4.12.0',
+      },
+      model_classic1s: {
+        min: '3.13.0',
+      },
+    };
+  }
+
+  checkSupportDelegateContractLockPeriod() {
+    const { delegate_resource_contract } = this.params.contract;
+    this.checkFeatureVersionLimit(
+      () =>
+        !!delegate_resource_contract &&
+        delegate_resource_contract.lock_period !== undefined &&
+        delegate_resource_contract.lock_period !== null,
+      () => this.supportDelegateResourceLockPeriodVersionRange()
+    );
+  }
+
   async run() {
     this.checkFixDataTypeSupportVoteWitnessError();
+    this.checkSupportDelegateContractLockPeriod();
 
     const response = await this.device.commands.typedCall('TronSignTx', 'TronSignedTx', {
       ...this.params,

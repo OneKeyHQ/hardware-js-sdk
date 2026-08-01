@@ -1,0 +1,68 @@
+---
+title: cardanoSignMessage
+---
+
+# cardanoSignMessage
+
+## 使用要求
+
+* 固件版本要求
+  * Touch: 4.1.0
+  * Classic/Mini: 3.0.0
+
+## Cardano：签名消息 <a href="#ethereum-sign-message" id="ethereum-sign-message"></a>
+
+使用指定 BIP32 路径派生的私钥对消息进行签名。
+
+```typescript
+const result = await HardwareSDK.cardanoSignMessage(connectId, deviceId, params);
+```
+
+### 参数
+
+[**可选通用参数**](/zh/hardware-sdk/core-api-guide#common-params)
+
+* `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](/zh/hardware-sdk/core-api-guide#hd-path)
+* `message` - _必需_ `string` 要签名的十六进制文本消息
+* `networkId` - _必需_ `Integer` 主网为 1，测试网为 0
+* `derivationType` - _可选_ `CardanoDerivationType` 枚举。决定使用的派生类型。默认设置为 ICARUS=1
+
+### 示例
+
+```typescript
+// 原始消息
+const message = "Hello World";
+
+// 转换为十六进制
+const messageHex = Buffer.from(message).toString('hex');
+
+HardwareSDK.cardanoSignMessage(connectId, deviceId, {
+    path: "m/1852'/1815'/0'/0/0",
+    message: messageHex,
+    networkId: 1
+});
+```
+
+返回结果
+
+```typescript
+{
+    success: true,
+    payload: {
+        signature: string;
+        key: string;
+    }
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误码
+    }
+}
+```

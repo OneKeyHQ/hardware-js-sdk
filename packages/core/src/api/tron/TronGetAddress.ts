@@ -1,16 +1,21 @@
-import { TronGetAddress as HardwareTronGetAddress } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { TronGetAddressParams, TronAddress } from '../../types';
+
+import type { TronGetAddress as HardwareTronGetAddress } from '@onekeyfe/hd-transport';
+import type { TronAddress, TronGetAddressParams } from '../../types';
 
 export default class TronGetAddress extends BaseMethod<HardwareTronGetAddress[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };

@@ -1,0 +1,52 @@
+---
+title: Safety Rules
+---
+
+# Safety Rules
+
+Agent Wallet workflows can read balances, build transactions, and execute swaps. Keep the safety boundary explicit.
+
+## Read Versus Write
+
+| Request type | Examples | Required behavior |
+| --- | --- | --- |
+| Read-only | Balance, receive address, price, trending tokens, history, token info | Return concise results and one useful next step. |
+| Preparation | Swap quote, transaction build, token audit, simulation | Show result and risk context; do not submit. |
+| Write | Transfer, swap execute, approval, broadcast, signing | Ask for explicit confirmation before execution. |
+| Hardware-gated write | High-value transfer, sensitive contract call, hidden-wallet signing | Require OneKey device confirmation and stop if the device rejects. |
+
+## Never Expose Secrets
+
+Agents must never reveal:
+
+- Private keys or seed phrases.
+- Decrypted Agent Wallet credentials.
+- Hardware passphrases.
+- Access tokens.
+- Keychain contents or credential payloads.
+
+## Confirm Writes
+
+Before any transfer, swap execution, approval, or signing request, show a compact confirmation:
+
+| Field | Required |
+| --- | --- |
+| Action | Transfer, swap, sign, approve, or broadcast |
+| Source | Wallet address and chain |
+| Destination | Recipient, contract, or target chain |
+| Amount | Native or token amount |
+| Fees | Gas or fee estimate when available |
+| Risk result | Security audit or simulation result when available |
+| Hardware step | Device confirmation requirement when applicable |
+
+Do not submit until the user confirms.
+
+## Stop Conditions
+
+Stop and report state when:
+
+- `onekey auth status` is unauthenticated.
+- The active address does not match the user's expected wallet.
+- The device is locked, disconnected, rejected, or waiting for PIN/passphrase.
+- The CLI schema does not expose the parameter the agent wants to use.
+- A security command reports a high-risk result and the user has not explicitly accepted it.

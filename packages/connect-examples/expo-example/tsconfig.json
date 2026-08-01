@@ -6,6 +6,9 @@
   },
   "include": [
     "**/*.ts",
-    "**/*.tsx"
-, "src/utils/mockDevice/ecc.js", "src/utils/mockDevice/__test__/dnxGetAddress.test.js"  ]
+    "**/*.tsx",
+    "**/*.d.ts",
+    "src/utils/mockDevice/ecc.js",
+    "src/utils/mockDevice/__test__/dnxGetAddress.test.js"
+  ]
 }

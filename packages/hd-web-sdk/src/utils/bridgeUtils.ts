@@ -1,12 +1,11 @@
-import {
-  IJsBridgeIframeConfig,
-  JsBridgeIframe,
-  setPostMessageListenerFlag,
-} from '@onekeyfe/cross-inpage-provider-core';
-import { CoreMessage, getLogger, LoggerNames, LogBlockEvent } from '@onekeyfe/hd-core';
+import { JsBridgeIframe, setPostMessageListenerFlag } from '@onekeyfe/cross-inpage-provider-core';
+import { LoggerNames, getLogBlockLabel, getLogger } from '@onekeyfe/hd-core';
 import { ERRORS } from '@onekeyfe/hd-shared';
-import { get } from 'lodash';
+
 import JSBridgeConfig from '../iframe/bridge-config';
+
+import type { CoreMessage } from '@onekeyfe/hd-core';
+import type { IJsBridgeIframeConfig } from '@onekeyfe/cross-inpage-provider-core';
 
 // eslint-disable-next-line import/no-mutable-exports
 let frameBridge: JsBridgeIframe;
@@ -30,7 +29,7 @@ export const sendMessage = async (messages: CoreMessage, isHost = true): Promise
   const bridge = isHost ? hostBridge : frameBridge;
 
   try {
-    const blockLog = LogBlockEvent.has(get(messages, 'type')) ? messages.type : undefined;
+    const blockLog = getLogBlockLabel(messages);
     if (messages.event !== 'LOG_EVENT') {
       if (blockLog) {
         Log.debug('request: ', blockLog);

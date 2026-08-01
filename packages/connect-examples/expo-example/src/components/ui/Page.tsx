@@ -1,4 +1,5 @@
 import { ScrollView, View } from 'tamagui';
+
 import HeaderView from './Header';
 
 export interface PageViewProps {
@@ -14,7 +15,9 @@ const PageView = ({ children, scrollable = true }: PageViewProps) => (
         {children}
       </ScrollView>
     ) : (
-      <View testID="page-view-non-scrollable">{children}</View>
+      <View flex={1} testID="page-view-non-scrollable">
+        {children}
+      </View>
     )}
   </View>
 );

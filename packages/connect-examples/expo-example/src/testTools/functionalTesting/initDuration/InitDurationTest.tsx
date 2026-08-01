@@ -1,20 +1,20 @@
 import { useMemo, useState } from 'react';
-
-import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
-
+import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Stack, Text, XStack, YStack } from 'tamagui';
 import { useIntl } from 'react-intl';
 import { get } from 'lodash';
+
 import { TestRunnerView } from '../../../components/BaseTestRunner/TestRunnerView';
-import { TestCaseDataWithKey } from '../../../components/BaseTestRunner/types';
 import { useRunnerTest } from '../../../components/BaseTestRunner/useRunnerTest';
 import useExportReport from '../../../components/BaseTestRunner/useExportReport';
 import { Button } from '../../../components/ui/Button';
 import TestRunnerOptionButtons from '../../../components/BaseTestRunner/TestRunnerOptionButtons';
-import type { InitDurationTestCase, ResultViewProps, TestCaseDataType } from './types';
-
 import { useHardwareInputPinDialog } from '../../../provider/HardwareInputPinProvider';
 import { CommonInput } from '../../../components/CommonInput';
+
+import type { CoreMessage } from '@onekeyfe/hd-core';
+import type { TestCaseDataWithKey } from '../../../components/BaseTestRunner/types';
+import type { InitDurationTestCase, ResultViewProps, TestCaseDataType } from './types';
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T | 'timeout'> {
   let timeoutHandle: NodeJS.Timeout;
@@ -94,7 +94,7 @@ function ExecuteView() {
   const [intervalTime, setIntervalTime] = useState(1000);
   const [testCount, setTestCount] = useState(10);
 
-  const { stopTest, beginTest } = useRunnerTest<TestCaseDataType>({
+  const { stopTest, beginTest, retryFailedTasks } = useRunnerTest<TestCaseDataType>({
     initHardwareListener: sdk => {
       if (hardwareUiEventListener) {
         sdk.off(UI_EVENT, hardwareUiEventListener);
@@ -136,21 +136,21 @@ function ExecuteView() {
         params: requestParams,
       });
     },
-    processRequest: async (sdk, method, connectId, deviceId, requestParams, item) => {
+    processRequest: async (sdk, _method, connectId, deviceId, requestParams, item) => {
       // eslint-disable-next-line no-promise-executor-return
       await new Promise(resolve => setTimeout(resolve, intervalTime));
       const sdkPromise = async () => {
         try {
-          const res = await sdk[`${method}` as keyof typeof sdk](connectId, requestParams);
+          const res = await sdk.testInitializeDeviceDuration(connectId, requestParams);
           return { payload: res, skipVerify: true };
         } catch (error) {
           console.log('=====>>>>> processRequest error: ', error);
           return {
             payload: {
-              success: false,
+              success: false as const,
               payload: {
                 code: 800,
-                error,
+                error: error instanceof Error ? error.message : String(error),
               },
             },
             skipVerify: true,
@@ -206,13 +206,17 @@ function ExecuteView() {
           />
 
           <XStack flexWrap="wrap">
-            <TestRunnerOptionButtons onStop={stopTest} onStart={beginTest} />
+            <TestRunnerOptionButtons
+              onStop={stopTest}
+              onStart={beginTest}
+              onRetryFailed={retryFailedTasks}
+            />
             <ExportReportView />
           </XStack>
         </Stack>
       </YStack>
     ),
-    [beginTest, intervalTime, intl, stopTest, testCount]
+    [beginTest, intervalTime, intl, retryFailedTasks, stopTest, testCount]
   );
 
   return contentMemo;

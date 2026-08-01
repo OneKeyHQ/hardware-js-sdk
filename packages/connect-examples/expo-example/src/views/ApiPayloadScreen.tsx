@@ -1,8 +1,8 @@
-import React, { memo, useMemo, useEffect, useState } from 'react';
+import React, { memo, useEffect, useMemo, useState } from 'react';
 import { FlatList, Platform } from 'react-native';
 import { Stack, YStack } from 'tamagui';
-
 import { useIntl } from 'react-intl';
+
 import PageView from '../components/ui/Page';
 import HandleSDKEvents from '../components/HandleSDKEvents';
 import { DeviceProvider } from '../provider/DeviceProvider';
@@ -12,9 +12,11 @@ import { UploadScreen } from '../components/UploadScreen';
 import ChangeScreenComponent from '../components/ChangeScreen';
 import { ExpandModeProvider } from '../provider/ExpandModeProvider';
 import { CollapsibleSection } from '../components/CollapsibleSection';
-import Playground, { PlaygroundProps as ApiPayloadProps } from '../components/Playground';
+import Playground from '../components/Playground';
 import PanelView from '../components/ui/Panel';
 import { useMedia } from '../provider/MediaProvider';
+
+import type { PlaygroundProps as ApiPayloadProps } from '../components/Playground';
 
 /* eslint-disable global-require, @typescript-eslint/no-var-requires */
 const playgroundConfig = [
@@ -141,6 +143,10 @@ const playgroundConfig = [
   {
     title: 'TRON API',
     data: require('../data/tron').default,
+  },
+  {
+    title: 'WipeDevice API',
+    data: require('../data/wipeDevice').default,
   },
 ];
 

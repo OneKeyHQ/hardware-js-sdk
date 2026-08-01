@@ -1,5 +1,6 @@
-import type { AddressTestCaseData } from '../types';
 import passphrase12Empty from './passphrase_empty';
+
+import type { AddressTestCaseData } from '../types';
 
 export default {
   ...passphrase12Empty,

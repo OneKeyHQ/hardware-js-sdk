@@ -1,0 +1,48 @@
+---
+description: 将 OneKey 集成到 Web3Modal (EVM)
+---
+
+# Web3Modal
+
+## 文档
+
+- 官方文档：https://docs.walletconnect.com/web3modal/about
+
+## 安装
+
+```bash
+npm install @web3modal/wagmi wagmi@1.4.13 viem@1.21.4
+# 或
+yarn add @web3modal/wagmi wagmi@1.4.13 viem@1.21.4
+```
+
+## 配置 OneKey
+
+将 OneKey 添加到 `featuredWalletIds` 和 `includeWalletIds`。
+
+```javascript
+createWeb3Modal({
+  wagmiConfig,
+  projectId,
+  chains,
+  featuredWalletIds: [
+    // OneKey 钱包 ID，参见 https://explorer.walletconnect.com/onekey
+    "1aedbcfc1f31aade56ca34c38b0a1607b41cccfa3de93c946ef3b4ba2dfab11c",
+  ],
+  includeWalletIds: [
+    // OneKey 钱包 ID，参见 https://explorer.walletconnect.com/onekey
+    "1aedbcfc1f31aade56ca34c38b0a1607b41cccfa3de93c946ef3b4ba2dfab11c",
+  ],
+});
+```
+
+## 快速开始 / Demo
+
+<iframe src="https://codesandbox.io/embed/xd9wjd?module=/src/App.tsx&view=Editor++Preview" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
+
+## 相关资源
+
+- [Reown AppKit 文档](https://docs.reown.com/appkit/overview)
+- [WalletConnect 钱包指南 - OneKey](https://walletguide.walletconnect.network/?search=onekey)
+- [获取 Project ID](https://cloud.reown.com)
+- React + wagmi（基于 Hooks 的集成）：[指南](/zh/connect-to-software/react-hooks/wagmi)

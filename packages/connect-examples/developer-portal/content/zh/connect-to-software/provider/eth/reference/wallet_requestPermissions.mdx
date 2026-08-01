@@ -1,0 +1,76 @@
+---
+title: wallet_requestPermissions
+description: 请求 dApp 权限
+---
+
+# wallet_requestPermissions
+
+请求 dApp 访问特定方法的权限。这是 EIP-2255 钱包权限系统的一部分。
+
+---
+
+## 参数
+
+`Array` 包含一个权限请求对象：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `eth_accounts` | `object` | 请求访问用户账户 |
+
+---
+
+## 返回值
+
+`Array` 权限对象数组：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `parentCapability` | `string` | 权限名称 |
+| `date` | `number` | 授权时间戳 |
+| `caveats` | `array` | 权限限制 |
+
+---
+
+## 示例
+
+```typescript
+const permissions = await window.$onekey.ethereum.request({
+  method: 'wallet_requestPermissions',
+  params: [{ eth_accounts: {} }]
+})
+
+console.log('已授权权限:', permissions)
+// [{ parentCapability: 'eth_accounts', date: 1234567890, caveats: [...] }]
+```
+
+### 检查特定权限
+
+```typescript
+const permissions = await window.$onekey.ethereum.request({
+  method: 'wallet_requestPermissions',
+  params: [{ eth_accounts: {} }]
+})
+
+const hasAccountsPermission = permissions.some(
+  p => p.parentCapability === 'eth_accounts'
+)
+console.log('是否有账户权限:', hasAccountsPermission)
+```
+
+---
+
+## 错误码
+
+| 错误码 | 消息 | 说明 |
+|--------|------|------|
+| 4001 | User rejected the request | 用户拒绝权限请求 |
+| -32602 | Invalid params | 权限请求无效 |
+
+---
+
+## 说明
+
+- 目前仅支持 `eth_accounts` 权限
+- 如果尚未连接，调用此方法会触发连接弹窗
+- 权限会持久化，直到用户撤销
+- 遵循 [EIP-2255](https://eips.ethereum.org/EIPS/eip-2255) 规范

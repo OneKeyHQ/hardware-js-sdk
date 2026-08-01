@@ -1,0 +1,30 @@
+---
+title: 基础 API
+---
+
+# 基础 API
+
+用于 Air-Gap 离线签名的核心 UR 类型。
+
+## 类型
+
+| 类型 | 描述 |
+|------|-------------|
+| [CryptoHDKey](./cryptohdkey) | 分层确定性密钥信息（扩展公钥） |
+| [CryptoCoinInfo](./cryptocoininfo) | 加密货币类型和网络信息 |
+| [CryptoKeypath](./cryptokeypath) | BIP-44 派生路径表示 |
+
+## 使用说明
+
+这些类型是链特定签名请求的基础组件：
+
+- `CryptoHDKey` – 从设备获取，包含用于地址派生的 xpub
+- `CryptoKeypath` – 指定用于签名的密钥
+- `CryptoCoinInfo` – 标识目标链/网络
+
+## 依赖包
+
+```bash
+npm install @keystonehq/bc-ur-registry
+```
+

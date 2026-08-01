@@ -1,0 +1,155 @@
+---
+title: 快速开始
+description: 使用 OneKey 的 Petra 兼容 Provider 连接 Aptos
+---
+
+import { Callout } from 'nextra/components'
+
+# 快速开始
+
+了解如何检测、连接和与 Aptos 进行交互。
+
+<Callout type="info">
+OneKey 的 Aptos provider 完全兼容 Petra 钱包接口和 Aptos Wallet Standard。
+</Callout>
+
+---
+
+## Provider 检测
+
+```typescript
+// 检测 OneKey Aptos provider
+const provider = window.$onekey?.aptos
+
+if (!provider) {
+  throw new Error('未检测到 OneKey Aptos provider')
+}
+
+// 检查 provider 信息
+console.log('Provider:', provider.isOneKey ? 'OneKey' : '未知')
+```
+
+---
+
+## 连接钱包
+
+```typescript
+// 连接并获取账户信息
+const response = await provider.connect()
+
+console.log({
+  address: response.address,     // 账户地址
+  publicKey: response.publicKey, // 公钥
+})
+```
+
+---
+
+## 检查连接状态
+
+```typescript
+const isConnected = await provider.isConnected()
+console.log('已连接:', isConnected)
+```
+
+---
+
+## 获取当前账户
+
+```typescript
+const account = await provider.account()
+
+console.log({
+  address: account.address,
+  publicKey: account.publicKey,
+})
+```
+
+---
+
+## 获取网络信息
+
+```typescript
+const network = await provider.network()
+
+console.log('网络:', network) // 'mainnet', 'testnet', 'devnet'
+
+// 获取完整网络信息
+const networkInfo = await provider.getNetwork()
+console.log({
+  name: networkInfo.name,
+  chainId: networkInfo.chainId,
+  url: networkInfo.url,
+})
+```
+
+---
+
+## 断开连接
+
+```typescript
+await provider.disconnect()
+```
+
+---
+
+## 事件监听
+
+### 监听账户变更
+
+```typescript
+provider.onAccountChange((newAccount) => {
+  if (newAccount) {
+    console.log('账户已变更:', newAccount.address)
+  } else {
+    console.log('钱包已断开连接')
+  }
+})
+```
+
+### 监听网络变更
+
+```typescript
+provider.onNetworkChange((network) => {
+  console.log('网络已变更:', network)
+})
+```
+
+---
+
+## 从 Petra 迁移
+
+OneKey 的 Aptos provider 与 Petra 兼容。更新您的 provider 检测方式：
+
+```typescript
+// 之前 (仅 Petra)
+const provider = window.petra
+
+// 之后 (OneKey 优先，Petra 作为备选)
+const provider = window.$onekey?.aptos || window.petra
+```
+
+---
+
+## 使用 Aptos Wallet Adapter
+
+对于 React 应用，使用官方的 Aptos Wallet Adapter：
+
+```bash
+npm install @aptos-labs/wallet-adapter-react
+```
+
+```tsx
+import { AptosWalletAdapterProvider } from '@aptos-labs/wallet-adapter-react'
+
+function App() {
+  return (
+    <AptosWalletAdapterProvider>
+      <YourApp />
+    </AptosWalletAdapterProvider>
+  )
+}
+```
+
+OneKey 会被 Aptos Wallet Adapter 自动检测。
+

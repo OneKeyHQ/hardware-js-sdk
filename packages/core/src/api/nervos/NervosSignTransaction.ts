@@ -1,10 +1,16 @@
-import type { NervosSignTx as HardwareNervosSignTx, TypedCall } from '@onekeyfe/hd-transport';
 import { bytesToHex } from '@noble/hashes/utils';
+
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import type { NervosSignTransactionParams, NervosSignedTx } from '../../types';
 import { formatAnyHex } from '../helpers/hexUtils';
+
+import type { DeviceFirmwareRange, NervosSignTransactionParams, NervosSignedTx } from '../../types';
+import type {
+  NervosSignTx as HardwareNervosSignTx,
+  NervosTxRequest,
+  TypedCall,
+} from '@onekeyfe/hd-transport';
 import type { TypedResponseMessage } from '../../device/DeviceCommands';
 
 type NervosSignTx = Omit<HardwareNervosSignTx, 'data_initial_chunk' | 'data_length'> & {
@@ -16,7 +22,8 @@ export default class NervosSignTransaction extends BaseMethod<NervosSignTx> {
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode];
+    this.allowDeviceMode = [...this.allowDeviceMode];
+    this.allowUsePreInitialize = true;
 
     // check payload
     validateParams(this.payload, [
@@ -38,7 +45,7 @@ export default class NervosSignTransaction extends BaseMethod<NervosSignTx> {
     };
   }
 
-  getVersionRange() {
+  getVersionRange(): DeviceFirmwareRange {
     return {
       model_mini: {
         min: '3.7.0',
@@ -56,7 +63,9 @@ export default class NervosSignTransaction extends BaseMethod<NervosSignTx> {
     res: TypedResponseMessage<'NervosSignedTx'> | TypedResponseMessage<'NervosTxRequest'>,
     data: Buffer,
     offset = 0
-  ): Promise<NervosSignedTx> => {
+    // The final NervosTxRequest may return a signature without data_length or address,
+    // so the result accurately uses a union type.
+  ): Promise<NervosSignedTx | (NervosTxRequest & { path: string })> => {
     if (res.type === 'NervosSignedTx') {
       if (!res?.message?.signature) {
         throw new Error('No signature returned');

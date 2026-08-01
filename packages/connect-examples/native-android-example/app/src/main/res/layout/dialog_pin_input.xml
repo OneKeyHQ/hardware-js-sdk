@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="输入 PIN"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:layout_marginBottom="20dp" />
+
+    <!-- Password display field with dots -->
+    <TextView
+        android:id="@+id/pinDisplay"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="18sp"
+        android:gravity="center"
+        android:minHeight="30dp"
+        android:layout_marginBottom="24dp"
+        android:background="#F5F5F5" />
+
+    <!-- 3x3 Grid for PIN buttons -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+        
+        <!-- First row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_weight="1">
+            
+            <Button
+                android:id="@+id/pinButton1"
+                android:layout_width="0dp"
+                android:layout_height="60dp"
+                android:layout_weight="1"
+                android:text="•"
+                android:textSize="24sp"
+                android:layout_margin="4dp" />
+                
+            <Button
+                android:id="@+id/pinButton2"
+                android:layout_width="0dp"
+                android:layout_height="60dp"
+                android:layout_weight="1"
+                android:text="•"
+                android:textSize="24sp"
+                android:layout_margin="4dp" />
+                
+            <Button
+                android:id="@+id/pinButton3"
+                android:layout_width="0dp"
+                android:layout_height="60dp"
+                android:layout_weight="1"
+                android:text="•"
+                android:textSize="24sp"
+                android:layout_margin="4dp" />
+        </LinearLayout>
+        
+        <!-- Second row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_weight="1">
+            
+            <Button
+                android:id="@+id/pinButton4"
+                android:layout_width="0dp"
+                android:layout_height="60dp"
+                android:layout_weight="1"
+                android:text="•"
+                android:textSize="24sp"
+                android:layout_margin="4dp" />
+                
+            <Button
+                android:id="@+id/pinButton5"
+                android:layout_width="0dp"
+                android:layout_height="60dp"
+                android:layout_weight="1"
+                android:text="•"
+                android:textSize="24sp"
+                android:layout_margin="4dp" />
+                
+            <Button
+                android:id="@+id/pinButton6"
+                android:layout_width="0dp"
+                android:layout_height="60dp"
+                android:layout_weight="1"
+                android:text="•"
+                android:textSize="24sp"
+                android:layout_margin="4dp" />
+        </LinearLayout>
+        
+        <!-- Third row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_weight="1">
+            
+            <Button
+                android:id="@+id/pinButton7"
+                android:layout_width="0dp"
+                android:layout_height="60dp"
+                android:layout_weight="1"
+                android:text="•"
+                android:textSize="24sp"
+                android:layout_margin="4dp" />
+                
+            <Button
+                android:id="@+id/pinButton8"
+                android:layout_width="0dp"
+                android:layout_height="60dp"
+                android:layout_weight="1"
+                android:text="•"
+                android:textSize="24sp"
+                android:layout_margin="4dp" />
+                
+            <Button
+                android:id="@+id/pinButton9"
+                android:layout_width="0dp"
+                android:layout_height="60dp"
+                android:layout_weight="1"
+                android:text="•"
+                android:textSize="24sp"
+                android:layout_margin="4dp" />
+        </LinearLayout>
+    </LinearLayout>
+    
+    <!-- Action buttons -->
+    <Button
+        android:id="@+id/confirmButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="确认"
+        android:layout_marginTop="20dp"
+        android:padding="12dp"
+        android:backgroundTint="#E5E5E5"
+        android:textColor="#000000" />
+        
+    <Button
+        android:id="@+id/switchToDeviceButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="切换到设备输入"
+        android:layout_marginTop="8dp"
+        android:padding="12dp"
+        android:backgroundTint="#E5E5E5"
+        android:textColor="#000000" />
+
+</LinearLayout> 

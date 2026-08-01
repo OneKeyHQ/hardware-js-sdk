@@ -3,7 +3,7 @@ import { type PlaygroundProps } from '../components/Playground';
 const api: PlaygroundProps[] = [
   {
     method: 'solGetAddress',
-    description: 'Get address',
+
     presupposes: [
       {
         title: 'Get address',
@@ -35,7 +35,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'solSignTransaction',
-    description: 'Sign Transaction',
+
     presupposes: [
       {
         title: 'Sign Transaction',
@@ -62,7 +62,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'solSignMessage',
-    description: 'Sign Message',
+
     presupposes: [
       {
         title: 'Sign Message',

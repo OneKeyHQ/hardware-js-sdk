@@ -1,0 +1,50 @@
+---
+title: Ethereum & EVM
+---
+
+# Ethereum & EVM
+
+Ethereum 和 EVM 兼容链的 Air-Gap 签名支持。
+
+## 账户设置
+
+要获取 ETH 账户，使用 [CryptoHDKey](../basic-api/cryptohdkey) 从设备获取扩展公钥。
+
+## 支持的操作
+
+| 操作 | DataType | 描述 |
+|-----------|----------|-------------|
+| EIP-1559 交易 | `typedTransaction (4)` | 现代交易格式 |
+| Legacy 交易 | `transaction (1)` | 经典交易格式 |
+| EIP-712 TypedData | `typedData (2)` | 结构化数据签名 |
+| Personal Message | `personalMessage (3)` | 消息签名 |
+
+## 流程
+
+1. 使用 [EthSignRequest](./ethsignrequest) 构建签名请求
+2. 编码为 UR，显示动画二维码
+3. 设备扫描、验证、离线签名
+4. 使用 [EthSignature](./ethsignature) 解码响应
+5. 将签名附加到交易并广播
+
+## 快速示例
+
+```ts
+import { KeystoneEthereumSDK } from '@keystonehq/keystone-sdk';
+
+const eth = new KeystoneEthereumSDK();
+
+// 生成签名请求
+const ur = eth.generateSignRequest({
+  requestId: 'uuid-string',
+  signData: unsignedTxHex,    // 不带 0x 的十六进制
+  dataType: 4,                // EIP-1559
+  path: "m/44'/60'/0'/0/0",
+  xfp: '12345678',
+  chainId: 1,
+  origin: 'your-app',
+});
+
+// 编码并显示二维码
+```
+

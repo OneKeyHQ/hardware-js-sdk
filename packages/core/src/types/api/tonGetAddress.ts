@@ -1,4 +1,4 @@
-import { TonWalletVersion, TonWorkChain } from '@onekeyfe/hd-transport';
+import type { TonWalletVersion, TonWorkChain } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type TonAddress = {

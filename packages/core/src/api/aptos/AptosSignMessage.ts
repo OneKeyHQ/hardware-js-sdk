@@ -1,14 +1,20 @@
-import { AptosSignMessage as HardwareAptosSignMessage } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { AptosMessageSignature, AptosSignMessageParams } from '../../types';
+
+import type { AptosSignMessage as HardwareAptosSignMessage } from '@onekeyfe/hd-transport';
+import type { AptosMessageSignature, AptosSignMessageParams } from '../../types';
 
 export default class AptosSignMessage extends BaseMethod<HardwareAptosSignMessage> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = true;
 
     // check payload
     validateParams(this.payload, [

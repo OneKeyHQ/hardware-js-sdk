@@ -1,0 +1,33 @@
+---
+description: 通过 OneKey 集成 WebLN — enable、getInfo、makeInvoice、sendPayment、签名/验证消息
+slug: /dapp/chains/webln
+---
+
+# WebLN
+
+使用 OneKey 的 WebLN Provider 与支持闪电网络的应用交互。
+
+## 快速链接
+
+- [指南](guide)
+- [API 参考](api-reference)
+- [事件](event)
+
+## 最小示例
+
+```js
+const provider = window?.$onekey?.webln || window?.webln
+if (!provider) throw new Error('未检测到 OneKey WebLN Provider')
+
+await provider.enable()
+const info = await provider.getInfo()
+```
+
+## 事件
+
+- 查看 [事件](event) 了解账户/网络更新
+
+## 常见错误
+
+- 4001：用户拒绝
+- 无效参数/数据：确保发票/消息格式正确

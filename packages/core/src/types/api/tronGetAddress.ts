@@ -1,4 +1,4 @@
-import { TronAddress as HardwareTronAddress } from '@onekeyfe/hd-transport';
+import type { TronAddress as HardwareTronAddress } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type TronAddress = {

@@ -1,15 +1,21 @@
-import { TypedCall } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import { TypedResponseMessage } from '../../device/DeviceCommands';
+
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { NexaSignTransactionParams, NexaSignature } from '../../types';
+
+import type { TypedResponseMessage } from '../../device/DeviceCommands';
+import type { TypedCall } from '@onekeyfe/hd-transport';
+import type { DeviceFirmwareRange, NexaSignTransactionParams, NexaSignature } from '../../types';
 
 export default class NexaSignTransaction extends BaseMethod<NexaSignTransactionParams> {
+  checkDeviceId = true;
+
   hasBundle = false;
 
   init() {
+    this.allowUsePreInitialize = true;
+
     const payload = this.payload as NexaSignTransactionParams;
 
     payload.inputs.forEach(input => {
@@ -23,7 +29,7 @@ export default class NexaSignTransaction extends BaseMethod<NexaSignTransactionP
     this.params = payload;
   }
 
-  getVersionRange() {
+  getVersionRange(): DeviceFirmwareRange {
     return {
       model_mini: {
         min: '3.2.0',
@@ -64,17 +70,12 @@ export default class NexaSignTransaction extends BaseMethod<NexaSignTransactionP
 
       const nextIndex = res.message.request_index;
       const input = this.params.inputs[nextIndex];
-      const response = await typedCall(
-        'NexaTxInputAck',
-        // @ts-expect-error
-        ['NexaTxInputRequest', 'NexaSignedTx'],
-        {
-          address_n: input.path,
-          raw_message: input.message,
-        }
-      );
+      const response = await typedCall('NexaTxInputAck', ['NexaTxInputRequest', 'NexaSignedTx'], {
+        // Normalize a string path to address_n, matching the first input handled by run().
+        address_n: validatePath(input.path, 3),
+        raw_message: input.message,
+      });
 
-      // @ts-expect-error
       return this.processTxRequest(typedCall, response, nextIndex, signatures);
     }
 

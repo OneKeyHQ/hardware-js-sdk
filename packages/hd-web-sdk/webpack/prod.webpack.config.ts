@@ -1,15 +1,21 @@
 import path from 'path';
 import webpack from 'webpack';
 import TerserPlugin from 'terser-webpack-plugin';
+
 import config from './webpack.config';
+
+const sdkBuildTarget = process.env.SDK_BUILD_TARGET === 'min' ? 'min' : 'normal';
+const isMinifiedBuild = sdkBuildTarget === 'min';
+const shouldBuildSourceMap = process.env.SDK_BUILD_SOURCEMAP !== 'false';
+const sdkEntryName = isMinifiedBuild ? 'onekey-js-sdk.min' : 'onekey-js-sdk';
+const sdkEntry = path.resolve(__dirname, '../src/index.ts');
 
 const prodConfig = {
   target: 'web',
   mode: 'production',
-  devtool: 'hidden-source-map',
+  devtool: shouldBuildSourceMap ? 'hidden-source-map' : false,
   entry: {
-    'onekey-js-sdk': path.resolve(__dirname, '../src/index.ts'),
-    'onekey-js-sdk.min': path.resolve(__dirname, '../src/index.ts'),
+    [sdkEntryName]: sdkEntry,
   },
   output: config.output,
 
@@ -52,17 +58,20 @@ const prodConfig = {
   ],
 
   optimization: {
-    minimizer: [
-      new TerserPlugin({
-        exclude: /onekey-js-sdk.js/,
-        extractComments: false,
-        terserOptions: {
-          format: {
-            comments: false,
-          },
-        },
-      }),
-    ],
+    minimize: isMinifiedBuild,
+    minimizer: isMinifiedBuild
+      ? [
+          new TerserPlugin({
+            extractComments: false,
+            parallel: false,
+            terserOptions: {
+              format: {
+                comments: false,
+              },
+            },
+          }),
+        ]
+      : [],
   },
 };
 

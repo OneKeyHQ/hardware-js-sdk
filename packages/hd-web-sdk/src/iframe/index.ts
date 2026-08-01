@@ -1,32 +1,36 @@
 import HttpTransport from '@onekeyfe/hd-transport-http';
-import WebusbTransport from '@onekeyfe/hd-transport-webusb';
+import EmulatorTransport from '@onekeyfe/hd-transport-emulator';
+import { WebUsbTransport } from '@onekeyfe/hd-transport-web-device';
 import {
-  PostMessageEvent,
-  IFRAME,
-  parseMessage,
-  DataManager,
-  parseConnectSettings,
-  IFrameInit,
-  createIFrameMessage,
-  createErrorMessage,
-  initCore,
-  switchTransport,
-  Core,
   CORE_EVENT,
-  getLogger,
+  DataManager,
+  IFRAME,
   LoggerNames,
-  LogBlockEvent,
-  ConnectSettings,
+  createErrorMessage,
+  createIFrameMessage,
+  getLogBlockLabel,
+  getLogger,
+  initCore,
+  parseConnectSettings,
+  parseMessage,
+  switchTransport,
 } from '@onekeyfe/hd-core';
-import { get } from 'lodash';
-import { getOrigin } from '../utils/urlUtils';
-import { sendMessage, createJsBridge } from '../utils/bridgeUtils';
 
+import { getOrigin } from '../utils/urlUtils';
+import { createJsBridge, sendMessage } from '../utils/bridgeUtils';
 import JSBridgeConfig from './bridge-config';
 import { isExtensionWhitelisted, isOriginWhitelisted } from '..';
 
+import type { ConnectSettings, Core, IFrameInit, PostMessageEvent } from '@onekeyfe/hd-core';
+
 let _core: Core | undefined;
 const Log = getLogger(LoggerNames.Iframe);
+
+const getTransport = (env: ConnectSettings['env']) => {
+  if (env === 'webusb' || env === 'desktop-webusb') return WebUsbTransport;
+  if (env === 'emulator') return EmulatorTransport;
+  return HttpTransport;
+};
 
 const handleMessage = (event: PostMessageEvent) => {
   if (event.source === window || !event.data) return;
@@ -66,7 +70,7 @@ export async function init(payload: IFrameInit['payload']) {
   Log.enabled = !!settings.debug;
 
   try {
-    const Transport = settings.env === 'webusb' ? WebusbTransport : HttpTransport;
+    const Transport = getTransport(settings.env);
     _core = await initCore(settings, Transport);
     _core?.on(CORE_EVENT, messages => sendMessage(messages, false));
   } catch (error) {
@@ -82,7 +86,7 @@ export async function init(payload: IFrameInit['payload']) {
     targetOrigin: getOrigin(settings.parentOrigin as string),
     receiveHandler: async messageEvent => {
       const message = parseMessage(messageEvent);
-      const blockLog = LogBlockEvent.has(get(message, 'type')) ? message.type : undefined;
+      const blockLog = getLogBlockLabel(message);
       if (blockLog) {
         Log.debug('Frame Bridge Receive message: ', blockLog);
       } else {
@@ -90,6 +94,7 @@ export async function init(payload: IFrameInit['payload']) {
       }
 
       if (message.event === IFRAME.SWITCH_TRANSPORT) {
+        Log.debug('switchCoreTransport', message.payload.env);
         switchCoreTransport(message.payload.env);
         return { success: true, payload: {} };
       }
@@ -109,7 +114,7 @@ export async function init(payload: IFrameInit['payload']) {
 
 export const switchCoreTransport = (env: ConnectSettings['env']) => {
   if (_core) {
-    const Transport = env === 'webusb' ? WebusbTransport : HttpTransport;
+    const Transport = getTransport(env);
     switchTransport({
       env,
       Transport,

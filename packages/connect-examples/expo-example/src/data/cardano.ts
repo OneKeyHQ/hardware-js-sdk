@@ -3,7 +3,7 @@ import { type PlaygroundProps } from '../components/Playground';
 const api: PlaygroundProps[] = [
   {
     method: 'cardanoGetAddress',
-    description: 'Get address',
+
     presupposes: [
       {
         title: 'Get address',
@@ -18,6 +18,25 @@ const api: PlaygroundProps[] = [
           },
           protocolMagic: 764824073,
           networkId: 1,
+          derivationType: 1,
+          address: '',
+          showOnOneKey: false,
+          isCheck: false,
+        },
+      },
+      {
+        title: 'Get address (Testnet)',
+        value: {
+          addressParameters: {
+            addressType: 0,
+            path: "m/1852'/1815'/0'/0/0",
+            stakingPath: "m/1852'/1815'/0'/2/0",
+            stakingKeyHash: undefined,
+            paymentScriptHash: undefined,
+            stakingScriptHash: undefined,
+          },
+          protocolMagic: 1097911063,
+          networkId: 0,
           derivationType: 1,
           address: '',
           showOnOneKey: false,
@@ -120,7 +139,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'cardanoGetPublicKey',
-    description: 'Get PublicKey',
+
     presupposes: [
       {
         title: 'Get PublicKey',
@@ -178,7 +197,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'cardanoSignTransaction',
-    description: 'Sign Transaction',
+
     presupposes: [
       {
         title: 'Sign Transaction',
@@ -232,7 +251,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'cardanoSignMessage',
-    description: 'Sign Message',
+
     presupposes: [
       {
         title: 'Sign Message',
@@ -241,6 +260,16 @@ const api: PlaygroundProps[] = [
           message: 'Hello World',
           derivationType: 1,
           networkId: 1,
+        },
+      },
+      {
+        title: 'Sign Message (Testnet)',
+        value: {
+          path: "m/1852'/1815'/0'/0/0",
+          message: 'Hello World',
+          derivationType: 1,
+          networkId: 0,
+          protocolMagic: 1097911063,
         },
       },
     ],

@@ -1,53 +1,16 @@
-name: build-example-desktop
+name: Build Example Desktop (All Platforms)
 
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
-  build:
-    runs-on: macos-latest
-    env:
-      PROJECT_PATH: packages/connect-examples/electron-example
-    steps:
-    - uses: actions/checkout@v4
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        registry-url: 'https://registry.npmjs.org'
+  build-mac:
+    uses: ./.github/workflows/build-example-desktop-mac.yml
+    secrets: inherit
 
-    - name: Install dependencies
-      run: |
-        yarn
-        yarn bootstrap
-
-    - name: Build Target
-      run: |
-        yarn build
-
-    - name: Build Desktop Application
-      env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: yarn build:example:desktop
-
-    - name: Upload Mac x64 Artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: mac-x64-example-desktop
-        path: |
-          ${{ env.PROJECT_PATH }}/out/*x64.dmg
-          ${{ env.PROJECT_PATH }}/out/*mac-x64.zip
-
-    - name: Upload Mac arm64 Artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: mac-arm64-example-desktop
-        path: |
-          ${{ env.PROJECT_PATH }}/out/*arm64.dmg
-          ${{ env.PROJECT_PATH }}/out/*mac-arm64.zip
-
-    - name: Upload Windows Artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: win-x64-example-desktop
-        path: |
-          ${{ env.PROJECT_PATH }}/out/*.exe
+  build-win:
+    uses: ./.github/workflows/build-example-desktop-win.yml
+    secrets: inherit

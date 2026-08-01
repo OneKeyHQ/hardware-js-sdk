@@ -1,0 +1,80 @@
+---
+title: xrpSignTransaction
+---
+
+# xrpSignTransaction
+
+### Ripple：签名交易 <a href="#cardano-sign-transaction" id="cardano-sign-transaction"></a>
+
+对指定交易进行签名。用户需要在 OneKey 上确认所有交易详情。
+
+```typescript
+const response = await HardwareSDK.xrpSignTransaction(connectId, deviceId, params)
+```
+
+### 参数
+
+[**可选通用参数**](/zh/hardware-sdk/core-api-guide#common-params)
+
+* `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](/zh/hardware-sdk/core-api-guide#hd-path)
+* `transaction` - _必需_ `XrpTransaction` 类型
+
+#### XrpTransaction 类型
+
+```typescript
+type XrpTransaction = {
+    fee: string;
+    flags?: number;
+    sequence: number;
+    maxLedgerVersion?: number; // Proto: "last_ledger_sequence"
+    payment: RipplePayment;
+}
+
+type XrpPayment = {
+    amount: string;
+    destination: string;
+    destinationTag?: number;
+}
+```
+
+### 示例
+
+```typescript
+HardwareSDK.xrpSignTransaction(connectId, deviceId, {
+    path: "m/44'/144'/0'/0'/0",
+    transaction: {
+        fee: 12,
+        flags: 0,
+        sequence: 32841006,
+        maxLedgerVersion: 32841630,
+        payment: {
+            amount: 1000000,
+            destination: 'rwgumKP89VhMrJ4dRkGVS4tafRfAmZmKf8',
+        }
+    }
+});
+```
+
+返回结果
+
+```typescript
+{
+    success: true,
+    payload: {
+        signature: string;
+        serializedTx: string;
+    }
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误码
+    }
+}
+```

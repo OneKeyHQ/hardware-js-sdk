@@ -1,8 +1,5 @@
 const { parseConfigure } = require('../src/serialization/protobuf/messages');
-const { buildOne } = require('../src/serialization/send');
-const { receiveOne } = require('../src/serialization/receive');
-
-const { buildEncodeBuffers } = require('../src/serialization/send');
+const { ProtocolV1 } = require('../src/protocols');
 
 const messages = {
   StellarPaymentOp: {
@@ -97,17 +94,17 @@ const parsedMessages = parseConfigure({
 describe('encoding json -> protobuf -> json', () => {
   fixtures.forEach(f => {
     describe(f.name, () => {
-      test('buildOne - receiveOne', () => {
+      test('encodeEnvelope - decodeMessage', () => {
         // encoded message
-        const encodedMessage = buildOne(parsedMessages, f.name, f.in);
+        const encodedMessage = ProtocolV1.encodeEnvelope(parsedMessages, f.name, f.in);
         // then decode message and check, whether decoded message matches original json
-        const decodedMessage = receiveOne(parsedMessages, encodedMessage);
+        const decodedMessage = ProtocolV1.decodeMessage(parsedMessages, encodedMessage);
         expect(decodedMessage.type).toEqual(f.name);
         expect(decodedMessage.message).toEqual(f.in);
       });
 
-      test('buildBuffers - receiveAndParse', () => {
-        const result = buildEncodeBuffers(parsedMessages, f.name, f.in);
+      test('encodeMessageChunks - receiveAndParse', () => {
+        const result = ProtocolV1.encodeMessageChunks(parsedMessages, f.name, f.in);
         result.forEach(r => {
           expect(r.byteLength).toBeLessThanOrEqual(63);
         });

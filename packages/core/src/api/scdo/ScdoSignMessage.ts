@@ -1,14 +1,17 @@
-import { ScdoSignMessage as HardwareScdoSignMessage } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { stripHexPrefix } from '../helpers/hexUtils';
 
+import type { ScdoSignMessage as HardwareScdoSignMessage } from '@onekeyfe/hd-transport';
+import type { DeviceFirmwareRange } from '../../types';
+
 export default class ScdoSignMessage extends BaseMethod<HardwareScdoSignMessage> {
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = true;
 
     // check payload
     validateParams(this.payload, [
@@ -26,7 +29,7 @@ export default class ScdoSignMessage extends BaseMethod<HardwareScdoSignMessage>
     };
   }
 
-  getVersionRange() {
+  getVersionRange(): DeviceFirmwareRange {
     return {
       model_touch: {
         min: '4.10.0',

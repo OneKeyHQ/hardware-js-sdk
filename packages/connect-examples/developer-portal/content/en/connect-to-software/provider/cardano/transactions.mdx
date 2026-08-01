@@ -1,0 +1,168 @@
+---
+title: Transactions
+description: Send transactions on Cardano using OneKey
+---
+
+import { Callout } from 'nextra/components'
+
+# Transactions
+
+Learn how to sign and submit transactions on Cardano.
+
+---
+
+## Sign Transaction
+
+```typescript
+// transaction should be CBOR-encoded hex string
+const signedTx = await api.signTx(transactionCbor, partialSign)
+
+// partialSign: boolean
+// - false: sign all inputs owned by wallet
+// - true: sign only inputs explicitly owned (for multi-sig)
+
+console.log('Signed TX:', signedTx)
+```
+
+---
+
+## Submit Transaction
+
+```typescript
+// Submit signed transaction
+const txHash = await api.submitTx(signedTransactionCbor)
+console.log('Transaction hash:', txHash)
+```
+
+---
+
+## Complete Transaction Flow
+
+```typescript
+import {
+  TransactionBuilder,
+  TransactionBuilderConfigBuilder,
+  LinearFee,
+  BigNum,
+  Address,
+  TransactionOutput,
+  Value,
+} from '@emurgo/cardano-serialization-lib-browser'
+
+async function sendAda(recipientAddress, amountLovelace) {
+  const api = await window.cardano.onekey.enable()
+
+  // Get UTxOs
+  const utxos = await api.getUtxos()
+  const changeAddress = await api.getChangeAddress()
+
+  // Build transaction
+  const txBuilder = TransactionBuilder.new(
+    TransactionBuilderConfigBuilder.new()
+      .fee_algo(LinearFee.new(
+        BigNum.from_str('44'),
+        BigNum.from_str('155381')
+      ))
+      .pool_deposit(BigNum.from_str('500000000'))
+      .key_deposit(BigNum.from_str('2000000'))
+      .max_value_size(5000)
+      .max_tx_size(16384)
+      .coins_per_utxo_byte(BigNum.from_str('4310'))
+      .build()
+  )
+
+  // Add inputs from UTxOs
+  utxos.forEach(utxo => {
+    // Add UTxO as input...
+  })
+
+  // Add output
+  txBuilder.add_output(
+    TransactionOutput.new(
+      Address.from_bech32(recipientAddress),
+      Value.new(BigNum.from_str(amountLovelace))
+    )
+  )
+
+  // Set change address
+  txBuilder.add_change_if_needed(Address.from_bech32(changeAddress))
+
+  // Build transaction
+  const tx = txBuilder.build_tx()
+  const txCbor = Buffer.from(tx.to_bytes()).toString('hex')
+
+  // Sign
+  const signedTxCbor = await api.signTx(txCbor, false)
+
+  // Submit
+  const txHash = await api.submitTx(signedTxCbor)
+  console.log('TX Hash:', txHash)
+
+  return txHash
+}
+```
+
+---
+
+## Using with Lucid
+
+[Lucid](https://github.com/spacebudz/lucid) provides a simpler API:
+
+```bash
+npm install lucid-cardano
+```
+
+```typescript
+import { Lucid } from 'lucid-cardano'
+
+// Initialize Lucid with OneKey
+const lucid = await Lucid.new(
+  new Blockfrost('https://cardano-mainnet.blockfrost.io/api', 'your-api-key'),
+  'Mainnet'
+)
+
+// Connect OneKey
+const api = await window.cardano.onekey.enable()
+lucid.selectWallet(api)
+
+// Send ADA
+const tx = await lucid
+  .newTx()
+  .payToAddress('addr1...', { lovelace: 5000000n })
+  .complete()
+
+const signedTx = await tx.sign().complete()
+const txHash = await signedTx.submit()
+
+console.log('TX Hash:', txHash)
+```
+
+---
+
+## Using with Mesh
+
+[Mesh](https://meshjs.dev/) is another popular Cardano SDK:
+
+```bash
+npm install @meshsdk/core
+```
+
+```typescript
+import { BrowserWallet, Transaction } from '@meshsdk/core'
+
+// Connect to OneKey
+const wallet = await BrowserWallet.enable('onekey')
+
+// Get wallet info
+const balance = await wallet.getBalance()
+const addresses = await wallet.getUsedAddresses()
+
+// Build and send transaction
+const tx = new Transaction({ initiator: wallet })
+  .sendLovelace('addr1...', '5000000')
+
+const unsignedTx = await tx.build()
+const signedTx = await wallet.signTx(unsignedTx)
+const txHash = await wallet.submitTx(signedTx)
+```
+

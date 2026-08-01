@@ -1,6 +1,12 @@
-import axios, { AxiosRequestConfig } from 'axios';
-import { HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import axios from 'axios';
+import {
+  CreateHardwareErrorByBridgeError,
+  HardwareError,
+  HardwareErrorCode,
+} from '@onekeyfe/hd-shared';
 import secureJSON from 'secure-json-parse';
+
+import type { AxiosError, AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
 
 export type HttpRequestOptions = {
   body?: Array<any> | Record<string, unknown> | string;
@@ -50,35 +56,49 @@ export async function request(options: HttpRequestOptions) {
     transformResponse: data => data,
   };
 
-  const res = await axios.request(fetchOptions);
+  try {
+    const res = await axios.request(fetchOptions);
 
-  if (+res.status === 200) {
-    return parseResult(res.data);
-  }
-  const resJson = parseResult(res.data);
-  if (typeof resJson === 'object' && resJson != null && resJson.error != null) {
+    if (+res.status === 200) {
+      return parseResult(res.data);
+    }
+    const resJson = parseResult(res.data);
+    if (typeof resJson === 'object' && resJson != null && resJson.error != null) {
+      throw new HardwareError({
+        errorCode: HardwareErrorCode.NetworkError,
+        message: resJson.error,
+      });
+    } else {
+      throw new HardwareError({ errorCode: HardwareErrorCode.NetworkError, message: res.data });
+    }
+  } catch (err) {
+    const axiosErr = err as AxiosError<string>;
+    const respData = axiosErr?.response?.data;
+
+    if (typeof respData === 'string') {
+      const parsed = parseResult(respData);
+      if (typeof parsed === 'object' && parsed !== null && parsed.error) {
+        throw CreateHardwareErrorByBridgeError(String(parsed.error));
+      }
+      throw CreateHardwareErrorByBridgeError(respData);
+    }
+
     throw new HardwareError({
-      errorCode: HardwareErrorCode.NetworkError,
-      message: resJson.error,
+      errorCode: HardwareErrorCode.BridgeNetworkError,
+      message: axiosErr?.message || 'Bridge network error',
     });
-  } else {
-    throw new HardwareError({ errorCode: HardwareErrorCode.NetworkError, message: res.data });
   }
 }
 
-axios.interceptors.request.use(config => {
+axios.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   if (typeof window !== 'undefined') {
     return config;
   }
   // node environment
   if (config.url?.startsWith('http://localhost:21320')) {
-    if (!config?.headers?.Origin) {
-      console.log('set node request origin');
+    if (!config.headers.get('Origin')) {
       // add Origin field for request headers
-      config.headers = {
-        ...config.headers,
-        Origin: 'https://jssdk.onekey.so',
-      };
+      config.headers.set('Origin', 'https://jssdk.onekey.so');
     }
   }
   return config;

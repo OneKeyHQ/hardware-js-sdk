@@ -1,14 +1,17 @@
-import { BenfenSignMessage as HardwareBenfenSignMessage } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { stripHexPrefix } from '../helpers/hexUtils';
 
+import type { BenfenSignMessage as HardwareBenfenSignMessage } from '@onekeyfe/hd-transport';
+import type { DeviceFirmwareRange } from '../../types';
+
 export default class BenfenSignMessage extends BaseMethod<HardwareBenfenSignMessage> {
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = true;
 
     validateParams(this.payload, [
       { name: 'path', required: true },
@@ -24,7 +27,7 @@ export default class BenfenSignMessage extends BaseMethod<HardwareBenfenSignMess
     };
   }
 
-  getVersionRange() {
+  getVersionRange(): DeviceFirmwareRange {
     return {
       pro: {
         min: '4.12.0',

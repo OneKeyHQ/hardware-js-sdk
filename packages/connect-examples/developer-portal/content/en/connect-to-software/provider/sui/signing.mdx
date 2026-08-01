@@ -1,0 +1,90 @@
+---
+title: Signing
+description: Sign messages on Sui using OneKey
+---
+
+import { Callout } from 'nextra/components'
+
+# Signing
+
+Learn how to sign messages for authentication.
+
+---
+
+## Sign Personal Message
+
+Sign arbitrary messages for authentication:
+
+```typescript
+const message = new TextEncoder().encode('Hello, Sui!')
+
+const result = await provider.signPersonalMessage({
+  message,
+})
+
+console.log({
+  signature: result.signature,   // Base64 encoded signature
+  bytes: result.bytes,           // Signed message bytes
+})
+```
+
+---
+
+## Sign Message (Legacy)
+
+```typescript
+const message = new TextEncoder().encode('Hello, Sui!')
+
+const result = await provider.signMessage({
+  message,
+})
+
+console.log({
+  signature: result.signature,
+  messageBytes: result.messageBytes,
+})
+```
+
+---
+
+## Verify Signature
+
+```typescript
+import { verifyPersonalMessage } from '@mysten/sui.js/verify'
+
+const message = new TextEncoder().encode('Hello, Sui!')
+const { signature } = await provider.signPersonalMessage({ message })
+
+const accounts = await provider.getAccounts()
+const publicKey = accounts[0].publicKey
+
+const isValid = await verifyPersonalMessage(message, signature)
+console.log('Signature valid:', isValid)
+```
+
+---
+
+## Error Handling
+
+```typescript
+try {
+  await provider.requestPermissions()
+} catch (error) {
+  if (error.code === 4001) {
+    console.log('User rejected the connection request')
+  } else {
+    console.error('Connection error:', error.message)
+  }
+}
+```
+
+---
+
+## Common Error Codes
+
+| Code | Description |
+|------|-------------|
+| 4001 | User rejected request |
+| 4100 | Unauthorized |
+| -32603 | Internal error |
+

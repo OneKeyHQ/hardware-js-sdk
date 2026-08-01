@@ -1,32 +1,40 @@
-import { PolkadotSignTx as HardwarePolkadotSignTx } from '@onekeyfe/hd-transport';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { PolkadotSignTransactionParams } from '../../types';
 import { formatAnyHex } from '../helpers/hexUtils';
-import { getPolkadotVersionRange } from './networks';
+import { getPolkadotVersionRange, parseNetwork } from './networks';
+
+import type { PolkadotSignTransactionParams } from '../../types';
+import type { PolkadotSignTx as HardwarePolkadotSignTx } from '@onekeyfe/hd-transport';
 
 export default class PolkadotSignTransaction extends BaseMethod<HardwarePolkadotSignTx> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode];
+    this.allowDeviceMode = [...this.allowDeviceMode];
+    this.allowUsePreInitialize = true;
 
     // check payload
     validateParams(this.payload, [
       { name: 'path', required: true },
       { name: 'network', required: true },
+      { name: 'prefix' },
       { name: 'rawTx', type: 'hexString', required: true },
     ]);
 
     // init params
-    const { path, rawTx, network } = this.payload as PolkadotSignTransactionParams;
+    const { path, rawTx, network, prefix } = this.payload as PolkadotSignTransactionParams;
     const addressN = validatePath(path, 3);
 
     this.params = {
       address_n: addressN,
-      network,
+      network: parseNetwork(network),
+      prefix,
       raw_tx: formatAnyHex(rawTx),
     };
   }

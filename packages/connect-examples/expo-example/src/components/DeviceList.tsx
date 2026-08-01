@@ -1,60 +1,64 @@
-import {
-  ForwardedRef,
-  forwardRef,
-  useCallback,
-  useContext,
-  useEffect,
-  useImperativeHandle,
-  useState,
-} from 'react';
-
+import { forwardRef, useCallback, useContext, useEffect, useImperativeHandle } from 'react';
 import { ListItem, Stack, Text, View, XStack } from 'tamagui';
 import { FlatList, Platform } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { Check } from '@tamagui/lucide-icons';
 import { useIntl } from 'react-intl';
-import { useAtom } from 'jotai';
-import type { Features } from '@onekeyfe/hd-transport';
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
+import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
+
 import HardwareSDKContext from '../provider/HardwareSDKContext';
 import { Button } from './ui/Button';
 import PanelView from './ui/Panel';
-import { getItem, removeItem, setItem } from '../utils/storeUtil';
-import { connectionTypeAtom, ConnectionType } from '../atoms/deviceConnectAtoms';
+import { getItem, setItem } from '../utils/storeUtil';
+import { connectionTypeAtom } from '../atoms/deviceConnectAtoms';
+import { deviceActionsAtom, deviceListAtom, selectDeviceAtom } from '../atoms/deviceAtoms';
+
+import type { ConnectionType } from '../atoms/deviceConnectAtoms';
+import type { ForwardedRef } from 'react';
+import type { Features } from '@onekeyfe/hd-transport';
 
 export type Device = {
   connectId: string;
   name: string;
   features?: Features;
   deviceType?: string;
+  id?: string;
+  state?: string;
 };
 
-const STORE_KEY = '@onekey/selectedDevice';
-const storeSelectedDevice = async (value: Device | undefined) => {
+const CONNECTION_TYPE_STORE_KEY = '@onekey/connectionType';
+
+/**
+ * Determine if the connection type should use hd-common-connect-sdk
+ */
+const shouldUseCommonSdk = (connectionType: ConnectionType | null): boolean =>
+  connectionType === 'desktop-web-ble' || connectionType === 'webusb';
+
+/**
+ * Check if switching between connection types requires app restart
+ */
+const needsRestartForSwitch = (from: ConnectionType | null, to: ConnectionType | null): boolean => {
+  const fromUsesCommonSdk = shouldUseCommonSdk(from);
+  const toUsesCommonSdk = shouldUseCommonSdk(to);
+  return fromUsesCommonSdk !== toUsesCommonSdk;
+};
+
+const storeConnectionType = async (value: ConnectionType) => {
   try {
-    if (value) {
-      await setItem(STORE_KEY, JSON.stringify(value));
-    }
+    await setItem(CONNECTION_TYPE_STORE_KEY, value);
   } catch (error) {
-    console.log(error);
+    console.log('Error storing connection type:', error);
   }
 };
 
-const getSelectedDevice = async () => {
+const getStoredConnectionType = async (): Promise<ConnectionType | null> => {
   try {
-    const value = await getItem(STORE_KEY);
-    if (value !== null) {
-      return JSON.parse(value) as Device;
-    }
+    const value = await getItem(CONNECTION_TYPE_STORE_KEY);
+    return value as ConnectionType | null;
   } catch (error) {
-    console.log(error);
-  }
-};
-
-const removeSelectedId = async () => {
-  try {
-    await removeItem(STORE_KEY);
-  } catch (e) {
-    // remove error
+    console.log('Error getting stored connection type:', error);
+    return null;
   }
 };
 
@@ -86,7 +90,6 @@ const Item = ({ item, onPress, connected }: ItemProps) => {
 };
 
 type IDeviceListProps = {
-  onSelected: (device: Device | undefined) => void;
   disableSaveDevice?: boolean;
 };
 export interface IDeviceListInstance {
@@ -94,56 +97,59 @@ export interface IDeviceListInstance {
 }
 
 function DeviceListFC(
-  { onSelected, disableSaveDevice = false }: IDeviceListProps,
+  { disableSaveDevice = false }: IDeviceListProps,
   ref: ForwardedRef<IDeviceListInstance>
 ) {
   const intl = useIntl();
   const { sdk } = useContext(HardwareSDKContext);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [devices, setDevices] = useState<Device[]>([]);
+  const selectedDevice = useAtomValue(selectDeviceAtom);
+  const devices = useAtomValue(deviceListAtom);
+  const setDeviceActions = useSetAtom(deviceActionsAtom);
   const [connectionType, setConnectionType] = useAtom(connectionTypeAtom);
 
+  // Initialize connection type from storage on mount
   useEffect(() => {
-    if (disableSaveDevice) return;
-    getSelectedDevice().then(value => {
-      if (value) {
-        setSelectedId(value.connectId);
-        onSelected(value);
+    getStoredConnectionType().then(storedType => {
+      if (storedType) {
+        setConnectionType(storedType);
       }
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [setConnectionType]);
 
   const selectDevice = useCallback(
     (device: Device | undefined) => {
-      setSelectedId(device?.connectId ?? '');
-      storeSelectedDevice(device);
-      onSelected(device);
+      setDeviceActions({ type: 'select', payload: device });
     },
-    [onSelected]
+    [setDeviceActions]
   );
 
   const searchDevices = useCallback(async () => {
     selectDevice(undefined);
     if (!sdk) return alert(intl.formatMessage({ id: 'tip__sdk_not_ready' }));
 
-    let response;
+    // Use unified searchDevices approach for all transport types
+    // WebUSB authorization is now handled internally by the SDK
     if (connectionType === 'webusb') {
-      const promptResponse = await sdk.promptWebDeviceAccess();
-      console.log('promptResponse:====>>>::: ', promptResponse);
-      response = promptResponse.success
-        ? { payload: [promptResponse.payload.device] }
-        : { payload: [] };
-    } else {
-      response = await sdk.searchDevices();
+      try {
+        await window?.navigator?.usb?.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
+      } catch (error) {
+        console.warn('WebUSB request device failed:', error);
+      }
     }
+    const response = await sdk.searchDevices();
     const foundDevices = (response.payload as unknown as Device[]) ?? [];
-    setDevices(foundDevices);
-    if (Platform.OS === 'web' && foundDevices?.length) {
+    setDeviceActions({ type: 'setList', payload: foundDevices });
+
+    // 🔧 DESKTOP BLE FIX: Don't auto-select devices, let user choose manually
+    // This prevents automatic connection which can cause issues with device switching
+    // Users should manually click the "Connect Device" button for their desired device
+
+    // Only auto-select for non-desktop-web-ble connections to maintain backward compatibility
+    if (Platform.OS === 'web' && foundDevices?.length && connectionType !== 'desktop-web-ble') {
       const device = foundDevices[0];
       selectDevice(device);
     }
-  }, [intl, sdk, selectDevice, connectionType]);
+  }, [intl, sdk, selectDevice, setDeviceActions, connectionType]);
 
   const deviceCancel = useCallback(() => {
     if (!sdk) return alert(intl.formatMessage({ id: 'tip__sdk_not_ready' }));
@@ -152,19 +158,55 @@ function DeviceListFC(
   }, [intl, sdk]);
 
   const handleRemoveSelected = useCallback(() => {
-    removeSelectedId();
-    setSelectedId(null);
-  }, []);
+    setDeviceActions({ type: 'clear' });
+  }, [setDeviceActions]);
 
   const onSwitchConnectionType = useCallback(
     async (value: ConnectionType) => {
-      console.log('value:====>>>::: ', value);
-      setConnectionType(value);
-      // @ts-expect-error
-      const res = await sdk?.switchTransport(value);
-      console.log('switchTransport res:====>>>::: ', res);
+      if (value === connectionType) return;
+
+      const previousConnectionType = connectionType;
+
+      try {
+        // Update connection type and persist manually
+        setConnectionType(value);
+        await storeConnectionType(value);
+
+        // Restart desktop client when switching between different SDK types
+        // (e.g., bridge <-> webusb, bridge <-> desktop-web-ble, webusb <-> desktop-web-ble)
+        const shouldRestart =
+          Platform.OS === 'web' && needsRestartForSwitch(previousConnectionType, value);
+
+        // @ts-expect-error
+        if (shouldRestart && window.desktopApi?.restart) {
+          console.log('Restarting app due to SDK type change:', {
+            from: previousConnectionType,
+            to: value,
+          });
+          // @ts-expect-error
+          window.desktopApi.restart();
+          return; // Exit early as the app will restart
+        }
+
+        // @ts-expect-error
+        const res = await sdk?.switchTransport(value);
+        console.log('switchTransport res:====>>>::: ', res);
+
+        // Clear device list when switching connection type
+        setDeviceActions({ type: 'setList', payload: [] });
+        selectDevice(undefined);
+      } catch (error) {
+        console.error('Failed to switch connection type:', error);
+        // Rollback on error and persist the rollback
+        setConnectionType(previousConnectionType);
+        await storeConnectionType(previousConnectionType);
+        alert(
+          intl.formatMessage({ id: 'tip__switch_connection_type_failed' }) ||
+            'Failed to switch connection type'
+        );
+      }
     },
-    [sdk, setConnectionType]
+    [sdk, setConnectionType, connectionType, intl, selectDevice, setDeviceActions]
   );
 
   useImperativeHandle(
@@ -176,7 +218,7 @@ function DeviceListFC(
   );
 
   const renderItem = ({ item }: { item: Device }) => {
-    const connected = item.connectId === selectedId;
+    const connected = item.connectId === selectedDevice?.connectId;
 
     return (
       <Item
@@ -199,12 +241,13 @@ function DeviceListFC(
         <View flexDirection="row" justifyContent="space-between" flexWrap="wrap">
           <Text fontSize={15}>
             {intl.formatMessage({ id: 'message__current_selector_device' })}
-            {selectedId || intl.formatMessage({ id: 'message__no_device' })}
+            {selectedDevice?.connectId || intl.formatMessage({ id: 'message__no_device' })}
           </Text>
           <XStack gap={4}>
             <Picker selectedValue={connectionType} onValueChange={onSwitchConnectionType}>
               <Picker.Item label="OneKey Bridge" value="bridge" />
               <Picker.Item label="WebUSB" value="webusb" />
+              <Picker.Item label="Desktop Web BLE" value="desktop-web-ble" />
             </Picker>
             <Button onPress={handleRemoveSelected}>
               {intl.formatMessage({ id: 'action__clean_device' })}
@@ -230,7 +273,7 @@ function DeviceListFC(
         data={devices}
         renderItem={renderItem}
         keyExtractor={item => item.connectId}
-        extraData={selectedId}
+        extraData={selectedDevice?.connectId}
       />
     </PanelView>
   );

@@ -1,0 +1,35 @@
+---
+title: CryptoCoinInfo
+---
+
+# CryptoCoinInfo
+
+The `CryptoCoinInfo` class represents cryptocurrency information.
+
+## Types
+
+```typescript
+export enum Type {
+  bitcoin = 0,
+  ethereum = 60,
+}
+
+export enum Network {
+  mainnet,
+  testnet,
+}
+```
+
+## Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `Type` | `enum` | Currency type (e.g., `bitcoin = 0`, `ethereum = 60`) |
+| `Network` | `enum` | Network type (`mainnet` or `testnet`) |
+
+## UR Example
+
+```
+ur:crypto-coin-info/xxxxx
+```
+

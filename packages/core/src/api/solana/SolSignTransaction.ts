@@ -1,17 +1,23 @@
-import { SolanaSignTx as HardwareSolanaSignTx } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { SolanaSignedTx, SolanaSignTransactionParams } from '../../types';
 import { formatAnyHex } from '../helpers/hexUtils';
 
+import type { SolanaSignTransactionParams, SolanaSignedTx } from '../../types';
+import type { SolanaSignTx as HardwareSolanaSignTx } from '@onekeyfe/hd-transport';
+
 export default class SolSignTransaction extends BaseMethod<HardwareSolanaSignTx[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = true;
 
     this.hasBundle = !!this.payload?.bundle;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };
@@ -27,11 +33,13 @@ export default class SolSignTransaction extends BaseMethod<HardwareSolanaSignTx[
       validateParams(batch, [
         { name: 'path', required: true },
         { name: 'rawTx', type: 'hexString', required: true },
+        { name: 'extraInfo', type: 'object' },
       ]);
 
       this.params.push({
         address_n: addressN,
         raw_tx: formatAnyHex(batch.rawTx),
+        ...(batch.extraInfo ? { extra_info: batch.extraInfo } : undefined),
       });
     });
   }
@@ -39,6 +47,9 @@ export default class SolSignTransaction extends BaseMethod<HardwareSolanaSignTx[
   getVersionRange() {
     if (this.existsVersionedTx()) {
       return {
+        pro2: {
+          min: '0.0.0',
+        },
         model_mini: {
           min: '3.1.0',
         },
@@ -49,6 +60,9 @@ export default class SolSignTransaction extends BaseMethod<HardwareSolanaSignTx[
     }
 
     return {
+      pro2: {
+        min: '0.0.0',
+      },
       classic: {
         min: '2.1.9',
       },

@@ -1,0 +1,54 @@
+---
+title: Bitcoin (PSBT)
+---
+
+# Bitcoin (PSBT)
+
+PSBT data handling for offline signing with animated UR codes.
+
+## Data Types
+
+- Request/response UR type: `crypto-psbt`
+- See also: [Basic API](/en/air-gap/basic-api) (UR primitives and structures)
+
+## Flow
+
+1. Build an unsigned PSBT with your wallet backend
+2. Encode PSBT → UR (`crypto-psbt`) and display as animated QR
+3. Device scans → returns signed PSBT as `crypto-psbt`
+4. Finalize and broadcast
+
+> **Tip**: Keep PSBT size within practical QR limits; split across frames as needed.
+
+## Examples
+
+### Encode unsigned PSBT → animated QR
+
+```ts
+import { CryptoPSBT } from '@keystonehq/bc-ur-registry-btc';
+import { airGapUrUtils } from '@keystonehq/keystone-sdk';
+
+const psbtBytes = Buffer.from(unsignedPsbtBase64, 'base64');
+const req = CryptoPSBT.fromPSBT(psbtBytes); // or new CryptoPSBT(psbtBytes)
+const ur = req.toUR();
+const frames = airGapUrUtils.urToQrcode(ur); // render frames in your UI
+```
+
+### Decode animated QR → signed PSBT
+
+```ts
+import { URDecoder } from '@ngraveio/bc-ur';
+import { CryptoPSBT } from '@keystonehq/bc-ur-registry-btc';
+
+const dec = new URDecoder();
+// For each scanned frame string from camera:
+// dec.receivePart(frameString)
+
+if (dec.isComplete()) {
+  const ur = dec.resultUR();              // ur.type should be 'crypto-psbt'
+  const psbt = CryptoPSBT.fromCBOR(ur.cbor);
+  const signedPsbt = psbt.getPSBT();      // Buffer of PSBT (signed or partially signed)
+  // finalize & broadcast using your backend
+}
+```
+

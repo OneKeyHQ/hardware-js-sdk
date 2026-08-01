@@ -1,27 +1,46 @@
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+
 import { UI_REQUEST } from '../constants/ui-request';
+import { refreshProtocolV2DeviceStatus } from '../protocols/protocol-v2/walletSession';
 import { getPassphraseStateWithRefreshDeviceInfo } from '../utils/deviceFeaturesUtils';
 import { BaseMethod } from './BaseMethod';
 
 export default class GetPassphraseState extends BaseMethod {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
     this.useDevicePassphraseState = false;
   }
 
   async run() {
-    if (!this.device.features)
-      return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceInitializeFailed));
-
-    const passphraseState = await getPassphraseStateWithRefreshDeviceInfo(this.device);
-    const { features } = this.device;
-
-    if (features && features.passphrase_protection === true) {
-      if (passphraseState && features.device_id) {
-        this.device.tryFixInternalState(passphraseState, features.device_id, features.session_id);
-      }
-      return Promise.resolve(passphraseState);
+    if (!this.device.features) {
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceInitializeFailed);
     }
-    return Promise.resolve(undefined);
+
+    const isProtocolV2 = this.device.isProtocolV2();
+    if (isProtocolV2 && this.payload.useEmptyPassphrase !== true) {
+      const features = await refreshProtocolV2DeviceStatus(this.device);
+      if (features.unlocked === false) {
+        await this.device.unlockDevice();
+      }
+    }
+    const { passphraseState } = await getPassphraseStateWithRefreshDeviceInfo(
+      this.device,
+      isProtocolV2
+        ? {
+            onlyMainPin: this.payload.useEmptyPassphrase === true,
+            initSession: this.payload.initSession === true,
+          }
+        : undefined
+    );
+
+    if (!isProtocolV2 && this.device.getCurrentPassphraseProtection() !== true) {
+      return undefined;
+    }
+
+    return passphraseState;
   }
 }

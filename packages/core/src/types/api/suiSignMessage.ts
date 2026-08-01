@@ -1,4 +1,4 @@
-import { SuiMessageSignature } from '@onekeyfe/hd-transport';
+import type { SuiMessageSignature } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type SuiSignMessageParams = {

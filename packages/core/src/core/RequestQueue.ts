@@ -1,6 +1,7 @@
-import { Deferred } from '@onekeyfe/hd-shared';
+import { LoggerNames, getLogger } from '../utils';
+
+import type { Deferred } from '@onekeyfe/hd-shared';
 import type { BaseMethod } from '../api/BaseMethod';
-import { getLogger, LoggerNames } from '../utils';
 
 const Log = getLogger(LoggerNames.Core);
 export type RequestTask = {
@@ -12,6 +13,8 @@ export type RequestTask = {
 
 export default class RequestQueue {
   private requestQueue = new Map<number, RequestTask>();
+
+  private pendingCallbackTasks = new Map<string, Deferred<void>>();
 
   // 生成唯一请求ID
   public generateRequestId = (method?: BaseMethod) => {
@@ -27,6 +30,7 @@ export default class RequestQueue {
       method.responseID = requestId;
     }
     const abortController = new AbortController();
+    method.abortSignal = abortController.signal;
     const task = { id: requestId, method, abortController };
     this.requestQueue.set(requestId, task);
     return task;
@@ -103,5 +107,36 @@ export default class RequestQueue {
   // 删除请求
   public releaseTask(requestId: number) {
     this.requestQueue.delete(requestId);
+  }
+
+  public registerPendingCallbackTask(connectId: string, callbackPromise: Deferred<void>) {
+    this.pendingCallbackTasks.set(connectId, callbackPromise);
+
+    callbackPromise.promise.finally(() => {
+      Log.debug(`Callback task completed for connectId: ${connectId}`);
+      // Delete by identity so a newer task that replaced this slot isn't orphaned.
+      if (this.pendingCallbackTasks.get(connectId) === callbackPromise) {
+        this.pendingCallbackTasks.delete(connectId);
+      }
+    });
+  }
+
+  public async waitForPendingCallbackTasks(
+    connectId: string,
+    exceptTask?: Deferred<void>
+  ): Promise<void> {
+    const pendingTask = this.pendingCallbackTasks.get(connectId);
+    // Skip only the caller's own task (self-wait); a different one is still awaited.
+    if (pendingTask && pendingTask !== exceptTask) {
+      Log.debug(`Waiting for pending callback task to complete for connectId: ${connectId}`);
+      await pendingTask.promise;
+    }
+  }
+
+  public cancelCallbackTasks(connectId: string) {
+    const pendingTask = this.pendingCallbackTasks.get(connectId);
+    if (pendingTask) {
+      pendingTask.resolve();
+    }
   }
 }

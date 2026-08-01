@@ -1,0 +1,163 @@
+---
+title: React Native BLE (hd-ble-sdk)
+---
+
+# React Native BLE (hd-ble-sdk)
+
+> **Note:**
+Demo: React Native / Expo example → [react-native-demo](https://github.com/OneKeyHQ/hardware-js-sdk/tree/develop/packages/connect-examples/react-native-demo)
+
+
+This guide shows how to use the pure React Native BLE stack with `@onekeyfe/hd-ble-sdk` and `@onekeyfe/hd-transport-react-native`. No WebView or low-level adapter is required. The chain API usage stays the same as in Quick Start.
+
+## Install
+
+We recommend installing the RN-native dependencies at the app layer so that autolinking includes the native modules in your Dev Client build:
+
+```bash
+npm i @onekeyfe/hd-ble-sdk @onekeyfe/hd-transport-react-native \
+      @onekeyfe/react-native-ble-utils react-native-ble-plx \
+      buffer process react-native-get-random-values react-native-url-polyfill
+```
+
+In your app entry (e.g., `index.js` or `App.tsx`):
+
+```ts
+// Polyfills (adjust to your project needs)
+import 'react-native-get-random-values';
+import 'react-native-url-polyfill/auto';
+// @ts-ignore
+global.Buffer = global.Buffer || require('buffer').Buffer;
+// @ts-ignore
+global.process = global.process || require('process');
+
+// Register RN transport side-effects before SDK init
+import '@onekeyfe/hd-transport-react-native';
+
+import HardwareSDK from '@onekeyfe/hd-ble-sdk';
+```
+
+## Android setup
+
+Add permissions in `AndroidManifest.xml` (Android 12+):
+
+```xml
+<uses-permission android:name="android.permission.INTERNET"/>
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+
+<uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30"/>
+<uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30"/>
+<uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation"/>
+<uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+```
+
+At runtime, request `BLUETOOTH_SCAN` and `BLUETOOTH_CONNECT` (and location on Android 12+). Ensure the system Location toggle is ON.
+
+## iOS setup
+
+Add to `Info.plist`:
+
+- `NSBluetoothAlwaysUsageDescription` (required)
+- Optionally `NSBluetoothPeripheralUsageDescription` for older iOS versions
+- If your app uses the camera (e.g. QR scanning), add `NSCameraUsageDescription`
+
+If using Expo, you can declare these in `app.json` under `expo.ios.infoPlist` and `expo.android.permissions`.
+
+## Metro config (polyfills & exports)
+
+Map Node core APIs and enable package exports for subpath imports like `@noble/hashes/blake2b`:
+
+```js
+// metro.config.js
+config.resolver.extraNodeModules = {
+  buffer: require.resolve('buffer/'),
+  crypto: require.resolve('crypto-browserify'),
+  stream: require.resolve('stream-browserify'),
+  process: require.resolve('process/browser'),
+  events: require.resolve('events/'),
+  http: require.resolve('http-browserify'),
+  https: require.resolve('https-browserify'),
+  zlib: require.resolve('browserify-zlib'),
+  util: require.resolve('util/'),
+  url: require.resolve('url/'),
+  path: require.resolve('path-browserify'),
+};
+config.resolver.unstable_enablePackageExports = true;
+```
+
+## Build Dev Client (real devices)
+
+Expo Go does not include your native BLE modules. Build a Dev Client:
+
+```bash
+# iOS
+expo run:ios --device
+
+# Android
+expo run:android --device
+
+# Start bundler for Dev Client
+expo start --dev-client -c
+```
+
+## Initialize and subscribe to events
+
+```ts
+export async function setupBle() {
+  await HardwareSDK.init({
+    env: 'react-native',                 // React Native BLE transport
+    debug: __DEV__,
+    fetchConfig: true,
+  });
+
+  // Subscribe to UI events (PIN / Passphrase / confirmations)
+  // import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core'
+  // HardwareSDK.on(UI_EVENT, (msg) => { /* open dialogs and reply via HardwareSDK.uiResponse(...) */ });
+}
+```
+
+## Discover devices and identify device_id
+
+```ts
+const devices = await HardwareSDK.searchDevices();
+if (!devices.success) throw new Error(devices.payload.error);
+
+// BLE returns id + name; fetch features to obtain device_id
+const candidate = devices.payload[0];
+const connectId = candidate.connectId;
+
+const features = await HardwareSDK.getFeatures(connectId);
+if (!features.success) throw new Error(features.payload.error);
+const deviceId = features.payload.device_id;
+```
+
+Persist `connectId` and `deviceId` (most chain APIs require both).
+
+## First call example (BTC address)
+
+```ts
+const res = await HardwareSDK.btcGetAddress(connectId, deviceId, {
+  path: "m/44'/0'/0'/0/0",
+  coin: 'btc',
+  showOnOneKey: false,
+});
+
+if (res.success) {
+  console.log('BTC address:', res.payload.address);
+} else {
+  console.error('Error:', res.payload.error, res.payload.code);
+}
+```
+
+## Tips
+
+- Always subscribe early to `UI_EVENT` so PIN/Passphrase/confirmations do not stall requests. See [Config Event](/en/hardware-sdk/core-api-guide#events-ui).
+- Keep BLE permissions in sync with the OS version. Test on physical devices.
+- For additional examples, check: [react-native-demo](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/react-native-demo)
+
+## Continue
+
+- [Introduction](/en/hardware-sdk)
+- [Error Code](/en/hardware-sdk/core-api-guide#error-codes), [Common Params](/en/hardware-sdk/core-api-guide#common-params)
+- Protocol framing (64 bytes, for reference only): [See Low-Level Transport Plugin](/en/hardware-sdk/concepts/low-level-plugin#message-protocol-part-of-low-level-transport)

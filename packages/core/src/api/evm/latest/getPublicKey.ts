@@ -1,4 +1,8 @@
-import { EthereumGetPublicKeyOneKey, MessageResponse, TypedCall } from '@onekeyfe/hd-transport';
+import type {
+  EthereumGetPublicKeyOneKey,
+  MessageResponse,
+  TypedCall,
+} from '@onekeyfe/hd-transport';
 
 export default async function ({
   typedCall,

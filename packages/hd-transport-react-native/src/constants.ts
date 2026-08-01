@@ -1,19 +1,8 @@
+import { createKnownBleUuidAliases, matchesKnownBleUuid } from '@onekeyfe/hd-shared';
+
 export const IOS_PACKET_LENGTH = 128;
 export const ANDROID_PACKET_LENGTH = 192;
-
-export const isOnekeyDevice = (name: string | null, id?: string): boolean => {
-  if (id?.startsWith?.('MI')) {
-    return true;
-  }
-
-  // 过滤 BixinKeyxxx 和 Kxxxx 和 Txxxx
-  // i 忽略大小写模式
-  const re = /(BixinKey\d{10})|(K\d{4})|(T\d{4})|(Touch\s\w{4})|(Pro\s\w{4})/i;
-  if (name && re.exec(name)) {
-    return true;
-  }
-  return false;
-};
+export const ANDROID_DEFAULT_MTU = 23;
 
 type BluetoothServices = Record<
   string,
@@ -49,9 +38,24 @@ export const getInfosForServiceUuid = (serviceUuid: string, deviceType: 'classic
   if (!services) {
     return null;
   }
-  const service = services[serviceUuid];
+  const normalizedServiceUuid = normalizeBleUuid(serviceUuid);
+  const service =
+    services[serviceUuid] ??
+    Object.values(services).find(
+      item =>
+        normalizeBleUuid(item.serviceUuid) === normalizedServiceUuid ||
+        matchesKnownBleUuid(serviceUuid, createKnownBleUuidAliases(item.serviceUuid))
+    );
   if (!service) {
     return null;
   }
   return service;
+};
+
+export const normalizeBleUuid = (uuid?: string | null) =>
+  (uuid ?? '').replace(/-/g, '').toLowerCase();
+
+export const isSameBleUuid = (left?: string | null, right?: string | null) => {
+  if (!left || !right) return false;
+  return matchesKnownBleUuid(left, createKnownBleUuidAliases(right));
 };

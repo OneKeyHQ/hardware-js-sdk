@@ -1,0 +1,286 @@
+.markdown {
+  font-size: 14px;
+  line-height: 22px;
+  color: #d3dff0;
+  font-family: inherit;
+  overflow-wrap: anywhere;
+  background: transparent;
+}
+
+.markdown::selection,
+.markdown *::selection {
+  background: rgba(59, 130, 246, 0.18) !important;
+  color: inherit !important;
+}
+
+.markdown > *:first-child {
+  margin-top: 0;
+}
+
+.markdown > *:last-child {
+  margin-bottom: 0;
+}
+
+.markdown h1,
+.markdown h2,
+.markdown h3 {
+  margin: 10px 0 6px;
+  color: #f3f7ff;
+  font-family: inherit;
+  font-weight: 600;
+}
+
+.markdown h1 {
+  font-size: 18px;
+  line-height: 25px;
+}
+
+.markdown h2 {
+  font-size: 16px;
+  line-height: 23px;
+}
+
+.markdown h3 {
+  font-size: 15px;
+  line-height: 22px;
+}
+
+.markdown p {
+  margin: 0 0 8px;
+  color: #d3dff0;
+  font-size: 14px;
+  line-height: 22px;
+  overflow-wrap: anywhere;
+}
+
+.markdown strong {
+  color: #f8fbff;
+  font-weight: 600;
+}
+
+.markdown em {
+  color: #c2d2ea;
+}
+
+.markdown mark {
+  background: rgba(250, 204, 21, 0.25);
+  color: #fff6d1;
+  border-radius: 4px;
+  padding: 0 3px;
+}
+
+.markdown ul,
+.markdown ol {
+  margin: 0 0 8px 18px;
+  color: #d3dff0;
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.markdown li {
+  margin: 2px 0;
+  overflow-wrap: anywhere;
+}
+
+.markdown a {
+  color: #8bc5ff;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: rgba(139, 197, 255, 0.58);
+}
+
+.markdown a:hover {
+  color: #b8ddff;
+  text-decoration-color: rgba(184, 221, 255, 0.86);
+}
+
+.markdown blockquote {
+  margin: 7px 0;
+  padding: 6px 10px;
+  border-left: 2px solid rgba(148, 163, 184, 0.62);
+  color: #c4d1e7;
+  background: rgba(15, 23, 42, 0.56);
+  border-radius: 6px;
+}
+
+.tableWrap {
+  display: block;
+  overflow-x: auto;
+  margin: 8px 0;
+  border: 1px solid rgba(148, 163, 184, 0.34);
+  border-radius: 8px;
+  background: rgba(6, 11, 22, 0.7);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+}
+
+.tableWrap::-webkit-scrollbar {
+  height: 6px;
+}
+
+.tableWrap::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tableWrap::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.38);
+  border-radius: 999px;
+}
+
+.markdown table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.markdown th,
+.markdown td {
+  border-right: 1px solid rgba(148, 163, 184, 0.3);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.3);
+  padding: 7px 10px;
+  text-align: left;
+  vertical-align: top;
+  font-size: 13px;
+  line-height: 19px;
+  white-space: pre-wrap;
+}
+
+.markdown th:last-child,
+.markdown td:last-child {
+  border-right: 0;
+}
+
+.markdown tr:last-child td {
+  border-bottom: 0;
+}
+
+.markdown th {
+  font-weight: 600;
+  color: #f3f7ff;
+  background: rgba(15, 23, 42, 0.76);
+}
+
+.markdown td {
+  color: #d3dff0;
+  overflow-wrap: anywhere;
+}
+
+.inlineCode {
+  border: 1px solid rgba(148, 163, 184, 0.38) !important;
+  border-radius: 6px !important;
+  background: rgba(15, 23, 42, 0.72) !important;
+  color: #e9f3ff !important;
+  padding: 1px 5px !important;
+  font-size: 0.84em !important;
+  font-weight: 500 !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+}
+
+.codeBlock {
+  margin: 8px 0;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.34);
+  overflow: hidden;
+  background: rgba(2, 6, 23, 0.9);
+}
+
+.codeHead {
+  height: 30px;
+  padding: 0 10px 0 11px;
+  background: #111827;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  color: #dbe7fb;
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: inherit;
+}
+
+.codeCopy {
+  border: 0;
+  background: transparent;
+  color: #dbe7fb;
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.codeCopy:hover {
+  color: #f8fafc;
+}
+
+.codeScroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: #0f172a;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+}
+
+/* Neutralize Prism's global CSS (loaded by Nextra for MDX pages) which
+   leaks .token backgrounds like `background: #ffffff80` into our chat
+   code blocks.  prism-react-renderer only uses inline color styles. */
+.codeScroll :global(.token) {
+  background: none !important;
+  text-shadow: none !important;
+}
+
+.codePlainPre {
+  margin: 0;
+  min-width: max-content;
+  padding: 10px 12px;
+  background: transparent;
+  border: 0;
+}
+
+.codeText {
+  color: #e5e7eb;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.56;
+}
+
+.codeScroll::-webkit-scrollbar {
+  height: 6px;
+}
+
+.codeScroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.codeScroll::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.38);
+  border-radius: 999px;
+}
+
+@media (max-width: 768px) {
+  .markdown {
+    font-size: 14px;
+  }
+
+  .markdown h1 {
+    font-size: 17px;
+    line-height: 24px;
+  }
+
+  .markdown h2 {
+    font-size: 15px;
+    line-height: 22px;
+  }
+
+  .markdown h3 {
+    font-size: 14px;
+    line-height: 21px;
+  }
+}

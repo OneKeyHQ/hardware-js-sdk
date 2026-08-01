@@ -3,11 +3,12 @@ import { Checkbox, type CheckedState, H5, Label, Stack, Text, XStack } from 'tam
 import { Check as CheckIcon } from '@tamagui/lucide-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
-import type { Features, OnekeyFeatures } from '@onekeyfe/hd-core';
+import { type Features, type OnekeyFeatures, getFirmwareType } from '@onekeyfe/hd-core';
 import { Platform } from 'react-native';
 import { useIntl } from 'react-intl';
-import { EDeviceType } from '@onekeyfe/hd-shared';
-import type { Device, IDeviceListInstance } from '../../components/DeviceList';
+import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
+import { useAtomValue, useSetAtom } from 'jotai';
+
 import PageView from '../../components/ui/Page';
 import PanelView from '../../components/ui/Panel';
 import { Button } from '../../components/ui/Button';
@@ -18,10 +19,13 @@ import { MessageBox } from './MessageBox';
 import { FirmwareUpdateEvent } from './FirmwareUpdateEvent';
 import { DeviceFieldContext } from './DeviceFieldContext';
 import { DeviceInfoFieldGroup, DeviceSeFieldGroup } from './DeviceFieldGroup';
-import { ExportDeviceInfo, formatCurrentTime } from './ExportDeviceInfo';
+import { ExportDeviceInfo, formatCurrentTime, getDeviceMode } from './ExportDeviceInfo';
 import { getDeviceBasicInfo } from '../../utils/deviceUtils';
 import { HardwareInputPinDialogProvider } from '../../provider/HardwareInputPinProvider';
 import { useMedia } from '../../provider/MediaProvider';
+import { selectDeviceAtom } from '../../atoms/deviceAtoms';
+
+import type { IDeviceListInstance } from '../../components/DeviceList';
 
 type UpdateType = 'ble' | 'firmware' | 'source' | 'bootloader';
 type UpdateState = {
@@ -381,17 +385,13 @@ function FirmwareMultipleFiles({ title, onUpdate, deviceType }: FirmwareMultiple
 }
 
 interface FirmwareUpdateProps {
-  selectDevice: Device | undefined;
   onReconnectDevice: () => void;
   onDisconnectDevice: () => void;
 }
-function FirmwareUpdate({
-  selectDevice,
-  onDisconnectDevice,
-  onReconnectDevice,
-}: FirmwareUpdateProps) {
+function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdateProps) {
   const intl = useIntl();
   const { sdk } = useContext(HardwareSDKContext);
+  const selectDevice = useAtomValue(selectDeviceAtom);
   const [features, setFeatures] = useState<Features | undefined>(undefined);
   const [onekeyFeatures, setOnekeyFeatures] = useState<OnekeyFeatures | undefined>(undefined);
   const [connecting, setConnecting] = useState<boolean>(false);
@@ -409,44 +409,65 @@ function FirmwareUpdate({
   } = getDeviceBasicInfo(features, onekeyFeatures);
   const deviceTypeLowerCase = deviceType.toLowerCase();
 
-  const loadOnekeyFeatures = useCallback(() => {
-    if (!sdk) return;
-    sdk.getOnekeyFeatures(selectDevice?.connectId).then(res => {
+  const loadOnekeyFeatures = useCallback(async () => {
+    if (!sdk || !selectDevice?.connectId) return undefined;
+
+    try {
+      console.log('loadOnekeyFeatures: Starting to load OneKey features...');
+      const res = await sdk.getOnekeyFeatures(selectDevice.connectId);
+      console.log('loadOnekeyFeatures: Result:', res);
+
       if (res.success) {
-        setOnekeyFeatures(res.payload);
-      } else {
-        setOnekeyFeatures(undefined);
+        return res.payload;
       }
-    });
+      return undefined;
+    } catch (error) {
+      console.error('loadOnekeyFeatures: Error:', error);
+      return undefined;
+    }
   }, [sdk, selectDevice?.connectId]);
 
   useEffect(() => {
     if (!sdk) return;
-    if (selectDevice?.connectId == null || selectDevice?.features == null) {
+    if (selectDevice?.connectId == null) {
       setFeatures(undefined);
       setOnekeyFeatures(undefined);
       return;
     }
 
-    setConnecting(true);
-    setFeatures(undefined);
-    sdk
-      .getFeatures(selectDevice?.connectId)
-      .then(res => {
-        if (res.success) {
-          setFeatures(res.payload);
-          loadOnekeyFeatures();
+    const loadDeviceFeatures = async () => {
+      setConnecting(true);
+      setFeatures(undefined);
+      setOnekeyFeatures(undefined);
+      setError(undefined);
+
+      try {
+        console.log('Loading device features for:', selectDevice.connectId);
+
+        const featuresRes = await sdk.getFeatures(selectDevice.connectId);
+        console.log('getFeatures result:', featuresRes);
+
+        if (featuresRes.success) {
+          const fetchedFeatures = featuresRes.payload;
+          console.log('Features loaded successfully, now loading OneKey features...');
+          const fetchedOnekeyFeatures = await loadOnekeyFeatures();
+
+          setFeatures(fetchedFeatures);
+          setOnekeyFeatures(fetchedOnekeyFeatures);
         } else {
-          setError(res.payload.error);
+          console.error('Failed to get features:', featuresRes.payload.error);
+          setError(featuresRes.payload.error);
         }
-      })
-      .catch(e => {
-        setError(e.message);
-      })
-      .finally(() => {
+      } catch (error) {
+        console.error('Exception in loadDeviceFeatures:', error);
+        setError(error instanceof Error ? error.message : String(error));
+      } finally {
         setConnecting(false);
-      });
-  }, [loadOnekeyFeatures, sdk, selectDevice?.connectId, selectDevice?.features]);
+      }
+    };
+
+    loadDeviceFeatures();
+  }, [sdk, selectDevice?.connectId, loadOnekeyFeatures]);
 
   const disconnectDevice = useCallback(() => {
     setFeatures(undefined);
@@ -546,14 +567,21 @@ function FirmwareUpdate({
 
       if (type === 'ble' || type === 'firmware') {
         setShowUpdateDialog(true);
-        const res = await sdk.firmwareUpdateV2(
-          Platform.OS === 'web' ? undefined : selectDevice.connectId,
-          {
-            binary: fileData,
-            updateType: type,
-            platform: 'web',
-          }
-        );
+        console.log('Starting firmware update:', {
+          type,
+          deviceId: selectDevice.connectId,
+          platform: 'web',
+        });
+
+        // For desktop-web-ble mode, we need to pass the connectId
+        const deviceId = selectDevice.connectId;
+        console.log('Using device ID for firmware update:', deviceId);
+
+        const res = await sdk.firmwareUpdateV2(deviceId, {
+          binary: fileData,
+          updateType: type,
+          platform: 'web',
+        });
         setShowUpdateDialog(false);
         if (!res.success) {
           return {
@@ -637,12 +665,21 @@ function FirmwareUpdate({
           {connecting && (
             <MessageBox message={intl.formatMessage({ id: 'tip__connecting_device' })} />
           )}
+
           {!selectDevice && (
             <MessageBox
               message={intl.formatMessage({ id: 'tip__need_connect_and_search_device_first' })}
             />
           )}
           {!!error && <MessageBox message={error} />}
+          {features && !onekeyFeatures && (
+            <MessageBox message="OneKey Features not available. Try clicking 'Refresh OneKey Features' button." />
+          )}
+          {selectDevice && selectDevice.state === 'disconnected' && (
+            <MessageBox
+              message={`Device "${selectDevice.name}" shows as disconnected. In desktop-web-ble mode, this is normal - the device can still communicate via Bluetooth.`}
+            />
+          )}
         </Stack>
 
         {features && (
@@ -687,10 +724,16 @@ function FirmwareUpdate({
                 <DeviceField
                   field={intl.formatMessage({ id: 'label__device_device_statue' })}
                   value={intl.formatMessage({
+                    id: getDeviceMode(features),
+                  })}
+                />
+                <DeviceField
+                  field={intl.formatMessage({ id: 'label__device_firmware_type' })}
+                  value={intl.formatMessage({
                     id:
-                      features.bootloader_mode === true
-                        ? 'label__device_bootloader_statue'
-                        : 'label__device_firmware_status',
+                      getFirmwareType(features) === EFirmwareType.BitcoinOnly
+                        ? 'label__device_firmware_type_bitcoin_only'
+                        : 'label__device_firmware_type_universal',
                   })}
                 />
               </Stack>
@@ -774,15 +817,14 @@ function FirmwareUpdate({
 }
 
 export default function FirmwareScreen() {
-  const [selectedDevice, setSelectedDevice] = useState<Device | undefined>(undefined);
+  const setSelectedDevice = useSetAtom(selectDeviceAtom);
   const deviceListInstanceRef = useRef<IDeviceListInstance>(null);
 
   return (
     <PageView>
       <Stack padding="$2">
-        <DeviceList ref={deviceListInstanceRef} onSelected={setSelectedDevice} disableSaveDevice />
+        <DeviceList ref={deviceListInstanceRef} disableSaveDevice />
         <FirmwareUpdate
-          selectDevice={selectedDevice}
           onDisconnectDevice={() => setSelectedDevice(undefined)}
           onReconnectDevice={() => {
             deviceListInstanceRef.current?.searchDevices();

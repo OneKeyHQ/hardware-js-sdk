@@ -1,0 +1,167 @@
+---
+title: 签名
+description: 使用 OneKey 在 Polkadot 上签署交易和消息
+---
+
+import { Callout } from 'nextra/components'
+
+# 签名
+
+了解如何在 Polkadot 上签署交易和消息。
+
+---
+
+## 签署交易 Payload
+
+签署外部调用 payload：
+
+```typescript
+import { web3FromAddress } from '@polkadot/extension-dapp'
+
+// 获取特定账户的注入器
+const injector = await web3FromAddress(accountAddress)
+
+// 签署 payload
+const payload = {
+  address: accountAddress,
+  blockHash: '0x...',
+  blockNumber: '0x...',
+  era: '0x...',
+  genesisHash: '0x...',
+  method: '0x...',
+  nonce: '0x...',
+  specVersion: '0x...',
+  tip: '0x...',
+  transactionVersion: '0x...',
+  signedExtensions: [...],
+  version: 4,
+}
+
+const result = await provider.web3SignPayload(payload)
+
+console.log({
+  id: result.id,
+  signature: result.signature, // 十六进制签名
+})
+```
+
+---
+
+## 签署原始消息
+
+```typescript
+const payload = {
+  address: accountAddress,
+  data: '0x48656c6c6f', // 十六进制编码的消息
+  type: 'bytes',
+}
+
+const result = await provider.web3SignRaw(payload)
+
+console.log({
+  id: result.id,
+  signature: result.signature,
+})
+```
+
+---
+
+## 监听交易事件
+
+```typescript
+await tx.signAndSend(
+  account.address,
+  { signer: injector.signer },
+  ({ status, events }) => {
+    if (status.isInBlock) {
+      console.log('已入块:', status.asInBlock.toHex())
+    }
+    if (status.isFinalized) {
+      console.log('已最终确认:', status.asFinalized.toHex())
+
+      events.forEach(({ event }) => {
+        if (api.events.system.ExtrinsicSuccess.is(event)) {
+          console.log('交易成功')
+        }
+        if (api.events.system.ExtrinsicFailed.is(event)) {
+          console.log('交易失败')
+        }
+      })
+    }
+  }
+)
+```
+
+---
+
+## RPC 方法
+
+### 发送 RPC 请求
+
+```typescript
+const response = await provider.web3RpcSend({
+  method: 'chain_getHeader',
+  params: [],
+})
+
+console.log('最新区块头:', response.result)
+```
+
+### 订阅 RPC 事件
+
+```typescript
+const subscriptionId = await provider.web3RpcSubscribe(
+  {
+    method: 'chain_subscribeNewHeads',
+    params: [],
+  },
+  (response) => {
+    console.log('新区块:', response.result)
+  }
+)
+
+// 稍后取消订阅
+await provider.web3RpcUnSubscribe()
+```
+
+---
+
+## 错误处理
+
+```typescript
+try {
+  const result = await provider.web3SignPayload(payload)
+} catch (error) {
+  if (error.message === 'Cancelled') {
+    console.log('用户取消了签名')
+  } else {
+    console.error('签名失败:', error)
+  }
+}
+```
+
+---
+
+## 在 React 中使用
+
+```tsx
+import { useState, useEffect } from 'react'
+import { web3Enable, web3Accounts } from '@polkadot/extension-dapp'
+
+function usePolkadotWallet() {
+  const [accounts, setAccounts] = useState([])
+  const [isConnected, setIsConnected] = useState(false)
+
+  const connect = async () => {
+    const extensions = await web3Enable('My dApp')
+    if (extensions.length > 0) {
+      const allAccounts = await web3Accounts()
+      setAccounts(allAccounts)
+      setIsConnected(true)
+    }
+  }
+
+  return { accounts, isConnected, connect }
+}
+```
+

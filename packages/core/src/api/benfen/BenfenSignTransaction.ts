@@ -1,17 +1,20 @@
-import { BenfenSignTx, TypedCall, BenfenSignedTx, MessageType } from '@onekeyfe/hd-transport';
-
 import { bytesToHex } from '@noble/hashes/utils';
+
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
+
+import type { BenfenSignTx, BenfenSignedTx, MessageType, TypedCall } from '@onekeyfe/hd-transport';
 import type { TypedResponseMessage } from '../../device/DeviceCommands';
+import type { DeviceFirmwareRange } from '../../types';
 
 export default class BenfenSignTransaction extends BaseMethod<BenfenSignTx> {
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = true;
 
     validateParams(this.payload, [
       { name: 'path', required: true },
@@ -31,7 +34,7 @@ export default class BenfenSignTransaction extends BaseMethod<BenfenSignTx> {
     };
   }
 
-  getVersionRange() {
+  getVersionRange(): DeviceFirmwareRange {
     return {
       pro: {
         min: '4.12.0',

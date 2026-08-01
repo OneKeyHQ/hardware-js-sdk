@@ -1,0 +1,107 @@
+---
+title: tonGetAddress
+---
+
+# tonGetAddress
+
+### 使用要求
+
+* 固件版本要求
+  * Touch: 4.10.0
+
+### TON：获取地址
+
+显示指定 BIP32 路径派生的地址，并返回给调用者。用户需要在 OneKey 上确认导出。
+
+```typescript
+const response = await HardwareSDK.tonGetAddress(connectId, deviceId, {
+    path: "m/44'/607'/0'",
+    showOnOneKey: true,
+    walletVersion: 3,
+    isBounceable: false,
+    isTestnetOnly: false
+});
+```
+
+#### 参数
+
+[**可选通用参数**](/zh/hardware-sdk/core-api-guide#common-params)
+
+**导出单个地址**
+
+* `path` - _必需_ `string | Array<number>` 最小长度为 3。[更多信息](/zh/hardware-sdk/core-api-guide#hd-path)
+* `showOnOneKey` - _可选_ `boolean` 决定是否在设备上显示地址。默认设置为 `true`
+* `walletVersion` - _可选_ `TonWalletVersion` TON 钱包版本（默认：3）
+* `isBounceable` - _可选_ `boolean` 地址是否可弹回（默认：false）
+* `isTestnetOnly` - _可选_ `boolean` 是否使用测试网（默认：false）
+
+**导出批量地址**
+
+* `bundle` - 包含 `path` 和 `showOnOneKey` 字段的对象 `Array`
+
+#### 示例
+
+```typescript
+// 获取单个地址
+const response = await HardwareSDK.tonGetAddress(connectId, deviceId, {
+    path: "m/44'/607'/0'",
+    showOnOneKey: false,
+    walletVersion: 3,
+    isBounceable: false,
+    isTestnetOnly: false,
+});
+
+// 获取多个地址
+const batchResponse = await HardwareSDK.tonGetAddress(connectId, deviceId, {
+    bundle: [
+        {
+            path: "m/44'/607'/0'",
+            showOnOneKey: false
+        },
+        {
+            path: "m/44'/607'/1'",
+            showOnOneKey: false
+        }
+    ]
+});
+```
+
+**返回结果**
+
+只有一个地址的结果
+
+```typescript
+{
+    success: true,
+    payload: {
+        address: string,     // 显示的地址
+        publicKey: string,
+        path: Array<number> // 强化路径
+    }
+}
+```
+
+按 FIFO 排序的批量地址结果
+
+```typescript
+{
+    success: true,
+    payload: [
+        { address: string, publicKey: string, path: Array<number> }, // 账户 1
+        { address: string, publicKey: string, path: Array<number> }, // 账户 2
+        { address: string, publicKey: string, path: Array<number> }  // 账户 3
+    ]
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误码
+    }
+}
+```
