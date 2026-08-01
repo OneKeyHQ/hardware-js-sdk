@@ -13,7 +13,6 @@ import { DeviceModelToTypes } from '../../types';
 import { DataManager } from '../../data-manager';
 import { BaseMethod } from '../BaseMethod';
 import { DEVICE } from '../../events';
-import { createFirmwareProgressThrottle } from './progressThrottle';
 
 import type {
   IFirmwareUpdateProgressType,
@@ -40,8 +39,6 @@ const isDeviceDisconnectedError = (error: unknown) => {
 
 export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
   checkPromise: Deferred<any> | null = null;
-
-  private shouldPostFirmwareProgress = createFirmwareProgressThrottle();
 
   init(): void {}
 
@@ -86,10 +83,6 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
    * @param progress Post the percentage of the progress
    */
   postProgressMessage = (progress: number, progressType: IFirmwareUpdateProgressType) => {
-    if (!this.shouldPostFirmwareProgress(progress, progressType)) {
-      return;
-    }
-
     this.postMessage(
       createUiMessage(UI_REQUEST.FIRMWARE_PROGRESS, {
         device: this.device.toMessageObject() as KnownDevice,

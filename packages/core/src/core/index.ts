@@ -60,6 +60,7 @@ import {
   ProtocolV2UiInteractionCoordinator,
   isProtocolV2UiEnabled,
 } from '../protocols/protocol-v2/uiInteraction';
+import { createUiProgressMessageFilter } from '../utils/uiProgressThrottle';
 
 import type { ConnectSettings, Features, KnownDevice } from '../types';
 import type { CoreMessage, IFrameCallMessage, UiPromise, UiPromiseResponse } from '../events';
@@ -154,7 +155,12 @@ export const callAPI = async (context: CoreContext, message: CoreMessage) => {
   try {
     method = findMethod(message as IFrameCallMessage);
     method.connector = _connector;
-    method.postMessage = postMessage;
+    const shouldPostMessage = createUiProgressMessageFilter();
+    method.postMessage = event => {
+      if (shouldPostMessage(event)) {
+        postMessage(event);
+      }
+    };
     method.setContext?.(context);
 
     method.requestContext = createRequestContext(method.responseID, method.name, {
