@@ -11,7 +11,6 @@ const RULE_PATCH = {
   'TxRequest.request_type': 'required',
   'TxRequest.details': 'required',
   'TxAckPaymentRequest.memos': 'optional', // protobuf repeated bytes are always optional (fallback to [])
-  'DeviceSessionGet.seed_domains': 'optional', // omitted means all supported seed domains
   'CardanoPoolOwnerType.staking_key_path': 'optional',
   'CardanoPoolOwner.staking_key_path': 'optional',
   'CardanoTxCertificateType.path': 'optional',

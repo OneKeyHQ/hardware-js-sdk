@@ -1,0 +1,187 @@
+import DeviceUploadNft from '../src/api/protocol-v2/DeviceUploadNft';
+
+jest.mock('../src/data/config', () => ({
+  getSDKVersion: jest.fn(() => '1.0.0'),
+  DEFAULT_DOMAIN: 'https://jssdk.onekey.so/1.0.0/',
+}));
+
+const createRgba = (width: number, height: number) => {
+  const data = new Uint8Array(width * height * 4);
+  for (let index = 3; index < data.length; index += 4) data[index] = 0xff;
+  return data;
+};
+
+const createMethod = ({
+  typedCall,
+  supportedMessages = [60805, 61500],
+  useFullBundle = false,
+}: {
+  typedCall: jest.Mock;
+  supportedMessages?: number[];
+  useFullBundle?: boolean;
+}) => {
+  const method = new DeviceUploadNft({
+    id: 1,
+    payload: {
+      method: 'deviceUploadNft',
+      image: { width: 540, height: 540, rgba: createRgba(540, 540) },
+      thumbnail: { width: 263, height: 263, rgba: createRgba(263, 263) },
+      title: 'CryptoPunk #3100',
+      subtitle: 'CryptoPunks',
+      timestampMs: 1_760_000_000_000,
+      chunkSize: 2048,
+      paceMs: 0,
+    },
+  });
+  (method as any).device = {
+    commands: { typedCall },
+    ensureProtocolV2RuntimeContext: jest.fn(() =>
+      Promise.resolve({
+        version: 2,
+        build_fingerprint: 'application__1.0.0__test__DEV__DEBUG',
+        supported_messages: supportedMessages,
+      })
+    ),
+    getCurrentFirmwareType: jest.fn(),
+  };
+  method.postMessage = jest.fn();
+
+  if (useFullBundle) {
+    method.init();
+  } else {
+    (method as any).params = { chunkSize: 2048, paceMs: 0, timeoutMs: 15_000 };
+    (method as any).bundle = {
+      basename: 'nft-deadbeef-1760000000000',
+      image: new Uint8Array([1]),
+      thumbnail: new Uint8Array([2]),
+      metadata: new TextEncoder().encode('{"title":"NFT","subtitle":""}'),
+    };
+  }
+
+  return method;
+};
+
+const fileWriteSuccess = (params: { file: { offset: number; data: Uint8Array } }) => ({
+  message: {
+    processed_byte: params.file.offset + params.file.data.byteLength,
+  },
+});
+
+describe('DeviceUploadNft', () => {
+  test('uploads the triplet in order without creating the firmware-owned directory', async () => {
+    const typedCall = jest.fn((request: string, _response: string, params: any) => {
+      if (request === 'FilesystemFileWrite') return fileWriteSuccess(params);
+      if (request === 'NftUpdate') return { message: { message: 'NFT updated' } };
+      throw new Error(`Unexpected request: ${request}`);
+    });
+    const method = createMethod({ typedCall, useFullBundle: true });
+
+    const result = await method.run();
+
+    const requests = typedCall.mock.calls.map(call => call[0]);
+    expect(requests[0]).toBe('FilesystemFileWrite');
+    expect(requests).not.toContain('FilesystemDirMake');
+    expect(requests.at(-1)).toBe('NftUpdate');
+    const fileWrites = typedCall.mock.calls.filter(call => call[0] === 'FilesystemFileWrite');
+    const paths = fileWrites.map(call => call[2].file.path as string);
+    const imagePath = paths[0];
+    const thumbnailStart = paths.findIndex(path => path.endsWith('_m.bin'));
+    const metadataStart = paths.findIndex(path => path.endsWith('.json'));
+    expect(imagePath).toMatch(/^vol1:\/nft\/nft-[a-f0-9]{8}-1760000000000\.bin$/);
+    expect(thumbnailStart).toBeGreaterThan(0);
+    expect(metadataStart).toBeGreaterThan(thumbnailStart);
+    expect(new Set(paths.slice(0, thumbnailStart))).toEqual(new Set([imagePath]));
+    expect(new Set(paths.slice(thumbnailStart, metadataStart))).toEqual(
+      new Set([result.thumbnailPath])
+    );
+    expect(typedCall).toHaveBeenLastCalledWith(
+      'NftUpdate',
+      'Success',
+      { file_name_no_ext: result.basename },
+      { timeoutMs: 15_000 }
+    );
+    expect(result).toMatchObject({
+      nftUpdated: true,
+      message: 'NFT updated',
+      totalSize: 583_212 + 138_876 + 53,
+    });
+    expect(method.postMessage).toHaveBeenLastCalledWith({
+      event: 'UI_EVENT',
+      type: 'ui-device_progress',
+      payload: expect.objectContaining({
+        progress: 100,
+        transferredBytes: result.totalSize,
+        totalBytes: result.totalSize,
+      }),
+    });
+  });
+
+  test('retries one timed-out NftUpdate with the same basename', async () => {
+    const timeout = Object.assign(new Error('Protocol V2 response timeout'), {
+      code: 'response-timeout',
+    });
+    let updateCalls = 0;
+    const typedCall = jest.fn((request: string, _response: string, params: any) => {
+      if (request === 'FilesystemFileWrite') return fileWriteSuccess(params);
+      if (request === 'NftUpdate') {
+        updateCalls += 1;
+        if (updateCalls === 1) throw timeout;
+        return { message: { message: 'NFT updated' } };
+      }
+      throw new Error(`Unexpected request: ${request}`);
+    });
+    const method = createMethod({ typedCall });
+
+    await expect(method.run()).resolves.toMatchObject({ nftUpdated: true });
+
+    const updateRequests = typedCall.mock.calls.filter(call => call[0] === 'NftUpdate');
+    expect(updateRequests).toHaveLength(2);
+    expect(updateRequests[1]).toEqual(updateRequests[0]);
+  });
+
+  test('does not retry a non-timeout NftUpdate failure', async () => {
+    const typedCall = jest.fn((request: string, _response: string, params: any) => {
+      if (request === 'FilesystemFileWrite') return fileWriteSuccess(params);
+      if (request === 'NftUpdate') throw new Error('Invalid NFT metadata');
+      throw new Error(`Unexpected request: ${request}`);
+    });
+    const method = createMethod({ typedCall });
+
+    await expect(method.run()).rejects.toThrow('Invalid NFT metadata');
+    expect(typedCall.mock.calls.filter(call => call[0] === 'NftUpdate')).toHaveLength(1);
+  });
+
+  test('propagates a second NftUpdate timeout after one retry', async () => {
+    const timeout = Object.assign(new Error('Protocol V2 response timeout'), {
+      code: 'response-timeout',
+    });
+    const typedCall = jest.fn((request: string, _response: string, params: any) => {
+      if (request === 'FilesystemFileWrite') return fileWriteSuccess(params);
+      if (request === 'NftUpdate') throw timeout;
+      throw new Error(`Unexpected request: ${request}`);
+    });
+    const method = createMethod({ typedCall });
+
+    await expect(method.run()).rejects.toBe(timeout);
+    expect(typedCall.mock.calls.filter(call => call[0] === 'NftUpdate')).toHaveLength(2);
+  });
+
+  test('does not publish when a file write fails', async () => {
+    const typedCall = jest.fn((request: string) => {
+      if (request === 'FilesystemFileWrite') throw new Error('Filesystem full');
+      throw new Error(`Unexpected request: ${request}`);
+    });
+    const method = createMethod({ typedCall });
+
+    await expect(method.run()).rejects.toThrow('Filesystem full');
+    expect(typedCall.mock.calls.some(call => call[0] === 'NftUpdate')).toBe(false);
+  });
+
+  test('rejects unsupported firmware before writing files', async () => {
+    const typedCall = jest.fn();
+    const method = createMethod({ typedCall, supportedMessages: [60805] });
+
+    await expect(method.run()).rejects.toBeDefined();
+    expect(typedCall).not.toHaveBeenCalled();
+  });
+});

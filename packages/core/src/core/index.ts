@@ -55,8 +55,7 @@ import DeviceConnector from '../device/DeviceConnector';
 import RequestQueue from './RequestQueue';
 import { registerHardwareUiEventListeners } from './deviceEventRegistration';
 import { getSynchronize } from '../utils/getSynchronize';
-import { runMethodWithUnlockRetry } from '../protocols/protocol-v2/unlockRetry';
-import { ensureProtocolV2WalletSessionUnlocked } from '../protocols/protocol-v2/walletSession';
+import { runMethodWithUnlockPolicy } from '../protocols/protocol-v2/unlockPolicyRunner';
 import {
   ProtocolV2UiInteractionCoordinator,
   isProtocolV2UiEnabled,
@@ -551,96 +550,92 @@ const onCallDevice = async (
         );
       }
 
-      if (method.deviceId && method.checkDeviceId) {
-        const isSameDeviceID = await checkLiveDeviceId(device, method.deviceId);
-        if (!isSameDeviceID) {
-          return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError));
-        }
-      }
-
-      /**
-       * check firmware release info
-       */
-      method.checkFirmwareRelease();
-
-      /**
-       * check additional supported feature
-       */
-      method.checkDeviceSupportFeature();
-
-      // reconfigure messages
-      if (_deviceList && device.features && !device.isProtocolV2()) {
-        await TransportManager.reconfigure(device.features);
-      }
-
-      // Check to see if it is safe to use Passphrase
-      checkPassphraseEnableState(method, device.features);
-
-      if (shouldCheckPassphraseState(method, device)) {
-        // check version
-        const support = device.supportNewPassphrase();
-        if (!support.support) {
-          return Promise.reject(
-            ERRORS.TypedError(
-              HardwareErrorCode.DeviceNotSupportPassphrase,
-              `Device not support passphrase, please update to ${support.require}`,
-              {
-                require: support.require,
+      try {
+        let deviceIdCheckedDuringUnlockPreflight = false;
+        const response = await runMethodWithUnlockPolicy<object>(method, device, {
+          uiCoordinator: protocolV2UiCoordinator,
+          afterStatusBeforeUnlock: () => {
+            if (method.deviceId && method.checkDeviceId) {
+              if (!device.checkDeviceId(method.deviceId)) {
+                throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError);
               }
-            )
-          );
-        }
+              deviceIdCheckedDuringUnlockPreflight = true;
+            }
+          },
+          prepare: async () => {
+            if (method.deviceId && method.checkDeviceId && !deviceIdCheckedDuringUnlockPreflight) {
+              const isSameDeviceID = await checkLiveDeviceId(device, method.deviceId);
+              if (!isSameDeviceID) {
+                throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError);
+              }
+            }
 
-        // Wallet-session recovery is part of the protected business call, not onboarding.
-        await ensureProtocolV2WalletSessionUnlocked(device);
+            /**
+             * check firmware release info
+             */
+            method.checkFirmwareRelease();
 
-        // Check Device passphrase State
-        const passphraseStateSafety = await device.checkPassphraseStateSafety(
-          method.payload?.passphraseState,
-          method.payload?.useEmptyPassphrase,
-          method.payload?.skipPassphraseCheck,
-          hasDeriveCardano(method)
-        );
+            /**
+             * check additional supported feature
+             */
+            method.checkDeviceSupportFeature();
 
-        // Double check, handles the special case of Touch/Pro
-        checkPassphraseEnableState(method, device.features);
+            // reconfigure messages
+            if (_deviceList && device.features && !device.isProtocolV2()) {
+              await TransportManager.reconfigure(device.features);
+            }
 
-        if (!passphraseStateSafety) {
-          DevicePool.clearDeviceCache(method.payload.connectId);
-          return Promise.reject(
-            ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError)
-          );
-        }
+            // Check to see if it is safe to use Passphrase
+            checkPassphraseEnableState(method, device.features);
 
-        // Protocol V2 emits the PIN phase completion from DeviceSessionAskPin.
-        // Keep the legacy compatibility close for Protocol V1 only.
-        if (!device.isProtocolV2()) {
-          postMessage(createUiMessage(UI_REQUEST.CLOSE_UI_PIN_WINDOW));
-        }
-      }
+            if (shouldCheckPassphraseState(method, device)) {
+              // check version
+              const support = device.supportNewPassphrase();
+              if (!support.support) {
+                throw ERRORS.TypedError(
+                  HardwareErrorCode.DeviceNotSupportPassphrase,
+                  `Device not support passphrase, please update to ${support.require}`,
+                  {
+                    require: support.require,
+                  }
+                );
+              }
 
-      // Automatic check safety_check level for Kovan, Ropsten, Rinkeby, Goerli test networks.
-      try {
-        await method.checkSafetyLevelOnTestNet();
-      } catch (e) {
-        const error =
-          e instanceof HardwareError
-            ? e
-            : ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'open safety check failed.');
-        // messageResponse = createResponseMessage(method.responseID, false, { error });
-        // requestQueue.resolveRequest(method.responseID, messageResponse);
-        // return;
-        throw error;
-      }
+              // Check Device passphrase State after the Protocol V2 pre-unlock gate.
+              const passphraseStateSafety = await device.checkPassphraseStateSafety(
+                method.payload?.passphraseState,
+                method.payload?.useEmptyPassphrase,
+                method.payload?.skipPassphraseCheck,
+                hasDeriveCardano(method)
+              );
 
-      method.device?.commands?.checkDisposed();
+              // Double check, handles the special case of Touch/Pro
+              checkPassphraseEnableState(method, device.features);
 
-      try {
-        const response: object = await runMethodWithUnlockRetry(
-          method,
-          device,
-          protocolV2UiCoordinator
-        );
+              if (!passphraseStateSafety) {
+                DevicePool.clearDeviceCache(method.payload.connectId);
+                throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError);
+              }
+
+              // Protocol V2 emits the PIN phase completion from DeviceSessionAskPin.
+              // Keep the legacy compatibility close for Protocol V1 only.
+              if (!device.isProtocolV2()) {
+                postMessage(createUiMessage(UI_REQUEST.CLOSE_UI_PIN_WINDOW));
+              }
+            }
+
+            // Automatic check safety_check level for Kovan, Ropsten, Rinkeby, Goerli test networks.
+            try {
+              await method.checkSafetyLevelOnTestNet();
+            } catch (e) {
+              throw e instanceof HardwareError
+                ? e
+                : ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'open safety check failed.');
+            }
+
+            method.device?.commands?.checkDisposed();
+          },
+        });
         messageResponse = createResponseMessage(method.responseID, true, response);
         requestQueue.resolveRequest(method.responseID, messageResponse);
         completeMethodRequestContext(method);

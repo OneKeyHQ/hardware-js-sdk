@@ -8,6 +8,8 @@ export const PRO2_WALLPAPER_HEIGHT = 1024;
 
 export type Pro2WallpaperColorFormat = 'RGB565' | 'RGB565A8';
 
+export type Pro2ImageAlphaMode = 'preserve' | 'black-background';
+
 const COLOR_FORMAT_RGB565 = 0x12;
 const COLOR_FORMAT_RGB565A8 = 0x14;
 
@@ -36,10 +38,11 @@ function align(value: number, boundary: number): number {
   return Math.ceil(value / boundary) * boundary;
 }
 
-export function encodePro2Wallpaper(options: {
+export function encodePro2Image(options: {
   width: number;
   height: number;
   rgba: Uint8Array | ArrayBuffer;
+  alphaMode?: Pro2ImageAlphaMode;
 }): { data: Uint8Array; colorFormat: Pro2WallpaperColorFormat } {
   const { width, height } = options;
   if (!Number.isInteger(width) || width <= 0 || width > 0xffff) {
@@ -57,11 +60,14 @@ export function encodePro2Wallpaper(options: {
     );
   }
 
+  const alphaMode = options.alphaMode ?? 'preserve';
   let hasTransparency = false;
-  for (let index = 3; index < rgba.length; index += 4) {
-    if (rgba[index] !== 0xff) {
-      hasTransparency = true;
-      break;
+  if (alphaMode === 'preserve') {
+    for (let index = 3; index < rgba.length; index += 4) {
+      if (rgba[index] !== 0xff) {
+        hasTransparency = true;
+        break;
+      }
     }
   }
 
@@ -85,9 +91,22 @@ export function encodePro2Wallpaper(options: {
     for (let x = 0; x < width; x += 1) {
       const sourceOffset = (y * width + x) * 4;
       const thresholdIndex = ((y & 7) << 3) + (x & 7);
-      const red = Math.min(rgba[sourceOffset] + RED_THRESHOLD[thresholdIndex], 0xff) & 0xf8;
-      const green = Math.min(rgba[sourceOffset + 1] + GREEN_THRESHOLD[thresholdIndex], 0xff) & 0xfc;
-      const blue = Math.min(rgba[sourceOffset + 2] + BLUE_THRESHOLD[thresholdIndex], 0xff) & 0xf8;
+      const alpha = rgba[sourceOffset + 3];
+      const redChannel =
+        alphaMode === 'black-background'
+          ? Math.round((rgba[sourceOffset] * alpha) / 0xff)
+          : rgba[sourceOffset];
+      const greenChannel =
+        alphaMode === 'black-background'
+          ? Math.round((rgba[sourceOffset + 1] * alpha) / 0xff)
+          : rgba[sourceOffset + 1];
+      const blueChannel =
+        alphaMode === 'black-background'
+          ? Math.round((rgba[sourceOffset + 2] * alpha) / 0xff)
+          : rgba[sourceOffset + 2];
+      const red = Math.min(redChannel + RED_THRESHOLD[thresholdIndex], 0xff) & 0xf8;
+      const green = Math.min(greenChannel + GREEN_THRESHOLD[thresholdIndex], 0xff) & 0xfc;
+      const blue = Math.min(blueChannel + BLUE_THRESHOLD[thresholdIndex], 0xff) & 0xf8;
       const rgb565 = ((red >> 3) << 11) | ((green >> 2) << 5) | (blue >> 3);
       const rgbOffset = 12 + y * stride + x * 2;
       data[rgbOffset] = rgb565 & 0xff;
@@ -100,4 +119,12 @@ export function encodePro2Wallpaper(options: {
   }
 
   return { data, colorFormat };
+}
+
+export function encodePro2Wallpaper(options: {
+  width: number;
+  height: number;
+  rgba: Uint8Array | ArrayBuffer;
+}): { data: Uint8Array; colorFormat: Pro2WallpaperColorFormat } {
+  return encodePro2Image(options);
 }

@@ -48,6 +48,7 @@ describe('public Pro2 API boundary', () => {
     const api = createCoreApi(jest.fn() as CoreApi['call']) as Record<string, unknown>;
 
     expect(api.deviceGetOnboardingStatus).toBeInstanceOf(Function);
+    expect(api.deviceUploadNft).toBeInstanceOf(Function);
     expect(api.uploadPortfolio).toBeInstanceOf(Function);
     expect(api.testProtocolV2Ping).toBeInstanceOf(Function);
     expect(publicMethods.testProtocolV2Ping).toBeInstanceOf(Function);

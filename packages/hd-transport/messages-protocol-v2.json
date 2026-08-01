@@ -470,6 +470,7 @@
         "MessageType_DeviceSessionAskPin": 61202,
         "MessageType_DeviceSessionAskPassphrase": 61203,
         "MessageType_PortfolioUpdate": 61400,
+        "MessageType_NftUpdate": 61500,
         "MessageType_OnboardingStatusGet": 61600,
         "MessageType_OnboardingStatus": 61601
       },
@@ -12200,26 +12201,11 @@
         "DeviceSessionError_Busy": 5
       }
     },
-    "DeviceSessionSeedDomain": {
-      "values": {
-        "SeedDomain_Standard": 1,
-        "SeedDomain_Cardano": 2
-      }
-    },
     "DeviceSessionGet": {
       "fields": {
         "session_id": {
           "type": "bytes",
           "id": 1
-        },
-        "btc_test_address": {
-          "type": "string",
-          "id": 2
-        },
-        "seed_domains": {
-          "rule": "repeated",
-          "type": "DeviceSessionSeedDomain",
-          "id": 3
         }
       }
     },
@@ -12550,6 +12536,15 @@
           "rule": "required",
           "type": "uint32",
           "id": 4
+        }
+      }
+    },
+    "NftUpdate": {
+      "fields": {
+        "file_name_no_ext": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
         }
       }
     },

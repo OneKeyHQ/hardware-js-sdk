@@ -31,19 +31,21 @@ export type ProtocolV2FileWriteOptions = {
   uiPercentage?: number;
   timeoutMs?: number;
   maxChunkRetries?: number;
+  paceMs?: number;
   throwIfAborted?: () => void;
   onProgress?: (progress: ProtocolV2FileWriteProgress) => void;
 };
 
 const MIN_FILE_CHUNK_SIZE = 64;
 
-function isRetryableFileWriteTimeout(error: unknown) {
+export function isProtocolV2ResponseTimeout(error: unknown) {
   if (!error || typeof error !== 'object') return false;
-  const candidate = error as { errorCode?: number; code?: number; message?: string };
+  const candidate = error as { errorCode?: number; code?: number | string; message?: string };
   const code = candidate.errorCode ?? candidate.code;
   return (
     code === HardwareErrorCode.BleTimeoutError ||
-    /Lowlevel response timeout/i.test(candidate.message ?? '')
+    code === 'response-timeout' ||
+    /(?:BLE|Lowlevel|Protocol V2) response timeout/i.test(candidate.message ?? '')
   );
 }
 
@@ -147,7 +149,7 @@ export async function writeProtocolV2File(options: ProtocolV2FileWriteOptions) {
         );
         isWritePending = false;
       } catch (error) {
-        if (retryCount >= maxChunkRetries || !isRetryableFileWriteTimeout(error)) throw error;
+        if (retryCount >= maxChunkRetries || !isProtocolV2ResponseTimeout(error)) throw error;
         retryCount += 1;
         options.throwIfAborted?.();
       }
@@ -186,6 +188,11 @@ export async function writeProtocolV2File(options: ProtocolV2FileWriteOptions) {
         elapsedMs > 0 ? Math.round((transferredBytes / elapsedMs) * 1000) : undefined,
       elapsedMs,
     });
+    if (options.paceMs && options.paceMs > 0) {
+      await new Promise(resolve => {
+        setTimeout(resolve, options.paceMs);
+      });
+    }
   }
 
   return {

@@ -79,7 +79,10 @@ import {
   getProtocolV2WalletSession,
   refreshProtocolV2DeviceStatus,
 } from '../src/protocols/protocol-v2/walletSession';
-import { runMethodWithUnlockRetry } from '../src/protocols/protocol-v2/unlockRetry';
+import {
+  createProtocolV2UnlockContext,
+  runMethodWithUnlockPolicy,
+} from '../src/protocols/protocol-v2/unlockPolicyRunner';
 import { BaseMethod } from '../src/api/BaseMethod';
 import {
   buildProtocolV1FeaturesPayload,
@@ -241,7 +244,7 @@ describe('UploadPortfolio', () => {
     (method as any).device = device;
 
     method.init();
-    await runMethodWithUnlockRetry(method, device as any);
+    await runMethodWithUnlockPolicy(method, device as any);
 
     expect(unlockDevice).not.toHaveBeenCalled();
     expect(typedCall).toHaveBeenNthCalledWith(
@@ -868,7 +871,6 @@ describe('Protocol V2 feature adapter', () => {
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
       session_id: 'standard-session',
-      btc_test_address: 'standard-state',
     });
     expect(deviceWalletSessionStore.getStandard(deviceId)).toEqual({
       passphraseState: 'standard-state',
@@ -1338,7 +1340,6 @@ describe('Protocol V2 feature adapter', () => {
 
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
       session_id: 'session-a',
-      btc_test_address: 'state-a',
     });
     expect(device.getInternalState()).toBe('session-b');
   });
@@ -1406,11 +1407,7 @@ describe('Protocol V2 feature adapter', () => {
     });
     expect(typedCall.mock.calls).toEqual([
       ['ProtocolInfoRequest', 'ProtocolInfo', { eventless_wallet_session: true }],
-      [
-        'DeviceSessionGet',
-        'DeviceSession',
-        { session_id: 'session-a', btc_test_address: 'state-a' },
-      ],
+      ['DeviceSessionGet', 'DeviceSession', { session_id: 'session-a' }],
     ]);
     expect(promptPassphrase).not.toHaveBeenCalled();
     expect(device.getInternalState()).toBeUndefined();
@@ -1618,9 +1615,7 @@ describe('Protocol V2 feature adapter', () => {
       });
 
       expect(promptPassphrase).not.toHaveBeenCalled();
-      expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
-        btc_test_address: 'expected-state',
-      });
+      expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
       expect(typedCall).toHaveBeenCalledWith('LockDevice', 'Success', {});
       expect(typedCall.mock.calls.filter(call => call[0] === 'DeviceSessionGet')).toHaveLength(1);
       expect(device.getInternalState()).toBeUndefined();
@@ -2008,9 +2003,7 @@ describe('Protocol V2 feature adapter', () => {
     await expect(
       getProtocolV2WalletSession(device, { expectedPassphraseState: 'expected-state' })
     ).resolves.toMatchObject({ passphraseState: 'expected-state' });
-    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
-      btc_test_address: 'expected-state',
-    });
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
     expect(promptPassphrase).not.toHaveBeenCalled();
   });
 
@@ -2077,11 +2070,7 @@ describe('Protocol V2 feature adapter', () => {
       true
     );
     expect(typedCall.mock.calls).toEqual([
-      [
-        'DeviceSessionGet',
-        'DeviceSession',
-        { session_id: 'session-pro2-app', btc_test_address: 'state-pro2-app' },
-      ],
+      ['DeviceSessionGet', 'DeviceSession', { session_id: 'session-pro2-app' }],
     ]);
   });
 
@@ -2348,9 +2337,7 @@ describe('Protocol V2 feature adapter', () => {
     );
 
     expect(device.getInternalState()).toBeUndefined();
-    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
-      btc_test_address: 'expected-state',
-    });
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {
       passphrase: 'host hidden wallet',
       on_device: false,
@@ -6206,334 +6193,230 @@ describe('Protocol V2 protected method execution', () => {
     expect(method.unlockPolicy).toBe('none');
   });
 
-  test('unlocks and retries an opted-in Protocol V2 method once', async () => {
+  test('checks fresh status for a wallet business method without a name allowlist', async () => {
     const calls: string[] = [];
-    const method = {
-      name: 'testBusinessMethod',
-      unlockPolicy: 'retry-on-locked',
-      protocolV2UiInteraction: { reason: 'settings-page' },
-      run: jest
-        .fn()
-        .mockImplementationOnce(() => {
-          calls.push('run-1');
-          return Promise.reject(deviceLockedError());
-        })
-        .mockImplementationOnce(() => {
-          calls.push('run-2');
-          return Promise.resolve({ message: 'ok' });
-        }),
-    };
-    const device = {
-      isProtocolV2: () => true,
-      unlockDevice: jest.fn(() => {
-        calls.push('unlock');
-        return Promise.resolve();
-      }),
-    };
-    const uiCoordinator = {
-      enterMethodInteraction: jest.fn(() => calls.push('method-prompt')),
-      enterUnlockInteraction: jest.fn(() => calls.push('unlock-prompt')),
-      resumeMethodInteraction: jest.fn(() => calls.push('method-prompt')),
-    };
-
-    await expect(
-      runMethodWithUnlockRetry(method as any, device as any, uiCoordinator as any)
-    ).resolves.toEqual({ message: 'ok' });
-    expect(calls).toEqual([
-      'method-prompt',
-      'run-1',
-      'unlock-prompt',
-      'unlock',
-      'method-prompt',
-      'run-2',
-    ]);
-  });
-
-  test('restores the expected hidden-wallet session before retrying after unlock', async () => {
-    const calls: string[] = [];
-    const method = {
-      name: 'evmSignMessage',
-      payload: { passphraseState: 'hidden-state' },
-      useDevicePassphraseState: true,
-      unlockPolicy: 'retry-on-locked',
-      run: jest
-        .fn()
-        .mockImplementationOnce(() => {
-          calls.push('run-1');
-          return Promise.reject(deviceLockedError());
-        })
-        .mockImplementationOnce(() => {
-          calls.push('run-2');
-          return Promise.resolve({ message: 'ok' });
-        }),
-    };
-    const typedCall = jest.fn((requestType: string, _responseType: string, request: any) => {
-      if (requestType === 'ProtocolInfoRequest') {
-        calls.push('negotiate-session');
-        return Promise.resolve({ message: { version: 2 } });
-      }
-      if (requestType === 'DeviceSessionGet') {
-        calls.push('resume-hidden-session');
-        expect(request).toEqual({
-          session_id: 'hidden-session',
-          btc_test_address: 'hidden-state',
-        });
-        return Promise.resolve({
-          message: {
-            session_id: 'hidden-session',
-            btc_test_address: 'hidden-state',
-          },
-        });
-      }
-      throw new Error(`Unexpected request: ${requestType}`);
-    });
-    const device = {
-      features: { unlocked: true, passphraseProtection: true },
-      passphraseState: 'hidden-state',
-      commands: { typedCall },
-      ensureProtocolV2RuntimeContext: () =>
-        typedCall('ProtocolInfoRequest', 'ProtocolInfo', {
-          eventless_wallet_session: true,
-        }).then(response => response.message),
-      isProtocolV2: () => true,
-      unlockDevice: jest.fn(() => {
-        calls.push('unlock');
-        return Promise.resolve();
-      }),
-      getCurrentPassphraseProtection: () => true,
-      getInternalState: () => 'hidden-session',
-      clearInternalState: jest.fn(),
-      getCurrentDeviceId: () => 'wallet-device-id',
-      updateInternalState: jest.fn(() => calls.push('validate-hidden-session')),
-    };
-
-    await expect(runMethodWithUnlockRetry(method as any, device as any)).resolves.toEqual({
-      message: 'ok',
-    });
-    expect(calls).toEqual([
-      'run-1',
-      'unlock',
-      'negotiate-session',
-      'resume-hidden-session',
-      'validate-hidden-session',
-      'run-2',
-    ]);
-  });
-
-  test('does not replay a business method when the hidden-wallet session cannot be restored after unlock', async () => {
-    const initialError = deviceLockedError();
-    const restoreError = new Error('Invalid wallet session');
-    const method = {
-      name: 'evmSignMessage',
-      payload: { passphraseState: 'hidden-state' },
-      useDevicePassphraseState: true,
-      unlockPolicy: 'retry-on-locked',
-      run: jest.fn().mockRejectedValueOnce(initialError),
-    };
-    const typedCall = jest.fn((requestType: string) => {
-      if (requestType === 'ProtocolInfoRequest') {
-        return Promise.resolve({ message: { version: 2 } });
-      }
-      if (requestType === 'DeviceSessionGet') {
-        return Promise.reject(restoreError);
-      }
-      throw new Error(`Unexpected request: ${requestType}`);
-    });
-    const device = {
-      features: { unlocked: true, passphraseProtection: true },
-      passphraseState: 'hidden-state',
-      commands: { typedCall },
-      ensureProtocolV2RuntimeContext: () =>
-        typedCall('ProtocolInfoRequest', 'ProtocolInfo', {
-          eventless_wallet_session: true,
-        }).then(response => response.message),
-      isProtocolV2: () => true,
-      unlockDevice: jest.fn().mockResolvedValue(undefined),
-      getCurrentPassphraseProtection: () => true,
-      getInternalState: () => 'hidden-session',
-      clearInternalState: jest.fn(),
-      getCurrentDeviceId: () => 'wallet-device-id',
-      updateInternalState: jest.fn(),
-    };
-
-    await expect(runMethodWithUnlockRetry(method as any, device as any)).rejects.toBe(restoreError);
-    expect(method.run).toHaveBeenCalledTimes(1);
-    expect(device.unlockDevice).toHaveBeenCalledTimes(1);
-    expect(device.clearInternalState).toHaveBeenCalledTimes(1);
-    expect(device.updateInternalState).not.toHaveBeenCalled();
-  });
-
-  test('restores the expected hidden-wallet session after pre-unlock without selecting Attach PIN', async () => {
-    const calls: string[] = [];
-    const method = {
-      name: 'evmSignMessage',
-      payload: { passphraseState: 'hidden-state' },
-      useDevicePassphraseState: true,
-      unlockPolicy: 'retry-on-locked',
-      run: jest.fn(() => {
-        calls.push('run');
-        return Promise.resolve({ message: 'ok' });
-      }),
-    };
-    const typedCall = jest.fn((requestType: string, _responseType: string, request: any) => {
-      if (requestType === 'ProtocolInfoRequest') {
-        calls.push('negotiate-session');
-        return Promise.resolve({ message: { version: 2 } });
-      }
-      if (requestType === 'DeviceSessionGet') {
-        calls.push('resume-hidden-session');
-        expect(request).toEqual({
-          session_id: 'hidden-session',
-          btc_test_address: 'hidden-state',
-        });
-        return Promise.resolve({
-          message: {
-            session_id: 'hidden-session',
-            btc_test_address: 'hidden-state',
-          },
-        });
-      }
-      throw new Error(`Unexpected request: ${requestType}`);
-    });
-    const features = {
-      unlocked: false,
-      unlockedAttachPin: true,
-      passphraseProtection: true,
-    };
-    const device = {
-      features,
-      passphraseState: 'hidden-state',
-      commands: { typedCall },
-      ensureProtocolV2RuntimeContext: () =>
-        typedCall('ProtocolInfoRequest', 'ProtocolInfo', {
-          eventless_wallet_session: true,
-        }).then(response => response.message),
-      isProtocolV2: () => true,
-      unlockDevice: jest.fn(() => {
-        calls.push('unlock-main');
-        features.unlocked = true;
-        features.unlockedAttachPin = false;
-        return Promise.resolve();
-      }),
-      getCurrentPassphraseProtection: () => true,
-      getInternalState: () => 'hidden-session',
-      clearInternalState: jest.fn(),
-      getCurrentDeviceId: () => 'wallet-device-id',
-      updateInternalState: jest.fn(() => calls.push('validate-hidden-session')),
-    };
-
-    await expect(runMethodWithUnlockRetry(method as any, device as any)).resolves.toEqual({
-      message: 'ok',
-    });
-    expect(device.unlockDevice).toHaveBeenCalledWith(undefined, {
-      source: 'unlock-coordinator',
-      reason: 'device-locked',
-      deviceOnly: true,
-      method: 'evmSignMessage',
-    });
-    expect(calls).toEqual([
-      'unlock-main',
-      'negotiate-session',
-      'resume-hidden-session',
-      'validate-hidden-session',
-      'run',
-    ]);
-  });
-
-  test('does not restore a hidden-wallet session for a standard-wallet pre-unlock', async () => {
-    const method = {
-      name: 'evmGetAddress',
-      payload: { useEmptyPassphrase: true },
-      useDevicePassphraseState: true,
-      unlockPolicy: 'retry-on-locked',
-      run: jest.fn().mockResolvedValue({ address: 'standard-wallet-address' }),
-    };
-    const device = {
-      features: { unlocked: false },
-      passphraseState: 'stale-hidden-state',
-      isProtocolV2: () => true,
-      unlockDevice: jest.fn().mockResolvedValue(undefined),
-    };
-
-    await expect(runMethodWithUnlockRetry(method as any, device as any)).resolves.toEqual({
-      address: 'standard-wallet-address',
-    });
-    expect(device.unlockDevice).toHaveBeenCalledTimes(1);
-    expect(method.run).toHaveBeenCalledTimes(1);
-  });
-
-  test('refreshes status and unlocks before a protected Protocol V2 method', async () => {
-    const calls: string[] = [];
-    const method = {
-      name: 'deviceSettingsPageShow',
-      unlockPolicy: 'unlock-before-run',
-      protocolV2UiInteraction: { reason: 'settings-page' },
-      run: jest.fn(() => {
-        calls.push('run');
-        return Promise.resolve({ message: 'ok' });
-      }),
-    };
     const features = { unlocked: true };
+    const method = {
+      name: 'confluxSignMessageCIP23',
+      unlockPolicy: 'none',
+      useDevicePassphraseState: true,
+      protocolV2UiInteraction: { reason: 'address-confirmation' },
+      run: jest.fn(() => {
+        calls.push('run');
+        return Promise.resolve({ address: '0x1' });
+      }),
+    };
     const device = {
       features,
       commands: {
         typedCall: jest.fn(() => {
-          calls.push('refresh-status');
+          calls.push('status');
+          return Promise.resolve({ message: { unlocked: true } });
+        }),
+      },
+      isProtocolV2: () => true,
+      isBootloader: () => false,
+      isRomloader: () => false,
+      updateProtocolV2Status: jest.fn((status: { unlocked?: boolean }) => {
+        features.unlocked = status.unlocked === true;
+        return features;
+      }),
+      unlockDevice: jest.fn(),
+    };
+    const uiCoordinator = {
+      enterMethodInteraction: jest.fn(() => calls.push('method-prompt')),
+      enterUnlockInteraction: jest.fn(),
+    };
+
+    await expect(
+      runMethodWithUnlockPolicy(method as any, device as any, {
+        uiCoordinator: uiCoordinator as any,
+      })
+    ).resolves.toEqual({ address: '0x1' });
+
+    expect(calls).toEqual(['status', 'method-prompt', 'run']);
+    expect(device.commands.typedCall).toHaveBeenCalledWith('DeviceStatusGet', 'DeviceStatus', {});
+    expect(device.unlockDevice).not.toHaveBeenCalled();
+    expect(method.run).toHaveBeenCalledTimes(1);
+  });
+
+  test('validates the fresh device identity before starting unlock', async () => {
+    const calls: string[] = [];
+    const identityError = new Error('Unexpected device');
+    const method = {
+      name: 'evmSignMessage',
+      unlockPolicy: 'none',
+      useDevicePassphraseState: true,
+      run: jest.fn(),
+    };
+    const features = { unlocked: false };
+    const device = {
+      features,
+      commands: {
+        typedCall: jest.fn(() => {
+          calls.push('status');
           return Promise.resolve({ message: { unlocked: false } });
         }),
       },
       isProtocolV2: () => true,
+      isBootloader: () => false,
+      isRomloader: () => false,
+      updateProtocolV2Status: jest.fn(() => features),
+      unlockDevice: jest.fn(),
+    };
+
+    await expect(
+      runMethodWithUnlockPolicy(method as any, device as any, {
+        afterStatusBeforeUnlock: () => {
+          calls.push('identity');
+          throw identityError;
+        },
+      })
+    ).rejects.toBe(identityError);
+
+    expect(calls).toEqual(['status', 'identity']);
+    expect(device.unlockDevice).not.toHaveBeenCalled();
+    expect(method.run).not.toHaveBeenCalled();
+  });
+
+  test('unlocks before business and never replays the callback', async () => {
+    const calls: string[] = [];
+    const features = { unlocked: true };
+    const method = {
+      name: 'evmSignMessage',
+      unlockPolicy: 'unlock-before-run',
+      protocolV2UiInteraction: { reason: 'signing-confirmation' },
+      run: jest.fn(() => {
+        calls.push('run');
+        return Promise.resolve({ signature: 'signed' });
+      }),
+    };
+    const device = {
+      features,
+      commands: {
+        typedCall: jest.fn(() => {
+          calls.push('status');
+          return Promise.resolve({ message: { unlocked: false } });
+        }),
+      },
+      isProtocolV2: () => true,
+      isBootloader: () => false,
+      isRomloader: () => false,
       updateProtocolV2Status: jest.fn((status: { unlocked?: boolean }) => {
-        features.unlocked = status.unlocked ?? features.unlocked;
+        features.unlocked = status.unlocked === true;
         return features;
       }),
       unlockDevice: jest.fn(() => {
         calls.push('unlock');
         features.unlocked = true;
-        return Promise.resolve();
+        return Promise.resolve(features);
       }),
     };
     const uiCoordinator = {
       enterMethodInteraction: jest.fn(() => calls.push('method-prompt')),
-      enterUnlockInteraction: jest.fn(() => calls.push('unlock-prompt')),
-      resumeMethodInteraction: jest.fn(() => calls.push('method-prompt')),
+      enterUnlockInteraction: jest.fn(() => {
+        calls.push('unlock-prompt');
+        return undefined;
+      }),
     };
 
     await expect(
-      runMethodWithUnlockRetry(method as any, device as any, uiCoordinator as any)
-    ).resolves.toEqual({ message: 'ok' });
-    expect(calls).toEqual(['refresh-status', 'unlock-prompt', 'unlock', 'method-prompt', 'run']);
-    expect(device.commands.typedCall).toHaveBeenCalledWith('DeviceStatusGet', 'DeviceStatus', {});
+      runMethodWithUnlockPolicy(method as any, device as any, {
+        uiCoordinator: uiCoordinator as any,
+        prepare: () => {
+          calls.push('wallet-session');
+          return Promise.resolve();
+        },
+      })
+    ).resolves.toEqual({ signature: 'signed' });
+
+    expect(calls).toEqual([
+      'status',
+      'unlock-prompt',
+      'unlock',
+      'wallet-session',
+      'method-prompt',
+      'run',
+    ]);
+    expect(device.unlockDevice).toHaveBeenCalledTimes(1);
     expect(method.run).toHaveBeenCalledTimes(1);
-    expect(uiCoordinator.enterMethodInteraction).toHaveBeenCalledTimes(1);
-    expect(uiCoordinator.resumeMethodInteraction).not.toHaveBeenCalled();
   });
 
-  test('uses refreshed unlocked status instead of a stale locked cache', async () => {
-    const features = { unlocked: false };
+  test('fails closed when fresh status does not explicitly report unlocked state', async () => {
     const method = {
-      name: 'deviceSettings',
+      name: 'evmGetAddress',
       unlockPolicy: 'unlock-before-run',
-      run: jest.fn().mockResolvedValue({ message: 'ok' }),
+      run: jest.fn(),
     };
     const device = {
-      features,
-      commands: {
-        typedCall: jest.fn().mockResolvedValue({ message: { unlocked: true } }),
-      },
+      features: { unlocked: undefined },
+      commands: { typedCall: jest.fn().mockResolvedValue({ message: {} }) },
       isProtocolV2: () => true,
-      updateProtocolV2Status: jest.fn((status: { unlocked?: boolean }) => {
-        features.unlocked = status.unlocked ?? features.unlocked;
-        return features;
-      }),
+      isBootloader: () => false,
+      isRomloader: () => false,
+      updateProtocolV2Status: jest.fn(() => ({ unlocked: undefined })),
       unlockDevice: jest.fn(),
     };
 
-    await expect(runMethodWithUnlockRetry(method as any, device as any)).resolves.toEqual({
-      message: 'ok',
+    await expect(runMethodWithUnlockPolicy(method as any, device as any)).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.RuntimeError,
     });
     expect(device.unlockDevice).not.toHaveBeenCalled();
+    expect(method.run).not.toHaveBeenCalled();
+  });
+
+  test('returns a business DeviceLocked error without unlocking or replaying', async () => {
+    const error = deviceLockedError();
+    const method = {
+      name: 'evmSignMessage',
+      unlockPolicy: 'unlock-before-run',
+      run: jest.fn().mockRejectedValue(error),
+    };
+    const features = { unlocked: true };
+    const device = {
+      features,
+      commands: { typedCall: jest.fn().mockResolvedValue({ message: { unlocked: true } }) },
+      isProtocolV2: () => true,
+      isBootloader: () => false,
+      isRomloader: () => false,
+      updateProtocolV2Status: jest.fn(() => features),
+      unlockDevice: jest.fn(),
+    };
+
+    await expect(runMethodWithUnlockPolicy(method as any, device as any)).rejects.toBe(error);
+    expect(device.unlockDevice).not.toHaveBeenCalled();
     expect(method.run).toHaveBeenCalledTimes(1);
+  });
+
+  test('reuses one lightweight preflight context across nested protected methods', async () => {
+    const features = { unlocked: true };
+    const context = createProtocolV2UnlockContext();
+    const firstMethod = {
+      name: 'allNetworkGetAddress',
+      unlockPolicy: 'unlock-before-run',
+      run: jest.fn().mockResolvedValue({ root: true }),
+    };
+    const nestedMethod = {
+      name: 'evmGetAddress',
+      unlockPolicy: 'unlock-before-run',
+      run: jest.fn().mockResolvedValue({ address: '0x1' }),
+    };
+    const device = {
+      features,
+      commands: { typedCall: jest.fn().mockResolvedValue({ message: { unlocked: true } }) },
+      isProtocolV2: () => true,
+      isBootloader: () => false,
+      isRomloader: () => false,
+      updateProtocolV2Status: jest.fn(() => features),
+      unlockDevice: jest.fn(),
+    };
+
+    await runMethodWithUnlockPolicy(firstMethod as any, device as any, { context });
+    await runMethodWithUnlockPolicy(nestedMethod as any, device as any, { context });
+
+    expect(device.commands.typedCall).toHaveBeenCalledTimes(1);
+    expect(firstMethod.run).toHaveBeenCalledTimes(1);
+    expect(nestedMethod.run).toHaveBeenCalledTimes(1);
   });
 
   test.each(['bootloader', 'romloader'] as const)(
@@ -6553,7 +6436,7 @@ describe('Protocol V2 protected method execution', () => {
         unlockDevice: jest.fn(),
       };
 
-      await expect(runMethodWithUnlockRetry(method as any, device as any)).resolves.toEqual({
+      await expect(runMethodWithUnlockPolicy(method as any, device as any)).resolves.toEqual({
         message: 'updating',
       });
       expect(device.commands.typedCall).not.toHaveBeenCalled();
@@ -6562,188 +6445,29 @@ describe('Protocol V2 protected method execution', () => {
     }
   );
 
-  test('infers a signing interaction before running a Protocol V2 business method', async () => {
-    const method = {
-      name: 'evmSignMessage',
-      params: { message: 'not-exposed-in-event' },
-      payload: {},
-      unlockPolicy: 'retry-on-locked',
-      run: jest.fn().mockResolvedValue({ signature: 'test' }),
-    };
-    const device = {
-      isProtocolV2: () => true,
-      unlockDevice: jest.fn(),
-    };
-    const uiCoordinator = {
-      enterMethodInteraction: jest.fn(),
-      enterUnlockInteraction: jest.fn(),
-      resumeMethodInteraction: jest.fn(),
-    };
-
-    await runMethodWithUnlockRetry(method as any, device as any, uiCoordinator as any);
-
-    expect(uiCoordinator.enterMethodInteraction).toHaveBeenCalledWith({
-      request: 'button',
-      source: 'method-lifecycle',
-      reason: 'signing-confirmation',
-      completion: 'operation-completed',
-      deviceOnly: true,
-      operation: 'evmSignMessage',
-    });
-  });
-
-  test('does not unlock a Protocol V1 device or a method without the policy', async () => {
+  test('keeps Protocol V1 and lock-free methods outside the preflight path', async () => {
     for (const [isProtocolV2, unlockPolicy] of [
-      [false, 'retry-on-locked'],
+      [false, 'unlock-before-run'],
       [true, 'none'],
     ] as const) {
-      const error = deviceLockedError();
       const method = {
         unlockPolicy,
-        run: jest.fn().mockRejectedValue(error),
+        useDevicePassphraseState: false,
+        run: jest.fn().mockResolvedValue({ message: 'ok' }),
       };
       const device = {
+        commands: { typedCall: jest.fn() },
         isProtocolV2: () => isProtocolV2,
         unlockDevice: jest.fn(),
       };
 
-      await expect(runMethodWithUnlockRetry(method as any, device as any)).rejects.toBe(error);
+      await expect(runMethodWithUnlockPolicy(method as any, device as any)).resolves.toEqual({
+        message: 'ok',
+      });
+      expect(device.commands.typedCall).not.toHaveBeenCalled();
       expect(device.unlockDevice).not.toHaveBeenCalled();
       expect(method.run).toHaveBeenCalledTimes(1);
     }
-  });
-
-  test('runs lock-free eventless methods without unlocking or synthesized UI', async () => {
-    const method = {
-      name: 'uploadPortfolio',
-      unlockPolicy: 'none',
-      protocolV2UiMode: 'none',
-      run: jest.fn().mockResolvedValue({ message: 'ok' }),
-    };
-    const device = {
-      features: { unlocked: false },
-      isProtocolV2: () => true,
-      unlockDevice: jest.fn().mockResolvedValue(undefined),
-    };
-    const uiCoordinator = {
-      enterMethodInteraction: jest.fn(),
-      enterUnlockInteraction: jest.fn(),
-      resumeMethodInteraction: jest.fn(),
-    };
-
-    await expect(
-      runMethodWithUnlockRetry(method as any, device as any, uiCoordinator as any)
-    ).resolves.toEqual({ message: 'ok' });
-    expect(device.unlockDevice).not.toHaveBeenCalled();
-    expect(uiCoordinator.enterMethodInteraction).not.toHaveBeenCalled();
-    expect(uiCoordinator.enterUnlockInteraction).not.toHaveBeenCalled();
-    expect(uiCoordinator.resumeMethodInteraction).not.toHaveBeenCalled();
-  });
-
-  test('keeps the PIN prompt when an eventless method actually unlocks the device', async () => {
-    const lockedError = deviceLockedError();
-    const method = {
-      name: 'backgroundRead',
-      unlockPolicy: 'retry-on-locked',
-      protocolV2UiMode: 'none',
-      run: jest.fn().mockRejectedValueOnce(lockedError).mockResolvedValueOnce({ message: 'ok' }),
-    };
-    const device = {
-      isProtocolV2: () => true,
-      unlockDevice: jest.fn().mockResolvedValue(undefined),
-    };
-    const uiCoordinator = {
-      enterMethodInteraction: jest.fn(),
-      enterUnlockInteraction: jest.fn(),
-      resumeMethodInteraction: jest.fn(),
-    };
-
-    await expect(
-      runMethodWithUnlockRetry(method as any, device as any, uiCoordinator as any)
-    ).resolves.toEqual({ message: 'ok' });
-    expect(device.unlockDevice).toHaveBeenCalledWith(undefined, {
-      source: 'unlock-coordinator',
-      reason: 'device-locked',
-      deviceOnly: true,
-      method: 'backgroundRead',
-    });
-    expect(uiCoordinator.enterMethodInteraction).not.toHaveBeenCalled();
-    expect(uiCoordinator.enterUnlockInteraction).not.toHaveBeenCalled();
-    expect(uiCoordinator.resumeMethodInteraction).not.toHaveBeenCalled();
-  });
-
-  test('does not unlock or replay a lock-free state-changing method after a locked response', async () => {
-    const error = deviceLockedError();
-    const method = {
-      name: 'uploadPortfolio',
-      unlockPolicy: 'none',
-      run: jest.fn().mockRejectedValue(error),
-    };
-    const device = {
-      features: { unlocked: true },
-      isProtocolV2: () => true,
-      unlockDevice: jest.fn(),
-    };
-
-    await expect(runMethodWithUnlockRetry(method as any, device as any)).rejects.toBe(error);
-    expect(method.run).toHaveBeenCalledTimes(1);
-    expect(device.unlockDevice).not.toHaveBeenCalled();
-  });
-
-  test('does not retry when unlock fails or when the retry is still locked', async () => {
-    const initialError = deviceLockedError();
-    const unlockError = new Error('PIN cancelled');
-    const unlockFailMethod = {
-      unlockPolicy: 'retry-on-locked',
-      run: jest.fn().mockRejectedValue(initialError),
-    };
-    const unlockFailDevice = {
-      isProtocolV2: () => true,
-      unlockDevice: jest.fn().mockRejectedValue(unlockError),
-    };
-    const unlockFailCoordinator = {
-      enterMethodInteraction: jest.fn(),
-      enterUnlockInteraction: jest.fn(),
-      resumeMethodInteraction: jest.fn(),
-    };
-
-    await expect(
-      runMethodWithUnlockRetry(
-        unlockFailMethod as any,
-        unlockFailDevice as any,
-        unlockFailCoordinator as any
-      )
-    ).rejects.toBe(unlockError);
-    expect(unlockFailMethod.run).toHaveBeenCalledTimes(1);
-    expect(unlockFailCoordinator.enterUnlockInteraction).toHaveBeenCalledTimes(1);
-    expect(unlockFailCoordinator.resumeMethodInteraction).not.toHaveBeenCalled();
-
-    const retryError = deviceLockedError();
-    const retryFailMethod = {
-      unlockPolicy: 'retry-on-locked',
-      run: jest.fn().mockRejectedValueOnce(initialError).mockRejectedValueOnce(retryError),
-    };
-    const retryFailDevice = {
-      isProtocolV2: () => true,
-      unlockDevice: jest.fn().mockResolvedValue(undefined),
-    };
-    const retryFailCoordinator = {
-      enterMethodInteraction: jest.fn(),
-      enterUnlockInteraction: jest.fn(),
-      resumeMethodInteraction: jest.fn(),
-    };
-
-    await expect(
-      runMethodWithUnlockRetry(
-        retryFailMethod as any,
-        retryFailDevice as any,
-        retryFailCoordinator as any
-      )
-    ).rejects.toBe(retryError);
-    expect(retryFailMethod.run).toHaveBeenCalledTimes(2);
-    expect(retryFailDevice.unlockDevice).toHaveBeenCalledTimes(1);
-    expect(retryFailCoordinator.enterUnlockInteraction).toHaveBeenCalledTimes(1);
-    expect(retryFailCoordinator.resumeMethodInteraction).toHaveBeenCalledTimes(1);
   });
 });
 

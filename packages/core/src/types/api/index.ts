@@ -1,6 +1,7 @@
 import type {
   deviceGetOnboardingStatus,
   deviceReboot,
+  deviceUploadNft,
   deviceUploadWallpaper,
   testProtocolV2Ping,
   uploadPortfolio,
@@ -234,6 +235,7 @@ export type CoreApi = {
    */
   deviceReboot: typeof deviceReboot;
   deviceGetOnboardingStatus: typeof deviceGetOnboardingStatus;
+  deviceUploadNft: typeof deviceUploadNft;
   deviceUploadWallpaper: typeof deviceUploadWallpaper;
   uploadPortfolio: typeof uploadPortfolio;
 

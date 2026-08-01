@@ -10,7 +10,7 @@
 ### 第一次进入仓库
 
 1. [SDK 架构概览](./architecture/overview.md)：理解包分层、Device 生命周期和 V1/V2 边界。
-2. [SDK 关键架构决策](./architecture/decisions.md)：了解 Link、Transport、钱包 Session 和解锁重试的约束。
+2. [SDK 关键架构决策](./architecture/decisions.md)：了解 Link、Transport、钱包 Session 和调用前解锁的约束。
 3. [Protocol V1/V2 传输协议](./protocol/protocol-v1-v2.md)：理解探测、帧、Schema、USB/BLE 和错误恢复。
 4. [SDK Core 运行时](./sdk/core-runtime.md)：理解协议消息如何进入 Features、Profile 和公共能力。
 
@@ -71,6 +71,7 @@
 - 设备文档回答“设备身份、钱包状态、安全和能力如何管理”。
 - 业务文档只记录实现复杂、容易误改的用户能力编排。
 - 维护文档回答“仓库规范和自动化入口如何保持一致”。
+
 ## 维护规则
 
 1. 一个主题只保留一个当前事实源，其他文档通过链接引用。

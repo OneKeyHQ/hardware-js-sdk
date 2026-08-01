@@ -91,28 +91,40 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
 
   async run(): Promise<OpenWalletSessionPayload> {
     const isProtocolV2 = this.device.isProtocolV2();
-    const state = await this.device.getDeviceState({ refreshSections: ['status'] });
+    let state = await this.device.getDeviceState({ refreshSections: ['status'] });
     let currentDeviceId = state.identity.deviceId;
+    const hasAuthoritativeProtocolV2WalletStatus = (candidate: typeof state) =>
+      candidate.status.unlocked === true &&
+      typeof candidate.status.passphraseProtection === 'boolean' &&
+      typeof candidate.status.unlockedAttachPin === 'boolean';
+    const requireAuthoritativeProtocolV2WalletStatus = (candidate: typeof state) => {
+      if (!hasAuthoritativeProtocolV2WalletStatus(candidate)) {
+        throw ERRORS.TypedError(HardwareErrorCode.DeviceInitializeFailed);
+      }
+      return candidate;
+    };
     const requireDeviceId = () => {
       if (!currentDeviceId) {
         throw ERRORS.TypedError(HardwareErrorCode.DeviceInitializeFailed);
       }
       return currentDeviceId;
     };
-    const refreshProtocolV2DeviceId = async () => {
-      const refreshedState = await this.device.getDeviceState({ refreshSections: ['status'] });
-      currentDeviceId = refreshedState.identity.deviceId;
-      return requireDeviceId();
+    const refreshProtocolV2DeviceState = async () => {
+      state = await this.device.getDeviceState({ refreshSections: ['status'] });
+      currentDeviceId = state.identity.deviceId;
+      return state;
     };
-    const unlockProtocolV2IfLocked = async () => {
-      if (isProtocolV2 && state.status.unlocked === false) {
+    const ensureProtocolV2WalletStatus = async () => {
+      if (isProtocolV2 && !hasAuthoritativeProtocolV2WalletStatus(state)) {
         await this.device.unlockDevice(DeviceSessionPinType.Main, {
           source: 'unlock-coordinator',
           reason: 'device-locked',
           deviceOnly: true,
           method: 'openWalletSession',
         });
+        requireAuthoritativeProtocolV2WalletStatus(await refreshProtocolV2DeviceState());
       }
+      return state;
     };
 
     const protocol = isProtocolV2 ? 'V2' : 'V1';
@@ -124,14 +136,21 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
             onlyMainPin: true,
             deriveCardano: this.payload.deriveCardano,
             selectMainWalletBeforeRestore:
-              state.status.unlocked === false || state.status.unlockedAttachPin === true,
+              !hasAuthoritativeProtocolV2WalletStatus(state) ||
+              state.status.unlockedAttachPin === true,
           })
         : await getPassphraseStateWithRefreshDeviceInfo(this.device, {
             onlyMainPin: true,
             initSession: this.payload.initSession,
           });
-      const deviceId = isProtocolV2 ? await refreshProtocolV2DeviceId() : requireDeviceId();
-      if (session.unlockedAttachPin) {
+      const refreshedState = isProtocolV2
+        ? requireAuthoritativeProtocolV2WalletStatus(await refreshProtocolV2DeviceState())
+        : state;
+      const deviceId = requireDeviceId();
+      if (
+        session.unlockedAttachPin ||
+        (isProtocolV2 && refreshedState.status.unlockedAttachPin === true)
+      ) {
         try {
           await this.device.lockDevice();
         } catch {
@@ -151,8 +170,8 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
 
     if (this.params.mode === OpenWalletSessionMode.ResumeHidden) {
       if (isProtocolV2) {
-        await unlockProtocolV2IfLocked();
-        const refreshedDeviceId = await refreshProtocolV2DeviceId();
+        await ensureProtocolV2WalletStatus();
+        const refreshedDeviceId = requireDeviceId();
         if (refreshedDeviceId !== this.params.deviceId) {
           deviceWalletSessionStore.delete(this.params.deviceId, this.params.passphraseState);
           throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError);
@@ -197,15 +216,18 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
     }
 
     this.device.passphraseState = undefined;
-    await unlockProtocolV2IfLocked();
+    await ensureProtocolV2WalletStatus();
     const session = isProtocolV2
       ? await getProtocolV2WalletSession(this.device, {
           forceWalletSelection: true,
           deriveCardano: this.payload.deriveCardano,
         })
       : await getPassphraseStateWithRefreshDeviceInfo(this.device, { initSession: true });
-    const deviceId = isProtocolV2 ? await refreshProtocolV2DeviceId() : requireDeviceId();
-    if (isProtocolV2 && this.device.getCurrentPassphraseProtection() !== true) {
+    const refreshedState = isProtocolV2
+      ? requireAuthoritativeProtocolV2WalletStatus(await refreshProtocolV2DeviceState())
+      : state;
+    const deviceId = requireDeviceId();
+    if (isProtocolV2 && refreshedState.status.passphraseProtection !== true) {
       this.device.clearInternalState();
       throw ERRORS.TypedError(HardwareErrorCode.DeviceNotOpenedPassphrase);
     }

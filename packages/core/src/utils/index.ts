@@ -54,7 +54,12 @@ export { getHDPath, getScriptType, getOutputScriptType } from '../api/helpers/pa
 
 export const isBleConnect = (env: string) => env === 'react-native' || env === 'lowlevel';
 
-export { getHomeScreenHex, getHomeScreenDefaultList, getHomeScreenSize } from './homescreen';
+export {
+  getHomeScreenHex,
+  getHomeScreenDefaultList,
+  getHomeScreenSize,
+  getNftSize,
+} from './homescreen';
 export { encodePro2Wallpaper, PRO2_WALLPAPER_HEIGHT, PRO2_WALLPAPER_WIDTH } from './pro2Wallpaper';
 export type { Pro2WallpaperColorFormat } from './pro2Wallpaper';
 

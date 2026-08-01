@@ -162,6 +162,7 @@ export const createCoreApi = (
     call({ ...params, connectId, method: 'deviceGetOnboardingStatus' }),
   deviceUploadWallpaper: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceUploadWallpaper' }),
+  deviceUploadNft: (connectId, params) => call({ ...params, connectId, method: 'deviceUploadNft' }),
   uploadPortfolio: (connectId, params) => call({ ...params, connectId, method: 'uploadPortfolio' }),
   deviceRecovery: (connectId, params) => call({ ...params, connectId, method: 'deviceRecovery' }),
   deviceReset: (connectId, params) => call({ ...params, connectId, method: 'deviceReset' }),

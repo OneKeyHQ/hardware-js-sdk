@@ -33,6 +33,7 @@ describe('AllNetworkGetAddressBase tracing', () => {
       init: jest.fn(),
       name: 'evmGetAddress',
       responseID: 43,
+      unlockPolicy: 'unlock-before-run',
       run: jest.fn().mockImplementation(() => {
         calls.push('run-chain-method');
         return Promise.resolve([{ address: '0xhidden' }]);
@@ -51,10 +52,12 @@ describe('AllNetworkGetAddressBase tracing', () => {
         bundle: [],
       },
     });
+    method.protocolV2UnlockContext = { preflightCompleted: true };
+    const typedCall = jest.fn();
     method.device = {
       checkPassphraseStateSafety,
       commands: {
-        typedCall: jest.fn().mockResolvedValue({ message: { unlocked: true } }),
+        typedCall,
       },
       getCurrentFirmwareType: jest.fn(),
       getProtocol: jest.fn().mockReturnValue('V2'),
@@ -89,6 +92,7 @@ describe('AllNetworkGetAddressBase tracing', () => {
 
     expect(checkPassphraseStateSafety).toHaveBeenCalledWith('hidden-state', false, undefined);
     expect(calls).toEqual(['resume-hidden-session', 'run-chain-method']);
+    expect(typedCall).not.toHaveBeenCalled();
   });
 
   test('releases the nested request context when an unhandled error escapes', async () => {

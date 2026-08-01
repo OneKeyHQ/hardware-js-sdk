@@ -135,29 +135,35 @@ Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类�
 - `packages/core/src/protocols/protocol-v2/walletSession.ts`
 - `packages/core/src/device/Device.ts`
 
-## 受保护方法的单次解锁重试
+## 受保护方法的调用前解锁
 
-自动解锁会产生用户交互，也可能造成有副作用请求重复执行，因此必须由方法显式声明：
+自动解锁会产生用户交互，业务重放还可能重复执行有副作用请求，因此 Core 只允许调用前解锁：
 
-- `BaseMethod` 默认使用 `unlockPolicy = 'none'`；安全重放方法由完整显式白名单声明
-  `unlockPolicy = 'retry-on-locked'`。
-- 有副作用的方法只能声明 `unlockPolicy = 'unlock-before-run'`：已知设备锁定时先解锁，
-  但收到 locked 响应后不重放原操作。
-- `unlock-before-run` 仅对 Pro2 / Protocol V2 生效。统一方法入口在正常固件模式下先刷新
-  `DeviceStatus`，状态明确锁定才解锁；Bootloader 和 Romloader 不支持 `DeviceStatusGet`，
-  必须跳过状态查询与解锁，直接进入固件升级流程。
+- 地址、签名、加解密等需要钱包 Session 的方法以 `useDevicePassphraseState=true` 作为唯一事实源，
+  不维护方法名白名单；新增钱包业务默认继承该值，因此必须先通过调用前解锁门。
+- `UnlockPolicy` 只有 `none` 和 `unlock-before-run`。不使用钱包 Session、但固件仍要求设备已解锁
+  的管理方法显式使用 `unlock-before-run`；状态、连接、loader 和公开资源方法显式关闭钱包
+  Session 处理，且保持 `none`。
+- 调用前解锁仅对 Pro2 / Protocol V2 生效。统一方法入口在 normal/application 模式下，先读取
+  fresh `DeviceStatus`；携带目标 `deviceId` 时必须利用该状态先确认设备身份，再按需调用
+  `device.unlockDevice()`。随后才进入 Wallet Session、Safety Check 和业务 I/O，并使用解锁流程
+  返回的 post-unlock Status 确认设备已解锁。
+- Bootloader 和 Romloader 不支持 `DeviceStatusGet`，必须跳过状态查询与解锁，直接进入已有
+  loader 流程。
+- all-network root、bundle 和内部链方法共享轻量 preflight context，因此每个 logical operation
+  只执行一次 Status/Unlock；每个子链仍按固件语义独立恢复和校验 Wallet Session。
 - Pro2 设置按固件锁定边界分类：语言、亮度、动画、轻触唤醒、振动反馈、设备名称显示和壁纸
   无需解锁；自动锁定、自动关机、蓝牙、FIDO、USB Lock、随机键盘和设备名称修改需要先解锁；
   Change PIN、Passphrase、Air-gap 与 Wipe 先解锁后打开设备确认页。未知新增设置默认要求解锁。
-- 只有结构化 `HardwareErrorCode.DeviceLocked` 会触发解锁。
-- 解锁成功后原方法最多重试一次；取消、解锁失败或第二次调用失败时直接返回错误。
-- Protocol V1、未声明策略的方法和其他错误不进入自动解锁流程。
-- 锁定错误优先依据 Protocol V2 Failure 的 code/subcode，消息文本只作兼容回退。
+- 业务 callback 只执行一次。业务阶段返回结构化 `HardwareErrorCode.DeviceLocked` 时直接失败，
+  不捕获、不解锁、不重放；解锁取消、失败或 post-unlock Status 仍锁定时，业务发送次数为零。
+- Protocol V1，以及同时满足 `useDevicePassphraseState=false` 和 `unlockPolicy='none'` 的方法，
+  不进入调用前解锁流程。
 
 主要实现：
 
 - `packages/core/src/api/BaseMethod.ts`
-- `packages/core/src/protocols/protocol-v2/unlockRetry.ts`
+- `packages/core/src/protocols/protocol-v2/unlockPolicyRunner.ts`
 - `packages/core/src/device/DeviceCommands.ts`
 
 ## 方法协议能力与固件版本边界

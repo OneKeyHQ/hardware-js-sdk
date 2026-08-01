@@ -1,0 +1,166 @@
+import { createDeviceNotSupportMethodError } from '@onekeyfe/hd-shared';
+
+import { UI_REQUEST, createUiMessage } from '../../events/ui-request';
+import { supportsProtocolV2Message } from '../../protocols/protocol-v2/features';
+import {
+  PRO2_NFT_DEFAULT_CHUNK_SIZE,
+  PRO2_NFT_DEFAULT_PACE_MS,
+  PRO2_NFT_DEFAULT_TIMEOUT_MS,
+  PRO2_NFT_DIRECTORY,
+  PRO2_NFT_MAX_CHUNK_SIZE,
+  PRO2_NFT_MIN_CHUNK_SIZE,
+  type Pro2NftBundle,
+  type Pro2NftImage,
+  buildPro2NftBundle,
+} from '../../utils/pro2Nft';
+import { BaseMethod } from '../BaseMethod';
+import { invalidParameter } from '../helpers/filesystemValidation';
+import { isProtocolV2ResponseTimeout, writeProtocolV2File } from '../helpers/protocolV2FileWrite';
+
+export type DeviceUploadNftParams = {
+  image: Pro2NftImage;
+  thumbnail: Pro2NftImage;
+  title: string;
+  subtitle: string;
+  timestampMs?: number;
+  chunkSize?: number;
+  paceMs?: number;
+  timeoutMs?: number;
+};
+
+export type DeviceUploadNftResponse = {
+  basename: string;
+  imagePath: string;
+  thumbnailPath: string;
+  metadataPath: string;
+  totalSize: number;
+  nftUpdated: true;
+  message?: string;
+};
+
+const FILESYSTEM_FILE_WRITE_MESSAGE_TYPE = 60805;
+const NFT_UPDATE_MESSAGE_TYPE = 61500;
+
+export default class DeviceUploadNft extends BaseMethod<DeviceUploadNftParams> {
+  private bundle?: Pro2NftBundle;
+
+  getSupportedProtocols() {
+    return ['V2'] as const;
+  }
+
+  init() {
+    const {
+      image,
+      thumbnail,
+      title,
+      subtitle,
+      timestampMs = Date.now(),
+      chunkSize = PRO2_NFT_DEFAULT_CHUNK_SIZE,
+      paceMs = PRO2_NFT_DEFAULT_PACE_MS,
+      timeoutMs = PRO2_NFT_DEFAULT_TIMEOUT_MS,
+    } = this.payload;
+    if (
+      !Number.isInteger(chunkSize) ||
+      chunkSize < PRO2_NFT_MIN_CHUNK_SIZE ||
+      chunkSize > PRO2_NFT_MAX_CHUNK_SIZE
+    ) {
+      throw invalidParameter(
+        `Parameter [chunkSize] must be an integer between ${PRO2_NFT_MIN_CHUNK_SIZE} and ${PRO2_NFT_MAX_CHUNK_SIZE}.`
+      );
+    }
+    if (!Number.isInteger(paceMs) || paceMs < 0) {
+      throw invalidParameter('Parameter [paceMs] must be a non-negative integer.');
+    }
+    if (!Number.isInteger(timeoutMs) || timeoutMs <= 0) {
+      throw invalidParameter('Parameter [timeoutMs] must be a positive integer.');
+    }
+
+    this.bundle = buildPro2NftBundle({ image, thumbnail, title, subtitle, timestampMs });
+    this.params = { image, thumbnail, title, subtitle, timestampMs, chunkSize, paceMs, timeoutMs };
+    this.unlockPolicy = 'none';
+    this.skipForceUpdateCheck = true;
+    this.useDevicePassphraseState = false;
+  }
+
+  private async assertCapabilities() {
+    const protocolInfo = await this.device.ensureProtocolV2RuntimeContext();
+    const hasFileWrite = supportsProtocolV2Message(
+      protocolInfo,
+      FILESYSTEM_FILE_WRITE_MESSAGE_TYPE
+    );
+    const hasNftUpdate = supportsProtocolV2Message(protocolInfo, NFT_UPDATE_MESSAGE_TYPE);
+    if (!hasFileWrite || !hasNftUpdate) {
+      throw createDeviceNotSupportMethodError(this.name, this.device.getCurrentFirmwareType());
+    }
+  }
+
+  private async updateNft(basename: string) {
+    const params = { file_name_no_ext: basename };
+    const options = { timeoutMs: this.params.timeoutMs };
+    try {
+      return await this.device.commands.typedCall('NftUpdate', 'Success', params, options);
+    } catch (error) {
+      if (!isProtocolV2ResponseTimeout(error)) {
+        throw error;
+      }
+      this.throwIfAborted();
+      return this.device.commands.typedCall('NftUpdate', 'Success', params, options);
+    }
+  }
+
+  async run(): Promise<DeviceUploadNftResponse> {
+    const { bundle } = this;
+    if (!bundle) throw invalidParameter('NFT data has not been initialized.');
+
+    await this.assertCapabilities();
+
+    const files = [
+      { path: `${PRO2_NFT_DIRECTORY}/${bundle.basename}.bin`, data: bundle.image },
+      { path: `${PRO2_NFT_DIRECTORY}/${bundle.basename}_m.bin`, data: bundle.thumbnail },
+      { path: `${PRO2_NFT_DIRECTORY}/${bundle.basename}.json`, data: bundle.metadata },
+    ];
+    const totalSize = files.reduce((sum, file) => sum + file.data.byteLength, 0);
+    let transferredBeforeFile = 0;
+
+    for (const file of files) {
+      const transferredAtFileStart = transferredBeforeFile;
+      await writeProtocolV2File({
+        commands: this.device.commands,
+        path: file.path,
+        data: file.data,
+        totalSize: file.data.byteLength,
+        chunkSize: this.params.chunkSize,
+        timeoutMs: this.params.timeoutMs,
+        paceMs: this.params.paceMs,
+        overwrite: true,
+        append: false,
+        throwIfAborted: () => this.throwIfAborted(),
+        onProgress: progress => {
+          if (typeof this.postMessage !== 'function') return;
+          const transferredBytes = transferredAtFileStart + progress.transferredBytes;
+          this.postMessage(
+            createUiMessage(UI_REQUEST.DEVICE_PROGRESS, {
+              ...progress,
+              progress: Math.floor((transferredBytes / totalSize) * 100),
+              transferredBytes,
+              totalBytes: totalSize,
+            })
+          );
+        },
+      });
+      transferredBeforeFile += file.data.byteLength;
+    }
+
+    this.throwIfAborted();
+    const response = await this.updateNft(bundle.basename);
+    return {
+      basename: bundle.basename,
+      imagePath: files[0].path,
+      thumbnailPath: files[1].path,
+      metadataPath: files[2].path,
+      totalSize,
+      nftUpdated: true,
+      message: response.message?.message,
+    };
+  }
+}

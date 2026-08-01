@@ -121,18 +121,10 @@ describe('messages', () => {
       id: 1,
       type: 'bytes',
     });
-    expect(v2Messages.nested.DeviceSessionGet.fields).toMatchObject({
-      btc_test_address: { id: 2, type: 'string' },
-      seed_domains: {
-        id: 3,
-        type: 'DeviceSessionSeedDomain',
-        rule: 'repeated',
-      },
+    expect(v2Messages.nested.DeviceSessionGet.fields).toEqual({
+      session_id: { id: 1, type: 'bytes' },
     });
-    expect(v2Messages.nested.DeviceSessionSeedDomain.values).toEqual({
-      SeedDomain_Standard: 1,
-      SeedDomain_Cardano: 2,
-    });
+    expect(v2Messages.nested).not.toHaveProperty('DeviceSessionSeedDomain');
     expect(v2Messages.nested.DeviceSessionPinType.values).toEqual({
       Any: 1,
       Main: 2,
@@ -229,6 +221,13 @@ describe('messages', () => {
       wallet_initialized: { id: 5, type: 'bool' },
     });
     expect(v2Messages.nested).not.toHaveProperty('DevOnboardingStatus');
+  });
+
+  test('Protocol V2 NFT update matches the current firmware-pro2 schema', () => {
+    expect(v2Messages.nested.MessageType.values.MessageType_NftUpdate).toBe(61500);
+    expect(v2Messages.nested.NftUpdate.fields).toEqual({
+      file_name_no_ext: { id: 1, type: 'string', rule: 'required' },
+    });
   });
 
   test('Protocol V2 does not restore retired unlock or passphrase ids', () => {

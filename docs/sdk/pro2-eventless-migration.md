@@ -231,16 +231,20 @@ requestId/connectId 关联，并在取消、超时、断连和方法结束时清
 
 ```text
 业务请求
-  -> 安全重放白名单：DeviceLocked -> 解锁 -> method.run() 最多重试一次
-  -> 有副作用方法：已知 locked -> 先解锁 -> method.run() 只执行一次
+  -> 钱包业务或显式受保护管理方法：fresh Status -> 校验设备身份 -> 按需解锁
+  -> Wallet Session -> method.run() 一次
+  -> 业务阶段 DeviceLocked：直接失败，不解锁、不重放
 ```
 
 - App 不回传 PIN，也不重发业务请求。
 - Pro2 `REQUEST_PIN` 是非阻塞设备提示。
-- 非幂等方法不得在收到 locked 响应后重放，只能使用 `unlock-before-run`。
-- 同一设备并发调用共享串行解锁任务。
-- `uploadPortfolio` 使用 `unlockPolicy='none'` 且通过 `protocolV2UiMode='none'` 关闭普通方法交互提示；
-  SDK 不会为该方法主动发送 `DeviceSessionAskPin`，文件写入与应用流程只执行一次。
+- 钱包业务由 `useDevicePassphraseState=true` 自动进入调用前解锁，不维护方法名白名单；非钱包但
+  固件要求解锁的管理方法显式使用 `unlock-before-run`。不存在 `retry-on-locked`。
+- all-network root 与内部子方法共享一次 Status/Unlock preflight，每个子链仍独立恢复 Wallet Session。
+- bootloader/romloader 跳过 Status/Unlock，Protocol V1 保持原流程。
+- `uploadPortfolio` 关闭钱包 Session 处理、使用 `unlockPolicy='none'`，并通过
+  `protocolV2UiMode='none'` 关闭普通方法交互提示；SDK 不会为该方法主动发送
+  `DeviceSessionAskPin`，文件写入与应用流程只执行一次。
 
 ## 地址、公钥、签名和设备管理
 
@@ -316,7 +320,7 @@ Cancel 必须绑定当前设备和 Transport source；断连时清理请求、UI
 - 区分阻塞选择 Event 与非阻塞提示 Event。
 - 设备 Passphrase 必须合成一次 `REQUEST_PASSPHRASE_ON_DEVICE`；Attach PIN 必须合成一次兼容现有
   App 的设备 PIN 阶段提示。
-- 自动解锁只重试一次，并验证方法重试安全契约。
+- 自动解锁只发生在业务发送前；业务 callback 和已开始的多步骤操作都不重放。
 - 保留签名数据握手、进度、Transport 和生命周期事件。
 - 统一 cancel/timeout/disconnect 的 UI Promise 和 Event 清理。
 - `DeviceSessionGet({ session_id })` 后校验 `btc_test_address`，不匹配时禁止继续业务。

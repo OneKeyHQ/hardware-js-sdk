@@ -1,5 +1,5 @@
 import { EDeviceType, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import { DeviceSessionPinType, DeviceSessionSeedDomain } from '@onekeyfe/hd-transport';
+import { DeviceSessionPinType } from '@onekeyfe/hd-transport';
 
 import GetPassphraseState from '../src/api/GetPassphraseState';
 import OpenWalletSession from '../src/api/OpenWalletSession';
@@ -27,6 +27,7 @@ const createDevice = ({
       unlocked: true,
       passphraseProtection,
       attachToPinEnabled: false,
+      unlockedAttachPin: false,
     },
     commands: {
       typedCall: jest.fn((request: string, ...args: unknown[]) => {
@@ -49,10 +50,16 @@ const createDevice = ({
         eventless_wallet_session: true,
       })
     ),
-    getDeviceState: jest.fn().mockResolvedValue({
-      identity: { deviceId: 'device-1' },
-      status: { passphraseProtection },
-    }),
+    getDeviceState: jest.fn(() =>
+      Promise.resolve({
+        identity: { deviceId: 'device-1' },
+        status: {
+          unlocked: device.features.unlocked,
+          passphraseProtection: device.features.passphraseProtection,
+          unlockedAttachPin: device.features.unlockedAttachPin,
+        },
+      })
+    ),
     getCurrentDeviceId: () => 'device-1',
     getCurrentPassphraseProtection: () => passphraseProtection,
     getInternalState: () =>
@@ -323,10 +330,24 @@ describe('openWalletSession', () => {
       typedCall,
       promptPassphrase: jest.fn().mockResolvedValue({ passphraseOnDevice: true }),
     });
-    device.getDeviceState = jest.fn().mockResolvedValue({
-      identity: { deviceId: 'device-1' },
-      status: { unlocked: false, passphraseProtection: true },
-    });
+    device.getDeviceState = jest
+      .fn()
+      .mockResolvedValueOnce({
+        identity: { deviceId: 'device-1' },
+        status: {
+          unlocked: false,
+          passphraseProtection: null,
+          unlockedAttachPin: null,
+        },
+      })
+      .mockResolvedValue({
+        identity: { deviceId: 'device-1' },
+        status: {
+          unlocked: true,
+          passphraseProtection: true,
+          unlockedAttachPin: false,
+        },
+      });
     method.device = device as any;
 
     await expect(method.run()).resolves.toMatchObject({
@@ -380,6 +401,12 @@ describe('openWalletSession', () => {
         status.passphrase_enabled ?? device.features.passphraseProtection;
       return device.features;
     });
+    device.unlockDevice = jest.fn().mockImplementation(() => {
+      device.features.unlocked = true;
+      device.features.passphraseProtection = true;
+      device.features.unlockedAttachPin = false;
+      return Promise.resolve(device.features);
+    });
     method.device = device as any;
 
     await expect(method.run()).resolves.toEqual({
@@ -389,8 +416,96 @@ describe('openWalletSession', () => {
       passphraseState: 'hidden-state-after-unlock',
       resumed: false,
     });
-    expect(device.unlockDevice).not.toHaveBeenCalled();
+    expect(device.unlockDevice).toHaveBeenCalledTimes(1);
     expect(promptPassphrase).toHaveBeenCalledTimes(1);
+  });
+
+  test('unlocks before wallet selection when the Protocol V2 wallet status is unknown', async () => {
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce({ message: { version: 2 } })
+      .mockResolvedValueOnce({ message: {} })
+      .mockResolvedValueOnce({
+        message: {
+          btc_test_address: 'hidden-state-after-unknown-status',
+          session_id: 'hidden-session-after-unknown-status',
+        },
+      });
+    const promptPassphrase = jest.fn().mockResolvedValue({ passphrase: 'host hidden wallet' });
+    const method = new OpenWalletSession({
+      payload: { method: 'openWalletSession', connectId: 'connect-id', mode: 'select-hidden' },
+    });
+    method.init();
+    const device = createDevice({ typedCall, promptPassphrase });
+    device.getDeviceState = jest
+      .fn()
+      .mockResolvedValueOnce({
+        identity: { deviceId: 'device-1' },
+        status: {
+          unlocked: undefined,
+          passphraseProtection: null,
+          unlockedAttachPin: null,
+        },
+      })
+      .mockResolvedValue({
+        identity: { deviceId: 'device-1' },
+        status: {
+          unlocked: true,
+          passphraseProtection: true,
+          unlockedAttachPin: false,
+        },
+      });
+    device.unlockDevice = jest.fn().mockImplementation(() => {
+      device.features.unlocked = true;
+      device.features.passphraseProtection = true;
+      device.features.unlockedAttachPin = false;
+      return Promise.resolve(device.features);
+    });
+    method.device = device as any;
+
+    await expect(method.run()).resolves.toMatchObject({
+      walletType: 'hidden',
+      passphraseState: 'hidden-state-after-unknown-status',
+    });
+    expect(device.unlockDevice).toHaveBeenCalledTimes(1);
+    expect(device.unlockDevice.mock.invocationCallOrder[0]).toBeLessThan(
+      promptPassphrase.mock.invocationCallOrder[0]
+    );
+  });
+
+  test('rejects wallet selection when the post-unlock Protocol V2 status remains incomplete', async () => {
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce({ message: { version: 2 } })
+      .mockResolvedValueOnce({ message: {} })
+      .mockResolvedValueOnce({
+        message: {
+          btc_test_address: 'hidden-state-from-incomplete-status',
+          session_id: 'hidden-session-from-incomplete-status',
+        },
+      });
+    const promptPassphrase = jest.fn().mockResolvedValue({ passphrase: 'host hidden wallet' });
+    const method = new OpenWalletSession({
+      payload: { method: 'openWalletSession', connectId: 'connect-id', mode: 'select-hidden' },
+    });
+    method.init();
+    const device = createDevice({ typedCall, promptPassphrase });
+    device.getDeviceState = jest.fn().mockResolvedValue({
+      identity: { deviceId: 'device-1' },
+      status: {
+        unlocked: true,
+        passphraseProtection: null,
+        unlockedAttachPin: null,
+      },
+    });
+    device.unlockDevice = jest.fn().mockResolvedValue(device.features);
+    method.device = device as any;
+
+    await expect(method.run()).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.DeviceInitializeFailed,
+    });
+    expect(device.unlockDevice).toHaveBeenCalledTimes(1);
+    expect(promptPassphrase).not.toHaveBeenCalled();
   });
 
   test('rejects a Pro2 standard-wallet fallback after selecting a hidden wallet', async () => {
@@ -529,7 +644,6 @@ describe('openWalletSession', () => {
     });
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
       session_id: 'known-session',
-      btc_test_address: 'hidden-state',
     });
     expect(promptPassphrase).not.toHaveBeenCalled();
   });
@@ -741,7 +855,11 @@ describe('openWalletSession', () => {
       })
       .mockResolvedValueOnce({
         identity: { deviceId: 'device-1' },
-        status: { passphraseProtection: true },
+        status: {
+          unlocked: true,
+          passphraseProtection: true,
+          unlockedAttachPin: false,
+        },
       });
     device.unlockDevice = jest.fn().mockImplementation(() => {
       device.features.unlocked = true;
@@ -780,14 +898,24 @@ describe('openWalletSession', () => {
     method.init();
     const device = createDevice({ typedCall });
     device.features.unlockedAttachPin = true;
-    device.getDeviceState = jest.fn().mockResolvedValue({
-      identity: { deviceId: 'device-1' },
-      status: {
-        unlocked: true,
-        unlockedAttachPin: true,
-        passphraseProtection: true,
-      },
-    });
+    device.getDeviceState = jest
+      .fn()
+      .mockResolvedValueOnce({
+        identity: { deviceId: 'device-1' },
+        status: {
+          unlocked: true,
+          unlockedAttachPin: true,
+          passphraseProtection: true,
+        },
+      })
+      .mockResolvedValue({
+        identity: { deviceId: 'device-1' },
+        status: {
+          unlocked: true,
+          unlockedAttachPin: false,
+          passphraseProtection: true,
+        },
+      });
     device.unlockDevice = jest.fn().mockImplementation(() => {
       device.features.unlockedAttachPin = false;
       return Promise.resolve(device.features);
@@ -1253,7 +1381,6 @@ describe('openWalletSession', () => {
     });
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
       session_id: 'known-session',
-      btc_test_address: 'hidden-state',
     });
     expect(promptPassphrase).not.toHaveBeenCalled();
   });
@@ -1289,7 +1416,11 @@ describe('openWalletSession', () => {
       })
       .mockResolvedValueOnce({
         identity: { deviceId: 'device-1' },
-        status: { passphraseProtection: true },
+        status: {
+          unlocked: true,
+          passphraseProtection: true,
+          unlockedAttachPin: false,
+        },
       });
     device.unlockDevice = jest.fn().mockImplementation(() => {
       device.features.unlocked = true;
@@ -1308,7 +1439,6 @@ describe('openWalletSession', () => {
     expect(device.getDeviceState).toHaveBeenCalledTimes(2);
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
       session_id: 'known-session',
-      btc_test_address: 'hidden-state',
     });
     const sessionGetCall = typedCall.mock.calls.findIndex(
       ([requestName]) => requestName === 'DeviceSessionGet'
@@ -1346,7 +1476,11 @@ describe('openWalletSession', () => {
       })
       .mockResolvedValueOnce({
         identity: { deviceId: 'other-device' },
-        status: { passphraseProtection: true },
+        status: {
+          unlocked: true,
+          passphraseProtection: true,
+          unlockedAttachPin: false,
+        },
       });
     device.unlockDevice = jest.fn().mockImplementation(() => {
       device.features.unlocked = true;
@@ -1401,7 +1535,6 @@ describe('openWalletSession', () => {
     });
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
       session_id: 'expired-session',
-      btc_test_address: 'hidden-state',
     });
     expect(promptPassphrase).toHaveBeenCalledTimes(1);
     expect(deviceWalletSessionStore.get('device-1', 'hidden-state')).toBe('renewed-session');
@@ -1437,26 +1570,12 @@ describe('openWalletSession', () => {
       passphraseState: 'hidden-state',
       resumed: false,
     });
-    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
-      btc_test_address: 'hidden-state',
-    });
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
     expect(promptPassphrase).not.toHaveBeenCalled();
     expect(deviceWalletSessionStore.get('device-1', 'hidden-state')).toBe('new-session');
   });
 
-  test.each([
-    {
-      deriveCardano: false,
-      seedDomains: [DeviceSessionSeedDomain.SeedDomain_Standard],
-    },
-    {
-      deriveCardano: true,
-      seedDomains: [
-        DeviceSessionSeedDomain.SeedDomain_Standard,
-        DeviceSessionSeedDomain.SeedDomain_Cardano,
-      ],
-    },
-  ])('requests the selected seed domains: $seedDomains', async ({ deriveCardano, seedDomains }) => {
+  test.each([false, true])('keeps deriveCardano API compatibility: %s', async deriveCardano => {
     const typedCall = jest
       .fn()
       .mockResolvedValueOnce({ message: { version: 2 } })
@@ -1485,8 +1604,6 @@ describe('openWalletSession', () => {
       walletType: 'hidden',
       passphraseState: 'hidden-state',
     });
-    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
-      seed_domains: seedDomains,
-    });
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
   });
 });
