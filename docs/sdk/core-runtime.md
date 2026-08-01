@@ -332,7 +332,11 @@ Pro2 接入的强制前置条件。
 | 钱包 Session   | `openWalletSession`、`clearSessionCache`                 | 无                                                        | `deviceSessionOpen`                                                      |
 | 固件           | `firmwareUpdateV4` 等高层流程                            | `deviceGetFirmwareUpdateStatus`                           | `deviceFirmwareUpdate`                                                   |
 | 文件维护       | `uploadPortfolio`、`deviceUploadWallpaper`、高层固件升级 | `fileRead`、`dirList`、`pathInfo`，以及受约束的 `dirMake` | `fileWrite`、`fileDelete`、`dirRemove`、`filesystemFormat/PermissionFix` |
-| 协议与工厂调试 | 无                                                       | `protocolInfoRequest`、`ping`、`deviceFactoryInfoGet`     | `deviceFactoryInfoSet`                                                   |
+| Pro2 工厂接口  | 见下方语义 API                                           | `protocolInfoRequest`、`ping`                             | 原始 `DeviceFactoryInfo*`、`DeviceCertificate*` 命令                     |
+
+Pro2 工厂语义 API 包括 `deviceReadFactoryInfo`、`deviceProvisionFactoryInfo`、
+`deviceReadFactoryCertificate`、`deviceWriteFactoryCertificate` 和
+`deviceSignFactoryChallenge`。
 
 `getFeatures`、`getOnekeyFeatures` 仅作为 Protocol V1 兼容入口保留并标记废弃，新接入使用 `getDeviceState`。
 

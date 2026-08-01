@@ -7,6 +7,7 @@ export default class DeviceInfoSettings extends BaseMethod<HardwareDeviceInfoSet
   init() {
     this.useDevicePassphraseState = false;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.BOOTLOADER];
+    this.skipForceUpdateCheck = true;
     this.params = {
       serial_no: this.payload.serial_no,
       cpu_info: this.payload.cpu_info,

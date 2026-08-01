@@ -447,6 +447,20 @@ DeviceFactoryInfoSet -> Success
 
 即使工厂序列号与普通设备序列号值相同，SDK 也不能在两者之间静默兜底，因为它们具有不同的读取和写入权限。
 
+### 11.3 SDK 工厂接口边界
+
+生产工具通过带业务语义的 Protocol V2 API 访问制造信息和设备证书，原始 protobuf 命令不进入公共 `CoreApi`：
+
+| 公共 API                        | 运行模式           | 职责                                     |
+| ------------------------------- | ------------------ | ---------------------------------------- |
+| `deviceReadFactoryInfo`         | application/loader | 读取制造信息                             |
+| `deviceProvisionFactoryInfo`    | bootloader         | 提交完整制造信息                         |
+| `deviceReadFactoryCertificate`  | application/loader | 读取设备证书，不导出设备私钥             |
+| `deviceWriteFactoryCertificate` | bootloader         | 提交设备证书和可选的 32 字节设备私钥     |
+| `deviceSignFactoryChallenge`    | application/loader | 对调用方提供的 32 字节摘要执行设备内签名 |
+
+本节只定义 SDK 接口职责和权限边界；具体写号顺序、断点重试与工位操作由写号工具文档维护。
+
 ## 12. SDK 如何转换字段
 
 SDK 对外只有一条统一设备状态路径。
