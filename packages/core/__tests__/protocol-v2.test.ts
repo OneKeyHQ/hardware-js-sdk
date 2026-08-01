@@ -13,6 +13,9 @@ import DirList from '../src/api/DirList';
 import FileRead from '../src/api/FileRead';
 import FileWrite from '../src/api/FileWrite';
 import UploadPortfolio from '../src/api/UploadPortfolio';
+import DeviceFactoryCertificateRead from '../src/api/protocol-v2/DeviceFactoryCertificateRead';
+import DeviceFactoryCertificateWrite from '../src/api/protocol-v2/DeviceFactoryCertificateWrite';
+import DeviceFactoryChallengeSign from '../src/api/protocol-v2/DeviceFactoryChallengeSign';
 import DeviceFactoryInfoGet from '../src/api/protocol-v2/DeviceFactoryInfoGet';
 import DeviceFactoryInfoSet from '../src/api/protocol-v2/DeviceFactoryInfoSet';
 import DeviceFirmwareUpdate from '../src/api/protocol-v2/DeviceFirmwareUpdate';
@@ -6723,12 +6726,23 @@ describe('Protocol V2 current low-level methods', () => {
 
   test('sends DeviceFactoryInfoSet and DeviceFactoryInfoGet', async () => {
     const typedCall = jest.fn().mockResolvedValue({ message: {} });
+    const manufactureTime = {
+      year: 2026,
+      month: 8,
+      day: 1,
+      hour: 10,
+      minute: 20,
+      second: 30,
+    };
     const setMethod = new DeviceFactoryInfoSet({
       id: 1,
       payload: {
         method: 'deviceFactoryInfoSet',
+        version: 1,
         serial_number: 'PR2SERIAL',
         burn_in_completed: true,
+        factory_test_completed: true,
+        manufacture_time: manufactureTime,
       },
     });
     setMethod.init();
@@ -6738,11 +6752,11 @@ describe('Protocol V2 current low-level methods', () => {
 
     expect(typedCall).toHaveBeenCalledWith('DeviceFactoryInfoSet', 'Success', {
       info: {
-        version: undefined,
+        version: 1,
         serial_number: 'PR2SERIAL',
         burn_in_completed: true,
-        factory_test_completed: undefined,
-        manufacture_time: undefined,
+        factory_test_completed: true,
+        manufacture_time: manufactureTime,
       },
     });
 
@@ -6757,6 +6771,108 @@ describe('Protocol V2 current low-level methods', () => {
     await getMethod.run();
 
     expect(typedCall).toHaveBeenLastCalledWith('DeviceFactoryInfoGet', 'DeviceFactoryInfo', {});
+  });
+
+  test('validates the write-once DeviceFactoryInfoSet payload before sending', () => {
+    expect(() =>
+      new DeviceFactoryInfoSet({
+        id: 1,
+        payload: {
+          method: 'deviceProvisionFactoryInfo',
+          serial_number: 'PR2SERIAL',
+        },
+      }).init()
+    ).toThrow('Parameter [manufacture_time] is required.');
+
+    expect(() =>
+      new DeviceFactoryInfoSet({
+        id: 1,
+        payload: {
+          method: 'deviceProvisionFactoryInfo',
+          version: 1,
+          serial_number: 'P'.repeat(25),
+          burn_in_completed: true,
+          factory_test_completed: true,
+          manufacture_time: {
+            year: 2026,
+            month: 8,
+            day: 1,
+            hour: 0,
+            minute: 0,
+            second: 0,
+          },
+        },
+      }).init()
+    ).toThrow('must not exceed 24 UTF-8 bytes');
+  });
+
+  test('writes, reads and signs with the Protocol V2 factory certificate API', async () => {
+    const typedCall = jest.fn().mockResolvedValue({ message: {} });
+    const write = new DeviceFactoryCertificateWrite({
+      id: 1,
+      payload: {
+        method: 'deviceWriteFactoryCertificate',
+        certificate: 'aabbcc',
+        privateKey: '11'.repeat(32),
+      },
+    });
+    write.init();
+    (write as any).device = stubDevice({ commands: { typedCall } });
+    await write.run();
+
+    expect(typedCall).toHaveBeenLastCalledWith('DeviceCertificateWrite', 'Success', {
+      cert: {
+        cert_and_pubkey: 'aabbcc',
+        private_key: '11'.repeat(32),
+      },
+    });
+
+    const read = new DeviceFactoryCertificateRead({
+      id: 2,
+      payload: { method: 'deviceReadFactoryCertificate' },
+    });
+    read.init();
+    (read as any).device = stubDevice({ commands: { typedCall } });
+    await read.run();
+    expect(typedCall).toHaveBeenLastCalledWith('DeviceCertificateRead', 'DeviceCertificate', {});
+
+    const sign = new DeviceFactoryChallengeSign({
+      id: 3,
+      payload: {
+        method: 'deviceSignFactoryChallenge',
+        digest: '22'.repeat(32),
+      },
+    });
+    sign.init();
+    (sign as any).device = stubDevice({ commands: { typedCall } });
+    await sign.run();
+    expect(typedCall).toHaveBeenLastCalledWith(
+      'DeviceCertificateSign',
+      'DeviceCertificateSignature',
+      { data: '22'.repeat(32) }
+    );
+  });
+
+  test('rejects malformed Protocol V2 factory certificate fields', () => {
+    expect(() =>
+      new DeviceFactoryCertificateWrite({
+        id: 1,
+        payload: {
+          method: 'deviceWriteFactoryCertificate',
+          certificate: 'xyz',
+        },
+      }).init()
+    ).toThrow('even-length hexadecimal string');
+
+    expect(() =>
+      new DeviceFactoryChallengeSign({
+        id: 2,
+        payload: {
+          method: 'deviceSignFactoryChallenge',
+          digest: '11',
+        },
+      }).init()
+    ).toThrow('exactly 32 bytes');
   });
 
   test('marks explicit Protocol V2 unlock as an on-device PIN interaction', () => {

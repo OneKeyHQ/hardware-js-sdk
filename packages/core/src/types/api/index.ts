@@ -1,7 +1,13 @@
+import type { deviceInfoSettings } from './deviceInfoSettings';
 import type {
   deviceGetOnboardingStatus,
+  deviceProvisionFactoryInfo,
+  deviceReadFactoryCertificate,
+  deviceReadFactoryInfo,
   deviceReboot,
+  deviceSignFactoryChallenge,
   deviceUploadWallpaper,
+  deviceWriteFactoryCertificate,
   testProtocolV2Ping,
   uploadPortfolio,
 } from './protocolV2';
@@ -144,13 +150,11 @@ import type { benfenSignMessage } from './benfenSignMessage';
 import type { neoGetAddress } from './neoGetAddress';
 import type { neoSignTransaction } from './neoSignTransaction';
 import type { ConnectSettings } from '../settings';
-
-import { deviceInfoSettings } from './deviceInfoSettings';
-import { deviceGetInfo } from './deviceGetInfo';
-import { deviceWriteSEPrivateKey } from './deviceWriteSEPrivateKey';
-import { deviceReadSEPublicCert } from './deviceReadSEPublicCert';
-import { deviceWriteSEPublicCert } from './deviceWriteSEPublicCert';
-import { deviceSESignMessage } from './deviceSESignMessage';
+import type { deviceGetInfo } from './deviceGetInfo';
+import type { deviceWriteSEPrivateKey } from './deviceWriteSEPrivateKey';
+import type { deviceReadSEPublicCert } from './deviceReadSEPublicCert';
+import type { deviceWriteSEPublicCert } from './deviceWriteSEPublicCert';
+import type { deviceSESignMessage } from './deviceSESignMessage';
 
 export * from './export';
 export type { DeviceStateScope, GetDeviceStateParams } from './getDeviceState';
@@ -162,7 +166,12 @@ export type {
   OpenWalletSessionPayload,
 } from './openWalletSession';
 export type { ClearSessionCacheParams, ClearSessionCachePayload } from './sessionCache';
-export type { TestProtocolV2PingParams } from './protocolV2';
+export type {
+  DeviceFactoryCertificateWriteParams,
+  DeviceFactoryChallengeSignParams,
+  DeviceFactoryInfoSetParams,
+  TestProtocolV2PingParams,
+} from './protocolV2';
 
 export type CoreApi = {
   /**
@@ -241,6 +250,11 @@ export type CoreApi = {
    */
   deviceReboot: typeof deviceReboot;
   deviceGetOnboardingStatus: typeof deviceGetOnboardingStatus;
+  deviceProvisionFactoryInfo: typeof deviceProvisionFactoryInfo;
+  deviceReadFactoryInfo: typeof deviceReadFactoryInfo;
+  deviceWriteFactoryCertificate: typeof deviceWriteFactoryCertificate;
+  deviceReadFactoryCertificate: typeof deviceReadFactoryCertificate;
+  deviceSignFactoryChallenge: typeof deviceSignFactoryChallenge;
   deviceUploadWallpaper: typeof deviceUploadWallpaper;
   uploadPortfolio: typeof uploadPortfolio;
 

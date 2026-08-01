@@ -37,11 +37,11 @@ export type DeviceFirmwareUpdateStatusGetParams = {
 };
 
 export type DeviceFactoryInfoSetParams = {
-  version?: number;
-  serial_number?: string;
-  burn_in_completed?: boolean;
-  factory_test_completed?: boolean;
-  manufacture_time?: {
+  version: number;
+  serial_number: string;
+  burn_in_completed: boolean;
+  factory_test_completed: boolean;
+  manufacture_time: {
     year: number;
     month: number;
     day: number;
@@ -50,6 +50,153 @@ export type DeviceFactoryInfoSetParams = {
     second: number;
   };
 };
+
+export type DeviceFactoryCertificateWriteParams = {
+  certificate: string;
+  privateKey?: string;
+};
+
+export type DeviceFactoryChallengeSignParams = {
+  digest: string;
+};
+
+const FACTORY_SERIAL_MAX_UTF8_BYTES = 24;
+const FACTORY_CERTIFICATE_MAX_BYTES = 512;
+const FACTORY_PRIVATE_KEY_BYTES = 32;
+const FACTORY_CHALLENGE_DIGEST_BYTES = 32;
+
+const getUtf8ByteLength = (value: string) =>
+  Array.from(value).reduce((length, character) => {
+    const codePoint = character.codePointAt(0) ?? 0;
+    if (codePoint <= 0x7f) return length + 1;
+    if (codePoint <= 0x7ff) return length + 2;
+    if (codePoint <= 0xffff) return length + 3;
+    return length + 4;
+  }, 0);
+
+const validateRequiredBoolean = (value: unknown, name: string): boolean => {
+  if (typeof value !== 'boolean') {
+    throw invalidParameter(`Parameter [${name}] is required and must be a boolean.`);
+  }
+  return value;
+};
+
+const validateIntegerInRange = (
+  value: unknown,
+  name: string,
+  minimum: number,
+  maximum: number
+): number => {
+  if (
+    typeof value !== 'number' ||
+    !Number.isSafeInteger(value) ||
+    value < minimum ||
+    value > maximum
+  ) {
+    throw invalidParameter(
+      `Parameter [${name}] must be an integer between ${minimum} and ${maximum}.`
+    );
+  }
+  return value;
+};
+
+const validateHexBytes = (
+  value: unknown,
+  name: string,
+  options: { exactBytes?: number; maxBytes?: number }
+): string => {
+  const hex = validateNonEmptyString(value, name).trim();
+  if (!/^(?:[0-9a-fA-F]{2})+$/.test(hex)) {
+    throw invalidParameter(`Parameter [${name}] must be an even-length hexadecimal string.`);
+  }
+  const byteLength = hex.length / 2;
+  if (options.exactBytes !== undefined && byteLength !== options.exactBytes) {
+    throw invalidParameter(`Parameter [${name}] must contain exactly ${options.exactBytes} bytes.`);
+  }
+  if (options.maxBytes !== undefined && byteLength > options.maxBytes) {
+    throw invalidParameter(`Parameter [${name}] must not exceed ${options.maxBytes} bytes.`);
+  }
+  return hex;
+};
+
+export function validateDeviceFactoryInfoSetParams(
+  payload: Partial<DeviceFactoryInfoSetParams>
+): DeviceFactoryInfoSetParams {
+  const serialNumber = validateNonEmptyString(payload.serial_number, 'serial_number').trim();
+  if (getUtf8ByteLength(serialNumber) > FACTORY_SERIAL_MAX_UTF8_BYTES) {
+    throw invalidParameter(
+      `Parameter [serial_number] must not exceed ${FACTORY_SERIAL_MAX_UTF8_BYTES} UTF-8 bytes.`
+    );
+  }
+
+  const time = payload.manufacture_time;
+  if (!time || typeof time !== 'object') {
+    throw invalidParameter('Parameter [manufacture_time] is required.');
+  }
+  const manufactureTime = {
+    year: validateIntegerInRange(time.year, 'manufacture_time.year', 2000, 9999),
+    month: validateIntegerInRange(time.month, 'manufacture_time.month', 1, 12),
+    day: validateIntegerInRange(time.day, 'manufacture_time.day', 1, 31),
+    hour: validateIntegerInRange(time.hour, 'manufacture_time.hour', 0, 23),
+    minute: validateIntegerInRange(time.minute, 'manufacture_time.minute', 0, 59),
+    second: validateIntegerInRange(time.second, 'manufacture_time.second', 0, 59),
+  };
+  const normalizedDate = new Date(
+    Date.UTC(
+      manufactureTime.year,
+      manufactureTime.month - 1,
+      manufactureTime.day,
+      manufactureTime.hour,
+      manufactureTime.minute,
+      manufactureTime.second
+    )
+  );
+  if (
+    normalizedDate.getUTCFullYear() !== manufactureTime.year ||
+    normalizedDate.getUTCMonth() + 1 !== manufactureTime.month ||
+    normalizedDate.getUTCDate() !== manufactureTime.day
+  ) {
+    throw invalidParameter('Parameter [manufacture_time] must be a valid calendar date.');
+  }
+
+  return {
+    version: validateIntegerInRange(payload.version, 'version', 0, 255),
+    serial_number: serialNumber,
+    burn_in_completed: validateRequiredBoolean(payload.burn_in_completed, 'burn_in_completed'),
+    factory_test_completed: validateRequiredBoolean(
+      payload.factory_test_completed,
+      'factory_test_completed'
+    ),
+    manufacture_time: manufactureTime,
+  };
+}
+
+export function validateDeviceFactoryCertificateWriteParams(
+  payload: Partial<DeviceFactoryCertificateWriteParams>
+): DeviceFactoryCertificateWriteParams {
+  return {
+    certificate: validateHexBytes(payload.certificate, 'certificate', {
+      maxBytes: FACTORY_CERTIFICATE_MAX_BYTES,
+    }),
+    ...(payload.privateKey === undefined
+      ? {}
+      : {
+          privateKey: validateHexBytes(payload.privateKey, 'privateKey', {
+            exactBytes: FACTORY_PRIVATE_KEY_BYTES,
+          }),
+        }),
+  };
+}
+
+export function validateDeviceFactoryChallengeSignParams(
+  payload: Partial<DeviceFactoryChallengeSignParams>
+): DeviceFactoryChallengeSignParams {
+  return {
+    digest: validateHexBytes(payload.digest, 'digest', {
+      exactBytes: FACTORY_CHALLENGE_DIGEST_BYTES,
+    }),
+  };
+}
 
 const DEVICE_REBOOT_TYPES: Record<string, DeviceRebootType> = {
   Normal: DeviceRebootType.Normal,

@@ -1,26 +1,28 @@
 import { BaseMethod } from '../BaseMethod';
 import { UI_REQUEST } from '../../constants/ui-request';
+import { validateDeviceFactoryChallengeSignParams } from './helpers';
 
-export default class DeviceFactoryInfoGet extends BaseMethod {
+import type { DeviceFactoryChallengeSignParams } from './helpers';
+
+export default class DeviceFactoryChallengeSign extends BaseMethod<DeviceFactoryChallengeSignParams> {
   getSupportedProtocols() {
     return ['V2'] as const;
   }
 
   init() {
-    // Protocol V2 (Pro2) only; Core rejects non-V2 devices.
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
     this.unlockPolicy = 'none';
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.BOOTLOADER];
-    this.params = undefined;
+    this.params = validateDeviceFactoryChallengeSignParams(this.payload);
   }
 
   async run() {
     const res = await this.device.commands.typedCall(
-      'DeviceFactoryInfoGet',
-      'DeviceFactoryInfo',
-      {}
+      'DeviceCertificateSign',
+      'DeviceCertificateSignature',
+      { data: this.params.digest }
     );
-    return Promise.resolve(res.message);
+    return res.message;
   }
 }

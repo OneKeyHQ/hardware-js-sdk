@@ -160,6 +160,16 @@ export const createCoreApi = (
   deviceReboot: (connectId, params) => call({ ...params, connectId, method: 'deviceReboot' }),
   deviceGetOnboardingStatus: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceGetOnboardingStatus' }),
+  deviceProvisionFactoryInfo: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceProvisionFactoryInfo' }),
+  deviceReadFactoryInfo: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceReadFactoryInfo' }),
+  deviceWriteFactoryCertificate: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceWriteFactoryCertificate' }),
+  deviceReadFactoryCertificate: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceReadFactoryCertificate' }),
+  deviceSignFactoryChallenge: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceSignFactoryChallenge' }),
   deviceUploadWallpaper: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceUploadWallpaper' }),
   uploadPortfolio: (connectId, params) => call({ ...params, connectId, method: 'uploadPortfolio' }),
