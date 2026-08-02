@@ -84,7 +84,7 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
       status: 'required',
       hasUpgrade: true,
       required: true,
-      targetsToUpdate: ['boot', 'app_v1', 'resource'],
+      targetsToUpdate: ['boot', 'app_v1'],
       components: [
         { configKey: 'bootloader', status: 'outdated', updateTarget: 'boot' },
         { configKey: 'applicationP1', status: 'outdated', updateTarget: 'app_v1' },
@@ -247,13 +247,26 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
         firmwareVersion: '1.0.0',
       },
       getDeviceState,
+      getCommands: () => ({ typedCall: jest.fn().mockResolvedValue({ message: { items: [] } }) }),
     } as unknown as CheckAllFirmwareRelease['device'];
     jest.spyOn(DataManager, 'getFirmwareLatestRelease').mockReturnValue(release);
+    jest.spyOn(DataManager, 'getProtocolV2Resources').mockReturnValue(
+      ['images', 'animation', 'wallpaper', 'translations', 'roobert', 'noto'].map(
+        (type, index) => ({
+          type,
+          url: `https://example.com/${type}.okpkg`,
+          size: index + 1,
+          fileHash: 'a'.repeat(64),
+          headerHash: index.toString(16).padStart(128, '0'),
+        })
+      ) as any
+    );
 
     await expect(method.run()).resolves.toMatchObject({
       protocol: 'V2',
       deviceType: 'pro2',
       status: 'required',
+      resourceStatus: 'outdated',
       targetsToUpdate: ['boot', 'app_v1', 'resource'],
       firmware: {
         status: 'required',

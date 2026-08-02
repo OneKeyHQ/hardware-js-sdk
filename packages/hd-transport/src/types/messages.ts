@@ -4895,6 +4895,15 @@ export enum DeviceSEState {
   APP = 85,
 }
 
+export enum ResourceBundleType {
+  IMAGES = 0,
+  ANIMATION = 1,
+  WALLPAPER = 2,
+  TRANSLATIONS = 3,
+  ROOBERT = 4,
+  NOTO = 5,
+}
+
 // DeviceFirmwareImageInfo
 export type DeviceFirmwareImageInfo = {
   version?: string;
@@ -4969,6 +4978,21 @@ export type ProtocolV2DeviceInfo = {
   se2?: DeviceSEInfo;
   se3?: DeviceSEInfo;
   se4?: DeviceSEInfo;
+};
+
+// ResourceInventoryGet
+export type ResourceInventoryGet = {};
+
+// ResourceInventoryItem
+export type ResourceInventoryItem = {
+  type: ResourceBundleType;
+  size: number;
+  header_hash: string;
+};
+
+// ResourceInventory
+export type ResourceInventory = {
+  items: ResourceInventoryItem[];
 };
 
 export enum DeviceSessionErrorCode {
@@ -5894,6 +5918,9 @@ export type MessageType = {
   DeviceInfoTargets: DeviceInfoTargets;
   DeviceInfoTypes: DeviceInfoTypes;
   DeviceInfoGet: DeviceInfoGet;
+  ResourceInventoryGet: ResourceInventoryGet;
+  ResourceInventoryItem: ResourceInventoryItem;
+  ResourceInventory: ResourceInventory;
   DeviceSessionGet: DeviceSessionGet;
   DeviceSession: DeviceSession;
   DeviceSessionAskPin: DeviceSessionAskPin;

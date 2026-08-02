@@ -61,6 +61,30 @@ export type IProtocolV2FirmwareComponent = {
   version?: IVersionArray;
 };
 
+export type IProtocolV2ResourceType =
+  | 'images'
+  | 'animation'
+  | 'wallpaper'
+  | 'translations'
+  | 'roobert'
+  | 'noto';
+
+/** Pro2 RES package descriptor. Hashes identify content without a human-managed version. */
+export type IProtocolV2Resource = {
+  type: IProtocolV2ResourceType;
+  url: string;
+  /** Complete okpkg file size in bytes. */
+  size: number;
+  /** SHA-256 of the complete okpkg file. */
+  fileHash: string;
+  /** SHA3-512 header_hash from the signed okpkg header. */
+  headerHash: string;
+};
+
+export type IProtocolV2Resources = {
+  stable: IProtocolV2Resource[];
+};
+
 /** Pro2 RESC bundle okpkg descriptor for incremental FileWrite synchronization. */
 export type IProtocolV2ResourceBundle = {
   /** Bundle name, such as images, animation, translations, or fonts_roobert. */
@@ -136,6 +160,8 @@ export type DeviceTypeMap = {
     'firmware-v8'?: IFirmwareReleaseInfo[];
     'firmware-btc-v8'?: IFirmwareReleaseInfo[];
     ble: IBLEFirmwareReleaseInfo[];
+    /** Independent Pro2 resource release configuration. */
+    resources?: IProtocolV2Resources;
   };
 };
 

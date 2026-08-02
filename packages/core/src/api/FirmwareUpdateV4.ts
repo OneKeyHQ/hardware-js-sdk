@@ -2,7 +2,6 @@ import { EDeviceType, ERRORS, HardwareError, HardwareErrorCode, wait } from '@on
 import {
   DeviceRebootType,
   PROTOCOL_V2_BLE_FILE_CHUNK_SIZE,
-  PROTOCOL_V2_BLE_FILE_READ_CHUNK_SIZE,
   PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE,
 } from '@onekeyfe/hd-transport';
 import { sha256 } from '@noble/hashes/sha256';
@@ -28,6 +27,12 @@ import {
 } from '../protocols/protocol-v2';
 import { requestProtocolV2DeviceInfo } from '../protocols/protocol-v2/features';
 import {
+  PROTOCOL_V2_RESOURCE_DEVICE_PATHS,
+  buildProtocolV2ResourceUpdatePlan,
+  isProtocolV2ResourceFileValid,
+  requestProtocolV2ResourceInventory,
+} from '../protocols/protocol-v2/resources';
+import {
   getProtocolV2UnknownErrorText,
   isProtocolV2DeviceDisconnectedError,
 } from './protocol-v2/helpers';
@@ -41,6 +46,7 @@ import type {
   Features,
   IFirmwareReleaseInfo,
   IProtocolV2FirmwareComponent,
+  IProtocolV2Resource,
   IVersionArray,
 } from '../types';
 
@@ -120,11 +126,6 @@ type ProtocolV2ResourceBundleBinary = {
   name: string;
   binary: ArrayBuffer;
   devicePath: string;
-  /** Download URL for remote-config mode; omitted in manual mode. */
-  url?: string;
-  version?: IVersionArray;
-  payloadHash?: string;
-  headerHash?: string;
 };
 
 type ProtocolV2RemoteComponentBinary = ProtocolV2RemoteComponentTarget & {
@@ -275,18 +276,6 @@ const normalizeProtocolV2TargetStatus = (
 };
 
 const normalizeProtocolV2Hex = (value?: string) => value?.replace(/^0x/i, '').toLowerCase();
-
-const versionArrayToNumber = (version?: IVersionArray) => {
-  if (!version) return undefined;
-  return version[0] * 0x10000 + version[1] * 0x100 + version[2];
-};
-
-const compareProtocolV2Versions = (current?: IVersionArray, target?: IVersionArray) => {
-  const currentNumber = versionArrayToNumber(current);
-  const targetNumber = versionArrayToNumber(target);
-  if (currentNumber === undefined || targetNumber === undefined) return undefined;
-  return currentNumber - targetNumber;
-};
 
 const bytesToHex = (bytes: Uint8Array) =>
   Array.from(bytes)
@@ -468,16 +457,13 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     };
   }
 
-  private getProtocolV2FirmwareChunkSize(direction: 'read' | 'write' = 'write') {
+  private getProtocolV2FirmwareChunkSize() {
     const payloadChunkSize = Number(this.params?.chunkSize);
     const env = DataManager.getSettings('env');
     const isBle = this.params?.platform === 'native' || (env && DataManager.isBleConnect(env));
     let maxChunkSize = PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE;
     if (isBle) {
-      maxChunkSize =
-        direction === 'read'
-          ? PROTOCOL_V2_BLE_FILE_READ_CHUNK_SIZE
-          : PROTOCOL_V2_BLE_FILE_CHUNK_SIZE;
+      maxChunkSize = PROTOCOL_V2_BLE_FILE_CHUNK_SIZE;
     }
     if (!Number.isFinite(payloadChunkSize) || payloadChunkSize <= 0) {
       return maxChunkSize;
@@ -498,6 +484,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const deviceFeatures = await this.getProtocolV2DeviceFeatures();
     const deviceFirmwareType = getFirmwareType(deviceFeatures);
     const firmwareType = this.params.firmwareType ?? deviceFirmwareType;
+    const resourceRecoveryMode =
+      this.isProtocolV2BootloaderMode() || this.isProtocolV2RomloaderMode();
 
     let fwBinaryMap: ProtocolV2TargetBinary[] = [];
     let bootloaderBinary: ArrayBuffer | null = null;
@@ -507,7 +495,15 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       this.postTipMessage(FirmwareUpdateTipMessage.StartDownloadFirmware);
       fwBinaryMap = this.collectExplicitTargetBinaries();
       bootloaderBinary = this.prepareBootloaderBinary();
-      if (!this.hasExplicitProtocolV2Payload(fwBinaryMap)) {
+      const needsRemoteFirmware = !this.hasExplicitProtocolV2Payload(fwBinaryMap);
+      const needsRemoteResources =
+        !this.params.resourceBundleFiles?.length &&
+        !!this.params.targetsToUpdate?.includes('resource');
+      if (needsRemoteFirmware || needsRemoteResources) {
+        // Remote updates must use a freshly fetched config before any reboot or file write.
+        await DataManager.forceReloadData();
+      }
+      if (needsRemoteFirmware) {
         const remoteBinaries = await this.prepareRemoteProtocolV2Binaries(
           firmwareType,
           deviceFeatures
@@ -516,16 +512,17 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         fwBinaryMap = remoteBinaries.fwBinaryMap;
         installItems = remoteBinaries.installItems;
       }
-      resourceBundles = this.prepareProtocolV2ResourceBundles(firmwareType, deviceFeatures);
-      if (resourceBundles?.length) {
-        resourceBundles = await this.prefetchProtocolV2ResourceBundles(resourceBundles);
-      }
+      resourceBundles = await this.prepareProtocolV2ResourceBundles(resourceRecoveryMode);
       this.postTipMessage(FirmwareUpdateTipMessage.FinishDownloadFirmware);
     } catch (err) {
       throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
     }
 
     if (!bootloaderBinary && fwBinaryMap.length === 0 && !resourceBundles?.length) {
+      if (resourceBundles !== undefined) {
+        this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdateCompleted);
+        return this.getProtocolV2VersionResult(deviceFeatures);
+      }
       throw ERRORS.TypedError(
         HardwareErrorCode.FirmwareUpdateDownloadFailed,
         'No firmware to update'
@@ -662,57 +659,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return target;
   }
 
-  private getProtocolV2ResourceFilePath(path: string) {
-    if (path.startsWith('vol')) return path;
-    if (path.startsWith('/')) return `vol0:${path}`;
-    return `vol0:/${path}`;
-  }
-
-  private async readProtocolV2DeviceFileHeader(path: string) {
-    const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
-    const filePath = this.getProtocolV2ResourceFilePath(path);
-    const pathInfoRes = await typedCall('FilesystemPathInfoQuery', 'FilesystemPathInfo', {
-      path: filePath,
-    });
-    const fileSize = toProtocolV2FiniteNumber(pathInfoRes.message?.size);
-    if (
-      !pathInfoRes.message?.exist ||
-      pathInfoRes.message?.directory ||
-      fileSize === undefined ||
-      fileSize < PROTOCOL_V2_OKPP_HEADER_SIZE
-    ) {
-      return null;
-    }
-
-    const chunkSize = this.getProtocolV2FirmwareChunkSize('read');
-    const chunks: Uint8Array[] = [];
-    let offset = 0;
-    while (offset < PROTOCOL_V2_OKPP_HEADER_SIZE) {
-      const readLen = Math.min(chunkSize, PROTOCOL_V2_OKPP_HEADER_SIZE - offset);
-      const res = await typedCall('FilesystemFileRead', 'FilesystemFile', {
-        file: {
-          path: filePath,
-          offset,
-          total_size: 0,
-        },
-        chunk_len: readLen,
-        ui_percentage: undefined,
-      });
-      const data = toProtocolV2Bytes(res.message?.data);
-      if (data.byteLength === 0) return null;
-      chunks.push(data);
-      offset += data.byteLength;
-    }
-
-    const headerBytes = new Uint8Array(offset);
-    let cursor = 0;
-    chunks.forEach(chunk => {
-      headerBytes.set(chunk, cursor);
-      cursor += chunk.byteLength;
-    });
-    return parseProtocolV2OkppHeader(headerBytes);
-  }
-
   private async downloadRemoteProtocolV2Component(
     key: string,
     component: IProtocolV2FirmwareComponent
@@ -801,23 +747,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     };
   }
 
-  // ============================================================
-  // Incremental RESC bundle sync through FileRead and FilesystemFileWrite
-  // ============================================================
-
-  /**
-   * Prepare the RESC bundle list.
-   *
-   * Two modes, matching FirmwareUpdateV3 binary-versus-version behavior:
-   * - resourceBundleFiles supplied: use binaries directly without version checks.
-   * - Otherwise load release.resourceBundles from remote config.json; the binaries
-   *   are prefetched before reboot and synchronization skips matching device headers.
-   */
-  private prepareProtocolV2ResourceBundles(
-    firmwareType: EFirmwareType,
-    features: Features
-  ): ProtocolV2ResourceBundleBinary[] | undefined {
-    // Manual binaries are installed directly without comparison.
+  private async prepareProtocolV2ResourceBundles(
+    recoveryMode: boolean
+  ): Promise<ProtocolV2ResourceBundleBinary[] | undefined> {
     if (this.params.resourceBundleFiles?.length) {
       return this.params.resourceBundleFiles.map((file, index) => {
         const devicePath = validateProtocolV2FilesystemPath(
@@ -836,70 +768,51 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       return undefined;
     }
 
-    // Remote-config bundles are downloaded and compared later.
-    const release = DataManager.getFirmwareLatestRelease(features, firmwareType);
-    if (!release?.resourceBundles?.length) return undefined;
-
-    return release.resourceBundles.map((bundle, index) => ({
-      name: bundle.name,
-      binary: new ArrayBuffer(0),
-      devicePath: validateProtocolV2FilesystemPath(
-        bundle.devicePath,
-        `resourceBundles[${index}].devicePath`
-      ),
-      url: bundle.url,
-      version: bundle.version,
-      payloadHash: bundle.payloadHash,
-      headerHash: bundle.headerHash,
-    })) as ProtocolV2ResourceBundleBinary[];
-  }
-
-  private async prefetchProtocolV2ResourceBundles(
-    bundles: ProtocolV2ResourceBundleBinary[]
-  ): Promise<ProtocolV2ResourceBundleBinary[]> {
-    const prefetched: ProtocolV2ResourceBundleBinary[] = [];
-    for (const bundle of bundles) {
-      let { binary } = bundle;
-      let downloadedFromRemote = false;
-      if (binary.byteLength === 0) {
-        if (!bundle.url) {
-          throw new Error(`Missing Protocol V2 RESC bundle binary: ${bundle.name}`);
-        }
-        Log.log(`[FirmwareUpdateV4] downloading remote RESC bundle ${bundle.name}`);
-        ({ binary } = await getSysResourceBinary(bundle.url));
-        downloadedFromRemote = true;
-      }
-      if (binary.byteLength === 0) {
-        throw new Error(`Protocol V2 RESC bundle is empty: ${bundle.name}`);
-      }
-      if (downloadedFromRemote) {
-        const header = parseProtocolV2OkppHeader(toProtocolV2Bytes(binary));
-        if (!header || header.type !== 'RESC') {
-          throw new Error(`Invalid Protocol V2 RESC bundle header: ${bundle.name}`);
-        }
-        if (bundle.version && compareProtocolV2Versions(header.version, bundle.version) !== 0) {
-          throw new Error(`Protocol V2 RESC bundle version mismatch: ${bundle.name}`);
-        }
-        const expectedPayloadHash = normalizeProtocolV2Hex(bundle.payloadHash);
-        if (expectedPayloadHash && header.payloadHash !== expectedPayloadHash) {
-          throw new Error(`Protocol V2 RESC bundle payload hash mismatch: ${bundle.name}`);
-        }
-        const expectedHeaderHash = normalizeProtocolV2Hex(bundle.headerHash);
-        if (expectedHeaderHash && header.headerHash !== expectedHeaderHash) {
-          throw new Error(`Protocol V2 RESC bundle header hash mismatch: ${bundle.name}`);
-        }
-      }
-      prefetched.push({ ...bundle, binary });
+    const resources = DataManager.getProtocolV2Resources();
+    if (!resources?.length) {
+      throw new Error('Missing Pro2 stable resource configuration');
     }
-    return prefetched;
+
+    const inventory = recoveryMode
+      ? undefined
+      : await requestProtocolV2ResourceInventory({
+          commands: this.device.getCommands(),
+          timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
+        });
+    const plan = buildProtocolV2ResourceUpdatePlan({
+      resources,
+      inventory,
+      mode: recoveryMode ? 'bootloader-recovery' : 'application',
+      forced: this.params.forcedUpdateRes,
+    });
+    Log.log(
+      `[FirmwareUpdateV4] Pro2 resource plan mode=${
+        recoveryMode ? 'bootloader-recovery' : 'application'
+      } status=${plan.status} count=${plan.resources.length}`
+    );
+
+    const bundles: ProtocolV2ResourceBundleBinary[] = [];
+    for (const resource of plan.resources) {
+      bundles.push(await this.downloadProtocolV2Resource(resource));
+    }
+    return bundles;
   }
 
-  /**
-   * Synchronize RESC bundles to the device.
-   *
-   * Manual mode writes supplied binaries directly.
-   * Remote-config mode uses prefetched binaries and skips matching bundles after FileRead.
-   */
+  private async downloadProtocolV2Resource(
+    resource: IProtocolV2Resource
+  ): Promise<ProtocolV2ResourceBundleBinary> {
+    Log.log(`[FirmwareUpdateV4] downloading Pro2 resource ${resource.type}`);
+    const { binary } = await getSysResourceBinary(resource.url);
+    if (!isProtocolV2ResourceFileValid(binary, resource)) {
+      throw new Error(`Pro2 resource file verification failed: ${resource.type}`);
+    }
+    return {
+      name: `${resource.type}.okpkg`,
+      binary,
+      devicePath: PROTOCOL_V2_RESOURCE_DEVICE_PATHS[resource.type],
+    };
+  }
+
   private async syncProtocolV2ResourceBundles(
     bundles: ProtocolV2ResourceBundleBinary[],
     firmwareSize: number
@@ -907,37 +820,13 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const transferStartTime = Date.now();
     const transferTransport = this.getProtocolV2FirmwareTransferTransport();
 
-    const isRemoteMode = bundles.some(bundle => !!bundle.url);
-    let bundlesToSync = bundles;
-
-    // Remote binaries were prefetched before bootloader entry. Only device-local
-    // header comparison and transfer are allowed in this phase.
-    if (isRemoteMode) {
-      const filtered: ProtocolV2ResourceBundleBinary[] = [];
-      for (const bundle of bundles) {
-        // Compare the existing device header.
-        const upToDate = await this.isProtocolV2ResourceBundleUpToDate(bundle);
-        if (upToDate) {
-          Log.log(`[FirmwareUpdateV4] skip RESC bundle ${bundle.name}; already up to date`);
-        } else {
-          filtered.push(bundle);
-        }
-      }
-      bundlesToSync = filtered;
-    }
-
-    if (bundlesToSync.length === 0) {
-      Log.log('[FirmwareUpdateV4] all RESC bundles up to date, nothing to sync');
-      return { processedSize: 0, totalSize: firmwareSize };
-    }
-
     // Write directly to the device through FileWrite.
     let totalSize = 0;
-    for (const b of bundlesToSync) totalSize += b.binary.byteLength;
+    for (const b of bundles) totalSize += b.binary.byteLength;
 
     const transferTotalSize = totalSize + firmwareSize;
     let processedSize = 0;
-    for (const bundle of bundlesToSync) {
+    for (const bundle of bundles) {
       Log.log(
         `[FirmwareUpdateV4] syncing RESC bundle ${bundle.name} -> ${bundle.devicePath} bytes=${bundle.binary.byteLength}`
       );
@@ -958,41 +847,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return { processedSize, totalSize: transferTotalSize };
   }
 
-  /**
-   * Compare the existing okpkg OKPP header in remote-config mode.
-   */
-  private async isProtocolV2ResourceBundleUpToDate(
-    bundle: ProtocolV2ResourceBundleBinary
-  ): Promise<boolean> {
-    if (this.params.forcedUpdateRes) return false;
-    if (!bundle.version && !bundle.payloadHash) return false;
-
-    try {
-      const header = await this.readProtocolV2DeviceFileHeader(bundle.devicePath);
-      if (!header) return false;
-
-      if (bundle.version) {
-        const cmp = compareProtocolV2Versions(header.version, bundle.version);
-        if (cmp === undefined || cmp !== 0) return false;
-      }
-      if (bundle.payloadHash) {
-        const expected = normalizeProtocolV2Hex(bundle.payloadHash);
-        if (expected && header.payloadHash !== expected) return false;
-      }
-      if (bundle.headerHash) {
-        const expected = normalizeProtocolV2Hex(bundle.headerHash);
-        if (expected && header.headerHash !== expected) return false;
-      }
-      return true;
-    } catch (error) {
-      Log.log(`[FirmwareUpdateV4] RESC bundle ${bundle.name} header check failed: `, error);
-      return false;
-    }
-  }
-
   private isProtocolV2BootloaderMode() {
     if (typeof this.device.isBootloader === 'function') {
-      return this.device.isBootloader();
+      return !!this.device.isBootloader();
     }
     return (
       this.device.features?.mode === 'bootloader' ||
@@ -1406,6 +1263,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       PROTOCOL_V2_FINAL_RECONNECT_TIMEOUT
     );
 
+    return this.getProtocolV2VersionResult(features);
+  }
+
+  private getProtocolV2VersionResult(features: Features) {
     const bootloaderVersion = getDeviceBootloaderVersion(features).join('.');
     const bleVersion = getDeviceBLEFirmwareVersion(features).join('.');
     const firmwareVersion = getDeviceFirmwareVersion(features).join('.');

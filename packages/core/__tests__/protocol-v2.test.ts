@@ -3666,6 +3666,15 @@ describe('API compatibility handling', () => {
 
 describe('Protocol V2 firmware update targets', () => {
   const OKPP_HEADER_SIZE = 0x52a0;
+  let forceReloadDataSpy: jest.SpyInstance<Promise<void>, []>;
+
+  beforeEach(() => {
+    forceReloadDataSpy = jest.spyOn(DataManager, 'forceReloadData').mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   const buildOkppHeader = ({
     type = 'RESC',
@@ -3955,6 +3964,9 @@ describe('Protocol V2 firmware update targets', () => {
       },
     });
     (method as any).captureProtocolV2PhysicalIdentity = jest.fn().mockResolvedValue(undefined);
+    const prepareResourceBundles = jest
+      .spyOn(method as any, 'prepareProtocolV2ResourceBundles')
+      .mockResolvedValue(undefined);
     (method as any).protocolV2Reboot = jest.fn();
     (method as any).executeProtocolV2Update = jest.fn().mockResolvedValue(undefined);
     (method as any).exitProtocolV2BootloaderToNormal = jest.fn().mockResolvedValue(undefined);
@@ -3967,6 +3979,7 @@ describe('Protocol V2 firmware update targets', () => {
 
     await method.run();
 
+    expect(prepareResourceBundles).toHaveBeenCalledWith(true);
     expect((method as any).protocolV2Reboot).not.toHaveBeenCalled();
     expect((method as any).executeProtocolV2Update).toHaveBeenCalledWith({
       bootloaderBinary: null,
@@ -4979,272 +4992,6 @@ describe('Protocol V2 firmware update targets', () => {
     getFirmwareLatestReleaseSpy.mockRestore();
   });
 
-  test('maps remote Pro2 resource bundles to direct-write descriptors', () => {
-    const method = new FirmwareUpdateV4({
-      id: 1,
-      payload: {
-        method: 'firmwareUpdateV4',
-        platform: 'web',
-        targetsToUpdate: ['resource'],
-      },
-    });
-    method.init();
-
-    const getFirmwareLatestReleaseSpy = jest
-      .spyOn(DataManager, 'getFirmwareLatestRelease')
-      .mockReturnValue({
-        required: false,
-        version: [1, 0, 0],
-        url: '',
-        resourceBundles: [
-          {
-            name: 'images',
-            url: 'https://example.com/images.okpkg',
-            devicePath: 'VOL0:/resource/images/images.okpkg',
-            version: [2, 0, 0],
-            payloadHash: 'ab'.repeat(64),
-            headerHash: 'cd'.repeat(64),
-          },
-        ],
-        fingerprint: '',
-        changelog: {
-          'zh-CN': '',
-          'en-US': '',
-        },
-      });
-
-    const bundles = (method as any).prepareProtocolV2ResourceBundles('universal', {
-      deviceType: 'pro2',
-      firmwareVersion: '1.0.0',
-      capabilities: [],
-    });
-
-    expect(bundles).toEqual([
-      {
-        name: 'images',
-        binary: expect.any(ArrayBuffer),
-        devicePath: 'vol0:/resource/images/images.okpkg',
-        url: 'https://example.com/images.okpkg',
-        version: [2, 0, 0],
-        payloadHash: 'ab'.repeat(64),
-        headerHash: 'cd'.repeat(64),
-      },
-    ]);
-    expect(bundles[0].binary.byteLength).toBe(0);
-
-    getFirmwareLatestReleaseSpy.mockRestore();
-  });
-
-  test('rejects remote RESC bundle paths before download or bootloader entry', async () => {
-    const method = new FirmwareUpdateV4({
-      id: 1,
-      payload: {
-        method: 'firmwareUpdateV4',
-        platform: 'web',
-        targetsToUpdate: ['resource'],
-      },
-    });
-    method.init();
-    (method as any).captureProtocolV2PhysicalIdentity = jest.fn().mockResolvedValue(undefined);
-
-    const getSysResourceBinarySpy = jest.spyOn(firmwareBinaryApi, 'getSysResourceBinary');
-    const getFirmwareLatestReleaseSpy = jest
-      .spyOn(DataManager, 'getFirmwareLatestRelease')
-      .mockReturnValue({
-        required: false,
-        version: [1, 0, 0],
-        url: '',
-        resourceBundles: [
-          {
-            name: 'images',
-            url: 'https://example.com/images.okpkg',
-            devicePath: 'vol0:/resource/../images.okpkg',
-          },
-        ],
-        fingerprint: '',
-        changelog: {
-          'zh-CN': '',
-          'en-US': '',
-        },
-      });
-
-    (method as any).device = stubDevice({
-      originalDescriptor: { protocolType: 'V2' },
-      features: { deviceType: 'pro2', firmwareVersion: '1.0.0', capabilities: [] },
-    });
-    (method as any).prepareRemoteProtocolV2Binaries = jest.fn().mockResolvedValue({
-      bootloaderBinary: null,
-      fwBinaryMap: [],
-    });
-    (method as any).enterProtocolV2BootloaderMode = jest.fn();
-    method.postTipMessage = jest.fn();
-
-    await expect(method.run()).rejects.toThrow('resourceBundles[0].devicePath');
-    expect(getSysResourceBinarySpy).not.toHaveBeenCalled();
-    expect((method as any).enterProtocolV2BootloaderMode).not.toHaveBeenCalled();
-
-    getSysResourceBinarySpy.mockRestore();
-    getFirmwareLatestReleaseSpy.mockRestore();
-  });
-
-  test('downloads and validates remote RESC bundles before entering bootloader', async () => {
-    const method = new FirmwareUpdateV4({
-      id: 1,
-      payload: {
-        method: 'firmwareUpdateV4',
-        platform: 'web',
-        targetsToUpdate: ['resource'],
-      },
-    });
-    method.init();
-    (method as any).captureProtocolV2PhysicalIdentity = jest.fn().mockResolvedValue(undefined);
-
-    const order: string[] = [];
-    const resourceBinary = buildOkppHeader().buffer as ArrayBuffer;
-    const getSysResourceBinarySpy = jest
-      .spyOn(firmwareBinaryApi, 'getSysResourceBinary')
-      .mockImplementation(() => {
-        order.push('download');
-        return Promise.resolve({ binary: resourceBinary });
-      });
-    const getFirmwareLatestReleaseSpy = jest
-      .spyOn(DataManager, 'getFirmwareLatestRelease')
-      .mockReturnValue({
-        required: false,
-        version: [1, 0, 0],
-        url: '',
-        resourceBundles: [
-          {
-            name: 'images',
-            url: 'https://example.com/images.okpkg',
-            devicePath: '  VOL0:/resource/images/images.okpkg  ',
-          },
-        ],
-        fingerprint: '',
-        changelog: {
-          'zh-CN': '',
-          'en-US': '',
-        },
-      });
-
-    (method as any).device = stubDevice({
-      originalDescriptor: { protocolType: 'V2' },
-      features: { deviceType: 'pro2', firmwareVersion: '1.0.0', capabilities: [] },
-    });
-    (method as any).prepareRemoteProtocolV2Binaries = jest.fn().mockResolvedValue({
-      bootloaderBinary: null,
-      fwBinaryMap: [],
-    });
-    (method as any).enterProtocolV2BootloaderMode = jest.fn().mockImplementation(() => {
-      order.push('bootloader');
-      return Promise.resolve(true);
-    });
-    (method as any).executeProtocolV2Update = jest.fn().mockResolvedValue(undefined);
-    (method as any).exitProtocolV2BootloaderToNormal = jest.fn().mockResolvedValue(undefined);
-    (method as any).waitForProtocolV2FinalFeatures = jest.fn().mockResolvedValue({
-      bootloaderVersion: '1.0.0',
-      bleVersion: '0.0.0',
-      firmwareVersion: '1.0.0',
-    });
-    method.postTipMessage = jest.fn();
-
-    await method.run();
-
-    expect(order).toEqual(['download', 'bootloader']);
-    expect((method as any).executeProtocolV2Update).toHaveBeenCalledWith({
-      bootloaderBinary: null,
-      fwBinaryMap: [],
-      resourceBundles: [
-        {
-          name: 'images',
-          binary: resourceBinary,
-          devicePath: 'vol0:/resource/images/images.okpkg',
-          url: 'https://example.com/images.okpkg',
-        },
-      ],
-    });
-
-    getSysResourceBinarySpy.mockRestore();
-    getFirmwareLatestReleaseSpy.mockRestore();
-  });
-
-  test('rejects a remote RESC bundle without an OKPP header when metadata is absent', async () => {
-    const method = new FirmwareUpdateV4({
-      id: 1,
-      payload: {
-        method: 'firmwareUpdateV4',
-      },
-    });
-    const getSysResourceBinarySpy = jest
-      .spyOn(firmwareBinaryApi, 'getSysResourceBinary')
-      .mockResolvedValue({ binary: new Uint8Array([1, 2, 3]).buffer });
-
-    await expect(
-      (method as any).prefetchProtocolV2ResourceBundles([
-        {
-          name: 'images',
-          binary: new ArrayBuffer(0),
-          devicePath: 'vol0:/resource/images/images.okpkg',
-          url: 'https://example.com/images.okpkg',
-        },
-      ])
-    ).rejects.toThrow('Invalid Protocol V2 RESC bundle header: images');
-
-    getSysResourceBinarySpy.mockRestore();
-  });
-
-  test('rejects an empty remote RESC bundle before entering bootloader', async () => {
-    const method = new FirmwareUpdateV4({
-      id: 1,
-      payload: {
-        method: 'firmwareUpdateV4',
-        platform: 'web',
-        targetsToUpdate: ['resource'],
-      },
-    });
-    method.init();
-    (method as any).captureProtocolV2PhysicalIdentity = jest.fn().mockResolvedValue(undefined);
-
-    const getSysResourceBinarySpy = jest
-      .spyOn(firmwareBinaryApi, 'getSysResourceBinary')
-      .mockResolvedValue({ binary: new ArrayBuffer(0) });
-    const getFirmwareLatestReleaseSpy = jest
-      .spyOn(DataManager, 'getFirmwareLatestRelease')
-      .mockReturnValue({
-        required: false,
-        version: [1, 0, 0],
-        url: '',
-        resourceBundles: [
-          {
-            name: 'images',
-            url: 'https://example.com/images.okpkg',
-            devicePath: 'vol0:/resource/images/images.okpkg',
-          },
-        ],
-        fingerprint: '',
-        changelog: {
-          'zh-CN': '',
-          'en-US': '',
-        },
-      });
-    (method as any).device = stubDevice({
-      originalDescriptor: { protocolType: 'V2' },
-      features: { deviceType: 'pro2', firmwareVersion: '1.0.0', capabilities: [] },
-    });
-    (method as any).prepareRemoteProtocolV2Binaries = jest.fn().mockResolvedValue({
-      bootloaderBinary: null,
-      fwBinaryMap: [],
-    });
-    (method as any).enterProtocolV2BootloaderMode = jest.fn();
-    method.postTipMessage = jest.fn();
-
-    await expect(method.run()).rejects.toThrow('Protocol V2 RESC bundle is empty: images');
-    expect((method as any).enterProtocolV2BootloaderMode).not.toHaveBeenCalled();
-
-    getSysResourceBinarySpy.mockRestore();
-    getFirmwareLatestReleaseSpy.mockRestore();
-  });
-
   test('does not download Pro2 firmware components that App did not select', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
@@ -5345,11 +5092,37 @@ describe('Protocol V2 firmware update targets', () => {
 
     await method.run();
 
+    expect(forceReloadDataSpy).toHaveBeenCalledTimes(1);
     expect((method as any).prepareRemoteProtocolV2Binaries).toHaveBeenCalledTimes(1);
     expect((method as any).executeProtocolV2Update).toHaveBeenCalledWith({
       bootloaderBinary: remoteBinaries.bootloaderBinary,
       fwBinaryMap: remoteBinaries.fwBinaryMap,
     });
+  });
+
+  test('stops a remote update before reboot when the latest config cannot be refreshed', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+      },
+    });
+    method.init();
+    (method as any).captureProtocolV2PhysicalIdentity = jest.fn().mockResolvedValue(undefined);
+    (method as any).device = stubDevice({
+      originalDescriptor: { protocolType: 'V2' },
+      features: { deviceType: 'pro2', firmwareVersion: '0.0.0', capabilities: [] },
+    });
+    forceReloadDataSpy.mockRejectedValue(new Error('latest config unavailable'));
+    (method as any).prepareRemoteProtocolV2Binaries = jest.fn();
+    (method as any).enterProtocolV2BootloaderMode = jest.fn();
+    method.postTipMessage = jest.fn();
+
+    await expect(method.run()).rejects.toThrow('latest config unavailable');
+
+    expect((method as any).prepareRemoteProtocolV2Binaries).not.toHaveBeenCalled();
+    expect((method as any).enterProtocolV2BootloaderMode).not.toHaveBeenCalled();
   });
 
   test('keeps explicit Protocol V2 binaries isolated from remote component auto-fill', async () => {
@@ -6026,34 +5799,131 @@ describe('Protocol V2 firmware reconnect identity', () => {
     });
   });
 
-  test('uses the BLE read limit when reading an existing firmware bundle header', async () => {
+  test('uses ResourceInventory instead of host-side FileRead for resource comparison', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
         method: 'firmwareUpdateV4',
-        platform: 'native',
-        chunkSize: 1800,
+        platform: 'web',
+        targetsToUpdate: ['resource'],
       },
     });
     method.init();
-    const readChunkLengths: number[] = [];
-    const typedCall = jest.fn((requestType: string, _responseType: string, request: any) => {
-      if (requestType === 'FilesystemPathInfoQuery') {
-        return Promise.resolve({ message: { exist: true, directory: false, size: 0x52a0 } });
-      }
-      if (requestType === 'FilesystemFileRead') {
-        readChunkLengths.push(request.chunk_len);
-        return Promise.resolve({ message: { data: new Uint8Array(request.chunk_len) } });
-      }
-      throw new Error(`Unexpected request: ${requestType}`);
+    const stable = ['images', 'animation', 'wallpaper', 'translations', 'roobert', 'noto'].map(
+      (type, index) => ({
+        type,
+        url: `https://example.com/${type}.okpkg`,
+        size: index + 1,
+        fileHash: 'a'.repeat(64),
+        headerHash: index.toString(16).padStart(128, '0'),
+      })
+    );
+    const typedCall = jest.fn().mockResolvedValue({
+      message: {
+        items: stable.map(item => ({
+          type: item.type.toUpperCase(),
+          size: item.size,
+          header_hash: item.headerHash,
+        })),
+      },
     });
     (method as any).device = stubDevice({
       getCommands: () => ({ typedCall }),
     });
+    const resourcesSpy = jest
+      .spyOn(DataManager, 'getProtocolV2Resources')
+      .mockReturnValue(stable as any);
+    (method as any).downloadProtocolV2Resource = jest.fn();
 
-    await expect((method as any).readProtocolV2DeviceFileHeader('bundle.okpp')).resolves.toBeNull();
-    expect(readChunkLengths.length).toBeGreaterThan(1);
-    expect(Math.max(...readChunkLengths)).toBe(900);
+    await expect((method as any).prepareProtocolV2ResourceBundles(false)).resolves.toEqual([]);
+    expect(typedCall).toHaveBeenCalledWith(
+      'ResourceInventoryGet',
+      'ResourceInventory',
+      {},
+      { timeoutMs: 5000 }
+    );
+    expect(typedCall.mock.calls.some(call => call[0] === 'FilesystemFileRead')).toBe(false);
+    expect((method as any).downloadProtocolV2Resource).not.toHaveBeenCalled();
+    resourcesSpy.mockRestore();
+  });
+
+  test('downloads only changed resources in Application mode', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: { method: 'firmwareUpdateV4', platform: 'web', targetsToUpdate: ['resource'] },
+    });
+    method.init();
+    const stable = ['images', 'animation', 'wallpaper', 'translations', 'roobert', 'noto'].map(
+      (type, index) => ({
+        type,
+        url: `https://example.com/${type}.okpkg`,
+        size: index + 1,
+        fileHash: 'a'.repeat(64),
+        headerHash: index.toString(16).padStart(128, '0'),
+      })
+    );
+    const typedCall = jest.fn().mockResolvedValue({
+      message: {
+        items: stable.slice(1).map(item => ({
+          type: item.type.toUpperCase(),
+          size: item.size,
+          header_hash: item.headerHash,
+        })),
+      },
+    });
+    (method as any).device = stubDevice({ getCommands: () => ({ typedCall }) });
+    const resourcesSpy = jest
+      .spyOn(DataManager, 'getProtocolV2Resources')
+      .mockReturnValue(stable as any);
+    (method as any).downloadProtocolV2Resource = jest.fn(resource =>
+      Promise.resolve({
+        name: `${resource.type}.okpkg`,
+        binary: new ArrayBuffer(resource.size),
+        devicePath: `vol0:/${resource.type}.okpkg`,
+      })
+    );
+
+    const bundles = await (method as any).prepareProtocolV2ResourceBundles(false);
+
+    expect(bundles).toHaveLength(1);
+    expect((method as any).downloadProtocolV2Resource).toHaveBeenCalledWith(stable[0]);
+    resourcesSpy.mockRestore();
+  });
+
+  test('downloads all six resources in Bootloader recovery without inventory RPC', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: { method: 'firmwareUpdateV4', platform: 'web', targetsToUpdate: ['resource'] },
+    });
+    method.init();
+    const stable = ['images', 'animation', 'wallpaper', 'translations', 'roobert', 'noto'].map(
+      (type, index) => ({
+        type,
+        url: `https://example.com/${type}.okpkg`,
+        size: index + 1,
+        fileHash: 'a'.repeat(64),
+        headerHash: index.toString(16).padStart(128, '0'),
+      })
+    );
+    const typedCall = jest.fn();
+    (method as any).device = stubDevice({ getCommands: () => ({ typedCall }) });
+    const resourcesSpy = jest
+      .spyOn(DataManager, 'getProtocolV2Resources')
+      .mockReturnValue(stable as any);
+    (method as any).downloadProtocolV2Resource = jest.fn(resource =>
+      Promise.resolve({
+        name: `${resource.type}.okpkg`,
+        binary: new ArrayBuffer(resource.size),
+        devicePath: `vol0:/${resource.type}.okpkg`,
+      })
+    );
+
+    const bundles = await (method as any).prepareProtocolV2ResourceBundles(true);
+
+    expect(bundles).toHaveLength(6);
+    expect(typedCall).not.toHaveBeenCalled();
+    expect((method as any).downloadProtocolV2Resource).toHaveBeenCalledTimes(6);
+    resourcesSpy.mockRestore();
   });
 });
 

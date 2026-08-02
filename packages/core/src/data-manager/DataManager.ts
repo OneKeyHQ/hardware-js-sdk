@@ -17,6 +17,7 @@ import {
 } from '../utils';
 import { DeviceModelToTypes } from '../types';
 import { findLatestRelease, getReleaseChangelog, getReleaseStatus } from '../utils/release';
+import { parseProtocolV2Resources } from '../protocols/protocol-v2/resources';
 
 import type {
   AssetsMap,
@@ -397,10 +398,10 @@ export default class DataManager {
     return enrichedData;
   }
 
-  static async load(settings: ConnectSettings) {
+  static async load(settings: ConnectSettings): Promise<boolean> {
     this.settings = settings;
     if (!settings.fetchConfig) {
-      return;
+      return false;
     }
 
     const url = settings.preRelease
@@ -445,6 +446,9 @@ export default class DataManager {
 
     // 3. Apply config if available
     if (data) {
+      const pro2Resources = parseProtocolV2Resources(
+        (data.pro2 as { resources?: unknown } | undefined)?.resources
+      );
       Log.log(`[DataConfig] Config loaded successfully via [${fetchMethod}]`);
       this.deviceMap = {
         [EDeviceType.Classic]: this.enrichFirmwareReleaseInfo(data.classic),
@@ -453,14 +457,18 @@ export default class DataManager {
         [EDeviceType.Mini]: this.enrichFirmwareReleaseInfo(data.mini),
         [EDeviceType.Touch]: this.enrichFirmwareReleaseInfo(data.touch),
         [EDeviceType.Pro]: this.enrichFirmwareReleaseInfo(data.pro),
-        [EDeviceType.Pro2]: this.enrichFirmwareReleaseInfo(data.pro2),
+        [EDeviceType.Pro2]: {
+          ...this.enrichFirmwareReleaseInfo(data.pro2),
+          ...(pro2Resources ? { resources: pro2Resources } : undefined),
+        },
       };
       this.assets = {
         bridge: data.bridge,
       };
-    } else {
-      Log.warn('[DataConfig] All fetch methods failed, using built-in default config');
+      return true;
     }
+    Log.warn('[DataConfig] All fetch methods failed, using built-in default config');
+    return false;
   }
 
   static updateEnv(newEnv: ConnectSettings['env']) {
@@ -478,10 +486,27 @@ export default class DataManager {
 
   static async checkAndReloadData() {
     if (getTimeStamp() - this.lastCheckTimestamp > 1000 * 60 * 60 * 3) {
-      await this.load(this.settings).then(() => {
+      const loaded = await this.load(this.settings);
+      if (loaded) {
         this.lastCheckTimestamp = getTimeStamp();
-      });
+      }
     }
+  }
+
+  /** Force a fresh remote config before an update is allowed to mutate the device. */
+  static async forceReloadData(): Promise<void> {
+    if (!this.settings) {
+      throw new Error('Remote config settings are not initialized');
+    }
+    const loaded = await this.load(this.settings);
+    if (!loaded) {
+      throw new Error('Unable to refresh the latest remote config');
+    }
+    this.lastCheckTimestamp = getTimeStamp();
+  }
+
+  static getProtocolV2Resources() {
+    return this.deviceMap[EDeviceType.Pro2]?.resources?.stable;
   }
 
   static getProtobufMessages(schema: ProtobufMessageSchema = 'v1CurrentSchema'): JSON {

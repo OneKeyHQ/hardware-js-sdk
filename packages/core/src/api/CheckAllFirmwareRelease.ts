@@ -11,6 +11,10 @@ import {
 import { getBridgeReleaseInfo } from '../utils/bridgeUpdate';
 import { getDeviceFirmwareVersion, getDeviceType, getFirmwareType } from '../utils';
 import { BaseMethod } from './BaseMethod';
+import {
+  buildProtocolV2ResourceUpdatePlan,
+  requestProtocolV2ResourceInventory,
+} from '../protocols/protocol-v2/resources';
 
 import type {
   AllFirmwareRelease,
@@ -219,9 +223,6 @@ export function buildProtocolV2FirmwareRelease({
   const targetsToUpdate = components.flatMap(component =>
     component.status === 'outdated' && component.updateTarget ? [component.updateTarget] : []
   );
-  if (targetsToUpdate.length > 0 && release.resourceBundles?.length) {
-    targetsToUpdate.push('resource');
-  }
   const uniqueTargetsToUpdate = Array.from(new Set(targetsToUpdate));
   const hasUpgrade = uniqueTargetsToUpdate.length > 0;
   const required = release.required && hasUpgrade;
@@ -341,6 +342,34 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
       firmwareType,
       release,
     });
+    const resources = DataManager.getProtocolV2Resources();
+    let resourceStatus: 'valid' | 'outdated' | 'unknown' = 'unknown';
+    if (resources?.length) {
+      const loaderMode = state.status.mode === 'bootloader' || state.status.mode === 'romloader';
+      if (loaderMode) {
+        resourceStatus = buildProtocolV2ResourceUpdatePlan({
+          resources,
+          mode: 'bootloader-recovery',
+        }).status;
+      } else if (state.status.mode === 'normal') {
+        try {
+          const inventory = await requestProtocolV2ResourceInventory({
+            commands: this.device.getCommands(),
+          });
+          resourceStatus = buildProtocolV2ResourceUpdatePlan({
+            resources,
+            inventory,
+            mode: 'application',
+          }).status;
+        } catch {
+          resourceStatus = 'unknown';
+        }
+      }
+    }
+    const targetsToUpdate = [
+      ...plan.targetsToUpdate,
+      ...(resourceStatus === 'outdated' ? (['resource'] as const) : []),
+    ];
     const firmwareStatus = plan.status === 'unavailable' ? 'unknown' : plan.status;
     const emptyRelease = 'none' as const;
 
@@ -363,6 +392,9 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
       protocol: 'V2',
       deviceType: 'pro2',
       ...plan,
+      resourceStatus,
+      hasUpgrade: plan.hasUpgrade || resourceStatus === 'outdated',
+      targetsToUpdate,
     };
   }
 }
