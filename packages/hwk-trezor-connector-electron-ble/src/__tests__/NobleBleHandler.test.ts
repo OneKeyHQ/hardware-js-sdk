@@ -198,6 +198,40 @@ describe('NobleBleHandler', () => {
     // _connectInner: scanning first is what keeps macOS from hanging).
   }, 15_000);
 
+  test('cancelPairing ends a connect still waiting on the OS pairing window', async () => {
+    // Pairing happens inside connectAsync, so the device is not in _connected
+    // yet. Before cancelPairing could abandon the attempt, cancelling left the
+    // caller waiting out the full connect timeout — sized to the OS pairing
+    // window, so on Windows it read as a hang.
+    const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
+    peripheral.connectAsync = jest.fn(
+      () =>
+        new Promise<void>(() => {
+          // Never settles: the OS pairing dialog is still open.
+        })
+    );
+    const noble = new FakeNoble([peripheral]);
+    const handler = new NobleBleHandler({
+      nobleFactory: () => noble as any,
+      connectTimeoutMs: 60_000,
+    });
+    await handler.scan({ durationMs: 0 });
+
+    const pending = handler.connect('id-1');
+    const settled = pending.then(
+      () => 'resolved',
+      (error: Error) => error.message
+    );
+    // Let _connectInner get past its settle delay and into connectAsync.
+    await new Promise(resolve => {
+      setTimeout(resolve, 350);
+    });
+
+    await handler.cancelPairing();
+
+    await expect(settled).resolves.toMatch(/connect cancelled/);
+  });
+
   test('a connect that outlives its timeout is torn down, not committed', async () => {
     // Promise.race only rejects the caller; noble's connectAsync keeps running.
     // If its late success were committed to _connected, the handler would hold

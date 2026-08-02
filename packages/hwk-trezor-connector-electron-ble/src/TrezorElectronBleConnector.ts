@@ -108,6 +108,16 @@ export class TrezorElectronBleConnector extends TrezorConnectorBase {
           params: { connectId: device.connectId, originalError: { message: reason } },
         });
       }
+      // cancelPairing abandoned the connect. Reporting that as a connect failure
+      // would tell the user the device is unreachable when they are the one who
+      // stopped it.
+      if (/connect cancelled/i.test(reason)) {
+        throw createHwkError({
+          code: HardwareErrorCode.BlePairingCancelled,
+          message: `Trezor BLE pairing cancelled: ${device.connectId}`,
+          params: { connectId: device.connectId, originalError: { message: reason } },
+        });
+      }
       throw createHwkError({
         code: HardwareErrorCode.BleConnectFailed,
         message: `Trezor BLE connect failed: ${device.connectId} (${reason})`,

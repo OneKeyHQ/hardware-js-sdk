@@ -221,6 +221,9 @@ export class NobleBleHandler {
 
   private _lastNobleRecoverAt?: number;
 
+  /** The connect currently in flight, so cancelPairing can abandon it. */
+  private _activeConnect?: { id: string; abandon: (error: Error) => void };
+
   constructor(options: NobleBleHandlerOptions = {}) {
     this._factory = options.nobleFactory ?? DEFAULT_NOBLE_FACTORY;
     this._uuids = options.uuids ?? TREZOR_BLE_UUIDS;
@@ -471,11 +474,23 @@ export class NobleBleHandler {
   }
 
   /**
-   * Abort the in-flight pairing flow: stop scanning, disconnect every
-   * peripheral the host currently has open. Caller is responsible for
-   * surfacing the cancellation to the upper UI layer.
+   * Abort the in-flight pairing flow: abandon a connect that is still running,
+   * stop scanning, disconnect every peripheral the host currently has open.
+   * Caller is responsible for surfacing the cancellation to the upper UI layer.
+   *
+   * Abandoning the connect is what actually ends the flow. Pairing happens
+   * inside connectAsync and the entry only reaches _connected after service
+   * discovery, so the loop below never sees the device being paired — without
+   * the abandon the caller waits out the full connect timeout, which is sized
+   * to the OS pairing window and so feels like a hang.
    */
   async cancelPairing(): Promise<void> {
+    const attempt = this._activeConnect;
+    if (attempt) {
+      this._activeConnect = undefined;
+      // connect()'s catch tears down the half-open peripheral from _discovered.
+      attempt.abandon(new Error(`connect cancelled: ${attempt.id}`));
+    }
     await this.stopScan();
     for (const id of Array.from(this._connected.keys())) {
       await this.disconnect(id).catch(() => undefined);
@@ -611,20 +626,30 @@ export class NobleBleHandler {
     // down instead of committing it.
     const claim = { abandoned: false };
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const timeout = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => {
+    // The timeout is one way to abandon the attempt; cancelPairing is the other,
+    // so the rejection is hoisted out of the timer and both share it.
+    let abandon!: (error: Error) => void;
+    const abandoned = new Promise<never>((_, reject) => {
+      abandon = (error: Error) => {
         claim.abandoned = true;
-        reject(new Error(`connect timed out after ${this._connectTimeoutMs}ms`));
-      }, this._connectTimeoutMs);
+        reject(error);
+      };
     });
+    timer = setTimeout(
+      () => abandon(new Error(`connect timed out after ${this._connectTimeoutMs}ms`)),
+      this._connectTimeoutMs
+    );
+    const attempt = { id, abandon };
+    this._activeConnect = attempt;
     try {
-      return await Promise.race([this._connectInner(id, claim), timeout]);
+      return await Promise.race([this._connectInner(id, claim), abandoned]);
     } catch (error) {
       const peripheral = this._discovered.get(id);
       if (peripheral) await this._safeDisconnect(peripheral);
       throw error;
     } finally {
       if (timer) clearTimeout(timer);
+      if (this._activeConnect === attempt) this._activeConnect = undefined;
     }
   }
 
