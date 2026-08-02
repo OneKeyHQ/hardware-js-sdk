@@ -191,9 +191,6 @@ export const matchesKnownBleUuid = (
 const ONEKEY_COMMUNICATION_SERVICE_ALIASES = createKnownBleUuidAliases(ONEKEY_SERVICE_UUID);
 const FIDO_SERVICE_ALIASES = createKnownBleUuidAliases('0000fffd-0000-1000-8000-00805f9b34fb');
 
-const isFindMyAdvertisementName = (value?: string | null) =>
-  /\bfinde?\s+my\b/.test(value?.trim().toLowerCase() ?? '');
-
 export const hasOnekeyCommunicationService = (
   serviceUuids: Array<string | null | undefined> | null | undefined
 ) =>
@@ -208,10 +205,6 @@ export const isOnekeyBluetoothDevice = ({
   serviceUuids,
 }: BluetoothDeviceIdentity): boolean => {
   const advertisedServiceUuids = serviceUuids ?? [];
-  if (isFindMyAdvertisementName(name) || isFindMyAdvertisementName(localName)) {
-    return false;
-  }
-
   if (hasOnekeyCommunicationService(advertisedServiceUuids)) {
     return true;
   }

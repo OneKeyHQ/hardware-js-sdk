@@ -20,14 +20,14 @@ describe('hardware device identity filters', () => {
     expect(isOnekeyDevice('Ledger Nano X')).toBe(false);
   });
 
-  it('does not identify an unnamed FFFD or Find My advertisement as OneKey', () => {
+  it('does not identify an FFFD-only advertisement as OneKey', () => {
     expect(isOnekeyBluetoothDevice({ name: 'Find My', serviceUuids: ['fffd'] })).toBe(false);
     expect(
       isOnekeyBluetoothDevice({ serviceUuids: ['0000fffd-0000-1000-8000-00805f9b34fb'] })
     ).toBe(false);
   });
 
-  it('keeps Pro2 communication advertisements and rejects its Find My advertisement', () => {
+  it('identifies Pro2 communication advertisements independently of their display name', () => {
     expect(
       isOnekeyBluetoothDevice({
         name: 'Pro2 A1B2',
@@ -37,15 +37,15 @@ describe('hardware device identity filters', () => {
     expect(
       isOnekeyBluetoothDevice({
         localName: 'Pro2 A1B2 - Find My',
-        serviceUuids: ['fffd'],
+        serviceUuids: ['0001', 'fffd'],
       })
-    ).toBe(false);
+    ).toBe(true);
     expect(
       isOnekeyBluetoothDevice({
         name: 'Pro2 5E9D - Finde My',
         serviceUuids: ['0001', 'fffd'],
       })
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('keeps OneKey discovery on the communication service', () => {
