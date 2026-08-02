@@ -484,8 +484,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const deviceFeatures = await this.getProtocolV2DeviceFeatures();
     const deviceFirmwareType = getFirmwareType(deviceFeatures);
     const firmwareType = this.params.firmwareType ?? deviceFirmwareType;
-    const resourceRecoveryMode =
-      this.isProtocolV2BootloaderMode() || this.isProtocolV2RomloaderMode();
+    const resourceRecoveryMode = Boolean(
+      this.isProtocolV2BootloaderMode() || this.isProtocolV2RomloaderMode()
+    );
 
     let fwBinaryMap: ProtocolV2TargetBinary[] = [];
     let bootloaderBinary: ArrayBuffer | null = null;
