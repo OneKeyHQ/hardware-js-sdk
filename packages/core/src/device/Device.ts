@@ -986,7 +986,10 @@ export class Device extends EventEmitter {
       await this.getFeatures();
     }
 
-    if (!this.isProtocolV2() && refresh.has('verification')) {
+    const supportsProtocolV1OnekeyFeatures =
+      this.getCurrentDeviceType() === EDeviceType.Touch ||
+      this.getCurrentDeviceType() === EDeviceType.Pro;
+    if (!this.isProtocolV2() && refresh.has('verification') && supportsProtocolV1OnekeyFeatures) {
       const { message } = await this.commands.typedCall('OnekeyGetFeatures', 'OnekeyFeatures');
       this.updateState(mapProtocolV1OnekeyFeaturesToState(message), 'device-info');
     }

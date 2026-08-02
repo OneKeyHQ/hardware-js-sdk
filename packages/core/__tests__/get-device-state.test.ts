@@ -466,6 +466,34 @@ describe('getDeviceState', () => {
     });
   });
 
+  test.each([
+    EDeviceType.Classic,
+    EDeviceType.Classic1s,
+    EDeviceType.ClassicPure,
+    EDeviceType.Mini,
+  ])('keeps the GetFeatures-only firmware path for %s', async deviceType => {
+    const typedCall = jest.fn().mockResolvedValue({
+      message: {
+        onekey_device_type: deviceType.toUpperCase(),
+        initialized: true,
+        onekey_firmware_version: '3.5.0',
+        se_ver: '1.1.0.2',
+      },
+    });
+    const device = createV1Device(typedCall);
+
+    const state = await device.getDeviceState({
+      refreshSections: ['identity', 'versions', 'verification'],
+    });
+
+    expect(typedCall.mock.calls.map(call => call[0])).toEqual(['GetFeatures']);
+    expect(state.versions).toMatchObject({
+      firmware: '3.5.0',
+      se: '1.1.0.2',
+      se01: '1.1.0.2',
+    });
+  });
+
   test('does not clear Protocol V1 firmware details during a later runtime refresh', async () => {
     let getFeaturesCount = 0;
     const typedCall = jest.fn().mockImplementation((requestType: string) => {
