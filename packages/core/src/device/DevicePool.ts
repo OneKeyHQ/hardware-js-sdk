@@ -11,6 +11,19 @@ import type DeviceConnector from './DeviceConnector';
 
 const Log = getLogger(LoggerNames.DevicePool);
 
+/**
+ * A device in bootloader mode reports a placeholder USB serial number of all
+ * zeros, and the descriptor path is that serial number. Every model reports the
+ * same placeholder — and bootloader product ids are shared too (0x53c0 covers
+ * Classic, Classic1s and Mini) — so the descriptor holds nothing that tells two
+ * of them apart. Only the features read off the device do.
+ *
+ * Matching a cached device by such a path therefore returns whichever device was
+ * seen first: plug in a Mini, then a Classic, and the Classic is still reported
+ * as a Mini. Devices carrying a real serial keep using the cache as before.
+ */
+export const canPathIdentifyDevice = (path?: string) => !!path && !/^0+$/.test(path);
+
 export type DeviceDescriptorDiff = {
   didUpdate: boolean;
   connected: DeviceDescriptor[];
@@ -102,7 +115,10 @@ export class DevicePool extends EventEmitter {
     if (connectId) {
       const device = this.devicesCache[connectId];
       if (device) {
-        const exist = descriptorList.find(d => d.path === device.originalDescriptor.path);
+        const cachedPath = device.originalDescriptor.path;
+        const exist = canPathIdentifyDevice(cachedPath)
+          ? descriptorList.find(d => d.path === cachedPath)
+          : undefined;
         if (exist && !initOptions?.forceProtocolDetection) {
           // Log.debug('find existed Device: ', connectId);
           device.updateDescriptor(exist, true);
@@ -283,6 +299,9 @@ export class DevicePool extends EventEmitter {
   }
 
   static getDeviceByPath(path: string) {
+    // A path that cannot identify a device would match an arbitrary cache entry,
+    // so report a miss and let the caller read the device instead.
+    if (!canPathIdentifyDevice(path)) return undefined;
     return Object.values(this.devicesCache).find(d => d.originalDescriptor.path === path);
   }
 
