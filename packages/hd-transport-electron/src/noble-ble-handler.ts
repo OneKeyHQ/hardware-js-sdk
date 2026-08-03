@@ -75,10 +75,10 @@ const ONEKEY_NOTIFY_UUID_ALIASES = createKnownBleUuidAliases(ONEKEY_NOTIFY_CHARA
 
 // Timeout and interval constants
 const BLUETOOTH_INIT_TIMEOUT = 10000; // 10 seconds for Bluetooth initialization
-const DEVICE_SCAN_TIMEOUT = 8000; // 8 seconds for device scanning (Pro2 has longer advertising interval)
-const FAST_SCAN_TIMEOUT = 8000; // 8 seconds for targeted scanning (Pro2 has longer advertising interval)
+const DEVICE_SCAN_TIMEOUT = 5000; // 5 seconds for device scanning
+const FAST_SCAN_TIMEOUT = 1500; // 1.5 seconds for targeted scanning
 const DEVICE_CHECK_INTERVAL = 500; // 500ms interval for periodic device checks
-const CONNECTION_TIMEOUT = 8000; // 8 seconds for device connection (BLE reconnect after release can be slow)
+const CONNECTION_TIMEOUT = 3000; // 3 seconds for device connection
 const SERVICE_DISCOVERY_TIMEOUT = 10000; // 10 seconds for service discovery
 const BLE_CLEANUP_TIMEOUT = 250;
 

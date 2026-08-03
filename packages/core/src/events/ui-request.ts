@@ -1,6 +1,7 @@
 import type { PROTO } from '../constants';
 import type { Device } from '../types';
 import type { DeviceButtonRequest } from './device';
+import type { UiResponseCorrelation } from './ui-response';
 import type { MessageFactoryFn } from './utils';
 
 export const UI_EVENT = 'UI_EVENT';
@@ -121,6 +122,7 @@ export type UiRequestDeviceAction = {
   payload: ProtocolV2UiEventMetadata & {
     device: Device;
     type?: PROTO.PinMatrixRequestType | 'ButtonRequest_PinEntry' | 'ButtonRequest_AttachPin';
+    responseCorrelation?: UiResponseCorrelation;
   };
 };
 
@@ -140,6 +142,7 @@ export interface UiRequestPassphrase {
     reason?: 'open-wallet' | 'session-recovery';
     expectedPassphraseState?: string;
     interaction?: HardwareUiInteractionMeta;
+    responseCorrelation?: UiResponseCorrelation;
   };
 }
 

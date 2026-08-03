@@ -48,6 +48,26 @@ describe('hardware device identity filters', () => {
     ).toBe(true);
   });
 
+  it('rejects Pro2 Find My entries when the communication service is absent', () => {
+    expect(
+      isOnekeyBluetoothDevice({
+        name: 'Pro2 A1B2 - Find My',
+      })
+    ).toBe(false);
+    expect(
+      isOnekeyBluetoothDevice({
+        localName: 'OneKey Pro 2 A1B2 - Find My',
+        serviceUuids: [],
+      })
+    ).toBe(false);
+    expect(
+      isOnekeyBluetoothDevice({
+        name: 'Pro2 5E9D - Finde My',
+        serviceUuids: ['fffd'],
+      })
+    ).toBe(false);
+  });
+
   it('keeps OneKey discovery on the communication service', () => {
     expect(
       isOnekeyBluetoothDevice({

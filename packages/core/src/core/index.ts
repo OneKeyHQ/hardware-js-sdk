@@ -26,6 +26,7 @@ import {
   createRequestContext,
   createSdkTracingContext,
   formatRequestContext,
+  generateInstanceId,
   getActiveRequestsByDeviceInstance,
   updateRequestContext,
 } from '../utils/tracing';
@@ -53,6 +54,7 @@ import {
 import TransportManager from '../data-manager/TransportManager';
 import DeviceConnector from '../device/DeviceConnector';
 import RequestQueue from './RequestQueue';
+import { findUiPromiseForResponse } from './uiPromiseRegistry';
 import { registerHardwareUiEventListeners } from './deviceEventRegistration';
 import { getSynchronize } from '../utils/getSynchronize';
 import { runMethodWithUnlockPolicy } from '../protocols/protocol-v2/unlockPolicyRunner';
@@ -1260,6 +1262,7 @@ const onDevicePinHandler = async (...[device, type, callback]: DeviceEvents['pin
     createUiMessage(UI_REQUEST.REQUEST_PIN, {
       device: device.toMessageObject() as unknown as KnownDevice,
       type,
+      responseCorrelation: uiPromise.responseCorrelation,
     })
   );
   // wait for pin
@@ -1308,6 +1311,7 @@ const onDevicePassphraseHandler = async (
       reason: requestPayload.reason,
       expectedPassphraseState: requestPayload.expectedPassphraseState,
       ...(requestPayload.interaction ? { interaction: requestPayload.interaction } : {}),
+      responseCorrelation: uiPromise.responseCorrelation,
     })
   );
   // wait for passphrase
@@ -1431,13 +1435,20 @@ const postMessage = (message: CoreMessage) => {
 
 const createUiPromise = <T extends UiPromiseResponse['type']>(promiseEvent: T, device?: Device) => {
   const uiPromise: UiPromise<T> = createDeferred(promiseEvent, device);
+  if (
+    device &&
+    (promiseEvent === UI_RESPONSE.RECEIVE_PIN || promiseEvent === UI_RESPONSE.RECEIVE_PASSPHRASE)
+  ) {
+    const publicDeviceId = device.toMessageObject()?.deviceId;
+    uiPromise.responseCorrelation = {
+      interactionId: generateInstanceId('UiResponse', device.sdkInstanceId),
+      deviceId: publicDeviceId || device.instanceId,
+    };
+  }
   _uiPromises.push(uiPromise as any);
 
   return uiPromise;
 };
-
-const findUiPromise = <T extends UiPromiseResponse['type']>(promiseEvent: T) =>
-  _uiPromises.find(p => p.id === promiseEvent);
 
 const removeUiPromise = (promise: Deferred<any>) => {
   _uiPromises = _uiPromises.filter(p => p !== promise);
@@ -1490,11 +1501,16 @@ export default class Core extends EventEmitter {
       case UI_RESPONSE.RECEIVE_PASSPHRASE:
       case UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE:
       case UI_RESPONSE.SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE: {
-        const uiPromise = findUiPromise(message.type);
+        const uiPromise = findUiPromiseForResponse(_uiPromises, message);
         if (uiPromise) {
           Log.log('receive UI Response: ', message.type);
           uiPromise.resolve(message);
           removeUiPromise(uiPromise);
+        } else if (
+          message.type === UI_RESPONSE.RECEIVE_PIN ||
+          message.type === UI_RESPONSE.RECEIVE_PASSPHRASE
+        ) {
+          Log.warn('Ignored unmatched or ambiguous sensitive UI response:', message.type);
         }
         break;
       }

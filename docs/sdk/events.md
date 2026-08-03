@@ -1,7 +1,7 @@
 # OneKey `hd-*` SDK 公共事件（SDK → App）
 
 > - 文档状态：Protocol V1 当前契约 + Protocol V2 通用事件边界
-> - 最后代码核验：2026-07-31
+> - 最后代码核验：2026-08-03
 > - 适用范围：`@onekeyfe/hd-core`、`hd-web-sdk`、`hd-common-connect-sdk`
 > - 事实来源：`packages/core/src/events`、`packages/core/src/core/index.ts` 和 SDK 外层消息转发实现
 
@@ -180,6 +180,7 @@ SDK 仍必须生成该 PIN 提示。
 HardwareSDK.uiResponse({
   type: UI_RESPONSE.RECEIVE_PIN,
   payload: '1234',
+  ...requestPayload.responseCorrelation,
 });
 ```
 
@@ -189,6 +190,7 @@ HardwareSDK.uiResponse({
 HardwareSDK.uiResponse({
   type: UI_RESPONSE.RECEIVE_PIN,
   payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
+  ...requestPayload.responseCorrelation,
 });
 ```
 
@@ -210,6 +212,7 @@ HardwareSDK.uiResponse({
     passphraseOnDevice: false,
     save: false,
   },
+  ...requestPayload.responseCorrelation,
 });
 ```
 
@@ -223,6 +226,7 @@ HardwareSDK.uiResponse({
     passphraseOnDevice: true,
     save: false,
   },
+  ...requestPayload.responseCorrelation,
 });
 ```
 
@@ -236,6 +240,7 @@ HardwareSDK.uiResponse({
     attachPinOnDevice: true,
     save: false,
   },
+  ...requestPayload.responseCorrelation,
 });
 ```
 
@@ -372,26 +377,31 @@ passphrase 后设备可能主动锁定，此时后续锁定快照允许该字段
 
 ## 响应匹配和并发边界
 
-当前 Core 使用全局 `_uiPromises` 保存等待项，匹配键只有 `UI_RESPONSE` 类型：
+当前 Core 使用全局 `_uiPromises` 保存等待项。PIN 和 Passphrase 请求的 payload 会携带
+`responseCorrelation = { interactionId, deviceId }`，应用必须把这两个字段原样放回
+`uiResponse()`；Core 使用以下匹配键：
 
 ```text
-RECEIVE_PIN -> 当前 V1 PIN 等待
-RECEIVE_PASSPHRASE -> 当前 Passphrase 等待
+RECEIVE_PIN + interactionId + deviceId -> 对应 V1 PIN 等待
+RECEIVE_PASSPHRASE + interactionId + deviceId -> 对应 Passphrase 等待
 SELECT_DEVICE_* -> 当前对应设备选择等待
 ```
 
-这带来以下约束：
+兼容和安全边界如下：
 
-- 响应中没有 requestId，也不携带 connectId 用于匹配。
-- 同一响应类型不能安全地同时服务两个并发交互。
-- 正常安全边界依赖 Core 请求队列和设备调用串行化。
+- 新接入必须原样回传 correlation；不完整或不匹配的 correlation 会被忽略。
+- 旧接入不带 correlation 时，只在同类型敏感等待项唯一的情况下兼容；存在多个候选时拒绝猜测。
+- `interactionId` 是每个阻塞 UI Promise 的唯一标识，不等同于 V2 页面状态机中跨多个阶段的
+  `interaction.interactionId`。
+- `deviceId` 优先使用公开的钱包生命周期 ID；设备状态尚未提供该 ID 时，Core 使用当前 SDK Device
+  instance ID 作为本次 correlation 的回传值，应用不得自行替换。
 - 没有匹配等待项的 `uiResponse()` 会被忽略。
 - 旧 UI 等待没有独立超时；应用必须确保响应或调用取消路径能够执行。
-- 多设备 UI 可以依据请求 payload 展示正确设备，但不能通过响应 payload 指定要解析哪个等待项。
-- V2 合成阻塞 Event 复用该机制时，必须保持调用串行，或增加 requestId/connectId 关联。
+- 多设备并发的同类型敏感响应只能解析相同 correlation 的等待项。
 - 取消、超时、断连和方法结束必须删除等待项；迟到响应不能解析下一个调用。
 
-因此，应用层不应自行并行启动两个需要相同 Passphrase 响应的硬件流程；V1 PIN 同样受此限制。
+应用仍应避免无业务必要的并发交互，但正确回传 correlation 后，并发本身不会再导致 PIN 或
+Passphrase 命中另一台设备的等待项。
 
 ## `UI_REQUEST` 中并非事件的常量
 

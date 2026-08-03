@@ -81,6 +81,27 @@ const nftFileList = (count: number, basenameAt?: number) =>
     .join('\n');
 
 describe('DeviceUploadNft', () => {
+  test('defaults to maximum-size chunks without artificial pacing', () => {
+    const method = new DeviceUploadNft({
+      id: 1,
+      payload: {
+        method: 'deviceUploadNft',
+        image: { width: 540, height: 540, rgba: createRgba(540, 540) },
+        thumbnail: { width: 263, height: 263, rgba: createRgba(263, 263) },
+        title: 'CryptoPunk #3100',
+        subtitle: 'CryptoPunks',
+        timestampMs: 1_760_000_000_000,
+      },
+    });
+
+    method.init();
+
+    expect((method as any).params).toMatchObject({
+      chunkSize: 2048,
+      paceMs: 0,
+    });
+  });
+
   test('uploads the triplet in order without creating the firmware-owned directory', async () => {
     const typedCall = jest.fn((request: string, _response: string, params: any) => {
       if (request === 'FilesystemDirList') {

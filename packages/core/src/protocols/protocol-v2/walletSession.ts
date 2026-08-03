@@ -164,9 +164,13 @@ const selectDeviceSession = async (
     return getDeviceSession(device, buildDeviceSessionGetRequest({ deriveCardano }));
   }
 
+  const passphraseOnDeviceInteraction = device.createProtocolV2UiPhaseMetadata?.(
+    'passphrase-on-device',
+    'start'
+  );
   device.emit(DEVICE.PASSPHRASE_ON_DEVICE, device, {
     ...metadata,
-    ...(passphraseInteraction ? { interaction: passphraseInteraction } : {}),
+    ...(passphraseOnDeviceInteraction ? { interaction: passphraseOnDeviceInteraction } : {}),
   });
   await askDevicePassphrase(device, { on_device: true });
   return getDeviceSession(device, buildDeviceSessionGetRequest({ deriveCardano }));

@@ -5797,16 +5797,10 @@ describe('Protocol V2 firmware reconnect identity', () => {
     ).not.toThrow();
   });
 
-  test('fails closed when the physical serial is unavailable', () => {
-    expect(() => assertProtocolV2ReconnectIdentity('expected-serial', undefined)).toThrow(
-      expect.objectContaining({ errorCode: HardwareErrorCode.DeviceNotFound })
-    );
-    expect(() => assertProtocolV2ReconnectIdentity(undefined, 'actual-serial')).toThrow(
-      expect.objectContaining({ errorCode: HardwareErrorCode.DeviceNotFound })
-    );
-    expect(() => assertProtocolV2ReconnectIdentity(undefined, undefined)).toThrow(
-      expect.objectContaining({ errorCode: HardwareErrorCode.DeviceNotFound })
-    );
+  test('allows reconnect when either physical serial is unavailable', () => {
+    expect(() => assertProtocolV2ReconnectIdentity('expected-serial', undefined)).not.toThrow();
+    expect(() => assertProtocolV2ReconnectIdentity(undefined, 'actual-serial')).not.toThrow();
+    expect(() => assertProtocolV2ReconnectIdentity(undefined, undefined)).not.toThrow();
   });
 
   test('captures physical identity from active DeviceInfo instead of wallet deviceId', async () => {
@@ -5839,7 +5833,7 @@ describe('Protocol V2 firmware reconnect identity', () => {
     );
   });
 
-  test('rejects firmware update startup when DeviceInfo has no physical serial', async () => {
+  test('allows firmware update startup when DeviceInfo has no physical serial', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: { method: 'firmwareUpdateV4' },
@@ -5852,9 +5846,8 @@ describe('Protocol V2 firmware reconnect identity', () => {
       getCommands: () => ({ typedCall }),
     });
 
-    await expect((method as any).captureProtocolV2PhysicalIdentity()).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.DeviceNotFound,
-    });
+    await expect((method as any).captureProtocolV2PhysicalIdentity()).resolves.toBeUndefined();
+    expect((method as any).protocolV2ExpectedSerialNumber).toBeUndefined();
   });
 
   test('uses ResourceInventory instead of host-side FileRead for resource comparison', async () => {

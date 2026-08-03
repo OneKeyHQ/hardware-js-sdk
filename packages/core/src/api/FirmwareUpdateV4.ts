@@ -369,11 +369,10 @@ export const assertProtocolV2ReconnectIdentity = (
   expectedSerialNumber?: string,
   actualSerialNumber?: string
 ) => {
+  // Some Pro2 loader builds omit serial_no. Reconnect still uses the same BLE
+  // descriptor or requires a uniquely enumerated USB device before this check.
   if (!expectedSerialNumber || !actualSerialNumber) {
-    throw ERRORS.TypedError(
-      HardwareErrorCode.DeviceNotFound,
-      'Protocol V2 reconnect physical identity is unavailable'
-    );
+    return;
   }
   if (actualSerialNumber !== expectedSerialNumber) {
     throw ERRORS.TypedError(

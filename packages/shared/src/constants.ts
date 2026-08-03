@@ -191,6 +191,11 @@ export const matchesKnownBleUuid = (
 const ONEKEY_COMMUNICATION_SERVICE_ALIASES = createKnownBleUuidAliases(ONEKEY_SERVICE_UUID);
 const FIDO_SERVICE_ALIASES = createKnownBleUuidAliases('0000fffd-0000-1000-8000-00805f9b34fb');
 
+const isPro2FindMyAdvertisementName = (value?: string | null) => {
+  const normalizedName = value?.trim().toLowerCase() ?? '';
+  return /\bpro\s*2\b/.test(normalizedName) && /\bfinde?\s+my\b/.test(normalizedName);
+};
+
 export const hasOnekeyCommunicationService = (
   serviceUuids: Array<string | null | undefined> | null | undefined
 ) =>
@@ -207,6 +212,12 @@ export const isOnekeyBluetoothDevice = ({
   const advertisedServiceUuids = serviceUuids ?? [];
   if (hasOnekeyCommunicationService(advertisedServiceUuids)) {
     return true;
+  }
+
+  // Android can return a connected Find My peripheral without its advertised
+  // services. Do not let the Pro2-looking name fall through to name discovery.
+  if (isPro2FindMyAdvertisementName(name) || isPro2FindMyAdvertisementName(localName)) {
+    return false;
   }
 
   if (advertisedServiceUuids.some(uuid => matchesKnownBleUuid(uuid, FIDO_SERVICE_ALIASES))) {

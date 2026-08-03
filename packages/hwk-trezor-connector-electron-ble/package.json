@@ -36,7 +36,9 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "clean": "rimraf dist",
-    "test": "jest"
+    "test": "jest",
+    "verify:types": "node scripts/verify-package-types.js",
+    "prepack": "yarn build && yarn verify:types"
   },
   "publishConfig": {
     "access": "public"

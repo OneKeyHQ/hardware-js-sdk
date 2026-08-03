@@ -5,6 +5,7 @@ import GetPassphraseState from '../src/api/GetPassphraseState';
 import OpenWalletSession from '../src/api/OpenWalletSession';
 import { Device } from '../src/device/Device';
 import { deviceWalletSessionStore } from '../src/device/DeviceWalletSessionStore';
+import { DEVICE } from '../src/events';
 import {
   ensureProtocolV2WalletSessionUnlocked,
   getProtocolV2WalletSession,
@@ -1130,7 +1131,28 @@ describe('openWalletSession', () => {
       payload: { method: 'openWalletSession', connectId: 'connect-id', mode: 'select-hidden' },
     });
     method.init();
-    method.device = createDevice({ typedCall, promptPassphrase }) as any;
+    const device = createDevice({ typedCall, promptPassphrase });
+    const passphraseInteraction = {
+      interactionId: 'interaction-1',
+      phaseId: 'interaction-1:phase-1',
+      sequence: 1,
+      phase: 'passphrase',
+      transition: 'start',
+      protocol: 'V2',
+    } as const;
+    const passphraseOnDeviceInteraction = {
+      interactionId: 'interaction-1',
+      phaseId: 'interaction-1:phase-2',
+      sequence: 2,
+      phase: 'passphrase-on-device',
+      transition: 'start',
+      protocol: 'V2',
+    } as const;
+    device.createProtocolV2UiPhaseMetadata = jest
+      .fn()
+      .mockReturnValueOnce(passphraseInteraction)
+      .mockReturnValueOnce(passphraseOnDeviceInteraction);
+    method.device = device as any;
 
     await expect(method.run()).resolves.toMatchObject({
       walletType: 'hidden',
@@ -1141,6 +1163,16 @@ describe('openWalletSession', () => {
     });
     expect(typedCall).toHaveBeenNthCalledWith(3, 'DeviceSessionGet', 'DeviceSession', {
       seed_domains: [],
+    });
+    expect(device.createProtocolV2UiPhaseMetadata).toHaveBeenNthCalledWith(
+      2,
+      'passphrase-on-device',
+      'start'
+    );
+    expect(device.emit).toHaveBeenCalledWith(DEVICE.PASSPHRASE_ON_DEVICE, device, {
+      source: 'wallet-session-coordinator',
+      reason: 'open-wallet',
+      interaction: passphraseOnDeviceInteraction,
     });
   });
 
