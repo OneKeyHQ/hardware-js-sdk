@@ -191,7 +191,7 @@ export const matchesKnownBleUuid = (
 const ONEKEY_COMMUNICATION_SERVICE_ALIASES = createKnownBleUuidAliases(ONEKEY_SERVICE_UUID);
 const FIDO_SERVICE_ALIASES = createKnownBleUuidAliases('0000fffd-0000-1000-8000-00805f9b34fb');
 
-const isPro2FindMyAdvertisementName = (value?: string | null) => {
+export const isPro2FindMyAdvertisementName = (value?: string | null) => {
   const normalizedName = value?.trim().toLowerCase() ?? '';
   return /\bpro\s*2\b/.test(normalizedName) && /\bfinde?\s+my\b/.test(normalizedName);
 };
