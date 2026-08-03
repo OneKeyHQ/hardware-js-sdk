@@ -5004,6 +5004,11 @@ export enum DeviceSessionErrorCode {
   DeviceSessionError_Busy = 5,
 }
 
+export enum DeviceSessionSeedDomain {
+  SeedDomain_Standard = 1,
+  SeedDomain_Cardano = 2,
+}
+
 // DeviceSessionGet
 export type DeviceSessionGet = {
   session_id?: string;

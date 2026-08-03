@@ -1,5 +1,5 @@
 import { EDeviceType, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import { DeviceSessionPinType } from '@onekeyfe/hd-transport';
+import { DeviceSessionPinType, DeviceSessionSeedDomain } from '@onekeyfe/hd-transport';
 
 import GetPassphraseState from '../src/api/GetPassphraseState';
 import OpenWalletSession from '../src/api/OpenWalletSession';

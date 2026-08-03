@@ -1,5 +1,5 @@
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import { DeviceSessionPinType } from '@onekeyfe/hd-transport';
+import { DeviceSessionPinType, DeviceSessionSeedDomain } from '@onekeyfe/hd-transport';
 
 import { DEVICE } from '../../events';
 import { assertCompleteDeviceSession } from './deviceSession';
@@ -88,7 +88,11 @@ const askDevicePassphrase = async (device: Device, requestPayload: DeviceSession
   await refreshProtocolV2DeviceStatus(device);
 };
 
-const selectDeviceSession = async (device: Device, expectedPassphraseState?: string) => {
+const selectDeviceSession = async (
+  device: Device,
+  expectedPassphraseState?: string,
+  deriveCardano?: boolean
+) => {
   const existsAttachPinUser = device.features?.attachToPinEnabled === true;
   const metadata = {
     source: 'wallet-session-coordinator' as const,
@@ -368,7 +372,7 @@ export async function getProtocolV2WalletSession(
       device.clearInternalState();
       throw ERRORS.TypedError(HardwareErrorCode.WalletSessionInvalid);
     }
-    response = await selectDeviceSession(device, expectedPassphraseState);
+    response = await selectDeviceSession(device, expectedPassphraseState, options?.deriveCardano);
   }
 
   let { message } = response;
@@ -398,7 +402,7 @@ export async function getProtocolV2WalletSession(
       );
     } else {
       device.clearInternalState();
-      response = await selectDeviceSession(device, expectedPassphraseState);
+      response = await selectDeviceSession(device, expectedPassphraseState, options?.deriveCardano);
     }
     message = response.message;
     try {
