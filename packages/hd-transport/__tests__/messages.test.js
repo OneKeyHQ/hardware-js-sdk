@@ -3,6 +3,7 @@ const {
   createMessageFromType,
   parseConfigure,
 } = require('../src/serialization/protobuf/messages');
+const { encode } = require('../src/serialization/protobuf/encode');
 const v1Messages = require('../../core/src/data/messages/messages.json');
 const v2Messages = require('../messages-protocol-v2.json');
 const coreV2Messages = require('../../core/src/data/messages/messages-protocol-v2.json');
@@ -186,11 +187,13 @@ describe('messages', () => {
     const messages = parseConfigure(v2Messages);
     const { Message } = createMessageFromName(messages, 'DeviceSessionAskPassphrase');
 
+    const standardWallet = encode(Message, { passphrase: '', on_device: false });
     const onHost = Message.encode(
       Message.create({ passphrase: 'host hidden wallet', on_device: false })
     ).finish();
     const onDevice = Message.encode(Message.create({ on_device: true })).finish();
 
+    expect(standardWallet.toString('hex')).toBe('0a001000');
     expect(Buffer.from(onHost).toString('hex')).toBe(
       '0a12686f73742068696464656e2077616c6c65741000'
     );

@@ -215,7 +215,7 @@ export async function getProtocolV2WalletSession(
       : undefined;
   let response;
   let resumed = false;
-  let mainWalletSelected =
+  let mainPinSelected =
     options?.onlyMainPin === true &&
     device.features?.unlocked === true &&
     device.features?.unlockedAttachPin === false;
@@ -243,14 +243,25 @@ export async function getProtocolV2WalletSession(
     throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckUnlockTypeError);
   };
 
-  const selectMainWallet = async (force = false) => {
-    if (force || !mainWalletSelected) {
+  const selectMainPin = async (force = false) => {
+    if (force || !mainPinSelected) {
       await device.unlockDevice(DeviceSessionPinType.Main, {
         source: 'wallet-session-coordinator',
         reason: expectedPassphraseState ? 'session-recovery' : 'open-wallet',
         deviceOnly: true,
       });
-      mainWalletSelected = true;
+      mainPinSelected = true;
+    }
+  };
+
+  const selectStandardWallet = async () => {
+    // Main PIN authenticates the device; an empty host passphrase selects the standard derivation.
+    await selectMainPin();
+    if (device.features?.passphraseProtection === true) {
+      await askDevicePassphrase(device, {
+        passphrase: '',
+        on_device: false,
+      });
     }
   };
 
@@ -259,7 +270,7 @@ export async function getProtocolV2WalletSession(
     if (cachedStandardSession) {
       try {
         if (options?.selectMainWalletBeforeRestore) {
-          await selectMainWallet();
+          await selectMainPin();
         }
         response = await getDeviceSession(
           device,
@@ -280,7 +291,7 @@ export async function getProtocolV2WalletSession(
     }
 
     if (!response) {
-      await selectMainWallet();
+      await selectStandardWallet();
       response = await getDeviceSession(
         device,
         buildDeviceSessionGetRequest({ deriveCardano: options?.deriveCardano })
@@ -348,7 +359,7 @@ export async function getProtocolV2WalletSession(
     }
     if (options?.onlyMainPin) {
       device.clearStandardInternalState?.();
-      await selectMainWallet(true);
+      await selectStandardWallet();
       response = await getDeviceSession(
         device,
         buildDeviceSessionGetRequest({ deriveCardano: options?.deriveCardano })
@@ -391,7 +402,7 @@ export async function getProtocolV2WalletSession(
   return {
     passphraseState: message.btc_test_address,
     newSession: message.session_id,
-    unlockedAttachPin: mainWalletSelected ? false : undefined,
+    unlockedAttachPin: mainPinSelected ? false : undefined,
     resumed,
   };
 }

@@ -786,6 +786,9 @@ describe('Protocol V2 feature adapter', () => {
         if (request === 'DeviceStatusGet') {
           return { type: 'DeviceStatus', message: { unlocked: true } };
         }
+        if (request === 'DeviceSessionAskPassphrase') {
+          return { type: 'Success', message: {} };
+        }
         if (request === 'DeviceSessionGet') {
           return {
             type: 'DeviceSession',
@@ -818,6 +821,10 @@ describe('Protocol V2 feature adapter', () => {
     });
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPin', 'Success', {
       type: DeviceSessionPinType.Main,
+    });
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {
+      passphrase: '',
+      on_device: false,
     });
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
       seed_domains: [],
@@ -854,6 +861,7 @@ describe('Protocol V2 feature adapter', () => {
           },
         };
       }
+      if (request === 'DeviceSessionAskPassphrase') return { message: {} };
       if (request === 'DeviceSessionGet') {
         return {
           message: {
@@ -870,6 +878,9 @@ describe('Protocol V2 feature adapter', () => {
     await getProtocolV2WalletSession(device, { onlyMainPin: true });
 
     expect(typedCall.mock.calls.filter(call => call[0] === 'DeviceSessionAskPin')).toHaveLength(1);
+    expect(
+      typedCall.mock.calls.filter(call => call[0] === 'DeviceSessionAskPassphrase')
+    ).toHaveLength(1);
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
       seed_domains: [],
     });
@@ -918,6 +929,7 @@ describe('Protocol V2 feature adapter', () => {
           },
         };
       }
+      if (request === 'DeviceSessionAskPassphrase') return { message: {} };
       if (request === 'DeviceSessionAskPin') {
         return { type: 'Success', message: { message: 'PIN verified' } };
       }
@@ -1012,6 +1024,7 @@ describe('Protocol V2 feature adapter', () => {
       if (request === 'DeviceStatusGet') {
         return { message: { device_id: deviceId, unlocked: true, passphrase_enabled: true } };
       }
+      if (request === 'DeviceSessionAskPassphrase') return { message: {} };
       if (request === 'DeviceSessionGet') {
         sessionGetCalls += 1;
         return {
@@ -2415,13 +2428,18 @@ describe('Protocol V2 feature adapter', () => {
     await expect(
       device.checkPassphraseStateSafety('stale-hidden-state', true, false)
     ).resolves.toBe(true);
-    expect(typedCall).toHaveBeenCalledTimes(2);
+    expect(typedCall).toHaveBeenCalledTimes(4);
     expect(typedCall).toHaveBeenCalledWith('ProtocolInfoRequest', 'ProtocolInfo', {
       eventless_wallet_session: true,
     });
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
       seed_domains: [],
     });
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {
+      passphrase: '',
+      on_device: false,
+    });
+    expect(typedCall).toHaveBeenCalledWith('DeviceStatusGet', 'DeviceStatus', {});
     expect(typedCall).not.toHaveBeenCalledWith('DeviceSessionAskPin', 'Success', expect.anything());
   });
 

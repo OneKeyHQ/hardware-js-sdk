@@ -98,10 +98,13 @@ describe('openWalletSession', () => {
     deviceWalletSessionStore.clear();
   });
 
-  test('reuses the authoritative Main wallet DeviceStatus', async () => {
+  test('selects the standard wallet explicitly when passphrase is enabled', async () => {
     const typedCall = jest.fn((request: string) => {
       if (request === 'ProtocolInfoRequest') {
         return { message: { version: 2 } };
+      }
+      if (request === 'DeviceSessionAskPassphrase') {
+        return { message: {} };
       }
       if (request === 'DeviceSessionGet') {
         return {
@@ -125,6 +128,39 @@ describe('openWalletSession', () => {
     });
 
     expect(device.unlockDevice).not.toHaveBeenCalled();
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {
+      passphrase: '',
+      on_device: false,
+    });
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
+      seed_domains: [],
+    });
+  });
+
+  test('opens the standard wallet directly when passphrase is disabled', async () => {
+    const typedCall = jest.fn((request: string) => {
+      if (request === 'ProtocolInfoRequest') {
+        return { message: { version: 2 } };
+      }
+      if (request === 'DeviceSessionGet') {
+        return {
+          message: {
+            btc_test_address: 'standard-state',
+            session_id: 'standard-session',
+          },
+        };
+      }
+      throw new Error(`Unexpected request: ${request}`);
+    });
+    const device = createDevice({ passphraseProtection: false, typedCall });
+
+    await getProtocolV2WalletSession(device as any, { onlyMainPin: true });
+
+    expect(typedCall).not.toHaveBeenCalledWith(
+      'DeviceSessionAskPassphrase',
+      'Success',
+      expect.anything()
+    );
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
       seed_domains: [],
     });
@@ -134,6 +170,9 @@ describe('openWalletSession', () => {
     const typedCall = jest.fn((request: string) => {
       if (request === 'ProtocolInfoRequest') {
         return { message: { version: 2 } };
+      }
+      if (request === 'DeviceSessionAskPassphrase') {
+        return { message: {} };
       }
       if (request === 'DeviceSessionGet') {
         return {
@@ -865,6 +904,7 @@ describe('openWalletSession', () => {
     const typedCall = jest
       .fn()
       .mockResolvedValueOnce({ message: { version: 2 } })
+      .mockResolvedValueOnce({ message: {} })
       .mockResolvedValueOnce({
         message: {
           btc_test_address: 'main-wallet-state',
@@ -887,11 +927,15 @@ describe('openWalletSession', () => {
       passphraseState: null,
       resumed: false,
     });
-    expect(typedCall).toHaveBeenCalledTimes(2);
+    expect(typedCall).toHaveBeenCalledTimes(3);
     expect(typedCall).toHaveBeenCalledWith('ProtocolInfoRequest', 'ProtocolInfo', {
       eventless_wallet_session: true,
     });
     expect(device.unlockDevice).not.toHaveBeenCalled();
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {
+      passphrase: '',
+      on_device: false,
+    });
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
       seed_domains: [],
     });
@@ -903,6 +947,7 @@ describe('openWalletSession', () => {
     const typedCall = jest
       .fn()
       .mockResolvedValueOnce({ message: { version: 2 } })
+      .mockResolvedValueOnce({ message: {} })
       .mockResolvedValueOnce({
         message: {
           btc_test_address: 'main-wallet-state',
@@ -954,6 +999,7 @@ describe('openWalletSession', () => {
     const typedCall = jest
       .fn()
       .mockResolvedValueOnce({ message: { version: 2 } })
+      .mockResolvedValueOnce({ message: {} })
       .mockResolvedValueOnce({
         message: {
           btc_test_address: 'main-wallet-state',
