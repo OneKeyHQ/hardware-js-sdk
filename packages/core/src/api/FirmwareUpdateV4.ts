@@ -487,9 +487,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const deviceFeatures = await this.getProtocolV2DeviceFeatures();
     const deviceFirmwareType = getFirmwareType(deviceFeatures);
     const firmwareType = this.params.firmwareType ?? deviceFirmwareType;
-    const resourceRecoveryMode = Boolean(
-      this.isProtocolV2BootloaderMode() || this.isProtocolV2RomloaderMode()
-    );
+    const needsRemoteResources =
+      !this.params.resourceBundleFiles?.length &&
+      !!this.params.targetsToUpdate?.includes('resource');
 
     let fwBinaryMap: ProtocolV2TargetBinary[] = [];
     let bootloaderBinary: ArrayBuffer | null = null;
@@ -498,12 +498,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     let resourceBundles: ProtocolV2ResourceBundleBinary[] | undefined;
     try {
       this.postTipMessage(FirmwareUpdateTipMessage.StartDownloadFirmware);
+      resourceBundles = this.prepareExplicitProtocolV2ResourceBundles();
       fwBinaryMap = this.collectExplicitTargetBinaries();
       bootloaderBinary = this.prepareBootloaderBinary();
       const needsRemoteFirmware = !this.hasExplicitProtocolV2Payload(fwBinaryMap);
-      const needsRemoteResources =
-        !this.params.resourceBundleFiles?.length &&
-        !!this.params.targetsToUpdate?.includes('resource');
       const needsRemoteBootResources =
         !this.params.bootResourcesBinary &&
         !!this.params.targetsToUpdate?.includes('boot_resources');
@@ -527,8 +525,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           ...(installItems ?? this.buildProtocolV2InstallItems({ bootloaderBinary, fwBinaryMap })),
         ];
       }
-      resourceBundles = await this.prepareProtocolV2ResourceBundles(resourceRecoveryMode);
-      this.postTipMessage(FirmwareUpdateTipMessage.FinishDownloadFirmware);
+      if (!needsRemoteResources) {
+        this.postTipMessage(FirmwareUpdateTipMessage.FinishDownloadFirmware);
+      }
     } catch (err) {
       throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
     }
@@ -537,19 +536,35 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       !bootloaderBinary &&
       fwBinaryMap.length === 0 &&
       !installItems?.length &&
-      !resourceBundles?.length
+      !resourceBundles?.length &&
+      !needsRemoteResources
     ) {
-      if (resourceBundles !== undefined) {
-        this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdateCompleted);
-        return this.getProtocolV2VersionResult(deviceFeatures);
-      }
       throw ERRORS.TypedError(
         HardwareErrorCode.FirmwareUpdateDownloadFailed,
         'No firmware to update'
       );
     }
 
-    await this.enterProtocolV2BootloaderMode();
+    const enteredBootloader = await this.enterProtocolV2BootloaderMode();
+
+    if (needsRemoteResources) {
+      try {
+        resourceBundles = await this.prepareProtocolV2ResourceBundles();
+        this.postTipMessage(FirmwareUpdateTipMessage.FinishDownloadFirmware);
+      } catch (err) {
+        if (enteredBootloader) {
+          try {
+            await this.exitProtocolV2BootloaderToNormal();
+          } catch (restoreError) {
+            Log.warn(
+              '[FirmwareUpdateV4] failed to restore App mode after resource preparation error:',
+              restoreError
+            );
+          }
+        }
+        throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
+      }
+    }
 
     await this.executeProtocolV2Update({
       fwBinaryMap,
@@ -816,23 +831,25 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     };
   }
 
-  private async prepareProtocolV2ResourceBundles(
-    recoveryMode: boolean
-  ): Promise<ProtocolV2ResourceBundleBinary[] | undefined> {
-    if (this.params.resourceBundleFiles?.length) {
-      return this.params.resourceBundleFiles.map((file, index) => {
-        const devicePath = validateProtocolV2FilesystemPath(
-          file.devicePath,
-          `resourceBundleFiles[${index}].devicePath`
-        );
-        return {
-          name: devicePath.split('/').pop() ?? devicePath,
-          binary: file.binary,
-          devicePath,
-        };
-      });
-    }
+  private prepareExplicitProtocolV2ResourceBundles(): ProtocolV2ResourceBundleBinary[] | undefined {
+    if (!this.params.resourceBundleFiles?.length) return undefined;
 
+    return this.params.resourceBundleFiles.map((file, index) => {
+      const devicePath = validateProtocolV2FilesystemPath(
+        file.devicePath,
+        `resourceBundleFiles[${index}].devicePath`
+      );
+      return {
+        name: devicePath.split('/').pop() ?? devicePath,
+        binary: file.binary,
+        devicePath,
+      };
+    });
+  }
+
+  private async prepareProtocolV2ResourceBundles(): Promise<
+    ProtocolV2ResourceBundleBinary[] | undefined
+  > {
     if (!this.params.targetsToUpdate?.includes('resource')) {
       return undefined;
     }
@@ -853,13 +870,11 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const plan = buildProtocolV2ResourceUpdatePlan({
       resources,
       inventory,
-      mode: recoveryMode ? 'bootloader-recovery' : 'application',
+      mode: 'bootloader-recovery',
       forced: this.params.forcedUpdateRes,
     });
     Log.log(
-      `[FirmwareUpdateV4] Pro2 resource plan mode=${
-        recoveryMode ? 'bootloader-recovery' : 'application'
-      } status=${plan.status} count=${plan.resources.length}`
+      `[FirmwareUpdateV4] Pro2 resource plan mode=bootloader-recovery status=${plan.status} count=${plan.resources.length}`
     );
 
     const bundles: ProtocolV2ResourceBundleBinary[] = [];
@@ -1423,20 +1438,33 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       return;
     }
 
-    // App and bootloader serials may differ temporarily. During V4 reconnect, accept
-    // only a uniquely enumerated device instead of repeatedly using the old App path.
+    // Reinitialize every USB descriptor so DeviceInfo can provide the physical serial.
+    // Enumeration order is not stable and must never decide the reconnect target.
     const { deviceList } = await DevicePool.getDevices(devicesDescriptor, undefined, {
       connectProtocol: PROTOCOL_V2_CONNECT_PROTOCOL,
     });
-    if (deviceList.length !== 1) {
+    const expectedSerialNumber = this.protocolV2ExpectedSerialNumber?.trim();
+    const identityMatch = expectedSerialNumber
+      ? deviceList.find(
+          candidate => candidate.getCurrentSerialNo?.().trim() === expectedSerialNumber
+        )
+      : undefined;
+    const singleCandidate = deviceList.length === 1 ? deviceList.at(0) : undefined;
+    const singleCandidateSerialNumber = singleCandidate?.getCurrentSerialNo?.().trim();
+    const reconnectDevice =
+      identityMatch ??
+      (singleCandidate && (!expectedSerialNumber || !singleCandidateSerialNumber)
+        ? singleCandidate
+        : undefined);
+    if (!reconnectDevice) {
       throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound);
     }
 
     Log.debug(
-      'Protocol V2 firmware reconnect using single enumerated device:',
-      deviceList[0].getConnectId()
+      'Protocol V2 firmware reconnect using matched device:',
+      reconnectDevice.getConnectId()
     );
-    this.device.updateFromCache(deviceList[0]);
+    this.device.updateFromCache(reconnectDevice);
     await this.ensureProtocolV2DeviceAcquired();
     this.device.commands.disposed = false;
     this.device.getCommands().mainId = this.device.mainId ?? '';

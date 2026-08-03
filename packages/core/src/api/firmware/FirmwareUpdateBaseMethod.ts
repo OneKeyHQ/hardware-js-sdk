@@ -191,7 +191,8 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
             await this.device.deviceConnector?.acquire(
               this.device.originalDescriptor.id,
               null,
-              true
+              true,
+              this.payload.connectProtocol ?? this.device.originalDescriptor.protocolType
             );
             await this.device.initialize();
             if (this.device.isBootloader()) {
@@ -225,7 +226,9 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
   ) {
     const deviceDiff = await this.device.deviceConnector?.enumerate();
     const devicesDescriptor = deviceDiff?.descriptors ?? [];
-    const { deviceList } = await DevicePool.getDevices(devicesDescriptor, connectId);
+    const { deviceList } = await DevicePool.getDevices(devicesDescriptor, connectId, {
+      connectProtocol: this.payload.connectProtocol ?? this.device.originalDescriptor.protocolType,
+    });
 
     if (deviceList.length === 1 && deviceList[0]?.isBootloader()) {
       // should update current device from cache
@@ -434,7 +437,12 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
         const env = DataManager.getSettings('env');
         if (DataManager.isBleConnect(env)) {
           await wait(3000);
-          await this.device.deviceConnector?.acquire(this.device.originalDescriptor.id, null, true);
+          await this.device.deviceConnector?.acquire(
+            this.device.originalDescriptor.id,
+            null,
+            true,
+            this.payload.connectProtocol ?? this.device.originalDescriptor.protocolType
+          );
           await this.device.initialize();
         } else if (
           error?.message?.indexOf(SESSION_ERROR) > -1 ||
@@ -442,7 +450,10 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
         ) {
           const deviceDiff = await this.device.deviceConnector?.enumerate();
           const devicesDescriptor = deviceDiff?.descriptors ?? [];
-          const { deviceList } = await DevicePool.getDevices(devicesDescriptor, undefined);
+          const { deviceList } = await DevicePool.getDevices(devicesDescriptor, undefined, {
+            connectProtocol:
+              this.payload.connectProtocol ?? this.device.originalDescriptor.protocolType,
+          });
           if (deviceList.length === 1 && deviceList[0]?.isBootloader()) {
             this.device.updateFromCache(deviceList[0]);
             await this.device.acquire();

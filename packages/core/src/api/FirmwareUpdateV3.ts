@@ -503,7 +503,8 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
             await this.device.deviceConnector?.acquire(
               this.device.originalDescriptor.id,
               null,
-              true
+              true,
+              this.payload.connectProtocol ?? this.device.originalDescriptor.protocolType
             );
             const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
             await Promise.race([
@@ -540,7 +541,10 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
             webUsbCheckCount = 0;
           }
 
-          const { deviceList } = await DevicePool.getDevices(devicesDescriptor, this.connectId);
+          const { deviceList } = await DevicePool.getDevices(devicesDescriptor, this.connectId, {
+            connectProtocol:
+              this.payload.connectProtocol ?? this.device.originalDescriptor.protocolType,
+          });
 
           if (deviceList.length === 1) {
             this.device.updateFromCache(deviceList[0]);

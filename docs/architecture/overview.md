@@ -54,9 +54,10 @@ flowchart TD
 - `ProtocolV2SequenceCursor`：让普通断开和重连后的帧序号继续递增，Transport dispose 时再清除。
 - `probeProtocolV2()`：公共 V2 probe helper，发送 `Ping { message: 'protocol-v2-probe' }` 并执行失败清理钩子。
 
-各 transport 的 `detectProtocol()` 根据 hint 和连接缓存选择 V1/V2 probe 顺序。调用方显式传入的
-`connectProtocol` 是严格预期，必须通过对应协议的活动响应验证；descriptor 或历史连接中的协议只作为
-`protocolHint`，首次 probe 失败后必须清理旧探测状态并尝试另一协议。
+各 transport 的 `detectProtocol()` 根据尚未确认的内部 hint 选择首次 V1/V2 probe 顺序。调用方显式传入的
+`connectProtocol` 是严格预期，必须通过对应协议的活动响应验证；初次活动探测确认后，descriptor 和 App
+持久化结果都作为后续连接的严格预期，不再回退到另一协议。只有显式 `forceProtocolDetection` 会让单次
+调用忽略绑定并重新探测。
 
 WebUSB、Electron BLE、React Native BLE 和 lowlevel BLE 只负责各自的物理连接、读写、订阅/桥接和平台错误映射，不再各自复制 V2 协议会话逻辑。
 
@@ -66,9 +67,9 @@ WebUSB、Electron BLE、React Native BLE 和 lowlevel BLE 只负责各自的物�
 
 `DeviceStateStore` 是设备身份、版本、设置和运行状态的唯一状态源。V1/V2 Mapper 只负责把协议响应转换为统一 patch；旧版 `Features` 仅由统一状态即时投影：
 
-| 协议 | 数据来源                       | 标准输出      | 兼容输出                      |
-| ---- | ------------------------------ | ------------- | ----------------------------- |
-| V1   | `Initialize -> Features`       | `DeviceState` | `getFeatures()` 投影（仅 V1） |
+| 协议 | 数据来源                                                 | 标准输出      | 兼容输出                      |
+| ---- | -------------------------------------------------------- | ------------- | ----------------------------- |
+| V1   | `Initialize -> Features`                                 | `DeviceState` | `getFeatures()` 投影（仅 V1） |
 | V2   | `Ping` probe + `DeviceInfoGet/ProtocolInfo/DeviceStatus` | `DeviceState` | 不支持 `getFeatures()`        |
 
 `getDeviceState()` 和 `DEVICE.STATE` 共享同一份完整快照。normal 模式下只有明确请求 runtime/status
@@ -151,15 +152,32 @@ Protocol V2 固件更新使用系统消息：
 
 ```mermaid
 flowchart TD
-  Prepare["prepare binaries"]
+  Prepare["refresh config + prepare firmware binaries"]
+  Enter["normal -> reboot Bootloader / loader -> reuse connection"]
+  Inventory["loader only: resource size + header hash"]
+  Download["download changed resource bundles"]
   Mkdir["FilesystemDirMake"]
   Write["FilesystemFileWrite(resource / bootloader / firmware)"]
+  Install{"firmware or CRATE targets?"}
   Update["DeviceFirmwareUpdate(targets)"]
+  Done["resource sync complete"]
 
-  Prepare --> Mkdir --> Write --> Update
+  Prepare --> Enter
+  Enter --> Inventory --> Download --> Mkdir
+  Enter --> Mkdir
+  Mkdir --> Write --> Install
+  Install -->|yes| Update
+  Install -->|RESC only| Done
 ```
 
-`DeviceFirmwareUpdate.targets` 必须包含所有需要安装的文件，包括 resource、bootloader 和 firmware。SDK 不假设固件端会隐式扫描已写入路径。
+Application 模式只允许宿主访问 `vol1:/wallpapers`、`vol1:/portfolio` 和 `vol1:/nft`，读取
+`vol0:/bundles/**` 会返回 `Path not allowed`。因此普通模式下的版本检查把资源状态保留为
+`unknown`；`FirmwareUpdateV4` 先切换到 Bootloader，再通过 `FilesystemPathInfoQuery` 和
+`FilesystemFileRead` 比较资源大小及文件头哈希，最后只下载和写入有差异的资源。设备已经在
+Bootloader 或 Romloader 时复用当前 loader 连接，不重复 reboot。
+
+`DeviceFirmwareUpdate.targets` 必须包含所有需要安装的固件和 CRATE 文件；普通 RESC bundle
+直接同步到最终路径，资源单独更新时不发送空的安装请求。SDK 不假设固件端会隐式扫描已写入路径。
 
 ## 包职责速查
 

@@ -3923,6 +3923,68 @@ describe('Protocol V2 firmware update targets', () => {
     });
   });
 
+  test('enters Protocol V2 bootloader before reading and downloading remote resources', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+        targetsToUpdate: ['resource'],
+      },
+    });
+    method.init();
+
+    (method as any).device = stubDevice({
+      originalDescriptor: { id: 'usb-id', path: 'app-path', protocolType: 'V2' },
+      features: {
+        deviceType: 'pro2',
+        firmwareVersion: '1.0.0',
+        mode: 'normal',
+        bootloaderMode: false,
+        capabilities: [],
+      },
+      isBootloader: () => false,
+      isRomloader: () => false,
+    });
+    (method as any).captureProtocolV2PhysicalIdentity = jest.fn().mockResolvedValue(undefined);
+    (method as any).prepareRemoteProtocolV2Binaries = jest.fn().mockResolvedValue({
+      bootloaderBinary: null,
+      fwBinaryMap: [],
+      installItems: [],
+    });
+
+    const order: string[] = [];
+    (method as any).enterProtocolV2BootloaderMode = jest.fn().mockImplementation(() => {
+      order.push('enter-bootloader');
+      return Promise.resolve(true);
+    });
+    (method as any).prepareProtocolV2ResourceBundles = jest.fn().mockImplementation(() => {
+      order.push('prepare-resources');
+      return Promise.resolve([
+        {
+          name: 'images.okpkg',
+          binary: new Uint8Array([1]).buffer,
+          devicePath: 'vol0:/bundles/images/images.okpkg',
+        },
+      ]);
+    });
+    (method as any).executeProtocolV2Update = jest.fn().mockImplementation(() => {
+      order.push('execute-update');
+      return Promise.resolve();
+    });
+    (method as any).exitProtocolV2BootloaderToNormal = jest.fn().mockResolvedValue(undefined);
+    (method as any).waitForProtocolV2FinalFeatures = jest.fn().mockResolvedValue({
+      bootloaderVersion: '1.0.0',
+      bleVersion: '1.0.0',
+      firmwareVersion: '1.0.0',
+    });
+    method.postTipMessage = jest.fn();
+
+    await method.run();
+
+    expect(order).toEqual(['enter-bootloader', 'prepare-resources', 'execute-update']);
+  });
+
   test('reboots Protocol V2 normal-mode device to bootloader before transfer', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
@@ -3970,6 +4032,33 @@ describe('Protocol V2 firmware update targets', () => {
     expect(method.postTipMessage).toHaveBeenCalledWith('GoToBootloaderSuccess');
     expect((method as any).checkDeviceToBootloader).not.toHaveBeenCalled();
     expect(reconnectProtocolV2Device).toHaveBeenCalledTimes(1);
+  });
+
+  test('keeps Protocol V2 bootloader active before firmware transfer', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    (method as any).device = stubDevice({
+      originalDescriptor: { id: 'usb-id', path: 'bootloader-path', protocolType: 'V2' },
+      features: {
+        deviceType: 'pro2',
+        mode: 'bootloader',
+        bootloaderMode: true,
+        capabilities: [],
+      },
+      isBootloader: () => true,
+      isRomloader: () => false,
+    });
+    (method as any).protocolV2Reboot = jest.fn();
+    method.postTipMessage = jest.fn();
+
+    await expect((method as any).enterProtocolV2BootloaderMode()).resolves.toBe(false);
+
+    expect((method as any).protocolV2Reboot).not.toHaveBeenCalled();
+    expect(method.postTipMessage).not.toHaveBeenCalledWith('AutoRebootToBootloader');
   });
 
   test('keeps Protocol V2 romloader active before firmware transfer', async () => {
@@ -4039,7 +4128,7 @@ describe('Protocol V2 firmware update targets', () => {
 
     await method.run();
 
-    expect(prepareResourceBundles).toHaveBeenCalledWith(true);
+    expect(prepareResourceBundles).not.toHaveBeenCalled();
     expect((method as any).protocolV2Reboot).not.toHaveBeenCalled();
     expect((method as any).executeProtocolV2Update).toHaveBeenCalledWith({
       bootloaderBinary: null,
@@ -4122,7 +4211,10 @@ describe('Protocol V2 firmware update targets', () => {
       getCommands: () => commands,
       mainId: 'usb-path',
     });
-    const cachedDevice = { getConnectId: () => 'usb-path' };
+    const cachedDevice = {
+      getConnectId: () => 'usb-path',
+      getCurrentSerialNo: () => '',
+    };
     const getDevices = jest.spyOn(DevicePool, 'getDevices').mockResolvedValue({
       devices: {},
       deviceList: [cachedDevice],
@@ -4137,6 +4229,182 @@ describe('Protocol V2 firmware update targets', () => {
 
     expect(device.acquire).toHaveBeenCalledWith('V2', { throwOnRunPromiseError: true });
     expect(initialize).not.toHaveBeenCalled();
+  });
+
+  test('selects the matching physical device from multiple Protocol V2 USB reconnect candidates', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const commands = { disposed: true, mainId: '' };
+    const updateFromCache = jest.fn();
+    const device = stubDevice({
+      originalDescriptor: { id: 'old-usb-id', path: 'old-usb-path', protocolType: 'V2' },
+      deviceConnector: {
+        enumerate: jest.fn().mockResolvedValue({
+          descriptors: [
+            { id: 'usb-a', path: 'usb-a', protocolType: 'V2' },
+            { id: 'usb-b', path: 'usb-b', protocolType: 'V2' },
+          ],
+        }),
+      },
+      updateFromCache,
+      hasDeviceAcquire: jest.fn(() => false),
+      acquire: jest.fn().mockResolvedValue(undefined),
+      commands,
+      getCommands: () => commands,
+      mainId: 'old-usb-path',
+    });
+    const otherDevice = {
+      getConnectId: () => 'usb-a',
+      getCurrentSerialNo: () => 'PRO2-PHYSICAL-A',
+    };
+    const expectedDevice = {
+      getConnectId: () => 'usb-b',
+      getCurrentSerialNo: () => 'PRO2-PHYSICAL-B',
+    };
+    const getDevices = jest.spyOn(DevicePool, 'getDevices').mockResolvedValue({
+      devices: {},
+      deviceList: [otherDevice, expectedDevice],
+    } as any);
+    (method as any).device = device;
+    (method as any).protocolV2ExpectedSerialNumber = 'PRO2-PHYSICAL-B';
+
+    try {
+      await (method as any).reconnectProtocolV2Device();
+    } finally {
+      getDevices.mockRestore();
+    }
+
+    expect(updateFromCache).toHaveBeenCalledWith(expectedDevice);
+  });
+
+  test('rejects ambiguous Protocol V2 USB reconnect candidates without an identity match', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const updateFromCache = jest.fn();
+    const device = stubDevice({
+      originalDescriptor: { id: 'old-usb-id', path: 'old-usb-path', protocolType: 'V2' },
+      deviceConnector: {
+        enumerate: jest.fn().mockResolvedValue({
+          descriptors: [
+            { id: 'usb-a', path: 'usb-a', protocolType: 'V2' },
+            { id: 'usb-b', path: 'usb-b', protocolType: 'V2' },
+          ],
+        }),
+      },
+      updateFromCache,
+    });
+    const getDevices = jest.spyOn(DevicePool, 'getDevices').mockResolvedValue({
+      devices: {},
+      deviceList: [
+        {
+          getConnectId: () => 'usb-a',
+          getCurrentSerialNo: () => 'PRO2-PHYSICAL-A',
+        },
+        {
+          getConnectId: () => 'usb-b',
+          getCurrentSerialNo: () => 'PRO2-PHYSICAL-B',
+        },
+      ],
+    } as any);
+    (method as any).device = device;
+    (method as any).protocolV2ExpectedSerialNumber = 'PRO2-PHYSICAL-C';
+
+    try {
+      await expect((method as any).reconnectProtocolV2Device()).rejects.toBeDefined();
+    } finally {
+      getDevices.mockRestore();
+    }
+
+    expect(updateFromCache).not.toHaveBeenCalled();
+  });
+
+  test('allows a single Protocol V2 USB reconnect candidate when its physical serial is unavailable', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const commands = { disposed: true, mainId: '' };
+    const updateFromCache = jest.fn();
+    const device = stubDevice({
+      originalDescriptor: { id: 'old-usb-id', path: 'old-usb-path', protocolType: 'V2' },
+      deviceConnector: {
+        enumerate: jest.fn().mockResolvedValue({
+          descriptors: [{ id: 'usb-a', path: 'usb-a', protocolType: 'V2' }],
+        }),
+      },
+      updateFromCache,
+      hasDeviceAcquire: jest.fn(() => false),
+      acquire: jest.fn().mockResolvedValue(undefined),
+      commands,
+      getCommands: () => commands,
+      mainId: 'old-usb-path',
+    });
+    const candidate = {
+      getConnectId: () => 'usb-a',
+      getCurrentSerialNo: () => '',
+    };
+    const getDevices = jest.spyOn(DevicePool, 'getDevices').mockResolvedValue({
+      devices: {},
+      deviceList: [candidate],
+    } as any);
+    (method as any).device = device;
+    (method as any).protocolV2ExpectedSerialNumber = 'PRO2-PHYSICAL-A';
+
+    try {
+      await (method as any).reconnectProtocolV2Device();
+    } finally {
+      getDevices.mockRestore();
+    }
+
+    expect(updateFromCache).toHaveBeenCalledWith(candidate);
+  });
+
+  test('rejects a single Protocol V2 USB reconnect candidate with a different physical serial', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const updateFromCache = jest.fn();
+    const device = stubDevice({
+      originalDescriptor: { id: 'old-usb-id', path: 'old-usb-path', protocolType: 'V2' },
+      deviceConnector: {
+        enumerate: jest.fn().mockResolvedValue({
+          descriptors: [{ id: 'usb-a', path: 'usb-a', protocolType: 'V2' }],
+        }),
+      },
+      updateFromCache,
+    });
+    const getDevices = jest.spyOn(DevicePool, 'getDevices').mockResolvedValue({
+      devices: {},
+      deviceList: [
+        {
+          getConnectId: () => 'usb-a',
+          getCurrentSerialNo: () => 'PRO2-PHYSICAL-A',
+        },
+      ],
+    } as any);
+    (method as any).device = device;
+    (method as any).protocolV2ExpectedSerialNumber = 'PRO2-PHYSICAL-B';
+
+    try {
+      await expect((method as any).reconnectProtocolV2Device()).rejects.toBeDefined();
+    } finally {
+      getDevices.mockRestore();
+    }
+
+    expect(updateFromCache).not.toHaveBeenCalled();
   });
 
   test('reuses an acquired Protocol V2 USB session while polling reconnect readiness', async () => {
@@ -5938,14 +6206,14 @@ describe('Protocol V2 firmware reconnect identity', () => {
       .mockReturnValue(stable as any);
     (method as any).downloadProtocolV2Resource = jest.fn();
 
-    await expect((method as any).prepareProtocolV2ResourceBundles(false)).resolves.toEqual([]);
+    await expect((method as any).prepareProtocolV2ResourceBundles()).resolves.toEqual([]);
     expect(typedCall.mock.calls.some(call => call[0] === 'ResourceInventoryGet')).toBe(false);
     expect(typedCall.mock.calls.some(call => call[0] === 'FilesystemFileRead')).toBe(true);
     expect((method as any).downloadProtocolV2Resource).not.toHaveBeenCalled();
     resourcesSpy.mockRestore();
   });
 
-  test('downloads only changed resources in Application mode', async () => {
+  test('downloads only changed resources from loader inventory', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: { method: 'firmwareUpdateV4', platform: 'web', targetsToUpdate: ['resource'] },
@@ -5973,7 +6241,7 @@ describe('Protocol V2 firmware reconnect identity', () => {
       })
     );
 
-    const bundles = await (method as any).prepareProtocolV2ResourceBundles(false);
+    const bundles = await (method as any).prepareProtocolV2ResourceBundles();
 
     expect(bundles).toHaveLength(1);
     expect((method as any).downloadProtocolV2Resource).toHaveBeenCalledWith(stable[0]);
@@ -6008,7 +6276,7 @@ describe('Protocol V2 firmware reconnect identity', () => {
       })
     );
 
-    const bundles = await (method as any).prepareProtocolV2ResourceBundles(true);
+    const bundles = await (method as any).prepareProtocolV2ResourceBundles();
 
     expect(bundles).toHaveLength(1);
     expect(typedCall.mock.calls.some(call => call[0] === 'ResourceInventoryGet')).toBe(false);

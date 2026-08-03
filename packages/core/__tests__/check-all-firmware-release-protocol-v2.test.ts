@@ -291,7 +291,7 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
     expect(result.targetsToUpdate).toEqual(['app_v1', 'app_v2']);
   });
 
-  test('uses the existing method on Protocol V2 and keeps its public API name', async () => {
+  test('does not read vol0 resource inventory while Protocol V2 is in Application mode', async () => {
     const method = new CheckAllFirmwareRelease({
       id: 1,
       payload: {
@@ -325,13 +325,13 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
       protocol: 'V2',
       deviceType: 'pro2',
       status: 'required',
-      resourceStatus: 'outdated',
-      targetsToUpdate: ['boot', 'app_v1', 'resource'],
+      resourceStatus: 'unknown',
+      targetsToUpdate: ['boot', 'app_v1'],
       firmware: {
         status: 'required',
       },
     });
-    expect(typedCall.mock.calls.some(call => call[0] === 'ResourceInventoryGet')).toBe(false);
+    expect(typedCall).not.toHaveBeenCalled();
     expect(method.getSupportedProtocols()).toEqual(['V1', 'V2']);
   });
 

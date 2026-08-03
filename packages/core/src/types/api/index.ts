@@ -19,6 +19,7 @@ import type { checkBootloaderRelease } from './checkBootloaderRelease';
 import type { checkAllFirmwareRelease } from './checkAllFirmwareRelease';
 import type { checkFirmwareTypeAvailable } from './checkFirmwareTypeAvailable';
 import type { searchDevices } from './searchDevices';
+import type { detectDeviceConnectProtocol } from './detectDeviceConnectProtocol';
 import type { getFeatures } from './getFeatures';
 import type { getDeviceState } from './getDeviceState';
 import type { getOnekeyFeatures } from './getOnekeyFeatures';
@@ -145,6 +146,7 @@ import type { benfenSignMessage } from './benfenSignMessage';
 import type { neoGetAddress } from './neoGetAddress';
 import type { neoSignTransaction } from './neoSignTransaction';
 import type { ConnectSettings } from '../settings';
+import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
 
 export * from './export';
 export type { DeviceStateScope, GetDeviceStateParams } from './getDeviceState';
@@ -169,6 +171,14 @@ export type CoreApi = {
   removeAllListeners: typeof removeAllListeners;
   dispose: () => void | Promise<void>;
   call: (params: any) => Promise<any>;
+  /**
+   * Bind a protocol that has already been verified for one transport endpoint.
+   * Every later SDK call for the same connectId uses it as a strict expectation.
+   */
+  setDeviceConnectProtocol: (
+    connectId: string,
+    connectProtocol: HardwareConnectProtocol | undefined
+  ) => void;
   uiResponse: typeof uiResponse;
   cancel: (connectId?: string) => void;
   updateSettings: typeof updateSettings;
@@ -196,6 +206,7 @@ export type CoreApi = {
    * Device function
    */
   searchDevices: typeof searchDevices;
+  detectDeviceConnectProtocol: typeof detectDeviceConnectProtocol;
   promptWebDeviceAccess: typeof promptWebDeviceAccess;
   getFeatures: typeof getFeatures;
   getDeviceState: typeof getDeviceState;

@@ -95,6 +95,7 @@ export type InitOptions = {
   passphraseState?: string;
   deriveCardano?: boolean;
   connectProtocol?: HardwareConnectProtocol;
+  forceProtocolDetection?: boolean;
   protocolV2DeviceInfoTimeoutMs?: number;
   /** Refresh Protocol V2 runtime state before returning discovery results. */
   refreshRuntimeState?: boolean;
@@ -377,7 +378,10 @@ export class Device extends EventEmitter {
    * Device connect
    * @returns {Promise<boolean>}
    */
-  connect(connectProtocol?: HardwareConnectProtocol) {
+  connect(
+    connectProtocol?: HardwareConnectProtocol,
+    options?: { forceProtocolDetection?: boolean }
+  ) {
     const env = DataManager.getSettings('env');
     // eslint-disable-next-line no-async-promise-executor
     return new Promise<boolean>(async (resolve, reject) => {
@@ -387,7 +391,7 @@ export class Device extends EventEmitter {
           return;
         }
         try {
-          await this.acquire(connectProtocol);
+          await this.acquire(connectProtocol, options);
           resolve(true);
         } catch (error) {
           reject(error);
@@ -397,7 +401,7 @@ export class Device extends EventEmitter {
       // 不存在 Session ID 或存在 Session ID 但设备在别处使用，都需要 acquire 获取最新 sessionID
       if (!this.mainId || (!this.isUsedHere() && this.originalDescriptor)) {
         try {
-          await this.acquire(connectProtocol);
+          await this.acquire(connectProtocol, options);
           resolve(true);
         } catch (error) {
           reject(error);
@@ -414,11 +418,16 @@ export class Device extends EventEmitter {
 
   async acquire(
     expectedProtocol?: HardwareConnectProtocol,
-    options?: { throwOnRunPromiseError?: boolean }
+    options?: { throwOnRunPromiseError?: boolean; forceProtocolDetection?: boolean }
   ) {
     const env = DataManager.getSettings('env');
     const mainIdKey = DataManager.isBleConnect(env) ? 'id' : 'session';
-    const protocolHint = expectedProtocol ? undefined : this.originalDescriptor.protocolType;
+    const previousProtocol = this.originalDescriptor.protocolType;
+    // A protocol stored after a successful probe is authoritative. Only the explicit
+    // first-connection/recovery path may bypass it and probe both protocols again.
+    const strictProtocol = options?.forceProtocolDetection
+      ? undefined
+      : expectedProtocol ?? this.originalDescriptor.protocolType;
     try {
       let acquireResult: unknown;
       if (DataManager.isBleConnect(env)) {
@@ -430,8 +439,8 @@ export class Device extends EventEmitter {
           this.originalDescriptor.id,
           undefined,
           true,
-          expectedProtocol,
-          protocolHint
+          strictProtocol,
+          undefined
         );
         this.mainId = (acquireResult as any)?.uuid ?? '';
         Log.debug('Expected uuid:', this.mainId);
@@ -440,24 +449,31 @@ export class Device extends EventEmitter {
           this.originalDescriptor.path,
           this.originalDescriptor.session,
           undefined,
-          expectedProtocol,
-          protocolHint
+          strictProtocol,
+          undefined
         );
         this.mainId = acquireResult as string | undefined;
         Log.debug('Expected session id:', this.mainId);
       }
-      this.deviceAcquired = true;
-      this.updateDescriptor({ [mainIdKey]: this.mainId } as unknown as DeviceDescriptor);
-
       // Propagate protocol version detected during acquire.
       const detectedProtocol =
         (acquireResult as { protocolType?: HardwareConnectProtocol } | undefined)?.protocolType ??
         TransportManager.transport?.getProtocolType?.(
           DataManager.isBleConnect(env) ? this.originalDescriptor.id : this.originalDescriptor.path
         );
+      if (options?.forceProtocolDetection && !detectedProtocol) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.RuntimeError,
+          `Active protocol detection returned no protocol for ${
+            this.originalDescriptor.path || this.originalDescriptor.id
+          }`
+        );
+      }
       if (detectedProtocol) {
         this.originalDescriptor.protocolType = detectedProtocol;
       }
+      this.deviceAcquired = true;
+      this.updateDescriptor({ [mainIdKey]: this.mainId } as unknown as DeviceDescriptor);
 
       if (this.commands) {
         await this.commands.dispose(false);
@@ -465,6 +481,22 @@ export class Device extends EventEmitter {
 
       this.commands = new DeviceCommands(this, this.mainId ?? '');
     } catch (error) {
+      if (options?.forceProtocolDetection) {
+        this.originalDescriptor.protocolType = previousProtocol;
+        const failedSession = this.mainId;
+        this.deviceAcquired = false;
+        if (failedSession) {
+          try {
+            await this.deviceConnector?.release?.(failedSession, false);
+          } catch (releaseError) {
+            Log.debug('Failed to release an unsuccessful protocol probe', releaseError);
+          }
+        }
+        if (!DataManager.isBleConnect(env)) {
+          this.mainId = null;
+          this.updateDescriptor({ session: null } as DeviceDescriptor);
+        }
+      }
       if (options?.throwOnRunPromiseError) {
         throw error;
       }
@@ -1349,11 +1381,17 @@ export class Device extends EventEmitter {
       }
     };
 
-    if (!this.isUsedHere() || this.commands.disposed) {
-      const env = DataManager.getSettings('env');
+    const env = DataManager.getSettings('env');
+    if (options.forceProtocolDetection && env !== 'react-native' && this.isUsedHere()) {
+      await this.release();
+    }
+
+    if (options.forceProtocolDetection || !this.isUsedHere() || this.commands.disposed) {
       if (env !== 'react-native') {
         try {
-          await this.acquire(options.connectProtocol);
+          await this.acquire(options.connectProtocol, {
+            forceProtocolDetection: options.forceProtocolDetection,
+          });
         } catch (error) {
           clearRunPromise();
           runPromise.reject(error);

@@ -106,6 +106,7 @@ const parseInitOptions = (method?: BaseMethod): InitOptions => ({
   deviceId: method?.payload.deviceId,
   deriveCardano: method && hasDeriveCardano(method),
   connectProtocol: method?.payload.connectProtocol,
+  forceProtocolDetection: method?.payload.forceProtocolDetection,
   protocolV2DeviceInfoTimeoutMs: method?.payload.protocolV2DeviceInfoTimeoutMs,
 });
 
@@ -895,10 +896,18 @@ function isRetryableBleProtocolV2ProbeError(method: BaseMethod, error: unknown) 
  */
 async function connectDeviceForBle(method: BaseMethod, device: Device, retryCount = 0) {
   try {
+    if (method.payload.forceProtocolDetection && device.hasDeviceAcquire()) {
+      await device.release();
+    }
     const shouldAcquire =
-      !device.hasDeviceAcquire() || !device.commands || device.commands.disposed;
+      method.payload.forceProtocolDetection ||
+      !device.hasDeviceAcquire() ||
+      !device.commands ||
+      device.commands.disposed;
     if (shouldAcquire) {
-      await device.acquire(method.payload.connectProtocol);
+      await device.acquire(method.payload.connectProtocol, {
+        forceProtocolDetection: method.payload.forceProtocolDetection,
+      });
     }
     if (method.payload?.onlyConnectBleDevice) {
       if (shouldAcquire) {

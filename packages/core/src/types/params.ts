@@ -61,9 +61,15 @@ export interface CommonParams {
 
   /**
    * Strictly expected transport protocol. The SDK actively verifies this value and
-   * rejects a mismatch. If omitted, a cached protocol only influences probe order.
+   * rejects a mismatch. After a successful probe, the cached protocol is also strict.
    */
   connectProtocol?: HardwareConnectProtocol;
+
+  /**
+   * Ignore a previously bound protocol for this call and actively detect the
+   * protocol again. Intended for the first verified connection or explicit recovery.
+   */
+  forceProtocolDetection?: boolean;
 }
 
 export type Params<T> = CommonParams & T & { bundle?: undefined };

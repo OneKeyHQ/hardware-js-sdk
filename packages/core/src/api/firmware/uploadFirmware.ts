@@ -322,7 +322,12 @@ const newTouchUpdateProcess = async (
       try {
         if (isBleReconnect) {
           try {
-            await device.deviceConnector?.acquire(device.originalDescriptor.id, null, true);
+            await device.deviceConnector?.acquire(
+              device.originalDescriptor.id,
+              null,
+              true,
+              device.originalDescriptor.protocolType
+            );
             const typedCall = device.getCommands().typedCall.bind(device.getCommands());
             await Promise.race([
               typedCall('Initialize', 'Features', {}),
@@ -341,7 +346,8 @@ const newTouchUpdateProcess = async (
           const devicesDescriptor = deviceDiff?.descriptors ?? [];
           const { deviceList } = await DevicePool.getDevices(
             devicesDescriptor,
-            device.originalDescriptor.id
+            device.originalDescriptor.id,
+            { connectProtocol: device.originalDescriptor.protocolType }
           );
           if (deviceList.length === 1) {
             device.updateFromCache(deviceList[0]);
@@ -416,7 +422,12 @@ const emmcFileWriteWithRetry = async (
       const env = DataManager.getSettings('env');
       if (DataManager.isBleConnect(env)) {
         await wait(3000);
-        await device.deviceConnector?.acquire(device.originalDescriptor.id, null, true);
+        await device.deviceConnector?.acquire(
+          device.originalDescriptor.id,
+          null,
+          true,
+          device.originalDescriptor.protocolType
+        );
         await device.initialize();
       } else if (
         error?.message?.indexOf(SESSION_ERROR) > -1 ||
@@ -424,7 +435,9 @@ const emmcFileWriteWithRetry = async (
       ) {
         const deviceDiff = await device.deviceConnector?.enumerate();
         const devicesDescriptor = deviceDiff?.descriptors ?? [];
-        const { deviceList } = await DevicePool.getDevices(devicesDescriptor, undefined);
+        const { deviceList } = await DevicePool.getDevices(devicesDescriptor, undefined, {
+          connectProtocol: device.originalDescriptor.protocolType,
+        });
         if (deviceList.length === 1 && deviceList[0]?.isBootloader()) {
           device.updateFromCache(deviceList[0]);
           await device.acquire();

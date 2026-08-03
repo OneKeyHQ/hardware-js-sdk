@@ -156,7 +156,9 @@ export class DevicePool extends EventEmitter {
     if (!device) {
       device = Device.fromDescriptor(descriptor);
       device.deviceConnector = this.connector;
-      await device.connect(initOptions?.connectProtocol);
+      await device.connect(initOptions?.connectProtocol, {
+        forceProtocolDetection: initOptions?.forceProtocolDetection,
+      });
       try {
         await device.initialize(initOptions);
         if (initOptions?.refreshRuntimeState && device.isProtocolV2()) {
@@ -181,7 +183,10 @@ export class DevicePool extends EventEmitter {
           refreshError = error;
         }
       },
-      { connectProtocol: initOptions.connectProtocol }
+      {
+        connectProtocol: initOptions.connectProtocol,
+        forceProtocolDetection: initOptions.forceProtocolDetection,
+      }
     );
     if (refreshError instanceof Error) throw refreshError;
     if (refreshError) throw new Error(String(refreshError));

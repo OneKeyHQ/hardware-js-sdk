@@ -346,7 +346,9 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
     let resourceStatus: 'valid' | 'outdated' | 'unknown' = 'unknown';
     if (resources?.length) {
       const loaderMode = state.status.mode === 'bootloader' || state.status.mode === 'romloader';
-      if (loaderMode || state.status.mode === 'normal') {
+      // Application mode rejects host access to vol0:/bundles. Resource inventory is
+      // resolved after FirmwareUpdateV4 enters a loader instead of probing here.
+      if (loaderMode) {
         try {
           const inventory = await readProtocolV2ResourceInventory({
             commands: this.device.getCommands(),
@@ -355,12 +357,12 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
           resourceStatus = buildProtocolV2ResourceUpdatePlan({
             resources,
             inventory,
-            mode: loaderMode ? 'bootloader-recovery' : 'application',
+            mode: 'bootloader-recovery',
           }).status;
         } catch {
           resourceStatus = buildProtocolV2ResourceUpdatePlan({
             resources,
-            mode: loaderMode ? 'bootloader-recovery' : 'application',
+            mode: 'bootloader-recovery',
           }).status;
         }
       }

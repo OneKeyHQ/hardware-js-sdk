@@ -1,6 +1,7 @@
 import { EFirmwareType, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { BaseMethod } from '../src/api/BaseMethod';
+import { findMethod } from '../src/api/utils';
 import BTCGetAddress from '../src/api/btc/BTCGetAddress';
 import DeviceReboot from '../src/api/protocol-v2/DeviceReboot';
 import SolGetAddress from '../src/api/solana/SolGetAddress';
@@ -20,6 +21,24 @@ class DefaultMethod extends BaseMethod {
 }
 
 describe('method protocol support', () => {
+  test('creates a protocol detection method that returns only the current protocol', async () => {
+    const method = findMethod({
+      id: 6,
+      payload: {
+        method: 'detectDeviceConnectProtocol',
+        connectId: 'ble-device',
+      },
+    } as never);
+
+    method.init();
+    (method as unknown as { device: unknown }).device = {
+      getProtocol: () => 'V2',
+    };
+
+    expect(method.getSupportedProtocols()).toEqual(['V1', 'V2']);
+    await expect(method.run()).resolves.toBe('V2');
+  });
+
   test('defaults existing methods to Protocol V1 only', () => {
     const method = new DefaultMethod({
       id: 1,
