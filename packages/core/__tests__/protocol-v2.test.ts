@@ -4053,6 +4053,68 @@ describe('Protocol V2 firmware update targets', () => {
     expect(order).toEqual(['enter-bootloader', 'prepare-resources', 'execute-update']);
   });
 
+  test('enters Protocol V2 bootloader before reading and downloading remote resources', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+        targetsToUpdate: ['resource'],
+      },
+    });
+    method.init();
+
+    (method as any).device = stubDevice({
+      originalDescriptor: { id: 'usb-id', path: 'app-path', protocolType: 'V2' },
+      features: {
+        deviceType: 'pro2',
+        firmwareVersion: '1.0.0',
+        mode: 'normal',
+        bootloaderMode: false,
+        capabilities: [],
+      },
+      isBootloader: () => false,
+      isRomloader: () => false,
+    });
+    (method as any).captureProtocolV2PhysicalIdentity = jest.fn().mockResolvedValue(undefined);
+    (method as any).prepareRemoteProtocolV2Binaries = jest.fn().mockResolvedValue({
+      bootloaderBinary: null,
+      fwBinaryMap: [],
+      installItems: [],
+    });
+
+    const order: string[] = [];
+    (method as any).enterProtocolV2BootloaderMode = jest.fn().mockImplementation(() => {
+      order.push('enter-bootloader');
+      return Promise.resolve(true);
+    });
+    (method as any).prepareProtocolV2ResourceBundles = jest.fn().mockImplementation(() => {
+      order.push('prepare-resources');
+      return Promise.resolve([
+        {
+          name: 'images.okpkg',
+          binary: new Uint8Array([1]).buffer,
+          devicePath: 'vol0:/bundles/images/images.okpkg',
+        },
+      ]);
+    });
+    (method as any).executeProtocolV2Update = jest.fn().mockImplementation(() => {
+      order.push('execute-update');
+      return Promise.resolve();
+    });
+    (method as any).exitProtocolV2BootloaderToNormal = jest.fn().mockResolvedValue(undefined);
+    (method as any).waitForProtocolV2FinalFeatures = jest.fn().mockResolvedValue({
+      bootloaderVersion: '1.0.0',
+      bleVersion: '1.0.0',
+      firmwareVersion: '1.0.0',
+    });
+    method.postTipMessage = jest.fn();
+
+    await method.run();
+
+    expect(order).toEqual(['enter-bootloader', 'prepare-resources', 'execute-update']);
+  });
+
   test('reboots Protocol V2 normal-mode device to bootloader before transfer', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
