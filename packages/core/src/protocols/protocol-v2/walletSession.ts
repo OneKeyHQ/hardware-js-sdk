@@ -1,5 +1,5 @@
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import { DeviceSessionPinType } from '@onekeyfe/hd-transport';
+import { DeviceSessionPinType, DeviceSessionSeedDomain } from '@onekeyfe/hd-transport';
 
 import { DEVICE } from '../../events';
 import { assertCompleteDeviceSession } from './deviceSession';
@@ -63,12 +63,36 @@ const negotiateEventlessWalletSession = async (device: Device) => {
 const getDeviceSession = async (device: Device, request: DeviceSessionGet) =>
   device.commands.typedCall('DeviceSessionGet', 'DeviceSession', request);
 
+const buildDeviceSessionGetRequest = ({
+  sessionId,
+  expectedPassphraseState,
+  deriveCardano,
+}: {
+  sessionId?: string;
+  expectedPassphraseState?: string;
+  deriveCardano?: boolean;
+} = {}): DeviceSessionGet => ({
+  ...(sessionId ? { session_id: sessionId } : {}),
+  ...(expectedPassphraseState ? { btc_test_address: expectedPassphraseState } : {}),
+  seed_domains:
+    deriveCardano === undefined
+      ? []
+      : [
+          DeviceSessionSeedDomain.SeedDomain_Standard,
+          ...(deriveCardano ? [DeviceSessionSeedDomain.SeedDomain_Cardano] : []),
+        ],
+});
+
 const askDevicePassphrase = async (device: Device, requestPayload: DeviceSessionAskPassphrase) => {
   await device.commands.typedCall('DeviceSessionAskPassphrase', 'Success', requestPayload);
   await refreshProtocolV2DeviceStatus(device);
 };
 
-const selectDeviceSession = async (device: Device, expectedPassphraseState?: string) => {
+const selectDeviceSession = async (
+  device: Device,
+  expectedPassphraseState?: string,
+  deriveCardano?: boolean
+) => {
   const existsAttachPinUser = device.features?.attachToPinEnabled === true;
   const metadata = {
     source: 'wallet-session-coordinator' as const,
@@ -129,7 +153,7 @@ const selectDeviceSession = async (device: Device, expectedPassphraseState?: str
       emitUiEvent: false,
       interaction: attachPinInteraction,
     });
-    return getDeviceSession(device, {});
+    return getDeviceSession(device, buildDeviceSessionGetRequest({ deriveCardano }));
   }
 
   if (hasHostPassphrase) {
@@ -137,7 +161,7 @@ const selectDeviceSession = async (device: Device, expectedPassphraseState?: str
       passphrase: hostPassphrase,
       on_device: false,
     });
-    return getDeviceSession(device, {});
+    return getDeviceSession(device, buildDeviceSessionGetRequest({ deriveCardano }));
   }
 
   device.emit(DEVICE.PASSPHRASE_ON_DEVICE, device, {
@@ -145,7 +169,7 @@ const selectDeviceSession = async (device: Device, expectedPassphraseState?: str
     ...(passphraseInteraction ? { interaction: passphraseInteraction } : {}),
   });
   await askDevicePassphrase(device, { on_device: true });
-  return getDeviceSession(device, {});
+  return getDeviceSession(device, buildDeviceSessionGetRequest({ deriveCardano }));
 };
 
 export async function getProtocolV2WalletSession(
@@ -191,7 +215,10 @@ export async function getProtocolV2WalletSession(
       : undefined;
   let response;
   let resumed = false;
-  let mainWalletSelected = false;
+  let mainWalletSelected =
+    options?.onlyMainPin === true &&
+    device.features?.unlocked === true &&
+    device.features?.unlockedAttachPin === false;
 
   const clearCurrentWalletSession = () => {
     if (options?.onlyMainPin) {
@@ -234,9 +261,14 @@ export async function getProtocolV2WalletSession(
         if (options?.selectMainWalletBeforeRestore) {
           await selectMainWallet();
         }
-        response = await getDeviceSession(device, {
-          session_id: cachedStandardSession.sessionId,
-        });
+        response = await getDeviceSession(
+          device,
+          buildDeviceSessionGetRequest({
+            sessionId: cachedStandardSession.sessionId,
+            expectedPassphraseState,
+            deriveCardano: options?.deriveCardano,
+          })
+        );
         resumed = true;
       } catch (error) {
         device.clearStandardInternalState?.();
@@ -249,13 +281,21 @@ export async function getProtocolV2WalletSession(
 
     if (!response) {
       await selectMainWallet();
-      response = await getDeviceSession(device, {});
+      response = await getDeviceSession(
+        device,
+        buildDeviceSessionGetRequest({ deriveCardano: options?.deriveCardano })
+      );
     }
   } else if (cachedSessionId && expectedPassphraseState) {
     try {
-      response = await getDeviceSession(device, {
-        session_id: cachedSessionId,
-      });
+      response = await getDeviceSession(
+        device,
+        buildDeviceSessionGetRequest({
+          sessionId: cachedSessionId,
+          expectedPassphraseState,
+          deriveCardano: options?.deriveCardano,
+        })
+      );
       resumed = true;
     } catch (error) {
       device.clearInternalState();
@@ -266,7 +306,13 @@ export async function getProtocolV2WalletSession(
     }
   } else if (expectedPassphraseState) {
     try {
-      response = await getDeviceSession(device, {});
+      response = await getDeviceSession(
+        device,
+        buildDeviceSessionGetRequest({
+          expectedPassphraseState,
+          deriveCardano: options?.deriveCardano,
+        })
+      );
     } catch (error) {
       if (options?.resumeOnly || !isWalletSessionInvalidError(error)) {
         throw error;
@@ -279,7 +325,7 @@ export async function getProtocolV2WalletSession(
       device.clearInternalState();
       throw ERRORS.TypedError(HardwareErrorCode.WalletSessionInvalid);
     }
-    response = await selectDeviceSession(device, expectedPassphraseState);
+    response = await selectDeviceSession(device, expectedPassphraseState, options?.deriveCardano);
   }
 
   let { message } = response;
@@ -303,10 +349,13 @@ export async function getProtocolV2WalletSession(
     if (options?.onlyMainPin) {
       device.clearStandardInternalState?.();
       await selectMainWallet(true);
-      response = await getDeviceSession(device, {});
+      response = await getDeviceSession(
+        device,
+        buildDeviceSessionGetRequest({ deriveCardano: options?.deriveCardano })
+      );
     } else {
       device.clearInternalState();
-      response = await selectDeviceSession(device, expectedPassphraseState);
+      response = await selectDeviceSession(device, expectedPassphraseState, options?.deriveCardano);
     }
     message = response.message;
     try {

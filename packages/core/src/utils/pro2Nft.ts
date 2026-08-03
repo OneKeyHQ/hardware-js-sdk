@@ -14,6 +14,7 @@ export const PRO2_NFT_DEFAULT_PACE_MS = 20;
 export const PRO2_NFT_DEFAULT_TIMEOUT_MS = 15_000;
 export const PRO2_NFT_MIN_CHUNK_SIZE = 64;
 export const PRO2_NFT_MAX_CHUNK_SIZE = 2048;
+export const PRO2_NFT_MAX_ITEMS = 10;
 
 export type Pro2NftImage = {
   width: number;
@@ -27,6 +28,56 @@ export type Pro2NftBundle = {
   thumbnail: Uint8Array;
   metadata: Uint8Array;
 };
+
+const PRO2_NFT_BASENAME_PATTERN = /^nft-[0-9a-f]{8}-[1-9][0-9]*$/;
+
+type Pro2NftFileType = 'image' | 'thumbnail' | 'metadata';
+
+function parsePro2NftFile(listedPath: string):
+  | {
+      basename: string;
+      fileType: Pro2NftFileType;
+    }
+  | undefined {
+  const filename = listedPath.trim().split('/').at(-1);
+  if (!filename) return undefined;
+
+  let basename: string | undefined;
+  let fileType: Pro2NftFileType | undefined;
+  if (filename.endsWith('_m.bin')) {
+    basename = filename.slice(0, -'_m.bin'.length);
+    fileType = 'thumbnail';
+  } else if (filename.endsWith('.json')) {
+    basename = filename.slice(0, -'.json'.length);
+    fileType = 'metadata';
+  } else if (filename.endsWith('.bin')) {
+    basename = filename.slice(0, -'.bin'.length);
+    fileType = 'image';
+  }
+
+  return basename && fileType && PRO2_NFT_BASENAME_PATTERN.test(basename)
+    ? { basename, fileType }
+    : undefined;
+}
+
+export function getCompletePro2NftBasenames(childFiles?: string): Set<string> {
+  const filesByBasename = new Map<string, Set<Pro2NftFileType>>();
+
+  for (const listedPath of childFiles?.split('\n') ?? []) {
+    const file = parsePro2NftFile(listedPath);
+    if (file) {
+      const fileTypes = filesByBasename.get(file.basename) ?? new Set<Pro2NftFileType>();
+      fileTypes.add(file.fileType);
+      filesByBasename.set(file.basename, fileTypes);
+    }
+  }
+
+  return new Set(
+    [...filesByBasename.entries()]
+      .filter(([, fileTypes]) => fileTypes.size === 3)
+      .map(([basename]) => basename)
+  );
+}
 
 function utf8Length(value: string): number {
   return new TextEncoder().encode(value).byteLength;

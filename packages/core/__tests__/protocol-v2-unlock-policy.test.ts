@@ -61,6 +61,116 @@ describe('Protocol V2 unlock semantics', () => {
     expect(method.run).toHaveBeenCalledTimes(1);
   });
 
+  test('lets the standard wallet session own the Main PIN unlock', async () => {
+    const calls: string[] = [];
+    const features = {
+      unlocked: false,
+      passphraseProtection: true,
+    };
+    const method = {
+      name: 'btcGetPublicKey',
+      unlockPolicy: 'none',
+      useDevicePassphraseState: true,
+      payload: { useEmptyPassphrase: true },
+      run: jest.fn().mockImplementation(() => {
+        calls.push('run');
+        return Promise.resolve({ message: 'ok' });
+      }),
+    };
+    const device = {
+      features,
+      commands: {
+        typedCall: jest.fn().mockImplementation(() => {
+          calls.push('status');
+          return Promise.resolve({
+            message: {
+              unlocked: false,
+              passphraseProtection: true,
+            },
+          });
+        }),
+      },
+      isProtocolV2: () => true,
+      isBootloader: () => false,
+      isRomloader: () => false,
+      updateProtocolV2Status: jest.fn(() => features),
+      unlockDevice: jest.fn().mockImplementation(() => {
+        calls.push('wallet-session-unlock');
+        features.unlocked = true;
+        return Promise.resolve(features);
+      }),
+    };
+
+    await expect(
+      runMethodWithUnlockPolicy(method as any, device as any, {
+        prepare: async () => {
+          await device.unlockDevice();
+        },
+      })
+    ).resolves.toEqual({ message: 'ok' });
+
+    expect(calls).toEqual(['status', 'wallet-session-unlock', 'run']);
+    expect(device.unlockDevice).toHaveBeenCalledTimes(1);
+  });
+
+  test('reuses a Main PIN selected by pre-unlock when locked status hides passphrase state', async () => {
+    const calls: string[] = [];
+    const features: {
+      unlocked: boolean;
+      passphraseProtection?: boolean;
+      unlockedAttachPin?: boolean;
+    } = {
+      unlocked: false,
+    };
+    const method: any = {
+      name: 'btcGetPublicKey',
+      unlockPolicy: 'none',
+      useDevicePassphraseState: true,
+      payload: { useEmptyPassphrase: true },
+      run: jest.fn().mockImplementation(() => {
+        calls.push('run');
+        return Promise.resolve({ message: 'ok' });
+      }),
+    };
+    const device = {
+      features,
+      commands: {
+        typedCall: jest.fn().mockImplementation(() => {
+          calls.push('status');
+          return Promise.resolve({
+            message: {
+              unlocked: false,
+            },
+          });
+        }),
+      },
+      isProtocolV2: () => true,
+      isBootloader: () => false,
+      isRomloader: () => false,
+      updateProtocolV2Status: jest.fn(() => features),
+      unlockDevice: jest.fn().mockImplementation(() => {
+        calls.push('main-pin');
+        features.unlocked = true;
+        features.passphraseProtection = true;
+        features.unlockedAttachPin = false;
+        return Promise.resolve(features);
+      }),
+    };
+
+    await expect(
+      runMethodWithUnlockPolicy(method, device as any, {
+        prepare: async () => {
+          if (!(features.unlocked && features.unlockedAttachPin === false)) {
+            await device.unlockDevice();
+          }
+        },
+      })
+    ).resolves.toEqual({ message: 'ok' });
+
+    expect(calls).toEqual(['status', 'main-pin', 'run']);
+    expect(device.unlockDevice).toHaveBeenCalledTimes(1);
+  });
+
   test('runs fresh-status validation before starting unlock', async () => {
     const identityError = new Error('Unexpected device');
     const method = {

@@ -502,6 +502,12 @@ export const HardwareErrorCode = {
   WalletSessionInvalid: 831,
 
   /**
+   * Pro2 NFT storage has reached its item limit.
+   * @params: { count: number; limit: number }
+   */
+  NftStorageLimitReached: 832,
+
+  /**
    * Lowlevel transport connect error
    */
   LowlevelTrasnportConnectError: 900,
@@ -655,6 +661,8 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.DeviceLocked]: 'Device locked',
   [HardwareErrorCode.KaspaPrevTxIdMismatch]: 'Kaspa previous transaction id mismatch',
   [HardwareErrorCode.WalletSessionInvalid]: 'Wallet session is invalid or expired',
+  [HardwareErrorCode.NftStorageLimitReached]:
+    'NFT storage limit reached. Remove an NFT from the device and try again.',
 
   /**
    * Lowlevel transport

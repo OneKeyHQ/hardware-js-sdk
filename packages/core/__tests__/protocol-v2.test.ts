@@ -819,7 +819,9 @@ describe('Protocol V2 feature adapter', () => {
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPin', 'Success', {
       type: DeviceSessionPinType.Main,
     });
-    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
+      seed_domains: [],
+    });
     device.passphraseState = 'state-1';
     expect(device.getInternalState()).toBe('session-1');
   });
@@ -868,9 +870,13 @@ describe('Protocol V2 feature adapter', () => {
     await getProtocolV2WalletSession(device, { onlyMainPin: true });
 
     expect(typedCall.mock.calls.filter(call => call[0] === 'DeviceSessionAskPin')).toHaveLength(1);
-    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
+      seed_domains: [],
+    });
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
       session_id: 'standard-session',
+      btc_test_address: 'standard-state',
+      seed_domains: [],
     });
     expect(deviceWalletSessionStore.getStandard(deviceId)).toEqual({
       passphraseState: 'standard-state',
@@ -1232,7 +1238,9 @@ describe('Protocol V2 feature adapter', () => {
       passphrase: 'host hidden wallet',
       on_device: false,
     });
-    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
+      seed_domains: [],
+    });
   });
 
   test('deviceStatusGet returns raw DeviceStatus and updates dynamic features', async () => {
@@ -1340,6 +1348,8 @@ describe('Protocol V2 feature adapter', () => {
 
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
       session_id: 'session-a',
+      btc_test_address: 'state-a',
+      seed_domains: [],
     });
     expect(device.getInternalState()).toBe('session-b');
   });
@@ -1407,7 +1417,15 @@ describe('Protocol V2 feature adapter', () => {
     });
     expect(typedCall.mock.calls).toEqual([
       ['ProtocolInfoRequest', 'ProtocolInfo', { eventless_wallet_session: true }],
-      ['DeviceSessionGet', 'DeviceSession', { session_id: 'session-a' }],
+      [
+        'DeviceSessionGet',
+        'DeviceSession',
+        {
+          session_id: 'session-a',
+          btc_test_address: 'state-a',
+          seed_domains: [],
+        },
+      ],
     ]);
     expect(promptPassphrase).not.toHaveBeenCalled();
     expect(device.getInternalState()).toBeUndefined();
@@ -1455,7 +1473,7 @@ describe('Protocol V2 feature adapter', () => {
         { passphrase: 'host hidden wallet', on_device: false },
       ],
       ['DeviceStatusGet', 'DeviceStatus', {}],
-      ['DeviceSessionGet', 'DeviceSession', {}],
+      ['DeviceSessionGet', 'DeviceSession', { seed_domains: [] }],
     ]);
   });
 
@@ -1615,7 +1633,10 @@ describe('Protocol V2 feature adapter', () => {
       });
 
       expect(promptPassphrase).not.toHaveBeenCalled();
-      expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
+      expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
+        btc_test_address: 'expected-state',
+        seed_domains: [],
+      });
       expect(typedCall).toHaveBeenCalledWith('LockDevice', 'Success', {});
       expect(typedCall.mock.calls.filter(call => call[0] === 'DeviceSessionGet')).toHaveLength(1);
       expect(device.getInternalState()).toBeUndefined();
@@ -2003,7 +2024,10 @@ describe('Protocol V2 feature adapter', () => {
     await expect(
       getProtocolV2WalletSession(device, { expectedPassphraseState: 'expected-state' })
     ).resolves.toMatchObject({ passphraseState: 'expected-state' });
-    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
+      btc_test_address: 'expected-state',
+      seed_domains: [],
+    });
     expect(promptPassphrase).not.toHaveBeenCalled();
   });
 
@@ -2070,7 +2094,15 @@ describe('Protocol V2 feature adapter', () => {
       true
     );
     expect(typedCall.mock.calls).toEqual([
-      ['DeviceSessionGet', 'DeviceSession', { session_id: 'session-pro2-app' }],
+      [
+        'DeviceSessionGet',
+        'DeviceSession',
+        {
+          session_id: 'session-pro2-app',
+          btc_test_address: 'state-pro2-app',
+          seed_domains: [],
+        },
+      ],
     ]);
   });
 
@@ -2259,7 +2291,9 @@ describe('Protocol V2 feature adapter', () => {
       passphrase: 'host hidden wallet',
       on_device: false,
     });
-    expect(typedCall).toHaveBeenLastCalledWith('DeviceSessionGet', 'DeviceSession', {});
+    expect(typedCall).toHaveBeenLastCalledWith('DeviceSessionGet', 'DeviceSession', {
+      seed_domains: [],
+    });
   });
 
   test('does not mark Pro2 passphrase enabled from a main PIN session alone', async () => {
@@ -2337,13 +2371,18 @@ describe('Protocol V2 feature adapter', () => {
     );
 
     expect(device.getInternalState()).toBeUndefined();
-    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
+      btc_test_address: 'expected-state',
+      seed_domains: [],
+    });
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {
       passphrase: 'host hidden wallet',
       on_device: false,
     });
     expect(typedCall).toHaveBeenCalledWith('DeviceStatusGet', 'DeviceStatus', {});
-    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
+      seed_domains: [],
+    });
   });
 
   test('useEmptyPassphrase ignores a stale hidden-wallet state during Protocol V2 safety check', async () => {
@@ -2376,13 +2415,14 @@ describe('Protocol V2 feature adapter', () => {
     await expect(
       device.checkPassphraseStateSafety('stale-hidden-state', true, false)
     ).resolves.toBe(true);
-    expect(typedCall).toHaveBeenCalledTimes(4);
+    expect(typedCall).toHaveBeenCalledTimes(2);
     expect(typedCall).toHaveBeenCalledWith('ProtocolInfoRequest', 'ProtocolInfo', {
       eventless_wallet_session: true,
     });
-    expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPin', 'Success', {
-      type: DeviceSessionPinType.Main,
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
+      seed_domains: [],
     });
+    expect(typedCall).not.toHaveBeenCalledWith('DeviceSessionAskPin', 'Success', expect.anything());
   });
 
   test('marks fallback features as unavailable when DeviceInfo is missing', () => {

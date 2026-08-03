@@ -203,20 +203,34 @@ export class ProtocolV2UiInteractionCoordinator {
     this.enterMethodInteraction(this.methodInteraction);
   }
 
-  close() {
+  close(
+    options: {
+      ensureOperationClose?: boolean;
+      protocolV2Operation?: boolean;
+    } = {}
+  ): boolean {
     if (
-      !this.device.isProtocolV2() ||
-      (!this.opened && !this.device.hasOpenProtocolV2UiInteraction?.()) ||
+      (!options.protocolV2Operation && !this.device.isProtocolV2()) ||
+      (!options.ensureOperationClose &&
+        !this.opened &&
+        !this.device.hasOpenProtocolV2UiInteraction?.()) ||
       this.closed
     )
-      return;
+      return false;
     this.closed = true;
-    const interaction = this.device.finishProtocolV2UiInteraction?.();
+    const interaction = this.device.finishProtocolV2UiInteraction?.('succeeded', {
+      ensureMetadata: options.ensureOperationClose,
+    });
+    const device = this.device.toMessageObject();
     this.postMessage(
       interaction
-        ? createUiMessage(UI_REQUEST.CLOSE_UI_WINDOW, interaction)
+        ? createUiMessage(UI_REQUEST.CLOSE_UI_WINDOW, {
+            ...interaction,
+            ...(device ? { device } : {}),
+          })
         : createUiMessage(UI_REQUEST.CLOSE_UI_WINDOW)
     );
+    return true;
   }
 
   private emit(

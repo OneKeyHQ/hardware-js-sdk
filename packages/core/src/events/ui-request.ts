@@ -64,6 +64,7 @@ export type HardwareUiInteractionMeta = {
   transition: 'start' | 'complete' | 'finish';
   outcome?: 'submitted' | 'succeeded' | 'failed' | 'cancelled' | 'disconnected';
   protocol: 'V2';
+  device?: Device;
 };
 
 export type ProtocolV2UiEventMetadata = {

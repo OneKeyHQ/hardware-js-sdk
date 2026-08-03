@@ -1,3 +1,5 @@
+import { HardwareErrorCode } from '@onekeyfe/hd-shared';
+
 import DeviceUploadNft from '../src/api/protocol-v2/DeviceUploadNft';
 
 jest.mock('../src/data/config', () => ({
@@ -13,7 +15,7 @@ const createRgba = (width: number, height: number) => {
 
 const createMethod = ({
   typedCall,
-  supportedMessages = [60805, 61500],
+  supportedMessages = [60805, 60808, 61500],
   useFullBundle = false,
 }: {
   typedCall: jest.Mock;
@@ -67,9 +69,23 @@ const fileWriteSuccess = (params: { file: { offset: number; data: Uint8Array } }
   },
 });
 
+const nftFileList = (count: number, basenameAt?: number) =>
+  Array.from({ length: count }, (_, index) => {
+    const basename =
+      index === basenameAt
+        ? 'nft-deadbeef-1760000000000'
+        : `nft-${index.toString(16).padStart(8, '0')}-${1760000000001 + index}`;
+    return [`${basename}.bin`, `${basename}_m.bin`, `${basename}.json`];
+  })
+    .flat()
+    .join('\n');
+
 describe('DeviceUploadNft', () => {
   test('uploads the triplet in order without creating the firmware-owned directory', async () => {
     const typedCall = jest.fn((request: string, _response: string, params: any) => {
+      if (request === 'FilesystemDirList') {
+        return { message: { path: 'vol1:/nft', child_files: '' } };
+      }
       if (request === 'FilesystemFileWrite') return fileWriteSuccess(params);
       if (request === 'NftUpdate') return { message: { message: 'NFT updated' } };
       throw new Error(`Unexpected request: ${request}`);
@@ -79,7 +95,14 @@ describe('DeviceUploadNft', () => {
     const result = await method.run();
 
     const requests = typedCall.mock.calls.map(call => call[0]);
-    expect(requests[0]).toBe('FilesystemFileWrite');
+    expect(requests[0]).toBe('FilesystemDirList');
+    expect(typedCall).toHaveBeenNthCalledWith(
+      1,
+      'FilesystemDirList',
+      'FilesystemDir',
+      { path: 'vol1:/nft', depth: 1 },
+      { timeoutMs: 15_000 }
+    );
     expect(requests).not.toContain('FilesystemDirMake');
     expect(requests.at(-1)).toBe('NftUpdate');
     const fileWrites = typedCall.mock.calls.filter(call => call[0] === 'FilesystemFileWrite');
@@ -122,6 +145,9 @@ describe('DeviceUploadNft', () => {
     });
     let updateCalls = 0;
     const typedCall = jest.fn((request: string, _response: string, params: any) => {
+      if (request === 'FilesystemDirList') {
+        return { message: { path: 'vol1:/nft', child_files: '' } };
+      }
       if (request === 'FilesystemFileWrite') return fileWriteSuccess(params);
       if (request === 'NftUpdate') {
         updateCalls += 1;
@@ -141,6 +167,9 @@ describe('DeviceUploadNft', () => {
 
   test('does not retry a non-timeout NftUpdate failure', async () => {
     const typedCall = jest.fn((request: string, _response: string, params: any) => {
+      if (request === 'FilesystemDirList') {
+        return { message: { path: 'vol1:/nft', child_files: '' } };
+      }
       if (request === 'FilesystemFileWrite') return fileWriteSuccess(params);
       if (request === 'NftUpdate') throw new Error('Invalid NFT metadata');
       throw new Error(`Unexpected request: ${request}`);
@@ -156,6 +185,9 @@ describe('DeviceUploadNft', () => {
       code: 'response-timeout',
     });
     const typedCall = jest.fn((request: string, _response: string, params: any) => {
+      if (request === 'FilesystemDirList') {
+        return { message: { path: 'vol1:/nft', child_files: '' } };
+      }
       if (request === 'FilesystemFileWrite') return fileWriteSuccess(params);
       if (request === 'NftUpdate') throw timeout;
       throw new Error(`Unexpected request: ${request}`);
@@ -168,6 +200,9 @@ describe('DeviceUploadNft', () => {
 
   test('does not publish when a file write fails', async () => {
     const typedCall = jest.fn((request: string) => {
+      if (request === 'FilesystemDirList') {
+        return { message: { path: 'vol1:/nft', child_files: '' } };
+      }
       if (request === 'FilesystemFileWrite') throw new Error('Filesystem full');
       throw new Error(`Unexpected request: ${request}`);
     });
@@ -183,5 +218,55 @@ describe('DeviceUploadNft', () => {
 
     await expect(method.run()).rejects.toBeDefined();
     expect(typedCall).not.toHaveBeenCalled();
+  });
+
+  test('rejects a new NFT before writing when ten complete NFT bundles exist', async () => {
+    const typedCall = jest.fn((request: string) => {
+      if (request === 'FilesystemDirList') {
+        return { message: { path: 'vol1:/nft', child_files: nftFileList(10) } };
+      }
+      throw new Error(`Unexpected request: ${request}`);
+    });
+    const method = createMethod({ typedCall });
+
+    await expect(method.run()).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.NftStorageLimitReached,
+      params: { count: 10, limit: 10 },
+    });
+    expect(typedCall.mock.calls.map(call => call[0])).toEqual(['FilesystemDirList']);
+  });
+
+  test('allows an idempotent retry for a basename already counted at the limit', async () => {
+    const typedCall = jest.fn((request: string, _response: string, params: any) => {
+      if (request === 'FilesystemDirList') {
+        return { message: { path: 'vol1:/nft', child_files: nftFileList(10, 0) } };
+      }
+      if (request === 'FilesystemFileWrite') return fileWriteSuccess(params);
+      if (request === 'NftUpdate') return { message: {} };
+      throw new Error(`Unexpected request: ${request}`);
+    });
+    const method = createMethod({ typedCall });
+
+    await expect(method.run()).resolves.toMatchObject({ nftUpdated: true });
+    expect(typedCall.mock.calls.some(call => call[0] === 'FilesystemFileWrite')).toBe(true);
+  });
+
+  test('does not count unrelated or incomplete files as stored NFTs', async () => {
+    const typedCall = jest.fn((request: string, _response: string, params: any) => {
+      if (request === 'FilesystemDirList') {
+        return {
+          message: {
+            path: 'vol1:/nft',
+            child_files: `${nftFileList(9)}\nnft-ffffffff-1760000009999.json\nnotes.txt`,
+          },
+        };
+      }
+      if (request === 'FilesystemFileWrite') return fileWriteSuccess(params);
+      if (request === 'NftUpdate') return { message: {} };
+      throw new Error(`Unexpected request: ${request}`);
+    });
+    const method = createMethod({ typedCall });
+
+    await expect(method.run()).resolves.toMatchObject({ nftUpdated: true });
   });
 });

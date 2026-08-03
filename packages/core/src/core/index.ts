@@ -429,6 +429,8 @@ const onCallDevice = async (
   );
 
   const protocolV2UiCoordinator = new ProtocolV2UiInteractionCoordinator(device, postMessage);
+  let protocolV2Operation = false;
+  let protocolV2CloseEmitted = false;
   device.beginProtocolV2UiInteraction();
   device.on(
     DEVICE.SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE,
@@ -447,6 +449,7 @@ const onCallDevice = async (
       // Protocol is established from an active device response during acquire/initialize.
       // Reject unsupported methods before any method-specific device command is sent.
       method.assertProtocolSupported(device.getProtocol(), device.getCurrentFirmwareType());
+      protocolV2Operation = device.isProtocolV2();
 
       // check firmware version
       const versionRange = device.getCurrentMethodVersionRange(
@@ -659,7 +662,12 @@ const onCallDevice = async (
           throw error;
         }
       } finally {
-        protocolV2UiCoordinator.close();
+        if (isProtocolV2UiEnabled(method)) {
+          protocolV2CloseEmitted = protocolV2UiCoordinator.close({
+            ensureOperationClose: protocolV2Operation,
+            protocolV2Operation,
+          });
+        }
       }
     };
     Log.debug('Call API - Device Run: ', device.mainId);
@@ -714,7 +722,15 @@ const onCallDevice = async (
     requestQueue.releaseTask(method.responseID);
 
     if (isProtocolV2UiEnabled(method)) {
-      closePopup();
+      if (!protocolV2CloseEmitted && protocolV2Operation) {
+        protocolV2CloseEmitted = protocolV2UiCoordinator.close({
+          ensureOperationClose: true,
+          protocolV2Operation: true,
+        });
+      }
+      if (!protocolV2CloseEmitted) {
+        closePopup();
+      }
     }
 
     cleanup();

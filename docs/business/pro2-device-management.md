@@ -80,15 +80,18 @@ App 只展示“请在设备上操作”，不调用 `uiResponse()`。API `Succe
 `deviceUploadNft` 仅支持 Pro2 / Protocol V2。调用方先将原图和缩略图分别裁剪为 `540 × 540`
 与 `263 × 263` RGBA；SDK 随后完成以下编排：
 
-1. 从当前 Link 的 `ProtocolInfo.supported_messages` 确认 `FilesystemFileWrite(60805)` 和
-   `NftUpdate(61500)`，不使用固件版本字符串推断能力。
+1. 从当前 Link 的 `ProtocolInfo.supported_messages` 确认 `FilesystemFileWrite(60805)`、
+   `FilesystemDirList(60808)` 和 `NftUpdate(61500)`，不使用固件版本字符串推断能力。
 2. 将透明区域合成到黑色背景，以 LVGL v9 未压缩 RGB565 编码两张图片；编码与壁纸共用
    RGB565 抖动实现，但 NFT 不生成 A8 alpha plane。
 3. 以完整原图 `.bin` 的 BLAKE2s 前 8 位和 Unix 毫秒时间生成
    `nft-<hash8>-<timestamp_ms>` basename。
-4. 按原图 `.bin`、缩略图 `_m.bin`、元数据 `.json` 顺序串行写入固件预置的 `vol1:/nft`，
+4. 写入前使用 `FilesystemDirList("vol1:/nft", depth=1)` 统计完整的 NFT 三文件集合；新 NFT
+   达到 10 个上限时抛出 `NftStorageLimitReached`，不触发固件删除最旧 NFT；同 basename 的
+   幂等重试不受该限制。
+5. 按原图 `.bin`、缩略图 `_m.bin`、元数据 `.json` 顺序串行写入固件预置的 `vol1:/nft`，
    不额外发送 `FilesystemDirMake`；默认使用 512-byte chunk、20 ms pacing 和 15 秒单次请求超时。
-5. 三个文件全部确认后发送 `NftUpdate`；若响应超时，以同一 basename 重试一次，其他错误不重试；
+6. 三个文件全部确认后发送 `NftUpdate`；若响应超时，以同一 basename 重试一次，其他错误不重试；
    只有最终 `Success` 才返回 `nftUpdated: true`。
 
 `title` 限制为 1 ～ 63 UTF-8 bytes，`subtitle` 限制为 0 ～ 95 UTF-8 bytes。公开参数允许传入固定

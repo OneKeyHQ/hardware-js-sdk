@@ -1644,18 +1644,28 @@ export class Device extends EventEmitter {
     });
   }
 
-  finishProtocolV2UiInteraction(outcome: HardwareUiInteractionMeta['outcome'] = 'succeeded') {
+  finishProtocolV2UiInteraction(
+    outcome?: HardwareUiInteractionMeta['outcome'],
+    options?: { ensureMetadata?: boolean }
+  ) {
     const interaction = this.protocolV2UiInteraction;
-    if (!interaction?.opened) {
+    if (!interaction || (!interaction.opened && !options?.ensureMetadata)) {
       this.protocolV2UiInteraction = undefined;
       return undefined;
     }
 
     const phaseId = `${interaction.interactionId}:phase-${Math.max(interaction.phaseCounter, 1)}`;
-    const metadata = this.createProtocolV2UiPhaseMetadata('processing', 'finish', {
+    interaction.opened = true;
+    interaction.sequence += 1;
+    const metadata: HardwareUiInteractionMeta = {
+      interactionId: interaction.interactionId,
       phaseId,
-      outcome,
-    });
+      sequence: interaction.sequence,
+      phase: 'processing',
+      transition: 'finish',
+      outcome: outcome ?? 'succeeded',
+      protocol: 'V2',
+    };
     this.protocolV2UiInteraction = undefined;
     return metadata;
   }

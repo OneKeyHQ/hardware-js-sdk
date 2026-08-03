@@ -1,4 +1,4 @@
-import { createDeviceNotSupportMethodError } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareErrorCode, createDeviceNotSupportMethodError } from '@onekeyfe/hd-shared';
 
 import { UI_REQUEST, createUiMessage } from '../../events/ui-request';
 import { supportsProtocolV2Message } from '../../protocols/protocol-v2/features';
@@ -8,10 +8,12 @@ import {
   PRO2_NFT_DEFAULT_TIMEOUT_MS,
   PRO2_NFT_DIRECTORY,
   PRO2_NFT_MAX_CHUNK_SIZE,
+  PRO2_NFT_MAX_ITEMS,
   PRO2_NFT_MIN_CHUNK_SIZE,
   type Pro2NftBundle,
   type Pro2NftImage,
   buildPro2NftBundle,
+  getCompletePro2NftBasenames,
 } from '../../utils/pro2Nft';
 import { BaseMethod } from '../BaseMethod';
 import { invalidParameter } from '../helpers/filesystemValidation';
@@ -39,6 +41,7 @@ export type DeviceUploadNftResponse = {
 };
 
 const FILESYSTEM_FILE_WRITE_MESSAGE_TYPE = 60805;
+const FILESYSTEM_DIR_LIST_MESSAGE_TYPE = 60808;
 const NFT_UPDATE_MESSAGE_TYPE = 61500;
 
 export default class DeviceUploadNft extends BaseMethod<DeviceUploadNftParams> {
@@ -88,9 +91,26 @@ export default class DeviceUploadNft extends BaseMethod<DeviceUploadNftParams> {
       protocolInfo,
       FILESYSTEM_FILE_WRITE_MESSAGE_TYPE
     );
+    const hasDirList = supportsProtocolV2Message(protocolInfo, FILESYSTEM_DIR_LIST_MESSAGE_TYPE);
     const hasNftUpdate = supportsProtocolV2Message(protocolInfo, NFT_UPDATE_MESSAGE_TYPE);
-    if (!hasFileWrite || !hasNftUpdate) {
+    if (!hasFileWrite || !hasDirList || !hasNftUpdate) {
       throw createDeviceNotSupportMethodError(this.name, this.device.getCurrentFirmwareType());
+    }
+  }
+
+  private async assertStorageCapacity(basename: string) {
+    const { message } = await this.device.commands.typedCall(
+      'FilesystemDirList',
+      'FilesystemDir',
+      { path: PRO2_NFT_DIRECTORY, depth: 1 },
+      { timeoutMs: this.params.timeoutMs }
+    );
+    const existingBasenames = getCompletePro2NftBasenames(message.child_files);
+    if (existingBasenames.size >= PRO2_NFT_MAX_ITEMS && !existingBasenames.has(basename)) {
+      throw ERRORS.TypedError(HardwareErrorCode.NftStorageLimitReached, undefined, {
+        count: existingBasenames.size,
+        limit: PRO2_NFT_MAX_ITEMS,
+      });
     }
   }
 
@@ -113,6 +133,9 @@ export default class DeviceUploadNft extends BaseMethod<DeviceUploadNftParams> {
     if (!bundle) throw invalidParameter('NFT data has not been initialized.');
 
     await this.assertCapabilities();
+    this.throwIfAborted();
+    await this.assertStorageCapacity(bundle.basename);
+    this.throwIfAborted();
 
     const files = [
       { path: `${PRO2_NFT_DIRECTORY}/${bundle.basename}.bin`, data: bundle.image },

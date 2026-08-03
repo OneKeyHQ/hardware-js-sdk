@@ -9,6 +9,41 @@ jest.mock('../src/data/config', () => ({
 }));
 
 describe('Protocol V2 UI interaction lifecycle', () => {
+  test('synthesizes finish metadata for a progress-only operation', () => {
+    const device = new Device({ id: 'connect-progress' } as any);
+    device.isProtocolV2 = jest.fn(() => true);
+    device.beginProtocolV2UiInteraction();
+
+    const metadata = device.finishProtocolV2UiInteraction('succeeded', {
+      ensureMetadata: true,
+    });
+
+    expect(metadata).toMatchObject({
+      phase: 'processing',
+      transition: 'finish',
+      outcome: 'succeeded',
+      protocol: 'V2',
+    });
+  });
+
+  test('keeps finish metadata after the Protocol V2 transport is released', () => {
+    const device = new Device({ id: 'connect-released' } as any);
+    const isProtocolV2 = jest.fn().mockReturnValueOnce(true).mockReturnValue(false);
+    device.isProtocolV2 = isProtocolV2;
+    device.beginProtocolV2UiInteraction();
+
+    const metadata = device.finishProtocolV2UiInteraction('succeeded', {
+      ensureMetadata: true,
+    });
+
+    expect(metadata).toMatchObject({
+      phase: 'processing',
+      transition: 'finish',
+      outcome: 'succeeded',
+      protocol: 'V2',
+    });
+  });
+
   test('emits a matching PIN phase completion after DeviceSessionAskPin succeeds', async () => {
     const device = new Device({ id: 'connect-1' } as any);
     device.isProtocolV2 = jest.fn(() => true);
