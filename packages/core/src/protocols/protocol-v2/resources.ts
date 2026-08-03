@@ -1,6 +1,7 @@
 import { sha256 } from '@noble/hashes/sha256';
 
 import type {
+  IProtocolV2BootResources,
   IProtocolV2Resource,
   IProtocolV2ResourceType,
   IProtocolV2Resources,
@@ -149,6 +150,34 @@ function validateResource(value: unknown, index: number): IProtocolV2Resource {
   };
 }
 
+function validateBootResources(value: unknown): IProtocolV2BootResources {
+  if (!value || typeof value !== 'object') {
+    throw new Error('Invalid Pro2 boot resources config');
+  }
+  const resource = value as Partial<IProtocolV2BootResources>;
+  if (resource.required !== false) {
+    throw new Error('Invalid Pro2 boot resources required flag: expected false');
+  }
+  if (resource.target !== 'CRATE') {
+    throw new Error('Invalid Pro2 boot resources target: expected CRATE');
+  }
+  if (typeof resource.url !== 'string' || !resource.url.startsWith('https://')) {
+    throw new Error('Invalid Pro2 boot resources url');
+  }
+  if (!Number.isSafeInteger(resource.size) || Number(resource.size) <= 0) {
+    throw new Error('Invalid Pro2 boot resources size');
+  }
+  return {
+    required: false,
+    target: 'CRATE',
+    url: resource.url,
+    size: Number(resource.size),
+    fileHash: normalizeHex(resource.fileHash, SHA256_HEX_LENGTH, 'boot fileHash'),
+    payloadHash: normalizeHex(resource.payloadHash, SHA3_512_HEX_LENGTH, 'boot payloadHash'),
+    headerHash: normalizeHex(resource.headerHash, SHA3_512_HEX_LENGTH, 'boot headerHash'),
+  };
+}
+
 /** Validate a complete Pro2 stable resource set from remote configuration. */
 export function parseProtocolV2Resources(value: unknown): IProtocolV2Resources | undefined {
   if (value === undefined) return undefined;
@@ -160,7 +189,8 @@ export function parseProtocolV2Resources(value: unknown): IProtocolV2Resources |
     throw new Error('Invalid Pro2 resources config: stable must be an array');
   }
 
-  const stable = (value as { stable: unknown[] }).stable.map(validateResource);
+  const config = value as { stable: unknown[]; boot?: unknown };
+  const stable = config.stable.map(validateResource);
   const types = new Set(stable.map(resource => resource.type));
   if (stable.length !== PROTOCOL_V2_RESOURCE_TYPES.length || types.size !== stable.length) {
     throw new Error('Invalid Pro2 resources config: stable must contain six unique resource types');
@@ -170,6 +200,7 @@ export function parseProtocolV2Resources(value: unknown): IProtocolV2Resources |
       throw new Error(`Invalid Pro2 resources config: stable is missing ${type}`);
     }
   }
+  const boot = config.boot === undefined ? undefined : validateBootResources(config.boot);
   return {
     stable: PROTOCOL_V2_RESOURCE_TYPES.map(type => {
       const resource = stable.find(item => item.type === type);
@@ -178,6 +209,7 @@ export function parseProtocolV2Resources(value: unknown): IProtocolV2Resources |
       }
       return resource;
     }),
+    ...(boot ? { boot } : undefined),
   };
 }
 

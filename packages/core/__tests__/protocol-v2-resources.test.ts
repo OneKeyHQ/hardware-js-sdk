@@ -12,7 +12,12 @@ import {
   requestProtocolV2ResourceInventory,
 } from '../src/protocols/protocol-v2/resources';
 
-import type { ConnectSettings, IProtocolV2Resource, RemoteConfigResponse } from '../src/types';
+import type {
+  ConnectSettings,
+  IProtocolV2BootResources,
+  IProtocolV2Resource,
+  RemoteConfigResponse,
+} from '../src/types';
 
 jest.mock('axios');
 jest.mock('../src/data/config', () => ({
@@ -31,6 +36,16 @@ const resources: IProtocolV2Resource[] = PROTOCOL_V2_RESOURCE_TYPES.map((type, i
   headerHash: index.toString(16).padStart(128, '0'),
 }));
 
+const bootResources: IProtocolV2BootResources = {
+  required: false,
+  target: 'CRATE',
+  url: 'https://example.com/boot-resources.crate.okpkg',
+  size: 1234,
+  fileHash: 'ab'.repeat(32),
+  payloadHash: 'cd'.repeat(64),
+  headerHash: 'ef'.repeat(64),
+};
+
 const createSettings = (configFetcher: ConnectSettings['configFetcher']): ConnectSettings =>
   ({
     env: 'node',
@@ -47,7 +62,7 @@ const createRemoteConfig = (): RemoteConfigResponse =>
     mini: { firmware: [], ble: [] },
     touch: { firmware: [], ble: [] },
     pro: { firmware: [], ble: [] },
-    pro2: { firmware: [], ble: [], resources: { stable: resources } },
+    pro2: { firmware: [], ble: [], resources: { stable: resources, boot: bootResources } },
     bridge: {},
   } as unknown as RemoteConfigResponse);
 
@@ -58,9 +73,13 @@ describe('Pro2 resource configuration', () => {
   });
 
   test('accepts exactly six resources and normalizes their deterministic order', () => {
-    const parsed = parseProtocolV2Resources({ stable: [...resources].reverse() });
+    const parsed = parseProtocolV2Resources({
+      stable: [...resources].reverse(),
+      boot: bootResources,
+    });
 
     expect(parsed?.stable.map(item => item.type)).toEqual(PROTOCOL_V2_RESOURCE_TYPES);
+    expect(parsed?.boot).toEqual(bootResources);
     expect(PROTOCOL_V2_RESOURCE_DEVICE_PATHS.translations).toBe(
       'vol0:/bundles/translations/translations.okpkg'
     );
@@ -80,6 +99,21 @@ describe('Pro2 resource configuration', () => {
         ),
       })
     ).toThrow('headerHash');
+  });
+
+  test('requires boot resources to remain optional and use a CRATE package', () => {
+    expect(() =>
+      parseProtocolV2Resources({
+        stable: resources,
+        boot: { ...bootResources, required: true },
+      })
+    ).toThrow('required flag');
+    expect(() =>
+      parseProtocolV2Resources({
+        stable: resources,
+        boot: { ...bootResources, target: 'RESC' },
+      })
+    ).toThrow('expected CRATE');
   });
 
   test('downloads nothing when all resource identities match', () => {
@@ -186,6 +220,7 @@ describe('Pro2 resource configuration', () => {
       expect.stringMatching(/^https:\/\/data\.onekey\.so\/pre-config\.json\?noCache=/)
     );
     expect(DataManager.getProtocolV2Resources()).toEqual(resources);
+    expect(DataManager.getProtocolV2BootResources()).toEqual(bootResources);
   });
 
   test('does not advance the cache timestamp when refresh fails', async () => {

@@ -81,8 +81,24 @@ export type IProtocolV2Resource = {
   headerHash: string;
 };
 
+/** Optional Pro2 startup-resource CRATE installed by the bootloader updater. */
+export type IProtocolV2BootResources = {
+  required: false;
+  target: 'CRATE';
+  url: string;
+  /** Complete CRATE file size in bytes. */
+  size: number;
+  /** SHA-256 of the complete CRATE file. */
+  fileHash: string;
+  /** SHA3-512 payload_hash from the signed CRATE header. */
+  payloadHash: string;
+  /** SHA3-512 header_hash from the signed CRATE header. */
+  headerHash: string;
+};
+
 export type IProtocolV2Resources = {
   stable: IProtocolV2Resource[];
+  boot?: IProtocolV2BootResources;
 };
 
 /** Pro2 RESC bundle okpkg descriptor for incremental FileWrite synchronization. */

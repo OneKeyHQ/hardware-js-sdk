@@ -45,6 +45,7 @@ import type { TypedResponseMessage } from '../device/DeviceCommands';
 import type {
   Features,
   IFirmwareReleaseInfo,
+  IProtocolV2BootResources,
   IProtocolV2FirmwareComponent,
   IProtocolV2Resource,
   IVersionArray,
@@ -74,6 +75,7 @@ const PROTOCOL_V2_OKPP_HEADER_SIZE = 0x52a0;
 const PROTOCOL_V2_OKPP_PAYLOAD_HASH_OFFSET = 0x200;
 const PROTOCOL_V2_OKPP_HEADER_HASH_OFFSET = 0x240;
 const PROTOCOL_V2_OKPP_HASH_SIZE = 64;
+const PROTOCOL_V2_BOOT_RESOURCES_FILE_NAME = 'boot_resources.crate.okpkg';
 
 const getProtocolV2DeviceTransferProgress = (
   bytesBeforeChunk: number,
@@ -108,7 +110,7 @@ type ProtocolV2FirmwareUpdateStartResponse = TypedResponseMessage<'Success'>;
 
 type ProtocolV2TargetBinary = { fileName: string; binary: ArrayBuffer; targetId: number };
 type ProtocolV2InstallItem = ProtocolV2TargetBinary & {
-  kind: ProtocolV2RemoteComponentTarget['kind'];
+  kind: ProtocolV2RemoteComponentTarget['kind'] | 'boot_resources';
 };
 type ProtocolV2InstallTarget = ProtocolV2InstallItem & {
   path: string;
@@ -423,6 +425,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       { name: 'chunkSize', type: 'number' },
       { name: 'forcedUpdateRes', type: 'boolean' },
       { name: 'bootloaderBinary', type: 'buffer' },
+      { name: 'bootResourcesBinary', type: 'buffer' },
       { name: 'romloaderBinary', type: 'buffer' },
       { name: 'applicationP1Binary', type: 'buffer' },
       { name: 'applicationP2Binary', type: 'buffer' },
@@ -441,6 +444,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       chunkSize: payload.chunkSize,
       forcedUpdateRes: payload.forcedUpdateRes,
       bootloaderBinary: payload.bootloaderBinary,
+      bootResourcesBinary: payload.bootResourcesBinary,
       romloaderBinary: payload.romloaderBinary,
       applicationP1Binary: payload.applicationP1Binary,
       applicationP2Binary: payload.applicationP2Binary,
@@ -489,6 +493,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
     let fwBinaryMap: ProtocolV2TargetBinary[] = [];
     let bootloaderBinary: ArrayBuffer | null = null;
+    let bootResourcesInstallItem: ProtocolV2InstallItem | undefined;
     let installItems: ProtocolV2InstallItem[] | undefined;
     let resourceBundles: ProtocolV2ResourceBundleBinary[] | undefined;
     try {
@@ -499,7 +504,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       const needsRemoteResources =
         !this.params.resourceBundleFiles?.length &&
         !!this.params.targetsToUpdate?.includes('resource');
-      if (needsRemoteFirmware || needsRemoteResources) {
+      const needsRemoteBootResources =
+        !this.params.bootResourcesBinary &&
+        !!this.params.targetsToUpdate?.includes('boot_resources');
+      if (needsRemoteFirmware || needsRemoteResources || needsRemoteBootResources) {
         // Remote updates must use a freshly fetched config before any reboot or file write.
         await DataManager.forceReloadData();
       }
@@ -512,13 +520,25 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         fwBinaryMap = remoteBinaries.fwBinaryMap;
         installItems = remoteBinaries.installItems;
       }
+      bootResourcesInstallItem = await this.prepareProtocolV2BootResources();
+      if (bootResourcesInstallItem) {
+        installItems = [
+          bootResourcesInstallItem,
+          ...(installItems ?? this.buildProtocolV2InstallItems({ bootloaderBinary, fwBinaryMap })),
+        ];
+      }
       resourceBundles = await this.prepareProtocolV2ResourceBundles(resourceRecoveryMode);
       this.postTipMessage(FirmwareUpdateTipMessage.FinishDownloadFirmware);
     } catch (err) {
       throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
     }
 
-    if (!bootloaderBinary && fwBinaryMap.length === 0 && !resourceBundles?.length) {
+    if (
+      !bootloaderBinary &&
+      fwBinaryMap.length === 0 &&
+      !installItems?.length &&
+      !resourceBundles?.length
+    ) {
       if (resourceBundles !== undefined) {
         this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdateCompleted);
         return this.getProtocolV2VersionResult(deviceFeatures);
@@ -598,6 +618,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return (
       !!this.params.resourceBundleFiles?.length ||
       !!this.params.bootloaderBinary ||
+      !!this.params.bootResourcesBinary ||
       fwBinaryMap.length > 0
     );
   }
@@ -744,6 +765,54 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       bootloaderBinary,
       fwBinaryMap,
       installItems,
+    };
+  }
+
+  private validateProtocolV2BootResourcesBinary(
+    binary: ArrayBuffer,
+    resource?: IProtocolV2BootResources
+  ) {
+    if (resource && !isProtocolV2ResourceFileValid(binary, resource)) {
+      throw new Error('Pro2 boot resources file verification failed');
+    }
+    const header = parseProtocolV2OkppHeader(toProtocolV2Bytes(binary));
+    if (!header || header.type !== 'CRAT') {
+      throw new Error('Invalid Pro2 boot resources CRATE header');
+    }
+    if (resource) {
+      const expectedPayloadHash = normalizeProtocolV2Hex(resource.payloadHash);
+      const expectedHeaderHash = normalizeProtocolV2Hex(resource.headerHash);
+      if (header.payloadHash !== expectedPayloadHash) {
+        throw new Error('Pro2 boot resources payload hash mismatch');
+      }
+      if (header.headerHash !== expectedHeaderHash) {
+        throw new Error('Pro2 boot resources header hash mismatch');
+      }
+    }
+  }
+
+  private async prepareProtocolV2BootResources(): Promise<ProtocolV2InstallItem | undefined> {
+    let binary = this.params.bootResourcesBinary;
+    let resource: IProtocolV2BootResources | undefined;
+
+    if (!binary) {
+      if (!this.params.targetsToUpdate?.includes('boot_resources')) {
+        return undefined;
+      }
+      resource = DataManager.getProtocolV2BootResources();
+      if (!resource) {
+        throw new Error('Missing Pro2 boot resources configuration');
+      }
+      Log.log('[FirmwareUpdateV4] downloading Pro2 boot resources CRATE');
+      ({ binary } = await getSysResourceBinary(resource.url));
+    }
+
+    this.validateProtocolV2BootResourcesBinary(binary, resource);
+    return {
+      fileName: PROTOCOL_V2_BOOT_RESOURCES_FILE_NAME,
+      binary,
+      targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_CRATE,
+      kind: 'boot_resources',
     };
   }
 
