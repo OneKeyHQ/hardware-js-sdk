@@ -450,8 +450,6 @@
         "MessageType_DeviceInfo": 60601,
         "MessageType_DeviceStatusGet": 60602,
         "MessageType_DeviceStatus": 60603,
-        "MessageType_ResourceInventoryGet": 60604,
-        "MessageType_ResourceInventory": 60605,
         "MessageType_FilesystemPermissionFix": 60800,
         "MessageType_FilesystemPathInfo": 60801,
         "MessageType_FilesystemPathInfoQuery": 60802,
@@ -11996,16 +11994,6 @@
         "APP": 85
       }
     },
-    "ResourceBundleType": {
-      "values": {
-        "IMAGES": 0,
-        "ANIMATION": 1,
-        "WALLPAPER": 2,
-        "TRANSLATIONS": 3,
-        "ROOBERT": 4,
-        "NOTO": 5
-      }
-    },
     "DeviceFirmwareImageInfo": {
       "fields": {
         "version": {
@@ -12200,37 +12188,6 @@
         "se4": {
           "type": "DeviceSEInfo",
           "id": 430
-        }
-      }
-    },
-    "ResourceInventoryGet": {
-      "fields": {}
-    },
-    "ResourceInventoryItem": {
-      "fields": {
-        "type": {
-          "rule": "required",
-          "type": "ResourceBundleType",
-          "id": 1
-        },
-        "size": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 2
-        },
-        "header_hash": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 3
-        }
-      }
-    },
-    "ResourceInventory": {
-      "fields": {
-        "items": {
-          "rule": "repeated",
-          "type": "ResourceInventoryItem",
-          "id": 1
         }
       }
     },
