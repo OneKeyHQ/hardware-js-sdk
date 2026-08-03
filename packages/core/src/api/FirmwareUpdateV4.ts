@@ -30,7 +30,7 @@ import {
   PROTOCOL_V2_RESOURCE_DEVICE_PATHS,
   buildProtocolV2ResourceUpdatePlan,
   isProtocolV2ResourceFileValid,
-  requestProtocolV2ResourceInventory,
+  readProtocolV2ResourceInventory,
 } from '../protocols/protocol-v2/resources';
 import {
   getProtocolV2UnknownErrorText,
@@ -842,10 +842,12 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       throw new Error('Missing Pro2 stable resource configuration');
     }
 
-    const inventory = recoveryMode
+    const inventory = this.params.forcedUpdateRes
       ? undefined
-      : await requestProtocolV2ResourceInventory({
+      : await readProtocolV2ResourceInventory({
           commands: this.device.getCommands(),
+          resources,
+          chunkSize: this.getProtocolV2FirmwareChunkSize(),
           timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
         });
     const plan = buildProtocolV2ResourceUpdatePlan({

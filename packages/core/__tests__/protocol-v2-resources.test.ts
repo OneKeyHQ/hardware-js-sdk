@@ -7,9 +7,8 @@ import {
   PROTOCOL_V2_RESOURCE_TYPES,
   buildProtocolV2ResourceUpdatePlan,
   isProtocolV2ResourceFileValid,
-  parseProtocolV2ResourceInventory,
   parseProtocolV2Resources,
-  requestProtocolV2ResourceInventory,
+  readProtocolV2ResourceInventory,
 } from '../src/protocols/protocol-v2/resources';
 
 import type {
@@ -27,6 +26,24 @@ jest.mock('../src/data/config', () => ({
 
 const bytesToHex = (bytes: Uint8Array) =>
   Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+
+const PROTOCOL_V2_OKPP_HEADER_SIZE = 0x52a0;
+
+const createResourceHeader = (headerHash: string) => {
+  const header = new Uint8Array(PROTOCOL_V2_OKPP_HEADER_SIZE);
+  const view = new DataView(header.buffer);
+  'OKPP'.split('').forEach((char, index) => {
+    header[index] = char.charCodeAt(0);
+  });
+  'RESC'.split('').forEach((char, index) => {
+    header[0x08 + index] = char.charCodeAt(0);
+  });
+  view.setUint32(0x0c, header.byteLength, true);
+  for (let index = 0; index < headerHash.length / 2; index++) {
+    header[0x240 + index] = Number.parseInt(headerHash.slice(index * 2, index * 2 + 2), 16);
+  }
+  return header;
+};
 
 const resources: IProtocolV2Resource[] = PROTOCOL_V2_RESOURCE_TYPES.map((type, index) => ({
   type,
@@ -124,50 +141,62 @@ describe('Pro2 resource configuration', () => {
     ).toEqual({ status: 'valid', resources: [] });
   });
 
-  test('normalizes the success-only ResourceInventory RPC response', async () => {
-    const items = resources.slice(0, 2).map((resource, index) => ({
-      type: index === 0 ? 'IMAGES' : 1,
-      size: resource.size,
-      header_hash: resource.headerHash,
+  test('builds inventory from existing filesystem calls without ResourceInventoryGet', async () => {
+    const installedResources = resources.map((resource, index) => ({
+      ...resource,
+      size: PROTOCOL_V2_OKPP_HEADER_SIZE + index + 1,
     }));
-    const typedCall = jest.fn().mockResolvedValue({ message: { items } });
+    const resourceByPath = new Map(
+      installedResources.map(resource => [
+        PROTOCOL_V2_RESOURCE_DEVICE_PATHS[resource.type],
+        resource,
+      ])
+    );
+    const typedCall = jest.fn(
+      (requestType: string, _responseType: string, payload: Record<string, any>) => {
+        if (requestType === 'ResourceInventoryGet') {
+          throw new Error('ResourceInventoryGet is unavailable on released firmware');
+        }
+        if (requestType === 'FilesystemPathInfoQuery') {
+          const resource = resourceByPath.get(payload.path);
+          return {
+            message: {
+              exist: Boolean(resource),
+              directory: false,
+              size: resource?.size ?? 0,
+            },
+          };
+        }
+        if (requestType === 'FilesystemFileRead') {
+          const resource = resourceByPath.get(payload.file.path);
+          if (!resource) throw new Error('missing resource');
+          const header = createResourceHeader(resource.headerHash);
+          const offset = Number(payload.file.offset);
+          const chunkLength = Number(payload.chunk_len);
+          return {
+            message: {
+              data: header.slice(offset, offset + chunkLength),
+            },
+          };
+        }
+        throw new Error(`Unexpected request: ${requestType}`);
+      }
+    );
 
     await expect(
-      requestProtocolV2ResourceInventory({ commands: { typedCall } as any })
-    ).resolves.toEqual([
-      {
-        type: 'images',
-        size: resources[0].size,
-        headerHash: resources[0].headerHash,
-      },
-      {
-        type: 'animation',
-        size: resources[1].size,
-        headerHash: resources[1].headerHash,
-      },
-    ]);
-    expect(typedCall).toHaveBeenCalledWith(
-      'ResourceInventoryGet',
-      'ResourceInventory',
-      {},
-      { timeoutMs: 5000 }
+      readProtocolV2ResourceInventory({
+        commands: { typedCall },
+        resources: installedResources,
+        chunkSize: 4000,
+      })
+    ).resolves.toEqual(
+      installedResources.map(({ type, size, headerHash }) => ({ type, size, headerHash }))
     );
-  });
-
-  test('rejects malformed or duplicate inventory identities', () => {
-    expect(() =>
-      parseProtocolV2ResourceInventory({
-        items: [
-          { type: 'IMAGES', size: 1, header_hash: 'a'.repeat(128) },
-          { type: 'IMAGES', size: 1, header_hash: 'b'.repeat(128) },
-        ],
-      })
-    ).toThrow('duplicate resource type');
-    expect(() =>
-      parseProtocolV2ResourceInventory({
-        items: [{ type: 'IMAGES', size: 1, header_hash: 'bad' }],
-      })
-    ).toThrow('inventory headerHash');
+    expect(typedCall.mock.calls.some(call => call[0] === 'ResourceInventoryGet')).toBe(false);
+    expect(typedCall.mock.calls.filter(call => call[0] === 'FilesystemPathInfoQuery')).toHaveLength(
+      6
+    );
+    expect(typedCall.mock.calls.some(call => call[0] === 'FilesystemFileRead')).toBe(true);
   });
 
   test('selects only the changed or missing resource in application mode', () => {
@@ -197,6 +226,22 @@ describe('Pro2 resource configuration', () => {
     expect(
       buildProtocolV2ResourceUpdatePlan({ resources, mode: 'bootloader-recovery' }).resources
     ).toHaveLength(6);
+  });
+
+  test('uses a filesystem inventory for incremental recovery mode updates', () => {
+    const inventory = resources.slice(1).map(({ type, size, headerHash }) => ({
+      type,
+      size,
+      headerHash,
+    }));
+
+    expect(
+      buildProtocolV2ResourceUpdatePlan({
+        resources,
+        inventory,
+        mode: 'bootloader-recovery',
+      }).resources.map(resource => resource.type)
+    ).toEqual(['images']);
   });
 
   test('verifies both full file size and SHA-256 before transfer', () => {

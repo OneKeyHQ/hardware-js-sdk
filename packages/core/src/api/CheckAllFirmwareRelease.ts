@@ -13,7 +13,7 @@ import { getDeviceFirmwareVersion, getDeviceType, getFirmwareType } from '../uti
 import { BaseMethod } from './BaseMethod';
 import {
   buildProtocolV2ResourceUpdatePlan,
-  requestProtocolV2ResourceInventory,
+  readProtocolV2ResourceInventory,
 } from '../protocols/protocol-v2/resources';
 
 import type {
@@ -346,23 +346,22 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
     let resourceStatus: 'valid' | 'outdated' | 'unknown' = 'unknown';
     if (resources?.length) {
       const loaderMode = state.status.mode === 'bootloader' || state.status.mode === 'romloader';
-      if (loaderMode) {
-        resourceStatus = buildProtocolV2ResourceUpdatePlan({
-          resources,
-          mode: 'bootloader-recovery',
-        }).status;
-      } else if (state.status.mode === 'normal') {
+      if (loaderMode || state.status.mode === 'normal') {
         try {
-          const inventory = await requestProtocolV2ResourceInventory({
+          const inventory = await readProtocolV2ResourceInventory({
             commands: this.device.getCommands(),
+            resources,
           });
           resourceStatus = buildProtocolV2ResourceUpdatePlan({
             resources,
             inventory,
-            mode: 'application',
+            mode: loaderMode ? 'bootloader-recovery' : 'application',
           }).status;
         } catch {
-          resourceStatus = 'unknown';
+          resourceStatus = buildProtocolV2ResourceUpdatePlan({
+            resources,
+            mode: loaderMode ? 'bootloader-recovery' : 'application',
+          }).status;
         }
       }
     }

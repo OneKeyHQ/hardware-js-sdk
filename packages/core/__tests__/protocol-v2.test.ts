@@ -76,6 +76,7 @@ import {
   requestProtocolV2ProtocolInfo,
   supportsProtocolV2Message,
 } from '../src/protocols/protocol-v2/features';
+import { PROTOCOL_V2_RESOURCE_DEVICE_PATHS } from '../src/protocols/protocol-v2/resources';
 import {
   getProtocolV2WalletSession,
   refreshProtocolV2DeviceStatus,
@@ -5789,6 +5790,64 @@ describe('Protocol V2 firmware update method', () => {
 });
 
 describe('Protocol V2 firmware reconnect identity', () => {
+  const createResourceFilesystemTypedCall = (
+    stable: Array<{ type: string; size: number; headerHash: string }>,
+    missingTypes: string[] = []
+  ) => {
+    const missing = new Set(missingTypes);
+    const resourceByPath = new Map(
+      stable.map(resource => [
+        PROTOCOL_V2_RESOURCE_DEVICE_PATHS[
+          resource.type as keyof typeof PROTOCOL_V2_RESOURCE_DEVICE_PATHS
+        ],
+        resource,
+      ])
+    );
+    return jest.fn((requestType: string, _responseType: string, payload: Record<string, any>) => {
+      if (requestType === 'ResourceInventoryGet') {
+        throw new Error('ResourceInventoryGet is unavailable on released firmware');
+      }
+      if (requestType === 'FilesystemPathInfoQuery') {
+        const resource = resourceByPath.get(payload.path);
+        const exists = Boolean(resource && !missing.has(resource.type));
+        return {
+          message: {
+            exist: exists,
+            directory: false,
+            size: exists ? resource?.size : 0,
+          },
+        };
+      }
+      if (requestType === 'FilesystemFileRead') {
+        const resource = resourceByPath.get(payload.file.path);
+        if (!resource || missing.has(resource.type)) throw new Error('missing resource');
+        const header = new Uint8Array(0x52a0);
+        const view = new DataView(header.buffer);
+        'OKPP'.split('').forEach((char, index) => {
+          header[index] = char.charCodeAt(0);
+        });
+        'RESC'.split('').forEach((char, index) => {
+          header[0x08 + index] = char.charCodeAt(0);
+        });
+        view.setUint32(0x0c, header.byteLength, true);
+        for (let index = 0; index < resource.headerHash.length / 2; index++) {
+          header[0x240 + index] = Number.parseInt(
+            resource.headerHash.slice(index * 2, index * 2 + 2),
+            16
+          );
+        }
+        const offset = Number(payload.file.offset);
+        const chunkLength = Number(payload.chunk_len);
+        return {
+          message: {
+            data: header.slice(offset, offset + chunkLength),
+          },
+        };
+      }
+      throw new Error(`Unexpected request: ${requestType}`);
+    });
+  };
+
   test('rejects a different physical serial before firmware transfer resumes', () => {
     expect(() => assertProtocolV2ReconnectIdentity('expected-serial', 'other-serial')).toThrow(
       'identity mismatch'
@@ -5851,7 +5910,7 @@ describe('Protocol V2 firmware reconnect identity', () => {
     expect((method as any).protocolV2ExpectedSerialNumber).toBeUndefined();
   });
 
-  test('uses ResourceInventory instead of host-side FileRead for resource comparison', async () => {
+  test('uses filesystem reads instead of ResourceInventoryGet for resource comparison', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -5865,20 +5924,12 @@ describe('Protocol V2 firmware reconnect identity', () => {
       (type, index) => ({
         type,
         url: `https://example.com/${type}.okpkg`,
-        size: index + 1,
+        size: 0x52a0 + index + 1,
         fileHash: 'a'.repeat(64),
         headerHash: index.toString(16).padStart(128, '0'),
       })
     );
-    const typedCall = jest.fn().mockResolvedValue({
-      message: {
-        items: stable.map(item => ({
-          type: item.type.toUpperCase(),
-          size: item.size,
-          header_hash: item.headerHash,
-        })),
-      },
-    });
+    const typedCall = createResourceFilesystemTypedCall(stable);
     (method as any).device = stubDevice({
       getCommands: () => ({ typedCall }),
     });
@@ -5888,13 +5939,8 @@ describe('Protocol V2 firmware reconnect identity', () => {
     (method as any).downloadProtocolV2Resource = jest.fn();
 
     await expect((method as any).prepareProtocolV2ResourceBundles(false)).resolves.toEqual([]);
-    expect(typedCall).toHaveBeenCalledWith(
-      'ResourceInventoryGet',
-      'ResourceInventory',
-      {},
-      { timeoutMs: 5000 }
-    );
-    expect(typedCall.mock.calls.some(call => call[0] === 'FilesystemFileRead')).toBe(false);
+    expect(typedCall.mock.calls.some(call => call[0] === 'ResourceInventoryGet')).toBe(false);
+    expect(typedCall.mock.calls.some(call => call[0] === 'FilesystemFileRead')).toBe(true);
     expect((method as any).downloadProtocolV2Resource).not.toHaveBeenCalled();
     resourcesSpy.mockRestore();
   });
@@ -5909,20 +5955,12 @@ describe('Protocol V2 firmware reconnect identity', () => {
       (type, index) => ({
         type,
         url: `https://example.com/${type}.okpkg`,
-        size: index + 1,
+        size: 0x52a0 + index + 1,
         fileHash: 'a'.repeat(64),
         headerHash: index.toString(16).padStart(128, '0'),
       })
     );
-    const typedCall = jest.fn().mockResolvedValue({
-      message: {
-        items: stable.slice(1).map(item => ({
-          type: item.type.toUpperCase(),
-          size: item.size,
-          header_hash: item.headerHash,
-        })),
-      },
-    });
+    const typedCall = createResourceFilesystemTypedCall(stable, ['images']);
     (method as any).device = stubDevice({ getCommands: () => ({ typedCall }) });
     const resourcesSpy = jest
       .spyOn(DataManager, 'getProtocolV2Resources')
@@ -5942,7 +5980,7 @@ describe('Protocol V2 firmware reconnect identity', () => {
     resourcesSpy.mockRestore();
   });
 
-  test('downloads all six resources in Bootloader recovery without inventory RPC', async () => {
+  test('uses filesystem inventory for incremental Bootloader recovery', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: { method: 'firmwareUpdateV4', platform: 'web', targetsToUpdate: ['resource'] },
@@ -5952,12 +5990,12 @@ describe('Protocol V2 firmware reconnect identity', () => {
       (type, index) => ({
         type,
         url: `https://example.com/${type}.okpkg`,
-        size: index + 1,
+        size: 0x52a0 + index + 1,
         fileHash: 'a'.repeat(64),
         headerHash: index.toString(16).padStart(128, '0'),
       })
     );
-    const typedCall = jest.fn();
+    const typedCall = createResourceFilesystemTypedCall(stable, ['images']);
     (method as any).device = stubDevice({ getCommands: () => ({ typedCall }) });
     const resourcesSpy = jest
       .spyOn(DataManager, 'getProtocolV2Resources')
@@ -5972,9 +6010,10 @@ describe('Protocol V2 firmware reconnect identity', () => {
 
     const bundles = await (method as any).prepareProtocolV2ResourceBundles(true);
 
-    expect(bundles).toHaveLength(6);
-    expect(typedCall).not.toHaveBeenCalled();
-    expect((method as any).downloadProtocolV2Resource).toHaveBeenCalledTimes(6);
+    expect(bundles).toHaveLength(1);
+    expect(typedCall.mock.calls.some(call => call[0] === 'ResourceInventoryGet')).toBe(false);
+    expect(typedCall.mock.calls.some(call => call[0] === 'FilesystemPathInfoQuery')).toBe(true);
+    expect((method as any).downloadProtocolV2Resource).toHaveBeenCalledWith(stable[0]);
     resourcesSpy.mockRestore();
   });
 

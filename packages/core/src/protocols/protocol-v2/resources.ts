@@ -1,4 +1,5 @@
 import { sha256 } from '@noble/hashes/sha256';
+import { PROTOCOL_V2_BLE_FILE_READ_CHUNK_SIZE } from '@onekeyfe/hd-transport';
 
 import type {
   IProtocolV2BootResources,
@@ -7,7 +8,6 @@ import type {
   IProtocolV2Resources,
 } from '../../types';
 import type { DeviceCommands } from '../../device/DeviceCommands';
-import type { ResourceInventory } from '@onekeyfe/hd-transport';
 
 export const PROTOCOL_V2_RESOURCE_TYPES = [
   'images',
@@ -31,22 +31,15 @@ export const PROTOCOL_V2_RESOURCE_DEVICE_PATHS: Readonly<Record<IProtocolV2Resou
 const RESOURCE_TYPE_SET = new Set<string>(PROTOCOL_V2_RESOURCE_TYPES);
 const SHA256_HEX_LENGTH = 64;
 const SHA3_512_HEX_LENGTH = 128;
+const PROTOCOL_V2_OKPP_HEADER_SIZE = 0x52a0;
+const PROTOCOL_V2_OKPP_TYPE_OFFSET = 0x08;
+const PROTOCOL_V2_OKPP_HEADER_LENGTH_OFFSET = 0x0c;
+const PROTOCOL_V2_OKPP_HEADER_HASH_OFFSET = 0x240;
+const PROTOCOL_V2_OKPP_HASH_SIZE = 64;
+const PROTOCOL_V2_RESOURCE_IDENTITY_READ_SIZE =
+  PROTOCOL_V2_OKPP_HEADER_HASH_OFFSET + PROTOCOL_V2_OKPP_HASH_SIZE;
+const PROTOCOL_V2_MIN_FILE_READ_CHUNK_SIZE = 64;
 export const PROTOCOL_V2_RESOURCE_INVENTORY_TIMEOUT_MS = 5 * 1000;
-
-const RESOURCE_TYPE_BY_DEVICE_VALUE: Readonly<Record<string, IProtocolV2ResourceType>> = {
-  '0': 'images',
-  IMAGES: 'images',
-  '1': 'animation',
-  ANIMATION: 'animation',
-  '2': 'wallpaper',
-  WALLPAPER: 'wallpaper',
-  '3': 'translations',
-  TRANSLATIONS: 'translations',
-  '4': 'roobert',
-  ROOBERT: 'roobert',
-  '5': 'noto',
-  NOTO: 'noto',
-};
 
 export type ProtocolV2ResourceInventoryItem = {
   type: IProtocolV2ResourceType;
@@ -61,57 +54,153 @@ export type ProtocolV2ResourceUpdatePlan = {
   resources: IProtocolV2Resource[];
 };
 
-/** Normalize the success-only device response into the SDK resource identity shape. */
-export function parseProtocolV2ResourceInventory(
-  value: ResourceInventory | unknown
-): ProtocolV2ResourceInventoryItem[] {
-  const items = (value as { items?: unknown })?.items;
-  if (!Array.isArray(items)) {
-    throw new Error('Invalid Pro2 resource inventory: items must be an array');
+function toFiniteNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : undefined;
   }
-
-  const inventory = items.map((item, index) => {
-    if (!item || typeof item !== 'object') {
-      throw new Error(`Invalid Pro2 resource inventory item at ${index}`);
+  if (value && typeof value === 'object') {
+    const longLike = value as { toNumber?: () => number };
+    if (typeof longLike.toNumber === 'function') {
+      const numeric = longLike.toNumber();
+      return Number.isFinite(numeric) ? numeric : undefined;
     }
-    const raw = item as { type?: unknown; size?: unknown; header_hash?: unknown };
-    const type = RESOURCE_TYPE_BY_DEVICE_VALUE[String(raw.type).toUpperCase()];
-    if (!type) {
-      throw new Error(`Invalid Pro2 resource inventory type at ${index}`);
-    }
-    if (!Number.isSafeInteger(raw.size) || Number(raw.size) <= 0) {
-      throw new Error(`Invalid Pro2 resource inventory size at ${index}`);
-    }
-    return {
-      type,
-      size: Number(raw.size),
-      headerHash: normalizeHex(raw.header_hash, SHA3_512_HEX_LENGTH, 'inventory headerHash'),
-    };
-  });
-
-  if (new Set(inventory.map(item => item.type)).size !== inventory.length) {
-    throw new Error('Invalid Pro2 resource inventory: duplicate resource type');
   }
-  return PROTOCOL_V2_RESOURCE_TYPES.flatMap(type => {
-    const item = inventory.find(candidate => candidate.type === type);
-    return item ? [item] : [];
-  });
+  return undefined;
 }
 
-export async function requestProtocolV2ResourceInventory({
+function toUint8Array(value: unknown): Uint8Array {
+  if (value instanceof Uint8Array) return value;
+  if (value instanceof ArrayBuffer) return new Uint8Array(value);
+  if (ArrayBuffer.isView(value)) {
+    return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+  }
+  if (typeof value === 'string') {
+    const hex = value.replace(/^0x/i, '');
+    if (!hex || hex.length % 2 !== 0 || /[^0-9a-f]/i.test(hex)) {
+      return new Uint8Array(0);
+    }
+    const bytes = new Uint8Array(hex.length / 2);
+    for (let index = 0; index < bytes.length; index += 1) {
+      bytes[index] = Number.parseInt(hex.slice(index * 2, index * 2 + 2), 16);
+    }
+    return bytes;
+  }
+  return new Uint8Array(0);
+}
+
+function readAscii(bytes: Uint8Array, offset: number, length: number): string {
+  return Array.from(bytes.slice(offset, offset + length), byte => String.fromCharCode(byte)).join(
+    ''
+  );
+}
+
+function parseProtocolV2ResourceHeaderHash(bytes: Uint8Array): string | undefined {
+  if (bytes.byteLength < PROTOCOL_V2_RESOURCE_IDENTITY_READ_SIZE) return undefined;
+  if (readAscii(bytes, 0, 4) !== 'OKPP') return undefined;
+  if (readAscii(bytes, PROTOCOL_V2_OKPP_TYPE_OFFSET, 4) !== 'RESC') return undefined;
+
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (
+    view.getUint32(PROTOCOL_V2_OKPP_HEADER_LENGTH_OFFSET, true) !== PROTOCOL_V2_OKPP_HEADER_SIZE
+  ) {
+    return undefined;
+  }
+  return bytesToHex(
+    bytes.slice(
+      PROTOCOL_V2_OKPP_HEADER_HASH_OFFSET,
+      PROTOCOL_V2_OKPP_HEADER_HASH_OFFSET + PROTOCOL_V2_OKPP_HASH_SIZE
+    )
+  );
+}
+
+async function readProtocolV2ResourceIdentity({
   commands,
+  resource,
+  chunkSize,
   timeoutMs = PROTOCOL_V2_RESOURCE_INVENTORY_TIMEOUT_MS,
 }: {
-  commands: DeviceCommands;
+  commands: Pick<DeviceCommands, 'typedCall'>;
+  resource: IProtocolV2Resource;
+  chunkSize: number;
   timeoutMs?: number;
-}): Promise<ProtocolV2ResourceInventoryItem[]> {
-  const { message } = await commands.typedCall(
-    'ResourceInventoryGet',
-    'ResourceInventory',
-    {},
+}): Promise<ProtocolV2ResourceInventoryItem | undefined> {
+  const path = PROTOCOL_V2_RESOURCE_DEVICE_PATHS[resource.type];
+  const pathInfo = await commands.typedCall(
+    'FilesystemPathInfoQuery',
+    'FilesystemPathInfo',
+    { path },
     { timeoutMs }
   );
-  return parseProtocolV2ResourceInventory(message);
+  const size = toFiniteNumber(pathInfo.message?.size);
+  if (
+    !pathInfo.message?.exist ||
+    pathInfo.message?.directory ||
+    !Number.isSafeInteger(size) ||
+    size !== resource.size ||
+    size < PROTOCOL_V2_OKPP_HEADER_SIZE
+  ) {
+    return undefined;
+  }
+
+  const header = new Uint8Array(PROTOCOL_V2_RESOURCE_IDENTITY_READ_SIZE);
+  let offset = 0;
+  while (offset < header.byteLength) {
+    const readLength = Math.min(chunkSize, header.byteLength - offset);
+    const response = await commands.typedCall(
+      'FilesystemFileRead',
+      'FilesystemFile',
+      {
+        file: { path, offset, total_size: 0 },
+        chunk_len: readLength,
+      },
+      { timeoutMs }
+    );
+    const data = toUint8Array(response.message?.data);
+    if (data.byteLength === 0) return undefined;
+    const copied = Math.min(data.byteLength, header.byteLength - offset);
+    header.set(data.subarray(0, copied), offset);
+    offset += copied;
+  }
+
+  const headerHash = parseProtocolV2ResourceHeaderHash(header);
+  return headerHash ? { type: resource.type, size, headerHash } : undefined;
+}
+
+/**
+ * 使用已发布 Pro2 固件支持的文件系统消息构建资源清单。
+ * 缺失、无法读取或格式错误的文件不会进入清单，因此会被选中重写。
+ */
+export async function readProtocolV2ResourceInventory({
+  commands,
+  resources,
+  chunkSize = PROTOCOL_V2_BLE_FILE_READ_CHUNK_SIZE,
+  timeoutMs = PROTOCOL_V2_RESOURCE_INVENTORY_TIMEOUT_MS,
+}: {
+  commands: Pick<DeviceCommands, 'typedCall'>;
+  resources: readonly IProtocolV2Resource[];
+  chunkSize?: number;
+  timeoutMs?: number;
+}): Promise<ProtocolV2ResourceInventoryItem[]> {
+  const normalizedChunkSize = Number.isFinite(chunkSize)
+    ? Math.max(Math.floor(chunkSize), PROTOCOL_V2_MIN_FILE_READ_CHUNK_SIZE)
+    : PROTOCOL_V2_BLE_FILE_READ_CHUNK_SIZE;
+  const inventory: ProtocolV2ResourceInventoryItem[] = [];
+  for (const resource of resources) {
+    try {
+      const item = await readProtocolV2ResourceIdentity({
+        commands,
+        resource,
+        chunkSize: normalizedChunkSize,
+        timeoutMs,
+      });
+      if (item) inventory.push(item);
+    } catch {
+      // 单个资源无法读取时按缺失处理，不阻断其余资源的增量检查。
+    }
+  }
+  return inventory;
 }
 
 function normalizeHex(value: unknown, expectedLength: number, field: string): string {
@@ -213,7 +302,7 @@ export function parseProtocolV2Resources(value: unknown): IProtocolV2Resources |
   };
 }
 
-/** Compare the application inventory or select the full set for bootloader recovery. */
+/** 比较文件系统资源清单；恢复模式无法取得清单时回退到全量更新。 */
 export function buildProtocolV2ResourceUpdatePlan({
   resources,
   inventory,
@@ -225,14 +314,19 @@ export function buildProtocolV2ResourceUpdatePlan({
   mode: ProtocolV2ResourceUpdateMode;
   forced?: boolean;
 }): ProtocolV2ResourceUpdatePlan {
-  if (mode === 'bootloader-recovery' || forced) {
+  if (forced) {
     return {
       status: resources.length > 0 ? 'outdated' : 'valid',
       resources: [...resources],
     };
   }
   if (!inventory) {
-    return { status: 'unknown', resources: [] };
+    return mode === 'bootloader-recovery'
+      ? {
+          status: resources.length > 0 ? 'outdated' : 'valid',
+          resources: [...resources],
+        }
+      : { status: 'unknown', resources: [] };
   }
 
   const inventoryByType = new Map(inventory.map(item => [item.type, item]));
