@@ -150,6 +150,17 @@ export class TrezorElectronBleConnector extends TrezorConnectorBase {
     };
   }
 
+  override async cancel(sessionId: string): Promise<void> {
+    await super.cancel(sessionId);
+    // Base cancel only settles UI waiters; a connect stuck in the main process
+    // must be abandoned there.
+    try {
+      await this._transport?.cancelPairing();
+    } catch {
+      // Cancel must never throw.
+    }
+  }
+
   reset(): void {
     super.reset();
     this._transport?.reset();

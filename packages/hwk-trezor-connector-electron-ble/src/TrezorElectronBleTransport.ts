@@ -92,6 +92,11 @@ export class TrezorElectronBleTransport {
     await this._bridge.stopScan();
   }
 
+  /** Abandon the in-flight connect/pairing in the main process. */
+  async cancelPairing(): Promise<void> {
+    await this._bridge.cancelPairing();
+  }
+
   async connect(connectId: string): Promise<void> {
     if (this._connected.has(connectId)) return;
     await this._bridge.connect(connectId);
