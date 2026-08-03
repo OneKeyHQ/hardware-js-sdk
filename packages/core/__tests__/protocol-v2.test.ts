@@ -5,6 +5,7 @@ import {
   DeviceSettingsPage,
   DeviceType,
 } from '@onekeyfe/hd-transport';
+import { sha256 } from '@noble/hashes/sha256';
 
 import * as firmwareBinaryApi from '../src/api/firmware/getBinary';
 import DnxGetAddress from '../src/api/dynex/DnxGetAddress';
@@ -5982,6 +5983,100 @@ describe('Protocol V2 firmware reconnect identity', () => {
     expect(typedCall).not.toHaveBeenCalled();
     expect((method as any).downloadProtocolV2Resource).toHaveBeenCalledTimes(6);
     resourcesSpy.mockRestore();
+  });
+
+  const buildBootResourcesHeader = ({
+    type = 'CRAT',
+    payloadHash = 'ab'.repeat(64),
+    headerHash = 'cd'.repeat(64),
+  }: {
+    type?: string;
+    payloadHash?: string;
+    headerHash?: string;
+  } = {}) => {
+    const header = new Uint8Array(0x52a0);
+    const view = new DataView(header.buffer);
+    'OKPP'.split('').forEach((char, index) => {
+      header[index] = char.charCodeAt(0);
+    });
+    type.split('').forEach((char, index) => {
+      header[0x08 + index] = char.charCodeAt(0);
+    });
+    view.setUint32(0x0c, header.byteLength, true);
+    const writeHex = (offset: number, hex: string) => {
+      for (let index = 0; index < hex.length / 2; index++) {
+        header[offset + index] = Number.parseInt(hex.slice(index * 2, index * 2 + 2), 16);
+      }
+    };
+    writeHex(0x200, payloadHash);
+    writeHex(0x240, headerHash);
+    return header;
+  };
+
+  test('does not resolve boot resources unless the optional target is selected', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: { method: 'firmwareUpdateV4', platform: 'web' },
+    });
+    method.init();
+    const configSpy = jest.spyOn(DataManager, 'getProtocolV2BootResources');
+    const downloadSpy = jest.spyOn(firmwareBinaryApi, 'getSysResourceBinary');
+
+    await expect((method as any).prepareProtocolV2BootResources()).resolves.toBeUndefined();
+
+    expect(configSpy).not.toHaveBeenCalled();
+    expect(downloadSpy).not.toHaveBeenCalled();
+  });
+
+  test('downloads and maps the selected boot resources CRATE target', async () => {
+    const payloadHash = 'ab'.repeat(64);
+    const headerHash = 'cd'.repeat(64);
+    const bytes = buildBootResourcesHeader({ payloadHash, headerHash });
+    const binary = bytes.buffer as ArrayBuffer;
+    const fileHash = Array.from(sha256(bytes), byte => byte.toString(16).padStart(2, '0')).join('');
+    const resource = {
+      required: false as const,
+      target: 'CRATE' as const,
+      url: 'https://example.com/boot-resources.crate.okpkg',
+      size: bytes.byteLength,
+      fileHash,
+      payloadHash,
+      headerHash,
+    };
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+        targetsToUpdate: ['boot_resources'],
+      },
+    });
+    method.init();
+    jest.spyOn(DataManager, 'getProtocolV2BootResources').mockReturnValue(resource);
+    jest.spyOn(firmwareBinaryApi, 'getSysResourceBinary').mockResolvedValue({ binary });
+
+    await expect((method as any).prepareProtocolV2BootResources()).resolves.toEqual({
+      fileName: 'boot_resources.crate.okpkg',
+      binary,
+      targetId: 1,
+      kind: 'boot_resources',
+    });
+  });
+
+  test('rejects a non-CRATE manual boot resources package', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+        bootResourcesBinary: buildBootResourcesHeader({ type: 'RESC' }).buffer,
+      },
+    });
+    method.init();
+
+    await expect((method as any).prepareProtocolV2BootResources()).rejects.toThrow(
+      'Invalid Pro2 boot resources CRATE header'
+    );
   });
 });
 

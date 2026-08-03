@@ -509,6 +509,10 @@ export default class DataManager {
     return this.deviceMap[EDeviceType.Pro2]?.resources?.stable;
   }
 
+  static getProtocolV2BootResources() {
+    return this.deviceMap[EDeviceType.Pro2]?.resources?.boot;
+  }
+
   static getProtobufMessages(schema: ProtobufMessageSchema = 'v1CurrentSchema'): JSON {
     return this.messages[schema];
   }
