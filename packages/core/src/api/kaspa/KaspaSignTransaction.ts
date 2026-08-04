@@ -506,18 +506,7 @@ export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactio
           'KaspaSignTransaction: device firmware uses the streaming protocol; every output requires address or addressN'
         );
       }
-      try {
-        return await this.signTxStream(typedCall, response);
-      } catch (error) {
-        // Device rejected our refTxs; the caller decides whether to sign without them.
-        if (
-          error instanceof HardwareError &&
-          String(error.message).toLowerCase().includes('previous transaction id mismatch')
-        ) {
-          throw ERRORS.TypedError(HardwareErrorCode.KaspaPrevTxIdMismatch, String(error.message));
-        }
-        throw error;
-      }
+      return this.signTxStream(typedCall, response);
     }
 
     // Legacy answer to a streaming-only packet: no prehash material exists.
