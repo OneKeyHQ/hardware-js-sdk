@@ -573,7 +573,6 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
           platform: 'web',
         });
 
-        // For desktop-web-ble mode, we need to pass the connectId
         const deviceId = selectDevice.connectId;
         console.log('Using device ID for firmware update:', deviceId);
 
@@ -677,7 +676,7 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
           )}
           {selectDevice && selectDevice.state === 'disconnected' && (
             <MessageBox
-              message={`Device "${selectDevice.name}" shows as disconnected. In desktop-web-ble mode, this is normal - the device can still communicate via Bluetooth.`}
+              message={`Device "${selectDevice.name}" is disconnected. Reconnect it and search again.`}
             />
           )}
         </Stack>

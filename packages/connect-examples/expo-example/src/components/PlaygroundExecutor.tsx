@@ -35,7 +35,6 @@ const PlaygroundExecutor: React.FC<PlaygroundExecutorProps> = ({
       if (!sdk) return intl.formatMessage({ id: 'tip__sdk_not_ready' });
 
       const connectId = selectedDevice?.connectId ?? '';
-      // @ts-expect-error
       const deviceId = selectedDevice?.features?.deviceId ?? '';
       const { method } = methodPayload;
       // setIsLoading(true);
