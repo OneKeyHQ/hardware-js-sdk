@@ -54,11 +54,13 @@ import type {
 const Log = getLogger(LoggerNames.Method);
 
 const SESSION_ERROR = 'session not found';
-const PROTOCOL_V2_BOOTLOADER_RECONNECT_TIMEOUT = 60 * 1000;
-const PROTOCOL_V2_FINAL_RECONNECT_TIMEOUT = 2 * 60 * 1000;
+const PROTOCOL_V2_BOOTLOADER_RECONNECT_TIMEOUT = 90 * 1000;
+const PROTOCOL_V2_FINAL_RECONNECT_TIMEOUT = 3 * 60 * 1000;
 const PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT = 5 * 1000;
+const PROTOCOL_V2_FIRMWARE_STATUS_RESPONSE_TIMEOUT = 15 * 1000;
 const PROTOCOL_V2_START_UPDATE_TIMEOUT = 3 * 60 * 1000;
-const PROTOCOL_V2_INSTALL_TIMEOUT = 5 * 60 * 1000;
+const PROTOCOL_V2_INSTALL_TIMEOUT = 8 * 60 * 1000;
+const PROTOCOL_V2_MISSING_TARGET_STATUS_GRACE_TIMEOUT = 30 * 1000;
 const PROTOCOL_V2_TARGET_STATUS_PENDING = 0;
 const PROTOCOL_V2_TARGET_STATUS_IN_PROGRESS = 1;
 const PROTOCOL_V2_TARGET_STATUS_FINISHED = 2;
@@ -69,7 +71,7 @@ const PROTOCOL_V2_MIN_FILE_CHUNK_SIZE = 64;
 const PROTOCOL_V2_CONNECT_RETRY_COUNT = 10;
 const PROTOCOL_V2_CONNECT_POLL_INTERVAL = 500;
 const PROTOCOL_V2_CONNECT_SINGLE_TIMEOUT = 75 * 1000;
-const PROTOCOL_V2_DEVICE_INFO_READY_TIMEOUT = 60 * 1000;
+const PROTOCOL_V2_DEVICE_INFO_READY_TIMEOUT = 30 * 1000;
 const PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT = 3;
 const PROTOCOL_V2_OKPP_HEADER_SIZE = 0x52a0;
 const PROTOCOL_V2_OKPP_PAYLOAD_HASH_OFFSET = 0x200;
@@ -573,6 +575,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       ...(resourceBundles?.length ? { resourceBundles } : undefined),
     });
 
+    this.postTipMessage(FirmwareUpdateTipMessage.SwitchFirmwareReconnectDevice);
     await this.exitProtocolV2BootloaderToNormal();
 
     const versions = await this.waitForProtocolV2FinalFeatures();
@@ -605,10 +608,16 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     );
   }
 
+  private getProtocolV2DeviceInfoTimeout() {
+    return this.isBleReconnect()
+      ? this.payload.protocolV2DeviceInfoTimeoutMs ?? PROTOCOL_V2_DEVICE_INFO_READY_TIMEOUT
+      : PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT;
+  }
+
   private async requestProtocolV2PhysicalIdentity() {
     return requestProtocolV2DeviceInfo({
       commands: this.device.getCommands(),
-      timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
+      timeoutMs: this.getProtocolV2DeviceInfoTimeout(),
     });
   }
 
@@ -987,13 +996,17 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   ) {
     const startTime = Date.now();
     let lastError: unknown;
+    let shouldReconnect = true;
 
     while (Date.now() - startTime < timeout) {
       try {
-        await this.reconnectProtocolV2Device();
+        if (shouldReconnect) {
+          await this.reconnectProtocolV2Device();
+          shouldReconnect = false;
+        }
         const deviceInfo = await requestProtocolV2DeviceInfo({
           commands: this.device.getCommands(),
-          timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
+          timeoutMs: this.getProtocolV2DeviceInfoTimeout(),
         });
         this.assertProtocolV2DeviceInfoIdentity(deviceInfo);
         const features = await this.device.probeProtocolV2RuntimeState(
@@ -1008,6 +1021,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         if (this.isProtocolV2ReconnectIdentityError(error)) {
           throw error;
         }
+        shouldReconnect = true;
         lastError = error;
         Log.log('Protocol V2 bootloader mode not ready, polling reconnect: ', error);
       }
@@ -1249,17 +1263,43 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return false;
   }
 
+  private getProtocolV2MissingTargetIds(
+    statusTargets: ProtocolV2FirmwareUpdateStatusTarget[],
+    expectedTargetIds: Set<number>
+  ) {
+    const reportedTargetIds = new Set<number>();
+    statusTargets.forEach(target => {
+      const targetId = normalizeProtocolV2TargetId(target.target_id);
+      if (targetId !== undefined) {
+        reportedTargetIds.add(targetId);
+      }
+    });
+    return Array.from(expectedTargetIds).filter(targetId => !reportedTargetIds.has(targetId));
+  }
+
   private async waitForProtocolV2FirmwareUpdateComplete(
     targets: Array<{ target_id: number; path: string }>
   ) {
     const expectedTargetIds = new Set(targets.map(target => target.target_id));
     const startTime = Date.now();
     let lastError: unknown;
+    let shouldReconnect = true;
+    let deviceInfo: ProtocolV2DeviceInfo | undefined;
+    let missingTargetStatusSince: number | undefined;
+    let missingTargetStatusKey: string | undefined;
+    const resetMissingTargetStatusGrace = () => {
+      missingTargetStatusSince = undefined;
+      missingTargetStatusKey = undefined;
+    };
 
     while (Date.now() - startTime < PROTOCOL_V2_INSTALL_TIMEOUT) {
       try {
-        await this.reconnectProtocolV2Device();
-        const deviceInfo = await this.verifyProtocolV2ReconnectIdentity();
+        if (shouldReconnect) {
+          await this.reconnectProtocolV2Device();
+          deviceInfo = await this.verifyProtocolV2ReconnectIdentity();
+          shouldReconnect = false;
+        }
+        const currentDeviceInfo = deviceInfo;
         try {
           const statusResponse = await this.device.getCommands().typedCall(
             'DeviceFirmwareUpdateStatusGet',
@@ -1271,17 +1311,57 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
                 path: true,
               },
             },
-            { timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT }
+            { timeoutMs: PROTOCOL_V2_FIRMWARE_STATUS_RESPONSE_TIMEOUT }
           );
-          if (
-            this.assertProtocolV2TargetStatus(
-              (statusResponse.message.records ?? []) as ProtocolV2FirmwareUpdateStatusTarget[],
-              expectedTargetIds
-            )
-          ) {
+          const statusTargets = (statusResponse.message.records ??
+            []) as ProtocolV2FirmwareUpdateStatusTarget[];
+          if (this.assertProtocolV2TargetStatus(statusTargets, expectedTargetIds)) {
             return;
           }
-          lastError = new Error('Protocol V2 firmware targets are still installing');
+
+          if (
+            statusTargets.length === 0 &&
+            currentDeviceInfo &&
+            (await this.probeProtocolV2NormalMode(currentDeviceInfo))
+          ) {
+            Log.log(
+              '[FirmwareUpdateV4] empty firmware status after confirmed App reboot; update complete'
+            );
+            this.postProgressMessage(100, 'installingFirmware');
+            return;
+          }
+
+          const missingTargetIds = this.getProtocolV2MissingTargetIds(
+            statusTargets,
+            expectedTargetIds
+          );
+          if (missingTargetIds.length > 0) {
+            const now = Date.now();
+            const missingKey = missingTargetIds.join(',');
+            if (missingTargetStatusSince === undefined || missingTargetStatusKey !== missingKey) {
+              missingTargetStatusSince = now;
+              missingTargetStatusKey = missingKey;
+            } else if (
+              now - missingTargetStatusSince >=
+              PROTOCOL_V2_MISSING_TARGET_STATUS_GRACE_TIMEOUT
+            ) {
+              const reportedTargetIds = statusTargets
+                .map(target => normalizeProtocolV2TargetId(target.target_id))
+                .filter((targetId): targetId is number => targetId !== undefined);
+              throw ERRORS.TypedError(
+                HardwareErrorCode.FirmwareError,
+                `Protocol V2 firmware status is missing requested records: targetIds=${missingKey} reportedTargetIds=${reportedTargetIds.join(
+                  ','
+                )}`
+              );
+            }
+            lastError = new Error(
+              `Protocol V2 firmware status is temporarily missing targetIds=${missingKey}`
+            );
+          } else {
+            resetMissingTargetStatusGrace();
+            lastError = new Error('Protocol V2 firmware targets are still installing');
+          }
         } catch (error) {
           if (
             error instanceof HardwareError &&
@@ -1289,19 +1369,31 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           ) {
             throw error;
           }
+          // Only consecutive full status dumps can prove that a record is absent.
+          // A reboot or transport interruption starts a fresh grace window.
+          resetMissingTargetStatusGrace();
           // App firmware does not register DeviceFirmwareUpdateStatusGet. Treat the
           // missing endpoint as completion only after the runtime probe confirms App mode.
           if (isProtocolV2FirmwareStatusEndpointUnavailable(error)) {
-            if (await this.probeProtocolV2NormalMode(deviceInfo)) {
+            if (!currentDeviceInfo) {
+              throw ERRORS.TypedError(
+                HardwareErrorCode.RuntimeError,
+                'Protocol V2 device identity is unavailable during install polling'
+              );
+            }
+            if (await this.probeProtocolV2NormalMode(currentDeviceInfo)) {
               Log.log(
                 '[FirmwareUpdateV4] firmware status endpoint unavailable after confirmed App reboot'
               );
+              this.postProgressMessage(100, 'installingFirmware');
               return;
             }
             lastError = new Error(
               'Protocol V2 firmware status endpoint is unavailable while the device remains in loader mode'
             );
           } else {
+            shouldReconnect = true;
+            deviceInfo = undefined;
             lastError = error;
             Log.log(
               '[FirmwareUpdateV4] DeviceFirmwareUpdateStatusGet unavailable during install: ',
@@ -1317,6 +1409,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         if (error instanceof HardwareError && error.errorCode === HardwareErrorCode.FirmwareError) {
           throw error;
         }
+        shouldReconnect = true;
+        deviceInfo = undefined;
+        resetMissingTargetStatusGrace();
         Log.log('Protocol V2 firmware install device readiness probe failed: ', error);
       }
       await wait(1000);
@@ -1324,15 +1419,23 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
     throw ERRORS.TypedError(
       HardwareErrorCode.RuntimeError,
-      `Protocol V2 firmware update status timeout: ${this.normalizeErrorMessage(lastError)}`
+      `Protocol V2 firmware update status not complete within ${
+        PROTOCOL_V2_INSTALL_TIMEOUT / 1000
+      }s: ${this.normalizeErrorMessage(lastError)}`
     );
   }
 
   private async exitProtocolV2BootloaderToNormal() {
     await this.reconnectProtocolV2Device();
-    await this.verifyProtocolV2ReconnectIdentity();
-    // The connection may still be in bootloader. Request a Normal reboot directly;
-    // repeating it after an automatic App reboot is idempotent.
+    const deviceInfo = await this.verifyProtocolV2ReconnectIdentity();
+    try {
+      if (await this.probeProtocolV2NormalMode(deviceInfo)) {
+        Log.log('[FirmwareUpdateV4] device already returned to App mode; skip Normal reboot');
+        return;
+      }
+    } catch (error) {
+      Log.log('[FirmwareUpdateV4] unable to confirm App mode before Normal reboot: ', error);
+    }
     await this.protocolV2Reboot(DeviceRebootType.Normal);
   }
 
@@ -1372,13 +1475,17 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   private async waitForProtocolV2ReconnectAndFeatures(timeout: number) {
     const startTime = Date.now();
     let lastError: unknown;
+    let shouldReconnect = true;
 
     while (Date.now() - startTime < timeout) {
       try {
-        await this.reconnectProtocolV2Device();
+        if (shouldReconnect) {
+          await this.reconnectProtocolV2Device();
+          shouldReconnect = false;
+        }
         const deviceInfo = await requestProtocolV2DeviceInfo({
           commands: this.device.getCommands(),
-          timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
+          timeoutMs: this.getProtocolV2DeviceInfoTimeout(),
           // Completion needs target versions only; keep scope aligned with the request.
           request: PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST,
         });
@@ -1387,21 +1494,22 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           deviceInfo,
           PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT
         );
-        if (features.mode !== 'normal' || features.bootloaderMode) {
-          throw ERRORS.TypedError(
-            HardwareErrorCode.DeviceNotFound,
-            'Protocol V2 device is still in bootloader mode'
-          );
+        if (features.mode === 'normal' && !features.bootloaderMode) {
+          return features;
         }
-        return features;
+        lastError = ERRORS.TypedError(
+          HardwareErrorCode.DeviceNotFound,
+          'Protocol V2 device is still in bootloader mode'
+        );
       } catch (error) {
         if (this.isProtocolV2ReconnectIdentityError(error)) {
           throw error;
         }
+        shouldReconnect = true;
         lastError = error;
         Log.log('Protocol V2 normal mode not ready, polling Ping: ', error);
-        await wait(1000);
       }
+      await wait(1000);
     }
 
     throw ERRORS.TypedError(

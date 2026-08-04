@@ -125,6 +125,51 @@ describe('DeviceCommands failure mapping', () => {
     expect(JSON.stringify(log.messages)).not.toContain('secret-wallet-address');
   });
 
+  it('logs the sanitized DeviceFirmwareUpdateStatus response payload', async () => {
+    const commands = createCommands();
+    const log = getLogger(LoggerNames.DeviceCommands);
+    log.messages.length = 0;
+
+    await expect(
+      commands._filterCommonTypes(
+        {
+          type: 'DeviceFirmwareUpdateStatus',
+          message: {
+            records: [
+              {
+                target_id: 4,
+                status: 2,
+                payload_version: 0x010203,
+                path: 'vol0:/application_p1.bin',
+              },
+            ],
+          },
+        } as any,
+        'DeviceFirmwareUpdateStatusGet'
+      )
+    ).resolves.toMatchObject({ type: 'DeviceFirmwareUpdateStatus' });
+
+    expect(log.messages.at(-1)?.message).toEqual([
+      '_filterCommonTypes: ',
+      {
+        request: 'DeviceFirmwareUpdateStatusGet',
+        response: {
+          type: 'DeviceFirmwareUpdateStatus',
+          message: {
+            records: [
+              {
+                target_id: 4,
+                status: 2,
+                payload_version: 0x010203,
+                path: 'vol0:/application_p1.bin',
+              },
+            ],
+          },
+        },
+      },
+    ]);
+  });
+
   it('maps an invalid DeviceSessionGet resume to WalletSessionInvalid', async () => {
     const commands = createCommands();
 

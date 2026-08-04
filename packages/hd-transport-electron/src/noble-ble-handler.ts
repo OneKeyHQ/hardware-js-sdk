@@ -15,6 +15,7 @@ import {
   createKnownBleUuidAliases,
   hasOnekeyCommunicationService,
   isOnekeyBluetoothDevice,
+  isPro2FindMyAdvertisementName,
   matchesKnownBleUuid,
   wait,
 } from '@onekeyfe/hd-shared';
@@ -93,11 +94,19 @@ const ABORTABLE_WRITE_ERROR_PATTERNS = [
 
 function isOneKeyPeripheral(peripheral: Peripheral) {
   const serviceUuids = peripheral.advertisement?.serviceUuids;
+  const localName = peripheral.advertisement?.localName;
+
+  // Noble localName is the current advertisement name, so reject the Pro2
+  // Find My endpoint before the communication-service fast path accepts it.
+  if (isPro2FindMyAdvertisementName(localName)) {
+    return false;
+  }
+
   return (
     hasOnekeyCommunicationService(serviceUuids) &&
     isOnekeyBluetoothDevice({
       id: peripheral.id,
-      localName: peripheral.advertisement?.localName,
+      localName,
       serviceUuids,
     })
   );

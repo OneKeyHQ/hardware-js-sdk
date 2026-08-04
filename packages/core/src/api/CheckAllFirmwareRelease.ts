@@ -94,6 +94,7 @@ function buildComponentRelease({
   component,
   currentVersions,
   currentVerification,
+  checkFirmwareHash,
   remotePayloadHash,
   releaseRequired,
 }: {
@@ -101,6 +102,7 @@ function buildComponentRelease({
   component: IProtocolV2FirmwareComponent;
   currentVersions: DeviceStateVersions;
   currentVerification: Partial<DeviceFeaturesVerify>;
+  checkFirmwareHash: boolean;
   remotePayloadHash: string | null | undefined;
   releaseRequired: boolean;
 }): ProtocolV2FirmwareComponentRelease {
@@ -129,7 +131,7 @@ function buildComponentRelease({
       status = 'valid';
     } else {
       const currentHashKey = CURRENT_HASH_BY_COMPONENT_TARGET[componentTarget];
-      if (!currentHashKey) {
+      if (!checkFirmwareHash || !currentHashKey) {
         status = 'valid';
       } else {
         const currentHash = normalizeHex(currentVerification[currentHashKey]);
@@ -168,12 +170,14 @@ type ProtocolV2FirmwareReleasePlan = {
 export function buildProtocolV2FirmwareRelease({
   currentVersions,
   currentVerification = {},
+  checkFirmwareHash = false,
   remotePayloadHashes = {},
   firmwareType,
   release,
 }: {
   currentVersions: DeviceStateVersions;
   currentVerification?: Partial<DeviceFeaturesVerify>;
+  checkFirmwareHash?: boolean;
   remotePayloadHashes?: Readonly<Record<string, string | null>>;
   firmwareType: EFirmwareType;
   release: IFirmwareReleaseInfo | undefined;
@@ -197,6 +201,7 @@ export function buildProtocolV2FirmwareRelease({
       component,
       currentVersions,
       currentVerification,
+      checkFirmwareHash,
       remotePayloadHash: Object.prototype.hasOwnProperty.call(remotePayloadHashes, configKey)
         ? remotePayloadHashes[configKey]
         : normalizeHex(component.payloadHash),
@@ -314,8 +319,12 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
   }
 
   private async runProtocolV2(): Promise<AllFirmwareRelease> {
+    const { checkFirmwareHash = false, firmwareType: firmwareTypeParam } = this
+      .payload as CheckAllFirmwareReleaseParams;
     const state = await this.device.getDeviceState({
-      refreshSections: ['identity', 'versions', 'verification'],
+      refreshSections: checkFirmwareHash
+        ? ['identity', 'versions', 'verification']
+        : ['identity', 'versions'],
     });
     if (state.identity.deviceType !== 'pro2') {
       throw ERRORS.TypedError(
@@ -332,13 +341,13 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
       );
     }
 
-    const { firmwareType: firmwareTypeParam } = this.payload as CheckAllFirmwareReleaseParams;
     const firmwareType =
       firmwareTypeParam ?? state.identity.firmwareType ?? EFirmwareType.Universal;
     const release = DataManager.getFirmwareLatestRelease(features, firmwareType);
     const plan = buildProtocolV2FirmwareRelease({
       currentVersions: state.versions,
-      currentVerification: state.verification,
+      currentVerification: checkFirmwareHash ? state.verification : undefined,
+      checkFirmwareHash,
       firmwareType,
       release,
     });

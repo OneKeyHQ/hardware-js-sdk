@@ -68,6 +68,7 @@ export type AllFirmwareRelease = {
 
 export type CheckAllFirmwareReleaseParams = {
   checkBridgeRelease?: boolean;
+  checkFirmwareHash?: boolean;
   firmwareType?: EFirmwareType;
 };
 

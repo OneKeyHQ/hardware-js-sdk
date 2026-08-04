@@ -157,7 +157,7 @@ export const PROTOCOL_V2_FULL_DEVICE_INFO_REQUEST = {
 };
 
 export const PROTOCOL_V2_DEVICE_INFO_REQUEST = PROTOCOL_V2_FULL_DEVICE_INFO_REQUEST;
-export const PROTOCOL_V2_DEVICE_INFO_TIMEOUT_MS = 10 * 1000;
+export const PROTOCOL_V2_DEVICE_INFO_TIMEOUT_MS = 30 * 1000;
 
 export async function requestProtocolV2ProtocolInfo({
   commands,

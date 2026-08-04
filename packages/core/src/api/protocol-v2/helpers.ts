@@ -118,6 +118,7 @@ export const isProtocolV2DeviceDisconnectedError = (error: unknown) => {
     message.includes('connection has timed out unexpectedly') ||
     message.includes('connection error has occured') ||
     message.includes('connection error has occurred') ||
+    message.includes('react native ble transport released') ||
     message.includes('multiplatformbleadapter') ||
     message.includes('multipalformebleadapter') ||
     compactMessage.includes('rxerrorerror6') ||

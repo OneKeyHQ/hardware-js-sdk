@@ -435,7 +435,13 @@ export class DeviceCommands {
       if (!shouldReduceDebugForCall(callType)) {
         Log.debug('_filterCommonTypes: ', {
           request: callType,
-          response: res.type,
+          response:
+            callType === 'DeviceFirmwareUpdateStatusGet'
+              ? {
+                  type: res.type,
+                  message: getSafeTransportLogPayload(res.message, res.type),
+                }
+              : res.type,
         });
       }
     } catch (error) {

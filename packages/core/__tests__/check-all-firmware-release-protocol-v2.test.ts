@@ -210,6 +210,7 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
         applicationP1Hash: 'aa'.repeat(32),
         applicationP2Hash: 'bb'.repeat(32),
       },
+      checkFirmwareHash: true,
       remotePayloadHashes: {
         applicationP1: 'aa'.repeat(64),
         applicationP2: 'cc'.repeat(64),
@@ -225,6 +226,37 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
         { configKey: 'applicationP1', status: 'valid' },
         { configKey: 'applicationP2', status: 'outdated' },
       ],
+    });
+  });
+
+  test('uses version-only comparison for same-version packages by default', () => {
+    const packageSet: IFirmwareReleaseInfo = {
+      ...release,
+      required: false,
+      resourceBundles: undefined,
+      installOrder: ['applicationP1'],
+      components: {
+        applicationP1: {
+          target: 'APPLICATION_P1',
+          version: [1, 0, 0],
+          url: 'https://example.com/application-p1.okpkg',
+          payloadHash: 'cc'.repeat(64),
+        },
+      },
+    };
+
+    expect(
+      buildProtocolV2FirmwareRelease({
+        currentVersions: { ...currentVersions, applicationP1: '1.0.0' },
+        currentVerification: { applicationP1Hash: 'aa'.repeat(32) },
+        firmwareType: EFirmwareType.Universal,
+        release: packageSet,
+      })
+    ).toMatchObject({
+      status: 'valid',
+      hasUpgrade: false,
+      targetsToUpdate: [],
+      components: [{ configKey: 'applicationP1', status: 'valid' }],
     });
   });
 
@@ -248,6 +280,7 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
       buildProtocolV2FirmwareRelease({
         currentVersions: { ...currentVersions, applicationP1: '1.0.0' },
         currentVerification: { applicationP1Hash: 'aa'.repeat(32) },
+        checkFirmwareHash: true,
         firmwareType: EFirmwareType.Universal,
         release: packageSet,
       })
@@ -283,6 +316,7 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
     const result = buildProtocolV2FirmwareRelease({
       currentVersions,
       currentVerification: { applicationP1Hash: 'aa'.repeat(32) },
+      checkFirmwareHash: true,
       remotePayloadHashes: { applicationP1: 'cc'.repeat(64) },
       firmwareType: EFirmwareType.Universal,
       release: packageSet,
@@ -332,7 +366,58 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
       },
     });
     expect(typedCall).not.toHaveBeenCalled();
+    expect(getDeviceState).toHaveBeenCalledWith({
+      refreshSections: ['identity', 'versions'],
+    });
     expect(method.getSupportedProtocols()).toEqual(['V1', 'V2']);
+  });
+
+  test('requests and compares firmware hashes only when explicitly enabled', async () => {
+    const packageSet: IFirmwareReleaseInfo = {
+      ...release,
+      required: false,
+      resourceBundles: undefined,
+      installOrder: ['applicationP1'],
+      components: {
+        applicationP1: {
+          target: 'APPLICATION_P1',
+          version: [1, 0, 0],
+          url: 'https://example.com/application-p1.okpkg',
+          payloadHash: 'cc'.repeat(64),
+        },
+      },
+    };
+    const method = new CheckAllFirmwareRelease({
+      id: 1,
+      payload: {
+        method: 'checkAllFirmwareRelease',
+        firmwareType: EFirmwareType.Universal,
+        checkFirmwareHash: true,
+      },
+    });
+    method.init();
+    const getDeviceState = jest.fn().mockResolvedValue({
+      identity: { deviceType: 'pro2', firmwareType: EFirmwareType.Universal },
+      status: { mode: 'normal' },
+      versions: { ...currentVersions, applicationP1: '1.0.0' },
+      verification: { applicationP1Hash: 'aa'.repeat(32) },
+    });
+    method.device = {
+      isProtocolV2: () => true,
+      features: { deviceType: 'pro2', firmwareVersion: '1.0.0' },
+      getDeviceState,
+      getCommands: () => ({ typedCall: jest.fn() }),
+    } as unknown as CheckAllFirmwareRelease['device'];
+    jest.spyOn(DataManager, 'getFirmwareLatestRelease').mockReturnValue(packageSet);
+    jest.spyOn(DataManager, 'getProtocolV2Resources').mockReturnValue(undefined);
+
+    await expect(method.run()).resolves.toMatchObject({
+      status: 'outdated',
+      targetsToUpdate: ['app_v1'],
+    });
+    expect(getDeviceState).toHaveBeenCalledWith({
+      refreshSections: ['identity', 'versions', 'verification'],
+    });
   });
 
   test.each(['bootloader', 'romloader'] as const)(
@@ -375,12 +460,14 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
     const api = createCoreApi(call as CoreApi['call']) as CoreApi;
 
     await api.checkAllFirmwareRelease('pro2-connect-id', {
+      checkFirmwareHash: true,
       firmwareType: EFirmwareType.Universal,
       retryCount: 0,
     });
 
     expect(call).toHaveBeenCalledWith({
       connectId: 'pro2-connect-id',
+      checkFirmwareHash: true,
       firmwareType: EFirmwareType.Universal,
       retryCount: 0,
       method: 'checkAllFirmwareRelease',

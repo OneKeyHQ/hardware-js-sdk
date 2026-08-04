@@ -2456,11 +2456,7 @@ describe('Protocol V2 feature adapter', () => {
 
     expect(typedCall).toHaveBeenCalledWith('DeviceStatusGet', 'DeviceStatus', {});
     expect(typedCall).toHaveBeenCalledWith('LockDevice', 'Success', {});
-    expect(typedCall).not.toHaveBeenCalledWith(
-      'DeviceSessionAskPin',
-      'Success',
-      expect.anything()
-    );
+    expect(typedCall).not.toHaveBeenCalledWith('DeviceSessionAskPin', 'Success', expect.anything());
     expect(typedCall).not.toHaveBeenCalledWith(
       'DeviceSessionAskPassphrase',
       'Success',
@@ -2511,7 +2507,9 @@ describe('Protocol V2 feature adapter', () => {
       on_device: false,
     });
     expect(typedCall).toHaveBeenCalledWith('DeviceStatusGet', 'DeviceStatus', {});
-    expect(typedCall.mock.calls.filter(([request]) => request === 'DeviceStatusGet')).toHaveLength(2);
+    expect(typedCall.mock.calls.filter(([request]) => request === 'DeviceStatusGet')).toHaveLength(
+      2
+    );
     expect(typedCall).not.toHaveBeenCalledWith('DeviceSessionAskPin', 'Success', expect.anything());
   });
 
@@ -3929,7 +3927,7 @@ describe('Protocol V2 firmware update targets', () => {
           specific: true,
         },
       },
-      { timeoutMs: 5000 }
+      { timeoutMs: 30000 }
     );
     expect(typedCall).toHaveBeenCalledTimes(3);
     expect(typedCall.mock.calls.map(call => call[0])).toEqual([
@@ -3991,6 +3989,7 @@ describe('Protocol V2 firmware update targets', () => {
       ],
       bootloaderBinary: null,
     });
+    expect(method.postTipMessage).toHaveBeenCalledWith('SwitchFirmwareReconnectDevice');
   });
 
   test('enters Protocol V2 bootloader before reading and downloading remote resources', async () => {
@@ -4571,7 +4570,9 @@ describe('Protocol V2 firmware update targets', () => {
     });
     method.postTipMessage = jest.fn();
     (method as any).reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
-    (method as any).verifyProtocolV2ReconnectIdentity = jest.fn().mockResolvedValue(undefined);
+    const deviceInfo = { hw: { serial_no: 'PRO2-PHYSICAL-1' } };
+    (method as any).verifyProtocolV2ReconnectIdentity = jest.fn().mockResolvedValue(deviceInfo);
+    (method as any).probeProtocolV2NormalMode = jest.fn().mockResolvedValue(false);
     (method as any).protocolV2Reboot = jest.fn().mockResolvedValue({
       message: 'Device rebooted successfully',
     });
@@ -4580,7 +4581,27 @@ describe('Protocol V2 firmware update targets', () => {
 
     expect(method.postTipMessage).not.toHaveBeenCalledWith('SwitchFirmwareReconnectDevice');
     expect((method as any).reconnectProtocolV2Device).toHaveBeenCalledTimes(1);
+    expect((method as any).probeProtocolV2NormalMode).toHaveBeenCalledWith(deviceInfo);
     expect((method as any).protocolV2Reboot).toHaveBeenCalledWith(DeviceRebootType.Normal);
+  });
+
+  test('skips a second Normal reboot after Pro2 already returned to App mode', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const deviceInfo = { hw: { serial_no: 'PRO2-PHYSICAL-1' } };
+    (method as any).reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
+    (method as any).verifyProtocolV2ReconnectIdentity = jest.fn().mockResolvedValue(deviceInfo);
+    (method as any).probeProtocolV2NormalMode = jest.fn().mockResolvedValue(true);
+    (method as any).protocolV2Reboot = jest.fn();
+
+    await (method as any).exitProtocolV2BootloaderToNormal();
+
+    expect((method as any).probeProtocolV2NormalMode).toHaveBeenCalledWith(deviceInfo);
+    expect((method as any).protocolV2Reboot).not.toHaveBeenCalled();
   });
 
   test('treats iOS BLE RxError 6 during Protocol V2 reboot as expected disconnect', async () => {
@@ -4623,6 +4644,27 @@ describe('Protocol V2 firmware update targets', () => {
     await expect((method as any).protocolV2Reboot(DeviceRebootType.Normal)).resolves.toEqual({
       message: 'Device rebooted successfully',
     });
+  });
+
+  test('treats Android BLE transport release during Protocol V2 reboot as expected', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const typedCall = jest.fn().mockRejectedValue(new Error('React Native BLE transport released'));
+
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+    });
+
+    await expect((method as any).protocolV2Reboot(DeviceRebootType.Bootloader)).resolves.toEqual({
+      message: 'Device rebooted successfully',
+    });
+    expect((method as any).device.markProtocolV2Reboot).toHaveBeenCalledWith(
+      DeviceRebootType.Bootloader
+    );
   });
 
   test('requires an explicit Protocol V2 update ACK before entering install state', async () => {
@@ -4715,7 +4757,7 @@ describe('Protocol V2 firmware update targets', () => {
       { target_id: 4, path: 'vol0:/application_p1.bin' },
     ]);
 
-    expect(reconnectProtocolV2Device).toHaveBeenCalledTimes(3);
+    expect(reconnectProtocolV2Device).toHaveBeenCalledTimes(2);
     expect(typedCall.mock.calls.map(call => call[0])).toEqual([
       'DeviceFirmwareUpdateStatusGet',
       'DeviceFirmwareUpdateStatusGet',
@@ -4753,6 +4795,46 @@ describe('Protocol V2 firmware update targets', () => {
     expect(reconnectProtocolV2Device).toHaveBeenCalledTimes(1);
     expect(typedCall.mock.calls.map(call => call[0])).toEqual(['DeviceFirmwareUpdateStatusGet']);
     expect((method as any).probeProtocolV2NormalMode).toHaveBeenCalledWith(deviceInfo);
+    expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'installingFirmware');
+  });
+
+  test('accepts an empty firmware status dump only after confirming normal mode', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const typedCall = jest.fn().mockResolvedValue({
+      type: 'DeviceFirmwareUpdateStatus',
+      message: { records: [] },
+    });
+    const deviceInfo = { hw: { serial_no: 'PRO2-PHYSICAL-1' } };
+    let now = 0;
+    jest.spyOn(Date, 'now').mockImplementation(() => now);
+    jest.spyOn(global, 'setTimeout').mockImplementation(((callback: () => void) => {
+      now += 31 * 1000;
+      callback();
+      return 0 as any;
+    }) as typeof setTimeout);
+
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+    });
+    (method as any).reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
+    (method as any).verifyProtocolV2ReconnectIdentity = jest.fn().mockResolvedValue(deviceInfo);
+    (method as any).probeProtocolV2NormalMode = jest.fn().mockResolvedValue(true);
+    method.postProgressMessage = jest.fn();
+
+    await expect(
+      (method as any).waitForProtocolV2FirmwareUpdateComplete([
+        { target_id: 4, path: 'vol0:/application_p1.bin' },
+      ])
+    ).resolves.toBeUndefined();
+
+    expect(typedCall).toHaveBeenCalledTimes(1);
+    expect((method as any).probeProtocolV2NormalMode).toHaveBeenCalledWith(deviceInfo);
+    expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'installingFirmware');
   });
 
   test.each([
@@ -4858,6 +4940,151 @@ describe('Protocol V2 firmware update targets', () => {
       expect.anything()
     );
     expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'installingFirmware');
+  });
+
+  test('fails clearly when a requested target stays absent from the full status dump', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const typedCall = jest.fn().mockResolvedValue({
+      type: 'DeviceFirmwareUpdateStatus',
+      message: {
+        records: [{ target_id: 4, status: 2 }],
+      },
+    });
+    let now = 0;
+    jest.spyOn(Date, 'now').mockImplementation(() => now);
+    jest.spyOn(global, 'setTimeout').mockImplementation(((callback: () => void) => {
+      now += 31 * 1000;
+      callback();
+      return 0 as any;
+    }) as typeof setTimeout);
+
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+    });
+    (method as any).reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
+    (method as any).verifyProtocolV2ReconnectIdentity = jest.fn().mockResolvedValue(undefined);
+    method.postProgressMessage = jest.fn();
+
+    await expect(
+      (method as any).waitForProtocolV2FirmwareUpdateComplete([
+        { target_id: 3, path: 'vol0:/bootloader.bin' },
+        { target_id: 4, path: 'vol0:/application_p1.bin' },
+      ])
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.FirmwareError,
+      message: expect.stringContaining('targetIds=3'),
+    });
+    expect(typedCall).toHaveBeenCalledTimes(2);
+  });
+
+  test('resets the missing-record grace period after a Pro2 reboot interruption', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce({
+        type: 'DeviceFirmwareUpdateStatus',
+        message: { records: [{ target_id: 4, status: 2 }] },
+      })
+      .mockRejectedValueOnce(new Error('Pro2 is rebooting'))
+      .mockResolvedValueOnce({
+        type: 'DeviceFirmwareUpdateStatus',
+        message: { records: [{ target_id: 4, status: 2 }] },
+      })
+      .mockResolvedValueOnce({
+        type: 'DeviceFirmwareUpdateStatus',
+        message: {
+          records: [
+            { target_id: 3, status: 2 },
+            { target_id: 4, status: 2 },
+          ],
+        },
+      });
+    const reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
+    let now = 0;
+    jest.spyOn(Date, 'now').mockImplementation(() => now);
+    jest.spyOn(global, 'setTimeout').mockImplementation(((callback: () => void) => {
+      now += 31 * 1000;
+      callback();
+      return 0 as any;
+    }) as typeof setTimeout);
+
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+    });
+    (method as any).reconnectProtocolV2Device = reconnectProtocolV2Device;
+    (method as any).verifyProtocolV2ReconnectIdentity = jest.fn().mockResolvedValue(undefined);
+    method.postProgressMessage = jest.fn();
+
+    await expect(
+      (method as any).waitForProtocolV2FirmwareUpdateComplete([
+        { target_id: 3, path: 'vol0:/bootloader.bin' },
+        { target_id: 4, path: 'vol0:/application_p1.bin' },
+      ])
+    ).resolves.toBeUndefined();
+    expect(reconnectProtocolV2Device).toHaveBeenCalledTimes(2);
+    expect(typedCall).toHaveBeenCalledTimes(4);
+  });
+
+  test('uses an eight-minute Pro2 install status window', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    jest
+      .spyOn(Date, 'now')
+      .mockReturnValueOnce(0)
+      .mockReturnValue(8 * 60 * 1000);
+
+    await expect(
+      (method as any).waitForProtocolV2FirmwareUpdateComplete([
+        { target_id: 4, path: 'vol0:/application_p1.bin' },
+      ])
+    ).rejects.toThrow('within 480s');
+  });
+
+  test('uses a 90-second Pro2 bootloader reconnect window', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    jest
+      .spyOn(Date, 'now')
+      .mockReturnValueOnce(0)
+      .mockReturnValue(90 * 1000);
+
+    await expect((method as any).waitForProtocolV2BootloaderMode()).rejects.toThrow('within 90s');
+  });
+
+  test('uses a three-minute Pro2 final reconnect window', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const waitForProtocolV2ReconnectAndFeatures = jest
+      .fn()
+      .mockRejectedValue(new Error('stop after capturing timeout'));
+    (method as any).waitForProtocolV2ReconnectAndFeatures = waitForProtocolV2ReconnectAndFeatures;
+
+    await expect((method as any).waitForProtocolV2FinalFeatures()).rejects.toThrow(
+      'stop after capturing timeout'
+    );
+    expect(waitForProtocolV2ReconnectAndFeatures).toHaveBeenCalledWith(3 * 60 * 1000);
   });
 
   test('uses SDK decoded enum names for Protocol V2 install polling', () => {
@@ -4992,7 +5219,7 @@ describe('Protocol V2 firmware update targets', () => {
           path: true,
         },
       },
-      { timeoutMs: 5000 }
+      { timeoutMs: 15000 }
     );
   });
 

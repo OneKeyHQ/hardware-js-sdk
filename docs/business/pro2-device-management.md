@@ -126,13 +126,17 @@ Protocol V1 继续使用 `firmwareUpdate` 至 `firmwareUpdateV3`；Pro2 使用 `
 5. 必要时重启进入 bootloader，并轮询确认模式。
 6. 将目标文件分片写入 `vol0:/`，再使用 PathInfo 校验大小。
 7. 一次发送包含全部待安装文件的 `DeviceFirmwareUpdateRequest`。
-8. 轮询安装状态，允许安装阶段断连、超时和重连探测。
-9. 回到 normal mode 后显式刷新 `DeviceState` 的 identity/versions。
+8. 轮询 target 安装状态，允许安装阶段断连、超时和重连探测；同一连接可用时复用当前
+   command channel，只在链路失败后重新枚举和校验物理身份。
+9. 确认设备已自动回到 normal mode 时不再重复发送 Normal reboot；随后显式刷新
+   `DeviceState` 的 identity/versions。
 
 可靠性约束：
 
 - BLE 与 WebUSB 使用不同默认 chunk，最小值为 64 字节。
 - 文件传输根据 `processed_byte` 恢复进度，总进度按全部目标字节聚合。
+- 固件未提供 target 内部百分比，安装进度只能表示已完成 target 的比例；接入方如需连续动画，
+  必须将其作为有阶段上限的估算值，不能当成设备真实进度。
 - 安装开始、安装完成和用户交互使用不同超时窗口。
 - Transport 不自动重发安装请求；重试由高层流程依据阶段和幂等性决定。
 - release 配置、SDK target 类型和固件枚举必须同步发布。
