@@ -24,7 +24,7 @@ describe('BleTransport side-effecting writes', () => {
       errorCode: BleErrorCode.DeviceDisconnected,
     });
     const writeCharacteristic = {
-      writeWithoutResponse: jest.fn(() => Promise.reject(error)),
+      writeWithResponse: jest.fn(() => Promise.reject(error)),
     };
     const device = {
       id: 'classic-id',
@@ -35,7 +35,7 @@ describe('BleTransport side-effecting writes', () => {
 
     await expect(transport.writeWithRetry('payload')).rejects.toBe(error);
 
-    expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalledTimes(1);
+    expect(writeCharacteristic.writeWithResponse).toHaveBeenCalledTimes(1);
     expect(device.connect).not.toHaveBeenCalled();
   });
 });

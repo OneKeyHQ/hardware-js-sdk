@@ -23,6 +23,7 @@ export type ProtocolV2CallContext = {
   messageName: string;
   timeoutMs?: number;
   highVolume: boolean;
+  writeWithResponse?: boolean;
   generation: number;
   signal: AbortSignal;
 };
@@ -52,6 +53,7 @@ export type ProtocolV2CallOptions = {
   expectedTypes?: string[];
   intermediateTypes?: string[];
   onIntermediateResponse?: (response: MessageFromOneKey) => void;
+  writeWithResponse?: boolean;
 };
 
 export { concatUint8Arrays, ProtocolV2FrameAssembler };
@@ -220,6 +222,9 @@ export class ProtocolV2Session {
       messageName: name,
       timeoutMs,
       highVolume: shouldReduceDebug,
+      ...(callOptions.writeWithResponse === undefined
+        ? {}
+        : { writeWithResponse: callOptions.writeWithResponse }),
       generation,
       signal: abortController.signal,
     };

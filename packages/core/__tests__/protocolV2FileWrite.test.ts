@@ -89,4 +89,43 @@ describe('writeProtocolV2File', () => {
     expect(typedCall.mock.calls[1][2]).toEqual(typedCall.mock.calls[0][2]);
     expect(onProgress).toHaveBeenCalledTimes(1);
   });
+
+  test('按确认分片的时间窗口记录实时传输速率', async () => {
+    const data = new Uint8Array(4097);
+    const typedCall = jest.fn().mockResolvedValue({ message: {} });
+    const onProgress = jest.fn();
+    const dateNowSpy = jest
+      .spyOn(Date, 'now')
+      .mockReturnValueOnce(1_000)
+      .mockReturnValueOnce(2_000)
+      .mockReturnValueOnce(3_000);
+
+    try {
+      await writeProtocolV2File({
+        commands: { typedCall } as any,
+        path: 'vol1:/wallpapers/test.bin',
+        data,
+        onProgress,
+      });
+    } finally {
+      dateNowSpy.mockRestore();
+    }
+
+    expect(onProgress).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        transferredBytes: 4000,
+        rateBytesPerSecond: 4000,
+        elapsedMs: 1000,
+      })
+    );
+    expect(onProgress).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        transferredBytes: 4097,
+        rateBytesPerSecond: 97,
+        elapsedMs: 2000,
+      })
+    );
+  });
 });

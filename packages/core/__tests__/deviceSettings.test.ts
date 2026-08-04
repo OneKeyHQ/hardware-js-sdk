@@ -1,13 +1,13 @@
 import { EDeviceType } from '@onekeyfe/hd-shared';
 
 import {
+  PROTOCOL_V2_NEVER_TIMEOUT_MS,
   getAutoLockOptions,
   getAutoShutDownOptions,
   getDeviceSettingsCapabilities,
   getLanguageConfig,
   mapLanguageFromProtocolV2,
   mapLanguageToProtocolV2,
-  PROTOCOL_V2_NEVER_TIMEOUT_MS,
 } from '../src/utils/deviceSettings';
 
 describe('Pro 2 device settings options', () => {

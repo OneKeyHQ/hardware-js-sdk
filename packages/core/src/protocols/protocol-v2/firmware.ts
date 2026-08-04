@@ -15,5 +15,7 @@ export const ProtocolV2FirmwareTargetType = {
   FW_MGMT_TARGET_SE04: 10,
 } as const;
 
+// 这里有意同时导出同名值与类型，以保持现有公共 API 不变。
+// eslint-disable-next-line @typescript-eslint/no-redeclare
 export type ProtocolV2FirmwareTargetType =
   (typeof ProtocolV2FirmwareTargetType)[keyof typeof ProtocolV2FirmwareTargetType];

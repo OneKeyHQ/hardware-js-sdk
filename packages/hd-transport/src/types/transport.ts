@@ -63,6 +63,8 @@ export type TransportCallOptions = {
   expectedTypes?: string[];
   intermediateTypes?: string[];
   onIntermediateResponse?: (response: MessageFromOneKey) => void;
+  /** Prefer acknowledged BLE characteristic writes for this call when supported. */
+  writeWithResponse?: boolean;
 };
 
 type ITransportInitFn = (

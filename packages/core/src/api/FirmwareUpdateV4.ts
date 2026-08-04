@@ -1698,17 +1698,22 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     progress: number | null
   ): Promise<TypedResponseMessage<'FilesystemFile'>> {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
-    const writeRes = await typedCall('FilesystemFileWrite', 'FilesystemFile', {
-      file: {
-        path: filePath,
-        offset,
-        total_size: totalFileSize,
-        data: chunk,
+    const writeRes = await typedCall(
+      'FilesystemFileWrite',
+      'FilesystemFile',
+      {
+        file: {
+          path: filePath,
+          offset,
+          total_size: totalFileSize,
+          data: chunk,
+        },
+        overwrite,
+        append: false,
+        ui_percentage: progress ?? undefined,
       },
-      overwrite,
-      append: false,
-      ui_percentage: progress ?? undefined,
-    });
+      { writeWithResponse: true }
+    );
     if (writeRes.type !== 'FilesystemFile') {
       if ((writeRes as any).type === 'CallMethodError') {
         if (((writeRes as any).message.error ?? '').indexOf(SESSION_ERROR) > -1) {

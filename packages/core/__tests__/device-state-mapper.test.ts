@@ -1,6 +1,6 @@
 import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
-
 import { DeviceType, Enum_SafetyCheckLevel } from '@onekeyfe/hd-transport';
+
 import {
   mapApplySettingsToState,
   mapDeviceSettingsToState,

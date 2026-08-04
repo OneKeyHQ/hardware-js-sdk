@@ -541,6 +541,17 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     await transport.release(uuid, true);
   });
 
+  test('uses withResponse for an iOS Protocol V2 firmware file write when requested', async () => {
+    const { transport, uuid, writeCharacteristic } = createHarness();
+
+    await transport.acquire({ uuid });
+
+    await transport.call(uuid, 'FileWrite', {}, { writeWithResponse: true });
+    expect(writeCharacteristic.writeWithResponse).toHaveBeenCalledTimes(1);
+    expect(writeCharacteristic.writeWithoutResponse).not.toHaveBeenCalled();
+    await transport.release(uuid, true);
+  });
+
   test('falls back to withoutResponse for an iOS Protocol V2 control call when required', async () => {
     const { transport, uuid, writeCharacteristic } = createHarness({
       isWritableWithResponse: false,

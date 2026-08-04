@@ -662,7 +662,7 @@ export class TrezorDeviceSession {
     let requestName = name;
     let requestData = data;
 
-    while (true) {
+    for (;;) {
       let response: { type: string; message: Record<string, unknown> };
       try {
         response = await this.core!.call(requestName, requestData, { thpState: this.thpState });

@@ -1223,7 +1223,7 @@ export default class ReactNativeBleTransport {
           // eslint-disable-next-line no-constant-condition
           while (true) {
             try {
-              await transport.writeCharacteristic.writeWithoutResponse(data);
+              await transport.writeCharacteristic.writeWithResponse(data);
               return;
             } catch (error) {
               const retryType = getFirmwareUploadWriteRetryType(error);
@@ -1698,9 +1698,8 @@ export default class ReactNativeBleTransport {
     assertCurrentGeneration: () => void
   ) {
     const shouldUseWriteWithResponse =
-      Platform.OS === 'ios' &&
-      !context.highVolume &&
-      transport.writeCharacteristic.isWritableWithResponse;
+      transport.writeCharacteristic.isWritableWithResponse &&
+      (context.writeWithResponse === true || (Platform.OS === 'ios' && !context.highVolume));
     let attempt = 0;
     for (;;) {
       assertCurrentGeneration();
@@ -1791,7 +1790,7 @@ export default class ReactNativeBleTransport {
       const tuning = getProtocolV2BleTuning();
       Log?.debug('[ReactNativeBleTransport] Protocol V2 high-volume write configured', {
         name,
-        writeMode: 'withoutResponse',
+        writeMode: options?.writeWithResponse ? 'withResponse' : 'withoutResponse',
         packetCapacity: Platform.OS === 'ios' ? tuning.iosPacketLength : tuning.androidPacketLength,
       });
     }

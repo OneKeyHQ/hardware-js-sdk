@@ -37,6 +37,7 @@ export type ProtocolV2FileWriteOptions = {
 };
 
 const MIN_FILE_CHUNK_SIZE = 64;
+const FILE_TRANSFER_RATE_WINDOW_MS = 1000;
 
 export function isProtocolV2ResponseTimeout(error: unknown) {
   if (!error || typeof error !== 'object') return false;
@@ -121,6 +122,9 @@ export async function writeProtocolV2File(options: ProtocolV2FileWriteOptions) {
   let chunks = 0;
   let lastMessage: Record<string, unknown> | undefined;
   const startTime = Date.now();
+  let rateWindowStartedAt = startTime;
+  let rateWindowStartedBytes = 0;
+  let rateBytesPerSecond: number | undefined;
 
   while (written < dataLength) {
     options.throwIfAborted?.();
@@ -178,14 +182,23 @@ export async function writeProtocolV2File(options: ProtocolV2FileWriteOptions) {
     written =
       rawProcessedByte === undefined ? written + chunk.byteLength : processedByte - startOffset;
     chunks += 1;
-    const elapsedMs = Date.now() - startTime;
+    const now = Date.now();
+    const elapsedMs = now - startTime;
     const transferredBytes = Math.min(written, dataLength);
+    const rateWindowElapsedMs = now - rateWindowStartedAt;
+    if (rateWindowElapsedMs >= FILE_TRANSFER_RATE_WINDOW_MS) {
+      const rateWindowBytes = Math.max(transferredBytes - rateWindowStartedBytes, 0);
+      rateBytesPerSecond = Math.round((rateWindowBytes / rateWindowElapsedMs) * 1000);
+      rateWindowStartedAt = now;
+      rateWindowStartedBytes = transferredBytes;
+    } else if (rateBytesPerSecond === undefined && elapsedMs > 0) {
+      rateBytesPerSecond = Math.round((transferredBytes / elapsedMs) * 1000);
+    }
     options.onProgress?.({
       progress: getConfirmedProgress(startOffset + written, totalSize, written, dataLength),
       transferredBytes,
       totalBytes: dataLength,
-      rateBytesPerSecond:
-        elapsedMs > 0 ? Math.round((transferredBytes / elapsedMs) * 1000) : undefined,
+      rateBytesPerSecond,
       elapsedMs,
     });
     if (options.paceMs && options.paceMs > 0) {

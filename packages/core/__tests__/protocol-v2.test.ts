@@ -6071,6 +6071,10 @@ describe('Protocol V2 firmware update targets', () => {
     expect(writePayloads.map(payload => payload.file.offset)).toEqual([0, 1800]);
     expect(writePayloads.map(payload => payload.file.data.byteLength)).toEqual([1800, 1]);
     expect(writePayloads.map(payload => payload.ui_percentage)).toEqual([0, 100]);
+    expect(typedCall.mock.calls.map(call => call[3])).toEqual([
+      { writeWithResponse: true },
+      { writeWithResponse: true },
+    ]);
   });
 
   test('ends device confirmation and starts install progress only after Protocol V2 ACK', async () => {

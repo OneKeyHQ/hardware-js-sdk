@@ -1,5 +1,4 @@
 import { EventEmitter } from 'events';
-
 import { EOneKeyBleMessageKeys } from '@onekeyfe/hd-shared';
 
 import type { WebContents } from 'electron';

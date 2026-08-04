@@ -33,6 +33,6 @@ export default class BleTransport {
   }
 
   async writeWithRetry(data: string): Promise<void> {
-    await this.writeCharacteristic.writeWithoutResponse(data);
+    await this.writeCharacteristic.writeWithResponse(data);
   }
 }
