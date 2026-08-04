@@ -364,6 +364,20 @@ function clearIdleDisconnect(deviceId: string): void {
   }
 }
 
+function broadcastToAllWebContents(channel: string, payload: unknown): void {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports, global-require
+    const { webContents: electronWebContents } = require('electron') as {
+      webContents: { getAllWebContents(): WebContents[] };
+    };
+    for (const wc of electronWebContents.getAllWebContents()) {
+      if (!wc.isDestroyed()) wc.send(channel, payload);
+    }
+  } catch (error) {
+    logger?.error('[NobleBLE] broadcast failed:', { channel, error: String(error) });
+  }
+}
+
 function armIdleDisconnect(
   deviceId: string,
   ms: number = BLE_IDLE_DISCONNECT_MS,
@@ -376,11 +390,21 @@ function armIdleDisconnect(
       idleDisconnectTimers.delete(deviceId);
       if (!connectedDevices.has(deviceId)) return;
       logger?.info('[NobleBLE] Keep-alive timeout, disconnecting device', { deviceId, reason });
-      // Fire and forget: disconnectDevice broadcasts the disconnect event, so a
-      // call still blocked on this link rejects instead of hanging.
-      disconnectDevice(deviceId).catch(error => {
-        logger?.error('[NobleBLE] Keep-alive disconnect failed', { deviceId, error });
-      });
+      const peripheral = connectedDevices.get(deviceId);
+      const deviceName = peripheral?.advertisement?.localName || 'Unknown Device';
+      disconnectDevice(deviceId)
+        .then(() => {
+          // disconnectDevice stays silent (its other caller is the renderer's
+          // own request). On the busy backstop a call IS still in flight and
+          // must reject instead of hanging on a dead link.
+          broadcastToAllWebContents(EOneKeyBleMessageKeys.BLE_DEVICE_DISCONNECTED, {
+            id: deviceId,
+            name: deviceName,
+          });
+        })
+        .catch(error => {
+          logger?.error('[NobleBLE] Keep-alive disconnect failed', { deviceId, error });
+        });
     }, ms)
   );
 }
@@ -646,6 +670,9 @@ async function transmitHexDataToDevice(
       `Device ${deviceId} not connected or characteristics not available`
     );
   }
+  // Request outstanding: swap the idle clock for the busy backstop. The
+  // renderer's logical release re-arms the 60s idle clock when it is done.
+  armIdleDisconnect(deviceId, BLE_BUSY_BACKSTOP_MS, 'busy-backstop');
 
   const toBuffer = Buffer.from(hexData, 'hex');
   const doGetWriteCharacteristic = () => deviceCharacteristics.get(deviceId)?.write;
@@ -1307,28 +1334,44 @@ async function tryDirectConnectById(deviceId: string): Promise<Peripheral | unde
   const cooldownUntil = directConnectCooldownUntil.get(deviceId) ?? 0;
   if (Date.now() < cooldownUntil) return undefined;
 
-  let timedOut = false;
   try {
-    const peripheral = await Promise.race([
-      nobleInstance.connectAsync(deviceId),
-      new Promise<undefined>(resolve => {
-        setTimeout(() => {
-          timedOut = true;
-          resolve(undefined);
-        }, DIRECT_CONNECT_TIMEOUT_MS);
+    // The late-orphan guard must attach to THIS pending connect.
+    const directPromise = nobleInstance.connectAsync(deviceId);
+    const raced = await Promise.race([
+      directPromise,
+      new Promise<'timeout'>(resolve => {
+        setTimeout(() => resolve('timeout'), DIRECT_CONNECT_TIMEOUT_MS);
       }),
     ]);
-    if (peripheral) {
-      logger?.info('[NobleBLE] Direct connect-by-id succeeded', { deviceId });
-      return peripheral;
-    }
-    if (timedOut) {
+    if (raced === 'timeout') {
       directConnectCooldownUntil.set(deviceId, Date.now() + DIRECT_CONNECT_COOLDOWN_MS);
       logger?.info('[NobleBLE] Direct connect-by-id timed out, falling back to scan', {
         deviceId,
       });
+      // Promise.race times out the CALLER only — noble has no abort. A late
+      // success would leave an open GATT link nobody owns, and a linked device
+      // stops advertising, so every later scan would dead-end until restart.
+      directPromise
+        .then(late => {
+          const latePeripheral = late ?? discoveredDevices.get(deviceId);
+          if (
+            latePeripheral &&
+            latePeripheral.state === 'connected' &&
+            !connectedDevices.has(deviceId)
+          ) {
+            latePeripheral.removeAllListeners('disconnect');
+            latePeripheral.disconnect(() => undefined);
+          }
+        })
+        .catch(() => undefined);
+      return undefined;
     }
-    return undefined;
+    // Backends emit a `discover` for the peripheral as a side effect, so the
+    // cache may hold it even when connectAsync resolves without a value.
+    const peripheral = raced ?? discoveredDevices.get(deviceId);
+    if (!peripheral || peripheral.state !== 'connected') return undefined;
+    logger?.info('[NobleBLE] Direct connect-by-id succeeded', { deviceId });
+    return peripheral;
   } catch (error) {
     directConnectCooldownUntil.set(deviceId, Date.now() + DIRECT_CONNECT_COOLDOWN_MS);
     logger?.info('[NobleBLE] Direct connect-by-id failed, falling back to scan', {
@@ -1778,6 +1821,8 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
           // Send data back to renderer process
           webContents.send(EOneKeyBleMessageKeys.NOBLE_BLE_NOTIFICATION, deviceId, data);
         });
+        // Still acquiring (in flight) — busy backstop, not the 60s idle clock.
+        armIdleDisconnect(deviceId, BLE_BUSY_BACKSTOP_MS, 'busy-backstop');
       }
     );
 
@@ -1786,6 +1831,7 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
       EOneKeyBleMessageKeys.NOBLE_BLE_UNSUBSCRIBE,
       async (_event: IpcMainInvokeEvent, deviceId: string) => {
         await unsubscribeNotifications(deviceId);
+        armIdleDisconnect(deviceId);
       }
     );
 
