@@ -360,7 +360,7 @@ export class Device extends EventEmitter {
       deviceId,
       path: this.originalDescriptor?.path,
       bleName,
-      name: displayName || bleName || `OneKey ${deviceType?.toUpperCase()}`,
+      name: bleName || displayName || `OneKey ${deviceType?.toUpperCase()}`,
       // Keep the legacy top-level field string-compatible while preserving
       // the canonical nullable value at state.identity.label.
       label: displayName ?? '',

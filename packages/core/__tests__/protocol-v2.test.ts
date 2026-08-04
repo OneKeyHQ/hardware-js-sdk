@@ -2581,7 +2581,7 @@ describe('Protocol V2 feature adapter', () => {
       uuid: 'CACHED-SERIAL',
       deviceId: null,
       bleName: 'Cached BLE',
-      name: 'Cached Label',
+      name: 'Cached BLE',
       label: 'Cached Label',
       deviceType: 'pro2',
     });
@@ -2608,7 +2608,7 @@ describe('Protocol V2 feature adapter', () => {
     expect(device.features?.label).toBeNull();
   });
 
-  test('prefers the real Protocol V2 label over the BLE name for display', () => {
+  test('uses the BLE name for discovery while preserving the Protocol V2 label', () => {
     const device = Device.fromDescriptor({ ...descriptor, protocolType: 'V2' } as any);
     (device as any).features = {
       ...normalizeProtocolV2Features({ ...descriptor, protocolType: 'V2' } as any),
@@ -2616,9 +2616,10 @@ describe('Protocol V2 feature adapter', () => {
       bleName: 'Pro2 6136',
     };
 
+    expect(device.getCurrentDisplayName()).toBe('My Pro 2');
     expect(device.toMessageObject()).toMatchObject({
       bleName: 'Pro2 6136',
-      name: 'My Pro 2',
+      name: 'Pro2 6136',
       label: 'My Pro 2',
     });
   });
