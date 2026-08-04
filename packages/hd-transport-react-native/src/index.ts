@@ -207,11 +207,34 @@ function getDeviceDisplayName(device?: Device | null) {
 
 const ANDROID_REQUEST_MTU = 256;
 
+const BLE_NATIVE_CONNECT_TIMEOUT_MS = 3000;
+
 const connectOptions: Record<string, unknown> = {
   requestMTU: ANDROID_REQUEST_MTU,
-  timeout: 3000,
+  timeout: BLE_NATIVE_CONNECT_TIMEOUT_MS,
   refreshGatt: 'OnConnected',
 };
+
+/** Fallback connect options: drops requestMTU (the thing being worked around) but keeps the native budget. */
+const fallbackConnectOptions: Record<string, unknown> = {
+  timeout: BLE_NATIVE_CONNECT_TIMEOUT_MS,
+};
+
+/**
+ * JS backstop for connect. The native adapter applies its own 3s budget, but it
+ * schedules that timeout on its serial queue, so a busy queue (e.g. right after a
+ * firmware install tears the link down) can leave the promise unsettled — observed
+ * blocking a reconnect for 61s until the app-level timeout. Healthy connects finish
+ * inside the native budget, so this only fires when the native timeout did not.
+ */
+export const BLE_CONNECT_TIMEOUT_MS = BLE_NATIVE_CONNECT_TIMEOUT_MS * 2 + 2000;
+/** Consecutive connect timeouts on one device before the BLE manager itself is recreated. */
+export const BLE_CONNECT_TIMEOUT_MANAGER_RESET_THRESHOLD = 2;
+const CONNECT_TIMEOUT_MESSAGE = 'BLE connect timeout after';
+const isConnectTimeoutError = (error: unknown): boolean =>
+  (error as { errorCode?: unknown })?.errorCode === HardwareErrorCode.BleConnectedError &&
+  typeof (error as { message?: unknown })?.message === 'string' &&
+  (error as { message: string }).message.startsWith(CONNECT_TIMEOUT_MESSAGE);
 
 export type IOneKeyDevice = OneKeyDeviceInfoBase & Device;
 
@@ -311,6 +334,9 @@ export default class ReactNativeBleTransport {
 
   /** Consecutive write timeouts per device; reset by any write that completes. */
   private writeTimeoutCounts: Map<string, number> = new Map();
+
+  /** Consecutive connect timeouts per device; reset by any connect that settles. */
+  private connectTimeoutCounts: Map<string, number> = new Map();
 
   private deviceProtocolHints: Map<string, ProtocolType> = new Map();
 
@@ -531,13 +557,13 @@ export default class ReactNativeBleTransport {
       const isConnected = await device.isConnected().catch(() => false);
       if (!isConnected) {
         try {
-          device = await device.connect(connectOptions);
+          device = await this.connectWithTimeout(uuid, () => device.connect(connectOptions));
         } catch (e) {
           if (
             e.errorCode === BleErrorCode.DeviceMTUChangeFailed ||
             e.errorCode === BleErrorCode.OperationCancelled
           ) {
-            device = await device.connect();
+            device = await this.connectWithTimeout(uuid, () => device.connect());
           } else if (e.errorCode !== BleErrorCode.DeviceAlreadyConnected) {
             throw e;
           }
@@ -829,15 +855,22 @@ export default class ReactNativeBleTransport {
     if (!device) {
       Log?.debug('try to connect to device: ', uuid);
       try {
-        device = await blePlxManager.connectToDevice(uuid, connectOptions);
+        device = await this.connectWithTimeout(uuid, () =>
+          blePlxManager.connectToDevice(uuid, connectOptions)
+        );
       } catch (e) {
         Log?.debug('try to connect to device has error: ', e);
+        if (isConnectTimeoutError(e)) {
+          throw e;
+        }
         if (
           e.errorCode === BleErrorCode.DeviceMTUChangeFailed ||
           e.errorCode === BleErrorCode.OperationCancelled
         ) {
           Log?.debug('first try to reconnect without params');
-          device = await blePlxManager.connectToDevice(uuid);
+          device = await this.connectWithTimeout(uuid, () =>
+            blePlxManager.connectToDevice(uuid, fallbackConnectOptions)
+          );
         } else if (e.errorCode === BleErrorCode.DeviceAlreadyConnected) {
           Log?.debug('device already connected');
           throw ERRORS.TypedError(HardwareErrorCode.BleAlreadyConnected);
@@ -853,26 +886,36 @@ export default class ReactNativeBleTransport {
 
     if (!(await device.isConnected())) {
       Log?.debug('not connected, try to connect to device: ', uuid);
+      const disconnectedDevice = device;
 
       try {
-        device = await device.connect(connectOptions);
+        device = await this.connectWithTimeout(uuid, () =>
+          disconnectedDevice.connect(connectOptions)
+        );
       } catch (e) {
         Log?.debug('not connected, try to connect to device has error: ', e);
+        if (isConnectTimeoutError(e)) {
+          throw e;
+        }
         if (
           e.errorCode === BleErrorCode.DeviceMTUChangeFailed ||
           e.errorCode === BleErrorCode.OperationCancelled
         ) {
           Log?.debug('second try to reconnect without params');
           try {
-            device = await device.connect();
+            device = await this.connectWithTimeout(uuid, () =>
+              disconnectedDevice.connect(fallbackConnectOptions)
+            );
           } catch (e) {
             Log?.debug('last try to reconnect error: ', e);
             // last try to reconnect device if this issue exists
             // https://github.com/dotintent/react-native-ble-plx/issues/426
             if (e.errorCode === BleErrorCode.OperationCancelled) {
               Log?.debug('last try to reconnect');
-              await device.cancelConnection();
-              device = await device.connect();
+              await disconnectedDevice.cancelConnection();
+              device = await this.connectWithTimeout(uuid, () =>
+                disconnectedDevice.connect(fallbackConnectOptions)
+              );
             }
           }
         } else {
@@ -1510,6 +1553,75 @@ export default class ReactNativeBleTransport {
     }
     this.runPromise = null;
     this.runPromiseDeviceId = null;
+  }
+
+  /** Run a native connect under the JS backstop budget. */
+  private async connectWithTimeout<T>(uuid: string, connect: () => Promise<T>): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let timedOut = false;
+    const pending = connect();
+    // The abandoned attempt keeps running; swallow its late outcome so it cannot
+    // surface as an unhandled rejection after we have already given up on it.
+    pending.catch(() => undefined);
+    try {
+      const result = await Promise.race([
+        pending,
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => {
+            timedOut = true;
+            reject(
+              ERRORS.TypedError(
+                HardwareErrorCode.BleConnectedError,
+                `BLE connect timeout after ${BLE_CONNECT_TIMEOUT_MS}ms for ${uuid}`
+              )
+            );
+          }, BLE_CONNECT_TIMEOUT_MS);
+        }),
+      ]);
+      this.connectTimeoutCounts.delete(uuid);
+      return result;
+    } catch (error) {
+      if (timedOut) {
+        this.abandonStalledConnect(uuid);
+      }
+      throw error;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
+  /**
+   * Give up on a connect the native layer never settled. The abandoned attempt still
+   * holds a native "connecting" entry that would cancel the NEXT attempt out from under
+   * itself, so it is cleared here — fire and forget, because that call talks to the very
+   * queue that just stopped responding.
+   */
+  private abandonStalledConnect(uuid: string) {
+    const timeouts = (this.connectTimeoutCounts.get(uuid) ?? 0) + 1;
+    this.connectTimeoutCounts.set(uuid, timeouts);
+    Log?.error('[ReactNativeBleTransport] BLE connect timed out:', uuid, {
+      consecutiveConnectTimeouts: timeouts,
+    });
+
+    this.blePlxManager?.cancelDeviceConnection(uuid).catch(() => {
+      // Rejects with "Operation was cancelled" while merely connecting — expected.
+    });
+    const stalled = transportCache[uuid];
+    if (stalled) {
+      delete transportCache[uuid];
+    }
+    this.deviceProtocol.delete(uuid);
+    this.probingProtocols.delete(uuid);
+    this.protocolV2Assemblers.delete(uuid);
+    this.resetProtocolV2Frames(uuid);
+
+    if (timeouts >= BLE_CONNECT_TIMEOUT_MANAGER_RESET_THRESHOLD) {
+      // BleManager.destroy() force-rejects every promise the native queue abandoned —
+      // the only JS-reachable way to settle them — and drops all cached peripherals.
+      Log?.error('[ReactNativeBleTransport] BLE connects wedged repeatedly, resetting BLE manager');
+      this.resetPlxManager();
+      this.connectTimeoutCounts.delete(uuid);
+    }
   }
 
   private getCachedTransport(uuid: string) {

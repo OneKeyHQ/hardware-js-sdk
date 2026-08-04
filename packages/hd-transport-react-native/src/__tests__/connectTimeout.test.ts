@@ -1,0 +1,192 @@
+import { EventEmitter } from 'events';
+
+import { HardwareErrorCode } from '@onekeyfe/hd-shared';
+
+import ReactNativeBleTransport, {
+  BLE_CONNECT_TIMEOUT_MS,
+  BLE_CONNECT_TIMEOUT_MANAGER_RESET_THRESHOLD,
+} from '../index';
+
+import messages from '@onekeyfe/hd-transport/messages.json';
+
+jest.mock(
+  'react-native',
+  () => ({
+    Platform: { OS: 'ios', select: (spec: Record<string, unknown>) => spec.ios },
+    PermissionsAndroid: {
+      PERMISSIONS: {},
+      RESULTS: {},
+      request: jest.fn(),
+      requestMultiple: jest.fn(),
+    },
+  }),
+  { virtual: true }
+);
+
+jest.mock('react-native-ble-plx', () => ({
+  BleATTErrorCode: { InvalidHandle: 1, UnlikelyError: 14 },
+  BleError: Error,
+  BleErrorCode: {
+    DeviceDisconnected: 201,
+    OperationStartFailed: 601,
+    DeviceMTUChangeFailed: 401,
+    OperationCancelled: 2,
+    DeviceAlreadyConnected: 203,
+  },
+  BleManager: jest.fn(),
+  ScanMode: { LowLatency: 2 },
+}));
+
+jest.mock('@onekeyfe/react-native-ble-utils', () => ({
+  __esModule: true,
+  default: {
+    getConnectedPeripherals: jest.fn(() => Promise.resolve([])),
+    getBondedPeripherals: jest.fn(() => Promise.resolve([])),
+    pairDevice: jest.fn(() => Promise.resolve()),
+  },
+}));
+
+const UUID = 'stalled-connect-device';
+
+const flush = () =>
+  new Promise(resolve => {
+    setImmediate(resolve);
+  });
+
+async function advanceUntil(settled: () => boolean, totalMs: number, stepMs = 250) {
+  for (let elapsed = 0; elapsed < totalMs; elapsed += stepMs) {
+    jest.advanceTimersByTime(stepMs);
+    // eslint-disable-next-line no-await-in-loop
+    await flush();
+    if (settled()) return;
+  }
+  throw new Error(`fake timers exhausted after ${totalMs}ms before the connect settled`);
+}
+
+/** A device whose native connect() never settles — the observed iOS failure mode. */
+function createHarness(connectImpl: () => Promise<unknown>) {
+  const connect = jest.fn(connectImpl);
+  const device = {
+    id: UUID,
+    name: 'OneKey Classic',
+    localName: 'OneKey Classic',
+    serviceUUIDs: ['00000001-0000-1000-8000-00805f9b34fb'],
+    isConnected: jest.fn(() => Promise.resolve(false)),
+    cancelConnection: jest.fn(() => Promise.resolve()),
+    connect,
+    onDisconnected: jest.fn(() => ({ remove: jest.fn() })),
+  };
+  const transport = new ReactNativeBleTransport({ scanTimeout: 1 });
+  const bleManager = {
+    devices: jest.fn(() => Promise.resolve([device])),
+    connectedDevices: jest.fn(() => Promise.resolve([])),
+    connectToDevice: jest.fn(connectImpl),
+    cancelTransaction: jest.fn(() => Promise.resolve()),
+    cancelDeviceConnection: jest.fn(() => Promise.resolve()),
+    onStateChange: jest.fn((listener: (state: string) => void) => {
+      // Dispatch asynchronously: subscribeBleOn wires its own cleanup after
+      // registering, so a synchronous callback would run before it is ready.
+      setImmediate(() => listener('PoweredOn'));
+      return { remove: jest.fn() };
+    }),
+    state: jest.fn(() => Promise.resolve('PoweredOn')),
+    startDeviceScan: jest.fn(),
+    stopDeviceScan: jest.fn(),
+  };
+  (transport as any).blePlxManager = bleManager;
+  transport.init(
+    { debug: jest.fn(), error: jest.fn(), warn: jest.fn() } as any,
+    new EventEmitter()
+  );
+  transport.configure(messages);
+  return { transport, device, bleManager, connect };
+}
+
+describe('BLE connect timeout', () => {
+  beforeAll(() => {
+    jest.useFakeTimers({ doNotFake: ['setImmediate', 'performance'] });
+  });
+
+  afterAll(() => {
+    jest.useRealTimers();
+  });
+
+  afterEach(() => {
+    jest.clearAllTimers();
+    jest.restoreAllMocks();
+  });
+
+  test('a native connect that never settles is bounded instead of blocking forever', async () => {
+    // iOS applies its own connect timeout on a serial queue; when that queue is busy
+    // the timeout never fires and acquire() blocks until the app-level 60s timeout.
+    const { transport } = createHarness(
+      () =>
+        new Promise(() => {
+          // never settles
+        })
+    );
+
+    const errors: Array<{ errorCode?: unknown }> = [];
+    let settled = false;
+    transport.acquire({ uuid: UUID }).catch(e => {
+      errors.push(e);
+      settled = true;
+    });
+    await flush();
+
+    await advanceUntil(() => settled, BLE_CONNECT_TIMEOUT_MS + 5000);
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.errorCode).toBe(HardwareErrorCode.BleConnectedError);
+  });
+
+  test('the connect budget leaves generous headroom over a healthy connect', () => {
+    // Healthy connects finish in ~2-3s (the native budget is 3s); this backstop only
+    // fires when the native timeout itself fails to.
+    expect(BLE_CONNECT_TIMEOUT_MS).toBeGreaterThanOrEqual(6000);
+    expect(BLE_CONNECT_TIMEOUT_MS).toBeLessThanOrEqual(12000);
+  });
+
+  test('a stalled connect is abandoned natively so the next attempt is not cancelled by it', async () => {
+    const { transport, bleManager } = createHarness(
+      () =>
+        new Promise(() => {
+          // never settles
+        })
+    );
+
+    let settled = false;
+    transport.acquire({ uuid: UUID }).catch(() => {
+      settled = true;
+    });
+    await flush();
+    await advanceUntil(() => settled, BLE_CONNECT_TIMEOUT_MS + 5000);
+
+    expect(bleManager.cancelDeviceConnection).toHaveBeenCalledWith(UUID);
+  });
+
+  test('repeated stalled connects recreate the BLE manager', async () => {
+    const { transport, bleManager } = createHarness(
+      () =>
+        new Promise(() => {
+          // never settles
+        })
+    );
+    const destroy = jest.fn();
+    (bleManager as unknown as { destroy: jest.Mock }).destroy = destroy;
+
+    for (let attempt = 0; attempt < BLE_CONNECT_TIMEOUT_MANAGER_RESET_THRESHOLD; attempt += 1) {
+      let settled = false;
+      transport.acquire({ uuid: UUID }).catch(() => {
+        settled = true;
+      });
+      // eslint-disable-next-line no-await-in-loop
+      await flush();
+      // eslint-disable-next-line no-await-in-loop
+      await advanceUntil(() => settled, BLE_CONNECT_TIMEOUT_MS + 5000);
+    }
+
+    expect(destroy).toHaveBeenCalledTimes(1);
+    expect((transport as unknown as { blePlxManager?: unknown }).blePlxManager).toBeUndefined();
+  });
+});
