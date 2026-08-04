@@ -4,6 +4,7 @@ import { EDeviceType, EFirmwareType, ERRORS, HardwareErrorCode } from '@onekeyfe
 import semver from 'semver';
 
 import { getDeviceType, getDeviceUUID } from '../../utils/deviceInfoUtils';
+import { resolveDeviceBootloaderMode } from '../../utils/deviceFeaturesCompat';
 import {
   getDeviceBootloaderVersion,
   getDeviceFirmwareVersion,
@@ -350,8 +351,13 @@ export const assertFirmwareUpdatePlan = (value: unknown): FirmwareUpdatePlan => 
       plan.targetsToUpdate.some(target =>
         legacyOnlyTargets.has(target as FirmwareUpdatePlanTarget)
       )) ||
+    // Only executor v2 services identity-less bootloader recovery (classic family);
+    // Pro (v3) and Pro2 (v4) report a serial even in bootloader mode, so their plans
+    // must always carry a real identity. Degraded v2 plans are bound to the live
+    // device at install time instead.
     (plan.artifacts.length > 0 &&
       (plan.platform === 'native' || plan.platform === 'desktop') &&
+      plan.executor !== 'v2' &&
       plan.deviceIdentity === 'unavailable')
   ) {
     return planError('Firmware update plan executor contract is invalid');
@@ -604,7 +610,19 @@ export const buildFirmwareUpdatePlan = ({
   const firmwareRelease = asRelease(firmware);
   const validatedForceTargets = validateFirmwareUpdatePlanForceTargets(forceUpdateTargets);
   const forcedTargets = new Set(validatedForceTargets);
-  const shouldUpdateFirmware = isUpgrade(firmware) || forcedTargets.has('firmware');
+  const bootloaderMode = resolveDeviceBootloaderMode(features);
+  // Bootloader recovery: an erased device reports firmware status 'none', a device
+  // with intact firmware in bootloader mode reports 'unknown' (version fields carry
+  // the bootloader version), and neither can report its BLE version — yet the app
+  // treats bootloader mode as a mandatory reinstall. Only bootloader mode may treat
+  // these statuses as install targets: in normal mode 'none' also describes devices
+  // without the component at all (e.g. Mini has no BLE) and must stay excluded.
+  const isRecoveryInstall = (release: ReleaseSelection | undefined): boolean =>
+    bootloaderMode &&
+    (release?.status === 'none' || release?.status === 'unknown') &&
+    !!asRelease(release);
+  const shouldUpdateFirmware =
+    isUpgrade(firmware) || isRecoveryInstall(firmware) || forcedTargets.has('firmware');
   const shouldUpdateResource = isUpgrade(firmware) || forcedTargets.has('resource');
 
   if (
@@ -689,7 +707,7 @@ export const buildFirmwareUpdatePlan = ({
         }
       }
     }
-    if (isUpgrade(ble) || forcedTargets.has('ble')) {
+    if (isUpgrade(ble) || isRecoveryInstall(ble) || forcedTargets.has('ble')) {
       const bleRelease = asRelease(ble);
       artifacts.push({
         artifactId: 'ble',
@@ -716,11 +734,20 @@ export const buildFirmwareUpdatePlan = ({
     targetsToUpdate,
   });
 
-  const deviceIdentity = getDeviceUUID(features);
+  // 'unavailable' is the reserved degraded-identity sentinel; a device-reported
+  // serial must never be able to collide with it.
+  const reportedIdentity = getDeviceUUID(features);
+  const deviceIdentity = reportedIdentity === 'unavailable' ? '' : reportedIdentity;
+  // Bootloader-mode classic-family devices (executor v2, e.g. classic1s) cannot report
+  // a serial number, so their recovery plans fall back to the degraded 'unavailable'
+  // identity. Binding is then enforced against the live device at install time instead
+  // (assertFirmwareUpdatePreparedPlanDeviceIdentity), and plan integrity by the digest.
+  // Pro (v3) and Pro2 (v4) report a serial even in bootloader mode and stay strict.
   if (
     artifacts.length > 0 &&
     (platform === 'native' || platform === 'desktop') &&
-    !deviceIdentity
+    !deviceIdentity &&
+    !(bootloaderMode && executor === 'v2')
   ) {
     throw ERRORS.TypedError(
       HardwareErrorCode.RuntimeError,

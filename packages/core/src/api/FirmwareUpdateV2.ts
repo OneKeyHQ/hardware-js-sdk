@@ -21,7 +21,8 @@ import {
   uploadFirmwareFromSource,
 } from './firmware/uploadFirmware';
 import { BOOTLOADER_POLL_INITIALIZE_TIMEOUT_MS } from './firmware/FirmwareUpdateBaseMethod';
-import { LoggerNames, getDeviceUUID, getLogger, wait } from '../utils';
+import { LoggerNames, getDeviceType, getDeviceUUID, getLogger, wait } from '../utils';
+import { resolveDeviceBootloaderMode } from '../utils/deviceFeaturesCompat';
 import { FirmwareUpdateTipMessage, createUiMessage } from '../events/ui-request';
 import { DeviceModelToTypes } from '../types';
 import { DataManager } from '../data-manager';
@@ -432,6 +433,8 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
       assertFirmwareUpdatePreparedPlanDeviceIdentity({
         preparedPlan: params.preparedPlan,
         deviceIdentity: getDeviceUUID(features) || undefined,
+        bootloaderMode: resolveDeviceBootloaderMode(features),
+        deviceModel: String(getDeviceType(features)),
       });
     }
 

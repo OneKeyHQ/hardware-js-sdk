@@ -297,12 +297,35 @@ export const validateFirmwareUpdatePreparedPlan = (value: unknown): FirmwareUpda
 
 export const assertFirmwareUpdatePreparedPlanDeviceIdentity = ({
   preparedPlan: value,
-  deviceIdentity,
+  deviceIdentity: reportedIdentity,
+  bootloaderMode,
+  deviceModel,
 }: {
   preparedPlan: unknown;
   deviceIdentity: string | undefined;
+  /** Live device mode; only bootloader mode may accept a degraded-identity plan. */
+  bootloaderMode?: boolean;
+  /** Live device model; a degraded plan must target the same model. */
+  deviceModel?: string;
 }): FirmwareUpdatePreparedPlan => {
   const preparedPlan = validateFirmwareUpdatePreparedPlan(value);
+  // 'unavailable' is the reserved degraded sentinel — a device-reported serial equal
+  // to it must never satisfy the exact-match branch below.
+  const deviceIdentity = reportedIdentity === 'unavailable' ? undefined : reportedIdentity;
+  // Bootloader recovery: classic-family devices report no serial in bootloader mode,
+  // so a degraded plan is only acceptable when the live device is equally
+  // identity-less AND targets the same device model (identity equality implies the
+  // model match in the strict branch; the degraded branch must substitute it).
+  // A device that DOES report an identity must match the plan exactly.
+  if (
+    preparedPlan.deviceIdentity === 'unavailable' &&
+    !deviceIdentity &&
+    bootloaderMode === true &&
+    deviceModel !== undefined &&
+    preparedPlan.deviceModel === deviceModel
+  ) {
+    return preparedPlan;
+  }
   if (!deviceIdentity || preparedPlan.deviceIdentity !== deviceIdentity) {
     throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError);
   }
