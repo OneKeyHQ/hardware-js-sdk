@@ -4,7 +4,7 @@
 > 适用读者：Core、App 钱包接入与安全审查人员
 > 内容状态：兼容迁移中
 > 代码范围：`packages/core`、App 钱包 Session 接入
-> 最后代码核验：2026-07-31
+> 最后代码核验：2026-08-04
 > 前置阅读：[SDK 架构概览](../architecture/overview.md)
 
 ## 1. 范围与核心结论
@@ -56,6 +56,10 @@
   先调用 `DeviceSessionGet(session_id, btc_test_address)` 恢复，恢复结果不匹配时再执行一次
   `AskPin(Main) -> Get()` 重建。Core 使用返回的真实
   `btc_test_address` 建立标准钱包内部索引，不引入 SDK 自造的 `STANDARD_WALLET_KEY`。
+- Protocol V2 进入 `select-hidden` 时，如果实时状态明确设备已经由 Attach PIN 解锁，Core 会再次
+  校验原始 `DeviceStatus`，然后直接用空参数 `DeviceSessionGet()` 读取当前隐藏钱包，不重新发起
+  Passphrase 选择、`DeviceSessionAskPassphrase` 或 `DeviceSessionAskPin`。复核状态不一致时失败关闭，
+  不回退到钱包重选。
 - Core 把现有 `deriveCardano` 意图映射为 `DeviceSessionGet.seed_domains`：普通业务请求
   `[Standard]`，Cardano 业务请求 `[Standard, Cardano]`。调用链没有提供派生意图时省略该字段，
   保持固件“派生全部支持域”的兼容行为。
@@ -322,7 +326,8 @@ await HardwareSDK.clearSessionCache({ deviceId, passphraseState });
    `ProtocolInfoRequest { eventless_wallet_session: true }`。标准钱包首次打开时发送
    `DeviceSessionAskPin(Main) -> DeviceSessionGet()`；缓存存在时发送
    `DeviceSessionGet(session_id, btc_test_address)`。隐藏钱包恢复时携带 `btc_test_address`，按新钱包
-   选择时仍先发送 Ask，成功后发送 `DeviceSessionGet()`。
+   选择时通常先发送 Ask，成功后发送 `DeviceSessionGet()`；设备已经由 Attach PIN 解锁时则复核
+   实时状态并直接读取当前 `DeviceSession`，避免再次询问 Passphrase 或重复输入 Attach PIN。
 7. 固件按 `btc_test_address` 校验当前 SE Session，并对带 `session_id` 的 Get 尝试恢复指定 Session。
    若首次 `passphraseState` 不匹配，标准钱包
    执行一次 `AskPin(Main) -> Get()`；隐藏钱包执行一次统一钱包选择及 `Ask -> Get()`。第二次仍不
@@ -641,6 +646,8 @@ Protocol V2 的钱包选择由 SDK 主动发起带 `deviceOnly=false` 的 `REQUE
 `{ passphrase }`，回传 `passphraseOnDevice` 时进入设备输入，回传 `attachPinOnDevice` 时进入
 Attach PIN。三种 Ask 路径均返回 `Success`，随后由 Get 读取 Session。Host Passphrase 只在该次
 交互中转交给固件，不进入日志、缓存或钱包 Session 公共响应。
+如果 `select-hidden` 开始时设备已由 Attach PIN 解锁，则该选择已经在设备端完成；Core 不再触发
+上述 UI/Ask 路径，而是复核 `DeviceStatus` 后直接读取当前 Session。
 `DeviceSessionAskPassphrase` 必须显式携带 `on_device`：Host 输入发送
 `{ passphrase, on_device: false }`，设备输入发送 `{ on_device: true }`。
 Core 会再次执行幂等 NFKD 规范化，并按固件上限拒绝空值、NUL 或超过 50 个 UTF-8 字节的

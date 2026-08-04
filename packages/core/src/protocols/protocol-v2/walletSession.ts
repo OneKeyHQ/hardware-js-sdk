@@ -189,10 +189,13 @@ export async function getProtocolV2WalletSession(
     selectMainWalletBeforeRestore?: boolean;
     resumeOnly?: boolean;
     deriveCardano?: boolean;
+    /** Read the wallet already selected by Attach PIN without reopening wallet selection. */
+    readCurrentAttachPinSession?: boolean;
   }
 ) {
   const forceWalletSelection =
     options?.forceWalletSelection === true || options?.initSession === true;
+  const readCurrentAttachPinSession = options?.readCurrentAttachPinSession === true;
 
   if (forceWalletSelection) {
     if (options.onlyMainPin) {
@@ -205,18 +208,21 @@ export async function getProtocolV2WalletSession(
 
   await negotiateEventlessWalletSession(device);
 
-  if (options?.onlyMainPin) {
+  if (options?.onlyMainPin || readCurrentAttachPinSession) {
     device.passphraseState = undefined;
   }
-  let expectedPassphraseState = options?.onlyMainPin
-    ? undefined
-    : options?.expectedPassphraseState ?? device.passphraseState;
+  let expectedPassphraseState =
+    options?.onlyMainPin || readCurrentAttachPinSession
+      ? undefined
+      : options?.expectedPassphraseState ?? device.passphraseState;
 
   const cachedStandardSession = options?.onlyMainPin
     ? device.getStandardInternalState?.()
     : undefined;
   const cachedSessionId =
-    !options?.onlyMainPin && typeof device.getInternalState === 'function'
+    !options?.onlyMainPin &&
+    !readCurrentAttachPinSession &&
+    typeof device.getInternalState === 'function'
       ? device.getInternalState()
       : undefined;
   let response;
@@ -280,7 +286,22 @@ export async function getProtocolV2WalletSession(
     }
   };
 
-  if (options?.onlyMainPin) {
+  if (readCurrentAttachPinSession) {
+    const status = await requestProtocolV2DeviceStatus(device);
+    device.updateProtocolV2Status(status);
+    if (
+      status.unlocked !== true ||
+      status.passphrase_enabled !== true ||
+      status.unlocked_by_attach_to_pin !== true
+    ) {
+      device.clearInternalState();
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckUnlockTypeError);
+    }
+    response = await getDeviceSession(
+      device,
+      buildDeviceSessionGetRequest({ deriveCardano: options?.deriveCardano })
+    );
+  } else if (options?.onlyMainPin) {
     expectedPassphraseState = cachedStandardSession?.passphraseState;
     if (cachedStandardSession) {
       try {
@@ -414,10 +435,17 @@ export async function getProtocolV2WalletSession(
     device.updateInternalState(...internalStateArgs);
   }
 
+  let unlockedAttachPin: boolean | undefined;
+  if (readCurrentAttachPinSession) {
+    unlockedAttachPin = true;
+  } else if (mainPinSelected) {
+    unlockedAttachPin = false;
+  }
+
   return {
     passphraseState: message.btc_test_address,
     newSession: message.session_id,
-    unlockedAttachPin: mainPinSelected ? false : undefined,
+    unlockedAttachPin,
     resumed,
   };
 }

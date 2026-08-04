@@ -221,9 +221,13 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
       this.device.clearInternalState();
       throw ERRORS.TypedError(HardwareErrorCode.DeviceNotOpenedPassphrase);
     }
+    const readCurrentAttachPinSession =
+      isProtocolV2 && walletStatus.status.unlockedAttachPin === true;
     const session = isProtocolV2
       ? await getProtocolV2WalletSession(this.device, {
-          forceWalletSelection: true,
+          ...(readCurrentAttachPinSession
+            ? { readCurrentAttachPinSession: true }
+            : { forceWalletSelection: true }),
           deriveCardano: this.payload.deriveCardano,
         })
       : await getPassphraseStateWithRefreshDeviceInfo(this.device, { initSession: true });
@@ -234,6 +238,14 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
     if (isProtocolV2 && refreshedState.status.passphraseProtection !== true) {
       this.device.clearInternalState();
       throw ERRORS.TypedError(HardwareErrorCode.DeviceNotOpenedPassphrase);
+    }
+    if (
+      isProtocolV2 &&
+      readCurrentAttachPinSession &&
+      refreshedState.status.unlockedAttachPin !== true
+    ) {
+      this.device.clearInternalState();
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckUnlockTypeError);
     }
     const responseBase = {
       protocol,
