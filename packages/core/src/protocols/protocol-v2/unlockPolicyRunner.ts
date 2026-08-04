@@ -94,14 +94,7 @@ export async function runMethodWithUnlockPolicy<T = unknown>(
 
     await afterStatusBeforeUnlock?.();
 
-    const isStandardWalletRequest =
-      method.unlockPolicy !== 'unlock-before-run' &&
-      method.useDevicePassphraseState &&
-      method.payload?.useEmptyPassphrase === true;
-    const standardWalletSessionOwnsUnlock =
-      isStandardWalletRequest && status.passphraseProtection === true;
-
-    if (!status.unlocked && !standardWalletSessionOwnsUnlock) {
+    if (!status.unlocked) {
       const unlockInteraction: HardwareUiInteractionMeta | undefined = shouldCoordinateUi
         ? uiCoordinator.enterUnlockInteraction(method.name)
         : undefined;
