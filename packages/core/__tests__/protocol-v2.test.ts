@@ -1,4 +1,4 @@
-import { EFirmwareType, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { EFirmwareType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import {
   DeviceRebootType,
   DeviceSessionPinType,
@@ -2673,10 +2673,6 @@ describe('Protocol V2 feature adapter', () => {
           hw: true,
           fw: true,
           coprocessor: true,
-          se1: true,
-          se2: true,
-          se3: true,
-          se4: true,
         },
         types: {
           version: true,
@@ -2868,10 +2864,6 @@ describe('Protocol V2 feature adapter', () => {
           hw: true,
           fw: true,
           coprocessor: true,
-          se1: true,
-          se2: true,
-          se3: true,
-          se4: true,
         },
         types: {
           version: true,
@@ -3221,10 +3213,6 @@ describe('Protocol V2 feature adapter', () => {
           hw: true,
           fw: true,
           coprocessor: true,
-          se1: true,
-          se2: true,
-          se3: true,
-          se4: true,
         },
         types: {
           version: true,
@@ -5740,12 +5728,17 @@ describe('Protocol V2 firmware update targets', () => {
       originalDescriptor: { protocolType: 'V2' },
       features: { deviceType: 'pro2', firmwareVersion: '0.0.0', capabilities: [] },
     });
-    forceReloadDataSpy.mockRejectedValue(new Error('latest config unavailable'));
+    forceReloadDataSpy.mockRejectedValue(
+      ERRORS.TypedError(HardwareErrorCode.NetworkError, 'latest config unavailable')
+    );
     (method as any).prepareRemoteProtocolV2Binaries = jest.fn();
     (method as any).enterProtocolV2BootloaderMode = jest.fn();
     method.postTipMessage = jest.fn();
 
-    await expect(method.run()).rejects.toThrow('latest config unavailable');
+    await expect(method.run()).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.NetworkError,
+      message: 'latest config unavailable',
+    });
 
     expect((method as any).prepareRemoteProtocolV2Binaries).not.toHaveBeenCalled();
     expect((method as any).enterProtocolV2BootloaderMode).not.toHaveBeenCalled();

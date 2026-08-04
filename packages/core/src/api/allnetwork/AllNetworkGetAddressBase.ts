@@ -391,11 +391,13 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
           // Protocol V2 hands a wallet session to exactly one blockchain request.
           // The parent all-network call consumes its first handoff while fetching
           // the root fingerprint, so each nested chain method must resume the
-          // requested hidden wallet before it sends its own device command.
-          if (this.device.isProtocolV2() && this.payload.passphraseState) {
+          // requested standard or hidden wallet before sending its device command.
+          const useEmptyPassphrase = this.payload.useEmptyPassphrase === true;
+          const shouldResumeWalletSession = useEmptyPassphrase || !!this.payload.passphraseState;
+          if (this.device.isProtocolV2() && shouldResumeWalletSession) {
             const passphraseStateSafety = await this.device.checkPassphraseStateSafety(
               this.payload.passphraseState,
-              false,
+              useEmptyPassphrase,
               this.payload.skipPassphraseCheck
             );
             if (!passphraseStateSafety) {

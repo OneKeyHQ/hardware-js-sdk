@@ -1,6 +1,6 @@
 import axios from 'axios';
 import semver from 'semver';
-import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
+import { EDeviceType, EFirmwareType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import MessagesJSON from '../data/messages/messages.json';
 import MessagesLegacyV1JSON from '../data/messages/messages_legacy_v1.json';
@@ -500,7 +500,10 @@ export default class DataManager {
     }
     const loaded = await this.load(this.settings);
     if (!loaded) {
-      throw new Error('Unable to refresh the latest remote config');
+      throw ERRORS.TypedError(
+        HardwareErrorCode.NetworkError,
+        'Unable to refresh the latest remote config'
+      );
     }
     this.lastCheckTimestamp = getTimeStamp();
   }

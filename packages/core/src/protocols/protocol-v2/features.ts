@@ -107,10 +107,6 @@ export const PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST = {
     hw: true,
     fw: true,
     coprocessor: true,
-    se1: true,
-    se2: true,
-    se3: true,
-    se4: true,
   },
   types: {
     version: true,

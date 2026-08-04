@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { sha256 } from '@noble/hashes/sha256';
+import { HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { DataManager } from '../src/data-manager';
 import {
@@ -276,9 +277,10 @@ describe('Pro2 resource configuration', () => {
     await DataManager.checkAndReloadData();
 
     expect(DataManager.lastCheckTimestamp).toBe(0);
-    await expect(DataManager.forceReloadData()).rejects.toThrow(
-      'Unable to refresh the latest remote config'
-    );
+    await expect(DataManager.forceReloadData()).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.NetworkError,
+      message: 'Unable to refresh the latest remote config',
+    });
     expect(DataManager.lastCheckTimestamp).toBe(0);
   });
 });

@@ -531,6 +531,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         this.postTipMessage(FirmwareUpdateTipMessage.FinishDownloadFirmware);
       }
     } catch (err) {
+      if (err instanceof HardwareError && err.errorCode === HardwareErrorCode.NetworkError) {
+        throw err;
+      }
       throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
     }
 

@@ -24,24 +24,28 @@ export default class AllNetworkGetAddress extends AllNetworkGetAddressBase {
     const resultMap: Record<string, AllNetworkAddress> = {};
     const { bundle } = this.payload as AllNetworkGetAddressParams;
 
-    const methodGroups = bundle
-      .map((param, index) =>
-        this.generateMethodName({
-          network: param.network,
-          payload: param,
-          originalIndex: index,
-        })
-      )
-      .reduce((acc, cur) => {
-        if (!acc[cur.methodName]) {
-          acc[cur.methodName] = [];
-        }
-        acc[cur.methodName].push(cur);
-        return acc;
-      }, {} as Record<keyof CoreApi, MethodParams[]>);
+    const methodParams = bundle.map((param, index) =>
+      this.generateMethodName({
+        network: param.network,
+        payload: param,
+        originalIndex: index,
+      })
+    );
+    const groupedMethodParams = methodParams.reduce((groups, param) => {
+      const group = groups.get(param.methodName) ?? [];
+      group.push(param);
+      groups.set(param.methodName, group);
+      return groups;
+    }, new Map<keyof CoreApi, MethodParams[]>());
+    const requiresProtocolV2WalletHandoff =
+      this.device.isProtocolV2() &&
+      (this.payload.useEmptyPassphrase === true || !!this.payload.passphraseState);
+    const methodGroups: [keyof CoreApi, MethodParams[]][] = requiresProtocolV2WalletHandoff
+      ? methodParams.map(param => [param.methodName, [param]])
+      : Array.from(groupedMethodParams.entries());
 
     let i = 0;
-    for (const [methodName, params] of Object.entries(methodGroups)) {
+    for (const [methodName, params] of methodGroups) {
       const methodParams = {
         bundle: params.map(param => ({
           ...param.params,
@@ -52,11 +56,7 @@ export default class AllNetworkGetAddress extends AllNetworkGetAddressBase {
         throw new Error(HardwareErrorCodeMessage[HardwareErrorCode.RepeatUnlocking]);
       }
       // call method
-      const response = await this.callMethod(
-        methodName as keyof CoreApi,
-        methodParams,
-        rootFingerprint
-      );
+      const response = await this.callMethod(methodName, methodParams, rootFingerprint);
 
       if (this.abortController?.signal.aborted) {
         throw new Error(HardwareErrorCodeMessage[HardwareErrorCode.RepeatUnlocking]);
