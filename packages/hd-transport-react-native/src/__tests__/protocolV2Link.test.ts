@@ -722,6 +722,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     configureProtocolV2BleTuning({ iosPacketLength: 20 });
 
     await transport.writeProtocolV2Frame(
+      'device-uuid',
       bleTransport,
       new Uint8Array(30),
       context,
@@ -753,7 +754,13 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     configureProtocolV2BleTuning({ iosPacketLength: 20 });
 
     await expect(
-      transport.writeProtocolV2Frame(bleTransport, new Uint8Array(30), context, jest.fn())
+      transport.writeProtocolV2Frame(
+        'device-uuid',
+        bleTransport,
+        new Uint8Array(30),
+        context,
+        jest.fn()
+      )
     ).rejects.toMatchObject({ errorCode: 205 });
     expect(writeWithoutResponse).toHaveBeenCalledTimes(1);
   });

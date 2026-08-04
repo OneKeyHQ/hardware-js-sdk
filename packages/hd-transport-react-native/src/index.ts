@@ -135,6 +135,22 @@ const resolveFirmwareUploadRetryDelay = (attempt: number, baseDelayMs = 200, max
   Math.min(baseDelayMs * 2 ** attempt, maxDelayMs);
 const PROTOCOL_PROBE_TIMEOUT_MS = 1000;
 const PROTOCOL_V2_PROBE_TIMEOUT_MS = 10_000;
+/**
+ * Per-packet write budget. iOS only resolves writeWithoutResponse once CoreBluetooth
+ * reports the peripheral ready again; a peripheral wedged by its own firmware reboot
+ * stops reporting ready while staying connected, so the write promise never settles.
+ * Response timeouts cannot cover that — they are armed after the writes complete —
+ * and an unbounded write leaves the whole transport unusable until the process dies.
+ * A healthy packet completes in milliseconds, so this only fires on a dead link.
+ */
+export const BLE_WRITE_PACKET_TIMEOUT_MS = 10_000;
+const WEDGED_WRITE_MESSAGE = 'BLE write timeout after';
+const isWedgedWriteError = (error: unknown): boolean =>
+  (error as { errorCode?: unknown })?.errorCode === HardwareErrorCode.BleWriteCharacteristicError &&
+  typeof (error as { message?: unknown })?.message === 'string' &&
+  (error as { message: string }).message.startsWith(WEDGED_WRITE_MESSAGE);
+/** Consecutive wedged writes on one device before the BLE manager itself is recreated. */
+export const BLE_WRITE_TIMEOUT_MANAGER_RESET_THRESHOLD = 2;
 const DEVICE_SCAN_TIMEOUT_MS = 3000;
 const IOS_NOTIFY_READY_DELAY_MS = 150;
 const ANDROID_NOTIFY_READY_DELAY_MS = 300;
@@ -284,6 +300,17 @@ export default class ReactNativeBleTransport {
 
   /** Per-device protocol type detected by active wire-level probe after connect. */
   private deviceProtocol: Map<string, ProtocolType> = new Map();
+
+  /**
+   * Protocol a probe is currently trying, before the device has confirmed it. Calls
+   * must route with it, but acquire() must not treat it as a detected protocol: a
+   * probe that never answers would otherwise leave the reuse fast path handing out a
+   * transport that was never validated.
+   */
+  private probingProtocols: Map<string, ProtocolType> = new Map();
+
+  /** Consecutive write timeouts per device; reset by any write that completes. */
+  private writeTimeoutCounts: Map<string, number> = new Map();
 
   private deviceProtocolHints: Map<string, ProtocolType> = new Map();
 
@@ -922,7 +949,7 @@ export default class ReactNativeBleTransport {
           Log?.debug('monitor error ignored for stale transport: ', uuid, notifyTransactionId);
           return;
         }
-        if (this.deviceProtocol.get(uuid) === 'V2') {
+        if (this.getActiveProtocol(uuid) === 'V2') {
           let errorCode:
             | typeof HardwareErrorCode.BleDeviceBondError
             | typeof HardwareErrorCode.BleCharacteristicNotifyError
@@ -992,7 +1019,7 @@ export default class ReactNativeBleTransport {
 
       try {
         const data = Buffer.from(c.value as string, 'base64');
-        const protocol = this.deviceProtocol.get(uuid);
+        const protocol = this.getActiveProtocol(uuid);
         if (!protocol) {
           Log?.debug('monitor data ignored before protocol detection: ', uuid);
           return;
@@ -1026,7 +1053,7 @@ export default class ReactNativeBleTransport {
       } catch (error) {
         Log?.debug('monitor data error: ', error);
         const notifyError = ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError);
-        if (this.deviceProtocol.get(uuid) === 'V2') {
+        if (this.getActiveProtocol(uuid) === 'V2') {
           this.rejectProtocolV2Frames(uuid, notifyError);
         } else if (this.runPromiseDeviceId === uuid) {
           this.runPromise?.reject(notifyError);
@@ -1090,6 +1117,7 @@ export default class ReactNativeBleTransport {
     }
 
     this.deviceProtocol.delete(uuid);
+    this.probingProtocols.delete(uuid);
     // Preserve a name-derived hint across disconnects so reconnect can probe V2 first.
     this.protocolV2Assemblers.get(uuid)?.reset();
     this.protocolV2Assemblers.delete(uuid);
@@ -1174,6 +1202,7 @@ export default class ReactNativeBleTransport {
         this.runPromiseDeviceId = null;
       }
     };
+    const isCurrentOwner = () => this.runPromise === runPromise;
     const messages = this._messages;
     const buffers = ProtocolV1.encodeTransportPackets(messages, name, data);
     let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -1199,6 +1228,9 @@ export default class ReactNativeBleTransport {
             chunk = ByteBuffer.allocate(packetCapacity);
           } catch (e) {
             onError(e);
+            if (isWedgedWriteError(e)) {
+              throw e;
+            }
             throw ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError);
           }
         }
@@ -1230,6 +1262,9 @@ export default class ReactNativeBleTransport {
             }
           } catch (e) {
             onError(e);
+            if (isWedgedWriteError(e)) {
+              throw e;
+            }
             throw ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError);
           }
         }
@@ -1243,7 +1278,13 @@ export default class ReactNativeBleTransport {
     if (name === 'EmmcFileWrite') {
       await writeChunkedData(
         buffers,
-        data => transport.writeWithRetry(data),
+        data =>
+          this.writeBlePacket(
+            uuid,
+            data,
+            payload => transport.writeWithRetry(payload),
+            isCurrentOwner
+          ),
         e => {
           releaseOwnershipIfCurrent();
           Log?.error('writeCharacteristic write error: ', e);
@@ -1266,7 +1307,12 @@ export default class ReactNativeBleTransport {
           // eslint-disable-next-line no-constant-condition
           while (true) {
             try {
-              await transport.writeWithRetry(data);
+              await this.writeBlePacket(
+                uuid,
+                data,
+                payload => transport.writeWithRetry(payload),
+                isCurrentOwner
+              );
               return;
             } catch (error) {
               const retryType = getFirmwareUploadWriteRetryType(error);
@@ -1296,14 +1342,21 @@ export default class ReactNativeBleTransport {
         try {
           const shouldUseWriteWithResponse =
             Platform.OS === 'ios' && transport.writeCharacteristic.isWritableWithResponse;
-          if (shouldUseWriteWithResponse) {
-            await transport.writeCharacteristic.writeWithResponse(outData);
-          } else {
-            await transport.writeCharacteristic.writeWithoutResponse(outData);
-          }
+          await this.writeBlePacket(
+            uuid,
+            outData,
+            payload =>
+              shouldUseWriteWithResponse
+                ? transport.writeCharacteristic.writeWithResponse(payload)
+                : transport.writeCharacteristic.writeWithoutResponse(payload),
+            isCurrentOwner
+          );
         } catch (e) {
           Log?.debug('writeCharacteristic write error: ', e);
           releaseOwnershipIfCurrent();
+          if (isWedgedWriteError(e)) {
+            throw e;
+          }
           if (e.errorCode === BleErrorCode.DeviceDisconnected) {
             throw ERRORS.TypedError(HardwareErrorCode.BleDeviceNotBonded);
           } else if (e.errorCode === BleErrorCode.OperationStartFailed) {
@@ -1432,6 +1485,7 @@ export default class ReactNativeBleTransport {
       delete transportCache[session];
     }
     this.deviceProtocol.delete(session);
+    this.probingProtocols.delete(session);
     this.deviceProtocolHints.delete(session);
     this.protocolV2Assemblers.delete(session);
     this.resetProtocolV2Frames(session);
@@ -1466,6 +1520,105 @@ export default class ReactNativeBleTransport {
     return transport;
   }
 
+  /**
+   * Write one packet under a bounded budget. A write that never settles means the
+   * peripheral is wedged even though the GATT link still reports connected, so the
+   * link is torn down: releasing JS state alone would leave the poisoned peripheral
+   * cached and every later call would hang on it again.
+   */
+  private async writeBlePacket(
+    uuid: string,
+    data: string,
+    write: (payload: string) => Promise<unknown>,
+    isCurrentOwner?: () => boolean
+  ) {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let timedOut = false;
+    try {
+      await Promise.race([
+        write(data),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => {
+            timedOut = true;
+            reject(
+              ERRORS.TypedError(
+                HardwareErrorCode.BleWriteCharacteristicError,
+                `BLE write timeout after ${BLE_WRITE_PACKET_TIMEOUT_MS}ms`
+              )
+            );
+          }, BLE_WRITE_PACKET_TIMEOUT_MS);
+        }),
+      ]);
+      this.writeTimeoutCounts.delete(uuid);
+    } catch (error) {
+      if (timedOut) {
+        // A superseded call's late write must not tear down the link the current
+        // call is using; only the owner of the transport may declare it dead.
+        if (isCurrentOwner && !isCurrentOwner()) {
+          Log?.debug('[ReactNativeBleTransport] stale BLE write timed out, link kept:', uuid);
+        } else {
+          this.tearDownWedgedLink(uuid);
+        }
+      }
+      throw error;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
+  /**
+   * Drop a link whose writes stopped completing. The JS state is purged synchronously
+   * so the next acquire() cannot reuse the dead transport, while the native teardown is
+   * intentionally NOT awaited: it talks to the very layer that just stopped settling
+   * promises, so awaiting it could hang exactly like the write it is recovering from.
+   */
+  private tearDownWedgedLink(uuid: string) {
+    const timeouts = (this.writeTimeoutCounts.get(uuid) ?? 0) + 1;
+    this.writeTimeoutCounts.set(uuid, timeouts);
+    Log?.error('[ReactNativeBleTransport] BLE write timed out, tearing down link:', uuid, {
+      consecutiveWriteTimeouts: timeouts,
+    });
+
+    const wedged = transportCache[uuid];
+    this.disconnect(uuid).catch(error => {
+      Log?.debug('[ReactNativeBleTransport] wedged link teardown failed (ignored):', error);
+    });
+    if (wedged && transportCache[uuid] === wedged) {
+      delete transportCache[uuid];
+    }
+    this.deviceProtocol.delete(uuid);
+    this.probingProtocols.delete(uuid);
+    this.protocolV2Assemblers.delete(uuid);
+    this.resetProtocolV2Frames(uuid);
+
+    if (timeouts >= BLE_WRITE_TIMEOUT_MANAGER_RESET_THRESHOLD) {
+      // Reconnecting reuses the same native peripheral object. When it stays wedged
+      // across attempts the poison lives in the BLE manager itself, and only a fresh
+      // manager drops every cached peripheral — the JS equivalent of restarting the app.
+      Log?.error('[ReactNativeBleTransport] BLE writes wedged repeatedly, resetting BLE manager');
+      this.resetPlxManager();
+      this.writeTimeoutCounts.delete(uuid);
+    }
+  }
+
+  private resetPlxManager() {
+    const manager = this.blePlxManager;
+    this.blePlxManager = undefined;
+    // Every cached transport belongs to the destroyed manager's peripherals.
+    Object.keys(transportCache).forEach(key => {
+      delete transportCache[key];
+    });
+    this.deviceProtocol.clear();
+    this.probingProtocols.clear();
+    this.monitorTokens.clear();
+    this.protocolV2Assemblers.clear();
+    try {
+      manager?.destroy();
+    } catch (error) {
+      Log?.debug('[ReactNativeBleTransport] BLE manager destroy failed (ignored):', error);
+    }
+  }
+
   private createProtocolMismatchError(expected: ProtocolType) {
     return ERRORS.TypedError(
       HardwareErrorCode.RuntimeError,
@@ -1481,9 +1634,17 @@ export default class ReactNativeBleTransport {
   }
 
   private clearProbeProtocol(uuid: string, protocol: ProtocolType) {
+    if (this.probingProtocols.get(uuid) === protocol) {
+      this.probingProtocols.delete(uuid);
+    }
     if (this.deviceProtocol.get(uuid) === protocol) {
       this.deviceProtocol.delete(uuid);
     }
+  }
+
+  /** Protocol to route a call with: confirmed if known, otherwise the one being probed. */
+  private getActiveProtocol(uuid: string): ProtocolType | undefined {
+    return this.deviceProtocol.get(uuid) ?? this.probingProtocols.get(uuid);
   }
 
   private async detectProtocol(
@@ -1559,6 +1720,7 @@ export default class ReactNativeBleTransport {
     }
 
     this.deviceProtocol.delete(uuid);
+    this.probingProtocols.delete(uuid);
     throw this.createProtocolDetectionError();
   }
 
@@ -1620,14 +1782,20 @@ export default class ReactNativeBleTransport {
     }
 
     try {
-      this.deviceProtocol.set(uuid, 'V1');
+      this.probingProtocols.set(uuid, 'V1');
       // GetFeatures identifies Protocol V1 without resetting an existing wallet
       // session before Core has a chance to restore a hidden wallet.
       await this.callProtocolV1(uuid, 'GetFeatures', {}, { timeoutMs: PROTOCOL_PROBE_TIMEOUT_MS });
+      this.probingProtocols.delete(uuid);
       return true;
     } catch (error) {
       this.clearProbeProtocol(uuid, 'V1');
       Log?.debug('[ReactNativeBleTransport] Protocol V1 GetFeatures probe failed:', error);
+      // A wedged write already dropped the link, so probing another protocol on it
+      // would only fail against a torn-down transport: surface the real cause.
+      if (isWedgedWriteError(error)) {
+        throw error;
+      }
       return false;
     }
   }
@@ -1637,7 +1805,7 @@ export default class ReactNativeBleTransport {
       return false;
     }
 
-    this.deviceProtocol.set(uuid, 'V2');
+    this.probingProtocols.set(uuid, 'V2');
     this.protocolV2Assemblers.get(uuid)?.reset();
     const detected = await probeProtocolV2Helper({
       call: (name: string, data: Record<string, unknown>, options?: TransportCallOptions) =>
@@ -1652,6 +1820,8 @@ export default class ReactNativeBleTransport {
     });
     if (!detected) {
       this.clearProbeProtocol(uuid, 'V2');
+    } else {
+      this.probingProtocols.delete(uuid);
     }
     return detected;
   }
@@ -1733,6 +1903,7 @@ export default class ReactNativeBleTransport {
   }
 
   private async writeProtocolV2Packet(
+    uuid: string,
     transport: BleTransport,
     base64: string,
     context: ProtocolV2CallContext,
@@ -1748,11 +1919,24 @@ export default class ReactNativeBleTransport {
         throw new Error(`Protocol V2 BLE write aborted for ${context.messageName}`);
       }
       try {
-        if (shouldUseWriteWithResponse) {
-          await transport.writeCharacteristic.writeWithResponse(base64);
-        } else {
-          await transport.writeCharacteristic.writeWithoutResponse(base64);
-        }
+        await this.writeBlePacket(
+          uuid,
+          base64,
+          payload =>
+            shouldUseWriteWithResponse
+              ? transport.writeCharacteristic.writeWithResponse(payload)
+              : transport.writeCharacteristic.writeWithoutResponse(payload),
+          // Same rule as Protocol V1: a write from a superseded generation must not
+          // tear down the link that the current generation is using.
+          () => {
+            try {
+              assertCurrentGeneration();
+              return !context.signal.aborted;
+            } catch {
+              return false;
+            }
+          }
+        );
         assertCurrentGeneration();
         return;
       } catch (error) {
@@ -1775,6 +1959,7 @@ export default class ReactNativeBleTransport {
   }
 
   private async writeProtocolV2Frame(
+    uuid: string,
     transport: BleTransport,
     frame: Uint8Array,
     context: ProtocolV2CallContext,
@@ -1806,6 +1991,7 @@ export default class ReactNativeBleTransport {
       wait: delay,
       writePacket: packet =>
         this.writeProtocolV2Packet(
+          uuid,
           transport,
           Buffer.from(packet).toString('base64'),
           context,
@@ -1870,7 +2056,13 @@ export default class ReactNativeBleTransport {
       writeFrame: async (frame: Uint8Array, context: ProtocolV2CallContext) => {
         assertCurrentGeneration();
         const currentTransport = this.getCachedTransport(uuid);
-        await this.writeProtocolV2Frame(currentTransport, frame, context, assertCurrentGeneration);
+        await this.writeProtocolV2Frame(
+          uuid,
+          currentTransport,
+          frame,
+          context,
+          assertCurrentGeneration
+        );
       },
       readFrame: async () => {
         assertCurrentGeneration();
@@ -1895,6 +2087,6 @@ export default class ReactNativeBleTransport {
   }
 
   getProtocolType(path: string): ProtocolType | undefined {
-    return this.deviceProtocol.get(path);
+    return this.getActiveProtocol(path);
   }
 }
