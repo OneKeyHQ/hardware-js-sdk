@@ -396,6 +396,15 @@ export default class ElectronBleTransport {
   }
 
   /**
+   * `DeviceConnector.disconnect` feature-detects this method — without it the
+   * SDK's REQUIRE_DISCONNECT recovery silently does nothing on this transport,
+   * so keep-alive hands the wedged link to every retry.
+   */
+  async disconnect(id: string) {
+    return this.releaseNative(id);
+  }
+
+  /**
    * Hard teardown: physically drops the link. For error paths only (link-fatal
    * V2 errors, response timeouts) — a link presumed dead must not be reused by
    * the next call, which is exactly what keep-alive would otherwise do.
@@ -992,6 +1001,12 @@ export default class ElectronBleTransport {
         bufferState.bufferLength = dataView.getInt32(5, false);
         bufferState.buffer = [...data.subarray(3)];
       } else {
+        if (bufferState.buffer.length === 0) {
+          // Tail of a cancelled call's response, arriving after the buffer was
+          // reset (keep-alive outlives the call). Appending it would satisfy the
+          // `bufferLength === 0` check below and resolve the next call with garbage.
+          return { isComplete: false, error: 'Orphan continuation chunk discarded' };
+        }
         bufferState.buffer = bufferState.buffer.concat([...data]);
       }
 

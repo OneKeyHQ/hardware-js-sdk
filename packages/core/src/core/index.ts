@@ -944,6 +944,10 @@ async function connectDeviceForBle(method: BaseMethod, device: Device, retryCoun
       device.deviceConnector
     ) {
       await device.deviceConnector.disconnect(device.mainId).catch(() => undefined);
+      // The connector only drops the link; `deviceAcquired` is reset by
+      // release()/markTransportDisconnected() alone. Leaving it set makes the
+      // next attempt skip acquire and initialize onto the link we just cut.
+      device.markTransportDisconnected();
     }
     if (
       (err.errorCode === HardwareErrorCode.BleTimeoutError ||

@@ -900,19 +900,21 @@ async function enumerateDevices(): Promise<DeviceInfo[]> {
     };
 
     // Collect discovered devices into the devices array
-    const checkDevices = () => {
-      discoveredDevices.forEach((peripheral, id) => {
-        const existingDevice = devices.find(d => d.id === id);
-        if (!existingDevice) {
-          const deviceName = peripheral.advertisement?.localName || 'Unknown Device';
-          devices.push({
-            commType: 'electron-ble',
-            id,
-            name: deviceName,
-            state: peripheral.state || 'disconnected',
-          });
-        }
+    const pushDevice = (peripheral: Peripheral, id: string) => {
+      if (devices.some(d => d.id === id)) return;
+      devices.push({
+        commType: 'electron-ble',
+        id,
+        name: peripheral.advertisement?.localName || 'Unknown Device',
+        state: peripheral.state || 'disconnected',
       });
+    };
+    const checkDevices = () => {
+      discoveredDevices.forEach(pushDevice);
+      // A device we hold a link to stops advertising (standard BLE), so the scan
+      // above never rediscovers it — the one device the user is actively using
+      // would vanish from the list. Same fix as the Trezor handler (69699746).
+      connectedDevices.forEach(pushDevice);
     };
 
     // Set timeout for scanning — use longer timeout to catch slow-advertising devices like Pro2
@@ -1512,13 +1514,22 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
     }
 
     // Setup connection and discover services
-    const characteristics = await setupConnectionAndDiscoverServices(
-      peripheral,
-      deviceId,
-      webContents
-    );
-    deviceCharacteristics.set(deviceId, characteristics);
-    logger?.info('[NobleBLE] Device ready for communication:', deviceId);
+    try {
+      const characteristics = await setupConnectionAndDiscoverServices(
+        peripheral,
+        deviceId,
+        webContents
+      );
+      deviceCharacteristics.set(deviceId, characteristics);
+      logger?.info('[NobleBLE] Device ready for communication:', deviceId);
+    } catch (setupError) {
+      // The caller cleared the keep-alive timer before this and only re-arms on
+      // success, so leaving the link up would strand it: held by us, invisible
+      // to scans, released by nobody.
+      logger?.error('[NobleBLE] Connection setup failed on kept-alive link:', setupError);
+      await disconnectDevice(deviceId).catch(() => undefined);
+      throw setupError;
+    }
     return;
   }
 
