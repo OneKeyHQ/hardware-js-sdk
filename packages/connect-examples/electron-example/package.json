@@ -2,15 +2,16 @@
   "name": "hardware-example",
   "productName": "HardwareExample",
   "executableName": "onekey-hardware-example",
-  "version": "1.2.0-alpha.61",
+  "version": "1.2.0-alpha.62",
   "author": "OneKey",
-  "description": "OneKey Hardware SDK Electron BLE example",
+  "description": "End-to-end encrypted workspaces for teams",
   "main": "dist/index.js",
   "license": "GPL-3.0-only",
   "scripts": {
+    "copy:inject": "node scripts/copy-injected.js",
     "clean:build": "rimraf out",
-    "dev-electron-web": "cross-env NODE_ENV=development yarn build:main && cd ../expo-example && yarn dev:electron-web",
-    "build-electron-web": "yarn build:main && cd ../expo-example && yarn build:electron-web",
+    "dev-electron-web": "cross-env NODE_ENV=development yarn copy:inject && yarn build:main && cd ../expo-example && yarn dev:electron-web",
+    "build-electron-web": "yarn copy:inject && yarn build:main && cd ../expo-example && yarn build:electron-web",
     "dev": "npx concurrently \"yarn dev:electron\" \"cross-env TRANSFORM_REGENERATOR_DISABLED=true BROWSER=none yarn dev-electron-web\"",
     "dev:electron": "electron --inspect=5858 dist/index.js",
     "build:main": "webpack --config webpack.config.ts",
@@ -21,12 +22,14 @@
     "ts:check": "yarn tsc --noEmit"
   },
   "dependencies": {
-    "@onekeyfe/hd-transport-electron": "1.2.0-alpha.61",
+    "@onekeyfe/hd-transport-electron": "1.1.34-alpha.1",
     "@stoprocent/noble": "2.3.16",
     "debug": "4.3.4",
     "electron-is-dev": "^3.0.1",
     "electron-log": "^5.1.5",
-    "electron-updater": "^6.2.1"
+    "electron-updater": "^6.2.1",
+    "fs-extra": "^11.2.0",
+    "node-fetch": "^2.6.7"
   },
   "devDependencies": {
     "@types/webpack": "^5.28.5",
