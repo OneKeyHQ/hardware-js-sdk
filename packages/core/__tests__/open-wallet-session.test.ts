@@ -18,10 +18,14 @@ jest.mock('../src/data/config', () => ({
 
 const createDevice = ({
   passphraseProtection = true,
+  unlockedAttachPin = false,
+  refreshedUnlockedAttachPin = unlockedAttachPin,
   typedCall = jest.fn(),
   promptPassphrase = jest.fn(),
 }: {
   passphraseProtection?: boolean;
+  unlockedAttachPin?: boolean;
+  refreshedUnlockedAttachPin?: boolean;
   typedCall?: jest.Mock;
   promptPassphrase?: jest.Mock;
 } = {}) => {
@@ -30,8 +34,8 @@ const createDevice = ({
     features: {
       unlocked: true,
       passphraseProtection,
-      attachToPinEnabled: false,
-      unlockedAttachPin: false,
+      attachToPinEnabled: unlockedAttachPin,
+      unlockedAttachPin,
     },
     commands: {
       typedCall: jest.fn((request: string, ...args: unknown[]) => {
@@ -40,7 +44,9 @@ const createDevice = ({
             message: {
               device_id: 'device-1',
               unlocked: true,
-              unlocked_attach_pin: false,
+              attach_to_pin_enabled: unlockedAttachPin,
+              unlocked_attach_pin: refreshedUnlockedAttachPin,
+              unlocked_by_attach_to_pin: refreshedUnlockedAttachPin,
               passphrase_enabled: passphraseProtection,
             },
           };
@@ -82,8 +88,12 @@ const createDevice = ({
     unlockDevice: jest.fn(),
     updateProtocolV2Status: jest.fn((status: Record<string, unknown>) => {
       device.features.unlocked = status.unlocked ?? device.features.unlocked;
+      device.features.attachToPinEnabled =
+        status.attach_to_pin_enabled ?? device.features.attachToPinEnabled;
       device.features.unlockedAttachPin =
-        status.unlocked_attach_pin ?? device.features.unlockedAttachPin;
+        status.unlocked_by_attach_to_pin ??
+        status.unlocked_attach_pin ??
+        device.features.unlockedAttachPin;
       return device.features;
     }),
     initialize: jest.fn(),
@@ -672,32 +682,10 @@ describe('openWalletSession', () => {
       payload: { method: 'openWalletSession', connectId: 'connect-id', mode: 'select-hidden' },
     });
     method.init();
-    const device = createDevice({ typedCall, promptPassphrase });
-    device.features.attachToPinEnabled = true;
-    device.features.unlockedAttachPin = true;
-    device.commands.typedCall = jest.fn((request: string, ...args: unknown[]) => {
-      if (request === 'DeviceStatusGet') {
-        return {
-          message: {
-            device_id: 'device-1',
-            unlocked: true,
-            passphrase_enabled: true,
-            attach_to_pin_enabled: true,
-            unlocked_by_attach_to_pin: true,
-          },
-        };
-      }
-      return typedCall(request, ...args);
-    });
-    device.updateProtocolV2Status = jest.fn((status: Record<string, unknown>) => {
-      device.features.unlocked = status.unlocked ?? device.features.unlocked;
-      device.features.passphraseProtection =
-        status.passphrase_enabled ?? device.features.passphraseProtection;
-      device.features.attachToPinEnabled =
-        status.attach_to_pin_enabled ?? device.features.attachToPinEnabled;
-      device.features.unlockedAttachPin =
-        status.unlocked_by_attach_to_pin ?? device.features.unlockedAttachPin;
-      return device.features;
+    const device = createDevice({
+      typedCall,
+      promptPassphrase,
+      unlockedAttachPin: true,
     });
     method.device = device as any;
 
@@ -748,30 +736,11 @@ describe('openWalletSession', () => {
       payload: { method: 'openWalletSession', connectId: 'connect-id', mode: 'select-hidden' },
     });
     method.init();
-    const device = createDevice({ typedCall, promptPassphrase });
-    device.features.attachToPinEnabled = true;
-    device.features.unlockedAttachPin = true;
-    device.commands.typedCall = jest.fn((request: string, ...args: unknown[]) => {
-      if (request === 'DeviceStatusGet') {
-        return {
-          message: {
-            device_id: 'device-1',
-            unlocked: true,
-            passphrase_enabled: true,
-            attach_to_pin_enabled: true,
-            unlocked_by_attach_to_pin: false,
-          },
-        };
-      }
-      return typedCall(request, ...args);
-    });
-    device.updateProtocolV2Status = jest.fn((status: Record<string, unknown>) => {
-      device.features.unlocked = status.unlocked ?? device.features.unlocked;
-      device.features.passphraseProtection =
-        status.passphrase_enabled ?? device.features.passphraseProtection;
-      device.features.unlockedAttachPin =
-        status.unlocked_by_attach_to_pin ?? device.features.unlockedAttachPin;
-      return device.features;
+    const device = createDevice({
+      typedCall,
+      promptPassphrase,
+      unlockedAttachPin: true,
+      refreshedUnlockedAttachPin: false,
     });
     method.device = device as any;
 
