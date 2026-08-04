@@ -20,6 +20,7 @@ import {
   updateResourcesFromSources,
   uploadFirmwareFromSource,
 } from './firmware/uploadFirmware';
+import { BOOTLOADER_POLL_INITIALIZE_TIMEOUT_MS } from './firmware/FirmwareUpdateBaseMethod';
 import { LoggerNames, getDeviceUUID, getLogger, wait } from '../utils';
 import { FirmwareUpdateTipMessage, createUiMessage } from '../events/ui-request';
 import { DeviceModelToTypes } from '../types';
@@ -252,6 +253,10 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
     this.checkPromise = createDeferred();
     const env = DataManager.getSettings('env');
     const isBleReconnect = connectId && DataManager.isBleConnect(env);
+    // Tracks the in-flight BLE probe so interval ticks never overlap: a superseded
+    // Initialize left pending on the V1 transport is exactly what later times out
+    // and used to tear down the connection mid-firmware-upload.
+    let bleProbeInFlight = false;
 
     Log.log('FirmwareUpdateV2 [checkDeviceToBootloader] isBleReconnect: ', isBleReconnect);
 
@@ -299,6 +304,8 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
         }
 
         if (isBleReconnect) {
+          if (bleProbeInFlight) return;
+          bleProbeInFlight = true;
           try {
             await this.device.deviceConnector?.acquire(
               this.device.originalDescriptor.id,
@@ -306,7 +313,10 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
               true,
               this.payload.connectProtocol ?? this.device.originalDescriptor.protocolType
             );
-            await this.device.initialize();
+            // Bound each probe so a request the rebooting device never received
+            // frees the slot for the next tick instead of hanging into the
+            // 30s reboot budget.
+            await this.device.initialize({ timeoutMs: BOOTLOADER_POLL_INITIALIZE_TIMEOUT_MS });
             if (this.device.isBootloader()) {
               clearInterval(intervalTimer);
               this.checkPromise?.resolve(true);
@@ -314,6 +324,8 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
           } catch (e) {
             // ignore error because of device is not connected
             Log.log('catch Bluetooth error when device is restarting: ', e);
+          } finally {
+            bleProbeInFlight = false;
           }
         } else {
           await this._checkDeviceInBootloaderMode(connectId, intervalTimer, timeoutTimer);

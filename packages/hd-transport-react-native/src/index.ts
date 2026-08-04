@@ -1156,8 +1156,24 @@ export default class ReactNativeBleTransport {
     const transport = this.getCachedTransport(uuid);
     const runPromise = createDeferred<string>();
     runPromise.promise.catch(() => undefined);
+    const supersededRunPromise = this.runPromise;
+    if (supersededRunPromise) {
+      // Only forceRun calls (Initialize/Cancel) reach here with a pending call. Settle
+      // the superseded deferred now so its response race resolves and its finally block
+      // clears its timeout timer; an orphaned timer would otherwise fire much later and
+      // tear down the shared connection while another call is using it.
+      supersededRunPromise.reject(ERRORS.TypedError(HardwareErrorCode.BleForceCleanRunPromise));
+    }
     this.runPromise = runPromise;
     this.runPromiseDeviceId = uuid;
+    // A superseded call's late write failure must not clear the successor's ownership;
+    // only the call that still owns the slot may release it.
+    const releaseOwnershipIfCurrent = () => {
+      if (this.runPromise === runPromise) {
+        this.runPromise = null;
+        this.runPromiseDeviceId = null;
+      }
+    };
     const messages = this._messages;
     const buffers = ProtocolV1.encodeTransportPackets(messages, name, data);
     let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -1229,7 +1245,7 @@ export default class ReactNativeBleTransport {
         buffers,
         data => transport.writeWithRetry(data),
         e => {
-          this.runPromise = null;
+          releaseOwnershipIfCurrent();
           Log?.error('writeCharacteristic write error: ', e);
         }
       );
@@ -1269,7 +1285,7 @@ export default class ReactNativeBleTransport {
           }
         },
         e => {
-          this.runPromise = null;
+          releaseOwnershipIfCurrent();
           Log?.error('writeCharacteristic write error: ', e);
         }
       );
@@ -1287,7 +1303,7 @@ export default class ReactNativeBleTransport {
           }
         } catch (e) {
           Log?.debug('writeCharacteristic write error: ', e);
-          this.runPromise = null;
+          releaseOwnershipIfCurrent();
           if (e.errorCode === BleErrorCode.DeviceDisconnected) {
             throw ERRORS.TypedError(HardwareErrorCode.BleDeviceNotBonded);
           } else if (e.errorCode === BleErrorCode.OperationStartFailed) {
@@ -1330,8 +1346,13 @@ export default class ReactNativeBleTransport {
       }
       const isProbeTimeout =
         name === 'GetFeatures' && options?.timeoutMs === PROTOCOL_PROBE_TIMEOUT_MS;
+      // A call that has been superseded (forceRun) or cleaned up no longer owns the
+      // transport; its late timeout must not tear down the connection the current
+      // call is actively using.
+      const isStaleCall = this.runPromise !== runPromise;
       if (
         !isProbeTimeout &&
+        !isStaleCall &&
         (e as { errorCode?: unknown })?.errorCode === HardwareErrorCode.BleTimeoutError
       ) {
         await this.disconnect(uuid);
