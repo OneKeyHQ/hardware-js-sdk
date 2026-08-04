@@ -90,6 +90,16 @@ const DEVICE_SCAN_TIMEOUT = 5000; // 5 seconds for device scanning
 const DEVICE_CHECK_INTERVAL = 500; // 500ms interval for periodic device checks
 const SERVICE_DISCOVERY_TIMEOUT = 10000; // 10 seconds for service discovery
 const BLE_CLEANUP_TIMEOUT = 250;
+// Keep-alive idle window. release() from the renderer is logical only, so this
+// timer is what physically frees the device for other hosts (a BLE peripheral
+// serves one central at a time and does not advertise while connected). 60s
+// matches the device's own auto-lock default: past that the next operation
+// needs a PIN anyway, so holding the link longer buys nothing.
+const BLE_IDLE_DISCONNECT_MS = 60_000;
+// Ceiling while an operation is in flight. A slow on-device prompt (PIN,
+// passphrase, word entry) has no outstanding write, so the idle clock must not
+// run — but a wedged call must not hold the link forever either.
+const BLE_BUSY_BACKSTOP_MS = 10 * 60_000;
 
 // Write-related constants
 const BLE_PACKET_SIZE_FALLBACK = 192;
@@ -341,6 +351,40 @@ interface DeviceCleanupOptions {
   reason?: string;
 }
 
+// One timer per device: connect/subscribe arm the busy backstop, a logical
+// release arms the 60s idle clock. Lives in the main process so a renderer
+// reload cannot orphan a held link.
+const idleDisconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function clearIdleDisconnect(deviceId: string): void {
+  const timer = idleDisconnectTimers.get(deviceId);
+  if (timer) {
+    clearTimeout(timer);
+    idleDisconnectTimers.delete(deviceId);
+  }
+}
+
+function armIdleDisconnect(
+  deviceId: string,
+  ms: number = BLE_IDLE_DISCONNECT_MS,
+  reason: 'idle' | 'busy-backstop' = 'idle'
+): void {
+  clearIdleDisconnect(deviceId);
+  idleDisconnectTimers.set(
+    deviceId,
+    setTimeout(() => {
+      idleDisconnectTimers.delete(deviceId);
+      if (!connectedDevices.has(deviceId)) return;
+      logger?.info('[NobleBLE] Keep-alive timeout, disconnecting device', { deviceId, reason });
+      // Fire and forget: disconnectDevice broadcasts the disconnect event, so a
+      // call still blocked on this link rejects instead of hanging.
+      disconnectDevice(deviceId).catch(error => {
+        logger?.error('[NobleBLE] Keep-alive disconnect failed', { deviceId, error });
+      });
+    }, ms)
+  );
+}
+
 /**
  * Unified device cleanup function - single entry point for all cleanup operations
  */
@@ -365,6 +409,8 @@ function cleanupDevice(
     sendDisconnectEvent,
     cancelOperations,
   });
+
+  clearIdleDisconnect(deviceId);
 
   // Get device info before cleanup
   const peripheral = connectedDevices.get(deviceId);
@@ -1234,6 +1280,65 @@ async function setupConnectionAndDiscoverServices(
   }
 }
 
+// Time box on connect-by-id: noble/mac silently never resolves for an id
+// CoreBluetooth cannot retrieve, so a hang here would stall every connect.
+const DIRECT_CONNECT_TIMEOUT_MS = 2000;
+// Floor after a timeout, so a device that cannot be reached this way does not
+// pay the 2s probe on every attempt.
+const DIRECT_CONNECT_COOLDOWN_MS = 15_000;
+const directConnectCooldownUntil = new Map<string, number>();
+
+/**
+ * Connect straight by id, skipping the ~650ms targeted scan. Both native
+ * backends support it and emit a `discover` as a side effect: macOS resolves
+ * via `retrievePeripheralsWithIdentifiers`, Windows synthesizes one for an
+ * unknown address. Returns undefined when unavailable so the caller scans.
+ *
+ * Ported from the Trezor connector, where it is field-proven.
+ */
+async function tryDirectConnectById(deviceId: string): Promise<Peripheral | undefined> {
+  const nobleInstance = noble as
+    | (typeof noble & {
+        connectAsync?: (id: string) => Promise<Peripheral | undefined>;
+      })
+    | null;
+  if (!nobleInstance?.connectAsync) return undefined;
+
+  const cooldownUntil = directConnectCooldownUntil.get(deviceId) ?? 0;
+  if (Date.now() < cooldownUntil) return undefined;
+
+  let timedOut = false;
+  try {
+    const peripheral = await Promise.race([
+      nobleInstance.connectAsync(deviceId),
+      new Promise<undefined>(resolve => {
+        setTimeout(() => {
+          timedOut = true;
+          resolve(undefined);
+        }, DIRECT_CONNECT_TIMEOUT_MS);
+      }),
+    ]);
+    if (peripheral) {
+      logger?.info('[NobleBLE] Direct connect-by-id succeeded', { deviceId });
+      return peripheral;
+    }
+    if (timedOut) {
+      directConnectCooldownUntil.set(deviceId, Date.now() + DIRECT_CONNECT_COOLDOWN_MS);
+      logger?.info('[NobleBLE] Direct connect-by-id timed out, falling back to scan', {
+        deviceId,
+      });
+    }
+    return undefined;
+  } catch (error) {
+    directConnectCooldownUntil.set(deviceId, Date.now() + DIRECT_CONNECT_COOLDOWN_MS);
+    logger?.info('[NobleBLE] Direct connect-by-id failed, falling back to scan', {
+      deviceId,
+      error: String(error),
+    });
+    return undefined;
+  }
+}
+
 // Connect to device - supports both discovered and direct connection modes
 async function connectDevice(deviceId: string, webContents: WebContents): Promise<void> {
   logger?.info('[NobleBLE] Connect device request:', {
@@ -1260,6 +1365,15 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
       throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Noble not available');
     }
 
+    // Cheaper than a scan when it works, and reaches a bonded device that is
+    // not currently advertising. Falls through to the scan when it doesn't.
+    peripheral = await tryDirectConnectById(deviceId);
+    if (peripheral) {
+      discoveredDevices.set(deviceId, peripheral);
+    }
+  }
+
+  if (!peripheral) {
     // Perform a targeted scan to find the specific device
     try {
       const foundPeripheral = await performTargetedScan(deviceId);
@@ -1617,7 +1731,21 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
           hasCharacteristics: deviceCharacteristics.has(deviceId),
           totalConnectedDevices: connectedDevices.size,
         });
+        // An armed idle timer must not fire mid-connect (pairing can take ~30s).
+        clearIdleDisconnect(deviceId);
         await connectDevice(deviceId, webContents);
+        // An operation is now in flight: hold the long backstop, NOT the idle
+        // clock — that starts only when the renderer signals logical release.
+        armIdleDisconnect(deviceId, BLE_BUSY_BACKSTOP_MS, 'busy-backstop');
+      }
+    );
+
+    // Handle logical release: the operation is done, so start the idle
+    // countdown. The physical link is kept for the next call unless it elapses.
+    ipcMain.handle(
+      EOneKeyBleMessageKeys.NOBLE_BLE_RELEASE,
+      (_event: IpcMainInvokeEvent, deviceId: string) => {
+        if (connectedDevices.has(deviceId)) armIdleDisconnect(deviceId);
       }
     );
 

@@ -12,6 +12,12 @@ export interface NobleBleAPI {
   enumerate: () => Promise<{ id: string; name: string }[]>;
   getDevice: (uuid: string) => Promise<{ id: string; name: string; mtu?: number } | null>;
   connect: (uuid: string) => Promise<void>;
+  /**
+   * Logical end-of-operation (keep-alive). The link stays up; the main process
+   * starts its idle countdown. Without this bridge method the device is held
+   * for the full busy backstop instead of the short idle window.
+   */
+  release: (uuid: string) => Promise<void>;
   disconnect: (uuid: string) => Promise<void>;
   subscribe: (uuid: string) => Promise<void>;
   unsubscribe: (uuid: string) => Promise<void>;

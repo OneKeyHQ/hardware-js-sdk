@@ -139,6 +139,9 @@ export default class ElectronBleTransport {
     },
   });
 
+  /** One-shot guard so a missing preload `release` bridge is reported once. */
+  private warnedMissingRelease = false;
+
   private notificationCleanups: Map<string, () => void> = new Map();
 
   private mtuCleanups: Map<string, () => void> = new Map();
@@ -385,13 +388,18 @@ export default class ElectronBleTransport {
   async release(id: string) {
     try {
       await this.protocolV2Links.invalidateLink(id, 'Electron BLE transport released');
-      await this.releaseNative(id);
+      await this.releaseLogical(id);
     } catch (error) {
       this.Log?.error('[Electron BLE] release failed:', error);
       this.cleanupDeviceState(id);
     }
   }
 
+  /**
+   * Hard teardown: physically drops the link. For error paths only (link-fatal
+   * V2 errors, response timeouts) — a link presumed dead must not be reused by
+   * the next call, which is exactly what keep-alive would otherwise do.
+   */
   private async releaseNative(id: string) {
     try {
       if (this.connectedDevices.has(id)) {
@@ -403,6 +411,37 @@ export default class ElectronBleTransport {
       }
     } catch (error) {
       this.Log?.error('[Electron BLE] release failed:', error);
+      this.cleanupDeviceState(id);
+    }
+  }
+
+  /**
+   * Logical release (keep-alive): the link and subscription stay up for the
+   * next call and the main process starts its idle countdown. Renderer
+   * listeners still go, or the next acquire's fresh listeners would
+   * double-process every packet.
+   */
+  private async releaseLogical(id: string) {
+    try {
+      if (!this.connectedDevices.has(id)) return;
+      this.cleanupDeviceState(id);
+
+      const release = window.desktopApi?.nobleBle?.release;
+      if (!release) {
+        // Degraded, not broken: the link falls back to the busy backstop. Say so
+        // once — a silent regression here just looks like a slow device.
+        if (!this.warnedMissingRelease) {
+          this.warnedMissingRelease = true;
+          this.Log?.error(
+            '[Electron BLE] desktopApi.nobleBle.release is missing from the preload bridge; ' +
+              'keep-alive idle countdown will never start — map NOBLE_BLE_RELEASE in the desktop preload'
+          );
+        }
+        return;
+      }
+      await release(id);
+    } catch (error) {
+      this.Log?.error('[Electron BLE] logical release failed:', error);
       this.cleanupDeviceState(id);
     }
   }

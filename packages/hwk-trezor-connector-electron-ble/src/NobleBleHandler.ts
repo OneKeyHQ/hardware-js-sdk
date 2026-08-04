@@ -625,7 +625,6 @@ export class NobleBleHandler {
     // token flags the attempt as abandoned so a late success tears the link
     // down instead of committing it.
     const claim = { abandoned: false };
-    let timer: ReturnType<typeof setTimeout> | undefined;
     // The timeout is one way to abandon the attempt; cancelPairing is the other,
     // so the rejection is hoisted out of the timer and both share it.
     let abandon!: (error: Error) => void;
@@ -635,7 +634,7 @@ export class NobleBleHandler {
         reject(error);
       };
     });
-    timer = setTimeout(
+    const timer = setTimeout(
       () => abandon(new Error(`connect timed out after ${this._connectTimeoutMs}ms`)),
       this._connectTimeoutMs
     );

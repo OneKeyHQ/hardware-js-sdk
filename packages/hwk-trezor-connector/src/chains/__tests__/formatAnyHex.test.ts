@@ -162,9 +162,7 @@ describe('normalizeEvmSignTxHexFields', () => {
       maxPriorityFeePerGas: '0x1',
       accessList: [{ address: '0xabcdef0000000000000000000000000000000001' }],
     } as unknown as EvmSignTxTrezorParams);
-    expect(noKeys.accessList).toEqual([
-      { address: 'abcdef0000000000000000000000000000000001' },
-    ]);
+    expect(noKeys.accessList).toEqual([{ address: 'abcdef0000000000000000000000000000000001' }]);
   });
 
   it('rejects invalid hex in amount fields instead of signing truncated bytes', () => {
