@@ -98,7 +98,7 @@ function isOneKeyPeripheral(peripheral: Peripheral) {
 
   // Noble localName is the current advertisement name, so reject the Pro2
   // Find My endpoint before the communication-service fast path accepts it.
-  if (isPro2FindMyAdvertisementName(localName)) {
+  if (!localName?.trim() || isPro2FindMyAdvertisementName(localName)) {
     return false;
   }
 
