@@ -356,12 +356,25 @@ interface DeviceCleanupOptions {
 // reload cannot orphan a held link.
 const idleDisconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
+// A fired timer cannot be cancelled, and its disconnect takes a few hundred ms.
+// A connect arriving inside that window would see `state === 'connected'`, take
+// the already-connected fast path, and hand back a link that is torn down a
+// moment later — the renderer then probes a dead link (BleTimeoutError 713).
+// Connect awaits this instead.
+const idleDisconnectInFlight = new Map<string, Promise<void>>();
+
 function clearIdleDisconnect(deviceId: string): void {
   const timer = idleDisconnectTimers.get(deviceId);
   if (timer) {
     clearTimeout(timer);
     idleDisconnectTimers.delete(deviceId);
   }
+}
+
+/** Settle any keep-alive disconnect already running for this device. */
+async function awaitIdleDisconnect(deviceId: string): Promise<void> {
+  const pending = idleDisconnectInFlight.get(deviceId);
+  if (pending) await pending.catch(() => undefined);
 }
 
 function broadcastToAllWebContents(channel: string, payload: unknown): void {
@@ -392,7 +405,7 @@ function armIdleDisconnect(
       logger?.info('[NobleBLE] Keep-alive timeout, disconnecting device', { deviceId, reason });
       const peripheral = connectedDevices.get(deviceId);
       const deviceName = peripheral?.advertisement?.localName || 'Unknown Device';
-      disconnectDevice(deviceId)
+      const pending = disconnectDevice(deviceId)
         .then(() => {
           // disconnectDevice stays silent (its other caller is the renderer's
           // own request). On the busy backstop a call IS still in flight and
@@ -404,7 +417,13 @@ function armIdleDisconnect(
         })
         .catch(error => {
           logger?.error('[NobleBLE] Keep-alive disconnect failed', { deviceId, error });
+        })
+        .finally(() => {
+          if (idleDisconnectInFlight.get(deviceId) === pending) {
+            idleDisconnectInFlight.delete(deviceId);
+          }
         });
+      idleDisconnectInFlight.set(deviceId, pending);
     }, ms)
   );
 }
@@ -1776,6 +1795,9 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
         });
         // An armed idle timer must not fire mid-connect (pairing can take ~30s).
         clearIdleDisconnect(deviceId);
+        // A timer that already fired cannot be cancelled — let its disconnect
+        // finish first, or the fast path below would hand back a dying link.
+        await awaitIdleDisconnect(deviceId);
         await connectDevice(deviceId, webContents);
         // An operation is now in flight: hold the long backstop, NOT the idle
         // clock — that starts only when the renderer signals logical release.
