@@ -1,4 +1,5 @@
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { DeviceSessionPinType } from '@onekeyfe/hd-transport';
 
 import { LoggerNames, getLogger } from '../../utils';
 import { isProtocolV2UiEnabled, resolveProtocolV2UiInteraction } from './uiInteraction';
@@ -80,19 +81,12 @@ export async function runMethodWithUnlockPolicy<T = unknown>(
 
     await afterStatusBeforeUnlock?.();
 
-    const isStandardWalletRequest =
-      method.unlockPolicy !== 'unlock-before-run' &&
-      method.useDevicePassphraseState &&
-      method.payload?.useEmptyPassphrase === true;
-    const standardWalletSessionOwnsUnlock =
-      isStandardWalletRequest && status.passphraseProtection === true;
-
-    if (!status.unlocked && !standardWalletSessionOwnsUnlock) {
+    if (!status.unlocked) {
       const unlockInteraction: HardwareUiInteractionMeta | undefined = shouldCoordinateUi
         ? uiCoordinator.enterUnlockInteraction(method.name)
         : undefined;
       const unlockedStatus = await device.unlockDevice(
-        undefined,
+        DeviceSessionPinType.Main,
         shouldCoordinateUi
           ? { emitUiEvent: false, interaction: unlockInteraction }
           : {

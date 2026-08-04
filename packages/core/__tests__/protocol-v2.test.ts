@@ -2400,6 +2400,75 @@ describe('Protocol V2 feature adapter', () => {
     });
   });
 
+  test('fails closed instead of switching to Main PIN during a standard-wallet safety check', async () => {
+    const device = Device.fromDescriptor({ ...descriptor, protocolType: 'V2' } as any);
+    const typedCall = jest.fn((request: string) => {
+      if (request === 'ProtocolInfoRequest') {
+        return { message: { version: 2 } };
+      }
+      if (request === 'DeviceStatusGet') {
+        return {
+          message: {
+            device_id: 'attach-wallet-device',
+            unlocked: true,
+            passphrase_enabled: true,
+            attach_to_pin_enabled: true,
+            unlocked_by_attach_to_pin: true,
+          },
+        };
+      }
+      if (request === 'DeviceSessionAskPin' || request === 'DeviceSessionAskPassphrase') {
+        return { message: { message: 'Wallet selected' } };
+      }
+      if (request === 'DeviceSessionGet') {
+        return {
+          message: {
+            session_id: 'main-wallet-session',
+            btc_test_address: 'main-wallet-state',
+          },
+        };
+      }
+      if (request === 'LockDevice') {
+        return { message: { message: 'Device locked' } };
+      }
+      throw new Error(`Unexpected request: ${request}`);
+    });
+
+    (device as any).features = normalizeProtocolV2Features(
+      { ...descriptor, protocolType: 'V2' } as any,
+      {
+        status: {
+          device_id: 'attach-wallet-device',
+          unlocked: true,
+          passphrase_enabled: true,
+          attach_to_pin_enabled: true,
+          // 模拟缓存滞后：设备状态刷新后才确认当前由 Attach PIN 解锁。
+          unlocked_by_attach_to_pin: false,
+        },
+      }
+    );
+    (device as any).commands = { typedCall };
+    const clearInternalState = jest.spyOn(device, 'clearInternalState');
+
+    await expect(device.checkPassphraseStateSafety(undefined, true, false)).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.DeviceCheckUnlockTypeError,
+    });
+
+    expect(typedCall).toHaveBeenCalledWith('DeviceStatusGet', 'DeviceStatus', {});
+    expect(typedCall).toHaveBeenCalledWith('LockDevice', 'Success', {});
+    expect(typedCall).not.toHaveBeenCalledWith(
+      'DeviceSessionAskPin',
+      'Success',
+      expect.anything()
+    );
+    expect(typedCall).not.toHaveBeenCalledWith(
+      'DeviceSessionAskPassphrase',
+      'Success',
+      expect.anything()
+    );
+    expect(clearInternalState).toHaveBeenCalledTimes(1);
+  });
+
   test('useEmptyPassphrase ignores a stale hidden-wallet state during Protocol V2 safety check', async () => {
     const device = Device.fromDescriptor({ ...descriptor, protocolType: 'V2' } as any);
     const typedCall = createWalletSessionTypedCall(
@@ -2430,7 +2499,7 @@ describe('Protocol V2 feature adapter', () => {
     await expect(
       device.checkPassphraseStateSafety('stale-hidden-state', true, false)
     ).resolves.toBe(true);
-    expect(typedCall).toHaveBeenCalledTimes(4);
+    expect(typedCall).toHaveBeenCalledTimes(5);
     expect(typedCall).toHaveBeenCalledWith('ProtocolInfoRequest', 'ProtocolInfo', {
       eventless_wallet_session: true,
     });
@@ -2442,6 +2511,7 @@ describe('Protocol V2 feature adapter', () => {
       on_device: false,
     });
     expect(typedCall).toHaveBeenCalledWith('DeviceStatusGet', 'DeviceStatus', {});
+    expect(typedCall.mock.calls.filter(([request]) => request === 'DeviceStatusGet')).toHaveLength(2);
     expect(typedCall).not.toHaveBeenCalledWith('DeviceSessionAskPin', 'Success', expect.anything());
   });
 
@@ -7001,6 +7071,29 @@ describe('Protocol V2 current low-level methods', () => {
 
     await expect(method.run()).resolves.toBe(features);
     expect(unlockDevice).toHaveBeenCalledTimes(1);
+    expect(unlockDevice).toHaveBeenCalledWith(DeviceSessionPinType.Main, {
+      emitUiEvent: false,
+    });
+  });
+
+  test('forwards an explicit PIN type when unlocking a Protocol V2 device', async () => {
+    const method = new DeviceUnlock({
+      id: 1,
+      payload: {
+        method: 'deviceUnlock',
+        pinType: DeviceSessionPinType.Any,
+      },
+    });
+    method.init();
+
+    const unlockDevice = jest.fn().mockResolvedValue({ unlocked: true });
+    (method as any).device = { unlockDevice };
+
+    await method.run();
+
+    expect(unlockDevice).toHaveBeenCalledWith(DeviceSessionPinType.Any, {
+      emitUiEvent: false,
+    });
   });
 
   test.each([

@@ -210,7 +210,9 @@ export type DeviceStateStatus = {
   recoveryMode: boolean | null;
   passphraseProtection: boolean | null;
   pinProtection: boolean | null;
+  /** `attach_to_pin_enabled`：是否至少存在一个 Attach PIN 绑定。 */
   attachToPinEnabled: boolean | null;
+  /** `unlocked_by_attach_to_pin`：本次解锁是否由 Attach PIN 完成。 */
   unlockedAttachPin: boolean | null;
 };
 
@@ -321,6 +323,7 @@ export type NormalizedFeatures = {
   sdProtection: boolean | null;
   wipeCodeProtection: boolean | null;
   passphraseAlwaysOnDevice: boolean | null;
+  /** `attach_to_pin_enabled`：是否至少存在一个 Attach PIN 绑定。 */
   attachToPinEnabled?: boolean | null;
   safetyChecks: Enum_SafetyCheckLevel | null;
   autoLockDelayMs: number | null;

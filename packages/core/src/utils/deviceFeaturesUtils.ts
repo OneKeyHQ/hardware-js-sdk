@@ -107,6 +107,7 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (
     onlyMainPin?: boolean;
     initSession?: boolean;
     deriveCardano?: boolean;
+    rejectAttachPinForMainWallet?: boolean;
   }
 ) => {
   if (device.isProtocolV2()) {
@@ -123,6 +124,7 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (
       expectedPassphraseState: options?.expectPassphraseState,
       onlyMainPin: options?.onlyMainPin,
       deriveCardano: options?.deriveCardano,
+      rejectAttachPinForMainWallet: options?.rejectAttachPinForMainWallet,
     });
   }
 
@@ -188,6 +190,7 @@ export const getPassphraseState = async (
     onlyMainPin?: boolean;
     initSession?: boolean;
     deriveCardano?: boolean;
+    rejectAttachPinForMainWallet?: boolean;
   }
 ): Promise<{
   passphraseState: string | undefined;
@@ -209,6 +212,7 @@ export const getPassphraseState = async (
       expectedPassphraseState: options?.expectPassphraseState,
       onlyMainPin: options?.onlyMainPin,
       deriveCardano: options?.deriveCardano,
+      rejectAttachPinForMainWallet: options?.rejectAttachPinForMainWallet,
     });
   }
 

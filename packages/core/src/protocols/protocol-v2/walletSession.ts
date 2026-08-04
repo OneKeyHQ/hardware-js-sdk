@@ -184,6 +184,8 @@ export async function getProtocolV2WalletSession(
     initSession?: boolean;
     expectedPassphraseState?: string;
     onlyMainPin?: boolean;
+    /** 业务安全校验遇到 Attach PIN 上下文时直接拒绝，不主动切换钱包。 */
+    rejectAttachPinForMainWallet?: boolean;
     selectMainWalletBeforeRestore?: boolean;
     resumeOnly?: boolean;
     deriveCardano?: boolean;
@@ -243,9 +245,18 @@ export async function getProtocolV2WalletSession(
     } catch {
       // Reject the mismatched Attach PIN wallet even when older firmware cannot lock.
     }
-    clearCurrentWalletSession();
+    if (options?.rejectAttachPinForMainWallet) {
+      device.clearStandardInternalState?.();
+      device.clearInternalState();
+    } else {
+      clearCurrentWalletSession();
+    }
     throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckUnlockTypeError);
   };
+
+  if (options?.onlyMainPin && options.rejectAttachPinForMainWallet) {
+    await rejectMismatchedAttachPinWallet();
+  }
 
   const selectMainPin = async (force = false) => {
     if (force || !mainPinSelected) {

@@ -1836,6 +1836,7 @@ export class Device extends EventEmitter {
         expectPassphraseState: expectedPassphraseState,
         onlyMainPin: useEmptyPassphrase,
         deriveCardano,
+        rejectAttachPinForMainWallet: useEmptyPassphrase === true,
       });
 
     // Main wallet and unlock Attach Pin, throw safe error

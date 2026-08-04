@@ -1,3 +1,5 @@
+import { DeviceSessionPinType } from '@onekeyfe/hd-transport';
+
 import ConfluxSignMessageCIP23 from '../src/api/conflux/ConfluxSignMessageCIP23';
 import DeviceLock from '../src/api/device/DeviceLock';
 import { runMethodWithUnlockPolicy } from '../src/protocols/protocol-v2/unlockPolicyRunner';
@@ -61,7 +63,7 @@ describe('Protocol V2 unlock semantics', () => {
     expect(method.run).toHaveBeenCalledTimes(1);
   });
 
-  test('lets the standard wallet session own the Main PIN unlock', async () => {
+  test('pre-unlocks a locked standard wallet before wallet-session preparation', async () => {
     const calls: string[] = [];
     const features = {
       unlocked: false,
@@ -95,7 +97,7 @@ describe('Protocol V2 unlock semantics', () => {
       isRomloader: () => false,
       updateProtocolV2Status: jest.fn(() => features),
       unlockDevice: jest.fn().mockImplementation(() => {
-        calls.push('wallet-session-unlock');
+        calls.push('pre-unlock');
         features.unlocked = true;
         return Promise.resolve(features);
       }),
@@ -103,14 +105,17 @@ describe('Protocol V2 unlock semantics', () => {
 
     await expect(
       runMethodWithUnlockPolicy(method as any, device as any, {
-        prepare: async () => {
-          await device.unlockDevice();
+        prepare: () => {
+          calls.push('prepare');
+          expect(features.unlocked).toBe(true);
+          return Promise.resolve();
         },
       })
     ).resolves.toEqual({ message: 'ok' });
 
-    expect(calls).toEqual(['status', 'wallet-session-unlock', 'run']);
+    expect(calls).toEqual(['status', 'pre-unlock', 'prepare', 'run']);
     expect(device.unlockDevice).toHaveBeenCalledTimes(1);
+    expect(device.unlockDevice).toHaveBeenCalledWith(DeviceSessionPinType.Main, expect.any(Object));
   });
 
   test('reuses a Main PIN selected by pre-unlock when locked status hides passphrase state', async () => {
