@@ -614,7 +614,7 @@ describe('openWalletSession', () => {
     expect(promptPassphrase).not.toHaveBeenCalled();
   });
 
-  test('rejects a Pro2 standard-wallet fallback after selecting a hidden wallet', async () => {
+  test('rejects before prompting for a hidden wallet when Pro2 passphrase is disabled', async () => {
     const typedCall = jest
       .fn()
       .mockResolvedValueOnce({ message: { version: 2 } })
@@ -641,6 +641,12 @@ describe('openWalletSession', () => {
       errorCode: HardwareErrorCode.DeviceNotOpenedPassphrase,
     });
     expect(device.clearInternalState).toHaveBeenCalled();
+    expect(promptPassphrase).not.toHaveBeenCalled();
+    expect(typedCall).not.toHaveBeenCalledWith(
+      'DeviceSessionAskPassphrase',
+      'Success',
+      expect.anything()
+    );
   });
 
   test('select-hidden starts a fresh hidden-wallet session on Protocol V2', async () => {

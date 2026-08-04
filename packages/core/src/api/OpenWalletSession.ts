@@ -216,7 +216,11 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
     }
 
     this.device.passphraseState = undefined;
-    await ensureProtocolV2WalletStatus();
+    const walletStatus = await ensureProtocolV2WalletStatus();
+    if (isProtocolV2 && walletStatus.status.passphraseProtection !== true) {
+      this.device.clearInternalState();
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceNotOpenedPassphrase);
+    }
     const session = isProtocolV2
       ? await getProtocolV2WalletSession(this.device, {
           forceWalletSelection: true,
