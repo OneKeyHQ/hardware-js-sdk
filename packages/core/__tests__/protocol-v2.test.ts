@@ -7377,6 +7377,7 @@ describe('Protocol V2 current low-level methods', () => {
       },
     });
     setMethod.init();
+    expect(setMethod.getSupportedProtocols()).toEqual(['V2']);
     expect(setMethod.requireDeviceMode).toEqual([UI_REQUEST.BOOTLOADER]);
     (setMethod as any).device = stubDevice({ commands: { typedCall } });
 
@@ -7398,6 +7399,7 @@ describe('Protocol V2 current low-level methods', () => {
       payload: { method: 'deviceFactoryInfoGet' },
     });
     getMethod.init();
+    expect(getMethod.getSupportedProtocols()).toEqual(['V2']);
     (getMethod as any).device = stubDevice({ commands: { typedCall } });
 
     await getMethod.run();
@@ -7448,6 +7450,7 @@ describe('Protocol V2 current low-level methods', () => {
       },
     });
     write.init();
+    expect(write.getSupportedProtocols()).toEqual(['V2']);
     expect(write.requireDeviceMode).toEqual([UI_REQUEST.BOOTLOADER]);
     (write as any).device = stubDevice({ commands: { typedCall } });
     await write.run();
@@ -7464,6 +7467,7 @@ describe('Protocol V2 current low-level methods', () => {
       payload: { method: 'deviceReadFactoryCertificate' },
     });
     read.init();
+    expect(read.getSupportedProtocols()).toEqual(['V2']);
     (read as any).device = stubDevice({ commands: { typedCall } });
     await read.run();
     expect(typedCall).toHaveBeenLastCalledWith('DeviceCertificateRead', 'DeviceCertificate', {});
@@ -7476,6 +7480,7 @@ describe('Protocol V2 current low-level methods', () => {
       },
     });
     sign.init();
+    expect(sign.getSupportedProtocols()).toEqual(['V2']);
     (sign as any).device = stubDevice({ commands: { typedCall } });
     await sign.run();
     expect(typedCall).toHaveBeenLastCalledWith(

@@ -450,6 +450,102 @@ const api: PlaygroundProps[] = [
       },
     ],
   },
+  {
+    method: 'deviceReadFactoryInfo',
+    description: 'Read Pro2 factory information (Protocol V2).',
+    noDeviceIdReq: true,
+    expect: {
+      common: {
+        normal: { skip: true },
+        bootloader: { skip: true },
+      },
+      pro2: {
+        normal: { success: true },
+        bootloader: { success: true },
+      },
+    },
+  },
+  {
+    method: 'deviceReadFactoryCertificate',
+    description: 'Read the Pro2 factory certificate (Protocol V2).',
+    noDeviceIdReq: true,
+    expect: {
+      common: {
+        normal: { skip: true },
+        bootloader: { skip: true },
+      },
+      pro2: {
+        normal: { success: true },
+        bootloader: { success: true },
+      },
+    },
+  },
+  {
+    method: 'deviceSignFactoryChallenge',
+    description: 'Sign a test challenge with the Pro2 attestation key.',
+    noDeviceIdReq: true,
+    presupposes: [
+      {
+        title: 'Sign test digest',
+        value: {
+          digest: '22'.repeat(32),
+          connectProtocol: 'V2',
+        },
+        expect: {
+          common: {
+            normal: { skip: true },
+            bootloader: { skip: true },
+          },
+          pro2: {
+            normal: { requestButton: true },
+            bootloader: { skip: true },
+          },
+        },
+      },
+    ],
+  },
+  {
+    method: 'deviceProvisionFactoryInfo',
+    description: 'Write-once Pro2 provisioning API; batch execution is disabled.',
+    noDeviceIdReq: true,
+    presupposes: [
+      {
+        title: 'Validation-only placeholder',
+        value: { connectProtocol: 'V2' },
+        expect: {
+          common: {
+            normal: { skip: true },
+            bootloader: { skip: true },
+          },
+          pro2: {
+            normal: { skip: true },
+            bootloader: { skip: true },
+          },
+        },
+      },
+    ],
+  },
+  {
+    method: 'deviceWriteFactoryCertificate',
+    description: 'Write-once Pro2 certificate API; batch execution is disabled.',
+    noDeviceIdReq: true,
+    presupposes: [
+      {
+        title: 'Validation-only placeholder',
+        value: { connectProtocol: 'V2' },
+        expect: {
+          common: {
+            normal: { skip: true },
+            bootloader: { skip: true },
+          },
+          pro2: {
+            normal: { skip: true },
+            bootloader: { skip: true },
+          },
+        },
+      },
+    ],
+  },
 ];
 
 export default api;
