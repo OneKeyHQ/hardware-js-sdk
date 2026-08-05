@@ -150,12 +150,12 @@ Pro 2 最多提供 `se1` 至 `se4` 四组安全芯片信息。每组可以包含
 
 SDK 当前使用的典型范围：
 
-| 场景        | 读取内容                                           | 原因                         |
-| ----------- | -------------------------------------------------- | ---------------------------- |
+| 场景        | 读取内容                                           | 原因                                         |
+| ----------- | -------------------------------------------------- | -------------------------------------------- |
 | 初始化      | hw、fw、coprocessor；version、specific             | 建立静态信息，结合 ProtocolInfo 识别运行阶段 |
-| 轻量刷新    | hw、fw、coprocessor；version、specific             | 刷新静态信息，不隐式读取状态 |
-| versions    | hw、fw、coprocessor、se1 至 se4；version、specific | 展示所有组件版本             |
-| verify/full | 所有 target；version、build_id、hash、specific     | 设备完整校验                 |
+| 轻量刷新    | hw、fw、coprocessor；version、specific             | 刷新静态信息，不隐式读取状态                 |
+| versions    | hw、fw、coprocessor、se1 至 se4；version、specific | 展示所有组件版本                             |
+| verify/full | 所有 target；version、build_id、hash、specific     | 设备完整校验                                 |
 
 ## 6. 设备实时状态
 
@@ -451,13 +451,16 @@ DeviceFactoryInfoSet -> Success
 
 生产工具通过带业务语义的 Protocol V2 API 访问制造信息和设备证书，原始 protobuf 命令不进入公共 `CoreApi`：
 
-| 公共 API                        | 运行模式           | 职责                                     |
-| ------------------------------- | ------------------ | ---------------------------------------- |
-| `deviceReadFactoryInfo`         | application/loader | 读取制造信息                             |
-| `deviceProvisionFactoryInfo`    | bootloader         | 提交完整制造信息                         |
-| `deviceReadFactoryCertificate`  | application/loader | 读取设备证书，不导出设备私钥             |
-| `deviceWriteFactoryCertificate` | bootloader         | 提交设备证书和可选的 32 字节设备私钥     |
-| `deviceSignFactoryChallenge`    | application/loader | 对调用方提供的 32 字节摘要执行设备内签名 |
+| API                             | 暴露位置                     | 运行模式           | 职责                                     |
+| ------------------------------- | ---------------------------- | ------------------ | ---------------------------------------- |
+| `deviceReadFactoryInfo`         | 生产 `CoreApi`               | application/loader | 读取制造信息                             |
+| `deviceProvisionFactoryInfo`    | `@onekeyfe/hd-test-api` 扩展 | bootloader         | 提交完整制造信息                         |
+| `deviceReadFactoryCertificate`  | 生产 `CoreApi`               | application/loader | 读取设备证书，不导出设备私钥             |
+| `deviceWriteFactoryCertificate` | `@onekeyfe/hd-test-api` 扩展 | bootloader         | 提交设备证书和可选的 32 字节设备私钥     |
+| `deviceSignFactoryChallenge`    | 生产 `CoreApi`               | application/loader | 对调用方提供的 32 字节摘要执行设备内签名 |
+
+两项写入方法只有在创建测试 SDK 时显式设置 `allowDestructiveOperations: true` 才能调度；
+默认测试实例即使暴露类型化包装方法，也会在 Core 方法解析阶段拒绝执行。
 
 本节只定义 SDK 接口职责和权限边界；具体写号顺序、断点重试与工位操作由写号工具文档维护。
 
