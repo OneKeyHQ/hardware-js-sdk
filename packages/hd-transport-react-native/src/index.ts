@@ -229,6 +229,13 @@ const fallbackConnectOptions: Record<string, unknown> = {
  */
 export const BLE_CONNECT_TIMEOUT_MS = BLE_NATIVE_CONNECT_TIMEOUT_MS * 2 + 2000;
 /**
+ * Service discovery and characteristic resolution run after connect() succeeds, but
+ * CoreBluetooth schedules them on the same serial queue. If that queue is wedged by a
+ * device reboot, these calls can remain pending forever unless they have their own
+ * budget.
+ */
+export const BLE_GATT_SETUP_TIMEOUT_MS = 10_000;
+/**
  * How many times a known device may fail its own protocol before we probe the others
  * again. Reconnect polling during a device reboot repeats this every few seconds, and
  * probing Protocol V2 costs a 10s Ping timeout, so paying it on every attempt for a
@@ -236,13 +243,15 @@ export const BLE_CONNECT_TIMEOUT_MS = BLE_NATIVE_CONNECT_TIMEOUT_MS * 2 + 2000;
  * change a device's protocol, so the shortcut has to expire rather than stick.
  */
 export const PROTOCOL_REPROBE_FALLBACK_ATTEMPTS = 3;
-/** Consecutive connect timeouts on one device before the BLE manager itself is recreated. */
+/** BLE setup timeouts since the last successful setup before the manager is recreated. */
 export const BLE_CONNECT_TIMEOUT_MANAGER_RESET_THRESHOLD = 2;
 const CONNECT_TIMEOUT_MESSAGE = 'BLE connect timeout after';
 const isConnectTimeoutError = (error: unknown): boolean =>
   (error as { errorCode?: unknown })?.errorCode === HardwareErrorCode.BleConnectedError &&
   typeof (error as { message?: unknown })?.message === 'string' &&
   (error as { message: string }).message.startsWith(CONNECT_TIMEOUT_MESSAGE);
+const isNativeOperationTimeoutError = (error: unknown): boolean =>
+  (error as { errorCode?: unknown })?.errorCode === BleErrorCode.OperationTimedOut;
 
 export type IOneKeyDevice = OneKeyDeviceInfoBase & Device;
 
@@ -343,8 +352,8 @@ export default class ReactNativeBleTransport {
   /** Consecutive write timeouts per device; reset by any write that completes. */
   private writeTimeoutCounts: Map<string, number> = new Map();
 
-  /** Consecutive connect timeouts per device; reset by any connect that settles. */
-  private connectTimeoutCounts: Map<string, number> = new Map();
+  /** BLE setup timeouts per device since the last complete characteristic resolution. */
+  private connectionSetupTimeoutCounts: Map<string, number> = new Map();
 
   private deviceProtocolHints: Map<string, ProtocolType> = new Map();
 
@@ -584,9 +593,8 @@ export default class ReactNativeBleTransport {
         }
       }
 
-      const { writeCharacteristic, notifyCharacteristic } = await this.resolveCharacteristics(
-        device
-      );
+      const { writeCharacteristic, notifyCharacteristic } =
+        await this.resolveCharacteristicsWithTimeout(uuid, device);
 
       transport.device = device;
       transport.writeCharacteristic = writeCharacteristic;
@@ -765,7 +773,7 @@ export default class ReactNativeBleTransport {
     characteristics?: ResolvedBleCharacteristics
   ) {
     const { writeCharacteristic, notifyCharacteristic } =
-      characteristics ?? (await this.resolveCharacteristics(device));
+      characteristics ?? (await this.resolveCharacteristicsWithTimeout(uuid, device));
     const transport = new BleTransport(device, writeCharacteristic, notifyCharacteristic);
     if (Platform.OS === 'android') {
       transport.mtuSize = typeof device.mtu === 'number' ? device.mtu : transport.mtuSize;
@@ -940,9 +948,8 @@ export default class ReactNativeBleTransport {
 
     device = await requestAndroidMtu(device);
     const acquiredDevice = device;
-    const { writeCharacteristic, notifyCharacteristic } = await this.resolveCharacteristics(
-      acquiredDevice
-    );
+    const { writeCharacteristic, notifyCharacteristic } =
+      await this.resolveCharacteristicsWithTimeout(uuid, acquiredDevice);
 
     const protocolHint = expectedProtocol
       ? undefined
@@ -1594,11 +1601,46 @@ export default class ReactNativeBleTransport {
           }, BLE_CONNECT_TIMEOUT_MS);
         }),
       ]);
-      this.connectTimeoutCounts.delete(uuid);
       return result;
     } catch (error) {
-      if (timedOut) {
-        this.abandonStalledConnect(uuid);
+      if (timedOut || isNativeOperationTimeoutError(error)) {
+        this.abandonStalledConnection(uuid, timedOut ? 'connect-backstop' : 'connect-native');
+      }
+      throw error;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
+  /** Resolve the complete GATT shape under a budget so acquire() always settles. */
+  private async resolveCharacteristicsWithTimeout(
+    uuid: string,
+    device: Device
+  ): Promise<ResolvedBleCharacteristics> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let timedOut = false;
+    const pending = this.resolveCharacteristics(device);
+    pending.catch(() => undefined);
+    try {
+      const result = await Promise.race([
+        pending,
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => {
+            timedOut = true;
+            reject(
+              ERRORS.TypedError(
+                HardwareErrorCode.BleConnectedError,
+                `BLE GATT setup timeout after ${BLE_GATT_SETUP_TIMEOUT_MS}ms for ${uuid}`
+              )
+            );
+          }, BLE_GATT_SETUP_TIMEOUT_MS);
+        }),
+      ]);
+      this.connectionSetupTimeoutCounts.delete(uuid);
+      return result;
+    } catch (error) {
+      if (timedOut || isNativeOperationTimeoutError(error)) {
+        this.abandonStalledConnection(uuid, timedOut ? 'gatt-backstop' : 'gatt-native');
       }
       throw error;
     } finally {
@@ -1607,16 +1649,19 @@ export default class ReactNativeBleTransport {
   }
 
   /**
-   * Give up on a connect the native layer never settled. The abandoned attempt still
-   * holds a native "connecting" entry that would cancel the NEXT attempt out from under
-   * itself, so it is cleared here — fire and forget, because that call talks to the very
-   * queue that just stopped responding.
+   * Give up on a BLE setup operation the native layer did not settle. The abandoned
+   * operation still owns native connection/GATT state that can poison the next attempt,
+   * so it is cleared here without awaiting the same queue that stopped responding.
    */
-  private abandonStalledConnect(uuid: string) {
-    const timeouts = (this.connectTimeoutCounts.get(uuid) ?? 0) + 1;
-    this.connectTimeoutCounts.set(uuid, timeouts);
-    Log?.error('[ReactNativeBleTransport] BLE connect timed out:', uuid, {
-      consecutiveConnectTimeouts: timeouts,
+  private abandonStalledConnection(
+    uuid: string,
+    stage: 'connect-backstop' | 'connect-native' | 'gatt-backstop' | 'gatt-native'
+  ) {
+    const timeouts = (this.connectionSetupTimeoutCounts.get(uuid) ?? 0) + 1;
+    this.connectionSetupTimeoutCounts.set(uuid, timeouts);
+    Log?.error('[ReactNativeBleTransport] BLE setup timed out:', uuid, {
+      stage,
+      setupTimeoutsSinceSuccess: timeouts,
     });
 
     this.blePlxManager?.cancelDeviceConnection(uuid).catch(() => {
@@ -1634,9 +1679,9 @@ export default class ReactNativeBleTransport {
     if (timeouts >= BLE_CONNECT_TIMEOUT_MANAGER_RESET_THRESHOLD) {
       // BleManager.destroy() force-rejects every promise the native queue abandoned —
       // the only JS-reachable way to settle them — and drops all cached peripherals.
-      Log?.error('[ReactNativeBleTransport] BLE connects wedged repeatedly, resetting BLE manager');
+      Log?.error('[ReactNativeBleTransport] BLE setup wedged repeatedly, resetting BLE manager');
       this.resetPlxManager();
-      this.connectTimeoutCounts.delete(uuid);
+      this.connectionSetupTimeoutCounts.delete(uuid);
     }
   }
 

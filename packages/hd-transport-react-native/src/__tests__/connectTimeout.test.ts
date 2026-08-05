@@ -1,10 +1,12 @@
 import { EventEmitter } from 'events';
+import { BleErrorCode } from 'react-native-ble-plx';
 
 import { HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import ReactNativeBleTransport, {
   BLE_CONNECT_TIMEOUT_MS,
   BLE_CONNECT_TIMEOUT_MANAGER_RESET_THRESHOLD,
+  BLE_GATT_SETUP_TIMEOUT_MS,
 } from '../index';
 
 import messages from '@onekeyfe/hd-transport/messages.json';
@@ -31,6 +33,7 @@ jest.mock('react-native-ble-plx', () => ({
     OperationStartFailed: 601,
     DeviceMTUChangeFailed: 401,
     OperationCancelled: 2,
+    OperationTimedOut: 3,
     DeviceAlreadyConnected: 203,
   },
   BleManager: jest.fn(),
@@ -66,6 +69,14 @@ async function advanceUntil(settled: () => boolean, totalMs: number, stepMs = 25
 /** A device whose native connect() never settles — the observed iOS failure mode. */
 function createHarness(connectImpl: () => Promise<unknown>) {
   const connect = jest.fn(connectImpl);
+  const writeCharacteristic = {
+    uuid: '00000002-0000-1000-8000-00805f9b34fb',
+    isWritableWithResponse: true,
+  };
+  const notifyCharacteristic = {
+    uuid: '00000003-0000-1000-8000-00805f9b34fb',
+    isNotifiable: true,
+  };
   const device = {
     id: UUID,
     name: 'OneKey Classic',
@@ -74,6 +85,11 @@ function createHarness(connectImpl: () => Promise<unknown>) {
     isConnected: jest.fn(() => Promise.resolve(false)),
     cancelConnection: jest.fn(() => Promise.resolve()),
     connect,
+    discoverAllServicesAndCharacteristics: jest.fn(() => Promise.resolve()),
+    characteristicsForService: jest.fn(() =>
+      Promise.resolve([writeCharacteristic, notifyCharacteristic])
+    ),
+    services: jest.fn(() => Promise.resolve([])),
     onDisconnected: jest.fn(() => ({ remove: jest.fn() })),
   };
   const transport = new ReactNativeBleTransport({ scanTimeout: 1 });
@@ -188,5 +204,79 @@ describe('BLE connect timeout', () => {
 
     expect(destroy).toHaveBeenCalledTimes(1);
     expect((transport as unknown as { blePlxManager?: unknown }).blePlxManager).toBeUndefined();
+  });
+
+  test('native connect timeouts contribute to the same manager reset budget', async () => {
+    const { transport, bleManager } = createHarness(() => Promise.resolve());
+    const destroy = jest.fn();
+    (bleManager as unknown as { destroy: jest.Mock }).destroy = destroy;
+    const nativeTimeout = Object.assign(new Error('Operation timed out'), {
+      errorCode: BleErrorCode.OperationTimedOut,
+    });
+
+    for (let attempt = 0; attempt < BLE_CONNECT_TIMEOUT_MANAGER_RESET_THRESHOLD; attempt += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await expect(
+        (transport as any).connectWithTimeout(UUID, () => Promise.reject(nativeTimeout))
+      ).rejects.toBe(nativeTimeout);
+    }
+
+    expect(destroy).toHaveBeenCalledTimes(1);
+  });
+
+  test('GATT discovery is bounded and abandons the native connection', async () => {
+    const { transport, device, bleManager } = createHarness(() => Promise.resolve());
+    device.discoverAllServicesAndCharacteristics.mockImplementation(
+      () =>
+        new Promise(() => {
+          // never settles
+        })
+    );
+
+    const errors: Array<{ errorCode?: unknown }> = [];
+    let settled = false;
+    (transport as any).resolveCharacteristicsWithTimeout(UUID, device).catch((error: unknown) => {
+      errors.push(error as { errorCode?: unknown });
+      settled = true;
+    });
+    await flush();
+    await advanceUntil(() => settled, BLE_GATT_SETUP_TIMEOUT_MS + 5000);
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.errorCode).toBe(HardwareErrorCode.BleConnectedError);
+    expect(bleManager.cancelDeviceConnection).toHaveBeenCalledWith(UUID);
+  });
+
+  test('a successful GATT retry clears the timeout budget before an abandoned call settles', async () => {
+    const { transport, device, bleManager } = createHarness(() => Promise.resolve());
+    let resolveAbandonedDiscovery: (() => void) | undefined;
+    device.discoverAllServicesAndCharacteristics
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>(resolve => {
+            resolveAbandonedDiscovery = resolve;
+          })
+      )
+      .mockResolvedValueOnce(undefined);
+
+    let firstSettled = false;
+    (transport as any).resolveCharacteristicsWithTimeout(UUID, device).catch(() => {
+      firstSettled = true;
+    });
+    await flush();
+    await advanceUntil(() => firstSettled, BLE_GATT_SETUP_TIMEOUT_MS + 5000);
+
+    await expect(
+      (transport as any).resolveCharacteristicsWithTimeout(UUID, device)
+    ).resolves.toMatchObject({
+      writeCharacteristic: expect.any(Object),
+      notifyCharacteristic: expect.any(Object),
+    });
+
+    resolveAbandonedDiscovery?.();
+    await flush();
+
+    expect(bleManager.cancelDeviceConnection).toHaveBeenCalledTimes(1);
+    expect((transport as any).connectionSetupTimeoutCounts.has(UUID)).toBe(false);
   });
 });
