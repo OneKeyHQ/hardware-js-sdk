@@ -318,7 +318,8 @@ function ExecuteView() {
           useEmptyPassphrase: !item.passphrase,
         };
 
-        // @ts-expect-error
+        // Dynamic test data selects methods with different public signatures.
+        // @ts-expect-error The runner validates the method and parameters before dispatch.
         const addressRes = await sdk[item.method as keyof typeof sdk](connectId, deviceId, params);
         if (!addressRes.success) {
           return Promise.resolve(undefined);

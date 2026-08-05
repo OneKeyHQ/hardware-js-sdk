@@ -6,7 +6,7 @@ import { BluetoothSearching } from '@tamagui/lucide-icons';
 import { getHardwareSDKInstance } from '../../utils/hardwareInstance';
 import HardwareSDKContext from '../HardwareSDKContext';
 
-import type { CoreApi } from '@onekeyfe/hd-core';
+import type { TestApi } from '@onekeyfe/hd-core';
 
 let isSdkInit = false;
 
@@ -37,7 +37,7 @@ const requestBluetoothScanPermission = async () => {
 };
 
 export default function Bluetooth({ children }: { children: React.ReactNode }) {
-  const [sdk, createSDK] = React.useState<CoreApi>();
+  const [sdk, createSDK] = React.useState<TestApi>();
   const sdkInit = () => {
     getHardwareSDKInstance().then(res => {
       console.log('Bluetooth SDK init success', res);
