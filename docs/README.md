@@ -91,5 +91,6 @@
 - Web SDK：[`packages/hd-web-sdk/README.md`](../packages/hd-web-sdk/README.md)
 - BLE SDK：[`packages/hd-ble-sdk/README.md`](../packages/hd-ble-sdk/README.md)
 - Common Connect SDK：[`packages/hd-common-connect-sdk/README.md`](../packages/hd-common-connect-sdk/README.md)
+- Test API 扩展：[`packages/hd-test-api/README.md`](../packages/hd-test-api/README.md)
 - Transport：[`packages/hd-transport/README.md`](../packages/hd-transport/README.md)
 - Web Device Transport：[`packages/hd-transport-web-device/README.md`](../packages/hd-transport-web-device/README.md)
