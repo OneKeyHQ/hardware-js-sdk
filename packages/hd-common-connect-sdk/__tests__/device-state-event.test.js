@@ -1,4 +1,5 @@
 import { CORE_EVENT, DEVICE, DEVICE_EVENT, initCore } from '@onekeyfe/hd-core';
+import { WebUsbTransport } from '@onekeyfe/hd-transport-web-device';
 
 import HardwareCommonConnectSdk from '../src';
 
@@ -77,6 +78,11 @@ describe('hd-common-connect-sdk device state events', () => {
     HardwareCommonConnectSdk.on(DEVICE.STATE, listener);
 
     await HardwareCommonConnectSdk.init({ env: 'webusb' });
+    expect(initCore).toHaveBeenLastCalledWith(
+      expect.objectContaining({ env: 'webusb' }),
+      WebUsbTransport,
+      undefined
+    );
     const payload = {
       connectId: 'connect-id',
       revision: 1,
