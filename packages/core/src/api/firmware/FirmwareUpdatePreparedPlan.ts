@@ -295,6 +295,27 @@ export const validateFirmwareUpdatePreparedPlan = (value: unknown): FirmwareUpda
   return preparedPlan;
 };
 
+/**
+ * Identity observed on the live device while a degraded recovery plan runs, keyed by
+ * the plan's opaque lease. Bootloader recovery starts with no serial and the device
+ * reports one only after the firmware phase reboots it, so the later phases of the
+ * SAME workflow must be allowed to continue — but only for the device that first
+ * answered, never for a second one that appears mid-recovery.
+ */
+const degradedPlanIdentityPins = new Map<string, string>();
+/** Keep the pin map from growing without bound across many workflows. */
+const DEGRADED_PLAN_IDENTITY_PIN_LIMIT = 32;
+
+const pinDegradedPlanIdentity = (leaseRef: string, deviceIdentity: string) => {
+  if (degradedPlanIdentityPins.size >= DEGRADED_PLAN_IDENTITY_PIN_LIMIT) {
+    const oldest = degradedPlanIdentityPins.keys().next();
+    if (!oldest.done) {
+      degradedPlanIdentityPins.delete(oldest.value);
+    }
+  }
+  degradedPlanIdentityPins.set(leaseRef, deviceIdentity);
+};
+
 export const assertFirmwareUpdatePreparedPlanDeviceIdentity = ({
   preparedPlan: value,
   deviceIdentity: reportedIdentity,
@@ -303,7 +324,7 @@ export const assertFirmwareUpdatePreparedPlanDeviceIdentity = ({
 }: {
   preparedPlan: unknown;
   deviceIdentity: string | undefined;
-  /** Live device mode; only bootloader mode may accept a degraded-identity plan. */
+  /** Live device mode; a degraded plan may only START while the device is in bootloader. */
   bootloaderMode?: boolean;
   /** Live device model; a degraded plan must target the same model. */
   deviceModel?: string;
@@ -312,20 +333,33 @@ export const assertFirmwareUpdatePreparedPlanDeviceIdentity = ({
   // 'unavailable' is the reserved degraded sentinel — a device-reported serial equal
   // to it must never satisfy the exact-match branch below.
   const deviceIdentity = reportedIdentity === 'unavailable' ? undefined : reportedIdentity;
-  // Bootloader recovery: classic-family devices report no serial in bootloader mode,
-  // so a degraded plan is only acceptable when the live device is equally
-  // identity-less AND targets the same device model (identity equality implies the
-  // model match in the strict branch; the degraded branch must substitute it).
-  // A device that DOES report an identity must match the plan exactly.
-  if (
-    preparedPlan.deviceIdentity === 'unavailable' &&
-    !deviceIdentity &&
-    bootloaderMode === true &&
-    deviceModel !== undefined &&
-    preparedPlan.deviceModel === deviceModel
-  ) {
+
+  if (preparedPlan.deviceIdentity === 'unavailable') {
+    // Identity equality implies a model match in the strict branch; the degraded
+    // branch has no identity to compare, so the model check must stand in for it.
+    if (deviceModel === undefined || preparedPlan.deviceModel !== deviceModel) {
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError);
+    }
+    const pinnedIdentity = degradedPlanIdentityPins.get(preparedPlan.leaseRef);
+    if (!deviceIdentity) {
+      // Still identity-less: only legitimate while the device sits in bootloader.
+      if (bootloaderMode !== true) {
+        throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError);
+      }
+      return preparedPlan;
+    }
+    // The recovered device now reports a serial: bind this recovery to it, and hold
+    // every later phase to the same one.
+    if (!pinnedIdentity) {
+      pinDegradedPlanIdentity(preparedPlan.leaseRef, deviceIdentity);
+      return preparedPlan;
+    }
+    if (pinnedIdentity !== deviceIdentity) {
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError);
+    }
     return preparedPlan;
   }
+
   if (!deviceIdentity || preparedPlan.deviceIdentity !== deviceIdentity) {
     throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError);
   }

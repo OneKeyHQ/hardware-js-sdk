@@ -15,7 +15,8 @@ import {
   assertFirmwareUpdatePreparedPlanBinding,
   assertFirmwareUpdatePreparedPlanDeviceIdentity,
 } from '../firmware/FirmwareUpdatePreparedPlan';
-import { getDeviceUUID } from '../../utils';
+import { getDeviceType, getDeviceUUID } from '../../utils';
+import { resolveDeviceBootloaderMode } from '../../utils/deviceFeaturesCompat';
 
 import type { DeviceUpdateBootloaderParams } from '../../types/api/deviceUpdateBootloader';
 import type { EFirmwareType } from '@onekeyfe/hd-shared';
@@ -167,6 +168,8 @@ export default class DeviceUpdateBootloader extends FirmwareUpdateBaseMethod<any
       assertFirmwareUpdatePreparedPlanDeviceIdentity({
         preparedPlan: payload.preparedPlan,
         deviceIdentity: getDeviceUUID(features) || undefined,
+        bootloaderMode: resolveDeviceBootloaderMode(features),
+        deviceModel: String(getDeviceType(features)),
       });
       assertFirmwareUpdatePreparedPlanBinding({
         preparedPlan: payload.preparedPlan,

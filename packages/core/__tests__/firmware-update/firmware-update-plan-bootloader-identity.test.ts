@@ -156,6 +156,102 @@ describe('firmware update plan identity in bootloader mode', () => {
     expect(plan.executor).toBe('v2');
   });
 
+  describe('degraded plan identity transition within one recovery workflow', () => {
+    // Bootloader recovery installs the main firmware while the device has no serial;
+    // it then reboots into normal mode and reports one, and the remaining phases of
+    // the SAME workflow reuse the same prepared plan.
+    let lease = 0;
+    const prepareRecoveryPlan = () => {
+      lease += 1;
+      const plan = buildDesktopPlan(bootloaderClassic1sFeatures);
+      return prepareFirmwareUpdatePlan({
+        plan,
+        leaseRef: `fwlease:00000000-0000-4000-8000-00000000000${lease}`,
+        artifacts: [
+          {
+            artifactId: 'firmware',
+            artifact: {
+              artifactRef: `fw:${FIRMWARE_SHA256}`,
+              size: 4,
+              sha256: FIRMWARE_SHA256,
+            },
+          },
+        ],
+      });
+    };
+
+    test('accepts the phase that runs after the device reboots and reports a serial', () => {
+      const preparedPlan = prepareRecoveryPlan();
+      // Phase 1: still in bootloader, no serial.
+      expect(() =>
+        assertFirmwareUpdatePreparedPlanDeviceIdentity({
+          preparedPlan,
+          deviceIdentity: undefined,
+          bootloaderMode: true,
+          deviceModel: String(EDeviceType.Classic1s),
+        })
+      ).not.toThrow();
+      // Phase 2: firmware installed, device rebooted and now has an identity.
+      expect(() =>
+        assertFirmwareUpdatePreparedPlanDeviceIdentity({
+          preparedPlan,
+          deviceIdentity: 'CLA45F0023',
+          bootloaderMode: false,
+          deviceModel: String(EDeviceType.Classic1s),
+        })
+      ).not.toThrow();
+    });
+
+    test('pins the first identity it sees, so a different device cannot take over', () => {
+      const preparedPlan = prepareRecoveryPlan();
+      assertFirmwareUpdatePreparedPlanDeviceIdentity({
+        preparedPlan,
+        deviceIdentity: 'CLA45F0023',
+        bootloaderMode: false,
+        deviceModel: String(EDeviceType.Classic1s),
+      });
+      expect(() =>
+        assertFirmwareUpdatePreparedPlanDeviceIdentity({
+          preparedPlan,
+          deviceIdentity: 'CLA99Z9999',
+          bootloaderMode: false,
+          deviceModel: String(EDeviceType.Classic1s),
+        })
+      ).toThrow();
+    });
+
+    test('still refuses a different device model after the identity appears', () => {
+      const preparedPlan = prepareRecoveryPlan();
+      expect(() =>
+        assertFirmwareUpdatePreparedPlanDeviceIdentity({
+          preparedPlan,
+          deviceIdentity: 'MINI0000001',
+          bootloaderMode: false,
+          deviceModel: String(EDeviceType.Mini),
+        })
+      ).toThrow();
+    });
+
+    test('a fresh workflow does not inherit the previous workflow identity pin', () => {
+      const first = prepareRecoveryPlan();
+      assertFirmwareUpdatePreparedPlanDeviceIdentity({
+        preparedPlan: first,
+        deviceIdentity: 'CLA45F0023',
+        bootloaderMode: false,
+        deviceModel: String(EDeviceType.Classic1s),
+      });
+      const second = prepareRecoveryPlan();
+      expect(() =>
+        assertFirmwareUpdatePreparedPlanDeviceIdentity({
+          preparedPlan: second,
+          deviceIdentity: 'CLA99Z9999',
+          bootloaderMode: false,
+          deviceModel: String(EDeviceType.Classic1s),
+        })
+      ).not.toThrow();
+    });
+  });
+
   describe('prepared plan device identity assertion', () => {
     const prepareDegradedPlan = () => {
       const plan = buildDesktopPlan(bootloaderClassic1sFeatures);
@@ -210,7 +306,11 @@ describe('firmware update plan identity in bootloader mode', () => {
       ).toThrow();
     });
 
-    test('rejects a degraded plan when the live device reports a real identity', () => {
+    // Superseded: a degraded plan MUST accept the first real identity, because that is
+    // the recovering device reporting its serial after the firmware phase rebooted it.
+    // The boundary that remains — a SECOND, different identity — is covered by
+    // 'pins the first identity it sees, so a different device cannot take over'.
+    test('binds to the identity the recovered device reports', () => {
       const preparedPlan = prepareDegradedPlan();
       expect(() =>
         assertFirmwareUpdatePreparedPlanDeviceIdentity({
@@ -219,7 +319,7 @@ describe('firmware update plan identity in bootloader mode', () => {
           bootloaderMode: true,
           deviceModel: String(EDeviceType.Classic1s),
         })
-      ).toThrow();
+      ).not.toThrow();
     });
 
     test('rejects a degraded plan on a different device model', () => {
