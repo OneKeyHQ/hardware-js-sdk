@@ -1,28 +1,44 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CoreApi, UiEvent, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
+import {
+  CoreApi,
+  DEVICE,
+  DEVICE_EVENT,
+  UiEvent,
+  UI_REQUEST,
+  UI_RESPONSE,
+  supportInputPinOnSoftware,
+} from '@onekeyfe/hd-core';
 import { useDeviceStore } from '../../store/deviceStore';
 import { useHardwareStore } from '../../store/hardwareStore';
 
 import { submitPin, submitPassphrase } from '../../services/hardwareService';
-import { EDeviceType } from '@onekeyfe/hd-shared';
 import GlobalDialogManager from '../global/GlobalDialogManager';
 import WebUsbAuthorizeDialog from '../global/WebUsbAuthorizeDialog';
-import { logData, logInfo, logError } from '../../utils/logger';
+import { logInfo, logError } from '../../utils/logger';
 import { SDKUtils } from '../../utils/hardwareInstance';
 import { create } from 'zustand';
 import {
   createHardwareUiState,
+  getUiResponseCorrelation,
   HardwareUiEventQueue,
+  isProtocolV2UiEvent,
   reduceHardwareUiEvent,
 } from '../../utils/hardwareUiStateMachine';
+import type {
+  DeviceEventMessage,
+  UiRequestDeviceAction,
+  UiResponseCorrelation,
+} from '@onekeyfe/hd-core';
 
 // 声明全局弹窗管理器类型
 declare global {
   interface Window {
     globalDialogManager?: {
-      showPinDialog: () => void;
-      showPassphraseDialog: () => void;
+      showPinDialog: (responseCorrelation?: UiResponseCorrelation) => void;
+      showPassphraseDialog: (responseCorrelation?: UiResponseCorrelation) => void;
+      closePinDialog: () => void;
+      closePassphraseDialog: () => void;
       closeAllDialogs: () => void;
     };
   }
@@ -55,7 +71,13 @@ export const useFirmwareProgress = () => {
 
 export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
   const { t } = useTranslation();
-  const { setDeviceAction, clearDeviceAction, updateSdkInitState } = useDeviceStore();
+  const {
+    setCurrentDevice,
+    setDeviceAction,
+    setDeviceState,
+    clearDeviceAction,
+    updateSdkInitState,
+  } = useDeviceStore();
   const initializationRef = useRef<boolean>(false);
   const [webUsbModalOpen, setWebUsbModalOpen] = React.useState(false);
   const [webUsbResponseType, setWebUsbResponseType] = React.useState<
@@ -75,8 +97,17 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
       sdkInstance.on('UI_EVENT', (message: UiEvent) => {
         void hardwareUiQueueRef.current
           .enqueue(message, async queuedMessage => {
-            const latestCurrentDevice = useDeviceStore.getState().currentDevice;
-            logInfo(`收到UI事件: ${queuedMessage.type}`, queuedMessage.payload as logData);
+            const payload =
+              queuedMessage.payload && typeof queuedMessage.payload === 'object'
+                ? (queuedMessage.payload as {
+                    device?: { connectId?: string | null; connectProtocol?: string };
+                    interaction?: { protocol?: string };
+                  })
+                : undefined;
+            logInfo(`收到UI事件: ${queuedMessage.type}`, {
+              connectId: payload?.device?.connectId,
+              protocol: payload?.device?.connectProtocol ?? payload?.interaction?.protocol,
+            });
 
             const previousState = hardwareUiStateRef.current;
             const nextState = reduceHardwareUiEvent(previousState, queuedMessage);
@@ -108,29 +139,43 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
             }
 
             switch (queuedMessage.type) {
-              case UI_REQUEST.REQUEST_PIN:
-                if (
-                  latestCurrentDevice &&
-                  (latestCurrentDevice.deviceType === EDeviceType.Pro ||
-                    latestCurrentDevice.deviceType === EDeviceType.Touch)
-                ) {
-                  await submitPin('@@ONEKEY_INPUT_PIN_IN_DEVICE').catch(console.error);
+              case UI_REQUEST.REQUEST_PIN: {
+                const requestPayload = queuedMessage.payload as UiRequestDeviceAction['payload'];
+                const isProtocolV2 = isProtocolV2UiEvent(queuedMessage);
+                const responseCorrelation = getUiResponseCorrelation(queuedMessage);
+
+                if (isProtocolV2) {
+                  // Protocol V2 PIN is entered on the device and has no host UI response.
+                  window.globalDialogManager?.closePinDialog();
+                } else if (supportInputPinOnSoftware(requestPayload.device.features).support) {
+                  window.globalDialogManager?.showPinDialog(responseCorrelation);
                 } else {
-                  window.globalDialogManager?.showPinDialog();
+                  await submitPin('@@ONEKEY_INPUT_PIN_IN_DEVICE', responseCorrelation);
                 }
                 break;
+              }
 
               case UI_REQUEST.REQUEST_PASSPHRASE: {
+                const responseCorrelation = getUiResponseCorrelation(queuedMessage);
                 const hardwareState = useHardwareStore.getState();
                 const shouldAutoSubmit = hardwareState.commonParameters.useEmptyPassphrase;
 
                 if (shouldAutoSubmit) {
-                  await submitPassphrase('', false, false).catch(console.error);
+                  await submitPassphrase('', false, false, responseCorrelation);
                 } else {
-                  window.globalDialogManager?.showPassphraseDialog();
+                  window.globalDialogManager?.showPassphraseDialog(responseCorrelation);
                 }
                 break;
               }
+
+              case UI_REQUEST.REQUEST_PASSPHRASE_ON_DEVICE:
+                // This event is informational; the device already owns the input flow.
+                window.globalDialogManager?.closePassphraseDialog();
+                break;
+
+              case UI_REQUEST.CLOSE_UI_PIN_WINDOW:
+                window.globalDialogManager?.closePinDialog();
+                break;
 
               case UI_REQUEST.REQUEST_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE:
                 setWebUsbResponseType(UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE);
@@ -166,16 +211,47 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
           });
       });
 
+      sdkInstance.on(DEVICE_EVENT, (message: DeviceEventMessage) => {
+        if (message.type === DEVICE.STATE) {
+          const currentDevice = useDeviceStore.getState().currentDevice;
+          if (
+            !currentDevice?.connectId ||
+            !message.payload.connectId ||
+            currentDevice.connectId === message.payload.connectId
+          ) {
+            setDeviceState(message.payload.state);
+          }
+          return;
+        }
+
+        if (message.type === DEVICE.DISCONNECT) {
+          const currentDevice = useDeviceStore.getState().currentDevice;
+          const disconnectedConnectId = message.payload.device.connectId;
+          if (!currentDevice || currentDevice.connectId === disconnectedConnectId) {
+            setCurrentDevice(null);
+            clearDeviceAction();
+            window.globalDialogManager?.closeAllDialogs();
+            hardwareUiQueueRef.current.reset();
+          }
+        }
+      });
+
       // 监听设备连接/断开事件
       sdkInstance.on('device-connect', device => {
-        logInfo('device-connect', device);
+        logInfo('device-connect', {
+          connectId: device?.connectId,
+          protocol: device?.connectProtocol,
+        });
       });
 
       sdkInstance.on('device-disconnect', device => {
-        logInfo('device-disconnect', device);
+        logInfo('device-disconnect', {
+          connectId: device?.connectId,
+          protocol: device?.connectProtocol,
+        });
       });
     },
-    [setDeviceAction, clearDeviceAction]
+    [setCurrentDevice, setDeviceAction, setDeviceState, clearDeviceAction]
   );
 
   // 初始化SDK

@@ -22,7 +22,7 @@ export function useDeviceInfo(): UseDeviceInfoReturn {
     const deviceType = currentDevice.deviceType.toString().toLowerCase();
     if (deviceType.includes('classic')) return 'classic';
     if (deviceType.includes('mini')) return 'mini';
-    if (deviceType.includes('pro')) return 'pro';
+    if (deviceType.includes('pro2') || deviceType.includes('pro')) return 'pro';
     if (deviceType.includes('touch')) return 'touch';
     return 'classic';
   }, [currentDevice?.deviceType]);

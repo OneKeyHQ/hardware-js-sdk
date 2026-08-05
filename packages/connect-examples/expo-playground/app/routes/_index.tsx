@@ -2,16 +2,7 @@ import { Card, CardContent } from '../components/ui/Card';
 import { useTranslation } from 'react-i18next';
 import { useDeviceStore } from '../store/deviceStore';
 import { useTransportPersistence } from '../store/persistenceStore';
-import {
-  CheckCircle,
-  XCircle,
-  Usb,
-  Wifi,
-  Server,
-  AlertCircle,
-  Info,
-  ChevronRight,
-} from 'lucide-react';
+import { CheckCircle, XCircle, Usb, Server, AlertCircle, Info, ChevronRight } from 'lucide-react';
 import TransportSwitcher from '../components/common/TransportSwitcher';
 import DeviceIcon from '../components/device/DeviceIcon';
 import deviceList from '../assets/device_list.png';
@@ -37,8 +28,6 @@ export default function IndexPage() {
     switch (transportType) {
       case 'webusb':
         return <Usb className="h-4 w-4 text-primary" />;
-      case 'jsbridge':
-        return <Wifi className="h-4 w-4 text-primary" />;
       case 'emulator':
         return <Server className="h-4 w-4 text-primary" />;
       default:
@@ -248,16 +237,28 @@ export default function IndexPage() {
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-sm text-muted-foreground">deviceId</span>
-                          <span className="text-sm font-mono">{currentDevice.deviceId}</span>
+                          <span className="text-sm font-mono">
+                            {currentDevice.deviceId || 'N/A'}
+                          </span>
                         </div>
-                        {currentDevice.features && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Protocol</span>
+                          <span className="text-sm font-medium">
+                            {currentDevice.connectProtocol ||
+                              currentDevice.state?.protocol ||
+                              'Unknown'}
+                          </span>
+                        </div>
+                        {(currentDevice.state || currentDevice.features) && (
                           <>
                             <div className="flex items-center justify-between">
                               <span className="text-sm text-muted-foreground">
                                 {t('common.firmwareVersion')}
                               </span>
                               <span className="text-sm">
-                                {currentDevice.features.onekey_firmware_version}
+                                {currentDevice.state?.versions.firmware ||
+                                  currentDevice.features?.onekey_firmware_version ||
+                                  'N/A'}
                               </span>
                             </div>
                             <div className="flex items-center justify-between">
@@ -265,8 +266,9 @@ export default function IndexPage() {
                                 {t('common.bluetoothVersion')}
                               </span>
                               <span className="text-sm">
-                                {currentDevice.features.onekey_ble_version ||
-                                  currentDevice.features.ble_ver ||
+                                {currentDevice.state?.versions.ble ||
+                                  currentDevice.features?.onekey_ble_version ||
+                                  currentDevice.features?.ble_ver ||
                                   'N/A'}
                               </span>
                             </div>
@@ -275,7 +277,9 @@ export default function IndexPage() {
                                 {t('common.bootVersion')}
                               </span>
                               <span className="text-sm">
-                                {currentDevice.features.onekey_boot_version || 'N/A'}
+                                {currentDevice.state?.versions.bootloader ||
+                                  currentDevice.features?.onekey_boot_version ||
+                                  'N/A'}
                               </span>
                             </div>
                           </>

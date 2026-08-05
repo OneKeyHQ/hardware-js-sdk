@@ -20,16 +20,7 @@ module.exports = {
   directories: {
     output: 'out',
   },
-  files: [
-    'web-build',
-    'public',
-    'bin',
-    '!public/bin/**/*',
-    'dist/**/*.js',
-    '!dist/__**',
-    'package.json',
-    '!scripts/**',
-  ],
+  files: ['web-build', 'public', 'dist/**/*.js', '!dist/__**', 'package.json', '!scripts/**'],
   extraResources: [
     {
       from: 'public/icons/512x512.png',
@@ -60,12 +51,6 @@ module.exports = {
   mac: {
     // skip code signing
     identity: null,
-    extraResources: [
-      {
-        from: 'public/bin/bridge/mac-${arch}',
-        to: 'bin/bridge',
-      },
-    ],
     icon: 'public/icons/512x512.png',
     artifactName: 'Hardware-Example-mac-${arch}.${ext}',
     hardenedRuntime: true,
@@ -82,12 +67,6 @@ module.exports = {
     },
   },
   win: {
-    extraResources: [
-      {
-        from: 'public/bin/bridge/win-${arch}',
-        to: 'bin/bridge',
-      },
-    ],
     icon: 'public/icons/512x512.png',
     artifactName: 'Hardware-Example-win-${arch}.${ext}',
     verifyUpdateCodeSignature: false,
@@ -99,12 +78,6 @@ module.exports = {
     ],
   },
   linux: {
-    extraResources: [
-      {
-        from: 'public/bin/bridge/linux-${arch}',
-        to: 'bin/bridge',
-      },
-    ],
     icon: 'public/icons/512x512.png',
     artifactName: 'Hardware-Example-linux-${arch}.${ext}',
     executableName: 'onekey-hardware-example',

@@ -13,7 +13,7 @@ import {
 } from './ui/sidebar';
 import { Badge } from './ui/Badge';
 import { Card, CardContent } from './ui/Card';
-import { Link, useLocation , useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useDeviceStore } from '../store/deviceStore';
 import { useTransportPersistence } from '../store/persistenceStore';
@@ -150,7 +150,10 @@ export function AppSidebar() {
                           {t('common.deviceName')}
                         </span>
                         <span className="text-xs font-bold text-foreground truncate max-w-24">
-                          {currentDevice.label || getDeviceLabel(currentDevice.features)}
+                          {currentDevice.state?.identity.label ||
+                            currentDevice.label ||
+                            getDeviceLabel(currentDevice.features) ||
+                            currentDevice.name}
                         </span>
                       </div>
 
@@ -164,12 +167,21 @@ export function AppSidebar() {
                       </div>
 
                       <div className="flex justify-between items-center">
+                        <span className="text-xs text-muted-foreground font-medium">Protocol</span>
+                        <span className="text-xs font-semibold text-foreground">
+                          {currentDevice.connectProtocol ||
+                            currentDevice.state?.protocol ||
+                            'Unknown'}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between items-center">
                         <span className="text-xs text-muted-foreground font-medium">
                           {t('common.uuid')}
                         </span>
                         <span
                           className="text-xs font-mono text-foreground truncate max-w-24"
-                          title={currentDevice.connectId}
+                          title={currentDevice.connectId ?? undefined}
                         >
                           {currentDevice.connectId?.slice(0, 8)}...
                         </span>
@@ -180,11 +192,7 @@ export function AppSidebar() {
                           {t('common.transport')}
                         </span>
                         <Badge variant="outline" className="text-xs px-1.5 py-0 font-medium">
-                          {transportType === 'webusb'
-                            ? 'WebUSB'
-                            : transportType === 'jsbridge'
-                            ? 'JSBridge'
-                            : transportType || 'Unknown'}
+                          {transportType === 'webusb' ? 'WebUSB' : transportType || 'Unknown'}
                         </Badge>
                       </div>
                     </div>
@@ -237,8 +245,6 @@ export function AppSidebar() {
                         >
                           {transportType === 'webusb'
                             ? 'WebUSB'
-                            : transportType === 'jsbridge'
-                            ? 'JSBridge'
                             : transportType === 'emulator'
                             ? 'Emulator'
                             : '--'}

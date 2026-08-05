@@ -4,7 +4,9 @@ import { UI_REQUEST } from '@onekeyfe/hd-core';
 
 import {
   createHardwareUiState,
+  getUiResponseCorrelation,
   HardwareUiEventQueue,
+  isProtocolV2UiEvent,
   reduceHardwareUiEvent,
 } from '../utils/hardwareUiStateMachine';
 
@@ -18,8 +20,7 @@ const metadata = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-const event = (type: string, payload: Record<string, unknown> = {}) =>
-  ({ type, payload } as never);
+const event = (type: string, payload: Record<string, unknown> = {}) => ({ type, payload } as never);
 
 describe('hardware UI state machine', () => {
   test('moves PIN to processing and ignores a late PIN completion after Passphrase starts', () => {
@@ -95,5 +96,47 @@ describe('hardware UI state machine', () => {
     state = reduceHardwareUiEvent(state, event(UI_REQUEST.CLOSE_UI_PIN_WINDOW));
 
     expect(state.phase).toBe('processing');
+  });
+
+  test('detects Protocol V2 from the active device response or interaction metadata', () => {
+    expect(
+      isProtocolV2UiEvent(
+        event(UI_REQUEST.REQUEST_PIN, {
+          device: { connectProtocol: 'V2' },
+        })
+      )
+    ).toBe(true);
+    expect(
+      isProtocolV2UiEvent(
+        event(UI_REQUEST.REQUEST_PIN, {
+          device: { connectProtocol: 'V1' },
+          interaction: metadata(),
+        })
+      )
+    ).toBe(true);
+    expect(
+      isProtocolV2UiEvent(
+        event(UI_REQUEST.REQUEST_PIN, {
+          device: { connectProtocol: 'V1' },
+        })
+      )
+    ).toBe(false);
+  });
+
+  test('only forwards complete UI response correlation fields', () => {
+    expect(
+      getUiResponseCorrelation(
+        event(UI_REQUEST.REQUEST_PASSPHRASE, {
+          responseCorrelation: { interactionId: 'interaction-1', deviceId: 'device-1' },
+        })
+      )
+    ).toEqual({ interactionId: 'interaction-1', deviceId: 'device-1' });
+    expect(
+      getUiResponseCorrelation(
+        event(UI_REQUEST.REQUEST_PASSPHRASE, {
+          responseCorrelation: { interactionId: 'interaction-1' },
+        })
+      )
+    ).toBeUndefined();
   });
 });

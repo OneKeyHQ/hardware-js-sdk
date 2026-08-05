@@ -40,8 +40,10 @@ export function previewHardwareParams(method: string, params: Record<string, unk
     // 通用：消息/数据（只展示安全摘要，避免日志过大）
     const msg = p.messageHex ?? p.message ?? p.msg ?? p.data;
     if (typeof msg === 'string') {
-      const s = msg.replace(/^0x/i, '');
-      preview.message = s.length > 64 ? `${s.slice(0, 64)}... (len=${s.length})` : s;
+      preview.message_summary = {
+        encoding: /^0x/i.test(msg) ? 'hex' : 'text',
+        length: msg.replace(/^0x/i, '').length,
+      };
     } else if (typeof msg === 'object' && msg) {
       preview.message_summary = {
         keys: Object.keys(msg).slice(0, 10),
@@ -52,8 +54,10 @@ export function previewHardwareParams(method: string, params: Record<string, unk
     // 通用：交易核心字段（EVM/SOL/其他链尽量兼容）
     const tx = p.rawTx ?? p.tx ?? p.transaction;
     if (typeof tx === 'string') {
-      const s = tx.replace(/^0x/i, '');
-      preview.rawTx = s.length > 64 ? `${s.slice(0, 64)}... (len=${s.length})` : s;
+      preview.tx_summary = {
+        encoding: /^0x/i.test(tx) ? 'hex' : 'text',
+        length: tx.replace(/^0x/i, '').length,
+      };
     } else if (typeof tx === 'object' && tx) {
       preview.tx_summary = {
         keys: Object.keys(tx).slice(0, 15),
@@ -62,15 +66,26 @@ export function previewHardwareParams(method: string, params: Record<string, unk
     }
 
     // 其他通用易读字段（如果存在）
-    ['to','value','gas','gasPrice','maxFeePerGas','maxPriorityFeePerGas','nonce','type',
-     'message_version','message_format','application_domain','pubkey','public_key']
-      .forEach(k => {
-        if (p[k] !== undefined) preview[k] = p[k];
-      });
+    [
+      'to',
+      'value',
+      'gas',
+      'gasPrice',
+      'maxFeePerGas',
+      'maxPriorityFeePerGas',
+      'nonce',
+      'type',
+      'message_version',
+      'message_format',
+      'application_domain',
+      'pubkey',
+      'public_key',
+    ].forEach(k => {
+      if (p[k] !== undefined) preview[k] = p[k];
+    });
 
     logHardware(`Preview hardware params for ${method}`, preview);
   } catch (e) {
     logError('Failed to preview hardware params', { error: e });
   }
 }
-

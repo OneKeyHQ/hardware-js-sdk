@@ -1,6 +1,6 @@
 import { UI_REQUEST } from '@onekeyfe/hd-core';
 
-import type { UiEvent } from '@onekeyfe/hd-core';
+import type { UiEvent, UiResponseCorrelation } from '@onekeyfe/hd-core';
 
 export type HardwareUiPhase =
   | 'idle'
@@ -22,8 +22,9 @@ type HardwareUiInteraction = {
 };
 
 type HardwareUiEventPayload = {
-  device?: { connectId?: string | null };
+  device?: { connectId?: string | null; connectProtocol?: 'V1' | 'V2' };
   interaction?: HardwareUiInteraction;
+  responseCorrelation?: UiResponseCorrelation;
 };
 
 export type HardwareUiState = {
@@ -62,6 +63,23 @@ const getPayload = (event: UiEvent): HardwareUiEventPayload => {
   return payload;
 };
 
+export const isProtocolV2UiEvent = (event: UiEvent) => {
+  const payload = getPayload(event);
+  return payload.device?.connectProtocol === 'V2' || payload.interaction?.protocol === 'V2';
+};
+
+export const getUiResponseCorrelation = (event: UiEvent): UiResponseCorrelation | undefined => {
+  const correlation = getPayload(event).responseCorrelation;
+  if (
+    !correlation ||
+    typeof correlation.interactionId !== 'string' ||
+    typeof correlation.deviceId !== 'string'
+  ) {
+    return undefined;
+  }
+  return correlation;
+};
+
 const isSameDevice = (state: HardwareUiState, payload: HardwareUiEventPayload) => {
   const connectId = payload.device?.connectId;
   return !connectId || !state.connectId || connectId === state.connectId;
@@ -89,10 +107,7 @@ const applyInteraction = (
   };
 };
 
-export const reduceHardwareUiEvent = (
-  state: HardwareUiState,
-  event: UiEvent
-): HardwareUiState => {
+export const reduceHardwareUiEvent = (state: HardwareUiState, event: UiEvent): HardwareUiState => {
   const payload = getPayload(event);
   const interaction = payload.interaction;
 

@@ -47,13 +47,6 @@ export const DeviceStatus: React.FC = () => {
         icon: <Monitor className="h-4 w-4" />,
         className: 'bg-blue-50 text-blue-700 border-blue-200',
       };
-    } else if (normalizedTransport === 'lowlevel' || normalizedTransport === 'jsbridge') {
-      return {
-        label: 'JSBridge',
-        variant: 'secondary' as const,
-        icon: <Wifi className="h-4 w-4" />,
-        className: 'bg-purple-50 text-purple-700 border-purple-200',
-      };
     } else if (normalizedTransport === 'webble' || normalizedTransport === 'ble') {
       return {
         label: 'WebBLE',
@@ -75,11 +68,18 @@ export const DeviceStatus: React.FC = () => {
 
   // 设备类型显示名称映射
   const deviceTypeNames: Record<string, string> = {
+    classic: 'OneKey Classic',
+    classic1s: 'OneKey Classic 1S',
+    mini: 'OneKey Mini',
+    touch: 'OneKey Touch',
+    pro: 'OneKey Pro',
+    pro2: 'OneKey Pro 2',
     Classic: 'OneKey Classic',
     Classic1s: 'OneKey Classic 1S',
     Mini: 'OneKey Mini',
     Touch: 'OneKey Touch',
     Pro: 'OneKey Pro',
+    Pro2: 'OneKey Pro 2',
     Unknown: '未知设备',
   };
 
@@ -116,13 +116,25 @@ export const DeviceStatus: React.FC = () => {
 
         {/* Connection Type Badge */}
         <div className="mb-3">
-          <Badge
-            variant={connectionDisplay.variant}
-            className={`gap-1.5 ${connectionDisplay.className}`}
-          >
-            {connectionDisplay.icon}
-            <span>{connectionDisplay.label}</span>
-          </Badge>
+          <div className="flex flex-wrap gap-2">
+            <Badge
+              variant={connectionDisplay.variant}
+              className={`gap-1.5 ${connectionDisplay.className}`}
+            >
+              {connectionDisplay.icon}
+              <span>{connectionDisplay.label}</span>
+            </Badge>
+            <Badge
+              variant="outline"
+              className={
+                currentDevice.connectProtocol === 'V2'
+                  ? 'border-purple-200 bg-purple-50 text-purple-700'
+                  : 'border-gray-200 bg-gray-50 text-gray-700'
+              }
+            >
+              Protocol {currentDevice.connectProtocol ?? currentDevice.state?.protocol ?? 'Unknown'}
+            </Badge>
+          </div>
         </div>
 
         {/* Device Details */}
@@ -171,6 +183,13 @@ export const DeviceStatus: React.FC = () => {
                     )}`
                   : currentDevice.deviceId
                 : 'N/A'}
+            </span>
+          </div>
+
+          <div className="flex justify-between items-center py-1">
+            <span className="text-gray-500 font-medium">运行模式:</span>
+            <span className="text-gray-700 truncate ml-2 max-w-32">
+              {currentDevice.state?.status.mode || 'Unknown'}
             </span>
           </div>
 

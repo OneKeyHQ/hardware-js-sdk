@@ -5269,45 +5269,6 @@
   resolved "https://registry.npmjs.org/@onekeyfe/cross-inpage-provider-types/-/cross-inpage-provider-types-2.2.67.tgz#e36a59855a1d781f296d7563a93cac868ae46098"
   integrity sha512-sjTF8kpcxWrZtFfHtdQhJ6KneyLTmg+Z4rnn0acEK5Vwoy07EjmF9xjBTyMoInrNwPc7OIwkaiXX+JYr0ovNgw==
 
-"@onekeyfe/hd-core@1.1.34-alpha.1":
-  version "1.1.34-alpha.1"
-  resolved "https://registry.npmjs.org/@onekeyfe/hd-core/-/hd-core-1.1.34-alpha.1.tgz#bd0bb68a0a66e99716a9859326de200411bf0967"
-  integrity sha512-sYCIW14V/GflbwSUzKfhzbINIcIGkqLlOqYn6Ces6LkqFDbfxJA8t6juXxzP0pmCwIbGVhzn1sIBwi7gbaqdtQ==
-  dependencies:
-    "@onekeyfe/hd-shared" "1.1.34-alpha.1"
-    "@onekeyfe/hd-transport" "1.1.34-alpha.1"
-    axios "1.15.2"
-    bignumber.js "^9.0.2"
-    bytebuffer "^5.0.1"
-    jszip "^3.10.1"
-    parse-uri "^1.0.7"
-    semver "^7.3.7"
-
-"@onekeyfe/hd-shared@1.1.34-alpha.1":
-  version "1.1.34-alpha.1"
-  resolved "https://registry.npmjs.org/@onekeyfe/hd-shared/-/hd-shared-1.1.34-alpha.1.tgz#8e3b92265a06d8241b7ab1f6282fb810c5648c91"
-  integrity sha512-JaZEOHQD0X2ceZ9XjuEwQ0VOMJm/kjZq8rFEtq32qBYoe1bLz065HNGnoUcRtBqTrc/6LsjIzyllZHbEVMSuJQ==
-
-"@onekeyfe/hd-transport-electron@1.1.34-alpha.1":
-  version "1.1.34-alpha.1"
-  resolved "https://registry.npmjs.org/@onekeyfe/hd-transport-electron/-/hd-transport-electron-1.1.34-alpha.1.tgz#871cc4d7fd9e8ca4ad4c3a346442e1afd9a7cee0"
-  integrity sha512-5QQykRMXJQugxQEffU81hcxpjw3mSaLqFJy1eOBo04B9SXjNaZTOTKfSxc6WlmLnDo6EMjk7HkNod//tcTRbUQ==
-  dependencies:
-    "@onekeyfe/hd-core" "1.1.34-alpha.1"
-    "@onekeyfe/hd-shared" "1.1.34-alpha.1"
-    "@onekeyfe/hd-transport" "1.1.34-alpha.1"
-    "@stoprocent/noble" "2.3.16"
-    p-retry "^4.6.2"
-
-"@onekeyfe/hd-transport@1.1.34-alpha.1":
-  version "1.1.34-alpha.1"
-  resolved "https://registry.npmjs.org/@onekeyfe/hd-transport/-/hd-transport-1.1.34-alpha.1.tgz#260203c548a7c0eedcaa39381cbdf3d3d7156861"
-  integrity sha512-dN6snOkLP8KDoyuULgYpbxZo9SmX1rh8EBZFIiEu4DyNxIrS6cBrNDAL2PlMqCqDIV3XZKtqId7TlBFw0FZ4aQ==
-  dependencies:
-    bytebuffer "^5.0.1"
-    long "^4.0.0"
-    protobufjs "^6.11.2"
-
 "@onekeyfe/hwk-adapter-core@1.1.34-alpha.1":
   version "1.1.34-alpha.1"
   resolved "https://registry.npmjs.org/@onekeyfe/hwk-adapter-core/-/hwk-adapter-core-1.1.34-alpha.1.tgz#09f04102d0ea44c2ded40474544a46cacc793d23"

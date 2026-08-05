@@ -6,13 +6,19 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Alert, AlertDescription } from '../ui/Alert';
 import { Eye, EyeOff } from 'lucide-react';
+import type { UiResponseCorrelation } from '@onekeyfe/hd-core';
 
 interface PassphraseDialogProps {
   isOpen: boolean;
   onClose: () => void;
+  responseCorrelation?: UiResponseCorrelation;
 }
 
-const PassphraseDialog: React.FC<PassphraseDialogProps> = ({ isOpen, onClose }) => {
+const PassphraseDialog: React.FC<PassphraseDialogProps> = ({
+  isOpen,
+  onClose,
+  responseCorrelation,
+}) => {
   const { t } = useTranslation();
   const [passphrase, setPassphrase] = useState('');
   const [confirmPassphrase, setConfirmPassphrase] = useState('');
@@ -26,7 +32,7 @@ const PassphraseDialog: React.FC<PassphraseDialogProps> = ({ isOpen, onClose }) 
     }
 
     try {
-      await submitPassphrase(passphrase, false);
+      await submitPassphrase(passphrase, false, false, responseCorrelation);
       resetState();
     } catch (error) {
       console.error('Passphrase submit failed:', error);
@@ -44,7 +50,7 @@ const PassphraseDialog: React.FC<PassphraseDialogProps> = ({ isOpen, onClose }) 
 
   const handleUseDevice = async () => {
     try {
-      await submitPassphrase('', true);
+      await submitPassphrase('', true, false, responseCorrelation);
       resetState();
     } catch (error) {
       console.error('Device input failed:', error);
@@ -68,7 +74,12 @@ const PassphraseDialog: React.FC<PassphraseDialogProps> = ({ isOpen, onClose }) 
   const isFormValid = passphrase && passphrase === confirmPassphrase;
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleCancel}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={open => {
+        if (!open) void handleCancel();
+      }}
+    >
       <DialogContent
         className="w-96 bg-background p-6 max-w-sm mx-auto"
         onPointerDownOutside={e => e.preventDefault()}

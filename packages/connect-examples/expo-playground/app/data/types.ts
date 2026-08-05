@@ -42,6 +42,11 @@ export type MethodCategory =
   | 'signing'
   | 'device'
   | 'info'
+  | 'security'
+  | 'management'
+  | 'basic'
+  | 'message'
+  | 'advanced'
   | 'firmware'
   | 'other';
 

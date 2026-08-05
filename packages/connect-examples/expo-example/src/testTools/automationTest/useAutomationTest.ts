@@ -60,7 +60,12 @@ import {
   type TestSuiteType,
 } from '../../services/phonePilotMcp/types';
 
-import type { CoreApi } from '@onekeyfe/hd-core';
+import type {
+  CoreApi,
+  CoreMessage,
+  UiRequestDeviceAction,
+  UiRequestPassphrase,
+} from '@onekeyfe/hd-core';
 import type { SLIP39MethodData, SLIP39TestCaseData } from '../slip39Test/types';
 
 const SUITE_EXECUTION_ORDER: TestSuiteType[] = [
@@ -1078,7 +1083,7 @@ export function useAutomationTest() {
     }
   }, [addLog, updateHealthState]);
 
-  const uiListenerRef = useRef<((message: { type: string }) => void) | null>(null);
+  const uiListenerRef = useRef<((message: CoreMessage) => void) | null>(null);
 
   const setupUIListener = useCallback(
     (sdk: CoreApi, buttonOverride?: () => Promise<void>) => {
@@ -1086,7 +1091,7 @@ export function useAutomationTest() {
         sdk.off(UI_EVENT, uiListenerRef.current);
       }
 
-      const listener = async (message: { type: string }) => {
+      const listener = async (message: CoreMessage) => {
         addLog(`UI Event: ${message.type}`);
 
         switch (message.type) {
@@ -1110,38 +1115,63 @@ export function useAutomationTest() {
           case UI_REQUEST.REQUEST_PIN:
             if (clientRef.current) {
               try {
+                const requestPayload: UiRequestDeviceAction['payload'] = message.payload;
+                const isProtocolV2 =
+                  requestPayload?.device?.connectProtocol === 'V2' ||
+                  requestPayload?.interaction?.protocol === 'V2';
                 await clientRef.current.inputPin('1111');
-                sdk.uiResponse({
-                  type: UI_RESPONSE.RECEIVE_PIN,
-                  payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
-                });
-                addLog('PIN input via PhonePilot');
+                if (!isProtocolV2 && requestPayload?.responseCorrelation) {
+                  sdk.uiResponse({
+                    type: UI_RESPONSE.RECEIVE_PIN,
+                    payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
+                    ...requestPayload.responseCorrelation,
+                  });
+                  addLog('PIN input via PhonePilot (Protocol V1)');
+                } else {
+                  // Protocol V2 PIN prompts are device-only and non-blocking.
+                  addLog('PIN input via PhonePilot (Protocol V2 device-side)');
+                }
               } catch (error) {
                 addLog(`PIN input failed: ${error}`);
               }
             }
             break;
           case UI_REQUEST.REQUEST_PASSPHRASE:
-            addLog(
-              `Device requesting passphrase, sending via SDK: "${
-                currentPassphraseRef.current || '(empty)'
-              }"`
-            );
-            setTimeout(async () => {
-              sdk.uiResponse({
-                type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-                payload: { value: currentPassphraseRef.current ?? '' },
-              });
-              // Pro device needs physical confirmation after passphrase entry
-              if (clientRef.current) {
-                try {
-                  await clientRef.current.confirmAction();
-                  addLog('Passphrase confirmed via PhonePilot');
-                } catch (error) {
-                  addLog(`Passphrase confirm failed: ${error}`);
+            {
+              const requestPayload: UiRequestPassphrase['payload'] = message.payload;
+              const passphrase = currentPassphraseRef.current;
+              const responseCorrelation = requestPayload?.responseCorrelation;
+              const passphraseOnDevice = passphrase.length === 0;
+              addLog(
+                `Device requesting passphrase, responding via ${
+                  passphraseOnDevice ? 'device' : 'host'
+                } input`
+              );
+              setTimeout(async () => {
+                sdk.uiResponse({
+                  type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+                  payload: {
+                    value: passphraseOnDevice ? '' : passphrase,
+                    passphraseOnDevice,
+                    save: false,
+                  },
+                  ...(responseCorrelation ?? {}),
+                });
+                // Host passphrase entry still requires device confirmation.
+                if (!passphraseOnDevice && clientRef.current) {
+                  try {
+                    await clientRef.current.confirmAction();
+                    addLog('Passphrase confirmed via PhonePilot');
+                  } catch (error) {
+                    addLog(`Passphrase confirm failed: ${error}`);
+                  }
                 }
-              }
-            }, 200);
+              }, 200);
+            }
+            break;
+          case UI_REQUEST.REQUEST_PASSPHRASE_ON_DEVICE:
+            // Protocol V2 handles on-device passphrase entry entirely on the device.
+            addLog('Passphrase input requested on device');
             break;
           default:
             break;

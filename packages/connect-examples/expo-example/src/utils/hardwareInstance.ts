@@ -5,6 +5,17 @@ import { importSdk } from './importSdk';
 
 import type { ConnectSettings, CoreApi, LowLevelCoreApi } from '@onekeyfe/hd-core';
 
+type ElectronRendererWindow = Window & {
+  desktopApi?: {
+    nobleBle?: unknown;
+  };
+};
+
+export const isElectronBleRuntime = (): boolean =>
+  Platform.OS === 'web' &&
+  typeof window !== 'undefined' &&
+  Boolean((window as ElectronRendererWindow).desktopApi?.nobleBle);
+
 // eslint-disable-next-line import/no-mutable-exports
 let HardwareSDK: CoreApi | undefined;
 let initialized = false;
@@ -25,7 +36,7 @@ export const getHardwareSDKInstance = memoizee(
     };
 
     if (Platform.OS === 'web') {
-      settings.env = 'webusb';
+      settings.env = isElectronBleRuntime() ? 'desktop-web-ble' : 'webusb';
       settings.preRelease = true;
     }
 

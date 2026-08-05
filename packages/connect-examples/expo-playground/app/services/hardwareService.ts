@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { UI_RESPONSE, Success, Unsuccessful, CoreApi } from '@onekeyfe/hd-core';
 import { logError, logRequest, logResponse, logInfo } from '../utils/logger';
-import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
 import {
   getCurrentSDKInstance,
   clearSDKInstanceCache,
@@ -11,6 +10,9 @@ import {
 import { useHardwareStore } from '../store/hardwareStore';
 import { METHODS_REQUIRING_PASSPHRASE_CHECK } from '../utils/constants';
 import { previewHardwareParams } from './previewHardwareParams';
+import { normalizeProtocolAwareParams } from './protocolAwareParams';
+import type { UiResponseCorrelation } from '@onekeyfe/hd-core';
+import type { DeviceInfo } from '../types/hardware';
 // 使用 hd-core 的标准类型
 export type ApiResponse<T = any> = Success<T> | Unsuccessful;
 export type HardwareApiMethod = keyof CoreApi;
@@ -63,9 +65,6 @@ export async function switchTransport(transport: TransportType): Promise<ApiResp
     } else if (transport === 'webusb') {
       // WebUSB模式
       await sdkInstance.switchTransport('webusb');
-    } else {
-      // JSBridge模式
-      await sdkInstance.switchTransport('web');
     }
 
     logResponse(`Transport switched successfully to ${transport}`);
@@ -81,7 +80,10 @@ export async function switchTransport(transport: TransportType): Promise<ApiResp
 }
 
 // UI响应函数
-export async function submitPin(pin: string | null): Promise<void> {
+export async function submitPin(
+  pin: string,
+  responseCorrelation?: UiResponseCorrelation
+): Promise<void> {
   logRequest('Submitting PIN response');
   if (typeof window === 'undefined') return;
 
@@ -89,7 +91,8 @@ export async function submitPin(pin: string | null): Promise<void> {
     const sdkInstance = await getSDKInstance();
     sdkInstance.uiResponse({
       type: UI_RESPONSE.RECEIVE_PIN,
-      payload: pin || '@@ONEKEY_INPUT_PIN_IN_DEVICE',
+      payload: pin,
+      ...(responseCorrelation ?? {}),
     });
     logResponse('PIN response submitted successfully');
   } catch (error) {
@@ -101,7 +104,8 @@ export async function submitPin(pin: string | null): Promise<void> {
 export async function submitPassphrase(
   passphrase: string,
   onDevice = false,
-  save = false
+  save = false,
+  responseCorrelation?: UiResponseCorrelation
 ): Promise<void> {
   logRequest('Submitting passphrase response', { onDevice, save });
   if (typeof window === 'undefined') return;
@@ -115,12 +119,62 @@ export async function submitPassphrase(
         passphraseOnDevice: onDevice,
         save: save,
       },
+      ...(responseCorrelation ?? {}),
     });
     logResponse('Passphrase response submitted successfully');
   } catch (error) {
     logError('Failed to submit passphrase response', { error });
     throw error;
   }
+}
+
+const getResponseError = (response: ApiResponse, fallback: string) => {
+  if (response.success) return fallback;
+  const payload = response.payload as { error?: string } | undefined;
+  return payload?.error || fallback;
+};
+
+/**
+ * Refreshes the public cross-protocol state and keeps the legacy Features projection for
+ * existing playground panels. Protocol selection still comes from the SDK's active probe.
+ */
+export async function initializeDevice(device: DeviceInfo): Promise<DeviceInfo> {
+  if (!device.connectId) {
+    throw new Error('Device is missing connectId');
+  }
+
+  const sdk = await getSDKInstance();
+  if (device.connectProtocol) {
+    sdk.setDeviceConnectProtocol(device.connectId, device.connectProtocol);
+  }
+
+  const stateResult = await sdk.getDeviceState(device.connectId, { scope: 'firmware' });
+  if (!stateResult.success) {
+    throw new Error(getResponseError(stateResult, 'Failed to initialize device state'));
+  }
+
+  const state = stateResult.payload;
+  const featuresResult = await sdk.getFeatures(device.connectId);
+  const features = featuresResult.success ? featuresResult.payload : device.features;
+
+  if (!featuresResult.success) {
+    logInfo('Legacy Features projection is unavailable; using DeviceState only', {
+      connectId: device.connectId,
+      protocol: state.protocol,
+    });
+  }
+
+  return {
+    ...device,
+    connectProtocol: state.protocol === 'unknown' ? device.connectProtocol : state.protocol,
+    serialNo: state.identity.serialNo || device.serialNo,
+    uuid: state.identity.serialNo || device.serialNo || device.uuid,
+    deviceId: state.identity.deviceId,
+    deviceType: state.identity.deviceType,
+    label: state.identity.label ?? device.label,
+    state,
+    features,
+  };
 }
 
 // 获取设备的passphraseState
@@ -155,7 +209,9 @@ export async function callHardwareAPI(
   method: HardwareApiMethod,
   params: Record<string, unknown>
 ): Promise<ApiResponse> {
-  logRequest(`Calling hardware API method: ${method}`, params);
+  logRequest(`Calling hardware API method: ${method}`, {
+    parameterKeys: Object.keys(params).sort(),
+  });
 
   if (typeof window === 'undefined') {
     const error = 'Browser environment required';
@@ -167,6 +223,10 @@ export async function callHardwareAPI(
   }
 
   try {
+    if (method === 'searchDevices') {
+      return searchDevices({ promptWebUsbAccess: true });
+    }
+
     // 获取 SDK 实例
     const sdk = await getSDKInstance();
 
@@ -180,16 +240,17 @@ export async function callHardwareAPI(
       } as Unsuccessful;
     }
 
-    const { connectId, deviceId } = params;
+    let executionParams = { ...params };
+    const { connectId, deviceId } = executionParams;
 
     // FOR EXAMPLE APP: 如果参数中没有 passphraseState (或者为空)，则尝试从设备获取
     // app-monorepo 的逻辑更复杂，这里简化以满足 example 的需求
     if (connectId && METHODS_REQUIRING_PASSPHRASE_CHECK.includes(method)) {
       // 只有当 params.passphraseState 是空字符串、undefined 或 null 时才尝试获取
       if (
-        params.passphraseState === '' ||
-        params.passphraseState === undefined ||
-        params.passphraseState === null
+        executionParams.passphraseState === '' ||
+        executionParams.passphraseState === undefined ||
+        executionParams.passphraseState === null
       ) {
         logInfo(
           `PassphraseState is empty in params for method: ${method}, attempting to fetch from device.`
@@ -197,8 +258,8 @@ export async function callHardwareAPI(
         try {
           const passphraseResult = await getPassphraseState(connectId as string);
           if (passphraseResult.success && typeof passphraseResult.payload === 'string') {
-            logInfo(`Passphrase state obtained from device: ${passphraseResult.payload}`);
-            params.passphraseState = passphraseResult.payload;
+            logInfo('Passphrase state obtained from device');
+            executionParams.passphraseState = passphraseResult.payload;
             // IMPORTANT: Update the store's commonParameter so the UI reflects the fetched value
             useHardwareStore
               .getState()
@@ -206,24 +267,26 @@ export async function callHardwareAPI(
           } else {
             logInfo('Device passphrase protection not enabled or failed to get state from device.');
             // Ensure passphraseState is explicitly an empty string if not enabled/fetched
-            params.passphraseState = '';
+            executionParams.passphraseState = '';
             useHardwareStore.getState().setCommonParameter('passphraseState', '');
           }
         } catch (passphraseError) {
           logError('Failed to get passphrase state from device', { passphraseError });
           // In case of error, ensure it's an empty string to avoid unexpected behavior
-          params.passphraseState = '';
+          executionParams.passphraseState = '';
           useHardwareStore.getState().setCommonParameter('passphraseState', '');
         }
       } else {
-        logInfo(`Using existing passphrase state from params: ${params.passphraseState}`);
+        logInfo('Using the existing passphrase state from parameters');
       }
     }
+
+    executionParams = normalizeProtocolAwareParams(method, executionParams);
 
     // 打印最终传入硬件的关键参数（尽量不变形，保持与 hd-core 接口一致）
     try {
       // 使用通用预览函数
-      previewHardwareParams(method as string, params as Record<string, unknown>);
+      previewHardwareParams(method as string, executionParams);
     } catch (e) {
       // 仅日志失败时忽略
       logError('Failed to preview hardware params', { error: e });
@@ -232,20 +295,21 @@ export async function callHardwareAPI(
     logInfo(`Executing method ${method}`, {
       connectId,
       deviceId,
-      hasPassphraseState: !!params.passphraseState,
-      useEmptyPassphrase: params.useEmptyPassphrase, // Log this for debugging
+      hasPassphraseState: !!executionParams.passphraseState,
+      useEmptyPassphrase: executionParams.useEmptyPassphrase,
     });
 
     const methodFunc = sdk[method] as (...args: any[]) => Promise<ApiResponse>;
     let result: ApiResponse;
 
-    // 根据参数中是否包含 deviceId 来决定调用方式
-    if (deviceId) {
+    if (method === 'openWalletSession') {
+      result = await methodFunc(connectId, executionParams);
+    } else if (deviceId) {
       // 三参数调用：connectId, deviceId, params
-      result = await methodFunc(connectId, deviceId, params);
+      result = await methodFunc(connectId, deviceId, executionParams);
     } else {
       // 二参数调用：connectId, params
-      result = await methodFunc(connectId, params);
+      result = await methodFunc(connectId, executionParams);
     }
 
     if (result.success) {
@@ -272,7 +336,13 @@ export async function callHardwareAPI(
   }
 }
 // 搜索设备
-export async function searchDevices(): Promise<ApiResponse> {
+export type SearchDevicesOptions = {
+  promptWebUsbAccess?: boolean;
+};
+
+export async function searchDevices({
+  promptWebUsbAccess = false,
+}: SearchDevicesOptions = {}): Promise<ApiResponse<DeviceInfo[]>> {
   logRequest('Searching for devices');
 
   const currentTransport = TransportManager.getCurrentTransport();
@@ -286,31 +356,24 @@ export async function searchDevices(): Promise<ApiResponse> {
       await sdkInstance.switchTransport('emulator');
     } else if (currentTransport === 'webusb') {
       await sdkInstance.switchTransport('webusb');
-    } else {
-      await sdkInstance.switchTransport('web');
     }
 
-    // For WebUSB, ensure device is authorized in the browser before searching
-    if (currentTransport === 'webusb') {
-      try {
-        if (!navigator?.usb) {
-          throw new Error('WebUSB not supported by this browser');
-        }
-        const authorized = (await navigator.usb.getDevices?.()) ?? [];
-        if (!authorized.length) {
-          logInfo('No authorized WebUSB devices yet. Prompting user for device access...');
-          await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
-        }
-      } catch (e) {
-        const msg = `WebUSB authorization cancelled or failed: ${
-          e instanceof Error ? e.message : String(e)
-        }`;
-        logError(msg);
+    if (currentTransport === 'webusb' && promptWebUsbAccess) {
+      const accessResponse = await sdkInstance.promptWebDeviceAccess();
+      if (accessResponse.success && accessResponse.payload.device) {
+        const selectedDevice = accessResponse.payload.device as unknown as DeviceInfo;
+        logResponse('WebUSB device authorized', {
+          connectId: selectedDevice.connectId,
+          protocol: selectedDevice.connectProtocol,
+        });
         return {
-          success: false,
-          payload: { error: msg },
-        } as Unsuccessful;
+          success: true,
+          payload: [selectedDevice],
+        } as Success<DeviceInfo[]>;
       }
+
+      // The browser may already have authorized devices even when the chooser is cancelled.
+      logInfo('WebUSB chooser did not return a device; searching existing grants');
     }
 
     // 对于所有transport类型，使用标准的searchDevices
@@ -323,7 +386,7 @@ export async function searchDevices(): Promise<ApiResponse> {
           ? response.payload.map(d => d.connectId || 'unknown')
           : ['single device'],
       });
-      return response;
+      return response as Success<DeviceInfo[]>;
     } else {
       const errorPayload = response.payload as any;
       return {

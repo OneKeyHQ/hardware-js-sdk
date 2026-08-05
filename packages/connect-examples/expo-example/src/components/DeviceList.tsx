@@ -6,6 +6,7 @@ import { useIntl } from 'react-intl';
 import { useAtomValue, useSetAtom } from 'jotai';
 
 import HardwareSDKContext from '../provider/HardwareSDKContext';
+import { isElectronBleRuntime } from '../utils/hardwareInstance';
 import { Button } from './ui/Button';
 import PanelView from './ui/Panel';
 import { deviceActionsAtom, deviceListAtom, selectDeviceAtom } from '../atoms/deviceAtoms';
@@ -80,7 +81,8 @@ function DeviceListFC(
     if (!sdk) return alert(intl.formatMessage({ id: 'tip__sdk_not_ready' }));
 
     let foundDevices: Device[] = [];
-    if (Platform.OS === 'web') {
+    const useElectronBle = isElectronBleRuntime();
+    if (Platform.OS === 'web' && !useElectronBle) {
       const accessResponse = await sdk.promptWebDeviceAccess();
       if (accessResponse.success && accessResponse.payload.device) {
         foundDevices = [accessResponse.payload.device as unknown as Device];
@@ -97,7 +99,7 @@ function DeviceListFC(
 
     setDeviceActions({ type: 'setList', payload: foundDevices });
 
-    if (Platform.OS === 'web' && foundDevices.length > 0) {
+    if (Platform.OS === 'web' && !useElectronBle && foundDevices.length > 0) {
       selectDevice(foundDevices[0]);
     }
   }, [intl, sdk, selectDevice, setDeviceActions]);
@@ -111,6 +113,11 @@ function DeviceListFC(
   const handleRemoveSelected = useCallback(() => {
     setDeviceActions({ type: 'clear' });
   }, [setDeviceActions]);
+
+  let transportLabel = 'Bluetooth';
+  if (Platform.OS === 'web') {
+    transportLabel = isElectronBleRuntime() ? 'Desktop BLE' : 'WebUSB';
+  }
 
   useImperativeHandle(
     ref,
@@ -147,7 +154,7 @@ function DeviceListFC(
             {selectedDevice?.connectId || intl.formatMessage({ id: 'message__no_device' })}
           </Text>
           <XStack gap={4}>
-            <Text>{Platform.OS === 'web' ? 'WebUSB' : 'Bluetooth'}</Text>
+            <Text>{transportLabel}</Text>
             <Button onPress={handleRemoveSelected}>
               {intl.formatMessage({ id: 'action__clean_device' })}
             </Button>

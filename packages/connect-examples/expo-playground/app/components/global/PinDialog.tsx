@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { submitPin } from '../../services/hardwareService';
+import { cancelHardwareOperation, submitPin } from '../../services/hardwareService';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../ui/Dialog';
 import { Button } from '../ui/Button';
+import type { UiResponseCorrelation } from '@onekeyfe/hd-core';
 
 interface PinDialogProps {
   isOpen: boolean;
   onClose: () => void;
+  responseCorrelation?: UiResponseCorrelation;
 }
 
-const PinDialog: React.FC<PinDialogProps> = ({ isOpen, onClose }) => {
+const PinDialog: React.FC<PinDialogProps> = ({ isOpen, onClose, responseCorrelation }) => {
   const { t } = useTranslation();
   const [pin, setPin] = useState('');
 
@@ -32,7 +34,7 @@ const PinDialog: React.FC<PinDialogProps> = ({ isOpen, onClose }) => {
     if (!pin) return;
 
     try {
-      await submitPin(pin);
+      await submitPin(pin, responseCorrelation);
       setPin('');
     } catch (error) {
       console.error('PIN submit failed:', error);
@@ -41,7 +43,7 @@ const PinDialog: React.FC<PinDialogProps> = ({ isOpen, onClose }) => {
 
   const handleUseDevice = async () => {
     try {
-      await submitPin('@@ONEKEY_INPUT_PIN_IN_DEVICE');
+      await submitPin('@@ONEKEY_INPUT_PIN_IN_DEVICE', responseCorrelation);
       setPin('');
     } catch (error) {
       console.error('Device PIN input failed:', error);
@@ -50,7 +52,7 @@ const PinDialog: React.FC<PinDialogProps> = ({ isOpen, onClose }) => {
 
   const handleCancel = async () => {
     try {
-      await submitPin(null);
+      await cancelHardwareOperation();
       setPin('');
       onClose();
     } catch (error) {
@@ -89,7 +91,10 @@ const PinDialog: React.FC<PinDialogProps> = ({ isOpen, onClose }) => {
                 {t('pin.enterPin', 'Enter PIN')}
               </DialogTitle>
               <DialogDescription className="text-sm text-gray-600 leading-relaxed">
-                {t('pin.checkDeviceLayout', 'Please check the keyboard layout on your device screen.')}
+                {t(
+                  'pin.checkDeviceLayout',
+                  'Please check the keyboard layout on your device screen.'
+                )}
               </DialogDescription>
             </div>
           </div>

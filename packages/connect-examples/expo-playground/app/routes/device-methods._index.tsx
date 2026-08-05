@@ -115,7 +115,6 @@ const DeviceMethodsIndexPage: React.FC = () => {
         methodName.includes('firmware') ||
         methodName.includes('bootloader') ||
         methodName.includes('check') ||
-        methodName.includes('bridge') ||
         methodName.includes('reboot')
       ) {
         firmwareMethods.push(method);

@@ -16,6 +16,45 @@ const api: UnifiedMethodConfig[] = [
     presets: [],
   },
   {
+    method: 'detectDeviceConnectProtocol',
+    description: 'methodDescriptions.detectDeviceConnectProtocol',
+    noDeviceIdReq: true,
+    presets: [],
+  },
+  {
+    method: 'getDeviceState',
+    description: 'methodDescriptions.getDeviceState',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'Runtime state',
+        parameters: [
+          {
+            name: 'scope',
+            type: 'select',
+            required: true,
+            label: 'Refresh Scope',
+            options: ['runtime', 'settings', 'firmware'],
+            value: 'runtime',
+          },
+        ],
+      },
+      {
+        title: 'Firmware state',
+        parameters: [
+          {
+            name: 'scope',
+            type: 'select',
+            required: true,
+            label: 'Refresh Scope',
+            options: ['runtime', 'settings', 'firmware'],
+            value: 'firmware',
+          },
+        ],
+      },
+    ],
+  },
+  {
     method: 'getOnekeyFeatures',
     description: 'methodDescriptions.getOnekeyFeatures',
     noDeviceIdReq: true,
@@ -26,6 +65,118 @@ const api: UnifiedMethodConfig[] = [
     description: 'methodDescriptions.getPassphraseState',
     noDeviceIdReq: true,
     presets: [],
+  },
+  {
+    method: 'openWalletSession',
+    description: 'methodDescriptions.openWalletSession',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'Open standard wallet',
+        parameters: [
+          {
+            name: 'mode',
+            type: 'select',
+            required: true,
+            label: 'Wallet Mode',
+            options: ['standard', 'select-hidden', 'resume-hidden'],
+            value: 'standard',
+          },
+        ],
+      },
+      {
+        title: 'Select hidden wallet',
+        parameters: [
+          {
+            name: 'mode',
+            type: 'select',
+            required: true,
+            label: 'Wallet Mode',
+            options: ['standard', 'select-hidden', 'resume-hidden'],
+            value: 'select-hidden',
+          },
+        ],
+      },
+      {
+        title: 'Resume hidden wallet',
+        parameters: [
+          {
+            name: 'mode',
+            type: 'select',
+            required: true,
+            label: 'Wallet Mode',
+            options: ['standard', 'select-hidden', 'resume-hidden'],
+            value: 'resume-hidden',
+          },
+          {
+            name: 'deviceId',
+            type: 'string',
+            required: true,
+            label: 'Wallet Device ID',
+          },
+          {
+            name: 'passphraseState',
+            type: 'string',
+            required: true,
+            label: 'Passphrase State',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'deviceUnlock',
+    description: 'methodDescriptions.deviceUnlock',
+    noDeviceIdReq: true,
+    presets: [],
+  },
+  {
+    method: 'testProtocolV2Ping',
+    description: 'methodDescriptions.testProtocolV2Ping',
+    noDeviceIdReq: true,
+    supportedDevices: ['pro2'],
+    presets: [
+      {
+        title: 'Protocol V2 ping',
+        parameters: [
+          {
+            name: 'message',
+            type: 'string',
+            required: false,
+            label: 'Message',
+            value: 'expo-playground',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'deviceGetOnboardingStatus',
+    description: 'methodDescriptions.deviceGetOnboardingStatus',
+    noDeviceIdReq: true,
+    supportedDevices: ['pro2'],
+    presets: [],
+  },
+  {
+    method: 'deviceReboot',
+    description: 'methodDescriptions.deviceReboot',
+    noDeviceIdReq: true,
+    supportedDevices: ['pro2'],
+    presets: [
+      {
+        title: 'Reboot device',
+        parameters: [
+          {
+            name: 'rebootType',
+            type: 'select',
+            required: true,
+            label: 'Reboot Target',
+            options: ['normal', 'bootloader', 'romloader'],
+            value: 'normal',
+          },
+        ],
+      },
+    ],
   },
 
   // === 设备管理 ===

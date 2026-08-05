@@ -118,7 +118,7 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
 
   // 执行方法
   const handleExecute = useCallback(async () => {
-    if (!isConnected) {
+    if (!isConnected && !methodConfig.noConnIdReq) {
       toast({
         title: t('components.methodExecutor.deviceNotConnected'),
         description: t('components.methodExecutor.connectDeviceFirst'),
@@ -133,11 +133,19 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
     // 使用 hardwareStore 的完整执行参数（包含通用参数）
     const finalExecutionParams = getExecutionParameters();
     await execute(finalExecutionParams, executionHandler);
-  }, [isConnected, execute, getExecutionParameters, executionHandler, toast, t]);
+  }, [
+    isConnected,
+    methodConfig.noConnIdReq,
+    execute,
+    getExecutionParameters,
+    executionHandler,
+    toast,
+    t,
+  ]);
 
   // 取消操作
   const handleCancel = useCallback(async () => {
-    await cancel(currentDevice?.connectId);
+    await cancel(currentDevice?.connectId ?? undefined);
   }, [cancel, currentDevice?.connectId]);
 
   // 重置状态

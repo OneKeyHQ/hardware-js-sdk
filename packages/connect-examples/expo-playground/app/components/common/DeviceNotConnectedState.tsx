@@ -3,9 +3,8 @@ import { Button } from '../ui/Button';
 import { useTranslation } from 'react-i18next';
 import { Search, AlertTriangle, ArrowRight } from 'lucide-react';
 import { useDeviceStore } from '../../store/deviceStore';
-import { searchDevices } from '../../services/hardwareService';
+import { initializeDevice, searchDevices } from '../../services/hardwareService';
 import { useToast } from '../../hooks/use-toast';
-import { SDKUtils } from '../../utils/hardwareInstance';
 
 interface DeviceNotConnectedStateProps {
   className?: string;
@@ -20,14 +19,8 @@ export function DeviceNotConnectedState({
 }: DeviceNotConnectedStateProps) {
   const { t } = useTranslation();
   const { toast } = useToast();
-  const {
-    currentDevice,
-    setIsConnecting,
-    setConnectedDevices,
-    setCurrentDevice,
-    setDeviceFeatures,
-    sdkInitState,
-  } = useDeviceStore();
+  const { currentDevice, setIsConnecting, setConnectedDevices, setCurrentDevice, sdkInitState } =
+    useDeviceStore();
 
   // 如果设备已连接，不显示此组件
   if (currentDevice) {
@@ -49,7 +42,7 @@ export function DeviceNotConnectedState({
 
     try {
       // 搜索设备
-      const searchResult = await searchDevices();
+      const searchResult = await searchDevices({ promptWebUsbAccess: true });
 
       if (searchResult.success && searchResult.payload) {
         const devices = searchResult.payload;
@@ -57,17 +50,8 @@ export function DeviceNotConnectedState({
 
         // 自动连接第一个设备
         if (devices.length > 0) {
-          const targetDevice = devices[0];
+          const targetDevice = await initializeDevice(devices[0]);
           setCurrentDevice(targetDevice);
-
-          // 获取设备特征信息
-          const sdk = await SDKUtils.getInstance();
-          if (targetDevice.connectId && targetDevice.deviceId) {
-            const featuresResult = await sdk.getFeatures(targetDevice.connectId);
-            if (featuresResult.success && featuresResult.payload) {
-              setDeviceFeatures(featuresResult.payload);
-            }
-          }
 
           toast({
             title: t('device.connected'),
@@ -84,7 +68,9 @@ export function DeviceNotConnectedState({
           });
         }
       } else {
-        const errorMessage = searchResult.payload?.error || t('transport.searchDeviceFailed');
+        const errorMessage =
+          (!searchResult.success && searchResult.payload?.error) ||
+          t('transport.searchDeviceFailed');
         toast({
           title: t('transport.searchFailed'),
           description: errorMessage,

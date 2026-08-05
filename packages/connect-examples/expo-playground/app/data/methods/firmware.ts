@@ -2,6 +2,132 @@ import type { UnifiedMethodConfig, DeviceMethodCategory } from '../types';
 
 const api: UnifiedMethodConfig[] = [
   {
+    method: 'deviceUploadWallpaper',
+    description: 'methodDescriptions.deviceUploadWallpaper',
+    noDeviceIdReq: true,
+    supportedDevices: ['pro2'],
+    presets: [
+      {
+        title: 'Upload Pro2 wallpaper',
+        description: 'Upload a 604x1024 raw RGBA8888 file and apply it as the wallpaper.',
+        parameters: [
+          {
+            name: 'width',
+            type: 'number',
+            required: true,
+            label: 'Width',
+            value: 604,
+          },
+          {
+            name: 'height',
+            type: 'number',
+            required: true,
+            label: 'Height',
+            value: 1024,
+          },
+          {
+            name: 'rgba',
+            type: 'file',
+            required: true,
+            label: 'Raw RGBA File',
+            accept: '.rgba,.bin',
+          },
+          {
+            name: 'fileName',
+            type: 'string',
+            required: false,
+            label: 'Device File Name',
+            value: 'playground-wallpaper.bin',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'deviceUploadNft',
+    description: 'methodDescriptions.deviceUploadNft',
+    noDeviceIdReq: true,
+    supportedDevices: ['pro2'],
+    presets: [
+      {
+        title: 'Upload Pro2 NFT',
+        description: 'Upload raw RGBA8888 image and thumbnail files with NFT metadata.',
+        parameters: [
+          {
+            name: 'imageWidth',
+            type: 'number',
+            required: true,
+            label: 'Image Width',
+          },
+          {
+            name: 'imageHeight',
+            type: 'number',
+            required: true,
+            label: 'Image Height',
+          },
+          {
+            name: 'imageRgba',
+            type: 'file',
+            required: true,
+            label: 'Image RGBA File',
+            accept: '.rgba,.bin',
+          },
+          {
+            name: 'thumbnailWidth',
+            type: 'number',
+            required: true,
+            label: 'Thumbnail Width',
+          },
+          {
+            name: 'thumbnailHeight',
+            type: 'number',
+            required: true,
+            label: 'Thumbnail Height',
+          },
+          {
+            name: 'thumbnailRgba',
+            type: 'file',
+            required: true,
+            label: 'Thumbnail RGBA File',
+            accept: '.rgba,.bin',
+          },
+          {
+            name: 'title',
+            type: 'string',
+            required: true,
+            label: 'Title',
+          },
+          {
+            name: 'subtitle',
+            type: 'string',
+            required: true,
+            label: 'Subtitle',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'uploadPortfolio',
+    description: 'methodDescriptions.uploadPortfolio',
+    noDeviceIdReq: true,
+    supportedDevices: ['pro2'],
+    presets: [
+      {
+        title: 'Upload Pro2 portfolio package',
+        parameters: [
+          {
+            name: 'packageBytes',
+            type: 'file',
+            required: true,
+            label: 'Portfolio Package',
+            accept: '.zip,.bin',
+          },
+        ],
+      },
+    ],
+  },
+  {
     method: 'firmwareUpdateV2',
     description: 'methodDescriptions.firmwareUpdateV2',
     noDeviceIdReq: true,
@@ -201,24 +327,9 @@ const api: UnifiedMethodConfig[] = [
     presets: [
       {
         title: 'Check all firmware releases',
-        parameters: [
-          {
-            name: 'checkBridgeRelease',
-            type: 'boolean',
-            required: false,
-            label: 'Check Bridge Release',
-            description: 'Include bridge release in check',
-            value: true,
-          },
-        ],
+        parameters: [],
       },
     ],
-  },
-  {
-    method: 'checkBridgeRelease',
-    description: 'methodDescriptions.checkBridgeRelease',
-    noDeviceIdReq: true,
-    presets: [],
   },
 
   // === 固件更新 ===
@@ -236,7 +347,8 @@ const api: UnifiedMethodConfig[] = [
             type: 'file',
             required: false,
             label: 'Bootloader Binary',
-            description: 'Upload bootloader binary file (.bin). If not provided, latest will be downloaded automatically.',
+            description:
+              'Upload bootloader binary file (.bin). If not provided, latest will be downloaded automatically.',
             accept: '.bin',
             visible: true,
             editable: true,

@@ -28,16 +28,17 @@ import type {
 declare global {
   interface Window {
     desktopApi?: {
-      bluetoothSystem?: {
-        requestPermission: () => Promise<boolean>;
-        openBluetoothSettings: () => void;
-        openSystemSettings: () => void;
-        getSystemState: () => Promise<{
-          isSupported: boolean;
-          isPoweredOn: boolean;
-          hasPermission: boolean;
-          isScanning: boolean;
+      nobleBle?: {
+        checkAvailability: () => Promise<{
+          available: boolean;
+          state: string;
+          unsupported: boolean;
+          initialized: boolean;
         }>;
+      };
+      bluetoothSystem?: {
+        openBluetoothSettings: () => void;
+        openPrivacySettings: () => void;
       };
     };
   }
@@ -112,16 +113,15 @@ export default function HandleSDKEvents() {
   const onBluetoothRequestPermission = useCallback(async () => {
     console.log('Requesting Bluetooth permission...');
 
-    if (typeof window !== 'undefined' && window.desktopApi?.bluetoothSystem) {
+    if (typeof window !== 'undefined' && window.desktopApi?.nobleBle) {
       try {
-        const granted = await window.desktopApi.bluetoothSystem.requestPermission();
-        if (granted) {
+        const status = await window.desktopApi.nobleBle.checkAvailability();
+        if (status.available) {
           console.log('Bluetooth permission granted');
           setShowBluetoothPermission(false);
-          // 可以在这里触发重新连接
         } else {
-          console.log('Bluetooth permission denied');
-          // 保持对话框打开，让用户选择其他操作
+          console.log('Bluetooth is unavailable; opening system privacy settings');
+          window.desktopApi.bluetoothSystem?.openPrivacySettings();
         }
       } catch (error) {
         console.error('Failed to request Bluetooth permission:', error);

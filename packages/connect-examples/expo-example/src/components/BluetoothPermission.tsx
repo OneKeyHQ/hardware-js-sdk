@@ -11,16 +11,17 @@ import { useMedia } from '../provider/MediaProvider';
 declare global {
   interface Window {
     desktopApi?: {
-      bluetoothSystem?: {
-        requestPermission: () => Promise<boolean>;
-        openBluetoothSettings: () => void;
-        openSystemSettings: () => void;
-        getSystemState: () => Promise<{
-          isSupported: boolean;
-          isPoweredOn: boolean;
-          hasPermission: boolean;
-          isScanning: boolean;
+      nobleBle?: {
+        checkAvailability: () => Promise<{
+          available: boolean;
+          state: string;
+          unsupported: boolean;
+          initialized: boolean;
         }>;
+      };
+      bluetoothSystem?: {
+        openBluetoothSettings: () => void;
+        openPrivacySettings: () => void;
       };
     };
   }
