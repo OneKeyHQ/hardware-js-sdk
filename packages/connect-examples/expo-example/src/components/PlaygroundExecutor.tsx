@@ -65,19 +65,17 @@ const PlaygroundExecutor: React.FC<PlaygroundExecutorProps> = ({
         };
       }
 
-      console.log('requestParams: ', requestParams);
-
       let res;
       if (methodPayload.noConnIdReq) {
         console.info('[REQUEST] call sdk', { method });
         res = await (sdk as any)[method]();
       } else if (methodPayload.noDeviceIdReq) {
         // if (!selectedDevice) return intl.formatMessage({ id: 'tip__need_connect_device_first' });
-        console.info('[REQUEST] call sdk', { method, connectId, params: requestParams });
+        console.info('[REQUEST] call sdk', { method, connectId });
         res = await (sdk as any)[method](connectId, requestParams);
       } else {
         // if (!selectedDevice) return intl.formatMessage({ id: 'tip__need_connect_device_first' });
-        console.info('[REQUEST] call sdk', { method, connectId, deviceId, params: requestParams });
+        console.info('[REQUEST] call sdk', { method, connectId, deviceId });
         res = await (sdk as any)[method](connectId, deviceId, requestParams);
       }
 
