@@ -5,6 +5,7 @@ import { BlindSignatureChainCheck } from '../testTools/securityCheckTest/blindSi
 import PanelView from '../components/ui/Panel';
 import { DeviceProvider } from '../provider/DeviceProvider';
 import { HardwareInputPinDialogProvider } from '../provider/HardwareInputPinProvider';
+import TestApiExport from '../testTools/securityCheckTest/apiExportTest/TestApiExport';
 
 export default function SecurityCheckScreen() {
   return (
@@ -14,6 +15,9 @@ export default function SecurityCheckScreen() {
           <HardwareInputPinDialogProvider>
             <BlindSignatureChainCheck />
           </HardwareInputPinDialogProvider>
+        </PanelView>
+        <PanelView>
+          <TestApiExport />
         </PanelView>
       </DeviceProvider>
     </PageView>
