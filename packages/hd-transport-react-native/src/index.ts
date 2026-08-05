@@ -228,6 +228,14 @@ const fallbackConnectOptions: Record<string, unknown> = {
  * inside the native budget, so this only fires when the native timeout did not.
  */
 export const BLE_CONNECT_TIMEOUT_MS = BLE_NATIVE_CONNECT_TIMEOUT_MS * 2 + 2000;
+/**
+ * How many times a known device may fail its own protocol before we probe the others
+ * again. Reconnect polling during a device reboot repeats this every few seconds, and
+ * probing Protocol V2 costs a 10s Ping timeout, so paying it on every attempt for a
+ * device we just spoke V1 to dominates the wait. A firmware update can legitimately
+ * change a device's protocol, so the shortcut has to expire rather than stick.
+ */
+export const PROTOCOL_REPROBE_FALLBACK_ATTEMPTS = 3;
 /** Consecutive connect timeouts on one device before the BLE manager itself is recreated. */
 export const BLE_CONNECT_TIMEOUT_MANAGER_RESET_THRESHOLD = 2;
 const CONNECT_TIMEOUT_MESSAGE = 'BLE connect timeout after';
@@ -339,6 +347,12 @@ export default class ReactNativeBleTransport {
   private connectTimeoutCounts: Map<string, number> = new Map();
 
   private deviceProtocolHints: Map<string, ProtocolType> = new Map();
+
+  /** Protocol this device actually answered on, kept across reconnects of one session. */
+  private sessionProtocols: Map<string, ProtocolType> = new Map();
+
+  /** Consecutive detections that failed while trusting sessionProtocols. */
+  private protocolReprobeFailures: Map<string, number> = new Map();
 
   private protocolV2Assemblers: Map<string, ProtocolV2FrameAssembler> = new Map();
 
@@ -1530,6 +1544,8 @@ export default class ReactNativeBleTransport {
     this.deviceProtocol.delete(session);
     this.probingProtocols.delete(session);
     this.deviceProtocolHints.delete(session);
+    this.sessionProtocols.delete(session);
+    this.protocolReprobeFailures.delete(session);
     this.protocolV2Assemblers.delete(session);
     this.resetProtocolV2Frames(session);
 
@@ -1722,6 +1738,8 @@ export default class ReactNativeBleTransport {
     });
     this.deviceProtocol.clear();
     this.probingProtocols.clear();
+    this.sessionProtocols.clear();
+    this.protocolReprobeFailures.clear();
     this.monitorTokens.clear();
     this.protocolV2Assemblers.clear();
     try {
@@ -1778,6 +1796,7 @@ export default class ReactNativeBleTransport {
     if (expectedProtocol === 'V1') {
       if (await this.probeProtocolV1(uuid)) {
         this.deviceProtocol.set(uuid, 'V1');
+        this.sessionProtocols.set(uuid, 'V1');
         Log?.debug('[ReactNativeBleTransport] protocol detected', {
           deviceId: uuid,
           protocol: 'V1',
@@ -1791,6 +1810,7 @@ export default class ReactNativeBleTransport {
     if (expectedProtocol === 'V2') {
       if (await this.probeProtocolV2(uuid)) {
         this.deviceProtocol.set(uuid, 'V2');
+        this.sessionProtocols.set(uuid, 'V2');
         Log?.debug('[ReactNativeBleTransport] protocol detected', {
           deviceId: uuid,
           protocol: 'V2',
@@ -1803,8 +1823,18 @@ export default class ReactNativeBleTransport {
 
     // Protocol must be actively probed after connection. Name, PID, and descriptors only
     // influence probe order; a V2 hint probes V2 first and falls back to V1.
-    const probeOrder: ProtocolType[] =
+    const sessionProtocol = this.sessionProtocols.get(uuid);
+    const reprobeFailures = this.protocolReprobeFailures.get(uuid) ?? 0;
+    const fullProbeOrder: ProtocolType[] =
       protocolHint === 'V2' || this.deviceProtocol.get(uuid) === 'V2' ? ['V2', 'V1'] : ['V1', 'V2'];
+    // A device that already answered on a protocol in this session keeps answering on
+    // it; while it is rebooting nothing answers at all, so probing the other protocol
+    // only adds its timeout to every poll.
+    const trustSessionProtocol =
+      sessionProtocol !== undefined &&
+      !protocolHint &&
+      reprobeFailures < PROTOCOL_REPROBE_FALLBACK_ATTEMPTS;
+    const probeOrder: ProtocolType[] = trustSessionProtocol ? [sessionProtocol] : fullProbeOrder;
 
     for (let i = 0; i < probeOrder.length; i += 1) {
       const protocol = probeOrder[i];
@@ -1822,6 +1852,8 @@ export default class ReactNativeBleTransport {
         protocol === 'V1' ? await this.probeProtocolV1(uuid) : await this.probeProtocolV2(uuid);
       if (detected) {
         this.deviceProtocol.set(uuid, protocol);
+        this.sessionProtocols.set(uuid, protocol);
+        this.protocolReprobeFailures.delete(uuid);
         Log?.debug('[ReactNativeBleTransport] protocol detected', {
           deviceId: uuid,
           protocol,
@@ -1829,6 +1861,14 @@ export default class ReactNativeBleTransport {
         });
         return protocol;
       }
+    }
+
+    if (trustSessionProtocol) {
+      // Still silent on its own protocol: count it, and let the streak expire the
+      // shortcut so a device that genuinely switched protocols is found again.
+      this.protocolReprobeFailures.set(uuid, reprobeFailures + 1);
+    } else {
+      this.protocolReprobeFailures.delete(uuid);
     }
 
     this.deviceProtocol.delete(uuid);
