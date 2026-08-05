@@ -52,6 +52,10 @@ interface SDKProviderProps {
 export interface FirmwareProgressData {
   progress: number;
   progressType: 'transferData' | 'installingFirmware';
+  transferredBytes?: number;
+  totalBytes?: number;
+  rateBytesPerSecond?: number;
+  elapsedMs?: number;
 }
 
 export const useFirmwareProgressStore = create<{
@@ -187,19 +191,33 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
                 setWebUsbModalOpen(true);
                 break;
 
-              case UI_REQUEST.FIRMWARE_PROGRESS:
-                if (queuedMessage.payload && typeof queuedMessage.payload === 'object') {
-                  const payload = queuedMessage.payload as {
-                    progress?: number;
-                    progressType?: string;
-                  };
-                  if (typeof payload.progress === 'number' && payload.progressType) {
-                    useFirmwareProgressStore.getState().setProgressData({
-                      progress: payload.progress,
-                      progressType: payload.progressType as 'transferData' | 'installingFirmware',
-                    });
-                  }
-                }
+                  case UI_REQUEST.FIRMWARE_PROGRESS:
+                  case UI_REQUEST.DEVICE_PROGRESS:
+                    if (queuedMessage.payload && typeof queuedMessage.payload === 'object') {
+                      const payload = queuedMessage.payload as {
+                        progress?: number;
+                        progressType?: string;
+                        transferredBytes?: number;
+                        totalBytes?: number;
+                        rateBytesPerSecond?: number;
+                        elapsedMs?: number;
+                      };
+                      if (typeof payload.progress === 'number') {
+                        useFirmwareProgressStore.getState().setProgressData({
+                          progress: payload.progress,
+                          progressType:
+                            queuedMessage.type === UI_REQUEST.DEVICE_PROGRESS
+                              ? 'transferData'
+                              : (payload.progressType as
+                                  | 'transferData'
+                                  | 'installingFirmware') || 'transferData',
+                          transferredBytes: payload.transferredBytes,
+                          totalBytes: payload.totalBytes,
+                          rateBytesPerSecond: payload.rateBytesPerSecond,
+                          elapsedMs: payload.elapsedMs,
+                        });
+                      }
+                    }
                 break;
 
               default:

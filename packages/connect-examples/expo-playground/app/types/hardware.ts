@@ -12,6 +12,7 @@ export interface DeviceInfo {
   label?: string;
   path?: string;
   state?: DeviceState;
+  protocolVersion?: number | null;
   features?: Features;
   onekeyFeatures?: OnekeyFeatures;
 }

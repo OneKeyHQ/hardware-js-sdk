@@ -8,14 +8,138 @@ import {
   TransportManager,
 } from '../utils/hardwareInstance';
 import { useHardwareStore } from '../store/hardwareStore';
+import { useDeviceStore } from '../store/deviceStore';
 import { METHODS_REQUIRING_PASSPHRASE_CHECK } from '../utils/constants';
 import { previewHardwareParams } from './previewHardwareParams';
 import { normalizeProtocolAwareParams } from './protocolAwareParams';
-import type { UiResponseCorrelation } from '@onekeyfe/hd-core';
+import type { DeviceState, UiResponseCorrelation } from '@onekeyfe/hd-core';
 import type { DeviceInfo } from '../types/hardware';
+import { applyDeviceStateToDevice } from './deviceStateAdapter';
+import { getPassphraseProtectionFromDeviceState } from './deviceStateSelectors';
 // 使用 hd-core 的标准类型
 export type ApiResponse<T = any> = Success<T> | Unsuccessful;
 export type HardwareApiMethod = keyof CoreApi;
+export type HardwareApiCallMode = 'params' | 'connectId-params' | 'connectId-deviceId-params';
+
+function getErrorText(error: unknown): string {
+  if (typeof error === 'string') return error;
+  if (error instanceof Error) return `${error.name} ${error.message}`;
+  if (error && typeof error === 'object') {
+    const value = error as {
+      error?: unknown;
+      message?: unknown;
+      payload?: { error?: unknown };
+    };
+    return [value.error, value.message, value.payload?.error]
+      .filter(item => typeof item === 'string')
+      .join(' ');
+  }
+  return '';
+}
+
+export function getDeviceSearchUserMessage(error: unknown): string {
+  const normalized = getErrorText(error).toLowerCase();
+  if (normalized.includes('not supported')) {
+    return 'WebUSB is not supported in this browser.';
+  }
+  if (
+    normalized.includes('permission') ||
+    normalized.includes('securityerror') ||
+    normalized.includes('notallowederror')
+  ) {
+    return 'Device permission is required. Reconnect the device and approve the browser prompt.';
+  }
+  if (
+    normalized.includes('protocol') ||
+    normalized.includes('did not respond') ||
+    normalized.includes('timeout')
+  ) {
+    return 'The device did not respond. Reconnect it, unlock it if needed, and try again.';
+  }
+  if (
+    normalized.includes('notfounderror') ||
+    normalized.includes('no device') ||
+    normalized.includes('not found')
+  ) {
+    return 'No compatible device was selected. Connect a OneKey device and try again.';
+  }
+  return 'Unable to connect to the device. Reconnect it and try again.';
+}
+
+type PassphraseStateMetadata = {
+  passphraseState?: string;
+};
+
+function extractPassphraseStateMetadata(payload: unknown): PassphraseStateMetadata {
+  if (typeof payload === 'string') return { passphraseState: payload };
+  if (!payload || typeof payload !== 'object') return {};
+  const value = (payload as { passphraseState?: unknown }).passphraseState;
+  return typeof value === 'string' ? { passphraseState: value } : {};
+}
+
+function clearPassphraseState(params: Record<string, unknown>) {
+  delete params.passphraseState;
+  useHardwareStore.getState().setCommonParameter('passphraseState', '');
+}
+
+function updateCachedDeviceState(connectId: string, state: DeviceState) {
+  const store = useDeviceStore.getState();
+  if (store.currentDevice?.connectId === connectId) {
+    store.setCurrentDevice(applyDeviceStateToDevice(store.currentDevice, state));
+  }
+  store.setDeviceState(state);
+}
+
+async function resolvePassphraseProtection(
+  sdk: CoreApi,
+  connectId: string
+): Promise<boolean | undefined> {
+  const store = useDeviceStore.getState();
+  const cachedState = store.currentDevice?.connectId === connectId ? store.currentDevice.state : undefined;
+  if (cachedState) return getPassphraseProtectionFromDeviceState(cachedState);
+
+  const stateResult = await sdk.getDeviceState(connectId);
+  if (!stateResult.success || !stateResult.payload) return undefined;
+  updateCachedDeviceState(connectId, stateResult.payload);
+  return getPassphraseProtectionFromDeviceState(stateResult.payload);
+}
+
+async function preparePassphraseParams(
+  sdk: CoreApi,
+  method: HardwareApiMethod,
+  params: Record<string, unknown>,
+  connectId: string
+) {
+  if (!METHODS_REQUIRING_PASSPHRASE_CHECK.includes(method)) return;
+
+  if (params.useEmptyPassphrase === true) {
+    clearPassphraseState(params);
+    return;
+  }
+
+  const passphraseProtection = await resolvePassphraseProtection(sdk, connectId);
+  if (passphraseProtection === false) {
+    clearPassphraseState(params);
+    return;
+  }
+
+  if (typeof params.passphraseState === 'string' && params.passphraseState) return;
+
+  const walletResult = await sdk.openWalletSession(connectId, { mode: 'select-hidden' });
+  if (!walletResult.success) {
+    clearPassphraseState(params);
+    throw new Error(String(walletResult.payload?.error || 'Failed to open wallet session.'));
+  }
+
+  const metadata = extractPassphraseStateMetadata(walletResult.payload);
+  if (!metadata.passphraseState) {
+    clearPassphraseState(params);
+    return;
+  }
+
+  params.passphraseState = metadata.passphraseState;
+  useHardwareStore.getState().setCommonParameter('passphraseState', metadata.passphraseState);
+}
 
 // 获取SDK实例的简化函数
 async function getSDKInstance(): Promise<CoreApi> {
@@ -177,6 +301,11 @@ export async function initializeDevice(device: DeviceInfo): Promise<DeviceInfo> 
   };
 }
 
+/** Hydrate discovered devices through the current public DeviceState API. */
+export async function hydrateConnectedDeviceInfo(device: DeviceInfo): Promise<DeviceInfo> {
+  return initializeDevice(device);
+}
+
 // 获取设备的passphraseState
 export async function getPassphraseState(
   connectId: string
@@ -207,7 +336,8 @@ export async function getPassphraseState(
 // 统一的 SDK 方法调用抽象
 export async function callHardwareAPI(
   method: HardwareApiMethod,
-  params: Record<string, unknown>
+  params: Record<string, unknown>,
+  callMode?: HardwareApiCallMode
 ): Promise<ApiResponse> {
   logRequest(`Calling hardware API method: ${method}`, {
     parameterKeys: Object.keys(params).sort(),
@@ -243,42 +373,8 @@ export async function callHardwareAPI(
     let executionParams = { ...params };
     const { connectId, deviceId } = executionParams;
 
-    // FOR EXAMPLE APP: 如果参数中没有 passphraseState (或者为空)，则尝试从设备获取
-    // app-monorepo 的逻辑更复杂，这里简化以满足 example 的需求
-    if (connectId && METHODS_REQUIRING_PASSPHRASE_CHECK.includes(method)) {
-      // 只有当 params.passphraseState 是空字符串、undefined 或 null 时才尝试获取
-      if (
-        executionParams.passphraseState === '' ||
-        executionParams.passphraseState === undefined ||
-        executionParams.passphraseState === null
-      ) {
-        logInfo(
-          `PassphraseState is empty in params for method: ${method}, attempting to fetch from device.`
-        );
-        try {
-          const passphraseResult = await getPassphraseState(connectId as string);
-          if (passphraseResult.success && typeof passphraseResult.payload === 'string') {
-            logInfo('Passphrase state obtained from device');
-            executionParams.passphraseState = passphraseResult.payload;
-            // IMPORTANT: Update the store's commonParameter so the UI reflects the fetched value
-            useHardwareStore
-              .getState()
-              .setCommonParameter('passphraseState', passphraseResult.payload);
-          } else {
-            logInfo('Device passphrase protection not enabled or failed to get state from device.');
-            // Ensure passphraseState is explicitly an empty string if not enabled/fetched
-            executionParams.passphraseState = '';
-            useHardwareStore.getState().setCommonParameter('passphraseState', '');
-          }
-        } catch (passphraseError) {
-          logError('Failed to get passphrase state from device', { passphraseError });
-          // In case of error, ensure it's an empty string to avoid unexpected behavior
-          executionParams.passphraseState = '';
-          useHardwareStore.getState().setCommonParameter('passphraseState', '');
-        }
-      } else {
-        logInfo('Using the existing passphrase state from parameters');
-      }
+    if (typeof connectId === 'string' && connectId) {
+      await preparePassphraseParams(sdk, method, executionParams, connectId);
     }
 
     executionParams = normalizeProtocolAwareParams(method, executionParams);
@@ -302,14 +398,31 @@ export async function callHardwareAPI(
     const methodFunc = sdk[method] as (...args: any[]) => Promise<ApiResponse>;
     let result: ApiResponse;
 
-    if (method === 'openWalletSession') {
-      result = await methodFunc(connectId, executionParams);
-    } else if (deviceId) {
+    const hasDeviceIdParameter = Object.prototype.hasOwnProperty.call(
+      executionParams,
+      'deviceId'
+    );
+    const hasConnectIdParameter = Object.prototype.hasOwnProperty.call(
+      executionParams,
+      'connectId'
+    );
+    const resolvedCallMode =
+      callMode ??
+      (hasDeviceIdParameter
+        ? 'connectId-deviceId-params'
+        : hasConnectIdParameter
+        ? 'connectId-params'
+        : 'params');
+
+    if (resolvedCallMode === 'connectId-deviceId-params') {
       // 三参数调用：connectId, deviceId, params
       result = await methodFunc(connectId, deviceId, executionParams);
-    } else {
+    } else if (resolvedCallMode === 'connectId-params') {
       // 二参数调用：connectId, params
       result = await methodFunc(connectId, executionParams);
+    } else {
+      // 无连接方法以 params 作为首个参数。
+      result = await methodFunc(executionParams);
     }
 
     if (result.success) {
@@ -392,12 +505,12 @@ export async function searchDevices({
       return {
         success: false,
         payload: {
-          error: errorPayload?.error || 'No devices found',
+          error: getDeviceSearchUserMessage(errorPayload),
         },
       } as Unsuccessful;
     }
   } catch (error) {
-    const errorMsg = `Device search error: ${error}`;
+    const errorMsg = getDeviceSearchUserMessage(error);
     logError(errorMsg, { currentTransport, error });
     return {
       success: false,

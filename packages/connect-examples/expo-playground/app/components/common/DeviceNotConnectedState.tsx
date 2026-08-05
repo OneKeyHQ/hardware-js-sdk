@@ -3,7 +3,11 @@ import { Button } from '../ui/Button';
 import { useTranslation } from 'react-i18next';
 import { Search, AlertTriangle, ArrowRight } from 'lucide-react';
 import { useDeviceStore } from '../../store/deviceStore';
-import { initializeDevice, searchDevices } from '../../services/hardwareService';
+import {
+  getDeviceSearchUserMessage,
+  initializeDevice,
+  searchDevices,
+} from '../../services/hardwareService';
 import { useToast } from '../../hooks/use-toast';
 
 interface DeviceNotConnectedStateProps {
@@ -68,9 +72,7 @@ export function DeviceNotConnectedState({
           });
         }
       } else {
-        const errorMessage =
-          (!searchResult.success && searchResult.payload?.error) ||
-          t('transport.searchDeviceFailed');
+        const errorMessage = getDeviceSearchUserMessage(searchResult);
         toast({
           title: t('transport.searchFailed'),
           description: errorMessage,
@@ -78,8 +80,7 @@ export function DeviceNotConnectedState({
         });
       }
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : t('transport.unknownConnectionError');
+      const errorMessage = getDeviceSearchUserMessage(error);
       toast({
         title: t('transport.connectionTip'),
         description: errorMessage,

@@ -42,7 +42,7 @@ export default function IndexPage() {
     if (sdkInitState.error) {
       toast({
         title: t('transport.sdkInitError'),
-        description: sdkInitState.error,
+        description: t('transport.connectionFailed'),
         variant: 'destructive',
       });
     }

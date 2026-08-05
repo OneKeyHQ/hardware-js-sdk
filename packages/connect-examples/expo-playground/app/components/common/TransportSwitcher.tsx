@@ -4,7 +4,12 @@ import { Link } from 'react-router-dom';
 import { useDeviceStore } from '../../store/deviceStore';
 import { useToast } from '../../hooks/use-toast';
 import { useTransportPersistence } from '../../store/persistenceStore';
-import { initializeDevice, searchDevices, switchTransport } from '../../services/hardwareService';
+import {
+  getDeviceSearchUserMessage,
+  initializeDevice,
+  searchDevices,
+  switchTransport,
+} from '../../services/hardwareService';
 import type { TransportType } from '../../utils/hardwareInstance';
 import { DeviceInfo } from '../../types/hardware';
 import { Button } from '../ui/Button';
@@ -89,7 +94,7 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
       if (!result.success) {
         return toast({
           title: t('transport.connectionFailed'),
-          description: result.payload?.error || t('transport.switchFailed'),
+          description: getDeviceSearchUserMessage(result),
           variant: 'warning',
         });
       }
@@ -108,9 +113,7 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
       } else {
         toast({
           title: t('transport.searchFailed'),
-          description:
-            (!searchResult.success && searchResult.payload?.error) ||
-            t('transport.searchDeviceFailed'),
+          description: getDeviceSearchUserMessage(searchResult),
           variant: 'warning',
         });
         setConnectedDevices([]);
@@ -155,7 +158,7 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
       const result = await switchTransport(newTransport);
 
       if (!result.success) {
-        const errorMessage = result.payload?.error || t('transport.switchFailed');
+        const errorMessage = getDeviceSearchUserMessage(result);
         toast({
           title: t('transport.connectionFailed'),
           description: errorMessage,
@@ -182,9 +185,7 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
           });
         }
       } else {
-        const errorMessage =
-          (!searchResult.success && searchResult.payload?.error) ||
-          t('transport.searchDeviceFailed');
+        const errorMessage = getDeviceSearchUserMessage(searchResult);
         toast({
           title: t('transport.searchFailed'),
           description: errorMessage,
@@ -193,8 +194,7 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
         setConnectedDevices([]);
       }
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : t('transport.unknownConnectionError');
+      const errorMessage = getDeviceSearchUserMessage(error);
       toast({
         title: t('transport.connectionTip'),
         description: errorMessage,
@@ -212,7 +212,7 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
     if (sdkInitState.error) {
       toast({
         title: t('transport.sdkInitError'),
-        description: sdkInitState.error,
+        description: t('transport.connectionFailed'),
         variant: 'destructive',
       });
     }

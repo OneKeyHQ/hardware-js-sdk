@@ -141,6 +141,34 @@ const api: UnifiedMethodConfig[] = [
     ],
   },
   {
+    method: 'aptosSignInMessage',
+    description: 'Sign an Aptos-compatible sign-in message',
+    presets: [
+      {
+        title: 'Sign-in message',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            description: 'BIP32 derivation path',
+            value: "m/44'/637'/0'/0'/0'",
+          },
+          {
+            name: 'payload',
+            type: 'textarea',
+            required: true,
+            label: 'Payload',
+            description: 'Aptos sign-in message payload',
+            value:
+              'example.onekey.so wants you to sign in with your Aptos account:\n0xeb2d1d9bbfca9d892e124e858f1dc449935a3f785f8860892e03fb9820db1839\n\nURI: https://example.onekey.so\nVersion: 1.0.0\nNonce: playground\nChain ID: aptos--1',
+          },
+        ],
+      },
+    ],
+  },
+  {
     method: 'aptosSignTransaction',
 
     presets: [

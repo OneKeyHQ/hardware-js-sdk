@@ -26,6 +26,9 @@ import {
   XCircle,
   Server,
   Info,
+  KeyRound,
+  ListChecks,
+  ShieldCheck,
 } from 'lucide-react';
 import { getDeviceLabel } from '@onekeyfe/hd-core';
 import packageJson from '../../package.json';
@@ -62,6 +65,26 @@ const navigationItems = [
     title: 'common.logs',
     url: '/logs',
     icon: FileText,
+  },
+  {
+    title: 'common.pro2Update',
+    url: '/pro2-update',
+    icon: ListChecks,
+  },
+  {
+    title: 'common.methodBatchTest',
+    url: '/method-batch-test',
+    icon: ListChecks,
+  },
+  {
+    title: 'common.multisigTest',
+    url: '/multisig-test',
+    icon: ShieldCheck,
+  },
+  {
+    title: 'common.walletSessionTest',
+    url: '/wallet-session-test',
+    icon: KeyRound,
   },
 ];
 
