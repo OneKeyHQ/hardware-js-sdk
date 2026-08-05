@@ -55,8 +55,10 @@ const DEVICE_SESSION_CALLS = new Set([
   'DeviceSessionAskPassphrase',
 ]);
 
-// Protocol V2 subcodes are domain-scoped, so cross-domain cancellation fallback
-// must use explicit firmware cancellation messages instead of a global number map.
+const PROTOCOL_V2_ACTION_CANCELLED_SUBCODE = 1;
+
+// Older Protocol V2 firmware may omit the cancellation subcode, so retain a
+// narrow message fallback for compatibility.
 const isProtocolV2ActionCancelledMessage = (message: string) =>
   /^(?:cancel(?:led|ed)(?: on device)?|confirm dismissed|user cancel(?:led|ed)(?:\s+.*)?)$/i.test(
     message
@@ -499,6 +501,15 @@ export class DeviceCommands {
         const normalizedMessage = message?.trim() ?? '';
         const isProtocolV2ActionCancelledFailure =
           this.device.isProtocolV2() && isProtocolV2ActionCancelledMessage(normalizedMessage);
+        const isProtocolV2ActionCancelledSubcode =
+          this.device.isProtocolV2() && subcode === PROTOCOL_V2_ACTION_CANCELLED_SUBCODE;
+        // DeviceErrorCode currently reuses subcode 1 for Busy. Resolve that
+        // domain-specific exception before applying the common cancellation map.
+        const isProtocolV2DeviceBusyFailure =
+          this.device.isProtocolV2() &&
+          callType.startsWith('Device') &&
+          !DEVICE_SESSION_CALLS.has(callType) &&
+          subcode === DeviceErrorCode.DeviceError_Busy;
         const isLegacyProtocolV2LockedFailure =
           this.device.isProtocolV2() && /^device (?:is )?locked$/i.test(normalizedMessage);
         if (
@@ -556,8 +567,15 @@ export class DeviceCommands {
             subcode,
             firmwareMessage: message,
           });
+        } else if (isProtocolV2DeviceBusyFailure) {
+          error = ERRORS.TypedError(HardwareErrorCode.DeviceBusy, message, {
+            failureCode: code,
+            subcode,
+            firmwareMessage: message,
+          });
         } else if (
           subcode === DeviceErrorCode.DeviceError_ActionCancelled ||
+          isProtocolV2ActionCancelledSubcode ||
           isProtocolV2ActionCancelledFailure
         ) {
           error = ERRORS.TypedError(HardwareErrorCode.ActionCancelled, message, {

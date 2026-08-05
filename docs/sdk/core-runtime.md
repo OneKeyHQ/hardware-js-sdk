@@ -121,9 +121,10 @@ Protocol V2 的自动锁屏和自动关机使用 `0x10000000` 表示“永不”
 
 每次实际状态变化都会发送 `DEVICE.STATE`。宿主应用应监听该事件并持久化完整状态，
 不需要为 label、language、auto-lock 等字段分别维护手工数据库 patch。Protocol V1 额外发送
-兼容事件 `DEVICE.FEATURES`；Protocol V2 不发送该事件。设置读取与写入事件分别使用
-`settings-read` 和 `settings-write` 来源。App 应只在设备设置页面进入或重新聚焦时显式调用
-`getDeviceState({ scope: 'settings' })`；普通 SDK 业务调用不会隐式刷新设置。
+兼容事件 `DEVICE.FEATURES`；Protocol V2 不发送该事件。Protocol V2 设置写入成功后会强制刷新
+`status` 与 `settings`，状态只以设备读回结果为准，对应事件来源为 `device-status` 和
+`settings-read`；不会再用请求参数生成 `settings-write` patch。App 在设置页进入或重新聚焦时仍可
+显式调用 `getDeviceState({ scope: 'settings' })`，用于发现设备端或其他客户端产生的外部变化。
 
 详见 [钱包 Session 与设备安全](../device/wallet-session-and-security.md) 和 [SDK 关键架构决策](../architecture/decisions.md#受保护方法的调用前解锁)。
 

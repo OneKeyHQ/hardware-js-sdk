@@ -306,12 +306,14 @@ V1 用户选择设备端输入后，设备可能返回 `ButtonRequest_Passphrase
 | `DEVICE_PROGRESS`         | SDK 计算                         | 文件写入、批量地址等方法   | `progress`、字节数、速率、耗时 | 展示通用设备任务进度                       |
 | `PREVIOUS_ADDRESS_RESULT` | SDK 生成                         | 每次地址结果返回后         | `device`、`address`、`path`    | 增量展示地址；当前 OneKey App 跳过该事件   |
 | `FIRMWARE_PROCESSING`     | SDK 固件状态机生成               | 固件升级方法               | 当前处理类型                   | 切换 firmware/ble/bootloader/resource 阶段 |
-| `FIRMWARE_PROGRESS`       | SDK 计算；部分由硬件状态消息转换 | 固件传输或安装状态         | `progress`、`progressType`     | 更新传输或安装进度条                       |
+| `FIRMWARE_PROGRESS`       | SDK 计算；部分由硬件状态消息转换 | 固件传输或安装状态         | `progress`、阶段及可选传输指标 | 更新传输或安装进度条                       |
 | `FIRMWARE_TIP`            | SDK 固件状态机生成               | 下载、重启、确认和安装阶段 | `FirmwareUpdateTipMessage`     | 展示固件升级阶段提示                       |
 
 `FIRMWARE_PROGRESS` 会进行节流，不能依赖每个底层分片都产生一次事件。Protocol V2 安装阶段收到
 `DeviceFirmwareUpdateStatus` 时也会发送安装进度，但固件只报告 target 状态，不报告 target 内部
 百分比；因此该进度是已完成 target 的粗粒度比例，不能解释为设备真实安装百分比。
+Protocol V2 文件传输阶段还会附带 `transferredBytes`、`totalBytes`、`rateBytesPerSecond` 和
+`elapsedMs`；这些字段在安装阶段及旧协议流程中可能缺省。
 
 ## 固件事件的两条通道
 
@@ -348,12 +350,15 @@ HardwareSDK.on(FIRMWARE_EVENT, message => {
 
 `SUPPORT_FEATURES` 不是硬件主动推送。它是 SDK 根据设备型号和 Features 计算出的业务辅助信息。
 
-`DEVICE.STATE` 是 V1/V2 的统一状态变更通知。它可能来自设备读取、设置成功后的 confirmed patch
-或解锁结果；相同 patch 不会重复发送。新接入只消费完整 `DeviceState`，无需识别底层协议。
+`DEVICE.STATE` 是 V1/V2 的统一状态变更通知。它可能来自设备读取、Protocol V1 设置成功后的
+confirmed patch 或解锁结果；相同 patch 不会重复发送。Protocol V2 设置成功后会强制读回
+`status` 与 `settings`，只发布设备返回的状态。新接入只消费完整 `DeviceState`，无需识别底层协议。
 
 设置调用中的状态刷新会先在 Core 内更新 `DeviceState` 并同步发出 `DEVICE.STATE`，随后 API Promise
-才完成。App 如果在 listener 中异步落库，必须把“设置调用完成”和“该设备的事件落库完成”串行化，
-再读取本地状态；不能在 Promise 返回后立即读取旧 `Features` 缓存，也不能用请求参数乐观覆盖设备状态。
+才完成。Protocol V2 的 API Promise 还会等待写后 `status + settings` 读回完成；读回失败时调用失败，
+即使此前的设置命令可能已经被设备接受。App 如果在 listener 中异步落库，必须把“设置调用完成”和
+“该设备的事件落库完成”串行化，再读取本地状态；不能在 Promise 返回后立即读取旧 `Features` 缓存，
+也不能用请求参数乐观覆盖设备状态。
 
 Pro2 的 `status.passphraseProtection` 只在设备已解锁、私有 Status 可验证时具有权威值。关闭
 passphrase 后设备可能主动锁定，此时后续锁定快照允许该字段为 `undefined`；App 应保留最近一次已确认值，

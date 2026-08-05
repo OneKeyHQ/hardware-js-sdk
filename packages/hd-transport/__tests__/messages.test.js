@@ -208,18 +208,16 @@ describe('messages', () => {
   test('Protocol V2 wallet recovery carries the expected wallet and seed domains on wire', () => {
     const messages = parseConfigure(v2Messages);
     const { Message } = createMessageFromName(messages, 'DeviceSessionGet');
-    const payload = Message.encode(
-      Message.create({
-        btc_test_address: 'tb1qwallet',
-        seed_domains: [
-          generatedTypes.DeviceSessionSeedDomain.SeedDomain_Standard,
-          generatedTypes.DeviceSessionSeedDomain.SeedDomain_Cardano,
-        ],
-      })
-    ).finish();
+    const payload = encode(Message, {
+      btc_test_address: 'tb1qwallet',
+      seed_domains: [
+        generatedTypes.DeviceSessionSeedDomain.SeedDomain_Standard,
+        generatedTypes.DeviceSessionSeedDomain.SeedDomain_Cardano,
+      ],
+    });
 
-    expect(Buffer.from(payload).toString('hex')).toBe('120a7462317177616c6c65741a020102');
-    expect(Message.decode(payload)).toMatchObject({
+    expect(payload.toString('hex')).toBe('120a7462317177616c6c65741a020102');
+    expect(Message.decode(payload.toBuffer())).toMatchObject({
       btc_test_address: 'tb1qwallet',
       seed_domains: [
         generatedTypes.DeviceSessionSeedDomain.SeedDomain_Standard,

@@ -4092,6 +4092,38 @@ describe('Protocol V2 firmware update targets', () => {
     expect(reconnectProtocolV2Device).toHaveBeenCalledTimes(1);
   });
 
+  test('announces bootloader success only after Protocol V2 bootloader mode is confirmed', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    (method as any).device = stubDevice({
+      features: { bootloader_mode: false, capabilities: [] },
+      isBootloader: () => false,
+      isRomloader: () => false,
+    });
+    (method as any).protocolV2Reboot = jest.fn().mockResolvedValue({
+      message: 'Device rebooted successfully',
+    });
+
+    const tipMessages: string[] = [];
+    method.postTipMessage = jest.fn((message: string) => {
+      tipMessages.push(message);
+    });
+    let successWasAnnouncedBeforeConfirmation = false;
+    (method as any).waitForProtocolV2BootloaderMode = jest.fn().mockImplementation(() => {
+      successWasAnnouncedBeforeConfirmation = tipMessages.includes('GoToBootloaderSuccess');
+      return Promise.resolve({ mode: 'bootloader' });
+    });
+
+    await (method as any).enterProtocolV2BootloaderMode();
+
+    expect(successWasAnnouncedBeforeConfirmation).toBe(false);
+    expect(tipMessages).toEqual(['AutoRebootToBootloader', 'GoToBootloaderSuccess']);
+  });
+
   test('keeps Protocol V2 bootloader active before firmware transfer', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
@@ -4117,6 +4149,7 @@ describe('Protocol V2 firmware update targets', () => {
 
     expect((method as any).protocolV2Reboot).not.toHaveBeenCalled();
     expect(method.postTipMessage).not.toHaveBeenCalledWith('AutoRebootToBootloader');
+    expect(method.postTipMessage).toHaveBeenCalledWith('GoToBootloaderSuccess');
   });
 
   test('keeps Protocol V2 romloader active before firmware transfer', async () => {
@@ -5913,8 +5946,9 @@ describe('Protocol V2 firmware update targets', () => {
 
     (method as any).device = stubDevice({
       getCommands: () => ({ typedCall }),
+      toMessageObject: () => ({ connectId: 'firmware-device' }),
     });
-    method.postProgressMessage = jest.fn();
+    method.postMessage = jest.fn();
 
     await (method as any).protocolV2CommonUpdateProcess({
       payload: new Uint8Array(4097).buffer,
@@ -5929,6 +5963,17 @@ describe('Protocol V2 firmware update targets', () => {
     expect(writePayloads.map(payload => payload.overwrite)).toEqual([true, false]);
     expect(writePayloads.every(payload => payload.append === false)).toBe(true);
     expect(writePayloads.map(payload => payload.ui_percentage)).toEqual([0, 100]);
+    expect(method.postMessage).toHaveBeenLastCalledWith({
+      event: 'UI_EVENT',
+      type: UI_REQUEST.FIRMWARE_PROGRESS,
+      payload: expect.objectContaining({
+        progress: 99,
+        progressType: 'transferData',
+        transferredBytes: 4097,
+        totalBytes: 4097,
+        elapsedMs: expect.any(Number),
+      }),
+    });
   });
 
   test('restarts the whole file from offset zero after an ambiguous chunk write failure', async () => {

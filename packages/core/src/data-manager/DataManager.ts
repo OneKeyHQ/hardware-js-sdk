@@ -26,6 +26,7 @@ import type {
   Features,
   IDeviceBLEFirmwareStatus,
   IDeviceFirmwareStatus,
+  IProtocolV2Resources,
   ITransportStatus,
   IVersionArray,
   RemoteConfigResponse,
@@ -111,6 +112,8 @@ export default class DataManager {
   };
 
   static lastCheckTimestamp = 0;
+
+  static protocolV2ResourcesConfigError: Error | undefined;
 
   static getFirmwareStatus = (
     features: Features,
@@ -400,6 +403,7 @@ export default class DataManager {
 
   static async load(settings: ConnectSettings): Promise<boolean> {
     this.settings = settings;
+    this.protocolV2ResourcesConfigError = undefined;
     if (!settings.fetchConfig) {
       return false;
     }
@@ -446,9 +450,20 @@ export default class DataManager {
 
     // 3. Apply config if available
     if (data) {
-      const pro2Resources = parseProtocolV2Resources(
-        (data.pro2 as { resources?: unknown } | undefined)?.resources
-      );
+      let pro2Resources: IProtocolV2Resources | undefined;
+      try {
+        pro2Resources = parseProtocolV2Resources(
+          (data.pro2 as { resources?: unknown } | undefined)?.resources
+        );
+      } catch (error) {
+        // Firmware resource metadata is not required for base communication. If the
+        // remote config is temporarily incomplete, disable this resource update only.
+        this.protocolV2ResourcesConfigError =
+          error instanceof Error ? error : new Error(String(error));
+        Log.warn('[DataConfig] Ignoring invalid Pro2 resources config:', error);
+      }
+      const enrichedPro2Config = this.enrichFirmwareReleaseInfo(data.pro2);
+      const { resources: _unvalidatedResources, ...pro2Config } = enrichedPro2Config;
       Log.log(`[DataConfig] Config loaded successfully via [${fetchMethod}]`);
       this.deviceMap = {
         [EDeviceType.Classic]: this.enrichFirmwareReleaseInfo(data.classic),
@@ -458,7 +473,7 @@ export default class DataManager {
         [EDeviceType.Touch]: this.enrichFirmwareReleaseInfo(data.touch),
         [EDeviceType.Pro]: this.enrichFirmwareReleaseInfo(data.pro),
         [EDeviceType.Pro2]: {
-          ...this.enrichFirmwareReleaseInfo(data.pro2),
+          ...pro2Config,
           ...(pro2Resources ? { resources: pro2Resources } : undefined),
         },
       };
@@ -503,6 +518,12 @@ export default class DataManager {
       throw ERRORS.TypedError(
         HardwareErrorCode.NetworkError,
         'Unable to refresh the latest remote config'
+      );
+    }
+    if (this.protocolV2ResourcesConfigError) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.NetworkError,
+        `Invalid Pro2 resources config: ${this.protocolV2ResourcesConfigError.message}`
       );
     }
     this.lastCheckTimestamp = getTimeStamp();

@@ -269,6 +269,30 @@ describe('Pro2 resource configuration', () => {
     expect(DataManager.getProtocolV2BootResources()).toEqual(bootResources);
   });
 
+  test('keeps base SDK initialization available when remote Pro2 resources are invalid', async () => {
+    const remoteConfig = createRemoteConfig();
+    (remoteConfig.pro2 as { resources?: unknown }).resources = { stable: [] };
+    const configFetcher = jest.fn().mockResolvedValue(remoteConfig);
+
+    await expect(DataManager.load(createSettings(configFetcher))).resolves.toBe(true);
+
+    expect(DataManager.getProtocolV2Resources()).toBeUndefined();
+    expect(DataManager.getProtocolV2BootResources()).toBeUndefined();
+  });
+
+  test('still blocks firmware mutation when the refreshed Pro2 resources are invalid', async () => {
+    const remoteConfig = createRemoteConfig();
+    (remoteConfig.pro2 as { resources?: unknown }).resources = { stable: [] };
+    const settings = createSettings(jest.fn().mockResolvedValue(remoteConfig));
+    DataManager.settings = settings;
+
+    await expect(DataManager.forceReloadData()).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.NetworkError,
+      message: expect.stringContaining('Invalid Pro2 resources config'),
+    });
+    expect(DataManager.lastCheckTimestamp).toBe(0);
+  });
+
   test('does not advance the cache timestamp when refresh fails', async () => {
     jest.spyOn(axios, 'get').mockRejectedValue(new Error('offline'));
     const settings = createSettings(jest.fn().mockResolvedValue(null));

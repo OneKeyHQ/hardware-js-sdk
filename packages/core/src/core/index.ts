@@ -652,6 +652,12 @@ const onCallDevice = async (
         requestQueue.resolveRequest(method.responseID, messageResponse);
         completeMethodRequestContext(method);
       } catch (error) {
+        // Device.run may release the request before transport callbacks finish after a timeout.
+        // Ignore the stale callback because the caller already received the connection error.
+        if (!requestQueue.getTask(method.responseID)) {
+          Log.debug(`Call API - Ignore late inner method result`, error);
+          return;
+        }
         Log.debug(`Call API - Inner Method Run Error`, error);
         messageResponse = createResponseMessage(method.responseID, false, { error });
         requestQueue.resolveRequest(method.responseID, messageResponse);
@@ -1647,12 +1653,8 @@ export const init = async (
   plugin?: LowlevelTransportSharedPlugin
 ) => {
   try {
-    try {
-      await DataManager.load(settings);
-      initTransport(Transport, plugin);
-    } catch {
-      Log.error('DataManager.load error');
-    }
+    await DataManager.load(settings);
+    initTransport(Transport, plugin);
     enableLog(DataManager.getSettings('debug'));
     if (DataManager.getSettings('env') !== 'react-native') {
       setLoggerPostMessage(postMessage);
@@ -1663,6 +1665,7 @@ export const init = async (
     return _core;
   } catch (error) {
     Log.error('core init', error);
+    throw error;
   }
 };
 

@@ -5,8 +5,11 @@ import {
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { DataManager } from '../../data-manager';
+import { LoggerNames, getLogger } from '../../utils/logger';
 
 import type { DeviceCommands } from '../../device/DeviceCommands';
+
+const Log = getLogger(LoggerNames.Method);
 
 export type ProtocolV2FileWriteData = ArrayBuffer | Uint8Array | Blob | string;
 
@@ -16,6 +19,12 @@ export type ProtocolV2FileWriteProgress = {
   totalBytes: number;
   rateBytesPerSecond?: number;
   elapsedMs: number;
+};
+
+export type ProtocolV2FileWriteChunkContext = {
+  offset: number;
+  chunkLength: number;
+  totalSize: number;
 };
 
 export type ProtocolV2FileWriteOptions = {
@@ -30,14 +39,54 @@ export type ProtocolV2FileWriteOptions = {
   append?: boolean;
   uiPercentage?: number;
   timeoutMs?: number;
+  writeWithResponse?: boolean;
   maxChunkRetries?: number;
   paceMs?: number;
   throwIfAborted?: () => void;
+  getUiPercentage?: (context: ProtocolV2FileWriteChunkContext) => number | undefined;
   onProgress?: (progress: ProtocolV2FileWriteProgress) => void;
 };
 
 const MIN_FILE_CHUNK_SIZE = 64;
 const FILE_TRANSFER_RATE_WINDOW_MS = 1000;
+const FILE_TRANSFER_LOG_INTERVAL_MS = 10_000;
+const SESSION_ERROR = 'session not found';
+
+function formatFileTransferRate(bytesPerSecond: number) {
+  return (Math.max(bytesPerSecond, 0) / 1024).toFixed(2);
+}
+
+function getAverageFileTransferRate(transferredBytes: number, elapsedMs: number) {
+  if (elapsedMs <= 0) return 0;
+  return Math.round((Math.max(transferredBytes, 0) / elapsedMs) * 1000);
+}
+
+function getFileTransferTransport() {
+  const env = DataManager.getSettings('env');
+  return env && DataManager.isBleConnect(env) ? 'BLE' : String(env ?? 'unknown');
+}
+
+function logFileTransferMetrics({
+  transport,
+  status,
+  transferredBytes,
+  totalBytes,
+  elapsedMs,
+  rateBytesPerSecond,
+}: {
+  transport: string;
+  status: 'progress' | 'completed' | 'failed';
+  transferredBytes: number;
+  totalBytes: number;
+  elapsedMs: number;
+  rateBytesPerSecond: number;
+}) {
+  Log.log(
+    `[FileWrite] metrics transport=${transport} status=${status} bytes=${transferredBytes}/${totalBytes} elapsed=${(
+      elapsedMs / 1000
+    ).toFixed(2)}s speed=${formatFileTransferRate(rateBytesPerSecond)} KiB/s`
+  );
+}
 
 export function isProtocolV2ResponseTimeout(error: unknown) {
   if (!error || typeof error !== 'object') return false;
@@ -125,88 +174,158 @@ export async function writeProtocolV2File(options: ProtocolV2FileWriteOptions) {
   let rateWindowStartedAt = startTime;
   let rateWindowStartedBytes = 0;
   let rateBytesPerSecond: number | undefined;
+  let lastConfirmedAt = startTime;
+  let logWindowStartedAt = startTime;
+  let logWindowStartedBytes = 0;
+  const transport = getFileTransferTransport();
 
-  while (written < dataLength) {
-    options.throwIfAborted?.();
-    const chunk = data.slice(written, Math.min(written + chunkSize, dataLength));
-    const offset = startOffset + written;
-    const progress =
-      options.uiPercentage ??
-      getDeviceTransferProgress(offset, offset + chunk.byteLength, totalSize);
-    const request = {
-      file: { path: options.path, offset, total_size: totalSize, data: chunk },
-      overwrite: chunks === 0 ? options.overwrite ?? false : false,
-      append: options.append ?? false,
-      ui_percentage: progress,
-    };
-    const maxChunkRetries = Math.max(Math.floor(options.maxChunkRetries ?? 0), 0);
-    let retryCount = 0;
-    let response;
-    let isWritePending = true;
-    while (isWritePending) {
-      try {
-        response = await options.commands.typedCall(
-          'FilesystemFileWrite',
-          'FilesystemFile',
-          request,
-          { timeoutMs: options.timeoutMs }
+  try {
+    while (written < dataLength) {
+      options.throwIfAborted?.();
+      const chunk = data.slice(written, Math.min(written + chunkSize, dataLength));
+      const offset = startOffset + written;
+      const progress =
+        options.uiPercentage ??
+        options.getUiPercentage?.({
+          offset,
+          chunkLength: chunk.byteLength,
+          totalSize,
+        }) ??
+        getDeviceTransferProgress(offset, offset + chunk.byteLength, totalSize);
+      const request = {
+        file: { path: options.path, offset, total_size: totalSize, data: chunk },
+        overwrite: chunks === 0 ? options.overwrite ?? false : false,
+        append: options.append ?? false,
+        ui_percentage: progress,
+      };
+      const maxChunkRetries = Math.max(Math.floor(options.maxChunkRetries ?? 0), 0);
+      let retryCount = 0;
+      let response;
+      let isWritePending = true;
+      while (isWritePending) {
+        try {
+          const callOptions =
+            options.writeWithResponse === undefined
+              ? { timeoutMs: options.timeoutMs }
+              : {
+                  ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
+                  writeWithResponse: options.writeWithResponse,
+                };
+          response = await options.commands.typedCall(
+            'FilesystemFileWrite',
+            'FilesystemFile',
+            request,
+            callOptions
+          );
+          isWritePending = false;
+        } catch (error) {
+          if (retryCount >= maxChunkRetries || !isProtocolV2ResponseTimeout(error)) throw error;
+          retryCount += 1;
+          options.throwIfAborted?.();
+        }
+      }
+      if (!response) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.RuntimeError,
+          'FilesystemFileWrite completed without a response'
         );
-        isWritePending = false;
-      } catch (error) {
-        if (retryCount >= maxChunkRetries || !isProtocolV2ResponseTimeout(error)) throw error;
-        retryCount += 1;
-        options.throwIfAborted?.();
+      }
+      const responseType = (response as { type?: string }).type;
+      if (responseType && responseType !== 'FilesystemFile') {
+        const responseError = (response as { message?: { error?: unknown } }).message?.error;
+        if (typeof responseError === 'string' && responseError.includes(SESSION_ERROR)) {
+          throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, SESSION_ERROR);
+        }
+        throw ERRORS.TypedError(
+          HardwareErrorCode.RuntimeError,
+          `FilesystemFileWrite received unexpected response ${responseType}`
+        );
+      }
+      options.throwIfAborted?.();
+      lastMessage = response.message;
+      const rawProcessedByte = response.message?.processed_byte;
+      const processedByte = Number(rawProcessedByte);
+      if (
+        rawProcessedByte !== undefined &&
+        (!Number.isFinite(processedByte) ||
+          processedByte <= offset ||
+          processedByte > offset + chunk.byteLength)
+      ) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.RuntimeError,
+          `FilesystemFileWrite invalid processed_byte ${processedByte}`
+        );
+      }
+      written =
+        rawProcessedByte === undefined ? written + chunk.byteLength : processedByte - startOffset;
+      chunks += 1;
+      const now = Date.now();
+      lastConfirmedAt = now;
+      const elapsedMs = now - startTime;
+      const transferredBytes = Math.min(written, dataLength);
+      const rateWindowElapsedMs = now - rateWindowStartedAt;
+      if (rateWindowElapsedMs >= FILE_TRANSFER_RATE_WINDOW_MS) {
+        const rateWindowBytes = Math.max(transferredBytes - rateWindowStartedBytes, 0);
+        rateBytesPerSecond = Math.round((rateWindowBytes / rateWindowElapsedMs) * 1000);
+        rateWindowStartedAt = now;
+        rateWindowStartedBytes = transferredBytes;
+      } else if (rateBytesPerSecond === undefined && elapsedMs > 0) {
+        rateBytesPerSecond = Math.round((transferredBytes / elapsedMs) * 1000);
+      }
+      options.onProgress?.({
+        progress: getConfirmedProgress(startOffset + written, totalSize, written, dataLength),
+        transferredBytes,
+        totalBytes: dataLength,
+        rateBytesPerSecond,
+        elapsedMs,
+      });
+      const logWindowElapsedMs = now - logWindowStartedAt;
+      if (logWindowElapsedMs >= FILE_TRANSFER_LOG_INTERVAL_MS && transferredBytes < dataLength) {
+        const logWindowBytes = Math.max(transferredBytes - logWindowStartedBytes, 0);
+        logFileTransferMetrics({
+          transport,
+          status: 'progress',
+          transferredBytes,
+          totalBytes: dataLength,
+          elapsedMs,
+          rateBytesPerSecond: getAverageFileTransferRate(logWindowBytes, logWindowElapsedMs),
+        });
+        logWindowStartedAt = now;
+        logWindowStartedBytes = transferredBytes;
+      }
+      if (options.paceMs && options.paceMs > 0) {
+        await new Promise(resolve => {
+          setTimeout(resolve, options.paceMs);
+        });
       }
     }
-    if (!response) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.RuntimeError,
-        'FilesystemFileWrite completed without a response'
-      );
-    }
-    options.throwIfAborted?.();
-    lastMessage = response.message;
-    const rawProcessedByte = response.message?.processed_byte;
-    const processedByte = Number(rawProcessedByte);
-    if (
-      rawProcessedByte !== undefined &&
-      (!Number.isFinite(processedByte) ||
-        processedByte <= offset ||
-        processedByte > offset + chunk.byteLength)
-    ) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.RuntimeError,
-        `FilesystemFileWrite invalid processed_byte ${processedByte}`
-      );
-    }
-    written =
-      rawProcessedByte === undefined ? written + chunk.byteLength : processedByte - startOffset;
-    chunks += 1;
+  } catch (error) {
     const now = Date.now();
-    const elapsedMs = now - startTime;
-    const transferredBytes = Math.min(written, dataLength);
-    const rateWindowElapsedMs = now - rateWindowStartedAt;
-    if (rateWindowElapsedMs >= FILE_TRANSFER_RATE_WINDOW_MS) {
-      const rateWindowBytes = Math.max(transferredBytes - rateWindowStartedBytes, 0);
-      rateBytesPerSecond = Math.round((rateWindowBytes / rateWindowElapsedMs) * 1000);
-      rateWindowStartedAt = now;
-      rateWindowStartedBytes = transferredBytes;
-    } else if (rateBytesPerSecond === undefined && elapsedMs > 0) {
-      rateBytesPerSecond = Math.round((transferredBytes / elapsedMs) * 1000);
-    }
-    options.onProgress?.({
-      progress: getConfirmedProgress(startOffset + written, totalSize, written, dataLength),
-      transferredBytes,
+    const elapsedMs = Math.max(now - startTime, 0);
+    const logWindowElapsedMs = Math.max(now - logWindowStartedAt, 0);
+    const logWindowBytes = Math.max(written - logWindowStartedBytes, 0);
+    logFileTransferMetrics({
+      transport,
+      status: 'failed',
+      transferredBytes: written,
       totalBytes: dataLength,
-      rateBytesPerSecond,
       elapsedMs,
+      rateBytesPerSecond: getAverageFileTransferRate(logWindowBytes, logWindowElapsedMs),
     });
-    if (options.paceMs && options.paceMs > 0) {
-      await new Promise(resolve => {
-        setTimeout(resolve, options.paceMs);
-      });
-    }
+    throw error;
   }
+
+  const elapsedMs = Math.max(lastConfirmedAt - startTime, 0);
+  const logWindowElapsedMs = Math.max(lastConfirmedAt - logWindowStartedAt, 0);
+  const logWindowBytes = Math.max(written - logWindowStartedBytes, 0);
+  logFileTransferMetrics({
+    transport,
+    status: 'completed',
+    transferredBytes: written,
+    totalBytes: dataLength,
+    elapsedMs,
+    rateBytesPerSecond: getAverageFileTransferRate(logWindowBytes, logWindowElapsedMs),
+  });
 
   return {
     ...lastMessage,

@@ -91,8 +91,90 @@ describe('AllNetworkGetAddressBase tracing', () => {
       0
     );
 
-    expect(checkPassphraseStateSafety).toHaveBeenCalledWith('hidden-state', false, undefined);
+    expect(checkPassphraseStateSafety).toHaveBeenCalledWith(
+      'hidden-state',
+      false,
+      undefined,
+      false
+    );
     expect(calls).toEqual(['resume-hidden-session', 'run-chain-method']);
+    expect(typedCall).not.toHaveBeenCalled();
+  });
+
+  test('resumes a Protocol V2 Cardano hidden wallet with the Cardano seed domain', async () => {
+    const calls: string[] = [];
+    const checkPassphraseStateSafety = jest.fn().mockImplementation(() => {
+      calls.push('resume-cardano-session');
+      return Promise.resolve(true);
+    });
+    const innerMethod = {
+      checkSafetyLevelOnTestNet: jest.fn().mockResolvedValue(false),
+      connectId: 'connect-id',
+      deviceId: 'device-id',
+      getVersionRange: jest.fn().mockReturnValue({}),
+      assertProtocolSupported: jest.fn(),
+      init: jest.fn(),
+      name: 'cardanoGetAddress',
+      responseID: 45,
+      unlockPolicy: 'unlock-before-run',
+      run: jest.fn().mockImplementation(() => {
+        calls.push('run-cardano-method');
+        return Promise.resolve([{ address: 'addr1hidden' }]);
+      }),
+      setDevice: jest.fn(),
+      strictCheckDeviceSupport: false,
+    };
+    (findMethod as jest.Mock).mockReturnValue(innerMethod);
+    const method = new TestAllNetworkMethod({
+      id: 5,
+      payload: {
+        method: 'allNetworkGetAddress',
+        connectId: 'connect-id',
+        deviceId: 'device-id',
+        passphraseState: 'hidden-state',
+        bundle: [],
+      },
+    });
+    method.protocolV2UnlockContext = { preflightCompleted: true };
+    const typedCall = jest.fn();
+    method.device = {
+      checkPassphraseStateSafety,
+      commands: {
+        typedCall,
+      },
+      getCurrentFirmwareType: jest.fn(),
+      getProtocol: jest.fn().mockReturnValue('V2'),
+      getCurrentFirmwareVersionString: jest.fn().mockReturnValue('1.0.0'),
+      getCurrentMethodVersionRange: jest
+        .fn()
+        .mockImplementation((getRange: (type: string) => unknown) => getRange('pro2')),
+      instanceId: 'device-instance',
+      isProtocolV2: jest.fn().mockReturnValue(true),
+      isBootloader: jest.fn().mockReturnValue(false),
+      isRomloader: jest.fn().mockReturnValue(false),
+      off: jest.fn(),
+      on: jest.fn(),
+      state: { status: { unlocked: true } },
+      updateProtocolV2Status: jest.fn(),
+    } as any;
+
+    await method.callMethod(
+      'cardanoGetAddress',
+      {
+        bundle: [
+          {
+            _originRequestParams: {
+              network: 'ada',
+              path: "m/1852'/1815'/0'/0/0",
+            },
+          },
+        ],
+      },
+      0
+    );
+
+    expect(checkPassphraseStateSafety).toHaveBeenCalledWith('hidden-state', false, undefined, true);
+    expect(calls).toEqual(['resume-cardano-session', 'run-cardano-method']);
     expect(typedCall).not.toHaveBeenCalled();
   });
 
@@ -168,7 +250,7 @@ describe('AllNetworkGetAddressBase tracing', () => {
       0
     );
 
-    expect(checkPassphraseStateSafety).toHaveBeenCalledWith(undefined, true, undefined);
+    expect(checkPassphraseStateSafety).toHaveBeenCalledWith(undefined, true, undefined, false);
     expect(calls).toEqual(['resume-standard-session', 'run-chain-method']);
     expect(typedCall).not.toHaveBeenCalled();
   });

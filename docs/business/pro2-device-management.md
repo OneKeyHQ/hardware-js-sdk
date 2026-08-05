@@ -16,6 +16,10 @@
 
 `deviceSettingsSet` 支持部分更新，但 SDK 会移除 `passphrase_enable` 与 `airgap_mode`。仅包含 `label`、`language`、`brightness`、`haptic_feedback` 时不解锁直接修改；只要包含其他字段，SDK 就会在锁定时先解锁再执行。修改成功提示及 `autolock_delay_ms`、`autoshutdown_delay_ms` 的页面跳转由设备固件实现。
 
+任何 Protocol V2 设置写入成功后，SDK 都会强制刷新 `DeviceStatus` 与 `DeviceSettings`，并只用设备
+读回结果更新统一 `DeviceState`。写入请求参数不作为状态来源；如果写入成功后的读回失败，公共调用会
+返回失败，调用方不得自动重放可能已经生效的设置命令。
+
 `passphrase_enable` 与 `airgap_mode` 必须通过 `deviceSettingsPageShow` 打开设备页面，由用户在设备端确认。
 
 设置页当前支持：

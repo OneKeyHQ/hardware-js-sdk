@@ -15,6 +15,7 @@ import { BaseMethod } from '../BaseMethod';
 import { DEVICE } from '../../events';
 
 import type {
+  FirmwareProgress,
   IFirmwareUpdateProgressType,
   IFirmwareUpdateTipMessage,
 } from '../../events/ui-request';
@@ -27,6 +28,11 @@ import type { TypedResponseMessage } from '../../device/DeviceCommands';
 const Log = getLogger(LoggerNames.Method);
 const SESSION_ERROR = 'session not found';
 const FIRMWARE_UPDATE_CONFIRM = 'Firmware install confirmed';
+
+type FirmwareTransferMetrics = Pick<
+  FirmwareProgress['payload'],
+  'transferredBytes' | 'totalBytes' | 'rateBytesPerSecond' | 'elapsedMs'
+>;
 
 const isDeviceDisconnectedError = (error: unknown) => {
   const message = error instanceof Error ? error.message : String(error ?? '');
@@ -82,12 +88,17 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
    * @description Post the progress message
    * @param progress Post the percentage of the progress
    */
-  postProgressMessage = (progress: number, progressType: IFirmwareUpdateProgressType) => {
+  postProgressMessage = (
+    progress: number,
+    progressType: IFirmwareUpdateProgressType,
+    metrics?: FirmwareTransferMetrics
+  ) => {
     this.postMessage(
       createUiMessage(UI_REQUEST.FIRMWARE_PROGRESS, {
         device: this.device.toMessageObject() as KnownDevice,
         progress,
         progressType,
+        ...metrics,
       })
     );
   };

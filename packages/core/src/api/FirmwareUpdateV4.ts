@@ -8,6 +8,7 @@ import { sha256 } from '@noble/hashes/sha256';
 
 import { FirmwareUpdateTipMessage, UI_REQUEST } from '../events/ui-request';
 import { validateProtocolV2FilesystemPath } from './helpers/filesystemValidation';
+import { writeProtocolV2File } from './helpers/protocolV2FileWrite';
 import { validateParams } from './helpers/paramsValidator';
 import {
   LoggerNames,
@@ -53,7 +54,6 @@ import type {
 
 const Log = getLogger(LoggerNames.Method);
 
-const SESSION_ERROR = 'session not found';
 const PROTOCOL_V2_BOOTLOADER_RECONNECT_TIMEOUT = 90 * 1000;
 const PROTOCOL_V2_FINAL_RECONNECT_TIMEOUT = 3 * 60 * 1000;
 const PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT = 5 * 1000;
@@ -974,15 +974,16 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     }
     if (this.isProtocolV2BootloaderMode()) {
       Log.debug('Protocol V2 device is already in bootloader mode, skip reboot');
+      this.postTipMessage(FirmwareUpdateTipMessage.GoToBootloaderSuccess);
       return false;
     }
 
     try {
       this.postTipMessage(FirmwareUpdateTipMessage.AutoRebootToBootloader);
       await this.protocolV2Reboot(DeviceRebootType.Bootloader);
-      this.postTipMessage(FirmwareUpdateTipMessage.GoToBootloaderSuccess);
       await wait(1000);
       await this.waitForProtocolV2BootloaderMode();
+      this.postTipMessage(FirmwareUpdateTipMessage.GoToBootloaderSuccess);
       return true;
     } catch (error) {
       if (error instanceof HardwareError) {
@@ -1631,7 +1632,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     onTransferredBytes,
   }: ProtocolV2FileTransferParams) {
     const chunkSize = this.getProtocolV2FirmwareChunkSize();
-    let offset = 0;
     const getUploadProgress = (fileOffset: number) => {
       if (totalSize !== undefined && processedSize !== undefined) {
         return Math.min(Math.ceil(((processedSize + fileOffset) / totalSize) * 100), 99);
@@ -1639,37 +1639,43 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       return Math.min(Math.ceil((fileOffset / payload.byteLength) * 100), 99);
     };
 
-    while (offset < payload.byteLength) {
-      const chunkEnd = Math.min(offset + chunkSize, payload.byteLength);
-      const chunkLength = chunkEnd - offset;
-      const chunk = payload.slice(offset, chunkEnd);
-      const overwrite = offset === 0;
-      const progress = getProtocolV2DeviceTransferProgress(
-        (processedSize ?? 0) + offset,
-        (processedSize ?? 0) + chunkEnd,
-        totalSize ?? payload.byteLength
-      );
-
-      const writeRes = await this.fileWriteChunk(
-        filePath,
-        payload.byteLength,
-        offset,
-        chunk,
-        overwrite,
-        progress
-      );
-      const rawProcessedByte = writeRes.message.processed_byte;
-      const processedByte = Number(rawProcessedByte);
-      const nextOffset = rawProcessedByte === undefined ? offset + chunkLength : processedByte;
-      if (!Number.isFinite(nextOffset) || nextOffset <= offset || nextOffset > chunkEnd) {
-        throw ERRORS.TypedError(
-          HardwareErrorCode.EmmcFileWriteFirmwareError,
-          `invalid processed_byte ${writeRes.message.processed_byte} for offset ${offset}`
-        );
+    try {
+      await writeProtocolV2File({
+        commands: this.device.getCommands(),
+        path: filePath,
+        data: payload,
+        totalSize: payload.byteLength,
+        chunkSize,
+        overwrite: true,
+        append: false,
+        writeWithResponse: true,
+        maxChunkRetries: 0,
+        getUiPercentage: ({ offset, chunkLength }) =>
+          getProtocolV2DeviceTransferProgress(
+            (processedSize ?? 0) + offset,
+            (processedSize ?? 0) + offset + chunkLength,
+            totalSize ?? payload.byteLength
+          ),
+        onProgress: progress => {
+          const transferredBytes = (processedSize ?? 0) + progress.transferredBytes;
+          onTransferredBytes?.(transferredBytes);
+          this.postProgressMessage(getUploadProgress(progress.transferredBytes), 'transferData', {
+            transferredBytes,
+            totalBytes: totalSize ?? payload.byteLength,
+            rateBytesPerSecond: progress.rateBytesPerSecond,
+            elapsedMs: progress.elapsedMs,
+          });
+        },
+      });
+    } catch (error) {
+      if (
+        error instanceof HardwareError &&
+        error.errorCode === HardwareErrorCode.RuntimeError &&
+        error.message.includes('FilesystemFileWrite')
+      ) {
+        throw ERRORS.TypedError(HardwareErrorCode.EmmcFileWriteFirmwareError, error.message);
       }
-      offset = nextOffset;
-      onTransferredBytes?.((processedSize ?? 0) + offset);
-      this.postProgressMessage(getUploadProgress(offset), 'transferData');
+      throw error;
     }
 
     return totalSize !== undefined ? (processedSize ?? 0) + payload.byteLength : 0;
@@ -1687,42 +1693,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       return 'WebUSB';
     }
     return env ?? 'unknown';
-  }
-
-  private async fileWriteChunk(
-    filePath: string,
-    totalFileSize: number,
-    offset: number,
-    chunk: ArrayBuffer | Buffer,
-    overwrite: boolean,
-    progress: number | null
-  ): Promise<TypedResponseMessage<'FilesystemFile'>> {
-    const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
-    const writeRes = await typedCall(
-      'FilesystemFileWrite',
-      'FilesystemFile',
-      {
-        file: {
-          path: filePath,
-          offset,
-          total_size: totalFileSize,
-          data: chunk,
-        },
-        overwrite,
-        append: false,
-        ui_percentage: progress ?? undefined,
-      },
-      { writeWithResponse: true }
-    );
-    if (writeRes.type !== 'FilesystemFile') {
-      if ((writeRes as any).type === 'CallMethodError') {
-        if (((writeRes as any).message.error ?? '').indexOf(SESSION_ERROR) > -1) {
-          throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, SESSION_ERROR);
-        }
-      }
-      throw ERRORS.TypedError(HardwareErrorCode.EmmcFileWriteFirmwareError, 'transfer data error');
-    }
-    return writeRes;
   }
 
   private async recoverProtocolV2FileTransfer() {

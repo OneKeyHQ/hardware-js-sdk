@@ -23,6 +23,10 @@ import pRetry from 'p-retry';
 
 import { safeLog } from './types/noble-extended';
 import { runBleCallbackOperation, softRefreshSubscription } from './ble-ops';
+import {
+  NOBLE_BLE_CONNECTION_TIMEOUT_MS,
+  NOBLE_BLE_TARGETED_SCAN_TIMEOUT_MS,
+} from './noble-ble-timeouts';
 
 import type { IpcMainInvokeEvent, WebContents } from 'electron';
 import type { Characteristic, Peripheral, Service } from '@stoprocent/noble';
@@ -77,9 +81,7 @@ const ONEKEY_NOTIFY_UUID_ALIASES = createKnownBleUuidAliases(ONEKEY_NOTIFY_CHARA
 // Timeout and interval constants
 const BLUETOOTH_INIT_TIMEOUT = 10000; // 10 seconds for Bluetooth initialization
 const DEVICE_SCAN_TIMEOUT = 5000; // 5 seconds for device scanning
-const FAST_SCAN_TIMEOUT = 1500; // 1.5 seconds for targeted scanning
 const DEVICE_CHECK_INTERVAL = 500; // 500ms interval for periodic device checks
-const CONNECTION_TIMEOUT = 3000; // 3 seconds for device connection
 const SERVICE_DISCOVERY_TIMEOUT = 10000; // 10 seconds for service discovery
 const BLE_CLEANUP_TIMEOUT = 250;
 
@@ -650,6 +652,13 @@ function ensureDiscoverListener(): void {
   }
 }
 
+async function waitForNobleScanStop(nobleInstance: NobleModule): Promise<void> {
+  await runBleCallbackOperation(callback => nobleInstance.stopScanning(() => callback()), {
+    timeoutMs: BLE_CLEANUP_TIMEOUT,
+    timeoutBehavior: 'resolve',
+  });
+}
+
 // Perform targeted scan for a specific device ID
 // Uses self-contained local listener pattern - no global state needed
 async function performTargetedScan(targetDeviceId: string): Promise<Peripheral | null> {
@@ -663,6 +672,26 @@ async function performTargetedScan(targetDeviceId: string): Promise<Peripheral |
   logger?.info('[NobleBLE] Starting targeted scan for device:', targetDeviceId);
 
   return new Promise((resolve, reject) => {
+    let settled = false;
+
+    const finish = async (peripheral: Peripheral | null, error?: Error) => {
+      if (settled) return;
+      settled = true;
+      if (timeoutId) clearTimeout(timeoutId);
+      nobleInstance.removeListener('discover', onDiscover);
+      await waitForNobleScanStop(nobleInstance);
+
+      if (error) {
+        logger?.error('[NobleBLE] Failed to start targeted scan:', error);
+        reject(ERRORS.TypedError(HardwareErrorCode.BleScanError, error.message));
+        return;
+      }
+      if (peripheral) {
+        discoveredDevices.set(peripheral.id, peripheral);
+      }
+      resolve(peripheral);
+    };
+
     // Local discover listener - only matches target device
     const onDiscover = (peripheral: Peripheral) => {
       if (peripheral.id === targetDeviceId && isOneKeyPeripheral(peripheral)) {
@@ -670,21 +699,14 @@ async function performTargetedScan(targetDeviceId: string): Promise<Peripheral |
           id: peripheral.id,
           name: peripheral.advertisement?.localName,
         });
-        clearTimeout(timeoutId);
-        nobleInstance.removeListener('discover', onDiscover);
-        nobleInstance.stopScanning();
-        discoveredDevices.set(peripheral.id, peripheral);
-        resolve(peripheral);
+        finish(peripheral).catch(reject);
       }
     };
 
-    // Timeout handler - must be after onDiscover so it can reference it
     const timeoutId = setTimeout(() => {
-      nobleInstance.removeListener('discover', onDiscover);
-      nobleInstance.stopScanning();
       logger?.info('[NobleBLE] Targeted scan timeout for device:', targetDeviceId);
-      resolve(null);
-    }, FAST_SCAN_TIMEOUT);
+      finish(null).catch(reject);
+    }, NOBLE_BLE_TARGETED_SCAN_TIMEOUT_MS);
 
     // Add local listener for this scan
     nobleInstance.on('discover', onDiscover);
@@ -692,10 +714,7 @@ async function performTargetedScan(targetDeviceId: string): Promise<Peripheral |
     // Start scanning — no service UUID filter (Pro2 may use different service UUID)
     nobleInstance.startScanning([], false, (error?: Error) => {
       if (error) {
-        clearTimeout(timeoutId);
-        nobleInstance.removeListener('discover', onDiscover);
-        logger?.error('[NobleBLE] Failed to start targeted scan:', error);
-        reject(ERRORS.TypedError(HardwareErrorCode.BleScanError, error.message));
+        finish(null, error).catch(reject);
         return;
       }
       logger?.info('[NobleBLE] Targeted scan started for device:', targetDeviceId);
@@ -729,11 +748,13 @@ async function enumerateDevices(): Promise<DeviceInfo[]> {
     const devices: DeviceInfo[] = [];
     let intervalId: ReturnType<typeof setInterval> | undefined;
 
-    // Cleanup function: clears both timeout and interval
-    const cleanup = () => {
+    // Cleanup function: clears timers and waits until Noble confirms scanning
+    // has stopped. Resolving enumerate before this callback creates a race with
+    // an immediately-following connection attempt.
+    const cleanup = async () => {
       clearTimeout(timeoutId);
       if (intervalId) clearInterval(intervalId);
-      nobleInstance.stopScanning();
+      await waitForNobleScanStop(nobleInstance);
     };
 
     // Collect discovered devices into the devices array
@@ -753,10 +774,10 @@ async function enumerateDevices(): Promise<DeviceInfo[]> {
     };
 
     // Set timeout for scanning — use longer timeout to catch slow-advertising devices like Pro2
-    const timeoutId = setTimeout(() => {
+    const timeoutId = setTimeout(async () => {
       // Final collection before resolving — catches devices discovered near the deadline
       checkDevices();
-      cleanup();
+      await cleanup();
       logger?.info('[NobleBLE] Scan completed, found devices:', devices.length);
       resolve(devices);
     }, DEVICE_SCAN_TIMEOUT);
@@ -764,9 +785,9 @@ async function enumerateDevices(): Promise<DeviceInfo[]> {
     // Start scanning without a service UUID filter so Pro2 advertisements with
     // short vendor UUIDs can be found, but only OneKey candidates are logged/returned.
     logger?.info('[NobleBLE] Scanning for OneKey BLE devices');
-    nobleInstance.startScanning([], false, (error?: Error) => {
+    nobleInstance.startScanning([], false, async (error?: Error) => {
       if (error) {
-        cleanup();
+        await cleanup();
         logger?.error('[NobleBLE] Failed to start scanning:', error);
         reject(ERRORS.TypedError(HardwareErrorCode.BleScanError, error.message));
         return;
@@ -784,10 +805,7 @@ async function enumerateDevices(): Promise<DeviceInfo[]> {
 async function stopScanning(): Promise<void> {
   if (!noble) return;
   const nobleInstance = noble;
-  await runBleCallbackOperation(callback => nobleInstance.stopScanning(() => callback()), {
-    timeoutMs: BLE_CLEANUP_TIMEOUT,
-    timeoutBehavior: 'resolve',
-  });
+  await waitForNobleScanStop(nobleInstance);
   logger?.info('[NobleBLE] Scanning stopped');
 }
 
@@ -1005,7 +1023,7 @@ async function forceReconnectPeripheral(peripheral: Peripheral, deviceId: string
 
   // Step 3: Re-establish connection
   await runBleCallbackOperation(callback => peripheral.connect(callback), {
-    timeoutMs: CONNECTION_TIMEOUT,
+    timeoutMs: NOBLE_BLE_CONNECTION_TIMEOUT_MS,
     timeoutBehavior: 'reject',
   });
   logger?.info('[NobleBLE] Force reconnect successful');
@@ -1277,14 +1295,29 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
   }
 
   return new Promise((resolve, reject) => {
+    let connectionTimedOut = false;
     const timeout = setTimeout(() => {
+      connectionTimedOut = true;
       reject(ERRORS.TypedError(HardwareErrorCode.BleConnectedError, 'Connection timeout'));
-    }, CONNECTION_TIMEOUT);
+    }, NOBLE_BLE_CONNECTION_TIMEOUT_MS);
 
     // TypeScript type assertion - peripheral is guaranteed to be defined at this point
     const connectedPeripheral = peripheral as Peripheral;
     connectedPeripheral.connect(async (error: Error | undefined) => {
       clearTimeout(timeout);
+
+      // Noble may invoke the callback after the SDK timed out and released the request.
+      // Ignore it to avoid initializing disposed commands or leaving an orphaned connection.
+      if (connectionTimedOut) {
+        if (!error) {
+          try {
+            connectedPeripheral.disconnect(() => undefined);
+          } catch {
+            // Best-effort cleanup only.
+          }
+        }
+        return;
+      }
 
       if (error) {
         logger?.error('[NobleBLE] Connection failed:', error);
@@ -1459,7 +1492,7 @@ async function subscribeNotifications(
       timeoutBehavior: 'resolve',
     });
     await runBleCallbackOperation(callback => notifyCharacteristic.subscribe(callback), {
-      timeoutMs: CONNECTION_TIMEOUT,
+      timeoutMs: NOBLE_BLE_CONNECTION_TIMEOUT_MS,
       timeoutBehavior: 'reject',
     });
 

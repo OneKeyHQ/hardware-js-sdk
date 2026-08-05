@@ -7,7 +7,6 @@ import { validateParams } from '../helpers/paramsValidator';
 import {
   mapApplySettingsToState,
   mapCommonSettingsToProtocolV2,
-  mapDeviceSettingsToState,
 } from '../../device/DeviceStateMapper';
 import { getProtocolV2SettingsBehavior } from '../../protocols/protocol-v2/settingsUnlockPolicy';
 import {
@@ -163,6 +162,8 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
   async run() {
     try {
       if (this.device.isProtocolV2()) {
+        const refreshStatusAndSettings = () =>
+          this.device.getDeviceState({ refreshSections: ['status', 'settings'] });
         assertSettingsSupported(this.payload, DEVICE_SETTINGS_V1_ONLY_FIELDS, 'Protocol V2');
         const capabilities = getDeviceSettingsCapabilities(
           this.device.getCurrentDeviceType(),
@@ -194,7 +195,7 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
           const res = await this.device.commands.typedCall('DeviceSettingsPageShow', 'Success', {
             page: DeviceSettingsPage.DevicePassphrase,
           });
-          const updated = await this.device.getDeviceState({ refreshSections: ['status'] });
+          const updated = await refreshStatusAndSettings();
           const lockedAfterDisabling =
             requestedPassphrase === false &&
             current.status.unlocked === true &&
@@ -219,7 +220,7 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
           const res = await this.device.commands.typedCall('DeviceSettingsPageShow', 'Success', {
             page: DeviceSettingsPage.DeviceAirgap,
           });
-          const updated = await this.device.getDeviceState({ refreshSections: ['settings'] });
+          const updated = await refreshStatusAndSettings();
           if (updated.settings.airgapMode !== requestedAirgap) {
             throw TypedError(
               HardwareErrorCode.RuntimeError,
@@ -235,7 +236,7 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
         const res = await this.device.commands.typedCall('DeviceSettingsSet', 'Success', {
           settings,
         });
-        this.device.updateState(mapDeviceSettingsToState(settings), 'settings-write');
+        await refreshStatusAndSettings();
         return res.message;
       }
 

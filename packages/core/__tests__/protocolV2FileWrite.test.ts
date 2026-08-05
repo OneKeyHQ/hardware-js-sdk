@@ -1,6 +1,8 @@
 import { HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { writeProtocolV2File } from '../src/api/helpers/protocolV2FileWrite';
+import { DataManager } from '../src/data-manager';
+import { LoggerNames, getLogger } from '../src/utils/logger';
 
 jest.mock('../src/data/config', () => ({
   getSDKVersion: jest.fn(() => '1.0.0'),
@@ -65,6 +67,24 @@ describe('writeProtocolV2File', () => {
     ).rejects.toMatchObject({ errorCode: HardwareErrorCode.RuntimeError });
   });
 
+  test('拒绝非 FilesystemFile 响应', async () => {
+    const typedCall = jest.fn().mockResolvedValue({
+      type: 'CallMethodError',
+      message: { error: 'unexpected response' },
+    });
+
+    await expect(
+      writeProtocolV2File({
+        commands: { typedCall } as any,
+        path: 'vol1:/wallpapers/test.bin',
+        data: new Uint8Array([1]),
+      })
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.RuntimeError,
+      message: 'FilesystemFileWrite received unexpected response CallMethodError',
+    });
+  });
+
   test('BLE 响应超时时原偏移重试且不重复上报进度', async () => {
     const timeoutError = Object.assign(new Error('Lowlevel response timeout'), {
       errorCode: HardwareErrorCode.BleTimeoutError,
@@ -88,6 +108,31 @@ describe('writeProtocolV2File', () => {
     expect(typedCall).toHaveBeenCalledTimes(2);
     expect(typedCall.mock.calls[1][2]).toEqual(typedCall.mock.calls[0][2]);
     expect(onProgress).toHaveBeenCalledTimes(1);
+  });
+
+  test('支持固件上传的响应写入选项和全局设备进度', async () => {
+    const typedCall = jest.fn().mockResolvedValue({ message: { processed_byte: 3 } });
+    const getUiPercentage = jest.fn().mockReturnValue(42);
+
+    await writeProtocolV2File({
+      commands: { typedCall } as any,
+      path: 'vol0:/firmware.bin',
+      data: new Uint8Array([1, 2, 3]),
+      writeWithResponse: true,
+      getUiPercentage,
+    });
+
+    expect(getUiPercentage).toHaveBeenCalledWith({
+      offset: 0,
+      chunkLength: 3,
+      totalSize: 3,
+    });
+    expect(typedCall).toHaveBeenCalledWith(
+      'FilesystemFileWrite',
+      'FilesystemFile',
+      expect.objectContaining({ ui_percentage: 42 }),
+      { writeWithResponse: true }
+    );
   });
 
   test('按确认分片的时间窗口记录实时传输速率', async () => {
@@ -127,5 +172,73 @@ describe('writeProtocolV2File', () => {
         elapsedMs: 2000,
       })
     );
+  });
+
+  test('通过 Core Log 每十秒输出一次 BLE 传输关键指标', async () => {
+    const log = getLogger(LoggerNames.Method);
+    const logSpy = jest.spyOn(log, 'log').mockImplementation(() => undefined);
+    const getSettingsSpy = jest
+      .spyOn(DataManager, 'getSettings')
+      .mockReturnValue('react-native' as any);
+    const isBleConnectSpy = jest.spyOn(DataManager, 'isBleConnect').mockReturnValue(true);
+    const data = new Uint8Array(5400);
+    const typedCall = jest.fn().mockResolvedValue({ message: {} });
+    const dateNowSpy = jest
+      .spyOn(Date, 'now')
+      .mockReturnValueOnce(1_000)
+      .mockReturnValueOnce(5_000)
+      .mockReturnValueOnce(11_000)
+      .mockReturnValueOnce(15_000);
+
+    try {
+      await writeProtocolV2File({
+        commands: { typedCall } as any,
+        path: 'vol1:/wallpapers/test.bin',
+        data,
+      });
+
+      expect(logSpy).toHaveBeenCalledTimes(2);
+      expect(logSpy).toHaveBeenNthCalledWith(
+        1,
+        '[FileWrite] metrics transport=BLE status=progress bytes=3600/5400 elapsed=10.00s speed=0.35 KiB/s'
+      );
+      expect(logSpy).toHaveBeenNthCalledWith(
+        2,
+        '[FileWrite] metrics transport=BLE status=completed bytes=5400/5400 elapsed=14.00s speed=0.44 KiB/s'
+      );
+    } finally {
+      dateNowSpy.mockRestore();
+      getSettingsSpy.mockRestore();
+      isBleConnectSpy.mockRestore();
+      logSpy.mockRestore();
+    }
+  });
+
+  test('写入失败时通过 Core Log 输出已传输字节和平均速率', async () => {
+    const log = getLogger(LoggerNames.Method);
+    const logSpy = jest.spyOn(log, 'log').mockImplementation(() => undefined);
+    const typedCall = jest.fn().mockRejectedValue(new Error('write failed'));
+    const dateNowSpy = jest
+      .spyOn(Date, 'now')
+      .mockReturnValueOnce(1_000)
+      .mockReturnValueOnce(2_000);
+
+    try {
+      await expect(
+        writeProtocolV2File({
+          commands: { typedCall } as any,
+          path: 'vol1:/wallpapers/test.bin',
+          data: new Uint8Array(4000),
+        })
+      ).rejects.toThrow('write failed');
+
+      expect(logSpy).toHaveBeenNthCalledWith(
+        1,
+        '[FileWrite] metrics transport=unknown status=failed bytes=0/4000 elapsed=1.00s speed=0.00 KiB/s'
+      );
+    } finally {
+      dateNowSpy.mockRestore();
+      logSpy.mockRestore();
+    }
   });
 });

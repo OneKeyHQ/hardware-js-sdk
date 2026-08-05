@@ -121,6 +121,12 @@ export default class TransportManager {
   }
 
   static setTransport(TransportConstructor: any, plugin?: LowlevelTransportSharedPlugin) {
+    if (typeof TransportConstructor !== 'function') {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.TransportNotConfigured,
+        'Transport constructor is not available'
+      );
+    }
     const env = DataManager.getSettings('env');
     if (env === 'react-native') {
       /** Actually initializes the ReactNativeTransport */

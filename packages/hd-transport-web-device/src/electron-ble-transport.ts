@@ -313,12 +313,16 @@ export default class ElectronBleTransport {
 
       const cleanup = this.createNotificationSubscription(uuid);
       this.notificationCleanups.set(uuid, cleanup);
+      const connectionToken = this.notificationTokens.get(uuid);
 
       const protocolType = await this.detectProtocol(uuid, expectedProtocol, protocolHint);
 
       const disconnectCleanup = window.desktopApi.nobleBle.onDeviceDisconnected(
         (disconnectedDevice: any) => {
-          if (disconnectedDevice.id === uuid) {
+          if (
+            disconnectedDevice.id === uuid &&
+            this.notificationTokens.get(uuid) === connectionToken
+          ) {
             this.cleanupDeviceState(uuid);
             this.emitter?.emit(TRANSPORT_EVENT.DEVICE_DISCONNECT, {
               name: disconnectedDevice.name,

@@ -363,9 +363,14 @@ describe('DeviceCommands failure mapping', () => {
     }
   );
 
-  it.each(['Cancelled', 'User cancelled typed data signing'])(
-    'maps the Protocol V2 MP engine cancellation response "%s" to ActionCancelled',
-    async message => {
+  it.each([
+    ['SignTx', 'Rejected by the user'],
+    ['EthereumSignTypedDataOneKey', ''],
+    ['SolanaSignTx', 'Localized cancellation message'],
+    ['GetAddress', 'Address confirmation rejected'],
+  ] as const)(
+    'maps Protocol V2 cancellation subcode 1 for %s regardless of message',
+    async (callType, message) => {
       const commands = createCommands();
 
       await expect(
@@ -378,7 +383,7 @@ describe('DeviceCommands failure mapping', () => {
               message,
             },
           } as any,
-          'SignTx'
+          callType
         )
       ).rejects.toMatchObject({
         errorCode: HardwareErrorCode.ActionCancelled,
@@ -401,6 +406,7 @@ describe('DeviceCommands failure mapping', () => {
           type: 'Failure',
           message: {
             code: 'Failure_ProcessError',
+            subcode: 1,
             message: 'Cancelled on device',
           },
         } as any,
@@ -411,7 +417,7 @@ describe('DeviceCommands failure mapping', () => {
     });
   });
 
-  it('keeps an unrecognized Protocol V2 process subcode generic', async () => {
+  it('maps the DeviceError subcode 1 exception to DeviceBusy', async () => {
     const commands = createCommands();
 
     await expect(
@@ -427,7 +433,12 @@ describe('DeviceCommands failure mapping', () => {
         'DeviceSettingsPageShow'
       )
     ).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.RuntimeError,
+      errorCode: HardwareErrorCode.DeviceBusy,
+      params: {
+        failureCode: 'Failure_ProcessError',
+        subcode: 1,
+        firmwareMessage: 'Another process error',
+      },
     });
   });
 
