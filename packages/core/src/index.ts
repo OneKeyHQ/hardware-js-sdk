@@ -10,6 +10,11 @@ export type { LowLevelCoreApi, LowLevelInjectApi } from './lowLevelInject';
 export type { TopLevelInjectApi } from './topLevelInject';
 
 export { default as Core, init as initCore, switchTransport } from './core';
+export type { CoreOptions } from './core';
+export { factoryApiMethodExtension, testApiMethodExtension } from './api/methodExtension';
+export type { CoreMethodConstructor, CoreMethodExtension } from './api/methodExtension';
+export { FACTORY_API_METHOD_NAMES, TEST_API_METHOD_NAMES } from './api/extensionMethodNames';
+export { createFactoryApi, createTestApi } from './inject';
 
 export * from './constants';
 export * from './utils';

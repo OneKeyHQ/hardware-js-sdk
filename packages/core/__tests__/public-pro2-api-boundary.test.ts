@@ -1,8 +1,10 @@
 import * as publicMethods from '../src/api';
+import { FACTORY_API_METHOD_NAMES } from '../src/api/extensionMethodNames';
+import { factoryApiMethodExtension } from '../src/api/methodExtension';
 import { findMethod } from '../src/api/utils';
-import { createCoreApi } from '../src/inject';
+import { createCoreApi, createFactoryApi } from '../src/inject';
 
-import type { CoreApi } from '../src/types/api';
+import type { CoreApi, TestApi } from '../src/types/api';
 
 jest.mock('../src/data/config', () => ({
   DEFAULT_DOMAIN: 'https://example.com/',
@@ -49,14 +51,16 @@ describe('public Pro2 API boundary', () => {
 
     expect(api.deviceGetOnboardingStatus).toBeInstanceOf(Function);
     expect(api.deviceUploadNft).toBeInstanceOf(Function);
-    expect(api.deviceProvisionFactoryInfo).toBeInstanceOf(Function);
     expect(api.deviceReadFactoryInfo).toBeInstanceOf(Function);
-    expect(api.deviceWriteFactoryCertificate).toBeInstanceOf(Function);
     expect(api.deviceReadFactoryCertificate).toBeInstanceOf(Function);
     expect(api.deviceSignFactoryChallenge).toBeInstanceOf(Function);
     expect(api.uploadPortfolio).toBeInstanceOf(Function);
     expect(api.testProtocolV2Ping).toBeInstanceOf(Function);
     expect(publicMethods.testProtocolV2Ping).toBeInstanceOf(Function);
+    expect(api).not.toHaveProperty('deviceProvisionFactoryInfo');
+    expect(api).not.toHaveProperty('deviceWriteFactoryCertificate');
+    expect(publicMethods).not.toHaveProperty('deviceProvisionFactoryInfo');
+    expect(publicMethods).not.toHaveProperty('deviceWriteFactoryCertificate');
 
     expect(api).not.toHaveProperty('deviceSessionOpen');
     expect(publicMethods).not.toHaveProperty('deviceSessionOpen');
@@ -72,7 +76,10 @@ describe('public Pro2 API boundary', () => {
 
   test('routes semantic Pro2 factory APIs without publishing raw message names', async () => {
     const call = jest.fn().mockResolvedValue({ success: true, payload: {} });
-    const api = createCoreApi(call as CoreApi['call']) as CoreApi;
+    const api = {
+      ...createCoreApi(call as CoreApi['call']),
+      ...createFactoryApi(call as CoreApi['call']),
+    } as TestApi;
     const manufactureTime = {
       year: 2026,
       month: 8,
@@ -133,6 +140,25 @@ describe('public Pro2 API boundary', () => {
       digest: '22'.repeat(32),
       connectProtocol: 'V2',
     });
+  });
+
+  test('requires explicit destructive authorization for Pro2 factory writes', () => {
+    expect(Object.keys(factoryApiMethodExtension.methods)).toEqual(FACTORY_API_METHOD_NAMES);
+    const message = {
+      id: 1,
+      payload: { method: 'deviceProvisionFactoryInfo' },
+    } as any;
+
+    expect(() => findMethod(message)).toThrow('Method deviceProvisionFactoryInfo is not set');
+    expect(() => findMethod(message, { extensions: [factoryApiMethodExtension] })).toThrow(
+      'requires allowDestructiveOperations'
+    );
+    expect(
+      findMethod(message, {
+        extensions: [factoryApiMethodExtension],
+        allowDestructiveOperations: true,
+      }).name
+    ).toBe('deviceProvisionFactoryInfo');
   });
 
   test('routes the diagnostic Protocol V2 Ping without publishing the raw ping command', async () => {

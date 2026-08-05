@@ -1,16 +1,17 @@
 import { CORE_EVENT, DEVICE, DEVICE_EVENT, initCore } from '@onekeyfe/hd-core';
 import { WebUsbTransport } from '@onekeyfe/hd-transport-web-device';
 
-import HardwareCommonConnectSdk from '../src';
+import HardwareCommonConnectSdk, { createHardwareCommonConnectSdk } from '../src';
 
 jest.mock('@onekeyfe/hd-core', () => {
   const actual = jest.requireActual('@onekeyfe/hd-core');
   return {
     __esModule: true,
     ...actual,
-    default: ({ eventEmitter, init, dispose }) => ({
+    default: ({ eventEmitter, init, dispose, call }) => ({
       init,
       dispose,
+      call,
       on: (type, listener) => eventEmitter.on(type, listener),
       off: (type, listener) => eventEmitter.off(type, listener),
       removeAllListeners: type => eventEmitter.removeAllListeners(type),
@@ -99,5 +100,34 @@ describe('hd-common-connect-sdk device state events', () => {
     expect(listener).toHaveBeenCalledWith(payload);
     HardwareCommonConnectSdk.removeAllListeners(DEVICE.STATE);
     await HardwareCommonConnectSdk.dispose();
+  });
+
+  test('keeps method extensions scoped to the created SDK instance', async () => {
+    const methodExtension = {
+      name: 'test-extension',
+      methods: {},
+    };
+    const extendedSdk = createHardwareCommonConnectSdk({
+      extension: {
+        methodExtensions: [methodExtension],
+        createApi: () => ({ extensionMarker: () => 'enabled' }),
+      },
+    });
+
+    expect(extendedSdk.extensionMarker()).toBe('enabled');
+    expect(HardwareCommonConnectSdk).not.toHaveProperty('extensionMarker');
+
+    initCore.mockResolvedValue({ on: jest.fn(), dispose: jest.fn() });
+    await extendedSdk.init({ env: 'webusb' });
+    expect(initCore).toHaveBeenLastCalledWith(
+      expect.objectContaining({ env: 'webusb' }),
+      WebUsbTransport,
+      undefined,
+      {
+        methodExtensions: [methodExtension],
+        allowDestructiveOperations: false,
+      }
+    );
+    await extendedSdk.dispose();
   });
 });

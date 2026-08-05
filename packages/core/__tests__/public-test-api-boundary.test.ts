@@ -1,6 +1,10 @@
-import * as methods from '../src/api';
+import * as publicMethods from '../src/api';
+import * as methods from '../src/api/testMethods';
 import DeviceWipe from '../src/api/device/DeviceWipe';
-import { createCoreApi } from '../src/inject';
+import { TEST_API_METHOD_NAMES } from '../src/api/extensionMethodNames';
+import { testApiMethodExtension } from '../src/api/methodExtension';
+import { findMethod } from '../src/api/utils';
+import { createCoreApi, createTestApi } from '../src/inject';
 
 import type { BaseMethod } from '../src/api/BaseMethod';
 import type { CoreApi } from '../src/types/api';
@@ -95,12 +99,20 @@ const testApiNames = [
 ] as const;
 
 describe('public test API boundary', () => {
-  test('exports and injects every test-only API', () => {
-    const api = createCoreApi(jest.fn() as CoreApi['call']) as Record<string, unknown>;
+  test('keeps every test API behind the explicit extension', () => {
+    expect(testApiNames).toEqual(TEST_API_METHOD_NAMES);
+    expect(Object.keys(testApiMethodExtension.methods).sort()).toEqual(
+      [...TEST_API_METHOD_NAMES].sort()
+    );
+    const call = jest.fn() as CoreApi['call'];
+    const publicApi = createCoreApi(call) as Record<string, unknown>;
+    const api = createTestApi(call) as Record<string, unknown>;
 
     testApiNames.forEach(name => {
       expect(typeof methods[name]).toBe('function');
       expect(typeof api[name]).toBe('function');
+      expect(publicMethods).not.toHaveProperty(name);
+      expect(publicApi).not.toHaveProperty(name);
     });
   });
 
@@ -124,7 +136,7 @@ describe('public test API boundary', () => {
 
   test('routes representative calls through the current public call boundary', async () => {
     const call = jest.fn().mockResolvedValue({ success: true });
-    const api = createCoreApi(call as CoreApi['call']);
+    const api = createTestApi(call as CoreApi['call']);
 
     await api.devicePing('usb:1', { message: 'ping' });
     await api.evmGetAddressTrezor('usb:1', 'device:1', {
@@ -144,5 +156,12 @@ describe('public test API boundary', () => {
       path: "m/44'/60'/0'/0/0",
       showOnOneKey: false,
     });
+  });
+
+  test('resolves test methods only for the configured Core instance', () => {
+    const message = { id: 1, payload: { method: 'devicePing' } } as any;
+
+    expect(() => findMethod(message)).toThrow('Method devicePing is not set');
+    expect(findMethod(message, { extensions: [testApiMethodExtension] }).name).toBe('devicePing');
   });
 });
