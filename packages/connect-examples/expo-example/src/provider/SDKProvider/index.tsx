@@ -6,11 +6,11 @@ import { getHardwareSDKInstance } from '../../utils/hardwareInstance';
 import HardwareSDKContext from '../HardwareSDKContext';
 
 import type { LowLevelCoreApi } from '@onekeyfe/hd-core/dist/lowLevelInject';
-import type { CoreApi } from '@onekeyfe/hd-core';
+import type { TestApi } from '@onekeyfe/hd-core';
 
 let isSdkInit = false;
 export default function USB({ children }: { children: React.ReactNode }) {
-  const [sdk, createSDK] = useState<CoreApi>();
+  const [sdk, createSDK] = useState<TestApi>();
   const [lowLevelSDK, createLowLevelSDK] = useState<LowLevelCoreApi>();
   const [useLowLevelApi, setUseLowLevelApi] = useState<boolean>(false);
   const sdkInit = () => {

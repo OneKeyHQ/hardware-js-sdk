@@ -3,15 +3,15 @@ import { Platform } from 'react-native';
 
 import { importSdk } from './importSdk';
 
-import type { ConnectSettings, CoreApi, LowLevelCoreApi } from '@onekeyfe/hd-core';
+import type { ConnectSettings, LowLevelCoreApi, TestApi } from '@onekeyfe/hd-core';
 
 // eslint-disable-next-line import/no-mutable-exports
-let HardwareSDK: CoreApi | undefined;
+let HardwareSDK: TestApi | undefined;
 let initialized = false;
 
 export const getHardwareSDKInstance = memoizee(
   async (): Promise<{
-    HardwareSDK: CoreApi;
+    HardwareSDK: TestApi;
     HardwareLowLevelSDK: LowLevelCoreApi | undefined;
     useLowLevelApi: false;
   }> => {
