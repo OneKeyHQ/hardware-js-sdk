@@ -160,30 +160,24 @@ describe('DeviceUploadNft', () => {
     });
   });
 
-  test('retries one timed-out NftUpdate with the same basename', async () => {
+  test('does not retry a timed-out NftUpdate', async () => {
     const timeout = Object.assign(new Error('Protocol V2 response timeout'), {
       code: 'response-timeout',
     });
-    let updateCalls = 0;
     const typedCall = jest.fn((request: string, _response: string, params: any) => {
       if (request === 'FilesystemDirList') {
         return { message: { path: 'vol1:/nft', child_files: '' } };
       }
       if (request === 'FilesystemFileWrite') return fileWriteSuccess(params);
-      if (request === 'NftUpdate') {
-        updateCalls += 1;
-        if (updateCalls === 1) throw timeout;
-        return { message: { message: 'NFT updated' } };
-      }
+      if (request === 'NftUpdate') throw timeout;
       throw new Error(`Unexpected request: ${request}`);
     });
     const method = createMethod({ typedCall });
 
-    await expect(method.run()).resolves.toMatchObject({ nftUpdated: true });
+    await expect(method.run()).rejects.toBe(timeout);
 
     const updateRequests = typedCall.mock.calls.filter(call => call[0] === 'NftUpdate');
-    expect(updateRequests).toHaveLength(2);
-    expect(updateRequests[1]).toEqual(updateRequests[0]);
+    expect(updateRequests).toHaveLength(1);
   });
 
   test('does not retry a non-timeout NftUpdate failure', async () => {
@@ -199,24 +193,6 @@ describe('DeviceUploadNft', () => {
 
     await expect(method.run()).rejects.toThrow('Invalid NFT metadata');
     expect(typedCall.mock.calls.filter(call => call[0] === 'NftUpdate')).toHaveLength(1);
-  });
-
-  test('propagates a second NftUpdate timeout after one retry', async () => {
-    const timeout = Object.assign(new Error('Protocol V2 response timeout'), {
-      code: 'response-timeout',
-    });
-    const typedCall = jest.fn((request: string, _response: string, params: any) => {
-      if (request === 'FilesystemDirList') {
-        return { message: { path: 'vol1:/nft', child_files: '' } };
-      }
-      if (request === 'FilesystemFileWrite') return fileWriteSuccess(params);
-      if (request === 'NftUpdate') throw timeout;
-      throw new Error(`Unexpected request: ${request}`);
-    });
-    const method = createMethod({ typedCall });
-
-    await expect(method.run()).rejects.toBe(timeout);
-    expect(typedCall.mock.calls.filter(call => call[0] === 'NftUpdate')).toHaveLength(2);
   });
 
   test('does not publish when a file write fails', async () => {

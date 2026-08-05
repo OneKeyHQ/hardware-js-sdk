@@ -17,7 +17,7 @@ import {
 } from '../../utils/pro2Nft';
 import { BaseMethod } from '../BaseMethod';
 import { invalidParameter } from '../helpers/filesystemValidation';
-import { isProtocolV2ResponseTimeout, writeProtocolV2File } from '../helpers/protocolV2FileWrite';
+import { writeProtocolV2File } from '../helpers/protocolV2FileWrite';
 
 export type DeviceUploadNftParams = {
   image: Pro2NftImage;
@@ -115,17 +115,12 @@ export default class DeviceUploadNft extends BaseMethod<DeviceUploadNftParams> {
   }
 
   private async updateNft(basename: string) {
-    const params = { file_name_no_ext: basename };
-    const options = { timeoutMs: this.params.timeoutMs };
-    try {
-      return await this.device.commands.typedCall('NftUpdate', 'Success', params, options);
-    } catch (error) {
-      if (!isProtocolV2ResponseTimeout(error)) {
-        throw error;
-      }
-      this.throwIfAborted();
-      return this.device.commands.typedCall('NftUpdate', 'Success', params, options);
-    }
+    return this.device.commands.typedCall(
+      'NftUpdate',
+      'Success',
+      { file_name_no_ext: basename },
+      { timeoutMs: this.params.timeoutMs }
+    );
   }
 
   async run(): Promise<DeviceUploadNftResponse> {

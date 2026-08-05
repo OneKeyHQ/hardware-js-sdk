@@ -103,7 +103,7 @@ export class DevicePool extends EventEmitter {
       const device = this.devicesCache[connectId];
       if (device) {
         const exist = descriptorList.find(d => d.path === device.originalDescriptor.path);
-        if (exist) {
+        if (exist && !initOptions?.forceProtocolDetection) {
           // Log.debug('find existed Device: ', connectId);
           device.updateDescriptor(exist, true);
           await this._refreshRuntimeState(device, initOptions);
@@ -151,14 +151,23 @@ export class DevicePool extends EventEmitter {
     }
   }
 
-  static async _createDevice(descriptor: DeviceDescriptor, initOptions?: InitOptions) {
-    let device = this.getDeviceByPath(descriptor.path);
-    if (!device) {
-      device = Device.fromDescriptor(descriptor);
+  static async _createDevice(
+    descriptor: DeviceDescriptor,
+    initOptions?: InitOptions
+  ): Promise<Device> {
+    const cachedDevice = this.getDeviceByPath(descriptor.path);
+    const forceProtocolDetection = initOptions?.forceProtocolDetection === true;
+    const isNewDevice = !cachedDevice;
+    const device = cachedDevice ?? Device.fromDescriptor(descriptor);
+    if (isNewDevice || forceProtocolDetection) {
       device.deviceConnector = this.connector;
-      await device.connect(initOptions?.connectProtocol, {
-        forceProtocolDetection: initOptions?.forceProtocolDetection,
-      });
+      if (forceProtocolDetection && !isNewDevice) {
+        await device.acquire(initOptions?.connectProtocol, { forceProtocolDetection: true });
+      } else {
+        await device.connect(initOptions?.connectProtocol, {
+          forceProtocolDetection: initOptions?.forceProtocolDetection,
+        });
+      }
       try {
         await device.initialize(initOptions);
         if (initOptions?.refreshRuntimeState && device.isProtocolV2()) {
