@@ -1,8 +1,10 @@
+import { FACTORY_API_METHOD_NAMES, TEST_API_METHOD_NAMES } from './api/extensionMethodNames';
+
 import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
 import type { Unsuccessful } from './types';
 import type { EventEmitter } from 'events';
 import type { CallMethod } from './events';
-import type { CoreApi } from './types/api';
+import type { CoreApi, FactoryApi, TestApi, TestApiMethods } from './types/api';
 import type { AllNetworkAddress } from './types/api/allNetworkGetAddress';
 
 type CallbackFunction = (data?: any, error?: Unsuccessful) => void;
@@ -131,10 +133,7 @@ export const inject = ({
   return api;
 };
 
-export const createCoreApi = (
-  call: CoreApi['call']
-): Omit<
-  CoreApi,
+type ApiControlMethodName =
   | 'on'
   | 'off'
   | 'emit'
@@ -146,8 +145,11 @@ export const createCoreApi = (
   | 'uiResponse'
   | 'cancel'
   | 'updateSettings'
-  | 'switchTransport'
-> => ({
+  | 'switchTransport';
+
+type InjectedApi<TApi> = Omit<TApi, ApiControlMethodName>;
+
+const createAllCoreApi = (call: CoreApi['call']): InjectedApi<TestApi> => ({
   getLogs: () => call({ method: 'getLogs' }),
   clearSessionCache: params => call({ ...params, method: 'clearSessionCache' }),
   /**
@@ -655,3 +657,31 @@ export const createCoreApi = (
   neoSignTransaction: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'neoSignTransaction' }),
 });
+
+const pickApiMethods = <TApi extends object>(
+  api: InjectedApi<TestApi>,
+  methodNames: readonly string[]
+): TApi => {
+  const selected: Record<string, unknown> = {};
+  methodNames.forEach(methodName => {
+    selected[methodName] = api[methodName as keyof typeof api];
+  });
+  return selected as TApi;
+};
+
+export const createCoreApi = (call: CoreApi['call']): InjectedApi<CoreApi> => {
+  const api = createAllCoreApi(call);
+  const extensionMethodNames = new Set<string>([
+    ...TEST_API_METHOD_NAMES,
+    ...FACTORY_API_METHOD_NAMES,
+  ]);
+  return Object.fromEntries(
+    Object.entries(api).filter(([methodName]) => !extensionMethodNames.has(methodName))
+  ) as InjectedApi<CoreApi>;
+};
+
+export const createTestApi = (call: CoreApi['call']): TestApiMethods =>
+  pickApiMethods<TestApiMethods>(createAllCoreApi(call), TEST_API_METHOD_NAMES);
+
+export const createFactoryApi = (call: CoreApi['call']): FactoryApi =>
+  pickApiMethods<FactoryApi>(createAllCoreApi(call), FACTORY_API_METHOD_NAMES);

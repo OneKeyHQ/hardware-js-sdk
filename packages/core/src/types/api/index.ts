@@ -4,8 +4,8 @@ import type {
   deviceReadFactoryCertificate,
   deviceReadFactoryInfo,
   deviceReboot,
-  deviceUploadNft,
   deviceSignFactoryChallenge,
+  deviceUploadNft,
   deviceUploadWallpaper,
   deviceWriteFactoryCertificate,
   testProtocolV2Ping,
@@ -251,7 +251,7 @@ export type {
   TestProtocolV2PingParams,
 } from './protocolV2';
 
-export type CoreApi = {
+type CoreApiWithExtensions = {
   /**
    * Inject function
    */
@@ -653,3 +653,93 @@ export type CoreApi = {
   bixinMessageSE: typeof bixinMessageSE;
   bixinVerifyDeviceRequest: typeof bixinVerifyDeviceRequest;
 };
+
+export type TestApiMethodName =
+  | 'btcGetOwnershipId'
+  | 'btcGetOwnershipProof'
+  | 'btcAuthorizeCoinJoin'
+  | 'cryptoBatchGetPublickeys'
+  | 'cryptoCipherKeyValue'
+  | 'cryptoCosiCommit'
+  | 'cryptoCosiSign'
+  | 'cryptoGetECDHSessionKey'
+  | 'cryptoSignIdentity'
+  | 'evmGetAddressTrezor'
+  | 'evmGetPublicKeyTrezor'
+  | 'evmSignMessageTrezor'
+  | 'evmSignTransactionTrezor'
+  | 'evmSignTypedDataTrezor'
+  | 'evmVerifyMessageTrezor'
+  | 'nemDecryptMessage'
+  | 'deviceSpiFlashWrite'
+  | 'deviceSpiFlashRead'
+  | 'deviceInfoSettings'
+  | 'deviceGetInfo'
+  | 'deviceReadSEPublicCert'
+  | 'deviceWriteSEPrivateKey'
+  | 'deviceWriteSEPublicCert'
+  | 'deviceSESignMessage'
+  | 'devicePing'
+  | 'deviceGetEntropy'
+  | 'deviceGetFirmwareHash'
+  | 'deviceUnlockPath'
+  | 'deviceSdProtect'
+  | 'deviceChangeWipeCode'
+  | 'deviceEndSession'
+  | 'deviceLoad'
+  | 'deviceDoPreauthorized'
+  | 'deviceCancelAuthorization'
+  | 'emmcDirList'
+  | 'emmcDirMake'
+  | 'emmcDirRemove'
+  | 'emmcFileDelete'
+  | 'emmcFileRead'
+  | 'emmcFileWrite'
+  | 'emmcFixPermission'
+  | 'emmcPathInfo'
+  | 'debugLinkDecision'
+  | 'debugLinkEraseSdCard'
+  | 'debugLinkFlashErase'
+  | 'debugLinkGetState'
+  | 'debugLinkMemoryRead'
+  | 'debugLinkMemoryWrite'
+  | 'debugLinkRecordScreen'
+  | 'debugLinkReseedRandom'
+  | 'debugLinkStop'
+  | 'debugLinkWatchLayout'
+  | 'firmwareErase'
+  | 'firmwareEraseEx'
+  | 'firmwareUpdateEmmcTest'
+  | 'firmwareUploadTest'
+  | 'reboot'
+  | 'selfTest'
+  | 'tezosGetAddress'
+  | 'tezosGetPublicKey'
+  | 'tezosSignTx'
+  | 'moneroGetAddress'
+  | 'moneroGetWatchKey'
+  | 'eosGetPublicKey'
+  | 'eosSignTx'
+  | 'binanceGetAddress'
+  | 'binanceGetPublicKey'
+  | 'binanceSignTx'
+  | 'webAuthnAddResidentCredential'
+  | 'webAuthnListResidentCredentials'
+  | 'webAuthnRemoveResidentCredential'
+  | 'getPublicKeyMultiple'
+  | 'listResDir'
+  | 'nftWriteData'
+  | 'nftWriteInfo'
+  | 'readSEPublicKey'
+  | 'resourceUpdate'
+  | 'bixinBackupDevice'
+  | 'bixinLoadDevice'
+  | 'bixinMessageSE'
+  | 'bixinVerifyDeviceRequest';
+
+export type FactoryApiMethodName = 'deviceProvisionFactoryInfo' | 'deviceWriteFactoryCertificate';
+
+export type TestApiMethods = Pick<CoreApiWithExtensions, TestApiMethodName>;
+export type FactoryApi = Pick<CoreApiWithExtensions, FactoryApiMethodName>;
+export type CoreApi = Omit<CoreApiWithExtensions, TestApiMethodName | FactoryApiMethodName>;
+export type TestApi = CoreApi & TestApiMethods & FactoryApi;
