@@ -15,7 +15,7 @@ const createRgba = (width: number, height: number) => {
 
 const createMethod = ({
   typedCall,
-  supportedMessages = [60805, 60808, 61500],
+  supportedMessages = [60802, 60805, 60808, 61500],
   useFullBundle = false,
 }: {
   typedCall: jest.Mock;
@@ -104,6 +104,9 @@ describe('DeviceUploadNft', () => {
 
   test('uploads the triplet in order without creating the firmware-owned directory', async () => {
     const typedCall = jest.fn((request: string, _response: string, params: any) => {
+      if (request === 'FilesystemPathInfoQuery') {
+        return { message: { exist: true, directory: true } };
+      }
       if (request === 'FilesystemDirList') {
         return { message: { path: 'vol1:/nft', child_files: '' } };
       }
@@ -116,9 +119,16 @@ describe('DeviceUploadNft', () => {
     const result = await method.run();
 
     const requests = typedCall.mock.calls.map(call => call[0]);
-    expect(requests[0]).toBe('FilesystemDirList');
+    expect(requests[0]).toBe('FilesystemPathInfoQuery');
     expect(typedCall).toHaveBeenNthCalledWith(
       1,
+      'FilesystemPathInfoQuery',
+      'FilesystemPathInfo',
+      { path: 'vol1:/nft' },
+      { timeoutMs: 15_000 }
+    );
+    expect(typedCall).toHaveBeenNthCalledWith(
+      2,
       'FilesystemDirList',
       'FilesystemDir',
       { path: 'vol1:/nft', depth: 1 },
@@ -160,11 +170,30 @@ describe('DeviceUploadNft', () => {
     });
   });
 
+  test('treats a missing NFT directory as empty before the first upload', async () => {
+    const typedCall = jest.fn((request: string, _response: string, params: any) => {
+      if (request === 'FilesystemPathInfoQuery') {
+        return { message: { exist: false, directory: false } };
+      }
+      if (request === 'FilesystemFileWrite') return fileWriteSuccess(params);
+      if (request === 'NftUpdate') return { message: { message: 'NFT updated' } };
+      throw new Error(`Unexpected request: ${request}`);
+    });
+    const method = createMethod({ typedCall });
+
+    await expect(method.run()).resolves.toMatchObject({ nftUpdated: true });
+    expect(typedCall.mock.calls.map(call => call[0])).not.toContain('FilesystemDirList');
+    expect(typedCall.mock.calls.some(call => call[0] === 'FilesystemFileWrite')).toBe(true);
+  });
+
   test('does not retry a timed-out NftUpdate', async () => {
     const timeout = Object.assign(new Error('Protocol V2 response timeout'), {
       code: 'response-timeout',
     });
     const typedCall = jest.fn((request: string, _response: string, params: any) => {
+      if (request === 'FilesystemPathInfoQuery') {
+        return { message: { exist: true, directory: true } };
+      }
       if (request === 'FilesystemDirList') {
         return { message: { path: 'vol1:/nft', child_files: '' } };
       }
@@ -182,6 +211,9 @@ describe('DeviceUploadNft', () => {
 
   test('does not retry a non-timeout NftUpdate failure', async () => {
     const typedCall = jest.fn((request: string, _response: string, params: any) => {
+      if (request === 'FilesystemPathInfoQuery') {
+        return { message: { exist: true, directory: true } };
+      }
       if (request === 'FilesystemDirList') {
         return { message: { path: 'vol1:/nft', child_files: '' } };
       }
@@ -197,6 +229,9 @@ describe('DeviceUploadNft', () => {
 
   test('does not publish when a file write fails', async () => {
     const typedCall = jest.fn((request: string) => {
+      if (request === 'FilesystemPathInfoQuery') {
+        return { message: { exist: true, directory: true } };
+      }
       if (request === 'FilesystemDirList') {
         return { message: { path: 'vol1:/nft', child_files: '' } };
       }
@@ -219,6 +254,9 @@ describe('DeviceUploadNft', () => {
 
   test('rejects a new NFT before writing when ten complete NFT bundles exist', async () => {
     const typedCall = jest.fn((request: string) => {
+      if (request === 'FilesystemPathInfoQuery') {
+        return { message: { exist: true, directory: true } };
+      }
       if (request === 'FilesystemDirList') {
         return { message: { path: 'vol1:/nft', child_files: nftFileList(10) } };
       }
@@ -230,11 +268,17 @@ describe('DeviceUploadNft', () => {
       errorCode: HardwareErrorCode.NftStorageLimitReached,
       params: { count: 10, limit: 10 },
     });
-    expect(typedCall.mock.calls.map(call => call[0])).toEqual(['FilesystemDirList']);
+    expect(typedCall.mock.calls.map(call => call[0])).toEqual([
+      'FilesystemPathInfoQuery',
+      'FilesystemDirList',
+    ]);
   });
 
   test('allows an idempotent retry for a basename already counted at the limit', async () => {
     const typedCall = jest.fn((request: string, _response: string, params: any) => {
+      if (request === 'FilesystemPathInfoQuery') {
+        return { message: { exist: true, directory: true } };
+      }
       if (request === 'FilesystemDirList') {
         return { message: { path: 'vol1:/nft', child_files: nftFileList(10, 0) } };
       }
@@ -250,6 +294,9 @@ describe('DeviceUploadNft', () => {
 
   test('does not count unrelated or incomplete files as stored NFTs', async () => {
     const typedCall = jest.fn((request: string, _response: string, params: any) => {
+      if (request === 'FilesystemPathInfoQuery') {
+        return { message: { exist: true, directory: true } };
+      }
       if (request === 'FilesystemDirList') {
         return {
           message: {

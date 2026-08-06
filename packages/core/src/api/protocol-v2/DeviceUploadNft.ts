@@ -40,6 +40,7 @@ export type DeviceUploadNftResponse = {
   message?: string;
 };
 
+const FILESYSTEM_PATH_INFO_QUERY_MESSAGE_TYPE = 60802;
 const FILESYSTEM_FILE_WRITE_MESSAGE_TYPE = 60805;
 const FILESYSTEM_DIR_LIST_MESSAGE_TYPE = 60808;
 const NFT_UPDATE_MESSAGE_TYPE = 61500;
@@ -91,14 +92,26 @@ export default class DeviceUploadNft extends BaseMethod<DeviceUploadNftParams> {
       protocolInfo,
       FILESYSTEM_FILE_WRITE_MESSAGE_TYPE
     );
+    const hasPathInfo = supportsProtocolV2Message(
+      protocolInfo,
+      FILESYSTEM_PATH_INFO_QUERY_MESSAGE_TYPE
+    );
     const hasDirList = supportsProtocolV2Message(protocolInfo, FILESYSTEM_DIR_LIST_MESSAGE_TYPE);
     const hasNftUpdate = supportsProtocolV2Message(protocolInfo, NFT_UPDATE_MESSAGE_TYPE);
-    if (!hasFileWrite || !hasDirList || !hasNftUpdate) {
+    if (!hasFileWrite || !hasPathInfo || !hasDirList || !hasNftUpdate) {
       throw createDeviceNotSupportMethodError(this.name, this.device.getCurrentFirmwareType());
     }
   }
 
   private async assertStorageCapacity(basename: string) {
+    const { message: pathInfo } = await this.device.commands.typedCall(
+      'FilesystemPathInfoQuery',
+      'FilesystemPathInfo',
+      { path: PRO2_NFT_DIRECTORY },
+      { timeoutMs: this.params.timeoutMs }
+    );
+    if (!pathInfo.exist) return;
+
     const { message } = await this.device.commands.typedCall(
       'FilesystemDirList',
       'FilesystemDir',
