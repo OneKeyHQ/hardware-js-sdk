@@ -92,10 +92,15 @@ const SERVICE_DISCOVERY_TIMEOUT = 10000; // 10 seconds for service discovery
 const BLE_CLEANUP_TIMEOUT = 250;
 // Keep-alive idle window. release() from the renderer is logical only, so this
 // timer is what physically frees the device for other hosts (a BLE peripheral
-// serves one central at a time and does not advertise while connected). 60s
-// matches the device's own auto-lock default: past that the next operation
-// needs a PIN anyway, so holding the link longer buys nothing.
-const BLE_IDLE_DISCONNECT_MS = 60_000;
+// serves one central at a time and does not advertise while connected).
+//
+// This TERMINATES a link, so it must outlast the longest single wait any flow
+// expects to survive — firmware update waits up to PROTOCOL_V2_FINAL_RECONNECT_
+// TIMEOUT (2min) for a device to come back, and BLE releases after every call
+// regardless of keepSession. Matching that 2min exactly would race it; 3min
+// leaves headroom. The cost is that the device stays exclusive to this host for
+// that long after the last completed operation.
+const BLE_IDLE_DISCONNECT_MS = 3 * 60_000;
 // Ceiling while an operation is in flight. A slow on-device prompt (PIN,
 // passphrase, word entry) has no outstanding write, so the idle clock must not
 // run — but a wedged call must not hold the link forever either.
