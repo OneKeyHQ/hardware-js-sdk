@@ -1,8 +1,7 @@
 import { HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import ReactNativeBleTransport from '../index';
-
-import messages from '@onekeyfe/hd-transport/messages.json';
+import protocolV1Schema from './protocolV1SchemaFixture';
 
 jest.mock(
   'react-native',
@@ -44,7 +43,7 @@ const flush = () =>
 
 function createHarness() {
   const t = new ReactNativeBleTransport({});
-  t.configure(messages);
+  t.configure(protocolV1Schema);
   (t as any).deviceProtocol.set(UUID, 'V1');
   const writeWithoutResponse = jest.fn(() => Promise.resolve());
   const fakeBleTransport = {

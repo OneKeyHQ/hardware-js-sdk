@@ -206,7 +206,7 @@ export default class DeviceUpdateBootloader extends FirmwareUpdateBaseMethod<any
         }
         return true;
       } finally {
-        await source.close();
+        await source.close().catch(() => undefined);
       }
     }
 

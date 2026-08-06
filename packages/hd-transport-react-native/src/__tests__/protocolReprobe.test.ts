@@ -1,6 +1,5 @@
 import ReactNativeBleTransport, { PROTOCOL_REPROBE_FALLBACK_ATTEMPTS } from '../index';
-
-import messages from '@onekeyfe/hd-transport/messages.json';
+import protocolV1Schema from './protocolV1SchemaFixture';
 
 jest.mock(
   'react-native',
@@ -38,7 +37,7 @@ const UUID = 'reprobe-device';
 /** Drive detectProtocol with stubbed probes so we can observe which are attempted. */
 function createHarness({ v1, v2 }: { v1: boolean; v2: boolean }) {
   const transport = new ReactNativeBleTransport({});
-  transport.configure(messages);
+  transport.configure(protocolV1Schema);
   const probeV1 = jest.fn(() => {
     if (v1) {
       (transport as any).deviceProtocol.set(UUID, 'V1');

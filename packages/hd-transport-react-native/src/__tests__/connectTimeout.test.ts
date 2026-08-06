@@ -8,8 +8,7 @@ import ReactNativeBleTransport, {
   BLE_CONNECT_TIMEOUT_MANAGER_RESET_THRESHOLD,
   BLE_GATT_SETUP_TIMEOUT_MS,
 } from '../index';
-
-import messages from '@onekeyfe/hd-transport/messages.json';
+import protocolV1Schema from './protocolV1SchemaFixture';
 
 jest.mock(
   'react-native',
@@ -114,7 +113,7 @@ function createHarness(connectImpl: () => Promise<unknown>) {
     { debug: jest.fn(), error: jest.fn(), warn: jest.fn() } as any,
     new EventEmitter()
   );
-  transport.configure(messages);
+  transport.configure(protocolV1Schema);
   return { transport, device, bleManager, connect };
 }
 

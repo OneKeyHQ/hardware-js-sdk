@@ -4,8 +4,7 @@ import ReactNativeBleTransport, {
   BLE_WRITE_PACKET_TIMEOUT_MS,
   BLE_WRITE_TIMEOUT_MANAGER_RESET_THRESHOLD,
 } from '../index';
-
-import messages from '@onekeyfe/hd-transport/messages.json';
+import protocolV1Schema from './protocolV1SchemaFixture';
 
 jest.mock(
   'react-native',
@@ -67,7 +66,7 @@ async function drain(totalMs: number, stepMs = 500) {
 
 function createHarness(writeImpl: () => Promise<void>) {
   const t = new ReactNativeBleTransport({});
-  t.configure(messages);
+  t.configure(protocolV1Schema);
   (t as any).deviceProtocol.set(UUID, 'V1');
   const writeWithoutResponse = jest.fn(writeImpl);
   const fakeBleTransport = {
